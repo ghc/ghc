@@ -194,23 +194,22 @@ extract_ctxt ctxt acc = foldr extract_pred acc ctxt
 extract_pred (HsClassP cls tys) acc	= foldr extract_ty (cls : acc) tys
 extract_pred (HsIParam n ty) acc	= extract_ty ty acc
 
-extract_ty (HsAppTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (HsListTy ty)              acc = extract_ty ty acc
-extract_ty (HsPArrTy ty)              acc = extract_ty ty acc
-extract_ty (HsTupleTy _ tys)          acc = foldr extract_ty acc tys
-extract_ty (HsFunTy ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (HsPredTy p)		      acc = extract_pred p acc
-extract_ty (HsTyVar tv)               acc = tv : acc
-extract_ty (HsForAllTy Nothing cx ty) acc = extract_ctxt cx (extract_ty ty acc)
-extract_ty (HsOpTy ty1 nam ty2)       acc = extract_ty ty1 (extract_ty ty2 acc)
-extract_ty (HsParTy ty)               acc = extract_ty ty acc
--- Generics
-extract_ty (HsNumTy num)              acc = acc
-extract_ty (HsKindSig ty k)	      acc = extract_ty ty acc
-extract_ty (HsForAllTy (Just tvs) ctxt ty) 
+extract_ty (HsAppTy ty1 ty2)         acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsListTy ty)             acc = extract_ty ty acc
+extract_ty (HsPArrTy ty)             acc = extract_ty ty acc
+extract_ty (HsTupleTy _ tys)         acc = foldr extract_ty acc tys
+extract_ty (HsFunTy ty1 ty2)         acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsPredTy p)		     acc = extract_pred p acc
+extract_ty (HsTyVar tv)              acc = tv : acc
+extract_ty (HsOpTy ty1 nam ty2)      acc = extract_ty ty1 (extract_ty ty2 acc)
+extract_ty (HsParTy ty)              acc = extract_ty ty acc
+extract_ty (HsNumTy num)             acc = acc
+extract_ty (HsKindSig ty k)	     acc = extract_ty ty acc
+extract_ty (HsForAllTy exp [] cx ty) acc = extract_ctxt cx (extract_ty ty acc)
+extract_ty (HsForAllTy exp tvs cx ty) 
                                 acc = acc ++
                                       (filter (`notElem` locals) $
-				       extract_ctxt ctxt (extract_ty ty []))
+				       extract_ctxt cx (extract_ty ty []))
 				    where
 				      locals = hsTyVarNames tvs
 
@@ -378,14 +377,14 @@ hsIfaceName rdr_name	-- Qualify unqualifed occurrences
   | otherwise         = ExtPkg (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
 
 hsIfaceType :: HsType RdrName -> IfaceType	
-hsIfaceType (HsForAllTy mb_tvs cxt ty) 
-  = foldr (IfaceForAllTy . hsIfaceTv) rho tvs
+hsIfaceType (HsForAllTy exp tvs cxt ty) 
+  = foldr (IfaceForAllTy . hsIfaceTv) rho tvs'
   where
     rho = foldr (IfaceFunTy . IfacePredTy . hsIfacePred) tau cxt
     tau = hsIfaceType ty
-    tvs = case mb_tvs of
-	    Just tvs -> tvs
-	    Nothing  -> map UserTyVar (extractHsRhoRdrTyVars cxt ty)
+    tvs' = case exp of
+	     Explicit -> tvs
+	     Implicit -> map UserTyVar (extractHsRhoRdrTyVars cxt ty)
 
 hsIfaceType ty@(HsTyVar _)     = hs_tc_app ty []
 hsIfaceType ty@(HsAppTy t1 t2) = hs_tc_app ty []
@@ -634,14 +633,14 @@ tyConToDataCon tc
 checkInstType :: RdrNameHsType -> P RdrNameHsType
 checkInstType t 
   = case t of
-	HsForAllTy tvs ctxt ty ->
+	HsForAllTy exp tvs ctxt ty ->
 		checkDictTy ty [] >>= \ dict_ty ->
-	      	return (HsForAllTy tvs ctxt dict_ty)
+	      	return (HsForAllTy exp tvs ctxt dict_ty)
 
         HsParTy ty -> checkInstType ty
 
 	ty ->   checkDictTy ty [] >>= \ dict_ty->
-	      	return (HsForAllTy Nothing [] dict_ty)
+	      	return (HsForAllTy Implicit [] [] dict_ty)
 
 checkTyVars :: [RdrNameHsType] -> P [RdrNameHsTyVar]
 checkTyVars tvs 
@@ -769,7 +768,7 @@ checkPat e [] = case e of
 			      -- but they aren't explicit forall points.  Hence
 			      -- we have to remove the implicit forall here.
 			      let t' = case t of 
-					  HsForAllTy Nothing [] ty -> ty
+					  HsForAllTy Implicit _ [] ty -> ty
 					  other -> other
 			      in
 			      return (SigPatIn e t')

@@ -32,14 +32,14 @@ import TcEnv		( tcExtendTyVarEnv, tcExtendTyVarKindEnv,
 		 	  TyThing(..), TcTyThing(..), 
 			  getInLocalScope
 			)
-import TcMType		( newKindVar, tcInstType, newMutTyVar,
+import TcMType		( newKindVar, newOpenTypeKind, tcInstType, newMutTyVar, 
 			  zonkTcType, zonkTcKindToKind,
 			  checkValidType, UserTypeCtxt(..), pprHsSigCtxt
 			)
-import TcUnify		( unifyKind, unifyFunKind, unifyTypeKind )
+import TcUnify		( unifyKind, unifyFunKind )
 import TcType		( Type, PredType(..), ThetaType, TyVarDetails(..),
 			  TcTyVar, TcKind, TcThetaType, TcTauType,
-			  mkTyVarTy, mkTyVarTys, mkFunTy, 
+			  mkTyVarTy, mkTyVarTys, mkFunTy, isTypeKind,
 		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy,
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
 			  liftedTypeKind, unliftedTypeKind, eqKind,
@@ -204,15 +204,21 @@ tcHsKindedContext hs_theta = mappM dsHsPred hs_theta
 \begin{code}
 ---------------------------
 kcLiftedType :: HsType Name -> TcM (HsType Name)
-	-- The type ty must be a *lifted* *type*
+-- The type ty must be a *lifted* *type*
 kcLiftedType ty = kcCheckHsType ty liftedTypeKind
     
 ---------------------------
 kcTypeType :: HsType Name -> TcM (HsType Name)
-	-- The type ty must be a *type*, but it can be lifted or unlifted
+-- The type ty must be a *type*, but it can be lifted or unlifted
+-- Be sure to use checkExpectedKind, rather than simply unifying 
+-- with (Type bx), because it gives better error messages
 kcTypeType ty
   = kcHsType ty			`thenM` \ (ty', kind) ->
-    unifyTypeKind kind		`thenM_`
+    if isTypeKind kind then
+	return ty'
+    else
+    newOpenTypeKind				`thenM` \ type_kind ->
+    checkExpectedKind (ppr ty) kind type_kind	`thenM_`
     returnM ty'
 
 ---------------------------
@@ -292,14 +298,14 @@ kcHsType (HsPredTy pred)
   = kcHsPred pred		`thenM` \ pred' ->
     returnM (HsPredTy pred', liftedTypeKind)
 
-kcHsType (HsForAllTy (Just tv_names) context ty)
+kcHsType (HsForAllTy exp tv_names context ty)
   = kcHsTyVars tv_names		$ \ tv_names' ->
     kcHsContext context		`thenM`	\ ctxt' ->
     kcLiftedType ty		`thenM` \ ty' ->
 	-- The body of a forall must be of kind *
 	-- In principle, I suppose, we could allow unlifted types,
 	-- but it seems simpler to stick to lifted types for now.
-    returnM (HsForAllTy (Just tv_names') ctxt' ty', liftedTypeKind)
+    returnM (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind)
 
 ---------------------------
 kcApps :: TcKind		-- Function kind
@@ -483,7 +489,7 @@ dsHsType (HsPredTy pred)
   = dsHsPred pred	`thenM` \ pred' ->
     returnM (mkPredTy pred')
 
-dsHsType full_ty@(HsForAllTy (Just tv_names) ctxt ty)
+dsHsType full_ty@(HsForAllTy exp tv_names ctxt ty)
   = tcTyVarBndrs tv_names		$ \ tyvars ->
     mappM dsHsPred ctxt			`thenM` \ theta ->
     dsHsType ty				`thenM` \ tau ->

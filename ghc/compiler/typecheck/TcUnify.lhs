@@ -11,7 +11,7 @@ module TcUnify (
 
 	-- Various unifications
   unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-  unifyKind, unifyKinds, unifyTypeKind, unifyFunKind,
+  unifyKind, unifyKinds, unifyFunKind, 
 
   --------------------------------
   -- Holes
@@ -47,7 +47,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			)
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, newKindVar,
-			  newTyVarTy, newTyVarTys, newBoxityVar, 
+			  newTyVarTy, newTyVarTys, newOpenTypeKind,
 			  zonkTcType, zonkTcTyVars, zonkTcTyVarsAndFV )
 import TcSimplify	( tcSimplifyCheck )
 import TysWiredIn	( listTyCon, parrTyCon, tupleTyCon )
@@ -921,8 +921,8 @@ unifyTypeKind ty@(TyVarTy tyvar)
   = getTcTyVar tyvar	`thenM` \ maybe_ty ->
     case maybe_ty of
 	Just ty' -> unifyTypeKind ty'
-	Nothing	 -> newBoxityVar					`thenM` \ bx_var ->
-		    putTcTyVar tyvar (mkTyConApp typeCon [bx_var])	`thenM_`
+	Nothing	 -> newOpenTypeKind		`thenM` \ kind -> 
+		    putTcTyVar tyvar kind	`thenM_`
 		    returnM ()
 	
 unifyTypeKind ty

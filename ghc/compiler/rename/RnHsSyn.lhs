@@ -86,11 +86,10 @@ extractHsTyNames ty
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
     get (HsKindSig ty k)       = get ty
-    get (HsForAllTy (Just tvs) 
+    get (HsForAllTy _ tvs 
 		    ctxt ty)   = (extractHsCtxtTyNames ctxt `unionNameSets` get ty)
 					    `minusNameSet`
 				  mkNameSet (hsTyVarNames tvs)
-    get ty@(HsForAllTy Nothing _ _) = pprPanic "extractHsTyNames" (ppr ty)
 
 extractHsTyNames_s  :: [RenamedHsType] -> NameSet
 extractHsTyNames_s tys = foldr (unionNameSets . extractHsTyNames) emptyNameSet tys

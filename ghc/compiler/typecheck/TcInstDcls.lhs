@@ -680,9 +680,9 @@ simplified: only zeze2 is extracted and its body is simplified.
 \begin{code}
 instDeclCtxt1 hs_inst_ty 
   = inst_decl_ctxt (case hs_inst_ty of
-			HsForAllTy _ _ (HsPredTy pred) -> ppr pred
-			HsPredTy pred	      	       -> ppr pred
-			other			       -> ppr hs_inst_ty)	-- Don't expect this
+			HsForAllTy _ _ _ (HsPredTy pred) -> ppr pred
+			HsPredTy pred	                 -> ppr pred
+			other			         -> ppr hs_inst_ty)	-- Don't expect this
 instDeclCtxt2 dfun_ty
   = inst_decl_ctxt (ppr (mkClassPred cls tys))
   where

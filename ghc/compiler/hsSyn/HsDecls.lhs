@@ -476,7 +476,7 @@ unbangedType ty = BangType HsNoBang ty
 \begin{code}
 instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr (ConDecl con tvs cxt con_details loc)
-      = sep [pprHsForAll tvs cxt, ppr_con_details con con_details]
+      = sep [pprHsForAll Explicit tvs cxt, ppr_con_details con con_details]
 
 ppr_con_details con (InfixCon ty1 ty2)
   = hsep [ppr ty1, ppr con, ppr ty2]

@@ -318,8 +318,8 @@ ifaceExtRdrName :: IfaceExtName -> RdrName
 ifaceExtRdrName (ExtPkg mod occ) = mkOrig mod occ
 ifaceExtRdrName other = pprPanic "ParserCore.ifaceExtRdrName" (ppr other)
 
-add_forall tv (HsForAllTy (Just tvs) cxt t) = HsForAllTy (Just (tv:tvs)) cxt t
-add_forall tv t                             = HsForAllTy (Just [tv]) [] t
+add_forall tv (HsForAllTy exp tvs cxt t) = HsForAllTy exp (tv:tvs) cxt t
+add_forall tv t                          = HsForAllTy Explicit [tv] [] t
   
 happyError :: P a 
 happyError s l = failP (show l ++ ": Parse error\n") (take 100 s) l

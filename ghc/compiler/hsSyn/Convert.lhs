@@ -19,7 +19,7 @@ import HsSyn as Hs
 		HsDecl(..), TyClDecl(..), InstDecl(..), ConDecl(..),
 		Stmt(..), HsBinds(..), MonoBinds(..), Sig(..),
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
-		placeHolderType, HsType(..), 
+		placeHolderType, HsType(..), HsExplicitForAll(..),
 		HsTyVarBndr(..), HsContext,
 		mkSimpleMatch, mkHsForAllTy
 	) 
@@ -98,9 +98,7 @@ cvt_top (InstanceD tys ty decs)
   = Left $ InstD (InstDecl inst_ty binds sigs loc0)
   where
     (binds, sigs) = cvtBindsAndSigs decs
-    inst_ty = HsForAllTy Nothing 
-			 (cvt_context tys) 
-			 (HsPredTy (cvt_pred ty))
+    inst_ty = mkImplicitHsForAllTy (cvt_context tys) (HsPredTy (cvt_pred ty))
 
 cvt_top (Meta.SigD nm typ) = Left $ Hs.SigD (Sig (vName nm) (cvtType typ) loc0)
 
@@ -321,9 +319,8 @@ cvtType ty = trans (root ty [])
 	trans (VarT nm, args)	    = foldl HsAppTy (HsTyVar (tName nm)) args
         trans (ConT tc, args)       = foldl HsAppTy (HsTyVar (tconName tc)) args
 
-	trans (ForallT tvs cxt ty, []) = mkHsForAllTy (Just (cvt_tvs tvs))
-				  		      (cvt_context cxt)
-				      		      (cvtType ty)
+	trans (ForallT tvs cxt ty, []) = mkExplicitHsForAllTy 
+						(cvt_tvs tvs) (cvt_context cxt) (cvtType ty)
 
 split_ty_app :: Meta.Type -> (Meta.Type, [Meta.Type])
 split_ty_app ty = go ty []

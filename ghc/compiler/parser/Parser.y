@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.126 2003/10/09 11:59:02 simonpj Exp $
+$Id: Parser.y,v 1.127 2003/10/21 12:54:21 simonpj Exp $
 
 Haskell grammar.
 
@@ -673,7 +673,8 @@ sigtypes :: { [RdrNameHsType] }
 	| sigtypes ',' sigtype		{ $3 : $1 }
 
 sigtype :: { RdrNameHsType }
-	: ctype				{ mkHsForAllTy Nothing [] $1 }
+	: ctype				{ mkImplicitHsForAllTy [] $1 }
+	-- Wrap an Implicit forall if there isn't one there already
 
 sig_vars :: { [RdrName] }
 	 : sig_vars ',' var		{ $3 : $1 }
@@ -684,8 +685,8 @@ sig_vars :: { [RdrName] }
 
 -- A ctype is a for-all type
 ctype	:: { RdrNameHsType }
-	: 'forall' tv_bndrs '.' ctype	{ mkHsForAllTy (Just $2) [] $4 }
-	| context '=>' type		{ mkHsForAllTy Nothing   $1 $3 }
+	: 'forall' tv_bndrs '.' ctype	{ mkExplicitHsForAllTy $2 [] $4 }
+	| context '=>' type		{ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| type				{ $1 }
 

@@ -75,7 +75,7 @@ want a gratuitous knot.
 \begin{code}
 rnHsType :: SDoc -> RdrNameHsType -> RnM RenamedHsType
 
-rnHsType doc (HsForAllTy Nothing ctxt ty)
+rnHsType doc (HsForAllTy Implicit _ ctxt ty)
 	-- Implicit quantifiction in source code (no kinds on tyvars)
 	-- Given the signature  C => T  we universally quantify 
 	-- over FV(T) \ {in-scope-tyvars} 
@@ -89,9 +89,9 @@ rnHsType doc (HsForAllTy Nothing ctxt ty)
 	--	class C a where { op :: a -> a }
 	forall_tyvars = filter (not . (`elemLocalRdrEnv` name_env)) mentioned
     in
-    rnForAll doc (map UserTyVar forall_tyvars) ctxt ty
+    rnForAll doc Implicit (map UserTyVar forall_tyvars) ctxt ty
 
-rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
+rnHsType doc (HsForAllTy Explicit forall_tyvars ctxt tau)
 	-- Explicit quantification.
 	-- Check that the forall'd tyvars are actually 
 	-- mentioned in the type, and produce a warning if not
@@ -103,7 +103,7 @@ rnHsType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
 	warn_guys = filter (`notElem` mentioned) forall_tyvar_names
     in
     mappM_ (forAllWarn doc tau) warn_guys	`thenM_`
-    rnForAll doc forall_tyvars ctxt tau
+    rnForAll doc Explicit forall_tyvars ctxt tau
 
 rnHsType doc (HsTyVar tyvar)
   = lookupOccRn tyvar 		`thenM` \ tyvar' ->
@@ -167,11 +167,11 @@ rnHsTypes doc tys = mappM (rnHsType doc) tys
 
 
 \begin{code}
-rnForAll doc forall_tyvars ctxt ty
+rnForAll doc exp forall_tyvars ctxt ty
   = bindTyVarsRn doc forall_tyvars	$ \ new_tyvars ->
     rnContext doc ctxt			`thenM` \ new_ctxt ->
     rnHsType doc ty			`thenM` \ new_ty ->
-    returnM (mkHsForAllTy (Just new_tyvars) new_ctxt new_ty)
+    returnM (HsForAllTy exp new_tyvars new_ctxt new_ty)
 \end{code}
 
 

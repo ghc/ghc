@@ -12,10 +12,11 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 #include "HsVersions.h"
 
-import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..), HsType(..),
+import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..), HsType(..), 
 			  HsExpr(..), HsLit(..), Pat(WildPat), HsTyVarBndr(..),
+			  HsExplicitForAll(..),
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
-			  isPragSig, placeHolderType, mkHsForAllTy
+			  isPragSig, placeHolderType, mkExplicitHsForAllTy
 			)
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 import RnHsSyn		( RenamedTyClDecl, RenamedSig,
@@ -699,8 +700,12 @@ groupWith op ((t,v):prs) = (t, op (v:vs)) : groupWith op rest
 eqPatType :: HsType Name -> HsType Name -> Bool
 -- A very simple equality function, only for 
 -- type patterns in generic function definitions.
-eqPatType (HsTyVar v1)    (HsTyVar v2)    = v1==v2
-eqPatType (HsAppTy s1 t1) (HsAppTy s2 t2) = s1 `eqPatType` s2 && t2 `eqPatType` t2
+eqPatType (HsTyVar v1)       (HsTyVar v2)    	= v1==v2
+eqPatType (HsAppTy s1 t1)    (HsAppTy s2 t2) 	= s1 `eqPatType` s2 && t2 `eqPatType` t2
+eqPatType (HsOpTy s1 op1 t1) (HsOpTy s2 op2 t2) = s1 `eqPatType` s2 && t2 `eqPatType` t2 && op1 == op2
+eqPatType (HsNumTy n1)	     (HsNumTy n2)	= n1 == n2
+eqPatType (HsParTy t1)	     t2			= t1 `eqPatType` t2
+eqPatType t1		     (HsParTy t2)	= t1 `eqPatType` t2
 eqPatType _ _ = False
 
 ---------------------------------
@@ -717,7 +722,7 @@ mkGenericInstance clas loc (hs_ty, binds)
 	-- works in the standard way
     let
 	sig_tvs = map UserTyVar (nameSetToList (extractHsTyVars hs_ty))
-	hs_forall_ty = mkHsForAllTy (Just sig_tvs) [] hs_ty
+	hs_forall_ty = mkExplicitHsForAllTy sig_tvs [] hs_ty
     in
 	-- Type-check the instance type, and check its form
     tcHsSigType GenPatCtxt hs_forall_ty		`thenM` \ forall_inst_ty ->
@@ -798,7 +803,7 @@ dupGenericInsts tc_inst_infos
 	  ptext SLIT("All the type patterns for a generic type constructor must be identical")
     ]
   where 
-    ppr_inst_ty (tc,inst) = ppr (simpleInstInfoTy inst)
+    ppr_inst_ty (tc,inst) = ppr tc <+> ppr (simpleInstInfoTy inst)
 
 mixedGenericErr op
   = ptext SLIT("Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)

@@ -1167,7 +1167,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
     get_tag_rhs = ExprWithTySig 
 			(HsLam (mkSimpleHsAlt (VarPat a_RDR) 
 					      (HsApp (HsVar getTag_RDR) a_Expr)))
-			(HsForAllTy (Just (map UserTyVar tvs)) [] con2tag_ty)
+			(mkExplicitHsForAllTy (map UserTyVar tvs) [] con2tag_ty)
 
     con2tag_ty = foldl HsAppTy (HsTyVar (getRdrName tycon)) 
 		       (map HsTyVar tvs)

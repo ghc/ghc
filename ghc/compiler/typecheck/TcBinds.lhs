@@ -544,7 +544,7 @@ checkSigsTyVars qtvs sigs
   where
     check_one (TySigInfo id sig_tyvars sig_theta sig_tau _ _ src_loc)
       = addSrcLoc src_loc						$
-	addErrCtxt (ptext SLIT("When checking the type signature for") 
+	addErrCtxt (ptext SLIT("In the type signature for") 
 		      <+> quotes (ppr id))				$
 	addErrCtxtM (sigCtxt id sig_tyvars sig_theta sig_tau)		$
 	checkSigTyVarsWrt (idFreeTyVars id) sig_tyvars

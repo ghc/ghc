@@ -986,7 +986,7 @@ caseScrutCtxt expr
   = hang (ptext SLIT("In the scrutinee of a case expression:")) 4 (ppr expr)
 
 exprSigCtxt expr
-  = hang (ptext SLIT("When checking the type signature of the expression:"))
+  = hang (ptext SLIT("In the type signature of the expression:"))
 	 4 (ppr expr)
 
 exprCtxt expr

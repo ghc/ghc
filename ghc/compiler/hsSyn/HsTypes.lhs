@@ -5,10 +5,10 @@
 
 \begin{code}
 module HsTypes (
-	  HsType(..), HsTyVarBndr(..), 
+	  HsType(..), HsTyVarBndr(..), HsExplicitForAll(..),
 	, HsContext, HsPred(..)
 
-	, mkHsForAllTy, mkHsDictTy, mkHsIParamTy
+	, mkExplicitHsForAllTy, mkImplicitHsForAllTy, mkHsDictTy, mkHsIParamTy
 	, hsTyVarName, hsTyVarNames, replaceTyVarName
 	, splitHsInstDeclTy
 	
@@ -32,6 +32,7 @@ import PprType		( {- instance Outputable Kind -}, pprParendKind, pprKind )
 import BasicTypes	( IPName, Boxity, tupleParens )
 import PrelNames	( unboundKey )
 import SrcLoc		( noSrcLoc )
+import CmdLineOpts	( opt_PprStyle_Debug )
 import Outputable
 \end{code}
 
@@ -80,7 +81,11 @@ data HsPred name = HsClassP name [HsType name]
 		 | HsIParam (IPName name) (HsType name)
 
 data HsType name
-  = HsForAllTy	(Maybe [HsTyVarBndr name])	-- Nothing for implicitly quantified signatures
+  = HsForAllTy	HsExplicitForAll	-- Renamer leaves this flag unchanged, to record the way
+					-- the user wrote it originally, so that the printer can
+					-- print it as the user wrote it
+		[HsTyVarBndr name]	-- With ImplicitForAll, this is the empty list
+					-- until the renamer fills in the variables
 		(HsContext name)
 		(HsType name)
 
@@ -117,6 +122,7 @@ data HsType name
   | HsKindSig		(HsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
 
+data HsExplicitForAll = Explicit | Implicit
 
 -----------------------
 -- Combine adjacent for-alls. 
@@ -128,18 +134,22 @@ data HsType name
 --
 -- A valid type must have one for-all at the top of the type, or of the fn arg types
 
-mkHsForAllTy mtvs []   ty = mk_forall_ty mtvs ty
-mkHsForAllTy mtvs ctxt ty = HsForAllTy mtvs ctxt ty
+mkImplicitHsForAllTy     ctxt ty = mkHsForAllTy Implicit [] ctxt ty
+mkExplicitHsForAllTy tvs ctxt ty = mkHsForAllTy Explicit tvs ctxt ty
+
+mkHsForAllTy :: HsExplicitForAll -> [HsTyVarBndr name] -> HsContext name -> HsType name -> HsType name
+-- Smart constructor for HsForAllTy
+mkHsForAllTy exp tvs []   ty = mk_forall_ty exp tvs ty
+mkHsForAllTy exp tvs ctxt ty = HsForAllTy exp tvs ctxt ty
 
 -- mk_forall_ty makes a pure for-all type (no context)
-mk_forall_ty (Just []) ty 			  = ty	-- Explicit for-all with no tyvars
-mk_forall_ty mtvs1     (HsParTy ty)		  = mk_forall_ty mtvs1 ty
-mk_forall_ty mtvs1     (HsForAllTy mtvs2 ctxt ty) = mkHsForAllTy (mtvs1 `plus` mtvs2) ctxt ty
-mk_forall_ty mtvs1     ty			  = HsForAllTy mtvs1 [] ty
+mk_forall_ty Explicit [] ty 			      = ty	-- Explicit for-all with no tyvars
+mk_forall_ty exp  tvs  (HsParTy ty)		      = mk_forall_ty exp tvs ty
+mk_forall_ty exp1 tvs1 (HsForAllTy exp2 tvs2 ctxt ty) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ tvs2) ctxt ty
+mk_forall_ty exp  tvs  ty			      = HsForAllTy exp tvs [] ty
 
-mtvs1       `plus` Nothing     = mtvs1
-Nothing     `plus` mtvs2       = mtvs2 
-(Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
+Implicit `plus` Implicit = Implicit
+exp1     `plus` exp2     = Explicit
 
 mkHsDictTy cls tys = HsPredTy (HsClassP cls tys)
 mkHsIParamTy v ty  = HsPredTy (HsIParam v ty)
@@ -183,7 +193,8 @@ splitHsInstDeclTy
 
 splitHsInstDeclTy inst_ty
   = case inst_ty of
-	HsForAllTy (Just tvs) cxt1 tau 
+	HsForAllTy _ tvs cxt1 tau 	-- The type vars should have been
+					-- computed by now, even if they were implicit
 	      -> (tvs, cxt1++cxt2, cls, tys)
 	      where
 		 (cxt2, cls, tys) = split_tau tau
@@ -226,8 +237,14 @@ pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
 pprHsTyVarBndr name kind | kind `eqKind` liftedTypeKind = ppr name
 			 | otherwise 	  	        = hsep [ppr name, dcolon, pprParendKind kind]
 
-pprHsForAll []  []  = empty
-pprHsForAll tvs cxt = ptext SLIT("forall") <+> interppSP tvs <+> pprHsContext cxt
+pprHsForAll exp tvs cxt 
+  | show_forall = forall_part <+> pprHsContext cxt
+  | otherwise   = pprHsContext cxt
+  where
+    show_forall =  opt_PprStyle_Debug
+		|| (not (null tvs) && is_explicit)
+    is_explicit = case exp of {Explicit -> True; Implicit -> False}
+    forall_part = ptext SLIT("forall") <+> interppSP tvs <> dot
 
 pprHsContext :: (Outputable name) => HsContext name -> SDoc
 pprHsContext []	 = empty
@@ -264,16 +281,11 @@ pprParendHsType ty = ppr_mono_ty pREC_CON ty
 -- (b) Drop top-level for-all type variables in user style
 --     since they are implicit in Haskell
 prepare sty (HsParTy ty)	  = prepare sty ty
-prepare sty (HsForAllTy _ cxt ty) | userStyle sty = (HsForAllTy Nothing cxt ty)
 prepare sty ty			  = ty
 
-ppr_mono_ty ctxt_prec (HsForAllTy maybe_tvs ctxt ty)
+ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
-    sep [pp_header, ppr_mono_ty pREC_TOP ty]
-  where
-    pp_header = case maybe_tvs of
-		  Just tvs -> pprHsForAll tvs ctxt
-		  Nothing  -> pprHsContext ctxt
+    sep [pprHsForAll exp tvs ctxt, ppr_mono_ty pREC_TOP ty]
 
 ppr_mono_ty ctxt_prec (HsTyVar name)      = ppr name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
