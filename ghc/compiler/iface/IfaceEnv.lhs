@@ -131,7 +131,6 @@ lookupOrig :: Module -> OccName -> TcRnIf a b Name
 -- Even if we get a miss in the original-name cache, we 
 -- make a new External Name. 
 -- We fake up 
---	Module to AnotherPackage
 -- 	SrcLoc to noSrcLoc
 --	Parent no Nothing
 -- They'll be overwritten, in due course, by LoadIface.loadDecl.
