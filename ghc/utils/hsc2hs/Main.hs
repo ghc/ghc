@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.7 2001/01/11 19:50:19 qrczak Exp $
+-- $Id: Main.hs,v 1.8 2001/01/12 22:54:23 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -16,11 +16,11 @@ import System    (getProgName, getArgs, ExitCode(..), system, exitWith, exitFail
 import Directory (removeFile)
 import Parsec
 import Monad     (liftM, liftM2, when)
-import Char      (ord, intToDigit, isSpace, isAlphaNum, toUpper)
+import Char      (ord, intToDigit, isSpace, isAlpha, isAlphaNum, toUpper)
 import List      (intersperse)
 
 version :: String
-version = "0.64"
+version = "hsc2hs-0.64"
 
 data Flag
     = Help
@@ -58,7 +58,7 @@ main = do
     case getOpt Permute options args of
         (flags, _, _)
             | any isHelp    flags -> putStrLn (usageInfo header options)
-            | any isVersion flags -> putStrLn ("hsc2hs-"++version)
+            | any isVersion flags -> putStrLn version
             where
             isHelp    Help    = True; isHelp    _ = False
             isVersion Version = True; isVersion _ = False
@@ -73,7 +73,7 @@ processFile :: [Flag] -> String -> IO ()
 processFile flags name = do
     parsed <- parseFromFile parser name
     case parsed of
-        Left err -> print err >> exitFailure
+        Left err   -> do print err; exitFailure
         Right toks -> output flags name toks
 
 data Token
@@ -84,7 +84,39 @@ parser :: Parser [Token]
 parser = many (text <|> special)
 
 text :: Parser Token
-text = liftM Text $ many1 $ satisfy (/= '#') <|> try (string "##" >> return '#')
+text =
+    liftM (Text . concat) $ many1
+    (   many1 (satisfy (\ch -> not (isAlpha ch || ch `elem` "\"#'-_{")))
+    <|> (do a <- satisfy (\ch -> isAlpha ch || ch == '_')
+            b <- many (satisfy (\ch -> isAlphaNum ch || ch == '_' || ch == '\''))
+            return (a:b))
+    <|> (do char '\"'; a <- hsString '\"'; char '\"'; return ("\""++a++"\""))
+    <|> (do try (string "##"); return "#")
+    <|> (do char '\''; a <- hsString '\''; char '\''; return ("\'"++a++"\'"))
+    <|> (do try (string "--"); a <- many (satisfy (/= '\n')); return ("--"++a))
+    <|> string "-"
+    <|> (do try (string "{-"); a <- hsComment; return ("{-"++a))
+    <|> string "{"
+    <?> "Haskell source")
+
+hsComment :: Parser String
+hsComment =
+    (   (do a <- many1 (noneOf "-{"); b <- hsComment; return (a++b))
+    <|> try (string "-}")
+    <|> (do char '-'; b <- hsComment; return ('-':b))
+    <|> (do try (string "{-"); a <- hsComment; b <- hsComment; return ("{-"++a++b))
+    <|> (do char '{'; b <- hsComment; return ('{':b))
+    <?> "Haskell comment")
+
+hsString :: Char -> Parser String
+hsString quote =
+    liftM concat $ many
+    (   many1 (noneOf (quote:"\n\\"))
+    <|> (do char '\\'; a <- escape; return ('\\':a))
+    <?> "Haskell character or string")
+    where
+    escape = (do a <- many1 (satisfy isSpace); char '\\'; return (a++"\\"))
+         <|> (do a <- anyChar; return [a])
 
 special :: Parser Token
 special = do
@@ -97,13 +129,14 @@ special = do
     return (Special key arg)
 
 argument :: Parser String -> Parser String
-argument eol = liftM concat $ many
+argument eol =
+    liftM concat $ many
     (   many1 (noneOf "\n\"\'()/[\\]{}")
     <|> eol
-    <|> (do char '\"'; a <- cString '\''; char '\"'; return ("\""++a++"\""))
-    <|> (do char '\''; a <- cString '\"'; char '\''; return ("\'"++a++"\'"))
+    <|> (do char '\"'; a <- cString '\"'; char '\"'; return ("\""++a++"\""))
+    <|> (do char '\''; a <- cString '\''; char '\''; return ("\'"++a++"\'"))
     <|> (do char '('; a <- nested; char ')'; return ("("++a++")"))
-    <|> (do try (string "/*"); comment; return " ")
+    <|> (do try (string "/*"); cComment; return " ")
     <|> (do try (string "//"); skipMany (satisfy (/= '\n')); return " ")
     <|> string "/"
     <|> (do char '['; a <- nested; char ']'; return ("["++a++"]"))
@@ -112,16 +145,17 @@ argument eol = liftM concat $ many
     <?> "C expression")
     where nested = argument (string "\n")
 
-comment :: Parser ()
-comment = (do skipMany1 (noneOf "*"); comment)
-      <|> (do try (string "*/"); return ())
-      <|> (do char '*'; comment)
-      <?> "C comment"
+cComment :: Parser ()
+cComment =
+    (   (do skipMany1 (noneOf "*"); cComment)
+    <|> (do try (string "*/"); return ())
+    <|> (do char '*'; cComment)
+    <?> "C comment")
 
 cString :: Char -> Parser String
-cString otherQuote = liftM concat $ many
-    (   many1 (noneOf "\n\\\'\"")
-    <|> string [otherQuote]
+cString quote =
+    liftM concat $ many
+    (   many1 (noneOf (quote:"\n\\"))
     <|> (do char '\\'; a <- anyChar; return ['\\',a])
     <?> "C character or string")
 

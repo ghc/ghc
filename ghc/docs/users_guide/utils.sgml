@@ -116,7 +116,7 @@ tags:
     that gets included into the C code to which the Haskell module
     will be compiled (when compiled via C) and into the C file. These
     two files are created when the <literal>#def</literal> construct
-    is used.</para>
+    is used (see below).</para>
 
     <para>Actually <command>hsc2hs</command> does not output the Haskell
     file directly.  It creates a C program that includes the headers,
@@ -230,17 +230,18 @@ tags:
     <sect2><title>Input syntax</title>
 
       <para>All special processing is triggered by the
-      <literal>#</literal> character. To output a literal
-      <literal>#</literal>, write it twice: <literal>##</literal>.</para>
+      <literal>#</literal> character placed outside Haskell comments
+      and string literals. To output a literal <literal>#</literal>,
+      write it twice: <literal>##</literal>.</para>
 
       <para>Otherwise <literal>#</literal> is followed by optional
-      spaces and tabs, an alphanumeric key that describes the kind of
-      processing, and its arguments. Arguments look like C expressions
-      and extend up to the nearest unmatched <literal>)</literal>,
-      <literal>]</literal>, or <literal>}</literal>, or to the end of
-      line outside any <literal>() [] {} '' "" /* */</literal>. Any
-      character may be preceded by a backslash and will not be treated
-      specially.</para>
+      spaces and tabs, an alphanumeric key that describes the
+      kind of processing, and its arguments. Arguments look
+      like C expressions separated by commas and extend up to the
+      nearest unmatched <literal>)</literal>, <literal>]</literal>,
+      or <literal>}</literal>, or to the end of line outside any
+      <literal>() [] {} '' "" /* */</literal>. Any character may be
+      preceded by a backslash and will not be treated specially.</para>
 
       <para>Meanings of specific keys:</para>
 

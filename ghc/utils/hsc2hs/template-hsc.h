@@ -12,6 +12,7 @@
 #endif
 
 #if __GLASGOW_HASKELL__
+
 static int hsc_options_started;
 
 static void hsc_begin_options (void)
@@ -38,11 +39,14 @@ static void hsc_end_options (void)
 {
     if (hsc_options_started) printf (" #-}\n");
 }
-#else
+
+#else /* !__GLASGOW_HASKELL__ */
+
 #define hsc_begin_options()
 #define hsc_option(s)
 #define hsc_end_options()
-#endif
+
+#endif /* !__GLASGOW_HASKELL__ */
 
 #define hsc_const(x)                        \
     if ((x) < 0)                            \
