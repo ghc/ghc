@@ -44,12 +44,20 @@ void _stgAssert PROTO((char *, unsigned int));
 #ifdef nextstep3_TARGET_OS
 #define _NEXT_SOURCE
 #endif
- 
+
+#ifdef aix_TARGET_OS
+/* for fd_set */
+#include <sys/select.h>
+#endif
+
 #ifdef NON_POSIX_SOURCE
 #undef _POSIX_SOURCE
 #undef _POSIX_C_SOURCE
 #else
+# ifndef aix_TARGET_OS
+/* already defined on aix */
 #define _POSIX_SOURCE 1
+# endif
 #ifndef irix_TARGET_OS
 #define _POSIX_C_SOURCE 199301L
 #else

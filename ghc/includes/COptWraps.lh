@@ -576,6 +576,13 @@ gets whatever it's after.
 
 #define WRAPPER_NAME(f)	  /* nothing */
 
+#define SET_RETADDR(loc)	\
+    __asm__ volatile (		\
+    	"mflr 0\n"		\
+    	"\tst 0,%0"		\
+    	:"=m" (loc) :: "0");
+/*    __asm__ volatile ("st %%r0, %0" : "=m" ((void *)(loc))); */
+
 #define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
 /* we have to make sure the STG registers are restored. 
