@@ -82,6 +82,10 @@ package_details installing
 #ifdef USING_LIBBFD
 			      "bfd": "iberty":	-- for debugging
 #endif
+#ifdef THREADED_RTS
+			      "pthread" :
+#endif
+
 			    [],
         include_dirs   = if installing
                             then [ "$libdir/include"

@@ -41,6 +41,10 @@ else
 SRC_HC_OPTS += -syslib concurrent -syslib posix -syslib misc
 endif
 
+ifeq "$(GhcRtsThreaded)" "YES"
+SRC_HC_OPTS +=-DTHREADED_RTS
+endif
+
 SRC_HC_OPTS += -DWANT_PRETTY
 SRC_HC_OPTS += $(filter -D% -U%,$(GhcRtsCcOpts))
 
