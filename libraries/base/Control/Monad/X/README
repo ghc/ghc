@@ -1,0 +1,80 @@
+This is an experimental replacement for the current monad library.
+(at some point the .X. part of the names should disappear)
+
+It is mostly complete, but some more work is needed in places,
+in particular the interaction of continuations with other features.
+also a lot more tests/laws are need.  and of course documentation.
+
+Resumptions are very new and not well tested.  Also the nonstandard
+morphisms for them are not fixed.
+
+Changes from the original library
+=================================
+
+General:
+  * the monads are implemented in terms of the transformers
+    - the transformer files end in "T"
+    - the monad files have no "T" at the end
+    - a monad file defines a type synonym, and redefines the "run" functions.
+  * The file Transformers imports all transformers
+  * The file Monads imports all monads and fix, and so everything in the library
+    (it is note very useful except for compiling the library)
+  * Currently there is no ListT, instead we have NondetT,
+    which is (kind of) based on what's in Ralf Hinze's 
+    "Deriving Monad Transformers" paper.
+  * there is no RWS transformer
+  * NondetT transformer is new
+  * ResumeT is new
+  * New class HasBaseMonad to perform computations in the "heart" of the monad
+  * structural changes in the code
+    - tried to capture common patterns in definitions
+    - the library is currently in "column" format, i.e.
+      a file for a transformer contains:
+        - basic instances (Functor, Monad, HasBaseMonad)
+        - arbitrary functions (mostly from old library) things like "run" etc.
+        - liftings of all features only for this transformer
+
+    - the file "Fix" is in "row" format, i.e. it implements "mfix" for all transformers.
+  * MonadPlus is used for backtracking and _not_ error handling
+  * none of the transformers implement "fail" it is just passed along to the base monad,
+    thus: fail x = inBase (fail x)
+    - reason for that is that there seems to be no reasonable way to implement it
+
+  
+Specific:
+
+Reader: new function runReader (like runReadrT with swapped arguments)  
+Writer: * new function runWriter (same as runWriterT)
+        * new behavior for "listen": it does not produce any output
+          thus: oldListen m = do (a,w) <- listen m
+                                 tell w
+        * moved "pass" out of the class (implemented in terms of the other functions)
+State:  * new functions runState (like evalState with swapped arguments)
+                        runStateS (like runStateT with swapped arguments)
+Error:  * new function runError (same as runErrorT)
+        * removed Error class, now errors can be of any type
+        * fail "" does _not_ cause an error to be thrown  (see comments above)
+        * mzero does _not_ cause an error to be thrown  (see comments above)
+        * mplus does _not_ handle errors (see comments above)
+Nondet: new
+Resume: new
+Cont:   unfinished
+          - how to do "local" (current seems reasonable, but deviates from "standard" definitions)
+          - how to do "listen"
+          - understand better interaction with other control transformers
+            (exceptions, resumptions, nondeterminism)
+
+
+People
+======
+
+discussions etc should probably be sent to:
+libraries@haskell.org
+
+author of current version:  Iavor S. Diatchki <mailto:diatchki@cse.ogi.edu>
+based upon the original by: Andy Gill <mailto:andy@cse.ogi.edu>
+the ErrorT in the original library was rendered by: Michael Weber <mailto:michael.weber@post.rwth-aachen.de>
+the initial version of the NondetT code in CPS style was from: Andrew J Bromage <mailto:ajb@spamcop.net>
+
+iavor: if i forgot someone (sorry!) please send me email 
+
