@@ -29,18 +29,18 @@ module Control.Monad.Writer (
 	execWriterT,
 	mapWriterT,
 	module Control.Monad,
-	module Control.Monad.Monoid,
 	module Control.Monad.Fix,
 	module Control.Monad.Trans,
+	module Data.Monoid,
   ) where
 
 import Prelude
 
 import Control.Monad
-import Control.Monad.Monoid
 import Control.Monad.Fix
 import Control.Monad.Trans
 import Control.Monad.Reader
+import Data.Monoid
 
 -- ---------------------------------------------------------------------------
 -- MonadWriter class

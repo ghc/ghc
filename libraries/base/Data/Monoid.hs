@@ -1,15 +1,15 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Control.Monad.Monoid
+-- Module      :  Data.Monoid
 -- Copyright   :  (c) Andy Gill 2001,
 --		  (c) Oregon Graduate Institute of Science and Technology, 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable ( requires mulit-parameter type classes )
+-- Portability :  non-portable (requires extended type classes)
 --
--- Declaration of the Monoid class,and instances for list and functions
+-- Declaration of the Monoid class, and instances for list and functions.
 --
 --	  Inspired by the paper
 --	  /Functional Programming with Overloading and
@@ -18,24 +18,28 @@
 --		  Advanced School of Functional Programming, 1995.
 -----------------------------------------------------------------------------
 
-module Control.Monad.Monoid (
+module Data.Monoid (
  	Monoid(..)
   ) where
 
 import Prelude
 
 -- ---------------------------------------------------------------------------
--- The Monoid class
+-- | The monoid class.
+-- A minimal complete definition must supply 'mempty' and 'mappend',
+-- and these should satisfy the monoid laws.
 
 class Monoid a where
 	mempty  :: a
+	-- ^ Identity of 'mappend'
 	mappend :: a -> a -> a
+	-- ^ An associative operation
 	mconcat :: [a] -> a
 
--- Now the default for mconcat.  For most types, this
--- default will be used, but is included in the class definition so
--- that optimized version of mconcat can be provided
--- for specific types.
+	-- ^ Fold a list using the monoid.
+	-- For most types, the default definition for 'mconcat' will be
+	-- used, but the function is included in the class definition so
+	-- that an optimized version can be provided for specific types.
 
 	mconcat = foldr mappend mempty
 

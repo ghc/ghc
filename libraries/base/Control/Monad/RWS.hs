@@ -37,13 +37,12 @@ module Control.Monad.RWS (
 import Prelude
 
 import Control.Monad
-import Control.Monad.Monoid
 import Control.Monad.Fix
 import Control.Monad.Trans
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Control.Monad.State
-
+import Data.Monoid
 
 newtype RWS r w s a = RWS { runRWS :: r -> s -> (a, s, w) }
 
