@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: writeError.c,v 1.8 2001/07/16 09:23:24 rrt Exp $
+ * $Id: writeError.c,v 1.9 2001/11/07 18:26:27 sof Exp $
  *
  * hPutStr Runtime Support
  */
@@ -20,8 +20,10 @@ implementation in one or two places.)
 #include "RtsUtils.h"
 #include "HsStd.h"
 
+#include "PrelIOUtils.h"
+
 void
-writeErrString__ (HsAddr msg_hdr, HsAddr msg, HsInt len)
+writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len)
 {
   int count = 0;
   char* p  = (char*)msg;
