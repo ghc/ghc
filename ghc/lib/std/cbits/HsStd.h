@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsStd.h,v 1.3 2001/06/06 11:03:48 simonmar Exp $
+ * $Id: HsStd.h,v 1.4 2001/08/17 11:06:58 simonmar Exp $
  *
  * Definitions for package `std' which are visible in Haskell land.
  *
@@ -30,6 +30,9 @@
 #endif
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
 #endif
 #if defined(HAVE_GETTIMEOFDAY)
 #  ifdef HAVE_SYS_TIME_H
