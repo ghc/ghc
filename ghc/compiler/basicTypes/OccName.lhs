@@ -458,7 +458,7 @@ guys never show up in error messages.  What a hack.
 \begin{code}
 mkMethodOcc :: OccName -> OccName
 mkMethodOcc occ@(OccName VarName fs) = occ
-mkMethodOcc occ			     = mk_simple_deriv varName "$m"
+mkMethodOcc occ			     = mk_simple_deriv varName "$m" occ
 \end{code}
 
 
