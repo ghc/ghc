@@ -56,6 +56,7 @@ import UniqSet		( emptyUniqSet, elementOfUniqSet,
 import StgSyn		( SRT(..) )
 import BitSet		( intBS )
 import Outputable
+import GlaExts
 import Util		( nOfThem )
 
 import ST
@@ -1266,9 +1267,9 @@ pprMagicId BaseReg	    	    = ptext SLIT("BaseReg")
 pprMagicId (VanillaReg pk n)
 				    = hcat [ pprVanillaReg n, char '.',
 						  pprUnionTag pk ]
-pprMagicId (FloatReg  n)            = (<>) (ptext SLIT("F")) (int IBOX(n))
-pprMagicId (DoubleReg n)	    = (<>) (ptext SLIT("D")) (int IBOX(n))
-pprMagicId (LongReg _ n)	    = (<>) (ptext SLIT("L")) (int IBOX(n))
+pprMagicId (FloatReg  n)            = ptext SLIT("F") <> int (I# n)
+pprMagicId (DoubleReg n)	    = ptext SLIT("D") <> int (I# n)
+pprMagicId (LongReg _ n)	    = ptext SLIT("L") <> int (I# n)
 pprMagicId Sp			    = ptext SLIT("Sp")
 pprMagicId Su			    = ptext SLIT("Su")
 pprMagicId SpLim		    = ptext SLIT("SpLim")
@@ -1277,8 +1278,8 @@ pprMagicId HpLim		    = ptext SLIT("HpLim")
 pprMagicId CurCostCentre	    = ptext SLIT("CCCS")
 pprMagicId VoidReg		    = panic "pprMagicId:VoidReg!"
 
-pprVanillaReg :: FastInt -> SDoc
-pprVanillaReg n = (<>) (char 'R') (int IBOX(n))
+pprVanillaReg :: Int# -> SDoc
+pprVanillaReg n = char 'R' <> int (I# n)
 
 pprUnionTag :: PrimRep -> SDoc
 

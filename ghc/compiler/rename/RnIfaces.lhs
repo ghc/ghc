@@ -98,10 +98,17 @@ loadInterface doc mod from
 
 tryLoadInterface :: SDoc -> ModuleName -> WhereFrom -> RnM d (Ifaces, Maybe Message)
 	-- Returns (Just err) if an error happened
-	-- Guarantees to return with iImpModInfo m --> (... Just cts)
-	-- (If the load fails, we plug in a vanilla placeholder
+	-- Guarantees to return with iImpModInfo m --> (..., True)
+	-- (If the load fails, we plug in a vanilla placeholder)
 tryLoadInterface doc_str mod_name from
- = getIfacesRn 			`thenRn` \ ifaces ->
+ = getHomeIfaceTableRn		`thenRn` \ hit ->
+   getIfacesRn 			`thenRn` \ ifaces ->
+	
+	-- Check whether we have it already in the home package
+   case lookupModuleEnvByName hit mod_name of {
+	Just _  -> returnRn (ifaces, Nothing) ;	-- In the home package
+	Nothing -> 
+
    let
 	mod_map  = iImpModInfo ifaces
 	mod_info = lookupFM mod_map mod_name
@@ -205,7 +212,7 @@ tryLoadInterface doc_str mod_name from
     in
     setIfacesRn new_ifaces		`thenRn_`
     returnRn (new_ifaces, Nothing)
-    }}
+    }}}
 
 -----------------------------------------------------
 --	Adding module dependencies from the 
@@ -697,14 +704,11 @@ lookupFixityRn name
       -- right away (after all, it's possible that nothing from B will be used).
       -- When we come across a use of 'f', we need to know its fixity, and it's then,
       -- and only then, that we load B.hi.  That is what's happening here.
-  = getHomeIfaceTableRn 		`thenRn` \ hst ->
-    case lookupFixityEnv hst name of {
-	Just fixity -> returnRn fixity ;
-	Nothing	    -> 
-
+  = getHomeIfaceTableRn 		`thenRn` \ hit ->
     loadHomeInterface doc name		`thenRn` \ ifaces ->
-    returnRn (lookupFixityEnv (iPIT ifaces) name `orElse` defaultFixity) 
-    }
+    case lookupTable hit (iPIT ifaces) name of
+	Just iface -> returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
+	Nothing	   -> returnRn defaultFixity
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 \end{code}

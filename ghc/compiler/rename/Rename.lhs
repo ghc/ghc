@@ -75,9 +75,7 @@ renameModule :: DynFlags -> Finder
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
-	     -> IO (PersistentCompilerState, Maybe ModIface)
-			-- The mi_decls in the ModIface include
-			-- ones imported from packages too
+	     -> IO (PersistentCompilerState, Maybe (ModIface, [RenamedHsDecl]))
 
 renameModule dflags finder hit hst old_pcs this_module 
 	     this_mod@(HsModule _ _ _ _ _ _ loc)
@@ -110,7 +108,7 @@ rename this_module this_mod@(HsModule mod_name vers exports imports local_decls 
     case maybe_stuff of {
 	Nothing -> 	-- Everything is up to date; no need to recompile further
 		rnDump [] []		`thenRn` \ dump_action ->
-		returnRn (Nothing, [], dump_action) ;
+		returnRn (Nothing, dump_action) ;
 
   	Just (gbl_env, local_gbl_env, export_avails, global_avail_env) ->
 

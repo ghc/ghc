@@ -44,8 +44,8 @@ import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idName, idUnfolding )
 import Module           ( Module, moduleName, plusModuleEnv )
-import Name		( nameOccName, isLocallyDefined, isGlobalName,
-			  toRdrName, nameEnvElts, emptyNameEnv
+import Name		( Name, nameOccName, isLocallyDefined, isGlobalName,
+			  toRdrName, nameEnvElts, emptyNameEnv, lookupNameEnv
 			)
 import TyCon		( TyCon, isDataTyCon, tyConName, tyConGenInfo )
 import OccName		( isSysOcc )
@@ -53,14 +53,14 @@ import TyCon		( TyCon, isClassTyCon )
 import Class		( Class )
 import PrelNames	( mAIN_Name, mainName )
 import UniqSupply       ( UniqSupply )
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, thenMaybe )
 import Util
-import BasicTypes       ( EP(..) )
+import BasicTypes       ( EP(..), Fixity )
 import Bag		( Bag, isEmptyBag )
 import Outputable
-import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
-			  PackageSymbolTable, DFunId, 
-			  TypeEnv, extendTypeEnv,
+import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, HomeIfaceTable,
+			  PackageSymbolTable, PackageIfaceTable, DFunId, ModIface(..),
+			  TypeEnv, extendTypeEnv, lookupTable,
 		          TyThing(..), groupTyThings )
 import FiniteMap	( FiniteMap, delFromFM, lookupWithDefaultFM )
 \end{code}
@@ -107,10 +107,8 @@ typecheckModule dflags this_mod pcs hst hit pit (HsModule mod_name _ _ _ decls _
 		         -> tcModule pcs hst get_fixity this_mod decls unf_env)
 
     get_fixity :: Name -> Maybe Fixity
-    get_fixity nm
-       = case lookupFixityEnv hit nm of
-            Just f  -> Just f
-            Nothing -> lookupFixityEnv pit nm
+    get_fixity nm = lookupTable hit pit nm 	`thenMaybe` \ iface ->
+		    lookupNameEnv (mi_fixities iface) nm
 \end{code}
 
 The internal monster:

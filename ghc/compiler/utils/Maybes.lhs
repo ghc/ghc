@@ -15,13 +15,10 @@ module Maybes (
 	expectJust,
 	maybeToBool,
 
-	failMaB,
-	failMaybe,
-	seqMaybe,
-	returnMaB,
-	returnMaybe,
-	thenMaB,
-	catMaybes
+	thenMaybe, seqMaybe, returnMaybe, failMaybe, catMaybes,
+
+	thenMaB, returnMaB, failMaB
+
     ) where
 
 #include "HsVersions.h"
@@ -103,6 +100,11 @@ The Maybe monad
 seqMaybe :: Maybe a -> Maybe a -> Maybe a
 seqMaybe (Just x) _  = Just x
 seqMaybe Nothing  my = my
+
+thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
+thenMaybe ma mb = case ma of
+		    Just x  -> mb x
+		    Nothing -> Nothing
 
 returnMaybe :: a -> Maybe a
 returnMaybe = Just

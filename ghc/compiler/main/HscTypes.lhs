@@ -9,7 +9,8 @@ module HscTypes (
 
 	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
-	HomeIfaceTable, PackageIfaceTable,
+	HomeIfaceTable, PackageIfaceTable, 
+	lookupTable,
 
 	IfaceDecls(..), 
 
@@ -18,8 +19,6 @@ module HscTypes (
 	TyThing(..), groupTyThings,
 
 	TypeEnv, extendTypeEnv, lookupTypeEnv, 
-
-	lookupFixityEnv,
 
 	WhetherHasOrphans, ImportVersion, WhatsImported(..),
 	PersistentRenamerState(..), IsBootInterface, Avails, DeclsMap,
@@ -68,6 +67,7 @@ import Type		( Type )
 
 import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
 import Bag		( Bag )
+import Maybes		( seqMaybe )
 import UniqFM 		( UniqFM )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
@@ -118,7 +118,10 @@ data ModIface
         mi_version  :: VersionInfo,		-- Module version number
         mi_orphan   :: WhetherHasOrphans,       -- Whether this module has orphans
 
-        mi_usages   :: [ImportVersion Name],	-- Usages; kept sorted
+        mi_usages   :: [ImportVersion Name],	-- Usages; kept sorted so that it's easy
+						-- to decide whether to write a new iface file
+						-- (changing usages doesn't affect the version of
+						--  this module)
 
         mi_exports  :: Avails,			-- What it exports
 						-- Kept sorted by (mod,occ),
@@ -182,11 +185,12 @@ type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
 Simple lookups in the symbol table.
 
 \begin{code}
-lookupFixityEnv :: IfaceTable -> Name -> Maybe Fixity
-lookupFixityEnv tbl name
-  = case lookupModuleEnv tbl (nameModule name) of
-	Nothing	     -> Nothing
-	Just details -> lookupNameEnv (mi_fixities details) name
+lookupTable :: ModuleEnv a -> ModuleEnv a -> Name -> Maybe a
+-- We often have two Symbol- or IfaceTables, and want to do a lookup
+lookupTable ht pt name
+  = lookupModuleEnv ht mod `seqMaybe` lookupModuleEnv pt mod
+  where
+    mod = nameModule name
 \end{code}
 
 

@@ -8,7 +8,7 @@ module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) w
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
+import CmdLineOpts	( DynFlag(..), dopt )
 import HsSyn		
 import TcHsSyn		( TypecheckedPat, TypecheckedMatch )
 import DsHsSyn		( outPatType )

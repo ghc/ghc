@@ -36,7 +36,6 @@ import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
 			)
 import UniqSupply	-- all of it, really
 import BasicTypes	( TopLevelFlag(..), isNotTopLevel )
-import CmdLineOpts	( opt_D_verbose_stg2stg )
 import UniqSet		( emptyUniqSet )
 import Maybes
 import Outputable
@@ -167,12 +166,10 @@ locations.
 
 \begin{code}
 bOGUS_LVs :: StgLiveVars
-bOGUS_LVs | opt_D_verbose_stg2stg = emptyUniqSet
-	  | otherwise =panic "bOGUS_LVs"
+bOGUS_LVs = emptyUniqSet
 
 bOGUS_FVs :: [Id]
-bOGUS_FVs | opt_D_verbose_stg2stg = [] 
-	  | otherwise = panic "bOGUS_FVs"
+bOGUS_FVs = [] 
 \end{code}
 
 \begin{code}

@@ -32,18 +32,13 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 import Type		( unUsgTy, repType,
 			  splitTyConApp_maybe, splitFunTys, splitForAllTys,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkTyVarTy, mkFunTy, splitAppTy, applyTy, funResultTy
+			  mkFunTy, splitAppTy, applyTy, funResultTy
 			)
-import PrimOp		( PrimOp(..), CCall(..), 
-			  CCallTarget(..), dynamicTarget )
-import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
-			  addrDataCon
-			)
+import PrimOp		( CCall(..), CCallTarget(..), dynamicTarget )
+import TysWiredIn	( unitTy, addrTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
-import PrelNames	( Uniquable(..), hasKey,
-			  ioTyConKey, deRefStablePtrName, returnIOIdKey, 
-			  bindIOName,
-			  returnIOName, makeStablePtrName
+import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, 
+			  bindIOName, returnIOName, makeStablePtrName
 			)
 import Outputable
 

@@ -25,7 +25,7 @@ import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, tcHsTyVars, tcClass
 			)
 import TcEnv		( tcExtendTyVarEnv, 
 			  tcLookupTyCon, tcLookupClass, tcLookupGlobalId, 
-			  TyThing(..), TyThingDetails(..)
+			  TyThingDetails(..)
 			)
 import TcMonad
 

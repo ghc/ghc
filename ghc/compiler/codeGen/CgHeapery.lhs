@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.23 2000/07/26 14:48:16 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.24 2000/10/24 08:40:10 simonpj Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -197,7 +197,7 @@ fastEntryChecks regs tags ret node_points code
 		 tag_assts
 
     free_reg  = case length regs + 1 of 
-		       IBOX(x) -> CReg (VanillaReg PtrRep x)
+		       I# x -> CReg (VanillaReg PtrRep x)
 
     all_pointers = all pointer regs
     pointer (VanillaReg rep _) = isFollowableRep rep
@@ -283,19 +283,19 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 		    tag_assts
 -}
 	    -- this will cover all cases for x86
-	    [VanillaReg rep ILIT(1)] 
+	    [VanillaReg rep 1#] 
 
 	       | isFollowableRep rep ->
 	          CCheck HP_CHK_UT_ALT
 		      [mkIntCLit words_required, mkIntCLit 1, mkIntCLit 0,
-			CReg (VanillaReg RetRep ILIT(2)),
+			CReg (VanillaReg RetRep 2#),
 			CLbl (mkReturnInfoLabel ret_addr) RetRep]
 		      tag_assts
 
 	       | otherwise ->
 	          CCheck HP_CHK_UT_ALT
 		      [mkIntCLit words_required, mkIntCLit 0, mkIntCLit 1,
-			CReg (VanillaReg RetRep ILIT(2)),
+			CReg (VanillaReg RetRep 2#),
 			CLbl (mkReturnInfoLabel ret_addr) RetRep]
 		      tag_assts
 
@@ -304,7 +304,7 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
  		in
 		CCheck HP_CHK_GEN
 		     [mkIntCLit words_required, 
-		      mkIntCLit (IBOX(word2Int# liveness)),
+		      mkIntCLit (I# (word2Int# liveness)),
 			-- HP_CHK_GEN needs a direct return address,
 			-- not an info table (might be different if
 			-- we're not assembly-mangling/tail-jumping etc.)
@@ -346,7 +346,7 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 	    -- We need this case because the closure in Node won't return
 	    -- directly when we enter it (it could be a function), so the
 	    -- heap check code needs to push a seq frame on top of the stack.
-	    [VanillaReg rep ILIT(1)]
+	    [VanillaReg rep 1#]
 		|  rep == PtrRep
  		&& is_fun ->
 	          CCheck HP_CHK_SEQ_NP
@@ -354,7 +354,7 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 			AbsCNop
 
 	    -- R1 is lifted (the common case)
-	    [VanillaReg rep ILIT(1)]
+	    [VanillaReg rep 1#]
 	        | rep == PtrRep ->
 	          CCheck HP_CHK_NP
 			[mkIntCLit words_required, mkIntCLit 1{-regs live-}]
@@ -369,15 +369,15 @@ altHeapCheck is_fun regs [] AbsCNop Nothing code
 		  CCheck HP_CHK_UNBX_R1 [mkIntCLit words_required] AbsCNop
 
 	    -- FloatReg1
-	    [FloatReg ILIT(1)] ->
+	    [FloatReg 1#] ->
 		  CCheck HP_CHK_F1 [mkIntCLit words_required] AbsCNop
 
 	    -- DblReg1
-	    [DoubleReg ILIT(1)] ->
+	    [DoubleReg 1#] ->
 		  CCheck HP_CHK_D1 [mkIntCLit words_required] AbsCNop
 
 	    -- LngReg1
-	    [LongReg _ ILIT(1)] ->
+	    [LongReg _ 1#] ->
 		  CCheck HP_CHK_L1 [mkIntCLit words_required] AbsCNop
 
 #ifdef DEBUG
@@ -406,7 +406,7 @@ fetchAndReschedule regs node_reqd  =
       where
         liveness_mask = mkRegLiveness regs
 	reschedule_code = absC  (CMacroStmt GRAN_RESCHEDULE [
-                                 mkIntCLit (IBOX(word2Int# liveness_mask)), 
+                                 mkIntCLit (I# (word2Int# liveness_mask)), 
 				 mkIntCLit (if node_reqd then 1 else 0)])
 
 	 --HWL: generate GRAN_FETCH macro for GrAnSim
@@ -440,7 +440,7 @@ yield regs node_reqd =
      liveness_mask = mkRegLiveness regs
      yield_code = 
        absC (CMacroStmt GRAN_YIELD 
-                          [mkIntCLit (IBOX(word2Int# liveness_mask))])
+                          [mkIntCLit (I# (word2Int# liveness_mask))])
 \end{code}
 
 \begin{code}

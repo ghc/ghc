@@ -11,7 +11,7 @@ module CoreTidy (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_simpl, opt_D_verbose_core2core, opt_UsageSPOn )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_UsageSPOn, dopt )
 import CoreSyn
 import CoreUnfold	( noUnfolding )
 import CoreLint		( beginPass, endPass )
@@ -34,7 +34,7 @@ import Name		( getOccName, tidyTopName, mkLocalName, isLocallyDefined )
 import OccName		( initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType, tidyType, tidyTypes, tidyTyVar, tidyTyVars )
 import Module		( Module )
-import UniqSupply	( UniqSupply )
+import UniqSupply	( mkSplitUniqSupply )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( mapAccumL )
@@ -66,22 +66,27 @@ Several tasks are done by @tidyCorePgm@
    from the uniques for local thunks etc.]
 
 \begin{code}
-tidyCorePgm :: UniqSupply -> Module -> [CoreBind] -> RuleBase
+tidyCorePgm :: DynFlags -> Module -> [CoreBind] -> RuleBase
 	    -> IO ([CoreBind], [ProtoCoreRule])
-tidyCorePgm us module_name binds_in rulebase_in
+tidyCorePgm dflags module_name binds_in rulebase_in
   = do
-	beginPass "Tidy Core"
+	us <- mkSplitUniqSupply 'u'
+
+	beginPass dflags "Tidy Core"
 
         binds_in1 <- if opt_UsageSPOn
                      then _scc_ "CoreUsageSPInf"
-                                doUsageSPInf us binds_in rulebase_in
+                                doUsageSPInf dflags us binds_in rulebase_in
                      else return binds_in
 
 	let (tidy_env1, binds_out)  = mapAccumL (tidyBind (Just module_name))
                                                 init_tidy_env binds_in1
 	    rules_out	  	    = tidyProtoRules tidy_env1 (mk_local_protos rulebase_in)
 
-	endPass "Tidy Core" (opt_D_dump_simpl || opt_D_verbose_core2core) binds_out
+	endPass dflags "Tidy Core" (dopt Opt_D_dump_simpl dflags || 
+				    dopt Opt_D_verbose_core2core dflags)
+	        binds_out
+
 	return (binds_out, rules_out)
   where
 	-- We also make sure to avoid any exported binders.  Consider

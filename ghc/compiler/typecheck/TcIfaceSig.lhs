@@ -257,9 +257,6 @@ tcCoreExpr (UfNote note expr)
 	UfInlineCall   -> returnTc (Note InlineCall expr')
 	UfInlineMe     -> returnTc (Note InlineMe   expr')
 	UfSCC cc       -> returnTc (Note (SCC cc)   expr')
-
-tcCoreNote (UfSCC cc)   = returnTc (SCC cc)
-tcCoreNote UfInlineCall = returnTc InlineCall 
 \end{code}
 
 \begin{code}

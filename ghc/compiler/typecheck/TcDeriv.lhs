@@ -28,6 +28,7 @@ import RnMonad		( --RnNameSupply,
 			  renameSourceCode, thenRn, mapRn, returnRn )
 import HscTypes		( DFunId, GlobalSymbolTable, PersistentRenamerState )
 
+import BasicTypes	( Fixity )
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
 import ErrUtils		( dumpIfSet_dyn, Message )
@@ -39,7 +40,6 @@ import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
 import Name		( Name, isLocallyDefined, getSrcLoc, NamedThing(..) )
 import RdrName		( RdrName )
---import RnMonad		( FixityEnv )
 
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
@@ -258,7 +258,7 @@ tcDeriving prs mod inst_env_in get_fixity local_tycons
 		   iBinds = binds,
 		   iLoc = getSrcLoc dfun, iPrags = [] }
         where
-	 (tyvars, theta, tau, clas, tys) = splitDFunTy (idType dfun)
+	 (tyvars, theta, clas, tys) = splitDFunTy (idType dfun)
 
     rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
 	-- Ignore the free vars returned

@@ -11,15 +11,15 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
 
 import CmdLineOpts	( DynFlag(..), dopt )
 
-import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..),
-			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..),
+import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), InPat(..),
+			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), Match(..),
 			  andMonoBindList, collectMonoBinders, isClassDecl
 			)
 import HsTypes          ( HsType (..), HsTyVarBndr(..), toHsTyVar )
-import HsPat            ( InPat (..) )
-import HsMatches        ( Match (..) )
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl,
-			  extractHsTyVars )
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, RenamedMonoBinds,
+			  RenamedTyClDecl, RenamedHsType, 
+			  extractHsTyVars, maybeGenericMatch
+			)
 import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
@@ -70,11 +70,10 @@ import Name             ( Name, NameEnv, extendNameEnv_C, emptyNameEnv,
 			  plusNameEnv_C, nameEnvElts )
 import FiniteMap        ( mapFM )
 import SrcLoc           ( SrcLoc )
-import RnHsSyn          -- ( RenamedMonoBinds )
 import VarSet           ( varSetElems )
 import UniqFM           ( mapUFM )
 import Unique		( Uniquable(..) )
-import BasicTypes	( NewOrData(..) )
+import BasicTypes	( NewOrData(..), Fixity )
 import ErrUtils		( dumpIfSet_dyn )
 import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
 			  assocElts, extendAssoc_C,

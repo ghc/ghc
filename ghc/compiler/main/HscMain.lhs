@@ -111,7 +111,6 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs 	-> -- desugarer
     mkSplitUniqSupply 'r'	>>= \ ru_uniqs 	-> -- rules
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs -> -- core-to-stg
-    mkSplitUniqSupply 'u'	>>= \ tidy_uniqs -> -- tidy up
     mkSplitUniqSupply 'g'	>>= \ st_uniqs  -> -- stg-to-stg passes
     mkSplitUniqSupply 'n'	>>= \ ncg_uniqs -> -- native-code generator
 
@@ -158,7 +157,7 @@ hscMain flags core_cmds stg_cmds summary maybe_old_iface
     core2core core_cmds desugared rules		>>= \ (simplified, orphan_rules) ->
 
 	-- Do the final tidy-up
-    tidyCorePgm tidy_uniqs this_mod
+    tidyCorePgm this_mod
 		simplified orphan_rules		>>= \ (tidy_binds, tidy_orphan_rules) -> 
 
 	-- Run the occurrence analyser one last time, so that

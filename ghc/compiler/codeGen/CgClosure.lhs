@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.41 2000/07/14 08:14:53 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.42 2000/10/24 08:40:09 simonpj Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -57,7 +57,8 @@ import Outputable
 
 import Name             ( nameOccName )
 import OccName          ( occNameFS )
-
+import FastTypes	( iBox )
+	
 getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
 \end{code}
 
@@ -539,7 +540,7 @@ argSatisfactionCheck closure_info arg_regs
 
         getSpRelOffset 0 	`thenFC` \ (SpRel sp) ->
 	let
-	    off = I# sp
+	    off     = iBox sp
 	    rel_arg = mkIntCLit off
 	in
 	ASSERT(off /= 0)

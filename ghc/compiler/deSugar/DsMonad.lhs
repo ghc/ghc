@@ -37,7 +37,6 @@ import Type             ( Type )
 import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
-import UniqFM		( lookupWithDefaultUFM_Directly )
 import Util		( zipWithEqual )
 import Name		( Name, lookupNameEnv )
 import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), 

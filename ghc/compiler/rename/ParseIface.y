@@ -630,10 +630,6 @@ qdata_name	:: { RdrName }
 qdata_name	:  data_name		{ $1 }
 		|  qdata_fs 	        { mkSysQual dataName $1 }
 				
-qdata_names	:: { [RdrName] }
-qdata_names	:				{ [] }
-		| qdata_name qdata_names	{ $1 : $2 }
-
 var_or_data_name :: { RdrName }
                   : var_name                    { $1 }
                   | data_name                   { $1 }
@@ -721,7 +717,7 @@ akind		:: { Kind }
 --------------------------------------------------------------------------
 
 id_info		:: { [HsIdInfo RdrName] }
-		: 	 			{ [] }
+		: id_info_item 			{ [$1] }
 		| id_info_item id_info		{ $1 : $2 }
 
 id_info_item	:: { HsIdInfo RdrName }
