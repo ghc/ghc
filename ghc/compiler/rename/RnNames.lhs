@@ -19,7 +19,7 @@ import HsSyn		( IE(..), ieName, ImportDecl(..),
 			  ForeignDecl(..), HsGroup(..),
 			  collectLocatedHsBinders, tyClDeclNames 
 			)
-import RdrHsSyn		( RdrNameIE, RdrNameImportDecl )
+import RdrHsSyn		( RdrNameIE, RdrNameImportDecl, main_RDR_Unqual )
 import RnEnv
 import TcRnMonad
 
@@ -34,7 +34,7 @@ import NameSet
 import NameEnv
 import OccName		( OccName, srcDataName, isTcOcc )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
-			  GenAvailInfo(..), AvailInfo, Avails, 
+			  GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
 			  IsBootInterface,
 			  availName, availNames, availsToNameSet, 
 			  Deprecations(..), ModIface(..), Dependencies(..),
@@ -528,14 +528,30 @@ type ExportOccMap = FiniteMap OccName (Name, RdrNameIE)
 	--   that have the same occurrence name
 
 
-exportsFromAvail :: Maybe [RdrNameIE] -> TcRn m Avails
+exportsFromAvail :: Maybe Module 	-- Nothing => no 'module M(..) where' header at all
+		 -> Maybe [RdrNameIE] 	-- Nothing => no explicit export list
+		 -> TcRn m Avails
 	-- Complains if two distinct exports have same OccName
         -- Warns about identical exports.
 	-- Complains about exports items not in scope
 
-exportsFromAvail exports
+exportsFromAvail maybe_mod exports
  = do { TcGblEnv { tcg_rdr_env = rdr_env, 
 		   tcg_imports = imports } <- getGblEnv ;
+
+	-- If the module header is omitted altogether, then behave
+	-- as if the user had written "module Main(main) where..."
+	-- EXCEPT in interactive mode, when we behave as if he had
+	-- written "module Main where ..."
+	-- Reason: don't want to complain about 'main' not in scope
+	--	   in interactive mode
+	ghci_mode <- getGhciMode ;
+	let { real_exports 
+	        = case maybe_mod of
+		    Just mod -> exports
+		    Nothing | ghci_mode == Interactive -> Nothing
+			    | otherwise		     -> Just [IEVar main_RDR_Unqual] } ;
+
 	exports_from_avail exports rdr_env imports }
 
 exports_from_avail Nothing rdr_env

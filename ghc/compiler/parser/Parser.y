@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.118 2003/05/19 15:10:40 simonpj Exp $
+$Id: Parser.y,v 1.119 2003/06/23 10:35:22 simonpj Exp $
 
 Haskell grammar.
 
@@ -265,19 +265,9 @@ REIFY_FIXITY	{ ITreifyFixity }
 
 module 	:: { RdrNameHsModule }
  	: srcloc 'module' modid maybemoddeprec maybeexports 'where' body 
-		{ HsModule (mkHomeModule $3) Nothing $5 (fst $7) (snd $7) $4 $1 }
+		{ HsModule (Just (mkHomeModule $3)) $5 (fst $7) (snd $7) $4 $1 }
 	| srcloc body
-		{ 	-- Behave as if we'd said 
-			--	module Main( main ) where ...
-		  let
-			main_RDR_Unqual = mkUnqual varName FSLIT("main")
-			-- We definitely don't want an Orig RdrName, because
-			-- main might, in principle, be imported into module Main
-		  in
-		  HsModule (mkHomeModule mAIN_Name) 
-			   Nothing 
-			   (Just [IEVar main_RDR_Unqual])
-			   (fst $2) (snd $2) Nothing $1 }
+		{ HsModule Nothing Nothing (fst $2) (snd $2) Nothing $1 }
 
 maybemoddeprec :: { Maybe DeprecTxt }
 	: '{-# DEPRECATED' STRING '#-}' 	{ Just $2 }

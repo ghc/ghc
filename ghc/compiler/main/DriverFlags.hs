@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.115 2003/05/27 12:40:19 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.116 2003/06/23 10:35:17 simonpj Exp $
 --
 -- Driver flags
 --
@@ -225,6 +225,7 @@ static_flags =
 	------- Miscellaneous -----------------------------------------------
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
   ,  ( "no-hs-main"     , NoArg (writeIORef v_NoHsMain True) )
+  ,  ( "main-is"   	, SepArg setMainIs )
 
 	------- Output Redirection ------------------------------------------
   ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
@@ -519,6 +520,21 @@ buildStaticHscOpts = do
 					      else return "")
 
   return ( static : filtered_opts )
+
+setMainIs :: String -> IO ()
+setMainIs arg
+  | not (null main_mod)		-- The arg looked like "Foo.baz"
+  = do { writeIORef v_MainFunIs (Just main_fn) ;
+	 writeIORef v_MainModIs (Just main_mod) }
+
+  | isUpper (head main_fn)	-- The arg looked like "Foo"
+  = writeIORef v_MainModIs (Just main_fn)
+  
+  | otherwise			-- The arg looked like "baz"
+  = writeIORef v_MainFunIs (Just main_fn)
+  where
+    (main_mod, main_fn) = split_longest_prefix arg (== '.')
+  
 
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff

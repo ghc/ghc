@@ -21,7 +21,7 @@ module HsSyn (
 	module HsTypes,
 	Fixity, NewOrData, 
 
-	HsModule(..), hsModule, hsImports,
+	HsModule(..), 
 	collectStmtsBinders,
 	collectHsBinders,   collectLocatedHsBinders, 
 	collectMonoBinders, collectLocatedMonoBinders,
@@ -51,10 +51,10 @@ All we actually declare here is the top-level structure for a module.
 \begin{code}
 data HsModule name
   = HsModule
-	Module
-	(Maybe Version)		-- source interface version number
-	(Maybe [IE name])	-- export list; Nothing => export everything
-				-- Just [] => export *nothing* (???)
+	(Maybe Module)		-- Nothing => "module X where" is omitted
+				--	(in which case the next field is Nothing too)
+	(Maybe [IE name])	-- Export list; Nothing => export list omitted, so export everything
+				-- Just [] => export *nothing*
 				-- Just [...] => as you would expect...
 	[ImportDecl name]	-- We snaffle interesting stuff out of the
 				-- imported interfaces early on, adding that
@@ -69,8 +69,10 @@ data HsModule name
 instance (NamedThing name, OutputableBndr name)
 	=> Outputable (HsModule name) where
 
-    ppr (HsModule name iface_version exports imports
-		      decls deprec src_loc)
+    ppr (HsModule Nothing _ imports decls _ src_loc)
+      = pp_nonnull imports $$ pp_nonnull decls
+
+    ppr (HsModule (Just name) exports imports decls deprec src_loc)
       = vcat [
 	    case exports of
 	      Nothing -> pp_header (ptext SLIT("where"))
@@ -89,11 +91,8 @@ instance (NamedThing name, OutputableBndr name)
 
 	pp_modname = ptext SLIT("module") <+> ppr name
 
-	pp_nonnull [] = empty
-	pp_nonnull xs = vcat (map ppr xs)
-
-hsModule  (HsModule mod _ _ _ _ _ _) = mod
-hsImports (HsModule mod vers exports imports decls deprec src_loc) = imports
+pp_nonnull [] = empty
+pp_nonnull xs = vcat (map ppr xs)
 \end{code}
 
 

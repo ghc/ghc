@@ -287,12 +287,12 @@ pREL_REAL    	= mkBasePkgModule pREL_REAL_Name
 pREL_FLOAT   	= mkBasePkgModule pREL_FLOAT_Name
 pRELUDE		= mkBasePkgModule pRELUDE_Name
 
-
-iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
-
 -- MetaHaskell Extension  text2 from Meta/work/gen.hs
 mETA_META_Name   = mkModuleName "Language.Haskell.THSyntax"
 
+dOLLAR_MAIN_Name = mkModuleName "$Main"		-- Root module for initialisation 
+dOLLAR_MAIN	 = mkHomeModule dOLLAR_MAIN_Name
+iNTERACTIVE      = mkHomeModule (mkModuleName "$Interactive")
 \end{code}
 
 %************************************************************************
@@ -462,7 +462,7 @@ and it's convenient to write them all down in one place.
 
 
 \begin{code}
-dollarMainName = varQual mAIN_Name FSLIT("$main") dollarMainKey
+dollarMainName = varQual dOLLAR_MAIN_Name FSLIT("main") dollarMainKey
 runIOName      = varQual pREL_TOP_HANDLER_Name FSLIT("runIO") runMainKey
 
 -- Stuff from GHC.Prim

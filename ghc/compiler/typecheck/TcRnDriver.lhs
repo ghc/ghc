@@ -21,6 +21,8 @@ import		      DsMeta   ( templateHaskellNames )
 #endif
 
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
+import DriverState	( v_MainModIs, v_MainFunIs )
+import DriverUtil	( split_longest_prefix )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsExpr(..),
 			  Stmt(..), Pat(VarPat), HsStmtContext(..), RuleDecl(..),
 			  HsGroup(..), SpliceDecl(..),
@@ -86,7 +88,8 @@ import ErrUtils		( mkDumpDoc, showPass, pprBagOfErrors )
 import Id		( Id, mkLocalId, isLocalId, idName, idType, idUnfolding, setIdLocalExported )
 import IdInfo		( GlobalIdDetails(..) )
 import Var		( Var, setGlobalIdDetails )
-import Module           ( Module, moduleName, moduleUserString, moduleEnvElts )
+import Module           ( Module, ModuleName, mkHomeModule, mkModuleName, moduleName, moduleUserString, moduleEnvElts )
+import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, nameOccName )
 import NameEnv		( delListFromNameEnv )
 import NameSet
@@ -115,6 +118,8 @@ import HscTypes		( GlobalRdrElt(..), GlobalRdrEnv, ImportReason(..), Provenance(
 			  isLocalGRE )
 #endif
 
+import DATA_IOREF	( readIORef )
+import FastString	( mkFastString )
 import Panic		( showException )
 import List		( partition )
 import Util		( sortLt )
@@ -135,9 +140,13 @@ tcRnModule :: HscEnv -> PersistentCompilerState
 	   -> IO (PersistentCompilerState, Maybe TcGblEnv)
 
 tcRnModule hsc_env pcs
-	   (HsModule this_mod _ exports import_decls local_decls mod_deprec loc)
+	   (HsModule maybe_mod exports import_decls local_decls mod_deprec loc)
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 
+   let { this_mod = case maybe_mod of
+			Nothing  -> mkHomeModule mAIN_Name	-- 'module M where' is omitted
+			Just mod -> mod } ;			-- The normal case
+		
    initTc hsc_env pcs this_mod $ addSrcLoc loc $
    do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
@@ -165,7 +174,7 @@ tcRnModule hsc_env pcs
 		  $ do {
 
 		-- Process the export list
-	export_avails <- exportsFromAvail exports ;
+	export_avails <- exportsFromAvail maybe_mod exports ;
 	updGblEnv (\gbl -> gbl { tcg_exports = export_avails })
 		  $  do {
 
@@ -528,8 +537,8 @@ tcRnExtCore :: HscEnv -> PersistentCompilerState
 	    -> IO (PersistentCompilerState, Maybe ModGuts)
 	-- Nothing => some error occurred 
 
-tcRnExtCore hsc_env pcs 
-            (HsModule this_mod _ _ _ local_decls _ loc)
+tcRnExtCore hsc_env pcs (HsModule (Just this_mod) _ _ decls _ loc)
+	-- For external core, the module name is syntactically reqd
 	-- Rename the (Core) module.  It's a bit like an interface
 	-- file: all names are original names
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
@@ -539,14 +548,14 @@ tcRnExtCore hsc_env pcs
 	-- Rename the source, only in interface mode.
 	-- rnSrcDecls handles fixity decls etc too, which won't occur
 	-- but that doesn't matter
-   let { local_group = mkGroup local_decls } ;
-   (_, rn_local_decls, dus) <- initRn (InterfaceMode this_mod) 
+   let { local_group = mkGroup decls } ;
+   (_, rn_decls, dus) <- initRn (InterfaceMode this_mod) 
 				      (rnSrcDecls local_group) ;
    failIfErrsM ;
 
  	-- Get the supporting decls
    rn_imp_decls <- slurpImpDecls (duUses dus) ;
-   let { rn_decls = rn_local_decls `addImpDecls` rn_imp_decls } ;
+   let { rn_decls = rn_decls `addImpDecls` rn_imp_decls } ;
 
 	-- Dump trace of renaming part
    rnDump (ppr rn_decls) ;
@@ -558,7 +567,7 @@ tcRnExtCore hsc_env pcs
    setGblEnv tcg_env $ do {
    
 	-- Now the core bindings
-   core_prs <- tcCoreBinds (hs_coreds rn_local_decls) ;
+   core_prs <- tcCoreBinds (hs_coreds rn_decls) ;
    tcExtendGlobalValEnv (map fst core_prs) $ do {
    
 	-- Wrap up
@@ -570,8 +579,8 @@ tcRnExtCore hsc_env pcs
 	final_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) bndrs ;
 
 	mod_guts = ModGuts {	mg_module   = this_mod,
-				mg_usages   = [],	-- ToDo: compute usage
-				mg_dir_imps = [],	-- ??
+				mg_usages   = [],		-- ToDo: compute usage
+				mg_dir_imps = [],		-- ??
 				mg_deps     = noDependencies,	-- ??
 				mg_exports  = my_exports,
 				mg_types    = final_type_env,
@@ -1093,10 +1102,21 @@ noRdrEnvErr mod = ptext SLIT("No top-level environment available for module")
 checkMain 
   = do { ghci_mode <- getGhciMode ;
 	 tcg_env   <- getGblEnv ;
-	 check_main ghci_mode tcg_env
+
+	 mb_main_mod <- readMutVar v_MainModIs ;
+	 mb_main_fn  <- readMutVar v_MainFunIs ;
+	 let { main_mod = case mb_main_mod of {
+				Just mod -> mkModuleName mod ;
+				Nothing  -> mAIN_Name } ;
+	        main_fn  = case mb_main_fn of {
+				Just fn -> mkRdrUnqual (mkVarOcc (mkFastString fn)) ;
+				Nothing -> main_RDR_Unqual } } ;
+	
+	 check_main ghci_mode tcg_env main_mod main_fn
     }
 
-check_main ghci_mode tcg_env
+
+check_main ghci_mode tcg_env main_mod main_fn
      -- If we are in module Main, check that 'main' is defined.
      -- It may be imported from another module, in which case 
      -- we have to drag in its.
@@ -1111,7 +1131,7 @@ check_main ghci_mode tcg_env
      -- 
      -- Blimey: a whole page of code to do this...
 
- | mod_name /= mAIN_Name
+ | mod_name /= main_mod
  = return (tcg_env, emptyFVs)
 
 	-- Check that 'main' is in scope
@@ -1119,11 +1139,12 @@ check_main ghci_mode tcg_env
 	-- 
 	-- We use a guard for this (rather than letting lookupSrcName fail)
 	-- because it's not an error in ghci)
- | not (main_RDR_Unqual `elemRdrEnv` rdr_env)
+ | not (main_fn `elemRdrEnv` rdr_env)
  = do { complain_no_main; return (tcg_env, emptyFVs) }
 
- | otherwise
- = do { main_name <- lookupSrcName main_RDR_Unqual ;
+ | otherwise	-- OK, so the appropriate 'main' is in scope
+		-- 
+ = do { main_name <- lookupSrcName main_fn ;
 
 	tcg_env <- importSupportingDecls (unitFV runIOName) ;
 
@@ -1152,8 +1173,9 @@ check_main ghci_mode tcg_env
 	-- In other modes, fail altogether, so that we don't go on
 	-- and complain a second time when processing the export list.
 
-    mainCtxt  = ptext SLIT("When checking the type of 'main'")
-    noMainMsg = ptext SLIT("No 'main' defined in module Main")
+    mainCtxt  = ptext SLIT("When checking the type of the main function") <+> quotes (ppr main_fn)
+    noMainMsg = ptext SLIT("The main function") <+> quotes (ppr main_fn) 
+		<+> ptext SLIT("is not defined in module") <+> quotes (ppr main_mod)
 \end{code}
 
 
@@ -1253,9 +1275,8 @@ ppr_rules rs = vcat [ptext SLIT("{-# RULES"),
 		      ptext SLIT("#-}")]
 
 ppr_gen_tycons []  = empty
-ppr_gen_tycons tcs = vcat [ptext SLIT("{-# Generic type constructor details"),
-			   vcat (map ppr_gen_tycon tcs),
-		   	   ptext SLIT("#-}")
+ppr_gen_tycons tcs = vcat [ptext SLIT("Generic type constructor details:"),
+			   nest 2 (vcat (map ppr_gen_tycon tcs))
 		     ]
 
 -- x&y are now Id's, not CoreExpr's 

@@ -24,11 +24,11 @@ module CodeGen ( codeGen ) where
 -- bother to compile it.
 import CgExpr           ( {-NOTHING!-} )	-- DO NOT DELETE THIS IMPORT
 
-import DriverState	( v_Build_tag )
+import DriverState	( v_Build_tag, v_MainModIs )
 import StgSyn
 import CgMonad
 import AbsCSyn
-import PrelNames	( gHC_PRIM )
+import PrelNames	( gHC_PRIM, dOLLAR_MAIN, mAIN_Name )
 import CLabel		( mkSRTLabel, mkClosureLabel, 
 			  mkPlainModuleInitLabel, mkModuleInitLabel )
 import PprAbsC		( dumpRealC )
@@ -47,11 +47,12 @@ import Name		( nameSrcLoc, nameOccName, nameUnique, isInternalName, mkExternalNa
 import OccName		( mkLocalOcc )
 import PrimRep		( PrimRep(..) )
 import TyCon            ( isDataTyCon )
-import Module		( Module )
+import Module		( Module, mkModuleName )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
+import qualified Module ( moduleName )
 
 #ifdef DEBUG
 import Outputable
@@ -76,6 +77,7 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
 	showPass dflags "CodeGen"
 	fl_uniqs <- mkSplitUniqSupply 'f'
 	way <- readIORef v_Build_tag
+	mb_main_mod <- readIORef v_MainModIs
 
 	let
 	    tycons	   = typeEnvTyCons type_env
@@ -89,8 +91,9 @@ codeGen dflags this_mod type_env foreign_stubs imported_mods
 
 	    datatype_stuff = genStaticConBits cinfo data_tycons
 	    code_stuff     = initC cinfo (mapCs cgTopBinding stg_binds)
-	    init_stuff     = mkModuleInit way cost_centre_info this_mod
-				foreign_stubs imported_mods
+	    init_stuff     = mkModuleInit way cost_centre_info 
+					  this_mod mb_main_mod
+			  	   	  foreign_stubs imported_mods
 
 	    abstractC = mkAbstractCs [ maybeSplitCode,
 				       init_stuff, 
@@ -117,10 +120,11 @@ mkModuleInit
 	:: String		-- the "way"
 	-> CollectedCCs         -- cost centre info
 	-> Module
+	-> Maybe String		-- Just m ==> we have flag: -main-is Foo.baz 
 	-> ForeignStubs
 	-> [Module]
 	-> AbstractC
-mkModuleInit way cost_centre_info this_mod foreign_stubs imported_mods
+mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mods
   = let
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
@@ -142,6 +146,21 @@ mkModuleInit way cost_centre_info this_mod foreign_stubs imported_mods
 				]
 
 	register_mod_imports = map mk_import_register imported_mods
+
+	-- When compiling the module in which the 'main' function lives,
+	-- we inject an extra stg_init procedure for stg_init_zdMain, for the 
+	-- RTS to invoke.  We must consult the -main-is flag in case the
+	-- user specified a different function to Main.main
+	main_mod_name = case mb_main_mod of
+			  Just mod_name -> mkModuleName mod_name
+			  Nothing	-> mAIN_Name
+	main_init_block
+	  | Module.moduleName this_mod /= main_mod_name 
+  	  = AbsCNop	-- The normal case
+	  | otherwise	-- this_mod contains the main function
+	  = CModuleInitBlock (mkPlainModuleInitLabel dOLLAR_MAIN)
+			     (mkModuleInitLabel dOLLAR_MAIN way)
+			     (mk_import_register this_mod)
     in
     mkAbstractCs [
 	cc_decls,
@@ -149,7 +168,8 @@ mkModuleInit way cost_centre_info this_mod foreign_stubs imported_mods
 			 (mkModuleInitLabel this_mod way)
 		         (mkAbstractCs (register_foreign_exports ++
 				        cc_regs :
-				        register_mod_imports))
+				        register_mod_imports)),
+	main_init_block
     ]
 \end{code}
 

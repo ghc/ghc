@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.91 2003/06/12 16:50:19 simonpj Exp $
+-- $Id: DriverState.hs,v 1.92 2003/06/23 10:35:17 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -95,6 +95,8 @@ GLOBAL_VAR(v_Scale_sizes_by,    	1.0,		Double)
 GLOBAL_VAR(v_Static, 			True,		Bool)
 GLOBAL_VAR(v_NoLink, 			False,		Bool)
 GLOBAL_VAR(v_NoHsMain, 			False, 		Bool)
+GLOBAL_VAR(v_MainModIs,			Nothing,	Maybe String)
+GLOBAL_VAR(v_MainFunIs,			Nothing,	Maybe String)
 GLOBAL_VAR(v_Recomp,  			True,		Bool)
 GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(v_Do_asm_mangling,		True,		Bool)

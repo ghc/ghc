@@ -101,7 +101,7 @@ extern HsInt foo(HsInt a0);</programlisting>
       invoke <literal>foo()</literal> from C, just <literal>#include
       "Foo_stub.h"</literal> and call <literal>foo()</literal>.</para>
 
-      <sect3> 
+      <sect3 id="using-own-main"> 
 	<title>Using your own <literal>main()</literal></title>
 
 	<para>Normally, GHC's runtime system provides a

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.126 2003/06/17 23:26:30 sof Exp $
+-- $Id: Main.hs,v 1.127 2003/06/23 10:35:17 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -160,7 +160,7 @@ main =
    extra_non_static <- processArgs static_flags 
 			   (unreg_opts ++ way_opts ++ pkg_extra_opts) []
 
-	-- give the static flags to hsc
+	-- Give the static flags to hsc
    static_opts <- buildStaticHscOpts
    writeIORef v_Static_hsc_opts static_opts
 

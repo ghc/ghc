@@ -555,6 +555,27 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
+	  <term><option>-main-is <replaceable>thing</replaceable></option></term>
+	  <indexterm><primary><option>-main-is</option></primary></indexterm>
+	  <indexterm><primary>specifying your own main function</primary></indexterm>
+	  <listitem>
+	    <para> The normal rule in Haskell is that your program must supply a <literal>main</literal>
+	      function in module <literal>Main</literal>.  When testing, it is often convenient
+	      to change which function is the "main" one, and the <option>-main-is</option> flag
+	      allows you to do so.  The  <replaceable>thing</replaceable> can be one of:
+	      <itemizedlist>
+		<listitem><para>A lower-case identifier <literal>foo</literal>.  GHC assumes that the main function is <literal>Main.foo</literal>.</para></listitem>
+		<listitem><para>An module name <literal>A</literal>.  GHC assumes that the main function is <literal>A.main</literal>.</para></listitem>
+		<listitem><para>An qualified name <literal>A.foo</literal>.  GHC assumes that the main function is <literal>A.foo</literal>.</para></listitem>
+		</itemizedlist>
+	      Strictly speaking, <option>-main-is</option> is not a link-phase flag at all; it has no effect on the link step.
+	      The flag must be specified when compiling the module containing the specified main function (e.g. module <literal>A</literal>
+	      in the latter two items above.  It has no effect for other modules (and hence can safely be given to <literal>ghc --make</literal>).
+	      </para> 
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>-no-hs-main</option></term>
 	  <indexterm><primary><option>-no-hs-main</option></primary></indexterm>
 	  <indexterm><primary>linking Haskell libraries with foreign code</primary></indexterm>
@@ -564,7 +585,7 @@ strmod = "\
             be supplying its definition of <function>main()</function>
             at link-time, you will have to. To signal that to the
             compiler when linking, use
-            <option>-no-hs-main</option>.</para>
+            <option>-no-hs-main</option>. See also <xref linkend="using-own-main">.</para>
 
 	    <para>Notice that since the command-line passed to the
             linker is rather involved, you probably want to use

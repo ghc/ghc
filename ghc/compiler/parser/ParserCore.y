@@ -68,7 +68,7 @@ import Outputable
 
 module	:: { RdrNameHsModule }
 	: '%module' modid tdefs vdefgs
-		{ HsModule (mkHomeModule $2) Nothing Nothing 
+		{ HsModule (Just (mkHomeModule $2)) Nothing 
 		           [] ($3 ++ concat $4) Nothing noSrcLoc}
 
 tdefs	:: { [RdrNameHsDecl] }

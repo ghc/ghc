@@ -567,7 +567,6 @@ pprCLbl (CCS_Label ccs) 	= ppr ccs
 pprCLbl (ModuleInitLabel mod way)	
    = ptext SLIT("__stginit_") <> ftext (moduleNameFS (moduleName mod))
 	<> char '_' <> text way
-
 pprCLbl (PlainModuleInitLabel mod)	
    = ptext SLIT("__stginit_") <> ftext (moduleNameFS (moduleName mod))
 
