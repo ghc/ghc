@@ -14,22 +14,10 @@
 
 module System.Directory 
    ( 
-     -- $intro
-
-     -- * Permissions
-
-     -- $permissions
-
-     Permissions(
-	Permissions,
-	readable,		-- :: Permissions -> Bool 
-	writable,		-- :: Permissions -> Bool
-	executable,		-- :: Permissions -> Bool
-	searchable		-- :: Permissions -> Bool
-     )
+    -- $intro
 
     -- * Actions on directories
-    , createDirectory		-- :: FilePath -> IO ()
+      createDirectory		-- :: FilePath -> IO ()
     , removeDirectory		-- :: FilePath -> IO ()
     , renameDirectory		-- :: FilePath -> FilePath -> IO ()
 
@@ -45,7 +33,17 @@ module System.Directory
     , doesFileExist		-- :: FilePath -> IO Bool
     , doesDirectoryExist        -- :: FilePath -> IO Bool
 
-    -- * Setting and retrieving permissions
+    -- * Permissions
+
+    -- $permissions
+
+    , Permissions(
+	Permissions,
+	readable,		-- :: Permissions -> Bool
+	writable,		-- :: Permissions -> Bool
+	executable,		-- :: Permissions -> Bool
+	searchable		-- :: Permissions -> Bool
+      )
 
     , getPermissions            -- :: FilePath -> IO Permissions
     , setPermissions	        -- :: FilePath -> Permissions -> IO ()
@@ -120,6 +118,18 @@ data Permissions
     executable, searchable :: Bool 
    } deriving (Eq, Ord, Read, Show)
 
+{- |The 'getPermissions' operation returns the
+permissions for the file or directory.
+
+The operation may fail with:
+
+* 'isPermissionError' if the user is not permitted to access
+  the permissions; or
+
+* 'isDoesNotExistError' if the file or directory does not exist.
+
+-}
+
 getPermissions :: FilePath -> IO Permissions
 getPermissions name = do
   withCString name $ \s -> do
@@ -136,6 +146,18 @@ getPermissions name = do
       searchable = is_dir && exec == 0
     }
    )
+
+{- |The 'setPermissions' operation sets the
+permissions for the file or directory.
+
+The operation may fail with:
+
+* 'isPermissionError' if the user is not permitted to set
+  the permissions; or
+
+* 'isDoesNotExistError' if the file or directory does not exist.
+
+-}
 
 setPermissions :: FilePath -> Permissions -> IO ()
 setPermissions name (Permissions r w e s) = do
@@ -549,10 +571,8 @@ setCurrentDirectory path = do
        throwErrnoIfMinus1Retry_ "setCurrentDirectory" (c_chdir s)
 	-- ToDo: add path to error
 
-{- |To clarify, 'doesDirectoryExist' returns 'True' if a file system object
-exist, and it's a directory. 'doesFileExist' returns 'True' if the file
-system object exist, but it's not a directory (i.e., for every other 
-file system object that is not a directory.) 
+{- |The operation 'doesDirectoryExist' returns 'True' if the argument file
+exists and is a directory, and 'False' otherwise.
 -}
 
 doesDirectoryExist :: FilePath -> IO Bool
@@ -561,11 +581,27 @@ doesDirectoryExist name =
    (withFileStatus name $ \st -> isDirectory st)
    (\ _ -> return False)
 
+{- |The operation 'doesFileExist' returns 'True'
+if the argument file exists and is not a directory, and 'False' otherwise.
+-}
+
 doesFileExist :: FilePath -> IO Bool
 doesFileExist name = do 
  catch
    (withFileStatus name $ \st -> do b <- isDirectory st; return (not b))
    (\ _ -> return False)
+
+{- |The 'getModificationTime' operation returns the
+clock time at which the file or directory was last modified.
+
+The operation may fail with:
+
+* 'isPermissionError' if the user is not permitted to access
+  the modification time; or
+
+* 'isDoesNotExistError' if the file or directory does not exist.
+
+-}
 
 getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =

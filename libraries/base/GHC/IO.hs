@@ -49,13 +49,19 @@ import GHC.Conc
 -- ---------------------------------------------------------------------------
 -- Simple input operations
 
--- Computation "hReady hdl" indicates whether at least
--- one item is available for input from handle "hdl".
-
 -- If hWaitForInput finds anything in the Handle's buffer, it
 -- immediately returns.  If not, it tries to read from the underlying
 -- OS handle. Notice that for buffered Handles connected to terminals
 -- this means waiting until a complete line is available.
+
+-- | Computation 'hWaitForInput' @hdl t@
+-- waits until input is available on handle @hdl@.
+-- It returns 'True' as soon as input is available on @hdl@,
+-- or 'False' if no input is available within @t@ milliseconds.
+--
+-- This operation may fail with:
+--
+--  * 'isEOFError' if the end of file has been reached.
 
 hWaitForInput :: Handle -> Int -> IO Bool
 hWaitForInput h msecs = do
@@ -77,8 +83,12 @@ foreign import ccall unsafe "inputReady"
 -- ---------------------------------------------------------------------------
 -- hGetChar
 
--- hGetChar reads the next character from a handle,
--- blocking until a character is available.
+-- | Computation 'hGetChar' @hdl@ reads a character from the file or
+-- channel managed by @hdl@, blocking until a character is available.
+--
+-- This operation may fail with:
+--
+--  * 'isEOFError' if the end of file has been reached.
 
 hGetChar :: Handle -> IO Char
 hGetChar handle =
@@ -121,12 +131,21 @@ hGetcBuffered fd ref buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }
 -- ---------------------------------------------------------------------------
 -- hGetLine
 
--- If EOF is reached before EOL is encountered, ignore the EOF and
--- return the partial line. Next attempt at calling hGetLine on the
--- handle will yield an EOF IO exception though.
-
 -- ToDo: the unbuffered case is wrong: it doesn't lock the handle for
 -- the duration.
+
+-- | Computation 'hGetLine' @hdl@ reads a line from the file or
+-- channel managed by @hdl@.
+--
+-- This operation may fail with:
+--
+--  * 'isEOFError' if the end of file is encountered when reading
+--    the /first/ character of the line.
+--
+-- If 'hGetLine' encounters end-of-file at any other point while reading
+-- in a line, it is treated as a line terminator and the (partial)
+-- line is returned.
+
 hGetLine :: Handle -> IO String
 hGetLine h = do
   m <- wantReadableHandle "hGetLine" h $ \ handle_ -> do
@@ -240,12 +259,37 @@ hGetLineUnBuffered h = do
 -- -----------------------------------------------------------------------------
 -- hGetContents
 
--- hGetContents returns the list of characters corresponding to the
--- unread portion of the channel or file managed by the handle, which
--- is made semi-closed.
-
 -- hGetContents on a DuplexHandle only affects the read side: you can
 -- carry on writing to it afterwards.
+
+-- | Computation 'hGetContents' @hdl@ returns the list of characters
+-- corresponding to the unread portion of the channel or file managed
+-- by @hdl@, which is put into an intermediate state, /semi-closed/.
+-- In this state, @hdl@ is effectively closed,
+-- but items are read from @hdl@ on demand and accumulated in a special
+-- list returned by 'hGetContents' @hdl@.
+--
+-- Any operation that fails because a handle is closed,
+-- also fails if a handle is semi-closed.  The only exception is 'hClose'.
+-- A semi-closed handle becomes closed:
+--
+--  * if 'hClose' is applied to it;
+--
+--  * if an I\/O error occurs when reading an item from the handle;
+--
+--  * or once the entire contents of the handle has been read.
+--
+-- Once a semi-closed handle becomes closed, the contents of the
+-- associated list becomes fixed.  The contents of this final list is
+-- only partially specified: it will contain at least all the items of
+-- the stream that were evaluated prior to the handle becoming closed.
+--
+-- Any I\/O errors encountered while a handle is semi-closed are simply
+-- discarded.
+--
+-- This operation may fail with:
+--
+--  * 'isEOFError' if the end of file has been reached.
 
 hGetContents :: Handle -> IO String
 hGetContents handle = 
@@ -331,9 +375,15 @@ unpackAcc buf (I# r) (I# len) acc = IO $ \s -> unpack acc (len -# 1#) s
 -- ---------------------------------------------------------------------------
 -- hPutChar
 
--- `hPutChar hdl ch' writes the character `ch' to the file or channel
--- managed by `hdl'.  Characters may be buffered if buffering is
--- enabled for `hdl'.
+-- | Computation 'hPutChar' @hdl ch@ writes the character @ch@ to the
+-- file or channel managed by @hdl@.  Characters may be buffered if
+-- buffering is enabled for @hdl@.
+--
+-- This operation may fail with:
+--
+--  * 'isFullError' if the device is full; or
+--
+--  * 'isPermissionError' if another system resource limit would be exceeded.
 
 hPutChar :: Handle -> Char -> IO ()
 hPutChar handle c = 
@@ -369,9 +419,6 @@ hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 -- ---------------------------------------------------------------------------
 -- hPutStr
 
--- `hPutStr hdl s' writes the string `s' to the file or
--- hannel managed by `hdl', buffering the output if needs be.
-
 -- We go to some trouble to avoid keeping the handle locked while we're
 -- evaluating the string argument to hPutStr, in case doing so triggers another
 -- I/O operation on the same handle which would lead to deadlock.  The classic
@@ -388,6 +435,15 @@ hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 -- buffer into the handle's buffer, flushing one or both buffers, or
 -- maybe just swapping the buffers over (if the handle's buffer was
 -- empty).  See commitBuffer below.
+
+-- | Computation 'hPutStr' @hdl s@ writes the string
+-- @s@ to the file or channel managed by @hdl@.
+--
+-- This operation may fail with:
+--
+--  * 'isFullError' if the device is full; or
+--
+--  * 'isPermissionError' if another system resource limit would be exceeded.
 
 hPutStr :: Handle -> String -> IO ()
 hPutStr handle str = do
@@ -573,35 +629,18 @@ commitBuffer' hdl raw sz@(I# _) count@(I# _) flush release
 -- ---------------------------------------------------------------------------
 -- Reading/writing sequences of bytes.
 
-{-
-Semantics of hGetBuf:
-
-   - hGetBuf reads data into the buffer until either
-
-	(a) EOF is reached
-	(b) the buffer is full
-     
-     It returns the amount of data actually read.  This may
-     be zero in case (a).  hGetBuf never raises
-     an EOF exception, it always returns zero instead.
-
-     If the handle is a pipe or socket, and the writing end
-     is closed, hGetBuf will behave as for condition (a).
-
-Semantics of hPutBuf:
-
-    - hPutBuf writes data from the buffer to the handle 
-      until the buffer is empty.  It returns ().
-
-      If the handle is a pipe or socket, and the reading end is
-      closed, hPutBuf will raise a ResourceVanished exception.
-      (If this is a POSIX system, and the program has not 
-      asked to ignore SIGPIPE, then a SIGPIPE may be delivered
-      instead, whose default action is to terminate the program).
--}
-
 -- ---------------------------------------------------------------------------
 -- hPutBuf
+
+-- | 'hPutBuf' @hdl buf count@ writes @count@ 8-bit bytes from the
+-- buffer @buf@ to the handle @hdl@.  It returns ().
+--
+-- This operation may fail with:
+--
+--  * 'ResourceVanished' if the handle is a pipe or socket, and the
+--    reading end is closed.  (If this is a POSIX system, and the program
+--    has not asked to ignore SIGPIPE, then a SIGPIPE may be delivered
+--    instead, whose default action is to terminate the program).
 
 hPutBuf :: Handle			-- handle to write to
 	-> Ptr a			-- address of buffer
@@ -645,6 +684,18 @@ writeChunk fd is_stream ptr bytes = loop 0 bytes
 
 -- ---------------------------------------------------------------------------
 -- hGetBuf
+
+-- | 'hGetBuf' @hdl buf count@ reads data from the handle @hdl@
+-- into the buffer @buf@ until either EOF is reached or
+-- @count@ 8-bit bytes have been read.
+-- It returns the number of bytes actually read.  This may be zero if
+-- EOF was reached before any data was read (or if @count@ is zero).
+--
+-- 'hGetBuf' never raises an EOF exception, instead it returns a value
+-- smaller than @count@.
+--
+-- If the handle is a pipe or socket, and the writing end
+-- is closed, 'hGetBuf' will behave as if EOF was reached.
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
 hGetBuf handle ptr count

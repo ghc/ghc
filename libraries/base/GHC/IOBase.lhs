@@ -220,6 +220,34 @@ instance Eq (MVar a) where
 -- Note: when a Handle is garbage collected, we want to flush its buffer
 -- and close the OS file handle, so as to free up a (precious) resource.
 
+-- | Haskell defines operations to read and write characters from and to files,
+-- represented by values of type @Handle@.  Each value of this type is a
+-- /handle/: a record used by the Haskell run-time system to /manage/ I\/O
+-- with file system objects.  A handle has at least the following properties:
+-- 
+--  * whether it manages input or output or both;
+--
+--  * whether it is /open/, /closed/ or /semi-closed/;
+--
+--  * whether the object is seekable;
+--
+--  * whether buffering is disabled, or enabled on a line or block basis;
+--
+--  * a buffer (whose length may be zero).
+--
+-- Most handles will also have a current I\/O position indicating where the next
+-- input or output operation will occur.  A handle is /readable/ if it
+-- manages only input or both input and output; likewise, it is /writable/ if
+-- it manages only output or both input and output.  A handle is /open/ when
+-- first allocated.
+-- Once it is closed it can no longer be used for either input or output,
+-- though an implementation cannot re-use its storage while references
+-- remain to it.  Handles are in the 'Show' and 'Eq' classes.  The string
+-- produced by showing a handle is system dependent; it should include
+-- enough information to identify the handle for debugging.  A handle is
+-- equal according to '==' only to itself; no attempt
+-- is made to compare the internal state of different handles for equality.
+
 data Handle 
   = FileHandle				-- A normal handle to a file
 	FilePath			-- the file (invariant)
@@ -340,53 +368,63 @@ isWritableHandleType WriteHandle     = True
 isWritableHandleType ReadWriteHandle = True
 isWritableHandleType _	       	     = False
 
--- File names are specified using @FilePath@, a OS-dependent
--- string that (hopefully, I guess) maps to an accessible file/object.
+-- | File and directory names are values of type 'String', whose precise
+-- meaning is operating system dependent. Files can be opened, yielding a
+-- handle which can then be used to operate on the contents of that file.
 
 type FilePath = String
 
 -- ---------------------------------------------------------------------------
 -- Buffering modes
 
--- Three kinds of buffering are supported: line-buffering, 
+-- | Three kinds of buffering are supported: line-buffering, 
 -- block-buffering or no-buffering.  These modes have the following
--- effects. For output, items are written out from the internal
--- buffer according to the buffer mode:
+-- effects. For output, items are written out, or /flushed/,
+-- from the internal buffer according to the buffer mode:
 --
--- o line-buffering  the entire output buffer is written
---   out whenever a newline is output, the output buffer overflows, 
---   a flush is issued, or the handle is closed.
+--  * /line-buffering/: the entire output buffer is flushed
+--    whenever a newline is output, the buffer overflows, 
+--    a 'System.IO.hFlush' is issued, or the handle is closed.
 --
--- o block-buffering the entire output buffer is written out whenever 
---   it overflows, a flush is issued, or the handle
---   is closed.
+--  * /block-buffering/: the entire buffer is written out whenever it
+--    overflows, a 'System.IO.hFlush' is issued, or the handle is closed.
 --
--- o no-buffering output is written immediately, and never stored
---   in the output buffer.
+--  * /no-buffering/: output is written immediately, and never stored
+--    in the buffer.
 --
+-- An implementation is free to flush the buffer more frequently,
+-- but not less frequently, than specified above.
 -- The output buffer is emptied as soon as it has been written out.
-
+--
 -- Similarly, input occurs according to the buffer mode for handle {\em hdl}.
-
--- o line-buffering when the input buffer for the handle is not empty,
---   the next item is obtained from the buffer;
---   otherwise, when the input buffer is empty,
---   characters up to and including the next newline
---   character are read into the buffer.  No characters
---   are available until the newline character is
---   available.
 --
--- o block-buffering when the input buffer for the handle becomes empty,
---   the next block of data is read into this buffer.
+--  * /line-buffering/: when the buffer for the handle is not empty,
+--    the next item is obtained from the buffer; otherwise, when the
+--    buffer is empty, characters up to and including the next newline
+--    character are read into the buffer.  No characters are available
+--    until the newline character is available or the buffer is full.
 --
--- o no-buffering the next input item is read and returned.
-
+--  * /block-buffering/: when the buffer for the handle becomes empty,
+--    the next block of data is read into the buffer.
+--
+--  * /no-buffering/: the next input item is read and returned.
+--    The 'hLookAhead' operation implies that even a no-buffered handle
+--    may require a one-character buffer.
+--
+-- The default buffering mode when a handle is opened is
+-- implementation-dependent and may depend on the file system object
+-- which is attached to that handle.
 -- For most implementations, physical files will normally be block-buffered 
--- and terminals will normally be line-buffered. (the IO interface provides
--- operations for changing the default buffering of a handle tho.)
+-- and terminals will normally be line-buffered.
 
 data BufferMode  
- = NoBuffering | LineBuffering | BlockBuffering (Maybe Int)
+ = NoBuffering	-- ^ buffering is disabled if possible.
+ | LineBuffering
+		-- ^ line-buffering should be enabled if possible.
+ | BlockBuffering (Maybe Int)
+		-- ^ block-buffering should be enabled if possible.
+		-- The size of the buffer is @n@ items if the argument
+		-- is 'Just' @n@ and is otherwise implementation-dependent.
    deriving (Eq, Ord, Read, Show)
 
 -- ---------------------------------------------------------------------------

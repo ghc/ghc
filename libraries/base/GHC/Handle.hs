@@ -590,6 +590,7 @@ fd_stdin  = 0 :: FD
 fd_stdout = 1 :: FD
 fd_stderr = 2 :: FD
 
+-- | A handle managing input from the Haskell program's standard input channel.
 stdin :: Handle
 stdin = unsafePerformIO $ do
    -- ToDo: acquire lock
@@ -597,6 +598,7 @@ stdin = unsafePerformIO $ do
    (buf, bmode) <- getBuffer fd_stdin ReadBuffer
    mkStdHandle fd_stdin "<stdin>" ReadHandle buf bmode
 
+-- | A handle managing output to the Haskell program's standard output channel.
 stdout :: Handle
 stdout = unsafePerformIO $ do
    -- ToDo: acquire lock
@@ -606,6 +608,7 @@ stdout = unsafePerformIO $ do
    (buf, bmode) <- getBuffer fd_stdout WriteBuffer
    mkStdHandle fd_stdout "<stdout>" WriteHandle buf bmode
 
+-- | A handle managing output to the Haskell program's standard error channel.
 stderr :: Handle
 stderr = unsafePerformIO $ do
     -- ToDo: acquire lock
@@ -618,40 +621,47 @@ stderr = unsafePerformIO $ do
 -- ---------------------------------------------------------------------------
 -- Opening and Closing Files
 
-{-
-Computation `openFile file mode' allocates and returns a new, open
-handle to manage the file `file'.  It manages input if `mode'
-is `ReadMode', output if `mode' is `WriteMode' or `AppendMode',
-and both input and output if mode is `ReadWriteMode'.
-
-If the file does not exist and it is opened for output, it should be
-created as a new file.  If `mode' is `WriteMode' and the file
-already exists, then it should be truncated to zero length.  The
-handle is positioned at the end of the file if `mode' is
-`AppendMode', and otherwise at the beginning (in which case its
-internal position is 0).
-
-Implementations should enforce, locally to the Haskell process,
-multiple-reader single-writer locking on files, which is to say that
-there may either be many handles on the same file which manage input,
-or just one handle on the file which manages output.  If any open or
-semi-closed handle is managing a file for output, no new handle can be
-allocated for that file.  If any open or semi-closed handle is
-managing a file for input, new handles can only be allocated if they
-do not manage output.
-
-Two files are the same if they have the same absolute name.  An
-implementation is free to impose stricter conditions.
--}
-
 addFilePathToIOError fun fp (IOError h iot _ str _)
   = IOError h iot fun str (Just fp)
+
+-- | Computation 'openFile' @file mode@ allocates and returns a new, open
+-- handle to manage the file @file@.  It manages input if @mode@
+-- is 'ReadMode', output if @mode@ is 'WriteMode' or 'AppendMode',
+-- and both input and output if mode is 'ReadWriteMode'.
+--
+-- If the file does not exist and it is opened for output, it should be
+-- created as a new file.  If @mode@ is 'WriteMode' and the file
+-- already exists, then it should be truncated to zero length.
+-- Some operating systems delete empty files, so there is no guarantee
+-- that the file will exist following an 'openFile' with @mode@
+-- 'WriteMode' unless it is subsequently written to successfully.
+-- The handle is positioned at the end of the file if `mode' is
+-- `AppendMode', and otherwise at the beginning (in which case its
+-- internal position is 0).
+-- The initial buffer mode is implementation-dependent.
+--
+-- This operation may fail with:
+--
+--  * 'isAlreadyInUseError' if the file is already open and cannot be reopened;
+--
+--  * 'isDoesNotExistError' if the file does not exist; or
+--
+--  * 'isPermissionError' if the user does not have permission to open the file.
 
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
   catch 
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE)
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
+
+-- | Like 'openFile', but open the file in binary mode.
+-- On Windows, reading a file in text mode (which is the default)
+-- will translate CRLF to LF, and writing will translate LF to CRLF.
+-- This is usually what you want with text files.  With binary files
+-- this is undesirable; also, as usual under Microsoft operating systems,
+-- text mode treats control-Z as EOF.  Binary mode turns off all special
+-- treatment of end-of-line and end-of-file characters.
+-- (See also 'hSetBinaryMode'.)
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
@@ -827,12 +837,14 @@ initBufferState _ 	   = WriteBuffer
 -- ---------------------------------------------------------------------------
 -- Closing a handle
 
--- Computation `hClose hdl' makes handle `hdl' closed.  Before the
--- computation finishes, any items buffered for output and not already
--- sent to the operating system are flushed as for `hFlush'.
-
--- For a duplex handle, we close&flush the write side, and just close
--- the read side.
+-- | Computation 'hClose' @hdl@ makes handle @hdl@ closed.  Before the
+-- computation finishes, if @hdl@ is writable its buffer is flushed as
+-- for 'hFlush'.
+-- Performing 'hClose' on a handle that has already been closed has no effect; 
+-- doing so not an error.  All other operations on a closed handle will fail.
+-- If 'hClose' fails for any reason, any further operations (apart from
+-- 'hClose') on the handle will still fail as if @hdl@ had been successfully
+-- closed.
 
 hClose :: Handle -> IO ()
 hClose h@(FileHandle _ m)     = hClose' h m
@@ -885,9 +897,8 @@ hClose_handle_ handle_ = do
 -----------------------------------------------------------------------------
 -- Detecting the size of a file
 
--- For a handle `hdl' which attached to a physical file, `hFileSize
--- hdl' returns the size of `hdl' in terms of the number of items
--- which can be read from `hdl'.
+-- | For a handle @hdl@ which attached to a physical file,
+-- 'hFileSize' @hdl@ returns the size of that file in 8-bit bytes.
 
 hFileSize :: Handle -> IO Integer
 hFileSize handle =
@@ -905,10 +916,10 @@ hFileSize handle =
 -- ---------------------------------------------------------------------------
 -- Detecting the End of Input
 
--- For a readable handle `hdl', `hIsEOF hdl' returns
--- `True' if no further input can be taken from `hdl' or for a
--- physical file, if the current I/O position is equal to the length of
--- the file.  Otherwise, it returns `False'.
+-- | For a readable handle @hdl@, 'hIsEOF' @hdl@ returns
+-- 'True' if no further input can be taken from @hdl@ or for a
+-- physical file, if the current I\/O position is equal to the length of
+-- the file.  Otherwise, it returns 'False'.
 
 hIsEOF :: Handle -> IO Bool
 hIsEOF handle =
@@ -916,15 +927,22 @@ hIsEOF handle =
      (do hLookAhead handle; return False)
      (\e -> if isEOFError e then return True else ioError e)
 
+-- | The computation 'isEOF' is identical to 'hIsEOF',
+-- except that it works only on 'stdin'.
+
 isEOF :: IO Bool
 isEOF = hIsEOF stdin
 
 -- ---------------------------------------------------------------------------
 -- Looking ahead
 
--- hLookahead returns the next character from the handle without
--- removing it from the input buffer, blocking until a character is
--- available.
+-- | Computation 'hLookahead' returns the next character from the handle
+-- without removing it from the input buffer, blocking until a character
+-- is available.
+--
+-- This operation may fail with:
+--
+--  * 'isEOFError' if the end of file has been reached.
 
 hLookAhead :: Handle -> IO Char
 hLookAhead handle = do
@@ -951,23 +969,21 @@ hLookAhead handle = do
 -- block-buffering or no-buffering.  See GHC.IOBase for definition and
 -- further explanation of what the type represent.
 
--- Computation `hSetBuffering hdl mode' sets the mode of buffering for
+-- | Computation 'hSetBuffering' @hdl mode@ sets the mode of buffering for
 -- handle hdl on subsequent reads and writes.
 --
---   * If mode is LineBuffering, line-buffering should be enabled if possible.
+-- If the buffer mode is changed from 'BlockBuffering' or
+-- 'LineBuffering' to 'NoBuffering', then
 --
---   * If mode is `BlockBuffering size', then block-buffering
---     should be enabled if possible.  The size of the buffer is n items
---     if size is `Just n' and is otherwise implementation-dependent.
+--  * if @hdl@ is writable, the buffer is flushed as for 'hFlush';
 --
---   * If mode is NoBuffering, then buffering is disabled if possible.
-
--- If the buffer mode is changed from BlockBuffering or
--- LineBuffering to NoBuffering, then any items in the output
--- buffer are written to the device, and any items in the input buffer
--- are discarded.  The default buffering mode when a handle is opened
--- is implementation-dependent and may depend on the object which is
--- attached to that handle.
+--  * if @hdl@ is not writable, the contents of the buffer is discarded.
+--
+-- This operation may fail with:
+--
+--  * 'isPermissionError' if the handle has already been used for reading
+--    or writing and the implementation does not allow the buffering mode
+--    to be changed.
 
 hSetBuffering :: Handle -> BufferMode -> IO ()
 hSetBuffering handle mode =
@@ -1020,9 +1036,16 @@ hSetBuffering handle mode =
 -- -----------------------------------------------------------------------------
 -- hFlush
 
--- The action `hFlush hdl' causes any items buffered for output
--- in handle `hdl' to be sent immediately to the operating
--- system.
+-- | The action 'hFlush' @hdl@ causes any items buffered for output
+-- in handle `hdl' to be sent immediately to the operating system.
+--
+-- This operation may fail with:
+--
+--  * 'isFullError' if the device is full;
+--
+--  * 'isPermissionError' if a system resource limit would be exceeded.
+--    It is unspecified whether the characters in the buffer are discarded
+--    or retained under these circumstances.
 
 hFlush :: Handle -> IO () 
 hFlush handle =
@@ -1052,14 +1075,21 @@ instance Show HandlePosn where
   -- that reports the position back via (merely) an Int.
 type HandlePosition = Integer
 
--- Computation `hGetPosn hdl' returns the current I/O position of
--- `hdl' as an abstract position.  Computation `hSetPosn p' sets the
--- position of `hdl' to a previously obtained position `p'.
+-- | Computation 'hGetPosn' @hdl@ returns the current I\/O position of
+-- @hdl@ as a value of the abstract type 'HandlePosn'.
 
 hGetPosn :: Handle -> IO HandlePosn
 hGetPosn handle = do
     posn <- hTell handle
     return (HandlePosn handle posn)
+
+-- | If a call to 'hGetPosn' @hdl@ returns a position @p@,
+-- then computation 'hSetPosn' @p@ sets the position of @hdl@
+-- to the position it held at the time of the call to 'hGetPosn'.
+--
+-- This operation may fail with:
+--
+--  * 'isPermissionError' if a system resource limit would be exceeded.
 
 hSetPosn :: HandlePosn -> IO () 
 hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
@@ -1067,25 +1097,16 @@ hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
 -- ---------------------------------------------------------------------------
 -- hSeek
 
-{-
-The action `hSeek hdl mode i' sets the position of handle
-`hdl' depending on `mode'.  If `mode' is
+-- | A mode that determines the effect of 'hSeek' @hdl mode i@, as follows:
+data SeekMode
+  = AbsoluteSeek	-- ^ the position of @hdl@ is set to @i@.
+  | RelativeSeek	-- ^ the position of @hdl@ is set to offset @i@
+			-- from the current position.
+  | SeekFromEnd		-- ^ the position of @hdl@ is set to offset @i@
+			-- from the end of the file.
+    deriving (Eq, Ord, Ix, Enum, Read, Show)
 
- * AbsoluteSeek - The position of `hdl' is set to `i'.
- * RelativeSeek - The position of `hdl' is set to offset `i' from
-                  the current position.
- * SeekFromEnd  - The position of `hdl' is set to offset `i' from
-                  the end of the file.
-
-Some handles may not be seekable (see `hIsSeekable'), or only
-support a subset of the possible positioning operations (e.g. it may
-only be possible to seek to the end of a tape, or to a positive
-offset from the beginning or current position).
-
-It is not possible to set a negative I/O position, or for a physical
-file, an I/O position beyond the current end-of-file. 
-
-Note: 
+{- Note: 
  - when seeking using `SeekFromEnd', positive offsets (>=0) means
    seeking at or past EOF.
 
@@ -1094,8 +1115,23 @@ Note:
    clear here.
 -}
 
-data SeekMode    =  AbsoluteSeek | RelativeSeek | SeekFromEnd
-                    deriving (Eq, Ord, Ix, Enum, Read, Show)
+-- | Computation 'hSeek' @hdl mode i@ sets the position of handle
+-- @hdl@ depending on @mode@.
+-- The offset @i@ is given in terms of 8-bit bytes.
+--
+-- If @hdl@ is block- or line-buffered, then seeking to a position which is not
+-- in the current buffer will first cause any items in the output buffer to be
+-- written to the device, and then cause the input buffer to be discarded.
+-- Some handles may not be seekable (see 'hIsSeekable'), or only support a
+-- subset of the possible positioning operations (for instance, it may only
+-- be possible to seek to the end of a tape, or to a positive offset from
+-- the beginning or current position).
+-- It is not possible to set a negative I\/O position, or for
+-- a physical file, an I\/O position beyond the current end-of-file.
+--
+-- This operation may fail with:
+--
+--  * 'isPermissionError' if a system resource limit would be exceeded.
 
 hSeek :: Handle -> SeekMode -> Integer -> IO () 
 hSeek handle mode offset =
@@ -1211,7 +1247,8 @@ hIsWritable handle =
       SemiClosedHandle 	   -> ioe_closedHandle
       htype 		   -> return (isWritableHandleType htype)
 
--- Querying how a handle buffers its data:
+-- | Computation 'hGetBuffering' @hdl@ returns the current buffering mode
+-- for @hdl@.
 
 hGetBuffering :: Handle -> IO BufferMode
 hGetBuffering handle = 
@@ -1276,14 +1313,9 @@ hIsTerminalDevice handle = do
 -- -----------------------------------------------------------------------------
 -- hSetBinaryMode
 
--- | On Windows, reading a file in text mode (which is the default) will
--- translate CRLF to LF, and writing will translate LF to CRLF. This
--- is usually what you want with text files. With binary files this is
--- undesirable; also, as usual under Microsoft operating systems, text
--- mode treats control-Z as EOF.  Setting binary mode using
--- 'hSetBinaryMode' turns off all special treatment of end-of-line and
--- end-of-file characters.
---
+-- | Select binary mode ('True') or text mode ('False') on a open handle.
+-- (GHC only; see also 'openBinaryFile'.)
+
 hSetBinaryMode :: Handle -> Bool -> IO ()
 hSetBinaryMode handle bin =
   withAllHandles__ "hSetBinaryMode" handle $ \ handle_ ->
@@ -1359,8 +1391,8 @@ hDuplicateTo h1 _ =
 -- ---------------------------------------------------------------------------
 -- showing Handles.
 --
--- hShow is in the IO monad, and gives more comprehensive output
--- than the (pure) instance of Show for Handle.
+-- | 'hShow' is in the 'IO' monad, and gives more comprehensive output
+-- than the (pure) instance of 'Show' for 'Handle'.
 
 hShow :: Handle -> IO String
 hShow h@(FileHandle path _) = showHandle' path False h
