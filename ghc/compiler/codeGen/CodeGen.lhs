@@ -48,11 +48,15 @@ import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn, showPass )
 import Panic		( assertPanic )
+
+#ifdef DEBUG
+import Id		( idCafInfo )
+import IdInfo		( mayHaveCafRefs )
+import Outputable
+#endif
 \end{code}
 
 \begin{code}
-
-
 codeGen :: DynFlags
 	-> Module		-- Module name
 	-> [Module]		-- Import names
@@ -260,7 +264,11 @@ cgTopRhs bndr (StgRhsCon cc con args)
     forkStatics (cgTopRhsCon bndr con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
-  = ASSERT(null fvs) -- There should be no free variables
+  =     -- There should be no free variables
+    ASSERT(null fvs)
+	-- If the closure is a thunk, then the binder must be recorded as such.
+    ASSERT2(not (isUpdatable upd_flag) || mayHaveCafRefs (idCafInfo bndr), ppr bndr)
+
     getSRTLabel `thenFC` \srt_label ->
     let lf_info = 
 	  mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args srt_label srt
