@@ -1,10 +1,32 @@
-* export some missing operations from ST/LazyST
-* remove wired-in runST from the compiler, move runST from STBase to Unsafe
-  and give it a type signature.
-* fix cut-n-paste-o in PosixUtils.lhs.
-* better code for checking for overlapping(incomplete?) patterns.
-* -fwarn-simple-patterns for pattern-bindings that could fail.
-* win32 green-card stubs imported.
-* fix 'make carries on after errors' problem /again/.
-* driver fixed to be perl4 compatible again.
-* obscure happy bug fixed.
+Changes made since 2.08:
+
+\begin{itemize}
+
+\item export some missing operations from ST/LazyST
+
+\item remove wired-in @runST@ from the compiler, move @runST@ from
+@STBase@ to @Unsafe@ and give it a type signature.  Fix a bug in the
+compiler to do with universal quantification so this actually works.
+
+\item fix cut-n-paste-o in @PosixUtils.lhs@.
+
+\item better code for checking for overlapping(incomplete?) patterns.
+
+\item @-fwarn-simple-patterns@ for pattern-bindings that could fail.
+
+\item win32 green-card stubs imported.
+
+\item fix 'make carries on after errors' problem {\em again}.
+
+\item driver fixed to be perl4 compatible again.
+
+\item obscure happy bug fixed.
+
+\item @Word@ removed from hbc library to avoid conflicts.
+
+\item lots of fixes to the binary distribution system - you can now do
+@gmake binary-dist Project=Happy@ from the top-level and get a Happy
+binary distribution.  GHC binary distributions no longer contain
+Happy.  
+
+\end{itemize}
