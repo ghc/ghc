@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.19 2001/01/24 15:38:14 simonmar Exp $
+ * $Id: Signals.c,v 1.20 2001/07/26 03:24:01 ken Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -16,6 +16,10 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "StablePriv.h"
+
+#ifdef alpha_TARGET_ARCH
+#include <machine/fpu.h>
+#endif
 
 #ifndef mingw32_TARGET_OS
 
@@ -285,6 +289,11 @@ shutdown_handler(int sig STG_UNUSED)
  * Haskell code may install their own SIGINT handler, which is
  * fine, provided they're so kind as to put back the old one
  * when they de-install.
+ *
+ * In addition to handling SIGINT, the RTS also handles SIGFPE
+ * by ignoring it.  Apparently IEEE requires floating-point
+ * exceptions to be ignored by default, but alpha-dec-osf3
+ * doesn't seem to do so.
  */
 void
 init_default_handlers()
@@ -303,6 +312,17 @@ init_default_handlers()
     }
 
     siginterrupt(SIGINT, 1);
+
+    action.sa_handler = SIG_IGN;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+    if (sigaction(SIGFPE, &action, &oact) != 0) {
+      /* Oh well, at least we tried. */
+      prog_belch("failed to install SIGFPE handler");
+    }
+#ifdef alpha_TARGET_ARCH
+    ieee_set_fp_control(0);
+#endif
 }
 
 #endif /*! mingw32_TARGET_OS */
