@@ -1598,42 +1598,49 @@ tcSimplifyTop wanted_lie
 	std_groups = equivClasses cmp_by_tyvar stds
 
 		-- Pick the ones which its worth trying to disambiguate
-	(std_oks, std_bads) = partition worth_a_try std_groups
-
-		-- Have a try at disambiguation
-		-- if the type variable isn't bound
+		-- namely, the onese whose type variable isn't bound
 		-- up with one of the non-standard classes
+	(std_oks, std_bads)	= partition worth_a_try std_groups
 	worth_a_try group@(d:_) = not (non_std_tyvars `intersectsVarSet` tyVarsOfInst d)
 	non_std_tyvars		= unionVarSets (map tyVarsOfInst non_stds)
 
 		-- Collect together all the bad guys
-	bad_guys = non_stds ++ concat std_bads
+	bad_guys 	       = non_stds ++ concat std_bads
+    	(tidy_env, tidy_dicts) = tidyInsts bad_guys
+    	(bad_ips, non_ips)     = partition is_ip tidy_dicts
+    	(no_insts, ambigs)     = partition no_inst non_ips
+    	is_ip d   = any isIPPred (predsOfInst d)
+    	no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
+    	fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
     in
 
-    ifErrsTc (returnTc []) (
-	-- Don't check for ambiguous things
-	-- if there has been an error; errors often
+	-- Report definite errors
+    mapNF_Tc (addTopInstanceErrs tidy_env) (groupInsts no_insts)	`thenNF_Tc_`
+    mapNF_Tc (addTopIPErrs tidy_env)       (groupInsts bad_ips)		`thenNF_Tc_`
+
+	-- Deal with ambiguity errors, but only if
+	-- if there has not been an error so far; errors often
 	-- give rise to spurious ambiguous Insts
+    ifErrsTc (returnTc []) (
 	
-    
-	-- And complain about the ones that don't fall under
+	-- Complain about the ones that don't fall under
 	-- the Haskell rules for disambiguation
 	-- This group includes both non-existent instances
 	--	e.g. Num (IO a) and Eq (Int -> Int)
 	-- and ambiguous dictionaries
 	--	e.g. Num a
-        addTopAmbigErrs bad_guys	`thenNF_Tc_`
+	mapNF_Tc (addAmbigErr tidy_env)	ambigs	`thenNF_Tc_`
 
 	-- Disambiguate the ones that look feasible
         mapTc disambigGroup std_oks
     )					`thenTc` \ binds_ambig ->
 
-
     returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
   where
-    wanteds	= lieToList wanted_lie
+    wanteds = lieToList wanted_lie
 
-    d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
+----------------------------------
+d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
 get_tv d   = case getDictClassTys d of
 		   (clas, [ty]) -> tcGetTyVar "tcSimplify" ty
@@ -1886,20 +1893,6 @@ groupInsts (inst:insts) = (inst:friends) : groupInsts others
 			  (friends, others) = partition is_friend insts
 			  loc_msg	    = showSDoc (pprInstLoc (instLoc inst))
 			  is_friend friend  = showSDoc (pprInstLoc (instLoc friend)) == loc_msg
-
-
-addTopAmbigErrs dicts
-  = mapNF_Tc (addTopInstanceErrs tidy_env) (groupInsts no_insts)	`thenNF_Tc_`
-    mapNF_Tc (addTopIPErrs tidy_env)       (groupInsts bad_ips)		`thenNF_Tc_`
-    mapNF_Tc (addAmbigErr tidy_env)	   ambigs			`thenNF_Tc_`
-    returnNF_Tc ()
-  where
-    fixed_tvs = oclose (predsOfInsts tidy_dicts) emptyVarSet
-    (tidy_env, tidy_dicts) = tidyInsts dicts
-    (bad_ips, non_ips)     = partition is_ip tidy_dicts
-    (no_insts, ambigs)     = partition no_inst non_ips
-    is_ip d   = any isIPPred (predsOfInst d)
-    no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
 
 plural [x] = empty
 plural xs  = char 's'
