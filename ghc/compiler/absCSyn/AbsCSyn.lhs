@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.20 1999/03/03 17:41:13 simonm Exp $
+% $Id: AbsCSyn.lhs,v 1.21 1999/03/11 11:32:22 simonm Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -185,7 +185,6 @@ stored in a mixed type location.)
 	AbstractC		-- Slow entry point code
 	(Maybe AbstractC)
 				-- Fast entry point code, if any
-	(CLabel,SRT)		-- SRT info
 	String			-- Closure description; NB we can't get this
 				-- from ClosureInfo, because the latter refers 
 				-- to the *right* hand side of a defn, whereas

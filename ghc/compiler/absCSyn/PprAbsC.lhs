@@ -359,7 +359,7 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 		ppLocalnessMacro True{-include dyn-} info_lbl,
 		char ')'
 		],
-	nest 2 (ppr_payload (amodes ++ padding_wds)),
+	nest 2 (ppr_payload (amodes ++ padding_wds ++ static_link_field)),
 	ptext SLIT("};") ]
     }
   where
@@ -378,16 +378,18 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
       where 
 	rep = getAmodeRep item
 
-    -- always at least one padding word: this is the static link field for
-    -- the garbage collector.
     padding_wds =
 	if not (closureUpdReqd cl_info) then
-	    [mkIntCLit 0]
+	    []
     	else
-	    case 1 + (max 0 (mIN_UPD_SIZE - length amodes)) of { still_needed ->
+	    case max 0 (mIN_UPD_SIZE - length amodes) of { still_needed ->
 	    nOfThem still_needed (mkIntCLit 0) } -- a bunch of 0s
 
-pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast srt cl_descr) _
+    static_link_field
+	| staticClosureNeedsLink cl_info = [mkIntCLit 0]
+	| otherwise 			 = []
+
+pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
   = vcat [
 	hcat [
 	     ptext SLIT("INFO_TABLE"),
@@ -435,7 +437,8 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast srt cl_descr) _
     is_constr = maybeToBool maybe_tag
     (Just tag) = maybe_tag
 
-    needs_srt = has_srt srt && needsSRT cl_info
+    needs_srt = infoTblNeedsSRT cl_info
+    srt = getSRTInfo cl_info
 
     size = closureNonHdrSize cl_info
 
@@ -1461,7 +1464,7 @@ ppr_decls_AbsC (CStaticClosure closure_lbl closure_info cost_centre amodes)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = ppr_decls_Amodes amodes
 
-ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast _ _)
+ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast _)
   = ppr_decls_Amodes [entry_lbl]	    	`thenTE` \ p1 ->
     ppr_decls_AbsC slow				`thenTE` \ p2 ->
     (case maybe_fast of

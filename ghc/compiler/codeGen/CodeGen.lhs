@@ -183,7 +183,9 @@ cgTopRhs bndr (StgRhsCon cc con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi srt fvs upd_flag args body)
   = ASSERT(null fvs) -- There should be no free variables
-    forkStatics (cgTopRhsClosure bndr cc bi srt args body lf_info)
-  where
-    lf_info = mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args
+    getSRTLabel `thenFC` \srt_label ->
+    let lf_info = 
+	  mkClosureLFInfo bndr TopLevel [{-no fvs-}] upd_flag args srt_label srt
+    in
+    forkStatics (cgTopRhsClosure bndr cc bi args body lf_info)
 \end{code}

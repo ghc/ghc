@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.19 1999/01/14 17:58:46 sof Exp $
+% $Id: CgExpr.lhs,v 1.20 1999/03/11 11:32:26 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -303,7 +303,7 @@ mkRhsClosure	bndr cc	bi srt
   && maybeToBool maybe_offset			-- Selectee is a component of the tuple
   && offset_into_int <= mAX_SPEC_SELECTEE_SIZE	-- Offset is small enough
   = ASSERT(is_single_constructor)
-    cgStdRhsClosure bndr cc bi srt [the_fv] [] body lf_info [StgVarArg the_fv]
+    cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
     lf_info 		  = mkSelectorLFInfo (idType bndr) offset_into_int 
 				(isUpdatable upd_flag)
@@ -345,7 +345,7 @@ mkRhsClosure 	bndr cc bi srt
  	&& arity <= mAX_SPEC_AP_SIZE 
 
  		   -- Ha! an Ap thunk
-	= cgStdRhsClosure bndr cc bi srt fvs [] body lf_info payload
+	= cgStdRhsClosure bndr cc bi fvs [] body lf_info payload
 
    where
 	lf_info = mkApLFInfo (idType bndr) upd_flag arity
@@ -359,8 +359,11 @@ The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
 mkRhsClosure bndr cc bi srt fvs upd_flag args body
-  = cgRhsClosure bndr cc bi srt fvs args body lf_info
-  where lf_info = mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
+  = getSRTLabel		`thenFC` \ srt_label ->
+    let lf_info = 
+	  mkClosureLFInfo bndr NotTopLevel fvs upd_flag args srt_label srt
+    in
+    cgRhsClosure bndr cc bi fvs args body lf_info
 \end{code}
 
 

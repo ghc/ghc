@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.24 1999/03/02 14:34:36 sof Exp $
+% $Id: CgClosure.lhs,v 1.25 1999/03/11 11:32:25 simonm Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -72,13 +72,12 @@ They should have no free variables.
 cgTopRhsClosure :: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
-	 	-> SRT
 		-> [Id]		-- Args
 		-> StgExpr
 		-> LambdaFormInfo
 		-> FCode (Id, CgIdInfo)
 
-cgTopRhsClosure id ccs binder_info srt args body lf_info
+cgTopRhsClosure id ccs binder_info args body lf_info
   = 	-- LAY OUT THE OBJECT
     let
 	closure_info = layOutStaticNoFVClosure name lf_info
@@ -107,7 +106,7 @@ cgTopRhsClosure id ccs binder_info srt args body lf_info
     							`thenC`
 
 	-- GENERATE THE INFO TABLE (IF NECESSARY)
-    forkClosureBody (closureCodeBody binder_info srt closure_info
+    forkClosureBody (closureCodeBody binder_info closure_info
 					 ccs args body)
 
     ) `thenC`
@@ -132,7 +131,6 @@ cgStdRhsClosure
 	:: Id
 	-> CostCentreStack	-- Optional cost centre annotation
 	-> StgBinderInfo
-	-> SRT			-- SRT info
 	-> [Id]			-- Free vars
 	-> [Id]			-- Args
 	-> StgExpr
@@ -140,7 +138,7 @@ cgStdRhsClosure
 	-> [StgArg]		-- payload
 	-> FCode (Id, CgIdInfo)
 
-cgStdRhsClosure binder cc binder_info srt fvs args body lf_info payload
+cgStdRhsClosure binder cc binder_info fvs args body lf_info payload
 		-- AHA!  A STANDARD-FORM THUNK
   = (
 	-- LAY OUT THE OBJECT
@@ -169,14 +167,13 @@ Here's the general case.
 cgRhsClosure	:: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
-		-> SRT			-- SRT info
 		-> [Id]			-- Free vars
 		-> [Id]			-- Args
 		-> StgExpr
 		-> LambdaFormInfo
 		-> FCode (Id, CgIdInfo)
 
-cgRhsClosure binder cc binder_info srt fvs args body lf_info
+cgRhsClosure binder cc binder_info fvs args body lf_info
   = (
   	-- LAY OUT THE OBJECT
 	--
@@ -223,7 +220,7 @@ cgRhsClosure binder cc binder_info srt fvs args body lf_info
 		nopC)					`thenC`
 
 		-- Compile the body
-	    closureCodeBody binder_info srt closure_info cc args body
+	    closureCodeBody binder_info closure_info cc args body
     )	`thenC`
 
 	-- BUILD THE OBJECT
@@ -245,7 +242,6 @@ cgRhsClosure binder cc binder_info srt fvs args body lf_info
 
 \begin{code}
 closureCodeBody :: StgBinderInfo
-		-> SRT
 		-> ClosureInfo	   -- Lots of information about this closure
 		-> CostCentreStack -- Optional cost centre attached to closure
 		-> [Id]
@@ -260,14 +256,13 @@ no argument satisfaction check, so fast and slow entry-point labels
 are the same.
 
 \begin{code}
-closureCodeBody binder_info srt closure_info cc [] body
+closureCodeBody binder_info closure_info cc [] body
   = -- thunks cannot have a primitive type!
     getAbsC body_code 	`thenFC` \ body_absC ->
     moduleName		`thenFC` \ mod_name ->
-    getSRTLabel		`thenFC` \ srt_label ->
 
     absC (CClosureInfoAndCode closure_info body_absC Nothing
-			      (srt_label, srt) (cl_descr mod_name))
+			      (cl_descr mod_name))
   where
     cl_descr mod_name = closureDescription mod_name (closureName closure_info)
 
@@ -291,7 +286,7 @@ argSatisfactionCheck (by calling fetchAndReschedule).  There info if
 Node points to closure is available. -- HWL
 
 \begin{code}
-closureCodeBody binder_info srt closure_info cc all_args body
+closureCodeBody binder_info closure_info cc all_args body
   = getEntryConvention name lf_info
 		       (map idPrimRep all_args)		`thenFC` \ entry_conv ->
 
@@ -408,7 +403,6 @@ closureCodeBody binder_info srt closure_info cc all_args body
 				`thenFC` \ slow_abs_c ->
     forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
     moduleName			`thenFC` \ mod_name ->
-    getSRTLabel			`thenFC` \ srt_label ->
 
 	-- Now either construct the info table, or put the fast code in alone
 	-- (We never have slow code without an info table)
@@ -417,7 +411,7 @@ closureCodeBody binder_info srt closure_info cc all_args body
     absC (
       if info_table_needed then
 	CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
-			(srt_label, srt) (cl_descr mod_name)
+			(cl_descr mod_name)
       else
 	CCodeBlock fast_label fast_abs_c
     )

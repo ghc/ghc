@@ -13,7 +13,8 @@ import CLabel		( CLabel )
 import StgSyn		( SRT(..) )
 import ClosureInfo	( closurePtrsSize,
 			  closureNonHdrSize, closureSMRep,
-			  infoTableLabelFromCI
+			  infoTableLabelFromCI,
+			  infoTblNeedsSRT, getSRTInfo
 			)
 import PrimRep		( PrimRep(..) )
 import SMRep		( SMRep(..), getSMRepClosureTypeInt )
@@ -33,15 +34,14 @@ genCodeInfoTable
     :: AbstractC
     -> UniqSM StixTreeList
 
-genCodeInfoTable (CClosureInfoAndCode cl_info _ _ srt cl_descr)
+genCodeInfoTable (CClosureInfoAndCode cl_info _ _ cl_descr)
   = returnUs (\xs -> StData PtrRep table : StLabel info_lbl : xs)
 
     where
 	info_lbl = infoTableLabelFromCI cl_info
 
-	table = case srt_len of 
-		   0 -> rest_of_table
-		   _ -> srt_label : rest_of_table
+	table | infoTblNeedsSRT cl_info	= srt_label : rest_of_table
+	      | otherwise               = rest_of_table
 
 	rest_of_table = 
 		[
@@ -62,7 +62,8 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ srt cl_descr)
 		    (fromInt closure_type `shiftL` 8) .|.
 		    (fromInt srt_len `shiftL` 16)
 #endif	     
-	     
+	srt = getSRTInfo cl_info	     
+
 	(srt_label,srt_len) = 
 	     case srt of
 		(lbl, NoSRT) -> (StInt 0, 0)

@@ -138,13 +138,9 @@ genConInfo comp_info tycon data_con
     closure_code = if zero_arity_con then 
 			AbsCNop 
 		   else 
-			CClosureInfoAndCode closure_info body Nothing 
-			   srt_info con_descr
+			CClosureInfoAndCode closure_info body Nothing con_descr
 
-    srt_info = (error "genConInfo: no srt label", NoSRT)
-
-    static_code  = CClosureInfoAndCode static_ci body Nothing 
-			srt_info con_descr
+    static_code  = CClosureInfoAndCode static_ci body Nothing con_descr
 
     tag	    	 = dataConTag data_con
 

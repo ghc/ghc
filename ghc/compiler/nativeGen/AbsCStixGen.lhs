@@ -23,7 +23,8 @@ import SMRep		( fixedItblSize,
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
-			  fastLabelFromCI, closureUpdReqd
+			  fastLabelFromCI, closureUpdReqd,
+			  staticClosureNeedsLink
 			)
 import Const		( Literal(..) )
 import Maybes	    	( maybeToBool )
@@ -97,7 +98,7 @@ Here we handle top-level things, like @CCodeBlock@s and
 			 LvSmall _ -> rET_SMALL
 			 LvLarge _ -> rET_BIG
 
- gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _ _)
+ gentopcode stmt@(CClosureInfoAndCode cl_info slow Nothing _)
 
   | slow_is_empty
   = genCodeInfoTable stmt		`thenUs` \ itbl ->
@@ -112,7 +113,7 @@ Here we handle top-level things, like @CCodeBlock@s and
     slow_is_empty = not (maybeToBool (nonemptyAbsC slow))
     slow_lbl = entryLabelFromCI cl_info
 
- gentopcode stmt@(CClosureInfoAndCode cl_info slow (Just fast) _ _) =
+ gentopcode stmt@(CClosureInfoAndCode cl_info slow (Just fast) _) =
  -- ToDo: what if this is empty? ------------------------^^^^
     genCodeInfoTable stmt		`thenUs` \ itbl ->
     gencode slow			`thenUs` \ slow_code ->
@@ -171,14 +172,17 @@ Here we handle top-level things, like @CCodeBlock@s and
   where
     table = StData PtrRep [StCLbl (infoTableLabelFromCI cl_info)] : 
 	    map (\amode -> StData (getAmodeRep amode) [a2stix amode]) amodes ++
-	    [StData PtrRep padding_wds]
+	    [StData PtrRep (padding_wds ++ static_link)]
 
     -- always at least one padding word: this is the static link field
     -- for the garbage collector.
     padding_wds = if closureUpdReqd cl_info then
-    	    		take (1 + max 0 (mIN_UPD_SIZE - length amodes)) zeros
+    	    		take (max 0 (mIN_UPD_SIZE - length amodes)) zeros
     	   	  else
-    	    		[StInt 0]
+    	    		[]
+
+    static_link | staticClosureNeedsLink cl_info = [StInt 0]
+	        | otherwise                      = []
 
     zeros = StInt 0 : zeros
 

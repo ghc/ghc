@@ -217,7 +217,7 @@ costs absC =
 
    CStaticClosure _ _ _ _    -> nullCosts
 
-   CClosureInfoAndCode _ _ _ _ _ -> nullCosts
+   CClosureInfoAndCode _ _ _ _ -> nullCosts
 
    CRetDirect _ _ _ _	     -> nullCosts
 

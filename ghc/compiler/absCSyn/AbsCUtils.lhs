@@ -305,11 +305,11 @@ flatAbsC (AbsCStmts s1 s2)
     returnFlt (mkAbsCStmts inline_s1 inline_s2,
 	       mkAbsCStmts top_s1    top_s2)
 
-flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast srt descr)
+flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast descr)
   = flatAbsC slow		`thenFlt` \ (slow_heres, slow_tops) ->
     flat_maybe maybe_fast	`thenFlt` \ (fast_heres, fast_tops) ->
     returnFlt (AbsCNop, mkAbstractCs [slow_tops, fast_tops,
-       CClosureInfoAndCode cl_info slow_heres fast_heres srt descr]
+       CClosureInfoAndCode cl_info slow_heres fast_heres descr]
     )
 
 flatAbsC (CCodeBlock label abs_C)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.34 1999/03/04 17:52:08 simonm Exp $
+% $Id: ClosureInfo.lhs,v 1.35 1999/03/11 11:32:27 simonm Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -50,7 +50,10 @@ module ClosureInfo (
 	allocProfilingMsg,
 	blackHoleClosureInfo,
 	maybeSelectorInfo,
-	needsSRT
+
+	infoTblNeedsSRT,
+	staticClosureNeedsLink,
+	getSRTInfo
     ) where
 
 #include "HsVersions.h"
@@ -118,6 +121,8 @@ data LambdaFormInfo
 	TopLevelFlag	-- True if top level
 	!Int		-- Arity
 	!Bool		-- True <=> no fvs
+	CLabel		-- SRT label
+	SRT		-- SRT info
 
   | LFCon		-- Constructor
 	DataCon		-- The constructor
@@ -133,6 +138,8 @@ data LambdaFormInfo
 	!Bool		-- True <=> no free vars
 	Bool		-- True <=> updatable (i.e., *not* single-entry)
 	StandardFormInfo
+	CLabel		-- SRT label
+	SRT		-- SRT info
 
   | LFArgument		-- Used for function arguments.  We know nothing about
 			-- this closure.  Treat like updatable "LFThunk"...
@@ -199,20 +206,23 @@ mkClosureLFInfo :: Id		-- The binder
 		-> [Id]		-- Free vars
 		-> UpdateFlag 	-- Update flag
 		-> [Id] 	-- Args
+		-> CLabel	-- SRT label
+		-> SRT		-- SRT info
 		-> LambdaFormInfo
 
-mkClosureLFInfo bndr top fvs upd_flag args@(_:_)  -- Non-empty args
-  = LFReEntrant (idType bndr) top (length args) (null fvs)
+mkClosureLFInfo bndr top fvs upd_flag args@(_:_) srt_label srt -- Non-empty args
+  = LFReEntrant (idType bndr) top (length args) (null fvs) srt_label srt
 
-mkClosureLFInfo bndr top fvs ReEntrant []
-  = LFReEntrant (idType bndr) top 0 (null fvs)
+mkClosureLFInfo bndr top fvs ReEntrant [] srt_label srt
+  = LFReEntrant (idType bndr) top 0 (null fvs) srt_label srt
 
-mkClosureLFInfo bndr top fvs upd_flag []
+mkClosureLFInfo bndr top fvs upd_flag [] srt_label srt
 #ifdef DEBUG
   | isUnLiftedType ty = pprPanic "mkClosureLFInfo" (ppr bndr <+> ppr ty)
 #endif
   | otherwise
   = LFThunk ty top (null fvs) (isUpdatable upd_flag) NonStandardThunk
+	srt_label srt
   where
     ty = idType bndr
 \end{code}
@@ -228,10 +238,14 @@ mkConLFInfo con
 
 mkSelectorLFInfo rhs_ty offset updatable
   = LFThunk rhs_ty NotTopLevel False updatable (SelectorThunk offset)
+	(error "mkSelectorLFInfo: no srt label")
+	(error "mkSelectorLFInfo: no srt")
 
 mkApLFInfo rhs_ty upd_flag arity
   = LFThunk rhs_ty NotTopLevel (arity == 0) (isUpdatable upd_flag) 
 	(ApThunk arity)
+	(error "mkApLFInfo: no srt label")
+	(error "mkApLFInfo: no srt")
 \end{code}
 
 Miscellaneous LF-infos.
@@ -247,7 +261,11 @@ mkLFImported id
       ArityExactly 0	-> LFThunk (idType id)
 				TopLevel True{-no fvs-}
 				True{-updatable-} NonStandardThunk
+				(error "mkLFImported: no srt label") 
+				(error "mkLFImported: no srt")
       ArityExactly n	-> LFReEntrant (idType id) TopLevel n True  -- n > 0
+				(error "mkLFImported: no srt label") 
+				(error "mkLFImported: no srt")
       other	   	-> LFImported	-- Not sure of exact arity
 \end{code}
 
@@ -434,14 +452,14 @@ chooseDynSMRep lf_info tot_wds ptr_wds
 getStaticClosureType :: LambdaFormInfo -> ClosureType
 getStaticClosureType lf_info =
     case lf_info of
-        LFCon con True        -> CONSTR_NOCAF
-	LFCon con False       -> CONSTR
-  	LFReEntrant _ _ _ _   -> FUN
-	LFTuple _ _	      -> CONSTR
-	LFThunk _ _ _ _ (SelectorThunk _) -> THUNK_SELECTOR
-	LFThunk _ _ _ True _  -> THUNK
-	LFThunk _ _ _ False _ -> FUN
-	_                     -> panic "getClosureType"
+        LFCon con True            -> CONSTR_NOCAF
+	LFCon con False           -> CONSTR
+  	LFReEntrant _ _ _ _ _ _   -> FUN
+	LFTuple _ _	          -> CONSTR
+	LFThunk _ _ _ _ (SelectorThunk _) _ _ -> THUNK_SELECTOR
+	LFThunk _ _ _ True  _ _ _ -> THUNK
+	LFThunk _ _ _ False _ _ _ -> FUN
+	_                         -> panic "getClosureType"
 
 -- we *do* get non-updatable top-level thunks sometimes.  eg. f = g
 -- gets compiled to a jump to g (if g has non-zero arity), instead of
@@ -457,7 +475,7 @@ getClosureType tot_wds ptrs nptrs lf_info =
 		| tot_wds > 0 && tot_wds <= mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n ptrs nptrs
 		| otherwise -> CONSTR
 
-  	LFReEntrant _ _ _ _ 
+  	LFReEntrant _ _ _ _ _ _
 		| tot_wds > 0 && tot_wds <= mAX_SPEC_FUN_SIZE -> FUN_p_n ptrs nptrs
 		| otherwise -> FUN
 
@@ -465,9 +483,9 @@ getClosureType tot_wds ptrs nptrs lf_info =
 		| tot_wds > 0 && tot_wds <= mAX_SPEC_CONSTR_SIZE -> CONSTR_p_n ptrs nptrs
 		| otherwise -> CONSTR
 
-	LFThunk _ _ _ _ (SelectorThunk _) -> THUNK_SELECTOR
+	LFThunk _ _ _ _ (SelectorThunk _) _ _ -> THUNK_SELECTOR
 
-	LFThunk _ _ _ _ _
+	LFThunk _ _ _ _ _ _ _
 		| tot_wds > 0 && tot_wds <= mAX_SPEC_THUNK_SIZE -> THUNK_p_n ptrs nptrs
 		| otherwise -> THUNK
 
@@ -523,7 +541,7 @@ nodeMustPointToIt :: LambdaFormInfo -> FCode Bool
 nodeMustPointToIt lf_info
 
   = case lf_info of
-	LFReEntrant ty top arity no_fvs -> returnFC (
+	LFReEntrant ty top arity no_fvs _ _ -> returnFC (
 	    not no_fvs ||   -- Certainly if it has fvs we need to point to it
 	    case top of { TopLevel -> False; _ -> True }
 		    -- If it is not top level we will point to it
@@ -550,7 +568,7 @@ nodeMustPointToIt lf_info
 	-- having Node point to the result of an update.  SLPJ
 	-- 27/11/92.
 
-	LFThunk _ _ no_fvs updatable NonStandardThunk
+	LFThunk _ _ no_fvs updatable NonStandardThunk _ _
 	  -> returnFC (updatable || not no_fvs || opt_SccProfilingOn)
 
 	  -- For the non-updatable (single-entry case):
@@ -560,7 +578,7 @@ nodeMustPointToIt lf_info
 	  -- or profiling (in which case we need to recover the cost centre
 	  --		 from inside it)
 
-	LFThunk _ _ no_fvs updatable some_standard_form_thunk
+	LFThunk _ _ no_fvs updatable some_standard_form_thunk _ _
 	  -> returnFC True
 	  -- Node must point to any standard-form thunk.
 
@@ -633,7 +651,7 @@ getEntryConvention name lf_info arg_kinds
 
     case lf_info of
 
-	LFReEntrant _ _ arity _ ->
+	LFReEntrant _ _ arity _ _ _ ->
 	    if arity == 0 || (length arg_kinds) < arity then
 		StdEntry (mkStdEntryLabel name)
 	    else
@@ -659,7 +677,7 @@ getEntryConvention name lf_info arg_kinds
 			     -- Should have no args (meaning what?)
 			     StdEntry (mkConEntryLabel (dataConName tup))
 
-	LFThunk _ _ _ updatable std_form_info
+	LFThunk _ _ _ updatable std_form_info _ _
 	  -> if updatable
 	     then ViaNode
 	     else StdEntry (thunkEntryLabel name std_form_info updatable)
@@ -694,9 +712,9 @@ blackHoleOnEntry (MkClosureInfo _ _ (StaticRep _ _ _)) = False
 
 blackHoleOnEntry (MkClosureInfo _ lf_info _)
   = case lf_info of
-	LFReEntrant _ _ _ _	  -> False
+	LFReEntrant _ _ _ _ _ _	  -> False
 	LFLetNoEscape _		  -> False
-	LFThunk _ _ no_fvs updatable _
+	LFThunk _ _ no_fvs updatable _ _ _
 	  -> if updatable
 	     then not opt_OmitBlackHoling
 	     else not no_fvs
@@ -704,23 +722,45 @@ blackHoleOnEntry (MkClosureInfo _ lf_info _)
 
 isStandardFormThunk :: LambdaFormInfo -> Bool
 
-isStandardFormThunk (LFThunk _ _ _ _ (SelectorThunk _)) = True
-isStandardFormThunk (LFThunk _ _ _ _ (ApThunk _)) 	= True
-isStandardFormThunk other_lf_info 			= False
+isStandardFormThunk (LFThunk _ _ _ _ (SelectorThunk _) _ _) = True
+isStandardFormThunk (LFThunk _ _ _ _ (ApThunk _) _ _)	    = True
+isStandardFormThunk other_lf_info 			    = False
 
 maybeSelectorInfo (MkClosureInfo _ (LFThunk _ _ _ _
-			(SelectorThunk offset)) _) = Just offset
+			(SelectorThunk offset) _ _) _) = Just offset
 maybeSelectorInfo _ = Nothing
+\end{code}
 
--- Does this thunk's info table have an SRT?
+-----------------------------------------------------------------------------
+SRT-related stuff
 
-needsSRT :: ClosureInfo -> Bool
-needsSRT (MkClosureInfo _ info _) =
+
+\begin{code}
+infoTblNeedsSRT :: ClosureInfo -> Bool
+infoTblNeedsSRT (MkClosureInfo _ info _) =
   case info of
-    LFThunk _ _ _ _ (SelectorThunk _) -> False 	-- not for selectors
-    LFThunk _ _ _ _ _   -> True
-    LFReEntrant _ _ _ _ -> True
+    LFThunk _ _ _ _ _ _ NoSRT   -> False
+    LFThunk _ _ _ _ _ _ _       -> True
+
+    LFReEntrant _ _ _ _ _ NoSRT -> False
+    LFReEntrant _ _ _ _ _ _     -> True
+
     _ -> False
+
+staticClosureNeedsLink :: ClosureInfo -> Bool
+staticClosureNeedsLink (MkClosureInfo _ info _) =
+  case info of
+    LFThunk _ _ _ _ _ _ NoSRT   -> False
+    LFReEntrant _ _ _ _ _ NoSRT -> False
+    LFCon _ True                -> False -- zero arity constructors
+    _ -> True
+
+getSRTInfo :: ClosureInfo -> (CLabel, SRT)
+getSRTInfo  (MkClosureInfo _ info _) =
+  case info of
+    LFThunk _ _ _ _ _ lbl srt   -> (lbl,srt)
+    LFReEntrant _ _ _ _ lbl srt -> (lbl,srt)
+    _ -> panic "getSRTInfo"
 \end{code}
 
 Avoiding generating entries and info tables
@@ -791,7 +831,7 @@ staticClosureRequired
 	-> LambdaFormInfo
 	-> Bool
 staticClosureRequired binder (StgBinderInfo arg_occ unsat_occ _ _ _)
-		      (LFReEntrant _ top_level _ _)	-- It's a function
+		      (LFReEntrant _ top_level _ _ _ _)	-- It's a function
   = ASSERT( case top_level of { TopLevel -> True; other -> False } )
 	-- Assumption: it's a top-level, no-free-var binding
     arg_occ 		-- There's an argument occurrence
@@ -821,7 +861,7 @@ funInfoTableRequired
 	-> LambdaFormInfo
 	-> Bool
 funInfoTableRequired  binder (StgBinderInfo arg_occ unsat_occ _ _ _)
-		     (LFReEntrant _ top_level _ _)
+		     (LFReEntrant _ top_level _ _ _ _)
   = (case top_level of { NotTopLevel -> True; TopLevel -> False })
     || arg_occ 		-- There's an argument occurrence
     || unsat_occ	-- There's an unsaturated call
@@ -852,7 +892,7 @@ closureLFInfo (MkClosureInfo _ lf_info _) = lf_info
 
 closureUpdReqd :: ClosureInfo -> Bool
 
-closureUpdReqd (MkClosureInfo _ (LFThunk _ _ _ upd _) _) = upd
+closureUpdReqd (MkClosureInfo _ (LFThunk _ _ _ upd _ _ _) _) = upd
 closureUpdReqd (MkClosureInfo _ LFBlackHole _)         = True
 	-- Black-hole closures are allocated to receive the results of an
 	-- alg case with a named default... so they need to be updated.
@@ -860,7 +900,7 @@ closureUpdReqd other_closure			       = False
 
 closureSingleEntry :: ClosureInfo -> Bool
 
-closureSingleEntry (MkClosureInfo _ (LFThunk _ _ _ upd _) _) = not upd
+closureSingleEntry (MkClosureInfo _ (LFThunk _ _ _ upd _ _ _) _) = not upd
 closureSingleEntry other_closure			   = False
 \end{code}
 
@@ -879,8 +919,8 @@ isToplevClosure :: ClosureInfo -> Bool
 
 isToplevClosure (MkClosureInfo _ lf_info _)
   = case lf_info of
-      LFReEntrant _ TopLevel _ _ -> True
-      LFThunk _ TopLevel _ _ _   -> True
+      LFReEntrant _ TopLevel _ _ _ _ -> True
+      LFThunk _ TopLevel _ _ _ _ _   -> True
       other -> False
 \end{code}
 
@@ -895,7 +935,7 @@ Label generation.
 
 \begin{code}
 fastLabelFromCI :: ClosureInfo -> CLabel
-fastLabelFromCI (MkClosureInfo name (LFReEntrant _ _ arity _) _)
+fastLabelFromCI (MkClosureInfo name (LFReEntrant _ _ arity _ _ _) _)
   = mkFastEntryLabel name arity
 
 fastLabelFromCI (MkClosureInfo name _ _)
@@ -909,10 +949,10 @@ infoTableLabelFromCI (MkClosureInfo id lf_info rep)
 
 	LFBlackHole     -> mkBlackHoleInfoTableLabel
 
-	LFThunk _ _ _ upd_flag (SelectorThunk offset) -> 
+	LFThunk _ _ _ upd_flag (SelectorThunk offset) _ _ -> 
 		mkSelectorInfoLabel upd_flag offset
 
-	LFThunk _ _ _ upd_flag (ApThunk arity) -> 
+	LFThunk _ _ _ upd_flag (ApThunk arity) _ _ -> 
 		mkApInfoTableLabel upd_flag arity
 
 	other -> {-NO: if isStaticRep rep
@@ -945,7 +985,7 @@ closureLabelFromCI (MkClosureInfo id _ other_rep)   = mkClosureLabel id
 entryLabelFromCI :: ClosureInfo -> CLabel
 entryLabelFromCI (MkClosureInfo id lf_info rep)
   = case lf_info of
-	LFThunk _ _ _ upd_flag std_form_info -> thunkEntryLabel id std_form_info upd_flag
+	LFThunk _ _ _ upd_flag std_form_info _ _ -> thunkEntryLabel id std_form_info upd_flag
 	LFCon con _			     -> mkConEntryPtr con rep
 	LFTuple tup _			     -> mkConEntryPtr tup rep
 	other				     -> mkStdEntryLabel id
@@ -966,10 +1006,10 @@ allocProfilingMsg :: ClosureInfo -> FAST_STRING
 
 allocProfilingMsg (MkClosureInfo _ lf_info _)
   = case lf_info of
-      LFReEntrant _ _ _ _	-> SLIT("TICK_ALLOC_FUN")
+      LFReEntrant _ _ _ _ _ _	-> SLIT("TICK_ALLOC_FUN")
       LFCon _ _			-> SLIT("TICK_ALLOC_CON")
       LFTuple _ _		-> SLIT("TICK_ALLOC_CON")
-      LFThunk _ _ _ _ _		-> SLIT("TICK_ALLOC_THK")
+      LFThunk _ _ _ _ _ _ _     -> SLIT("TICK_ALLOC_THK")
       LFBlackHole		-> SLIT("TICK_ALLOC_BH")
       LFImported		-> panic "TICK_ALLOC_IMP"
 \end{code}
@@ -999,9 +1039,9 @@ in the closure info using @closureTypeDescr@.
 
 \begin{code}
 closureTypeDescr :: ClosureInfo -> String
-closureTypeDescr (MkClosureInfo name (LFThunk ty _ _ _ _) _)
+closureTypeDescr (MkClosureInfo name (LFThunk ty _ _ _ _ _ _) _)
   = getTyDescription ty
-closureTypeDescr (MkClosureInfo name (LFReEntrant ty _ _ _) _)
+closureTypeDescr (MkClosureInfo name (LFReEntrant ty _ _ _ _ _) _)
   = getTyDescription ty
 closureTypeDescr (MkClosureInfo name lf _)
   = showSDoc (ppr name)
