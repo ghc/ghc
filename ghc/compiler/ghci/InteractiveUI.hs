@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.110 2002/01/24 16:55:36 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.111 2002/01/28 12:01:12 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -40,7 +40,7 @@ import Name		( Name, isHomePackageName, nameSrcLoc, nameOccName,
 import OccName		( isSymOcc )
 import BasicTypes	( defaultFixity )
 import Outputable
-import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags,
+import CmdLineOpts	( DynFlag(..), DynFlags(..), getDynFlags, saveDynFlags,
 			  restoreDynFlags, dopt_unset )
 import Panic		( GhcException(..), showGhcException )
 import Config
@@ -148,12 +148,12 @@ interactiveUI cmstate paths cmdline_libs = do
    hFlush stdout
    hSetBuffering stdout NoBuffering
 
+   dflags <- getDynFlags
+
    -- link in the available packages
    pkgs <- getPackageInfo
    initLinker
-   linkPackages cmdline_libs pkgs
-
-   dflags <- getDynFlags
+   linkPackages dflags cmdline_libs pkgs
 
    (cmstate, maybe_hval) 
 	<- cmCompileExpr cmstate dflags "IO.hSetBuffering IO.stdout IO.NoBuffering Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
@@ -180,7 +180,7 @@ interactiveUI cmstate paths cmdline_libs = do
    Readline.initialize
 #endif
 
-   startGHCi (runGHCi paths) 
+   startGHCi (runGHCi paths dflags) 
 	GHCiState{ progname = "<interactive>",
 		   args = [],
 		   targets = paths,
@@ -194,8 +194,8 @@ interactiveUI cmstate paths cmdline_libs = do
    return ()
 
 
-runGHCi :: [FilePath] -> GHCi ()
-runGHCi paths = do
+runGHCi :: [FilePath] -> DynFlags -> GHCi ()
+runGHCi paths dflags = do
   read_dot_files <- io (readIORef v_Read_DotGHCi)
 
   when (read_dot_files) $ do
@@ -233,20 +233,24 @@ runGHCi paths = do
 	loadModule (unwords paths)
 
   -- enter the interactive loop
-  interactiveLoop
+  is_tty <- io (hIsTerminalDevice stdin)
+  interactiveLoop is_tty
 
   -- and finally, exit
-  io $ do putStrLn "Leaving GHCi."
+  io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
 
 
-interactiveLoop = do
+interactiveLoop is_tty = do
   -- ignore ^C exceptions caught here
-  ghciHandleDyn (\e -> case e of Interrupted -> ghciUnblock interactiveLoop
-			         _other      -> return ()) $ do
+  ghciHandleDyn (\e -> case e of 
+			Interrupted -> ghciUnblock (interactiveLoop is_tty)
+			_other      -> return ()) $ do
 
   -- read commands from stdin
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
-  readlineLoop
+  if (is_tty) 
+	then readlineLoop
+	else fileLoop stdin False  -- turn off prompt for non-TTY input
 #else
   fileLoop stdin True
 #endif
@@ -487,7 +491,7 @@ addModule str = do
   (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) dflags graph)
   setGHCiState state{ cmstate = cmstate1, targets = new_targets }
   setContextAfterLoad mods
-  modulesLoadedMsg ok mods
+  modulesLoadedMsg ok mods dflags
 
 changeDirectory :: String -> GHCi ()
 changeDirectory ('~':d) = do
@@ -561,7 +565,7 @@ loadModule' str = do
   setGHCiState state{ cmstate = cmstate2, targets = files }
 
   setContextAfterLoad mods
-  modulesLoadedMsg ok mods
+  modulesLoadedMsg ok mods dflags
 
 
 reloadModule :: String -> GHCi ()
@@ -580,7 +584,7 @@ reloadModule "" = do
 		<- io (cmLoadModules (cmstate state) dflags graph)
         setGHCiState state{ cmstate=cmstate1 }
 	setContextAfterLoad mods
-	modulesLoadedMsg ok mods
+	modulesLoadedMsg ok mods dflags
 
 reloadModule _ = noArgs ":reload"
 
@@ -590,12 +594,13 @@ setContextAfterLoad (m:_) = do
   b <- io (cmModuleIsInterpreted cmstate m)
   if b then setContext m else setContext ('*':m)
 
-modulesLoadedMsg ok mods = do
-  let mod_commas 
+modulesLoadedMsg ok mods dflags =
+  when (verbosity dflags > 0) $ do
+   let mod_commas 
 	| null mods = text "none."
 	| otherwise = hsep (
 	    punctuate comma (map text mods)) <> text "."
-  case ok of
+   case ok of
     False -> 
        io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
     True  -> 
@@ -861,7 +866,7 @@ newPackages new_pkgs = do
     flushPackageCache pkgs
    
     new_pkg_info <- getPackageDetails new_pkgs
-    mapM_ linkPackage (reverse new_pkg_info)
+    mapM_ (linkPackage dflags) (reverse new_pkg_info)
 
 -----------------------------------------------------------------------------
 -- code for `:show'
@@ -988,26 +993,27 @@ type LibrarySpec
 showLS (Left nm)  = "(static) " ++ nm
 showLS (Right nm) = "(dynamic) " ++ nm
 
-linkPackages :: [LibrarySpec] -> [PackageConfig] -> IO ()
-linkPackages cmdline_lib_specs pkgs
-   = do mapM_ linkPackage (reverse pkgs)
+linkPackages :: DynFlags -> [LibrarySpec] -> [PackageConfig] -> IO ()
+linkPackages dflags cmdline_lib_specs pkgs
+   = do mapM_ (linkPackage dflags) (reverse pkgs)
         lib_paths <- readIORef v_Library_paths
-        mapM_ (preloadLib lib_paths) cmdline_lib_specs
+        mapM_ (preloadLib dflags lib_paths) cmdline_lib_specs
 	if (null cmdline_lib_specs)
 	   then return ()
-	   else do putStr "final link ... "
+	   else do maybePutStr dflags "final link ... "
 		   ok <- resolveObjs
-		   if ok then putStrLn "done."
+		   if ok then maybePutStrLn dflags "done."
 	      		 else throwDyn (InstallationError 
                                           "linking extra libraries/objects failed")
      where
-        preloadLib :: [String] -> LibrarySpec -> IO ()
-        preloadLib lib_paths lib_spec
-           = do putStr ("Loading object " ++ showLS lib_spec ++ " ... ")
+        preloadLib :: DynFlags -> [String] -> LibrarySpec -> IO ()
+        preloadLib dflags lib_paths lib_spec
+           = do maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
                 case lib_spec of
                    Left static_ish
                       -> do b <- preload_static lib_paths static_ish
-                            putStrLn (if b then "done." else "not found")
+                            maybePutStrLn dflags (if b  then "done." 
+							else "not found")
                    Right dll_unadorned
                       -> -- We add "" to the set of paths to try, so that
                          -- if none of the real paths match, we force addDLL
@@ -1017,11 +1023,12 @@ linkPackages cmdline_lib_specs pkgs
                             case maybe_errstr of
                                Nothing -> return ()
                                Just mm -> preloadFailed mm lib_paths lib_spec
-                            putStrLn "done"
+                            maybePutStrLn dflags "done"
 
         preloadFailed :: String -> [String] -> LibrarySpec -> IO ()
         preloadFailed sys_errmsg paths spec
-           = do putStr ("failed.\nDynamic linker error message was:\n   " 
+           = do maybePutStr dflags
+		       ("failed.\nDynamic linker error message was:\n   " 
                         ++ sys_errmsg  ++ "\nWhilst trying to load:  " 
                         ++ showLS spec ++ "\nDirectories to search are:\n"
                         ++ unlines (map ("   "++) paths) )
@@ -1062,8 +1069,8 @@ loaded_in_ghci
 	   = [ ]
 #          endif
 
-linkPackage :: PackageConfig -> IO ()
-linkPackage pkg
+linkPackage :: DynFlags -> PackageConfig -> IO ()
+linkPackage dflags pkg
    | name pkg `elem` dont_load_these = return ()
    | otherwise
    = do 
@@ -1079,11 +1086,11 @@ linkPackage pkg
         let sos_first | name pkg `elem` loaded_in_ghci = obj_libs
 		      | otherwise      		       = so_libs ++ obj_libs
 
-	putStr ("Loading package " ++ name pkg ++ " ... ")
+	maybePutStr dflags ("Loading package " ++ name pkg ++ " ... ")
         mapM loadClassified sos_first
-        putStr "linking ... "
+        maybePutStr dflags "linking ... "
         ok <- resolveObjs
-	if ok then putStrLn "done."
+	if ok then maybePutStrLn dflags "done."
 	      else panic ("can't load package `" ++ name pkg ++ "'")
      where
         isRight (Right _) = True
@@ -1136,11 +1143,17 @@ printTimes allocs psecs
 
 -----------------------------------------------------------------------------
 -- utils
-	
+
 looksLikeModuleName [] = False
 looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
 
 isAlphaNumEx c = isAlphaNum c || c == '_'
+
+maybePutStr dflags s | verbosity dflags > 0 = putStr s
+		     | otherwise	    = return ()
+
+maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
+		       | otherwise	      = return ()
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
