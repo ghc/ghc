@@ -381,6 +381,7 @@ genOutputFilenameFunc :: Bool -> Maybe FilePath -> Phase -> String
 genOutputFilenameFunc keep_output maybe_output_filename stop_phase basename
  = do
    hcsuf      <- readIORef v_HC_suf
+   odir       <- readIORef v_Output_dir
    osuf       <- readIORef v_Object_suf
    keep_hc    <- readIORef v_Keep_hc_files
 #ifdef ILX
@@ -398,12 +399,14 @@ genOutputFilenameFunc keep_output maybe_output_filename stop_phase basename
      		| next_phase == stop_phase
                      = case maybe_output_filename of
 			     Just file -> return file
-			     Nothing | keep_output -> return persistent
-				     | otherwise   -> newTempName suffix
+			     Nothing
+				 | Ln <- next_phase -> return odir_persistent
+				 | keep_output      -> return persistent
+				 | otherwise        -> newTempName suffix
 			-- sometimes, we keep output from intermediate stages
      		| otherwise
      		     = case next_phase of
-     			     Ln                  -> return persistent
+     			     Ln                  -> return odir_persistent
      			     Mangle | keep_raw_s -> return persistent
      			     As     | keep_s     -> return persistent
      			     HCc    | keep_hc    -> return persistent
@@ -411,6 +414,10 @@ genOutputFilenameFunc keep_output maybe_output_filename stop_phase basename
 	   where
 		suffix = myPhaseInputExt next_phase
 		persistent = basename ++ '.':suffix
+
+		odir_persistent
+		   | Just d <- odir = replaceFilenameDirectory persistent d
+		   | otherwise      = persistent
 
    return func
 
