@@ -2,6 +2,7 @@
 
 # Manuel M. T. Chakravarty <chak@acm.org>, June 2000
 # Updated for GHC 5.00, Simon Marlow, March 2001
+# Updated for GHC 5.04.3, Urban Boquist, March 2003
 #
 # Script to build GHC from .hc files (must be run in the fptools/ root
 # directory into which the source and .hc files must already have been
@@ -32,29 +33,37 @@ END
 # touch happy generated files; so that in non-bootstrapping mode for
 # installation, no attempt is made to call happy
 #
-touch ghc/compiler/rename/ParseIface.hs
 touch ghc/compiler/parser/Parser.hs
 touch ghc/compiler/main/ParsePkgConf.hs
 touch hslibs/hssource/HsParser.hs
 
 # We don't have genprimopcode yet so don't try to use it
 touch ghc/compiler/prelude/primops.txt
-touch ghc/lib/std/PrelPrimopWrappers.hs
+touch libraries/base/GHC/PrimopWrappers.hs
 
-echo "*** Building hsc..."
+echo "*** Building compiler..."
 ./configure --enable-hc-boot $configopts
+
+# A couple of Makefiles test BootingFromHc before including
+# boilerplate.mk, so we have to pass it explicitly:
+MAKEFLAGS="BootingFromHc=YES"
+export MAKEFLAGS
+
 $MAKE -C glafp-utils boot all
 $MAKE -C ghc boot
+$MAKE -C libraries boot all
 $MAKE -C hslibs boot all
 $MAKE -C ghc all
+
+MAKEFLAGS=
 
 echo "*** Building libraries..."
 
 # Reconfigure, using the newly-build ghc binary as our $(GHC), and
 # with hc bootstrapping disabled.
-HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/ghc/compiler/ghc-inplace"
+HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/ghc/compiler/ghc-inplace" $configopts
 
-PRIMOP_BITS=primop-data-decl.hs-incl \
+PRIMOP_BITS="primop-data-decl.hs-incl \
             primop-tag.hs-incl  \
             primop-list.hs-incl  \
             primop-has-side-effects.hs-incl  \
@@ -64,28 +73,30 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-can-fail.hs-incl  \
             primop-strictness.hs-incl  \
             primop-usage.hs-incl  \
-            primop-primop-info.hs-incl
+            primop-primop-info.hs-incl"
 
 # The reconfigure step updates a few files, which can lead to
 # unnecessary recompilations.  Touch a bunch of things here to avoid
 # having to recompile stuff that we've already built.
-(cd ghc/compiler; touch $PRIMOP_BITS prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
+(cd ghc/compiler; touch $PRIMOP_BITS parser/hschooks.o prelude/PrimOp.o main/Config.hs main/Config.o ghc-*)
 
 # Remove the old libraries.  Don't use make clean, because we don't
 # want to delete the .hs files generated from the .hsc files, because
 # we don't have hsc2hs built yet.
-find ghc/lib/std hslibs | grep '\.\(o\|a\)' | xargs rm -f
+find libraries hslibs | grep '\.\(o\|a\)' | xargs rm -f
 
 # Do includes and RTS now
 $MAKE -C ghc/includes boot && $MAKE -C ghc/includes all
 $MAKE -C ghc/rts      boot && $MAKE -C ghc/rts      all
 
 # Now build a new set of libraries
-$MAKE -C ghc/lib boot all
+$MAKE -C libraries boot all
 $MAKE -C hslibs  boot all
 
-# Finally build ghc/utils, now that we have libraries
-$MAKE -C ghc/utils boot all
+# Finally build all of ghc/utils
+$MAKE -C ghc/utils clean && $MAKE -C ghc/utils boot all
+
+# Avoid relinking the compiler during 'make install':
+(cd ghc/compiler; touch parser/hschooks.o ghc-*)
 
 # At this point, the tree should be safe to do 'make install' in.
-
