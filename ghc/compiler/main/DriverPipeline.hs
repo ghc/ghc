@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.57 2001/03/23 16:36:20 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.58 2001/03/23 17:04:56 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -1043,9 +1043,6 @@ dealWithStubs basename maybe_stub_h maybe_stub_c
 	   Just tmp_stub_h -> do
 	      	runSomething "Copy stub .h file"
 				("cp " ++ tmp_stub_h ++ ' ':stub_h)
-	
-			-- #include <..._stub.h> in .hc file
-		addCmdlineHCInclude tmp_stub_h	-- hack
 
   -- copy the .stub_c file into the current dir, and compile it, if necessary
 	case maybe_stub_c of
