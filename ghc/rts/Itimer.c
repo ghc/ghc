@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.12 2000/03/21 11:33:12 rrt Exp $
+ * $Id: Itimer.c,v 1.13 2000/04/03 15:54:49 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -24,6 +24,7 @@
 
 #include "Rts.h"
 #include "Itimer.h"
+#include "Proftimer.h"
 #include "Schedule.h"
 
 /* As recommended in the autoconf manual */
@@ -43,7 +44,6 @@
 #endif
  
 lnat total_ticks = 0;
-rtsBool do_prof_ticks = rtsFalse;
 
 static
 void
@@ -73,9 +73,7 @@ handle_tick(int unused STG_UNUSED)
   total_ticks++;
 
 #ifdef PROFILING
-  if (do_prof_ticks == rtsTrue) {
-    CCS_TICK(CCCS);
-  }
+  handleProfTick();
 #endif
 
   /* For threadDelay etc., see Select.c */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.9 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: ProfHeap.c,v 1.10 2000/04/03 15:54:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -18,11 +18,10 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "ProfRts.h"
+#include "Profiling.h"
 #include "Storage.h"
 #include "ProfHeap.h"
 #include "Stats.h"
-#include "ProfRts.h"
 #ifdef DEBUG_HEAP_PROF
 #include "Printer.h"
 static void initSymbolHash(void);
@@ -286,7 +285,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, nat components)
   prev = ccs->prevStack;
 
   if (prev == NULL
-      || prev->cc->is_subsumed != CC_IS_BORING
+      || prev->cc->is_caf != CC_IS_BORING
       || components == 1) { 
     fprintf(fp,"%s",cc->label);
     return; 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.28 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: RtsFlags.c,v 1.29 2000/04/03 15:54:50 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -25,7 +25,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "BlockAlloc.h"
-#include "ProfRts.h"
+#include "Profiling.h"
 
 #if defined(PROFILING) 
 #include "Itimer.h"
@@ -200,8 +200,10 @@ static void process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool
 static void set_par_debug_options(nat n);
 static void help_par_debug_options(nat n);
 #endif
+#if defined(DEBUG)
 static void set_debug_options(nat n);
 static void help_debug_options(nat n);
+#endif
 
 //@node Command-line option parsing routines, GranSim specific options, Static function decls
 //@subsection Command-line option parsing routines
@@ -226,10 +228,6 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.oldGenFactor       = 2;
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.steps              = 2;
-
-    RtsFlags.GcFlags.forceGC		= rtsFalse;
-    RtsFlags.GcFlags.forcingInterval	= 5000000; /* 5MB (or words?) */
-    RtsFlags.GcFlags.ringBell		= rtsFalse;
 
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
 
@@ -382,37 +380,19 @@ usage_text[] = {
 "  -B       Sound the bell at the start of each garbage collection",
 #if defined(PROFILING) || defined(PAR)
 "",
-"  -p<sort> Produce cost centre time profile  (output file <program>.prof)",
+"  -px      Time/allocation profile (XML)  (output file <program>.prof)",
+"  -p<sort> Time/allocation profile        (output file <program>.prof)",
 "             sort: T = time (default), A = alloc, C = cost centre label",
-"  -P<sort> Produce serial time profile (output file <program>.time)",
-"             and a -p profile with detailed tick/alloc info",
+"  -P<sort> More detailed Time/Allocation profile"
 # if defined(PROFILING)
 "",
-"  -h<break-down> Heap residency profile      (output file <program>.hp)",
+"  -hx            Heap residency profile (XML)  (output file <program>.prof)",
+"  -h<break-down> Heap residency profile (text) (output file <program>.prof)",
 "     break-down: C = cost centre stack (default), M = module",
 "                 D = closure description, Y = type description",
-"                 T<ints>,<start> = time closure created",
-"                    ints:  no. of interval bands plotted (default 18)",
-"                    start: seconds after which intervals start (default 0.0)",
-"  A subset of closures may be selected by the attached cost centre using:",
-"    -c{mod:lab,mod:lab...}, specific module:label cost centre(s)",
-"    -m{mod,mod...} all cost centres from the specified modules(s)",
-"  Selections can also be made by description, type, kind and age:",
-"    -d{des,des...} closures with specified closure descriptions",
-"    -y{typ,typ...} closures with specified type descriptions",
-"    -k{knd,knd...} closures of the specified kinds",
-"    -a<age>        closures which survived <age> complete intervals",
-"  The selection logic used is summarised as follows:",
-"    ([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) and [-a]",
-"    where an option is true if not specified",
 "",
 "  -xc      Show current cost centre stack on raising an exception",
 # endif
-"",
-"  -z<tbl><size>  set hash table <size> for <tbl> (C, M, G, D or Y)",
-"",
-"  -i<secs> Number of seconds in a profiling interval (default 1.0):",
-"           heap profile (-h) and/or serial time profile (-P) frequency",
 #endif /* PROFILING or PAR */
 #if !defined(PROFILING) && defined(DEBUG)
 "",
@@ -684,14 +664,6 @@ error = rtsTrue;
 		}
 		break;
 
-	      case 'j': /* force GC option */
-		RtsFlags.GcFlags.forceGC = rtsTrue;
-		if (rts_argv[arg][2]) {
-		    RtsFlags.GcFlags.forcingInterval
-			= decode(rts_argv[arg]+2) / sizeof(W_);
-		}
-		break;
-
 	      case 'S':
 		RtsFlags.GcFlags.giveStats ++;
 
@@ -732,13 +704,6 @@ error = rtsTrue;
 		}
 		) break;
 
-	      case 'i': /* serial profiling -- initial timer interval */
-		COST_CENTRE_USING_BUILD_ONLY(
-		interval_ticks = (I_) ((atof(rts_argv[arg]+2) * TICK_FREQUENCY));
-		if (interval_ticks <= 0)
-		    interval_ticks = 1;
-		) break;
-
 	      case 'h': /* serial heap profile */
 #if !defined(PROFILING) && defined(DEBUG)
 		switch (rts_argv[arg][2]) {
@@ -769,22 +734,6 @@ error = rtsTrue;
 		  case TYPEchar:
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
 		    break;
-		  case TIMEchar:
-		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_TIME;
-		    if (rts_argv[arg][3]) {
-			char *start_str = strchr(rts_argv[arg]+3, ',');
-			I_ intervals;
-			if (start_str) *start_str = '\0';
-
-			if ((intervals = decode(rts_argv[arg]+3)) != 0) {
-			    time_intervals = (hash_t) intervals;
-			    /* ToDo: and what if it *is* zero intervals??? */
-			}
-			if (start_str) {
-			    earlier_ticks = (I_)((atof(start_str + 1) * TICK_FREQUENCY));
-			}
-		    }
-		    break;
 		  default:
 		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
@@ -792,81 +741,6 @@ error = rtsTrue;
 		) 
 #endif
 	        break;
-
-	      case 'z': /* size of index tables */
-		PROFILING_BUILD_ONLY(
-		switch (rts_argv[arg][2]) {
-		  case CCchar:
-		    max_cc_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_cc_no == 0) {
-		      prog_belch("bad number of cost centres %s", rts_argv[arg]);
-		      error = rtsTrue;
-		    }
-		    break;
-		  case MODchar:
-		    max_mod_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_mod_no == 0) {
-		      prog_belch("bad number of modules %s", rts_argv[arg]);
-		      error = rtsTrue;
-		    }
-		    break;
-		  case DESCRchar:
-		    max_descr_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_descr_no == 0) {
-			prog_belch("bad number of closure descriptions %s", 
-				   rts_argv[arg]);
-			error = rtsTrue;
-		    }
-		    break;
-		  case TYPEchar:
-		    max_type_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_type_no == 0) {
-			prog_belch("bad number of type descriptions %s", 
-				   rts_argv[arg]);
-			error = rtsTrue;
-		    }
-		    break;
-		  default:
-		    prog_belch("invalid index table size option: %s",
-			       rts_argv[arg]);
-		    error = rtsTrue;
-		}
-		) break;
-
-	      case 'c': /* cost centre label select */
-	      case 'd': /* closure descr select */
-	      case 'y': /* closure type select */
-		PROFILING_BUILD_ONLY(
-		{char *left  = strchr(rts_argv[arg], '{');
-		 char *right = strrchr(rts_argv[arg], '}');
-
-		if (! left || ! right ||
-		        strrchr(rts_argv[arg], '{') != left ||
-		         strchr(rts_argv[arg], '}') != right) {
-		  prog_belch("invalid heap profiling selection bracketing: %s",
-			     rts_argv[arg]);
-		  error = rtsTrue;
-		} else {
-		    *right = '\0';
-		    switch (rts_argv[arg][1]) {
-		      case 'c': /* cost centre label select */
-			RtsFlags.ProfFlags.ccSelector = left + 1;
-			break;
-		      case 'm': /* cost centre module select */
-			RtsFlags.ProfFlags.modSelector = left + 1;
-			break;
-		      case 'd': /* closure descr select */
-			RtsFlags.ProfFlags.descrSelector = left + 1;
-			break;
-		      case 'y': /* closure type select */
-			RtsFlags.ProfFlags.typeSelector = left + 1;
-			break;
-		      case 'k': /* closure kind select */
-			RtsFlags.ProfFlags.kindSelector = left + 1;
-			break;
-		    }
-		}}
-		) break;
 
 	      /* =========== CONCURRENT ========================= */
     	      case 'C':	/* context switch interval */
@@ -1909,8 +1783,9 @@ help_par_debug_options(nat n) {
       fprintf(stderr, par_debug_opts_strs[i]);
 }
 
-#endif /* GRAN */
+#endif /* PAR */
 
+#ifdef DEBUG
 static void
 set_debug_options(nat n) {
   nat i;
@@ -1943,6 +1818,7 @@ help_debug_options(nat n) {
     if ((n>>i)&1) 
       fprintf(stderr, debug_opts_strs[i]);
 }
+#endif /* DEBUG */
 
 //@node Aux fcts,  , GranSim specific options
 //@subsection Aux fcts

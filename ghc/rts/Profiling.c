@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.16 2000/03/08 17:48:24 simonmar Exp $
+ * $Id: Profiling.c,v 1.17 2000/04/03 15:54:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -12,7 +12,7 @@
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
-#include "ProfRts.h"
+#include "Profiling.h"
 #include "Storage.h"
 #include "Proftimer.h"
 #include "Itimer.h"
@@ -81,25 +81,26 @@ CostCentreStack *CCS_LIST;
  *    SUBSUMED is the one-and-only CCS placed on top-level functions. 
  *           It indicates that all costs are to be attributed to the
  *           enclosing cost centre stack.  SUBSUMED never accumulates
- *           any costs.
+ *           any costs.  The is_caf flag is set on the subsumed cost
+ *           centre.
  *
  *    DONT_CARE is a placeholder cost-centre we assign to static
  *           constructors.  It should *never* accumulate any costs.
  */
 
-CC_DECLARE(CC_MAIN,      "MAIN", 	"MAIN",      CC_IS_BORING,);
-CC_DECLARE(CC_SYSTEM,    "SYSTEM",   	"MAIN",      CC_IS_BORING,);
-CC_DECLARE(CC_GC,        "GC",   	"GC",        CC_IS_BORING,);
-CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", CC_IS_CAF,);
-CC_DECLARE(CC_SUBSUMED,  "SUBSUMED",    "MAIN",      CC_IS_SUBSUMED,);
-CC_DECLARE(CC_DONTZuCARE,"DONT_CARE",   "MAIN",      CC_IS_BORING,);
+CC_DECLARE(CC_MAIN,      "MAIN", 	"MAIN",      CC_IS_BORING, );
+CC_DECLARE(CC_SYSTEM,    "SYSTEM",   	"MAIN",      CC_IS_BORING, );
+CC_DECLARE(CC_GC,        "GC",   	"GC",        CC_IS_BORING, );
+CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", CC_IS_CAF,    );
+CC_DECLARE(CC_SUBSUMED,  "SUBSUMED",    "MAIN",      CC_IS_CAF,    );
+CC_DECLARE(CC_DONT_CARE, "DONT_CARE",   "MAIN",      CC_IS_BORING, );
 
-CCS_DECLARE(CCS_MAIN, 	    CC_MAIN,       CC_IS_BORING,   );
-CCS_DECLARE(CCS_SYSTEM,	    CC_SYSTEM,     CC_IS_BORING,   );
-CCS_DECLARE(CCS_GC,         CC_GC,         CC_IS_BORING,   );
-CCS_DECLARE(CCS_OVERHEAD,   CC_OVERHEAD,   CC_IS_CAF,      );
-CCS_DECLARE(CCS_SUBSUMED,   CC_SUBSUMED,   CC_IS_SUBSUMED, );
-CCS_DECLARE(CCS_DONTZuCARE, CC_DONTZuCARE, CC_IS_BORING,   );
+CCS_DECLARE(CCS_MAIN, 	    CC_MAIN,       );
+CCS_DECLARE(CCS_SYSTEM,	    CC_SYSTEM,     );
+CCS_DECLARE(CCS_GC,         CC_GC,         );
+CCS_DECLARE(CCS_OVERHEAD,   CC_OVERHEAD,   );
+CCS_DECLARE(CCS_SUBSUMED,   CC_SUBSUMED,   );
+CCS_DECLARE(CCS_DONT_CARE,  CC_DONT_CARE, );
 
 /* 
  * Uniques for the XML log-file format
@@ -166,13 +167,13 @@ initProfiling1 (void)
   REGISTER_CC(CC_GC);
   REGISTER_CC(CC_OVERHEAD);
   REGISTER_CC(CC_SUBSUMED);
-  REGISTER_CC(CC_DONTZuCARE);
+  REGISTER_CC(CC_DONT_CARE);
   REGISTER_CCS(CCS_MAIN);
   REGISTER_CCS(CCS_SYSTEM);
   REGISTER_CCS(CCS_GC);
   REGISTER_CCS(CCS_OVERHEAD);
   REGISTER_CCS(CCS_SUBSUMED);
-  REGISTER_CCS(CCS_DONTZuCARE);
+  REGISTER_CCS(CCS_DONT_CARE);
 
   CCCS = CCS_OVERHEAD;
 
@@ -279,8 +280,7 @@ EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn )
     return CCCS;
   }
 
-  if (ccsfn->root->is_subsumed == CC_IS_CAF
-      || ccsfn->root->is_subsumed == CC_IS_SUBSUMED) {
+  if (ccsfn->root->is_caf == CC_IS_CAF) {
     return AppendCCS(cccs,ccsfn);
   } else {
     return ccsfn;
@@ -378,7 +378,7 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
     return ccs1;
   }
 
-  if (ccs2->cc->is_subsumed != CC_IS_BORING) {
+  if (ccs2->cc->is_caf == CC_IS_CAF) {
     return ccs1;
   }
   
@@ -749,7 +749,7 @@ static rtsBool
 ccs_to_ignore (CostCentreStack *ccs)
 {
     if (    ccs == CCS_OVERHEAD 
-	 || ccs == CCS_DONTZuCARE
+	 || ccs == CCS_DONT_CARE
 	 || ccs == CCS_GC 
 	 || ccs == CCS_SYSTEM) {
 	return rtsTrue;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.39 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: StgMiscClosures.hc,v 1.40 2000/04/03 15:54:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -14,7 +14,7 @@
 #include "HeapStackCheck.h"   /* for stg_gen_yield */
 #include "Storage.h"
 #include "StoragePriv.h"
-#include "ProfRts.h"
+#include "Profiling.h"
 #include "Prelude.h"
 #include "SMP.h"
 #if defined(GRAN) || defined(PAR)
@@ -612,7 +612,7 @@ FN_(dummy_ret_entry)
   JMP_(ENTRY_CODE(ret_addr));
   FE_
 }
-SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONTZuCARE,,EI_)
+SET_STATIC_HDR(dummy_ret_closure,dummy_ret_info,CCS_DONT_CARE,,EI_)
 , /*payload*/{} };
 
 /* -----------------------------------------------------------------------------
@@ -667,7 +667,7 @@ FN_(forceIO_entry)
   JMP_(GET_ENTRY(R1.cl));
   FE_
 }
-SET_STATIC_HDR(forceIO_closure,forceIO_info,CCS_DONTZuCARE,,EI_)
+SET_STATIC_HDR(forceIO_closure,forceIO_info,CCS_DONT_CARE,,EI_)
 , /*payload*/{} };
 
 
@@ -734,14 +734,14 @@ static INFO_TBL_CONST StgInfoTable izh_static_info;
 #define CHARLIKE_HDR(n)						\
 	{							\
 	  STATIC_HDR(Char_hash_static_info, /* C# */   		\
-			 CCS_DONTZuCARE),			\
+			 CCS_DONT_CARE),			\
           data : n						\
 	}
 					     
 #define INTLIKE_HDR(n)						\
 	{							\
 	  STATIC_HDR(Int_hash_static_info,  /* I# */  		\
-			 CCS_DONTZuCARE),			\
+			 CCS_DONT_CARE),			\
           data : n						\
 	}
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.37 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: RtsStartup.c,v 1.38 2000/04/03 15:54:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -24,7 +24,7 @@
 #include "Prelude.h"		/* fixupRTStoPreludeRefs */
 
 #if defined(PROFILING) || defined(DEBUG)
-# include "ProfRts.h"
+# include "Profiling.h"
 # include "ProfHeap.h"
 #endif
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.8 2000/03/08 17:48:26 simonmar Exp $
+ * $Id: StgProf.h,v 1.9 2000/04/03 15:54:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998
  *
@@ -9,8 +9,124 @@
 #ifndef STGPROF_H
 #define STGPROF_H
 
-#if defined(PROFILING)
+#if !defined(PROFILING)
   
+#define CCS_ALLOC(ccs, amount) doNothing()
+#define ENTER_CC_PAP_CL(r)     doNothing()
+#define ENTER_CCS_PAP_CL(r)    doNothing()
+ 
+#else /* PROFILING... */
+
+/* -----------------------------------------------------------------------------
+ * Constants
+ * ---------------------------------------------------------------------------*/
+
+#define EMPTY_STACK NULL
+#define EMPTY_TABLE NULL
+
+/* Constants used to set sumbsumed flag on CostCentres */
+
+#define CC_IS_CAF      'c'            /* 'c'  => *is* a CAF cc           */
+#define CC_IS_BORING   'B'            /* 'B'  => *not* a CAF/sub cc      */
+
+/* -----------------------------------------------------------------------------
+ * Data Structures 
+ * ---------------------------------------------------------------------------*/  
+/* 
+ * CostCentre 
+ */
+
+typedef struct _CostCentre {
+  int ccID;
+
+  char *label;
+  char *module;
+ 
+  /* used for accumulating costs at the end of the run... */
+  unsigned long time_ticks;
+  unsigned long mem_alloc;
+
+  char is_caf;
+
+  struct _CostCentre *link;
+} CostCentre;
+
+
+	
+/* 
+ * CostCentreStack 
+ */
+
+typedef struct _CostCentreStack {
+  int ccsID;
+
+  CostCentre *cc;
+  struct _CostCentreStack *prevStack;
+  struct _IndexTable *indexTable;
+  
+  unsigned long scc_count;
+  unsigned long sub_scc_count;
+  unsigned long sub_cafcc_count;
+    
+  unsigned long time_ticks;
+  unsigned long mem_alloc;
+  unsigned long mem_resid;
+
+  CostCentre *root;
+} CostCentreStack;
+
+
+
+/* 
+ * IndexTable 
+ */
+
+typedef struct _IndexTable {
+  CostCentre *cc;
+  CostCentreStack *ccs;
+  struct _IndexTable *next;
+  unsigned int back_edge;
+} IndexTable;
+
+     
+/* -----------------------------------------------------------------------------
+   Pre-defined cost centres and cost centre stacks
+   -------------------------------------------------------------------------- */
+
+extern CostCentreStack *CCCS;	        /* current CCS */
+ 
+extern CostCentre      CC_MAIN[];	
+extern CostCentreStack CCS_MAIN[];      /* Top CCS */
+
+extern CostCentre      CC_SYSTEM[];	
+extern CostCentreStack CCS_SYSTEM[];    /* RTS costs */
+
+extern CostCentre      CC_GC[];
+extern CostCentreStack CCS_GC[];	 /* Garbage collector costs */
+
+extern CostCentre      CC_SUBSUMED[];	
+extern CostCentreStack CCS_SUBSUMED[];   /* Costs are subsumed by caller */
+
+extern CostCentre      CC_OVERHEAD[];
+extern CostCentreStack CCS_OVERHEAD[];   /* Profiling overhead */
+
+extern CostCentre      CC_DONT_CARE[];
+extern CostCentreStack CCS_DONT_CARE[];  /* shouldn't ever get set */
+
+extern unsigned int CC_ID;	/* global ids */
+extern unsigned int CCS_ID;
+extern unsigned int HP_ID;
+
+/* -----------------------------------------------------------------------------
+ * Functions 
+ * ---------------------------------------------------------------------------*/
+
+CostCentreStack *EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn );
+CostCentreStack *PushCostCentre ( CostCentreStack *, CostCentre * );
+CostCentreStack *AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
+
+extern unsigned int entering_PAP;
+
 /* -----------------------------------------------------------------------------
  * Registering CCs
  
@@ -59,17 +175,17 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
  * Declaring Cost Centres & Cost Centre Stacks.
  * -------------------------------------------------------------------------- */
 
-# define CC_DECLARE(cc_ident,name,module,subsumed,is_local)	\
+# define CC_DECLARE(cc_ident,name,module,caf,is_local)		\
      is_local CostCentre cc_ident[1]				\
 	= {{ 0,							\
 	     name,						\
 	     module,						\
              0,							\
 	     0,							\
-	     subsumed,						\
+	     caf,						\
 	     0 }};
 
-# define CCS_DECLARE(ccs_ident,cc_ident,subsumed,is_local)	\
+# define CCS_DECLARE(ccs_ident,cc_ident,is_local)		\
      is_local CostCentreStack ccs_ident[1]			\
        = {{ ccsID 		: 0,				\
 	    cc 			: cc_ident,			\
@@ -165,11 +281,6 @@ extern CostCentreStack *CCS_LIST;         /* registered CCS list */
 #else
 #define CCCS_DETAIL_COUNT(inc_this) /*nothing*/
 #endif
-
-#define IS_CAF_OR_SUB_CCS(ccs)			\
-        /* tests for lower case character */	\
-        ((ccs)->is_subsumed & ' ')
-	
 
 /* On entry to top level CAFs we count the scc ...*/
 

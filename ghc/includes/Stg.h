@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.24 2000/03/14 01:54:06 sof Exp $
+ * $Id: Stg.h,v 1.25 2000/04/03 15:54:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -109,7 +109,7 @@ void _stgAssert (char *, unsigned int);
 #include "Constants.h"
 
 /* Profiling information */
-#include "Profiling.h"
+#include "StgProf.h"
 
 /* Storage format definitions */
 #include "Closures.h"
@@ -163,7 +163,6 @@ void _stgAssert (char *, unsigned int);
 #include "ClosureMacros.h"
 #include "InfoMacros.h"
 #include "StgMacros.h"
-#include "StgProf.h"
 #include "PrimOps.h"
 #include "Updates.h"
 #include "StgTicky.h"

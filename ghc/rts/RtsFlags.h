@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.23 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: RtsFlags.h,v 1.24 2000/04/03 15:54:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,8 +32,6 @@ struct GC_FLAGS {
     nat     generations;
     nat     steps;
 
-    rtsBool forceGC; /* force a major GC every <interval> bytes */
-    int	    forcingInterval; /* actually, stored as a number of *words* */
     rtsBool ringBell;
 
     rtsBool squeezeUpdFrames;
