@@ -38,6 +38,7 @@ data Lexeme
    | L_LBrace			-- {
    | L_RBrace			-- }
    | L_Comma			-- ,
+   | L_Bar			-- |
    | L_Include			-- include
    | L_If			-- if
    | L_Then			-- then
@@ -114,6 +115,8 @@ tokenise_wrk n (c:cs)
    = (Tok bomb n L_RBrace) : tokenise_wrk n cs
    | c == ','
    = (Tok bomb n L_Comma) : tokenise_wrk n cs
+   | c == '|'
+   = (Tok bomb n L_Bar) : tokenise_wrk n cs
    | c == '='
    = (Tok bomb n L_Assign) : tokenise_wrk n cs
    | otherwise

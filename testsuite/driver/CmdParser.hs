@@ -90,6 +90,7 @@ pExpr8
 
 pExpr7
    = pAlts [ p3 (\e0 op e6 -> EOp op e0 e6) pExpr0 pOp pExpr7,
+             p3 (\src bar cmd -> EPipe src cmd) pExpr0 (pKW L_Bar) pExpr0,
              pExpr0 ]
      where
         pOp = pAlts [pConstKW L_Eq OpEq,

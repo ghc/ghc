@@ -7,9 +7,11 @@ import CmdLexer		( isVarChar )
 import CmdParser	( parseScript )
 import TopSort		( topSort )
 import Monad		( when )
-import Directory	( doesFileExist )
+import Directory	( doesFileExist, removeFile )
 import System		( ExitCode(..) )
 import List		( nub, (\\) )
+import Char		( ord )
+import IO
 
 #ifdef __NHC__
 import NonStdTrace(trace)
@@ -130,9 +132,11 @@ data EvalEnv
         -- WRITABLE, DISCARDED AT PROCEDURE EXIT
 	locals  :: [(Var, String)],		-- local var binds
         -- THREADED
-        results :: (Maybe Result, Maybe Result)
+        results :: (Maybe Result, Maybe Result),
 				-- expected and actual results
+        counter :: Int		-- for generating unique file names
      }
+     deriving Show
 
 -- Record in the environment an expected or actual result.
 -- Complain about duplicate assignments.
@@ -169,6 +173,13 @@ addLocalVarBind v s
 						`thenE_`
           returnEV ()
 
+getCounterE :: IOE Int
+getCounterE
+   = getEvalEnv					`thenE` \ p ->
+     counter p					`bind` \ n ->
+     setEvalEnv p{counter=n+1}			`thenE_`
+     returnE (n+1)
+
 lookupVar_maybe :: Var -> IOE (Maybe String)
 lookupVar_maybe v
    = getEvalEnv					`thenE` \ p ->
@@ -176,10 +187,7 @@ lookupVar_maybe v
 
 lookupVar :: Var -> IOEV String
 lookupVar v 
-   = --getEvalEnv `thenE` \ p ->
-     --ioToEV (putStrLn (unlines (map show (globals p ++ locals p)))) `thenEV` \ _ ->
-
-     lookupVar_maybe v				`thenE` \ maybe_v ->
+   = lookupVar_maybe v				`thenE` \ maybe_v ->
      case maybe_v of
         Just xx -> returnEV xx
         Nothing -> failEV (missingVar v)
@@ -193,7 +201,7 @@ lookupMacro mnm
 
 initialEnv global_env macro_env
    = EvalEnv{ globals=global_env, mdefs=macro_env,
-              locals=[], results=(Nothing,Nothing) }
+              locals=[], results=(Nothing,Nothing), counter=0 }
 
 
 ---------------------------------------------------------------------
@@ -442,8 +450,6 @@ runMacro mnm args
    = 
      lookupMacro mnm				`thenEV` \ mdef ->
      case mdef of { MacroDef formals stmts ->
-     --ioToEV (putStrLn ("running macro " ++ mnm ++ " with formals " ++ show formals))
-     --    `thenEV` \ _ ->
      length formals				`bind` \ n_formals ->
      length args				`bind` \ n_args ->
      if   n_formals /= n_args
@@ -453,11 +459,9 @@ runMacro mnm args
           getLocalEnv				`thenE` \ our_local_env ->
           setLocalEnv new_local_env		`thenE_`
           getLocalEnv `thenE` \ xxx ->
-          --trace ("local env = " ++ show xxx) (
           doStmts stmts				`thenEV` \ res ->
           setLocalEnv our_local_env		`thenE_`
           returnEV res
-          --)
      }
 
 
@@ -467,6 +471,8 @@ runMacro mnm args
 fromBool b
    = if b then "True" else "False"
 
+pipeErr p
+   = "Can't run pipe `" ++ p ++ "'"
 cantOpen f 
    = "Can't open file `" ++ f ++ "'"
 regExpErr rx
@@ -564,7 +570,41 @@ evalExpr (EMacro mnm args)
         Nothing -> failEV (noValue mnm)
         Just xx -> returnEV xx
 
+evalExpr (EPipe src cmd)
+   = evalExpr src				`thenEV` \ src_txt ->
+     evalExpr cmd				`thenEV` \ cmd_txt ->
+     runPipeEV src_txt cmd_txt
+
 -------------------------
+
+-- Go to some trouble to manufacture temp file names without recourse
+-- to the FFI, since ghci can't handle FFI calls right now
+myMkTempName :: String -> Int -> String
+myMkTempName hashable_str ctr
+   = "/tmp/testdriver_" ++ show (hash 0 hashable_str) ++ "_" ++ show ctr
+     where
+        hash :: Int -> String -> Int
+        hash h []     = h
+        hash h (c:cs) = hash (((h * 7) + ord c) `mod` 1000000000) cs
+
+runPipeEV :: String{-src-} -> String{-cmd-} -> IOEV String
+runPipeEV src cmd
+   = getCounterE				`thenE` \ ctr ->
+     getEvalEnv					`thenE` \ p ->
+     myMkTempName (show p) ctr			`bind`  \ tmpf_root ->
+     (tmpf_root ++ "_in")			`bind`  \ tmpf_in ->
+     (tmpf_root ++ "_out")			`bind`  \ tmpf_out ->
+     ioToEV (writeFile tmpf_in src)		`thenEV_`
+     ioToEV (my_system 
+               (cmd ++ " < " ++ tmpf_in 
+                    ++ " > " ++ tmpf_out))	`thenEV` \ ret_code ->
+     case ret_code of
+        ExitFailure m -> failEV (pipeErr cmd)
+        ExitSuccess 
+           -> ioToEV (myReadFile tmpf_out)	`thenEV` \ result ->
+              ioToEV (removeFile tmpf_in)	`thenEV_`
+              ioToEV (removeFile tmpf_out)	`thenEV_`
+              returnEV result
 
 -- Does filename exist?
 doesFileExistEV :: String -> IOEV Bool
@@ -572,16 +612,28 @@ doesFileExistEV filename
    = ioToEV (doesFileExist filename)		`thenEV` \ b ->
      returnEV b
 
-
 -- Get the contents of a file.
 readFileEV :: String -> IOEV String
 readFileEV filename
    = ioToEV (doesFileExist filename) 		`thenEV` \ exists ->
      if   not exists 
      then failEV (cantOpen filename)
-     else ioToEV (readFile filename) 		`thenEV` \ contents ->
+     else ioToEV (myReadFile filename) 		`thenEV` \ contents ->
      returnEV contents
 
+-- Use this round-the-houses scheme to ensure we don't run out of file
+-- handles.
+myReadFile :: String -> IO String
+myReadFile f
+   = do hdl <- openFile f ReadMode
+        cts <- hGetContents hdl
+        case seqList cts of
+           () -> do hClose hdl
+                    return cts
+
+-- sigh ...
+seqList []     = ()
+seqList (x:xs) = seqList xs
 
 -- Run a command.
 systemEV :: String -> IOEV Int

@@ -71,6 +71,7 @@ data Expr
    | EOtherwise
    | EDefined   Var
    | EFFail     Expr
+   | EPipe      Expr Expr	-- input to pipe, name of program
      deriving Show
 
 freeVars :: Expr -> [Var]
