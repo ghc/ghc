@@ -1294,21 +1294,6 @@ name="Concurrent and Parallel Haskell" id="concurrent-and-parallel">.
 
 %************************************************************************
 %*                                                                      *
-<sect2>Potential problems with Concurrent Haskell
-<label id="concurrent-problems">
-<p>
-<nidx>Concurrent Haskell problems</nidx>
-<nidx>problems, Concurrent Haskell</nidx>
-%*                                                                      *
-%************************************************************************
-
-The previous implementation of Concurrent Haskell in GHC had problems
-with using signals handlers in concurrent programs.  The current
-system, however, provides thread-safe signal handling (see Section
-<ref name="Signal Handling" id="signals">).
-
-%************************************************************************
-%*                                                                      *
 <sect1>Using Parallel Haskell
 <p>
 <nidx>Parallel Haskell---use</nidx>

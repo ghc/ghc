@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.4 1999/02/11 12:30:38 simonm Exp $
+% $Id: glasgow_exts.vsgml,v 1.5 1999/02/22 10:22:35 sof Exp $
 %
 % GHC Language Extensions.
 %
@@ -428,7 +428,7 @@ performGC :: IO ()
 </verb></tscreen>
 
 More information on the programmers' interface to @ForeignObj@ can be
-found in Section <ref name="Foreign objects" id="sec:foreign-obj">.
+found in the library documentation.
 
 %************************************************************************
 %*                                                                      *

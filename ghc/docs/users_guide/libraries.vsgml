@@ -1,5 +1,5 @@
 % 
-% $Id: libraries.vsgml,v 1.4 1999/02/02 14:14:12 sof Exp $
+% $Id: libraries.vsgml,v 1.5 1999/02/22 10:22:35 sof Exp $
 %
 % GHC Prelude and Libraries.
 %
@@ -866,9 +866,8 @@ writeForeignObj
 <ncdx>makeForeignObj#</ncdx>
 <ncdx>writeForeignObj#</ncdx>
 
-The module @Foreign@ (Section <ref name="Foreign objects"
-id="sec:foreign-obj">) provides a more programmer-friendly interface
-to foreign objects.
+The module @Foreign@ (see library documentation) provides a more
+programmer-friendly interface to foreign objects.
 
 <sect2>Synchronizing variables (M-vars)
 <p>

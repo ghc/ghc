@@ -10,7 +10,7 @@
 	       waits for it to complete before returning.
 	<item> <tt/mkWeak/ now takes a <tt/Maybe (IO ())/ for the finalizer,
 	       and <tt/mkWeakNoFinalizer/ is removed.
-	<itemize>
+	</itemize>
 
 <item> Changed representation of <tt/Integer/ type to speed up
 computations on small integers.  The performance of <tt/Integer/ is now
