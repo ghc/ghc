@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.29 2003/07/17 12:04:53 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.30 2003/07/18 13:18:07 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -133,25 +133,23 @@ beginMkDependHS = do
 doMkDependHSPhase basename suff input_fn
  = do src <- readFile input_fn
       let (import_sources, import_normals, mod_name) = getImports src
-      (_, location') <- mkHomeModLocation mod_name "." basename suff
+      let orig_fn = basename ++ '.':suff
+      (_, location') <- mkHomeModLocation mod_name orig_fn
 
       -- take -ohi into account if present
       ohi <- readIORef v_Output_hi
       let location | Just fn <- ohi = location'{ ml_hi_file = fn }
 		   | otherwise      = location'
 
-      let orig_fn = basename ++ '.':suff
       deps_sources <- mapM (findDependency True  orig_fn) import_sources
       deps_normals <- mapM (findDependency False orig_fn) import_normals
       let deps = deps_sources ++ deps_normals
 
       osuf <- readIORef v_Object_suf
-
       extra_suffixes <- readIORef v_Dep_suffixes
-      let suffixes = osuf : map (++ ('_':osuf)) extra_suffixes
-          ofiles = map (\suf -> basename ++ '.':suf) suffixes
-
-      objs <- mapM odir_ify ofiles
+      let suffixes = map (++ ('_':osuf)) extra_suffixes
+	  obj_file = ml_obj_file location
+          objs = obj_file : map (replaceFilenameSuffix obj_file) suffixes
 
 	-- Handle for file that accumulates dependencies 
       hdl <- readIORef v_Dep_tmp_hdl

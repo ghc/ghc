@@ -13,8 +13,7 @@ module Finder (
     findPackageModule,  -- :: ModuleName
 			--   -> IO (Either [FilePath] (Module, ModLocation))
 
-    mkHomeModLocation,	-- :: ModuleName -> String -> FilePath 
-			--	-> IO ModLocation
+    mkHomeModLocation,	-- :: ModuleName -> FilePath -> IO ModLocation
 
     findLinkable,	-- :: ModuleName -> ModLocation -> IO (Maybe Linkable)
 
@@ -29,7 +28,7 @@ import Module
 import UniqFM		( filterUFM )
 import HscTypes		( Linkable(..), Unlinked(..) )
 import DriverState
-import DriverUtil	( split_longest_prefix, splitFilename3 )
+import DriverUtil
 import FastString
 import Config
 import Util
@@ -121,8 +120,8 @@ maybeHomeModule mod_name = do
 
    let
      source_exts = 
-      [ ("hs",   mkHomeModLocation mod_name)
-      , ("lhs",  mkHomeModLocation mod_name)
+      [ ("hs",   mkHomeModLocationSearched mod_name)
+      , ("lhs",  mkHomeModLocationSearched mod_name)
       ]
      
      hi_exts = [ (hisuf,  mkHiOnlyModLocation hisuf mod_name) ]
@@ -266,7 +265,7 @@ hiOnlyModLocation path basename hisuf
 --
 -- path
 --      (a): The search path component where the source file was found.
---      (b) and (c): Nothing
+--      (b) and (c): "."
 --
 -- src_basename
 --      (a): dots_to_slashes (moduleNameUserString mod_name)
@@ -275,7 +274,23 @@ hiOnlyModLocation path basename hisuf
 -- ext
 --	The filename extension of the source file (usually "hs" or "lhs").
 
-mkHomeModLocation mod_name path src_basename ext = do
+mkHomeModLocation mod_name src_filename = do
+   let mod_basename = dots_to_slashes (moduleNameUserString mod_name)
+       (basename,extension) = splitFilename src_filename
+
+   case my_prefix_match (reverse mod_basename) (reverse basename) of
+	Just ""   ->
+	   mkHomeModLocationSearched mod_name "."  mod_basename extension
+	Just rest -> do
+	   let path = reverse (dropWhile (=='/') rest)
+	   mkHomeModLocationSearched mod_name path mod_basename extension
+	Nothing   -> do
+	  hPutStrLn stderr ("Warning: " ++ src_filename ++
+	  			 ": filename and module name do not match")
+	  let (dir,basename,ext) = splitFilename3 src_filename
+	  mkHomeModLocationSearched mod_name dir basename ext
+
+mkHomeModLocationSearched mod_name path src_basename ext = do
    hisuf  <- readIORef v_Hi_suf
    hidir  <- readIORef v_Hi_dir
 

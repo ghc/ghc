@@ -1235,11 +1235,10 @@ summariseFile file
    = do hspp_fn <- preprocess file
         (srcimps,imps,mod_name) <- getImportsFromFile hspp_fn
 
-        let (basename, ext) = splitFilename file
-	     -- GHC.Prim doesn't exist physically, so don't go looking for it.
+        let -- GHC.Prim doesn't exist physically, so don't go looking for it.
             the_imps = filter (/= gHC_PRIM_Name) imps
 
-	(mod, location) <- mkHomeModLocation mod_name "." basename ext
+	(mod, location) <- mkHomeModLocation mod_name file
 
         src_timestamp
            <- case ml_hs_file location of 

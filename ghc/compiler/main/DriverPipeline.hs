@@ -576,7 +576,7 @@ runPhase Hsc basename suff input_fn get_output_fn _maybe_loc = do
   	       getImportsFromFile input_fn
 
   -- build a ModLocation to pass to hscMain.
-	(mod, location') <- mkHomeModLocation mod_name "." basename suff
+	(mod, location') <- mkHomeModLocation mod_name (basename ++ '.':suff)
 
   -- take -ohi into account if present
 	ohi <- readIORef v_Output_hi
