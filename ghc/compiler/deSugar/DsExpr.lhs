@@ -88,7 +88,7 @@ dsLet (ThenBinds b1 b2) body
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
 -- Silently ignore INLINE pragmas...
-dsLet (MonoBind (AbsBinds [] [] exports inlines binds) sigs is_rec) body
+dsLet bind@(MonoBind (AbsBinds [] [] exports inlines binds) sigs is_rec) body
   | or [isUnLiftedType (idType g) | (_, g, l) <- exports]
   = ASSERT (case is_rec of {NonRecursive -> True; other -> False})
 	-- Unlifted bindings are always non-recursive
@@ -109,6 +109,8 @@ dsLet (MonoBind (AbsBinds [] [] exports inlines binds) sigs is_rec) body
 	   dsGuarded grhss 			`thenDs` \ rhs ->
 	   mk_error_app pat			`thenDs` \ error_expr ->
 	   matchSimply rhs PatBindRhs pat body_w_exports error_expr
+
+      other -> pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
   where
     body_w_exports		 = foldr bind_export body exports
     bind_export (tvs, g, l) body = ASSERT( null tvs )
