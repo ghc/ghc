@@ -60,30 +60,27 @@ completeVar env var args result_ty
   = tick MagicUnfold	`thenSmpl_`
     magic_result
 
-  | not do_deforest &&
-    maybeToBool maybe_unfolding_info &&
-    (not essential_unfoldings_only || idMustBeINLINEd var) && 
-	-- If "essential_unfolds_only" is true we do no inlinings at all,
+	-- If there's an InUnfolding it means that there's no
+	-- let-binding left for the thing, so we'd better inline it!
+  | must_unfold
+  = let
+	Just (_, _, InUnfolding rhs_env rhs) = info_from_env
+    in
+    unfold var rhs_env rhs args result_ty
+
+
+	-- Conditional unfolding. There's a binding for the
+	-- thing, but perhaps we want to inline it anyway
+  | (  maybeToBool maybe_unfolding_info
+    && (not essential_unfoldings_only || idMustBeINLINEd var)
+	-- If "essential_unfoldings_only" is true we do no inlinings at all,
 	-- EXCEPT for things that absolutely have to be done
 	-- (see comments with idMustBeINLINEd)
-    ok_to_inline &&
-    costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
-    
-  = 
-{-
-    simplCount		`thenSmpl` \ n ->
-    (if n > 1000 then
-	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr PprDebug var])
-    else
-	id
+    && ok_to_inline
+    && costCentreOk (getEnclosingCC env) (getEnclosingCC unf_env)
     )
-    (if n>4000 then
-       returnSmpl (mkGenApp (Var var) args)
-    else
--}
+  = unfold var unf_env unf_template args result_ty
 
-    tickUnfold var		`thenSmpl_`
-    simplExpr unfold_env unf_template args result_ty
 
   | maybeToBool maybe_specialisation
   = tick SpecialisationDone	`thenSmpl_`
@@ -96,6 +93,7 @@ completeVar env var args result_ty
   = returnSmpl (mkGenApp (Var var) args)
 
   where
+    info_from_env     = lookupOutIdEnv env var
     unfolding_from_id = getIdUnfolding var
 
 	---------- Magic unfolding stuff
@@ -106,26 +104,25 @@ completeVar env var args result_ty
     (Just magic_result)	= maybe_magic_result
 
 	---------- Unfolding stuff
+    must_unfold = case info_from_env of
+			Just (_, _, InUnfolding _ _) -> True
+			other			     -> False
+
     maybe_unfolding_info 
-	= case (lookupOutIdEnv env var, unfolding_from_id) of
+	= case (info_from_env, unfolding_from_id) of
 
 	     (Just (_, occ_info, OutUnfolding enc_cc unf), _)
 		-> Just (occ_info, setEnclosingCC env enc_cc, unf)	
 
-	     (Just (_, occ_info, InUnfolding env_unf unf), _)
-		-> -- pprTrace ("InUnfolding for ") (ppr PprDebug var) $
-		   Just (occ_info, env_unf, unf)	
-
 	     (_, CoreUnfolding unf)
-		-> -- pprTrace ("CoreUnfolding for ") (ppr PprDebug var) $
-		   Just (noBinderInfo, env, unf)
+		-> Just (noBinderInfo, env, unf)
 
 	     other -> Nothing
 
-    Just (occ_info, unfold_env, simple_unfolding)     = maybe_unfolding_info
+    Just (occ_info, unf_env, simple_unfolding) = maybe_unfolding_info
     SimpleUnfolding form guidance unf_template = simple_unfolding
 
-	---------- Specialisation stuff
+    	---------- Specialisation stuff
     (ty_args, remaining_args) = initialTyArgs args
     maybe_specialisation = lookupSpecEnv (getIdSpecialisation var) ty_args
     (Just (spec_template, (spec_bindings, leftover_ty_args))) = maybe_specialisation
@@ -142,11 +139,23 @@ completeVar env var args result_ty
     is_evald (VarArg v) = isEvaluated (lookupRhsInfo env v)
     is_evald (LitArg l) = True
 
-#if OMIT_DEFORESTER
-    do_deforest = False
-#else
-    do_deforest = case (getDeforestInfo (getIdInfo var)) of { DoDeforest -> True; _ -> False }
-#endif
+
+-- Perform the unfolding
+unfold var unf_env unf_template args result_ty
+ =
+{-
+    simplCount		`thenSmpl` \ n ->
+    (if n > 1000 then
+	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr PprDebug var])
+    else
+	id
+    )
+    (if n>4000 then
+       returnSmpl (mkGenApp (Var var) args)
+    else
+-}
+    tickUnfold var		`thenSmpl_`
+    simplExpr unf_env unf_template args result_ty
 
 
 -- costCentreOk checks that it's ok to inline this thing
