@@ -353,7 +353,7 @@ hscBackEnd dflags
       HscInterpreted ->
 #ifdef GHCI
 	do  -----------------  Generate byte code ------------------
-	    comp_bc <- byteCodeGen dflags core_binds type_env
+	    comp_bc <- byteCodeGen dflags prepd_binds type_env
 	
 	    ------------------ Create f-x-dynamic C-side stuff ---
 	    (istub_h_exists, istub_c_exists) 
