@@ -52,7 +52,7 @@ import TcEnv		( TcEnv, RecTcEnv, InstInfo(iDFunId), tcExtendGlobalValEnv, tcLook
 import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
-import TcInstDcls	( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns, tcInstDecls2 )
+import TcInstDcls	( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns, initInstEnv, tcInstDecls2 )
 import TcUnify		( unifyTauTy )
 import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
@@ -111,7 +111,7 @@ typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (stmt, iface_decl
     tcSetDefaultTys defaultDefaultTys $
 
 	-- Typecheck the extra declarations
-    tcExtraDecls pcs this_mod iface_decls	`thenTc` \ (new_pcs, env) ->
+    tcExtraDecls pcs hst this_mod iface_decls	`thenTc` \ (new_pcs, env) ->
 
     tcSetEnv env				$
     tcExtendGlobalTypeEnv ic_type_env		$
@@ -245,7 +245,7 @@ typecheckExpr dflags pcs hst ic_type_env unqual this_mod (expr, decls)
     tcSetDefaultTys defaultDefaultTys $
 
 	-- Typecheck the extra declarations
-    tcExtraDecls pcs this_mod decls	`thenTc` \ (new_pcs, env) ->
+    tcExtraDecls pcs hst this_mod decls	`thenTc` \ (new_pcs, env) ->
 
 	-- Now typecheck the expression
     tcSetEnv env			$
@@ -296,15 +296,17 @@ typecheckExtraDecls
 
 typecheckExtraDecls dflags pcs hst unqual this_mod decls
  = typecheck dflags pcs hst unqual $
-   tcExtraDecls pcs this_mod decls	`thenTc` \ (new_pcs, _) ->
+   tcExtraDecls pcs hst this_mod decls	`thenTc` \ (new_pcs, _) ->
    returnTc new_pcs
 
 tcExtraDecls :: PersistentCompilerState
+	     -> HomeSymbolTable
  	     -> Module		
 	     -> [RenamedHsDecl]	
 	     -> TcM (PersistentCompilerState, TcEnv)
+	-- Returned environment includes instances
 
-tcExtraDecls pcs this_mod decls
+tcExtraDecls pcs hst this_mod decls
   = tcIfaceImports this_mod decls 	`thenTc` \ (env, all_things, dfuns, rules) ->
     addInstDFuns (pcs_insts pcs) dfuns	`thenNF_Tc` \ new_pcs_insts ->
     let
@@ -317,8 +319,11 @@ tcExtraDecls pcs this_mod decls
 	    		pcs_rules = new_pcs_rules
       	          }
     in
-	-- Add the new instances
-    tcSetEnv env (tcSetInstEnv new_pcs_insts tcGetEnv)	`thenNF_Tc` \ new_env ->
+	-- Initialise the instance environment
+    tcSetEnv env (
+	initInstEnv new_pcs hst		`thenNF_Tc` \ inst_env ->
+	tcSetInstEnv inst_env tcGetEnv
+    )					`thenNF_Tc` \ new_env ->
     returnTc (new_pcs, new_env)
 \end{code}
 
@@ -386,10 +391,11 @@ tcModule pcs hst get_fixity this_mod decls
     	tcSetEnv env1				$
 
 		-- Do the source-language instances, including derivings
-	tcInstDecls1 new_pcs hst unf_env 
+	initInstEnv new_pcs hst			`thenNF_Tc` \ inst_env1 ->
+	tcInstDecls1 (pcs_PRS new_pcs) inst_env1
 		     get_fixity this_mod 
-		     tycl_decls src_inst_decls 	`thenTc` \ (inst_env, inst_info, deriv_binds) ->
-	tcSetInstEnv inst_env			$
+		     tycl_decls src_inst_decls 	`thenTc` \ (inst_env2, inst_info, deriv_binds) ->
+	tcSetInstEnv inst_env2			$
 
         -- Foreign import declarations next
         traceTc (text "Tc4")			`thenNF_Tc_`

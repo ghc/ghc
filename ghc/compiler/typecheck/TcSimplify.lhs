@@ -1738,7 +1738,6 @@ tcSimplifyDeriv tyvars theta
     simpleReduceLoop doc reduceMe wanteds		`thenTc` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
-    doptsTc Opt_AllowUndecidableInstances		`thenNF_Tc` \ undecidable_ok ->
     let
  	tv_set      = mkVarSet tvs
 	simpl_theta = map dictPred irreds	-- reduceMe squashes all non-dicts
@@ -1746,8 +1745,11 @@ tcSimplifyDeriv tyvars theta
 	check_pred pred
 	  -- Check that the returned dictionaries are all of form (C a b)
 	  -- 	(where a, b are type variables).  
-	  -- Unless we have -fallow-undecidable-instances.
-	  | not undecidable_ok && not (isTyVarClassPred pred)
+	  -- At one time we allowed this if we had -fallow-undecidable-instances,
+	  -- but that risks non-termination in the 'deriving' context-inference
+	  -- fixpoint loop. If you want fancy stuff you just have to write the
+	  -- instance decl yourself.
+	  | not (isTyVarClassPred pred)
           = addErrTc (noInstErr pred)
   
 	  -- Check for a bizarre corner case, when the derived instance decl should
