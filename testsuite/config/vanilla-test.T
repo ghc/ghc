@@ -32,6 +32,16 @@ def qualify ( $_filename_frag )
    fi
 }
 
+def testnameWith ( $_filename_frag )
+{
+   if   $_filename_frag == ""
+   then
+      return $testname
+   else
+      return $testname ++ "." ++ $_filename_frag
+   fi
+}
+
 ---------------------------------------------------------------
 --- COMPILATION                                             ---
 ---------------------------------------------------------------
@@ -109,18 +119,21 @@ def simple_run_main( $_extra_args )
 {
    -- figure out what to use for stdin
    $devnull = "/dev/null"
-   if $stdin == "" then
-	$stdin = qualify("stdin")
+   if $stdin /= "" then
+	$use_stdin = $stdin
+   else
+	$stdin = testnameWith("stdin")
+	$stdin_path = $testdir ++ "/" ++ $stdin
+	$use_stdin = if exists($stdin_path) then $stdin else $devnull
    fi
-   $use_stdin = if exists($stdin) then $stdin else $devnull
 
-   $run_stdout = qualify("run.stdout")
-   $run_stderr = qualify("run.stderr")
+   $run_stdout = testnameWith("run.stdout")
+   $run_stderr = testnameWith("run.stderr")
 
    rm_or_fail($run_stdout)
    rm_or_fail($run_stderr)
-   $cmd = qualify("") 
-          ++ " " ++ $_extra_args
+   $cmd = "cd " ++ $testdir ++ " && "
+	  ++ "./" ++ $testname ++ " " ++ $_extra_args
           ++ " < " ++ $use_stdin
           ++ " > " ++ $run_stdout
           ++ " 2> " ++ $run_stderr
