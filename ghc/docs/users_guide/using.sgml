@@ -940,6 +940,13 @@ f "2"    = 2
 	  <para>Report any function definitions (and local bindings)
           which are unused.  For top-level functions, the warning is
           only given if the binding is not exported.</para>
+	  <para>A definition is regarded as "used" if (a) it is exported, or (b) it is
+	    mentioned in the right hand side of another definition that is used, or (c) the 
+	    function it defines begins with an underscore.  The last case provides a 
+	    way to suppress unused-binding warnings selectively.  </para>
+	  <para> Notice that a variable
+	    is reported as unused even if it appears in the right-hand side of another
+	    unused binding. </para>
 	</listitem>
       </varlistentry>
 
@@ -950,8 +957,10 @@ f "2"    = 2
 	  <indexterm><primary>unused imports, warning</primary></indexterm>
 	  <indexterm><primary>imports, unused</primary></indexterm>
 
-	  <para>Report any objects that are explicitly imported but
-	  never used.</para>
+	  <para>Report any modules that are explicitly imported but
+	  never used.  However, the form <literal>import M()</literal> is
+	  never reported as an unused import, because it is a useful idiom
+	  for importing instance declarations, which are anonymous in Haskell.</para>
 	</listitem>
       </varlistentry>
 
