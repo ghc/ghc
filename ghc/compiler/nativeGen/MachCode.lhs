@@ -757,7 +757,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 			  mkSeqInstr (LEA sz (OpAddr (AddrBaseIndex (Just src1) Nothing src2)) (OpReg dst))
 	in
 	returnUs (Any IntRep code__2)
-
+{-
     add_code sz x (StInd _ mem)
       = getRegister x		`thenUs` \ register1 ->
 	--getNewRegNCG (registerRep register1)
@@ -767,7 +767,6 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    code2 = amodeCode amode
 	    src2  = amodeAddr amode
 
---	    fixedname  = registerName register1 eax
 	    code__2 dst = let code1 = registerCode register1 dst
 			      src1  = registerName register1 dst
 			  in asmParThen [code2 asmVoid,code1 asmVoid] .
@@ -788,7 +787,6 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    code1 = amodeCode amode
 	    src1  = amodeAddr amode
 
---	    fixedname  = registerName register2 eax
 	    code__2 dst = let code2 = registerCode register2 dst
 			      src2  = registerName register2 dst
 			  in asmParThen [code1 asmVoid,code2 asmVoid] .
@@ -799,7 +797,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 				    mkSeqInstrs [ADD sz (OpAddr src1) (OpReg src2)]
 	in
 	returnUs (Any IntRep code__2)
-
+-}
     add_code sz x y
       = getRegister x		`thenUs` \ register1 ->
 	getRegister y		`thenUs` \ register2 ->
@@ -2786,7 +2784,6 @@ trivialCode instr x y
   = getRegister x		`thenUs` \ register1 ->
     --getNewRegNCG IntRep	`thenUs` \ tmp1 ->
     let
---    	fixedname  = registerName register1 eax
     	code__2 dst = let code1 = registerCode register1 dst
     	                  src1  = registerName register1 dst
 		      in code1 .
@@ -2806,7 +2803,6 @@ trivialCode instr x y
   = getRegister y		`thenUs` \ register1 ->
     --getNewRegNCG IntRep	`thenUs` \ tmp1 ->
     let
---    	fixedname  = registerName register1 eax
     	code__2 dst = let code1 = registerCode register1 dst
 			  src1  = registerName register1 dst
 		      in code1 .
@@ -2820,13 +2816,12 @@ trivialCode instr x y
   where
     imm = maybeImm x
     imm__2 = case imm of Just x -> x
-
+{-
 trivialCode instr x (StInd pk mem)
   = getRegister x		`thenUs` \ register ->
     --getNewRegNCG IntRep	`thenUs` \ tmp ->
     getAmode mem		`thenUs` \ amode ->
     let
---    	fixedname  = registerName register eax
     	code2 = amodeCode amode asmVoid
     	src2  = amodeAddr amode
     	code__2 dst = let code1 = registerCode register dst asmVoid
@@ -2845,7 +2840,6 @@ trivialCode instr (StInd pk mem) y
     --getNewRegNCG IntRep	`thenUs` \ tmp ->
     getAmode mem		`thenUs` \ amode ->
     let
---    	fixedname  = registerName register eax
     	code2 = amodeCode amode asmVoid
     	src2  = amodeAddr amode
     	code__2 dst = let
@@ -2859,14 +2853,13 @@ trivialCode instr (StInd pk mem) y
 				mkSeqInstr (instr (OpAddr src2) (OpReg src1))
     in
     returnUs (Any pk code__2)
-
+-}
 trivialCode instr x y
   = getRegister x		`thenUs` \ register1 ->
     getRegister y		`thenUs` \ register2 ->
     --getNewRegNCG IntRep	`thenUs` \ tmp1 ->
     getNewRegNCG IntRep		`thenUs` \ tmp2 ->
     let
---    	fixedname  = registerName register1 eax
     	code2 = registerCode register2 tmp2 asmVoid
     	src2  = registerName register2 tmp2
     	code__2 dst = let
@@ -2886,7 +2879,6 @@ trivialUCode instr x
   = getRegister x		`thenUs` \ register ->
 --    getNewRegNCG IntRep	`thenUs` \ tmp ->
     let
---    	fixedname = registerName register eax
     	code__2 dst = let
     	                  code = registerCode register dst
 		      	  src  = registerName register dst
@@ -3241,7 +3233,6 @@ chrCode x
   = getRegister x		`thenUs` \ register ->
     --getNewRegNCG IntRep	`thenUs` \ reg ->
     let
---    	fixedname = registerName register eax
     	code__2 dst = let
     	                  code = registerCode register dst
     	                  src  = registerName register dst

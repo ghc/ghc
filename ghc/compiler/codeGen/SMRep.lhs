@@ -14,19 +14,34 @@ module SMRep (
 
 #ifndef OMIT_NATIVE_CODEGEN
 	, getSMRepClosureTypeInt
-	, cONSTR                  
-	, cONSTR_STATIC           
-	, cONSTR_NOCAF_STATIC     
-	, fUN                     
-	, fUN_STATIC              
-	, tHUNK                   
-	, tHUNK_STATIC            
-	, tHUNK_SELECTOR          
-	, rET_SMALL               
-	, rET_VEC_SMALL           
-	, rET_BIG                 
+	, cONSTR
+	, cONSTR_1_0
+	, cONSTR_0_1
+	, cONSTR_2_0
+	, cONSTR_1_1
+	, cONSTR_0_2
+	, cONSTR_STATIC
+	, cONSTR_NOCAF_STATIC
+	, fUN
+	, fUN_1_0
+	, fUN_0_1
+	, fUN_2_0
+	, fUN_1_1
+	, fUN_0_2
+	, fUN_STATIC
+	, tHUNK
+	, tHUNK_1_0
+	, tHUNK_0_1
+	, tHUNK_2_0
+	, tHUNK_1_1
+	, tHUNK_0_2
+	, tHUNK_STATIC
+	, tHUNK_SELECTOR
+	, rET_SMALL
+	, rET_VEC_SMALL
+	, rET_BIG
 	, rET_VEC_BIG
-	, bLACKHOLE               
+	, bLACKHOLE
 #endif
     ) where
 
@@ -34,9 +49,9 @@ module SMRep (
 
 import CmdLineOpts
 import AbsCSyn		( Liveness(..) )
-import Constants	( sTD_HDR_SIZE, pROF_HDR_SIZE, 
+import Constants	( sTD_HDR_SIZE, pROF_HDR_SIZE,
 			  gRAN_HDR_SIZE, tICKY_HDR_SIZE, aRR_HDR_SIZE,
-			  sTD_ITBL_SIZE, pROF_ITBL_SIZE, 
+			  sTD_ITBL_SIZE, pROF_ITBL_SIZE,
 			  gRAN_ITBL_SIZE, tICKY_ITBL_SIZE )
 import Outputable
 import GlaExts		( Int(..), Int#, (<#), (==#), (<#), (>#) )
@@ -158,14 +173,29 @@ pprClosureType THUNK_SELECTOR   = ptext SLIT("THUNK_SELECTOR")
 #ifndef OMIT_NATIVE_CODEGEN
 getSMRepClosureTypeInt :: SMRep -> Int
 getSMRepClosureTypeInt (GenericRep _ _ t) =
-  case t of 
+  case t of
     CONSTR 	   -> cONSTR
+    CONSTR_p_n 1 0 -> cONSTR_1_0
+    CONSTR_p_n 0 1 -> cONSTR_0_1
+    CONSTR_p_n 2 0 -> cONSTR_2_0
+    CONSTR_p_n 1 1 -> cONSTR_1_1
+    CONSTR_p_n 0 2 -> cONSTR_0_2
     CONSTR_NOCAF   -> panic "getClosureTypeInt: CONSTR_NOCAF"
     FUN    	   -> fUN
+    FUN_p_n 1 0    -> fUN_1_0
+    FUN_p_n 0 1    -> fUN_0_1
+    FUN_p_n 2 0    -> fUN_2_0
+    FUN_p_n 1 1    -> fUN_1_1
+    FUN_p_n 0 2    -> fUN_0_2
     THUNK  	   -> tHUNK
+    THUNK_p_n 1 0  -> tHUNK_1_0
+    THUNK_p_n 0 1  -> tHUNK_0_1
+    THUNK_p_n 2 0  -> tHUNK_2_0
+    THUNK_p_n 1 1  -> tHUNK_1_1
+    THUNK_p_n 0 2  -> tHUNK_0_2
     THUNK_SELECTOR -> tHUNK_SELECTOR
 getSMRepClosureTypeInt (StaticRep _ _ t) =
-  case t of 
+  case t of
     CONSTR 	   -> cONSTR_STATIC
     CONSTR_NOCAF   -> cONSTR_NOCAF_STATIC
     FUN    	   -> fUN_STATIC
@@ -181,11 +211,26 @@ getSMRepClosureTypeInt BlackHoleRep = bLACKHOLE
 #include "../includes/ClosureTypes.h"
 
 cONSTR                  = (CONSTR               :: Int)
+cONSTR_1_0              = (CONSTR_1_0           :: Int)
+cONSTR_0_1              = (CONSTR_0_1           :: Int)
+cONSTR_2_0              = (CONSTR_2_0           :: Int)
+cONSTR_1_1              = (CONSTR_1_1           :: Int)
+cONSTR_0_2              = (CONSTR_0_2           :: Int)
 cONSTR_STATIC           = (CONSTR_STATIC        :: Int)
 cONSTR_NOCAF_STATIC     = (CONSTR_NOCAF_STATIC  :: Int)
 fUN                     = (FUN                  :: Int)
+fUN_1_0                 = (FUN_1_0              :: Int)
+fUN_0_1                 = (FUN_0_1              :: Int)
+fUN_2_0                 = (FUN_2_0              :: Int)
+fUN_1_1                 = (FUN_1_1              :: Int)
+fUN_0_2                 = (FUN_0_2              :: Int)
 fUN_STATIC              = (FUN_STATIC           :: Int)
 tHUNK                   = (THUNK                :: Int)
+tHUNK_1_0               = (THUNK_1_0            :: Int)
+tHUNK_0_1               = (THUNK_0_1            :: Int)
+tHUNK_2_0               = (THUNK_2_0            :: Int)
+tHUNK_1_1               = (THUNK_1_1            :: Int)
+tHUNK_0_2               = (THUNK_0_2            :: Int)
 tHUNK_STATIC            = (THUNK_STATIC         :: Int)
 tHUNK_SELECTOR          = (THUNK_SELECTOR       :: Int)
 rET_SMALL               = (RET_SMALL            :: Int)

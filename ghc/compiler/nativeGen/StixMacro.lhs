@@ -76,7 +76,7 @@ macroCode UPD_CAF args
 	blocking_queue = StInd PtrRep (StIndex PtrRep bhptr fixedHS)
 	a1 = StAssign PtrRep w0 ind_static_info
 	a2 = StAssign PtrRep w1 bhptr
-	a3 = StAssign PtrRep blocking_queue end_tso_queue
+	a3 = StCall SLIT("newCAF") cCallConv VoidRep [cafptr]
     in
     returnUs (\xs -> a1 : a2 : a3 : xs)
 \end{code}
@@ -161,7 +161,6 @@ bh_info   	= sStLitLbl SLIT("BLACKHOLE_info")
 ind_static_info	= sStLitLbl SLIT("IND_STATIC_info")
 ind_info  	= sStLitLbl SLIT("IND_info")
 upd_frame_info	= sStLitLbl SLIT("Upd_frame_entry")
-end_tso_queue	= sStLitLbl SLIT("END_TSO_QUEUE_closure")
 
 -- Some common call trees
 
