@@ -33,10 +33,10 @@ GHC is surprisingly zippy for normal compilations without <Option>-O</Option>!
 <ListItem>
 <Para>
 Within reason, more memory for heap space means less garbage
-collection for GHC, which means less compilation time.  If you use
-the <Option>-Rgc-stats</Option> option, you'll get a garbage-collector report.
-(Again, you can use the cheap-and-nasty <Option>-optCrts-Sstderr</Option> option to
-send the GC stats straight to standard error.)
+collection for GHC, which means less compilation time.  If you use the
+<Option>-Rghc-timing</Option> option, you'll get a garbage-collector
+report.  (Again, you can use the cheap-and-nasty <Option>+RTS -Sstderr
+-RTS</Option> option to send the GC stats straight to standard error.)
 </Para>
 
 <Para>
@@ -128,8 +128,8 @@ individually with <Option>-fno-strictness</Option>.
 
 <Para>
 To figure out which part of the compiler is badly behaved, the
-<Option>-dshow-passes</Option><IndexTerm><Primary>-dshow-passes option</Primary></IndexTerm> option is your
-friend.
+<Option>-v2</Option><IndexTerm><option>-v</option></primary>
+</indexterm> option is your friend.
 </Para>
 
 <Para>
@@ -141,19 +141,14 @@ allocator to founder.  Bring on <Option>-fvia-C</Option><IndexTerm><Primary>-fvi
 </ListItem>
 </VarListEntry>
 <VarListEntry>
-<Term>Avoid the consistency-check on linking:</Term>
-<ListItem>
-<Para>
-Use <Option>-no-link-chk</Option><IndexTerm><Primary>-no-link-chk</Primary></IndexTerm>; saves effort.  This is
-probably safe in a I-only-compile-things-one-way setup.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
 <Term>Explicit <Literal>import</Literal> declarations:</Term>
 <ListItem>
 <Para>
-Instead of saying <Literal>import Foo</Literal>, say <Literal>import Foo (...stuff I want...)</Literal>.
+Instead of saying <Literal>import Foo</Literal>, say <Literal>import
+Foo (...stuff I want...)</Literal> You can get GHC to tell you the
+minimal set of required imports by using the
+<option>-ddump-minimal-imports</option> option (see <xref
+linkend="hi-options">).
 </Para>
 
 <Para>
@@ -227,12 +222,12 @@ At present, <Option>-O2</Option> is nearly indistinguishable from <Option>-O</Op
 <Term>Compile via C and crank up GCC:</Term>
 <ListItem>
 <Para>
-Even with <Option>-O</Option>, GHC tries to
-use a native-code generator, if available.  But the native
-code-generator is designed to be quick, not mind-bogglingly clever.
-Better to let GCC have a go, as it tries much harder on register
-allocation, etc.
-</Para>
+The native code-generator is designed to be quick, not mind-bogglingly
+clever.  Better to let GCC have a go, as it tries much harder on
+register allocation, etc.</para>
+
+<para>At the moment, if you turn on <option>-O</option> you get GCC
+instead.  This may change in the future.</para>
 
 <Para>
 So, when we want very fast code, we use: <Option>-O -fvia-C -O2-for-C</Option>.
