@@ -303,8 +303,8 @@ endef
 else
 define BUILD_LIB
 $(RM) $@ $@.tmp
-echo $(STUBOBJS) > $@.list
-echo $(EXTRA_OBJS) > $@.list
+echo $(STUBOBJS)    > $@.list
+echo $(EXTRA_OBJS) >> $@.list
 $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' >> $@.list
 $(AR) $(AR_OPTS) $@.tmp $(ArSupportsInput) $@.list
 $(RM) $@.list
