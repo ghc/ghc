@@ -1,0 +1,3 @@
+This current error message is rather unhelpful:
+
+	read009.hs:12: parse error on input `'
