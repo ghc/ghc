@@ -159,13 +159,18 @@ tcUserStmt :: [Name] -> RenamedStmt -> TcM (TypecheckedHsExpr, [Id])
 
 tcUserStmt names (ExprStmt expr loc)
   = ASSERT( null names )
+    tcGetUnique 		`thenNF_Tc` \ uniq ->
+    let 
+	fresh_it = itName uniq
+        the_bind = FunMonoBind fresh_it False 
+			[ mkSimpleMatch [] expr Nothing loc ] loc
+    in
     tryTc_ (traceTc (text "tcs 1b") `thenNF_Tc_`
-		tc_stmts [itName] [LetStmt (MonoBind the_bind [] NonRecursive),
-			       ExprStmt (HsApp (HsVar printName) (HsVar itName)) loc])
+		tc_stmts [fresh_it] [
+		    LetStmt (MonoBind the_bind [] NonRecursive),
+		    ExprStmt (HsApp (HsVar printName) (HsVar fresh_it)) loc])
 	   (    traceTc (text "tcs 1a") `thenNF_Tc_`
-		tc_stmts [itName] [BindStmt (VarPatIn itName) expr loc])
-  where
-    the_bind = FunMonoBind itName False [mkSimpleMatch [] expr Nothing loc] loc
+		tc_stmts [fresh_it] [BindStmt (VarPatIn fresh_it) expr loc])
 
 tcUserStmt names stmt
   = tc_stmts names [stmt]

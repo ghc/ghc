@@ -67,7 +67,7 @@ import Panic	  ( panic )
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName = mkLocalName itIdKey (mkOccFS varName SLIT("it")) noSrcLoc
+itName uniq = mkLocalName uniq (mkOccFS varName SLIT("it")) noSrcLoc
 \end{code}
 
 \begin{code}
@@ -864,7 +864,6 @@ mapIdKey		      = mkPreludeMiscIdUnique 120
 \begin{code}
 assertIdKey		      = mkPreludeMiscIdUnique 121
 runSTRepIdKey		      = mkPreludeMiscIdUnique 122
-itIdKey			      = mkPreludeMiscIdUnique 123	-- "it" for the interactive interface
 \end{code}
 
 

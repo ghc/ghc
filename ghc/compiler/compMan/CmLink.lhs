@@ -12,7 +12,8 @@ module CmLink ( Linkable(..),  Unlinked(..),
 		unload,
                 PersistentLinkerState{-abstractly!-}, emptyPLS,
 #ifdef GHCI
-		updateClosureEnv,
+		delListFromClosureEnv,
+		addListToClosureEnv,
 		linkExpr
 #endif
   ) where
@@ -95,9 +96,14 @@ emptyPLS = return (PersistentLinkerState {})
 #endif
 
 #ifdef GHCI
-updateClosureEnv :: PersistentLinkerState -> [(Name,HValue)] 
+delListFromClosureEnv :: PersistentLinkerState -> [Name]
+  	-> IO PersistentLinkerState
+delListFromClosureEnv pls names
+  = return pls{ closure_env = delListFromFM (closure_env pls) names }
+
+addListToClosureEnv :: PersistentLinkerState -> [(Name,HValue)] 
 	-> IO PersistentLinkerState
-updateClosureEnv pls new_bindings
+addListToClosureEnv pls new_bindings
   = return pls{ closure_env = addListToFM (closure_env pls) new_bindings }
 #endif
 

@@ -9,7 +9,8 @@ module NameEnv (
 	emptyNameEnv, unitNameEnv, nameEnvElts, 
 	extendNameEnv_C, extendNameEnv, foldNameEnv, filterNameEnv,
 	plusNameEnv, plusNameEnv_C, extendNameEnv, extendNameEnvList,
-	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, elemNameEnv
+	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
+	elemNameEnv
     ) where
 
 #include "HsVersions.h"
@@ -37,6 +38,7 @@ plusNameEnv    	 :: NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_C  	 :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 extendNameEnvList:: NameEnv a -> [(Name,a)] -> NameEnv a
 delFromNameEnv 	 :: NameEnv a -> Name -> NameEnv a
+delListFromNameEnv :: NameEnv a -> [Name] -> NameEnv a
 elemNameEnv    	 :: Name -> NameEnv a -> Bool
 unitNameEnv    	 :: Name -> a -> NameEnv a
 lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
@@ -55,6 +57,7 @@ plusNameEnv    	 = plusUFM
 plusNameEnv_C  	 = plusUFM_C
 extendNameEnvList= addListToUFM
 delFromNameEnv 	 = delFromUFM
+delListFromNameEnv = delListFromUFM
 elemNameEnv    	 = elemUFM
 mapNameEnv	 = mapUFM
 unitNameEnv    	 = unitUFM

@@ -37,9 +37,9 @@ import CmTypes
 import HscTypes
 import RnEnv		( unQualInScope )
 import Id		( idType, idName )
-import Name		( Name, NamedThing(..) )
+import Name		( Name, NamedThing(..), nameRdrName )
 import NameEnv
-import RdrName		( emptyRdrEnv )
+import RdrName		( lookupRdrEnv, emptyRdrEnv )
 import Module		( Module, ModuleName, moduleName, isHomeModule,
 			  mkModuleName, moduleNameUserString, moduleUserString )
 import CmStaticInfo	( GhciMode(..) )
@@ -194,12 +194,18 @@ cmRunStmt cmstate dflags expr
 
 		-- update the interactive context
 	        let 
-		    new_rn_env   = extendLocalRdrEnv rn_env (map idName ids)
+		    names = map idName ids
 
-			-- Extend the renamer-env from bound_ids, not
-			-- bound_names, because the latter may contain
-			-- [it] when the former is empty
-		    new_type_env = extendNameEnvList type_env 	
+		    -- these names have just been shadowed
+		    shadowed = [ n | r <- map nameRdrName names,
+				     Just n <- [lookupRdrEnv rn_env r] ]
+		    
+		    new_rn_env   = extendLocalRdrEnv rn_env names
+
+		    -- remove any shadowed bindings from the type_env
+		    filtered_type_env = delListFromNameEnv type_env shadowed
+
+		    new_type_env = extendNameEnvList filtered_type_env 	
 			      		[ (getName id, AnId id)	| id <- ids]
 
 		    new_ic = icontext { ic_rn_env   = new_rn_env, 
@@ -212,9 +218,11 @@ cmRunStmt cmstate dflags expr
 		let thing_to_run = unsafeCoerce# hval :: IO [HValue]
 		hvals <- thing_to_run
 
-		-- get the newly bound things, and bind them
-		let names = map idName ids
-		new_pls <- updateClosureEnv pls (zip names hvals)
+		-- Get the newly bound things, and bind them.  Don't forget
+		-- to delete any shadowed bindings from the closure_env, lest
+		-- we end up with a space leak.
+		pls <- delListFromClosureEnv pls shadowed
+		new_pls <- addListToClosureEnv pls (zip names hvals)
 
 	        return (cmstate{ pcs=new_pcs, pls=new_pls, ic=new_ic }, names)
    where
