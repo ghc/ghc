@@ -287,8 +287,13 @@ foreign import ccall unsafe "killpg"
 raiseSignal :: Signal -> IO ()
 raiseSignal sig = throwErrnoIfMinus1_ "raiseSignal" (c_raise sig)
 
+#if defined(__GLASGOW_HASKELL__) && defined(openbsd_TARGET_OS)
+foreign import ccall unsafe "genericRaise"
+  c_raise :: CInt -> IO CInt
+#else
 foreign import ccall unsafe "raise"
   c_raise :: CInt -> IO CInt
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 data Handler = Default
