@@ -100,6 +100,7 @@ Death to "ExpandingDicts".
 %************************************************************************
 
 \begin{code}
+tcClassDecl1 :: ValueEnv -> RenamedTyClDecl -> TcM s (Name, TyThingDetails)
 tcClassDecl1 rec_env
       	     (ClassDecl context class_name
 			tyvar_names fundeps class_sigs def_methods pragmas 
