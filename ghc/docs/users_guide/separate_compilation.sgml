@@ -325,7 +325,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 	  <indexterm><primary><option>-hisuf</option></primary></indexterm>
 	  <indexterm><primary><option>-hcsuf</option></primary></indexterm>
 	  <listitem>
-	    <para>EXOTICA: The <option>-osuf</option>
+	    <para>The <option>-osuf</option>
             <replaceable>suffix</replaceable> will change the
             <literal>.o</literal> file suffix for object files to
             whatever you specify.  We use this when compiling
