@@ -741,6 +741,14 @@ getBitsPerWordMinus1
         t2
      )
 
+-- IA64 mangler doesn't place tables next to code
+tablesNextToCode :: Bool
+#ifdef ia64_TARGET_ARCH
+tablesNextToCode = False
+#else
+tablesNextToCode = not opt_Unregisterised
+#endif
+
 ------------------------------------------------------------------------------
 
 -- This is the main top-level desugarer PrimOps into MachOps.  First we
@@ -913,17 +921,14 @@ dscCOpStmt [res] AddrToHValueOp [arg] vols
 -- 
 --   In the unregisterised case, we don't attempt to compute the location
 --   of the tag halfword, just a macro. For this build, fixing on layout
---   info has only got drawbacks. [NOTE: We're faking it slightly here,
---   info table layout is a separate issue from having an unregistered
---   impl of the STG machine, but currently only the unregisterised build
---   doesn't have TABLES_NEXT_TO_CODE]
+--   info has only got drawbacks.
 --
 --   Should this arrangement deeply offend you for some reason, code which
 --   computes the offset can be found below also.
 --      -- sof 3/02
 -- 
 dscCOpStmt [res] DataToTagOp [arg] vols
-   | opt_Unregisterised
+   | not tablesNextToCode
    = returnFlt (CMacroStmt DATA_TO_TAGZH [res,arg])
    | otherwise
    = mkTemps [PtrRep, WordRep]		`thenFlt` \ [t_infoptr, t_theword] ->
