@@ -8,7 +8,7 @@ import IOExts
 import ST
 import MutableArray
 import ByteArray
-import Addr
+import PrelAddr
 import Int( Num(fromInt) )
 import CString (packString)
 	
