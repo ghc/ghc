@@ -578,13 +578,21 @@ $ cvs commit -F <replaceable>commit-message</replaceable> <replaceable>directory
 
 <screen>
 $ cd fptools
-$ cvs update -Pd 2&gt;&amp;1 | tee log</screen>
+$ cvs update -P 2&gt;&amp;1 | tee log</screen>
 
       <para>Look at the log file, and fix any conflicts (denoted by a
-      <quote>C</quote> in the first column). If you're using multiple
-      build trees, then for every build tree you have pointing at this
-      source tree, you need to update the links in case any new files
-      have appeared: </para>
+      <quote>C</quote> in the first column).  New directories may have
+      appeared in the repository; CVS doesn't check these out by
+      default, so to get new directories you have to explicitly do
+<screen>
+$ cvs update -d</screen>
+      in each project subdirectory.  Don't do this at the top level,
+      because then <emphasis>all</emphasis> the projects will be
+      checked out.</para>
+
+      <para>If you're using multiple build trees, then for every build
+      tree you have pointing at this source tree, you need to update
+      the links in case any new files have appeared: </para>
 
 <screen>
 $ cd <replaceable>build-tree</replaceable>
