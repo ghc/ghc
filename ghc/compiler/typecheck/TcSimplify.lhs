@@ -1119,18 +1119,24 @@ extractResults avails wanteds
 			     where
 				new_binds = addBind binds w rhs
 
-	  Just (LinRhss (rhs:rhss))	-- Consume one of the Rhss
+	  Just (Linear n split_inst avail)	-- Transform Linear --> LinRhss
+	    -> get_root irreds frees avail w		`thenNF_Tc` \ (irreds', frees', root_id) ->
+	       split n (instToId split_inst) root_id w	`thenNF_Tc` \ (binds', rhss) ->
+	       go (addToFM avails w (LinRhss rhss))
+		  (binds `AndMonoBinds` binds')
+		  irreds' frees' (split_inst : w : ws)
+
+	  Just (LinRhss (rhs:rhss))		-- Consume one of the Rhss
 		-> go new_avails new_binds irreds frees ws
 		where		
 		   new_binds  = addBind binds w rhs
 		   new_avails = addToFM avails w (LinRhss rhss)
 
-	  Just (Linear n split_inst avail)
-	    -> split n (instToId split_inst) avail w	`thenNF_Tc` \ (binds', (rhs:rhss), irreds') ->
-	       go (addToFM avails w (LinRhss rhss))
-		  (binds `AndMonoBinds` addBind binds' w rhs)
-		  (irreds' ++ irreds) frees (split_inst:ws)
-
+    get_root irreds frees (Given id _) w = returnNF_Tc (irreds, frees, id)
+    get_root irreds frees Irred	       w = cloneDict w	`thenNF_Tc` \ w' ->
+					   returnNF_Tc (w':irreds, frees, instToId w')
+    get_root irreds frees IsFree       w = cloneDict w	`thenNF_Tc` \ w' ->
+					   returnNF_Tc (irreds, w':frees, instToId w')
 
     add_given avails w 
 	| instBindingRequired w = addToFM avails w (Given (instToId w) True)
@@ -1158,30 +1164,30 @@ extractResults avails wanteds
 	--			  1 or 0 insts to add to irreds
 
 
-split :: Int -> TcId -> Avail -> Inst 
-      -> NF_TcM (TcDictBinds, [TcExpr], [Inst])
--- (split n split_id avail wanted) returns
+split :: Int -> TcId -> TcId -> Inst 
+      -> NF_TcM (TcDictBinds, [TcExpr])
+-- (split n split_id root_id wanted) returns
 --	* a list of 'n' expressions, all of which witness 'avail'
 --	* a bunch of auxiliary bindings to support these expressions
 --	* one or zero insts needed to witness the whole lot
 --	  (maybe be zero if the initial Inst is a Given)
-split n split_id avail wanted
+--
+-- NB: 'wanted' is just a template
+
+split n split_id root_id wanted
   = go n
   where
-    ty  = linearInstType wanted
+    ty      = linearInstType wanted
     pair_ty = mkTyConApp pairTyCon [ty,ty]
-    id  = instToId wanted
-    occ = getOccName id
-    loc = getSrcLoc id
+    id      = instToId wanted
+    occ     = getOccName id
+    loc     = getSrcLoc id
 
-    go 1 = case avail of
-	     Given id _ -> returnNF_Tc (EmptyMonoBinds, [HsVar id], [])
-	     Irred      -> cloneDict wanted		`thenNF_Tc` \ w' ->
-			   returnNF_Tc (EmptyMonoBinds, [HsVar (instToId w')], [w'])
+    go 1 = returnNF_Tc (EmptyMonoBinds, [HsVar root_id])
 
-    go n = go ((n+1) `div` 2)		`thenNF_Tc` \ (binds1, rhss, irred) ->
+    go n = go ((n+1) `div` 2)		`thenNF_Tc` \ (binds1, rhss) ->
 	   expand n rhss		`thenNF_Tc` \ (binds2, rhss') ->
-	   returnNF_Tc (binds1 `AndMonoBinds` binds2, rhss', irred)
+	   returnNF_Tc (binds1 `AndMonoBinds` binds2, rhss')
 
 	-- (expand n rhss) 
 	-- Given ((n+1)/2) rhss, make n rhss, using auxiliary bindings
@@ -1420,23 +1426,30 @@ isAvailable avails wanted = lookupFM avails wanted
 
 addLinearAvailable :: Avails -> Avail -> Inst -> NF_TcM (Avails, [Inst])
 addLinearAvailable avails avail wanted
-  | need_split avail
+	-- avails currently maps [wanted -> avail]
+	-- Extend avails to reflect a neeed for an extra copy of avail
+
+  | Just avail' <- split_avail avail
+  = returnNF_Tc (addToFM avails wanted avail', [])
+
+  | otherwise
   = tcLookupGlobalId splitName			`thenNF_Tc` \ split_id ->
     newMethodAtLoc (instLoc wanted) split_id 
 		   [linearInstType wanted]	`thenNF_Tc` \ (split_inst,_) ->
     returnNF_Tc (addToFM avails wanted (Linear 2 split_inst avail), [split_inst])
 
-  | otherwise
-  = returnNF_Tc (addToFM avails wanted avail', [])
   where
-    avail' = case avail of
-		Given id _   -> Given id True
-		Linear n i a -> Linear (n+1) i a 
-
-    need_split Irred	      = True
-    need_split (Given _ used) = used
-    need_split (Linear _ _ _) = False
-
+    split_avail :: Avail -> Maybe Avail
+	-- (Just av) if there's a modified version of avail that
+	-- 	     we can use to replace avail in avails
+	-- Nothing   if there isn't, so we need to create a Linear
+    split_avail (Linear n i a)		    = Just (Linear (n+1) i a)
+    split_avail (Given id used) | not used  = Just (Given id True)
+				| otherwise = Nothing
+    split_avail Irred			    = Nothing
+    split_avail IsFree			    = Nothing
+    split_avail other = pprPanic "addLinearAvailable" (ppr avail $$ ppr wanted $$ ppr avails)
+		  
 -------------------------
 addFree :: Avails -> Inst -> NF_TcM Avails
 	-- When an Inst is tossed upstairs as 'free' we nevertheless add it
