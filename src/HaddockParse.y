@@ -27,7 +27,9 @@ import HaddockTypes
 
 doc	:: { ParsedDoc }
 	: apara PARA doc	{ docAppend $1 $3 }
+	| PARA doc 		{ $2 }
 	| apara			{ $1 }
+	| {- empty -}		{ DocEmpty }
 
 apara	:: { ParsedDoc }
 	: ulpara		{ DocUnorderedList [$1] }
