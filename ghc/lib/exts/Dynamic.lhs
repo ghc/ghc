@@ -69,7 +69,8 @@ import Foreign ( ForeignObj, StablePtr )
 import PrelConc ( MVar )
    END_FOR_GHC -}
 {- BEGIN_FOR_HUGS -}
-import Concurrent ( MVar )
+import   -- fool mkdependHS
+	Concurrent ( MVar )
 {- END_FOR_HUGS -}
 import Word  ( Word8, Word16, Word32, Word64 )
 import Int   ( Int8, Int16, Int32 )

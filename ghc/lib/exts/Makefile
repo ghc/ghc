@@ -42,12 +42,14 @@ endif
 Int_HC_OPTS          += -H8m -fno-prune-tydecls
 Word_HC_OPTS         += -H8m
 NativeInfo_HC_OPTS   += -fno-prune-tydecls
-Dynamic_HC_OPTS	     += -DBEGIN_FOR_GHC='-}' -DEND_FOR_GHC='{-' -DBEGIN_FOR_HUGS='{-' -DEND_FOR_HUGS='-}'
+Dynamic_HC_OPTS	     += $(MAGIC_HSCPP_OPTS)
+
+MAGIC_HSCPP_OPTS=-DBEGIN_FOR_GHC='-}' -DEND_FOR_GHC='{-' -DBEGIN_FOR_HUGS='{-' -DEND_FOR_HUGS='-}'
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
 
-SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR) -optdep--include-prelude -optdep-w
+SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR) -optdep--include-prelude -optdep-w $(MAGIC_HSCPP_OPTS)
 
 #-----------------------------------------------------------------------------
 # 	Installation; need to install .hi files as well as libraries
