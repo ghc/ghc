@@ -57,6 +57,8 @@ instance Outputable TopLevelFlag where
 \begin{code}
 dmdAnalPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
 dmdAnalPgm dflags binds
+  = panic "dmdAnalPgm called"
+dmdAnalPgm dflags binds
   = do {
 	showPass dflags "Demand analysis" ;
 	let { binds_plus_dmds = do_prog binds ;
