@@ -10,6 +10,7 @@ import IO
 main = catch loop (\e -> print e)
 
 loop = do 
+  hSetBuffering stdin LineBuffering
   l <- hGetLine stdin
   putStrLn l
   loop

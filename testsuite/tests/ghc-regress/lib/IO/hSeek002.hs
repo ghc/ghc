@@ -5,7 +5,7 @@ module Main(main) where
 import IO
 import Directory ( removeFile )
 #ifdef i386_unknown_mingw32
-import PrelHandle(hSetBinaryMode)
+import GHC.Handle(hSetBinaryMode)
 #endif
 
 main :: IO ()

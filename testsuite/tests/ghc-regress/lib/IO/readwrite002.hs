@@ -4,7 +4,7 @@ import IO
 import Directory (removeFile, doesFileExist)
 import Monad
 #ifdef i386_unknown_mingw32
-import PrelHandle(hSetBinaryMode)
+import GHC.Handle(hSetBinaryMode)
 #endif
 
 -- This test is weird, full marks to whoever dreamt it up!

@@ -2,7 +2,7 @@
 
 import IO
 #ifdef i386_unknown_mingw32
-import PrelHandle(hSetBinaryMode)
+import GHC.Handle(hSetBinaryMode)
 #endif
 
 -- one version of 'cat'
@@ -15,6 +15,7 @@ main = do
   h <- openFile "hGetLine001.hs" ReadMode
 
 #ifdef i386_unknown_mingw32
+  hSetBinaryMode stdout True
   hSetBinaryMode h True
 #endif
 

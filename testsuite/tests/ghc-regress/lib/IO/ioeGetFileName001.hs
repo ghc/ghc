@@ -2,7 +2,7 @@
 
 import IO
 #ifdef i386_unknown_mingw32
-import PrelHandle(hSetBinaryMode)
+import GHC.Handle(hSetBinaryMode)
 #endif
 
 main = do
