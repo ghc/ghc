@@ -117,7 +117,7 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = 'L';
     $T_X86_BADJMP   = '^\tjmp [^L\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.stab[^n].*|\.type\s+.*|\.size\s+.*)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.stab[^n].*|\.type\s+.*|\.size\s+.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|stab)';
     $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
     $T_DOT_WORD	    = '\.long';
@@ -400,6 +400,15 @@ sub mangle_asm {
 	  && /^\t\.(globl \S+ \.text|comm\t)/ ) {
 	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/;
   
+	# As a temporary solution for compiling "foreign export" declarations,
+	# we use global variables to pass arguments from C to STG land.
+	# These declarations live in the .hc file and not in the generated C
+	# stub file, so we let them pass through here.
+	} elsif ( /^\t\.comm\t__fexp_.*$/ ) {
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'data';
+	    $chksymb[$i] = '';
+
 	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
 	    # duplicated from the bottom
 
@@ -519,6 +528,15 @@ sub mangle_asm {
             # either vtbl_'s or ret_'s, caught above. - andre
 	    $chksymb[$i] = ''; 
 
+	# As a temporary solution for compiling "foreign export" declarations,
+	# we use global variables to pass arguments from C to STG land.
+	# These declarations live in the .hc file and not in the generated C
+	# stub file, so we let them pass through here.
+	} elsif ( /^[\t ]+\.comm[\t ]+__fexp_.*$/ ) {
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'data';
+	    $chksymb[$i] = '';
+
 	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
 	     &&   /^(_uname|uname|stat|fstat):/ ) {
 	    # for some utterly bizarre reason, this platform
@@ -545,6 +563,7 @@ sub mangle_asm {
 		unless $KNOWN_FUNNY_THING{$thing}
 		    || /^$TUS[@]?_(PRIn|PRStart).*$TPOSTLBL[@]?$/o # pointer reversal GC routines
 		    || /^$TUS[@]?CC_.*$TPOSTLBL$/o		# PROF: _CC_ccident  ([@]? is a silly hack (see above))
+		    || /^$TUS__fexp_.*$TPOSTLBL$/o		# foreign export droppings (temporary)
 		    || /^$TUS[@]?_reg.*$TPOSTLBL$/o;		# PROF: __reg<module>
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
@@ -1266,34 +1285,42 @@ sub print_doctored {
     # OK, now we can decide what our patch-up code is going to
     # be:
 
+    # Offsets into register table - you'd better update these magic
+    # numbers should you change its contents!
+    local($OFFSET_R1)=48;
+    local($OFFSET_SpA)=80;
+
 	# Note funky ".=" stuff; we're *adding* to these _patch guys
     if ( $StolenX86Regs <= 2
-	 && ( /32\(\%ebx\)/ || /\%esi/ || /^\tcmps/ ) ) { # R1 (esi)
-	$entry_patch .= "\tmovl \%esi,32(\%ebx)\n";
-	$exit_patch  .= "\tmovl 32(\%ebx),\%esi\n";
+	 && ( /${OFFSET_R1}\(\%ebx\)/ || /\%esi/ || /^\tcmps/ ) ) { # R1 (esi)
+	$entry_patch .= "\tmovl \%esi,${OFFSET_R1}(\%ebx)\n";
+	$exit_patch  .= "\tmovl ${OFFSET_R1}(\%ebx),\%esi\n";
 
-	$gc_call_entry_patch  .= "\tmovl \%esi,32(\%ebx)\n";
-	$gc_call_exit_patch .= "\tmovl 32(\%ebx),\%esi\n";
+	$gc_call_entry_patch  .= "\tmovl \%esi,${OFFSET_R1}(\%ebx)\n";
+	$gc_call_exit_patch .= "\tmovl ${OFFSET_R1}(\%ebx),\%esi\n";
 
 	# nothing for call_{entry,exit} because %esi is callee-save
     }
     if ( $StolenX86Regs <= 3
-	 && ( /64\(\%ebx\)/ || /\%edi/ || /^\t(scas|cmps)/ ) ) { # SpA (edi)
-	$entry_patch .= "\tmovl \%edi,64(\%ebx)\n";
-	$exit_patch  .= "\tmovl 64(\%ebx),\%edi\n";
+	 && ( /${OFFSET_SpA}\(\%ebx\)/ || /\%edi/ || /^\t(scas|cmps)/ ) ) { # SpA (edi)
+	$entry_patch .= "\tmovl \%edi,${OFFSET_SpA}(\%ebx)\n";
+	$exit_patch  .= "\tmovl ${OFFSET_SpA}(\%ebx),\%edi\n";
 
-	$gc_call_entry_patch  .= "\tmovl \%edi,64(\%ebx)\n";
-	$gc_call_exit_patch .= "\tmovl 64(\%ebx),\%edi\n";
+	$gc_call_entry_patch  .= "\tmovl \%edi,${OFFSET_SpA}(\%ebx)\n";
+	$gc_call_exit_patch .= "\tmovl ${OFFSET_SpA}(\%ebx),\%edi\n";
 
 	# nothing for call_{entry,exit} because %edi is callee-save
     }
+    local ($OFFSET_Hp) = 96;
+
+#=  local ($OFFSET_rSaveECX) = 124;
 #=  if ( $StolenX86Regs <= 4
-#=	 && ( /80\(\%ebx\)/ || /\%ecx/ || /^\t(rep|loop)/ ) ) { # Hp (ecx)
-#=	$entry_patch .= "\tmovl \%ecx,80(\%ebx)\n";
-#=	$exit_patch  .= "\tmovl 80(\%ebx),\%ecx\n";
+#=	 && ( /${OFFSET_Hp}\(\%ebx\)/ || /\%ecx/ || /^\t(rep|loop)/ ) ) { # Hp (ecx)
+#=	$entry_patch .= "\tmovl \%ecx,${OFFSET_Hp}(\%ebx)\n";
+#=	$exit_patch  .= "\tmovl ${OFFSET_Hp}(\%ebx),\%ecx\n";
 #=
-#=	$call_exit_patch  .= "\tmovl \%ecx,108(\%ebx)\n";
-#=	$call_entry_patch .= "\tmovl 108(\%ebx),\%ecx\n";
+#=	$call_exit_patch  .= "\tmovl \%ecx,${OFFSET_rSaveECX}(\%ebx)\n";
+#=	$call_entry_patch .= "\tmovl ${OFFSET_rSaveECX}(\%ebx),\%ecx\n";
 #=	# I have a really bad feeling about this if we ever
 #=	# have a nested call...
 #=	# NB: should just hide it somewhere in the C stack.
@@ -1340,7 +1367,9 @@ sub print_doctored {
 
     # final peephole fixes
 
-    s/^\tmovl \%eax,36\(\%ebx\)\n\tjmp \*36\(\%ebx\)\n/\tmovl \%eax,36\(\%ebx\)\n\tjmp \*\%eax\n/;
+    local($OFFSET_R2)=52;
+    s/^\tmovl \%eax,${OFFSET_R2}\(\%ebx\)\n\tjmp \*${OFFSET_R2}\(\%ebx\)\n/\tmovl \%eax,${OFFSET_R2}\(\%ebx\)\n\tjmp \*\%eax\n/;
+
 # the short form may tickle perl bug:
 #    s/^\tmovl \$${T_US}(.*),(\%e[abcd]x)\n\tjmp \*$2/\tjmp $T_US$1/g;
     s/^\tmovl \$${T_US}(.*),\%eax\n\tjmp \*\%eax/\tjmp $T_US$1/g;
@@ -1355,12 +1384,12 @@ sub print_doctored {
     #  (i) the offset of Hp from BaseReg changes from 80, or
     #  (ii) the register assignment of BaseReg changes from %ebx
 
-    s/^\tmovl 80\(\%ebx\),\%e.x\n\tmovl \$(.*),(-?[0-9]*)\(\%e.x\)\n\tmovl 80\(\%ebx\),\%e(.)x/\tmovl 80\(\%ebx\),\%e$3x\n\tmovl \$$1,$2\(\%e$3x\)/g;
+    s/^\tmovl ${OFFSET_Hp}\(\%ebx\),\%e.x\n\tmovl \$(.*),(-?[0-9]*)\(\%e.x\)\n\tmovl ${OFFSET_Hp}\(\%ebx\),\%e(.)x/\tmovl ${OFFSET_Hp}\(\%ebx\),\%e$3x\n\tmovl \$$1,$2\(\%e$3x\)/g;
 
-    s/^\tmovl 80\(\%ebx\),\%e(.)x\n\tmovl (.*),\%e(.)x\n\tmovl \%e$3x,(-?[0-9]*\(\%e$1x\))\n\tmovl 80\(\%ebx\),\%e$1x/\tmovl 80\(\%ebx\),\%e$1x\n\tmovl $2,\%e$3x\n\tmovl \%e$3x,$4/g;
+    s/^\tmovl ${OFFSET_Hp}\(\%ebx\),\%e(.)x\n\tmovl (.*),\%e(.)x\n\tmovl \%e$3x,(-?[0-9]*\(\%e$1x\))\n\tmovl ${OFFSET_Hp}\(\%ebx\),\%e$1x/\tmovl ${OFFSET_Hp}\(\%ebx\),\%e$1x\n\tmovl $2,\%e$3x\n\tmovl \%e$3x,$4/g;
 
-    s/^\tmovl 80\(\%ebx\),\%edx((\n\t(movl|addl) .*,((-?[0-9]*\(.*)|(\%e[abc]x)))+)\n\tmovl 80\(\%ebx\),\%edx/\tmovl 80\(\%ebx\),\%edx$1/g;
-    s/^\tmovl 80\(\%ebx\),\%eax((\n\t(movl|addl) .*,((-?[0-9]*\(.*)|(\%e[bcd]x)))+)\n\tmovl 80\(\%ebx\),\%eax/\tmovl 80\(\%ebx\),\%eax$1/g;
+    s/^\tmovl ${OFFSET_Hp}\(\%ebx\),\%edx((\n\t(movl|addl) .*,((-?[0-9]*\(.*)|(\%e[abc]x)))+)\n\tmovl ${OFFSET_Hp}\(\%ebx\),\%edx/\tmovl ${OFFSET_Hp}\(\%ebx\),\%edx$1/g;
+    s/^\tmovl ${OFFSET_Hp}\(\%ebx\),\%eax((\n\t(movl|addl) .*,((-?[0-9]*\(.*)|(\%e[bcd]x)))+)\n\tmovl ${OFFSET_Hp}\(\%ebx\),\%eax/\tmovl ${OFFSET_Hp}\(\%ebx\),\%eax$1/g;
 
     # --------------------------------------------------------
     # that's it -- print it
@@ -1425,7 +1454,8 @@ sub init_FUNNY_THINGS {
 	"${T_US}startEnterInt${T_POST_LBL}", 1,
 	"${T_US}startPerformIO${T_POST_LBL}", 1,
 	"${T_US}startStgWorld${T_POST_LBL}", 1,
-	"${T_US}stopPerformIO${T_POST_LBL}", 1
+	"${T_US}stopPerformIO${T_POST_LBL}", 1,
+        "${T_US}ShouldCompile_Z36d1z5${T_POST_LBL}", 1
     );
 }
 \end{code}
