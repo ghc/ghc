@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 1997/03/24 02:50:26 sof Exp $
+# $Id: Makefile,v 1.7 1997/09/03 23:29:20 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -35,7 +35,7 @@ endif
 #
 # install setup
 # 
-INSTALL_LIBS += $(DYN_LOADABLE_BITS)
+INSTALL_LIBS    += $(DYN_LOADABLE_BITS)
 INSTALL_SCRIPTS += $(SCRIPT_PROG)
 
 
