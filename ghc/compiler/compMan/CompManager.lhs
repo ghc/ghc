@@ -14,22 +14,22 @@ where
 #include "HsVersions.h"
 
 import List		( nub )
-import Maybe		( catMaybes, maybeToList, fromMaybe )
+import Maybe		( catMaybes, fromMaybe )
 import Maybes		( maybeToBool )
 import Outputable
 import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
 			  UniqFM, listToUFM )
 import Unique		( Uniquable )
-import Digraph		( SCC(..), stronglyConnComp, flattenSCC, flattenSCCs )
+import Digraph		( SCC(..), stronglyConnComp )
 
 import CmLink
 import CmTypes
 import HscTypes
 import Interpreter	( HValue )
-import Module		( ModuleName, moduleName, packageOfModule, 
-			  isModuleInThisPackage, PackageName, moduleEnvElts,
+import Module		( ModuleName, moduleName,
+			  isModuleInThisPackage, moduleEnvElts,
 			  moduleNameUserString )
-import CmStaticInfo	( Package(..), PackageConfigInfo, GhciMode(..) )
+import CmStaticInfo	( PackageConfigInfo, GhciMode(..) )
 import DriverPipeline
 import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
@@ -40,7 +40,7 @@ import Module
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
-import DriverUtil	( BarfKind(..) )
+import DriverUtil	( BarfKind(..), splitFilename3 )
 import Util
 import Panic		( panic )
 
@@ -534,6 +534,11 @@ downsweep rootNm
            | trace ("getSummary: "++ showSDoc (ppr nm)) True
            = do found <- findModule nm
 		case found of
+                   -- Be sure not to use the mod and location passed in to 
+                   -- summarise for any other purpose -- summarise may change
+                   -- the module names in them if name of module /= name of file,
+                   -- and put the changed versions in the returned summary.
+                   -- These will then conflict with the passed-in versions.
 		   Just (mod, location) -> summarise mod location
 		   Nothing -> throwDyn (OtherError 
                                    ("no signs of life for module `" 
@@ -557,14 +562,14 @@ downsweep rootNm
                  else loop (newHomeSummaries ++ homeSummaries)
 
 
--- Summarise a module, and pick and source and interface timestamps.
+-- Summarise a module, and pick up source and interface timestamps.
 summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
    | isModuleInThisPackage mod
    = do let hs_fn = unJust (ml_hs_file location) "summarise"
         hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn
-        let (srcimps,imps) = getImports modsrc
+        let (srcimps,imps,mod_name) = getImports modsrc
 
         maybe_src_timestamp
            <- case ml_hs_file location of 
@@ -575,9 +580,36 @@ summarise mod location
                  Nothing     -> return Nothing
                  Just if_fn  -> maybe_getModificationTime if_fn
 
-        return (ModSummary mod location{ml_hspp_file=Just hspp_fn} 
-                               srcimps imps
-                               maybe_src_timestamp maybe_iface_timestamp)
+        -- If the module name is Main, allow it to be in a file
+        -- different from Main.hs, and mash the mod and loc 
+        -- to match.  Otherwise just moan.
+        (mashed_mod, mashed_loc)
+           <- case () of
+              () |  mod_name == moduleName mod
+                 -> return (mod, location)
+                 |  mod_name /= moduleName mod && mod_name == mkModuleName "Main"
+                 -> return (mash mod location "Main")
+                 |  otherwise
+                 -> do hPutStrLn stderr (showSDoc (
+                          text "ghc: warning: file name - module name mismatch:" <+> 
+                          ppr (moduleName mod) <+> text "vs" <+> ppr mod_name))
+                       return (mash mod location (moduleNameUserString (moduleName mod)))
+               where
+                 mash old_mod old_loc new_nm
+                    = (mkHomeModule (mkModuleName new_nm), 
+                       old_loc{ml_hi_file = maybe_swizzle_basename new_nm 
+                                                (ml_hi_file old_loc)})
+
+                 maybe_swizzle_basename new Nothing = Nothing
+                 maybe_swizzle_basename new (Just old) 
+                    = case splitFilename3 old of 
+                         (dir, name, ext) -> Just (dir ++ new ++ ext)
+
+        return (ModSummary mashed_mod 
+                           mashed_loc{ml_hspp_file=Just hspp_fn} 
+                           srcimps imps
+                           maybe_src_timestamp maybe_iface_timestamp)
+
    | otherwise
    = return (ModSummary mod location [] [] Nothing Nothing)
 

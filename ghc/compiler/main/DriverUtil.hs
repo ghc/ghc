@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.7 2000/11/16 11:39:37 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.8 2000/11/17 13:33:17 sewardj Exp $
 --
 -- Utils for the driver
 --
@@ -135,6 +135,13 @@ splitFilename f = (reverse (stripDot rev_basename), reverse rev_ext)
   where (rev_ext, rev_basename) = span ('.' /=) (reverse f)
         stripDot ('.':xs) = xs
         stripDot xs       = xs
+
+-- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
+splitFilename3 :: String -> (String,String,String)
+splitFilename3 str
+   = let dir = getdir str
+         (name, ext) = splitFilename (drop (length dir) str)
+     in  (dir, name, ext)
 
 remove_suffix :: Char -> String -> String
 remove_suffix c s
