@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.28 2001/10/11 23:52:51 sof Exp $
+-- $Id: DriverUtil.hs,v 1.29 2002/01/22 14:47:52 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -43,7 +43,8 @@ getOptionsFromSource file
 	  (\e -> if isEOFError e then return [] else ioError e)
   where
 	look h = do
-	    l <- hGetLine h
+	    l' <- hGetLine h
+	    let l = remove_spaces l'
 	    case () of
 		() | null l -> look h
 		   | prefixMatch "#" l -> look h
