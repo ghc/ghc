@@ -1,13 +1,12 @@
 <Chapter id="bugs-and-infelicities">
-  <title>Known bugs and infelicities
-</title>
+  <title>Known bugs and infelicities</title>
 
-<sect1 id="vs-Haskell-defn">
-  <title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
+  <sect1 id="vs-Haskell-defn">
+    <title>Haskell&nbsp;98 vs.&nbsp;Glasgow Haskell: language non-compliance
 </title>
-
-  <indexterm><primary>GHC vs the Haskell 98 language</primary></indexterm>
-  <indexterm><primary>Haskell 98 language vs GHC</primary></indexterm>
+    
+    <indexterm><primary>GHC vs the Haskell 98 language</primary></indexterm>
+    <indexterm><primary>Haskell 98 language vs GHC</primary></indexterm>
 
   <para>This section lists Glasgow Haskell infelicities in its
   implementation of Haskell&nbsp;98.  See also the &ldquo;when things
@@ -39,16 +38,6 @@
 	  such as <literal>M.\</literal>, GHC will interpret it as a
 	  single qualified operator rather than the two lexemes
 	  <literal>M</literal> and <literal>.\</literal>.</para>
-	</listitem>
-
-	<listitem>
-	  <para>When <option>-fglasgow-exts</option> is on, GHC
-	  reserves several keywords beginning with two underscores.
-	  This is due to the fact that GHC uses the same lexical
-	  analyser for interface file parsing as it does for source
-	  file parsing, and these keywords are used in interface
-	  files.  Do not use any identifiers beginning with a double
-	  underscore in <option>-fglasgow-exts</option> mode.</para>
 	</listitem>
       </itemizedlist>
     </sect3>
@@ -86,21 +75,7 @@
   <sect3 id="infelicities-exprs-pats">
       <title>Expressions and patterns</title>
 
-      <variablelist>
-	<varlistentry>
-	  <term>Very long <literal>String</literal> constants:</term>
-	  <listitem>
-	    <para>May not go through.  If you add a &ldquo;string
-            gap&rdquo; every few thousand characters, then the strings
-            can be as long as you like.</para>
-
-	    <para>Bear in mind that string gaps and the
-            <option>-cpp</option><indexterm><primary><option>-cpp</option>
-            </primary></indexterm> option don't mix very well (see
-            <xref linkend="c-pre-processor">).</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
+	<para>None known.</para>
 
     </sect3>
 
@@ -110,23 +85,31 @@
       <para>None known.</para>
 
     </sect3>
+      
+      <sect3 id="infelicities-Modules">
+	<title>Module system and interface files</title>
+	
+	<variablelist>
+	  <varlistentry>
+	    <term><literal>Main</literal> module</term>
+	    <listitem>
+	      <para>GHC interprets the module header
+<programlisting>module Main where</programlisting>
+              as if it was
+<programlisting>module Main (main) where</programlisting>
+              </para>
 
-    <sect3 id="infelicities-Modules">
-      <title>Module system and interface files</title>
+              <para>This change allows GHC to optimise slightly more
+              aggresively inside the <literal>Main</literal>
+              module.</para>
 
-      <variablelist>
-
-	<varlistentry>
-	  <term> Namespace pollution </term>
-	  <listitem>
-	    <para>Several modules internal to GHC are visible in the
-            standard namespace.  All of these modules begin with
-            <literal>Prel</literal>, so the rule is: don't use any
-            modules beginning with <literal>Prel</literal> in your
-            program, or you may be comprehensively screwed.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
+              <para>You are highly unlikely to notice the difference, since
+              importing <literal>Main</literal> is very rare (it would
+              introduce a recursive module dependency, so doing it by
+              accident is unlikely too).</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
 
     </sect3>
 
@@ -151,7 +134,7 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
     </sect3>
 
       <sect3 id="infelicities-Prelude">
-	<title>In Prelude support</title>
+	<title>In <literal>Prelude</literal> support</title>
 
       <variablelist>
 	<varlistentry>
@@ -170,12 +153,12 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	<varlistentry>
 	  <term>Arbitrary-sized tuples</term>
 	  <listitem>
-	    <para>Tuples are currently limited to size 61.  HOWEVER:
+	    <para>Tuples are currently limited to size 100.  HOWEVER:
             standard instances for tuples (<literal>Eq</literal>,
             <literal>Ord</literal>, <literal>Bounded</literal>,
             <literal>Ix</literal> <literal>Read</literal>, and
             <literal>Show</literal>) are available
-            <emphasis>only</emphasis> up to 5-tuples.</para>
+            <emphasis>only</emphasis> up to 16-tuples.</para>
 
 	    <para>This limitation is easily subvertible, so please ask
             if you get stuck on it.</para>
@@ -279,67 +262,73 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
       </varlistentry>
     </variablelist>
       
-  </sect2>
-
-</sect1>
-
-
-<sect1 id="bugs">
-  <title>Known bugs or infelicities</title>
-
-<para>GHC has the following known bugs or infelicities:
-<itemizedlist>
-
-<listitem><para>
-GHC only provides tuples up to size 62, and derived tuple instances (for
-Eq, Ord, etc) up to size 15.
-</para></listitem>
-
-<listitem><para>
-GHC can warn about non-exhaustive or overlapping patterns, and usually does so correctly.
-But not always.  It gets confused by string patterns, and by guards, and can then 
-emit bogus warnings.  The entire overlap-check code needs an overhaul really.
-</para></listitem>
+    </sect2>
+  </sect1>
 
 
+  <sect1 id="bugs">
+    <title>Known bugs or infelicities</title>
 
-<listitem><para>Dangers with multiple Main modules.</para>
+    <para>In addition to the divergences from the Haskell 98 standard
+    listed above, GHC has the following known bugs or
+    infelicities.</para>
 
-	<para>
-	GHC does not insist that module <literal>Main</literal> lives in a file called <filename>Main.hs</filename>.
-	This is useful if you want multiple versions of <literal>Main</literal>.  But there's a danger: when
-	compiling module  <literal>Main</literal> (regardless of what file it comes from), GHC looks for 
-	the interface <filename>Main.hi</filename>; it uses this to get version information from the last
-	time it recompiled <literal>Main</literal>.   The trouble is that this  <filename>Main.hi</filename>
-	may not correspond to the source file being compiled.
-	  </para>
-	<para>
-	  Solution: remove <filename>Main.hi</filename> first.  A better solution would be for GHC to
-	    record the source-file filename in the interface file, or even an MD5 checksum.
-	    </para>
-     </listitem>
+    <itemizedlist>
+      <listitem>
+	<para> GHC can warn about non-exhaustive or overlapping
+        patterns (see <xref linkend="options-sanity">, and usually
+        does so correctly.  But not always.  It gets confused by
+        string patterns, and by guards, and can then emit bogus
+        warnings.  The entire overlap-check code needs an overhaul
+        really.</para>
+      </listitem>
+
+      <listitem>
+	<para>Dangers with multiple <literal>Main</literal>
+	modules.</para>
+
+	<para>GHC does not insist that module <literal>Main</literal>
+	lives in a file called <filename>Main.hs</filename>.  This is
+	useful if you want multiple versions of
+	<literal>Main</literal>.  But there's a danger: when compiling
+	module <literal>Main</literal> (regardless of what file it
+	comes from), GHC looks for the interface
+	<filename>Main.hi</filename>; it uses this to get version
+	information from the last time it recompiled
+	<literal>Main</literal>.  The trouble is that this
+	<filename>Main.hi</filename> may not correspond to the source
+	file being compiled.</para>
+
+	<para>Solution: remove <filename>Main.hi</filename> first.  A
+	better solution would be for GHC to record the source-file
+	filename in the interface file, or even an MD5 checksum.
+	</para>
+      </listitem>
     
+      <listitem>
+	<para>GHCi does not respect the <literal>default</literal>
+        declaration in the module whose scope you are in.  Instead,
+        for expressions typed at the command line, you always get the
+        default default-type behaviour; that is,
+        <literal>default(Int,Double)</literal>.</para>
 
-<listitem><para>
-GHCi does not respect the <literal>default</literal> declaration in the module whose
-scope you are in.  Instead, for expressions typed at the command line, you always 
-get the default default-type behaviour; that is, <literal>default(Int,Double)</literal>.
-</para>
-<para>
-It would be better for GHCi to record what the default settings in each module are, and
-use those of the 'current' module (whatever that is).
-</para></listitem>
+	<para>It would be better for GHCi to record what the default
+        settings in each module are, and use those of the 'current'
+        module (whatever that is).</para>
+      </listitem>
 
-<listitem><para>
-GHCi does not keep careful track of what instance declarations are 'in scope' if they
-come from other packages.
-Instead, all instance declarations that GHC has seen in other packages are all in scope
-everywhere, whether or not the module from that package is used by the command-line expression.
-</para></listitem>
+      <listitem>
+	<para>GHCi does not keep careful track of what instance
+        declarations are 'in scope' if they come from other packages.
+        Instead, all instance declarations that GHC has seen in other
+        packages are all in scope everywhere, whether or not the
+        module from that package is used by the command-line
+        expression.</para>
+      </listitem>
 
-<listitem><para>
-GHC's inliner can be persuaded into non-termination using the standard way to encode
-recursion via a data type:
+      <listitem>
+	<para>GHC's inliner can be persuaded into non-termination
+        using the standard way to encode recursion via a data type:</para>
 <programlisting>
   data U = MkU (U -> Bool)
        
@@ -349,17 +338,19 @@ recursion via a data type:
   x :: Bool
   x = russel (MkU russel)
 </programlisting>
-We have never found another class of programs, other than this contrived one, that makes GHC
-diverge, and fixing the problem would impose an extra overhead on every compilation.  So the
-bug remains un-fixed.  There is more background in
-<ulink
-url="http://research.microsoft.com/~simonpj/Papers/inlining">
-Secrets of the GHC inliner</ulink>.
-</para></listitem>
-</itemizedlist></para>
-</sect1>
 
-</Chapter>
+        <para>We have never found another class of programs, other
+        than this contrived one, that makes GHC diverge, and fixing
+        the problem would impose an extra overhead on every
+        compilation.  So the bug remains un-fixed.  There is more
+        background in <ulink
+        url="http://research.microsoft.com/~simonpj/Papers/inlining">
+        Secrets of the GHC inliner</ulink>.</para>
+      </listitem>
+    </itemizedlist>
+  </sect1>
+
+</chapter>
 
 <!-- Emacs stuff:
      ;;; Local Variables: ***
