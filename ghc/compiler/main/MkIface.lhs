@@ -29,8 +29,8 @@ import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
 			)
 
 import CmdLineOpts
-import Id		( Id, idType, idInfo, isImplicitId, isDictFunId,
-			  idSpecialisation, setIdInfo, isLocalId, idName, hasNoBinding
+import Id		( idType, idInfo, isImplicitId, isDictFunId,
+			  idSpecialisation, isLocalId, idName, hasNoBinding
 			)
 import Var		( isId )
 import VarSet
@@ -362,11 +362,13 @@ addVersionInfo Nothing new_iface
 -- No old interface, so definitely write a new one!
   = (new_iface, Just (text "No old interface available"))
 
-addVersionInfo (Just old_iface@(ModIface { mi_version = old_version, 
-				       	   mi_decls   = old_decls,
-				       	   mi_fixities = old_fixities }))
-	       new_iface@(ModIface { mi_decls = new_decls,
-				     mi_fixities = new_fixities })
+addVersionInfo (Just old_iface@(ModIface { mi_version  = old_version, 
+				       	   mi_decls    = old_decls,
+				       	   mi_fixities = old_fixities,
+					   mi_deprecs  = old_deprecs }))
+	       new_iface@(ModIface { mi_decls    = new_decls,
+				     mi_fixities = new_fixities,
+				     mi_deprecs  = new_deprecs })
 
   | no_output_change && no_usage_change
   = (new_iface, Nothing)
@@ -384,11 +386,12 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 				vers_rules   = bumpVersion no_rule_change   (vers_rules   old_version),
 				vers_decls   = tc_vers }
 
-    no_output_change = no_tc_change && no_rule_change && no_export_change
+    no_output_change = no_tc_change && no_rule_change && no_export_change && no_deprec_change
     no_usage_change  = mi_usages old_iface == mi_usages new_iface
 
     no_export_change = mi_exports old_iface == mi_exports new_iface		-- Kept sorted
     no_rule_change   = dcl_rules old_decls  == dcl_rules  new_decls		-- Ditto
+    no_deprec_change = old_deprecs	    == new_deprecs
 
 	-- Fill in the version number on the new declarations by looking at the old declarations.
 	-- Set the flag if anything changes. 
@@ -399,6 +402,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
     pp_diffs = vcat [pp_tc_diffs,
 		     pp_change no_export_change "Export list",
 		     pp_change no_rule_change   "Rules",
+		     pp_change no_deprec_change "Deprecations",
 		     pp_change no_usage_change  "Usages"]
     pp_change True  what = empty
     pp_change False what = text what <+> ptext SLIT("changed")

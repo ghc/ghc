@@ -34,7 +34,7 @@ module HscTypes (
 	InstEnv, ClsInstEnv, DFunId,
 	PackageInstEnv, PackageRuleBase,
 
-	GlobalRdrEnv, RdrAvailInfo, pprGlobalRdrEnv,
+	GlobalRdrEnv, GlobalRdrElt(..), RdrAvailInfo, pprGlobalRdrEnv,
 
 	-- Provenance
 	Provenance(..), ImportReason(..), 
@@ -328,6 +328,13 @@ lookupDeprec (DeprecAll  txt) name = Just txt
 lookupDeprec (DeprecSome env) name = case lookupNameEnv env name of
 					    Just (_, txt) -> Just txt
 					    Nothing	  -> Nothing
+
+instance Eq Deprecations where
+  -- Used when checking whether we need write a new interface
+  NoDeprecs       == NoDeprecs	     = True
+  (DeprecAll t1)  == (DeprecAll t2)  = t1 == t2
+  (DeprecSome e1) == (DeprecSome e2) = nameEnvElts e1 == nameEnvElts e2
+  d1		  == d2		     = False
 \end{code}
 
 
@@ -427,7 +434,6 @@ data PersistentCompilerState
 
         pcs_PRS :: PersistentRenamerState
      }
-
 \end{code}
 
 The @PersistentRenamerState@ persists across successive calls to the
@@ -528,15 +534,18 @@ The GlobalRdrEnv gives maps RdrNames to Names.  There is a separate
 one for each module, corresponding to that module's top-level scope.
 
 \begin{code}
-type GlobalRdrEnv = RdrNameEnv [(Name,Provenance)]	-- The list is because there may be name clashes
-							-- These only get reported on lookup,
-							-- not on construction
+type GlobalRdrEnv = RdrNameEnv [GlobalRdrElt]
+	-- The list is because there may be name clashes
+	-- These only get reported on lookup, not on construction
+
+data GlobalRdrElt = GRE Name Provenance (Maybe DeprecTxt)
+	-- The Maybe DeprecTxt tells whether this name is deprecated
 
 pprGlobalRdrEnv env
   = vcat (map pp (rdrEnvToList env))
   where
     pp (rn, nps) = ppr rn <> colon <+> 
-		   vcat [ppr n <+> pprNameProvenance n p | (n,p) <- nps]
+		   vcat [ppr n <+> pprNameProvenance n p | (GRE n p _) <- nps]
 \end{code}
 
 The "provenance" of something says how it came to be in scope.

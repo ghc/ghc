@@ -6,7 +6,6 @@
 \begin{code}
 module RnIfaces
      (
-	getInterfaceExports,
 	recordLocalSlurps, 
 	mkImportInfo, 
 
@@ -29,7 +28,7 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl,
 			  extractHsTyNames, extractHsCtxtTyNames, 
 			  tyClDeclFVs, ruleDeclFVs, instDeclFVs
 			)
-import RnHiFiles	( tryLoadInterface, loadHomeInterface, loadInterface, 
+import RnHiFiles	( tryLoadInterface, loadHomeInterface, 
 			  loadOrphanModules
 			)
 import RnSource		( rnTyClDecl, rnInstDecl, rnIfaceRuleDecl )
@@ -58,24 +57,6 @@ import FiniteMap
 import Outputable
 import Bag
 import Util		( sortLt )
-\end{code}
-
-
-%*********************************************************
-%*							*
-\subsection{Getting what a module exports}
-%*							*
-%*********************************************************
-
-@getInterfaceExports@ is called only for directly-imported modules.
-
-\begin{code}
-getInterfaceExports :: ModuleName -> WhereFrom -> RnMG (Module, [(ModuleName,Avails)])
-getInterfaceExports mod_name from
-  = loadInterface doc_str mod_name from	`thenRn` \ iface ->
-    returnRn (mi_module iface, mi_exports iface)
-  where
-      doc_str = sep [ppr mod_name, ptext SLIT("is directly imported")]
 \end{code}
 
 
