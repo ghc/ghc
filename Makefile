@@ -295,14 +295,14 @@ hc-file-bundle : project-check
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
-             $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
-             $(ProjectNameShort)-$(ProjectVersion)/hslibs \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
+	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
 	  -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" > hc-files-to-go
-        find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
-             $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
-             $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
-             $(ProjectNameShort)-$(ProjectVersion)/hslibs \
-          -name "*.hsc" | sed 's/hsc$/hs$/g' >> hc-files-to-go
+	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
+	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
+	  -name "*.hsc" | sed 's/hsc$/hs$/g' >> hc-files-to-go
 	tar czf $(ProjectNameShort)-$(ProjectVersion)-$(TARGETPLATFORM)-hc.tar.gz `cat hc-files-to-go`
 
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz
