@@ -400,7 +400,7 @@ def compile_and_run( name, way, extra_hc_opts ):
     pretest_cleanup(name)
 
     if way == 'ghci': # interpreted...
-        return interpreter_run( name, way, extra_hc_opts, 0 )
+        return interpreter_run( name, way, extra_hc_opts, 0, '' )
     else: # compiled...
         result = simple_build( name, way, extra_hc_opts, 0, '', 1 )
 
@@ -413,7 +413,11 @@ def compile_and_run( name, way, extra_hc_opts ):
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
     pretest_cleanup(name)
-    result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
+
+    if way == 'ghci': # interpreted...
+        return interpreter_run( name, way, extra_hc_opts, 0, top_mod )
+    else: # compiled...
+        result = simple_build( name, way, extra_hc_opts, 0, top_mod, 1 )
 
     if result != 0:
         return 'fail'
@@ -514,15 +518,18 @@ def simple_run( name ):
 # -----------------------------------------------------------------------------
 # Run a program in the interpreter and check its output
 
-def interpreter_run( name, way, extra_hc_opts, compile_only ):
+def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     outname = add_suffix(name, 'interp.stdout')
     errname = add_suffix(name, 'interp.stderr')
     rm_no_fail(outname)
     rm_no_fail(errname)
     rm_no_fail(name)
     
-    srcname = add_suffix(name, 'hs')
-
+    if (top_mod == ''):
+        srcname = add_suffix(name, 'hs')
+    else:
+        srcname = top_mod
+        
     scriptname = add_suffix(name, 'script')
     qscriptname = in_testdir(scriptname)
     rm_no_fail(qscriptname)
