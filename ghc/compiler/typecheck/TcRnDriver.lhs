@@ -35,7 +35,7 @@ import TcType		( tidyTopType )
 import Inst		( showLIE )
 import TcBinds		( tcTopBinds )
 import TcDefaults	( tcDefaults )
-import TcEnv		( tcExtendGlobalValEnv, tcLookupGlobal )
+import TcEnv		( tcExtendGlobalValEnv )
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
@@ -62,7 +62,6 @@ import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..),
 			  GhciMode(..), noDependencies,
 			  Deprecs( NoDeprecs ), plusDeprecs,
-			  GenAvailInfo(Avail), availsToNameSet, availName,
 			  ForeignStubs(NoStubs), TypeEnv, typeEnvTyCons, 
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons,
 			  emptyFixityEnv
@@ -81,7 +80,7 @@ import TcMType		( zonkTcType )
 import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
 import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType )
-import TcEnv		( tcLookupTyCon, tcLookupId )
+import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import Inst		( tcStdSyntaxName )
 import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
@@ -102,7 +101,7 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, retu
 import Module		( ModuleName, lookupModuleEnvByName )
 import HscTypes		( InteractiveContext(..),
 			  HomeModInfo(..), typeEnvElts, 
-			  TyThing(..), availNames, icPrintUnqual,
+			  TyThing(..), availName, availNames, icPrintUnqual,
 			  ModIface(..), ModDetails(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Bag		( unitBag )
