@@ -32,6 +32,8 @@ import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn,
 			)
 import RnMonad
 
+import FunDeps		( oclose )
+
 import Name		( Name, OccName,
 			  ExportFlag(..), Provenance(..), 
 			  nameOccName, NamedThing(..)
@@ -61,6 +63,8 @@ It also does the following error checks:
 \item
 Checks that tyvars are used properly. This includes checking
 for undefined tyvars, and tyvars in contexts that are ambiguous.
+(Some of this checking has now been moved to module @TcMonoType@,
+since we don't have functional dependency information at this point.)
 \item
 Checks that all variable occurences are defined.
 \item 
@@ -158,7 +162,7 @@ rnDecl (TyClD (TySynonym name tyvars ty src_loc))
   where
     syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
 
-rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
+rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
                tname dname snames src_loc))
   = pushSrcLocRn src_loc $
 
@@ -181,6 +185,9 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
 	-- Check the superclasses
     rnContext cls_doc context			`thenRn` \ (context', cxt_fvs) ->
 
+	-- Check the functional dependencies
+    rnFds cls_doc fds			`thenRn` \ (fds', fds_fvs) ->
+
 	-- Check the signatures
     let
 	    -- First process the class op sigs, then the fixity sigs.
@@ -188,7 +195,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
 	  (fix_sigs, non_sigs)   = partition isFixitySig  non_op_sigs
     in
     checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	`thenRn_` 
-    mapFvRn (rn_op cname' clas_tyvar_names) op_sigs
+    mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs
     `thenRn` \ (sigs', sig_fvs) ->
     mapRn_  (unknownSigErr) non_sigs			`thenRn_`
     let
@@ -208,11 +215,12 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
 	-- for instance decls.
 
     ASSERT(isNoClassPragmas pragmas)
-    returnRn (TyClD (ClassDecl context' cname' tyvars' (fixs' ++ sigs') mbinds'
+    returnRn (TyClD (ClassDecl context' cname' tyvars' fds' (fixs' ++ sigs') mbinds'
 			       NoClassPragmas tname' dname' snames' src_loc),
 	      sig_fvs	`plusFV`
 	      fix_fvs	`plusFV`
 	      cxt_fvs	`plusFV`
+	      fds_fvs	`plusFV`
 	      meth_fvs
 	     )
     )
@@ -225,7 +233,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
     meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
     meth_rdr_names	  = map fst meth_rdr_names_w_locs
 
-    rn_op clas clas_tyvars sig@(ClassOpSig op dm_rdr_name explicit_dm ty locn)
+    rn_op clas clas_tyvars clas_fds sig@(ClassOpSig op dm_rdr_name explicit_dm ty locn)
       = pushSrcLocRn locn $
  	lookupBndrRn op				`thenRn` \ op_name ->
 
@@ -233,7 +241,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
 	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ (new_ty, op_ty_fvs)  ->
 	let
 	    check_in_op_ty clas_tyvar =
-		 checkRn (clas_tyvar `elemNameSet` op_ty_fvs)
+		 checkRn (clas_tyvar `elemNameSet` oclose clas_fds op_ty_fvs)
 			 (classTyVarNotInOpTyErr clas_tyvar sig)
 	in
         mapRn_ check_in_op_ty clas_tyvars		 `thenRn_`
@@ -565,7 +573,7 @@ rnHsPolyType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
  
 	forall_tyvar_names    = map getTyVarName forall_tyvars
     in
-    mapRn_ (forAllErr doc tau) bad_guys 					`thenRn_`
+    -- mapRn_ (forAllErr doc tau) bad_guys 					`thenRn_`
     mapRn_ (forAllWarn doc tau) warn_guys					`thenRn_`
     checkConstraints doc forall_tyvar_names mentioned_in_tau ctxt tau	`thenRn` \ ctxt' ->
     rnForAll doc forall_tyvars ctxt' tau
@@ -583,16 +591,11 @@ checkConstraints doc forall_tyvars tau_vars ctxt ty
 	    -- Remove problem ones, to avoid duplicate error message.
    where
      check ct@(_,tys)
-	| ambiguous = failWithRn Nothing (ambigErr doc ct ty)
 	| not_univ  = failWithRn Nothing (univErr  doc ct ty)
 	| otherwise = returnRn (Just ct)
         where
 	  ct_vars    = extractHsTysRdrTyVars tys
 
-	  ambiguous  =	-- All the universally-quantified tyvars in the constraint must appear in the tau ty
-			-- (will change when we get functional dependencies)
-			not (all (\ct_var -> not (ct_var `elem` forall_tyvars) || ct_var `elem` tau_vars) ct_vars)
-			
 	  not_univ   = 	-- At least one of the tyvars in each constraint must
 			-- be universally quantified. This restriction isn't in Hugs
 			not (any (`elem` forall_tyvars) ct_vars)
@@ -692,6 +695,23 @@ rnContext doc ctxt
       = (c1 `compare` c2) `thenCmp` (cmpHsTypes compare tys1 tys2)
 \end{code}
 
+\begin{code}
+rnFds :: SDoc -> [([RdrName],[RdrName])] -> RnMS ([([Name],[Name])], FreeVars)
+
+rnFds doc fds
+  = mapAndUnzipRn rn_fds fds		`thenRn` \ (theta, fvs_s) ->
+    returnRn (theta, plusFVs fvs_s)
+  where
+    rn_fds (tys1, tys2)
+      =	rnHsTyVars doc tys1		`thenRn` \ (tys1', fvs1) ->
+	rnHsTyVars doc tys2		`thenRn` \ (tys2', fvs2) ->
+	returnRn ((tys1', tys2'), fvs1 `plusFV` fvs2)
+
+rnHsTyVars doc tvs = mapFvRn (rnHsTyvar doc) tvs
+rnHsTyvar doc tyvar
+  = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
+    returnRn (tyvar', unitFV tyvar')
+\end{code}
 
 %*********************************************************
 %*							 *

@@ -36,11 +36,13 @@ import Type		( Type, ThetaType, UsageAnn(..),
 			  mkSigmaTy, mkDictTy, mkTyConApp, mkAppTys, splitForAllTys, splitRhoTy,
 			  boxedTypeKind, unboxedTypeKind, tyVarsOfType,
 			  mkArrowKinds, getTyVar_maybe, getTyVar,
-		  	  tidyOpenType, tidyOpenTypes, tidyTyVar
+		  	  tidyOpenType, tidyOpenTypes, tidyTyVar,
+			  tyVarsOfType, tyVarsOfTypes
 			)
+import PprType		( pprConstraint )
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
-import Var		( TyVar, mkTyVar, mkNamedUVar )
+import Var		( TyVar, mkTyVar, mkNamedUVar, varName )
 import VarEnv
 import VarSet
 import Bag		( bagToList )
@@ -49,6 +51,7 @@ import PrelInfo		( cCallishClassKeys )
 import TyCon		( TyCon )
 import Name		( Name, OccName, isLocallyDefined )
 import TysWiredIn	( mkListTy, mkTupleTy, mkUnboxedTupleTy )
+import UniqFM		( elemUFM, foldUFM )
 import SrcLoc		( SrcLoc )
 import Unique		( Unique, Uniquable(..) )
 import Util		( zipWithEqual, zipLazy, mapAccumL )
@@ -182,9 +185,10 @@ tc_type_kind (MonoUsgForAllTy uv_name ty)
       returnTc (kind, mkUsForAllTy uv tc_ty)
 
 tc_type_kind (HsForAllTy (Just tv_names) context ty)
-  = tcExtendTyVarScope tv_names		$ \ tyvars -> 
+  = tcExtendTyVarScope tv_names		$ \ tyvars ->
     tcContext context			`thenTc` \ theta ->
     tc_type_kind ty			`thenTc` \ (kind, tau) ->
+    tcGetInScopeTyVars			`thenTc` \ in_scope_vars ->
     let
 	body_kind | null theta = kind
 		  | otherwise  = boxedTypeKind
@@ -193,7 +197,16 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 		-- give overloaded functions like
 		--	f :: forall a. Num a => (# a->a, a->a #)
 		-- And we want these to get through the type checker
+        check ct@(c,tys) | ambiguous = failWithTc (ambigErr ct tau)
+			 | otherwise = returnTc ()
+	  where ct_vars = tyVarsOfTypes tys
+		forall_tyvars = map varName in_scope_vars
+		tau_vars = tyVarsOfType tau
+		ambig ct_var = (varName ct_var `elem` forall_tyvars) &&
+			       not (ct_var `elemUFM` tau_vars)
+		ambiguous = foldUFM ((||) . ambig) False ct_vars
     in
+    mapTc check theta			`thenTc_`
     returnTc (body_kind, mkSigmaTy tyvars theta tau)
 \end{code}
 
@@ -667,4 +680,9 @@ tyConAsClassErr name
 
 tyVarAsClassErr name
   = ptext SLIT("Type variable used as a class:") <+> ppr name
+
+ambigErr (c, ts) ty
+  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprConstraint c ts),
+	 nest 4 (ptext SLIT("for the type:") <+> ppr ty),
+	 nest 4 (ptext SLIT("Each forall'd type variable mentioned by the constraint must appear after the =>."))]
 \end{code}

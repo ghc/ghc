@@ -482,7 +482,7 @@ is doing.
 %*									*
 %************************************************************************
 
-@getTyVarsToGen@ decides what type variables generalise over.
+@getTyVarsToGen@ decides what type variables to generalise over.
 
 For a "restricted group" -- see the monomorphism restriction
 for a definition -- we bind no dictionaries, and

@@ -9,7 +9,7 @@ module Class (
 
 	mkClass, classTyVars,
 	classKey, classSelIds, classTyCon,
-	classBigSig, classInstEnv
+	classBigSig, classExtraBigSig, classInstEnv, classTvsFds
     ) where
 
 #include "HsVersions.h"
@@ -39,7 +39,8 @@ data Class
 	classKey  :: Unique,			-- Key for fast comparison
 	className :: Name,
 	
-	classTyVars :: [TyVar],			-- The class type variables
+	classTyVars  :: [TyVar],		-- The class type variables
+	classFunDeps :: [([TyVar], [TyVar])],	-- The functional dependencies
 
 	classSCTheta :: [(Class,[Type])],	-- Immediate superclasses, and the
 	classSCSels  :: [Id],			-- corresponding selector functions to
@@ -63,17 +64,19 @@ The @mkClass@ function fills in the indirect superclasses.
 
 \begin{code}
 mkClass :: Name -> [TyVar]
+	-> [([TyVar], [TyVar])]
 	-> [(Class,[Type])] -> [Id]
 	-> [(Id, Id, Bool)]
 	-> TyCon
 	-> InstEnv
 	-> Class
 
-mkClass name tyvars super_classes superdict_sels
+mkClass name tyvars fds super_classes superdict_sels
 	op_stuff tycon class_insts
   = Class {	classKey = getUnique name, 
 		className = name,
 		classTyVars = tyvars,
+		classFunDeps = fds,
 		classSCTheta = super_classes,
 		classSCSels = superdict_sels,
 		classOpStuff = op_stuff,
@@ -93,9 +96,16 @@ The rest of these functions are just simple selectors.
 classSelIds (Class {classSCSels = sc_sels, classOpStuff = op_stuff})
   = sc_sels ++ [op_sel | (op_sel, _, _) <- op_stuff]
 
+classTvsFds c
+  = (classTyVars c, classFunDeps c)
+
 classBigSig (Class {classTyVars = tyvars, classSCTheta = sc_theta, 
 	 	    classSCSels = sc_sels, classOpStuff = op_stuff})
   = (tyvars, sc_theta, sc_sels, op_stuff)
+classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
+			 classSCTheta = sc_theta, classSCSels = sc_sels,
+			 classOpStuff = op_stuff})
+  = (tyvars, fundeps, sc_theta, sc_sels, op_stuff)
 \end{code}
 
 

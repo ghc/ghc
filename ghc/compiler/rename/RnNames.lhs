@@ -331,7 +331,7 @@ fixitiesFromLocalDecls gbl_env decls
     getFixities acc (FixD fix)
       = fix_decl acc fix
 
-    getFixities acc (TyClD (ClassDecl _ _ _ sigs _ _ _ _ _ _))
+    getFixities acc (TyClD (ClassDecl _ _ _ _ sigs _ _ _ _ _ _))
       = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
 		-- Get fixities from class decl sigs too.
     getFixities acc other_decl

@@ -201,8 +201,8 @@ file (which would be equally good).
 Similarly for mkClassOpSig and default-method names.
   
 \begin{code}
-mkClassDecl cxt cname tyvars sigs mbinds prags loc
-  = ClassDecl cxt cname tyvars sigs mbinds prags tname dname sc_sel_names loc
+mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
+  = ClassDecl cxt cname tyvars fds sigs mbinds prags tname dname sc_sel_names loc
   where
     cls_occ = rdrNameOcc cname
     dname   = mkRdrUnqual (mkClassDataConOcc cls_occ)

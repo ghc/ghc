@@ -329,7 +329,7 @@ ppSourceStats short (HsModule name version exports imports decls src_loc)
 	= (length constrs, case derivs of {Nothing -> 0; Just ds -> length ds})
     data_info other = (0,0)
 
-    class_info (ClassDecl _ _ _ meth_sigs def_meths _ _ _ _ _)
+    class_info (ClassDecl _ _ _ _ meth_sigs def_meths _ _ _ _ _)
 	= case count_sigs meth_sigs of
 	    (_,classops,_,_) ->
 	       (classops, addpr (count_monobinds def_meths))

@@ -783,7 +783,7 @@ getDeclBinders new_name (TyClD (TySynonym tycon _ _ src_loc))
   = new_name tycon src_loc		`thenRn` \ tycon_name ->
     returnRn (Just (AvailTC tycon_name [tycon_name]))
 
-getDeclBinders new_name (TyClD (ClassDecl _ cname _ sigs _ _ _ _ _ src_loc))
+getDeclBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ _ _ _ src_loc))
   = new_name cname src_loc			`thenRn` \ class_name ->
 
 	-- Record the names for the class ops
@@ -852,7 +852,7 @@ and the dict fun of an instance decl, because both of these have
 bindings of their own elsewhere.
 
 \begin{code}
-getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ sigs _ _ tname dname snames src_loc))
+getDeclSysBinders new_name (TyClD (ClassDecl _ cname _ _ sigs _ _ tname dname snames src_loc))
   = new_name dname src_loc		    	    	`thenRn` \ datacon_name ->
     new_name tname src_loc		        	`thenRn` \ tycon_name ->
     sequenceRn [new_name n src_loc | n <- snames]	`thenRn` \ scsel_names ->

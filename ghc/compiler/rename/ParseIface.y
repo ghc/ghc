@@ -302,8 +302,8 @@ decl    : src_loc var_name '::' type maybe_idinfo
 	       		{ TyClD (TyData DataType $3 $4 $5 $6 Nothing noDataPragmas $1) }
 	| src_loc 'newtype' decl_context tc_name tv_bndrs newtype_constr
 			{ TyClD (TyData NewType $3 $4 $5 $6 Nothing noDataPragmas $1) }
-	| src_loc 'class' decl_context tc_name tv_bndrs csigs
-			{ TyClD (mkClassDecl $3 $4 $5 $6 EmptyMonoBinds 
+	| src_loc 'class' decl_context tc_name tv_bndrs fds csigs
+			{ TyClD (mkClassDecl $3 $4 $5 $6 $7 EmptyMonoBinds 
 					noClassPragmas $1) }
         | src_loc fixity mb_fix var_or_data_name
                         { FixD (FixitySig $4 (Fixity $3 $2) $1) }
@@ -579,6 +579,22 @@ tv_bndr		:: { HsTyVar RdrName }
 tv_bndrs	:: { [HsTyVar RdrName] }
 		:  			{ [] }
 		| tv_bndr tv_bndrs	{ $1 : $2 }
+
+---------------------------------------------------
+fds :: { [([RdrName], [RdrName])] }
+	: {- empty -}			{ [] }
+	| '|' fds1			{ reverse $2 }
+
+fds1 :: { [([RdrName], [RdrName])] }
+	: fds1 ',' fd			{ $3 : $1 }
+	| fd				{ [$1] }
+
+fd :: { ([RdrName], [RdrName]) }
+	: varids0 '->' varids0		{ (reverse $1, reverse $3) }
+
+varids0	:: { [RdrName] }
+	: {- empty -}			{ [] }
+	| varids0 tv_name		{ $2 : $1 }
 
 ---------------------------------------------------
 kind		:: { Kind }

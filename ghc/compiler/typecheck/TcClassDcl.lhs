@@ -106,7 +106,7 @@ Death to "ExpandingDicts".
 
 \begin{code}
 kcClassDecl (ClassDecl	context class_name
-			tyvar_names class_sigs def_methods pragmas 
+			tyvar_names fundeps class_sigs def_methods pragmas
 			tycon_name datacon_name sc_sel_names src_loc)
   =         -- CHECK ARITY 1 FOR HASKELL 1.4
     checkTc (opt_GlasgowExts || length tyvar_names == 1)
@@ -138,7 +138,7 @@ kcClassDecl (ClassDecl	context class_name
 \begin{code}
 tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
       	     (ClassDecl context class_name
-			tyvar_names class_sigs def_methods pragmas 
+			tyvar_names fundeps class_sigs def_methods pragmas 
 			tycon_name datacon_name sc_sel_names src_loc)
   = 	-- LOOK THINGS UP IN THE ENVIRONMENT
     tcLookupTy class_name				`thenTc` \ (class_kind, _, AClass rec_class) ->
@@ -151,6 +151,9 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 						`thenTc` \ (sc_theta, sc_tys, sc_sel_ids) ->
 --  traceTc (text "tcClassCtxt done" <+> ppr class_name)	`thenTc_`
 
+	-- CHECK THE FUNCTIONAL DEPENDENCIES,
+    tcFundeps fundeps				`thenTc` \ fds ->
+
 	-- CHECK THE CLASS SIGNATURES,
     mapTc (tcClassSig rec_env rec_class tyvars) 
 	  (filter isClassOpSig class_sigs)
@@ -160,7 +163,7 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
     let
 	(op_tys, op_items) = unzip sig_stuff
 	rec_class_inst_env = rec_inst_mapper rec_class
-	clas = mkClass class_name tyvars
+	clas = mkClass class_name tyvars fds
 		       sc_theta sc_sel_ids op_items
 		       tycon
 		       rec_class_inst_env
@@ -199,6 +202,18 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
     returnTc clas
 \end{code}
 
+\begin{code}
+tcFundeps = mapTc tc_fundep
+tc_fundep (us, vs) =
+    mapTc tc_fd_tyvar us	`thenTc` \ us' ->
+    mapTc tc_fd_tyvar vs	`thenTc` \ vs' ->
+    returnTc (us', vs')
+tc_fd_tyvar v =
+    tcLookupTy v `thenTc` \(_, _, thing) ->
+    case thing of
+        ATyVar tv -> returnTc tv
+	-- ZZ else should fail more gracefully
+\end{code}
 
 \begin{code}
 tcClassContext :: Name -> Class -> [TyVar]
@@ -324,7 +339,7 @@ tcClassDecl2 :: RenamedTyClDecl		-- The class declaration
 	     -> NF_TcM s (LIE, TcMonoBinds)
 
 tcClassDecl2 (ClassDecl context class_name
-			tyvar_names class_sigs default_binds pragmas _ _ _ src_loc)
+			tyvar_names _ class_sigs default_binds pragmas _ _ _ src_loc)
 
   | not (isLocallyDefined class_name)
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)

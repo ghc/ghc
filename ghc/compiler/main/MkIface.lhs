@@ -46,7 +46,7 @@ import OccName		( OccName, pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons
 			)
-import Class		( Class, classBigSig )
+import Class		( Class, classExtraBigSig )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType, deNoteType,
 			  Type, ThetaType
@@ -54,6 +54,7 @@ import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType, deNoteType,
 
 import PprType
 import PprCore		( pprIfaceUnfolding, pprCoreRule )
+import FunDeps		( pprFundeps )
 import Rules		( pprProtoCoreRule, ProtoCoreRule(..) )
 
 import Bag		( bagToList, isEmptyBag )
@@ -549,11 +550,12 @@ ifaceClass clas
 	   ppr_decl_context sc_theta,
 	   ppr clas,			-- Print the name
 	   pprTyVarBndrs clas_tyvars,
+	   pprFundeps clas_fds,
 	   pp_ops,
 	   semi
 	  ]
    where
-     (clas_tyvars, sc_theta, _, op_stuff) = classBigSig clas
+     (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
 
      pp_ops | null op_stuff  = empty
 	    | otherwise      = hsep [ptext SLIT("where"),

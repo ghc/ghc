@@ -30,6 +30,7 @@ import Var		( TyVar )
 
 -- others:
 import PprType
+import {-# SOURCE #-} FunDeps ( pprFundeps )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Util
@@ -85,7 +86,7 @@ hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 tyClDeclName :: TyClDecl name pat -> name
 tyClDeclName (TyData _ _ name _ _ _ _ _)        = name
 tyClDeclName (TySynonym name _ _ _)             = name
-tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _) = name
+tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _ _) = name
 \end{code}
 
 \begin{code}
@@ -131,6 +132,7 @@ data TyClDecl name pat
   | ClassDecl	(Context name)	    	-- context...
 		name		    	-- name of the class
 		[HsTyVar name]	    	-- the class type variables
+		[([name], [name])]	-- functional dependencies
 		[Sig name]		-- methods' signatures
 		(MonoBinds name pat)	-- default methods
 		(ClassPragmas name)
@@ -143,7 +145,7 @@ data TyClDecl name pat
 countTyClDecls :: [TyClDecl name pat] -> (Int, Int, Int, Int)
 	-- class, data, newtype, synonym decls
 countTyClDecls decls 
- = (length [() | ClassDecl _ _ _ _ _ _ _ _ _ _ <- decls],
+ = (length [() | ClassDecl _ _ _ _ _ _ _ _ _ _ _ <- decls],
     length [() | TyData DataType _ _ _ _ _ _ _ <- decls],
     length [() | TyData NewType  _ _ _ _ _ _ _ <- decls],
     length [() | TySynonym _ _ _ _	       <- decls])
@@ -156,7 +158,7 @@ isSynDecl other		      = False
 isDataDecl (TyData _ _ _ _ _ _ _ _) = True
 isDataDecl other		    = False
 
-isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ _) = True
+isClassDecl (ClassDecl _ _ _ _ _ _ _ _ _ _ _) = True
 isClassDecl other		 	    = False
 \end{code}
 
@@ -178,7 +180,7 @@ instance (Outputable name, Outputable pat)
 			NewType  -> SLIT("newtype")
 			DataType -> SLIT("data")
 
-    ppr (ClassDecl context clas tyvars sigs methods pragmas _ _ _ src_loc)
+    ppr (ClassDecl context clas tyvars fds sigs methods pragmas _ _ _ src_loc)
       | null sigs	-- No "where" part
       = top_matter
 
@@ -189,7 +191,7 @@ instance (Outputable name, Outputable pat)
 				   char '}'])]
       where
         top_matter = hsep [ptext SLIT("class"), pprContext context,
-                            ppr clas, hsep (map (ppr) tyvars)]
+                            ppr clas, hsep (map (ppr) tyvars), pprFundeps fds]
 	ppr_sig sig = ppr sig <> semi
 
 

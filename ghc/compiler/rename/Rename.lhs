@@ -399,7 +399,7 @@ vars of the source program, and extracts from the decl the gate names.
 getGates source_fvs (SigD (IfaceSig _ ty _ _))
   = extractHsTyNames ty
 
-getGates source_fvs (TyClD (ClassDecl ctxt cls tvs sigs _ _ _ _ _ _))
+getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _))
   = delListFromNameSet (foldr (plusFV . get) (extractHsCtxtTyNames ctxt) sigs)
 		       (map getTyVarName tvs)
     `addOneToNameSet` cls

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.16 1999/11/25 10:34:53 simonpj Exp $
+$Id: Parser.y,v 1.17 1999/11/30 16:10:11 lewie Exp $
 
 Haskell grammar.
 
@@ -324,14 +324,14 @@ topdecl :: { RdrBinding }
 		      (TyData NewType cs c ts [$5] $6
 			NoDataPragmas $1))) }
 
-	| srcloc 'class' ctype where
+	| srcloc 'class' ctype fds where
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
 		   let (binds,sigs) 
 			   = cvMonoBindsAndSigs cvClassOpSig 
-				(groupBindings $4) 
+				(groupBindings $5) 
 		   in
 	 	   returnP (RdrHsDecl (TyClD
-		      (mkClassDecl cs c ts sigs binds 
+		      (mkClassDecl cs c ts $4 sigs binds 
 			NoClassPragmas $1))) }
 
 	| srcloc 'instance' inst_type where
@@ -525,6 +525,21 @@ simpletype :: { (RdrName, [RdrNameHsTyVar]) }
 tyvars :: { [RdrNameHsTyVar] }
 	: tyvars tyvar			{ UserTyVar $2 : $1 }
 	| {- empty -}			{ [] }
+
+fds :: { [([RdrName], [RdrName])] }
+	: {- empty -}			{ [] }
+	| '|' fds1			{ reverse $2 }
+
+fds1 :: { [([RdrName], [RdrName])] }
+	: fds1 ',' fd			{ $3 : $1 }
+	| fd				{ [$1] }
+
+fd :: { ([RdrName], [RdrName]) }
+	: varids0 '->' varids0		{ (reverse $1, reverse $3) }
+
+varids0	:: { [RdrName] }
+	: {- empty -}			{ [] }
+	| varids0 tyvar			{ $2 : $1 }
 
 -----------------------------------------------------------------------------
 -- Datatype declarations
