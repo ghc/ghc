@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.17 2000/04/03 15:54:49 simonmar Exp $
+ * $Id: Profiling.c,v 1.18 2000/04/05 15:21:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -815,6 +815,8 @@ reportCCS_XML(CostCentreStack *ccs)
 {
   CostCentre *cc;
   IndexTable *i;
+
+  if (ccs_to_ignore(ccs)) { return; }
 
   cc = ccs->cc;
   
