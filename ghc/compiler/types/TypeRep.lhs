@@ -17,7 +17,7 @@ module TypeRep (
 	openKindCon, 					-- :: KX
 	typeCon,					-- :: BX -> KX
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
-	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind,
+	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, isSuperKind,
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 
 	funTyCon,
@@ -362,7 +362,7 @@ isOpenTypeKind (TyConApp tc []) = tyConName tc == openKindConName
 isOpenTypeKind other = False
 
 isSuperKind (TyConApp tc []) = tyConName tc == superKindName
-isSuperTypeKind other = False
+isSuperKind other = False
 \end{code}
 
 ------------------------------------------
@@ -522,11 +522,13 @@ ppr_type p ty@(ForAllTy _ _)
     (tvs,  rho) = split1 [] ty
     (ctxt, tau) = split2 [] rho
 
-    split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
-    split1 tvs ty		= (reverse tvs, ty)
+    split1 tvs (ForAllTy tv ty)        = split1 (tv:tvs) ty
+    split1 tvs (NoteTy (FTVNote _) ty) = split1 tvs ty
+    split1 tvs ty		       = (reverse tvs, ty)
  
-    split2 ps (PredTy p `FunTy` ty) = split2 (p:ps) ty
-    split2 ps ty		    = (reverse ps, ty)
+    split2 ps (PredTy p `FunTy` ty)   = split2 (p:ps) ty
+    split2 ps (NoteTy (FTVNote _) ty) = split2 ps ty
+    split2 ps ty		      = (reverse ps, ty)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
 ppr_tc_app p tc [] 

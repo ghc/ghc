@@ -15,6 +15,7 @@ module Type (
 	openKindCon, 					-- :: KX
 	typeCon,					-- :: BX -> KX
 	liftedTypeKind, unliftedTypeKind, openTypeKind,	-- :: KX
+	isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind, isSuperKind,
 	mkArrowKind, mkArrowKinds,			-- :: KX -> KX -> KX
 	isTypeKind, isAnyTypeKind,
 	funTyCon,

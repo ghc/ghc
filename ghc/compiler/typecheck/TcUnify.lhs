@@ -30,7 +30,7 @@ module TcUnify (
 import HsSyn		( HsExpr(..) )
 import TcHsSyn		( mkHsLet,
 			  ExprCoFn, idCoercion, isIdCoercion, mkCoercion, (<.>), (<$>) )
-import TypeRep		( Type(..), PredType(..), TyNote(..), typeCon, openKindCon )
+import TypeRep		( Type(..), PredType(..), TyNote(..), typeCon, openKindCon, isSuperKind )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
@@ -43,7 +43,7 @@ import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
 			  isSkolemTyVar, isUserTyVar, 
 			  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
 			  eqKind, openTypeKind, liftedTypeKind, isTypeKind, mkArrowKind,
-			  hasMoreBoxityInfo, allDistinctTyVars, pprType )
+			  hasMoreBoxityInfo, allDistinctTyVars, pprType, pprKind )
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( getTcTyVar, putTcTyVar, tcInstType, newKindVar,
 			  newTyVarTy, newTyVarTys, newOpenTypeKind,
@@ -992,6 +992,8 @@ unifyMisMatch ty1 ty2
     zonkTcType ty2	`thenM` \ ty2' ->
     let
     	(env, [tidy_ty1, tidy_ty2]) = tidyOpenTypes emptyTidyEnv [ty1',ty2']
+	ppr | isSuperKind (typeKind ty1) = pprKind
+	    | otherwise			 = pprType
 	msg = hang (ptext SLIT("Couldn't match"))
 		   4 (sep [quotes (ppr tidy_ty1), 
 			   ptext SLIT("against"), 
