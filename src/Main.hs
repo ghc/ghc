@@ -6,6 +6,7 @@
 
 module Main (main) where
 
+import HaddockVersion
 import HaddockRename
 import HaddockParse
 import HaddockLex
@@ -55,19 +56,20 @@ main = do
 usage = usageInfo "usage: haddock [OPTION] file...\n" options
 
 data Flag
-  = Flag_Verbose
-  | Flag_DocBook
+  = Flag_CSS String
   | Flag_Debug
-  | Flag_Html
-  | Flag_Heading String
-  | Flag_Prologue FilePath
-  | Flag_SourceURL String
-  | Flag_CSS String
-  | Flag_Lib String
-  | Flag_OutputDir FilePath
-  | Flag_ReadInterface FilePath
+  | Flag_DocBook
   | Flag_DumpInterface FilePath
+  | Flag_Heading String
+  | Flag_Html
+  | Flag_Lib String
+  | Flag_MSHtmlHelp
   | Flag_NoImplicitPrelude
+  | Flag_OutputDir FilePath
+  | Flag_Prologue FilePath
+  | Flag_ReadInterface FilePath
+  | Flag_SourceURL String
+  | Flag_Verbose
   deriving (Eq)
 
 options =
@@ -90,12 +92,14 @@ options =
 	"be verbose",
     Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
 	"read an interface from FILE",
-    Option []  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
-        "dump an interface for these modules in FILE",
     Option []  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"The CSS file to use for HTML output",
+    Option []  ["dump-interface"]   (ReqArg Flag_DumpInterface "FILE")
+        "dump an interface for these modules in FILE",
     Option []  ["lib"]         (ReqArg Flag_Lib "DIR") 
-	"Directory containing Haddock's auxiliary files",
+	"Location of Haddock's auxiliary files",
+    Option []  ["ms-help"]    (NoArg Flag_MSHtmlHelp)
+	"Produce Microsoft HTML Help files (with -h)",
     Option []  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
  	"Do not assume Prelude is imported"
   ]
@@ -111,6 +115,11 @@ run flags files = do
       source_url = case [str | Flag_SourceURL str <- flags] of
 			[] -> Nothing
 			(t:ts) -> Just t
+
+  when (Flag_Verbose `elem` flags) $
+     hPutStrLn stderr 
+	  ("Haddock version " ++ projectVersion ++
+		", (c) Simon Marlow 2002")
 
   libdir <- case [str | Flag_Lib str <- flags] of
 		[] -> dieMsg "no --lib option"
@@ -178,7 +187,7 @@ run flags files = do
 
   when (Flag_Html `elem` flags) $
     ppHtml title source_url these_mod_ifaces odir css_file 
-	libdir inst_maps prologue
+	libdir inst_maps prologue (Flag_MSHtmlHelp `elem` flags)
 
   -- dump an interface if requested
   case dump_iface of
@@ -321,6 +330,8 @@ mkInterface no_implicit_prelude mod_map filename
 		   buildImportEnv mod_map mod exported_visible_names 
 			implicit_imps
 
+  -- trace (show (fmToList orig_env)) $ do
+  -- trace (show (fmToList import_env)) $ do
   let
      final_decls = orig_decls
 
