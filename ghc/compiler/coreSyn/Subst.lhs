@@ -37,9 +37,9 @@ module Subst (
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_PprStyle_Debug )
-import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr, CoreBndr,
+import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  CoreRules(..), CoreRule(..), 
-			  emptyCoreRules, isEmptyCoreRules, seqRules
+			  isEmptyCoreRules, seqRules
 			)
 import CoreFVs		( exprFreeVars, mustHaveLocalBinding )
 import TypeRep		( Type(..), TyNote(..), 
@@ -63,6 +63,7 @@ import Outputable
 import PprCore		()		-- Instances
 import UniqFM		( ufmToList )	-- Yuk (add a new op to VarEnv)
 import Util		( mapAccumL, foldl2, seqList, ($!) )
+import FastTypes
 \end{code}
 
 
@@ -73,7 +74,7 @@ import Util		( mapAccumL, foldl2, seqList, ($!) )
 %************************************************************************
 
 \begin{code}
-data InScopeSet = InScope (VarEnv Var) Int#
+data InScopeSet = InScope (VarEnv Var) FastInt
 	-- The Int# is a kind of hash-value used by uniqAway
 	-- For example, it might be the size of the set
 	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
@@ -88,8 +89,9 @@ extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# 1#)
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
-extendInScopeSetList (InScope in_scope n) vs = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
-						       (case length vs of { I# l -> n +# l })
+extendInScopeSetList (InScope in_scope n) vs
+   = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
+		    (n +# iUnbox (length vs))
 
 modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
 -- Exploit the fact that the in-scope "set" is really a map
@@ -132,17 +134,17 @@ uniqAway (InScope set n) var
     try k 
 #ifdef DEBUG
 	  | k ># 1000#
-	  = pprPanic "uniqAway loop:" (ppr (I# k) <+> text "tries" <+> ppr var <+> int (I# n)) 
+	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
 #endif			    
 	  | uniq `elemUniqSet_Directly` set = try (k +# 1#)
 #ifdef DEBUG
 	  | opt_PprStyle_Debug && k ># 3#
-	  = pprTrace "uniqAway:" (ppr (I# k) <+> text "tries" <+> ppr var <+> int (I# n)) 
+	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
 	    setVarUnique var uniq
 #endif			    
 	  | otherwise = setVarUnique var uniq
 	  where
-	    uniq = deriveUnique orig_unique (I# (n *# k))
+	    uniq = deriveUnique orig_unique (iBox (n *# k))
 \end{code}
 
 

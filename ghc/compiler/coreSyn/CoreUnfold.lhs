@@ -35,27 +35,27 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 			  opt_UF_UseThreshold,
 			  opt_UF_FunAppDiscount,
 		  	  opt_UF_KeenessFactor,
-			  opt_UF_CheapOp, opt_UF_DearOp,
-			  opt_UnfoldCasms, opt_PprStyle_Debug,
+			  opt_UF_DearOp, opt_UnfoldCasms,
 			  DynFlags, dopt_D_dump_inlinings
 			)
 import CoreSyn
 import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
-import CoreUtils	( exprIsValue, exprIsCheap, exprIsBottom, exprIsTrivial )
-import Id		( Id, idType, idFlavour, isId, idWorkerInfo,
+import CoreUtils	( exprIsValue, exprIsCheap, exprIsTrivial )
+import Id		( Id, idType, idFlavour, isId,
 			  idSpecialisation, idInlinePragma, idUnfolding,
 			  isPrimOpId_maybe
 			)
 import VarSet
 import Literal		( isLitLitLit, litIsDupable )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), 
-			  insideLam, workerExists, isNeverInlinePrag
+import IdInfo		( InlinePragInfo(..), OccInfo(..), IdFlavour(..),
+			  isNeverInlinePrag
 			)
-import Type		( splitFunTy_maybe, isUnLiftedType )
+import Type		( isUnLiftedType )
 import PrelNames	( hasKey, buildIdKey, augmentIdKey )
 import Bag
+import FastTypes
 import Outputable
 
 #if __GLASGOW_HASKELL__ >= 404
@@ -147,9 +147,9 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 			n_val_binders
 			(map discount_for val_binders)
 			final_size
-			(I# scrut_discount)
+			(iBox scrut_discount)
 	where        
-	    boxed_size    = I# size
+	    boxed_size    = iBox size
 
 	    final_size | inline     = boxed_size `min` max_inline_size
 		       | otherwise  = boxed_size
@@ -182,7 +182,7 @@ sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
 	 -> CoreExpr
 	 -> ExprSize
 
-sizeExpr (I# bOMB_OUT_SIZE) top_args expr
+sizeExpr bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
     size_up (Type t)	      = sizeZero	-- Types cost nothing
@@ -255,7 +255,7 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 		-- the case when we are scrutinising an argument variable
 	  alts_size (SizeIs tot tot_disc tot_scrut)		-- Size of all alternatives
 		    (SizeIs max max_disc max_scrut)		-- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, I# (1# +# tot -# max)) `unionBags` max_disc) max_scrut
+	 	= SizeIs tot (unitBag (v, iBox (_ILIT 1 +# tot -# max)) `unionBags` max_disc) max_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of rh largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
@@ -328,16 +328,16 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
 	-- I don't want to give them bOMB_OUT_SIZE as an argument
 
     addSizeN TooBig          _      = TooBig
-    addSizeN (SizeIs n xs d) (I# m)
-      | n_tot ># bOMB_OUT_SIZE	    = TooBig
+    addSizeN (SizeIs n xs d) m
+      | n_tot ># (iUnbox bOMB_OUT_SIZE) = TooBig
       | otherwise 		    = SizeIs n_tot xs d
       where
-	n_tot = n +# m
+	n_tot = n +# iUnbox m
     
     addSize TooBig _ = TooBig
     addSize _ TooBig = TooBig
     addSize (SizeIs n1 xs d1) (SizeIs n2 ys d2)
-      | n_tot ># bOMB_OUT_SIZE = TooBig
+      | n_tot ># (iUnbox bOMB_OUT_SIZE) = TooBig
       | otherwise 	       = SizeIs n_tot xys d_tot
       where
 	n_tot = n1 +# n2
@@ -350,9 +350,9 @@ Code for manipulating sizes
 \begin{code}
 
 data ExprSize = TooBig
-	      | SizeIs Int#		-- Size found
+	      | SizeIs FastInt		-- Size found
 		       (Bag (Id,Int))	-- Arguments cased herein, and discount for each such
-		       Int#		-- Size to subtract if result is scrutinised 
+		       FastInt		-- Size to subtract if result is scrutinised 
 					-- by a case expression
 
 isTooBig TooBig = True
@@ -363,16 +363,16 @@ maxSize _              TooBig				  = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 					      | otherwise = s2
 
-sizeZero     	= SizeIs 0# emptyBag 0#
-sizeOne      	= SizeIs 1# emptyBag 0#
-sizeTwo      	= SizeIs 2# emptyBag 0#
-sizeN (I# n) 	= SizeIs n  emptyBag 0#
-conSizeN (I# n) = SizeIs 1# emptyBag (n +# 1#)
+sizeZero     	= SizeIs (_ILIT 0) emptyBag (_ILIT 0)
+sizeOne      	= SizeIs (_ILIT 1) emptyBag (_ILIT 0)
+sizeTwo      	= SizeIs (_ILIT 2) emptyBag (_ILIT 0)
+sizeN n 	= SizeIs (iUnbox n) emptyBag (_ILIT 0)
+conSizeN n      = SizeIs (_ILIT 1) emptyBag (iUnbox n +# _ILIT 1)
 	-- Treat constructors as size 1; we are keen to expose them
 	-- (and we charge separately for their args).  We can't treat
-	-- them as size zero, else we find that (I# x) has size 1,
+	-- them as size zero, else we find that (iBox x) has size 1,
 	-- which is the same as a lone variable; and hence 'v' will 
-	-- always be replaced by (I# x), where v is bound to I# x.
+	-- always be replaced by (iBox x), where v is bound to iBox x.
 
 primOpSize op n_args
  | not (primOpIsDupable op) = sizeN opt_UF_DearOp
@@ -395,7 +395,7 @@ nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
 nukeScrutDiscount TooBig	  = TooBig
 
 -- When we return a lambda, give a discount if it's used (applied)
-lamScrutDiscount  (SizeIs n vs d) = case opt_UF_FunAppDiscount of { I# d -> SizeIs n vs d }
+lamScrutDiscount  (SizeIs n vs d) = case opt_UF_FunAppDiscount of { d -> SizeIs n vs (iUnbox d) }
 lamScrutDiscount TooBig	 	  = TooBig
 \end{code}
 
