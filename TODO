@@ -48,6 +48,9 @@
 -----------------------------------------------------------------------------
 -- features
 
+* Command-line flag to give the effect of --#ignore-exports on all modules
+  (request by Chris Ryder, for generating implementation docs.)
+
 * Parse and remember {-# SOURCE #-} imports, possibly do something sensible
   with them?
 
@@ -67,6 +70,8 @@
 * Comments on instance declarations?  (suggested by Daan and Iavor).
 
 * Comments on default method declarations?  (suggested by Satnam).
+
+* Comments on components of a tuple, for argument or return types.
 
 * Add a search feature which just invokes Google?
 
