@@ -165,7 +165,7 @@ ppr_expr add_par pe expr@(Lam _ _)
     in
     add_par $
     hang (ptext SLIT("\\") <+> sep (map (pBndr pe LambdaBind) bndrs) <+> arrow)
-	 4 (ppr_noparend_expr pe body)
+	 2 (ppr_noparend_expr pe body)
 
 ppr_expr add_par pe expr@(App fun arg)
   = case collectArgs expr of { (fun, args) -> 
@@ -184,9 +184,9 @@ ppr_expr add_par pe expr@(App fun arg)
 			     tc	       = dataConTyCon dc
 			     saturated = length val_args == idArity f
 
-		   other -> add_par (hang (pOcc pe f) 4 pp_args)
+		   other -> add_par (hang (pOcc pe f) 2 pp_args)
 
-	other -> add_par (hang (ppr_parend_expr pe fun) 4 pp_args)
+	other -> add_par (hang (ppr_parend_expr pe fun) 2 pp_args)
     }
 
 ppr_expr add_par pe (Case expr var [(con,args,rhs)])
@@ -207,7 +207,7 @@ ppr_expr add_par pe (Case expr var alts)
   = add_par $
     sep [sep [ptext SLIT("case") <+> ppr_noparend_expr pe expr,
 	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
-	 nest 4 (sep (punctuate semi (map (ppr_alt pe) alts))),
+	 nest 2 (sep (punctuate semi (map (ppr_alt pe) alts))),
 	 char '}'
     ]
   where
@@ -229,7 +229,7 @@ ppr_expr add_par pe (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = add_par
     (hang (ptext SLIT("let {"))
 	  2 (hsep [hang (hsep [pBndr pe LetBind val_bdr, equals])
-			   4 (ppr_noparend_expr pe rhs),
+			   2 (ppr_noparend_expr pe rhs),
        ptext SLIT("} in")])
      $$
      ppr_noparend_expr pe expr)
@@ -260,7 +260,7 @@ ppr_expr add_par pe (Note (Coerce to_ty from_ty) expr)
 #else
 ppr_expr add_par pe (Note (Coerce to_ty from_ty) expr)
   = add_par $
-    sep [sep [ptext SLIT("__coerce"), nest 4 (pTy pe to_ty)],
+    sep [sep [ptext SLIT("__coerce"), nest 2 (pTy pe to_ty)],
 	 ppr_parend_expr pe expr]
 #endif
 
@@ -271,7 +271,7 @@ ppr_expr add_par pe (Note InlineMe expr)
   = add_par $ ptext SLIT("__inline_me") <+> ppr_parend_expr pe expr
 
 ppr_alt pe (con, args, rhs) 
-  = hang (ppr_case_pat pe con args) 4 (ppr_noparend_expr pe rhs)
+  = hang (ppr_case_pat pe con args) 2 (ppr_noparend_expr pe rhs)
 
 ppr_case_pat pe con@(DataAlt dc) args
   | isTupleTyCon tc
@@ -372,7 +372,7 @@ pprCoreRule pp_fn (Rule name tpl_vars tpl_args rhs)
   = doubleQuotes (ptext name) <+> 
     sep [
 	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
-	  nest 4 (pp_fn <+> sep (map pprArg tpl_args)),
-	  nest 4 (ptext SLIT("=") <+> pprCoreExpr rhs)
+	  nest 2 (pp_fn <+> sep (map pprArg tpl_args)),
+	  nest 2 (ptext SLIT("=") <+> pprCoreExpr rhs)
     ] <+> semi
 \end{code}
