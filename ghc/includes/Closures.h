@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Closures.h,v 1.34 2003/11/14 09:27:00 stolz Exp $
+ * $Id: Closures.h,v 1.35 2003/11/14 14:28:07 stolz Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,8 +22,8 @@
 typedef struct {
   CostCentreStack *ccs;
   union {
-    struct _RetainerSet *rs;  /* Retainer Set */
-    StgWord ldvw;             /* Lag/Drag/Void Word */
+    struct _RetainerSet *rs;  // Retainer Set
+    StgWord ldvw;             // Lag/Drag/Void Word
   } hp;
 } StgProfHeader;
 
@@ -95,14 +95,14 @@ typedef struct {
     StgClosure *payload[FLEXIBLE_ARRAY];
 } StgPAP;
 
-/* AP closures have the same layout, for convenience */
+// AP closures have the same layout, for convenience
 typedef StgPAP StgAP;
 
 typedef struct {
     StgHeader   header;
-    StgWord     size;                    /* number of words in payload */
+    StgWord     size;                    // number of words in payload
     StgClosure *fun;
-    StgClosure *payload[FLEXIBLE_ARRAY]; /* contains a chunk of *stack* */
+    StgClosure *payload[FLEXIBLE_ARRAY]; // contains a chunk of *stack*
 } StgAP_STACK;
 
 typedef struct {
@@ -218,13 +218,13 @@ typedef struct _StgDeadWeak {	/* Weak v */
 
 typedef struct {
     StgHeader      header;
-    StgArrWords   *instrs;	/* a pointer to an ArrWords */
-    StgArrWords   *literals;	/* a pointer to an ArrWords */
-    StgMutArrPtrs *ptrs;	/* a pointer to a  MutArrPtrs */
-    StgArrWords   *itbls;	/* a pointer to an ArrWords */
-    StgHalfWord   arity;        /* arity of this BCO */
-    StgHalfWord   size;         /* size of this BCO (in words) */
-    StgWord       bitmap[FLEXIBLE_ARRAY];  /* an StgLargeBitmap */
+    StgArrWords   *instrs;	// a pointer to an ArrWords
+    StgArrWords   *literals;	// a pointer to an ArrWords
+    StgMutArrPtrs *ptrs;	// a pointer to a  MutArrPtrs
+    StgArrWords   *itbls;	// a pointer to an ArrWords
+    StgHalfWord   arity;        // arity of this BCO
+    StgHalfWord   size;         // size of this BCO (in words)
+    StgWord       bitmap[FLEXIBLE_ARRAY];  // an StgLargeBitmap
 } StgBCO;
 
 #define BCO_BITMAP(bco)      ((StgLargeBitmap *)((StgBCO *)(bco))->bitmap)
