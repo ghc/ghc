@@ -103,8 +103,8 @@ regexec (Regex regex_fptr) str = do
 
 matched_parts :: String -> Ptr CRegMatch -> IO (String, String, String)
 matched_parts string p_match = do
-  start <- (#peek regmatch_t, rm_so) p_match :: IO CInt
-  end   <- (#peek regmatch_t, rm_eo) p_match :: IO CInt
+  start <- (#peek regmatch_t, rm_so) p_match :: IO (#type regoff_t)
+  end   <- (#peek regmatch_t, rm_eo) p_match :: IO (#type regoff_t)
   let s = fromIntegral start; e = fromIntegral end
   return ( take s string, 
 	   take (e-s) (drop s string),
@@ -112,8 +112,8 @@ matched_parts string p_match = do
 
 unpack :: String -> Ptr CRegMatch -> IO (String)
 unpack string p_match = do
-  start <- (#peek regmatch_t, rm_so) p_match :: IO CInt
-  end   <- (#peek regmatch_t, rm_eo) p_match :: IO CInt
+  start <- (#peek regmatch_t, rm_so) p_match :: IO (#type regoff_t)
+  end   <- (#peek regmatch_t, rm_eo) p_match :: IO (#type regoff_t)
   -- the subexpression may not have matched at all, perhaps because it
   -- was optional.  In this case, the offsets are set to -1.
   if (start == -1) then return "" else do
