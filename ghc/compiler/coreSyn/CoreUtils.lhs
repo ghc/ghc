@@ -156,9 +156,16 @@ Drop trivial InlineMe's.  This is somewhat important, because if we have an unfo
 that looks like	(Note InlineMe (Var v)), the InlineMe doesn't go away because it may
 not be *applied* to anything.
 
+We don't use exprIsTrivial here, though, because we sometimes generate worker/wrapper
+bindings like
+	fw = ...
+	f  = inline_me (coerce t fw)
+As usual, the inline_me prevents the worker from getting inlined back into the wrapper.
+We want the split, so that the coerces can cancel at the call site.  
+
 \begin{code}
-mkInlineMe e | exprIsTrivial e = e
-	     | otherwise       = Note InlineMe e
+mkInlineMe (Var v) = Var v
+mkInlineMe e	   = Note InlineMe e
 \end{code}
 
 
