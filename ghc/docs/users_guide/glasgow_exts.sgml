@@ -2627,12 +2627,17 @@ i2d (I# i) = D# (int2Double# i) -- uses Glasgow prim-op directly
 Same idea, except for instance declarations.  For example:
 
 <programlisting>
-instance (Eq a) => Eq (Foo a) where { ... usual stuff ... }
-
-{-# SPECIALIZE instance Eq (Foo [(Int, Bar)] #-}
+instance (Eq a) => Eq (Foo a) where { 
+   {-# SPECIALIZE instance Eq (Foo [(Int, Bar)]) #-}
+   ... usual stuff ...
+ }
 </programlisting>
-
-Compatible with HBC, by the way.
+The pragma must occur inside the <literal>where</literal> part
+of the instance declaration.
+</para>
+<para>
+Compatible with HBC, by the way, except perhaps in the placement
+of the pragma.
 </para>
 
 </sect2>
