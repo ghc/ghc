@@ -342,7 +342,7 @@ AC_SUBST(exeext)
 case $HostPlatform in
   i386-unknown-mingw32 | i386-unknown-cygwin32)
   	# get rid off /cygdrive/ prefix
-	hardtop=`echo ${hardtop} | sed -e 's%/cygdrive/\(.\)/%\1:/%g' `
+	hardtop=`echo ${hardtop} | sed -e 's%^/cygdrive/\(.\)/%\1:/%' `
   	hardtop_plat=`cygpath -w ${hardtop} | sed -e 's@\\\\@\\\\\\\\@g' `
 	;;
   *)
