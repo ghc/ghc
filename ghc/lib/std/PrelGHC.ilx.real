@@ -1,18 +1,19 @@
 // The ILX implementation of PrelGHC 
 
-.module extern ilx 'PrelBase.dll'
-.classunion extern thunk [.module ilx 'PrelBase.dll']PrelBase_Bool {.alternative 'PrelBase_False' ()
+.module extern 'PrelBase.dll'
+.classunion import [.module 'PrelBase.dll']PrelBase_Bool {.alternative 'PrelBase_False' ()
 .alternative 'PrelBase_True' ()}
+.assembly extern 'mscorlib' { }
 
 .namespace GHC {
    .class support {
-      .method public static class [.module ilx 'PrelBase.dll']PrelBase_Bool mkBool (bool b) {
+      .method public static class [.module 'PrelBase.dll']PrelBase_Bool mkBool (bool b) {
          ldarg b
-         brtrue true
-         newdata class [.module ilx 'PrelBase.dll']PrelBase_Bool, PrelBase_False()
+         brtrue Ltrue
+         newdata class [.module 'PrelBase.dll']PrelBase_Bool, PrelBase_False()
          ret
-        true:
-         newdata class [.module ilx 'PrelBase.dll']PrelBase_Bool, PrelBase_True()
+        Ltrue:
+         newdata class [.module 'PrelBase.dll']PrelBase_Bool, PrelBase_True()
          ret
       }
       .method public static int32 IntGcdOp (int32,int32) {
@@ -435,16 +436,16 @@ end:
 // TODO
 .class public 'PrelGHC_Weakzh'<any> {
   .field public !0 contents
-   .field public thunk<(func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)> _finalizer
-   .method public rtspecialname specialname instance void .ctor(!0 x, thunk<(func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)> f) {
+   .field public thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)> _finalizer
+   .method public rtspecialname specialname instance void .ctor(!0 x, thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)> f) {
        ldarg 0 ldarg x stfld !0 class PrelGHC_Weakzh<!0>::contents
-       ldarg 0 ldarg f stfld thunk<(func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)> class PrelGHC_Weakzh<!0>::_finalizer
+       ldarg 0 ldarg f stfld thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)> class PrelGHC_Weakzh<!0>::_finalizer
        ret 
     }
-   .method public static  value class PrelGHC_Z1H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)>> finalizer<any>(class PrelGHC_Weakzh<!!0>) { 
+   .method public static  value class PrelGHC_Z1H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)>> finalizer<any>(class PrelGHC_Weakzh<!!0>) { 
        ldc.i4 1
-       ldarg 0 ldfld thunk<(func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)> class PrelGHC_Weakzh<!!0>::_finalizer
-         newobj void value class PrelGHC_Z1H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)>>::.ctor(!0,!1)
+       ldarg 0 ldfld thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)> class PrelGHC_Weakzh<!!0>::_finalizer
+         newobj void value class PrelGHC_Z1H<int32,thunk<(func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)>>::.ctor(!0,!1)
        ret
    }
    .method public static value class PrelGHC_Z1H<int32,!!0> deref<any>(class PrelGHC_Weakzh<!!0>) { 
@@ -453,13 +454,13 @@ end:
        newobj void  value class PrelGHC_Z1H<int32,!!0>::.ctor(!0,!1)
        ret
    }
-   .method public  static  class PrelGHC_Weakzh<!!1> bake<any,any,any>(!!0,!!1 object,!!2 finalizer) {
-         ldarg object 
+   .method public  static  class PrelGHC_Weakzh<!!1> bake<any,any,any>(!!0,!!1 obj,!!2 finalizer) {
+         ldarg obj 
 	 // TODO: work out how to get finalizer correctly...  why is it a type variable anyway? 
          // The unbox below doesn't work in all circumstances because of known problems with 
          // the runtime types ascribed to funtion types (see RAID bug)
-         ldnull // ldarg finalizer unbox.any (func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)
-         newobj void class 'PrelGHC_Weakzh'<!!1>::.ctor(!0 x, (func ( /* unit skipped */ ) --> class [.module ilx 'PrelBase.dll']PrelBase_Z0T)) 
+         ldnull // ldarg finalizer unbox.any (func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)
+         newobj void class 'PrelGHC_Weakzh'<!!1>::.ctor(!0 x, (func ( /* unit skipped */ ) --> class [.module 'PrelBase.dll']PrelBase_Z0T)) 
          ret 
    }
 
@@ -656,7 +657,7 @@ end:
 
 }
 
-.classunion thunk '()'  { 
+.classunion '()' extends thunk<class '()'>  { 
    .alternative '()'()
 }
 
