@@ -32,6 +32,16 @@ endif
 
 
 #
+# In main/Signals we need to distinguish between irix5 and irix6,
+# so we suitably mangle HostOS_FULL to get at the major version.
+# (A hack, for sure - ToDo: consider systematically adding more
+# fine-grained OS info to this Makefile/configure soup )
+
+ifeq "$(HostOS_CPP)" "irix"
+IRIX_MAJOR = $(shell echo $(HostOS_Full) | sed 's/\(irix[^.]*\).*$$/\1/' )
+endif
+
+#
 # The fptools configure script creates the configuration header file 
 # and puts it in fptools/mk/config.h. We copy it down to here, prepending
 # some make variables specifying cpp platform variables.
@@ -55,10 +65,12 @@ $(H_CONFIG) :
 	@echo >> $@
 	@echo "#define $(HostOS_CPP)_HOST_OS		1" >> $@
 	@echo "#define $(HostOS_CPP)_TARGET_OS		1" >> $@  
-	@echo "#ifndef $(HostPlaform_GNU)_TARGET_OS	 " >> $@  
-	@echo "#define $(HostPlaform_GNU)_TARGET_OS	1" >> $@  
-	@echo "#endif 	 				 " >> $@  
 	@echo "#define $(HostOS_CPP)_BUILD_OS 		1" >> $@
+ifeq "$(HostOS_CPP)" "irix"
+	@echo "#ifndef $(IRIX_MAJOR)_TARGET_OS		 " >> $@  
+	@echo "#define $(IRIX_MAJOR)_TARGET_OS		1" >> $@  
+	@echo "#endif					 " >> $@  
+endif
 	@echo >> $@
 	@echo "#define $(HostVendor_CPP)_HOST_VENDOR	1" >> $@
 	@echo "#define $(HostVendor_CPP)_TARGET_VENDOR  1" >> $@
