@@ -738,7 +738,8 @@ because it's already installed on your system.
 
 %************************************************************************
 %*									*
-\section{Building from source}
+\section[building-from-source]{Building from source}
+\index{Building from source}
 %*									*
 %************************************************************************
 
@@ -1594,9 +1595,28 @@ supplied intermediate C (\tr{.hc}) files.  This would probably be
 because no binaries have been provided, or because the machine
 is not ``fully supported.''
 
-THIS SECTION HASN'T BEEN UPDATED YET.  Please let us know if you want to use this
-route. Unless someone does, this section may never get written, and the
-.hc files distribution may not get built!
+The intermediate C files are normally made available together with a
+source release, please check the announce message for exact directions
+of where to find them. If we've haven't made them available or you
+can't find them, please ask.
+
+Assuming you've got them, unpack them on top of a fresh source tree.
+Then follow the `normal' instructions in
+\sectionref{building-from-source} for setting up a build tree and
+configuring it. The only extra thing to remember when booting from
+\tr{.hc} files is to add the following line to the \tr{build.mk}
+file:
+
+\begin{verbatim}
+GhcWithHscBuiltViaC=YES
+\end{verbatim}
+
+and proceed with doing a \tr{make boot} followed by a \tr{make all}.
+
+That's the mechanics of the boot process, but, of course, if you're
+trying to boot on a platform that is not supported and significantly
+`different' from any of the supported ones, this is only the start
+of the adventure...(ToDo: porting tips - stuff to look out for, etc.)
 
 
 %************************************************************************
