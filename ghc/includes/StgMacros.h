@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.29 2000/07/21 09:01:48 rrt Exp $
+ * $Id: StgMacros.h,v 1.30 2000/07/21 09:31:46 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -41,6 +41,7 @@
 #define STGFUN(f)       StgFunPtr f(void)
 #define EXTFUN(f)	extern StgFunPtr f(void)
 #define EXTFUN_RTS(f)	extern DLL_IMPORT_RTS StgFunPtr f(void)
+#define EXTINFO_RTS(f)	extern DLL_IMPORT_RTS INFO_TBL_CONST StgInfoTable
 #define FN_(f)		F_ f(void)
 #define IFN_(f)		static F_ f(void)
 #define IF_(f)		static F_ f(void)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.16 2000/01/13 14:34:01 hwloidl Exp $
+ * $Id: StgMiscClosures.h,v 1.17 2000/07/21 09:31:46 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -132,92 +132,86 @@ extern StgFun stg_error_entry;
 
 /* standard selector thunks */
 
-#ifdef COMPILING_RTS
-#define EI__ EI_
-#else
-#define EI__ EDI_
-#endif
+EXTINFO_RTS __sel_0_upd_info;
+EXTINFO_RTS __sel_1_upd_info;
+EXTINFO_RTS __sel_2_upd_info;
+EXTINFO_RTS __sel_3_upd_info;
+EXTINFO_RTS __sel_4_upd_info;
+EXTINFO_RTS __sel_5_upd_info;
+EXTINFO_RTS __sel_6_upd_info;
+EXTINFO_RTS __sel_7_upd_info;
+EXTINFO_RTS __sel_8_upd_info;
+EXTINFO_RTS __sel_8_upd_info;
+EXTINFO_RTS __sel_9_upd_info;
+EXTINFO_RTS __sel_10_upd_info;
+EXTINFO_RTS __sel_11_upd_info;
+EXTINFO_RTS __sel_12_upd_info;
+EXTINFO_RTS __sel_13_upd_info;
+EXTINFO_RTS __sel_14_upd_info;
+EXTINFO_RTS __sel_15_upd_info;
 
-EI__ __sel_0_upd_info;
-EI__ __sel_1_upd_info;
-EI__ __sel_2_upd_info;
-EI__ __sel_3_upd_info;
-EI__ __sel_4_upd_info;
-EI__ __sel_5_upd_info;
-EI__ __sel_6_upd_info;
-EI__ __sel_7_upd_info;
-EI__ __sel_8_upd_info;
-EI__ __sel_8_upd_info;
-EI__ __sel_9_upd_info;
-EI__ __sel_10_upd_info;
-EI__ __sel_11_upd_info;
-EI__ __sel_12_upd_info;
-EI__ __sel_13_upd_info;
-EI__ __sel_14_upd_info;
-EI__ __sel_15_upd_info;
-
-EI__ __sel_0_noupd_info;
-EI__ __sel_1_noupd_info;
-EI__ __sel_2_noupd_info;
-EI__ __sel_3_noupd_info;
-EI__ __sel_4_noupd_info;
-EI__ __sel_5_noupd_info;
-EI__ __sel_6_noupd_info;
-EI__ __sel_7_noupd_info;
-EI__ __sel_8_noupd_info;
-EI__ __sel_9_noupd_info;
-EI__ __sel_10_noupd_info;
-EI__ __sel_11_noupd_info;
-EI__ __sel_12_noupd_info;
-EI__ __sel_13_noupd_info;
-EI__ __sel_14_noupd_info;
-EI__ __sel_15_noupd_info;
+EXTINFO_RTS __sel_0_noupd_info;
+EXTINFO_RTS __sel_1_noupd_info;
+EXTINFO_RTS __sel_2_noupd_info;
+EXTINFO_RTS __sel_3_noupd_info;
+EXTINFO_RTS __sel_4_noupd_info;
+EXTINFO_RTS __sel_5_noupd_info;
+EXTINFO_RTS __sel_6_noupd_info;
+EXTINFO_RTS __sel_7_noupd_info;
+EXTINFO_RTS __sel_8_noupd_info;
+EXTINFO_RTS __sel_9_noupd_info;
+EXTINFO_RTS __sel_10_noupd_info;
+EXTINFO_RTS __sel_11_noupd_info;
+EXTINFO_RTS __sel_12_noupd_info;
+EXTINFO_RTS __sel_13_noupd_info;
+EXTINFO_RTS __sel_14_noupd_info;
+EXTINFO_RTS __sel_15_noupd_info;
 
   /* and their standard entry points  -- KSW 1998-12 */
 
-EF_(__sel_0_upd_entry);
-EF_(__sel_1_upd_entry);
-EF_(__sel_2_upd_entry);
-EF_(__sel_3_upd_entry);
-EF_(__sel_4_upd_entry);
-EF_(__sel_5_upd_entry);
-EF_(__sel_6_upd_entry);
-EF_(__sel_7_upd_entry);
-EF_(__sel_8_upd_entry);
-EF_(__sel_8_upd_entry);
-EF_(__sel_9_upd_entry);
-EF_(__sel_10_upd_entry);
-EF_(__sel_11_upd_entry);
-EF_(__sel_12_upd_entry);
-EF_(__sel_13_upd_entry);
-EF_(__sel_14_upd_entry);
-EF_(__sel_15_upd_entry);
+EXTFUN_RTS(__sel_0_upd_entry);
+EXTFUN_RTS(__sel_1_upd_entry);
+EXTFUN_RTS(__sel_2_upd_entry);
+EXTFUN_RTS(__sel_3_upd_entry);
+EXTFUN_RTS(__sel_4_upd_entry);
+EXTFUN_RTS(__sel_5_upd_entry);
+EXTFUN_RTS(__sel_6_upd_entry);
+EXTFUN_RTS(__sel_7_upd_entry);
+EXTFUN_RTS(__sel_8_upd_entry);
+EXTFUN_RTS(__sel_8_upd_entry);
+EXTFUN_RTS(__sel_9_upd_entry);
+EXTFUN_RTS(__sel_10_upd_entry);
+EXTFUN_RTS(__sel_11_upd_entry);
+EXTFUN_RTS(__sel_12_upd_entry);
+EXTFUN_RTS(__sel_13_upd_entry);
+EXTFUN_RTS(__sel_14_upd_entry);
+EXTFUN_RTS(__sel_15_upd_entry);
 
-EF_(__sel_0_noupd_entry);
-EF_(__sel_1_noupd_entry);
-EF_(__sel_2_noupd_entry);
-EF_(__sel_3_noupd_entry);
-EF_(__sel_4_noupd_entry);
-EF_(__sel_5_noupd_entry);
-EF_(__sel_6_noupd_entry);
-EF_(__sel_7_noupd_entry);
-EF_(__sel_8_noupd_entry);
-EF_(__sel_9_noupd_entry);
-EF_(__sel_10_noupd_entry);
-EF_(__sel_11_noupd_entry);
-EF_(__sel_12_noupd_entry);
-EF_(__sel_13_noupd_entry);
-EF_(__sel_14_noupd_entry);
-EF_(__sel_15_noupd_entry);
+EXTFUN_RTS(__sel_0_noupd_entry);
+EXTFUN_RTS(__sel_1_noupd_entry);
+EXTFUN_RTS(__sel_2_noupd_entry);
+EXTFUN_RTS(__sel_3_noupd_entry);
+EXTFUN_RTS(__sel_4_noupd_entry);
+EXTFUN_RTS(__sel_5_noupd_entry);
+EXTFUN_RTS(__sel_6_noupd_entry);
+EXTFUN_RTS(__sel_7_noupd_entry);
+EXTFUN_RTS(__sel_8_noupd_entry);
+EXTFUN_RTS(__sel_9_noupd_entry);
+EXTFUN_RTS(__sel_10_noupd_entry);
+EXTFUN_RTS(__sel_11_noupd_entry);
+EXTFUN_RTS(__sel_12_noupd_entry);
+EXTFUN_RTS(__sel_13_noupd_entry);
+EXTFUN_RTS(__sel_14_noupd_entry);
+EXTFUN_RTS(__sel_15_noupd_entry);
 
 /* standard ap thunks */
 
-EI__ __ap_1_upd_info;
-EI__ __ap_2_upd_info;
-EI__ __ap_3_upd_info;
-EI__ __ap_4_upd_info;
-EI__ __ap_5_upd_info;
-EI__ __ap_6_upd_info;
-EI__ __ap_7_upd_info;
-EI__ __ap_8_upd_info;
+EXTINFO_RTS __ap_1_upd_info;
+EXTINFO_RTS __ap_2_upd_info;
+EXTINFO_RTS __ap_3_upd_info;
+EXTINFO_RTS __ap_4_upd_info;
+EXTINFO_RTS __ap_5_upd_info;
+EXTINFO_RTS __ap_6_upd_info;
+EXTINFO_RTS __ap_7_upd_info;
+EXTINFO_RTS __ap_8_upd_info;
 
