@@ -1103,14 +1103,15 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 
      let (basename,ext) = split_filename input_fn
 
-     split <- readIORef split_object_files
+     split  <- readIORef split_object_files
      mangle <- readIORef do_asm_mangling
-     lang <- readIORef hsc_lang
+     lang   <- readIORef hsc_lang
 
 	-- figure out what the next phase is.  This is
 	-- straightforward, apart from the fact that hsc can generate
 	-- either C or assembler direct, and assembly mangling is
-	-- optional.
+	-- optional, and splitting involves one extra phase and an alternate
+	-- assembler.
      let next_phase =
 	  case phase of
 		Hsc -> case lang of
@@ -1129,7 +1130,7 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 		_  -> succ phase
 
 
-	-- filename extension for the output
+	-- filename extension for the output, determined by next_phase
      let new_ext = phase_input_ext next_phase
 
 	-- Figure out what the output from this pass should be called.
@@ -1157,7 +1158,7 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 			    osuf_ify f
 
 		-- .o files are always kept.  .s files and .hc file may be kept.
-		else if keep_this_output
+	    else if keep_this_output
 			then odir_ify (orig_basename ++ '.':new_ext)
 			else do filename <- newTempName new_ext
 				add files_to_clean filename
@@ -1165,6 +1166,13 @@ run_pipeline last_phase do_linking use_ofile orig_basename (phase, input_fn)
 	)
 
      run_phase phase orig_basename input_fn output_fn
+
+	-- sadly, ghc -E is supposed to write the file to stdout.  We
+	-- generate <file>.cpp, so we also have to cat the file here.
+     if (next_phase > last_phase && last_phase == Cpp)
+	then run_something "Dump pre-processed file to stdout"
+		("cat " ++ output_fn)
+	else return ()
 
      run_pipeline last_phase do_linking use_ofile 
 	  orig_basename (next_phase, output_fn)
