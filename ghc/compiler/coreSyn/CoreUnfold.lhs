@@ -453,16 +453,12 @@ couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold 
 						UnfoldNever -> False
 						other	    -> True
 
-certainlyWillInline :: Id -> Bool
-	-- Sees if the Id is pretty certain to inline	
-certainlyWillInline v
-  = case idUnfolding v of
-
-	CoreUnfolding _ _ _ is_cheap g@(UnfoldIfGoodArgs n_vals _ size _)
-	   ->    is_cheap
-	      && size - (n_vals +1) <= opt_UF_UseThreshold
-
-	other -> False
+certainlyWillInline :: Unfolding -> Bool
+  -- Sees if the unfolding is pretty certain to inline	
+certainlyWillInline (CoreUnfolding _ _ _ is_cheap (UnfoldIfGoodArgs n_vals _ size _))
+  = is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
+certainlyWillInline other
+  = False
 \end{code}
 
 @okToUnfoldInHifile@ is used when emitting unfolding info into an interface
