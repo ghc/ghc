@@ -104,7 +104,7 @@ options =
     Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"location of Haddock's auxiliary files",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
---	"output in docbook (SGML)",
+--	"output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
     Option []  ["html-help"]    (ReqArg Flag_HtmlHelp "format")

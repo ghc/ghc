@@ -325,7 +325,7 @@
           <option>--docbook</option>
         </term>
 	<listitem>
-	  <para>Reserved for future use (output documentation in SGML DocBook
+	  <para>Reserved for future use (output documentation in DocBook XML
 	  format).</para>
 	</listitem>
       </varlistentry>
