@@ -707,16 +707,13 @@ monad; it augments it and returns the new TcGblEnv.
 tcRnGroup :: HsGroup RdrName -> TcM ((TcGblEnv, TcLclEnv), DefUses)
 	-- Returns the variables free in the decls, for unused-binding reporting
 tcRnGroup decls
- = do {	showLIE (text "LIE at start of tcRnGroup" <+> ppr decls) ;
-
-		-- Rename the declarations
+ = do {		-- Rename the declarations
 	(tcg_env, rn_decls, src_dus) <- rnTopSrcDecls decls ;
 	setGblEnv tcg_env $ do {
 
 		-- Typecheck the declarations
 	tc_envs <- tcTopSrcDecls rn_decls ;
 
-	showLIE (text "LIE at end of tcRnGroup" <+> ppr decls) ;
 	return (tc_envs, src_dus)
   }}
 
