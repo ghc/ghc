@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.77 2002/07/18 06:05:30 sof Exp $
+ * $Id: StgMiscClosures.hc,v 1.78 2002/09/17 12:32:40 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -36,14 +36,13 @@
   Template for the entry code of non-enterable closures.
 */
 
-#define NON_ENTERABLE_ENTRY_CODE(type)					\
-STGFUN(stg_##type##_entry)							\
-{									\
-  FB_									\
-    DUMP_ERRMSG(#type " object entered!\n");                            \
-    STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);			\
-    return NULL;							\
-  FE_									\
+#define NON_ENTERABLE_ENTRY_CODE(type)		\
+STGFUN(stg_##type##_entry)			\
+{						\
+  FB_						\
+    barf(#type " object entered!\n");		\
+    return NULL;				\
+  FE_						\
 }
 
 
@@ -629,7 +628,7 @@ STGFUN(stg_SE_BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
+INFO_TABLE(stg_SE_CAF_BLACKHOLE_info, SE_CAF_BLACKHOLE_entry,0,2,SE_CAF_BLACKHOLE,,EF_,"CAF_BLACKHOLE","CAF_BLACKHOLE");
 STGFUN(stg_SE_CAF_BLACKHOLE_entry)
 {
   FB_
