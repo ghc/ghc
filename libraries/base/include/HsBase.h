@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.17 2002/10/08 08:03:02 wolfgang Exp $
+ * $Id: HsBase.h,v 1.18 2002/10/25 13:07:41 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -7,8 +7,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef HSCORE_H
-#define HSCORE_H
+#ifndef __HSBASE_H__
+#define __HSBASE_H__
 
 #include "config.h"
 #include "HsFFI.h"
@@ -109,6 +109,9 @@
 
 /* in ghc_errno.c */
 int *ghcErrno(void);
+
+#if !defined(__HUGS__)
+/* The rest isn't needed by Hugs, so we break off here. */
 
 /* in system.c */
 HsInt systemCmd(HsAddr cmd);
@@ -637,7 +640,9 @@ INLINE int __hsposix_SIGXFSZ()   { return SIGXFSZ; }
 INLINE int __hsposix_SIG_BLOCK()   { return SIG_BLOCK; }
 INLINE int __hsposix_SIG_UNBLOCK() { return SIG_SETMASK; }
 INLINE int __hsposix_SIG_SETMASK() { return SIG_UNBLOCK; }
-#endif // mingw32_TARGET_OS
+#endif /* mingw32_TARGET_OS */
 
-#endif
+#endif /* !__HUGS__ */
+
+#endif /* __HSBASE_H__ */
 
