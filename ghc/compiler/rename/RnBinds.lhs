@@ -34,6 +34,7 @@ import Name		( Name, nameOccName, nameSrcLoc )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc )
 import BasicTypes	( RecFlag(..) )
+import List		( unzip4 )
 import Outputable
 \end{code}
 
@@ -266,12 +267,13 @@ rn_mono_binds siglist mbinds
 	 -- Do the SCC analysis
     let 
 	scc_result  = rnSCC mbinds_info
-	final_binds = foldr (ThenBinds . reconstructCycle) EmptyBinds scc_result
+	(binds_s, rhs_fvs_s) = unzip (map reconstructCycle scc_result)
+	final_binds = foldr ThenBinds EmptyBinds binds_s
 
 	-- Deal with bound and free-var calculation
 	-- Caller removes binders from free-var set
-	rhs_fvs = plusFVs [fvs  | (_,fvs,_)  <- mbinds_info]
-	bndrs   = plusFVs [defs | (defs,_,_) <- mbinds_info]
+	rhs_fvs = plusFVs rhs_fvs_s
+	bndrs   = plusFVs [defs | (defs,_,_,_) <- mbinds_info]
     in
     returnM (bndrs, final_binds, rhs_fvs)
 \end{code}
@@ -305,9 +307,8 @@ flattenMonoBinds sigs (PatMonoBind pat grhss locn)
     sigsForMe names_bound_here sigs	`thenM` \ sigs_for_me ->
     rnGRHSs PatBindRhs grhss		`thenM` \ (grhss', fvs) ->
     returnM 
-	[(names_bound_here,
-	  fvs `plusFV` pat_fvs,
-	  (PatMonoBind pat' grhss' locn, sigs_for_me)
+	[(names_bound_here, fvs `plusFV` pat_fvs,
+	  PatMonoBind pat' grhss' locn, sigs_for_me
 	)]
 
 flattenMonoBinds sigs (FunMonoBind name inf matches locn)
@@ -320,9 +321,8 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
     mapFvRn (rnMatch (FunRhs new_name)) matches		`thenM` \ (new_matches, fvs) ->
     mappM_ (checkPrecMatch inf new_name) new_matches	`thenM_`
     returnM
-      [(unitNameSet new_name,
-	fvs,
-	(FunMonoBind new_name inf new_matches locn, sigs_for_me)
+      [(unitNameSet new_name, fvs,
+	FunMonoBind new_name inf new_matches locn, sigs_for_me
       )]
 
 
@@ -406,42 +406,47 @@ a function binding, and has itself been dependency-analysed and
 renamed.
 
 \begin{code}
-type BindWithSigs = (RenamedMonoBinds, [RenamedSig])
+
+type Defs = NameSet
+type Uses = NameSet
+type FlatMonoBinds = (Defs, Uses, RenamedMonoBinds, [RenamedSig])
 			-- Signatures, if any, for this vertex
 
-type FlatMonoBinds = (NameSet,	-- Defs
-	 	      NameSet, 	-- Uses
-		      BindWithSigs)
-
-rnSCC :: [FlatMonoBinds] -> [SCC BindWithSigs]
+rnSCC :: [FlatMonoBinds] -> [SCC FlatMonoBinds]
 rnSCC nodes = stronglyConnComp (mkEdges nodes)
 
 type VertexTag	= Int
 
-mkEdges :: [FlatMonoBinds] -> [(BindWithSigs, VertexTag, [VertexTag])]
+mkEdges :: [FlatMonoBinds] -> [(FlatMonoBinds, VertexTag, [VertexTag])]
+	-- We keep the uses with the binding, 
+	-- so we can track unused bindings better
 mkEdges nodes
   = [ (thing, tag, dest_vertices uses)
-    | ((defs, uses, thing), tag) <- tagged_nodes
+    | (thing@(_, uses, _, _), tag) <- tagged_nodes
     ]
   where
     tagged_nodes = nodes `zip` [0::VertexTag ..]
 
  	 -- An edge (v,v') indicates that v depends on v'
     dest_vertices uses = [ target_vertex
-			 | ((defs, _, _), target_vertex) <- tagged_nodes,
-			   mentioned_name <- nameSetToList uses,
-			   mentioned_name `elemNameSet` defs
+			 | ((defs, _, _, _), target_vertex) <- tagged_nodes,
+			   defs `intersectsNameSet` uses
 			 ]
 
-reconstructCycle :: SCC BindWithSigs -> RenamedHsBinds
-reconstructCycle (AcyclicSCC (binds, sigs))
-  = MonoBind binds sigs NonRecursive
+reconstructCycle :: SCC FlatMonoBinds -> (RenamedHsBinds, Uses)
+reconstructCycle (AcyclicSCC (defs, uses, binds, sigs))
+  = (MonoBind binds sigs NonRecursive, uses)
 reconstructCycle (CyclicSCC cycle)
-  = MonoBind this_gp_binds this_gp_sigs Recursive
+  = (MonoBind this_gp_binds this_gp_sigs Recursive, 
+     unionManyNameSets uses_s `minusNameSet` unionManyNameSets defs_s)
+	-- The uses of the cycle are the things used in any RHS
+	-- minus the binders of the group.  Knocking them out 
+	-- right here improves the error reporting for usused
+	-- bindings; e.g. f x = f x 	-- Otherwise unused
   where
-    (binds,sigs)  = unzip cycle
-    this_gp_binds = foldr1 AndMonoBinds binds
-    this_gp_sigs  = foldr1 (++)	        sigs
+    (defs_s, uses_s, binds_s, sigs_s) = unzip4 cycle
+    this_gp_binds = foldr1 AndMonoBinds binds_s
+    this_gp_sigs  = foldr1 (++)	        sigs_s
 \end{code}
 
 
