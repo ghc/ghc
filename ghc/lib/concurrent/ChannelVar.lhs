@@ -11,9 +11,9 @@ module ChannelVar
        (
 	 {- abstract -}
          CVar,
-	 newCVar,	--:: IO (CVar a)
-	 writeCVar,	--:: CVar a -> a -> IO ()
-	 readCVar,	--:: CVar a -> IO a
+	 newCVar,	-- :: IO (CVar a)
+	 writeCVar,	-- :: CVar a -> a -> IO ()
+	 readCVar,	-- :: CVar a -> IO a
 	 MVar
 
        ) where

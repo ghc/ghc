@@ -19,13 +19,13 @@ potentially, wakes up a blocked reader  (same as for @putMVar@ on empty @MVar@).
 \begin{code}
 module SampleVar
        (
-         SampleVar,         --:: type _ =
+         SampleVar,         -- :: type _ =
  
-	 newEmptySampleVar, --:: IO (SampleVar a)
-         newSampleVar,      --:: a -> IO (SampleVar a)
-	 emptySampleVar,    --:: SampleVar a -> IO ()
-	 readSampleVar,	    --:: SampleVar a -> IO a
-	 writeSampleVar	    --:: SampleVar a -> a -> IO ()
+	 newEmptySampleVar, -- :: IO (SampleVar a)
+         newSampleVar,      -- :: a -> IO (SampleVar a)
+	 emptySampleVar,    -- :: SampleVar a -> IO ()
+	 readSampleVar,	    -- :: SampleVar a -> IO a
+	 writeSampleVar	    -- :: SampleVar a -> a -> IO ()
 
        ) where
 

@@ -10,8 +10,8 @@ IO monad.
 module Merge
 
 	(
-	 mergeIO,	--:: [a]   -> [a] -> IO [a]
-	 nmergeIO	--:: [[a]] -> IO [a]
+	 mergeIO,	-- :: [a]   -> [a] -> IO [a]
+	 nmergeIO	-- :: [[a]] -> IO [a]
 	) where
 
 import Semaphore

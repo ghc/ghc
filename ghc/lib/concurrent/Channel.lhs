@@ -111,6 +111,6 @@ getChanContents ch
 
 -------------
 writeList2Chan :: Chan a -> [a] -> IO ()
-writeList2Chan ch ls = sequence (map (writeChan ch) ls)
+writeList2Chan ch ls = sequence_ (map (writeChan ch) ls)
 
 \end{code}

@@ -11,15 +11,15 @@ module Semaphore
        {- abstract -}
        QSem,
 
-       newQSem,		--:: Int  -> IO QSem
-       waitQSem,	--:: QSem -> IO ()
-       signalQSem,	--:: QSem -> IO ()
+       newQSem,		-- :: Int  -> IO QSem
+       waitQSem,	-- :: QSem -> IO ()
+       signalQSem,	-- :: QSem -> IO ()
 
        {- abstract -}
        QSemN,
-       newQSemN,	--:: Int   -> IO QSemN
-       waitQSemN,	--:: QSemN -> Int -> IO ()
-       signalQSemN	--:: QSemN -> Int -> IO ()
+       newQSemN,	-- :: Int   -> IO QSemN
+       waitQSemN,	-- :: QSemN -> Int -> IO ()
+       signalQSemN	-- :: QSemN -> Int -> IO ()
 	
       ) where
 
