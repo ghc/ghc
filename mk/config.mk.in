@@ -439,7 +439,7 @@ datadir			= @datadir@
 #sysconfdir		= @datadir@
 #sharedstatedir		= @sharedstatedir@
 #localstatedir		= @localstatedir@
-libdir			= @libdir@/$(ProjectNameShort)-$(ProjectVersion)
+libdir			= @libdir@
 includedir		= @includedir@
 oldincludedir		= @oldincludedir@
 mandir			= @mandir@
@@ -451,8 +451,8 @@ mandir			= @mandir@
 # override libdir and datadir to put project-specific stuff in
 # a subdirectory with the version number included.
 #
-libdir     := $(if $(ProjectNameShort), $(libdir), $(libdir))
-datadir    := $(if $(ProjectNameShort), $(datadir)/$(ProjectNameShort)-$(ProjectVersion), $(datadir))
+libdir     := $(if $(ProjectNameShort),$(libdir)/$(ProjectNameShort)-$(ProjectVersion),$(libdir))
+datadir    := $(if $(ProjectNameShort),$(datadir)/$(ProjectNameShort)-$(ProjectVersion),$(datadir))
 
 # 
 # Default values for most of the above are only set if
