@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.24 2000/03/17 13:30:23 simonmar Exp $
+ * $Id: StgMacros.h,v 1.25 2000/05/08 15:05:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -50,17 +50,17 @@
 #define ED_		extern
 #define EDD_		extern DLLIMPORT 
 #define ED_RO_		extern const
-#define ID_		extern
-#define ID_RO_		extern const
+#define ID_		static
+#define ID_RO_		static const
 #define EI_             extern INFO_TBL_CONST StgInfoTable
 #define EDI_            extern DLLIMPORT INFO_TBL_CONST StgInfoTable
-#define II_             extern INFO_TBL_CONST StgInfoTable
+#define II_             static INFO_TBL_CONST StgInfoTable
 #define EC_		extern StgClosure
 #define EDC_		extern DLLIMPORT StgClosure
-#define IC_		extern StgClosure
+#define IC_		static StgClosure
 #define ECP_(x)		extern const StgClosure *(x)[]
 #define EDCP_(x)	extern DLLIMPORT StgClosure *(x)[]
-#define ICP_(x)		extern const StgClosure *(x)[]
+#define ICP_(x)		static const StgClosure *(x)[]
 
 /* -----------------------------------------------------------------------------
    Stack Tagging.
