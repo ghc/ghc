@@ -134,6 +134,43 @@ m4_popdef([fp_Cache])[]dnl
 ])# FP_CHECK_ALIGNMENT
 
 
+# FP_CHECK_CONST(EXPRESSION, [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = -1])
+# -------------------------------------------------------------------------------
+# Defines CONST_EXPRESSION to the value of the compile-time EXPRESSION, using
+# INCLUDES. If the value cannot be determined, use VALUE-IF-FAIL.
+AC_DEFUN([FP_CHECK_CONST],
+[AS_VAR_PUSHDEF([fp_Cache], [fp_cv_const_$1])[]dnl
+AC_CACHE_CHECK([value of $1], fp_Cache,
+[FP_COMPUTE_INT([$1], fp_check_const_result, [AC_INCLUDES_DEFAULT([$2])],
+                [fp_check_const_result=m4_default([$3], ['-1'])])
+AS_VAR_SET(fp_Cache, [$fp_check_const_result])])[]dnl
+AC_DEFINE_UNQUOTED(AS_TR_CPP([CONST_$1]), AS_VAR_GET(fp_Cache), [The value of $1.])[]dnl
+AS_VAR_POPDEF([fp_Cache])[]dnl
+])# FP_CHECK_CONST
+
+
+# FP_CHECK_CONSTS_TEMPLATE(EXPRESSION...)
+# ---------------------------------------
+# autoheader helper for FP_CHECK_CONSTS
+m4_define([FP_CHECK_CONSTS_TEMPLATE],
+[AC_FOREACH([fp_Const], [$1],
+  [AH_TEMPLATE(AS_TR_CPP(CONST_[]fp_Const),
+               [The value of ]fp_Const[.])])[]dnl
+])# FP_CHECK_CONSTS_TEMPLATE
+
+
+# FP_CHECK_CONSTS(EXPRESSION..., [INCLUDES = DEFAULT-INCLUDES], [VALUE-IF-FAIL = -1])
+# -----------------------------------------------------------------------------------
+# List version of FP_CHECK_CONST
+AC_DEFUN(FP_CHECK_CONSTS,
+[FP_CHECK_CONSTS_TEMPLATE([$1])dnl
+for fp_const_name in $1
+do
+FP_CHECK_CONST([$fp_const_name], [$2], [$3])
+done
+])# FP_CHECK_CONSTS
+
+
 # FP_LEADING_UNDERSCORE
 # ---------------------
 # Test for determining whether symbol names have a leading underscore. We assume
@@ -248,9 +285,15 @@ AC_DEFUN(FPTOOLS_HAPPY,
 [
 if test -d $srcdir/happy; then
    SrcTreeHappyCmd=$hardtop/happy/src/happy-inplace
+else
+   SrcTreeHappyCmd=""
 fi
 if test x"$UseSrcTreeHappy" = xYES; then
-  HappyCmd=$SrcTreeHappyCmd
+  if test x"$SrcTreeHappyCmd" != x; then
+     HappyCmd=$SrcTreeHappyCmd
+  else
+     AC_MSG_ERROR([--enable-src-tree-happy given, but happy not found in source tree])
+  fi
 else
   AC_PATH_PROG(HappyCmd,happy,$SrcTreeHappyCmd)
 fi
@@ -282,9 +325,15 @@ AC_DEFUN(FPTOOLS_HADDOCK,
 [
 if test -d $srcdir/haddock; then
    SrcTreeHaddockCmd=$hardtop/haddock/src/haddock-inplace
+else
+   SrcTreeHaddockCmd=""
 fi
 if test x"$UseSrcTreeHaddock" = xYES; then
-  HaddockCmd=$SrcTreeHaddockCmd
+  if test x"$SrcTreeHaddockCmd" != x; then
+     HaddockCmd=$SrcTreeHaddockCmd
+  else
+     AC_MSG_ERROR([--enable-src-tree-haddock given, but haddock not found in source tree])
+  fi
 else
   AC_PATH_PROG(HaddockCmd,haddock,$SrcTreeHaddockCmd)
 fi
@@ -303,9 +352,15 @@ AC_DEFUN(FPTOOLS_ALEX,
 [
 if test -d $srcdir/alex; then
    SrcTreeAlexCmd=$hardtop/alex/src/alex-inplace
+else
+   SrcTreeAlexCmd=""
 fi
 if test x"$UseSrcTreeAlex" = xYES; then
-  AlexCmd=$SrcTreeAlexCmd
+  if test x"$SrcTreeAlexCmd" != x; then
+     AlexCmd=$SrcTreeAlexCmd
+  else
+     AC_MSG_ERROR([--enable-src-tree-alex given, but alex not found in source tree])
+  fi
 else
   AC_PATH_PROG(AlexCmd,alex,$SrcTreeAlexCmd)
 fi
@@ -330,65 +385,28 @@ AC_SUBST(AlexVersion)
 ])
 
 
-# FP_PROG_LD
-# ----------
-# Sets the output variable LdCmd to the (non-Cygwin version of the) full path
-# of ld. Exits if no ld can be found
-AC_DEFUN([FP_PROG_LD],
-[AC_PATH_PROG([fp_prog_ld_raw], [ld])
-if test -z "$fp_prog_ld_raw"; then
-  AC_MSG_ERROR([cannot find ld in your PATH, no idea how to link])
-fi
-LdCmd=$fp_prog_ld_raw
-case $HostPlatform in
-  *mingw32) if test x${OSTYPE} != xmsys; then
- 	      LdCmd="`cygpath -w ${fp_prog_ld_raw} | sed -e 's@\\\\@/@g'`"
-              AC_MSG_NOTICE([normalized ld command to $LdCmd])
-            fi
-            ;;
-esac
-AC_SUBST([LdCmd])
-])# FP_PROG_LD
-
-
-# FP_PROG_LD_X
-# ------------
-# Sets the output variable LdXFlag to -x if ld supports this flag, otherwise the
-# variable's value is empty.
-AC_DEFUN([FP_PROG_LD_X],
-[AC_REQUIRE([FP_PROG_LD])
-AC_CACHE_CHECK([whether ld understands -x], [fp_cv_ld_x],
-[echo 'foo() {}' > conftest.c
+dnl
+dnl Check whether ld supports -x
+dnl
+AC_DEFUN(FPTOOLS_LD_X,
+[AC_CACHE_CHECK([whether ld understands -x], fptools_cv_ld_x,
+[
+echo 'foo() {}' > conftest.c
 ${CC-cc} -c conftest.c
-if ${LdCmd} -r -x -o conftest2.o conftest.o; then
-   fp_cv_ld_x=yes
+if ${LdCmd} -r -x -o foo.o conftest.o; then
+   fptools_cv_ld_x=yes
 else
-   fp_cv_ld_x=no
+   fptools_cv_ld_x=no
 fi
-rm -rf conftest*])
-if test "$fp_cv_ld_x" = yes; then
-  LdXFlag=-x
+rm -rf conftest.c conftest.o foo.o
+])
+if test "$fptools_cv_ld_x" = yes; then
+	LdXFlag=-x
 else
-  LdXFlag=
+	LdXFlag=
 fi
-AC_SUBST([LdXFlag])
-])# FP_PROG_LD_X
-
-
-# FP_PROG_LD_IS_GNU
-# -----------------
-# Sets the output variable LdIsGNULd to YES or NO, depending on whether it is
-# GNU ld or not.
-AC_DEFUN([FP_PROG_LD_IS_GNU],
-[AC_REQUIRE([FP_PROG_LD])
-AC_CACHE_CHECK([whether ld is GNU ld], [fp_cv_gnu_ld],
-[if ${LdCmd} --version 2> /dev/null | grep "GNU" > /dev/null 2>&1; then
-  fp_cv_gnu_ld=yes
-else
-  fp_cv_gnu_ld=no
-fi])
-AC_SUBST([LdIsGNULd], [`echo $fp_cv_gnu_ld | sed 'y/yesno/YESNO/'`])
-])# FP_PROG_LD_IS_GNU
+AC_SUBST(LdXFlag)
+])
 
 
 # FP_PROG_AR
@@ -527,40 +545,53 @@ fi
 rm -f conftest
 ])])
 
-
-# FP_HAVE_GCC
-# -----------
-# Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
-# output variables HaveGcc and GccVersion.
-AC_DEFUN([FP_HAVE_GCC],
-[AC_REQUIRE([AC_PROG_CC])
-AC_CACHE_CHECK([whether your gcc is OK], [fp_cv_have_gcc],
+dnl
+dnl Extra testing of the result AC_PROG_CC, testing the gcc version no.
+dnl *Must* be called after AC_PROG_CC
+dnl
+AC_DEFUN(FPTOOLS_HAVE_GCC,
+[AC_CACHE_CHECK([whether you have an ok gcc], fptools_cv_have_gcc,
 [if test -z "$GCC"; then
-  fp_cv_have_gcc='no'
-  AC_MSG_WARN([You would be better off with gcc, perhaps it is already installed, but not in your PATH?])
+    echo ''
+    echo "You would be better off with gcc"
+    echo "Perhaps it is already installed, but not in your PATH?"
+    fptools_cv_have_gcc='no'
 else
-  fp_cv_have_gcc='yes'
-  gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [[^0-9]]*\([[0-9]][[0-9]]*\)\.\([[0-9]][[0-9]]*\).*/\1\.\2/g' `"
-  FP_COMPARE_VERSIONS([$gcc_version_str], [-lt], [2.0],
-    [AC_MSG_ERROR([Need at least gcc version 2.0 (2.95.3 recommend)])])
-fi])
-AC_SUBST([HaveGcc], [`echo $fp_cv_have_gcc | sed 'y/yesno/YESNO/'`])
-AC_SUBST([GccVersion], [`gcc --version | grep mingw | cut -f 3 -d ' '`])
-])# FP_HAVE_GCC
-
-AC_DEFUN([FP_MINGW_GCC],
-[
-  case $HostOS_CPP in
-    mingw*)  AC_MSG_CHECKING([whether $CC is a mingw gcc])
-	     if $CC -v 2>&1 | grep mingw >/dev/null; then
-		AC_MSG_RESULT([yes])
-	     else
-		AC_MSG_RESULT([no])
-		AC_MSG_ERROR([Please use --with-gcc to specify a mingw gcc])
-	     fi;;
-    *) ;;	
-  esac
+changequote(, )dnl
+    gcc_version_str="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1\.\2/g' `"
+changequote([, ])dnl
+    fptools_cv_have_gcc='yes'
+    FP_COMPARE_VERSIONS([$gcc_version_str], [-lt], [2.0],
+        [fptools_cv_have_gcc='no'
+        echo ""
+	echo "your gcc version appears to be ..."
+        $CC --version
+        echo "gcc prior to 2.0 and have never worked with ghc."
+        echo "we recommend 2.95.3, although versions back to 2.7.2 should be ok."
+        AC_MSG_ERROR([gcc 1.X has never been supported])])
+fi
 ])
+HaveGcc=`echo $fptools_cv_have_gcc | sed 'y/yesno/YESNO/'`
+AC_SUBST(HaveGcc)
+GccVersion=`gcc --version | grep mingw | cut -f 3 -d ' '`
+AC_SUBST(GccVersion)
+])
+
+dnl
+dnl Some OSs (Mandrake Linux, in particular) configure GCC with
+dnl -momit-leaf-frame-pointer on by default.  If this is the case, we
+dnl need to turn it off for mangling to work.  The test is currently a bit
+dnl crude, using only the version number of gcc.
+dnl
+AC_DEFUN([FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR],
+[AC_CACHE_CHECK([whether gcc needs -mno-omit-leaf-frame-pointer], [fptools_cv_gcc_needs_no_omit_lfptr],
+[FP_COMPARE_VERSIONS([$gcc_version_str], [-ge], [3.2],
+  [fptools_cv_gcc_needs_no_omit_lfptr=yes],
+  [fptools_cv_gcc_needs_no_omit_lfptr=no])])
+if test "$fptools_cv_gcc_needs_no_omit_lfptr" = "yes"; then
+   AC_DEFINE([HAVE_GCC_MNO_OMIT_LFPTR], [1], [Define to 1 if gcc supports -mno-omit-leaf-frame-pointer.])
+fi])# FPTOOLS_GCC_NEEDS_NO_OMIT_LFPTR
+
 
 dnl Small feature test for perl version. Assumes PerlCmd
 dnl contains path to perl binary
@@ -997,5 +1028,220 @@ if test x"$fp_cv_matching_ghc_pkg" = xno; then
 else
   GhcPkgCmd=$fp_cv_matching_ghc_pkg
 fi])# FP_PROG_GHC_PKG
+
+
+# FP_CHECK_WIN32
+# --------------
+# If Windows is the target platform (e.g. MinGW/MSYS or Cygwin with
+# -mno-cygwin), the variable "is_win32" is set to "yes", otherwise (e.g. *nix
+# systems or plain Cygwin) it is set to "no".
+AC_DEFUN([FP_CHECK_WIN32],
+[AC_CACHE_CHECK([for Windows environment], [fp_cv_is_win32],
+  [AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [
+#if !_WIN32
+   syntax error;
+#endif
+])], [fp_cv_is_win32=yes], [fp_cv_is_win32=no])])
+is_win32="$fp_cv_is_win32"[]dnl
+])# FP_CHECK_WIN32
+
+
+# FP_PATH_X
+# ---------
+# Same as AC_PATH_X, but works even for broken Cygwins which try to include the
+# non-existant <gl/mesa_wgl.h> header when -mno-cygwin is used.
+AC_DEFUN([FP_PATH_X],
+[AC_REQUIRE([FP_CHECK_WIN32])
+if test x"$is_win32" = xyes; then
+  no_x=yes
+else
+  AC_PATH_X
+fi
+])# FP_PATH_X
+
+
+# FP_PATH_XTRA
+# ------------
+# Same as AC_PATH_XTRA, but works even for broken Cygwins which try to include
+# the non-existant <gl/mesa_wgl.h> header when -mno-cygwin is used.
+AC_DEFUN([FP_PATH_XTRA],
+[AC_REQUIRE([FP_CHECK_WIN32])
+if test x"$is_win32" = xyes; then
+  no_x=yes
+else
+  AC_PATH_XTRA
+fi
+])# FP_PATH_XTRA
+
+
+# FP_CHECK_GL_HELPER(LIBNAME, LIBS, INCLUDES, FUNCTION-BODY)
+# ----------------------------------------------------------
+# Try each library in LIBS to successfully link INCLUDES plus FUNCTION-BODY,
+# setting LIBNAME_CFLAGS and LIBNAME_LIBS to the corresponding values. Sets
+# no_LIBNAME to "yes" if no suitable library was found. (LIBNAME_CFLAGS0
+# contains the value of LIBNAME_CFLAGS without CPPFLAGS, and LIBNAME_LIBS0
+# contains the value of LIBNAME_LIBS without LDFLAGS, but these are only
+# used internally.)
+AC_DEFUN([FP_CHECK_GL_HELPER],
+[AC_CACHE_CHECK([for $1 library], [fp_cv_check_$1_lib],
+  [fp_cv_check_$1_lib="no"
+  fp_save_CPPFLAGS="$CPPFLAGS"
+  CPPFLAGS="$CPPFLAGS ${$1_CFLAGS}"
+  fp_save_LIBS="$LIBS"
+  for fp_try_lib in $2; do
+    # transform "-lfoo" to "foo.lib" when using cl
+    if test x"$CC" = xcl; then
+      fp_try_lib=`echo $fp_try_lib | sed -e 's/^-l//' -e 's/$/.lib/'`
+    fi
+    LIBS="$fp_try_lib ${$1_LIBS} $fp_save_LIBS"
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([$3], [$4])], [fp_cv_check_$1_lib="$fp_try_lib ${$1_LIBS}"; break])
+  done
+  LIBS="$fp_save_LIBS"
+  CPPFLAGS="$fp_save_CPPFLAGS"])
+
+  if test x"$fp_cv_check_$1_lib" = xno; then
+    no_$1=yes
+    $1_CFLAGS=
+    $1_LIBS=
+  else
+    $1_CFLAGS0="${$1_CFLAGS}"
+    $1_CFLAGS="$CPPFLAGS ${$1_CFLAGS0}"
+    $1_LIBS0="$fp_cv_check_$1_lib"
+    $1_LIBS="$LDFLAGS ${$1_LIBS0}"
+  fi
+])# FP_CHECK_GL_HELPER
+
+
+# FP_CHECK_GL
+# -----------
+AC_DEFUN([FP_CHECK_GL],
+[AC_REQUIRE([FP_PATH_X])
+AC_REQUIRE([AC_CANONICAL_TARGET])
+
+AC_ARG_ENABLE([hopengl],
+  [AC_HELP_STRING([--enable-hopengl],
+    [build a Haskell binding for OpenGL (GL/GLU). On Mac OS X, use
+     --enable-hopengl=x11 to use X11 instead of the "native" libraries.
+     (default=no)])],
+  [enable_opengl=$enableval], [enable_opengl=no])
+
+if test x"$enable_opengl" = xno; then
+   no_GL=yes
+else
+  use_quartz_opengl=no
+  case $target_os in
+  darwin*)
+    if test x"$enable_opengl" != xx11; then
+      AC_DEFINE([USE_QUARTZ_OPENGL], [1],
+                [Define to 1 if native OpenGL should be used on Mac OS X])
+      use_quartz_opengl=yes
+    fi
+    ;;
+  esac
+
+  if test x"$use_quartz_opengl" != xyes; then
+    AC_CHECK_LIB([m], [atan], [GL_LIBS="-lm $GL_LIBS"])
+
+    if test x"$no_x" != xyes; then
+      test -n "$x_includes" && GL_CFLAGS="-I$x_includes $GL_CFLAGS"
+      test -n "$x_libraries" && GL_LIBS="-L$x_libraries -lX11 $GL_LIBS"
+    fi
+
+    FP_CHECK_GL_HELPER([GL], [-lGL -lopengl32], [@%:@include <GL/gl.h>], [glEnd()])
+
+    if test x"$no_GL" != xyes; then
+      # Ugly: To get wglGetProcAddress on Windows, we have to link with
+      # opengl32.dll, too, even when we are using Cygwin with X11.
+      case "$GL_LIBS" in
+        *-lopengl32*|*opengl32.lib*) ;;
+        *) fp_save_LIBS="$LIBS"
+           LIBS="$LIBS -lopengl32"
+           AC_LINK_IFELSE([AC_LANG_PROGRAM([[@%:@include <GL/gl.h>]], [[glEnd()]])],
+             [GL_LIBS="$GL_LIBS -lopengl32"; GL_LIBS0="$GL_LIBS0 -lopengl32"])
+           LIBS="$fp_save_LIBS"
+           ;;
+      esac
+    fi
+  fi
+fi
+
+AC_SUBST([GL_CFLAGS])
+AC_SUBST([GL_LIBS])
+])# FP_CHECK_GL
+
+
+# FP_CHECK_GLU
+# ------------
+AC_DEFUN([FP_CHECK_GLU],
+[AC_REQUIRE([FP_CHECK_GL])dnl
+GLU_CFLAGS="$GL_CFLAGS0"
+GLU_LIBS="$GL_LIBS0"
+
+if test x"$enable_opengl" = xno; then
+   no_GLU=yes
+elif test x"$use_quartz_opengl" != xyes; then
+  FP_CHECK_GL_HELPER([GLU], [-lglu32 -lGLU], [@%:@include <GL/glu.h>], [gluNewQuadric()])
+fi
+
+AC_SUBST([GLU_CFLAGS])
+AC_SUBST([GLU_LIBS])
+])# FP_CHECK_GLU
+
+
+# FP_CHECK_GLUT
+# -------------
+AC_DEFUN([FP_CHECK_GLUT],
+[AC_REQUIRE([FP_CHECK_GLU])
+FP_PATH_XTRA
+
+if test x"$enable_opengl" = xno; then
+   no_GLUT=yes
+elif test x"$use_quartz_opengl" != xyes; then
+  GLUT_CFLAGS="$GLU_CFLAGS0"
+  GLUT_LIBS="$GLU_LIBS0"
+
+  if test x"$no_x" != xyes; then
+    GLUT_LIBS="$X_PRE_LIBS -lXmu -lXi $X_EXTRA_LIBS $GLUT_LIBS"
+  fi
+
+  AC_CHECK_HEADERS([windows.h GL/glut.h])
+  # Note 1: On Cygwin with X11, GL/GLU functions use the "normal" calling
+  # convention, but GLUT functions use stdcall. To get this right, it is
+  # necessary to include <windows.h> first.
+  # Note 2: MinGW/MSYS comes without a GLUT header, so we use Cygwin's one in
+  # that case.
+  FP_CHECK_GL_HELPER([GLUT], [-lglut32 -lglut], [
+#if HAVE_WINDOWS_H
+#include <windows.h>
+#endif
+#if HAVE_GL_GLUT_H
+#include <GL/glut.h>
+#else
+#include "glut_local.h"
+#endif
+    ], [glutMainLoop()])
+fi
+
+AC_SUBST([GLUT_CFLAGS])
+AC_SUBST([GLUT_LIBS])
+])# FP_CHECK_GLUT
+
+
+# FP_EMPTY_STRUCTS
+# ---------------- 
+# Define output variable SUPPORTS_EMPTY_STRUCTS if empty structs are accepted by
+# CC.
+dnl
+AC_DEFUN(FP_EMPTY_STRUCTS,
+[AC_CACHE_CHECK(empty struct support, fp_cv_empty_structs,
+[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[typedef struct { /* empty */ } StgFoo;]],
+[[int i;]])],
+[fp_cv_empty_structs=yes],
+[fp_cv_empty_structs=no])])
+if test x"$fp_cv_empty_structs" = xyes; then
+  AC_DEFINE([SUPPORTS_EMPTY_STRUCTS], [1], [Define to 1 if C compiler supports declaration of empty structure types.])
+fi
+])
+
 
 # LocalWords:  fi
