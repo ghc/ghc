@@ -20,6 +20,8 @@ import Bag		( Bag, bagToList, isEmptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Util		( sortLt )
 import Outputable
+
+import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr )
 \end{code}
 
@@ -83,11 +85,10 @@ pprBagOfWarnings bag_of_warns = pprBagOfErrors bag_of_warns
 
 \begin{code}
 ghcExit :: Int -> IO ()
-
 ghcExit val
-  = if val /= 0
-    then hPutStr stderr "\nCompilation had errors\n\n"
-    else return ()
+  | val == 0  = exitWith ExitSuccess
+  | otherwise = do hPutStr stderr "\nCompilation had errors\n\n"
+	           exitWith (ExitFailure val)
 \end{code}
 
 \begin{code}
