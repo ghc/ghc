@@ -44,7 +44,6 @@ import PrelBase
 import PrelIOBase
 import PrelHandle ( openFileEx, IOModeEx(..) )
 import PrelST
-import PrelUnsafe
 import PrelArr
 import PrelGHC
 import Ix

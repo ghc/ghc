@@ -29,7 +29,6 @@ module ST (
     ) where
 
 import PrelArr
-import PrelUnsafeST
 import PrelST
 import PrelBase	( Eq(..), Int, Bool, ($), ()(..) )
 import Monad

@@ -16,7 +16,6 @@ module Merge
 
 import Semaphore
 import PrelConc
-import PrelUnsafe  ( unsafeInterleaveIO )
 import PrelIOBase
 
 max_buff_size = 1

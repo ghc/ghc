@@ -29,7 +29,7 @@ module Channel
 import Prelude
 import PrelConc
 import PrelST
-import PrelUnsafe ( unsafeInterleaveIO )
+import PrelIOBase ( unsafeInterleaveIO )
 \end{code}
 
 A channel is represented by two @MVar@s keeping track of the two ends
