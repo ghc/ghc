@@ -414,15 +414,17 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
   | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
   = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
        ; let cond = cmmULtWord tag_expr' (CmmLit (mkIntCLit lowest_branch))
-       ; stmtC (CmmCondBranch cond deflt)
-       ; mk_switch tag_expr' branches mb_deflt lowest_branch hi_tag
+	     branch = CmmCondBranch cond deflt
+       ; stmts <- mk_switch tag_expr' branches mb_deflt lowest_branch hi_tag
+       ; return (assign_tag `consCgStmt` (branch `consCgStmt` stmts))
        }
 
   | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
   = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
        ; let cond = cmmUGtWord tag_expr' (CmmLit (mkIntCLit highest_branch))
-       ; stmtC (CmmCondBranch cond deflt)
-       ; mk_switch tag_expr' branches mb_deflt lo_tag highest_branch
+	     branch = CmmCondBranch cond deflt
+       ; stmts <- mk_switch tag_expr' branches mb_deflt lo_tag highest_branch
+       ; return (assign_tag `consCgStmt` (branch `consCgStmt` stmts))
        }
 
   | otherwise	-- Use an if-tree
@@ -437,9 +439,9 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag
 	}
   where
     use_switch 	 = ASSERT( n_branches > 1 && n_tags > 1 ) 
-		   {- pprTrace "mk_switch" (ppr tag_expr <+> text "n_tags: "
+		   pprTrace "mk_switch" (ppr tag_expr <+> text "n_tags: "
 					<+> int n_tags <+> text "dense: "
-					<+> int n_branches) $ -}
+					<+> int n_branches) $
 		   n_tags > 2 && (small || dense)
 		 -- a 2-branch switch always turns into an if.
     small      	 = n_tags <= 4
