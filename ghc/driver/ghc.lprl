@@ -46,8 +46,8 @@ to stdout or stderr, however).
 
 The phase at which to STOP processing is determined by a command-line
 option:
+    -E		stop after generating preprocessed, de-litted Haskell (used in conjunction with -cpp)
     -C		stop after generating C (.hc output)
-    -E		stop after generating preprocessed C (.i output)
     -S		stop after generating assembler (.s output)
     -c		stop after generating object files (.o output)
 
@@ -64,9 +64,9 @@ Other commonly-used options are:
 
     -M          Output the Makefile rules recording the
                 dependencies of a list of Haskell files.
-	        (ghc driver just calls upon the help of a
-                 compatible mkdependHS script to do the
-                 actual processing)
+	        (ghc driver script calls upon the help of a
+                 compatible mkdependHS script to do the actual
+		 processing)
 
 The User's Guide has more information about GHC's *many* options.
 
@@ -443,7 +443,8 @@ Here are the initial defaults applied to all files:
 \begin{code}
 $Cpp_flag_set = 0;	  # (hack)
 $Only_preprocess_C = 0;	  # pretty hackish
-$Only_generate_deps = 0;  #
+$Only_preprocess_hc = 0;  # ditto
+$Only_generate_deps = 0;  # "
 $PostprocessCcOutput = 0;
 
 # native code-gen or via C?
@@ -585,6 +586,7 @@ if (  $Status == 0 && $Only_generate_deps ) {
 
     push (@MkDependHS_flags, "-o$Osuffix") if $Osuffix;
     push (@MkDependHS_flags, "-s$BuildTag") if $BuildTag;
+    push (@MkDependHS_flags, "-D__HASKELL1__=$Haskell1Version");
     local($to_do) = "$MkDependHS @MkDependHS_flags -- @Cmd_opts -- @Input_file" ;
     &run_something($to_do, 'Haskell dependencies');
     exit $Status;
@@ -1576,7 +1578,12 @@ Again, we'll do the post-recompilation-checker parts of this later.
     local($do_as)	= $Do_as;
     local($hsc_out)	  = ( $HscOut eq '-C=' ) ? "$Tmp_prefix.hc" : "$Tmp_prefix.s" ;
 
-    if ($ifile =~ /.lhs$/ || $ifile =~ /.hs$/ ) {
+    if ($Only_preprocess_hc) { # stop after having run $Cc -E
+       $do_as=0;
+    }
+    if ($Only_preprocess_C)     { # stop after having run $hscpp
+       $do_hsc=0; $do_cc = 0; $do_as=0;
+    } elsif ($ifile =~ /.lhs$/ || $ifile =~ /.hs$/ ) {
        ;
     } elsif ($ifile =~ /\.hc$/ || $ifile =~ /_hc$/ ) { # || $ifile =~ /\.$Isuffix$/o) # ToDo: better
     	$do_hscpp = 0; $do_hsc = 0; $do_cc = 1;
@@ -1594,8 +1601,8 @@ Again, we'll do the post-recompilation-checker parts of this later.
     # hack to avoid running hscpp
     $HsCpp = $Cat if ! $Cpp_flag_set;
 
-    &runHscpp($in_lit2pgm, $lit2pgm_hscpp, $hscpp_hsc)
-	if $do_hscpp;
+    &runHscpp($in_lit2pgm, $lit2pgm_hscpp, $hscpp_hsc) if $do_hscpp;
+
 \end{code}
 
 We now think about whether to run hsc/cc or not (when hsc produces .s
@@ -1604,6 +1611,7 @@ stuff, it effectively takes the place of both phases).
 To get the output file name right: for each phase that we are {\em
 not} going to run, set its input (i.e., the output of its preceding
 phase) to @"$ifile_root.<suffix>"@.
+
 \begin{code}
     local($going_interactive) = $HscOut eq '-N=' || $ifile_root eq '_stdin';
 
@@ -1626,7 +1634,7 @@ phase) to @"$ifile_root.<suffix>"@.
     if (! $do_as) { # stopping after gcc (or hsc)
 	$cc_as = ($Specific_output_file ne '')
 		 ? $Specific_output_file
-		 : &odir_ify($ifile_root, ( $Only_preprocess_C ) ? 'i' : 's');
+		 : &odir_ify($ifile_root, ( $Only_preprocess_hc ) ? 'i' : 's');
 
 	$ofile_target = $cc_as; # reset
     }
@@ -1644,7 +1652,7 @@ Now the Haskell compiler, C compiler, and assembler
 
     if ($do_cc) {
 	&runGcc    ($is_hc_file, $hsc_out, $cc_as_o);
-	&runMangler($is_hc_file, $cc_as_o, $cc_as, $ifile_root);
+	&runMangler($is_hc_file, $cc_as_o, $cc_as, $ifile_root) if ! $Only_preprocess_hc;
     }
 
     &split_asm_file($cc_as)  if $do_as && $SplitObjFiles;
@@ -1709,6 +1717,12 @@ sub runHscpp {
 	@Files_to_tidy = ( $hscpp_hsc );
 	&run_something($to_do, 'Haskellised C pre-processor');
     }
+   
+    if ( $Only_preprocess_C ) {
+	$to_do = "$Cat $hscpp_hsc";
+	&run_something($to_do, '');
+    }
+
 }
 \end{code}
 
@@ -1998,15 +2012,21 @@ EOINCL
     print TMP "#include \"$hsc_out\"\n";
     close(TMP) || &tidy_up_and_die(1,"Failed writing to $cc_help\n");
 
-    local($to_do) = "$cc $Verbose $ddebug_flag $c_flags @Cpp_define -D__HASKELL1__=$Haskell1Version $includes $cc_help > $Tmp_prefix.ccout 2>&1 && ( if [ $cc_help_s != $s_output ] ; then mv $cc_help_s $s_output ; else exit 0 ; fi )";
+    # Don't redirect stderr into intermediate file if slamming output onto stdout (e.g., with -E)
+    local($fuse_stderr) = "2>&1" if ! $Only_preprocess_hc;
+    local($to_do) = "$cc $Verbose $ddebug_flag $c_flags @Cpp_define -D__HASKELL1__=$Haskell1Version $includes $cc_help > $Tmp_prefix.ccout $fuse_stderr && ( if [ $cc_help_s != $s_output ] ; then mv $cc_help_s $s_output ; else exit 0 ; fi )";
     # note: __GLASGOW_HASKELL__ is pointedly *not* #defined at the C level.
-    if ( $Only_preprocess_C ) { # HACK ALERT!
+
+    if ( $Only_preprocess_hc ) { # HACK ALERT!
 	$to_do =~ s/ -S\b//g;
     }
     @Files_to_tidy = ( $cc_help, $cc_help_s, $s_output );
-    $PostprocessCcOutput = 1;	# hack, dear hack...
+    $PostprocessCcOutput = 1 if ! $Only_preprocess_hc;	# hack, dear hack...
     &run_something($to_do, 'C compiler');
     $PostprocessCcOutput = 0;
+    if ( $Only_preprocess_hc ) {
+       system("$Cat $Tmp_prefix.ccout");
+    }
     unlink($cc_help, $cc_help_s);
 }
 \end{code}
@@ -2735,7 +2755,7 @@ arg: while($_ = $Args[0]) {
     /^-optP(.*)$/   && do { push(@HsCpp_flags,      $1); next arg; };
     /^-optCrts(.*)$/&& do { push(@HsC_rts_flags,    $1); next arg; };
     /^-optC(.*)$/   && do { push(@HsC_flags,        $1); next arg; };
-    /^-optcpp(.*)$/ && do { push(@Cpp_define,       $1); next arg; };
+    /^-optcpp(.*)$/ && do { push(@Cpp_define,       $1); $Only_preprocess_hc = ($1 eq "-E"); next arg; };
     /^-optc(.*)$/   && do { push(@CcBoth_flags,     $1); next arg; };
     /^-opta(.*)$/   && do { push(@As_flags,         $1); next arg; };
     /^-optl(.*)$/   && do { push(@Ld_flags,         $1); next arg; };
