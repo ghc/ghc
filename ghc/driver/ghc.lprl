@@ -220,7 +220,6 @@ These are the default values, which may be changed by user flags.
 
 \begin{code}
 sub setupOptFlags {
-   $Oopt_UnfoldingUseThreshold	  = '-fsimpl-uf-use-threshold3';
    $Oopt_MaxSimplifierIterations  = '-fmax-simplifier-iterations4';
    $Oopt_PedanticBottoms	  = '-fpedantic-bottoms'; # ON by default
    $Oopt_MonadEtaExpansion	  = '';
@@ -705,7 +704,6 @@ sub setupOptimiseFlags {
 #	  '-fsimpl-uf-use-threshold0',
 #	  '-fessential-unfoldings-only',
 
-	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
 	  ']',
@@ -764,7 +762,6 @@ sub setupOptimiseFlags {
 	  '-freuse-con',
 	  $Oopt_PedanticBottoms,
 	  $Oopt_MonadEtaExpansion,
-	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
 	  #
@@ -796,7 +793,6 @@ sub setupOptimiseFlags {
 #		  '-freuse-con',
 #		  $Oopt_PedanticBottoms,
 #		  $Oopt_MonadEtaExpansion,
-#		  $Oopt_UnfoldingUseThreshold,
 #		  $Oopt_MaxSimplifierIterations,
 #		  $Oopt_ShowSimplifierProgress,
 #		  ']',
@@ -824,7 +820,6 @@ sub setupOptimiseFlags {
 	    '-freuse-con',
 	    $Oopt_PedanticBottoms,
 	    $Oopt_MonadEtaExpansion,
-	    $Oopt_UnfoldingUseThreshold,
 	    $Oopt_MaxSimplifierIterations,
 	    $Oopt_ShowSimplifierProgress,
 	    ']',
@@ -849,7 +844,6 @@ sub setupOptimiseFlags {
 			# but do reductions if you see them!
 	  $Oopt_PedanticBottoms,
 	  $Oopt_MonadEtaExpansion,
-	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
 	  ']',
@@ -870,7 +864,6 @@ sub setupOptimiseFlags {
 	  '-flet-to-case',		# Aha! Only done after strictness analysis
 	  $Oopt_PedanticBottoms,
 	  $Oopt_MonadEtaExpansion,
-	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
 	  ']',
@@ -882,7 +875,7 @@ sub setupOptimiseFlags {
 
 #	( ($OptLevel != 2)
 #        ? ''
-#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_UnfoldingUseThreshold $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
+#	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-eta-reduction -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MonadEtaExpansion $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
 
 # Final clean-up simplification:
 
@@ -904,7 +897,6 @@ sub setupOptimiseFlags {
 			# but still do reductions if you see them!
 	  $Oopt_PedanticBottoms,
 	  $Oopt_MonadEtaExpansion,
-	  $Oopt_UnfoldingUseThreshold,
 	  $Oopt_MaxSimplifierIterations,
 	  $Oopt_ShowSimplifierProgress,
 	  ']',
@@ -2962,9 +2954,8 @@ arg: while($_ = $Args[0]) {
 
     # ---------------
 
-    /^(-funfolding-use-threshold)(.*)$/
-		    && do { $Oopt_UnfoldingUseThreshold = $1 . &grab_arg_arg(*Args,$1, $2);
-			    next arg; };
+    /^-funfolding-.*$/
+		    && do { push(@HsC_flags, $_); next arg };
 
     /^(-fmax-simplifier-iterations)(.*)$/
 		    && do { $Oopt_MaxSimplifierIterations = $1 . &grab_arg_arg(*Args,$1, $2);
