@@ -23,8 +23,7 @@ import TcHsSyn		( TypecheckedRuleDecl )
 import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..),
 			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
-			  ImportVersion, AvailInfo, Deprecations(..), 
-			  ModuleLocation(..)
+			  ImportVersion, AvailInfo, Deprecations(..)
 			)
 
 import CmdLineOpts
@@ -54,8 +53,7 @@ import FieldLabel	( fieldLabelType )
 import Type		( splitSigmaTy, tidyTopType, deNoteType )
 import SrcLoc		( noSrcLoc )
 import Outputable
-import Module		( ModuleName, moduleName )
-import Finder		( findModule )
+import Module		( ModuleName )
 
 import List		( partition )
 import IO		( IOMode(..), openFile, hClose )
@@ -128,7 +126,7 @@ mkModDetailsFromIface type_env dfun_ids rules
 completeIface :: Maybe ModIface		-- The old interface, if we have it
 	      -> ModIface		-- The new one, minus the decls and versions
 	      -> ModDetails		-- The ModDetails for this module
-	      -> Maybe (ModIface, SDoc)	-- The new one, complete with decls and versions
+	      -> (ModIface, Maybe SDoc)	-- The new one, complete with decls and versions
 					-- The SDoc is a debug document giving differences
 					-- Nothing => no change
 
@@ -224,6 +222,8 @@ ifaceTyCls (ATyCon tycon) so_far
 
     mk_field strict_mark field_label
 	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
+
+ifaceTyCls (ATyCon tycon) so_far = pprPanic "ifaceTyCls" (ppr tycon)
 
 ifaceTyCls (AnId id) so_far
   | omitIfaceSigForId id = so_far
@@ -522,7 +522,7 @@ getRules orphan_rules binds emitted
 \begin{code}
 addVersionInfo :: Maybe ModIface		-- The old interface, read from M.hi
 	       -> ModIface			-- The new interface decls
-	       -> Maybe (ModIface, SDoc)	-- Nothing => no change; no need to write new Iface
+	       -> (ModIface, Maybe SDoc)	-- Nothing => no change; no need to write new Iface
 						-- Just mi => Here is the new interface to write
 						-- 	      with correct version numbers
 
@@ -532,7 +532,7 @@ addVersionInfo :: Maybe ModIface		-- The old interface, read from M.hi
 
 addVersionInfo Nothing new_iface
 -- No old interface, so definitely write a new one!
-  = Just (new_iface, text "No old interface available")
+  = (new_iface, Just (text "No old interface available"))
 
 addVersionInfo (Just old_iface@(ModIface { mi_version = old_version, 
 				       	   mi_decls   = old_decls,
@@ -541,10 +541,10 @@ addVersionInfo (Just old_iface@(ModIface { mi_version = old_version,
 				     mi_fixities = new_fixities })
 
   | no_output_change && no_usage_change
-  = Nothing
+  = (old_iface, Nothing)
 
   | otherwise		-- Add updated version numbers
-  = Just (final_iface, pp_tc_diffs)
+  = (final_iface, Just pp_tc_diffs)
 	
   where
     final_iface = new_iface { mi_version = new_version }
@@ -613,11 +613,8 @@ diffDecls old_vers old_fixities new_fixities old new
 %************************************************************************
 
 \begin{code}
-writeIface :: FilePath -> Maybe ModIface -> IO ()
-writeIface hi_path Nothing
-  = return ()
-
-writeIface hi_path (Just mod_iface)
+writeIface :: FilePath -> ModIface -> IO ()
+writeIface hi_path mod_iface
   = do	{ if_hdl <- openFile hi_path WriteMode
 	; printForIface if_hdl (pprIface mod_iface)
 	; hClose if_hdl

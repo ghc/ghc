@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.13 2000/10/30 18:13:15 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.14 2000/10/31 13:01:46 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -294,9 +294,15 @@ run_phase Unlit _basename _suff input_fn output_fn
 -------------------------------------------------------------------------------
 -- Cpp phase 
 
-run_phase Cpp _basename _suff input_fn output_fn
+run_phase Cpp basename suff input_fn output_fn
   = do src_opts <- getOptionsFromSource input_fn
-       _ <- processArgs dynamic_flags src_opts []
+       unhandled_flags <- processArgs dynamic_flags src_opts []
+
+       when (not (null unhandled_flags)) 
+            (throwDyn (OtherError (
+                          basename ++ "." ++ suff 
+                          ++ ": static flags are not allowed in {-# OPTIONS #-} pragmas:\n\t" 
+                          ++ unwords unhandled_flags)) (ExitFailure 1))
 
        do_cpp <- readState cpp_flag
        if do_cpp
@@ -349,7 +355,7 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
    
    hdl <- readIORef v_Dep_tmp_hdl
 
-	-- std dependeny of the object(s) on the source file
+	-- std dependency of the object(s) on the source file
    hPutStrLn hdl (unwords objs ++ " : " ++ basename ++ '.':suff)
 
    let genDep (dep, False {- not an hi file -}) = 
@@ -412,27 +418,27 @@ run_phase Hsc basename suff input_fn output_fn
   -- only do this if we're eventually going to generate a .o file.
   -- (ToDo: do when generating .hc files too?)
   --
-  -- Setting source_unchanged to "-fsource-unchanged" means that M.o seems
+  -- Setting source_unchanged to True means that M.o seems
   -- to be up to date wrt M.hs; so no need to recompile unless imports have
   -- changed (which the compiler itself figures out).
-  -- Setting source_unchanged to "" tells the compiler that M.o is out of
+  -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
 	do_recomp <- readIORef v_Recomp
 	todo <- readIORef v_GhcMode
         o_file <- odir_ify (basename ++ '.':phaseInputExt Ln)
 	source_unchanged <- 
           if not (do_recomp && ( todo == DoLink || todo == StopBefore Ln ))
-	     then return ""
+	     then return False
 	     else do t1 <- getModificationTime (basename ++ '.':suff)
 		     o_file_exists <- doesFileExist o_file
 		     if not o_file_exists
-		        then return ""	-- Need to recompile
+		        then return False	-- Need to recompile
 			else do t2 <- getModificationTime o_file
 			        if t2 > t1
-				  then return "-fsource-unchanged"
-				  else return ""
+				  then return True
+				  else return False
 
-   -- build a bogus ModuleLocation to pass to hscMain.
+   -- build a ModuleLocation to pass to hscMain.
         let location = ModuleLocation {
                           ml_hs_file   = Nothing,
                           ml_hspp_file = Just input_fn,
@@ -446,7 +452,7 @@ run_phase Hsc basename suff input_fn output_fn
   -- run the compiler!
         pcs <- initPersistentCompilerState
 	result <- hscMain dyn_flags{ hscOutName = output_fn }
-			  (source_unchanged == "-fsource-unchanged")
+			  source_unchanged
 			  location
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
@@ -460,13 +466,14 @@ run_phase Hsc basename suff input_fn output_fn
 	    HscOK details maybe_iface maybe_stub_h maybe_stub_c 
 			_maybe_interpreted_code pcs -> do
 
-    -- deal with stubs
+	    -- deal with stubs
 	maybe_stub_o <- dealWithStubs basename maybe_stub_h maybe_stub_c
 	case maybe_stub_o of
 		Nothing -> return ()
 		Just stub_o -> add v_Ld_inputs stub_o
 
-	return True
+        let keep_going = case maybe_iface of Just _ -> True; Nothing -> False
+	return keep_going
     }
 
 -----------------------------------------------------------------------------

@@ -33,6 +33,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import Outputable
 import CmdLineOpts	( DynFlags, HscLang(..), dopt_OutName )
 import TmpFiles		( newTempName )
+import UniqSupply	( mkSplitUniqSupply )
 
 import IO		( IOMode(..), hClose, openFile, Handle )
 \end{code}
@@ -108,9 +109,7 @@ outputAsm dflags filenm flat_absC
 #ifndef OMIT_NATIVE_CODEGEN
 
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
-       let
-	    (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
-       in
+       let (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
        dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
        dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" ncg_output_d
        doOutput filenm ( \f -> printForAsm f ncg_output_d)

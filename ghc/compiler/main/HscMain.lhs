@@ -95,8 +95,7 @@ hscMain
 
 hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
  = do {
-      putStrLn ( "hscMain: location =\n" ++ show location);
-      putStrLn "checking old iface ...";
+      putStrLn "CHECKING OLD IFACE";
       (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
          <- checkOldIface dflags hit hst pcs (unJust (ml_hi_file location) "hscMain")
 			  source_unchanged maybe_old_iface;
@@ -108,7 +107,6 @@ hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
-      putStrLn "doing what_next ...";
       what_next dflags location maybe_checked_iface
                 hst hit pcs_ch
       }}
@@ -116,6 +114,7 @@ hscMain dflags source_unchanged location maybe_old_iface hst hit pcs
 
 hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
  = do {
+      hPutStrLn stderr "COMPILATION NOT REQUIRED";
       -- we definitely expect to have the old interface available
       let old_iface = case maybe_checked_iface of 
                          Just old_if -> old_if
@@ -154,10 +153,11 @@ hscNoRecomp dflags location maybe_checked_iface hst hit pcs_ch
 
 hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
  = do {
+      hPutStrLn stderr "COMPILATION IS REQUIRED";
+
       -- what target are we shooting for?
       let toInterp = dopt_HscLang dflags == HscInterpreted
       ;
---      putStrLn ("toInterp = " ++ show toInterp);
       -- PARSE
       maybe_parsed 
          <- myParseModule dflags (unJust (ml_hspp_file location) "hscRecomp:hspp");
@@ -201,15 +201,9 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
       let new_details = mkModDetails env_tc local_insts tidy_binds 
 			             top_level_ids orphan_rules
       ;
-      -- and possibly create a new ModIface
-      let maybe_final_iface_and_sdoc 
-             = completeIface maybe_checked_iface new_iface new_details 
-          maybe_final_iface
-             = case maybe_final_iface_and_sdoc of 
-                  Just (fif, sdoc) -> Just fif; Nothing -> Nothing
-      ;
-      -- Write the interface file
-      writeIface (unJust (ml_hi_file location) "hscRecomp:hi") maybe_final_iface
+      -- and the final interface
+      final_iface 
+         <- mkFinalIface dflags location maybe_checked_iface new_iface new_details
       ;
       -- do the rest of code generation/emission
       (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)
@@ -219,10 +213,22 @@ hscRecomp dflags location maybe_checked_iface hst hit pcs_ch
                hit (pcs_PIT pcs_tc)       
       ;
       -- and the answer is ...
-      return (HscOK new_details maybe_final_iface 
+      return (HscOK new_details (Just final_iface)
 		    maybe_stub_h_filename maybe_stub_c_filename
                     maybe_ibinds pcs_tc)
       }}}}}}}
+
+
+
+mkFinalIface dflags location maybe_old_iface new_iface new_details
+ = case completeIface maybe_old_iface new_iface new_details of
+      (new_iface, Nothing) -- no change in the interfacfe
+         -> return new_iface
+      (new_iface, Just sdoc)
+         -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "NEW INTERFACE" sdoc
+               -- Write the interface file
+               writeIface (unJust (ml_hi_file location) "hscRecomp:hi") new_iface
+               return new_iface
 
 
 myParseModule dflags src_filename
