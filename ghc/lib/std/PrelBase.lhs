@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.49 2001/04/29 11:01:13 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.50 2001/05/03 19:03:27 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -309,7 +309,7 @@ mapList f (x:xs) = f x : mapList f xs
 "map"	    forall f xs.	map f xs		= build (\c n -> foldr (mapFB c f) n xs)
 "mapFB"	    forall c f g.	mapFB (mapFB c f) g	= mapFB c (f.g) 
 "mapList"   forall f.		foldr (mapFB (:) f) []	= mapList f
- #-}
+  #-}
 \end{code}
 
 
@@ -321,8 +321,8 @@ mapList f (x:xs) = f x : mapList f xs
 (++) = append
 
 {-# RULES
-"++"	forall xs ys. (++) xs ys = augment (\c n -> foldr c n xs) ys
- #-}
+"++"	forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
+  #-}
 
 append :: [a] -> [a] -> [a]
 append []     ys = ys
@@ -426,13 +426,13 @@ instance Ord Char where
     (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 {-# RULES
-"x# `eqChar#` x#" forall x#. eqChar# x# x# = True
-"x# `neChar#` x#" forall x#. neChar# x# x# = False
-"x# `gtChar#` x#" forall x#. gtChar# x# x# = False
-"x# `geChar#` x#" forall x#. geChar# x# x# = True
-"x# `leChar#` x#" forall x#. leChar# x# x# = True
-"x# `ltChar#` x#" forall x#. ltChar# x# x# = False
-    #-}
+"x# `eqChar#` x#" forall x#. x# `eqChar#` x# = True
+"x# `neChar#` x#" forall x#. x# `neChar#` x# = False
+"x# `gtChar#` x#" forall x#. x# `gtChar#` x# = False
+"x# `geChar#` x#" forall x#. x# `geChar#` x# = True
+"x# `leChar#` x#" forall x#. x# `leChar#` x# = True
+"x# `ltChar#` x#" forall x#. x# `ltChar#` x# = False
+  #-}
 
 chr :: Int -> Char
 chr (I# i#) | int2Word# i# `leWord#` int2Word# 0x10FFFF# = C# (chr# i#)
@@ -616,15 +616,15 @@ plusInt, minusInt, timesInt, quotInt, remInt, divInt, modInt, gcdInt :: Int -> I
 (I# x) `modInt`   (I# y) = I# (x `modInt#`  y)
 
 {-# RULES
-"x# +# 0#" forall x#. (+#) x# 0# = x#
-"0# +# x#" forall x#. (+#) 0# x# = x#
-"x# -# 0#" forall x#. (-#) x# 0# = x#
-"x# -# x#" forall x#. (-#) x# x# = 0#
-"x# *# 0#" forall x#. (*#) x# 0# = 0#
-"0# *# x#" forall x#. (*#) 0# x# = 0#
-"x# *# 1#" forall x#. (*#) x# 1# = x#
-"1# *# x#" forall x#. (*#) 1# x# = x#
-    #-}
+"x# +# 0#" forall x#. x# +# 0# = x#
+"0# +# x#" forall x#. 0# +# x# = x#
+"x# -# 0#" forall x#. x# -# 0# = x#
+"x# -# x#" forall x#. x# -# x# = 0#
+"x# *# 0#" forall x#. x# *# 0# = 0#
+"0# *# x#" forall x#. 0# *# x# = 0#
+"x# *# 1#" forall x#. x# *# 1# = x#
+"1# *# x#" forall x#. 1# *# x# = x#
+  #-}
 
 gcdInt (I# a) (I# b) = g a b
    where g 0# 0# = error "PrelBase.gcdInt: gcd 0 0 is undefined"
@@ -649,25 +649,25 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `leInt` (I# y) = x <=# y
 
 {-# RULES
-"x# ># x#"  forall x#. (>#)  x# x# = False
-"x# >=# x#" forall x#. (>=#) x# x# = True
-"x# ==# x#" forall x#. (==#) x# x# = True
-"x# /=# x#" forall x#. (/=#) x# x# = False
-"x# <# x#"  forall x#. (<#)  x# x# = False
-"x# <=# x#" forall x#. (<=#) x# x# = True
-    #-}
+"x# ># x#"  forall x#. x# >#  x# = False
+"x# >=# x#" forall x#. x# >=# x# = True
+"x# ==# x#" forall x#. x# ==# x# = True
+"x# /=# x#" forall x#. x# /=# x# = False
+"x# <# x#"  forall x#. x# <#  x# = False
+"x# <=# x#" forall x#. x# <=# x# = True
+  #-}
 
 #if WORD_SIZE_IN_BYTES == 4
 {-# RULES
 "intToInt32#"   forall x#. intToInt32#   x# = x#
 "wordToWord32#" forall x#. wordToWord32# x# = x#
-     #-}
+   #-}
 #endif
 
 {-# RULES
 "int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#
 "word2Int2Word" forall x#. word2Int# (int2Word# x#) = x#
-    #-}
+  #-}
 \end{code}
 
 
