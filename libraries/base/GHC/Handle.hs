@@ -46,6 +46,8 @@ module GHC.Handle (
   hIsOpen, hIsClosed, hIsReadable, hIsWritable, hGetBuffering, hIsSeekable,
   hSetEcho, hGetEcho, hIsTerminalDevice,
 
+  hShow,
+
 #ifdef DEBUG_DUMP
   puts,
 #endif
@@ -96,11 +98,11 @@ dEFAULT_OPEN_IN_BINARY_MODE = False :: Bool
 -- ---------------------------------------------------------------------------
 -- Creating a new handle
 
-newFileHandle     :: (MVar Handle__ -> IO ()) -> Handle__ -> IO Handle
-newFileHandle finalizer hc = do 
+newFileHandle :: FilePath -> (MVar Handle__ -> IO ()) -> Handle__ -> IO Handle
+newFileHandle filepath finalizer hc = do 
   m <- newMVar hc
   addMVarFinalizer m (finalizer m)
-  return (FileHandle m)
+  return (FileHandle filepath m)
 
 -- ---------------------------------------------------------------------------
 -- Working with Handles
@@ -129,8 +131,8 @@ but we might want to revisit this in the future --SDM ].
 
 {-# INLINE withHandle #-}
 withHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
-withHandle fun h@(FileHandle m)     act = withHandle' fun h m act
-withHandle fun h@(DuplexHandle m _) act = withHandle' fun h m act
+withHandle fun h@(FileHandle _ m)     act = withHandle' fun h m act
+withHandle fun h@(DuplexHandle _ m _) act = withHandle' fun h m act
 
 withHandle' :: String -> Handle -> MVar Handle__
    -> (Handle__ -> IO (Handle__,a)) -> IO a
@@ -141,16 +143,16 @@ withHandle' fun h m act =
    (h',v)  <- catchException (act h_) 
 		(\ err -> putMVar m h_ >>
 		          case err of
-		              IOException ex -> ioError (augmentIOError ex fun h h_)
-		              _ -> throw err)
+		             IOException ex -> ioError (augmentIOError ex fun h)
+		             _ -> throw err)
    checkBufferInvariants h'
    putMVar m h'
    return v
 
 {-# INLINE withHandle_ #-}
 withHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
-withHandle_ fun h@(FileHandle m)     act = withHandle_' fun h m act
-withHandle_ fun h@(DuplexHandle m _) act = withHandle_' fun h m act
+withHandle_ fun h@(FileHandle _ m)     act = withHandle_' fun h m act
+withHandle_ fun h@(DuplexHandle _ m _) act = withHandle_' fun h m act
 
 withHandle_' fun h m act = 
    block $ do
@@ -159,15 +161,15 @@ withHandle_' fun h m act =
    v  <- catchException (act h_) 
 		(\ err -> putMVar m h_ >>
 		          case err of
-		              IOException ex -> ioError (augmentIOError ex fun h h_)
-		              _ -> throw err)
+		             IOException ex -> ioError (augmentIOError ex fun h)
+		             _ -> throw err)
    checkBufferInvariants h_
    putMVar m h_
    return v
 
 withAllHandles__ :: String -> Handle -> (Handle__ -> IO Handle__) -> IO ()
-withAllHandles__ fun h@(FileHandle m)     act = withHandle__' fun h m act
-withAllHandles__ fun h@(DuplexHandle r w) act = do
+withAllHandles__ fun h@(FileHandle _ m)     act = withHandle__' fun h m act
+withAllHandles__ fun h@(DuplexHandle _ r w) act = do
   withHandle__' fun h r act
   withHandle__' fun h w act
 
@@ -178,24 +180,27 @@ withHandle__' fun h m act =
    h'  <- catchException (act h_)
 		(\ err -> putMVar m h_ >>
 		          case err of
-		              IOException ex -> ioError (augmentIOError ex fun h h_)
-		              _ -> throw err)
+		             IOException ex -> ioError (augmentIOError ex fun h)
+		             _ -> throw err)
    checkBufferInvariants h'
    putMVar m h'
    return ()
 
-augmentIOError (IOError _ iot _ str fp) fun h h_
+augmentIOError (IOError _ iot _ str fp) fun h
   = IOError (Just h) iot fun str filepath
-  where filepath | Just _ <- fp = fp
-		 | otherwise    = Just (haFilePath h_)
+  where filepath
+	  | Just _ <- fp = fp
+	  | otherwise = case h of
+		    	  FileHandle fp _     -> Just fp
+		    	  DuplexHandle fp _ _ -> Just fp
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for write operations.
 
 wantWritableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
-wantWritableHandle fun h@(FileHandle m) act
+wantWritableHandle fun h@(FileHandle _ m) act
   = wantWritableHandle' fun h m act
-wantWritableHandle fun h@(DuplexHandle _ m) act
+wantWritableHandle fun h@(DuplexHandle _ _ m) act
   = wantWritableHandle' fun h m act
   -- ToDo: in the Duplex case, we don't need to checkWritableHandle
 
@@ -226,9 +231,9 @@ checkWritableHandle act handle_
 -- Wrapper for read operations.
 
 wantReadableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
-wantReadableHandle fun h@(FileHandle   m)   act
+wantReadableHandle fun h@(FileHandle  _ m)   act
   = wantReadableHandle' fun h m act
-wantReadableHandle fun h@(DuplexHandle m _) act
+wantReadableHandle fun h@(DuplexHandle _ m _) act
   = wantReadableHandle' fun h m act
   -- ToDo: in the Duplex case, we don't need to checkReadableHandle
 
@@ -257,10 +262,10 @@ checkReadableHandle act handle_ =
 -- Wrapper for seek operations.
 
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
-wantSeekableHandle fun h@(DuplexHandle _ _) _act =
+wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
   ioException (IOError (Just h) IllegalOperation fun 
 		   "handle is not seekable" Nothing)
-wantSeekableHandle fun h@(FileHandle m) act =
+wantSeekableHandle fun h@(FileHandle _ m) act =
   withHandle_' fun h m (checkSeekableHandle act)
   
 checkSeekableHandle act handle_ = 
@@ -756,13 +761,12 @@ mkStdHandle :: FD -> FilePath -> HandleType -> IORef Buffer -> BufferMode
 	-> IO Handle
 mkStdHandle fd filepath ha_type buf bmode = do
    spares <- newIORef BufferListNil
-   newFileHandle stdHandleFinalizer
+   newFileHandle filepath stdHandleFinalizer
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
 			haIsStream = False,
 			haBufferMode = bmode,
-			haFilePath = filepath,
 			haBuffer = buf,
 			haBuffers = spares,
 			haOtherSide = Nothing
@@ -772,13 +776,12 @@ mkFileHandle :: FD -> Bool -> FilePath -> HandleType -> Bool -> IO Handle
 mkFileHandle fd is_stream filepath ha_type binary = do
   (buf, bmode) <- getBuffer fd (initBufferState ha_type)
   spares <- newIORef BufferListNil
-  newFileHandle handleFinalizer
+  newFileHandle filepath handleFinalizer
 	    (Handle__ { haFD = fd,
 			haType = ha_type,
                         haIsBin = binary,
 			haIsStream = is_stream,
 			haBufferMode = bmode,
-			haFilePath = filepath,
 			haBuffer = buf,
 			haBuffers = spares,
 		        haOtherSide = Nothing
@@ -794,7 +797,6 @@ mkDuplexHandle fd is_stream filepath binary = do
                         haIsBin = binary,
 			haIsStream = is_stream,
 			haBufferMode = w_bmode,
-			haFilePath = filepath,
 			haBuffer = w_buf,
 			haBuffers = w_spares,
 			haOtherSide = Nothing
@@ -809,7 +811,6 @@ mkDuplexHandle fd is_stream filepath binary = do
                         haIsBin = binary,
 			haIsStream = is_stream,
 			haBufferMode = r_bmode,
-			haFilePath = filepath,
 			haBuffer = r_buf,
 			haBuffers = r_spares,
 			haOtherSide = Just write_side
@@ -817,7 +818,7 @@ mkDuplexHandle fd is_stream filepath binary = do
   read_side <- newMVar r_handle_
 
   addMVarFinalizer write_side (handleFinalizer write_side)
-  return (DuplexHandle read_side write_side)
+  return (DuplexHandle filepath read_side write_side)
    
 
 initBufferState ReadHandle = ReadBuffer
@@ -834,8 +835,8 @@ initBufferState _ 	   = WriteBuffer
 -- the read side.
 
 hClose :: Handle -> IO ()
-hClose h@(FileHandle m)     = hClose' h m
-hClose h@(DuplexHandle r w) = hClose' h w >> hClose' h r
+hClose h@(FileHandle _ m)     = hClose' h m
+hClose h@(DuplexHandle _ r w) = hClose' h w >> hClose' h r
 
 hClose' h m = withHandle__' "hClose" h m $ hClose_help
 
@@ -1193,7 +1194,7 @@ hIsClosed handle =
 -}
 
 hIsReadable :: Handle -> IO Bool
-hIsReadable (DuplexHandle _ _) = return True
+hIsReadable (DuplexHandle _ _ _) = return True
 hIsReadable handle =
     withHandle_ "hIsReadable" handle $ \ handle_ -> do
     case haType handle_ of 
@@ -1202,7 +1203,7 @@ hIsReadable handle =
       htype 		   -> return (isReadableHandleType htype)
 
 hIsWritable :: Handle -> IO Bool
-hIsWritable (DuplexHandle _ _) = return True
+hIsWritable (DuplexHandle _ _ _) = return True
 hIsWritable handle =
     withHandle_ "hIsWritable" handle $ \ handle_ -> do
     case haType handle_ of 
@@ -1301,16 +1302,16 @@ foreign import ccall unsafe "__hscore_setmode"
 -- discarding any input data, before the handle is duplicated.
 
 hDuplicate :: Handle -> IO Handle
-hDuplicate h@(FileHandle m) = do
+hDuplicate h@(FileHandle path m) = do
   new_h_ <- withHandle' "hDuplicate" h m (dupHandle_ Nothing)
   new_m <- newMVar new_h_
-  return (FileHandle new_m)
-hDuplicate h@(DuplexHandle r w) = do
+  return (FileHandle path new_m)
+hDuplicate h@(DuplexHandle path r w) = do
   new_w_ <- withHandle' "hDuplicate" h w (dupHandle_ Nothing)
   new_w <- newMVar new_w_
   new_r_ <- withHandle' "hDuplicate" h r (dupHandle_ (Just new_w))
   new_r <- newMVar new_r_
-  return (DuplexHandle new_r new_w)
+  return (DuplexHandle path new_r new_w)
 
 dupHandle_ other_side h_ = do
   -- flush the buffer first, so we don't have to copy its contents
@@ -1340,11 +1341,11 @@ This can be used to retarget the standard Handles, for example:
 -}
 
 hDuplicateTo :: Handle -> Handle -> IO ()
-hDuplicateTo h1@(FileHandle m1) h2@(FileHandle m2)  = do
+hDuplicateTo h1@(FileHandle _ m1) h2@(FileHandle _ m2)  = do
  withHandle__' "hDuplicateTo" h2 m2 $ \h2_ -> do
    _ <- hClose_help h2_
    withHandle' "hDuplicateTo" h1 m1 (dupHandle_ Nothing)
-hDuplicateTo h1@(DuplexHandle r1 w1) h2@(DuplexHandle r2 w2)  = do
+hDuplicateTo h1@(DuplexHandle _ r1 w1) h2@(DuplexHandle _ r2 w2)  = do
  withHandle__' "hDuplicateTo" h2 w2  $ \w2_ -> do
    _ <- hClose_help w2_
    withHandle' "hDuplicateTo" h1 r1 (dupHandle_ Nothing)
@@ -1354,6 +1355,49 @@ hDuplicateTo h1@(DuplexHandle r1 w1) h2@(DuplexHandle r2 w2)  = do
 hDuplicateTo h1 _ =
    ioException (IOError (Just h1) IllegalOperation "hDuplicateTo" 
 		"handles are incompatible" Nothing)
+
+-- ---------------------------------------------------------------------------
+-- showing Handles.
+--
+-- hShow is in the IO monad, and gives more comprehensive output
+-- than the (pure) instance of Show for Handle.
+
+hShow :: Handle -> IO String
+hShow h@(FileHandle path _) = showHandle' path False h
+hShow h@(DuplexHandle path _ _) = showHandle' path True h
+
+showHandle' filepath is_duplex h = 
+  withHandle_ "showHandle" h $ \hdl_ ->
+    let
+     showType | is_duplex = showString "duplex (read-write)"
+	      | otherwise = shows (haType hdl_)
+    in
+    return 
+      (( showChar '{' . 
+        showHdl (haType hdl_) 
+	    (showString "loc=" . showString filepath . showChar ',' .
+	     showString "type=" . showType . showChar ',' .
+	     showString "binary=" . shows (haIsBin hdl_) . showChar ',' .
+	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
+      ) "")
+   where
+
+    showHdl :: HandleType -> ShowS -> ShowS
+    showHdl ht cont = 
+       case ht of
+        ClosedHandle  -> shows ht . showString "}"
+	_ -> cont
+
+    showBufMode :: Buffer -> BufferMode -> ShowS
+    showBufMode buf bmo =
+      case bmo of
+        NoBuffering   -> showString "none"
+	LineBuffering -> showString "line"
+	BlockBuffering (Just n) -> showString "block " . showParen True (shows n)
+	BlockBuffering Nothing  -> showString "block " . showParen True (shows def)
+      where
+       def :: Int 
+       def = bufSize buf
 
 -- ---------------------------------------------------------------------------
 -- debugging

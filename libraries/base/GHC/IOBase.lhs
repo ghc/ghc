@@ -222,9 +222,12 @@ instance Eq (MVar a) where
 
 data Handle 
   = FileHandle				-- A normal handle to a file
+	FilePath			-- the file (invariant)
 	!(MVar Handle__)
 
   | DuplexHandle			-- A handle to a read/write stream
+	FilePath			-- file for a FIFO, otherwise some
+					--   descriptive string.
 	!(MVar Handle__)		-- The read side
 	!(MVar Handle__)		-- The write side
 
@@ -233,8 +236,8 @@ data Handle
 --      seekable.
 
 instance Eq Handle where
- (FileHandle h1)     == (FileHandle h2)     = h1 == h2
- (DuplexHandle h1 _) == (DuplexHandle h2 _) = h1 == h2
+ (FileHandle _ h1)     == (FileHandle _ h2)     = h1 == h2
+ (DuplexHandle _ h1 _) == (DuplexHandle _ h2 _) = h1 == h2
  _ == _ = False 
 
 type FD = Int -- XXX ToDo: should be CInt
@@ -246,7 +249,6 @@ data Handle__
       haIsBin       :: Bool,		     -- binary mode?
       haIsStream    :: Bool,		     -- is this a stream handle?
       haBufferMode  :: BufferMode,	     -- buffer contains read/write data?
-      haFilePath    :: FilePath,	     -- file name, possibly
       haBuffer	    :: !(IORef Buffer),	     -- the current buffer
       haBuffers     :: !(IORef BufferList),  -- spare buffers
       haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 
@@ -467,46 +469,10 @@ instance Show HandleType where
       ReadWriteHandle   -> showString "read-writable"
 
 instance Show Handle where 
-  showsPrec p (FileHandle   h)   = showHandle p h False
-  showsPrec p (DuplexHandle _ h) = showHandle p h True
-   
-showHandle p h duplex =
-    let
-     -- (Big) SIGH: unfolded defn of takeMVar to avoid
-     -- an (oh-so) unfortunate module loop with GHC.Conc.
-     hdl_ = unsafePerformIO (IO $ \ s# ->
-	     case h                 of { MVar h# ->
-	     case takeMVar# h# s#   of { (# s2# , r #) -> 
-	     case putMVar# h# r s2# of { s3# ->
-	     (# s3#, r #) }}})
+  showsPrec p (FileHandle   file _)   = showHandle file
+  showsPrec p (DuplexHandle file _ _) = showHandle file
 
-     showType | duplex = showString "duplex (read-write)"
-	      | otherwise = showsPrec p (haType hdl_)
-    in
-    showChar '{' . 
-    showHdl (haType hdl_) 
-	    (showString "loc=" . showString (haFilePath hdl_) . showChar ',' .
-	     showString "type=" . showType . showChar ',' .
-	     showString "binary=" . showsPrec p (haIsBin hdl_) . showChar ',' .
-	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
-   where
-
-    showHdl :: HandleType -> ShowS -> ShowS
-    showHdl ht cont = 
-       case ht of
-        ClosedHandle  -> showsPrec p ht . showString "}"
-	_ -> cont
-       
-    showBufMode :: Buffer -> BufferMode -> ShowS
-    showBufMode buf bmo =
-      case bmo of
-        NoBuffering   -> showString "none"
-	LineBuffering -> showString "line"
-	BlockBuffering (Just n) -> showString "block " . showParen True (showsPrec p n)
-	BlockBuffering Nothing  -> showString "block " . showParen True (showsPrec p def)
-      where
-       def :: Int 
-       def = bufSize buf
+showHandle file = showString "{handle: " . showString file . showString "}"
 
 -- ------------------------------------------------------------------------
 -- Exception datatype and operations
@@ -830,19 +796,18 @@ userError str	=  IOError Nothing UserError "" str Nothing
 
 instance Show IOException where
     showsPrec p (IOError hdl iot loc s fn) =
-      showsPrec p iot .
+      (case fn of
+	 Nothing -> case hdl of
+		        Nothing -> id
+			Just h  -> showsPrec p h . showString ": "
+	 Just name -> showString name . showString ": ") .
       (case loc of
          "" -> id
-	 _  -> showString "\nAction: " . showString loc) .
-      (case hdl of
-        Nothing -> id
-	Just h  -> showString "\nHandle: " . showsPrec p h) .
+	 _  -> showString loc . showString ": ") .
+      showsPrec p iot . 
       (case s of
 	 "" -> id
-	 _  -> showString "\nReason: " . showString s) .
-      (case fn of
-	 Nothing -> id
-	 Just name -> showString "\nFile: " . showString name)
+	 _  -> showString " (" . showString s . showString ")")
 
 -- -----------------------------------------------------------------------------
 -- IOMode type
