@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.104 2002/01/03 17:05:50 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.105 2002/01/03 17:09:15 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -463,7 +463,8 @@ addModule str = do
   dflags <- io (getDynFlags)
   io (revertCAFs)			-- always revert CAFs on load/add.
   let new_targets = files ++ targets state 
-  (cmstate1, ok, mods) <- io (cmLoadModule (cmstate state) new_targets)
+  graph <- io (cmDepAnal (cmstate state) dflags new_targets)
+  (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) dflags graph)
   setGHCiState state{ cmstate = cmstate1, targets = new_targets }
   modulesLoadedMsg ok mods
 
@@ -536,23 +537,39 @@ loadModule' str = do
   let files = words str
   state <- getGHCiState
   dflags <- io getDynFlags
+
+  -- do the dependency anal first, so that if it fails we don't throw
+  -- away the current set of modules.
+  graph <- io (cmDepAnal (cmstate state) dflags files)
+
+  -- Dependency anal ok, now unload everything
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, targets = [] }
-  io (revertCAFs)			-- always revert CAFs on load.
-  (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 files)
+
+  io (revertCAFs)  -- always revert CAFs on load.
+  (cmstate2, ok, mods) <- io (cmLoadModules cmstate1 dflags graph)
+
   setGHCiState state{ cmstate = cmstate2, targets = files }
   modulesLoadedMsg ok mods
+
 
 reloadModule :: String -> GHCi ()
 reloadModule "" = do
   state <- getGHCiState
+  dflags <- io getDynFlags
   case targets state of
    [] -> io (putStr "no current target\n")
-   paths
-      -> do io (revertCAFs)		-- always revert CAFs on reload.
-	    (new_cmstate, ok, mods) <- io (cmLoadModule (cmstate state) paths)
-            setGHCiState state{ cmstate=new_cmstate }
-	    modulesLoadedMsg ok mods
+   paths -> do
+	-- do the dependency anal first, so that if it fails we don't throw
+	-- away the current set of modules.
+	graph <- io (cmDepAnal (cmstate state) dflags paths)
+
+	io (revertCAFs)		-- always revert CAFs on reload.
+	(new_cmstate, ok, mods) 
+		<- io (cmLoadModules (cmstate state) dflags graph)
+
+        setGHCiState state{ cmstate=new_cmstate }
+	modulesLoadedMsg ok mods
 
 reloadModule _ = noArgs ":reload"
 

@@ -1,36 +1,43 @@
 %
-% (c) The University of Glasgow, 2000
+% (c) The University of Glasgow, 2002
 %
-\section[CompManager]{The Compilation Manager}
-
+% The Compilation Manager
+%
 \begin{code}
 {-# OPTIONS -fvia-C #-}
 module CompManager ( 
-    cmInit, 	  -- :: GhciMode -> IO CmState
+    ModuleGraph, 
+    CmRunResult(..),
 
-    cmLoadModule, -- :: CmState -> FilePath -> IO (CmState, [String])
+    CmState, emptyCmState,  -- abstract
 
-    cmUnload,	  -- :: CmState -> DynFlags -> IO CmState
+    cmInit, 	   -- :: GhciMode -> IO CmState
 
-    cmSetContext, -- :: CmState -> String -> IO CmState
+    cmDepAnal,	   -- :: CmState -> DynFlags -> [FilePath] -> IO ModuleGraph
 
-    cmGetContext, -- :: CmState -> IO String
+    cmLoadModules, -- :: CmState -> DynFlags -> ModuleGraph
+		   --	 -> IO (CmState, [String])
+
+    cmUnload,	   -- :: CmState -> DynFlags -> IO CmState
+
+    cmSetContext,  -- :: CmState -> String -> IO CmState
+
+    cmGetContext,  -- :: CmState -> IO String
 
 #ifdef GHCI
-    cmInfoThing,  -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
+    cmInfoThing,   -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
 
-    CmRunResult(..),
-    cmRunStmt,	  -- :: CmState -> DynFlags -> String -> IO (CmState, CmRunResult)
+    cmRunStmt,	   -- :: CmState -> DynFlags -> String
+		   --	 -> IO (CmState, CmRunResult)
 
-    cmTypeOfExpr, -- :: CmState -> DynFlags -> String
-		  -- -> IO (CmState, Maybe String)
+    cmTypeOfExpr,  -- :: CmState -> DynFlags -> String
+		   -- 	-> IO (CmState, Maybe String)
 
-    cmTypeOfName, -- :: CmState -> Name -> IO (Maybe String)
+    cmTypeOfName,  -- :: CmState -> Name -> IO (Maybe String)
 
-    cmCompileExpr,-- :: CmState -> DynFlags -> String 
-		  -- -> IO (CmState, Maybe HValue)#endif
+    cmCompileExpr, -- :: CmState -> DynFlags -> String 
+		   -- 	-> IO (CmState, Maybe HValue)#endif
 #endif
-    CmState, emptyCmState  -- abstract
   )
 where
 
@@ -72,7 +79,7 @@ import Id		( idType, idName )
 import NameEnv
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
-import RnEnv		( unQualInScope )
+import RnEnv		( unQualInScope, mkIfaceGlobalRdrEnv )
 import BasicTypes	( Fixity, defaultFixity )
 import Interpreter	( HValue )
 import HscMain		( hscStmt )
@@ -226,8 +233,7 @@ cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
    = do 
 	let InteractiveContext { 
 	       	ic_rn_env = rn_env, 
-	       	ic_type_env = type_env,
-	       	ic_module   = this_mod } = icontext
+	       	ic_type_env = type_env } = icontext
 
         (new_pcs, maybe_stuff) 
 	    <- hscStmt dflags hst hit pcs icontext expr False{-stmt-}
@@ -336,8 +342,11 @@ cmTypeOfExpr cmstate dflags expr
 getUnqual pcs hit ic
    = case lookupIfaceByModName hit pit modname of
 	Nothing    -> alwaysQualify
-	Just iface -> unQualInScope (mi_globals iface)
- where
+	Just iface -> 
+	   case mi_globals iface of
+	      Just env -> unQualInScope env
+	      Nothing  -> unQualInScope (mkIfaceGlobalRdrEnv (mi_exports iface))
+  where
     pit = pcs_PIT pcs
     modname = moduleName (ic_module ic)
 #endif
@@ -410,18 +419,35 @@ cmUnload state@CmState{ gmode=mode, pls=pls, pcs=pcs } dflags
       new_state <- cmInit mode
       return new_state{ pcs=pcs, pls=new_pls }
 
+
+-----------------------------------------------------------------------------
+-- Trace dependency graph
+
+-- This is a seperate pass so that the caller can back off and keep
+-- the current state if the downsweep fails.
+
+cmDepAnal :: CmState -> DynFlags -> [FilePath] -> IO ModuleGraph
+cmDepAnal cmstate dflags rootnames
+  = do showPass dflags "Chasing dependencies"
+       when (verbosity dflags >= 1 && gmode cmstate == Batch) $
+           hPutStrLn stderr (showSDoc (hcat [
+	     text progName, text ": chasing modules from: ",
+	     hcat (punctuate comma (map text rootnames))]))
+       downsweep rootnames (mg cmstate)
+
 -----------------------------------------------------------------------------
 -- The real business of the compilation manager: given a system state and
 -- a module name, try and bring the module up to date, probably changing
 -- the system state at the same time.
 
-cmLoadModule :: CmState 
-             -> [FilePath]
+cmLoadModules :: CmState 
+	     -> DynFlags
+             -> ModuleGraph
              -> IO (CmState,		-- new state
 		    Bool, 		-- was successful
 		    [String])		-- list of modules loaded
 
-cmLoadModule cmstate1 rootnames
+cmLoadModules cmstate1 dflags mg2unsorted
    = do -- version 1's are the original, before downsweep
         let pls1      = pls    cmstate1
         let pcs1      = pcs    cmstate1
@@ -430,21 +456,17 @@ cmLoadModule cmstate1 rootnames
 	-- similarly, ui1 is the (complete) set of linkables from
 	-- the previous pass, if any.
         let ui1       = ui     cmstate1
-   	let mg1       = mg     cmstate1
 
         let ghci_mode = gmode cmstate1 -- this never changes
 
         -- Do the downsweep to reestablish the module graph
-	dflags <- getDynFlags
         let verb = verbosity dflags
 
-	showPass dflags "Chasing dependencies"
-        when (verb >= 1 && ghci_mode == Batch) $
-           hPutStrLn stderr (showSDoc (hcat [
-	     text progName, text ": chasing modules from: ",
-	     hcat (punctuate comma (map text rootnames))]))
+	-- Find out if we have a Main module
+        let a_root_is_Main 
+               = any ((=="Main").moduleNameUserString.name_of_summary) 
+                     mg2unsorted
 
-        (mg2unsorted, a_root_is_Main) <- downsweep rootnames mg1
         let mg2unsorted_names = map name_of_summary mg2unsorted
 
         -- reachable_from follows source as well as normal imports
@@ -1035,22 +1057,26 @@ topological_sort include_source_imports summaries
          sccs
 
 
+-----------------------------------------------------------------------------
+-- Downsweep (dependency analysis)
+
 -- Chase downwards from the specified root set, returning summaries
 -- for all home modules encountered.  Only follow source-import
--- links.  Also returns a Bool to indicate whether any of the roots
--- are module Main.
-downsweep :: [FilePath] -> [ModSummary] -> IO ([ModSummary], Bool)
-downsweep rootNm old_summaries
-   = do rootSummaries <- mapM getRootSummary rootNm
-        let a_root_is_Main 
-               = any ((=="Main").moduleNameUserString.name_of_summary) 
-                     rootSummaries
+-- links.
+
+-- We pass in the previous collection of summaries, which is used as a
+-- cache to avoid recalculating a module summary if the source is
+-- unchanged.
+
+downsweep :: [FilePath] -> [ModSummary] -> IO [ModSummary]
+downsweep roots old_summaries
+   = do rootSummaries <- mapM getRootSummary roots
         all_summaries
            <- loop (concat (map ms_imps rootSummaries))
 		(mkModuleEnv [ (mod, s) | s <- rootSummaries, 
 					  let mod = ms_mod s, isHomeModule mod 
 			     ])
-        return (all_summaries, a_root_is_Main)
+        return all_summaries
      where
 	getRootSummary :: FilePath -> IO ModSummary
 	getRootSummary file
@@ -1107,8 +1133,8 @@ downsweep rootNm old_summaries
 
 -- We have two types of summarisation:
 --
---    * Summarise a file.  This is used for the root module passed to
---	cmLoadModule.  The file is read, and used to determine the root
+--    * Summarise a file.  This is used for the root module(s) passed to
+--	cmLoadModules.  The file is read, and used to determine the root
 --	module name.  The module name may differ from the filename.
 --
 --    * Summarise a module.  We are given a module name, and must provide

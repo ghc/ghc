@@ -193,7 +193,13 @@ loadContextModule scope_module thing_inside
   = let doc = text "context for compiling expression"
     in
     loadInterface doc (moduleName scope_module) ImportByUser `thenRn` \ iface ->
-    let rdr_env       = mi_globals iface
+
+	-- If this is a module we previously compiled, then mi_globals will
+	-- have its top-level environment.  If it is an imported module, then
+	-- we must invent a top-level environment from its exports.
+    let rdr_env | Just env <- mi_globals iface = env
+		| otherwise = mkIfaceGlobalRdrEnv (mi_exports iface)
+			  
 	print_unqual  = unQualInScope rdr_env
     in 
     checkErrsRn				`thenRn` \ no_errs_so_far ->
@@ -345,7 +351,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 				mi_boot	    = False,
 				mi_orphan   = panic "is_orphan",
 				mi_exports  = my_exports,
-				mi_globals  = gbl_env,
+				mi_globals  = Just gbl_env,
 				mi_fixities = fixities,
 				mi_deprecs  = my_deprecs,
 				mi_decls    = panic "mi_decls"
@@ -357,7 +363,7 @@ rename this_module contents@(HsModule _ _ exports imports local_decls mod_deprec
 
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface print_unqualified 
-		      imports full_avail_env
+		      imports full_avail_env gbl_env
 		      source_fvs2 rn_imp_decls		`thenRn_`
 		-- NB: source_fvs2: include exports (else we get bogus 
 		--     warnings of unused things) but not implicit FVs.
@@ -531,7 +537,7 @@ loadOldIface parsed_iface
 			       mi_boot = False, mi_orphan = pi_orphan iface, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
 			       mi_decls   = decls,
-			       mi_globals = mkIfaceGlobalRdrEnv avails
+			       mi_globals = Nothing
 		    }
     in
     returnRn mod_iface
@@ -634,10 +640,11 @@ closeIfaceDecls dflags hit hst pcs
 reportUnusedNames :: ModIface -> PrintUnqualified
 		  -> [RdrNameImportDecl] 
 		  -> AvailEnv
+		  -> GlobalRdrEnv
 		  -> NameSet 		-- Used in this module
 		  -> [RenamedHsDecl] 
 		  -> RnMG ()
-reportUnusedNames my_mod_iface unqual imports avail_env 
+reportUnusedNames my_mod_iface unqual imports avail_env gbl_env
 		  used_names imported_decls
   = warnUnusedModules unused_imp_mods				`thenRn_`
     warnUnusedLocalBinds bad_locals				`thenRn_`
@@ -645,7 +652,6 @@ reportUnusedNames my_mod_iface unqual imports avail_env
     printMinimalImports this_mod unqual minimal_imports
   where
     this_mod   = mi_module my_mod_iface
-    gbl_env    = mi_globals my_mod_iface
     
     -- Now, a use of C implies a use of T,
     -- if C was brought into scope by T(..) or T(C)

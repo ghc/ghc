@@ -147,7 +147,10 @@ data ModIface
    = ModIface {
         mi_module   :: !Module,		    -- Complete with package info
         mi_version  :: !VersionInfo,	    -- Module version number
+
         mi_orphan   :: WhetherHasOrphans,   -- Whether this module has orphans
+		-- NOT STRICT!  we fill this field with _|_ sometimes
+
 	mi_boot	    :: !IsBootInterface,    -- read from an hi-boot file?
 
         mi_usages   :: ![ImportVersion Name],	
@@ -159,12 +162,15 @@ data ModIface
 		-- What it exports Kept sorted by (mod,occ), to make
 		-- version comparisons easier
 
-        mi_globals  :: !GlobalRdrEnv,	    -- Its top level environment
+        mi_globals  :: !(Maybe GlobalRdrEnv),
+		-- Its top level environment or Nothing if we read this
+		-- interface from a file.
 
         mi_fixities :: !(NameEnv Fixity),   -- Fixities
 	mi_deprecs  :: !Deprecations,	    -- Deprecations
 
 	mi_decls    :: IfaceDecls	    -- The RnDecls form of ModDetails
+		-- NOT STRICT!  we fill this field with _|_ sometimes
      }
 
 data IfaceDecls = IfaceDecls { dcl_tycl  :: [RenamedTyClDecl],	-- Sorted
@@ -236,7 +242,7 @@ emptyModIface mod
 	       mi_boot	   = False,
 	       mi_exports  = [],
 	       mi_fixities = emptyNameEnv,
-	       mi_globals  = emptyRdrEnv,
+	       mi_globals  = Nothing,
 	       mi_deprecs  = NoDeprecs,
 	       mi_decls    = panic "emptyModIface: decls"
     }		
