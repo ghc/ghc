@@ -30,6 +30,8 @@ module System.IO.Error (
 
     annotateIOError,		-- :: IOError -> String -> Maybe Handle
 				--    -> Maybe FilePath -> IOError
+
+    modifyIOError,		-- :: (IOError -> IOError) -> IO a -> IO a
 #endif
 
     alreadyExistsErrorType,	-- :: IOErrorType
@@ -66,6 +68,12 @@ module System.IO.Error (
     ioeGetHandle,		-- :: IOError -> Maybe Handle
     ioeGetFileName,		-- :: IOError -> Maybe FilePath
 
+#ifndef __NHC__
+    ioeSetErrorType,		-- :: IOError -> IOErrorType -> IOError
+    ioeSetErrorString,		-- :: IOError -> String -> IOError
+    ioeSetHandle,		-- :: IOError -> Handle -> IOError
+    ioeSetFileName,		-- :: IOError -> FilePath -> IOError
+#endif
   ) where
 
 import Data.Either
@@ -221,19 +229,32 @@ isUserErrorType _ = False
 
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 ioeGetErrorType	      :: IOError -> IOErrorType
-ioeGetHandle          :: IOError -> Maybe Handle
 ioeGetErrorString     :: IOError -> String
+ioeGetHandle          :: IOError -> Maybe Handle
 ioeGetFileName        :: IOError -> Maybe FilePath
 
 ioeGetErrorType ioe = ioe_type ioe
-
-ioeGetHandle ioe = ioe_handle ioe
 
 ioeGetErrorString ioe
    | isUserErrorType (ioe_type ioe) = ioe_description ioe
    | otherwise                      = show (ioe_type ioe)
 
+ioeGetHandle ioe = ioe_handle ioe
+
 ioeGetFileName ioe = ioe_filename ioe
+
+ioeSetErrorType		:: IOError -> IOErrorType -> IOError
+ioeSetErrorString	:: IOError -> String      -> IOError
+ioeSetHandle		:: IOError -> Handle      -> IOError
+ioeSetFileName		:: IOError -> FilePath    -> IOError
+
+ioeSetErrorType   ioe errtype  = ioe{ ioe_type = errtype }
+ioeSetErrorString ioe str      = ioe{ ioe_description = str }
+ioeSetHandle      ioe hdl      = ioe{ ioe_handle = Just hdl }
+ioeSetFileName    ioe filename = ioe{ ioe_filename = Just filename }
+
+modifyIOError :: (IOError -> IOError) -> IO a -> IO a
+modifyIOError f io = GHC.Exception.catch io (\e -> ioError (f e))
 
 -- -----------------------------------------------------------------------------
 -- annotating an IOError
