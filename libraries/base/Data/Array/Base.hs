@@ -968,6 +968,10 @@ class (HasBounds a, Monad m) => MArray a e m where
     unsafeRead  :: Ix i => a i e -> Int -> m e
     unsafeWrite :: Ix i => a i e -> Int -> e -> m ()
 
+    {-# INLINE newArray #-}
+	-- The INLINE is crucial, because until we know at least which monad 	
+	-- we are in, the code below allocates like crazy.  So inline it,
+	-- in the hope that the context will know the monad.
     newArray (l,u) init = do
         marr <- newArray_ (l,u)
         sequence_ [unsafeWrite marr i init | i <- [0 .. rangeSize (l,u) - 1]]
