@@ -136,13 +136,13 @@ tcMonoExpr (HsIPVar ip) res_ty
 
 \begin{code}
 tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
+ = tcAddErrCtxt (exprSigCtxt in_expr)	$
+   tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
    tcExpr expr sig_tc_ty		`thenTc` \ (expr', lie1) ->
 
 	-- Must instantiate the outer for-alls of sig_tc_ty
 	-- else we risk instantiating a ? res_ty to a forall-type
 	-- which breaks the invariant that tcMonoExpr only returns phi-types
-   tcAddErrCtxt (exprSigCtxt in_expr)	$
    tcInstCall SignatureOrigin sig_tc_ty	`thenNF_Tc` \ (inst_fn, lie2, inst_sig_ty) ->
    tcSubExp res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
 
