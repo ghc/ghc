@@ -561,28 +561,36 @@ fi
 rm -fr conftest*
 ])
 
-dnl
-dnl Getting at the right version of 'find'
-dnl (i.e., not the MS util on a Win32 box).
-dnl
-AC_DEFUN(FPTOOLS_FIND_FIND,
-[
-AC_PATH_PROG(Find2Cmd, find)
-$Find2Cmd --version > conftest.out 2>&1 
-if grep "FIND: Parameter format" conftest.out >/dev/null 2>&1 ; then
-   # Encountered MS' find utility, which is not what we're after.
-   #
-   # HACK - AC_CHECK_PROG is useful here in that does let you reject
-   # an (absolute) entry in the path (Find2Cmd). It is not so useful
-   # in that it doesn't let you (AFAIU) set VARIABLE equal to the 
-   # absolute path eventually found. So, hack around this by inspecting
-   # what variables hold the abs. path & use them directly.
-   AC_CHECK_PROG(FindCmd,find,`echo $ac_dir/$ac_word`,find,,$Find2Cmd)
+
+# FP_CHECK_PROG(VARIABLE, PROG-TO-CHECK-FOR,
+#               [VALUE-IF-NOT-FOUND], [PATH], [REJECT])
+# -----------------------------------------------------
+# HACK: A small wrapper around AC_CHECK_PROG, setting VARIABLE to the full path
+# of PROG-TO-CHECK-FOR when found.
+AC_DEFUN([FP_CHECK_PROG],
+[AC_CHECK_PROG([$1], [$2], [$as_dir/$ac_word$ac_exec_ext], [$3], [$4], [$5])][]dnl
+)# FP_CHECK_PROC
+
+
+# FP_PROG_FIND
+# ------------
+# Find a non-WinDoze version of the "find" utility.
+AC_DEFUN([FP_PROG_FIND],
+[AC_PATH_PROG([fp_prog_find], [find])
+echo foo > conftest.txt
+$fp_prog_find conftest.txt -print > conftest.out 2>&1
+if grep '^conftest.txt$' conftest.out > /dev/null 2>&1 ; then
+  # OK, looks like a real "find".
+  FindCmd="$fp_prog_find"
 else
-FindCmd=$Find2Cmd
-AC_SUBST(FindCmd)
+  # Found a poor WinDoze version of "find", ignore it.
+  AC_MSG_WARN([$fp_prog_find looks like a non-*nix find, ignoring it])
+  FP_CHECK_PROG([FindCmd], [find], [], [], [$fp_prog_find])
 fi
-])
+rm -f conftest.txt conftest.out
+AC_SUBST([FindCmd])[]dnl
+])# FP_PROG_FIND
+
 
 dnl
 dnl FPTOOLS_NOCACHE_CHECK prints a message, then sets the
@@ -665,51 +673,55 @@ AC_CACHE_VAL(AC_CV_NAME,
 AC_TRY_RUN([#include <stdio.h>
 #include <stddef.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
 
-#ifdef HAVE_UNISTD_H
+#if HAVE_UNISTD_H
 # include <unistd.h>
 #endif
 
-#ifdef HAVE_SYS_STAT_H
+#if HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
 
-#ifdef HAVE_FCNTL_H
+#if HAVE_FCNTL_H
 # include <fcntl.h>
 #endif
 
-#ifdef HAVE_SIGNAL_H
+#if HAVE_SIGNAL_H
 # include <signal.h>
 #endif
 
-#ifdef HAVE_TIME_H
+#if HAVE_TIME_H
 # include <time.h>
 #endif
 
-#ifdef HAVE_TERMIOS_H
+#if HAVE_TERMIOS_H
 # include <termios.h>
 #endif
 
-#ifdef HAVE_STRING_H
+#if HAVE_STRING_H
 # include <string.h>
 #endif
 
-#ifdef HAVE_CTYPE_H
+#if HAVE_CTYPE_H
 # include <ctype.h>
 #endif
 
-#ifdef HAVE_GL_GL_H
+#if defined(HAVE_GL_GL_H)
 # include <GL/gl.h>
-#endif
-
-#ifdef HAVE_OPENGL_GL_H
+#elif defined(HAVE_OPENGL_GL_H)
 # include <OpenGL/gl.h>
 #endif
 
-#ifdef HAVE_SYS_RESOURCE_H
+#if defined(HAVE_AL_ALC_H)
+# include <AL/alc.h>
+#elif defined(HAVE_OPENAL_ALC_H)
+# include <OpenAL/alc.h>
+#endif
+
+#if HAVE_SYS_RESOURCE_H
 # include <sys/resource.h>
 #endif
 

@@ -716,7 +716,7 @@ dnl ** figure out how to do context diffs
 FP_PROG_CONTEXT_DIFF
 
 dnl ** Find find command (for Win32's benefit)
-FPTOOLS_FIND_FIND
+FP_PROG_FIND
 
 dnl ** figure out how to do a BSD-ish install
 AC_PROG_INSTALL
