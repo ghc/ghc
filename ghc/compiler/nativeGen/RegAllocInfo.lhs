@@ -236,7 +236,8 @@ regUsage instr = case instr of
     ADD    sz src dst	-> usageRM src dst
     SUB    sz src dst	-> usageRM src dst
     IMUL   sz src dst	-> usageRM src dst
-    IDIV   sz src	-> mkRU (eax:edx:use_R src) [eax,edx]
+    IQUOT  sz src dst	-> usageRM src dst
+    IREM   sz src dst	-> usageRM src dst
     AND    sz src dst	-> usageRM src dst
     OR     sz src dst	-> usageRM src dst
     XOR    sz src dst	-> usageRM src dst
@@ -329,14 +330,6 @@ regUsage instr = case instr of
 
     mkRU src dst = RU (regSetFromList (filter interesting src))
   	    	      (regSetFromList (filter interesting dst))
-
--- Allow the spiller to de\cide whether or not it can use 
--- %edx as a spill temporary.
-hasFixedEDX instr
-   = case instr of
-        IDIV _ _ -> True
-        CLTD     -> True
-        other    -> False
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -438,10 +431,9 @@ findReservedRegs instrs
 #endif
 #if i386_TARGET_ARCH
   -- We can use %fake4 and %fake5 safely for float temps.
-  -- Int regs are more troublesome.  Only %ecx is definitely
-  -- available.  If there are no division insns, we can use %edx
-  -- too.  At a pinch, we also could bag %eax if there are no 
-  -- divisions and no ccalls, but so far we've never encountered
+  -- Int regs are more troublesome.  Only %ecx and %edx are
+  -- definitely.  At a pinch, we also could bag %eax if there 
+  -- are no ccalls, but so far we've never encountered
   -- a situation where three integer temporaries are necessary.
   -- 
   -- Because registers are in short supply on x86, we give the
@@ -453,7 +445,7 @@ findReservedRegs instrs
   = let f1 = fake5
         f2 = fake4
         intregs_avail
-           = ecx : if any hasFixedEDX instrs then [] else [edx]
+           = [ecx, edx]
         possibilities
            = case intregs_avail of
                 [i1] -> [ [], [i1], [f1], [i1,f1], [f1,f2], 
@@ -635,7 +627,8 @@ patchRegs instr env = case instr of
     ADD  sz src dst	-> patch2 (ADD  sz) src dst
     SUB  sz src dst	-> patch2 (SUB  sz) src dst
     IMUL sz src dst 	-> patch2 (IMUL sz) src dst
-    IDIV sz src  	-> patch1 (IDIV sz) src
+    IQUOT sz src dst 	-> patch2 (IQUOT sz) src dst
+    IREM sz src dst 	-> patch2 (IREM sz) src dst
     AND  sz src dst	-> patch2 (AND  sz) src dst
     OR   sz src dst	-> patch2 (OR   sz) src dst
     XOR  sz src dst	-> patch2 (XOR  sz) src dst

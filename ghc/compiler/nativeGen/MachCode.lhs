@@ -665,8 +665,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 
       IntAddOp  -> add_code  L x y
       IntSubOp  -> sub_code  L x y
-      IntQuotOp -> quot_code L x y True{-division-}
-      IntRemOp  -> quot_code L x y False{-remainder-}
+      IntQuotOp -> trivialCode (IQUOT L) Nothing x y
+      IntRemOp  -> trivialCode (IREM L) Nothing x y
       IntMulOp  -> let op = IMUL L in trivialCode op (Just op) x y
 
       FloatAddOp -> trivialFCode  FloatRep  GADD x y
@@ -832,41 +832,6 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 
     sub_code sz x y = trivialCode (SUB sz) Nothing x y
 
-    --------------------
-    quot_code
-	:: Size
-	-> StixTree -> StixTree
-	-> Bool -- True => division, False => remainder operation
-	-> NatM Register
-
-    -- x must go into eax, edx must be a sign-extension of eax, and y
-    -- should go in some other register (or memory), so that we get
-    -- edx:eax / reg -> eax (remainder in edx).  Currently we choose
-    -- to put y on the C stack, since that avoids tying up yet another
-    -- precious register.
-
-    quot_code sz x y is_division
-      = getRegister x		`thenNat` \ register1 ->
-	getRegister y		`thenNat` \ register2 ->
-	getNewRegNCG IntRep	`thenNat` \ tmp ->
-        getDeltaNat             `thenNat` \ delta ->
-	let
-	    code1   = registerCode register1 tmp
-	    src1    = registerName register1 tmp
-	    code2   = registerCode register2 tmp
-	    src2    = registerName register2 tmp
-	    code__2 = code2               `snocOL`      --       src2 := y
-                      PUSH L (OpReg src2) `snocOL`      --   -4(%esp) := y
-                      DELTA (delta-4)     `appOL`
-                      code1               `snocOL`      --       src1 := x
-                      MOV L (OpReg src1) (OpReg eax) `snocOL`  -- eax := x
-                      CLTD                           `snocOL`
-                      IDIV sz (OpAddr (spRel 0))     `snocOL`
-                      ADD L (OpImm (ImmInt 4)) (OpReg esp) `snocOL`
-                      DELTA delta
-	in
-	returnNat (Fixed IntRep (if is_division then eax else edx) code__2)
-	-----------------------
 
 getRegister (StInd pk mem)
   = getAmode mem    	    	    `thenNat` \ amode ->

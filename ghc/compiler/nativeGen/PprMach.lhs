@@ -931,7 +931,6 @@ pprInstr (ADD size src dst)
   = pprSizeOpOp SLIT("add") size src dst
 pprInstr (SUB size src dst) = pprSizeOpOp SLIT("sub") size src dst
 pprInstr (IMUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
-pprInstr (IDIV size op) = pprSizeOp SLIT("idiv") size op
 
 pprInstr (AND size src dst) = pprSizeOpOp SLIT("and") size src dst
 pprInstr (OR  size src dst) = pprSizeOpOp SLIT("or")  size src dst
@@ -962,6 +961,8 @@ pprInstr (JMP dsts (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP dsts op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
 pprInstr (CALL imm)             = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
 
+pprInstr (IQUOT sz src dst) = pprInstr_quotRem True sz src dst
+pprInstr (IREM  sz src dst) = pprInstr_quotRem False sz src dst
 
 -- Simulating a flat register set on the x86 FP stack is tricky.
 -- you have to free %st(7) before pushing anything on the FP reg stack
@@ -1098,6 +1099,24 @@ pprInstr GFREE
    = vcat [ ptext SLIT("\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
             ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
           ]
+
+
+pprInstr_quotRem isQuot sz src dst
+   | case sz of L -> False; _ -> True
+   = panic "pprInstr_quotRem: dunno how to do non-32bit operands"
+   | otherwise
+   = vcat [
+     (text "\t# BEGIN " <> fakeInsn),
+     (text "\tpushl $0;  pushl %eax;  pushl %edx;  pushl " <> pprOperand sz src),
+     (text "\tmovl " <> pprOperand sz dst <> text ",%eax;  xorl %edx,%edx;  cltd"),
+     (text "\tdivl 0(%esp);  movl " <> text resReg <> text ",12(%esp)"),
+     (text "\tpopl %edx;  popl %edx;  popl %eax;  popl " <> pprOperand sz dst),
+     (text "\t# END   " <> fakeInsn)
+     ]
+     where
+        resReg = if isQuot then "%eax" else "%edx"
+        opStr  = if isQuot then "IQUOT" else "IREM"
+        fakeInsn = text opStr <+> pprOperand sz src <> char ',' <+> pprOperand sz dst
 
 --------------------------
 

@@ -438,6 +438,15 @@ We might as well make use of whatever unique FP facilities Intel have
 chosen to bless us with (let's not be churlish, after all).
 Hence GLDZ and GLD1.  Bwahahahahahahaha!
 
+LATER (10 Nov 2000): idiv gives problems with the register spiller,
+because the spiller is simpleminded and because idiv has fixed uses of
+%eax and %edx.  Rather than make the spiller cleverer, we do away with
+idiv, and instead have iquot and irem fake (integer) insns, which have
+no operand register constraints -- ie, they behave like add, sub, mul.
+The printer-outer transforms them to a sequence of real insns which does
+the Right Thing (tm).  As with the FP stuff, this gives ropey code, 
+but we don't care, since it doesn't get used much.  We hope.
+
 \begin{code}
 #if i386_TARGET_ARCH
 
@@ -457,12 +466,14 @@ Hence GLDZ and GLD1.  Bwahahahahahahaha!
 
 	      | ADD	      Size Operand Operand
 	      | SUB	      Size Operand Operand
-
--- Multiplication (signed and unsigned), Division (signed and unsigned),
--- result in %eax, %edx.
-
 	      | IMUL	      Size Operand Operand
-	      | IDIV	      Size Operand
+
+-- Quotient and remainder.  SEE comment above -- these are not
+-- real x86 insns; instead they are expanded when printed
+-- into a sequence of real insns.
+
+              | IQUOT         Size Operand Operand
+              | IREM          Size Operand Operand
 
 -- Simple bit-twiddling.
 
