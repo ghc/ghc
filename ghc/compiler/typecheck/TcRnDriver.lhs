@@ -33,7 +33,7 @@ import RdrHsSyn		( RdrNameHsModule, RdrNameHsDecl, RdrNameStmt, RdrNameHsExpr,
 
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames,
 			  returnIOName, runIOName, 
-			  rootMainName, itName, mAIN_Name, unsafeCoerceName
+			  rootMainName, itName, mAIN_Name
 			)
 import RdrName		( RdrName, getRdrName, mkRdrUnqual, 
 			  lookupRdrEnv, elemRdrEnv )
@@ -52,6 +52,7 @@ import TcType		( Type,
 			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
 			)
 import Inst		( showLIE, tcStdSyntaxName )
+import MkId		( unsafeCoerceId )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2 )
 import TcDefaults	( tcDefaults )
@@ -381,8 +382,10 @@ tcUserStmt stmt = tc_stmts [stmt]
 tc_stmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
 	let {
-	    ret_ty = mkListTy unitTy ;
-	    names  = collectStmtsBinders stmts ;
+	    ret_ty    = mkListTy unitTy ;
+	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
+
+	    names = collectStmtsBinders stmts ;
 
 	    stmt_ctxt = SC { sc_what = DoExpr, 
 			     sc_rhs  = check_rhs,
@@ -390,16 +393,23 @@ tc_stmts stmts
 			     sc_ty   = ret_ty } ;
 
 	    check_rhs rhs rhs_ty = tcCheckRho rhs  (mkTyConApp ioTyCon [rhs_ty]) ;
-	    check_body body      = tcCheckRho body (mkTyConApp ioTyCon [ret_ty]) ;
+	    check_body body      = tcCheckRho body io_ret_ty ;
 
-		-- ret_expr is the expression
-		--	returnIO [coerce () x, ..,  coerce () z]
-	    ret_stmt = ResultStmt ret_expr noSrcLoc ;
-	    ret_expr = HsApp (HsVar returnIOName) 
-			     (ExplicitList placeHolderType (map mk_item names)) ;
-	    mk_item name = HsApp (HsVar unsafeCoerceName) (HsVar name) ;
-
-	    all_stmts = stmts ++ [ret_stmt] ;
+		-- mk_return builds the expression
+		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
+		--
+		-- Despite the inconvenience of building the type applications etc,
+		-- this *has* to be done in type-annotated post-typecheck form
+		-- because we are going to return a list of *polymorphic* values
+		-- coerced to type (). If we built a *source* stmt
+		--	return [coerce x, ..., coerce z]
+		-- then the type checker would instantiate x..z, and we wouldn't
+		-- get their *polymorphic* values.  (And we'd get ambiguity errs
+		-- if they were overloaded, since they aren't applied to anything.)
+	    mk_return ret_id ids = HsApp (TyApp (HsVar ret_id) [ret_ty]) 
+			      		 (ExplicitList unitTy (map mk_item ids)) ;
+	    mk_item id = HsApp (TyApp (HsVar unsafeCoerceId) [idType id, unitTy])
+		    	       (HsVar id) ;
 
 	    io_ty = mkTyConApp ioTyCon []
 	 } ;
@@ -407,15 +417,16 @@ tc_stmts stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "tcs 2") ;
 	((ids, tc_expr), lie) <- getLIE $ do {
-	    (ids, tc_stmts) <- tcStmtsAndThen combine stmt_ctxt all_stmts	$ 
+	    (ids, tc_stmts) <- tcStmtsAndThen combine stmt_ctxt stmts	$ 
 			do {
 			    -- Look up the names right in the middle,
 			    -- where they will all be in scope
 			    ids <- mappM tcLookupId names ;
-			    return (ids, []) } ;
+			    ret_id <- tcLookupId returnIOName ;		-- return @ IO
+			    return (ids, [ResultStmt (mk_return ret_id ids) noSrcLoc]) } ;
+
 	    io_ids <- mappM (tcStdSyntaxName DoOrigin io_ty) monadNames ;
-	    return (ids, HsDo DoExpr tc_stmts io_ids
-		 	      (mkTyConApp ioTyCon [ret_ty]) noSrcLoc) 
+	    return (ids, HsDo DoExpr tc_stmts io_ids io_ret_ty noSrcLoc) 
 	} ;
 
 	-- Simplify the context right here, so that we fail
@@ -479,8 +490,10 @@ tcRnThing :: HscEnv -> PersistentCompilerState
 	  -> RdrName
 	  -> IO (PersistentCompilerState, Maybe [TyThing])
 -- Look up a RdrName and return all the TyThings it might be
--- We treat a capitalised RdrName as both a data constructor 
--- and as a type or class constructor; hence we return up to two results
+-- A capitalised RdrName is given to us in the DataName namespace,
+-- but we want to treat it as *both* a data constructor 
+-- *and* as a type or class constructor; 
+-- hence the call to dataTcOccs, and we return up to two results
 tcRnThing hsc_env pcs ictxt rdr_name
   = initTc hsc_env pcs iNTERACTIVE $ 
     setInteractiveContext ictxt $ do {
@@ -500,7 +513,12 @@ tcRnThing hsc_env pcs ictxt rdr_name
 	  errs_s = [msgs | (msgs, Nothing) <- results] } ;
 
 	-- Fail if nothing good happened, else add warnings
-    if null good_names then	-- Fail
+    if null good_names then
+		-- No lookup succeeded, so
+		-- pick the first error message and report it
+		-- ToDo: If one of the errors is "could be Foo.X or Baz.X",
+		--	 while the other is "X is not in scope", 
+		--	 we definitely want the former; but we might pick the latter
 	do { addMessages (head errs_s) ; failM }
       else 			-- Add deprecation warnings
 	mapM_ addMessages warns_s ;
