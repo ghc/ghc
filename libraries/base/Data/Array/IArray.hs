@@ -54,8 +54,4 @@ import Prelude
 
 import Data.Ix
 import Data.Array (Array)
-#ifdef __HUGS__
-import Hugs.Array.Base
-#else
 import Data.Array.Base
-#endif

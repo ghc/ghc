@@ -46,8 +46,6 @@ import Hugs.IOArray
 #endif
 
 #ifdef __GLASGOW_HASKELL__
--- GHC only to the end of file
-
 import Foreign.C
 import Foreign.Ptr		( Ptr, FunPtr )
 import Foreign.StablePtr	( StablePtr )
@@ -63,6 +61,27 @@ import GHC.Handle
 import GHC.Conc
 
 import GHC.Base
+#endif /* __GLASGOW_HASKELL__ */
+
+#ifdef __HUGS__
+instance HasBounds IOArray where
+    bounds = boundsIOArray
+
+instance MArray IOArray e IO where
+    newArray    = newIOArray
+    unsafeRead  = unsafeReadIOArray
+    unsafeWrite = unsafeWriteIOArray
+#endif /* __HUGS__ */
+
+iOArrayTc :: TyCon
+iOArrayTc = mkTyCon "IOArray"
+
+instance (Typeable a, Typeable b) => Typeable (IOArray a b) where
+  typeOf a = mkAppTy iOArrayTc [typeOf ((undefined :: IOArray a b -> a) a),
+				typeOf ((undefined :: IOArray a b -> b) a)]
+
+#ifdef __GLASGOW_HASKELL__
+-- GHC only to the end of file
 
 -----------------------------------------------------------------------------
 -- | Mutable, boxed, non-strict arrays in the 'IO' monad.  The type
@@ -73,13 +92,6 @@ import GHC.Base
 --  * @e@: the element type of the array.
 --
 newtype IOArray i e = IOArray (STArray RealWorld i e) deriving Eq
-
-iOArrayTc :: TyCon
-iOArrayTc = mkTyCon "IOArray"
-
-instance (Typeable a, Typeable b) => Typeable (IOArray a b) where
-  typeOf a = mkAppTy iOArrayTc [typeOf ((undefined :: IOArray a b -> a) a),
-				typeOf ((undefined :: IOArray a b -> b) a)]
 
 instance HasBounds IOArray where
     {-# INLINE bounds #-}

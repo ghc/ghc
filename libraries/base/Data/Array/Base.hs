@@ -22,7 +22,8 @@ import Data.Ix		( Ix, range, index, rangeSize )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Arr		( STArray, unsafeIndex )
-import qualified GHC.Arr
+import qualified GHC.Arr as Arr
+import qualified GHC.Arr as ArrST
 import GHC.ST		( ST(..), runST )
 import GHC.Base
 import GHC.Word		( Word(..) )
@@ -31,6 +32,13 @@ import GHC.Float	( Float(..), Double(..) )
 import GHC.Stable	( StablePtr(..) )
 import GHC.Int		( Int8(..),  Int16(..),  Int32(..),  Int64(..) )
 import GHC.Word		( Word8(..), Word16(..), Word32(..), Word64(..) )
+#endif
+
+#ifdef __HUGS__
+import qualified Hugs.Array as Arr
+import qualified Hugs.ST as ArrST
+import Hugs.Array ( unsafeIndex )
+import Hugs.ST ( STArray, ST(..), runST )
 #endif
 
 import Data.Dynamic
@@ -161,9 +169,10 @@ listArrayST (l,u) es = do
 
 {-# RULES
 "listArray/Array" listArray =
-    \lu es -> runST (listArrayST lu es >>= GHC.Arr.unsafeFreezeSTArray)
+    \lu es -> runST (listArrayST lu es >>= ArrST.unsafeFreezeSTArray)
     #-}
 
+#ifdef __GLASGOW_HASKELL__
 {-# INLINE listUArrayST #-}
 listUArrayST :: (MArray (STUArray s) e (ST s), Ix i)
              => (i,i) -> [e] -> ST s (STUArray s i e)
@@ -223,29 +232,30 @@ listUArrayST (l,u) es = do
 "listArray/UArray/Word64"    listArray = \lu (es :: [Word64])      ->
     runST (listUArrayST lu es >>= unsafeFreezeSTUArray)
     #-}
+#endif /* __GLASGOW_HASKELL__ */
 
 {-# INLINE (!) #-}
 -- | Returns the element of an immutable array at the specified index.
 (!) :: (IArray a e, Ix i) => a i e -> i -> e
-arr ! i | (l,u) <- bounds arr = unsafeAt arr (index (l,u) i)
+arr ! i = case bounds arr of (l,u) -> unsafeAt arr (index (l,u) i)
 
 {-# INLINE indices #-}
 -- | Returns a list of all the valid indices in an array.
 indices :: (HasBounds a, Ix i) => a i e -> [i]
-indices arr | (l,u) <- bounds arr = range (l,u)
+indices arr = case bounds arr of (l,u) -> range (l,u)
 
 {-# INLINE elems #-}
 -- | Returns a list of all the elements of an array, in the same order
 -- as their indices.
 elems :: (IArray a e, Ix i) => a i e -> [e]
-elems arr | (l,u) <- bounds arr =
-    [unsafeAt arr i | i <- [0 .. rangeSize (l,u) - 1]]
+elems arr = case bounds arr of
+    (l,u) -> [unsafeAt arr i | i <- [0 .. rangeSize (l,u) - 1]]
 
 {-# INLINE assocs #-}
 -- | Returns the contents of an array as a list of associations.
 assocs :: (IArray a e, Ix i) => a i e -> [(i, e)]
-assocs arr | (l,u) <- bounds arr =
-    [(i, unsafeAt arr (unsafeIndex (l,u) i)) | i <- range (l,u)]
+assocs arr = case bounds arr of
+    (l,u) -> [(i, unsafeAt arr (unsafeIndex (l,u) i)) | i <- range (l,u)]
 
 {-# INLINE accumArray #-}
 
@@ -286,8 +296,8 @@ of the array.  However, the 'Data.Array.Diff.DiffArray' type provides
 this operation with complexity linear in the number of updates.
 -}
 (//) :: (IArray a e, Ix i) => a i e -> [(i, e)] -> a i e
-arr // ies | (l,u) <- bounds arr =
-    unsafeReplace arr [(index (l,u) i, e) | (i, e) <- ies]
+arr // ies = case bounds arr of
+    (l,u) -> unsafeReplace arr [(index (l,u) i, e) | (i, e) <- ies]
 
 {-# INLINE accum #-}
 {-|
@@ -298,15 +308,16 @@ from the list into the array with the accumulating function @f@. Thus
 > accumArray f z b = accum f (array b [(i, z) | i \<- range b])
 -}
 accum :: (IArray a e, Ix i) => (e -> e' -> e) -> a i e -> [(i, e')] -> a i e
-accum f arr ies | (l,u) <- bounds arr =
-    unsafeAccum f arr [(index (l,u) i, e) | (i, e) <- ies]
+accum f arr ies = case bounds arr of
+    (l,u) -> unsafeAccum f arr [(index (l,u) i, e) | (i, e) <- ies]
 
 {-# INLINE amap #-}
 -- | Returns a new array derived from the original array by applying a
 -- function to each of the elements.
 amap :: (IArray a e', IArray a e, Ix i) => (e' -> e) -> a i e' -> a i e
-amap f arr | (l,u) <- bounds arr =
-    unsafeArray (l,u) [(i, f (unsafeAt arr i)) | i <- [0 .. rangeSize (l,u) - 1]]
+amap f arr = case bounds arr of
+    (l,u) -> unsafeArray (l,u) [(i, f (unsafeAt arr i)) |
+				i <- [0 .. rangeSize (l,u) - 1]]
 {-# INLINE ixmap #-}
 -- | Returns a new array derived from the original array by applying a
 -- function to each of the indices.
@@ -317,22 +328,23 @@ ixmap (l,u) f arr =
 -----------------------------------------------------------------------------
 -- Normal polymorphic arrays
 
-instance HasBounds GHC.Arr.Array where
+instance HasBounds Arr.Array where
     {-# INLINE bounds #-}
-    bounds = GHC.Arr.bounds
+    bounds = Arr.bounds
 
-instance IArray GHC.Arr.Array e where
+instance IArray Arr.Array e where
     {-# INLINE unsafeArray #-}
-    unsafeArray      = GHC.Arr.unsafeArray
+    unsafeArray      = Arr.unsafeArray
     {-# INLINE unsafeAt #-}
-    unsafeAt         = GHC.Arr.unsafeAt
+    unsafeAt         = Arr.unsafeAt
     {-# INLINE unsafeReplace #-}
-    unsafeReplace    = GHC.Arr.unsafeReplace
+    unsafeReplace    = Arr.unsafeReplace
     {-# INLINE unsafeAccum #-}
-    unsafeAccum      = GHC.Arr.unsafeAccum
+    unsafeAccum      = Arr.unsafeAccum
     {-# INLINE unsafeAccumArray #-}
-    unsafeAccumArray = GHC.Arr.unsafeAccumArray
+    unsafeAccumArray = Arr.unsafeAccumArray
 
+#ifdef __GLASGOW_HASKELL__
 -----------------------------------------------------------------------------
 -- Flat unboxed arrays
 
@@ -429,6 +441,7 @@ cmpIntUArray arr1@(UArray l1 u1 _) arr2@(UArray l2 u2 _) =
         other -> other
 
 {-# RULES "cmpUArray/Int" cmpUArray = cmpIntUArray #-}
+#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Showing IArrays
@@ -446,6 +459,7 @@ showsIArray p a =
     showChar ' ' .
     shows (assocs a)
 
+#ifdef __GLASGOW_HASKELL__
 -----------------------------------------------------------------------------
 -- Flat unboxed arrays: instances
 
@@ -795,6 +809,7 @@ instance (Ix ix, Show ix) => Show (UArray ix Word32) where
 
 instance (Ix ix, Show ix) => Show (UArray ix Word64) where
     showsPrec = showsIArray
+#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Mutable arrays
@@ -865,34 +880,35 @@ newListArray (l,u) es = do
 {-# INLINE readArray #-}
 -- | Read an element from a mutable array
 readArray :: (MArray a e m, Ix i) => a i e -> i -> m e
-readArray marr i | (l,u) <- bounds marr =
-    unsafeRead marr (index (l,u) i)
+readArray marr i = case bounds marr of
+    (l,u) -> unsafeRead marr (index (l,u) i)
 
 {-# INLINE writeArray #-}
 -- | Write an element in a mutable array
 writeArray :: (MArray a e m, Ix i) => a i e -> i -> e -> m ()
-writeArray marr i e | (l,u) <- bounds marr =
-    unsafeWrite marr (index (l,u) i) e
+writeArray marr i e = case bounds marr of
+    (l,u) -> unsafeWrite marr (index (l,u) i) e
 
 {-# INLINE getElems #-}
 -- | Return a list of all the elements of a mutable array
 getElems :: (MArray a e m, Ix i) => a i e -> m [e]
-getElems marr | (l,u) <- bounds marr =
-    sequence [unsafeRead marr i | i <- [0 .. rangeSize (l,u) - 1]]
+getElems marr = case bounds marr of
+    (l,u) -> sequence [unsafeRead marr i | i <- [0 .. rangeSize (l,u) - 1]]
 
 {-# INLINE getAssocs #-}
 -- | Return a list of all the associations of a mutable array, in
 -- index order.
 getAssocs :: (MArray a e m, Ix i) => a i e -> m [(i, e)]
-getAssocs marr | (l,u) <- bounds marr =
-    sequence [do e <- unsafeRead marr (index (l,u) i); return (i,e)
+getAssocs marr = case bounds marr of
+    (l,u) -> sequence [do e <- unsafeRead marr (index (l,u) i); return (i,e)
               | i <- range (l,u)]
 
 {-# INLINE mapArray #-}
 -- | Constructs a new array derived from the original array by applying a
 -- function to each of the elements.
 mapArray :: (MArray a e' m, MArray a e m, Ix i) => (e' -> e) -> a i e' -> m (a i e)
-mapArray f marr | (l,u) <- bounds marr = do
+mapArray f marr = case bounds marr of
+  (l,u) -> do
     marr' <- newArray_ (l,u)
     sequence_ [do
         e <- unsafeRead marr i
@@ -917,15 +933,15 @@ mapIndices (l,u) f marr = do
 
 instance HasBounds (STArray s) where
     {-# INLINE bounds #-}
-    bounds = GHC.Arr.boundsSTArray
+    bounds = ArrST.boundsSTArray
 
 instance MArray (STArray s) e (ST s) where
     {-# INLINE newArray #-}
-    newArray    = GHC.Arr.newSTArray
+    newArray    = ArrST.newSTArray
     {-# INLINE unsafeRead #-}
-    unsafeRead  = GHC.Arr.unsafeReadSTArray
+    unsafeRead  = ArrST.unsafeReadSTArray
     {-# INLINE unsafeWrite #-}
-    unsafeWrite = GHC.Arr.unsafeWriteSTArray
+    unsafeWrite = ArrST.unsafeWriteSTArray
 
 -----------------------------------------------------------------------------
 -- Typeable instance for STArray
@@ -938,6 +954,7 @@ instance (Typeable a, Typeable b, Typeable c) => Typeable (STArray a b c) where
 				typeOf ((undefined :: STArray a b c -> b) a),
 				typeOf ((undefined :: STArray a b c -> c) a)]
 
+#ifdef __GLASGOW_HASKELL__
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (ST monad)
 
@@ -1260,6 +1277,7 @@ bOOL_BIT, bOOL_NOT_BIT :: Int# -> Word#
 bOOL_BIT     n# = int2Word# 1# `uncheckedShiftL#` (word2Int# (int2Word# n# `and#` mask#))
   where W# mask# = SIZEOF_HSWORD * 8 - 1
 bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb# where W# mb# = maxBound
+#endif /* __GLASGOW_HASKELL__ */
 
 -----------------------------------------------------------------------------
 -- Freezing
@@ -1268,11 +1286,13 @@ bOOL_NOT_BIT n# = bOOL_BIT n# `xor#` mb# where W# mb# = maxBound
 -- immutable array (any instance of 'IArray') by taking a complete
 -- copy of it.
 freeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
-freeze marr | (l,u) <- bounds marr = do
+freeze marr = case bounds marr of
+  (l,u) -> do
     ies <- sequence [do e <- unsafeRead marr i; return (i,e)
                      | i <- [0 .. rangeSize (l,u) - 1]]
     return (unsafeArray (l,u) ies)
 
+#ifdef __GLASGOW_HASKELL__
 freezeSTUArray :: Ix i => STUArray s i e -> ST s (UArray i e)
 freezeSTUArray (STUArray l u marr#) = ST $ \s1# ->
     case sizeofMutableByteArray# marr#  of { n# ->
@@ -1282,9 +1302,10 @@ freezeSTUArray (STUArray l u marr#) = ST $ \s1# ->
     (# s4#, UArray l u arr# #) }}}}
 
 {-# RULES
-"freeze/STArray"  freeze = GHC.Arr.freezeSTArray
+"freeze/STArray"  freeze = ArrST.freezeSTArray
 "freeze/STUArray" freeze = freezeSTUArray
     #-}
+#endif /* __GLASGOW_HASKELL__ */
 
 -- In-place conversion of mutable arrays to immutable ones places
 -- a proof obligation on the user: no other parts of your code can
@@ -1303,7 +1324,7 @@ unsafeFreeze :: (Ix i, MArray a e m, IArray b e) => a i e -> m (b i e)
 unsafeFreeze = freeze
 
 {-# RULES
-"unsafeFreeze/STArray"  unsafeFreeze = GHC.Arr.unsafeFreezeSTArray
+"unsafeFreeze/STArray"  unsafeFreeze = ArrST.unsafeFreezeSTArray
 "unsafeFreeze/STUArray" unsafeFreeze = unsafeFreezeSTUArray
     #-}
 
@@ -1314,12 +1335,14 @@ unsafeFreeze = freeze
 -- mutable array (any instance of 'MArray') by taking a complete copy
 -- of it.
 thaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
-thaw arr | (l,u) <- bounds arr = do
+thaw arr = case bounds arr of
+  (l,u) -> do
     marr <- newArray_ (l,u)
     sequence_ [unsafeWrite marr i (unsafeAt arr i)
                | i <- [0 .. rangeSize (l,u) - 1]]
     return marr
 
+#ifdef __GLASGOW_HASKELL__
 thawSTUArray :: Ix i => UArray i e -> ST s (STUArray s i e)
 thawSTUArray (UArray l u arr#) = ST $ \s1# ->
     case sizeofByteArray# arr#          of { n# ->
@@ -1331,9 +1354,10 @@ foreign import ccall unsafe "memcpy"
     memcpy :: MutableByteArray# RealWorld -> ByteArray# -> Int# -> IO ()
 
 {-# RULES
-"thaw/STArray"  thaw = GHC.Arr.thawSTArray
+"thaw/STArray"  thaw = ArrST.thawSTArray
 "thaw/STUArray" thaw = thawSTUArray
     #-}
+#endif /* __GLASGOW_HASKELL__ */
 
 -- In-place conversion of immutable arrays to mutable ones places
 -- a proof obligation on the user: no other parts of your code can
@@ -1350,12 +1374,14 @@ foreign import ccall unsafe "memcpy"
 unsafeThaw :: (Ix i, IArray a e, MArray b e m) => a i e -> m (b i e)
 unsafeThaw = thaw
 
+#ifdef __GLASGOW_HASKELL__
 {-# INLINE unsafeThawSTUArray #-}
 unsafeThawSTUArray :: Ix i => UArray i e -> ST s (STUArray s i e)
 unsafeThawSTUArray (UArray l u marr#) =
     return (STUArray l u (unsafeCoerce# marr#))
 
 {-# RULES
-"unsafeThaw/STArray"    unsafeThaw = GHC.Arr.unsafeThawSTArray
+"unsafeThaw/STArray"    unsafeThaw = ArrST.unsafeThawSTArray
 "unsafeThaw/STUArray"   unsafeThaw = unsafeThawSTUArray
     #-}
+#endif /* __GLASGOW_HASKELL__ */
