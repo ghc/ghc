@@ -2668,7 +2668,7 @@ sub check_for_source_options {
     open(FILE,$file) || return(1); # No big loss
     
     while (<FILE>) {
-	if ( /^${comment_start} OPTIONS (.*)${comment_end}$/ ) {
+	if ( /^${comment_start} OPTIONS (.*)${comment_end}/ ) {
            # add the options found at the back of the command line.
 	   local(@entries) = split(/\s+/,$1);
 	   print STDERR "Found OPTIONS " . join(' ',@entries) . " in $file\n" if $Verbose;
