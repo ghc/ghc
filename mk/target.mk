@@ -297,6 +297,11 @@ $(HS_PROG) :: $(HS_OBJS)
 	$(HC) -o $@ $(HC_OPTS) $(LD_OPTS) $(HS_OBJS) $(LIBS)
 endif
 
+# Object and interface files have suffixes tagged with their ways
+ifneq "$(way)" ""
+SRC_HC_OPTS += -hisuf $(way_)hi
+endif
+
 #----------------------------------------
 #	C programs
 
