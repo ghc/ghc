@@ -498,7 +498,11 @@ findAndReadIface doc_str mod_name hi_boot_file
 	; read_result <- readIface mod_name file_path hi_boot_file
 	; case read_result of
 	    Left err    -> returnM (Left (badIfaceFile file_path err))
-	    Right iface -> returnM (Right iface)
+	    Right iface 
+		| moduleName (mi_module iface) /= mod_name ->
+		  return (Left (wrongIfaceModErr iface mod_name file_path))
+		| otherwise ->
+		  returnM (Right iface)
 	}}}
 
 findHiFile :: ModuleName -> IsBootInterface
@@ -681,4 +685,15 @@ noIfaceErr dflags mod_name boot_file files
         text "(use -v to see a list of the files searched for)"
     | otherwise =
         hang (ptext SLIT("locations searched:")) 4 (vcat (map text files))
+
+wrongIfaceModErr iface mod_name file_path 
+  = sep [ptext SLIT("Interface file") <+> iface_file,
+         ptext SLIT("contains module") <+> quotes (ppr (mi_module iface)) <> comma,
+         ptext SLIT("but we were expecting module") <+> quotes (ppr mod_name),
+	 sep [ptext SLIT("Probable cause: the source code which generated"),
+	     nest 2 iface_file,
+	     ptext SLIT("has an incompatible module name")
+	    ]
+	]
+  where iface_file = doubleQuotes (text file_path)
 \end{code}
