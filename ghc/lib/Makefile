@@ -4,7 +4,7 @@
 #
 #		Makefile for building the GHC Prelude libraries umpteen ways
 #
-# 	$Id: Makefile,v 1.7 1997/03/20 17:32:01 sof Exp $
+# 	$Id: Makefile,v 1.8 1997/03/25 21:21:56 sof Exp $
 #
 #	
 #################################################################################
@@ -31,7 +31,7 @@ LIBRARY = libHS$(_way).a
 HS_SRCS	= $(foreach d, $(LIB_DIRS), $(wildcard $(d)/*.lhs))
 HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
 LIBOBJS = $(HS_OBJS)
-HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) ghc/GHC.hi
+HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) ghc/GHC.$(way_)hi
 
 #-----------------------------------------------------------------------------
 # 	Setting the GHC compile options
