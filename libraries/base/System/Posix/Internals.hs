@@ -143,6 +143,7 @@ foreign import stdcall unsafe "HsBase.h closesocket"
 fdGetMode :: Int -> IO IOMode
 fdGetMode fd = do
 #if defined(mingw32_TARGET_OS) || defined(__MINGW32__)
+    -- XXX: this code is *BROKEN*, _setmode only deals with O_TEXT/O_BINARY
     flags1 <- throwErrnoIfMinus1Retry "fdGetMode" 
                 (c__setmode (fromIntegral fd) (fromIntegral o_WRONLY))
     flags  <- throwErrnoIfMinus1Retry "fdGetMode" 
