@@ -3,11 +3,11 @@ dnl (run "grep '^dnl \*' configure.ac | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
 dnl  (or some such) to see the outline of this file)
 dnl
 #
-# (c) The AQUA Project, Glasgow University, 1994-1998
+# (c) The AQUA Project, Glasgow University, 1994-2004
 #
 # Configure script template for the Glasgow functional programming tools
 #
-# Process with 'autoconf' to get a working configure script.
+# Process with 'autoreconf' to get a working configure script.
 #
 # For the generated configure script, do "./configure --help" to
 # see what flags are available. (Better yet, read the documentation!)
