@@ -57,6 +57,7 @@ module CmdLineOpts (
 	opt_WarnDuplicateExports,
 	opt_WarnHiShadows,
 	opt_WarnIncompletePatterns,
+	opt_WarnMissingFields,
 	opt_WarnMissingMethods,
 	opt_WarnMissingSigs,
 	opt_WarnNameShadowing,
@@ -344,6 +345,7 @@ opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give th
 opt_WarnDuplicateExports	= lookUp  SLIT("-fwarn-duplicate-exports")
 opt_WarnHiShadows		= lookUp  SLIT("-fwarn-hi-shadowing")
 opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
+opt_WarnMissingFields		= lookUp  SLIT("-fwarn-missing-fields")
 opt_WarnMissingMethods		= lookUp  SLIT("-fwarn-missing-methods")
 opt_WarnMissingSigs		= lookUp  SLIT("-fwarn-missing-signatures")
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")

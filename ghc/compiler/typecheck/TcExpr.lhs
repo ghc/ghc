@@ -39,12 +39,15 @@ import TcType		( TcType, TcTauType,
 			  newTyVarTy, newTyVarTy_OpenKind, zonkTcType )
 
 import Class		( Class )
-import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType )
+import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType
+			)
 import Id		( idType, recordSelectorFieldLabel,
 			  isRecordSelector,
 			  Id
 			)
-import DataCon		( dataConFieldLabels, dataConSig, dataConId )
+import DataCon		( dataConFieldLabels, dataConSig, dataConId,
+			  dataConStrictMarks, StrictnessMark(..)
+			)
 import Name		( Name )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 			  splitFunTy_maybe, splitFunTys, isNotUsgTy,
@@ -72,9 +75,11 @@ import Unique		( cCallableClassKey, cReturnableClassKey,
 			  thenMClassOpKey, failMClassOpKey, returnMClassOpKey
 			)
 import Outputable
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, mapMaybe )
 import ListSetOps	( minusList )
 import Util
+import CmdLineOpts      ( opt_WarnMissingFields )
+
 \end{code}
 
 %************************************************************************
@@ -475,9 +480,21 @@ tcMonoExpr (RecordCon con_name rbinds) res_ty
 
 	-- Typecheck the record bindings
     tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
+    
+    let
+      missing_s_fields = missingStrictFields rbinds data_con
+    in
+    checkTcM (null missing_s_fields)
+	(mapNF_Tc (addErrTc . missingStrictFieldCon con_name) missing_s_fields `thenNF_Tc_`
+	 returnNF_Tc ())  `thenNF_Tc_`
+    let
+      missing_fields = missingFields rbinds data_con
+    in
+    checkTcM (not (opt_WarnMissingFields && not (null missing_fields)))
+	(mapNF_Tc ((warnTc True) . missingFieldCon con_name) missing_fields `thenNF_Tc_`
+	 returnNF_Tc ())  `thenNF_Tc_`
 
     returnTc (RecordConOut data_con con_expr rbinds', con_lie `plusLIE` rbinds_lie)
-
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -955,6 +972,36 @@ badFields rbinds data_con
     ]
   where
     field_names = map fieldLabelName (dataConFieldLabels data_con)
+
+missingStrictFields rbinds data_con
+  = [ fn | fn <- strict_field_names,
+  		 not (fn `elem` field_names_used)
+    ]
+  where
+    field_names_used = [ field_name | (field_name, _, _) <- rbinds ]
+    strict_field_names = mapMaybe isStrict field_info
+
+    isStrict (fl, MarkedStrict) = Just (fieldLabelName fl)
+    isStrict _			= Nothing
+
+    field_info = zip (dataConFieldLabels data_con)
+    		     (dataConStrictMarks data_con)
+
+missingFields rbinds data_con
+  = [ fn | fn <- non_strict_field_names, not (fn `elem` field_names_used) ]
+  where
+    field_names_used = [ field_name | (field_name, _, _) <- rbinds ]
+
+     -- missing strict fields have already been flagged as 
+     -- being so, so leave them out here.
+    non_strict_field_names = mapMaybe isn'tStrict field_info
+
+    isn'tStrict (fl, MarkedStrict) = Nothing
+    isn'tStrict (fl, _)            = Just (fieldLabelName fl)
+
+    field_info = zip (dataConFieldLabels data_con)
+    		     (dataConStrictMarks data_con)
+
 \end{code}
 
 %************************************************************************
@@ -1057,5 +1104,15 @@ illegalCcallTyErr isArg ty
     | isArg     = ptext SLIT("argument")
     | otherwise = ptext SLIT("result")
 
+
+missingStrictFieldCon :: Name -> Name -> SDoc
+missingStrictFieldCon con field
+  = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
+	  ptext SLIT("does not have the required strict field"), quotes (ppr field)]
+
+missingFieldCon :: Name -> Name -> SDoc
+missingFieldCon con field
+  = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
+	  ptext SLIT("does not have the field"), quotes (ppr field)]
 
 \end{code}
