@@ -68,6 +68,7 @@ module Type (
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 	namesOfType, usageAnnOfType, typeKind, addFreeTyVars,
+	namesOfDFunHead,
 
 	-- Tidying up for printing
 	tidyType,     tidyTypes,
@@ -766,6 +767,17 @@ splitDFunTy ty
   = case splitSigmaTy ty of { (tvs, theta, tau) -> 
     case splitDictTy tau of { (clas, tys) ->
     (tvs, theta, clas, tys) }}
+
+namesOfDFunHead :: Type -> NameSet
+-- Find the free type constructors and classes 
+-- of the head of the dfun instance type
+-- The 'dfun_head_type' is because of
+--	instance Foo a => Baz T where ...
+-- The decl is an orphan if Baz and T are both not locally defined,
+--	even if Foo *is* locally defined
+namesOfDFunHead dfun_ty = case splitSigmaTy dfun_ty of
+				(tvs,_,head_ty) -> delListFromNameSet (namesOfType head_ty)
+								      (map getName tvs)
 
 mkPredName :: Unique -> SrcLoc -> PredType -> Name
 mkPredName uniq loc (ClassP cls tys) = mkLocalName uniq (mkDictOcc (getOccName cls)) loc

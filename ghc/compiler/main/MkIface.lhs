@@ -50,7 +50,7 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyCo
 			)
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
-import Type		( splitSigmaTy, tidyTopType, deNoteType, namesOfType )
+import Type		( splitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
@@ -131,15 +131,9 @@ write_diffs dflags new_iface (Just sdoc_diffs)
 isOrphanModule this_mod (ModDetails {md_insts = insts, md_rules = rules})
   = any orphan_inst insts || any orphan_rule rules
   where
-    orphan_inst dfun_id = no_locals (namesOfType (dfun_head_type dfun_id))
+    orphan_inst dfun_id = no_locals (namesOfDFunHead (idType dfun_id))
     orphan_rule rule    = no_locals (ruleLhsFreeNames rule)
     no_locals names     = isEmptyNameSet (filterNameSet (nameIsLocalOrFrom this_mod) names)
-    dfun_head_type dfun	= case splitSigmaTy (idType dfun) of
-				(_,_,head_ty) -> head_ty
-	-- The 'dfun_head_type' is because of
-	--	instance Foo a => Baz T where ...
-	-- The decl is an orphan if Baz and T are both not locally defined,
-	--	even if Foo *is* locally defined
 \end{code}
 
 \begin{code}
