@@ -26,7 +26,7 @@ Package {
 #                           endif
 	extra_libraries   = [ "HSbase_cbits"
 #ifdef mingw32_TARGET_OS
-                            , "wsock32", "msvcrt", "kernel32", "user32"
+                            , "wsock32", "kernel32", "user32"
 #endif
 			    ],
 #ifdef INSTALLING
