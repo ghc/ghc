@@ -73,7 +73,8 @@ AC_CACHE_CHECK([alignment of $1], AS_TR_SH([fp_cv_alignment_$1]),
   FP_COMPUTE_INT([(long) (&((struct { char c; $1 ty; } *)0)->ty)],
                  [AS_TR_SH([fp_cv_alignment_$1])],
                  [AC_INCLUDES_DEFAULT([$3])],
-                 [AC_MSG_FAILURE([cannot compute alignment ($1), 77])])
+                 [AC_MSG_ERROR([cannot compute alignment ($1)
+See `config.log' for more details.], [77])])
 else
   AS_TR_SH([fp_cv_alignment_$1])=0
 fi])dnl
