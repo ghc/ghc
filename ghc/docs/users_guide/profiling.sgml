@@ -365,7 +365,7 @@ x = nfib 25
 
     <para>You can view the time and allocation profiling graph of your
     program graphically, using <command>ghcprof</command>.  This is a
-    new tool with GHC 4.07, and will eventually be the de-facto
+    new tool with GHC 4.08, and will eventually be the de-facto
     standard way of viewing GHC profiles.</para>
 
     <para>To run <command>ghcprof</command>, you need
