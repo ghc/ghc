@@ -419,7 +419,21 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 	  -> NewOrData -> TyCon -> [TyVar]
 	  -> ConDecl Name -> TcM DataCon
 
-tcConDecl unbox_strict new_or_data tycon tc_tvs
+tcConDecl unbox_strict NewType tycon tc_tvs	-- Newtypes
+	  (ConDecl name ex_tvs ex_ctxt details)
+  = ASSERT( null ex_tvs && null (unLoc ex_ctxt) )	
+    do	{ let tc_datacon field_lbls arg_ty
+		= do { arg_ty' <- tcHsKindedType arg_ty	-- No bang on newtype
+		     ; buildDataCon (unLoc name) False {- Prefix -} 
+				    True {- Vanilla -} [NotMarkedStrict]
+		    		    (map unLoc field_lbls)
+			   	    tc_tvs [] [arg_ty']
+				    tycon (mkTyVarTys tc_tvs) }
+	; case details of
+	    PrefixCon [arg_ty] -> tc_datacon [] arg_ty
+	    RecCon [(field_lbl, arg_ty)] -> tc_datacon [field_lbl] arg_ty }
+
+tcConDecl unbox_strict DataType tycon tc_tvs	-- Ordinary data types
 	  (ConDecl name ex_tvs ex_ctxt details)
   = tcTyVarBndrs ex_tvs		$ \ ex_tvs' -> do 
     { ex_ctxt' <- tcHsKindedContext ex_ctxt
@@ -444,7 +458,7 @@ tcConDecl unbox_strict new_or_data tycon tc_tvs
 				 ; let { (field_names, btys) = unzip fields }
 				 ; tc_datacon False field_names btys } }
 
-tcConDecl unbox_strict new_or_data tycon tc_tvs
+tcConDecl unbox_strict DataType tycon tc_tvs	-- GADTs
 	  decl@(GadtDecl name con_ty)
   = do	{ traceTc (text "tcConDecl"  <+> ppr name)
 	; (tvs, theta, bangs, arg_tys, tc, res_tys) <- tcLHsConSig con_ty
@@ -466,6 +480,7 @@ tcConDecl unbox_strict new_or_data tycon tc_tvs
 		       [{- No field labels -}]
 		       tvs' theta arg_tys' tycon res_tys' }
 
+-------------------
 tcStupidTheta :: LHsContext Name -> [LConDecl Name] -> TcM (Maybe ThetaType)
 -- For GADTs we don't allow a context on the data declaration
 -- whereas for standard Haskell style data declarations, we do
