@@ -232,9 +232,9 @@ moduleNameToModule hpt mn = do
     _not_a_home_module -> do
 	  maybe_stuff <- findModule mn
 	  case maybe_stuff of
-	    Nothing -> throwDyn (CmdLineError ("can't find module `"
+	    Left _ -> throwDyn (CmdLineError ("can't find module `"
 	  			    ++ moduleNameUserString mn ++ "'"))
-	    Just (m,_) -> return m
+	    Right (m,_) -> return m
 
 cmGetContext :: CmState -> IO ([String],[String])
 cmGetContext CmState{ic=ic} = 
