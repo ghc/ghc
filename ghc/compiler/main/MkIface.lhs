@@ -90,7 +90,7 @@ ifaceDecls :: Maybe Handle
 	   -> [Id]		-- Ids used at code-gen time; they have better pragma info!
 	   -> [CoreBind]	-- In dependency order, later depend on earlier
 	   -> [ProtoCoreRule]	-- Rules
-	   -> InterfaceDetails
+	   -> [Deprecation Name]
 	   -> IO ()
 
 endIface    :: Maybe Handle -> IO ()
@@ -127,7 +127,7 @@ ifaceDecls (Just hdl)
 	   final_ids
 	   binds
 	   orphan_rules		-- Rules defined locally for an Id that is *not* defined locally
-	   (InterfaceDetails _ _ _ deprecations)
+	   deprecations
   | null_decls = return ()		 
 	--  You could have a module with just (re-)exports/instances in it
   | otherwise

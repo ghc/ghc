@@ -20,6 +20,7 @@ import Lex		( PState(..), P, ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
 
 import Rename		( renameModule )
+import RnMonad		( InterfaceDetails(..) )
 
 import MkIface		( startIface, ifaceDecls, endIface )
 import TcModule		( TcResults(..), typecheckModule )
@@ -123,7 +124,8 @@ doIt (core_cmds, stg_cmds)
 			reportCompile mod_name "Compilation NOT required!" >>
 			return ();
 	
-	Just (this_mod, rn_mod, iface_file_stuff, rn_name_supply, imported_modules) ->
+	Just (this_mod, rn_mod, iface_file_stuff@(InterfaceDetails _ _ _ deprecations),
+	      rn_name_supply, imported_modules) ->
 			-- Oh well, we've got to recompile for real
 
 
@@ -187,8 +189,8 @@ doIt (core_cmds, stg_cmds)
 --	thoroughout code generation
 
     ifaceDecls if_handle local_tycons local_classes inst_info
-	       final_ids tidy_binds imp_rule_ids iface_file_stuff	>>
-    endIface if_handle							>>
+	       final_ids tidy_binds imp_rule_ids deprecations	>>
+    endIface if_handle						>>
 	    -- We are definitely done w/ interface-file stuff at this point:
 	    -- (See comments near call to "startIface".)
 
