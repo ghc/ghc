@@ -91,6 +91,7 @@ import Addr		( Addr(..) )
 import MutableArray	( MutableArray(..) )
 #else
 import PrelArr		( STArray(..), newSTArray )
+import IOExts		( hPutBuf, hPutBufBA )
 #endif
 
 -- ForeignObj is now exported abstractly.
