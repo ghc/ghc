@@ -114,14 +114,14 @@ DONT_WANT_STD_GHCI_LIB_RULE=YES
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # 		Standard rule
-HSstd.o :: $(GHCI_LIBOBJS)
+HSstd.o : $(GHCI_LIBOBJS)
 	$(LD) -r -x -o $@ $(GHCI_LIBOBJS)
 
 else
 # 		Rule for Win32 platform
 # Keep HSstd.o as a pseudo-target (I think)
 
-HSstd.o :: $(GHCI_LIBOBJS)
+HSstd.o : $(GHCI_LIBOBJS)
 	$(LD) -r -x -o HSstd1.o $(filter     Prel%, $(GHCI_LIBOBJS))
 	$(LD) -r -x -o HSstd2.o $(filter-out Prel%, $(GHCI_LIBOBJS))
 	@touch HSstd.o
