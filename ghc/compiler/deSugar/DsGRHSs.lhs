@@ -59,7 +59,7 @@ dsGuarded :: TypecheckedGRHSsAndBinds
 	  -> DsM CoreExpr
 
 dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
-  = dsBinds Nothing binds			`thenDs` \ core_binds ->
+  = dsBinds False{-don't auto scc-} binds       `thenDs` \ core_binds ->
     dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn _) ->
     case can_it_fail of
 	CantFail -> returnDs (mkCoLetsAny core_binds (core_grhss_fn (panic "It can't fail")))
@@ -138,8 +138,8 @@ matchGuard (GuardStmt expr _ : stmts) body_result
     returnDs (MatchResult CanFail ty expr_fn cxt)
 
 matchGuard (LetStmt binds : stmts) body_result
-  = matchGuard stmts body_result	`thenDs` \ match_result ->
-    dsBinds Nothing binds		`thenDs` \ core_binds ->
+  = matchGuard stmts body_result	  `thenDs` \ match_result ->
+    dsBinds False{-don't auto scc-} binds `thenDs` \ core_binds ->
     returnDs (mkCoLetsMatchResult core_binds match_result)
 
 matchGuard (BindStmt pat rhs _ : stmts) body_result

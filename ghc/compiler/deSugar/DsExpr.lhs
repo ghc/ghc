@@ -266,7 +266,7 @@ dsExpr expr@(HsCase discrim matches src_loc)
     returnDs ( mkCoLetAny (NonRec discrim_var core_discrim) matching_code )
 
 dsExpr (HsLet binds expr)
-  = dsBinds Nothing binds   `thenDs` \ core_binds ->
+  = dsBinds False binds     `thenDs` \ core_binds ->
     dsExpr expr		    `thenDs` \ core_expr ->
     returnDs ( mkCoLetsAny core_binds core_expr )
 
@@ -654,7 +654,7 @@ dsDo do_or_lc stmts return_id then_id zero_id result_ty
 				   VarArg (mkValLam [ignored_result_id] rest)]
     
 	go (LetStmt binds : stmts )
-	  = dsBinds Nothing binds `thenDs` \ binds2 ->
+	  = dsBinds False binds   `thenDs` \ binds2 ->
 	    go stmts 		  `thenDs` \ rest   ->
 	    returnDs (mkCoLetsAny binds2 rest)
     

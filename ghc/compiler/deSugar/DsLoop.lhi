@@ -27,6 +27,6 @@ matchSimply :: CoreExpr			-- Scrutinee
 	    -> CoreExpr			-- Return this if it does
 	    -> DsM CoreExpr
 
-dsBinds :: Maybe (FastString, FastString) -> TypecheckedHsBinds -> DsM [CoreBinding]
+dsBinds :: Bool -> TypecheckedHsBinds -> DsM [CoreBinding]
 dsExpr  :: TypecheckedHsExpr  -> DsM CoreExpr
 \end{code}

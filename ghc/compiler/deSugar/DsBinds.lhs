@@ -58,16 +58,17 @@ that some of the binders are of unboxed type.  This is sorted out when
 the caller wraps the bindings round an expression.
 
 \begin{code}
-type Group = FAST_STRING
 
-dsBinds :: Maybe (Module, Group) -> TypecheckedHsBinds -> DsM [CoreBinding]
+dsBinds :: Bool   -- if candidate, auto add scc's on toplevs ?
+	-> TypecheckedHsBinds 
+	-> DsM [CoreBinding]
 
 dsBinds _ EmptyBinds	  	     = returnDs []
-dsBinds mb_mod_grp (ThenBinds binds_1 binds_2) 
-  = andDs (++) (dsBinds mb_mod_grp binds_1) (dsBinds mb_mod_grp binds_2)
+dsBinds auto_scc (ThenBinds binds_1 binds_2) 
+  = andDs (++) (dsBinds auto_scc binds_1) (dsBinds auto_scc binds_2)
 
-dsBinds mb_mod_grp (MonoBind binds sigs is_rec)
-  = dsMonoBinds mb_mod_grp is_rec binds  `thenDs` \ prs ->
+dsBinds auto_scc (MonoBind binds sigs is_rec)
+  = dsMonoBinds auto_scc is_rec binds  `thenDs` \ prs ->
     returnDs (if is_rec then
 		[Rec prs]
 	      else
@@ -83,15 +84,15 @@ dsBinds mb_mod_grp (MonoBind binds sigs is_rec)
 %************************************************************************
 
 \begin{code}
-dsMonoBinds :: Maybe (Module, Group)   -- Nothing => don't (auto-)annotate scc on toplevs.
+dsMonoBinds :: Bool		-- False => don't (auto-)annotate scc on toplevs.
 	    -> RecFlag 
 	    -> TypecheckedMonoBinds 
 	    -> DsM [(Id,CoreExpr)]
 
 dsMonoBinds _ is_rec EmptyMonoBinds = returnDs []
 
-dsMonoBinds mb_mod_grp is_rec (AndMonoBinds  binds_1 binds_2)
-  = andDs (++) (dsMonoBinds mb_mod_grp is_rec binds_1) (dsMonoBinds mb_mod_grp is_rec binds_2)
+dsMonoBinds auto_scc is_rec (AndMonoBinds  binds_1 binds_2)
+  = andDs (++) (dsMonoBinds auto_scc is_rec binds_1) (dsMonoBinds auto_scc is_rec binds_2)
 
 dsMonoBinds _ is_rec (CoreMonoBind var core_expr)
   = returnDs [(var, core_expr)]
@@ -105,37 +106,40 @@ dsMonoBinds _ is_rec (VarMonoBind var expr)
 
     returnDs [(var, core_expr')]
 
-dsMonoBinds mb_mod_grp is_rec (FunMonoBind fun _ matches locn)
+dsMonoBinds auto_scc is_rec (FunMonoBind fun _ matches locn)
   = putSrcLocDs locn	$
     matchWrapper (FunMatch fun) matches error_string	`thenDs` \ (args, body) ->
-    returnDs [addAutoScc mb_mod_grp (fun, mkValLam args body)]
+    addAutoScc auto_scc (fun, mkValLam args body)       `thenDs` \ pair ->
+    returnDs [pair]
   where
     error_string = "function " ++ showForErr fun
 
-dsMonoBinds mb_mod_grp is_rec (PatMonoBind pat grhss_and_binds locn)
+dsMonoBinds _ is_rec (PatMonoBind pat grhss_and_binds locn)
   = putSrcLocDs locn $
     dsGuarded grhss_and_binds		`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr
 
 	-- Common special case: no type or dictionary abstraction
-dsMonoBinds mb_mod_grp is_rec (AbsBinds [] [] exports binds)
-  = dsMonoBinds Nothing is_rec binds			`thenDs` \ prs ->
-    returnDs (prs ++ [ addAutoScc mb_mod_grp (global, Var local) | (_, global, local) <- exports])
+dsMonoBinds auto_scc is_rec (AbsBinds [] [] exports binds)
+  = dsMonoBinds False is_rec binds			`thenDs` \ prs ->
+    mapDs (addAutoScc auto_scc) [(global, Var local) | (_, global, local) <- exports] `thenDs` \ exports' ->
+    returnDs (prs ++ exports')
 
 	-- Another common case: one exported variable
 	-- All non-recursive bindings come through this way
-dsMonoBinds mb_mod_grp is_rec (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds)
+dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts [(tyvars, global, local)] binds)
   = ASSERT( all (`elem` tyvars) all_tyvars )
-    dsMonoBinds Nothing is_rec binds			`thenDs` \ core_prs ->
+    dsMonoBinds False is_rec binds			`thenDs` \ core_prs ->
     let 
 	core_binds | is_rec    = [Rec core_prs]
 		   | otherwise = [NonRec b e | (b,e) <- core_prs]
     in
-    returnDs [addAutoScc mb_mod_grp (global, mkLam tyvars dicts $ 
-					     mkCoLetsAny core_binds (Var local))]
+    addAutoScc auto_scc (global, mkLam tyvars dicts $ 
+			         mkCoLetsAny core_binds (Var local)) `thenDs` \ global' ->
+    returnDs [global']
 
-dsMonoBinds mb_mod_grp is_rec (AbsBinds all_tyvars dicts exports binds)
-  = dsMonoBinds Nothing is_rec binds			`thenDs` \ core_prs ->
+dsMonoBinds auto_scc is_rec (AbsBinds all_tyvars dicts exports binds)
+  = dsMonoBinds False is_rec binds			`thenDs` \ core_prs ->
     let 
 	core_binds | is_rec    = [Rec core_prs]
 		   | otherwise = [NonRec b e | (b,e) <- core_prs]
@@ -154,10 +158,10 @@ dsMonoBinds mb_mod_grp is_rec (AbsBinds all_tyvars dicts exports binds)
 	  = 	-- Need to make fresh locals to bind in the selector, because
 		-- some of the tyvars will be bound to voidTy
 	    newSysLocalsDs (map (instantiateTy env) local_tys) 	`thenDs` \ locals' ->
-	    returnDs (addAutoScc mb_mod_grp $
-			(global, mkLam tyvars dicts $
-		     	         mkTupleSelector locals' (locals' !! n) $
-		     	         mkValApp (mkTyApp (Var tup_id) ty_args) dict_args))
+	    addAutoScc auto_scc
+		       (global, mkLam tyvars dicts $
+		     	        mkTupleSelector locals' (locals' !! n) $
+		     	        mkValApp (mkTyApp (Var tup_id) ty_args) dict_args)
 	  where
 	    mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 				| otherwise		  = voidTy
@@ -177,18 +181,17 @@ dsMonoBinds mb_mod_grp is_rec (AbsBinds all_tyvars dicts exports binds)
 %************************************************************************
 
 \begin{code}
-addAutoScc :: Maybe (Module, Group)	-- Module and group
+addAutoScc :: Bool		-- if needs be, decorate toplevs?
 	   -> (Id, CoreExpr)
-	   -> (Id, CoreExpr)
+	   -> DsM (Id, CoreExpr)
 
-addAutoScc mb_mod_grp pair@(bndr, core_expr) 
-  = case mb_mod_grp of
-      Just (mod,grp) 
-       | worthSCC core_expr &&
-         (opt_AutoSccsOnAllToplevs ||
-          (isExported bndr && opt_AutoSccsOnExportedToplevs))
-        -> (bndr, SCC (mkAutoCC bndr mod grp IsNotCafCC) core_expr)
-      _ -> pair -- no auto-annotation.
+addAutoScc auto_scc_candidate pair@(bndr, core_expr) 
+ | auto_scc_candidate && worthSCC core_expr && 
+   (opt_AutoSccsOnAllToplevs || (isExported bndr && opt_AutoSccsOnExportedToplevs))
+     = getModuleAndGroupDs `thenDs` \ (mod,grp) ->
+       returnDs (bndr, SCC (mkAutoCC bndr mod grp IsNotCafCC) core_expr)
+ | otherwise 
+     = returnDs pair
 
 worthSCC (SCC _ _) = False
 worthSCC (Con _ _) = False

@@ -613,14 +613,14 @@ matchWrapper kind [(PatMatch (VarPat var) match)] error_string
     returnDs (var:vars, core_expr)
 
 matchWrapper kind [(PatMatch (WildPat ty) match)] error_string
-  = newSysLocalDs ty		      `thenDs` \ var ->
+  = newSysLocalDs ty		           `thenDs` \ var ->
     matchWrapper kind [match] error_string `thenDs` \ (vars, core_expr) ->
     returnDs (var:vars, core_expr)
 
 matchWrapper kind [(GRHSMatch
 		     (GRHSsAndBindsOut [OtherwiseGRHS expr _] binds _))] error_string
-  = dsBinds Nothing binds   `thenDs` \ core_binds ->
-    dsExpr  expr	    `thenDs` \ core_expr ->
+  = dsBinds False{-don't auto-scc-} binds            `thenDs` \ core_binds ->
+    dsExpr  expr	                             `thenDs` \ core_expr ->
     returnDs ([], mkCoLetsAny core_binds core_expr)
 
 ----------------------------------------------------------------------------
@@ -718,7 +718,7 @@ flattenMatches kind (match : matches)
       = flatten_match (pat:pats_so_far) match
 
     flatten_match pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
-      = dsBinds Nothing binds			`thenDs` \ core_binds ->
+      = dsBinds False{-don't auto-scc-} binds	`thenDs` \ core_binds ->
 	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
 	returnDs (EqnInfo pats (mkCoLetsMatchResult core_binds match_result))
       where

@@ -28,7 +28,8 @@ import DsBinds		( dsBinds )
 import DsUtils
 
 import Bag		( unionBags )
-import CmdLineOpts	( opt_DoCoreLinting, opt_SccGroup )
+import BasicTypes       ( SYN_IE(Module) )
+import CmdLineOpts	( opt_DoCoreLinting, opt_SccGroup, opt_SccProfilingOn )
 import CostCentre       ( IsCafCC(..), mkAutoCC )
 import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
@@ -43,7 +44,7 @@ start.
 
 \begin{code}
 deSugar :: UniqSupply		-- name supply
-	-> FAST_STRING			-- module name
+	-> Module		-- module name
 
 	-> (TypecheckedHsBinds, -- input: recsel, class, instance, and value
 	    TypecheckedHsBinds, --   bindings; see "tcModule" (which produces
@@ -63,30 +64,30 @@ deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst
 	(us3, us3a) = splitUniqSupply us2a
 	(us4, us5)  = splitUniqSupply us3a
 
+        module_and_group = (mod_name, grp_name)
 
-	module_and_group = (mod_name, grp_name)
 	grp_name  = case opt_SccGroup of
 		    	Just xx -> _PK_ xx
 		    	Nothing -> mod_name	-- default: module name
 
 	(core_const_binds, shadows1)
-	    = initDs us0 nullIdEnv mod_name (dsBinds Nothing const_inst_binds)
+	    = initDs us0 nullIdEnv module_and_group (dsBinds False const_inst_binds)
 	core_const_prs = pairsFromCoreBinds core_const_binds
 
 	(core_clas_binds, shadows2)
-			= initDs us1 nullIdEnv mod_name (dsBinds Nothing clas_binds)
+			= initDs us1 nullIdEnv module_and_group (dsBinds False clas_binds)
 	core_clas_prs	= pairsFromCoreBinds core_clas_binds
 
 	(core_inst_binds, shadows3)
-			= initDs us2 nullIdEnv mod_name (dsBinds Nothing inst_binds)
+			= initDs us2 nullIdEnv module_and_group (dsBinds False inst_binds)
 	core_inst_prs	= pairsFromCoreBinds core_inst_binds
 
 	(core_val_binds, shadows4)
-			= initDs us3 nullIdEnv mod_name (dsBinds (Just module_and_group) val_binds)
+			= initDs us3 nullIdEnv module_and_group (dsBinds opt_SccProfilingOn val_binds)
 	core_val_pairs	= pairsFromCoreBinds core_val_binds
 
 	(core_recsel_binds, shadows5)
-			= initDs us4 nullIdEnv mod_name (dsBinds Nothing recsel_binds)
+			= initDs us4 nullIdEnv module_and_group (dsBinds False recsel_binds)
 	core_recsel_prs	= pairsFromCoreBinds core_recsel_binds
 
     	final_binds

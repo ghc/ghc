@@ -29,7 +29,8 @@ module DsMonad (
 IMP_Ubiq()
 
 import Bag		( emptyBag, snocBag, bagToList, Bag )
-import CmdLineOpts	( opt_SccGroup, opt_PprUserLength )
+import BasicTypes       ( SYN_IE(Module) )
+import CmdLineOpts	( opt_PprUserLength )
 import CoreSyn		( SYN_IE(CoreExpr) )
 import CoreUtils	( substCoreExpr )
 import HsSyn		( OutPat )
@@ -59,8 +60,8 @@ presumably include source-file location information:
 \begin{code}
 type DsM result =
 	UniqSupply
-	-> SrcLoc			-- to put in pattern-matching error msgs
-	-> (FAST_STRING, FAST_STRING)	-- "module"+"group" : for SCC profiling
+	-> SrcLoc		 -- to put in pattern-matching error msgs
+	-> (Module, Group)       -- module + group name : for SCC profiling
 	-> DsIdEnv
 	-> DsWarnings
 	-> (result, DsWarnings)
@@ -68,6 +69,9 @@ type DsM result =
 type DsWarnings = Bag (DsWarnFlavour, DsMatchContext)
 					-- The desugarer reports matches which are
 					-- completely shadowed or incomplete patterns
+
+type Group = FAST_STRING
+
 {-# INLINE andDs #-}
 {-# INLINE thenDs #-}
 {-# INLINE returnDs #-}
@@ -76,17 +80,12 @@ type DsWarnings = Bag (DsWarnFlavour, DsMatchContext)
 
 initDs  :: UniqSupply
 	-> DsIdEnv
-	-> FAST_STRING -- module name: for profiling; (group name: from switches)
+	-> (Module, Group)      -- module name: for profiling; (group name: from switches)
 	-> DsM a
 	-> (a, DsWarnings)
 
-initDs init_us env mod_name action
+initDs init_us env module_and_group action
   = action init_us noSrcLoc module_and_group env emptyBag
-  where
-    module_and_group = (mod_name, grp_name)
-    grp_name  = case opt_SccGroup of
-		    Just xx -> _PK_ xx
-		    Nothing -> mod_name	-- default: module name
 
 thenDs :: DsM a -> (a -> DsM b) -> DsM b
 andDs  :: (a -> a -> a) -> DsM a -> DsM a -> DsM a

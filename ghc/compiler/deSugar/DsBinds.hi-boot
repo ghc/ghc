@@ -2,4 +2,4 @@ _interface_ DsBinds 1
 _exports_
 DsBinds dsBinds;
 _declarations_
-1 dsBinds _:_ PrelBase.Maybe (BasicTypes.Module, FastString.FastString) -> TcHsSyn.TypecheckedHsBinds -> DsMonad.DsM [CoreSyn.CoreBinding] ;;
+1 dsBinds _:_ PrelBase.Bool -> TcHsSyn.TypecheckedHsBinds -> DsMonad.DsM [CoreSyn.CoreBinding] ;;
