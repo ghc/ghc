@@ -120,11 +120,11 @@ infixl 	1 `setTyGenInfo`,
 	  `setCafInfo`,
 	  `setNewStrictnessInfo`,
 	  `setAllStrictnessInfo`,
-	  `setNewDemandInfo`
+	  `setNewDemandInfo`,
 #ifdef DEBUG
 	  `setCprInfo`,
 	  `setDemandInfo`,
-	  `setStrictnessInfo`,
+	  `setStrictnessInfo`
 #endif
 \end{code}
 
