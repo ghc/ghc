@@ -106,11 +106,17 @@ instance Eq IOError where
   (IOError h1 e1 str1) == (IOError h2 e2 str2) = 
     e1==e2 && str1==str2 && h1==h2
 
+#ifndef __CONCURRENT_HASKELL__
+
 instance Eq Handle where
  (Handle h1) == (Handle h2) = h1 == h2
 
+#else
+
 {-	OLD equality instance. The simpler one above
-	seems more accurate!
+	seems more accurate!  This one is still used for concurrent haskell,
+	since there's no equality instance over MVars.
+-}
 
 instance Eq Handle where
  h1 == h2 =
@@ -129,7 +135,7 @@ instance Eq Handle where
       (AppendHandle v1 _ _ ,    AppendHandle v2 _ _) -> v1 == v2
       (ReadWriteHandle v1 _ _ , ReadWriteHandle v2 _ _) -> v1 == v2
       _ -> False))
--}
+#endif {- __CONCURRENT_HASKELL__ -}
 
 instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
 
