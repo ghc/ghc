@@ -34,7 +34,7 @@ module Util (
 
 	-- comparisons
 	eqListBy, equalLength, compareLength,
-	thenCmp, cmpList, prefixMatch, suffixMatch,
+	thenCmp, cmpList, prefixMatch, suffixMatch, maybePrefixMatch,
 
 	-- strictness
 	foldl', seqList,
@@ -731,6 +731,13 @@ prefixMatch [] _str = True
 prefixMatch _pat [] = False
 prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
 			  | otherwise = False
+
+maybePrefixMatch :: String -> String -> Maybe String
+maybePrefixMatch []    rest = Just rest
+maybePrefixMatch (_:_) []   = Nothing
+maybePrefixMatch (p:pat) (r:rest)
+  | p == r    = maybePrefixMatch pat rest
+  | otherwise = Nothing
 
 suffixMatch :: Eq a => [a] -> [a] -> Bool
 suffixMatch pat str = prefixMatch (reverse pat) (reverse str)
