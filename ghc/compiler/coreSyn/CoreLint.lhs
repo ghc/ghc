@@ -24,7 +24,7 @@ import Literal		( literalType )
 import DataCon		( dataConRepType )
 import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId, mustHaveLocalBinding )
 import VarSet
-import Subst		( mkTyVarSubst, substTy )
+import Subst		( substTyWith )
 import Name		( getSrcLoc )
 import PprCore
 import ErrUtils		( doIfSet, dumpIfSet_core, ghcExit, Message, showPass,
@@ -375,7 +375,7 @@ lintTyApp ty arg_ty
 		-- 	error :: forall a:*. String -> a
 		-- and then apply it to both boxed and unboxed types.
 	 then
-	    returnL (substTy (mkTyVarSubst [tyvar] [arg_ty]) body)
+	    returnL (substTyWith [tyvar] [arg_ty] body)
 	else
 	    addErrL (mkKindErrMsg tyvar arg_ty)
 

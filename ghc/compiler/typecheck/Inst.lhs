@@ -64,7 +64,7 @@ import Name	( Name, mkMethodOcc, getOccName )
 import NameSet	( NameSet )
 import PprType	( pprPred )	
 import Subst	( emptyInScopeSet, mkSubst, 
-		  substTy, substTheta, mkTyVarSubst, mkTopTyVarSubst
+		  substTy, substTyWith, substTheta, mkTyVarSubst, mkTopTyVarSubst
 		)
 import Literal	( inIntRange )
 import VarEnv	( TidyEnv, lookupSubstEnv, SubstResult(..) )
@@ -391,7 +391,7 @@ newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     let
 	(tyvars, rho) = tcSplitForAllTys (idType id)
-	rho_ty	      = substTy (mkTyVarSubst tyvars tys) rho
+	rho_ty	      = substTyWith tyvars tys rho
 	(pred, tau)   = tcSplitMethodTy rho_ty
     in
     newMethodWithGivenTy orig id tys [pred] tau

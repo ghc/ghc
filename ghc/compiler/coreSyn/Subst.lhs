@@ -28,7 +28,7 @@ module Subst (
 
 	-- Type stuff
 	mkTyVarSubst, mkTopTyVarSubst, 
-	substTy, substTheta,
+	substTyWith, substTy, substTheta,
 
 	-- Expression stuff
 	substExpr, substIdInfo
@@ -373,7 +373,8 @@ type TyVarSubst = Subst	-- TyVarSubst are expected to have range elements
 -- the types given; but it's just a thunk so with a bit of luck
 -- it'll never be evaluated
 mkTyVarSubst :: [TyVar] -> [Type] -> Subst
-mkTyVarSubst tyvars tys = Subst (mkInScopeSet (tyVarsOfTypes tys)) (zip_ty_env tyvars tys emptySubstEnv)
+mkTyVarSubst tyvars tys = Subst (mkInScopeSet (tyVarsOfTypes tys)) 
+				(zip_ty_env tyvars tys emptySubstEnv)
 
 -- mkTopTyVarSubst is called when doing top-level substitutions.
 -- Here we expect that the free vars of the range of the
@@ -392,6 +393,9 @@ zip_ty_env (tv:tvs) (ty:tys) env
 substTy works with general Substs, so that it can be called from substExpr too.
 
 \begin{code}
+substTyWith :: [TyVar] -> [Type] -> Type -> Type
+substTyWith tvs tys = substTy (mkTyVarSubst tvs tys)
+
 substTy :: Subst -> Type  -> Type
 substTy subst ty | isEmptySubst subst = ty
 	         | otherwise	      = subst_ty subst ty

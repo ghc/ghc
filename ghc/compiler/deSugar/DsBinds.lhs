@@ -30,7 +30,7 @@ import Id		( idType, idName, isExportedId, isSpecPragmaId, Id )
 import NameSet
 import VarSet
 import TcType		( mkTyVarTy )
-import Subst		( mkTyVarSubst, substTy )
+import Subst		( substTyWith )
 import TysWiredIn	( voidTy )
 import Outputable
 import Maybe		( isJust )
@@ -132,16 +132,16 @@ dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
 	mk_bind (tyvars, global, local) n	-- locals !! n == local
 	  = 	-- Need to make fresh locals to bind in the selector, because
 		-- some of the tyvars will be bound to voidTy
-	    newSysLocalsDs (map (substTy env) local_tys) 	`thenDs` \ locals' ->
-	    newSysLocalDs  (substTy env tup_ty)			`thenDs` \ tup_id ->
+	    newSysLocalsDs (map substitute local_tys) 	`thenDs` \ locals' ->
+	    newSysLocalDs  (substitute tup_ty)		`thenDs` \ tup_id ->
 	    returnDs (global, mkLams tyvars $ mkLams dicts $
 		              mkTupleSelector locals' (locals' !! n) tup_id $
 		              mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args)
 	  where
 	    mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
 				| otherwise		  = voidTy
-	    ty_args = map mk_ty_arg all_tyvars
-	    env     = mkTyVarSubst all_tyvars ty_args
+	    ty_args    = map mk_ty_arg all_tyvars
+	    substitute = substTyWith all_tyvars ty_args
     in
     zipWithDs mk_bind exports [0..]		`thenDs` \ export_binds ->
      -- don't scc (auto-)annotate the tuple itself.

@@ -28,7 +28,7 @@ import ForeignCall	( CCallConv(..), ForeignCall(..), CCallSpec(..), CCallTarget(
 import TysWiredIn	( mkTupleTy, tupleCon )
 import PrimRep		( PrimRep(..) )
 import Name		( nameModule, nameOccName, isGlobalName, isLocalName, NamedThing(getName) )
-import Subst   		( substTy, mkTyVarSubst )
+import Subst   		( substTyWith )
 
 import Module		( Module, PackageName, ModuleName, moduleName, 
                           modulePackage, preludePackage,
@@ -812,7 +812,7 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
     get_type_args max ((arg@(StgTypeArg v)):rest) env (ForAllTy tv rem_funty) 
         = if isIlxTyVar tv then 
             let env2 = extendIlxEnvWithFormalTyVars env [tv] in 
-            let rest_ty = deepIlxRepType (substTy (mkTyVarSubst [tv] [v]) rem_funty) in 
+            let rest_ty = deepIlxRepType (substTyWith [tv] [v] rem_funty) in 
             let (now,now_tys,env3,later,later_ty) = get_type_args (max - 1) rest env rest_ty in 
             let arg_ty = mkTyVarTy tv in 
             (arg:now,(arg,arg_ty):now_tys,env2, later, later_ty)

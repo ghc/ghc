@@ -1,6 +1,5 @@
-__interface Subst 1 0 where
-__export Subst Subst mkTyVarSubst substTy ;
+__interface Subst 2 0 where
+__export Subst Subst substTyWith ;
 1 data Subst;
-1 mkTyVarSubst :: [Var.TyVar] -> [TypeRep.Type] -> Subst ;
-1 substTy :: Subst -> TypeRep.Type -> TypeRep.Type ;
+1 substTyWith :: [Var.TyVar] -> [TypeRep.Type] -> TypeRep.Type -> TypeRep.Type ;
 

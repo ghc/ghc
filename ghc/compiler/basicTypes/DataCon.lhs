@@ -22,7 +22,7 @@ module DataCon (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Subst( substTy, mkTyVarSubst )
+import {-# SOURCE #-} Subst( substTyWith )
 
 import CmdLineOpts	( opt_DictsStrict )
 import Type		( Type, TauType, ThetaType, 
@@ -324,7 +324,7 @@ dataConArgTys :: DataCon
 
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
- = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
+ = map (substTyWith (tyvars ++ ex_tyvars) inst_tys) arg_tys
 
 dataConTheta :: DataCon -> ThetaType
 dataConTheta dc = dcTheta dc
@@ -334,7 +334,7 @@ dataConTheta dc = dcTheta dc
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
 dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
- = map (substTy (mkTyVarSubst (tyvars ++ ex_tyvars) inst_tys)) arg_tys
+ = map (substTyWith (tyvars ++ ex_tyvars) inst_tys) arg_tys
 \end{code}
 
 These two functions get the real argument types of the constructor,

@@ -39,7 +39,7 @@ import RdrName		( RdrName, mkUnqual )
 import Name		( Name, getName )
 import OccName		( NameSpace, tvName )
 import Var		( TyVar, tyVarKind )
-import Subst		( mkTyVarSubst, substTy )
+import Subst		( substTyWith )
 import PprType		( {- instance Outputable Kind -}, pprParendKind )
 import BasicTypes	( Boxity(..), Arity, tupleParens )
 import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey, hasKey,
@@ -313,7 +313,7 @@ toHsType (NoteTy (SynNote ty@(TyConApp tycon tyargs)) real_ty)
   where
     syn_matches      = ty_from_syn `tcEqType` real_ty
     (tyvars,syn_ty)  = getSynTyConDefn tycon
-    ty_from_syn      = substTy (mkTyVarSubst tyvars tyargs) syn_ty
+    ty_from_syn      = substTyWith tyvars tyargs syn_ty
 
     -- We only use the type synonym in the file if this doesn't cause
     -- us to lose important information.  This matters for usage
