@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.6 2001/08/16 05:30:27 chak Exp $
+ * $Id: FrontPanel.c,v 1.7 2001/10/31 14:38:00 simonmar Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -704,6 +704,7 @@ residencyCensus( void )
 		    case STABLE_NAME:
 		    case MVAR:
 		    case MUT_VAR:
+		    case MUT_CONS:
 		    case IND_PERM:
 		    case IND_OLDGEN_PERM:
 			size = sizeW_fromITBL(info);
