@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.33 2002/10/25 12:56:34 simonmar Exp $
+ * $Id: MBlock.c,v 1.34 2002/10/27 21:46:27 wolfgang Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -37,6 +37,9 @@
 #endif
 #if HAVE_WINDOWS_H
 #include <windows.h>
+#endif
+#if darwin_TARGET_OS
+#include <mach/vm_map.h>
 #endif
 
 #include <errno.h>
@@ -102,8 +105,25 @@ my_mmap (void *addr, int size)
     ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
 	       MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif darwin_TARGET_OS
-    ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
-	       MAP_FIXED | MAP_ANON | MAP_PRIVATE, -1, 0);
+    // Without MAP_FIXED, Apple's mmap ignores addr.
+    // With MAP_FIXED, it overwrites already mapped regions, whic
+    // mmap(0, ... MAP_FIXED ...) is worst of all: It unmaps the program text
+    // and replaces it with zeroes, causing instant death.
+    // This behaviour seems to be conformant with IEEE Std 1003.1-2001.
+    // Let's just use the underlying Mach Microkernel calls directly,
+    // they're much nicer.
+    
+    kern_return_t err;
+    ret = addr;
+    if(addr)	// try to allocate at adress
+	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
+    if(!addr || err)	// try to allocate anywhere
+	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
+	
+    if(err)
+	ret = (void*) -1;
+    else
+	vm_protect(mach_task_self(),ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
 #else
     ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
 	       MAP_ANON | MAP_PRIVATE, -1, 0);
