@@ -671,9 +671,20 @@ the "build hack" to work.
 occAnalApp env (Var fun, args) is_rhs
   = case args_stuff of { (args_uds, args') ->
     let
-	final_uds = fun_uds `combineUsageDetails` args_uds
+	-- We mark the free vars of the argument of a constructor or PAP 
+	-- as "many", if it is the RHS of a let(rec).
+	-- This means that nothing gets inlined into a constructor argument
+	-- position, which is what we want.  Typically those constructor
+	-- arguments are just variables, or trivial expressions.
+	--
+	-- This is the *whole point* of the isRhsEnv predicate
+        final_args_uds
+		| isRhsEnv env,
+		  isDataConId fun || valArgCount args < idArity fun
+		= mapVarEnv markMany args_uds
+		| otherwise = args_uds
     in
-    (final_uds, mkApps (Var fun) args') }
+    (fun_uds `combineUsageDetails` final_args_uds, mkApps (Var fun) args') }
   where
     fun_uniq = idUnique fun
 
@@ -689,16 +700,6 @@ occAnalApp env (Var fun, args) is_rhs
 			-- This means we can optimise
 			--	foldr (\x -> let v = ...x... in \y -> ...v...) z xs
 			-- by floating in the v
-
-		| isRhsEnv env,
-		  isDataConId fun || valArgCount args < idArity fun
-		= case occAnalArgs env args of
-		    (arg_uds, args') -> (mapVarEnv markMany arg_uds, args')
-			-- We mark the free vars of the argument of a constructor or PAP 
-			-- as "many", if it is the RHS of a let(rec).
-			-- This means that nothing gets inlined into a constructor argument
-			-- position, which is what we want.  Typically those constructor
-			-- arguments are just variables, or trivial expressions.
 
 		| otherwise = occAnalArgs env args
 
