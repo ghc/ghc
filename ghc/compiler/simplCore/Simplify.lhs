@@ -42,7 +42,8 @@ import CoreFVs		( mustHaveLocalBinding, exprFreeVars )
 import CoreUnfold	( mkOtherCon, mkUnfolding, otherCons,
 			  callSiteInline
 			)
-import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, exprIsConApp_maybe,
+import CoreUtils	( cheapEqExpr, exprIsDupable, exprIsTrivial, 
+			  exprIsConApp_maybe, mkPiType,
 			  exprType, coreAltsType, exprIsValue, idAppIsCheap,
 			  exprOkForSpeculation, 
 			  mkCoerce, mkSCC, mkInlineMe, mkAltExpr
@@ -1556,12 +1557,31 @@ mkDupableAlt case_bndr case_bndr' cont alt@(con, bndrs, rhs)
 	`thenSmpl` \ (final_bndrs', final_args) ->
 
 	-- See comment about "$j" name above
-    newId SLIT("$j") (foldr (mkFunTy . idType) rhs_ty' final_bndrs')	$ \ join_bndr ->
+    newId SLIT("$j") (foldr mkPiType rhs_ty' final_bndrs')	$ \ join_bndr ->
+	-- Notice the funky mkPiType.  If the contructor has existentials
+	-- it's possible that the join point will be abstracted over
+	-- type varaibles as well as term variables.
+	--  Example:  Suppose we have
+	--	data T = forall t.  C [t]
+	--  Then faced with
+	--	case (case e of ...) of
+	--	    C t xs::[t] -> rhs
+	--  We get the join point
+	--	let j :: forall t. [t] -> ...
+	--	    j = /\t \xs::[t] -> rhs
+	--	in
+	--	case (case e of ...) of
+	--	    C t xs::[t] -> j t xs
 
-	-- Notice that we make the lambdas into one-shot-lambdas.  The
+    let 
+	-- We make the lambdas into one-shot-lambdas.  The
 	-- join point is sure to be applied at most once, and doing so
 	-- prevents the body of the join point being floated out by
 	-- the full laziness pass
-    returnSmpl ([NonRec join_bndr (mkLams (map setOneShotLambda final_bndrs') rhs')],
+	really_final_bndrs = map one_shot final_bndrs'
+	one_shot v | isId v    = setOneShotLambda v
+		   | otherwise = v
+    in
+    returnSmpl ([NonRec join_bndr (mkLams really_final_bndrs rhs')],
 		(con, bndrs, mkApps (Var join_bndr) final_args))
 \end{code}
