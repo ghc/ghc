@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.157 2003/07/21 14:33:19 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.158 2003/08/27 12:29:21 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -229,33 +229,31 @@ runGHCi paths dflags = do
      ghciHandle showException $
 	loadModule paths
 
-  -- enter the interactive loop
-#if defined(mingw32_HOST_OS)
-   -- Always show prompt, since hIsTerminalDevice returns True for Consoles
-   -- only, which we may or may not be running under (cf. Emacs sub-shells.)
-  interactiveLoop True
-#else
+  -- if verbosity is greater than 0, or we are connected to a
+  -- terminal, display the prompt in the interactive loop.
   is_tty <- io (hIsTerminalDevice stdin)
-  interactiveLoop is_tty
-#endif
+  let show_prompt = verbosity dflags > 0 || is_tty
+
+  -- enter the interactive loop
+  interactiveLoop is_tty show_prompt
 
   -- and finally, exit
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
 
 
-interactiveLoop is_tty = do
+interactiveLoop is_tty show_prompt = do
   -- Ignore ^C exceptions caught here
   ghciHandleDyn (\e -> case e of 
-			Interrupted -> ghciUnblock (interactiveLoop is_tty)
+			Interrupted -> ghciUnblock (interactiveLoop is_tty show_prompt)
 			_other      -> return ()) $ do
 
   -- read commands from stdin
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
   if (is_tty) 
 	then readlineLoop
-	else fileLoop stdin False  -- turn off prompt for non-TTY input
+	else fileLoop stdin show_prompt
 #else
-  fileLoop stdin is_tty
+  fileLoop stdin show_prompt
 #endif
 
 
