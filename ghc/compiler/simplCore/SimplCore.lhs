@@ -457,6 +457,23 @@ simplifyPgm dflags rule_base
     max_iterations    = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2
  
     iteration us iteration_no counts binds
+	-- iteration_no is the number of the iteration we are
+	-- about to begin, with '1' for the first
+      | iteration_no > max_iterations	-- Stop if we've run out of iterations
+      = do {
+#ifdef DEBUG
+	    if  max_iterations > 2 then
+		hPutStr stderr ("NOTE: Simplifier still going after " ++ 
+				show max_iterations ++ 
+			    	" iterations; bailing out.\n")
+	    else 
+		return ();
+#endif
+		-- Subtract 1 from iteration_no to get the
+		-- number of iterations we actually completed
+	    return ("Simplifier baled out", iteration_no - 1, counts, binds)
+	}
+
       -- Try and force thunks off the binds; significantly reduces
       -- space usage, especially with -O.  JRS, 000620.
       | let sz = coreBindsSize binds in sz == sz
@@ -475,7 +492,7 @@ simplifyPgm dflags rule_base
 		--	t = initSmpl ...
 		--	counts' = snd t
 		--   in
-		-- 	case t of {(_,counts') -> if counts'=0 then ...
+		-- 	case t of {(_,counts') -> if counts'=0 then ... }
 		-- So the conditional didn't force counts', because the
 		-- selection got duplicated.  Sigh!
 	   case initSmpl dflags us1 (simplTopBinds simpl_env tagged_binds) of {
@@ -498,27 +515,12 @@ simplifyPgm dflags rule_base
 
 		-- Dump the result of this iteration
 	   dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations herald
-		     (pprSimplCount counts') ;
+		         (pprSimplCount counts') ;
 
 	   endPass dflags herald Opt_D_dump_simpl_iterations binds' ;
 
-		-- Stop if we've run out of iterations
-	   if iteration_no == max_iterations then
-		do {
-#ifdef DEBUG
-		    if  max_iterations > 2 then
-			    hPutStr stderr ("NOTE: Simplifier still going after " ++ 
-				    show max_iterations ++ 
-				    " iterations; bailing out.\n")
-		    else 
-#endif
-			return ();
-
-		    return ("Simplifier baled out", iteration_no, all_counts, binds')
-		}
-
-		-- Else loop
-  	   else iteration us2 (iteration_no + 1) all_counts binds'
+		-- Loop
+  	   iteration us2 (iteration_no + 1) all_counts binds'
 	}  } } }
       where
   	  (us1, us2) = splitUniqSupply us

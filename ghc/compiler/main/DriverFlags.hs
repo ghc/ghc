@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.111 2003/02/04 15:09:40 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.112 2003/02/07 09:39:02 simonpj Exp $
 --
 -- Driver flags
 --
@@ -314,7 +314,7 @@ static_flags =
   ,  ( "fno-asm-mangling"  , NoArg (writeIORef v_Do_asm_mangling False) )
 
   ,  ( "fmax-simplifier-iterations", 
-		Prefix (writeIORef v_MaxSimplifierIterations . read) )
+		PrefixPred (all isDigit) (writeIORef v_MaxSimplifierIterations . read) )
 
   ,  ( "frule-check", 
 		SepArg (\s -> writeIORef v_RuleCheck (Just s)) )
