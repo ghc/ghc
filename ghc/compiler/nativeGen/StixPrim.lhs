@@ -20,7 +20,7 @@ import Literal		( Literal(..), word2IntLit )
 import CallConv		( cCallConv )
 import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
-import UniqSupply	( returnUs, thenUs, UniqSM )
+import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE )
 import Outputable
 
@@ -235,20 +235,22 @@ primCode [] WriteForeignObjOp [obj, v]
     returnUs (\xs -> assign : xs)
 \end{code}
 
+ToDo: saving/restoring of volatile regs around ccalls.
+
 \begin{code}
---primCode lhs (CCallOp fn is_asm may_gc) rhs
 primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"
-  | may_gc = error "ERROR: Native code generator can't handle _ccall_GC_\n"
-  | otherwise
-  = case lhs of
-      [] -> returnUs (\xs -> (StCall fn cconv VoidRep args) : xs)
-      [lhs] ->
-	  let lhs' = amodeToStix lhs
-	      pk = if isFloatingRep (getAmodeRep lhs) then DoubleRep else IntRep
-	      call = StAssign pk lhs' (StCall fn cconv pk args)
-	  in
-	      returnUs (\xs -> call : xs)
+  | not may_gc = returnUs (\xs -> ccall : xs)
+  | otherwise =
+	getUniqueUs		`thenUs` \ uniq -> 
+	let
+	   id = StReg (StixTemp uniq IntRep)
+    	   suspend = StAssign IntRep id 
+			(StCall SLIT("suspendThread") cconv IntRep [stgBaseReg])
+	   resume  = StCall SLIT("resumeThread") cconv VoidRep [id]
+	in
+	returnUs (\xs -> suspend : ccall : resume : xs)
+
   where
     args = map amodeCodeForCCall rhs
     amodeCodeForCCall x =
@@ -259,6 +261,14 @@ primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
 	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
 	      ForeignObjRep -> StIndex PtrRep base fixedHS
 	      _ -> base
+
+    ccall = case lhs of
+      [] -> StCall fn cconv VoidRep args
+      [lhs] ->
+	  let lhs' = amodeToStix lhs
+	      pk = if isFloatingRep (getAmodeRep lhs) then DoubleRep else IntRep
+	  in
+	      StAssign pk lhs' (StCall fn cconv pk args)
 \end{code}
 
 DataToTagOp won't work for 64-bit archs, as it is.
