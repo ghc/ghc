@@ -877,7 +877,7 @@ USER_WAYS=a b c d e f g h j k l m n o A B
 
 # Way 'i':
 WAY_i_NAME=ILX
-WAY_i_HC_OPTS= -filx
+WAY_i_HC_OPTS= -filx -fruntime-types
 
 # Way 'p':
 WAY_p_NAME=profiling
