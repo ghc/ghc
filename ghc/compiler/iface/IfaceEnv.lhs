@@ -11,7 +11,7 @@ module IfaceEnv (
 	tcIfaceTyVar, tcIfaceDataCon, tcIfaceLclId,
 
 	-- Name-cache stuff
-	allocateGlobalBinder, extendOrigNameCache, initNameCache
+	allocateGlobalBinder, initNameCache
    ) where
 
 #include "HsVersions.h"

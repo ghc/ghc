@@ -44,13 +44,10 @@ module CompManager (
 		   --	-> IO (CmState, Maybe HValue)
 
     cmGetModInfo,		-- :: CmState -> (ModuleGraph, HomePackageTable)
-    findModuleLinkable_maybe,	-- Exported to InteractiveUI
 
     cmSetDFlags,
     cmGetBindings, 	-- :: CmState -> [TyThing]
     cmGetPrintUnqual,	-- :: CmState -> PrintUnqualified
-
-    sandboxIO		-- Should be somewhere else
 #endif
   )
 where

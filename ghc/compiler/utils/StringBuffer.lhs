@@ -19,7 +19,6 @@ module StringBuffer
 	prevChar,          -- :: StringBuffer -> Char -> Char
 	lookAhead,         -- :: StringBuffer -> Int  -> Char
 	atEnd,		   -- :: StringBuffer -> Bool
-	difference,	   -- :: StringBuffer -> StringBuffer -> Int
 
 	-- * Moving
 	stepOn, stepOnBy,
@@ -142,9 +141,6 @@ lookAhead (StringBuffer arr# l# c#) (I# i#) =
   C# (indexCharArray# arr# off)
  where 
    off = c# +# i#
-
-difference :: StringBuffer -> StringBuffer -> Int
-difference (StringBuffer _ _ c1#) (StringBuffer _ _ c2#) = I# (c2# -# c1#)
 
 -- -----------------------------------------------------------------------------
 -- Moving

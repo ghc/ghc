@@ -24,7 +24,7 @@
 module Lexer (
    Token(..), Token__(..), lexer, mkPState, showPFailed,
    P(..), ParseResult(..), setSrcLocFor, getSrcLoc, 
-   failMsgP, failLocMsgP, srcParseFail,
+   failLocMsgP, srcParseFail,
    popContext, pushCurrentContext,
   ) where
 

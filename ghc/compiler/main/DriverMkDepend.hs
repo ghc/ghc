@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.30 2003/07/18 13:18:07 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.31 2003/11/17 14:23:38 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -7,7 +7,9 @@
 --
 -----------------------------------------------------------------------------
 
-module DriverMkDepend where
+module DriverMkDepend (
+	doMkDependHSPhase, beginMkDependHS, endMkDependHS
+  ) where
 
 #include "HsVersions.h"
 

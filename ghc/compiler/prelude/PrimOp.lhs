@@ -6,14 +6,11 @@
 \begin{code}
 module PrimOp (
 	PrimOp(..), allThePrimOps,
-	primOpType, primOpSig, primOpArity,
+	primOpType, primOpSig,
 	primOpTag, maxPrimOpTag, primOpOcc,
-
-	commutableOp,
 
 	primOpOutOfLine, primOpNeedsWrapper, 
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
-	primOpHasSideEffects,
 
 	getPrimOpResultInfo,  PrimOpResultInfo(..)
     ) where
@@ -368,14 +365,6 @@ primOpNeedsWrapper :: PrimOp -> Bool
 \end{code}
 
 \begin{code}
-primOpArity :: PrimOp -> Arity
-primOpArity op 
-  = case (primOpInfo op) of
-      Monadic occ ty			  -> 1
-      Dyadic occ ty			  -> 2
-      Compare occ ty 			  -> 2
-      GenPrimOp occ tyvars arg_tys res_ty -> length arg_tys
-		
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case (primOpInfo op) of

@@ -9,7 +9,7 @@ The bits common to TcInstDcls and TcDeriv.
 module InstEnv (
 	DFunId, InstEnv,
 
-	emptyInstEnv, extendInstEnv, pprInstEnv,
+	emptyInstEnv, extendInstEnv,
 	lookupInstEnv, 
 	classInstEnv, simpleDFunClassTyCon, checkFunDeps
     ) where
@@ -63,6 +63,7 @@ extendInstEnv inst_env dfun_id
     ins_tv_set = mkVarSet ins_tvs
     ins_item   = (ins_tv_set, ins_tys, dfun_id)
 
+#ifdef UNUSED
 pprInstEnv :: InstEnv -> SDoc
 pprInstEnv env
   = vcat [ brackets (pprWithCommas ppr (varSetElems tyvars)) <+> 
@@ -70,7 +71,7 @@ pprInstEnv env
 	 | cls_inst_env <-  eltsUFM env
 	 , (tyvars, tys, dfun) <- cls_inst_env
 	 ]
-
+#endif
 
 simpleDFunClassTyCon :: DFunId -> (Class, TyCon)
 simpleDFunClassTyCon dfun

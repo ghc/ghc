@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.61 2003/10/30 16:01:52 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.62 2003/11/17 14:23:31 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -12,8 +12,8 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 \begin{code}
 module CgClosure ( cgTopRhsClosure, 
 		   cgStdRhsClosure, 
-		   cgRhsClosure, 
-		   closureCodeBody ) where
+		   cgRhsClosure,
+		   ) where
 
 #include "HsVersions.h"
 

@@ -5,7 +5,7 @@
 
 \begin{code}
 module LoadIface (
-	loadHomeInterface, loadInterface, loadSysInterface,
+	loadHomeInterface, loadInterface,
 	loadSrcInterface, loadOrphanModules,
 	readIface,	-- Used when reading the module's old interface
 	predInstGates, ifaceInstGates, ifaceStats,

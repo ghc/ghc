@@ -10,8 +10,7 @@ module Class (
 
 	mkClass, classTyVars, classArity,
 	classKey, className, classSelIds, classTyCon,
-	classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
- 	classHasFDs
+	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
 #include "HsVersions.h"
@@ -115,9 +114,6 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
 			 classSCTheta = sc_theta, classSCSels = sc_sels,
 			 classOpStuff = op_stuff})
   = (tyvars, fundeps, sc_theta, sc_sels, op_stuff)
-
-classHasFDs :: Class -> Bool
-classHasFDs (Class {classFunDeps = fundeps}) = notNull fundeps
 \end{code}
 
 

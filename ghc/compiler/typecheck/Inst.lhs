@@ -5,8 +5,6 @@
 
 \begin{code}
 module Inst ( 
-	LIE, emptyLIE, unitLIE, plusLIE, consLIE, 
-	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 	showLIE,
 
 	Inst, 

@@ -18,18 +18,16 @@ Haskell).
 module Unique (
 	Unique, Uniquable(..), hasKey,
 
-	pprUnique, pprUnique10,
+	pprUnique,
 
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
 	getKey, getKey#,		-- Used in Var, UniqFM, Name only!
-	unpkUnique, 
 
 	incrUnique,			-- Used for renumbering
 	deriveUnique,			-- Ditto
 	newTagUnique,			-- Used in CgCase
 	initTyVarUnique,
-	initTidyUniques,
 
 	isTupleKey, 
 
@@ -42,8 +40,8 @@ module Unique (
 	mkPreludeTyConUnique, mkPreludeClassUnique,
 	mkPArrDataConUnique,
 
-	mkBuiltinUnique, builtinUniques,
-	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3
+	mkBuiltinUnique,
+	mkPseudoUnique3
     ) where
 
 #include "HsVersions.h"
@@ -198,15 +196,17 @@ instance Uniquable Unique where
 
 We do sometimes make strings with @Uniques@ in them:
 \begin{code}
-pprUnique, pprUnique10 :: Unique -> SDoc
-
+pprUnique :: Unique -> SDoc
 pprUnique uniq
   = case unpkUnique uniq of
       (tag, u) -> finish_ppr tag u (iToBase62 u)
 
+#ifdef UNUSED
+pprUnique10 :: Unique -> SDoc
 pprUnique10 uniq	-- in base-10, dudes
   = case unpkUnique uniq of
       (tag, u) -> finish_ppr tag u (int u)
+#endif
 
 finish_ppr 't' u pp_u | u < 26
   =	-- Special case to make v common tyvars, t1, t2, ...
@@ -302,9 +302,6 @@ mkPArrDataConUnique a	        = mkUnique ':' (2*a)
 
 initTyVarUnique :: Unique
 initTyVarUnique = mkUnique 't' 0
-
-initTidyUniques :: (Unique, Unique)	-- Global and local
-initTidyUniques = (mkUnique 'g' 0, mkUnique 'x' 0)
 
 mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3, 
    mkBuiltinUnique :: Int -> Unique

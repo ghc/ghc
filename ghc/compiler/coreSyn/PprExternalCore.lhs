@@ -3,7 +3,7 @@
 %
 \begin{code}
 
-module PprExternalCore where
+module PprExternalCore () where
 
 import Pretty
 import ExternalCore

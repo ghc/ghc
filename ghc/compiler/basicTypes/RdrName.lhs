@@ -10,11 +10,9 @@ module RdrName (
 
 	-- Construction
 	mkRdrUnqual, mkRdrQual, 
-	mkUnqual, mkVarUnqual, mkQual, mkOrig, mkIfaceOrig, 
+	mkUnqual, mkVarUnqual, mkQual, mkOrig,
 	nameRdrName, getRdrName, 
-	qualifyRdrName, unqualifyRdrName, 
 	mkDerivedRdrName, 
-	dummyRdrVarName, dummyRdrTcName,
 
 	-- Destruction
 	rdrNameModule, rdrNameOcc, setRdrNameSpace,
@@ -22,7 +20,6 @@ module RdrName (
 	isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
 	-- Printing;	instance Outputable RdrName
-	pprUnqualRdrName,
 
 	-- LocalRdrEnv
 	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv,
@@ -35,7 +32,7 @@ module RdrName (
 
 	-- GlobalRdrElt, Provenance, ImportSpec
 	GlobalRdrElt(..), Provenance(..), ImportSpec(..),
-	isLocalGRE, unQualOK, hasQual,
+	isLocalGRE, unQualOK,
 	pprNameProvenance
   ) where 
 
@@ -141,9 +138,6 @@ mkRdrQual mod occ = Qual mod occ
 mkOrig :: ModuleName -> OccName -> RdrName
 mkOrig mod occ = Orig mod occ
 
-mkIfaceOrig :: NameSpace -> EncodedFS -> EncodedFS -> RdrName
-mkIfaceOrig ns m n = Orig (mkSysModuleNameFS m) (mkSysOccFS ns n)
-
 ---------------
 mkDerivedRdrName :: Name -> (OccName -> OccName) -> (RdrName)
 mkDerivedRdrName parent mk_occ
@@ -170,29 +164,11 @@ nameRdrName name = Exact name
 -- unique is still there for debug printing, particularly
 -- of Types (which are converted to IfaceTypes before printing)
 
-qualifyRdrName :: ModuleName -> RdrName -> RdrName
-	-- Sets the module name of a RdrName, even if it has one already
-qualifyRdrName mod rn = Qual mod (rdrNameOcc rn)
-
-unqualifyRdrName :: RdrName -> RdrName
-unqualifyRdrName rdr_name = Unqual (rdrNameOcc rdr_name)
-
 nukeExact :: Name -> RdrName
 nukeExact n 
   | isExternalName n = Orig (nameModuleName n) (nameOccName n)
   | otherwise	     = Unqual (nameOccName n)
 \end{code}
-
-\begin{code}
-	-- This guy is used by the reader when HsSyn has a slot for
-	-- an implicit name that's going to be filled in by
-	-- the renamer.  We can't just put "error..." because
-	-- we sometimes want to print out stuff after reading but
-	-- before renaming
-dummyRdrVarName = Unqual (mkVarOcc FSLIT("V-DUMMY"))
-dummyRdrTcName  = Unqual (mkOccFS tcName FSLIT("TC-DUMMY"))
-\end{code}
-
 
 \begin{code}
 isRdrDataCon rn = isDataOcc (rdrNameOcc rn)
@@ -242,8 +218,6 @@ instance OutputableBndr RdrName where
     pprBndr _ n 
 	| isTvOcc (rdrNameOcc n) = char '@' <+> ppr n
 	| otherwise		 = ppr n
-
-pprUnqualRdrName rdr_name = ppr (rdrNameOcc rdr_name)
 
 instance Eq RdrName where
     (Exact n1) 	  == (Exact n2)    = n1==n2

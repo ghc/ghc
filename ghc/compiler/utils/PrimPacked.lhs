@@ -11,18 +11,15 @@ subsystem, mostly.
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
 module PrimPacked (
-	Ptr(..), nullPtr, writeCharOffPtr, plusAddr#,
-	BA(..), MBA(..),
+	Ptr(..), nullPtr, plusAddr#,
+	BA(..),
 	packString, 	   -- :: String -> (Int, BA)
 	unpackNBytesBA,    -- :: BA -> Int -> [Char]
         strLength,	   -- :: Ptr CChar -> Int
         copyPrefixStr,	   -- :: Addr# -> Int -> BA
-        copySubStr,	   -- :: Addr# -> Int -> Int -> BA
         copySubStrBA,	   -- :: BA -> Int -> Int -> BA
         eqStrPrefix,	   -- :: Addr# -> ByteArray# -> Int# -> Bool
-        eqCharStrPrefix,   -- :: Addr# -> Addr# -> Int# -> Bool
         eqStrPrefixBA,	   -- :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
-        eqCharStrPrefixBA, -- :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
  ) where
 
 -- This #define suppresses the "import FastString" that
@@ -70,11 +67,6 @@ nullPtr = Ptr (int2Addr# 0#)
 plusAddr# :: Addr# -> Int# -> Addr#
 plusAddr# a# i# = int2Addr# (addr2Int# a# +# i#)
 #endif
-
--- more compatibility: in 5.00+ we would use the Storable class for this,
--- but 4.08 doesn't have it.
-writeCharOffPtr (Ptr a#) (I# i#) (C# c#) = IO $ \s# ->
-  case writeCharOffAddr# a# i# c# s# of { s# -> (# s#, () #) }
 \end{code}
 
 Wrapper types for bytearrays
@@ -154,9 +146,11 @@ Copying out a substring, assume a 0-indexed string:
 (and positive lengths, thank you).
 
 \begin{code}
+#ifdef UNUSED
 copySubStr :: Addr# -> Int -> Int -> BA
 copySubStr a# (I# start#) length =
   copyPrefixStr (a# `plusAddr#` start#)  length
+#endif
 
 copySubStrBA :: BA -> Int -> Int -> BA
 copySubStrBA (BA barr#) (I# start#) len@(I# length#) = ba
@@ -218,12 +212,13 @@ eqStrPrefix a# barr# len# =
    x <- memcmp_ba a# barr# (I# len#)
    return (x == 0)
 
--- unused???
+#ifdef UNUSED
 eqCharStrPrefix :: Addr# -> Addr# -> Int# -> Bool
 eqCharStrPrefix a1# a2# len# = 
   unsafePerformIO $ do
    x <- memcmp a1# a2# (I# len#)
    return (x == 0)
+#endif
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
@@ -231,11 +226,13 @@ eqStrPrefixBA b1# b2# start# len# =
     x <- memcmp_baoff_ba b2# (I# start#) b1# (I# len#)
     return (x == 0)
 
+#ifdef UNUSED
 eqCharStrPrefixBA :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
 eqCharStrPrefixBA a# b2# start# len# = 
   unsafePerformIO $ do
     x <- memcmp_baoff b2# (I# start#) a# (I# len#) 
     return (x == 0)
+#endif
 \end{code}
 
 \begin{code}

@@ -15,7 +15,7 @@ necessary.
 
 {-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
-module Linker ( HValue, initDynLinker, showLinkerState,
+module Linker ( HValue, showLinkerState,
 		linkExpr, unload, extendLinkEnv, 
 		linkPackages,
 	) where

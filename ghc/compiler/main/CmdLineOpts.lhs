@@ -20,7 +20,6 @@ module CmdLineOpts (
 
 	-- Manipulating DynFlags
 	defaultDynFlags,		-- DynFlags
-	defaultHscLang,			-- HscLang
 	dopt,				-- DynFlag -> DynFlags -> Bool
 	dopt_set, dopt_unset,		-- DynFlags -> DynFlag -> DynFlags
 	dopt_CoreToDo,			-- DynFlags -> [CoreToDo]
@@ -42,13 +41,10 @@ module CmdLineOpts (
 	restoreDynFlags,		-- IO DynFlags
 
 	-- sets of warning opts
- 	standardWarnings,
 	minusWOpts,
 	minusWallOpts,
 
 	-- Output style options
-	opt_PprStyle_NoPrags,
-	opt_PprStyle_RawTypes,
 	opt_PprUserLength,
 	opt_PprStyle_Debug,
 
@@ -56,16 +52,13 @@ module CmdLineOpts (
 	opt_AutoSccsOnAllToplevs,
 	opt_AutoSccsOnExportedToplevs,
 	opt_AutoSccsOnIndividualCafs,
-	opt_AutoSccsOnDicts,
 	opt_SccProfilingOn,
 	opt_DoTickyProfiling,
 
 	-- language opts
-	opt_AllStrict,
 	opt_DictsStrict,
         opt_MaxContextReductionDepth,
 	opt_IrrefutableTuples,
-	opt_NumbersStrict,
 	opt_Parallel,
 	opt_SMP,
 	opt_RuntimeTypes,
@@ -73,7 +66,6 @@ module CmdLineOpts (
 
 	-- optimisation opts
 	opt_NoMethodSharing,
-	opt_DoSemiTagging,
 	opt_LiberateCaseThreshold,
 	opt_CprOff,
 	opt_RulesOff,
@@ -87,7 +79,6 @@ module CmdLineOpts (
 	opt_UF_FunAppDiscount,
 	opt_UF_KeenessFactor,
 	opt_UF_UpdateInPlace,
-	opt_UF_CheapOp,
 	opt_UF_DearOp,
 
 	-- misc opts
@@ -97,9 +88,7 @@ module CmdLineOpts (
 	opt_GranMacros,
 	opt_HiVersion,
 	opt_HistorySize,
-        opt_NoHiCheck,
 	opt_OmitBlackHoling,
-	opt_NoPruneDecls,
 	opt_Static,
 	opt_Unregisterised,
 	opt_EmitExternalCore
@@ -750,16 +739,13 @@ unpacked_opts =
 
 \begin{code}
 -- debugging opts
-opt_PprStyle_NoPrags		= lookUp  FSLIT("-dppr-noprags")
 opt_PprStyle_Debug		= lookUp  FSLIT("-dppr-debug")
-opt_PprStyle_RawTypes		= lookUp  FSLIT("-dppr-rawtypes")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
 -- profiling opts
 opt_AutoSccsOnAllToplevs	= lookUp  FSLIT("-fauto-sccs-on-all-toplevs")
 opt_AutoSccsOnExportedToplevs	= lookUp  FSLIT("-fauto-sccs-on-exported-toplevs")
 opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
-opt_AutoSccsOnDicts		= lookUp  FSLIT("-fauto-sccs-on-dicts")
 opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
 opt_DoTickyProfiling		= lookUp  FSLIT("-fticky-ticky")
 
@@ -768,14 +754,12 @@ opt_AllStrict			= lookUp  FSLIT("-fall-strict")
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
-opt_NumbersStrict		= lookUp  FSLIT("-fnumbers-strict")
 opt_Parallel			= lookUp  FSLIT("-fparallel")
 opt_SMP				= lookUp  FSLIT("-fsmp")
 opt_Flatten			= lookUp  FSLIT("-fflatten")
 
 -- optimisation opts
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
-opt_DoSemiTagging		= lookUp  FSLIT("-fsemi-tagging")
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
 opt_RulesOff			= lookUp  FSLIT("-frules-off")
 	-- Switch off CPR analysis in the new demand analyser
@@ -796,7 +780,6 @@ opt_EnsureSplittableC		= lookUp  FSLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
-opt_NoHiCheck                   = lookUp  FSLIT("-fno-hi-version-check")
 opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
 opt_RuntimeTypes		= lookUp  FSLIT("-fruntime-types")
 
@@ -813,10 +796,8 @@ opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-
 opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::Float)
 opt_UF_UpdateInPlace		= lookUp  FSLIT("-funfolding-update-in-place")
 
-opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)
 			
-opt_NoPruneDecls		= lookUp  FSLIT("-fno-prune-decls")
 opt_Static			= lookUp  FSLIT("-static")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
@@ -840,7 +821,6 @@ isStaticHscFlag f =
 	"fall-strict",
 	"fdicts-strict",
 	"firrefutable-tuples",
-	"fnumbers-strict",
 	"fparallel",
 	"fsmp",
 	"fflatten",

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.60 2003/10/30 16:01:52 simonpj Exp $
+% $Id: ClosureInfo.lhs,v 1.61 2003/11/17 14:23:31 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -17,7 +17,6 @@ module ClosureInfo (
 
 	mkClosureLFInfo, mkConLFInfo, mkSelectorLFInfo,
 	mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
-	UpdateFlag,
 
 	closureSize, closureNonHdrSize,
 	closureGoodStuffSize, closurePtrsSize,
@@ -40,7 +39,6 @@ module ClosureInfo (
 	closureLFInfo, closureSMRep, closureUpdReqd,
 	closureSingleEntry, closureReEntrant, closureSemiTag,
 	closureFunInfo,	isStandardFormThunk,
-	GenStgArg,
 
 	isToplevClosure,
 	closureTypeDescr,		-- profiling

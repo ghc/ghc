@@ -6,16 +6,16 @@
 \begin{code}
 module CoreUtils (
 	-- Construction
-	mkNote, mkInlineMe, mkSCC, mkCoerce, mkCoerce2,
+	mkInlineMe, mkSCC, mkCoerce, mkCoerce2,
 	bindNonRec, needsCaseBinding,
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
 	-- Taking expressions apart
-	findDefault, findAlt, hasDefault,
+	findDefault, findAlt,
 
 	-- Properties of expressions
-	exprType, coreAltsType, 
-	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
+	exprType,
+	exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
 	exprIsConApp_maybe, 
 	rhsIsStatic,
@@ -154,11 +154,13 @@ applyTypeToArgs e op_ty (other_arg : args)
 mkNote removes redundant coercions, and SCCs where possible
 
 \begin{code}
+#ifdef UNUSED
 mkNote :: Note -> CoreExpr -> CoreExpr
 mkNote (Coerce to_ty from_ty) expr = mkCoerce2 to_ty from_ty expr
 mkNote (SCC cc)	expr		   = mkSCC cc expr
 mkNote InlineMe expr		   = mkInlineMe expr
 mkNote note     expr		   = Note note expr
+#endif
 
 -- Slide InlineCall in around the function
 --	No longer necessary I think (SLPJ Apr 99)
@@ -276,10 +278,6 @@ The default alternative must be first, if it exists at all.
 This makes it easy to find, though it makes matching marginally harder.
 
 \begin{code}
-hasDefault :: [CoreAlt] -> Bool
-hasDefault ((DEFAULT,_,_) : alts) = True
-hasDefault _			  = False
-
 findDefault :: [CoreAlt] -> ([CoreAlt], Maybe CoreExpr)
 findDefault ((DEFAULT,args,rhs) : alts) = ASSERT( null args ) (alts, Just rhs)
 findDefault alts			= 		      (alts, Nothing)
