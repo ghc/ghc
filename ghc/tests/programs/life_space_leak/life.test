@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-$1 | sum > /tmp/sum-real-$$
+./life_space_leak | sum > /tmp/sum-real-$$
 
 cat > /tmp/sum-expected-$$ << EOTHING
 02845  1350
