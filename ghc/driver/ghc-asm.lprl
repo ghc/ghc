@@ -265,7 +265,7 @@ sub init_TARGET_STUFF {
     $T_COPY_DIRVS   = '\.(global|proc|stab)';
 
     $T_hsc_cc_PAT   = '\.asciz.*\)(hsc|cc) (.*)\\\\t(.*)"';
-    $T_DOT_WORD	    = '\.(word|byte|half|skip)';
+    $T_DOT_WORD	    = '\.(word|byte|half|skip|uahalf)';
     $T_DOT_GLOBAL   = '^\t\.global';
     $T_HDR_literal  = "\.text\n\t\.align 8\n";
     $T_HDR_misc	    = "\.text\n\t\.align 4\n";
@@ -644,6 +644,7 @@ sub mangle_asm {
 		if ($TargetPlatform =~ /^i386-/) {
 		    $p =~ s/^\tpushl \%edi\n//;
 		    $p =~ s/^\tpushl \%esi\n//;
+		    $p =~ s/^\tpushl \%ebx\n//;
 		    $p =~ s/^\tsubl \$\d+,\%esp\n//;
                     $p =~ s/^\tmovl \$\d+,\%eax\n\tcall __alloca\n// if ($TargetPlatform =~ /^.*-cygwin32/);
 		} elsif ($TargetPlatform =~ /^m68k-/) {
