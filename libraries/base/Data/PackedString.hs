@@ -298,7 +298,9 @@ hGetPS h i = do
 --                       nil, null, reverse, span, splitAt, subst, tail,
 --                       take, takeWhile, unlines, unwords, words)
 -- also hiding: Ix(..), Functor(..)
-import NHC.PackedString
+import qualified NHC.PackedString
+import NHC.PackedString (PackedString,packString,unpackPS)
+import List (intersperse)
 
 
 nilPS       :: PackedString
@@ -326,10 +328,13 @@ dropWhilePS :: (Char -> Bool) -> PackedString -> PackedString
 spanPS      :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
 breakPS     :: (Char -> Bool) -> PackedString -> (PackedString, PackedString)
 linesPS     :: PackedString -> [PackedString]
+unlinesPS   :: [PackedString] -> PackedString
 
 wordsPS     :: PackedString -> [PackedString]
+unwordsPS   :: [PackedString] -> PackedString
 splitPS     :: Char -> PackedString -> [PackedString]
 splitWithPS :: (Char -> Bool) -> PackedString -> [PackedString]
+joinPS      :: PackedString -> [PackedString] -> PackedString
 
 nilPS       = NHC.PackedString.nil
 consPS      = NHC.PackedString.cons
@@ -356,9 +361,20 @@ dropWhilePS = NHC.PackedString.dropWhile
 spanPS      = NHC.PackedString.span
 breakPS     = NHC.PackedString.break
 linesPS     = NHC.PackedString.lines
+unlinesPS   = NHC.PackedString.unlines
 
 wordsPS     = NHC.PackedString.words
+unwordsPS   = NHC.PackedString.unwords
 splitPS c   = splitWithPS (==c)
-splitWithPS = error "Data.PackedString: splitWithPS not implemented"
+splitWithPS p =
+    map packString . split' p [] . unpackPS
+  where
+    split' :: (Char->Bool) -> String -> String -> [String]
+    split' pred []  []     = []
+    split' pred acc []     = [reverse acc]
+    split' pred acc (x:xs) | pred x    = reverse acc: split' pred [] xs
+                           | otherwise = split' pred (x:acc) xs
+
+joinPS sep  = concatPS . intersperse sep
 
 #endif
