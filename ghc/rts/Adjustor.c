@@ -249,5 +249,11 @@ freeHaskellFunctionPtr(void* ptr)
  free(ptr);
 }
 
+#else /* Provide dummy */
+void
+freeHaskellFunctionPtr(void* ptr)
+{
+}
+
 #endif /* i386_TARGET_ARCH || sparc_TARGET_ARCH */
 
