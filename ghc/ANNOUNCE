@@ -20,7 +20,7 @@ Highlights include:
 
 See the release notes for a full list of the changes:
 
-   http://www.haskell.org/ghc/docs/latest/users_guide/release-5-04.html
+   http://www.haskell.org/ghc/docs/latest/html/users_guide/release-5-04.html
 
 
 How to get it
@@ -35,9 +35,8 @@ folks.  Binary builds for other platforms are available as a .tar.gz
 which can be installed wherever you want.  The source distribution is
 also available from the same place.
 
-Once you have the distribution, please follow the pointers in the
-README file to find all of the documentation about this release.
-
+Packages will appear as they are built - if the package for your
+system isn't available yet, please try again later.
 
 Background
 ~~~~~~~~~~
@@ -91,7 +90,7 @@ wunderhacker), but haven't been tested due to lack of time/hardware:
 The builder's guide on the web site gives a complete run-down of what
 ports work; it can be found at
 
-   http://www.haskell.org/ghc/docs/latest/building/building-guide.html
+   http://www.haskell.org/ghc/docs/latest/html/building/building-guide.html
 
 
 Mailing lists
