@@ -546,7 +546,11 @@ tryEtaReduce bndrs body
     go []       (Var fun)     | ok_fun fun   = Just (Var fun)	-- Success!
     go _        _			     = Nothing		-- Failure!
 
-    ok_fun fun   = not (fun `elem` bndrs)
+    ok_fun fun   = not (fun `elem` bndrs) && 
+		   isEvaldUnfolding (idUnfolding fun)
+	-- The exprIsValue is because eta reduction is not 
+	-- valid in general:  \x. bot  /=  bot
+	-- So we need to be sure that the "fun" is a value.
     ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
 \end{code}
 
