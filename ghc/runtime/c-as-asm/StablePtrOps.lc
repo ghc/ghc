@@ -19,6 +19,11 @@ is even more dated.)
 #include "rtsdefs.h"
 
 extern StgPtr unstable_Closure;
+#if 0
+extern int    CStackDelta;
+#endif
+
+StgInt entersFromC=0;
 
 void
 enterStablePtr(stableIndex, startCode)
@@ -28,9 +33,69 @@ enterStablePtr(stableIndex, startCode)
     unstable_Closure
       = _deRefStablePointer(stableIndex, StorageMgrInfo.StablePointerTable);
 
-/* ToDo: Set arity to right value - if necessary */
+    /* ToDo: Set arity to right value - if necessary */
 
+    /* Inactive code for computing the chunk of C stack we have allocated
+       since initially leaving Haskell land.
+    */
+#if 0 && defined(CONCURRENT) && defined(i386_TARGET_ARCH)
+    __asm__ volatile ("mov %%esp,%0" : "=m" (CurrentRegTable->rWrapReturn));
+    CStackDelta=(int)(((unsigned int)CurrentRegTable->rCstkptr - (unsigned int)CurrentRegTable->rWrapReturn) / sizeof(W_));
+    CurrentTSOinC=CurrentTSO;
+# if defined(DEBUG)
+    fprintf(stderr,"enterStablePtr: current: %#x c-entry: %#x (delta %d)\n", CurrentRegTable->rWrapReturn, CurrentRegTable->rCstkptr, CStackDelta);
+    __asm__ volatile ("mov %%esp,%0" : "=m" (CurrentRegTable->rWrapReturn));
+    CStackDelta=(int)(((unsigned int)CurrentRegTable->rCstkptr - (unsigned int)CurrentRegTable->rWrapReturn) / sizeof(W_));
+# endif
+#endif
+    /* 
+     * Combining Concurrent Haskell and stable pointers poses a headache or
+     * two. If the thread that jumps into Haskell causes a context switch,
+     * we're in deep trouble, as miniInterpret() is used to enter the threaded world,
+     * which stash away return address and callee-saves registers on the C
+     * stack and enter.
+     *
+     * If the thread should happen to context switch, the scheduler is 
+     * currently coded to use longjmp() to jump from the rescheduling
+     * code to the main scheduler loop. i.e., we unwind chunks of the
+     * C stack, including the return address++ the thread left there
+     * before entering the stable pointer.
+     * 
+     * Ideally, we would like to impose no restrictions on the use of
+     * stable pointers with Concurrent Haskell, but currently we 
+     * do turn off heap check context switching when a thread jumps into
+     * Haskell from C. This reduces the `risk' of a context switch, but
+     * doesn't solve the problem - a thread that blocks will still
+     * force a re-schedule. To cope with this situation, we use a counter
+     * to keep track of whether any threads have entered Haskell from C.
+     * If any have, we avoid longjmp()ing in the RTS to preserve the region
+     * of the C stack that the thread expects to be there when it exits.
+     * 
+     * This scheme is a hack (no, really!) to get Haskell callbacks to work
+     * with Concurrent Haskell. It is currently only supported for x86 platforms
+     * (due to use of asm to get at stack pointer in PerformIO.lhc)
+     *
+     * ToDo: do Right in the new RTS.
+     */
+#if defined(CONCURRENT) && defined(i386_TARGET_ARCH)
+    entersFromC++;
     miniInterpret(startCode);
+    entersFromC--;
+#else
+    miniInterpret(startCode);
+#endif
+
+#if 0 && defined(DEBUG)
+    if (CurrentTSO == CurrentTSOinC) {
+       CurrentTSOinC=NULL;
+    }
+    /* C stack should have been reconstructed by now (we'll soon find out..) */
+    do {
+            char *p;
+	    __asm__ volatile ("mov %%esp,%0" : "=m" (p));
+            fprintf(stderr,"enterStablePtr-end: current: %#x c-entry: %#x\n", p, CurrentRegTable->rCstkptr);
+	} while(0);
+#endif
 }
 \end{code}
 
