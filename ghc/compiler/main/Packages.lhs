@@ -201,12 +201,15 @@ readPackageConfigs dflags = do
 	-- unless the -no-user-package-conf flag was given.
 	-- We only do this when getAppUserDataDirectory is available 
 	-- (GHC >= 6.3).
-   appdir <- getAppUserDataDirectory "ghc"
-   let 
+   (exists, pkgconf) <- catch (do
+      appdir <- getAppUserDataDirectory "ghc"
+      let 
      	 pkgconf = appdir ++ '/':TARGET_ARCH ++ '-':TARGET_OS
 			++ '-':cProjectVersion ++ "/package.conf"
-   --
-   exists <- doesFileExist pkgconf
+      flg <- doesFileExist pkgconf
+      return (flg, pkgconf))
+       -- gobble them all up and turn into False.
+      (\ _ -> return (False, ""))
    pkg_map2 <- if (dopt Opt_ReadUserPackageConf dflags && exists)
 		  then readPackageConfig dflags pkg_map1 pkgconf
 		  else return pkg_map1

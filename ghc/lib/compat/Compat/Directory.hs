@@ -31,7 +31,7 @@ import Control.Monad		( when )
 import Foreign.Marshal.Alloc	( allocaBytes )
 import System.IO (IOMode(..), openBinaryFile, hGetBuf, hPutBuf, hClose)
 import System.IO.Error		( try )
-import GHC.IOBase ( IOException(..) )
+import GHC.IOBase ( IOException(..), IOErrorType(..) )
 #else
 import System.IO		( try )
 #endif
@@ -46,6 +46,7 @@ getAppUserDataDirectory appName = do
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
   allocaBytes long_path_size $ \pPath -> do
      r <- c_SHGetFolderPath nullPtr csidl_APPDATA nullPtr 0 pPath
+     when (r<0) (raiseUnsupported "Compat.Directory.getAppUserDataDirectory")
      s <- peekCString pPath
      return (s++'\\':appName)
 #else
@@ -54,7 +55,7 @@ getAppUserDataDirectory appName = do
 #endif
 
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
-foreign import stdcall unsafe "SHGetFolderPathA"
+foreign import stdcall unsafe "directory.h __hscore_getFolderPath"
             c_SHGetFolderPath :: Ptr () 
                               -> CInt 
                               -> Ptr () 
@@ -63,10 +64,13 @@ foreign import stdcall unsafe "SHGetFolderPathA"
                               -> IO CInt
 
 -- __compat_long_path_size defined in cbits/directory.c
-foreign import ccall unsafe "__compat_long_path_size"
+foreign import ccall unsafe "directory.h __compat_long_path_size"
   long_path_size :: Int
 
-foreign import ccall unsafe "__hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
+foreign import ccall unsafe "directory.h __hscore_CSIDL_APPDATA"  csidl_APPDATA  :: CInt
+
+raiseUnsupported loc = 
+   ioError (IOError Nothing UnsupportedOperation loc "unsupported operation" Nothing)
 #endif
 
 

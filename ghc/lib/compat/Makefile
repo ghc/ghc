@@ -19,7 +19,7 @@ NO_INSTALL_LIBRARY = YES
 MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 # Needed so that the libraries can #include relative to this directory.
-SRC_HC_OPTS += -I.
+SRC_HC_OPTS += -I. -Iinclude
 
 UseGhcForCc = YES
 
