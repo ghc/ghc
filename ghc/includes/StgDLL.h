@@ -41,4 +41,10 @@
 # endif
 #endif
 
+#ifdef COMPILING_STDLIB
+#define DLL_IMPORT_STDLIB
+#else
+#define DLL_IMPORT_STDLIB DLLIMPORT
+#endif
+
 #endif /* __STGDLL_H__ */

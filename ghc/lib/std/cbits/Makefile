@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.22 2000/07/09 16:06:28 panne Exp $
+# $Id: Makefile,v 1.23 2000/08/07 16:09:03 rrt Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -34,6 +34,7 @@ DLL_IMPLIB_NAME = libHSstd_cbits_imp.a
 DLL_DESCRIPTION = "Haskell Prelude helpers"
 SRC_BLD_DLL_OPTS += --export-all --output-def=HSstdcbits.def DllVersionInfo.o
 SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -L../../../rts
+SRC_CC_OPTS += -optc-DCOMPILING_STDLIB
 
 #
 # Compile the files using the Haskell compiler (ghc really).
