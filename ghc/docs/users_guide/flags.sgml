@@ -688,13 +688,13 @@
 	    <row>
 	      <entry><option>-O</option></entry>
 	      <entry>Enable default optimisation (level 1)</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-O0</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-O</option><replaceable>n</replaceable></entry>
 	      <entry>Set optimisation level <replaceable>n</replaceable></entry>
-	      <entry>static</entry>
+	      <entry>dyanamic</entry>
 	      <entry><option>-O0</option></entry>
 	    </row>
 	  </tbody>
@@ -719,28 +719,28 @@
 	    <row>
 	      <entry><option>-fcase-merge</option></entry>
 	      <entry>Enable case-merging</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-case-merge</option></entry>
 	    </row>
 
 	    <row>
 	      <entry><option>-fdicts-strict</option></entry>
 	      <entry>Make dictionaries strict</entry>
-	      <entry>dynamic</entry>
+	      <entry>static</entry>
 	      <entry><option>-fno-dicts-strict</option></entry>
 	    </row>
 
 	    <row>
 	      <entry><option>-fdo-eta-reduction</option></entry>
 	      <entry>Enable eta-reduction</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-do-eta-reduction</option></entry>
 	    </row>
 
 	    <row>
 	      <entry><option>-fdo-lambda-eta-expansion</option></entry>
 	      <entry>Enable lambda eta-reduction</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-do-lambda-eta-expansion</option></entry>
 	    </row>
 
@@ -774,13 +774,6 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-flet-no-escape</option></entry>
-	      <entry>Enable let-no-escape optimisation</entry>
-	      <entry>static</entry>
-	      <entry><option>-fno-let-no-escape</option></entry>
-	    </row>
-
-	    <row>
 	      <entry><option>-fliberate-case-threshold</option></entry>
 	      <entry>Tweak the liberate-case optimisation (default: 10)</entry>
 	      <entry>static</entry>
@@ -790,7 +783,7 @@
 	    <row>
 	      <entry><option>-fomit-interface-pragmas</option></entry>
 	      <entry>Don't generate interface pragmas</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-omit-interface-pragmas</option></entry>
 	    </row>
 
@@ -805,7 +798,7 @@
 	    <row>
 	      <entry><option>-fmax-simplifier-iterations</option></entry>
 	      <entry>Set the max iterations for the simplifier</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 
@@ -819,7 +812,7 @@
 	    <row>
 	      <entry><option>-fno-cse</option></entry>
 	      <entry>Turn off common sub-expression</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 
@@ -833,7 +826,7 @@
 	    <row>
 	      <entry><option>-fno-strictness</option></entry>
 	      <entry>Turn off strictness analysis</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 
@@ -847,7 +840,7 @@
 	    <row>
 	      <entry><option>-funbox-strict-fields</option></entry>
 	      <entry>Flatten strict constructor fields</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-fno-unbox-strict-fields</option></entry>
 	    </row>
 
@@ -884,13 +877,6 @@
 	      <entry>Tweak unfolding settings</entry>
 	      <entry>static</entry>
 	      <entry><option>-fno-unfolding-use-threshold</option></entry>
-	    </row>
-
-	    <row>
-	      <entry><option>-fusagesp</option></entry>
-	      <entry>Turn on UsageSP analysis</entry>
-	      <entry>static</entry>
-	      <entry><option>-fno-usagesp</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>
