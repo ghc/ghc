@@ -2888,8 +2888,8 @@ genCCall fn cconv kind args
      -- ToDo:needed (WDP 96/03) ???
      fn_static = unLeft fn
      fn__2 = case (headFS fn_static) of
-	        '.' -> ImmLit (ptext fn_static)
-	        _   -> ImmLab False (ptext fn_static)
+	        '.' -> ImmLit (ftext fn_static)
+	        _   -> ImmLab False (ftext fn_static)
 
      -- move args from the integer vregs into which they have been 
      -- marshalled, into %o0 .. %o5, and the rest onto the stack.
