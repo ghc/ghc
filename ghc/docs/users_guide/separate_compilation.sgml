@@ -120,6 +120,43 @@
 
     </sect2>
 
+    <sect2 id="finding-hierarchical-modules">
+      <title>Finding interfaces for hierarchical modules</title>
+
+      <para>GHC supports a hierarchical module namespace as an
+      extension to Haskell 98 (see <xref
+      linkend="hierarchical-modules">).</para>
+
+      <para>A module name in general consists of a sequence of
+      components separated by dots
+      (&lsquo;<literal>.</literal>&rsquo;).  When looking for
+      interface files for a hierarchical module, the compiler turns
+      the dots into path separators, so for example a module
+      <literal>A.B.C</literal> becomes <literal>A/B/C</literal> (or
+      <literal>A\B\C</literal> under Windows).  Then each component of
+      the import directories list is tested in turn; so for example if
+      the list contains directories
+      <literal>D<subscript>1</subscript></literal> to
+      <literal>D<subscript>n</subscript></literal>, then the compiler
+      will look for the interface in
+      <literal>D<subscript>1</subscript>/A/B/C.hi</literal> first,
+      then <literal>D<subscript>2</subscript>/A/B/C.hi</literal> and
+      so on.</para>
+
+      <para>Note that it's perfectly reasonable to have a module which
+      is both a leaf and a branch of the tree.  For example, if we
+      have modules <literal>A.B</literal> and
+      <literal>A.B.C</literal>, then <literal>A.B</literal>'s
+      interface file will be in <literal>A/B.hi</literal> and
+      <literal>A.B.C</literal>'s interface file will be in
+      <literal>A/B/C.hi</literal>.</para>
+
+      <para>For GHCi and <option>--make</option>, the search strategy
+      for source files is exactly the same, just replace the
+      <literal>.hi</literal> suffix in the above description with
+      <literal>.hs</literal> or <literal>.lhs</literal>.</para>
+    </sect2>
+
     <Sect2 id="hi-options">
       <title>Other options related to interface files</title>
       <indexterm><primary>interface files, options</primary></indexterm>

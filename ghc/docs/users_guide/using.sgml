@@ -443,6 +443,12 @@ ghc &ndash;&ndash;make Main.hs
     interface file for the module, then GHC will complain.  The
     exception to this rule is for package modules, which may or may
     not have source files.</para>
+
+    <para>The source files for the program don't all need to be in the
+    same directory; the <option>-i</option> option can be used to add
+    directories to the search path (see <xref
+    linkend="options-finding-imports">).</para>
+
   </sect1>
   
   <Sect1 id="options-order">

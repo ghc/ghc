@@ -2385,30 +2385,29 @@ Assertion failures can be caught, see the documentation for the
       it extends the normally flat Haskell module namespace into a
       more flexible hierarchy of modules.</para>
 
-      <para>A module name in the extended syntax consists of a
-      sequence of components, each separated by a dot.  When searching
-      for an interface file (or a source file, in the case of GHCi or
-      when using <option>--make</option>) for an imported module, GHC
-      interprets the dot as a path separator.  So for example, if a
-      module <literal>A.B.C</literal> is imported, then for each
-      directory <literal>D</literal> on the search path (see the
-      <option>-i</option> option, <xref
-      linkend="options-finding-imports">), GHC will look in the
-      directory <literal>D/A/B</literal><footnote><para>On Windows,
-      this would be <literal>D\A\B</literal>.</para></footnote> for an
-      interface file called <filename>C.hi</filename> or a source file
-      <filename>C.hs</filename> or <filename>C.lhs</filename>.</para>
-
-      <para>Note that as far as the compiler is concerned, module
-      names are always fully qualified; the hierarchy only has a
-      special meaning when searching for interface files and source
-      files in the filesystem.  In particular, this means that the
-      full module name must be given after the
+      <para>This extension has very little impact on the language
+      itself; modules names are <emphasis>always</emphasis> fully
+      qualified, so you can just think of the fully qualified module
+      name as <quote>the module name</quote>.  In particular, this
+      means that the full module name must be given after the
       <literal>module</literal> keyword at the beginning of the
       module; for example, the module <literal>A.B.C</literal> must
       begin</para>
 
 <programlisting>module A.B.C</programlisting>
+
+
+      <para>It is a common strategy to use the <literal>as</literal>
+      keyword to save some typing when using qualified names with
+      hierarchical modules.  For example:</para>
+
+<programlisting>
+import qualified Control.Monad.ST.Strict as ST
+</programlisting>
+
+      <para>Hierarchical modules have an impact on the way that GHC
+      searches for files.  For a description, see <xref
+      linkend="finding-hierarchical-modules">.</para>
 
       <para>GHC comes with a large collection of libraries arranged
       hierarchically; see the accompanying library documentation.
@@ -2416,7 +2415,8 @@ Assertion failures can be caught, see the documentation for the
       of <quote>core</quote> libraries used by several Haskell
       compilers, and the libraries that GHC comes with represent the
       current status of that project.  For more details, see <ulink
-      url="http://www.haskell.org/~simonmar/libraries/libraries.html">.</ulink></para>
+      url="http://www.haskell.org/~simonmar/libraries/libraries.html">Haskell
+      Libraries</ulink>.</para>
 
     </sect2>
 
