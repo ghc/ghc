@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.5 1999/03/17 13:19:21 simonm Exp $
+ * $Id: HeapStackCheck.hc,v 1.6 1999/03/17 16:25:07 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -817,7 +817,7 @@ INFO_TABLE_SRT_BITMAP(stg_yield_noregs_info, stg_yield_noregs_ret, 0/*BITMAP*/,
 FN_(stg_yield_noregs_ret)
 {
   FB_
-  JMP_(ENTRY_CODE(Sp[0]))
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 
