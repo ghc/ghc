@@ -1,4 +1,3 @@
-
 module Test1_nostdlib  where
 foreign import "ilxHello" unsafe ilxHello :: ()
 
