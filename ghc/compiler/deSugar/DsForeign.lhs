@@ -90,7 +90,7 @@ dsForeigns mod_name fos
     = dsFExport mod_name id (idType id) 
 		ext_nm cconv False                 `thenDs` \(h, c) ->
       warnDepr depr loc				   `thenDs` \_              ->
-      returnDs (acc_feb, acc_f, h $$ acc_h, c $$ acc_c, acc_header)
+      returnDs (id:acc_feb, acc_f, h $$ acc_h, c $$ acc_c, acc_header)
 
   warnDepr False _   = returnDs ()
   warnDepr True  loc = dsWarn (addShortWarnLocLine loc msg)
