@@ -135,7 +135,8 @@ stopTaskManager ()
 /************ THREADS version *****************/
 
 void
-startTaskManager( nat maxCount, void (*taskStart)(void) )
+startTaskManager( nat maxCount,
+		  void (*taskStart)(void) STG_UNUSED )
 {
   /* In the threaded case, maxCount is used to limit the
      the creation of worker tasks. Tasks are created lazily, i.e.,
@@ -151,8 +152,6 @@ startTask ( void (*taskStart)(void) )
 {
   int r;
   OSThreadId tid;
-  
-  /* Locks assumed: rts_mutex */
   
   /* If more than one worker thread is known to be blocked waiting
      on thread_ready_cond, signal it rather than creating a new one.
