@@ -1,14 +1,14 @@
 % 	Building and installing the Glasgow Functional Programming Tools Suite
 %
-%				Version 2.04
-%				June 1997
+%				Version 2.05
+%				July 1997
 			
 
 \begin{onlystandalone}
 \documentstyle[11pt,literate]{article}
 \begin{document}
 \title{Building and installing the Glasgow Functional Programming Tools Suite\\
-Version~2.04}
+Version~2.05}
 \author{The GHC Team\\
 Department of Computing Science\\
 University of Glasgow\\
@@ -84,8 +84,8 @@ confidence will work well by having tested it (more) thoroughly.
 Source-only distributions are either bugfix releases or snapshots of
 current state of development. The release has undergone some testing.
 
-GHC~2.04 is a source-only release, and it can be compiled up using
-either GHC~2.02 (or the bugfix release, GHC~2.03) or the Good Old
+GHC~2.05 is a source-only release, and it can be compiled up using
+either GHC~2.02 (or subsequent bugfix releases) or the Good Old
 Compiler, GHC~0.29. Compiling with 0.29 is recommended if you're
 a performance junkie, as 0.29 (still) generates zippier code, but
 GHC~2.04 is catching up.
@@ -179,7 +179,7 @@ If in doubt, please send a message to \tr{glasgow-haskell-bugs@dcs.gla.ac.uk}.
 
 %************************************************************************
 %*									*
-\section[port-info]{What machines the Glasgow tools, version~2.04, run on}
+\section[port-info]{What machines the Glasgow tools, version~2.05, run on}
 \index{ports, GHC}
 \index{GHC ports}
 \index{supported platforms}
@@ -226,7 +226,7 @@ unsurprisingly.  Both have native-code generators, for quicker
 compilations.  The native-code generator for iX86 platforms (e.g.,
 Linux ELF) is {\em nearly} working; but is not turned on by default.
 
-Here's everything that's known about GHC ports, as of 2.04. We
+Here's everything that's known about GHC ports, as of 2.05. We
 identify platforms by their ``canonical'' CPU/Manufacturer/OS triple.
 
 Note that some ports are fussy about which GCC version you use; or
@@ -267,7 +267,7 @@ Concurrent/Parallel Haskell probably don't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{i386-*-linux} (PCs running Linux---ELF format):]
 \index{i386-*-linux: registerised port}
-GHC~2.04 works registerised.
+GHC~2.05 works registerised.
 You {\em must} have GCC 2.7.x or later.
 The iX86 native-code generator is {\em nearly} there, but it
 isn't turned on by default.
@@ -284,7 +284,7 @@ On old Linux a.out systems: should be the same.
 %-------------------------------------------------------------------
 \item[\tr{i386-*-freebsd} (PCs running FreeBSD 2.2 or higher, and
 NetBSD/OpenBSD using FreeBSD emulation):] \index{i386-*-freebsd:
-registerised port} GHC~2.04 works registerised. Supports same set of
+registerised port} GHC~2.05 works registerised. Supports same set of
 bundles as the above.
 
 \index{i386-*-freebsd: profiling---yes}
@@ -306,7 +306,7 @@ Profiling works, so does Concurrent Haskell.
 %-------------------------------------------------------------------
 \item[\tr{mips-sgi-irix5}:]
 \index{mips-sgi-irix5: registerised port}
-GHC~2.04 works registerised (no native-code generator).
+GHC~2.05 works registerised (no native-code generator).
 I suspect any GCC~2.6.x (or later) is OK.  The GCC that I used
 was built with \tr{--with-gnu-as}; turns out that is important!
 
@@ -320,7 +320,7 @@ Profiling might work, but it is untested.
 \item[\tr{mips-sgi-irix6}:]
 \index{mips-sgi-irix6: registerised port}
 Thanks to the fine efforts of Tomasz Cholewo
-\tr{<tjchol01@mecca.spd.louisville.edu>}, GHC~2.04 works registerised
+\tr{<tjchol01@mecca.spd.louisville.edu>}, GHC~2.05 works registerised
 (no native code generator) under IRIX 6.2 and 6.3. Depends on having
 specially tweaked version of gcc-2.7.2 around, which can be downloaded
 from
@@ -337,7 +337,7 @@ Profiling works, Concurrent/Parallel Haskell might work (AFAIK, untested).
 %-------------------------------------------------------------------
 \item[\tr{powerpc-ibm-aix}:]
 \index{powerpc-ibm-aix: registerised port}
-GHC~2.04 works registerised (no native-code generator..yet).
+GHC~2.05 works registerised (no native-code generator..yet).
 I suspect 2.7.x is what you need together with this.
 
 Concurrent/Parallel Haskell probably don't work (yet).
@@ -370,7 +370,7 @@ Concurrent/Parallel Haskell probably won't work (yet).
 %-------------------------------------------------------------------
 \item[\tr{m68k-sun-sunos4} (Sun3):]
 \index{m68k-sun-sunos4: registerised port}
-GHC~2.04 hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
+GHC~2.05 hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
 No native-code generator.
 
 Concurrent/Parallel Haskell probably don't work (yet).
@@ -528,7 +528,7 @@ should always invoke @GHC@ version 2.02.
 \subsection{What bundles there are}
 
 There are plenty of ``non-basic'' GHC bundles.  The files for them are
-called \tr{ghc-2.04-<bundle>-<platform>.tar.gz}, where the
+called \tr{ghc-2.05-<bundle>-<platform>.tar.gz}, where the
 \tr{<platform>} is as above, and \tr{<bundle>} is one of these:
 \begin{description}
 \item[\tr{prof}:]  Profiling with cost-centres.  You probably want this.
@@ -571,7 +571,7 @@ main = putStr "Hello, world!\n"
 First, give yourself a convenient way to execute the driver script
 \tr{ghc/driver/ghc}, perhaps something like...
 \begin{verbatim}
-% ln -s /local/src/ghc-2.04/ghc/driver/ghc ~/bin/alpha/ghc
+% ln -s /local/src/ghc-2.05/ghc/driver/ghc ~/bin/alpha/ghc
 % rehash
 \end{verbatim}
 
@@ -1726,7 +1726,7 @@ installation, this bug also suggests that you have an old GCC.
 \item
 You {\em may} need to re-\tr{ranlib} your libraries (on Sun4s).
 \begin{verbatim}
-% cd $(libdir)/ghc-2.04/sparc-sun-sunos4
+% cd $(libdir)/ghc-2.05/sparc-sun-sunos4
 % foreach i ( `find . -name '*.a' -print` ) # or other-shell equiv...
 ?    ranlib $i
 ?    # or, on some machines: ar s $i
