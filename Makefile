@@ -129,12 +129,19 @@ binary-dist ::
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
 	   for dir in $(BINDIST_DOCS); do \
 	     echo Making $$way documentation in $$dir && \
-	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way && \
-	     echo cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way && \
-	     cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way && \
+	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way >.doclog  2>&1 && \
+	     if [ "$$way" = "html" ]; then \
+		for subdir in `perl -n -e '/output will be in ([_A-Za-z0-9]*)/ && do { print $$1; };' <.doclog`; do \
+		   echo Copying HTML docs from $$subdir...; \
+		   cp -Rf $$dir/$$subdir $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
+		done \
+	     else \
+	        cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
+	     fi && \
 	     echo "Done."; \
 	   done; \
 	done
+	@rm -f .doclog
 
 # Rename scripts to $i.prl and $i.sh where necessary.
 # ToDo: do this in a cleaner way...
