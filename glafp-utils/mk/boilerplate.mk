@@ -1,10 +1,10 @@
-#################################################################################
+################################################################################
 #
 #			    GHC boilerplate.mk
 #
 #		Boilerplate Makefile for an fptools project
 #
-#################################################################################
+################################################################################
 
 # Begin by slurping in the boilerplate from one level up.
 # Remember, TOP is the top level of the innermost level
@@ -15,6 +15,8 @@ GLAFP_UTILS_TOP := $(TOP)
 TOP:=$(GLAFP_UTILS_TOP)/..
 
 include $(TOP)/mk/boilerplate.mk
+
+TOP:=$(GLAFP_UTILS_TOP)
 
 # -----------------------------------------------------------------
 # Everything after this point
