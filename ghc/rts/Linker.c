@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.25 2001/02/12 13:30:15 sewardj Exp $
+ * $Id: Linker.c,v 1.26 2001/02/12 16:40:34 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -463,7 +463,9 @@ unloadObj( char *path )
 	    free(oc->fileName);
 	    free(oc->symbols);
 	    free(oc->sections);
-            freeHashTable(oc->lochash, NULL);
+	    /* The local hash table should have been freed at the end
+               of the ocResolve_ call on it. */
+            ASSERT(oc->lochash == NULL);
 	    free(oc);
 	    return 1;
 	}
@@ -1610,6 +1612,10 @@ ocResolve_ELF ( ObjectCode* oc )
          if (!ok) return ok;
       }
    }
+
+   /* Free the local symbol table; we won't need it again. */
+   freeHashTable(oc->lochash, NULL);
+   oc->lochash = NULL;
 
    return 1;
 }
