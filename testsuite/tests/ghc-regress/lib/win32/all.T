@@ -7,7 +7,8 @@ include ($confdir ++ "/../vanilla-test.T")
 def myvtr($extra_comp_args, $a, $b)
 {
    -- Only run the tests on Windows
-   skip when $platform == "i386-unknown-mingw32"
+   skip when $platform /= "i386-unknown-mingw32" && 
+	     $platform /= "i386-unknown-cygwin32"
    vtr("-package lang -package win32 " ++ $extra_comp_args, $a, $b)
 }
 
