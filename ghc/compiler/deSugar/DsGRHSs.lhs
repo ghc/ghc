@@ -14,7 +14,7 @@ IMPORT_DELOOPER(DsLoop)		-- break dsExpr/dsBinds-ish loop
 #else
 import {-# SOURCE #-} DsExpr  ( dsExpr )
 import {-# SOURCE #-} DsBinds ( dsBinds )
-import {-# SOURCE #-} Match   ( match )
+import {-# SOURCE #-} Match   ( matchExport )
 #endif
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
@@ -38,7 +38,7 @@ import PrelVals		( nON_EXHAUSTIVE_GUARDS_ERROR_ID )
 import Outputable	( PprStyle(..) )
 import SrcLoc		( SrcLoc{-instance-} )
 import Type             ( SYN_IE(Type) )
-import Unique		( Unique, otherwiseIdKey, Uniquable(..) )
+import Unique		( Unique, otherwiseIdKey, trueDataConKey, Uniquable(..) )
 import Util		( panic )
 \end{code}
 
@@ -59,7 +59,7 @@ dsGuarded :: TypecheckedGRHSsAndBinds
 
 dsGuarded (GRHSsAndBindsOut grhss binds err_ty)
   = dsBinds False{-don't auto scc-} binds       `thenDs` \ core_binds ->
-    dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn _) ->
+    dsGRHSs err_ty PatBindMatch [] grhss 	`thenDs` \ (MatchResult can_it_fail _ core_grhss_fn) ->
     case can_it_fail of
 	CantFail -> returnDs (mkCoLetsAny core_binds (core_grhss_fn (panic "It can't fail")))
 	CanFail  -> mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID err_ty "" `thenDs` \ error_expr ->
@@ -96,7 +96,7 @@ dsGRHS ty kind pats (OtherwiseGRHS expr locn)
     let
 	expr_fn = \ ignore -> core_expr
     in
-    returnDs (MatchResult CantFail ty expr_fn (DsMatchContext kind pats locn))
+    returnDs (MatchResult CantFail ty expr_fn ) --(DsMatchContext kind pats locn))
 
 dsGRHS ty kind pats (GRHS guard expr locn)
   = putSrcLocDs locn $
@@ -104,7 +104,7 @@ dsGRHS ty kind pats (GRHS guard expr locn)
     let
 	expr_fn = \ ignore -> core_expr
     in
-    matchGuard guard (MatchResult CantFail ty expr_fn (DsMatchContext kind pats locn))
+    matchGuard guard (DsMatchContext kind pats locn) (MatchResult CantFail ty expr_fn) 
 \end{code}
 
 
@@ -118,33 +118,37 @@ dsGRHS ty kind pats (GRHS guard expr locn)
 
 \begin{code}
 matchGuard :: [TypecheckedStmt] 	-- Guard
+           -> DsMatchContext            -- Context
 	   -> MatchResult		-- What to do if the guard succeeds
 	   -> DsM MatchResult
 
-matchGuard [] body_result = returnDs body_result
+matchGuard [] ctx body_result = returnDs body_result
 
 	-- Turn an "otherwise" guard is a no-op
-matchGuard (GuardStmt (HsVar v) _ : stmts) body_result
-  | uniqueOf v == otherwiseIdKey
-  = matchGuard stmts body_result
+matchGuard (GuardStmt (HsVar v) _ : stmts) ctx body_result
+  |  uniq == otherwiseIdKey
+  || uniq == trueDataConKey
+  = matchGuard stmts ctx body_result
+  where
+    uniq = uniqueOf v
 
-matchGuard (GuardStmt expr _ : stmts) body_result
-  = matchGuard stmts body_result	`thenDs` \ (MatchResult _ ty body_fn cxt) ->
+matchGuard (GuardStmt expr _ : stmts) ctx body_result
+  = matchGuard stmts ctx body_result	`thenDs` \ (MatchResult _ ty body_fn) ->
     dsExpr expr				`thenDs` \ core_expr ->
     let
 	expr_fn = \ fail -> mkCoreIfThenElse core_expr (body_fn fail) fail
     in
-    returnDs (MatchResult CanFail ty expr_fn cxt)
+    returnDs (MatchResult CanFail ty expr_fn)
 
-matchGuard (LetStmt binds : stmts) body_result
-  = matchGuard stmts body_result	  `thenDs` \ match_result ->
+matchGuard (LetStmt binds : stmts) ctx body_result
+  = matchGuard stmts ctx body_result	  `thenDs` \ match_result ->
     dsBinds False{-don't auto scc-} binds `thenDs` \ core_binds ->
     returnDs (mkCoLetsMatchResult core_binds match_result)
 
-matchGuard (BindStmt pat rhs _ : stmts) body_result
-  = matchGuard stmts body_result			`thenDs` \ match_result ->
+matchGuard (BindStmt pat rhs _ : stmts) ctx body_result
+  = matchGuard stmts ctx body_result			`thenDs` \ match_result ->
     dsExpr rhs						`thenDs` \ core_rhs ->
     newSysLocalDs (coreExprType core_rhs)		`thenDs` \ scrut_var ->
-    match [scrut_var] [EqnInfo [pat] match_result] []	`thenDs` \ match_result' ->
+    matchExport [scrut_var] [EqnInfo 1 ctx [pat] match_result] 	`thenDs` \ match_result' ->
     returnDs (mkCoLetsMatchResult [NonRec scrut_var core_rhs] match_result')
 \end{code}
