@@ -9,8 +9,8 @@ main :: IO ()
 main = do
   args <- getArgs
   case args of
-        [ "install"  ] -> do { putStr (dumpPackages (package_details True)) }
-        [ "in-place" ] -> do { putStr (dumpPackages (package_details False)) }
+        [ "install"  ] -> do { putStrLn (dumpPackages (package_details True)) }
+        [ "in-place" ] -> do { putStrLn (dumpPackages (package_details False)) }
         _ -> do hPutStr stderr "usage: pkgconf (install | in-place)\n"
                 exitWith (ExitFailure 1)
 
