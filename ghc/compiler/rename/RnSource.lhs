@@ -654,7 +654,8 @@ rnHsType doc (MonoUsgForAllTy uv_rdr ty)
 
 rnHsType doc (MonoUsgTy usg ty)
   = newUsg usg                          `thenRn` \ (usg', usg_fvs) ->
-    rnHsType doc ty                     `thenRn` \ (ty', ty_fvs) ->
+    rnHsPolyType doc ty                 `thenRn` \ (ty', ty_fvs) ->
+	-- A for-all can occur inside a usage annotation
     returnRn (MonoUsgTy usg' ty',
               usg_fvs `plusFV` ty_fvs)
   where
