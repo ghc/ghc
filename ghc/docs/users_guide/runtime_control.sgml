@@ -271,7 +271,7 @@
   </sect2>
 
 <!-- ---------------------------------------------------------------------- -->
-  <sect2>
+  <sect2 id="rts-options-debugging">
     <title>RTS options for hackers, debuggers, and over-interested
     souls</title>
 
@@ -338,7 +338,7 @@
 	</listitem>
       </varlistentry>
 
-      <varlistentry id="stack-trace-option">
+      <varlistentry>
 	<term><option>-xc</option></term>
 	<indexterm><primary><option>-xc</option></primary><secondary>RTS
 	option</secondary></indexterm>

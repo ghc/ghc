@@ -682,7 +682,7 @@ $ ghcprof &lt;prog&gt;.prof
 	  <para>This option makes use of the extra information
 	  maintained by the cost-centre-stack profiler to provide
 	  useful information about the location of runtime errors.
-	  See <xref linkend="stack-trace-option">.</para>
+	  See <xref linkend="rts-options-debugging">.</para>
 	</listitem>
       </varlistentry>
 
