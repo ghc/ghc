@@ -121,9 +121,11 @@ importDecl :: Name -> IfM lcl (MaybeErr Message TyThing)
 -- Get the TyThing for this Name from an interface file
 importDecl name 
   | Just thing <- wiredInNameTyThing_maybe name
-	-- This case only happens for tuples, because we pre-populate the eps_PTE
-	-- with other wired-in things.  We can't do that for tuples because we
+	-- This case definitely happens for tuples, because we
 	-- don't know how many of them we'll find
+	-- It also now happens for all other wired in things.  We used
+	-- to pre-populate the eps_PTE with other wired-in things, but
+	-- we don't seem to do that any more.  I guess it keeps the PTE smaller?
   = do 	{ updateEps_ (\ eps -> eps { eps_PTE = extendTypeEnv (eps_PTE eps) thing })
 	; return (Succeeded thing) }
 
