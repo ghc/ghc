@@ -546,11 +546,10 @@ tryRhsTyLam rhs 			-- Only does something if there's a let
   where
     (tyvars, body) = collectTyBinders rhs
 
-    worth_it (Let (NonRec x rhs) e) | isUnLiftedType (exprType rhs) = False
-    worth_it (Let _ e) = whnf_in_middle e
-    worth_it other     = False
+    worth_it e@(Let _ _) = whnf_in_middle e
+    worth_it e		 = False
 
-    whnf_in_middle (Let (NonRec x rhs) e) | isUnLiftedType (exprType rhs) = False
+    whnf_in_middle (Let (NonRec x rhs) e) | isUnLiftedType (idType x) = False
     whnf_in_middle (Let _ e) = whnf_in_middle e
     whnf_in_middle e	     = exprIsCheap e
 
