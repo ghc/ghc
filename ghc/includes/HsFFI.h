@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.17 2002/11/17 15:27:07 panne Exp $
+ * $Id: HsFFI.h,v 1.18 2003/01/28 16:30:07 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -151,6 +151,7 @@ typedef void*			HsForeignObj;   /* DEPRECATED */
 extern void hs_init     (int *argc, char **argv[]);
 extern void hs_exit     (void);
 extern void hs_set_argv (int argc, char *argv[]);
+extern void hs_add_root (void (*init_root)(void));
 
 extern void hs_perform_gc (void);
 

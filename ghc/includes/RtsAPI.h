@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.31 2003/01/25 15:54:48 wolfgang Exp $
+ * $Id: RtsAPI.h,v 1.32 2003/01/28 16:30:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -35,7 +35,6 @@ extern void startupHaskell         ( int argc, char *argv[],
 				     void (*init_root)(void) );
 extern void shutdownHaskell        ( void );
 extern void shutdownHaskellAndExit ( int exitCode );
-extern void setProgArgv            ( int argc, char *argv[] );
 extern void getProgArgv            ( int *argc, char **argv[] );
 
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.c,v 1.1 2002/11/17 15:27:08 panne Exp $
+ * $Id: HsFFI.c,v 1.2 2003/01/28 16:30:06 simonmar Exp $
  *
  * (c) The GHC Team, 2002
  *
@@ -10,22 +10,13 @@
 #include "HsFFI.h"
 #include "Rts.h"
 
-void
-hs_init(int *argc, char **argv[])
-{
-  /* ToDo: Implement! */
-}
-
-void
-hs_exit(void)
-{
-  /* ToDo: Implement! */
-}
+// hs_init and hs_exit are defined in RtsStartup.c
 
 void
 hs_set_argv(int argc, char *argv[])
 {
-  /* ToDo: Implement! */
+    prog_argc = argc;
+    prog_argv = argv;
 }
 
 void

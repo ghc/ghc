@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.67 2002/12/11 15:36:48 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.68 2003/01/28 16:30:06 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2002
  *
  * Main function for a standalone Haskell program.
  *
@@ -52,52 +52,24 @@
 
 #include <stdlib.h>
 
-/*
- * Flag Structure
- */
+// Flag Structure
 struct RTS_FLAGS RtsFlags;
 
-static int rts_has_started_up = 0;
-#if defined(PAR)
-ullong startTime = 0;
-#endif
+// Count of how many outstanding hs_init()s there have been.
+static int hs_init_count = 0;
 
-EXTFUN(__stginit_Prelude);
-static void initModules ( void (*)(void) );
-
-void
-setProgArgv(int argc, char *argv[])
-{
-   /* Usually this is done by startupHaskell, so we don't need to call this. 
-      However, sometimes Hugs wants to change the arguments which Haskell
-      getArgs >>= ... will be fed.  So you can do that by calling here
-      _after_ calling startupHaskell.
-   */
-   prog_argc = argc;
-   prog_argv = argv;
-}
+/* -----------------------------------------------------------------------------
+   Starting up the RTS
+   -------------------------------------------------------------------------- */
 
 void
-getProgArgv(int *argc, char **argv[])
+hs_init(int *argc, char **argv[])
 {
-   *argc = prog_argc;
-   *argv = prog_argv;
-}
-
-
-void
-startupHaskell(int argc, char *argv[], void (*init_root)(void))
-{
-   /* To avoid repeated initialisations of the RTS */
-  if (rts_has_started_up) {
-    /* RTS is up and running, so only run the per-module initialisation code */
-    if (init_root) {
-      initModules(init_root);
+    hs_init_count++;
+    if (hs_init_count > 1) {
+	// second and subsequent inits are ignored
+	return;
     }
-    return;
-  } else {
-    rts_has_started_up=1;
-  }
 
     /* The very first thing we do is grab the start time...just in case we're
      * collecting timing statistics.
@@ -127,9 +99,11 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     defaultsHook();
 
     /* Parse the flags, separating the RTS flags from the programs args */
-    setupRtsFlags(&argc, argv, &rts_argc, rts_argv);
-    prog_argc = argc;
-    prog_argv = argv;
+    if (argc != NULL && argv != NULL) {
+	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
+	prog_argc = *argc;
+	prog_argv = *argv;
+    }
 
 #if defined(PAR)
     /* NB: this really must be done after processing the RTS flags */
@@ -166,9 +140,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     initProfiling1();
 #endif
 
-    /* run the per-module initialisation code */
-    initModules(init_root);
-
 #if defined(PROFILING) || defined(DEBUG)
     initProfiling2();
 #endif
@@ -196,6 +167,28 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     stat_endInit();
 }
 
+// Compatibility interface
+void
+startupHaskell(int argc, char *argv[], void (*init_root)(void))
+{
+    hs_init(&argc, &argv);
+    hs_add_root(init_root);
+}
+
+
+/* -----------------------------------------------------------------------------
+   Getting the program's arguments.
+
+   This is used by System.Environment.getArgs.
+   -------------------------------------------------------------------------- */
+
+void
+getProgArgv(int *argc, char **argv[])
+{
+    *argc = prog_argc;
+    *argv = prog_argv;
+}
+
 /* -----------------------------------------------------------------------------
    Per-module initialisation
 
@@ -214,8 +207,7 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 
    The code generator inserts a small function "__stginit_<module>" in each
    module and calls the registration functions in each of the modules it
-   imports.  So, if we call "__stginit_PrelMain", each reachable module in the
-   program will be registered (because PrelMain.mainIO calls Main.main).
+   imports.
 
    The init* functions are compiled in the same way as STG code,
    i.e. without normal C call/return conventions.  Hence we must use
@@ -225,10 +217,10 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
 /* The init functions use an explicit stack... 
  */
 #define INIT_STACK_BLOCKS  4
-F_ *init_stack = NULL;
+static F_ *init_stack = NULL;
 
-static void
-initModules ( void (*init_root)(void) )
+void
+hs_add_root(void (*init_root)(void))
 {
     bdescr *bd;
 #ifdef SMP
@@ -238,11 +230,14 @@ initModules ( void (*init_root)(void) )
 #endif
     nat init_sp;
 
+    if (hs_init_count <= 0) {
+	barf("hs_add_root() must be called after hs_init()");
+    }
+
     init_sp = 0;
     bd = allocGroup(INIT_STACK_BLOCKS);
     init_stack = (F_ *)bd->start;
     init_stack[init_sp++] = (F_)stg_init_ret;
-//    init_stack[init_sp++] = (F_)__stginit_Prelude;
     if (init_root != NULL) {
 	init_stack[init_sp++] = (F_)init_root;
     }
@@ -254,73 +249,62 @@ initModules ( void (*init_root)(void) )
 }
 
 /* -----------------------------------------------------------------------------
- * Shutting down the RTS - two ways of doing this, one which
- * calls exit(), one that doesn't.
- *
- * (shutdownHaskellAndExit() is called by System.exitWith).
- * -----------------------------------------------------------------------------
- */
-void
-shutdownHaskellAndExit(int n)
-{
-  OnExitHook();
-  shutdownHaskell();
-#if defined(PAR)
-  /* really exit (stg_exit() would call shutdownParallelSystem() again) */
-  exit(n);
-#else
-  stg_exit(n);
-#endif
-}
+   Shutting down the RTS
+   -------------------------------------------------------------------------- */
 
 void
-shutdownHaskell(void)
+hs_exit(void)
 {
-  if (!rts_has_started_up)
-     return;
-  rts_has_started_up=0;
-  
-  /* start timing the shutdown */
-  stat_startExit();
+    if (hs_init_count <= 0) {
+	barf("too many hs_exit()s");
+    }
+    hs_init_count--;
+    if (hs_init_count > 0) {
+	// ignore until it's the last one
+	return;
+    }
 
-  /* stop all running tasks */
-  exitScheduler();
-
+    /* start timing the shutdown */
+    stat_startExit();
+    
+    /* stop all running tasks */
+    exitScheduler();
+    
 #if !defined(GRAN)
-  /* Finalize any remaining weak pointers */
-  finalizeWeakPointersNow();
+    /* Finalize any remaining weak pointers */
+    finalizeWeakPointersNow();
 #endif
-
+    
 #if defined(GRAN)
-  /* end_gr_simulation prints global stats if requested -- HWL */
-  if (!RtsFlags.GranFlags.GranSimStats.Suppressed)
-    end_gr_simulation();
+    /* end_gr_simulation prints global stats if requested -- HWL */
+    if (!RtsFlags.GranFlags.GranSimStats.Suppressed)
+	end_gr_simulation();
 #endif
-
-  /* stop the ticker */
-  stopVirtTimer();
-  
-  /* reset the standard file descriptors to blocking mode */
-  resetNonBlockingFd(0);
-  resetNonBlockingFd(1);
-  resetNonBlockingFd(2);
+    
+    /* stop the ticker */
+    stopVirtTimer();
+    
+    /* reset the standard file descriptors to blocking mode */
+    resetNonBlockingFd(0);
+    resetNonBlockingFd(1);
+    resetNonBlockingFd(2);
 
 #if defined(PAR)
-  /* controlled exit; good thread! */
-  shutdownParallelSystem(0);
-
-  /* global statistics in parallel system */
-  PAR_TICKY_PAR_END();
+    /* controlled exit; good thread! */
+    shutdownParallelSystem(0);
+    
+    /* global statistics in parallel system */
+    PAR_TICKY_PAR_END();
 #endif
 
-  /* stop timing the shutdown, we're about to print stats */
-  stat_endExit();
-
-  /* clean up things from the storage manager's point of view.
-   * also outputs the stats (+RTS -s) info.
-   */
-  exitStorage();
-
+    /* stop timing the shutdown, we're about to print stats */
+    stat_endExit();
+    
+    /* clean up things from the storage manager's point of view.
+     * also outputs the stats (+RTS -s) info.
+     */
+    exitStorage();
+    
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {
 	stopFrontPanel();
@@ -328,23 +312,45 @@ shutdownHaskell(void)
 #endif
 
 #if defined(PROFILING) 
-  reportCCSProfiling();
+    reportCCSProfiling();
 #endif
 
 #if defined(PROFILING) || defined(DEBUG)
-  endProfiling();
+    endProfiling();
 #endif
 
 #ifdef PROFILING
-  // Originally, this was in report_ccs_profiling().  Now, retainer
-  // profiling might tack some extra stuff on to the end of this file
-  // during endProfiling().
-  fclose(prof_file);
+    // Originally, this was in report_ccs_profiling().  Now, retainer
+    // profiling might tack some extra stuff on to the end of this file
+    // during endProfiling().
+    fclose(prof_file);
 #endif
-
+    
 #if defined(TICKY_TICKY)
-  if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
+    if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
 #endif
+}
+
+// Compatibility interfaces
+void
+shutdownHaskell(void)
+{
+    hs_exit();
+}
+
+void
+shutdownHaskellAndExit(int n)
+{
+    if (hs_init_count == 1) {
+	OnExitHook();
+	hs_exit();
+#if defined(PAR)
+	/* really exit (stg_exit() would call shutdownParallelSystem() again) */
+	exit(n);
+#else
+	stg_exit(n);
+#endif
+    }
 }
 
 /* 
