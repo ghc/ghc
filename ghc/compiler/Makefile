@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.107 2000/11/03 11:30:23 sewardj Exp $
+# $Id: Makefile,v 1.108 2000/11/03 17:09:00 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -453,8 +453,8 @@ CLEAN_FILES += $(PRIMOP_BITS)
 
 # Extra tidy, remove the .hc files (if you've got them).
 MAINTAINER_CLEAN_FILES += $(wildcard */*.hc) \
+	parser/Parser.info rename/ParseIface.info \
 	parser/Parser.hs rename/ParseIface.hs
-
 
 #-----------------------------------------------------------------------------
 # 		TAGS setup
