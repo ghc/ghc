@@ -161,6 +161,9 @@ that only the desired thread is running after the fork().
 
 The stopped threads are /not/ garbage collected! This behaviour may change in
 future releases.
+
+NOTE: currently, main threads are not stopped in the child process.
+To work around this problem, call 'forkProcessPrim' from the main thread. 
 -}
 
 forkProcessPrim :: IO Int
@@ -169,6 +172,9 @@ forkProcessPrim = IO $ \s -> case (forkProcess# s) of (# s1, id #) -> (# s1, (I#
 {- | 'forkProcess' is a wrapper around 'forkProcessPrim' similar to the one found in
 "Posix.forkProcess" which returns a Maybe-type. The child receives @Nothing@, the
 parent @Just (pid::Int)@. In case of an error, an exception is thrown.
+
+NOTE: currently, main threads are not stopped in the child process.
+To work around this problem, call 'forkProcess' from the main thread. 
 -}
 
 forkProcess :: IO (Maybe Int)
