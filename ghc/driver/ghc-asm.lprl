@@ -225,25 +225,39 @@ sub init_TARGET_STUFF {
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_DO_GC	    = 'PerformGC_wrapper';
     $T_PRE_APP	    = 'NOT APPLICABLE'; # regexp that says what comes before APP/NO_APP
-    $T_CONST_LBL    = '^LC\.\.(\d+):$'; # regexp for what such a lbl looks like
+    $T_CONST_LBL    = 'NOT APPLICABLE'; # regexp for what such a lbl looks like
+#    $T_CONST_LBL    = '^LC\.\.(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.toc|.csect \S+|\.l?globl \S+|\.align \d+)\n)';
+    $T_MOVE_DIRVS   = '^(\s*(\.toc|\.align \d+|\.csect \S+|\t\.?l?globl \S+)\n)';
+#    $T_MOVE_DIRVS  = '^(\s*(\.toc|.csect \S+|\.l?globl \S+|\.align \d+)\n)';
     $T_COPY_DIRVS   = '\.(l?globl)';
 
     $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
     $T_DOT_WORD	    = '\.long';
     $T_DOT_GLOBAL   = '\.globl';
-    $T_HDR_literal  = "\.section\t\.rodata\n";
-    $T_HDR_misc	    = "\.text\n\t\.align 2\n";
-    $T_HDR_data	    = "\.data\n\t\.align 2\n";
-    $T_HDR_consist  = "\.text\n";
-    $T_HDR_closure  = "\.data\n\t\.align 2\n";
-    $T_HDR_info	    = "\.text\n\t\.align 2\n";
-    $T_HDR_entry    = "\.text\n";
-    $T_HDR_fast	    = "\.text\n\t\.align 2\n";
-    $T_HDR_vector   = "\.text\n\t\.align 2\n";
-    $T_HDR_direct   = "\.text\n\t\.align 2\n";
+    $T_HDR_toc      = "\.toc\n";
+    $T_HDR_literal  = "# literal\n\.csect .data[RW]\n\t\.align 2\n"; #not RO!?
+    $T_HDR_misc	    = "# misc\n\.csect \.text[PR]\n\t\.align 2\n";
+    $T_HDR_data	    = "# data\n\.csect \.data[RW]\n\t\.align 2\n";
+    $T_HDR_consist  = "# consist\n\.csect \.data[RW]\n\t\.align 2\n";
+    $T_HDR_closure  = "# closure\n\.csect \.data[RW]\n\t\.align 2\n";
+    $T_HDR_info	    = "# info\n\.csect \.data[RW]\n\t\.align 2\n"; #not RO!?
+    $T_HDR_entry    = "# entry\n";
+    $T_HDR_fast	    = "# fast\n\.csect \.text[PR]\n\t\.align 2\n";
+    $T_HDR_vector   = "# vector\n\.csect \.data[RW]\n\t\.align 2\n"; #not RO!?
+    $T_HDR_direct   = "# direct\n";
+
+#   $T_HDR_literal  = "\.section\t\.rodata\n";
+#   $T_HDR_misc	    = "\.text\n\t\.align 2\n";
+#   $T_HDR_data	    = "\.data\n\t\.align 2\n";
+#   $T_HDR_consist  = "\.text\n";
+#   $T_HDR_closure  = "\.data\n\t\.align 2\n";
+#   $T_HDR_info	    = "\.text\n\t\.align 2\n";
+#   $T_HDR_entry    = "\.text\n";
+#   $T_HDR_fast	    = "\.text\n\t\.align 2\n";
+#   $T_HDR_vector   = "\.text\n\t\.align 2\n";
+#   $T_HDR_direct   = "\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^sparc-.*-solaris2/ ) {
@@ -476,12 +490,23 @@ sub mangle_asm {
 	} elsif ( /^([A-Za-z0-9_]+)\s+\.comm/ && $TargetPlatform =~ /^hppa/ ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'bss';
+   	    $chksymb[$i] = $1; # useless, $1 is always '', since we end up using the second
+                               # pattern /^hppa/. Change $1 to ''. Or reverse the pattern.
+                               # Anyway, it is never used. - andre
   	    $chksymb[$i] = $1;
 
+ 	} elsif ( $TargetPlatform =~ /^powerpc-/ && /^LC\.\.([0-9]+)/ ) {
+# 	} elsif ( /^LC\.\.([0-9]+)/ && $TargetPlatform =~ /^powerpc-/ ) {
+ 	    $chk[++$i]   = $_;
+ 	    $chkcat[$i]  = 'toc';
+   	    $chksymb[$i] = $1;
+ 
 	} elsif ( /^$TUS[@]?(ret_|djn_)/o ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
+ 	    $symbtmp = $1;
+            $chksymb[$i] = $symbtmp if ($TargetPlatform =~ /^powerpc-/) ;
 
 	} elsif ( /^$TUS[@]?vtbl_([A-Za-z0-9_]+)$TPOSTLBL[@]?$/o ) {
 	    $chk[++$i]   = $_;
@@ -497,10 +522,13 @@ sub mangle_asm {
 
 	    $directchk{$1} = $i;
 
-	} elsif ( /^$TUS[@]?[A-Za-z0-9_]+_upd$TPOSTLBL[@]?$/o ) {
+	} elsif ( /^$TUS[@]?([A-Za-z0-9_]+)_upd$TPOSTLBL[@]?$/o ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
-	    $chksymb[$i] = '';
+            if ($TargetPlatform =~ /^powerpc-/) 
+               { $chksymb[$i] = $symbtmp;}
+	    else { $chksymb[$i] = ''; };
+	    
 
 	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
 	     &&   /^(_uname|uname|stat|fstat):/ ) {
@@ -531,7 +559,9 @@ sub mangle_asm {
 		    || /^$TUS[@]?_reg.*$TPOSTLBL$/o;		# PROF: __reg<module>
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
-	    $chksymb[$i] = '';
+            if ($TargetPlatform =~ /^powerpc-/) 
+	       { $chksymb[$i] = $thing; }
+	    else { $chksymb[$i] = ''; };
 
 	} else { # simple line (duplicated at the top)
 
@@ -548,7 +578,7 @@ sub mangle_asm {
     # about the whole module before we start spitting
     # output.
 
-    local($FIRST_MANGLABLE) = ($TargetPlatform =~ /^(alpha-|hppa|mips-)/) ? 1 : 0;
+    local($FIRST_MANGLABLE) = ($TargetPlatform =~ /^(alpha-|hppa|mips-|power)/) ? 1 : 0;
 
 #   print STDERR "first chunk to mangle: $FIRST_MANGLABLE\n";
 
@@ -559,6 +589,57 @@ sub mangle_asm {
     local($magic_rdata_seen) = 0;
   
     # HPPAs, MIPSen: also start medding at chunk 1
+
+# AIX hack for the moment, to join up multiple identical tocs
+    if ($TargetPlatform =~ /^powerpc/) {
+    print OUTASM ".toc\n.csect .text[PR]\ngcc2_compiled.:\n__gnu_compiled_c:\n";
+#   print OUTASM ".csect _ghc88142.rw_c[RW]\n\t.align 2\nghc_cc_ID:\n\t.byte \"@(#)cc prelude/Prelude.hc\"\n\t.byte 9\n\t.byte "35.0,,"\n\t.byte 0"
+    print OUTASM $T_HDR_toc;
+    %tocequiv = ();          # maps toc symbol number to toc symbol
+    %revtocequiv = ();       # maps toc symbol to toc symbol number
+    for ($i = 1; $i < $numchks; $i++) {
+	$chk[$i] =~ s/\[RW\]//g;
+	$chk[$i] =~ s/\[DS\]//g;
+	$chk[$i] =~ s/^\.csect .*\[DS\]$//g;
+	if ( $chkcat[$i] eq 'toc' && $chk[$i] !~ /\.byte/ )
+	   { $chk[$i] =~ s/$T_MOVE_DIRVS//g;
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(\S+_fast\d+)/\t\.tc \1\[TC\],\.\2/; 
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(\S+_entry)\n/\t\.tc \1\[TC\],\.\2\n/;
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(ret_\S+)/\t\.tc \1\[TC\],\.\2/;
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(djn_\S+)/\t\.tc \1\[TC\],\.\2/;
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(vtbl_\S+)/\t\.tc \1\[TC\],\.\2/;
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],ErrorIO_innards/\t\.tc \1\[TC\],\.ErrorIO_innards/;
+	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],startStgWorld/\t\.tc \1\[TC\],\.startStgWorld/;
+	     $chk[$i] =~ s/\.tc UpdatePAP\[TC\],UpdatePAP/\.tc UpdatePAP\[TC\],\.UpdatePAP/;
+	     $chk[$i] =~ s/\.tc IndUpdRetDir\[TC\],IndUpdRetDir/\.tc IndUpdRetDir\[TC\],\.IndUpdRetDir/;
+	     $chk[$i] =~ s/\t\.tc (_PRStart_\S+)\[TC\],_PRStart_\S+/\t\.tc \1\[TC\],\.\1/;
+
+             $tocnumber = $chksymb[$i];
+             $tocsymb = $chk[$i];
+             $tocsymb =~ s/^LC\.\.\d+:\n//;
+             $tocsymb =~ s/^\t\.tc \S+,(\S+)\n/\1/;
+             $tocequiv{$tocnumber} = $tocsymb;
+
+             # limit is the limit of the scope of the current toc (either eof or find a new toc)
+             $limit = $i;             
+             while ($chkcat[$limit] eq 'toc') {$limit++;};
+             while (($limit < $numchks) && ($chkcat[$limit] ne 'toc')) {$limit++;};
+
+             if ( $revtocequiv{$tocsymb} eq '') {
+               $revtocequiv{$tocsymb} = $tocnumber;
+               if (   $chk[$i] !~ /\.tc \S+_fast\d+\[TC\],\.\S+_fast\d+/ # no need to print these
+                   || $chk[$i] !~ /\.tc UpdatePAP\[TC\],\.UpdatePAP/
+                   || $chk[$i] !~ /\.tc \S+\[TC\],\.\S+_entry\n/ ) 
+                 { print OUTASM $chk[$i]; };
+             } else {
+               for ($j = $i; $j <= $limit; $j++) {
+                 $chk[$j] =~ s/LC\.\.$tocnumber\(/LC\.\.${revtocequiv{$tocsymb}}\(/g;
+               };
+             };
+	     $chkcat[$i] = 'DONE ALREADY';
+             }
+            }
+         };
 
     for ($i = $FIRST_MANGLABLE; $i < $numchks; $i++) {
 	$c = $chk[$i]; # convenience copy
@@ -602,6 +683,11 @@ sub mangle_asm {
 		    $p =~ s/^\tsw\t\$fp,\d+\(\$sp\)\n//;
 		    $p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//;
 		    $p =~ s/__FRAME__/$FRAME/;
+ 		} elsif ($TargetPlatform =~ /^powerpc-/) {
+ 		    $p =~ s/^\tmflr 0\n//;
+ 		    $p =~ s/^\tstm \d+,-\d+\(1\)\n//;
+ 		    $p =~ s/^\tst 0,\d+\(1\)\n//;
+ 		    $p =~ s/^\tstu 1,-\d+\(1\)\n//; 
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
@@ -636,6 +722,11 @@ sub mangle_asm {
 		    $e =~ s/^\tlw\t\$fp,\d+\(\$sp\)\n//;
 		    $e =~ s/^\taddu\t\$sp,\$sp,\d+\n//;
 		    $e =~ s/^\tj\t\$31\n//;
+ 		} elsif ($TargetPlatform =~ /^powerpc-/) {
+ 		    $e =~ s/^\cal 1,\d+\(1\)\n//;
+ 		    $e =~ s/^\tl \d+,\d+\(1\)\n//; 
+ 		    $e =~ s/^\tmtlr 0\n//;
+ 		    $e =~ s/^\tbr\n//;
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
@@ -778,7 +869,22 @@ sub mangle_asm {
 	if ( $chkcat[$i] eq 'misc' ) {
 	    if ($chk[$i] ne '') {
 		print OUTASM $T_HDR_misc;
-		&print_doctored($chk[$i], 0);
+                if ($TargetPlatform =~ /^powerpc-/) { 
+                   $chksymb[$i] =~ s/://;
+                   if ($chksymb[$i] =~ /ret.*upd/ || $KNOWN_FUNNY_THING{$chksymb[$i]}
+                    || $chksymb[$i] =~ /^${T_US}_(PRIn|PRStart).*${T_POST_LBL}$/o )
+                      { print OUTASM "\t\.globl $chksymb[$i]\n\t\.globl \.$chksymb[$i]\n"; 
+                   } else { print OUTASM "\t\.lglobl \.$chksymb[$i]\n"; };
+                   if ($chk[$i] =~ /TOC\[tc0\], 0\n/)
+	             { ($p, $r) = split(/TOC\[tc0\], 0\n/, $chk[$i]); $printDS = 1;}
+                   else { $r = $chk[$i]; $printDS = 0; };
+                   $chk[$i] = &mangle_powerpc_tailjump($r);
+                };
+ 		&print_doctored($chk[$i], 0);
+                if ($TargetPlatform =~ /^powerpc-/ && $printDS) { 
+  		   print OUTASM "\.csect ${chksymb[$i]}[DS]\n"; 	
+  		   print OUTASM "${p}TOC[tc0], 0\n";
+                }
 	    }
 
 	} elsif ( $chkcat[$i] eq 'toss' ) {
@@ -848,6 +954,19 @@ sub mangle_asm {
 		# teach it to drop through to the fast entry point:
 		$c = $chk[$slowchk{$symb}];
 
+                if ($TargetPlatform =~ /^powerpc-/) { 
+	        ($p, $r) = split(/TOC\[tc0\], 0\n/, $c); 
+                if ($symb =~ /^[_A-Z]/)
+		{ 
+	          print OUTASM "\t\.globl ${chksymb[$i]}_entry\n";
+		  print OUTASM "\t\.globl \.${chksymb[$i]}_entry\n"; 
+		  print OUTASM "\.csect ${symb}_entry[DS]\n"; 	
+		  print OUTASM "${p}TOC[tc0], 0\n";
+                }  
+		else { print OUTASM "\t\.lglobl \.${symb}_entry\n"; }; 
+                 $c = &mangle_powerpc_tailjump($r);
+                };
+
 		if ( defined($fastchk{$symb}) ) {
 		    if ( $TargetPlatform =~ /^alpha-/ ) {
 			$c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
@@ -861,6 +980,8 @@ sub mangle_asm {
 		    } elsif ( $TargetPlatform =~ /^m68k-/ ) {
 			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n\tnop\n//;
 			$c =~ s/^\tjmp ${T_US}${symb}_fast\d+.*\n//;
+		    } elsif ( $TargetPlatform =~ /^powerpc-/ ) {
+			$c =~ s/^\tb \.${T_US}${symb}_fast\d+\n//;
 		    } elsif ( $TargetPlatform =~ /^sparc-/ ) {
 			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n\tnop\n//;
 			$c =~ s/^\tcall ${T_US}${symb}_fast\d+,.*\n(\t[a-z].*\n)/$1/;
@@ -886,6 +1007,7 @@ sub mangle_asm {
 	    
 	    # FAST ENTRY POINT
 	    if ( defined($fastchk{$symb}) ) {
+ 		$c = $chk[$fastchk{$symb}];
     	    	if ( ! defined($slowchk{$symb})
 		   # ToDo: the || clause can go once we're no longer
 		   # concerned about producing exactly the same output as before
@@ -893,7 +1015,19 @@ sub mangle_asm {
 		   ) {
 		    print OUTASM $T_HDR_fast;
 		}
-		&print_doctored($chk[$fastchk{$symb}], 0);
+                  if ($TargetPlatform =~ /^powerpc-/) {
+                    local(@lbls) = split(/:/, $c);
+                    $fullname = $lbls[0];
+ 	            $fullname =~ s/$T_MOVE_DIRVS//g;
+                    if ( $fullname =~ /^[A-Z]/)
+                       { print OUTASM "\t\.globl \.${fullname}\n";
+                    } else {
+                       print OUTASM "\t\.lglobl \.${fullname}\n"; 
+                    };
+                    $c =~ s/((.*\n)*)\t.long \S+, TOC\[tc0\], 0\n\.csect \.text\[PR\]\n((.*\n)*)/\1\3/;
+                    $c = &mangle_powerpc_tailjump($c);
+                  };
+ 		&print_doctored($c, 0);
 		$chkcat[$fastchk{$symb}] = 'DONE ALREADY';
 	    }
 
@@ -904,7 +1038,17 @@ sub mangle_asm {
 	    # VECTOR TABLE
 	    if ( defined($vectorchk{$symb}) ) {
 		print OUTASM $T_HDR_vector;
-		print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
+                if ($TargetPlatform =~ /^powerpc-/) { 
+                  if ( $symb =~ /^[A-Z]/) {
+                     print OUTASM "\t\.globl \.vtbl_${symb}\n";
+		     print OUTASM "\t\.globl vtbl_${symb}\n";
+                  };
+		  $chk[$vectorchk{$symb}] =~ s/\.long (\S+)/\.long \.\1/g;
+		  print OUTASM ".vtbl_${symb}:\n";
+		  print OUTASM $chk[$vectorchk{$symb}];
+		} else {
+  		  print OUTASM &rev_tbl($symb, $chk[$vectorchk{$symb}], 0);
+		}
 		# direct return code will be put here!
 		$chkcat[$vectorchk{$symb}] = 'DONE ALREADY';
 	    }
@@ -912,7 +1056,14 @@ sub mangle_asm {
 	    # DIRECT RETURN
 	    if ( defined($directchk{$symb}) ) {
 		print OUTASM $T_HDR_direct;
-		&print_doctored($chk[$directchk{$symb}], 0);
+                if ($TargetPlatform =~ /^powerpc-/) { 
+	          ($p, $r) = split(/TOC\[tc0\], 0\n/, $chk[$directchk{$symb}]); 
+		  &print_doctored($r, 0);
+		  print OUTASM "\.csect ${symb}DirectReturn[DS]\n"; 	
+		  print OUTASM "${p}TOC[tc0], 0\n";
+                } else {
+  		  &print_doctored($chk[$directchk{$symb}], 0);
+		}
 		$chkcat[$directchk{$symb}] = 'DONE ALREADY';
 
 	    } elsif ( $TargetPlatform =~ /^alpha-/ ) {
@@ -925,6 +1076,12 @@ sub mangle_asm {
 		print OUTASM "\t# nop\n";
 	    }
 	    
+ 	} elsif ( $chkcat[$i] eq 'toc' ) {
+ 	    if ($chk[$i] ne '') {
+ 		print OUTASM $T_HDR_literal;
+ 		print OUTASM $chk[$i];
+ 	    }
+ 	    
 	} else {
 	    &tidy_up_and_die(1,"$Pgm: unknown chkcat (ghc-asm: $TargetPlatform)\n$chkcat[$i]\n$chk[$i]\n");
 	}
@@ -932,8 +1089,12 @@ sub mangle_asm {
 
     print OUTASM $EXTERN_DECLS if $TargetPlatform =~ /^mips-/;
 
-    print OUTASM ".csect .text[PR]\n_section_.text:\n.csect .data[RW]\n\t.long _section_.text\n"
-	if $TargetPlatform =~ /^powerpc-/;
+    if ($TargetPlatform =~ /^powerpc-/) { 
+         print OUTASM ".csect .text[PR]\n_section_.text:\n.csect .data[RW]\n\t.long _section_.text\n"
+    };
+
+#    print OUTASM ".csect .text[PR]\n_section_.text:\n.csect .data[RW]\n\t.long _section_.text\n"
+#	if $TargetPlatform =~ /^powerpc-/;
 
     # finished
     close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
@@ -1235,7 +1396,7 @@ sub rev_tbl {
     local(@words) = ();
     local($after) = '';
     local(@lines) = split(/\n/, $tbl);
-    local($i, $extra, $words_to_pad, $j);
+    local($i, $j); #local ($i, $extra, $words_to_pad, $j);
    
     # see comment in mangleAsm as to why this silliness is needed.
     local($TDOTWORD) = ${T_DOT_WORD};
@@ -1359,6 +1520,53 @@ sub mini_mangle_asm_hppa {
     # finished:
     close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
     close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
+}
+
+\end{code}
+ 
+\begin{code}
+sub mini_mangle_asm_powerpc {
+    local($in_asmf, $out_asmf) = @_;
+
+    open(INASM, "< $in_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$in_asmf' (to read)\n");
+    open(OUTASM,"> $out_asmf")
+	|| &tidy_up_and_die(1,"$Pgm: failed to open `$out_asmf' (to write)\n");
+
+    while (<INASM>) {
+	s/long _PRStart/long ._PRStart/;
+	s/long _PRIn_/long ._PRIn_/;
+	s/long _Dummy_(\S+)_entry/long ._Dummy_\1_entry/;
+	s/long _PRMarking_MarkNextRoot\[DS\]/long ._PRMarking_MarkNextRoot/;
+	s/long _PRMarking_MarkNextCAF\[DS\]/long ._PRMarking_MarkNextCAF/;
+	s/long _PRMarking_MarkNextAStack\[DS\]/long ._PRMarking_MarkNextAStack/;
+	s/long _PRMarking_MarkNextBStack\[DS\]/long ._PRMarking_MarkNextBStack/;
+	print OUTASM;
+    }
+
+    # finished:
+    close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
+    close(INASM)  || &tidy_up_and_die(1,"Failed reading from $in_asmf\n");
+}
+
+sub mangle_powerpc_tailjump {
+    local($c) = @_;
+    local($maybe_more) = 1;
+    while (($c =~ /\tl \d+,LC\.\.\d+\(2\)\n\tmtctr \d+\n\tbctr\n/) && $maybe_more) 
+      { $maybe_more = 0;
+        $lcsymb = $c;
+        $lcsymb =~ s/(.*\n)*\tl \d+,LC\.\.(\d+)\(2\)\n\tmtctr \d+\n\tbctr\n(.*\n)*/\2/;
+# the checks for r1 and r2 are mostly paranoia...
+        $r1 = $c;
+        $r1 =~ s/(.*\n)*\tl (\d+),LC\.\.\d+\(2\)\n\tmtctr \d+\n\tbctr\n(.*\n)*/\2/;
+        $r2 = $c;
+        $r2 =~ s/(.*\n)*\tl \d+,LC\.\.(\d+)\(2\)\n\tmtctr (\d+)\n\tbctr\n(.*\n)*/\3/;
+        if (r1 eq r2)
+          { $maybe_more = 1;
+            $c =~ s/((.*\n)*)\tl \d+,LC\.\.\d+\(2\)\n\tmtctr \d+\n\tbctr\n((.*\n)*)/\1\tb $tocequiv{$lcsymb}\n\3/;
+          }
+      };
+    $c;
 }
 
 # make "require"r happy...
