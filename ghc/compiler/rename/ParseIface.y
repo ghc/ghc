@@ -427,7 +427,7 @@ rule	   : src_loc STRING activation rule_forall qvar_name
 
 activation :: { Activation }
 activation : {- empty -}                { AlwaysActive }
-           | INTEGER                    { ActiveAfter (fromInteger $1) }
+           | '[' INTEGER ']'            { ActiveAfter (fromInteger $2) }
 
 rule_forall	:: { [UfBinder RdrName] }
 rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }
