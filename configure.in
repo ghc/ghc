@@ -453,11 +453,14 @@ AC_ALTZONE
 dnl ** what are the sizes of various types
 dnl    (these must come before GHC_CHECK_ALIGNMENT)
 AC_CHECK_SIZEOF(unsigned int,4)
-AC_CHECK_SIZEOF(float,4)
-AC_CHECK_SIZEOF(double,8)
+AC_CHECK_SIZEOF(float,       4)
+AC_CHECK_SIZEOF(double,      8)
+AC_CHECK_SIZEOF(long,        4)
+AC_CHECK_SIZEOF(void *,      4)
 
 dnl ** what are alignment constraints on various types
 GHC_CHECK_ALIGNMENT(unsigned int) dnl redundant but harmless
+GHC_CHECK_ALIGNMENT(long)
 GHC_CHECK_ALIGNMENT(float)
 GHC_CHECK_ALIGNMENT(double)
 
@@ -480,13 +483,6 @@ AC_TYPE_SIGNAL
 dnl ** check for leading underscores in symbol names
 #
 AC_UNDERSCORE
-
-#
-dnl ** check the size of various C types
-#
-AC_CHECK_SIZEOF(int,    4)
-AC_CHECK_SIZEOF(long,   4)
-AC_CHECK_SIZEOF(void *, 4)
 
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 
