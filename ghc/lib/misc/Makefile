@@ -16,7 +16,7 @@ endif
 # 	Setting the standard variables
 #
 
-LIBRARY = libHS$(_way).a
+LIBRARY = libHSmisc$(_way).a
 HS_SRCS	= $(wildcard *.lhs)
 
 # Remove Readline.lhs if readline.h isn't available.
