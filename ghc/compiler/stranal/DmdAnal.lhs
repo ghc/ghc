@@ -629,7 +629,7 @@ lub Abs d 	     = Lazy
 
 lub Eval Abs	          = Lazy
 lub Eval Lazy	          = Lazy
-lub Eval (Seq k Now   ds) = Seq Keep Now ds
+lub Eval (Seq k Now   ds) = Eval	-- Was (incorrectly): Seq Keep Now ds
 lub Eval (Seq k Defer ds) = Lazy
 lub Eval d    	          = Eval
 
