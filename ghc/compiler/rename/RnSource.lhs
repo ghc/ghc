@@ -11,7 +11,7 @@ module RnSource ( rnDecl, rnSourceDecls, rnHsType, rnHsSigType ) where
 import RnExpr
 import HsSyn
 import HsPragmas
-import HsTypes		( getTyVarName )
+import HsTypes		( getTyVarName, pprHsContext )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, isRdrTyVar, mkRdrNameWkr )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
@@ -977,7 +977,7 @@ dupClassAssertWarn ctxt (assertion : dups)
   = sep [hsep [ptext SLIT("Duplicate class assertion"), 
 	       quotes (ppr assertion),
 	       ptext SLIT("in the context:")],
-	 nest 4 (ppr ctxt <+> ptext SLIT("..."))]
+	 nest 4 (pprHsContext ctxt <+> ptext SLIT("..."))]
 
 naughtyCCallContextErr (HsPClass clas _)
   = sep [ptext SLIT("Can't use class") <+> quotes (ppr clas), 
