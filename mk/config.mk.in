@@ -378,7 +378,7 @@ NoFibHcOpts = -O
 ################################################################################
 
 # Directory used by GHC (and possibly other tools) for storing
-# temporary files.  If your /tmp isn't big enough, either override
+# temporary files.  If your TMPDIR isn't big enough, either override
 # this in build.mk or set your environment variable "TMPDIR" to point
 # to somewhere with more space.  (TMPDIR=. is a good choice).
 
