@@ -20,6 +20,7 @@ import Bag		( Bag, bagToList, isEmptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Util		( sortLt )
 import Outputable
+import IO		( hPutStr, stderr )
 \end{code}
 
 \begin{code}
@@ -85,7 +86,7 @@ ghcExit :: Int -> IO ()
 
 ghcExit val
   = if val /= 0
-    then error "Compilation had errors\n"
+    then hPutStr stderr "Compilation had errors\n"
     else return ()
 \end{code}
 
