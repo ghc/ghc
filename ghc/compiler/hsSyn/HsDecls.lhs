@@ -26,6 +26,7 @@ module HsDecls (
 -- friends:
 import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig(..) )
 import HsExpr		( HsExpr )
+import HsImpExp		( ppr_var )
 import HsTypes
 import PprCore		( pprCoreRule )
 import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
@@ -456,7 +457,10 @@ instance (NamedThing name, Outputable name, Outputable pat)
 	      => Outputable (TyClDecl name pat) where
 
     ppr (IfaceSig {tcdName = var, tcdType = ty, tcdIdInfo = info})
-	= hsep [ppr var, dcolon, ppr ty, pprHsIdInfo info]
+	= getPprStyle $ \ sty ->
+	   hsep [ if ifaceStyle sty then ppr var else ppr_var var,
+		  dcolon, ppr ty, pprHsIdInfo info
+		]
 
     ppr (ForeignType {tcdName = tycon})
 	= hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]

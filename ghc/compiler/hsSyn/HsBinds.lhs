@@ -15,6 +15,7 @@ import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr,
 			       GRHSs,  pprPatBind )
 
 -- friends:
+import HsImpExp		( ppr_var )
 import HsTypes		( HsType )
 import CoreSyn		( CoreExpr )
 import PprCore		( {- instance Outputable (Expr a) -} )
@@ -335,11 +336,20 @@ ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (ClassOpSig var dm ty _)
-      = sep [ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty)]
+      = getPprStyle $ \ sty ->
+        if ifaceStyle sty 
+	   then sep [ ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty) ]
+	   else sep [ ppr_var var <+> dcolon, 
+		      nest 4 (ppr ty),
+		      nest 4 (pp_dm_comment) ]
       where
 	pp_dm = case dm of 
 		  DefMeth _  -> equals 	-- Default method indicator
 		  GenDefMeth -> semi    -- Generic method indicator
+		  NoDefMeth  -> empty   -- No Method at all
+	pp_dm_comment = case dm of 
+		  DefMeth _  -> text "{- has default method -}"
+		  GenDefMeth -> text "{- has generic method -}"
 		  NoDefMeth  -> empty   -- No Method at all
 
 ppr_sig (SpecSig var ty _)
