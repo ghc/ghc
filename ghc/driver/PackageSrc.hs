@@ -429,6 +429,23 @@ package_details installing
          extra_ld_opts  = []
         }
 
+         ,Package {
+         name           = "HGL",
+         import_dirs    = if installing
+                             then [ "$libdir/imports/HGL" ]
+                             else [ "$libdir/hslibs/graphics/lib/x11" ],
+         source_dirs    = [],
+         library_dirs   = [],
+         hs_libraries   = [ "HSHGL" ],
+	 extra_libraries= [],
+         include_dirs   = [],
+         c_includes     = [],
+         package_deps   = [ "xlib", "concurrent" ],
+         extra_ghc_opts = [],
+         extra_cc_opts  = [],
+         extra_ld_opts  = []
+        }
+
    ]
   where
 	ghc_src_dir :: String -> String
