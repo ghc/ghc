@@ -558,7 +558,6 @@ CP			= cp
 CPP			= @CPP@
 CTAGS 			= $(ETAGS)
 RAWCPP                  = @RAWCPP@
-GNUCPP                  = @GNUCPP@
 INSTALL			= @INSTALL@
 #
 # Sigh - the autoconf macro for INSTALL will subst a relative path to the fallback
