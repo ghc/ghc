@@ -585,9 +585,16 @@ pprAssign r1 (CmmRegOff r2 off)
 	(op,off') | off >= 0  = (char '+', off1)
 		  | otherwise = (char '-', -off1)
 
--- dest is a reg, rhs is anything
+-- dest is a reg, rhs is anything.
+-- We can't cast the lvalue, so we have to cast the rhs if necessary.  Casting
+-- the lvalue elicits a warning from new GCC versions (3.4+).
 pprAssign r1 r2
-    = pprCastReg r1 <+> equals <+> pprExpr r2 <> semi
+  | isPtrReg r1
+  = pprAsPtrReg r1 <> ptext SLIT(" = ") <> mkP_ <> pprExpr1 r2 <> semi
+  | Just ty <- strangeRegType r1
+  = pprReg r1 <> ptext SLIT(" = ") <> parens ty <> pprExpr1 r2 <> semi
+  | otherwise
+  = pprReg r1 <> ptext SLIT(" = ") <> pprExpr r2 <> semi
 
 -- ---------------------------------------------------------------------
 -- Registers
@@ -622,6 +629,10 @@ isStrangeTypeGlobal CurrentTSO		= True
 isStrangeTypeGlobal CurrentNursery 	= True
 isStrangeTypeGlobal r 			= isPtrGlobalReg r
 
+strangeRegType :: CmmReg -> Maybe SDoc
+strangeRegType (CmmGlobal CurrentTSO) = Just (ptext SLIT("struct StgTSO_ *"))
+strangeRegType (CmmGlobal CurrentNursery) = Just (ptext SLIT("struct bdescr_ *"))
+strangeRegType _ = Nothing
 
 -- pprReg just prints the register name.
 --
@@ -673,7 +684,8 @@ pprCall ppr_fn cconv results args vols
     restore vols
   where 
      ppr_results []     = empty
-     ppr_results [(one,hint)]  = pprArg (CmmReg one,hint) <> ptext SLIT(" = ")
+     ppr_results [(one,hint)] 
+	 = pprExpr (CmmReg one) <> ptext SLIT(" = ") <> pprUnHint hint
      ppr_results _other = panic "pprCall: multiple results"
 
      pprArg (expr, PtrHint)
@@ -684,6 +696,10 @@ pprCall ppr_fn cconv results args vols
      pprArg (expr, _other)
 	= pprExpr expr
 
+     pprUnHint PtrHint    = mkW_
+     pprUnHint SignedHint = mkW_
+     pprUnHint _          = empty
+	
      save    = save_restore SLIT("CALLER_SAVE")
      restore = save_restore SLIT("CALLER_RESTORE")
 
