@@ -380,10 +380,6 @@ instance Bits Word16 where
 
 data Word32 = W32# Word# deriving (Eq, Ord)
 
-#if WORD_SIZE_IN_BYTES == 4
-{-# RULES "wordToWord32#" forall x#. wordToWord32# x# = x# #-}
-#endif
-
 instance CCallable Word32
 instance CReturnable Word32
 

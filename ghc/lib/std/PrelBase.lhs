@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.43 2001/03/01 09:23:40 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.44 2001/04/03 15:05:52 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -629,6 +629,13 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 (I# x) `neInt` (I# y) = x /=# y
 (I# x) `ltInt` (I# y) = x <#  y
 (I# x) `leInt` (I# y) = x <=# y
+
+#if WORD_SIZE_IN_BYTES == 4
+{-# RULES
+"intToInt32#" forall x#. intToInt32# x# = x#
+"wordToWord32#" forall x#. wordToWord32# x# = x#
+     #-}
+#endif
 
 {-# RULES
 "int2Word2Int"  forall x#. int2Word# (word2Int# x#) = x#

@@ -241,10 +241,6 @@ instance Bits Int16 where
 
 data Int32 = I32# Int# deriving (Eq, Ord)
 
-#if WORD_SIZE_IN_BYTES == 4
-{-# RULES "intToInt32#" forall x#. intToInt32# x# = x# #-}
-#endif
-
 instance CCallable Int32
 instance CReturnable Int32
 
