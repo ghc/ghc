@@ -145,6 +145,12 @@ addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- is an arbitrary @IO@ action.  When it is invoked, the finalizer
 -- will run in a new thread.
 --
+-- NB. Be very careful with these finalizers.  One common trap is that
+-- if a finalizer references another finalized value, it does not
+-- prevent that value from being finalized.  In particular, 'Handle's
+-- are finalized objects, so a finalizer should not refer to a 'Handle'
+-- (including @stdout@, @stdin@ or @stderr@).
+--
 addForeignPtrConcFinalizer f@(ForeignPtr fo r) finalizer = do
   fs <- readIORef r
   writeIORef r (finalizer : fs)
