@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Conc.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Conc.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -40,8 +40,9 @@ module GHC.Conc
 
     ) where
 
+import Data.Maybe
+
 import GHC.Base
-import GHC.Maybe
 import GHC.Err		( parError, seqError )
 import GHC.IOBase	( IO(..), MVar(..) )
 import GHC.Base		( Int(..) )

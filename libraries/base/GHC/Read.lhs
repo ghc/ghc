@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Read.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Read.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -13,13 +13,15 @@ Instances of the Read class.
 
 module GHC.Read where
 
+import Data.Maybe
+import Data.Either
+
 import {-# SOURCE #-} GHC.Err		( error )
 import GHC.Enum		( Enum(..), maxBound )
 import GHC.Num
 import GHC.Real
 import GHC.Float
 import GHC.List
-import GHC.Maybe
 import GHC.Show		-- isAlpha etc
 import GHC.Base
 \end{code}

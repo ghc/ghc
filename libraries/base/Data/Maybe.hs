@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Maybe.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Maybe.hs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
 --
 -- The Maybe type, and associated operations.
 --
@@ -33,11 +33,35 @@ module Data.Maybe
    ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Err	( error )
-import GHC.List
-import GHC.Maybe
+import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
 #endif
+
+-- ---------------------------------------------------------------------------
+-- The Maybe type, and instances
+
+data  Maybe a  =  Nothing | Just a	deriving (Eq, Ord)
+
+instance  Functor Maybe  where
+    fmap _ Nothing       = Nothing
+    fmap f (Just a)      = Just (f a)
+
+instance  Monad Maybe  where
+    (Just x) >>= k      = k x
+    Nothing  >>= _      = Nothing
+
+    (Just _) >>  k      = k
+    Nothing  >>  _      = Nothing
+
+    return              = Just
+    fail _		= Nothing
+
+-- ---------------------------------------------------------------------------
+-- Functions over Maybe
+
+maybe :: b -> (a -> b) -> Maybe a -> b
+maybe n _ Nothing  = n
+maybe _ f (Just x) = f x
 
 isJust         :: Maybe a -> Bool
 isJust Nothing = False

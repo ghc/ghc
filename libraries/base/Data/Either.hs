@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Either.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Either.hs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
 --
 -- The Either type, and associated operations.
 --
@@ -21,5 +21,11 @@ module Data.Either (
  ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Maybe
+import GHC.Base
 #endif
+
+data  Either a b  =  Left a | Right b	deriving (Eq, Ord )
+
+either                  :: (a -> c) -> (b -> c) -> Either a b -> c
+either f _ (Left x)     =  f x
+either _ g (Right y)    =  g y

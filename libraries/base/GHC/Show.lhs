@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Show.lhs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+% $Id: Show.lhs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -34,7 +34,8 @@ module GHC.Show
 
 import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
-import GHC.Maybe
+import Data.Maybe
+import Data.Either
 import GHC.List	( (!!), break, dropWhile
 #ifdef USE_REPORT_PRELUDE
                 , concatMap, foldr1

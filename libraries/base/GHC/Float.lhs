@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Float.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Float.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -23,6 +23,8 @@ and the classes
 
 module GHC.Float( module GHC.Float, Float#, Double# )  where
 
+import Data.Maybe
+
 import GHC.Base
 import GHC.List
 import GHC.Enum
@@ -30,7 +32,6 @@ import GHC.Show
 import GHC.Num
 import GHC.Real
 import GHC.Arr
-import GHC.Maybe
 
 infixr 8  **
 \end{code}

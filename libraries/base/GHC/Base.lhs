@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+% $Id: Base.lhs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -33,7 +33,7 @@ GHC.Show	Class: Show, plus instances for GHC.Base/GHC.Tup types
 
 GHC.Enum	Class: Enum,  plus instances for GHC.Base/GHC.Tup types
 
-GHC.Maybe	Type: Maybe, plus instances for GHC.Base classes
+Data.Maybe	Type: Maybe, plus instances for GHC.Base classes
 
 GHC.Num		Class: Num, plus instances for Int
 		Type:  Integer, plus instances for all classes so far (Eq, Ord, Num, Show)

@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Dynamic.hs,v 1.2 2001/07/03 11:37:49 simonmar Exp $
+-- $Id: Dynamic.hs,v 1.3 2001/07/03 14:13:32 simonmar Exp $
 --
 -- The Dynamic interface provides basic support for dynamic types.
 -- 
@@ -64,9 +64,11 @@ module Data.Dynamic
 	) where
 
 
+import Data.Maybe
+import Data.Either
+
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Maybe
 import GHC.Show
 import GHC.Err
 import GHC.Num

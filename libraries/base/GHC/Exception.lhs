@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Exception.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: Exception.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -17,8 +17,9 @@ module GHC.Exception
 	  throw, ioError ) 
   where
 
+import Data.Either
+
 import GHC.Base
-import GHC.Maybe
 import GHC.IOBase
 
 #endif

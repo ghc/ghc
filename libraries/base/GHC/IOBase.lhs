@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+% $Id: IOBase.lhs,v 1.2 2001/07/03 14:13:32 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -18,7 +18,7 @@ import GHC.STRef
 import GHC.Arr
 import GHC.Base
 import GHC.Num	-- To get fromInteger etc, needed because of -fno-implicit-prelude
-import GHC.Maybe  ( Maybe(..) )
+import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List
 import GHC.Read
