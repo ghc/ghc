@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.45 2001/06/25 09:44:10 rrt Exp $
+ * $Id: Linker.c,v 1.46 2001/06/27 13:56:01 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -80,36 +80,13 @@ typedef struct _RtsSymbolVal {
 #else
 
 #define RTS_POSIX_ONLY_SYMBOLS
+
+/* These are statically linked from the mingw libraries into the ghc
+   executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                  \
-      SymX(abort)                               \
-      Sym(_alloca)                              \
-      Sym(isxdigit)                             \
-      Sym(isupper)                              \
-      Sym(ispunct)                              \
-      Sym(islower)                              \
-      Sym(isspace)                              \
-      Sym(isprint)                              \
-      Sym(isdigit)                              \
-      Sym(iscntrl)                              \
-      Sym(isalpha)                              \
-      Sym(isalnum)                              \
-      SymX(memset)                              \
-      SymX(strncpy)                             \
-      SymX(strcpy)                              \
-      SymX(strcmp)                              \
-      SymX(strerror)                            \
-      Sym(mktime)                               \
-      Sym(gmtime)                               \
-      Sym(strftime)                             \
-      Sym(localtime)                            \
-      SymX(getenv)                              \
-      SymX(rename)                              \
-      Sym(opendir)                              \
-      Sym(readdir)                              \
-      Sym(closedir)                             \
-      Sym(PrelHandle_stderr_closure)            \
-      Sym(Main_main_closure)                    \
-      Sym(__init_Main)                          \
+      SymX(memmove)                             \
+      SymX(realloc)                             \
+      SymX(malloc)                              \
       SymX(pow)                                 \
       SymX(tanh)                                \
       SymX(cosh)                                \
@@ -123,46 +100,25 @@ typedef struct _RtsSymbolVal {
       SymX(exp)                                 \
       SymX(log)                                 \
       SymX(sqrt)                                \
-      SymX(Sleep)                               \
-      SymX(system)                              \
-      SymX(memchr)                              \
       SymX(memcpy)                              \
-      SymX(memmove)                             \
-      SymX(fprintf)                             \
-      Sym(_imp___iob)                           \
-      Sym(_imp___tzname)                        \
+      Sym(mktime)                               \
       Sym(_imp___timezone)                      \
-      Sym(__udivdi3)                            \
-      SymX(GetProcessTimes)                     \
-      SymX(GetCurrentProcess)                   \
-      SymX(read)                                \
-      SymX(write)                               \
-      SymX(open)                                \
-      SymX(close)                               \
-      SymX(send)                                \
-      SymX(recv)                                \
-      SymX(malloc)                              \
+      Sym(_imp___tzname)                        \
+      Sym(localtime)                            \
+      Sym(gmtime)                               \
+      SymX(getenv)                              \
       SymX(free)                                \
-      SymX(realloc)                             \
-      SymX(fstat)                               \
-      SymX(stat)                                \
-      Sym(ftime)                                \
-      SymX(isatty)                              \
-      SymX(lseek)                               \
-      SymX(access)                              \
-      Sym(setmode)                              \
-      SymX(chmod)                               \
-      SymX(chdir)                               \
-      SymX(getcwd)                              \
-      SymX(unlink)                              \
-      SymX(rmdir)                               \
-      SymX(mkdir)                               \
-      SymX(CreateProcessA)                      \
-      SymX(WaitForSingleObject)                 \
-      SymX(GetExitCodeProcess)                  \
+      SymX(rename)                              \
+      Sym(opendir)                              \
+      Sym(readdir)                              \
+      Sym(closedir)                             \
+      SymX(GetCurrentProcess)                   \
+      SymX(GetProcessTimes)                     \
       SymX(CloseHandle)                         \
-      SymX(_errno)                              \
-      SymX(closesocket)
+      SymX(GetExitCodeProcess)                  \
+      SymX(WaitForSingleObject)                 \
+      SymX(CreateProcessA)                      \
+      SymX(_errno)
 #endif
 
 
@@ -449,6 +405,7 @@ initLinker( void )
 
 typedef
    struct _OpenedDLL {
+      char*              name;
       struct _OpenedDLL* next;
       HINSTANCE instance;
    } 
@@ -485,33 +442,25 @@ addDLL ( char* path, char* dll_name )
    } else {
       return NULL;
    }
-   ASSERT(0); /*NOTREACHED*/
+   /*NOTREACHED*/
+
 #  elif defined(OBJFORMAT_PEi386)
 
    /* Add this DLL to the list of DLLs in which to search for symbols.
-      The first time through, also add the executable to the list,
-      since we need to search that too.  The path argument is ignored. */
+      The path argument is ignored. */
    char*      buf;
    OpenedDLL* o_dll;
    HINSTANCE  instance;
-   /* fprintf(stderr, "addDLL %s\n", dll_name ); */
 
-#if 0
-   /* Later ... can't figure out why this doesn't work.  So retain the
-      RTS_MINGW_ONLY_SYMBOLS hack for the time being.  */
-   if (opened_dlls == NULL) {
-      /* First time through ... */
-      instance = GetModuleHandle(NULL);
-      if (instance == NULL)
-         return "addDLL: can't get handle to the executable";
-      o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL-init" );
-      o_dll->instance = instance;
-      o_dll->next     = opened_dlls;
-      opened_dlls     = o_dll;
+   /* fprintf(stderr, "\naddDLL; path=`%s', dll_name = `%s'\n", path, dll_name); */
+
+   /* See if we've already got it, and ignore if so. */
+   for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
+      if (0 == strcmp(o_dll->name, dll_name))
+         return NULL;
    }
-#endif
 
-   buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
+   buf = stgMallocBytes(strlen(dll_name) + 10, "addDLL");
    sprintf(buf, "%s.DLL", dll_name);
    instance = LoadLibrary(buf);
    free(buf);
@@ -521,6 +470,8 @@ addDLL ( char* path, char* dll_name )
    }
 
    o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
+   o_dll->name     = stgMallocBytes(1+strlen(dll_name), "addDLL");
+   strcpy(o_dll->name, dll_name);
    o_dll->instance = instance;
    o_dll->next     = opened_dlls;
    opened_dlls     = o_dll;
@@ -548,6 +499,7 @@ lookupSymbol( char *lbl )
         OpenedDLL* o_dll;
         void* sym;
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
+           /* fprintf(stderr, "look in %s for %s\n", o_dll->name, lbl); */
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) return sym;
         }
@@ -977,7 +929,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    COFF_section* sectab;
    COFF_symbol*  symtab;
    UChar*        strtab;
-   fprintf(stderr, "\nLOADING %s\n", oc->fileName);
+   /* fprintf(stderr, "\nLOADING %s\n", oc->fileName); */
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
                ((UChar*)(oc->image)) 
