@@ -39,7 +39,6 @@ module Constants (
 	uF_RET,
 	uF_SU,
 	uF_UPDATEE,
-	uF_CCS,
 
 	sEQ_FRAME_SIZE,
 	sCC_SEQ_FRAME_SIZE,
@@ -159,7 +158,6 @@ gRAN_UF_SIZE = (GRAN_UF_SIZE::Int)
 uF_RET         = (UF_RET::Int)
 uF_SU          = (UF_SU::Int)
 uF_UPDATEE     = (UF_UPDATEE::Int)
-uF_CCS         = (UF_CCS::Int)
 \end{code}
 
 Seq frame sizes.
