@@ -217,7 +217,8 @@ unlink("$Makefile.bak");
 # 
 if ( ! -f $Makefile.bak ) {
    system("touch $Makefile.bak");
-} else {
+} 
+if ( -f $Makefile ) {
    rename($Makefile,"$Makefile.bak");
 }
 # now copy Makefile.bak into Makefile, rm'ing old dependencies
