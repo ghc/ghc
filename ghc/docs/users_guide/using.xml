@@ -64,9 +64,12 @@ module X where
       the top of your source files, upto the first
       (non-literate,non-empty) line not containing
       <literal>OPTIONS_GHC</literal>. Multiple <literal>OPTIONS_GHC</literal>
-      pragmas are recognised. Note that your command shell does not
+      pragmas are recognised.  Do not put comments before, or on the same line
+	as, the <literal>OPTIONS_GHC</literal> pragma.</para>
+
+      <para>Note that your command shell does not
       get to the source file options, they are just included literally
-      in the array of command-line arguments the compiler driver
+      in the array of command-line arguments the compiler
       maintains internally, so you'll be desperately disappointed if
       you try to glob etc. inside <literal>OPTIONS_GHC</literal>.</para>
 
