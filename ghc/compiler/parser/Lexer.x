@@ -123,6 +123,7 @@ $white_no_nl+ 				;
 <bol> {
   \n					;
   ^\# (line)?				{ begin line_prag1 }
+  ^\# pragma .* \n			; -- GCC 3.3 CPP generated, apparently
   ()					{ do_bol }
 }
 
