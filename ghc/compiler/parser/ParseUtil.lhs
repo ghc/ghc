@@ -198,6 +198,14 @@ checkPat e [] = case e of
 			      in
 			      returnP (SigPatIn e t')
 
+	-- translate out NegApps of literals in patterns.
+	-- NB. negative primitive literals are already handled by
+	-- RdrHsSyn.mkHsNegApp
+	NegApp (HsOverLit (HsIntegral i n)) _
+		-> returnP (NPatIn (HsIntegral (-i) n))
+	NegApp (HsOverLit (HsFractional f n)) _
+		-> returnP (NPatIn (HsFractional (-f) n))
+
 	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral _ _)) 
 		  	   | plus == plus_RDR
 			   -> returnP (mkNPlusKPat n lit)

@@ -237,21 +237,11 @@ mkHsNegApp :: RdrNameHsExpr -> RdrNameHsExpr
 -- If the type checker sees (negate 3#) it will barf, because negate
 -- can't take an unboxed arg.  But that is exactly what it will see when
 -- we write "-3#".  So we have to do the negation right now!
--- 
--- We also do the same service for boxed literals, because this function
--- is also used for patterns (which, remember, are parsed as expressions)
--- and pattern don't have negation in them.
--- 
--- Finally, it's important to represent minBound as minBound, and not
--- as (negate (-minBound)), becuase the latter is out of range. 
 
 mkHsNegApp (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))    
 mkHsNegApp (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
 mkHsNegApp (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
-
-mkHsNegApp (HsOverLit (HsIntegral   i n)) = HsOverLit (HsIntegral   (-i) n)
-mkHsNegApp (HsOverLit (HsFractional f n)) = HsOverLit (HsFractional (-f) n)
-mkHsNegApp expr 		  	  = NegApp expr negateName
+mkHsNegApp expr		  	    = NegApp expr negateName
 \end{code}
 
 A useful function for building @OpApps@.  The operator is always a
