@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.6 1999/02/05 16:02:56 simonm Exp $
+ * $Id: Stats.c,v 1.7 1999/02/09 12:49:23 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -403,7 +403,7 @@ stat_describe_gens(void)
   bdescr *bd;
   step *step;
 
-  fprintf(stderr, "     Gen    Steps      Max   Mutable  Mut-Once  Step  Blocks     Live    Large\n                    Blocks  Closures  Closures                         Objects\n");
+  fprintf(stderr, "     Gen    Steps      Max   Mutable  Mut-Once  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                         Objects\n");
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (m = generations[g].mut_list, mut = 0; m != END_MUT_LIST; 
@@ -420,7 +420,12 @@ stat_describe_gens(void)
       for (bd = step->large_objects, lge = 0; bd; bd = bd->link)
 	lge++;
       live = 0;
-      for (bd = step->blocks; bd; bd = bd->link) {
+      if (RtsFlags.GcFlags.generations == 1) {
+	bd = step->to_space;
+      } else {
+	bd = step->blocks;
+      }
+      for (; bd; bd = bd->link) {
 	live += (bd->free - bd->start) * sizeof(W_);
       }
       if (s != 0) {
