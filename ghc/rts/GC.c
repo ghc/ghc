@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.161 2003/10/22 15:00:59 simonmar Exp $
+ * $Id: GC.c,v 1.162 2003/10/24 11:45:40 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -2666,6 +2666,11 @@ scavenge(step *stp)
     {
 	StgPtr next;
 
+	// Set the mut_link field to NULL, so that we will put this
+	// array back on the mutable list if it is subsequently thawed
+	// by unsafeThaw#.
+	((StgMutArrPtrs*)p)->mut_link = NULL;
+
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    (StgClosure *)*p = evacuate((StgClosure *)*p);
@@ -2674,11 +2679,6 @@ scavenge(step *stp)
 	// false, but that breaks some assumptions (eg. every
 	// closure on the mutable list is supposed to have the MUT
 	// flag set, and MUT_ARR_PTRS_FROZEN doesn't).
-
-	// Set the mut_link field to NULL, so that we will put this
-	// array back on the mutable list if it is subsequently thawed
-	// by unsafeThaw#.
-	((StgMutArrPtrs*)p)->mut_link = NULL;
 	break;
     }
 
@@ -2981,14 +2981,15 @@ linear_scan:
 	{
 	    StgPtr next;
 	    
-	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		(StgClosure *)*p = evacuate((StgClosure *)*p);
-	    }
 	    // Set the mut_link field to NULL, so that we will put this
 	    // array on the mutable list if it is subsequently thawed
 	    // by unsafeThaw#.
 	    ((StgMutArrPtrs*)p)->mut_link = NULL;
+
+	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+		(StgClosure *)*p = evacuate((StgClosure *)*p);
+	    }
 	    break;
 	}
 
@@ -3207,14 +3208,15 @@ scavenge_one(StgPtr p)
 	// follow everything 
 	StgPtr next;
       
-	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
-	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    (StgClosure *)*p = evacuate((StgClosure *)*p);
-	}
 	// Set the mut_link field to NULL, so that we will put this
 	// array on the mutable list if it is subsequently thawed
 	// by unsafeThaw#.
 	((StgMutArrPtrs*)p)->mut_link = NULL;
+
+	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
+	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
+	    (StgClosure *)*p = evacuate((StgClosure *)*p);
+	}
 	break;
     }
 
