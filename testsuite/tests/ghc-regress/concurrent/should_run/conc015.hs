@@ -24,9 +24,9 @@ main = do
 	putMVar m ()
 	sum [1..10000] `seq` -- give 'foo' a chance to be raised
   	  (unblock (threadDelay 500000))
-		`Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
+		`Control.Exception.catch` (\e -> putStrLn ("caught1: " ++ show e))
      )
     takeMVar m2
    )
-    `Exception.catch`
+    `Control.Exception.catch`
     (\e -> putStrLn ("caught2: " ++ show e))

@@ -4,7 +4,6 @@ module Main where
 
 import Control.Concurrent
 import Control.Exception
-import IOExts
 
 choose :: a -> a -> IO a
 choose a b = do
@@ -14,7 +13,7 @@ choose a b = do
    b_id <- myForkIO (b `seq` takeMVar ready >> putMVar answer b)
    it <- takeMVar answer
    killThread a_id
-   killThread b_id
+--   killThread b_id
    return it
 
 -- We need to catch the exception raised by killThread and ignore it.
@@ -22,7 +21,7 @@ choose a b = do
 -- exception is raised in any thread.
 
 myForkIO :: IO () -> IO ThreadId
-myForkIO io = forkIO (Exception.catch io (\e -> return ()))
+myForkIO io = forkIO (Control.Exception.catch io (\e -> return ()))
 
 main = do
    let big = sum [1..]

@@ -1,7 +1,7 @@
 import Control.Concurrent
-import Exception
-import IOExts
-import Weak
+import Control.Exception
+import System.Mem ( performGC )
+import System.Mem.Weak ( addFinalizer )
 
 data P = P (MVar Bool)
 

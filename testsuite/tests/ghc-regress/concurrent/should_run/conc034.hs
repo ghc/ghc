@@ -11,5 +11,5 @@ main = do
   let a = sum [1..10000] + b
       b = sum [2..10000] + a
   forkIO (print a)
-  r <- Exception.try $ print b
+  r <- Control.Exception.try $ print b
   print r

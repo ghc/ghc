@@ -9,4 +9,4 @@ import Control.Exception
 
 main = do 
   id <- myThreadId
-  Exception.catch (killThread id) (\e -> putStr (show e))
+  Control.Exception.catch (killThread id) (\e -> putStr (show e))

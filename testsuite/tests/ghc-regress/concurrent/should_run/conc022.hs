@@ -34,7 +34,7 @@ timeout secs action on_timeout
 	 killThread timeout
 	 return result
       ) 
-      `Exception.catch`
+      `Control.Exception.catch`
       ( \exception -> case exception of
 		       ErrorCall "__timeout" -> on_timeout		       
 		       _other                -> do
@@ -45,5 +45,5 @@ forkIOIgnoreExceptions :: IO () -> IO ThreadId
 forkIOIgnoreExceptions action = IO $ \ s -> 
    case (fork# action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
  where
-  action_plus = Exception.catch action (\_ -> return ())
+  action_plus = Control.Exception.catch action (\_ -> return ())
 

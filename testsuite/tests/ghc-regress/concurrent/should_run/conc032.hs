@@ -3,7 +3,7 @@
 -- !!! same MVar.
 
 import Control.Concurrent
-import IOExts
+import System.IO.Unsafe
 
 awk True  True  z     = 1
 awk False y     True  = 2

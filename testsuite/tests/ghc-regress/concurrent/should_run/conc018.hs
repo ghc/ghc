@@ -6,7 +6,7 @@ import Control.Exception
 
 main = do
   t <- forkIO (
-	    Exception.catch (do
+	    Control.Exception.catch (do
 		m <- newMVar ()
 		putMVar m ()
 	     )
