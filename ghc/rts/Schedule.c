@@ -1343,7 +1343,9 @@ run_thread:
 	    // partially-evaluated thunks on the heap.
 	    raiseAsync_(t, NULL, rtsTrue);
             
+#ifdef REG_R1
 	    ASSERT(get_itbl((StgClosure *)t->sp)->type == ATOMICALLY_FRAME);
+#endif
           }
         }
       }
@@ -3110,7 +3112,17 @@ raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically)
 	    ASSERT(stop_at_atomically);
 	    ASSERT(stmGetEnclosingTRec(tso->trec) == NO_TREC);
 	    stmCondemnTransaction(tso -> trec);
+#ifdef REG_R1
 	    tso->sp = frame;
+#else
+	    // R1 is not a register: the return convention for IO in
+	    // this case puts the return value on the stack, so we
+	    // need to set up the stack to return to the atomically
+	    // frame properly...
+	    tso->sp = frame - 2;
+	    tso->sp[1] = (StgWord) &stg_NO_FINALIZER_closure; // why not?
+	    tso->sp[0] = (StgWord) &stg_ut_1_0_unreg_info;
+#endif
 	    tso->what_next = ThreadRunGHC;
 	    return;
 
@@ -3352,7 +3364,7 @@ findRetryFrameHelper (StgTSO *tso)
     }
   }
 }
-   
+
 /* -----------------------------------------------------------------------------
    resurrectThreads is called after garbage collection on the list of
    threads found to be garbage.  Each of these threads will be woken
