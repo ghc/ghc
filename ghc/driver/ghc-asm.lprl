@@ -512,10 +512,6 @@ sub mangle_asm {
             # I guess this is never entered, since all _upds are 
             # either vtbl_'s or ret_'s, caught above. - andre
 	    $chksymb[$i] = ''; 
-#            if ($TargetPlatform =~ /^powerpc-/) 
-#               { $chksymb[$i] = $symbtmp;}
-#	    else { $chksymb[$i] = ''; };
-	    
 
 	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
 	     &&   /^(_uname|uname|stat|fstat):/ ) {
@@ -577,7 +573,6 @@ sub mangle_asm {
   
     # HPPAs, MIPSen: also start medding at chunk 1
 
-# AIX hack for the moment, to join up multiple identical tocs
     if ($TargetPlatform =~ /^powerpc|^rs6000/) {
        print OUTASM $T_HDR_toc; # yes, we have to put a .toc 
                                 # in the beginning of every file!
@@ -587,6 +582,7 @@ sub mangle_asm {
 	$chk[$i] =~ s/\[RW\]//g;
 	$chk[$i] =~ s/\[DS\]//g;
 	$chk[$i] =~ s/^\.csect .*\[DS\]$//g;
+
 	if ( $chkcat[$i] eq 'toc' && $chk[$i] !~ /\.byte/ )
 	   { $chk[$i] =~ s/$T_MOVE_DIRVS//g;
 	     $chk[$i] =~ s/\t\.tc (\S+)\[TC\],(\S+_fast\d+)/\t\.tc \1\[TC\],\.\2/; 

@@ -345,16 +345,16 @@ stgAllocForGMP (size_in_bytes)
     */
     data_size_in_words  = BYTES_TO_STGWORDS(size_in_bytes);
     total_size_in_words = DATA_HS + data_size_in_words;
-
 #ifdef ALLOC_DEBUG
 	/* Check that we are within the current budget */
     if (DEBUG_GMPAllocBudget < total_size_in_words) {
 	fprintf(stderr, "stgAllocForGMP: budget error: %ld %ld\n",
 			DEBUG_GMPAllocBudget, total_size_in_words);
-	abort();
+	abort(); 
     }
-    else
+    else {
 	DEBUG_GMPAllocBudget -= total_size_in_words;
+    }
 #endif
 
     /*	if it's a DATA thingy, we'd better fill it in.

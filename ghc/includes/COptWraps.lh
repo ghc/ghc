@@ -559,33 +559,20 @@ gets whatever it's after.
 \begin{code}
 #if powerpc_TARGET_ARCH || rs6000_TARGET_ARCH
 
-/* shift 4 arg registers down one */
-
 #define MAGIC_CALL_SETUP  \
     register void (*f)() __asm__("$2");	\
     __asm__ volatile (			\
-    "move $2,$4\n"			\
     "not used!!!????\n"			\
-    "\tmove $4,$5\n"			\
-    "\tmove $5,$6\n"			\
-    "\tmove $6,$7\n"			\
-    "\tlw $7,16($sp)\n"			\
-    "\taddu $sp,$sp,4\n"		\
     : : : "$2" );
 
 #define MAGIC_CALL		\
     (*f)();   	    		\
      __asm__ volatile (		\
-    "subu $sp,$sp,4\n"		\
-    "\ts.d $f0, -8($sp)\n"  	\
-    "not used!!!????\n"		\
-    "\tsw  $2, -12($sp)");
+    "not used!!!????\n");
 
 #define MAGIC_RETURN		\
     __asm__ volatile (		\
-    "l.d $f0, -8($sp)\n"	\
-    "not used!!!????\n"		\
-    "\tlw  $2, -12($sp)");
+    "not used!!!????\n");
 
 #define WRAPPER_NAME(f)	  /* nothing */
 
@@ -600,7 +587,7 @@ We defeat it by saving the registers in the stack again. :-( */
     do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0); \
     __asm__ volatile (		\
 	"cal 1,136(1)\n" \
-        "\tstm 13,-76(1)\n" \
+        "\tstm 14,-72(1)\n" \
 	"\tstu 1,-136(1)");
 
 #define SEPARATE_WRAPPER_RESTORE    /* none */
