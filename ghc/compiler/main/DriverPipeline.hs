@@ -374,7 +374,15 @@ run_phase Cpp basename suff input_fn output_fn
 			    ++ map SysTools.Option md_c_flags
 			    ++ [ SysTools.Option     "-x"
 			       , SysTools.Option     "c"
-			       , SysTools.FileOption "" input_fn
+			       , SysTools.Option     input_fn
+	-- We hackily use Option instead of FileOption here, so that the file
+	-- name is not back-slashed on Windows.  cpp is capable of
+	-- dealing with / in filenames, so it works fine.  Furthermore
+	-- if we put in backslashes, cpp outputs #line directives
+	-- with *double* backslashes.   And that in turn means that
+	-- our error messages get double backslashes in them.
+	-- In due course we should arrange that the lexer deals
+	-- with these \\ escapes properly.
 			       , SysTools.Option     "-o"
 			       , SysTools.FileOption "" output_fn
 			       ])
