@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.30 2000/12/20 14:47:22 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.31 2000/12/20 15:26:50 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -34,7 +34,9 @@ STGFUN(stg_SE_CAF_BLACKHOLE_entry);
 #if defined(PAR) || defined(GRAN)
 STGFUN(stg_RBH_entry);
 #endif
+#ifdef GHCI
 STGFUN(stg_BCO_entry);
+#endif
 STGFUN(stg_EVACUATED_entry);
 STGFUN(stg_FOREIGN_entry);
 STGFUN(stg_WEAK_entry);
