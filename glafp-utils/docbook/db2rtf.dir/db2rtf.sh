@@ -1,3 +1,13 @@
+if [ -z "$SGML_CATALOG_FILES"]
+then
+  if [ ! -f "$FPTOOLS_CATALOG_FILE" ]
+  then
+    echo "CATALOG file not set up; see installation guide for details."
+    exit 1
+  fi
+  SGML_CATALOG_FILES=$FPTOOLS_CATALOG_FILE
+fi
+
 output=db2rtf.rtf
 
 # Dave Mason's option to specify a different stylesheet
@@ -28,13 +38,13 @@ then
   fi
 fi
 
-cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print
+cat $* | $JADE -t rtf -d ${DB_STYLESHEET}\#print -c $SGML_CATALOG_FILES
 
 if [ $# -eq 1 ]
 then
-  mv $JADE-out.rtf $output
+  mv jade-out.rtf $output
 else
-  cat $JADE-out.rtf
+  cat jade-out.rtf
 fi
 
 exit 0

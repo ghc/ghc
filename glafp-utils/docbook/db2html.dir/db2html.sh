@@ -1,4 +1,12 @@
-#! /bin/sh
+if [ -z "$SGML_CATALOG_FILES"]
+then
+  if [ ! -f "$FPTOOLS_CATALOG_FILE" ]
+  then
+    echo "CATALOG file not set up; see installation guide for details."
+    exit 1
+  fi
+  SGML_CATALOG_FILES=$FPTOOLS_CATALOG_FILE
+fi
 
 HTML_STYLESHEET=$HTML_DIR/html/docbook.css
 ADMON_GRAPHICS=$HTML_DIR/html/images/*.gif
@@ -50,10 +58,10 @@ mkdir $TMPDIR
 SAVE_PWD=`pwd`
 if [ $1 = `basename $1` ]; then
   echo "working on ../$1"
-  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html ../$1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html ../$1 -c $SGML_CATALOG_FILES; cd $SAVE_PWD)
 else
   echo "working on $1"
-  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html $1; cd $SAVE_PWD)
+  (cd $TMPDIR; $JADE -t sgml -ihtml -d ${DB_STYLESHEET}\#html $1 -c $SGML_CATALOG_FILES; cd $SAVE_PWD)
 fi
 
 if [ $# -eq 1 ]

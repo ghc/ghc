@@ -1,0 +1,25 @@
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Arrow Relations//EN" /usr/lib/sgml/ISOamsa
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Binary Operators//EN" /usr/lib/sgml/ISOamsb
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Delimiters//EN" /usr/lib/sgml/ISOamsc
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Negated Relations//EN" /usr/lib/sgml/ISOamsn
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Ordinary//EN" /usr/lib/sgml/ISOamso
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Relations//EN" /usr/lib/sgml/ISOamsr
+PUBLIC        "ISO 8879:1986//ENTITIES Box and Line Drawing//EN" /usr/lib/sgml/ISObox
+PUBLIC        "ISO 8879:1986//ENTITIES Russian Cyrillic//EN" /usr/lib/sgml/ISOcyr1
+PUBLIC        "ISO 8879:1986//ENTITIES Non-Russian Cyrillic//EN" /usr/lib/sgml/ISOcyr2
+PUBLIC        "ISO 8879:1986//ENTITIES Diacritical Marks//EN" /usr/lib/sgml/ISOdia
+PUBLIC        "ISO 8879:1986//ENTITIES Greek Letters//EN" /usr/lib/sgml/ISOgrk1
+PUBLIC        "ISO 8879:1986//ENTITIES Monotoniko Greek//EN" /usr/lib/sgml/ISOgrk2
+PUBLIC        "ISO 8879:1986//ENTITIES Greek Symbols//EN" /usr/lib/sgml/ISOgrk3
+PUBLIC        "ISO 8879:1986//ENTITIES Alternative Greek Symbols//EN" /usr/lib/sgml/ISOgrk4
+PUBLIC        "ISO 8879:1986//ENTITIES Added Latin 1//EN" /usr/lib/sgml/ISOlat1
+PUBLIC        "ISO 8879:1986//ENTITIES Added Latin 2//EN" /usr/lib/sgml/ISOlat2
+PUBLIC        "ISO 8879:1986//ENTITIES Numeric and Special Graphic//EN" /usr/lib/sgml/ISOnum
+PUBLIC        "ISO 8879:1986//ENTITIES Publishing//EN" /usr/lib/sgml/ISOpub
+PUBLIC        "ISO 8879:1986//ENTITIES General Technical//EN" /usr/lib/sgml/ISOtech
+
+PUBLIC        "-//Norman Walsh//DOCUMENT DocBook HTML Stylesheet//EN" /usr/lib/sgml/stylesheets/nwalsh-modular/html/docbook.dsl
+PUBLIC        "-//Norman Walsh//DOCUMENT DocBook Print Stylesheet//EN" /usr/lib/sgml/stylesheets/nwalsh-modular/print/docbook.dsl
+CATALOG       /usr/lib/sgml/dsssl.cat
+CATALOG       /usr/lib/sgml/docbook.cat
+CATALOG       /usr/lib/sgml/nwalsh-modular.cat

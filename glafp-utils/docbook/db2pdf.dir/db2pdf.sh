@@ -1,3 +1,13 @@
+if [ -z "$SGML_CATALOG_FILES"]
+then
+  if [ ! -f "$FPTOOLS_CATALOG_FILE" ]
+  then
+    echo "CATALOG file not set up; see installation guide for details."
+    exit 1
+  fi
+  SGML_CATALOG_FILES=$FPTOOLS_CATALOG_FILE
+fi
+
 TMPFN=`echo $1 | sed 's/\.sgml//'`
 
 # Dave Mason's option to specify a different stylesheet
@@ -28,7 +38,7 @@ then
   fi
 fi
 
-$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1 -c $SGML_CATALOG_FILES
 
 pdf$JADEtex $TMPFN
 

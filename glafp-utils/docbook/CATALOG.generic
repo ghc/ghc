@@ -1,0 +1,23 @@
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Arrow Relations//EN" /usr/local/lib/sgml/ISOamsa
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Binary Operators//EN" /usr/local/lib/sgml/ISOamsb
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Delimiters//EN" /usr/local/lib/sgml/ISOamsc
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Negated Relations//EN" /usr/local/lib/sgml/ISOamsn
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Ordinary//EN" /usr/local/lib/sgml/ISOamso
+PUBLIC        "ISO 8879:1986//ENTITIES Added Math Symbols: Relations//EN" /usr/local/lib/sgml/ISOamsr
+PUBLIC        "ISO 8879:1986//ENTITIES Box and Line Drawing//EN" /usr/local/lib/sgml/ISObox
+PUBLIC        "ISO 8879:1986//ENTITIES Russian Cyrillic//EN" /usr/local/lib/sgml/ISOcyr1
+PUBLIC        "ISO 8879:1986//ENTITIES Non-Russian Cyrillic//EN" /usr/local/lib/sgml/ISOcyr2
+PUBLIC        "ISO 8879:1986//ENTITIES Diacritical Marks//EN" /usr/local/lib/sgml/ISOdia
+PUBLIC        "ISO 8879:1986//ENTITIES Greek Letters//EN" /usr/local/lib/sgml/ISOgrk1
+PUBLIC        "ISO 8879:1986//ENTITIES Monotoniko Greek//EN" /usr/local/lib/sgml/ISOgrk2
+PUBLIC        "ISO 8879:1986//ENTITIES Greek Symbols//EN" /usr/local/lib/sgml/ISOgrk3
+PUBLIC        "ISO 8879:1986//ENTITIES Alternative Greek Symbols//EN" /usr/local/lib/sgml/ISOgrk4
+PUBLIC        "ISO 8879:1986//ENTITIES Added Latin 1//EN" /usr/local/lib/sgml/ISOlat1
+PUBLIC        "ISO 8879:1986//ENTITIES Added Latin 2//EN" /usr/local/lib/sgml/ISOlat2
+PUBLIC        "ISO 8879:1986//ENTITIES Numeric and Special Graphic//EN" /usr/local/lib/sgml/ISOnum
+PUBLIC        "ISO 8879:1986//ENTITIES Publishing//EN" /usr/local/lib/sgml/ISOpub
+PUBLIC        "ISO 8879:1986//ENTITIES General Technical//EN" /usr/local/lib/sgml/ISOtech
+
+CATALOG       /usr/local/lib/sgml/stylesheets/docbook/catalog
+CATALOG       /usr/local/lib/sgml/docbook.cat
+CATALOG       /usr/local/lib/sgml/catalog
