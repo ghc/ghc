@@ -7,5 +7,6 @@ that this "laying on of hands" is unnecessary.
 2. strip ghc/compiler/ghc.exe ghc/driver/ghci/ghci.exe hslibs/tools/*/*.exe
 3. cp ghc/utils/ghc-pkg/ghc-pkg.bin ghc/utils/ghc-pkg/ghc-pkg.exe
 4. strip ghc/utils/*/*.exe
-5. (cd docs/building && ps2pdf building.ps building.pdf)
-6. (cd ghc/docs/set && ps2pdf set.ps set.pdf)
+5. (cd docs/building && make building.ps && ps2pdf building.ps building.pdf)
+6. (cd ghc/docs/set && make set.ps && ps2pdf set.ps set.pdf)
+7. Make License and ANNOUNCE into RTF (or just rename as RTF?).
