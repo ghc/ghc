@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.62 2000/10/03 16:51:57 sewardj Exp $
+-- $Id: Main.hs,v 1.63 2000/10/05 13:25:03 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -1821,7 +1821,9 @@ run_phase Hsc	basename suff input_fn output_fn
   -- check whether compilation was performed, bail out if not
 	b <- doesFileExist output_fn
 	if not b && not (null source_unchanged) -- sanity
-		then return False
+		then do run_something "Touching object file"
+			    ("touch " ++ output_fn)
+			return False
 		else do -- carry on...
 
   -- Generate -Rghc-timing info
