@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.15 2001/05/22 10:38:57 simonmar Exp $
+# $Id: Makefile,v 1.16 2001/06/27 06:18:40 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -36,7 +36,8 @@ HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 HSC2HS_EXTRA="--cc=$(CC) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 else
-HSC2HS_EXTRA="--cc=$(CC) --cflag=-mno-cygwin --cflag=-mwin32 --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
+extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
+HSC2HS_EXTRA="--cc=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 endif
 endif
 
