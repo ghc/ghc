@@ -13,17 +13,16 @@ module Check ( check , ExhaustivePat ) where
 import HsSyn		
 import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType ) 
-import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, CanItFail(..),
-			  tidyLitPat
+import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, 
+			  CanItFail(..),  tidyLitPat, tidyNPat, 
  			)
 import Id		( idType )
 import DataCon		( DataCon, dataConTyCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
 import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkVarOcc )
 import Type		( splitAlgTyConApp, mkTyVarTys, splitTyConApp_maybe )
-import TysWiredIn	( nilDataCon, consDataCon, 
-                          mkListTy, mkTupleTy, tupleCon
-			)
+import TysPrim		( charPrimTy )
+import TysWiredIn
 import PrelNames	( unboundKey )
 import TyCon            ( tyConDataCons, tupleTyConBoxity, isTupleTyCon )
 import BasicTypes	( Boxity(..) )
@@ -617,7 +616,17 @@ simplify_pat (RecPat dc ty ex_tvs dicts idps)
       | otherwise  = x : insertNm nm p xs
 
 simplify_pat pat@(LitPat lit lit_ty)        = tidyLitPat lit pat
-simplify_pat pat@(NPat   lit lit_ty hsexpr) = tidyLitPat lit pat
+
+-- unpack string patterns fully, so we can see when they overlap with
+-- each other, or even explicit lists of Chars.
+simplify_pat pat@(NPat (HsString s) _ _) = 
+   foldr (\c pat -> ConPat consDataCon stringTy [] [] [mk_char_lit c,pat])
+	(ConPat nilDataCon stringTy [] [] []) (_UNPK_INT_ s)
+  where
+    mk_char_lit c = ConPat charDataCon charTy [] [] 
+			[LitPat (HsCharPrim c) charPrimTy]
+
+simplify_pat pat@(NPat lit lit_ty hsexpr) = tidyNPat lit lit_ty pat
 
 simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = 
      WildPat ty
