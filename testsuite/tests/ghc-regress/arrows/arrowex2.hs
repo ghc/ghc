@@ -215,3 +215,6 @@ maybeAll (n :&: ns) (j :&: js) =
 
 main = do
 	print (apply rev tree3)
+	print (apply invert tree3)
+	print (apply (invert >>> sort) tree3)
+	print (apply (scan (+) 0) tree3)
