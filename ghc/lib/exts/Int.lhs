@@ -24,7 +24,13 @@ module Int
 	, intToInt16 -- :: Int   -> Int16
 	, int32ToInt -- :: Int32 -> Int
 	, intToInt32 -- :: Int   -> Int32
+
 	, intToInt64 -- :: Int   -> Int64
+	, int64ToInt -- :: Int64 -> Int
+
+        , integerToInt64 -- :: Integer -> Int64
+        , int64ToInteger -- :: Int64   -> Integer
+
 	-- plus Eq, Ord, Num, Bounded, Real, Integral, Ix, Enum, Read,
 	--  Show and Bits instances for each of Int8, Int16, Int32 and Int64
 	) where
@@ -483,21 +489,28 @@ instance Bits Int32 where
 
 \subsection[Int64]{The @Int64@ interface}
 
+
 \begin{code}
 data Int64 = I64 {lo,hi::Int32} deriving (Eq, Ord, Bounded)
 
-i64ToInteger I64{lo,hi} = toInteger lo + 0x100000000 * toInteger hi 
-integerToI64 x = case x `quotRem` 0x100000000 of 
+int64ToInteger :: Int64 -> Integer
+int64ToInteger I64{lo,hi} = toInteger lo + 0x100000000 * toInteger hi 
+
+integerToInt64 :: Integer -> Int64
+integerToInt64 x = case x `quotRem` 0x100000000 of 
                  (h,l) -> I64{lo=fromInteger l, hi=fromInteger h}
 
 intToInt64 :: Int -> Int64
 intToInt64 x =  I64{lo=intToInt32 x, hi=0}
 
+int64ToInt :: Int64 -> Int
+int64ToInt (I64 lo _) = int32ToInt lo
+
 instance Show Int64 where
-  showsPrec p x = showsPrec p (i64ToInteger x)
+  showsPrec p x = showsPrec p (int64ToInteger x)
 
 instance Read Int64 where
-  readsPrec p s = [ (integerToI64 x,r) | (x,r) <- readDec s ]
+  readsPrec p s = [ (integerToInt64 x,r) | (x,r) <- readDec s ]
 
 \end{code}
 
