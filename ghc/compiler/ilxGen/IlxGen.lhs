@@ -1958,9 +1958,9 @@ ilxPrimOpTable op
 	Integer2WordOp     -> simp_op (ilxCallSuppMeth repWord "Integer2WordOp" [] [repInt, repByteArray])
 	Int2IntegerOp  	   -> simp_op (ilxCallSuppMeth repInteger "Int2IntegerOp" [] [repInt])
 	Word2IntegerOp     -> simp_op (ilxCallSuppMeth repInteger "Word2IntegerOp" [] [repWord])
-	IntegerToInt64Op   -> simp_op (ilxCallSuppMeth repInt64 "IntegerToInt64Op" [] [repInt,repByteArray])
+--	IntegerToInt64Op   -> simp_op (ilxCallSuppMeth repInt64 "IntegerToInt64Op" [] [repInt,repByteArray])
 	Int64ToIntegerOp   -> simp_op (ilxCallSuppMeth repInteger "Int64ToIntegerOp" [] [repInt64])
-	IntegerToWord64Op  -> simp_op (ilxCallSuppMeth repWord64 "IntegerToWord64Op" [] [repInt,repByteArray])
+--	IntegerToWord64Op  -> simp_op (ilxCallSuppMeth repWord64 "IntegerToWord64Op" [] [repInt,repByteArray])
 	Word64ToIntegerOp  -> simp_op (ilxCallSuppMeth repInteger "Word64ToIntegerOp" [] [repWord64])
 
 
@@ -2267,7 +2267,7 @@ ilxPrimOpTable op
 	ParGlobalOp -> warn_op "ParGlobalOp" (simp_op (ilxOp " /* ParGlobalOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
 	SeqOp -> warn_op "SeqOp" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw "))
 	AddrToHValueOp -> warn_op "AddrToHValueOp" (simp_op (ilxOp "newobj void [mscorlib]System.Object::.ctor() throw"))
-	ReallyUnsafePtrEqualityOp -> simp_op (ilxOp "ceq")
+--	ReallyUnsafePtrEqualityOp -> simp_op (ilxOp "ceq")
 
         MkApUpd0_Op ->  warn_op "MkApUpd0_Op" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw"))
         NewBCOOp ->  warn_op "NewBCOOp" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw"))
