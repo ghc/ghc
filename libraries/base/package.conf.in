@@ -1,43 +1,197 @@
 #include "ghcconfig.h"
 
-Package {
-        name           = "base",
-	auto	       = True,
+name:		PACKAGE
+version:	VERSION
+license:	BSD3
+maintainer:	libraries@haskell.org
+exposed:	True
+
+exposed-modules:
+	Control.Arrow,
+	Control.Concurrent,
+	Control.Concurrent.Chan,
+	Control.Concurrent.MVar,
+	Control.Concurrent.QSem,
+	Control.Concurrent.QSemN,
+	Control.Concurrent.SampleVar,
+	Control.Exception,
+	Control.Monad,
+	Control.Monad.Fix,
+	Control.Monad.ST,
+	Control.Monad.ST.Lazy,
+	Control.Monad.ST.Strict,
+	Control.Parallel,
+	Control.Parallel.Strategies,
+	Data.Array,
+	Data.Array.Base,
+	Data.Array.Diff,
+	Data.Array.IArray,
+	Data.Array.IO,
+	Data.Array.IO.Internals,
+	Data.Array.MArray,
+	Data.Array.ST,
+	Data.Array.Storable,
+	Data.Array.Unboxed,
+	Data.Bits,
+	Data.Bool,
+	Data.Char,
+	Data.Complex,
+	Data.Dynamic,
+	Data.Either,
+	Data.FiniteMap,
+	Data.Generics,
+	Data.Generics.Aliases,
+	Data.Generics.Basics,
+	Data.Generics.Instances,
+	Data.Generics.Schemes,
+	Data.Generics.Text,
+	Data.Generics.Twins,
+	Data.Graph,
+	Data.HashTable,
+	Data.IORef,
+	Data.Int,
+	Data.Ix,
+	Data.List,
+	Data.Maybe,
+	Data.Monoid,
+	Data.PackedString,
+	Data.Queue,
+	Data.Ratio,
+	Data.STRef,
+	Data.STRef.Lazy,
+	Data.STRef.Strict,
+	Data.Set,
+	Data.Tree,
+	Data.Tuple,
+	Data.Typeable,
+	Data.Unique,
+	Data.Version,
+	Data.Word,
+	Debug.Trace,
+	Foreign,
+	Foreign.C,
+	Foreign.C.Error,
+	Foreign.C.String,
+	Foreign.C.Types,
+	Foreign.Concurrent,
+	Foreign.ForeignPtr,
+	Foreign.Marshal,
+	Foreign.Marshal.Alloc,
+	Foreign.Marshal.Array,
+	Foreign.Marshal.Error,
+	Foreign.Marshal.Pool,
+	Foreign.Marshal.Utils,
+	Foreign.Ptr,
+	Foreign.StablePtr,
+	Foreign.Storable,
+	GHC.Dotnet,
+	GHC.Exts,
+	GHC.ForeignPtr,
+	GHC.Handle,
+	GHC.IO,
+	GHC.Int,
+	GHC.PArr,
+	GHC.PrimopWrappers,
+	GHC.Unicode,
+	GHC.Word,
+	Numeric,
+	Prelude,
+	System.Cmd,
+	System.Console.GetOpt,
+	System.CPUTime,
+	System.Directory,
+	System.Environment,
+	System.Exit,
+	System.FilePath,
+	System.IO,
+	System.IO.Error,
+	System.IO.Unsafe,
+	System.Info,
+	System.Locale,
+	System.Mem,
+	System.Mem.StableName,
+	System.Mem.Weak,
+	System.Posix.Internals,
+	System.Posix.Signals,
+	System.Posix.Types,
+	System.Process,
+	System.Process.Internals,
+	System.Random,
+	System.Time,
+	Text.Html,
+	Text.Html.BlockTable,
+	Text.ParserCombinators.ReadP,
+	Text.ParserCombinators.ReadPrec,
+	Text.PrettyPrint,
+	Text.PrettyPrint.HughesPJ,
+	Text.Read,
+	Text.Read.Lex,
+	Text.Regex,
+	Text.Regex.Posix,
+	Text.Show,
+	Text.Show.Functions,
+	GHC.Arr,
+	GHC.Base,
+	GHC.Conc,
+	GHC.Enum,
+	GHC.Err,
+	GHC.Exception,
+	GHC.Float,
+	GHC.IOBase,
+	GHC.List,
+	GHC.Num,
+	GHC.Pack,
+	GHC.Ptr,
+	GHC.Read,
+	GHC.Real,
+	GHC.ST,
+	GHC.STRef,
+	GHC.Show,
+	GHC.Stable,
+	GHC.Storable,
+	GHC.TopHandler,
+	GHC.Weak
+
+hidden-modules:
+
+import-dirs:	IMPORT_DIR
+
 #ifdef INSTALLING
-	import_dirs    = [ "$libdir/imports" ],
+library-dirs:	"$libdir"
 #else
-	import_dirs    = [ "$libdir/libraries/base" ],
+library-dirs:	"$libdir/libraries/base",
+		"$libdir/libraries/base/cbits"
 #endif
-        source_dirs    = [],
-#ifdef INSTALLING
-        library_dirs   = [ "$libdir" ],
+
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
+hs-libraries:   "HSbase"
 #else
-        library_dirs   = [ "$libdir/libraries/base"
-                         , "$libdir/libraries/base/cbits" ],
+--
+-- This splitting is the subject of a totally 
+-- horrible hack, which glues HSbase{1,2,3}
+-- back into HSbaase for the purposes of static linking.
+-- See DriverState.getPackageLibraries for details.
+--
+hs-libraries:	"HSbase1", "HSbase2", "HSbase3"
 #endif
-        hs_libraries      =
-#                           if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
-                            [ "HSbase" ],
-#                           else
-                            /* This splitting is the subject of a totally 
-                               horrible hack, which glues HSbase{1,2,3}
-                               back into HSbaase for the purposes of static linking.
-                               See DriverState.getPackageLibraries for details. */
-                            [ "HSbase1", "HSbase2", "HSbase3" ],
-#                           endif
-	extra_libraries   = [ "HSbase_cbits"
+
+extra-libs:  "HSbase_cbits"
 #if defined(mingw32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
-                            , "wsock32", "msvcrt", "kernel32", "user32", "shell32"
+	     , "wsock32", "msvcrt", "kernel32", "user32", "shell32"
 #endif
-			    ],
+
 #ifdef INSTALLING
-        include_dirs   = [],
+include-dirs:
 #else
-        include_dirs   = [ "$libdir/libraries/base/include" ],
+include-dirs: "$libdir/libraries/base/include"
 #endif
-        c_includes     = [ "HsBase.h" ],
-        package_deps   = [ "rts" ],
-        extra_ghc_opts = [],
-        extra_cc_opts  = [],
-        extra_ld_opts  = []
-}
+
+includes:		HsBase.h
+depends:	 	rts
+extra-hugs-opts:
+extra-cc-opts:
+extra-ld-opts:
+framework-dirs:
+extra-frameworks:
+haddock-interfaces:
+haddock-html:
