@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.39 2005/02/02 13:40:34 simonpj Exp $
+-- $Id: DriverMkDepend.hs,v 1.40 2005/02/04 15:43:32 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -13,17 +13,16 @@ module DriverMkDepend (
 
 #include "HsVersions.h"
 
-import CompManager	( cmInit, cmDepAnal, cmTopSort, cyclicModuleErr )
+import CompManager	( cmDownsweep, cmTopSort, cyclicModuleErr )
 import CmdLineOpts	( DynFlags( verbosity ) )
 import DriverState      ( getStaticOpts, v_Opt_dep )
 import DriverUtil	( escapeSpaces, splitFilename, add )
 import DriverFlags	( processArgs, OptKind(..) )
-import HscTypes		( IsBootInterface, ModSummary(..), GhciMode(..),
-			  msObjFilePath, msHsFilePath )
+import HscTypes		( IsBootInterface, ModSummary(..), msObjFilePath, msHsFilePath )
 import Packages		( PackageIdH(..) )
 import SysTools		( newTempName )
 import qualified SysTools
-import Module		( Module, ModLocation(..), moduleUserString, addBootSuffix_maybe )
+import Module		( Module, ModLocation(..), mkModule, moduleUserString, addBootSuffix_maybe )
 import Digraph		( SCC(..) )
 import Finder		( findModule, FindResult(..) )
 import Util             ( global )
@@ -51,11 +50,11 @@ import Panic		( catchJust, ioErrors )
 doMkDependHS :: DynFlags -> [FilePath] -> IO ()
 doMkDependHS dflags srcs
   = do	{ 	-- Initialisation
-	  cm_state <- cmInit Batch dflags
-	; files <- beginMkDependHS
+	  files <- beginMkDependHS
 
 		-- Do the downsweep to find all the modules
-	; mod_summaries <- cmDepAnal cm_state srcs
+	; excl_mods <- readIORef v_Dep_exclude_mods
+	; mod_summaries <- cmDownsweep dflags srcs [] excl_mods
 
 		-- Sort into dependency order
 		-- There should be no cycles
@@ -170,13 +169,15 @@ processDeps dflags hdl (CyclicSCC nodes)
     throwDyn (ProgramError (showSDoc $ cyclicModuleErr nodes))
 
 processDeps dflags hdl (AcyclicSCC node)
-  = do	{ extra_suffixes <- readIORef v_Dep_suffixes
+  = do	{ extra_suffixes   <- readIORef v_Dep_suffixes
+	; include_pkg_deps <- readIORef v_Dep_include_pkg_deps
 	; let src_file  = msHsFilePath node
 	      obj_file  = msObjFilePath node
 	      obj_files = insertSuffixes obj_file extra_suffixes
 
 	      do_imp is_boot imp_mod
-		= do { mb_hi <- findDependency dflags src_file imp_mod is_boot
+		= do { mb_hi <- findDependency dflags src_file imp_mod 
+					       is_boot include_pkg_deps
 		     ; case mb_hi of {
 			   Nothing      -> return () ;
 			   Just hi_file -> do
@@ -203,23 +204,16 @@ findDependency	:: DynFlags
 		-> FilePath 		-- Importing module: used only for error msg
 		-> Module		-- Imported module
 		-> IsBootInterface	-- Source import
+		-> Bool			-- Record dependency on package modules
 		-> IO (Maybe FilePath)	-- Interface file file
-findDependency dflags src imp is_boot
-  = do	{ excl_mods       <- readIORef v_Dep_exclude_mods
-	; include_prelude <- readIORef v_Dep_include_prelude
-	
-		-- Deal with the excluded modules
-	; let imp_mod = moduleUserString imp
-	; if imp_mod `elem` excl_mods 
-	  then return Nothing
-  	  else do
-	{	-- Find the module; this will be fast because
+findDependency dflags src imp is_boot include_pkg_deps
+  = do	{ 	-- Find the module; this will be fast because
 		-- we've done it once during downsweep
 	  r <- findModule dflags imp True {-explicit-}
 	; case r of 
 	    Found loc pkg
 		-- Not in this package: we don't need a dependency
-		| ExtPackage _ <- pkg, not include_prelude
+		| ExtPackage _ <- pkg, not include_pkg_deps
 		-> return Nothing
 
 		-- Home package: just depend on the .hi or hi-boot file
@@ -227,9 +221,9 @@ findDependency dflags src imp is_boot
 		-> return (Just (addBootSuffix_maybe is_boot (ml_hi_file loc)))
 
 	    _ -> throwDyn (ProgramError 
-		 (src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'"
+		 (src ++ ": " ++ "can't locate import `" ++ (moduleUserString imp) ++ "'"
 		  ++ if is_boot then " (SOURCE import)" else ""))
-	}}
+	}
 
 -----------------------------
 writeDependency :: Handle -> [FilePath] -> FilePath -> IO ()
@@ -314,8 +308,8 @@ endMkDependHS dflags
 
 	-- Flags
 GLOBAL_VAR(v_Dep_makefile, 		"Makefile", String);
-GLOBAL_VAR(v_Dep_include_prelude, 	False, Bool);
-GLOBAL_VAR(v_Dep_exclude_mods,          ["GHC.Prim"], [String]);
+GLOBAL_VAR(v_Dep_include_pkg_deps, 	False, Bool);
+GLOBAL_VAR(v_Dep_exclude_mods,          [], [Module]);
 GLOBAL_VAR(v_Dep_suffixes,		[], [String]);
 GLOBAL_VAR(v_Dep_warnings,		True, Bool);
 
@@ -328,7 +322,7 @@ dep_opts =
    [ (  "s", 			SepArg (add v_Dep_suffixes) )
    , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
    , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
-   , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) )
-   , (  "-exclude-module=",     Prefix (add v_Dep_exclude_mods) )
-   , (  "x",                    Prefix (add v_Dep_exclude_mods) )
+   , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_pkg_deps True) )
+   , (  "-exclude-module=",     Prefix (add v_Dep_exclude_mods . mkModule) )
+   , (  "x",                    Prefix (add v_Dep_exclude_mods . mkModule) )
    ]

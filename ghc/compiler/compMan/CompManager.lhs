@@ -13,6 +13,7 @@ module CompManager (
     cmInit, 	   -- :: GhciMode -> IO CmState
 
     cmDepAnal,	   -- :: CmState -> [FilePath] -> IO ModuleGraph
+    cmDownsweep,   
     cmTopSort,	   -- :: Bool -> ModuleGraph -> [SCC ModSummary]
     cyclicModuleErr,	-- :: [ModSummary] -> String	-- Used by DriverMkDepend
 
@@ -507,7 +508,7 @@ cmDepAnal cmstate rootnames
            hPutStrLn stderr (showSDoc (hcat [
 	     text "Chasing modules from: ",
 	     hcat (punctuate comma (map text rootnames))]))
-       downsweep dflags rootnames (cm_mg cmstate)
+       cmDownsweep dflags rootnames (cm_mg cmstate) []
   where
     hsc_env = cm_hsc cmstate
     dflags  = hsc_dflags hsc_env
@@ -1111,9 +1112,18 @@ cmTopSort drop_hs_boot_nodes summaries
 -- We pass in the previous collection of summaries, which is used as a
 -- cache to avoid recalculating a module summary if the source is
 -- unchanged.
+--
+-- The returned list of [ModSummary] nodes has one node for each home-package
+-- module.  The imports of these nodes are all there, including the imports
+-- of non-home-package modules.
 
-downsweep :: DynFlags -> [FilePath] -> [ModSummary] -> IO [ModSummary]
-downsweep dflags roots old_summaries
+cmDownsweep :: DynFlags
+	    -> [FilePath]	-- Roots
+	    -> [ModSummary]	-- Old summaries
+	    -> [Module]		-- Ignore dependencies on these; treat them as
+				-- if they were package modules
+	    -> IO [ModSummary]
+cmDownsweep dflags roots old_summaries excl_mods
    = do rootSummaries <- mapM getRootSummary roots
 	checkDuplicates rootSummaries
         loop (concatMap msImports rootSummaries) 
@@ -1134,7 +1144,8 @@ downsweep dflags roots old_summaries
 		exists <- doesFileExist lhs_file
 		if exists then summariseFile dflags lhs_file else do
 		let mod_name = mkModule file
-		maybe_summary <- summarise dflags emptyNodeMap Nothing False mod_name
+		maybe_summary <- summarise dflags emptyNodeMap Nothing False 
+					   mod_name excl_mods
 		case maybe_summary of
 		   Nothing -> packageModErr mod_name
 		   Just s  -> return s
@@ -1166,7 +1177,8 @@ downsweep dflags roots old_summaries
 	loop ((cur_path, wanted_mod, is_boot) : ss) done 
 	  | key `elemFM` done = loop ss done
 	  | otherwise	      = do { mb_s <- summarise dflags old_summary_map 
-						 (Just cur_path) is_boot wanted_mod
+						 (Just cur_path) is_boot 
+						 wanted_mod excl_mods
 				   ; case mb_s of
 					Nothing -> loop ss done
 					Just s  -> loop (msImports s ++ ss) 
@@ -1218,11 +1230,7 @@ summariseFile dflags file
 	-- to findModule will find it, even if it's not on any search path
 	addHomeModuleToFinder mod location
 
-        src_timestamp
-           <- case ml_hs_file location of 
-                 Nothing     -> noHsFileErr Nothing mod
-                 Just src_fn -> getModificationTime src_fn
-
+        src_timestamp <- getModificationTime file
         return (ModSummary { ms_mod = mod, ms_hsc_src = HsSrcFile,
 			     ms_location = location,
                              ms_hspp_file = Just hspp_fn,
@@ -1236,54 +1244,53 @@ summarise :: DynFlags
 	  -> Maybe FilePath	-- Importing module (for error messages)
 	  -> IsBootInterface	-- True <=> a {-# SOURCE #-} import
 	  -> Module 		-- Imported module to be summarised
+	  -> [Module]		-- Modules to exclude
 	  -> IO (Maybe ModSummary)	-- Its new summary
 
-summarise dflags old_summary_map cur_mod is_boot wanted_mod
+summarise dflags old_summary_map cur_mod is_boot wanted_mod excl_mods
+  | wanted_mod `elem` excl_mods
+  = return Nothing
+
+  | Just old_summary <- lookupFM old_summary_map (wanted_mod, hsc_src)
+  = do	{ 	-- Find its new timestamp; all the 
+		-- ModSummaries in the old map have valid ml_hs_files
+	   let location = ms_location old_summary
+	       src_fn = fromJust (ml_hs_file location)
+
+	;  src_timestamp <- getModificationTime src_fn
+
+		-- return the cached summary if the source didn't change
+	; if ms_hs_date old_summary == src_timestamp 
+	  then return (Just old_summary)
+	  else new_summary location
+	}
+
+  | otherwise
   = do	{ found <- findModule dflags wanted_mod True {-explicit-}
 	; case found of
 	     Found location pkg 
-		| isHomePackage pkg	
-		-> do { summary <- do_summary location
-		      ; return (Just summary) }
-		| otherwise
-		-> return Nothing	-- Drop an external-package modules
-
-	     err -> noModError dflags cur_mod wanted_mod err
+		| not (isHomePackage pkg)      -> return Nothing	-- Drop external-pkg
+		| isJust (ml_hs_file location) -> new_summary location	-- Home package
+	     err        -> noModError dflags cur_mod wanted_mod err	-- Not found
 	}
   where
     hsc_src = if is_boot then HsBootFile else HsSrcFile
 
-    do_summary location
+    new_summary location
       = do { 	-- Adjust location to point to the hs-boot source file, 
 		-- hi file, object file, when is_boot says so
-	     let location' | is_boot   = addBootSuffixLocn location
-			   | otherwise = location
+	  let location' | is_boot   = addBootSuffixLocn location
+			| otherwise = location
+	      src_fn = fromJust (ml_hs_file location')
 
-	 	-- Find the source file to summarise
-	   ; src_fn <- case ml_hs_file location' of
-			  Nothing     -> noHsFileErr cur_mod wanted_mod
-			  Just src_fn -> return src_fn
+		-- Check that it exists
+		-- It might have been deleted since the Finder last found it
+	; exists <- doesFileExist src_fn
+	; if exists then return () else noHsFileErr cur_mod src_fn
 
-		-- In the case of hs-boot files, check that it exists
-		-- The Finder was dealing only with the main source file
-	   ; if is_boot then do
-		{ exists <- doesFileExist src_fn
-		; if exists then return ()
-			    else noHsBootFileErr cur_mod src_fn }
-	     else return ()
-
-		-- Find its timestamp
-	   ; src_timestamp <- getModificationTime src_fn
-
-		-- return the cached summary if the source didn't change
-	   ; case lookupFM old_summary_map (wanted_mod, hsc_src) of {
-	       Just s | ms_hs_date s == src_timestamp -> return s;
-	       _ -> do
-
-	-- Preprocess the source file
-	{ (dflags', hspp_fn) <- preprocess dflags src_fn
-		-- The dflags' contains the OPTIONS pragmas
-
+	-- Preprocess the source file and get its imports
+	-- The dflags' contains the OPTIONS pragmas
+	; (dflags', hspp_fn) <- preprocess dflags src_fn
 	; buf <- hGetStringBuffer hspp_fn
         ; (srcimps, the_imps, mod_name) <- getImports dflags' buf hspp_fn
 
@@ -1293,15 +1300,17 @@ summarise dflags old_summary_map cur_mod is_boot wanted_mod
 			      <>  text ": file name does not match module name"
 			      <+> quotes (ppr mod_name))))
 
-	; return (ModSummary { ms_mod       = wanted_mod, 
-			       ms_hsc_src   = hsc_src,
-			       ms_location  = location',
-			       ms_hspp_file = Just hspp_fn,
-			       ms_hspp_buf  = Just buf,
-			       ms_srcimps   = srcimps,
-			       ms_imps      = the_imps,
-			       ms_hs_date   = src_timestamp })
-    }}}
+		-- Find its timestamp, and return the summary
+        ; src_timestamp <- getModificationTime src_fn
+	; return (Just ( ModSummary { ms_mod       = wanted_mod, 
+				      ms_hsc_src   = hsc_src,
+				      ms_location  = location',
+				      ms_hspp_file = Just hspp_fn,
+				      ms_hspp_buf  = Just buf,
+				      ms_srcimps   = srcimps,
+				      ms_imps      = the_imps,
+				      ms_hs_date   = src_timestamp }))
+    	}
 
 
 -----------------------------------------------------------------------------
@@ -1315,14 +1324,7 @@ noModError dflags cur_mod wanted_mod err
     vcat [cantFindError dflags wanted_mod err,
 	  nest 2 (parens (pp_where cur_mod))]
 				
-noHsFileErr :: Maybe FilePath -> Module -> IO a
--- Complain about not being able to find an imported module
-noHsFileErr cur_mod mod
-  = throwDyn $ CmdLineError $ showSDoc $
-    vcat [text "No source file for module" <+> quotes (ppr mod),
-	  nest 2 (parens (pp_where cur_mod))]
-
-noHsBootFileErr cur_mod path
+noHsFileErr cur_mod path
   = throwDyn $ CmdLineError $ showSDoc $
     vcat [text "Can't find" <+> text path,
 	  nest 2 (parens (pp_where cur_mod))]
