@@ -2249,3 +2249,62 @@ expt base n =
 expts :: [Integer]
 expts = [2^n | n <- [minExpt .. maxExpt]]
 
+
+irrefutPatError
+   , noMethodBindingError
+   , nonExhaustiveGuardsError
+   , patError
+   , recSelError
+   , recConError
+   , recUpdError :: String -> a
+
+noMethodBindingError     s = throw (NoMethodError (untangle s "No instance nor default method for class operation"))
+irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
+nonExhaustiveGuardsError s = throw (NonExhaustiveGuards (untangle s "Non-exhaustive guards in"))
+patError 		 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
+recSelError 		 s = throw (RecSelError (untangle s "Missing field in record selection"))
+recConError 		 s = throw (RecConError (untangle s "Missing field in record construction"))
+recUpdError 		 s = throw (RecUpdError (untangle s "Record doesn't contain field(s) to be updated"))
+
+
+tangleMessage :: String -> Int -> String
+tangleMessage ""  line = show line
+tangleMessage str line = str ++ show line
+
+assertError :: String -> Bool -> a -> a
+assertError str pred v 
+  | pred      = v
+  | otherwise = throw (AssertionFailed (untangle str "Assertion failed"))
+
+{-
+(untangle coded message) expects "coded" to be of the form 
+
+	"location|details"
+
+It prints
+
+	location message details
+-}
+
+untangle :: String -> String -> String
+untangle coded message
+  =  location
+  ++ ": " 
+  ++ message
+  ++ details
+  ++ "\n"
+  where
+    (location, details)
+      = case (span not_bar coded) of { (loc, rest) ->
+	case rest of
+	  ('|':det) -> (loc, ' ' : det)
+	  _	    -> (loc, "")
+	}
+    not_bar c = c /= '|'
+
+-- By default, we ignore asserts, but optionally, Hugs translates
+-- 	assert ==> assertError "<location info>"
+
+assert :: Bool -> a -> a
+assert _ a = a
+
