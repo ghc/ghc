@@ -207,18 +207,16 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 #if !defined(SMP)
     ASSERT(rts_n_free_capabilities == 0);
 #endif
+#if defined(SMP)
+    cap->link = free_capabilities;
+    free_capabilities = cap;
+#endif
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
     if (rts_n_waiting_workers > 0) {
 	// Decrement the counter here to avoid livelock where the
 	// thread that is yielding its capability will repeatedly
 	// signal returning_worker_cond.
-
-#if defined(SMP)
-	// SMP variant untested
-	cap->link = free_capabilities;
-	free_capabilities = cap;
-#endif
 
 	rts_n_waiting_workers--;
 	signalCondition(&returning_worker_cond);
@@ -230,13 +228,15 @@ releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
 	} else {
 	    signalCondition(passTarget);
 	}
+#if defined(SMP)
+	rts_n_free_capabilities++;
+#else
 	rts_n_free_capabilities = 1;
+#endif
 	IF_DEBUG(scheduler, sched_belch("worker: released capability, passing it"));
 
     } else {
 #if defined(SMP)
-	cap->link = free_capabilities;
-	free_capabilities = cap;
 	rts_n_free_capabilities++;
 #else
 	rts_n_free_capabilities = 1;
@@ -433,7 +433,6 @@ passCapabilityToWorker( void )
    ToDo: should check whether the thread at the front of the queue is
    bound, and if so wake up the appropriate worker.
    -------------------------------------------------------------------------- */
-
 void
 threadRunnable ( void )
 {
@@ -442,5 +441,19 @@ threadRunnable ( void )
 	signalCondition(&thread_ready_cond);
     }
     startSchedulerTaskIfNecessary();
+#endif
+}
+
+
+/* ----------------------------------------------------------------------------
+   prodWorker()
+
+   Wake up... time to die.
+   -------------------------------------------------------------------------- */
+void
+prodWorker ( void )
+{
+#if defined(RTS_SUPPORTS_THREADS)
+    signalCondition(&thread_ready_cond);
 #endif
 }

@@ -46,6 +46,6 @@ extern double    mut_user_time_during_heap_census(void);
 extern void      statDescribeGens( void );
 extern HsInt64   getAllocations( void );
 
-#if defined(SMP)
-extern long int  stat_getElapsedTime ( void );
-#endif
+extern void      stat_getTimes ( long *currentElapsedTime, 
+				 long *currentUserTime,
+				 long *elapsedGCTime );

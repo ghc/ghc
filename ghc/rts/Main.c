@@ -16,6 +16,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
+#include "Task.h"
 #include <stdlib.h>
 
 #ifdef DEBUG
@@ -49,6 +50,11 @@ int main(int argc, char *argv[])
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
     startupHaskell(argc,argv,__stginit_ZCMain);
+
+    /* Register this thread as a task, so we can get timing stats about it */
+#if defined(RTS_SUPPORTS_THREADS)
+    threadIsTask(osThreadId());
+#endif
 
     /* kick off the computation by creating the main thread with a pointer
        to mainIO_closure representing the computation of the overall program;

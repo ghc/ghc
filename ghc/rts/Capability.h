@@ -35,6 +35,8 @@ extern void releaseCapability( Capability* cap );
 //
 extern void threadRunnable ( void );
 
+extern void prodWorker ( void );
+
 #ifdef RTS_SUPPORTS_THREADS
 // Gives up the current capability IFF there is a higher-priority
 // thread waiting for it.  This happens in one of two ways:

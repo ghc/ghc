@@ -273,7 +273,6 @@ static void schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 // scheduler clearer.
 //
 static void schedulePreLoop(void);
-static void scheduleHandleInterrupt(void);
 static void scheduleStartSignalHandlers(void);
 static void scheduleCheckBlockedThreads(void);
 static void scheduleCheckBlackHoles(void);
@@ -333,26 +332,25 @@ taskStart(void)
   ACQUIRE_LOCK(&sched_mutex);
   startingWorkerThread = rtsFalse;
   schedule(NULL,NULL);
+  taskStop();
   RELEASE_LOCK(&sched_mutex);
 }
 
 void
 startSchedulerTaskIfNecessary(void)
 {
-  if(run_queue_hd != END_TSO_QUEUE
-    || blocked_queue_hd != END_TSO_QUEUE
-    || sleeping_queue != END_TSO_QUEUE)
-  {
-    if(!startingWorkerThread)
-    { // we don't want to start another worker thread
-      // just because the last one hasn't yet reached the
-      // "waiting for capability" state
-      startingWorkerThread = rtsTrue;
-      if (!startTask(taskStart)) {
-	  startingWorkerThread = rtsFalse;
-      }
+    if ( !EMPTY_RUN_QUEUE()
+	 && !shutting_down_scheduler // not if we're shutting down
+	 && !startingWorkerThread )
+    {
+	// we don't want to start another worker thread
+	// just because the last one hasn't yet reached the
+	// "waiting for capability" state
+	startingWorkerThread = rtsTrue;
+	if (!maybeStartNewWorker(taskStart)) {
+	    startingWorkerThread = rtsFalse;
+	}
     }
-  }
 }
 #endif
 
@@ -508,7 +506,26 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     	  stg_exit(1);
     }
 
-    scheduleHandleInterrupt();
+    //
+    // Test for interruption.  If interrupted==rtsTrue, then either
+    // we received a keyboard interrupt (^C), or the scheduler is
+    // trying to shut down all the tasks (shutting_down_scheduler) in
+    // the threaded RTS.
+    //
+    if (interrupted) {
+	if (shutting_down_scheduler) {
+	    IF_DEBUG(scheduler, sched_belch("shutting down"));
+	    releaseCapability(cap);
+	    if (mainThread) {
+		mainThread->stat = Interrupted;
+		mainThread->ret  = NULL;
+	    }
+	    return;
+	} else {
+	    IF_DEBUG(scheduler, sched_belch("interrupted"));
+	    deleteAllThreads();
+	}
+    }
 
 #if defined(not_yet) && defined(SMP)
     //
@@ -789,33 +806,6 @@ schedulePreLoop(void)
 	CurrentTSO->gran.clock = CurrentTime[CurrentProc];
     }      
 #endif
-}
-
-/* ----------------------------------------------------------------------------
- * Deal with the interrupt flag
- * ASSUMES: sched_mutex
- * ------------------------------------------------------------------------- */
-
-static
-void scheduleHandleInterrupt(void)
-{
-    //
-    // Test for interruption.  If interrupted==rtsTrue, then either
-    // we received a keyboard interrupt (^C), or the scheduler is
-    // trying to shut down all the tasks (shutting_down_scheduler) in
-    // the threaded RTS.
-    //
-    if (interrupted) {
-	if (shutting_down_scheduler) {
-	    IF_DEBUG(scheduler, sched_belch("shutting down"));
-#if defined(RTS_SUPPORTS_THREADS)
-	    shutdownThread();
-#endif
-	} else {
-	    IF_DEBUG(scheduler, sched_belch("interrupted"));
-	    deleteAllThreads();
-	}
-    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -1476,7 +1466,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 	blocks = (lnat)BLOCK_ROUND_UP(cap->r.rHpAlloc) / BLOCK_SIZE;
 	
 	IF_DEBUG(scheduler,
-		 debugBelch("--<< thread %ld (%s) stopped: requesting a large block (size %d)\n", 
+		 debugBelch("--<< thread %ld (%s) stopped: requesting a large block (size %ld)\n", 
 			    (long)t->id, whatNext_strs[t->what_next], blocks));
 	
 	// don't do this if it would push us over the
@@ -2620,8 +2610,12 @@ initScheduler(void)
   initCapabilities();
   
 #if defined(RTS_SUPPORTS_THREADS)
-    /* start our haskell execution tasks */
-    startTaskManager(0,taskStart);
+  initTaskManager();
+#endif
+
+#if defined(SMP)
+  /* eagerly start some extra workers */
+  startTasks(RtsFlags.ParFlags.nNodes, taskStart);
 #endif
 
 #if /* defined(SMP) ||*/ defined(PARALLEL_HASKELL)
@@ -2634,11 +2628,12 @@ initScheduler(void)
 void
 exitScheduler( void )
 {
+    interrupted = rtsTrue;
+    shutting_down_scheduler = rtsTrue;
 #if defined(RTS_SUPPORTS_THREADS)
-  stopTaskManager();
+    if (threadIsTask(osThreadId())) { taskStop(); }
+    stopTaskManager();
 #endif
-  interrupted = rtsTrue;
-  shutting_down_scheduler = rtsTrue;
 }
 
 /* ----------------------------------------------------------------------------

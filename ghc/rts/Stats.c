@@ -363,13 +363,13 @@ stat_startExit(void)
 	PROF_VAL(RPe_tot_time + HCe_tot_time) - InitElapsedStamp;
     if (MutElapsedTime < 0) { MutElapsedTime = 0; }	/* sometimes -0.00 */
 
-    /* for SMP, we don't know the mutator time yet, we have to inspect
+    /* for threads, we don't know the mutator time yet, we have to inspect
      * all the running threads to find out, and they haven't stopped
      * yet.  So we just timestamp MutUserTime at this point so we can
      * calculate the EXIT time.  The real MutUserTime is calculated
      * in stat_exit below.
      */
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
     MutUserTime = CurrentUserTime;
 #else
     MutUserTime = CurrentUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
@@ -381,7 +381,7 @@ void
 stat_endExit(void)
 {
     getTimes();
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
     ExitUserTime = CurrentUserTime - MutUserTime;
 #else
     ExitUserTime = CurrentUserTime - MutUserTime - GC_tot_time - PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime;
@@ -478,17 +478,13 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
 	
-#if defined(SMP)
+#if defined(RTS_SUPPORTS_THREADS)
 	{
-	    nat i;
-	    pthread_t me = pthread_self();
-
-	    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-		if (me == taskTable[i].id) {
-		    taskTable[i].gc_time += gc_time;
-		    taskTable[i].gc_etime += gc_etime;
-		    break;
-		}
+	    TaskInfo *task_info = taskOfId(osThreadId());
+	    
+	    if (task_info != NULL) {
+		task_info->gc_time += gc_time;
+		task_info->gc_etime += gc_etime;
 	    }
 	}
 #endif
@@ -582,35 +578,16 @@ stat_endHeapCensus(void)
    stats for this thread into the taskTable struct for that thread.
    -------------------------------------------------------------------------- */
 
-#if defined(SMP)
 void
-stat_workerStop(void)
-{
-    nat i;
-    pthread_t me = pthread_self();
-
-    getTimes();
-
-    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-	if (taskTable[i].id == me) {
-	    taskTable[i].mut_time = CurrentUserTime - taskTable[i].gc_time;
-	    taskTable[i].mut_etime = CurrentElapsedTime
-		- GCe_tot_time
-		- taskTable[i].elapsedtimestart;
-	    if (taskTable[i].mut_time < 0.0)  { taskTable[i].mut_time = 0.0;  }
-	    if (taskTable[i].mut_etime < 0.0) { taskTable[i].mut_etime = 0.0; }
-	}
-    }
-}
-#endif
-
-#if defined(SMP)
-long int stat_getElapsedTime ()
+stat_getTimes ( long *currentElapsedTime, 
+		long *currentUserTime,
+		long *elapsedGCTime )
 {
   getTimes();
-  return CurrentElapsedTime;
+  *currentElapsedTime = CurrentElapsedTime;
+  *currentUserTime = CurrentUserTime;
+  *elapsedGCTime = GCe_tot_time;
 }
-#endif
 
 /* -----------------------------------------------------------------------------
    Called at the end of execution
@@ -631,15 +608,10 @@ stat_exit(int alloc)
 	nat g, total_collections = 0;
 
 	getTimes();
-	time = CurrentUserTime;
 	etime = CurrentElapsedTime - ElapsedTimeStart;
 
 	GC_tot_alloc += alloc;
 
-	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
-	if (time  == 0.0)  time = 1;
-	if (etime == 0.0) etime = 1;
-	
 	/* Count total garbage collections */
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
 	    total_collections += generations[g].collections;
@@ -647,17 +619,24 @@ stat_exit(int alloc)
 	/* For SMP, we have to get the user time from each thread
 	 * and try to work out the total time.
 	 */
-#ifdef SMP
-	{   nat i;
+#if defined(RTS_SUPPORTS_THREADS)
+	{   
+	    nat i;
 	    MutUserTime = 0.0;
-	    for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
+	    for (i = 0; i < taskCount; i++) {
 		MutUserTime += taskTable[i].mut_time;
 	    }
 	}
 	time = MutUserTime + GC_tot_time + InitUserTime + ExitUserTime;
 	if (MutUserTime < 0) { MutUserTime = 0; }
+#else
+	time = CurrentUserTime;
 #endif
 
+	/* avoid divide by zero if time is measured as 0.00 seconds -- SDM */
+	if (time  == 0.0)  time = 1;
+	if (etime == 0.0) etime = 1;
+	
 	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
 	    statsPrintf("%9ld %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
 	    statsPrintf(" %5.2f %5.2f\n\n", 0.0, 0.0);
@@ -690,17 +669,18 @@ stat_exit(int alloc)
 	    statsPrintf("\n%11ld Mb total memory in use\n\n", 
 		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
-#ifdef SMP
+#if defined(RTS_SUPPORTS_THREADS)
 	    {
 		nat i;
-		for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-		    statsPrintf("  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
-			    "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
-			    i, 
-			    TICK_TO_DBL(taskTable[i].mut_time),
-			    TICK_TO_DBL(taskTable[i].mut_etime),
-			    TICK_TO_DBL(taskTable[i].gc_time),
-			    TICK_TO_DBL(taskTable[i].gc_etime));
+		for (i = 0; i < taskCount; i++) {
+		    statsPrintf("  Task %2d %-8s :  MUT time: %6.2fs  (%6.2fs elapsed)\n"
+			    "                      GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
+				i,
+				taskTable[i].is_worker ? "(worker)" : "(bound)",
+				TICK_TO_DBL(taskTable[i].mut_time),
+				TICK_TO_DBL(taskTable[i].mut_etime),
+				TICK_TO_DBL(taskTable[i].gc_time),
+				TICK_TO_DBL(taskTable[i].gc_etime));
 		}
 	    }
 #endif
