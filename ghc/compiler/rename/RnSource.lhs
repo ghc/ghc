@@ -629,9 +629,13 @@ rnHsType doc (MonoListTy ty)
   = rnHsType doc ty				`thenRn` \ (ty', fvs) ->
     returnRn (MonoListTy ty', fvs `addOneFV` listTyCon_name)
 
+-- Unboxed tuples are allowed to have poly-typed arguments.  These
+-- sometimes crop up as a result of CPR worker-wrappering dictionaries.
 rnHsType doc (MonoTupleTy tys boxed)
-  = rnHsTypes doc tys			`thenRn` \ (tys', fvs) ->
-    returnRn (MonoTupleTy tys' boxed, fvs `addOneFV` tup_con_name)
+  = (if boxed 
+      then mapFvRn (rnHsType doc)     tys
+      else mapFvRn (rnHsPolyType doc) tys)  `thenRn` \ (tys', fvs) ->
+    returnRn (MonoTupleTy tys' boxed, fvs   `addOneFV` tup_con_name)
   where
     tup_con_name = tupleTyCon_name boxed (length tys)
 
