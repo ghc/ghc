@@ -127,9 +127,14 @@ if (!$Include_prelude) {
 }
 
 foreach $lib ( @Syslibs ) {
-    local($dir) = 
-      ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
-	            : "${TopPwd}/ghc/lib/${lib}";
+    local($dir);
+
+    if ( $lib eq 'win32' && ! $INSTALLING ) {
+      $dir = "${TopPwd}/hslibs/${lib}/src";
+    } else {
+      $dir = ($INSTALLING) ? "${InstLibDirGhc}/imports/${lib}" 
+	                   : "${TopPwd}/ghc/lib/${lib}";
+    }
     if (!$Include_prelude) {
        push(@Ignore_dirs,$dir);
     } else {
@@ -360,7 +365,8 @@ sub preprocess_import_dirs {
 
 sub slurp_file_for_imports {
     local($file_to_read, $orig_src_file) = @_;
-    local($follow_file);
+    local($follow_file,$read_from_file);
+    local($cleanup)=0;
 
     local($last_seen_dir) = $orig_src_file;
     $last_seen_dir =~ s/\/[^\/]+$//; # strip to dir name
@@ -373,13 +379,17 @@ sub slurp_file_for_imports {
     
     local ($open_cmd);
     if ($Cpp_flag_set) {
-       $open_cmd = "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |";
+#       $open_cmd = "${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |";
+       &run_something("${SED} -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines 2>&1 > ${file_to_read}.i", 'Running cpp');
+       $read_from_file="${file_to_read}.i";
+       $cleanup=1;
     } else {
+       $read_from_file="${file_to_read}";
        $open_cmd = $file_to_read;
     }
     print STDERR "$open_cmd\n" if $Verbose;
 
-    open(SRCFILE, $open_cmd) || die "$Pgm: Can't open $file_to_read: $!\n";
+    open(SRCFILE, $read_from_file) || die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
         #
@@ -396,6 +406,13 @@ sub slurp_file_for_imports {
 	&process_dependency($todo,$source,$modname);
     }
     close(SRCFILE) || exit(1);
+    # remove temporary file, if any.
+    if ($cleanup) {
+	   # truncate() may not be implemented, so we
+	   # play it safe here.
+	   local(*TRUNC);
+	   open(TRUNC,"> $read_from_file") && close(TRUNC);
+    }
 }
 
 #

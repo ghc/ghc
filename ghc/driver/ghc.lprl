@@ -2453,18 +2453,23 @@ sub add_Hsc_flags {
 sub add_syslib {
     local($syslib) = @_;
     
-    unshift(@SysImport_dir,
-	    $INSTALLING ? "$InstLibDirGhc/imports/$syslib"
-		          : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib");
+    # The Win32 lib sources live in hslibs/
+    if ( $syslib eq 'win32' && ! $INSTALLING ) {
+         unshift(@SysImport_dir, "$TopPwd/hslibs/$syslib/src");
+         push(@SysLibrary_dir, "$TopPwd/hslibs/$syslib/src");
+    } else {
+       unshift(@SysImport_dir,
+	       $INSTALLING ? "$InstLibDirGhc/imports/$syslib"
+		           : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib");
 
-    push(@SysLibrary_dir,
-	 $INSTALLING ? ("$InstLibDirGhc")
-                       : ("$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib",
-			  "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib/cbits"));
-
+       push(@SysLibrary_dir,
+	       $INSTALLING ? ("$InstLibDirGhc")
+                           : ("$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib",
+			      "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib/cbits"));
+    }
     push(@SysLibrary, "-lHS$syslib");
     push(@SysLibrary, "-lHS${syslib}_cbits")
-          unless $syslib =~ /^(contrib|exts|conc|win32)$/; #HACK! have no cbits
+          unless $syslib =~ /^(contrib|exts|concurrent|win32)$/; #HACK! have no cbits
 }
 \end{code}
 
@@ -2813,7 +2818,7 @@ arg: while($_ = $Args[0]) {
 
     /^-syslib(.*)/  && do { local($syslib) = &grab_arg_arg(*Args,'-syslib',$1);
 			    print STDERR "$Pgm: no such system library (-syslib): $syslib\n",
-			      $Status++ unless $syslib =~ /^(exts|misc|posix|win32)$/;
+			      $Status++ unless $syslib =~ /^(exts|misc|posix|concurrent|win32)$/;
 
 			    #
 			    # The posix library is a `special' in that it relies on
