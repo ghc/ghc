@@ -44,11 +44,13 @@ compilation systems, has several interacting parts:
 <OrderedList>
 <ListItem>
 <Para>
-A <Emphasis>driver</Emphasis><IndexTerm><Primary>driver program</Primary></IndexTerm> 
+A <Emphasis>driver</Emphasis><IndexTerm><Primary>driver
+program</Primary></IndexTerm>
 <Literal>ghc</Literal><IndexTerm><Primary>ghc</Primary></IndexTerm>&mdash;which
-you usually think of as &ldquo;the compiler&rdquo;&mdash;is a program that merely
-invokes/glues-together the other pieces of the system (listed below),
-passing the right options to each, slurping in the right libraries, etc.
+you usually think of as &ldquo;the compiler&rdquo;&mdash;is a program
+that merely invokes/glues-together the other pieces of the system
+(listed below), passing the right options to each, slurping in the
+right libraries, etc.
 </Para>
 </ListItem>
 
@@ -213,18 +215,14 @@ of this guide!
 
 </Sect1>
 
-<Sect1 id="mailing-lists-GHC">
-<Title>Meta-information: Web sites, mailing lists, etc.
-</Title>
+  <Sect1 id="mailing-lists-GHC">
+    <Title>Meta-information: Web sites, mailing lists, etc.</Title>
 
-<Para>
-<IndexTerm><Primary>mailing lists, Glasgow Haskell</Primary></IndexTerm>
-<IndexTerm><Primary>Glasgow Haskell mailing lists</Primary></IndexTerm>
-</Para>
+    <IndexTerm><Primary>mailing lists, Glasgow Haskell</Primary></IndexTerm>
+    <IndexTerm><Primary>Glasgow Haskell mailing lists</Primary></IndexTerm>
 
-<Para>
-On the World-Wide Web, there are several URLs of likely interest:
-</Para>
+<Para>On the World-Wide Web, there are several URLs of likely
+interest:</Para>
 
 <Para>
 
@@ -354,7 +352,76 @@ Some Haskell-related discussion takes place in the Usenet newsgroup
 <Literal>comp.lang.functional</Literal>.
 </Para>
 
-</Sect1>
+  </Sect1>
+
+  <sect1 id="version-numbering">
+    <title>GHC version numbering policy</title>
+    <indexterm><primary>version, of ghc</primary></indexterm>
+
+    <para>As of GHC version 4.08, we have adopted the following
+    policy for numbering GHC versions:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term>Stable Releases</term>
+	<listitem>
+	  <para>These are numbered <literal>x.yy.z</literal>, where
+	  <literal>yy</literal> is <emphasis>even</emphasis>, and
+	  <literal>z</literal> is the patchlevel number (the trailing
+	  <literal>.z</literal> can be omitted if <literal>z</literal>
+	  is zero).  Patchlevels are bug-fix releases only, and never
+	  change the programmer interface to any system-supplied code.
+	  However, if you install a new patchlevel over an old one you
+	  may need to recompile any code that was compiled against the
+	  old libraries.</para>
+
+	  <para>The value of <literal>__GLASGOW_HASKELL__</literal>
+	  (see <xref linkend="c-pre-processor">) for a major release
+	  <literal>x.yy.z</literal> is the integer
+	  <literal>xyy</literal>.</para>
+	  <indexterm>
+	    <primary><literal>__GLASGOW_HASKELL__</literal></primary>
+	  </indexterm>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term>Snapshots/unstable releases</term>
+	<listitem>
+	  <para>We may make snapshot releases of the current
+	  development sources from time to time, and the current
+	  sources are always available via the CVS repository (see the
+	  GHC web site for details).</para>
+
+	  <para>Snapshot releases are named
+	  <literal>x.yy.DDMMYYYY</literal> where <literal>yy</literal>
+	  is <emphasis>odd</emphasis>, and <literal>DDMMYYYY</literal>
+	  is the date of the sources from which the snapshot was
+	  built.  In theory, you can check out the exact same sources
+	  from the CVS repository using this date.</para>
+
+	  <para>The value of <literal>__GLASGOW_HASKELL__</literal>
+	  for a snapshot release is the integer
+	  <literal>xyy</literal>.  You should never write any
+	  conditional code which tests for this value, however: since
+	  interfaces change on a day-to-day basis, and we don't have
+	  finer granularity in the values of
+	  <literal>__GLASGOW_HASKLL__</literal>, you should only
+	  conditionally compile using predicates which test whether
+	  <literal>__GLASGOW_HASKELL__</literal> is equal to, later
+	  than, or earlier than a given major release.</para>
+	  <indexterm>
+	    <primary><literal>__GLASGOW_HASKELL__</literal></primary>
+	  </indexterm>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+    
+    <para>The version number of your copy of GHC can be found by
+    invoking <literal>ghc</literal> with the
+    <literal>--version</literal> flag.</para>
+  </sect1>
+
 
 &relnotes
 
