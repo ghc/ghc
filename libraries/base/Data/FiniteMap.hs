@@ -8,6 +8,8 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
+-- NOTE: Data.FiniteMap is DEPRECATED, please use "Data.Map" instead.
+--
 -- A finite map implementation, derived from the paper:
 -- 	   /Efficient sets: a balancing act/, S. Adams,
 -- 	   Journal of functional programming 3(4) Oct 1993, pp553-562
@@ -38,7 +40,9 @@
 #define OUTPUTABLE_key {--}
 #endif
 
-module Data.FiniteMap (
+module Data.FiniteMap
+  {-# DEPRECATED "Please use Data.Map instead." #-} 
+  (
 	-- * The @FiniteMap@ type
 	FiniteMap,		-- abstract type
 
