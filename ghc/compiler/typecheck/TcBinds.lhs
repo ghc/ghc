@@ -944,7 +944,7 @@ mainTyCheckCtxt
 
 -----------------------------------------------
 unliftedBindErr flavour mbind
-  = hang (text flavour <+> ptext SLIT("bindings for unlifted types aren't allowed"))
+  = hang (text flavour <+> ptext SLIT("bindings for unlifted types aren't allowed:"))
 	 4 (ppr mbind)
 
 existentialExplode mbinds
