@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.9 2000/12/18 12:43:04 sewardj Exp $
+-- $Id: Interpreter.hs,v 1.10 2000/12/18 15:18:11 simonmar Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -14,19 +14,18 @@ module Interpreter (
 #else
     ClosureEnv, emptyClosureEnv, 
     ItblEnv, emptyItblEnv,
-    linkIModules,
-    stgExprToInterpSyn, stgBindsToInterpSyn,
+    byteCodeGen,
     HValue,
-    UnlinkedIBind, UnlinkedIExpr,
+    UnlinkedBCO, UnlinkedBCOExpr,
     loadObjs, resolveObjs,
 #endif
   ) where
 
 #ifdef GHCI
 
----------------------------------------------
---	YES!  We have an interpreter
----------------------------------------------
+-- ------------------------------------------------------------
+-- YES!  We have an interpreter
+-- ------------------------------------------------------------
 
 import ByteCodeGen
 import Linker
@@ -35,10 +34,9 @@ import Linker
 
 import Outputable
 
----------------------------------------------
---	NO!  No interpreter; generate stubs for all the bits
-
----------------------------------------------
+-- ------------------------------------------------------------
+-- NO!  No interpreter; generate stubs for all the bits
+-- ------------------------------------------------------------
 
 type ClosureEnv = ()
 emptyClosureEnv = ()
@@ -46,17 +44,15 @@ emptyClosureEnv = ()
 type ItblEnv = ()
 emptyItblEnv = ()
 
-type HValue        = ()
-data UnlinkedIBind = UnlinkedIBind
-data UnlinkedIExpr = UnlinkedIExpr
+type HValue          = ()
+data UnlinkedBCO     = UnlinkedBCO
+data UnlinkedBCOExpr = UnlinkedBCOExpr
 
-instance Outputable UnlinkedIBind where
-  ppr x = text "Can't output UnlinkedIBind"
+instance Outputable UnlinkedBCO where
+  ppr x = text "Can't output UnlinkedBCO"
 
-linkIModules	    = error "linkIModules"
-stgExprToInterpSyn  = error "stgToInterpSyn"
-stgBindsToInterpSyn = error "stgBindsToInterpSyn"
-loadObjs	    = error "loadObjs"
-resolveObjs	    = error "loadObjs"
-interactiveUI       = error "interactiveUI"
+byteCodeGen    = error "stgBindsToInterpSyn"
+loadObjs       = error "loadObjs"
+resolveObjs    = error "loadObjs"
+interactiveUI  = error "interactiveUI"
 #endif

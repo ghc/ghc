@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.39 2000/12/12 14:42:43 simonmar Exp $
+-- $Id: Main.hs,v 1.40 2000/12/18 15:18:11 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -84,7 +84,6 @@ import Maybe
 -- No more "Enter your Haskell program, end with ^D (on a line of its own):"
 -- consistency checking removed (may do this properly later)
 -- removed -noC
--- no hi diffs (could be added later)
 -- no -Ofile
 
 -----------------------------------------------------------------------------
