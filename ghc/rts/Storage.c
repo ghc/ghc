@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.59 2002/02/04 20:21:22 sof Exp $
+ * $Id: Storage.c,v 1.60 2002/03/21 11:23:59 sebc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,6 +25,43 @@
 #include "StoragePriv.h"
 
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
+
+#ifdef darwin_TARGET_OS
+#include <mach/mach.h>
+#include <mach/task.h>
+#include <mach/message.h>
+#include <mach/vm_prot.h>
+#include <mach/vm_region.h>
+#include <mach-o/getsect.h>
+unsigned long macho_etext = 0;
+unsigned long macho_edata = 0;
+#define IN_RANGE(base,size,x) (((P_)base) <= ((P_)x) && ((P_)x) < ((P_)((unsigned long)base + size)))
+static void macosx_get_memory_layout(void)
+{
+  vm_address_t address;
+  vm_size_t size;
+  struct vm_region_basic_info info;
+  mach_msg_type_number_t info_count;
+  mach_port_t object_name;
+  task_t task = mach_task_self();
+  P_ in_text = ((P_*)(&stg_BLACKHOLE_info))[0];
+  P_ in_data = (P_)&stg_dummy_ret_closure;
+
+  address = 0; /* VM_MIN_ADDRESS */
+  while (1) {
+    info_count = VM_REGION_BASIC_INFO_COUNT;
+    if (vm_region(task, &address, &size, VM_REGION_BASIC_INFO,
+		  (vm_region_info_t)&info, &info_count, &object_name)
+	!= KERN_SUCCESS)
+      break;
+    if (IN_RANGE(address, size, in_text))
+      macho_etext = address + size;
+    if (IN_RANGE(address, size, in_data))
+      macho_edata = address + size;
+    address += size;
+  }
+}
+#endif
 
 StgClosure    *caf_list         = NULL;
 
@@ -65,6 +102,30 @@ initStorage( void )
   nat g, s;
   step *stp;
   generation *gen;
+
+#if defined(darwin_TARGET_OS)
+    macosx_get_memory_layout();
+#endif
+
+    /* Sanity check to make sure we are able to make the distinction
+     * between closures and infotables
+     */
+  if (!LOOKS_LIKE_GHC_INFO(&stg_BLACKHOLE_info)) {
+    barf("LOOKS_LIKE_GHC_INFO+ is incorrectly defined");
+    exit(0);
+  }
+  if (LOOKS_LIKE_GHC_INFO(&stg_dummy_ret_closure)) {
+    barf("LOOKS_LIKE_GHC_INFO- is incorrectly defined");
+    exit(0);
+  }
+  if (LOOKS_LIKE_STATIC_CLOSURE(&stg_BLACKHOLE_info)) {
+    barf("LOOKS_LIKE_STATIC_CLOSURE- is incorrectly defined");
+    exit(0);
+  }
+  if (!LOOKS_LIKE_STATIC_CLOSURE(&stg_dummy_ret_closure)) {
+    barf("LOOKS_LIKE_STATIC_CLOSURE+ is incorrectly defined");
+    exit(0);
+  }
 
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.heapSizeSuggestion > 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.41 2002/02/14 17:21:50 sof Exp $
+ * $Id: Storage.h,v 1.42 2002/03/21 11:24:00 sebc Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -419,12 +419,24 @@ void printMutableList(generation *gen);
 extern void* TEXT_SECTION_END_MARKER_DECL;
 extern void* DATA_SECTION_END_MARKER_DECL;
 
+#ifdef darwin_TARGET_OS
+extern unsigned long macho_etext;
+extern unsigned long macho_edata;
+#define IS_CODE_PTR(p) (  ((P_)(p) < (P_)macho_etext) \
+                       || is_dynamically_loaded_code_or_rodata_ptr((char *)p) )
+#define IS_DATA_PTR(p) ( ((P_)(p) >= (P_)macho_etext && \
+                          (P_)(p) < (P_)macho_edata) \
+                       || is_dynamically_loaded_rwdata_ptr((char *)p) )
+#define IS_USER_PTR(p) ( ((P_)(p) >= (P_)macho_edata) \
+                       && is_not_dynamically_loaded_ptr((char *)p) )
+#else
 /* Take into account code sections in dynamically loaded object files. */
 #define IS_DATA_PTR(p) ( ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && \
                           (P_)(p) < (P_)&DATA_SECTION_END_MARKER) \
                        || is_dynamically_loaded_rwdata_ptr((char *)p) )
 #define IS_USER_PTR(p) ( ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER) \
                        && is_not_dynamically_loaded_ptr((char *)p) )
+#endif
 
 /* The HEAP_ALLOCED test below is called FOR EVERY SINGLE CLOSURE
  * during GC.  It needs to be FAST.
@@ -539,6 +551,10 @@ extern void* DATA_SECTION_END_MARKER_DECL;
                      (MAX_INTLIKE-MIN_INTLIKE) * sizeof(StgIntCharlikeClosure)) )
 
 #define LOOKS_LIKE_STATIC_CLOSURE(r) (((*(((unsigned long *)(r))-1)) == 0) || IS_CHARLIKE_CLOSURE(r) || IS_INTLIKE_CLOSURE(r))
+#elif defined(darwin_TARGET_OS) && defined(USE_MINIINTERPRETER)
+#define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
+#  define LOOKS_LIKE_STATIC_CLOSURE(r) \
+      (IS_DATA_PTR(r) && !LOOKS_LIKE_GHC_INFO(r))
 #else
 #define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
 #define LOOKS_LIKE_STATIC_CLOSURE(r) IS_DATA_PTR(r)
@@ -561,8 +577,13 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 /* LOOKS_LIKE_GHC_INFO is called moderately often during GC, but
  * Certainly not as often as HEAP_ALLOCED.
  */
+#if defined(darwin_TARGET_OS) && defined(USE_MINIINTERPRETER)
+	/* Plan C, see above */
+# define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(((P_*)(info))[0])
+#else
 #define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
                                    && !LOOKS_LIKE_STATIC_CLOSURE(info))
+#endif
 
 /* -----------------------------------------------------------------------------
    Macros for calculating how big a closure will be (used during allocation)
