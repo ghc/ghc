@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.17 $
- * $Date: 1999/11/22 17:18:02 $
+ * $Revision: 1.18 $
+ * $Date: 1999/11/23 09:48:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -378,11 +378,7 @@ StgExpr failExpr;
             /* Special cases */
             if (e == nameSel && length(args) == 3) {
                 Cell   con   = hd(args);
-#if 0
-                StgVar v     = stgOffset(hd(tl(args)),sc);
-#else
                 StgExpr v    = stgExpr(hd(tl(args)),co,sc,namePMFail);
-#endif
                 Int    ix    = intOf(hd(tl(tl(args))));
                 Int    da    = discrArity(con);
                 List   vs    = NIL;
@@ -400,13 +396,10 @@ StgExpr failExpr;
             /* Arguments must be StgAtoms */
             for(as=args; nonNull(as); as=tl(as)) {
                 StgRhs a = stgRhs(hd(as),co,sc,namePMFail);
-#if 1 /* optional flattening of let bindings */
                 if (whatIs(a) == LETREC) {
                     binds = appendOnto(stgLetBinds(a),binds);
                     a = stgLetBody(a);
                 }
-#endif
-                    
                 if (!isAtomic(a)) {
                     a     = mkStgVar(a,NIL);
                     binds = cons(a,binds);
