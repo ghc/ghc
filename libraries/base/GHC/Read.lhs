@@ -326,14 +326,13 @@ parenthesis-like objects such as (...) and [...] can be an argument to
 instance Read a => Read (Maybe a) where
   readPrec =
     parens
-    ( prec appPrec
-      ( do L.Ident "Nothing" <- lexP
-           return Nothing
-       +++
-        do L.Ident "Just" <- lexP
-           x            <- step readPrec
-           return (Just x)
-      )
+    (do L.Ident "Nothing" <- lexP
+        return Nothing
+     +++
+     prec appPrec (
+	do L.Ident "Just" <- lexP
+           x              <- step readPrec
+           return (Just x))
     )
 
   readListPrec = readListPrecDefault
