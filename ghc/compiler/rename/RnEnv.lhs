@@ -56,6 +56,8 @@ import List		( nub )
 import UniqFM		( lookupWithDefaultUFM )
 import CmdLineOpts
 import FastString	( FastString )
+
+import Maybe		( isJust )
 \end{code}
 
 %*********************************************************
@@ -481,30 +483,35 @@ bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 	    	    -> RnMS a
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
   = getModeRn 				`thenRn` \ mode ->
-    getLocalNameEnv			`thenRn` \ name_env ->
+    getLocalNameEnv			`thenRn` \ local_env ->
+    getGlobalNameEnv			`thenRn` \ global_env ->
 
 	-- Check for duplicate names
     checkDupOrQualNames doc_str rdr_names_w_loc	`thenRn_`
 
     	-- Warn about shadowing, but only in source modules
+    let
+      check_shadow (rdr_name,loc)
+	| isJust local || isJust global
+	= pushSrcLocRn loc $ addWarnRn (shadowedNameWarn rdr_name)
+        | otherwise 
+	= returnRn ()
+	where
+	  local  = lookupRdrEnv local_env rdr_name
+	  global = lookupRdrEnv global_env rdr_name
+    in
+
     (case mode of
 	SourceMode -> ifOptRn Opt_WarnNameShadowing	$
-		      mapRn_ (check_shadow name_env) rdr_names_w_loc
+		      mapRn_ check_shadow rdr_names_w_loc
 	other	   -> returnRn ()
     )					`thenRn_`
-	
+
     newLocalsRn rdr_names_w_loc		`thenRn` \ names ->
     let
-	new_local_env = addListToRdrEnv name_env (map fst rdr_names_w_loc `zip` names)
+	new_local_env = addListToRdrEnv local_env (map fst rdr_names_w_loc `zip` names)
     in
     setLocalNameEnv new_local_env (enclosed_scope names)
-
-  where
-    check_shadow name_env (rdr_name,loc)
-	= case lookupRdrEnv name_env rdr_name of
-		Nothing   -> returnRn ()
-		Just name -> pushSrcLocRn loc $
-			     addWarnRn (shadowedNameWarn rdr_name)
 
 bindCoreLocalRn :: RdrName -> (Name -> RnMS a) -> RnMS a
   -- A specialised variant when renaming stuff from interface
