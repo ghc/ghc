@@ -599,8 +599,8 @@ chunkify :: [a] -> [[a]]
 -- The sub-lists of the result all have length <= mAX_TUPLE_SIZE
 -- But there may be more than mAX_TUPLE_SIZE sub-lists
 chunkify xs
-  | n_xs <= mAX_TUPLE_SIZE = pprTrace "Small" (ppr n_xs) [xs] 
-  | otherwise		   = pprTrace "Big" (ppr n_xs) (split xs)
+  | n_xs <= mAX_TUPLE_SIZE = {- pprTrace "Small" (ppr n_xs) -} [xs] 
+  | otherwise		   = {- pprTrace "Big"   (ppr n_xs) -} (split xs)
   where
     n_xs     = length xs
     split [] = []
