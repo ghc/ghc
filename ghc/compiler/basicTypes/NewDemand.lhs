@@ -126,8 +126,12 @@ instance Outputable Demand where
 instance Outputable Demands where
     ppr (Poly Abs) = empty
     ppr (Poly d)   = parens (ppr d <> char '*')
-    ppr (Prod ds) | all isAbsent ds = empty
-		  | otherwise       = parens (hcat (map ppr ds))
+    ppr (Prod ds)  = parens (hcat (map ppr ds))
+	-- At one time I printed U(AAA) as U, but that
+	-- confuses (Poly Abs) with (Prod AAA), and the
+	-- worker/wrapper generation differs slightly for these two
+	-- [Reason: in the latter case we can avoid passing the arg;
+	--  see notes with WwLib.mkWWstr_one.]
 \end{code}
 
 
