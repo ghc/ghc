@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.27 2003/09/02 10:23:30 simonmar Exp $
+# $Id: bootstrap.mk,v 1.28 2004/01/15 14:43:24 igloo Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -88,6 +88,7 @@ DASH_L_GHC_RTS_GMP_DIR=-L$(FPTOOLS_TOP_ABS)/ghc/rts/gmp
 endif
 
 HC_BOOT_LD_OPTS =				\
+   -L$(FPTOOLS_TOP_ABS)/libraries/haskell-src	\
    -L$(FPTOOLS_TOP_ABS)/ghc/rts			\
    $(DASH_L_GHC_RTS_GMP_DIR)                    \
    -L$(FPTOOLS_TOP_ABS)/libraries/base		\
@@ -96,7 +97,7 @@ HC_BOOT_LD_OPTS =				\
 
 ifeq "$(GhcWithInterpreter)" "YES"
 HC_BOOT_LD_OPTS += \
-   -L$(FPTOOLS_TOP_ABS)/libraries/haskell-src	\
+   -L$(FPTOOLS_TOP_ABS)/libraries/template-haskell	\
    -L$(FPTOOLS_TOP_ABS)/libraries/readline	\
    -L$(FPTOOLS_TOP_ABS)/libraries/unix          \
    -L$(FPTOOLS_TOP_ABS)/libraries/unix/cbits
@@ -139,10 +140,10 @@ HC_BOOT_LD_OPTS += \
 HC_BOOT_LIBS =
 
 ifeq "$(GhcWithInterpreter)" "YES"
-HC_BOOT_LIBS += -lHSreadline -lHShaskell-src -lHSunix -lHSunix_cbits
+HC_BOOT_LIBS += -lHSreadline -lHStemplate-haskell -lHSunix -lHSunix_cbits
 endif
 
-HC_BOOT_LIBS += -lHShaskell98 -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
+HC_BOOT_LIBS += -lHShaskell98 -lHShaskell-src -lHSbase -lHSbase_cbits -lHSrts -lgmp -lm $(EXTRA_HC_BOOT_LIBS)
 
 ifeq "$(GhcLibsWithReadline)" "YES"
 HC_BOOT_LIBS += $(patsubst %, -l%, $(LibsReadline))

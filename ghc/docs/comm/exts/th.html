@@ -35,7 +35,7 @@
       A term in quasi-quote brackets needs to be translated into Core code
       that, when executed, yields a <em>representation</em> of that term in
       the form of the abstract syntax trees defined in <a
-      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/haskell-src/Language/Haskell/THSyntax.hs"><code>Language.Haskell.THSyntax</code></a>.
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/libraries/template-haskell/Language/Haskell/TH/Syntax.hs"><code>Language.Haskell.TH.Syntax</code></a>.
       Within <code>DsMeta</code>, this is achieved by four functions
       corresponding to the four types of quasi-quote brackets:
       <code>repE</code> (for <code>[|...|]</code>), <code>repP</code> (for
@@ -63,12 +63,12 @@
       type parameter to constrain the contexts in which they are applicable.
       For example, a function that builds a Core expression that evaluates to
       a TH type representation, which has type
-      <code>Language.Haskell.THSyntax.Type</code>, would return a value of
+      <code>Language.Haskell.TH.Syntax.Type</code>, would return a value of
       type 
     </p>
     <blockquote>
       <pre>
-Core Language.Haskell.THSyntax.Type</pre>
+Core Language.Haskell.TH.Syntax.Type</pre>
     </blockquote>
 
     <h3>Desugaring of Reification Operators</h3>
@@ -82,9 +82,9 @@ Core Language.Haskell.THSyntax.Type</pre>
       The operator <code>reifyType</code> receives the name of a function or
       data constructor as its argument and yields a representation of this
       entity's type in the form of a value of type
-      <code>THSyntax.Type</code>.  Similarly, <code>reifyDecl</code> receives
+      <code>TH.Syntax.Type</code>.  Similarly, <code>reifyDecl</code> receives
       the name of a type and yields a representation of the type's declaration
-      as a value of type <code>THSyntax.Decl</code>.  The name of the reified
+      as a value of type <code>TH.Syntax.Decl</code>.  The name of the reified
       entity is mapped to the GHC-internal representation of the entity by
       using the function <code>lookupOcc</code> on the name.
     </p>
@@ -177,7 +177,7 @@ in repTyClD and repC.</pre>
     <p>
       During the construction of representations, the desugarer needs to use a
       large number of functions defined in the library
-      <code>Language.Haskell.THSyntax</code>.  The names of these functions
+      <code>Language.Haskell.TH.Syntax</code>.  The names of these functions
       need to be made available to the compiler in the way outlined <a
       href="../the-beast/prelude.html">Primitives and the Prelude.</a>
       Unfortunately, any change to <a

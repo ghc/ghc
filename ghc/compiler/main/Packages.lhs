@@ -60,7 +60,7 @@ rtsPackage, basePackage, haskell98Package, thPackage :: PackageName
 basePackage      = FSLIT("base")
 rtsPackage 	 = FSLIT("rts")
 haskell98Package = FSLIT("haskell98")
-thPackage        = FSLIT("haskell-src")	-- Template Haskell libraries in here
+thPackage        = FSLIT("template-haskell")	-- Template Haskell libraries in here
 
 packageDependents :: PackageConfig -> [PackageName]
 -- Impedence matcher, because PackageConfig has Strings 

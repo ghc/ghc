@@ -1279,7 +1279,7 @@ tH_SYN_Name = mkModuleName "Language.Haskell.TH.Syntax"
 tH_LIB_Name = mkModuleName "Language.Haskell.TH.Lib"
 
 thSyn :: Module
--- NB: the TH.Syntax module comes from the "haskell-src" package
+-- NB: the TH.Syntax module comes from the "template-haskell" package
 thSyn = mkModule thPackage  tH_SYN_Name
 thLib = mkModule thPackage  tH_LIB_Name
 

@@ -705,7 +705,7 @@ partOfGHCi
 #          if defined(mingw32_TARGET_OS) || defined(darwin_TARGET_OS)
            = [ ]
 #          else
-           = [ "base", "haskell98", "haskell-src", "readline" ]
+           = [ "base", "haskell98", "template-haskell", "readline" ]
 #          endif
 
 showLS (Object nm)    = "(static) " ++ nm
