@@ -14,11 +14,11 @@ PVM. SysMan is unusual in that it is not part of the executable
 produced by ghc: it is a free-standing program that spawns PVM tasks
 (logical PEs) to evaluate the program.
 
-OK children, buckle down for some serious wierdness, it works like this.
+OK children, buckle down for some serious weirdness, it works like this.
 
 \begin{itemize}
 \item The argument vector (argv) for SysMan has one the following 2 shapes:
-@	
+\begin{verbatim}	
 -------------------------------------------------------------------------------
 | SysMan path | debug flag | pvm-executable path | Num. PEs | Program Args ...|
 -------------------------------------------------------------------------------
@@ -26,21 +26,21 @@ OK children, buckle down for some serious wierdness, it works like this.
 -------------------------------------------------------------------
 | SysMan path | pvm-executable path | Num. PEs | Program Args ... |
 -------------------------------------------------------------------
-@
+\end{verbatim}
 The "pvm-executable path" is an absolute path of where PVM stashes the
 code for each PE. The arguments passed on to each PE-executable
 spawned by PVM are:
-@
+\begin{verbatim}
 -------------------------------
 | Num. PEs | Program Args ... |
 -------------------------------
-@
+\end{verbatim}
 The arguments passed to the Main-thread PE-executable are
-@
+\begin{verbatim}
 -------------------------------------------------------------------
 | main flag | pvm-executable path | Num. PEs | Program Args ... |
 -------------------------------------------------------------------
-@
+\begin{verbatim}
 \item SysMan's algorithm is as follows.
 \begin{itemize}
 \item use PVM to spawn (nPE-1) PVM tasks 
