@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.33 2003/05/16 08:35:49 simonmar Exp $
+-- $Id: Main.hs,v 1.34 2003/05/30 13:32:20 simonmar Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -75,7 +75,7 @@ flags = [
 	"Use the specified package config file",
   Option ['l'] ["list-packages"] (NoArg List)
  	"List packages in all config files",
-  Option ['L'] ["list-packages-local"] (NoArg ListLocal)
+  Option ['L'] ["list-local-packages"] (NoArg ListLocal)
  	"List packages in the specified config file",
   Option ['a'] ["add-package"] (NoArg (Add False))
  	"Add a new package",

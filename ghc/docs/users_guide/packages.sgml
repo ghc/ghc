@@ -322,9 +322,9 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;list-packages-local</option></term>
+	  <term><option>&ndash;&ndash;list-local-packages</option></term>
 	  <term><option>-L</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;list-packages-local</option></primary></indexterm>
+	  <indexterm><primary><option>&ndash;&ndash;list-local-packages</option></primary></indexterm>
 	  <listitem>
 	    <para>Displays the list of packages installed in the
 	    topmost configuration file only: that will be the
