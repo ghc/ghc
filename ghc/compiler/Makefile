@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.58 1999/05/18 15:03:34 simonpj Exp $
+# $Id: Makefile,v 1.59 1999/05/18 16:38:23 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -215,6 +215,13 @@ typecheck/TcGenDeriv_HC_OPTS	= -H10m
 # tmp, -- SDM
 specialise/Specialise_HC_OPTS 	+= -fno-prune-tydecls
 hsSyn/HsBasic_HC_OPTS		+= -fno-prune-tydecls
+simplCore/SimplMonad_HC_OPTS	+= -fno-prune-tydecls
+absCSyn/AbsCSyn_HC_OPTS		+= -fno-prune-tydecls
+absCSyn/AbsCUtils_HC_OPTS	+= -fno-prune-tydecls
+codeGen/CgBindery_HC_OPTS	+= -fno-prune-tydecls
+codeGen/CgLetNoEscape_HC_OPTS	+= -fno-prune-tydecls
+codeGen/CgExpr_HC_OPTS		+= -fno-prune-tydecls
+nativeGen/AbsCStixGen_HC_OPTS	+= -fno-prune-tydecls
 
 # Was 10m for 2.10
 typecheck/TcHsSyn_HC_OPTS	= -H15m	
