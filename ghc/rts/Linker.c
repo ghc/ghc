@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.12 2001/01/24 15:39:50 simonmar Exp $
+ * $Id: Linker.c,v 1.13 2001/01/28 17:14:11 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -28,6 +28,12 @@
 #endif
 
 #ifdef GHCI /* endif is right at end of file */
+
+#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) || defined(freebsd_TARGET_OS)
+#define OBJFORMAT_ELF
+#elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
+#define OBJFORMAT_PEi386
+#endif
 
 /* A bucket in the symbol hash-table.  Primarily, maps symbol names to
  * absolute addresses.  All symbols from a given module are linked
@@ -84,11 +90,11 @@ typedef struct _ObjectCode {
 /* List of currently loaded objects */
 ObjectCode *objects;
 
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+#if defined(OBJFORMAT_ELF)
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
 static int ocResolve_ELF        ( ObjectCode* oc );
-#elif defined(cygwin32_TARGET_OS)		
+#elif defined(OBJFORMAT_PEi386)
 static int ocVerifyImage_PEi386 ( ObjectCode* oc );
 static int ocGetNames_PEi386    ( ObjectCode* oc );
 static int ocResolve_PEi386     ( ObjectCode* oc );
@@ -201,6 +207,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(__int_encodeFloat)			\
       SymX(__int_encodeDouble)			\
       SymX(__gmpz_cmp_si)			\
+      SymX(__gmpz_cmp_ui)			\
       SymX(__gmpz_cmp)				\
       SymX(__gmpn_gcd_1)			\
       SymX(prog_argv)				\
@@ -353,9 +360,9 @@ loadObj( char *path )
 
    oc = stgMallocBytes(sizeof(ObjectCode), "loadObj(oc)");
 
-#  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+#  if defined(OBJFORMAT_ELF)
    oc->formatName = "ELF";
-#  elif defined(cygwin32_TARGET_OS)
+#  elif defined(OBJFORMAT_PEi386)
    oc->formatName = "PEi386";
 #  else
    free(oc);
@@ -387,9 +394,9 @@ loadObj( char *path )
    }
 
    /* verify the in-memory image */
-#  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+#  if defined(OBJFORMAT_ELF)
    r = ocVerifyImage_ELF ( oc );
-#  elif defined(cygwin32_TARGET_OS)
+#  elif defined(OBJFORMAT_PEi386)
    r = ocVerifyImage_PEi386 ( oc );
 #  else
    barf("loadObj: no verify method");
@@ -397,9 +404,9 @@ loadObj( char *path )
    if (!r) { return r; }
 
    /* build the symbol list for this image */
-#  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+#  if defined(OBJFORMAT_ELF)
    r = ocGetNames_ELF ( oc );
-#  elif defined(cygwin32_TARGET_OS)
+#  elif defined(OBJFORMAT_PEi386)
    r = ocGetNames_PEi386 ( oc );
 #  else
    barf("loadObj: no getNames method");
@@ -425,9 +432,9 @@ resolveObjs( void )
 
     for (oc = objects; oc; oc = oc->next) {
 	if (oc->status != OBJECT_RESOLVED) {
-#  if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+#  if defined(OBJFORMAT_ELF)
 	    r = ocResolve_ELF ( oc );
-#  elif defined(cygwin32_TARGET_OS)
+#  elif defined(OBJFORMAT_PEi386)
 	    r = ocResolve_PEi386 ( oc );
 #  else
 	    barf("link: not implemented on this platform");
@@ -475,7 +482,7 @@ unloadObj( char *path )
 }
 
 /* --------------------------------------------------------------------------
- * PEi386 specifics (cygwin32)
+ * PEi386 specifics (Win32 targets)
  * ------------------------------------------------------------------------*/
 
 /* The information for this linker comes from 
@@ -486,7 +493,7 @@ unloadObj( char *path )
 */
       
 
-#if defined(cygwin32_TARGET_OS)
+#if defined(OBJFORMAT_PEi386)
 
 
 
@@ -1100,14 +1107,14 @@ ocResolve_PEi386 ( ObjectCode* oc, int verb )
    return TRUE;
 }
 
-#endif /* defined(cygwin32_TARGET_OS) */
+#endif /* defined(OBJFORMAT_PEi386) */
 
 
 /* --------------------------------------------------------------------------
- * ELF specifics (Linux, Solaris)
+ * ELF specifics
  * ------------------------------------------------------------------------*/
 
-#if defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS)
+#if defined(OBJFORMAT_ELF)
 
 #define FALSE 0
 #define TRUE  1
@@ -1467,7 +1474,7 @@ ocResolve_ELF ( ObjectCode* oc )
 }
 
 
-#endif /* defined(linux_TARGET_OS) || defined(solaris2_TARGET_OS) */
+#endif /* ELF */
 
 /* -----------------------------------------------------------------------------
  * Look up an address to discover whether it is in text or data space.
