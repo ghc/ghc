@@ -3,6 +3,6 @@
 
 __interface TcUnify 1 0 where
 __export TcUnify unifyTauTy ;
-1 unifyTauTy :: TcType.TcTauType -> TcType.TcTauType -> TcMonad.TcM () ;
+1 unifyTauTy :: TcType.TcTauType -> TcType.TcTauType -> TcMonad.TcM PrelBase.Z0T ;
 
 
