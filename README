@@ -42,8 +42,12 @@ install the package somewhere other than /usr/local.  Try ./configure
 There is usually an ANNOUNCE* file with any distribution.  Please
 consult that, or the <piece>/README file, to find out how to proceed.
 
-Full documentation for the fptools build system can be found on the
-GHC web pages: 
+Full documentation for the fptools build system can be found in the 
+Building Guide:
+
+	http://www.haskell.org/ghc/docs/latest/html/building/building-guide.html
+
+More information about GHC can be found here:
 
 	http://www.haskell.org/ghc/
 
