@@ -13,7 +13,6 @@ module CmTypes (
 import Interpreter
 import HscTypes
 import Module
---import CmStaticInfo
 import Outputable
 
 import Time		( ClockTime )
@@ -30,7 +29,7 @@ instance Outputable Unlinked where
    ppr (DotO path)   = text "DotO" <+> text path
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
-   ppr (BCOs bcos _) = text "BCOs" <+> vcat (map ppr bcos)
+   ppr (BCOs bcos _) = text "BCOs" <+> ppr bcos
 
 isObject (DotO _) = True
 isObject (DotA _) = True
@@ -55,8 +54,8 @@ isObjectLinkable l = all isObject (linkableUnlinked l)
 
 instance Outputable Linkable where
    ppr (LM when_made mod_nm unlinkeds)
-      = text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod_nm 
-                         <+> ppr unlinkeds
+      = (text "LinkableM" <+> parens (text (show when_made)) <+> ppr mod_nm)
+        $$ nest 3 (ppr unlinkeds)
 
 -- The ModuleLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
