@@ -374,7 +374,7 @@ sub process_stats_file {
 	local($tot_samples) = 0;
 
 	while (<STATS>) {
-	    if (! /Minor/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+\%/ ) {
+	    if (! /Gen:\s+0/ && /^\s*\d+\s+\d+\s+(\d+)\s+\d+\.\d+/ ) {
 		$max_live = $1 if $max_live < $1;
 		$tot_live += $1;
 		$tot_samples += 1;
@@ -386,7 +386,7 @@ sub process_stats_file {
 #		$MaxResidency = $1; $ResidencySamples = $2;
 #	    }
 
-	    $GCs = $1 if /^\s*([0-9,]+) garbage collections? performed/;
+	    $GCs = $1 if /^\s*([0-9,]+) collections? in generation 0/;
 
 	    if ( /^\s*INIT\s+time\s*(\d+\.\d\d)s\s*\(\s*(\d+\.\d\d)s elapsed\)/ ) {
 		$InitTime = $1; $InitElapsed = $2;
