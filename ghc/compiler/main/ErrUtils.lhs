@@ -61,9 +61,9 @@ dontAddErrLoc title rest_of_err_msg
  | otherwise  =
     ( noSrcLoc, hang (text title <> colon) 4 rest_of_err_msg )
 
-printErrorsAndWarnings :: Bag ErrMsg -> Bag WarnMsg -> IO ()
+printErrorsAndWarnings :: (Bag WarnMsg, Bag ErrMsg) -> IO ()
 	-- Don't print any warnings if there are errors
-printErrorsAndWarnings errs warns
+printErrorsAndWarnings (warns, errs)
   | no_errs && no_warns  = return ()
   | no_errs		 = printErrs (pprBagOfWarnings warns)
   | otherwise		 = printErrs (pprBagOfErrors   errs)

@@ -297,7 +297,7 @@ initRn :: DynFlags -> Finder -> GlobalSymbolTable
        -> PersistentRenamerState
        -> Module -> SrcLoc
        -> RnMG t
-       -> IO (t, Bag WarnMsg, Bag ErrMsg)
+       -> IO (t, (Bag WarnMsg, Bag ErrMsg))
 
 initRn dflags finder gst prs mod loc do_rn
   = do uniqs     <- mkSplitUniqSupply 'r'
@@ -322,7 +322,7 @@ initRn dflags finder gst prs mod loc do_rn
        -- grab errors and return
        (warns, errs) <- readIORef errs_var
 
-       return (res, errs, warns)
+       return (res, (warns, errs))
 
 
 initIfaces :: PersistentRenamerState -> Ifaces

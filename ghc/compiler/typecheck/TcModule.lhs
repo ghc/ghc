@@ -87,9 +87,9 @@ typecheckModule
 typecheckModule pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
   = do { env <- initTcEnv global_symbol_table global_inst_env ;
 
-	 (_, (maybe_result, warns, errs)) <- initTc env src_loc tc_module
+	 (_, (maybe_result, msgs)) <- initTc env src_loc tc_module
 		
-	 printErrorsAndWarnings errs warns ;
+	 printErrorsAndWarnings msgs ;
 	
 	 printTcDumps maybe_result ;
 			

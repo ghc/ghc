@@ -126,7 +126,7 @@ type TcRef a = IORef a
 initTc :: TcEnv
        -> SrcLoc
        -> TcM r
-       -> IO (Maybe r, Bag WarnMsg, Bag ErrMsg)
+       -> IO (Maybe r, (Bag ErrMsg, Bag WarnMsg))
 
 initTc tc_env src_loc do_this
   = do {
@@ -147,7 +147,7 @@ initTc tc_env src_loc do_this
 			 (\_ -> return Nothing) ;
         
       (warns,errs) <- readIORef errs_var ;
-      return (maybe_res, warns, errs)
+      return (maybe_res, (warns, errs))
     }
 
 -- Monadic operations

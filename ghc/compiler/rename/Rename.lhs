@@ -84,14 +84,14 @@ renameModule :: PersistentCompilerState -> RdrNameHsModule -> IO (Maybe RenameRe
 renameModule pcs this_mod@(HsModule mod_name vers exports imports local_decls _ loc)
   = 	-- Initialise the renamer monad
     do {
-	((maybe_rn_stuff, dump_action), rn_errs_bag, rn_warns_bag) 
+	((maybe_rn_stuff, dump_action), msgs) 
 	   <- initRn pcs 
 		     (mkThisModule mod_name) 
 		     (mkSearchPath opt_HiMap) loc
 		     (rename this_mod) ;
 
 	-- Check for warnings
-	printErrorsAndWarnings rn_errs_bag rn_warns_bag ;
+	printErrorsAndWarnings msgs ;
 
 	-- Dump any debugging output
 	dump_action ;
