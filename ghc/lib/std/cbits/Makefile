@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.8 1999/11/09 10:46:27 simonmar Exp $
+# $Id: Makefile,v 1.9 1999/11/26 15:56:52 simonmar Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +10,6 @@ override WAYS=
 endif
 
 LIBRARY=libHS_cbits$(_way).a
-INSTALL_LIBS+=$(LIBRARY)
 
 C_SRCS= $(wildcard *.c)
 
@@ -41,9 +40,19 @@ CC=$(GHC)
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
+# -----------------------------------------------------------------------------
+# Installation
+
+INSTALL_LIBS+=$(LIBRARY)
+
 ifeq "$(EnableWin32DLLs)" "YES"
 INSTALL_PROGS  += $(DLL_NAME)
 INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
 endif
+
+# install header files for the I/O library.  Other code might want to
+# plug 
+override datadir:=$(libdir)/includes
+INSTALL_DATAS += $(H_FILES) $(H_CONFIG)
 
 include $(TOP)/mk/target.mk
