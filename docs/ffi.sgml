@@ -1,0 +1,1501 @@
+<!DOCTYPE Article PUBLIC "-//OASIS//DTD DocBook V3.1//EN"> 
+
+<Article id="ffi">
+
+<ArtHeader>
+
+<Title>A Haskell foreign function interface</Title>
+<Author><OtherName>The GHC Team</OtherName></Author>
+<Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@dcs.gla.ac.uk</Email>
+</Address>
+<Edition>version 0.99</Edition>
+<PubDate>May 2000</PubDate>
+
+</ArtHeader>
+
+<Sect1 id="sec-intro">
+<Title>Introduction
+</Title>
+
+<Para>
+The motivation behind this foreign function interface(FFI)
+specification is to make it possible to describe in Haskell <Emphasis>source
+code</Emphasis> the interface to foreign functionality in a Haskell system
+independent manner. It builds on experiences made with the previous
+foreign function interfaces provided by GHC and Hugs.
+</Para>
+
+<Para>
+The FFI specified in this document is not in the market of trying to
+completely bridge the gap between the actual type of an external
+function, and what is a <Emphasis>convenient</Emphasis> type for that function to the
+Haskell programmer. That is the domain of tools like HaskellDirect or
+Green Card, both of which are capable of generating Haskell code that
+uses this FFI.
+</Para>
+
+<Para>
+The FFI can be split up into two complementary halves; one half that
+provides Haskell constructs for importing foreign functionality into
+Haskell, the other which lets you expose Haskell functions to the
+outside world. We start with the former, how to import external
+functionality into Haskell.
+</Para>
+
+</Sect1>
+
+<Sect1 id="sec-primitive">
+<Title>Calling foreign functions
+</Title>
+
+<Para>
+To bind a Haskell variable name and type to an external function, we
+introduce a new construct: <Literal>foreign import</Literal>. It defines the type of a Haskell function together with the name of an external function that actually implements it. The syntax of <Literal>foreign import</Literal> construct is as follows:
+</Para>
+
+<Para>
+
+<ProgramListing>
+topdecl 
+  : ...
+  ..
+  | 'foreign' 'import' [callconv] [ext_fun] ['unsafe'] varid '::' prim_type
+</ProgramListing>
+
+</Para>
+
+<Para>
+A <Literal>foreign import</Literal> declaration is only allowed as a toplevel
+declaration. It consists of two parts, one giving the Haskell type
+(<Literal>prim&lowbar;type</Literal>), Haskell name (<Literal>varid</Literal>) and a flag indicating whether the
+primitive is unsafe, the other giving details of the name of the
+external function (<Literal>ext&lowbar;fun</Literal>) and its calling interface
+(<Literal>callconv</Literal>.)
+</Para>
+
+<Para>
+Giving a Haskell name and type to an external entry point is clearly
+an unsafe thing to do, as the external name will in most cases be
+untyped. The onus is on the programmer using <Literal>foreign import</Literal> to
+ensure that the Haskell type given correctly maps on to the
+type of the external function. Section
+<XRef LinkEnd="sec-mapping"> specifies the mapping from 
+Haskell types to external types.
+</Para>
+
+<Sect2 id="sec-prim-name">
+<Title>Giving the external function a Haskell name
+</Title>
+
+<Para>
+The external function has to be given a Haskell name. The name
+must be a Haskell <Literal>varid</Literal>, so the language rules regarding
+variable names must be followed, i.e., it must start with a
+lower case letter followed by a sequence of alphanumeric
+(`in the Unicode sense') characters or '.
+
+<Footnote>
+<Para>
+Notice that with Haskell 98, underscore ('&lowbar;') is included in
+the character class <Literal>small</Literal>.
+</Para>
+</Footnote>
+
+</Para>
+
+<Para>
+<ProgramListing>
+varid : small ( small | large | udigit | ' )*
+</ProgramListing>
+</Para>
+
+</Sect2>
+
+<Sect2 id="sec-prim-ext-name">
+<Title>Naming the external function
+</Title>
+
+<Para>
+The name of the external function consists of two parts,
+one specifying its location, the other its name:
+</Para>
+
+<Para>
+
+<ProgramListing>
+ext_fun  : ext_loc ext_name
+         | ext_name
+
+ext_name : string
+ext_loc  : string
+</ProgramListing>
+
+</Para>
+
+<Para>
+For example,
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign import stdcall "Advapi32" "RegCloseKey" regCloseKey :: Addr -&#62; IO ()
+</ProgramListing>
+
+</Para>
+
+<Para>
+states that the external function named <Function>RegCloseKey</Function> at location
+<Function>Advapi32</Function> should be bound to the Haskell name <Function>regCloseKey</Function>.
+For a Win32 Haskell implementation that supports the loading of DLLs
+on-the-fly, this declaration will most likely cause the run-time
+system to load the <Filename>Advapi32.dll</Filename> DLL before looking up the 
+function <Function>RegCloseKey()</Function> therein to get at the function pointer
+to use when invoking <Function>regCloseKey</Function>. 
+</Para>
+
+<Para>
+Compiled implementations may do something completely different, i.e.,
+mangle "RegCloseKey" to convert it into an archive/import library
+symbol, that's assumed to be in scope when linking. The details of
+which are platform (and compiler command-line) dependent.
+</Para>
+
+<Para>
+If the location part is left out, the name of the external function
+specifies a symbol that is assumed to be in scope when linking.
+</Para>
+
+<Para>
+The location part can either contain an absolute `address' (i.e.,
+path) of the archive/DLL, or just its name, leaving it up to the
+underlying system (system meaning both RTS/compiler and OS) to resolve
+the name to its real location.
+</Para>
+
+<Para>
+An implementation is <Emphasis>expected</Emphasis> to be able to intelligently
+transform the <Literal>ext&lowbar;loc</Literal> location to fit platform-specific
+practices for naming dynamic libraries. For instance, given the
+declaration
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign import "Foo" "foo" foo :: Int -&#62; Int -&#62; IO ()
+</ProgramListing>
+
+</Para>
+
+<Para>
+an implementation should map <Filename>Foo</Filename> to <Filename>"Foo.dll"</Filename> on a Win32
+platform, and <Filename>libFoo.so</Filename> on ELF platforms. If the lookup of the
+dynamic library with this transformed location name should fail, the
+implementation should then attempt to use the original name before
+eventually giving up. As part of their documentation, implementations
+of <Literal>foreign import</Literal> should specify the exact details of how
+<Literal>ext&lowbar;loc</Literal>s are transformed and resolved, including the list of
+directories searched (and the order in which they are.)
+</Para>
+
+<Para>
+In the case the Haskell name of the imported function is identical to
+the external name, the <Literal>ext&lowbar;fun</Literal> can be omitted. i.e.,
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign import sin :: Double -&#62; IO Double
+</ProgramListing>
+
+</Para>
+
+<Para>
+is identical to 
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign import "sin" sin :: Double -&#62; IO Double
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="sec-cconv">
+<Title>Calling conventions
+</Title>
+
+<Para>
+The number of calling conventions supported is fixed:
+</Para>
+
+<Para>
+
+<ProgramListing>
+callconv : ccall | stdcall
+</ProgramListing>
+
+</Para>
+
+<Para>
+<VariableList>
+
+<VarListEntry>
+<Term><Literal>ccall</Literal></Term>
+<ListItem>
+<Para>
+The 'default' calling convention on a platform, i.e., the one
+used to do (C) function calls.
+</Para>
+
+<Para>
+In the case of x86 platforms, the caller pushes function arguments
+from right to left on the C stack before calling. The caller is
+responsible for popping the arguments off of the C stack on return.
+</Para>
+</ListItem>
+</VarListEntry>
+<VarListEntry>
+<Term><Literal>stdcall</Literal></Term>
+<ListItem>
+<Para>
+A Win32 specific calling convention. The same as <Literal>ccall</Literal>, except
+that the callee cleans up the C stack before returning.
+
+<Footnote>
+<Para>
+The <Literal>stdcall</Literal> is a Microsoft Win32 specific wrinkle; it used
+throughout the Win32 API, for instance. On platforms where
+<Literal>stdcall</Literal> isn't meaningful, it should be treated as being equal
+to <Literal>ccall</Literal>.
+</Para>
+</Footnote>
+
+</Para>
+</ListItem>
+</VarListEntry>
+</VariableList>
+</Para>
+
+<Para>
+<Emphasis remap="bf">Some remarks:</Emphasis>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+Interoperating well with external code is the name of the game here,
+so the guiding principle when deciding on what calling conventions
+to include in <Literal>callconv</Literal> is that there's a demonstrated need for
+a particular calling convention. Should it emerge that the inclusion
+of other calling conventions will generally improve the quality of
+this Haskell FFI, they will be considered for future inclusion in
+<Literal>callconv</Literal>.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Supporting <Literal>stdcall</Literal> (and perhaps other platform-specific calling
+conventions) raises the issue of whether a Haskell FFI should allow
+the user to write platform-specific Haskell code. The calling
+convention is clearly an integral part of an external function's
+interface, so if the one used differs from the standard one specified
+by the platform's ABI <Emphasis>and</Emphasis> that convention is used by a
+non-trivial amount of external functions, the view of the FFI authors
+is that a Haskell FFI should support it.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+For <Literal>foreign import</Literal> (and other <Literal>foreign</Literal> declarations),
+supplying the calling convention is optional. If it isn't supplied,
+it is treated as if <Literal>ccall</Literal> was specified. Users are encouraged
+to leave out the specification of the calling convention, if possible.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="sec-prim-types">
+<Title>External function types
+</Title>
+
+<Para>
+The range of types that can be passed as arguments to an external
+function is restricted (as are the range of results coming back):
+</Para>
+
+<Para>
+
+<ProgramListing>
+prim_type : IO prim_result
+          | prim_result
+          | prim_arg '-&#62;' prim_type
+</ProgramListing>
+
+</Para>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+If you associate a non-IO type with an external function, you
+have the same 'proof obligations' as when you make use of
+<Function>IOExts.unsafePerformIO</Function> in your Haskell programs.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The external function is strict in all its arguments.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+<Emphasis>GHC only:</Emphasis> The GHC FFI implementation provides one extension
+to <Literal>prim&lowbar;type</Literal>:
+
+
+<ProgramListing>
+prim_type : ... 
+          | unsafe_arr_ty '-&#62;' prim_type
+
+unsafe_arr_ty : ByteArray a
+              | MutableByteArray i s a
+</ProgramListing>
+
+
+GHC permits the passing of its byte array primitive types
+to external functions. There's some restrictions on when
+they can be used; see Section <XRef LinkEnd="sec-arguments">
+for more details.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+<Para>
+Section <XRef LinkEnd="sec-results"> defines
+<Literal>prim&lowbar;result</Literal>; Section <XRef LinkEnd="sec-arguments">
+defines <Literal>prim&lowbar;arg</Literal>.
+</Para>
+
+<Sect3 id="sec-arguments">
+<Title>Argument types
+</Title>
+
+<Para>
+The external function expects zero or more arguments. The set of legal
+argument types is restricted to the following set:
+</Para>
+
+<Para>
+
+<ProgramListing>
+prim_arg : ext_ty | new_ty | ForeignObj
+
+new_ty : a Haskell newtype of a prim_arg.
+
+ext_ty : int_ty   | word_ty | float_ty
+       | Addr     | Char    | StablePtr a
+       | Bool
+
+int_ty       : Int   | Int8   | Int16   | Int32 | Int64
+word_ty      : Word8 | Word16 | Word32  | Word64
+float_ty     : Float | Double
+</ProgramListing>
+
+</Para>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+<Literal>ext&lowbar;ty</Literal> represent the set of basic types supported by
+C-like languages, although the numeric types are explicitly sized.
+
+The <Emphasis>stable pointer</Emphasis> <Literal>StablePtr</Literal> type looks out of place in
+this list of C-like types, but it has a well-defined and simple
+C mapping, see Section <XRef LinkEnd="sec-mapping">
+for details.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+<Literal>prim&lowbar;arg</Literal> represent the set of permissible argument types. In
+addition to <Literal>ext&lowbar;ty</Literal>, <Literal>ForeignObj</Literal> is also included.
+
+The <Literal>ForeignObj</Literal> type represent values that are pointers to some
+external entity/object. It differs from the <Literal>Addr</Literal> type in that
+<Literal>ForeignObj</Literal>s are <Emphasis>finalized</Emphasis>, i.e., once the garbage collector
+determines that a <Literal>ForeignObj</Literal> is unreachable, it will invoke a
+finalising procedure attached to the <Literal>ForeignObj</Literal> to notify the
+outside world that we're through with using it.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Haskell <Literal>newtype</Literal>s that wrap up a <Literal>prim&lowbar;arg</Literal> type can also
+be passed to external functions. 
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Haskell type synonyms for any of the above can also be used
+in <Literal>foreign import</Literal> declarations. Qualified names likewise,
+i.e. <Literal>Word.Word32</Literal> is legal.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+<Literal>foreign import</Literal> does not support the binding to external
+constants/variables. A <Literal>foreign import</Literal> declaration that takes no
+arguments represent a binding to a function with no arguments.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+<Emphasis>GHC only:</Emphasis> GHC's implementation of the FFI provides
+two extensions:
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+Support for passing heap allocated byte arrays to an external
+function
+
+<ProgramListing>
+prim_type : ... 
+          | prim_arg '-&#62;' prim_type
+          | unsafe_arr_ty '-&#62;' prim_type
+
+unsafe_arr_ty : ByteArray a
+              | MutableByteArray i s a
+</ProgramListing>
+
+
+GHC's <Literal>ByteArray</Literal> and <Literal>MutableByteArray</Literal> primitive types are
+(im)mutable chunks of memory allocated on the Haskell heap, and
+pointers to these can be passed to <Literal>foreign import</Literal>ed external
+functions provided they are marked as <Literal>unsafe</Literal>. Since it is
+inherently unsafe to hand out references to objects in the Haskell
+heap if the external call may cause a garbage collection to happen,
+you have to annotate the <Literal>foreign import</Literal> declaration with
+the attribute <Literal>unsafe</Literal>. By doing so, the user explicitly states
+that the external function won't provoke a garbage collection,
+so passing out heap references to the external function is allright.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Another GHC extension is the support for unboxed types:
+
+
+<ProgramListing>
+prim_arg : ...  | unboxed_h_ty
+ext_ty   : .... | unboxed_ext_ty
+
+unboxed_ext_ty : Int#   | Word#    | Char#
+               | Float# | Double#  | Addr# 
+	       | StablePtr# a
+unboxed_h_ty : MutableByteArray# | ForeignObj#
+             | ByteArray#
+</ProgramListing>
+
+
+Clearly, if you want to be portable across Haskell systems, using 
+system-specific extensions such as this is not advisable; avoid
+using them if you can. (Support for using unboxed types might
+be withdrawn sometime in the future.)
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect3>
+
+<Sect3 id="sec-results">
+<Title>Result type
+</Title>
+
+<Para>
+An external function is permitted to return the following
+range of types:
+</Para>
+
+<Para>
+
+<ProgramListing>
+prim_result : ext_ty | new_ext_ty | ()
+
+new_ext_ty : a Haskell newtype of an ext_ty.
+</ProgramListing>
+
+</Para>
+
+<Para>
+where <Literal>()</Literal> represents <Literal>void</Literal> / no result. 
+</Para>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+External functions cannot raise exceptions (IO exceptions or non-IO ones.)
+It is the responsibility of the <Literal>foreign import</Literal> user to layer
+any error handling on top of an external function.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Only external types (<Literal>ext&lowbar;ty</Literal>) can be passed back, i.e., returning
+<Literal>ForeignObj</Literal>s is not supported/allowed. 
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Haskell newtypes that wrap up <Literal>ext&lowbar;ty</Literal> are also permitted.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect3>
+
+</Sect2>
+
+<Sect2 id="sec-mapping">
+<Title>Type mapping
+</Title>
+
+<Para>
+For the FFI to be of any practical use, the properties and sizes of
+the various types that can be communicated between the Haskell world
+and the outside, needs to be precisely defined. We do this by
+presenting a mapping to C, as it is commonly used and most other
+languages define a mapping to it. Table
+<XRef LinkEnd="sec-mapping-table">
+defines the mapping between Haskell and C types.
+</Para>
+
+<Para>
+
+<Table id="sec-mapping-table">
+<Title>Mapping of Haskell types to C types</Title>
+
+<TGroup Cols="6">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<ColSpec Align="Left" Colsep="0">
+<TBody>
+<Row RowSep="1">
+<Entry>Haskell type </Entry>
+<Entry> C type </Entry>
+<Entry> requirement </Entry>
+<Entry> range (9) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Char</Literal> </Entry>
+<Entry> <Literal>HsChar</Literal> </Entry>
+<Entry> unspec. integral type </Entry>
+<Entry> <Literal>HS&lowbar;CHAR&lowbar;MIN</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;CHAR&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Int</Literal> </Entry>
+<Entry> <Literal>HsInt</Literal> </Entry>
+<Entry> signed integral of unspec. size(4) </Entry>
+<Entry> <Literal>HS&lowbar;INT&lowbar;MIN</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;INT&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Int8</Literal> (2) </Entry>
+<Entry> <Literal>HsInt8</Literal> </Entry>
+<Entry> 8 bit signed integral </Entry>
+<Entry> <Literal>HS&lowbar;INT8&lowbar;MIN</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;INT8&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Int16</Literal> (2) </Entry>
+<Entry> <Literal>HsInt16</Literal> </Entry>
+<Entry> 16 bit signed integral </Entry>
+<Entry> <Literal>HS&lowbar;INT16&lowbar;MIN</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;INT16&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Int32</Literal> (2) </Entry>
+<Entry> <Literal>HsInt32</Literal> </Entry>
+<Entry> 32 bit signed integral </Entry>
+<Entry> <Literal>HS&lowbar;INT32&lowbar;MIN</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;INT32&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Int64</Literal> (2,3) </Entry>
+<Entry> <Literal>HsInt64</Literal> </Entry>
+<Entry> 64 bit signed integral (3) </Entry>
+<Entry> <Literal>HS&lowbar;INT64&lowbar;MIN</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;INT64&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Word8</Literal> (2) </Entry>
+<Entry> <Literal>HsWord8</Literal> </Entry>
+<Entry> 8 bit unsigned integral </Entry>
+<Entry> <Literal>0</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;WORD8&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Word16</Literal> (2) </Entry>
+<Entry> <Literal>HsWord16</Literal> </Entry>
+<Entry> 16 bit unsigned integral </Entry>
+<Entry> <Literal>0</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;WORD16&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Word32</Literal> (2) </Entry>
+<Entry> <Literal>HsWord32</Literal> </Entry>
+<Entry> 32 bit unsigned integral </Entry>
+<Entry> <Literal>0</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;WORD32&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Word64</Literal> (2,3) </Entry>
+<Entry> <Literal>HsWord64</Literal> </Entry>
+<Entry> 64 bit unsigned integral (3) </Entry>
+<Entry> <Literal>0</Literal> </Entry>
+<Entry>..</Entry>
+<Entry> <Literal>HS&lowbar;WORD64&lowbar;MAX</Literal></Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Float</Literal> </Entry>
+<Entry> <Literal>HsFloat</Literal> </Entry>
+<Entry> floating point of unspec. size (5) </Entry>
+<Entry> (10) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Double</Literal> </Entry>
+<Entry> <Literal>HsDouble</Literal> </Entry>
+<Entry> floating point of unspec. size (5) </Entry>
+<Entry> (10) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Bool</Literal> </Entry>
+<Entry> <Literal>HsBool</Literal> </Entry>
+<Entry> unspec. integral type </Entry>
+<Entry> (11) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>Addr</Literal> </Entry>
+<Entry> <Literal>HsAddr</Literal> </Entry>
+<Entry> void* (6) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>ForeignObj</Literal> </Entry>
+<Entry> <Literal>HsForeignObj</Literal> </Entry>
+<Entry> void* (7) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+<Literal>StablePtr</Literal> </Entry>
+<Entry> <Literal>HsStablePtr</Literal> </Entry>
+<Entry> void* (8) </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+<Entry> </Entry>
+</Row>
+<Row>
+<Entry>
+</Entry>
+</Row>
+</TBody>
+
+</TGroup>
+
+</Table>
+
+</Para>
+
+<Para>
+<Emphasis remap="bf">Some remarks:</Emphasis>
+
+<OrderedList>
+<ListItem>
+
+<Para>
+A Haskell system that implements the FFI will supply a header file
+<Filename>HsFFI.h</Filename> that includes target platform specific definitions
+for the above types and values.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The sized numeric types <Literal>Hs&lcub;Int,Word&rcub;&lcub;8,16,32,64&rcub;</Literal> have
+a 1-1 mapping to ISO C 99's <Literal>&lcub;,u&rcub;int&lcub;8,16,32,64&rcub;&lowbar;t</Literal>. For systems
+that doesn't support this revision of ISO C, a best-fit mapping
+onto the supported C types is provided.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+An implementation which does not support 64 bit integral types
+on the C side should implement <Literal>Hs&lcub;Int,Word&rcub;64</Literal> as a struct. In
+this case the bounds <Constant>HS&lowbar;INT64&lowbar;&lcub;MIN,MAX&rcub;</Constant> and <Constant>HS&lowbar;WORD64&lowbar;MAX</Constant>
+are undefined.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+A valid Haskell representation of <Literal>Int</Literal> has to be equal to or
+wider than 30 bits. The <Literal>HsInt</Literal> synonym is guaranteed to map
+onto a C type that satisifies Haskell's requirement for <Literal>Int</Literal>.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+It is guaranteed that <Literal>Hs&lcub;Float,Double&rcub;</Literal> are one of C's
+floating-point types <Literal>float</Literal>/<Literal>double</Literal>/<Literal>long double</Literal>.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+It is guaranteed that <Literal>HsAddr</Literal> is of the same size as <Literal>void*</Literal>, so
+any other pointer type can be converted to and from HsAddr without any
+loss of information (K&amp;R, Appendix A6.8).
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Foreign objects are handled like <Literal>Addr</Literal> by the FFI, so there
+is again the guarantee that <Literal>HsForeignObj</Literal> is the same as
+<Literal>void*</Literal>. The separate name is meant as a reminder that there is
+a finalizer attached to the object pointed to.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Stable pointers are passed as addresses by the FFI, but this is
+only because a <Literal>void*</Literal> is used as a generic container in most
+APIs, not because they are real addresses. To make this special
+case clear, a separate C type is used here. 
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The bounds are preprocessor macros, so they can be used in
+<Literal>&num;if</Literal> and for array bounds.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Floating-point limits are a little bit more complicated, so
+preprocessor macros mirroring ISO C's <Filename>float.h</Filename> are provided:
+
+<ProgramListing>
+HS_{FLOAT,DOUBLE}_RADIX
+HS_{FLOAT,DOUBLE}_ROUNDS
+HS_{FLOAT,DOUBLE}_EPSILON
+HS_{FLOAT,DOUBLE}_DIG
+HS_{FLOAT,DOUBLE}_MANT_DIG
+HS_{FLOAT,DOUBLE}_MIN
+HS_{FLOAT,DOUBLE}_MIN_EXP
+HS_{FLOAT,DOUBLE}_MIN_10_EXP
+HS_{FLOAT,DOUBLE}_MAX
+HS_{FLOAT,DOUBLE}_MAX_EXP
+HS_{FLOAT,DOUBLE}_MAX_10_EXP
+</ProgramListing>
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+It is guaranteed that Haskell's <Literal>False</Literal>/<Literal>True</Literal> map to
+C's <Literal>0</Literal>/<Literal>1</Literal>, respectively, and vice versa. The mapping of
+any other integral value to <Literal>Bool</Literal> is left unspecified.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+To avoid name clashes, identifiers starting with <Literal>Hs</Literal> and
+macros starting with <Literal>HS&lowbar;</Literal> are reserved for the FFI.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+<Emphasis>GHC only:</Emphasis> The GHC specific types <Literal>ByteArray</Literal> and
+<Literal>MutableByteArray</Literal> both map to <Literal>char*</Literal>.
+</Para>
+</ListItem>
+
+</OrderedList>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="sec-prim-remarks">
+<Title>Some <Literal>foreign import</Literal> wrinkles
+</Title>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+By default, a <Literal>foreign import</Literal> function is <Emphasis>safe</Emphasis>. A safe
+external function may cause a Haskell garbage collection as a result
+of being called. This will typically happen when the imported
+function end up calling Haskell functions that reside in the same
+'Haskell world' (i.e., shares the same storage manager heap) -- see
+Section <XRef LinkEnd="sec-entry"> for
+details of how the FFI let's you call Haskell functions from the outside.
+
+If the programmer can guarantee that the imported function won't
+call back into Haskell, the <Literal>foreign import</Literal> can be marked as
+'unsafe' (see Section <XRef LinkEnd="sec-primitive"> for details of
+how to do this.)
+
+Unsafe calls are cheaper than safe ones, so distinguishing the two
+classes of external calls may be worth your while if you're extra
+conscious about performance.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+A <Literal>foreign import</Literal>ed function should clearly not need to know that
+it is being called from Haskell. One consequence of this is that the
+lifetimes of the arguments that are passed from Haskell <Emphasis>must</Emphasis>
+equal that of a normal C call. For instance, for the following decl,
+
+
+<ProgramListing>
+foreign import "mumble" mumble :: ForeignObj -&#62; IO ()
+
+f :: Addr -&#62; IO ()
+f ptr = do
+  fo &#60;- makeForeignObj ptr myFinalizer
+  mumble fo
+</ProgramListing>
+
+
+The <Literal>ForeignObj</Literal> must live across the call to <Function>mumble</Function> even if
+it is not subsequently used/reachable. Why the insistence on this?
+Consider what happens if <Function>mumble</Function> calls a function which calls back
+into the Haskell world to execute a function, behind our back as it
+were. This evaluation may possibly cause a garbage collection, with
+the result that <Literal>fo</Literal> may end up being finalised.
+
+By guaranteeing that <Literal>fo</Literal> will be considered live across the call
+to <Function>mumble</Function>, the unfortunate situation where <Literal>fo</Literal> is finalised
+(and hence the reference passed to <Function>mumble</Function> is suddenly no longer
+valid) is avoided.
+
+
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect2>
+
+</Sect1>
+
+<Sect1 id="sec-prim-dynamic">
+<Title>Invoking external functions via a pointer
+</Title>
+
+<Para>
+A <Literal>foreign import</Literal> declaration imports an external 
+function into Haskell. (The name of the external function
+is statically known, but the loading/linking of it may very well
+be delayed until run-time.) A <Literal>foreign import</Literal> declaration is then
+(approximately) just a type cast of an external function with a
+<Emphasis>statically known name</Emphasis>. 
+</Para>
+
+<Para>
+An extension of <Literal>foreign import</Literal> is the support for <Emphasis>dynamic</Emphasis> type
+casts of external names/addresses:
+</Para>
+
+<Para>
+
+<ProgramListing>
+topdecl 
+   : ...
+   ..
+   | 'foreign' 'import' [callconv] 'dynamic' ['unsafe']
+            varid :: Addr -&#62; (prim_args -&#62; IO prim_result)
+</ProgramListing>
+
+</Para>
+
+<Para>
+i.e., identical to a <Literal>foreign import</Literal> declaration, but for the
+specification of <Literal>dynamic</Literal> instead of the name of an external
+function. The presence of <Literal>dynamic</Literal> indicates that when an
+application of <Literal>varid</Literal> is evaluated, the function pointed to by its
+first argument will be invoked, passing it the rest of <Literal>varid</Literal>'s
+arguments.
+</Para>
+
+<Para>
+What are the uses of this? Native invocation of COM methods,
+<Footnote>
+<Para>
+Or the interfacing to any other software component technologies.
+</Para>
+</Footnote>
+Haskell libraries that want to be dressed up as C libs (and hence may have
+to support C callbacks), Haskell code that need to dynamically load
+and execute code.
+</Para>
+
+</Sect1>
+
+<Sect1 id="sec-entry">
+<Title>Exposing Haskell functions
+</Title>
+
+<Para>
+So far we've provided the Haskell programmer with ways of importing
+external functions into the Haskell world. The other half of the FFI
+coin is how to expose Haskell functionality to the outside world. So,
+dual to the <Literal>foreign import</Literal> declaration is <Literal>foreign export</Literal>:
+</Para>
+
+<Para>
+
+<ProgramListing>
+topdecl 
+  : ...
+  ..
+  | 'foreign' 'export' callconv [ext_name] varid :: prim_type
+</ProgramListing>
+
+</Para>
+
+<Para>
+A <Literal>foreign export</Literal> declaration tells the compiler to expose a
+locally defined Haskell function to the outside world, i.e., wrap
+it up behind a calling interface that's useable from C. It is only
+permitted at the toplevel, where you have to specify the type at
+which you want to export the function, along with the calling
+convention to use. For instance, the following export declaration:
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign export ccall "foo" bar :: Int -&#62; Addr -&#62; IO Double
+</ProgramListing>
+
+</Para>
+
+<Para>
+will cause a Haskell system to generate the following C callable
+function:
+</Para>
+
+<Para>
+
+<ProgramListing>
+HsDouble foo(HsInt arg1, HsAddr arg2);
+</ProgramListing>
+
+</Para>
+
+<Para>
+When invoked, it will call the Haskell function <Function>bar</Function>, passing
+it the two arguments that was passed to <Function>foo()</Function>. 
+</Para>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+The range of types that can be passed as arguments and results
+is restricted, since <Literal>varid</Literal> has got a <Literal>prim&lowbar;type</Literal>.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+It is not possible to directly export operator symbols.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The type checker will verify that the type given for the
+<Literal>foreign export</Literal> declaration is compatible with the type given to
+function definition itself.  The type in the <Literal>foreign export</Literal> may
+be less general than that of the function itself.  For example,
+this is legal:
+
+
+<ProgramListing>
+   f :: Num a =&#62; a -&#62; a
+   foreign export ccall "fInt"   f :: Int -&#62; Int
+   foreign export ccall "fFloat" f :: Float -&#62; Float
+</ProgramListing>
+
+
+These declarations export two C-callable procedures <Literal>fInt</Literal> and
+<Literal>fFloat</Literal>, both of which are implemented by the (overloaded)
+Haskell function <Function>f</Function>.
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+The <Literal>foreign export</Literal>ed IO action must catch all exceptions, as
+the FFI does not address how to signal Haskell exceptions to the
+outside world.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+<Sect2 id="sec-callback">
+<Title>Exposing Haskell function values
+</Title>
+
+<Para>
+The <Literal>foreign export</Literal> declaration gives the C programmer access to
+statically defined Haskell functions. It does not allow you to
+conveniently expose dynamically-created Haskell function values as C
+function pointers though. To permit this, the FFI supports
+<Emphasis>dynamic</Emphasis> <Literal>foreign export</Literal>s:
+</Para>
+
+<Para>
+
+<ProgramListing>
+topdecl 
+  : ...
+  ..
+  | 'foreign' 'export' [callconv] 'dynamic' varid :: prim_type -&#62; IO Addr
+</ProgramListing>
+
+</Para>
+
+<Para>
+A <Literal>foreign export dynamic</Literal> declaration declares a C function
+pointer <Emphasis>generator</Emphasis>. Given a Haskell function value of some restricted
+type, the generator wraps it up behind an externally callable interface,
+returning an <Literal>Addr</Literal> to an externally callable (C) function pointer.
+</Para>
+
+<Para>
+When that function pointer is eventually called, the corresponding
+Haskell function value is applied to the function pointer's arguments
+and evaluated, returning the result (if any) back to the caller.
+</Para>
+
+<Para>
+The mapping between the argument to a <Literal>foreign export dynamic</Literal>
+declaration and its corresponding C function pointer type, is as
+follows:
+</Para>
+
+<Para>
+
+<ProgramListing>
+typedef cType[[Res]] (*Varid_FunPtr)
+        (cType[[Ty_1]] ,.., cType[[Ty_n]]);
+</ProgramListing>
+
+</Para>
+
+<Para>
+where <Literal>cType[[]]</Literal> is the Haskell to C type mapping presented
+in Section <XRef LinkEnd="sec-mapping">.
+</Para>
+
+<Para>
+To make it all a bit more concrete, here's an example:
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign export dynamic mkCallback :: (Int -&#62; IO Int) -&#62; IO Addr
+
+foreign import registerCallback :: Addr -&#62; IO ()
+
+exportCallback :: (Int -&#62; IO Int) -&#62; IO ()
+exportCallback f = do
+  fx &#60;- mkCallback f
+  registerCallback fx
+</ProgramListing>
+
+</Para>
+
+<Para>
+The <Literal>exportCallback</Literal> lets you register a Haskell function value as
+a callback function to some external library. The C type of the
+callback that the external library expects in <Literal>registerCallback()</Literal>,
+is:
+<Footnote>
+<Para>
+An FFI implementation is encouraged to generate the C typedef corresponding
+to a <Literal>foreign export dynamic</Literal> declaration, but isn't required
+to do so.
+</Para>
+</Footnote>
+
+</Para>
+
+<Para>
+
+<ProgramListing>
+typedef HsInt (*mkCallback_FunPtr) (HsInt arg1);
+</ProgramListing>
+
+</Para>
+
+<Para>
+Creating the view of a Haskell closure as a C function pointer entails
+registering the Haskell closure as a 'root' with the underlying
+Haskell storage system, so that it won't be garbage collected. The FFI
+implementation takes care of this, but when the outside world is
+through with using a C function pointer generated by a <Literal>foreign
+export dynamic</Literal> declaration, it needs to be explicitly freed. This is
+done by calling:
+</Para>
+
+<Para>
+
+<ProgramListing>
+void freeHaskellFunctionPtr(void *ptr);
+</ProgramListing>
+
+</Para>
+
+<Para>
+In the event you need to free these function pointers from within
+Haskell, a standard 'foreign import'ed binding of the above C entry
+point is also provided,
+</Para>
+
+<Para>
+
+<ProgramListing>
+Foreign.freeHaskellFunctionPtr :: Addr -&#62; IO ()
+</ProgramListing>
+
+</Para>
+
+</Sect2>
+
+<Sect2 id="sec-foreign-label">
+<Title>Code addresses
+</Title>
+
+<Para>
+The <Literal>foreign import</Literal> declaration allows us to invoke an external
+function by name from within the comforts of the Haskell world, while
+<Literal>foreign import dynamic</Literal> lets us invoke an external function by
+address. However, there's no way of getting at the code address of
+some particular external label though, which is at times useful,
+e.g. for the construction of method tables for, say, Haskell COM
+components. To support this, the FFI has got <Literal>foreign label</Literal>s:
+</Para>
+
+<Para>
+
+<ProgramListing>
+foreign label "freeAtLast" addrOf_freeAtLast :: Addr
+</ProgramListing>
+
+</Para>
+
+<Para>
+The meaning of this declaration is that <Literal>addrOf&lowbar;freeAtLast</Literal> will now
+contain the address of the label <Literal>freeAtLast</Literal>.
+</Para>
+
+</Sect2>
+
+</Sect1>
+
+<Sect1 id="sec-changelog">
+<Title>Change history
+</Title>
+
+<Para>
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+0.95 --&gt; 0.96:
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+changed the C representation of <Literal>Haskell&lowbar;ForeignObj</Literal> from
+<Literal>(long*)</Literal> to <Literal>(void*)</Literal> -- ANSI C guarantees that <Literal>(void*)</Literal>
+is the widest possible data pointer.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Updated defnition of <Literal>varid</Literal> in Section
+<XRef LinkEnd="sec-prim-name"> to reflect Haskell98's.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Replaced confusing uses of <Literal>stdcall</Literal> with <Literal>ccall</Literal>.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+0.96 --&gt; 0.97:
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+Simplified the calling convention section, support for Pascal (and
+fastcall) calling conventions dropped. 
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Clarified that the arguments to a safe <Literal>foreign import</Literal> must have
+lifetimes that equal that of a C function application.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Outlawed the use of the (GHC specific) types <Literal>ByteArray</Literal>
+and <Literal>MutableByteArray</Literal> in safe <Literal>foreign import</Literal>s.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Added a note that support for the use of unboxed types in
+<Literal>foreign import</Literal> may be withdrawn/deprecated sometime in the future.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Simplified section which sketches a possible implementation.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Use <Literal>Hs</Literal> as prefix for the typedefs for the primitive Haskell
+FFI types rather than the longer <Literal>Haskell&lowbar;</Literal>.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+0.97 --&gt; 0.98:
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+Leave out implementation section; of limited interest.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Outlined the criteria used to decide on what calling
+conventions to support.
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+Include <Literal>newtype</Literal>s that wrap primitive types in the list
+of types that can be both passed to and returned from external
+functions.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+0.98 --&gt; 0.99:
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+Updated the section on type mapping to integrate some comments
+from people on &lt;ffi@haskell.org&gt; (a fair chunk of the text
+in that section was contributed by Sven Panne.)
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+<Function>freeHaskellFunctionPtr</Function> should belong to module <Literal>Foreign</Literal>, not <Literal>IOExts</Literal>.
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+
+</Para>
+</ListItem>
+<ListItem>
+
+<Para>
+0.99 --&gt; 0.99.1:
+
+<ItemizedList>
+<ListItem>
+
+<Para>
+<Literal>Bool</Literal> is now an FFI-supported type (i.e., added it to
+<Literal>ext&lowbar;ty</Literal>.)
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+
+</Para>
+</ListItem>
+
+</ItemizedList>
+
+</Para>
+
+</Sect1>
+
+</Article>
