@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.13 2001/09/17 14:58:09 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.14 2001/09/17 16:21:41 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -18,7 +18,8 @@ module PrelIO (
    putChar, putStr, putStrLn, print, getChar, getLine, getContents,
    interact, readFile, writeFile, appendFile, readLn, readIO, hReady,
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
-   hPutStrLn, hPrint
+   hPutStrLn, hPrint,
+   commitBuffer, commitBuffer'
  ) where
 
 #include "HsStd.h"
@@ -553,13 +554,25 @@ commitBuffer
 	:: Handle			-- handle to commit to
 	-> RawBuffer -> Int		-- address and size (in bytes) of buffer
 	-> Int				-- number of bytes of data in buffer
-	-> Bool				-- flush the handle afterward?
+	-> Bool				-- True <=> flush the handle afterward
 	-> Bool 			-- release the buffer?
 	-> IO Buffer
 
-commitBuffer hdl raw sz count flush release = do
-  wantWritableHandle "commitAndReleaseBuffer" hdl $ 
-    \ handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } -> do
+commitBuffer hdl raw sz@(I## _) count@(I## _) flush release = do
+  wantWritableHandle "commitAndReleaseBuffer" hdl $
+     commitBuffer' hdl raw sz count flush release
+
+-- Explicitly lambda-lift this function to subvert GHC's full laziness
+-- optimisations, which otherwise tends to float out subexpressions
+-- past the \handle, which is really a pessimisation in this case because
+-- that lambda is a one-shot lambda.
+--
+-- Don't forget to export the function, to stop it being inlined too.
+--
+-- This hack is a fairly big win for hPutStr performance.
+--
+commitBuffer' hdl raw sz@(I## _) count@(I## _) flush release
+  handle_@Handle__{ haFD=fd, haBuffer=ref, haBuffers=spare_buf_ref } = do
 
 #ifdef DEBUG_DUMP
       puts ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
