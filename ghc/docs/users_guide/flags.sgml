@@ -240,7 +240,7 @@
     </sect2>
 
     <sect2>
-      <title>Finding imports (<xref linkend="options-finding-imports">)</title>
+      <title>Finding imports (<xref linkend="search-path">)</title>
 
       <informaltable>
 	<tgroup cols=3 align=left colsep=1 rowsep=1>

@@ -196,7 +196,7 @@ Ok, modules loaded: Main.
       <emphasis>source</emphasis> files, whereas in standard
       batch-compilation mode the <option>-i</option> option is used to
       specify the search path for interface files, see <xref
-      linkend="options-finding-imports">.</para> </footnote></para>
+      linkend="search-path">.</para> </footnote></para>
 
       <para>One consequence of the way that GHCi follows dependencies
       to find modules to load is that every module must have a source

@@ -415,9 +415,9 @@ tuples to avoid unnecessary allocation during sequences of operations.
 import qualified Control.Monad.ST.Strict as ST
 </programlisting>
 
-      <para>Hierarchical modules have an impact on the way that GHC
-      searches for files.  For a description, see <xref
-      linkend="finding-hierarchical-modules">.</para>
+      <para>For details on how GHC searches for source and interface
+      files in the presence of hierarchical modules, see <xref
+      linkend="search-path">.</para>
 
       <para>GHC comes with a large collection of libraries arranged
       hierarchically; see the accompanying library documentation.
