@@ -793,6 +793,9 @@ install:: $(INSTALL_LIBEXECS)
 	@$(INSTALL_DIR) $(libexecdir)
 	-for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(libexecdir); \
+                if test "$(darwin_TARGET_OS)" = "1"; then \
+                        sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(libexecdir)/`basename $$i` ; \
+                fi ; \
 	done
 endif
 
