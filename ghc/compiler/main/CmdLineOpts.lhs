@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996
+% (c) The AQUA Project, Glasgow University, 1996-98
 %
 \section[CmdLineOpts]{Things to do with command-line options}
 
@@ -26,6 +26,7 @@ module CmdLineOpts (
 	opt_D_dump_deriv,
 	opt_D_dump_ds,
 	opt_D_dump_flatC,
+	opt_D_dump_foreign,
 	opt_D_dump_occur_anal,
 	opt_D_dump_rdr,
 	opt_D_dump_realC,
@@ -48,12 +49,14 @@ module CmdLineOpts (
 	opt_DoSemiTagging,
 	opt_DoEtaReduction,
 	opt_DoTickyProfiling,
+	opt_EmitCExternDecls,
 	opt_EnsureSplittableC,
 	opt_FoldrBuildOn,
 	opt_ForConcurrent,
 	opt_GlasgowExts,
 	opt_GranMacros,
 	opt_HiMap,
+	opt_HiVersion,
 	opt_IgnoreIfacePragmas,
 	opt_IrrefutableTuples,
 	opt_LiberateCaseThreshold,
@@ -70,8 +73,11 @@ module CmdLineOpts (
 	opt_ProduceC,
 	opt_ProduceHi,
 	opt_ProduceS,
+	opt_ProduceExportCStubs,
+	opt_ProduceExportHStubs,
 	opt_ReportWhyUnfoldingsDisallowed,
 	opt_ReturnInRegsThreshold,
+	opt_ReportCompile,
 	opt_SccGroup,
 	opt_SccProfilingOn,
 	opt_ShowImportSpecs,
@@ -305,6 +311,7 @@ opt_D_dump_asm			= lookUp  SLIT("-ddump-asm")
 opt_D_dump_deriv		= lookUp  SLIT("-ddump-deriv")
 opt_D_dump_ds			= lookUp  SLIT("-ddump-ds")
 opt_D_dump_flatC		= lookUp  SLIT("-ddump-flatC")
+opt_D_dump_foreign		= lookUp  SLIT("-ddump-foreign-stubs")
 opt_D_dump_occur_anal		= lookUp  SLIT("-ddump-occur-anal")
 opt_D_dump_rdr			= lookUp  SLIT("-ddump-rdr")
 opt_D_dump_realC		= lookUp  SLIT("-ddump-realC")
@@ -324,15 +331,17 @@ opt_D_verbose_core2core		= lookUp  SLIT("-dverbose-simpl")
 opt_D_verbose_stg2stg		= lookUp  SLIT("-dverbose-stg")
 opt_DoCoreLinting		= lookUp  SLIT("-dcore-lint")
 opt_DoStgLinting		= lookUp  SLIT("-dstg-lint")
+opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
 opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
 opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
-opt_DoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
+opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
 opt_ForConcurrent		= lookUp  SLIT("-fconcurrent")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
 opt_GlasgowExts			= lookUp  SLIT("-fglasgow-exts")
-opt_HiMap 			= lookup_str "-himap="  -- file saying where to look for .hi files
+opt_HiMap 			= lookup_str "-himap="       -- file saying where to look for .hi files
+opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MultiParamClasses		= opt_GlasgowExts
@@ -347,8 +356,12 @@ opt_PprStyle_User		= lookUp  SLIT("-dppr-user")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 opt_ProduceC  			= lookup_str "-C="
 opt_ProduceS  			= lookup_str "-S="
+opt_ProduceExportCStubs		= lookup_str "-F="
+opt_ProduceExportHStubs		= lookup_str "-FH="
 opt_ProduceHi 			= lookup_str "-hifile=" -- the one to produce this time 
 opt_ReportWhyUnfoldingsDisallowed= lookUp SLIT("-freport-disallowed-unfoldings")
+opt_ReportCompile                = lookUp SLIT("-freport-compile")
+opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
 opt_ShowImportSpecs		= lookUp  SLIT("-fshow-import-specs")
 opt_SigsRequired		= lookUp  SLIT("-fsignatures-required")
@@ -359,7 +372,6 @@ opt_SpecialiseOverloaded	= lookUp  SLIT("-fspecialise-overloaded")
 opt_SpecialiseTrace		= lookUp  SLIT("-ftrace-specialisation")
 opt_SpecialiseUnboxed		= lookUp  SLIT("-fspecialise-unboxed")
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
-opt_ReturnInRegsThreshold	= lookup_int "-freturn-in-regs-threshold"
 opt_SccGroup  			= lookup_str "-G="
 opt_Verbose			= lookUp  SLIT("-v")
 
