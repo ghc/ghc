@@ -83,6 +83,14 @@ with arithmetic sequences) also hold for the <tt/Enum/ instances
 over the various <tt/Int/ types defined here.
 
 <item>
+Right and left shifts by amounts greater than or equal to the width of
+the type result in either zero or -1, depending on the sign of the
+value being shifted.  This is contrary to the behaviour in C, which is
+undefined; a common interpretation is to truncate the shift count to
+the width of the type, for example <tt>1 &lt;&lt; 32 == 1</tt> in some
+C implementations.
+
+<item>
 Hugs does not provide <tt/Int64/ at the moment.
 
 </itemize>

@@ -102,6 +102,13 @@ such as <tt/Int/ (see the section of the Haskell report dealing
 with arithmetic sequences) also hold for the <tt/Enum/ instances
 over the various <tt/Word/ types defined here.
 
+<item>
+Right and left shifts by amounts greater than or equal to the width of
+the type result in a zero result.  This is contrary to the behaviour
+in C, which is undefined; a common interpretation is to truncate
+the shift count to the width of the type, for example <tt>1 &lt;&lt;
+32 == 1</tt> in some C implementations.
+
 </itemize>
 
 <bf/Implementation notes:/
