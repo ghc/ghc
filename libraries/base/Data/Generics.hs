@@ -13,9 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Data.Generics ( 
-#ifdef __GLASGOW_HASKELL__
-	module GHC.Base
-#endif
+	(:*:)(..), (:+:)(..), Unit(..)
  ) where
 
 import Prelude
