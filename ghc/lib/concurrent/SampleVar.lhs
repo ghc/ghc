@@ -19,13 +19,13 @@ potentially, wakes up a blocked reader  (same as for @putMVar@ on empty @MVar@).
 \begin{code}
 module SampleVar
        (
-         SampleVar,        --:: type _ =
+         SampleVar,         --:: type _ =
  
 	 newEmptySampleVar, --:: IO (SampleVar a)
          newSampleVar,      --:: a -> IO (SampleVar a)
 	 emptySampleVar,    --:: SampleVar a -> IO ()
-	 readSample,  	    --:: SampleVar a -> IO a
-	 writeSample  	    --:: SampleVar a -> a -> IO ()
+	 readSampleVar,	    --:: SampleVar a -> IO a
+	 writeSampleVar	    --:: SampleVar a -> a -> IO ()
 
        ) where
 
@@ -63,8 +63,8 @@ emptySampleVar v = do
 -- filled => make empty and grab sample
 -- not filled => try to grab value, empty when read val.
 --
-readSample :: SampleVar a -> IO a
-readSample svar = do
+readSampleVar :: SampleVar a -> IO a
+readSampleVar svar = do
    (readers,val) <- takeMVar svar
    putMVar svar (readers-1,val)
    takeMVar val
@@ -73,8 +73,8 @@ readSample svar = do
 -- filled => overwrite
 -- not filled => fill, write val
 --
-writeSample :: SampleVar a -> a -> IO ()
-writeSample svar v = do
+writeSampleVar :: SampleVar a -> a -> IO ()
+writeSampleVar svar v = do
    (readers,val) <- takeMVar svar
    case readers of
      1 -> 
