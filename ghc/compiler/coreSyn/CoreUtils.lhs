@@ -163,6 +163,16 @@ bindings like
 As usual, the inline_me prevents the worker from getting inlined back into the wrapper.
 We want the split, so that the coerces can cancel at the call site.  
 
+However, we can get left with tiresome type applications.  Notably, consider
+	f = /\ a -> let t = e in (t, w)
+Then lifting the let out of the big lambda gives
+	t' = /\a -> e
+	f = /\ a -> let t = inline_me (t' a) in (t, w)
+The inline_me is to stop the simplifier inlining t' right back
+into t's RHS.  In the next phase we'll substitute for t (since
+its rhs is trivial) and *then* we could get rid of the inline_me.
+But it hardly seems worth it, so I don't bother.
+
 \begin{code}
 mkInlineMe (Var v) = Var v
 mkInlineMe e	   = Note InlineMe e
