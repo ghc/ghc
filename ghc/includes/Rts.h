@@ -52,20 +52,6 @@ extern "C" {
 
 #define STG_UNUSED    GNUC3_ATTRIBUTE(__unused__)
 
-/* 
- * Empty structures isn't supported by all, so to define
- * empty structures, please protect the defn with an
- * #if SUPPORTS_EMPTY_STRUCTS. Similarly for use,
- * employ the macro MAYBE_EMPTY_STRUCT():
- *
- *     MAYBE_EMPTY_STRUCT(structFoo, fieldName);
- */
-#if SUPPORTS_EMPTY_STRUCTS
-# define MAYBE_EMPTY_STRUCT(a,b) a b;
-#else
-# define MAYBE_EMPTY_STRUCT(a,b) /* empty */
-#endif
-
 /*
  * We often want to know the size of something in units of an
  * StgWord... (rounded up, of course!)

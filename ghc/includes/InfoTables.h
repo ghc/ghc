@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.34 2004/10/07 15:54:26 wolfgang Exp $
+ * $Id: InfoTables.h,v 1.35 2004/11/08 12:26:55 simonmar Exp $
  * 
  * (c) The GHC Team, 1998-2002
  *
@@ -83,13 +83,9 @@ typedef struct {
 
 /* -----------------------------------------------------------------------------
    Ticky info
-   -------------------------------------------------------------------------- */
 
-#if defined(SUPPORTS_EMPTY_STRUCTS)
-typedef struct {
-    /* empty */
-} StgTickyInfo;
-#endif
+   There is no ticky-specific stuff in an info table at this time.
+   -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------
    Debugging info
@@ -103,11 +99,7 @@ typedef struct {
 
 #else /* !DEBUG_CLOSURE */
 
-# if defined(SUPPORTS_EMPTY_STRUCTS)
-typedef struct StgDebugInfo {
-	/* empty */
-} StgDebugInfo;
-# endif
+// There is no DEBUG-specific stuff in an info table at this time.
 
 #endif /* DEBUG_CLOSURE */
 
@@ -259,10 +251,10 @@ typedef struct _StgInfoTable {
     StgProfInfo     prof;
 #endif
 #ifdef TICKY
-    MAYBE_EMPTY_STRUCT(StgTickyInfo,ticky)
+    // Ticky-specific stuff would go here.
 #endif
 #ifdef DEBUG_CLOSURE
-    MAYBE_EMPTY_STRUCT(StgDebugInfo,debug)
+    // Debug-specific stuff would go here.
 #endif
 
     StgClosureInfo  layout;	// closure layout info (one word)

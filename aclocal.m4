@@ -1184,22 +1184,4 @@ AC_SUBST([GLUT_CFLAGS])
 AC_SUBST([GLUT_LIBS])
 ])# FP_CHECK_GLUT
 
-
-# FP_EMPTY_STRUCTS
-# ---------------- 
-# Define output variable SUPPORTS_EMPTY_STRUCTS if empty structs are accepted by
-# CC.
-dnl
-AC_DEFUN(FP_EMPTY_STRUCTS,
-[AC_CACHE_CHECK(empty struct support, fp_cv_empty_structs,
-[AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[typedef struct { /* empty */ } StgFoo;]],
-[[int i;]])],
-[fp_cv_empty_structs=yes],
-[fp_cv_empty_structs=no])])
-if test x"$fp_cv_empty_structs" = xyes; then
-  AC_DEFINE([SUPPORTS_EMPTY_STRUCTS], [1], [Define to 1 if C compiler supports declaration of empty structure types.])
-fi
-])
-
-
 # LocalWords:  fi

@@ -1365,8 +1365,6 @@ esac
 AC_SUBST(LdCmd)
 FPTOOLS_LD_X
 
-FP_EMPTY_STRUCTS
-
 AC_CONFIG_FILES([mk/config.mk])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT

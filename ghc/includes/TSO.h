@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.36 2004/08/13 13:57:06 simonmar Exp $
+ * $Id: TSO.h,v 1.37 2004/11/08 12:26:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -9,8 +9,6 @@
 
 #ifndef TSO_H
 #define TSO_H
-
-#if defined(GRAN) || defined(PAR)
 
 #if DEBUG
 #define TSO_MAGIC 4321
@@ -34,7 +32,16 @@ typedef struct {
   StgInt   localsparks;
   rtsTime  clock;
 } StgTSOStatBuf;
-#endif
+
+/*
+ * GRAN: We distinguish between the various classes of threads in 
+ * the system.
+ */
+typedef enum {
+  AdvisoryPriority,
+  MandatoryPriority,
+  RevalPriority
+} StgThreadPriority;
 
 /*
  * PROFILING info in a TSO
@@ -46,54 +53,25 @@ typedef struct {
 /*
  * PAR info in a TSO
  */
-#ifdef PAR
 typedef StgTSOStatBuf StgTSOParInfo;
-#else
-#ifdef SUPPORTS_EMPTY_STRUCTS
-typedef struct {
-	/* empty */
-} StgTSOParInfo;
-#endif
-#endif
 
 /*
  * DIST info in a TSO
  */
-#ifdef DIST
 typedef struct {
   StgThreadPriority  priority;   
   StgInt             revalTid;   /* ToDo: merge both into 1 word */
   StgInt             revalSlot;
 } StgTSODistInfo;
-#else
-#ifdef SUPPORTS_EMPTY_STRUCTS
-typedef struct {
-	/* empty */
-} StgTSODistInfo;
-#endif
-#endif
 
 /*
  * GRAN info in a TSO
  */
-#ifdef GRAN
 typedef StgTSOStatBuf StgTSOGranInfo;
-#else
-#ifdef SUPPORTS_EMPTY_STRUCTS
-typedef struct {
-	/* empty */
-} StgTSOGranInfo;
-#endif
-#endif
 
 /*
- * TICKY_TICKY info in a TSO
+ * There is no TICKY info in a TSO at this time.
  */
-#ifdef SUPPORTS_EMPTY_STRUCTS
-typedef struct {
-    /* empty */
-} StgTSOTickyInfo;
-#endif
 
 /*
  * Thread IDs are 32 bits.
@@ -106,16 +84,6 @@ typedef StgWord32 StgThreadID;
  * full list.
  */
 typedef unsigned int StgThreadReturnCode;
-
-/*
- * We distinguish between the various classes of threads in the system.
- */
-
-typedef enum {
-  AdvisoryPriority,
-  MandatoryPriority,
-  RevalPriority
-} StgThreadPriority;
 
 #if defined(mingw32_TARGET_OS)
 /* results from an async I/O request + it's ID. */
@@ -170,15 +138,20 @@ typedef struct StgTSO_ {
   struct StgMainThread_* main;
   
 #ifdef TICKY_TICKY
-  MAYBE_EMPTY_STRUCT(StgTSOTickyInfo,ticky)
+  // TICKY-specific stuff would go here.
 #endif
 #ifdef PROFILING
    StgTSOProfInfo prof;
 #endif
-
-   MAYBE_EMPTY_STRUCT(StgTSOParInfo,par);
-   MAYBE_EMPTY_STRUCT(StgTSOGranInfo,gran);
-   MAYBE_EMPTY_STRUCT(StgTSODistInfo,dist);
+#ifdef PAR
+   StgTSOParInfo par;
+#endif
+#ifdef GRAN
+   StgTSOGranInfo gran;
+#endif
+#ifdef DIST
+   StgTSODistInfo dist;
+#endif
 
   /* The thread stack... */
   StgWord    	     stack_size;     /* stack size in *words* */

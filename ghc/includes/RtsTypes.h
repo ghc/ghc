@@ -1,5 +1,5 @@
 /*
-  Time-stamp: <Mon Mar 05 2001 22:39:27 Stardate: [-30]6284.72 hwloidl>
+  Time-stamp: <2004-11-08 12:17:01 simonmar>
 
   RTS specific types.
 */
@@ -41,6 +41,8 @@ typedef enum {
    Types specific to the parallel runtime system.
 */
 
+typedef ullong        rtsTime;
+
 #if defined(PAR)
 /* types only needed in the parallel system */
 typedef struct hashtable ParHashTable;
@@ -50,7 +52,6 @@ typedef struct hashlist ParHashList;
 // typedef W_ TIME;
 // typedef GlobalTaskId Proc;
 typedef int           GlobalTaskId;
-typedef ullong        rtsTime;
 typedef GlobalTaskId  PEs;
 typedef unsigned int  rtsWeight;
 typedef int           rtsPacket;

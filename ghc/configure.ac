@@ -1,5 +1,5 @@
 # Initialise and check sanity.
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.3], [glasgow-haskell-bugs@haskell.org], [ghc])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [6.3.20041107], [glasgow-haskell-bugs@haskell.org], [ghc])
 AC_CONFIG_SRCDIR([ghc.spec.in])
 
 FP_SETUP_PROJECT_INFO

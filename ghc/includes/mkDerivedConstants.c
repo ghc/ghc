@@ -133,7 +133,7 @@
     def_offset(str(s_type,field), OFFSET(s_type,field) - sizeof(StgHeader) - sizeof(StgTSOProfInfo));
 
 #define tso_field_macro(str) \
-    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+SIZEOF_OPT_StgTSOTickyInfo+SIZEOF_OPT_StgTSOParInfo+SIZEOF_OPT_StgTSOGranInfo+SIZEOF_OPT_StgTSODistInfo+OFFSET_" str "]\n");
+    printf("#define " str "(__ptr__)  REP_" str "[__ptr__+SIZEOF_StgHeader+SIZEOF_OPT_StgTSOProfInfo+SIZEOF_OPT_StgTSOParInfo+SIZEOF_OPT_StgTSOGranInfo+SIZEOF_OPT_StgTSODistInfo+OFFSET_" str "]\n");
 
 #define tso_field(s_type, field)		\
     tso_offset(s_type, field);			\
@@ -164,8 +164,9 @@ main(int argc, char *argv[])
     printf("#define STD_ITBL_SIZE   %d\n", sizeofW(StgInfoTable));
     printf("#define RET_ITBL_SIZE   %d\n", sizeofW(StgRetInfoTable) - sizeofW(StgInfoTable));
     printf("#define PROF_ITBL_SIZE  %d\n", sizeofW(StgProfInfo));
+
     printf("#define GRAN_ITBL_SIZE  %d\n", 0);
-    printf("#define TICKY_ITBL_SIZE %d\n", sizeofW(StgTickyInfo));
+    printf("#define TICKY_ITBL_SIZE %d\n", 0);
 
     printf("#define BLOCK_SIZE   %d\n", BLOCK_SIZE);
     printf("#define MBLOCK_SIZE   %d\n", MBLOCK_SIZE);  
@@ -258,13 +259,11 @@ main(int argc, char *argv[])
     tso_field(StgTSO, stack_size);
 
     struct_size(StgTSOProfInfo);
-    struct_size(StgTSOTickyInfo);
     struct_size(StgTSOParInfo);
     struct_size(StgTSOGranInfo);
     struct_size(StgTSODistInfo);
 
     opt_struct_size(StgTSOProfInfo,PROFILING);
-    opt_struct_size(StgTSOTickyInfo,TICKY_TICKY);
     opt_struct_size(StgTSOParInfo,PAR);
     opt_struct_size(StgTSOGranInfo,GRAN);
     opt_struct_size(StgTSODistInfo,DIST);
