@@ -22,10 +22,11 @@ import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
 			  idSpecialisation, idUnique, isDataConWrapId,
 			  mkVanillaGlobal, isLocalId, isRecordSelector,
-			  setIdUnfolding, hasNoBinding, mkUserLocal
+			  setIdUnfolding, hasNoBinding, mkUserLocal,
+			  idNewDemandInfo, setIdNewDemandInfo
 			) 
 import IdInfo		{- loads of stuff -}
-import NewDemand	( isBottomingSig, topSig )
+import NewDemand	( isBottomingSig, topSig, isStrictDmd )
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, isGlobalName, setNameUnique
 			)
@@ -617,7 +618,15 @@ tidyBndrs env vars = mapAccumL tidyBndr env vars
 
 -- tidyBndrWithRhs is used for let binders
 tidyBndrWithRhs :: TidyEnv -> (Id, CoreExpr) -> (TidyEnv, Var)
-tidyBndrWithRhs env (id,rhs) = tidyId env id
+tidyBndrWithRhs env (id,rhs) 
+  = add_dmd_info (tidyId env id)
+  where
+	-- We add demand info for let(rec) binders, because
+	-- that's what tells CorePrep to generate a case instead of a thunk
+    add_dmd_info (env,new_id) 
+	| isStrictDmd dmd_info = (env, setIdNewDemandInfo new_id dmd_info)
+	| otherwise	       = (env, new_id)
+    dmd_info = idNewDemandInfo id
 
 tidyId :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyId env@(tidy_env, var_env) id
