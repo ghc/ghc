@@ -34,10 +34,15 @@ Quick start:  the following is *supposed* to work
 	$ make install
 
 where 'make' is whatever GNU make is called on your system (GNU make
-is *required*).  The configuration script is a standard GNU autoconf
-script which accepts all the normal arguments, eg. --prefix=<blah> to
-install the package somewhere other than /usr/local.  Try ./configure
---help to get a full list of the options.
+is *required*).  If there are any other tools required for the build,
+then the configure script will detect them and tell you if any are
+missing.  For example, a working GHC installation is required for
+building most of the tools (including GHC itself).
+
+The configuration script is a standard GNU autoconf script which
+accepts all the normal arguments, eg. --prefix=<blah> to install the
+package somewhere other than /usr/local.  Try ./configure --help to
+get a full list of the options.
 
 There is usually an ANNOUNCE* file with any distribution.  Please
 consult that, or the <piece>/README file, to find out how to proceed.
