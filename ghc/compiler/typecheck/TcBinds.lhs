@@ -260,8 +260,9 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 	--   - zonking the generalized type vars
     let lie_avail = case maybe_sig_theta of
 		      Nothing	   -> emptyLIE
-		      Just (_, la) -> la in
-    tcImprove (lie_avail `plusLIE` lie_req)			`thenTc_`
+		      Just (_, la) -> la
+	lie_avail_req = lie_avail `plusLIE` lie_req in
+    tcImprove lie_avail_req				`thenTc_`
 
 	-- COMPUTE VARIABLES OVER WHICH TO QUANTIFY, namely tyvars_to_gen
 	-- The tyvars_not_to_gen are free in the environment, and hence
@@ -292,7 +293,7 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 
 	-- SIMPLIFY THE LIE
     tcExtendGlobalTyVars tyvars_not_to_gen (
-	let ips = getIPsOfLIE lie_req in
+	let ips = getIPsOfLIE lie_avail_req in
 	if null real_tyvars_to_gen_list && (null ips || not is_unrestricted) then
 		-- No polymorphism, and no IPs, so no need to simplify context
 	    returnTc (lie_req, EmptyMonoBinds, [])
