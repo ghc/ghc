@@ -10,7 +10,7 @@
 #
 ##############################################################################
 
-require "aux.pl";
+require "par-aux.pl";
 
 sub read_template {
     local ($org_templ_file_name,$input) = @_;

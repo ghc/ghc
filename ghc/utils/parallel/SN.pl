@@ -24,7 +24,7 @@ push(@INC, $gran_dir, $gran_dir . "/bin");
 # print STDERR "INC: " . join(':',@INC) . "\n";
 
 require "getopts.pl";
-require "aux.pl";
+require "par-aux.pl";
 require "stats.pl";
 
 &Getopts('hv');  
