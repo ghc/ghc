@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.44 2001/03/23 16:36:21 simonmar Exp $
+# $Id: Makefile,v 1.45 2001/04/03 15:57:30 dsyme Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -42,38 +42,35 @@ LIBOBJS = $(patsubst %.c,%.$(way_)o,$(SRCS_RTS_C)) \
 # gcc provides lots of useful warnings if you ask it.
 # This is a pretty good list to start with - use a # to comment out
 # any you don't like.
-WARNING_OPTS += -optc-Wall 
-WARNING_OPTS += -optc-W
-WARNING_OPTS += -optc-Wstrict-prototypes 
-WARNING_OPTS += -optc-Wmissing-prototypes 
-WARNING_OPTS += -optc-Wmissing-declarations
-WARNING_OPTS += -optc-Winline
-WARNING_OPTS += -optc-Waggregate-return
-#WARNING_OPTS += -optc-Wpointer-arith
-WARNING_OPTS += -optc-Wbad-function-cast
-#WARNING_OPTS += -optc-Wcast-align
-#WARNING_OPTS += -optc-Wnested-externs
-#WARNING_OPTS += -optc-Wshadow
-#WARNING_OPTS += -optc-Wcast-qual
-#WARNING_OPTS += -optc-Wno-unused 
-#WARNING_OPTS += -optc-Wredundant-decls 
-#WARNING_OPTS += -optc-Wconversion
+WARNING_OPTS += -Wall 
+WARNING_OPTS += -W
+WARNING_OPTS += -Wstrict-prototypes 
+WARNING_OPTS += -Wmissing-prototypes 
+WARNING_OPTS += -Wmissing-declarations
+WARNING_OPTS += -Winline
+WARNING_OPTS += -Waggregate-return
+#WARNING_OPTS += -Wpointer-arith
+WARNING_OPTS += -Wbad-function-cast
+#WARNING_OPTS += -Wcast-align
+#WARNING_OPTS += -Wnested-externs
+#WARNING_OPTS += -Wshadow
+#WARNING_OPTS += -Wcast-qual
+#WARNING_OPTS += -Wno-unused 
+#WARNING_OPTS += -Wredundant-decls 
+#WARNING_OPTS += -Wconversion
 
-SRC_HC_OPTS += -I../includes -I. -Iparallel $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
+SRC_CC_OPTS +=  $(GhcRtsCcOpts)  $(WARNING_OPTS) -DCOMPILING_RTS
+
+SRC_HC_OPTS += -I../includes -I. -Iparallel $(GhcRtsHcOpts) -DCOMPILING_RTS
 
 ifneq "$(DLLized)" "YES"
 SRC_HC_OPTS += -static
 endif
-# SRC_HC_OPTS += -optc-fPIC
+# SRC_HC_OPTS += -fPIC
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif
-
-# compiling straight C files: use all the HC_OPTS, plus any extra options in
-# $(GhcRtsCcOpts).
-SRC_CC_OPTS += $(GhcRtsCcOpts)
-SRC_CC_OPTS += $(HC_OPTS)
 
 #-----------------------------------------------------------------------------
 # Include the Front panel code?
@@ -83,9 +80,9 @@ SRCS_RTS_C :=  $(filter-out Vis%.c, $(SRCS_RTS_C))
 # we need GTK+ for the front panel
 ifneq "$(GTK_CONFIG)" ""
 ifeq "$(GhcRtsWithFrontPanel)" "YES"
-SRC_HC_OPTS 		+= `$(GTK_CONFIG) --cflags` -optc-DRTS_GTK_FRONTPANEL
+SRC_HC_OPTS 		+= `$(GTK_CONFIG) --cflags` -DRTS_GTK_FRONTPANEL
 SRCS_RTS_C 		:= $(SRCS_RTS_C) $(wildcard Vis*.c)
-VisCallbacks_CC_OPTS 	+= -optc-Wno-unused
+VisCallbacks_CC_OPTS 	+= -Wno-unused
 endif # GhcRtsWithFrontPanel
 endif # GTK_CONFIG
 
@@ -107,11 +104,12 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 
 ifeq "$(BootingFromHc)" "YES"
 # use the normal $(CC) when booting from .hc files
-SRC_CC_OPTS := $(patsubst -optc%,%,$(SRC_CC_OPTS))
-SRC_CC_OPTS += $(PLATFORM_CC_OPTS)
+SRC_CC_OPTS := $(SRC_CC_OPTS)
+SRC_CC_OPTS += $(PLATFORM_CC_OPTS) $(HC_OPTS)
 else
 # otherwise, use $(GHC_INPLACE) as the C compiler.
 CC=$(GHC_INPLACE)
+CC_OPTS := $(addprefix -optc, $(CC_OPTS)) $(HC_OPTS)
 endif
 
 HC=$(GHC_INPLACE)
@@ -164,7 +162,7 @@ ifeq "$(DLLized)" "YES"
 all :: $(DLL_PEN)/gmp.dll
 
 $(DLL_PEN)/gmp.dll:
-	make -C gmp gmp.dll
+	$(MAKE) -C gmp gmp.dll
 	$(MV) gmp/gmp.dll $(DLL_PEN)
 endif
 
