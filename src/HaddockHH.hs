@@ -1,4 +1,4 @@
-module HaddockHH(ppHHContents, ppHHIndex) where
+module HaddockHH(ppHHContents, ppHHIndex, ppHHProject) where
 
 import HsSyn hiding(Doc)
 
@@ -8,19 +8,20 @@ import FiniteMap
 #else
 import Text.PrettyPrint
 import Data.FiniteMap
+import Data.Char
 #endif
 
+import Maybe	( fromMaybe )
 import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes
 
-contentsHHFile, indexHHFile :: String
-contentsHHFile = "index.hhc"
-indexHHFile = "index.hhk"
 
-ppHHContents :: FilePath -> [ModuleTree] -> IO ()
-ppHHContents odir tree = do
-  let html =
+ppHHContents :: FilePath -> Maybe String -> [ModuleTree] -> IO ()
+ppHHContents odir maybe_package tree = do
+  let contentsHHFile = package++".hhc"
+
+      html =
       	text "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">" $$
 	text "<HTML>" $$
 	text "<HEAD>" $$
@@ -31,6 +32,8 @@ ppHHContents odir tree = do
 	text "</BODY><HTML>"
   writeFile (odir ++ pathSeparator:contentsHHFile) (render html)
   where
+	package = fromMaybe "pkg" maybe_package
+	
 	ppModuleTree :: [ModuleTree] -> Doc
 	ppModuleTree ts =
 		text "<OBJECT type=\"text/site properties\">" $$
@@ -67,9 +70,11 @@ ppHHContents odir tree = do
 			-- reconstruct the module name
 		
 -------------------------------
-ppHHIndex :: FilePath -> [(Module,Interface)] -> IO ()
-ppHHIndex odir ifaces = do
-  let html = 
+ppHHIndex :: FilePath -> Maybe String -> [(Module,Interface)] -> IO ()
+ppHHIndex odir maybe_package ifaces = do
+  let indexHHFile = package++".hhk"
+  
+      html = 
       	text "<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML//EN\">" $$
 	text "<HTML>" $$
 	text "<HEAD>" $$
@@ -81,7 +86,9 @@ ppHHIndex odir ifaces = do
 	text "</UL>" $$
 	text "</BODY><HTML>"
   writeFile (odir ++ pathSeparator:indexHHFile) (render html)
-  where	
+  where
+	package = fromMaybe "pkg" maybe_package
+  	
 	index :: [(HsName, [Module])]
 	index = fmToList (foldr getIfaceIndex emptyFM ifaces)
 
@@ -89,11 +96,60 @@ ppHHIndex odir ifaces = do
 		addListToFM_C (++) fm [(name, [mdl]) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
 	
 	ppList [] = empty
-	ppList ((name,(Module mdl:_)):mdls)  =
+	ppList ((name,refs):mdls)  =
 		text "<LI>" <> nest 4
 				(text "<OBJECT type=\"text/sitemap\">" $$
 				 text "<PARAM name=\"Name\" value=\"" <> text (show name) <> text "\">" $$
-				 text "<PARAM name=\"Local\" value=\"" <> text (nameHtmlRef "" mdl name) <> text "\">" $$
+				 ppReference name refs $$
 				 text "</OBJECT>") $+$
 		text "</LI>" $$
 		ppList mdls
+
+	ppReference name [] = empty
+	ppReference name (Module mdl:refs) =
+		text "<PARAM name=\"Local\" value=\"" <> text (nameHtmlRef "" mdl name) <> text "\">" $$
+		ppReference name refs
+
+
+ppHHProject :: FilePath -> String -> Maybe String -> [(Module,Interface)] -> IO ()
+ppHHProject odir doctitle maybe_package ifaces = do
+  let projectHHFile = package++".hhp"
+      doc =
+        text "[OPTIONS]" $$
+        text "Compatibility=1.1 or later" $$
+        text "Compiled file=" <> text package <> text ".chm" $$
+        text "Contents file=" <> text package <> text ".hhc" $$
+        text "Default topic=" <> text contentsHtmlFile $$
+        text "Display compile progress=No" $$
+        text "Index file=" <> text package <> text ".hhk" $$
+        text "Title=" <> text doctitle $$
+	space $$
+        text "[FILES]" $$
+        ppMods ifaces $$
+        text contentsHtmlFile $$
+        text indexHtmlFile $$
+        ppIndexFiles chars $$
+        text cssFile $$
+        text iconFile $$
+        text jsFile $$
+        text plusFile $$
+        text minusFile
+  writeFile (odir ++ pathSeparator:projectHHFile) (render doc)
+  where
+    package = fromMaybe "pkg" maybe_package
+	
+    ppMods [] = empty
+    ppMods ((Module mdl,_):ifaces) =
+        text (moduleHtmlFile "" mdl) $$
+        ppMods ifaces
+		
+    ppIndexFiles []     = empty
+    ppIndexFiles (c:cs) =
+        text (subIndexHtmlFile c) $$
+        ppIndexFiles cs
+
+    chars :: [Char]
+    chars = keysFM (foldr getIfaceIndex emptyFM ifaces)
+
+    getIfaceIndex (mdl,iface) fm =
+        addListToFM fm [(toUpper (head (show name)),()) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']

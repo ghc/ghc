@@ -86,6 +86,8 @@ ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format =  do
 
   -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
+    Just "mshelp" -> do
+		ppHHProject odir doctitle maybe_package visible_ifaces
     Just "mshelp2" -> do
 		ppHH2Files      odir maybe_package visible_ifaces
 		ppHH2Collection odir doctitle maybe_package
@@ -230,7 +232,7 @@ ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_ur
   -- Generate contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
-    Just "mshelp"  -> ppHHContents  odir tree
+    Just "mshelp"  -> ppHHContents  odir maybe_package tree
     Just "mshelp2" -> ppHH2Contents odir maybe_package tree
     Just format    -> fail ("The "++format++" format is not implemented")
 
@@ -315,7 +317,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
     -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
-    Just "mshelp"  -> ppHHIndex odir ifaces
+    Just "mshelp"  -> ppHHIndex  odir maybe_package ifaces
     Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
     Just format    -> fail ("The "++format++" format is not implemented")
  where
