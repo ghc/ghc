@@ -1,10 +1,11 @@
- 
+
 tcfail013.hs:4:
     Couldn't match `[t]' against `Bool'
 	Expected type: [t]
 	Inferred type: Bool
     In the pattern: True
     In an equation for function `f': f True = 2
+
 
 
 Compilation had errors

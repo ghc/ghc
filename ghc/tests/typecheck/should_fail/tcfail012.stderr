@@ -1,9 +1,10 @@
- 
+
 tcfail012.hs:3:
     Couldn't match `Bool' against `[t]'
 	Expected type: Bool
 	Inferred type: [t]
     In the right-hand side of a pattern binding: []
+
 
 
 Compilation had errors

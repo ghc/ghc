@@ -1,5 +1,6 @@
- 
+
 tcfail054.hs:3: Data constructor not in scope: `B'
+
 
 
 Compilation had errors

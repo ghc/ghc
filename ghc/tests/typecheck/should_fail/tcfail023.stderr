@@ -1,19 +1,20 @@
- 
+
 tcfail023.hs:1:
     Duplicate or overlapping instance declarations
 	for `A B' at tcfail023.hs:11 and tcfail023.hs:14
- 
+
 tcfail023.hs:11:
     Couldn't match `B' against `Bool'
 	Expected type: B
 	Inferred type: Bool
     In the right-hand side of an equation for `op': True
- 
+
 tcfail023.hs:14:
     Couldn't match `B' against `Bool'
 	Expected type: B
 	Inferred type: Bool
     In the right-hand side of an equation for `op': True
+
 
 
 Compilation had errors

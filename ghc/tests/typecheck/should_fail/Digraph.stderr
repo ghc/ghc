@@ -1,4 +1,4 @@
- 
+
 Digraph.hs:19:
     Inferred type is less polymorphic than expected
 	Quantified type variable `v' escapes
@@ -7,7 +7,7 @@ Digraph.hs:19:
 	    es :: [Edge vertex]
 	    vs :: [vertex]
     When checking the type signature
-	reversed_edges :: forall _118. {PrelBase.Eq _118} => [Edge _118]
+	reversed_edges :: forall v1. {Eq v1} => [Edge v1]
     In an equation for function `stronglyConnComp':
 	stronglyConnComp es vs
 			   = snd (span_tree (new_range reversed_edges)
@@ -29,6 +29,7 @@ Digraph.hs:19:
 			       swap (x, y) = (y, x)
 			       reversed_edges :: forall v. (Eq v) => [Edge v]
 			       reversed_edges = map swap es
+
 
 
 Compilation had errors

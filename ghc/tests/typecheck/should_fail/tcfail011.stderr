@@ -1,5 +1,6 @@
- 
-tcfail011.hs:3: Value not in scope: `y'
+
+tcfail011.hs:3: Variable not in scope: `y'
+
 
 
 Compilation had errors

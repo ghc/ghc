@@ -1,12 +1,13 @@
- 
+
 tcfail065.hs:29:
     Inferred type is less polymorphic than expected
 	Quantified type variable `x' escapes
 	It is mentioned in the environment
 	The following variables in the environment mention `x'
     When checking the type signature
-	setX :: forall _1201. _1201 -> X _120 -> X _120
+	setX :: forall x2. x2 -> X x1 -> X x1
     In the definition for method `setX'
+
 
 
 Compilation had errors

@@ -1,22 +1,24 @@
- 
-tcfail044.hs:12: Warning:
-    No explicit method nor default method for `PrelBase.signum'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail044.hs:12: Warning:
-    No explicit method nor default method for `PrelBase.abs'
-    in an instance declaration for `PrelBase.Num'
 
- 
-tcfail044.hs:5:
-    Illegal instance declaration for `PrelBase.Eq (a -> a)'
-	(the instance type must be of form (T a b c)
-	 where T is not a synonym, and a,b,c are distinct type variables)
- 
 tcfail044.hs:12:
-    Illegal instance declaration for `PrelBase.Num (a -> a)'
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail044.hs:12:
+    Warning: No explicit method nor default method for `abs'
+	     in an instance declaration for `Num'
+
+
+
+tcfail044.hs:5:
+    Illegal instance declaration for `Eq (a -> a)'
 	(the instance type must be of form (T a b c)
 	 where T is not a synonym, and a,b,c are distinct type variables)
+
+tcfail044.hs:12:
+    Illegal instance declaration for `Num (a -> a)'
+	(the instance type must be of form (T a b c)
+	 where T is not a synonym, and a,b,c are distinct type variables)
+
 
 
 Compilation had errors

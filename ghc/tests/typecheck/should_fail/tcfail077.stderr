@@ -1,5 +1,6 @@
- 
-tcfail077.hs:8: Value not in scope: `op2'
+
+tcfail077.hs:8: Variable not in scope: `op2'
+
 
 
 Compilation had errors

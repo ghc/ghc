@@ -1,9 +1,10 @@
- 
+
 tcfail005.hs:3:
-    Couldn't match `[t]' against `(_116, _1161)'
+    Couldn't match `[t]' against `(t1, t2)'
 	Expected type: [t]
-	Inferred type: (_116, _1161)
+	Inferred type: (t1, t2)
     In the right-hand side of a pattern binding: (1, 'a')
+
 
 
 Compilation had errors

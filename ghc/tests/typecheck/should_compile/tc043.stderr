@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed f A{op1} B{op2};
-instance {A PrelBase.Int} = _fAInt;
-instance __forall [a] {B a} => {B [a]} = _gB_91_93;
-1 _fAInt :: {A PrelBase.Int} ;
-1 _gB_91_93 :: __forall [a] {B a} => {B [a]} ;
+__export ShouldSucceed A{op1} B{op2} f;
+instance {A PrelBase.Int} = zdfAInt;
+instance __forall [a] {B a} => {B [a]} = zdfBZMZN;
 1 class A a where {op1 :: a} ;
 1 class B b where {op2 :: b -> PrelBase.Int} ;
 1 f :: __forall [t a] {A a} => t -> a ;
+1 zdfAInt :: {A PrelBase.Int} ;
+1 zdfBZMZN :: __forall [a] {B a} => {B [a]} ;

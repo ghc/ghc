@@ -1,10 +1,10 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed Eq'{doubleeq} Ord'{lt};
-instance {Eq' PrelBase.Int} = _fEq'Int;
-instance {Ord' PrelBase.Int} = _fOrd'Int;
-instance __forall [a] {Eq' a} => {Eq' [a]} = _gEq'_91_93;
-1 _fEq'Int :: {Eq' PrelBase.Int} ;
-1 _fOrd'Int :: {Ord' PrelBase.Int} ;
-1 _gEq'_91_93 :: __forall [a] {Eq' a} => {Eq' [a]} ;
-1 class Eq' a where {doubleeq :: a -> a -> PrelBase.Bool} ;
-1 class {Eq' a}  => Ord' a where {lt :: a -> a -> PrelBase.Bool} ;
+__export ShouldSucceed Eqzq{doubleeq} Ordzq{lt};
+instance {Eqzq PrelBase.Int} = zdfEqzqInt;
+instance __forall [a] {Eqzq a} => {Eqzq [a]} = zdfEqzqZMZN;
+instance {Ordzq PrelBase.Int} = zdfOrdzqInt;
+1 class Eqzq a where {doubleeq :: a -> a -> PrelBase.Bool} ;
+1 class {Eqzq a}  => Ordzq a where {lt :: a -> a -> PrelBase.Bool} ;
+1 zdfEqzqInt :: {Eqzq PrelBase.Int} ;
+1 zdfEqzqZMZN :: __forall [a] {Eqzq a} => {Eqzq [a]} ;
+1 zdfOrdzqInt :: {Ordzq PrelBase.Int} ;

@@ -1,9 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed g Reps{f} X{Tag};
-instance {Reps PrelBase.Bool} = _fRepsBool;
-instance __forall [q] => {Reps (X q)} = _fRepsX;
-1 _fRepsBool :: {Reps PrelBase.Bool} ;
-1 _fRepsX :: __forall [q] => {Reps (X q)} ;
+__export ShouldSucceed Reps{f} X{Tag} g;
+instance {Reps PrelBase.Bool} = zdfRepsBool;
+instance __forall [q] => {Reps (X q)} = zdfRepsX;
 1 class Reps r where {f :: r -> r -> r} ;
 1 data X a = Tag a ;
 1 g :: __forall [r] {Reps r} => r -> r ;
+1 zdfRepsBool :: {Reps PrelBase.Bool} ;
+1 zdfRepsX :: __forall [q] => {Reps (X q)} ;

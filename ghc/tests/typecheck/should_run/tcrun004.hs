@@ -1,7 +1,6 @@
--- Originally from Kevin Glynn
--- Tests existential data types
-
-module Main where
+-- !!! Tests existential data types
+--     Originally from Kevin Glynn
+module Main(main) where
 
 data Coordinate3D = Coord3D {cx, cy, cz::Double} 
                     deriving (Eq, Show)
@@ -66,7 +65,7 @@ putName x = putStr $ getPictureName x
 
 
 main :: IO ()
-main = do { sequence $ map put_it obj_list }
+main = do { sequence_ $ map put_it obj_list }
      where
-       put_it (MkGenPic s) = putStr (getPictureName s)
+       put_it (MkGenPic s) = putStrLn (getPictureName s)
 

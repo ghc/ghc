@@ -1,11 +1,8 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed bindState foo unState unitState St State{State} TS{TS vs};
-instance {PrelBase.Eq TS} = _fEqTS;
-instance __forall [c] {PrelBase.Eq c} => {PrelBase.Monad (State c)} = _fMonadState;
-instance {PrelBase.Show TS} = _fShowTS;
-1 _fEqTS :: {PrelBase.Eq TS} ;
-1 _fMonadState :: __forall [c] {PrelBase.Eq c} => {PrelBase.Monad (State c)} ;
-1 _fShowTS :: {PrelBase.Show TS} ;
+__export ShouldSucceed St State{State} TS{TS vs} bindState foo unState unitState;
+instance {PrelBase.Eq TS} = zdfEqTS;
+instance __forall [c] {PrelBase.Eq c} => {PrelBase.Monad (State c)} = zdfMonadState;
+instance {PrelBase.Show TS} = zdfShowTS;
 1 bindState :: __forall [c a b] => State c a -> (a -> State c b) -> State c b ;
 1 data State c a = State (c -> (a, c)) ;
 1 data TS = TS {vs :: PrelBase.Int} ;
@@ -13,3 +10,6 @@ instance {PrelBase.Show TS} = _fShowTS;
 1 type St a = State TS a ;
 1 unState :: __forall [c a] => State c a -> c -> (a, c) ;
 1 unitState :: __forall [a c] => a -> State c a ;
+1 zdfEqTS :: {PrelBase.Eq TS} ;
+1 zdfMonadState :: __forall [c] {PrelBase.Eq c} => {PrelBase.Monad (State c)} ;
+1 zdfShowTS :: {PrelBase.Show TS} ;

@@ -1,13 +1,14 @@
- 
+
 tcfail072.hs:23:
     Ambiguous type variable(s) `p'
-	in the constraint `PrelBase.Ord p'
+	in the constraint `Ord p'
 	arising from use of `g' at tcfail072.hs:23
- 
+
 tcfail072.hs:23:
     Ambiguous type variable(s) `q'
-	in the constraint `PrelBase.Ord q'
+	in the constraint `Ord q'
 	arising from use of `g' at tcfail072.hs:23
+
 
 
 Compilation had errors

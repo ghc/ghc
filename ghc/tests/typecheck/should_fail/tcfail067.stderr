@@ -1,37 +1,38 @@
- 
-tcfail067.hs:65: Warning:
-    No explicit method nor default method for `PrelBase.signum'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail067.hs:65: Warning:
-    No explicit method nor default method for `PrelBase.abs'
-    in an instance declaration for `PrelBase.Num'
 
- 
 tcfail067.hs:65:
-    Could not deduce `PrelBase.Ord a'
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail067.hs:65:
+    Warning: No explicit method nor default method for `abs'
+	     in an instance declaration for `Num'
+
+
+
+tcfail067.hs:65:
+    Could not deduce `Ord a'
 	(arising from use of `SubRange' at tcfail067.hs:65)
-	from the context: (PrelBase.Num (SubRange _97), PrelBase.Num _97, PrelBase.Eq (SubRange _97), PrelBase.Show (SubRange _97), PrelBase.Eq (SubRange _97), PrelBase.Show (SubRange _97))
-    Probable cause: missing `PrelBase.Ord a'
-		    in instance declaration context
+	from the context: (Num (SubRange a1), Num a1, Eq (SubRange a1), Show (SubRange a1), Eq (SubRange a1), Show (SubRange a1))
+    Probable cause: missing `Ord a' in instance declaration context
     When checking the methods of an instance declaration
- 
+
 tcfail067.hs:65:
-    Could not deduce `PrelBase.Show (SubRange a)'
+    Could not deduce `Show (SubRange a)'
 	(arising from an instance declaration at tcfail067.hs:65)
-	from the context: (PrelBase.Num _97)
-    Probable cause: missing `PrelBase.Show (SubRange a)'
+	from the context: (Num a1)
+    Probable cause: missing `Show (SubRange a)'
 		    in instance declaration context
-		    or missing instance declaration for `PrelBase.Show (SubRange a)'
+		    or missing instance declaration for `Show (SubRange a)'
     When checking the superclasses of an instance declaration
- 
+
 tcfail067.hs:74:
-    Could not deduce `PrelBase.Ord a'
+    Could not deduce `Ord a'
 	(arising from use of `SubRange' at tcfail067.hs:74)
-	from the context: (PrelBase.Num a)
-    Probable cause: missing `PrelBase.Ord a'
+	from the context: (Num a)
+    Probable cause: missing `Ord a'
 		    in type signature for `numSubRangeBinOp'
     When checking the type signature(s) for `numSubRangeBinOp'
+
 
 
 Compilation had errors

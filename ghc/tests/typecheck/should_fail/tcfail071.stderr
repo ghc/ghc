@@ -1,8 +1,9 @@
- 
+
 tcfail071.hs:8:
     Inferred type is less polymorphic than expected
 	Quantified type variable `c' is unified with `a -> [t] -> [t]'
-    When checking the type signature g :: forall _99. _99 -> _99
+    When checking the type signature g :: forall c1. c1 -> c1
+
 
 
 Compilation had errors

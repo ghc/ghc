@@ -1,9 +1,12 @@
- 
+
 tcfail038.hs:7:
-    Conflicting definitions for `==' in the bindings in an instance declaration
- 
+    Conflicting definitions for `=='
+    in the bindings in an instance declaration
+
 tcfail038.hs:8:
-    Conflicting definitions for `/=' in the bindings in an instance declaration
+    Conflicting definitions for `/='
+    in the bindings in an instance declaration
+
 
 
 Compilation had errors

@@ -1,48 +1,50 @@
- 
-tcfail035.hs:6: Warning:
-    No explicit method nor default method for `PrelBase.fromInteger'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:6: Warning:
-    No explicit method nor default method for `PrelBase.signum'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:6: Warning:
-    No explicit method nor default method for `PrelBase.abs'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:6: Warning:
-    No explicit method nor default method for `PrelBase.*'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:6: Warning:
-    No explicit method nor default method for `PrelBase.+'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:7: Warning:
-    No explicit method nor default method for `PrelBase.fromInteger'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:7: Warning:
-    No explicit method nor default method for `PrelBase.signum'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:7: Warning:
-    No explicit method nor default method for `PrelBase.abs'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:7: Warning:
-    No explicit method nor default method for `PrelBase.*'
-    in an instance declaration for `PrelBase.Num'
- 
-tcfail035.hs:7: Warning:
-    No explicit method nor default method for `PrelBase.+'
-    in an instance declaration for `PrelBase.Num'
 
- 
+tcfail035.hs:6:
+    Warning: No explicit method nor default method for `fromInteger'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:6:
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:6:
+    Warning: No explicit method nor default method for `abs'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:6:
+    Warning: No explicit method nor default method for `*'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:6:
+    Warning: No explicit method nor default method for `+'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `fromInteger'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `signum'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `abs'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `*'
+	     in an instance declaration for `Num'
+
+tcfail035.hs:7:
+    Warning: No explicit method nor default method for `+'
+	     in an instance declaration for `Num'
+
+
+
 tcfail035.hs:3:
     Duplicate or overlapping instance declarations
-	for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+	for `Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+
 
 
 Compilation had errors

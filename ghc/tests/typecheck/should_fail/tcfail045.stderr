@@ -1,7 +1,8 @@
- 
+
 tcfail045.hs:10:
     Unacceptable instance type for ccall-ish class
-	class PrelGHC.CCallable type Socket
+	class CCallable type Socket
+
 
 
 Compilation had errors

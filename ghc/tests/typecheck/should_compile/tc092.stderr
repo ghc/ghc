@@ -1,7 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed e0 e1 e2 q Empty{Empty};
+__export ShouldSucceed Empty{Empty} e0 e1 e2 q;
 1 data Empty q :: (* -> *) = Empty (__forall [a] {PrelBase.Ord a} => q a) ;
-1 e0 :: Empty PrelBase.[] ;
-1 e1 :: Empty PrelBase.[] ;
-1 e2 :: Empty PrelBase.[] ;
+1 e0 :: Empty PrelBase.ZMZN ;
+1 e1 :: Empty PrelBase.ZMZN ;
+1 e2 :: Empty PrelBase.ZMZN ;
 1 q :: __forall [a] {PrelBase.Ord a} => [a] ;

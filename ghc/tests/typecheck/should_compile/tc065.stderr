@@ -1,5 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
-__export ShouldSucceed dfs isCyclic isRecursiveCycle lookupVertex mkDigraph mkEdges mkVertices stronglyConnComp topSort Cycle Digraph{MkDigraph} Edge FlattenedDependencyInfo MaybeErr{Succeeded Failed};
+__export ShouldSucceed Cycle Digraph{MkDigraph} Edge FlattenedDependencyInfo MaybeErr{Succeeded Failed} dfs isCyclic isRecursiveCycle lookupVertex mkDigraph mkEdges mkVertices stronglyConnComp topSort;
 1 data Digraph vertex = MkDigraph [vertex] ;
 1 data MaybeErr a b = Succeeded a |  Failed b ;
 1 dfs :: __forall [a] {PrelBase.Eq a} => (a -> [a]) -> ([a], [a]) -> [a] -> ([a], [a]) ;

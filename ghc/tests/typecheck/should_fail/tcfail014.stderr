@@ -1,10 +1,11 @@
- 
+
 tcfail014.hs:5:
-    Occurs check: cannot construct the infinite type: t = t -> _116
+    Occurs check: cannot construct the infinite type: t = t -> t1
 	Expected type: t
-	Inferred type: t -> _116
+	Inferred type: t -> t1
     In the first argument of `z', namely `z'
     In the right-hand side of an equation for `h': z z
+
 
 
 Compilation had errors

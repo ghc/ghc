@@ -1,7 +1,8 @@
- 
+
 tcfail078.hs:5:
     Type constructor used as a class: Integer
     When checking kinds in `Integer i'
+
 
 
 Compilation had errors

@@ -1,4 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed x y;
-1 x :: __forall [t _116] => t -> t ;
-1 y :: __forall [t _116] => _116 -> _116 ;
+1 x :: __forall [t t1] => t -> t ;
+1 y :: __forall [t t1] => t1 -> t1 ;

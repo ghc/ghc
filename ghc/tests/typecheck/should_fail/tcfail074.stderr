@@ -1,8 +1,9 @@
- 
+
 tcfail074.hs:7:
     Multiple declarations of `main'
 	defined at tcfail074.hs:7
 	defined at tcfail074.hs:8
+
 
 
 Compilation had errors

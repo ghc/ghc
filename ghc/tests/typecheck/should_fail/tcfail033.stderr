@@ -1,9 +1,10 @@
- 
+
 tcfail033.hs:4:
-    Occurs check: cannot construct the infinite type: t = (t, _116)
-	Expected type: (t, _116)
+    Occurs check: cannot construct the infinite type: t = (t, t1)
+	Expected type: (t, t1)
 	Inferred type: t
     In a list-comprehension qualifier: return x
+
 
 
 Compilation had errors

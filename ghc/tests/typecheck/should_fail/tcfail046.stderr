@@ -1,7 +1,8 @@
- 
+
 tcfail046.hs:4:
-    No instance for `PrelBase.Eq (Process a)'
+    No instance for `Eq (Process a)'
     When deriving classes for `Message'
+
 
 
 Compilation had errors

@@ -1,67 +1,54 @@
- 
+
 tcfail068.hs:12:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
-	It unifies with `_115', which is mentioned in the environment
-	The following variables in the environment mention `_115'
-    In an expression with expected type: forall
-					 _1151.
-					 PrelST.ST _1151 a
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+    In an expression with expected type: forall s2. ST s2 a
     In the first argument of `runST', namely `(newArray ((1, 1), n) x)'
     In the right-hand side of an equation for `itgen':
 	runST (newArray ((1, 1), n) x)
- 
+
 tcfail068.hs:17:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
-	It unifies with `_115', which is mentioned in the environment
-	The following variables in the environment mention `_115'
-	    arr :: IndTree _115 a
-    In an expression with expected type: forall
-					 _1151.
-					 PrelST.ST _1151 _97
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	    arr :: IndTree s1 a
+    In an expression with expected type: forall s2. ST s2 a1
     In the first argument of `runST', namely
 	`((readArray arr i)
 	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
     In the right-hand side of an equation for `itiap':
 	runST ((readArray arr i)
 	       >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))
- 
+
 tcfail068.hs:24:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
-	It unifies with `_115', which is mentioned in the environment
-	The following variables in the environment mention `_115'
-	    arr :: IndTree _115 a
-	    itrap' :: Int -> Int -> PrelST.ST _115 (IndTree _115 a)
-	    itrapsnd :: Int -> Int -> PrelST.ST _115 (IndTree _115 a)
-    In an expression with expected type: forall
-					 _1151.
-					 PrelST.ST _1151 _97
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	    arr :: IndTree s1 a
+	    itrap' :: Int -> Int -> ST s1 (IndTree s1 a)
+	    itrapsnd :: Int -> Int -> ST s1 (IndTree s1 a)
+    In an expression with expected type: forall s2. ST s2 a1
     In the first argument of `runST', namely `(itrap' i k)'
     In the right-hand side of an equation for `itrap':
 	runST (itrap' i k)
- 
+
 tcfail068.hs:36:
     Inferred type is less polymorphic than expected
 	Quantified type variable `s' escapes
-	It unifies with `_115', which is mentioned in the environment
-	The following variables in the environment mention `_115'
-	    arr :: IndTree _115 b
-	    itrapstate' :: Int
-			   -> Int
-			   -> c
-			   -> PrelST.ST _115 (c, IndTree _115 b)
-	    itrapstatesnd :: Int
-			     -> Int
-			     -> c
-			     -> PrelST.ST _115 (c, IndTree _115 b)
-    In an expression with expected type: forall
-					 _1151.
-					 PrelST.ST _1151 a
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	    arr :: IndTree s1 b
+	    itrapstate' :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
+	    itrapstatesnd :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
+    In an expression with expected type: forall s2. ST s2 a
     In the first argument of `runST', namely `(itrapstate' i k s)'
     In the right-hand side of an equation for `itrapstate':
 	runST (itrapstate' i k s)
+
 
 
 Compilation had errors

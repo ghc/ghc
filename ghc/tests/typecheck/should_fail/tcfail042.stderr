@@ -1,11 +1,11 @@
- 
+
 tcfail042.hs:18:
-    Could not deduce `PrelBase.Num a'
+    Could not deduce `Num a'
 	(arising from an instance declaration at tcfail042.hs:18)
-	from the context: (PrelBase.Eq a, PrelBase.Show a)
-    Probable cause: missing `PrelBase.Num a'
-		    in instance declaration context
+	from the context: (Eq a, Show a)
+    Probable cause: missing `Num a' in instance declaration context
     When checking the superclasses of an instance declaration
+
 
 
 Compilation had errors

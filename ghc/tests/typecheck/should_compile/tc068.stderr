@@ -1,8 +1,8 @@
 ghc: module version changed to 1; reason: no old .hi file
 __export ShouldSucceed B{X Y} T{D C};
-instance __forall [b] {PrelBase.Eq b} => {PrelBase.Eq (B b)} = _fEqB;
-instance __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = _fEqT;
-1 _fEqB :: __forall [b] {PrelBase.Eq b} => {PrelBase.Eq (B b)} ;
-1 _fEqT :: __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;
+instance __forall [b] {PrelBase.Eq b} => {PrelBase.Eq (B b)} = zdfEqB;
+instance __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = zdfEqT;
 1 data B b = X |  Y b ;
 1 data T a = D (B a) |  C ;
+1 zdfEqB :: __forall [b] {PrelBase.Eq b} => {PrelBase.Eq (B b)} ;
+1 zdfEqT :: __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;

@@ -1,1 +1,7 @@
-tcfail030.hs:2:1: parse error on input: <EOF>
+
+tcfail030.hs:0: Module `Main' must include a definition for `main'
+
+
+
+Compilation had errors
+

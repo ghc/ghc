@@ -1,4 +1,4 @@
- 
+
 tcfail019.hs:19:
     Could not deduce `C [a]'
 	(arising from an instance declaration at tcfail019.hs:19)
@@ -6,7 +6,7 @@ tcfail019.hs:19:
     Probable cause: missing `C [a]' in instance declaration context
 		    or missing instance declaration for `C [a]'
     When checking the superclasses of an instance declaration
- 
+
 tcfail019.hs:19:
     Could not deduce `B [a]'
 	(arising from an instance declaration at tcfail019.hs:19)
@@ -14,6 +14,7 @@ tcfail019.hs:19:
     Probable cause: missing `B [a]' in instance declaration context
 		    or missing instance declaration for `B [a]'
     When checking the superclasses of an instance declaration
+
 
 
 Compilation had errors
