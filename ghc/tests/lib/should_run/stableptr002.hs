@@ -1,6 +1,7 @@
 module Main where
 
 import Stable
+import PrelIOBase
 
 -- Testing callbacks: the initial haskell thread calls out to C with
 -- the address of a Haskell callback.  The C function runs the callback
