@@ -522,8 +522,8 @@ lexToken cont glaexts buf =
 
     '}'# -> \ s@PState{context = ctx} ->
 	    case ctx of	
-		(NoLayout:ctx') -> cont ITccurly (incLexeme buf) s{context=ctx'}
-		_ 		-> lexError "too many '}'s" buf s
+		(_:ctx') -> cont ITccurly (incLexeme buf) s{context=ctx'}
+		_  	 -> lexError "too many '}'s" buf s
 
     '#'# -> case lookAhead# buf 1# of
 		')'#  | flag glaexts -> cont ITcubxparen (setCurrentPos# buf 2#)
