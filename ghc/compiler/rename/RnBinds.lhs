@@ -11,7 +11,7 @@ they may be affected by renaming (which isn't fully worked out yet).
 \begin{code}
 module RnBinds (
 	rnTopMonoBinds, rnMonoBinds, rnMonoBindsAndThen,
-	rnMethodBinds, renameSigs, checkSigs, unknownSigErr
+	rnMethodBinds, renameSigs, checkSigs
    ) where
 
 #include "HsVersions.h"
