@@ -359,6 +359,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
            = case scrut_primrep of
                 CharRep -> False ; AddrRep -> False ; WordRep -> False
                 IntRep -> False ; FloatRep -> False ; DoubleRep -> False
+                VoidRep -> False ;
                 PtrRep -> True
                 other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
 

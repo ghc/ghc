@@ -37,7 +37,7 @@ import MArray		( castSTUArray,
 			  newIntArray, writeIntArray,
 			  newAddrArray, writeAddrArray )
 import Foreign		( Word16, Ptr(..) )
-import Addr 		( Word, Addr )
+import Addr 		( Word, Addr, nullAddr )
 
 import PrelBase		( Int(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
@@ -297,6 +297,7 @@ mkBits findLabel st proto_insns
                                   CharRep   -> stg_ctoi_ret_R1n_info
                                   FloatRep  -> stg_ctoi_ret_F1_info
                                   DoubleRep -> stg_ctoi_ret_D1_info
+                                  VoidRep   -> stg_ctoi_ret_V_info
                                   _ -> pprPanic "mkBits.ctoi_itbl" (ppr pk)
 
        itoc_itbl st pk
@@ -307,11 +308,14 @@ mkBits findLabel st proto_insns
                                   IntRep    -> stg_gc_unbx_r1_info
                                   FloatRep  -> stg_gc_f1_info
                                   DoubleRep -> stg_gc_d1_info
+                                  VoidRep   -> nullAddr  
+                                  -- Interpreter.c spots this special case
                      
 foreign label "stg_ctoi_ret_R1p_info" stg_ctoi_ret_R1p_info :: Addr
 foreign label "stg_ctoi_ret_R1n_info" stg_ctoi_ret_R1n_info :: Addr
 foreign label "stg_ctoi_ret_F1_info"  stg_ctoi_ret_F1_info :: Addr
 foreign label "stg_ctoi_ret_D1_info"  stg_ctoi_ret_D1_info :: Addr
+foreign label "stg_ctoi_ret_V_info"   stg_ctoi_ret_V_info :: Addr
 
 foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
 foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
