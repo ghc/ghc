@@ -574,8 +574,8 @@ checkHSLib dirs auto_ghci_libs force lib = do
   let batch_lib_file = "lib" ++ lib ++ ".a"
   bs <- mapM (doesLibExistIn batch_lib_file) dirs
   case [ dir | (exists,dir) <- zip bs dirs, exists ] of
-	[] -> dieOrForce force ("cannot find `" ++ batch_lib_file ++
-				 "' on library path") 
+	[] -> dieOrForce force ("cannot find " ++ batch_lib_file ++
+				 " on library path") 
 	(dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
 
 doesLibExistIn :: String -> String -> IO Bool
@@ -589,7 +589,7 @@ checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build
   | otherwise  = do
       bs <- mapM (doesLibExistIn ghci_lib_file) dirs
       case [dir | (exists,dir) <- zip bs dirs, exists] of
-        []    -> hPutStrLn stderr ("warning: can't find GHCi lib `" ++ ghci_lib_file ++ "'")
+        []    -> hPutStrLn stderr ("warning: can't find GHCi lib " ++ ghci_lib_file)
    	(_:_) -> return ()
   where
     ghci_lib_file = lib ++ ".o"
@@ -601,7 +601,7 @@ autoBuildGHCiLib :: String -> String -> String -> IO ()
 autoBuildGHCiLib dir batch_file ghci_file = do
   let ghci_lib_file  = dir ++ '/':ghci_file
       batch_lib_file = dir ++ '/':batch_file
-  hPutStr stderr ("building GHCi library `" ++ ghci_lib_file ++ "'...")
+  hPutStr stderr ("building GHCi library " ++ ghci_lib_file ++ "...")
 #if defined(darwin_TARGET_OS)
   r <- system("ld -r -x -o " ++ ghci_lib_file ++ 
 		 " -all_load " ++ batch_lib_file)
