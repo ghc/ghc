@@ -19,7 +19,7 @@ import Name		( getOccName )
 import OccName		( occNameUserString )
 import TyCon		( tyConDataCons, isEnumerationTyCon, TyCon )
 import Type		( typePrimRep )
-import CmdLineOpts	( opt_EnsureSplittableC )
+import CmdLineOpts
 \end{code}
 
 For every constructor we generate the following info tables:
@@ -119,6 +119,7 @@ genConInfo comp_info data_con
 
     body       = initC comp_info (
 	    	      profCtrC SLIT("TICK_ENT_CON") [CReg node] `thenC`
+		      ldvEnter `thenC`
 		      body_code)
 
     con_descr  = occNameUserString (getOccName data_con)
