@@ -184,7 +184,11 @@ instance Ord Module where
 
 \begin{code}
 pprModule :: Module -> SDoc
-pprModule (Module mod _ _) = pprEncodedFS mod
+pprModule (Module mod _ _) = getPprStyle $ \ sty ->
+			     if userStyle sty then
+				text (moduleNameUserString mod)				
+			     else
+				pprModuleName mod
 \end{code}
 
 
