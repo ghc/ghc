@@ -14,7 +14,9 @@ ghc_le_600 = $(shell if (test $(GhcCanonVersion) -le 600); then echo YES; else e
 
 SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
 
-ifeq "$(HOSTPLATFORM)$(ghc_le_600)" "i386-unknown-mingw32YES"
+# <= 6.0.x quotes all arguments when invoking utils (using double quotes), hence
+# the need to escape the double quotes. >= 6.2.x does not.
+ifeq "$(ghc_le_600)" "NO"
 SRC_HC_OPTS += -D'GHC_PKG_VERSION=\"$(ProjectVersion)\"'
 else
 SRC_HC_OPTS += -D'GHC_PKG_VERSION="$(ProjectVersion)"'
