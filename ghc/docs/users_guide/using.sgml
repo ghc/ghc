@@ -105,14 +105,9 @@ module X where
     pragma in a source file or set from the GHCi command-line with
     <literal>:set</literal>.</para>
 
-    <para>As a rule of thumb, all the language options are dynamic, as
-    are the warning options and the debugging options.  The rest are
-    static, with the notable exceptions of <option>-v</option>,
-    <option>-cpp</option>, <option>-fasm</option>,
-    <option>-fvia-C</option>, and <option>-#include</option>.
-
-    The flag reference tables (<xref linkend="flag-reference">) lists
-    the status of each flag.</para>
+    <para>As a rule of thumb, options which relate to filenames are
+    static, and the rest are dynamic. The flag reference tables (<xref
+    linkend="flag-reference">) lists the status of each flag.</para>
   </sect1>
 
   <sect1 id="file-suffixes">
@@ -1016,13 +1011,11 @@ f "2"    = 2
       following &ldquo;packages&rdquo; of optimisations (or lack
       thereof) should suffice.</para>
 
-      <para>Once you choose a <option>-O*</option>
-      &ldquo;package,&rdquo; stick with it&mdash;don't chop and
-      change.  Modules' interfaces <emphasis>will</emphasis> change
-      with a shift to a new <option>-O*</option> option, and you may
-      have to recompile a large chunk of all importing modules before
-      your program can again be run safely (see <XRef
-      LinkEnd="recomp">).</para>
+      <para>Note that higher optimisation levels cause more
+      cross-module optimisation to be performed, which can have an
+      impact on how much of your program needs to be recompiled when
+      you change something.  This is one reaosn to stick to
+      no-optimisation when developing code.</para>
 
       <variablelist>
 
@@ -1059,6 +1052,10 @@ f "2"    = 2
 	    <para>Means: &ldquo;Generate good-quality code without
             taking too long about it.&rdquo; Thus, for example:
             <command>ghc -c -O Main.lhs</command></para>
+
+	    <para><option>-O</option> currently also implies
+	    <option>-fvia-C</option>.  This may change in the
+	    future.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1087,7 +1084,7 @@ f "2"    = 2
 	  <indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
 	  <indexterm><primary>optimising, customised</primary></indexterm>
 	  <listitem>
-	    <para>(NOTE: not supported yet in GHC 5.x.  Please ask if
+	    <para>(NOTE: not supported since GHC 4.x.  Please ask if
 	    you're interested in this.)</para>
 	    
 	    <para>For those who need <emphasis>absolute</emphasis>
@@ -1109,7 +1106,7 @@ f "2"    = 2
       <para>We don't use a <option>-O*</option> flag for day-to-day
       work.  We use <option>-O</option> to get respectable speed;
       e.g., when we want to measure something.  When we want to go for
-      broke, we tend to use <option>-O -fvia-C</option> (and we go for
+      broke, we tend to use <option>-O2 -fvia-C</option> (and we go for
       lots of coffee breaks).</para>
 
       <para>The easiest way to see what <option>-O</option> (etc.)
