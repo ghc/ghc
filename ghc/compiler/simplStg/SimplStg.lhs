@@ -35,13 +35,10 @@ import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
 			)
 import Maybes		( maybeToBool )
 import PprType		( GenType{-instance Outputable-} )
-import PprStyle         ( PprStyle )
+import Outputable       ( PprStyle, Outputable(..) )
 import Pretty		( Doc, ($$), vcat, text, ptext )
 import UniqSupply	( splitUniqSupply, UniqSupply )
 import Util		( mapAccumL, panic, assertPanic )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable       ( Outputable(..) )
-#endif
 \end{code}
 
 \begin{code}

@@ -20,17 +20,7 @@ import Usage		( SYN_IE(UVar) )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(SimplifiableCoreExpr) )
 import Maybes		( MaybeErr(..) )
---import PprStyle--ToDo:rm
---import Util(pprTrace)--ToDo:rm
---import Outputable--ToDo:rm
---import PprType--ToDo:rm
---import Pretty--ToDo:rm
---import PprCore--ToDo:rm
---import Id--ToDo:rm
 import TyVar --ToDo:rm
---import Unique--ToDo:rm
---import IdInfo--ToDo:rm
---import PprEnv--ToDo:rm
 \end{code}
 
 

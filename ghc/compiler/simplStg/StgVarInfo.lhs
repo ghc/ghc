@@ -28,14 +28,12 @@ import Id		( emptyIdSet, mkIdSet, minusIdSet,
 import IdInfo		( ArityInfo(..) )
 import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
-import TyCon            ( SYN_IE(Arity) )
-import PprStyle		( PprStyle(..) )
+import BasicTypes       ( SYN_IE(Arity) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import PprType		( GenType{-instance Outputable-} )
 import Util		( panic, pprPanic, assertPanic )
 import Pretty		( Doc )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable      ( Outputable(..) )
-#endif
+
 infixr 9 `thenLne`, `thenLne_`
 \end{code}
 
