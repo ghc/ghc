@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.30 2003/03/19 18:41:19 sof Exp $
+ * $Id: RtsUtils.c,v 1.31 2003/03/25 17:24:30 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -260,6 +260,7 @@ void resetNonBlockingFd(int fd STG_UNUSED) {}
 void setNonBlockingFd(int fd STG_UNUSED) {}
 #endif
 
+#ifdef PAR
 static ullong startTime = 0;
 
 /* used in a parallel setup */
@@ -294,6 +295,7 @@ msTime(void)
     return t * LL(1000) - startTime;
 # endif
 }
+#endif /* PAR */
 
 /* -----------------------------------------------------------------------------
    Print large numbers, with punctuation.
