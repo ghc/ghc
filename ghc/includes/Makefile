@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.17 2001/10/19 18:33:11 qrczak Exp $
+# $Id: Makefile,v 1.18 2001/11/21 16:56:19 sof Exp $
 #
 
 TOP = ..
@@ -32,7 +32,10 @@ $(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 $(H_CONFIG) :
 	@echo "Creating $@..."
 	@$(RM) $@
-	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)"  > $@
+	@echo "#ifndef __FPTOOLS_CONFIG_H__"  >$@
+	@echo "#define __FPTOOLS_CONFIG_H__" >>$@
+	@echo >> $@
+	@echo "#define HostPlatform_TYPE   $(HostPlatform_CPP)" >> $@
 	@echo "#define TargetPlatform_TYPE $(HostPlatform_CPP)" >> $@
 	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
 	@echo >> $@
@@ -59,6 +62,7 @@ endif
 	@echo "#define $(HostVendor_CPP)_TARGET_VENDOR  1" >> $@
 	@echo "#define $(HostVendor_CPP)_BUILD_VENDOR 	1" >> $@
 	@cat $(FPTOOLS_TOP)/mk/$@ >> $@
+	@echo "#endif /* __FPTOOLS_CONFIG_H__ */"          >> $@
 	@echo "Done."
 
 # ---------------------------------------------------------------------------
