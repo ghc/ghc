@@ -520,7 +520,7 @@ coreToStgApp maybe_thunk_body f args
     lookupVarLne f		`thenLne` \ how_bound ->
 
     let
-	n_args		 = length args
+	n_val_args	 = valArgCount args
 	not_letrec_bound = not (isLetBound how_bound)
 	fun_fvs	 	 = singletonFVInfo f how_bound fun_occ
 
@@ -529,13 +529,13 @@ coreToStgApp maybe_thunk_body f args
 			_                  -> 0
 
 	fun_occ 
-	 | not_letrec_bound		    = noBinderInfo	-- Uninteresting variable
-	 | f_arity > 0 && f_arity <= n_args = stgSatOcc		-- Saturated or over-saturated function call
-	 | otherwise			    = stgUnsatOcc	-- Unsaturated function or thunk
+	 | not_letrec_bound		        = noBinderInfo	-- Uninteresting variable
+	 | f_arity > 0 && f_arity <= n_val_args = stgSatOcc	-- Saturated or over-saturated function call
+	 | otherwise			        = stgUnsatOcc	-- Unsaturated function or thunk
 
 	fun_escs
-	 | not_letrec_bound  = emptyVarSet	-- Only letrec-bound escapees are interesting
-	 | f_arity == n_args = emptyVarSet	-- A function *or thunk* with an exactly
+	 | not_letrec_bound      = emptyVarSet	-- Only letrec-bound escapees are interesting
+	 | f_arity == n_val_args = emptyVarSet	-- A function *or thunk* with an exactly
 						-- saturated call doesn't escape
 						-- (let-no-escape applies to 'thunks' too)
 
