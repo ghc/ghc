@@ -42,7 +42,7 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    toHsType
 		  )
 
-import PrelNames  ( mETA_META_Name, rationalTyConName )
+import PrelNames  ( mETA_META_Name, rationalTyConName, negateName )
 import MkIface	  ( ifaceTyThing )
 import Name       ( Name, nameOccName, nameModule )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
@@ -370,7 +370,10 @@ repE (OpApp e1 op fix e2) =
 		     the_op <- lookupOcc op ;
 		     repInfixApp arg1 the_op arg2 } 
     _        -> panic "DsMeta.repE: Operator is not a variable"
-repE (NegApp x nm)        = repE x >>= repNeg
+repE (NegApp x nm)        = do
+			      a         <- repE x
+			      negateVar <- lookupOcc negateName >>= repVar
+			      negateVar `repApp` a
 repE (HsPar x)            = repE x
 repE (SectionL x y)       = do { a <- repE x; b <- repE y; repSectionL a b } 
 repE (SectionR x y)       = do { a <- repE x; b <- repE y; repSectionR a b } 
@@ -848,9 +851,6 @@ repSigExp (MkC e) (MkC t) = rep2 sigExpName [e,t]
 repInfixApp :: Core M.Expr -> Core String -> Core M.Expr -> DsM (Core M.Expr)
 repInfixApp (MkC x) (MkC y) (MkC z) = rep2 infixAppName [x,y,z]
 
-repNeg :: Core M.Expr -> DsM (Core M.Expr)
-repNeg (MkC x) = rep2 negName [x]
-
 repSectionL :: Core M.Expr -> Core M.Expr -> DsM (Core M.Expr)
 repSectionL (MkC x) (MkC y) = rep2 infixAppName [x,y]
 
@@ -1036,7 +1036,7 @@ templateHaskellNames
                 varName, conName, litName, appName, infixEName, lamName,
                 tupName, doEName, compName, 
                 listExpName, sigExpName, condName, letEName, caseEName,
-                infixAppName, negName, sectionLName, sectionRName,
+                infixAppName, sectionLName, sectionRName,
                 guardedName, normalName, 
 		bindStName, letStName, noBindStName, parStName,
 		fromName, fromThenName, fromToName, fromThenToName,
@@ -1088,7 +1088,6 @@ condName       = varQual FSLIT("cond")          condIdKey
 letEName       = varQual FSLIT("letE")          letEIdKey
 caseEName      = varQual FSLIT("caseE")         caseEIdKey
 infixAppName   = varQual FSLIT("infixApp")      infixAppIdKey
-negName        = varQual FSLIT("neg")           negIdKey
 sectionLName   = varQual FSLIT("sectionL")      sectionLIdKey
 sectionRName   = varQual FSLIT("sectionR")      sectionRIdKey
 guardedName    = varQual FSLIT("guarded")       guardedIdKey
@@ -1216,7 +1215,7 @@ condIdKey       = mkPreludeMiscIdUnique 238
 letEIdKey       = mkPreludeMiscIdUnique 239
 caseEIdKey      = mkPreludeMiscIdUnique 240
 infixAppIdKey   = mkPreludeMiscIdUnique 241
-negIdKey	= mkPreludeMiscIdUnique 242
+-- 242 unallocated
 sectionLIdKey   = mkPreludeMiscIdUnique 243
 sectionRIdKey   = mkPreludeMiscIdUnique 244
 guardedIdKey    = mkPreludeMiscIdUnique 245
