@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.22 $
- * $Date: 1999/12/06 16:25:27 $
+ * $Revision: 1.23 $
+ * $Date: 1999/12/07 11:36:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -370,6 +370,7 @@ StgExpr failExpr;
             List args  = NIL;
             List binds = NIL;
             List as    = NIL;
+            Int  length_args;
 
             /* Unwind args */
             while (isAp(e)) {
@@ -411,12 +412,16 @@ StgExpr failExpr;
             }
 
             /* Special case: saturated constructor application */
-            if (isName(e) && isCfun(e)
-                && name(e).arity > 0 
-                && name(e).arity == length(args)) {
+            length_args = length(args);
+            if ( (isName(e) && isCfun(e)
+                  && name(e).arity > 0 
+                  && name(e).arity == length_args)
+                 ||
+                 (isTuple(e) && tycon(e).tuple == length_args)
+               ) {
                StgVar v; 
                /* fprintf ( stderr, "saturated application of %s\n",
-                                    textToStr(name(e).text)); */
+                 	    textToStr(isTuple(e) ? tycon(e).text : name(e).text)); */
                v = mkStgVar(mkStgCon(e,args),NIL);
                binds = cons(v,binds);
                return mkStgLet(binds,v);
