@@ -9,12 +9,13 @@ main = do
   th <- newEmptyMVar
   forkIO $ do
      putStrLn "newThread started"
-     sleepBlock 5
+     sleepBlock 3
      putStrLn "newThread back again"
      putMVar th "5 secs later"
-  yield -- make sure the newly created thread is run.
-  putStrLn "mainThread"
+  threadDelay 1000000 >> putStrLn "mainThread"
+	-- tests that the other thread doing an unsafe call to 
+	-- sleep(3) has blocked this thread.  Not sure if this
+	-- is a useful test.
   x <- takeMVar th
   putStrLn x
   putStrLn "\nshutting down"
-  
