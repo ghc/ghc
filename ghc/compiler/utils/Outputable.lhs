@@ -10,7 +10,7 @@ Defines classes for pretty-printing and forcing, both forms of
 module Outputable (
 	Outputable(..),			-- Class
 
-	PprStyle, 
+	PprStyle, CodeStyle(..),
 	getPprStyle, withPprStyle, pprDeeper,
 	codeStyle, ifaceStyle, userStyle, debugStyle, asmStyle,
 	ifPprDebug, ifNotPprForUser,
@@ -32,7 +32,7 @@ module Outputable (
 
 	showSDoc, printSDoc, printErrs, printDump, 
 	printForC, printForAsm, printForIface,
-	pprCols,
+	pprCode, pprCols,
 
 	-- error handling
 	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic,
@@ -46,8 +46,7 @@ import CmdLineOpts	( opt_PprStyle_All, opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
-import Util		( panic, assertPanic, panic# )
-import GlaExts		( trace )
+import Util		( panic, assertPanic, panic#, trace )
 \end{code}
 
 
@@ -169,6 +168,8 @@ printForAsm handle doc = printDoc LeftMode handle (doc (PprCode AsmStyle))
 printForIface :: Handle -> SDoc -> IO ()
 printForIface handle doc = printDoc OneLineMode handle (doc PprInterface)
 
+pprCode :: CodeStyle -> SDoc -> SDoc
+pprCode cs d = withPprStyle (PprCode cs) d
 
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
