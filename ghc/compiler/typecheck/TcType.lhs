@@ -22,7 +22,7 @@ module TcType (
 
   --------------------------------
   -- TyVarDetails
-  TyVarDetails(..), isUserTyVar, isSkolemTyVar, 
+  TyVarDetails(..), isUserTyVar, isSkolemTyVar, isExistentialTyVar,
   tyVarBindingInfo,
 
   --------------------------------
@@ -248,6 +248,14 @@ data TyVarDetails
    | PatSigTv	-- Scoped type variable, introduced by a pattern
 		-- type signature	\ x::a -> e
 
+   | ExistTv	-- An existential type variable bound by a pattern for
+		-- a data constructor with an existential type. E.g.
+		--	data T = forall a. Eq a => MkT a
+		-- 	f (MkT x) = ...
+		-- The pattern MkT x will allocate an existential type
+		-- variable for 'a'.  We distinguish these from all others
+		-- on one place, namely InstEnv.lookupInstEnv.
+
    | VanillaTv	-- Everything else
 
 isUserTyVar :: TcTyVar -> Bool	-- Avoid unifying these if possible
@@ -257,10 +265,16 @@ isUserTyVar tv = case tcTyVarDetails tv of
 
 isSkolemTyVar :: TcTyVar -> Bool
 isSkolemTyVar tv = case tcTyVarDetails tv of
-		      SigTv  -> True
-		      ClsTv  -> True
-		      InstTv -> True
-		      oteher -> False
+		      SigTv   -> True
+		      ClsTv   -> True
+		      InstTv  -> True
+		      ExistTv -> True
+		      other   -> False
+
+isExistentialTyVar :: TcTyVar -> Bool
+isExistentialTyVar tv = case tcTyVarDetails tv of
+			      ExistTv -> True
+			      other   -> False
 
 tyVarBindingInfo :: TcTyVar -> SDoc	-- Used in checkSigTyVars
 tyVarBindingInfo tv
@@ -271,6 +285,7 @@ tyVarBindingInfo tv
     details ClsTv     = ptext SLIT("class declaration")
     details InstTv    = ptext SLIT("instance declaration")
     details PatSigTv  = ptext SLIT("pattern type signature")
+    details ExistTv   = ptext SLIT("existential constructor")
     details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
 \end{code}
 

@@ -26,7 +26,7 @@ import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupLocatedDataCon, tcLookupId )
 import TcMType 		( newTyVarTy, arityErr )
-import TcType		( TcType, TcTyVar, TcSigmaType, mkClassPred )
+import TcType		( TcType, TcTyVar, TcSigmaType, TyVarDetails(..), mkClassPred )
 import Kind		( argTypeKind, liftedTypeKind )
 import TcUnify		( tcSubOff, Expected(..), readExpectedType, zapExpectedType, 
 			  unifyTauTy, zapToListTy, zapToPArrTy, zapToTupleTy )  
@@ -229,8 +229,8 @@ tc_pat tc_bndr pat_in@(ConPatIn con_name arg_pats) pat_ty
   = addErrCtxt (patCtxt pat_in)			$
 
 	-- Check that it's a constructor, and instantiate it
-    tcLookupLocatedDataCon con_name		`thenM` \ data_con ->
-    tcInstDataCon (PatOrigin pat_in) data_con	`thenM` \ (_, ex_dicts1, arg_tys, con_res_ty, ex_tvs) ->
+    tcLookupLocatedDataCon con_name			`thenM` \ data_con ->
+    tcInstDataCon (PatOrigin pat_in) ExistTv data_con	`thenM` \ (_, ex_dicts1, arg_tys, con_res_ty, ex_tvs) ->
 
 	-- Check overall type matches.
 	-- The pat_ty might be a for-all type, in which

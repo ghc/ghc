@@ -839,9 +839,9 @@ tcId name	-- Look up the Id and instantiate its type
 	-- the type of dataConWrapId (see note on "stupid context" in DataCon.lhs
 	-- It's dual to TcPat.tcConstructor
     inst_data_con data_con
-      = tcInstDataCon orig data_con	`thenM` \ (ty_args, ex_dicts, arg_tys, result_ty, _) ->
-	extendLIEs ex_dicts		`thenM_`
-	getSrcSpanM			`thenM` \ loc ->
+      = tcInstDataCon orig VanillaTv data_con	`thenM` \ (ty_args, ex_dicts, arg_tys, result_ty, _) ->
+	extendLIEs ex_dicts			`thenM_`
+	getSrcSpanM				`thenM` \ loc ->
 	returnM (unLoc (mkHsDictApp (mkHsTyApp (L loc (HsVar (dataConWrapId data_con))) ty_args) 
 			     (map instToId ex_dicts)), 
 		 mkFunTys arg_tys result_ty)

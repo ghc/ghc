@@ -74,7 +74,7 @@ import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique 
 import PrelInfo	( isStandardClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, isInternalName )
 import NameSet	( addOneToNameSet )
-import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
+import Subst	( substTy, substTyWith, substTheta, mkTopTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
@@ -277,27 +277,34 @@ tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
     in
     returnM (mkCoercion inst_fn, tau)
 
-tcInstDataCon :: InstOrigin -> DataCon
+tcInstDataCon :: InstOrigin
+	      -> TyVarDetails	-- Use this for the existential tyvars
+				-- ExistTv when pattern-matching, 
+				-- VanillaTv at a call of the constructor
+	      -> DataCon
 	      -> TcM ([TcType],	-- Types to instantiate at
 		      [Inst],	-- Existential dictionaries to apply to
 		      [TcType],	-- Argument types of constructor
 		      TcType,	-- Result type
 		      [TyVar])	-- Existential tyvars
-tcInstDataCon orig data_con
+tcInstDataCon orig ex_tv_details data_con
   = let 
 	(tvs, stupid_theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
 	     -- We generate constraints for the stupid theta even when 
 	     -- pattern matching (as the Report requires)
     in
-    tcInstTyVars VanillaTv (tvs ++ ex_tvs)	`thenM` \ (all_tvs', ty_args', tenv) ->
+    mappM (tcInstTyVar VanillaTv)     tvs	`thenM` \ tvs' ->
+    mappM (tcInstTyVar ex_tv_details) ex_tvs	`thenM` \ ex_tvs' ->
     let
+	tv_tys'	   = mkTyVarTys tvs'
+	ex_tv_tys' = mkTyVarTys ex_tvs'
+	all_tys'   = tv_tys' ++ ex_tv_tys'
+
+	tenv          = mkTopTyVarSubst (tvs ++ ex_tvs) all_tys'
 	stupid_theta' = substTheta tenv stupid_theta
 	ex_theta'     = substTheta tenv ex_theta
 	arg_tys'      = map (substTy tenv) arg_tys
-
-	n_normal_tvs  = length tvs
-	ex_tvs'       = drop n_normal_tvs all_tvs'
-	result_ty     = mkTyConApp tycon (take n_normal_tvs ty_args')
+	result_ty'    = mkTyConApp tycon tv_tys'
     in
     newDicts orig stupid_theta'	`thenM` \ stupid_dicts ->
     newDicts orig ex_theta'	`thenM` \ ex_dicts ->
@@ -306,7 +313,7 @@ tcInstDataCon orig data_con
 	-- we don't otherwise use it at all
     extendLIEs stupid_dicts	`thenM_`
 
-    returnM (ty_args', ex_dicts, arg_tys', result_ty, ex_tvs')
+    returnM (all_tys', ex_dicts, arg_tys', result_ty', ex_tvs')
 
 newMethodFromName :: InstOrigin -> TcType -> Name -> TcM TcId
 newMethodFromName origin ty name
@@ -743,7 +750,10 @@ instantiate_dfun tenv dfun_id pred loc
     in
     mappM mk_ty_arg tyvars	`thenM` \ ty_args ->
     let
-    	dfun_rho   = substTy (mkTyVarSubst tyvars ty_args) rho
+    	dfun_rho   = substTy (mkTopTyVarSubst tyvars ty_args) rho
+		-- Since the tyvars are freshly made,
+		-- they cannot possibly be captured by
+		-- any existing for-alls.  Hence mkTopTyVarSubst
     	(theta, _) = tcSplitPhiTy dfun_rho
     	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) ty_args
     in
