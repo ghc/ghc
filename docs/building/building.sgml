@@ -1060,6 +1060,15 @@ $ cvs checkout nofib/spectral
 	</varlistentry>
 
 	<varlistentry>
+	  <term>ia64-unknown-linux</term>
+	  <indexterm><primary>ia64-unknown-linux</primary></indexterm>
+	  <listitem>
+	    <para>GHC currently works unregisterised.  A registerised
+	    port is in progress.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term>mips-sgi-irix5</term>
 	  <indexterm><primary>mips-sgi-irix[5-6]</primary></indexterm>
 	  <listitem>
@@ -3331,7 +3340,8 @@ foo% make install
 	Either (a)&nbsp;download them from the GHC site (if there are
 	some available for the right version of GHC), or
 	(b)&nbsp;build them yourself on any machine with a working
-	GHC.</para>
+	GHC.  If at all possible this should be a machine with the
+	same word size as the target.</para>
 
 	<para>There is a script available which should automate the
 	process of doing the 2-stage bootstrap necessary to get the
