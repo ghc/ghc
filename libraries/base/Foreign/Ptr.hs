@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Ptr.hs,v 1.3 2002/02/11 16:11:38 simonmar Exp $
+-- $Id: Ptr.hs,v 1.4 2002/02/27 14:31:44 simonmar Exp $
 --
 -- Pointer types.
 --
@@ -46,7 +46,6 @@ import Data.Dynamic
 import GHC.Ptr
 import GHC.IOBase
 import GHC.Err
-import GHC.Prim
 import GHC.Base
 import GHC.Num
 import GHC.List
