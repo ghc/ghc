@@ -28,11 +28,11 @@ AC_SUBST(ContextDiffCmd, [$fp_cv_context_diff])
 ])# FP_PROG_CONTEXT_DIFF
 
 
-# FP_ALTZONE
+# FP_DECL_ALTZONE
 # -------------------
 # Defines HAVE_DECL_ALTZONE to 1 if declared, 0 otherwise.
 # Used by base package.
-AC_DEFUN([FP_ALTZONE],
+AC_DEFUN([FP_DECL_ALTZONE],
 [AC_REQUIRE([AC_HEADER_TIME])dnl
 AC_CHECK_HEADERS([sys/time.h])
 AC_CHECK_DECLS([altzone], [], [],[#if TIME_WITH_SYS_TIME
@@ -45,7 +45,7 @@ AC_CHECK_DECLS([altzone], [], [],[#if TIME_WITH_SYS_TIME
 #  include <time.h>
 # endif
 #endif])
-])# FP_ALTZONE
+])# FP_DECL_ALTZONE
 
 
 # FP_COMPUTE_INT(EXPRESSION, VARIABLE, INCLUDES, IF-FAILS)
