@@ -9,9 +9,9 @@ main = do
   th <- newEmptyMVar
   forkIO $ do
      putStrLn "newThread started"
-     sleepBlock 5
+     sleepBlock 1
      putStrLn "newThread back again"
-     putMVar th "5 secs later"
+     putMVar th "1 sec later"
   yield -- make sure the newly created thread is run.
   putStrLn "mainThread"
   x <- takeMVar th

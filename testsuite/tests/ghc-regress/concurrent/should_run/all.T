@@ -15,7 +15,6 @@ test('conc003', normal, compile_and_run, [''])
 # Omit GHCi way - it blows up to 0.5G.  Something to do with the threaded RTS?
 test('conc004', omit_ways(['ghci']), compile_and_run, [''])
 
-test('conc005', normal, compile_and_run, ['-package concurrent'])
 test('conc006', normal, compile_and_run, [''])
 test('conc007', extra_run_opts('+RTS -H128M -RTS'), compile_and_run, [''])
 test('conc008', normal, compile_and_run, [''])
@@ -23,8 +22,8 @@ test('conc009', exit_code(1), compile_and_run, [''])
 test('conc010', normal, compile_and_run, [''])
 test('conc012', normal, compile_and_run, [''])
 
-# skip this, hangs for ever with the threaded RTS
-test('conc013', skip, compile_and_run, [''])
+# hangs for ever with the threaded RTS
+test('conc013', omit_ways(['threaded']), compile_and_run, [''])
 
 test('conc014', normal, compile_and_run, [''])
 test('conc015', normal, compile_and_run, [''])
@@ -51,23 +50,24 @@ test('conc031', skip, compile_and_run, [''])
 test('conc032', normal, compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
-# Now skipped altogether, hangs with the threaded RTS
-test('conc033', skip, compile_and_run, [''])
+# Also hangs with the threaded RTS
+test('conc033', omit_ways(['ghci','threaded']), compile_and_run, [''])
 
 # Omit for GHCi, because it just sits there waiting for you to press ^C
-# Now skipped altogether, hangs with the threaded RTS
-# test('conc034', compose(omit_ways(['ghci']), extra_run_opts('+RTS -C0 -RTS')),
-# 	compile_and_run, [''])
-test('conc034', skip, compile_and_run, [''])
+# Also hangs with the threaded RTS
+test('conc034', compose(omit_ways(['ghci','threaded']), 
+		extra_run_opts('+RTS -C0 -RTS')),
+		compile_and_run, [''])
 
 test('conc035', normal, compile_and_run, [''])
 test('conc036', normal, compile_and_run, [''])
 
-# These two depend on $(GhcThreadedRts) at the moment, so until we can find
-# a way to turn them off when $(GhcThreadedRts) == NO, disable them by default:
+test('conc037', only_ways(['threaded']), compile_and_run, [''])
+test('conc038', only_ways(['threaded']), compile_and_run, [''])
 
-test('conc037', skip, compile_and_run, [''])
-test('conc038', skip, compile_and_run, [''])
-
-# Omit for GHCi, uses foreign export:
+# Omit for GHCi, uses foreign export
 test('conc039', omit_ways(['ghci']), compile_and_run, [''])
+
+# Omit for GHCi, uses foreign export
+# Omit threaded RTS: Hangs forever
+test('conc040', compose(exit_code(1), omit_ways(['ghci','threaded'])), compile_and_run, [''])
