@@ -735,7 +735,7 @@ AC_ARG_ENABLE([openal],
 	GhcLibsWithOpenAL=NO
     fi
   ],
-  [GhcLibsWithOpenAL=yes])
+  [GhcLibsWithOpenAL=YES])
 
 AC_SUBST([GhcLibsWithOpenAL])
 
