@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.21 $
- * $Date: 2000/01/07 15:31:12 $
+ * $Revision: 1.22 $
+ * $Date: 2000/02/03 15:56:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -60,7 +60,7 @@ static Void   local addMembers          Args((Class));
 static Name   local newMember           Args((Int,Int,Cell,Type,Class));
 static Name   local newDSel             Args((Class,Int));
 static Text   local generateText        Args((String,Class));
-static Int    local visitClass          Args((Class));
+       Int          visitClass          Args((Class));
 
 static List   local classBindings       Args((String,Class,List));
 static Name   local memberName          Args((Class,Text));
@@ -1664,7 +1664,7 @@ Class  c; {                             /* to each class.                  */
     return findText(buffer);
 }
 
-static Int local visitClass(c)          /* visit class defn to check that  */
+       Int visitClass(c)                /* visit class defn to check that  */
 Class c; {                              /* class hierarchy is acyclic      */
 #if TREX
     if (isExt(c)) {                     /* special case for lacks preds    */

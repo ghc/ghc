@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/01/11 14:56:07 $
+ * $Revision: 1.26 $
+ * $Date: 2000/02/03 15:56:13 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -127,8 +127,8 @@ static Void finishGHCValue      Args((VarId));
 static Void startGHCSynonym     Args((Int,Cell,List,Type));
 static Void finishGHCSynonym    Args((Tycon)); 
 
-static Void startGHCClass       Args((Int,List,Cell,List,List));
-static Void finishGHCClass      Args((Class)); 
+static Void  startGHCClass      Args((Int,List,Cell,List,List));
+static Class finishGHCClass     Args((Class)); 
 
 static Inst startGHCInstance    Args((Int,List,Pair,VarId));
 static Void finishGHCInstance   Args((Inst));
@@ -554,6 +554,7 @@ Bool processInterfaces ( void )
     List    all_known_types;
     Int     num_known_types;
     Bool    didPrelude;
+    List    cls_list;
 
     List ifaces       = NIL;  /* :: List I_INTERFACE */
     List iface_sizes  = NIL;  /* :: List Int         */
@@ -845,6 +846,7 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
        the export lists; those must wait for later.
     */
     didPrelude = FALSE;
+    cls_list   = NIL;
     for (xs = ifaces; nonNull(xs); xs = tl(xs)) {
        iface   = unap(I_INTERFACE,hd(xs));
        mname   = textOf(zfst(iface));
@@ -888,8 +890,9 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
                 break;
              }
              case I_CLASS: {
-                Cell klass = unap(I_CLASS,decl);
-                finishGHCClass ( zsel35(klass) );
+                Cell  klass = unap(I_CLASS,decl);
+                Class cls   = finishGHCClass ( zsel35(klass) );
+                cls_list = cons(cls,cls_list);
                 break;
              }
              case I_VALUE: {
@@ -912,6 +915,8 @@ fprintf(stderr, "abstractify newtype %s\n", textToStr(textOf(getIEntityName(ent)
     */
     for (xs = ifaces; nonNull(xs); xs = tl(xs))
        finishGHCModule(hd(xs));
+
+    mapProc(visitClass,cls_list);
 
     /* Finished! */
     ifaces_outstanding = NIL;
@@ -1788,7 +1793,7 @@ List  mems0; {    /* [((VarId, Type))]     */
 }
 
 
-static Void finishGHCClass ( Tycon cls_tyc )
+static Class finishGHCClass ( Tycon cls_tyc )
 {
     List  mems;
     Int   line;
@@ -1820,6 +1825,8 @@ static Void finishGHCClass ( Tycon cls_tyc )
        name(n).arity  = arityInclDictParams(name(n).type);
        hd(mems) = n;
     }
+
+    return nw;
 }
 
 
