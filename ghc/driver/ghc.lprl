@@ -2546,7 +2546,7 @@ sub add_syslib {
 	       : "$TopPwd/hslibs/concurrent"
 	  )
 	, '' # where to find the cbits archive to use when linking
-	, '' # Syslib dependencies
+	, 'lang' # Syslib dependencies
 	, '' # extra ghc opts
 	, '' # extra cc opts
 	, '' # extra ld opts
