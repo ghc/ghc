@@ -151,7 +151,7 @@ $white_no_nl+ 				;
 -- single-line line pragmas, of the form
 --    # <line> "<file>" <extra-stuff> \n
 <line_prag1> $digit+			{ set_line line_prag1a }
-<line_prag1a> \" $graphic* \"		{ set_file line_prag1b }
+<line_prag1a> \" [$graphic \ ]* \"	{ set_file line_prag1b }
 <line_prag1b> .*			{ pop }
 
 -- Haskell-style line pragmas, of the form
