@@ -1032,7 +1032,7 @@ funAppCtxt fun arg_no arg sty
 	 4 (ppr sty arg)
 
 stmtCtxt ListComp stmt sty
-  = hang (ptext SLIT("In a list-comprehension qualifer:")) 
+  = hang (ptext SLIT("In a pattern guard/list-comprehension qualifier:")) 
          4 (ppr sty stmt)
 
 stmtCtxt DoStmt stmt sty
