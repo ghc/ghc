@@ -5,7 +5,7 @@
 
 \begin{code}
 module LoadIface (
-	loadHomeInterface, loadInterface,
+	loadHomeInterface, loadInterface, loadDecls,
 	loadSrcInterface, loadOrphanModules, loadHiBootInterface,
 	readIface,	-- Used when reading the module's old interface
 	predInstGates, ifaceInstGates, ifaceStats, discardDeclPrags,
@@ -262,8 +262,8 @@ loadInterface doc_str mod from
 	-- 	explicitly tag each export which seems a bit of a bore)
 
 	; ignore_prags <- doptM Opt_IgnoreInterfacePragmas
-	; new_eps_decls <- mapM (loadDecl ignore_prags) (mi_decls iface)
-	; new_eps_insts <- mapM loadInst                (mi_insts iface)
+	; new_eps_decls <- loadDecls ignore_prags (mi_decls iface)
+	; new_eps_insts <- mapM loadInst (mi_insts iface)
 	; new_eps_rules <- if ignore_prags 
 			   then return []
 			   else mapM loadRule (mi_rules iface)
@@ -297,21 +297,35 @@ badDepMsg mod
 -- the declaration itself, will find the fully-glorious Name
 -----------------------------------------------------
 
-addDeclsToPTE :: PackageTypeEnv -> [[(Name,TyThing)]] -> PackageTypeEnv
-addDeclsToPTE pte things = foldl extendNameEnvList pte things
+addDeclsToPTE :: PackageTypeEnv -> [(Name,TyThing)] -> PackageTypeEnv
+addDeclsToPTE pte things = extendNameEnvList pte things
+
+loadDecls :: Bool
+	  -> [(Version, IfaceDecl)]
+	  -> IfL [(Name,TyThing)]
+loadDecls ignore_prags ver_decls
+   = do { mod <- getIfModule
+ 	; thingss <- mapM (loadDecl ignore_prags mod) ver_decls
+	; return (concat thingss)
+	}
 
 loadDecl :: Bool			-- Don't load pragmas into the decl pool
+	 -> Module
 	  -> (Version, IfaceDecl)
 	  -> IfL [(Name,TyThing)]	-- The list can be poked eagerly, but the
 					-- TyThings are forkM'd thunks
-loadDecl ignore_prags (_version, decl)
+loadDecl ignore_prags mod (_version, decl)
   = do 	{ 	-- Populate the name cache with final versions of all 
 		-- the names associated with the decl
-	  mod <- getIfModule
-	; main_name      <- mk_new_bndr mod Nothing (ifName decl)
+	  main_name      <- mk_new_bndr mod Nothing (ifName decl)
 	; implicit_names <- mapM (mk_new_bndr mod (Just main_name)) (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily
+	-- NB. firstly, the laziness is there in case we never need the
+	-- declaration (in one-shot mode), and secondly it is there so that 
+	-- we don't look up the occurrence of a name before calling mk_new_bndr
+	-- on the binder.  This is important because we must get the right name
+	-- which includes its nameParent.
 	; thing <- forkM doc (bumpDeclStats main_name >> tcIfaceDecl stripped_decl)
 	; let mini_env = mkOccEnv [(getOccName t, t) | t <- implicitTyThings thing]
 	      lookup n = case lookupOccEnv mini_env (getOccName n) of

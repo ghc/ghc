@@ -13,7 +13,8 @@ module TcIface (
 #include "HsVersions.h"
 
 import IfaceSyn
-import LoadIface	( loadHomeInterface, loadInterface, predInstGates, discardDeclPrags )
+import LoadIface	( loadHomeInterface, loadInterface, predInstGates,
+			  discardDeclPrags, loadDecls )
 import IfaceEnv		( lookupIfaceTop, lookupIfaceExt, newGlobalBinder, lookupOrig,
 			  extendIfaceIdEnv, extendIfaceTyVarEnv, newIPName,
 			  tcIfaceTyVar, tcIfaceLclId,
@@ -177,30 +178,18 @@ typecheckIface hsc_env iface
 		-- It's not actually *wrong* to do so, but in fact GHCi is unable 
 		-- to handle unboxed tuples, so it must not see unfoldings.
 	  ignore_prags <- doptM Opt_IgnoreInterfacePragmas
-	; let { decls | ignore_prags = map (discardDeclPrags . snd) (mi_decls iface)
-		      | otherwise    = map snd (mi_decls iface)
-	      ; rules | ignore_prags = []
-		      | otherwise    = mi_rules iface
-	      ; dfuns    = mi_insts iface
-	      ; mod      = mi_module iface
-	  }
-		-- Typecheck the decls
-	; names <- mappM (lookupOrig mod . ifName) decls
-	; ty_things <- fixM (\ rec_ty_things -> do
-		{ writeMutVar tc_env_var (mkNameEnv (names `zipLazy` rec_ty_things))
-			-- This only makes available the "main" things,
-			-- but that's enough for the strictly-checked part
-		; mapM tcIfaceDecl decls })
-	
-		-- Now augment the type envt with all the implicit things
-		-- These will be needed when type-checking the unfoldings for
-		-- the IfaceIds, but this is done lazily, so writing the thing
-		-- now is sufficient
-	; let	{ add_implicits main_thing = main_thing : implicitTyThings main_thing
-		; type_env = mkTypeEnv (concatMap add_implicits ty_things) }
+
+		-- Load & typecheck the decls
+	; decl_things <- loadDecls ignore_prags (mi_decls iface)
+
+	; let type_env = mkNameEnv decl_things
 	; writeMutVar tc_env_var type_env
 
 		-- Now do those rules and instances
+	; let { rules | ignore_prags = []
+		      | otherwise    = mi_rules iface
+	      ; dfuns = mi_insts iface
+	      } 
 	; dfuns <- mapM tcIfaceInst dfuns
 	; rules <- mapM tcIfaceRule rules
 
