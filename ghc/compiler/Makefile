@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.190 2001/08/17 17:18:51 apt Exp $
+# $Id: Makefile,v 1.191 2001/08/17 22:29:06 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -223,6 +223,11 @@ SRC_HC_OPTS += \
 # Disaster!  Then the hc file sees the GHC 5.02 (or whatever)
 # include files.   For the moment we've reverted to using
 # an explicit path in the .hs sources
+#
+# For the benefit of <5.00 compilers, do include GHC_INCLUDE_DIR
+# when generating dependencies. (=> it gets passed onto mkdependHS,
+# which needs it).
+SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 ifneq "$(mingw32_TARGET_OS)" "1"
 SRC_HC_OPTS += -package concurrent -package posix -package text -package util
