@@ -1198,7 +1198,7 @@ else
 fi
 
 dnl ** check for math library
-AC_CHECK_LIB([m], [main], [LIBM="-lm"], [LIBM=])
+AC_CHECK_LIB([m], [atan], [LIBS="-lm $LIBS"; LIBM="-lm"], [LIBM=])
 AC_SUBST([LIBM])
 
 dnl ** check for X Window System
@@ -1308,8 +1308,6 @@ else
       ])    
     AC_SUBST(HaveRtldNow)
 fi
-
-FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
 dnl ---------- usleep ----------
 dnl --- stolen from guile configure ---

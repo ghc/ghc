@@ -1009,7 +1009,7 @@ else
   esac
 
   if test x"$use_quartz_opengl" != xyes; then
-    AC_CHECK_LIB([m], [main], [GL_LIBS="-lm $GL_LIBS"])
+    AC_CHECK_LIB([m], [atan], [GL_LIBS="-lm $GL_LIBS"])
 
     if test x"$no_x" != xyes; then
       test -n "$x_includes" && GL_CFLAGS="-I$x_includes $GL_CFLAGS"
