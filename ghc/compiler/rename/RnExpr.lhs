@@ -18,7 +18,12 @@ module RnExpr (
    ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(RnLoop)		-- break the RnPass/RnExpr/RnBinds loops
+#else
+import {-# SOURCE #-} RnBinds 
+import {-# SOURCE #-} RnSource ( rnHsSigType )
+#endif
 
 import HsSyn
 import RdrHsSyn
