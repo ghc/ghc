@@ -65,11 +65,12 @@ import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 import Outputable
 import Util		( sortLt, dropList, seqList )
 import Binary		( getBinFileWithDict )
-import BinIface		( writeBinIface )
+import BinIface		( writeBinIface, v_IgnoreHiVersion )
 import ErrUtils		( dumpIfSet_dyn )
 import FiniteMap
 import FastString
 
+import DATA_IOREF	( writeIORef )
 import Monad		( when )
 import Maybe		( catMaybes, isJust, isNothing )
 import Maybes		( orElse )
@@ -86,6 +87,9 @@ import IO		( putStrLn )
 \begin{code}
 showIface :: FilePath -> IO ()
 showIface filename = do
+   -- skip the version check; we don't want to worry about profiled vs.
+   -- non-profiled interfaces, for example.
+   writeIORef v_IgnoreHiVersion True
    parsed_iface <- Binary.getBinFileWithDict filename
    let ParsedIface{
       pi_mod=pi_mod, pi_pkg=pi_pkg, pi_vers=pi_vers,
