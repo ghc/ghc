@@ -1,8 +1,7 @@
 
 rnfail026.hs:16:
-    Couldn't match `* -> *' against `*'
-	Expected kind: (* -> *) -> *
-	Inferred kind: * -> k
+    Kind error: Expecting kind `* -> *',
+		but `forall a. (Eq a) => Set a' has kind `*'
     When checking kinds in `Monad (forall a. (Eq a) => Set a)'
     In the instance declaration for `Monad (forall a. (Eq a) => Set a)'
 
