@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.58 2002/01/30 12:17:21 simonmar Exp $
+# $Id: Makefile,v 1.59 2002/01/30 16:27:34 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -21,12 +21,13 @@ TOP=..
 # set of suffix rules for compiling C code, using $(HC) rather than $(CC)
 # and prepending "-optc" to $(CC_OPTS).  NB. must be done before including
 # boilerplate.mk below.
-HC=$(GHC_INPLACE)
 ifneq "$(BootingFromHc)" "YES"
 UseGhcForCc = YES
 endif
 
 include $(TOP)/mk/boilerplate.mk
+
+HC=$(GHC_INPLACE)
 
 PACKAGE = rts
 WAYS=$(GhcLibWays)
