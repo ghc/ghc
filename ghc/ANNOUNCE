@@ -32,7 +32,8 @@ Apart from that, there are the following changes
      libraries.
 
      The hslibs/ tree is organised in a Java-like fashion.  Details in 
-     the new Library guide.  <url please>
+     the new Library guide:
+     http://www.haskell.org/ghc/docs/4.06/hslibs/book1.html
 
      Existing programs that use the -syslib flag may need to change which
      syslibs they include.
@@ -42,13 +43,15 @@ Apart from that, there are the following changes
    - Clean up of concurrent I/O system; in particular, I/O is now non-blocking,
      except (alas) on stdout/stderr for tiresome reasons.
 
-   - Some refinements to the exceptions mechanism <url please>
+   - Some refinements to the exceptions mechanism:
+     http://www.haskell.org/ghc/docs/4.06/users_guide/release-notes-406.html#exc-changes-406
 
-   - More performance tuning: compiled programs now allocate 10% less than 4.04
+   - More performance tuning: compiled programs now allocate 10% less memory
+     than 4.04
 
 For full details see the release notes:
 
-	http://www.haskell.org/ghc/docs/latest/users_guide/users_guide-1.html#ss1.4
+	http://www.haskell.org/ghc/docs/4.06/users_guide/release-notes-406.html
 
 + Mailing lists
 ================
@@ -104,7 +107,7 @@ haven't been tested due to lack of time/hardware:
   * mips-sgi-irix{5,6}
   * {rs6000,powerpc}-ibm-aix
 
-The installer's guide included in distribution gives a complete
+The builder's guide included in distribution gives a complete
 run-down of what-ports-work; an on-line version can be found at
 
-   http://www.haskell.org/ghc/docs/latest/installation_guide/installing.html
+   http://www.haskell.org/ghc/docs/4.06/building_guide/installing.html
