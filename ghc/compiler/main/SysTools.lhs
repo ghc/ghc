@@ -483,11 +483,11 @@ findTopDir minusbs
        ; return (am_installed, top_dir)
        }
   where
-    -- get_proto returns a Unix-format path (relying on getExecDir to do so too)
+    -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
     get_proto | notNull minusbs
 	      = return (normalisePath (drop 2 (last minusbs)))	-- 2 for "-B"
 	      | otherwise	   
-	      = do { maybe_exec_dir <- getExecDir -- Get directory of executable
+	      = do { maybe_exec_dir <- getBaseDir -- Get directory of executable
 		   ; case maybe_exec_dir of	  -- (only works on Windows; 
 						  --  returns Nothing on Unix)
 			Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
@@ -845,11 +845,13 @@ slash s1 s2 = s1 ++ ('/' : s2)
 
 \begin{code}
 -----------------------------------------------------------------------------
--- Define	getExecDir     :: IO (Maybe String)
+-- Define	getBaseDir     :: IO (Maybe String)
 
 #if defined(mingw32_HOST_OS)
-getExecDir :: IO (Maybe String)
-getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
+getBaseDir :: IO (Maybe String)
+-- Assuming we are running ghc, accessed by path  $()/bin/ghc.exe,
+-- return the path $(stuff).  Note that we drop the "bin/" directory too.
+getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 		buf <- mallocArray len
 		ret <- getModuleFileName nullPtr buf len
 		if ret == 0 then free buf >> return Nothing
@@ -862,7 +864,7 @@ getExecDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 foreign import stdcall "GetModuleFileNameA" unsafe
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
-getExecDir :: IO (Maybe String) = do return Nothing
+getBaseDir :: IO (Maybe String) = do return Nothing
 #endif
 
 #ifdef mingw32_HOST_OS
