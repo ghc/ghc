@@ -143,16 +143,17 @@ showGFloat d x =  showString (formatRealFloat FFGeneric d x)
 
 showIntAtBase :: Integral a => a -> (Int -> Char) -> a -> ShowS
 showIntAtBase base toChr n r
-  | n < 0  = error ("Numeric.showIntAtBase: applied to negative number " ++ show n)
-  | otherwise = 
-    case quotRem n base of { (n', d) ->
-    let c = toChr (fromIntegral d) in
-    seq c $ -- stricter than necessary
-    let
-	r' = c : r
-    in
-    if n' == 0 then r' else showIntAtBase base toChr n' r'
-    }
+  | base <= 1 = error ("Numeric.showIntAtBase: applied to unsupported base " ++ show base)
+  | n <  0    = error ("Numeric.showIntAtBase: applied to negative number " ++ show n)
+  | otherwise = showIt (quotRem n base) r
+   where
+    showIt (n,d) r = seq c $ -- stricter than necessary
+      case n of
+        0 -> r'
+	_ -> showIt (quotRem n base) r'
+     where
+      c  = toChr (fromIntegral d) 
+      r' = c : r
 
 showHex, showOct :: Integral a => a -> ShowS
 showHex = showIntAtBase 16 intToDigit
