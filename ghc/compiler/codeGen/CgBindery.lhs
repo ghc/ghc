@@ -424,8 +424,6 @@ rebindToStack name offset
 %*									*
 %************************************************************************
 
-ToDo: remove the dependency on 32-bit words.
-
 There are four kinds of things on the stack:
 
 	- pointer variables (bound in the environment)
