@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.50 2005/03/24 18:44:16 sof Exp $
+# $Id: package.mk,v 1.51 2005/03/29 14:02:06 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -168,14 +168,15 @@ SRC_HC_OPTS 	+= -ignore-package $(PACKAGE)
 else
 ifneq "$(strip $(GHC))" ""
 # Making the assumption here that standalone packages will be using mk/config.mk:GHC
-SRC_HC_OPTS = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package $(PACKAGE)"; fi)
+SRC_HC_OPTS = $(shell if (test $(GhcCanonVersion) -ge 603); then echo "-ignore-package"; else echo "-package-name"; fi) $(PACKAGE)
 else
 SRC_HC_OPTS 	+= -ignore-package $(PACKAGE)
 endif
-endif
+endif # STANDALONE_PACKAGE
+
 SRC_HC_OPTS 	+= $(GhcLibHcOpts)
 SRC_HC_OPTS     += $(patsubst %, -package %, $(PACKAGE_DEPS))
-endif
+endif # NON_HS_PACKAGE
 
 #	-fgenerics switches on generation of support code for 
 #		derivable type classes.  This is now off by default,
