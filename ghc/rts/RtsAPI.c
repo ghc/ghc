@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.5 1999/03/03 19:20:15 sof Exp $
+ * $Id: RtsAPI.c,v 1.6 1999/05/04 10:19:18 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,8 +13,11 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 
+/* This is a temporary fudge until the scheduler guarantees
+   that the result returned from an evalIO() is fully evaluated.
+*/
 #define CHASE_OUT_INDIRECTIONS(p) \
-   while ((p)->header.info == &IND_info) { p=((StgInd*)p)->indirectee; }
+   while ((p)->header.info == &IND_info || (p)->header.info == &IND_STATIC_info || (p)->header.info == &IND_OLDGEN_info || (p)->header.info == &IND_PERM_info || (p)->header.info == &IND_OLDGEN_PERM_info) { p=((StgInd*)p)->indirectee; }
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
@@ -226,7 +229,21 @@ rts_getInt (HaskellObj p)
 {
   CHASE_OUT_INDIRECTIONS(p);
 
-  if ( 1 || /* ToDo: accommodate I32's here as well */
+  if ( 1 ||
+       p->header.info == (const StgInfoTable*)&Izh_con_info || 
+       p->header.info == (const StgInfoTable*)&Izh_static_info ) {
+    return (int)(p->payload[0]);
+  } else {
+    barf("getInt: not an Int");
+  }
+}
+
+int
+rts_getInt32 (HaskellObj p)
+{
+  CHASE_OUT_INDIRECTIONS(p);
+
+  if ( 1 ||
        p->header.info == (const StgInfoTable*)&Izh_con_info || 
        p->header.info == (const StgInfoTable*)&Izh_static_info ) {
     return (int)(p->payload[0]);
@@ -237,6 +254,20 @@ rts_getInt (HaskellObj p)
 
 unsigned int
 rts_getWord (HaskellObj p)
+{
+  CHASE_OUT_INDIRECTIONS(p);
+
+  if ( 1 || /* see above comment */
+       p->header.info == (const StgInfoTable*)&Wzh_con_info ||
+       p->header.info == (const StgInfoTable*)&Wzh_static_info ) {
+    return (unsigned int)(p->payload[0]);
+  } else {
+    barf("getWord: not a Word");
+  }
+}
+
+unsigned int
+rts_getWord32 (HaskellObj p)
 {
   CHASE_OUT_INDIRECTIONS(p);
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.57 1999/03/26 10:29:04 simonm Exp $
+ * $Id: GC.c,v 1.58 1999/05/04 10:19:14 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1134,8 +1134,8 @@ loop:
   /* make sure the info pointer is into text space */
   ASSERT(q && (LOOKS_LIKE_GHC_INFO(GET_INFO(q))
 	       || IS_HUGS_CONSTR_INFO(GET_INFO(q))));
-
   info = get_itbl(q);
+
   switch (info -> type) {
 
   case BCO:
@@ -1511,7 +1511,7 @@ scavenge_srt(const StgInfoTable *info)
        If the SRT entry hasn't got bit 0 set, the SRT entry points to a
        closure that's fixed at link-time, and no extra magic is required.
     */
-#ifdef HAVE_WIN32_DLL_SUPPORT
+#ifdef ENABLE_WIN32_DLL_SUPPORT
     if ( stgCast(unsigned long,*srt) & 0x1 ) {
        evacuate(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
     } else {
@@ -2323,8 +2323,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
      
     /* Is q a pointer to a closure?
      */
-
-    if (! LOOKS_LIKE_GHC_INFO(q)) {
+    if (! LOOKS_LIKE_GHC_INFO(q) ) {
 #ifdef DEBUG
       if ( 0 && LOOKS_LIKE_STATIC_CLOSURE(q) ) {  /* Is it a static closure? */
 	ASSERT(closure_STATIC(stgCast(StgClosure*,q)));

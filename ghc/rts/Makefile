@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 1999/04/27 09:37:04 simonm Exp $
+# $Id: Makefile,v 1.9 1999/05/04 10:19:17 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -56,7 +56,9 @@ WARNING_OPTS += -optc-Wbad-function-cast
 SRC_HC_OPTS += -I../includes -I. -Igum $(WARNING_OPTS) $(GhcRtsHcOpts) -optc-DCOMPILING_RTS
 SRC_CC_OPTS = $(GhcRtsCcOpts)
 
-DLLWRAP = dllwrap
+ifneq "$(way)" "dll"
+SRC_HC_OPTS += -static
+endif
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
@@ -84,12 +86,22 @@ unexport CC
 #
 #  Building DLLs is only supported on mingw32 at the moment.
 # 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-dll ::
-	$(CP) -f libHSrts.a libHSrts_dll.a
-	ar d libHSrts_dll.a Main.o
-	$(DLLWRAP) -mno-cygwin --target=i386-mingw32 --export-all --output-lib libHSrts_imp.a --def HSrts.def -o HSrts.dll libHSrts_dll.a -lwinmm -lHS -lgmp -L. -Lgmp
+ifeq "$(way)" "dll"
+DLL_NAME          = HSrts.dll
+SRC_BLD_DLL_OPTS += --def HSrts.def -lwinmm -lHS_imp -lgmp -L. -Lgmp
+
+LIBOBJS := $(filter-out Main.$(way_)o, $(LIBOBJS))
+
+$(DLL_NAME) :: libHS_imp.a
+
+libHS_imp.a :
+	dlltool --output-lib libHS_imp.a --def HSprel.def --dllname HSprel.dll
+
+# It's not included in the DLL, but we need to compile it up separately.
+all :: Main.dll_o
+
 endif
+
 # -----------------------------------------------------------------------------
 # Compile GMP only if we don't have it already
 #

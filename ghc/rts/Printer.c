@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.11 1999/04/27 12:27:49 sewardj Exp $
+ * $Id: Printer.c,v 1.12 1999/05/04 10:19:17 sof Exp $
  *
  * Copyright (c) 1994-1999.
  *
@@ -704,7 +704,10 @@ static void printZcoded( const char *raw )
  * Symbol table loading
  * ------------------------------------------------------------------------*/
 
-#ifdef HAVE_BFD_H
+/* Causing linking trouble on Win32 plats, so I'm
+   disabling this for now. 
+*/
+#if defined(HAVE_BFD_H) && !defined(_WIN32)
 
 #include <bfd.h>
 

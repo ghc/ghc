@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.20 1999/04/23 09:47:33 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.21 1999/05/04 10:19:19 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -463,7 +463,7 @@ INFO_TABLE_CONSTR(StablePtr_static_info,Hugs_CONSTR_entry,0,sizeofW(StgStablePtr
    replace them with references to the static objects.
    -------------------------------------------------------------------------- */
 
-#ifdef HAVE_WIN32_DLL_SUPPORT
+#ifdef ENABLE_WIN32_DLL_SUPPORT
 /*
  * When sticking the RTS in a DLL, we delay populating the
  * Charlike and Intlike tables until load-time, which is only

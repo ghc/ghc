@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.10 1999/04/27 12:30:26 simonm Exp $
+ * $Id: RtsStartup.c,v 1.11 1999/05/04 10:19:19 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -125,15 +125,13 @@ extern void startupHaskell(int argc, char *argv[])
        
        Ditto for Bool closure tbl.
     */
-#ifdef HAVE_WIN32_DLL_SUPPORT
+#ifdef ENABLE_WIN32_DLL_SUPPORT
     for(i=0;i<=255;i++)
        (CHARLIKE_closure[i]).header.info = (const StgInfoTable*)&Czh_static_info;
 
     for(i=0;i<=32;i++)
        (INTLIKE_closure[i]).header.info = (const StgInfoTable*)&Izh_static_info;
        
-    PrelBase_Bool_closure_tbl[0] = (const StgClosure*)&False_closure;
-    PrelBase_Bool_closure_tbl[1] = (const StgClosure*)&True_closure;
 #endif
     /* Record initialization times */
     end_init();
