@@ -16,6 +16,8 @@ module Inst (
 	newDictFromOld, newDicts, newClassDicts, newDictsAtLoc,
 	newMethod, newMethodWithGivenTy, newOverloadedLit,
 	newIPDict, instOverloadedFun,
+	instantiateFdClassTys, instFunDeps, instFunDepsOfTheta,
+	newFunDepFromDict,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, instLoc, getDictClassTys,
 	getDictPred_maybe, getMethodTheta_maybe,
@@ -80,7 +82,8 @@ import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn ( intDataCon, isIntTy,
 		    floatDataCon, isFloatTy,
 		    doubleDataCon, isDoubleTy,
-		    integerTy, isIntegerTy
+		    integerTy, isIntegerTy,
+		    voidTy
 		  ) 
 import Unique	( fromRationalClassOpKey, rationalTyConKey,
 		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
@@ -175,6 +178,7 @@ data Inst
 	InstLoc
 
   | FunDep
+	Unique
 	Class		-- the class from which this arises
 	[FunDep TcType]
 	InstLoc
@@ -207,11 +211,11 @@ cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2
 cmpInst (Method _ _ _ _ _ _)      other			    = LT
 
 cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `cmpOverLit` lit2) `thenCmp` (ty1 `compare` ty2)
-cmpInst (LitInst _ _ _ _)	  (FunDep _ _ _)	    = LT
+cmpInst (LitInst _ _ _ _)	  (FunDep _ _ _ _)	    = LT
 cmpInst (LitInst _ _ _ _)	  other 		    = GT
 
-cmpInst (FunDep clas1 fds1 _)     (FunDep clas2 fds2 _)     = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
-cmpInst (FunDep _ _ _)		  other			    = GT
+cmpInst (FunDep _ clas1 fds1 _)   (FunDep _ clas2 fds2 _)   = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
+cmpInst (FunDep _ _ _ _)	  other			    = GT
 
 cmpOverLit (OverloadedIntegral   i1) (OverloadedIntegral   i2) = i1 `compare` i2
 cmpOverLit (OverloadedFractional f1) (OverloadedFractional f2) = f1 `compare` f2
@@ -226,7 +230,7 @@ Selection
 instLoc (Dict   u pred      loc) = loc
 instLoc (Method u _ _ _ _   loc) = loc
 instLoc (LitInst u lit ty   loc) = loc
-instLoc (FunDep _ _	    loc) = loc
+instLoc (FunDep _ _ _	    loc) = loc
 
 getDictPred_maybe (Dict _ p _) = Just p
 getDictPred_maybe _	       = Nothing
@@ -236,7 +240,7 @@ getMethodTheta_maybe _			      = Nothing
 
 getDictClassTys (Dict u (Class clas tys) _) = (clas, tys)
 
-getFunDeps (FunDep clas fds _) = Just (clas, fds)
+getFunDeps (FunDep _ clas fds _) = Just (clas, fds)
 getFunDeps _ = Nothing
 
 getFunDepsOfLIE lie = catMaybes (map getFunDeps (lieToList lie))
@@ -251,7 +255,7 @@ getIPs _ = []
 
 getIPsOfLIE lie = concatMap getIPs (lieToList lie)
 
-getAllFunDeps (FunDep clas fds _) = fds
+getAllFunDeps (FunDep _ clas fds _) = fds
 getAllFunDeps inst = map (\(n,ty) -> ([], [ty])) (getIPs inst)
 
 getAllFunDepsOfLIE lie = concat (map getAllFunDeps (lieToList lie))
@@ -262,7 +266,7 @@ tyVarsOfInst (Method _ id tys _ _ _) = tyVarsOfTypes tys `unionVarSet` idFreeTyV
 					 -- The id might have free type variables; in the case of
 					 -- locally-overloaded class methods, for example
 tyVarsOfInst (LitInst _ _ ty _)      = tyVarsOfType  ty
-tyVarsOfInst (FunDep _ fds _)
+tyVarsOfInst (FunDep _ _ fds _)
   = foldr unionVarSet emptyVarSet (map tyVarsOfFd fds)
   where tyVarsOfFd (ts1, ts2) =
 	    tyVarsOfTypes ts1 `unionVarSet` tyVarsOfTypes ts2
@@ -305,8 +309,8 @@ isStdClassTyVarDict other
   = False
 
 notFunDep :: Inst -> Bool
-notFunDep (FunDep _ _ _) = False
-notFunDep other	         = True
+notFunDep (FunDep _ _ _ _) = False
+notFunDep other		   = True
 \end{code}
 
 Two predicates which deal with the case where class constraints don't
@@ -384,12 +388,18 @@ instOverloadedFun orig v arg_tys theta tau
     returnNF_Tc (instToId inst, mkLIE (inst : fds))
 
 instFunDeps orig theta
-  = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
+  = tcGetUnique		`thenNF_Tc` \ uniq ->
+    tcGetInstLoc orig	`thenNF_Tc` \ loc ->
     let ifd (Class clas tys) =
 	    let fds = instantiateFdClassTys clas tys in
-	    if null fds then Nothing else Just (FunDep clas fds loc)
+	    if null fds then Nothing else Just (FunDep uniq clas fds loc)
 	ifd _ = Nothing
     in returnNF_Tc (catMaybes (map ifd theta))
+
+instFunDepsOfTheta theta
+  = let ifd (Class clas tys) = instantiateFdClassTys clas tys
+	ifd _ = []
+    in concat (map ifd theta)
 
 newMethodWithGivenTy orig id tys theta tau
   = tcGetInstLoc orig	`thenNF_Tc` \ loc ->
@@ -448,6 +458,16 @@ newOverloadedLit orig lit ty		-- The general case
 \end{code}
 
 \begin{code}
+newFunDepFromDict dict
+  = tcGetUnique		`thenNF_Tc` \ uniq ->
+    let (clas, tys) = getDictClassTys dict
+	fds = instantiateFdClassTys clas tys
+	inst = FunDep uniq clas fds (instLoc dict)
+    in
+	if null fds then returnNF_Tc Nothing else returnNF_Tc (Just inst)
+\end{code}
+
+\begin{code}
 newIPDict name ty loc
   = tcGetUnique		`thenNF_Tc` \ new_uniq ->
     let d = Dict new_uniq (IParam name ty) loc in
@@ -470,8 +490,8 @@ instToIdBndr (Method u id tys theta tau (_,loc,_))
 instToIdBndr (LitInst u list ty loc)
   = mkSysLocal SLIT("lit") u ty
 
-instToIdBndr (FunDep clas fds _)
-  = panic "FunDep escaped!!!"
+instToIdBndr (FunDep u clas fds _)
+  = mkSysLocal SLIT("FunDep") u voidTy
 
 ipToId n ty loc
   = mkUserLocal (mkIPOcc (getOccName n)) (nameUnique n) (mkPredTy (IParam n ty)) loc
@@ -513,9 +533,9 @@ zonkInst (LitInst u lit ty loc)
   = zonkTcType ty			`thenNF_Tc` \ new_ty ->
     returnNF_Tc (LitInst u lit new_ty loc)
 
-zonkInst (FunDep clas fds loc)
+zonkInst (FunDep u clas fds loc)
   = zonkFunDeps fds			`thenNF_Tc` \ fds' ->
-    returnNF_Tc (FunDep clas fds' loc)
+    returnNF_Tc (FunDep u clas fds' loc)
 
 zonkPreds preds = mapNF_Tc zonkPred preds
 zonkInsts insts = mapNF_Tc zonkInst insts
@@ -562,7 +582,7 @@ pprInst m@(Method u id tys theta tau loc)
 	  show_uniq u,
 	  ppr (instToId m) -}]
 
-pprInst (FunDep clas fds loc)
+pprInst (FunDep _ clas fds loc)
   = hsep [ppr clas, ppr fds]
 
 tidyPred :: TidyEnv -> TcPredType -> (TidyEnv, TcPredType)
@@ -593,7 +613,7 @@ tidyInst env (Method u id tys theta tau loc)
     (env', tys') = tidyOpenTypes env tys
 
 -- this case shouldn't arise... (we never print fundeps)
-tidyInst env fd@(FunDep clas fds loc)
+tidyInst env fd@(FunDep _ clas fds loc)
   = (env, fd)
 
 tidyInsts env insts = mapAccumL tidyInst env insts

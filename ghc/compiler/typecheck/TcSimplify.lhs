@@ -132,10 +132,10 @@ import TcHsSyn		( TcExpr, TcId,
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  tyVarsOfInst, tyVarsOfInsts,
-			  isDict, isClassDict, isMethod, isStdClassTyVarDict,
-			  isMethodFor, notFunDep,
+			  isDict, isClassDict, isMethod, notFunDep,
+			  isStdClassTyVarDict, isMethodFor,
 			  instToId, instBindingRequired, instCanBeGeneralised,
-			  newDictFromOld,
+			  newDictFromOld, newFunDepFromDict,
 			  getDictClassTys, getIPs,
 			  getDictPred_maybe, getMethodTheta_maybe,
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
@@ -165,6 +165,7 @@ import CmdLineOpts	( opt_GlasgowExts )
 import Outputable
 import Util
 import List		( partition )
+import Maybe		( fromJust )
 import Maybes		( maybeToBool )
 \end{code}
 
@@ -231,17 +232,7 @@ tcSimplify str local_tvs wanted_lie
 	-- Finished
     returnTc (mkLIE frees, binds, mkLIE irreds')
   where
-    -- the idea behind filtering out the dependencies here is that
-    -- they've already served their purpose, and can be reconstructed
-    -- at a later point from the retained class predicates.
-    -- however, there *is* the possibility that a dependency
-    -- out-lives the predicate from which it arose.
-    -- I don't have any examples of this, but if they show up,
-    -- we'd want to consider the possibility of saving the
-    -- dependencies as hidden constraints (i.e. they'd only
-    -- show up in interface files) -- or maybe they'd be useful
-    -- as first class predicates...
-    wanteds = filter notFunDep (lieToList wanted_lie)
+    wanteds = lieToList wanted_lie
 
     try_me inst 
       -- Does not constrain a local tyvar
@@ -291,9 +282,7 @@ tcSimplifyAndCheck str local_tvs given_lie wanted_lie
     returnTc (mkLIE frees, binds)
   where
     givens  = lieToList given_lie
-    -- see comment on wanteds in tcSimplify
-    -- JRL nope - it's too early to throw away fundeps here...
-    wanteds = {- filter notFunDep -} (lieToList wanted_lie)
+    wanteds = lieToList wanted_lie
     given_dicts = filter isClassDict givens
 
     try_me inst 
@@ -339,9 +328,6 @@ tcSimplifyToDicts wanted_lie
     ASSERT( null frees )
     returnTc (mkLIE irreds, binds)
   where
-    -- see comment on wanteds in tcSimplify
-    -- ZZ waitaminute - doesn't appear that any funDeps should even be here...
-    -- wanteds = filter notFunDep (lieToList wanted_lie)
     wanteds = lieToList wanted_lie
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
@@ -520,6 +506,11 @@ reduceContext str try_me givens wanteds
   =     -- Zonking first
     mapNF_Tc zonkInst givens	`thenNF_Tc` \ givens ->
     mapNF_Tc zonkInst wanteds	`thenNF_Tc` \ wanteds ->
+    -- JRL - process fundeps last.  We eliminate fundeps by seeing
+    -- what available classes generate them, so we need to process the
+    -- classes first. (would it be useful to make LIEs ordered in the first place?)
+    let (wantedOther, wantedFds) = partition notFunDep wanteds
+	wanteds'		 = wantedOther ++ wantedFds in
 
 {-
     pprTrace "reduceContext" (vcat [
@@ -531,10 +522,10 @@ reduceContext str try_me givens wanteds
 	     ]) $
 -}
         -- Build the Avail mapping from "givens"
-    foldlNF_Tc addGiven emptyFM givens		`thenNF_Tc` \ avails ->
+    foldlNF_Tc addGiven emptyFM givens			`thenNF_Tc` \ avails ->
 
         -- Do the real work
-    reduceList (0,[]) try_me wanteds (avails, [], [])	`thenTc` \ (avails, frees, irreds) ->
+    reduceList (0,[]) try_me wanteds' (avails, [], [])	`thenNF_Tc` \ (avails, frees, irreds) ->
 
 	-- Extract the bindings from avails
     let
@@ -566,7 +557,7 @@ reduceContext str try_me givens wanteds
 	     text "----------------------"
 	     ]) $
 -}
-    returnTc (binds, frees, irreds)
+    returnNF_Tc (binds, frees, irreds)
 \end{code}
 
 The main context-reduction function is @reduce@.  Here's its game plan.
@@ -781,6 +772,7 @@ addAvail avails wanted avail
 
 addSuperClasses :: Avails s -> Inst -> NF_TcM s (Avails s)
 		-- Add all the superclasses of the Inst to Avails
+		-- JRL - also add in the functional dependencies
 		-- Invariant: the Inst is already in Avails.
 
 addSuperClasses avails dict
@@ -788,10 +780,15 @@ addSuperClasses avails dict
   = returnNF_Tc avails
 
   | otherwise	-- It is a dictionary
-  = foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_theta' sc_sels)
+  = foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_theta' sc_sels) `thenNF_Tc` \ avails' ->
+    newFunDepFromDict dict	`thenNF_Tc` \ fdInst_maybe ->
+    case fdInst_maybe of
+      Nothing -> returnNF_Tc avails'
+      Just fdInst ->
+	let fdAvail = Avail (instToId (fromJust fdInst_maybe)) NoRhs [] in
+        addAvail avails fdInst fdAvail
   where
     (clas, tys) = getDictClassTys dict
-    
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
     sc_theta' = substClasses (mkTopTyVarSubst tyvars tys) sc_theta
 
@@ -1083,8 +1080,7 @@ tcSimplifyTop wanted_lie
 
     returnTc (binds1 `andMonoBinds` andMonoBindList binds_ambig)
   where
-    -- see comment on wanteds in tcSimplify
-    wanteds	= filter notFunDep (lieToList wanted_lie)
+    wanteds	= lieToList wanted_lie
     try_me inst	= ReduceMe AddToIrreds
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2

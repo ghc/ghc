@@ -53,6 +53,7 @@ module RdrHsSyn (
 	extractHsTyRdrTyVars, extractHsTysRdrTyVars,
 	extractPatsTyVars, 
 	extractRuleBndrsTyVars,
+	extractHsCtxtRdrTyVars,
  
 	mkOpApp, mkClassDecl, mkClassOpSig, mkConDecl,
 
@@ -153,6 +154,8 @@ extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
 
 extractHsCtxtRdrNames :: HsContext RdrName -> [RdrName]
 extractHsCtxtRdrNames ty = nub (extract_ctxt ty [])
+extractHsCtxtRdrTyVars :: HsContext RdrName -> [RdrName]
+extractHsCtxtRdrTyVars ty = filter isRdrTyVar (extractHsCtxtRdrNames ty)
 
 extract_ctxt ctxt acc = foldr extract_pred acc ctxt
 

@@ -736,6 +736,7 @@ The error message here is somewhat unsatisfactory, but it'll do for
 now (ToDo).
 
 \begin{code}
+checkSigMatch :: TopLevelFlag -> [Name] -> [TcId] -> [TcSigInfo] -> TcM s (Maybe (TcThetaType, LIE))
 checkSigMatch top_lvl binder_names mono_ids sigs
   | main_bound_here
   =	-- First unify the main_id with IO t, for any old t
@@ -770,7 +771,7 @@ checkSigMatch top_lvl binder_names mono_ids sigs
 
     sig1_dict_tys	= mk_dict_tys theta1
     n_sig1_dict_tys	= length sig1_dict_tys
-    sig_lie 		= mkLIE [inst | TySigInfo _ _ _ _ _ _ inst _ <- sigs]
+    sig_lie 		= mkLIE (concat [insts | TySigInfo _ _ _ _ _ _ insts _ <- sigs])
 
     maybe_main        = find_main top_lvl binder_names mono_ids
     main_bound_here   = maybeToBool maybe_main

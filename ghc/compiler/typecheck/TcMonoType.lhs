@@ -28,7 +28,9 @@ import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			  newKindVar, tcInstSigVar,
 			  zonkTcKindToKind, zonkTcTypeToType, zonkTcTyVars, zonkTcType, zonkTcTyVar
 			)
-import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr )
+import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr,
+			  instFunDeps, instFunDepsOfTheta )
+import FunDeps		( tyVarFunDep, oclose )
 import TcUnify		( unifyKind, unifyKinds, unifyTypeKind )
 import Type		( Type, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
@@ -213,12 +215,15 @@ tc_type_kind (HsForAllTy (Just tv_names) context ty)
 		--	f :: forall a. Num a => (# a->a, a->a #)
 		-- And we want these to get through the type checker
         check ct@(Class c tys) | ambiguous = failWithTc (ambigErr (c,tys) tau)
-	  where ct_vars       = tyVarsOfTypes tys
-		forall_tyvars = map varName in_scope_vars
-		tau_vars      = tyVarsOfType tau
-		ambig ct_var  = (varName ct_var `elem` forall_tyvars) &&
-			        not (ct_var `elemUFM` tau_vars)
-		ambiguous     = foldUFM ((||) . ambig) False ct_vars
+	  where ct_vars		    = tyVarsOfTypes tys
+		forall_tyvars	    = map varName in_scope_vars
+		tau_vars	    = tyVarsOfType tau
+		fds		    = instFunDepsOfTheta theta
+		tvFundep	    = tyVarFunDep fds
+		extended_tau_vars   = oclose tvFundep tau_vars
+		ambig ct_var	    = (varName ct_var `elem` forall_tyvars) &&
+				      not (ct_var `elemUFM` extended_tau_vars)
+		ambiguous	    = foldUFM ((||) . ambig) False ct_vars
 	check _ = returnTc ()
     in
     mapTc check theta			`thenTc_`
@@ -383,7 +388,7 @@ data TcSigInfo
 				-- Does *not* have name = N
 				-- Has type tau
 
-	Inst			-- Empty if theta is null, or 
+	[Inst]			-- Empty if theta is null, or
 				-- (method mono_id) otherwise
 
 	SrcLoc			-- Of the signature
@@ -438,8 +443,9 @@ mkTcSig poly_id src_loc
 		tyvar_tys'
 		theta' tau'			`thenNF_Tc` \ inst ->
 	-- We make a Method even if it's not overloaded; no harm
+   instFunDeps SignatureOrigin theta'		`thenNF_Tc` \ fds ->
 	
-   returnNF_Tc (TySigInfo name poly_id tyvars' theta' tau' (instToIdBndr inst) inst src_loc)
+   returnNF_Tc (TySigInfo name poly_id tyvars' theta' tau' (instToIdBndr inst) (inst : fds) src_loc)
   where
     name = idName poly_id
 \end{code}
