@@ -2,6 +2,7 @@
 # Only the first word on each line counts; the rest can be explanation.
 #
 Control.Parallel.Strategies	unused by GHC too
-Data.Generics			GHC-specific
+Data.Generics			foralls in type synonyms
 Debug.QuickCheck.Batch		needs pre-emptive concurrency
+Foreign.Concurrent		Haskell finalizers
 System.Posix.Signals
