@@ -46,6 +46,9 @@ GHC_OPTS=-recomp -cpp 		\
 	 -fusing-ghc-internals	\
 	 HcMaxHeapFlag $(EXTRA_HC_OPTS)
 
+EXTRA_MKDEPENDHS_OPTS = -irequired:prelude:ghc:hbc:glaExts:concurrent
+
+
 PREL_OPTS=/*???-fcompiling-ghc-internals -fno-implicit-prelude*/
 
 /* per-build options: shared with RTS */
@@ -199,7 +202,35 @@ HSTAGS_OPTS=-cpp -fglasgow-exts
     /* otherwise, the dependencies jeopardize our .hc files --
 	which are all we have! */
 MAIN_INCLUDE_DIR = $(TOP_PWD)/$(CURRENT_DIR)/$(GHC_INCLUDES)
-MKDEPENDHS_OPTS= -o .hc -I$(MAIN_INCLUDE_DIR) 
+MKDEPENDHS_OPTS= \
+IfBuild_mc(-s mc) \
+IfBuild_mr(-s mr) \
+IfBuild_mt(-s mt) \
+IfBuild_mp(-s mp) \
+IfBuild_mg(-s mg) \
+IfBuild_2s(-s 2s) \
+IfBuild_1s(-s 1s) \
+IfBuild_du(-s du) \
+IfBuild_p(-s p) \
+IfBuild_t(-s t) \
+IfBuild_a(-s a) \
+IfBuild_b(-s b) \
+IfBuild_c(-s c) \
+IfBuild_d(-s d) \
+IfBuild_e(-s e) \
+IfBuild_f(-s f) \
+IfBuild_g(-s g) \
+IfBuild_h(-s h) \
+IfBuild_i(-s i) \
+IfBuild_j(-s j) \
+IfBuild_k(-s k) \
+IfBuild_l(-s l) \
+IfBuild_m(-s m) \
+IfBuild_n(-s n) \
+IfBuild_o(-s o) \
+IfBuild_A(-s A) \
+IfBuild_B(-s B) \
+-o hc -I$(MAIN_INCLUDE_DIR) 
 
-HaskellDependTarget( $(BASIC_HS_PREL) )
+HaskellDependTarget( $(BASIC_HS) )
 #endif
