@@ -38,7 +38,7 @@ then
   fi
 fi
 
-$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1 -c $SGML_CATALOG_FILES
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex -c $SGML_CATALOG_FILES $1
 
 pdf$JADEtex $TMPFN
 

@@ -40,7 +40,7 @@ echo OUTPUT FILE NAME IS $output
 
 TMPFN=`echo $1 | sed 's/\.sgml//'`
 
-$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex $1 -c $SGML_CATALOG_FILES
+$JADE -t tex -d ${DB_STYLESHEET}\#print -o ${TMPFN}.tex -c $SGML_CATALOG_FILES $1
 
 jadetex ${TMPFN}.tex
 
