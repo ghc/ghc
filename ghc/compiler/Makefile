@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.170 2001/07/05 13:31:09 sewardj Exp $
+# $Id: Makefile,v 1.171 2001/07/09 10:46:46 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -108,14 +108,14 @@ CANON_HC_VERSION=$(shell echo "$(GhcVersion)" | sed -e 's/\.//g;s/^\(...\)......
 
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
-ghc_411_at_least = YES
+bootstrapped = YES
 else
-ghc_411_at_least=$(shell if (test $(CANON_HC_VERSION) -ge 4110); then echo YES; else echo NO; fi)
+bootstrapped = $(shell if (test $(CANON_HC_VERSION) -ge $(ProjectVersionInt)0); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
-ifeq "$(ghc_411_at_least)" "YES"
+ifeq "$(bootstrapped)" "YES"
 SRC_HC_OPTS += -DGHCI
 DIRS += ghci
 endif
