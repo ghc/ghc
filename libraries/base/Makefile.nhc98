@@ -54,8 +54,8 @@ $(OBJDIR)/Data/Set.$O: $(OBJDIR)/Data/Monoid.$O $(OBJDIR)/Data/List.$O \
 $(OBJDIR)/Data/Array.$O: $(OBJDIR)/Data/Ix.$O $(OBJDIR)/Data/Typeable.$O
 $(OBJDIR)/Data/Dynamic.$O: $(OBJDIR)/Data/HashTable.$O \
 	$(OBJDIR)/Data/Typeable.$O
-$(OBJDIR)/Data/Typeable.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/Either.$O
-	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/Word.$O $(OBJDIR)/Data/List.$O
+$(OBJDIR)/Data/Typeable.$O: $(OBJDIR)/Data/Maybe.$O $(OBJDIR)/Data/Either.$O \
+	$(OBJDIR)/Data/Int.$O $(OBJDIR)/Data/Word.$O $(OBJDIR)/Data/List.$O \
 	$(OBJDIR)/Data/HashTable.$O
 $(OBJDIR)/Data/HashTable.$O: $(OBJDIR)/Control/Monad.$O \
 	$(OBJDIR)/Data/Tuple.$O $(OBJDIR)/Data/Bits.$O $(OBJDIR)/Data/List.$O \
