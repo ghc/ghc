@@ -105,7 +105,34 @@ data Note
 
   | InlineMe		-- Instructs simplifer to treat the enclosed expression
 			-- as very small, and inline it at its call sites
+
+-- NOTE: we also treat expressions wrapped in InlineMe as
+-- 'cheap' and 'dupable' (in the sense of exprIsCheap, exprIsDupable)
+-- What this means is that we obediently inline even things that don't
+-- look like valuse.  This is sometimes important:
+--	{-# INLINE f #-}
+--	f = g . h
+-- Here, f looks like a redex, and we aren't going to inline (.) because it's
+-- inside an INLINE, so it'll stay looking like a redex.  Nevertheless, we 
+-- should inline f even inside lambdas.  In effect, we should trust the programmer.
 \end{code}
+
+INVARIANTS:
+
+* The RHS of a letrec, and the RHSs of all top-level lets,
+  must be of LIFTED type.
+
+* The RHS of a let, may be of UNLIFTED type, but only if the expression 
+  is ok-for-speculation.  This means that the let can be floated around 
+  without difficulty.  e.g.
+	y::Int# = x +# 1#	ok
+	y::Int# = fac 4#	not ok [use case instead]
+
+* The argument of an App can be of any type.
+
+* The simplifier tries to ensure that if the RHS of a let is a constructor
+  application, its arguments are trivial, so that the constructor can be
+  inlined vigorously.
 
 
 %************************************************************************
