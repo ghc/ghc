@@ -318,7 +318,9 @@ mkLocalOcc :: Unique 		-- Unique
 	   -> OccName		-- Local name (e.g. "sat")
 	   -> OccName		-- Nice unique version ("$L23sat")
 mkLocalOcc uniq occ
-   = mk_deriv varName "$L" (show uniq ++ occNameString occ)
+   = mk_deriv varName ("$L" ++ show uniq) (occNameString occ)
+	-- The Unique might print with characters 
+	-- that need encoding (e.g. 'z'!)
 \end{code}
 
 
