@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Mem.hs,v 1.1 2002/02/12 10:50:03 simonmar Exp $
+-- $Id: Mem.hs,v 1.2 2002/02/13 12:17:14 simonmar Exp $
 --
 -- Memory-related system things.
 --
@@ -18,6 +18,8 @@ module System.Mem (
  	performGC	-- :: IO ()
   ) where
  
+import Prelude
+
 #ifdef __GLASGOW_HASKELL__
 foreign import {-safe-} "performGC" performGC :: IO ()
 #endif
