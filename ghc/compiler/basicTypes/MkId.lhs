@@ -404,13 +404,13 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     n_field_dict_tys			 = length field_dict_tys
 	-- If the field has a universally quantified type we have to 
 	-- be a bit careful.  Suppose we have
-	--	data R = R { op :: forall a => Foo a => a -> a }
+	--	data R = R { op :: forall a. Foo a => a -> a }
 	-- Then we can't give op the type
 	--	op :: R -> forall a. Foo a => a -> a
 	-- because the typechecker doesn't understand foralls to the
 	-- right of an arrow.  The "right" type to give it is
-	--	op :: forall a. Foo a => a -> a
-	-- But then we must generat the right unfolding too:
+	--	op :: forall a. Foo a => R -> a -> a
+	-- But then we must generate the right unfolding too:
 	--	op = /\a -> \dfoo -> \ r ->
 	--	     case r of
 	--		R op -> op a dfoo
