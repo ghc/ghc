@@ -43,6 +43,9 @@ instance Eq Fd where
 -- use with care.
 intToFd :: Int -> Fd
 intToFd (I# fd#) = FD# fd#
+
+fdToInt :: Fd -> Int
+fdToInt (FD# x#) = I# x#
 \end{code}
 
 Now some local functions that shouldn't go outside this library.
