@@ -54,6 +54,10 @@ static char sccsid[] = "@(#)regcomp.c	8.5 (Berkeley) 3/20/94";
 // removed collate stuff --SDM
 // #include "collate.h"
 
+#ifdef _WIN32
+#define isblank(c) ((c) == ' ' || (c) == '\t')
+#endif
+
 #include "utils.h"
 #include "regex2.h"
 
