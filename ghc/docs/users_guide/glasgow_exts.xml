@@ -73,8 +73,10 @@ documentation</ulink> describes all the libraries that come with GHC.
     <variablelist>
 
       <varlistentry>
-	<term><option>-fglasgow-exts</option>:</term>
-	<indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
+	<term>
+          <option>-fglasgow-exts</option>:
+          <indexterm><primary><option>-fglasgow-exts</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>This simultaneously enables all of the extensions to
           Haskell 98 described in <xref
@@ -97,9 +99,11 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-ffi</option> and <option>-fffi</option>:</term>
-	<indexterm><primary><option>-ffi</option></primary></indexterm>
-	<indexterm><primary><option>-fffi</option></primary></indexterm>
+	<term>
+          <option>-ffi</option> and <option>-fffi</option>:
+          <indexterm><primary><option>-ffi</option></primary></indexterm>
+          <indexterm><primary><option>-fffi</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>This option enables the language extension defined in the
 	  Haskell 98 Foreign Function Interface Addendum plus deprecated
@@ -111,8 +115,10 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fno-monomorphism-restriction</option>:</term>
-	<indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
+	<term>
+          <option>-fno-monomorphism-restriction</option>:
+          <indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para> Switch off the Haskell 98 monomorphism restriction.
           Independent of the <option>-fglasgow-exts</option>
@@ -121,13 +127,22 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fallow-overlapping-instances</option></term>
-	<term><option>-fallow-undecidable-instances</option></term>
-	<term><option>-fallow-incoherent-instances</option></term>
-	<term><option>-fcontext-stack</option></term>
-	<indexterm><primary><option>-fallow-overlapping-instances</option></primary></indexterm>
-	<indexterm><primary><option>-fallow-undecidable-instances</option></primary></indexterm>
-	<indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
+	<term>
+          <option>-fallow-overlapping-instances</option>
+          <indexterm><primary><option>-fallow-overlapping-instances</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-fallow-undecidable-instances</option>
+          <indexterm><primary><option>-fallow-undecidable-instances</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-fallow-incoherent-instances</option>
+          <indexterm><primary><option>-fallow-incoherent-instances</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-fcontext-stack</option>
+          <indexterm><primary><option>-fcontext-stack</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para> See <xref linkend="instance-decls"/>.  Only relevant
           if you also use <option>-fglasgow-exts</option>.</para>
@@ -135,8 +150,10 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-finline-phase</option></term>
-	<indexterm><primary><option>-finline-phase</option></primary></indexterm>
+	<term>
+          <option>-finline-phase</option>
+          <indexterm><primary><option>-finline-phase</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>See <xref linkend="rewrite-rules"/>.  Only relevant if
           you also use <option>-fglasgow-exts</option>.</para>
@@ -144,8 +161,10 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-farrows</option></term>
-	<indexterm><primary><option>-farrows</option></primary></indexterm>
+	<term>
+          <option>-farrows</option>
+          <indexterm><primary><option>-farrows</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>See <xref linkend="arrow-notation"/>.  Independent of
           <option>-fglasgow-exts</option>.</para>
@@ -161,8 +180,10 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fgenerics</option></term>
-	<indexterm><primary><option>-fgenerics</option></primary></indexterm>
+	<term>
+          <option>-fgenerics</option>
+          <indexterm><primary><option>-fgenerics</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>See <xref linkend="generic-classes"/>.  Independent of
           <option>-fglasgow-exts</option>.</para>

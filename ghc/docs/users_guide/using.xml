@@ -1058,8 +1058,10 @@ f "2"    = 2
       <variablelist>
 
 	<varlistentry>
-	  <term>No <option>-O*</option>-type option specified:</term>
-	  <indexterm><primary>-O* not specified</primary></indexterm>
+	  <term>
+            No <option>-O*</option>-type option specified:
+            <indexterm><primary>-O* not specified</primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>This is taken to mean: &ldquo;Please compile
             quickly; I'm not over-bothered about compiled-code
@@ -1069,8 +1071,10 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-O0</option>:</term>
-	  <indexterm><primary><option>-O0</option></primary></indexterm>
+	  <term>
+            <option>-O0</option>:
+            <indexterm><primary><option>-O0</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Means &ldquo;turn off all optimisation&rdquo;,
 	    reverting to the same settings as if no
@@ -1082,10 +1086,12 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-O</option> or <option>-O1</option>:</term>
-	  <indexterm><primary>-O option</primary></indexterm>
-	  <indexterm><primary>-O1 option</primary></indexterm>
-	  <indexterm><primary>optimise</primary><secondary>normally</secondary></indexterm>
+	  <term>
+            <option>-O</option> or <option>-O1</option>:
+            <indexterm><primary>-O option</primary></indexterm>
+            <indexterm><primary>-O1 option</primary></indexterm>
+            <indexterm><primary>optimise</primary><secondary>normally</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Means: &ldquo;Generate good-quality code without
             taking too long about it.&rdquo; Thus, for example:
@@ -1098,9 +1104,11 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-O2</option>:</term>
-	  <indexterm><primary>-O2 option</primary></indexterm>
-	  <indexterm><primary>optimise</primary><secondary>aggressively</secondary></indexterm>
+	  <term>
+            <option>-O2</option>:
+            <indexterm><primary>-O2 option</primary></indexterm>
+            <indexterm><primary>optimise</primary><secondary>aggressively</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Means: &ldquo;Apply every non-dangerous
             optimisation, even if it means significantly longer
@@ -1118,9 +1126,11 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-Ofile &lt;file&gt;</option>:</term>
-	  <indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
-	  <indexterm><primary>optimising, customised</primary></indexterm>
+	  <term>
+            <option>-Ofile &lt;file&gt;</option>:
+            <indexterm><primary>-Ofile &lt;file&gt; option</primary></indexterm>
+            <indexterm><primary>optimising, customised</primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>(NOTE: not supported since GHC 4.x.  Please ask if
 	    you're interested in this.)</para>
@@ -1195,9 +1205,10 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-fno-strictness</option></term>
-	  <indexterm><primary><option>-fno-strictness</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-fno-strictness</option>
+            <indexterm><primary><option>-fno-strictness</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Turns off the strictness analyser; sometimes it eats
 	    too many cycles.</para>
@@ -1205,9 +1216,10 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-fno-cpr-analyse</option></term>
-	  <indexterm><primary><option>-fno-cpr-analyse</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-fno-cpr-analyse</option>
+            <indexterm><primary><option>-fno-cpr-analyse</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Turns off the CPR (constructed product result)
 	    analysis; it is somewhat experimental.</para>
@@ -1215,12 +1227,13 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-funbox-strict-fields</option>:</term>
-	  <listitem>
+	  <term>
+            <option>-funbox-strict-fields</option>:
 	    <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
 	    <indexterm><primary>strict constructor fields</primary></indexterm>
 	    <indexterm><primary>constructor fields, strict</primary></indexterm>
-
+          </term>
+	  <listitem>
 	    <para>This option causes all constructor fields which are
             marked strict (i.e. &ldquo;!&rdquo;) to be unboxed or
             unpacked if possible.  It is equivalent to adding an
@@ -1236,8 +1249,10 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-funfolding-update-in-place&lt;n&gt;</option></term>
-	  <indexterm><primary><option>-funfolding-update-in-place</option></primary></indexterm>
+	  <term>
+            <option>-funfolding-update-in-place&lt;n&gt;</option>
+            <indexterm><primary><option>-funfolding-update-in-place</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Switches on an experimental "optimisation".
             Switching it on makes the compiler a little keener to
@@ -1252,12 +1267,13 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-funfolding-creation-threshold&lt;n&gt;</option>:</term>
-	  <listitem>
+	  <term>
+            <option>-funfolding-creation-threshold&lt;n&gt;</option>:
 	    <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
 	    <indexterm><primary>inlining, controlling</primary></indexterm>
 	    <indexterm><primary>unfolding, controlling</primary></indexterm>
-	    
+          </term>
+	  <listitem>
 	    <para>(Default: 45) Governs the maximum size that GHC will 
             allow a function unfolding to be.   (An unfolding has a
             &ldquo;size&rdquo; that reflects the cost in terms of
@@ -1750,10 +1766,10 @@ statements or clauses.
     <variablelist>
 
   	<varlistentry>
-	  <term><option>-fext-core</option></term>
-	  <indexterm>
-	    <primary><option>-fext-core</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-fext-core</option>
+            <indexterm><primary><option>-fext-core</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Generate <literal>.hcr</literal> files.</para>
 	  </listitem>

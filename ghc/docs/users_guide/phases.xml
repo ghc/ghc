@@ -15,9 +15,10 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-pgmL</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgmL</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgmL</option> <replaceable>cmd</replaceable>
+	  <indexterm><primary><option>-pgmL</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the literate
 	    pre-processor.</para>
@@ -25,9 +26,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgmP</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgmP</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgmP</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgmP</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the C
 	    pre-processor (with <option>-cpp</option> only).</para>
@@ -35,9 +37,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgmc</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgmc</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgmc</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgmc</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the C
 	    compiler.</para>
@@ -45,9 +48,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgma</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgma</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgma</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgma</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the
 	    assembler.</para>
@@ -55,9 +59,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgml</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgml</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgml</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgml</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the
 	    linker.</para>
@@ -65,9 +70,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgmdll</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgmdll</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgmdll</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgmdll</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the DLL
 	    generator.</para>
@@ -75,9 +81,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgmdep</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgmdep</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgmdep</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgmdep</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the dependency
 	    generator.</para>
@@ -85,9 +92,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-pgmF</option> <replaceable>cmd</replaceable></term>
-	  <indexterm><primary><option>-pgmF</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-pgmF</option> <replaceable>cmd</replaceable>
+            <indexterm><primary><option>-pgmF</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>cmd</replaceable> as the
 	    pre-processor (with <option>-F</option> only).</para>
@@ -106,68 +114,76 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-optL</option> <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optL</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optL</option> <replaceable>option</replaceable>
+            <indexterm><primary><option>-optL</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the
 	    literate pre-processor</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-optP</option>  <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optP</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optP</option>  <replaceable>option</replaceable>
+            <indexterm><primary><option>-optP</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to CPP (makes
 	    sense only if <option>-cpp</option> is also on).</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-optF</option> <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optF</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optF</option> <replaceable>option</replaceable>
+            <indexterm><primary><option>-optF</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the
 	    custom pre-processor (see <xref linkend="pre-processor"/>).</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-optc</option>  <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optc</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optc</option> <replaceable>option</replaceable>
+            <indexterm><primary><option>-optc</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the C compiler.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-opta</option>  <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-opta</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-opta</option>  <replaceable>option</replaceable>
+            <indexterm><primary><option>-opta</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the assembler.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-optl</option>  <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optl</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optl</option> <replaceable>option</replaceable>
+            <indexterm><primary><option>-optl</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the linker.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-optdll</option>  <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optdll</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optdll</option>  <replaceable>option</replaceable>
+            <indexterm><primary><option>-optdll</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the DLL generator.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>-optdep</option>  <replaceable>option</replaceable></term>
-	  <indexterm><primary><option>-optdep</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-optdep</option>  <replaceable>option</replaceable>
+            <indexterm><primary><option>-optdep</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Pass <replaceable>option</replaceable> to the
 	    dependency generator.</para>
@@ -197,8 +213,10 @@
       <variablelist>
 
 	<varlistentry>
-	  <term><option>-cpp</option></term>
-	  <indexterm><primary><option>-cpp</option></primary></indexterm>
+	  <term>
+            <option>-cpp</option>
+            <indexterm><primary><option>-cpp</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>The C pre-processor <command>cpp</command> is run
             over your Haskell code only if the <option>-cpp</option>
@@ -211,8 +229,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-D</option><replaceable>symbol</replaceable><optional>=<replaceable>value</replaceable></optional></term>
-	  <indexterm><primary><option>-D</option></primary></indexterm>
+	  <term>
+            <option>-D</option><replaceable>symbol</replaceable><optional>=<replaceable>value</replaceable></optional>
+            <indexterm><primary><option>-D</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Define macro <replaceable>symbol</replaceable> in the
             usual way.  NB: does <emphasis>not</emphasis> affect
@@ -224,8 +244,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-U</option><replaceable>symbol</replaceable></term>
-	  <indexterm><primary><option>-U</option></primary></indexterm>
+	  <term>
+            <option>-U</option><replaceable>symbol</replaceable>
+            <indexterm><primary><option>-U</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para> Undefine macro <replaceable>symbol</replaceable> in the
 	    usual way.</para>
@@ -233,8 +255,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-I</option><replaceable>dir</replaceable></term>
-	  <indexterm><primary><option>-I</option></primary></indexterm>
+	  <term>
+            <option>-I</option><replaceable>dir</replaceable>
+            <indexterm><primary><option>-I</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para> Specify a directory in which to look for
             <literal>&num;include</literal> files, in the usual C
@@ -250,8 +274,10 @@
       <variablelist>
 
 	<varlistentry>
-	  <term><constant>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</constant></term>
-	  <indexterm><primary><literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</literal></primary></indexterm>
+	  <term>
+            <constant>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</constant>
+            <indexterm><primary><literal>&lowbar;&lowbar;HASKELL98&lowbar;&lowbar;</literal></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>If defined, this means that GHC supports the
             language defined by the Haskell 98 report.</para>
@@ -259,8 +285,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant></term>
-	  <indexterm><primary><constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant></primary></indexterm>
+	  <term>
+            <constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant>
+            <indexterm><primary><constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;=98</constant></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>In GHC 4.04 and later, the
             <constant>&lowbar;&lowbar;HASKELL&lowbar;&lowbar;</constant>
@@ -270,9 +298,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</constant></term>
-	  <indexterm><primary><constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;
-	  </constant></primary></indexterm>
+	  <term>
+            <constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</constant>
+            <indexterm><primary><constant>&lowbar;&lowbar;HASKELL1&lowbar;&lowbar;</constant></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>If defined to <replaceable>n</replaceable>, that
             means GHC supports the Haskell language defined in the
@@ -283,8 +312,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant></term>
-	  <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+	  <term>
+            <constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant>
+            <indexterm><primary><constant>&lowbar;&lowbar;GLASGOW&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>For version <replaceable>n</replaceable> of the GHC
             system, this will be <literal>&num;define</literal>d to
@@ -315,8 +346,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant></term>
-	  <indexterm><primary><constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+	  <term>
+            <constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant>
+            <indexterm><primary><constant>&lowbar;&lowbar;CONCURRENT&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>This symbol is defined when pre-processing Haskell
             (input) and pre-processing C (GHC output).  Since GHC from
@@ -326,8 +359,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></term>
-	  <indexterm><primary><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+	  <term>
+            <constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant>
+            <indexterm><primary><constant>&lowbar;&lowbar;PARALLEL&lowbar;HASKELL&lowbar;&lowbar;</constant></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Only defined when <option>-parallel</option> is in
             use!  This symbol is defined when pre-processing Haskell
@@ -371,8 +406,10 @@ strmod = "\
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-F</option></term>
-	  <indexterm><primary><option>-F</option></primary></indexterm>
+	  <term>
+            <option>-F</option>
+            <indexterm><primary><option>-F</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A custom pre-processor is run over your Haskell
 	    source file only if the <option>-F</option> option
@@ -438,8 +475,10 @@ strmod = "\
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-fasm</option></term>
-	  <indexterm><primary><option>-fasm</option></primary></indexterm>
+	  <term>
+            <option>-fasm</option>
+            <indexterm><primary><option>-fasm</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Use GHC's native code generator rather than
 	    compiling via C.  This will compile faster (up to twice as
@@ -451,9 +490,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-fvia-C</option></term>
-	  <indexterm><primary><option>-fvia-C</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-fvia-C</option>
+            <indexterm><primary><option>-fvia-C</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Compile via C instead of using the native code
 	    generator.  This is default for optimised compilations,
@@ -463,9 +503,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-fno-code</option></term>
-	  <indexterm><primary><option>-fno-code</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-fno-code</option>
+            <indexterm><primary><option>-fno-code</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Omit code generation (and all later phases)
 	    altogether.  Might be of some use if you just want to see
@@ -489,8 +530,10 @@ strmod = "\
       <variablelist>
 
 	<varlistentry>
-	  <term><option>-l</option><replaceable>lib</replaceable></term>
-	  <indexterm><primary><option>-l</option></primary></indexterm>
+	  <term>
+            <option>-l</option><replaceable>lib</replaceable>
+            <indexterm><primary><option>-l</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Link in the <replaceable>lib</replaceable> library.
 	    On Unix systems, this will be in a file called
@@ -527,10 +570,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-no-link</option></term>
-	  <indexterm>
-	    <primary><option>-no-link</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-no-link</option>
+            <indexterm><primary><option>-no-link</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Omit the link step.  This flag can be useful if you
 	    want to avoid linking in <option>--make</option> mode,
@@ -540,8 +583,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-package</option> <replaceable>name</replaceable></term>
-	  <indexterm><primary><option>-package</option></primary></indexterm>
+	  <term>
+            <option>-package</option> <replaceable>name</replaceable>
+            <indexterm><primary><option>-package</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>If you are using a Haskell &ldquo;package&rdquo;
             (see <xref linkend="packages"/>), don't forget to add the
@@ -554,8 +599,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-framework</option> <replaceable>name</replaceable></term>
-	  <indexterm><primary><option>-framework</option></primary></indexterm>
+	  <term>
+            <option>-framework</option> <replaceable>name</replaceable>
+            <indexterm><primary><option>-framework</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>On Darwin/MacOS X only, link in the framework <replaceable>name</replaceable>.
 	    This option corresponds to the <option>-framework</option> option for Apple's Linker.
@@ -568,8 +615,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-L</option><replaceable>dir</replaceable></term>
-	  <indexterm><primary><option>-L</option></primary></indexterm>
+	  <term>
+            <option>-L</option><replaceable>dir</replaceable>
+            <indexterm><primary><option>-L</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Where to find user-supplied libraries&hellip;
             Prepend the directory <replaceable>dir</replaceable> to
@@ -578,8 +627,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-framework-path</option><replaceable>dir</replaceable></term>
-	  <indexterm><primary><option>-framework-path</option></primary></indexterm>
+	  <term>
+            <option>-framework-path</option><replaceable>dir</replaceable>
+            <indexterm><primary><option>-framework-path</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>On Darwin/MacOS X only, prepend the directory <replaceable>dir</replaceable> to
             the framework directories path. This option corresponds to the <option>-F</option>
@@ -588,8 +639,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-split-objs</option></term>
-	  <indexterm><primary><option>-split-objs</option></primary></indexterm>
+	  <term>
+            <option>-split-objs</option>
+            <indexterm><primary><option>-split-objs</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Tell the linker to split the single object file that
             would normally be generated into multiple object files,
@@ -601,8 +654,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-static</option></term>
-	  <indexterm><primary><option>-static</option></primary></indexterm>
+	  <term>
+            <option>-static</option>
+            <indexterm><primary><option>-static</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Tell the linker to avoid shared Haskell libraries,
 	    if possible.  This is the default.</para>
@@ -610,8 +665,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-dynamic</option></term>
-	  <indexterm><primary><option>-dynamic</option></primary></indexterm>
+	  <term>
+            <option>-dynamic</option>
+            <indexterm><primary><option>-dynamic</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Tell the linker to use shared Haskell libraries, if
 	    available (this option is only supported on Windows at the
@@ -621,9 +678,11 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-main-is <replaceable>thing</replaceable></option></term>
-	  <indexterm><primary><option>-main-is</option></primary></indexterm>
-	  <indexterm><primary>specifying your own main function</primary></indexterm>
+	  <term>
+            <option>-main-is <replaceable>thing</replaceable></option>
+            <indexterm><primary><option>-main-is</option></primary></indexterm>
+            <indexterm><primary>specifying your own main function</primary></indexterm>
+          </term>
 	  <listitem>
 	    <para> The normal rule in Haskell is that your program must supply a <literal>main</literal>
 	      function in module <literal>Main</literal>.  When testing, it is often convenient
@@ -642,9 +701,11 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-no-hs-main</option></term>
-	  <indexterm><primary><option>-no-hs-main</option></primary></indexterm>
-	  <indexterm><primary>linking Haskell libraries with foreign code</primary></indexterm>
+	  <term>
+            <option>-no-hs-main</option>
+            <indexterm><primary><option>-no-hs-main</option></primary></indexterm>
+            <indexterm><primary>linking Haskell libraries with foreign code</primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>In the event you want to include ghc-compiled code
             as part of another (non-Haskell) program, the RTS will not
@@ -671,9 +732,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-debug</option></term>
-	  <indexterm><primary><option>-debug</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-debug</option>
+            <indexterm><primary><option>-debug</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Link the program with a debugging version of the
 	    runtime system.  The debugging runtime turns on numerous
@@ -684,9 +746,10 @@ strmod = "\
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-threaded</option></term>
-	  <indexterm><primary><option>-threaded</option></primary>
-	  </indexterm>
+	  <term>
+            <option>-threaded</option>
+            <indexterm><primary><option>-threaded</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Link the program with the "threaded" runtime system.
 	    This version of the runtime is designed to be used in

@@ -345,8 +345,10 @@ x = nfib 25
 
     <variablelist>
       <varlistentry>
-	<term><option>-prof</option>:</term>
-	<indexterm><primary><option>-prof</option></primary></indexterm>
+	<term>
+          <option>-prof</option>:
+          <indexterm><primary><option>-prof</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para> To make use of the profiling system
           <emphasis>all</emphasis> modules must be compiled and linked
@@ -369,9 +371,11 @@ x = nfib 25
 
     <variablelist>
       <varlistentry>
-	<term><option>-auto</option>:</term>
-	<indexterm><primary><option>-auto</option></primary></indexterm>
-	<indexterm><primary>cost centres</primary><secondary>automatically inserting</secondary></indexterm>
+	<term>
+          <option>-auto</option>:
+          <indexterm><primary><option>-auto</option></primary></indexterm>
+          <indexterm><primary>cost centres</primary><secondary>automatically inserting</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para> GHC will automatically add
           <function>&lowbar;scc&lowbar;</function> constructs for all
@@ -380,8 +384,10 @@ x = nfib 25
       </varlistentry>
       
       <varlistentry>
-	<term><option>-auto-all</option>:</term>
-	<indexterm><primary><option>-auto-all</option></primary></indexterm>
+	<term>
+          <option>-auto-all</option>:
+          <indexterm><primary><option>-auto-all</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para> <emphasis>All</emphasis> top-level functions,
 	  exported or not, will be automatically
@@ -390,8 +396,10 @@ x = nfib 25
       </varlistentry>
 
       <varlistentry>
-	<term><option>-caf-all</option>:</term>
-	<indexterm><primary><option>-caf-all</option></primary></indexterm>
+	<term>
+          <option>-caf-all</option>:
+          <indexterm><primary><option>-caf-all</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para> The costs of all CAFs in a module are usually
 	  attributed to one &ldquo;big&rdquo; CAF cost-centre. With
@@ -401,8 +409,10 @@ x = nfib 25
       </varlistentry>
 
       <varlistentry>
-	<term><option>-ignore-scc</option>:</term>
-	<indexterm><primary><option>-ignore-scc</option></primary></indexterm>
+	<term>
+          <option>-ignore-scc</option>:
+          <indexterm><primary><option>-ignore-scc</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Ignore any <function>&lowbar;scc&lowbar;</function>
           constructs, so a module which already has
@@ -425,10 +435,12 @@ x = nfib 25
 
     <variablelist>
       <varlistentry>
-	<term><option>-p</option> or <option>-P</option>:</term>
-	<indexterm><primary><option>-p</option></primary></indexterm>
-	<indexterm><primary><option>-P</option></primary></indexterm>
-	<indexterm><primary>time profile</primary></indexterm>
+	<term>
+          <option>-p</option> or <option>-P</option>:
+          <indexterm><primary><option>-p</option></primary></indexterm>
+          <indexterm><primary><option>-P</option></primary></indexterm>
+          <indexterm><primary>time profile</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The <option>-p</option> option produces a standard
           <emphasis>time profile</emphasis> report.  It is written
@@ -442,8 +454,10 @@ x = nfib 25
       </varlistentry>
 
       <varlistentry>
-	<term><option>-px</option>:</term>
-	<indexterm><primary><option>-px</option></primary></indexterm>
+	<term>
+          <option>-px</option>:
+          <indexterm><primary><option>-px</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The <option>-px</option> option generates profiling
 	  information in the XML format understood by our new
@@ -452,9 +466,10 @@ x = nfib 25
       </varlistentry>
 
       <varlistentry>
-	<term><option>-xc</option></term>
-	<indexterm><primary><option>-xc</option></primary><secondary>RTS
-	option</secondary></indexterm>
+	<term>
+          <option>-xc</option>
+          <indexterm><primary><option>-xc</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>This option makes use of the extra information
 	  maintained by the cost-centre-stack profiler to provide
@@ -516,9 +531,10 @@ x = nfib 25
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-hc</option></term>
-	  <indexterm><primary><option>-hc</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hc</option>
+            <indexterm><primary><option>-hc</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Breaks down the graph by the cost-centre stack which
 	    produced the data.</para>
@@ -526,9 +542,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hm</option></term>
-	  <indexterm><primary><option>-hm</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hm</option>
+            <indexterm><primary><option>-hm</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Break down the live heap by the module containing
 	    the code which produced the data.</para>
@@ -536,9 +553,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hd</option></term>
-	  <indexterm><primary><option>-hd</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hd</option>
+            <indexterm><primary><option>-hd</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Breaks down the graph by <firstterm>closure
 	    description</firstterm>.  For actual data, the description
@@ -548,9 +566,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hy</option></term>
-	  <indexterm><primary><option>-hy</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hy</option>
+            <indexterm><primary><option>-hy</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Breaks down the graph by
 	    <firstterm>type</firstterm>.  For closures which have
@@ -560,9 +579,10 @@ x = nfib 25
 	</varlistentry>
 	
 	<varlistentry>
-	  <term><option>-hr</option></term>
-	  <indexterm><primary><option>-hr</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hr</option>
+            <indexterm><primary><option>-hr</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Break down the graph by <firstterm>retainer
 	    set</firstterm>.  Retainer profiling is described in more
@@ -571,9 +591,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hb</option></term>
-	  <indexterm><primary><option>-hb</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hb</option>
+            <indexterm><primary><option>-hb</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Break down the graph by
 	    <firstterm>biography</firstterm>.  Biographical profiling
@@ -591,9 +612,10 @@ x = nfib 25
       
       <variablelist>
 	<varlistentry>
-	  <term><option>-hc</option><replaceable>name</replaceable>,...</term>
-	  <indexterm><primary><option>-hc</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hc</option><replaceable>name</replaceable>,...
+            <indexterm><primary><option>-hc</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures produced by
 	    cost-centre stacks with one of the specified cost centres
@@ -602,9 +624,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hC</option><replaceable>name</replaceable>,...</term>
-	  <indexterm><primary><option>-hC</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hC</option><replaceable>name</replaceable>,...
+            <indexterm><primary><option>-hC</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures produced by
 	    cost-centre stacks with one of the specified cost centres
@@ -613,9 +636,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hm</option><replaceable>module</replaceable>,...</term>
-	  <indexterm><primary><option>-hm</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hm</option><replaceable>module</replaceable>,...
+            <indexterm><primary><option>-hm</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures produced by the
 	    specified modules.</para>
@@ -623,9 +647,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hd</option><replaceable>desc</replaceable>,...</term>
-	  <indexterm><primary><option>-hd</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hd</option><replaceable>desc</replaceable>,...
+            <indexterm><primary><option>-hd</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures with the specified
 	    description strings.</para>
@@ -633,9 +658,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hy</option><replaceable>type</replaceable>,...</term>
-	  <indexterm><primary><option>-hy</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hy</option><replaceable>type</replaceable>,...
+            <indexterm><primary><option>-hy</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures with the specified
 	    types.</para>
@@ -643,9 +669,10 @@ x = nfib 25
 	</varlistentry>
 	
 	<varlistentry>
-	  <term><option>-hr</option><replaceable>cc</replaceable>,...</term>
-	  <indexterm><primary><option>-hr</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hr</option><replaceable>cc</replaceable>,...
+            <indexterm><primary><option>-hr</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures with retainer sets
 	    containing cost-centre stacks with one of the specified
@@ -654,9 +681,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-hb</option><replaceable>bio</replaceable>,...</term>
-	  <indexterm><primary><option>-hb</option></primary><secondary>RTS
-	  option</secondary></indexterm>
+	  <term>
+            <option>-hb</option><replaceable>bio</replaceable>,...
+            <indexterm><primary><option>-hb</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Restrict the profile to closures with one of the
 	    specified biographies, where
@@ -687,8 +715,10 @@ x = nfib 25
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-i<replaceable>secs</replaceable></option>:</term>
-	  <indexterm><primary><option>-i</option></primary></indexterm>
+	  <term>
+            <option>-i<replaceable>secs</replaceable></option>:
+            <indexterm><primary><option>-i</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Set the profiling (sampling) interval to
             <replaceable>secs</replaceable> seconds (the default is
@@ -700,9 +730,10 @@ x = nfib 25
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-xt</option></term>
-	  <indexterm><primary><option>-xt</option></primary><secondary>RTS option</secondary>
-	  </indexterm>
+	  <term>
+            <option>-xt</option>
+            <indexterm><primary><option>-xt</option></primary><secondary>RTS option</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Include the memory occupied by threads in a heap
 	    profile.  Each thread takes up a small area for its thread

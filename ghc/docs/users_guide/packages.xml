@@ -301,10 +301,13 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;config-file <replaceable>file</replaceable></option></term>
-	  <term><option>-f <replaceable>file</replaceable></option></term>
-	  <indexterm><primary><option>&ndash;&ndash;config-file</option></primary>
-	      </indexterm>
+	  <term>
+            <option>&ndash;&ndash;config-file <replaceable>file</replaceable></option>
+            <indexterm><primary><option>&ndash;&ndash;config-file</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-f <replaceable>file</replaceable></option>
+          </term>
 	  <listitem>
 	    <para>Use <replaceable>file</replaceable> as an additional
 	    package configuration file. This is used to modify
@@ -322,9 +325,13 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;list-packages</option></term>
-	  <term><option>-l</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;list-packages</option></primary></indexterm>
+	  <term>
+            <option>&ndash;&ndash;list-packages</option>
+            <indexterm><primary><option>&ndash;&ndash;list-packages</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-l</option>
+          </term>
 	  <listitem>
 	    <para>This option displays the list of currently installed
 	    packages, including those in extra configuration files
@@ -352,9 +359,13 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;list-local-packages</option></term>
-	  <term><option>-L</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;list-local-packages</option></primary></indexterm>
+	  <term>
+            <option>&ndash;&ndash;list-local-packages</option>
+            <indexterm><primary><option>&ndash;&ndash;list-local-packages</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-L</option>
+          </term>
 	  <listitem>
 	    <para>Displays the list of packages installed in the
 	    topmost configuration file only: that will be the
@@ -369,19 +380,26 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>&ndash;&ndash;remove-package <replaceable>foo</replaceable></option></term>
-	  <term><option>-r <replaceable>foo</replaceable></option></term>
-	  <indexterm><primary><option>&ndash;&ndash;delete-package</option></primary>
-	      </indexterm>
+	  <term>
+            <option>&ndash;&ndash;remove-package <replaceable>foo</replaceable></option>
+            <indexterm><primary><option>&ndash;&ndash;delete-package</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-r <replaceable>foo</replaceable></option>
+          </term>
 	  <listitem>
 	    <para>Removes the specified package from the installed
 	    configuration.</para>
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>&ndash;&ndash;update-package</option></term>
-	  <term><option>-u</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;update-package</option></primary></indexterm>
+	  <term>
+            <option>&ndash;&ndash;update-package</option>
+            <indexterm><primary><option>&ndash;&ndash;update-package</option></primary></indexterm>
+          </term>
+	  <term>
+            <option>-u</option>
+          </term>
 	  <listitem>
 	    <para>Reads package specification from the input, and
 	    adds it to the database of installed packages. If a package
@@ -392,8 +410,10 @@ the auto packages required for linking without further assistance.
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>&ndash;&ndash;force</option></term>
-	  <indexterm><primary><option>&ndash;&ndash;force</option></primary></indexterm>
+	  <term>
+            <option>&ndash;&ndash;force</option>
+            <indexterm><primary><option>&ndash;&ndash;force</option></primary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Causes <literal>ghc-pkg</literal> to ignore missing
 	    directories and libraries when adding a package, and just
@@ -435,9 +455,10 @@ the auto packages required for linking without further assistance.
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>name</literal></term>
-	  <indexterm><primary><literal>name</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>name</literal>
+            <indexterm><primary><literal>name</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
             <para>The package's name, for use with
             the <literal>-package</literal> flag and as listed in the
@@ -447,10 +468,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>auto</literal></term>
-	  <indexterm><primary><literal>auto</literal></primary>
-	    <secondary>package specification</secondary>
-	  </indexterm>
+	  <term>
+            <literal>auto</literal>
+            <indexterm><primary><literal>auto</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Set to <literal>True</literal> if the package should
 	    be automatically available (see <xref
@@ -462,9 +483,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>import_dirs</literal></term>
-	  <indexterm><primary><literal>import_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>import_dirs</literal>
+            <indexterm><primary><literal>import_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of directories containing interface files
 	    (<literal>.hi</literal> files) for this package.</para>
@@ -479,9 +501,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>source_dirs</literal></term>
-	  <indexterm><primary><literal>source_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>source_dirs</literal>
+            <indexterm><primary><literal>source_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of directories containing Haskell source
 	    files for this package.  This field isn't used by GHC, but
@@ -491,9 +514,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>library_dirs</literal></term>
-	  <indexterm><primary><literal>library_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>library_dirs</literal>
+            <indexterm><primary><literal>library_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of directories containing libraries for this
 	    package.</para>
@@ -501,9 +525,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>hs_libraries</literal></term>
-	  <indexterm><primary><literal>hs_libraries</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>hs_libraries</literal>
+            <indexterm><primary><literal>hs_libraries</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of libraries containing Haskell code for this
 	    package, with the <literal>.a</literal> or
@@ -552,9 +577,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>extra_libraries</literal></term>
-	  <indexterm><primary><literal>extra_libraries</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>extra_libraries</literal>
+            <indexterm><primary><literal>extra_libraries</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of extra libraries for this package.  The
 	    difference between <literal>hs_libraries</literal> and
@@ -589,9 +615,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>include_dirs</literal></term>
-	  <indexterm><primary><literal>include_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>include_dirs</literal>
+            <indexterm><primary><literal>include_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of directories containing C includes for this
 	    package (maybe the empty list).</para>
@@ -599,9 +626,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>c_includes</literal></term>
-	  <indexterm><primary><literal>c_includes</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+           <literal>c_includes</literal>
+           <indexterm><primary><literal>c_includes</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of files to include for via-C compilations
 	    using this package.  Typically this include file will
@@ -613,9 +641,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>package_deps</literal></term>
-	  <indexterm><primary><literal>package_deps</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>package_deps</literal>
+            <indexterm><primary><literal>package_deps</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>A list of packages which this package depends
 	    on.</para>
@@ -623,9 +652,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>extra_ghc_opts</literal></term>
-	  <indexterm><primary><literal>extra_ghc_opts</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>extra_ghc_opts</literal>
+            <indexterm><primary><literal>extra_ghc_opts</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Extra arguments to be added to the GHC command line
 	    when this package is being used.</para>
@@ -633,9 +663,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>extra_cc_opts</literal></term>
-	  <indexterm><primary><literal>extra_cc_opts</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>extra_cc_opts</literal>
+            <indexterm><primary><literal>extra_cc_opts</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Extra arguments to be added to the gcc command line
 	    when this package is being used (only for via-C
@@ -644,9 +675,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>extra_ld_opts</literal></term>
-	  <indexterm><primary><literal>extra_ld_opts</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>extra_ld_opts</literal>
+            <indexterm><primary><literal>extra_ld_opts</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>Extra arguments to be added to the
 	    <command>gcc</command> command line (for linking) when
@@ -655,9 +687,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 	
 	<varlistentry>
-	  <term><literal>framework_dirs</literal></term>
-	  <indexterm><primary><literal>framework_dirs</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>framework_dirs</literal>
+            <indexterm><primary><literal>framework_dirs</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>On Darwin/MacOS X, a list of directories containing frameworks for this
 	    package. This corresponds to the <option>-framework-path</option> option.
@@ -666,9 +699,10 @@ the auto packages required for linking without further assistance.
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>extra_frameworks</literal></term>
-	  <indexterm><primary><literal>extra_frameworks</literal></primary>
-	    <secondary>package specification</secondary></indexterm>
+	  <term>
+            <literal>extra_frameworks</literal>
+            <indexterm><primary><literal>extra_frameworks</literal></primary><secondary>package specification</secondary></indexterm>
+          </term>
 	  <listitem>
 	    <para>On Darwin/MacOS X, a list of frameworks to link to. This corresponds to the
 	    <option>-framework</option> option. Take a look at Apple's developer documentation

@@ -99,9 +99,11 @@
     <variablelist>
 
       <varlistentry>
-	<term><option>-A</option><replaceable>size</replaceable></term>
-	<indexterm><primary><option>-A</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>allocation area, size</primary></indexterm>
+	<term>
+          <option>-A</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-A</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>allocation area, size</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>&lsqb;Default: 256k&rsqb; Set the allocation area size
           used by the garbage collector.  The allocation area
@@ -122,13 +124,12 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-c</option></term>
-	<indexterm><primary><option>-c</option></primary><secondary>RTS option</secondary>
-	</indexterm>
-	<indexterm><primary>garbage collection</primary><secondary>compacting</secondary>
-	</indexterm>
-	<indexterm><primary>compacting garbage collection</primary></indexterm>
-
+	<term>
+          <option>-c</option>
+          <indexterm><primary><option>-c</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>garbage collection</primary><secondary>compacting</secondary></indexterm>
+          <indexterm><primary>compacting garbage collection</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Use a compacting algorithm for collecting the oldest
 	  generation.  By default, the oldest generation is collected
@@ -164,10 +165,12 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-F</option><replaceable>factor</replaceable></term>
+	<term>
+          <option>-F</option><replaceable>factor</replaceable>
+          <indexterm><primary><option>-F</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>heap size, factor</primary></indexterm>
+        </term>
 	<listitem>
-	  <indexterm><primary><option>-F</option></primary><secondary>RTS option</secondary></indexterm>
-	  <indexterm><primary>heap size, factor</primary></indexterm>
 
 	  <para>&lsqb;Default: 2&rsqb; This option controls the amount
           of memory reserved for the older generations (and in the
@@ -191,10 +194,11 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-G</option><replaceable>generations</replaceable></term>
-	<indexterm><primary><option>-G</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>generations, number
-	of</primary></indexterm>
+	<term>
+          <option>-G</option><replaceable>generations</replaceable>
+          <indexterm><primary><option>-G</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>generations, number of</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>&lsqb;Default: 2&rsqb; Set the number of generations
           used by the garbage collector.  The default of 2 seems to be
@@ -216,9 +220,11 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-H</option><replaceable>size</replaceable></term>
-	<indexterm><primary><option>-H</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>heap size, suggested</primary></indexterm>
+	<term>
+          <option>-H</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-H</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>heap size, suggested</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>&lsqb;Default: 0&rsqb; This option provides a
           &ldquo;suggested heap size&rdquo; for the garbage collector.  The
@@ -238,9 +244,11 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-k</option><replaceable>size</replaceable></term>
-	<indexterm><primary><option>-k</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>stack, minimum size</primary></indexterm>
+	<term>
+         <option>-k</option><replaceable>size</replaceable>
+         <indexterm><primary><option>-k</option></primary><secondary>RTS option</secondary></indexterm>
+         <indexterm><primary>stack, minimum size</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>&lsqb;Default: 1k&rsqb; Set the initial stack size for
           new threads.  Thread stacks (including the main thread's
@@ -256,9 +264,11 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-K</option><replaceable>size</replaceable></term>
-	<indexterm><primary><option>-K</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>stack, maximum size</primary></indexterm>
+	<term>
+          <option>-K</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-K</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>stack, maximum size</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>&lsqb;Default: 8M&rsqb; Set the maximum stack size for
           an individual thread to <replaceable>size</replaceable>
@@ -269,9 +279,11 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-m</option><replaceable>n</replaceable></term>
-	<indexterm><primary><option>-m</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>heap, minimum free</primary></indexterm>
+	<term>
+          <option>-m</option><replaceable>n</replaceable>
+          <indexterm><primary><option>-m</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>heap, minimum free</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Minimum &percnt; <replaceable>n</replaceable> of heap
           which must be available for allocation.  The default is
@@ -280,9 +292,11 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-M</option><replaceable>size</replaceable></term>
-	<indexterm><primary><option>-M</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>heap size, maximum</primary></indexterm>
+	<term>
+          <option>-M</option><replaceable>size</replaceable>
+          <indexterm><primary><option>-M</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>heap size, maximum</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>&lsqb;Default: unlimited&rsqb; Set the maximum heap size to
           <replaceable>size</replaceable> bytes.  The heap normally
@@ -304,10 +318,14 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-s</option><replaceable>file</replaceable></term>
-	<term><option>-S</option><replaceable>file</replaceable></term>
-	<indexterm><primary><option>-S</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary><option>-s</option></primary><secondary>RTS option</secondary></indexterm>
+	<term>
+          <option>-s</option><replaceable>file</replaceable>
+          <indexterm><primary><option>-s</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
+	<term>
+          <option>-S</option><replaceable>file</replaceable>
+          <indexterm><primary><option>-S</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>Write modest (<option>-s</option>) or verbose
           (<option>-S</option>) garbage-collector statistics into file
@@ -325,8 +343,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-t</option></term>
-	<indexterm><primary><option>-t</option></primary><secondary>RTS option</secondary></indexterm>
+	<term>
+          <option>-t</option>
+          <indexterm><primary><option>-t</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>Write a one-line GC stats summary after running the
 	  program.  This output is in the same format as that produced
@@ -359,8 +379,10 @@
     <variablelist>
 
       <varlistentry>
-	<term><option>-B</option></term>
-	<indexterm><primary><option>-B</option></primary><secondary>RTS option</secondary></indexterm>
+	<term>
+          <option>-B</option>
+          <indexterm><primary><option>-B</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>Sound the bell at the start of each (major) garbage
 	  collection.</para>
@@ -378,8 +400,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-D</option><replaceable>num</replaceable></term>
-	<indexterm><primary>-D</primary><secondary>RTS option</secondary></indexterm>
+	<term>
+          <option>-D</option><replaceable>num</replaceable>
+          <indexterm><primary>-D</primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>An RTS debugging flag; varying quantities of output
           depending on which bits are set in
@@ -389,10 +413,12 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-r</option><replaceable>file</replaceable></term>
-	<indexterm><primary><option>-r</option></primary><secondary>RTS option</secondary></indexterm>
-	<indexterm><primary>ticky ticky profiling</primary></indexterm>
-	<indexterm><primary>profiling</primary><secondary>ticky ticky</secondary></indexterm>
+	<term>
+          <option>-r</option><replaceable>file</replaceable>
+          <indexterm><primary><option>-r</option></primary><secondary>RTS option</secondary></indexterm>
+          <indexterm><primary>ticky ticky profiling</primary></indexterm>
+          <indexterm><primary>profiling</primary><secondary>ticky ticky</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>Produce &ldquo;ticky-ticky&rdquo; statistics at the
           end of the program run.  The <replaceable>file</replaceable>
@@ -413,9 +439,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-xc</option></term>
-	<indexterm><primary><option>-xc</option></primary><secondary>RTS
-	option</secondary></indexterm>
+	<term>
+          <option>-xc</option>
+          <indexterm><primary><option>-xc</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>(Only available when the program is compiled for
 	  profiling.)  When an exception is raised in the program,
@@ -450,9 +477,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-Z</option></term>
-	<indexterm><primary><option>-Z</option></primary><secondary>RTS
-	option</secondary></indexterm>
+	<term>
+          <option>-Z</option>
+          <indexterm><primary><option>-Z</option></primary><secondary>RTS option</secondary></indexterm>
+        </term>
 	<listitem>
 	  <para>Turn <emphasis>off</emphasis> &ldquo;update-frame
           squeezing&rdquo; at garbage-collection time.  (There's no
@@ -508,24 +536,30 @@ char *ghc_rts_opts = "-H128m -K1m";
     <variablelist>
 
       <varlistentry>
-	<term><function>void OutOfHeapHook (unsigned long, unsigned long)</function></term>
-	<indexterm><primary><function>OutOfHeapHook</function></primary></indexterm>
+	<term>
+          <function>void OutOfHeapHook (unsigned long, unsigned long)</function>
+          <indexterm><primary><function>OutOfHeapHook</function></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The heap-overflow message.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><function>void StackOverflowHook (long int)</function></term>
-	<indexterm><primary><function>StackOverflowHook</function></primary></indexterm>
+	<term>
+          <function>void StackOverflowHook (long int)</function>
+          <indexterm><primary><function>StackOverflowHook</function></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The stack-overflow message.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><function>void MallocFailHook (long int)</function></term>
-	<indexterm><primary><function>MallocFailHook</function></primary></indexterm>
+	<term>
+          <function>void MallocFailHook (long int)</function>
+          <indexterm><primary><function>MallocFailHook</function></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>The message printed if <function>malloc</function>
 	  fails.</para>

@@ -14,8 +14,10 @@
     
     <variablelist>
       <varlistentry>
-	<term><option>-ddump-</option><replaceable>pass</replaceable></term>
-	<indexterm><primary><option>-ddump</option> options</primary></indexterm>
+	<term>
+          <option>-ddump-</option><replaceable>pass</replaceable>
+          <indexterm><primary><option>-ddump</option> options</primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Make a debugging dump after pass
         <literal>&lt;pass&gt;</literal> (may be common enough to need
@@ -27,28 +29,40 @@
 
 	  <variablelist>
 	    <varlistentry>
-	      <term><option>-ddump-parsed</option>:</term>
+	      <term>
+	        <option>-ddump-parsed</option>:
+                <indexterm><primary><option>-ddump-parsed</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>parser output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-rn</option>:</term>
+	      <term>
+	        <option>-ddump-rn</option>:
+                <indexterm><primary><option>-ddump-rn</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>renamer output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-tc</option>:</term>
+	      <term>
+	        <option>-ddump-tc</option>:
+                <indexterm><primary><option>-ddump-tc</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>typechecker output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-types</option>:</term>
+	      <term>
+	        <option>-ddump-types</option>:
+                <indexterm><primary><option>-ddump-types</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>Dump a type signature for each value defined at
               the top level of the module.  The list is sorted
@@ -60,28 +74,40 @@
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-deriv</option>:</term>
+	      <term>
+	        <option>-ddump-deriv</option>:
+                <indexterm><primary><option>-ddump-deriv</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>derived instances</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-ds</option>:</term>
+	      <term>
+	        <option>-ddump-ds</option>:
+                <indexterm><primary><option>-ddump-ds</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>desugarer output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-spec</option>:</term>
+	      <term>
+	        <option>-ddump-spec</option>:
+                <indexterm><primary><option>-ddump-spec</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>output of specialisation pass</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-rules</option>:</term>
+	      <term>
+	        <option>-ddump-rules</option>:
+                <indexterm><primary><option>-ddump-rules</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>dumps all rewrite rules (including those generated
 	      by the specialisation pass)</para>
@@ -89,159 +115,187 @@
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-simpl</option>:</term>
+	      <term>
+	        <option>-ddump-simpl</option>:
+                <indexterm><primary><option>-ddump-simpl</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>simplifer output (Core-to-Core passes)</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-inlinings</option>:</term>
+	      <term>
+	        <option>-ddump-inlinings</option>:
+                <indexterm><primary><option>-ddump-inlinings</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>inlining info from the simplifier</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-usagesp</option>:</term>
+	      <term>
+	        <option>-ddump-usagesp</option>:
+                <indexterm><primary><option>-ddump-usagesp</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>UsageSP inference pre-inf and output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-cpranal</option>:</term>
+	      <term>
+	        <option>-ddump-cpranal</option>:
+                <indexterm><primary><option>-ddump-cpranal</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>CPR analyser output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-stranal</option>:</term>
+	      <term>
+	        <option>-ddump-stranal</option>:
+                <indexterm><primary><option>-ddump-stranal</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>strictness analyser output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-cse</option>:</term>
+	      <term>
+	        <option>-ddump-cse</option>:
+                <indexterm><primary><option>-ddump-cse</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>CSE pass output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-workwrap</option>:</term>
+	      <term>
+	        <option>-ddump-workwrap</option>:
+                <indexterm><primary><option>-ddump-workwrap</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>worker/wrapper split output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-occur-anal</option>:</term>
+	      <term>
+	        <option>-ddump-occur-anal</option>:
+                <indexterm><primary><option>-ddump-occur-anal</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>`occurrence analysis' output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-sat</option>:</term>
+	      <term>
+	        <option>-ddump-sat</option>:
+                <indexterm><primary><option>-ddump-sat</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>output of &ldquo;saturate&rdquo; pass</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-stg</option>:</term>
+	      <term>
+	        <option>-ddump-stg</option>:
+                <indexterm><primary><option>-ddump-stg</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>output of STG-to-STG passes</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-absC</option>:</term>
+	      <term>
+	        <option>-ddump-absC</option>:
+                <indexterm><primary><option>-ddump-absC</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para><emphasis>un</emphasis>flattened Abstract&nbsp;C</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-flatC</option>:</term>
+	      <term>
+	        <option>-ddump-flatC</option>:
+                <indexterm><primary><option>-ddump-flatC</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para><emphasis>flattened</emphasis> Abstract&nbsp;C</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-realC</option>:</term>
+	      <term>
+	        <option>-ddump-realC</option>:
+                <indexterm><primary><option>-ddump-realC</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>same as what goes to the C compiler</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-stix</option>:</term>
+	      <term>
+	        <option>-ddump-stix</option>:
+                <indexterm><primary><option>-ddump-stix</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>native-code generator intermediate form</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-asm</option>:</term>
+	      <term>
+	        <option>-ddump-asm</option>:
+                <indexterm><primary><option>-ddump-asm</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>assembly language from the native-code generator</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-bcos</option>:</term>
+	      <term>
+	        <option>-ddump-bcos</option>:
+                <indexterm><primary><option>-ddump-bcos</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>byte code compiler output</para>
 	      </listitem>
 	    </varlistentry>
 
 	    <varlistentry>
-	      <term><option>-ddump-foreign</option>:</term>
+	      <term>
+	        <option>-ddump-foreign</option>:
+                <indexterm><primary><option>-ddump-foreign</option></primary></indexterm>
+	      </term>
 	      <listitem>
 		<para>dump foreign export stubs</para>
 	      </listitem>
 	    </varlistentry>
-
 	  </variablelist>
-
-	  <indexterm><primary><option>-ddump-absC</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-bcos</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-cpranal</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-cse</option></primary></indexterm>
-
-	  <indexterm><primary><option>-ddump-deriv</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-ds</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-flatC</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-foreign</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-inlinings</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-occur-anal</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-parsed</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-realC</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-rn</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-rules</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-sat</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-simpl</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-spec</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-stg</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-stix</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-stranal</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-tc</option></primary></indexterm>
-
-	  <indexterm><primary><option>-ddump-usagesp</option></primary></indexterm>
-	  <indexterm><primary><option>-ddump-workwrap</option></primary></indexterm>
 	</listitem>
       </varlistentry>
       
       <varlistentry>
-	<term><option>-dverbose-core2core</option></term>
-	<term><option>-dverbose-stg2stg</option></term>
-	<indexterm><primary><option>-dverbose-core2core</option></primary></indexterm>
-	<indexterm><primary><option>-dverbose-stg2stg</option></primary></indexterm>
+	<term>
+          <option>-dverbose-core2core</option>
+          <indexterm><primary><option>-dverbose-core2core</option></primary></indexterm>
+        </term>
+	<term>
+          <option>-dverbose-stg2stg</option>
+          <indexterm><primary><option>-dverbose-stg2stg</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Show the output of the intermediate Core-to-Core and
         STG-to-STG passes, respectively.  (<emphasis>Lots</emphasis>
@@ -255,8 +309,10 @@
       </varlistentry>
       
       <varlistentry>
-	<term><option>-ddump-simpl-iterations</option>:</term>
-	<indexterm><primary><option>-ddump-simpl-iterations</option></primary></indexterm>
+	<term>
+          <option>-ddump-simpl-iterations</option>:
+          <indexterm><primary><option>-ddump-simpl-iterations</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Show the output of each <emphasis>iteration</emphasis>
         of the simplifier (each run of the simplifier has a maximum
@@ -266,8 +322,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-dppr-debug</option></term>
-	<indexterm><primary><option>-dppr-debug</option></primary></indexterm>
+	<term>
+          <option>-dppr-debug</option>
+          <indexterm><primary><option>-dppr-debug</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Debugging output is in one of several
           &ldquo;styles.&rdquo; Take the printing of types, for
@@ -284,8 +342,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-dppr-user-length</option></term>
-	<indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
+	<term>
+          <option>-dppr-user-length</option>
+          <indexterm><primary><option>-dppr-user-length</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>In error messages, expressions are printed to a
 	  certain &ldquo;depth&rdquo;, with subexpressions beyond the
@@ -295,8 +355,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-ddump-simpl-stats</option></term>
-	<indexterm><primary><option>-ddump-simpl-stats option</option></primary></indexterm>
+	<term>
+          <option>-ddump-simpl-stats</option>
+          <indexterm><primary><option>-ddump-simpl-stats option</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Dump statistics about how many of each kind of
         transformation too place.  If you add
@@ -306,8 +368,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-ddump-rn-trace</option></term>
-	<indexterm><primary><option>-ddump-rn-trace</option></primary></indexterm>
+	<term>
+          <option>-ddump-rn-trace</option>
+          <indexterm><primary><option>-ddump-rn-trace</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Make the renamer be *real* chatty about what it is
 	upto.</para>
@@ -315,8 +379,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-ddump-rn-stats</option></term>
-	<indexterm><primary><option>-dshow-rn-stats</option></primary></indexterm>
+	<term>
+          <option>-ddump-rn-stats</option>
+          <indexterm><primary><option>-dshow-rn-stats</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Print out summary of what kind of information the renamer
         had to bring in.</para>
@@ -324,8 +390,10 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-dshow-unused-imports</option></term>
-	<indexterm><primary><option>-dshow-unused-imports</option></primary></indexterm>
+	<term>
+          <option>-dshow-unused-imports</option>
+          <indexterm><primary><option>-dshow-unused-imports</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Have the renamer report what imports does not
 	contribute.</para>
@@ -343,8 +411,10 @@
     <variablelist>
 
       <varlistentry>
-	<term><option>-dcore-lint</option></term>
-	<indexterm><primary><option>-dcore-lint</option></primary></indexterm>
+	<term>
+          <option>-dcore-lint</option>
+          <indexterm><primary><option>-dcore-lint</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Turn on heavyweight intra-pass sanity-checking within
           GHC, at Core level.  (It checks GHC's sanity, not yours.)</para>
@@ -352,16 +422,20 @@
       </varlistentry>
 
       <varlistentry>
-	<term><option>-dstg-lint</option>:</term>
-	<indexterm><primary><option>-dstg-lint</option></primary></indexterm>
+	<term>
+          <option>-dstg-lint</option>:
+          <indexterm><primary><option>-dstg-lint</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Ditto for STG level. (NOTE: currently doesn't work).</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-dusagesp-lint</option>:</term>
-	<indexterm><primary><option>-dstg-lint</option></primary></indexterm>
+	<term>
+          <option>-dusagesp-lint</option>:
+          <indexterm><primary><option>-dstg-lint</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Turn on checks around UsageSP inference
           (<option>-fusagesp</option>).  This verifies various simple
@@ -500,8 +574,10 @@ Main.skip2{-r1L6-} =
 
     <variablelist>
       <varlistentry>
-	<term><option>-unreg</option>:</term>
-	<indexterm><primary><option>-unreg</option></primary></indexterm>
+	<term>
+          <option>-unreg</option>:
+          <indexterm><primary><option>-unreg</option></primary></indexterm>
+        </term>
 	<listitem>
 	  <para>Compile via vanilla ANSI C only, turning off
 	  platform-specific optimisations.  NOTE: in order to use
