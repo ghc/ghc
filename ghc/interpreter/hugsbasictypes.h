@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugsbasictypes.h,v $
- * $Revision: 1.2 $
- * $Date: 2000/03/24 14:32:03 $
+ * $Revision: 1.3 $
+ * $Date: 2000/04/05 14:13:58 $
  * ------------------------------------------------------------------------*/
 
 #define NON_POSIX_SOURCE
@@ -243,15 +243,24 @@ extern int vsnprintf ( char*, int, const char*, va_list );
  * Tweaking this lets us redirect prompts, error messages, etc - but has no
  * effect on output of Haskell programs (which should use hPutStr and friends).
  *-------------------------------------------------------------------------*/
+              
+extern Void   hugsPrintf            (const char *, ...);
+extern Void   hugsPutchar           (int);
+extern Void   hugsFlushStdout       (Void);
+extern Void   hugsEnableOutput      (Bool);
+                            
+extern Void   hugsFFlush            (FILE*);
+extern Void   hugsFPrintf           (FILE*, const char*, ...);
+extern Void   hugsPutc              (int, FILE*);
+
+#define Printf               hugsPrintf
+#define Putchar              hugsPutchar
+#define FlushStdout          hugsFlushStdout
+#define EnableOutput         hugsEnableOutput
+#define ClearOutputBuffer    hugsClearOutputBuffer
+
+#define FFlush               hugsFFlush
+#define FPrintf              hugsFPrintf
+#define Putc                 hugsPutc
                              
-#define Printf               printf
-#define Putchar              putchar
-#define FlushStdout()        fflush(stdout)
-#define EnableOutput(f)      doNothing()
-#define ClearOutputBuffer()  0
-
-#define FFlush               fflush
-#define FPrintf              fprintf
-#define Putc                 putc
-
 /*-------------------------------------------------------------------------*/

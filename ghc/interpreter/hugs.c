@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.58 $
- * $Date: 2000/04/05 10:25:08 $
+ * $Revision: 1.59 $
+ * $Date: 2000/04/05 14:13:58 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -117,6 +117,7 @@ static String lastEdit   = 0;           /* Name of script to edit (if any) */
 static Int    lastEdLine = 0;           /* Editor line number (if possible)*/
 static String prompt     = 0;           /* Prompt string                   */
 static Int    hpSize     = DEFAULTHEAP; /* Desired heap size               */
+static Bool   disableOutput = FALSE;    /* TRUE => quiet                   */
        String hugsEdit   = 0;           /* String for editor command       */
        String hugsPath   = 0;           /* String for file search path     */
 
@@ -835,13 +836,13 @@ static void ppMG ( void )
       u = hd(t);
       switch (whatIs(u)) {
          case GRP_NONREC:
-            fprintf ( stderr, "  %s\n", textToStr(textOf(snd(u))));
+            FPrintf ( stderr, "  %s\n", textToStr(textOf(snd(u))));
             break;
          case GRP_REC:
-            fprintf ( stderr, "  {" );
+            FPrintf ( stderr, "  {" );
             for (v = snd(u); nonNull(v); v=tl(v))
-               fprintf ( stderr, "%s ", textToStr(textOf(hd(v))) );
-            fprintf ( stderr, "}\n" );
+               FPrintf ( stderr, "%s ", textToStr(textOf(hd(v))) );
+            FPrintf ( stderr, "}\n" );
             break;
          default:
             internal("ppMG");
@@ -2684,11 +2685,102 @@ String s; {
     return NULL;
 }
 
+
 /* --------------------------------------------------------------------------
  * Compiler output
  * We can redirect compiler output (prompts, error messages, etc) by
  * tweaking these functions.
  * ------------------------------------------------------------------------*/
+
+#ifdef HAVE_STDARG_H
+#include <stdarg.h>
+#else
+#include <varargs.h>
+#endif
+
+Void hugsEnableOutput(f) 
+Bool f; {
+    disableOutput = !f;
+}
+
+#ifdef HAVE_STDARG_H
+Void hugsPrintf(const char *fmt, ...) {
+    va_list ap;                    /* pointer into argument list           */
+    va_start(ap, fmt);             /* make ap point to first arg after fmt */
+    if (!disableOutput) {
+        vprintf(fmt, ap);
+    } else {
+    }
+    va_end(ap);                    /* clean up                             */
+}
+#else
+Void hugsPrintf(fmt, va_alist) 
+const char *fmt;
+va_dcl {
+    va_list ap;                    /* pointer into argument list           */
+    va_start(ap);                  /* make ap point to first arg after fmt */
+    if (!disableOutput) {
+        vprintf(fmt, ap);
+    } else {
+    }
+    va_end(ap);                    /* clean up                             */
+}
+#endif
+
+Void hugsPutchar(c)
+int c; {
+    if (!disableOutput) {
+        putchar(c);
+    } else {
+    }
+}
+
+Void hugsFlushStdout() {
+    if (!disableOutput) {
+        fflush(stdout);
+    }
+}
+
+Void hugsFFlush(fp)
+FILE* fp; {
+    if (!disableOutput) {
+        fflush(fp);
+    }
+}
+
+#ifdef HAVE_STDARG_H
+Void hugsFPrintf(FILE *fp, const char* fmt, ...) {
+    va_list ap;             
+    va_start(ap, fmt);      
+    if (!disableOutput) {
+        vfprintf(fp, fmt, ap);
+    } else {
+    }
+    va_end(ap);             
+}
+#else
+Void hugsFPrintf(FILE *fp, const char* fmt, va_list)
+FILE* fp;
+const char* fmt;
+va_dcl {
+    va_list ap;             
+    va_start(ap);      
+    if (!disableOutput) {
+        vfprintf(fp, fmt, ap);
+    } else {
+    }
+    va_end(ap);             
+}
+#endif
+
+Void hugsPutc(c, fp)
+int   c;
+FILE* fp; {
+    if (!disableOutput) {
+        putc(c,fp);
+    } else {
+    }
+}
 
 /* --------------------------------------------------------------------------
  * Send message to each component of system:
@@ -2710,6 +2802,11 @@ Int what; {                     /* system to respond as appropriate ...    */
     typeChecker(what);
     compiler(what);   
     codegen(what);
+
+    mark(moduleGraph);
+    mark(prelModules);
+    mark(targetModules);
+    mark(daSccs);
 }
 
 /*-------------------------------------------------------------------------*/
