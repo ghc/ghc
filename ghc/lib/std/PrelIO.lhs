@@ -421,9 +421,9 @@ commitAndReleaseBuffer hdl@(Handle h) buf sz count flush = do
       let ok    h_ = putMVar h h_ >> return ()
 
 	  -- enough room in handle buffer for the new data?
-      if (flush || fo_bufSize - fo_wptr - 1 < count)
+      if (flush || fo_bufSize - fo_wptr <= count)
 
-	  -- The -1 is to be sure that we never exactly fill up the
+	  -- The <= is to be sure that we never exactly fill up the
 	  -- buffer, which would require a flush.  So if copying the
 	  -- new data into the buffer would make the buffer full, we
 	  -- just flush the existing buffer and the new data immediately,
@@ -492,13 +492,13 @@ commitBuffer handle buf sz count flush = do
       fo_bufSize <- getBufSize fo
 
       new_wptr <-                       -- not enough room in handle buffer?
-	(if flush || (fo_bufSize - fo_wptr - 1 < count)
+	(if flush || (fo_bufSize - fo_wptr <= count)
 	    then do rc <- mayBlock fo (flushFile fo)
 		    if (rc < 0) then constructErrorAndFail "commitBuffer"
 				else return 0
 	    else return fo_wptr )
 
-      if (flush || fo_bufSize - 1 < count)  -- committed buffer too large?
+      if (flush || fo_bufSize <= count)  -- committed buffer too large?
 
 	    then do rc <- write_buf fo buf count
 		    if (rc < 0) then constructErrorAndFail "commitBuffer"
