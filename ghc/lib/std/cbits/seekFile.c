@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: seekFile.c,v 1.4 1999/09/19 19:25:24 sof Exp $
+ * $Id: seekFile.c,v 1.5 2000/01/17 12:30:07 simonmar Exp $
  *
  * hSeek and hIsSeekable Runtime Support
  */
@@ -19,11 +19,7 @@
 
 /* Invoked by IO.hSeek only */
 StgInt
-seekFile(ptr, whence, size, d)
-StgForeignPtr ptr;
-StgInt whence;
-StgInt size;
-StgByteArray d;
+seekFile(StgForeignPtr ptr, StgInt whence, StgInt size, StgByteArray d)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
@@ -101,7 +97,7 @@ StgByteArray d;
 	ghc_errstr = "can't seek on a pipe";
 	return -1;
     }
-    while ( lseek(fo->fd, offset, whence) == -1) {
+    while ( lseek(fo->fd, offset-posn_delta, whence) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
@@ -115,10 +111,7 @@ StgByteArray d;
 
 /* Invoked by IO.hSeek only */
 StgInt
-seekFile_int64(ptr, whence, d)
-StgForeignPtr ptr;
-StgInt whence;
-StgInt64 d;
+seekFile_int64(StgForeignPtr ptr, StgInt whence, StgInt64 d)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
@@ -174,7 +167,7 @@ StgInt64 d;
 	ghc_errstr = "can't seek on a pipe";
 	return -1;
     }
-    while ( lseek(fo->fd, offset, whence) == -1) {
+    while ( lseek(fo->fd, offset-posn_delta, whence) == -1) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    stdErrno();
@@ -187,8 +180,7 @@ StgInt64 d;
 }
 
 StgInt
-seekFileP(ptr)
-StgForeignPtr ptr;
+seekFileP(StgForeignPtr ptr)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     struct stat sb;
