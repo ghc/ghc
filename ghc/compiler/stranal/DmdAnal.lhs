@@ -40,7 +40,8 @@ import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 import Type		( isUnLiftedType )
 import CoreLint		( showPass, endPass )
 import Util		( mapAndUnzip, mapAccumL, mapAccumR, lengthIs )
-import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive )
+import BasicTypes	( Arity, TopLevelFlag(..), isTopLevel, isNeverActive,
+			  RecFlag(..), isRec )
 import Maybes		( orElse, expectJust )
 import Outputable
 \end{code}
@@ -89,8 +90,8 @@ dmdAnalTopBind :: SigEnv
 	       -> (SigEnv, CoreBind)
 dmdAnalTopBind sigs (NonRec id rhs)
   = let
-	(    _, _, (_,   rhs1)) = dmdAnalRhs TopLevel sigs (id, rhs)
-	(sigs2, _, (id2, rhs2)) = dmdAnalRhs TopLevel sigs (id, rhs1)
+	(    _, _, (_,   rhs1)) = dmdAnalRhs TopLevel NonRecursive sigs (id, rhs)
+	(sigs2, _, (id2, rhs2)) = dmdAnalRhs TopLevel NonRecursive sigs (id, rhs1)
 		-- Do two passes to improve CPR information
 		-- See comments with ignore_cpr_info in mk_sig_ty
 		-- and with extendSigsWithLam
@@ -264,7 +265,7 @@ dmdAnal sigs dmd (Case scrut case_bndr alts)
 
 dmdAnal sigs dmd (Let (NonRec id rhs) body) 
   = let
-	(sigs', lazy_fv, (id1, rhs')) = dmdAnalRhs NotTopLevel sigs (id, rhs)
+	(sigs', lazy_fv, (id1, rhs')) = dmdAnalRhs NotTopLevel NonRecursive sigs (id, rhs)
 	(body_ty, body') 	      = dmdAnal sigs' dmd body
 	(body_ty1, id2)    	      = annotateBndr body_ty id1
 	body_ty2		      = addLazyFVs body_ty1 lazy_fv
@@ -358,7 +359,7 @@ dmdFix top_lvl sigs orig_pairs
 	  ((sigs', lazy_fv'), pair')
 	  --	 )
  	where
-	  (sigs', lazy_fv1, pair') = dmdAnalRhs top_lvl sigs (id,rhs)
+	  (sigs', lazy_fv1, pair') = dmdAnalRhs top_lvl Recursive sigs (id,rhs)
 	  lazy_fv'		   = plusUFM_C both lazy_fv lazy_fv1   
 	  -- old_sig   		   = lookup sigs id
 	  -- new_sig  	   	   = lookup sigs' id
@@ -374,20 +375,20 @@ dmdFix top_lvl sigs orig_pairs
 	-- since it is part of the strictness signature
 initialSig id = idNewStrictness_maybe id `orElse` botSig
 
-dmdAnalRhs :: TopLevelFlag 
+dmdAnalRhs :: TopLevelFlag -> RecFlag
 	-> SigEnv -> (Id, CoreExpr)
 	-> (SigEnv,  DmdEnv, (Id, CoreExpr))
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
 
-dmdAnalRhs top_lvl sigs (id, rhs)
+dmdAnalRhs top_lvl rec_flag sigs (id, rhs)
  = (sigs', lazy_fv, (id', rhs'))
  where
   arity		     = idArity id   -- The idArity should be up to date
 				    -- The simplifier was run just beforehand
   (rhs_dmd_ty, rhs') = dmdAnal sigs (vanillaCall arity) rhs
   (lazy_fv, sig_ty)  = WARN( arity /= dmdTypeDepth rhs_dmd_ty, ppr id )
-		       mkSigTy top_lvl id rhs rhs_dmd_ty
+		       mkSigTy top_lvl rec_flag id rhs rhs_dmd_ty
   id'		     = id `setIdNewStrictness` sig_ty
   sigs'		     = extendSigEnv top_lvl sigs id sig_ty
 \end{code}
@@ -404,8 +405,8 @@ mkTopSigTy :: CoreExpr -> DmdType -> StrictSig
 	-- NB: not used for never-inline things; hence False
 mkTopSigTy rhs dmd_ty = snd (mk_sig_ty False False rhs dmd_ty)
 
-mkSigTy :: TopLevelFlag -> Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
-mkSigTy top_lvl id rhs dmd_ty 
+mkSigTy :: TopLevelFlag -> RecFlag -> Id -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
+mkSigTy top_lvl rec_flag id rhs dmd_ty 
   = mk_sig_ty never_inline thunk_cpr_ok rhs dmd_ty
   where
     never_inline = isNeverActive (idInlinePragma id)
@@ -415,6 +416,7 @@ mkSigTy top_lvl id rhs dmd_ty
     thunk_cpr_ok
 	| isTopLevel top_lvl       = False	-- Top level things don't get
 						-- their demandInfo set at all
+	| isRec rec_flag	   = False	-- Ditto recursive things
 	| Just dmd <- maybe_id_dmd = isStrictDmd dmd
 	| otherwise 		   = True	-- Optimistic, first time round
 						-- See notes below
