@@ -482,7 +482,8 @@ findAndReadIface doc_str mod_name hi_boot_file
     -- and start up GHCi - it won't complain that all the modules it tries
     -- to load are found in the home location.
     ioToRnM_no_fail (readIORef v_GhcMode) `thenRn` \ mode ->
-    let home_allowed = mode `notElem` [ DoInteractive, DoLink ]
+    let home_allowed = hi_boot_file ||
+		       mode `notElem` [ DoInteractive, DoMake ]
     in
 
     ioToRnM (if home_allowed 
