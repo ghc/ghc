@@ -149,7 +149,7 @@ calling convention (used by PprAbsC):
 
 \begin{code}
 ccallConvAttribute :: CCallConv -> String
-ccallConvAttribute StdCallConv = "__stdcall"
+ccallConvAttribute StdCallConv = "__attribute__((__stdcall__))"
 ccallConvAttribute CCallConv   = ""
 \end{code}
 
