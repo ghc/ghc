@@ -290,10 +290,12 @@ gen_primop_list (Info defaults entries)
      ) where (first:rest) = filter is_primop entries
 
 gen_primop_tag (Info defaults entries)
-   = unlines (zipWith f (filter is_primop entries) [1..])
+   = unlines (max_def : zipWith f primop_entries [1..])
      where
+	primop_entries = filter is_primop entries
         f i n = "tagOf_PrimOp " ++ cons i 
                 ++ " = _ILIT(" ++ show n ++ ") :: FastInt"
+	max_def = "maxPrimOpTag = " ++ show (length primop_entries) ++ " :: Int"
 
 gen_data_decl (Info defaults entries)
    = let conss = map cons (filter is_primop entries)
