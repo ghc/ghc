@@ -300,18 +300,36 @@ package_details installing =
         },
 
          Package {
+	 name         = "greencard",
+         import_dirs    = if installing
+                             then [ clibdir ++ "/imports/greencard" ]
+                   	     else [ cFPTOOLS_TOP_ABS ++ "/green-card/lib/ghc" ],
+         library_dirs   = if installing
+                             then [ clibdir ]
+                             else [ cFPTOOLS_TOP_ABS ++ "/green-card/lib/ghc" ],
+         hs_libraries      = [ "HSgreencard" ],
+         extra_libraries   = [],
+         include_dirs   = [],
+         c_includes     = [],
+         package_deps   = [],
+         extra_ghc_opts = [],
+         extra_cc_opts  = [],
+         extra_ld_opts  = [],
+        },
+
+         Package {
          name         = "win32",
 	 import_dirs    = if installing
                              then [ clibdir ++ "/imports/win32" ]
-                             else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
+                             else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32" ],
          library_dirs   = if installing
                              then [ clibdir ]
-                             else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32/src" ],
+                             else [ cFPTOOLS_TOP_ABS ++ "/hslibs/win32" ],
          hs_libraries      = [ "HSwin32" ],
 	 extra_libraries   = [],
          include_dirs   = [],
          c_includes     = [],           -- ???
-         package_deps   = [ "lang" ],
+         package_deps   = [ "lang", "greencard" ],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
          extra_ld_opts  = [ "-luser32",  "-lgdi32" ]
