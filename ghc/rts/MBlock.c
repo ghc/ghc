@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.45 2003/05/14 09:11:06 simonmar Exp $
+ * $Id: MBlock.c,v 1.46 2003/05/21 13:22:46 stolz Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -133,7 +133,7 @@ my_mmap (void *addr, lnat size)
 	    prog_belch("out of memory (requested %d bytes)", size);
 	    stg_exit(EXIT_FAILURE);
 	} else {
-	    barf("getMBlock: mmap: %s", sys_errlist[errno]);
+	    barf("getMBlock: mmap: %s", strerror(errno));
 	}
     }
 
