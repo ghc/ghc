@@ -146,10 +146,13 @@ instance Ord Literal where
 \begin{code}
 mkMachInt, mkMachWord, mkMachInt64, mkMachWord64 :: Integer -> Literal
 
-mkMachInt  x   = ASSERT2( inIntRange x,  integer x ) MachInt x
-mkMachWord x   = ASSERT2( inWordRange x, integer x ) MachWord x
-mkMachInt64  x = MachInt64 x	-- Assertions?
-mkMachWord64 x = MachWord64 x	-- Ditto?
+mkMachInt  x   = -- ASSERT2( inIntRange x,  integer x ) 
+	 	 -- not true: you can write out of range Int# literals
+		 MachInt x
+mkMachWord x   = -- ASSERT2( inWordRange x, integer x ) 
+		 MachWord x
+mkMachInt64  x = MachInt64 x
+mkMachWord64 x = MachWord64 x
 
 inIntRange, inWordRange :: Integer -> Bool
 inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT
