@@ -61,6 +61,8 @@ import Bits
 import Storable
 import CTypes
 import FastString
+import GlaExts		( Int(..) )
+import Module		( moduleNameFS )
 #endif
 
 import TyCon		( TyCon, isDataTyCon, tyConFamilySize, tyConDataCons )
@@ -550,7 +552,8 @@ lookupVar ce f v =
 -- HACK!!!  ToDo: cleaner
 rdrNameToCLabel :: RdrName -> String{-suffix-} -> String
 rdrNameToCLabel rn suffix = 
-  _UNPK_(rdrNameModule rn) ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
+  _UNPK_(moduleNameFS (rdrNameModule rn)) 
+  ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
 
 linkAlgAlts ie ce = map (linkAlgAlt ie ce)
 linkAlgAlt ie ce (AltAlg tag args rhs) = AltAlg tag args (linkIExpr ie ce rhs)
