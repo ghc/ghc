@@ -127,7 +127,7 @@ pairs.
 coreToStg :: DynFlags -> [CoreBind] -> IO [StgBinding]
 coreToStg dflags pgm
   = return pgm'
-  where (env', fvs, pgm') = coreTopBindsToStg emptyVarEnv pgm
+  where (_, _, pgm') = coreTopBindsToStg emptyVarEnv pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
 coreExprToStg expr 
@@ -141,7 +141,7 @@ coreTopBindsToStg
 
 coreTopBindsToStg env [] = (env, emptyFVInfo, [])
 coreTopBindsToStg env (b:bs)
-  = (env2, fvs1, b':bs')
+  = (env2, fvs2, b':bs')
   where
 	-- env accumulates down the list of binds, fvs accumulates upwards
 	(env1, fvs2, b' ) = coreTopBindToStg env fvs1 b
@@ -229,9 +229,6 @@ coreToStgRhs scope_fv_info top (binder, rhs)
 	       rhs_fvs, rhs_escs)
   where
     binder_info = lookupFVInfo scope_fv_info binder
-
-bogus_rhs = StgRhsClosure noCCS noBinderInfo [] ReEntrant [] bogus_expr
-bogus_expr = (StgLit (MachInt 1))
 
 mkStgRhs :: TopLevelFlag -> FreeVarsInfo -> StgBinderInfo
 	 -> StgExpr -> StgRhs
