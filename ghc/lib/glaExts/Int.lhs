@@ -244,9 +244,11 @@ instance Num Int32 where
     fromInteger   = to . fromInteger
     fromInt       = to
 
-instance Bounded Int32 where
-    minBound = to minBound
-    maxBound = to maxBound
+-- ToDo: remove LitLit when minBound::Int is fixed (currently it's one
+-- too high, and doesn't allow the correct minBound to be defined here).
+instance Bounded Int32 where 
+    minBound = I32 ``0x80000000''
+    maxBound = I32   0x7fffffff
 
 instance Real Int32 where
     toRational x = toInteger x % 1
@@ -284,12 +286,12 @@ instance Bits Int32 where
   x .&. y      	= to (binop (wordop and#) x y)
   x .|. y      	= to (binop (wordop or# ) x y)
   x `xor` y    	= to (binop (wordop xor#) x y)
-  complement x 	= (x `xor` maxBound) + 1
+  complement x 	= x `xor` -1
   shift (I32 (I# x)) i@(I# i#)
-	| i > 0     = I32 (I# (iShiftRL# x i#))
-	| otherwise = I32 (I# (iShiftL# x i#))
+	| i > 0     = I32 (I# (iShiftL# x i#))
+	| otherwise = I32 (I# (iShiftRA# x i#))
 --  rotate    	   
-  bit i        	= 1 `shift` -i
+  bit i        	= 1 `shift` i
   setBit x i    = x .|. bit i
   clearBit x i  = x .&. complement (bit i)
   complementBit x i = x `xor` bit i
