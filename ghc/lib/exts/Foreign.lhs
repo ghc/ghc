@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1994-1996
+% (c) The AQUA Project, Glasgow University, 1994-1998
 %
 
 \section[Foreign]{Module @Foreign@}
@@ -22,6 +22,7 @@ module Foreign
        ) where
 
 import PrelForeign --hiding ( makeForeignObj )
+import PrelStable
 --import qualified PrelForeign as PF ( makeForeignObj )
 import PrelBase    ( Int(..), Double(..), Float(..), Char(..) )
 import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#, 

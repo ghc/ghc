@@ -41,7 +41,7 @@ import PrelPack     ( packString )
 import PrelArr      ( ByteArray(..) )
 
 #ifndef __PARALLEL_HASKELL__
-import PrelForeign  ( StablePtr, deRefStablePtr )
+import PrelStable  ( StablePtr, deRefStablePtr )
 #endif
 
 ---------------------------------------------------------------

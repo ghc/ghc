@@ -89,6 +89,7 @@ import PrelArr
 import PrelAddr
 import PrelArrExtra
 import PrelForeign
+import PrelStable
 import PrelST
 import ST
 import Ix

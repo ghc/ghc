@@ -59,52 +59,6 @@ instance Eq ForeignObj where
 
 %*********************************************************
 %*							*
-\subsection{Type @StablePtr@ and its operations}
-%*							*
-%*********************************************************
-
-\begin{code}
-#ifndef __PARALLEL_HASKELL__
-data StablePtr a = StablePtr (StablePtr# a)
-instance CCallable   (StablePtr a)
-instance CCallable   (StablePtr# a)
-instance CReturnable (StablePtr a)
-
--- Nota Bene: it is important {\em not\/} to inline calls to
--- @makeStablePtr#@ since the corresponding macro is very long and we'll
--- get terrible code-bloat.
-
-makeStablePtr  :: a -> IO (StablePtr a)
-deRefStablePtr :: StablePtr a -> IO a
-freeStablePtr  :: StablePtr a -> IO ()
-
-{-# INLINE deRefStablePtr #-}
-{-# INLINE freeStablePtr #-}
-
-makeStablePtr f = IO $ \ rw1# ->
-    case makeStablePtr# f rw1# of
-      (# rw2#, sp# #) -> (# rw2#, StablePtr sp# #)
-
-deRefStablePtr (StablePtr sp#) = IO $ \ rw1# ->
-    deRefStablePtr# sp# rw1#
-
-freeStablePtr sp = _ccall_ freeStablePointer sp
-
-eqStablePtr :: StablePtr a -> StablePtr b -> Bool
-eqStablePtr (StablePtr sp1#) (StablePtr sp2#) = 
-  case eqStablePtr# sp1# sp2# of
-    0# -> False
-    _  -> True
-
-instance Eq (StablePtr a) where 
-    p == q = eqStablePtr p q
-    p /= q = not (eqStablePtr p q)
-
-#endif /* !__PARALLEL_HASKELL__ */
-\end{code}
-
-%*********************************************************
-%*							*
 \subsection{Unpacking Foreigns}
 %*							*
 %*********************************************************

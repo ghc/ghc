@@ -298,6 +298,12 @@ indexWord64OffForeignObj#
   makeStablePtr#
   deRefStablePtr#
   eqStablePtr#
+
+  StableName#
+  makeStableName#
+  eqStableName#
+  stableNameToInt#
+
   reallyUnsafePtrEquality#
 
   unsafeCoerce#

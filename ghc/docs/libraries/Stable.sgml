@@ -1,0 +1,126 @@
+<sect> <idx/Stable/
+<label id="sec:Stable">
+<p>
+
+This module provides two kinds of stable references to Haskell
+objects, stable names and stable pointers.
+
+<sect1> <idx/Stable Pointers/
+<label id="sec:stable-pointers">
+<p>
+
+A <em/stable pointer/ is a reference to a Haskell expression that
+can be passed to foreign functions via the foreign function
+interface. 
+
+Normally a Haskell object will move around from time to time, because
+of garbage collection, hence we can't just pass the address of an
+object to a foreign function and expect it to remain valid.  Stable
+pointers provide a level of indirection so that the foreign code can
+get the "real address" of the Haskell object by calling
+<tt/deRefStablePtr/ on the stable pointer object it has.
+
+The Haskell interface provided by the <tt/Stable/ module is as follows:
+
+<tscreen><verb>
+data StablePtr a  -- abstract, instance of: Eq.
+makeStablePtr  :: a -> IO (StablePtr a)
+deRefStablePtr :: StablePtr a -> IO a
+freeStablePtr  :: StablePtr a -> IO ()
+</verb></tscreen>
+
+Care must be taken to free stable pointers that are no longer required
+using the <tt/freeStablePtr/ function, otherwise two bad things can
+happen:
+
+<itemize>
+<item> The object referenced by the stable pointer will be retained in
+the heap.
+<item> The runtime system's internal stable pointer table will grow,
+which imposes an overhead on garbage collection.
+</itemize>
+
+Notes:
+
+<itemize>
+<item> If <tt/sp1 :: StablePtr/ and <tt/sp2 :: StablePtr/ and <tt/sp1
+== sp2/ then <tt/sp1/ and <tt/sp2/ are either the same stable pointer,
+or they were created by calls to <tt/makeStablePtr/ on the same
+object.  Another way to say this is "every time you call
+<tt/makeStablePtr/ on an object you get back the same stable pointer".
+<item> The reverse is not necessarily true: if two stable pointers are
+not equal, it doesn't mean that they don't refer to the same Haskell
+object (although they probably don't).  <item> Calling
+<tt/deRefStablePtr/ on a stable pointer which has previously been
+freed results in undefined behaviour.
+</itemize>
+
+The C interface (which is brought into scope by <tt/#include
+&lt;Stable.h&gt;/) is as follows:
+
+<tscreen><verb>
+typedef StablePtr /* abstract, probably an unsigned long */
+extern StgPtr         deRefStablePtr(StgStablePtr stable_ptr);
+static void           freeStablePtr(StgStablePtr sp);
+static StgStablePtr   splitStablePtr(StgStablePtr sp);
+</verb></tscreen>
+
+The functions <tt/deRefStablePtr/ and <tt/freeStablePtr/ are
+equivalent to the Haskell functions of the same name above.  
+
+The function <tt/splitStablePtr/ allows a stable pointer to be
+duplicated without making a new one with <tt/makeStablePtr/.  The
+stable pointer won't be removed from the runtime system's internal
+table until <tt/freeStablePtr/ is called on both pointers.
+
+<sect1>Stable Names
+<label id="sec:stable-pointers">
+<p>
+
+A haskell object can be given a <em/stable name/ by calling
+<tt/makeStableName/ on it.  Stable names solve the following problem:
+suppose you want to build a hash table with Haskell objects as keys,
+but you want to use pointer equality for comparison; maybe because the
+keys are large and hashing would be slow, or perhaps because the keys
+are infinite in size.  We can't build a hash table using the address
+of the object as the key, because objects get moved around by the
+garbage collector, meaning a re-hash would be necessary after every
+garbage collection.
+
+Enter stable names.  A stable name is an abstract entity that supports
+equality and hashing, with the following interface:
+
+<tscreen><verb>
+data StableName a -- abstract, instance Eq.
+makeStableName :: a -> IO (StableName a)
+hashStableName :: StableName a -> Int
+</verb></tscreen>
+
+All these operations run in constant time.
+
+Stable names have the following properties:
+
+<enum>
+<item> If <tt/sn1 :: StablePtr/ and <tt/sn2 :: StablePtr/ and <tt/sn1
+== sn2/ then <tt/sn1/ and <tt/sn2/ are either the same stable name,
+or they were created by calls to <tt/makeStableName/ on the same
+object.
+<item> The reverse is not necessarily true: if two stable names are
+not equal, it doesn't mean that they don't refer to the same Haskell
+object (although they probably don't).
+<item> There is no <tt/freeStableName/ operation.  Stable names are
+reclaimed by the runtime system when they are no longer needed.
+<item> There is no <tt/deRefStableName/ operation.  You can't get back
+from a stable name to the original Haskell object.  The reason for
+this is that the existence of a stable name for an object doesn't
+guarantee the existence of the object itself; it can still be garbage
+collected. 
+<item> There is a <tt/hashStableName/ operation, which converts a
+stable name to an <tt/Int/.  The <tt/Int/ returned is not necessarily
+unique (that is, it doesn't satisfy property (1) above), but it can be
+used for building hash tables of stable names.
+</enum>
+
+Properties (1) and (2) are similar to stable pointers, but the key
+differences are that you can't get back to the original object from a
+stable name, and you can convert one to an <tt/Int/ for hashing.
