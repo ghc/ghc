@@ -52,8 +52,7 @@ module RegAllocInfo (
     ) where
 
 #if __GLASGOW_HASKELL__ >= 202
-import qualified GlaExts (Addr(..))
-import GlaExts hiding (Addr(..))
+import GlaExts
 import FastString
 #else
 IMP_Ubiq(){-uitous-}
@@ -375,9 +374,9 @@ regUsage instr = case instr of
     XOR  sz src dst	-> usage2 src dst
     NOT  sz op		-> usage1 op
     NEGI sz op		-> usage1 op
-    SHL  sz imm dst	-> usage1 dst -- imm has to be an Imm
-    SAR  sz imm dst	-> usage1 dst -- imm has to be an Imm
-    SHR  sz imm dst	-> usage1 dst -- imm has to be an Imm
+    SHL  sz dst len	-> usage2 dst len -- len is either an Imm or ecx.
+    SAR  sz dst len	-> usage2 dst len -- len is either an Imm or ecx.
+    SHR  sz len dst	-> usage2 dst len -- len is either an Imm or ecx.
     PUSH sz op		-> usage (opToReg op) []
     POP  sz op		-> usage [] (opToReg op)
     TEST sz src dst	-> usage (opToReg src ++ opToReg dst) []
@@ -449,7 +448,7 @@ regUsage instr = case instr of
     opToReg (OpImm imm)   = []
     opToReg (OpAddr  ea)  = addrToRegs ea
 
-    addrToRegs (Addr base index _) = baseToReg base ++ indexToReg index
+    addrToRegs (Address base index _) = baseToReg base ++ indexToReg index
       where  baseToReg Nothing       = []
 	     baseToReg (Just r)      = [r]
 	     indexToReg Nothing      = []
@@ -672,9 +671,9 @@ patchRegs instr env = case instr of
     XOR  sz src dst	-> patch2 (XOR  sz) src dst
     NOT  sz op 		-> patch1 (NOT  sz) op
     NEGI sz op		-> patch1 (NEGI sz) op
-    SHL  sz imm dst 	-> patch1 (SHL  sz imm) dst
-    SAR  sz imm dst 	-> patch1 (SAR  sz imm) dst
-    SHR  sz imm dst 	-> patch1 (SHR  sz imm) dst
+    SHL  sz imm dst 	-> patch2 (SHL  sz) imm dst
+    SAR  sz imm dst 	-> patch2 (SAR  sz) imm dst
+    SHR  sz imm dst 	-> patch2 (SHR  sz) imm dst
     TEST sz src dst	-> patch2 (TEST sz) src dst
     CMP  sz src dst	-> patch2 (CMP  sz) src dst
     PUSH sz op		-> patch1 (PUSH sz) op
@@ -716,8 +715,8 @@ patchRegs instr env = case instr of
     patchOp (OpAddr ea)  = OpAddr (lookupAddr ea)
 
     lookupAddr (ImmAddr imm off) = ImmAddr imm off
-    lookupAddr (Addr base index disp)
-      = Addr (lookupBase base) (lookupIndex index) disp
+    lookupAddr (Address base index disp)
+      = Address (lookupBase base) (lookupIndex index) disp
       where
 	lookupBase Nothing       = Nothing
 	lookupBase (Just r)      = Just (env r)
