@@ -222,7 +222,7 @@ munch1 p =
 choice :: [ReadP a] -> ReadP a
 choice []     = pfail
 choice [p]    = p
-choide (p:ps) = p +++ choice ps
+choice (p:ps) = p +++ choice ps
 
 skipSpaces :: ReadP ()
 skipSpaces =
