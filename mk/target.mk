@@ -993,8 +993,9 @@ CLEAN_FILES += $(SGML_TEXT) $(SGML_TEX) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGM
 MOSTLY_CLEAN_FILES += $(patsubst %.vsgml, %.sgml, $(VSGML_SRCS))
 
 extraclean ::
+	$(RM) -rf DBTOHTML_OUTPUT_*
+	$(RM) -rf *.junk/
 	$(RM) -rf $(SGML_DOC)
-
 endif
 
 ###########################################
