@@ -137,6 +137,9 @@ static Capability *returning_capabilities;
    threaded RTS, clients must use waitFor*Capability()).
    ------------------------------------------------------------------------- */
 
+#if defined(RTS_SUPPORTS_THREADS)
+static
+#endif
 void
 grabCapability( Capability** cap )
 {
@@ -152,7 +155,9 @@ grabCapability( Capability** cap )
   free_capabilities = (*cap)->link;
   rts_n_free_capabilities--;
 #endif
+#if defined(RTS_SUPPORTS_THREADS)
   IF_DEBUG(scheduler, sched_belch("worker: got capability"));
+#endif
 }
 
 /* ----------------------------------------------------------------------------
