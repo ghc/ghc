@@ -63,6 +63,7 @@ module System.Directory
 
 #ifdef __NHC__
 import Directory
+import System (getEnv)
 getHomeDirectory :: IO FilePath
 getHomeDirectory = getEnv "HOME"
 getAppUserDataDirectory :: String -> IO FilePath
