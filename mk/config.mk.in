@@ -468,7 +468,7 @@ HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
 # Haskell compiler and mkdependHS
 
 # ToDo: $(HC) should be a local installation of some Haskell compiler
-HC		= $(FPTOOLS_TOP)/ghc/driver/ghc
+HC		= $(FPTOOLS_TOP)/ghc/driver/ghc-inplace
 MKDEPENDHS	= $(HC)
 
 #-----------------------------------------------------------------------------
