@@ -73,6 +73,7 @@ getGlobalNames (HsModule this_mod _ exports imports decls mod_loc)
 	   rec_unqual_fn = unQualInScope rec_rn_env
 	in
 	setOmitQualFn rec_unqual_fn		$
+	setModuleRn this_mod			$
 
 		-- PROCESS LOCAL DECLS
 		-- Do these *first* so that the correct provenance gets

@@ -203,16 +203,21 @@ loadInterface doc_str load_mod
 
 	-- LOAD IT INTO Ifaces
 	-- First set the module
-    setModuleRn load_mod 	$
 
 	-- NB: *first* we do loadDecl, so that the provenance of all the locally-defined
 	---    names is done correctly (notably, whether this is an .hi file or .hi-boot file).
 	--     If we do loadExport first the wrong info gets into the cache (unless we
 	-- 	explicitly tag each export which seems a bit of a bore)
+
+    getModuleRn 		`thenRn` \ this_mod ->
+    setModuleRn load_mod  $	-- First set the module name of the module being loaded,
+				-- so that unqualified occurrences in the interface file
+				-- get the right qualifer
     foldlRn loadDecl (iDecls ifaces) rd_decls		`thenRn` \ new_decls ->
     foldlRn loadFixDecl (iFixes ifaces) rd_decls	`thenRn` \ new_fixities ->
-    mapRn   loadExport exports				`thenRn` \ avails_s ->
     foldlRn loadInstDecl insts rd_insts			`thenRn` \ new_insts ->
+
+    mapRn (loadExport this_mod) exports			`thenRn` \ avails_s ->
     let
 	 mod_details = (new_hif, mod_vers, concat avails_s)
 
@@ -229,8 +234,26 @@ loadInterface doc_str load_mod
     returnRn new_ifaces
     }}
 
-loadExport :: ExportItem -> RnMG [AvailInfo]
-loadExport (mod, entities)
+loadExport :: Module -> ExportItem -> RnMG [AvailInfo]
+loadExport this_mod (mod, entities)
+  | mod == this_mod = returnRn []
+	-- If the module exports anything defined in this module, just ignore it.
+	-- Reason: otherwise it looks as if there are two local definition sites
+	-- for the thing, and an error gets reported.  Easiest thing is just to
+	-- filter them out up front. This situation only arises if a module
+	-- imports itself, or another module that imported it.  (Necessarily,
+	-- this invoves a loop.)  Consequence: if you say
+	--	module A where
+	--	   import B( AType )
+	--	   type AType = ...
+	--
+	--	module B( AType ) where
+	--	   import {-# SOURCE #-} A( AType )
+	--
+	-- then you'll get a 'B does not export AType' message.  A bit bogus
+	-- but it's a bogus thing to do!
+
+  | otherwise
   = mapRn load_entity entities
   where
     new_name occ = newImportedGlobalName mod occ

@@ -462,8 +462,8 @@ combine_globals :: [Name] 	-- Old
 combine_globals ns_old ns_new	-- ns_new is often short
   = foldr add ns_old ns_new
   where
-    add n ns | all (no_conflict n) ns_old = map choose ns	-- Eliminate duplicates
-	     | otherwise	          = n:ns
+    add n ns | any (is_duplicate n) ns_old = map choose ns	-- Eliminate duplicates
+	     | otherwise	           = n:ns
 	     where
 	       choose n' | n==n' && better_provenance n n' = n
 			 | otherwise			   = n'
@@ -479,12 +479,16 @@ better_provenance n1 n2
 	(NonLocalDef (UserImport _ _ _   ) _, NonLocalDef ImplicitImport _) -> True
 	other								    -> False
 
-no_conflict :: Name -> Name -> Bool
-no_conflict n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False
-		  | otherwise 		                       = n1 == n2
-	-- We complain of a conflict if one RdrName maps to two different Names,
-	-- OR if one RdrName maps to the same *locally-defined* Name.  The latter
-	-- case is to catch two separate, local definitions of the same thing.
+is_duplicate :: Name -> Name -> Bool
+is_duplicate n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False
+		   | otherwise 		                        = n1 == n2
+	-- We treat two bindings of a locally-defined name as a duplicate,
+	-- because they might be two separate, local defns and we want to report
+	-- and error for that, *not* eliminate a duplicate.
+
+	-- On the other hand, if you import the same name from two different
+	-- import statements, we *do* want to eliminate the duplicate, not report
+	-- an error.
 	--
 	-- If a module imports itself then there might be a local defn and an imported
 	-- defn of the same name; in this case the names will compare as equal, but
