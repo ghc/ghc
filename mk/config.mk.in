@@ -128,6 +128,7 @@ Project		  = Ghc
 ProjectName       = $($(Project)ProjectName)
 ProjectNameShort  = $($(Project)ProjectNameShort)
 ProjectVersion    = $($(Project)ProjectVersion)
+ProjectVersionInt = $($(Project)ProjectVersionInt)
 ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 
 #################################################################################
@@ -144,7 +145,8 @@ ProjectPatchLevel = $($(Project)ProjectPatchLevel)
 # 
 GhcProjectName         = The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort    = ghc
-GhcProjectVersion      = 3.01
+GhcProjectVersion      = 3.01	# treated as a  *string*
+GhcProjectVersionInt   = 301	# treated as an *integer* (for cpp defines)
 GhcProjectPatchLevel   = 0
 
 #---------------------------------------------------------------
@@ -284,6 +286,7 @@ GhcBinDistBins = hp2ps
 HappyProjectName       = Happy
 HappyProjectNameShort  = happy
 HappyProjectVersion    = 1.5
+HappyProjectVersionInt = 15
 HappyProjectPatchLevel = 0
 
 # The compiler you'd like to use to compile Happy

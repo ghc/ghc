@@ -13,7 +13,7 @@ SCRIPT_OBJS=hstags.prl
 SCRIPT_SUBST_VARS=\
  INSTALLING \
  TOP_PWD \
- PROJECTVERSION
+ ProjectVersionInt
 
 ifneq "$(BIN_DIST)" "1"
 SCRIPT_SUBST_VARS += libdir TMPDIR

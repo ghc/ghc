@@ -7,7 +7,7 @@
 #   TOP_PWD
 #   libdir
 #   libexecdir
-#   PROJECTVERSION
+#   ProjectVersionInt
 #   HSP_IMPORTS
 
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
@@ -56,7 +56,7 @@ while ($ARGV[0] =~ /^-./) {
     push(@Files, $_);
 }
 
-$ghc_version_info = int(${PROJECTVERSION} * 100);
+$ghc_version_info = ${ProjectVersionInt}
 $DoHsCpp = ( ! $DoCpp ) ? 'cat'
 			: "$HsCpp -D__HASKELL1__=2 -D__GLASGOW_HASKELL__=$ghc_version_info $Cpp_opts";
 

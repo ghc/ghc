@@ -3,12 +3,6 @@
 # ghc project specific make variables
 #
 
-#
-PROJECTVERSION=$(GhcProjectVersion)
-PROJECTNAME=$(GhcProjectName)
-PROJECTPATCHLEVEL=$(GhcProjectPatchLevel)
-
-
 # Override default haskell compiler if required
 #HC			= $(WithGhcHc)
 HaskellCompilerType	= $(WithGhcHcType)
