@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.5 2000/03/06 23:07:09 andy Exp $ 
+# $Id: Makefile,v 1.6 2000/03/08 21:45:03 andy Exp $ 
 # -------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -22,7 +22,19 @@ DATA_LIBS = FiniteMap.lhs Set.lhs \
 	ListSeq.hs MyersStack.hs RandList.hs RevSeq.hs Sequence.hs \
 	SequenceDefaults.hs SimpleQueue.hs SizedSeq.hs TestSeq.hs
 
-TEXT_LIBS = Pretty.lhs Html.lhs HtmlBlockTable.lhs
+TEXT_LIBS = Pretty.lhs Html.lhs HtmlBlockTable.lhs \
+	Haskell2Xml.hs \
+	ParseSTLib.hs \
+	Xml2Haskell.hs \
+	XmlCombinators.hs \
+	XmlHtmlGen.hs \
+	XmlHtmlPP.hs \
+	XmlHtmlParse.hs \
+	XmlLex.hs \
+	XmlLib.hs \
+	XmlPP.hs \
+	XmlParse.hs \
+	XmlTypes.hs
 
 LANG_LIBS = Addr.lhs Bits.lhs ByteArray.lhs Dynamic.lhs \
 	Exception.lhs Int.lhs IOExts.lhs LazyST.lhs \
@@ -37,7 +49,6 @@ UTIL_LIBS = QuickCheck.hs QuickCheckBatch.hs QuickCheckPoly.hs \
 	QuickCheckUtils.hs GetOpt.lhs \
 	Regex.lhs RegexString.lhs Observe.lhs Memo.lhs Readline.lhs \
 	Select.lhs 
-	
 
 LIBS =  $(STD_LIBS) \
 	$(DATA_LIBS) \
@@ -53,7 +64,7 @@ LIBS =  $(STD_LIBS) \
 all :: $(LIBS)
 
 
-HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE
+HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE -D__HASKELL98__
 
 %.lhs :: $(GHC_LIB_DIR)/std/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
@@ -88,6 +99,9 @@ HUGSCPP = ../../utils/hscpp/hscpp -D__HUGS__ -DUSE_REPORT_PRELUDE
 	$(HUGSCPP) -I../../includes $< > $*.lhs
 %.lhs :: $(FPTOOLS_TOP)/hslibs/text/html/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
+%.hs :: $(FPTOOLS_TOP)/hslibs/text/haxml/lib/%.hs
+	$(HUGSCPP) -I../../includes $< > $*.hs
+
 
 %.lhs :: $(FPTOOLS_TOP)/hslibs/util/%.lhs
 	$(HUGSCPP) -I../../includes $< > $*.lhs
