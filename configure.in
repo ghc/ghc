@@ -562,7 +562,7 @@ AC_HEADER_STDC
 #
 dnl ** check for specific header (.h) files that we are interested in
 #
-AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h )
+AC_CHECK_HEADERS(dirent.h fcntl.h grp.h malloc.h memory.h nlist.h pwd.h siginfo.h signal.h stdlib.h string.h sys/fault.h sys/file.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termios.h time.h types.h unistd.h utime.h vfork.h readline/readline.h )
 #
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 #
@@ -618,14 +618,14 @@ AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
 # check here on the generated config.mk file to see if the
 # sed that was used is of the well-behaved sort.
 #
-grep @ mk/config.mk > conftest.out
-if grep -v '#	   enclosed in @at-signs@.' conftest.out >/dev/null 2>&1; then
-   :
-else
-   echo 'Hmm..suspicious, did the configure script perform all the @..@ substitutions in mk/config.mk?..';
-   grep -v '#	   enclosed in @at-signs@.' conftest.out /dev/null
-fi
-rm -f conftest*
+#grep @ mk/config.mk > conftest.out
+#if grep -v '#	   enclosed in @at-signs@.' conftest.out >/dev/null 2>&1; then
+#   :
+#else
+#   echo 'Hmm..suspicious, did the configure script perform all the @..@ substitutions in mk/config.mk?..';
+#   grep -v '#	   enclosed in @at-signs@.' conftest.out /dev/null
+#fi
+#rm -f conftest*
 
 echo ''
 echo '************************************************'
