@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.61 2001/04/23 16:50:48 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.62 2001/04/24 13:05:51 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -147,7 +147,7 @@ interactiveUI cmstate mod cmdline_libs = do
 
    (unGHCi runGHCi) GHCiState{ target = mod,
 			       cmstate = cmstate,
-			       options = [ShowTiming] }
+			       options = [] }
    return ()
 
 
