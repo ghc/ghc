@@ -10,8 +10,9 @@ module CPUTime
 	 cpuTimePrecision  -- :: Integer
         ) where
 
-import PrelBase (Int(..), indexIntArray#, Addr(..) )
-import ArrBase  --(ByteArray(..))
+import PrelBase ( Int(..), indexIntArray# )
+import ArrBase  ( ByteArray(..), newIntArray, unsafeFreezeByteArray )
+import Foreign	( Addr )
 import IOBase
 import IO
 import STBase
