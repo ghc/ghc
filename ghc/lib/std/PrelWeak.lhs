@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelWeak.lhs,v 1.13 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelWeak.lhs,v 1.14 2001/01/03 14:47:18 simonmar Exp $
 %
 % (c) The University of Glasgow, 1998-2000
 %
@@ -40,7 +40,8 @@ addFinalizer key finalizer = do
    return ()
 
 addForeignFinalizer :: ForeignObj -> IO () -> IO ()
-addForeignFinalizer (ForeignObj fo) finalizer = addFinalizer fo finalizer
+addForeignFinalizer (ForeignObj fo) finalizer
+  = IO $ \s -> case mkWeak# fo () finalizer s of { (# s1, w #) -> (# s1, () #) }
 
 {-
 Instance Eq (Weak v) where
