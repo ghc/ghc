@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.18 2003/01/28 16:30:07 simonmar Exp $
+ * $Id: HsFFI.h,v 1.19 2004/04/12 16:26:40 panne Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -155,8 +155,8 @@ extern void hs_add_root (void (*init_root)(void));
 
 extern void hs_perform_gc (void);
 
-extern void hs_free_stable_ptr (HsStablePtr *sp);
-extern void hs_free_fun_ptr    (HsFunPtr *fp);
+extern void hs_free_stable_ptr (HsStablePtr sp);
+extern void hs_free_fun_ptr    (HsFunPtr fp);
 
 /* -------------------------------------------------------------------------- */
 

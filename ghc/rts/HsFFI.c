@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.c,v 1.2 2003/01/28 16:30:06 simonmar Exp $
+ * $Id: HsFFI.c,v 1.3 2004/04/12 16:26:41 panne Exp $
  *
  * (c) The GHC Team, 2002
  *
@@ -27,7 +27,7 @@ hs_perform_gc(void)
 }
 
 void
-hs_free_stable_ptr(HsStablePtr *sp)
+hs_free_stable_ptr(HsStablePtr sp)
 {
     /* The cast is for clarity only, both HsStablePtr and StgStablePtr are
        typedefs for void*. */
@@ -35,7 +35,7 @@ hs_free_stable_ptr(HsStablePtr *sp)
 }
 
 void
-hs_free_fun_ptr(HsFunPtr *fp)
+hs_free_fun_ptr(HsFunPtr fp)
 {
     /* I simply *love* all these similar names... */
     freeHaskellFunctionPtr(fp);
