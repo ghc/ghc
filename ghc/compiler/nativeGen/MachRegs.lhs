@@ -41,7 +41,6 @@ module MachRegs (
 	spRel,
 
 #if alpha_TARGET_ARCH
-	allArgRegs,
 	fits8Bits,
 	fReg,
 	gp, pv, ra, sp, t9, t10, t11, t12, v0, f0, zeroh,
