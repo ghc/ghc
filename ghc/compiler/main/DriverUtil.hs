@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.40 2003/11/10 12:04:25 simonpj Exp $
+-- $Id: DriverUtil.hs,v 1.41 2003/11/17 14:41:03 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -7,7 +7,17 @@
 --
 -----------------------------------------------------------------------------
 
-module DriverUtil where
+module DriverUtil (
+	getOptionsFromSource, softGetDirectoryContents,
+	createDirectoryHierarchy, doesDirNameExist, prefixUnderscore,
+	unknownFlagErr, unknownFlagsErr, missingArgErr, 
+	later, handleDyn, handle,
+	split, add, addNoDups, 
+	Suffix, splitFilename, getFileSuffix,
+	splitFilename3, remove_suffix, split_longest_prefix,
+	replaceFilenameSuffix, directoryOf, replaceFilenameDirectory,
+	remove_spaces, escapeSpaces,
+  ) where
 
 #include "../includes/config.h"
 #include "HsVersions.h"
@@ -38,6 +48,7 @@ getOptionsFromSource file
        catchJust ioErrors (look h `finally` hClose h)
 	  (\e -> if isEOFError e then return [] else ioError e)
   where
+
 	look h = do
 	    l' <- hGetLine h
 	    let l = remove_spaces l'
@@ -103,14 +114,6 @@ unknownFlagsErr fs = throwDyn (UsageError ("unrecognised flags: " ++ unwords fs)
 
 missingArgErr :: String -> a
 missingArgErr f = throwDyn (UsageError ("missing argument for flag: " ++ f))
-
-my_partition :: (a -> Maybe b) -> [a] -> ([(a,b)],[a])
-my_partition _ [] = ([],[])
-my_partition p (a:as)
-  = let (bs,cs) = my_partition p as in
-    case p a of
-	Nothing -> (bs,a:cs)
-	Just b  -> ((a,b):bs,cs)
 
 later = flip finally
 
