@@ -104,7 +104,7 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 
 \begin{code}
 outputC dflags filenm flat_absC 
-	(stub_h_exists, _) dependencies (ForeignStubs _ _ ffi_decl_headers _ ) 
+	(stub_h_exists, _) dependencies foreign_stubs
   = do dumpIfSet_dyn dflags Opt_D_dump_realC "Real C" (dumpRealC flat_absC)
 
        -- figure out which header files to #include in the generated .hc file:
@@ -120,6 +120,10 @@ outputC dflags filenm flat_absC
        c_includes <- getPackageCIncludes pkg_configs
        let cmdline_includes = cmdlineHcIncludes dflags -- -#include options
        
+	   ffi_decl_headers = case foreign_stubs of
+				NoStubs 		-> []
+				ForeignStubs _ _ fdhs _ -> fdhs 
+
            all_headers =  c_includes
 		       ++ reverse cmdline_includes
 		       ++ reverse (map unpackFS ffi_decl_headers)

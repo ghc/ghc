@@ -66,6 +66,8 @@ type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
 
 dsForeigns :: [TypecheckedForeignDecl] 
 	   -> DsM (ForeignStubs, [Binding])
+dsForeigns [] 
+  = returnDs (NoStubs, [])
 dsForeigns fos
   = foldlDs combine (ForeignStubs empty empty [] [], []) fos
  where
