@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.24 1999/03/22 12:59:32 simonm Exp $
+% $Id: CgCase.lhs,v 1.25 1999/03/22 16:57:10 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -10,7 +10,8 @@
 %********************************************************
 
 \begin{code}
-module CgCase (	cgCase, saveVolatileVarsAndRegs, restoreCurrentCostCentre,
+module CgCase (	cgCase, saveVolatileVarsAndRegs, 
+		restoreCurrentCostCentre, freeCostCentreSlot,
 		splitTyConAppThroughNewTypes ) where
 
 #include "HsVersions.h"

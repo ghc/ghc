@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.20 1999/03/11 11:32:26 simonm Exp $
+% $Id: CgExpr.lhs,v 1.21 1999/03/22 16:57:11 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -24,7 +24,7 @@ import CLabel		( mkClosureTblLabel )
 import SMRep		( fixedHdrSize )
 import CgBindery	( getArgAmodes, CgIdInfo, nukeDeadBindings )
 import CgCase		( cgCase, saveVolatileVarsAndRegs, 
-			  restoreCurrentCostCentre,
+			  restoreCurrentCostCentre, freeCostCentreSlot,
 			  splitTyConAppThroughNewTypes )
 import CgClosure	( cgRhsClosure, cgStdRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )
@@ -207,6 +207,7 @@ cgExpr (StgLetNoEscape live_in_whole_let live_in_rhss bindings body)
     saveVolatileVarsAndRegs live_in_rhss
     	    `thenFC` \ (save_assts, rhs_eob_info, maybe_cc_slot) ->
     -- ToDo: cost centre???
+    freeCostCentreSlot maybe_cc_slot	   `thenC`
     restoreCurrentCostCentre maybe_cc_slot `thenFC` \ restore_cc ->
 
 	-- Save those variables right now!
