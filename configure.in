@@ -1109,6 +1109,24 @@ AC_SUBST(HaveRtldNow)
 
 FPTOOLS_CHECK_LIB_NOWARN(m, atan)
 
+dnl ---------- usleep ----------
+dnl --- stolen from guile configure ---
+dnl --- FIXME: /usr/include/unistd.h can't be right?
+
+### On some systems usleep has no return value.  If it does have one,
+### we'd like to return it; otherwise, we'll fake it.
+AC_CACHE_CHECK([return type of usleep], cv_func_usleep_return_type,
+  [AC_EGREP_HEADER(changequote(<, >)<void[      ]+usleep>changequote([, ]),
+                   /usr/include/unistd.h,
+                   [cv_func_usleep_return_type=void],
+                   [cv_func_usleep_return_type=int])])
+case "$cv_func_usleep_return_type" in
+  "void" )
+    AC_DEFINE(USLEEP_RETURNS_VOID, 1,
+      [Define if the system headers declare usleep to return void.])
+  ;;
+esac
+
 dnl --------------------------------------------------
 dnl * test for GTK+
 dnl --------------------------------------------------

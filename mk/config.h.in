@@ -382,6 +382,9 @@
 /* Define if RTLD_NOW is available */
 #undef HAVE_RTLDNOW
 
+/* Define if usleep returns void */
+#undef USLEEP_RETURNS_VOID
+
 /* Define if C compiler supports long long types */
 #undef HAVE_LONG_LONG
 
