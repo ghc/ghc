@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 1999/08/04 10:07:50 simonmar Exp $
+# $Id: Makefile,v 1.14 1999/09/21 09:02:05 sof Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -20,6 +20,10 @@ enum03_HC_OPTS		= -cpp -fglasgow-exts -H12m
 
 stableptr001_RUNTEST_OPTS = +RTS -K4m
 dynamic001_HC_OPTS = -syslib exts
+
+io001_HC_OPTS = -fglasgow-exts
+io002_HC_OPTS = -fglasgow-exts
+addr001_HC_OPTS = -fglasgow-exts
 
 ioexts001_HC_OPTS 	= -fglasgow-exts -O
 ioexts001_RUNTEST_OPTS  = +RTS -K8m
