@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.107 2002/07/05 16:15:14 sof Exp $
+-- $Id: Main.hs,v 1.108 2002/07/06 10:14:31 chak Exp $
 --
 -- GHC Driver program
 --
@@ -264,7 +264,7 @@ main =
 	then throwDyn (UsageError "can't apply -o to multiple source files")
 	else do
 
-   if null real_srcs then throwDyn (UsageError "no input files") else do
+   if null srcs then throwDyn (UsageError "no input files") else do
 
    let compileFile src = do
 	  restoreDynFlags
