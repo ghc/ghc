@@ -27,7 +27,7 @@ import CodeGen		( codeGen )
 import AsmCodeGen	( dumpRealAsm, writeRealAsm )
 #endif
 
-import OccName		( Module, moduleString )
+import Module		( Module, moduleString )
 import AbsCSyn		( absCNop )
 import AbsCUtils	( flattenAbsC )
 import CmdLineOpts
@@ -120,7 +120,8 @@ doIt (core_cmds, stg_cmds)
     -- ******* TYPECHECKER
     show_pass "TypeCheck" 				>>
     _scc_     "TypeCheck"
-    typecheckModule tc_uniqs rn_name_supply rn_mod	>>= \ maybe_tc_stuff ->
+    typecheckModule tc_uniqs rn_name_supply iface_file_stuff rn_mod
+						        >>= \ maybe_tc_stuff ->
     case maybe_tc_stuff of {
 	Nothing -> ghcExit 1;	-- Type checker failed
 

@@ -80,6 +80,7 @@ module CmdLineOpts (
 	opt_SccGroup,
 	opt_SccProfilingOn,
 	opt_SourceUnchanged,
+	opt_Static,
 	opt_StgDoLetNoEscapes,
 	opt_Parallel,
 
@@ -338,6 +339,7 @@ opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
 opt_SourceUnchanged		= lookUp  SLIT("-fsource-unchanged")
 opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
 opt_Parallel			= lookUp  SLIT("-fparallel")
+opt_Static			= lookUp  SLIT("-static")
 opt_SccGroup  			= lookup_str "-G="
 opt_Verbose			= lookUp  SLIT("-v")
 
