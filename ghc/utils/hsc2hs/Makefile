@@ -1,10 +1,11 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 2000/12/22 19:51:09 qrczak Exp $
+# $Id: Makefile,v 1.4 2001/01/12 18:49:25 qrczak Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
 CURRENT_DIR=ghc/utils/hsc2hs
+INCLUDE_DIR=ghc/includes
 
 INSTALLING=1
 
@@ -32,7 +33,7 @@ HSC2HS_EXTRA=--cc=$(bindir)/ghc-$(ProjectVersion)
 endif # BIN_DIST
 else
 HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
-HSC2HS_EXTRA=--cc=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)/$(GHC_INPLACE)
+HSC2HS_EXTRA="--cc=$(CC) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
 endif
 
 $(SCRIPT_PROG) : Makefile
