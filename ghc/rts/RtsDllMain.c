@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsDllMain.c,v 1.1 1999/09/16 08:29:01 sof Exp $
+ * $Id: RtsDllMain.c,v 1.2 2000/04/26 17:27:00 rrt Exp $
  *
- * (c) The GHC Team 1999-1900
+ * (c) The GHC Team 1999-2000
  *
  * Entry point for RTS-in-a-DLL
  *
