@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.157 2002/10/22 11:01:19 simonmar Exp $
+ * $Id: Schedule.c,v 1.158 2002/12/10 13:38:40 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1970,7 +1970,7 @@ scheduleThread_(StgTSO *tso
 #endif
 	      )
 {
-  ACQUIRE_LOCK(&sched_mutex);
+  // Precondition: sched_mutex must be held.
 
   /* Put the new thread on the head of the runnable queue.  The caller
    * better push an appropriate closure on this thread's stack
@@ -1991,12 +1991,13 @@ scheduleThread_(StgTSO *tso
 #if 0
   IF_DEBUG(scheduler,printTSO(tso));
 #endif
-  RELEASE_LOCK(&sched_mutex);
 }
 
 void scheduleThread(StgTSO* tso)
 {
+  ACQUIRE_LOCK(&sched_mutex);
   scheduleThread_(tso, rtsFalse);
+  RELEASE_LOCK(&sched_mutex);
 }
 
 SchedulerStatus
@@ -2027,14 +2028,9 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret)
   m->link = main_threads;
   main_threads = m;
 
-  /* Inefficient (scheduleThread_() acquires it again right away),
-   * but obviously correct.
-   */
-  RELEASE_LOCK(&sched_mutex);
-
   scheduleThread_(tso, rtsTrue);
 #if defined(THREADED_RTS)
-  return waitThread_(m, rtsTrue);
+  return waitThread_(m, rtsTrue);	// waitThread_ releases sched_mutex
 #else
   return waitThread_(m);
 #endif
@@ -2236,11 +2232,10 @@ waitThread(StgTSO *tso, /*out*/StgClosure **ret)
   IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
   m->link = main_threads;
   main_threads = m;
-  RELEASE_LOCK(&sched_mutex);
 
   IF_DEBUG(scheduler, sched_belch("== scheduler: waiting for thread (%d)\n", tso->id));
 #if defined(THREADED_RTS)
-  return waitThread_(m, rtsFalse);
+  return waitThread_(m, rtsFalse);	// waitThread_ releases sched_mutex
 #else
   return waitThread_(m);
 #endif
@@ -2256,6 +2251,7 @@ waitThread_(StgMainThread* m
 {
   SchedulerStatus stat;
 
+  // Precondition: sched_mutex must be held.
   IF_DEBUG(scheduler, sched_belch("== scheduler: new main thread (%d)\n", m->tso->id));
 
 #if defined(RTS_SUPPORTS_THREADS)
@@ -2266,12 +2262,12 @@ waitThread_(StgMainThread* m
      * gets to enter the RTS directly without going via another
      * task/thread.
      */
+    RELEASE_LOCK(&sched_mutex);
     schedule();
     ASSERT(m->stat != NoStatus);
   } else 
 # endif
   {
-    ACQUIRE_LOCK(&sched_mutex);
     do {
       waitCondition(&m->wakeup, &sched_mutex);
     } while (m->stat == NoStatus);
@@ -2282,6 +2278,7 @@ waitThread_(StgMainThread* m
   procStatus[MainProc] = Busy;        // status of main PE
   CurrentProc = MainProc;             // PE to run it on
 
+  RELEASE_LOCK(&sched_mutex);
   schedule();
 #else
   RELEASE_LOCK(&sched_mutex);
@@ -2304,6 +2301,7 @@ waitThread_(StgMainThread* m
 #endif
     RELEASE_LOCK(&sched_mutex);
 
+  // Postcondition: sched_mutex must not be held
   return stat;
 }
 
