@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.127 2003/10/21 12:54:21 simonpj Exp $
+$Id: Parser.y,v 1.128 2003/11/04 13:14:06 simonpj Exp $
 
 Haskell grammar.
 
@@ -939,12 +939,8 @@ scc_annot :: { FastString }
 	: '_scc_' STRING			{ $2 }
 	| '{-# SCC' STRING '#-}'		{ $2 }
 
-ccallid :: { FastString }
-	:  VARID				{ $1 }
-	|  CONID				{ $1 }
-
 fexp 	:: { RdrNameHsExpr }
-	: fexp aexp				{ (HsApp $1 $2) }
+	: fexp aexp				{ HsApp $1 $2 }
   	| aexp					{ $1 }
 
 reifyexp :: { HsReify RdrName }
@@ -952,9 +948,6 @@ reifyexp :: { HsReify RdrName }
 	| REIFY_DECL qvar			{ Reify ReifyDecl $2 }
 	| REIFY_TYPE qcname			{ Reify ReifyType $2 }
 	| REIFY_FIXITY qcname			{ Reify ReifyFixity $2 }
-
-aexps0 	:: { [RdrNameHsExpr] }
-	: aexps					{ reverse $1 }
 
 aexps 	:: { [RdrNameHsExpr] }
 	: aexps aexp				{ $2 : $1 }
@@ -974,7 +967,7 @@ aexp1	:: { RdrNameHsExpr }
 -- so it's not enabled yet.
 -- But this case *is* used for the left hand side of a generic definition,
 -- which is parsed as an expression before being munged into a pattern
- 	| qcname '{|' gentype '|}'          { (HsApp (HsVar $1) (HsType $3)) }
+ 	| qcname '{|' gentype '|}'      { (HsApp (HsVar $1) (HsType $3)) }
 
 aexp2	:: { RdrNameHsExpr }
 	: ipvar				{ HsIPVar $1 }
@@ -1170,10 +1163,6 @@ fbind	:: { (RdrName, RdrNameHsExpr) }
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
-
-dbinding :: { [(IPName RdrName, RdrNameHsExpr)] }
-	: '{' dbinds '}'		{ $2 }
-	| vocurly dbinds close		{ $2 }
 
 dbinds 	:: { [(IPName RdrName, RdrNameHsExpr)] }
 	: dbinds ';' dbind		{ $3 : $1 }
