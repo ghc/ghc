@@ -19,7 +19,7 @@ Since they're pretty rudimentary, they shouldn't actually cause as
 much pain.
 
 \begin{code}
-#include "platform.h"
+#include "config.h"
 
 #if defined(sunos4_TARGET_OS)
     /* The sigaction in SunOS 4.1.X does not grok SA_SIGINFO */
@@ -52,8 +52,24 @@ much pain.
 #endif
 
 #if defined(linux_TARGET_OS) || defined(linuxaout_TARGET_OS)
-    /* to look *inside* sigcontext... */
-# include <asm/signal.h>
+/* to look *inside* sigcontext... 
+
+  sigcontext has moved and been protected from the General Public,
+  in later versions (>2), the sigcontext decl is protected by
+  a __KERNEL__ #ifdef. As ever, we workaround by trying to
+  be version savvy - the version numbers are currently just a guess!
+  (ToDo: determine at what version no. the sigcontext move
+   was made).
+*/
+# ifndef LINUX_VERSION_CODE
+#  include <linux/version.h>
+# endif
+# if (LINUX_VERSION_CODE < 0x020000)
+#  include <asm/signal.h>
+# else
+#  include <asm/sigcontext.h>
+# endif
+
 #endif
 
 #if defined(HAVE_SIGINFO_H)
@@ -62,7 +78,7 @@ much pain.
 #endif
 
 #if defined(cygwin32_TARGET_OS)
-#include <windows.h>
+# include <windows.h>
 #endif
 
 \end{code}
@@ -155,7 +171,7 @@ segv_handler(sig)
 {
     /* From gdb/win32-nat.c */
     DEBUG_EVENT event;
-    BOOL t = TRUE; /* WaitForDebugEvent (&event, INFINITE); */
+    BOOL t = WaitForDebugEvent (&event, INFINITE);
 
     fflush(stdout);
     if (t == FALSE) {
@@ -303,7 +319,7 @@ vtalrm_handler(int sig)
 
     if (delayTicks != 0) /* delayTicks>0 => don't handle timer expiry (in GC) */
        delayTicks++;
-    else if (WaitingThreadsHd != Prelude_Z91Z93_closure)
+    else if (WaitingThreadsHd != PrelBase_Z91Z93_closure)
 	     AwaitEvent(RTSflags.ConcFlags.ctxtSwitchTime);
 
 #  ifdef PAR
@@ -322,7 +338,7 @@ vtalrm_handler(int sig)
 
     if (CurrentTSO != NULL ||
 #  else
-    if (RunnableThreadsHd != Prelude_Z91Z93_closure ||
+    if (RunnableThreadsHd != PrelBase_Z91Z93_closure ||
 #  endif
       PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL] ||
       PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL]) {
