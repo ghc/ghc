@@ -305,7 +305,7 @@ connect :: Socket	-- Unconnected Socket
 	-> IO ()
 
 connect (MkSocket s _family _stype _protocol socketStatus) addr = do
-#ifndef _WIN32
+#if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
  let isDomainSocket = if _family == AF_UNIX then 1 else (0::Int)
 #else
  let isDomainSocket = 0
@@ -573,7 +573,7 @@ data SocketOption
     | RecvBuffer    {- SO_RCVBUF    -}
     | KeepAlive     {- SO_KEEPALIVE -}
     | OOBInline     {- SO_OOBINLINE -}
-#ifndef _WIN32
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
     | MaxSegment    {- TCP_MAXSEG   -}
 #endif
     | NoDelay       {- TCP_NODELAY  -}
@@ -590,7 +590,7 @@ data SocketOption
 socketOptLevel :: SocketOption -> Int
 socketOptLevel so = 
   case so of
-#ifndef _WIN32
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
     MaxSegment   -> ``IPPROTO_TCP''
 #endif
     NoDelay      -> ``IPPROTO_TCP''
@@ -609,7 +609,7 @@ packSocketOption so =
     RecvBuffer    -> ``SO_RCVBUF''
     KeepAlive     -> ``SO_KEEPALIVE''
     OOBInline     -> ``SO_OOBINLINE''
-#ifndef _WIN32
+#if !defined(cygwin32_TARGET_OS) && !defined(mingw32_TARGET_OS)
     MaxSegment    -> ``TCP_MAXSEG''
 #endif
     NoDelay       -> ``TCP_NODELAY''
@@ -1249,7 +1249,7 @@ socketToHandle (MkSocket fd _ _ _ _) m = do
        return hndl
  where
   socket_str = "<socket: "++show fd
-#ifdef _WIN32
+#if defined(mingw32_TARGET_OS)
   file_flags = flush_on_close + 1024{-I'm a socket fd, me!-}
 #else
   file_flags = flush_on_close
