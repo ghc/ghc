@@ -458,7 +458,7 @@ wlkPat pat
 #if __GLASGOW_HASKELL__ == 201
 	         ioToUgnM  (GHCbase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
 		 ioToUgnM  (GHCbase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
-#elif __GLASGOW_HASKELL__ >= 202
+#elif __GLASGOW_HASKELL__ >= 202 && __GLASGOW_HASKELL__ < 209
 	         ioToUgnM  (IOBase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
 		 ioToUgnM  (IOBase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
 #else

@@ -17,9 +17,6 @@ IMPORT_1_3(Char(isPrint,isDigit))
 #if __GLASGOW_HASKELL__ == 201
 import qualified GHCbase(Addr(..)) -- to see innards
 IMP_Ubiq(){-uitious-}
-#elif __GLASGOW_HASKELL__ >= 202
-import GlaExts
-import FastString
 #else
 IMP_Ubiq(){-uitious-}
 #endif

@@ -59,12 +59,7 @@ module MachRegs (
 #endif
     ) where
 
-#if __GLASGOW_HASKELL__ >= 202
-import GlaExts
-import FastString
-#else
 IMP_Ubiq(){-uitous-}
-#endif
 
 import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )

@@ -29,6 +29,10 @@ import {-# SOURCE #-} CostCentre
 # if __GLASGOW_HASKELL__ == 202
 import PrelBase ( Char(..) )
 # endif
+# if __GLASGOW_HASKELL__ >= 209
+import Addr ( Addr(..) )
+import ST   ( runST )
+# endif
 #endif
 
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
@@ -540,19 +544,19 @@ lex_tuple cont module_dot buf =
 
 id_arr :: _ByteArray Int
 id_arr =
- unsafePerformPrimIO (
-  newCharArray (0,255) `thenPrimIO` \ barr ->
+ unsafePerformST (
+  newCharArray (0,255) `thenStrictlyST` \ barr ->
   let
-   loop 256# = returnPrimIO ()
+   loop 256# = returnStrictlyST ()
    loop i# =
     if isAlphanum (C# (chr# i#)) || is_sym (chr# i#) then
-       writeCharArray barr (I# i#) '\1' `seqPrimIO`
+       writeCharArray barr (I# i#) '\1' `seqStrictlyST`
        loop (i# +# 1#)
     else
-       writeCharArray barr (I# i#) '\0' `seqPrimIO`
+       writeCharArray barr (I# i#) '\0' `seqStrictlyST`
        loop (i# +# 1#)
   in
-  loop 0#                    `seqPrimIO`
+  loop 0#                    `seqStrictlyST`
   unsafeFreezeByteArray barr)
 
 is_id_char (C# c#) = 
@@ -579,19 +583,19 @@ is_sym c#=
 
 mod_arr :: _ByteArray Int
 mod_arr =
- unsafePerformPrimIO (
-  newCharArray (0,255) `thenPrimIO` \ barr ->
+ unsafePerformST (
+  newCharArray (0,255) `thenStrictlyST` \ barr ->
   let
-   loop 256# = returnPrimIO ()
+   loop 256# = returnStrictlyST ()
    loop i# =
     if isAlphanum (C# (chr# i#)) || i# ==# (ord# '_'#) || i# ==# (ord# '\''#) then
-       writeCharArray barr (I# i#) '\1' `seqPrimIO`
+       writeCharArray barr (I# i#) '\1' `seqStrictlyST`
        loop (i# +# 1#)
     else
-       writeCharArray barr (I# i#) '\0' `seqPrimIO`
+       writeCharArray barr (I# i#) '\0' `seqStrictlyST`
        loop (i# +# 1#)
   in
-  loop 0#                    `seqPrimIO`
+  loop 0#                    `seqStrictlyST`
   unsafeFreezeByteArray barr)
 
              
