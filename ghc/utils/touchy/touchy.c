@@ -3,7 +3,7 @@
  * to the current system time.
  *
  */
-#if !defined(_MSC_VER) && !defined(__MINGW__) && !defined(_WIN32)
+#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
 #error "Win32-only, the platform you're using is supposed to have 'touch' already."
 #else
 #include <stdio.h>
