@@ -10,6 +10,8 @@ _exports_
 GHC
   ->
 
+  All	-- Pseudo class used for universal quantification
+
   Void
 -- void CAF is defined in PrelBase
 
