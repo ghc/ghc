@@ -47,20 +47,19 @@ $(odir_)%.$(way_)o : %.hs
 	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi
 	$(HC_POST_OPTS)
 
-$(odir_)%.$(way_)o-boot : %.hs-boot
-	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi-boot
-	$(HC_POST_OPTS)
-
 $(odir_)%.$(way_)o : %.lhs	 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi
 	$(HC_POST_OPTS)
 
-$(odir_)%.$(way_)o-boot : %.lhs-boot
-	$(HC_PRE_OPTS)
+# Now the rules for hs-boot files. 
+# Note that they do *not* do teh HS_PRE_OPTS / HS_POST_OPTS stuff,
+# (which concerns splitting) because they don't generate .o files
+$(odir_)%.$(way_)o-boot : %.hs-boot
 	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi-boot
-	$(HC_POST_OPTS)
+
+$(odir_)%.$(way_)o-boot : %.lhs-boot
+	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi-boot
 
 $(odir_)%.$(way_)hc : %.lhs	 
 	$(RM) $@
