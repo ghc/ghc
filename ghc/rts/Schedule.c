@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.34 1999/11/18 12:10:29 sewardj Exp $
+ * $Id: Schedule.c,v 1.35 1999/11/19 12:39:49 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -678,7 +678,7 @@ createThread(nat stack_size)
 void
 initThread(StgTSO *tso, nat stack_size)
 {
-  SET_INFO(tso,&TSO_info);
+  SET_HDR(tso, &TSO_info, CCS_MAIN);
   tso->whatNext     = ThreadEnterGHC;
   
   /* tso->id needs to be unique.  For now we use a heavyweight mutex to
