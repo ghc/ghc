@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: config.mk,v 1.15 2001/04/11 10:41:46 sewardj Exp $
+# $Id: config.mk,v 1.16 2002/01/10 10:46:12 sof Exp $
 #
 # GHC project configuration
 #
@@ -11,7 +11,11 @@
 GhcMainDir = ghc
 GhcBinDistDirs = ghc hslibs
 GhcBinDistDocs = ghc/docs/set
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 GhcBinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion)
+else
+GhcBinDistShScripts=
+endif
 GhcBinDistPrlScripts = 
 GhcBinDistLibPrlScripts = ghc-asm ghc-split
 GhcBinDistBins = hp2ps ghcprof hsc2hs DrIFT DtdToHaskell Xtract
