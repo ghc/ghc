@@ -208,7 +208,7 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOc
 			  extendOccSet, extendOccSetList,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
-import TyCon		( visibleDataCons, tyConDataCons )
+import TyCon		( visibleDataCons, tyConDataCons, isNewTyCon )
 import Class		( classSelIds )
 import DataCon		( dataConName )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
@@ -341,8 +341,16 @@ mkIface hsc_env location maybe_old_iface
 
 					      
 isAbstractThing :: NameSet -> TyThing -> Bool
-isAbstractThing exports (ATyCon tc) = not (any exported_data_con (tyConDataCons tc))
-  where	 	-- Don't expose rep if no datacons are exported
+isAbstractThing exports (ATyCon tc) 
+  =  not (isNewTyCon tc)  
+	-- Always expose the rep for newtypes.  This is for a
+	-- very annoying reason.  'Foreign import' is meant to
+	-- be able to look through newtypes transparently, but it
+	-- can only do that if it can "see" the newtype representation
+	-- So, for now anyway, we always expose the rep of newtypes. Sigh.
+  && not (any exported_data_con (tyConDataCons tc))
+	-- Don't expose rep if no datacons are exported
+  where	 	
      exported_data_con con = dataConName con `elemNameSet` exports
      		
 isAbstractThing exports (AClass cls) = not (any exported_class_op (classSelIds cls))
