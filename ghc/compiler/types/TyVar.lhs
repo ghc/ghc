@@ -35,12 +35,13 @@ import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
 			  plusUFM, sizeUFM, delFromUFM, UniqFM
 			)
-import Name		( mkSysLocalName, changeUnique, Name )
-import Pretty		( SYN_IE(Pretty), PrettyRep, ppBeside, ppPStr )
+import Name		--( mkSysLocalName, changeUnique, Name )
+import Pretty		( Doc, (<>), ptext )
 import PprStyle		( PprStyle )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag(..) )
 import SrcLoc		( noSrcLoc, SrcLoc )
 import Unique		( showUnique, mkAlphaTyVarUnique, Unique )
+import UniqFM           ( Uniquable(..) )
 import Util		( panic, Ord3(..) )
 \end{code}
 

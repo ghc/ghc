@@ -42,12 +42,12 @@ module Type (
     ) where
 
 IMP_Ubiq()
---IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking
+IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking
 IMPORT_DELOOPER(TyLoop)
 --IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 -- friends:
-import Class	( classSig, classOpLocalType, GenClass{-instances-} )
+import Class	--( classSig, classOpLocalType, GenClass{-instances-} )
 import Kind	( mkBoxedTypeKind, resultKind, notArrowKind, Kind )
 import TyCon	( mkFunTyCon, isFunTyCon, isEnumerationTyCon, isTupleTyCon, maybeTyConSingleCon,
 		  isPrimTyCon, isDataTyCon, isSynTyCon, maybeNewTyCon, isNewTyCon,
@@ -68,6 +68,7 @@ import Name	( NamedThing(..),
 import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
 import Unique	-- quite a few *Keys
+import UniqFM   ( Uniquable(..) )
 import Util	( thenCmp, zipEqual, assoc,
 		  panic, panic#, assertPanic, pprPanic,
 		  Ord3(..){-instances-}
@@ -79,10 +80,6 @@ import Util	( thenCmp, zipEqual, assoc,
 --	PprStyle
 --import	{-mumble-}
 --	PprType --(pprType )
---import  {-mumble-}
---	UniqFM (ufmToList )
---import {-mumble-}
---	Outputable
 --import PprEnv
 \end{code}
 
@@ -140,6 +137,21 @@ type TauType   = Type
 type ThetaType = [(Class, Type)]
 type SigmaType = Type
 \end{code}
+
+
+Notes on type synonyms
+~~~~~~~~~~~~~~~~~~~~~~
+The various "split" functions (splitFunTy, splitRhoTy, splitForAllTy) try
+to return type synonyms whereever possible. Thus
+
+	type Foo a = a -> a
+
+we want 
+	splitFunTys (a -> Foo a) = ([a], Foo a)
+not			           ([a], a -> a)
+
+The reason is that we then get better (shorter) type signatures in 
+interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 
 Expand abbreviations
@@ -240,11 +252,15 @@ mkFunTys ts t = foldr (\ f a -> FunTy f a usageOmega) t ts
   -- ToDo: NUKE when we do dicts via newtype
 
 getFunTy_maybe :: GenType t u -> Maybe (GenType t u, GenType t u)
-getFunTy_maybe (FunTy arg result _) = Just (arg,result)
-getFunTy_maybe (AppTy (AppTy (TyConTy tycon _) arg) res)
+getFunTy_maybe t
+  = go t t
+  where 
+	-- See notes on type synonyms above
+    go syn_t (FunTy arg result _) = Just (arg,result)
+    go syn_t (AppTy (AppTy (TyConTy tycon _) arg) res)
 	       	 | isFunTyCon tycon = Just (arg, res)
-getFunTy_maybe (SynTy _ _ t)        = getFunTy_maybe t
-getFunTy_maybe other		    = Nothing
+    go syn_t (SynTy _ _ t)          = go syn_t t
+    go syn_t other		    = Nothing
 
 getFunTyExpandingDicts_maybe :: Bool -- True <=> peek inside newtype applicatons
 			     -> Type
@@ -259,19 +275,28 @@ getFunTyExpandingDicts_maybe peek ty@(DictTy _ _ _) = getFunTyExpandingDicts_may
 getFunTyExpandingDicts_maybe True (ForAllTy _ ty)   = getFunTyExpandingDicts_maybe True ty
 	-- Ignore for-alls when peeking.  See note with defn of getFunTyExpandingDictsAndPeeking
 
+
+{-	This is a truly disgusting bit of code. 
+	It's used by the code generator to look at the rep of a newtype.
+	The code gen will have thrown away coercions involving that newtype, so
+	this is the other side of the coin.
+	Gruesome in the extreme.
+-}
+
 getFunTyExpandingDicts_maybe peek other
   | not peek = Nothing -- that was easy
   | otherwise
   = case (maybeAppTyCon other) of
-      Nothing -> Nothing
       Just (tc, arg_tys)
-        | not (isNewTyCon tc) -> Nothing
-	| otherwise ->
-	  let
-	     [newtype_con] = tyConDataCons tc -- there must be exactly one...
-	     [inside_ty]   = dataConArgTys newtype_con arg_tys
-	  in
-	  getFunTyExpandingDicts_maybe peek inside_ty
+        | isNewTyCon tc && not (null data_cons)
+	-> getFunTyExpandingDicts_maybe peek inside_ty
+	where
+	  data_cons   = tyConDataCons tc
+	  [the_con]   = data_cons
+	  [inside_ty] = dataConArgTys the_con arg_tys
+
+      other -> Nothing
+
 
 splitFunTy			   :: GenType t u -> ([GenType t u], GenType t u)
 splitFunTyExpandingDicts	   :: Type	  -> ([Type], Type)
@@ -282,7 +307,8 @@ splitFunTyExpandingDicts           t = split_fun_ty (getFunTyExpandingDicts_mayb
 splitFunTyExpandingDictsAndPeeking t = split_fun_ty (getFunTyExpandingDicts_maybe True)  t
 	-- This "peeking" stuff is used only by the code generator.
 	-- It's interested in the representation type of things, ignoring:
-	--	newtype
+	--	newtype 	Why???  Nuked SLPJ May 97.  We may not know the 
+	--			rep of an abstractly imported newtype
 	--	foralls
 	-- 	expanding dictionary reps
 	--	synonyms, of course
@@ -353,14 +379,15 @@ mkRhoTy theta ty =
 
 splitRhoTy :: GenType t u -> ([(Class,GenType t u)], GenType t u)
 splitRhoTy t =
-  go t []
+  go t t []
  where
-  go (FunTy (DictTy c t _) r _) ts = go r ((c,t):ts)
-  go (AppTy (AppTy (TyConTy tycon _) (DictTy c t _)) r) ts
+	-- See notes on type synonyms above
+  go syn_t (FunTy (DictTy c t _) r _) ts = go r r ((c,t):ts)
+  go syn_t (AppTy (AppTy (TyConTy tycon _) (DictTy c t _)) r) ts
 	| isFunTyCon tycon
-	= go r ((c,t):ts)
-  go (SynTy _ _ t) ts = go t ts
-  go t ts = (reverse ts, t)
+	= go r r ((c,t):ts)
+  go syn_t (SynTy _ _ t) ts = go syn_t t ts
+  go syn_t t ts = (reverse ts, syn_t)
 
 
 mkTheta :: [Type] -> ThetaType
@@ -397,11 +424,12 @@ getForAllTyExpandingDicts_maybe ty@(DictTy _ _ _)  = getForAllTyExpandingDicts_m
 getForAllTyExpandingDicts_maybe _		   = Nothing
 
 splitForAllTy :: GenType t u-> ([t], GenType t u)
-splitForAllTy t = go t []
+splitForAllTy t = go t t []
 	       where
-		    go (ForAllTy tv t) tvs = go t (tv:tvs)
-		    go (SynTy _ _ t)   tvs = go t tvs
-		    go t	       tvs = (reverse tvs, t)
+			-- See notes on type synonyms above
+		    go syn_t (ForAllTy tv t) tvs = go t t (tv:tvs)
+		    go syn_t (SynTy _ _ t)   tvs = go syn_t t tvs
+		    go syn_t t	             tvs = (reverse tvs, syn_t)
 \end{code}
 
 \begin{code}
@@ -465,7 +493,7 @@ maybe_app_data_tycon expand ty
 	(app_ty, arg_tys) = splitAppTys expanded_ty
     in
     case (getTyCon_maybe app_ty) of
-	Just tycon |  --pprTrace "maybe_app:" (ppCat [ppr PprDebug (isDataTyCon tycon), ppr PprDebug (notArrowKind (typeKind expanded_ty))]) $
+	Just tycon |  --pprTrace "maybe_app:" (hsep [ppr PprDebug (isDataTyCon tycon), ppr PprDebug (notArrowKind (typeKind expanded_ty))]) $
 		      isDataTyCon tycon && 
 		      notArrowKind (typeKind expanded_ty)
 			-- Must be saturated for ty to be a data type
@@ -620,6 +648,8 @@ instant_help ty lookup_tv deflt_tv choose_tycon
 					trace "instantiateTy: unexpected forall hit"
 				     else
 				        \x->x) ForAllTy (deflt_forall_tv tv) (go ty)
+
+instantiateTy [] ty = ty
 
 instantiateTy tenv ty
   = instant_help ty lookup_tv deflt_tv choose_tycon
