@@ -48,7 +48,7 @@ import Type		( Type, Kind, PredType(..), ThetaType, SigmaType, TauType,
 			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
 			  isUnboxedTupleType, isForAllTy, isIPPred
 			)
-import PprType		( pprType, pprPred )
+import PprType		( pprType, pprTheta, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, idName, idType )
@@ -565,12 +565,23 @@ checkAmbiguity wimp_out is_source_polytype forall_tyvars theta tau
     tau_vars	      = tyVarsOfType tau
     extended_tau_vars = grow theta tau_vars
 
+	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
+	-- something strange like {Eq k} -> k -> k, because there is no
+	-- ForAll at the top of the type.  Since this is going to the user
+	-- we want it to look like a proper Haskell type even then; hence the hack
+	-- 
+	-- This shows up in the complaint about
+	--	case C a where
+	--	  op :: Eq a => a -> a
+    ppr_sigma	      | null forall_tyvars = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
+		      | otherwise	   = ppr sigma_ty 
+
     is_ambig ct_var   = (ct_var `elem` forall_tyvars) &&
 		        not (ct_var `elemVarSet` extended_tau_vars)
     is_free ct_var    = not (ct_var `elem` forall_tyvars)
     
-    check_pred pred = checkTc (not any_ambig)                 (ambigErr pred sigma_ty) `thenTc_`
-	    	      checkTc (isIPPred pred || not all_free) (freeErr  pred sigma_ty)
+    check_pred pred = checkTc (not any_ambig)                 (ambigErr pred ppr_sigma) `thenTc_`
+	    	      checkTc (isIPPred pred || not all_free) (freeErr  pred ppr_sigma)
              where 
 	    	ct_vars	  = varSetElems (tyVarsOfPred pred)
 	    	all_free  = all is_free ct_vars
@@ -965,16 +976,16 @@ wrongThingErr expected thing name
     pp_thing (ATcId _)  	  = ptext SLIT("Local identifier")
     pp_thing (AThing _) 	  = ptext SLIT("Utterly bogus")
 
-ambigErr pred ty
+ambigErr pred ppr_ty
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
-	 nest 4 (ptext SLIT("for the type:") <+> ppr ty),
+	 nest 4 (ptext SLIT("for the type:") <+> ppr_ty),
 	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
 		 ptext SLIT("must be reachable from the type after the =>"))]
 
-freeErr pred ty
+freeErr pred ppr_ty
   = sep [ptext SLIT("The constraint") <+> quotes (pprPred pred) <+>
 		   ptext SLIT("does not mention any of the universally quantified type variables"),
-	 nest 4 (ptext SLIT("in the type") <+> quotes (ppr ty))
+	 nest 4 (ptext SLIT("in the type") <+> quotes ppr_ty)
     ]
 
 polyArgTyErr ty = ptext SLIT("Illegal polymorphic type as argument:")   <+> ppr ty
