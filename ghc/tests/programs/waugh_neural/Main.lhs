@@ -7,8 +7,7 @@ backpropagation functions and values.
 
 > import BpGen
 > import ReadLists (readWhiteList)
-> import {-fool mkdependHS-}
->	 Printf
+> import Numeric(showFFloat)
 
 -------------------------------------------------------------------------------
 |				Constant Values				      |
@@ -79,7 +78,7 @@ The following constants set the training problem and parameters:
 -------------------------------------------------------------------------------
 
 > showdouble :: Double -> ShowS
-> showdouble v = showString (printf "%6.4f " [UDouble v])
+> showdouble = showFFloat (Just 4)
 
 > showdoubles :: [Double] -> ShowS
 > showdoubles []     = showString ""
