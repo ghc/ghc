@@ -387,6 +387,21 @@ determine the second.  In general, given the same class decl, and given
 
 Then the criterion is: if U=unify(s1,t1) then U(s2) = U(t2).
 
+Matters are a little more complicated if there are free variables in
+the s2/t2.  
+
+	class D a b c | a -> b
+	instance D a b => D [(a,a)] [b] Int
+	instance D a b => D [a]     [b] Bool
+
+The instance decls don't overlap, because the third parameter keeps
+them separate.  But we want to make sure that given any constraint
+	D s1 s2 s3
+if s1 matches 
+
+
+
+
 \begin{code}
 badFunDeps :: ClsInstEnv -> Class
 	   -> TyVarSet -> [Type]	-- Proposed new instance type
