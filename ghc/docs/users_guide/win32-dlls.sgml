@@ -37,6 +37,16 @@ Notice how the "%1" argument is quoted (or not).
 
 <sect1>
 <title>
+Avoiding the console window</title>
+
+<para>By default GHC builds applications that open a console window when they start.
+If you want to build a GUI-only application, with no console window, use the flag
+<literal>-optl-mwindows</literal> in the link step.
+</para>
+</sect1>
+
+<sect1>
+<title>
 Using GHC (and other GHC-compiled executables) with cygwin</title>
 
 <sect2>
