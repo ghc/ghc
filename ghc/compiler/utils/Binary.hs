@@ -86,7 +86,7 @@ import Data.IORef
 import Data.Char		( ord, chr )
 import Data.Array.Base  	( unsafeRead, unsafeWrite )
 import Control.Monad		( when )
-import Control.Exception	( throw, throwDyn )
+import Control.Exception	( throwDyn )
 import System.IO as IO
 import System.IO.Unsafe		( unsafeInterleaveIO )
 import System.IO.Error		( mkIOError, eofErrorType )
@@ -297,7 +297,7 @@ getWord8 (BinMem _ ix_r sz_r arr_r) = do
     ix <- readFastMutInt ix_r
     sz <- readFastMutInt sz_r
     when (ix >= sz)  $
-	throw (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
+	ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
     arr <- readIORef arr_r
     w <- unsafeRead arr ix
     writeFastMutInt ix_r (ix+1)

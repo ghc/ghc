@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.138 2002/12/05 12:36:54 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.139 2002/12/12 13:21:46 ross Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -295,7 +295,7 @@ fileLoop hdl prompt = do
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e -> return ()
-	       | otherwise    -> throw e
+	       | otherwise    -> io (ioError e)
 	Right l -> 
 	  case remove_spaces l of
 	    "" -> fileLoop hdl prompt
