@@ -8,7 +8,7 @@
 module List ( 
     {- 
       This list follows the type signatures for the
-      standard List interface.
+      standard List interface.  -- 8/97 
     -}
     elemIndex, elemIndices,
     find, findIndex, findIndices,
@@ -16,10 +16,10 @@ module List (
     delete, deleteBy, (\\), deleteFirstsBy,
     union, unionBy, 
     intersect, intersectBy,
+    intersperse, transpose, partition, 
     group, groupBy,
     inits, tails,
     isPrefixOf, isSuffixOf,
-    intersperse, transpose, partition, 
     mapAccumL, mapAccumR,
     sort, sortBy, 
     insertBy, 
@@ -117,7 +117,7 @@ union			:: (Eq a) => [a] -> [a] -> [a]
 union 			= unionBy (==)
 
 unionBy                 :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) ys xs
+unionBy eq xs ys        =  xs ++ foldl (flip (deleteBy eq)) (nubBy eq ys) xs
 
 intersect               :: (Eq a) => [a] -> [a] -> [a]
 intersect               =  intersectBy (==)
