@@ -465,17 +465,17 @@ split x t
 
 -- | /O(log n)/. Performs a 'split' but also returns whether the pivot
 -- element was found in the original set.
-splitMember :: Int -> IntSet -> (Bool,IntSet,IntSet)
+splitMember :: Int -> IntSet -> (IntSet,Bool,IntSet)
 splitMember x t
   = case t of
       Bin p m l r
-        | zero x m  -> let (found,lt,gt) = splitMember x l in (found,lt,union gt r)
-        | otherwise -> let (found,lt,gt) = splitMember x r in (found,union l lt,gt)
+        | zero x m  -> let (lt,found,gt) = splitMember x l in (lt,found,union gt r)
+        | otherwise -> let (lt,found,gt) = splitMember x r in (union l lt,found,gt)
       Tip y 
-        | x>y       -> (False,t,Nil)
-        | x<y       -> (False,Nil,t)
-        | otherwise -> (True,Nil,Nil)
-      Nil -> (False,Nil,Nil)
+        | x>y       -> (t,False,Nil)
+        | x<y       -> (Nil,False,t)
+        | otherwise -> (Nil,True,Nil)
+      Nil -> (Nil,False,Nil)
 
 {----------------------------------------------------------------------
   Map

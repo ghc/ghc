@@ -807,17 +807,17 @@ split k t
 
 -- | /O(log n)/. Performs a 'split' but also returns whether the pivot
 -- key was found in the original map.
-splitLookup :: Key -> IntMap a -> (Maybe a,IntMap a,IntMap a)
+splitLookup :: Key -> IntMap a -> (IntMap a,Maybe a,IntMap a)
 splitLookup k t
   = case t of
       Bin p m l r
-        | zero k m  -> let (found,lt,gt) = splitLookup k l in (found,lt,union gt r)
-        | otherwise -> let (found,lt,gt) = splitLookup k r in (found,union l lt,gt)
+        | zero k m  -> let (lt,found,gt) = splitLookup k l in (lt,found,union gt r)
+        | otherwise -> let (lt,found,gt) = splitLookup k r in (union l lt,found,gt)
       Tip ky y 
-        | k>ky      -> (Nothing,t,Nil)
-        | k<ky      -> (Nothing,Nil,t)
-        | otherwise -> (Just y,Nil,Nil)
-      Nil -> (Nothing,Nil,Nil)
+        | k>ky      -> (t,Nothing,Nil)
+        | k<ky      -> (Nil,Nothing,t)
+        | otherwise -> (Nil,Just y,Nil)
+      Nil -> (Nil,Nothing,Nil)
 
 {--------------------------------------------------------------------
   Fold

@@ -675,7 +675,7 @@ intersectWithKey f t (Bin _ kx x l r)
       Nothing -> merge tl tr
       Just y  -> join kx (f kx y x) tl tr
   where
-    (found,lt,gt) = splitLookup kx t
+    (lt,found,gt) = splitLookup kx t
     tl            = intersectWithKey f lt l
     tr            = intersectWithKey f gt r
 
@@ -717,7 +717,7 @@ submap' f (Bin _ kx x l r) t
       Nothing -> False
       Just y  -> f x y && submap' f l lt && submap' f r gt
   where
-    (found,lt,gt) = splitLookup kx t
+    (lt,found,gt) = splitLookup kx t
 
 -- | /O(n+m)/. Is this a proper submap? (ie. a submap but not equal). 
 -- Defined as (@'isProperSubmapOf' = 'isProperSubmapOfBy' (==)@).
@@ -1104,13 +1104,13 @@ split k (Bin sx kx x l r)
 
 -- | /O(log n)/. The expression (@'splitLookup' k map@) splits a map just
 -- like 'split' but also returns @'lookup' k map@.
-splitLookup :: Ord k => k -> Map k a -> (Maybe a,Map k a,Map k a)
-splitLookup k Tip = (Nothing,Tip,Tip)
+splitLookup :: Ord k => k -> Map k a -> (Map k a,Maybe a,Map k a)
+splitLookup k Tip = (Tip,Nothing,Tip)
 splitLookup k (Bin sx kx x l r)
   = case compare k kx of
-      LT -> let (z,lt,gt) = splitLookup k l in (z,lt,join kx x gt r)
-      GT -> let (z,lt,gt) = splitLookup k r in (z,join kx x l lt,gt)
-      EQ -> (Just x,l,r)
+      LT -> let (lt,z,gt) = splitLookup k l in (lt,z,join kx x gt r)
+      GT -> let (lt,z,gt) = splitLookup k r in (join kx x l lt,z,gt)
+      EQ -> (l,Just x,r)
 
 {--------------------------------------------------------------------
   Utility functions that maintain the balance properties of the tree.

@@ -250,7 +250,7 @@ isSubsetOfX t Tip = False
 isSubsetOfX (Bin _ x l r) t
   = found && isSubsetOfX l lt && isSubsetOfX r gt
   where
-    (found,lt,gt) = splitMember x t
+    (lt,found,gt) = splitMember x t
 
 
 {--------------------------------------------------------------------
@@ -347,7 +347,7 @@ intersect' t (Bin _ x l r)
   | found     = join x tl tr
   | otherwise = merge tl tr
   where
-    (found,lt,gt) = splitMember x t
+    (lt,found,gt) = splitMember x t
     tl            = intersect' lt l
     tr            = intersect' gt r
 
@@ -616,13 +616,13 @@ split x (Bin sy y l r)
 
 -- | /O(log n)/. Performs a 'split' but also returns whether the pivot
 -- element was found in the original set.
-splitMember :: Ord a => a -> Set a -> (Bool,Set a,Set a)
-splitMember x Tip = (False,Tip,Tip)
+splitMember :: Ord a => a -> Set a -> (Set a,Bool,Set a)
+splitMember x Tip = (Tip,False,Tip)
 splitMember x (Bin sy y l r)
   = case compare x y of
-      LT -> let (found,lt,gt) = splitMember x l in (found,lt,join y gt r)
-      GT -> let (found,lt,gt) = splitMember x r in (found,join y l lt,gt)
-      EQ -> (True,l,r)
+      LT -> let (lt,found,gt) = splitMember x l in (lt,found,join y gt r)
+      GT -> let (lt,found,gt) = splitMember x r in (join y l lt,found,gt)
+      EQ -> (l,True,r)
 
 {--------------------------------------------------------------------
   Utility functions that maintain the balance properties of the tree.
