@@ -145,9 +145,18 @@ type ModuleName = EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
 
-isPrelModuleName :: ModuleName -> Bool
 	-- True for names of prelude modules
-isPrelModuleName m = take 4 (_UNPK_ m) == "Prel"
+isPrelModuleName :: ModuleName -> Bool
+	-- HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+	--  HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+	--   HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+	--    HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+isPrelModuleName m = take 4 m_str == "Prel" && m_str /= "PrelInfo"
+  where m_str = _UNPK_ m
+	--    HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+	--   HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+	--  HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
+	-- HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK HACK
 
 pprModuleName :: ModuleName -> SDoc
 pprModuleName nm = pprEncodedFS nm
