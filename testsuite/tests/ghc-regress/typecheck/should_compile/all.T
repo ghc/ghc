@@ -184,7 +184,7 @@ test('tc173', normal, run_command_ignore_output, ['$MAKE tc173'])
 clean(['Tc173a.hi', 'Tc173a.o', 'Tc173b.hi', 'Tc173b.o'])
 
 test('tc174', normal, compile, [''])
-test('tc175', expect_fail, compile, [''])
+test('tc175', expect_fail_if_compiler_type('ghc'), compile, [''])
 test('tc176', normal, compile, [''])
 test('tc177', normal, compile, [''])
 test('tc178', normal, compile, [''])
