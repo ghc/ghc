@@ -319,7 +319,7 @@ kcApps :: TcKind			-- Function kind
        -> TcM ([LHsType Name], TcKind)	-- Kind-checked args
 kcApps fun_kind ppr_fun args
   = split_fk fun_kind (length args)	`thenM` \ (arg_kinds, res_kind) ->
-    mappM kc_arg (args `zip` arg_kinds)	`thenM` \ args' ->
+    zipWithM kc_arg args arg_kinds	`thenM` \ args' ->
     returnM (args', res_kind)
   where
     split_fk fk 0 = returnM ([], fk)
@@ -329,7 +329,7 @@ kcApps fun_kind ppr_fun args
 			Just (ak,fk') -> split_fk fk' (n-1)	`thenM` \ (aks, rk) ->
 					 returnM (ak:aks, rk)
 
-    kc_arg (arg, arg_kind) = kcCheckHsType arg arg_kind
+    kc_arg arg arg_kind = kcCheckHsType arg arg_kind
 
     too_many_args = ptext SLIT("Kind error:") <+> quotes ppr_fun <+>
 		    ptext SLIT("is applied to too many type arguments")

@@ -10,7 +10,7 @@ module IOEnv (
 	returnM, thenM, thenM_, failM,
 	mappM, mappM_, sequenceM, foldlM, 
 	mapAndUnzipM, mapAndUnzip3M, 
-	checkM, ifM, 
+	checkM, ifM, zipWithM, zipWithM_,
 
 	-- Getting at the environment
 	getEnv, setEnv, updEnv,
@@ -161,6 +161,16 @@ mappM f (x:xs) = do { r <- f x; rs <- mappM f xs; return (r:rs) }
 
 mappM_ f []     = return ()
 mappM_ f (x:xs) = f x >> mappM_ f xs
+
+zipWithM :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env [c]
+zipWithM f [] bs = return []
+zipWithM f as [] = return []
+zipWithM f (a:as) (b:bs) = do { r <- f a b; rs <- zipWithM f as bs; return (r:rs) } 
+
+zipWithM_ :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env ()
+zipWithM_ f [] bs = return ()
+zipWithM_ f as [] = return ()
+zipWithM_ f (a:as) (b:bs) = do { f a b; zipWithM_ f as bs } 
 
 sequenceM [] = return []
 sequenceM (x:xs) = do { r <- x; rs <- sequenceM xs; return (r:rs) }

@@ -234,7 +234,7 @@ tc_cmd env cmd@(HsDo do_or_lc stmts _ ty) (cmd_stk, res_ty)
 
 tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)	
   = addErrCtxt (cmdCtxt cmd)	$
-    do	{ cmds_w_tys <- mapM new_cmd_ty (cmd_args `zip` [1..])
+    do	{ cmds_w_tys <- zipWithM new_cmd_ty cmd_args [1..]
 	; w_tv       <- newSigTyVar liftedTypeKind
 	; let w_ty = mkTyVarTy w_tv
 
@@ -264,9 +264,9 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
   where
  	-- Make the types	
 	--	b, ((e,s1) .. sm), s
-    new_cmd_ty :: (LHsCmdTop Name, Int)
+    new_cmd_ty :: LHsCmdTop Name -> Int
 	       -> TcM (LHsCmdTop Name, Int, TcType, TcType, TcType)
-    new_cmd_ty (cmd,i)
+    new_cmd_ty cmd i
 	  = do	{ b_ty   <- newTyVarTy arrowTyConKind
 		; tup_ty <- newTyVarTy liftedTypeKind
 			-- We actually make a type variable for the tuple

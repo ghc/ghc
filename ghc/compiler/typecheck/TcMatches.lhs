@@ -559,7 +559,7 @@ tcStmtAndThen combine ctxt (L src_loc (RecStmt stmts laterNames recNames _)) thi
     in
     tcExtendLocalValEnv rec_ids			$
     tcStmtsAndThen combine_rec ctxt stmts (
-	mappM tc_ret (recNames `zip` recTys)	`thenM` \ rec_rets ->
+	zipWithM tc_ret recNames recTys		`thenM` \ rec_rets ->
 	tcLookupLocalIds laterNames		`thenM` \ later_ids ->
 	returnM ([], (later_ids, rec_rets))
     )						`thenM` \ (stmts', (later_ids, rec_rets)) ->
@@ -574,7 +574,7 @@ tcStmtAndThen combine ctxt (L src_loc (RecStmt stmts laterNames recNames _)) thi
     combine_rec stmt (stmts, thing) = (stmt:stmts, thing)
 
     -- Unify the types of the "final" Ids with those of "knot-tied" Ids
-    tc_ret (rec_name, mono_ty)
+    tc_ret rec_name mono_ty
 	= tcLookupId rec_name				`thenM` \ poly_id ->
 		-- poly_id may have a polymorphic type
 		-- but mono_ty is just a monomorphic type variable

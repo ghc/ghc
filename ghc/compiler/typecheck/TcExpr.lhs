@@ -458,11 +458,11 @@ tc_expr expr@(RecordUpd record_expr rbinds) res_ty
 	non_upd_field_lbls  = concat relevant_field_lbls_s `minusList` upd_field_lbls
 	common_tyvars       = tyVarsOfTypes (map fieldLabelType non_upd_field_lbls)
 
-	mk_inst_ty (tyvar, result_inst_ty) 
+	mk_inst_ty tyvar result_inst_ty 
 	  | tyvar `elemVarSet` common_tyvars = returnM result_inst_ty	-- Same as result type
 	  | otherwise			     = newTyVarTy liftedTypeKind	-- Fresh type
     in
-    mappM mk_inst_ty (zip tycon_tyvars result_inst_tys)	`thenM` \ inst_tys ->
+    zipWithM mk_inst_ty tycon_tyvars result_inst_tys	`thenM` \ inst_tys ->
 
 	-- STEP 5
 	-- Typecheck the expression to be updated

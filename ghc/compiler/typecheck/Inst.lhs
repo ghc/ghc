@@ -38,6 +38,7 @@ module Inst (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcExpr( tcCheckSigma )
+import {-# SOURCE #-}	TcUnify	( unifyTauTy )	-- Used in checkKind (sigh)
 
 import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..), LHsExpr, mkHsApp )
 import TcHsSyn	( TcId, TcIdSet, 
@@ -52,7 +53,7 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
-		  PredType(..), TyVarDetails(VanillaTv),
+		  PredType(..), TyVarDetails(VanillaTv), typeKind,
 		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
 		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
@@ -64,6 +65,7 @@ import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
 		  pprPred, pprParendType, pprThetaArrow, pprClassPred
 		)
+import Kind	( isSubKind )
 import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
 import DataCon	( DataCon,dataConSig )
@@ -73,7 +75,7 @@ import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, isInt
 import NameSet	( addOneToNameSet )
 import Subst	( substTy, substTyWith, substTheta, mkTyVarSubst )
 import Literal	( inIntRange )
-import Var	( TyVar )
+import Var	( TyVar, tyVarKind )
 import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
@@ -329,6 +331,11 @@ newMethodWithGivenTy orig id tys theta tau
 -- This is important because they are used by TcSimplify
 -- to simplify Insts
 
+-- NB: the kind of the type variable to be instantiated
+--     might be a sub-kind of the type to which it is applied,
+--     notably when the latter is a type variable of kind ??
+--     Hence the call to checkKind
+-- A worry: is this needed anywhere else?
 tcInstClassOp :: InstLoc -> Id -> [TcType] -> TcM Inst
 tcInstClassOp inst_loc sel_id tys
   = let
@@ -337,7 +344,20 @@ tcInstClassOp inst_loc sel_id tys
 		       substTyWith tyvars tys rho
 	(preds,tau)  = tcSplitPhiTy rho_ty
     in
+    zipWithM_ checkKind tyvars tys	`thenM_` 
     newMethod inst_loc sel_id tys preds tau
+
+checkKind :: TyVar -> TcType -> TcM ()
+-- Ensure that the type has a sub-kind of the tyvar
+checkKind tv ty
+  = do	{ ty1 <- zonkTcType ty
+	; if typeKind ty1 `isSubKind` tyVarKind tv
+	  then return ()
+	  else do
+	{ traceTc (text "checkKind: adding kind constraint" <+> ppr tv <+> ppr ty)
+	; tv1 <- tcInstTyVar VanillaTv tv
+	; unifyTauTy (mkTyVarTy tv1) ty1 }}
+
 
 ---------------------------
 newMethod inst_loc id tys theta tau

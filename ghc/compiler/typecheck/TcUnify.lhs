@@ -904,6 +904,7 @@ okToUnifyWith tv ty
     Just p  `and` m = Just p
 \end{code}
 
+
 %************************************************************************
 %*									*
 		Kind unification
