@@ -33,8 +33,10 @@ import TyCon	( DataConDetails(..) )
 import Type	( Type )
 import BasicTypes( Boxity(..), RecFlag(Recursive), 
 		   NewOrData(..), StrictnessMark(..) )
-import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..) )
-import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignDecl(..) )
+import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
+                     CExportSpec(..)) 
+import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignExport(..),
+                 ForeignDecl(..) )
 import FastString( FastString, mkFastString, nilFS )
 import Char 	( ord, isAscii, isAlphaNum, isAlpha )
 import List	( partition )
@@ -119,6 +121,13 @@ cvt_top (ForeignD (ImportF callconv safety from nm typ))
                         Safe       -> PlaySafe False
                         Threadsafe -> PlaySafe True
           parsed = parse_ccall_impent nm from
+
+cvt_top (ForeignD (ExportF callconv as nm typ))
+ = let e = CExport (CExportStatic (mkFastString as) callconv')
+   in Left $ ForD (ForeignExport (vName nm) (cvtType typ) e False loc0)
+    where callconv' = case callconv of
+                          CCall -> CCallConv
+                          StdCall -> StdCallConv
 
 parse_ccall_impent :: String -> String -> Maybe (FastString, CImportSpec)
 parse_ccall_impent nm s
