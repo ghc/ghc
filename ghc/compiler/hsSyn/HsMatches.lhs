@@ -103,7 +103,7 @@ pprMatches sty print_info@(is_case, name) [match]
   = if is_case then
     	pprMatch sty is_case match
     else
-    	hang name 4 (pprMatch sty is_case match)
+    	name <+> (pprMatch sty is_case match)
 
 pprMatches sty print_info (match1 : rest)
  = ($$) (pprMatches sty print_info [match1])
@@ -115,8 +115,8 @@ pprMatch :: (NamedThing id, Outputable id, Outputable pat,
 	PprStyle -> Bool -> Match tyvar uvar id pat -> Doc
 
 pprMatch sty is_case first_match
- = hang (sep (map (ppr sty) row_of_pats))
-	8 grhss_etc_stuff
+ = sep [(sep (map (ppr sty) row_of_pats)),
+	grhss_etc_stuff]
  where
     (row_of_pats, grhss_etc_stuff) = ppr_match sty is_case first_match
 
@@ -129,8 +129,7 @@ pprMatch sty is_case first_match
       = ([], pprGRHSsAndBinds sty is_case grhss_n_binds)
 
     ppr_match sty is_case (SimpleMatch expr)
-      = ([], hang (text (if is_case then "->" else "="))
-		 4 (ppr sty expr))
+      = ([], text (if is_case then "->" else "=") <+> ppr sty expr)
 
 ----------------------------------------------------------
 
@@ -158,14 +157,13 @@ pprGRHS :: (NamedThing id, Outputable id, Outputable pat,
 	=> PprStyle -> Bool -> GRHS tyvar uvar id pat -> Doc
 
 pprGRHS sty is_case (GRHS [] expr locn)
- =  hang (text (if is_case then "->" else "="))
-	 4 (ppr sty expr)
+ =  text (if is_case then "->" else "=") <+> ppr sty expr
 
 pprGRHS sty is_case (GRHS guard expr locn)
- = hang (hsep [char '|', ppr sty guard, text (if is_case then "->" else "=")])
-        4 (ppr sty expr)
+ = sep [char '|' <+> ppr sty guard, 
+	text (if is_case then "->" else "=") <+> ppr sty expr
+   ]
 
 pprGRHS sty is_case (OtherwiseGRHS  expr locn)
-  = hang (text (if is_case then "->" else "="))
-	 4 (ppr sty expr)
+  = text (if is_case then "->" else "=") <+> ppr sty expr
 \end{code}

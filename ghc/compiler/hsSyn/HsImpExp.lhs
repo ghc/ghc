@@ -29,6 +29,8 @@ One per \tr{import} declaration in a module.
 data ImportDecl name
   = ImportDecl	  Module			-- module name
 		  Bool				-- True => qualified
+		  Bool				-- True => source imported module 
+						--    (current interpretation: ignore ufolding info)
 		  (Maybe Module)		-- as Module
 		  (Maybe (Bool, [IE name]))	-- (True => hiding, names)
 		  SrcLoc
@@ -36,10 +38,14 @@ data ImportDecl name
 
 \begin{code}
 instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) where
-    ppr sty (ImportDecl mod qual as spec _)
-      = hang (hsep [ptext SLIT("import"), pp_qual qual, ptext mod, pp_as as])
+    ppr sty (ImportDecl mod qual as_source as spec _)
+      = hang (hsep [ptext SLIT("import"), pp_src as_source, 
+                    pp_qual qual, ptext mod, pp_as as])
 	     4 (pp_spec spec)
       where
+	pp_src False   = empty
+	pp_src True	= ptext SLIT("{-# SOURCE #-}")
+
 	pp_qual False   = empty
 	pp_qual True	= ptext SLIT("qualified")
 
