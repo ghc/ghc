@@ -26,8 +26,7 @@ module IdInfo (
 
         -- Worker
         WorkerInfo, workerExists, 
-        mkWorkerInfo, noWorkerInfo, workerInfo, setWorkerInfo,
-        ppWorkerInfo,
+        workerInfo, setWorkerInfo,
 
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
@@ -59,7 +58,7 @@ module IdInfo (
 import {-# SOURCE #-} CoreUnfold ( Unfolding, noUnfolding )
 import {-# SOURCE #-} CoreSyn	 ( CoreExpr )
 
-import Id               ( Id )
+import Var              ( Id )
 import SpecEnv	        ( SpecEnv, emptySpecEnv )
 import Demand		( Demand,  isLazy, wwLazy, pprDemands )
 import Outputable	
@@ -350,13 +349,15 @@ There might not be a worker, even for a strict function, because:
 
 type WorkerInfo = Maybe Id
 
+{- UNUSED:
 mkWorkerInfo :: Id -> WorkerInfo
 mkWorkerInfo wk_id = Just wk_id
 
-noWorkerInfo = Nothing
-
 ppWorkerInfo Nothing      = empty
 ppWorkerInfo (Just wk_id) = ppr wk_id
+-}
+
+noWorkerInfo = Nothing
 
 workerExists :: Maybe Id -> Bool
 workerExists = isJust
