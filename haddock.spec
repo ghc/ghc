@@ -74,11 +74,15 @@ rm -rf ${RPM_BUILD_ROOT}
 %doc haddock/doc/haddock
 %doc haddock/doc/haddock.dvi.gz
 %doc haddock/doc/haddock.ps.gz
+%{prefix}/share/haddock-%{version}
 %{prefix}/lib/haddock-%{version}
 %{prefix}/bin/haddock
 %{prefix}/bin/haddock-%{version}
 
 %changelog
+
+* Sat Oct 11 2003 Sven Panne <sven_panne@yahoo.com>
+- Include architecture-independent files in file list
 
 * Tue Aug 26 2003 Sven Panne <sven_panne@yahoo.com>
 - Use autoreconf instead of autoconf
