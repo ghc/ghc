@@ -151,16 +151,17 @@ doCorePass dfs rb us binds (CoreDoFloatOutwards f)
 doCorePass dfs rb us binds CoreDoStaticArgs	        
    = _scc_ "StaticArgs"    noStats dfs (doStaticArgs us binds)
 doCorePass dfs rb us binds CoreDoStrictness	        
-   = _scc_ "Stranal"       noStats dfs (do { binds1 <- saBinds dfs binds ;
-					     dmdAnalPgm dfs binds1 })
+   = _scc_ "Stranal"       noStats dfs (strictAnal dfs binds)
 doCorePass dfs rb us binds CoreDoWorkerWrapper      
    = _scc_ "WorkWrap"      noStats dfs (wwTopBinds dfs us binds)
 doCorePass dfs rb us binds CoreDoSpecialising       
    = _scc_ "Specialise"    noStats dfs (specProgram dfs us binds)
 doCorePass dfs rb us binds CoreDoSpecConstr
    = _scc_ "SpecConstr"    noStats dfs (specConstrProgram dfs us binds)
+#ifdef DEBUG
 doCorePass dfs rb us binds CoreDoCPResult	        
    = _scc_ "CPResult"      noStats dfs (cprAnalyse dfs binds)
+#endif
 doCorePass dfs rb us binds CoreDoPrintCore	        
    = _scc_ "PrintCore"     noStats dfs (printCore binds)
 doCorePass dfs rb us binds CoreDoUSPInf             
@@ -171,6 +172,12 @@ doCorePass dfs rb us binds (CoreDoRuleCheck phase pat)
    = noStats dfs (ruleCheck dfs phase pat binds)
 doCorePass dfs rb us binds CoreDoNothing
    = noStats dfs (return binds)
+
+strictAnal dfs binds = do
+#ifdef DEBUG
+     binds <- saBinds dfs binds
+#endif
+     dmdAnalPgm dfs binds
 
 printCore binds = do dumpIfSet True "Print Core"
 			       (pprCoreBindings binds)

@@ -20,18 +20,24 @@ module PprCore (
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
 import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
-			  idInfo, idInlinePragma, idDemandInfo, idOccInfo,
-			  globalIdDetails, isGlobalId, isExportedId, isSpecPragmaId
+			  idInfo, idInlinePragma, idOccInfo,
+#ifdef DEBUG
+			  idDemandInfo, 
+#endif
+			  globalIdDetails, isGlobalId, isExportedId, 
+			  isSpecPragmaId, idNewDemandInfo
 			)
 import Var		( isTyVar )
 import IdInfo		( IdInfo, megaSeqIdInfo, 
 			  arityInfo, ppArityInfo, 
-			  specInfo, cprInfo, ppCprInfo, 
-			  strictnessInfo, ppStrictnessInfo, 
-			  cprInfo, ppCprInfo, 
+			  specInfo, ppStrictnessInfo, 
 			  workerInfo, ppWorkerInfo,
                           tyGenInfo, ppTyGenInfo,
-			  newDemandInfo, newStrictnessInfo
+			  newStrictnessInfo,
+#ifdef DEBUG
+			  cprInfo, ppCprInfo, 
+			  strictnessInfo,
+#endif
 			)
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
@@ -330,8 +336,11 @@ pprIdBndr id = ppr id <+>
 	       (megaSeqIdInfo (idInfo id) `seq`
 			-- Useful for poking on black holes
 	        ifPprDebug (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
-			    ppr (idDemandInfo id)) <+> ppr (newDemandInfo (idInfo id)) <+>
-			    ppr (idLBVarInfo id))
+#ifdef DEBUG
+			    ppr (idDemandInfo id) <+>
+#endif
+			    ppr (idNewDemandInfo id) <+>
+			    ppr (idLBVarInfo id)))
 \end{code}
 
 
@@ -347,8 +356,10 @@ ppIdInfo b info
   = hsep [  ppArityInfo a,
             ppTyGenInfo g,
 	    ppWorkerInfo (workerInfo info),
+#ifdef DEBUG
 	    ppStrictnessInfo s,
             ppCprInfo m,
+#endif
 	    ppr (newStrictnessInfo info),
 	    pprCoreRules b p
 	-- Inline pragma, occ, demand, lbvar info
@@ -358,8 +369,10 @@ ppIdInfo b info
   where
     a = arityInfo info
     g = tyGenInfo info
+#ifdef DEBUG
     s = strictnessInfo info
     m = cprInfo info
+#endif
     p = specInfo info
 \end{code}
 

@@ -24,7 +24,7 @@ import PrimRep		-- most of it
 import TysPrim
 import TysWiredIn
 
-import Demand		( wwLazy, wwPrim, wwStrict, StrictnessInfo(..) )
+import NewDemand
 import Var		( TyVar )
 import Name		( Name, mkWiredInName )
 import RdrName		( RdrName, mkRdrOrig )
@@ -140,7 +140,7 @@ mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOcc str) tvs tys ty
 Not all primops are strict!
 
 \begin{code}
-primOpStrictness :: PrimOp -> Arity -> StrictnessInfo
+primOpStrictness :: PrimOp -> Arity -> StrictSig
 	-- See Demand.StrictnessInfo for discussion of what the results
 	-- The arity should be the arity of the primop; that's why
 	-- this function isn't exported.
@@ -415,7 +415,7 @@ primOpOcc op = case (primOpInfo op) of
 -- (type variables, argument types, result type)
 -- It also gives arity, strictness info
 
-primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, StrictnessInfo)
+primOpSig :: PrimOp -> ([TyVar], [Type], Type, Arity, StrictSig)
 primOpSig op
   = (tyvars, arg_tys, res_ty, arity, primOpStrictness op arity)
   where

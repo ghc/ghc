@@ -2,6 +2,11 @@
 constructed product result}
 
 \begin{code}
+#ifndef DEBUG
+module CprAnalyse ( ) where
+
+#else
+
 module CprAnalyse ( cprAnalyse ) where
 
 #include "HsVersions.h"
@@ -131,11 +136,6 @@ ids decorated with their CprInfo pragmas.
 \begin{code}
 
 cprAnalyse :: DynFlags -> [CoreBind] -> IO [CoreBind]
-#ifndef DEBUG
--- Omit unless DEBUG is on
-cprAnalyse dflags binds = return binds
-
-#else
 cprAnalyse dflags binds
   = do {
 	showPass dflags "Constructed Product analysis" ;

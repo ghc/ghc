@@ -20,11 +20,18 @@ import PprCore
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idDemandInfo, idInlinePragma,
+import Id		( Id, idType, idInlinePragma,
 			  isDataConId, isGlobalId, idArity,
-			  idNewStrictness, idNewStrictness_maybe, setIdNewStrictness,
-			  idNewDemandInfo, setIdNewDemandInfo, idName, idStrictness, idCprInfo )
-import IdInfo		( newDemand, newStrictnessFromOld )
+#ifdef DEBUG
+			  idDemandInfo,  idStrictness, idCprInfo,
+#endif
+			  idNewStrictness, idNewStrictness_maybe,
+			  setIdNewStrictness, idNewDemandInfo,
+			  setIdNewDemandInfo, idName 
+			)
+#ifdef DEBUG
+import IdInfo 		( newStrictnessFromOld, newDemand )
+#endif
 import Var		( Var )
 import VarEnv
 import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
@@ -60,12 +67,13 @@ dmdAnalPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
 dmdAnalPgm dflags binds
   = do {
 	showPass dflags "Demand analysis" ;
-	let { binds_plus_dmds = do_prog binds ;
-	      dmd_changes = get_changes binds_plus_dmds } ;
+	let { binds_plus_dmds = do_prog binds } ;
 	endPass dflags "Demand analysis" 
 	 	Opt_D_dump_stranal binds_plus_dmds ;
 #ifdef DEBUG
-	-- Only if DEBUG is on, because only then is the old strictness analyser run
+	-- Only if DEBUG is on, because only then is the old
+	-- strictness analyser run
+	let dmd_changes = get_changes binds_plus_dmds ;
 	printDump (text "Changes in demands" $$ dmd_changes) ;
 #endif
 	return binds_plus_dmds
@@ -996,6 +1004,7 @@ boths = zipWithDmds both
 
 
 \begin{code}
+#ifdef DEBUG
 get_changes binds = vcat (map get_changes_bind binds)
 
 get_changes_bind (Rec pairs) = vcat (map get_changes_pr pairs)
@@ -1047,6 +1056,7 @@ get_changes_dmd id
     old = newDemand (idDemandInfo id)
     new_better = new `betterDemand` old 
     old_better = old `betterDemand` new
+#endif
 
 squashSig (StrictSig (DmdType fv ds res))
   = StrictSig (DmdType emptyDmdEnv (map squashDmd ds) res)

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.11 2001/12/07 11:34:48 sewardj Exp $
+-- $Id: primops.txt.pp,v 1.12 2001/12/10 14:07:30 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -57,7 +57,7 @@ defaults
    commutable       = False
    needs_wrapper    = False
    can_fail         = False
-   strictness       = { \ arity -> StrictnessInfo (replicate arity wwPrim) False }
+   strictness       = { \ arity -> mkStrictSig (mkTopDmdType (replicate arity lazyDmd) TopRes) }
    usage            = { nomangle other }
 
 -- Currently, documentation is produced using latex, so contents of
@@ -686,7 +686,6 @@ primop  NewArrayOp "newArray#" GenPrimOp
     in the specified state thread,
     with each element containing the specified initial value.}
    with
-   strictness  = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
    usage       = { mangle NewArrayOp [mkP, mkM, mkP] mkM }
    out_of_line = True
 
@@ -706,7 +705,6 @@ primop  WriteArrayOp "writeArray#" GenPrimOp
    {Write to specified index of mutable array.}
    with
    usage            = { mangle WriteArrayOp [mkM, mkP, mkM, mkP] mkR }
-   strictness       = { \ arity -> StrictnessInfo [wwPrim, wwPrim, wwLazy, wwPrim] False }
    has_side_effects = True
 
 primop  IndexArrayOp "indexArray#" GenPrimOp
@@ -1164,7 +1162,6 @@ primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
    with
    has_side_effects = True
-   strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
 
 primop EqForeignObj "eqForeignObj#" GenPrimOp
    ForeignObj# -> ForeignObj# -> Bool
@@ -1232,7 +1229,6 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
    {Create MutVar\# with specified initial value in specified state thread.}
    with
    usage       = { mangle NewMutVarOp [mkM, mkP] mkM }
-   strictness  = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    out_of_line = True
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
@@ -1245,7 +1241,6 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
    {Write contents of MutVar\#.}
    with
-   strictness       = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
    usage            = { mangle WriteMutVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
 
@@ -1264,7 +1259,6 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-   strictness = { \ arity -> StrictnessInfo [wwLazy, wwLazy, wwPrim] False }
 	-- Catch is actually strict in its first argument
 	-- but we don't want to tell the strictness
 	-- analyser about that!
@@ -1276,8 +1270,8 @@ primop  CatchOp "catch#" GenPrimOp
 primop  RaiseOp "raise#" GenPrimOp
    a -> b
    with
-   strictness  = { \ arity -> StrictnessInfo [wwLazy] True }
-      -- NB: True => result is bottom
+   strictness  = { \ arity -> mkStrictSig (mkTopDmdType [lazyDmd] BotRes) }
+      -- NB: result is bottom
    usage       = { mangle RaiseOp [mkM] mkM }
    out_of_line = True
 
@@ -1285,14 +1279,12 @@ primop  BlockAsyncExceptionsOp "blockAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    out_of_line = True
 
 primop  UnblockAsyncExceptionsOp "unblockAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
      -> (State# RealWorld -> (# State# RealWorld, a #))
    with
-   strictness  = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -1333,7 +1325,6 @@ primop  PutMVarOp "putMVar#" GenPrimOp
    {If mvar is full, block until it becomes empty.
    Then store value arg as its new contents.}
    with
-   strictness       = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
    usage            = { mangle PutMVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
@@ -1343,7 +1334,6 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    {If mvar is full, immediately return with integer 0.
     Otherwise, store value arg as mvar's new contents, and return with integer 1.}
    with
-   strictness       = { \ arity -> StrictnessInfo [wwPrim, wwLazy, wwPrim] False }
    usage            = { mangle TryPutMVarOp [mkM, mkM, mkP] mkR }
    has_side_effects = True
    out_of_line      = True
@@ -1399,7 +1389,6 @@ primop  ForkOp "fork#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    usage            = { mangle ForkOp [mkO, mkP] mkR }
-   strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    has_side_effects = True
    out_of_line      = True
 
@@ -1430,7 +1419,6 @@ section "Weak pointers"
 primop  MkWeakOp "mkWeak#" GenPrimOp
    o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
-   strictness       = { \ arity -> StrictnessInfo [wwLazy, wwLazy, wwLazy, wwPrim] False }
    usage            = { mangle MkWeakOp [mkZ, mkM, mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
@@ -1459,7 +1447,6 @@ section "Stable pointers and names"
 primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
    with
-   strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    usage            = { mangle MakeStablePtrOp [mkM, mkP] mkM }
    has_side_effects = True
    out_of_line      = True
@@ -1482,7 +1469,6 @@ primop  MakeStableNameOp "makeStableName#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StableName# a #)
    with
    usage            = { mangle MakeStableNameOp [mkZ, mkP] mkR }
-   strictness       = { \ arity -> StrictnessInfo [wwLazy, wwPrim] False }
    needs_wrapper    = True
    has_side_effects = True
    out_of_line      = True
@@ -1505,7 +1491,7 @@ primop  SeqOp "seq#" GenPrimOp
    a -> Int#
    with
    usage            = { mangle  SeqOp [mkO] mkR }
-   strictness       = { \ arity -> StrictnessInfo [wwStrict] False }
+   strictness       = { \ arity -> mkStrictSig (mkTopDmdType [evalDmd] TopRes) }
       -- Seq is strict in its argument; see notes in ConFold.lhs
    has_side_effects = True
 
@@ -1513,7 +1499,6 @@ primop  ParOp "par#" GenPrimOp
    a -> Int#
    with
    usage            = { mangle ParOp [mkO] mkR }
-   strictness       = { \ arity -> StrictnessInfo [wwLazy] False }
       -- Note that Par is lazy to avoid that the sparked thing
       -- gets evaluted strictly, which it should *not* be
    has_side_effects = True
@@ -1583,8 +1568,6 @@ section "Tag to enum stuff"
 
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#
-   with
-   strictness = { \ arity -> StrictnessInfo [wwLazy] False }
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp     
    Int# -> a

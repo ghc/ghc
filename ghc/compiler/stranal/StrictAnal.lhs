@@ -7,6 +7,11 @@ The original version(s) of all strictness-analyser code (except the
 Semantique analyser) was written by Andy Gill.
 
 \begin{code}
+#ifndef DEBUG
+module StrictAnal ( ) where
+
+#else
+
 module StrictAnal ( saBinds ) where
 
 #include "HsVersions.h"
@@ -80,12 +85,6 @@ strict workers.
 
 \begin{code}
 saBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
-#ifndef DEBUG
--- Omit strictness analyser if DEBUG is off
-
-saBinds dflags binds = return binds
-
-#else
 saBinds dflags binds
   = do {
 	showPass dflags "Strictness analysis";
@@ -490,5 +489,6 @@ sequenceSa []     = returnSa []
 sequenceSa (m:ms) = m		  `thenSa` \ r ->
 		    sequenceSa ms `thenSa` \ rs ->
 		    returnSa (r:rs)
+
 #endif /* DEBUG */
 \end{code}

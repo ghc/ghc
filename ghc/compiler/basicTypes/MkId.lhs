@@ -72,8 +72,8 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo, setCafInfo,
-			  newStrictnessFromOld, setAllStrictnessInfo,
-			  GlobalIdDetails(..), CafInfo(..), CprInfo(..)
+			  setAllStrictnessInfo,
+			  GlobalIdDetails(..), CafInfo(..)
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
 			  mkTopDmdType, topDmd, evalDmd, lazyDmd, 
@@ -640,7 +640,7 @@ mkPrimOpId :: PrimOp -> Id
 mkPrimOpId prim_op 
   = id
   where
-    (tyvars,arg_tys,res_ty, arity, strict_info) = primOpSig prim_op
+    (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
     ty   = mkForAllTys tyvars (mkFunTys arg_tys res_ty)
     name = mkPrimOpIdName prim_op
     id   = mkGlobalId (PrimOpId prim_op) name ty info
@@ -648,8 +648,7 @@ mkPrimOpId prim_op
     info = noCafNoTyGenIdInfo
 	   `setSpecInfo`	rules
 	   `setArityInfo` 	arity
-	   `setAllStrictnessInfo`	Just (newStrictnessFromOld name arity strict_info NoCPRInfo)
-	-- Until we modify the primop generation code
+	   `setAllStrictnessInfo` Just strict_sig
 
     rules = foldl (addRule id) emptyCoreRules (primOpRules prim_op)
 

@@ -25,14 +25,13 @@ module IdInfo (
 
 	-- New demand and strictness info
  	newStrictnessInfo, setNewStrictnessInfo, 
-  	newDemandInfo, setNewDemandInfo, newDemand, oldDemand,
+  	newDemandInfo, setNewDemandInfo,
 
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
 	ppStrictnessInfo,isBottomingStrictness, 
-	strictnessInfo, setStrictnessInfo, setAllStrictnessInfo,
-	oldStrictnessFromNew, newStrictnessFromOld, cprInfoFromNewStrictness,
+	setAllStrictnessInfo,
 
         -- Usage generalisation
         TyGenInfo(..),
@@ -46,8 +45,17 @@ module IdInfo (
 	-- Unfolding
 	unfoldingInfo, setUnfoldingInfo, 
 
-	-- DemandInfo
+#ifdef DEBUG
+	-- Old DemandInfo and StrictnessInfo
 	demandInfo, setDemandInfo, 
+	strictnessInfo, setStrictnessInfo,
+        cprInfoFromNewStrictness,
+	oldStrictnessFromNew, newStrictnessFromOld,
+	oldDemand, newDemand,
+
+        -- Constructed Product Result Info
+        CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
+#endif
 
 	-- Inline prags
 	InlinePragInfo, 
@@ -68,9 +76,6 @@ module IdInfo (
 
 	-- CAF info
 	CafInfo(..), ppCafInfo, setCafInfo, mayHaveCafRefs,
-
-        -- Constructed Product Result Info
-        CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
 
         -- Lambda-bound variable info
         LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo, hasNoLBVarInfo
@@ -95,25 +100,19 @@ import DataCon		( DataCon )
 import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
-import Demand		hiding( Demand )
+import Demand		hiding( Demand, seqDemand )
 import qualified Demand
-import NewDemand	( Demand(..), DmdResult(..), Demands(..),
-			  lazyDmd, topDmd, dmdTypeDepth, isStrictDmd, isBotRes, 
-			  splitStrictSig, strictSigResInfo,
-			  StrictSig, mkStrictSig, mkTopDmdType, evalDmd, lazyDmd
-			)
+import NewDemand
 import Outputable	
 import Util		( seqList, listLengthCmp )
 import List		( replicate )
 
-infixl 	1 `setDemandInfo`,
-    	  `setTyGenInfo`,
-	  `setStrictnessInfo`,
+-- infixl so you can say (id `set` a `set` b)
+infixl 	1 `setTyGenInfo`,
 	  `setSpecInfo`,
 	  `setArityInfo`,
 	  `setInlinePragInfo`,
 	  `setUnfoldingInfo`,
-	  `setCprInfo`,
 	  `setWorkerInfo`,
 	  `setLBVarInfo`,
 	  `setOccInfo`,
@@ -122,7 +121,11 @@ infixl 	1 `setDemandInfo`,
 	  `setNewStrictnessInfo`,
 	  `setAllStrictnessInfo`,
 	  `setNewDemandInfo`
-	-- infixl so you can say (id `set` a `set` b)
+#ifdef DEBUG
+	  `setCprInfo`,
+	  `setDemandInfo`,
+	  `setStrictnessInfo`,
+#endif
 \end{code}
 
 %************************************************************************
@@ -138,13 +141,23 @@ setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
 -- Set old and new strictness info
 setAllStrictnessInfo info Nothing
   = info { newStrictnessInfo = Nothing, 
+#ifdef DEBUG
 	   strictnessInfo = NoStrictnessInfo, 
-	   cprInfo = NoCPRInfo }
+	   cprInfo = NoCPRInfo,
+#endif
+	   }
 setAllStrictnessInfo info (Just sig)
   = info { newStrictnessInfo = Just sig, 
+#ifdef DEBUG
 	   strictnessInfo = oldStrictnessFromNew sig, 
-	   cprInfo = cprInfoFromNewStrictness sig }
+	   cprInfo = cprInfoFromNewStrictness sig,
+#endif
+	   }
 
+seqNewStrictnessInfo Nothing = ()
+seqNewStrictnessInfo (Just ty) = seqStrictSig ty
+
+#ifdef DEBUG
 oldStrictnessFromNew :: StrictSig -> Demand.StrictnessInfo
 oldStrictnessFromNew sig = mkStrictnessInfo (map oldDemand dmds, isBotRes res_info)
 			 where
@@ -196,6 +209,8 @@ oldDemand (Defer d)        = WwLazy False
 oldDemand (Eval (Prod ds)) = WwUnpack True (map oldDemand ds)
 oldDemand (Eval (Poly _))  = WwStrict
 oldDemand (Call _)         = WwStrict
+
+#endif /* DEBUG */
 \end{code}
 
 
@@ -261,15 +276,17 @@ case.  KSW 1999-04).
 \begin{code}
 data IdInfo
   = IdInfo {
-	arityInfo 	:: ArityInfo,		-- Its arity
-	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
+	arityInfo 	:: !ArityInfo,		-- Its arity
 	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
         tyGenInfo       :: TyGenInfo,           -- Restrictions on usage-generalisation of this Id
+#ifdef DEBUG
+	cprInfo 	:: CprInfo,             -- Function always constructs a product result
+	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
+#endif
         workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
 	unfoldingInfo	:: Unfolding,		-- Its unfolding
 	cgInfo		:: CgInfo,		-- Code generator info (arity, CAF info)
-	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
 	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
 	occInfo		:: OccInfo,		-- How it occurs
@@ -286,21 +303,26 @@ seqIdInfo (IdInfo {}) = ()
 
 megaSeqIdInfo :: IdInfo -> ()
 megaSeqIdInfo info
-  = seqArity (arityInfo info)			`seq`
-    seqDemand (demandInfo info)			`seq`
-    seqRules (specInfo info)			`seq`
+  = seqRules (specInfo info)			`seq`
     seqTyGenInfo (tyGenInfo info)               `seq`
-    seqStrictnessInfo (strictnessInfo info)	`seq`
     seqWorker (workerInfo info)			`seq`
 
---    seqUnfolding (unfoldingInfo info)	`seq`
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
+--    seqUnfolding (unfoldingInfo info)		`seq`
+
+    seqDemand (newDemandInfo info)		`seq`
+    seqNewStrictnessInfo (newStrictnessInfo info) `seq`
+
+#ifdef DEBUG
+    Demand.seqDemand (demandInfo info)		`seq`
+    seqStrictnessInfo (strictnessInfo info)	`seq`
+    seqCpr (cprInfo info)			`seq`
+#endif
 
 -- CgInfo is involved in a loop, so we have to be careful not to seq it
 -- too early.
 --    seqCg (cgInfo info)			`seq`
-    seqCpr (cprInfo info)		`seq`
     seqLBVar (lbvarInfo info)		`seq`
     seqOccInfo (occInfo info) 
 \end{code}
@@ -313,7 +335,9 @@ setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
 setTyGenInfo      info tg = tg `seq` info { tyGenInfo = tg }
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
+#ifdef DEBUG
 setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
+#endif
 	-- Try to avoid spack leaks by seq'ing
 
 setUnfoldingInfo  info uf 
@@ -334,14 +358,18 @@ setUnfoldingInfo  info uf
 	-- actually increases residency significantly. 
   = info { unfoldingInfo = uf }
 
+#ifdef DEBUG
 setDemandInfo	  info dd = info { demandInfo = dd }
+setCprInfo        info cp = info { cprInfo = cp }
+#endif
+
 setArityInfo	  info ar = info { arityInfo = ar  }
 setCgInfo         info cg = info { cgInfo = cg }
-setCprInfo        info cp = info { cprInfo = cp }
-setLBVarInfo      info lb = info { lbvarInfo = lb }
 
-setNewDemandInfo     info dd = info { newDemandInfo = dd }
-setNewStrictnessInfo info dd = info { newStrictnessInfo = dd }
+setLBVarInfo      info lb = {-lb `seq`-} info { lbvarInfo = lb }
+
+setNewDemandInfo     info dd = dd `seq` info { newDemandInfo = dd }
+setNewStrictnessInfo info dd = dd `seq` info { newStrictnessInfo = dd }
 \end{code}
 
 
@@ -351,13 +379,15 @@ vanillaIdInfo
   = IdInfo {
 	    cgInfo		= noCgInfo,
 	    arityInfo		= unknownArity,
+#ifdef DEBUG
+	    cprInfo		= NoCPRInfo,
 	    demandInfo		= wwLazy,
+	    strictnessInfo	= NoStrictnessInfo,
+#endif
 	    specInfo		= emptyCoreRules,
             tyGenInfo		= noTyGenInfo,
 	    workerInfo		= NoWorker,
-	    strictnessInfo	= NoStrictnessInfo,
 	    unfoldingInfo	= noUnfolding,
-	    cprInfo		= NoCPRInfo,
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= AlwaysActive,
 	    occInfo		= NoOccInfo,
@@ -392,9 +422,6 @@ type ArityInfo = Arity
 
 	-- The arity might increase later in the compilation process, if
 	-- an extra lambda floats up to the binding site.
-
-seqArity :: ArityInfo -> ()
-seqArity a = a `seq` ()
 
 unknownArity = 0 :: Arity
 
@@ -502,7 +529,7 @@ instance Show TyGenInfo where
 
 If this Id has a worker then we store a reference to it. Worker
 functions are generated by the worker/wrapper pass.  This uses
-information from the strictness and CPR analyses.
+information from strictness analysis.
 
 There might not be a worker, even for a strict function, because:
 (a) the function might be small enough to inline, so no need 
@@ -534,7 +561,7 @@ data WorkerInfo = NoWorker
 	-- w/w split. See comments in MkIface.ifaceId, with the 'Worker' code.
 
 seqWorker :: WorkerInfo -> ()
-seqWorker (HasWorker id _) = id `seq` ()
+seqWorker (HasWorker id a) = id `seq` a `seq` ()
 seqWorker NoWorker	   = ()
 
 ppWorkerInfo NoWorker            = empty
@@ -643,6 +670,7 @@ function has the CPR property and which components of the result are
 also CPRs.   
 
 \begin{code}
+#ifdef DEBUG
 data CprInfo
   = NoCPRInfo
   | ReturnsCPR	-- Yes, this function returns a constructed product
@@ -653,9 +681,7 @@ data CprInfo
 
 	-- We used to keep nested info about sub-components, but
 	-- we never used it so I threw it away
-\end{code}
 
-\begin{code}
 seqCpr :: CprInfo -> ()
 seqCpr ReturnsCPR = ()
 seqCpr NoCPRInfo  = ()
@@ -670,6 +696,7 @@ instance Outputable CprInfo where
 
 instance Show CprInfo where
     showsPrec p c = showsPrecSDoc p (ppr c)
+#endif
 \end{code}
 
 
@@ -823,8 +850,11 @@ shortableIdInfo info = isEmptyCoreRules (specInfo info)
 copyIdInfo :: IdInfo	-- f_local
   	   -> IdInfo	-- f (the exported one)
 	   -> IdInfo	-- New info for f
-copyIdInfo f_local f = f { strictnessInfo = strictnessInfo f_local,
-			   workerInfo     = workerInfo     f_local,
+copyIdInfo f_local f = f { newStrictnessInfo = newStrictnessInfo f_local,
+#ifdef DEBUG
+			   strictnessInfo = strictnessInfo f_local,
 			   cprInfo        = cprInfo        f_local
+#endif
+			   workerInfo     = workerInfo     f_local,
 			  }
 \end{code}

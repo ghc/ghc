@@ -44,29 +44,38 @@ module Id (
 	-- IdInfo stuff
 	setIdUnfolding,
 	setIdArity,
-	setIdDemandInfo, setIdNewDemandInfo, 
-	setIdStrictness, setIdNewStrictness, zapIdNewStrictness,
+	setIdNewDemandInfo, 
+	setIdNewStrictness, zapIdNewStrictness,
         setIdTyGenInfo,
 	setIdWorkerInfo,
 	setIdSpecialisation,
 	setIdCgInfo,
-	setIdCprInfo,
 	setIdOccInfo,
 
+#ifdef DEBUG
+	idDemandInfo, 
+	idStrictness, 
+	idCprInfo,
+	setIdStrictness, 
+	setIdDemandInfo, 
+	setIdCprInfo,
+#endif
+
 	idArity, 
-	idDemandInfo, idNewDemandInfo,
-	idStrictness, idNewStrictness, idNewStrictness_maybe, 
+	idNewDemandInfo,
+	idNewStrictness, idNewStrictness_maybe, 
         idTyGenInfo,
 	idWorkerInfo,
 	idUnfolding,
 	idSpecialisation,
 	idCgInfo,
 	idCafInfo,
-	idCprInfo,
 	idLBVarInfo,
 	idOccInfo,
 
+#ifdef DEBUG
 	newStrictnessFromOld 	-- Temporary
+#endif
 
     ) where
 
@@ -104,20 +113,21 @@ import SrcLoc		( SrcLoc )
 import Outputable
 import Unique		( Unique, mkBuiltinUnique )
 
+-- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setIdUnfolding`,
 	  `setIdArity`,
-	  `setIdDemandInfo`,
-	  `setIdStrictness`,
 	  `setIdNewDemandInfo`,
 	  `setIdNewStrictness`,
 	  `setIdTyGenInfo`,
 	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
 	  `setInlinePragma`,
-	  `idCafInfo`,
-	  `idCprInfo`
-
-	-- infixl so you can say (id `set` a `set` b)
+	  `idCafInfo`
+#ifdef DEBUG
+	  ,`idCprInfo`
+	  ,`setIdStrictness`
+	  ,`setIdDemandInfo`
+#endif
 \end{code}
 
 
@@ -311,13 +321,15 @@ idArity id = arityInfo (idInfo id)
 setIdArity :: Id -> Arity -> Id
 setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
 
+#ifdef DEBUG
 	---------------------------------
-	-- STRICTNESS 
+	-- (OLD) STRICTNESS 
 idStrictness :: Id -> StrictnessInfo
 idStrictness id = strictnessInfo (idInfo id)
 
 setIdStrictness :: Id -> StrictnessInfo -> Id
 setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) id
+#endif
 
 -- isBottomingId returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool
@@ -359,13 +371,15 @@ idUnfolding id = unfoldingInfo (idInfo id)
 setIdUnfolding :: Id -> Unfolding -> Id
 setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
+#ifdef DEBUG
 	---------------------------------
-	-- DEMAND
+	-- (OLD) DEMAND
 idDemandInfo :: Id -> Demand.Demand
 idDemandInfo id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand.Demand -> Id
 setIdDemandInfo id demand_info = modifyIdInfo (`setDemandInfo` demand_info) id
+#endif
 
 idNewDemandInfo :: Id -> NewDemand.Demand
 idNewDemandInfo id = newDemandInfo (idInfo id)
@@ -405,14 +419,15 @@ idCafInfo id = case cgInfo (idInfo id) of
 #else
 idCafInfo id = cgCafInfo (idCgInfo id)
 #endif
-
 	---------------------------------
 	-- CPR INFO
+#ifdef DEBUG
 idCprInfo :: Id -> CprInfo
 idCprInfo id = cprInfo (idInfo id)
 
 setIdCprInfo :: Id -> CprInfo -> Id
 setIdCprInfo id cpr_info = modifyIdInfo (`setCprInfo` cpr_info) id
+#endif
 
 	---------------------------------
 	-- Occcurrence INFO
