@@ -61,8 +61,8 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
    rm_or_fail($errname)
    rm_or_fail($testname)
 
-   $cmd = "cd " ++ $testdir ++ " && " ++ 
-	  $tool ++ " " ++ $flags ++ " " ++ $_extra_args ++ " "
+   $cmd = "cd " ++ $testdir ++ " && \"" ++ 
+	  $tool ++ "\" " ++ $flags ++ " " ++ $_extra_args ++ " "
 	  ++ (if defined $extra_hc_flags
 		  then $extra_hc_flags 
 		  else "")
@@ -162,7 +162,7 @@ def vanilla-compfail-test-actions ( $extra_compile_args )
    fi
 
    $res = simple_build_Main_WRK ( $extra_compile_args, True )
-
+   print "---> " ++ $res
    $actual_stderr = qualify("comp.stderr")
    $stderr_a = normalise_errmsg(contents($actual_stderr))
    $stderr_e = normalise_errmsg(contents($expected_stderr))

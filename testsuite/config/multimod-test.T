@@ -82,7 +82,7 @@ def simple_build_prog_WRK ( $_main, $_extra_args )
    rm_or_fail($errname)
    rm_or_fail($exename)
    rm_nofail(testdirify("*.o"))
-   $cmd = $tool ++ " " ++ $flags ++ " " ++ $_extra_args ++ " "
+   $cmd = "\"" ++ $tool ++ "\" " ++ $flags ++ " " ++ $_extra_args ++ " "
 	  ++ (if defined $extra_hc_flags
 		  then $extra_hc_flags 
 		  else "")
