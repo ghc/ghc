@@ -49,6 +49,7 @@ import UniqSupply
 import Util
 import Outputable
 import DirUtils		( getDirectoryContents )
+import IO		( hPutStrLn, stderr, isDoesNotExistError )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -354,10 +355,22 @@ mkModuleHiMap dirs = do
     | otherwise = old_path  -- don't warn about innocous shadowings.
 
 getAllFilesMatching :: FilePath -> String -> IO [(String, FilePath)]
-getAllFilesMatching dir_path suffix = do
+getAllFilesMatching dir_path suffix = (do
   fpaths <- getDirectoryContents dir_path
   -- fpaths entries do not have dir_path prepended
   return (mapMaybe withSuffix fpaths)
+   )  -- soft failure
+      `catch` 
+        (\ err -> do
+	      hPutStrLn stderr 
+		     ("Import path element `" ++ dir_path ++ 
+		      if (isDoesNotExistError err) then
+	                 "' does not exist, ignoring."
+		      else
+	                "' couldn't read, ignoring.")
+	       
+              return [] 
+	    )
  where
    xiffus = reverse dotted_suffix 
   
