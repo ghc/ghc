@@ -45,6 +45,7 @@ module IdInfo (
 	-- Inline prags
 	InlinePragInfo(..), 
 	inlinePragInfo, setInlinePragInfo, pprInlinePragInfo,
+	isNeverInlinePrag, neverInlinePrag,
 
 	-- Occurrence info
 	OccInfo(..), isFragileOccInfo,
@@ -323,6 +324,16 @@ data InlinePragInfo
   | IMustNotBeINLINEd Bool		-- True <=> came from an INLINE prag, False <=> came from a NOINLINE prag
 		      (Maybe Int)	-- Phase number from pragma, if any
 	-- The True, Nothing case doesn't need to be recorded
+
+	-- SEE COMMENTS WITH CoreUnfold.blackListed on the
+	-- exact significance of the IMustNotBeINLINEd pragma
+
+isNeverInlinePrag :: InlinePragInfo -> Bool
+isNeverInlinePrag (IMustNotBeINLINEd True Nothing) = True
+isNeverInlinePrag other				   = False
+
+neverInlinePrag :: InlinePragInfo
+neverInlinePrag = IMustNotBeINLINEd True Nothing
 
 instance Outputable InlinePragInfo where
   -- This is now parsed in interface files

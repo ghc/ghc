@@ -23,7 +23,8 @@ import Id		( Id, idType, idStrictness, setIdArityInfo, isOneShotLambda,
 import VarSet
 import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
-			  CprInfo(..), exactArity, InlinePragInfo(..), WorkerInfo(..)
+			  CprInfo(..), exactArity, InlinePragInfo(..), isNeverInlinePrag,
+			  WorkerInfo(..)
 			)
 import Demand           ( Demand, wwLazy )
 import SaLib
@@ -189,8 +190,11 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW non_rec fn_id rhs
-  | non_rec
-    && certainlyWillInline fn_id
+  | not (isNeverInlinePrag inline_prag) 
+  = 	-- Don't split things that will never be inlined
+    returnUs [ (fn_id, rhs) ]
+
+  | non_rec && certainlyWillInline fn_id
 	-- No point in worker/wrappering something that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)

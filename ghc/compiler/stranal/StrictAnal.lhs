@@ -17,7 +17,7 @@ import Id		( idType, setIdStrictness, setInlinePragma,
 			  idDemandInfo, setIdDemandInfo, isBottomingId,
 			  Id
 			)
-import IdInfo		( InlinePragInfo(..) )
+import IdInfo		( neverInlinePrag )
 import CoreLint		( beginPass, endPass )
 import ErrUtils		( dumpIfSet )
 import SaAbsInt
@@ -186,12 +186,12 @@ saTopBind str_env abs_env (Rec pairs)
     in
     returnSa (new_str_env, new_abs_env, Rec new_pairs)
 
+-- Hack alert!
 -- Top level divergent bindings are marked NOINLINE
 -- This avoids fruitless inlining of top level error functions
 addStrictnessInfoToTopId str_val abs_val bndr
   = if isBottomingId new_id then
-	new_id `setInlinePragma` IMustNotBeINLINEd False Nothing
-		-- This is a NOINLINE pragma
+	new_id `setInlinePragma` neverInlinePrag
     else
 	new_id
   where

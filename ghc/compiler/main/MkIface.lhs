@@ -34,7 +34,7 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo, InlinePragInfo(..), inli
 			  strictnessInfo, ppStrictnessInfo, isBottomingStrictness,
 			  cafInfo, ppCafInfo, specInfo,
 			  cprInfo, ppCprInfo, pprInlinePragInfo,
-			  occInfo, 
+			  occInfo, isNeverInlinePrag,
 			  workerExists, workerInfo, ppWorkerInfo, WorkerInfo(..)
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), rulesRules, rulesRhsFreeVars )
@@ -372,10 +372,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     ------------  Unfolding  --------------
     inline_pragma  = inlinePragInfo core_idinfo
-    dont_inline	   = case inline_pragma of
-			IMustNotBeINLINEd False Nothing -> True	-- Unconditional NOINLINE
-			other		  	        -> False
-
+    dont_inline	   = isNeverInlinePrag inline_pragma
 
     unfold_pretty | show_unfold = ptext SLIT("__U") <> pprInlinePragInfo inline_pragma <+> pprIfaceUnfolding rhs
 		  | otherwise   = empty

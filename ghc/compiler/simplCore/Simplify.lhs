@@ -985,9 +985,9 @@ postInlineUnconditionally :: Bool  	-- Black listed
 	-- we'll get another opportunity when we get to the ocurrence(s)
 
 postInlineUnconditionally black_listed occ_info bndr rhs
-  | isExportedId bndr	|| 
-    black_listed 	|| 
-    isLoopBreaker occ_info = False		-- Don't inline these
+  | isExportedId bndr	   = False		-- Don't inline these, ever
+  | black_listed 	   = False
+  | isLoopBreaker occ_info = False
   | otherwise	           = exprIsTrivial rhs	-- Duplicating is free
 	-- Don't inline even WHNFs inside lambdas; doing so may
 	-- simply increase allocation when the function is called

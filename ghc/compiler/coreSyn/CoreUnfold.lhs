@@ -54,7 +54,9 @@ import VarSet
 import Name		( isLocallyDefined )
 import Literal		( isLitLitLit )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), insideLam, workerExists )
+import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), 
+			  insideLam, workerExists, isNeverInlinePrag
+			)
 import TyCon		( tyConFamilySize )
 import Type		( splitFunTy_maybe, isUnLiftedType )
 import Unique		( Unique, buildIdKey, augmentIdKey )
@@ -435,16 +437,11 @@ certainlyWillInline :: Id -> Bool
 certainlyWillInline v
   = case idUnfolding v of
 
-	CoreUnfolding _ _ _ is_value _ (UnfoldIfGoodArgs n_vals _ size _)
+	CoreUnfolding _ _ _ is_value _ g@(UnfoldIfGoodArgs n_vals _ size _)
 	   ->    is_value 
 	      && size - (n_vals +1) <= opt_UF_UseThreshold
-	      && not never_inline
 
 	other -> False
-  where
-    never_inline = case idInlinePragma v of
-			IMustNotBeINLINEd False Nothing -> True
-			other			        -> False
 \end{code}
 
 @okToUnfoldInHifile@ is used when emitting unfolding info into an interface
@@ -673,7 +670,7 @@ For optimisation we use phase 1,2 and nothing (i.e. no -finline-phase flag)
 in that order.  The meanings of these are determined by the @blackListed@ function
 here.
 
-The final simplification doesn't have a phase number
+The final simplification doesn't have a phase number.
 
 Pragmas
 ~~~~~~~
@@ -696,9 +693,7 @@ blackListed :: IdSet 		-- Used in transformation rules
 -- place that the inline phase number is looked at.
 
 blackListed rule_vars Nothing		-- Last phase
-  = \v -> case idInlinePragma v of
-		IMustNotBeINLINEd False Nothing -> True		-- An unconditional NOINLINE pragma
-		other				-> False
+  = \v -> isNeverInlinePrag (idInlinePragma v)
 
 blackListed rule_vars (Just phase)
   = \v -> normal_case rule_vars phase v
@@ -712,8 +707,8 @@ normal_case rule_vars phase v
 	  | otherwise   -> True		-- Always blacklisted
 
 	IMustNotBeINLINEd from_inline (Just threshold)
-	  | from_inline -> phase < threshold && has_rules
-	  | otherwise   -> phase < threshold || has_rules
+	  | from_inline -> (phase < threshold && has_rules)
+	  | otherwise   -> (phase < threshold || has_rules)
   where
     has_rules =  v `elemVarSet` rule_vars
 	      || not (isEmptyCoreRules (idSpecialisation v))
