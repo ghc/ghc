@@ -37,3 +37,4 @@ test('rnfail035', normal, compile_fail, [''])
 # test('rnfail037', normal, compile_fail, [''])
 
 test('rnfail038', normal, compile_fail, [''])
+test('rnfail039', normal, compile_fail, [''])
