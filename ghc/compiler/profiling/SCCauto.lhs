@@ -16,7 +16,7 @@ This is a Core-to-Core pass (usually run {\em last}).
 
 module SCCauto ( addAutoCostCentres ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CmdLineOpts	( opt_AutoSccsOnAllToplevs,
 			  opt_AutoSccsOnExportedToplevs,

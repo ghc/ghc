@@ -10,7 +10,7 @@ module TcTyClsDecls (
 	tcTyAndClassDecls1
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		( TyDecl(..),  ConDecl(..), BangType(..),
 			  ClassDecl(..), MonoType(..), PolyType(..),
@@ -39,9 +39,9 @@ import UniqSet		( UniqSet(..), emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
-import TyCon		( TyCon, tyConDataCons, isDataTyCon, isSynTyCon )
+import TyCon		( TyCon )
 import Unique		( Unique )
-import Util		( panic, pprTrace )
+import Util		( panic{-, pprTrace-} )
 
 \end{code}
 

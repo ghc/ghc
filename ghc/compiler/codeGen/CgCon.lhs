@@ -16,7 +16,7 @@ module CgCon (
 	cgReturnDataCon
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CgMonad
 import AbsCSyn
@@ -33,9 +33,8 @@ import CgCompInfo	( mAX_INTLIKE, mIN_INTLIKE )
 import CgHeapery	( allocDynClosure )
 import CgRetConv	( dataReturnConvAlg, DataReturnConvention(..) )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
-import CLabel		( mkClosureLabel, mkInfoTableLabel,
-			  mkPhantomInfoTableLabel,
-			  mkConEntryLabel, mkStdEntryLabel
+import CLabel		( mkClosureLabel, mkStaticClosureLabel,
+			  mkConInfoTableLabel, mkPhantomInfoTableLabel
 			)
 import ClosureInfo	( mkClosureLFInfo, mkConLFInfo, mkLFArgument,
 			  layOutDynCon, layOutDynClosure,
@@ -157,13 +156,9 @@ cgTopRhsCon name con args all_zero_size_args
 	-- RETURN
     returnFC (name, stableAmodeIdInfo name (CLbl closure_label PtrRep) lf_info)
   where
-    con_tycon	    = dataConTyCon con
-    lf_info	    = mkConLFInfo     con
-
-    closure_label   = mkClosureLabel   name
-    info_label      = mkInfoTableLabel con
-    con_entry_label = mkConEntryLabel  con
-    entry_label	    = mkStdEntryLabel  name
+    con_tycon	    = dataConTyCon   con
+    lf_info	    = mkConLFInfo    con
+    closure_label   = mkClosureLabel name
 \end{code}
 
 The general case is:
@@ -277,7 +272,7 @@ at all.
 buildDynCon binder cc con args all_zero_size_args@True
   = ASSERT(isDataCon con)
     returnFC (stableAmodeIdInfo binder
-				(CLbl (mkClosureLabel con) PtrRep)
+				(CLbl (mkStaticClosureLabel con) PtrRep)
     				(mkConLFInfo con))
 \end{code}
 
@@ -427,7 +422,7 @@ cgReturnDataCon con amodes all_zero_size_args live_vars
 
 			-- MAKE NODE POINT TO IT
 		  let reg_assts = move_to_reg amode node
-		      info_lbl  = mkInfoTableLabel con
+		      info_lbl  = mkConInfoTableLabel con
 		  in
 
 			-- RETURN

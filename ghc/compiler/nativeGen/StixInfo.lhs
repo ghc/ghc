@@ -7,7 +7,7 @@
 
 module StixInfo ( genCodeInfoTable ) where
 
-import Ubiq{-uitious-}
+IMP_Ubiq(){-uitious-}
 
 import AbsCSyn		( AbstractC(..), CAddrMode, ReturnInfo,
 			  RegRelative, MagicId, CStmtMacro

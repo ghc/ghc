@@ -19,7 +19,7 @@ functions drive the mangling of top-level bindings.
 
 module CodeGen ( codeGen ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import StgSyn
 import CgMonad

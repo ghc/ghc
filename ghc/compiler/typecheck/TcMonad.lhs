@@ -1,4 +1,6 @@
 \begin{code}
+#include "HsVersions.h"
+
 module TcMonad(
 	TcM(..), NF_TcM(..), TcDown, TcEnv, 
 	SST_R, FSST_R,
@@ -33,9 +35,9 @@ module TcMonad(
 	MutableVar(..), _MutableArray
   ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
-import TcMLoop		( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
+IMPORT_DELOOPER(TcMLoop)		( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
 
 import Type		( Type(..), GenType )
 import TyVar		( TyVar(..), GenTyVar )
@@ -44,12 +46,14 @@ import ErrUtils		( Error(..), Message(..), ErrCtxt(..),
 			  Warning(..) )
 
 import SST
-import RnMonad		( RnM(..), RnDown, initRn, setExtraRn )
+import RnMonad		( RnM(..), RnDown, initRn, setExtraRn,
+			  returnRn, thenRn, getImplicitUpRn
+			)
 import RnUtils		( RnEnv(..) )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
-import FiniteMap	( FiniteMap, emptyFM )
+import FiniteMap	( FiniteMap, emptyFM, isEmptyFM )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
 import ErrUtils		( Error(..) )
 import Maybes		( MaybeErr(..) )
@@ -459,7 +463,18 @@ rnMtoTcM rn_env rn_action down env
     writeMutVarSST u_var new_uniq_supply	`thenSST_`
     let
 	(rn_result, rn_errs, rn_warns)
-	  = initRn True (panic "rnMtoTcM:module") rn_env uniq_s rn_action
+	  = initRn False{-*interface* mode! so we can see the builtins-}
+		   (panic "rnMtoTcM:module")
+		   rn_env uniq_s (
+		rn_action	`thenRn` \ result ->
+
+		-- Though we are in "interface mode", we must
+		-- not have added anything to the ImplicitEnv!
+		getImplicitUpRn	`thenRn` \ implicit_env@(v_env,tc_env) ->
+		if (isEmptyFM v_env && isEmptyFM tc_env)
+		then returnRn result
+		else panic "rnMtoTcM: non-empty ImplicitEnv!"
+	    )
     in
     returnSST (rn_result, rn_errs)
   where

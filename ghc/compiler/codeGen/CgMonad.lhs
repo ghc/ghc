@@ -47,8 +47,8 @@ module CgMonad (
 	CompilationInfo(..)
     ) where
 
-import Ubiq{-uitous-}
-import CgLoop1		-- stuff from CgBindery and CgUsages
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(CgLoop1)		-- stuff from CgBindery and CgUsages
 
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )

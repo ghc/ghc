@@ -8,7 +8,7 @@ x%
 
 module StgUtils ( mapStgBindeesRhs ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Id		( GenId{-instanced NamedThing-} )
 import StgSyn

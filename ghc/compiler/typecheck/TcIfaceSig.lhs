@@ -8,7 +8,7 @@
 
 module TcIfaceSig ( tcInterfaceSigs ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import TcMonad		hiding ( rnMtoTcM )
 import TcMonoType	( tcPolyType )
@@ -19,6 +19,7 @@ import RnHsSyn		( RenamedSig(..), RnName(..) )
 import CmdLineOpts	( opt_CompilingPrelude )
 import Id		( mkImported )
 --import Name		( Name(..) )
+import Maybes		( maybeToBool )
 import Pretty
 import Util		( panic )
 
@@ -41,7 +42,8 @@ tcInterfaceSigs :: [RenamedSig] -> TcM s [Id]
 
 tcInterfaceSigs [] = returnTc []
 
-tcInterfaceSigs (Sig name@(RnName full_name) ty pragmas src_loc : sigs)
+tcInterfaceSigs (Sig name ty pragmas src_loc : sigs)
+  | has_full_name
   = tcAddSrcLoc src_loc		(
     tcPolyType ty		`thenTc` \ sigma_ty ->
     fixTc ( \ rec_id ->
@@ -52,13 +54,19 @@ tcInterfaceSigs (Sig name@(RnName full_name) ty pragmas src_loc : sigs)
     tcInterfaceSigs sigs	`thenTc` \ sigs' ->
     returnTc (id:sigs')
 
-
-tcInterfaceSigs (Sig odd_name _ _ src_loc : sigs)
-  = case odd_name of
+  | otherwise -- odd name...
+  = case name of
       WiredInId _ | opt_CompilingPrelude
         -> tcInterfaceSigs sigs
       _ -> tcAddSrcLoc src_loc	$
-	   failTc (ifaceSigNameErr odd_name)
+	   failTc (ifaceSigNameErr name)
+  where
+    has_full_name    = maybeToBool full_name_maybe
+    (Just full_name) = full_name_maybe
+    full_name_maybe  = case name of
+			 RnName     fn	-> Just fn
+			 RnImplicit fn	-> Just fn
+			 _		-> Nothing
 
 ifaceSigNameErr name sty
   = ppHang (ppStr "Bad name in an interface type signature (a Prelude name?)")

@@ -33,7 +33,7 @@ useless as map' will be transformed back to what map was.
 
 module StgSAT (	doStaticArgs ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import StgSyn
 import UniqSupply	( UniqSM(..) )

@@ -12,7 +12,7 @@
 #endif
 
 module Pretty (
-	Pretty(..),
+	SYN_IE(Pretty),
 
 #if defined(COMPILING_GHC)
 	prettyToUn,
@@ -32,21 +32,20 @@ module Pretty (
 	ppShow, speakNth,
 
 #if defined(COMPILING_GHC)
-	ppAppendFile,
+	ppPutStr,
 #endif
 
 	-- abstract type, to complete the interface...
-	PrettyRep(..), CSeq, Delay
-#if defined(COMPILING_GHC)
-	, Unpretty(..)
-#endif
+	PrettyRep(..), Delay
    ) where
 
 #if defined(COMPILING_GHC)
 
 CHK_Ubiq() -- debugging consistency check
+IMPORT_1_3(Ratio)
+IMPORT_1_3(IO)
 
-import Unpretty		( Unpretty(..) )
+import Unpretty		( SYN_IE(Unpretty) )
 #endif
 
 import CharSeq
@@ -94,7 +93,7 @@ ppNest		:: Int -> Pretty -> Pretty
 ppShow		:: Int -> Pretty -> [Char]
 
 #if defined(COMPILING_GHC)
-ppAppendFile	:: _FILE -> Int -> Pretty -> IO ()
+ppPutStr	:: Handle -> Int -> Pretty -> IO ()
 #endif
 \end{code}
 
@@ -129,9 +128,9 @@ ppShow width p
       MkPrettyRep seq ll emp sl -> cShow seq
 
 #if defined(COMPILING_GHC)
-ppAppendFile f width p
+ppPutStr f width p
   = case (p width False) of
-      MkPrettyRep seq ll emp sl -> cAppendFile f seq
+      MkPrettyRep seq ll emp sl -> cPutStr f seq
 #endif
 
 ppNil    width is_vert = MkPrettyRep cNil (MkDelay 0) True (width >= 0)

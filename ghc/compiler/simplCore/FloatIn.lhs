@@ -16,7 +16,7 @@ then discover that they aren't needed in the chosen branch.
 
 module FloatIn ( floatInwards ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AnnCoreSyn
 import CoreSyn

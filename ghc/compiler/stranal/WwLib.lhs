@@ -12,7 +12,7 @@ module WwLib (
 	mkWwBodies, mAX_WORKER_ARGS
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 import Id		( idType, mkSysLocal, dataConArgTys )

@@ -8,7 +8,7 @@
 
 module WorkWrap ( workersAndWrappers ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..) )

@@ -10,7 +10,7 @@
 
 module LiberateCase ( liberateCase ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 import Util		( panic )
 
 liberateCase = panic "LiberateCase.liberateCase: ToDo"

@@ -12,8 +12,8 @@ lower levels it is preserved with @let@/@letrec@s).
 
 module DsBinds ( dsBinds, dsInstBinds ) where
 
-import Ubiq
-import DsLoop		-- break dsExpr-ish loop
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
 
 import HsSyn		-- lots of things
 			hiding ( collectBinders{-also in CoreSyn-} )

@@ -35,6 +35,7 @@ module UniqFM (
 	IF_NOT_GHC(addToUFM_C COMMA)
 	addListToUFM_C,
 	delFromUFM,
+	delFromUFM_Directly,
 	delListFromUFM,
 	plusUFM,
 	plusUFM_C,
@@ -53,7 +54,7 @@ module UniqFM (
     ) where
 
 #if defined(COMPILING_GHC)
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 #endif
 
 import Unique		( Unique, u2i, mkUniqueGrimily )
@@ -101,6 +102,7 @@ addListToUFM_C	:: Uniquable key => (elt -> elt -> elt)
 
 delFromUFM	:: Uniquable key => UniqFM elt -> key	 -> UniqFM elt
 delListFromUFM	:: Uniquable key => UniqFM elt -> [key] -> UniqFM elt
+delFromUFM_Directly :: UniqFM elt -> Unique -> UniqFM elt
 
 plusUFM		:: UniqFM elt -> UniqFM elt -> UniqFM elt
 
@@ -329,7 +331,8 @@ Now ways of removing things from UniqFM.
 \begin{code}
 delListFromUFM fm lst = foldl delFromUFM fm lst
 
-delFromUFM fm key = delete fm (u2i (uniqueOf key))
+delFromUFM          fm key = delete fm (u2i (uniqueOf key))
+delFromUFM_Directly fm u   = delete fm (u2i u)
 
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm

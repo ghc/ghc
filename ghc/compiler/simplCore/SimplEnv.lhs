@@ -43,27 +43,30 @@ module SimplEnv (
 	OutExpr(..), OutAlts(..), OutDefault(..), OutArg(..)
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
-import SmplLoop		-- breaks the MagicUFs / SimplEnv loop
+IMPORT_DELOOPER(SmplLoop)		-- breaks the MagicUFs / SimplEnv loop
 
-import BinderInfo	( BinderInfo{-instances-} )
+import BinderInfo	( orBinderInfo, oneSafeOcc,
+			  BinderInfo(..){-instances, too-}, FunOrArg, DuplicationDanger, InsideSCC
+			)
 import CgCompInfo	( uNFOLDING_CREATION_THRESHOLD )
 import CmdLineOpts	( switchIsOn, intSwitchSet, SimplifierSwitch(..), SwitchResult )
 import CoreSyn
-import CoreUnfold	( UnfoldingDetails(..), mkGenForm, modifyUnfoldingDetails,
+import CoreUnfold	( UnfoldingDetails(..), mkGenForm, mkConForm,
 			  calcUnfoldingGuidance, UnfoldingGuidance(..),
-			  mkFormSummary, FormSummary
+			  mkFormSummary, FormSummary(..)
 			)
 import CoreUtils	( manifestlyWHNF, exprSmallEnoughToDup )
 import FiniteMap	-- lots of things
 import Id		( idType, getIdUnfolding, getIdStrictness,
 			  applyTypeEnvToId,
 			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
-			  addOneToIdEnv, modifyIdEnv,
+			  addOneToIdEnv, modifyIdEnv, mkIdSet,
 			  IdEnv(..), IdSet(..), GenId )
 import IdInfo		( bottomIsGuaranteed, StrictnessInfo )
 import Literal		( isNoRepLit, Literal{-instances-} )
+import Maybes		( maybeToBool )
 import Name		( isLocallyDefined )
 import OccurAnal	( occurAnalyseExpr )
 import Outputable	( Outputable(..){-instances-} )
@@ -77,16 +80,15 @@ import TyVar		( nullTyVarEnv, addOneToIdEnv, addOneToTyVarEnv,
 			  TyVarEnv(..), GenTyVar{-instance Eq-}
 			)
 import Unique		( Unique{-instance Outputable-} )
-import UniqFM		( addToUFM_Directly, lookupUFM_Directly, ufmToList )
-import UniqSet		-- lots of things
+import UniqFM		( addToUFM_Directly, lookupUFM_Directly, delFromUFM_Directly,
+			  delFromUFM, ufmToList
+			)
+--import UniqSet		-- lots of things
 import Usage		( UVar(..), GenUsage{-instances-} )
 import Util		( zipEqual, thenCmp, cmpList, panic, panic#, assertPanic )
 
 type TypeEnv = TyVarEnv Type
 cmpType = panic "cmpType (SimplEnv)"
-oneSafeOcc = panic "oneSafeOcc (SimplEnv)"
-oneTextualOcc = panic "oneTextualOcc (SimplEnv)"
-simplIdWantsToBeINLINEd = panic "simplIdWantsToBeINLINEd (SimplEnv)"
 \end{code}
 
 %************************************************************************
@@ -171,13 +173,11 @@ pprSimplEnv (SimplEnv _ _ ty_env id_env (UFE unfold_env _ _))
       = ppCat [ppr PprDebug v, ppStr "=>",
 	       case form of
 		 NoUnfoldingDetails -> ppStr "NoUnfoldingDetails"
-		 LitForm l -> ppCat [ppStr "Lit:", ppr PprDebug l]
 		 OtherLitForm ls -> ppCat [ppStr "Other lit:", ppInterleave (ppStr ", ")
 						               [ppr PprDebug l | l <- ls]]
-		 ConForm c a     -> ppCat [ppStr "Con:", ppr PprDebug c, ppr PprDebug a]
 		 OtherConForm cs -> ppCat [ppStr "OtherCon:", ppInterleave (ppStr ", ")
 							      [ppr PprDebug c | c <- cs]]
-		 GenForm t w e g -> ppCat [ppStr "UF:",	ppr PprDebug t,	ppr PprDebug w,
+		 GenForm w e g -> ppCat [ppStr "UF:",	ppr PprDebug w,
 							ppr PprDebug g, ppr PprDebug e]
 		 MagicForm s _   -> ppCat [ppStr "Magic:", ppr PprDebug s]
 	      ]
@@ -258,12 +258,21 @@ data UnfoldConApp -- yet another glorified pair
 
 data UnfoldEnv	-- yup, a glorified triple...
   = UFE		(IdEnv UnfoldItem)	-- Maps an OutId => its UnfoldItem
-		IdSet			-- The Ids in the domain of the env
-					-- which have details (GenForm True ...)
-					-- i.e., they claim they are duplicatable.
-					-- These are the ones we have to worry
-					-- about when adding new items to the
-					-- unfold env.
+
+		(IdEnv (Id,BinderInfo))	-- Occurrence info for some (but not necessarily all)
+					-- in-scope ids.  The "Id" part is just so that
+					-- we can recover the domain of the mapping, which
+					-- IdEnvs don't allow directly.
+					--
+					-- Anything that isn't in here
+					-- should be assumed to occur many times.
+					-- The things in here all occur once, and the 
+					-- binder-info tells about whether that "once"
+					-- is inside a lambda, or perhaps once in each branch
+					-- of a case etc.
+					-- We keep this info so we can modify it when
+					-- something changes.
+
 		(FiniteMap UnfoldConApp [([Type], OutId)])
 					-- Maps applications of constructors (to
 					-- value atoms) back to an association list
@@ -274,7 +283,7 @@ data UnfoldEnv	-- yup, a glorified triple...
 					-- mapping for (part of) the main IdEnv
 					-- (1st part of UFE)
 
-null_unfold_env = UFE nullIdEnv emptyUniqSet emptyFM
+null_unfold_env = UFE nullIdEnv nullIdEnv emptyFM
 \end{code}
 
 The @UnfoldEnv@ type.  We expect on the whole that an @UnfoldEnv@ will
@@ -289,45 +298,40 @@ things silently grow quite big....  Here are some local functions used
 elsewhere in the module:
 
 \begin{code}
-grow_unfold_env   :: UnfoldEnv -> OutId -> UnfoldingDetails -> EnclosingCcDetails -> UnfoldEnv
+grow_unfold_env   :: UnfoldEnv -> OutId -> BinderInfo -> UnfoldingDetails -> EnclosingCcDetails -> UnfoldEnv
 lookup_unfold_env :: UnfoldEnv -> OutId -> UnfoldingDetails
 lookup_unfold_env_encl_cc
 		  :: UnfoldEnv -> OutId -> EnclosingCcDetails
 
-grow_unfold_env full_u_env id NoUnfoldingDetails _ = full_u_env
+grow_unfold_env full_u_env _ _ NoUnfoldingDetails _ = full_u_env
 
-grow_unfold_env (UFE u_env interesting_ids con_apps) id
-		uf_details@(GenForm True _ _ _) encl_cc
-    -- Only interested in Ids which have a "dangerous" unfolding; that is
-    -- one that claims to have a single occurrence.
+grow_unfold_env (UFE u_env occ_env con_apps) id occ_info uf_details encl_cc
   = UFE (addOneToIdEnv u_env id (UnfoldItem id uf_details encl_cc))
-	(addOneToUniqSet interesting_ids id)
-	con_apps
-
-grow_unfold_env (UFE u_env interesting_ids con_apps) id uf_details encl_cc
-  = UFE (addOneToIdEnv u_env id (UnfoldItem id uf_details encl_cc))
-	interesting_ids
+	new_occ_env
 	new_con_apps
   where
+    new_occ_env = modify_occ_info occ_env id occ_info
+
     new_con_apps
       = case uf_details of
-	  ConForm con args  -> snd (lookup_conapp_help con_apps con args id)
+	  GenForm WhnfForm (Con con args) UnfoldAlways -> snd (lookup_conapp_help con_apps con args id)
 	  not_a_constructor -> con_apps -- unchanged
 
-addto_unfold_env (UFE u_env interesting_ids con_apps) extra_items
+addto_unfold_env (UFE u_env occ_env con_apps) extra_items
   = ASSERT(not (any constructor_form_in_those extra_items))
     -- otherwise, we'd need to change con_apps
-    UFE (growIdEnvList u_env extra_items) interesting_ids con_apps
+    UFE (growIdEnvList u_env extra_items) occ_env con_apps
   where
-    constructor_form_in_those (_, UnfoldItem _ (ConForm _ _) _) = True
+    constructor_form_in_those (_, UnfoldItem _ (GenForm WhnfForm (Con _ _) UnfoldAlways) _) = True
     constructor_form_in_those _ = False
 
 rng_unfold_env (UFE u_env _ _) = rngIdEnv u_env
 
-get_interesting_ids (UFE _ interesting_ids _) = interesting_ids
+get_interesting_ids (UFE _ occ_env _)
+  = mkIdSet [ i | (_,(i,_)) <- ufmToList occ_env ]
 
-foldr_unfold_env fun (UFE u_env interesting_ids con_apps) stuff
-  = UFE (foldr fun u_env stuff) interesting_ids con_apps
+foldr_occ_env fun (UFE u_env occ_env con_apps) stuff
+  = UFE u_env (foldr fun occ_env stuff) con_apps
 
 lookup_unfold_env (UFE u_env _ _) id
   = case (lookupIdEnv u_env id) of
@@ -368,30 +372,27 @@ lookup_conapp_help con_apps con args outid
     cmp_ty ty1 ty2 -- NB: we really only know how to do *equality* on types
       = if (ty1 `eqTy` ty2) then EQ_ else LT_{-random choice-}
 
-modify_unfold_env (UFE u_env interesting_ids con_apps) zapper id
-  = UFE (modifyIdEnv u_env zapper id) interesting_ids con_apps
+modify_occ_info occ_env id new_occ@(OneOcc _ _ _ _ _)
+  = modifyIdEnv occ_env (\ (i,o) -> (i, orBinderInfo o new_occ)) id
 
--- If the current binding claims to be a "unique" one, then
--- we modify it.
-modifyItem :: Bool -> BinderInfo -> UnfoldItem -> UnfoldItem
-
-modifyItem ok_to_dup occ_info (UnfoldItem id details enc_cc)
-  = UnfoldItem id (modifyUnfoldingDetails ok_to_dup occ_info details) enc_cc
+modify_occ_info occ_env id other_new_occ
+  = 	-- Many or Dead occurrence, just delete from occ_env
+    delFromUFM occ_env id
 \end{code}
 
 The main thing about @UnfoldConApp@ is that it has @Ord@ defined on
 it, so we can use it for a @FiniteMap@ key.
 \begin{code}
 instance Eq  UnfoldConApp where
-    a == b = case cmp_app a b of { EQ_ -> True;   _ -> False }
-    a /= b = case cmp_app a b of { EQ_ -> False;  _ -> True  }
+    a == b = case (a `cmp` b) of { EQ_ -> True;   _ -> False }
+    a /= b = case (a `cmp` b) of { EQ_ -> False;  _ -> True  }
 
 instance Ord UnfoldConApp where
-    a <= b = case cmp_app a b of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
-    a <  b = case cmp_app a b of { LT_ -> True;  EQ_ -> False; GT__ -> False }
-    a >= b = case cmp_app a b of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >  b = case cmp_app a b of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp a b = case cmp_app a b of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    a <= b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
+    a <  b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
+    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    a >  b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 
 instance Ord3 UnfoldConApp where
     cmp = cmp_app
@@ -402,7 +403,7 @@ cmp_app (UCA c1 as1) (UCA c2 as2)
     -- ToDo: make an "instance Ord3 CoreArg"???
 
     cmp_arg (VarArg   x) (VarArg   y) = x `cmp` y
-    cmp_arg (LitArg   x) (LitArg   y) = case _tagCmp x y of { _LT -> LT_; _EQ -> EQ_; GT__ -> GT_ }
+    cmp_arg (LitArg   x) (LitArg   y) = x `cmp` y
     cmp_arg (TyArg    x) (TyArg    y) = panic# "SimplEnv.cmp_app:TyArgs"
     cmp_arg (UsageArg x) (UsageArg y) = panic# "SimplEnv.cmp_app:UsageArgs"
     cmp_arg x y
@@ -543,26 +544,19 @@ extendIdEnvWithAtom
 	-> InBinder -> OutArg{-Val args only, please-}
 	-> SimplEnv
 
-extendIdEnvWithAtom (SimplEnv chkr encl_cc ty_env id_env unfold_env) (in_id,occ_info) atom@(LitArg lit)
+extendIdEnvWithAtom (SimplEnv chkr encl_cc ty_env id_env unfold_env)
+		    (in_id,occ_info) atom@(LitArg lit)
   = SimplEnv chkr encl_cc ty_env new_id_env unfold_env
   where
     new_id_env = addOneToIdEnv id_env in_id (ItsAnAtom atom)
 
-extendIdEnvWithAtom (SimplEnv chkr encl_cc ty_env id_env unfold_env)
-	    (in_id, occ_info) atom@(VarArg out_id)
+extendIdEnvWithAtom (SimplEnv chkr encl_cc ty_env id_env (UFE u_env occ_env con_apps))
+	    	    (in_id, occ_info) atom@(VarArg out_id)
   = SimplEnv chkr encl_cc ty_env new_id_env new_unfold_env
   where
-    new_id_env = addOneToIdEnv id_env in_id (ItsAnAtom atom)
-
-    new_unfold_env = modify_unfold_env
-			unfold_env
-			(modifyItem ok_to_dup occ_info)
-			out_id
-		-- Modify binding for in_id
-		-- NO! modify out_id, because its the info on the
-		-- atom that interest's us.
-
-    ok_to_dup    = switchIsOn chkr SimplOkToDupCode
+    new_id_env     = addOneToIdEnv id_env in_id (ItsAnAtom atom)
+    new_unfold_env = UFE u_env (modify_occ_info occ_env out_id occ_info) con_apps
+			-- Modify occ info for out_id
 
 #ifdef DEBUG
 extendIdEnvWithAtom _ _ _ = panic "extendIdEnvWithAtom: non-Val arg!"
@@ -648,7 +642,8 @@ extendUnfoldEnvGivenFormDetails
       NoUnfoldingDetails -> env
       good_details	 -> SimplEnv chkr encl_cc ty_env id_env new_unfold_env
 	where
-	  new_unfold_env = grow_unfold_env unfold_env id good_details encl_cc
+	  new_unfold_env = grow_unfold_env unfold_env id fake_occ_info good_details encl_cc
+	  fake_occ_info  = {-ToDo!-} ManyOcc 0 -- generally paranoid
 
 extendUnfoldEnvGivenConstructor -- specialised variant
 	:: SimplEnv
@@ -663,7 +658,7 @@ extendUnfoldEnvGivenConstructor env var con args
 	(_, ty_args, _) = getAppDataTyConExpandingDicts scrut_ty
     in
     extendUnfoldEnvGivenFormDetails
-      env var (ConForm con (map TyArg ty_args ++ map VarArg args))
+      env var (mkConForm con (map TyArg ty_args ++ map VarArg args))
 \end{code}
 
 
@@ -720,40 +715,40 @@ extendUnfoldEnvGivenRhs env@(SimplEnv chkr encl_cc ty_env id_env unfold_env)
   = SimplEnv chkr encl_cc ty_env id_env new_unfold_env
   where
 	-- Occurrence-analyse the RHS
-    (fv_occ_info, template) = occurAnalyseExpr {-test:nullIdEnv-} interesting_fvs rhs
+    (fv_occ_info, template) = occurAnalyseExpr interesting_fvs rhs
 
-    interesting_fvs = get_interesting_ids unfold_env
+    interesting_fvs = get_interesting_ids unfold_env   -- Ids in dom of OccEnv
 
 	-- Compute unfolding details
-    details = case rhs of
-		Var v			   -> panic "Vars already dealt with"
-		Lit lit | isNoRepLit lit -> LitForm lit
-			  | otherwise	   -> panic "non-noRep Lits already dealt with"
-
-		Con con args 		   -> ConForm con args
-
-		other -> mkGenForm ok_to_dup occ_info
-				   (mkFormSummary (getIdStrictness out_id) rhs)
-				   template guidance
+    details = mkGenForm (mkFormSummary (getIdStrictness out_id) rhs)
+			template guidance
 
 	-- Compute resulting unfold env
     new_unfold_env = case details of
-			NoUnfoldingDetails	-> unfold_env
-			GenForm _ _ _ _	-> unfold_env2{-test: unfold_env1 -}
-			other			-> unfold_env1
+			NoUnfoldingDetails  -> unfold_env
+			other		    -> unfold_env1
 
 	-- Add unfolding to unfold env
-    unfold_env1 = grow_unfold_env unfold_env out_id details encl_cc
+    unfold_env1 = grow_unfold_env unfold_env out_id occ_info details encl_cc
 
+{- OLD: done in grow_unfold_env
 	-- Modify unfoldings of free vars of rhs, based on their
 	-- occurrence info in the rhs [see notes above]
-    unfold_env2 = foldr_unfold_env modify unfold_env1 (ufmToList fv_occ_info)
+    unfold_env2
+      = foldr_occ_env modify unfold_env1 (ufmToList fv_occ_info)
+      where
+	modify :: (Unique, (Id,BinderInfo)) -> IdEnv (Id,BinderInfo) -> IdEnv (Id,BinderInfo)
+	modify (u, item@(i,occ_info)) env
+	  = if maybeToBool (lookupUFM_Directly env u) then
+		-- it occurred before, so now it occurs multiple times;
+		-- therefore, *delete* it from the occ(urs once) env.
+		delFromUFM_Directly env u
 
-    modify :: (Unique, BinderInfo) -> IdEnv UnfoldItem -> IdEnv UnfoldItem
-    modify (u, occ_info) env
-      = case (lookupUFM_Directly env u) of
-	  Nothing -> env -- ToDo: can this happen?
-	  Just xx -> addToUFM_Directly env u (modifyItem ok_to_dup occ_info xx)
+	    else if not (oneSafeOcc ok_to_dup occ_info) then
+		env -- leave it alone
+	    else
+		addToUFM_Directly env u item
+-}
 
 	-- Compute unfolding guidance
     guidance = if simplIdWantsToBeINLINEd out_id env
@@ -765,8 +760,8 @@ extendUnfoldEnvGivenRhs env@(SimplEnv chkr encl_cc ty_env id_env unfold_env)
 		      Just xx -> xx
 
     ok_to_dup     = switchIsOn chkr SimplOkToDupCode
-			|| exprSmallEnoughToDup rhs
-			-- [Andy] added, Jun 95
+--NO:			|| exprSmallEnoughToDup rhs
+--			-- [Andy] added, Jun 95
 
 {- Reinstated AJG Jun 95; This is needed
     --example that does not (currently) work

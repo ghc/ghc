@@ -293,7 +293,7 @@ should an unfolding be required.
 >	  	then  no_unfold
 >
 >		else case (getIdUnfolding id) of
->			GenForm _ _ expr guidance ->
+>			GenForm _ expr guidance ->
 >			  panic "DefExpr:GenForm has changed a little; needs mod here"
 >			  -- SLPJ March 95
 >

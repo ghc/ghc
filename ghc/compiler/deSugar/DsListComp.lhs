@@ -4,10 +4,12 @@
 \section[DsListComp]{Desugaring list comprehensions}
 
 \begin{code}
+#include "HsVersions.h"
+
 module DsListComp ( dsListComp ) where
 
-import Ubiq
-import DsLoop		-- break dsExpr-ish loop
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
 
 import HsSyn		( Qual(..), HsExpr, HsBinds )
 import TcHsSyn		( TypecheckedQual(..), TypecheckedHsExpr(..) , TypecheckedHsBinds(..) )

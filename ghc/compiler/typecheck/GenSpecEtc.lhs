@@ -12,7 +12,7 @@ module GenSpecEtc (
 	checkSigTyVars, checkSigTyVarsGivenGlobals
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE, 
@@ -20,8 +20,8 @@ import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE,
 import TcEnv		( tcGetGlobalTyVars )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyWithExtraGlobals )
 import TcType		( TcType(..), TcThetaType(..), TcTauType(..), 
-			  TcTyVarSet(..), TcTyVar(..), tcInstType,
-			  newTyVarTy, zonkTcType
+			  TcTyVarSet(..), TcTyVar(..),
+			  newTyVarTy, zonkTcType, zonkTcTyVar, zonkTcTyVars 
 			)
 import Unify		( unifyTauTy )
 
@@ -41,7 +41,7 @@ import Outputable	( interppSP, interpp'SP )
 import Pretty
 import PprType		( GenClass, GenType, GenTyVar )
 import Type		( mkTyVarTy, splitSigmaTy, mkForAllTys, mkFunTys,
-			  getTyVar_maybe, tyVarsOfTypes, eqSimpleTheta )
+			  getTyVar, getTyVar_maybe, tyVarsOfTypes, eqSimpleTheta )
 import TyVar		( GenTyVar, TyVar(..), tyVarKind, minusTyVarSet, emptyTyVarSet,
 			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList )
 import Usage		( UVar(..) )
@@ -378,24 +378,39 @@ checkSigTyVars :: [TcTyVar s]		-- The original signature type variables
 	       -> TcM s ()
 
 checkSigTyVars sig_tyvars sig_tau
-  = tcGetGlobalTyVars			`thenNF_Tc` \ env_tyvars ->
-    checkSigTyVarsGivenGlobals env_tyvars sig_tyvars sig_tau
+  = checkSigTyVarsGivenGlobals emptyTyVarSet sig_tyvars sig_tau
 
 checkSigTyVarsGivenGlobals
-	 :: TcTyVarSet s	-- Consider these fully-zonked tyvars as global
+	 :: TcTyVarSet s	-- Consider these tyvars as global in addition to envt ones
 	 -> [TcTyVar s]		-- The original signature type variables
 	 -> TcType s		-- signature type (for err msg)
 	 -> TcM s ()
 
-checkSigTyVarsGivenGlobals globals sig_tyvars sig_tau
-  = 	-- Check point (c)
+checkSigTyVarsGivenGlobals extra_globals sig_tyvars sig_tau
+  = zonkTcTyVars extra_globals		`thenNF_Tc` \ extra_tyvars' ->
+    tcGetGlobalTyVars			`thenNF_Tc` \ env_tyvars ->
+    let
+	globals     = env_tyvars `unionTyVarSets` extra_tyvars'
+	mono_tyvars = filter (`elementOfTyVarSet` globals) sig_tyvars
+    in
+	-- TEMPORARY FIX
+	-- Until the final Bind-handling stuff is in, several type signatures in the same
+	-- bindings group can cause the signature type variable from the different
+	-- signatures to be unified.  So we still need to zonk and check point (b).
+	-- Remove when activating the new binding code
+    mapNF_Tc zonkTcTyVar sig_tyvars	`thenNF_Tc` \ sig_tys ->
+    checkTcM (hasNoDups (map (getTyVar "checkSigTyVars") sig_tys))
+	     (zonkTcType sig_tau 	`thenNF_Tc` \ sig_tau' ->
+	      failTc (badMatchErr sig_tau sig_tau')
+	     )				`thenTc_`
+
+
+	-- Check point (c)
 	-- We want to report errors in terms of the original signature tyvars,
 	-- ie sig_tyvars, NOT sig_tyvars'.  sig_tys and sig_tyvars' correspond
 	-- 1-1 with sig_tyvars, so we can just map back.
     checkTc (null mono_tyvars)
 	    (notAsPolyAsSigErr sig_tau mono_tyvars)
-  where
-    mono_tyvars = filter (`elementOfTyVarSet` globals) sig_tyvars
 \end{code}
 
 
@@ -406,9 +421,8 @@ Contexts and errors
 \begin{code}
 notAsPolyAsSigErr sig_tau mono_tyvars sty
   = ppHang (ppStr "A type signature is more polymorphic than the inferred type")
-	4  (ppAboves [ppStr "(That is, one or more type variables in the inferred type can't be forall'd.)",
-		      ppHang (ppStr "Monomorphic type variable(s):")
-		   	   4 (interpp'SP sty mono_tyvars),
+	4  (ppAboves [ppStr "Some type variables in the inferred type can't be forall'd, namely:",
+		      interpp'SP sty mono_tyvars,
 		      ppStr "Possible cause: the RHS mentions something subject to the monomorphism restriction"
 		     ])
 \end{code}

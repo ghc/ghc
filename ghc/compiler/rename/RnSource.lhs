@@ -8,8 +8,8 @@
 
 module RnSource ( rnSource, rnTyDecl, rnClassDecl, rnInstDecl, rnPolyType ) where
 
-import Ubiq
-import RnLoop		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
+IMP_Ubiq()
+IMPORT_DELOOPER(RnLoop)		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
 
 import HsSyn
 import HsPragmas
@@ -34,7 +34,7 @@ import SrcLoc		( SrcLoc )
 import Unique		( Unique )
 import UniqFM		( emptyUFM, addListToUFM_C, listToUFM, plusUFM, lookupUFM, eltsUFM )
 import UniqSet		( UniqSet(..) )
-import Util		( isIn, isn'tIn, sortLt, removeDups, mapAndUnzip3, cmpPString,
+import Util		( isIn, isn'tIn, thenCmp, sortLt, removeDups, mapAndUnzip3, cmpPString,
 			  assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
@@ -236,7 +236,7 @@ rnIE mods (IEThingWith name names)
 					   `unionBags`
 					 listToBag (map exp_all fields))
 	| otherwise
-	= rnWithErr "constructrs (and fields)" rn (cons++fields) rns 
+	= rnWithErr "constructors (and fields)" rn (cons++fields) rns 
     checkIEWith rn@(RnClass n ops) rns
 	| same_names ops rns
 	= returnRn (unitBag (exp_all n), listToBag (map exp_all ops))
@@ -298,7 +298,7 @@ rnTyDecl (TyData context tycon tyvars condecls derivings pragmas src_loc)
   = pushSrcLocRn src_loc $
     lookupTyCon tycon		       `thenRn` \ tycon' ->
     mkTyVarNamesEnv src_loc tyvars     `thenRn` \ (tv_env, tyvars') ->
-    rnContext tv_env context	       `thenRn` \ context' ->
+    rnContext tv_env src_loc context   `thenRn` \ context' ->
     rnConDecls tv_env condecls	       `thenRn` \ condecls' ->
     rn_derivs tycon' src_loc derivings `thenRn` \ derivings' ->
     ASSERT(isNoDataPragmas pragmas)
@@ -308,7 +308,7 @@ rnTyDecl (TyNew context tycon tyvars condecl derivings pragmas src_loc)
   = pushSrcLocRn src_loc $
     lookupTyCon tycon		      `thenRn` \ tycon' ->
     mkTyVarNamesEnv src_loc tyvars    `thenRn` \ (tv_env, tyvars') ->
-    rnContext tv_env context	      `thenRn` \ context' ->
+    rnContext tv_env src_loc context  `thenRn` \ context' ->
     rnConDecls tv_env condecl	      `thenRn` \ condecl' ->
     rn_derivs tycon' src_loc derivings `thenRn` \ derivings' ->
     ASSERT(isNoDataPragmas pragmas)
@@ -429,27 +429,34 @@ rnClassDecl :: RdrNameClassDecl -> RnM_Fixes s RenamedClassDecl
 
 rnClassDecl (ClassDecl context cname tyvar sigs mbinds pragmas src_loc)
   = pushSrcLocRn src_loc $
-    mkTyVarNamesEnv src_loc [tyvar]	`thenRn` \ (tv_env, [tyvar']) ->
-    rnContext tv_env context	    	`thenRn` \ context' ->
-    lookupClass cname		    	`thenRn` \ cname' ->
-    mapRn (rn_op cname' tv_env) sigs    `thenRn` \ sigs' ->
-    rnMethodBinds cname' mbinds    	`thenRn` \ mbinds' ->
+    mkTyVarNamesEnv src_loc [tyvar]	    `thenRn` \ (tv_env, [tyvar']) ->
+    rnContext tv_env src_loc context	    `thenRn` \ context' ->
+    lookupClass cname			    `thenRn` \ cname' ->
+    mapRn (rn_op cname' tyvar' tv_env) sigs `thenRn` \ sigs' ->
+    rnMethodBinds cname' mbinds		    `thenRn` \ mbinds' ->
     ASSERT(isNoClassPragmas pragmas)
     returnRn (ClassDecl context' cname' tyvar' sigs' mbinds' NoClassPragmas src_loc)
   where
-    rn_op clas tv_env (ClassOpSig op ty pragmas locn)
+    rn_op clas clas_tyvar tv_env sig@(ClassOpSig op ty pragmas locn)
       = pushSrcLocRn locn $
 	lookupClassOp clas op		`thenRn` \ op_name ->
 	rnPolyType tv_env ty		`thenRn` \ new_ty  ->
+	let
+	    (HsForAllTy tvs ctxt op_ty) = new_ty
+	    ctxt_tvs = extractCtxtTyNames ctxt
+	    op_tvs   = extractMonoTyNames is_tyvar_name op_ty
+	in
+	-- check that class tyvar appears in op_ty
+        ( if isIn "rn_op" clas_tyvar op_tvs
+	  then returnRn ()
+	  else addErrRn (classTyVarNotInOpTyErr clas_tyvar sig locn)
+	) `thenRn_`
 
-{-
-*** Please check here that tyvar' appears in new_ty ***
-*** (used to be in tcClassSig, but it's better here)
-***	    not_elem = isn'tIn "tcClassSigs"
-***	    -- Check that the class type variable is mentioned
-***	checkTc (clas_tyvar `not_elem` extractTyVarTemplatesFromTy local_ty)
-***		(methodTypeLacksTyVarErr clas_tyvar (_UNPK_ op_name) src_loc) `thenTc_`
--}
+	-- check that class tyvar *doesn't* appear in the sig's context
+        ( if isIn "rn_op(2)" clas_tyvar ctxt_tvs
+	  then addErrRn (classTyVarInOpCtxtErr clas_tyvar sig locn)
+	  else returnRn ()
+	) `thenRn_`
 
 	ASSERT(isNoClassOpPragmas pragmas)
 	returnRn (ClassOpSig op_name new_ty noClassOpPragmas locn)
@@ -630,13 +637,13 @@ rn_poly_help tv_env tyvars ctxt ty
     		ppStr ";ctxt=", ppCat (map (ppr PprShowAll) ctxt),
     		ppStr ";ty=", ppr PprShowAll ty]) $
     -}
-    getSrcLocRn 				`thenRn` \ src_loc ->
-    mkTyVarNamesEnv src_loc tyvars	 	`thenRn` \ (tv_env1, new_tyvars) ->
+    getSrcLocRn 			`thenRn` \ src_loc ->
+    mkTyVarNamesEnv src_loc tyvars	`thenRn` \ (tv_env1, new_tyvars) ->
     let
 	tv_env2 = catTyVarNamesEnvs tv_env1 tv_env
     in
-    rnContext tv_env2 ctxt	`thenRn` \ new_ctxt ->
-    rnMonoType tv_env2 ty	`thenRn` \ new_ty ->
+    rnContext tv_env2 src_loc ctxt	`thenRn` \ new_ctxt ->
+    rnMonoType tv_env2 ty		`thenRn` \ new_ty ->
     returnRn (HsForAllTy new_tyvars new_ctxt new_ty)
 \end{code}
 
@@ -673,75 +680,101 @@ rnMonoType tv_env (MonoTyApp name tys)
 \end{code}
 
 \begin{code}
-rnContext :: TyVarNamesEnv -> RdrNameContext -> RnM_Fixes s RenamedContext
+rnContext :: TyVarNamesEnv -> SrcLoc -> RdrNameContext -> RnM_Fixes s RenamedContext
 
-rnContext tv_env ctxt
-  = mapRn rn_ctxt ctxt
+rnContext tv_env locn ctxt
+  = mapRn rn_ctxt ctxt	`thenRn` \ result ->
+    let
+	(_, dup_asserts) = removeDups cmp_assert result
+    in
+    -- If this isn't an error, then it ought to be:
+    mapRn (addWarnRn . dupClassAssertWarn result locn) dup_asserts `thenRn_`
+    returnRn result
   where
     rn_ctxt (clas, tyvar)
-     = lookupClass clas	    	    `thenRn` \ clas_name ->
-       lookupTyVarName tv_env tyvar `thenRn` \ tyvar_name ->
-       returnRn (clas_name, tyvar_name)
+      = lookupClass clas	     `thenRn` \ clas_name ->
+	lookupTyVarName tv_env tyvar `thenRn` \ tyvar_name ->
+	returnRn (clas_name, tyvar_name)
+
+    cmp_assert (c1,tv1) (c2,tv2)
+      = (c1 `cmp` c2) `thenCmp` (tv1 `cmp` tv2)
 \end{code}
 
 
 \begin{code}
 dupNameExportWarn locn names@((n,_):_)
-  = addShortWarnLocLine locn (\ sty ->
-    ppCat [pprNonSym sty n, ppStr "exported", ppInt (length names), ppStr "times"])
+  = addShortWarnLocLine locn $ \ sty ->
+    ppCat [pprNonSym sty n, ppStr "exported", ppInt (length names), ppStr "times"]
 
 dupLocalsExportErr locn locals@((str,_):_)
-  = addErrLoc locn "exported names have same local name" (\ sty ->
-    ppInterleave ppSP (map (pprNonSym sty . snd) locals))
+  = addErrLoc locn "exported names have same local name" $ \ sty ->
+    ppInterleave ppSP (map (pprNonSym sty . snd) locals)
 
 classOpExportErr op locn
-  = addShortErrLocLine locn (\ sty ->
-    ppBesides [ppStr "class operation `", ppr sty op, ppStr "' can only be exported with class"])
+  = addShortErrLocLine locn $ \ sty ->
+    ppBesides [ppStr "class operation `", ppr sty op, ppStr "' can only be exported with class"]
 
 synAllExportErr is_error syn locn
-  = (if is_error then addShortErrLocLine else addShortWarnLocLine) locn (\ sty ->
-    ppBesides [ppStr "type synonym `", ppr sty syn, ppStr "' should be exported abstractly"])
+  = (if is_error then addShortErrLocLine else addShortWarnLocLine) locn $ \ sty ->
+    ppBesides [ppStr "type synonym `", ppr sty syn, ppStr "' should be exported abstractly"]
 
 withExportErr str rn has rns locn
-  = addErrLoc locn "" (\ sty ->
+  = addErrLoc locn "" $ \ sty ->
     ppAboves [ ppBesides [ppStr "inconsistent list of ", ppStr str, ppStr " in export list for `", ppr sty rn, ppStr "'"],
 	       ppCat [ppStr "    expected:", ppInterleave ppComma (map (ppr sty) has)],
-	       ppCat [ppStr "    found:   ", ppInterleave ppComma (map (ppr sty) rns)] ])
+	       ppCat [ppStr "    found:   ", ppInterleave ppComma (map (ppr sty) rns)] ]
 
 importAllErr rn locn
-  = addShortErrLocLine locn (\ sty ->
-    ppBesides [ ppStr "`", pprNonSym sty rn, ppStr "' has been exported with (..), but is only imported abstractly"])
+  = addShortErrLocLine locn $ \ sty ->
+    ppBesides [ ppStr "`", pprNonSym sty rn, ppStr "' has been exported with (..), but is only imported abstractly"]
 
 badModExportErr mod locn
-  = addShortErrLocLine locn (\ sty ->
-    ppCat [ ppStr "unknown module in export list: module", ppPStr mod])
+  = addShortErrLocLine locn $ \ sty ->
+    ppCat [ ppStr "unknown module in export list: module", ppPStr mod]
 
 emptyModExportWarn locn mod
-  = addShortWarnLocLine locn (\ sty ->
-    ppCat [ppStr "module", ppPStr mod, ppStr "has no unqualified imports to export"])
+  = addShortWarnLocLine locn $ \ sty ->
+    ppCat [ppStr "module", ppPStr mod, ppStr "has no unqualified imports to export"]
 
 dupModExportWarn locn mods@(mod:_)
-  = addShortWarnLocLine locn (\ sty ->
-    ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list"])
+  = addShortWarnLocLine locn $ \ sty ->
+    ppCat [ppStr "module", ppPStr mod, ppStr "appears", ppInt (length mods), ppStr "times in export list"]
 
 derivingNonStdClassErr clas locn
-  = addShortErrLocLine locn (\ sty ->
-    ppCat [ppStr "non-standard class in deriving:", ppr sty clas])
+  = addShortErrLocLine locn $ \ sty ->
+    ppCat [ppStr "non-standard class in deriving:", ppr sty clas]
 
 dupDefaultDeclErr (DefaultDecl _ locn1 : dup_things) sty
   = ppAboves (item1 : map dup_item dup_things)
   where
     item1
-      = addShortErrLocLine locn1 (\ sty -> ppStr "multiple default declarations") sty
+      = addShortErrLocLine locn1 (\ sty ->
+	ppStr "multiple default declarations") sty
 
     dup_item (DefaultDecl _ locn)
-      = addShortErrLocLine locn (\ sty -> ppStr "here was another default declaration") sty
+      = addShortErrLocLine locn (\ sty ->
+	ppStr "here was another default declaration") sty
 
 undefinedFixityDeclErr locn decl
-  = addErrLoc locn "fixity declaration for unknown operator" (\ sty ->
-    ppr sty decl)
+  = addErrLoc locn "fixity declaration for unknown operator" $ \ sty ->
+    ppr sty decl
 
 dupFixityDeclErr locn dups
-  = addErrLoc locn "multiple fixity declarations for same operator" (\ sty ->
-    ppAboves (map (ppr sty) dups))
+  = addErrLoc locn "multiple fixity declarations for same operator" $ \ sty ->
+    ppAboves (map (ppr sty) dups)
+
+classTyVarNotInOpTyErr clas_tyvar sig locn
+  = addShortErrLocLine locn $ \ sty ->
+    ppHang (ppBesides [ppStr "Class type variable `", ppr sty clas_tyvar, ppStr "' does not appear in method signature:"])
+	 4 (ppr sty sig)
+
+classTyVarInOpCtxtErr clas_tyvar sig locn
+  = addShortErrLocLine locn $ \ sty ->
+    ppHang (ppBesides [ppStr "Class type variable `", ppr sty clas_tyvar, ppStr "' present in method's local overloading context:"])
+	 4 (ppr sty sig)
+
+dupClassAssertWarn ctxt locn dups
+  = addShortWarnLocLine locn $ \ sty ->
+    ppHang (ppBesides [ppStr "Duplicate class assertion `", ppr sty dups, ppStr "' in context:"])
+	 4 (ppr sty ctxt)
 \end{code}

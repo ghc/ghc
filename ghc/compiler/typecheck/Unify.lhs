@@ -11,7 +11,7 @@ updatable substitution).
 
 module Unify ( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy ) where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends: 
 import TcMonad	hiding ( rnMtoTcM )
@@ -229,14 +229,23 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
     case (maybe_ty1, maybe_ty2) of
 	(_, BoundTo ty2') -> uUnboundVar tv1 maybe_ty1 ty2' ty2'
 
-	(DontBind,DontBind) 
-		     -> failTc (unifyDontBindErr tv1 ps_ty2)
-
 	(UnBound, _) |  kind2 `hasMoreBoxityInfo` kind1
 		     -> tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
 	
 	(_, UnBound) |  kind1 `hasMoreBoxityInfo` kind2
 		     -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
+
+-- TEMPORARY FIX
+--	(DontBind,DontBind) 
+--		     -> failTc (unifyDontBindErr tv1 ps_ty2)
+
+-- TEMPORARILY allow two type-sig variables to be bound together.
+-- See notes in tcCheckSigVars
+	(DontBind,DontBind) |  kind2 `hasMoreBoxityInfo` kind1
+		            -> tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
+	
+			    |  kind1 `hasMoreBoxityInfo` kind2
+			    -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
 
 	other	     -> failTc (unifyKindErr tv1 ps_ty2)
 

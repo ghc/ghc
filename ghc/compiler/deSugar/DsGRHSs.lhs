@@ -8,8 +8,8 @@
 
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
-import Ubiq
-import DsLoop		-- break dsExpr/dsBinds-ish loop
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		-- break dsExpr/dsBinds-ish loop
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 			  HsExpr, HsBinds )

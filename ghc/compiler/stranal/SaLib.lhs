@@ -18,7 +18,7 @@ module SaLib (
 	absValFromStrictness
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn		( CoreExpr(..) )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList,

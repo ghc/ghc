@@ -16,7 +16,7 @@ module CgStackery (
 	mkVirtStkOffsets, mkStkAmodes
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CgMonad
 import AbsCSyn

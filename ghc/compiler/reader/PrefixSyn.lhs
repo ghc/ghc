@@ -22,11 +22,15 @@ module PrefixSyn (
 	readInteger
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn
 import RdrHsSyn
 import Util		( panic )
+
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+#endif
 
 type RdrId   = RdrName
 type SrcLine = Int

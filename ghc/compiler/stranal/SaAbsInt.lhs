@@ -15,13 +15,13 @@ module SaAbsInt (
 	isBot
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 import CoreUnfold	( UnfoldingDetails(..), FormSummary )
 import CoreUtils	( unTagBinders )
 import Id		( idType, getIdStrictness, getIdUnfolding,
-			  dataConSig, dataConArgTys
+			  dataConTyCon, dataConArgTys
 			)
 import IdInfo		( StrictnessInfo(..), Demand(..),
 			  wwPrim, wwStrict, wwEnum, wwUnpack
@@ -393,14 +393,7 @@ absId anal var env
 	(Just abs_val, _, _) ->
 			abs_val	-- Bound in the environment
 
-	(Nothing, NoStrictnessInfo, LitForm _) ->
-			AbsTop 	-- Literals all terminate, and have no poison
-
-	(Nothing, NoStrictnessInfo, ConForm _ _) ->
-			AbsTop -- An imported constructor won't have
-			       -- bottom components, nor poison!
-
-	(Nothing, NoStrictnessInfo, GenForm _ _ unfolding _) ->
+	(Nothing, NoStrictnessInfo, GenForm _ unfolding _) ->
 			-- We have an unfolding for the expr
 			-- Assume the unfolding has no free variables since it
 			-- came from inside the Id
@@ -429,14 +422,9 @@ absId anal var env
 			-- Includes MagicForm, IWantToBeINLINEd, NoUnfoldingDetails
 			-- Try the strictness info
 			absValFromStrictness anal strictness_info
-
-
-	-- 	Done via strictness now
-	--	  GenForm _ BottomForm _ _ -> AbsBot
     in
-    -- pprTrace "absId:" (ppBesides [ppr PprDebug var, ppStr "=:", pp_anal anal, ppStr ":=",ppr PprDebug result]) (
+    -- pprTrace "absId:" (ppBesides [ppr PprDebug var, ppStr "=:", pp_anal anal, ppStr ":=",ppr PprDebug result]) $
     result
-    -- )
   where
     pp_anal StrAnal = ppStr "STR"
     pp_anal AbsAnal = ppStr "ABS"
@@ -518,8 +506,7 @@ absEval anal (Con con as) env
 		   then AbsBot
 		   else AbsTop
   where
-    (_,_,_, tycon) = dataConSig con
-    has_single_con = maybeToBool (maybeTyConSingleCon tycon)
+    has_single_con = maybeToBool (maybeTyConSingleCon (dataConTyCon con))
 \end{code}
 
 \begin{code}

@@ -40,4 +40,7 @@ iX = SLIT("Ix")
 
 fromPrelude :: FAST_STRING -> Bool
 fromPrelude s = (_SUBSTR_ s 0 6 == SLIT("Prelude"))
+  where
+    substr str beg end
+      = take (end - beg + 1) (drop beg str)
 \end{code}

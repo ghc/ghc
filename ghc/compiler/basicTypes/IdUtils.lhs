@@ -8,19 +8,19 @@
 
 module IdUtils ( primOpNameInfo, primOpId ) where
 
-import Ubiq
-import PrelLoop		-- here for paranoia checking
+IMP_Ubiq()
+IMPORT_DELOOPER(PrelLoop)		-- here for paranoia checking
 
 import CoreSyn
 import CoreUnfold	( UnfoldingGuidance(..) )
-import Id		( mkPreludeId )
+import Id		( mkPreludeId, mkTemplateLocals )
 import IdInfo		-- quite a few things
 import Name		( mkBuiltinName )
 import PrelMods		( pRELUDE_BUILTIN )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
 			  PrimOpInfo(..), PrimOpResultInfo(..) )
 import RnHsSyn		( RnName(..) )
-import Type		( mkForAllTys, mkFunTys, applyTyCon )
+import Type		( mkForAllTys, mkFunTys, mkTyVarTy, applyTyCon )
 import TysWiredIn	( boolTy )
 import Unique		( mkPrimOpIdUnique )
 import Util		( panic )
@@ -81,15 +81,12 @@ The functions to make common unfoldings are tedious.
 \begin{code}
 mk_prim_unfold :: PrimOp -> [TyVar] -> [Type] -> CoreExpr{-template-}
 
-mk_prim_unfold prim_op tvs arg_tys
-  = panic "IdUtils.mk_prim_unfold"
-{-
+mk_prim_unfold prim_op tyvars arg_tys
   = let
-	(inst_env, tyvars, tyvar_tys) = instantiateTyVars tvs (map uniqueOf tvs)
-	inst_arg_tys		      = map (instantiateTauTy inst_env) arg_tys
-	vars	    		      = mkTemplateLocals inst_arg_tys
+	vars = mkTemplateLocals arg_tys
     in
-    mkLam tyvars vars (Prim prim_op tyvar_tys [VarArg v | v <- vars])
--}
+    mkLam tyvars vars $
+    Prim prim_op
+	([TyArg (mkTyVarTy tv) | tv <- tyvars] ++ [VarArg v | v <- vars])
 \end{code}
 

@@ -7,8 +7,8 @@
 
 module StixPrim ( primCode, amodeToStix, amodeToStix' ) where
 
-import Ubiq{-uitous-}
-import NcgLoop		-- paranoia checking only
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(NcgLoop)		-- paranoia checking only
 
 import MachMisc
 import MachRegs
@@ -32,6 +32,10 @@ import StixInteger	{- everything -}
 import UniqSupply	( returnUs, thenUs, UniqSM(..) )
 import Unpretty		( uppBeside, uppPStr, uppInt )
 import Util		( panic )
+
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+#endif
 \end{code}
 
 The main honcho here is primCode, which handles the guts of COpStmts.

@@ -7,7 +7,7 @@
 
 module AsmCodeGen ( writeRealAsm, dumpRealAsm ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import MachMisc
 import MachRegs
@@ -23,7 +23,7 @@ import PrimRep		( PrimRep{-instance Eq-} )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
 import UniqSupply	( returnUs, thenUs, mapUs, UniqSM(..) )
-import Unpretty		( uppAppendFile, uppShow, uppAboves, Unpretty(..) )
+import Unpretty		( uppPutStr, uppShow, uppAboves, Unpretty(..) )
 \end{code}
 
 The 96/03 native-code generator has machine-independent and
@@ -73,10 +73,10 @@ The machine-dependent bits break down as follows:
 
 So, here we go:
 \begin{code}
-writeRealAsm :: _FILE -> AbstractC -> UniqSupply -> IO ()
+writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
 
-writeRealAsm file absC us
-  = uppAppendFile file 80 (runNCG absC us)
+writeRealAsm handle absC us
+  = uppPutStr handle 80 (runNCG absC us)
 
 dumpRealAsm :: AbstractC -> UniqSupply -> String
 

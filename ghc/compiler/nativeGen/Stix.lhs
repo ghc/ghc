@@ -15,7 +15,7 @@ module Stix (
 	getUniqLabelNCG
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn		( node, infoptr, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )

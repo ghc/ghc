@@ -28,6 +28,7 @@ import Id		( StrictnessMark, GenId, Id(..) )
 import IdInfo		( IdInfo, OptIdInfo(..), ArityInfo, DeforestInfo, Demand, StrictnessInfo, UpdateInfo )
 import Kind		( Kind )
 import Literal		( Literal )
+import MachRegs		( Reg )
 import Maybes		( MaybeErr )
 import MatchEnv 	( MatchEnv )
 import Name		( Module(..), RdrName, Name, ExportFlag, NamedThing(..) )
@@ -111,6 +112,7 @@ data MaybeErr a b
 data MatchEnv a b
 data Name
 data RdrName = Unqual _PackedString | Qual _PackedString _PackedString
+data Reg
 data OutPat a b c
 data PprStyle
 data PragmaInfo
@@ -144,4 +146,14 @@ type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
 type Type  = GenType (GenTyVar (GenUsage Unique)) Unique
 type TyVar = GenTyVar (GenUsage Unique)
 type Usage = GenUsage Unique
+
+-- These are here only for SPECIALIZing in FiniteMap (ToDo:move?)
+instance Ord Reg
+instance Ord RdrName
+instance Ord CLabel
+instance Ord TyCon
+instance Eq Reg
+instance Eq RdrName
+instance Eq CLabel
+instance Eq TyCon
 \end{code}

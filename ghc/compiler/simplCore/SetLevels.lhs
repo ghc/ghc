@@ -21,7 +21,7 @@ module SetLevels (
 -- not exported: , incMajorLvl, isTopMajLvl, unTopify
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AnnCoreSyn
 import CoreSyn

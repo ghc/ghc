@@ -20,17 +20,17 @@ module CoreUnfold (
 	FormSummary(..),
 
 	mkFormSummary,
-	mkGenForm,
+	mkGenForm, mkLitForm, mkConForm,
+	whnfDetails,
 	mkMagicUnfolding,
-	modifyUnfoldingDetails,
 	calcUnfoldingGuidance,
 	mentionedInUnfolding
     ) where
 
-import Ubiq
-import IdLoop	 -- for paranoia checking;
+IMP_Ubiq()
+IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking;
 		 -- and also to get mkMagicUnfoldingFun
-import PrelLoop  -- for paranoia checking
+IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 import Bag		( emptyBag, unitBag, unionBags, Bag )
 import BinderInfo	( oneTextualOcc, oneSafeOcc )
@@ -70,15 +70,8 @@ getMentionedTyConsAndClassesFromType = panic "getMentionedTyConsAndClassesFromTy
 data UnfoldingDetails
   = NoUnfoldingDetails
 
-  | LitForm
-	Literal
-
   | OtherLitForm
 	[Literal]		-- It is a literal, but definitely not one of these
-
-  | ConForm
-	Id			-- The constructor
-	[CoreArg]		-- Type/value arguments; NB OutArgs, already cloned
 
   | OtherConForm
 	[Id]			-- It definitely isn't one of these constructors
@@ -97,10 +90,6 @@ data UnfoldingDetails
 
 
   | GenForm
-	Bool			-- True <=> At most one textual occurrence of the
-				--		binder in its scope, *or*
-				--		if we are happy to duplicate this
-				--		binding.
 	FormSummary		-- Tells whether the template is a WHNF or bottom
 	TemplateOutExpr		-- The template
 	UnfoldingGuidance	-- Tells about the *size* of the template.
@@ -140,6 +129,12 @@ mkFormSummary si expr
   -- | manifestlyBottom expr  = BottomForm
 
   | otherwise = OtherForm
+
+whnfDetails :: UnfoldingDetails -> Bool		-- True => thing is evaluated
+whnfDetails (GenForm WhnfForm _ _) = True
+whnfDetails (OtherLitForm _)	   = True
+whnfDetails (OtherConForm _)	   = True
+whnfDetails other		   = False
 \end{code}
 
 \begin{code}
@@ -191,45 +186,24 @@ instance Outputable UnfoldingGuidance where
 
 %************************************************************************
 %*									*
-\subsection{@mkGenForm@ and @modifyUnfoldingDetails@}
+\subsection{@mkGenForm@ and friends}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkGenForm :: Bool		-- Ok to Dup code down different case branches,
-				-- because of either a flag saying so,
-				-- or alternatively the object is *SMALL*
-	  -> BinderInfo		--
-	  -> FormSummary
+mkGenForm :: FormSummary
 	  -> TemplateOutExpr	-- Template
 	  -> UnfoldingGuidance	-- Tells about the *size* of the template.
 	  -> UnfoldingDetails
 
-mkGenForm safe_to_dup occ_info WhnfForm template guidance
-  = GenForm (oneTextualOcc safe_to_dup occ_info) WhnfForm template guidance
+mkGenForm = GenForm
 
-mkGenForm safe_to_dup occ_info form_summary template guidance
-  | oneSafeOcc safe_to_dup occ_info	-- Non-WHNF with only safe occurrences
-  = GenForm True form_summary template guidance
+-- two shorthand variants:
+mkLitForm lit      = mk_go_for_it (Lit lit)
+mkConForm con args = mk_go_for_it (Con con args)
 
-  | otherwise				-- Not a WHNF, many occurrences
-  = NoUnfoldingDetails
+mk_go_for_it expr = mkGenForm WhnfForm expr UnfoldAlways
 \end{code}
-
-\begin{code}
-modifyUnfoldingDetails
-	:: Bool		-- OK to dup
-	-> BinderInfo	-- New occurrence info for the thing
-	-> UnfoldingDetails
-	-> UnfoldingDetails
-
-modifyUnfoldingDetails ok_to_dup occ_info
-	(GenForm only_one form_summary template guidance)
-  | only_one  = mkGenForm ok_to_dup occ_info form_summary template guidance
-
-modifyUnfoldingDetails ok_to_dup occ_info other = other
-\end{code}
-
 
 %************************************************************************
 %*									*

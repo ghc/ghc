@@ -30,7 +30,7 @@ module RnMonad (
 	fixIO
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import SST
 
@@ -42,22 +42,25 @@ import RnHsSyn		( RnName, mkRnName, mkRnUnbound, mkRnImplicit,
 			  isRnClassOp, RenamedFixityDecl(..) )
 import RnUtils		( RnEnv(..), extendLocalRnEnv,
 			  lookupRnEnv, lookupGlobalRnEnv, lookupTcRnEnv,
-			  unknownNameErr, badClassOpErr, qualNameErr,
-			  dupNamesErr, shadowedNameWarn
+			  qualNameErr, dupNamesErr
 			)
 
 import Bag		( Bag, emptyBag, isEmptyBag, snocBag )
 import CmdLineOpts	( opt_WarnNameShadowing )
-import ErrUtils		( Error(..), Warning(..) )
-import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM )
+import ErrUtils		( addErrLoc, addShortErrLocLine, addShortWarnLocLine,
+			  Error(..), Warning(..)
+			)
+import FiniteMap	( FiniteMap, emptyFM, lookupFM, addToFM, fmToList{-ToDo:rm-} )
 import Maybes		( assocMaybe )
 import Name		( Module(..), RdrName(..), isQual,
 			  Name, mkLocalName, mkImplicitName,
-			  getOccName
+			  getOccName, pprNonSym
 			)
 import PrelInfo		( builtinNameInfo, BuiltinNames(..), BuiltinKeys(..) )
 import PrelMods		( pRELUDE )
-import Pretty		( Pretty(..), PrettyRep )
+import PprStyle{-ToDo:rm-}
+import Outputable{-ToDo:rm-}
+import Pretty--ToDo:rm		( Pretty(..), PrettyRep )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
 import UniqFM		( UniqFM, emptyUFM )
 import UniqSet		( UniqSet(..), mkUniqSet, minusUniqSet )
@@ -426,10 +429,13 @@ lookup_tc rdr check mk_implicit err_str down@(RnDown _ _ locn (RnIface b_names b
     fail = failButContinueRn (mkRnUnbound rdr) (unknownNameErr err_str rdr locn) down
 
 lookup_nonexisting_tc check mk_implicit fail (_,b_names) b_key imp_var us_var rdr
-  = let str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
-    in case (lookupFM b_names str_mod) of
-	 Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
-	 Just xx -> returnSST xx
+  = let
+	str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n, pRELUDE) }
+    in
+    --pprTrace "lookup:" (ppAboves [case str_mod of {(n,m)->ppCat [ppPStr n, ppPStr m]}, ppAboves [ ppCat [ppPStr n, ppPStr m] | ((n,m), _) <- fmToList b_names]]) $
+    case (lookupFM b_names str_mod) of
+      Nothing -> lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
+      Just xx -> returnSST xx
 
 lookup_or_create_implicit_tc check mk_implicit fail b_key imp_var us_var rdr
   = readMutVarSST imp_var `thenSST` \ (implicit_val_fm, implicit_tc_fm) ->
@@ -544,4 +550,25 @@ fixIO k s = let
 		(Right loop, _) = result
 	    in
 	    result
+\end{code}
+
+*********************************************************
+*							*
+\subsection{Errors used in RnMonad}
+*							*
+*********************************************************
+
+\begin{code}
+unknownNameErr descriptor name locn
+  = addShortErrLocLine locn $ \ sty ->
+    ppBesides [ppStr "undefined ", ppStr descriptor, ppStr ": ", pprNonSym sty name]
+
+badClassOpErr clas op locn
+  = addErrLoc locn "" $ \ sty ->
+    ppBesides [ppChar '`', pprNonSym sty op, ppStr "' is not an operation of class `",
+	      ppr sty clas, ppStr "'"]
+
+shadowedNameWarn locn shadow
+  = addShortWarnLocLine locn $ \ sty ->
+    ppBesides [ppStr "more than one value with the same name (shadowing): ", ppr sty shadow]
 \end{code}

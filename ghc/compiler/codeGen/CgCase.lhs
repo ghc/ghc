@@ -12,8 +12,8 @@
 
 module CgCase (	cgCase, saveVolatileVarsAndRegs ) where
 
-import Ubiq{-uitous-}
-import CgLoop2		( cgExpr, getPrimOpArgAmodes )
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(CgLoop2)		( cgExpr, getPrimOpArgAmodes )
 
 import CgMonad
 import StgSyn
@@ -41,7 +41,7 @@ import CgStackery	( allocAStack, allocBStack, allocAStackTop, allocBStackTop )
 import CgTailCall	( tailCallBusiness, performReturn )
 import CgUsages		( getSpARelOffset, getSpBRelOffset, freeBStkSlot )
 import CLabel		( mkVecTblLabel, mkReturnPtLabel, mkDefaultLabel,
-			  mkAltLabel, mkClosureLabel
+			  mkAltLabel
 			)
 import ClosureInfo	( mkConLFInfo, mkLFArgument, layOutDynCon )
 import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
@@ -645,7 +645,6 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
       where
 	lf_info		= mkConLFInfo con
 	tag		= dataConTag con
-    	closure_lbl 	= mkClosureLabel con
 
 	-- alloc_code generates code to allocate constructor con, whose args are
 	-- in the arguments to alloc_code, assigning the result to Node.

@@ -15,7 +15,7 @@ Convert a @CoreSyntax@ program to a @StgSyntax@ program.
 
 module CoreToStg ( topCoreBindsToStg ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn		-- input
 import StgSyn		-- output
@@ -36,10 +36,17 @@ import PrelVals		( unpackCStringId, unpackCString2Id,
 import PrimOp		( PrimOp(..) )
 import SpecUtils	( mkSpecialisedCon )
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( getAppDataTyConExpandingDicts )
-import TysWiredIn	( stringTy, integerTy, rationalTy, ratioDataCon )
+import TyCon		( TyCon{-instance Uniquable-} )
+import Type		( maybeAppDataTyCon, getAppDataTyConExpandingDicts )
+import TysWiredIn	( stringTy )
+import Unique		( integerTyConKey, ratioTyConKey, Unique{-instance Eq-} )
 import UniqSupply	-- all of it, really
-import Util		( panic )
+import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
+import Pretty--ToDo:rm
+import PprStyle--ToDo:rm
+import PprType  --ToDo:rm
+import Outputable--ToDo:rm
+import PprEnv--ToDo:rm
 
 isLeakFreeType x y = False -- safe option; ToDo
 \end{code}
@@ -303,7 +310,7 @@ litToStgArg (NoRepStr s)
   where
     is_NUL c = c == '\0'
 
-litToStgArg (NoRepInteger i)
+litToStgArg (NoRepInteger i integer_ty)
   -- extremely convenient to look out for a few very common
   -- Integer literals!
   | i == 0    = returnUs (StgVarArg integerZeroId,     emptyBag)
@@ -312,7 +319,7 @@ litToStgArg (NoRepInteger i)
   | i == (-1) = returnUs (StgVarArg integerMinusOneId, emptyBag)
 
   | otherwise
-  = newStgVar integerTy 		`thenUs` \ var ->
+  = newStgVar integer_ty	`thenUs` \ var ->
     let
 	rhs = StgRhsClosure noCostCentre -- No cost centre (ToDo?)
 			    stgArgOcc	 -- safe
@@ -332,18 +339,33 @@ litToStgArg (NoRepInteger i)
     in
     returnUs (StgVarArg var, unitBag (StgNonRec var rhs))
 
-litToStgArg (NoRepRational r)
- = litToStgArg (NoRepInteger (numerator   r))	`thenUs` \ (num_atom,   binds1) ->
-   litToStgArg (NoRepInteger (denominator r))	`thenUs` \ (denom_atom, binds2) ->
-   newStgVar rationalTy			`thenUs` \ var ->
-   let
-	rhs = StgRhsCon noCostCentre	-- No cost centre (ToDo?)
-			ratioDataCon	-- Constructor
-			[num_atom, denom_atom]
-   in
-   returnUs (StgVarArg var, binds1 `unionBags`
-			   binds2 `unionBags`
-			   unitBag (StgNonRec var rhs))
+litToStgArg (NoRepRational r rational_ty)
+  = --ASSERT(is_rational_ty)
+    (if is_rational_ty then \x->x else pprTrace "litToStgArg:not rational?" (pprType PprDebug rational_ty)) $
+    litToStgArg (NoRepInteger (numerator   r) integer_ty) `thenUs` \ (num_atom,   binds1) ->
+    litToStgArg (NoRepInteger (denominator r) integer_ty) `thenUs` \ (denom_atom, binds2) ->
+    newStgVar rational_ty			`thenUs` \ var ->
+    let
+	 rhs = StgRhsCon noCostCentre	-- No cost centre (ToDo?)
+			 ratio_data_con	-- Constructor
+			 [num_atom, denom_atom]
+    in
+    returnUs (StgVarArg var, binds1 `unionBags`
+			    binds2 `unionBags`
+			    unitBag (StgNonRec var rhs))
+  where
+    (is_rational_ty, ratio_data_con, integer_ty)
+      = case (maybeAppDataTyCon rational_ty) of
+	  Just (tycon, [i_ty], [con])
+	    -> ASSERT(is_integer_ty i_ty)
+	       (uniqueOf tycon == ratioTyConKey, con, i_ty)
+
+	  _ -> (False, panic "ratio_data_con", panic "integer_ty")
+
+    is_integer_ty ty
+      = case (maybeAppDataTyCon ty) of
+	  Just (tycon, [], _) -> uniqueOf tycon == integerTyConKey
+	  _ -> False
 
 litToStgArg other_lit = returnUs (StgLitArg other_lit, emptyBag)
 \end{code}

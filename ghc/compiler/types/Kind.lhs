@@ -17,10 +17,11 @@ module Kind (
 	hasMoreBoxityInfo,
 	resultKind, argKind,
 
-	isUnboxedKind, isTypeKind
+	isUnboxedKind, isTypeKind,
+	notArrowKind
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Util		( panic, assertPanic )
 --import Outputable	( Outputable(..) )
@@ -66,7 +67,6 @@ kind1@(ArrowKind _ _) `hasMoreBoxityInfo` kind2@(ArrowKind _ _) = ASSERT( kind1 
 
 kind1		`hasMoreBoxityInfo` kind2	    = False
 
--- Not exported
 notArrowKind (ArrowKind _ _) = False
 notArrowKind other_kind	     = True
 

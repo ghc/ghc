@@ -7,6 +7,7 @@ module TyVar (
 	tyVarKind,		-- TyVar -> Kind
 	cloneTyVar,
 
+	openAlphaTyVar,
 	alphaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 
 	-- We also export "environments" keyed off of
@@ -23,11 +24,11 @@ module TyVar (
   ) where
 
 CHK_Ubiq() 	-- debugging consistency check
-import IdLoop 	-- for paranoia checking
+IMPORT_DELOOPER(IdLoop) 	-- for paranoia checking
 
 -- friends
 import Usage		( GenUsage, Usage(..), usageOmega )
-import Kind		( Kind, mkBoxedTypeKind )
+import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 
 -- others
 import UniqSet		-- nearly all of it
@@ -77,10 +78,16 @@ cloneTyVar (TyVar _ k n x) u = TyVar u k n x
 Fixed collection of type variables
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
+	-- openAlphaTyVar is prepared to be instantiated
+	-- to a boxed or unboxed type variable.  It's used for the 
+	-- result type for "error", so that we can have (error Int# "Help")
+openAlphaTyVar = TyVar (mkAlphaTyVarUnique 1) mkTypeKind Nothing usageOmega
+
 alphaTyVars = [ TyVar u mkBoxedTypeKind Nothing usageOmega
-	      | u <- map mkAlphaTyVarUnique [1..] ]
+	      | u <- map mkAlphaTyVarUnique [2..] ]
 
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
+
 \end{code}
 
 

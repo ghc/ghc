@@ -50,8 +50,8 @@ module ClosureInfo (
     	dataConLiveness				-- concurrency
     ) where
 
-import Ubiq{-uitous-}
-import AbsCLoop		-- here for paranoia-checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(AbsCLoop)		-- here for paranoia-checking
 
 import AbsCSyn
 import StgSyn
@@ -68,6 +68,7 @@ import CgRetConv	( assignRegs, dataReturnConvAlg,
 			)
 import CLabel		( mkStdEntryLabel, mkFastEntryLabel,
 			  mkPhantomInfoTableLabel, mkInfoTableLabel,
+			  mkConInfoTableLabel,
 			  mkBlackHoleInfoTableLabel, mkVapInfoTableLabel,
 			  mkStaticInfoTableLabel, mkStaticConEntryLabel,
 			  mkConEntryLabel, mkClosureLabel, mkVapEntryLabel
@@ -78,9 +79,9 @@ import HeapOffs		( intOff, addOff, totHdrSize, varHdrSize,
 			  VirtualHeapOffset(..)
 			)
 import Id		( idType, idPrimRep, getIdArity,
-			  externallyVisibleId, dataConSig,
+			  externallyVisibleId,
 			  dataConTag, fIRST_TAG,
-			  isDataCon, dataConArity, dataConTyCon,
+			  isDataCon, isNullaryDataCon, dataConTyCon,
 			  isTupleCon, DataCon(..),
 			  GenId{-instance Eq-}
 			)
@@ -425,7 +426,7 @@ mkClosureLFInfo False	    -- don't bother if at top-level
     offset_into_int_maybe = intOffsetIntoGoods the_offset
     Just offset_into_int  = offset_into_int_maybe
     is_single_constructor = maybeToBool (maybeTyConSingleCon tycon)
-    (_,_,_, tycon)	  = dataConSig con
+    tycon		  = dataConTyCon con
 \end{code}
 
 Same kind of thing, looking for vector-apply thunks, of the form:
@@ -477,14 +478,8 @@ isUpdatable Updatable   = True
 mkConLFInfo :: DataCon -> LambdaFormInfo
 
 mkConLFInfo con
-  = ASSERT(isDataCon con)
-    let
-	arity = dataConArity con
-    in
-    if isTupleCon con then
-	LFTuple con (arity == 0)
-    else
-	LFCon con (arity == 0)
+  = -- the isNullaryDataCon will do this: ASSERT(isDataCon con)
+    (if isTupleCon con then LFTuple else LFCon) con (isNullaryDataCon con)
 \end{code}
 
 
@@ -865,8 +860,8 @@ data EntryConvention
 	Int 				--   Its arity
 	[MagicId]			--   Its register assignments (possibly empty)
 
-getEntryConvention :: Id			-- Function being applied
-		   -> LambdaFormInfo		-- Its info
+getEntryConvention :: Id		-- Function being applied
+		   -> LambdaFormInfo	-- Its info
 		   -> [PrimRep]		-- Available arguments
 		   -> FCode EntryConvention
 
@@ -894,13 +889,14 @@ getEntryConvention id lf_info arg_kinds
 			  -> let itbl = if zero_arity then
     	    	    	    	        mkPhantomInfoTableLabel con
     	    	    	    	    	else
-    	    	    	    	    	mkInfoTableLabel con
-    	    	    	     in StdEntry (mkStdEntryLabel con) (Just itbl)
-				-- Should have no args
+    	    	    	    	    	mkConInfoTableLabel con
+    	    	    	     in
+			     --false:ASSERT (null arg_kinds)	-- Should have no args (meaning what?)
+			     StdEntry (mkConEntryLabel con) (Just itbl)
+
 	LFTuple tup zero_arity
-			 -> StdEntry (mkStdEntryLabel tup)
-				     (Just (mkInfoTableLabel tup))
-				-- Should have no args
+			  -> --false:ASSERT (null arg_kinds)	-- Should have no args (meaning what?)
+			     StdEntry (mkConEntryLabel tup) (Just (mkConInfoTableLabel tup))
 
 	LFThunk _ _ updatable std_form_info
 	  -> if updatable
@@ -1213,17 +1209,19 @@ infoTableLabelFromCI (MkClosureInfo id lf_info rep)
 		 else -} mkInfoTableLabel id
 
 mkConInfoPtr :: Id -> SMRep -> CLabel
-mkConInfoPtr id rep =
-  case rep of
-    PhantomRep	    -> mkPhantomInfoTableLabel id
-    StaticRep _ _   -> mkStaticInfoTableLabel  id
-    _		    -> mkInfoTableLabel	       id
+mkConInfoPtr con rep
+  = ASSERT(isDataCon con)
+    case rep of
+      PhantomRep    -> mkPhantomInfoTableLabel con
+      StaticRep _ _ -> mkStaticInfoTableLabel  con
+      _		    -> mkConInfoTableLabel     con
 
 mkConEntryPtr :: Id -> SMRep -> CLabel
-mkConEntryPtr id rep =
-  case rep of
-    StaticRep _ _   -> mkStaticConEntryLabel id
-    _		    -> mkConEntryLabel id
+mkConEntryPtr con rep
+  = ASSERT(isDataCon con)
+    case rep of
+      StaticRep _ _ -> mkStaticConEntryLabel con
+      _		    -> mkConEntryLabel con
 
 
 closureLabelFromCI (MkClosureInfo id _ _) = mkClosureLabel id

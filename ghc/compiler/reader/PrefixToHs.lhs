@@ -20,7 +20,7 @@ module PrefixToHs (
 	sepDeclsIntoSigsAndBinds
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import PrefixSyn	-- and various syntaxen.
 import HsSyn

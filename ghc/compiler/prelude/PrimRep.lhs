@@ -19,7 +19,7 @@ module PrimRep (
 	guessPrimRep
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import Pretty		-- pretty-printing code
 import Util
@@ -65,7 +65,6 @@ data PrimRep
 			-- (Primitive states are mapped onto this)
   deriving (Eq, Ord)
 	-- Kinds are used in PrimTyCons, which need both Eq and Ord
-	-- Text is needed for derived-Text on PrimitiveOps
 \end{code}
 
 %************************************************************************

@@ -31,9 +31,9 @@ module HeapOffs (
 	SpARelOffset(..), SpBRelOffset(..)
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 #if ! OMIT_NATIVE_CODEGEN
-import AbsCLoop		( fixedHdrSizeInWords, varHdrSizeInWords )
+IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords )
 #endif
 
 import Maybes		( catMaybes )

@@ -12,8 +12,8 @@
 
 module CgLetNoEscape ( cgLetNoEscapeClosure ) where
 
-import Ubiq{-uitious-}
-import CgLoop2		( cgExpr )
+IMP_Ubiq(){-uitious-}
+IMPORT_DELOOPER(CgLoop2)		( cgExpr )
 
 import StgSyn
 import CgMonad
@@ -169,9 +169,9 @@ cgLetNoEscapeBody :: [Id]		-- Args
 cgLetNoEscapeBody all_args rhs
   = getVirtSps		`thenFC` \ (vA, vB) ->
     let
-	arg_kinds	= map idPrimRep all_args
-	(arg_regs, _)	= assignRegs [{-nothing live-}] arg_kinds
-    	stk_args	= drop (length arg_regs) all_args
+	arg_kinds	     = map idPrimRep all_args
+	(arg_regs, _)	     = assignRegs [{-nothing live-}] arg_kinds
+	(reg_args, stk_args) = splitAt (length arg_regs) all_args
 
     	-- stk_args is the args which are passed on the stack at the fast-entry point
     	-- Using them, we define the stack layout
@@ -183,7 +183,7 @@ cgLetNoEscapeBody all_args rhs
     in
 
 	-- Bind args to appropriate regs/stk locns
-    bindArgsToRegs all_args arg_regs		    `thenC`
+    bindArgsToRegs reg_args arg_regs		    `thenC`
     mapCs bindNewToAStack stk_bxd_w_offsets	    `thenC`
     mapCs bindNewToBStack stk_ubxd_w_offsets	    `thenC`
     setRealAndVirtualSps spA_stk_args spB_stk_args  `thenC`

@@ -42,7 +42,7 @@ Experimental Evidence: Heap: +/- 7%
 
 module SAT ( doStaticArgs ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 import Util		( panic )
 
 doStaticArgs = panic "SAT.doStaticArgs (ToDo)"

@@ -21,7 +21,8 @@ module SimplUtils (
 	type_ok_for_let_to_case
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )

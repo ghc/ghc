@@ -18,8 +18,8 @@ module PprAbsC (
 #endif
     ) where
 
-import Ubiq{-uitous-}
-import AbsCLoop		-- break its dependence on ClosureInfo
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(AbsCLoop)		-- break its dependence on ClosureInfo
 
 import AbsCSyn
 
@@ -62,10 +62,10 @@ call to a cost evaluation function @GRAN_EXEC@. For that,
 @pprAbsC@ has a new ``costs'' argument.  %% HWL
 
 \begin{code}
-writeRealC :: _FILE -> AbstractC -> IO ()
+writeRealC :: Handle -> AbstractC -> IO ()
 
-writeRealC file absC
-  = uppAppendFile file 80 (
+writeRealC handle absC
+  = uppPutStr handle 80 (
       uppAbove (pprAbsC PprForC absC (costs absC)) (uppChar '\n')
     )
 

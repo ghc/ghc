@@ -4,6 +4,8 @@
 \section[ListSetOps]{Set-like operations on lists}
 
 \begin{code}
+#include "HsVersions.h"
+
 module ListSetOps (
 	unionLists,
 	intersectLists,
@@ -14,7 +16,7 @@ module ListSetOps (
    ) where
 
 #if defined(COMPILING_GHC)
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Util	( isIn, isn'tIn )
 #endif

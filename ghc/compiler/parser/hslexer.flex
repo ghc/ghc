@@ -240,7 +240,7 @@ O			[0-7]
 H			[0-9A-Fa-f]
 N			{D}+
 F   	    	    	{N}"."{N}(("e"|"E")("+"|"-")?{N})?
-S			[!#$%&*+./<=>?@\\^|-~:\xa1-\xbf\xd7\xf7]
+S			[!#$%&*+./<=>?@\\^|\-~:\xa1-\xbf\xd7\xf7]
 SId			{S}{S}*
 L			[A-Z\xc0-\xd6\xd8-\xde]
 l			[a-z\xdf-\xf6\xf8-\xff]
@@ -304,8 +304,13 @@ NL  	    	    	[\n\r]
                               PUSH_STATE(UserPragma);
                               RETURN(DEFOREST_UPRAGMA);
 			    }
+<Code,GlaExt>"{-#"{WS}*"GENERATE_SPECS" {
+			      /* these are handled by hscpp */
+			      nested_comments =1;
+                              PUSH_STATE(Comment);
+			    }
 <Code,GlaExt>"{-#"{WS}*[A-Z_]+ {
-    	    	    	      fprintf(stderr, "Warning: \"%s\", line %d: Unrecognised pragma '",
+    	    	    	      fprintf(stderr, "\"%s\", line %d: Warning: Unrecognised pragma '",
     	    	    	        input_filename, hsplineno);
     	    	    	      format_string(stderr, (unsigned char *) yytext, yyleng);
     	    	    	      fputs("'\n", stderr);
@@ -888,8 +893,6 @@ NL  	    	    	[\n\r]
    This allows unnamed sources to be piped into the parser.
 */
 
-extern BOOLEAN acceptPrim;
-
 void
 yyinit(void)
 {
@@ -899,7 +902,7 @@ yyinit(void)
        setyyin _before_ calling yylex for the first time! */
     yy_switch_to_buffer(yy_create_buffer(stdin, YY_BUF_SIZE));
 
-    if (acceptPrim)
+    if (nonstandardFlag)
 	PUSH_STATE(GlaExt);
     else
 	PUSH_STATE(Code);

@@ -8,8 +8,8 @@
 
 module MatchLit ( matchLiterals ) where
 
-import Ubiq
-import DsLoop		-- break match-ish and dsExpr-ish loops
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		-- break match-ish and dsExpr-ish loops
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..),
 			  Match, HsBinds, Stmt, Qual, PolyType, ArithSeqInfo )

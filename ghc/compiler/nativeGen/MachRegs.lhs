@@ -59,7 +59,7 @@ module MachRegs (
 #endif
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn		( MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
@@ -331,16 +331,19 @@ cmp_i a1 a2 = if a1 == a2 then EQ_ else if a1 < a2 then LT_ else GT_
 cmp_ihash :: FAST_INT -> FAST_INT -> TAG_
 cmp_ihash a1 a2 = if a1 _EQ_ a2 then EQ_ else if a1 _LT_ a2 then LT_ else GT_
 
+instance Ord3 Reg where
+    cmp = cmpReg
+
 instance Eq Reg where
-    a == b = case cmpReg a b of { EQ_ -> True;  _ -> False }
-    a /= b = case cmpReg a b of { EQ_ -> False; _ -> True  }
+    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
+    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True  }
 
 instance Ord Reg where
-    a <= b = case cmpReg a b of { LT_ -> True;	EQ_ -> True;  GT__ -> False }
-    a <	 b = case cmpReg a b of { LT_ -> True;	EQ_ -> False; GT__ -> False }
-    a >= b = case cmpReg a b of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >	 b = case cmpReg a b of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp a b = case cmpReg a b of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    a <= b = case (a `cmp` b) of { LT_ -> True;	EQ_ -> True;  GT__ -> False }
+    a <	 b = case (a `cmp` b) of { LT_ -> True;	EQ_ -> False; GT__ -> False }
+    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 
 instance Uniquable Reg where
     uniqueOf (UnmappedReg u _) = u

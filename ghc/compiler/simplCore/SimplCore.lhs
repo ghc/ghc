@@ -8,7 +8,7 @@
 
 module SimplCore ( core2core ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AnalFBWW		( analFBWW )
 import Bag		( isEmptyBag, foldBag )
@@ -327,7 +327,7 @@ calcInlinings scc_s_OK inline_env_so_far top_binds
       where
     	pp_det NoUnfoldingDetails   = ppStr "_N_"
 --LATER:	pp_det (IWantToBeINLINEd _) = ppStr "INLINE"
-    	pp_det (GenForm _ _ expr guide)
+    	pp_det (GenForm _ expr guide)
     	  = ppAbove (ppr PprDebug guide) (ppr PprDebug expr)
     	pp_det other	    	    = ppStr "???"
 

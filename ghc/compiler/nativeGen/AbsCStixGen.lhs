@@ -7,7 +7,7 @@
 
 module AbsCStixGen ( genCodeAbstractC ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn
 import Stix
@@ -33,6 +33,10 @@ import StixMacro	( macroCode )
 import StixPrim		( primCode, amodeToStix, amodeToStix' )
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
 import Util		( naturalMergeSortLe, panic )
+
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+#endif
 \end{code}
 
 For each independent chunk of AbstractC code, we generate a list of

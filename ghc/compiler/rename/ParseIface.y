@@ -3,7 +3,7 @@
 
 module ParseIface ( parseIface ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import ParseUtils
 
@@ -362,6 +362,7 @@ iname		:: { FAST_STRING }
 iname		:  VARID		{ $1 }
 		|  CONID		{ $1 }
 		|  OPAREN VARSYM CPAREN	{ $2 }
+		|  OPAREN BANG   CPAREN	{ SLIT("!"){-sigh, double-sigh-} }
 		|  OPAREN CONSYM CPAREN	{ $2 }
 
 qiname		:: { RdrName }

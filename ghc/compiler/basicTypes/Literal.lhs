@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[Literal]{@Literal@: Machine literals (unboxed, of course)}
 
@@ -13,11 +13,9 @@ module Literal (
 	literalType, literalPrimRep,
 	showLiteral,
 	isNoRepLit, isLitLitLit
-
-	-- and to make the interface self-sufficient....
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 -- friends:
 import PrimRep		( PrimRep(..) ) -- non-abstract
@@ -27,10 +25,10 @@ import TysPrim		( getPrimRepInfo,
 
 -- others:
 import CStrings		( stringToC, charToC, charToEasyHaskell )
-import TysWiredIn	( integerTy, rationalTy, stringTy )
+import TysWiredIn	( stringTy )
 import Pretty		-- pretty-printing stuff
 import PprStyle		( PprStyle(..), codeStyle )
-import Util		( panic )
+import Util		( thenCmp, panic )
 \end{code}
 
 So-called @Literals@ are {\em either}:
@@ -58,10 +56,10 @@ data Literal
 		PrimRep
 
   | NoRepStr	    FAST_STRING	-- the uncommitted ones
-  | NoRepInteger    Integer
-  | NoRepRational   Rational
+  | NoRepInteger    Integer  Type{-save what we learned in the typechecker-}
+  | NoRepRational   Rational Type{-ditto-}
 
-  deriving (Eq, Ord)
+  -- deriving (Eq, Ord): no, don't want to compare Types
   -- The Ord is needed for the FiniteMap used in the lookForConstructor
   -- in SimplEnv.  If you declared that lookForConstructor *ignores*
   -- constructor-applications with LitArg args, then you could get
@@ -71,12 +69,56 @@ mkMachInt, mkMachWord :: Integer -> Literal
 
 mkMachInt  x = MachInt x True{-signed-}
 mkMachWord x = MachInt x False{-unsigned-}
+
+instance Ord3 Literal where
+    cmp (MachChar      a)   (MachChar	   b)   = a `tcmp` b
+    cmp (MachStr       a)   (MachStr	   b)   = a `tcmp` b
+    cmp (MachAddr      a)   (MachAddr	   b)   = a `tcmp` b
+    cmp (MachInt       a b) (MachInt	   c d) = (a `tcmp` c) `thenCmp` (b `tcmp` d)
+    cmp (MachFloat     a)   (MachFloat	   b)   = a `tcmp` b
+    cmp (MachDouble    a)   (MachDouble	   b)   = a `tcmp` b
+    cmp (MachLitLit    a b) (MachLitLit    c d) = (a `tcmp` c) `thenCmp` (b `tcmp` d)
+    cmp (NoRepStr      a)   (NoRepStr	   b)   = a `tcmp` b
+    cmp (NoRepInteger  a _) (NoRepInteger  b _) = a `tcmp` b
+    cmp (NoRepRational a _) (NoRepRational b _) = a `tcmp` b
+
+      -- now we *know* the tags are different, so...
+    cmp other_1 other_2
+      | tag1 _LT_ tag2 = LT_
+      | otherwise      = GT_
+      where
+	tag1 = tagof other_1
+	tag2 = tagof other_2
+
+	tagof (MachChar      _)	  = ILIT(1)
+	tagof (MachStr       _)	  = ILIT(2)
+	tagof (MachAddr      _)	  = ILIT(3)
+	tagof (MachInt       _ _) = ILIT(4)
+	tagof (MachFloat     _)	  = ILIT(5)
+	tagof (MachDouble    _)	  = ILIT(6)
+	tagof (MachLitLit    _ _) = ILIT(7)
+	tagof (NoRepStr      _)	  = ILIT(8)
+	tagof (NoRepInteger  _ _) = ILIT(9)
+	tagof (NoRepRational _ _) = ILIT(10)
+    
+tcmp x y = case _tagCmp x y of { _LT -> LT_; _EQ -> EQ_; GT__ -> GT_ }
+
+instance Eq Literal where
+    a == b = case (a `cmp` b) of { EQ_ -> True;   _ -> False }
+    a /= b = case (a `cmp` b) of { EQ_ -> False;  _ -> True  }
+
+instance Ord Literal where
+    a <= b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
+    a <	 b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
+    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 \end{code}
 
 \begin{code}
 isNoRepLit (NoRepStr _)     	= True -- these are not primitive typed!
-isNoRepLit (NoRepInteger _) 	= True
-isNoRepLit (NoRepRational _)	= True
+isNoRepLit (NoRepInteger  _ _) 	= True
+isNoRepLit (NoRepRational _ _)	= True
 isNoRepLit _			= False
 
 isLitLitLit (MachLitLit _ _) = True
@@ -93,8 +135,8 @@ literalType (MachInt  _ signed) = if signed then intPrimTy else wordPrimTy
 literalType (MachFloat _)	= floatPrimTy
 literalType (MachDouble _)	= doublePrimTy
 literalType (MachLitLit _ k)	= case (getPrimRepInfo k) of { (_,t,_) -> t }
-literalType (NoRepInteger _)	= integerTy
-literalType (NoRepRational _)= rationalTy
+literalType (NoRepInteger  _ t)	= t
+literalType (NoRepRational _ t) = t
 literalType (NoRepStr _)	= stringTy
 \end{code}
 
@@ -109,9 +151,9 @@ literalPrimRep (MachFloat _)	= FloatRep
 literalPrimRep (MachDouble _)	= DoubleRep
 literalPrimRep (MachLitLit _ k)	= k
 #ifdef DEBUG
-literalPrimRep (NoRepInteger _)	= panic "literalPrimRep:NoRepInteger"
-literalPrimRep (NoRepRational _)= panic "literalPrimRep:NoRepRational"
-literalPrimRep (NoRepStr _)	= panic "literalPrimRep:NoRepString"
+literalPrimRep (NoRepInteger  _ _) = panic "literalPrimRep:NoRepInteger"
+literalPrimRep (NoRepRational _ _) = panic "literalPrimRep:NoRepRational"
+literalPrimRep (NoRepStr _)	   = panic "literalPrimRep:NoRepString"
 #endif
 \end{code}
 
@@ -160,12 +202,12 @@ instance Outputable Literal where
     ppr sty (MachFloat f)  = ppBesides [ppCast sty SLIT("(StgFloat)"), ppRational f, if_ubxd sty]
     ppr sty (MachDouble d) = ppBesides [ppRational d, if_ubxd sty, if_ubxd sty]
 
-    ppr sty (NoRepInteger i)
+    ppr sty (NoRepInteger i _)
       | codeStyle sty  = ppInteger i
       | ufStyle sty    = ppCat [ppStr "_NOREP_I_", ppInteger i]
       | otherwise      = ppBesides [ppInteger i, ppChar 'I']
 
-    ppr sty (NoRepRational r)
+    ppr sty (NoRepRational r _)
       | ufStyle sty    = ppCat [ppStr "_NOREP_R_", ppInteger (numerator r), ppInteger (denominator r)]
       | codeStyle sty = panic "ppr.ForC.NoRepRational"
       | otherwise     = ppBesides [ppRational r,  ppChar 'R']

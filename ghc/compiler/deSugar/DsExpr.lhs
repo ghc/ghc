@@ -8,18 +8,23 @@
 
 module DsExpr ( dsExpr ) where
 
-import Ubiq
-import DsLoop		-- partly to get dsBinds, partly to chk dsExpr
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		-- partly to get dsBinds, partly to chk dsExpr
 
-import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
-			  Match, Qual, HsBinds, Stmt, PolyType )
+import HsSyn		( failureFreePat,
+			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
+			  Stmt(..), Match(..), Qual, HsBinds, PolyType,
+			  GRHSsAndBinds
+			)
 import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
-			  TypecheckedRecordBinds(..), TypecheckedPat(..)
+			  TypecheckedRecordBinds(..), TypecheckedPat(..),
+			  TypecheckedStmt(..)
 			)
 import CoreSyn
 
 import DsMonad
 import DsCCall		( dsCCall )
+import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
 import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
 			  mkErrorAppDs, showForErr, EquationInfo,
@@ -42,20 +47,19 @@ import MagicUFs		( MagicUnfoldingFun )
 import Name		( Name{--O only-} )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType )
-import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID )
+import PrelVals		( rEC_CON_ERROR_ID, rEC_UPD_ERROR_ID, voidId )
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
 import TyCon		( isDataTyCon, isNewTyCon )
 import Type		( splitSigmaTy, splitFunTy, typePrimRep,
-			  getAppDataTyConExpandingDicts, getAppTyCon, applyTy
+			  getAppDataTyConExpandingDicts, getAppTyCon, applyTy,
+			  maybeBoxedPrimType
 			)
-import TysWiredIn	( mkTupleTy, unitTy, nilDataCon, consDataCon,
+import TysWiredIn	( mkTupleTy, voidTy, nilDataCon, consDataCon,
 			  charDataCon, charTy
 			)
 import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( UVar(..) )
 import Util		( zipEqual, pprError, panic, assertPanic )
-
-maybeBoxedPrimType = panic "DsExpr.maybeBoxedPrimType"
 
 mk_nil_con ty = mkCon nilDataCon [] [ty] []  -- micro utility...
 \end{code}
@@ -149,11 +153,11 @@ dsExpr (HsLitOut (HsLitLit s) ty)
 	    -> pprError "ERROR: ``literal-literal'' not a single-constructor type: "
 			(ppBesides [ppPStr s, ppStr "; type: ", ppr PprDebug ty])
 
-dsExpr (HsLitOut (HsInt i) _)
-  = returnDs (Lit (NoRepInteger i))
+dsExpr (HsLitOut (HsInt i) ty)
+  = returnDs (Lit (NoRepInteger i ty))
 
-dsExpr (HsLitOut (HsFrac r) _)
-  = returnDs (Lit (NoRepRational r))
+dsExpr (HsLitOut (HsFrac r) ty)
+  = returnDs (Lit (NoRepRational r ty))
 
 -- others where we know what to do:
 
@@ -268,9 +272,9 @@ dsExpr (HsLet binds expr)
     dsExpr expr		`thenDs` \ core_expr ->
     returnDs ( mkCoLetsAny core_binds core_expr )
 
-dsExpr (HsDoOut stmts m_id mz_id src_loc)
+dsExpr (HsDoOut stmts then_id zero_id src_loc)
   = putSrcLocDs src_loc $
-    panic "dsExpr:HsDoOut"
+    dsDo then_id zero_id stmts
 
 dsExpr (HsIf guard_expr then_expr else_expr src_loc)
   = putSrcLocDs src_loc $
@@ -278,7 +282,6 @@ dsExpr (HsIf guard_expr then_expr else_expr src_loc)
     dsExpr then_expr	`thenDs` \ core_then ->
     dsExpr else_expr	`thenDs` \ core_else ->
     returnDs (mkCoreIfThenElse core_guard core_then core_else)
-
 \end{code}
 
 
@@ -498,7 +501,7 @@ dsExpr (Dictionary dicts methods)
 			`thenDs` \ core_d_and_ms ->
 
     (case num_of_d_and_ms of
-      0 -> returnDs cocon_unit -- unit
+      0 -> returnDs (Var voidId)
 
       1 -> returnDs (head core_d_and_ms) -- just a single Id
 
@@ -515,7 +518,7 @@ dsExpr (Dictionary dicts methods)
 dsExpr (ClassDictLam dicts methods expr)
   = dsExpr expr		`thenDs` \ core_expr ->
     case num_of_d_and_ms of
-	0 -> newSysLocalDs unitTy `thenDs` \ new_x ->
+	0 -> newSysLocalDs voidTy `thenDs` \ new_x ->
 	     returnDs (mkValLam [new_x] core_expr)
 
 	1 -> -- no untupling
@@ -543,7 +546,6 @@ dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
 dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
 #endif
 
-cocon_unit = mkCon (mkTupleCon 0) [] [] [] -- out here to avoid CAF (sigh)
 out_of_range_msg			   -- ditto
   = " out of range: [" ++ show minInt ++ ", " ++ show maxInt ++ "]\n"
 \end{code}
@@ -593,7 +595,7 @@ dsApp (HsVar v) args
 
       Nothing -> -- we're only saturating constructors and PrimOps
 	case getIdUnfolding v of
-	  GenForm _ _ the_unfolding EssentialUnfolding
+	  GenForm _ the_unfolding EssentialUnfolding
 	    -> do_unfold nullTyVarEnv nullIdEnv (unTagBinders the_unfolding) args
 
 	  _ -> apply_to_args (Var v) args
@@ -652,4 +654,49 @@ do_unfold ty_env val_env body args
 
 	-- Apply result to remaining arguments
     apply_to_args body' args
+\end{code}
+
+Basically does the translation given in the Haskell~1.3 report:
+\begin{code}
+dsDo	:: Id		-- id for: (>>=) m
+	-> Id		-- id for: zero m
+	-> [TypecheckedStmt]
+	-> DsM CoreExpr
+
+dsDo then_id zero_id (stmt:stmts)
+  = case stmt of
+      ExprStmt expr locn -> ASSERT( null stmts ) do_expr expr locn
+
+      ExprStmtOut expr locn a b -> 
+	do_expr expr locn		`thenDs` \ expr2 ->
+	ds_rest	    			`thenDs` \ rest  ->
+	dsApp (HsVar then_id) [TyArg a, TyArg b, VarArg expr2, VarArg rest]
+
+      LetStmt binds ->
+        dsBinds binds	`thenDs` \ binds2 ->
+	ds_rest		`thenDs` \ rest   ->
+	returnDs (mkCoLetsAny binds2 rest)
+
+      BindStmtOut pat expr locn a b ->
+	do_expr expr locn   `thenDs` \ expr2 ->
+	let
+	    zero_expr = TyApp (HsVar zero_id) [b]
+	    main_match
+	      = PatMatch pat (SimpleMatch (HsDoOut stmts then_id zero_id locn))
+	    the_matches
+	      = if failureFreePat pat
+	        then [main_match]
+		else [main_match, PatMatch (WildPat a) (SimpleMatch zero_expr)]
+	in
+	matchWrapper DoBindMatch the_matches "`do' statement"
+			    `thenDs` \ (binders, matching_code) ->
+	dsApp (HsVar then_id) [TyArg a, TyArg b,
+			       VarArg expr2, VarArg (mkValLam binders matching_code)]
+  where
+    ds_rest = dsDo then_id zero_id stmts
+    do_expr expr locn = putSrcLocDs locn (dsExpr expr)
+
+#ifdef DEBUG
+dsDo then_expr zero_expr [] = panic "dsDo:[]"
+#endif
 \end{code}

@@ -14,7 +14,7 @@
 
 module SATMonad where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 import Util		( panic )
 
 junk_from_SATMonad = panic "SATMonad.junk"

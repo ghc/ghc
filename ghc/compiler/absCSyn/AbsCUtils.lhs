@@ -19,7 +19,7 @@ module AbsCUtils (
 	-- printing/forcing stuff comes from PprAbsC
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn
 

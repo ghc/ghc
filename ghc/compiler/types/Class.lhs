@@ -16,7 +16,8 @@ module Class (
 	isSuperClassOf,
 	classOpTagByString,
 
-	derivableClassKeys, cCallishClassKeys,
+	derivableClassKeys, needsDataDeclCtxtClassKeys,
+	cCallishClassKeys, isNoDictClass,
 	isNumericClass, isStandardClass, isCcallishClass,
 
 	GenClassOp(..), ClassOp(..),
@@ -29,7 +30,7 @@ module Class (
 
 CHK_Ubiq() -- debugging consistency check
 
-import TyLoop
+IMPORT_DELOOPER(TyLoop)
 
 import TyCon		( TyCon )
 import TyVar		( TyVar(..), GenTyVar )
@@ -191,25 +192,33 @@ isNumericClass   (Class key _ _ _ _ _ _ _ _ _) = --pprTrace "isNum:" (ppCat (map
 						 key `is_elem` numericClassKeys
 isStandardClass  (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` standardClassKeys
 isCcallishClass	 (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` cCallishClassKeys
+isNoDictClass    (Class key _ _ _ _ _ _ _ _ _) = key `is_elem` noDictClassKeys
 is_elem = isIn "is_X_Class"
 
 numericClassKeys
-  = [ numClassKey,
-      realClassKey,
-      integralClassKey,
-      fractionalClassKey,
-      floatingClassKey,
-      realFracClassKey,
-      realFloatClassKey ]
+  = [ numClassKey
+    , realClassKey
+    , integralClassKey
+    , fractionalClassKey
+    , floatingClassKey
+    , realFracClassKey
+    , realFloatClassKey
+    ]
 
 derivableClassKeys
-  = [ eqClassKey,
-      showClassKey,
-      ordClassKey,
-      boundedClassKey,
-      enumClassKey,
-      ixClassKey,
-      readClassKey ]
+  = [ eqClassKey
+    , ordClassKey
+    , enumClassKey
+    , evalClassKey
+    , boundedClassKey
+    , showClassKey
+    , readClassKey
+    , ixClassKey
+    ]
+
+needsDataDeclCtxtClassKeys -- see comments in TcDeriv
+  = [ readClassKey
+    ]
 
 cCallishClassKeys = [ cCallableClassKey, cReturnableClassKey ]
 
@@ -222,6 +231,16 @@ standardClassKeys
     --	    _ccall_ foo ... 93{-numeric literal-} ...
     --
     -- ... it can do The Right Thing on the 93.
+
+noDictClassKeys 	-- These classes are used only for type annotations;
+			-- they are not implemented by dictionaries, ever.
+  = cCallishClassKeys
+	-- I used to think that class Eval belonged in here, but
+	-- we really want functions with type (Eval a => ...) and that
+	-- means that we really want to pass a placeholder for an Eval
+	-- dictionary.  The unit tuple is what we'll get if we leave things
+	-- alone, and that'll do for now.  Could arrange to drop that parameter
+	-- in the end.
 \end{code}
 
 %************************************************************************

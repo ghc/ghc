@@ -14,7 +14,7 @@ structure should not be too overwhelming.
 
 module MachCode ( stmt2Instrs, asmVoid, InstrList(..) ) where
 
-import Ubiq{-uitious-}
+IMP_Ubiq(){-uitious-}
 
 import MachMisc		-- may differ per-platform
 import MachRegs

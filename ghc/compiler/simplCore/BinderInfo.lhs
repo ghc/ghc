@@ -16,7 +16,7 @@ module BinderInfo (
 
 	inlineUnconditionally, oneTextualOcc, oneSafeOcc,
 
-	combineBinderInfo, combineAltsBinderInfo,
+	addBinderInfo, orBinderInfo,
 
 	argOccurrence, funOccurrence,
 	markMany, markDangerousToDup, markInsideSCC,
@@ -26,7 +26,7 @@ module BinderInfo (
 	isFun, isDupDanger -- for Simon Marlow deforestation
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Pretty
 import Util		( panic )
@@ -46,7 +46,7 @@ data BinderInfo
 
   | ManyOcc	-- Everything else besides DeadCode and OneOccs
 
-	Int	-- number of arguments on stack when called
+	Int	-- number of arguments on stack when called; this is a minimum guarantee
 
 
   | OneOcc	-- Just one occurrence (or one each in
@@ -66,7 +66,7 @@ data BinderInfo
 		-- time we *use* the info; we could be more clever for
 		-- other cases if we really had to. (WDP/PS)
 
-      Int	-- number of arguments on stack when called
+      Int	-- number of arguments on stack when called; minimum guarantee
 
 -- In general, we are feel free to substitute unless
 -- (a) is in an argument position (ArgOcc)
@@ -170,17 +170,25 @@ markInsideSCC (OneOcc posn dup_danger _ n_alts ar)
   = OneOcc posn dup_danger InsideSCC n_alts ar
 markInsideSCC other = other
 
-combineBinderInfo, combineAltsBinderInfo
+addBinderInfo, orBinderInfo
 	:: BinderInfo -> BinderInfo -> BinderInfo
 
-combineBinderInfo DeadCode info2 = info2
-combineBinderInfo info1 DeadCode = info1
-combineBinderInfo info1 info2
+addBinderInfo DeadCode info2 = info2
+addBinderInfo info1 DeadCode = info1
+addBinderInfo info1 info2
 	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
 
-combineAltsBinderInfo DeadCode info2 = info2
-combineAltsBinderInfo info1 DeadCode = info1
-combineAltsBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
+-- (orBinderInfo orig new) is used in two situations:
+-- First, it combines occurrence info from branches of a case
+--
+-- Second, when a variable whose occurrence
+--   info is currently "orig" is bound to a variable whose occurrence info is "new"
+--	eg  (\new -> e) orig
+--   What we want to do is to *worsen* orig's info to take account of new's
+
+orBinderInfo DeadCode info2 = info2
+orBinderInfo info1 DeadCode = info1
+orBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
 		      (OneOcc posn2 dup2 scc2 n_alts2 ar_2)
   = OneOcc (combine_posns posn1 posn2)
 	   (combine_dups  dup1  dup2)
@@ -188,9 +196,6 @@ combineAltsBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
 	   (n_alts1 + n_alts2)
 	   (min ar_1 ar_2)
   where
-    combine_posns FunOcc FunOcc = FunOcc -- see comment at FunOrArg defn
-    combine_posns _  	 _      = ArgOcc
-
     combine_dups DupDanger _ = DupDanger	-- Too paranoid?? ToDo
     combine_dups _ DupDanger = DupDanger
     combine_dups _ _	     = NoDupDanger
@@ -199,8 +204,23 @@ combineAltsBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
     combine_sccs _ InsideSCC = InsideSCC
     combine_sccs _ _	     = NotInsideSCC
 
-combineAltsBinderInfo info1 info2
+orBinderInfo info1 info2
 	= ManyOcc (min (getBinderInfoArity info1) (getBinderInfoArity info2))
+
+combine_posns FunOcc FunOcc = FunOcc -- see comment at FunOrArg defn
+combine_posns _  	 _  = ArgOcc
+
+{-
+multiplyBinderInfo orig@(ManyOcc _) new
+  = ManyOcc (min (getBinderInfoArity orig) (getBinderInfoArity new))
+
+multiplyBinderInfo orig new@(ManyOcc _)
+  = ManyOcc (min (getBinderInfoArity orig) (getBinderInfoArity new))
+
+multiplyBinderInfo (OneOcc posn1 dup1 scc1 n_alts1 ar_1)
+		   (OneOcc posn2 dup2 scc2 n_alts2 ar_2)  
+  = OneOcc (combine_posns posn1 posn2) ???
+-}
 
 setBinderInfoArityToZero :: BinderInfo -> BinderInfo
 setBinderInfoArityToZero DeadCode    = DeadCode

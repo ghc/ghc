@@ -63,9 +63,6 @@ module CgCompInfo (
 
 	spARelToInt,
 	spBRelToInt
-
-	-- and to make the interface self-sufficient...
---	RegRelative
     ) where
 
 -- This magical #include brings in all the everybody-knows-these magic

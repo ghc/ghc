@@ -14,7 +14,7 @@ module CgHeapery (
         , heapCheckOnly, fetchAndReschedule, yield
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn
 import CgMonad

@@ -27,7 +27,7 @@ module CostCentre (
 	cmpCostCentre	-- used for removing dups in a list
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Id		( externallyVisibleId, GenId, Id(..) )
 import CStrings		( identToC, stringToC )

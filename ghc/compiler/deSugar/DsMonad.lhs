@@ -24,7 +24,7 @@ module DsMonad (
 	DsMatchContext(..), DsMatchKind(..), pprDsWarnings
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import Bag		( emptyBag, snocBag, bagToList )
 import CmdLineOpts	( opt_SccGroup )
@@ -247,6 +247,7 @@ data DsMatchKind
   | CaseMatch
   | LambdaMatch
   | PatBindMatch
+  | DoBindMatch
 
 pprDsWarnings :: PprStyle -> Bag DsMatchContext -> Pretty
 pprDsWarnings sty warns
@@ -272,6 +273,10 @@ pprDsWarnings sty warns
 
     pp_match LambdaMatch pats
       = ppHang (ppPStr SLIT("in a lambda abstraction:"))
+	4 (ppSep [ppSep (map (ppr sty) pats), pp_arrow_dotdotdot])
+
+    pp_match DoBindMatch pats
+      = ppHang (ppPStr SLIT("in a `do' pattern binding:"))
 	4 (ppSep [ppSep (map (ppr sty) pats), pp_arrow_dotdotdot])
 
     pp_arrow_dotdotdot = ppPStr SLIT("-> ...")

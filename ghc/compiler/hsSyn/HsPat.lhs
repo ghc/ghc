@@ -10,21 +10,21 @@ module HsPat (
 	InPat(..),
 	OutPat(..),
 
-	unfailablePats, unfailablePat,
+	irrefutablePat, irrefutablePats,
+	failureFreePat,
 	patsAreAllCons, isConPat,
 	patsAreAllLits,	isLitPat,
-	irrefutablePat,
 	collectPatBinders
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends:
 import HsLit		( HsLit )
-import HsLoop		( HsExpr )
+IMPORT_DELOOPER(HsLoop)		( HsExpr )
 
 -- others:
-import Id		( GenId, dataConSig )
+import Id		( dataConTyCon, GenId )
 import Maybes		( maybeToBool )
 import Name		( pprSym, pprNonSym )
 import Outputable	( interppSP, interpp'SP, ifPprShowAll )
@@ -234,17 +234,36 @@ At least the numeric ones may be overloaded.
 A pattern is in {\em exactly one} of the above three categories; `as'
 patterns are treated specially, of course.
 
+The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
-unfailablePats :: [OutPat a b c] -> Bool
-unfailablePats pat_list = all unfailablePat pat_list
+irrefutablePats :: [OutPat a b c] -> Bool
+irrefutablePats pat_list = all irrefutablePat pat_list
 
-unfailablePat (AsPat	_ pat)	= unfailablePat pat
-unfailablePat (WildPat	_)	= True
-unfailablePat (VarPat	_)	= True
-unfailablePat (LazyPat	_)	= True
-unfailablePat (DictPat ds ms)	= (length ds + length ms) <= 1
-unfailablePat other		= False
+irrefutablePat (AsPat	_ pat)	= irrefutablePat pat
+irrefutablePat (WildPat	_)	= True
+irrefutablePat (VarPat	_)	= True
+irrefutablePat (LazyPat	_)	= True
+irrefutablePat (DictPat ds ms)	= (length ds + length ms) <= 1
+irrefutablePat other		= False
 
+failureFreePat :: OutPat a b c -> Bool
+
+failureFreePat (WildPat _) 		  = True
+failureFreePat (VarPat _)  		  = True
+failureFreePat (LazyPat	_) 		  = True
+failureFreePat (AsPat _ pat)		  = failureFreePat pat
+failureFreePat (ConPat con tys pats)	  = only_con con && all failureFreePat pats
+failureFreePat (ConOpPat pat1 con pat2 _) = only_con con && failureFreePat pat1 && failureFreePat pat1
+failureFreePat (RecPat con _ fields)	  = only_con con && and [ failureFreePat pat | (_,pat,_) <- fields ]
+failureFreePat (ListPat _ _)		  = False
+failureFreePat (TuplePat pats)		  = all failureFreePat pats
+failureFreePat (DictPat _ _)		  = True
+failureFreePat other_pat		  = False   -- Literals, NPat
+
+only_con con = maybeToBool (maybeTyConSingleCon (dataConTyCon con))
+\end{code}
+
+\begin{code}
 patsAreAllCons :: [OutPat a b c] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
@@ -264,28 +283,6 @@ isLitPat (AsPat _ pat)	= isLitPat pat
 isLitPat (LitPat _ _)	= True
 isLitPat (NPat   _ _ _)	= True
 isLitPat other		= False
-\end{code}
-
-A pattern is irrefutable if a match on it cannot fail
-(at any depth).
-\begin{code}
-irrefutablePat :: OutPat a b c -> Bool
-
-irrefutablePat (WildPat _) 		  = True
-irrefutablePat (VarPat _)  		  = True
-irrefutablePat (LazyPat	_) 		  = True
-irrefutablePat (AsPat _ pat)		  = irrefutablePat pat
-irrefutablePat (ConPat con tys pats)	  = only_con con && all irrefutablePat pats
-irrefutablePat (ConOpPat pat1 con pat2 _) = only_con con && irrefutablePat pat1 && irrefutablePat pat1
-irrefutablePat (RecPat con _ fields)	  = only_con con && and [ irrefutablePat pat | (_,pat,_) <- fields ]
-irrefutablePat (ListPat _ _)		  = False
-irrefutablePat (TuplePat pats)		  = all irrefutablePat pats
-irrefutablePat (DictPat _ _)		  = True
-irrefutablePat other_pat		  = False   -- Literals, NPat
-
-only_con con = maybeToBool (maybeTyConSingleCon tycon)
- 	       where
-		 (_,_,_,tycon) = dataConSig con
 \end{code}
 
 This function @collectPatBinders@ works with the ``collectBinders''

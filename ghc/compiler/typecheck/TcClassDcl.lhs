@@ -10,7 +10,7 @@ module TcClassDcl (
 	tcClassDecl1, tcClassDecls2
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Match(..), GRHSsAndBinds(..), GRHS(..), HsExpr(..),
@@ -23,18 +23,19 @@ import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
 			  RnName{-instance Uniquable-}
 			)
 import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
-			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam )
+			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
-import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds)
-import TcInstDcls	( processInstBinds )
-import TcKind		( unifyKind )
-import TcMonoType	( tcMonoType, tcContext )
-import TcType		( TcType(..), TcTyVar(..), tcInstType, tcInstSigTyVars )
+import TcInstDcls	( processInstBinds, newMethodId )
 import TcKind		( TcKind )
+import TcKind		( unifyKind )
+import TcMonad		hiding ( rnMtoTcM )
+import TcMonoType	( tcPolyType, tcMonoType, tcContext )
+import TcSimplify	( tcSimplifyAndCheck )
+import TcType		( TcType(..), TcTyVar(..), tcInstType, tcInstSigTyVars, tcInstSigType )
 
-import Bag		( foldBag )
+import Bag		( foldBag, unionManyBags )
 import Class		( GenClass, mkClass, mkClassOp, classBigSig, 
 			  classOps, classOpString, classOpLocalType,
 			  classOpTagByString
@@ -52,15 +53,50 @@ import SrcLoc		( mkGeneratedSrcLoc )
 import Type		( mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy,
 			  mkForAllTy, mkSigmaTy, splitSigmaTy)
 import TysWiredIn	( stringTy )
-import TyVar		( GenTyVar )			 
+import TyVar		( mkTyVarSet, GenTyVar )
 import Unique		( Unique )			 
 import Util
+
 
 -- import TcPragmas	( tcGenPragmas, tcClassOpPragmas )
 tcGenPragmas ty id ps = returnNF_Tc noIdInfo
 tcClassOpPragmas ty sel def spec ps = returnNF_Tc (noIdInfo, noIdInfo)
-
 \end{code}
+
+
+
+Dictionary handling
+~~~~~~~~~~~~~~~~~~~
+Every class implicitly declares a new data type, corresponding to dictionaries
+of that class. So, for example:
+
+	class (D a) => C a where
+	  op1 :: a -> a
+	  op2 :: forall b. Ord b => a -> b -> b
+
+would implicitly declare
+
+	data CDict a = CDict (D a)	
+			     (a -> a)
+			     (forall b. Ord b => a -> b -> b)
+
+(We could use a record decl, but that means changing more of the existing apparatus.
+One step at at time!)
+
+For classes with just one superclass+method, we use a newtype decl instead:
+
+	class C a where
+	  op :: forallb. a -> b -> b
+
+generates
+
+	newtype CDict a = CDict (forall b. a -> b -> b)
+
+Now DictTy in Type is just a form of type synomym: 
+	DictTy c t = TyConTy CDict `AppTy` t
+
+Death to "ExpandingDicts".
+
 
 \begin{code}
 tcClassDecl1 rec_inst_mapper
@@ -88,8 +124,6 @@ tcClassDecl1 rec_inst_mapper
 				`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS OBJECT ITSELF
--- BOGUS:
---  tcGetUnique			`thenNF_Tc` \ uniq ->
     let
 	(ops, op_sel_ids, defm_ids) = unzip3 sig_stuff
 	clas = mkClass (uniqueOf class_name) (getName class_name) rec_tyvar
@@ -98,6 +132,32 @@ tcClassDecl1 rec_inst_mapper
     in
     returnTc clas
 \end{code}
+
+
+    let
+	clas_ty = mkTyVarTy clas_tyvar
+	dict_component_tys = [mkDictTy sc clas_ty | sc <- scs] ++
+			     [classOpLocalType op | op <- ops])
+ 	new_or_data = case dict_component_tys of
+			[_]   -> NewType
+			other -> DataType
+
+        dict_con_id = mkDataCon class_name
+			   [NotMarkedStrict]
+			   [{- No labelled fields -}]
+		      	   [clas_tyvar]
+		      	   [{-No context-}]
+			   dict_component_tys
+		      	   tycon
+
+	tycon = mkDataTyCon class_name
+			    (tyVarKind rec_tyvar `mkArrowKind` mkBoxedTypeKind)
+			    [rec_tyvar]
+			    [{- Empty context -}]
+			    [dict_con_id]
+			    [{- No derived classes -}]
+			    new_or_data
+    in
 
 
 \begin{code}
@@ -135,10 +195,10 @@ tcClassContext rec_class rec_tyvar context pragmas
 		Just prag -> tcGenPragmas Nothing{-ty unknown-} rec_super_id prag
 	    )				`thenNF_Tc` \ id_info ->
 	    let
-	      ty = mkForAllTy rec_tyvar (
-	           mkFunTy (mkDictTy rec_class   (mkTyVarTy rec_tyvar))
-		           (mkDictTy super_class (mkTyVarTy rec_tyvar))
-		   )
+		rec_tyvar_ty = mkTyVarTy rec_tyvar
+		ty = mkForAllTy rec_tyvar $
+		     mkFunTy (mkDictTy rec_class   rec_tyvar_ty)
+			     (mkDictTy super_class rec_tyvar_ty)
 	    in
 		-- BUILD THE SUPERCLASS ID
 	    returnTc (mkSuperDictSelId uniq rec_class super_class ty id_info)
@@ -164,21 +224,21 @@ tcClassSig :: Class	    		-- Knot tying only!
 
 tcClassSig rec_clas rec_clas_tyvar rec_classop_spec_fn
 	   (ClassOpSig op_name
-		       (HsForAllTy tyvar_names context monotype)
+		       op_ty
 		       pragmas src_loc)
   = tcAddSrcLoc src_loc $
     fixTc ( \ ~(_, rec_sel_id, rec_defm_id) ->	-- Knot for pragmas
 
 	-- Check the type signature.  NB that the envt *already has*
 	-- bindings for the type variables; see comments in TcTyAndClassDcls.
-    tcContext context				`thenTc`    \ theta ->
-    tcMonoType monotype				`thenTc`    \ tau ->
-    mapAndUnzipNF_Tc tcLookupTyVar tyvar_names	`thenNF_Tc` \ (_,tyvars) ->
+
+    -- NB: Renamer checks that the class type variable is mentioned in local_ty,
+    -- and that it is not constrained by theta
+    tcPolyType op_ty				`thenTc` \ local_ty ->
     let
-	full_tyvars = rec_clas_tyvar : tyvars
-	full_theta  = (rec_clas, mkTyVarTy rec_clas_tyvar) : theta
-	global_ty   = mkSigmaTy full_tyvars full_theta tau
-	local_ty    = mkSigmaTy tyvars theta tau
+	global_ty   = mkSigmaTy [rec_clas_tyvar] 
+			        [(rec_clas, mkTyVarTy rec_clas_tyvar)]
+			        local_ty
 	class_op_nm = getLocalName op_name
 	class_op    = mkClassOp class_op_nm
 				(classOpTagByString rec_clas{-yeeps!-} class_op_nm)
@@ -333,6 +393,7 @@ buildSelectors clas clas_tyvar clas_tc_tyvar scs sc_sel_ids ops op_sel_ids
 Make a selector expression for @sel_id@ from a dictionary @clas_dict@
 consisting of @dicts@ and @methods@.
 
+======================	OLD ============================
 We have to do a bit of jiggery pokery to get the type variables right.
 Suppose we have the class decl:
 \begin{verbatim}
@@ -360,6 +421,12 @@ whereas \tr{op1_sel} (the one we use) has the decent type
 \begin{verbatim}
 	op1_sel :: forall a b. Foo a -> Ord b -> a -> b -> a
 \end{verbatim}
+========================= END OF OLD ===========================
+
+NEW COMMENT: instead we now go for op1_sel' above.  Seems tidier and
+the rest of the compiler darn well ought to cope.
+
+
 
 NOTE that we return a TcMonoBinds (which is later zonked) even though
 there's no real back-substitution to do. It's just simpler this way!
@@ -376,28 +443,23 @@ mkSelBind :: Id 			-- the selector id
 	  -> NF_TcM s (TcMonoBinds s)
 
 mkSelBind sel_id clas_tyvar clas_dict dicts methods method_or_dict@(TcId op)
-  = let
-	(op_tyvars,op_theta,op_tau) = splitSigmaTy (idType op)
-	op_tys = mkTyVarTys op_tyvars
-    in
-    newDicts ClassDeclOrigin op_theta	`thenNF_Tc` \ (_, op_dicts) ->
-
-	-- sel_id = /\ clas_tyvar op_tyvars -> \ clas_dict op_dicts ->
+  = 
+	-- sel_id = /\ clas_tyvar -> \ clas_dict ->
 	--	    case clas_dict of 
-	--		 <dicts..methods> -> method_or_dict op_tyvars op_dicts
+	--		 <dicts..methods> -> method_or_dict
 
     returnNF_Tc (VarMonoBind (RealId sel_id)  (
-		 TyLam (clas_tyvar:op_tyvars) (
-		 DictLam (clas_dict:op_dicts) (
+		 TyLam [clas_tyvar] (
+		 DictLam [clas_dict] (
 		 HsCase
 		   (HsVar clas_dict)
                    ([PatMatch  (DictPat dicts methods) (
 		     GRHSMatch (GRHSsAndBindsOut
 			[OtherwiseGRHS
-			   (mkHsDictApp (mkHsTyApp (HsVar method_or_dict) op_tys) op_dicts)
+			   (HsVar method_or_dict)
 		  	   mkGeneratedSrcLoc]
 			EmptyBinds
-			op_tau))])
+			(idType op)))])
 		    mkGeneratedSrcLoc
 		 ))))
 \end{code}
@@ -425,11 +487,22 @@ we get the default methods:
 defm.Foo.op1 :: forall a. Foo a => a -> Bool
 defm.Foo.op1 = /\a -> \dfoo -> \x -> True
 
+====================== OLD ==================
+\begin{verbatim}
 defm.Foo.op2 :: forall a, b. (Foo a, Ord b) => a -> b -> b -> b
 defm.Foo.op2 = /\ a b -> \ dfoo dord -> \x y z ->
 		  if (op1 a dfoo x) && (< b dord y z) then y else z
 \end{verbatim}
 Notice that, like all ids, the foralls of defm.Foo.op2 are at the top.
+====================== END OF OLD ===================
+
+NEW:
+\begin{verbatim}
+defm.Foo.op2 :: forall a. Foo a => forall b. Ord b => a -> b -> b -> b
+defm.Foo.op2 = /\ a -> \ dfoo -> /\ b -> \ dord -> \x y z ->
+		  if (op1 a dfoo x) && (< b dord y z) then y else z
+\end{verbatim}
+
 
 When we come across an instance decl, we may need to use the default
 methods:
@@ -442,14 +515,15 @@ const.Foo.Int.op1 :: Int -> Bool
 const.Foo.Int.op1 = defm.Foo.op1 Int dfun.Foo.Int
 
 const.Foo.Int.op2 :: forall b. Ord b => Int -> b -> b -> b
-const.Foo.Int.op2 = /\b -> defm.Foo.op2 Int b dfun.Foo.Int
+const.Foo.Int.op2 = defm.Foo.op2 Int dfun.Foo.Int
 
 dfun.Foo.Int :: Foo Int
 dfun.Foo.Int = (const.Foo.Int.op1, const.Foo.Int.op2)
 \end{verbatim}
 Notice that, as with method selectors above, we assume that dictionary
 application is curried, so there's no need to mention the Ord dictionary
-in const.Foo.Int.op2
+in const.Foo.Int.op2 (or the type variable).
+
 \begin{verbatim}
 instance Foo a => Foo [a] where {}
 
@@ -458,7 +532,7 @@ dfun.Foo.List
   = /\ a -> \ dfoo_a ->
     let rec
 	op1 = defm.Foo.op1 [a] dfoo_list
-	op2 = /\b -> \dord -> defm.Foo.op2 [a] b dfoo_list dord
+	op2 = defm.Foo.op2 [a] dfoo_list
 	dfoo_list = (op1, op2)
     in
 	dfoo_list
@@ -474,16 +548,38 @@ buildDefaultMethodBinds
 
 buildDefaultMethodBinds clas clas_tyvar
 			default_method_ids default_binds
-  =	-- Deal with the method declarations themselves
+  = newDicts origin [(clas,inst_ty)]			`thenNF_Tc` \ (this_dict, [this_dict_id]) ->
+    mapAndUnzipNF_Tc mk_method default_method_ids	`thenNF_Tc` \ (insts_s, local_defm_ids) ->
+    let
+	avail_insts = this_dict `plusLIE` unionManyBags insts_s 	-- Insts available
+    in
     processInstBinds
 	 clas
-	 (makeClassDeclDefaultMethodRhs clas default_method_ids)
-	 []		-- No tyvars in scope for "this inst decl"
-	 emptyLIE 	-- No insts available
-	 (map RealId default_method_ids)
-	 default_binds		`thenTc` \ (dicts_needed, default_binds') ->
+	 (makeClassDeclDefaultMethodRhs clas local_defm_ids)
+	 [clas_tyvar]	-- Tyvars in scope
+	 avail_insts
+	 local_defm_ids
+	 default_binds					`thenTc` \ (insts_needed, default_binds') ->
 
-    returnTc (dicts_needed, SingleBind (NonRecBind default_binds'))
+    tcSimplifyAndCheck
+	(mkTyVarSet [clas_tyvar])
+	avail_insts
+	insts_needed					`thenTc` \ (const_lie, dict_binds) ->
+	
+
+    let
+	defm_binds = AbsBinds
+		 	[clas_tyvar]
+			[this_dict_id]
+			(local_defm_ids `zip` map RealId default_method_ids)
+			dict_binds
+			(RecBind default_binds')
+    in
+    returnTc (const_lie, defm_binds)
+  where
+    inst_ty = mkTyVarTy clas_tyvar
+    mk_method defm_id = newMethodId defm_id inst_ty origin
+    origin = ClassDeclOrigin
 \end{code}
 
 @makeClassDeclDefaultMethodRhs@ builds the default method for a
@@ -492,12 +588,21 @@ class declaration when no explicit default method is given.
 \begin{code}
 makeClassDeclDefaultMethodRhs
 	:: Class
-	-> [Id]
+	-> [TcIdOcc s]
 	-> Int
 	-> NF_TcM s (TcExpr s)
 
 makeClassDeclDefaultMethodRhs clas method_ids tag
-  = tcInstType [] (idType method_id) 	`thenNF_Tc` \ method_ty ->
+  = 	-- Return the expression
+	--	error ty "No default method for ..."
+	-- The interesting thing is that method_ty is a for-all type;
+	-- this is fun, although unusual in a type application!
+
+    returnNF_Tc (HsApp (mkHsTyApp (HsVar (RealId nO_DEFAULT_METHOD_ERROR_ID)) [tcIdType method_id])
+		       (HsLitOut (HsString (_PK_ error_msg)) stringTy))
+
+{-	OLD AND COMPLICATED
+    tcInstSigType () 	`thenNF_Tc` \ method_ty ->
     let 
 	(tyvars, theta, tau) = splitSigmaTy method_ty 
     in	
@@ -507,11 +612,13 @@ makeClassDeclDefaultMethodRhs clas method_ids tag
 		 mkHsDictLam dict_ids (
 		 HsApp (mkHsTyApp (HsVar (RealId nO_DEFAULT_METHOD_ERROR_ID)) [tau])
 		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
+-}
+
   where
     (clas_mod, clas_name) = moduleNamePair clas
 
     method_id = method_ids  !! (tag-1)
-    class_op = (classOps clas) !! (tag-1)
+    class_op  = (classOps clas) !! (tag-1)
 
     error_msg = _UNPK_ clas_mod ++ "." ++ _UNPK_ clas_name ++ "."
 		 ++ (ppShow 80 (ppr PprForUser class_op))

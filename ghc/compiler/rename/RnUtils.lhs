@@ -14,18 +14,14 @@ module RnUtils (
 
 	lubExportFlag,
 
-	unknownNameErr,
-	badClassOpErr,
 	qualNameErr,
-	dupNamesErr,
-	shadowedNameWarn,
-	multipleOccWarn
+	dupNamesErr
     ) where
 
-import Ubiq
+IMP_Ubiq(){-uitous-}
 
 import Bag		( Bag, emptyBag, snocBag, unionBags )
-import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, addErrLoc )
+import ErrUtils		( addShortErrLocLine )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM,
 			  lookupFM, addListToFM, addToFM )
 import Maybes		( maybeToBool )
@@ -164,20 +160,11 @@ lubExportFlag ExportAbs ExportAbs = ExportAbs
 
 *********************************************************
 *							*
-\subsection{Errors used in RnMonad}
+\subsection{Errors used *more than once* in the renamer}
 *							*
 *********************************************************
 
 \begin{code}
-unknownNameErr descriptor name locn
-  = addShortErrLocLine locn ( \ sty ->
-    ppBesides [ppStr "undefined ", ppStr descriptor, ppStr ": ", pprNonSym sty name] )
-
-badClassOpErr clas op locn
-  = addErrLoc locn "" ( \ sty ->
-    ppBesides [ppChar '`', pprNonSym sty op, ppStr "' is not an operation of class `",
-	      ppr sty clas, ppStr "'"] )
-
 qualNameErr descriptor (name,locn)
   = addShortErrLocLine locn ( \ sty ->
     ppBesides [ppStr "invalid use of qualified ", ppStr descriptor, ppStr ": ", pprNonSym sty name ] )
@@ -194,13 +181,5 @@ dupNamesErr descriptor ((name1,locn1) : dup_things) sty
       = addShortErrLocLine locn (\ sty ->
 	ppBesides [ppStr "here was another declaration of `",
 		   pprNonSym sty name, ppStr "'" ]) sty
-
-shadowedNameWarn locn shadow
-  = addShortWarnLocLine locn ( \ sty ->
-    ppBesides [ppStr "more than one value with the same name (shadowing): ", ppr sty shadow] )
-
-multipleOccWarn (name, occs) sty
-  = ppBesides [ppStr "warning:multiple names used to refer to `", ppr sty name, ppStr "': ",
-	       ppInterleave ppComma (map (ppr sty) occs)]
 \end{code}
 

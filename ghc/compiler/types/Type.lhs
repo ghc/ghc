@@ -10,7 +10,7 @@ module Type (
 	getFunTy_maybe, getFunTyExpandingDicts_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
 	mkSynTy,
-	mkForAllTy, mkForAllTys, getForAllTy_maybe, splitForAllTy,
+	mkForAllTy, mkForAllTys, getForAllTy_maybe, getForAllTyExpandingDicts_maybe, splitForAllTy,
 	mkForAllUsageTy, getForAllUsageTy,
 	applyTy,
 #ifdef DEBUG
@@ -39,15 +39,15 @@ module Type (
 	tyVarsOfType, tyVarsOfTypes, typeKind
     ) where
 
-import Ubiq
-import IdLoop	 -- for paranoia checking
-import TyLoop	 -- for paranoia checking
-import PrelLoop  -- for paranoia checking
+IMP_Ubiq()
+IMPORT_DELOOPER(IdLoop)	 -- for paranoia checking
+IMPORT_DELOOPER(TyLoop)	 -- for paranoia checking
+IMPORT_DELOOPER(PrelLoop)  -- for paranoia checking
 
 -- friends:
 import Class	( classSig, classOpLocalType, GenClass{-instances-} )
-import Kind	( mkBoxedTypeKind, resultKind )
-import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, isSynTyCon, tyConArity,
+import Kind	( mkBoxedTypeKind, resultKind, notArrowKind )
+import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon, isPrimTyCon, isDataTyCon, isSynTyCon,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
 import TyVar	( tyVarKind, GenTyVar{-instances-}, GenTyVarSet(..),
 		  emptyTyVarSet, unionTyVarSets, minusTyVarSet,
@@ -58,9 +58,11 @@ import Usage	( usageOmega, GenUsage, Usage(..), UVar(..), UVarEnv(..),
 		  eqUsage )
 
 -- others
-import Maybes	( maybeToBool )
+import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
-import Util	( thenCmp, zipEqual, panic, panic#, assertPanic, pprTrace{-ToDo:rm-}, pprPanic{-ToDo:rm-},
+import Unique	-- quite a few *Keys
+import Util	( thenCmp, zipEqual, assoc,
+		  panic, panic#, assertPanic, pprTrace{-ToDo:rm-}, pprPanic{-ToDo:rm-},
 		  Ord3(..){-instances-}
 		)
 -- ToDo:rm all these
@@ -69,11 +71,11 @@ import	{-mumble-}
 import  {-mumble-}
 	PprStyle
 import	{-mumble-}
-	PprType (pprType )
+	PprType --(pprType )
 import  {-mumble-}
 	UniqFM (ufmToList )
-import  {-mumble-}
-	Unique (pprUnique )
+import {-mumble-}
+	Outputable
 \end{code}
 
 Data types
@@ -143,6 +145,8 @@ expandTy (FunTy t1 t2 u) = AppTy (AppTy (TyConTy mkFunTyCon u) t1) t2
 expandTy (SynTy _  _  t) = expandTy t
 expandTy (DictTy clas ty u)
   = case all_arg_tys of
+
+	[]	 -> voidTy		-- Empty dictionary represented by Void
 
 	[arg_ty] -> expandTy arg_ty	-- just the <whatever> itself
 
@@ -258,7 +262,8 @@ mkTyConTy tycon
 
 applyTyCon :: TyCon -> [GenType t u] -> GenType t u
 applyTyCon tycon tys
-  = ASSERT (not (isSynTyCon tycon))
+  = --ASSERT (not (isSynTyCon tycon))
+    (if (not (isSynTyCon tycon)) then \x->x else pprTrace "applyTyCon:" (pprTyCon PprDebug tycon)) $
     foldl AppTy (TyConTy tycon usageOmega) tys
 
 getTyCon_maybe		     :: GenType t u -> Maybe TyCon
@@ -341,6 +346,12 @@ getForAllTy_maybe (SynTy _ _ t)	     = getForAllTy_maybe t
 getForAllTy_maybe (ForAllTy tyvar t) = Just(tyvar,t)
 getForAllTy_maybe _		     = Nothing
 
+getForAllTyExpandingDicts_maybe :: Type -> Maybe (TyVar, Type)
+getForAllTyExpandingDicts_maybe (SynTy _ _ t)	   = getForAllTyExpandingDicts_maybe t
+getForAllTyExpandingDicts_maybe (ForAllTy tyvar t) = Just(tyvar,t)
+getForAllTyExpandingDicts_maybe ty@(DictTy _ _ _)  = getForAllTyExpandingDicts_maybe (expandTy ty)
+getForAllTyExpandingDicts_maybe _		   = Nothing
+
 splitForAllTy :: GenType t u-> ([t], GenType t u)
 splitForAllTy t = go t []
 	       where
@@ -392,9 +403,9 @@ Applied data tycons (give back constrs)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 maybeAppDataTyCon
-	:: GenType tyvar uvar
+	:: GenType (GenTyVar any) uvar
 	-> Maybe (TyCon,		-- the type constructor
-		  [GenType tyvar uvar],	-- types to which it is applied
+		  [GenType (GenTyVar any) uvar],	-- types to which it is applied
 		  [Id])			-- its family of data-constructors
 maybeAppDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts
 	:: Type -> Maybe (TyCon, [Type], [Id])
@@ -405,26 +416,30 @@ maybeAppSpecDataTyConExpandingDicts ty = maybe_app_data_tycon expandTy ty
 
 
 maybe_app_data_tycon expand ty
-  = case (getTyCon_maybe app_ty) of
-	Just tycon |  isDataTyCon tycon && 
-		      tyConArity tycon == length arg_tys
+  = let
+	expanded_ty       = expand ty
+	(app_ty, arg_tys) = splitAppTy expanded_ty
+    in
+    case (getTyCon_maybe app_ty) of
+	Just tycon |  --pprTrace "maybe_app:" (ppCat [ppr PprDebug (isDataTyCon tycon), ppr PprDebug (notArrowKind (typeKind expanded_ty))]) $
+		      isDataTyCon tycon && 
+		      notArrowKind (typeKind expanded_ty)
 			-- Must be saturated for ty to be a data type
 		   -> Just (tycon, arg_tys, tyConDataCons tycon)
 
 	other      -> Nothing
-  where
-    (app_ty, arg_tys) = splitAppTy (expand ty)
 
 getAppDataTyCon, getAppSpecDataTyCon
-	:: GenType tyvar uvar
+	:: GenType (GenTyVar any) uvar
 	-> (TyCon,			-- the type constructor
-	    [GenType tyvar uvar],	-- types to which it is applied
+	    [GenType (GenTyVar any) uvar],	-- types to which it is applied
 	    [Id])			-- its family of data-constructors
 getAppDataTyConExpandingDicts, getAppSpecDataTyConExpandingDicts
 	:: Type -> (TyCon, [Type], [Id])
 
 getAppDataTyCon               ty = get_app_data_tycon maybeAppDataTyCon ty
-getAppDataTyConExpandingDicts ty = get_app_data_tycon maybeAppDataTyConExpandingDicts ty
+getAppDataTyConExpandingDicts ty = --pprTrace "getAppDataTyConEx...:" (pprType PprDebug ty) $
+				   get_app_data_tycon maybeAppDataTyConExpandingDicts ty
 
 -- these should work like the UniTyFuns.getUniDataSpecTyCon* things of old (ToDo)
 getAppSpecDataTyCon               = getAppDataTyCon
@@ -467,6 +482,7 @@ Finding the kind of a type
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
 typeKind :: GenType (GenTyVar any) u -> Kind
+
 typeKind (TyVarTy tyvar) 	= tyVarKind tyvar
 typeKind (TyConTy tycon usage)	= tyConKind tycon
 typeKind (SynTy _ _ ty)		= typeKind ty
@@ -619,9 +635,33 @@ This is *not* right: it is a placeholder (ToDo 96/03 WDP):
 typePrimRep :: GenType tyvar uvar -> PrimRep
 
 typePrimRep (SynTy _ _ ty)  = typePrimRep ty
-typePrimRep (TyConTy tc _)  = if isPrimTyCon tc then panic "typePrimRep:PrimTyCon" else PtrRep
 typePrimRep (AppTy ty _)    = typePrimRep ty
+typePrimRep (TyConTy tc _)  = if not (isPrimTyCon tc) then
+				 PtrRep
+			      else
+				 case (assocMaybe tc_primrep_list (uniqueOf tc)) of
+				   Just xx -> xx
+				   Nothing -> pprPanic "typePrimRep:" (pprTyCon PprDebug tc)
+
 typePrimRep _		    = PtrRep -- the "default"
+
+tc_primrep_list
+  = [(addrPrimTyConKey,	     	    AddrRep)
+    ,(arrayPrimTyConKey,     	    ArrayRep)
+    ,(byteArrayPrimTyConKey, 	    ByteArrayRep)
+    ,(charPrimTyConKey,	     	    CharRep)
+    ,(doublePrimTyConKey,    	    DoubleRep)
+    ,(floatPrimTyConKey,     	    FloatRep)
+    ,(foreignObjPrimTyConKey,	    ForeignObjRep)
+    ,(intPrimTyConKey,	     	    IntRep)
+    ,(mutableArrayPrimTyConKey,     ArrayRep)
+    ,(mutableByteArrayPrimTyConKey, ByteArrayRep)
+    ,(stablePtrPrimTyConKey, 	    StablePtrRep)
+    ,(statePrimTyConKey,	    VoidRep)
+    ,(synchVarPrimTyConKey,	    PtrRep)
+    ,(voidTyConKey,	     	    VoidRep)
+    ,(wordPrimTyConKey,	     	    WordRep)
+    ]
 \end{code}
 
 %************************************************************************

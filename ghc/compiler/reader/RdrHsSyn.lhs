@@ -50,7 +50,7 @@ module RdrHsSyn (
 	getRawExportees
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn
 import Name		( ExportFlag(..) )

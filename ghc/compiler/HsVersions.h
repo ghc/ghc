@@ -25,7 +25,30 @@ you will screw up the layout where they are used in case expressions!
 #else
 #define ASSERT(e)
 #endif
-#define CHK_Ubiq() import Ubiq
+
+#if __STDC__
+#define CAT2(a,b)a##b
+#else
+#define CAT2(a,b)a/**/b
+#endif
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 200
+# define REALLY_HASKELL_1_3
+# define SYN_IE(a) a
+# define IMPORT_DELOOPER(mod) import CAT2(mod,_1_3)
+# define IMPORT_1_3(mod) import mod
+# define _tagCmp compare
+# define _LT LT
+# define _EQ EQ
+# define _GT GT
+# define Text Show
+#else
+# define SYN_IE(a) a(..)
+# define IMPORT_DELOOPER(mod) import mod
+# define IMPORT_1_3(mod) {--}
+#endif
+#define IMP_Ubiq() IMPORT_DELOOPER(Ubiq)
+#define CHK_Ubiq() IMPORT_DELOOPER(Ubiq)
 
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 26
 #define trace _trace
@@ -76,7 +99,7 @@ you will screw up the layout where they are used in case expressions!
 
 #endif  {- ! __GLASGOW_HASKELL__ -}
 
-#if __GLASGOW_HASKELL__ >= 23
+#if __GLASGOW_HASKELL__ >= 23 && __GLASGOW_HASKELL__ < 200
 #define USE_FAST_STRINGS 1
 #define FAST_STRING _PackedString
 #define SLIT(x)	    (_packCString (A# x#))

@@ -1,5 +1,5 @@
 %
-% (c) The AQUA Project, Glasgow University, 1993-1995
+% (c) The AQUA Project, Glasgow University, 1993-1996
 %
 \section[SimplVar]{Simplifier stuff related to variables}
 
@@ -11,15 +11,15 @@ module SimplVar (
 	leastItCouldCost
     ) where
 
-import Ubiq{-uitous-}
-import SmplLoop		( simplExpr )
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(SmplLoop)		( simplExpr )
 
 import CgCompInfo	( uNFOLDING_USE_THRESHOLD,
 			  uNFOLDING_CON_DISCOUNT_WEIGHT
 			)
 import CmdLineOpts	( intSwitchSet, switchIsOn, SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
+import CoreUnfold	( whnfDetails, UnfoldingDetails(..), UnfoldingGuidance(..),
 			  FormSummary(..)
 			)
 import Id		( idType, getIdInfo,
@@ -55,21 +55,9 @@ completeVar env var args
     in
     case (lookupUnfolding env var) of
 
-      LitForm lit
-	| not (isNoRepLit lit)
-		-- Inline literals, if they aren't no-repish things
-	-> ASSERT( null args )
-	   returnSmpl (Lit lit)
-
-      ConForm con con_args
-		-- Always inline constructors.
-		-- See comments before completeLetBinding
-	-> ASSERT( null args )
-	   returnSmpl (Con con con_args)
-
-      GenForm txt_occ form_summary template guidance
+      GenForm form_summary template guidance
 	-> considerUnfolding env var args
-			     txt_occ form_summary template guidance
+			     (panic "completeVar"{-txt_occ-}) form_summary template guidance
 
       MagicForm str magic_fun
 	->  applyMagicUnfoldingFun magic_fun env args `thenSmpl` \ result ->
@@ -268,10 +256,9 @@ discountedCost env con_discount_weight size no_args is_con_vec args
 	    full_price
 	else
 	    case arg of
-	      LitArg _ -> full_price
-	      VarArg v -> case lookupUnfolding env v of
-			       ConForm _ _ -> take_something_off v
-			       other_form  -> full_price
+	      LitArg _ 					     -> full_price
+	      VarArg v | whnfDetails (lookupUnfolding env v) -> take_something_off v
+		       | otherwise			     -> full_price
 
 	) want_cons rest_args
 \end{code}

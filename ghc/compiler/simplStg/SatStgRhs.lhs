@@ -60,7 +60,7 @@ This is done for local definitions as well.
 
 module SatStgRhs ( satStgRhs ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import StgSyn
 

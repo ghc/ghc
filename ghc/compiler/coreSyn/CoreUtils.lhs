@@ -25,13 +25,14 @@ module CoreUtils (
 
 -}  ) where
 
-import Ubiq
-import IdLoop	-- for pananoia-checking purposes
+IMP_Ubiq()
+IMPORT_DELOOPER(IdLoop)	-- for pananoia-checking purposes
 
 import CoreSyn
 
 import CostCentre	( isDictCC )
 import Id		( idType, mkSysLocal, getIdArity, isBottomingId,
+			  toplevelishId, mkIdWithNewUniq, applyTypeEnvToId,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, IdEnv(..),
 			  GenId{-instances-}
@@ -46,7 +47,9 @@ import Pretty		( ppAboves )
 import PrelVals		( augmentId, buildId )
 import PrimOp		( primOpType, fragilePrimOp, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
-import TyVar		( isNullTyVarEnv, TyVarEnv(..) )
+import TyVar		( cloneTyVar,
+			  isNullTyVarEnv, addOneToTyVarEnv, TyVarEnv(..)
+			)
 import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  getFunTy_maybe, applyTy, isPrimType,
 			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
@@ -61,7 +64,6 @@ import Util		( zipEqual, panic, pprPanic, assertPanic )
 
 type TypeEnv = TyVarEnv Type
 applyUsage = panic "CoreUtils.applyUsage:ToDo"
-dup_binder = panic "CoreUtils.dup_binder"
 \end{code}
 
 %************************************************************************
@@ -728,11 +730,21 @@ do_CoreExpr venv tenv (Prim op as)
 
     do_PrimOp other_op = returnUs other_op
 
-do_CoreExpr venv tenv (Lam binder expr)
+do_CoreExpr venv tenv (Lam (ValBinder binder) expr)
   = dup_binder tenv binder `thenUs` \(new_binder, (old,new)) ->
     let  new_venv = addOneToIdEnv venv old new  in
     do_CoreExpr new_venv tenv expr  `thenUs` \ new_expr ->
-    returnUs (Lam new_binder new_expr)
+    returnUs (Lam (ValBinder new_binder) new_expr)
+
+do_CoreExpr venv tenv (Lam (TyBinder tyvar) expr)
+  = dup_tyvar tyvar	   `thenUs` \ (new_tyvar, (old, new)) ->
+    let
+	new_tenv = addOneToTyVarEnv tenv old new
+    in
+    do_CoreExpr venv new_tenv expr  `thenUs` \ new_expr ->
+    returnUs (Lam (TyBinder new_tyvar) new_expr)
+
+do_CoreExpr venv tenv (Lam _ expr) = panic "CoreUtils.do_CoreExpr:Lam UsageBinder"
 
 do_CoreExpr venv tenv (App expr arg)
   = do_CoreExpr venv tenv expr	`thenUs` \ new_expr ->
@@ -786,4 +798,29 @@ do_CoreExpr venv tenv (SCC label expr)
 do_CoreExpr venv tenv (Coerce c ty expr)
   = do_CoreExpr venv tenv expr	    	`thenUs` \ new_expr ->
     returnUs (Coerce c (applyTypeEnvToTy tenv ty) new_expr)
+\end{code}
+
+\begin{code}
+dup_tyvar :: TyVar -> UniqSM (TyVar, (TyVar, Type))
+dup_tyvar tyvar
+  = getUnique			`thenUs` \ uniq ->
+    let  new_tyvar = cloneTyVar tyvar uniq  in
+    returnUs (new_tyvar, (tyvar, mkTyVarTy new_tyvar))
+
+-- same thing all over again --------------------
+
+dup_binder :: TypeEnv -> Id -> UniqSM (Id, (Id, CoreExpr))
+dup_binder tenv b
+  = if (toplevelishId b) then
+	-- binder is "top-level-ish"; -- it should *NOT* be renamed
+	-- ToDo: it's unsavoury that we return something to heave in env
+	returnUs (b, (b, Var b))
+
+    else -- otherwise, the full business
+	getUnique			    `thenUs`  \ uniq ->
+	let
+	    new_b1 = mkIdWithNewUniq b uniq
+	    new_b2 = applyTypeEnvToId tenv new_b1
+	in
+	returnUs (new_b2, (b, Var new_b2))
 \end{code}

@@ -23,7 +23,7 @@ module PprEnv (
 --	lookupValVar, lookupTyVar, lookupUVar
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Pretty		( Pretty(..) )
 import Unique		( initRenumberingUniques )

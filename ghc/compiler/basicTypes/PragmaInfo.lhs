@@ -8,7 +8,7 @@
 
 module PragmaInfo where
 
-import Ubiq
+IMP_Ubiq()
 \end{code}
 
 \begin{code}

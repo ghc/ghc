@@ -19,7 +19,7 @@ module Outputable (
 	ifPprInterface
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import PprStyle		( PprStyle(..) )
 import Pretty

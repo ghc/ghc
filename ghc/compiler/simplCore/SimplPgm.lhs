@@ -8,7 +8,7 @@
 
 module SimplPgm ( simplifyPgm ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CmdLineOpts	( opt_D_verbose_core2core,
 			  switchIsOn, intSwitchSet, SimplifierSwitch(..)

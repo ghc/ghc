@@ -36,7 +36,7 @@ module Id {- (
 	getMentionedTyConsAndClassesFromId,
 
 	dataConTag, dataConStrictMarks,
-	dataConSig, dataConArgTys,
+	dataConSig, dataConRawArgTys, dataConArgTys,
 	dataConTyCon, dataConArity,
 	dataConFieldLabels,
 
@@ -44,6 +44,7 @@ module Id {- (
 
 	-- PREDICATES
 	isDataCon, isTupleCon,
+	isNullaryDataCon,
 	isSpecId_maybe, isSpecPragmaId_maybe,
 	toplevelishId, externallyVisibleId,
 	isTopLevId, isWorkerId, isWrapperId,
@@ -94,9 +95,9 @@ module Id {- (
 	GenIdSet(..), IdSet(..)
     )-} where
 
-import Ubiq
-import IdLoop   -- for paranoia checking
-import TyLoop   -- for paranoia checking
+IMP_Ubiq()
+IMPORT_DELOOPER(IdLoop)   -- for paranoia checking
+IMPORT_DELOOPER(TyLoop)   -- for paranoia checking
 
 import Bag
 import Class		( classOpString, Class(..), GenClass, ClassOp(..), GenClassOp )
@@ -1043,17 +1044,17 @@ mkSuperDictSelId u c sc ty info
 
     n = mkCompoundName u SLIT("sdsel") [origName cname, origName sc] cname
 
-mkMethodSelId u c op ty info
-  = Id u n ty (MethodSelId c op) NoPragmaInfo info
+mkMethodSelId u rec_c op ty info
+  = Id u n ty (MethodSelId rec_c op) NoPragmaInfo info
   where
-    cname = getName c -- we get other info out of here
+    cname = getName rec_c -- we get other info out of here
 
     n = mkCompoundName u SLIT("meth") [origName cname, Unqual (classOpString op)] cname
 
-mkDefaultMethodId u c op gen ty info
-  = Id u n ty (DefaultMethodId c op gen) NoPragmaInfo info
+mkDefaultMethodId u rec_c op gen ty info
+  = Id u n ty (DefaultMethodId rec_c op gen) NoPragmaInfo info
   where
-    cname = getName c -- we get other info out of here
+    cname = getName rec_c -- we get other info out of here
 
     n = mkCompoundName u SLIT("defm") [origName cname, Unqual (classOpString op)] cname
 
@@ -1226,6 +1227,8 @@ dataConArity id@(Id _ _ _ _ _ id_info)
     case (arityMaybe (getInfo id_info)) of
       Nothing -> pprPanic "dataConArity:Nothing:" (pprId PprDebug id)
       Just  i -> i
+
+isNullaryDataCon con = dataConArity con == 0 -- function of convenience
 
 addIdArity :: Id -> Int -> Id
 addIdArity (Id u n ty details pinfo info) arity
@@ -1405,6 +1408,9 @@ dataConStrictMarks (Id _ _ _ (DataConId _ stricts _ _ _ _ _) _ _) = stricts
 dataConStrictMarks (Id _ _ _ (TupleConId arity)		     _ _) 
   = nOfThem arity NotMarkedStrict
 
+dataConRawArgTys :: DataCon -> [TauType] -- a function of convenience
+dataConRawArgTys con = case (dataConSig con) of { (_,_, arg_tys,_) -> arg_tys }
+
 dataConArgTys :: DataCon 
 	      -> [Type] 	-- Instantiated at these types
 	      -> [Type]		-- Needs arguments of these types
@@ -1583,15 +1589,15 @@ instance Ord3 (GenId ty) where
     cmp = cmpId
 
 instance Eq (GenId ty) where
-    a == b = case cmpId a b of { EQ_ -> True;  _ -> False }
-    a /= b = case cmpId a b of { EQ_ -> False; _ -> True  }
+    a == b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
+    a /= b = case (a `cmp` b) of { EQ_ -> False; _ -> True  }
 
 instance Ord (GenId ty) where
-    a <= b = case cmpId a b of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
-    a <	 b = case cmpId a b of { LT_ -> True;  EQ_ -> False; GT__ -> False }
-    a >= b = case cmpId a b of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    a >	 b = case cmpId a b of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp a b = case cmpId a b of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    a <= b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
+    a <	 b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
+    a >= b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    a >	 b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+    _tagCmp a b = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 \end{code}
 
 @cmpId_withSpecDataCon@ ensures that any spectys are taken into

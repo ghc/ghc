@@ -8,7 +8,7 @@
 
 module DsCCall ( dsCCall ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import CoreSyn
 
@@ -23,15 +23,13 @@ import PprType		( GenType{-instances-} )
 import Pretty
 import PrelVals		( packStringForCId )
 import PrimOp		( PrimOp(..) )
-import Type		( isPrimType, maybeAppDataTyConExpandingDicts, eqTy )
+import Type		( isPrimType, maybeAppDataTyConExpandingDicts, eqTy, maybeBoxedPrimType )
 import TysPrim		( byteArrayPrimTy, realWorldTy,  realWorldStatePrimTy )
 import TysWiredIn	( getStatePairingConInfo,
 			  realWorldStateTy, stateDataCon,
 			  stringTy
 			)
 import Util		( pprPanic, pprError, panic )
-
-maybeBoxedPrimType = panic "DsCCall.maybeBoxedPrimType"
 \end{code}
 
 Desugaring of @ccall@s consists of adding some state manipulation,

@@ -29,7 +29,7 @@ module PrimOp (
 	pprPrimOp, showPrimOp
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import PrimRep		-- most of it
 import TysPrim
@@ -38,7 +38,7 @@ import TysWiredIn
 import CStrings		( identToC )
 import CgCompInfo   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize )
-import PprStyle		( codeStyle )
+import PprStyle		( codeStyle, PprStyle(..){-ToDo:rm-} )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
@@ -1310,6 +1310,12 @@ primOpInfo ParAtRelOp	-- parAtRel# :: Int# -> Int# -> Int# -> Int# -> Int# -> a 
 
 primOpInfo ParAtForNowOp	-- parAtForNow# :: Int# -> Int# -> Int# -> Int# -> a -> b -> c -> c
   = AlgResult SLIT("parAtForNow#")	[alphaTyVar,betaTyVar,gammaTyVar] [alphaTy,betaTy,intPrimTy,intPrimTy,intPrimTy,intPrimTy,gammaTy] liftTyCon [gammaTy]
+
+primOpInfo CopyableOp	-- copyable# :: a -> a
+  = AlgResult SLIT("copyable#")	[alphaTyVar] [alphaTy] liftTyCon [alphaTy]
+
+primOpInfo NoFollowOp	-- noFollow# :: a -> a
+  = AlgResult SLIT("noFollow#")	[alphaTyVar] [alphaTy] liftTyCon [alphaTy]
 \end{code}
 
 %************************************************************************
@@ -1335,8 +1341,12 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 primOpInfo (CCallOp _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
-    (result_tycon, tys_applied, _) = _trace "PrimOp.getAppDataTyConExpandingDicts" $
+    (result_tycon, tys_applied, _) = -- _trace "PrimOp.getAppDataTyConExpandingDicts" $
 				     getAppDataTyConExpandingDicts result_ty
+
+#ifdef DEBUG
+primOpInfo op = panic ("primOpInfo:"++ show (I# (tagOf_PrimOp op)))
+#endif
 \end{code}
 
 %************************************************************************

@@ -582,11 +582,11 @@ transitiveClosure :: (a -> [a])		-- Successor function
 		  -> [a]		-- The transitive closure
 
 transitiveClosure succ eq xs
- = do [] xs
+ = go [] xs
  where
-   do done [] 			   = done
-   do done (x:xs) | x `is_in` done = do done xs
-   		  | otherwise      = do (x:done) (succ x ++ xs)
+   go done [] 			   = done
+   go done (x:xs) | x `is_in` done = go done xs
+   		  | otherwise      = go (x:done) (succ x ++ xs)
 
    x `is_in` []                 = False
    x `is_in` (y:ys) | eq x y    = True

@@ -11,10 +11,10 @@ Definitions for: @FixityDecl@, @TyDecl@ and @ConDecl@, @ClassDecl@,
 
 module HsDecls where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends:
-import HsLoop		( nullMonoBinds, MonoBinds, Sig )
+IMPORT_DELOOPER(HsLoop)		( nullMonoBinds, MonoBinds, Sig )
 import HsPragmas	( DataPragmas, ClassPragmas,
 			  InstancePragmas, ClassOpPragmas
 			)

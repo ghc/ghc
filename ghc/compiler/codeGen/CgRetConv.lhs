@@ -20,12 +20,10 @@ module CgRetConv (
 	assignPrimOpResultRegs,
 	makePrimOpArgsRobust,
 	assignRegs
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import Ubiq{-uitous-}
-import AbsCLoop		-- paranoia checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(AbsCLoop)		-- paranoia checking
 
 import AbsCSyn		-- quite a few things
 import AbsCUtils	( mkAbstractCs, getAmodeRep,
@@ -36,7 +34,7 @@ import CgCompInfo	( mAX_FAMILY_SIZE_FOR_VEC_RETURNS,
 			  mAX_Double_REG
 			)
 import CmdLineOpts	( opt_ReturnInRegsThreshold )
-import Id		( isDataCon, dataConSig,
+import Id		( isDataCon, dataConRawArgTys,
 			  DataCon(..), GenId{-instance Eq-}
 			)
 import Maybes		( catMaybes )
@@ -123,7 +121,7 @@ dataReturnConvAlg data_con
 	[]    ->	ReturnInRegs reg_assignment
 	other ->	ReturnInHeap	-- Didn't fit in registers
   where
-    (_, _, arg_tys, _) = dataConSig data_con
+    arg_tys = dataConRawArgTys data_con
 
     (reg_assignment, leftover_kinds)
       = assignRegs [node, infoptr] -- taken...

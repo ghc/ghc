@@ -9,7 +9,7 @@ import Unique ( Unique )
 
 import FieldLabel ( FieldLabel )
 import Id      ( Id, GenId, StrictnessMark, mkTupleCon, mkDataCon,
-		 dataConSig, dataConArgTys )
+		 isNullaryDataCon, dataConArgTys )
 import PprType ( specMaybeTysSuffix )
 import Name    ( Name )
 import TyCon   ( TyCon )
@@ -17,6 +17,7 @@ import TyVar   ( GenTyVar, TyVar )
 import Type    ( GenType, Type )
 import Usage   ( GenUsage )
 import Class   ( Class, GenClass )
+import TysWiredIn ( voidTy )
 
 data GenId    ty
 data GenType  tyvar uvar
@@ -31,12 +32,13 @@ type Id	   = GenId (GenType (GenTyVar (GenUsage Unique)) Unique)
 
 -- Needed in TyCon
 mkTupleCon :: Int -> Id
-dataConSig :: Id -> ([TyVar], [(Class, Type)], [Type], TyCon)
+isNullaryDataCon :: Id -> Bool
 specMaybeTysSuffix :: [Maybe Type] -> _PackedString
 instance Eq (GenClass a b)
 
 -- Needed in Type
 dataConArgTys :: Id -> [Type] -> [Type]
+voidTy :: Type
 
 -- Needed in TysWiredIn
 data StrictnessMark = MarkedStrict | NotMarkedStrict

@@ -20,7 +20,7 @@ module UniqSet (
 	isEmptyUniqSet
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Maybes		( maybeToBool, Maybe )
 import UniqFM

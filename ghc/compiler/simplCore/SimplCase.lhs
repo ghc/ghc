@@ -10,13 +10,14 @@ Support code for @Simplify@.
 
 module SimplCase ( simplCase, bindLargeRhs ) where
 
-import Ubiq{-uitous-}
-import SmplLoop		( simplBind, simplExpr, MagicUnfoldingFun )
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(SmplLoop)		( simplBind, simplExpr, MagicUnfoldingFun )
 
 import BinderInfo	-- too boring to try to select things...
 import CmdLineOpts	( SimplifierSwitch(..) )
 import CoreSyn
-import CoreUnfold	( UnfoldingDetails(..), UnfoldingGuidance(..),
+import CoreUnfold	( whnfDetails, mkConForm, mkLitForm,
+			  UnfoldingDetails(..), UnfoldingGuidance(..),
 			  FormSummary(..)
 			)
 import CoreUtils	( coreAltsType, nonErrorRHSs, maybeErrorApp,
@@ -28,13 +29,13 @@ import Id		( idType, isDataCon, getIdDemandInfo,
 import IdInfo		( willBeDemanded, DemandInfo )
 import Literal		( isNoRepLit, Literal{-instance Eq-} )
 import Maybes		( maybeToBool )
-import PrelVals		( voidPrimId )
+import PrelVals		( voidId )
 import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
 import SimplUtils	( mkValLamTryingEta )
 import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTys, eqTy )
-import TysPrim		( voidPrimTy )
+import TysWiredIn	( voidTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
 import Util		( isIn, isSingleton, zipEqual, panic, assertPanic )
@@ -312,11 +313,6 @@ completeCase env scrut alts rhs_c
 					[alt | alt@(alt_con,_,_) <- alts,
 					       not (alt_con `is_elem` not_these)]
 
-#ifdef DEBUG
---				ConForm c v -> pprPanic "completeCase!" (ppAbove (ppCat [ppr PprDebug c, ppStr "<args>"]) (ppr PprDebug alts))
-				  -- ConForm can't happen, since we'd have
-				  -- inlined it, and be in completeCaseWithKnownCon by now
-#endif
 				other -> alts
 
 	      alt_binders_unused (con, args, rhs) = all is_dead args
@@ -330,12 +326,7 @@ completeCase env scrut alts rhs_c
 
 	-- If the scrut is already eval'd then there's no worry about
 	-- eliminating the case
-    scrut_is_evald = case scrut_form of
-			OtherLitForm _   -> True
-			ConForm      _ _ -> True
-			OtherConForm _   -> True
-			other		 -> False
-
+    scrut_is_evald = whnfDetails scrut_form
 
     scrut_is_eliminable_primitive
       = case scrut of
@@ -441,17 +432,17 @@ bindLargeRhs env args rhs_ty rhs_c
 	-- for let-binding-purposes, we will *caseify* it (!),
 	-- with potentially-disastrous strictness results.  So
 	-- instead we turn it into a function: \v -> e
-	-- where v::VoidPrim.  Since arguments of type
+	-- where v::Void.  Since arguments of type
 	-- VoidPrim don't generate any code, this gives the
 	-- desired effect.
 	--
 	-- The general structure is just the same as for the common "otherwise~ case
   = newId prim_rhs_fun_ty	`thenSmpl` \ prim_rhs_fun_id ->
-    newId voidPrimTy		`thenSmpl` \ void_arg_id ->
+    newId voidTy		`thenSmpl` \ void_arg_id ->
     rhs_c env 			`thenSmpl` \ prim_new_body ->
 
     returnSmpl (NonRec prim_rhs_fun_id (mkValLam [void_arg_id] prim_new_body),
-		App (Var prim_rhs_fun_id) (VarArg voidPrimId))
+		App (Var prim_rhs_fun_id) (VarArg voidId))
 
   | otherwise
   = 	-- Make the new binding Id.  NB: it's an OutId
@@ -484,7 +475,7 @@ bindLargeRhs env args rhs_ty rhs_c
     dead DeadCode  = True
     dead other     = False
 
-    prim_rhs_fun_ty = mkFunTys [voidPrimTy] rhs_ty
+    prim_rhs_fun_ty = mkFunTys [voidTy] rhs_ty
 \end{code}
 
 Case alternatives when we don't know the scrutinee
@@ -535,7 +526,7 @@ simplAlts env scrut (PrimAlts alts deflt) rhs_c
     do_alt (lit, rhs)
       = let
 	    new_env = case scrut of
-			Var v -> extendUnfoldEnvGivenFormDetails env v (LitForm lit)
+			Var v -> extendUnfoldEnvGivenFormDetails env v (mkLitForm lit)
 			other -> env
 	in
 	rhs_c new_env rhs 				`thenSmpl` \ rhs' ->
@@ -592,16 +583,14 @@ simplDefault env (Var scrut_var) (BindDefault binder rhs) form_from_this_case rh
 	= case (form_from_this_case, scrut_form) of
 	    (OtherConForm cs, OtherConForm ds) -> OtherConForm (cs++ds)
 	    (OtherLitForm cs, OtherLitForm ds) -> OtherLitForm (cs++ds)
-			-- ConForm, LitForm impossible
-			-- (ASSERT?  ASSERT?  Hello? WDP 95/05)
 	    other 			       -> form_from_this_case
 
       env2 = extendUnfoldEnvGivenFormDetails env1 binder' final_form
 
 	-- Change unfold details for scrut var.  We now want to unfold it
 	-- to binder'
-      new_scrut_var_form = GenForm True {- OK to dup -} WhnfForm
-				       (Var binder') UnfoldAlways
+      new_scrut_var_form = GenForm WhnfForm (Var binder') UnfoldAlways
+
       new_env    = extendUnfoldEnvGivenFormDetails env2 scrut_var new_scrut_var_form
 
     in
@@ -702,7 +691,7 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
 		let
 		    env1    = extendIdEnvWithClone env binder id'
 		    new_env = extendUnfoldEnvGivenFormDetails env1 id'
-					(ConForm con con_args)
+					(mkConForm con con_args)
 		in
 		rhs_c new_env rhs		`thenSmpl` \ rhs' ->
 		returnSmpl (Let (NonRec id' (Con con con_args)) rhs')

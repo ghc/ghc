@@ -8,7 +8,8 @@
 
 module HsLit where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
+IMPORT_1_3(Ratio(Rational))
 
 import Pretty
 \end{code}

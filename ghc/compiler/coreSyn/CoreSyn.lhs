@@ -50,12 +50,9 @@ module CoreSyn (
 	SimplifiableCoreArg(..),
 	SimplifiableCoreCaseAlts(..),
 	SimplifiableCoreCaseDefault(..)
-
-	-- and to make the interface self-sufficient ...
-
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 -- ToDo:rm:
 --import PprCore		( GenCoreExpr{-instance-} )

@@ -10,7 +10,7 @@ module Rename ( renameModule ) where
 
 import PreludeGlaST	( thenPrimIO, newVar, MutableVar(..) )
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn
 import RdrHsSyn		( RdrNameHsModule(..), RdrNameImportDecl(..) )
@@ -33,10 +33,10 @@ import RnMonad
 import RnNames		( getGlobalNames, GlobalNameInfo(..) )
 import RnSource		( rnSource )
 import RnIfaces		( rnIfaces )
-import RnUtils		( RnEnv(..), extendGlobalRnEnv, emptyRnEnv, multipleOccWarn )
+import RnUtils		( RnEnv(..), extendGlobalRnEnv, emptyRnEnv )
 
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
-import CmdLineOpts	( opt_HiMap )
+import CmdLineOpts	( opt_HiMap, opt_NoImplicitPrelude )
 import ErrUtils		( Error(..), Warning(..) )
 import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
 import Maybes		( catMaybes )
@@ -73,13 +73,15 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
 
   = let
 	(b_names, b_keys, _) = builtinNameInfo
+	pp_pair (n,m) = ppBesides [ppPStr m,ppChar '.',ppPStr n]
     in
-    --pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
-    --			    ppAboves [ ppCat (map ppPStr (keysFM builtin_ids))
-    --				     , ppCat (map ppPStr (keysFM builtin_tcs))
-    --				     , ppCat (map ppPStr (keysFM b_keys))
-    --				     ]}) $
-
+    {-
+    pprTrace "builtins:\n" (case b_names of { (builtin_ids, builtin_tcs) ->
+    			    ppAboves [ ppCat (map pp_pair (keysFM builtin_ids))
+    				     , ppCat (map pp_pair (keysFM builtin_tcs))
+    				     , ppCat (map pp_pair (keysFM b_keys))
+    				     ]}) $
+    -}
     makeHiMap opt_HiMap	    >>=	         \ hi_files ->
 --  pprTrace "HiMap:\n" (ppAboves [ ppCat [ppPStr m, ppStr p] | (m,p) <- fmToList hi_files])
     newVar (emptyFM,emptyFM,hi_files){-init iface cache-}  `thenPrimIO` \ iface_cache ->
@@ -165,6 +167,9 @@ renameModule us input@(HsModule mod _ _ imports _ _ _ _ _ _ _ _ _ _)
         pair_orig rn = (origName rn, rn)
 
 	must_haves
+	  | opt_NoImplicitPrelude
+	  = [{-no Prelude.hi, no point looking-}]
+	  | otherwise
 	  = [ name_fn (mkBuiltinName u mod str) 
 	    | ((str, mod), (u, name_fn)) <- fmToList b_keys,
 	      str `notElem` [ SLIT("main"), SLIT("mainPrimIO")] ]
@@ -213,6 +218,13 @@ makeHiMap (Just f)
     snag_path map mod []        rpath = addToFM map mod (reverse rpath)
     snag_path map mod ('\n':cs) rpath = snag_mod (addToFM map mod (reverse rpath)) cs []
     snag_path map mod (c:cs)    rpath = snag_path map mod cs (c:rpath)
+\end{code}
+
+Warning message used herein:
+\begin{code}
+multipleOccWarn (name, occs) sty
+  = ppBesides [ppStr "warning:multiple names used to refer to `", ppr sty name, ppStr "': ",
+	       ppInterleave ppComma (map (ppr sty) occs)]
 \end{code}
 
 \begin{code}

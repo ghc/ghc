@@ -8,7 +8,7 @@
 
 module AnalFBWW ( analFBWW ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn		( CoreBinding(..) )
 import Util		( panic{-ToDo:rm-} )

@@ -23,7 +23,7 @@ module HsTypes (
     ) where
 
 #ifdef COMPILING_GHC
-import Ubiq
+IMP_Ubiq()
 
 import Outputable	( interppSP, ifnotPprForUser )
 import Pretty

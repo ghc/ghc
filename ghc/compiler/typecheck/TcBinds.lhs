@@ -8,7 +8,7 @@
 
 module TcBinds ( tcBindsAndThen, tcPragmaSigs ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( HsBinds(..), Bind(..), Sig(..), MonoBinds(..), 
 			  HsExpr, Match, PolyType, InPat, OutPat(..),
@@ -24,12 +24,12 @@ import TcMonad		hiding ( rnMtoTcM )
 import GenSpecEtc	( checkSigTyVars, genBinds, TcSigInfo(..) )
 import Inst		( Inst, LIE(..), emptyLIE, plusLIE, InstOrigin(..) )
 import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds )
-import TcLoop		( tcGRHSsAndBinds )
+IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( newTcTyVar, tcInstType )
+import TcType		( newTcTyVar, tcInstSigType )
 import Unify		( unifyTauTy )
 
 import Kind		( mkBoxedTypeKind, mkTypeKind )
@@ -209,8 +209,8 @@ tcBindAndSigs binder_rn_names bind sigs prag_info_fn
     genBinds binder_names mono_ids bind' lie sig_info prag_info_fn
   where
     kind = case bind of
-	  	NonRecBind _ -> mkBoxedTypeKind	-- Recursive, so no unboxed types
-		RecBind _    -> mkTypeKind	-- Non-recursive, so we permit unboxed types
+	  	NonRecBind _ -> mkTypeKind	-- Recursive, so no unboxed types
+		RecBind _    -> mkBoxedTypeKind	-- Non-recursive, so we permit unboxed types
 \end{code}
 
 
@@ -451,7 +451,7 @@ tcTySigs :: [RenamedSig] -> TcM s [TcSigInfo s]
 tcTySigs (Sig v ty _ src_loc : other_sigs)
  = tcAddSrcLoc src_loc (
 	tcPolyType ty			`thenTc` \ sigma_ty ->
-	tcInstType [] sigma_ty		`thenNF_Tc` \ sigma_ty' ->
+	tcInstSigType sigma_ty		`thenNF_Tc` \ sigma_ty' ->
 	let
 	    (tyvars', theta', tau') = splitSigmaTy sigma_ty'
 	in
@@ -568,7 +568,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 
 	-- Get and instantiate its alleged specialised type
     tcPolyType poly_ty				`thenTc` \ sig_sigma ->
-    tcInstType [] sig_sigma			`thenNF_Tc` \ sig_ty ->
+    tcInstSigType  sig_sigma			`thenNF_Tc` \ sig_ty ->
     let
 	(sig_tyvars, sig_theta, sig_tau) = splitSigmaTy sig_ty
 	origin = ValSpecOrigin name
@@ -580,7 +580,7 @@ tcPragmaSig (SpecSig name poly_ty maybe_spec_name src_loc)
 
 	-- Get and instantiate the type of the id mentioned
     tcLookupLocalValueOK "tcPragmaSig" name	`thenNF_Tc` \ main_id ->
-    tcInstType [] (idType main_id)		`thenNF_Tc` \ main_ty ->
+    tcInstSigType [] (idType main_id)		`thenNF_Tc` \ main_ty ->
     let
 	(main_tyvars, main_rho) = splitForAllTy main_ty
 	(main_theta,main_tau)   = splitRhoTy main_rho

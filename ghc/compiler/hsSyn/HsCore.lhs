@@ -20,7 +20,7 @@ module HsCore (
 	UnfoldingPrimOp(..), UfCostCentre(..)
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends:
 import HsTypes		( MonoType, PolyType )

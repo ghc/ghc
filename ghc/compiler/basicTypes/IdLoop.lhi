@@ -65,11 +65,9 @@ data MagicUnfoldingFun
 data FormSummary   = WhnfForm | BottomForm | OtherForm
 data UnfoldingDetails
   = NoUnfoldingDetails
-  | LitForm Literal
   | OtherLitForm [Literal]
-  | ConForm (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) [GenCoreArg (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique]
   | OtherConForm [GenId (GenType (GenTyVar (GenUsage Unique)) Unique)]
-  | GenForm Bool FormSummary (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) UnfoldingGuidance
+  | GenForm FormSummary (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) UnfoldingGuidance
   | MagicForm _PackedString MagicUnfoldingFun
 
 data UnfoldingGuidance

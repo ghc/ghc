@@ -8,8 +8,9 @@
 
 module HsImpExp where
 
-import Ubiq
+IMP_Ubiq()
 
+import Name		( pprNonSym )
 import Outputable
 import PprStyle		( PprStyle(..) )
 import Pretty
@@ -33,23 +34,22 @@ data ImportDecl name
 \end{code}
 
 \begin{code}
-instance (Outputable name) => Outputable (ImportDecl name) where
+instance (NamedThing name, Outputable name) => Outputable (ImportDecl name) where
     ppr sty (ImportDecl mod qual as spec _)
-      = ppHang (ppCat [ppStr "import", pp_qual qual, ppPStr mod, pp_as as])
+      = ppHang (ppCat [ppPStr SLIT("import"), pp_qual qual, ppPStr mod, pp_as as])
 	     4 (pp_spec spec)
       where
 	pp_qual False   = ppNil
-	pp_qual True	= ppStr "qualified"
+	pp_qual True	= ppPStr SLIT("qualified")
 
 	pp_as Nothing   = ppNil
-	pp_as (Just a)  = ppCat [ppStr "as", ppPStr a]
+	pp_as (Just a)  = ppBeside (ppPStr SLIT("as ")) (ppPStr a)
 
 	pp_spec Nothing = ppNil
 	pp_spec (Just (False, spec))
-			= ppBesides [ppStr "(", interpp'SP sty spec, ppStr ")"]
+			= ppParens (interpp'SP sty spec)
 	pp_spec (Just (True, spec))
-			= ppBesides [ppStr "hiding (", interpp'SP sty spec, ppStr ")"]
-
+			= ppBeside (ppPStr SLIT("hiding ")) (ppParens (interpp'SP sty spec))
 \end{code}
 
 %************************************************************************
@@ -67,13 +67,14 @@ data IE name
 \end{code}
 
 \begin{code}
-instance (Outputable name) => Outputable (IE name) where
-    ppr sty (IEVar	var)	= ppr sty var
+instance (NamedThing name, Outputable name) => Outputable (IE name) where
+    ppr sty (IEVar	var)	= pprNonSym sty var
     ppr sty (IEThingAbs	thing)	= ppr sty thing
     ppr sty (IEThingAll	thing)
 	= ppBesides [ppr sty thing, ppStr "(..)"]
     ppr sty (IEThingWith thing withs)
-	= ppBesides [ppr sty thing, ppLparen, ppInterleave ppComma (map (ppr sty) withs), ppRparen]
+	= ppBeside (ppr sty thing)
+	    (ppParens (ppInterleave ppComma (map (pprNonSym sty) withs)))
     ppr sty (IEModuleContents mod)
 	= ppBeside (ppPStr SLIT("module ")) (ppPStr mod)
 \end{code}

@@ -18,13 +18,11 @@ module SimplMonad (
 
 	-- Cloning
 	cloneId, cloneIds, cloneTyVarSmpl, newIds, newId
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
-import SmplLoop		-- well, cheating sort of
+IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
 
 import Id		( mkSysLocal, mkIdWithNewUniq )
 import SimplEnv

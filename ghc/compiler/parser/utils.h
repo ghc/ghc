@@ -12,7 +12,6 @@ extern list all;
 
 extern BOOLEAN nonstandardFlag;
 extern BOOLEAN hashIds;
-extern BOOLEAN acceptPrim;
 extern BOOLEAN etags;
 				  
 extern BOOLEAN ignoreSCC;

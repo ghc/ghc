@@ -9,11 +9,12 @@
 module TcInstDcls (
 	tcInstDecls1,
 	tcInstDecls2,
-	processInstBinds
+	processInstBinds,
+	newMethodId
     ) where
 
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( InstDecl(..), FixityDecl, Sig(..),
 			  SpecInstSig(..), HsBinds(..), Bind(..),
@@ -33,7 +34,7 @@ import TcHsSyn		( TcIdOcc(..), TcHsBinds(..),
 
 
 import TcMonad		hiding ( rnMtoTcM )
-import GenSpecEtc	( checkSigTyVars )
+import GenSpecEtc	( checkSigTyVarsGivenGlobals )
 import Inst		( Inst, InstOrigin(..), InstanceMapper(..),
 			  newDicts, newMethod, LIE(..), emptyLIE, plusLIE )
 import TcBinds		( tcPragmaSigs )
@@ -44,11 +45,11 @@ import TcInstUtil	( InstInfo(..), mkInstanceRelatedIds, buildInstanceEnvs )
 import TcKind		( TcKind, unifyKind )
 import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcContext, tcMonoTypeKind )
-import TcSimplify	( tcSimplifyAndCheck, tcSimplifyThetas )
+import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcType(..), TcTyVar(..),
-			  tcInstSigTyVars, tcInstType, tcInstTheta
+			  tcInstSigTyVars, tcInstType, tcInstTheta, tcInstTcType
 			)
-import Unify		( unifyTauTy )
+import Unify		( unifyTauTy, unifyTauTyLists )
 
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
@@ -76,9 +77,9 @@ import RnUtils		( RnEnv(..) )
 import TyCon		( isSynTyCon, derivedFor )
 import Type		( GenType(..),  ThetaType(..), mkTyVarTys,
 			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
-			  getTyCon_maybe, maybeBoxedPrimType
+			  getTyCon_maybe, maybeBoxedPrimType, splitRhoTy
 			)
-import TyVar		( GenTyVar, mkTyVarSet )
+import TyVar		( GenTyVar, mkTyVarSet, unionTyVarSets )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
 import Util		( zipEqual, panic )
@@ -368,7 +369,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     let
 	sc_theta'        = super_classes `zip` repeat inst_ty'
  	origin    	 = InstanceDeclOrigin
-	mk_method sel_id = newMethodId sel_id inst_ty' origin locn
+	mk_method sel_id = newMethodId sel_id inst_ty' origin
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -447,6 +448,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
     returnTc (const_lie `plusLIE` spec_lie, inst_binds)
 \end{code}
 
+============= OLD ================
+
 @mkMethodId@ manufactures an id for a local method.
 It's rather turgid stuff, because there are two cases:
 
@@ -473,10 +476,15 @@ It's rather turgid stuff, because there are two cases:
       So for these we just make a local (non-Inst) id with a suitable type.
 
 How disgusting.
+=============== END OF OLD ===================
 
 \begin{code}
-newMethodId sel_id inst_ty origin loc
-  = let (sel_tyvars,sel_theta,sel_tau) = splitSigmaTy (idType sel_id)
+newMethodId sel_id inst_ty origin
+  = newMethod origin (RealId sel_id) [inst_ty]
+
+
+{- REMOVE SOON:		(this was pre-split-poly selector types)
+let (sel_tyvars,sel_theta,sel_tau) = splitSigmaTy (idType sel_id)
 	(_:meth_theta) = sel_theta	-- The local theta is all except the
 					-- first element of the context
     in 
@@ -493,6 +501,7 @@ newMethodId sel_id inst_ty origin loc
 								`thenNF_Tc` \ method_ty ->
 		newLocalId (getLocalName sel_id) method_ty	`thenNF_Tc` \ meth_id ->
 		returnNF_Tc (emptyLIE, meth_id)
+-}
 \end{code}
 
 The next function makes a default method which calls the global default method, at
@@ -511,22 +520,13 @@ makeInstanceDeclDefaultMethodExpr
 	-> NF_TcM s (TcExpr s)
 
 makeInstanceDeclDefaultMethodExpr origin meth_ids defm_ids inst_ty this_dict tag
-  = newDicts origin op_theta		`thenNF_Tc` \ (op_lie,op_dicts) ->
-
-	-- def_op_id = /\ op_tyvars -> \ op_dicts ->
-	--		  defm_id inst_ty op_tyvars this_dict op_dicts
-    returnNF_Tc (
-      mkHsTyLam op_tyvars (
-      mkHsDictLam op_dicts (
-      mkHsDictApp (mkHsTyApp (HsVar (RealId defm_id))
-			     (inst_ty :  mkTyVarTys op_tyvars))
-		  (this_dict : op_dicts)
-      )))
+  =
+	-- def_op_id = defm_id inst_ty this_dict
+    returnNF_Tc (mkHsDictApp (mkHsTyApp (HsVar (RealId defm_id)) [inst_ty]) [this_dict])
  where
     idx	    = tag - 1
     meth_id = meth_ids !! idx
     defm_id = defm_ids  !! idx
-    (op_tyvars, op_theta, op_tau) = splitSigmaTy (tcIdType meth_id)
 
 makeInstanceDeclNoDefaultExpr
 	:: InstOrigin s
@@ -539,23 +539,19 @@ makeInstanceDeclNoDefaultExpr
 	-> NF_TcM s (TcExpr s)
 
 makeInstanceDeclNoDefaultExpr origin meth_ids defm_ids inst_ty clas inst_mod tag
-  = newDicts origin op_theta		`thenNF_Tc` \ (op_lie, op_dicts) ->
-
+  = 
 	-- Produce a warning if the default instance method
 	-- has been omitted when one exists in the class
     warnTc (not err_defm_ok)
 	   (omitDefaultMethodWarn clas_op clas_name inst_ty)
 					`thenNF_Tc_`
-    returnNF_Tc (mkHsTyLam op_tyvars (
-		 mkHsDictLam op_dicts (
-		 HsApp (mkHsTyApp (HsVar (RealId nO_EXPLICIT_METHOD_ERROR_ID)) [op_tau])
-		     (HsLitOut (HsString (_PK_ error_msg)) stringTy))))
+    returnNF_Tc (HsApp (mkHsTyApp (HsVar (RealId nO_EXPLICIT_METHOD_ERROR_ID)) [tcIdType meth_id])
+		       (HsLitOut (HsString (_PK_ error_msg)) stringTy))
   where
     idx	    = tag - 1
     meth_id = meth_ids  !! idx
     clas_op = (classOps clas) !! idx
     defm_id = defm_ids  !! idx
-    (op_tyvars,op_theta,op_tau) = splitSigmaTy (tcIdType meth_id)
 
     Just (_, _, err_defm_ok) = isDefaultMethodId_maybe defm_id
 
@@ -666,16 +662,12 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
     let
 	tag       = classOpTagByString clas occ
 	method_id = method_ids !! (tag-1)
+	method_ty = tcIdType method_id
     in
 
-    -- The "method" might be a RealId, when processInstBinds is used by
-    -- TcClassDcls:buildDefaultMethodBinds to make default-method bindings
-    (case method_id of
-	TcId id   -> returnNF_Tc (idType id)
-	RealId id -> tcInstType [] (idType id)
-    )		`thenNF_Tc` \ method_ty ->
+    tcInstTcType method_ty		`thenNF_Tc` \ (method_tyvars, method_rho) ->
     let
-	(method_tyvars, method_theta, method_tau) = splitSigmaTy method_ty
+	(method_theta, method_tau) = splitRhoTy method_rho
     in
     newDicts origin method_theta	`thenNF_Tc` \ (method_dicts,method_dict_ids) ->
 
@@ -694,10 +686,17 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
 		-- The latter is needed just so we can return an AbsBinds wrapped
 		-- up inside a MonoBinds.
 
+
+		-- Make the method_tyvars into signature tyvars so they
+		-- won't get unified with anything.
+	tcInstSigTyVars method_tyvars		`thenNF_Tc` \ (sig_tyvars, sig_tyvar_tys, _) ->
+	unifyTauTyLists (mkTyVarTys method_tyvars) sig_tyvar_tys	`thenTc_`
+
 	newLocalId occ method_tau		`thenNF_Tc` \ local_id ->
 	newLocalId occ method_ty		`thenNF_Tc` \ copy_id ->
 	let
-	    inst_method_tyvars = inst_tyvars ++ method_tyvars
+	    inst_tyvar_set = mkTyVarSet inst_tyvars
+	    inst_method_tyvar_set = inst_tyvar_set `unionTyVarSets` (mkTyVarSet sig_tyvars)
 	in
 		-- Typecheck the method
 	tcMethodBind local_id method_tau mbind `thenTc` \ (mbind', lieIop) ->
@@ -712,11 +711,16 @@ processInstBinds1 clas inst_tyvars avail_insts method_ids mbind
 		-- Here we must simplify constraints on "a" to catch all
 		-- the Bar-ish things.
 	tcAddErrCtxt (methodSigCtxt op method_ty) (
+	    checkSigTyVarsGivenGlobals
+		inst_tyvar_set
+		sig_tyvars method_tau				`thenTc_`
+
 	  tcSimplifyAndCheck
-		(mkTyVarSet inst_method_tyvars)
+		inst_method_tyvar_set
 		(method_dicts `plusLIE` avail_insts)
 		lieIop
 	) 					 `thenTc` \ (f_dicts, dict_binds) ->
+
 
 	returnTc ([tag],
 		  f_dicts,
@@ -926,8 +930,8 @@ scrutiniseInstanceType from_here clas inst_tau
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     isCcallishClass clas
-    && not opt_CompilingPrelude		-- which allows anything
-    && maybeToBool (maybeBoxedPrimType inst_tau)
+--  && not opt_CompilingPrelude		-- which allows anything
+    && not (maybeToBool (maybeBoxedPrimType inst_tau))
   = failTc (nonBoxedPrimCCallErr clas inst_tau)
 
   | otherwise

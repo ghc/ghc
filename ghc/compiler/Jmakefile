@@ -27,6 +27,12 @@ SuffixRules_flexish()
 SuffixRule_c_o()
 LitSuffixRule(.lprl,.prl) /* for makeSymbolList.prl */
 
+.SUFFIXES: .lhi
+.lhi.hi:
+	$(RM) $@
+	$(GHC_UNLIT) $< $@
+	@chmod 444 $@
+
 /* assume ALL source is in subdirectories one level below
    they don't have Jmakefiles; this Jmakefile controls everything
 */
@@ -356,6 +362,28 @@ SIMPL_SRCS_LHS 		\
 STG_SRCS_LHS 		\
 BACKSRCS_LHS NATIVEGEN_SRCS_LHS
 
+#if GhcBuilderVersion >= 200
+#  define loop_hi(f) CAT3(f,_1_3,.hi)
+#else
+#  define loop_hi(f) CAT2(f,.hi)
+#endif
+
+DELOOP_HIs =		\
+utils/Ubiq.hi		\
+absCSyn/AbsCLoop.hi	\
+basicTypes/IdLoop.hi	\
+codeGen/CgLoop1.hi	\
+codeGen/CgLoop2.hi	\
+deSugar/DsLoop.hi	\
+hsSyn/HsLoop.hi		\
+nativeGen/NcgLoop.hi	\
+prelude/PrelLoop.hi	\
+rename/RnLoop.hi	\
+simplCore/SmplLoop.hi	\
+typecheck/TcMLoop.hi	\
+typecheck/TcLoop.hi	\
+types/TyLoop.hi
+
 /*
 \
 */
@@ -470,36 +498,6 @@ HaskellCompileWithExtraFlags_Recursive(module,isuf,o,-c,extra_flags)
 #endif
 
 /* OK, here we go: */
-
-utils/Ubiq.hi : utils/Ubiq.lhi
-	$(GHC_UNLIT) utils/Ubiq.lhi utils/Ubiq.hi
-
-absCSyn/AbsCLoop.hi : absCSyn/AbsCLoop.lhi
-	$(GHC_UNLIT) absCSyn/AbsCLoop.lhi absCSyn/AbsCLoop.hi
-basicTypes/IdLoop.hi : basicTypes/IdLoop.lhi
-	$(GHC_UNLIT) basicTypes/IdLoop.lhi basicTypes/IdLoop.hi
-codeGen/CgLoop1.hi : codeGen/CgLoop1.lhi
-	$(GHC_UNLIT) codeGen/CgLoop1.lhi codeGen/CgLoop1.hi
-codeGen/CgLoop2.hi : codeGen/CgLoop2.lhi
-	$(GHC_UNLIT) codeGen/CgLoop2.lhi codeGen/CgLoop2.hi
-deSugar/DsLoop.hi : deSugar/DsLoop.lhi
-	$(GHC_UNLIT) deSugar/DsLoop.lhi deSugar/DsLoop.hi
-hsSyn/HsLoop.hi : hsSyn/HsLoop.lhi
-	$(GHC_UNLIT) hsSyn/HsLoop.lhi hsSyn/HsLoop.hi
-nativeGen/NcgLoop.hi : nativeGen/NcgLoop.lhi
-	$(GHC_UNLIT) nativeGen/NcgLoop.lhi nativeGen/NcgLoop.hi
-prelude/PrelLoop.hi : prelude/PrelLoop.lhi
-	$(GHC_UNLIT) prelude/PrelLoop.lhi prelude/PrelLoop.hi
-rename/RnLoop.hi : rename/RnLoop.lhi
-	$(GHC_UNLIT) rename/RnLoop.lhi rename/RnLoop.hi
-simplCore/SmplLoop.hi : simplCore/SmplLoop.lhi
-	$(GHC_UNLIT) simplCore/SmplLoop.lhi simplCore/SmplLoop.hi
-typecheck/TcMLoop.hi : typecheck/TcMLoop.lhi
-	$(GHC_UNLIT) typecheck/TcMLoop.lhi typecheck/TcMLoop.hi
-typecheck/TcLoop.hi : typecheck/TcLoop.lhi
-	$(GHC_UNLIT) typecheck/TcLoop.lhi typecheck/TcLoop.hi
-types/TyLoop.hi : types/TyLoop.lhi
-	$(GHC_UNLIT) types/TyLoop.lhi types/TyLoop.hi
 
 rename/ParseIface.hs : rename/ParseIface.y
 	$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
@@ -620,7 +618,7 @@ compile(reader/RdrHsSyn,lhs,)
 compile(rename/ParseIface,hs,)
 compile(rename/ParseUtils,lhs,)
 compile(rename/RnHsSyn,lhs,)
-compile(rename/RnMonad,lhs,)
+compile(rename/RnMonad,lhs,if_ghc(-fvia-C))
 compile(rename/Rename,lhs,)
 compile(rename/RnNames,lhs,)
 compile(rename/RnSource,lhs,)
@@ -672,7 +670,7 @@ compile(deforest/Deforest,lhs,)
 compile(deforest/TreelessForm,lhs,)
 #endif
 
-compile(specialise/Specialise,lhs,)
+compile(specialise/Specialise,lhs,-H12m if_ghc(-Onot)) /* -Onot for compile-space reasons */
 compile(specialise/SpecEnv,lhs,)
 compile(specialise/SpecUtils,lhs,)
 
@@ -702,7 +700,7 @@ compile(typecheck/TcInstDcls,lhs,)
 compile(typecheck/TcInstUtil,lhs,)
 compile(typecheck/TcMatches,lhs,)
 compile(typecheck/TcModule,lhs,)
-compile(typecheck/TcMonad,lhs,)
+compile(typecheck/TcMonad,lhs,if_ghc(-fvia-C))
 compile(typecheck/TcKind,lhs,)
 compile(typecheck/TcType,lhs,)
 compile(typecheck/TcEnv,lhs,)
@@ -716,7 +714,7 @@ compile(typecheck/Unify,lhs,)
 
 compile(types/Class,lhs,)
 compile(types/Kind,lhs,)
-compile(types/PprType,lhs,)
+compile(types/PprType,lhs,if_ghc26(-Onot)) /* avoid a 0.26 bug */
 compile(types/TyCon,lhs,)
 compile(types/TyVar,lhs,)
 compile(types/Usage,lhs,)
@@ -822,17 +820,17 @@ InstallBinaryTarget(hsp,$(INSTLIBDIR_GHC))
 
 YaccRunWithExpectMsg(parser/hsparser,12,0)
 
-UgenTarget(parser/constr)
-UgenTarget(parser/binding)
-UgenTarget(parser/pbinding)
-UgenTarget(parser/entidt)
-UgenTarget(parser/list)
-UgenTarget(parser/literal)
-UgenTarget(parser/maybe)
-UgenTarget(parser/either)
-UgenTarget(parser/qid)
-UgenTarget(parser/tree)
-UgenTarget(parser/ttype)
+UgenTarget(parser,constr)
+UgenTarget(parser,binding)
+UgenTarget(parser,pbinding)
+UgenTarget(parser,entidt)
+UgenTarget(parser,list)
+UgenTarget(parser,literal)
+UgenTarget(parser,maybe)
+UgenTarget(parser,either)
+UgenTarget(parser,qid)
+UgenTarget(parser,tree)
+UgenTarget(parser,ttype)
 
 UGENS_C = parser/constr.c	\
 	parser/binding.c	\
@@ -884,6 +882,7 @@ MKDEPENDHS_OPTS= -o .hc -I$(MAIN_INCLUDE_DIR) -I$(COMPINFO_DIR)  -x HsVersions.h
 #if HaskellCompilerType != HC_USE_HC_FILES
     /* otherwise, the dependencies jeopardize our .hc files --
 	which are all we have! */
+depend :: $(DELOOP_HIs)
 HaskellDependTarget( $(DEPSRCS) )
 #endif
 

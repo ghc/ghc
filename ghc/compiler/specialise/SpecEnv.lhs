@@ -13,7 +13,7 @@ module SpecEnv (
 	specEnvToList
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import MatchEnv
 import Type		( matchTys, isTyVarTy )

@@ -11,7 +11,7 @@ module CoreLint (
 	lintUnfolding
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import CoreSyn
 
@@ -33,6 +33,7 @@ import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc )
 import Type		( mkFunTy,getFunTy_maybe,mkForAllTy,mkForAllTys,getForAllTy_maybe,
 			  getFunTyExpandingDicts_maybe,
+			  getForAllTyExpandingDicts_maybe,
 			  isPrimType,typeKind,instantiateTy,splitSigmaTy,
 			  mkForAllUsageTy,getForAllUsageTy,instantiateUsage,
 			  maybeAppDataTyConExpandingDicts, eqTy
@@ -285,7 +286,7 @@ lintCoreArg e ty a@(TyArg arg_ty)
   = -- ToDo: Check that ty is well-kinded and has no unbound tyvars
     checkIfSpecDoneL (not (isPrimType arg_ty)) (mkSpecTyAppMsg a)
     `seqL`
-    case (getForAllTy_maybe ty) of
+    case (getForAllTyExpandingDicts_maybe ty) of
       Nothing -> addErrL (mkTyAppMsg SLIT("Illegal") ty arg_ty e) `seqL` returnL Nothing
 
       Just (tyvar,body) ->

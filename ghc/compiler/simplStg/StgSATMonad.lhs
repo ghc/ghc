@@ -12,7 +12,7 @@
 
 module StgSATMonad ( getArgLists, saTransform ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Util		( panic )
 

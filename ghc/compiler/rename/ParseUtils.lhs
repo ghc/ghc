@@ -8,7 +8,7 @@
 
 module ParseUtils where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
@@ -278,8 +278,14 @@ lexIface str
 	ITinteger (read num) : lexIface rest }
 
     -----------
-    is_var_sym '_' = True
-    is_var_sym c   = isAlphanum c
+    is_var_sym '_'  = True
+    is_var_sym '\'' = True
+    is_var_sym '#'  = True -- for Glasgow-extended names
+    is_var_sym c    = isAlphanum c
+
+    is_var_sym1 '\'' = False
+    is_var_sym1 '#'  = False
+    is_var_sym1 c    = is_var_sym c
 
     is_sym_sym c = c `elem` ":!#$%&*+./<=>?@\\^|-~" -- ToDo: add ISOgraphic
 
@@ -287,16 +293,17 @@ lexIface str
     lex_word str@(c:cs) -- we know we have a capital letter to start
       = -- we first try for "<module>." on the front...
 	case (module_dot str) of
-	  Nothing       -> lex_name Nothing  is_var_sym  str
+	  Nothing       -> lex_name Nothing  (in_the_club str)  str
 	  Just (m,rest) -> lex_name (Just m) (in_the_club rest) rest
-	    where
-	      in_the_club []    = panic "lex_word:in_the_club"
-	      in_the_club (c:_) | isAlpha    c = is_var_sym
-				| is_sym_sym c = is_sym_sym
-				| otherwise    = panic ("lex_word:in_the_club="++[c])
+      where
+	in_the_club []    = panic "lex_word:in_the_club"
+	in_the_club (c:_) | isAlpha    c = is_var_sym
+			  | c == '_'     = is_var_sym
+			  | is_sym_sym c = is_sym_sym
+			  | otherwise    = panic ("lex_word:in_the_club="++[c])
 
     module_dot (c:cs)
-      = if not (isUpper c) then
+      = if not (isUpper c) || c == '\'' then
 	   Nothing
 	else
 	   case (span is_var_sym cs) of { (word, rest) ->
@@ -309,8 +316,15 @@ lexIface str
     lex_name module_dot in_the_club str
       =	case (span in_the_club str)     of { (word, rest) ->
 	case (lookupFM keywordsFM word) of
-	  Just xx -> ASSERT( not (maybeToBool module_dot) )
-		     xx : lexIface rest
+	  Just xx -> let
+			cont = xx : lexIface rest
+		     in
+		     case xx of
+		       ITbang -> case module_dot of
+				   Nothing -> cont
+				   Just  m -> ITqvarsym (Qual m SLIT("!"))
+					      : lexIface rest
+		       _ -> cont
 	  Nothing -> 
 	    (let
 		f = head word -- first char
@@ -382,5 +396,5 @@ happyError ln toks = Failed (ifaceParseErr ln toks)
 -----------------------------------------------------------------
 
 ifaceParseErr ln toks sty
-  = ppCat [ppPStr SLIT("Interface-file parse error: line"), ppInt ln, ppStr "toks=", ppStr (show toks)]
+  = ppCat [ppPStr SLIT("Interface-file parse error: line"), ppInt ln, ppStr "toks=", ppStr (show (take 10 toks))]
 \end{code}

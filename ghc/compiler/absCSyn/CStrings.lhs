@@ -18,6 +18,12 @@ CHK_Ubiq() -- debugging consistency check
 
 import Pretty
 import Unpretty( uppChar )
+
+IMPORT_1_3(Char (isAlphanum))
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+chr = toEnum   :: Int -> Char
+#endif
 \end{code}
 
 

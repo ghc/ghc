@@ -14,7 +14,7 @@ module TcInstUtil (
 	buildInstanceEnvs
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( MonoBinds, Fake, InPat, Sig )
 import RnHsSyn		( RenamedMonoBinds(..), RenamedSig(..), 
@@ -219,7 +219,7 @@ addClassInstance
 
 addClassInstance
     (class_inst_env, op_spec_envs)
-    (InstInfo clas inst_tyvars inst_ty inst_decl_theta dfun_theta
+    (InstInfo clas inst_tyvars inst_ty _ _ 
 	      dfun_id const_meth_ids _ _ _ src_loc _)
   = 
 

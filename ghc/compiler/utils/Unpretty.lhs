@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module Unpretty (
-	Unpretty(..),
+	SYN_IE(Unpretty),
 
 	uppNil, uppStr, uppPStr, uppChar, uppInt, uppInteger,
 	uppSP, upp'SP, uppLbrack, uppRbrack, uppLparen, uppRparen,
@@ -17,13 +17,14 @@ module Unpretty (
 	uppCat, uppBeside, uppBesides, uppAbove, uppAboves,
 	uppNest, uppSep, uppInterleave, uppIntersperse,
 	uppShow,
-	uppAppendFile,
+	uppPutStr,
 
 	-- abstract type, to complete the interface...
 	CSeq
    ) where
 
 CHK_Ubiq() -- debugging consistency check
+IMPORT_1_3(IO)
 
 import CharSeq
 \end{code}
@@ -69,7 +70,7 @@ uppNest		:: Int -> Unpretty -> Unpretty
 
 uppShow		:: Int -> Unpretty -> [Char]
 
-uppAppendFile	:: _FILE -> Int -> Unpretty -> IO ()
+uppPutStr	:: Handle -> Int -> Unpretty -> IO ()
 \end{code}
 
 %************************************************
@@ -81,7 +82,7 @@ uppAppendFile	:: _FILE -> Int -> Unpretty -> IO ()
 \begin{code}
 uppShow _ p	= cShow p
 
-uppAppendFile f _ p = cAppendFile f p
+uppPutStr f _ p = cPutStr f p
 
 uppNil		= cNil
 uppStr s	= cStr s

@@ -19,14 +19,14 @@ module PprType(
 	GenClass, 
 	GenClassOp, pprGenClassOp,
 	
-	addTyVar, nmbrTyVar,
+	addTyVar{-ToDo:don't export-}, nmbrTyVar,
 	addUVar,  nmbrUsage,
 	nmbrType, nmbrTyCon, nmbrClass
  ) where
 
-import Ubiq
-import IdLoop 	-- for paranoia checking
-import TyLoop 	-- for paranoia checking
+IMP_Ubiq()
+IMPORT_DELOOPER(IdLoop) 	-- for paranoia checking
+IMPORT_DELOOPER(TyLoop) 	-- for paranoia checking
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
@@ -289,9 +289,9 @@ showTyCon sty tycon = ppShow 80 (pprTyCon sty tycon)
 
 pprTyCon :: PprStyle -> TyCon -> Pretty
 
-pprTyCon sty FunTyCon 		        = ppStr "(->)"
-pprTyCon sty (TupleTyCon _ name _)      = ppr sty name
-pprTyCon sty (PrimTyCon uniq name kind) = ppr sty name
+pprTyCon sty FunTyCon 		    = ppStr "(->)"
+pprTyCon sty (TupleTyCon _ name _)  = ppr sty name
+pprTyCon sty (PrimTyCon _ name _ _) = ppr sty name
 
 pprTyCon sty tycon@(DataTyCon uniq name kind tyvars ctxt cons derivings nd)
   = ppr sty name
@@ -455,7 +455,13 @@ addTyVar, nmbrTyVar :: TyVar -> NmbrM TyVar
 addTyVar tv@(TyVar u k maybe_name use) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
   = --pprTrace "addTyVar:" (ppCat [pprUnique u, pprUnique ut]) $
     case (lookupUFM_Directly tvenv u) of
-      Just xx -> pprTrace "addTyVar: already in map!" (ppr PprDebug tv) $
+      Just xx -> -- pprTrace "addTyVar: already in map!" (ppr PprDebug tv) $
+		 -- (It gets triggered when we do a datatype: first we
+		 -- "addTyVar" the tyvars for the datatype as a whole;
+		 -- we will subsequently "addId" the data cons, including
+		 -- the type for each of them -- each of which includes
+		 -- _forall_ ...tvs..., which we will addTyVar.
+		 -- Harmless, if that's all that happens....
 		 (nenv, xx)
       Nothing ->
 	let
@@ -480,9 +486,9 @@ nmbrTyVar tv@(TyVar u _ _ _) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
 
 nmbrTyCon : only called from ``top-level'', if you know what I mean.
 \begin{code}
-nmbrTyCon tc@FunTyCon		= returnNmbr tc
-nmbrTyCon tc@(TupleTyCon _ _ _)	= returnNmbr tc
-nmbrTyCon tc@(PrimTyCon  _ _ _)	= returnNmbr tc
+nmbrTyCon tc@FunTyCon		  = returnNmbr tc
+nmbrTyCon tc@(TupleTyCon _ _ _)	  = returnNmbr tc
+nmbrTyCon tc@(PrimTyCon  _ _ _ _) = returnNmbr tc
 
 nmbrTyCon (DataTyCon u n k tvs theta cons clss nod)
   = --pprTrace "nmbrDataTyCon:" (ppCat (map (ppr PprDebug) tvs)) $

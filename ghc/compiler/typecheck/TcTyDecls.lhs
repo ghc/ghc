@@ -12,7 +12,7 @@ module TcTyDecls (
 	mkDataBinds
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		( TyDecl(..), ConDecl(..), BangType(..), HsExpr(..), 
 			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
@@ -249,7 +249,6 @@ mkConstructor con_id
     tcSimplifyThetas classInstEnv theta eval_theta	`thenTc` \ eval_theta' ->
     checkTc (null eval_theta')
 	    (missingEvalErr con_id eval_theta')		`thenTc_`
-
 
 	-- Build the data constructor
     let

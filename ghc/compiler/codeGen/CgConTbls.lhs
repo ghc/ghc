@@ -8,7 +8,7 @@
 
 module CgConTbls ( genStaticConBits ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn
 import CgMonad
@@ -23,7 +23,7 @@ import CgRetConv	( mkLiveRegsMask,
 			)
 import CgTailCall	( performReturn, mkStaticAlgReturnCode )
 import CgUsages		( getHpRelOffset )
-import CLabel		( mkConEntryLabel, mkClosureLabel,
+import CLabel		( mkConEntryLabel, mkStaticClosureLabel,
 			  mkConUpdCodePtrVecLabel,
 			  mkStdUpdCodePtrVecLabel, mkStdUpdVecTblLabel
 			)
@@ -35,7 +35,7 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 import CostCentre	( dontCareCostCentre )
 import FiniteMap	( fmToList )
 import HeapOffs		( zeroOff, VirtualHeapOffset(..) )
-import Id		( dataConTag, dataConSig,
+import Id		( dataConTag, dataConRawArgTys,
 			  dataConArity, fIRST_TAG,
 			  emptyIdSet,
 			  GenId{-instance NamedThing-}
@@ -240,10 +240,10 @@ genConInfo comp_info tycon data_con
 
     zero_size arg_ty = getPrimRepSize (typePrimRep arg_ty) == 0
 
-    (_,_,arg_tys,_) = dataConSig   data_con
-    con_arity	    = dataConArity data_con
-    entry_label     = mkConEntryLabel data_con
-    closure_label   = mkClosureLabel  data_con
+    arg_tys	    = dataConRawArgTys 	   data_con
+    con_arity	    = dataConArity 	   data_con
+    entry_label     = mkConEntryLabel      data_con
+    closure_label   = mkStaticClosureLabel data_con
 \end{code}
 
 The entry code for a constructor now loads the info ptr by indirecting
@@ -288,7 +288,7 @@ mkConCodeAndInfo con
 
     ReturnInHeap ->
 	let
-	    (_, _, arg_tys, _) = dataConSig con
+	    arg_tys = dataConRawArgTys con
 
 	    (closure_info, arg_things)
 		= layOutDynCon con typePrimRep arg_tys

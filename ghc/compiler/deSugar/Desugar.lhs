@@ -8,7 +8,7 @@
 
 module Desugar ( deSugar, DsMatchContext, pprDsWarnings ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		( HsBinds, HsExpr )
 import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..) )

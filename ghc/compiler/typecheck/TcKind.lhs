@@ -1,4 +1,6 @@
 \begin{code}
+#include "HsVersions.h"
+
 module TcKind (
 
 	Kind, mkTypeKind, mkBoxedTypeKind, mkUnboxedTypeKind, mkArrowKind, 
@@ -14,7 +16,7 @@ module TcKind (
 	tcDefaultKind	-- TcKind s -> NF_TcM s Kind
   ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Kind
 import TcMonad	hiding ( rnMtoTcM )

@@ -16,7 +16,9 @@ module CLabel (
 	mkConEntryLabel,
 	mkStaticConEntryLabel,
 	mkRednCountsLabel,
+	mkConInfoTableLabel,
 	mkPhantomInfoTableLabel,
+	mkStaticClosureLabel,
 	mkStaticInfoTableLabel,
 	mkVapEntryLabel,
 	mkVapInfoTableLabel,
@@ -45,12 +47,12 @@ module CLabel (
 #endif
     ) where
 
-import Ubiq{-uitous-}
-import AbsCLoop		( CtrlReturnConvention(..),
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(AbsCLoop)		( CtrlReturnConvention(..),
 			  ctrlReturnConvAlg
 			)
 #if ! OMIT_NATIVE_CODEGEN
-import NcgLoop		( underscorePrefix, fmtAsmLbl )
+IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl )
 #endif
 
 import CStrings		( pp_cSEP )
@@ -110,26 +112,25 @@ unspecialised constructors are compared.
 \begin{code}
 data CLabelId = CLabelId Id
 
+instance Ord3 CLabelId where
+    cmp (CLabelId a) (CLabelId b) = cmpId_withSpecDataCon a b
+
 instance Eq CLabelId where
-    CLabelId a == CLabelId b = case cmpId_withSpecDataCon a b of { EQ_ -> True;  _ -> False }
-    CLabelId a /= CLabelId b = case cmpId_withSpecDataCon a b of { EQ_ -> False; _ -> True  }
+    CLabelId a == CLabelId b = case (a `cmp` b) of { EQ_ -> True;  _ -> False }
+    CLabelId a /= CLabelId b = case (a `cmp` b) of { EQ_ -> False; _ -> True  }
 
 instance Ord CLabelId where
-    CLabelId a <= CLabelId b = case cmpId_withSpecDataCon a b
-	 of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
-    CLabelId a <  CLabelId b = case cmpId_withSpecDataCon a b
-	 of { LT_ -> True;  EQ_ -> False; GT__ -> False }
-    CLabelId a >= CLabelId b = case cmpId_withSpecDataCon a b
-	 of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
-    CLabelId a >  CLabelId b = case cmpId_withSpecDataCon a b
-	 of { LT_ -> False; EQ_ -> False; GT__ -> True  }
-    _tagCmp (CLabelId a) (CLabelId b) = case cmpId_withSpecDataCon a b
-	 of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
+    CLabelId a <= CLabelId b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> True;  GT__ -> False }
+    CLabelId a <  CLabelId b = case (a `cmp` b) of { LT_ -> True;  EQ_ -> False; GT__ -> False }
+    CLabelId a >= CLabelId b = case (a `cmp` b) of { LT_ -> False; EQ_ -> True;  GT__ -> True  }
+    CLabelId a >  CLabelId b = case (a `cmp` b) of { LT_ -> False; EQ_ -> False; GT__ -> True  }
+    _tagCmp (CLabelId a) (CLabelId b) = case (a `cmp` b) of { LT_ -> _LT; EQ_ -> _EQ; GT__ -> _GT }
 \end{code}
 
 \begin{code}
 data IdLabelInfo
   = Closure		-- Label for (static???) closure
+  | StaticClosure	-- Static closure -- e.g., nullary constructor
 
   | InfoTbl		-- Info table for a closure; always read-only
 
@@ -139,14 +140,15 @@ data IdLabelInfo
 			-- encoded into the name)
 
   | ConEntry		-- the only kind of entry pt for constructors
-  | StaticConEntry  	-- static constructor entry point
+  | ConInfoTbl		-- corresponding info table
 
+  | StaticConEntry  	-- static constructor entry point
   | StaticInfoTbl   	-- corresponding info table
 
   | PhantomInfoTbl  	-- for phantom constructors that only exist in regs
 
   | VapInfoTbl Bool	-- True <=> the update-reqd version; False <=> the no-update-reqd version
-  | VapEntry Bool
+  | VapEntry   Bool
 
 	-- Ticky-ticky counting
   | RednCounts		-- Label of place to keep reduction-count info for this Id
@@ -195,18 +197,28 @@ data RtsLabelInfo
 \end{code}
 
 \begin{code}
-mkClosureLabel	      	id 		= IdLabel (CLabelId id) Closure
-mkInfoTableLabel      	id 		= IdLabel (CLabelId id) InfoTbl
-mkStdEntryLabel	      	id 		= IdLabel (CLabelId id) EntryStd
+mkClosureLabel	      	id 		= IdLabel (CLabelId id)  Closure
+mkInfoTableLabel      	id 		= IdLabel (CLabelId id)  InfoTbl
+mkStdEntryLabel	      	id 		= IdLabel (CLabelId id)  EntryStd
 mkFastEntryLabel      	id arity	= ASSERT(arity > 0)
-					  IdLabel (CLabelId id) (EntryFast arity)
-mkConEntryLabel	      	id		= IdLabel (CLabelId id) ConEntry
-mkStaticConEntryLabel 	id		= IdLabel (CLabelId id) StaticConEntry
-mkRednCountsLabel     	id		= IdLabel (CLabelId id) RednCounts
-mkPhantomInfoTableLabel id		= IdLabel (CLabelId id) PhantomInfoTbl
-mkStaticInfoTableLabel  id		= IdLabel (CLabelId id) StaticInfoTbl
-mkVapEntryLabel		id upd_flag	= IdLabel (CLabelId id) (VapEntry upd_flag)
-mkVapInfoTableLabel	id upd_flag	= IdLabel (CLabelId id) (VapInfoTbl upd_flag)
+					  IdLabel (CLabelId id)  (EntryFast arity)
+
+mkStaticClosureLabel	con		= ASSERT(isDataCon con)
+					  IdLabel (CLabelId con) StaticClosure
+mkStaticInfoTableLabel  con		= ASSERT(isDataCon con)
+					  IdLabel (CLabelId con) StaticInfoTbl
+mkConInfoTableLabel     con		= ASSERT(isDataCon con)
+					  IdLabel (CLabelId con) ConInfoTbl
+mkPhantomInfoTableLabel con		= ASSERT(isDataCon con)
+					  IdLabel (CLabelId con) PhantomInfoTbl
+mkConEntryLabel	      	con		= ASSERT(isDataCon con)
+					  IdLabel (CLabelId con) ConEntry
+mkStaticConEntryLabel 	con		= ASSERT(isDataCon con)
+					  IdLabel (CLabelId con) StaticConEntry
+
+mkRednCountsLabel     	id		= IdLabel (CLabelId id)  RednCounts
+mkVapEntryLabel		id upd_flag	= IdLabel (CLabelId id)  (VapEntry upd_flag)
+mkVapInfoTableLabel	id upd_flag	= IdLabel (CLabelId id)  (VapInfoTbl upd_flag)
 
 mkConUpdCodePtrVecLabel   tycon tag = TyConLabel tycon (VecConUpdCode tag)
 mkStdUpdCodePtrVecLabel   tycon tag = TyConLabel tycon (StdUpdCode tag)
@@ -258,11 +270,12 @@ needsCDecl other		       = True
 
 Whether the labelled thing can be put in C "text space":
 \begin{code}
-isReadOnly (IdLabel _ InfoTbl)	       = True  -- info-tables: yes
-isReadOnly (IdLabel _ StaticInfoTbl)   = True  -- and so on, for other
-isReadOnly (IdLabel _ PhantomInfoTbl)  = True
-isReadOnly (IdLabel _ (VapInfoTbl _))  = True
-isReadOnly (IdLabel _ other)	       = False -- others: pessimistically, no
+isReadOnly (IdLabel _ InfoTbl)		= True  -- info-tables: yes
+isReadOnly (IdLabel _ ConInfoTbl)	= True -- and so on, for other
+isReadOnly (IdLabel _ StaticInfoTbl)	= True 
+isReadOnly (IdLabel _ PhantomInfoTbl)	= True
+isReadOnly (IdLabel _ (VapInfoTbl _))	= True
+isReadOnly (IdLabel _ other)		= False -- others: pessimistically, no
 
 isReadOnly (TyConLabel _ _)    = True
 isReadOnly (CaseLabel _ _)     = True
@@ -378,7 +391,9 @@ ppFlavor x = uppBeside pp_cSEP
 		       EntryStd	    	-> uppPStr SLIT("entry")
 		       EntryFast arity	-> --false:ASSERT (arity > 0)
 					   uppBeside (uppPStr SLIT("fast")) (uppInt arity)
-		       ConEntry	    	-> uppPStr SLIT("entry")
+		       StaticClosure   	-> uppPStr SLIT("static_closure")
+		       ConEntry	    	-> uppPStr SLIT("con_entry")
+		       ConInfoTbl    	-> uppPStr SLIT("con_info")
 		       StaticConEntry  	-> uppPStr SLIT("static_entry")
 		       StaticInfoTbl 	-> uppPStr SLIT("static_info")
 		       PhantomInfoTbl 	-> uppPStr SLIT("inregs_info")

@@ -35,7 +35,7 @@ module AbsCSyn {- (
 	CostRes(Cost)
     )-} where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CgCompInfo   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, lIVENESS_R1, lIVENESS_R2,

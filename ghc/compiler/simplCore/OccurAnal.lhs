@@ -17,7 +17,7 @@ module OccurAnal (
 	occurAnalyseBinds, occurAnalyseExpr, occurAnalyseGlobalExpr
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import BinderInfo
 import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
@@ -102,14 +102,14 @@ combineUsageDetails, combineAltsUsageDetails
 	:: UsageDetails -> UsageDetails -> UsageDetails
 
 combineUsageDetails usage1 usage2
-  = combineIdEnvs combineBinderInfo usage1 usage2
+  = combineIdEnvs addBinderInfo usage1 usage2
 
 combineAltsUsageDetails usage1 usage2
-  = combineIdEnvs combineAltsBinderInfo usage1 usage2
+  = combineIdEnvs orBinderInfo usage1 usage2
 
 addOneOcc :: UsageDetails -> Id -> BinderInfo -> UsageDetails
 addOneOcc usage id info
-  = combineIdEnvs combineBinderInfo usage (unitIdEnv id info)
+  = combineIdEnvs addBinderInfo usage (unitIdEnv id info)
 	-- ToDo: make this more efficient
 
 emptyDetails = (nullIdEnv :: UsageDetails)
@@ -206,7 +206,7 @@ occurAnalyseGlobalExpr :: CoreExpr -> SimplifiableCoreExpr
 occurAnalyseGlobalExpr expr
   = 	-- Top level expr, so no interesting free vars, and
 	-- discard occurence info returned
-    expr' where (_, expr') = occurAnalyseExpr emptyIdSet expr
+    snd (occurAnalyseExpr emptyIdSet expr)
 \end{code}
 
 %************************************************************************

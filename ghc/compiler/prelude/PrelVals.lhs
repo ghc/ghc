@@ -8,10 +8,10 @@
 
 module PrelVals where
 
-import Ubiq
-import IdLoop		( UnfoldingGuidance(..) )
+IMP_Ubiq()
+IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..) )
 import Id		( Id(..), GenId, mkPreludeId, mkTemplateLocals )
-import PrelLoop
+IMPORT_DELOOPER(PrelLoop)
 
 -- friends:
 import PrelMods
@@ -24,7 +24,7 @@ import IdInfo		-- quite a bit
 import Literal		( mkMachInt )
 import PrimOp		( PrimOp(..) )
 import SpecEnv		( SpecEnv(..), nullSpecEnv )
-import TyVar		( alphaTyVar, betaTyVar, gammaTyVar )
+import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}
@@ -97,7 +97,7 @@ pAR_ERROR_ID
     (mkSigmaTy [alphaTyVar] [] alphaTy) noIdInfo
 
 errorTy  :: Type
-errorTy  = mkSigmaTy [alphaTyVar] [] (mkFunTys [mkListTy charTy] alphaTy)
+errorTy  = mkSigmaTy [openAlphaTyVar] [] (mkFunTys [mkListTy charTy] alphaTy)
 \end{code}
 
 We want \tr{_trace} (NB: name not in user namespace) to be wired in
@@ -481,16 +481,12 @@ lex		:: ReadS String
 
 %************************************************************************
 %*									*
-\subsection[PrelVals-void]{@void#@: Magic value of type @Void#@}
+\subsection[PrelVals-void]{@void@: Magic value of type @Void@}
 %*									*
 %************************************************************************
 
-I don't think this is available to the user; it's used in the
-simplifier (WDP 94/06).
 \begin{code}
-voidPrimId
-  = pcMiscPrelId voidPrimIdKey pRELUDE_BUILTIN SLIT("void#")
-	voidPrimTy noIdInfo
+voidId = pcMiscPrelId voidIdKey pRELUDE_BUILTIN SLIT("_void") voidTy noIdInfo
 \end{code}
 
 %************************************************************************

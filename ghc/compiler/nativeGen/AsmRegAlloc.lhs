@@ -8,13 +8,14 @@
 
 module AsmRegAlloc ( runRegAllocate, runHairyRegAllocate ) where	
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import MachCode		( InstrList(..) )
 import MachMisc		( Instr )
 import MachRegs
 import RegAllocInfo
 
+import AbsCSyn		( MagicId )
 import BitSet		( BitSet )
 import FiniteMap	( emptyFM, addListToFM, delListFromFM, lookupFM, keysFM )
 import Maybes		( maybeToBool )

@@ -8,7 +8,7 @@
 
 module TcPat ( tcPat ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
 			  Match, HsBinds, Qual, PolyType,
@@ -23,7 +23,7 @@ import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
 			)
 import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
 			  tcLookupLocalValueOK )
-import TcType 		( TcType(..), TcMaybe, tcInstType, newTyVarTy, newTyVarTys, tcInstId )
+import TcType 		( TcType(..), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Bag		( Bag )

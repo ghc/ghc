@@ -12,8 +12,8 @@
 
 module CgExpr ( cgExpr, cgSccExpr, getPrimOpArgAmodes ) where
 
-import Ubiq{-uitous-}
-import CgLoop2	-- here for paranoia-checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(CgLoop2)	-- here for paranoia-checking
 
 import StgSyn
 import CgMonad

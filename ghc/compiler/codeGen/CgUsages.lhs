@@ -7,6 +7,8 @@ This module provides the functions to access (\tr{get*} functions) and
 modify (\tr{set*} functions) the stacks and heap usage information.
 
 \begin{code}
+#include "HsVersions.h"
+
 module CgUsages (
 	initHeapUsage, setVirtHp, getVirtAndRealHp, setRealHp,
 	setRealAndVirtualSps,
@@ -18,8 +20,8 @@ module CgUsages (
 	freeBStkSlot
     ) where
 
-import Ubiq{-uitous-}
-import CgLoop1	-- here for paranoia-checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(CgLoop1)	-- here for paranoia-checking
 
 import AbsCSyn		( RegRelative(..), AbstractC, CAddrMode )
 import CgMonad

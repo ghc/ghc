@@ -14,7 +14,7 @@ module UgenUtil (
 
 import PreludeGlaST
 
-import Ubiq
+IMP_Ubiq()
 
 import Name		( RdrName(..) )
 import SrcLoc		( mkSrcLoc2, mkUnknownSrcLoc )

@@ -57,7 +57,7 @@ module Costs( costs,
 	      addrModeCosts, CostRes(Cost), nullCosts, Side(..)
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AbsCSyn
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )

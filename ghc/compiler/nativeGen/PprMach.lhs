@@ -13,11 +13,12 @@ We start with the @pprXXX@s with some cross-platform commonality
 
 module PprMach ( pprInstr ) where
 
-import Ubiq{-uitious-}
+IMP_Ubiq(){-uitious-}
 
 import MachRegs		-- may differ per-platform
 import MachMisc
 
+import AbsCSyn		( MagicId )
 import CLabel		( pprCLabel_asm, externallyVisibleCLabel )
 import CStrings		( charToC )
 import Maybes		( maybeToBool )
@@ -214,8 +215,8 @@ pprSize x = uppPStr (case x of
 #endif
 #if sparc_TARGET_ARCH
 	B   -> SLIT("sb")
+	BU  -> SLIT("ub")
 --	HW  -> SLIT("hw") UNUSED
---	BU  -> SLIT("ub") UNUSED
 --	HWU -> SLIT("uhw") UNUSED
 	W   -> SLIT("")
 	F   -> SLIT("")

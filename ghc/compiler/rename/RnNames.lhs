@@ -13,7 +13,7 @@ module RnNames (
 
 import PreludeGlaST	( MutableVar(..) )
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn
 import RdrHsSyn
@@ -29,9 +29,9 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst )
 
 import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
 			  unionManyBags, mapBag, filterBag, listToBag, bagToList )
-import CmdLineOpts	( opt_NoImplicitPrelude )
+import CmdLineOpts	( opt_NoImplicitPrelude, opt_CompilingPrelude )
 import ErrUtils		( Error(..), Warning(..), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
-import FiniteMap	( emptyFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM )
+import FiniteMap	( emptyFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, keysFM{-ToDo:rm-} )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
 import Name		( RdrName(..), Name, isQual, mkTopLevName, origName,
@@ -40,14 +40,15 @@ import Name		( RdrName(..), Name, isQual, mkTopLevName, origName,
 			  pprNonSym, isLexCon, isRdrLexCon, ExportFlag(..)
 			)
 import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
-import PrelMods		( fromPrelude, pRELUDE, rATIO, iX )
+import PrelMods		( fromPrelude, pRELUDE_BUILTIN, pRELUDE, rATIO, iX )
 import Pretty
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import TyCon		( tyConDataCons )
 import UniqFM		( emptyUFM, addListToUFM_C, lookupUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( isIn, assoc, cmpPString, sortLt, removeDups,
-			  equivClasses, panic, assertPanic )
+			  equivClasses, panic, assertPanic, pprTrace{-ToDo:rm-}
+			)
 \end{code}
 
 
@@ -134,7 +135,7 @@ getTyDeclNames :: RdrNameTyDecl
 	       -> RnM_Info s (RnName, Bag RnName, Bag RnName)	-- tycon, constrs and fields
 
 getTyDeclNames (TyData _ tycon _ condecls _ _ src_loc)
-  = newGlobalName src_loc Nothing tycon	`thenRn` \ tycon_name ->
+  = newGlobalName src_loc Nothing False{-not val-} tycon `thenRn` \ tycon_name ->
     getConFieldNames (Just (nameExportFlag tycon_name)) emptyBag emptyBag emptyFM
 		     condecls 		`thenRn` \ (con_names, field_names) ->
     let
@@ -145,15 +146,15 @@ getTyDeclNames (TyData _ tycon _ condecls _ _ src_loc)
     returnRn (rn_tycon, listToBag rn_constrs, listToBag rn_fields)
 
 getTyDeclNames (TyNew _ tycon _ [NewConDecl con _ con_loc] _ _ src_loc)
-  = newGlobalName src_loc Nothing tycon	`thenRn` \ tycon_name ->
-    newGlobalName con_loc (Just (nameExportFlag tycon_name)) con
+  = newGlobalName src_loc Nothing False{-not val-} tycon	`thenRn` \ tycon_name ->
+    newGlobalName con_loc (Just (nameExportFlag tycon_name)) True{-val-} con
 					`thenRn` \ con_name ->
     returnRn (RnData tycon_name [con_name] [],
 	      unitBag (RnConstr con_name tycon_name),
 	      emptyBag)
 
 getTyDeclNames (TySynonym tycon _ _ src_loc)
-  = newGlobalName src_loc Nothing tycon	`thenRn` \ tycon_name ->
+  = newGlobalName src_loc Nothing False{-not val-} tycon	`thenRn` \ tycon_name ->
     returnRn (RnSyn tycon_name, emptyBag, emptyBag)
 
 
@@ -161,17 +162,17 @@ getConFieldNames exp constrs fields have []
   = returnRn (bagToList constrs, bagToList fields)
 
 getConFieldNames exp constrs fields have (ConDecl con _ src_loc : rest)
-  = newGlobalName src_loc exp con	`thenRn` \ con_name ->
+  = newGlobalName src_loc exp True{-val-} con	`thenRn` \ con_name ->
     getConFieldNames exp (constrs `snocBag` con_name) fields have rest
 
 getConFieldNames exp constrs fields have (ConOpDecl _ con _ src_loc : rest)
-  = newGlobalName src_loc exp con	`thenRn` \ con_name ->
+  = newGlobalName src_loc exp True{-val-} con	`thenRn` \ con_name ->
     getConFieldNames exp (constrs `snocBag` con_name) fields have rest
 
 getConFieldNames exp constrs fields have (RecConDecl con fielddecls src_loc : rest)
   = mapRn (addErrRn . dupFieldErr con src_loc) dups	`thenRn_`
-    newGlobalName src_loc exp con			`thenRn` \ con_name ->
-    mapRn (newGlobalName src_loc exp) new_fields 	`thenRn` \ field_names ->
+    newGlobalName src_loc exp True{-val-} con		`thenRn` \ con_name ->
+    mapRn (newGlobalName src_loc exp True{-val-}) new_fields 	`thenRn` \ field_names ->
     let
 	all_constrs = constrs `snocBag` con_name
 	all_fields  = fields  `unionBags` listToBag field_names
@@ -186,7 +187,7 @@ getClassNames :: RdrNameClassDecl
 	      -> RnM_Info s (RnName, Bag RnName)	-- class and class ops
 
 getClassNames (ClassDecl _ cname _ sigs _ _ src_loc)
-  = newGlobalName src_loc Nothing cname	`thenRn` \ class_name ->
+  = newGlobalName src_loc Nothing False{-notval-} cname	`thenRn` \ class_name ->
     getClassOpNames (Just (nameExportFlag class_name))
 				  sigs	`thenRn` \ op_names ->
     returnRn (RnClass class_name op_names,
@@ -195,7 +196,7 @@ getClassNames (ClassDecl _ cname _ sigs _ _ src_loc)
 getClassOpNames exp []
   = returnRn []
 getClassOpNames exp (ClassOpSig op _ _ src_loc : sigs)
-  = newGlobalName src_loc exp op `thenRn` \ op_name ->
+  = newGlobalName src_loc exp True{-val-} op `thenRn` \ op_name ->
     getClassOpNames exp sigs	 `thenRn` \ op_names ->
     returnRn (op_name : op_names)
 getClassOpNames exp (_ : sigs)
@@ -254,7 +255,7 @@ doPat locn (RecPatIn name fields)
 doField locn (_, pat, _) = doPat locn pat
 
 doName locn rdr
-  = newGlobalName locn Nothing rdr `thenRn` \ name ->
+  = newGlobalName locn Nothing True{-val-} rdr `thenRn` \ name ->
     returnRn (unitBag (RnName name))
 \end{code}
 
@@ -265,26 +266,36 @@ doName locn rdr
 *********************************************************
 
 \begin{code}
-newGlobalName :: SrcLoc -> Maybe ExportFlag
+newGlobalName :: SrcLoc -> Maybe ExportFlag -> Bool{-True<=>value name,False<=>tycon/class-}
 	      -> RdrName -> RnM_Info s Name
 
 -- ToDo: b_names and b_keys being defined in this module !!!
 
-newGlobalName locn maybe_exp rdr
-  = getExtraRn			`thenRn` \ (_,b_keys,exp_fn,occ_fn) ->
+newGlobalName locn maybe_exp is_val_name rdr
+  = getExtraRn			`thenRn` \ ((b_val_names,b_tc_names),b_keys,exp_fn,occ_fn) ->
     getModuleRn  		`thenRn` \ mod ->
     rnGetUnique 		`thenRn` \ u ->
     let
-	(uniq, unqual)
-	  = case rdr of
-	      Qual m n -> (u, n)
-	      Unqual n -> case (lookupFM b_keys n) of
-			    Nothing	 -> (u,   n)
-			    Just (key,_) -> (key, n)
+	unqual = case rdr of { Qual m n -> n; Unqual n -> n }
 
 	orig   = if fromPrelude mod
 	         then (Unqual unqual)
 	         else (Qual mod unqual)
+
+	uniq
+	  = let
+		str_mod = case orig of { Qual m n -> (n, m); Unqual n -> (n, pRELUDE) }
+		n       = fst str_mod
+		m       = snd str_mod
+	    in
+	    --pprTrace "newGlobalName:" (ppAboves ((ppCat [ppPStr n, ppPStr m]) : [ ppCat [ppPStr x, ppPStr y] | (x,y) <- keysFM b_keys])) $
+	    case (lookupFM b_keys str_mod) of
+	      Just (key,_) -> key
+	      Nothing	   -> if not opt_CompilingPrelude then u else
+			      case (lookupFM (if is_val_name then b_val_names else b_tc_names) str_mod) of
+			        Nothing -> u
+				Just xx -> --pprTrace "Using Unique for:" (ppCat [ppPStr n, ppPStr m]) $
+					   uniqueOf xx
 
 	exp = case maybe_exp of
 	       Just exp -> exp
@@ -339,6 +350,7 @@ doImportDecls iface_cache g_info us src_imps
 	-- cache the imported modules
 	-- this ensures that all directly imported modules
 	-- will have their original name iface in scope
+	-- pprTrace "doImportDecls:" (ppCat (map ppPStr imp_mods)) $
 	accumulate (map (cachedIface False iface_cache) imp_mods) >>
 
 	-- process the imports
@@ -354,14 +366,18 @@ doImportDecls iface_cache g_info us src_imps
     all_imps = implicit_qprel ++ the_imps
 
     implicit_qprel = if opt_NoImplicitPrelude
-		     then [{- no "import qualified Prelude" -}]
+		     then [{- no "import qualified Prelude" -}
+			   ImportDecl pRELUDE_BUILTIN True Nothing Nothing prel_loc
+			  ]
 		     else [ImportDecl pRELUDE True Nothing Nothing prel_loc]
 
     explicit_prelude_imp = not (null [ () | (ImportDecl mod qual _ _ _) <- src_imps,
 				            mod == pRELUDE ])
 
     implicit_prel  = if explicit_prelude_imp || opt_NoImplicitPrelude
-		     then [{- no "import Prelude" -}]
+		     then [{- no "import Prelude" -}
+			   ImportDecl pRELUDE_BUILTIN False Nothing Nothing prel_loc
+			  ]
 	             else [ImportDecl pRELUDE False Nothing Nothing prel_loc]
 
     prel_loc = mkBuiltinSrcLoc
@@ -386,7 +402,7 @@ doImportDecls iface_cache g_info us src_imps
 	has_same_mod (q,ImportDecl mod2 _ _ _ _) = mod == mod2
 
 
-    imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]
+    imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps, mod /= pRELUDE_BUILTIN ]
 
     imp_warns = listToBag (map dupImportWarn imp_dups)
     		`unionBags`
@@ -435,15 +451,25 @@ doImport :: IfaceCache
 		Bag (RnName,(ExportFlag,Bag SrcLoc)))	-- import flags and src locs
 
 doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
-  = cachedIface False iface_cache mod 	>>= \ maybe_iface ->
+  = let
+	(b_vals, b_tcs, maybe_spec') = getBuiltins info mod maybe_spec 
+    in
+    (if mod == pRELUDE_BUILTIN then
+	return (Succeeded (panic "doImport:PreludeBuiltin"),
+			 \ iface -> ([], [], emptyBag))
+     else
+	--pprTrace "doImport:" (ppPStr mod) $
+	cachedIface False iface_cache mod >>= \ maybe_iface ->
+	return (maybe_iface, \ iface -> getOrigIEs iface maybe_spec')
+    )	>>= \ (maybe_iface, do_ies) ->
+
     case maybe_iface of
       Failed err ->
 	return (emptyBag, emptyBag, emptyBag, emptyBag,
 		unitBag err, emptyBag, emptyBag)
       Succeeded iface -> 
         let
-	    (b_vals, b_tcs, maybe_spec') = getBuiltins info mod maybe_spec 
-	    (ies, chk_ies, get_errs)     = getOrigIEs iface maybe_spec'
+	    (ies, chk_ies, get_errs) = do_ies iface
 	in
 	doOrigIEs iface_cache info mod src_loc us ies 
 		>>= \ (ie_vals, ie_tcs, imp_flags, errs, warns) ->
@@ -452,9 +478,13 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
 	let
 	    final_vals = mapBag fst_occ b_vals `unionBags` mapBag pair_occ ie_vals
 	    final_tcs  = mapBag fst_occ b_tcs  `unionBags` mapBag pair_occ ie_tcs
+	    final_vals_list = bagToList final_vals
 	in
-	accumulate (map (getFixityDecl iface_cache) (bagToList final_vals))
-		>>= \ fix_maybes_errs ->
+	(if mod == pRELUDE_BUILTIN then
+	    return [ (Nothing, emptyBag) | _ <- final_vals_list ]
+	 else
+	    accumulate (map (getFixityDecl iface_cache) final_vals_list)
+	)		>>= \ fix_maybes_errs ->
 	let
 	    (chk_errs, chk_warns)  = unzip chk_errs_warns
 	    (fix_maybes, fix_errs) = unzip fix_maybes_errs
@@ -482,7 +512,7 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
 
 
 getBuiltins _ mod maybe_spec
-  | not ((fromPrelude mod) || mod == iX || mod == rATIO )
+  | not (fromPrelude mod || mod == iX || mod == rATIO)
   = (emptyBag, emptyBag, maybe_spec)
 
 getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
@@ -626,8 +656,8 @@ checkOrigIE iface_cache (IEThingWith n ns, ExportAll)
   = with_decl iface_cache n
 	(\ err  -> (unitBag (\ mod locn -> err), emptyBag))
 	(\ decl -> case decl of
-	     	NewTypeSig _ con _ _         -> (check_with "constructrs" [con] ns, emptyBag)
-	     	DataSig    _ cons fields _ _ -> (check_with "constructrs (and fields)" (cons++fields) ns, emptyBag)
+	     	NewTypeSig _ con _ _         -> (check_with "constructors" [con] ns, emptyBag)
+	     	DataSig    _ cons fields _ _ -> (check_with "constructors (and fields)" (cons++fields) ns, emptyBag)
              	ClassSig   _ ops _ _         -> (check_with "class ops"   ops   ns, emptyBag))
   where
     check_with str has rdrs
@@ -650,6 +680,8 @@ with_decl iface_cache n do_err do_decl
 getFixityDecl iface_cache (_,rn)
   = let
 	(mod, str) = moduleNamePair rn
+
+	succeeded infx i = return (Just (infx rn i), emptyBag)
     in
     cachedIface True iface_cache mod	>>= \ maybe_iface ->
     case maybe_iface of
@@ -658,9 +690,9 @@ getFixityDecl iface_cache (_,rn)
       Succeeded (ParsedIface _ _ _ _ _ _ _ _ fixes _ _ _ _) ->
 	case lookupFM fixes str of
 	  Nothing 	    -> return (Nothing, emptyBag)
-	  Just (InfixL _ i) -> return (Just (InfixL rn i), emptyBag)
-	  Just (InfixR _ i) -> return (Just (InfixR rn i), emptyBag)
-	  Just (InfixN _ i) -> return (Just (InfixN rn i), emptyBag)
+	  Just (InfixL _ i) -> succeeded InfixL i
+	  Just (InfixR _ i) -> succeeded InfixR i
+	  Just (InfixN _ i) -> succeeded InfixN i
 
 ie_name (IEVar n)         = n
 ie_name (IEThingAbs n)    = n
@@ -712,12 +744,13 @@ getIfaceDeclNames ie (NewTypeSig tycon con src_loc _)
 
 getIfaceDeclNames ie (DataSig tycon cons fields src_loc _)
   = newImportedName True src_loc Nothing Nothing tycon `thenRn` \ tycon_name ->
-    mapRn (newImportedName False src_loc (Just (nameExportFlag tycon_name))
-				         (Just (nameImportFlag tycon_name)))
-			         	     cons `thenRn` \ con_names ->
-    mapRn (newImportedName False src_loc (Just (nameExportFlag tycon_name))
-				         (Just (nameImportFlag tycon_name)))
-			         	   fields `thenRn` \ field_names ->
+    let
+	map_me = mapRn (newImportedName False src_loc
+				(Just (nameExportFlag tycon_name))
+				(Just (nameImportFlag tycon_name)))
+    in
+    map_me cons	    `thenRn` \ con_names ->
+    map_me fields   `thenRn` \ field_names ->
     let
 	rn_tycon   = RnData tycon_name con_names field_names
         rn_constrs = [ RnConstr name tycon_name | name <- con_names ]
@@ -775,11 +808,11 @@ newImportedName tycon_or_class locn maybe_exp maybe_imp rdr
     Nothing -> 
 	rnGetUnique	`thenRn` \ u ->
 	let 
-	    uniq = case rdr of
-		     Qual m n -> u
-		     Unqual n -> case lookupFM b_keys n of
-				   Nothing	-> u
-				   Just (key,_) -> key
+	    str_mod = case rdr of { Qual m n -> (n,m); Unqual n -> (n,pRELUDE) }
+
+	    uniq = case lookupFM b_keys str_mod of
+		     Nothing	  -> u
+		     Just (key,_) -> key
 
 	    exp  = case maybe_exp of
 	    	     Just exp -> exp

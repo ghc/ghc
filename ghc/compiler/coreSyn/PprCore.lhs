@@ -23,7 +23,7 @@ module PprCore (
 #endif
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 import CostCentre	( showCostCentre )

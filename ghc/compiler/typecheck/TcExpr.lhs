@@ -8,13 +8,13 @@
 
 module TcExpr ( tcExpr ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( HsExpr(..), Qual(..), Stmt(..),
 			  HsBinds(..), Bind(..), MonoBinds(..), 
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
 			  Match, Fake, InPat, OutPat, PolyType,
-			  irrefutablePat, collectPatBinders )
+			  failureFreePat, collectPatBinders )
 import RnHsSyn		( RenamedHsExpr(..), RenamedQual(..),
 			  RenamedStmt(..), RenamedRecordBinds(..),
 			  RnName{-instance Outputable-}
@@ -37,17 +37,18 @@ import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( TcType(..), TcMaybe(..),
-			  tcInstId, tcInstType, tcInstTheta, tcInstTyVars,
+			  tcInstId, tcInstType, tcInstSigTyVars,
+			  tcInstSigType, tcInstTcType, tcInstTheta,
 			  newTyVarTy, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
 import Class		( Class(..), classSig )
 import FieldLabel	( fieldLabelName )
-import Id		( Id(..), GenId, idType, dataConFieldLabels, dataConSig )
+import Id		( idType, dataConFieldLabels, dataConSig, Id(..), GenId )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import GenSpecEtc	( checkSigTyVars, checkSigTyVarsGivenGlobals )
 import Name		( Name{-instance Eq-} )
-import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
+import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
 			  getTyVar_maybe, getFunTy_maybe, instantiateTy,
 			  splitForAllTy, splitRhoTy, splitSigmaTy, splitFunTy,
 			  isTauTy, mkFunTys, tyVarsOfType, getForAllTy_maybe,
@@ -65,7 +66,7 @@ import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
-			  monadClassKey, monadZeroClassKey
+			  thenMClassOpKey, zeroClassOpKey
 			)
 --import Name		( Name )		-- Instance 
 import Outputable	( interpp'SP )
@@ -318,32 +319,8 @@ tcExpr (ListComp expr quals)
 \end{code}
 
 \begin{code}
-tcExpr (HsDo stmts src_loc)
-  = 	-- get the Monad and MonadZero classes
-	-- create type consisting of a fresh monad tyvar
-    tcAddSrcLoc src_loc	$
-    newTyVarTy monadKind	`thenNF_Tc` \ m ->
-    tcDoStmts False m stmts	`thenTc` \ ((stmts',monad,mzero), lie, do_ty) ->
-
-	-- create dictionaries for monad and possibly monadzero
-    (if monad then
-	tcLookupClassByKey monadClassKey		`thenNF_Tc` \ monadClass ->
-	newDicts DoOrigin [(monadClass, m)]	
-    else
-	returnNF_Tc (emptyLIE, [panic "TcExpr: MonadZero dictionary"])
-    )						`thenNF_Tc` \ (m_lie,  [m_id])  ->
-    (if mzero then
-	tcLookupClassByKey monadZeroClassKey	`thenNF_Tc` \ monadZeroClass ->
-	newDicts DoOrigin [(monadZeroClass, m)]
-     else
-        returnNF_Tc (emptyLIE, [panic "TcExpr: MonadZero dictionary"])
-    )						`thenNF_Tc` \ (mz_lie, [mz_id]) ->
-
-    returnTc (HsDoOut stmts' m_id mz_id src_loc,
-	      lie `plusLIE` m_lie `plusLIE` mz_lie,
-	      do_ty)
-  where
-    monadKind = mkArrowKind mkBoxedTypeKind mkBoxedTypeKind
+tcExpr expr@(HsDo stmts src_loc)
+  = tcDoStmts stmts src_loc
 \end{code}
 
 \begin{code}
@@ -487,7 +464,7 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty)
 
 	-- Check the tau-type part
    tcSetErrCtxt (exprSigCtxt in_expr)	$
-   tcInstType [] sigma_sig		`thenNF_Tc` \ sigma_sig' ->
+   tcInstSigType sigma_sig		`thenNF_Tc` \ sigma_sig' ->
    let
 	(sig_tyvars', sig_theta', sig_tau') = splitSigmaTy sigma_sig'
    in
@@ -590,11 +567,17 @@ tcArg expected_arg_ty arg
 	-- of instantiating a function involving rank-2 polymorphism, so there
 	-- isn't any danger of using the same tyvars twice
 	-- The argument type shouldn't be overloaded type (hence ASSERT)
+
+	-- To ensure that the forall'd type variables don't get unified with each
+	-- other or any other types, we make fresh *signature* type variables
+	-- and unify them with the tyvars.
     let
 	(expected_tyvars, expected_theta, expected_tau) = splitSigmaTy expected_arg_ty
     in
     ASSERT( null expected_theta )	-- And expected_tyvars are all DontBind things
-
+    tcInstSigTyVars expected_tyvars		`thenNF_Tc` \ (sig_tyvars, sig_tyvar_tys, _) ->
+    unifyTauTyLists (mkTyVarTys expected_tyvars) sig_tyvar_tys	`thenTc_`
+	
 	-- Type-check the arg and unify with expected type
     tcExpr arg					`thenTc` \ (arg', lie_arg, actual_arg_ty) ->
     unifyTauTy expected_tau actual_arg_ty	`thenTc_`  (
@@ -609,11 +592,10 @@ tcArg expected_arg_ty arg
 	-- So now s' isn't unconstrained because it's linked to a.
 	-- Conclusion: include the free vars of the expected arg type in the
 	-- list of "free vars" for the signature check.
+
     tcAddErrCtxt (rank2ArgCtxt arg expected_arg_ty) $
-    tcGetGlobalTyVars						`thenNF_Tc` \ env_tyvars ->
-    zonkTcTyVars (tyVarsOfType expected_arg_ty)			`thenNF_Tc` \ free_tyvars ->
     checkSigTyVarsGivenGlobals
-	(env_tyvars `unionTyVarSets` free_tyvars)
+	(tyVarsOfType expected_arg_ty)
 	expected_tyvars expected_tau				`thenTc_`
 
 	-- Check that there's no overloading involved
@@ -649,42 +631,45 @@ tcId name
   = 	-- Look up the Id and instantiate its type
     tcLookupLocalValue name	`thenNF_Tc` \ maybe_local ->
 
-    (case maybe_local of
-	Just tc_id -> let
-		        (tyvars, rho) = splitForAllTy (idType tc_id)
-		      in
-		      tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys', tenv)  ->
-		      let 
-			 rho' = instantiateTy tenv rho
-		      in
-		      returnNF_Tc (TcId tc_id, arg_tys', rho')
+    case maybe_local of
+      Just tc_id -> instantiate_it (TcId tc_id) (idType tc_id)
 
-	Nothing ->    tcLookupGlobalValue name	`thenNF_Tc` \ id ->
-		      let
-			(tyvars, rho) = splitForAllTy (idType id)
-		      in
-		      tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', arg_tys, tenv) ->
-		      tcInstType tenv rho		`thenNF_Tc` \ rho' ->
-		      returnNF_Tc (RealId id, arg_tys, rho')
+      Nothing ->    tcLookupGlobalValue name	`thenNF_Tc` \ id ->
+		    tcInstType [] (idType id)	`thenNF_Tc` \ inst_ty ->
+		    let
+			(tyvars, rho) = splitForAllTy inst_ty 
+		    in
+		    instantiate_it2 (RealId id) tyvars rho
 
-    )					`thenNF_Tc` \ (tc_id_occ, arg_tys, rho) ->
+  where
+	-- The instantiate_it loop runs round instantiating the Id.
+	-- It has to be a loop because we are now prepared to entertain
+	-- types like
+	--		f:: forall a. Eq a => forall b. Baz b => tau
+	-- We want to instantiate this to
+	--		f2::tau		{f2 = f1 b (Baz b), f1 = f a (Eq a)}
+    instantiate_it tc_id_occ ty
+      = tcInstTcType ty		`thenNF_Tc` \ (tyvars, rho) ->
+	instantiate_it2 tc_id_occ tyvars rho
 
-	-- Is it overloaded?
-    case splitRhoTy rho of
-      ([], tau)    -> 	-- Not overloaded, so just make a type application
-		    	returnNF_Tc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
+    instantiate_it2 tc_id_occ tyvars rho
+      | null theta	-- Is it overloaded?
+      = returnNF_Tc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
 
-      (theta, tau) ->	-- Overloaded, so make a Method inst
-			newMethodWithGivenTy (OccurrenceOf tc_id_occ)
-				tc_id_occ arg_tys rho		`thenNF_Tc` \ (lie, meth_id) ->
-			returnNF_Tc (HsVar meth_id, lie, tau)
+      | otherwise	-- Yes, it's overloaded
+      = newMethodWithGivenTy (OccurrenceOf tc_id_occ)
+			     tc_id_occ arg_tys rho	`thenNF_Tc` \ (lie1, meth_id) ->
+	instantiate_it meth_id tau			`thenNF_Tc` \ (expr, lie2, final_tau) ->
+	returnNF_Tc (expr, lie1 `plusLIE` lie2, final_tau)
+
+      where
+        (theta,  tau) = splitRhoTy   rho
+	arg_tys	      = mkTyVarTys tyvars
 \end{code}
-
-
 
 %************************************************************************
 %*									*
-\subsection{@tcQuals@ typchecks list comprehension qualifiers}
+\subsection{@tcQuals@ typechecks list-comprehension qualifiers}
 %*									*
 %************************************************************************
 
@@ -749,67 +734,78 @@ tcListComp expr (LetQual binds : quals)
 %************************************************************************
 
 \begin{code}
-tcDoStmts :: Bool			-- True => require a monad
-	  -> TcType s			-- m
-	  -> [RenamedStmt]	
-	  -> TcM s (([TcStmt s],
-		     Bool,		-- True => Monad
-		     Bool), 		-- True => MonadZero
-		    LIE s,
-		    TcType s)
-					
-tcDoStmts monad m [stmt@(ExprStmt exp src_loc)]
-  = tcAddSrcLoc src_loc $
-    tcSetErrCtxt (stmtCtxt stmt) $
-    tcExpr exp			 	`thenTc`    \ (exp', exp_lie, exp_ty) ->
-    (if monad then
-	newTyVarTy mkTypeKind		`thenNF_Tc` \ a ->
-	unifyTauTy (mkAppTy m a) exp_ty
-     else
-	returnTc ()
-    )					`thenTc_`
-    returnTc (([ExprStmt exp' src_loc], monad, False), exp_lie, exp_ty)
+tcDoStmts stmts src_loc
+  =	-- get the Monad and MonadZero classes
+	-- create type consisting of a fresh monad tyvar
+    tcAddSrcLoc src_loc	$
+    newTyVarTy (mkArrowKind mkBoxedTypeKind mkBoxedTypeKind)	`thenNF_Tc` \ m ->
 
-tcDoStmts _ m (stmt@(ExprStmt exp src_loc) : stmts)
-  = tcAddSrcLoc src_loc 		(
-    tcSetErrCtxt (stmtCtxt stmt)	(
-    	tcExpr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
-	newTyVarTy mkTypeKind		`thenNF_Tc` \ a ->
-    	unifyTauTy (mkAppTy m a) exp_ty	`thenTc_`
-	returnTc (ExprStmt exp' src_loc, exp_lie)
-    ))					`thenTc` \ (stmt',  stmt_lie) -> 
-    tcDoStmts True m stmts		`thenTc` \ ((stmts', _, mzero), stmts_lie, stmts_ty) ->
-    returnTc ((stmt':stmts', True, mzero),
-	      stmt_lie `plusLIE` stmts_lie,
-	      stmts_ty)
 
-tcDoStmts _ m (stmt@(BindStmt pat exp src_loc) : stmts)
-  = newMonoIds (collectPatBinders pat) mkBoxedTypeKind $ \ _ ->
-    tcAddSrcLoc src_loc			(
-    tcSetErrCtxt (stmtCtxt stmt)	(
-	tcPat pat			`thenTc`    \ (pat', pat_lie, pat_ty) ->  
+	-- Build the then and zero methods in case we need them
+    tcLookupGlobalValueByKey thenMClassOpKey	`thenNF_Tc` \ then_sel_id ->
+    tcLookupGlobalValueByKey zeroClassOpKey	`thenNF_Tc` \ zero_sel_id ->
+    newMethod DoOrigin
+	      (RealId then_sel_id) [m]		`thenNF_Tc` \ (m_lie, then_id) ->
+    newMethod DoOrigin
+	      (RealId zero_sel_id) [m]		`thenNF_Tc` \ (mz_lie, zero_id) ->
 
-    	tcExpr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
+    let
+      get_m_arg ty 
+	= newTyVarTy mkTypeKind			`thenNF_Tc` \ arg_ty ->
+	  unifyTauTy (mkAppTy m arg_ty) ty	`thenTc_`
+	  returnTc arg_ty
+
+      go [stmt@(ExprStmt exp src_loc)]
+	= tcAddSrcLoc src_loc $
+	  tcSetErrCtxt (stmtCtxt stmt) $
+	  tcExpr exp			 	`thenTc`    \ (exp', exp_lie, exp_ty) ->
+	  returnTc ([ExprStmt exp' src_loc], exp_lie, exp_ty)
+
+      go (stmt@(ExprStmt exp src_loc) : stmts)
+	= tcAddSrcLoc src_loc 		(
+	  tcSetErrCtxt (stmtCtxt stmt)	(
+		tcExpr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
+		get_m_arg exp_ty 		`thenTc` \ a ->
+		returnTc (a, exp', exp_lie)
+	  ))					`thenTc` \ (a, exp',  exp_lie) -> 
+	  go stmts				`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
+	  get_m_arg stmts_ty			`thenTc` \ b ->
+	  returnTc (ExprStmtOut exp' src_loc a b : stmts',
+		    exp_lie `plusLIE` stmts_lie `plusLIE` m_lie,
+		    stmts_ty)
+
+      go (stmt@(BindStmt pat exp src_loc) : stmts)
+	= newMonoIds (collectPatBinders pat) mkBoxedTypeKind $ \ _ ->
+	  tcAddSrcLoc src_loc		(
+	  tcSetErrCtxt (stmtCtxt stmt)	(
+		tcPat pat		`thenTc`    \ (pat', pat_lie, pat_ty) ->  
+	    	tcExpr exp		`thenTc`    \ (exp', exp_lie, exp_ty) ->
 		-- See comments with tcListComp on GeneratorQual
 
-	newTyVarTy mkTypeKind		`thenNF_Tc` \ a ->
-	unifyTauTy a pat_ty		`thenTc_`
-	unifyTauTy (mkAppTy m a) exp_ty	`thenTc_`
-	returnTc (BindStmt pat' exp' src_loc, pat_lie `plusLIE` exp_lie, irrefutablePat pat')
-    ))					`thenTc` \ (stmt', stmt_lie, failure_free) -> 
-    tcDoStmts True m stmts		`thenTc` \ ((stmts', _, mzero), stmts_lie, stmts_ty) ->
-    returnTc ((stmt':stmts', True, mzero || not failure_free),
-	      stmt_lie `plusLIE` stmts_lie,
-	      stmts_ty)
+		get_m_arg exp_ty	`thenTc` \ a ->
+		unifyTauTy a pat_ty	`thenTc_`
+		returnTc (a, pat', exp', pat_lie `plusLIE` exp_lie)
+	  ))				`thenTc` \ (a, pat', exp', stmt_lie) ->
+	  go stmts			`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
+	  get_m_arg stmts_ty		`thenTc` \ b ->
+	  returnTc (BindStmtOut pat' exp' src_loc a b : stmts',
+		    stmt_lie `plusLIE` stmts_lie `plusLIE` m_lie `plusLIE` 
+			(if failureFreePat pat' then emptyLIE else mz_lie),
+		    stmts_ty)
 
-tcDoStmts monad m (LetStmt binds : stmts)
-   = tcBindsAndThen		-- No error context, but a binding group is
-	combine			-- rather a large thing for an error context anyway
-	binds
-	(tcDoStmts monad m stmts)
-   where
-     combine binds' (stmts', monad, mzero) = ((LetStmt binds' : stmts'), monad, mzero)
+      go (LetStmt binds : stmts)
+	   = tcBindsAndThen		-- No error context, but a binding group is
+		combine			-- rather a large thing for an error context anyway
+		binds
+		(go stmts)
+	   where
+	     combine binds' stmts' = LetStmt binds' : stmts'
+    in
 
+    go stmts		`thenTc` \ (stmts', final_lie, final_ty) ->
+    returnTc (HsDoOut stmts' then_id zero_id src_loc,
+	      final_lie,
+	      final_ty)
 \end{code}
 
 Game plan for record bindings

@@ -17,7 +17,7 @@ module CoreLift (
 
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 import CoreUtils	( coreExprType )

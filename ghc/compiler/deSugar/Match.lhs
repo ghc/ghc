@@ -8,8 +8,8 @@
 
 module Match ( match, matchWrapper, matchSimply ) where
 
-import Ubiq
-import DsLoop		-- here for paranoia-checking reasons
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		-- here for paranoia-checking reasons
 			-- and to break dsExpr/dsBinds-ish loop
 
 import HsSyn		hiding ( collectBinders{-also from CoreSyn-} )
@@ -26,7 +26,7 @@ import MatchCon		( matchConFamily )
 import MatchLit		( matchLiterals )
 
 import FieldLabel	( allFieldLabelTags, fieldLabelTag )
-import Id		( idType, mkTupleCon, dataConSig,
+import Id		( idType, mkTupleCon,
 			  dataConArgTys, recordSelectorFieldLabel,
 			  GenId{-instance-}
 			)
@@ -43,7 +43,7 @@ import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy,
 import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  charTy, charDataCon, intTy, intDataCon,
 			  floatTy, floatDataCon, doubleTy,
-			  doubleDataCon, integerTy, stringTy, addrTy,
+			  doubleDataCon, stringTy, addrTy,
 			  addrDataCon, wordTy, wordDataCon
 			)
 import Unique		( Unique{-instance Eq-} )
@@ -209,9 +209,9 @@ match vars@(v:vs) eqns_info shadows
     unmix_eqns []    = []
     unmix_eqns [eqn] = [ [eqn] ]
     unmix_eqns (eq1@(EqnInfo (p1:p1s) _) : eq2@(EqnInfo (p2:p2s) _) : eqs)
-      = if (  (unfailablePat p1 && unfailablePat p2)
-	   || (isConPat      p1 && isConPat p2)
-	   || (isLitPat      p1 && isLitPat p2) ) then
+      = if (  (irrefutablePat p1 && irrefutablePat p2)
+	   || (isConPat       p1 && isConPat 	   p2)
+	   || (isLitPat       p1 && isLitPat 	   p2) ) then
 	    eq1 `tack_onto` unmixed_rest
 	else
 	    [ eq1 ] : unmixed_rest
@@ -514,8 +514,8 @@ matchUnmixedEqns :: [Id]
 matchUnmixedEqns [] _ _ = panic "matchUnmixedEqns: no names"
 
 matchUnmixedEqns all_vars@(var:vars) eqns_info shadows
-  | unfailablePat first_pat
-  = ASSERT( unfailablePats column_1_pats )	-- Sanity check
+  | irrefutablePat first_pat
+  = ASSERT( irrefutablePats column_1_pats )	-- Sanity check
   	-- Real true variables, just like in matchVar, SLPJ p 94
     match vars remaining_eqns_info remaining_shadows
 

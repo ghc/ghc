@@ -8,7 +8,7 @@
 
 module TcMonoType ( tcPolyType, tcMonoType, tcMonoTypeKind, tcContext ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		( PolyType(..), MonoType(..), Fake )
 import RnHsSyn		( RenamedPolyType(..), RenamedMonoType(..), 
@@ -31,7 +31,7 @@ import Type		( GenType, Type(..), ThetaType(..),
 import TyVar		( GenTyVar, TyVar(..), mkTyVar )
 import Type		( mkDictTy )
 import Class		( cCallishClassKeys )
-import TyCon		( TyCon, Arity(..) )
+import TyCon		( TyCon )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique )
 import PprStyle

@@ -35,11 +35,9 @@ module StgSyn (
 	isLitLitArg,
 	stgArity,
 	collectExportedStgBinders
-
-	-- and to make the interface self-sufficient...
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CostCentre	( showCostCentre )
 import Id		( idPrimRep, GenId{-instance NamedThing-} )

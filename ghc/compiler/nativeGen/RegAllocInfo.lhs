@@ -51,12 +51,13 @@ module RegAllocInfo (
 	freeRegSet
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import MachMisc
 import MachRegs
 import MachCode		( InstrList(..) )
 
+import AbsCSyn		( MagicId )
 import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
 import CLabel		( pprCLabel_asm, CLabel{-instance Ord-} )
 import FiniteMap	( addToFM, lookupFM )

@@ -27,8 +27,8 @@ module DsUtils (
 	showForErr
     ) where
 
-import Ubiq
-import DsLoop		( match, matchSimply )
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..),
 			  Match, HsBinds, Stmt, Qual, PolyType, ArithSeqInfo )
@@ -40,7 +40,7 @@ import DsMonad
 
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PprStyle		( PprStyle(..) )
-import PrelVals		( iRREFUT_PAT_ERROR_ID )
+import PrelVals		( iRREFUT_PAT_ERROR_ID, voidId )
 import Pretty		( ppShow )
 import Id		( idType, dataConArgTys, mkTupleCon,
 			  pprId{-ToDo:rm-},
@@ -50,6 +50,7 @@ import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
 			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
 			)
+import TysWiredIn	( voidTy )
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
 import PprCore{-ToDo:rm-}
@@ -551,13 +552,13 @@ which is of course utterly wrong.  Rather than drop the condition that
 only boxed types can be let-bound, we just turn the fail into a function
 for the primitive case:
 \begin{verbatim}
-	let fail.33 :: () -> Int#
+	let fail.33 :: Void -> Int#
 	    fail.33 = \_ -> error "Help"
 	in
 	case x of
 		p1 -> ...
-		p2 -> fail.33 ()
-		p3 -> fail.33 ()
+		p2 -> fail.33 void
+		p3 -> fail.33 void
 		p4 -> ...
 \end{verbatim}
 
@@ -572,19 +573,16 @@ mkFailurePair :: Type		-- Result type of the whole case expression
 				-- applied to unit tuple
 mkFailurePair ty
   | isUnboxedType ty
-  = newFailLocalDs (mkFunTys [unit_ty] ty)	`thenDs` \ fail_fun_var ->
-    newSysLocalDs unit_ty			`thenDs` \ fail_fun_arg ->
+  = newFailLocalDs (mkFunTys [voidTy] ty)	`thenDs` \ fail_fun_var ->
+    newSysLocalDs voidTy			`thenDs` \ fail_fun_arg ->
     returnDs (\ body ->
 		NonRec fail_fun_var (Lam (ValBinder fail_fun_arg) body),
-	      App (Var fail_fun_var) (VarArg unit_id))
+	      App (Var fail_fun_var) (VarArg voidId))
 
   | otherwise
   = newFailLocalDs ty 		`thenDs` \ fail_var ->
     returnDs (\ body -> NonRec fail_var body, Var fail_var)
-
-unit_id :: Id	-- out here to avoid CAF (sigh)
-unit_id = mkTupleCon 0
-
-unit_ty :: Type
-unit_ty = idType unit_id
 \end{code}
+
+
+

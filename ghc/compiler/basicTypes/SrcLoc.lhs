@@ -22,7 +22,7 @@ module SrcLoc (
 	unpackSrcLoc
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import PprStyle		( PprStyle(..) )
 import Pretty

@@ -8,7 +8,7 @@
 
 module RnHsSyn where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn
 
@@ -82,7 +82,7 @@ isRnField  (RnField _ _)  = True
 isRnField  _		  = False
 
 isRnClassOp cls (RnClassOp _ op_cls) = eqUniqsNamed cls op_cls
-isRnClassOp cls _		     = False
+isRnClassOp cls n		     = pprTrace "isRnClassOp:" (ppr PprShowAll n) $ True -- let it past anyway
 
 isRnImplicit (RnImplicit _)      = True
 isRnImplicit (RnImplicitTyCon _) = True

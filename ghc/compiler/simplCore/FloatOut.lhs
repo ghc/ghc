@@ -10,7 +10,7 @@
 
 module FloatOut ( floatOutwards ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 

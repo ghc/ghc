@@ -11,12 +11,11 @@ module TcModule (
 	TcResults(..),
 	TcResultBinds(..),
 	TcIfaceInfo(..),
-	TcLocalTyConsAndClasses(..),
 	TcSpecialiseRequests(..),
 	TcDDumpDeriv(..)
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import HsSyn		( HsModule(..), HsBinds(..), Bind, HsExpr,
 			  TyDecl, SpecDataSig, ClassDecl, InstDecl,
@@ -45,13 +44,13 @@ import TcTyDecls	( mkDataBinds )
 import Bag		( listToBag )
 import Class		( GenClass, classSelIds )
 import ErrUtils		( Warning(..), Error(..) )
-import Id		( GenId, isDataCon, isMethodSelId, idType, IdEnv(..), nullIdEnv )
+import Id		( idType, isMethodSelId, isTopLevId, GenId, IdEnv(..), nullIdEnv )
 import Maybes		( catMaybes )
 import Name		( isExported, isLocallyDefined )
 import Pretty
 import RnUtils		( RnEnv(..) )
-import TyCon		( isDataTyCon, TyCon )
-import Type		( mkSynTy )
+import TyCon		( TyCon )
+import Type		( applyTyCon )
 import TysWiredIn	( unitTy, mkPrimIoTy )
 import TyVar		( TyVarEnv(..), nullTyVarEnv )
 import Unify		( unifyTauTy )
@@ -70,7 +69,6 @@ Outside-world interface:
 type TcResults
   = (TcResultBinds,
      TcIfaceInfo,
-     TcLocalTyConsAndClasses,
      TcSpecialiseRequests,
      TcDDumpDeriv)
 
@@ -86,10 +84,6 @@ type TcResultBinds
 
 type TcIfaceInfo -- things for the interface generator
   = ([Id], [TyCon], [Class], Bag InstInfo)
-
-type TcLocalTyConsAndClasses -- things defined in this module
-  = ([TyCon], [Class])
-    -- not sure the classes are used at all (ToDo)
 
 type TcSpecialiseRequests
   = FiniteMap TyCon [(Bool, [Maybe Type])]
@@ -242,22 +236,20 @@ tcModule rn_env
 
     let
         localids = getEnv_LocalIds final_env
-	tycons   = getEnv_TyCons final_env
-	classes  = getEnv_Classes final_env
+	tycons   = getEnv_TyCons   final_env
+	classes  = getEnv_Classes  final_env
 
-	local_tycons  = [ tc | tc <- tycons, isLocallyDefined tc && isDataTyCon tc ]
+	local_tycons  = filter isLocallyDefined tycons
 	local_classes = filter isLocallyDefined classes
-	exported_ids' = filter isExported (eltsUFM ve2)
-    in    
-
+	local_vals    = [ v | v <- eltsUFM ve2, isLocallyDefined v && isTopLevId v ]
+			-- the isTopLevId is doubtful...
+    in
 	-- FINISHED AT LAST
     returnTc (
 	(data_binds', cls_binds', inst_binds', val_binds', const_insts'),
 
 	     -- the next collection is just for mkInterface
-	(exported_ids', tycons, classes, inst_info),
-
-	(local_tycons, local_classes),
+	(local_vals, local_tycons, local_classes, inst_info),
 
 	tycon_specs,
 
@@ -267,7 +259,6 @@ tcModule rn_env
     ty_decls_bag   = listToBag ty_decls
     cls_decls_bag  = listToBag cls_decls
     inst_decls_bag = listToBag inst_decls
-
 \end{code}
 
 
@@ -294,7 +285,7 @@ checkTopLevelIds mod final_env
 	
 	case (maybe_main, maybe_prim) of
 	  (Just main, Nothing) -> tcAddErrCtxt mainCtxt $
-		                  unifyTauTy (mkSynTy io_tc [unitTy])
+		                  unifyTauTy (applyTyCon io_tc [unitTy])
 					     (idType main)
 
 	  (Nothing, Just prim) -> tcAddErrCtxt primCtxt $

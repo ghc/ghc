@@ -24,11 +24,9 @@ module Maybes (
 	failMaB,
 	failMaybe,
 	seqMaybe,
-	mapMaybe,
 	returnMaB,
 	returnMaybe,
-	thenMaB,
-	thenMaybe
+	thenMaB
 
 #if ! defined(COMPILING_GHC)
 	, findJust
@@ -113,12 +111,6 @@ returnMaybe = Just
 
 failMaybe :: Maybe a
 failMaybe = Nothing
-
-mapMaybe :: (a -> Maybe b) -> [a] -> Maybe [b]
-mapMaybe f []	  = returnMaybe []
-mapMaybe f (x:xs) = f x			`thenMaybe` \ x' ->
-		    mapMaybe f xs	`thenMaybe` \ xs' ->
-		    returnMaybe (x':xs')
 \end{code}
 
 Lookup functions

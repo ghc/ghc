@@ -11,7 +11,7 @@ Semantique analyser) was written by Andy Gill.
 
 module StrictAnal ( saWwTopBinds, saTopBinds ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict,
 			  opt_D_dump_stranal, opt_D_simplifier_stats

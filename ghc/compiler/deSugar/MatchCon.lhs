@@ -8,8 +8,8 @@
 
 module MatchCon ( matchConFamily ) where
 
-import Ubiq
-import DsLoop		( match )	-- break match-ish loop
+IMP_Ubiq()
+IMPORT_DELOOPER(DsLoop)		( match )	-- break match-ish loop
 
 import HsSyn		( OutPat(..), HsLit, HsExpr )
 import DsHsSyn		( outPatType )

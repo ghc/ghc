@@ -13,7 +13,7 @@ module Specialise (
 	SpecialiseData(..)
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Bag		( emptyBag, unitBag, isEmptyBag, unionBags,
 			  partitionBag, listToBag, bagToList

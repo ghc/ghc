@@ -10,10 +10,10 @@ Datatype for: @HsBinds@, @Bind@, @Sig@, @MonoBinds@.
 
 module HsBinds where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends:
-import HsLoop
+IMPORT_DELOOPER(HsLoop)
 import HsMatches	( pprMatches, pprGRHSsAndBinds,
 			  Match, GRHSsAndBinds )
 import HsPat		( collectPatBinders, InPat )

@@ -12,7 +12,7 @@
 
 > module UpdAnal ( updateAnalyse ) where
 >
-> import Ubiq{-uitous-}
+> IMP_Ubiq(){-uitous-}
 >
 > import StgSyn
 > import Util		( panic )

@@ -52,7 +52,7 @@ module Name (
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import CStrings		( identToC, cSEP )
 import Outputable	( Outputable(..) )
@@ -64,6 +64,10 @@ import Unique		( funTyConKey, mkTupleDataConUnique, mkTupleTyConUnique,
 			  pprUnique, Unique
 			)
 import Util		( thenCmp, _CMP_STRING_, nOfThem, panic, assertPanic )
+
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+#endif
 \end{code}
 
 %************************************************************************

@@ -1,5 +1,5 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1995
+% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
 \section[TcSimplify]{TcSimplify}
 
@@ -12,7 +12,7 @@ module TcSimplify (
 	bindInstsOfLocalFuns
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
 			  Match, HsBinds, Qual, PolyType, ArithSeqInfo,
@@ -21,10 +21,13 @@ import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcExpr(..), TcMonoBinds(..) )
 
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( lookupInst, lookupSimpleInst,
-			  tyVarsOfInst, isTyVarDict, isDict, matchesInst,
-			  instToId, instBindingRequired, instCanBeGeneralised, newDictsAtLoc,
-			  Inst(..), LIE(..), zonkLIE, emptyLIE, plusLIE, unitLIE, consLIE,
-			  InstOrigin(..), OverloadedLit	)
+			  tyVarsOfInst, isTyVarDict, isDict,
+			  matchesInst, instToId, instBindingRequired,
+			  instCanBeGeneralised, newDictsAtLoc,
+			  pprInst,
+			  Inst(..), LIE(..), zonkLIE, emptyLIE,
+			  plusLIE, unitLIE, consLIE, InstOrigin(..),
+			  OverloadedLit )
 import TcEnv		( tcGetGlobalTyVars )
 import TcType		( TcType(..), TcTyVar(..), TcTyVarSet(..), TcMaybe, tcInstType )
 import Unify		( unifyTauTy )
@@ -378,7 +381,7 @@ elimTyCons squash_consts is_free_tv givens wanteds
 %************************************************************************
 %*									*
 \subsection[elimSCs]{@elimSCs@}
-%*			2						*
+%*									*
 %************************************************************************
 
 \begin{code}
@@ -554,7 +557,10 @@ elimSCsSimple givens (c_t@(clas,ty) : rest)
   where
     rest' = elimSCsSimple rest
     (c1,t1) `subsumes` (c2,t2) = t1 `eqSimpleTy` t2 && 
-				 maybeToBool (c2 `isSuperClassOf` c1)
+				 (c1 == c2 || maybeToBool (c2 `isSuperClassOf` c1))
+-- We deal with duplicates here   ^^^^^^^^
+-- It's a simple place to do it, although it's done in elimTyCons in the
+-- full-blown version of the simpifier.
 \end{code}
 
 %************************************************************************
@@ -668,8 +674,6 @@ the most common use of defaulting is code like:
 \end{verbatim}
 Since we're not using the result of @foo@, the result if (presumably)
 @void@.
-WDP Comment: no such thing as voidTy; so not quite in yet (94/07).
-SLPJ comment: since 
 
 \begin{code}
 disambigOne :: [SimpleDictInfo s] -> TcM s ()
@@ -740,8 +744,7 @@ genCantGenErr insts sty	-- Can't generalise these Insts
 
 \begin{code}
 ambigErr insts sty
-  = ppHang (ppStr "Ambiguous overloading")
-	4 (ppAboves (map (ppr sty) insts))
+  = ppAboves (map (pprInst sty "Ambiguous overloading") insts)
 \end{code}
 
 @reduceErr@ complains if we can't express required dictionaries in
@@ -749,10 +752,8 @@ terms of the signature.
 
 \begin{code}
 reduceErr insts sty
-  = ppHang (ppStr "Type signature lacks context required by inferred type")
-	 4 (ppHang (ppStr "Context reqd: ")
-	         4 (ppAboves (map (ppr sty) (bagToList insts)))
-          )
+  = ppAboves (map (pprInst sty "Context required by inferred type, but missing on a type signature")
+	          (bagToList insts))
 \end{code}
 
 \begin{code}
@@ -760,7 +761,7 @@ defaultErr dicts defaulting_tys sty
   = ppHang (ppStr "Ambiguously-overloaded types could not be resolved:")
 	 4 (ppAboves [
 	     ppHang (ppStr "Conflicting:")
-		  4 (ppInterleave ppSemi (map (ppr sty) dicts)),
+		  4 (ppInterleave ppSemi (map (pprInst sty ""{-???-}) dicts)),
 	     ppHang (ppStr "Defaulting types :")
 		  4 (ppr sty defaulting_tys),
 	     ppStr "([Int, Double] is the default list of defaulting types.)" ])

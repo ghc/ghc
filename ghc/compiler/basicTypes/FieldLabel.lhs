@@ -8,7 +8,7 @@
 
 module FieldLabel where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Name		( Name{-instance Eq/Outputable-} )
 import Type		( Type(..) )

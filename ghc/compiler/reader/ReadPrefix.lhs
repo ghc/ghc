@@ -6,11 +6,9 @@
 \begin{code}
 #include "HsVersions.h"
 
-module ReadPrefix (
-	rdModule
-    )  where
+module ReadPrefix ( rdModule )  where
 
-import Ubiq
+IMP_Ubiq()
 
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
@@ -24,7 +22,7 @@ import ErrUtils		( addErrLoc, ghcExit )
 import FiniteMap	( elemFM, FiniteMap )
 import Name		( RdrName(..), isRdrLexConOrSpecial )
 import PprStyle		( PprStyle(..) )
-import PrelMods		( fromPrelude )
+import PrelMods		( fromPrelude, pRELUDE )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Util		( nOfThem, pprError, panic )
@@ -307,7 +305,14 @@ wlkExpr expr
 
       U_negate nexp ->	 		-- prefix negation
 	wlkExpr nexp	`thenUgn` \ expr ->
-	returnUgn (NegApp expr (HsVar (Qual SLIT("Prelude") SLIT("negate"))))
+	-- this is a hack
+	let
+	    neg = SLIT("negate")
+	    rdr = if opt_CompilingPrelude
+	    	  then Unqual neg
+		  else Qual   pRELUDE neg
+	in
+	returnUgn (NegApp expr (HsVar rdr))
 
       U_llist llist -> -- explicit list
 	wlkList rdExpr llist `thenUgn` \ exprs ->
@@ -359,7 +364,13 @@ wlkPat pat
   = case pat of
       U_par ppat -> 			-- parenthesised pattern
 	wlkPat ppat	`thenUgn` \ pat ->
-	returnUgn (ParPatIn pat)
+	-- tidy things up a little:
+	returnUgn (
+	case pat of
+	  VarPatIn _ -> pat
+	  WildPatIn  -> pat
+	  other	     -> ParPatIn pat
+	)
 
       U_as avar as_pat -> 		-- "as" pattern
 	wlkQid avar	`thenUgn` \ var ->
@@ -453,7 +464,7 @@ wlkLiteral :: U_literal -> UgnM HsLit
 wlkLiteral ulit
   = returnUgn (
     case ulit of
-      U_integer    s -> HsInt	       (as_integer  s)
+      U_integer    s -> HsInt	     (as_integer  s)
       U_floatr     s -> HsFrac       (as_rational s)
       U_intprim    s -> HsIntPrim    (as_integer  s)
       U_doubleprim s -> HsDoublePrim (as_rational s)

@@ -8,8 +8,8 @@
 
 module Simplify ( simplTopBinds, simplExpr, simplBind ) where
 
-import Ubiq{-uitous-}
-import SmplLoop		-- paranoia checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
 
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )

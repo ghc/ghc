@@ -16,7 +16,7 @@ for values show up; ditto @SpecInstSig@ (for instances) and
 
 module HsPragmas where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends:
 import HsCore		( UnfoldingCoreExpr )

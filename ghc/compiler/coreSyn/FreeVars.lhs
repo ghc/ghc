@@ -20,7 +20,7 @@ module FreeVars (
 	FVInfo(..), LeakInfo(..)
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import AnnCoreSyn	-- output
 

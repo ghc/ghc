@@ -11,9 +11,9 @@ types and operations.''
 
 module TysPrim where
 
-import Ubiq
+IMP_Ubiq(){-uitous-}
 
-import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind )
+import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( mkBuiltinName )
 import PrelMods		( pRELUDE_BUILTIN )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
@@ -38,31 +38,34 @@ alphaTys = mkTyVarTys alphaTyVars
 
 \begin{code}
 -- only used herein
-pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING
-	    -> Int -> ([PrimRep] -> PrimRep) -> TyCon
-pcPrimTyCon key str arity{-UNUSED-} kind_fn{-UNUSED-}
-  = mkPrimTyCon name mkUnboxedTypeKind
+pcPrimTyCon :: Unique{-TyConKey-} -> FAST_STRING -> Int -> PrimRep -> TyCon
+
+pcPrimTyCon key str arity primrep
+  = mkPrimTyCon name (mk_kind arity) primrep
   where
     name = mkBuiltinName key pRELUDE_BUILTIN str
 
+    mk_kind 0 = mkUnboxedTypeKind
+    mk_kind n = mkTypeKind `mkArrowKind` mk_kind (n-1)
+
 
 charPrimTy	= applyTyCon charPrimTyCon []
-charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 (\ [] -> CharRep)
+charPrimTyCon	= pcPrimTyCon charPrimTyConKey SLIT("Char#") 0 CharRep
 
 intPrimTy	= applyTyCon intPrimTyCon []
-intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 (\ [] -> IntRep)
+intPrimTyCon	= pcPrimTyCon intPrimTyConKey SLIT("Int#") 0 IntRep
 
 wordPrimTy	= applyTyCon wordPrimTyCon []
-wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 (\ [] -> WordRep)
+wordPrimTyCon	= pcPrimTyCon wordPrimTyConKey SLIT("Word#") 0 WordRep
 
 addrPrimTy	= applyTyCon addrPrimTyCon []
-addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 (\ [] -> AddrRep)
+addrPrimTyCon	= pcPrimTyCon addrPrimTyConKey SLIT("Addr#") 0 AddrRep
 
 floatPrimTy	= applyTyCon floatPrimTyCon []
-floatPrimTyCon	= pcPrimTyCon floatPrimTyConKey SLIT("Float#") 0 (\ [] -> FloatRep)
+floatPrimTyCon	= pcPrimTyCon floatPrimTyConKey SLIT("Float#") 0 FloatRep
 
 doublePrimTy	= applyTyCon doublePrimTyCon []
-doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 (\ [] -> DoubleRep)
+doublePrimTyCon	= pcPrimTyCon doublePrimTyConKey SLIT("Double#") 0 DoubleRep
 \end{code}
 
 @PrimitiveKinds@ are used in @PrimitiveOps@, for which we often need
@@ -85,32 +88,29 @@ getPrimRepInfo DoubleRep = ("Double", doublePrimTy, doublePrimTyCon)
 
 %************************************************************************
 %*									*
-\subsection[TysPrim-void]{The @Void#@ type}
-%*									*
-%************************************************************************
-
-Very similar to the @State#@ type.
-\begin{code}
-voidPrimTy = applyTyCon voidPrimTyCon []
-  where
-   voidPrimTyCon = pcPrimTyCon voidPrimTyConKey SLIT("Void#") 0
-			(\ [] -> VoidRep)
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection[TysPrim-state]{The @State#@ type (and @_RealWorld@ types)}
 %*									*
 %************************************************************************
 
+State# is the primitive, unboxed type of states.  It has one type parameter,
+thus
+	State# RealWorld
+or
+	State# s
+
+where s is a type variable. The only purpose of the type parameter is to
+keep different state threads separate.  It is represented by nothing at all.
+
 \begin{code}
 mkStatePrimTy ty = applyTyCon statePrimTyCon [ty]
-statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1
-			(\ [s_kind] -> VoidRep)
+statePrimTyCon	 = pcPrimTyCon statePrimTyConKey SLIT("State#") 1 VoidRep
 \end{code}
 
 @_RealWorld@ is deeply magical.  It {\em is primitive}, but it
 {\em is not unboxed}.
+We never manipulate values of type RealWorld; it's only used in the type
+system, to parameterise State#.
+
 \begin{code}
 realWorldTy = applyTyCon realWorldTyCon []
 realWorldTyCon
@@ -136,17 +136,13 @@ defined in \tr{TysWiredIn.lhs}, not here.
 %************************************************************************
 
 \begin{code}
-arrayPrimTyCon	= pcPrimTyCon arrayPrimTyConKey SLIT("Array#") 1
-			(\ [elt_kind] -> ArrayRep)
+arrayPrimTyCon	= pcPrimTyCon arrayPrimTyConKey SLIT("Array#") 1 ArrayRep
 
-byteArrayPrimTyCon = pcPrimTyCon byteArrayPrimTyConKey SLIT("ByteArray#") 0
-			(\ [] -> ByteArrayRep)
+byteArrayPrimTyCon = pcPrimTyCon byteArrayPrimTyConKey SLIT("ByteArray#") 0 ByteArrayRep
 
-mutableArrayPrimTyCon = pcPrimTyCon mutableArrayPrimTyConKey SLIT("MutableArray#") 2
-			(\ [s_kind, elt_kind] -> ArrayRep)
+mutableArrayPrimTyCon = pcPrimTyCon mutableArrayPrimTyConKey SLIT("MutableArray#") 2 ArrayRep
 
-mutableByteArrayPrimTyCon = pcPrimTyCon mutableByteArrayPrimTyConKey SLIT("MutableByteArray#") 1
-			(\ [s_kind] -> ByteArrayRep)
+mutableByteArrayPrimTyCon = pcPrimTyCon mutableByteArrayPrimTyConKey SLIT("MutableByteArray#") 1 ByteArrayRep
 
 mkArrayPrimTy elt    	    = applyTyCon arrayPrimTyCon [elt]
 byteArrayPrimTy	    	    = applyTyCon byteArrayPrimTyCon []
@@ -161,8 +157,7 @@ mkMutableByteArrayPrimTy s  = applyTyCon mutableByteArrayPrimTyCon [s]
 %************************************************************************
 
 \begin{code}
-synchVarPrimTyCon = pcPrimTyCon synchVarPrimTyConKey SLIT("SynchVar#") 2
-			(\ [s_kind, elt_kind] -> PtrRep)
+synchVarPrimTyCon = pcPrimTyCon synchVarPrimTyConKey SLIT("SynchVar#") 2 PtrRep
 
 mkSynchVarPrimTy s elt 	    = applyTyCon synchVarPrimTyCon [s, elt]
 \end{code}
@@ -174,8 +169,7 @@ mkSynchVarPrimTy s elt 	    = applyTyCon synchVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
-stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConKey SLIT("StablePtr#") 1
-			(\ [elt_kind] -> StablePtrRep)
+stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConKey SLIT("StablePtr#") 1 StablePtrRep
 
 mkStablePtrPrimTy ty = applyTyCon stablePtrPrimTyCon [ty]
 \end{code}
@@ -202,6 +196,5 @@ could possibly be added?)
 
 \begin{code}
 foreignObjPrimTy    = applyTyCon foreignObjPrimTyCon []
-foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0
-			(\ [] -> ForeignObjRep)
+foreignObjPrimTyCon = pcPrimTyCon foreignObjPrimTyConKey SLIT("ForeignObj#") 0 ForeignObjRep
 \end{code}

@@ -67,9 +67,9 @@ module IdInfo (
 
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
-import IdLoop		-- IdInfo is a dependency-loop ranch, and
+IMPORT_DELOOPER(IdLoop)		-- IdInfo is a dependency-loop ranch, and
 			-- we break those loops by using IdLoop and
 			-- *not* importing much of anything else,
 			-- except from the very general "utils".
@@ -77,6 +77,7 @@ import IdLoop		-- IdInfo is a dependency-loop ranch, and
 import CmdLineOpts	( opt_OmitInterfacePragmas )
 import Maybes		( firstJust )
 import MatchEnv		( nullMEnv, isEmptyMEnv, mEnvToList )
+import OccurAnal	( occurAnalyseGlobalExpr )
 import Outputable	( ifPprInterface, Outputable(..){-instances-} )
 import PprStyle		( PprStyle(..) )
 import Pretty
@@ -84,10 +85,13 @@ import SrcLoc		( mkUnknownSrcLoc )
 import Type		( eqSimpleTy, splitFunTyExpandingDicts )
 import Util		( mapAccumL, panic, assertPanic, pprPanic )
 
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+#endif
+
 applySubstToTy = panic "IdInfo.applySubstToTy"
 showTypeCategory = panic "IdInfo.showTypeCategory"
 mkFormSummary = panic "IdInfo.mkFormSummary"
-occurAnalyseGlobalExpr = panic "IdInfo.occurAnalyseGlobalExpr"
 isWrapperFor = panic "IdInfo.isWrapperFor"
 pprCoreUnfolding = panic "IdInfo.pprCoreUnfolding"
 \end{code}
@@ -607,7 +611,11 @@ as the worker requires.  Hence we have to give up altogether, and call
 the wrapper only; so under these circumstances we return \tr{False}.
 
 \begin{code}
+#ifdef REALLY_HASKELL_1_3
+instance Read Demand where
+#else
 instance Text Demand where
+#endif
     readList str = read_em [{-acc-}] str
       where
 	read_em acc []		= [(reverse acc, "")]
@@ -626,6 +634,9 @@ instance Text Demand where
 
 	read_em acc other = panic ("IdInfo.readem:"++other)
 
+#ifdef REALLY_HASKELL_1_3
+instance Show Demand where
+#endif
     showList wrap_args rest = (concat (map show1 wrap_args)) ++ rest
       where
 	show1 (WwLazy False) = "L"
@@ -725,7 +736,7 @@ pp_strictness sty for_this_id_maybe better_id_fn inline_env
 
 \begin{code}
 mkUnfolding guide expr
-  = GenForm False (mkFormSummary NoStrictnessInfo expr)
+  = GenForm (mkFormSummary NoStrictnessInfo expr)
 	(occurAnalyseGlobalExpr expr)
 	guide
 \end{code}
@@ -735,8 +746,8 @@ noInfo_UF = NoUnfoldingDetails
 
 getInfo_UF (IdInfo _ _ _ _ unfolding _ _ _ _ _)
   = case unfolding of
-      GenForm _ _ _ BadUnfolding -> NoUnfoldingDetails
-      unfolding_as_was 		     -> unfolding_as_was
+      GenForm _ _ BadUnfolding -> NoUnfoldingDetails
+      unfolding_as_was 	       -> unfolding_as_was
 
 -- getInfo_UF ensures that any BadUnfoldings are never returned
 -- We had to delay the test required in TcPragmas until now due
@@ -757,9 +768,9 @@ pp_unfolding sty for_this_id inline_env uf_details
     pp (MagicForm tag _)
       = ppCat [ppPStr SLIT("_MF_"), ppPStr tag]
 
-    pp (GenForm _ _ _ BadUnfolding) = pp_NONE
+    pp (GenForm _ _ BadUnfolding) = pp_NONE
 
-    pp (GenForm _ _ template guide)
+    pp (GenForm _ template guide)
       = let
 	    untagged = unTagBinders template
 	in
@@ -798,7 +809,11 @@ updateInfoMaybe (SomeUpdateInfo	 u) = Just u
 Text instance so that the update annotations can be read in.
 
 \begin{code}
+#ifdef REALLY_HASKELL_1_3
+instance Read UpdateInfo where
+#else
 instance Text UpdateInfo where
+#endif
     readsPrec p s | null s    = panic "IdInfo: empty update pragma?!"
 		  | otherwise = [(SomeUpdateInfo (map ok_digit s),"")]
       where

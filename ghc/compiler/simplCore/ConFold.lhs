@@ -12,10 +12,10 @@ ToDo:
 
 module ConFold	( completePrim ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
-import CoreUnfold	( UnfoldingDetails(..), FormSummary(..) )
+import CoreUnfold	( whnfDetails, UnfoldingDetails(..), FormSummary(..) )
 import Id		( idType )
 import Literal		( mkMachInt, mkMachWord, Literal(..) )
 import MagicUFs		( MagicUnfoldingFun )
@@ -23,6 +23,11 @@ import PrimOp		( PrimOp(..) )
 import SimplEnv
 import SimplMonad
 import TysWiredIn	( trueDataCon, falseDataCon )
+
+#ifdef REALLY_HASKELL_1_3
+ord = fromEnum :: Char -> Int
+chr = toEnum   :: Int -> Char
+#endif
 \end{code}
 
 \begin{code}
@@ -90,17 +95,10 @@ completePrim env SeqOp [TyArg ty, LitArg lit]
   = returnSmpl (Lit (mkMachInt 1))
 
 completePrim env op@SeqOp args@[TyArg ty, VarArg var]
-  = case (lookupUnfolding env var) of
-      NoUnfoldingDetails     -> give_up
-      LitForm _		     -> hooray
-      OtherLitForm _	     -> hooray
-      ConForm _ _	     -> hooray
-      OtherConForm _	     -> hooray
-      GenForm _ WhnfForm _ _ -> hooray
-      _			     -> give_up
-  where
-    give_up = returnSmpl (Prim op args)
-    hooray  = returnSmpl (Lit (mkMachInt 1))
+  | whnfDetails (lookupUnfolding env var)
+  = returnSmpl (Lit (mkMachInt 1))
+  | otherwise
+  = returnSmpl (Prim op args)
 \end{code}
 
 \begin{code}

@@ -23,26 +23,30 @@ module Inst (
 	zonkInst, instToId,
 
 	matchesInst,
-	instBindingRequired, instCanBeGeneralised
-
+	instBindingRequired, instCanBeGeneralised,
+	
+	pprInst
     ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn	( HsLit(..), HsExpr(..), HsBinds, 
 		  InPat, OutPat, Stmt, Qual, Match,
 		  ArithSeqInfo, PolyType, Fake )
 import RnHsSyn	( RenamedArithSeqInfo(..), RenamedHsExpr(..) )
 import TcHsSyn	( TcIdOcc(..), TcExpr(..), TcIdBndr(..),
-		  mkHsTyApp, mkHsDictApp )
+		  mkHsTyApp, mkHsDictApp, tcIdTyVars )
 
 import TcMonad	hiding ( rnMtoTcM )
-import TcEnv	( tcLookupGlobalValueByKey )
+import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
 import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
 		  tcInstType, zonkTcType )
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
-import Class	( Class(..), GenClass, ClassInstEnv(..), classInstEnv )
+import Class	( isCcallishClass, isNoDictClass, classInstEnv,
+		  Class(..), GenClass, ClassInstEnv(..)
+		)
+import ErrUtils ( addErrLoc, Error(..) )
 import Id	( GenId, idType, mkInstId )
 import MatchEnv	( lookupMEnv, insertMEnv )
 import Name	( mkLocalName, getLocalName, Name )
@@ -55,13 +59,16 @@ import SpecEnv	( SpecEnv(..) )
 import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
 import Type	( GenType, eqSimpleTy, instantiateTy,
 		  isTyVarTy, mkDictTy, splitForAllTy, splitSigmaTy,
-		  splitRhoTy, matchTy, tyVarsOfType, tyVarsOfTypes )
-import TyVar	( GenTyVar )
+		  splitRhoTy, matchTy, tyVarsOfType, tyVarsOfTypes,
+		  mkSynTy
+		)
+import TyVar	( unionTyVarSets, GenTyVar )
 import TysPrim	  ( intPrimTy )
-import TysWiredIn ( intDataCon )
-import Unique	( Unique, showUnique,
-		  fromRationalClassOpKey, fromIntClassOpKey, fromIntegerClassOpKey )
-import Util	( panic, zipEqual, zipWithEqual, assoc, assertPanic )
+import TysWiredIn ( intDataCon, integerTy )
+import Unique	( showUnique, fromRationalClassOpKey, rationalTyConKey,
+		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
+		)
+import Util	( panic, zipEqual, zipWithEqual, assoc, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 %************************************************************************
@@ -178,7 +185,9 @@ newMethod orig id tys
   =   	-- Get the Id type and instantiate it at the specified types
     (case id of
        RealId id -> let (tyvars, rho) = splitForAllTy (idType id)
-		    in tcInstType (zipEqual "newMethod" tyvars tys) rho
+		    in
+		    (if length tyvars /= length tys then pprTrace "newMethod" (ppr PprDebug (idType id)) else \x->x) $
+		    tcInstType (zip{-Equal "newMethod"-} tyvars tys) rho
        TcId   id -> let (tyvars, rho) = splitForAllTy (idType id)
 		    in returnNF_Tc (instantiateTy (zipEqual "newMethod(2)" tyvars tys) rho)
     )						`thenNF_Tc` \ rho_ty ->
@@ -272,7 +281,9 @@ zonkInst (LitInst u lit ty orig loc)
 \begin{code}
 tyVarsOfInst :: Inst s -> TcTyVarSet s
 tyVarsOfInst (Dict _ _ ty _ _)        = tyVarsOfType  ty
-tyVarsOfInst (Method _ _ tys rho _ _) = tyVarsOfTypes tys
+tyVarsOfInst (Method _ id tys rho _ _) = tyVarsOfTypes tys `unionTyVarSets` tcIdTyVars id
+					 -- The id might not be a RealId; in the case of
+					 -- locally-overloaded class methods, for example
 tyVarsOfInst (LitInst _ _ ty _ _)     = tyVarsOfType  ty
 \end{code}
 
@@ -320,19 +331,12 @@ must be witnessed by an actual binding; the second tells whether an
 
 \begin{code}
 instBindingRequired :: Inst s -> Bool
-instBindingRequired inst
-  = case getInstOrigin inst of
-	CCallOrigin _ _   -> False	-- No binding required
-	LitLitOrigin  _   -> False
-	OccurrenceOfCon _ -> False
-	other             -> True
+instBindingRequired (Dict _ clas _ _ _) = not (isNoDictClass clas)
+instBindingRequired other		= True
 
 instCanBeGeneralised :: Inst s -> Bool
-instCanBeGeneralised inst
-  = case getInstOrigin inst of
-	CCallOrigin _ _ -> False	-- Can't be generalised
-	LitLitOrigin  _ -> False	-- Can't be generalised
-	other           -> True
+instCanBeGeneralised (Dict _ clas _ _ _) = not (isCcallishClass clas)
+instCanBeGeneralised other		 = True
 \end{code}
 
 
@@ -343,32 +347,29 @@ relevant in error messages.
 
 \begin{code}
 instance Outputable (Inst s) where
-    ppr sty (LitInst uniq lit ty orig loc)
-      = ppSep [case lit of
-			  OverloadedIntegral   i -> ppInteger i
-			  OverloadedFractional f -> ppRational f,
-	       ppStr "at",
-	       ppr sty ty,
-	       show_uniq sty uniq
-	]
+    ppr sty inst = ppr_inst sty ppNil (\ o l -> ppNil) inst
 
-    ppr sty (Dict uniq clas ty orig loc)
-      = ppSep [ppr sty clas, 
-	       ppStr "at",
-	       ppr sty ty,
-	       show_uniq sty uniq
-	]
+pprInst sty hdr inst = ppr_inst sty hdr (\ o l -> pprOrigin hdr o l sty) inst
 
-    ppr sty (Method uniq id tys rho orig loc)
-      = ppSep [ppr sty id, 
-	       ppStr "at",
-	       ppr sty tys,
-	       show_uniq sty uniq
-	]
+ppr_inst sty hdr ppr_orig (LitInst u lit ty orig loc)
+  = ppHang (ppr_orig orig loc)
+	 4 (ppCat [case lit of
+		      OverloadedIntegral   i -> ppInteger i
+		      OverloadedFractional f -> ppRational f,
+		   ppStr "at",
+		   ppr sty ty,
+		   show_uniq sty u])
 
-show_uniq PprDebug uniq = ppr PprDebug uniq
-show_uniq sty	   uniq = ppNil
+ppr_inst sty hdr ppr_orig (Dict u clas ty orig loc)
+  = ppHang (ppr_orig orig loc)
+	 4 (ppCat [ppr sty clas, ppr sty ty, show_uniq sty u])
 
+ppr_inst sty hdr ppr_orig (Method u id tys rho orig loc)
+  = ppHang (ppr_orig orig loc)
+	 4 (ppCat [ppr sty id, ppStr "at", interppSP sty tys, show_uniq sty u])
+
+show_uniq PprDebug u = ppr PprDebug u
+show_uniq sty	   u = ppNil
 \end{code}
 
 Printing in error messages
@@ -412,7 +413,7 @@ lookupInst :: Inst s
 lookupInst dict@(Dict _ clas ty orig loc)
   = case lookupMEnv matchTy (get_inst_env clas orig) ty of
       Nothing	-> tcAddSrcLoc loc		 $
-		   tcAddErrCtxt (pprOrigin orig) $
+		   tcAddErrCtxt (pprOrigin ""{-hdr-} orig loc) $
 		   failTc (noInstanceErr dict)
 
       Just (dfun_id, tenv) 
@@ -453,15 +454,22 @@ lookupInst inst@(LitInst u (OverloadedIntegral i) ty orig loc)
   =     -- Alas, it is overloaded and a big literal!
     tcLookupGlobalValueByKey fromIntegerClassOpKey	`thenNF_Tc` \ from_integer ->
     newMethodAtLoc orig loc from_integer [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) (HsLitOut (HsInt i) ty)))
+    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) (HsLitOut (HsInt i) integerTy)))
   where
     intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
     int_lit        = HsApp (HsVar (RealId intDataCon)) intprim_lit
 
 lookupInst inst@(LitInst u (OverloadedFractional f) ty orig loc)
   = tcLookupGlobalValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
+
+	-- The type Rational isn't wired in so we have to conjure it up
+    tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
+    let
+	rational_ty  = mkSynTy rational_tycon []
+	rational_lit = HsLitOut (HsFrac f) rational_ty
+    in
     newMethodAtLoc orig loc from_rational [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
-    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) (HsLitOut (HsFrac f) ty)))
+    returnTc ([method_inst], (instToId inst, HsApp (HsVar method_id) rational_lit))
 \end{code}
 
 There is a second, simpler interface, when you want an instance of a
@@ -611,51 +619,43 @@ get_inst_env clas (InstanceSpecOrigin inst_mapper _ _)
 get_inst_env clas other_orig = classInstEnv clas
 
 
-pprOrigin :: InstOrigin s -> PprStyle -> Pretty
+pprOrigin :: String -> InstOrigin s -> SrcLoc -> Error
 
-pprOrigin (OccurrenceOf id) sty
-      = ppBesides [ppPStr SLIT("at a use of an overloaded identifier: `"),
+pprOrigin hdr orig locn
+  = addErrLoc locn hdr $ \ sty ->
+    case orig of
+      OccurrenceOf id ->
+        ppBesides [ppPStr SLIT("at a use of an overloaded identifier: `"),
 		   ppr sty id, ppChar '\'']
-pprOrigin (OccurrenceOfCon id) sty
-      = ppBesides [ppPStr SLIT("at a use of an overloaded constructor: `"),
+      OccurrenceOfCon id ->
+        ppBesides [ppPStr SLIT("at a use of an overloaded constructor: `"),
 		   ppr sty id, ppChar '\'']
-pprOrigin (InstanceDeclOrigin) sty
-      = ppStr "in an instance declaration"
-pprOrigin (LiteralOrigin lit) sty
-      = ppCat [ppStr "at an overloaded literal:", ppr sty lit]
-pprOrigin (ArithSeqOrigin seq) sty
-      = ppCat [ppStr "at an arithmetic sequence:", ppr sty seq]
-pprOrigin (SignatureOrigin) sty
-      = ppStr "in a type signature"
-pprOrigin (DoOrigin) sty
-      = ppStr "in a do statement"
-pprOrigin (ClassDeclOrigin) sty
-      = ppStr "in a class declaration"
--- pprOrigin (DerivingOrigin _ clas tycon) sty
---      = ppBesides [ppStr "in a `deriving' clause; class `",
---			  ppr sty clas,
---			  ppStr "'; offending type `",
---		          ppr sty tycon,
---			  ppStr "'"]
-pprOrigin (InstanceSpecOrigin _ clas ty) sty
-      = ppBesides [ppStr "in a SPECIALIZE instance pragma; class \"",
+      InstanceDeclOrigin ->
+	ppStr "in an instance declaration"
+      LiteralOrigin lit ->
+	ppCat [ppStr "at an overloaded literal:", ppr sty lit]
+      ArithSeqOrigin seq ->
+	ppCat [ppStr "at an arithmetic sequence:", ppr sty seq]
+      SignatureOrigin ->
+	ppStr "in a type signature"
+      DoOrigin ->
+	ppStr "in a do statement"
+      ClassDeclOrigin ->
+	ppStr "in a class declaration"
+      InstanceSpecOrigin _ clas ty ->
+	ppBesides [ppStr "in a SPECIALIZE instance pragma; class \"",
 	 	   ppr sty clas, ppStr "\" type: ", ppr sty ty]
--- pprOrigin (DefaultDeclOrigin) sty
---      = ppStr "in a `default' declaration"
-pprOrigin (ValSpecOrigin name) sty
-      = ppBesides [ppStr "in a SPECIALIZE user-pragma for `",
+      ValSpecOrigin name ->
+	ppBesides [ppStr "in a SPECIALIZE user-pragma for `",
 		   ppr sty name, ppStr "'"]
-pprOrigin (CCallOrigin clabel Nothing{-ccall result-}) sty
-      = ppBesides [ppStr "in the result of the _ccall_ to `",
+      CCallOrigin clabel Nothing{-ccall result-} ->
+	ppBesides [ppStr "in the result of the _ccall_ to `",
 		   ppStr clabel, ppStr "'"]
-pprOrigin (CCallOrigin clabel (Just arg_expr)) sty
-      = ppBesides [ppStr "in an argument in the _ccall_ to `",
+      CCallOrigin clabel (Just arg_expr) ->
+	ppBesides [ppStr "in an argument in the _ccall_ to `",
 		  ppStr clabel, ppStr "', namely: ", ppr sty arg_expr]
-pprOrigin (LitLitOrigin s) sty
-      = ppBesides [ppStr "in this ``literal-literal'': ", ppStr s]
-pprOrigin UnknownOrigin sty
-      = ppStr "in... oops -- I don't know where the overloading came from!"
+      LitLitOrigin s ->
+	ppBesides [ppStr "in this ``literal-literal'': ", ppStr s]
+      UnknownOrigin ->
+	ppStr "in... oops -- I don't know where the overloading came from!"
 \end{code}
-
-
-

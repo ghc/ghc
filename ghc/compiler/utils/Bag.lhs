@@ -4,6 +4,8 @@
 \section[Bags]{@Bag@: an unordered collection with duplicates}
 
 \begin{code}
+#include "HsVersions.h"
+
 module Bag (
 	Bag,	-- abstract type
 
@@ -15,7 +17,8 @@ module Bag (
     ) where
 
 #ifdef COMPILING_GHC
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(partition))
 
 import Outputable	( interpp'SP )
 import Pretty

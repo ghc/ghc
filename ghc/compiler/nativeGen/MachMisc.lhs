@@ -41,9 +41,9 @@ module MachMisc (
 #endif
     ) where
 
-import Ubiq{-uitous-}
-import AbsCLoop		( fixedHdrSizeInWords, varHdrSizeInWords ) -- paranoia
-import NcgLoop		( underscorePrefix, fmtAsmLbl ) -- paranoia
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords ) -- paranoia
+IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl ) -- paranoia
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )

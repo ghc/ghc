@@ -63,17 +63,12 @@ module FiniteMap (
 	, FiniteSet(..), emptySet, mkSet, isEmptySet
 	, elementOf, setToList, union, minusSet
 #endif
-
-	-- To make it self-sufficient
-#if __HASKELL1__ < 3
-	, Maybe
-#endif
     ) where
 
 import Maybes
 
 #ifdef COMPILING_GHC
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 # ifdef DEBUG
 import Pretty
 # endif
@@ -757,97 +752,65 @@ When the FiniteMap module is used in GHC, we specialise it for
 \tr{Uniques}, for dastardly efficiency reasons.
 
 \begin{code}
-#if 0
-#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__
+#if defined(COMPILING_GHC) && __GLASGOW_HASKELL__ && !defined(REALLY_HASKELL_1_3)
 
+{-# SPECIALIZE addListToFM
+		:: FiniteMap (FAST_STRING, FAST_STRING) elt -> [((FAST_STRING, FAST_STRING),elt)] -> FiniteMap (FAST_STRING, FAST_STRING) elt
+    IF_NCG(COMMA   FiniteMap Reg elt -> [(Reg COMMA elt)] -> FiniteMap Reg elt)
+    #-}
+{-# SPECIALIZE addListToFM_C
+		:: (elt -> elt -> elt) -> FiniteMap TyCon elt -> [(TyCon,elt)] -> FiniteMap TyCon elt,
+		   (elt -> elt -> elt) -> FiniteMap FAST_STRING elt -> [(FAST_STRING,elt)] -> FiniteMap FAST_STRING elt
+    IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> [(Reg COMMA elt)] -> FiniteMap Reg elt)
+    #-}
+{-# SPECIALIZE addToFM
+		:: FiniteMap CLabel elt -> CLabel -> elt  -> FiniteMap CLabel elt,
+		   FiniteMap FAST_STRING elt -> FAST_STRING -> elt  -> FiniteMap FAST_STRING elt,
+		   FiniteMap (FAST_STRING, FAST_STRING) elt -> (FAST_STRING, FAST_STRING) -> elt  -> FiniteMap (FAST_STRING, FAST_STRING) elt,
+		   FiniteMap RdrName elt -> RdrName -> elt  -> FiniteMap RdrName elt
+    IF_NCG(COMMA   FiniteMap Reg elt -> Reg -> elt  -> FiniteMap Reg elt)
+    #-}
+{-# SPECIALIZE addToFM_C
+		:: (elt -> elt -> elt) -> FiniteMap (RdrName, RdrName) elt -> (RdrName, RdrName) -> elt -> FiniteMap (RdrName, RdrName) elt,
+		   (elt -> elt -> elt) -> FiniteMap FAST_STRING elt -> FAST_STRING -> elt -> FiniteMap FAST_STRING elt
+    IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> Reg -> elt -> FiniteMap Reg elt)
+    #-}
+{-# SPECIALIZE bagToFM
+		:: Bag (FAST_STRING,elt) -> FiniteMap FAST_STRING elt
+    #-}
+{-# SPECIALIZE delListFromFM
+		:: FiniteMap RdrName elt -> [RdrName]   -> FiniteMap RdrName elt,
+		   FiniteMap FAST_STRING elt -> [FAST_STRING]   -> FiniteMap FAST_STRING elt
+    IF_NCG(COMMA   FiniteMap Reg elt -> [Reg]   -> FiniteMap Reg elt)
+    #-}
 {-# SPECIALIZE listToFM
-		:: [(Int,elt)] -> FiniteMap Int elt,
-		   [(CLabel,elt)] -> FiniteMap CLabel elt,
+		:: [([Char],elt)] -> FiniteMap [Char] elt,
 		   [(FAST_STRING,elt)] -> FiniteMap FAST_STRING elt,
 		   [((FAST_STRING,FAST_STRING),elt)] -> FiniteMap (FAST_STRING, FAST_STRING) elt
     IF_NCG(COMMA   [(Reg COMMA elt)] -> FiniteMap Reg elt)
     #-}
-{-# SPECIALIZE addToFM
-		:: FiniteMap Int elt -> Int -> elt  -> FiniteMap Int elt,
-		   FiniteMap FAST_STRING elt -> FAST_STRING -> elt  -> FiniteMap FAST_STRING elt,
-		   FiniteMap CLabel elt -> CLabel -> elt  -> FiniteMap CLabel elt
-    IF_NCG(COMMA   FiniteMap Reg elt -> Reg -> elt  -> FiniteMap Reg elt)
-    #-}
-{-# SPECIALIZE addListToFM
-		:: FiniteMap Int elt -> [(Int,elt)] -> FiniteMap Int elt,
-		   FiniteMap CLabel elt -> [(CLabel,elt)] -> FiniteMap CLabel elt
-    IF_NCG(COMMA   FiniteMap Reg elt -> [(Reg COMMA elt)] -> FiniteMap Reg elt)
-    #-}
-{-NOT EXPORTED!! # SPECIALIZE addToFM_C
-		:: (elt -> elt -> elt) -> FiniteMap Int elt -> Int -> elt -> FiniteMap Int elt,
-		   (elt -> elt -> elt) -> FiniteMap CLabel elt -> CLabel -> elt -> FiniteMap CLabel elt
-    IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> Reg -> elt -> FiniteMap Reg elt)
-    #-}
-{-# SPECIALIZE addListToFM_C
-		:: (elt -> elt -> elt) -> FiniteMap Int elt -> [(Int,elt)] -> FiniteMap Int elt,
-		   (elt -> elt -> elt) -> FiniteMap TyCon elt -> [(TyCon,elt)] -> FiniteMap TyCon elt,
-		   (elt -> elt -> elt) -> FiniteMap CLabel elt -> [(CLabel,elt)] -> FiniteMap CLabel elt
-    IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> [(Reg COMMA elt)] -> FiniteMap Reg elt)
-    #-}
-{-NOT EXPORTED!!! # SPECIALIZE delFromFM
-		:: FiniteMap Int elt -> Int   -> FiniteMap Int elt,
-		   FiniteMap CLabel elt -> CLabel   -> FiniteMap CLabel elt
-    IF_NCG(COMMA   FiniteMap Reg elt -> Reg   -> FiniteMap Reg elt)
-    #-}
-{-# SPECIALIZE delListFromFM
-		:: FiniteMap Int elt -> [Int] -> FiniteMap Int elt,
-		   FiniteMap CLabel elt -> [CLabel] -> FiniteMap CLabel elt
-    IF_NCG(COMMA   FiniteMap Reg elt -> [Reg] -> FiniteMap Reg elt)
-    #-}
-{-# SPECIALIZE elemFM
-		:: FAST_STRING -> FiniteMap FAST_STRING elt -> Bool
-    #-}
-{-not EXPORTED!!! # SPECIALIZE filterFM
-		:: (Int -> elt -> Bool) -> FiniteMap Int elt -> FiniteMap Int elt,
-		   (CLabel -> elt -> Bool) -> FiniteMap CLabel elt -> FiniteMap CLabel elt
-    IF_NCG(COMMA   (Reg -> elt -> Bool) -> FiniteMap Reg elt -> FiniteMap Reg elt)
-    #-}
-{-NOT EXPORTED!!! # SPECIALIZE intersectFM
-		:: FiniteMap Int elt -> FiniteMap Int elt -> FiniteMap Int elt,
-		   FiniteMap CLabel elt -> FiniteMap CLabel elt -> FiniteMap CLabel elt
-    IF_NCG(COMMA   FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
-    #-}
-{-not EXPORTED !!!# SPECIALIZE intersectFM_C
-		:: (elt -> elt -> elt) -> FiniteMap Int elt -> FiniteMap Int elt -> FiniteMap Int elt,
-		   (elt -> elt -> elt) -> FiniteMap CLabel elt -> FiniteMap CLabel elt -> FiniteMap CLabel elt
-    IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
-    #-}
 {-# SPECIALIZE lookupFM
-		:: FiniteMap Int elt -> Int -> Maybe elt,
-		   FiniteMap CLabel elt -> CLabel -> Maybe elt,
+		:: FiniteMap CLabel elt -> CLabel -> Maybe elt,
+		   FiniteMap [Char] elt -> [Char] -> Maybe elt,
 		   FiniteMap FAST_STRING elt -> FAST_STRING -> Maybe elt,
-		   FiniteMap (FAST_STRING,FAST_STRING) elt -> (FAST_STRING,FAST_STRING) -> Maybe elt
+		   FiniteMap (FAST_STRING,FAST_STRING) elt -> (FAST_STRING,FAST_STRING) -> Maybe elt,
+		   FiniteMap RdrName elt -> RdrName -> Maybe elt,
+		   FiniteMap (RdrName,RdrName) elt -> (RdrName,RdrName) -> Maybe elt
     IF_NCG(COMMA   FiniteMap Reg elt -> Reg -> Maybe elt)
     #-}
 {-# SPECIALIZE lookupWithDefaultFM
-		:: FiniteMap Int elt -> elt -> Int -> elt,
-		   FiniteMap CLabel elt -> elt -> CLabel -> elt
+		:: FiniteMap FAST_STRING elt -> elt -> FAST_STRING -> elt
     IF_NCG(COMMA   FiniteMap Reg elt -> elt -> Reg -> elt)
     #-}
-{-# SPECIALIZE minusFM
-		:: FiniteMap Int elt -> FiniteMap Int elt -> FiniteMap Int elt,
-		   FiniteMap TyCon elt -> FiniteMap TyCon elt -> FiniteMap TyCon elt,
-		   FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt,
-		   FiniteMap CLabel elt -> FiniteMap CLabel elt -> FiniteMap CLabel elt
-    IF_NCG(COMMA   FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
-    #-}
 {-# SPECIALIZE plusFM
-		:: FiniteMap Int elt -> FiniteMap Int elt -> FiniteMap Int elt,
-		   FiniteMap TyCon elt -> FiniteMap TyCon elt -> FiniteMap TyCon elt,
-		   FiniteMap CLabel elt -> FiniteMap CLabel elt -> FiniteMap CLabel elt
+		:: FiniteMap RdrName elt -> FiniteMap RdrName elt -> FiniteMap RdrName elt,
+		   FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt
     IF_NCG(COMMA   FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
     #-}
 {-# SPECIALIZE plusFM_C
-		:: (elt -> elt -> elt) -> FiniteMap Int elt -> FiniteMap Int elt -> FiniteMap Int elt,
-		   (elt -> elt -> elt) -> FiniteMap CLabel elt -> FiniteMap CLabel elt -> FiniteMap CLabel elt
+		:: (elt -> elt -> elt) -> FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt -> FiniteMap FAST_STRING elt
     IF_NCG(COMMA   (elt -> elt -> elt) -> FiniteMap Reg elt -> FiniteMap Reg elt -> FiniteMap Reg elt)
     #-}
 
 #endif {- compiling for GHC -}
-#endif {- 0 -}
 \end{code}

@@ -14,7 +14,7 @@ module Usage (
 	eqUVar, eqUsage
 ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Pretty	( Pretty(..), PrettyRep, ppPStr, ppBeside )
 import UniqFM	( emptyUFM, listToUFM, addToUFM, lookupUFM,

@@ -8,9 +8,7 @@
 
 module Main ( main ) where
 
-import Ubiq{-uitous-}
-
-import PreludeGlaST	( thenPrimIO, fopen, fclose, _FILE{-instance CCallable-} )
+IMP_Ubiq(){-uitous-}
 
 import HsSyn
 
@@ -37,6 +35,7 @@ import RdrHsSyn		( getRawExportees )
 import Specialise	( SpecialiseData(..) )
 import StgSyn		( pprPlainStgBinding, GenStgBinding )
 import TcInstUtil	( InstInfo )
+import TyCon		( isDataTyCon )
 import UniqSupply	( mkSplitUniqSupply )
 
 import PprAbsC		( dumpRealC, writeRealC )
@@ -65,7 +64,7 @@ main
 doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
 
 doIt (core_cmds, stg_cmds) input_pgm
-  = doDump opt_Verbose "Glasgow Haskell Compiler, version 1.01, for Haskell 1.3" "" >>
+  = doDump opt_Verbose "Glasgow Haskell Compiler, version 2.01, for Haskell 1.3" "" >>
 
     -- ******* READER
     show_pass "Reader"	>>
@@ -159,8 +158,8 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     case tc_results
     of {  (typechecked_quint@(recsel_binds, class_binds, inst_binds, val_binds, const_binds),
-	   interface_stuff,
-	   (local_tycons,local_classes), pragma_tycon_specs, ddump_deriv) ->
+	   interface_stuff@(_,local_tycons,_,_),
+	   pragma_tycon_specs, ddump_deriv) ->
 
     doDump opt_D_dump_tc "Typechecked:"
 	(pp_show (ppAboves [
@@ -198,8 +197,11 @@ doIt (core_cmds, stg_cmds) input_pgm
     -- ******* CORE-TO-CORE SIMPLIFICATION (NB: I/O op)
     show_pass "Core2Core" 			>>
     _scc_     "Core2Core"
+    let
+	local_data_tycons = filter isDataTyCon local_tycons
+    in
     core2core core_cmds mod_name pprStyle
-	      sm_uniqs local_tycons pragma_tycon_specs desugared
+	      sm_uniqs local_data_tycons pragma_tycon_specs desugared
 						>>=
 
 	 \ (simplified, inlinings_env,
@@ -312,15 +314,9 @@ doIt (core_cmds, stg_cmds) input_pgm
       = case switch of
 	  Nothing -> return ()
 	  Just fname ->
-	    fopen fname "a+"	`thenPrimIO` \ file ->
-	    if (file == ``NULL'') then
-		error ("doOutput: failed to open:"++fname)
-	    else
-		io_action file		>>=     \ () ->
-		fclose file		`thenPrimIO` \ status ->
-		if status == 0
-		then return ()
-		else error ("doOutput: closed failed: "{-++show status++" "-}++fname)
+	    openFile fname WriteMode	>>= \ handle ->
+	    io_action handle		>>
+	    hClose handle
 
     doDump switch hdr string
       = if switch

@@ -8,7 +8,7 @@
 
 module DsHsSyn where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( OutPat(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Sig, HsExpr, GRHSsAndBinds, Match, HsLit )

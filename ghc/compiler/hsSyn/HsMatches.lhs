@@ -10,9 +10,9 @@ The @Match@, @GRHSsAndBinds@ and @GRHS@ datatypes.
 
 module HsMatches where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
-import HsLoop		( HsExpr, nullBinds, HsBinds )
+IMPORT_DELOOPER(HsLoop)		( HsExpr, nullBinds, HsBinds )
 import Outputable	( ifPprShowAll )
 import PprType		( GenType{-instance Outputable-} )
 import Pretty

@@ -8,7 +8,7 @@
 
 module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatch ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
 			  HsExpr, HsBinds, OutPat, Fake,
@@ -19,7 +19,7 @@ import TcHsSyn		( TcIdOcc(..), TcMatch(..) )
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, LIE(..), plusLIE )
 import TcEnv		( newMonoIds )
-import TcLoop		( tcGRHSsAndBinds )
+IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcPat		( tcPat )
 import TcType		( TcType(..), TcMaybe, zonkTcType )
 import Unify		( unifyTauTy, unifyTauTyList )

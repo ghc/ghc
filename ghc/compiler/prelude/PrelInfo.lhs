@@ -15,8 +15,8 @@ module PrelInfo (
 	maybeCharLikeTyCon, maybeIntLikeTyCon
     ) where
 
-import Ubiq
-import PrelLoop		( primOpNameInfo )
+IMP_Ubiq()
+IMPORT_DELOOPER(PrelLoop)		( primOpNameInfo )
 
 -- friends:
 import PrelMods		-- Prelude module names
@@ -119,8 +119,7 @@ builtinNameInfo
 	    -- tycons
 	    map pcTyConWiredInInfo prim_tycons,
 	    map pcTyConWiredInInfo g_tycons,
-	    map pcTyConWiredInInfo data_tycons,
-	    map pcTyConWiredInInfo synonym_tycons
+	    map pcTyConWiredInInfo data_tycons
 	  ]
 
     assoc_keys
@@ -174,13 +173,11 @@ g_con_tycons
 
 min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
   = [ boolTyCon
-    , orderingTyCon
     , charTyCon
     , intTyCon
     , floatTyCon
     , doubleTyCon
     , integerTyCon
-    , ratioTyCon
     , liftTyCon
     , return2GMPsTyCon	-- ADR asked for these last two (WDP 94/11)
     , returnIntAndGMPTyCon
@@ -191,16 +188,16 @@ data_tycons
   = [ addrTyCon
     , boolTyCon
     , charTyCon
-    , orderingTyCon
     , doubleTyCon
     , floatTyCon
+    , foreignObjTyCon
     , intTyCon
     , integerTyCon
     , liftTyCon
-    , foreignObjTyCon
-    , ratioTyCon
+    , primIoTyCon
     , return2GMPsTyCon
     , returnIntAndGMPTyCon
+    , stTyCon
     , stablePtrTyCon
     , stateAndAddrPrimTyCon
     , stateAndArrayPrimTyCon
@@ -208,23 +205,16 @@ data_tycons
     , stateAndCharPrimTyCon
     , stateAndDoublePrimTyCon
     , stateAndFloatPrimTyCon
-    , stateAndIntPrimTyCon
     , stateAndForeignObjPrimTyCon
+    , stateAndIntPrimTyCon
     , stateAndMutableArrayPrimTyCon
     , stateAndMutableByteArrayPrimTyCon
-    , stateAndSynchVarPrimTyCon
     , stateAndPtrPrimTyCon
     , stateAndStablePtrPrimTyCon
+    , stateAndSynchVarPrimTyCon
     , stateAndWordPrimTyCon
     , stateTyCon
     , wordTyCon
-    ]
-
-synonym_tycons
-  = [ primIoTyCon
-    , rationalTyCon
-    , stTyCon
-    , stringTyCon
     ]
 \end{code}
 
@@ -318,12 +308,28 @@ For the Ids we may also have some builtin IdInfo.
 \begin{code}
 id_keys_infos :: [((FAST_STRING,Module), Unique, Maybe IdInfo)]
 id_keys_infos
-  = [ ((SLIT("main"),SLIT("Main")),	  mainIdKey,	   Nothing)
+  = [ -- here so we can check the type of main/mainPrimIO
+      ((SLIT("main"),SLIT("Main")),	  mainIdKey,	   Nothing)
     , ((SLIT("mainPrimIO"),SLIT("Main")), mainPrimIOIdKey, Nothing)
+
+      -- here because we use them in derived instances
+    , ((SLIT("&&"), 	     pRELUDE),	andandIdKey,	Nothing)
+    , ((SLIT("."),  	     pRELUDE),	composeIdKey,	Nothing)
+    , ((SLIT("lex"), 	     pRELUDE),	lexIdKey,	Nothing)
+    , ((SLIT("not"), 	     pRELUDE),	notIdKey,	Nothing)
+    , ((SLIT("readParen"),   pRELUDE),	readParenIdKey,	Nothing)
+    , ((SLIT("showParen"),   pRELUDE),	showParenIdKey,	Nothing)
+    , ((SLIT("showString"),  pRELUDE),	showStringIdKey,Nothing)
+    , ((SLIT("__readList"),  pRELUDE),	ureadListIdKey,	Nothing)
+    , ((SLIT("__showList"),  pRELUDE),	ushowListIdKey,	Nothing)
+    , ((SLIT("__showSpace"), pRELUDE),	showSpaceIdKey,	Nothing)
     ]
 
 tysyn_keys
-  = [ ((SLIT("IO"),pRELUDE), (iOTyConKey, RnImplicitTyCon))
+  = [ ((SLIT("IO"),pRELUDE),       (iOTyConKey, RnImplicitTyCon))
+    , ((SLIT("Rational"),rATIO),   (rationalTyConKey, RnImplicitTyCon))
+    , ((SLIT("Ratio"),rATIO),      (ratioTyConKey, RnImplicitTyCon))
+    , ((SLIT("Ordering"),pRELUDE), (orderingTyConKey, RnImplicitTyCon))
     ]
 
 -- this "class_keys" list *must* include:
@@ -351,8 +357,8 @@ class_keys
     , ((SLIT("MonadZero"),pRELUDE),	monadZeroClassKey)
     , ((SLIT("MonadPlus"),pRELUDE),	monadPlusClassKey)
     , ((SLIT("Functor"),pRELUDE),	functorClassKey)
-    , ((SLIT("CCallable"),pRELUDE),	cCallableClassKey)	-- mentioned, ccallish
-    , ((SLIT("CReturnable"),pRELUDE), 	cReturnableClassKey)	-- mentioned, ccallish
+    , ((SLIT("_CCallable"),pRELUDE),	cCallableClassKey)	-- mentioned, ccallish
+    , ((SLIT("_CReturnable"),pRELUDE), 	cReturnableClassKey)	-- mentioned, ccallish
     ]]
 
 class_op_keys
@@ -365,6 +371,8 @@ class_op_keys
     , ((SLIT("enumFromTo"),pRELUDE),	enumFromToClassOpKey)
     , ((SLIT("enumFromThenTo"),pRELUDE),enumFromThenToClassOpKey)
     , ((SLIT("=="),pRELUDE),		eqClassOpKey)
+    , ((SLIT(">>="),pRELUDE),		thenMClassOpKey)
+    , ((SLIT("zero"),pRELUDE),		zeroClassOpKey)
     ]]
 \end{code}
 

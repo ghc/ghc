@@ -4,10 +4,12 @@
 \section[TcGRHSs]{Typecheck guarded right-hand-sides}
 
 \begin{code}
+#include "HsVersions.h"
+
 module TcGRHSs ( tcGRHSsAndBinds ) where
 
-import Ubiq{-uitous-}
-import TcLoop -- for paranoia checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(TcLoop) -- for paranoia checking
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 			  HsExpr, HsBinds(..), InPat, OutPat, Bind, Sig, Fake )

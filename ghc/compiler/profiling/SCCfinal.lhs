@@ -27,7 +27,7 @@ This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 
 module SCCfinal ( stgMassageForProfiling ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import StgSyn
 

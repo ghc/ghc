@@ -8,7 +8,7 @@
 
 module TcDefaults ( tcDefaults ) where
 
-import Ubiq
+IMP_Ubiq()
 
 import HsSyn		( DefaultDecl(..), MonoType,
 			  HsExpr, HsLit, ArithSeqInfo, Fake, InPat)

@@ -17,7 +17,7 @@ module SMRep (
 	isIntLikeRep
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Pretty		( ppStr )
 import Util		( panic )

@@ -8,8 +8,8 @@
 
 module HsExpr where
 
-import Ubiq{-uitous-}
-import HsLoop -- for paranoia checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(HsLoop) -- for paranoia checking
 
 -- friends:
 import HsBinds		( HsBinds )
@@ -84,8 +84,9 @@ data HsExpr tyvar uvar id pat
   | HsDo	[Stmt tyvar uvar id pat]	-- "do":one or more stmts
 		SrcLoc
 
-  | HsDoOut	[Stmt tyvar uvar id pat]	-- "do":one or more stmts
-		id id				-- Monad and MonadZero dicts
+  | HsDoOut	[Stmt   tyvar uvar id pat]	-- "do":one or more stmts
+		id				-- id for >>=,  types applied
+		id				-- id for zero, typed applied
 		SrcLoc
 
   | ListComp	(HsExpr tyvar uvar id pat)	-- list comprehension
@@ -278,9 +279,9 @@ pprExpr sty (HsLet binds expr)
 	   ppHang (ppPStr SLIT("in"))  2 (ppr sty expr)]
 
 pprExpr sty (HsDo stmts _)
-  = ppCat [ppPStr SLIT("do"), ppAboves (map (ppr sty) stmts)]
+  = ppHang (ppPStr SLIT("do")) 2 (ppAboves (map (ppr sty) stmts))
 pprExpr sty (HsDoOut stmts _ _ _)
-  = ppCat [ppPStr SLIT("do"), ppAboves (map (ppr sty) stmts)]
+  = ppHang (ppPStr SLIT("do")) 2 (ppAboves (map (ppr sty) stmts))
 
 pprExpr sty (ListComp expr quals)
   = ppHang (ppCat [ppLbrack, pprExpr sty expr, ppChar '|'])
@@ -304,8 +305,8 @@ pprExpr sty (RecordUpdOut aexp _ rbinds)
   = pp_rbinds sty (pprParendExpr sty aexp) rbinds
 
 pprExpr sty (ExprWithTySig expr sig)
-  = ppHang (ppBesides [ppLparen, ppNest 2 (pprExpr sty expr), ppPStr SLIT(" ::")])
-	 4 (ppBeside  (ppr sty sig) ppRparen)
+  = ppHang (ppBeside (ppNest 2 (pprExpr sty expr)) (ppPStr SLIT(" ::")))
+	 4 (ppr sty sig)
 
 pprExpr sty (ArithSeqIn info)
   = ppBracket (ppr sty info)
@@ -421,6 +422,10 @@ data Stmt tyvar uvar id pat
   | ExprStmt	(HsExpr  tyvar uvar id pat)
 		SrcLoc
   | LetStmt	(HsBinds tyvar uvar id pat)
+ 
+	-- Translations; the types are the "a" and "b" types of the monad.
+  | BindStmtOut	pat (HsExpr tyvar uvar id pat) SrcLoc (GenType tyvar uvar) (GenType tyvar uvar)
+  | ExprStmtOut	(HsExpr tyvar uvar id pat)     SrcLoc (GenType tyvar uvar) (GenType tyvar uvar)
 \end{code}
 
 \begin{code}
@@ -432,6 +437,10 @@ instance (NamedThing id, Outputable id, Outputable pat,
     ppr sty (LetStmt binds)
      = ppCat [ppPStr SLIT("let"), ppr sty binds]
     ppr sty (ExprStmt expr _)
+     = ppr sty expr
+    ppr sty (BindStmtOut pat expr _ _ _)
+     = ppCat [ppr sty pat, ppStr "<-", ppr sty expr]
+    ppr sty (ExprStmtOut expr _ _ _)
      = ppr sty expr
 \end{code}
 

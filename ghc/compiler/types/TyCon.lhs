@@ -28,7 +28,9 @@ module TyCon(
 	tyConDataCons,
 	tyConFamilySize,
 	tyConDerivings,
-	tyConArity, synTyConArity,
+	tyConTheta,
+	tyConPrimRep,
+	synTyConArity,
 	getSynTyConDefn,
 
         maybeTyConSingleCon,
@@ -38,10 +40,10 @@ module TyCon(
 
 CHK_Ubiq()	-- debugging consistency check
 
-import TyLoop		( Type(..), GenType,
+IMPORT_DELOOPER(TyLoop)		( Type(..), GenType,
 			  Class(..), GenClass,
 			  Id(..), GenId,
-			  mkTupleCon, dataConSig,
+			  mkTupleCon, isNullaryDataCon,
 			  specMaybeTysSuffix
 			)
 
@@ -55,6 +57,7 @@ import Name		( Name, RdrName(..), appendRdr, nameUnique,
 			)
 import Unique		( Unique, funTyConKey, mkTupleTyConUnique )
 import Pretty		( Pretty(..), PrettyRep )
+import PrimRep		( PrimRep(..) )
 import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import Util		( panic, panic#, pprPanic{-ToDo:rm-}, nOfThem, isIn, Ord3(..) )
 import {-hide me-}
@@ -91,6 +94,7 @@ data TyCon
 	Unique		-- Always unboxed; hence never represented by a closure
 	Name		-- Often represented by a bit-pattern for the thing
 	Kind		-- itself (eg Int#), but sometimes by a pointer to
+	PrimRep
 
   | SpecTyCon		-- A specialised TyCon; eg (Arr# Int#), or (List Int#)
 	TyCon
@@ -138,7 +142,7 @@ mkSynTyCon name
 isFunTyCon FunTyCon = True
 isFunTyCon _ = False
 
-isPrimTyCon (PrimTyCon _ _ _) = True
+isPrimTyCon (PrimTyCon _ _ _ _) = True
 isPrimTyCon _ = False
 
 -- At present there are no unboxed non-primitive types, so
@@ -166,7 +170,7 @@ kind2 = mkBoxedTypeKind `mkArrowKind` kind1
 tyConKind :: TyCon -> Kind
 tyConKind FunTyCon 			 = kind2
 tyConKind (DataTyCon _ _ kind _ _ _ _ _) = kind
-tyConKind (PrimTyCon _ _ kind)		 = kind
+tyConKind (PrimTyCon _ _ kind _)	 = kind
 tyConKind (SynTyCon _ _ k _ _ _)	 = k
 
 tyConKind (TupleTyCon _ _ n)
@@ -191,17 +195,9 @@ tyConUnique :: TyCon -> Unique
 tyConUnique FunTyCon			   = funTyConKey
 tyConUnique (DataTyCon uniq _ _ _ _ _ _ _) = uniq
 tyConUnique (TupleTyCon uniq _ _)	   = uniq
-tyConUnique (PrimTyCon uniq _ _) 	   = uniq
+tyConUnique (PrimTyCon uniq _ _ _) 	   = uniq
 tyConUnique (SynTyCon uniq _ _ _ _ _)      = uniq
 tyConUnique (SpecTyCon _ _ )		   = panic "tyConUnique:SpecTyCon"
-
-tyConArity :: TyCon -> Arity
-tyConArity FunTyCon			 = 2
-tyConArity (DataTyCon _ _ _ tvs _ _ _ _) = length tvs
-tyConArity (TupleTyCon _ _ arity)	 = arity
-tyConArity (PrimTyCon _ _ _)		 = 0	-- ??
-tyConArity (SpecTyCon _ _)		 = 0
-tyConArity (SynTyCon _ _ _ arity _ _)    = arity
 
 synTyConArity :: TyCon -> Maybe Arity -- Nothing <=> not a syn tycon
 synTyConArity (SynTyCon _ _ _ arity _ _) = Just arity
@@ -214,8 +210,10 @@ tyConTyVars FunTyCon			  = [alphaTyVar,betaTyVar]
 tyConTyVars (DataTyCon _ _ _ tvs _ _ _ _) = tvs
 tyConTyVars (TupleTyCon _ _ arity)	  = take arity alphaTyVars
 tyConTyVars (SynTyCon _ _ _ _ tvs _)      = tvs
-tyConTyVars (PrimTyCon _ _ _) 	     	  = panic "tyConTyVars:PrimTyCon"
+#ifdef DEBUG
+tyConTyVars (PrimTyCon _ _ _ _)	     	  = panic "tyConTyVars:PrimTyCon"
 tyConTyVars (SpecTyCon _ _ ) 	     	  = panic "tyConTyVars:SpecTyCon"
+#endif
 \end{code}
 
 \begin{code}
@@ -234,12 +232,23 @@ tyConFamilySize (TupleTyCon _ _ _)		    = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (pprTyCon PprDebug other)
 #endif
+
+tyConPrimRep :: TyCon -> PrimRep
+tyConPrimRep (PrimTyCon _ _ _ rep) = rep
+tyConPrimRep _			   = PtrRep
 \end{code}
 
 \begin{code}
 tyConDerivings :: TyCon -> [Class]
 tyConDerivings (DataTyCon _ _ _ _ _ _ derivs _) = derivs
 tyConDerivings other				= []
+\end{code}
+
+\begin{code}
+tyConTheta :: TyCon -> [(Class,Type)]
+tyConTheta (DataTyCon _ _ _ _ theta _ _ _) = theta
+tyConTheta (TupleTyCon _ _ _)		   = []
+-- should ask about anything else
 \end{code}
 
 \begin{code}
@@ -253,17 +262,14 @@ maybeTyConSingleCon :: TyCon -> Maybe Id
 maybeTyConSingleCon (TupleTyCon _ _ arity)        = Just (mkTupleCon arity)
 maybeTyConSingleCon (DataTyCon _ _ _ _ _ [c] _ _) = Just c
 maybeTyConSingleCon (DataTyCon _ _ _ _ _ _   _ _) = Nothing
-maybeTyConSingleCon (PrimTyCon _ _ _)	          = Nothing
+maybeTyConSingleCon (PrimTyCon _ _ _ _)	          = Nothing
 maybeTyConSingleCon (SpecTyCon tc tys)            = panic "maybeTyConSingleCon:SpecTyCon"
 						  -- requires DataCons of TyCon
 
 isEnumerationTyCon (TupleTyCon _ _ arity)
   = arity == 0
 isEnumerationTyCon (DataTyCon _ _ _ _ _ data_cons _ _)
-  = not (null data_cons) && all is_nullary data_cons
-  where
-    is_nullary con = case (dataConSig con) of { (_,_, arg_tys, _) ->
-		     null arg_tys }
+  = not (null data_cons) && all isNullaryDataCon data_cons
 \end{code}
 
 @derivedFor@ reports if we have an {\em obviously}-derived instance
@@ -292,28 +298,7 @@ the property @(a<=b) || (b<=a)@.
 
 \begin{code}
 instance Ord3 TyCon where
-  cmp FunTyCon		          FunTyCon		      = EQ_
-  cmp (DataTyCon a _ _ _ _ _ _ _) (DataTyCon b _ _ _ _ _ _ _) = a `cmp` b
-  cmp (SynTyCon a _ _ _ _ _)      (SynTyCon b _ _ _ _ _)      = a `cmp` b
-  cmp (TupleTyCon _ _ a)          (TupleTyCon _ _ b)	      = a `cmp` b
-  cmp (PrimTyCon a _ _)		  (PrimTyCon b _ _)	      = a `cmp` b
-  cmp (SpecTyCon tc1 mtys1)	  (SpecTyCon tc2 mtys2)
-    = panic# "cmp on SpecTyCons" -- case (tc1 `cmp` tc2) of { EQ_ -> mtys1 `cmp` mtys2; xxx -> xxx }
-
-    -- now we *know* the tags are different, so...
-  cmp other_1 other_2
-    | tag1 _LT_ tag2 = LT_
-    | otherwise      = GT_
-    where
-      tag1 = tag_TyCon other_1
-      tag2 = tag_TyCon other_2
-
-      tag_TyCon FunTyCon    		    = ILIT(1)
-      tag_TyCon (DataTyCon _ _ _ _ _ _ _ _) = ILIT(2)
-      tag_TyCon (TupleTyCon _ _ _)	    = ILIT(3)
-      tag_TyCon (PrimTyCon  _ _ _)	    = ILIT(4)
-      tag_TyCon (SpecTyCon  _ _) 	    = ILIT(5)
-      tag_TyCon (SynTyCon _ _ _ _ _ _)	    = ILIT(6)
+  cmp tc1 tc2 = uniqueOf tc1 `cmp` uniqueOf tc2
 
 instance Eq TyCon where
     a == b = case (a `cmp` b) of { EQ_ -> True;   _ -> False }
@@ -329,7 +314,7 @@ instance Ord TyCon where
 instance Uniquable TyCon where
     uniqueOf (DataTyCon  u _ _ _ _ _ _ _) = u
     uniqueOf (TupleTyCon u _ _)		  = u
-    uniqueOf (PrimTyCon  u _ _)		  = u
+    uniqueOf (PrimTyCon  u _ _ _)	  = u
     uniqueOf (SynTyCon   u _ _ _ _ _)	  = u
     uniqueOf tc@(SpecTyCon _ _)		  = panic "uniqueOf:SpecTyCon"
     uniqueOf tc				  = uniqueOf (getName tc)
@@ -338,7 +323,7 @@ instance Uniquable TyCon where
 \begin{code}
 instance NamedThing TyCon where
     getName (DataTyCon _ n _ _ _ _ _ _) = n
-    getName (PrimTyCon _ n _)		= n
+    getName (PrimTyCon _ n _ _)		= n
     getName (SpecTyCon tc _)		= getName tc
     getName (SynTyCon _ n _ _ _ _)	= n
     getName FunTyCon			= mkFunTyConName

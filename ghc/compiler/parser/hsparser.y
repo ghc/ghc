@@ -258,7 +258,7 @@ BOOLEAN inpat;
 		qvarid qconid qvarsym qconsym
 		qvar qcon qvarop qconop qop
 		qvark qconk qtycon qtycls
-		gcon gconk gtycon qop1 qvarop1 
+		gcon gconk gtycon itycon qop1 qvarop1 
 		ename iname 
 
 %type <ubinding>  topdecl topdecls letdecls
@@ -400,10 +400,16 @@ import_list:
 	;
 
 import	:  var					{ $$ = mkentid(mknoqual($1)); }
-	|  tycon				{ $$ = mkenttype(mknoqual($1)); }
-	|  tycon OPAREN DOTDOT CPAREN		{ $$ = mkenttypeall(mknoqual($1)); }
-	|  tycon OPAREN CPAREN			{ $$ = mkenttypenamed(mknoqual($1),Lnil); }
-	|  tycon OPAREN inames CPAREN		{ $$ = mkenttypenamed(mknoqual($1),$3); }
+	|  itycon				{ $$ = mkenttype($1); }
+	|  itycon OPAREN DOTDOT CPAREN		{ $$ = mkenttypeall($1); }
+	|  itycon OPAREN CPAREN			{ $$ = mkenttypenamed($1,Lnil);}
+	|  itycon OPAREN inames CPAREN		{ $$ = mkenttypenamed($1,$3); }
+	;
+
+itycon	:  tycon				{ $$ = mknoqual($1); }
+	|  OBRACK CBRACK			{ $$ = creategid(-1); }         
+	|  OPAREN CPAREN			{ $$ = creategid(0); }         
+	|  OPAREN commas CPAREN 		{ $$ = creategid($2); }
 	;
 
 inames  :  iname				{ $$ = lsing($1); }

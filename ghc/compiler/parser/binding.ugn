@@ -2,8 +2,10 @@
 #include "hspincl.h"
 %}
 %{{
+#include "HsVersions.h"
+
 module U_binding where
-import Ubiq --  debugging consistency check
+IMP_Ubiq() --  debugging consistency check
 import UgenUtil
 
 import U_constr

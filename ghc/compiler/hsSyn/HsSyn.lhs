@@ -27,7 +27,7 @@ module HsSyn (
 
      ) where
 
-import Ubiq
+IMP_Ubiq()
 
 -- friends:
 import HsBinds

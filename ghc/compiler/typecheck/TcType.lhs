@@ -1,4 +1,6 @@
 \begin{code}
+#include "HsVersions.h"
+
 module TcType (
 
   TcTyVar(..),
@@ -18,13 +20,15 @@ module TcType (
   tcReadTyVar,		-- :: TcTyVar s -> NF_TcM (TcMaybe s)
 
 
-  tcInstTyVars,    -- TyVar -> NF_TcM s (TcTyVar s)
+  tcInstTyVars,
   tcInstSigTyVars, 
-  tcInstType, tcInstTheta, tcInstId,
+  tcInstType, tcInstSigType, tcInstTcType,
+  tcInstTheta, tcInstId,
 
   zonkTcTyVars,
   zonkTcType,
   zonkTcTypeToType,
+  zonkTcTyVar,
   zonkTcTyVarToTyVar
 
   ) where
@@ -34,10 +38,12 @@ module TcType (
 -- friends:
 import Type	( Type(..), ThetaType(..), GenType(..),
 		  tyVarsOfTypes, getTyVar_maybe,
-		  splitForAllTy, splitRhoTy
+		  splitForAllTy, splitRhoTy,
+		  mkForAllTys, instantiateTy
 		)
 import TyVar	( TyVar(..), GenTyVar(..), TyVarSet(..), GenTyVarSet(..), 
-		  TyVarEnv(..), lookupTyVarEnv, addOneToTyVarEnv, mkTyVarEnv,
+		  TyVarEnv(..), lookupTyVarEnv, addOneToTyVarEnv,
+		  nullTyVarEnv, mkTyVarEnv,
 		  tyVarSetToList
 		)
 
@@ -51,11 +57,11 @@ import Usage	( Usage(..), GenUsage, UVar(..), duffUsage )
 
 import TysWiredIn	( voidTy )
 
-import Ubiq
+IMP_Ubiq()
 import Unique		( Unique )
 import UniqFM		( UniqFM )
 import Maybes		( assocMaybe )
-import Util		( zipEqual, nOfThem, panic, pprPanic )
+import Util		( zipEqual, nOfThem, panic, pprPanic, pprTrace{-ToDo:rm-} )
 
 import Outputable	( Outputable(..) )	-- Debugging messages
 import PprType		( GenTyVar, GenType )
@@ -121,14 +127,13 @@ newTyVarTys :: Int -> Kind -> NF_TcM s [TcType s]
 newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 
 
-
 -- For signature type variables, mark them as "DontBind"
 tcInstTyVars, tcInstSigTyVars
 	:: [GenTyVar flexi] 
   	-> NF_TcM s ([TcTyVar s], [TcType s], [(GenTyVar flexi, TcType s)])
+
 tcInstTyVars    tyvars = inst_tyvars UnBound  tyvars
 tcInstSigTyVars tyvars = inst_tyvars DontBind tyvars
-
 
 inst_tyvars initial_cts tyvars
   = mapNF_Tc (inst_tyvar initial_cts) tyvars	`thenNF_Tc` \ tc_tyvars ->
@@ -143,23 +148,43 @@ inst_tyvar initial_cts (TyVar _ kind name _)
     returnNF_Tc (TyVar uniq kind name box)
 \end{code}
 
-@tcInstType@ and @tcInstTcType@ both create a fresh instance of a
+@tcInstType@ and @tcInstSigType@ both create a fresh instance of a
 type, returning a @TcType@. All inner for-alls are instantiated with
 fresh TcTyVars.
 
-There are two versions, one for instantiating a @Type@, and one for a @TcType@.
-The former must instantiate everything; all tyvars must be bound either
-by a forall or by an environment passed in.  The latter can do some sharing,
-and is happy with free tyvars (which is vital when instantiating the type
-of local functions).  In the future @tcInstType@ may try to be clever about not
-instantiating constant sub-parts.
+The difference is that tcInstType instantiates all forall'd type
+variables (and their bindees) with UnBound type variables, whereas
+tcInstSigType instantiates them with DontBind types variables.
+@tcInstSigType@ also doesn't take an environment.
+
+On the other hand, @tcInstTcType@ instantiates a TcType. It uses
+instantiateTy which could take advantage of sharing some day.
 
 \begin{code}
+tcInstTcType :: TcType s -> NF_TcM s ([TcTyVar s], TcType s)
+tcInstTcType ty
+  = case tyvars of
+	[]    -> returnNF_Tc ([], ty)	-- Nothing to do
+	other -> tcInstTyVars tyvars		`thenNF_Tc` \ (tyvars', _, tenv)  ->
+		 returnNF_Tc (tyvars', instantiateTy tenv rho)
+  where
+    (tyvars, rho) = splitForAllTy ty
+
 tcInstType :: [(GenTyVar flexi,TcType s)] 
 	   -> GenType (GenTyVar flexi) UVar 
 	   -> NF_TcM s (TcType s)
 tcInstType tenv ty_to_inst
   = tcConvert bind_fn occ_fn (mkTyVarEnv tenv) ty_to_inst
+  where
+    bind_fn = inst_tyvar UnBound
+    occ_fn env tyvar = case lookupTyVarEnv env tyvar of
+			 Just ty -> returnNF_Tc ty
+			 Nothing -> pprPanic "tcInstType:" (ppAboves [ppr PprDebug ty_to_inst, 
+								      ppr PprDebug tyvar])
+
+tcInstSigType :: GenType (GenTyVar flexi) UVar -> NF_TcM s (TcType s)
+tcInstSigType ty_to_inst
+  = tcConvert bind_fn occ_fn nullTyVarEnv ty_to_inst
   where
     bind_fn = inst_tyvar DontBind
     occ_fn env tyvar = case lookupTyVarEnv env tyvar of
@@ -168,9 +193,15 @@ tcInstType tenv ty_to_inst
 								      ppr PprDebug tyvar])
 
 zonkTcTyVarToTyVar :: TcTyVar s -> NF_TcM s TyVar
-zonkTcTyVarToTyVar tyvar
-  = zonkTcTyVar tyvar	`thenNF_Tc` \ (TyVarTy tyvar') ->
-    returnNF_Tc (tcTyVarToTyVar tyvar')
+zonkTcTyVarToTyVar tv
+  = zonkTcTyVar tv	`thenNF_Tc` \ tv_ty ->
+    case tv_ty of	-- Should be a tyvar!
+
+      TyVarTy tv' ->    returnNF_Tc (tcTyVarToTyVar tv')
+
+      _ -> pprTrace "zonkTcTyVarToTyVar:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+	   returnNF_Tc (tcTyVarToTyVar tv)
+
 
 zonkTcTypeToType :: TyVarEnv Type -> TcType s -> NF_TcM s Type
 zonkTcTypeToType env ty 
@@ -331,9 +362,14 @@ zonkTcType (SynTy tc tys ty)
     returnNF_Tc (SynTy tc tys' ty')
 
 zonkTcType (ForAllTy tv ty)
-  = zonkTcTyVar tv		`thenNF_Tc` \ (TyVarTy tv') ->	-- Should be a tyvar!
+  = zonkTcTyVar tv		`thenNF_Tc` \ tv_ty ->
     zonkTcType ty 		`thenNF_Tc` \ ty' ->
-    returnNF_Tc (ForAllTy tv' ty')
+    case tv_ty of	-- Should be a tyvar!
+      TyVarTy tv' -> 
+		     returnNF_Tc (ForAllTy tv' ty')
+      _ -> pprTrace "zonkTcType:ForAllTy:" (ppCat [ppr PprDebug tv, ppr PprDebug tv_ty]) $
+	   
+	   returnNF_Tc (ForAllTy tv{-(tcTyVarToTyVar tv)-} ty')
 
 zonkTcType (ForAllUsageTy uv uvs ty)
   = panic "zonk:ForAllUsageTy"

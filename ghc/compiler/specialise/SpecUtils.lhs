@@ -21,7 +21,7 @@ module SpecUtils (
 	pprSpecErrs
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Bag		( isEmptyBag, bagToList )
 import Class		( classOpString, GenClass{-instance NamedThing-} )

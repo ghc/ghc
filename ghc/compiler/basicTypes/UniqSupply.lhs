@@ -21,7 +21,7 @@ module UniqSupply (
 	splitUniqSupply
   ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Unique
 import Util

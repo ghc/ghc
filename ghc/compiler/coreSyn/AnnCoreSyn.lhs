@@ -18,7 +18,7 @@ module AnnCoreSyn (
 	deAnnotate -- we may eventually export some of the other deAnners
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import CoreSyn
 \end{code}

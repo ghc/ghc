@@ -19,8 +19,8 @@ module RnBinds (
 	DefinedVars(..)
    ) where
 
-import Ubiq
-import RnLoop		-- break the RnPass/RnExpr/RnBinds loops
+IMP_Ubiq()
+IMPORT_DELOOPER(RnLoop)		-- break the RnPass/RnExpr/RnBinds loops
 
 import HsSyn
 import HsPragmas	( isNoGenPragmas, noGenPragmas )

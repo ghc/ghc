@@ -1,6 +1,8 @@
 Stuff the Ugenny things show to the parser.
 
 \begin{code}
+#include "HsVersions.h"
+
 module UgenAll (
 	-- re-exported Prelude stuff
 	returnUgn, thenUgn,
@@ -25,7 +27,7 @@ module UgenAll (
 
 import PreludeGlaST
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 -- friends:
 import U_binding

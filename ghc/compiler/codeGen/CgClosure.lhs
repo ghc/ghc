@@ -12,8 +12,8 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 
 module CgClosure ( cgTopRhsClosure, cgRhsClosure ) where
 
-import Ubiq{-uitous-}
-import CgLoop2		( cgExpr, cgSccExpr )
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(CgLoop2)		( cgExpr, cgSccExpr )
 
 import CgMonad
 import AbsCSyn
@@ -451,7 +451,10 @@ closureCodeBody binder_info closure_info cc all_args body
     	    	ViaNode	| is_concurrent	   -> []
 		other 		           -> panic "closureCodeBody:arg_regs"
 
-    	stk_args = drop (length arg_regs) all_args
+	num_arg_regs = length arg_regs
+	
+    	(reg_args, stk_args) = splitAt num_arg_regs all_args
+
     	(spA_stk_args, spB_stk_args, stk_bxd_w_offsets, stk_ubxd_w_offsets)
 	  = mkVirtStkOffsets
 		0 0 		-- Initial virtual SpA, SpB
@@ -509,7 +512,7 @@ closureCodeBody binder_info closure_info cc all_args body
 
 		-- Bind args to regs/stack as appropriate, and
 		-- record expected position of sps
-	    bindArgsToRegs all_args arg_regs		    `thenC`
+	    bindArgsToRegs reg_args arg_regs		    `thenC`
 	    mapCs bindNewToAStack stk_bxd_w_offsets	    `thenC`
 	    mapCs bindNewToBStack stk_ubxd_w_offsets	    `thenC`
 	    setRealAndVirtualSps spA_stk_args spB_stk_args  `thenC`
@@ -862,8 +865,6 @@ setupUpdate closure_info code
 	  absC (CMacroStmt UPD_CAF [CReg node, amode])
 						  	`thenC`
 	  returnFC amode
-
-   closure_label = mkClosureLabel (closureId closure_info)
 
    vector
      = case (closureType closure_info) of

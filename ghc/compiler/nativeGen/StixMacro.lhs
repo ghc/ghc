@@ -7,8 +7,8 @@
 
 module StixMacro ( macroCode, heapCheck ) where
 
-import Ubiq{-uitious-}
-import NcgLoop		( amodeToStix )
+IMP_Ubiq(){-uitious-}
+IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
 
 import MachMisc
 import MachRegs

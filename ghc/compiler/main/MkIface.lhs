@@ -18,7 +18,7 @@ module MkIface (
 	ifacePragmas
     ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 import Bag		( emptyBag, snocBag, bagToList )
 import Class		( GenClass(..){-instance NamedThing-}, GenClassOp(..) )
@@ -26,7 +26,7 @@ import CmdLineOpts	( opt_ProduceHi )
 import FieldLabel	( FieldLabel{-instance NamedThing-} )
 import FiniteMap	( fmToList )
 import HsSyn
-import Id		( idType, dataConSig, dataConFieldLabels,
+import Id		( idType, dataConRawArgTys, dataConFieldLabels,
 			  dataConStrictMarks, StrictnessMark(..),
 			  GenId{-instance NamedThing/Outputable-}
 			)
@@ -60,6 +60,7 @@ ppr_name   n
 	pp = prettyToUn (ppr PprInterface on)
     in
     (if isLexSym s then uppParens else id) pp
+{-OLD:
 ppr_unq_name n
   = let
 	on = origName n
@@ -67,6 +68,7 @@ ppr_unq_name n
 	pp = uppPStr  s
     in
     (if isLexSym s then uppParens else id) pp
+-}
 \end{code}
 
 We have a function @startIface@ to open the output file and put
@@ -144,7 +146,7 @@ ifaceUsages (Just if_hdl) usages
 	       upp_versions (fmToList versions), uppSemi]
 
     upp_versions nvs
-      = uppIntersperse upp'SP{-'-} [ uppCat [(if isLexSym n then uppParens else id) (uppPStr n), uppInt v] | (n,v) <- nvs ]
+      = uppIntersperse uppSP [ uppCat [(if isLexSym n then uppParens else id) (uppPStr n), uppInt v] | (n,v) <- nvs ]
 \end{code}
 
 \begin{code}
@@ -256,14 +258,13 @@ ifaceFixities (Just if_hdl) (HsModule _ _ _ _ fixities _ _ _ _ _ _ _ _ _)
 ifaceDecls Nothing{-no iface handle-} _ = return ()
 
 ifaceDecls (Just if_hdl) (vals, tycons, classes, _)
-  = let
-	togo_classes = [ c | c <- classes, isLocallyDefined c ]
-	togo_tycons  = [ t | t <- tycons,  isLocallyDefined t ]
-	togo_vals    = [ v | v <- vals,    isLocallyDefined v ]
-
-	sorted_classes   = sortLt ltLexical togo_classes
-	sorted_tycons	 = sortLt ltLexical togo_tycons
-	sorted_vals	 = sortLt ltLexical togo_vals
+  = ASSERT(all isLocallyDefined vals)
+    ASSERT(all isLocallyDefined tycons)
+    ASSERT(all isLocallyDefined classes)
+    let
+	sorted_classes   = sortLt ltLexical classes
+	sorted_tycons	 = sortLt ltLexical tycons
+	sorted_vals	 = sortLt ltLexical vals
     in
     if (null sorted_classes && null sorted_tycons && null sorted_vals) then
 	--  You could have a module with just instances in it
@@ -365,7 +366,7 @@ ppr_tycon tycon
     ppr_tc (initNmbr (nmbrTyCon tycon))
 
 ------------------------
-ppr_tc (PrimTyCon _ n _)
+ppr_tc (PrimTyCon _ n _ _)
   = uppCat [ uppStr "{- data", ppr_name n, uppStr " *built-in* -}" ]
 
 ppr_tc FunTyCon
@@ -386,7 +387,7 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 	   ppr_context ctxt,
 	   ppr_name n,
 	   uppIntersperse uppSP (map ppr_tyvar tvs),
-	   pp_unabstract_condecls,
+	   uppEquals, pp_condecls,
 	   uppSemi]
 	   -- NB: we do not print deriving info in interfaces
   where
@@ -401,16 +402,6 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 		   uppInterleave uppComma [uppCat [ppr_name c, ppr_ty t] | (c,t) <- cs],
 		   uppRparen, uppPStr SLIT(" =>")]
 
-    yes_we_print_condecls
-      = case (getExportFlag n) of
-	  ExportAbs -> False
-	  other	    -> True
-
-    pp_unabstract_condecls
-      = if yes_we_print_condecls
-	then uppCat [uppEquals, pp_condecls]
-	else uppNil
-
     pp_condecls
       = let
 	    (c:cs) = cons
@@ -421,11 +412,11 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 
     ppr_con con
       = let
-	    (_, _, con_arg_tys, _) = dataConSig con
+	    con_arg_tys  = dataConRawArgTys   con
 	    labels       = dataConFieldLabels con -- none if not a record
 	    strict_marks = dataConStrictMarks con
 	in
-	uppCat [ppr_unq_name con, ppr_fields labels strict_marks con_arg_tys]
+	uppCat [ppr_name con, ppr_fields labels strict_marks con_arg_tys]
 
     ppr_fields labels strict_marks con_arg_tys
       = if null labels then -- not a record thingy
@@ -440,7 +431,7 @@ ppr_tc this_tycon@(DataTyCon u n k tvs ctxt cons derivings data_or_new)
 		  (prettyToUn (pprParendType PprInterface t))
 
     ppr_field l b t
-      = uppBesides [ppr_unq_name l, uppPStr SLIT(" :: "),
+      = uppBesides [ppr_name l, uppPStr SLIT(" :: "),
 		   case b of { MarkedStrict -> uppChar '!'; _ -> uppNil },
 		   ppr_ty t]
 \end{code}

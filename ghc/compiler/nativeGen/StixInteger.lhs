@@ -11,8 +11,8 @@ module StixInteger (
 	encodeFloatingKind, decodeFloatingKind
     ) where
 
-import Ubiq{-uitous-}
-import NcgLoop		( amodeToStix )
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(NcgLoop)		( amodeToStix )
 
 import MachMisc
 import MachRegs

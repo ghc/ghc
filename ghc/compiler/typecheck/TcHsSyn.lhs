@@ -7,6 +7,8 @@ This module is an extension of @HsSyn@ syntax, for use in the type
 checker.
 
 \begin{code}
+#include "HsVersions.h"
+
 module TcHsSyn (
 	TcIdBndr(..), TcIdOcc(..),
 	
@@ -25,13 +27,13 @@ module TcHsSyn (
 
 	mkHsTyApp, mkHsDictApp,
 	mkHsTyLam, mkHsDictLam,
-	tcIdType,
+	tcIdType, tcIdTyVars,
 
 	zonkBinds,
 	zonkDictBinds
   ) where
 
-import Ubiq{-uitous-}
+IMP_Ubiq(){-uitous-}
 
 -- friends:
 import HsSyn	-- oodles of it
@@ -44,16 +46,15 @@ import Id	( GenId(..), IdDetails, PragmaInfo,	-- Can meddle modestly with Ids
 import Name	( Name{--O only-} )
 import TcMonad	hiding ( rnMtoTcM )
 import TcType	( TcType(..), TcMaybe, TcTyVar(..),
-		  zonkTcTypeToType, zonkTcTyVarToTyVar,
-		  tcInstType
+		  zonkTcTypeToType, zonkTcTyVarToTyVar
 		)
 import Usage	( UVar(..) )
 import Util	( zipEqual, panic, pprPanic, pprTrace )
 
 import PprType  ( GenType, GenTyVar ) 	-- instances
-import Type	( mkTyVarTy )
+import Type	( mkTyVarTy, tyVarsOfType )
 import TyVar	( GenTyVar {- instances -},
-		  TyVarEnv(..), growTyVarEnvList )		-- instances
+		  TyVarEnv(..), growTyVarEnvList, emptyTyVarSet )
 import TysWiredIn	( voidTy )
 import Unique	( Unique )		-- instances
 import UniqFM
@@ -122,9 +123,10 @@ mkHsDictLam dicts expr = DictLam dicts expr
 tcIdType :: TcIdOcc s -> TcType s
 tcIdType (TcId   id) = idType id
 tcIdType (RealId id) = pprPanic "tcIdType:" (ppr PprDebug id)
+
+tcIdTyVars (TcId id)  = tyVarsOfType (idType id)
+tcIdTyVars (RealId _) = emptyTyVarSet		-- Top level Ids have no free type variables
 \end{code}
-
-
 
 \begin{code}
 instance Eq (TcIdOcc s) where
@@ -396,17 +398,14 @@ zonkExpr te ve (HsIf e1 e2 e3 src_loc)
 
 zonkExpr te ve (HsLet binds expr)
   = zonkBinds te ve binds	`thenNF_Tc` \ (new_binds, new_ve) ->
-    zonkExpr te new_ve expr	`thenNF_Tc` \ new_expr ->
+    zonkExpr  te new_ve expr	`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsLet new_binds new_expr)
 
 zonkExpr te ve (HsDo _ _) = panic "zonkExpr te ve:HsDo"
 
-zonkExpr te ve (HsDoOut stmts m_id mz_id src_loc)
+zonkExpr te ve (HsDoOut stmts then_id zero_id src_loc)
   = zonkStmts te ve stmts 	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (HsDoOut new_stmts m_new mz_new src_loc)
-  where
-    m_new  = zonkIdOcc ve m_id
-    mz_new = zonkIdOcc ve mz_id
+    returnNF_Tc (HsDoOut new_stmts (zonkIdOcc ve then_id) (zonkIdOcc ve zero_id) src_loc)
 
 zonkExpr te ve (ListComp expr quals)
   = zonkQuals te ve quals	`thenNF_Tc` \ (new_quals, new_ve) ->
@@ -558,27 +557,36 @@ zonkQuals te ve (LetQual binds : quals)
 zonkStmts :: TyVarEnv Type -> IdEnv Id 
 	  -> [TcStmt s] -> NF_TcM s [TypecheckedStmt]
 
-zonkStmts te ve []
-  = returnNF_Tc []
+zonkStmts te ve [] = returnNF_Tc []
 
-zonkStmts te ve (BindStmt pat expr src_loc : stmts)
-  = zonkPat te ve pat    `thenNF_Tc` \ (new_pat, ids) ->
-    zonkExpr te ve expr   `thenNF_Tc` \ new_expr ->
+zonkStmts te ve [ExprStmt expr locn]
+  = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
+    returnNF_Tc [ExprStmt new_expr locn]
+
+zonkStmts te ve (ExprStmtOut expr locn a b : stmts)
+  = zonkExpr te ve      expr	`thenNF_Tc` \ new_expr  ->
+    zonkTcTypeToType te a	`thenNF_Tc` \ new_a     ->
+    zonkTcTypeToType te b	`thenNF_Tc` \ new_b     ->
+    zonkStmts te ve	stmts	`thenNF_Tc` \ new_stmts ->
+    returnNF_Tc (ExprStmtOut new_expr locn new_a new_b : new_stmts)
+
+zonkStmts te ve (LetStmt binds : stmts)
+  = zonkBinds te ve     binds	`thenNF_Tc` \ (new_binds, new_ve) ->
+    zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
+    returnNF_Tc (LetStmt new_binds : new_stmts)
+
+zonkStmts te ve (BindStmtOut pat expr locn a b : stmts)
+  = zonkPat te ve pat		`thenNF_Tc` \ (new_pat, ids) ->
+    zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
+    zonkTcTypeToType te a	`thenNF_Tc` \ new_a     ->
+    zonkTcTypeToType te b	`thenNF_Tc` \ new_b     ->
     let
 	new_ve = extend_ve ve ids
     in
     zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (BindStmt new_pat new_expr src_loc : new_stmts)
+    returnNF_Tc (BindStmtOut new_pat new_expr locn new_a new_b : new_stmts)
 
-zonkStmts te ve (ExprStmt expr src_loc : stmts)
-  = zonkExpr te ve expr		`thenNF_Tc` \ new_expr ->
-    zonkStmts te ve stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ExprStmt new_expr src_loc : new_stmts)
 
-zonkStmts te ve (LetStmt binds : stmts)
-  = zonkBinds te ve binds	`thenNF_Tc` \ (new_binds, new_ve) ->
-    zonkStmts te new_ve stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (LetStmt new_binds : new_stmts)
 
 -------------------------------------------------------------------------
 zonkRbinds :: TyVarEnv Type -> IdEnv Id 

@@ -21,18 +21,18 @@ module TcEnv(
   ) where
 
 
-import Ubiq
-import TcMLoop  -- for paranoia checking
+IMP_Ubiq()
+IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
 
 import Id	( Id(..), GenId, idType, mkUserLocal )
 import TcHsSyn	( TcIdBndr(..), TcIdOcc(..) )
 import TcKind	( TcKind, newKindVars, tcDefaultKind, kindToTcKind )
 import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
-		  newTyVarTys, tcInstTyVars, tcInstType, zonkTcTyVars
+		  newTyVarTys, tcInstTyVars, zonkTcTyVars
 		)
 import TyVar	( mkTyVar, tyVarKind, unionTyVarSets, emptyTyVarSet )
 import Type	( tyVarsOfTypes )
-import TyCon	( TyCon, Arity(..), tyConKind, synTyConArity )
+import TyCon	( TyCon, tyConKind, synTyConArity )
 import Class	( Class(..), GenClass, classSig )
 
 import TcMonad		hiding ( rnMtoTcM )
@@ -294,7 +294,7 @@ newMonoIds names kind m
 
 	mk_id name uniq ty
 	  = let
-		name_str = case (getOccName name) of { Unqual n -> n }
+		name_str = case (getOccName name) of { Unqual n -> n; Qual m n -> n }
 	    in
 	    mkUserLocal name_str uniq ty (getSrcLoc name)
     in

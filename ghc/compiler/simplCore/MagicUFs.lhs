@@ -13,8 +13,8 @@ module MagicUFs (
 	applyMagicUnfoldingFun
     ) where
 
-import Ubiq{-uitous-}
-import IdLoop		-- paranoia checking
+IMP_Ubiq(){-uitous-}
+IMPORT_DELOOPER(IdLoop)		-- paranoia checking
 
 import CoreSyn
 import SimplEnv		( SimplEnv )
@@ -320,9 +320,8 @@ foldr_fun _ _ = returnSmpl Nothing
 isConsFun :: SimplEnv -> CoreArg -> Bool
 isConsFun env (VarArg v)
   = case lookupUnfolding env v of
-	GenForm _ _ (Lam (x,_) (Lam (y,_)
-			(Con con tys [VarArg x',VarArg y']))) _
-			| con == consDataCon && x==x' && y==y'
+	GenForm _ (Lam (x,_) (Lam (y,_) (Con con tys [VarArg x',VarArg y']))) _
+	  | con == consDataCon && x==x' && y==y'
 	  -> ASSERT ( length tys == 1 ) True
 	_ -> False
 isConsFun env _ = False
@@ -330,12 +329,9 @@ isConsFun env _ = False
 isNilForm :: SimplEnv -> CoreArg -> Bool
 isNilForm env (VarArg v)
   = case lookupUnfolding env v of
-	GenForm _ _ (CoTyApp (Var id) _) _
-	  | id == nilDataCon -> True
-	ConForm id _ _
-	  | id == nilDataCon   -> True
-	LitForm (NoRepStr s) | _NULL_ s -> True
-	_ -> False
+	GenForm _ (CoTyApp (Var id) _) _ | id == nilDataCon -> True
+	GenForm _ (Lit (NoRepStr s))   _ | _NULL_ s	      -> True
+	_ 						      -> False
 isNilForm env _ = False
 
 getBuildForm :: SimplEnv -> CoreArg -> Maybe Id
@@ -343,9 +339,9 @@ getBuildForm env (VarArg v)
   = case lookupUnfolding env v of
 	GenForm False _ _ _ -> Nothing
 					-- not allowed to inline :-(
-	GenForm _ _ (App (CoTyApp (Var bld) _) (VarArg g)) _
+	GenForm _ (App (CoTyApp (Var bld) _) (VarArg g)) _
 	  | bld == buildId -> Just g
-	GenForm _ _ (App (App (CoTyApp (Var bld) _)
+	GenForm _ (App (App (CoTyApp (Var bld) _)
 					(VarArg g)) h) _
 	  | bld == augmentId && isNilForm env h  -> Just g
 	_ -> Nothing
@@ -358,7 +354,7 @@ getAugmentForm env (VarArg v)
   = case lookupUnfolding env v of
 	GenForm False _ _ _ -> Nothing
 				-- not allowed to inline :-(
-	GenForm _ _ (App (App (CoTyApp (Var bld) _)
+	GenForm _ (App (App (CoTyApp (Var bld) _)
 						(VarArg g)) h) _
 	  | bld == augmentId -> Just (g,h)
 	_ -> Nothing
@@ -373,7 +369,7 @@ getAppendForm :: SimplEnv -> CoreArg -> Maybe (GenCoreAtom Id,GenCoreAtom Id)
 getAppendForm env (VarArg v) =
     case lookupUnfolding env v of
 	GenForm False _ _ _ -> Nothing	-- not allowed to inline :-(
-	GenForm _ _ (App (App (App (CoTyApp (CoTyApp (Var fld) _) _) con) ys) xs) _
+	GenForm _ (App (App (App (CoTyApp (CoTyApp (Var fld) _) _) con) ys) xs) _
 	  | fld == foldrId && isConsFun env con -> Just (xs,ys)
 	_ -> Nothing
 getAppendForm env _ = Nothing
@@ -390,7 +386,7 @@ getListForm
 	-> Maybe ([CoreArg],CoreArg)
 getListForm env (VarArg v)
   = case lookupUnfolding env v of
-       ConForm id _ [head,tail]
+       GenForm _ (Con id [ty_arg,head,tail]) _
 	  | id == consDataCon ->
 		case getListForm env tail of
  		   Nothing -> Just ([head],tail)
@@ -402,7 +398,7 @@ isInterestingArg :: SimplEnv -> CoreArg -> Bool
 isInterestingArg env (VarArg v)
   = case lookupUnfolding env v of
        GenForm False _ _ UnfoldNever -> False
-       GenForm _ _ exp guide -> True
+       GenForm _ exp guide -> True
        _ -> False
 isInterestingArg env _ = False
 
