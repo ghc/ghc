@@ -114,8 +114,8 @@ Details in <XRef LinkEnd="rewrite-rules">.
 Before you get too carried away working at the lowest level (e.g.,
 sloshing <Literal>MutableByteArray&num;</Literal>s around your
 program), you may wish to check if there are libraries that provide a
-&ldquo;Haskellised veneer&rdquo; over the features you want.  See the
-accompanying library documentation.
+&ldquo;Haskellised veneer&rdquo; over the features you want.  See
+<xref linkend="book-hslibs">.
 </Para>
 
 <Sect1 id="primitives">
@@ -1239,11 +1239,9 @@ immutable, and our implementation of I/O, including &ldquo;C calls&rdquo;.
 </Para>
 
 <Para>
-The <Literal>ST</Literal> library, which provides access to the <Function>ST</Function> monad, is a
-GHC/Hugs extension library and is described in the separate <ULink
-URL="libs.html"
->GHC/Hugs Extension Libraries</ULink
-> document.
+The <Literal>ST</Literal> library, which provides access to the
+<Function>ST</Function> monad, is described in <xref
+linkend="sec-ST">.
 </Para>
 
 </Sect1>
@@ -3583,7 +3581,8 @@ expressions of the form <Literal>assert pred e</Literal> will be rewritten to <L
 
 <Para>
 Assertion failures can be caught, see the documentation for the
-Hugs/GHC Exception library for information of how.
+<literal>Exception</literal> library (<xref linkend="sec-Exception">)
+for the details.
 </Para>
 
 </Sect1>
