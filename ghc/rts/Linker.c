@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.59 2001/08/21 15:22:09 sewardj Exp $
+ * $Id: Linker.c,v 1.60 2001/08/29 15:12:21 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -424,7 +424,7 @@ static OpenedDLL* opened_dlls = NULL;
 
 
 char*
-addDLL ( char* path, char* dll_name )
+addDLL ( __attribute((unused)) char* path, char* dll_name )
 {
 #  if defined(OBJFORMAT_ELF)
    void *hdl;
@@ -589,6 +589,7 @@ loadObj( char *path )
    oc->symbols           = NULL;
    oc->sections          = NULL;
    oc->lochash           = allocStrHashTable();
+   oc->proddables        = NULL;
 
    /* chain it onto the list of objects */
    oc->next              = objects;
@@ -708,6 +709,39 @@ unloadObj( char *path )
     belch("unloadObj: can't find `%s' to unload", path);
     return 0;
 }
+
+/* -----------------------------------------------------------------------------
+ * Sanity checking.  For each ObjectCode, maintain a list of address ranges
+ * which may be prodded during relocation, and abort if we try and write
+ * outside any of these.
+ */
+static void addProddableBlock ( ObjectCode* oc, void* start, int size )
+{
+   ProddableBlock* pb 
+      = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
+   /* fprintf(stderr, "aPB %p %p %d\n", oc, start, size); */
+   ASSERT(size > 0);
+   pb->start      = start;
+   pb->size       = size;
+   pb->next       = oc->proddables;
+   oc->proddables = pb;
+}
+
+static void checkProddableBlock ( ObjectCode* oc, void* addr )
+{
+   ProddableBlock* pb;
+   for (pb = oc->proddables; pb != NULL; pb = pb->next) {
+      char* s = (char*)(pb->start);
+      char* e = s + pb->size - 1;
+      char* a = (char*)addr;
+      /* Assumes that the biggest fixup involves a 4-byte write.  This
+         probably needs to be changed to 8 (ie, +7) on 64-bit
+         plats. */
+      if (a >= s && (a+3) <= e) return;
+   }
+   barf("checkProddableBlock: invalid fixup in runtime linker");
+}
+
 
 /* --------------------------------------------------------------------------
  * PEi386 specifics (Win32 targets)
@@ -1036,13 +1070,15 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
                 "  data sz %d\n"
                 " data off %d\n"
                 "  num rel %d\n"
-                "  off rel %d\n",
+                "  off rel %d\n"
+                "  ptr raw 0x%x\n",
                 sectab_i->VirtualSize,
                 sectab_i->VirtualAddress,
                 sectab_i->SizeOfRawData,
                 sectab_i->PointerToRawData,
                 sectab_i->NumberOfRelocations,
-                sectab_i->PointerToRelocations
+                sectab_i->PointerToRelocations,
+                sectab_i->PointerToRawData
               );
       reltab = (COFF_reloc*) (
                   ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
@@ -1061,9 +1097,9 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
          printName ( sym->Name, strtab -10 );
          fprintf ( stderr, "'\n" );
       }
+
       fprintf ( stderr, "\n" );
    }
-
    fprintf ( stderr, "\n" );
    fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
    fprintf ( stderr, "---START of string table---\n");
@@ -1090,12 +1126,12 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       fprintf ( stderr, 
                 "'\n"
                 "    value 0x%x\n"
-                "     sec# %d\n"
+                "   1+sec# %d\n"
                 "     type 0x%x\n"
                 "   sclass 0x%x\n"
                 "     nAux %d\n",
                 symtab_i->Value,
-                (Int32)(symtab_i->SectionNumber) - 1,
+                (Int32)(symtab_i->SectionNumber),
                 (UInt32)symtab_i->Type,
                 (UInt32)symtab_i->StorageClass,
                 (UInt32)symtab_i->NumberOfAuxSymbols 
@@ -1134,6 +1170,25 @@ ocGetNames_PEi386 ( ObjectCode* oc )
             + hdr->PointerToSymbolTable
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
+   /* Allocate space for any (local, anonymous) .bss sections. */
+
+   for (i = 0; i < hdr->NumberOfSections; i++) {
+      UChar* zspace;
+      COFF_section* sectab_i
+         = (COFF_section*)
+           myindex ( sizeof_COFF_section, sectab, i );
+      if (0 != strcmp(sectab_i->Name, ".bss")) continue;
+      if (sectab_i->VirtualSize == 0) continue;
+      /* This is a non-empty .bss section.  Allocate zeroed space for
+         it, and set its PointerToRawData field such that oc->image +
+         PointerToRawData == addr_of_zeroed_space.  */
+      zspace = stgCallocBytes(1, sectab_i->VirtualSize, 
+                              "ocGetNames_PEi386(anonymous bss)");
+      sectab_i->PointerToRawData = ((UChar*)zspace) - ((UChar*)(oc->image));
+      addProddableBlock(oc, zspace, sectab_i->VirtualSize);
+      /* fprintf(stderr, "BSS section at 0x%x\n", zspace); */
+   }
+
    /* Copy exported symbols into the ObjectCode. */
 
    oc->n_symbols = hdr->NumberOfSymbols;
@@ -1150,33 +1205,66 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       symtab_i = (COFF_symbol*)
                  myindex ( sizeof_COFF_symbol, symtab, i );
 
-      if (symtab_i->StorageClass == MYIMAGE_SYM_CLASS_EXTERNAL &&
-          symtab_i->SectionNumber != MYIMAGE_SYM_UNDEFINED) {
+      addr  = NULL;
 
+      if (symtab_i->StorageClass == MYIMAGE_SYM_CLASS_EXTERNAL
+          && symtab_i->SectionNumber != MYIMAGE_SYM_UNDEFINED) {
          /* This symbol is global and defined, viz, exported */
-         COFF_section* sectabent;
-
-         /* cstring_from_COFF_symbol_name always succeeds. */
-         sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
-
          /* for MYIMAGE_SYMCLASS_EXTERNAL 
                 && !MYIMAGE_SYM_UNDEFINED,
             the address of the symbol is: 
                 address of relevant section + offset in section
          */
-         sectabent = (COFF_section*)
-                     myindex ( sizeof_COFF_section, 
-                               sectab,
-                               symtab_i->SectionNumber-1 );
+         COFF_section* sectabent 
+            = (COFF_section*) myindex ( sizeof_COFF_section, 
+                                        sectab,
+                                        symtab_i->SectionNumber-1 );
          addr = ((UChar*)(oc->image))
                 + (sectabent->PointerToRawData
                    + symtab_i->Value);
+      } 
+      else
+      if (symtab_i->SectionNumber == MYIMAGE_SYM_UNDEFINED
+	  && symtab_i->Value > 0) {
+         /* This symbol isn't in any section at all, ie, global bss.
+            Allocate zeroed space for it. */
+         addr = stgCallocBytes(1, symtab_i->Value, 
+                               "ocGetNames_PEi386(non-anonymous bss)");
+         addProddableBlock(oc, addr, symtab_i->Value);
+      }
+
+      if (addr != NULL) {
+         sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
          /* fprintf(stderr,"addSymbol %p `%s'\n", addr,sname); */
          IF_DEBUG(linker, belch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
+         /* cstring_from_COFF_symbol_name always succeeds. */
          oc->symbols[i] = sname;
          insertStrHashTable(symhash, sname, addr);
+      } else {
+#        if 0
+         fprintf ( stderr, 
+                   "IGNORING symbol %d\n"
+                   "     name `",
+                   i 
+                 );
+         printName ( symtab_i->Name, strtab );
+         fprintf ( stderr, 
+                   "'\n"
+                   "    value 0x%x\n"
+                   "   1+sec# %d\n"
+                   "     type 0x%x\n"
+                   "   sclass 0x%x\n"
+                   "     nAux %d\n",
+                   symtab_i->Value,
+                   (Int32)(symtab_i->SectionNumber),
+                   (UInt32)symtab_i->Type,
+                   (UInt32)symtab_i->StorageClass,
+                   (UInt32)symtab_i->NumberOfAuxSymbols 
+                 );
+#        endif
       }
+
       i += symtab_i->NumberOfAuxSymbols;
       i++;
    }
@@ -1198,7 +1286,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
            myindex ( sizeof_COFF_section, sectab, i );
       IF_DEBUG(linker, belch("section name = %s\n", sectab_i->Name ));
 
-#if 0
+#     if 0
       /* I'm sure this is the Right Way to do it.  However, the 
          alternative of testing the sectab_i->Name field seems to
          work ok with Cygwin.
@@ -1206,7 +1294,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE || 
           sectab_i->Characteristics & MYIMAGE_SCN_CNT_INITIALIZED_DATA)
          kind = SECTIONKIND_CODE_OR_RODATA;
-#endif
+#     endif
 
       if (0==strcmp(".text",sectab_i->Name) ||
           0==strcmp(".rodata",sectab_i->Name))
@@ -1225,9 +1313,12 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          return 0;
       }
 
-      oc->sections[i].start = start;
-      oc->sections[i].end   = end;
-      oc->sections[i].kind  = kind;
+      if (end >= start) {
+         oc->sections[i].start = start;
+         oc->sections[i].end   = end;
+         oc->sections[i].kind  = kind;
+         addProddableBlock(oc, start, end - start + 1);
+      }
    }
 
    return 1;   
@@ -1324,7 +1415,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 	        return 0;
             }
          }
-
+         checkProddableBlock(oc, pP);
          switch (reltab_j->Type) {
             case MYIMAGE_REL_I386_DIR32: 
                *pP = A + S; 

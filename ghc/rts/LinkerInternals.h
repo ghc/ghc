@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LinkerInternals.h,v 1.3 2001/02/28 10:03:42 sewardj Exp $
+ * $Id: LinkerInternals.h,v 1.4 2001/08/29 15:12:21 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -21,6 +21,14 @@ typedef enum { SECTIONKIND_CODE_OR_RODATA,
 
 typedef struct { void* start; void* end; SectionKind kind; } 
    Section;
+
+typedef 
+   struct _ProddableBlock {
+      void* start;
+      int   size;
+      struct _ProddableBlock* next;
+   }
+   ProddableBlock;
 
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
@@ -50,6 +58,12 @@ typedef struct _ObjectCode {
     
     /* Allow a chain of these things */
     struct _ObjectCode * next;
+
+    /* SANITY CHECK ONLY: a list of the only memory regions which may
+       safely be prodded during relocation.  Any attempt to prod
+       outside one of these is an error in the linker. */
+    ProddableBlock* proddables;
+    
 } ObjectCode;
 
 extern ObjectCode *objects;
