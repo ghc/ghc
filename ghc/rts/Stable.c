@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.29 2004/08/22 15:50:42 panne Exp $
+ * $Id: Stable.c,v 1.30 2004/09/03 15:28:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -180,7 +180,7 @@ lookupStableName(StgPtr p)
   
   if (sn != 0) {
     ASSERT(stable_ptr_table[sn].addr == p);
-    IF_DEBUG(stable,fprintf(stderr,"cached stable name %d at %p\n",sn,p));
+    IF_DEBUG(stable,debugBelch("cached stable name %d at %p\n",sn,p));
     return sn;
   } else {
     sn = stable_ptr_free - stable_ptr_table;
@@ -188,8 +188,7 @@ lookupStableName(StgPtr p)
     stable_ptr_table[sn].ref = 0;
     stable_ptr_table[sn].addr = p;
     stable_ptr_table[sn].sn_obj = NULL;
-    /* IF_DEBUG(stable,fprintf(stderr,"new stable name %d at
-       %p\n",sn,p)); */
+    /* IF_DEBUG(stable,debugBelch("new stable name %d at %p\n",sn,p)); */
     
     /* add the new stable name to the hash table */
     insertHashTable(addrToStableHash, (W_)p, (void *)sn);
@@ -374,13 +373,13 @@ gcStablePtrTable( void )
 		if (p->sn_obj == NULL) {
 		    // StableName object is dead
 		    freeStableName(p);
-		    IF_DEBUG(stable, fprintf(stderr,"GC'd Stable name %d\n", 
-					     p - stable_ptr_table));
+		    IF_DEBUG(stable, debugBelch("GC'd Stable name %d\n", 
+						p - stable_ptr_table));
 		    continue;
 		    
 		} else {
 		  p->addr = (StgPtr)isAlive((StgClosure *)p->addr);
-		    IF_DEBUG(stable, fprintf(stderr,"Stable name %d still alive at %p, ref %d\n", p - stable_ptr_table, p->addr, p->ref));
+		    IF_DEBUG(stable, debugBelch("Stable name %d still alive at %p, ref %d\n", p - stable_ptr_table, p->addr, p->ref));
 		}
 	    }
 	}

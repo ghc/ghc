@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.41 2004/08/13 13:10:44 simonmar Exp $
+ * $Id: Signals.c,v 1.42 2004/09/03 15:28:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -168,7 +168,7 @@ generic_handler(int sig)
 
     // stack full?
     if (next_pending_handler == &pending_handler_buf[N_PENDING_HANDLERS]) {
-	prog_belch("too many pending signals");
+	errorBelch("too many pending signals");
 	stg_exit(EXIT_FAILURE);
     }
     
@@ -436,7 +436,7 @@ initDefaultHandlers()
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGINT, &action, &oact) != 0) {
-	prog_belch("warning: failed to install SIGINT handler");
+	errorBelch("warning: failed to install SIGINT handler");
     }
 
 #if defined(HAVE_SIGINTERRUPT)
@@ -448,7 +448,7 @@ initDefaultHandlers()
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGCONT, &action, &oact) != 0) {
-	prog_belch("warning: failed to install SIGCONT handler");
+	errorBelch("warning: failed to install SIGCONT handler");
     }
 
     // install the SIGFPE handler
@@ -466,7 +466,7 @@ initDefaultHandlers()
     sigemptyset(&action.sa_mask);
     action.sa_flags = 0;
     if (sigaction(SIGFPE, &action, &oact) != 0) {
-	prog_belch("warning: failed to install SIGFPE handler");
+	errorBelch("warning: failed to install SIGFPE handler");
     }
 #endif
 

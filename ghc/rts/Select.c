@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.32 2004/07/15 20:50:40 sof Exp $
+ * $Id: Select.c,v 1.33 2004/09/03 15:28:53 simonmar Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -68,7 +68,7 @@ wakeUpSleepingThreads(nat ticks)
 	sleeping_queue = tso->link;
 	tso->why_blocked = NotBlocked;
 	tso->link = END_TSO_QUEUE;
-	IF_DEBUG(scheduler,belch("Waking up sleeping thread %d\n", tso->id));
+	IF_DEBUG(scheduler,debugBelch("Waking up sleeping thread %d\n", tso->id));
 	PUSH_ON_RUN_QUEUE(tso);
 	flag = rtsTrue;
     }
@@ -105,11 +105,11 @@ awaitEvent(rtsBool wait)
     tv.tv_usec = 0;
     
     IF_DEBUG(scheduler,
-	     belch("scheduler: checking for threads blocked on I/O");
+	     debugBelch("scheduler: checking for threads blocked on I/O");
 	     if (wait) {
-		 belch(" (waiting)");
+		 debugBelch(" (waiting)");
 	     }
-	     belch("\n");
+	     debugBelch("\n");
 	     );
 
     /* loop until we've woken up some threads.  This loop is needed
@@ -220,8 +220,6 @@ awaitEvent(rtsBool wait)
 	      unblock_all = rtsTrue;
 	      break;
 	    } else {
- 	      fprintf(stderr,"%d\n", errno);
- 	      fflush(stderr);
  	      perror("select");
 	      barf("select failed");
 	    }
@@ -299,7 +297,7 @@ awaitEvent(rtsBool wait)
 	      }
       
 	      if (ready) {
-		  IF_DEBUG(scheduler,belch("Waking up blocked thread %d\n", tso->id));
+		  IF_DEBUG(scheduler,debugBelch("Waking up blocked thread %d\n", tso->id));
 		  tso->why_blocked = NotBlocked;
 		  tso->link = END_TSO_QUEUE;
 		  PUSH_ON_RUN_QUEUE(tso);

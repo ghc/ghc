@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: FrontPanel.c,v 1.9 2004/08/13 13:09:49 simonmar Exp $
+ * $Id: FrontPanel.c,v 1.10 2004/09/03 15:28:20 simonmar Exp $
  *
  * (c) The GHC Team 2000
  *
@@ -102,7 +102,7 @@ configure_event( GtkWidget *widget, GdkEventConfigure *event STG_UNUSED,
 		      widget->allocation.width,
 		      widget->allocation.height);
 
-  fprintf(stderr, "configure!\n");
+  debugBelch("configure!\n");
   updateFrontPanel();
   return TRUE;
 }

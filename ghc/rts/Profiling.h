@@ -6,6 +6,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
+#include <stdio.h>
+
 #if defined(PROFILING) || defined(DEBUG)
 void initProfiling1 ( void );
 void initProfiling2 ( void );
@@ -25,5 +27,9 @@ void PrintNewStackDecls ( void );
 extern lnat RTS_VAR(total_prof_ticks);
 
 extern void fprintCCS( FILE *f, CostCentreStack *ccs );
+
+#ifdef DEBUG
+extern void debugCCS( CostCentreStack *ccs );
+#endif
 
 #endif

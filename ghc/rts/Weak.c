@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.32 2004/08/13 13:11:13 simonmar Exp $
+ * $Id: Weak.c,v 1.33 2004/09/03 15:28:59 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,6 +10,7 @@
 #include "PosixSource.h"
 #define COMPILING_RTS_MAIN
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "Weak.h"
@@ -40,7 +41,7 @@ finalizeWeakPointersNow(void)
     weak_ptr_list = w->link;
     if (w->header.info != &stg_DEAD_WEAK_info) {
 	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
-	IF_DEBUG(weak,fprintf(stderr,"Finalising weak pointer at %p -> %p\n", w, w->key));
+	IF_DEBUG(weak,debugBelch("Finalising weak pointer at %p -> %p\n", w, w->key));
 	if (w->finalizer != &stg_NO_FINALIZER_closure) {
 	    rts_evalLazyIO(w->finalizer,NULL);
 	    rts_unlock();
@@ -101,7 +102,7 @@ scheduleFinalizers(StgWeak *list)
     // No finalizers to run?
     if (n == 0) return;
 
-    IF_DEBUG(weak,fprintf(stderr,"weak: batching %d finalizers\n", n));
+    IF_DEBUG(weak,debugBelch("weak: batching %d finalizers\n", n));
 
     arr = (StgMutArrPtrs *)allocate(sizeofW(StgMutArrPtrs) + n);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerSet.c,v 1.5 2003/11/12 17:49:08 sof Exp $
+ * $Id: RetainerSet.c,v 1.6 2004/09/03 15:28:39 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -148,7 +148,7 @@ addElement(retainer r, RetainerSet *rs)
     StgWord hk;         // Hash Key
 
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "addElement(%p, %p) = ", r, rs);
+    // debugBelch("addElement(%p, %p) = ", r, rs);
 #endif
 
     ASSERT(rs != NULL);
@@ -188,7 +188,7 @@ addElement(retainer r, RetainerSet *rs)
 	if (i < rs->num) continue;
 
 #ifdef DEBUG_RETAINER
-	// fprintf(stderr, "%p\n", nrs);
+	// debugBelch("%p\n", nrs);
 #endif
 	// The set we are seeking already exists!
 	return nrs;
@@ -211,7 +211,7 @@ addElement(retainer r, RetainerSet *rs)
     hashTable[hash(hk)] = nrs;
 
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "%p\n", nrs);
+    // debugBelch("%p\n", nrs);
 #endif
     return nrs;
 }

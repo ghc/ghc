@@ -501,7 +501,7 @@ freeHaskellFunctionPtr(void* ptr)
 #if defined(i386_TARGET_ARCH)
  if ( *(unsigned char*)ptr != 0x68 &&
       *(unsigned char*)ptr != 0x58 ) {
-   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
@@ -513,7 +513,7 @@ freeHaskellFunctionPtr(void* ptr)
  }    
 #elif defined(sparc_TARGET_ARCH)
  if ( *(unsigned long*)ptr != 0x9C23A008UL ) {
-   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
@@ -521,7 +521,7 @@ freeHaskellFunctionPtr(void* ptr)
  freeStablePtr(*((StgStablePtr*)((unsigned long*)ptr + 11)));
 #elif defined(alpha_TARGET_ARCH)
  if ( *(StgWord64*)ptr != 0xa77b0018a61b0010L ) {
-   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
 
@@ -529,7 +529,7 @@ freeHaskellFunctionPtr(void* ptr)
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x10)));
 #elif defined(powerpc_TARGET_ARCH)
  if ( *(StgWord*)ptr != 0x7d0a4378 ) {
-   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 4*12)));
@@ -538,7 +538,7 @@ freeHaskellFunctionPtr(void* ptr)
  StgWord64 *code = (StgWord64 *)(fdesc+1);
 
  if (fdesc->ip != (StgWord64)code) {
-   prog_belch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
    return;
  }
  freeStablePtr((StgStablePtr)code[16]);

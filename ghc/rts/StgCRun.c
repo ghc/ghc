@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.43 2004/08/13 13:57:08 simonmar Exp $
+ * $Id: StgCRun.c,v 1.44 2004/09/03 15:28:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -87,9 +87,9 @@ StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg STG_UNUSED)
 {
     while (f) {
 	if (RtsFlags[0].DebugFlags.interpreter) {
-	    fprintf(stderr,"Jumping to ");
+	    debugBelch("Jumping to ");
 	    printPtr((P_)f); fflush(stdout);
-	    fprintf(stderr,"\n");
+	    debugBelch("\n");
 	}
 	f = (StgFunPtr) (f)();
     }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.19 2004/08/13 13:09:56 simonmar Exp $
+ * $Id: GCCompact.c,v 1.20 2004/09/03 15:28:26 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -72,15 +72,15 @@ thread( StgPtr p )
 STATIC_INLINE void
 unthread( StgPtr p, StgPtr free )
 {
-    StgPtr q = (StgPtr)*p, r;
+    StgWord q = *p, r;
     
-    while (((StgWord)q & 1) != 0) {
-	(StgWord)q -= 1;	// unset the low bit again
-	r = (StgPtr)*q;
-	*q = (StgWord)free;
+    while ((q & 1) != 0) {
+	q -= 1;	// unset the low bit again
+	r = *((StgPtr)q);
+	*((StgPtr)q) = (StgWord)free;
 	q = r;
     }
-    *p = (StgWord)q;
+    *p = q;
 }
 
 STATIC_INLINE StgInfoTable *
@@ -880,12 +880,12 @@ compact( void (*get_roots)(evac_fn) )
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
 	for (s = 0; s < generations[g].n_steps; s++) {
 	    stp = &generations[g].steps[s];
-	    IF_DEBUG(gc, fprintf(stderr,"update_fwd:  %d.%d\n", stp->gen->no, stp->no););
+	    IF_DEBUG(gc, debugBelch("update_fwd:  %d.%d\n", stp->gen->no, stp->no););
 
 	    update_fwd(stp->to_blocks);
 	    update_fwd_large(stp->scavenged_large_objects);
 	    if (g == RtsFlags.GcFlags.generations-1 && stp->blocks != NULL) {
-		IF_DEBUG(gc, fprintf(stderr,"update_fwd:  %d.%d (compact)\n", stp->gen->no, stp->no););
+		IF_DEBUG(gc, debugBelch("update_fwd:  %d.%d (compact)\n", stp->gen->no, stp->no););
 		update_fwd_compact(stp->blocks);
 	    }
 	}
@@ -895,7 +895,7 @@ compact( void (*get_roots)(evac_fn) )
     stp = &oldest_gen->steps[0];
     if (stp->blocks != NULL) {
 	blocks = update_bkwd_compact(stp);
-	IF_DEBUG(gc, fprintf(stderr,"update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)\n", 
+	IF_DEBUG(gc, debugBelch("update_bkwd: %d.%d (compact, old: %d blocks, now %d blocks)\n", 
 			     stp->gen->no, stp->no,
 			     stp->n_blocks, blocks););
 	stp->n_blocks = blocks;

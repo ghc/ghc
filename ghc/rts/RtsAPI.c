@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.51 2003/12/17 12:17:18 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.52 2004/09/03 15:28:39 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -479,13 +479,13 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc )
     case Success:
 	return;
     case Killed:
-	prog_belch("%s: uncaught exception",site);
+	errorBelch("%s: uncaught exception",site);
 	stg_exit(EXIT_FAILURE);
     case Interrupted:
-	prog_belch("%s: interrupted", site);
+	errorBelch("%s: interrupted", site);
 	stg_exit(EXIT_FAILURE);
     default:
-	prog_belch("%s: Return code (%d) not ok",(site),(rc));	
+	errorBelch("%s: Return code (%d) not ok",(site),(rc));	
 	stg_exit(EXIT_FAILURE);
     }
 }

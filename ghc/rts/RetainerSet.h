@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerSet.h,v 1.2 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: RetainerSet.h,v 1.3 2004/09/03 15:28:39 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -10,6 +10,8 @@
 
 #ifndef RETAINERSET_H
 #define RETAINERSET_H
+
+#include <stdio.h>
 
 #ifdef PROFILING
 

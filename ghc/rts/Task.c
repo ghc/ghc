@@ -91,7 +91,7 @@ startTask ( void (*taskStart)(void) )
   taskTable[taskCount].gc_etime = 0.0;
   taskTable[taskCount].elapsedtimestart = stat_getElapsedTime();
 
-  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: Started task: %ld\n",tid););
+  IF_DEBUG(scheduler,debugBelch("scheduler: Started task: %ld\n",tid););
   return;
 }
 
@@ -113,7 +113,7 @@ stopTaskManager ()
   
   /* Wait for all the tasks to terminate */
   for (i = 0; i < maxCount; i++) {
-    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: waiting for task %ld\n", 
+    IF_DEBUG(scheduler,debugBelch("scheduler: waiting for task %ld\n", 
 			       taskTable[i].id));
     pthread_join(taskTable[i].id, NULL);
   }
@@ -166,7 +166,7 @@ startTask ( void (*taskStart)(void) )
      on thread_ready_cond, don't create a new one.
   */
   if ( rts_n_waiting_tasks > 0) {
-    IF_DEBUG(scheduler,fprintf(stderr,
+    IF_DEBUG(scheduler,debugBelch(
 			       "scheduler: startTask: %d tasks waiting, not creating new one.\n", 
 			       rts_n_waiting_tasks););
     // the task will run as soon as a capability is available,
@@ -176,7 +176,7 @@ startTask ( void (*taskStart)(void) )
 
   /* If the task limit has been reached, just return. */
   if (maxTasks > 0 && taskCount == maxTasks) {
-    IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: task limit (%d) reached, not creating new one.\n",maxTasks));
+    IF_DEBUG(scheduler,debugBelch("scheduler: startTask: task limit (%d) reached, not creating new one.\n",maxTasks));
     return rtsFalse;
   }
   
@@ -187,7 +187,7 @@ startTask ( void (*taskStart)(void) )
   }
   taskCount++;
 
-  IF_DEBUG(scheduler,fprintf(stderr,"scheduler: startTask: new task %ld (total_count: %d; waiting: %d)\n", tid, taskCount, rts_n_waiting_tasks););
+  IF_DEBUG(scheduler,debugBelch("scheduler: startTask: new task %ld (total_count: %d; waiting: %d)\n", tid, taskCount, rts_n_waiting_tasks););
   return rtsTrue;
 }
 

@@ -644,18 +644,18 @@ checkTSOsSanity(void) {
   nat i, tsos;
   StgTSO *tso;
   
-  belch("Checking sanity of all runnable TSOs:");
+  debugBelch("Checking sanity of all runnable TSOs:");
   
   for (i=0, tsos=0; i<RtsFlags.GranFlags.proc; i++) {
     for (tso=run_queue_hds[i]; tso!=END_TSO_QUEUE; tso=tso->link) {
-      fprintf(stderr, "TSO %p on PE %d ...", tso, i);
+      debugBelch("TSO %p on PE %d ...", tso, i);
       checkTSO(tso); 
-      fprintf(stderr, "OK, ");
+      debugBelch("OK, ");
       tsos++;
     }
   }
   
-  belch(" checked %d TSOs on %d PEs; ok\n", tsos, RtsFlags.GranFlags.proc);
+  debugBelch(" checked %d TSOs on %d PEs; ok\n", tsos, RtsFlags.GranFlags.proc);
 }
 
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.36 2003/12/22 16:27:10 simonmar Exp $
+ * $Id: Itimer.c,v 1.37 2004/09/03 15:28:29 simonmar Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -92,7 +92,7 @@ int
 startTicker(nat ms, TickProc handle_tick)
 {
 # ifndef HAVE_SETITIMER
-  /*    fprintf(stderr, "No virtual timer on this system\n"); */
+  /*    debugBelch("No virtual timer on this system\n"); */
     return -1;
 # else
     struct itimerval it;
@@ -112,7 +112,7 @@ int
 stopTicker()
 {
 # ifndef HAVE_SETITIMER
-  /*    fprintf(stderr, "No virtual timer on this system\n"); */
+  /*    debugBelch("No virtual timer on this system\n"); */
     return -1;
 # else
     struct itimerval it;

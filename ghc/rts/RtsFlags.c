@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.75 2004/08/13 13:10:29 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.76 2004/09/03 15:28:40 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -115,12 +115,13 @@ static char par_debug_opts_flags[] = {
    Static function decls
    -------------------------------------------------------------------------- */
 
-static FILE *		/* return NULL on error */
+static int		/* return NULL on error */
 open_stats_file (
     I_ arg,
     int argc, char *argv[],
     int rts_argc, char *rts_argv[],
-    const char *FILENAME_FMT);
+    const char *FILENAME_FMT,
+    FILE **file_ret);
 
 static I_ decode(const char *s);
 static void bad_option(const char *s);
@@ -577,7 +578,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     for (arg = 0; arg < *rts_argc; arg++) {
 	if (rts_argv[arg][0] != '-') {
 	    fflush(stdout);
-	    prog_belch("unexpected RTS argument: %s", rts_argv[arg]);
+	    errorBelch("unexpected RTS argument: %s", rts_argv[arg]);
 	    error = rtsTrue;
 
         } else {
@@ -595,7 +596,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 # define TICKY_BUILD_ONLY(x) x
 #else
 # define TICKY_BUILD_ONLY(x) \
-prog_belch("not built for: ticky-ticky stats"); \
+errorBelch("not built for: ticky-ticky stats"); \
 error = rtsTrue;
 #endif
 
@@ -603,7 +604,7 @@ error = rtsTrue;
 # define COST_CENTRE_USING_BUILD_ONLY(x) x
 #else
 # define COST_CENTRE_USING_BUILD_ONLY(x) \
-prog_belch("not built for: -prof or -parallel"); \
+errorBelch("not built for: -prof or -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -611,7 +612,7 @@ error = rtsTrue;
 # define PROFILING_BUILD_ONLY(x)   x
 #else
 # define PROFILING_BUILD_ONLY(x) \
-prog_belch("not built for: -prof"); \
+errorBelch("not built for: -prof"); \
 error = rtsTrue;
 #endif
 
@@ -619,7 +620,7 @@ error = rtsTrue;
 # define SMP_BUILD_ONLY(x)      x
 #else
 # define SMP_BUILD_ONLY(x) \
-prog_belch("not built for: -smp"); \
+errorBelch("not built for: -smp"); \
 error = rtsTrue;
 #endif
 
@@ -627,7 +628,7 @@ error = rtsTrue;
 # define PAR_BUILD_ONLY(x)      x
 #else
 # define PAR_BUILD_ONLY(x) \
-prog_belch("not built for: -parallel"); \
+errorBelch("not built for: -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -635,7 +636,7 @@ error = rtsTrue;
 # define PAR_OR_SMP_BUILD_ONLY(x)      x
 #else
 # define PAR_OR_SMP_BUILD_ONLY(x) \
-prog_belch("not built for: -parallel or -smp"); \
+errorBelch("not built for: -parallel or -smp"); \
 error = rtsTrue;
 #endif
 
@@ -643,7 +644,7 @@ error = rtsTrue;
 # define GRAN_BUILD_ONLY(x)     x
 #else
 # define GRAN_BUILD_ONLY(x) \
-prog_belch("not built for: -gransim"); \
+errorBelch("not built for: -gransim"); \
 error = rtsTrue;
 #endif
 
@@ -816,13 +817,15 @@ error = rtsTrue;
 #ifdef PAR
 		/* Opening all those files would almost certainly fail... */
 		// RtsFlags.ParFlags.ParStats.Full = rtsTrue;
-		RtsFlags.GcFlags.statsFile = stderr; /* temporary; ToDo: rm */
+		RtsFlags.GcFlags.statsFile = NULL; /* temporary; ToDo: rm */
 #else
-		  RtsFlags.GcFlags.statsFile
-		      = open_stats_file(arg, *argc, argv,
-					*rts_argc, rts_argv, STAT_FILENAME_FMT);
-		  
-		  if (RtsFlags.GcFlags.statsFile == NULL) error = rtsTrue;
+		{ 
+		    int r;
+		    r = open_stats_file(arg, *argc, argv,
+					*rts_argc, rts_argv, STAT_FILENAME_FMT,
+					&RtsFlags.GcFlags.statsFile);
+		    if (r == -1) { error = rtsTrue; }
+		}
 #endif
 		  break;
 
@@ -870,7 +873,7 @@ error = rtsTrue;
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
 		    break;
 		  default:
-		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
+		    errorBelch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
 #else
@@ -939,7 +942,7 @@ error = rtsTrue;
 		    }
 
 		    if (RtsFlags.ProfFlags.doHeapProfile != 0) {
-			prog_belch("multiple heap profile options");
+			errorBelch("multiple heap profile options");
 			error = rtsTrue;
 			break;
 		    }
@@ -974,7 +977,7 @@ error = rtsTrue;
 		    break;
 		      
 		default:
-		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
+		    errorBelch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
 		) 
@@ -1023,7 +1026,7 @@ error = rtsTrue;
 		    RtsFlags.ParFlags.nNodes
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
 		    if (RtsFlags.ParFlags.nNodes <= 0) {
-		      prog_belch("bad value for -N");
+		      errorBelch("bad value for -N");
 		      error = rtsTrue;
 		    }
 		}
@@ -1036,7 +1039,7 @@ error = rtsTrue;
 		    RtsFlags.ParFlags.maxLocalSparks
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
 		    if (RtsFlags.ParFlags.maxLocalSparks <= 0) {
-		      prog_belch("bad value for -e");
+		      errorBelch("bad value for -e");
 		      error = rtsTrue;
 		    }
 		}
@@ -1060,11 +1063,14 @@ error = rtsTrue;
 		TICKY_BUILD_ONLY(
 
 		RtsFlags.TickyFlags.showTickyStats = rtsTrue;
-		RtsFlags.TickyFlags.tickyFile
-		  = open_stats_file(arg, *argc, argv,
-			*rts_argc, rts_argv, TICKY_FILENAME_FMT);
 
-		if (RtsFlags.TickyFlags.tickyFile == NULL) error = rtsTrue;
+		{ 
+		    int r;
+		    r = open_stats_file(arg, *argc, argv,
+					*rts_argc, rts_argv, TICKY_FILENAME_FMT,
+					&RtsFlags.TickyFlags.tickyFile);
+		    if (r == -1) { error = rtsTrue; }
+		}
 	        ) break;
 
 	      /* =========== EXTENDED OPTIONS =================== */
@@ -1072,7 +1078,7 @@ error = rtsTrue;
               case 'x': /* Extend the argument space */
                 switch(rts_argv[arg][2]) {
                   case '\0':
-		    prog_belch("incomplete RTS option: %s",rts_argv[arg]);
+		    errorBelch("incomplete RTS option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		    break;
 
@@ -1091,7 +1097,7 @@ error = rtsTrue;
                   /* The option prefix '-xx' is reserved for future extension.  KSW 1999-11. */
 
 	          default:
-		    prog_belch("unknown RTS option: %s",rts_argv[arg]);
+		    errorBelch("unknown RTS option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		    break;
                 }
@@ -1099,7 +1105,7 @@ error = rtsTrue;
 
 	      /* =========== OH DEAR ============================ */
 	      default:
-		prog_belch("unknown RTS option: %s",rts_argv[arg]);
+		errorBelch("unknown RTS option: %s",rts_argv[arg]);
 		error = rtsTrue;
 		break;
 	    }
@@ -1110,7 +1116,7 @@ error = rtsTrue;
 
         fflush(stdout);
 	for (p = usage_text; *p; p++)
-	    belch("%s", *p);
+	    errorBelch("%s", *p);
 	stg_exit(EXIT_FAILURE);
     }
 }
@@ -1123,7 +1129,7 @@ error = rtsTrue;
 static void
 enable_GranSimLight(void) {
 
-    fprintf(stderr,"GrAnSim Light enabled (infinite number of processors;  0 communication costs)\n");
+    debugBelch("GrAnSim Light enabled (infinite number of processors;  0 communication costs)\n");
     RtsFlags.GranFlags.Light=rtsTrue;
     RtsFlags.GranFlags.Costs.latency = 
 	RtsFlags.GranFlags.Costs.fetchtime = 
@@ -1383,7 +1389,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	    RtsFlags.GranFlags.Costs.pri_spark_overhead = decode(rts_argv[arg]+3);
 	  else
 	    RtsFlags.GranFlags.Costs.pri_spark_overhead = PRI_SPARK_OVERHEAD;
-	  fprintf(stderr,"Overhead for pri spark: %d (per elem).\n",
+	  debugBelch("Overhead for pri spark: %d (per elem).\n",
 		         RtsFlags.GranFlags.Costs.pri_spark_overhead);
 	  break;
 
@@ -1392,7 +1398,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	    RtsFlags.GranFlags.Costs.pri_sched_overhead = decode(rts_argv[arg]+3);
 	  else
 	    RtsFlags.GranFlags.Costs.pri_sched_overhead = PRI_SCHED_OVERHEAD;
-	  fprintf(stderr,"Overhead for pri sched: %d (per elem).\n",
+	  debugBelch("Overhead for pri sched: %d (per elem).\n",
 		       RtsFlags.GranFlags.Costs.pri_sched_overhead);
 	  break;
 
@@ -1406,7 +1412,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	      } else if (RtsFlags.GranFlags.proc > MAX_PROC || 
 			 RtsFlags.GranFlags.proc < 1)
 		{
-		  fprintf(stderr,"setupRtsFlags: no more than %u processors allowed\n",
+		  debugBelch("setupRtsFlags: no more than %u processors allowed\n",
 			  MAX_PROC);
 		  *error = rtsTrue;
 		}
@@ -1436,22 +1442,22 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	  break;
 
         case 'G':
-	  fprintf(stderr,"Bulk fetching enabled.\n");
+	  debugBelch("Bulk fetching enabled.\n");
 	  RtsFlags.GranFlags.DoBulkFetching=rtsTrue;
 	  break;
 	  
         case 'M':
-	  fprintf(stderr,"Thread migration enabled.\n");
+	  debugBelch("Thread migration enabled.\n");
 	  RtsFlags.GranFlags.DoThreadMigration=rtsTrue;
 	  break;
 
         case 'R':
-	  fprintf(stderr,"Fair Scheduling enabled.\n");
+	  debugBelch("Fair Scheduling enabled.\n");
 	  RtsFlags.GranFlags.DoFairSchedule=rtsTrue;
 	  break;
 	  
         case 'I':
-	  fprintf(stderr,"Priority Scheduling enabled.\n");
+	  debugBelch("Priority Scheduling enabled.\n");
 	  RtsFlags.GranFlags.DoPriorityScheduling=rtsTrue;
 	  break;
 
@@ -1512,18 +1518,18 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	    arg0 = rts_argv[arg]+3;
 	    if ((tmp = strstr(arg0,","))==NULL) {
 	      RtsFlags.GranFlags.SparkPriority = decode(arg0);
-	      fprintf(stderr,"SparkPriority: %u.\n",RtsFlags.GranFlags.SparkPriority);
+	      debugBelch("SparkPriority: %u.\n",RtsFlags.GranFlags.SparkPriority);
 	    } else {
 	      *(tmp++) = '\0'; 
 	      RtsFlags.GranFlags.SparkPriority = decode(arg0);
 	      RtsFlags.GranFlags.SparkPriority2 = decode(tmp);
-	      fprintf(stderr,"SparkPriority: %u.\n",
+	      debugBelch("SparkPriority: %u.\n",
 		      RtsFlags.GranFlags.SparkPriority);
-	      fprintf(stderr,"SparkPriority2:%u.\n",
+	      debugBelch("SparkPriority2:%u.\n",
 		      RtsFlags.GranFlags.SparkPriority2);
 	      if (RtsFlags.GranFlags.SparkPriority2 < 
 		  RtsFlags.GranFlags.SparkPriority) {
-		fprintf(stderr,"WARNING: 2nd pri < main pri (%u<%u); 2nd pri has no effect\n",
+		debugBelch("WARNING: 2nd pri < main pri (%u<%u); 2nd pri has no effect\n",
 			RtsFlags.GranFlags.SparkPriority2,
 			RtsFlags.GranFlags.SparkPriority);
 	      }
@@ -1531,7 +1537,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	  } else {
 	    /* plain pri spark is now invoked with -bX  
 	       RtsFlags.GranFlags.DoPrioritySparking = 1;
-	       fprintf(stderr,"PrioritySparking.\n");
+	       debugBelch("PrioritySparking.\n");
 	    */
 	  }
 	  break;
@@ -1542,13 +1548,13 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	  } else {
 	    RtsFlags.GranFlags.ThunksToPack = 1;
 	  }
-	  fprintf(stderr,"Thunks To Pack in one packet: %u.\n",
+	  debugBelch("Thunks To Pack in one packet: %u.\n",
 		  RtsFlags.GranFlags.ThunksToPack);
 	  break;
 		      
         case 'e':
 	  RtsFlags.GranFlags.RandomSteal = rtsFalse;
-	  fprintf(stderr,"Deterministic mode (no random stealing)\n");
+	  debugBelch("Deterministic mode (no random stealing)\n");
 		      break;
 
 	  /* The following class of options contains eXperimental */
@@ -1562,7 +1568,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	  } else {
 	    RtsFlags.GranFlags.packBufferSize_internal = GRANSIM_DEFAULT_PACK_BUFFER_SIZE;
 	  }
-	  fprintf(stderr,"Size of GranSim internal pack buffer: %u.\n",
+	  debugBelch("Size of GranSim internal pack buffer: %u.\n",
 		  RtsFlags.GranFlags.packBufferSize_internal);
 	  break;
   		      
@@ -1571,7 +1577,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	    
 	    case '\0':
 	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      fprintf(stderr,"Priority Sparking with Normal Priorities.\n");
+	      debugBelch("Priority Sparking with Normal Priorities.\n");
 	      RtsFlags.GranFlags.InversePriorities = rtsFalse; 
 	      RtsFlags.GranFlags.RandomPriorities = rtsFalse;
 	      RtsFlags.GranFlags.IgnorePriorities = rtsFalse;
@@ -1579,19 +1585,19 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 			
 	    case 'I':
 	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      fprintf(stderr,"Priority Sparking with Inverse Priorities.\n");
+	      debugBelch("Priority Sparking with Inverse Priorities.\n");
 	      RtsFlags.GranFlags.InversePriorities++; 
 	      break;
 	      
 	    case 'R': 
 	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      fprintf(stderr,"Priority Sparking with Random Priorities.\n");
+	      debugBelch("Priority Sparking with Random Priorities.\n");
 	      RtsFlags.GranFlags.RandomPriorities++;
 	      break;
 	      
 	    case 'N':
 	      RtsFlags.GranFlags.DoPrioritySparking = 1;
-	      fprintf(stderr,"Priority Sparking with No Priorities.\n");
+	      debugBelch("Priority Sparking with No Priorities.\n");
 	      RtsFlags.GranFlags.IgnorePriorities++;
 	      break;
 	      
@@ -1679,10 +1685,10 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	    case 'Q':    /* Set pack buffer size (same as 'Q' in GUM) */
 	      if (rts_argv[arg][4] != '\0') {
 		RtsFlags.GranFlags.packBufferSize = decode(rts_argv[arg]+4);
-		fprintf(stderr,"Pack buffer size: %d\n",
+		debugBelch("Pack buffer size: %d\n",
 			RtsFlags.GranFlags.packBufferSize);
 	      } else {
-    	    	fprintf(stderr, "setupRtsFlags: missing size of PackBuffer (for -Q)\n");
+    	    	debugBelch("setupRtsFlags: missing size of PackBuffer (for -Q)\n");
     	    	*error = rtsTrue;
     	      }
 	      break;
@@ -1699,7 +1705,7 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 		    break;
 		
 		if (i==MAX_GRAN_DEBUG_OPTION+1) {
-		  fprintf(stderr, "Valid GranSim debug options are:\n");
+		  debugBelch("Valid GranSim debug options are:\n");
 		  help_GranSim_debug_options(MAX_GRAN_DEBUG_MASK);
 		  bad_option( rts_argv[arg] );
 		} else { // flag found; now set it
@@ -1710,92 +1716,92 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	      
 #if 0
 	    case 'e':       /* event trace; also -bD1 */
-	      fprintf(stderr,"DEBUG: event_trace; printing event trace.\n");
+	      debugBelch("DEBUG: event_trace; printing event trace.\n");
 	      RtsFlags.GranFlags.Debug.event_trace = rtsTrue;
 	      /* RtsFlags.GranFlags.event_trace=rtsTrue; */
 	      break;
 	      
 	    case 'E':       /* event statistics; also -bD2 */
-	      fprintf(stderr,"DEBUG: event_stats; printing event statistics.\n");
+	      debugBelch("DEBUG: event_stats; printing event statistics.\n");
 	      RtsFlags.GranFlags.Debug.event_stats = rtsTrue;
 	      /* RtsFlags.GranFlags.Debug |= 0x20; print event statistics   */
 	      break;
 	      
 	    case 'f':       /* thunkStealing; also -bD4 */
-	      fprintf(stderr,"DEBUG: thunkStealing; printing forwarding of FETCHNODES.\n");
+	      debugBelch("DEBUG: thunkStealing; printing forwarding of FETCHNODES.\n");
 	      RtsFlags.GranFlags.Debug.thunkStealing = rtsTrue;
 	      /* RtsFlags.GranFlags.Debug |= 0x2;  print fwd messages */
 	      break;
 
 	    case 'z':       /* blockOnFetch; also -bD8 */
-	      fprintf(stderr,"DEBUG: blockOnFetch; check for blocked on fetch.\n");
+	      debugBelch("DEBUG: blockOnFetch; check for blocked on fetch.\n");
 	      RtsFlags.GranFlags.Debug.blockOnFetch = rtsTrue;
 	      /* RtsFlags.GranFlags.Debug |= 0x4; debug non-reschedule-on-fetch */
 	      break;
 	      
 	    case 't':       /* blockOnFetch_sanity; also -bD16 */  
-	      fprintf(stderr,"DEBUG: blockOnFetch_sanity; check for TSO asleep on fetch.\n");
+	      debugBelch("DEBUG: blockOnFetch_sanity; check for TSO asleep on fetch.\n");
 	      RtsFlags.GranFlags.Debug.blockOnFetch_sanity = rtsTrue;
 	      /* RtsFlags.GranFlags.Debug |= 0x10; debug TSO asleep for fetch  */
 	      break;
 
 	    case 'S':       /* priSpark; also -bD32 */
-	      fprintf(stderr,"DEBUG: priSpark; priority sparking.\n");
+	      debugBelch("DEBUG: priSpark; priority sparking.\n");
 	      RtsFlags.GranFlags.Debug.priSpark = rtsTrue;
 	      break;
 
 	    case 's':       /* priSched; also -bD64 */
-	      fprintf(stderr,"DEBUG: priSched; priority scheduling.\n");
+	      debugBelch("DEBUG: priSched; priority scheduling.\n");
 	      RtsFlags.GranFlags.Debug.priSched = rtsTrue;
 	      break;
 
 	    case 'F':       /* findWork; also -bD128 */
-	      fprintf(stderr,"DEBUG: findWork; searching spark-pools (local & remote), thread queues for work.\n");
+	      debugBelch("DEBUG: findWork; searching spark-pools (local & remote), thread queues for work.\n");
 	      RtsFlags.GranFlags.Debug.findWork = rtsTrue;
 	      break;
 	      
 	    case 'g':       /* globalBlock; also -bD256 */
-	      fprintf(stderr,"DEBUG: globalBlock; blocking on remote closures (FETCHMEs etc in GUM).\n");
+	      debugBelch("DEBUG: globalBlock; blocking on remote closures (FETCHMEs etc in GUM).\n");
 	      RtsFlags.GranFlags.Debug.globalBlock = rtsTrue;
 	      break;
 	      
 	    case 'G':       /* pack; also -bD512 */
-	      fprintf(stderr,"DEBUG: pack; routines for (un-)packing graph structures.\n");
+	      debugBelch("DEBUG: pack; routines for (un-)packing graph structures.\n");
 	      RtsFlags.GranFlags.Debug.pack = rtsTrue;
 	      break;
 	      
 	    case 'P':       /* packBuffer; also -bD1024 */
-	      fprintf(stderr,"DEBUG: packBuffer; routines handling pack buffer (GranSim internal!).\n");
+	      debugBelch("DEBUG: packBuffer; routines handling pack buffer (GranSim internal!).\n");
 	      RtsFlags.GranFlags.Debug.packBuffer = rtsTrue;
 	      break;
 	      
 	    case 'o':       /* sortedQ; also -bD2048 */
-	      fprintf(stderr,"DEBUG: sortedQ; check whether spark/thread queues are sorted.\n");
+	      debugBelch("DEBUG: sortedQ; check whether spark/thread queues are sorted.\n");
 	      RtsFlags.GranFlags.Debug.sortedQ = rtsTrue;
 	      break;
 	      
 	    case 'r':       /* randomSteal; also -bD4096 */
-	      fprintf(stderr,"DEBUG: randomSteal; stealing sparks/threads from random PEs.\n");
+	      debugBelch("DEBUG: randomSteal; stealing sparks/threads from random PEs.\n");
 	      RtsFlags.GranFlags.Debug.randomSteal = rtsTrue;
 	      break;
 	      
 	    case 'q':       /* checkSparkQ; also -bD8192 */
-	      fprintf(stderr,"DEBUG: checkSparkQ; check consistency of the spark queues.\n");
+	      debugBelch("DEBUG: checkSparkQ; check consistency of the spark queues.\n");
 	      RtsFlags.GranFlags.Debug.checkSparkQ = rtsTrue;
 	      break;
 	      
 	    case ':':       /* checkLight; also -bD16384 */
-	      fprintf(stderr,"DEBUG: checkLight; check GranSim-Light setup.\n");
+	      debugBelch("DEBUG: checkLight; check GranSim-Light setup.\n");
 	      RtsFlags.GranFlags.Debug.checkLight = rtsTrue;
 	      break;
 	      
 	    case 'b':       /* bq; also -bD32768 */
-	      fprintf(stderr,"DEBUG: bq; check blocking queues\n");
+	      debugBelch("DEBUG: bq; check blocking queues\n");
 	      RtsFlags.GranFlags.Debug.bq = rtsTrue;
 	      break;
 	      
 	    case 'd':       /* all options turned on */
-	      fprintf(stderr,"DEBUG: all options turned on.\n");
+	      debugBelch("DEBUG: all options turned on.\n");
 	      set_GranSim_debug_options(MAX_GRAN_DEBUG_MASK);
 	      /* RtsFlags.GranFlags.Debug |= 0x40; */
 	      break;
@@ -1824,7 +1830,7 @@ set_GranSim_debug_options(nat n) {
 
   for (i=0; i<=MAX_GRAN_DEBUG_OPTION; i++) 
     if ((n>>i)&1) {
-      fprintf(stderr, gran_debug_opts_strs[i]);
+      errorBelch(gran_debug_opts_strs[i]);
       switch (i) {
         case 0: RtsFlags.GranFlags.Debug.event_trace   = rtsTrue;  break;
         case 1: RtsFlags.GranFlags.Debug.event_stats   = rtsTrue;  break;
@@ -1856,7 +1862,7 @@ help_GranSim_debug_options(nat n) {
 
   for (i=0; i<=MAX_GRAN_DEBUG_OPTION; i++) 
     if ((n>>i)&1) 
-      fprintf(stderr, gran_debug_opts_strs[i]);
+      debugBelch(gran_debug_opts_strs[i]);
 }
 
 # elif defined(PAR)
@@ -1866,7 +1872,7 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 {
 
   if (rts_argv[arg][1] != 'q') { /* All GUM options start with -q */
-    belch("Warning: GUM option does not start with -q: %s", rts_argv[arg]);
+    errorBelch("Warning: GUM option does not start with -q: %s", rts_argv[arg]);
     return;
   }
 
@@ -1878,12 +1884,12 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
       
       if (RtsFlags.ParFlags.maxLocalSparks <= 0) {
-	belch("setupRtsFlags: bad value for -e\n");
+	errorBelch("setupRtsFlags: bad value for -e\n");
 	*error = rtsTrue;
       }
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qe<n>: max %d local sparks", 
+		 errorBelch("-qe<n>: max %d local sparks", 
 		       RtsFlags.ParFlags.maxLocalSparks));
     break;
   
@@ -1892,11 +1898,11 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
       RtsFlags.ParFlags.maxThreads
 	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
     } else {
-      belch("setupRtsFlags: missing size for -qt\n");
+      errorBelch("missing size for -qt\n");
       *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qt<n>: max %d threads", 
+		 errorBelch("-qt<n>: max %d threads", 
 		       RtsFlags.ParFlags.maxThreads));
     break;
 
@@ -1907,7 +1913,7 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
       RtsFlags.ParFlags.maxFishes = MAX_FISHES;
     break;
     IF_PAR_DEBUG(verbose,
-		 belch("-qf<n>: max %d fishes sent out at one time", 
+		 errorBelch("-qf<n>: max %d fishes sent out at one time", 
 		       RtsFlags.ParFlags.maxFishes));
     break;
   
@@ -1916,29 +1922,29 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
       RtsFlags.ParFlags.fishDelay
 	= strtol(rts_argv[arg]+3, (char **) NULL, 10);
     } else {
-      belch("setupRtsFlags: missing fish delay time for -qF\n");
+      errorBelch("missing fish delay time for -qF\n");
       *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qF<n>: fish delay time %d us", 
+		 errorBelch("-qF<n>: fish delay time %d us", 
 		       RtsFlags.ParFlags.fishDelay));
     break;
 
   case 'O':
     RtsFlags.ParFlags.outputDisabled = rtsTrue;
     IF_PAR_DEBUG(verbose,
-		 belch("-qO: output disabled"));
+		 errorBelch("-qO: output disabled"));
     break;
   
   case 'g': /* -qg<n> ... globalisation scheme */
     if (rts_argv[arg][3] != '\0') {
       RtsFlags.ParFlags.globalising = decode(rts_argv[arg]+3);
     } else {
-      belch("setupRtsFlags: missing identifier for globalisation scheme (for -qg)\n");
+      errorBelch("missing identifier for globalisation scheme (for -qg)\n");
       *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qg<n>: globalisation scheme set to  %d", 
+		 debugBelch("-qg<n>: globalisation scheme set to  %d", 
 		       RtsFlags.ParFlags.globalising));
     break;
 
@@ -1946,11 +1952,11 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
     if (rts_argv[arg][3] != '\0') {
       RtsFlags.ParFlags.thunksToPack = decode(rts_argv[arg]+3);
     } else {
-      belch("setupRtsFlags: missing number of thunks per packet (for -qh)\n");
+      errorBelch("missing number of thunks per packet (for -qh)\n");
       *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qh<n>: thunks per packet set to %d", 
+		 debugBelch("-qh<n>: thunks per packet set to %d", 
 		       RtsFlags.ParFlags.thunksToPack));
     break;
 
@@ -1975,14 +1981,14 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 # if defined(PAR_TICKY)
       RtsFlags.ParFlags.ParStats.Global = rtsTrue;
 # else 
-      fprintf(stderr,"-qPg is only possible for a PAR_TICKY RTS, which this is not");
+      errorBelch("-qPg is only possible for a PAR_TICKY RTS, which this is not");
       stg_exit(EXIT_FAILURE);
 # endif
       break;
     default: barf("Unknown option -qP%c", rts_argv[arg][2]);
     }
     IF_PAR_DEBUG(verbose,
-		 belch("(-qP) writing to log-file (RtsFlags.ParFlags.ParStats.Full=%s)",
+		 debugBelch("(-qP) writing to log-file (RtsFlags.ParFlags.ParStats.Full=%s)",
 		       (RtsFlags.ParFlags.ParStats.Full ? "rtsTrue" : "rtsFalse")));
     break;
   
@@ -1990,18 +1996,18 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
     if (rts_argv[arg][3] != '\0') {
       RtsFlags.ParFlags.packBufferSize = decode(rts_argv[arg]+3);
     } else {
-      belch("setupRtsFlags: missing size of PackBuffer (for -qQ)\n");
+      errorBelch("missing size of PackBuffer (for -qQ)\n");
       *error = rtsTrue;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qQ<n>: pack buffer size set to %d", 
+		 debugBelch("-qQ<n>: pack buffer size set to %d", 
 		       RtsFlags.ParFlags.packBufferSize));
     break;
 
   case 'R':
     RtsFlags.ParFlags.doFairScheduling = rtsTrue;
     IF_PAR_DEBUG(verbose,
-		 belch("-qR: fair-ish scheduling"));
+		 debugBelch("-qR: fair-ish scheduling"));
     break;
   
 # if defined(DEBUG)  
@@ -2013,7 +2019,7 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
       RtsFlags.ParFlags.wait = 1000;
     }
     IF_PAR_DEBUG(verbose,
-		 belch("-qw<n>: length of wait loop after synchr before reduction: %d", 
+		 debugBelch("-qw<n>: length of wait loop after synchr before reduction: %d", 
 		       RtsFlags.ParFlags.wait));
     break;
 
@@ -2029,7 +2035,7 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	  break;
 	
       if (i==MAX_PAR_DEBUG_OPTION+1) {
-	fprintf(stderr, "Valid GUM debug options are:\n");
+	errorBelch("Valid GUM debug options are:\n");
 	help_par_debug_options(MAX_PAR_DEBUG_MASK);
 	bad_option( rts_argv[arg] );
       } else { // flag found; now set it
@@ -2039,7 +2045,7 @@ process_par_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
     break;
 # endif
   default:
-    belch("Unknown option -q%c (%d opts in total)", 
+    errorBelch("Unknown option -q%c (%d opts in total)", 
 	  rts_argv[arg][2], *rts_argc);
     break;
   } /* switch */
@@ -2055,7 +2061,7 @@ set_par_debug_options(nat n) {
 
   for (i=0; i<=MAX_PAR_DEBUG_OPTION; i++) 
     if ((n>>i)&1) {
-      fprintf(stderr, par_debug_opts_strs[i]);
+      debugBelch(par_debug_opts_strs[i]);
       switch (i) {
         case 0: RtsFlags.ParFlags.Debug.verbose       = rtsTrue;  break;
         case 1: RtsFlags.ParFlags.Debug.bq            = rtsTrue;  break;
@@ -2086,7 +2092,7 @@ help_par_debug_options(nat n) {
 
   for (i=0; i<=MAX_PAR_DEBUG_OPTION; i++) 
     if ((n>>i)&1) 
-      fprintf(stderr, par_debug_opts_strs[i]);
+      debugBelch(par_debug_opts_strs[i]);
 }
 
 #endif /* PAR */
@@ -2094,39 +2100,61 @@ help_par_debug_options(nat n) {
 //@node Aux fcts,  , GranSim specific options
 //@subsection Aux fcts
 
-static FILE *		/* return NULL on error */
+static void
+stats_fprintf(FILE *f, char *s, ...)
+{
+    va_list ap;
+    va_start(ap,s);
+    if (f == NULL) {
+	vdebugBelch(s, ap);
+    } else {
+	vfprintf(f, s, ap);
+    }
+    va_end(ap);
+}
+
+static int		/* return -1 on error */
 open_stats_file (
     I_ arg,
     int argc, char *argv[],
     int rts_argc, char *rts_argv[],
-    const char *FILENAME_FMT)
+    const char *FILENAME_FMT,
+    FILE **file_ret)
 {
     FILE *f = NULL;
 
-    if (strequal(rts_argv[arg]+2, "stderr")) /* use real stderr */
-	f = stderr;
-    else if (rts_argv[arg][2] != '\0')	    /* stats file specified */
-	f = fopen(rts_argv[arg]+2,"w");
-    else {
-	char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.<ext> */
-	sprintf(stats_filename, FILENAME_FMT, argv[0]);
-	f = fopen(stats_filename,"w");
-    }
-    if (f == NULL) {
-	fprintf(stderr, "Can't open stats file %s\n", rts_argv[arg]+2);
+    if (strequal(rts_argv[arg]+2, "stderr")) { /* use debugBelch */
+        f = NULL; /* NULL means use debugBelch */
     } else {
-	/* Write argv and rtsv into start of stats file */
-	I_ count;
-	for(count = 0; count < argc; count++)
-	    fprintf(f, "%s ", argv[count]);
-	fprintf(f, "+RTS ");
-	for(count = 0; count < rts_argc; count++)
-	    fprintf(f, "%s ", rts_argv[count]);
-	fprintf(f, "\n");
+	if (rts_argv[arg][2] != '\0') {  /* stats file specified */
+	    f = fopen(rts_argv[arg]+2,"w");
+	} else {
+	    char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.<ext> */
+	    sprintf(stats_filename, FILENAME_FMT, argv[0]);
+	    f = fopen(stats_filename,"w");
+	}
+	if (f == NULL) {
+	    errorBelch("Can't open stats file %s\n", rts_argv[arg]+2);
+	    return -1;
+	}
     }
+    *file_ret = f;
 
-    return(f);
+    {
+	/* Write argv and rtsv into start of stats file */
+	int count;
+	for(count = 0; count < argc; count++) {
+	    stats_fprintf(f, "%s ", argv[count]);
+	}
+	stats_fprintf(f, "+RTS ");
+	for(count = 0; count < rts_argc; count++)
+	    stats_fprintf(f, "%s ", rts_argv[count]);
+	stats_fprintf(f, "\n");
+    }
+    return 0;
 }
+
+
 
 static I_
 decode(const char *s)
@@ -2155,6 +2183,6 @@ decode(const char *s)
 static void
 bad_option(const char *s)
 {
-  prog_belch("bad RTS option: %s", s);
+  errorBelch("bad RTS option: %s", s);
   stg_exit(EXIT_FAILURE);
 }

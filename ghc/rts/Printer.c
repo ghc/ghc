@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.63 2004/08/13 13:10:23 simonmar Exp $
+ * $Id: Printer.c,v 1.64 2004/09/03 15:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -10,12 +10,10 @@
 #include "PosixSource.h"
 #include "Rts.h"
 #include "Printer.h"
-
-#include <stdio.h>
+#include "RtsUtils.h"
 
 #ifdef DEBUG
 
-#include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "MBlock.h"
 #include "Storage.h"
@@ -62,23 +60,23 @@ void printPtr( StgPtr p )
     if (raw != NULL) {
         printZcoded(raw);
     } else {
-        fprintf(stderr, "%p", p);
+        debugBelch("%p", p);
     }
 }
   
 void printObj( StgClosure *obj )
 {
-    fprintf(stderr,"Object "); printPtr((StgPtr)obj); fprintf(stderr," = ");
+    debugBelch("Object "); printPtr((StgPtr)obj); debugBelch(" = ");
     printClosure(obj);
 }
 
 STATIC_INLINE void
 printStdObjHdr( StgClosure *obj, char* tag )
 {
-    fprintf(stderr,"%s(",tag);
+    debugBelch("%s(",tag);
     printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
-    fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
+    debugBelch(", %s", obj->header.prof.ccs->cc->label);
 #endif
 }
 
@@ -90,13 +88,13 @@ printStdObjPayload( StgClosure *obj )
 
     info = get_itbl(obj);
     for (i = 0; i < info->layout.payload.ptrs; ++i) {
-        fprintf(stderr,", ");
+        debugBelch(", ");
         printPtr((StgPtr)obj->payload[i]);
     }
     for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        fprintf(stderr,", %pd#",obj->payload[i+j]);
+        debugBelch(", %pd#",obj->payload[i+j]);
     }
-    fprintf(stderr,")\n");
+    debugBelch(")\n");
 }
 
 static void
@@ -130,21 +128,21 @@ printClosure( StgClosure *obj )
 	     */
             StgWord i, j;
 #ifdef PROFILING
-	    fprintf(stderr,"%s(", info->prof.closure_desc);
-	    fprintf(stderr,"%s", obj->header.prof.ccs->cc->label);
+	    debugBelch("%s(", info->prof.closure_desc);
+	    debugBelch("%s", obj->header.prof.ccs->cc->label);
 #else
-            fprintf(stderr,"CONSTR(");
+            debugBelch("CONSTR(");
             printPtr((StgPtr)obj->header.info);
-            fprintf(stderr,"(tag=%d)",info->srt_bitmap);
+            debugBelch("(tag=%d)",info->srt_bitmap);
 #endif
             for (i = 0; i < info->layout.payload.ptrs; ++i) {
-		fprintf(stderr,", ");
+		debugBelch(", ");
                 printPtr((StgPtr)obj->payload[i]);
             }
             for (j = 0; j < info->layout.payload.nptrs; ++j) {
-                fprintf(stderr,", %p#", obj->payload[i+j]);
+                debugBelch(", %p#", obj->payload[i+j]);
             }
-            fprintf(stderr,")\n");
+            debugBelch(")\n");
             break;
         }
 
@@ -152,10 +150,10 @@ printClosure( StgClosure *obj )
     case FUN_1_0: case FUN_0_1: 
     case FUN_1_1: case FUN_0_2: case FUN_2_0:
     case FUN_STATIC:
-	fprintf(stderr,"FUN/%d(",itbl_to_fun_itbl(info)->f.arity);
+	debugBelch("FUN/%d(",itbl_to_fun_itbl(info)->f.arity);
 	printPtr((StgPtr)obj->header.info);
 #ifdef PROFILING
-	fprintf(stderr,", %s", obj->header.prof.ccs->cc->label);
+	debugBelch(", %s", obj->header.prof.ccs->cc->label);
 #endif
 	printStdObjPayload(obj);
 	break;
@@ -174,7 +172,7 @@ printClosure( StgClosure *obj )
 
     case THUNK_SELECTOR:
 	printStdObjHdr(obj, "THUNK_SELECTOR");
-	fprintf(stderr, ", %p)\n", ((StgSelector *)obj)->selectee);
+	debugBelch(", %p)\n", ((StgSelector *)obj)->selectee);
 	break;
 
     case BCO:
@@ -185,12 +183,12 @@ printClosure( StgClosure *obj )
         {
 	    StgPAP* ap = stgCast(StgPAP*,obj);
             StgWord i;
-            fprintf(stderr,"AP("); printPtr((StgPtr)ap->fun);
+            debugBelch("AP("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->n_args; ++i) {
-                fprintf(stderr,", ");
+                debugBelch(", ");
                 printPtr((P_)ap->payload[i]);
             }
-            fprintf(stderr,")\n");
+            debugBelch(")\n");
             break;
         }
 
@@ -198,13 +196,13 @@ printClosure( StgClosure *obj )
         {
 	    StgPAP* pap = stgCast(StgPAP*,obj);
             StgWord i;
-            fprintf(stderr,"PAP/%d(",pap->arity); 
+            debugBelch("PAP/%d(",pap->arity); 
 	    printPtr((StgPtr)pap->fun);
             for (i = 0; i < pap->n_args; ++i) {
-                fprintf(stderr,", ");
+                debugBelch(", ");
                 printPtr((StgPtr)pap->payload[i]);
             }
-            fprintf(stderr,")\n");
+            debugBelch(")\n");
             break;
         }
 
@@ -212,43 +210,43 @@ printClosure( StgClosure *obj )
         {
 	    StgAP_STACK* ap = stgCast(StgAP_STACK*,obj);
             StgWord i;
-            fprintf(stderr,"AP_STACK("); printPtr((StgPtr)ap->fun);
+            debugBelch("AP_STACK("); printPtr((StgPtr)ap->fun);
             for (i = 0; i < ap->size; ++i) {
-                fprintf(stderr,", ");
+                debugBelch(", ");
                 printPtr((P_)ap->payload[i]);
             }
-            fprintf(stderr,")\n");
+            debugBelch(")\n");
             break;
         }
 
     case IND:
-            fprintf(stderr,"IND("); 
+            debugBelch("IND("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case IND_OLDGEN:
-            fprintf(stderr,"IND_OLDGEN("); 
+            debugBelch("IND_OLDGEN("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case IND_PERM:
-            fprintf(stderr,"IND("); 
+            debugBelch("IND("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case IND_OLDGEN_PERM:
-            fprintf(stderr,"IND_OLDGEN_PERM("); 
+            debugBelch("IND_OLDGEN_PERM("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case IND_STATIC:
-            fprintf(stderr,"IND_STATIC("); 
+            debugBelch("IND_STATIC("); 
             printPtr((StgPtr)stgCast(StgInd*,obj)->indirectee);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     /* Cannot happen -- use default case.
@@ -264,79 +262,79 @@ printClosure( StgClosure *obj )
     case UPDATE_FRAME:
         {
             StgUpdateFrame* u = stgCast(StgUpdateFrame*,obj);
-            fprintf(stderr,"UPDATE_FRAME(");
+            debugBelch("UPDATE_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,",");
+            debugBelch(",");
             printPtr((StgPtr)u->updatee);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
         }
 
     case CATCH_FRAME:
         {
             StgCatchFrame* u = stgCast(StgCatchFrame*,obj);
-            fprintf(stderr,"CATCH_FRAME(");
+            debugBelch("CATCH_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,",");
+            debugBelch(",");
             printPtr((StgPtr)u->handler);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
         }
 
     case STOP_FRAME:
         {
             StgStopFrame* u = stgCast(StgStopFrame*,obj);
-            fprintf(stderr,"STOP_FRAME(");
+            debugBelch("STOP_FRAME(");
             printPtr((StgPtr)GET_INFO(u));
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
         }
 
     case CAF_BLACKHOLE:
-            fprintf(stderr,"CAF_BH("); 
+            debugBelch("CAF_BH("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case BLACKHOLE:
-            fprintf(stderr,"BH\n"); 
+            debugBelch("BH\n"); 
             break;
 
     case BLACKHOLE_BQ:
-            fprintf(stderr,"BQ("); 
+            debugBelch("BQ("); 
             printPtr((StgPtr)stgCast(StgBlockingQueue*,obj)->blocking_queue);
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case SE_BLACKHOLE:
-            fprintf(stderr,"SE_BH\n"); 
+            debugBelch("SE_BH\n"); 
             break;
 
     case SE_CAF_BLACKHOLE:
-            fprintf(stderr,"SE_CAF_BH\n"); 
+            debugBelch("SE_CAF_BH\n"); 
             break;
 
     case ARR_WORDS:
         {
             StgWord i;
-            fprintf(stderr,"ARR_WORDS(\"");
+            debugBelch("ARR_WORDS(\"");
             /* ToDo: we can't safely assume that this is a string! 
             for (i = 0; arrWordsGetChar(obj,i); ++i) {
                 putchar(arrWordsGetChar(obj,i));
 		} */
 	    for (i=0; i<((StgArrWords *)obj)->words; i++)
-	      fprintf(stderr, "%u", ((StgArrWords *)obj)->payload[i]);
-            fprintf(stderr,"\")\n");
+	      debugBelch("%u", ((StgArrWords *)obj)->payload[i]);
+            debugBelch("\")\n");
             break;
         }
 
     case MUT_ARR_PTRS:
-	fprintf(stderr,"MUT_ARR_PTRS(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
     case MUT_ARR_PTRS_FROZEN:
 #if !defined(XMLAMBDA)
-	fprintf(stderr,"MUT_ARR_PTRS_FROZEN(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
+	debugBelch("MUT_ARR_PTRS_FROZEN(size=%d)\n", ((StgMutArrPtrs *)obj)->ptrs);
 	break;
 #else
           {
@@ -344,12 +342,12 @@ printClosure( StgClosure *obj )
             StgWord i;
             StgMutArrPtrs* p = stgCast(StgMutArrPtrs*,obj);
 
-            fprintf(stderr,"Row<%i>(",p->ptrs);
+            debugBelch("Row<%i>(",p->ptrs);
             for (i = 0; i < p->ptrs; ++i) {
-                if (i > 0) fprintf(stderr,", ");
+                if (i > 0) debugBelch(", ");
                 printPtr((StgPtr)(p->payload[i]));
             }
-            fprintf(stderr,")\n");
+            debugBelch(")\n");
             break;
           }
 #endif  
@@ -357,63 +355,63 @@ printClosure( StgClosure *obj )
     case MUT_VAR:
         {
 	  StgMutVar* mv = (StgMutVar*)obj;
-	  fprintf(stderr,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
+	  debugBelch("MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
           break;
         }
 
     case WEAK:
-            fprintf(stderr,"WEAK("); 
-	    fprintf(stderr," key=%p value=%p finalizer=%p", 
+            debugBelch("WEAK("); 
+	    debugBelch(" key=%p value=%p finalizer=%p", 
 		    (StgPtr)(((StgWeak*)obj)->key),
 		    (StgPtr)(((StgWeak*)obj)->value),
 		    (StgPtr)(((StgWeak*)obj)->finalizer));
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
 	    /* ToDo: chase 'link' ? */
             break;
 
     case FOREIGN:
-            fprintf(stderr,"FOREIGN("); 
+            debugBelch("FOREIGN("); 
             printPtr((StgPtr)( ((StgForeignObj*)obj)->data ));
-            fprintf(stderr,")\n"); 
+            debugBelch(")\n"); 
             break;
 
     case STABLE_NAME:
-            fprintf(stderr,"STABLE_NAME(%d)\n", ((StgStableName*)obj)->sn); 
+            debugBelch("STABLE_NAME(%d)\n", ((StgStableName*)obj)->sn); 
             break;
 
     case TSO:
-      fprintf(stderr,"TSO("); 
-      fprintf(stderr,"%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
-      fprintf(stderr,")\n"); 
+      debugBelch("TSO("); 
+      debugBelch("%d (%p)",((StgTSO*)obj)->id, (StgTSO*)obj);
+      debugBelch(")\n"); 
       break;
 
 #if defined(PAR)
     case BLOCKED_FETCH:
-      fprintf(stderr,"BLOCKED_FETCH("); 
+      debugBelch("BLOCKED_FETCH("); 
       printGA(&(stgCast(StgBlockedFetch*,obj)->ga));
       printPtr((StgPtr)(stgCast(StgBlockedFetch*,obj)->node));
-      fprintf(stderr,")\n"); 
+      debugBelch(")\n"); 
       break;
 
     case FETCH_ME:
-      fprintf(stderr,"FETCH_ME("); 
+      debugBelch("FETCH_ME("); 
       printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stderr,")\n"); 
+      debugBelch(")\n"); 
       break;
 
     case FETCH_ME_BQ:
-      fprintf(stderr,"FETCH_ME_BQ("); 
+      debugBelch("FETCH_ME_BQ("); 
       // printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
       printPtr((StgPtr)stgCast(StgFetchMeBlockingQueue*,obj)->blocking_queue);
-      fprintf(stderr,")\n"); 
+      debugBelch(")\n"); 
       break;
 #endif
 
 #if defined(GRAN) || defined(PAR)
     case RBH:
-      fprintf(stderr,"RBH("); 
+      debugBelch("RBH("); 
       printPtr((StgPtr)stgCast(StgRBH*,obj)->blocking_queue);
-      fprintf(stderr,")\n"); 
+      debugBelch(")\n"); 
       break;
 
 #endif
@@ -421,23 +419,23 @@ printClosure( StgClosure *obj )
 #if 0
       /* Symptomatic of a problem elsewhere, have it fall-through & fail */
     case EVACUATED:
-      fprintf(stderr,"EVACUATED("); 
+      debugBelch("EVACUATED("); 
       printClosure((StgEvacuated*)obj->evacuee);
-      fprintf(stderr,")\n"); 
+      debugBelch(")\n"); 
       break;
 #endif
 
 #if defined(PAR) && defined(DIST)
     case REMOTE_REF:
-      fprintf(stderr,"REMOTE_REF("); 
+      debugBelch("REMOTE_REF("); 
       printGA((globalAddr *)stgCast(StgFetchMe*,obj)->ga);
-      fprintf(stderr,")\n"); 
+      debugBelch(")\n"); 
       break;
 #endif
 
     default:
             //barf("printClosure %d",get_itbl(obj)->type);
-            fprintf(stderr, "*** printClosure: unknown type %d ****\n",
+            debugBelch("*** printClosure: unknown type %d ****\n",
                     get_itbl(obj)->type );
             barf("printClosure %d",get_itbl(obj)->type);
             return;
@@ -454,31 +452,31 @@ void printGraph( StgClosure *obj )
 StgPtr
 printStackObj( StgPtr sp )
 {
-    /*fprintf(stderr,"Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
+    /*debugBelch("Stack[%d] = ", &stgStack[STACK_SIZE] - sp); */
 
         StgClosure* c = (StgClosure*)(*sp);
         printPtr((StgPtr)*sp);
         if (c == (StgClosure*)&stg_ctoi_R1p_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1p_info\n" );
+           debugBelch("\t\t\tstg_ctoi_ret_R1p_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_R1n_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_R1n_info\n" );
+           debugBelch("\t\t\tstg_ctoi_ret_R1n_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_F1_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_F1_info\n" );
+           debugBelch("\t\t\tstg_ctoi_ret_F1_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_D1_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_D1_info\n" );
+           debugBelch("\t\t\tstg_ctoi_ret_D1_info\n" );
 	} else
         if (c == (StgClosure*)&stg_ctoi_V_info) {
-           fprintf(stderr, "\t\t\tstg_ctoi_ret_V_info\n" );
+           debugBelch("\t\t\tstg_ctoi_ret_V_info\n" );
 	} else
         if (get_itbl(c)->type == BCO) {
-           fprintf(stderr, "\t\t\t");
-           fprintf(stderr, "BCO(...)\n"); 
+           debugBelch("\t\t\t");
+           debugBelch("BCO(...)\n"); 
         }
         else {
-           fprintf(stderr, "\t\t\t");
+           debugBelch("\t\t\t");
            printClosure ( (StgClosure*)(*sp));
         }
         sp += 1;
@@ -495,12 +493,12 @@ printSmallBitmap( StgPtr spBottom, StgPtr payload, StgWord bitmap, nat size )
 
     p = payload;
     for(i = 0; i < size; i++, bitmap >>= 1 ) {
-	fprintf(stderr,"   stk[%d] (%p) = ", spBottom-(payload+i), payload+i);
+	debugBelch("   stk[%d] (%p) = ", spBottom-(payload+i), payload+i);
 	if ((bitmap & 1) == 0) {
 	    printPtr((P_)payload[i]);
-	    fprintf(stderr,"\n");
+	    debugBelch("\n");
 	} else {
-	    fprintf(stderr,"Word# %d\n", payload[i]);
+	    debugBelch("Word# %d\n", payload[i]);
 	}
     }
 }
@@ -516,12 +514,12 @@ printLargeBitmap( StgPtr spBottom, StgPtr payload, StgLargeBitmap* large_bitmap,
 	StgWord bitmap = large_bitmap->bitmap[bmp];
 	j = 0;
 	for(; i < size && j < BITS_IN(W_); j++, i++, bitmap >>= 1 ) {
-	    fprintf(stderr,"   stk[%d] (%p) = ", spBottom-(payload+i), payload+i);
+	    debugBelch("   stk[%d] (%p) = ", spBottom-(payload+i), payload+i);
 	    if ((bitmap & 1) == 0) {
 		printPtr((P_)payload[i]);
-		fprintf(stderr,"\n");
+		debugBelch("\n");
 	    } else {
-		fprintf(stderr,"Word# %d\n", payload[i]);
+		debugBelch("Word# %d\n", payload[i]);
 	    }
 	}
     }
@@ -555,7 +553,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 	    r = (StgRetDyn *)sp;
 	    dyn = r->liveness;
-	    fprintf(stderr, "RET_DYN (%p)\n", r);
+	    debugBelch("RET_DYN (%p)\n", r);
 
 	    p = (P_)(r->payload);
 	    printSmallBitmap(spBottom, sp,
@@ -564,13 +562,13 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    p += RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE;
 
 	    for (size = RET_DYN_NONPTRS(dyn); size > 0; size--) {
-		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);
-		fprintf(stderr,"Word# %ld\n", (long)*p);
+		debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-p), p);
+		debugBelch("Word# %ld\n", (long)*p);
 		p++;
 	    }
 	
 	    for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-		fprintf(stderr,"   stk[%ld] (%p) = ", (long)(spBottom-p), p);
+		debugBelch("   stk[%ld] (%p) = ", (long)(spBottom-p), p);
 		printPtr(p);
 		p++;
 	    }
@@ -579,7 +577,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 
 	case RET_SMALL:
 	case RET_VEC_SMALL:
-	    fprintf(stderr, "RET_SMALL (%p)\n", sp);
+	    debugBelch("RET_SMALL (%p)\n", sp);
 	    bitmap = info->layout.bitmap;
 	    printSmallBitmap(spBottom, sp+1, 
 			     BITMAP_BITS(bitmap), BITMAP_SIZE(bitmap));
@@ -590,7 +588,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    
 	    bco = ((StgBCO *)sp[1]);
 
-	    fprintf(stderr, "RET_BCO (%p)\n", sp);
+	    debugBelch("RET_BCO (%p)\n", sp);
 	    printLargeBitmap(spBottom, sp+2,
 			     BCO_BITMAP(bco), BCO_BITMAP_SIZE(bco));
 	    continue;
@@ -609,7 +607,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	    ret_fun = (StgRetFun *)sp;
 	    fun_info = get_fun_itbl(ret_fun->fun);
 	    size = ret_fun->size;
-	    fprintf(stderr,"RET_FUN (%p) (type=%d)\n", ret_fun, fun_info->f.fun_type);
+	    debugBelch("RET_FUN (%p) (type=%d)\n", ret_fun, fun_info->f.fun_type);
 	    switch (fun_info->f.fun_type) {
 	    case ARG_GEN:
 		printSmallBitmap(spBottom, sp+1,
@@ -631,7 +629,7 @@ printStackChunk( StgPtr sp, StgPtr spBottom )
 	}
 	   
 	default:
-	    fprintf(stderr, "unknown object %d\n", info->type);
+	    debugBelch("unknown object %d\n", info->type);
 	    barf("printStackChunk");
 	}
     }
@@ -940,10 +938,10 @@ static void printZcoded( const char *raw )
     
     while ( raw[j] != '\0' ) {
         if (raw[j] == 'Z') {
-            fputc(unZcode(raw[j+1]),stderr);
+            debugBelch("%c", unZcode(raw[j+1]));
             j = j + 2;
         } else {
-            fputc(raw[j],stderr);
+            debugBelch("%c", unZcode(raw[j+1]));
             j = j + 1;
         }
     }
@@ -1012,7 +1010,7 @@ extern void DEBUG_LoadSymbols( char *name )
 	}     
 #if 0
 	if (storage_needed == 0) {
-	    belch("no storage needed");
+	    debugBelch("no storage needed");
 	}
 #endif
 	symbol_table = (asymbol **) stgMallocBytes(storage_needed,"DEBUG_LoadSymbols");
@@ -1026,14 +1024,14 @@ extern void DEBUG_LoadSymbols( char *name )
         for( i = 0; i != number_of_symbols; ++i ) {
             symbol_info info;
             bfd_get_symbol_info(abfd,symbol_table[i],&info);
-            /*fprintf(stderr,"\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
+            /*debugBelch("\t%c\t0x%x      \t%s\n",info.type,(nat)info.value,info.name); */
             if (isReal(info.type, info.name)) {
                 num_real_syms += 1;
             }
         }
     
         IF_DEBUG(interpreter,
-                 fprintf(stderr,"Loaded %ld symbols. Of which %ld are real symbols\n", 
+                 debugBelch("Loaded %ld symbols. Of which %ld are real symbols\n", 
                          number_of_symbols, num_real_syms)
                  );
 
@@ -1092,7 +1090,7 @@ findPtr(P_ p, int follow)
 			  while (!LOOKS_LIKE_INFO_PTR(*r) || (P_)*r == NULL) {
 			      r--;
 			  }
-			  fprintf(stderr, "%p = ", r);
+			  debugBelch("%p = ", r);
 			  printClosure((StgClosure *)r);
 			  arr[i++] = r;
 		      } else {
@@ -1104,7 +1102,7 @@ findPtr(P_ p, int follow)
       }
   }
   if (follow && i == 1) {
-      fprintf(stderr, "-->\n");
+      debugBelch("-->\n");
       findPtr(arr[0], 1);
   }
 }
@@ -1112,11 +1110,11 @@ findPtr(P_ p, int follow)
 #else /* DEBUG */
 void printPtr( StgPtr p )
 {
-    fprintf(stderr, "ptr 0x%p (enable -DDEBUG for more info) " , p );
+    debugBelch("ptr 0x%p (enable -DDEBUG for more info) " , p );
 }
   
 void printObj( StgClosure *obj )
 {
-    fprintf(stderr, "obj 0x%p (enable -DDEBUG for more info) " , obj );
+    debugBelch("obj 0x%p (enable -DDEBUG for more info) " , obj );
 }
 #endif /* DEBUG */

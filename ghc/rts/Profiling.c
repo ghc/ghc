@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.39 2004/09/01 08:43:23 simonmar Exp $
+ * $Id: Profiling.c,v 1.40 2004/09/03 15:28:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -266,7 +266,7 @@ initProfilingLogFile(void)
 
     /* open the log file */
     if ((prof_file = fopen(prof_filename, "w")) == NULL) {
-	fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
+	debugBelch("Can't open profiling report file %s\n", prof_filename);
 	RtsFlags.CcFlags.doCostCentres = 0;
         // The following line was added by Sung; retainer/LDV profiling may need
         // two output files, i.e., <program>.prof/hp.
@@ -297,7 +297,7 @@ initProfilingLogFile(void)
 	
 	/* open the log file */
 	if ((hp_file = fopen(hp_filename, "w")) == NULL) {
-	    fprintf(stderr, "Can't open profiling report file %s\n", 
+	    debugBelch("Can't open profiling report file %s\n", 
 		    hp_filename);
 	    RtsFlags.ProfFlags.doHeapProfile = 0;
 	    return;
@@ -355,9 +355,9 @@ PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
 #define PushCostCentre _PushCostCentre
 {
   IF_DEBUG(prof, 
-	   fprintf(stderr,"Pushing %s on ", cc->label);
-	   fprintCCS(stderr,ccs);
-	   fprintf(stderr,"\n"));
+	   debugBelch("Pushing %s on ", cc->label);
+	   debugCCS(ccs);
+	   debugBelch("\n"));
   return PushCostCentre(ccs,cc);
 }
 #endif
@@ -417,11 +417,11 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 {
   IF_DEBUG(prof, 
 	   if (ccs1 != ccs2) {
-	     fprintf(stderr,"Appending ");
-	     fprintCCS(stderr,ccs1);
-	     fprintf(stderr," to ");
-	     fprintCCS(stderr,ccs2);
-	     fprintf(stderr,"\n");});
+	     debugBelch("Appending ");
+	     debugCCS(ccs1);
+	     debugBelch(" to ");
+	     debugCCS(ccs2);
+	     debugBelch("\n");});
   return AppendCCS(ccs1,ccs2);
 }
 #endif
@@ -916,5 +916,20 @@ fprintCCS( FILE *f, CostCentreStack *ccs )
   }
   fprintf(f,">");
 }
+
+#ifdef DEBUG
+void
+debugCCS( CostCentreStack *ccs )
+{
+  debugBelch("<");
+  for (; ccs && ccs != CCS_MAIN; ccs = ccs->prevStack ) {
+      debugBelch("%s.%s", ccs->cc->module, ccs->cc->label);
+      if (ccs->prevStack && ccs->prevStack != CCS_MAIN) {
+	  debugBelch(",");
+      }
+  }
+  debugBelch(">");
+}
+#endif // DEBUG
 
 #endif /* PROFILING */

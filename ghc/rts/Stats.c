@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.48 2004/08/13 13:10:45 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Statistics and timing-related functions.
  *
@@ -122,6 +121,10 @@ static TICK_TYPE *GC_coll_times;
 static void  getTimes(void);
 static nat   pageFaults(void);
 
+static void statsPrintf( char *s, ... );
+static void statsFlush( void );
+static void statsClose( void );
+
 /* elapsedtime() -- The current elapsed time in seconds */
 
 #if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS)
@@ -198,7 +201,7 @@ getTimes(void)
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
-    fprintf(stderr, "NOTE: `getTimes' does nothing!\n");
+    debugBelch("NOTE: `getTimes' does nothing!\n");
     return 0.0;
 
 #else /* not stumped */
@@ -275,11 +278,10 @@ void
 initStats(void)
 {
     nat i;
-    FILE *sf = RtsFlags.GcFlags.statsFile;
   
     if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
-	fprintf(sf, "    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
-	fprintf(sf, "    bytes     bytes     bytes  user  elap    user    elap\n");
+	statsPrintf("    Alloc    Collect    Live    GC    GC     TOT     TOT  Page Flts\n");
+	statsPrintf("    bytes     bytes     bytes  user  elap    user    elap\n");
     }
     GC_coll_times = 
 	(TICK_TYPE *)stgMallocBytes(
@@ -306,7 +308,7 @@ stat_startInit(void)
 
     ticks = sysconf(_SC_CLK_TCK);
     if ( ticks == -1 ) {
-	fprintf(stderr, "stat_init: bad call to 'sysconf'!\n");
+	debugBelch("stat_init: bad call to 'sysconf'!\n");
     	stg_exit(EXIT_FAILURE);
     }
     TicksPerSecond = ticks;
@@ -322,7 +324,7 @@ stat_startInit(void)
     /* We will #ifdef around the fprintf for machines
        we *know* are unsupported. (WDP 94/05)
     */
-    fprintf(stderr, "NOTE: Guessing `TicksPerSecond = 60'!\n");
+    debugBelch("NOTE: Guessing `TicksPerSecond = 60'!\n");
     TicksPerSecond = 60;
 #endif
 
@@ -408,10 +410,10 @@ stat_startGC(void)
 
     if (bell) {
 	if (bell > 1) {
-	    fprintf(stderr, " GC ");
+	    debugBelch(" GC ");
 	    rub_bell = 1;
 	} else {
-	    fprintf(stderr, "\007");
+	    debugBelch("\007");
 	}
     }
 
@@ -439,8 +441,6 @@ stat_startGC(void)
 void
 stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 {
-    FILE *sf = RtsFlags.GcFlags.statsFile;
-
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 	TICK_TYPE time, etime, gc_time, gc_etime;
 	
@@ -450,12 +450,12 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	gc_time  = time - GC_start_time;
 	gc_etime = etime - GCe_start_time;
 	
-	if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS && sf != NULL) {
+	if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
 	    nat faults = pageFaults();
 	    
-	    fprintf(sf, "%9ld %9ld %9ld",
+	    statsPrintf("%9ld %9ld %9ld",
 		    alloc*sizeof(W_), collect*sizeof(W_), live*sizeof(W_));
-	    fprintf(sf, " %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
+	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
 		    TICK_TO_DBL(gc_time),
 		    TICK_TO_DBL(gc_etime),
 		    TICK_TO_DBL(time),
@@ -465,7 +465,7 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 		    gen);
 
 	    GC_end_faults = faults;
-	    fflush(sf);
+	    statsFlush();
 	}
 
 	GC_coll_times[gen] += gc_time;
@@ -500,7 +500,7 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
     }
 
     if (rub_bell) {
-	fprintf(stderr, "\b\b\b  \b\b\b");
+	debugBelch("\b\b\b  \b\b\b");
 	rub_bell = 0;
     }
 }
@@ -620,8 +620,6 @@ long int stat_getElapsedTime ()
 void
 stat_exit(int alloc)
 {
-    FILE *sf = RtsFlags.GcFlags.statsFile;
-    
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 
 	char temp[BIG_STRING_LEN];
@@ -657,43 +655,43 @@ stat_exit(int alloc)
 	if (MutUserTime < 0) { MutUserTime = 0; }
 #endif
 
-	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS && sf != NULL) {
-	    fprintf(sf, "%9ld %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
-	    fprintf(sf, " %5.2f %5.2f\n\n", 0.0, 0.0);
+	if (RtsFlags.GcFlags.giveStats >= VERBOSE_GC_STATS) {
+	    statsPrintf("%9ld %9.9s %9.9s", (lnat)alloc*sizeof(W_), "", "");
+	    statsPrintf(" %5.2f %5.2f\n\n", 0.0, 0.0);
 	}
 
-	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS && sf != NULL) {
+	if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
 	    ullong_format_string(GC_tot_alloc*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
-	    fprintf(sf, "%11s bytes allocated in the heap\n", temp);
+	    statsPrintf("%11s bytes allocated in the heap\n", temp);
 
 	    ullong_format_string(GC_tot_copied*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
-	    fprintf(sf, "%11s bytes copied during GC\n", temp);
+	    statsPrintf("%11s bytes copied during GC\n", temp);
 
 	    if ( ResidencySamples > 0 ) {
 		ullong_format_string(MaxResidency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
-		fprintf(sf, "%11s bytes maximum residency (%ld sample(s))\n",
+		statsPrintf("%11s bytes maximum residency (%ld sample(s))\n",
 			temp, ResidencySamples);
 	    }
-	    fprintf(sf,"\n");
+	    statsPrintf("\n");
 
 	    /* Print garbage collections in each gen */
 	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-		fprintf(sf, "%11d collections in generation %d (%6.2fs)\n", 
+		statsPrintf("%11d collections in generation %d (%6.2fs)\n", 
 			generations[g].collections, g, 
 			TICK_TO_DBL(GC_coll_times[g]));
 	    }
 
-	    fprintf(sf,"\n%11ld Mb total memory in use\n\n", 
+	    statsPrintf("\n%11ld Mb total memory in use\n\n", 
 		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
 #ifdef SMP
 	    {
 		nat i;
 		for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
-		    fprintf(sf, "  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
+		    statsPrintf("  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
 			    "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
 			    i, 
 			    TICK_TO_DBL(task_ids[i].mut_time),
@@ -704,23 +702,23 @@ stat_exit(int alloc)
 	    }
 #endif
 
-	    fprintf(sf, "  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  INIT  time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(InitUserTime), TICK_TO_DBL(InitElapsedTime));
-	    fprintf(sf, "  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  MUT   time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(MutUserTime), TICK_TO_DBL(MutElapsedTime));
-	    fprintf(sf, "  GC    time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  GC    time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
 #ifdef PROFILING
-	    fprintf(sf, "  RP    time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  RP    time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(RP_tot_time), TICK_TO_DBL(RPe_tot_time));
-	    fprintf(sf, "  PROF  time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  PROF  time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(HC_tot_time), TICK_TO_DBL(HCe_tot_time));
 #endif 
-	    fprintf(sf, "  EXIT  time  %6.2fs  (%6.2fs elapsed)\n",
+	    statsPrintf("  EXIT  time  %6.2fs  (%6.2fs elapsed)\n",
 		    TICK_TO_DBL(ExitUserTime), TICK_TO_DBL(ExitElapsedTime));
-	    fprintf(sf, "  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
+	    statsPrintf("  Total time  %6.2fs  (%6.2fs elapsed)\n\n",
 		    TICK_TO_DBL(time), TICK_TO_DBL(etime));
-	    fprintf(sf, "  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
+	    statsPrintf("  %%GC time     %5.1f%%  (%.1f%% elapsed)\n\n",
 		    TICK_TO_DBL(GC_tot_time)*100/TICK_TO_DBL(time),
 		    TICK_TO_DBL(GCe_tot_time)*100/TICK_TO_DBL(etime));
 
@@ -733,9 +731,9 @@ stat_exit(int alloc)
 					 PROF_VAL(RP_tot_time + HC_tot_time))),
 		    temp, rtsTrue/*commas*/);
 	    
-	    fprintf(sf, "  Alloc rate    %s bytes per MUT second\n\n", temp);
+	    statsPrintf("  Alloc rate    %s bytes per MUT second\n\n", temp);
 	
-	    fprintf(sf, "  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
+	    statsPrintf("  Productivity %5.1f%% of total user, %.1f%% of total elapsed\n\n",
 		    TICK_TO_DBL(time - GC_tot_time - 
 				PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime) * 100 
 		    / TICK_TO_DBL(time), 
@@ -744,10 +742,10 @@ stat_exit(int alloc)
 		    / TICK_TO_DBL(etime));
 	}
 
-	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS && sf != NULL) {
+	if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
 	  /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
-	  fprintf(sf, "<<ghc: %llu bytes, ", GC_tot_alloc*sizeof(W_));
-	  fprintf(sf, "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
+	  statsPrintf("<<ghc: %llu bytes, ", GC_tot_alloc*sizeof(W_));
+	  statsPrintf("%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.2f INIT (%.2f elapsed), %.2f MUT (%.2f elapsed), %.2f GC (%.2f elapsed) :ghc>>\n",
 		    total_collections,
 		    ResidencySamples == 0 ? 0 : 
 		        AvgResidency*sizeof(W_)/ResidencySamples, 
@@ -759,10 +757,8 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
 	}
 
-	fflush(sf);
-	if (sf != stderr) {
-	    fclose(sf);
-	}
+	statsFlush();
+	statsClose();
     }
 }
 
@@ -780,7 +776,7 @@ statDescribeGens(void)
   bdescr *bd;
   step *step;
 
-  fprintf(stderr, "     Gen    Steps      Max   Mutable  Mut-Once  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                          Objects\n");
+  debugBelch("     Gen    Steps      Max   Mutable  Mut-Once  Step   Blocks     Live    Large\n                    Blocks  Closures  Closures                          Objects\n");
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
     for (m = generations[g].mut_list, mut = 0; m != END_MUT_LIST; 
@@ -789,7 +785,7 @@ statDescribeGens(void)
     for (m = generations[g].mut_once_list, mut_once = 0; m != END_MUT_LIST; 
 	 m = m->mut_link) 
       mut_once++;
-    fprintf(stderr, "%8d %8d %8d %9d %9d", g, generations[g].n_steps,
+    debugBelch("%8d %8d %8d %9d %9d", g, generations[g].n_steps,
 	    generations[g].max_blocks, mut, mut_once);
 
     for (s = 0; s < generations[g].n_steps; s++) {
@@ -806,13 +802,13 @@ statDescribeGens(void)
 	live += (bd->free - bd->start) * sizeof(W_);
       }
       if (s != 0) {
-	fprintf(stderr,"%46s","");
+	debugBelch("%46s","");
       }
-      fprintf(stderr,"%6d %8d %8d %8d\n", s, step->n_blocks,
+      debugBelch("%6d %8d %8d %8d\n", s, step->n_blocks,
 	      live, lge);
     }
   }
-  fprintf(stderr,"\n");
+  debugBelch("\n");
 }
 #endif
 
@@ -823,3 +819,40 @@ statDescribeGens(void)
 
 extern HsInt64 getAllocations( void ) 
 { return (HsInt64)total_allocated * sizeof(W_); }
+
+/* -----------------------------------------------------------------------------
+   Dumping stuff in the stats file, or via the debug message interface
+   -------------------------------------------------------------------------- */
+
+static void
+statsPrintf( char *s, ... )
+{
+    FILE *sf = RtsFlags.GcFlags.statsFile;
+    va_list ap;
+    
+    va_start(ap,s);
+    if (sf == NULL) {
+	vdebugBelch(s,ap);
+    } else {
+	vfprintf(sf, s, ap);
+    }
+    va_end(ap);
+}
+
+static void
+statsFlush( void )
+{
+    FILE *sf = RtsFlags.GcFlags.statsFile;
+    if (sf != NULL) {
+	fflush(sf);
+    }
+}
+
+static void
+statsClose( void )
+{
+    FILE *sf = RtsFlags.GcFlags.statsFile;
+    if (sf != NULL) {
+	fclose(sf);
+    }
+}

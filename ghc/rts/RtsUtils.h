@@ -9,15 +9,65 @@
 #ifndef RTSUTILS_H
 #define RTSUTILS_H
 
-/* (Checked) dynamic allocation: */
+#include <stdarg.h>
+
+/* -----------------------------------------------------------------------------
+ * Message generation
+ * -------------------------------------------------------------------------- */
+
+/*
+ * A fatal internal error: this is for errors that probably indicate
+ * bugs in the RTS or compiler.  We normally output bug reporting
+ * instructions along with the error message.
+ */
+extern void barf(char *s, ...) 
+   GNUC3_ATTRIBUTE(__noreturn__);
+
+/*
+ * An error condition which is caused by and/or can be corrected by
+ * the user.
+ */
+extern void errorBelch(char *s, ...)
+   GNUC3_ATTRIBUTE(format (printf, 1, 2));
+
+/*
+ * A debugging message.  Debugging messages are generated either as a
+ * virtue of having DEBUG turned on, or by being explicitly selected
+ * via RTS options (eg. +RTS -Ds).
+ */
+extern void debugBelch(char *s, ...)
+   GNUC3_ATTRIBUTE(format (printf, 1, 2));
+
+/* Version of debugBelch() that takes parameters as a va_list */
+extern void vdebugBelch(char *s, va_list ap);
+
+/* Hooks for redirecting message generation: */
+
+typedef void RtsMsgFunction(char *, va_list);
+
+extern RtsMsgFunction *fatalInternalMsgFn;
+extern RtsMsgFunction *debugMsgFn;
+extern RtsMsgFunction *errorMsgFn;
+
+/* Default stdio implementation of the message hooks: */
+
+extern RtsMsgFunction stdioFatalInternalMsgFn;
+extern RtsMsgFunction stdioDebugMsgFn;
+extern RtsMsgFunction stdioErrorMsgFn;
+
+/* -----------------------------------------------------------------------------
+ * (Checked) dynamic allocation
+ * -------------------------------------------------------------------------- */
+
 extern void *stgMallocBytes(int n, char *msg) GNUC3_ATTRIBUTE(__malloc__);
 extern void *stgReallocBytes(void *p, int n, char *msg);
 extern void *stgCallocBytes(int n, int m, char *msg) GNUC3_ATTRIBUTE(__malloc__);
 extern void stgFree(void* p);
 
-extern void barf(char *s, ...) GNU_ATTRIBUTE(__noreturn__);
-extern void belch(char *s, ...);
-extern void prog_belch(char *s, ...);
+
+/* -----------------------------------------------------------------------------
+ * Misc other utilities
+ * -------------------------------------------------------------------------- */
 
 extern void _stgAssert (char *filename, unsigned int linenum);
 

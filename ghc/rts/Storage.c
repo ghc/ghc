@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.84 2004/08/13 13:11:01 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2004
  *
  * Storage manager front end
  *
@@ -88,7 +87,7 @@ initStorage( void )
   if (RtsFlags.GcFlags.maxHeapSize != 0 &&
       RtsFlags.GcFlags.minAllocAreaSize > 
       RtsFlags.GcFlags.maxHeapSize) {
-      prog_belch("maximum heap size (-M) is smaller than minimum alloc area size (-A)");
+      errorBelch("maximum heap size (-M) is smaller than minimum alloc area size (-A)");
       exit(1);
   }
 
@@ -177,7 +176,7 @@ initStorage( void )
   /* The oldest generation has one step and it is compacted. */
   if (RtsFlags.GcFlags.compact) {
       if (RtsFlags.GcFlags.generations == 1) {
-	  belch("WARNING: compaction is incompatible with -G1; disabled");
+	  errorBelch("WARNING: compaction is incompatible with -G1; disabled");
       } else {
 	  oldest_gen->steps[0].is_compacted = 1;
       }
@@ -279,7 +278,7 @@ newCAF(StgClosure* caf)
 #ifdef PAR
   /* If we are PAR or DIST then  we never forget a CAF */
   { globalAddr *newGA;
-    //belch("<##> Globalising CAF %08x %s",caf,info_type(caf));
+    //debugBelch("<##> Globalising CAF %08x %s",caf,info_type(caf));
     newGA=makeGlobal(caf,rtsTrue); /*given full weight*/
     ASSERT(newGA);
   } 
@@ -418,7 +417,7 @@ resizeNursery ( nat blocks )
   }
 
   else if (nursery_blocks < blocks) {
-    IF_DEBUG(gc, fprintf(stderr, "Increasing size of nursery to %d blocks\n", 
+    IF_DEBUG(gc, debugBelch("Increasing size of nursery to %d blocks\n", 
 			 blocks));
     g0s0->blocks = allocNursery(g0s0->blocks, blocks-nursery_blocks);
   } 
@@ -426,7 +425,7 @@ resizeNursery ( nat blocks )
   else {
     bdescr *next_bd;
     
-    IF_DEBUG(gc, fprintf(stderr, "Decreasing size of nursery to %d blocks\n", 
+    IF_DEBUG(gc, debugBelch("Decreasing size of nursery to %d blocks\n", 
 			 blocks));
 
     bd = g0s0->blocks;
@@ -832,7 +831,7 @@ memInventory(void)
 
   if (total_blocks + free_blocks != mblocks_allocated *
       BLOCKS_PER_MBLOCK) {
-    fprintf(stderr, "Blocks: %ld live + %ld free  = %ld total (%ld around)\n",
+    debugBelch("Blocks: %ld live + %ld free  = %ld total (%ld around)\n",
 	    total_blocks, free_blocks, total_blocks + free_blocks,
 	    mblocks_allocated * BLOCKS_PER_MBLOCK);
   }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.17 2003/11/12 17:49:05 sof Exp $
+ * $Id: BlockAlloc.c,v 1.18 2004/09/03 15:28:19 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -325,8 +325,8 @@ checkFreeListSanity(void)
 
   for (bd = free_list; bd != NULL; bd = bd->link) {
     IF_DEBUG(block_alloc,
-	     fprintf(stderr,"group at 0x%x, length %d blocks\n", 
-		     (nat)bd->start, bd->blocks));
+	     debugBelch("group at 0x%x, length %d blocks\n", 
+			(nat)bd->start, bd->blocks));
     ASSERT(bd->blocks > 0);
     checkWellFormedGroup(bd);
     if (bd->link != NULL) {

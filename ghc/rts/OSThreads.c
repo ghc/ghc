@@ -144,7 +144,7 @@ initCondition( Condition* pCond )
 			  NULL); /* unnamed => process-local. */
   
   if ( h == NULL ) {
-    belch("initCondition: unable to create");
+    errorBelch("initCondition: unable to create");
   }
   *pCond = h;
   return;
@@ -154,7 +154,7 @@ void
 closeCondition( Condition* pCond )
 {
   if ( CloseHandle(*pCond) == 0 ) {
-    belch("closeCondition: failed to close");
+    errorBelch("closeCondition: failed to close");
   }
   return;
 }

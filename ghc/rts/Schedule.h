@@ -315,7 +315,8 @@ startSchedulerTaskIfNecessary(void);
 #endif
 
 #ifdef DEBUG
-extern void sched_belch(char *s, ...);
+extern void sched_belch(char *s, ...)
+   GNU_ATTRIBUTE(format (printf, 1, 2));
 #endif
 
 #endif /* __SCHEDULE_H__ */

@@ -21,8 +21,8 @@ typedef pthread_t       OSThreadId;
 #define INIT_COND_VAR       PTHREAD_COND_INITIALIZER
 
 #ifdef LOCK_DEBUG
-#define ACQUIRE_LOCK(mutex) fprintf(stderr, "ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); fflush(stderr); pthread_mutex_lock(mutex)
-#define RELEASE_LOCK(mutex) fprintf(stderr, "RELEASE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); fflush(stderr); pthread_mutex_unlock(mutex)
+#define ACQUIRE_LOCK(mutex) debugBelch("ACQUIRE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); pthread_mutex_lock(mutex)
+#define RELEASE_LOCK(mutex) debugBelch("RELEASE_LOCK(0x%p) %s %d\n", mutex,__FILE__,__LINE__); pthread_mutex_unlock(mutex)
 #else
 #define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex)
 #define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.168 2004/08/13 13:09:49 simonmar Exp $
+ * $Id: GC.c,v 1.169 2004/09/03 15:28:20 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -307,7 +307,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 #endif
 
 #if defined(DEBUG) && defined(GRAN)
-  IF_DEBUG(gc, belch("@@ Starting garbage collection at %ld (%lx)\n", 
+  IF_DEBUG(gc, debugBelch("@@ Starting garbage collection at %ld (%lx)\n", 
 		     Now, Now));
 #endif
 
@@ -440,7 +440,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	      stp->bitmap = bitmap_bdescr;
 	      bitmap = bitmap_bdescr->start;
 	      
-	      IF_DEBUG(gc, belch("bitmap_size: %d, bitmap: %p",
+	      IF_DEBUG(gc, debugBelch("bitmap_size: %d, bitmap: %p",
 				   bitmap_size, bitmap););
 	      
 	      // don't forget to fill it with zeros!
@@ -851,10 +851,10 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	    oldest_gen->steps[0].n_blocks > 
 	    (RtsFlags.GcFlags.compactThreshold * max) / 100))) {
 	  oldest_gen->steps[0].is_compacted = 1;
-//	  fprintf(stderr,"compaction: on\n", live);
+//	  debugBelch("compaction: on\n", live);
       } else {
 	  oldest_gen->steps[0].is_compacted = 0;
-//	  fprintf(stderr,"compaction: off\n", live);
+//	  debugBelch("compaction: off\n", live);
       }
 
       // if we're going to go over the maximum heap size, reduce the
@@ -886,7 +886,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       }
 
 #if 0
-      fprintf(stderr,"live: %d, min_alloc: %d, size : %d, max = %d\n", live,
+      debugBelch("live: %d, min_alloc: %d, size : %d, max = %d\n", live,
 	      min_alloc, size, max);
 #endif
 
@@ -968,7 +968,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
       int pc_free; 
       
       adjusted_blocks = (RtsFlags.GcFlags.maxHeapSize - 2 * blocks);
-      IF_DEBUG(gc, belch("@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
+      IF_DEBUG(gc, debugBelch("@@ Near maximum heap size of 0x%x blocks, blocks = %d, adjusted to %ld", RtsFlags.GcFlags.maxHeapSize, blocks, adjusted_blocks));
       pc_free = adjusted_blocks * 100 / RtsFlags.GcFlags.maxHeapSize;
       if (pc_free < RtsFlags.GcFlags.pcFreeHeap) /* might even be < 0 */ {
 	heapOverflow();
@@ -1196,7 +1196,7 @@ traverse_weak_ptr_list(void)
 		  w->link = weak_ptr_list;
 		  weak_ptr_list = w;
 		  flag = rtsTrue;
-		  IF_DEBUG(weak, belch("Weak pointer still alive at %p -> %p", 
+		  IF_DEBUG(weak, debugBelch("Weak pointer still alive at %p -> %p", 
 				       w, w->key));
 		  continue;
 	      }
@@ -1958,7 +1958,7 @@ loop:
       //ToDo: derive size etc from reverted IP
       //to = copy(q,size,stp);
       IF_DEBUG(gc,
-	       belch("@@ evacuate: RBH %p (%s) to %p (%s)",
+	       debugBelch("@@ evacuate: RBH %p (%s) to %p (%s)",
 		     q, info_type(q), to, info_type(to)));
       return to;
     }
@@ -1967,7 +1967,7 @@ loop:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
     to = copy(q,sizeofW(StgBlockedFetch),stp);
     IF_DEBUG(gc,
-	     belch("@@ evacuate: %p (%s) to %p (%s)",
+	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
 		   q, info_type(q), to, info_type(to)));
     return to;
 
@@ -1978,7 +1978,7 @@ loop:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
     to = copy(q,sizeofW(StgFetchMe),stp);
     IF_DEBUG(gc,
-	     belch("@@ evacuate: %p (%s) to %p (%s)",
+	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
 		   q, info_type(q), to, info_type(to)));
     return to;
 
@@ -1986,7 +1986,7 @@ loop:
     ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
     to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
     IF_DEBUG(gc,
-	     belch("@@ evacuate: %p (%s) to %p (%s)",
+	     debugBelch("@@ evacuate: %p (%s) to %p (%s)",
 		   q, info_type(q), to, info_type(to)));
     return to;
 #endif
@@ -2750,7 +2750,7 @@ scavenge(step *stp)
 	recordMutable((StgMutClosure *)to);
 	failed_to_evac = rtsFalse;  // mutable anyhow.
 	IF_DEBUG(gc,
-		 belch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
+		 debugBelch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
 		       p, info_type(p), (StgClosure *)rbh->blocking_queue));
 	// ToDo: use size of reverted closure here!
 	p += BLACKHOLE_sizeW(); 
@@ -2771,7 +2771,7 @@ scavenge(step *stp)
 	    recordMutable((StgMutClosure *)bf);
 	}
 	IF_DEBUG(gc,
-		 belch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
+		 debugBelch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
 		       bf, info_type((StgClosure *)bf), 
 		       bf->node, info_type(bf->node)));
 	p += sizeofW(StgBlockedFetch);
@@ -2795,7 +2795,7 @@ scavenge(step *stp)
 	    recordMutable((StgMutClosure *)fmbq);
 	}
 	IF_DEBUG(gc,
-		 belch("@@ scavenge: %p (%s) exciting, isn't it",
+		 debugBelch("@@ scavenge: %p (%s) exciting, isn't it",
 		       p, info_type((StgClosure *)p)));
 	p += sizeofW(StgFetchMeBlockingQueue);
 	break;
@@ -3059,7 +3059,7 @@ linear_scan:
 	    recordMutable((StgMutClosure *)rbh);
 	    failed_to_evac = rtsFalse;  // mutable anyhow.
 	    IF_DEBUG(gc,
-		     belch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
+		     debugBelch("@@ scavenge: RBH %p (%s) (new blocking_queue link=%p)",
 			   p, info_type(p), (StgClosure *)rbh->blocking_queue));
 	    break;
 	}
@@ -3078,7 +3078,7 @@ linear_scan:
 		recordMutable((StgMutClosure *)bf);
 	    }
 	    IF_DEBUG(gc,
-		     belch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
+		     debugBelch("@@ scavenge: %p (%s); node is now %p; exciting, isn't it",
 			   bf, info_type((StgClosure *)bf), 
 			   bf->node, info_type(bf->node)));
 	    break;
@@ -3100,7 +3100,7 @@ linear_scan:
 		recordMutable((StgMutClosure *)fmbq);
 	    }
 	    IF_DEBUG(gc,
-		     belch("@@ scavenge: %p (%s) exciting, isn't it",
+		     debugBelch("@@ scavenge: %p (%s) exciting, isn't it",
 			   p, info_type((StgClosure *)p)));
 	    break;
 	}
@@ -3123,7 +3123,7 @@ linear_scan:
 
     // start a new linear scan if the mark stack overflowed at some point
     if (mark_stack_overflowed && oldgen_scan_bd == NULL) {
-	IF_DEBUG(gc, belch("scavenge_mark_stack: starting linear scan"));
+	IF_DEBUG(gc, debugBelch("scavenge_mark_stack: starting linear scan"));
 	mark_stack_overflowed = rtsFalse;
 	oldgen_scan_bd = oldest_gen->steps[0].blocks;
 	oldgen_scan = oldgen_scan_bd->start;
@@ -3367,7 +3367,7 @@ scavenge_mut_once_list(generation *gen)
 	} else {
 	  size = gen->steps[0].scan - start;
 	}
-	belch("evac IND_OLDGEN: %ld bytes", size * sizeof(W_));
+	debugBelch("evac IND_OLDGEN: %ld bytes", size * sizeof(W_));
       }
 #endif
 
@@ -3743,7 +3743,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   StgWord bitmap;
   nat size;
 
-  //IF_DEBUG(sanity, belch("  scavenging stack between %p and %p", p, stack_end));
+  //IF_DEBUG(sanity, debugBelch("  scavenging stack between %p and %p", p, stack_end));
 
   /* 
    * Each time around this loop, we are looking at a chunk of stack
@@ -3987,7 +3987,7 @@ gcCAFs(void)
     ASSERT(info->type == IND_STATIC);
 
     if (STATIC_LINK(info,p) == NULL) {
-      IF_DEBUG(gccafs, belch("CAF gc'd at 0x%04lx", (long)p));
+      IF_DEBUG(gccafs, debugBelch("CAF gc'd at 0x%04lx", (long)p));
       // black hole it 
       SET_INFO(p,&stg_BLACKHOLE_info);
       p = STATIC_LINK2(info,p);
@@ -4001,7 +4001,7 @@ gcCAFs(void)
 
   }
 
-  //  belch("%d CAFs live", i); 
+  //  debugBelch("%d CAFs live", i); 
 }
 #endif
 
@@ -4048,7 +4048,7 @@ threadLazyBlackHole(StgTSO *tso)
 	    if (bh->header.info != &stg_BLACKHOLE_BQ_info &&
 		bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
+		debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 #ifdef PROFILING
 		// @LDV profiling
@@ -4175,7 +4175,7 @@ threadSqueezeStack(StgTSO *tso)
 		    bh->header.info != &stg_BLACKHOLE_BQ_info &&
 		    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
-		    belch("Unexpected lazy BHing required at 0x%04x",(int)bh);
+		    debugBelch("Unexpected lazy BHing required at 0x%04x",(int)bh);
 #endif
 #ifdef DEBUG
 		    /* zero out the slop so that the sanity checker can tell
@@ -4310,12 +4310,12 @@ printMutOnceList(generation *gen)
   p = gen->mut_once_list;
   next = p->mut_link;
 
-  fprintf(stderr, "@@ Mut once list %p: ", gen->mut_once_list);
+  debugBelch("@@ Mut once list %p: ", gen->mut_once_list);
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
-    fprintf(stderr, "%p (%s), ", 
+    debugBelch("%p (%s), ", 
 	    p, info_type((StgClosure *)p));
   }
-  fputc('\n', stderr);
+  debugBelch("\n");
 }
 
 void
@@ -4326,12 +4326,12 @@ printMutableList(generation *gen)
   p = gen->mut_list;
   next = p->mut_link;
 
-  fprintf(stderr, "@@ Mutable list %p: ", gen->mut_list);
+  debugBelch("@@ Mutable list %p: ", gen->mut_list);
   for (; p != END_MUT_LIST; p = next, next = p->mut_link) {
-    fprintf(stderr, "%p (%s), ",
+    debugBelch("%p (%s), ",
 	    p, info_type((StgClosure *)p));
   }
-  fputc('\n', stderr);
+  debugBelch("\n");
 }
 
 STATIC_INLINE rtsBool

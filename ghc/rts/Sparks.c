@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Sparks.c,v 1.7 2003/11/12 17:49:11 sof Exp $
+ * $Id: Sparks.c,v 1.8 2004/09/03 15:28:54 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -137,7 +137,7 @@ add_to_spark_queue( StgClosure *closure, StgSparkPool *pool )
     // collect parallel global statistics (currently done together with GC stats)
     if (RtsFlags.ParFlags.ParStats.Global &&
 	RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
-      // fprintf(stderr, "Creating spark for %x @ %11.2f\n", closure, usertime()); 
+      // debugBelch("Creating spark for %x @ %11.2f\n", closure, usertime()); 
       globalParStats.tot_sparks_created++;
     }
 #endif
@@ -147,7 +147,7 @@ add_to_spark_queue( StgClosure *closure, StgSparkPool *pool )
     // collect parallel global statistics (currently done together with GC stats)
     if (RtsFlags.ParFlags.ParStats.Global &&
 	RtsFlags.GcFlags.giveStats > NO_GC_STATS) {
-      //fprintf(stderr, "Ignoring spark for %x @ %11.2f\n", closure, usertime()); 
+      //debugBelch("Ignoring spark for %x @ %11.2f\n", closure, usertime()); 
       globalParStats.tot_sparks_ignored++;
     }
 #endif
@@ -240,20 +240,20 @@ markSparkQueue( void )
     
 #if defined(SMP)
     IF_DEBUG(scheduler,
-	     belch("markSparkQueue: marked %d sparks and pruned %d sparks on [%x]",
+	     debugBelch("markSparkQueue: marked %d sparks and pruned %d sparks on [%x]",
 		   n, pruned_sparks, pthread_self()));
 #elif defined(PAR)
     IF_DEBUG(scheduler,
-	     belch("markSparkQueue: marked %d sparks and pruned %d sparks on [%x]",
+	     debugBelch("markSparkQueue: marked %d sparks and pruned %d sparks on [%x]",
 		   n, pruned_sparks, mytid));
 #else
     IF_DEBUG(scheduler,
-	     belch("markSparkQueue: marked %d sparks and pruned %d sparks",
+	     debugBelch("markSparkQueue: marked %d sparks and pruned %d sparks",
 		   n, pruned_sparks));
 #endif
 
     IF_DEBUG(scheduler,
-	     belch("markSparkQueue:   new spark queue len=%d; (hd=%p; tl=%p)",
+	     debugBelch("markSparkQueue:   new spark queue len=%d; (hd=%p; tl=%p)",
 		   spark_queue_len(pool), pool->hd, pool->tl));
 
   }
@@ -322,7 +322,7 @@ findLocalSpark (rtsEvent *event, rtsBool *found_res, rtsSparkQ *spark_res)
        if (!closure_SHOULD_SPARK(node)) 
          {
 	   IF_GRAN_DEBUG(checkSparkQ,
-			 belch("^^ pruning spark %p (node %p) in gimme_spark",
+			 debugBelch("^^ pruning spark %p (node %p) in gimme_spark",
 			       spark, node));
 
            if (RtsFlags.GranFlags.GranSimStats.Sparks)
@@ -362,7 +362,7 @@ findLocalSpark (rtsEvent *event, rtsBool *found_res, rtsSparkQ *spark_res)
 # if defined(GRAN) && defined(GRAN_CHECK)
            /* Should never happen; just for testing 
            if (spark==pending_sparks_tl) {
-             fprintf(stderr,"ReSchedule: Last spark != SparkQueueTl\n");
+             debugBelch("ReSchedule: Last spark != SparkQueueTl\n");
 	   	stg_exit(EXIT_FAILURE);
 		} */
 # endif
@@ -400,7 +400,7 @@ findLocalSpark (rtsEvent *event, rtsBool *found_res, rtsSparkQ *spark_res)
   
            /* Should never happen; just for testing 
            if (spark==pending_sparks_tl) {
-             fprintf(stderr,"ReSchedule: Last spark != SparkQueueTl\n");
+             debugBelch("ReSchedule: Last spark != SparkQueueTl\n");
   		stg_exit(EXIT_FAILURE);
              break;
 	   } */                
@@ -408,7 +408,7 @@ findLocalSpark (rtsEvent *event, rtsBool *found_res, rtsSparkQ *spark_res)
 	   spark = spark->next;
 
 	   IF_GRAN_DEBUG(pri,
-			 belch("++ Ignoring spark of priority %u (SparkPriority=%u); node=%p; name=%u\n", 
+			 debugBelch("++ Ignoring spark of priority %u (SparkPriority=%u); node=%p; name=%u\n", 
 			       spark->gran_info, RtsFlags.GranFlags.SparkPriority, 
 			       spark->node, spark->name);)
            }
@@ -471,7 +471,7 @@ activateSpark (rtsEvent *event, rtsSparkQ spark)
 
       globalGranStats.tot_low_pri_sparks++;
       IF_GRAN_DEBUG(pri,
-		    belch("++ No high priority spark available; low priority (%u) spark chosen: node=%p; name=%u\n",
+		    debugBelch("++ No high priority spark available; low priority (%u) spark chosen: node=%p; name=%u\n",
 			  spark->gran_info, 
 			  spark->node, spark->name));
     } 
@@ -549,7 +549,7 @@ nat name, gran_info, size_info, par_info, local;
   if ( RtsFlags.GranFlags.SparkPriority!=0 && 
        pri<RtsFlags.GranFlags.SparkPriority ) {
     IF_GRAN_DEBUG(pri,
-      belch(",, NewSpark: Ignoring spark of priority %u (SparkPriority=%u); node=%#x; name=%u\n", 
+      debugBelch(",, NewSpark: Ignoring spark of priority %u (SparkPriority=%u); node=%#x; name=%u\n", 
 	      pri, RtsFlags.GranFlags.SparkPriority, node, name));
     return ((rtsSpark*)NULL);
   }
@@ -590,7 +590,7 @@ rtsSparkQ spark;
 
 # ifdef GRAN_CHECK
   if (SparksAvail < 0) {
-    fprintf(stderr,"disposeSparkQ: SparksAvail<0 after disposing sparkq @ %p\n", &spark);
+    debugBelch("disposeSparkQ: SparksAvail<0 after disposing sparkq @ %p\n", &spark);
     print_spark(spark);
   }
 # endif
@@ -666,7 +666,7 @@ rtsSpark *spark;
   }
 
   IF_GRAN_DEBUG(checkSparkQ,
-		belch("++ Spark stats after adding spark %p (node %p) to queue on PE %d",
+		debugBelch("++ Spark stats after adding spark %p (node %p) to queue on PE %d",
 		      spark, spark->node, CurrentProc);
 		print_sparkq_stats());
 
@@ -677,7 +677,7 @@ rtsSpark *spark;
 	 prev = next, next = next->next) 
       {}
     if ( (prev!=NULL) && (prev!=pending_sparks_tl) )
-      fprintf(stderr,"SparkQ inconsistency after adding spark %p: (PE %u) pending_sparks_tl (%p) not end of queue (%p)\n",
+      debugBelch("SparkQ inconsistency after adding spark %p: (PE %u) pending_sparks_tl (%p) not end of queue (%p)\n",
 	      spark,CurrentProc, 
 	      pending_sparks_tl, prev);
   }
@@ -703,7 +703,7 @@ rtsSpark *spark;
       }
     }
     if (!sorted) {
-      fprintf(stderr,"ghuH: SPARKQ on PE %d is not sorted:\n",
+      debugBelch("ghuH: SPARKQ on PE %d is not sorted:\n",
 	      CurrentProc);
       print_sparkq(CurrentProc);
     }
@@ -730,7 +730,7 @@ PEs proc;
 #  if defined(GRAN_CHECK)
   if ( RtsFlags.GranFlags.Debug.checkSparkQ ) 
     if ( (prev!=NULL) && (prev!=pending_sparks_tls[proc]) )
-      fprintf(stderr,"ERROR in spark_queue_len: (PE %u) pending_sparks_tl (%p) not end of queue (%p)\n",
+      debugBelch("ERROR in spark_queue_len: (PE %u) pending_sparks_tl (%p) not end of queue (%p)\n",
 	      proc, pending_sparks_tls[proc], prev);
 #  endif
 
@@ -756,7 +756,7 @@ rtsBool dispose_too;
 
 #  if defined(GRAN_CHECK)
   if ( RtsFlags.GranFlags.Debug.checkSparkQ ) {
-    fprintf(stderr,"## |%p:%p| (%p)<-spark=%p->(%p) <-(%p)\n",
+    debugBelch("## |%p:%p| (%p)<-spark=%p->(%p) <-(%p)\n",
 	    pending_sparks_hd, pending_sparks_tl,
 	    spark->prev, spark, spark->next, 
 	    (spark->next==NULL ? 0 : spark->next->prev));
@@ -781,7 +781,7 @@ rtsBool dispose_too;
   
 #  if defined(GRAN_CHECK)
   if ( RtsFlags.GranFlags.Debug.checkSparkQ ) {
-    fprintf(stderr,"## |%p:%p| (%p)<-spark=%p->(%p) <-(%p); spark=%p will be deleted NOW \n",
+    debugBelch("## |%p:%p| (%p)<-spark=%p->(%p) <-(%p); spark=%p will be deleted NOW \n",
 	    pending_sparks_hd, pending_sparks_tl,
 	    spark->prev, spark, spark->next, 
 	    (spark->next==NULL ? 0 : spark->next->prev), spark);
@@ -811,7 +811,7 @@ markSparkQueue(void)
       sp->node = (StgClosure *)MarkRoot(sp->node);
     }
   IF_DEBUG(gc,
-	   belch("@@ markSparkQueue: spark statistics at start of GC:");
+	   debugBelch("@@ markSparkQueue: spark statistics at start of GC:");
 	   print_sparkq_stats());
 }
 
@@ -823,14 +823,14 @@ rtsSpark *spark;
   char str[16];
 
   if (spark==NULL) {
-    fprintf(stderr,"Spark: NIL\n");
+    debugBelch("Spark: NIL\n");
     return;
   } else {
     sprintf(str,
 	    ((spark->node==NULL) ? "______" : "%#6lx"), 
 	    stgCast(StgPtr,spark->node));
 
-    fprintf(stderr,"Spark: Node %8s, Name %#6x, Global %5s, Creator %5x, Prev %6p, Next %6p\n",
+    debugBelch("Spark: Node %8s, Name %#6x, Global %5s, Creator %5x, Prev %6p, Next %6p\n",
 	    str, spark->name, 
             ((spark->global)==rtsTrue?"True":"False"), spark->creator, 
             spark->prev, spark->next);
@@ -845,7 +845,7 @@ PEs proc;
 {
   rtsSpark *x = pending_sparks_hds[proc];
 
-  fprintf(stderr,"Spark Queue of PE %d with root at %p:\n", proc, x);
+  debugBelch("Spark Queue of PE %d with root at %p:\n", proc, x);
   for (; x!=(rtsSpark*)NULL; x=x->next) {
     print_spark(x);
   }
@@ -860,10 +860,10 @@ print_sparkq_stats(void)
 {
   PEs p;
 
-  fprintf(stderr, "SparkQs: [");
+  debugBelch("SparkQs: [");
   for (p=0; p<RtsFlags.GranFlags.proc; p++)
-    fprintf(stderr, ", PE %d: %d", p, spark_queue_len(p));
-  fprintf(stderr, "\n");
+    debugBelch(", PE %d: %d", p, spark_queue_len(p));
+  debugBelch("\n");
 }
 
 #endif

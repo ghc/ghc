@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.41 2004/08/13 13:10:10 simonmar Exp $
+ * $Id: Main.c,v 1.42 2004/09/03 15:28:34 simonmar Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -78,14 +78,14 @@ int main(int argc, char *argv[])
 
     if (IAmMainThread == rtsTrue) {
       IF_PAR_DEBUG(verbose,
-		   fprintf(stderr, "==== [%x] Main Thread Started ...\n", mytid));
+		   debugBelch("==== [%x] Main Thread Started ...\n", mytid));
 
       /* ToDo: Dump event for the main thread */
       status = rts_mainLazyIO((HaskellObj)mainIO_closure, NULL);
     } else {
       /* Just to show we're alive */
       IF_PAR_DEBUG(verbose,
-		   fprintf(stderr, "== [%x] Non-Main PE enters scheduler via taskStart() without work ...\n",
+		   debugBelch("== [%x] Non-Main PE enters scheduler via taskStart() without work ...\n",
 			   mytid));
      
       /* all non-main threads enter the scheduler without work */
@@ -110,11 +110,11 @@ int main(int argc, char *argv[])
     /* check the status of the entire Haskell computation */
     switch (status) {
     case Killed:
-      prog_belch("main thread exited (uncaught exception)");
+      errorBelch("main thread exited (uncaught exception)");
       exit_status = EXIT_KILLED;
       break;
     case Interrupted:
-      prog_belch("interrupted");
+      errorBelch("interrupted");
       exit_status = EXIT_INTERRUPTED;
       break;
     case Success:
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
       break;
 #if defined(PAR)
     case NoStatus:
-      prog_belch("main thread PE killed; probably due to failure of another PE; check /tmp/pvml...");
+      errorBelch("main thread PE killed; probably due to failure of another PE; check /tmp/pvml...");
       exit_status = EXIT_KILLED;
       break;
 #endif 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.53 2004/08/13 13:10:25 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.54 2004/09/03 15:28:35 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -332,7 +332,7 @@ nextEra( void )
 	era++;
 
 	if (era == max_era) {
-	    prog_belch("maximum number of censuses reached; use +RTS -i to reduce");
+	    errorBelch("maximum number of censuses reached; use +RTS -i to reduce");
 	    stg_exit(EXIT_FAILURE);
 	}
 	
@@ -368,7 +368,7 @@ void initProfiling2( void )
     
     /* open the log file */
     if ((hp_file = fopen(hp_filename, "w")) == NULL) {
-      fprintf(stderr, "Can't open profiling report file %s\n", 
+      debugBelch("Can't open profiling report file %s\n", 
 	      hp_filename);
       RtsFlags.ProfFlags.doHeapProfile = 0;
       return;
@@ -406,7 +406,7 @@ initHeapProfiling(void)
 
 #ifdef PROFILING
     if (doingLDVProfiling() && doingRetainerProfiling()) {
-	prog_belch("cannot mix -hb and -hr");
+	errorBelch("cannot mix -hb and -hr");
 	stg_exit(1);
     }
 #endif
@@ -567,7 +567,7 @@ rtsBool
 strMatchesSelector( char* str, char* sel )
 {
    char* p;
-   // fprintf(stderr, "str_matches_selector %s %s\n", str, sel);
+   // debugBelch("str_matches_selector %s %s\n", str, sel);
    while (1) {
        // Compare str against wherever we've got to in sel.
        p = str;
@@ -696,8 +696,8 @@ aggregateCensusInfo( void )
 		// totals *must* be zero.
 		ASSERT(c->c.ldv.void_total == 0 && c->c.ldv.drag_total == 0);
 
-		// fprintCCS(stderr,c->identity);
-		// fprintf(stderr," census=%d void_total=%d drag_total=%d\n",
+		// debugCCS(c->identity);
+		// debugBelch(" census=%d void_total=%d drag_total=%d\n",
 		//         t, c->c.ldv.void_total, c->c.ldv.drag_total);
 	    } else {
 		d->c.ldv.void_total += c->c.ldv.void_total;

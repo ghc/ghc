@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.50 2003/10/31 16:21:27 sof Exp $
+ * $Id: MBlock.c,v 1.51 2004/09/03 15:28:33 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -133,7 +133,7 @@ my_mmap (void *addr, lnat size)
 	    (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
 	    // If we request more than 3Gig, then we get EINVAL
 	    // instead of ENOMEM (at least on Linux).
-	    prog_belch("out of memory (requested %d bytes)", size);
+	    errorBelch("out of memory (requested %d bytes)", size);
 	    stg_exit(EXIT_FAILURE);
 	} else {
 	    barf("getMBlock: mmap: %s", strerror(errno));
@@ -205,7 +205,7 @@ getMBlocks(nat n)
       if (((W_)ret & MBLOCK_MASK) != 0) {
 	  // misaligned block!
 #if 0 // defined(DEBUG)
-	  belch("warning: getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
+	  errorBelch("warning: getMBlock: misaligned block %p returned when allocating %d megablock(s) at %p", ret, n, next_request);
 #endif
 
 	  // unmap this block...
@@ -221,7 +221,7 @@ getMBlocks(nat n)
   // ToDo: check that we haven't already grabbed the memory at next_request
   next_request = ret + size;
 
-  IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at %p\n",n,ret));
+  IF_DEBUG(gc,debugBelch("Allocated %d megablock(s) at %p\n",n,ret));
 
   // fill in the table
   for (i = 0; i < n; i++) {
@@ -291,19 +291,19 @@ getMBlocks(nat n)
 				      , PAGE_READWRITE
 				      );
     if ( base_non_committed == 0 ) {
-         fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
+         errorBelch("getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
          ret=(void*)-1;
     } else {
       end_non_committed = (char*)base_non_committed + (unsigned long)size_reserved_pool;
       /* The returned pointer is not aligned on a mega-block boundary. Make it. */
       base_mblocks = (char*)((unsigned long)base_non_committed & (unsigned long)~MBLOCK_MASK) + MBLOCK_SIZE;
 #      if 0
-       fprintf(stderr, "getMBlocks: Dropping %d bytes off of 256M chunk\n", 
-	               (unsigned)base_mblocks - (unsigned)base_non_committed);
+       debugBelch("getMBlocks: Dropping %d bytes off of 256M chunk\n", 
+		  (unsigned)base_mblocks - (unsigned)base_non_committed);
 #      endif
 
        if ( ((char*)base_mblocks + size) > end_non_committed ) {
-          fprintf(stderr, "getMBlocks: oops, committed too small a region to start with.");
+          debugBelch("getMBlocks: oops, committed too small a region to start with.");
 	  ret=(void*)-1;
        } else {
           next_request = base_mblocks;
@@ -314,7 +314,7 @@ getMBlocks(nat n)
   if ( ret != (void*)-1 ) {
      ret = VirtualAlloc(next_request, size, MEM_COMMIT, PAGE_READWRITE);
      if (ret == NULL) {
-        fprintf(stderr, "getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
+        debugBelch("getMBlocks: VirtualAlloc failed with: %ld\n", GetLastError());
         ret=(void*)-1;
      }
   }
@@ -327,7 +327,7 @@ getMBlocks(nat n)
      barf("getMBlocks: unknown memory allocation failure on Win32.");
   }
 
-  IF_DEBUG(gc,fprintf(stderr,"Allocated %d megablock(s) at 0x%x\n",n,(nat)ret));
+  IF_DEBUG(gc,debugBelch("Allocated %d megablock(s) at 0x%x\n",n,(nat)ret));
   next_request = (char*)next_request + size;
 
   mblocks_allocated += n;
@@ -356,7 +356,7 @@ freeMBlock(void* p, nat n)
   
   if (rc == FALSE) {
 #    ifdef DEBUG
-     fprintf(stderr, "freeMBlocks: VirtualFree failed with: %d\n", GetLastError());
+     debugBelch("freeMBlocks: VirtualFree failed with: %d\n", GetLastError());
 #    endif
   }
 

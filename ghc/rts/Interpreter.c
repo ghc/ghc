@@ -111,22 +111,22 @@ void interp_startup ( void )
 void interp_shutdown ( void )
 {
    int i, j, k, o_max, i_max, j_max;
-   fprintf(stderr, "%d constrs entered -> (%d BCO, %d UPD, %d ??? )\n",
+   debugBelch("%d constrs entered -> (%d BCO, %d UPD, %d ??? )\n",
                    it_retto_BCO + it_retto_UPDATE + it_retto_other,
                    it_retto_BCO, it_retto_UPDATE, it_retto_other );
-   fprintf(stderr, "%d total entries, %d unknown entries \n", 
+   debugBelch("%d total entries, %d unknown entries \n", 
                    it_total_entries, it_total_unknown_entries);
    for (i = 0; i < N_CLOSURE_TYPES; i++) {
      if (it_unknown_entries[i] == 0) continue;
-     fprintf(stderr, "   type %2d: unknown entries (%4.1f%%) == %d\n",
+     debugBelch("   type %2d: unknown entries (%4.1f%%) == %d\n",
 	     i, 100.0 * ((double)it_unknown_entries[i]) / 
                         ((double)it_total_unknown_entries),
              it_unknown_entries[i]);
    }
-   fprintf(stderr, "%d insns, %d slides, %d BCO_entries\n", 
+   debugBelch("%d insns, %d slides, %d BCO_entries\n", 
                    it_insns, it_slides, it_BCO_entries);
    for (i = 0; i < 27; i++) 
-      fprintf(stderr, "opcode %2d got %d\n", i, it_ofreq[i] );
+      debugBelch("opcode %2d got %d\n", i, it_ofreq[i] );
 
    for (k = 1; k < 20; k++) {
       o_max = 0;
@@ -140,7 +140,7 @@ void interp_shutdown ( void )
 	 }
       }
       
-      fprintf ( stderr, "%d:  count (%4.1f%%) %6d   is %d then %d\n",
+      debugBelch("%d:  count (%4.1f%%) %6d   is %d then %d\n",
                 k, ((double)o_max) * 100.0 / ((double)it_insns), o_max,
                    i_max, j_max );
       it_oofreq[i_max][j_max] = 0;
@@ -228,14 +228,14 @@ eval_obj:
     INTERP_TICK(it_total_evals);
 
     IF_DEBUG(interpreter,
-             fprintf(stderr, 
+             debugBelch(
              "\n---------------------------------------------------------------\n");
-             fprintf(stderr,"Evaluating: "); printObj(obj);
-             fprintf(stderr,"Sp = %p\n", Sp);
-             fprintf(stderr, "\n" );
+             debugBelch("Evaluating: "); printObj(obj);
+             debugBelch("Sp = %p\n", Sp);
+             debugBelch("\n" );
 
              printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
-             fprintf(stderr, "\n\n");
+             debugBelch("\n\n");
             );
 
     IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
@@ -327,7 +327,7 @@ eval_obj:
     {
 	// Can't handle this object; yield to scheduler
 	IF_DEBUG(interpreter,
-		 fprintf(stderr, "evaluating unknown closure -- yielding to sched\n"); 
+		 debugBelch("evaluating unknown closure -- yielding to sched\n"); 
 		 printObj(obj);
 	    );
 	Sp -= 2;
@@ -344,13 +344,13 @@ do_return:
     ASSERT(closure_HNF(obj));
 
     IF_DEBUG(interpreter,
-             fprintf(stderr, 
+             debugBelch(
              "\n---------------------------------------------------------------\n");
-             fprintf(stderr,"Returning: "); printObj(obj);
-             fprintf(stderr,"Sp = %p\n", Sp);
-             fprintf(stderr, "\n" );
+             debugBelch("Returning: "); printObj(obj);
+             debugBelch("Sp = %p\n", Sp);
+             debugBelch("\n" );
              printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
-             fprintf(stderr, "\n\n");
+             debugBelch("\n\n");
             );
 
     IF_DEBUG(sanity,checkStackChunk(Sp, cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size));
@@ -422,7 +422,7 @@ do_return:
 	// Can't handle this return address; yield to scheduler
 	INTERP_TICK(it_retto_other);
 	IF_DEBUG(interpreter,
-		 fprintf(stderr, "returning to unknown frame -- yielding to sched\n"); 
+		 debugBelch("returning to unknown frame -- yielding to sched\n"); 
 		 printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
 	    );
 	Sp -= 2;
@@ -485,7 +485,7 @@ do_return_unboxed:
 	    // Can't handle this return address; yield to scheduler
 	    INTERP_TICK(it_retto_other);
 	    IF_DEBUG(interpreter,
-		     fprintf(stderr, "returning to unknown frame -- yielding to sched\n"); 
+		     debugBelch("returning to unknown frame -- yielding to sched\n"); 
 		     printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
 		);
 	    RETURN_TO_SCHEDULER(ThreadRunGHC, ThreadYielding);
@@ -729,18 +729,18 @@ run_BCO:
 	ASSERT(bciPtr <= instrs[0]);
 	IF_DEBUG(interpreter,
 		 //if (do_print_stack) {
-		 //fprintf(stderr, "\n-- BEGIN stack\n");
+		 //debugBelch("\n-- BEGIN stack\n");
 		 //printStack(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
-		 //fprintf(stderr, "-- END stack\n\n");
+		 //debugBelch("-- END stack\n\n");
 		 //}
-		 fprintf(stderr,"Sp = %p   pc = %d      ", Sp, bciPtr);
+		 debugBelch("Sp = %p   pc = %d      ", Sp, bciPtr);
 		 disInstr(bco,bciPtr);
 		 if (0) { int i;
-		 fprintf(stderr,"\n");
+		 debugBelch("\n");
 		 for (i = 8; i >= 0; i--) {
-		     fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(Sp+i)));
+		     debugBelch("%d  %p\n", i, (StgPtr)(*(Sp+i)));
 		 }
-		 fprintf(stderr,"\n");
+		 debugBelch("\n");
 		 }
 		 //if (do_print_stack) checkStack(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size,iSu);
 	    );
@@ -962,7 +962,7 @@ run_BCO:
 		ap->payload[i] = (StgClosure*)Sp[i+1];
 	    Sp += n_payload+1;
 	    IF_DEBUG(interpreter,
-		     fprintf(stderr,"\tBuilt "); 
+		     debugBelch("\tBuilt "); 
 		     printObj((StgClosure*)ap);
 		);
 	    goto nextInsn;
@@ -997,7 +997,7 @@ run_BCO:
 	    Sp --;
 	    Sp[0] = (W_)con;
 	    IF_DEBUG(interpreter,
-		     fprintf(stderr,"\tBuilt "); 
+		     debugBelch("\tBuilt "); 
 		     printObj((StgClosure*)con);
 		);
 	    goto nextInsn;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.82 2004/08/21 12:48:00 panne Exp $
+ * $Id: RtsStartup.c,v 1.83 2004/09/03 15:28:42 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -143,7 +143,7 @@ hs_init(int *argc, char **argv[])
 #if defined(PAR)
     /* NB: this really must be done after processing the RTS flags */
     IF_PAR_DEBUG(verbose,
-                 fprintf(stderr, "==== Synchronising system (%d PEs)\n", nPEs));
+                 debugBelch("==== Synchronising system (%d PEs)\n", nPEs));
     synchroniseSystem();             // calls initParallelSystem etc
 #endif	/* PAR */
 
@@ -461,7 +461,7 @@ stg_exit(int n)
     return;
   exit_started=rtsTrue;
 
-  IF_PAR_DEBUG(verbose, fprintf(stderr,"==-- stg_exit %d on [%x]...", n, mytid));
+  IF_PAR_DEBUG(verbose, debugBelch("==-- stg_exit %d on [%x]...", n, mytid));
   shutdownParallelSystem(n);
 #endif
   exit(n);

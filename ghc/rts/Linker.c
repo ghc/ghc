@@ -666,7 +666,7 @@ static void ghciInsertStrHashTable ( char* obj_name,
       insertStrHashTable(table, (StgWord)key, data);
       return;
    }
-   fprintf(stderr,
+   debugBelch(
       "\n\n"
       "GHCi runtime linker: fatal error: I found a duplicate definition for symbol\n"
       "   %s\n"
@@ -803,7 +803,7 @@ addDLL( char *dll_name )
 
    initLinker();
 
-   /* fprintf(stderr, "\naddDLL; dll_name = `%s'\n", dll_name); */
+   /* debugBelch("\naddDLL; dll_name = `%s'\n", dll_name); */
 
    /* See if we've already got it, and ignore if so. */
    for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
@@ -880,7 +880,7 @@ lookupSymbol( char *lbl )
         OpenedDLL* o_dll;
         void* sym;
         for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
-	  /* fprintf(stderr, "look in %s for %s\n", o_dll->name, lbl); */
+	  /* debugBelch("look in %s for %s\n", o_dll->name, lbl); */
            if (lbl[0] == '_') {
               /* HACK: if the name has an initial underscore, try stripping
                  it off & look that up first. I've yet to verify whether there's
@@ -889,13 +889,13 @@ lookupSymbol( char *lbl )
               */
               sym = GetProcAddress(o_dll->instance, (lbl+1));
               if (sym != NULL) {
-		/*fprintf(stderr, "found %s in %s\n", lbl+1,o_dll->name); fflush(stderr);*/
+		/*debugBelch("found %s in %s\n", lbl+1,o_dll->name);*/
 		return sym;
 	      }
            }
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) {
-	     /*fprintf(stderr, "found %s in %s\n", lbl,o_dll->name); fflush(stderr);*/
+	     /*debugBelch("found %s in %s\n", lbl,o_dll->name);*/
 	     return sym;
 	   }
         }
@@ -947,7 +947,7 @@ void ghci_enquire ( char* addr )
       for (i = 0; i < oc->n_symbols; i++) {
          sym = oc->symbols[i];
          if (sym == NULL) continue;
-         // fprintf(stderr, "enquire %p %p\n", sym, oc->lochash);
+         // debugBelch("enquire %p %p\n", sym, oc->lochash);
          a = NULL;
          if (oc->lochash != NULL) {
             a = lookupStrHashTable(oc->lochash, sym);
@@ -956,10 +956,10 @@ void ghci_enquire ( char* addr )
             a = lookupStrHashTable(symhash, sym);
 	 }
          if (a == NULL) {
-	     // fprintf(stderr, "ghci_enquire: can't find %s\n", sym);
+	     // debugBelch("ghci_enquire: can't find %s\n", sym);
          }
          else if (addr-DELTA <= a && a <= addr+DELTA) {
-            fprintf(stderr, "%p + %3d  ==  `%s'\n", addr, a - addr, sym);
+            debugBelch("%p + %3d  ==  `%s'\n", addr, a - addr, sym);
          }
       }
    }
@@ -990,7 +990,7 @@ loadObj( char *path )
 
    initLinker();
 
-   /* fprintf(stderr, "loadObj %s\n", path ); */
+   /* debugBelch("loadObj %s\n", path ); */
 
    /* Check that we haven't already loaded this object. 
       Ignore requests to load multiple times */
@@ -1004,7 +1004,7 @@ loadObj( char *path )
           }
        }
        if (is_dup) {
-          IF_DEBUG(linker, belch(
+          IF_DEBUG(linker, debugBelch(
             "GHCi runtime linker: warning: looks like you're trying to load the\n"
             "same object file twice:\n"
             "   %s\n"
@@ -1209,7 +1209,7 @@ unloadObj( char *path )
 	}
     }
 
-    belch("unloadObj: can't find `%s' to unload", path);
+    errorBelch("unloadObj: can't find `%s' to unload", path);
     return 0;
 }
 
@@ -1222,7 +1222,7 @@ static void addProddableBlock ( ObjectCode* oc, void* start, int size )
 {
    ProddableBlock* pb
       = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
-   /* fprintf(stderr, "aPB %p %p %d\n", oc, start, size); */
+   /* debugBelch("aPB %p %p %d\n", oc, start, size); */
    ASSERT(size > 0);
    pb->start      = start;
    pb->size       = size;
@@ -1258,7 +1258,7 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
    s->next      = oc->sections;
    oc->sections = s;
    /*
-   fprintf(stderr, "addSection: %p-%p (size %d), kind %d\n",
+   debugBelch("addSection: %p-%p (size %d), kind %d\n",
                    start, ((char*)end)-1, end - start + 1, kind );
    */
 }
@@ -1420,12 +1420,12 @@ printName ( UChar* name, UChar* strtab )
 {
    if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
       UInt32 strtab_offset = * (UInt32*)(name+4);
-      fprintf ( stderr, "%s", strtab + strtab_offset );
+      debugBelch("%s", strtab + strtab_offset );
    } else {
       int i;
       for (i = 0; i < 8; i++) {
          if (name[i] == 0) break;
-         fprintf ( stderr, "%c", name[i] );
+         debugBelch("%c", name[i] );
       }
    }
 }
@@ -1532,7 +1532,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    COFF_section* sectab;
    COFF_symbol*  symtab;
    UChar*        strtab;
-   /* fprintf(stderr, "\nLOADING %s\n", oc->fileName); */
+   /* debugBelch("\nLOADING %s\n", oc->fileName); */
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
                ((UChar*)(oc->image))
@@ -1546,36 +1546,36 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
 
    if (hdr->Machine != 0x14c) {
-      belch("Not x86 PEi386");
+      errorBelch("Not x86 PEi386");
       return 0;
    }
    if (hdr->SizeOfOptionalHeader != 0) {
-      belch("PEi386 with nonempty optional header");
+      errorBelch("PEi386 with nonempty optional header");
       return 0;
    }
    if ( /* (hdr->Characteristics & MYIMAGE_FILE_RELOCS_STRIPPED) || */
         (hdr->Characteristics & MYIMAGE_FILE_EXECUTABLE_IMAGE) ||
         (hdr->Characteristics & MYIMAGE_FILE_DLL) ||
         (hdr->Characteristics & MYIMAGE_FILE_SYSTEM) ) {
-      belch("Not a PEi386 object file");
+      errorBelch("Not a PEi386 object file");
       return 0;
    }
    if ( (hdr->Characteristics & MYIMAGE_FILE_BYTES_REVERSED_HI)
         /* || !(hdr->Characteristics & MYIMAGE_FILE_32BIT_MACHINE) */ ) {
-      belch("Invalid PEi386 word size or endiannness: %d",
+      errorBelch("Invalid PEi386 word size or endiannness: %d",
             (int)(hdr->Characteristics));
       return 0;
    }
    /* If the string table size is way crazy, this might indicate that
       there are more than 64k relocations, despite claims to the
       contrary.  Hence this test. */
-   /* fprintf(stderr, "strtab size %d\n", * (UInt32*)strtab); */
+   /* debugBelch("strtab size %d\n", * (UInt32*)strtab); */
 #if 0
    if ( (*(UInt32*)strtab) > 600000 ) {
       /* Note that 600k has no special significance other than being
          big enough to handle the almost-2MB-sized lumps that
          constitute HSwin32*.o. */
-      belch("PEi386 object has suspiciously large string table; > 64k relocs?");
+      debugBelch("PEi386 object has suspiciously large string table; > 64k relocs?");
       return 0;
    }
 #endif
@@ -1585,44 +1585,34 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    IF_DEBUG(linker, i=1);
    if (i == 0) return 1;
 
-   fprintf ( stderr,
-             "sectab offset = %d\n", ((UChar*)sectab) - ((UChar*)hdr) );
-   fprintf ( stderr,
-             "symtab offset = %d\n", ((UChar*)symtab) - ((UChar*)hdr) );
-   fprintf ( stderr,
-             "strtab offset = %d\n", ((UChar*)strtab) - ((UChar*)hdr) );
+   debugBelch( "sectab offset = %d\n", ((UChar*)sectab) - ((UChar*)hdr) );
+   debugBelch( "symtab offset = %d\n", ((UChar*)symtab) - ((UChar*)hdr) );
+   debugBelch( "strtab offset = %d\n", ((UChar*)strtab) - ((UChar*)hdr) );
 
-   fprintf ( stderr, "\n" );
-   fprintf ( stderr,
-             "Machine:           0x%x\n", (UInt32)(hdr->Machine) );
-   fprintf ( stderr,
-             "# sections:        %d\n",   (UInt32)(hdr->NumberOfSections) );
-   fprintf ( stderr,
-             "time/date:         0x%x\n", (UInt32)(hdr->TimeDateStamp) );
-   fprintf ( stderr,
-             "symtab offset:     %d\n",   (UInt32)(hdr->PointerToSymbolTable) );
-   fprintf ( stderr,
-             "# symbols:         %d\n",   (UInt32)(hdr->NumberOfSymbols) );
-   fprintf ( stderr,
-             "sz of opt hdr:     %d\n",   (UInt32)(hdr->SizeOfOptionalHeader) );
-   fprintf ( stderr,
-             "characteristics:   0x%x\n", (UInt32)(hdr->Characteristics) );
+   debugBelch("\n" );
+   debugBelch( "Machine:           0x%x\n", (UInt32)(hdr->Machine) );
+   debugBelch( "# sections:        %d\n",   (UInt32)(hdr->NumberOfSections) );
+   debugBelch( "time/date:         0x%x\n", (UInt32)(hdr->TimeDateStamp) );
+   debugBelch( "symtab offset:     %d\n",   (UInt32)(hdr->PointerToSymbolTable) );
+   debugBelch( "# symbols:         %d\n",   (UInt32)(hdr->NumberOfSymbols) );
+   debugBelch( "sz of opt hdr:     %d\n",   (UInt32)(hdr->SizeOfOptionalHeader) );
+   debugBelch( "characteristics:   0x%x\n", (UInt32)(hdr->Characteristics) );
 
    /* Print the section table. */
-   fprintf ( stderr, "\n" );
+   debugBelch("\n" );
    for (i = 0; i < hdr->NumberOfSections; i++) {
       COFF_reloc* reltab;
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      fprintf ( stderr,
+      debugBelch(
                 "\n"
                 "section %d\n"
                 "     name `",
                 i
               );
       printName ( sectab_i->Name, strtab );
-      fprintf ( stderr,
+      debugBelch(
                 "'\n"
                 "    vsize %d\n"
                 "    vaddr %d\n"
@@ -1662,7 +1652,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
          COFF_symbol* sym;
          COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, j );
-         fprintf ( stderr,
+         debugBelch(
                    "        type 0x%-4x   vaddr 0x%-8x   name `",
                    (UInt32)rel->Type,
                    rel->VirtualAddress );
@@ -1670,35 +1660,35 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
                myindex ( sizeof_COFF_symbol, symtab, rel->SymbolTableIndex );
 	 /* Hmm..mysterious looking offset - what's it for? SOF */
          printName ( sym->Name, strtab -10 );
-         fprintf ( stderr, "'\n" );
+         debugBelch("'\n" );
       }
 
-      fprintf ( stderr, "\n" );
+      debugBelch("\n" );
    }
-   fprintf ( stderr, "\n" );
-   fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
-   fprintf ( stderr, "---START of string table---\n");
+   debugBelch("\n" );
+   debugBelch("string table has size 0x%x\n", * (UInt32*)strtab );
+   debugBelch("---START of string table---\n");
    for (i = 4; i < *(Int32*)strtab; i++) {
       if (strtab[i] == 0)
-         fprintf ( stderr, "\n"); else
-         fprintf( stderr, "%c", strtab[i] );
+         debugBelch("\n"); else
+         debugBelch("%c", strtab[i] );
    }
-   fprintf ( stderr, "--- END  of string table---\n");
+   debugBelch("--- END  of string table---\n");
 
-   fprintf ( stderr, "\n" );
+   debugBelch("\n" );
    i = 0;
    while (1) {
       COFF_symbol* symtab_i;
       if (i >= (Int32)(hdr->NumberOfSymbols)) break;
       symtab_i = (COFF_symbol*)
                  myindex ( sizeof_COFF_symbol, symtab, i );
-      fprintf ( stderr,
+      debugBelch(
                 "symbol %d\n"
                 "     name `",
                 i
               );
       printName ( symtab_i->Name, strtab );
-      fprintf ( stderr,
+      debugBelch(
                 "'\n"
                 "    value 0x%x\n"
                 "   1+sec# %d\n"
@@ -1715,7 +1705,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       i++;
    }
 
-   fprintf ( stderr, "\n" );
+   debugBelch("\n" );
    return 1;
 }
 
@@ -1761,7 +1751,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
                               "ocGetNames_PEi386(anonymous bss)");
       sectab_i->PointerToRawData = ((UChar*)zspace) - ((UChar*)(oc->image));
       addProddableBlock(oc, zspace, sectab_i->VirtualSize);
-      /* fprintf(stderr, "BSS anon section at 0x%x\n", zspace); */
+      /* debugBelch("BSS anon section at 0x%x\n", zspace); */
    }
 
    /* Copy section information into the ObjectCode. */
@@ -1776,7 +1766,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      IF_DEBUG(linker, belch("section name = %s\n", sectab_i->Name ));
+      IF_DEBUG(linker, debugBelch("section name = %s\n", sectab_i->Name ));
 
 #     if 0
       /* I'm sure this is the Right Way to do it.  However, the
@@ -1808,7 +1798,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           && 0 != strcmp(".stab", sectab_i->Name)
           && 0 != strcmp(".stabstr", sectab_i->Name)
          ) {
-         belch("Unknown PEi386 section name `%s'", sectab_i->Name);
+         errorBelch("Unknown PEi386 section name `%s'", sectab_i->Name);
          return 0;
       }
 
@@ -1862,26 +1852,26 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          addSection(oc, SECTIONKIND_RWDATA, addr,
                         ((UChar*)addr) + symtab_i->Value - 1);
          addProddableBlock(oc, addr, symtab_i->Value);
-         /* fprintf(stderr, "BSS      section at 0x%x\n", addr); */
+         /* debugBelch("BSS      section at 0x%x\n", addr); */
       }
 
       if (addr != NULL ) {
          sname = cstring_from_COFF_symbol_name ( symtab_i->Name, strtab );
-         /* fprintf(stderr,"addSymbol %p `%s \n", addr,sname);  */
-         IF_DEBUG(linker, belch("addSymbol %p `%s'\n", addr,sname);)
+         /* debugBelch("addSymbol %p `%s \n", addr,sname);  */
+         IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
          oc->symbols[i] = sname;
          ghciInsertStrHashTable(oc->fileName, symhash, sname, addr);
       } else {
 #        if 0
-         fprintf ( stderr,
+         debugBelch(
                    "IGNORING symbol %d\n"
                    "     name `",
                    i
                  );
          printName ( symtab_i->Name, strtab );
-         fprintf ( stderr,
+         debugBelch(
                    "'\n"
                    "    value 0x%x\n"
                    "   1+sec# %d\n"
@@ -1923,7 +1913,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
    /* ToDo: should be variable-sized?  But is at least safe in the
       sense of buffer-overrun-proof. */
    char symbol[1000];
-   /* fprintf(stderr, "resolving for %s\n", oc->fileName); */
+   /* debugBelch("resolving for %s\n", oc->fileName); */
 
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
@@ -1967,7 +1957,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
         COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, 0 );
 	noRelocs = rel->VirtualAddress;
-	fprintf(stderr, "WARNING: Overflown relocation field (# relocs found: %u)\n", noRelocs); fflush(stderr);
+	debugBelch("WARNING: Overflown relocation field (# relocs found: %u)\n",
+		   noRelocs);
 	j = 1;
       } else {
 	noRelocs = sectab_i->NumberOfRelocations;
@@ -1995,20 +1986,20 @@ ocResolve_PEi386 ( ObjectCode* oc )
                myindex ( sizeof_COFF_symbol,
                          symtab, reltab_j->SymbolTableIndex );
          IF_DEBUG(linker,
-                  fprintf ( stderr,
+                  debugBelch(
                             "reloc sec %2d num %3d:  type 0x%-4x   "
                             "vaddr 0x%-8x   name `",
                             i, j,
                             (UInt32)reltab_j->Type,
                             reltab_j->VirtualAddress );
                             printName ( sym->Name, strtab );
-                            fprintf ( stderr, "'\n" ));
+                            debugBelch("'\n" ));
 
          if (sym->StorageClass == MYIMAGE_SYM_CLASS_STATIC) {
             COFF_section* section_sym
                = findPEi386SectionCalled ( oc, sym->Name );
             if (!section_sym) {
-               belch("%s: can't find section `%s'", oc->fileName, sym->Name);
+               errorBelch("%s: can't find section `%s'", oc->fileName, sym->Name);
                return 0;
             }
             S = ((UInt32)(oc->image))
@@ -2026,7 +2017,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             (void*)S = lookupSymbol( symbol );
             if ((void*)S != NULL) goto foundit;
 	    /* Newline first because the interactive linker has printed "linking..." */
-            belch("\n%s: unknown symbol `%s'", oc->fileName, symbol);
+            errorBelch("\n%s: unknown symbol `%s'", oc->fileName, symbol);
             return 0;
            foundit:
          }
@@ -2051,7 +2042,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
                *pP = S - ((UInt32)pP) - 4;
                break;
             default:
-               belch("%s: unhandled PEi386 relocation type %d",
+               debugBelch(("%s: unhandled PEi386 relocation type %d",
 		     oc->fileName, reltab_j->Type);
                return 0;
          }
@@ -2059,7 +2050,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
       }
    }
 
-   IF_DEBUG(linker, belch("completed %s", oc->fileName));
+   IF_DEBUG(linker, debugBelch("completed %s", oc->fileName));
    return 1;
 }
 
@@ -2328,44 +2319,44 @@ ocVerifyImage_ELF ( ObjectCode* oc )
        ehdr->e_ident[EI_MAG1] != ELFMAG1 ||
        ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
        ehdr->e_ident[EI_MAG3] != ELFMAG3) {
-      belch("%s: not an ELF object", oc->fileName);
+      errorBelch("%s: not an ELF object", oc->fileName);
       return 0;
    }
 
    if (ehdr->e_ident[EI_CLASS] != ELFCLASS) {
-      belch("%s: unsupported ELF format", oc->fileName);
+      errorBelch("%s: unsupported ELF format", oc->fileName);
       return 0;
    }
 
    if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB) {
-       IF_DEBUG(linker,belch( "Is little-endian" ));
+       IF_DEBUG(linker,debugBelch( "Is little-endian" ));
    } else
    if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
-       IF_DEBUG(linker,belch( "Is big-endian" ));
+       IF_DEBUG(linker,debugBelch( "Is big-endian" ));
    } else {
-       belch("%s: unknown endiannness", oc->fileName);
+       errorBelch("%s: unknown endiannness", oc->fileName);
        return 0;
    }
 
    if (ehdr->e_type != ET_REL) {
-      belch("%s: not a relocatable object (.o) file", oc->fileName);
+      errorBelch("%s: not a relocatable object (.o) file", oc->fileName);
       return 0;
    }
-   IF_DEBUG(linker, belch( "Is a relocatable object (.o) file" ));
+   IF_DEBUG(linker, debugBelch( "Is a relocatable object (.o) file" ));
 
-   IF_DEBUG(linker,belch( "Architecture is " ));
+   IF_DEBUG(linker,debugBelch( "Architecture is " ));
    switch (ehdr->e_machine) {
-      case EM_386:   IF_DEBUG(linker,belch( "x86" )); break;
-      case EM_SPARC: IF_DEBUG(linker,belch( "sparc" )); break;
+      case EM_386:   IF_DEBUG(linker,debugBelch( "x86" )); break;
+      case EM_SPARC: IF_DEBUG(linker,debugBelch( "sparc" )); break;
 #ifdef EM_IA_64
-      case EM_IA_64: IF_DEBUG(linker,belch( "ia64" )); break;
+      case EM_IA_64: IF_DEBUG(linker,debugBelch( "ia64" )); break;
 #endif
-      default:       IF_DEBUG(linker,belch( "unknown" ));
-                     belch("%s: unknown architecture", oc->fileName);
+      default:       IF_DEBUG(linker,debugBelch( "unknown" ));
+                     errorBelch("%s: unknown architecture", oc->fileName);
                      return 0;
    }
 
-   IF_DEBUG(linker,belch(
+   IF_DEBUG(linker,debugBelch(
              "\nSection header table: start %d, n_entries %d, ent_size %d",
              ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
 
@@ -2374,36 +2365,36 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    shdr = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
 
    if (ehdr->e_shstrndx == SHN_UNDEF) {
-      belch("%s: no section header string table", oc->fileName);
+      errorBelch("%s: no section header string table", oc->fileName);
       return 0;
    } else {
-      IF_DEBUG(linker,belch( "Section header string table is section %d",
+      IF_DEBUG(linker,debugBelch( "Section header string table is section %d",
                           ehdr->e_shstrndx));
       sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
    }
 
    for (i = 0; i < ehdr->e_shnum; i++) {
-      IF_DEBUG(linker,fprintf(stderr, "%2d:  ", i ));
-      IF_DEBUG(linker,fprintf(stderr, "type=%2d  ", (int)shdr[i].sh_type ));
-      IF_DEBUG(linker,fprintf(stderr, "size=%4d  ", (int)shdr[i].sh_size ));
-      IF_DEBUG(linker,fprintf(stderr, "offs=%4d  ", (int)shdr[i].sh_offset ));
-      IF_DEBUG(linker,fprintf(stderr, "  (%p .. %p)  ",
+      IF_DEBUG(linker,debugBelch("%2d:  ", i ));
+      IF_DEBUG(linker,debugBelch("type=%2d  ", (int)shdr[i].sh_type ));
+      IF_DEBUG(linker,debugBelch("size=%4d  ", (int)shdr[i].sh_size ));
+      IF_DEBUG(linker,debugBelch("offs=%4d  ", (int)shdr[i].sh_offset ));
+      IF_DEBUG(linker,debugBelch("  (%p .. %p)  ",
                ehdrC + shdr[i].sh_offset,
 		      ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
 
       if (shdr[i].sh_type == SHT_REL) {
-	  IF_DEBUG(linker,fprintf(stderr, "Rel  " ));
+	  IF_DEBUG(linker,debugBelch("Rel  " ));
       } else if (shdr[i].sh_type == SHT_RELA) {
-	  IF_DEBUG(linker,fprintf(stderr, "RelA " ));
+	  IF_DEBUG(linker,debugBelch("RelA " ));
       } else {
-	  IF_DEBUG(linker,fprintf(stderr,"     "));
+	  IF_DEBUG(linker,debugBelch("     "));
       }
       if (sh_strtab) {
-	  IF_DEBUG(linker,fprintf(stderr, "sname=%s\n", sh_strtab + shdr[i].sh_name ));
+	  IF_DEBUG(linker,debugBelch("sname=%s\n", sh_strtab + shdr[i].sh_name ));
       }
    }
 
-   IF_DEBUG(linker,belch( "\nString tables" ));
+   IF_DEBUG(linker,debugBelch( "\nString tables" ));
    strtab = NULL;
    nstrtab = 0;
    for (i = 0; i < ehdr->e_shnum; i++) {
@@ -2414,65 +2405,65 @@ ocVerifyImage_ELF ( ObjectCode* oc )
              debugging info. */
           && 0 != memcmp(".stabstr", sh_strtab + shdr[i].sh_name, 8)
          ) {
-         IF_DEBUG(linker,belch("   section %d is a normal string table", i ));
+         IF_DEBUG(linker,debugBelch("   section %d is a normal string table", i ));
          strtab = ehdrC + shdr[i].sh_offset;
          nstrtab++;
       }
    }
    if (nstrtab != 1) {
-      belch("%s: no string tables, or too many", oc->fileName);
+      errorBelch("%s: no string tables, or too many", oc->fileName);
       return 0;
    }
 
    nsymtabs = 0;
-   IF_DEBUG(linker,belch( "\nSymbol tables" ));
+   IF_DEBUG(linker,debugBelch( "\nSymbol tables" ));
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
-      IF_DEBUG(linker,belch( "section %d is a symbol table", i ));
+      IF_DEBUG(linker,debugBelch( "section %d is a symbol table", i ));
       nsymtabs++;
       stab = (Elf_Sym*) (ehdrC + shdr[i].sh_offset);
       nent = shdr[i].sh_size / sizeof(Elf_Sym);
-      IF_DEBUG(linker,belch( "   number of entries is apparently %d (%d rem)",
+      IF_DEBUG(linker,debugBelch( "   number of entries is apparently %d (%d rem)",
                nent,
                shdr[i].sh_size % sizeof(Elf_Sym)
              ));
       if (0 != shdr[i].sh_size % sizeof(Elf_Sym)) {
-         belch("%s: non-integral number of symbol table entries", oc->fileName);
+         errorBelch("%s: non-integral number of symbol table entries", oc->fileName);
          return 0;
       }
       for (j = 0; j < nent; j++) {
-         IF_DEBUG(linker,fprintf(stderr, "   %2d  ", j ));
-         IF_DEBUG(linker,fprintf(stderr, "  sec=%-5d  size=%-3d  val=%5p  ",
+         IF_DEBUG(linker,debugBelch("   %2d  ", j ));
+         IF_DEBUG(linker,debugBelch("  sec=%-5d  size=%-3d  val=%5p  ",
                              (int)stab[j].st_shndx,
                              (int)stab[j].st_size,
                              (char*)stab[j].st_value ));
 
-         IF_DEBUG(linker,fprintf(stderr, "type=" ));
+         IF_DEBUG(linker,debugBelch("type=" ));
          switch (ELF_ST_TYPE(stab[j].st_info)) {
-            case STT_NOTYPE:  IF_DEBUG(linker,fprintf(stderr, "notype " )); break;
-            case STT_OBJECT:  IF_DEBUG(linker,fprintf(stderr, "object " )); break;
-            case STT_FUNC  :  IF_DEBUG(linker,fprintf(stderr, "func   " )); break;
-            case STT_SECTION: IF_DEBUG(linker,fprintf(stderr, "section" )); break;
-            case STT_FILE:    IF_DEBUG(linker,fprintf(stderr, "file   " )); break;
-            default:          IF_DEBUG(linker,fprintf(stderr, "?      " )); break;
+            case STT_NOTYPE:  IF_DEBUG(linker,debugBelch("notype " )); break;
+            case STT_OBJECT:  IF_DEBUG(linker,debugBelch("object " )); break;
+            case STT_FUNC  :  IF_DEBUG(linker,debugBelch("func   " )); break;
+            case STT_SECTION: IF_DEBUG(linker,debugBelch("section" )); break;
+            case STT_FILE:    IF_DEBUG(linker,debugBelch("file   " )); break;
+            default:          IF_DEBUG(linker,debugBelch("?      " )); break;
          }
-         IF_DEBUG(linker,fprintf(stderr, "  " ));
+         IF_DEBUG(linker,debugBelch("  " ));
 
-         IF_DEBUG(linker,fprintf(stderr, "bind=" ));
+         IF_DEBUG(linker,debugBelch("bind=" ));
          switch (ELF_ST_BIND(stab[j].st_info)) {
-            case STB_LOCAL :  IF_DEBUG(linker,fprintf(stderr, "local " )); break;
-            case STB_GLOBAL:  IF_DEBUG(linker,fprintf(stderr, "global" )); break;
-            case STB_WEAK  :  IF_DEBUG(linker,fprintf(stderr, "weak  " )); break;
-            default:          IF_DEBUG(linker,fprintf(stderr, "?     " )); break;
+            case STB_LOCAL :  IF_DEBUG(linker,debugBelch("local " )); break;
+            case STB_GLOBAL:  IF_DEBUG(linker,debugBelch("global" )); break;
+            case STB_WEAK  :  IF_DEBUG(linker,debugBelch("weak  " )); break;
+            default:          IF_DEBUG(linker,debugBelch("?     " )); break;
          }
-         IF_DEBUG(linker,fprintf(stderr, "  " ));
+         IF_DEBUG(linker,debugBelch("  " ));
 
-         IF_DEBUG(linker,fprintf(stderr, "name=%s\n", strtab + stab[j].st_name ));
+         IF_DEBUG(linker,debugBelch("name=%s\n", strtab + stab[j].st_name ));
       }
    }
 
    if (nsymtabs == 0) {
-      belch("%s: didn't find any symbol tables", oc->fileName);
+      errorBelch("%s: didn't find any symbol tables", oc->fileName);
       return 0;
    }
 
@@ -2494,7 +2485,7 @@ ocGetNames_ELF ( ObjectCode* oc )
    ASSERT(symhash != NULL);
 
    if (!strtab) {
-      belch("%s: no strtab", oc->fileName);
+      errorBelch("%s: no strtab", oc->fileName);
       return 0;
    }
 
@@ -2540,7 +2531,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                                        "ocGetNames_ELF(BSS)");
          shdr[i].sh_offset = ((char*)zspace) - ((char*)ehdrC);
 	 /*
-         fprintf(stderr, "BSS section at 0x%x, size %d\n",
+         debugBelch("BSS section at 0x%x, size %d\n",
                          zspace, shdr[i].sh_size);
 	 */
       }
@@ -2576,7 +2567,7 @@ ocGetNames_ELF ( ObjectCode* oc )
             isLocal = FALSE;
             ad = stgCallocBytes(1, stab[j].st_size, "ocGetNames_ELF(COMMON)");
 	    /*
-            fprintf(stderr, "COMMON symbol, size %d name %s\n",
+            debugBelch("COMMON symbol, size %d name %s\n",
                             stab[j].st_size, nm);
 	    */
 	    /* Pointless to do addProddableBlock() for this area,
@@ -2601,7 +2592,7 @@ ocGetNames_ELF ( ObjectCode* oc )
             ASSERT(secno > 0 && secno < ehdr->e_shnum);
 	    /*
             if (shdr[secno].sh_type == SHT_NOBITS) {
-               fprintf(stderr, "   BSS symbol, size %d off %d name %s\n",
+               debugBelch("   BSS symbol, size %d off %d name %s\n",
                                stab[j].st_size, stab[j].st_value, nm);
             }
             */
@@ -2616,7 +2607,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                if (ELF_ST_TYPE(stab[j].st_info) == STT_FUNC)
                    ad = (char *)allocateFunctionDesc((Elf_Addr)ad);
 #endif
-               IF_DEBUG(linker,belch( "addOTabName(GLOB): %10p  %s %s",
+               IF_DEBUG(linker,debugBelch( "addOTabName(GLOB): %10p  %s %s",
                                       ad, oc->fileName, nm ));
                isLocal = FALSE;
             }
@@ -2635,10 +2626,10 @@ ocGetNames_ELF ( ObjectCode* oc )
             }
          } else {
             /* Skip. */
-            IF_DEBUG(linker,belch( "skipping `%s'",
+            IF_DEBUG(linker,debugBelch( "skipping `%s'",
                                    strtab + stab[j].st_name ));
             /*
-            fprintf(stderr,
+            debugBelch(
                     "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
                     (int)ELF_ST_BIND(stab[j].st_info),
                     (int)ELF_ST_TYPE(stab[j].st_info),
@@ -2672,7 +2663,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    targ  = (Elf_Word*)(ehdrC + shdr[ target_shndx ].sh_offset);
-   IF_DEBUG(linker,belch( "relocations for section %d using symtab %d",
+   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d",
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
@@ -2686,10 +2677,10 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       void*     S_tmp;
       Elf_Addr  value;
 
-      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)",
+      IF_DEBUG(linker,debugBelch( "Rel entry %3d is raw(%6p %6p)",
                              j, (void*)offset, (void*)info ));
       if (!info) {
-         IF_DEBUG(linker,belch( " ZERO" ));
+         IF_DEBUG(linker,debugBelch( " ZERO" ));
          S = 0;
       } else {
          Elf_Sym sym = stab[ELF_R_SYM(info)];
@@ -2709,13 +2700,13 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             S = (Elf_Addr)S_tmp;
 	 }
          if (!S) {
-            belch("%s: unknown symbol `%s'", oc->fileName, symbol);
+            errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	    return 0;
          }
-         IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
+         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p", symbol, (void*)S ));
       }
 
-      IF_DEBUG(linker,belch( "Reloc: P = %p   S = %p   A = %p",
+      IF_DEBUG(linker,debugBelch( "Reloc: P = %p   S = %p   A = %p",
 			     (void*)P, (void*)S, (void*)A ));
       checkProddableBlock ( oc, pP );
 
@@ -2727,7 +2718,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          case R_386_PC32: *pP = value - P; break;
 #        endif
          default:
-            belch("%s: unhandled ELF relocation(Rel) type %d\n",
+            errorBelch("%s: unhandled ELF relocation(Rel) type %d\n",
 		  oc->fileName, ELF_R_TYPE(info));
             return 0;
       }
@@ -2753,7 +2744,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
    stab  = (Elf_Sym*) (ehdrC + shdr[ symtab_shndx ].sh_offset);
    targ  = (Elf_Addr) (ehdrC + shdr[ target_shndx ].sh_offset);
-   IF_DEBUG(linker,belch( "relocations for section %d using symtab %d",
+   IF_DEBUG(linker,debugBelch( "relocations for section %d using symtab %d",
                           target_shndx, symtab_shndx ));
 
    for (j = 0; j < nent; j++) {
@@ -2775,11 +2766,11 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf_Addr addr;
 #     endif
 
-      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p %6p)   ",
+      IF_DEBUG(linker,debugBelch( "Rel entry %3d is raw(%6p %6p %6p)   ",
                              j, (void*)offset, (void*)info,
                                 (void*)A ));
       if (!info) {
-         IF_DEBUG(linker,belch( " ZERO" ));
+         IF_DEBUG(linker,debugBelch( " ZERO" ));
          S = 0;
       } else {
          Elf_Sym sym = stab[ELF_R_SYM(info)];
@@ -2808,17 +2799,17 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	    /* If a function, already a function descriptor - we would
 	       have to copy it to add an offset. */
             if (S && (ELF_ST_TYPE(sym.st_info) == STT_FUNC) && (A != 0))
-               belch("%s: function %s with addend %p", oc->fileName, symbol, (void *)A);
+               errorBelch("%s: function %s with addend %p", oc->fileName, symbol, (void *)A);
 #endif
 	 }
          if (!S) {
-	   belch("%s: unknown symbol `%s'", oc->fileName, symbol);
+	   errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	   return 0;
          }
-         IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
+         IF_DEBUG(linker,debugBelch( "`%s' resolves to %p", symbol, (void*)S ));
       }
 
-      IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
+      IF_DEBUG(linker,debugBelch("Reloc: P = %p   S = %p   A = %p\n",
                                         (void*)P, (void*)S, (void*)A ));
       /* checkProddableBlock ( oc, (void*)P ); */
 
@@ -2892,7 +2883,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	    break;
 #        endif
          default:
-            belch("%s: unhandled ELF relocation(RelA) type %d\n",
+            errorBelch("%s: unhandled ELF relocation(RelA) type %d\n",
 		  oc->fileName, ELF_R_TYPE(info));
             return 0;
       }
@@ -2919,7 +2910,7 @@ ocResolve_ELF ( ObjectCode* oc )
    strtab = findElfSection ( ehdrC, SHT_STRTAB );
 
    if (stab == NULL || strtab == NULL) {
-      belch("%s: can't find string or symbol table", oc->fileName);
+      errorBelch("%s: can't find string or symbol table", oc->fileName);
       return 0;
    }
 
@@ -3150,7 +3141,7 @@ static int resolveImports(
 	    addr = lookupSymbol(nm);
 	if(!addr)
 	{
-	    belch("\n%s: unknown symbol `%s'", oc->fileName, nm);
+	    errorBelch("\n%s: unknown symbol `%s'", oc->fileName, nm);
 	    return 0;
 	}
 	ASSERT(addr);
@@ -3381,7 +3372,7 @@ static int relocateSection(
 		    unsigned long symbolAddress = (unsigned long) (lookupSymbol(nm));
 		    if(!symbolAddress)
 		    {
-			belch("\nunknown symbol `%s'", nm);
+			errorBelch("\nunknown symbol `%s'", nm);
 			return 0;
 		    }
 

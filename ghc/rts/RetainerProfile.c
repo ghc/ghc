@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.11 2004/08/13 13:10:28 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.12 2004/09/03 15:28:38 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -16,8 +16,6 @@
 #else
 #define INLINE inline
 #endif
-
-#include <stdio.h>
 
 #include "Rts.h"
 #include "RtsUtils.h"
@@ -439,7 +437,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     bdescr *nbd;      // Next Block Descriptor
 
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    // debugBelch("push(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type != TSO);
@@ -632,7 +630,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
     if (stackTop - 1 < stackBottom) {
 #ifdef DEBUG_RETAINER
-	// fprintf(stderr, "push() to the next stack.\n");
+	// debugBelch("push() to the next stack.\n");
 #endif
 	// currentStack->free is updated when the active stack is switched
 	// to the next stack.
@@ -661,7 +659,7 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
     stackSize++;
     if (stackSize > maxStackSize) maxStackSize = stackSize;
     // ASSERT(stackSize >= 0);
-    // fprintf(stderr, "stackSize = %d\n", stackSize);
+    // debugBelch("stackSize = %d\n", stackSize);
 #endif
 }
 
@@ -684,7 +682,7 @@ popOffReal(void)
     bdescr *pbd;    // Previous Block Descriptor
 
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "pop() to the previous stack.\n");
+    // debugBelch("pop() to the previous stack.\n");
 #endif
 
     ASSERT(stackTop + 1 == stackLimit);
@@ -699,7 +697,7 @@ popOffReal(void)
 	if (stackSize > maxStackSize) maxStackSize = stackSize;
 	/*
 	  ASSERT(stackSize >= 0);
-	  fprintf(stderr, "stackSize = %d\n", stackSize);
+	  debugBelch("stackSize = %d\n", stackSize);
 	*/
 #endif
 	return;
@@ -720,7 +718,7 @@ popOffReal(void)
     if (stackSize > maxStackSize) maxStackSize = stackSize;
     /*
       ASSERT(stackSize >= 0);
-      fprintf(stderr, "stackSize = %d\n", stackSize);
+      debugBelch("stackSize = %d\n", stackSize);
     */
 #endif
 }
@@ -728,7 +726,7 @@ popOffReal(void)
 static INLINE void
 popOff(void) {
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    // debugBelch("\tpopOff(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
     ASSERT(stackTop != stackLimit);
@@ -742,7 +740,7 @@ popOff(void) {
 	if (stackSize > maxStackSize) maxStackSize = stackSize;
 	/*
 	  ASSERT(stackSize >= 0);
-	  fprintf(stderr, "stackSize = %d\n", stackSize);
+	  debugBelch("stackSize = %d\n", stackSize);
 	*/
 #endif
 	return;
@@ -773,7 +771,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
     stackElement *se;
 
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
+    // debugBelch("pop(): stackTop = 0x%x, currentStackBoundary = 0x%x\n", stackTop, currentStackBoundary);
 #endif
 
     do {
@@ -1293,7 +1291,7 @@ retainStack( StgClosure *c, retainer c_child_r,
     currentStackBoundary = stackTop;
 
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n", oldStackBoundary, currentStackBoundary);
+    // debugBelch("retainStack() called: oldStackBoundary = 0x%x, currentStackBoundary = 0x%x\n", oldStackBoundary, currentStackBoundary);
 #endif
 
     ASSERT(get_itbl(c)->type != TSO || 
@@ -1409,7 +1407,7 @@ retainStack( StgClosure *c, retainer c_child_r,
     // restore currentStackBoundary
     currentStackBoundary = oldStackBoundary;
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "retainStack() finished: currentStackBoundary = 0x%x\n", currentStackBoundary);
+    // debugBelch("retainStack() finished: currentStackBoundary = 0x%x\n", currentStackBoundary);
 #endif
 
 #ifdef DEBUG_RETAINER
@@ -1495,7 +1493,7 @@ retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
 
 #ifdef DEBUG_RETAINER
     // oldStackTop = stackTop;
-    // fprintf(stderr, "retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n", c0, cp0, r0);
+    // debugBelch("retainClosure() called: c0 = 0x%x, cp0 = 0x%x, r0 = 0x%x\n", c0, cp0, r0);
 #endif
 
     // (c, cp, r) = (c0, cp0, r0)
@@ -1505,18 +1503,18 @@ retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
     goto inner_loop;
 
 loop:
-    //fprintf(stderr, "loop");
+    //debugBelch("loop");
     // pop to (c, cp, r);
     pop(&c, &cp, &r);
 
     if (c == NULL) {
 #ifdef DEBUG_RETAINER
-	// fprintf(stderr, "retainClosure() ends: oldStackTop = 0x%x, stackTop = 0x%x\n", oldStackTop, stackTop);
+	// debugBelch("retainClosure() ends: oldStackTop = 0x%x, stackTop = 0x%x\n", oldStackTop, stackTop);
 #endif
 	return;
     }
 
-    //fprintf(stderr, "inner_loop");
+    //debugBelch("inner_loop");
 
 inner_loop:
     // c  = current closure under consideration,
@@ -1558,13 +1556,13 @@ inner_loop:
 	if (((StgTSO *)c)->what_next == ThreadComplete ||
 	    ((StgTSO *)c)->what_next == ThreadKilled) {
 #ifdef DEBUG_RETAINER
-	    fprintf(stderr, "ThreadComplete or ThreadKilled encountered in retainClosure()\n");
+	    debugBelch("ThreadComplete or ThreadKilled encountered in retainClosure()\n");
 #endif
 	    goto loop;
 	}
 	if (((StgTSO *)c)->what_next == ThreadRelocated) {
 #ifdef DEBUG_RETAINER
-	    fprintf(stderr, "ThreadRelocated encountered in retainClosure()\n");
+	    debugBelch("ThreadRelocated encountered in retainClosure()\n");
 #endif
 	    c = (StgClosure *)((StgTSO *)c)->link;
 	    goto inner_loop;
@@ -1912,7 +1910,7 @@ resetStaticObjectForRetainerProfiling( void )
 	}
     }
 #ifdef DEBUG_RETAINER
-    // fprintf(stderr, "count in scavenged_static_objects = %d\n", count);
+    // debugBelch("count in scavenged_static_objects = %d\n", count);
 #endif
 }
 
@@ -1934,25 +1932,25 @@ retainerProfile(void)
 #endif
 
 #ifdef DEBUG_RETAINER
-  fprintf(stderr, " < retainerProfile() invoked : %d>\n", retainerGeneration);
+  debugBelch(" < retainerProfile() invoked : %d>\n", retainerGeneration);
 #endif
 
   stat_startRP();
 
   // We haven't flipped the bit yet.
 #ifdef DEBUG_RETAINER
-  fprintf(stderr, "Before traversing:\n");
+  debugBelch("Before traversing:\n");
   sumOfCostLinear = 0;
   for (i = 0;i < N_CLOSURE_TYPES; i++)
     costArrayLinear[i] = 0;
   totalHeapSize = checkHeapSanityForRetainerProfiling();
 
-  fprintf(stderr, "\tsumOfCostLinear = %d, totalHeapSize = %d\n", sumOfCostLinear, totalHeapSize);
+  debugBelch("\tsumOfCostLinear = %d, totalHeapSize = %d\n", sumOfCostLinear, totalHeapSize);
   /*
-  fprintf(stderr, "costArrayLinear[] = ");
+  debugBelch("costArrayLinear[] = ");
   for (i = 0;i < N_CLOSURE_TYPES; i++)
-    fprintf(stderr, "[%u:%u] ", i, costArrayLinear[i]);
-  fprintf(stderr, "\n");
+    debugBelch("[%u:%u] ", i, costArrayLinear[i]);
+  debugBelch("\n");
   */
 
   ASSERT(sumOfCostLinear == totalHeapSize);
@@ -1960,7 +1958,7 @@ retainerProfile(void)
 /*
 #define pcostArrayLinear(index) \
   if (costArrayLinear[index] > 0) \
-    fprintf(stderr, "costArrayLinear[" #index "] = %u\n", costArrayLinear[index])
+    debugBelch("costArrayLinear[" #index "] = %u\n", costArrayLinear[index])
   pcostArrayLinear(THUNK_STATIC);
   pcostArrayLinear(FUN_STATIC);
   pcostArrayLinear(CONSTR_STATIC);
@@ -1983,7 +1981,7 @@ retainerProfile(void)
   timesAnyObjectVisited = 0;
 
 #ifdef DEBUG_RETAINER
-  fprintf(stderr, "During traversing:\n");
+  debugBelch("During traversing:\n");
   sumOfNewCost = 0;
   sumOfNewCostExtra = 0;
   for (i = 0;i < N_CLOSURE_TYPES; i++)
@@ -2005,13 +2003,13 @@ retainerProfile(void)
   computeRetainerSet();
 
 #ifdef DEBUG_RETAINER
-  fprintf(stderr, "After traversing:\n");
+  debugBelch("After traversing:\n");
   sumOfCostLinear = 0;
   for (i = 0;i < N_CLOSURE_TYPES; i++)
     costArrayLinear[i] = 0;
   totalHeapSize = checkHeapSanityForRetainerProfiling();
 
-  fprintf(stderr, "\tsumOfCostLinear = %d, totalHeapSize = %d\n", sumOfCostLinear, totalHeapSize);
+  debugBelch("\tsumOfCostLinear = %d, totalHeapSize = %d\n", sumOfCostLinear, totalHeapSize);
   ASSERT(sumOfCostLinear == totalHeapSize);
 
   // now, compare the two results
@@ -2022,22 +2020,22 @@ retainerProfile(void)
         1) Dead weak pointers, whose type is CONSTR. These objects are not
            reachable from any roots.
   */
-  fprintf(stderr, "Comparison:\n");
-  fprintf(stderr, "\tcostArrayLinear[] (must be empty) = ");
+  debugBelch("Comparison:\n");
+  debugBelch("\tcostArrayLinear[] (must be empty) = ");
   for (i = 0;i < N_CLOSURE_TYPES; i++)
     if (costArray[i] != costArrayLinear[i])
       // nothing should be printed except MUT_VAR after major GCs
-      fprintf(stderr, "[%u:%u] ", i, costArrayLinear[i]);
-  fprintf(stderr, "\n");
+      debugBelch("[%u:%u] ", i, costArrayLinear[i]);
+  debugBelch("\n");
 
-  fprintf(stderr, "\tsumOfNewCost = %u\n", sumOfNewCost);
-  fprintf(stderr, "\tsumOfNewCostExtra = %u\n", sumOfNewCostExtra);
-  fprintf(stderr, "\tcostArray[] (must be empty) = ");
+  debugBelch("\tsumOfNewCost = %u\n", sumOfNewCost);
+  debugBelch("\tsumOfNewCostExtra = %u\n", sumOfNewCostExtra);
+  debugBelch("\tcostArray[] (must be empty) = ");
   for (i = 0;i < N_CLOSURE_TYPES; i++)
     if (costArray[i] != costArrayLinear[i])
       // nothing should be printed except MUT_VAR after major GCs
-      fprintf(stderr, "[%u:%u] ", i, costArray[i]);
-  fprintf(stderr, "\n");
+      debugBelch("[%u:%u] ", i, costArray[i]);
+  debugBelch("\n");
 
   // only for major garbage collection
   ASSERT(sumOfNewCost + sumOfNewCostExtra == sumOfCostLinear);
@@ -2083,17 +2081,17 @@ sanityCheckHeapClosure( StgClosure *c )
 	if (get_itbl(c)->type == CONSTR &&
 	    !strcmp(get_itbl(c)->prof.closure_type, "DEAD_WEAK") &&
 	    !strcmp(get_itbl(c)->prof.closure_desc, "DEAD_WEAK")) {
-	    fprintf(stderr, "\tUnvisited dead weak pointer object found: c = %p\n", c);
+	    debugBelch("\tUnvisited dead weak pointer object found: c = %p\n", c);
 	    costArray[get_itbl(c)->type] += cost(c);
 	    sumOfNewCost += cost(c);
 	} else
-	    fprintf(stderr,
+	    debugBelch(
 		    "Unvisited object: flip = %d, c = %p(%d, %s, %s), rs = %p\n",
 		    flip, c, get_itbl(c)->type,
 		    get_itbl(c)->prof.closure_type, get_itbl(c)->prof.closure_desc,
 		    RSET(c));
     } else {
-	// fprintf(stderr, "sanityCheckHeapClosure) S: flip = %d, c = %p(%d), rs = %p\n", flip, c, get_itbl(c)->type, RSET(c));
+	// debugBelch("sanityCheckHeapClosure) S: flip = %d, c = %p(%d), rs = %p\n", flip, c, get_itbl(c)->type, RSET(c));
     }
 
     info = get_itbl(c);
@@ -2282,12 +2280,12 @@ checkHeapSanityForRetainerProfiling( void )
     nat costSum, g, s;
 
     costSum = 0;
-    fprintf(stderr, "START: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+    debugBelch("START: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
     if (RtsFlags.GcFlags.generations == 1) {
 	costSum += heapCheck(g0s0->to_blocks);
-	fprintf(stderr, "heapCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+	debugBelch("heapCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
 	costSum += chainCheck(g0s0->large_objects);
-	fprintf(stderr, "chainCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+	debugBelch("chainCheck: sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
     } else {
 	for (g = 0; g < RtsFlags.GcFlags.generations; g++)
 	for (s = 0; s < generations[g].n_steps; s++) {
@@ -2300,14 +2298,14 @@ checkHeapSanityForRetainerProfiling( void )
 	    */
 	    if (g == 0 && s == 0) {
 		costSum += smallObjectPoolCheck();
-		fprintf(stderr, "smallObjectPoolCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+		debugBelch("smallObjectPoolCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
 		costSum += chainCheck(generations[g].steps[s].large_objects);
-		fprintf(stderr, "chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+		debugBelch("chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
 	    } else {
 		costSum += heapCheck(generations[g].steps[s].blocks);
-		fprintf(stderr, "heapCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+		debugBelch("heapCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
 		costSum += chainCheck(generations[g].steps[s].large_objects);
-		fprintf(stderr, "chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
+		debugBelch("chainCheck(): sumOfCostLinear = %d, costSum = %d\n", sumOfCostLinear, costSum);
 	    }
 	}
     }
@@ -2331,7 +2329,7 @@ findPointer(StgPtr p)
 		    if (*q == (StgWord)p) {
 			r = q;
 			while (!LOOKS_LIKE_GHC_INFO(*r)) r--;
-			fprintf(stderr, "Found in gen[%d], step[%d]: q = %p, r = %p\n", g, s, q, r);
+			debugBelch("Found in gen[%d], step[%d]: q = %p, r = %p\n", g, s, q, r);
 			// return;
 		    }
 		}
@@ -2343,7 +2341,7 @@ findPointer(StgPtr p)
 		    if (*q == (StgWord)p) {
 			r = q;
 			while (*r == 0 || !LOOKS_LIKE_GHC_INFO(*r)) r--;
-			fprintf(stderr, "Found in gen[%d], large_objects: %p\n", g, r);
+			debugBelch("Found in gen[%d], large_objects: %p\n", g, r);
 			// return;
 		    }
 		}
@@ -2364,14 +2362,14 @@ belongToHeap(StgPtr p)
 	    bd = generations[g].steps[s].blocks;
 	    for (; bd; bd = bd->link) {
 		if (bd->start <= p && p < bd->free) {
-		    fprintf(stderr, "Belongs to gen[%d], step[%d]", g, s);
+		    debugBelch("Belongs to gen[%d], step[%d]", g, s);
 		    return;
 		}
 	    }
 	    bd = generations[g].steps[s].large_objects;
 	    for (; bd; bd = bd->link) {
 		if (bd->start <= p && p < bd->start + getHeapClosureSize((StgClosure *)bd->start)) {
-		    fprintf(stderr, "Found in gen[%d], large_objects: %p\n", g, bd->start);
+		    debugBelch("Found in gen[%d], large_objects: %p\n", g, bd->start);
 		    return;
 		}
 	    }

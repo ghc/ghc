@@ -1,7 +1,6 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.36 2003/10/21 11:51:15 stolz Exp $
  *
- * (c) The GHC Team, 1998-2002
+ * (c) The GHC Team, 1998-2004
  *
  * General utility functions used in the RTS.
  *
@@ -33,14 +32,62 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdio.h>
 
-/* variable-argument internal error function. */
+/* -----------------------------------------------------------------------------
+   General message generation functions
+
+   All messages should go through here.  We can't guarantee that
+   stdout/stderr will be available - e.g. in a Windows program there
+   is no console for generating messages, so they have to either go to
+   to the debug console, or pop up message boxes.
+   -------------------------------------------------------------------------- */
+
+RtsMsgFunction *fatalInternalMsgFn = stdioFatalInternalMsgFn;
+RtsMsgFunction *debugMsgFn         = stdioDebugMsgFn;
+RtsMsgFunction *errorMsgFn         = stdioErrorMsgFn;
 
 void
 barf(char *s, ...)
 {
   va_list ap;
   va_start(ap,s);
+  (*fatalInternalMsgFn)(s,ap);
+  stg_exit(EXIT_INTERNAL_ERROR);
+  va_end(ap);
+}
+
+void
+errorBelch(char *s, ...)
+{
+  va_list ap;
+  va_start(ap,s);
+  (*errorMsgFn)(s,ap);
+  va_end(ap);
+}
+
+void
+debugBelch(char *s, ...)
+{
+  va_list ap;
+  va_start(ap,s);
+  (*debugMsgFn)(s,ap);
+  va_end(ap);
+}
+
+void
+vdebugBelch(char *s, va_list ap)
+{
+  (*debugMsgFn)(s,ap);
+}
+
+/* -----------------------------------------------------------------------------
+   stdio versions of the message functions
+   -------------------------------------------------------------------------- */
+
+void 
+stdioFatalInternalMsgFn(char *s, va_list ap)
+{
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   if (prog_argv != NULL && prog_name != NULL) {
     fprintf(stderr, "%s: internal error: ", prog_name);
@@ -51,36 +98,30 @@ barf(char *s, ...)
   fprintf(stderr, "\n");
   fprintf(stderr, "    Please report this as a bug to glasgow-haskell-bugs@haskell.org,\n    or http://www.sourceforge.net/projects/ghc/\n");
   fflush(stderr);
-  stg_exit(EXIT_INTERNAL_ERROR);
-  va_end(ap);
 }
 
 void
-prog_belch(char *s, ...)
+stdioErrorMsgFn(char *s, va_list ap)
 {
-  va_list ap;
-  va_start(ap,s);
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   if (prog_argv != NULL && prog_name != NULL) {
     fprintf(stderr, "%s: ", prog_name);
   } 
   vfprintf(stderr, s, ap);
   fprintf(stderr, "\n");
-  va_end(ap);
 }
 
 void
-belch(char *s, ...)
+stdioDebugMsgFn(char *s, va_list ap)
 {
-  va_list ap;
-  va_start(ap,s);
   /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
   vfprintf(stderr, s, ap);
-  fprintf(stderr, "\n");
-  va_end(ap);
+  fflush(stderr);
 }
 
-/* result-checking malloc wrappers. */
+/* -----------------------------------------------------------------------------
+   Result-checking malloc wrappers.
+   -------------------------------------------------------------------------- */
 
 void *
 stgMallocBytes (int n, char *msg)
