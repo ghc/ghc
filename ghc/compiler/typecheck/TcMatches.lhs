@@ -26,10 +26,10 @@ import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
 import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars )
 import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
 import TcMType		( newTyVarTy )
-import TcType		( TcType, TcTyVar, tyVarsOfType, isTauTy,  
+import TcType		( TcType, TcTyVar, tyVarsOfType,
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind  )
 import TcBinds		( tcBindsAndThen )
-import TcUnify		( subFunTy, unifyTauTy, checkSigTyVars, sigPatCtxt )
+import TcUnify		( subFunTy, checkSigTyVars, tcSub, isIdCoercion, (<$>), sigPatCtxt )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
 import TysWiredIn	( boolTy )
@@ -143,37 +143,38 @@ tcMatch xve1 ctxt match@(Match pats maybe_rhs_sig grhss) expected_ty
 
   where
     tc_grhss pats' rhs_ty 
-	=	-- Check that the remaining "expected type" is not a rank-2 type
-		-- If it is it'll mess up the unifier when checking the RHS
-	  checkTc (isTauTy rhs_ty) lurkingRank2SigErr 	`thenTc` \_ -> 
+	= tcExtendLocalValEnv xve1 			$
 
 		-- Deal with the result signature
-		-- It "wraps" the rest of the body typecheck because it may
-		-- bring into scope the type variables in the signature
-	  tc_result_sig maybe_rhs_sig rhs_ty 		$
+	  case maybe_rhs_sig of
+	    Nothing ->  tcGRHSs ctxt grhss rhs_ty	`thenTc` \ (grhss', lie) ->
+		        returnTc ((pats', grhss'), lie)
 
-		-- Typecheck the body
-	  tcExtendLocalValEnv xve1 			$
-	  tcGRHSs ctxt grhss rhs_ty			`thenTc` \ (grhss', lie) ->
-	  returnTc ((pats', grhss'), lie)
+	    Just sig ->	 tcAddScopedTyVars [sig]	$
+				-- Bring into scope the type variables in the signature
+			 tcHsSigType ResSigCtxt sig	`thenTc` \ sig_ty ->
+			 tcGRHSs ctxt grhss sig_ty	`thenTc` \ (grhss', lie1) ->
+			 tcSub rhs_ty sig_ty		`thenTc` \ (co_fn, lie2)  ->
+			 returnTc ((pats', lift_grhss co_fn rhs_ty grhss'), 
+				   lie1 `plusLIE` lie2)
 
-    tc_result_sig Nothing rhs_ty thing_inside
-	= thing_inside
-    tc_result_sig (Just sig) rhs_ty thing_inside
-	= tcAddScopedTyVars [sig]			$
-	  tcHsSigType ResSigCtxt sig			`thenTc` \ sig_ty ->
-
-		-- Check that the signature isn't a polymorphic one, which
-		-- we don't permit (at present, anyway)
-	  checkTc (isTauTy sig_ty) (polyPatSig sig_ty)	`thenTc_`
-	  unifyTauTy sig_ty rhs_ty			`thenTc_`
-	  thing_inside
-
-
-	-- glue_on just avoids stupid dross
+-- lift_grhss pushes the coercion down to the right hand sides,
+-- because there is no convenient place to hang it otherwise.
+lift_grhss co_fn rhs_ty grhss 
+  | isIdCoercion co_fn = grhss
+lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
+  = GRHSs (map lift_grhs grhss) binds rhs_ty	-- Change the type, since we
+  where
+    lift_grhs (GRHS stmts loc) = GRHS (map lift_stmt stmts) loc
+	      
+    lift_stmt (ResultStmt e l) = ResultStmt (co_fn <$> e) l
+    lift_stmt stmt	       = stmt
+   
+-- glue_on just avoids stupid dross
 glue_on _ EmptyMonoBinds grhss = grhss		-- The common case
 glue_on is_rec mbinds (GRHSs grhss binds ty)
   = GRHSs grhss (mkMonoBind mbinds [] is_rec `ThenBinds` binds) ty
+
 
 tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
 	-> TcType
@@ -451,7 +452,4 @@ stmtCtxt do_or_lc stmt = hang (pprMatchContext do_or_lc <> colon) 4 (ppr stmt)
 
 varyingArgsErr name matches
   = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
-
-lurkingRank2SigErr
-  = ptext SLIT("Too few explicit arguments when defining a function with a rank-2 type")
 \end{code}
