@@ -40,6 +40,7 @@ import ArrBase		( MutableByteArray(..), newCharArray )
 import IOHandle		-- much of the real stuff is in here
 import PackBase		( unpackNBytesST )
 import PrelBase
+import PrelRead         ( readParen, Read(..), reads, lex )
 import PrelMaybe
 import PrelEither
 import GHC
@@ -128,6 +129,18 @@ instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
 --Type declared in IOHandle, instance here because it depends on Eq.Handle
 instance Eq HandlePosn where
     (HandlePosn h1 p1) == (HandlePosn h2 p2) = p1==p2 && h1==h2
+
+-- Type declared in IOBase, instance here because it
+-- depends on PrelRead.(Read Maybe) instance.
+instance Read BufferMode where
+    readsPrec p = 
+      readParen False
+	(\r ->	let lr = lex r
+		in
+		[(NoBuffering, rest)       | ("NoBuffering", rest) <- lr] ++
+		[(LineBuffering,rest)      | ("LineBuffering",rest) <- lr] ++
+		[(BlockBuffering mb,rest2) | ("BlockBuffering",rest1) <- lr,
+		                             (mb, rest2) <- reads rest1])
 
 \end{code}
 
