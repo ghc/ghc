@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.7 1999/03/02 19:44:17 sof Exp $
+ * $Id: Stg.h,v 1.8 1999/03/03 19:28:23 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -52,7 +52,11 @@
 #define DLL_IMPORT
 #define DLL_IMPORT_RTS DLLIMPORT
 #define DLL_IMPORT_DATA DLLIMPORT
-#define DLL_IMPORT_DATA_VAR(x) _imp__##x
+# ifdef HAVE_WIN32_DLL_SUPPORT
+#  define DLL_IMPORT_DATA_VAR(x) _imp__##x
+# else
+#  define DLL_IMPORT_DATA_VAR(x) x
+# endif
 #endif
 
 /* bit macros
