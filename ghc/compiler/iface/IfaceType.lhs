@@ -307,10 +307,13 @@ instance Outputable IfaceTyCon where
 -------------------
 pprIfaceContext :: IfaceContext -> SDoc
 -- Prints "(C a, D b) =>", including the arrow
-pprIfaceContext []    = empty
-pprIfaceContext theta = parens (sep (punctuate comma (map ppr theta))) 
-			<+> ptext SLIT("=>")
-  
+pprIfaceContext []     = empty
+pprIfaceContext theta = ppr_preds theta <+> ptext SLIT("=>")
+
+ppr_preds [pred] = ppr pred	-- No parens
+ppr_preds preds  = parens (sep (punctuate comma (map ppr preds))) 
+			 
+-------------------
 pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \end{code}
 
