@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.46 2000/03/13 12:11:43 simonmar Exp $
+ * $Id: PrimOps.h,v 1.47 2000/03/17 12:40:03 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -221,15 +221,16 @@ typedef union {
 #define int2Addrzh(r,a) 	r=(A_)(a)
 #define addr2Intzh(r,a) 	r=(I_)(a)
 
-#define indexCharOffAddrzh(r,a,i)   r= ((C_ *)(a))[i]
-#define indexIntOffAddrzh(r,a,i)    r= ((I_ *)(a))[i]
-#define indexAddrOffAddrzh(r,a,i)   r= ((PP_)(a))[i]
-#define indexFloatOffAddrzh(r,a,i)  r= PK_FLT((P_) (((StgFloat *)(a)) + i))
-#define indexDoubleOffAddrzh(r,a,i) r= PK_DBL((P_) (((StgDouble *)(a)) + i))
-#define indexStablePtrOffAddrzh(r,a,i)    r= ((StgStablePtr *)(a))[i]
+#define readCharOffAddrzh(r,a,i)   	r= ((C_ *)(a))[i]
+#define readIntOffAddrzh(r,a,i)    	r= ((I_ *)(a))[i]
+#define readWordOffAddrzh(r,a,i)    	r= ((W_ *)(a))[i]
+#define readAddrOffAddrzh(r,a,i)   	r= ((PP_)(a))[i]
+#define readFloatOffAddrzh(r,a,i)  	r= PK_FLT((P_) (((StgFloat *)(a)) + i))
+#define readDoubleOffAddrzh(r,a,i) 	r= PK_DBL((P_) (((StgDouble *)(a)) + i))
+#define readStablePtrOffAddrzh(r,a,i)   r= ((StgStablePtr *)(a))[i]
 #ifdef SUPPORT_LONG_LONGS
-#define indexInt64OffAddrzh(r,a,i)  r= ((LI_ *)(a))[i]
-#define indexWord64OffAddrzh(r,a,i) r= ((LW_ *)(a))[i]
+#define readInt64OffAddrzh(r,a,i)  	r= ((LI_ *)(a))[i]
+#define readWord64OffAddrzh(r,a,i) 	r= ((LW_ *)(a))[i]
 #endif
 
 #define writeCharOffAddrzh(a,i,v)       ((C_ *)(a))[i] = (v)
@@ -243,6 +244,18 @@ typedef union {
 #ifdef SUPPORT_LONG_LONGS
 #define writeInt64OffAddrzh(a,i,v)   ((LI_ *)(a))[i] = (v)
 #define writeWord64OffAddrzh(a,i,v)  ((LW_ *)(a))[i] = (v)
+#endif
+
+#define indexCharOffAddrzh(r,a,i)   	r= ((C_ *)(a))[i]
+#define indexIntOffAddrzh(r,a,i)    	r= ((I_ *)(a))[i]
+#define indexWordOffAddrzh(r,a,i)   	r= ((W_ *)(a))[i]
+#define indexAddrOffAddrzh(r,a,i)   	r= ((PP_)(a))[i]
+#define indexFloatOffAddrzh(r,a,i)  	r= PK_FLT((P_) (((StgFloat *)(a)) + i))
+#define indexDoubleOffAddrzh(r,a,i) 	r= PK_DBL((P_) (((StgDouble *)(a)) + i))
+#define indexStablePtrOffAddrzh(r,a,i)  r= ((StgStablePtr *)(a))[i]
+#ifdef SUPPORT_LONG_LONGS
+#define indexInt64OffAddrzh(r,a,i)  	r= ((LI_ *)(a))[i]
+#define indexWord64OffAddrzh(r,a,i) 	r= ((LW_ *)(a))[i]
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -560,29 +573,6 @@ extern I_ resetGenSymZh(void);
 #define indexWord64Arrayzh(r,a,i) indexWord64OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #endif
 
-#define indexCharOffForeignObjzh(r,fo,i)   indexCharOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexIntOffForeignObjzh(r,fo,i)    indexIntOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexWordOffForeignObjzh(r,fo,i)   indexWordOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexAddrOffForeignObjzh(r,fo,i)   indexAddrOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexFloatOffForeignObjzh(r,fo,i)  indexFloatOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexDoubleOffForeignObjzh(r,fo,i) indexDoubleOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexStablePtrOffForeignObjzh(r,fo,i)  indexStablePtrOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#ifdef SUPPORT_LONG_LONGS
-#define indexInt64OffForeignObjzh(r,fo,i)  indexInt64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#define indexWord64OffForeignObjzh(r,fo,i) indexWord64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#endif
-
-#define indexCharOffAddrzh(r,a,i)   r= ((C_ *)(a))[i]
-#define indexIntOffAddrzh(r,a,i)    r= ((I_ *)(a))[i]
-#define indexWordOffAddrzh(r,a,i)   r= ((W_ *)(a))[i]
-#define indexAddrOffAddrzh(r,a,i)   r= ((PP_)(a))[i]
-#define indexFloatOffAddrzh(r,a,i)  r= PK_FLT((P_) (((StgFloat *)(a)) + i))
-#define indexDoubleOffAddrzh(r,a,i) r= PK_DBL((P_) (((StgDouble *)(a)) + i))
-#ifdef SUPPORT_LONG_LONGS
-#define indexInt64OffAddrzh(r,a,i)  r= ((LI_ *)(a))[i]
-#define indexWord64OffAddrzh(r,a,i) r= ((LW_ *)(a))[i]
-#endif
-
 /* Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
    objects, even if they are in old space.  When they become immutable,
@@ -863,6 +853,18 @@ EF_(makeForeignObjzh_fast);
    (ForeignObj_CLOSURE_DATA(res) = (P_)(datum))
 
 #define eqForeignObj(f1,f2)  ((f1)==(f2))
+
+#define indexCharOffForeignObjzh(r,fo,i)   indexCharOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexIntOffForeignObjzh(r,fo,i)    indexIntOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWordOffForeignObjzh(r,fo,i)   indexWordOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexAddrOffForeignObjzh(r,fo,i)   indexAddrOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexFloatOffForeignObjzh(r,fo,i)  indexFloatOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexDoubleOffForeignObjzh(r,fo,i) indexDoubleOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexStablePtrOffForeignObjzh(r,fo,i)  indexStablePtrOffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#ifdef SUPPORT_LONG_LONGS
+#define indexInt64OffForeignObjzh(r,fo,i)  indexInt64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#define indexWord64OffForeignObjzh(r,fo,i) indexWord64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
+#endif
 
 #endif
 

@@ -178,6 +178,9 @@ primCode [lhs] (ReadByteArrayOp pk) [obj, ix]
     in
     returnUs (\xs -> assign : xs)
 
+primCode lhs@[_] (ReadOffAddrOp pk) args
+  = primCode lhs (IndexOffAddrOp pk) args
+
 primCode [lhs] (IndexOffAddrOp pk) [obj, ix]
   = let
 	lhs' = amodeToStix lhs

@@ -247,6 +247,17 @@ __export PrelGHC
   indexInt64OffAddrzh
   indexWord64OffAddrzh
   
+  readCharOffAddrzh
+  readIntOffAddrzh
+  readWordOffAddrzh
+  readAddrOffAddrzh
+  readForeignObjOffAddrzh
+  readFloatOffAddrzh
+  readDoubleOffAddrzh
+  readStablePtrOffAddrzh
+  readInt64OffAddrzh
+  readWord64OffAddrzh
+
   writeCharOffAddrzh
   writeIntOffAddrzh
   writeWordOffAddrzh
