@@ -831,19 +831,19 @@ freeErr pred
 	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
     ]
 
-forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr ty
-usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr ty
-unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr ty
-ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
+forAllTyErr     ty = ptext SLIT("Illegal polymorphic type:") <+> ppr_ty ty
+usageTyErr      ty = ptext SLIT("Illegal usage type:") <+> ppr_ty ty
+unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr_ty ty
+ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr_ty ty
 badSourceTyErr sty = ptext SLIT("Illegal constraint") <+> pprSourceType sty
 predTyVarErr pred  = ptext SLIT("Non-type variables in constraint:") <+> pprPred pred
 kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
 
 checkTypeCtxt ctxt ty
-  = vcat [ptext SLIT("In the type:") <+> ppr_ty,
+  = vcat [ptext SLIT("In the type:") <+> ppr_ty ty,
 	  ptext SLIT("While checking") <+> pprUserTypeCtxt ctxt ]
-  where  
+
 	-- Hack alert.  If there are no tyvars, (ppr sigma_ty) will print
 	-- something strange like {Eq k} -> k -> k, because there is no
 	-- ForAll at the top of the type.  Since this is going to the user
@@ -852,9 +852,10 @@ checkTypeCtxt ctxt ty
 	-- This shows up in the complaint about
 	--	case C a where
 	--	  op :: Eq a => a -> a
-    ppr_ty | null forall_tyvars = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
-	   | otherwise	 	= ppr ty
-    (forall_tyvars, theta, tau) = tcSplitSigmaTy ty
+ppr_ty ty | null forall_tvs && not (null theta) = pprTheta theta <+> ptext SLIT("=>") <+> ppr tau
+          | otherwise	 		     = ppr ty
+          where
+	    (forall_tvs, theta, tau) = tcSplitSigmaTy ty
 
 checkThetaCtxt ctxt theta
   = vcat [ptext SLIT("In the context:") <+> pprTheta theta,

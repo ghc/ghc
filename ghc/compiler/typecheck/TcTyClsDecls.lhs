@@ -173,10 +173,12 @@ tcGroup unf_env this_mod scc
     )						`thenTc` \ (_, tyclss, env) ->
 
 
-	-- Step 7: Check validity; but only for things defined in this module
-    traceTc (text "ready for validity check")				`thenTc_`
-    mapTc_ checkValidTyCl (filter (isLocalThing this_mod) tyclss)	`thenTc_`
-    traceTc (text "done")						`thenTc_`
+	-- Step 7: Check validity
+    traceTc (text "ready for validity check")	`thenTc_`
+    tcSetEnv env (
+	mapTc_ (checkValidTyCl this_mod) decls
+    )						`thenTc_`
+    traceTc (text "done")			`thenTc_`
    
     returnTc env
 
@@ -193,8 +195,16 @@ tcTyClDecl1 unf_env decl
   | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 unf_env decl)
   | otherwise	     = tcAddDeclCtxt decl (tcTyDecl     unf_env decl)
 
-checkValidTyCl (ATyCon tc) = checkValidTyCon tc
-checkValidTyCl (AClass cl) = checkValidClass cl
+checkValidTyCl this_mod decl
+  = tcLookup (tcdName decl)	`thenNF_Tc` \ (AGlobal thing) ->
+    if not (isLocalThing this_mod thing) then
+	-- Don't bother to check validity for non-local things
+	returnTc ()
+    else
+    tcAddDeclCtxt decl $
+    case thing of
+	ATyCon tc -> checkValidTyCon tc
+	AClass cl -> checkValidClass cl
 \end{code}
 
 
