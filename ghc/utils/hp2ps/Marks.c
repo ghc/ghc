@@ -16,7 +16,7 @@ Marks()
     floatish m;
 
     for (i = 0; i < nmarks; i++) {
-	m = (markmap[i] / xrange) * graphwidth;
+	m = ((markmap[i] - samplemap[0]) / xrange) * graphwidth;
 	Caret(xpage(m), ypage(0.0), 4.0);
     }
 }
