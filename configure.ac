@@ -1419,4 +1419,22 @@ we_have_sigpoll
 ], AC_DEFINE([HAVE_SIGPOLL], [1], [Define to 1 if you have the sigpoll() function.]) haveSIGPOLL=yes, haveSIGPOLL=no)
 AC_MSG_RESULT([$haveSIGPOLL])
 
+AC_MSG_CHECKING([for SIGINFO])
+AC_EGREP_CPP(we_have_siginfo,
+[#include <signal.h>
+#ifdef SIGINFO
+we_have_siginfo
+#endif
+], AC_DEFINE([HAVE_SIGINFO], [1], [Define to 1 if you have the INFO-signal.]) haveSIGINFO=yes, haveSIGINFO=no)
+AC_MSG_RESULT([$haveSIGINFO])
+
+AC_MSG_CHECKING([for SIGWINCH])
+AC_EGREP_CPP(we_have_sigwinch,
+[#include <signal.h>
+#ifdef SIGWINCH
+we_have_sigwinch
+#endif
+], AC_DEFINE([HAVE_SIGWINCH], [1], [Define to 1 if you have the WINCH-signal.]) haveSIGWINCH=yes, haveSIGWINCH=no)
+AC_MSG_RESULT([$haveSIGWINCH])
+
 AC_OUTPUT(mk/config.mk, echo timestamp > mk/stamp-h )
