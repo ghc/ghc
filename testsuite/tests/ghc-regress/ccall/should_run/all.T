@@ -45,7 +45,7 @@ test('ffi008', compose(expect_fail_for(['extcore','optextcore']), exit_code(1)),
 if config.platform == 'i386-unknown-openbsd':
 	ways = expect_fail_for(['extcore','optextcore'])
 else:
-	ways = expect_fail_for(['optasm','extcore', 'optextcore'])
+	ways = expect_fail_for(['optasm','profasm','extcore', 'optextcore'])
 
 test('ffi009', ways ,compile_and_run, [''])
 
