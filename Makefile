@@ -433,6 +433,7 @@ hc-file-bundle : project-check
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
 	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/utils \
+	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
 	     $(ProjectNameShort)-$(ProjectVersion)/libraries -follow \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
 	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/utils $(ProjectNameShort)-$(ProjectVersion)/libraries -name "*.hsc" -follow -print` ""; do \
