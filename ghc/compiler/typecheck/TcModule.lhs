@@ -445,8 +445,9 @@ tcModule pcs hst (RnResult { rr_decls = decls, rr_mod = this_mod,
 			   lie_rules	 `plusLIE`
 			   lie_main
 	in
-	tcSimplifyTop lie_alldecls	`thenTc` \ const_inst_binds ->
-        traceTc (text "endsimpltop")	`thenTc_`
+	tcSimplifyTop lie_alldecls		`thenTc` \ const_inst_binds ->
+        traceTc (text "endsimpltop")		`thenTc_`
+	
 	
 	    -- Backsubstitution.    This must be done last.
 	    -- Even tcSimplifyTop may do some unification.

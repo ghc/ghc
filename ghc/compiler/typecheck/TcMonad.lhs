@@ -17,7 +17,7 @@ module TcMonad(
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
 	failTc, failWithTc, addErrTc, addErrsTc, warnTc, 
-	recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
+	recoverTc, checkNoErrsTc, ifErrsTc, recoverNF_Tc, discardErrsTc,
 	addErrTcM, addInstErrTcM, failWithTcM,
 
 	tcGetEnv, tcSetEnv,
@@ -407,6 +407,19 @@ checkNoErrsTc main
 	where
 	  errs_var = getTcErrs down
 
+
+ifErrsTc :: TcM r -> TcM r -> TcM r
+--	ifErrsTc bale_out main
+-- does 'bale_out' if there are errors in errors collection
+-- and does 'main' otherwise
+-- Useful to avoid error cascades
+
+ifErrsTc bale_out main
+  = getErrsTc	`thenNF_Tc` \ (warns, errs) -> 
+    if isEmptyBag errs then
+	   main
+    else	
+	   bale_out
 
 -- (tryTc_ r m) tries m; if it succeeds it returns it,
 -- otherwise it returns r.  Any error messages added by m are discarded,

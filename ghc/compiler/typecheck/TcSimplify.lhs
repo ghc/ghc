@@ -1609,15 +1609,25 @@ tcSimplifyTop wanted_lie
 		-- Collect together all the bad guys
 	bad_guys = non_stds ++ concat std_bads
     in
-	-- Disambiguate the ones that look feasible
-    mapTc disambigGroup std_oks		`thenTc` \ binds_ambig ->
 
-	-- And complain about the ones that don't
+    ifErrsTc (returnTc []) (
+	-- Don't check for ambiguous things
+	-- if there has been an error; errors often
+	-- give rise to spurious ambiguous Insts
+	
+    
+	-- And complain about the ones that don't fall under
+	-- the Haskell rules for disambiguation
 	-- This group includes both non-existent instances
 	--	e.g. Num (IO a) and Eq (Int -> Int)
 	-- and ambiguous dictionaries
 	--	e.g. Num a
-    addTopAmbigErrs bad_guys		`thenNF_Tc_`
+        addTopAmbigErrs bad_guys	`thenNF_Tc_`
+
+	-- Disambiguate the ones that look feasible
+        mapTc disambigGroup std_oks
+    )					`thenTc` \ binds_ambig ->
+
 
     returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
   where
