@@ -32,12 +32,23 @@ GHC's own exception type.
 ghcError :: GhcException -> a
 ghcError e = throwDyn e
 
+-- error messages all take the form
+--
+--	<location>: <error>
+--
+-- If the location is on the command line, or in GHC itself, then 
+-- <location>="ghc".  All of the error types below correspond to 
+-- a <location> of "ghc", except for ProgramError (where the string is
+-- assumed to contain a location already, so we don't print one).
+
 data GhcException
-  = PhaseFailed String ExitCode
-  | Interrupted
+  = PhaseFailed String ExitCode	-- an external phase (eg. cpp) failed
+  | Interrupted			-- someone pressed ^C
   | UsageError String		-- prints the short usage msg after the error
+  | CmdLineError String		-- cmdline prob, but doesn't print usage
   | Panic String		-- the `impossible' happened
-  | OtherError String		-- just prints the error message
+  | InstallationError String	-- an installation problem
+  | ProgramError String		-- error in the user's code, probably
   deriving Eq
 
 progName = unsafePerformIO (getProgName)
@@ -46,22 +57,28 @@ progName = unsafePerformIO (getProgName)
 short_usage = "Usage: For basic information, try the `--help' option."
    
 instance Show GhcException where
-  showsPrec _ e = showString progName . showString ": " . showBarf e
+  showsPrec _ e@(ProgramError _) = showGhcException e
+  showsPrec _ e = showString progName . showString ": " . showGhcException e
 
-showBarf (UsageError str)
+showGhcException (UsageError str)
    = showString str . showChar '\n' . showString short_usage
-showBarf (OtherError str)
-   = showString str
-showBarf (PhaseFailed phase code)
+showGhcException (PhaseFailed phase code)
    = showString phase . showString " failed, code = " . shows code
-showBarf (Interrupted)
+showGhcException (CmdLineError str)
+   = showString str
+showGhcException (ProgramError str)
+   = showString str
+showGhcException (InstallationError str)
+   = showString str
+showGhcException (Interrupted)
    = showString "interrupted"
-showBarf (Panic s)
+showGhcException (Panic s)
    = showString ("panic! (the `impossible' happened, GHC version "
 		 ++ cProjectVersion ++ "):\n\t"
 	         ++ s ++ "\n\n"
 	         ++ "Please report it as a compiler bug "
-	         ++ "to glasgow-haskell-bugs@haskell.org.\n\n")
+	         ++ "to glasgow-haskell-bugs@haskell.org,\n"
+		 ++ "or http://sourceforge.net/projects/ghc/.\n\n")
 
 ghcExceptionTc = mkTyCon "GhcException"
 {-# NOINLINE ghcExceptionTc #-}
