@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.6 1999/07/06 16:40:27 sewardj Exp $
+ * $Id: StgCRun.c,v 1.7 1999/07/27 13:29:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -203,7 +203,7 @@ StgThreadReturnCode
 StgRun(StgFunPtr f) 
 {
     StgChar space[RESERVED_C_STACK_BYTES+16*sizeof(long)+10*sizeof(double)];
-    StgThredReturnCode ret;
+    StgThreadReturnCode ret;
 
     __asm__ volatile ("ldo %0(%%r30),%%r19\n"
 		      "\tstw %%r3, 0(0,%%r19)\n"
@@ -276,9 +276,9 @@ StgRun(StgFunPtr f)
 		      "\tldo 32(%%r19),%%r19\n"
 		      "\tfldds -16(0,%%r19),%%fr20\n"
 		      "\tfldds  -8(0,%%r19),%%fr21\n" 
-		      : "=r" (ret) /* result */
-                      : "n" (-(116 * sizeof(long) + 10 * sizeof(double))) 
-		      : "%r19"
+		         : "=r" (ret)
+		         : "n" (-(116 * sizeof(long) + 10 * sizeof(double)))
+		         : "%r19"
 		      );
 
     return ret;
