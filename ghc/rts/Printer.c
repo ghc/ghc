@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.45 2001/08/14 13:40:09 sewardj Exp $
+ * $Id: Printer.c,v 1.46 2001/08/21 10:12:02 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -95,6 +95,13 @@ void printClosure( StgClosure *obj )
     case BCO:
             disassemble( (StgBCO*)obj );
             break;
+
+    case MUT_VAR:
+        {
+	  StgMutVar* mv = (StgMutVar*)obj;
+	  fprintf(stderr,"MUT_VAR(var=%p, link=%p)\n", mv->var, mv->mut_link);
+          break;
+        }
 
     case AP_UPD:
         {
