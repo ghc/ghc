@@ -12,12 +12,12 @@ module TcTyClsDecls (
 
 import HsSyn		( HsDecl(..), TyClDecl(..),
 			  HsType(..), HsTyVarBndr,
-			  ConDecl(..), ConDetails(..), BangType(..),
+			  ConDecl(..), ConDetails(..), 
 			  Sig(..), HsPred(..), HsTupCon(..),
 			  tyClDeclName, hsTyVarNames, isClassDecl, isSynDecl, isClassOpSig, getBangType
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
-import BasicTypes	( RecFlag(..), NewOrData(..), Arity )
+import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
 import TcEnv		( ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind,
@@ -26,7 +26,7 @@ import TcEnv		( ValueEnv, TyThing(..), TyThingDetails(..), tyThingKind,
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsBoxedSigType, kcHsContext, mkTyClTyVars )
-import TcType		( TcKind, newKindVar, newKindVars, zonkKindEnv )
+import TcType		( TcKind, newKindVar, zonkKindEnv )
 
 import TcUnify		( unifyKind )
 import Type		( Kind, mkArrowKind, boxedTypeKind, zipFunTys )
@@ -34,18 +34,15 @@ import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
 import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), mkSynTyCon, mkAlgTyCon, mkClassTyCon )
 import DataCon		( isNullaryDataCon )
-import Var		( TyVar, tyVarKind, varName )
-import VarEnv
+import Var		( varName )
 import FiniteMap
-import Bag	
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( Name, NamedThing(..), NameEnv, getSrcLoc, isTvOcc, nameOccName,
 			  mkNameEnv, lookupNameEnv_NF
 			)
 import Outputable
 import Maybes		( mapMaybe, catMaybes )
-import UniqSet		( UniqSet, emptyUniqSet,
-			  unitUniqSet, unionUniqSets, 
+import UniqSet		( emptyUniqSet, unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import ErrUtils		( Message )
 import Unique		( Unique, Uniquable(..) )
@@ -457,7 +454,6 @@ get_sigs sigs
 
 ----------------------------------------------------
 set_name name = unitUniqSet (getUnique name)
-set_to_bag set = listToBag (uniqSetToList set)
 \end{code}
 
 

@@ -9,8 +9,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), InstDecl(..),
-			  HsBinds(..), MonoBinds(..),
-			  HsExpr(..), InPat(..), HsLit(..), Sig(..),
+			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..),
 			  andMonoBindList
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl )
@@ -20,7 +19,7 @@ import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, checkFromThisClass )
 import TcMonad
 import RnMonad		( RnNameSupply, FixityEnv )
-import Inst		( Inst, InstOrigin(..),
+import Inst		( InstOrigin(..),
 			  newDicts, newClassDicts,
 			  LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
@@ -30,33 +29,32 @@ import TcEnv		( ValueEnv, tcExtendGlobalValEnv, tcExtendTyVarEnvForMeths,
 import TcInstUtil	( InstInfo(..), classDataCon )
 import TcMonoType	( tcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcTyVar, zonkTcSigTyVars )
+import TcType		( zonkTcSigTyVars )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  foldBag, Bag
 			)
 import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances )
-import Class		( classBigSig, Class )
-import Var		( idName, idType, Id, TyVar )
-import Maybes 		( maybeToBool, catMaybes, expectJust )
+import Class		( classBigSig )
+import Var		( idName, idType )
+import Maybes 		( maybeToBool, expectJust )
 import MkId		( mkDictFunId )
 import Module		( Module )
-import Name		( isLocallyDefined, NamedThing(..)	)
+import Name		( isLocallyDefined )
 import NameSet		( emptyNameSet )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint )
 import TyCon		( isSynTyCon, tyConDerivings )
-import Type		( Type, isUnLiftedType, mkTyVarTys,
-			  splitSigmaTy, isTyVarTy,
+import Type		( mkTyVarTys, splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,
-			  getClassTys_maybe, splitAlgTyConApp_maybe,
+			  splitAlgTyConApp_maybe,
 			  classesToPreds, classesOfPreds,
 			  unUsgTy, tyVarsOfTypes
 			)
 import Subst		( mkTopTyVarSubst, substClasses )
 import VarSet		( mkVarSet, varSetElems )
-import TysWiredIn	( stringTy, isFFIArgumentTy, isFFIResultTy )
-import Unique		( Unique, cCallableClassKey, cReturnableClassKey, hasKey, Uniquable(..) )
+import TysWiredIn	( isFFIArgumentTy, isFFIResultTy )
+import Unique		( cCallableClassKey, cReturnableClassKey, hasKey )
 import Outputable
 \end{code}
 
@@ -422,7 +420,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		-- mention the constructor, which doesn't exist for CCallable, CReturnable
 		-- Hardly beautiful, but only three extra lines.
 	    HsApp (TyApp (HsVar eRROR_ID) [(unUsgTy . idType) this_dict_id])
-		  (HsLitOut (HsString msg) stringTy)
+		  (HsLit (HsString msg))
 
 	  | otherwise	-- The common case
 	  = mkHsConApp dict_constr inst_tys' (map HsVar (sc_dict_ids ++ meth_ids))

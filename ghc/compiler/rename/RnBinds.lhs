@@ -27,17 +27,16 @@ import RnHsSyn
 import RnMonad
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, 
-			  lookupGlobalOccRn, lookupOccRn, lookupSigOccRn,
+			  lookupGlobalOccRn, lookupSigOccRn,
 			  warnUnusedLocalBinds, mapFvRn, 
-			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV,
-			  unknownNameErr
+			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, addOneFV
 			)
 import CmdLineOpts	( opt_WarnMissingSigs )
 import Digraph		( stronglyConnComp, SCC(..) )
 import Name		( OccName, Name, nameOccName, mkUnboundName, isUnboundName )
 import NameSet
 import RdrName		( RdrName, rdrNameOcc  )
-import BasicTypes	( RecFlag(..), TopLevelFlag(..) )
+import BasicTypes	( RecFlag(..) )
 import List		( partition )
 import Bag		( bagToList )
 import Outputable

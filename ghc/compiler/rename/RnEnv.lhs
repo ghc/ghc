@@ -12,7 +12,6 @@ import CmdLineOpts	( opt_WarnNameShadowing, opt_WarnUnusedMatches,
 			  opt_WarnUnusedBinds, opt_WarnUnusedImports )
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
-import RnHsSyn		( RenamedHsType )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual,
 			  mkRdrUnqual, qualifyRdrName
 			)
@@ -22,23 +21,17 @@ import RnMonad
 import Name		( Name, Provenance(..), ExportFlag(..), NamedThing(..),
 			  ImportReason(..), getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName, mkUnboundName,
-			  mkIPName, isWiredInName, hasBetterProv,
+			  mkIPName, hasBetterProv, isLocallyDefined, 
 			  nameOccName, setNameModule, nameModule,
-			  pprOccName, isLocallyDefined, nameUnique, 
 			  setNameProvenance, getNameProvenance, pprNameProvenance,
 			  extendNameEnv_C, plusNameEnv_C, nameEnvElts
 			)
 import NameSet
-import OccName		( OccName,
-			  mkDFunOcc, occNameUserString, occNameString,
-			  occNameFlavour
-			)
-import TysWiredIn	( listTyCon )
-import Type		( funTyCon )
-import Module		( ModuleName, mkThisModule, moduleName, mkVanillaModule, pprModuleName )
+import OccName		( OccName, occNameUserString, occNameFlavour )
+import Module		( ModuleName, moduleName, mkVanillaModule, pprModuleName )
 import FiniteMap
 import UniqSupply
-import SrcLoc		( SrcLoc, noSrcLoc )
+import SrcLoc		( SrcLoc )
 import Outputable
 import Util		( removeDups, equivClasses, thenCmp, sortLt )
 import List		( nub )
@@ -677,11 +670,13 @@ addOneFV :: FreeVars -> Name -> FreeVars
 unitFV   :: Name -> FreeVars
 emptyFVs :: FreeVars
 plusFVs  :: [FreeVars] -> FreeVars
+mkFVs	 :: [Name] -> FreeVars
 
 isEmptyFVs = isEmptyNameSet
 emptyFVs   = emptyNameSet
 plusFVs    = unionManyNameSets
 plusFV     = unionNameSets
+mkFVs	   = mkNameSet
 
 -- No point in adding implicitly imported names to the free-var set
 addOneFV s n = addOneToNameSet s n

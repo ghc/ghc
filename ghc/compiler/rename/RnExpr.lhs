@@ -27,32 +27,28 @@ import RnMonad
 import RnEnv
 import RnIfaces		( lookupFixityRn )
 import CmdLineOpts	( opt_GlasgowExts, opt_IgnoreAsserts )
-import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity, negatePrecedence )
-import PrelInfo		( numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
+import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
+import PrelInfo		( eqClass_RDR, 
 			  ccallableClass_RDR, creturnableClass_RDR, 
 			  monadClass_RDR, enumClass_RDR, ordClass_RDR,
 			  ratioDataCon_RDR, negate_RDR, assertErr_RDR,
-			  ioDataCon_RDR, addr2Integer_RDR,
+			  ioDataCon_RDR, 
 			  foldr_RDR, build_RDR
 			)
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon
 			)
-import Name		( nameUnique, isLocallyDefined, NamedThing(..)
-                        , mkSysLocalName, nameSrcLoc
-			)
+import TysWiredIn	( intTyCon, integerTyCon )
+import Name		( NamedThing(..), mkSysLocalName, nameSrcLoc )
 import NameSet
 import UniqFM		( isNullUFM )
 import FiniteMap	( elemFM )
-import UniqSet		( emptyUniqSet, UniqSet )
+import UniqSet		( emptyUniqSet )
 import Unique		( hasKey, assertIdKey )
 import Util		( removeDups )
 import ListSetOps	( unionLists )
 import Maybes		( maybeToBool )
 import Outputable
-import Literal		( inIntRange, tARGET_MAX_INT )
-import RdrName		( mkSrcUnqual )
-import OccName		( varName )
 \end{code}
 
 
@@ -84,9 +80,20 @@ rnPat (SigPatIn pat ty)
     doc = text "a pattern type-signature"
     
 rnPat (LitPatIn lit) 
-  = litOccurrence lit			`thenRn` \ fvs1 ->
-    lookupOrigName eqClass_RDR	`thenRn` \ eq   ->	-- Needed to find equality on pattern
-    returnRn (LitPatIn lit, fvs1 `addOneFV` eq)
+  = litFVs lit		`thenRn` \ fvs ->
+    returnRn (LitPatIn lit, fvs) 
+
+rnPat (NPatIn lit) 
+  = rnOverLit lit			`thenRn` \ (lit', fvs1) ->
+    lookupOrigName eqClass_RDR		`thenRn` \ eq   ->	-- Needed to find equality on pattern
+    returnRn (NPatIn lit', fvs1 `addOneFV` eq)
+
+rnPat (NPlusKPatIn name lit minus)
+  = rnOverLit lit			`thenRn` \ (lit', fvs) ->
+    lookupOrigName ordClass_RDR		`thenRn` \ ord ->
+    lookupBndrRn name			`thenRn` \ name' ->
+    lookupOccRn minus			`thenRn` \ minus' ->
+    returnRn (NPlusKPatIn name' lit' minus', fvs `addOneFV` ord `addOneFV` minus')
 
 rnPat (LazyPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
@@ -116,32 +123,9 @@ rnPat (ConOpPatIn pat1 con _ pat2)
     )								`thenRn` \ pat' ->
     returnRn (pat', fvs1 `plusFV` fvs2 `addOneFV` con')
 
--- Negated patters can only be literals, and they are dealt with
--- by negating the literal at compile time, not by using the negation
--- operation in Num.  So we don't need to make an implicit reference
--- to negate_RDR.
-rnPat neg@(NegPatIn pat)
-  = checkRn (valid_neg_pat pat) (negPatErr neg)
-			`thenRn_`
-    rnPat pat		`thenRn` \ (pat', fvs) ->
-    returnRn (NegPatIn pat', fvs)
-  where
-    valid_neg_pat (LitPatIn (HsInt        _)) = True
-    valid_neg_pat (LitPatIn (HsIntPrim    _)) = True
-    valid_neg_pat (LitPatIn (HsFrac       _)) = True
-    valid_neg_pat (LitPatIn (HsFloatPrim  _)) = True
-    valid_neg_pat (LitPatIn (HsDoublePrim _)) = True
-    valid_neg_pat _                           = False
-
 rnPat (ParPatIn pat)
   = rnPat pat		`thenRn` \ (pat', fvs) ->
     returnRn (ParPatIn pat', fvs)
-
-rnPat (NPlusKPatIn name lit)
-  = litOccurrence lit			`thenRn` \ fvs ->
-    lookupOrigName ordClass_RDR	`thenRn` \ ord ->
-    lookupBndrRn name			`thenRn` \ name' ->
-    returnRn (NPlusKPatIn name' lit, fvs `addOneFV` ord)
 
 rnPat (ListPatIn pats)
   = mapFvRn rnPat pats			`thenRn` \ (patslist, fvs) ->
@@ -291,15 +275,13 @@ rnExpr (HsIPVar v)
   = newIPName v			`thenRn` \ name ->
     returnRn (HsIPVar name, emptyFVs)
 
--- Special case for integral literals with a large magnitude:
--- They are transformed into an expression involving only smaller
--- integral literals. This improves constant folding.
-rnExpr (HsLit (HsInt i))
-  | not (inIntRange i) = rnExpr (horner tARGET_MAX_INT i)
-
 rnExpr (HsLit lit) 
-  = litOccurrence lit		`thenRn` \ fvs ->
+  = litFVs lit		`thenRn` \ fvs -> 
     returnRn (HsLit lit, fvs)
+
+rnExpr (HsOverLit lit) 
+  = rnOverLit lit		`thenRn` \ (lit', fvs) ->
+    returnRn (HsOverLit lit', fvs)
 
 rnExpr (HsLam match)
   = rnMatch match	`thenRn` \ (match', fvMatch) ->
@@ -330,16 +312,10 @@ rnExpr (OpApp e1 op _ e2)
     returnRn (final_e,
 	      fv_e1 `plusFV` fv_op `plusFV` fv_e2)
 
--- constant-fold some negate applications on unboxed literals.  Since
--- negate is a polymorphic function, we have to do these here.
-rnExpr (NegApp (HsLit (HsIntPrim i))    _) = rnExpr (HsLit (HsIntPrim (-i)))
-rnExpr (NegApp (HsLit (HsFloatPrim i))  _) = rnExpr (HsLit (HsFloatPrim (-i)))
-rnExpr (NegApp (HsLit (HsDoublePrim i)) _) = rnExpr (HsLit (HsDoublePrim (-i)))
-
 rnExpr (NegApp e n)
-  = rnExpr e				`thenRn` \ (e', fv_e) ->
+  = rnExpr e			`thenRn` \ (e', fv_e) ->
     lookupOrigName negate_RDR	`thenRn` \ neg ->
-    mkNegAppRn e' (HsVar neg)		`thenRn` \ final_e ->
+    mkNegAppRn e' neg		`thenRn` \ final_e ->
     returnRn (final_e, fv_e `addOneFV` neg)
 
 rnExpr (HsPar e)
@@ -477,18 +453,9 @@ rnExpr e@(EAsPat _ _) = addErrRn (patSynErr e)	`thenRn_`
 
 rnExpr e@(ELazyPat _) = addErrRn (patSynErr e)	`thenRn_`
 		        returnRn (EWildPat, emptyFVs)
-
--- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
-horner :: Integer -> Integer -> RdrNameHsExpr
-horner b i | abs q <= 1 = if r == 0 || r == i then mkInt i else mkInt r `plus` mkInt (i-r)
-           | r == 0     =                 horner b q `times` mkInt b
-           | otherwise  = mkInt r `plus` (horner b q `times` mkInt b)
-   where (q,r)    = i `quotRem` b
-         mkInt i  = HsLit (HsInt i)
-         plus     = mkOp "+"
-         times    = mkOp "*"
-         mkOp op  = \x y -> HsPar (OpApp x (HsVar (mkSrcUnqual varName (_PK_ op))) (panic "fixity") y)
 \end{code}
+
+
 
 %************************************************************************
 %*									*
@@ -715,14 +682,6 @@ mkConOpPatRn p1@(ConOpPatIn p11 op1 fix1 p12)
   where
     (nofix_error, associate_right) = compareFixity fix1 fix2
 
-mkConOpPatRn p1@(NegPatIn neg_arg) 
-	  op2 
-	  fix2@(Fixity prec2 dir2)
-	  p2
-  | prec2 > negatePrecedence 	-- Precedence of unary - is wired in
-  = addErrRn (precParseNegPatErr (ppr_op op2,fix2))	`thenRn_`
-    returnRn (ConOpPatIn p1 op2 fix2 p2)
-
 mkConOpPatRn p1 op fix p2 			-- Default case, no rearrangment
   = ASSERT( not_op_pat p2 )
     returnRn (ConOpPatIn p1 op fix p2)
@@ -763,10 +722,6 @@ checkPrec op (ConOpPatIn _ op1 _ _) right
     in
     checkRn inf_ok (precParseErr infol infor)
 
-checkPrec op (NegPatIn _) right
-  = lookupFixityRn op	`thenRn` \ op_fix@(Fixity op_prec op_dir) ->
-    checkRn (op_prec <= negatePrecedence) (precParseNegPatErr (ppr_op op,op_fix))
-
 checkPrec op pat right
   = returnRn ()
 
@@ -776,7 +731,7 @@ checkPrec op pat right
 checkSectionPrec left_or_right section op arg
   = case arg of
 	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
-	NegApp _ op	 -> go_for_it pp_prefix_minus negateFixity
+	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
 	other		 -> returnRn ()
   where
     HsVar op_name = op
@@ -822,42 +777,32 @@ that the types and classes they involve
 are made available.
 
 \begin{code}
-litOccurrence (HsChar _)
-  = returnRn (unitFV charTyCon_name)
+litFVs (HsChar c)       = returnRn (unitFV charTyCon_name)
+litFVs (HsCharPrim c)   = returnRn (unitFV (getName charPrimTyCon))
+litFVs (HsString s)     = returnRn (mkFVs [listTyCon_name, charTyCon_name])
+litFVs (HsStringPrim s) = returnRn (unitFV (getName addrPrimTyCon))
+litFVs (HsInt i)	= returnRn (unitFV (getName intTyCon))
+litFVs (HsInteger i)	= returnRn (unitFV (getName integerTyCon))
+litFVs (HsIntPrim i)    = returnRn (unitFV (getName intPrimTyCon))
+litFVs (HsFloatPrim f)  = returnRn (unitFV (getName floatPrimTyCon))
+litFVs (HsDoublePrim d) = returnRn (unitFV (getName doublePrimTyCon))
+litFVs (HsLitLit l bogus_ty)
+  = lookupOrigName ccallableClass_RDR	`thenRn` \ cc ->
+    returnRn (unitFV cc)
 
-litOccurrence (HsCharPrim _)
-  = returnRn (unitFV (getName charPrimTyCon))
+rnOverLit (HsIntegral i n)
+  = lookupOccRn n			`thenRn` \ n' ->
+    returnRn (HsIntegral i n', unitFV n')
 
-litOccurrence (HsString _)
-  = returnRn (unitFV listTyCon_name `plusFV` unitFV charTyCon_name)
-
-litOccurrence (HsStringPrim _)
-  = returnRn (unitFV (getName addrPrimTyCon))
-
-litOccurrence (HsInt _)
-  = lookupOrigNames [numClass_RDR, addr2Integer_RDR]
-    -- Int and Integer are forced in by Num
-
-litOccurrence (HsFrac _)
-  = lookupOrigNames [fractionalClass_RDR,ratioDataCon_RDR,addr2Integer_RDR]
+rnOverLit (HsFractional i n)
+  = lookupOccRn n				`thenRn` \ n' ->
+    lookupOrigNames [ratioDataCon_RDR]		`thenRn` \ ns' ->
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.
 	-- The Rational type is needed too, but that will come in
 	-- when fractionalClass does.
-    
-litOccurrence (HsIntPrim _)
-  = returnRn (unitFV (getName intPrimTyCon))
-
-litOccurrence (HsFloatPrim _)
-  = returnRn (unitFV (getName floatPrimTyCon))
-
-litOccurrence (HsDoublePrim _)
-  = returnRn (unitFV (getName doublePrimTyCon))
-
-litOccurrence (HsLitLit _)
-  = lookupOrigName ccallableClass_RDR	`thenRn` \ cc ->
-    returnRn (unitFV cc)
+    returnRn (HsFractional i n', ns' `addOneFV` n')
 \end{code}
 
 %************************************************************************
@@ -912,16 +857,6 @@ dupFieldErr str (dup:rest)
   = hsep [ptext SLIT("duplicate field name"), 
           quotes (ppr dup),
 	  ptext SLIT("in record"), text str]
-
-negPatErr pat 
-  = sep [pp_prefix_minus <+> ptext SLIT("not applied to literal in pattern"), 
-	 quotes (ppr pat)]
-
-precParseNegPatErr op 
-  = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [pp_prefix_minus <+> ptext SLIT("has lower precedence than"), 
-	       ppr_opfix op, 
-	       ptext SLIT("in pattern")])
 
 precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))

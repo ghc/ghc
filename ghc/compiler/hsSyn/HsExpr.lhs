@@ -12,8 +12,8 @@ module HsExpr where
 import {-# SOURCE #-} HsMatches ( pprMatches, pprMatch, Match )
 
 import HsBinds		( HsBinds(..) )
-import HsBasic		( HsLit )
-import BasicTypes	( Fixity(..), FixityDirection(..) )
+import HsLit		( HsLit, HsOverLit )
+import BasicTypes	( Fixity(..) )
 import HsTypes		( HsType )
 
 -- others:
@@ -21,7 +21,7 @@ import Name		( Name, isLexSym )
 import Outputable	
 import PprType		( pprType, pprParendType )
 import Type		( Type )
-import Var		( TyVar, Id )
+import Var		( TyVar )
 import DataCon		( DataCon )
 import CStrings		( CLabelString, pprCLabelString )
 import BasicTypes	( Boxity, tupleParens )
@@ -36,11 +36,10 @@ import SrcLoc		( SrcLoc )
 
 \begin{code}
 data HsExpr id pat
-  = HsVar	id				-- variable
-  | HsIPVar	id				-- implicit parameter
-  | HsLit	HsLit				-- literal
-  | HsLitOut	HsLit				-- TRANSLATION
-		Type		-- (with its type)
+  = HsVar	id		-- variable
+  | HsIPVar	id		-- implicit parameter
+  | HsOverLit	(HsOverLit id)	-- Overloaded literals; eliminated by type checker
+  | HsLit	HsLit		-- Simple (non-overloaded) literals
 
   | HsLam	(Match  id pat)	-- lambda
   | HsApp	(HsExpr id pat)	-- application
@@ -61,7 +60,7 @@ data HsExpr id pat
   -- They are eventually removed by the type checker.
 
   | NegApp	(HsExpr id pat)	-- negated expr
-		(HsExpr id pat)	-- the negate id (in a HsVar)
+		id 		-- the negate id (in a HsVar)
 
   | HsPar	(HsExpr id pat)	-- parenthesised expr
 
@@ -216,10 +215,9 @@ ppr_expr (HsVar v)
   | isOperator v = parens (ppr v)
   | otherwise    = ppr v
 
-ppr_expr (HsIPVar v) = {- char '?' <> -} ppr v
-
-ppr_expr (HsLit    lit)   = ppr lit
-ppr_expr (HsLitOut lit _) = ppr lit
+ppr_expr (HsIPVar v)     = {- char '?' <> -} ppr v
+ppr_expr (HsLit lit)     = ppr lit
+ppr_expr (HsOverLit lit) = ppr lit
 
 ppr_expr (HsLam match)
   = hsep [char '\\', nest 2 (pprMatch (True,empty) match)]
@@ -249,8 +247,7 @@ ppr_expr (OpApp e1 op fixity e2)
 		| otherwise    = char '`' <> ppr v <> char '`'
 	        -- Put it in backquotes if it's not an operator already
 
-ppr_expr (NegApp e _)
-  = char '-' <+> pprParendExpr e
+ppr_expr (NegApp e _) = char '-' <+> pprParendExpr e
 
 ppr_expr (HsPar e) = parens (ppr_expr e)
 
@@ -378,7 +375,7 @@ pprParendExpr expr
     in
     case expr of
       HsLit l		    -> ppr l
-      HsLitOut l _	    -> ppr l
+      HsOverLit l 	    -> ppr l
 
       HsVar _		    -> pp_as_was
       HsIPVar _		    -> pp_as_was

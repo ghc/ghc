@@ -19,7 +19,7 @@ module HsPat (
 #include "HsVersions.h"
 
 -- friends:
-import HsBasic		( HsLit )
+import HsLit		( HsLit, HsOverLit )
 import HsExpr		( HsExpr )
 import HsTypes		( HsType )
 import BasicTypes	( Fixity, Boxity, tupleParens )
@@ -27,7 +27,7 @@ import BasicTypes	( Fixity, Boxity, tupleParens )
 -- others:
 import Var		( Id, TyVar )
 import DataCon		( DataCon, dataConTyCon )
-import Name		( isDataSymOcc, getOccName, NamedThing )
+import Name		( Name, isDataSymOcc, getOccName, NamedThing )
 import Maybes		( maybeToBool )
 import Outputable	
 import TyCon		( maybeTyConSingleCon )
@@ -52,12 +52,17 @@ data InPat name
 		    Fixity		-- c.f. OpApp in HsExpr
 		    (InPat name)
 
-  | NPlusKPatIn	    name		--  n+k pattern
-		    HsLit
+  | NPatIn	    (HsOverLit name)
+
+  | NPlusKPatIn	    name		-- n+k pattern
+		    (HsOverLit name)	-- It'll always be an HsIntegral, but
+					-- we need those names to support -fuser-numerics
+		    name		-- Name for "-"; this supports -fuser-numerics
+					-- We don't do the same for >= because that isn't
+					-- affected by -fuser-numerics
 
   -- We preserve prefix negation and parenthesis for the precedence parser.
 
-  | NegPatIn	    (InPat name)	-- negated pattern
   | ParPatIn        (InPat name)	-- parenthesised pattern
 
   | ListPatIn	    [InPat name]	-- syntactic list
@@ -74,13 +79,13 @@ data OutPat id
   | AsPat	    id		-- as pattern
 		    (OutPat id)
 
-  | ListPat		 	-- syntactic list
-		    Type	-- the type of the elements
+  | ListPat		 	-- Syntactic list
+		    Type	-- The type of the elements
    	    	    [OutPat id]
 
-  | TuplePat	    [OutPat id]	-- tuple
+  | TuplePat	    [OutPat id]	-- Tuple
 		    Boxity
-						-- UnitPat is TuplePat []
+				-- UnitPat is TuplePat []
 
   | ConPat	    DataCon
 		    Type    	-- the type of the pattern
@@ -90,31 +95,28 @@ data OutPat id
 
   -- ConOpPats are only used on the input side
 
-  | RecPat	    DataCon		-- record constructor
-		    Type    	-- the type of the pattern
-		    [TyVar]	-- Existentially bound type variables
+  | RecPat	    DataCon		-- Record constructor
+		    Type 	   	-- The type of the pattern
+		    [TyVar]		-- Existentially bound type variables
 		    [id]		-- Ditto dictionaries
 		    [(Id, OutPat id, Bool)]	-- True <=> source used punning
 
   | LitPat	    -- Used for *non-overloaded* literal patterns:
 		    -- Int#, Char#, Int, Char, String, etc.
 		    HsLit
-		    Type 	-- type of pattern
+		    Type 		-- Type of pattern
 
   | NPat	    -- Used for *overloaded* literal patterns
-		    HsLit			-- the literal is retained so that
+		    HsLit			-- The literal is retained so that
 						-- the desugarer can readily identify
 						-- equations with identical literal-patterns
-		    Type 	-- type of pattern, t
-   	    	    (HsExpr id (OutPat id))
-						-- of type t -> Bool; detects match
+						-- Always HsInt, HsRat or HsString.
+		    Type	 		-- Type of pattern, t
+   	    	    (HsExpr id (OutPat id))	-- Of type t -> Bool; detects match
 
   | NPlusKPat	    id
-		    HsLit			-- Same reason as for LitPat
-						-- (This could be an Integer, but then
-						-- it's harder to partitionEqnsByLit
-						-- in the desugarer.)
-		    Type    	-- Type of pattern, t
+		    Integer
+		    Type		    	-- Type of pattern, t
    	    	    (HsExpr id (OutPat id)) 	-- Of type t -> Bool; detects match
    	    	    (HsExpr id (OutPat id)) 	-- Of type t -> t; subtracts k
 
@@ -134,12 +136,17 @@ instance (Outputable name) => Outputable (InPat name) where
 
 pprInPat :: (Outputable name) => InPat name -> SDoc
 
-pprInPat (WildPatIn)	    = char '_'
-pprInPat (VarPatIn var)	    = ppr var
-pprInPat (LitPatIn s)	    = ppr s
-pprInPat (SigPatIn pat ty)  = ppr pat <+> dcolon <+> ppr ty
-pprInPat (LazyPatIn pat)    = char '~' <> ppr pat
-pprInPat (AsPatIn name pat) = parens (hcat [ppr name, char '@', ppr pat])
+pprInPat (WildPatIn)	      = char '_'
+pprInPat (VarPatIn var)	      = ppr var
+pprInPat (LitPatIn s)	      = ppr s
+pprInPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
+pprInPat (LazyPatIn pat)      = char '~' <> ppr pat
+pprInPat (AsPatIn name pat)   = parens (hcat [ppr name, char '@', ppr pat])
+pprInPat (ParPatIn pat)	      = parens (pprInPat pat)
+pprInPat (ListPatIn pats)     = brackets (interpp'SP pats)
+pprInPat (TuplePatIn pats bx) = tupleParens bx (interpp'SP pats)
+pprInPat (NPlusKPatIn n k _)  = parens (hcat [ppr n, char '+', ppr k])
+pprInPat (NPatIn l)	      = ppr l
 
 pprInPat (ConPatIn c pats)
   | null pats = ppr c
@@ -150,26 +157,6 @@ pprInPat (ConOpPatIn pat1 op fixity pat2)
 
 	-- ToDo: use pprSym to print op (but this involves fiddling various
 	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
-
-pprInPat (NegPatIn pat)
-  = let
-	pp_pat = pprInPat pat
-    in
-    char '-' <> (
-    case pat of
-      LitPatIn _ -> pp_pat
-      _          -> parens pp_pat
-    )
-
-pprInPat (ParPatIn pat)
-  = parens (pprInPat pat)
-
-pprInPat (ListPatIn pats)
-  = brackets (interpp'SP pats)
-pprInPat (TuplePatIn pats boxity)
-  = tupleParens boxity (interpp'SP pats)
-pprInPat (NPlusKPatIn n k)
-  = parens (hcat [ppr n, char '+', ppr k])
 
 pprInPat (RecPatIn con rpats)
   = hsep [ppr con, braces (hsep (punctuate comma (map (pp_rpat) rpats)))]
@@ -216,7 +203,7 @@ pprOutPat (RecPat con ty tvs dicts rpats)
 pprOutPat (LitPat l ty) 	= ppr l	-- ToDo: print more
 pprOutPat (NPat   l ty e)	= ppr l	-- ToDo: print more
 pprOutPat (NPlusKPat n k ty e1 e2)		-- ToDo: print more
-  = parens (hcat [ppr n, char '+', ppr k])
+  = parens (hcat [ppr n, char '+', integer k])
 
 pprOutPat (DictPat dicts methods)
  = parens (sep [ptext SLIT("{-dict-}"),
@@ -322,10 +309,10 @@ collect (LitPatIn _)	      	 bndrs = bndrs
 collect (SigPatIn pat _)	 bndrs = collect pat bndrs
 collect (LazyPatIn pat)     	 bndrs = collect pat bndrs
 collect (AsPatIn a pat)     	 bndrs = a : collect pat bndrs
-collect (NPlusKPatIn n _)        bndrs = n : bndrs
+collect (NPlusKPatIn n _ _)      bndrs = n : bndrs
+collect (NPatIn _)		 bndrs = bndrs
 collect (ConPatIn c pats)   	 bndrs = foldr collect bndrs pats
 collect (ConOpPatIn p1 c f p2)   bndrs = collect p1 (collect p2 bndrs)
-collect (NegPatIn  pat)     	 bndrs = collect pat bndrs
 collect (ParPatIn  pat)     	 bndrs = collect pat bndrs
 collect (ListPatIn pats)    	 bndrs = foldr collect bndrs pats
 collect (TuplePatIn pats _)  	 bndrs = foldr collect bndrs pats
@@ -343,10 +330,10 @@ collect_pat (VarPatIn var)         acc = acc
 collect_pat (LitPatIn _)	   acc = acc
 collect_pat (LazyPatIn pat)        acc = collect_pat pat acc
 collect_pat (AsPatIn a pat)        acc = collect_pat pat acc
-collect_pat (NPlusKPatIn n _)      acc = acc
+collect_pat (NPatIn _)		   acc = acc
+collect_pat (NPlusKPatIn n _ _)    acc = acc
 collect_pat (ConPatIn c pats)      acc = foldr collect_pat acc pats
 collect_pat (ConOpPatIn p1 c f p2) acc = collect_pat p1 (collect_pat p2 acc)
-collect_pat (NegPatIn  pat)        acc = collect_pat pat acc
 collect_pat (ParPatIn  pat)        acc = collect_pat pat acc
 collect_pat (ListPatIn pats)       acc = foldr collect_pat acc pats
 collect_pat (TuplePatIn pats _)    acc = foldr collect_pat acc pats

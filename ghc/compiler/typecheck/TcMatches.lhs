@@ -20,8 +20,8 @@ import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
 
 import TcMonad
 import TcMonoType	( kcHsSigType, kcTyVarScope, newSigTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )
-import Inst		( Inst, LIE, plusLIE, emptyLIE, plusLIEs )
-import TcEnv		( tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars, tcGetGlobalTyVars )
+import Inst		( LIE, plusLIE, emptyLIE, plusLIEs )
+import TcEnv		( tcExtendTyVarEnv, tcExtendLocalValEnv, tcExtendGlobalTyVars )
 import TcPat		( tcPat, tcPatBndr_NoSigs, polyPatSig )
 import TcType		( TcType, newTyVarTy )
 import TcBinds		( tcBindsAndThen )
@@ -31,7 +31,7 @@ import Name		( Name )
 import TysWiredIn	( boolTy )
 
 import BasicTypes	( RecFlag(..) )
-import Type		( Kind, tyVarsOfType, isTauTy, mkFunTy, boxedTypeKind, openTypeKind )
+import Type		( tyVarsOfType, isTauTy, mkFunTy, boxedTypeKind, openTypeKind )
 import VarSet
 import Var		( Id )
 import Bag

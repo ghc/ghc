@@ -12,18 +12,18 @@ import RnExpr
 import HsSyn
 import HsPragmas
 import HsTypes		( hsTyVarNames, pprHsContext )
-import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, isRdrTyVar, mkRdrNameWkr )
+import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, mkRdrNameWkr )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
 			  extractRuleBndrsTyVars, extractHsTyRdrTyVars,
-			  extractHsTysRdrTyVars, extractHsCtxtRdrTyVars
+			  extractHsCtxtRdrTyVars
 			)
 import RnHsSyn
 import HsCore
 
-import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, unknownSigErr )
-import RnEnv		( bindTyVarsRn, lookupTopBndrRn, lookupOccRn, newIPName,
-			  lookupOrigName, lookupOrigNames, lookupSysBinder,
-			  bindLocalsRn, bindLocalRn, bindLocalsFVRn, bindUVarRn,
+import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs )
+import RnEnv		( lookupTopBndrRn, lookupOccRn, newIPName,
+			  lookupOrigNames, lookupSysBinder,
+			  bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
 			  bindCoreLocalFVRn, bindCoreLocalsFVRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames,
@@ -34,11 +34,7 @@ import RnMonad
 
 import FunDeps		( oclose )
 import Class		( FunDep )
-
-import Name		( Name, OccName,
-			  ExportFlag(..), Provenance(..), 
-			  nameOccName, NamedThing(..)
-			)
+import Name		( Name, OccName, nameOccName, NamedThing(..) )
 import NameSet
 import FiniteMap	( elemFM )
 import PrelInfo		( derivableClassKeys, cCallishClassKeys,
@@ -901,13 +897,6 @@ forAllWarn doc ty tyvar
       $$
       (ptext SLIT("In") <+> doc))
     }
-
-forAllErr doc ty tyvar
-  = addErrRn (
-      sep [ptext SLIT("The constrained type variable") <+> quotes (ppr tyvar),
-	   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
-      $$
-      (ptext SLIT("In") <+> doc))
 
 badRuleLhsErr name lhs
   = sep [ptext SLIT("Rule") <+> ptext name <> colon,

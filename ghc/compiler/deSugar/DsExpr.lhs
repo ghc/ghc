@@ -26,28 +26,25 @@ import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall, resultWrapper )
 import DsListComp	( dsListComp )
 import DsUtils		( mkErrorAppDs, mkDsLets, mkStringLit, mkStringLitFS, 
-			  mkConsExpr, mkNilExpr
+			  mkConsExpr, mkNilExpr, mkIntegerLit
 			)
 import Match		( matchWrapper, matchSimply )
 
 import CostCentre	( mkUserCC )
 import Id		( Id, idType, recordSelectorFieldLabel )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
-import DataCon		( DataCon, dataConWrapId, dataConTyCon, dataConArgTys, dataConFieldLabels )
+import DataCon		( DataCon, dataConWrapId, dataConArgTys, dataConFieldLabels )
 import DataCon		( isExistentialDataCon )
-import Literal		( Literal(..), inIntRange )
+import Literal		( Literal(..) )
 import Type		( splitFunTys,
 			  splitAlgTyConApp, splitAlgTyConApp_maybe, splitTyConApp_maybe, 
 			  isNotUsgTy, unUsgTy,
 			  splitAppTy, isUnLiftedType, Type
 			)
-import TysWiredIn	( tupleCon, listTyCon,
-			  charDataCon, charTy, stringTy,
-			  smallIntegerDataCon, isIntegerTy
-			)
+import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon, isIntegerTy )
 import BasicTypes	( RecFlag(..), Boxity(..) )
 import Maybes		( maybeToBool )
-import Unique		( hasKey, ratioTyConKey, addr2IntegerIdKey )
+import Unique		( hasKey, ratioTyConKey )
 import Util		( zipEqual, zipWithEqual )
 import Outputable
 
@@ -111,102 +108,17 @@ dsLet (MonoBind binds sigs is_rec) body
 
 %************************************************************************
 %*									*
-\subsection[DsExpr-vars-and-cons]{Variables and constructors}
+\subsection[DsExpr-vars-and-cons]{Variables, constructors, literals}
 %*									*
 %************************************************************************
 
 \begin{code}
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
-dsExpr e@(HsVar var) = returnDs (Var var)
-dsExpr e@(HsIPVar var) = returnDs (Var var)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[DsExpr-literals]{Literals}
-%*									*
-%************************************************************************
-
-We give int/float literals type @Integer@ and @Rational@, respectively.
-The typechecker will (presumably) have put \tr{from{Integer,Rational}s}
-around them.
-
-ToDo: put in range checks for when converting ``@i@''
-(or should that be in the typechecker?)
-
-For numeric literals, we try to detect there use at a standard type
-(@Int@, @Float@, etc.) are directly put in the right constructor.
-[NB: down with the @App@ conversion.]
-
-See also below where we look for @DictApps@ for \tr{plusInt}, etc.
-
-\begin{code}
-dsExpr (HsLitOut (HsString s) _)
-  | _NULL_ s
-  = returnDs (mkNilExpr charTy)
-
-  | _LENGTH_ s == 1
-  = let
-	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_INT_ s))]
-	the_nil  = mkNilExpr charTy
-	the_cons = mkConsExpr charTy the_char the_nil
-    in
-    returnDs the_cons
-
-
--- "_" => build (\ c n -> c 'c' n)	-- LATER
-
-dsExpr (HsLitOut (HsString str) _)
-  = mkStringLitFS str
-
-dsExpr (HsLitOut (HsLitLit str) ty)
-  = ASSERT( maybeToBool maybe_ty )
-    returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
-  where
-    (maybe_ty, wrap_fn) = resultWrapper ty
-    Just rep_ty 	= maybe_ty
-
-dsExpr (HsLitOut (HsInt i) ty)
-  = mkIntegerLit i
-
-
-dsExpr (HsLitOut (HsFrac r) ty)
-  = mkIntegerLit (numerator r)		`thenDs` \ num ->
-    mkIntegerLit (denominator r)	`thenDs` \ denom ->
-    returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
-  where
-    (ratio_data_con, integer_ty)
-      = case (splitAlgTyConApp_maybe ty) of
-	  Just (tycon, [i_ty], [con])
-	    -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
-	       (con, i_ty)
-
-	  _ -> (panic "ratio_data_con", panic "integer_ty")
-
-
--- others where we know what to do:
-
-dsExpr (HsLitOut (HsIntPrim i) _) 
-  = returnDs (mkIntLit i)
-
-dsExpr (HsLitOut (HsFloatPrim f) _)
-  = returnDs (mkLit (MachFloat f))
-
-dsExpr (HsLitOut (HsDoublePrim d) _)
-  = returnDs (mkLit (MachDouble d))
-    -- ToDo: range checking needed!
-
-dsExpr (HsLitOut (HsChar c) _)
-  = returnDs ( mkConApp charDataCon [mkLit (MachChar c)] )
-
-dsExpr (HsLitOut (HsCharPrim c) _)
-  = returnDs (mkLit (MachChar c))
-
-dsExpr (HsLitOut (HsStringPrim s) _)
-  = returnDs (mkLit (MachStr s))
-
--- end of literals magic. --
+dsExpr (HsVar var)	 = returnDs (Var var)
+dsExpr (HsIPVar var)     = returnDs (Var var)
+dsExpr (HsLit lit)       = dsLit lit
+-- HsOverLit has been gotten rid of by the type checker
 
 dsExpr expr@(HsLam a_Match)
   = matchWrapper LambdaMatch [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
@@ -619,7 +531,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	    let
 		(_, a_ty)  = splitAppTy (exprType expr2) -- Must be of form (m a)
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
-                                   (HsLitOut (HsString (_PK_ msg)) stringTy)
+                                   (HsLit (HsString (_PK_ msg)))
 	        msg = ASSERT2( isNotUsgTy a_ty, ppr a_ty )
                       ASSERT2( isNotUsgTy b_ty, ppr b_ty )
                       "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
@@ -649,20 +561,57 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 			ListComp -> "comprehension"
 \end{code}
 
-\begin{code}
-var_pat (WildPat _) = True
-var_pat (VarPat _) = True
-var_pat _ = False
-\end{code}
+
+%************************************************************************
+%*									*
+\subsection[DsExpr-literals]{Literals}
+%*									*
+%************************************************************************
+
+We give int/float literals type @Integer@ and @Rational@, respectively.
+The typechecker will (presumably) have put \tr{from{Integer,Rational}s}
+around them.
+
+ToDo: put in range checks for when converting ``@i@''
+(or should that be in the typechecker?)
+
+For numeric literals, we try to detect there use at a standard type
+(@Int@, @Float@, etc.) are directly put in the right constructor.
+[NB: down with the @App@ conversion.]
+
+See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
 \begin{code}
-mkIntegerLit :: Integer -> DsM CoreExpr
-mkIntegerLit i
-  | inIntRange i  	-- Small enough, so start from an Int
-  = returnDs (mkConApp smallIntegerDataCon [mkIntLit i])
+dsLit :: HsLit -> DsM CoreExpr
+dsLit (HsChar c)       = returnDs (mkConApp charDataCon [mkLit (MachChar c)])
+dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
+dsLit (HsString str)   = mkStringLitFS str
+dsLit (HsStringPrim s) = returnDs (mkLit (MachStr s))
+dsLit (HsInteger i)    = mkIntegerLit i
+dsLit (HsInt i)	       = returnDs (mkConApp intDataCon [mkIntLit i])
+dsLit (HsIntPrim i)    = returnDs (mkIntLit i)
+dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
+dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
+dsLit (HsLitLit str ty)
+  = ASSERT( maybeToBool maybe_ty )
+    returnDs (wrap_fn (mkLit (MachLitLit str rep_ty)))
+  where
+    (maybe_ty, wrap_fn) = resultWrapper ty
+    Just rep_ty 	= maybe_ty
 
-  | otherwise 		-- Big, so start from a string
-  = dsLookupGlobalValue addr2IntegerIdKey	`thenDs` \ addr2IntegerId ->
-    returnDs (App (Var addr2IntegerId) (Lit (MachStr (_PK_ (show i)))))
+dsLit (HsRat r ty)
+  = mkIntegerLit (numerator r)		`thenDs` \ num ->
+    mkIntegerLit (denominator r)	`thenDs` \ denom ->
+    returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
+  where
+    (ratio_data_con, integer_ty)
+      = case (splitAlgTyConApp_maybe ty) of
+	  Just (tycon, [i_ty], [con])
+	    -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+	       (con, i_ty)
+
+	  _ -> (panic "ratio_data_con", panic "integer_ty")
 \end{code}
+
+
 

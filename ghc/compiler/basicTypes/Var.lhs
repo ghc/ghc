@@ -173,6 +173,10 @@ newMutTyVar :: Name -> Kind -> IO TyVar
 newMutTyVar name kind = newTyVar name kind False
 
 newSigTyVar :: Name -> Kind -> IO TyVar
+-- Type variables from type signatures are still mutable, because
+-- they may get unified with type variables from other signatures
+-- But they do contain a flag to distinguish them, so we can tell if
+-- we unify them with a non-type-variable.
 newSigTyVar name kind = newTyVar name kind True
 
 newTyVar name kind is_sig

@@ -32,12 +32,11 @@ import PrelGHC		--( unsafeCoerce#, dataToTag#,
 import IO		( hPutStr, stderr )
 import PrelAddr 	( Addr(..) )
 import Addr		( intToAddr, addrToInt )
-import Storable
 import Addr		-- again ...
 import Word
 import Bits
+import Storable
 #endif
-
 
 runStgI :: [TyCon] -> [Class] -> [StgBinding] -> IO Int
 

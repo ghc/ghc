@@ -44,17 +44,17 @@ import BasicTypes	( Fixity(..), FixityDirection(..),
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import CallConv         ( cCallConv )
 import HsPragmas	( noDataPragmas, noClassPragmas )
-import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind, UsageAnn(..) )
-import IdInfo           ( ArityInfo, exactArity, CprInfo(..), InlinePragInfo(..) )
+import Type		( Kind, mkArrowKind, boxedTypeKind, openTypeKind )
+import IdInfo           ( exactArity, InlinePragInfo(..) )
 import PrimOp           ( CCall(..), CCallTarget(..) )
 import Lex		
 
 import RnMonad		( ImportVersion, ParsedIface(..), WhatsImported(..),
-			  RdrNamePragma, ExportItem, RdrAvailInfo, GenAvailInfo(..), 
+			  ExportItem, RdrAvailInfo, GenAvailInfo(..), 
                           WhetherHasOrphans, IsBootInterface
 			) 
-import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual, mkRdrNameWkr )
-import Name		( OccName, Provenance )
+import RdrName          ( RdrName, mkRdrUnqual, mkSysQual, mkSysUnqual )
+import Name		( OccName )
 import OccName          ( mkSysOccFS,
 			  tcName, varName, ipName, dataName, clsName, tvName, uvName,
 			  EncodedFS 

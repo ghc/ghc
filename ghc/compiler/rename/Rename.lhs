@@ -275,6 +275,7 @@ isOrphanDecl (RuleD (HsRule _ _ _ lhs _ _))
     check (HsVar v)   	  = not (isLocallyDefined v)
     check (HsApp f a) 	  = check f && check a
     check (HsLit _)   	  = False
+    check (HsOverLit _)	  = False
     check (OpApp l o _ r) = check l && check o && check r
     check (NegApp e _)    = check e
     check (HsPar e)	  = check e

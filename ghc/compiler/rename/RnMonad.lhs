@@ -34,9 +34,8 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
 	
 import HsSyn		
 import RdrHsSyn
-import RnHsSyn		( RenamedFixitySig, RenamedDeprecation )
+import RnHsSyn		( RenamedFixitySig )
 import BasicTypes	( Version, defaultFixity )
-import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg, Message
 			)
@@ -56,10 +55,8 @@ import NameSet
 import CmdLineOpts	( opt_D_dump_rn_trace, opt_HiMap )
 import PrelInfo		( builtinNames )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
-import Unique		( Unique, getUnique, unboundKey )
-import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM, 
-			  addListToFM_C, addToFM_C, eltsFM, fmToList
-			)
+import Unique		( Unique )
+import FiniteMap	( FiniteMap, emptyFM, bagToFM )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSupply
 import Outputable

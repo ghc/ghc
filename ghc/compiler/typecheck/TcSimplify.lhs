@@ -131,7 +131,7 @@ import TcHsSyn		( TcExpr, TcId,
 
 import TcMonad
 import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
-			  tyVarsOfInst, tyVarsOfInsts,
+			  tyVarsOfInst, 
 			  isDict, isClassDict, isMethod, notFunDep,
 			  isStdClassTyVarDict, isMethodFor,
 			  instToId, instBindingRequired, instCanBeGeneralised,
@@ -141,18 +141,18 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull,
 			  mkLIE, emptyLIE, unitLIE, consLIE, plusLIE,
-			  lieToList, listToLIE
+			  lieToList 
 			)
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv,
-			  InstEnv, lookupInstEnv, InstLookupResult(..) 
+			  lookupInstEnv, InstLookupResult(..) 
 			)
-import TcType		( TcType, TcTyVarSet )
+import TcType		( TcTyVarSet )
 import TcUnify		( unifyTauTy )
 import Id		( idType )
 import Class		( Class, classBigSig )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass )
 
-import Type		( Type, ThetaType, TauType, ClassContext,
+import Type		( Type, ClassContext,
 			  mkTyVarTy, getTyVar,
 			  isTyVarTy, splitSigmaTy, tyVarsOfTypes
 			)
@@ -1239,14 +1239,6 @@ warnDefault dicts default_ty
 	  ptext SLIT("to type") <+> quotes (ppr default_ty)
 
     (_, tidy_dicts) = mapAccumL tidyInst emptyTidyEnv dicts
-
-addRuleLhsErr dict
-  = addInstErrTcM (instLoc dict)
-	(tidy_env,
-	 vcat [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
-	       nest 4 (ptext SLIT("LHS of a rule must have no overloading"))])
-  where
-    (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 addTopIPErr dict
   = addInstErrTcM (instLoc dict) 

@@ -27,7 +27,7 @@ import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcGetValueEnv, tcGetInScopeTyVars,
                           tcExtendUVarEnv, tcLookupUVar,
 			  tcGetGlobalTyVars, valueEnvIds, 
-		 	  TyThing(..), tyThingKind, tcExtendKindEnv
+		 	  TyThing(..), tcExtendKindEnv
 			)
 import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 			  newKindVar, tcInstSigVar,
@@ -36,33 +36,33 @@ import TcType		( TcType, TcKind, TcTyVar, TcThetaType, TcTauType,
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToIdBndr,
 			  instFunDeps, instFunDepsOfTheta )
 import FunDeps		( tyVarFunDep, oclose )
-import TcUnify		( unifyKind, unifyKinds, unifyOpenTypeKind )
+import TcUnify		( unifyKind, unifyOpenTypeKind )
 import Type		( Type, Kind, PredType(..), ThetaType, UsageAnn(..),
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy, mkUsgTy,
                           mkUsForAllTy, zipFunTys, hoistForAllTys,
-			  mkSigmaTy, mkDictTy, mkPredTy, mkTyConApp,
+			  mkSigmaTy, mkPredTy, mkTyConApp,
 			  mkAppTys, splitForAllTys, splitRhoTy, mkRhoTy,
 			  boxedTypeKind, unboxedTypeKind, mkArrowKind,
 			  mkArrowKinds, getTyVar_maybe, getTyVar, splitFunTy_maybe,
 		  	  tidyOpenType, tidyOpenTypes, tidyTyVar, tidyTyVars,
-			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, mkForAllTys,
+			  tyVarsOfType, tyVarsOfPred, mkForAllTys,
 			  classesOfPreds
 			)
-import PprType		( pprConstraint, pprType, pprPred )
+import PprType		( pprType, pprPred )
 import Subst		( mkTopTyVarSubst, substTy )
 import Id		( mkVanillaId, idName, idType, idFreeTyVars )
-import Var		( TyVar, mkTyVar, tyVarKind, mkNamedUVar, varName )
+import Var		( TyVar, mkTyVar, tyVarKind, mkNamedUVar )
 import VarEnv
 import VarSet
 import ErrUtils		( Message )
 import TyCon		( TyCon, isSynTyCon, tyConArity, tyConKind )
 import Class		( ClassContext, classArity, classTyCon )
-import Name		( Name, OccName, isLocallyDefined )
+import Name		( Name, isLocallyDefined )
 import TysWiredIn	( mkListTy, mkTupleTy )
-import UniqFM		( elemUFM, foldUFM )
+import UniqFM		( elemUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
-import Util		( mapAccumL, isSingleton, removeDups )
+import Util		( mapAccumL, isSingleton )
 import Outputable
 \end{code}
 
@@ -842,8 +842,6 @@ sigPatCtxt bound_tvs bound_ids tidy_env
 
 \begin{code}
 tcsigCtxt v   = ptext SLIT("In a type signature for") <+> quotes (ppr v)
-
-typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)
 
 typeKindCtxt :: RenamedHsType -> Message
 typeKindCtxt ty = sep [ptext SLIT("When checking that"),

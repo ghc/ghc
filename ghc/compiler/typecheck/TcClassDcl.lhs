@@ -11,20 +11,18 @@ module TcClassDcl ( tcClassDecl1, tcClassDecls2, mkImplicitClassBinds,
 #include "HsVersions.h"
 
 import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
-			  InPat(..), HsBinds(..), GRHSs(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..),
-			  mkSimpleMatch,
-			  andMonoBinds, andMonoBindList, 
+			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isClassDecl, isClassOpSig, isPragSig, collectMonoBinders
 			)
-import BasicTypes	( NewOrData(..), TopLevelFlag(..), RecFlag(..) )
-import RnHsSyn		( RenamedTyClDecl, RenamedClassPragmas,
+import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
+import RnHsSyn		( RenamedTyClDecl, 
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  RenamedContext, RenamedHsDecl, RenamedSig
 			)
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 
-import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
+import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
 import TcEnv		( TcId, ValueEnv, TyThing(..), TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupTy, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
@@ -32,24 +30,20 @@ import TcEnv		( TcId, ValueEnv, TyThing(..), TyThingDetails(..), tcAddImportedId
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcMonoType	( tcHsSigType, tcClassContext, checkSigTyVars, sigCtxt, mkTcSig )
 import TcSimplify	( tcSimplifyAndCheck, bindInstsOfLocalFuns )
-import TcType		( TcType, TcTyVar, tcInstTyVars, tcGetTyVar, zonkTcSigTyVars )
+import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
 import TcMonad
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Bag		( unionManyBags, bagToList )
+import Bag		( bagToList )
 import Class		( classTyVars, classBigSig, classSelIds, classTyCon, Class, ClassOpItem )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
-import DataCon		( mkDataCon, dataConId, dataConWrapId, notMarkedStrict )
-import Id		( Id, setInlinePragma, idUnfolding, idType, idName )
+import DataCon		( mkDataCon, notMarkedStrict )
+import Id		( Id, idType, idName )
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
 import NameSet		( NameSet, mkNameSet, elemNameSet, emptyNameSet )
 import Outputable
-import Type		( Type, ThetaType, ClassContext,
-			  mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, mkDictTys,
-			  mkSigmaTy, mkClassPred, classesOfPreds,
-			  boxedTypeKind, mkArrowKind
-			)
-import Var		( tyVarKind, TyVar )
+import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkSigmaTy, mkClassPred )
+import Var		( TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
 import Maybes		( seqMaybe )
 \end{code}

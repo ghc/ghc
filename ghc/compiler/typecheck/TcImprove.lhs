@@ -4,21 +4,17 @@ module TcImprove ( tcImprove ) where
 #include "HsVersions.h"
 
 import Name		( Name )
-import Class		( Class, FunDep, className, classExtraBigSig )
-import Unify		( unifyTyListsX, matchTys )
+import Class		( Class, FunDep, className )
+import Unify		( unifyTyListsX )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
 import TcEnv		( tcGetInstEnv, classInstEnv )
 import TcMonad
-import TcType		( TcType, TcTyVar, TcTyVarSet, zonkTcType, zonkTcTypes )
+import TcType		( TcType, TcTyVarSet, zonkTcType )
 import TcUnify		( unifyTauTyLists )
-import Inst		( LIE, Inst, LookupInstResult(..),
-			  lookupInst, getFunDepsOfLIE, getIPsOfLIE,
-			  zonkLIE, zonkFunDeps {- for debugging -} )
+import Inst		( LIE, getFunDepsOfLIE, getIPsOfLIE )
 import VarSet		( VarSet, emptyVarSet, unionVarSet )
-import VarEnv		( emptyVarEnv )
 import FunDeps		( instantiateFdClassTys )
-import Outputable
-import List		( elemIndex, nub )
+import List		( nub )
 \end{code}
 
 \begin{code}
@@ -124,15 +120,6 @@ zonkEqTys ts1 ts2
   = mapTc zonkTcType ts1 `thenTc` \ ts1' ->
     mapTc zonkTcType ts2 `thenTc` \ ts2' ->
     returnTc (ts1' == ts2')
-
-zonkMatchTys ts1 free ts2
-  = mapTc zonkTcType ts1 `thenTc` \ ts1' ->
-    mapTc zonkTcType ts2 `thenTc` \ ts2' ->
-    -- pprTrace "zMT" (ppr (ts1', free, ts2')) $
-    case matchTys free ts2' ts1' of
-      Just (subst, []) -> -- pprTrace "zMT match!" empty $
-			  returnTc (Just subst)
-      Nothing -> returnTc Nothing
 
 zonkUnifyTys free ts1 ts2
   = mapTc zonkTcType ts1 `thenTc` \ ts1' ->

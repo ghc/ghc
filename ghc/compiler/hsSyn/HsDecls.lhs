@@ -21,7 +21,7 @@ module HsDecls (
 #include "HsVersions.h"
 
 -- friends:
-import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig(..), nullMonoBinds )
+import HsBinds		( HsBinds, MonoBinds, Sig(..), FixitySig(..) )
 import HsExpr		( HsExpr )
 import HsPragmas	( DataPragmas, ClassPragmas )
 import HsImpExp		( IE(..) )
@@ -29,7 +29,7 @@ import HsTypes
 import PprCore		( pprCoreRule )
 import HsCore		( UfExpr(UfVar), UfBinder, IfaceSig(..), eq_ufBinders, eq_ufExpr, pprUfExpr, toUfExpr, toUfBndr )
 import CoreSyn		( CoreRule(..) )
-import BasicTypes	( Fixity, NewOrData(..) )
+import BasicTypes	( NewOrData(..) )
 import CallConv		( CallConv, pprCallConv )
 import Name		( toRdrName )
 

@@ -18,16 +18,13 @@ import TcType		( zonkTcTypes, zonkTcTyVarToTyVar, newTyVarTy )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar )
 import TcMonoType	( kcTyVarScope, kcHsSigType, tcHsSigType, newSigTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( tcExtendLocalValEnv, newLocalId,
-			  tcExtendTyVarEnv
-			)
+import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv	)
 import Inst		( LIE, emptyLIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
 import VarSet
 import Type		( tyVarsOfTypes, openTypeKind )
 import Bag		( bagToList )
 import Outputable
-import Util
 \end{code}
 
 \begin{code}

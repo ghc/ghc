@@ -12,7 +12,7 @@ module TcDeriv ( tcDeriving ) where
 
 import HsSyn		( HsBinds(..), MonoBinds(..), collectMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
+import RnHsSyn		( RenamedHsBinds )
 import CmdLineOpts	( opt_D_dump_deriv )
 
 import TcMonad
@@ -28,20 +28,17 @@ import RnMonad		( RnNameSupply,
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
-import ErrUtils		( dumpIfSet, Message, pprBagOfErrors )
+import ErrUtils		( dumpIfSet, Message )
 import MkId		( mkDictFunId )
 import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
 import Module		( Module )
-import Name		( isLocallyDefined, getSrcLoc,
-			  Name, NamedThing(..),
-			  OccName, nameOccName
-			)
+import Name		( isLocallyDefined, getSrcLoc, NamedThing(..) )
 import RdrName		( RdrName )
 import RnMonad		( FixityEnv )
-import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
+
 import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isAlgTyCon, TyCon

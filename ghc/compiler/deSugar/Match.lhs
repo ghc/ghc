@@ -505,17 +505,13 @@ tidy1 v (DictPat dicts methods) match_result
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map VarPat (dicts ++ methods)
 
-
--- deeply ugly mangling for some (common) NPats/LitPats
-
--- LitPats: the desugarer only sees these at well-known types
-
+-- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 v pat@(LitPat lit lit_ty) match_result
-  = returnDs (tidyLitPat lit lit_ty pat, match_result)
+  = returnDs (tidyLitPat lit pat, match_result)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 tidy1 v pat@(NPat lit lit_ty _) match_result
-  = returnDs (tidyLitPat lit lit_ty pat, match_result)
+  = returnDs (tidyNPat lit lit_ty pat, match_result)
 
 -- and everything else goes through unchanged...
 

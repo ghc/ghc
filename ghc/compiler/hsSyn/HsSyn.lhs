@@ -18,7 +18,7 @@ module HsSyn (
 	module HsDecls,
 	module HsExpr,
 	module HsImpExp,
-	module HsBasic,
+	module HsLit,
 	module HsMatches,
 	module HsPat,
 	module HsTypes,
@@ -34,7 +34,7 @@ import HsDecls
 import HsBinds
 import HsExpr
 import HsImpExp
-import HsBasic
+import HsLit
 import HsMatches
 import HsPat
 import HsTypes

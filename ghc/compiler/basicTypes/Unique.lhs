@@ -77,6 +77,7 @@ module Unique (
 	enumFromToClassOpKey,
 	eqClassKey,
 	eqClassOpKey,
+	eqStringIdKey,
 	errorIdKey,
 	falseDataConKey,
 	failMClassOpKey,
@@ -141,6 +142,7 @@ module Unique (
 	parErrorIdKey,
 	parIdKey,
 	patErrorIdKey,
+	plusIntegerIdKey,
 	ratioDataConKey,
 	ratioTyConKey,
 	rationalTyConKey,
@@ -167,6 +169,7 @@ module Unique (
 	stableNameTyConKey,
 
 	statePrimTyConKey,
+	timesIntegerIdKey,
 	typeConKey,
 	kindConKey,
 	boxityConKey,
@@ -599,8 +602,7 @@ stablePtrDataConKey			= mkPreludeDataConUnique 12
 stableNameDataConKey			= mkPreludeDataConUnique 13
 trueDataConKey				= mkPreludeDataConUnique 14
 wordDataConKey				= mkPreludeDataConUnique 15
-stDataConKey				= mkPreludeDataConUnique 16
-ioDataConKey				= mkPreludeDataConUnique 17
+ioDataConKey				= mkPreludeDataConUnique 16
 \end{code}
 
 %************************************************************************
@@ -625,7 +627,7 @@ integerZeroIdKey	      = mkPreludeMiscIdUnique 12
 int2IntegerIdKey	      = mkPreludeMiscIdUnique 13
 addr2IntegerIdKey	      = mkPreludeMiscIdUnique 14
 irrefutPatErrorIdKey	      = mkPreludeMiscIdUnique 15
-lexIdKey		      = mkPreludeMiscIdUnique 16
+eqStringIdKey		      = mkPreludeMiscIdUnique 16
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 17
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 18
 parErrorIdKey		      = mkPreludeMiscIdUnique 20
@@ -649,6 +651,8 @@ returnIOIdKey		      = mkPreludeMiscIdUnique 37
 deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
 makeStablePtrIdKey	      = mkPreludeMiscIdUnique 39
 getTagIdKey		      = mkPreludeMiscIdUnique 40
+plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
+timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
 \end{code}
 
 Certain class operations from Prelude classes.  They get their own

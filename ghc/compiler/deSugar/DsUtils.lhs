@@ -10,7 +10,7 @@ module DsUtils (
 	CanItFail(..), EquationInfo(..), MatchResult(..),
         EqnNo, EqnSet,
 
-	tidyLitPat, 
+	tidyLitPat, tidyNPat,
 
 	mkDsLet, mkDsLets,
 
@@ -21,7 +21,7 @@ module DsUtils (
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 
 	mkErrorAppDs, mkNilExpr, mkConsExpr,
-	mkStringLit, mkStringLitFS,
+	mkStringLit, mkStringLitFS, mkIntegerLit, 
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector,
 
@@ -42,7 +42,7 @@ import DsMonad
 import CoreUtils	( exprType, mkIfThenElse )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
 import Id		( idType, Id, mkWildId )
-import Literal		( Literal(..) )
+import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
 import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed, 
 			  dataConStrictMarks, dataConId, splitProductType_maybe
@@ -50,27 +50,21 @@ import DataCon		( DataCon, StrictnessMark, maybeMarkedUnboxed,
 import Type		( mkFunTy, isUnLiftedType, splitAlgTyConApp, unUsgTy,
 			  Type
 			)
-import TysPrim		( intPrimTy, 
-                          charPrimTy, 
-                          floatPrimTy, 
-                          doublePrimTy,
-			  addrPrimTy, 
-                          wordPrimTy
-			)
+import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon,
 			  stringTy,
 			  unitDataConId, unitTy,
                           charTy, charDataCon, 
-                          intTy, intDataCon,
+                          intTy, intDataCon, smallIntegerDataCon, 
 			  floatTy, floatDataCon, 
-                          doubleTy, doubleDataCon, 
-                          addrTy, addrDataCon,
-                          wordTy, wordDataCon
+                          doubleTy, doubleDataCon,
+			  stringTy
 			)
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
-import Unique		( unpackCStringIdKey, unpackCStringUtf8IdKey )
+import Unique		( unpackCStringIdKey, unpackCStringUtf8IdKey, 
+			  plusIntegerIdKey, timesIntegerIdKey )
 import Outputable
 import UnicodeUtil      ( stringToUtf8 )
 \end{code}
@@ -84,46 +78,34 @@ import UnicodeUtil      ( stringToUtf8 )
 %************************************************************************
 
 \begin{code}
-tidyLitPat lit lit_ty default_pat
-  | lit_ty == charTy      = ConPat charDataCon   lit_ty [] [] [LitPat (mk_char lit)   charPrimTy]
-  | lit_ty == intTy    	  = ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
-  | lit_ty == wordTy   	  = ConPat wordDataCon   lit_ty [] [] [LitPat (mk_word lit)   wordPrimTy]
-  | lit_ty == addrTy   	  = ConPat addrDataCon   lit_ty [] [] [LitPat (mk_addr lit)   addrPrimTy]
-  | lit_ty == floatTy  	  = ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
-  | lit_ty == doubleTy 	  = ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
+tidyLitPat :: HsLit -> TypecheckedPat -> TypecheckedPat
+tidyLitPat (HsChar c) pat = ConPat charDataCon   charTy [] [] [LitPat (HsCharPrim c)   charPrimTy]
+tidyLitPat lit        pat = pat
 
-	-- Convert short string-literal patterns like "f" to 'f':[]
-  | str_lit lit           = mk_list lit
+tidyNPat :: HsLit -> Type -> TypecheckedPat -> TypecheckedPat
+tidyNPat (HsString s) _ pat
+  | _LENGTH_ s <= 1	-- Short string literals only
+  = foldr (\c pat -> ConPat consDataCon stringTy [] [] [mk_char_lit c,pat])
+	  (ConPat nilDataCon stringTy [] [] []) (_UNPK_INT_ s)
+	-- The stringTy is the type of the whole pattern, not 
+	-- the type to instantiate (:) or [] with!
+  where
+    mk_char_lit c = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim c) charPrimTy]
 
-  | otherwise = default_pat
+tidyNPat lit lit_ty default_pat
+  | lit_ty == intTy    	= ConPat intDataCon    lit_ty [] [] [LitPat (mk_int lit)    intPrimTy]
+  | lit_ty == floatTy  	= ConPat floatDataCon  lit_ty [] [] [LitPat (mk_float lit)  floatPrimTy]
+  | lit_ty == doubleTy 	= ConPat doubleDataCon lit_ty [] [] [LitPat (mk_double lit) doublePrimTy]
+  | otherwise		= default_pat
 
   where
-    mk_int    (HsInt i)      = HsIntPrim i
-    mk_int    l@(HsLitLit s) = l
+    mk_int    (HsInteger i) = HsIntPrim i
 
-    mk_char   (HsChar c)     = HsCharPrim c
-    mk_char   l@(HsLitLit s) = l
+    mk_float  (HsInteger i) = HsFloatPrim (fromInteger i)
+    mk_float  (HsRat f _)   = HsFloatPrim f
 
-    mk_word   l@(HsLitLit s) = l
-
-    mk_addr   l@(HsLitLit s) = l
-
-    mk_float  (HsInt i)      = HsFloatPrim (fromInteger i)
-    mk_float  (HsFrac f)     = HsFloatPrim f
-    mk_float  l@(HsLitLit s) = l
-
-    mk_double (HsInt i)      = HsDoublePrim (fromInteger i)
-    mk_double (HsFrac f)     = HsDoublePrim f
-    mk_double l@(HsLitLit s) = l
-
-    str_lit (HsString s)     = _LENGTH_ s <= 1	-- Short string literals only
-    str_lit _                = False
-
-    mk_list (HsString s)     = foldr
-	(\c pat -> ConPat consDataCon lit_ty [] [] [mk_char_lit c,pat])
-	(ConPat nilDataCon lit_ty [] [] []) (_UNPK_INT_ s)
-
-    mk_char_lit c            = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim c) charPrimTy]
+    mk_double (HsInteger i) = HsDoublePrim (fromInteger i)
+    mk_double (HsRat f _)   = HsDoublePrim f
 \end{code}
 
 
@@ -382,26 +364,74 @@ mkErrorAppDs err_id ty msg
     mkStringLit full_msg		`thenDs` \ core_msg ->
     returnDs (mkApps (Var err_id) [(Type . unUsgTy) ty, core_msg])
     -- unUsgTy *required* -- KSW 1999-04-07
+\end{code}
+
+
+*************************************************************
+%*									*
+\subsection{Making literals}
+%*									*
+%************************************************************************
+
+\begin{code}
+mkIntegerLit :: Integer -> DsM CoreExpr
+mkIntegerLit i
+  | inIntRange i  	-- Small enough, so start from an Int
+  = returnDs (mkSmallIntegerLit i)
+
+-- Special case for integral literals with a large magnitude:
+-- They are transformed into an expression involving only smaller
+-- integral literals. This improves constant folding.
+
+  | otherwise 		-- Big, so start from a string
+  = dsLookupGlobalValue plusIntegerIdKey	`thenDs` \ plus_id ->
+    dsLookupGlobalValue timesIntegerIdKey	`thenDs` \ times_id ->
+    let 
+        plus a b  = Var plus_id  `App` a `App` b
+        times a b = Var times_id `App` a `App` b
+
+	-- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
+	horner :: Integer -> Integer -> CoreExpr
+	horner b i | abs q <= 1 = if r == 0 || r == i 
+				  then mkSmallIntegerLit i 
+				  else mkSmallIntegerLit r `plus` mkSmallIntegerLit (i-r)
+	           | r == 0     =                   	      horner b q `times` mkSmallIntegerLit b
+	           | otherwise  = mkSmallIntegerLit r `plus` (horner b q `times` mkSmallIntegerLit b)
+  		   where
+		     (q,r) = i `quotRem` b
+
+    in
+    returnDs (horner tARGET_MAX_INT i)
+
+mkSmallIntegerLit i = mkConApp smallIntegerDataCon [mkIntLit i]
 
 mkStringLit   :: String       -> DsM CoreExpr
 mkStringLit str	= mkStringLitFS (_PK_ str)
 
 mkStringLitFS :: FAST_STRING  -> DsM CoreExpr
 mkStringLitFS str
+  | _NULL_ str
+  = returnDs (mkNilExpr charTy)
+
+  | _LENGTH_ str == 1
+  = let
+	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_INT_ str))]
+    in
+    returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
+
   | all safeChar chars
-  =
-    dsLookupGlobalValue unpackCStringIdKey	`thenDs` \ unpack_id ->
+  = dsLookupGlobalValue unpackCStringIdKey	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
   | otherwise
-  =
-    dsLookupGlobalValue unpackCStringUtf8IdKey	`thenDs` \ unpack_id ->
+  = dsLookupGlobalValue unpackCStringUtf8IdKey	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr (_PK_ (stringToUtf8 chars)))))
 
   where
     chars = _UNPK_INT_ str
     safeChar c = c >= 1 && c <= 0xFF
 \end{code}
+
 
 %************************************************************************
 %*									*

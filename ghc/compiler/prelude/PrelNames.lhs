@@ -38,7 +38,7 @@ module PrelNames
 	showString_RDR, showParen_RDR, readParen_RDR, lex_RDR,
 	showSpace_RDR, showList___RDR, readList___RDR, negate_RDR,
 	addr2Integer_RDR, ioTyCon_RDR,
-	foldr_RDR, build_RDR, getTag_RDR, 
+	foldr_RDR, build_RDR, getTag_RDR, plusInteger_RDR, timesInteger_RDR, eqString_RDR,
 
 	orderingTyCon_RDR, rationalTyCon_RDR, ratioTyCon_RDR, byteArrayTyCon_RDR,
 	mutableByteArrayTyCon_RDR, foreignObjTyCon_RDR,
@@ -73,7 +73,7 @@ module PrelNames
 
 #include "HsVersions.h"
 
-import Module	  ( Module, ModuleName, mkPrelModule, mkSrcModule )
+import Module	  ( ModuleName, mkPrelModule, mkSrcModule )
 import OccName	  ( NameSpace, varName, dataName, tcName, clsName )
 import RdrName	  ( RdrName, mkPreludeQual )
 import BasicTypes ( Boxity(..), Arity )
@@ -207,6 +207,7 @@ foldr_RDR	   = varQual pREL_BASE_Name SLIT("foldr")
 map_RDR		   = varQual pREL_BASE_Name SLIT("map")
 build_RDR	   = varQual pREL_BASE_Name SLIT("build")
 augment_RDR	   = varQual pREL_BASE_Name SLIT("augment")
+eqString_RDR	   = varQual pREL_BASE_Name SLIT("eqString")
 
 -- Strings
 unpackCString_RDR       = varQual pREL_BASE_Name SLIT("unpackCString#")
@@ -267,7 +268,9 @@ minus_RDR	   = varQual pREL_NUM_Name SLIT("-")
 negate_RDR	   = varQual pREL_NUM_Name SLIT("negate")
 plus_RDR	   = varQual pREL_NUM_Name SLIT("+")
 times_RDR	   = varQual pREL_NUM_Name SLIT("*")
-addr2Integer_RDR   = varQual pREL_NUM_Name   SLIT("addr2Integer")
+addr2Integer_RDR   = varQual pREL_NUM_Name SLIT("addr2Integer")
+plusInteger_RDR	   = varQual pREL_NUM_Name SLIT("plusInteger")
+timesInteger_RDR   = varQual pREL_NUM_Name SLIT("timesInteger")
 
 -- Other numberic classes
 realClass_RDR		= clsQual pREL_REAL_Name  SLIT("Real")

@@ -31,21 +31,21 @@ import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  HsBinds(..), StmtCtxt(..), HsType(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList
 			)
-import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
+import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkSrcUnqual )
 import RnMonad		( FixityEnv, lookupFixity )
 import BasicTypes	( RecFlag(..), Fixity(..), FixityDirection(..)
-			, maxPrecedence, defaultFixity
+			, maxPrecedence
 			, Boxity(..)
 			)
 import FieldLabel       ( fieldLabelName )
 import DataCon		( isNullaryDataCon, dataConTag,
 			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
-			  DataCon, ConTag,
+			  DataCon, 
 			  dataConFieldLabels )
 import Name		( getOccString, getOccName, getSrcLoc, occNameString, 
 			  occNameUserString, nameRdrName, varName,
-			  OccName, Name, NamedThing(..), NameSpace,
+			  Name, NamedThing(..), 
 			  isDataSymOcc, isSymOcc
 			)
 
@@ -59,7 +59,7 @@ import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
 			  floatPrimTy, doublePrimTy
 			)
 import Util		( mapAccumL, zipEqual, zipWithEqual,
-			  zipWith3Equal, nOfThem, assocDefault )
+			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool )
 import Constants
@@ -1350,7 +1350,7 @@ parenify e	     = HsPar e
 -- For some reason the renamer doesn't reassociate it right, and I can't
 -- be bothered to find out why just now.
 
-genOpApp e1 op e2 = mkOpApp e1 op e2
+genOpApp e1 op e2 = mkHsOpApp e1 op e2
 \end{code}
 
 \begin{code}

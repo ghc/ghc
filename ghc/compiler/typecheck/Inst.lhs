@@ -8,7 +8,7 @@ module Inst (
 	LIE, emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE,
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
-	Inst, OverloadedLit(..),
+	Inst, 
 	pprInst, pprInsts, pprInstsInFull, tidyInst, tidyInsts,
 
 	newDictFromOld, newDicts, newClassDicts, newDictsAtLoc,
@@ -37,13 +37,14 @@ module Inst (
 
 #include "HsVersions.h"
 
-import HsSyn	( HsLit(..), HsExpr(..) )
+import HsSyn	( HsLit(..), HsOverLit(..), HsExpr(..) )
+import RnHsSyn	( RenamedHsOverLit )
 import TcHsSyn	( TcExpr, TcId, 
 		  mkHsTyApp, mkHsDictApp, mkHsConApp, zonkId
 		)
 import TcMonad
-import TcEnv	( TcIdSet, InstEnv, tcGetInstEnv, lookupInstEnv, InstLookupResult(..),
-		  tcLookupValueByKey, tcLookupTyConByKey
+import TcEnv	( TcIdSet, tcGetInstEnv, lookupInstEnv, InstLookupResult(..),
+		  tcLookupValue, tcLookupValueByKey
 		)
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
@@ -55,33 +56,26 @@ import Class	( Class, FunDep )
 import FunDeps	( instantiateFdClassTys )
 import Id	( Id, idFreeTyVars, idType, mkUserLocal, mkSysLocal )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
-import Name	( OccName, Name, mkDictOcc, mkMethodOcc, mkIPOcc,
-		  getOccName, nameUnique )
+import Name	( mkDictOcc, mkMethodOcc, mkIPOcc, getOccName, nameUnique )
 import PprType	( pprPred )	
-import Type	( Type, PredType(..), ThetaType,
-		  mkTyVarTy, isTyVarTy, mkDictTy, mkPredTy,
+import Type	( Type, PredType(..), 
+		  isTyVarTy, mkDictTy, mkPredTy,
 		  splitForAllTys, splitSigmaTy, funArgTy,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
-		  mkSynTy, tidyOpenType, tidyOpenTypes
+		  tidyOpenType, tidyOpenTypes
 		)
 import Subst	( emptyInScopeSet, mkSubst, mkInScopeSet,
 		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
 		)
 import Literal	( inIntRange )
-import VarEnv	( lookupVarEnv, TidyEnv,
-		  lookupSubstEnv, SubstResult(..)
-		)
+import VarEnv	( TidyEnv, lookupSubstEnv, SubstResult(..) )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet )
-import TysPrim	  ( intPrimTy, floatPrimTy, doublePrimTy )
-import TysWiredIn ( intDataCon, isIntTy,
+import TysWiredIn ( isIntTy,
 		    floatDataCon, isFloatTy,
 		    doubleDataCon, isDoubleTy,
-		    integerTy, isIntegerTy,
-		    voidTy
+		    isIntegerTy, voidTy
 		  ) 
-import Unique	( fromRationalClassOpKey, rationalTyConKey,
-		  fromIntClassOpKey, fromIntegerClassOpKey, Unique
-		)
+import Unique	( Unique, hasKey, fromIntClassOpKey, fromIntegerClassOpKey )
 import Maybe	( catMaybes )
 import Util	( thenCmp, zipWithEqual, mapAccumL )
 import Outputable
@@ -166,8 +160,8 @@ data Inst
 
   | LitInst
 	Unique
-	OverloadedLit
-	TcType		-- The type at which the literal is used
+	RenamedHsOverLit	-- The literal from the occurrence site
+	TcType			-- The type at which the literal is used
 	InstLoc
 
   | FunDep
@@ -175,10 +169,6 @@ data Inst
 	Class		-- the class from which this arises
 	[FunDep TcType]
 	InstLoc
-
-data OverloadedLit
-  = OverloadedIntegral	 Integer	-- The number
-  | OverloadedFractional Rational	-- The number
 \end{code}
 
 Ordering
@@ -203,17 +193,14 @@ cmpInst (Method _ _ _ _ _ _) 	  (Dict _ _ _)	  	    = GT
 cmpInst (Method _ id1 tys1 _ _ _) (Method _ id2 tys2 _ _ _) = (id1 `compare` id2) `thenCmp` (tys1 `compare` tys2)
 cmpInst (Method _ _ _ _ _ _)      other			    = LT
 
-cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `cmpOverLit` lit2) `thenCmp` (ty1 `compare` ty2)
+cmpInst (LitInst _ lit1 ty1 _)	  (LitInst _ lit2 ty2 _)    = (lit1 `compare` lit2) `thenCmp` (ty1 `compare` ty2)
 cmpInst (LitInst _ _ _ _)	  (FunDep _ _ _ _)	    = LT
 cmpInst (LitInst _ _ _ _)	  other 		    = GT
 
 cmpInst (FunDep _ clas1 fds1 _)   (FunDep _ clas2 fds2 _)   = (clas1 `compare` clas2) `thenCmp` (fds1 `compare` fds2)
 cmpInst (FunDep _ _ _ _)	  other			    = GT
 
-cmpOverLit (OverloadedIntegral   i1) (OverloadedIntegral   i2) = i1 `compare` i2
-cmpOverLit (OverloadedFractional f1) (OverloadedFractional f2) = f1 `compare` f2
-cmpOverLit (OverloadedIntegral _)    (OverloadedFractional _)  = LT
-cmpOverLit (OverloadedFractional _)  (OverloadedIntegral _)    = GT
+-- and they can only have HsInt or HsFracs in them.
 \end{code}
 
 
@@ -425,10 +412,10 @@ cases (the rest are caught in lookupInst).
 
 \begin{code}
 newOverloadedLit :: InstOrigin
-		 -> OverloadedLit
+		 -> RenamedHsOverLit
 		 -> TcType
 		 -> NF_TcM s (TcExpr, LIE)
-newOverloadedLit orig (OverloadedIntegral i) ty
+newOverloadedLit orig (HsIntegral i _) ty
   | isIntTy ty && inIntRange i		-- Short cut for Int
   = returnNF_Tc (int_lit, emptyLIE)
 
@@ -436,9 +423,8 @@ newOverloadedLit orig (OverloadedIntegral i) ty
   = returnNF_Tc (integer_lit, emptyLIE)
 
   where
-    intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
-    integer_lit    = HsLitOut (HsInt i) integerTy
-    int_lit        = mkHsConApp intDataCon [] [intprim_lit]
+    int_lit     = HsLit (HsInt i)
+    integer_lit = HsLit (HsInteger i)
 
 newOverloadedLit orig lit ty		-- The general case
   = tcGetInstLoc orig		`thenNF_Tc` \ loc ->
@@ -532,7 +518,6 @@ zonkInst (FunDep u clas fds loc)
   = zonkFunDeps fds			`thenNF_Tc` \ fds' ->
     returnNF_Tc (FunDep u clas fds' loc)
 
-zonkPreds preds = mapNF_Tc zonkPred preds
 zonkInsts insts = mapNF_Tc zonkInst insts
 
 zonkFunDeps fds = mapNF_Tc zonkFd fds
@@ -561,12 +546,7 @@ instance Outputable Inst where
     ppr inst = pprInst inst
 
 pprInst (LitInst u lit ty loc)
-  = hsep [case lit of
-	      OverloadedIntegral   i -> integer i
-	      OverloadedFractional f -> rational f,
-	   ptext SLIT("at"),
-	   ppr ty,
-	   show_uniq u]
+  = hsep [ppr lit, ptext SLIT("at"), ppr ty, show_uniq u]
 
 pprInst (Dict u pred loc) = pprPred pred <+> show_uniq u
 
@@ -644,7 +624,7 @@ lookupInst dict@(Dict _ (Class clas tys) loc)
 		(tyvars, rho) = splitForAllTys (idType dfun_id)
 		ty_args	      = map subst_tv tyvars
 		dfun_rho      = substTy subst rho
-		(theta, tau)  = splitRhoTy dfun_rho
+		(theta, _)    = splitRhoTy dfun_rho
 		ty_app        = mkHsTyApp (HsVar dfun_id) ty_args
 		subst_tv tv   = case lookupSubstEnv tenv tv of
 				   Just (DoneTy ty)  -> ty
@@ -670,7 +650,7 @@ lookupInst inst@(Method _ id tys theta _ loc)
 
 -- Literals
 
-lookupInst inst@(LitInst u (OverloadedIntegral i) ty loc)
+lookupInst inst@(LitInst u (HsIntegral i from_integer_name) ty loc)
   | isIntTy ty && in_int_range			-- Short cut for Int
   = returnNF_Tc (GenInst [] int_lit)
 	-- GenInst, not SimpleInst, because int_lit is actually a constructor application
@@ -678,42 +658,45 @@ lookupInst inst@(LitInst u (OverloadedIntegral i) ty loc)
   | isIntegerTy ty				-- Short cut for Integer
   = returnNF_Tc (GenInst [] integer_lit)
 
-  | in_int_range				-- It's overloaded but small enough to fit into an Int
-  = tcLookupValueByKey fromIntClassOpKey	`thenNF_Tc` \ from_int ->
+  | in_int_range 				-- It's overloaded but small enough to fit into an Int
+  && from_integer_name `hasKey` fromIntegerClassOpKey	-- And it's the built-in prelude fromInteger
+							-- (i.e. no funny business with user-defined
+							--  packages of numeric classes)
+  =	-- So we can use the Prelude fromInt 
+    tcLookupValueByKey fromIntClassOpKey	`thenNF_Tc` \ from_int ->
     newMethodAtLoc loc from_int [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) int_lit))
 
   | otherwise   				-- Alas, it is overloaded and a big literal!
-  = tcLookupValueByKey fromIntegerClassOpKey	`thenNF_Tc` \ from_integer ->
+  = tcLookupValue from_integer_name		`thenNF_Tc` \ from_integer ->
     newMethodAtLoc loc from_integer [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) integer_lit))
   where
     in_int_range   = inIntRange i
-    intprim_lit    = HsLitOut (HsIntPrim i) intPrimTy
-    integer_lit    = HsLitOut (HsInt i) integerTy
-    int_lit        = mkHsConApp intDataCon [] [intprim_lit]
+    integer_lit    = HsLit (HsInteger i)
+    int_lit        = HsLit (HsInt i)
 
 -- similar idea for overloaded floating point literals: if the literal is
 -- *definitely* a float or a double, generate the real thing here.
 -- This is essential  (see nofib/spectral/nucleic).
 
-lookupInst inst@(LitInst u (OverloadedFractional f) ty loc)
+lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
   | isFloatTy ty    = returnNF_Tc (GenInst [] float_lit)
   | isDoubleTy ty   = returnNF_Tc (GenInst [] double_lit)
 
   | otherwise 
-  = tcLookupValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
+  = tcLookupValue from_rat_name			`thenNF_Tc` \ from_rational ->
     newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
 	rational_ty  = funArgTy (idType method_id)
-	rational_lit = HsLitOut (HsFrac f) rational_ty
+	rational_lit = HsLit (HsRat f rational_ty)
     in
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rational_lit))
 
   where
-    floatprim_lit  = HsLitOut (HsFloatPrim f) floatPrimTy
+    floatprim_lit  = HsLit (HsFloatPrim f)
     float_lit      = mkHsConApp floatDataCon [] [floatprim_lit]
-    doubleprim_lit = HsLitOut (HsDoublePrim f) doublePrimTy
+    doubleprim_lit = HsLit (HsDoublePrim f)
     double_lit     = mkHsConApp doubleDataCon [] [doubleprim_lit]
 
 -- there are no `instances' of functional dependencies or implicit params

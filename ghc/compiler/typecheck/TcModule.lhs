@@ -15,20 +15,19 @@ import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_types, opt_PprStyle_Debug )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
 import HsTypes		( toHsType )
 import RnHsSyn		( RenamedHsModule )
-import TcHsSyn		( TcMonoBinds, TypecheckedMonoBinds, 
+import TcHsSyn		( TypecheckedMonoBinds, 
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkForeignExports, zonkRules
 			)
 
 import TcMonad
-import Inst		( Inst, emptyLIE, plusLIE )
+import Inst		( emptyLIE, plusLIE )
 import TcBinds		( tcTopBindsAndThen )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
-import TcEnv		( tcExtendGlobalValEnv, tcExtendTypeEnv,
+import TcEnv		( tcExtendGlobalValEnv, 
 			  getEnvTyCons, getEnvClasses, tcLookupValueByKeyMaybe,
-			  tcSetValueEnv, tcSetInstEnv,
-			  initEnv, 
+			  tcSetValueEnv, tcSetInstEnv, initEnv, 
 			  ValueEnv, 
 			)
 import TcRules		( tcRules )
@@ -39,21 +38,20 @@ import TcInstUtil	( buildInstanceEnv, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
-import TcType		( TcType, TcKind )
 
 import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
-import ErrUtils		( Message, printErrorsAndWarnings, dumpIfSet )
-import Id		( Id, idType, idName )
+import ErrUtils		( printErrorsAndWarnings, dumpIfSet )
+import Id		( idType, idName )
 import Module           ( pprModuleName, mkThisModule )
-import Name		( Name, nameUnique, nameOccName, isLocallyDefined, isGlobalName,
-			  toRdrName, nameEnvElts, NamedThing(..)
+import Name		( nameOccName, isLocallyDefined, isGlobalName,
+			  toRdrName, nameEnvElts, 
 			)
 import OccName		( isSysOcc )
-import TyCon		( TyCon, tyConKind, tyConClass_maybe )
-import Class		( Class, classSelIds, classTyCon )
+import TyCon		( TyCon, tyConClass_maybe )
+import Class		( Class )
 import PrelInfo		( mAIN_Name )
-import Unique		( Unique, mainKey )
+import Unique		( mainKey )
 import UniqSupply       ( UniqSupply )
 import Maybes		( maybeToBool )
 import Util

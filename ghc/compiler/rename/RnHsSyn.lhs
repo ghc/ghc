@@ -15,7 +15,6 @@ import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import Name		( Name, getName )
 import NameSet
 import BasicTypes	( Boxity )
-import Util
 import Outputable
 \end{code}
 
@@ -47,6 +46,7 @@ type RenamedSig			= Sig			Name
 type RenamedStmt		= Stmt			Name RenamedPat
 type RenamedFixitySig		= FixitySig		Name
 type RenamedDeprecation		= DeprecDecl		Name
+type RenamedHsOverLit		= HsOverLit		Name
 
 type RenamedClassOpPragmas	= ClassOpPragmas	Name
 type RenamedClassPragmas	= ClassPragmas		Name

@@ -45,11 +45,10 @@ module TcMonad(
 
 import {-# SOURCE #-} TcEnv  ( TcEnv )
 
-import HsSyn		( HsLit )
-import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
+import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr, RenamedHsOverLit )
 import Type		( Type, Kind, PredType, ThetaType, RhoType, TauType,
 			)
-import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, pprBagOfErrors, ErrMsg, Message, WarnMsg )
+import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 import CmdLineOpts      ( opt_PprStyle_Debug )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
@@ -57,7 +56,7 @@ import Bag		( Bag, emptyBag, isEmptyBag,
 import Class		( Class )
 import Name		( Name )
 import Var		( Id, TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
-import VarEnv		( TyVarEnv, emptyVarEnv, TidyEnv, emptyTidyEnv )
+import VarEnv		( TidyEnv, emptyTidyEnv )
 import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 			  UniqSM, initUs_ )
@@ -659,7 +658,7 @@ data InstOrigin
 
   | InstanceDeclOrigin		-- Typechecking an instance decl
 
-  | LiteralOrigin HsLit		-- Occurrence of a literal
+  | LiteralOrigin RenamedHsOverLit	-- Occurrence of a literal
 
   | PatOrigin RenamedPat
 

@@ -678,6 +678,8 @@ ClassPred and ClassContext are used in class and instance declarations.
 %************************************************************************
 
 \begin{code}
+-- f :: (C a, ?x :: Int -> Int) => a -> Int
+-- Here the "C a" and "?x :: Int -> Int" are Preds
 data PredType  = Class  Class [Type]
 	       | IParam Name  Type
 	       deriving( Eq, Ord )

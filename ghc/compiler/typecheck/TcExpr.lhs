@@ -9,20 +9,17 @@ module TcExpr ( tcApp, tcExpr, tcPolyExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsBinds(..), MonoBinds(..), Stmt(..), StmtCtxt(..),
-			  mkMonoBind, nullMonoBinds
+			  MonoBinds(..), StmtCtxt(..),
+			  mkMonoBind, nullMonoBinds 
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, mkHsConApp,
-			  mkHsTyApp, mkHsLet
-			)
+import TcHsSyn		( TcExpr, TcRecordBinds, mkHsTyApp, mkHsLet )
 
 import TcMonad
 import BasicTypes	( RecFlag(..) )
 
-import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
-			  LIE, emptyLIE, unitLIE, consLIE, plusLIE, plusLIEs,
-			  lieToList, listToLIE,
+import Inst		( InstOrigin(..), 
+			  LIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethod, newIPDict,
 			  instOverloadedFun, newDicts, newClassDicts,
 			  getIPsOfLIE, instToId, ipToId
@@ -36,24 +33,21 @@ import TcEnv		( tcInstId,
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
 import TcMonoType	( tcHsSigType, checkSigTyVars, sigCtxt )
-import TcPat		( badFieldCon )
-import TcSimplify	( tcSimplify, tcSimplifyAndCheck, partitionPredsOfLIE )
+import TcPat		( badFieldCon, simpleHsLitTy )
+import TcSimplify	( tcSimplifyAndCheck, partitionPredsOfLIE )
 import TcImprove	( tcImprove )
 import TcType		( TcType, TcTauType,
 			  tcInstTyVars,
 			  tcInstTcType, tcSplitRhoTy,
 			  newTyVarTy, newTyVarTys, zonkTcType )
 
-import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
-import Id		( idType, recordSelectorFieldLabel, isRecordSelector,
-			  Id, mkVanillaId
-			)
+import FieldLabel	( fieldLabelName, fieldLabelType, fieldLabelTyCon )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector, mkVanillaId )
 import DataCon		( dataConFieldLabels, dataConSig, 
 			  dataConStrictMarks, StrictnessMark(..)
 			)
 import Name		( Name, getName )
-import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
-			  ipName_maybe,
+import Type		( mkFunTy, mkAppTy, mkTyVarTys, ipName_maybe,
 			  splitFunTy_maybe, splitFunTys, isNotUsgTy,
 			  mkTyConApp, splitSigmaTy, 
 			  splitRhoTy,
@@ -65,12 +59,8 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys,
 import TyCon		( TyCon, tyConTyVars )
 import Subst		( mkTopTyVarSubst, substClasses, substTy )
 import UsageSPUtils     ( unannotTy )
-import VarSet		( emptyVarSet, unionVarSet, elemVarSet, mkVarSet )
-import TyCon		( tyConDataCons )
-import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
-			  floatPrimTy, addrPrimTy
-			)
-import TysWiredIn	( boolTy, charTy, stringTy )
+import VarSet		( elemVarSet, mkVarSet )
+import TysWiredIn	( boolTy )
 import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
 import Unique		( cCallableClassKey, cReturnableClassKey, 
 			  enumFromClassOpKey, enumFromThenClassOpKey,
@@ -207,88 +197,17 @@ tcMonoExpr (HsIPVar name) res_ty
 
 %************************************************************************
 %*									*
-\subsection{Literals}
-%*									*
-%************************************************************************
-
-Overloaded literals.
-
-\begin{code}
-tcMonoExpr (HsLit (HsInt i)) res_ty
-  = newOverloadedLit (LiteralOrigin (HsInt i))
-		     (OverloadedIntegral i)
-		     res_ty  `thenNF_Tc` \ stuff ->
-    returnTc stuff
-
-tcMonoExpr (HsLit (HsFrac f)) res_ty
-  = newOverloadedLit (LiteralOrigin (HsFrac f))
-		     (OverloadedFractional f)
-		     res_ty  `thenNF_Tc` \ stuff ->
-    returnTc stuff
-
-
-tcMonoExpr (HsLit lit@(HsLitLit s)) res_ty
-  = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
-    newClassDicts (LitLitOrigin (_UNPK_ s))
-	          [(cCallableClass,[res_ty])]		`thenNF_Tc` \ (dicts, _) ->
-    returnTc (HsLitOut lit res_ty, dicts)
-\end{code}
-
-Primitive literals:
-
-\begin{code}
-tcMonoExpr (HsLit lit@(HsCharPrim c)) res_ty
-  = unifyTauTy res_ty charPrimTy		`thenTc_`
-    returnTc (HsLitOut lit charPrimTy, emptyLIE)
-
-tcMonoExpr (HsLit lit@(HsStringPrim s)) res_ty
-  = unifyTauTy res_ty addrPrimTy		`thenTc_`
-    returnTc (HsLitOut lit addrPrimTy, emptyLIE)
-
-tcMonoExpr (HsLit lit@(HsIntPrim i)) res_ty
-  = unifyTauTy res_ty intPrimTy		`thenTc_`
-    returnTc (HsLitOut lit intPrimTy, emptyLIE)
-
-tcMonoExpr (HsLit lit@(HsFloatPrim f)) res_ty
-  = unifyTauTy res_ty floatPrimTy		`thenTc_`
-    returnTc (HsLitOut lit floatPrimTy, emptyLIE)
-
-tcMonoExpr (HsLit lit@(HsDoublePrim d)) res_ty
-  = unifyTauTy res_ty doublePrimTy		`thenTc_`
-    returnTc (HsLitOut lit doublePrimTy, emptyLIE)
-\end{code}
-
-Unoverloaded literals:
-
-\begin{code}
-tcMonoExpr (HsLit lit@(HsChar c)) res_ty
-  = unifyTauTy res_ty charTy		`thenTc_`
-    returnTc (HsLitOut lit charTy, emptyLIE)
-
-tcMonoExpr (HsLit lit@(HsString str)) res_ty
-  = unifyTauTy res_ty stringTy 		`thenTc_`
-    returnTc (HsLitOut lit stringTy, emptyLIE)
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{Other expression forms}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcMonoExpr (HsPar expr) res_ty -- preserve parens so printing needn't guess where they go
-  = tcMonoExpr expr res_ty
+tcMonoExpr (HsLit lit)     res_ty = tcLit lit res_ty
+tcMonoExpr (HsOverLit lit) res_ty = newOverloadedLit (LiteralOrigin lit) lit res_ty
+tcMonoExpr (HsPar expr)    res_ty = tcMonoExpr expr res_ty
 
--- perform the negate *before* overloading the integer, since the case
--- of minBound on Ints fails otherwise.  Could be done elsewhere, but
--- convenient to do it here.
-
-tcMonoExpr (NegApp (HsLit (HsInt i)) neg) res_ty
-  = tcMonoExpr (HsLit (HsInt (-i))) res_ty
-
-tcMonoExpr (NegApp expr neg) res_ty 
-  = tcMonoExpr (HsApp neg expr) res_ty
+tcMonoExpr (NegApp expr neg) res_ty
+  = tcMonoExpr (HsApp (HsVar neg) expr) res_ty
 
 tcMonoExpr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenTc` \ (match',lie) ->
@@ -1079,12 +998,36 @@ tcMonoExprs (expr:exprs) (ty:tys)
 \end{code}
 
 
-% =================================================
+%************************************************************************
+%*									*
+\subsection{Literals}
+%*									*
+%************************************************************************
 
-Errors and contexts
-~~~~~~~~~~~~~~~~~~~
+Overloaded literals.
+
+\begin{code}
+tcLit :: HsLit -> TcType -> TcM s (TcExpr, LIE)
+tcLit (HsLitLit s _) res_ty
+  = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
+    newClassDicts (LitLitOrigin (_UNPK_ s))
+	          [(cCallableClass,[res_ty])]		`thenNF_Tc` \ (dicts, _) ->
+    returnTc (HsLit (HsLitLit s res_ty), dicts)
+
+tcLit lit res_ty 
+  = unifyTauTy res_ty (simpleHsLitTy lit)		`thenTc_`
+    returnTc (HsLit lit, emptyLIE)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Errors and contexts}
+%*									*
+%************************************************************************
 
 Mini-utils:
+
 \begin{code}
 pp_nest_hang :: String -> SDoc -> SDoc
 pp_nest_hang lbl stuff = nest 2 (hang (text lbl) 4 stuff)
@@ -1140,9 +1083,6 @@ lurkingRank2Err fun fun_ty
 	 4 (vcat [ptext SLIT("It is applied to too few arguments"),  
 		  ptext SLIT("so that the result type has for-alls in it")])
 
-rank2ArgCtxt arg expected_arg_ty
-  = ptext SLIT("In a polymorphic function argument:") <+> ppr arg
-
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))
 	 4 (pprQuotedList fields)
@@ -1154,15 +1094,6 @@ recordConCtxt expr = ptext SLIT("In the record construction:") <+> ppr expr
 
 notSelector field
   = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
-
-illegalCcallTyErr isArg ty
-  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, ptext SLIT("type in _ccall_ or _casm_:")])
-	 4 (hsep [ppr ty])
-  where
-   arg_or_res
-    | isArg     = ptext SLIT("argument")
-    | otherwise = ptext SLIT("result")
-
 
 missingStrictFieldCon :: Name -> Name -> SDoc
 missingStrictFieldCon con field

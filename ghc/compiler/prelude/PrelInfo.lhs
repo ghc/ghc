@@ -46,11 +46,7 @@ import TysWiredIn
 
 -- others:
 import RdrName		( RdrName )
-import Name		( Name, OccName, Provenance(..), 
-			  NameSpace, tcName, clsName, varName, dataName,
-			  mkKnownKeyGlobal,
-			  getName, mkGlobalName, nameRdrName
-			)
+import Name		( Name, mkKnownKeyGlobal, getName )
 import Class		( Class, classKey )
 import TyCon		( tyConDataConsIfAvailable, TyCon )
 import Type		( funTyCon )
@@ -290,6 +286,9 @@ knownKeyNames
 
 	-- Others
     , (otherwiseId_RDR,		otherwiseIdKey)
+    , (plusInteger_RDR,		plusIntegerIdKey)
+    , (timesInteger_RDR,	timesIntegerIdKey)
+    , (eqString_RDR,		eqStringIdKey)
     , (assert_RDR,		assertIdKey)
     , (runSTRep_RDR,		runSTRepIdKey)
     ]
@@ -371,7 +370,6 @@ because the list of ambiguous dictionaries hasn't been simplified.
 isCcallishClass, isCreturnableClass, isNoDictClass, 
   isNumericClass, isStandardClass :: Class -> Bool
 
-isFractionalClass  clas = classKey clas `is_elem` fractionalClassKeys
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
 isCcallishClass	   clas = classKey clas `is_elem` cCallishClassKeys

@@ -8,15 +8,14 @@ module MkIface ( writeIface  ) where
 
 #include "HsVersions.h"
 
-import IO		( Handle, hPutStr, openFile, 
-			  hClose, hPutStrLn, IOMode(..) )
+import IO		( openFile, hClose, IOMode(..) )
 
 import HsSyn
 import HsCore		( HsIdInfo(..), toUfExpr )
 import RdrHsSyn		( RdrNameRuleDecl )
 import HsPragmas	( DataPragmas(..), ClassPragmas(..) )
 import HsTypes		( toHsTyVars )
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..),
+import BasicTypes	( Fixity(..), NewOrData(..),
 			  Version, bumpVersion, initialVersion, isLoopBreaker
 			)
 import RnMonad
@@ -30,18 +29,18 @@ import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBindi
 import Var		( isId )
 import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
-import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..), InlinePragInfo(..), 
+import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo(..), 
 			  CprInfo(..), CafInfo(..),
 			  inlinePragInfo, arityInfo, arityLowerBound,
 			  strictnessInfo, isBottomingStrictness,
 			  cafInfo, specInfo, cprInfo, 
 			  occInfo, isNeverInlinePrag,
-			  workerExists, workerInfo, WorkerInfo(..)
+			  workerInfo, WorkerInfo(..)
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), isBuiltinRule, rulesRules, rulesRhsFreeVars )
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
 import CoreUnfold	( okToUnfoldInHiFile, couldBeSmallEnoughToInline )
-import Module		( moduleString, pprModule, pprModuleName, moduleUserString )
+import Module		( pprModuleName, moduleUserString )
 import Name		( isLocallyDefined, isWiredInName, toRdrName, nameModule,
 			  Name, NamedThing(..)
 			)
@@ -49,20 +48,17 @@ import OccName		( OccName, pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
 			)
-import Class		( Class, classExtraBigSig )
-import FieldLabel	( fieldLabelName, fieldLabelType )
+import Class		( classExtraBigSig )
+import FieldLabel	( fieldLabelType )
 import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
-			  deNoteType, classesToPreds,
-			  Type, ThetaType, PredType(..), ClassContext
+			  deNoteType, classesToPreds
 		        )
 
-import PprType
-import Rules		( pprProtoCoreRule, ProtoCoreRule(..) )
+import Rules		( ProtoCoreRule(..) )
 
-import Bag		( bagToList, isEmptyBag )
-import Maybes		( catMaybes, maybeToBool )
+import Bag		( bagToList )
 import UniqFM		( lookupUFM, listToUFM )
-import Util		( sortLt, mapAccumL )
+import Util		( sortLt )
 import SrcLoc		( noSrcLoc )
 import Bag
 import Outputable
@@ -153,7 +149,7 @@ checkIface (Just iface) new_iface
 
   | otherwise		-- Add updated version numbers
   = do { dumpIfSet opt_D_dump_hi_diffs "Interface file changes" pp_diffs ;
-	 return (Just new_iface )}
+	 return (Just final_iface )}
 	
   where
     final_iface = new_iface { pi_vers = new_mod_vers,
@@ -669,13 +665,6 @@ ifaceId get_idinfo is_rec id rhs
 
     find_fvs expr = exprSomeFreeVars interestingId expr
 
-    ------------ Sanity checking --------------
-	-- The arity of a wrapper function should match its strictness,
-	-- or else an importing module will get very confused indeed.
-    arity_matches_strictness 
-       = case work_info of
-	     HasWorker _ wrap_arity -> wrap_arity == arityLowerBound arity_info
-	     other		    -> True
     
 interestingId id = isId id && isLocallyDefined id && not (hasNoBinding id)
 \end{code}

@@ -24,14 +24,12 @@ import DsGRHSs		( dsGuarded )
 import DsUtils
 import Match		( matchWrapper )
 
-import CmdLineOpts	( opt_SccProfilingOn, opt_AutoSccsOnAllToplevs, 
-			  opt_AutoSccsOnExportedToplevs, opt_AutoSccsOnDicts
-		        )
-import CostCentre	( CostCentre, mkAutoCC, IsCafCC(..) )
+import CmdLineOpts	( opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )
+import CostCentre	( mkAutoCC, IsCafCC(..) )
 import Id		( idType, idName, isUserExportedId, isSpecPragmaId, Id )
 import NameSet
 import VarSet
-import Type		( mkTyVarTy, isDictTy )
+import Type		( mkTyVarTy )
 import Subst		( mkTyVarSubst, substTy )
 import TysWiredIn	( voidTy )
 import Outputable
@@ -200,7 +198,7 @@ addAutoScc :: AutoScc		-- if needs be, decorate toplevs?
 	   -> DsM (Id, CoreExpr)
 
 addAutoScc (TopLevelAddSccs auto_scc_fn) pair@(bndr, core_expr) 
- | do_auto_scc && worthSCC core_expr
+ | do_auto_scc
      = getModuleDs `thenDs` \ mod ->
        returnDs (bndr, mkSCC (mkAutoCC top_bndr mod NotCafCC) core_expr)
  where do_auto_scc = isJust maybe_auto_scc
@@ -209,9 +207,6 @@ addAutoScc (TopLevelAddSccs auto_scc_fn) pair@(bndr, core_expr)
 
 addAutoScc _ pair
      = returnDs pair
-
-noUserSCC (Note (SCC _) _) = False
-worthSCC core_expr         = True
 \end{code}
 
 If profiling and dealing with a dict binding,

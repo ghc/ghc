@@ -31,7 +31,7 @@ module RdrName (
 #include "HsVersions.h"
 
 import OccName	( NameSpace, tcName,
-		  OccName,
+		  OccName, UserFS,
 		  mkSysOccFS,
 		  mkSrcOccFS, mkSrcVarOcc,
 		  isDataOcc, isTvOcc, mkWorkerOcc
@@ -89,8 +89,8 @@ mkRdrQual mod occ = RdrName (Qual mod) occ
 mkSrcUnqual :: NameSpace -> FAST_STRING -> RdrName
 mkSrcUnqual sp n = RdrName Unqual (mkSrcOccFS sp n)
 
-mkSrcQual :: NameSpace -> FAST_STRING -> FAST_STRING -> RdrName
-mkSrcQual sp m n = RdrName (Qual (mkSrcModuleFS m)) (mkSrcOccFS sp n)
+mkSrcQual :: NameSpace -> (UserFS, UserFS) -> RdrName
+mkSrcQual sp (m, n) = RdrName (Qual (mkSrcModuleFS m)) (mkSrcOccFS sp n)
 
 	-- These two are used when parsing interface files
 	-- They do not encode the module and occurrence name

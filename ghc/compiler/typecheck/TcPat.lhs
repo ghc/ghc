@@ -4,16 +4,16 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcPatBndr_NoSigs, badFieldCon, polyPatSig ) where
+module TcPat ( tcPat, tcPatBndr_NoSigs, simpleHsLitTy, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsExpr(..), Sig(..) )
+import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsOverLit(..), HsExpr(..) )
 import RnHsSyn		( RenamedPat )
 import TcHsSyn		( TcPat, TcId )
 
 import TcMonad
-import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
+import Inst		( InstOrigin(..),
 			  emptyLIE, plusLIE, LIE,
 			  newMethod, newOverloadedLit, newDicts, newClassDicts
 			)
@@ -27,18 +27,18 @@ import TcMonoType	( tcHsSigType )
 import TcUnify 		( unifyTauTy, unifyListTy, unifyTupleTy	)
 
 import CmdLineOpts	( opt_IrrefutableTuples )
-import DataCon		( DataCon, dataConSig, dataConFieldLabels, 
+import DataCon		( dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
 			)
-import Id		( Id, idType, isDataConWrapId_maybe )
-import Type		( Type, isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
+import Id		( isDataConWrapId_maybe )
+import Type		( isTauTy, mkTyConApp, mkClassPred, boxedTypeKind )
 import Subst		( substTy, substClasses )
 import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
 			  doublePrimTy, addrPrimTy
 			)
-import TysWiredIn	( charTy, stringTy, intTy )
-import Unique		( eqClassOpKey, geClassOpKey, minusClassOpKey,
-			  cCallableClassKey
+import TysWiredIn	( charTy, stringTy, intTy, integerTy )
+import Unique		( eqClassOpKey, geClassOpKey, 
+			  cCallableClassKey, eqStringIdKey,
 			)
 import BasicTypes	( isBoxed )
 import Bag
@@ -121,16 +121,6 @@ tcPat tc_bndr pat_in@(AsPatIn name pat) pat_ty
 
 tcPat tc_bndr WildPatIn pat_ty
   = returnTc (WildPat pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
-
-tcPat tc_bndr (NegPatIn pat) pat_ty
-  = tcPat tc_bndr (negate_lit pat) pat_ty
-  where
-    negate_lit (LitPatIn (HsInt  i))       = LitPatIn (HsInt  (-i))
-    negate_lit (LitPatIn (HsIntPrim i))    = LitPatIn (HsIntPrim (-i))
-    negate_lit (LitPatIn (HsFrac f))       = LitPatIn (HsFrac (-f))
-    negate_lit (LitPatIn (HsFloatPrim f))  = LitPatIn (HsFloatPrim (-f))
-    negate_lit (LitPatIn (HsDoublePrim f)) = LitPatIn (HsDoublePrim (-f))
-    negate_lit _                           = panic "TcPat:negate_pat"
 
 tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty
@@ -267,71 +257,65 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
 
 %************************************************************************
 %*									*
-\subsection{Non-overloaded literals}
+\subsection{Literals}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcPat tc_bndr (LitPatIn lit@(HsChar _))       pat_ty = tcSimpleLitPat lit charTy       pat_ty
-tcPat tc_bndr (LitPatIn lit@(HsIntPrim _))    pat_ty = tcSimpleLitPat lit intPrimTy    pat_ty
-tcPat tc_bndr (LitPatIn lit@(HsCharPrim _))   pat_ty = tcSimpleLitPat lit charPrimTy   pat_ty
-tcPat tc_bndr (LitPatIn lit@(HsStringPrim _)) pat_ty = tcSimpleLitPat lit addrPrimTy   pat_ty
-tcPat tc_bndr (LitPatIn lit@(HsFloatPrim _))  pat_ty = tcSimpleLitPat lit floatPrimTy  pat_ty
-tcPat tc_bndr (LitPatIn lit@(HsDoublePrim _)) pat_ty = tcSimpleLitPat lit doublePrimTy pat_ty
-
-tcPat tc_bndr (LitPatIn lit@(HsLitLit s))     pat_ty 
+tcPat tc_bndr (LitPatIn lit@(HsLitLit s _)) pat_ty 
 	-- cf tcExpr on LitLits
   = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
     newDicts (LitLitOrigin (_UNPK_ s))
 	     [mkClassPred cCallableClass [pat_ty]]	`thenNF_Tc` \ (dicts, _) ->
-    returnTc (LitPat lit pat_ty, dicts, emptyBag, emptyBag, emptyLIE)
+    returnTc (LitPat (HsLitLit s pat_ty) pat_ty, dicts, emptyBag, emptyBag, emptyLIE)
+
+tcPat tc_bndr pat@(LitPatIn lit@(HsString _)) pat_ty
+  = unifyTauTy pat_ty stringTy			`thenTc_` 
+    tcLookupValueByKey eqStringIdKey		`thenNF_Tc` \ eq_id ->
+    returnTc (NPat lit stringTy (HsVar eq_id `HsApp` HsLit lit), 
+	      emptyLIE, emptyBag, emptyBag, emptyLIE)
+
+tcPat tc_bndr (LitPatIn simple_lit) pat_ty
+  = unifyTauTy pat_ty (simpleHsLitTy simple_lit)		`thenTc_` 
+    returnTc (LitPat simple_lit pat_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
+
+tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
+  = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
+    tcLookupValueByKey eqClassOpKey			`thenNF_Tc` \ eq_sel_id ->
+    newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ (lie2, eq_id) ->
+
+    returnTc (NPat lit' pat_ty (HsApp (HsVar eq_id) over_lit_expr),
+	      lie1 `plusLIE` lie2,
+	      emptyBag, emptyBag, emptyLIE)
+  where
+    origin = PatOrigin pat
+    lit' = case over_lit of
+		HsIntegral i   _ -> HsInteger i
+		HsFractional f _ -> HsRat f pat_ty
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection{Overloaded patterns: int literals and \tr{n+k} patterns}
+\subsection{n+k patterns}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcPat tc_bndr pat@(LitPatIn lit@(HsString str)) pat_ty
-  = unifyTauTy pat_ty stringTy			`thenTc_` 
-    tcLookupValueByKey eqClassOpKey		`thenNF_Tc` \ sel_id ->
-    newMethod (PatOrigin pat) sel_id [stringTy]	`thenNF_Tc` \ (lie, eq_id) ->
-    let
-	comp_op = HsApp (HsVar eq_id) (HsLitOut lit stringTy)
-    in
-    returnTc (NPat lit stringTy comp_op, lie, emptyBag, emptyBag, emptyLIE)
-
-
-tcPat tc_bndr pat@(LitPatIn lit@(HsInt i)) pat_ty
-  = tcOverloadedLitPat pat lit (OverloadedIntegral i) pat_ty
-
-tcPat tc_bndr pat@(LitPatIn lit@(HsFrac f)) pat_ty
-  = tcOverloadedLitPat pat lit (OverloadedFractional f) pat_ty
-
-
-tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsInt i)) pat_ty
+tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus) pat_ty
   = tc_bndr name pat_ty				`thenTc` \ bndr_id ->
+    tcLookupValue minus				`thenNF_Tc` \ minus_sel_id ->
     tcLookupValueByKey geClassOpKey		`thenNF_Tc` \ ge_sel_id ->
-    tcLookupValueByKey minusClassOpKey		`thenNF_Tc` \ minus_sel_id ->
-
-    newOverloadedLit origin
-		     (OverloadedIntegral i) pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-
+    newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
     newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ (lie2, ge_id) ->
     newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ (lie3, minus_id) ->
 
-    returnTc (NPlusKPat bndr_id lit pat_ty
+    returnTc (NPlusKPat bndr_id i pat_ty
 			(SectionR (HsVar ge_id) over_lit_expr)
 			(SectionR (HsVar minus_id) over_lit_expr),
 	      lie1 `plusLIE` lie2 `plusLIE` lie3,
 	      emptyBag, unitBag (name, bndr_id), emptyLIE)
   where
     origin = PatOrigin pat
-
-tcPat tc_bndr (NPlusKPatIn pat other) pat_ty
-  = panic "TcPat:NPlusKPat: not an HsInt literal"
 \end{code}
 
 %************************************************************************
@@ -364,23 +348,18 @@ tcPats tc_bndr (ty:tys) (pat:pats)
 
 ------------------------------------------------------
 \begin{code}
-tcSimpleLitPat lit lit_ty pat_ty
-  = unifyTauTy pat_ty lit_ty	`thenTc_` 
-    returnTc (LitPat lit lit_ty, emptyLIE, emptyBag, emptyBag, emptyLIE)
-
-
-tcOverloadedLitPat pat lit over_lit pat_ty
-  = newOverloadedLit (PatOrigin pat) over_lit pat_ty	`thenNF_Tc` \ (over_lit_expr, lie1) ->
-    tcLookupValueByKey eqClassOpKey			`thenNF_Tc` \ eq_sel_id ->
-    newMethod origin eq_sel_id [pat_ty]			`thenNF_Tc` \ (lie2, eq_id) ->
-
-    returnTc (NPat lit pat_ty (HsApp (HsVar eq_id)
-				     over_lit_expr),
-	      lie1 `plusLIE` lie2,
-	      emptyBag, emptyBag, emptyLIE)
-  where
-    origin = PatOrigin pat
+simpleHsLitTy :: HsLit -> TcType
+simpleHsLitTy (HsCharPrim c)   = charPrimTy
+simpleHsLitTy (HsStringPrim s) = addrPrimTy
+simpleHsLitTy (HsInt i)	       = intTy
+simpleHsLitTy (HsInteger i)    = integerTy
+simpleHsLitTy (HsIntPrim i)    = intPrimTy
+simpleHsLitTy (HsFloatPrim f)  = floatPrimTy
+simpleHsLitTy (HsDoublePrim d) = doublePrimTy
+simpleHsLitTy (HsChar c)       = charTy
+simpleHsLitTy (HsString str)   = stringTy
 \end{code}
+
 
 ------------------------------------------------------
 \begin{code}
@@ -452,14 +431,6 @@ tcConPat tc_bndr pat con_name arg_pats pat_ty
 \begin{code}
 patCtxt pat = hang (ptext SLIT("In the pattern:")) 
 		 4 (ppr pat)
-
-recordLabel field_label
-  = hang (hcat [ptext SLIT("When matching record field"), ppr field_label])
-	 4 (hcat [ptext SLIT("with its immediately enclosing constructor")])
-
-recordRhs field_label pat
-  = hang (ptext SLIT("In the record field pattern"))
-	 4 (sep [ppr field_label, char '=', ppr pat])
 
 badFieldCon :: Name -> Name -> SDoc
 badFieldCon con field

@@ -41,19 +41,18 @@ import ParseIface	( parseIface, IfaceStuff(..) )
 
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocallyDefined, 
-			  isWiredInName, nameUnique, NamedThing(..),
+			  isWiredInName, NamedThing(..),
 			  elemNameEnv, extendNameEnv
 			 )
-import Module		( Module, moduleString, pprModule,
-			  mkVanillaModule, pprModuleName,
-			  moduleUserString, moduleName, isLocalModule,
+import Module		( Module, mkVanillaModule, pprModuleName,
+			  moduleName, isLocalModule,
 			  ModuleName, WhereFrom(..),
 			)
 import RdrName		( RdrName, rdrNameOcc )
 import NameSet
 import SrcLoc		( mkSrcLoc, SrcLoc )
 import PrelInfo		( cCallishTyKeys )
-import Maybes		( MaybeErr(..), maybeToBool, orElse )
+import Maybes		( maybeToBool )
 import Unique		( Uniquable(..) )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
@@ -953,6 +952,7 @@ mkImportExportInfo this_mod export_avails exports
 
 	export_info = [(m, sortExport as) | (m,as) <- fmToList export_fm]
     in
+    traceRn (text "Modules in Ifaces: " <+> fsep (map ppr (keysFM mod_map)))	`thenRn_`
     returnRn (export_info, import_info)
 
 
@@ -1202,10 +1202,6 @@ getDeclErr name
   = vcat [ptext SLIT("Failed to find interface decl for") <+> quotes (ppr name),
 	  ptext SLIT("from module") <+> quotes (ppr (nameModule name))
 	 ]
-
-getDeclWarn name loc
-  = sep [ptext SLIT("Failed to find (optional) interface decl for") <+> quotes (ppr name),
-	 ptext SLIT("desired at") <+> ppr loc]
 
 importDeclWarn name
   = sep [ptext SLIT(

@@ -25,40 +25,24 @@ module ParseUtil (
 	-- , checkExpr		-- HsExp -> P HsExp
 	, checkValDef		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
 	, checkValSig		-- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-
-	
-	-- some built-in names (all :: RdrName)
-	, unitCon_RDR, unitTyCon_RDR, nilCon_RDR, listTyCon_RDR
-	, tupleCon_RDR, tupleTyCon_RDR, ubxTupleCon_RDR, ubxTupleTyCon_RDR
-	, funTyCon_RDR
-
-	-- pseudo-keywords, in var and tyvar forms (all :: RdrName)
-	, as_var_RDR, hiding_var_RDR, qualified_var_RDR, forall_var_RDR
-	, export_var_RDR, label_var_RDR, dynamic_var_RDR, unsafe_var_RDR
-	, stdcall_var_RDR, ccall_var_RDR
-
-	, as_tyvar_RDR, hiding_tyvar_RDR, qualified_tyvar_RDR
-	, export_tyvar_RDR, label_tyvar_RDR, dynamic_tyvar_RDR
-	, unsafe_tyvar_RDR, stdcall_tyvar_RDR, ccall_tyvar_RDR
-
-	, minus_RDR, pling_RDR, dot_RDR
-
  ) where
 
 #include "HsVersions.h"
 
 import Lex
-import HsSyn
+import HsSyn		-- Lots of it
 import SrcLoc
-import RdrHsSyn
+import RdrHsSyn		( mkNPlusKPatIn, unitTyCon_RDR,
+			  RdrBinding(..),
+			  RdrNameHsType, RdrNameBangType, RdrNameContext,
+			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr, RdrNameGRHSs,
+			  RdrNameHsRecordBinds, RdrNameMonoBinds
+			)
 import RdrName
 import CallConv
-import PrelNames 	( pRELUDE_Name, mkTupNameStr )
-import OccName  	( dataName, tcName, varName, tvName, tcClsName,
+import OccName  	( dataName, varName, tcClsName,
 			  occNameSpace, setOccNameSpace, occNameUserString )
-import CmdLineOpts 	( opt_NoImplicitPrelude )
 import FastString	( unpackFS )
-import BasicTypes	( Boxity(..) )
 import UniqFM		( UniqFM, listToUFM, lookupUFM )
 import Outputable
 
@@ -188,10 +172,11 @@ checkPat e [] = case e of
 	EWildPat	   -> returnP WildPatIn
 	HsVar x		   -> returnP (VarPatIn x)
 	HsLit l 	   -> returnP (LitPatIn l)
+	HsOverLit l	   -> returnP (NPatIn l)
 	ELazyPat e	   -> checkPat e [] `thenP` (returnP . LazyPatIn)
 	EAsPat n e	   -> checkPat e [] `thenP` (returnP . AsPatIn n)
         ExprWithTySig e t  -> checkPat e [] `thenP` \e ->
-			      -- pattern signatures are parsed as sigtypes,
+			      -- Pattern signatures are parsed as sigtypes,
 			      -- but they aren't explicit forall points.  Hence
 			      -- we have to remove the implicit forall here.
 			      let t' = case t of 
@@ -200,8 +185,9 @@ checkPat e [] = case e of
 			      in
 			      returnP (SigPatIn e t')
 
-	OpApp (HsVar n) (HsVar plus) _ (HsLit k@(HsInt _)) | plus == plus_RDR
-			   -> returnP (NPlusKPatIn n k)
+	OpApp (HsVar n) (HsVar plus) _ (HsOverLit lit@(HsIntegral k _)) 
+		  	   | plus == plus_RDR
+			   -> returnP (mkNPlusKPatIn n lit)
 
 	OpApp l op fix r   -> checkPat l [] `thenP` \l ->
 			      checkPat r [] `thenP` \r ->
@@ -209,7 +195,6 @@ checkPat e [] = case e of
 			   	 HsVar c -> returnP (ConOpPatIn l c fix r)
 			   	 _ -> patFail
 
-	NegApp l r	   -> checkPat l [] `thenP` (returnP . NegPatIn)
 	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPatIn)
 	ExplicitList es	   -> mapP (\e -> checkPat e []) es `thenP` \ps ->
 			      returnP (ListPatIn ps)
@@ -229,92 +214,7 @@ checkPatField (n,e,b) =
 
 patFail = parseError "Parse error in pattern"
 
----------------------------------------------------------------------------
--- Check Expression Syntax
 
-{-
-We can get away without checkExpr if the renamer generates errors for
-pattern syntax used in expressions (wildcards, as patterns and lazy 
-patterns).
-
-checkExpr :: RdrNameHsExpr -> P RdrNameHsExpr
-checkExpr e = case e of
-	HsVar _			  -> returnP e
-	HsIPVar _		  -> returnP e
-	HsLit _			  -> returnP e
-	HsLam match		  -> checkMatch match `thenP` (returnP.HsLam)
-	HsApp e1 e2		  -> check2Exprs e1 e2 HsApp
-	OpApp e1 e2 fix e3	  -> checkExpr e1 `thenP` \e1 ->
-				     checkExpr e2 `thenP` \e2 ->
-				     checkExpr e3 `thenP` \e3 ->
-				     returnP (OpApp e1 e2 fix e3)
-	NegApp e neg		  -> checkExpr e `thenP` \e ->
-				     returnP (NegApp e neg)
-	HsPar e			  -> check1Expr e HsPar
-	SectionL e1 e2	  	  -> check2Exprs e1 e2 SectionL
-	SectionR e1 e2      	  -> check2Exprs e1 e2 SectionR
-	HsCase e alts		  -> mapP checkMatch alts `thenP` \alts ->
-				     checkExpr e `thenP` \e ->
-				     returnP (HsCase e alts)
-	HsIf e1 e2 e3		  -> check3Exprs e1 e2 e3 HsIf
-
-	HsLet bs e		  -> check1Expr e (HsLet bs)
-	HsDo stmts		  -> mapP checkStmt stmts `thenP` (returnP . HsDo)
-	HsTuple es		  -> checkManyExprs es HsTuple
-	HsList es		  -> checkManyExprs es HsList
-	HsRecConstr c fields	  -> mapP checkField fields `thenP` \fields ->
-				     returnP (HsRecConstr c fields)
-	HsRecUpdate e fields	  -> mapP checkField fields `thenP` \fields ->
-				     checkExpr e `thenP` \e ->
-				     returnP (HsRecUpdate e fields)
-	HsEnumFrom e		  -> check1Expr e HsEnumFrom
-	HsEnumFromTo e1 e2	  -> check2Exprs e1 e2 HsEnumFromTo
-	HsEnumFromThen e1 e2      -> check2Exprs e1 e2 HsEnumFromThen
-	HsEnumFromThenTo e1 e2 e3 -> check3Exprs e1 e2 e3 HsEnumFromThenTo
-	HsListComp e stmts        -> mapP checkStmt stmts `thenP` \stmts ->
-				     checkExpr e `thenP` \e ->
-				     returnP (HsListComp e stmts)
-	RdrNameHsExprTypeSig loc e ty     -> checkExpr e `thenP` \e ->
-				     returnP (RdrNameHsExprTypeSig loc e ty)
-        _                         -> parseError "parse error in expression"
-
--- type signature for polymorphic recursion!!
-check1Expr :: RdrNameHsExpr -> (RdrNameHsExpr -> a) -> P a
-check1Expr e f = checkExpr e `thenP` (returnP . f)
-
-check2Exprs :: RdrNameHsExpr -> RdrNameHsExpr -> (RdrNameHsExpr -> RdrNameHsExpr -> a) -> P a
-check2Exprs e1 e2 f = 
-	checkExpr e1 `thenP` \e1 ->
-	checkExpr e2 `thenP` \e2 ->
-	returnP (f e1 e2)
-
-check3Exprs :: RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr -> (RdrNameHsExpr -> RdrNameHsExpr -> RdrNameHsExpr -> a) -> P a
-check3Exprs e1 e2 e3 f = 
-	checkExpr e1 `thenP` \e1 ->
-	checkExpr e2 `thenP` \e2 ->
-	checkExpr e3 `thenP` \e3 ->
-	returnP (f e1 e2 e3)
-
-checkManyExprs es f =
-	mapP checkExpr es `thenP` \es ->
-	returnP (f es) 
-
-checkAlt (HsAlt loc p galts bs) 
-	= checkGAlts galts `thenP` \galts -> returnP (HsAlt loc p galts bs)
-
-checkGAlts (HsUnGuardedAlt e) = check1Expr e HsUnGuardedAlt
-checkGAlts (HsGuardedAlts galts) 
-    = mapP checkGAlt galts `thenP` (returnP . HsGuardedAlts)
-
-checkGAlt (HsGuardedAlt loc e1 e2) = check2Exprs e1 e2 (HsGuardedAlt loc)
-
-checkStmt (HsGenerator p e) = check1Expr e (HsGenerator p)
-checkStmt (HsQualifier e)   = check1Expr e HsQualifier
-checkStmt s@(HsLetStmt bs)  = returnP s
-
-checkField (HsFieldUpdate n e) = check1Expr e (HsFieldUpdate n)
-checkField e = returnP e
--}
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
@@ -414,93 +314,5 @@ groupBindings binds = group Nothing binds
 		RdrValBinding b@(FunMonoBind _ _ _ _) -> group (Just b) binds
 		other -> bind `RdrAndBindings` group Nothing binds
 
------------------------------------------------------------------------------
--- Built-in names
-
-unitCon_RDR, unitTyCon_RDR, nilCon_RDR, listTyCon_RDR :: RdrName
-tupleCon_RDR, tupleTyCon_RDR		:: Int -> RdrName
-ubxTupleCon_RDR, ubxTupleTyCon_RDR 	:: Int -> RdrName
-
-unitCon_RDR
-	| opt_NoImplicitPrelude = mkSrcUnqual   dataName unitName
-	| otherwise		= mkPreludeQual dataName pRELUDE_Name unitName
-
-unitTyCon_RDR
-	| opt_NoImplicitPrelude = mkSrcUnqual   tcName unitName
-	| otherwise		= mkPreludeQual tcName pRELUDE_Name unitName
-
-nilCon_RDR
-	| opt_NoImplicitPrelude = mkSrcUnqual   dataName listName
-	| otherwise		= mkPreludeQual dataName pRELUDE_Name listName
-
-listTyCon_RDR
-	| opt_NoImplicitPrelude = mkSrcUnqual   tcName listName
-	| otherwise		= mkPreludeQual tcName pRELUDE_Name listName
-
-funTyCon_RDR
-	| opt_NoImplicitPrelude = mkSrcUnqual   tcName funName
-	| otherwise		= mkPreludeQual tcName pRELUDE_Name funName
-
-tupleCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   dataName (snd (mkTupNameStr Boxed arity))
-  | otherwise		  = mkPreludeQual dataName pRELUDE_Name
-				(snd (mkTupNameStr Boxed arity))
-
-tupleTyCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   tcName (snd (mkTupNameStr Boxed arity))
-  | otherwise		  = mkPreludeQual tcName pRELUDE_Name
-				(snd (mkTupNameStr Boxed arity))
-
-
-ubxTupleCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   dataName (snd (mkTupNameStr Unboxed arity))
-  | otherwise		  = mkPreludeQual dataName pRELUDE_Name 
-				(snd (mkTupNameStr Unboxed arity))
-
-ubxTupleTyCon_RDR arity
-  | opt_NoImplicitPrelude = mkSrcUnqual   tcName (snd (mkTupNameStr Unboxed arity))
-  | otherwise		  = mkPreludeQual tcName pRELUDE_Name 
-				(snd (mkTupNameStr Unboxed arity))
-
-unitName = SLIT("()")
-funName  = SLIT("(->)")
-listName = SLIT("[]")
-
-asName              = SLIT("as")
-hidingName          = SLIT("hiding")
-qualifiedName       = SLIT("qualified")
-forallName          = SLIT("forall")
-exportName	    = SLIT("export")
-labelName	    = SLIT("label")
-dynamicName	    = SLIT("dynamic")
-unsafeName          = SLIT("unsafe")
-stdcallName         = SLIT("stdcall")
-ccallName           = SLIT("ccall")
-
-as_var_RDR          = mkSrcUnqual varName asName
-hiding_var_RDR      = mkSrcUnqual varName hidingName
-qualified_var_RDR   = mkSrcUnqual varName qualifiedName
-forall_var_RDR      = mkSrcUnqual varName forallName
-export_var_RDR      = mkSrcUnqual varName exportName
-label_var_RDR       = mkSrcUnqual varName labelName
-dynamic_var_RDR     = mkSrcUnqual varName dynamicName
-unsafe_var_RDR      = mkSrcUnqual varName unsafeName
-stdcall_var_RDR     = mkSrcUnqual varName stdcallName
-ccall_var_RDR       = mkSrcUnqual varName ccallName
-
-as_tyvar_RDR        = mkSrcUnqual tvName asName
-hiding_tyvar_RDR    = mkSrcUnqual tvName hidingName
-qualified_tyvar_RDR = mkSrcUnqual tvName qualifiedName
-export_tyvar_RDR    = mkSrcUnqual tvName exportName
-label_tyvar_RDR     = mkSrcUnqual tvName labelName
-dynamic_tyvar_RDR   = mkSrcUnqual tvName dynamicName
-unsafe_tyvar_RDR    = mkSrcUnqual tvName unsafeName
-stdcall_tyvar_RDR   = mkSrcUnqual tvName stdcallName
-ccall_tyvar_RDR     = mkSrcUnqual tvName ccallName
-
-minus_RDR           = mkSrcUnqual varName SLIT("-")
-pling_RDR	    = mkSrcUnqual varName SLIT("!")
-dot_RDR		    = mkSrcUnqual varName SLIT(".")
-
-plus_RDR	    = mkSrcUnqual varName SLIT("+")
+plus_RDR = mkSrcUnqual varName SLIT("+")
 \end{code}

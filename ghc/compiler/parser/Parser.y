@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.35 2000/09/14 13:46:40 simonpj Exp $
+$Id: Parser.y,v 1.36 2000/09/22 15:56:13 simonpj Exp $
 
 Haskell grammar.
 
@@ -20,7 +20,7 @@ import Lex
 import ParseUtil
 import RdrName
 import PrelInfo		( mAIN_Name )
-import OccName		( varName, ipName, tcName, dataName, tcClsName, tvName )
+import OccName		( UserFS, varName, ipName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
 import CallConv
@@ -156,8 +156,6 @@ Conflicts: 14 shift/reduce
  '!'		{ ITbang }
  '.'		{ ITdot }
 
- '/\\'		{ ITbiglam }			-- GHC-extension symbols
-
  '{'		{ ITocurly } 			-- special symbols
  '}'		{ ITccurly }
  vccurly	{ ITvccurly } -- virtual close curly (from layout)
@@ -182,8 +180,6 @@ Conflicts: 14 shift/reduce
 
  IPVARID   	{ ITipvarid  $$ }		-- GHC extension
 
- PRAGMA		{ ITpragma   $$ }
-
  CHAR		{ ITchar     $$ }
  STRING		{ ITstring   $$ }
  INTEGER	{ ITinteger  $$ }
@@ -195,8 +191,6 @@ Conflicts: 14 shift/reduce
  PRIMFLOAT	{ ITprimfloat  $$ }
  PRIMDOUBLE	{ ITprimdouble $$ }
  CLITLIT	{ ITlitlit     $$ }
-
- UNKNOWN	{ ITunknown  $$ }
 
 %monad { P } { thenP } { returnP }
 %lexer { lexer } { ITeof }
@@ -693,7 +687,7 @@ exp10 :: { RdrNameHsExpr }
   	| 'let' declbinds 'in' exp		{ HsLet $2 $4 }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
-	| '-' fexp				{ NegApp $2 (error "NegApp") }
+	| '-' fexp				{ mkHsNegApp $2 }
   	| srcloc 'do' stmtlist			{ HsDo DoStmt $3 $1 }
 
 	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 False False cbot }
@@ -730,7 +724,9 @@ aexp1	:: { RdrNameHsExpr }
 	: qvar				{ HsVar $1 }
 	| ipvar				{ HsIPVar $1 }
 	| gcon				{ HsVar $1 }
-  	| literal			{ HsLit $1 }
+	| literal			{ HsLit $1 }
+	| INTEGER			{ HsOverLit (mkHsIntegralLit $1) }
+	| RATIONAL			{ HsOverLit (mkHsFractionalLit $1) }
 	| '(' exp ')'			{ HsPar $2 }
 	| '(' exp ',' texps ')'		{ ExplicitTuple ($2 : reverse $4) Boxed}
 	| '(#' texps '#)'		{ ExplicitTuple (reverse $2)      Unboxed }
@@ -913,7 +909,7 @@ qvarop :: { RdrName }
 	| '`' qvarid '`'	{ $2 }
 
 qvaropm :: { RdrName }
-	: qvarsymm		{ $1 }
+	: qvarsym_no_minus	{ $1 }
 	| '`' qvarid '`'	{ $2 }
 
 conop :: { RdrName }
@@ -944,41 +940,42 @@ qopm	:: { RdrNameHsExpr }   -- used in sections
 
 qvarid :: { RdrName }
 	: varid			{ $1 }
-	| QVARID		{ case $1 of { (mod,n) ->
-				  mkSrcQual varName mod n } }
+	| QVARID		{ mkSrcQual varName $1 }
 
 varid :: { RdrName }
-	: VARID			{ mkSrcUnqual varName $1 }
-	| 'as'			{ as_var_RDR }
-	| 'qualified'		{ qualified_var_RDR }
-	| 'hiding'		{ hiding_var_RDR }
-	| 'forall'		{ forall_var_RDR }
-	| 'export'		{ export_var_RDR }
-	| 'label'		{ label_var_RDR }
-	| 'dynamic'		{ dynamic_var_RDR }
-	| 'unsafe'		{ unsafe_var_RDR }
-	| 'stdcall'             { stdcall_var_RDR }
-	| 'ccall'               { ccall_var_RDR }
+	: varid_no_unsafe 	{ $1 }
+	| 'unsafe'		{ mkSrcUnqual varName SLIT("unsafe") }
 
 varid_no_unsafe :: { RdrName }
 	: VARID			{ mkSrcUnqual varName $1 }
-	| 'as'			{ as_var_RDR }
-	| 'qualified'		{ qualified_var_RDR }
-	| 'hiding'		{ hiding_var_RDR }
-	| 'forall'		{ forall_var_RDR }
-	| 'export'		{ export_var_RDR }
-	| 'label'		{ label_var_RDR }
-	| 'dynamic'		{ dynamic_var_RDR }
-	| 'stdcall'             { stdcall_var_RDR }
-	| 'ccall'               { ccall_var_RDR }
+	| special_id		{ mkSrcUnqual varName $1 }
+	| 'forall'		{ mkSrcUnqual varName SLIT("forall") }
+
+tyvar 	:: { RdrName }
+	: VARID			{ mkSrcUnqual tvName $1 }
+	| special_id		{ mkSrcUnqual tvName $1 }
+	| 'unsafe' 		{ mkSrcUnqual tvName SLIT("unsafe") }
+
+-- These special_ids are treated as keywords in various places, 
+-- but as ordinary ids elsewhere.   A special_id collects all thsee
+-- except 'unsafe' and 'forall' whose treatment differs depending on context
+special_id :: { UserFS }
+special_id
+	: 'as'			{ SLIT("as") }
+	| 'qualified'		{ SLIT("qualified") }
+	| 'hiding'		{ SLIT("hiding") }
+	| 'export'		{ SLIT("export") }
+	| 'label'		{ SLIT("label")  }
+	| 'dynamic'		{ SLIT("dynamic") }
+	| 'stdcall'             { SLIT("stdcall") }
+	| 'ccall'               { SLIT("ccall") }
 
 -----------------------------------------------------------------------------
 -- ConIds
 
 qconid :: { RdrName }
 	: conid			{ $1 }
-	| QCONID		{ case $1 of { (mod,n) ->
-				  mkSrcQual dataName mod n } }
+	| QCONID		{ mkSrcQual dataName $1 }
 
 conid 	:: { RdrName }
 	: CONID			{ mkSrcUnqual dataName $1 }
@@ -988,8 +985,7 @@ conid 	:: { RdrName }
 
 qconsym :: { RdrName }
 	: consym		{ $1 }
-	| QCONSYM		{ case $1 of { (mod,n) ->
-				  mkSrcQual dataName mod n } }
+	| QCONSYM		{ mkSrcQual dataName $1 }
 
 consym :: { RdrName }
 	: CONSYM		{ mkSrcUnqual dataName $1 }
@@ -1001,37 +997,39 @@ qvarsym :: { RdrName }
 	: varsym		{ $1 }
 	| qvarsym1		{ $1 }
 
-qvarsymm :: { RdrName }
-	: varsymm		{ $1 }
+qvarsym_no_minus :: { RdrName }
+	: varsym_no_minus	{ $1 }
 	| qvarsym1		{ $1 }
 
-varsym :: { RdrName }
-	: VARSYM		{ mkSrcUnqual varName $1 }
-	| '-'			{ minus_RDR }
-	| '!'			{ pling_RDR }
-	| '.'			{ dot_RDR }
-
-varsymm :: { RdrName } -- varsym not including '-'
-	: VARSYM		{ mkSrcUnqual varName $1 }
-	| '!'			{ pling_RDR }
-	| '.'			{ dot_RDR }
-
 qvarsym1 :: { RdrName }
-	: QVARSYM		{ case $1 of { (mod,n) ->
-				  mkSrcQual varName mod n } }
+qvarsym1 : QVARSYM		{ mkSrcQual varName $1 }
+
+varsym :: { RdrName }
+	: varsym_no_minus 	{ $1 }
+	| '-'			{ mkSrcUnqual varName SLIT("-") }
+
+varsym_no_minus :: { RdrName } -- varsym not including '-'
+	: VARSYM		{ mkSrcUnqual varName $1 }
+	| special_sym		{ mkSrcUnqual varName $1 }
+
+
+-- See comments with special_id
+special_sym :: { UserFS }
+special_sym : '!'	{ SLIT("!") }
+	    | '.' 	{ SLIT(".") }
+
+-----------------------------------------------------------------------------
+-- Literals
 
 literal :: { HsLit }
-	: INTEGER		{ HsInt    $1 }
-	| CHAR 			{ HsChar   $1 }
-	| RATIONAL		{ HsFrac   $1 }
-	| STRING		{ HsString $1 }
-
+	: CHAR 			{ HsChar       $1 }
+	| STRING		{ HsString     $1 }
 	| PRIMINTEGER		{ HsIntPrim    $1 }
 	| PRIMCHAR		{ HsCharPrim   $1 }
 	| PRIMSTRING		{ HsStringPrim $1 }
 	| PRIMFLOAT		{ HsFloatPrim  $1 }
 	| PRIMDOUBLE		{ HsDoublePrim $1 }
-	| CLITLIT		{ HsLitLit     $1 }
+	| CLITLIT		{ HsLitLit     $1 (error "Parser.y: CLITLIT") }
 
 srcloc :: { SrcLoc }	:	{% getSrcLocP }
  
@@ -1056,24 +1054,10 @@ tycon 	:: { RdrName }
 
 qtycon :: { RdrName }
 	: tycon			{ $1 }
-	| QCONID		{ case $1 of { (mod,n) ->
-				  mkSrcQual tcClsName mod n } }
+	| QCONID		{ mkSrcQual tcClsName $1 }
 
 qtycls 	:: { RdrName }
 	: qtycon		{ $1 }
-
-tyvar 	:: { RdrName }
-	: VARID			{ mkSrcUnqual tvName $1 }
-	| 'as'			{ as_tyvar_RDR }
-	| 'qualified'		{ qualified_tyvar_RDR }
-	| 'hiding'		{ hiding_tyvar_RDR }
-	| 'export'		{ export_tyvar_RDR }
-	| 'label'		{ label_tyvar_RDR }
-	| 'dynamic'		{ dynamic_tyvar_RDR }
-	| 'unsafe'		{ unsafe_tyvar_RDR }
-	| 'stdcall'             { stdcall_tyvar_RDR }
-	| 'ccall'               { ccall_tyvar_RDR }
-	-- NOTE: no 'forall'
 
 commas :: { Int }
 	: commas ','			{ $1 + 1 }

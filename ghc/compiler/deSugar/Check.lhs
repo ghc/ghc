@@ -13,21 +13,14 @@ module Check ( check , ExhaustivePat ) where
 import HsSyn		
 import TcHsSyn		( TypecheckedPat )
 import DsHsSyn		( outPatType ) 
-import CoreSyn		
-
-import DsUtils		( EquationInfo(..),
-			  MatchResult(..),
-			  EqnSet,
-			  CanItFail(..),
+import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, CanItFail(..),
 			  tidyLitPat
  			)
 import Id		( idType )
 import DataCon		( DataCon, dataConTyCon, dataConArgTys,
 			  dataConSourceArity, dataConFieldLabels )
 import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkSrcVarOcc )
-import Type		( Type, splitAlgTyConApp, mkTyVarTys,
-                          splitTyConApp_maybe
-			)
+import Type		( splitAlgTyConApp, mkTyVarTys, splitTyConApp_maybe )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           mkListTy, mkTupleTy, tupleCon
 			)
@@ -151,13 +144,7 @@ untidy b (ConOpPatIn pat1 name fixity pat2) =
 untidy _ (ListPatIn pats)  = ListPatIn (map untidy_no_pars pats) 
 untidy _ (TuplePatIn pats boxed) = TuplePatIn (map untidy_no_pars pats) boxed
 
-untidy _ (SigPatIn pat ty)      = panic "Check.untidy: SigPatIn"
-untidy _ (LazyPatIn pat)        = panic "Check.untidy: LazyPatIn"
-untidy _ (AsPatIn name pat)     = panic "Check.untidy: AsPatIn"
-untidy _ (NPlusKPatIn name lit) = panic "Check.untidy: NPlusKPatIn"
-untidy _ (NegPatIn ipat)        = panic "Check.untidy: NegPatIn"
-untidy _ (ParPatIn pat)         = panic "Check.untidy: ParPatIn"
-untidy _ (RecPatIn name fields) = panic "Check.untidy: RecPatIn"
+untidy _ pat = pprPanic "Check.untidy: SigPatIn" (ppr pat)
 
 pars :: NeedPars -> WarningPat -> WarningPat
 pars True p = ParPatIn p
@@ -625,8 +612,8 @@ simplify_pat (RecPat dc ty ex_tvs dicts idps)
       | nm == n    = (nm,p):xs
       | otherwise  = x : insertNm nm p xs
 
-simplify_pat pat@(LitPat lit lit_ty)        = tidyLitPat lit lit_ty pat
-simplify_pat pat@(NPat   lit lit_ty hsexpr) = tidyLitPat lit lit_ty pat
+simplify_pat pat@(LitPat lit lit_ty)        = tidyLitPat lit pat
+simplify_pat pat@(NPat   lit lit_ty hsexpr) = tidyLitPat lit pat
 
 simplify_pat (NPlusKPat	id hslit ty hsexpr1 hsexpr2) = 
      WildPat ty

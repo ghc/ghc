@@ -21,21 +21,20 @@ module TcForeign
 
 import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
 			  ExtName(Dynamic), isDynamicExtName, MonoBinds(..),
-			  OutPat(..), ForKind(..)
+			  ForKind(..)
 			)
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
 import TcEnv		( newLocalId )
-import TcType		( tcSplitRhoTy, zonkTcTypeToType )
 import TcMonoType	( tcHsBoxedSigType )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl,
 			  TcForeignExportDecl )
-import TcExpr		( tcId, tcPolyExpr )			
+import TcExpr		( tcPolyExpr )			
 import Inst		( emptyLIE, LIE, plusLIE )
 
 import ErrUtils		( Message )
-import Id		( Id, idName, mkVanillaId )
+import Id		( Id, mkVanillaId )
 import Name		( nameOccName )
 import Type		( splitFunTys
 			, splitTyConApp_maybe

@@ -22,7 +22,7 @@ import TcEnv		( InstEnv, emptyInstEnv, addToInstEnv )
 import Bag		( bagToList, Bag )
 import Class		( Class )
 import Var		( TyVar, Id, idName )
-import Maybes		( MaybeErr(..), mkLookupFunDef )
+import Maybes		( MaybeErr(..) )
 import Name		( getSrcLoc, nameModule, isLocallyDefined )
 import SrcLoc		( SrcLoc )
 import Type		( Type, ClassContext )
@@ -30,8 +30,6 @@ import PprType		( pprConstraint )
 import Class		( classTyCon )
 import DataCon		( DataCon )
 import TyCon		( tyConDataCons )
-import Unique		( Unique, getUnique )
-import Util		( equivClassesByUniq )
 import Outputable
 \end{code}
 

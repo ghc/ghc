@@ -18,7 +18,7 @@ import TcMonoType	( tcHsType )
 import TcEnv		( ValueEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetValueEnv,
 			  tcLookupValueMaybe,
-			  explicitLookupValue, badCon, badPrimOp, valueEnvIds
+			  explicitLookupValue, valueEnvIds
 			)
 
 import RnHsSyn		( RenamedHsDecl )
@@ -36,9 +36,9 @@ import Id		( Id, mkId, mkVanillaId,
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
-import Type		( mkSynTy, mkTyVarTys, splitAlgTyConApp, splitAlgTyConApp_maybe, splitFunTys, unUsgTy )
+import Type		( mkTyVarTys, splitAlgTyConApp_maybe, unUsgTy )
 import Var		( mkTyVar, tyVarKind )
-import Name		( Name, NamedThing(..), isLocallyDefined )
+import Name		( Name, isLocallyDefined )
 import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
 import Outputable	

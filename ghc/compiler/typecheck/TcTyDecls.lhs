@@ -14,20 +14,19 @@ module TcTyDecls (
 
 import HsSyn		( MonoBinds(..), 
 			  TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
-			  andMonoBindList, getBangType
+			  getBangType
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
 import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
-import BasicTypes	( RecFlag(..), NewOrData(..) )
+import BasicTypes	( NewOrData(..) )
 
 import TcMonoType	( tcHsType, tcHsSigType, tcHsBoxedSigType, kcTyVarScope, tcClassContext,
 			  kcHsContext, kcHsSigType, mkImmutTyVars
 			)
 import TcEnv		( tcExtendTyVarEnv, tcLookupTy, tcLookupValueByKey, TyThing(..), TyThingDetails(..) )
 import TcMonad
-import TcUnify		( unifyKind )
 
-import Class		( Class, ClassContext )
+import Class		( ClassContext )
 import DataCon		( DataCon, mkDataCon, 
 			  dataConFieldLabels, dataConId, dataConWrapId,
 			  markedStrict, notMarkedStrict, markedUnboxed, dataConRepType
@@ -35,24 +34,19 @@ import DataCon		( DataCon, mkDataCon,
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
 import Var		( Id, TyVar )
-import Name		( Name, isLocallyDefined, OccName, NamedThing(..), nameUnique )
+import Name		( Name, isLocallyDefined, NamedThing(..) )
 import Outputable
-import TyCon		( TyCon, AlgTyConFlavour(..), ArgVrcs, mkSynTyCon, mkAlgTyCon, 
-			  tyConDataConsIfAvailable, tyConTyVars,
-			  isSynTyCon, isNewTyCon
+import TyCon		( TyCon, isSynTyCon, isNewTyCon,
+			  tyConDataConsIfAvailable, tyConTyVars
 			)
-import Type		( getTyVar, tyVarsOfTypes, splitFunTy, applyTys,
-			  mkTyConApp, mkTyVarTys, mkForAllTys, mkFunTy,
-			  mkTyVarTy, splitAlgTyConApp_maybe,
-			  mkArrowKind, mkArrowKinds, boxedTypeKind,
-			  isUnboxedType, Type, ThetaType, classesOfPreds
+import Type		( tyVarsOfTypes, splitFunTy, applyTys,
+			  mkTyConApp, mkTyVarTys, mkForAllTys, 
+			  splitAlgTyConApp_maybe, Type
 			)
 import TysWiredIn	( unitTy )
-import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import Unique		( unpackCStringIdKey, unpackCStringUtf8IdKey )
 import Util		( equivClasses )
-import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
 \end{code}
 
 %************************************************************************

@@ -12,14 +12,14 @@ module TcBinds ( tcBindsAndThen, tcTopBindsAndThen,
 import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcExpr )
 
-import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), InPat(..), StmtCtxt(..),
-			  Match(..), collectMonoBinders, andMonoBindList, andMonoBinds
+import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), StmtCtxt(..),
+			  Match(..), collectMonoBinders, andMonoBinds
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedSig, RenamedMonoBinds )
-import TcHsSyn		( TcHsBinds, TcMonoBinds, TcId, zonkId, mkHsLet )
+import TcHsSyn		( TcMonoBinds, TcId, zonkId, mkHsLet )
 
 import TcMonad
-import Inst		( Inst, LIE, emptyLIE, mkLIE, plusLIE, plusLIEs, InstOrigin(..),
+import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 			  newDicts, tyVarsOfInst, instToId,
 			  getAllFunDepsOfLIE, getIPsOfLIE, zonkFunDeps
 			)
@@ -35,32 +35,30 @@ import TcMonoType	( tcHsSigType, checkSigTyVars,
 			)
 import TcPat		( tcPat )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcType		( TcType, TcThetaType,
-			  TcTyVar,
-			  newTyVarTy, newTyVar, tcInstTcType,
-			  zonkTcType, zonkTcTypes, zonkTcThetaType, zonkTcTyVarToTyVar
+import TcType		( TcThetaType, newTyVarTy, newTyVar, 
+			  zonkTcTypes, zonkTcThetaType, zonkTcTyVarToTyVar
 			)
 import TcUnify		( unifyTauTy, unifyTauTyLists )
 
-import Id		( Id, mkVanillaId, setInlinePragma, idFreeTyVars )
+import Id		( mkVanillaId, setInlinePragma, idFreeTyVars )
 import Var		( idType, idName )
-import IdInfo		( setInlinePragInfo, InlinePragInfo(..) )
-import Name		( Name, getName, getOccName, getSrcLoc )
+import IdInfo		( InlinePragInfo(..) )
+import Name		( Name, getOccName, getSrcLoc )
 import NameSet
 import Type		( mkTyVarTy, tyVarsOfTypes, mkTyConApp,
-			  splitSigmaTy, mkForAllTys, mkFunTys, getTyVar, 
-			  mkPredTy, splitRhoTy, mkForAllTy, isUnLiftedType, 
+			  mkForAllTys, mkFunTys, 
+			  mkPredTy, mkForAllTy, isUnLiftedType, 
 			  isUnboxedType, unboxedTypeKind, boxedTypeKind, openTypeKind
 			)
 import FunDeps		( tyVarFunDep, oclose )
-import Var		( TyVar, tyVarKind )
+import Var		( tyVarKind )
 import VarSet
 import Bag
 import Util		( isIn )
 import Maybes		( maybeToBool )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..), isNotTopLevel )
 import FiniteMap	( listToFM, lookupFM )
-import Unique		( ioTyConKey, mainKey, hasKey, Uniquable(..) )
+import Unique		( ioTyConKey, mainKey, hasKey )
 import Outputable
 \end{code}
 
@@ -906,21 +904,6 @@ patMonoBindsCtxt bind
 valSpecSigCtxt v ty
   = sep [ptext SLIT("In a SPECIALIZE pragma for a value:"),
 	 nest 4 (ppr v <+> dcolon <+> ppr ty)]
-
------------------------------------------------
-notAsPolyAsSigErr sig_tau mono_tyvars
-  = hang (ptext SLIT("A type signature is more polymorphic than the inferred type"))
-	4  (vcat [text "Can't for-all the type variable(s)" <+> 
-		  pprQuotedList mono_tyvars,
-		  text "in the type" <+> quotes (ppr sig_tau)
-	   ])
-
------------------------------------------------
-badMatchErr sig_ty inferred_ty
-  = hang (ptext SLIT("Type signature doesn't match inferred type"))
-	 4 (vcat [hang (ptext SLIT("Signature:")) 4 (ppr sig_ty),
-		      hang (ptext SLIT("Inferred :")) 4 (ppr inferred_ty)
-	   ])
 
 -----------------------------------------------
 unboxedPatBindErr id

@@ -10,20 +10,15 @@ module RnNames (
 
 #include "HsVersions.h"
 
-import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports, 
-			opt_SourceUnchanged, opt_WarnUnusedBinds
-		      )
+import CmdLineOpts    ( opt_NoImplicitPrelude, opt_WarnDuplicateExports, opt_SourceUnchanged )
 
-import HsSyn	( HsModule(..), HsDecl(..), TyClDecl(..),
-		  IE(..), ieName, 
-		  ForeignDecl(..), ForKind(..), isDynamicExtName,
-		  FixitySig(..), Sig(..), ImportDecl(..),
+import HsSyn	( HsModule(..), HsDecl(..), IE(..), ieName, ImportDecl(..),
 		  collectTopBinders
 		)
 import RdrHsSyn	( RdrNameIE, RdrNameImportDecl,
 		  RdrNameHsModule, RdrNameHsDecl
 		)
-import RnIfaces	( getInterfaceExports, getDeclBinders, getDeclSysBinders,
+import RnIfaces	( getInterfaceExports, getDeclBinders, 
 		  recordLocalSlurps, checkModUsage, findAndReadIface, outOfDate
 		)
 import RnEnv
@@ -36,7 +31,7 @@ import Bag	( bagToList )
 import Module	( ModuleName, mkThisModule, pprModuleName, WhereFrom(..) )
 import NameSet
 import Name	( Name, ExportFlag(..), ImportReason(..), Provenance(..),
-		  isLocallyDefined, setNameProvenance,
+		  setNameProvenance,
 		  nameOccName, getSrcLoc, pprProvenance, getNameProvenance,
 		  nameEnvElts
 		)
@@ -45,8 +40,8 @@ import OccName	( setOccNameSpace, dataName )
 import NameSet	( elemNameSet, emptyNameSet )
 import Outputable
 import Maybes	( maybeToBool, catMaybes, mapMaybe )
-import UniqFM   ( emptyUFM, listToUFM, plusUFM_C )
-import Util	( removeDups, equivClassesByUniq, sortLt )
+import UniqFM   ( emptyUFM, listToUFM )
+import Util	( removeDups, sortLt )
 import List	( partition )
 \end{code}
 

@@ -12,6 +12,7 @@ import {-# SOURCE #-} Match  ( match )
 import {-# SOURCE #-} DsExpr ( dsExpr )
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..) )
+import TcHsSyn		( TypecheckedPat )
 import CoreSyn		( Expr(..), Bind(..) )
 import Id		( Id )
 
@@ -20,7 +21,7 @@ import DsUtils
 
 import Literal		( mkMachInt, Literal(..) )
 import Maybes		( catMaybes )
-import Type		( Type, isUnLiftedType )
+import Type		( isUnLiftedType )
 import Panic		( panic, assertPanic )
 \end{code}
 
@@ -47,10 +48,10 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
   where
     match_prims_used _ [{-no more eqns-}] = returnDs []
 
-    match_prims_used vars eqns_info@(EqnInfo n ctx ((LitPat literal lit_ty):ps1) _ : eqns)
+    match_prims_used vars eqns_info@(EqnInfo n ctx (pat@(LitPat literal lit_ty):ps1) _ : eqns)
       = let
 	    (shifted_eqns_for_this_lit, eqns_not_for_this_lit)
-	      = partitionEqnsByLit Nothing literal eqns_info
+	      = partitionEqnsByLit pat eqns_info
 	in
 	-- recursive call to make other alts...
 	match_prims_used vars eqns_not_for_this_lit       `thenDs` \ rest_of_alts ->
@@ -59,28 +60,28 @@ matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (LitPat literal lit_t
 	-- now do the business to make the alt for _this_ LitPat ...
 	match vars shifted_eqns_for_this_lit 	`thenDs` \ match_result ->
 	returnDs (
-	    (mk_core_lit lit_ty literal, match_result)
+	    (mk_core_lit literal, match_result)
 	    : rest_of_alts
 	)
       where
-	mk_core_lit :: Type -> HsLit -> Literal
+	mk_core_lit :: HsLit -> Literal
 
-	mk_core_lit ty (HsIntPrim     i) = mkMachInt  i
-	mk_core_lit ty (HsCharPrim    c) = MachChar   c
-	mk_core_lit ty (HsStringPrim  s) = MachStr    s
-	mk_core_lit ty (HsFloatPrim   f) = MachFloat  f
-	mk_core_lit ty (HsDoublePrim  d) = MachDouble d
-	mk_core_lit ty (HsLitLit      s) = ASSERT(isUnLiftedType ty)
-				           MachLitLit s ty
-    	mk_core_lit ty other	         = panic "matchLiterals:mk_core_lit:unhandled"
+	mk_core_lit (HsIntPrim     i) 	 = mkMachInt  i
+	mk_core_lit (HsCharPrim    c) 	 = MachChar   c
+	mk_core_lit (HsStringPrim  s) 	 = MachStr    s
+	mk_core_lit (HsFloatPrim   f) 	 = MachFloat  f
+	mk_core_lit (HsDoublePrim  d)    = MachDouble d
+	mk_core_lit (HsLitLit      s ty) = ASSERT(isUnLiftedType ty)
+		    		           MachLitLit s ty
+    	mk_core_lit other	         = panic "matchLiterals:mk_core_lit:unhandled"
 \end{code}
 
 \begin{code}
 matchLiterals all_vars@(var:vars)
-  eqns_info@(EqnInfo n ctx ((NPat literal lit_ty eq_chk):ps1) _ : eqns)
+  eqns_info@(EqnInfo n ctx (pat@(NPat literal lit_ty eq_chk):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
-	  = partitionEqnsByLit Nothing literal eqns_info
+	  = partitionEqnsByLit pat eqns_info
     in
     dsExpr (HsApp eq_chk (HsVar var))		`thenDs` \ pred_expr ->
     match vars shifted_eqns_for_this_lit        `thenDs` \ inner_match_result ->
@@ -107,10 +108,10 @@ We generate:
 
 
 \begin{code}
-matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx ((NPlusKPat master_n k ty ge sub):ps1) _ : eqns)
+matchLiterals all_vars@(var:vars) eqns_info@(EqnInfo n ctx (pat@(NPlusKPat master_n k ty ge sub):ps1) _ : eqns)
   = let
 	(shifted_eqns_for_this_lit, eqns_not_for_this_lit)
-	  = partitionEqnsByLit (Just master_n) k eqns_info
+	  = partitionEqnsByLit pat eqns_info
     in
     match vars shifted_eqns_for_this_lit	`thenDs` \ inner_match_result ->
 
@@ -135,10 +136,7 @@ that are ``same''/different as one we are looking at.  We need to know
 whether we're looking at a @LitPat@/@NPat@, and what literal we're after.
 
 \begin{code}
-partitionEqnsByLit :: Maybe Id 	-- (Just v) for N-plus-K patterns, where v
-				-- is the "master" variable;
-				-- Nothing for NPats and LitPats
-		   -> HsLit
+partitionEqnsByLit :: TypecheckedPat
 		   -> [EquationInfo]
 		   -> ([EquationInfo], 	-- These ones are for this lit, AND
 					-- they've been "shifted" by stripping
@@ -147,51 +145,34 @@ partitionEqnsByLit :: Maybe Id 	-- (Just v) for N-plus-K patterns, where v
 					-- are exactly as fed in.
 		      )
 
-partitionEqnsByLit nPlusK lit eqns
+partitionEqnsByLit master_pat eqns
   = ( \ (xs,ys) -> (catMaybes xs, catMaybes ys))
-	(unzip (map (partition_eqn nPlusK lit) eqns))
+	(unzip (map (partition_eqn master_pat) eqns))
   where
-    partition_eqn :: Maybe Id -> HsLit -> EquationInfo ->
-		(Maybe EquationInfo, Maybe EquationInfo)
+    partition_eqn :: TypecheckedPat -> EquationInfo -> (Maybe EquationInfo, Maybe EquationInfo)
 
-    partition_eqn Nothing lit (EqnInfo n ctx (LitPat k _ : remaining_pats) match_result)
-      | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
+    partition_eqn (LitPat k1 _) (EqnInfo n ctx (LitPat k2 _ : remaining_pats) match_result)
+      | k1 == k2 = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn Nothing lit (EqnInfo n ctx (NPat k _ _ : remaining_pats) match_result)
-      | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
+    partition_eqn (NPat k1 _ _) (EqnInfo n ctx (NPat k2 _ _ : remaining_pats) match_result)
+      | k1 == k2 = (Just (EqnInfo n ctx remaining_pats match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
 
-    partition_eqn (Just master_n) lit
-        (EqnInfo n ctx (NPlusKPat n' k _ _ _ : remaining_pats) match_result)
-      | lit `eq_lit` k  = (Just (EqnInfo n ctx remaining_pats new_match_result), Nothing)
+    partition_eqn (NPlusKPat master_n k1 _ _ _)
+ 	          (EqnInfo n ctx (NPlusKPat n' k2 _ _ _ : remaining_pats) match_result)
+      | k1 == k2 = (Just (EqnInfo n ctx remaining_pats new_match_result), Nothing)
 			  -- NB the pattern is stripped off the EquationInfo
       where
 	new_match_result | master_n == n' = match_result
 			 | otherwise 	  = mkCoLetsMatchResult
-			       [NonRec n' (Var master_n)] match_result
+					       [NonRec n' (Var master_n)] match_result
 
 	-- Wild-card patterns, which will only show up in the shadows,
         -- go into both groups
-    partition_eqn nPlusK lit
-                  eqn@(EqnInfo n ctx (WildPat _ : remaining_pats) match_result)
+    partition_eqn master_pat eqn@(EqnInfo n ctx (WildPat _ : remaining_pats) match_result)
 			= (Just (EqnInfo n ctx remaining_pats match_result), Just eqn)
 
 	-- Default case; not for this pattern
-    partition_eqn nPlusK lit eqn = (Nothing, Just eqn)
-
--- ToDo: meditate about this equality business...
-
-eq_lit (HsInt  i1)   	 (HsInt  i2)       = i1 == i2
-eq_lit (HsFrac f1) 	 (HsFrac f2)       = f1 == f2
-
-eq_lit (HsIntPrim i1)	 (HsIntPrim i2)    = i1 == i2
-eq_lit (HsFloatPrim f1)  (HsFloatPrim f2)  = f1 == f2
-eq_lit (HsDoublePrim d1) (HsDoublePrim d2) = d1 == d2
-eq_lit (HsChar c1) 	 (HsChar c2)       = c1 == c2
-eq_lit (HsCharPrim c1)	 (HsCharPrim c2)   = c1 == c2
-eq_lit (HsString s1)	 (HsString s2)     = s1 == s2
-eq_lit (HsStringPrim s1) (HsStringPrim s2) = s1 == s2
-eq_lit (HsLitLit s1)	 (HsLitLit s2)     = s1 == s2 -- ToDo: ??? (dubious)
-eq_lit other1	      	 other2		   = panic "matchLiterals:eq_lit"
+    partition_eqn master_pat eqn = (Nothing, Just eqn)
 \end{code}
