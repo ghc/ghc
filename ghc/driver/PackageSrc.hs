@@ -82,11 +82,13 @@ package_details installing
         extra_cc_opts  = [],
                 -- the RTS forward-references to a bunch of stuff in the prelude,
                 -- so we force it to be included with special options to ld.
-        extra_ld_opts  = map (
+        extra_ld_opts  =
+	   foldr (\ x xs -> "-u" : x : xs) []
+                 (map (
 #ifndef LEADING_UNDERSCORE
-		          "-u "
+		          ""
 #else
-			  "-u _"
+			  "_"
 #endif
                           ++ ) [
            "PrelBase_Izh_static_info"
@@ -119,7 +121,7 @@ package_details installing
          , "PrelIOBase_BlockedOnDeadMVar_closure"
          , "PrelWeak_runFinalizzerBatch_closure"
          , "__init_Prelude"
-         ]
+         ])
         },
 
         Package {
@@ -183,9 +185,9 @@ package_details installing
          extra_cc_opts  = [],
          extra_ld_opts  = [
 #ifndef LEADING_UNDERSCORE
-		          "-u Addr_Azh_static_info"
+		          "-u", "Addr_Azh_static_info"
 #else
-			  "-u _Addr_Azh_static_info"
+			  "-u", "_Addr_Azh_static_info"
 #endif
 			]
         },
