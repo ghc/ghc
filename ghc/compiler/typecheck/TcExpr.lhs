@@ -327,6 +327,14 @@ tc_expr (ExplicitTuple exprs boxity) res_ty
 tc_expr (HsProc pat cmd) res_ty
   = tcProc pat cmd res_ty			`thenM` \ (pat', cmd') ->
     returnM (HsProc pat' cmd')
+
+tc_expr e@(HsArrApp _ _ _ _ _) _
+  = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
+                      ptext SLIT("was found where an expression was expected")])
+
+tc_expr e@(HsArrForm _ _ _) _
+  = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
+                      ptext SLIT("was found where an expression was expected")])
 \end{code}
 
 %************************************************************************
