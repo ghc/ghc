@@ -40,7 +40,7 @@ import GHC.Num
 import GHC.Int
 import GHC.Word
 import GHC.Stable
-import Foreign.Ptr
+import GHC.Ptr
 import GHC.Float
 import GHC.Err
 import GHC.IOBase
