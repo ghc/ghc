@@ -20,6 +20,7 @@ import Bag		( Bag, bagToList, isEmptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Util		( sortLt )
 import Outputable
+import CmdLineOpts	( DynFlags )
 
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr )
@@ -99,9 +100,9 @@ doIfSet flag action | flag      = action
 
 \begin{code}
 dumpIfSet :: DynFlags -> (DynFlags -> Bool) -> String -> SDoc -> IO ()
-dumpIfSet flag hdr doc
-  | not flag  = return ()
-  | otherwise = printDump dump
+dumpIfSet dflags flag hdr doc
+  | not (flag dflags)  = return ()
+  | otherwise          = printDump dump
   where
     dump = vcat [text "", 
 		 line <+> text hdr <+> line,

@@ -111,7 +111,7 @@ import Type		( Type, mkTyConTy, mkTyConApp, mkSigmaTy, mkTyVarTys,
 			  TauType, ClassContext )
 import Unique		( incrUnique, mkTupleTyConUnique, mkTupleDataConUnique )
 import PrelNames
-import CmdLineOpts      ( opt_GlasgowExts )
+import CmdLineOpts      ( DynFlags, dopt_GlasgowExts )
 import Array
 import Maybe 		( fromJust )
 import FiniteMap 	( lookupFM )
@@ -416,9 +416,10 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
-isFFIArgumentTy :: Bool -> Type -> Bool
+isFFIArgumentTy :: DynFlags -> Bool -> Type -> Bool
 -- Checks for valid argument type for a 'foreign import'
-isFFIArgumentTy is_safe ty = checkRepTyCon (legalOutgoingTyCon is_safe) ty
+isFFIArgumentTy dflags is_safe ty 
+   = checkRepTyCon (legalOutgoingTyCon dflags is_safe) ty
 
 isFFIExternalTy :: Type -> Bool
 -- Types that are allowed as arguments of a 'foreign export'
@@ -469,25 +470,26 @@ legalIncomingTyCon :: TyCon -> Bool
 -- bytearrays from a _ccall_ / foreign declaration
 -- (or be passed them as arguments in foreign exported functions).
 legalIncomingTyCon tc
-  | getUnique tc `elem` [ foreignObjTyConKey, byteArrayTyConKey, mutableByteArrayTyConKey ] 
+  | getUnique tc `elem` [ foreignObjTyConKey, byteArrayTyConKey, 
+                                              mutableByteArrayTyConKey ] 
   = False
   -- It's also illegal to make foreign exports that take unboxed
   -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
   | otherwise
   = boxedMarshalableTyCon tc
 
-legalOutgoingTyCon :: Bool -> TyCon -> Bool
+legalOutgoingTyCon :: DynFlags -> Bool -> TyCon -> Bool
 -- Checks validity of types going from Haskell -> external world
 -- The boolean is true for a 'safe' call (when we don't want to
 -- pass Haskell pointers to the world)
-legalOutgoingTyCon be_safe tc
+legalOutgoingTyCon dflags be_safe tc
   | be_safe && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
   = False
   | otherwise
-  = marshalableTyCon tc
+  = marshalableTyCon dflags tc
 
-marshalableTyCon tc
-  =  (opt_GlasgowExts && isUnLiftedTyCon tc)
+marshalableTyCon dflags tc
+  =  (dopt_GlasgowExts dflags && isUnLiftedTyCon tc)
   || boxedMarshalableTyCon tc
 
 boxedMarshalableTyCon tc

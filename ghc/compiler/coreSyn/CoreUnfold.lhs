@@ -37,7 +37,7 @@ import CmdLineOpts	( opt_UF_CreationThreshold,
 		  	  opt_UF_KeenessFactor,
 			  opt_UF_CheapOp, opt_UF_DearOp,
 			  opt_UnfoldCasms, opt_PprStyle_Debug,
-			  opt_D_dump_inlinings
+			  DynFlags, dopt_D_dump_inlinings
 			)
 import CoreSyn
 import PprCore		( pprCoreExpr )
@@ -509,7 +509,8 @@ them inlining is to give them a NOINLINE pragma, which we do in
 StrictAnal.addStrictnessInfoToTopId
 
 \begin{code}
-callSiteInline :: Bool			-- True <=> the Id is black listed
+callSiteInline :: DynFlags
+	       -> Bool			-- True <=> the Id is black listed
 	       -> Bool			-- 'inline' note at call site
 	       -> OccInfo
 	       -> Id			-- The Id
@@ -518,7 +519,7 @@ callSiteInline :: Bool			-- True <=> the Id is black listed
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline black_listed inline_call occ id arg_infos interesting_cont
+callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon cs -> Nothing ;
@@ -612,7 +613,7 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
 		
     in    
 #ifdef DEBUG
-    if opt_D_dump_inlinings then
+    if dopt_D_dump_inlinings dflags then
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "black listed:" <+> ppr black_listed,
 				   text "occ info:" <+> ppr occ,
