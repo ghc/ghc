@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.191 2004/02/27 15:58:54 simonmar Exp $
+ * $Id: Schedule.c,v 1.192 2004/02/27 16:16:31 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -321,7 +321,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
           Capability *initialCapability )
 {
   StgTSO *t;
-  Capability *cap = initialCapability;
+  Capability *cap;
   StgThreadReturnCode ret;
 #if defined(GRAN)
   rtsEvent *event;
@@ -339,7 +339,9 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
   StgTSOWhatNext prev_what_next;
   
   // Pre-condition: sched_mutex is held.
- 
+  // We might have a capability, passed in as initialCapability.
+  cap = initialCapability;
+
 #if defined(RTS_SUPPORTS_THREADS)
   //
   // in the threaded case, the capability is either passed in via the
@@ -440,54 +442,42 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	StgMainThread *m, **prev;
 	prev = &main_threads;
 	for (m = main_threads; m != NULL; prev = &m->link, m = m->link) {
-	  if (m->tso->what_next == ThreadComplete
-	      || m->tso->what_next == ThreadKilled)
-	  {
-	    if (m == mainThread)
-	    {
-              if (m->tso->what_next == ThreadComplete)
-              {
-                if (m->ret)
-                {
-                  // NOTE: return val is tso->sp[1] (see StgStartup.hc)
-                  *(m->ret) = (StgClosure *)m->tso->sp[1]; 
-                }
-                m->stat = Success;
-              }
-              else
-              {
-                if (m->ret)
-                {
-                  *(m->ret) = NULL;
-                }
-                if (was_interrupted)
-                {
-                  m->stat = Interrupted;
-                }
-                else
-                {
-                  m->stat = Killed;
-                }
-              }
-              *prev = m->link;
-	    
+	    if (m->tso->what_next == ThreadComplete
+		|| m->tso->what_next == ThreadKilled) {
+		if (m == mainThread) {
+		    if (m->tso->what_next == ThreadComplete) {
+			if (m->ret) {
+			    // NOTE: return val is tso->sp[1]
+			    // (see StgStartup.hc)
+			    *(m->ret) = (StgClosure *)m->tso->sp[1]; 
+			}
+			m->stat = Success;
+		    } else {
+			if (m->ret) {
+			    *(m->ret) = NULL;
+			}
+			if (was_interrupted) {
+			    m->stat = Interrupted;
+			} else {
+			    m->stat = Killed;
+			}
+		    }
+		    *prev = m->link;
 #ifdef DEBUG
-	      removeThreadLabel((StgWord)m->tso->id);
+		    removeThreadLabel((StgWord)m->tso->id);
 #endif
-              releaseCapability(cap);
-              return;
-            }
-            else
-            {
-                // The current OS thread can not handle the fact that
-                // the Haskell thread "m" has ended.  "m" is bound;
-                // the scheduler loop in it's bound OS thread has to
-                // return, so let's pass our capability directly to
-                // that thread.
-		passCapability(&m->bound_thread_cond);
-		continue;
-            }
-          }
+		    releaseCapability(cap);
+		    return;
+		} else {
+		    // The current OS thread can not handle the fact that
+		    // the Haskell thread "m" has ended.  "m" is bound;
+		    // the scheduler loop in its bound OS thread has to
+		    // return, so let's pass the capability directly to
+		    // that thread.
+		    passCapability(&m->bound_thread_cond);
+		    continue;
+		}
+	    }
 	}
     }
     
@@ -536,19 +526,20 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     }
 #endif
 
-    /* Check whether any waiting threads need to be woken up.  If the
-     * run queue is empty, and there are no other tasks running, we
-     * can wait indefinitely for something to happen.
-     */
-    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue) 
+    //
+    // Check whether any waiting threads need to be woken up.  If the
+    // run queue is empty, and there are no other tasks running, we
+    // can wait indefinitely for something to happen.
+    //
+    if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue)
 #if defined(RTS_SUPPORTS_THREADS)
 		|| EMPTY_RUN_QUEUE()
 #endif
-        )
+	)
     {
       awaitEvent( EMPTY_RUN_QUEUE() );
     }
-    /* we can be interrupted while waiting for I/O... */
+    // we can be interrupted while waiting for I/O...
     if (interrupted) continue;
 
     /* 
@@ -635,7 +626,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 
 #if defined(RTS_SUPPORTS_THREADS)
     if ( EMPTY_RUN_QUEUE() ) {
-      continue; // nothing to do
+	continue; // nothing to do
     }
 #endif
 
