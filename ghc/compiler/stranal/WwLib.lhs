@@ -239,8 +239,7 @@ mkWrapper fun_ty demands
     in
     getUniques n_wrap_args	`thenUs` \ wrap_uniqs ->
     let
---	(tyvars, tau_ty)   = splitForAllTyExpandingDicts fun_ty
-	(tyvars, tau_ty)   = splitForAllTy fun_ty
+	(tyvars, tau_ty)   = splitForAllTyExpandingDicts fun_ty
 	(arg_tys, body_ty) = splitFunTyExpandingDicts tau_ty
 		-- The "expanding dicts" part here is important, even for the splitForAll
 		-- The imported thing might be a dictionary, such as Functor Foo
