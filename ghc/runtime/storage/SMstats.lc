@@ -177,7 +177,7 @@ elapsedtime()
     struct timeb t;
 
     ftime(&t);
-    return t.time + 1e-3*t.millitm - ElapsedTimeStart;
+    return (fabs(t.time + 1e-3*t.millitm - ElapsedTimeStart));
 
 # endif /* HAVE_FTIME */
 #endif /* not stumped */
