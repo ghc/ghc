@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 1999/09/16 08:35:38 sof Exp $
+# $Id: Makefile,v 1.14 1999/10/08 14:16:15 simonmar Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -84,7 +84,8 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 # ../driver/ghc (a better C compiler :-) to compile the
 # different RTS pieces
 #
-CC=$(HC) $(HC_OPTS) $($*_HC_OPTS)
+CC=$(GHC) $(HC_OPTS) $($*_HC_OPTS)
+HC=$(GHC)
 
 # prevent this value from leaking into the GMP makefile
 unexport CC
