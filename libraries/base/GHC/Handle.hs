@@ -740,7 +740,9 @@ addFilePathToIOError fun fp (IOError h iot _ str _)
 --  * 'isDoesNotExistError' if the file does not exist; or
 --
 --  * 'isPermissionError' if the user does not have permission to open the file.
-
+--
+-- Note: if you will be working with files containing binary data, you'll want to
+-- be using 'openBinaryFile'.
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
   catch 
