@@ -59,28 +59,29 @@
 #
 .PHONY: depend
 
-depend :: $(HS_SRCS) $(C_SRCS)
+depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
 	@$(RM) .depend
 	@touch .depend
 ifneq "$(DOC_SRCS)" ""
 	$(MKDEPENDLIT) -o .depend $(MKDEPENDLIT_OPTS) $(filter %.lit,$(DOC_SRCS))
 endif
-ifneq "$(C_SRCS)" ""
-	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(C_SRCS) $(MKDEPENDC_SRCS)
+ifneq "$(MKDEPENDC_SRCS)" ""
+	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) \
+                -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
 endif
-ifneq "$(HS_SRCS)" ""
+ifneq "$(MKDEPENDHS_SRCS)" ""
 ifeq ($(notdir $(MKDEPENDHS)),ghc)
-#	New way of doing dependencies: the ghc driver knows how
+#	New way of doing dependencies: the ghc driver knows how to invoke script
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend \
 		$(foreach way,$(WAYS),-optdep-s -optdep$(way)) \
 		$(MKDEPENDHS_OPTS) \
 		$(HC_OPTS) \
-		$(HS_SRCS)
+		$(MKDEPENDHS_SRCS)
 else
 #	Old way: call mkdependHS-1.2
 	$(MKDEPENDHS) -f .depend $(MKDEPENDHS_OPTS) \
 		$(foreach way,$(WAYS),-s $(way)) \
-		-- $(HC_OPTS) -- $(HS_SRCS) $(MKDEPENDHS_SRCS)
+		-- $(HC_OPTS) -- $(MKDEPENDHS_SRCS)
 endif
 endif
 
@@ -886,7 +887,7 @@ all docs runtests TAGS clean veryclean maintainer-clean install ::
 	  echo "==fptools== $(MAKE) way=$$i $@;"; \
 	  echo "PWD = $(shell pwd)"; \
 	  echo "------------------------------------------------------------------------"; \
-	  $(MAKE) way=$$i $(MFLAGS) $@ ; \
+	  $(MAKE) way=$$i --no-print-directory $(MFLAGS) $@ ; \
 	done
 	@echo "------------------------------------------------------------------------"
 	@echo "===fptools== Finished recusrively making \`$@' for ways: $(WAYS) ..."
