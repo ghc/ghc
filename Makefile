@@ -97,6 +97,9 @@ BIN_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
 BIN_DIST_TMPDIR=$(FPTOOLS_TOP_ABS)
 
 binary-dist-pre::
+ifeq "$(BIN_DIST)" ""
+	echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in your build.mk" && exit 1
+endif
 	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
 	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
