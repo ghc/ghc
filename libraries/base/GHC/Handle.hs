@@ -786,9 +786,13 @@ openFile' filepath mode binary =
 
     let 
       oflags1 = case mode of
-	    	  ReadMode      -> read_flags  
-	    	  WriteMode     -> write_flags 
-	    	  ReadWriteMode -> rw_flags    
+	    	  ReadMode      -> read_flags
+#ifdef mingw32_TARGET_OS
+	    	  WriteMode     -> write_flags .|. o_TRUNC
+#else
+	    	  WriteMode     -> write_flags
+#endif
+	    	  ReadWriteMode -> rw_flags
 	    	  AppendMode    -> append_flags
 
       binary_flags
@@ -807,13 +811,19 @@ openFile' filepath mode binary =
 	      throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    openFd fd Nothing False filepath mode binary
-	`catchException` \e -> do c_close (fromIntegral fd); throw e
+    h <- openFd fd Nothing False filepath mode binary
+            `catchException` \e -> do c_close (fromIntegral fd); throw e
 	-- NB. don't forget to close the FD if openFd fails, otherwise
 	-- this FD leaks.
 	-- ASSERT: if we just created the file, then openFd won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
+#ifndef mingw32_TARGET_OS
+    throwErrnoIf (/=0) "openFile" 
+       (c_ftruncate (fromIntegral fd) 0)
+#endif
+    return h
+
 
 -- | The function creates a temporary file in ReadWrite mode.
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
@@ -864,7 +874,7 @@ openTempFile' loc tmp_dir template binary = do
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
 read_flags   = std_flags    .|. o_RDONLY 
-write_flags  = output_flags .|. o_WRONLY .|. o_TRUNC
+write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
 
