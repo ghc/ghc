@@ -1,7 +1,7 @@
 /* 
  * (c) The University of Glasgow 2002
  *
- * $Id: system.c,v 1.7 2003/02/04 11:55:54 simonmar Exp $
+ * $Id: system.c,v 1.8 2003/07/02 13:27:35 stolz Exp $
  *
  * system Runtime Support
  */
@@ -37,7 +37,7 @@ systemCmd(HsAddr cmd)
 
     switch(pid = fork()) {
     case -1:
-	if (errno != EINTR) {
+	{
 	    return -1;
 	}
     case 0:
