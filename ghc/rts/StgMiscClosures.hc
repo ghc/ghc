@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.28 1999/11/02 15:06:03 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.29 1999/11/02 17:17:47 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -174,10 +174,11 @@ STGFUN(CAF_ENTERED_entry)
    waiting for the evaluation of the closure to finish.
    -------------------------------------------------------------------------- */
 
-/* Note: a black hole must be big enough to be overwritten with an
- * indirection/evacuee/catch.  Thus we claim it has 1 non-pointer word of
- * payload (in addition to the pointer word for the blocking queue), which 
- * should be big enough for an old-generation indirection.  
+/* Note: a BLACKHOLE and BLACKHOLE_BQ must be big enough to be
+ * overwritten with an indirection/evacuee/catch.  Thus we claim it
+ * has 1 non-pointer word of payload (in addition to the pointer word
+ * for the blocking queue in a BQ), which should be big enough for an
+ * old-generation indirection. 
  */
 
 INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,0,0);
@@ -208,7 +209,7 @@ STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
 #ifdef SMP
-    CMPXCHG(R1.cl->header.info, &BLACKHOLE_info, &WHITEHOLE_info);
+    CMPXCHG(R1.cl->header.info, &BLACKHOLE_BQ_info, &WHITEHOLE_info);
 #endif
 
     TICK_ENT_BH();
@@ -232,7 +233,26 @@ INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,,EF_,0,0);
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
+#ifdef SMP
+    CMPXCHG(R1.cl->header.info, &CAF_BLACKHOLE_info, &WHITEHOLE_info);
+
+    TICK_ENT_BH();
+
+    /* Put ourselves on the blocking queue for this black hole */
+    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+    ((StgBlockingQueue *)R1.p)->blocking_queue = CurrentTSO;
+    CurrentTSO->why_blocked = BlockedOnBlackHole;
+    CurrentTSO->block_info.closure = R1.cl;
+    recordMutable((StgMutClosure *)R1.cl);
+    /* Change the CAF_BLACKHOLE into a BLACKHOLE_BQ */
+    ((StgBlockingQueue *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+    /* stg_gen_block is too heavyweight, use a specialised one */
+    BLOCK_NP(1);
+
+#else
     JMP_(BLACKHOLE_entry);
+#endif
+
   FE_
 }
 
