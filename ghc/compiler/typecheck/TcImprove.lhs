@@ -3,6 +3,9 @@ module TcImprove ( tcImprove ) where
 
 #include "HsVersions.h"
 
+import InstEnv		( InstEnv )		-- Reqd for 4.02; InstEnv is a synonym, and
+						-- 4.02 doesn't "see" it soon enough
+
 import Type		( tyVarsOfTypes )
 import Class		( classInstEnv, classExtraBigSig )
 import Unify		( matchTys )

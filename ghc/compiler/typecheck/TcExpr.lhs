@@ -9,7 +9,8 @@ module TcExpr ( tcApp, tcExpr, tcPolyExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsBinds(..), Stmt(..), StmtCtxt(..)
+			  HsBinds(..), Stmt(..), StmtCtxt(..),
+			  mkMonoBind
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds,
@@ -395,7 +396,7 @@ tcMonoExpr (HsLet binds expr) res_ty
   where
     tc_expr = tcMonoExpr expr res_ty `thenTc` \ (expr', lie) ->
 	      returnTc (expr', lie)
-    combiner is_rec bind expr = HsLet (MonoBind bind [] is_rec) expr
+    combiner is_rec bind expr = HsLet (mkMonoBind bind [] is_rec) expr
 
 tcMonoExpr in_expr@(HsCase scrut matches src_loc) res_ty
   = tcAddSrcLoc src_loc			$

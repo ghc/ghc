@@ -29,7 +29,7 @@ module TcGenDeriv (
 import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
 			  HsBinds(..), StmtCtxt(..), HsType(..),
-			  unguardedRHS, mkSimpleMatch
+			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList
 			)
 import RdrHsSyn		( mkOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkSrcUnqual )
@@ -1170,10 +1170,7 @@ mk_easy_FunMonoBind loc fun pats binds expr
   = FunMonoBind fun False{-not infix-} [mk_easy_Match loc pats binds expr] loc
 
 mk_easy_Match loc pats binds expr
-  = mk_match loc pats expr (mkbind binds)
-  where
-    mkbind [] = EmptyBinds
-    mkbind bs = MonoBind (foldr1 AndMonoBinds bs) [] Recursive
+  = mk_match loc pats expr (mkMonoBind (andMonoBindList binds) [] Recursive)
 	-- The renamer expects everything in its input to be a
 	-- "recursive" MonoBinds, and it is its job to sort things out
 	-- from there.

@@ -453,6 +453,10 @@ data Stmt id pat
 		SrcLoc
 
   | ReturnStmt	(HsExpr id pat)		-- List comps only, at the end
+
+consLetStmt :: HsBinds id pat -> [Stmt id pat] -> [Stmt id pat]
+consLetStmt EmptyBinds stmts = stmts
+consLetStmt binds      stmts = LetStmt binds : stmts
 \end{code}
 
 \begin{code}

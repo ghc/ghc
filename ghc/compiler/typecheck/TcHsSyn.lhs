@@ -235,7 +235,7 @@ zonkBinds binds
 	    fixNF_Tc (\ ~(_, new_ids) ->
 		tcExtendGlobalValEnv (bagToList new_ids)	$
 		zonkMonoBinds bind				`thenNF_Tc` \ (new_bind, new_ids) ->
-		thing_inside (MonoBind new_bind [] is_rec)	`thenNF_Tc` \ stuff ->
+		thing_inside (mkMonoBind new_bind [] is_rec)	`thenNF_Tc` \ stuff ->
 		returnNF_Tc (stuff, new_ids)
 	    )							`thenNF_Tc` \ (stuff, _) ->
 	   returnNF_Tc stuff

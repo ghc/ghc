@@ -12,7 +12,8 @@ import {-# SOURCE #-}	TcExpr( tcExpr )
 
 import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
 			  MonoBinds(..), StmtCtxt(..), Stmt(..),
-			  pprMatch, getMatchLoc
+			  pprMatch, getMatchLoc, consLetStmt,
+			  mkMonoBind
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt )
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt )
@@ -212,7 +213,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 	-- glue_on just avoids stupid dross
 glue_on _ EmptyMonoBinds grhss = grhss		-- The common case
 glue_on is_rec mbinds (GRHSs grhss binds ty)
-  = GRHSs grhss (MonoBind mbinds [] is_rec `ThenBinds` binds) ty
+  = GRHSs grhss (mkMonoBind mbinds [] is_rec `ThenBinds` binds) ty
 
 tcGRHSs :: RenamedGRHSs
 	-> TcType -> StmtCtxt
@@ -341,8 +342,7 @@ tcStmts do_or_lc m (stmt@(BindStmt pat exp src_loc) : stmts) elt_ty
 	lie_avail stmts_lie			`thenTc` \ (final_lie, dict_binds) ->
 
     returnTc (BindStmt pat' exp' src_loc : 
-	        LetStmt (MonoBind dict_binds [] Recursive) :
-	          stmts',
+	        consLetStmt (mkMonoBind dict_binds [] Recursive) stmts',
   	      lie_req `plusLIE` final_lie)
 
 tcStmts do_or_lc m (LetStmt binds : stmts) elt_ty
@@ -351,7 +351,7 @@ tcStmts do_or_lc m (LetStmt binds : stmts) elt_ty
   	binds
   	(tcStmts do_or_lc m stmts elt_ty)
      where
-      	combine is_rec binds' stmts' = LetStmt (MonoBind binds' [] is_rec) : stmts'
+      	combine is_rec binds' stmts' = consLetStmt (mkMonoBind binds' [] is_rec) stmts'
 
 
 isDoStmt DoStmt = True

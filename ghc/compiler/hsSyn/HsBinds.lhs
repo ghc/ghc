@@ -60,6 +60,10 @@ nullBinds :: HsBinds id pat -> Bool
 nullBinds EmptyBinds		= True
 nullBinds (ThenBinds b1 b2)	= nullBinds b1 && nullBinds b2
 nullBinds (MonoBind b _ _)	= nullMonoBinds b
+
+mkMonoBind :: MonoBinds id pat -> [Sig id] -> RecFlag -> HsBinds id pat
+mkMonoBind EmptyMonoBinds _ _ = EmptyBinds
+mkMonoBind mbinds sigs is_rec = MonoBind mbinds sigs is_rec
 \end{code}
 
 \begin{code}
@@ -151,10 +155,11 @@ So the desugarer tries to do a better job:
 				      in (fm,gm)
 
 \begin{code}
-nullMonoBinds :: MonoBinds id pat -> Bool
+-- We keep the invariant that a MonoBinds is only empty 
+-- if it is exactly EmptyMonoBinds
 
+nullMonoBinds :: MonoBinds id pat -> Bool
 nullMonoBinds EmptyMonoBinds	     = True
-nullMonoBinds (AndMonoBinds bs1 bs2) = nullMonoBinds bs1 && nullMonoBinds bs2
 nullMonoBinds other_monobind	     = False
 
 andMonoBinds :: MonoBinds id pat -> MonoBinds id pat -> MonoBinds id pat
@@ -163,7 +168,17 @@ andMonoBinds mb EmptyMonoBinds = mb
 andMonoBinds mb1 mb2 = AndMonoBinds mb1 mb2
 
 andMonoBindList :: [MonoBinds id pat] -> MonoBinds id pat
-andMonoBindList binds = foldr AndMonoBinds EmptyMonoBinds binds
+andMonoBindList binds
+  = loop1 binds
+  where
+    loop1 [] = EmptyMonoBinds
+    loop1 (EmptyMonoBinds : binds) = loop1 binds
+    loop1 (b:bs) = loop2 b bs
+
+	-- acc is non-empty
+    loop2 acc [] = acc
+    loop2 acc (EmptyMonoBinds : bs) = loop2 acc bs
+    loop2 acc (b:bs) = loop2 (acc `AndMonoBinds` b) bs
 \end{code}
 
 \begin{code}
