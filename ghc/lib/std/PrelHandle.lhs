@@ -35,15 +35,13 @@ import PrelConc				-- concurrent only
 
 %*********************************************************
 %*							*
-\subsection{Types @FilePath@, @Handle@, @Handle__@}
+\subsection{Types @Handle@, @Handle__@}
 %*							*
 %*********************************************************
 
 The @Handle@ and @Handle__@ types are defined in @IOBase@.
 
 \begin{code}
-type FilePath = String
-
 {-# INLINE newHandle   #-}
 {-# INLINE readHandle  #-}
 {-# INLINE writeHandle #-}

@@ -291,6 +291,13 @@ constructErrorMsg call_site reason =
  return (IOError Nothing iot call_site msg)
 \end{code}
 
+File names are specified using @FilePath@, a OS-dependent
+string that (hopefully, I guess) maps to an accessible file/object.
+
+\begin{code}
+type FilePath = String
+\end{code}
+
 %*********************************************************
 %*							*
 \subsection{Types @Handle@, @Handle__@}
@@ -367,7 +374,7 @@ data Handle__
       haFO__	      :: FILE_OBJECT,
       haType__        :: Handle__Type,
       haBufferMode__  :: BufferMode,
-      haFilePath__    :: String
+      haFilePath__    :: FilePath
     }      
 
 {-
