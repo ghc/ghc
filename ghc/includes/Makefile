@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.28 2005/03/02 09:48:16 simonmar Exp $
+# $Id: Makefile,v 1.29 2005/03/22 11:53:48 simonmar Exp $
 #
 
 TOP = ..
@@ -109,8 +109,6 @@ CLEAN_FILES += mkDerivedConstantsHdr$(exeext) DerivedConstants.h
 #
 
 all :: GHCConstants.h
-
-mkGHCConstants.c : $(H_CONFIG)
 
 mkGHCConstants : mkGHCConstants.o
 	$(CC) -o $@ $(CC_OPTS) $(LD_OPTS) mkGHCConstants.o
