@@ -20,7 +20,7 @@ TOP=..
 # set of suffix rules for compiling C code, using $(HC) rather than $(CC)
 # and prepending "-optc" to $(CC_OPTS).  NB. must be done before including
 # boilerplate.mk below.
-UseGhcForCc = $(shell if (test "x$(BootingFromHc)" = "xYES"); then echo NO; else echo YES; fi)
+UseGhcForCc = YES
 
 include $(TOP)/mk/boilerplate.mk
 
@@ -175,12 +175,11 @@ SRC_MKDEPENDC_OPTS += -I. -I../includes
 
 AUTO_APPLY = AutoApply.hc
 
-gen_apply : GenApply.hs
-	$(GHC) -o $@ -I$(GHC_INCLUDE_DIR) GenApply.hs 
-
+ifneq "$(BootingFromHc)" "YES"
 $(AUTO_APPLY): $(GHC_GENAPPLY)
 	@$(RM) $@
 	$(GHC_GENAPPLY) >$@
+endif
 
 EXTRA_SRCS += $(AUTO_APPLY)
 
