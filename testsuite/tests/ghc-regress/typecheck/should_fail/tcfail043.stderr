@@ -4,4 +4,4 @@ tcfail043.hs:15:
       `Ord_ a' arising from use of `gt' at tcfail043.hs:38
     Possible cause: the monomorphism restriction applied to the following:
       search :: a -> [a] -> Bool (bound at tcfail043.hs:38)
-    Probable fix: give these definitions an explicit type signature
+    Probable fix: give these definition(s) an explicit type signature
