@@ -133,9 +133,12 @@ sub constructNewHiFile {
     $mod_name_dec =~ s/ZZ/Z/g;
 
     if ($Specific_hi_file eq '') {  # -ohi is used even if  module name != stem of filename.
-        ($hiname = $hifile_target) = $1 if  $hifile_target =~ /\/?([^\/\.]+)\.$HiSuffix/;
+        ($hiname = $hifile_target) = $1 if  $hifile_target =~ /\/?([^\/]+)\.$HiSuffix$/;
         if ( $mod_name_dec ne $hiname ) {
-          ($hidir  = $hifile_target) =~ s/(.*)$hiname\.$HiSuffix/$1/;
+	  $hidir = '';
+	  # strip off basename only if we've got a dirname.
+          ($hidir  = $hifile_target) =~ s/(.*\/)[^\/]*$/$1/
+	              if ( $hifile_target =~ /\/$hiname\.$HiSuffix/ ); 
 	  $hifile_target = $hidir . $mod_name_dec . ".$HiSuffix";
         }
     }
