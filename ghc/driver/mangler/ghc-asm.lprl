@@ -104,7 +104,7 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|netbsd|nextstep3|cygwin32|mingw32)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/ ) {
 				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -135,12 +135,12 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\.text\n\t\.align 2,0x90\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd|netbsd_elf)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|freebsd3)$/ ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = # regexp that says what comes before APP/NO_APP
-		      ($TargetPlatform =~ /-(linux|freebsd|netbsd_elf)$/) ? '#' : '/' ;
+		      ($TargetPlatform =~ /-(linux|freebsd3)$/) ? '#' : '/' ;
     $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
     $T_X86_PRE_LLBL_PAT = '\.L';
@@ -150,7 +150,7 @@ sub init_TARGET_STUFF {
     $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.Lfe.*\n\t\.size\s+.*|\.size\s+.*|\.ident.*)\n)';
     $T_COPY_DIRVS   = '\.(globl)';
 
-    if ( $TargetPlatform =~ /freebsd|netbsd_elf/ ) {
+    if ( $TargetPlatform =~ /freebsd3/ ) {
         $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
     } else {
         $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
@@ -478,11 +478,6 @@ sub mangle_asm {
 
 	    $srtchk{$1} = $i;
 
-	} elsif ( /^$TUS[@]?([A-Za-z0-9_]+)_ct$TPOSTLBL[@]?$/o ) {
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'data';
-	    $chksymb[$i] = '';
-
 	} elsif ( /^$TUS[@]?ghc.*c_ID$TPOSTLBL/o ) {
 	    $chk[++$i]  = $_;
 	    $chkcat[$i] = 'consist';
@@ -492,6 +487,7 @@ sub mangle_asm {
 
 	} elsif ( /^$TUS[A-Za-z0-9_]+\.\d+$TPOSTLBL[@]?$/o
 	       || /^$TUS[@]?.*_CAT$TPOSTLBL[@]?$/o 		# PROF: _entryname_CAT
+	       || /^$TUS[@]?CC_.*_struct$TPOSTLBL[@]?$/o	# PROF: _CC_ccident_struct
 	       || /^$TUS[@]?.*_done$TPOSTLBL[@]?$/o		# PROF: _module_done
 	       || /^$TUS[@]?_module_registered$TPOSTLBL[@]?$/o	# PROF: _module_registered
 	       ) {
@@ -509,7 +505,7 @@ sub mangle_asm {
  	    $chkcat[$i]  = 'toc';
    	    $chksymb[$i] = $1;
 
-	} elsif ( /^$TUS[@]?([A-Za-z0-9_]+)_cc(s)?$TPOSTLBL[@]?$/o ) {
+ 	} elsif ( /^$TUS[@]?CC(S)?_.*$/ ) {
             # all CC_ symbols go in the data section...
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
@@ -687,9 +683,6 @@ sub mangle_asm {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
 
-		# HWL HACK: dont die, just print a warning
-		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
-		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 		die "Prologue junk?: $p\n" if $p =~ /^\t[^\.]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
@@ -730,9 +723,6 @@ sub mangle_asm {
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
-		# HWL HACK: dont die, just print a warning
-		#print stderr "HWL: this should die! Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
-		#    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 		die "Epilogue junk?: $e\n" if $e =~ /^\t[^\.]/
 		    && $TargetPlatform !~ /^powerpc-/; #ToDo: remove test
 
