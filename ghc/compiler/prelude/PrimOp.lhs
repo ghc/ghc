@@ -363,7 +363,7 @@ See also @primOpIsCheap@ (below).
 primOpOkForSpeculation :: PrimOp -> Bool
 	-- See comments with CoreUtils.exprOkForSpeculation
 primOpOkForSpeculation op 
-  = primOpIsCheap op && not (primOpCanFail op)
+  = not (primOpHasSideEffects op || primOpOutOfLine op || primOpCanFail op)
 \end{code}
 
 
@@ -376,8 +376,9 @@ than once.  Evaluation order is unaffected.
 
 \begin{code}
 primOpIsCheap :: PrimOp -> Bool
-	-- See comments with CoreUtils.exprOkForSpeculation
-primOpIsCheap op = not (primOpHasSideEffects op || primOpOutOfLine op)
+primOpIsCheap op = False
+	-- March 2001: be less eager to inline PrimOps
+	-- Was: not (primOpHasSideEffects op || primOpOutOfLine op)
 \end{code}
 
 primOpIsDupable
