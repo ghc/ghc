@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/10/15 21:40:49 $
+ * $Revision: 1.13 $
+ * $Date: 1999/10/15 22:35:04 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -32,6 +32,13 @@
 
 
 Bool haskell98 = TRUE;                  /* TRUE => Haskell 98 compatibility*/
+
+#if EXPLAIN_INSTANCE_RESOLUTION
+Bool showInstRes = FALSE;
+#endif
+#if MULTI_INST
+Bool multiInstRes = FALSE;
+#endif
 
 /* --------------------------------------------------------------------------
  * Local function prototypes:
@@ -83,7 +90,8 @@ static Void   local forgetScriptsFrom Args((Script));
 static Void   local setLastEdit       Args((String,Int));
 static Void   local failed            Args((Void));
 static String local strCopy           Args((String));
-
+static Void   local browseit	      Args((Module,String));
+static Void   local browse	      Args((Void));
 
 /* --------------------------------------------------------------------------
  * Machine dependent code for Hugs interpreter:
@@ -231,12 +239,12 @@ char *argv[]; {
        hugsEnableOutput(0);
     }
 
-    Printf("__   __ __  __  ____   ___     _______________________________________________\n");
-    Printf("||   || ||  || ||  || ||__     Hugs 98: The Nottingham and Yale Haskell system\n");
-    Printf("||___|| ||__|| ||__||  __||    Copyright (c) 1994-1999\n");
-    Printf("||---||         ___||          World Wide Web: http://haskell.org/hugs\n");
-    Printf("||   ||                        Report bugs to: hugs-bugs@haskell.org\n");
-    Printf("||   || Version: %s _______________________________________________\n\n",HUGS_VERSION);
+    Printf("__   __ __  __  ____   ___      _________________________________________\n");
+    Printf("||   || ||  || ||  || ||__      Hugs 98: Based on the Haskell 98 standard\n");
+    Printf("||___|| ||__|| ||__||  __||     Copyright (c) 1994-1999\n");
+    Printf("||---||         ___||           World Wide Web: http://haskell.org/hugs\n");
+    Printf("||   ||                         Report bugs to: hugs-bugs@haskell.org\n");
+    Printf("||   || Version: %s _________________________________________\n\n",HUGS_VERSION);
 
 #if SYMANTEC_C
     Printf("   Ported to Macintosh by Hans Aberg, compiled " __DATE__ ".\n\n");
@@ -272,13 +280,14 @@ String argv[]; {
     namesUpto     = 1;
 
 #if HUGS_FOR_WINDOWS
-    hugsEdit      = strCopy(fromEnv("EDITOR","c:\\windows\notepad.exe"));
+    hugsEdit      = strCopy(fromEnv("EDITOR","c:\\windows\\notepad.exe"));
 #elif SYMANTEC_C
     hugsEdit      = "";
 #else
     hugsEdit      = strCopy(fromEnv("EDITOR",NULL));
 #endif
-    hugsPath      = strCopy(HUGSPATH); readOptions("-p\"%s> \" -r$$");
+    hugsPath      = strCopy(HUGSPATH);
+    readOptions("-p\"%s> \" -r$$");
 #if USE_REGISTRY
     projectPath   = strCopy(readRegChildStrings(HKEY_LOCAL_MACHINE,ProjectRoot,
                                                 "HUGSPATH", PATHSEP, ""));
@@ -347,6 +356,7 @@ String argv[]; {
 
 struct options {                        /* command line option toggles     */
     char   c;                           /* table defined in main app.      */
+    int    h98;
     String description;
     Bool   *flag;
 };
@@ -370,7 +380,7 @@ Bool state; {                           /* given state                     */
     Int count = 0;
     Int i;
     for (i=0; toggle[i].c; ++i)
-        if (*toggle[i].flag == state) {
+ 	if (*toggle[i].flag == state && (!haskell98 || toggle[i].h98)) {
             if (count==0)
                 Putchar((char)(state ? '+' : '-'));
             Putchar(toggle[i].c);
@@ -386,8 +396,11 @@ static Void local optionInfo() {        /* Print information about command */
     Int    i;
 
     Printf("TOGGLES: groups begin with +/- to turn options on/off resp.\n");
-    for (i=0; toggle[i].c; ++i)
-        Printf(fmtc,toggle[i].c,toggle[i].description);
+    for (i=0; toggle[i].c; ++i) {
+	if (!haskell98 || toggle[i].h98) {
+  	    Printf(fmtc,toggle[i].c,toggle[i].description);
+	}
+    }
 
     Printf("\nOTHER OPTIONS: (leading + or - makes no difference)\n");
     Printf(fmts,"hnum","Set heap size (cannot be changed within Hugs)");
@@ -423,8 +436,8 @@ ToDo
     Printf("\nPreprocessor    : -F");
     printString(preprocessor);
 #endif
-    Printf("\nCompatibility   : %s", haskell98 ? "Haskell 98"
-                                               : "Hugs Extensions");
+    Printf("\nCompatibility   : %s", haskell98 ? "Haskell 98 (+98)"
+ 					       : "Hugs Extensions (-98)");
     Putchar('\n');
 }
 
@@ -472,6 +485,7 @@ static String local optionsToStr() {          /* convert options to string */
         PUTC(toggle[i].c);
         PUTC(' ');
     }
+    PUTS(haskell98 ? "+98 " : "-98 ");
     PUTInt('h',hpSize);  PUTC(' ');
     PUTStr('p',prompt);
     PUTStr('r',repeatStr);
@@ -666,6 +680,11 @@ static struct cmd cmds[] = {
  {":names",  NAMES},  {":info", INFO},    {":project", PROJECT},
  {":dump",   DUMP},   {":ztats", STATS},
  {":module",SETMODULE}, 
+ {":browse", BROWSE},
+#if EXPLAIN_INSTANCE_RESOLUTION
+ {":xplain", XPLAIN},
+#endif
+ {":version", PNTVER},
  {"",      EVAL},
  {0,0}
 };
@@ -688,10 +707,15 @@ static Void local menu() {
     Printf(":set                help on command line options\n");
     Printf(":names [pat]        list names currently in scope\n");
     Printf(":info <names>       describe named objects\n");
+    Printf(":browse <modules>   browse names defined in <modules>\n");
+#if EXPLAIN_INSTANCE_RESOLUTION
+    Printf(":xplain <context>   explain instance resolution for <context>\n");
+#endif
     Printf(":find <name>        edit module containing definition of name\n");
     Printf(":!command           shell escape\n");
     Printf(":cd dir             change directory\n");
     Printf(":gc                 force garbage collection\n");
+    Printf(":version            print Hugs version\n");
     Printf(":dump <name>        print STG code for named fn\n");
 #ifdef CRUDE_PROFILING
     Printf(":ztats <name>       print reduction stats\n");
@@ -713,22 +737,40 @@ static Void local forHelp() {
  * ------------------------------------------------------------------------*/
 
 struct options toggle[] = {             /* List of command line toggles    */
-    {'s', "Print no. reductions/cells after eval", &showStats},
-    {'t', "Print type after evaluation",           &addType},
-    /*ToDo??    {'f', "Terminate evaluation on first error",   &failOnError},*/
-    {'g', "Print no. cells recovered after gc",    &gcMessages},
-    {'l', "Literate modules as default",           &literateScripts},
-    {'e', "Warn about errors in literate modules", &literateErrors},
-    {'.', "Print dots to show progress",           &useDots},
-    {'q', "Print nothing to show progress",        &quiet},
-    {'w', "Always show which modules are loaded",  &listScripts},
-    {'k', "Show kind errors in full",              &kindExpert},
-    {'o', "Allow overlapping instances",           &allowOverlap},
-    {'O', "Optimise (improve?) generated code",    &optimise},
+    {'s', 1, "Print no. reductions/cells after eval", &showStats},
+    {'t', 1, "Print type after evaluation",           &addType},
+    {'g', 1, "Print no. cells recovered after gc",    &gcMessages},
+    {'l', 1, "Literate modules as default",           &literateScripts},
+    {'e', 1, "Warn about errors in literate modules", &literateErrors},
+    {'.', 1, "Print dots to show progress",           &useDots},
+    {'q', 1, "Print nothing to show progress",        &quiet},
+    {'w', 1, "Always show which modules are loaded",  &listScripts},
+    {'k', 1, "Show kind errors in full",              &kindExpert},
+    {'o', 0, "Allow overlapping instances",           &allowOverlap},
+    {'O', 1, "Optimise (improve?) generated code",    &optimise},
+
+
 #if DEBUG_CODE
-    {'D', "Debug: show generated code",            &debugCode},
+    {'D', 1, "Debug: show generated code",            &debugCode},
 #endif
-    {0,   0,                                       0}
+#if EXPLAIN_INSTANCE_RESOLUTION
+    {'x', 1, "Explain instance resolution",           &showInstRes},
+#endif
+#if MULTI_INST
+    {'m', 0, "Use multi instance resolution",         &multiInstRes},
+#endif
+#if DEBUG_CODE
+    {'D', 1, "Debug: show generated G code",          &debugCode},
+#endif
+#if DEBUG_SHOWSC
+    {'S', 1, "Debug: show generated SC code",         &debugSC},
+#endif
+#if 0
+    {'f', 1, "Terminate evaluation on first error",   &failOnError},
+    {'u', 1, "Use \"show\" to display results",       &useShow},
+    {'i', 1, "Chase imports while loading modules",   &chaseImports}, 
+#endif
+    {0,   0, 0,                                       0}
 };
 
 static Void local set() {               /* change command line options from*/
@@ -1370,6 +1412,83 @@ static Void local showtype() {         /* print type of expression (if any)*/
     Putchar('\n');
 }
 
+
+static Void local browseit(mod,t)
+Module mod; 
+String t; {
+#if 0
+  /* AJG: DISABLED FOR NOW */
+    if (nonNull(mod)) {
+	Cell cs;
+	Printf("module %s where\n",textToStr(module(mod).text));
+	for (cs = module(mod).names; nonNull(cs); cs=tl(cs)) {
+	    Name nm = hd(cs);
+	    /* only look at things defined in this module */
+	    if (name(nm).mod == mod) {
+		/* unwanted artifacts, like lambda lifted values,
+		   are in the list of names, but have no types */
+		if (nonNull(name(nm).type)) {
+		    printExp(stdout,nm);
+		    Printf(" :: ");
+		    printType(stdout,name(nm).type);
+		    if (isCfun(nm)) {
+			Printf("  -- data constructor");
+		    } else if (isMfun(nm)) {
+			Printf("  -- class member");
+		    } else if (isSfun(nm)) {
+			Printf("  -- selector function");
+		    }
+		    if (name(nm).primDef) {
+			Printf("   -- primitive");
+		    }
+		    Printf("\n");
+		}
+	    }
+	}
+    } else {
+      if (isNull(mod)) {
+	Printf("Unknown module %s\n",t);
+      }
+    }
+#endif
+}
+
+static Void local browse() {            /* browse modules                  */
+    Int    count = 0;                   /* or give menu of commands        */
+    String s;
+
+    setCurrModule(findEvalModule());
+    startNewScript(0);                  /* for recovery of storage         */
+    for (; (s=readFilename())!=0; count++) {
+	browseit(findModule(findText(s)),s);
+    }
+    if (count == 0) {
+	whatScripts();
+    }
+}
+
+#if EXPLAIN_INSTANCE_RESOLUTION
+static Void local xplain() {         /* print type of expression (if any)*/
+    Cell type;
+    Cell d;
+    Bool sir = showInstRes;
+
+    setCurrModule(findEvalModule());
+    startNewScript(0);                 /* Enables recovery of storage      */
+				       /* allocated during evaluation      */
+    parseContext();
+    checkContext();
+    showInstRes = TRUE;
+    d = provePred(NIL,NIL,hd(inputContext));
+    if (isNull(d)) {
+	fprintf(stdout, "not Sat\n");
+    } else {
+	fprintf(stdout, "Sat\n");
+    }
+    showInstRes = sir;
+}
+#endif
+
 /* --------------------------------------------------------------------------
  * Enhanced help system:  print current list of scripts or give information
  * about an object.
@@ -1502,7 +1621,6 @@ Text t; {
     Tycon  tc  = findTycon(t);
     Class  cl  = findClass(t);
     Name   nm  = findName(t);
-    Module mod = findModule(t);
 
     if (nonNull(tc)) {                  /* as a type constructor           */
         Type t = tc;
@@ -1591,6 +1709,18 @@ Text t; {
             Printf(" => ");
         }
         printPred(stdout,cclass(cl).head);
+#if 0
+	/* AJG: commented out for now */
+	if (nonNull(cclass(cl).fds)) {
+	    List   fds = cclass(cl).fds;
+	    String pre = " | ";
+	    for (; nonNull(fds); fds=tl(fds)) {
+		Printf(pre);
+		printFD(stdout,hd(fds));
+		pre = ", ";
+	    }
+	}
+#endif
         if (nonNull(cclass(cl).members)) {
             List ms = cclass(cl).members;
             Printf(" where");
@@ -1639,32 +1769,8 @@ Text t; {
         Printf("\n\n");
     }
 
-    if (nonNull(mod)) {                 /* as a module                     */
-        List t;
-        Printf("-- module\n");
 
-        Printf("\n-- values\n");
-        for (t=module(mod).names; nonNull(t); t=tl(t)) {
-           Name nm = hd(t);
-           Printf ( "%s ", textToStr(name(nm).text));
-        }
-
-        Printf("\n\n-- type constructors\n");
-        for (t=module(mod).tycons; nonNull(t); t=tl(t)) {
-           Tycon tc = hd(t);
-           Printf ( "%s ", textToStr(tycon(tc).text));
-        }
-
-        Printf("\n\n-- classes\n");
-        for (t=module(mod).classes; nonNull(t); t=tl(t)) {
-           Class cl = hd(t);
-           Printf ( "%s ", textToStr(cclass(cl).text));
-        }
-
-        Printf("\n\n");
-    }
-
-    if (isNull(tc) && isNull(cl) && isNull(nm) && isNull(mod)) {
+    if (isNull(tc) && isNull(cl) && isNull(nm)) {
         Printf("Unknown reference `%s'\n",textToStr(t));
     }
 }
@@ -1828,6 +1934,12 @@ String argv[]; {
                           break;
             case TYPEOF : showtype();
                           break;
+	    case BROWSE : browse();
+			  break;
+#if EXPLAIN_INSTANCE_RESOLUTION
+	    case XPLAIN : xplain();
+			  break;
+#endif
             case NAMES  : listNames();
                           break;
             case HELP   : menu();
@@ -1848,6 +1960,9 @@ String argv[]; {
                           break;
             case INFO   : info();
                           break;
+	    case PNTVER: Printf("-- Hugs Version %s\n",
+				 HUGS_VERSION);
+ 			  break;
             case DUMP   : dumpStg();
                           break;
             case QUIT   : return;
@@ -2063,7 +2178,7 @@ String s; {
 
 /* ----------------------------------------------------------------------- */
 
-#define BufferSize 5000               /* size of redirected output buffer  */
+#define BufferSize 10000              /* size of redirected output buffer  */
 
 typedef struct _HugsStream {
     char buffer[BufferSize];          /* buffer for redirected output      */

@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: command.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/15 21:41:03 $
+ * $Revision: 1.6 $
+ * $Date: 1999/10/15 22:35:05 $
  * ------------------------------------------------------------------------*/
 
 typedef Int Command;
@@ -41,6 +41,9 @@ extern Command readCommand Args((struct cmd *, Char, Char));
 #define SETMODULE 17
 #define DUMP    18
 #define STATS   19
-#define NOCMD   20
+#define BROWSE  20
+#define XPLAIN  21
+#define PNTVER  22
+#define NOCMD   23
 
 /*-------------------------------------------------------------------------*/
