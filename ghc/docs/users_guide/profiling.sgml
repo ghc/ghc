@@ -843,6 +843,10 @@ x = nfib 25
       information simultaneously.</para>
     </sect2>
 
+
+
+
+
   </sect1>
 
   <sect1 id="prof-xml-tool">
@@ -1064,6 +1068,132 @@ hp2ps [flags] [&lt;file&gt;[.hp]]
 	</listItem>
       </varListEntry>
     </variableList>
+
+
+    <sect2 id="manipulating-hp">
+      <title>Manipulating the hp file</title>
+
+<para>(Notes kindly offered by Jan-Willhem Maessen.)</para>
+
+<para>
+The <filename>FOO.hp</filename> file produced when you ask for the
+heap profile of a program <filename>FOO</filename> is a text file with a particularly
+simple structure. Here's a representative example, with much of the
+actual data omitted:
+<screen>
+JOB "FOO -hC"
+DATE "Thu Dec 26 18:17 2002"
+SAMPLE_UNIT "seconds"
+VALUE_UNIT "bytes"
+BEGIN_SAMPLE 0.00
+END_SAMPLE 0.00
+BEGIN_SAMPLE 15.07
+  ... sample data ...
+END_SAMPLE 15.07
+BEGIN_SAMPLE 30.23
+  ... sample data ...
+END_SAMPLE 30.23
+... etc.
+BEGIN_SAMPLE 11695.47
+END_SAMPLE 11695.47
+</screen>
+The first four lines (<literal>JOB</literal>, <literal>DATE</literal>, <literal>SAMPLE_UNIT</literal>, <literal>VALUE_UNIT</literal>) form a
+header.  Each block of lines starting with <literal>BEGIN_SAMPLE</literal> and ending
+with <literal>END_SAMPLE</literal> forms a single sample (you can think of this as a
+vertical slice of your heap profile).  The hp2ps utility should accept
+any input with a properly-formatted header followed by a series of
+*complete* samples.
+</para>
+</sect2>
+
+    <sect2>
+      <title>Zooming in on regions of your profile</title>
+
+<para>
+You can look at particular regions of your profile simply by loading a
+copy of the <filename>.hp</filename> file into a text editor and deleting the unwanted
+samples.  The resulting <filename>.hp</filename> file can be run through <command>hp2ps</command> and viewed
+or printed.
+</para>
+</sect2>
+
+    <sect2>
+      <title>Viewing the heap profile of a running program</title>
+
+<para>
+The <filename>.hp</filename> file is generated incrementally as your
+program runs.  In principle, running <command>hp2ps</command> on the incomplete file
+should produce a snapshot of your program's heap usage.  However, the
+last sample in the file may be incomplete, causing <command>hp2ps</command> to fail.  If
+you are using a machine with UNIX utilities installed, it's not too
+hard to work around this problem (though the resulting command line
+looks rather Byzantine):
+<screen>
+  head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
+    | hp2ps > FOO.ps
+</screen>
+
+The command <command>fgrep -n END_SAMPLE FOO.hp</command> finds the
+end of every complete sample in <filename>FOO.hp</filename>, and labels each sample with
+its ending line number.  We then select the line number of the last
+complete sample using <command>tail</command> and <command>cut</command>.  This is used as a
+parameter to <command>head</command>; the result is as if we deleted the final
+incomplete sample from <filename>FOO.hp</filename>.  This results in a properly-formatted
+.hp file which we feed directly to <command>hp2ps</command>.
+</para>
+</sect2>
+    <sect2>
+      <title>Viewing a heap profile in real time</title>
+
+<para>
+The <command>gv</command> and <command>ghostview</command> programs
+have a "watch file" option can be used to view an up-to-date heap
+profile of your program as it runs.  Simply generate an incremental
+heap profile as described in the previous section.  Run <command>gv</command> on your
+profile:
+<screen>
+  gv -watch -seascape FOO.ps 
+</screen>
+If you forget the <literal>-watch</literal> flag you can still select
+"Watch file" from the "State" menu.  Now each time you generate a new
+profile <filename>FOO.ps</filename> the view will update automatically.
+</para>
+
+<para>
+This can all be encapsulated in a little script:
+<screen>
+  #!/bin/sh
+  head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
+    | hp2ps > FOO.ps
+  gv -watch -seascape FOO.ps &
+  while [ 1 ] ; do
+    sleep 10 # We generate a new profile every 10 seconds.
+    head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
+      | hp2ps > FOO.ps
+  done
+</screen>
+Occasionally <command>gv</command> will choke as it tries to read an incomplete copy of
+<filename>FOO.ps</filename> (because <command>hp2ps</command> is still running as an update
+occurs).  A slightly more complicated script works around this
+problem, by using the fact that sending a SIGHUP to gv will cause it
+to re-read its input file:
+<screen>
+  #!/bin/sh
+  head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
+    | hp2ps > FOO.ps
+  gv FOO.ps &
+  gvpsnum=$!
+  while [ 1 ] ; do
+    sleep 10
+    head -`fgrep -n END_SAMPLE FOO.hp | tail -1 | cut -d : -f 1` FOO.hp \
+      | hp2ps > FOO.ps
+    kill -HUP $gvpsnum
+  done    
+</screen>
+</para>
+</sect2>
+
+
   </sect1>
 
   <sect1 id="ticky-ticky">
