@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.9 2001/05/18 21:45:43 qrczak Exp $
+% $Id: PrelCError.lhs,v 1.10 2001/07/13 11:11:34 rrt Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -117,7 +117,8 @@ import IO           (IOError, Handle, ioError)
 -- ------------
 
 -- import of C function that gives address of errno
---
+-- This function exists because errno is a variable on some systems, but on
+-- Windows it is a macro for a function...
 foreign import "ghcErrno" unsafe _errno :: Ptr CInt
 
 -- Haskell representation for "errno" values
