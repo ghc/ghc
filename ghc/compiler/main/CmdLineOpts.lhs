@@ -99,6 +99,7 @@ module CmdLineOpts (
 	opt_WarnSimplePatterns,
 	opt_WarnMissingMethods,
 	opt_WarnDuplicateExports,
+	opt_WarnHiShadows,
 	opt_PruneTyDecls, opt_PruneInstDecls,
 	opt_D_show_rn_stats
     ) where
@@ -230,6 +231,12 @@ data SimplifierSwitch
 			-- the scrutinee of a case expression, so we should
 			-- apply the scrutinee discount when considering inlinings.
 			-- See SimplVar.lhs
+
+  | SimplCloneBinds	-- This flag controls whether the simplifier should 
+			-- always clone binder ids when creating expression 
+			-- copies. The default is NO, but it needs to be turned on
+			-- prior to floating binders outwards.
+			-- (see comment inside SimplVar.simplBinder)
 \end{code}
 
 %************************************************************************
@@ -344,6 +351,7 @@ opt_UnfoldingConDiscount	= lookup_def_int "-funfolding-con-discount"	   uNFOLDIN
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold"	   lIBERATE_CASE_THRESHOLD
 opt_UnfoldingKeenessFactor	= lookup_def_float "-funfolding-keeness-factor"	   uNFOLDING_KEENESS_FACTOR
 opt_WarnNameShadowing		= lookUp  SLIT("-fwarn-name-shadowing")
+opt_WarnHiShadows		= lookUp  SLIT("-fwarn-hi-shadowing")
 opt_WarnIncompletePatterns	= lookUp  SLIT("-fwarn-incomplete-patterns")
 opt_WarnOverlappingPatterns	= lookUp  SLIT("-fwarn-overlapping-patterns")
 opt_WarnSimplePatterns	     	= lookUp  SLIT("-fwarn-simple-patterns")
@@ -456,6 +464,7 @@ classifyOpts = sep argv [] [] -- accumulators...
 	  "-fno-let-from-case"		    -> SIMPL_SW(SimplNoLetFromCase)
 	  "-fno-let-from-app"		    -> SIMPL_SW(SimplNoLetFromApp)
 	  "-fno-let-from-strict-let"	    -> SIMPL_SW(SimplNoLetFromStrictLet)
+	  "-fclone-binds"		    -> SIMPL_SW(SimplCloneBinds)
 
 	  o | starts_with_msi  -> SIMPL_SW(MaxSimplifierIterations (read after_msi))
 	   where
@@ -508,12 +517,13 @@ tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(29)
 tagOf_SimplSwitch SimplDontFoldBackAppend       = ILIT(30)
 tagOf_SimplSwitch SimplCaseMerge		= ILIT(31)
 tagOf_SimplSwitch SimplCaseScrutinee		= ILIT(32)
+tagOf_SimplSwitch SimplCloneBinds	        = ILIT(33)
 
 -- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 tagOf_SimplSwitch _ = panic# "tagOf_SimplSwitch"
 
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCaseScrutinee)
+lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplCloneBinds)
 \end{code}
 
 %************************************************************************
