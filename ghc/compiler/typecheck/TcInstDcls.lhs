@@ -33,7 +33,7 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
 			  newDFunName, tcExtendTyVarEnv
 			)
-import TcInstUtil	( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
+import InstEnv	( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
  			  simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
 			  extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, tcHsType, kcHsSigType )

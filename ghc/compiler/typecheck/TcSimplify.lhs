@@ -143,7 +143,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  lieToList 
 			)
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
-import TcInstUtil	( lookupInstEnv, InstLookupResult(..) )
+import InstEnv		( lookupInstEnv, InstLookupResult(..) )
 
 import TcType		( TcTyVarSet )
 import TcUnify		( unifyTauTy )

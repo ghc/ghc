@@ -8,7 +8,7 @@ import Class		( Class, FunDep, className )
 import Unify		( unifyTyListsX )
 import Subst		( mkSubst, emptyInScopeSet, substTy )
 import TcEnv		( tcGetInstEnv )
-import TcInstUtil	( classInstEnv )
+import InstEnv	( classInstEnv )
 import TcMonad
 import TcType		( TcType, TcTyVarSet, zonkTcType )
 import TcUnify		( unifyTauTyLists )

@@ -20,7 +20,7 @@ import BasicTypes	( Fixity(..), NewOrData(..),
 			)
 import RnMonad
 
-import TcInstUtil	( InstInfo(..) )
+import InstEnv	( InstInfo(..) )
 
 import CmdLineOpts
 import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId, hasNoBinding,

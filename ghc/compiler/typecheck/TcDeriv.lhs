@@ -18,7 +18,7 @@ import CmdLineOpts	( DynFlag(..), DynFlags )
 import TcMonad
 import TcEnv		( TcEnv, tcSetInstEnv, getTcGST, newDFunName )
 import TcGenDeriv	-- Deriv stuff
-import TcInstUtil	( InstInfo(..), InstEnv, 
+import InstEnv	( InstInfo(..), InstEnv, 
 			  pprInstInfo, simpleDFunClassTyCon, extendInstEnv )
 import TcSimplify	( tcSimplifyThetas )
 

@@ -69,7 +69,7 @@ import UniqFM
 import Util		( zipEqual )
 import SrcLoc		( SrcLoc )
 import Outputable
-import TcInstUtil	( emptyInstEnv )
+import InstEnv	( emptyInstEnv )
 
 import IOExts		( newIORef )
 \end{code}

@@ -44,7 +44,7 @@ import TcHsSyn	( TcExpr, TcId,
 		)
 import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupGlobalId )
-import TcInstUtil ( InstLookupResult(..), lookupInstEnv )
+import InstEnv ( InstLookupResult(..), lookupInstEnv )
 import TcType	( TcThetaType,
 		  TcType, TcTauType, TcTyVarSet,
 		  zonkTcTyVars, zonkTcType, zonkTcTypes, 

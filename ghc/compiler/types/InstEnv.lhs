@@ -1,12 +1,12 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-\section[TcInstUtil]{Utilities for typechecking instance declarations}
+\section[InstEnv]{Utilities for typechecking instance declarations}
 
 The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
-module TcInstUtil (
+module InstEnv (
 	InstInfo(..), pprInstInfo,
 	simpleInstInfoTy, simpleInstInfoTyCon, simpleDFunClassTyCon,
 
