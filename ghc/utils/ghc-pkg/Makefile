@@ -9,9 +9,16 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
-SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY -D'GHC_PKG_VERSION="$(ProjectVersion)"'
-
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
+ghc_le_600 = $(shell if (test $(GhcCanonVersion) -le 600); then echo YES; else echo NO; fi)
+
+SRC_HC_OPTS      += -cpp -DPKG_TOOL -DWANT_PRETTY
+
+ifeq "$(HOSTPLATFORM)$(ghc_le_600)" "i386-unknown-mingw32YES"
+SRC_HC_OPTS += -D'GHC_PKG_VERSION=\"$(ProjectVersion)\"'
+else
+SRC_HC_OPTS += -D'GHC_PKG_VERSION="$(ProjectVersion)"'
+endif
 
 ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
