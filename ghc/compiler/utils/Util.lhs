@@ -70,7 +70,7 @@ import List		( zipWith4 )
 import Panic		( panic )
 import IOExts		( IORef, newIORef, unsafePerformIO )
 import FastTypes
-#if __GLASGOW__HASKELL__ <= 408
+#if __GLASGOW_HASKELL__ <= 408
 import Exception	( catchIO, justIoErrors, raiseInThread )
 #endif
 infixr 9 `thenCmp`
