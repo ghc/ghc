@@ -38,8 +38,9 @@ PACKAGE = base
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude -\#include HsBase.h
 SRC_HSC2HS_OPTS += -Iinclude -I$(FPTOOLS_TOP)/ghc/includes
 
-# Make sure we can get hold of regex.h
+# If there is no system-supplied POSIX regex library, use our own
 ifneq "$(HavePosixRegex)" "YES"
+# Make sure we can get hold of regex.h
 SRC_HC_OPTS     += -Icbits/regex
 SRC_HSC2HS_OPTS += -Icbits/regex
 endif

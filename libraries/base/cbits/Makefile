@@ -1,10 +1,11 @@
-# $Id: Makefile,v 1.8 2002/07/18 22:01:07 sof Exp $
+# $Id: Makefile,v 1.9 2003/10/20 13:16:58 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
 HC = $(GHC_INPLACE)
 
+# If there is no system-supplied POSIX regex library, use our own
 ifneq "$(HavePosixRegex)" "YES"
 ALL_DIRS      += regex
 SRC_CC_OPTS   += -Iregex
