@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.45 2003/03/24 14:46:55 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.46 2003/05/16 14:16:53 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -836,6 +836,7 @@ heapCensusChain( Census *census, bdescr *bd )
 	    case FUN:
 	    case THUNK:
 	    case IND_PERM:
+	    case IND_OLDGEN:
 	    case IND_OLDGEN_PERM:
 	    case CAF_BLACKHOLE:
 	    case SE_CAF_BLACKHOLE:
