@@ -10,7 +10,8 @@
 -- Stability   :  internal
 -- Portability :  non-portable
 --
--- POSIX support layer for the standard libraries
+-- POSIX support layer for the standard libraries.
+-- This library is built on *every* platform, including Win32.
 --
 -- Non-posix compliant in order to support the following features:
 --	* S_ISSOCK (no sockets in POSIX)
