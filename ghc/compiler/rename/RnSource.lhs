@@ -35,7 +35,7 @@ import BasicTypes	( TopLevelFlag(..)  )
 import HscTypes		( FixityEnv, FixItem(..),
 			  Deprecations, Deprecs(..), DeprecTxt, plusDeprecs )
 import Class		( FunDep )
-import Name		( Name )
+import Name		( Name, nameOccName )
 import NameSet
 import NameEnv
 import Outputable
@@ -179,8 +179,7 @@ rnFixityDecl fix_env (L loc (FixitySig rdr_name fixity))
     		     returnM fix_env
     	  Nothing -> returnM (extendNameEnv fix_env name fix_item)
       where
-	fix_item = FixItem (rdrNameOcc (unLoc rdr_name)) fixity
-			 (getLoc rdr_name)
+	fix_item = FixItem (nameOccName name) fixity (getLoc rdr_name)
 
 pprFixEnv :: FixityEnv -> SDoc
 pprFixEnv env 
