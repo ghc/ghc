@@ -253,6 +253,17 @@ strmod = "\
 	    code generator.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><option>-fno-code</option></term>
+	  <indexterm><primary><option>-fno-code</option></primary>
+	  </indexterm>
+	  <listitem>
+	    <para>Omit code generation (and all later phases)
+	    altogether.  Might be of some use if you just want to see
+	    dumps of the intermediate compilation phases.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
     </sect2>
 
