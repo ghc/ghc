@@ -1,6 +1,7 @@
 test('arrowapply1', normal, compile, [''])
 test('arrowapply2', normal, compile, [''])
 test('arrowapply3', normal, compile, [''])
+test('arrowapply4', normal, compile, [''])
 test('arrowcase1', normal, compile, [''])
 test('arrowdo1', normal, compile, [''])
 test('arrowdo2', normal, compile, [''])
