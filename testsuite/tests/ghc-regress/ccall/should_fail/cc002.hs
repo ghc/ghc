@@ -6,7 +6,7 @@ import Foreign
 
 -- Test returning results
 
-a :: IO ForeignObj
+a :: IO (ForeignPtr a)
 a = _ccall_ a
 
 b :: IO (StablePtr Double)
@@ -14,7 +14,7 @@ b = _ccall_ b
 
 -- Test taking arguments
 
-c :: ForeignObj -> IO Int
+c :: ForeignPtr a -> IO Int
 c x = _ccall_ c x
 
 d :: StablePtr Int -> IO Int

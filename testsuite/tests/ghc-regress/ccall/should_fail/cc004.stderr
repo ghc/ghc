@@ -1,28 +1,28 @@
 
-./cc004.hs:8:
+cc004.hs:8:
     Ambiguous type variable(s) `a'
-	in the constraint `PrelGHC.CReturnable a'
-    arising from the result of the _ccall_ to `f' at ./cc004.hs:8
+	in the constraint `GHC.Prim.CReturnable a'
+    arising from the result of the _ccall_ to `f' at cc004.hs:8
     In the first argument of `thenADR', namely `_ccall_ f'
     In the definition of `foo':
 	(_ccall_ f) `thenADR` (\ a -> return (a + 1))
 
-./cc004.hs:8:
+cc004.hs:8:
     Ambiguous type variable(s) `a' in the constraint `Num a'
-    arising from the literal `1' at ./cc004.hs:8
+    arising from the literal `1' at cc004.hs:8
     In the second argument of `(+)', namely `1'
     In the first argument of `return', namely `(a + 1)'
 
-./cc004.hs:15:
+cc004.hs:15:
     Ambiguous type variable(s) `a'
-	in the constraint `PrelGHC.CReturnable a'
-    arising from the result of the _ccall_ to `f' at ./cc004.hs:15
+	in the constraint `GHC.Prim.CReturnable a'
+    arising from the result of the _ccall_ to `f' at cc004.hs:15
     In the first argument of `thenADR', namely `_ccall_ f'
     In the definition of `bar':
 	(_ccall_ f) `thenADR` (\ a -> return (a + 1))
 
-./cc004.hs:15:
+cc004.hs:15:
     Ambiguous type variable(s) `a' in the constraint `Num a'
-    arising from the literal `1' at ./cc004.hs:15
+    arising from the literal `1' at cc004.hs:15
     In the second argument of `(+)', namely `1'
     In the first argument of `return', namely `(a + 1)'

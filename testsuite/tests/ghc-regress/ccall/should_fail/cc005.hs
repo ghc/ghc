@@ -2,7 +2,7 @@
 
 module ShouldFail where
 
-import PrelGHC
+import GHC.Exts
 
 foreign export ccall foo :: Int# -> IO ()
 foo i | i ==# 0# = return ()
