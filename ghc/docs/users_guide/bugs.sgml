@@ -335,7 +335,7 @@ recursion via a data type:
   x :: Bool
   x = russel (MkU russel)
 </programlisting>
-We have never found another program, other than this contrived one, that makes GHC
+We have never found another class of programs, other than this contrived one, that makes GHC
 diverge, and fixing the problem would impose an extra overhead on every compilation.  So the
 bug remains un-fixed.  There is more background in
 <ulink
