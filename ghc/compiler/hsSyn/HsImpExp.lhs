@@ -8,7 +8,7 @@ module HsImpExp where
 
 #include "HsVersions.h"
 
-import Module		( ModuleName, WhereFrom, pprModuleName )
+import Module		( ModuleName, WhereFrom )
 import Outputable
 import SrcLoc		( SrcLoc )
 \end{code}
@@ -34,14 +34,14 @@ data ImportDecl name
 instance (Outputable name) => Outputable (ImportDecl name) where
     ppr (ImportDecl mod from qual as spec _)
       = hang (hsep [ptext SLIT("import"), ppr from, 
-                    pp_qual qual, pprModuleName mod, pp_as as])
+                    pp_qual qual, ppr mod, pp_as as])
 	     4 (pp_spec spec)
       where
 	pp_qual False   = empty
 	pp_qual True	= ptext SLIT("qualified")
 
 	pp_as Nothing   = empty
-	pp_as (Just a)  = ptext SLIT("as ") <+> pprModuleName a
+	pp_as (Just a)  = ptext SLIT("as ") <+> ppr a
 
 	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
@@ -88,6 +88,6 @@ instance (Outputable name) => Outputable (IE name) where
     ppr (IEThingWith thing withs)
 	= ppr thing <> parens (fsep (punctuate comma (map ppr withs)))
     ppr (IEModuleContents mod)
-	= ptext SLIT("module") <+> pprModuleName mod
+	= ptext SLIT("module") <+> ppr mod
 \end{code}
 

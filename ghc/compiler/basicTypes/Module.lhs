@@ -25,21 +25,20 @@ module Module
 			    -- abstract, instance of Eq, Ord, Outputable
     , ModuleName
     , ModuleKind(..)
-    , isPackageKind
+    , isLocalModuleKind
 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
 
-    , moduleString          -- :: Module -> EncodedString
-    , moduleUserString      -- :: Module -> UserString
-    , moduleName	    -- :: Module -> ModuleName
+    , moduleString		-- :: Module -> EncodedString
+    , moduleUserString		-- :: Module -> UserString
+    , moduleName		-- :: Module -> ModuleName
 
---    , mkVanillaModule	    -- :: ModuleName -> Module
+    , mkVanillaModule	    -- :: ModuleName -> Module
 --    , mkThisModule	    -- :: ModuleName -> Module
---    , mkPrelModule          -- :: UserString -> Module
-    , mkModule		    -- :: ModuleName -> ModuleKind -> Module
-    
---    , isLocalModule       -- :: Module -> Bool
+    , mkPrelModule		-- :: UserString -> Module
+    , mkModule			-- :: ModuleName -> ModuleKind -> Module
+    , isLocalModule	 	-- :: Module -> Bool
 
 --    , mkSrcModule
 
@@ -99,13 +98,13 @@ data ModuleKind
    | ObjectCode FilePath FilePath   -- .o, .hi
    | InPackage  PackageName
 
-isPackageKind (InPackage _) = True
-isPackageKind _             = False
+isLocalModuleKind (InPackage _) = False
+isLocalModuleKind _             = True
 
 type PackageName = FastString		-- No encoding at all
 
-preludePackage :: PackageName
-preludePackage = SLIT("std")
+preludePackage :: ModuleKind
+preludePackage = InPackage SLIT("std")
 
 instance Outputable ModuleKind where
    ppr (SourceOnly path_hs) 
@@ -240,17 +239,17 @@ mkModule = Module
 --	      | otherwise		   = AnotherPackage pack_name
 
 
---mkVanillaModule :: ModuleName -> Module
---mkVanillaModule name = Module name ThisPackage
-	-- Used temporarily when we first come across Foo.x in an interface
-	-- file, but before we've opened Foo.hi.
-	-- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
+-- Used temporarily when we first come across Foo.x in an interface
+-- file, but before we've opened Foo.hi.
+-- (Until we've opened Foo.hi we don't know what the PackageInfo is.)
+mkVanillaModule :: ModuleName -> Module
+mkVanillaModule name = Module name (panic "mkVanillaModule:unknown mod_kind field")
 
 --mkThisModule :: ModuleName -> Module	-- The module being compiled
 --mkThisModule name = Module name ThisPackage
 
---mkPrelModule :: ModuleName -> Module
---mkPrelModule name = mkModule name preludePackage
+mkPrelModule :: ModuleName -> Module
+mkPrelModule name = Module name preludePackage
 
 moduleString :: Module -> EncodedString
 moduleString (Module (ModuleName fs) _) = _UNPK_ fs
@@ -260,12 +259,9 @@ moduleName (Module mod _) = mod
 
 moduleUserString :: Module -> UserString
 moduleUserString (Module mod _) = moduleNameUserString mod
-\end{code}
 
-\begin{code}
---isLocalModule :: Module -> Bool
---isLocalModule (Module _ ThisPackage) = True
---isLocalModule _		      	     = False
+isLocalModule :: Module -> Bool
+isLocalModule (Module nm kind) = isLocalModuleKind kind
 \end{code}
 
 %************************************************************************

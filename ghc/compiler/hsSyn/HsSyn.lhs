@@ -45,7 +45,7 @@ import BasicTypes	( Fixity, Version, NewOrData )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Bag
-import Module		( ModuleName, pprModuleName )
+import Module		( ModuleName )
 \end{code}
 
 All we actually declare here is the top-level structure for a module.
@@ -88,7 +88,7 @@ instance (Outputable name, Outputable pat)
            Nothing -> pp_modname <+> rest
            Just d -> vcat [ pp_modname, ppr d, rest ]
 
-	pp_modname = ptext SLIT("module") <+> pprModuleName name
+	pp_modname = ptext SLIT("module") <+> ppr name
 
 	pp_nonnull [] = empty
 	pp_nonnull xs = vcat (map ppr xs)

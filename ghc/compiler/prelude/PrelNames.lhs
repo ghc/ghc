@@ -35,7 +35,7 @@ module PrelNames (
 
 #include "HsVersions.h"
 
-import Module	  ( ModuleName, mkPrelModule, mkSrcModule )
+import Module	  ( ModuleName, mkPrelModule, mkModuleName )
 import OccName	  ( NameSpace, varName, dataName, tcName, clsName )
 import RdrName	  ( RdrName, mkPreludeQual )
 import UniqFM
@@ -167,32 +167,32 @@ knownKeyRdrNames
 %************************************************************************
 
 \begin{code}
-pRELUDE_Name      = mkSrcModule "Prelude"
-pREL_GHC_Name     = mkSrcModule "PrelGHC"	   -- Primitive types and values
-pREL_BASE_Name    = mkSrcModule "PrelBase"
-pREL_ENUM_Name    = mkSrcModule "PrelEnum"
-pREL_SHOW_Name    = mkSrcModule "PrelShow"
-pREL_READ_Name    = mkSrcModule "PrelRead"
-pREL_NUM_Name     = mkSrcModule "PrelNum"
-pREL_LIST_Name    = mkSrcModule "PrelList"
-pREL_TUP_Name     = mkSrcModule "PrelTup"
-pREL_PACK_Name    = mkSrcModule "PrelPack"
-pREL_CONC_Name    = mkSrcModule "PrelConc"
-pREL_IO_BASE_Name = mkSrcModule "PrelIOBase"
-pREL_ST_Name	  = mkSrcModule "PrelST"
-pREL_ARR_Name     = mkSrcModule "PrelArr"
-pREL_BYTEARR_Name = mkSrcModule "PrelByteArr"
-pREL_FOREIGN_Name = mkSrcModule "PrelForeign"
-pREL_STABLE_Name  = mkSrcModule "PrelStable"
-pREL_ADDR_Name    = mkSrcModule "PrelAddr"
-pREL_ERR_Name     = mkSrcModule "PrelErr"
-pREL_REAL_Name    = mkSrcModule "PrelReal"
-pREL_FLOAT_Name   = mkSrcModule "PrelFloat"
+pRELUDE_Name      = mkModuleName "Prelude"
+pREL_GHC_Name     = mkModuleName "PrelGHC"	   -- Primitive types and values
+pREL_BASE_Name    = mkModuleName "PrelBase"
+pREL_ENUM_Name    = mkModuleName "PrelEnum"
+pREL_SHOW_Name    = mkModuleName "PrelShow"
+pREL_READ_Name    = mkModuleName "PrelRead"
+pREL_NUM_Name     = mkModuleName "PrelNum"
+pREL_LIST_Name    = mkModuleName "PrelList"
+pREL_TUP_Name     = mkModuleName "PrelTup"
+pREL_PACK_Name    = mkModuleName "PrelPack"
+pREL_CONC_Name    = mkModuleName "PrelConc"
+pREL_IO_BASE_Name = mkModuleName "PrelIOBase"
+pREL_ST_Name	  = mkModuleName "PrelST"
+pREL_ARR_Name     = mkModuleName "PrelArr"
+pREL_BYTEARR_Name = mkModuleName "PrelByteArr"
+pREL_FOREIGN_Name = mkModuleName "PrelForeign"
+pREL_STABLE_Name  = mkModuleName "PrelStable"
+pREL_ADDR_Name    = mkModuleName "PrelAddr"
+pREL_ERR_Name     = mkModuleName "PrelErr"
+pREL_REAL_Name    = mkModuleName "PrelReal"
+pREL_FLOAT_Name   = mkModuleName "PrelFloat"
 
-pREL_MAIN_Name   = mkSrcModule "PrelMain"
-mAIN_Name	 = mkSrcModule "Main"
-iNT_Name	 = mkSrcModule "Int"
-wORD_Name	 = mkSrcModule "Word"
+pREL_MAIN_Name   = mkModuleName "PrelMain"
+mAIN_Name	 = mkModuleName "Main"
+iNT_Name	 = mkModuleName "Int"
+wORD_Name	 = mkModuleName "Word"
 
 pREL_GHC     = mkPrelModule pREL_GHC_Name
 pREL_BASE    = mkPrelModule pREL_BASE_Name

@@ -36,8 +36,8 @@ import OccName	( NameSpace, tcName,
 		  mkSrcOccFS, mkSrcVarOcc,
 		  isDataOcc, isTvOcc, mkWorkerOcc
 		)
-import Module   ( ModuleName, pprModuleName,
-		  mkSysModuleFS, mkSrcModuleFS
+import Module   ( ModuleName,
+		  mkSysModuleNameFS, mkModuleNameFS
 		)
 import FiniteMap
 import Outputable
@@ -90,7 +90,7 @@ mkSrcUnqual :: NameSpace -> FAST_STRING -> RdrName
 mkSrcUnqual sp n = RdrName Unqual (mkSrcOccFS sp n)
 
 mkSrcQual :: NameSpace -> (UserFS, UserFS) -> RdrName
-mkSrcQual sp (m, n) = RdrName (Qual (mkSrcModuleFS m)) (mkSrcOccFS sp n)
+mkSrcQual sp (m, n) = RdrName (Qual (mkModuleNameFS m)) (mkSrcOccFS sp n)
 
 	-- These two are used when parsing interface files
 	-- They do not encode the module and occurrence name
@@ -98,7 +98,7 @@ mkSysUnqual :: NameSpace -> FAST_STRING -> RdrName
 mkSysUnqual sp n = RdrName Unqual (mkSysOccFS sp n)
 
 mkSysQual :: NameSpace -> (FAST_STRING, FAST_STRING) -> RdrName
-mkSysQual sp (m,n) = RdrName (Qual (mkSysModuleFS m)) (mkSysOccFS sp n)
+mkSysQual sp (m,n) = RdrName (Qual (mkSysModuleNameFS m)) (mkSysOccFS sp n)
 
 mkPreludeQual :: NameSpace -> ModuleName -> FAST_STRING -> RdrName
 mkPreludeQual sp mod n = RdrName (Qual mod) (mkSrcOccFS sp n)
@@ -144,7 +144,7 @@ instance Outputable RdrName where
     ppr (RdrName qual occ) = pp_qual qual <> ppr occ
 			   where
 			     pp_qual Unqual     = empty
-			     pp_qual (Qual mod) = pprModuleName mod <> dot
+			     pp_qual (Qual mod) = ppr mod <> dot
 
 pprUnqualRdrName (RdrName qual occ) = ppr occ
 
