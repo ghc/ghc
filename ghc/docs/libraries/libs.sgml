@@ -8,8 +8,9 @@
 <article>
 
 <title>The Hugs-GHC Extension Libraries
-<author>Alastair Reid <tt/reid-alastair@cs.yale.edu/
-<date>v0.7, 21 November 1997
+<author>Alastair Reid <tt/reid-alastair@cs.yale.edu/ 
+        Simon Marlow <tt/simonm@dcs.gla.ac.uk/
+<date>v0.8, 14 December 1997
 <abstract>
 Hugs and GHC provide a common set of libraries to aid portability.
 This document specifies the interfaces to these libraries and documents
@@ -17,28 +18,24 @@ known differences.  We hope that these modules will be adopted for inclusion
 as Standard Haskell Libraries sometime soon.
 </abstract>
 
-<!--  Commented out the table of contents - ADR
 <toc>
--->
 
-<sect> <idx/LazyST/ <p>
+<sect> <idx/ST/ 
+<label id="sec:ST">
+<p>
 
-This library provides support for both <em/lazy/ and <em/strict/ state
-threads, as described in the PLDI '94 paper by John Launchbury and
-Simon Peyton Jones <cite id="LazyStateThreads">.  In addition to the
-monad <tt/ST/, it also provides mutable variables <tt/STRef/ and
-mutable arrays <tt/STArray/.  As the name suggests, the monad <tt/ST/
-instance is <em/lazy/.
+This library provides support for <em/strict/ state threads, as
+described in the PLDI '94 paper by John Launchbury and Simon Peyton
+Jones <cite id="LazyStateThreads">.  In addition to the monad <tt/ST/,
+it also provides mutable variables <tt/STRef/ and mutable arrays
+<tt/STArray/.
 
 <tscreen><verb>
-module LazyST( module LazyST, module Monad ) where
+module ST( module ST, module Monad ) where
 import Monad
 
 data ST s a        -- abstract type
 runST              :: forall a. (forall s. ST s a) -> a
-returnST           :: a -> ST s a
-thenLazyST         :: ST s a -> (a -> ST s b) -> ST s b
-thenStrictST       :: ST s a -> (a -> ST s b) -> ST s b
 fixST              :: (a -> ST s a) -> ST s a
 unsafeInterleaveST :: ST s a -> ST s a
 instance Functor (ST s)
@@ -95,23 +92,37 @@ GHC soon.
   -->
 
 <item>
-The only difference between the lazy and strict instances of the
-<tt/ST/ monad is in their bind operators.  The monadic bind operators
-<tt/thenLazyST/ and <tt/thenStrictST/ are provided so that you can
+Hugs provides <tt/thenLazyST/ and <tt/thenStrictST/ so that you can
 import <tt/LazyST/ (say) and still use the strict instance in those
-places where it matters.  GHC also allows you to write <tt/LazyST.>>=/
-and <tt/ST.>>=/ but this is not supported by Hugs yet.
-
+places where it matters.  GHC implements LazyST and ST using different
+types, so this isn't possible.
+</item>
 
 </itemize>
 
-<sect> <idx/ST/ <p>
+<sect> <idx/LazyST/ 
+<label id="sec:LazyST">
+<p>
 
-This library is identical to <tt/LazyST/ except that the <tt/ST/ monad
-instance is <em/strict/.  Most programmers use the <em/strict/ instance
-to avoid the space leaks associated with the <em/lazy/ instance.
+This library is identical to <tt/ST/ except that the <tt/ST/ monad
+instance is <em/lazy/.  The lazy ST monad tends to be more prone to
+space leaks than the strict version, so most programmers will use the
+former unless laziness is explicitly required.  <tt/LazyST/ provides
+two additional operations:
 
-<sect> <idx/IOExts/ <p>
+<tscreen> <verb>
+lazyToStrictST :: LazyST.ST s a -> ST.ST s a
+strictToLazyST :: ST.ST s a -> LazyST.ST s a
+</verb> </tscreen>
+
+These are used to convert between lazy and strict state threads.  The
+semantics with respect to laziness are as you would expect: the strict
+state thread passed to <tt/strictToLazyST/ is not performed until the
+result of the lazy state thread it returns is demanded.
+
+<sect> <idx/IOExts/
+<label id="sec:IOExts">
+<p>
 
 This library provides the following extensions to the IO monad:
 <itemize>
@@ -225,7 +236,9 @@ unsafePtrEq         :: a -> a -> Bool
   
   -->
 
-<sect> <idx/Bits/ <p>
+<sect> <idx/Bits/
+<label id="sec:Bits">
+<p>
 
 This library defines bitwise operations for signed and unsigned ints.
 
@@ -285,13 +298,15 @@ Notes:
   <tt/bit i/ is the value with the i'th bit set.
 </itemize>
 
-<sect> <idx/Word/ <p>
+<sect> <idx/Word/
+<label id="sec:Word">
+<p>
 
 This library provides unsigned integers of various sizes.
 The types supported are as follows:
 
-<tabular ca="|l|l|">
-type    | number of bits @ 
+<tabular ca="ll">
+type    | number of bits @
 <hline> 
 Word8    | 8  @
 Word16   | 16 @
@@ -378,12 +393,14 @@ Integer).
 Hugs only provides <tt/Eq/, <tt/Ord/, <tt/Read/ and <tt/Show/
 instances for <tt/Word64/ at the moment.
 
-<sect> <idx/Int/ <p>
+<sect> <idx/Int/
+<label id="sec:Int">
+<p>
 
 This library provides signed integers of various sizes.  The types
 supported are as follows:
 
-<tabular ca="|l|l|l|">
+<tabular ca="ll">
 type    | number of bits @ 
 <hline> 
 Int8    | 8  @
@@ -430,7 +447,9 @@ ToDo: complete the set of coercion functions.
 
 </itemize>
 
-<sect> <idx/Addr/ <p>
+<sect> <idx/Addr/
+<label id="sec:Addr">
+<p>
 
 This library provides machine addresses and is primarily intended for 
 use in creating foreign function interfaces using GreenCard.
@@ -493,12 +512,16 @@ Hugs provides <tt/Addr/ and <tt/nullAddr/ but does not provide any of
 the index, read or write functions.  They can be implemented using 
 GreenCard if required.
 
-<sect> <idx/ForeignObj/ <p>
+<sect> <idx/ForeignObj/
+<label id="sec:ForeignObj">
+<p>
 
 This module is provided by GHC but not by Hugs.
 GreenCard for Hugs provides the <tt/ForeignObj/ type.
 
-<sect> <idx/Concurrent/ <p>
+<sect> <idx/Concurrent/
+<label id="sec:Concurrent">
+<p>
 
 This library provides the Concurrent Haskell extensions
 <cite id="concurrentHaskell:popl96">.
@@ -596,7 +619,9 @@ which might be used to build an ordered binary tree, say.
 
 </itemize>
 
-<sect> <idx/Pretty/ <p>
+<sect> <idx/Pretty/
+<label id="sec:Pretty">
+<p>
 
 This library contains Simon Peyton Jones' implementation of John
 Hughes's pretty printer combinators.
