@@ -7,7 +7,7 @@
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  stable
+-- Stability   :  highly experimental
 -- Portability :  portable
 --
 -- System-independent pathname manipulations.
