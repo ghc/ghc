@@ -890,7 +890,7 @@ tcIfaceGlobal name
 	    Nothing    -> do
 
 	{ env <- getGblEnv
-	; case if_rec_types env of
+	; case if_rec_types env of {
 	    Just (mod, get_type_env) 
 		| nameIsLocalOrFrom mod name
 		-> do 		-- It's defined in the module being compiled
@@ -900,13 +900,13 @@ tcIfaceGlobal name
 			Nothing	   -> pprPanic "tcIfaceGlobal (local): not found:"  
 						(ppr name $$ ppr type_env) }
 
-	    other -> do
+	  ; other -> do
 
 	{ mb_thing <- importDecl name 	-- It's imported; go get it
 	; case mb_thing of
 	    Failed err      -> failIfM err
 	    Succeeded thing -> return thing
-    }}}}
+    }}}}}
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon IfaceIntTc  = return intTyCon
