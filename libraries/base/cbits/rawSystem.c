@@ -76,10 +76,14 @@ rawSystem(HsAddr cmd)
        Since we are going to wait for the process to terminate anyway,
        there is no problem with such sharing. */
 
+      errno = EINVAL; // ToDo: wrong, caller should use GetLastError()
       return -1;
   }
   WaitForSingleObject(pInfo.hProcess, INFINITE);
-  if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) return -1;
+  if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) {
+      errno = EINVAL; // ToDo: wrong, caller should use GetLastError()
+      return -1;
+  }
 
   CloseHandle(pInfo.hProcess);
   CloseHandle(pInfo.hThread);
