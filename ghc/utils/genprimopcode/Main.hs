@@ -1,11 +1,16 @@
-
+{-# OPTIONS -cpp #-}
 ------------------------------------------------------------------
 -- A primop-table mangling program                              --
 ------------------------------------------------------------------
 
 module Main where
 
+#if __GLASGOW_HASKELL__ >= 504
+import Text.ParserCombinators.Parsec
+#else
 import Parsec
+#endif
+
 import Monad
 import Char
 import List
