@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.12 $
- * $Date: 1999/11/12 17:32:37 $
+ * $Revision: 1.13 $
+ * $Date: 1999/11/18 12:10:18 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1486,17 +1486,20 @@ Void evalExp() {                    /* compile and run input expression    */
     /* Run thread (and any other runnable threads) */
 
     /* Re-initialise the scheduler - ToDo: do I need this? */
-    initScheduler();
+    /* JRS, 991118: on SM's advice, don't call initScheduler every time.
+       This causes an assertion failure in GC.c(revert_dead_cafs)
+       unless doRevertCAFs below is permanently TRUE.
+     */
+    /* initScheduler(); */
 #ifdef CRUDE_PROFILING
     cp_init();
 #endif
 
-    /* ToDo: don't really initScheduler every time.  fix */
     {
         HaskellObj      result; /* ignored */
         sighandler_t    old_ctrlbrk;
         SchedulerStatus status;
-        Bool            doRevertCAFs = FALSE;
+        Bool            doRevertCAFs = TRUE;  /* do not change -- comment above */
         old_ctrlbrk         = signal(SIGINT, eval_ctrlbrk);
         ASSERT(old_ctrlbrk != SIG_ERR);
         status              = rts_eval_(closureOfVar(v),10000,&result);
@@ -1523,6 +1526,7 @@ Void evalExp() {                    /* compile and run input expression    */
         default:
                 internal("evalExp: Unrecognised SchedulerStatus");
         }
+        deleteAllThreads();
         fflush(stdout);
         fflush(stderr);
     }

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/16 17:38:55 $
+ * $Revision: 1.14 $
+ * $Date: 1999/11/18 12:10:19 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -332,7 +332,8 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         nameMkF          = addPrimCfunREP(findText("F#"),1,0,FLOAT_REP);
         nameMkD          = addPrimCfunREP(findText("D#"),1,0,DOUBLE_REP);
         nameMkStable     = addPrimCfunREP(findText("Stable#"),1,0,STABLE_REP);
-        nameMkInteger    = addPrimCfunREP(findText("Integer#"),1,0,0);
+        nameMkThreadId   = addPrimCfunREP(findText("ThreadId#"),1,0,THREADID_REP);
+
 #ifdef PROVIDE_FOREIGN
         nameMkForeign    = addPrimCfunREP(findText("Foreign#"),1,0,0);
 #endif
@@ -344,8 +345,8 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         nameMkRef                  = addPrimCfunREP(findText("Ref#"),1,0,0);
         nameMkPrimMutableArray     = addPrimCfunREP(findText("PrimMutableArray#"),1,0,0);
         nameMkPrimMutableByteArray = addPrimCfunREP(findText("PrimMutableByteArray#"),1,0,0);
-        nameMkThreadId             = addPrimCfunREP(findText("ThreadId#"),1,0,0);
         nameMkPrimMVar             = addPrimCfunREP(findText("MVar#"),1,0,0);
+        nameMkInteger              = addPrimCfunREP(findText("Integer#"),1,0,0);
 
         /* The following primitives are referred to in derived instances and
          * hence require types; the following types are a little more general

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.27 $
- * $Date: 1999/11/16 17:39:10 $
+ * $Revision: 1.28 $
+ * $Date: 1999/11/18 12:10:26 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -294,7 +294,7 @@ static inline void PushTaggedRealWorld( void );
 /* static inline void PushTaggedInteger  ( mpz_ptr ); */
 static inline StgPtr grabHpUpd( nat size );
 static inline StgPtr grabHpNonUpd( nat size );
-static        StgClosure* raiseAnError   ( StgClosure* errObj );
+static        StgClosure* raiseAnError   ( StgClosure* exception );
 
 static int  enterCountI = 0;
 
@@ -501,9 +501,11 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
 
     if (
 #ifdef DEBUG
-        1 ||
+             ((++eCount) & 0x0F) == 0
+#else
+             ++eCount == 0
 #endif
-             ++eCount == 0) {
+       ) {
        if (context_switch) {
           xPushCPtr(obj); /* code to restart with */
           RETURN(ThreadYielding);
@@ -1720,22 +1722,22 @@ static inline void PopSeqFrame ( void )
     gSu = stgCast(StgSeqFrame*,gSu)->link;		
 }
 
-static inline StgClosure* raiseAnError ( StgClosure* errObj )
+static inline StgClosure* raiseAnError ( StgClosure* exception )
 {
-    StgClosure *raise_closure;
-
-    /* This closure represents the expression 'raise# E' where E
-     * is the exception raised.  It is used to overwrite all the
+    /* This closure represents the expression 'primRaise E' where E
+     * is the exception raised (:: Exception).  
+     * It is used to overwrite all the
      * thunks which are currently under evaluation.
      */
-    raise_closure = (StgClosure *)allocate(sizeofW(StgClosure)+1);
-    raise_closure->header.info = &raise_info;
-    raise_closure->payload[0] = (StgPtr)0xdead10c6; /*R1.cl;*/
-
+    HaskellObj primRaiseClosure
+       = asmClosureOfObject(getHugs_AsmObject_for("primRaise"));
+    HaskellObj reraiseClosure
+       = rts_apply ( primRaiseClosure, exception );
+   
     while (1) {
         switch (get_itbl(gSu)->type) {
         case UPDATE_FRAME:
-                UPD_IND(gSu->updatee,raise_closure);
+                UPD_IND(gSu->updatee,reraiseClosure);
                 gSp = stgCast(StgStackPtr,gSu) + sizeofW(StgUpdateFrame);
                 gSu = gSu->link;
                 break;
@@ -1748,7 +1750,7 @@ static inline StgClosure* raiseAnError ( StgClosure* errObj )
                 StgClosure *handler = fp->handler;
                 gSu = fp->link; 
                 gSp += sizeofW(StgCatchFrame); /* Pop */
-                PushCPtr(errObj);
+                PushCPtr(exception);
                 return handler;
 	    }
         case STOP_FRAME:
@@ -2950,7 +2952,7 @@ static void* enterBCO_primop2 ( int primop2code,
                        will re-enter primTakeMVar, with the args still on
                        the top of the stack. 
                     */
-                    PushCPtr(*bco);
+                    PushCPtr((StgClosure*)(*bco));
                     *return2 = ThreadBlocked;
                     return (void*)(1+(NULL));
 
@@ -2991,26 +2993,43 @@ static void* enterBCO_primop2 ( int primop2code,
                 }
                 break;
             }
-
-#ifdef PROVIDE_CONCURRENT
-        case i_fork:
-            {
-                StgClosure* c = PopCPtr();
-                StgTSO* t = createGenThread(RtsFlags.GcFlags.initialStkSize,c);
-                PushPtr(stgCast(StgPtr,t));
-
-                /* switch at the earliest opportunity */ 
-                context_switch = 1;
-                /* but don't automatically switch to GHC - or you'll waste your
-                 * time slice switching back.
-                 * 
-                 * Actually, there's more to it than that: the default
-                 * (ThreadEnterGHC) causes the thread to crash - don't 
-                 * understand why. - ADR
-                 */
-                t->whatNext = ThreadEnterHugs;
+        case i_sameMVar:
+            {   /* identical to i_sameRef */
+                StgMVar* x = (StgMVar*)PopPtr();
+                StgMVar* y = (StgMVar*)PopPtr();
+                PushTaggedBool(x==y);
                 break;
             }
+        case i_getThreadId:
+            {
+                StgWord tid = cap->rCurrentTSO->id;
+                PushTaggedWord(tid);
+                break;
+            }
+        case i_cmpThreadIds:
+            {
+                StgWord tid1 = PopTaggedWord();
+                StgWord tid2 = PopTaggedWord();
+                if (tid1 < tid2) PushTaggedInt(-1);
+                else if (tid1 > tid2) PushTaggedInt(1);
+                else PushTaggedInt(0);
+                break;
+            }
+        case i_forkIO:
+            {
+                StgClosure* closure;
+                StgTSO*     tso;
+                StgWord     tid;
+                closure = PopCPtr();
+                tso     = createGenThread (RtsFlags.GcFlags.initialStkSize,closure);
+                tid     = tso->id;
+                scheduleThread(tso);
+                context_switch = 1;
+                PushTaggedWord(tid);
+                break;
+            }
+
+#ifdef PROVIDE_CONCURRENT
         case i_killThread:
             {
                 StgTSO* tso = stgCast(StgTSO*,PopPtr());
@@ -3019,13 +3038,6 @@ static void* enterBCO_primop2 ( int primop2code,
                     *return2 = ThreadFinished;
                     return (void*)(1+(NULL));
                 }
-                break;
-            }
-        case i_sameMVar:
-            { /* identical to i_sameRef */
-                StgPtr x = PopPtr();
-                StgPtr y = PopPtr();
-                PushTaggedBool(x==y);
                 break;
             }
 

@@ -103,8 +103,8 @@ module Prelude (
     asTypeOf, error, undefined,
     seq, ($!)
 
-    , MVar, newMVar, putMVar, takeMVar
-
+    , MVar, newEmptyMVar, newMVar, putMVar, takeMVar, readMVar, swapMVar
+    , ThreadId, forkIO
     ,trace
     -- Arrrggghhh!!! Help! Help! Help!
     -- What?!  Prelude.hs doesn't even _define_ most of these things!
@@ -1791,9 +1791,6 @@ primGetEnv v
 -- ST, IO --------------------------------------------------------------------
 ------------------------------------------------------------------------------
 
--- Do not change this newtype to a data, or MVars will stop
--- working.  In general the MVar stuff is pretty fragile: do
--- not mess with it.
 newtype ST s a = ST (s -> (a,s))
 
 data RealWorld
@@ -1828,9 +1825,11 @@ primRunIO m
         protect comp 
            = primCatch comp (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
 
-trace :: String -> a -> a
+trace, trace_quiet :: String -> a -> a
 trace s x
-   = (primRunST (putStr ("trace: " ++ s ++ "\n"))) `seq` x
+   = trace_quiet ("trace: " ++ s) x
+trace_quiet s x
+   = (primRunST (putStr (s ++ "\n"))) `seq` x
 
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST m = ST (\ s -> (fst (unST m s), s))
@@ -1840,7 +1839,7 @@ unsafeInterleaveIO = unsafeInterleaveST
 
 
 ------------------------------------------------------------------------------
--- Word, Addr, StablePtr, Prim*Array, ThreadId, MVar -------------------------
+-- Word, Addr, StablePtr, Prim*Array -----------------------------------------
 ------------------------------------------------------------------------------
 
 data Addr
@@ -1888,13 +1887,15 @@ data Ref                  s a -- mutable variables
 data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
 
-data ThreadId
+
+------------------------------------------------------------------------------
+-- ThreadId, MVar, concurrency stuff -----------------------------------------
+------------------------------------------------------------------------------
 
 data MVar a
 
-
-newMVar :: IO (MVar a)
-newMVar = primNewMVar
+newEmptyMVar :: IO (MVar a)
+newEmptyMVar = primNewEmptyMVar
 
 putMVar :: MVar a -> a -> IO ()
 putMVar = primPutMVar
@@ -1923,6 +1924,53 @@ takeMVar m
         --
         -- primTakeMVar_wrk has the special property that it is
         -- restartable by the scheduler, should the MVar be empty.
+
+newMVar :: a -> IO (MVar a)
+newMVar value =
+    newEmptyMVar        >>= \ mvar ->
+    putMVar mvar value  >>
+    return mvar
+
+readMVar :: MVar a -> IO a
+readMVar mvar =
+    takeMVar mvar       >>= \ value ->
+    putMVar mvar value  >>
+    return value
+
+swapMVar :: MVar a -> a -> IO a
+swapMVar mvar new =
+    takeMVar mvar       >>= \ old ->
+    putMVar mvar new    >>
+    return old
+
+instance Eq (MVar a) where
+    m1 == m2 = primSameMVar m1 m2
+
+
+data ThreadId
+
+instance Eq ThreadId where
+   tid1 == tid2 = primCmpThreadIds tid1 tid2 == 0
+
+instance Ord ThreadId where
+   compare tid1 tid2
+      = let r = primCmpThreadIds tid1 tid2
+        in  if r < 0 then LT else if r > 0 then GT else EQ
+
+
+forkIO :: IO a -> IO ThreadId
+-- Simple version; doesn't catch exceptions in computation
+-- forkIO computation 
+--    = primForkIO (primRunST computation)
+
+forkIO computation
+   = primForkIO (
+        primCatch
+           (unST computation realWorld `primSeq` ())
+           (\e -> trace_quiet ("forkIO: uncaught exception: " ++ show e) ())
+     )
+     where
+        realWorld = error "primForkIO: entered the RealWorld"
 
 
 -- showFloat ------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.33 1999/11/15 14:14:43 simonmar Exp $
+ * $Id: Schedule.c,v 1.34 1999/11/18 12:10:29 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -513,6 +513,23 @@ schedule( void )
     }
   } /* end of while(1) */
 }
+
+
+/* A hack for Hugs concurrency support.  Needs sanitisation (?) */
+void deleteAllThreads ( void )
+{
+  StgTSO* t;
+  IF_DEBUG(scheduler,belch("deleteAllThreads()"));
+  for (t = run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+    deleteThread(t);
+  }
+  for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+    deleteThread(t);
+  }
+  run_queue_hd = run_queue_tl = END_TSO_QUEUE;
+  blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+}
+
 
 /* -----------------------------------------------------------------------------
  * Suspending & resuming Haskell threads.

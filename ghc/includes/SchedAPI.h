@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.7 1999/11/02 15:05:52 simonmar Exp $
+ * $Id: SchedAPI.h,v 1.8 1999/11/18 12:10:17 sewardj Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -72,6 +72,7 @@ createStrictIOThread(nat stack_size,  StgClosure *closure) {
  */
 
 void    deleteThread(StgTSO *tso);
+void    deleteAllThreads ( void );
 
 /*
  * Reverting CAFs

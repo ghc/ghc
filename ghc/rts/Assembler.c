@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/16 17:39:07 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/18 12:10:24 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -484,12 +484,13 @@ static StgWord repSizeW( AsmRep rep )
     case CHAR_REP:    return sizeofW(StgWord) + sizeofW(StgChar);
 
     case BOOL_REP:
-    case INT_REP:     return sizeofW(StgWord) + sizeofW(StgInt);
-    case WORD_REP:    return sizeofW(StgWord) + sizeofW(StgWord);
-    case ADDR_REP:    return sizeofW(StgWord) + sizeofW(StgAddr);
-    case FLOAT_REP:   return sizeofW(StgWord) + sizeofW(StgFloat);
-    case DOUBLE_REP:  return sizeofW(StgWord) + sizeofW(StgDouble);
-    case STABLE_REP:  return sizeofW(StgWord) + sizeofW(StgWord);
+    case INT_REP:      return sizeofW(StgWord) + sizeofW(StgInt);
+    case THREADID_REP:
+    case WORD_REP:     return sizeofW(StgWord) + sizeofW(StgWord);
+    case ADDR_REP:     return sizeofW(StgWord) + sizeofW(StgAddr);
+    case FLOAT_REP:    return sizeofW(StgWord) + sizeofW(StgFloat);
+    case DOUBLE_REP:   return sizeofW(StgWord) + sizeofW(StgDouble);
+    case STABLE_REP:   return sizeofW(StgWord) + sizeofW(StgWord);
 
     case INTEGER_REP: 
 #ifdef PROVIDE_WEAK
@@ -509,7 +510,6 @@ static StgWord repSizeW( AsmRep rep )
     case REF_REP    :  /* Ref                  s a */ 
     case MUTARR_REP :  /* PrimMutableArray     s a */ 
     case MUTBARR_REP:  /* PrimMutableByteArray s a */ 
-    case THREADID_REP: /* ThreadId                 */ 
     case MVAR_REP:     /* MVar a                   */ 
     case PTR_REP:     return sizeofW(StgPtr);
 
@@ -811,6 +811,7 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case INT_REP:
             emit_i_VAR_INT(bco,offset);
             break;
+    case THREADID_REP:
     case WORD_REP:
             emit_i_VAR_WORD(bco,offset);
             break;
@@ -848,7 +849,6 @@ void   asmVar           ( AsmBCO bco, AsmVar v, AsmRep rep )
     case REF_REP    :  /* Ref                  s a */
     case MUTARR_REP :  /* PrimMutableArray     s a */
     case MUTBARR_REP:  /* PrimMutableByteArray s a */
-    case THREADID_REP: /* ThreadId	           */
     case MVAR_REP:     /* MVar a	           */
     case PTR_REP:
             emit_i_VAR(bco,offset);
@@ -896,6 +896,7 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
             emiti_(bco,i_PACK_INT);
             grabHpNonUpd(bco,Izh_sizeW);
             break;
+    case THREADID_REP:
     case WORD_REP:
             emiti_(bco,i_PACK_WORD);
             grabHpNonUpd(bco,Wzh_sizeW);
@@ -936,6 +937,7 @@ AsmVar asmUnbox( AsmBCO bco, AsmRep rep )
     case INT_REP:
             emiti_(bco,i_UNPACK_INT);
             break;
+    case THREADID_REP:
     case WORD_REP:
             emiti_(bco,i_UNPACK_WORD);
             break;
@@ -1406,15 +1408,18 @@ const AsmPrim asmPrimOps[] = {
     /* Concurrency operations */
     , { "primFork",                  "a", "T",   MONAD_IO, i_PRIMOP2, i_fork }
     , { "primKillThread",            "T", "",    MONAD_IO, i_PRIMOP2, i_killThread }
-    , { "primSameMVar",              "rr", "B",  MONAD_Id, i_PRIMOP2, i_sameMVar }
     , { "primDelay",                 "I", "",    MONAD_IO, i_PRIMOP2, i_delay }
     , { "primWaitRead",              "I", "",    MONAD_IO, i_PRIMOP2, i_waitRead }
     , { "primWaitWrite",             "I", "",    MONAD_IO, i_PRIMOP2, i_waitWrite }
 #endif
-    , { "primNewMVar",               "",  "r",   MONAD_IO, i_PRIMOP2, i_newMVar }
+    , { "primNewEmptyMVar",         "",  "r",   MONAD_IO, i_PRIMOP2, i_newMVar }
       /* primTakeMVar is handwritten bytecode */
     , { "primPutMVar",               "ra", "",   MONAD_IO, i_PRIMOP2, i_putMVar } 
-
+    , { "primSameMVar",              "rr", "B",  MONAD_Id, i_PRIMOP2, i_sameMVar }
+    , { "primGetThreadId",           "",   "T",  MONAD_IO, i_PRIMOP2, i_getThreadId }
+    , { "primCmpThreadIds",          "TT", "I",  MONAD_Id, i_PRIMOP2, i_cmpThreadIds }
+    , { "primForkIO",                 "a", "T",  MONAD_IO, i_PRIMOP2, i_forkIO }
+  
     /* Ccall is polyadic - so it's excluded from this table */
 
     , { 0,0,0,0,0,0 }

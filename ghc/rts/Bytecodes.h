@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.11 1999/11/16 17:39:09 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.12 1999/11/18 12:10:25 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -421,14 +421,17 @@ typedef enum
     /* Concurrency operations */
     , i_fork
     , i_killThread
-    , i_sameMVar
     , i_delay
     , i_waitRead
     , i_waitWrite
 #endif
+    , i_sameMVar
     , i_newMVar
     , i_takeMVar
     , i_putMVar
+    , i_getThreadId
+    , i_cmpThreadIds
+    , i_forkIO
 
     /* CCall! */
     , i_ccall_ccall_Id
