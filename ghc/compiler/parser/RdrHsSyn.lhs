@@ -160,7 +160,7 @@ mkClassDecl (cxt, cname, tyvars) fds sigs mbinds
   = ClassDecl { tcdCtxt = cxt, tcdLName = cname, tcdTyVars = tyvars,
 		tcdFDs = fds,  
 		tcdSigs = sigs,
-		tcdMeths = mbinds,
+		tcdMeths = mbinds
 		}
 
 mkTyData new_or_data (context, tname, tyvars) data_cons maybe
