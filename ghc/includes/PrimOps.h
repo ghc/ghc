@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.81 2001/08/17 17:18:53 apt Exp $
+ * $Id: PrimOps.h,v 1.82 2001/08/18 11:55:48 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -243,8 +243,8 @@ typedef union {
    -------------------------------------------------------------------------- */
 
 #define nullAddrzh(r,i)         r=(A_)(0)
-#define plusAddrzh(r,a,i)       r=((void *)(a)) + (i)
-#define minusAddrzh(r,a,b)      r=((void *)(a)) - ((void *)(b))
+#define plusAddrzh(r,a,i)       r=((char *)(a)) + (i)
+#define minusAddrzh(r,a,b)      r=((char *)(a)) - ((char *)(b))
 #define remAddrzh(r,a,i)        r=((W_)(a))%(i)
 #define int2Addrzh(r,a) 	r=(A_)(a)
 #define addr2Intzh(r,a) 	r=(I_)(a)
