@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.15 2000/04/14 14:07:43 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.16 2000/05/24 11:01:07 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -233,7 +233,7 @@ static ullong startTime = 0;
 ullong
 msTime(void)
 {
-# if defined(HAVE_GETCLOCK) && !defined(alpha_TARGET_ARCH)
+# if defined(HAVE_GETCLOCK) && !defined(alpha_TARGET_ARCH) && !defined(hppa1_1_TARGET_ARCH)
     struct timespec tv;
 
     if (getclock(TIMEOFDAY, &tv) != 0) {
