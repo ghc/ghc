@@ -43,8 +43,10 @@ class  Enum a	where
 
     succ		   = toEnum . (`plusInt` oneInt)  . fromEnum
     pred		   = toEnum . (`minusInt` oneInt) . fromEnum
-    enumFromTo n m         = map toEnum [fromEnum n .. fromEnum m]
-    enumFromThenTo n1 n2 m = map toEnum [fromEnum n1, fromEnum n2 .. fromEnum m]
+    enumFrom x       	   = map toEnum [fromEnum x ..]
+    enumFromThen x y 	   = map toEnum [fromEnum x, fromEnum y ..]
+    enumFromTo x y         = map toEnum [fromEnum x .. fromEnum y]
+    enumFromThenTo x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
 -- Default methods for bounded enumerations
 enumFromBounded :: (Enum a, Bounded a) => a -> [a]
