@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.21 2001/03/22 03:51:09 hwloidl Exp $
+ * $Id: RtsAPI.h,v 1.22 2001/08/03 16:30:13 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -66,9 +66,15 @@ HaskellObj   rts_mkAddr       ( HsAddr   a );
    ------------------------------------------------------------------------- */
 HsChar       rts_getChar      ( HaskellObj );
 HsInt        rts_getInt       ( HaskellObj );
+HsInt8       rts_getInt8      ( HaskellObj );
+HsInt16      rts_getInt16     ( HaskellObj );
 HsInt32      rts_getInt32     ( HaskellObj );
+HsInt64      rts_getInt64     ( HaskellObj );
 HsWord       rts_getWord      ( HaskellObj );
+HsWord8      rts_getWord8     ( HaskellObj );
+HsWord16     rts_getWord16    ( HaskellObj );
 HsWord32     rts_getWord32    ( HaskellObj );
+HsWord64     rts_getWord64    ( HaskellObj );
 HsPtr        rts_getPtr       ( HaskellObj );
 HsFloat      rts_getFloat     ( HaskellObj );
 HsDouble     rts_getDouble    ( HaskellObj );

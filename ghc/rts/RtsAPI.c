@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.26 2001/03/22 03:51:10 hwloidl Exp $
+ * $Id: RtsAPI.c,v 1.27 2001/08/03 16:30:13 sof Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -204,7 +204,7 @@ rts_getChar (HaskellObj p)
        p->header.info == Czh_static_info) {
     return (StgChar)(StgWord)(p->payload[0]);
   } else {
-    barf("getChar: not a Char");
+    barf("rts_getChar: not a Char");
   }
 }
 
@@ -214,9 +214,33 @@ rts_getInt (HaskellObj p)
   if ( 1 ||
        p->header.info == Izh_con_info || 
        p->header.info == Izh_static_info ) {
-    return (int)(p->payload[0]);
+    return (HsInt)(p->payload[0]);
   } else {
-    barf("getInt: not an Int");
+    barf("rts_getInt: not an Int");
+  }
+}
+
+HsInt8
+rts_getInt8 (HaskellObj p)
+{
+  if ( 1 ||
+       p->header.info == I8zh_con_info || 
+       p->header.info == I8zh_static_info ) {
+    return (HsInt8)(HsInt)(p->payload[0]);
+  } else {
+    barf("rts_getInt8: not an Int8");
+  }
+}
+
+HsInt16
+rts_getInt16 (HaskellObj p)
+{
+  if ( 1 ||
+       p->header.info == I16zh_con_info || 
+       p->header.info == I16zh_static_info ) {
+    return (HsInt16)(HsInt)(p->payload[0]);
+  } else {
+    barf("rts_getInt16: not an Int16");
   }
 }
 
@@ -226,21 +250,58 @@ rts_getInt32 (HaskellObj p)
   if ( 1 ||
        p->header.info == I32zh_con_info || 
        p->header.info == I32zh_static_info ) {
-    return (int)(p->payload[0]);
+    return (HsInt32)(p->payload[0]);
   } else {
-    barf("getInt: not an Int");
+    barf("rts_getInt32: not an Int32");
   }
 }
 
+HsInt64
+rts_getInt64 (HaskellObj p)
+{
+  HsInt64* tmp;
+  if ( 1 ||
+       p->header.info == I64zh_con_info || 
+       p->header.info == I64zh_static_info ) {
+    tmp = (HsInt64*)&(p->payload[0]);
+    return *tmp;
+  } else {
+    barf("rts_getInt64: not an Int64");
+  }
+}
 HsWord
 rts_getWord (HaskellObj p)
 {
   if ( 1 || /* see above comment */
        p->header.info == Wzh_con_info ||
        p->header.info == Wzh_static_info ) {
-    return (unsigned int)(p->payload[0]);
+    return (HsWord)(p->payload[0]);
   } else {
-    barf("getWord: not a Word");
+    barf("rts_getWord: not a Word");
+  }
+}
+
+HsWord8
+rts_getWord8 (HaskellObj p)
+{
+  if ( 1 || /* see above comment */
+       p->header.info == W8zh_con_info ||
+       p->header.info == W8zh_static_info ) {
+    return (HsWord8)(HsWord)(p->payload[0]);
+  } else {
+    barf("rts_getWord8: not a Word8");
+  }
+}
+
+HsWord16
+rts_getWord16 (HaskellObj p)
+{
+  if ( 1 || /* see above comment */
+       p->header.info == W16zh_con_info ||
+       p->header.info == W16zh_static_info ) {
+    return (HsWord16)(HsWord)(p->payload[0]);
+  } else {
+    barf("rts_getWord16: not a Word16");
   }
 }
 
@@ -252,7 +313,22 @@ rts_getWord32 (HaskellObj p)
        p->header.info == W32zh_static_info ) {
     return (unsigned int)(p->payload[0]);
   } else {
-    barf("getWord: not a Word");
+    barf("rts_getWord: not a Word");
+  }
+}
+
+
+HsWord64
+rts_getWord64 (HaskellObj p)
+{
+  HsWord64* tmp;
+  if ( 1 || /* see above comment */
+       p->header.info == W64zh_con_info ||
+       p->header.info == W64zh_static_info ) {
+    tmp = (HsWord64*)&(p->payload[0]);
+    return *tmp;
+  } else {
+    barf("rts_getWord64: not a Word64");
   }
 }
 
@@ -263,7 +339,7 @@ rts_getFloat (HaskellObj p)
        p->header.info == Fzh_static_info ) {
     return (float)(PK_FLT((P_)p->payload));
   } else {
-    barf("getFloat: not a Float");
+    barf("rts_getFloat: not a Float");
   }
 }
 
@@ -274,7 +350,7 @@ rts_getDouble (HaskellObj p)
        p->header.info == Dzh_static_info ) {
     return (double)(PK_DBL((P_)p->payload));
   } else {
-    barf("getDouble: not a Double");
+    barf("rts_getDouble: not a Double");
   }
 }
 
@@ -285,7 +361,7 @@ rts_getStablePtr (HaskellObj p)
        p->header.info == StablePtr_static_info ) {
     return (StgStablePtr)(p->payload[0]);
   } else {
-    barf("getStablePtr: not a StablePtr");
+    barf("rts_getStablePtr: not a StablePtr");
   }
 }
 
@@ -296,7 +372,7 @@ rts_getPtr (HaskellObj p)
        p->header.info == Ptr_static_info ) {
     return (void *)(p->payload[0]);
   } else {
-    barf("getPtr: not an Ptr");
+    barf("rts_getPtr: not an Ptr");
   }
 }
 
@@ -309,7 +385,7 @@ rts_getBool (HaskellObj p)
   } else if (p == False_closure) {
     return 0;
   } else {
-    barf("getBool: not a Bool");
+    barf("rts_getBool: not a Bool");
   }
 }
 #endif /* COMPILER */
