@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: createDirectory.c,v 1.3 1998/12/02 13:27:16 simonm Exp $
+ * $Id: createDirectory.c,v 1.4 1999/03/01 09:03:37 sof Exp $
  *
  * createDirectory Runtime Support}
  */
@@ -17,6 +17,12 @@
 #include <sys/stat.h>
 #endif
 
+#if defined(mingw32_TARGET_OS)
+#define mkDir(nm,p) mkdir(nm)
+#else
+#define mkDir(nm,p) mkdir(nm,p)
+#endif
+
 StgInt 
 createDirectory(path)
 StgByteArray path;
@@ -24,7 +30,7 @@ StgByteArray path;
     int rc;
     struct stat sb;
 
-    while((rc = mkdir(path, 0777)) != 0) {
+    while((rc = mkDir(path, 0777)) != 0) {
 	if (errno != EINTR) {
 	    cvtErrno();
 	    switch (ghc_errno) {
