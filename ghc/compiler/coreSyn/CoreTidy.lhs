@@ -26,7 +26,7 @@ import Id		( idType, idInfo, idName, isExportedId,
 			) 
 import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
-		  	  localiseName, mkLocalName, isGlobalName
+		  	  localiseName, mkLocalName, isGlobalName, isDllName
 			)
 import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
 import Type		( tidyTopType, tidyType, tidyTyVar )
@@ -37,6 +37,8 @@ import HscTypes		( PersistentCompilerState( pcs_PRS ),
 			  NameSupply( nsNames ), OrigNameCache
 			)
 import UniqSupply
+import DataCon		( dataConName )
+import Literal		( isLitLitLit )
 import FiniteMap	( lookupFM, addToFM )
 import Maybes		( maybeToBool, orElse )
 import ErrUtils		( showPass )
@@ -662,24 +664,37 @@ rhsIsNonUpd (Lam b e)          = isId b || rhsIsNonUpd e
 rhsIsNonUpd (Note (SCC _) e)   = False
 rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
 rhsIsNonUpd other_expr
-  = go other_expr 0
+  = go other_expr 0 []
   where
-    go (Var f) n_args = idAppIsNonUpd f n_args
+    go (Var f) n_args args = idAppIsNonUpd f n_args args
 	
-    go (App f a) n_args
-	| isTypeArg a = go f n_args
-	| otherwise   = go f (n_args + 1) 
+    go (App f a) n_args args
+	| isTypeArg a = go f n_args args
+	| otherwise   = go f (n_args + 1) (a:args)
 
-    go (Note (SCC _) f) n_args = False
-    go (Note _ f) n_args       = go f n_args
+    go (Note (SCC _) f) n_args args = False
+    go (Note _ f) n_args args       = go f n_args args
 
-    go other n_args = False
+    go other n_args args = False
 
-idAppIsNonUpd :: Id -> Int -> Bool
-idAppIsNonUpd id n_val_args 
+idAppIsNonUpd :: Id -> Int -> [CoreExpr] -> Bool
+idAppIsNonUpd id n_val_args args
   = case idFlavour id of
-	DataConId _ -> True
-	other       -> n_val_args < idArity id
+	DataConId con | not (isDynConApp con args) -> True
+	other -> n_val_args < idArity id
+
+isDynConApp con args = isDllName (dataConName con) || any isDynArg args
+
+	-- Does this argument refer to something in a different DLL,
+	-- or is a LitLit?  Constructor arguments which are in another
+	-- DLL or are LitLits aren't compiled into static constructors
+	-- (see CoreToStg), so we have to take that into account here.
+isDynArg :: CoreExpr -> Bool
+isDynArg (Var v)    = isDllName (idName v)
+isDynArg (Note _ e) = isDynArg e
+isDynArg (Lit lit)  = isLitLitLit lit
+isDynArg (App e _)  = isDynArg e	-- must be a type app
+isDynArg (Lam _ e)  = isDynArg e	-- must be a type lam
 
 -- We consider partial applications to be non-updatable.  NOTE: this
 -- must match how CoreToStg marks the closure.
