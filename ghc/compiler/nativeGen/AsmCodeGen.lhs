@@ -317,7 +317,7 @@ fltFix locs [] = []
 -- address.  Eliminate the instruction and replace all future references
 -- to the temporary with the memory address.
 fltFix locs ((StAssign rep (StReg (StixTemp uq _)) loc) : trees)
-  | isFloatingRep rep  = trace "found one" $ fltFix (addToUFM locs uq loc) trees
+  | isFloatingRep rep  = fltFix (addToUFM locs uq loc) trees
 
 fltFix locs ((StAssign rep src dst) : trees)
   = StAssign rep (fltFix1 locs src) (fltFix1 locs dst) : fltFix locs trees
@@ -329,8 +329,8 @@ fltFix locs (tree : trees)
 fltFix1 :: UniqFM StixTree -> StixTree -> StixTree
 fltFix1 locs r@(StReg (StixTemp uq rep))
   | isFloatingRep rep = case lookupUFM locs uq of
-			 	Nothing -> panic "fltFix1"
-				Just tree -> trace "substed" $ tree
+			 	Nothing   -> panic "fltFix1"
+				Just tree -> tree
 
 fltFix1 locs (StIndex rep l r) =
   StIndex rep (fltFix1 locs l) (fltFix1 locs r)
