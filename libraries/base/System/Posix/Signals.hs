@@ -12,8 +12,6 @@
 --
 -----------------------------------------------------------------------------
 
-#include "ghcconfig.h"
-
 module System.Posix.Signals (
 #ifndef mingw32_HOST_OS
   -- * The Signal type
@@ -41,7 +39,7 @@ module System.Posix.Signals (
   backgroundWrite, sigTTOU,
   userDefinedSignal1, sigUSR1,
   userDefinedSignal2, sigUSR2,
-#ifdef SIGPOLL
+#if CONST_SIGPOLL != -1
   pollableEvent, sigPOLL,
 #endif
   profilingTimerExpired, sigPROF,
@@ -98,9 +96,9 @@ import Prelude -- necessary to get dependencies right
 
 #ifdef __GLASGOW_HASKELL__
 #include "Signals.h"
-#else
-#include "HsBase.h"
 #endif
+
+#include "HsBaseConfig.h"
 
 import Foreign
 import Foreign.C
@@ -119,69 +117,34 @@ type Signal = CInt
 nullSignal :: Signal
 nullSignal = 0
 
-#ifdef __HUGS__
-sigABRT   = (#const SIGABRT)   :: CInt
-sigALRM   = (#const SIGALRM)   :: CInt
-sigBUS    = (#const SIGBUS)    :: CInt
-sigCHLD   = (#const SIGCHLD)   :: CInt
-sigCONT   = (#const SIGCONT)   :: CInt
-sigFPE    = (#const SIGFPE)    :: CInt
-sigHUP    = (#const SIGHUP)    :: CInt
-sigILL    = (#const SIGILL)    :: CInt
-sigINT    = (#const SIGINT)    :: CInt
-sigKILL   = (#const SIGKILL)   :: CInt
-sigPIPE   = (#const SIGPIPE)   :: CInt
-sigQUIT   = (#const SIGQUIT)   :: CInt
-sigSEGV   = (#const SIGSEGV)   :: CInt
-sigSTOP   = (#const SIGSTOP)   :: CInt
-sigTERM   = (#const SIGTERM)   :: CInt
-sigTSTP   = (#const SIGTSTP)   :: CInt
-sigTTIN   = (#const SIGTTIN)   :: CInt
-sigTTOU   = (#const SIGTTOU)   :: CInt
-sigUSR1   = (#const SIGUSR1)   :: CInt
-sigUSR2   = (#const SIGUSR2)   :: CInt
-#ifdef SIGPOLL
-sigPOLL   = (#const SIGPOLL)   :: CInt
-#endif
-sigPROF   = (#const SIGPROF)   :: CInt
-sigSYS    = (#const SIGSYS)    :: CInt
-sigTRAP   = (#const SIGTRAP)   :: CInt
-sigURG    = (#const SIGURG)    :: CInt
-sigVTALRM = (#const SIGVTALRM) :: CInt
-sigXCPU   = (#const SIGXCPU)   :: CInt
-sigXFSZ   = (#const SIGXFSZ)   :: CInt
-#else
-foreign import ccall unsafe "__hsposix_SIGABRT"   sigABRT   :: CInt
-foreign import ccall unsafe "__hsposix_SIGALRM"   sigALRM   :: CInt
-foreign import ccall unsafe "__hsposix_SIGBUS"    sigBUS    :: CInt
-foreign import ccall unsafe "__hsposix_SIGCHLD"   sigCHLD   :: CInt
-foreign import ccall unsafe "__hsposix_SIGCONT"   sigCONT   :: CInt
-foreign import ccall unsafe "__hsposix_SIGFPE"    sigFPE    :: CInt
-foreign import ccall unsafe "__hsposix_SIGHUP"    sigHUP    :: CInt
-foreign import ccall unsafe "__hsposix_SIGILL"    sigILL    :: CInt
-foreign import ccall unsafe "__hsposix_SIGINT"    sigINT    :: CInt
-foreign import ccall unsafe "__hsposix_SIGKILL"   sigKILL   :: CInt
-foreign import ccall unsafe "__hsposix_SIGPIPE"   sigPIPE   :: CInt
-foreign import ccall unsafe "__hsposix_SIGQUIT"   sigQUIT   :: CInt
-foreign import ccall unsafe "__hsposix_SIGSEGV"   sigSEGV   :: CInt
-foreign import ccall unsafe "__hsposix_SIGSTOP"   sigSTOP   :: CInt
-foreign import ccall unsafe "__hsposix_SIGTERM"   sigTERM   :: CInt
-foreign import ccall unsafe "__hsposix_SIGTSTP"   sigTSTP   :: CInt
-foreign import ccall unsafe "__hsposix_SIGTTIN"   sigTTIN   :: CInt
-foreign import ccall unsafe "__hsposix_SIGTTOU"   sigTTOU   :: CInt
-foreign import ccall unsafe "__hsposix_SIGUSR1"   sigUSR1   :: CInt
-foreign import ccall unsafe "__hsposix_SIGUSR2"   sigUSR2   :: CInt
-#ifdef SIGPOLL
-foreign import ccall unsafe "__hsposix_SIGPOLL"   sigPOLL   :: CInt
-#endif
-foreign import ccall unsafe "__hsposix_SIGPROF"   sigPROF   :: CInt
-foreign import ccall unsafe "__hsposix_SIGSYS"    sigSYS    :: CInt
-foreign import ccall unsafe "__hsposix_SIGTRAP"   sigTRAP   :: CInt
-foreign import ccall unsafe "__hsposix_SIGURG"    sigURG    :: CInt
-foreign import ccall unsafe "__hsposix_SIGVTALRM" sigVTALRM :: CInt
-foreign import ccall unsafe "__hsposix_SIGXCPU"   sigXCPU   :: CInt
-foreign import ccall unsafe "__hsposix_SIGXFSZ"   sigXFSZ   :: CInt
-#endif /* __HUGS__ */
+sigABRT   = CONST_SIGABRT   :: CInt
+sigALRM   = CONST_SIGALRM   :: CInt
+sigBUS    = CONST_SIGBUS    :: CInt
+sigCHLD   = CONST_SIGCHLD   :: CInt
+sigCONT   = CONST_SIGCONT   :: CInt
+sigFPE    = CONST_SIGFPE    :: CInt
+sigHUP    = CONST_SIGHUP    :: CInt
+sigILL    = CONST_SIGILL    :: CInt
+sigINT    = CONST_SIGINT    :: CInt
+sigKILL   = CONST_SIGKILL   :: CInt
+sigPIPE   = CONST_SIGPIPE   :: CInt
+sigQUIT   = CONST_SIGQUIT   :: CInt
+sigSEGV   = CONST_SIGSEGV   :: CInt
+sigSTOP   = CONST_SIGSTOP   :: CInt
+sigTERM   = CONST_SIGTERM   :: CInt
+sigTSTP   = CONST_SIGTSTP   :: CInt
+sigTTIN   = CONST_SIGTTIN   :: CInt
+sigTTOU   = CONST_SIGTTOU   :: CInt
+sigUSR1   = CONST_SIGUSR1   :: CInt
+sigUSR2   = CONST_SIGUSR2   :: CInt
+sigPOLL   = CONST_SIGPOLL   :: CInt
+sigPROF   = CONST_SIGPROF   :: CInt
+sigSYS    = CONST_SIGSYS    :: CInt
+sigTRAP   = CONST_SIGTRAP   :: CInt
+sigURG    = CONST_SIGURG    :: CInt
+sigVTALRM = CONST_SIGVTALRM :: CInt
+sigXCPU   = CONST_SIGXCPU   :: CInt
+sigXFSZ   = CONST_SIGXFSZ   :: CInt
 
 internalAbort ::Signal
 internalAbort = sigABRT
@@ -243,7 +206,7 @@ userDefinedSignal1 = sigUSR1
 userDefinedSignal2 :: Signal
 userDefinedSignal2 = sigUSR2
 
-#ifdef SIGPOLL
+#if CONST_SIGPOLL != -1
 pollableEvent :: Signal
 pollableEvent = sigPOLL
 #endif
@@ -323,23 +286,25 @@ installHandler int handler maybe_mask = do
       alloca $ \p_sp -> do
 
       rc <- case handler of
-      	      Default -> stg_sig_install int (#const STG_SIG_DFL) p_sp mask
-      	      Ignore  -> stg_sig_install int (#const STG_SIG_IGN) p_sp mask
-      	      Catch m -> install'' m p_sp mask int (#const STG_SIG_HAN)
-      	      CatchOnce m -> install'' m p_sp mask int (#const STG_SIG_RST)
+      	      Default      -> stg_sig_install int STG_SIG_DFL p_sp mask
+      	      Ignore       -> stg_sig_install int STG_SIG_IGN p_sp mask
+      	      Catch m      -> hinstall m p_sp mask int STG_SIG_HAN
+      	      CatchOnce m  -> hinstall m p_sp mask int STG_SIG_RST
 
       case rc of
-	(#const STG_SIG_DFL) -> return Default
-	(#const STG_SIG_IGN) -> return Ignore
-	(#const STG_SIG_ERR) -> throwErrno "installHandler"
-	(#const STG_SIG_HAN) -> do
+	STG_SIG_DFL -> return Default
+	STG_SIG_IGN -> return Ignore
+	STG_SIG_ERR -> throwErrno "installHandler"
+	STG_SIG_HAN -> do
         	m <- peekHandler p_sp
 		return (Catch m)
-	(#const STG_SIG_RST) -> do
+	STG_SIG_RST -> do
         	m <- peekHandler p_sp
 		return (CatchOnce m)
+	_other ->
+	   error "internal error: System.Posix.Signals.installHandler"
 
-    install'' m p_sp mask int reset = do
+    hinstall m p_sp mask int reset = do
       sptr <- newStablePtr m
       poke p_sp sptr
       stg_sig_install int reset p_sp mask
@@ -349,8 +314,12 @@ installHandler int handler maybe_mask = do
       deRefStablePtr osptr
 
 foreign import ccall unsafe
-  stg_sig_install :: CInt -> CInt -> Ptr (StablePtr (IO ())) -> Ptr CSigset
-	 -> IO CInt
+  stg_sig_install
+	:: CInt				-- sig no.
+	-> CInt				-- action code (STG_SIG_HAN etc.)
+	-> Ptr (StablePtr (IO ()))	-- (in, out) Haskell handler
+	-> Ptr CSigset			-- (in, out) blocked
+	-> IO CInt			-- (ret) action code
 
 #endif /* !__PARALLEL_HASKELL__ */
 #endif /* __GLASGOW_HASKELL__ */
@@ -442,13 +411,13 @@ sigProcMask fn how (SignalSet set) =
     throwErrnoIfMinus1_ fn (c_sigprocmask how p_set nullPtr)
   
 setSignalMask :: SignalSet -> IO ()
-setSignalMask set = sigProcMask "setSignalMask" c_SIG_SETMASK set
+setSignalMask set = sigProcMask "setSignalMask" (CONST_SIG_SETMASK :: CInt) set
 
 blockSignals :: SignalSet -> IO ()
-blockSignals set = sigProcMask "blockSignals" c_SIG_BLOCK set
+blockSignals set = sigProcMask "blockSignals" (CONST_SIG_BLOCK :: CInt) set
 
 unblockSignals :: SignalSet -> IO ()
-unblockSignals set = sigProcMask "unblockSignals" c_SIG_UNBLOCK set
+unblockSignals set = sigProcMask "unblockSignals" (CONST_SIG_UNBLOCK :: CInt) set
 
 getPendingSignals :: IO SignalSet
 getPendingSignals = do
@@ -495,16 +464,6 @@ foreign import ccall unsafe "__hscore_sigismember"
 
 foreign import ccall unsafe "sigpending"
   c_sigpending :: Ptr CSigset -> IO CInt
-
-#ifdef __HUGS__
-c_SIG_BLOCK   = (#const SIG_BLOCK)   :: CInt
-c_SIG_SETMASK = (#const SIG_SETMASK) :: CInt
-c_SIG_UNBLOCK = (#const SIG_UNBLOCK) :: CInt
-#else
-foreign import ccall unsafe "__hsposix_SIG_BLOCK"   c_SIG_BLOCK   :: CInt
-foreign import ccall unsafe "__hsposix_SIG_SETMASK" c_SIG_SETMASK :: CInt
-foreign import ccall unsafe "__hsposix_SIG_UNBLOCK" c_SIG_UNBLOCK :: CInt
-#endif /* __HUGS__ */
 
 #endif /* mingw32_HOST_OS */
 
