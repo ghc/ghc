@@ -1,7 +1,7 @@
 {-# OPTIONS -fglasgow-exts #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.35 2003/08/17 01:36:54 sof Exp $
+-- $Id: Main.hs,v 1.36 2003/09/08 17:55:40 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -59,6 +59,7 @@ data Flag
   | Add Bool {- True => replace existing info -}
   | Remove String | Show String 
   | Field String | AutoGHCiLibs | Force
+  | DefinedName String String
   deriving (Eq)
 
 isAction (Config _)     = False
@@ -66,6 +67,7 @@ isAction (Field _)      = False
 isAction (Input _)      = False
 isAction (AutoGHCiLibs) = False
 isAction (Force)	= False
+isAction DefinedName{}  = False
 isAction _              = True
 
 usageHeader = "ghc-pkg [OPTION...]"
@@ -92,9 +94,15 @@ flags = [
   Option ['r'] ["remove-package"] (ReqArg Remove "NAME")
  	"Remove an installed package",
   Option ['g'] ["auto-ghci-libs"] (NoArg AutoGHCiLibs)
-	"Automatically build libs for GHCi (with -a)"
+	"Automatically build libs for GHCi (with -a)",
+  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
+  	"Define NAME as VALUE"
   ]
-
+ where
+  toDefined str = 
+    case break (=='=') str of
+      (nm,[]) -> DefinedName nm []
+      (nm,_:val) -> DefinedName nm val
 
 runit clis = do
   let err_msg = "missing -f option, location of package.conf unknown"
@@ -140,12 +148,15 @@ runit clis = do
       input_file = head ([ f | (Input f) <- clis] ++ ["-"])
 
       force = Force `elem` clis
+      
+      defines = [ (nm,val) | DefinedName nm val <- clis ]
 
   case [ c | c <- clis, isAction c ] of
     [ List ]      -> listPackages pkg_confs conf_filenames
     [ ListLocal ] -> listPackages [head pkg_confs] [""]
-    [ Add upd ]  -> addPackage pkg_confs conf_filename input_file 
-			auto_ghci_libs upd force
+    [ Add upd ]  -> addPackage pkg_confs defines 
+    			       conf_filename input_file
+			       auto_ghci_libs upd force
     [ Remove p ] -> removePackage pkg_confs conf_filename p
     [ Show p ]   -> showPackage pkg_confs conf_filename p fields
     _            -> die (usageInfo usageHeader flags)
@@ -175,9 +186,12 @@ showPackage pkg_confs filename pkg_name fields =
 				(map (vcat . map text) (map ($ pkg) fields))))
     _     -> die "showPackage: internal error"
 
-addPackage :: [[PackageConfig]] -> FilePath -> FilePath
-	 -> Bool -> Bool -> Bool -> IO ()
-addPackage pkg_confs filename inputFile auto_ghci_libs updatePkg force = do
+addPackage :: [[PackageConfig]] -> [(String, String)] 
+	   -> FilePath -> FilePath
+ 	   -> Bool -> Bool -> Bool -> IO ()
+addPackage pkg_confs defines 
+	   filename inputFile
+	   auto_ghci_libs updatePkg force = do
   checkConfigAccess filename
   s <-
     case inputFile of
@@ -191,7 +205,7 @@ addPackage pkg_confs filename inputFile auto_ghci_libs updatePkg force = do
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
   hPutStr stdout "Expanding embedded variables... "
-  new_exp_pkg <- expandEnvVars new_pkg force
+  new_exp_pkg <- expandEnvVars new_pkg defines force
   hPutStrLn stdout "done."
   new_details <- validatePackageConfig new_exp_pkg pkg_confs 
 			auto_ghci_libs updatePkg force
@@ -337,8 +351,8 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   hPutStrLn stderr (" done.")
 
 -----------------------------------------------------------------------------
-expandEnvVars :: PackageConfig -> Bool -> IO PackageConfig
-expandEnvVars pkg force = do
+expandEnvVars :: PackageConfig -> [(String, String)] -> Bool -> IO PackageConfig
+expandEnvVars pkg defines force = do
    -- permit _all_ strings to contain ${..} environment variable references,
    -- arguably too flexible.
   nm       <- expandString (name pkg)
@@ -387,6 +401,9 @@ expandEnvVars pkg force = do
        _ -> return str	   
 
    lookupEnvVar nm = 
+     case lookup nm defines of
+       Just x | not (null x) -> return x
+       _      -> 
 	catch (System.getEnv nm)
 	   (\ _ -> do dieOrForce force ("Unable to expand variable " ++ 
 					show nm)
