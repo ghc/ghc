@@ -26,11 +26,6 @@ import GHC.IOBase
 import GHC.Handle
 #endif
 
-#ifdef __HUGS__
-import Hugs.IOExts
-#endif
-
-#ifdef __GLASGOW_HASKELL__
 {-# NOINLINE trace #-}
 {-|
 When called, 'trace' prints the string in its first argument to
@@ -44,14 +39,12 @@ trace :: String -> a -> a
 trace string expr = unsafePerformIO $ do
     hPutStr stderr string
     hPutChar stderr '\n'
+#ifdef __GLASGOW_HASKELL__
     fd <- withHandle_ "trace" stderr $ (return.haFD)
     postTraceHook fd
+#endif
     return expr
 
+#ifdef __GLASGOW_HASKELL__
 foreign import ccall "PostTraceHook" postTraceHook :: Int -> IO ()
-#endif
-
-#ifdef __NHC__
-trace :: String -> a -> a
-trace str expr = unsafePerformIO $ do hPutStr stderr str; return expr
 #endif
