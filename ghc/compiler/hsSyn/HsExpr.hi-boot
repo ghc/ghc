@@ -1,12 +1,11 @@
 _interface_ HsExpr 1
 _exports_
-HsExpr HsExpr pprExpr Match GRHSs pprMatch pprMatches pprGRHSs ;
+HsExpr HsExpr pprExpr Match GRHSs pprFunBind pprPatBind ;
 _declarations_
 1 data HsExpr i p;
 1 pprExpr _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => HsExpr.HsExpr i p -> Outputable.SDoc ;;
 
 1 data Match a b ;
 1 data GRHSs a b ;
-1 pprGRHSs _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => PrelBase.Bool -> HsExpr.GRHSs i p -> Outputable.SDoc ;;
-1 pprMatch _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> HsExpr.Match i p -> Outputable.SDoc ;;
-1 pprMatches _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => (PrelBase.Bool, Outputable.SDoc) -> [HsExpr.Match i p] -> Outputable.SDoc ;;
+1 pprPatBind _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => p -> HsExpr.GRHSs i p -> Outputable.SDoc ;;
+1 pprFunBind _:_ _forall_ [i p] {Outputable.Outputable i, Outputable.Outputable p} => i -> [HsExpr.Match i p] -> Outputable.SDoc ;;

@@ -13,7 +13,7 @@ module TcModule (
 
 import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
-			  Stmt(..), InPat(..), HsMatchContext(..), RuleDecl(..),
+			  Stmt(..), InPat(..), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
 			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch
 			)
 import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName,
@@ -196,7 +196,7 @@ tc_stmts names stmts
     in
 
     traceTc (text "tcs 2") `thenNF_Tc_`
-    tcStmtsAndThen combine DoExpr io_ty stmts	(
+    tcStmtsAndThen combine (DoCtxt DoExpr) io_ty stmts	(
 	-- Look up the names right in the middle,
 	-- where they will all be in scope
 	mapNF_Tc tcLookupId names			`thenNF_Tc` \ ids ->

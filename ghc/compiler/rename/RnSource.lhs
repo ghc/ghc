@@ -119,7 +119,7 @@ rnSourceDecl (DefD (DefaultDecl tys src_loc))
     mapFvRn (rnHsTypeFVs doc_str) tys		`thenRn` \ (tys', fvs) ->
     returnRn (DefD (DefaultDecl tys' src_loc), fvs)
   where
-    doc_str = text "a `default' declaration"
+    doc_str = text "In a `default' declaration"
 \end{code}
 
 
@@ -178,7 +178,7 @@ finishSourceInstDecl (InstDecl _       mbinds uprags _               _      )
 	-- Used for both source decls only
   = ASSERT( not (maybeToBool maybe_dfun_name) )	-- Source decl!
     let
-	meth_doc    = text "the bindings in an instance declaration"
+	meth_doc    = text "In the bindings in an instance declaration"
 	meth_names  = collectLocatedMonoBinders mbinds
 	inst_tyvars = case inst_ty of
 			HsForAllTy (Just inst_tyvars) _ _ -> inst_tyvars
@@ -246,7 +246,7 @@ rnHsRuleDecl (HsRule rule_name tvs vars lhs rhs src_loc)
     returnRn (HsRule rule_name sig_tvs' vars' lhs' rhs' src_loc,
 	      fv_vars `plusFV` fv_lhs `plusFV` fv_rhs)
   where
-    doc = text "the transformation rule" <+> ptext rule_name
+    doc = text "In the transformation rule" <+> ptext rule_name
     sig_tvs = extractRuleBndrsTyVars vars
   
     get_var (RuleBndr v)      = v
@@ -285,7 +285,7 @@ rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc
     mapRn rnIdInfo id_infos		`thenRn` \ id_infos' -> 
     returnRn (IfaceSig {tcdName = name', tcdType = ty', tcdIdInfo = id_infos', tcdLoc = loc})
   where
-    doc_str = text "the interface signature for" <+> quotes (ppr name)
+    doc_str = text "In the interface signature for" <+> quotes (ppr name)
 
 rnTyClDecl (ForeignType {tcdName = name, tcdFoType = spec, tcdLoc = loc})
   = pushSrcLocRn loc 			$
@@ -300,13 +300,24 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
     bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
     rnContext data_doc context 			`thenRn` \ context' ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
+
+	-- Check that there's at least one condecl,
+	-- or else we're reading an interface file, or -fglasgow-exts
+    (if null condecls then
+	doptRn Opt_GlasgowExts	`thenRn` \ glaExts ->
+	getModeRn		`thenRn` \ mode ->
+	checkRn (glaExts || isInterfaceMode mode)
+		(emptyConDeclsErr tycon)
+     else returnRn ()
+    )						`thenRn_` 
+
     mapRn rnConDecl condecls			`thenRn` \ condecls' ->
     mapRn lookupSysBinder sys_names	        `thenRn` \ sys_names' ->
     returnRn (TyData {tcdND = new_or_data, tcdCtxt = context', tcdName = tycon',
 		      tcdTyVars = tyvars', tcdCons = condecls', tcdNCons = nconstrs,
 		      tcdDerivs = Nothing, tcdLoc = src_loc, tcdSysNames = sys_names'})
   where
-    data_doc = text "the data type declaration for" <+> quotes (ppr tycon)
+    data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
     con_names = map conDeclName condecls
 
 rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLoc = src_loc})
@@ -317,7 +328,7 @@ rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLo
     rnHsType syn_doc (unquantify glaExts ty)	`thenRn` \ ty' ->
     returnRn (TySynonym {tcdName = name', tcdTyVars = tyvars', tcdSynRhs = ty', tcdLoc = src_loc})
   where
-    syn_doc = text "the declaration for type synonym" <+> quotes (ppr name)
+    syn_doc = text "In the declaration for type synonym" <+> quotes (ppr name)
 
 	-- For H98 we do *not* universally quantify on the RHS of a synonym
 	-- Silently discard context... but the tyvars in the rest won't be in scope
@@ -370,8 +381,8 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
 			  tcdFDs = fds', tcdSigs = non_ops' ++ sigs', tcdMeths = Nothing, 
 			  tcdSysNames = names', tcdLoc = src_loc})
   where
-    cls_doc  = text "the declaration for class" 	<+> ppr cname
-    sig_doc  = text "the signatures for class"  	<+> ppr cname
+    cls_doc  = text "In the declaration for class" 	<+> ppr cname
+    sig_doc  = text "In the signatures for class"  	<+> ppr cname
 
 rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op dm_stuff ty locn)
   = pushSrcLocRn locn $
@@ -433,7 +444,7 @@ finishSourceTyClDecl (ClassDecl {tcdMeths = Just mbinds, tcdLoc = src_loc})	-- G
     rnMethodBinds gen_tyvars mbinds			`thenRn` \ (mbinds', meth_fvs) ->
     returnRn (rn_cls_decl {tcdMeths = Just mbinds'}, meth_fvs)
   where
-    meth_doc = text "the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
+    meth_doc = text "In the default-methods for class"	<+> ppr (tcdName rn_cls_decl)
 
 finishSourceTyClDecl _ tycl_decl = returnRn (tycl_decl, emptyFVs)
 	-- Not a class or data type declaration
@@ -473,7 +484,7 @@ rnConDecl (ConDecl name wkr tvs cxt details locn)
     rnConDetails doc locn details	`thenRn` \ new_details -> 
     returnRn (ConDecl new_name new_wkr new_tyvars new_context new_details locn)
   where
-    doc = text "the definition of data constructor" <+> quotes (ppr name)
+    doc = text "In the definition of data constructor" <+> quotes (ppr name)
 
 rnConDetails doc locn (VanillaCon tys)
   = mapRn (rnBangTy doc) tys	`thenRn` \ new_tys  ->
@@ -537,7 +548,7 @@ rnHsSigType :: SDoc -> RdrNameHsType -> RnMS RenamedHsType
 	-- rnHsSigType is used for source-language type signatures,
 	-- which use *implicit* universal quantification.
 rnHsSigType doc_str ty
-  = rnHsType (text "the type signature for" <+> doc_str) ty
+  = rnHsType (text "In the type signature for" <+> doc_str) ty
     
 ---------------------------------------
 rnHsType :: SDoc -> RdrNameHsType -> RnMS RenamedHsType
@@ -872,7 +883,7 @@ forAllWarn doc ty tyvar
 		   sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
 		   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
 		   $$
-		   (ptext SLIT("In") <+> doc)
+		   doc
                 )
           }
 
@@ -896,4 +907,7 @@ dupClassAssertWarn ctxt (assertion : dups)
 naughtyCCallContextErr (HsClassP clas _)
   = sep [ptext SLIT("Can't use class") <+> quotes (ppr clas), 
 	 ptext SLIT("in a context")]
+emptyConDeclsErr tycon
+  = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
+	 nest 4 (ptext SLIT("(-fglasgow-exts permits this)"))]
 \end{code}

@@ -983,7 +983,7 @@ dupNamesErr descriptor ((name,loc) : dup_things)
   = pushSrcLocRn loc $
     addErrRn ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
-	      (ptext SLIT("in") <+> descriptor))
+	      descriptor)
 
 warnDeprec :: Name -> DeprecTxt -> RnM d ()
 warnDeprec name txt
@@ -992,3 +992,4 @@ warnDeprec name txt
 		     quotes (ppr name) <+> text "is deprecated:", 
 		     nest 4 (ppr txt) ])
 \end{code}
+

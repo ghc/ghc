@@ -12,7 +12,7 @@ import {-# SOURCE #-} DsExpr  ( dsExpr, dsLet )
 import {-# SOURCE #-} Match   ( matchSinglePat )
 
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), HsMatchContext(..) )
-import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt )
+import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt, TypecheckedMatchContext )
 import CoreSyn		( CoreExpr )
 import Type		( Type )
 
@@ -45,8 +45,8 @@ dsGuarded grhss
 In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 \begin{code}
-dsGRHSs :: HsMatchContext -> [TypecheckedPat]	-- These are to build a MatchContext from
-	-> TypecheckedGRHSs			-- Guarded RHSs
+dsGRHSs :: TypecheckedMatchContext -> [TypecheckedPat]	-- These are to build a MatchContext from
+	-> TypecheckedGRHSs				-- Guarded RHSs
 	-> DsM (Type, MatchResult)
 
 dsGRHSs kind pats (GRHSs grhss binds (Just ty))

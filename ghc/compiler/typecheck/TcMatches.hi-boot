@@ -3,9 +3,9 @@ _exports_
 TcMatches tcGRHSs tcMatchesFun;
 _declarations_
 2 tcGRHSs _:_ _forall_ [s] => 
-	      RnHsSyn.RenamedGRHSs
+	      HsExpr.HsMatchContext Name.Name
+	      -> RnHsSyn.RenamedGRHSs
 	      -> TcMonad.TcType
-	      -> HsExpr.HsMatchContext
 	      -> TcMonad.TcM s (TcHsSyn.TcGRHSs, Inst.LIE) ;;
 3 tcMatchesFun _:_ _forall_ [s] => 
 		[(Name.Name,Var.Id)]

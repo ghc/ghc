@@ -78,11 +78,9 @@ dsMonoBinds _ (VarMonoBind var expr) rest
 
 dsMonoBinds auto_scc (FunMonoBind fun _ matches locn) rest
   = putSrcLocDs locn	$
-    matchWrapper (FunRhs (idName fun)) matches error_string	`thenDs` \ (args, body) ->
-    addAutoScc auto_scc (fun, mkLams args body)			`thenDs` \ pair ->
+    matchWrapper (FunRhs fun) matches 			`thenDs` \ (args, body) ->
+    addAutoScc auto_scc (fun, mkLams args body)		`thenDs` \ pair ->
     returnDs (pair : rest)
-  where
-    error_string = "function " ++ showSDoc (ppr fun)
 
 dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
   = putSrcLocDs locn $

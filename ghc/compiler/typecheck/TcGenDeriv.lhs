@@ -28,7 +28,7 @@ module TcGenDeriv (
 
 import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
-			  HsBinds(..), HsType(..), HsMatchContext(..),
+			  HsBinds(..), HsType(..), HsDoContext(..),
 			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList
 			)
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )

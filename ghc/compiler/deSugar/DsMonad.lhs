@@ -25,7 +25,7 @@ module DsMonad (
 
 #include "HsVersions.h"
 
-import HsSyn		( HsMatchContext )
+import TcHsSyn		( TypecheckedPat, TypecheckedMatchContext )
 import Bag		( emptyBag, snocBag, Bag )
 import ErrUtils 	( WarnMsg )
 import Id		( mkSysLocal, setIdUnique, Id )
@@ -33,7 +33,6 @@ import Module		( Module )
 import Var		( TyVar, setTyVarUnique )
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
-import TcHsSyn		( TypecheckedPat )
 import Type             ( Type )
 import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
@@ -218,7 +217,7 @@ dsLookupGlobalValue name dflags us genv loc mod warns
 
 \begin{code}
 data DsMatchContext
-  = DsMatchContext HsMatchContext [TypecheckedPat] SrcLoc
+  = DsMatchContext TypecheckedMatchContext [TypecheckedPat] SrcLoc
   | NoMatchContext
   deriving ()
 \end{code}

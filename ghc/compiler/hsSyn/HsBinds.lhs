@@ -10,7 +10,9 @@ module HsBinds where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} HsExpr ( pprExpr, HsExpr, pprMatches, Match, pprGRHSs, GRHSs )
+import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr,
+			       Match,  pprFunBind,
+			       GRHSs,  pprPatBind )
 
 -- friends:
 import HsTypes		( HsType )
@@ -199,11 +201,8 @@ ppr_monobind EmptyMonoBinds = empty
 ppr_monobind (AndMonoBinds binds1 binds2)
       = ppr_monobind binds1 $$ ppr_monobind binds2
 
-ppr_monobind (PatMonoBind pat grhss locn)
-      = sep [ppr pat, nest 4 (pprGRHSs False grhss)]
-
-ppr_monobind (FunMonoBind fun inf matches locn)
-      = pprMatches (False, ppr fun) matches
+ppr_monobind (PatMonoBind pat grhss locn)	= pprPatBind pat grhss
+ppr_monobind (FunMonoBind fun inf matches locn) = pprFunBind fun matches
       -- ToDo: print infix if appropriate
 
 ppr_monobind (VarMonoBind name expr)

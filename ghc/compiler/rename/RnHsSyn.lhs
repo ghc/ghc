@@ -35,6 +35,7 @@ type RenamedHsBinds		= HsBinds		Name RenamedPat
 type RenamedHsExpr		= HsExpr		Name RenamedPat
 type RenamedHsModule		= HsModule		Name RenamedPat
 type RenamedInstDecl		= InstDecl		Name RenamedPat
+type RenamedMatchContext	= HsMatchContext	Name
 type RenamedMatch		= Match			Name RenamedPat
 type RenamedMonoBinds		= MonoBinds		Name RenamedPat
 type RenamedPat			= InPat			Name

@@ -10,7 +10,7 @@ module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) w
 
 import CmdLineOpts	( DynFlag(..), dopt )
 import HsSyn		
-import TcHsSyn		( TypecheckedPat, TypecheckedMatch )
+import TcHsSyn		( TypecheckedPat, TypecheckedMatch, TypecheckedMatchContext )
 import DsHsSyn		( outPatType )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
@@ -622,9 +622,8 @@ Call @match@ with all of this information!
 \end{enumerate}
 
 \begin{code}
-matchWrapper :: HsMatchContext		-- For shadowing warning messages
+matchWrapper :: TypecheckedMatchContext	-- For shadowing warning messages
 	     -> [TypecheckedMatch]	-- Matches being desugared
-	     -> String 			-- Error message if the match fails
 	     -> DsM ([Id], CoreExpr) 	-- Results
 \end{code}
 
@@ -651,11 +650,12 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 
 \begin{code}
-matchWrapper kind matches error_string
+matchWrapper ctxt matches
   = getDOptsDs					`thenDs` \ dflags ->
-    flattenMatches kind matches			`thenDs` \ (result_ty, eqns_info) ->
+    flattenMatches ctxt matches			`thenDs` \ (result_ty, eqns_info) ->
     let
 	EqnInfo _ _ arg_pats _ : _ = eqns_info
+	error_string = matchContextErrString ctxt
     in
     mapDs selectMatchVar arg_pats		`thenDs` \ new_vars ->
     match_fun dflags new_vars eqns_info 	`thenDs` \ match_result ->
@@ -664,7 +664,7 @@ matchWrapper kind matches error_string
     extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
     returnDs (new_vars, result_expr)
   where match_fun dflags
-           = case kind of 
+           = case ctxt of 
                 LambdaExpr | dopt Opt_WarnSimplePatterns dflags -> matchExport 
                            | otherwise                          -> match
                 _                                               -> matchExport
@@ -681,11 +681,11 @@ situation where we want to match a single expression against a single
 pattern. It returns an expression.
 
 \begin{code}
-matchSimply :: CoreExpr		-- Scrutinee
-	    -> HsMatchContext	-- Match kind
-	    -> TypecheckedPat	-- Pattern it should match
-	    -> CoreExpr		-- Return this if it matches
-	    -> CoreExpr		-- Return this if it doesn't
+matchSimply :: CoreExpr			-- Scrutinee
+	    -> TypecheckedMatchContext	-- Match kind
+	    -> TypecheckedPat		-- Pattern it should match
+	    -> CoreExpr			-- Return this if it matches
+	    -> CoreExpr			-- Return this if it doesn't
 	    -> DsM CoreExpr
 
 matchSimply scrut kind pat result_expr fail_expr
@@ -726,7 +726,7 @@ matchSinglePat scrut ctx pat match_result
 This is actually local to @matchWrapper@.
 
 \begin{code}
-flattenMatches :: HsMatchContext
+flattenMatches :: TypecheckedMatchContext
 	       -> [TypecheckedMatch]
 	       -> DsM (Type, [EquationInfo])
 

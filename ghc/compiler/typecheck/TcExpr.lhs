@@ -9,7 +9,7 @@ module TcExpr ( tcApp, tcExpr, tcMonoExpr, tcPolyExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsMatchContext(..), mkMonoBind
+			  HsMatchContext(..), HsDoContext(..), mkMonoBind
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, mkHsLet )
@@ -779,7 +779,7 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 		   returnNF_Tc (m_ty, (mkAppTy m_ty, elt_ty))
     )							`thenNF_Tc` \ (tc_ty, m_ty) ->
 
-    tcStmts do_or_lc m_ty stmts				`thenTc`   \ (stmts', stmts_lie) ->
+    tcStmts (DoCtxt do_or_lc) m_ty stmts		`thenTc`   \ (stmts', stmts_lie) ->
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,

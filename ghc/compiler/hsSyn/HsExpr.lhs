@@ -83,11 +83,11 @@ data HsExpr id pat
   | HsWith	(HsExpr id pat)	-- implicit parameter binding
   		[(id, HsExpr id pat)]
 
-  | HsDo	HsMatchContext
+  | HsDo	HsDoContext
 		[Stmt id pat]	-- "do":one or more stmts
 		SrcLoc
 
-  | HsDoOut	HsMatchContext
+  | HsDoOut	HsDoContext
 		[Stmt id pat]	-- "do":one or more stmts
 		id		-- id for return
 		id		-- id for >>=
@@ -222,7 +222,7 @@ ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
 
 ppr_expr (HsLam match)
-  = hsep [char '\\', nest 2 (pprMatch (True,empty) match)]
+  = hsep [char '\\', nest 2 (pprMatch LambdaExpr match)]
 
 ppr_expr expr@(HsApp e1 e2)
   = let (fun, args) = collect_args expr [] in
@@ -278,7 +278,7 @@ ppr_expr (SectionR op expr)
 
 ppr_expr (HsCase expr matches _)
   = sep [ sep [ptext SLIT("case"), nest 4 (pprExpr expr), ptext SLIT("of")],
-	    nest 2 (pprMatches (True, empty) matches) ]
+	    nest 2 (pprMatches CaseAlt matches) ]
 
 ppr_expr (HsIf e1 e2 e3 _)
   = sep [hsep [ptext SLIT("if"), nest 2 (pprExpr e1), ptext SLIT("then")],
@@ -479,46 +479,56 @@ We know the list must have at least one @Match@ in it.
 
 \begin{code}
 pprMatches :: (Outputable id, Outputable pat)
-	   => (Bool, SDoc) -> [Match id pat] -> SDoc
-pprMatches print_info matches = vcat (map (pprMatch print_info) matches)
+	   => HsMatchContext id -> [Match id pat] -> SDoc
+pprMatches ctxt matches = vcat (map (pprMatch ctxt) matches)
+
+-- Exported to HsBinds, which can't see the defn of HsMatchContext
+pprFunBind :: (Outputable id, Outputable pat)
+	   => id -> [Match id pat] -> SDoc
+pprFunBind fun matches = pprMatches (FunRhs fun) matches
+
+-- Exported to HsBinds, which can't see the defn of HsMatchContext
+pprPatBind :: (Outputable id, Outputable pat)
+	   => pat -> GRHSs id pat -> SDoc
+pprPatBind pat grhss = sep [ppr pat, nest 4 (pprGRHSs PatBindRhs grhss)]
 
 
 pprMatch :: (Outputable id, Outputable pat)
-	   => (Bool, SDoc) -> Match id pat -> SDoc
-pprMatch print_info@(is_case, name) (Match _ pats maybe_ty grhss)
-  = maybe_name <+> sep [sep (map ppr pats), 
-			ppr_maybe_ty,
-			nest 2 (pprGRHSs is_case grhss)]
+	   => HsMatchContext id -> Match id pat -> SDoc
+pprMatch ctxt (Match _ pats maybe_ty grhss)
+  = pp_name ctxt <+> sep [sep (map ppr pats), 
+		     ppr_maybe_ty,
+		     nest 2 (pprGRHSs ctxt grhss)]
   where
-    maybe_name | is_case   = empty
-	       | otherwise = name
+    pp_name (FunRhs fun) = ppr fun
+    pp_name other	 = empty
     ppr_maybe_ty = case maybe_ty of
 			Just ty -> dcolon <+> ppr ty
 			Nothing -> empty
 
 
 pprGRHSs :: (Outputable id, Outputable pat)
-	 => Bool -> GRHSs id pat -> SDoc
-pprGRHSs is_case (GRHSs grhss binds maybe_ty)
-  = vcat (map (pprGRHS is_case) grhss)
+	 => HsMatchContext id -> GRHSs id pat -> SDoc
+pprGRHSs ctxt (GRHSs grhss binds maybe_ty)
+  = vcat (map (pprGRHS ctxt) grhss)
     $$
     (if nullBinds binds then empty
      else text "where" $$ nest 4 (pprDeeper (ppr binds)))
 
 
 pprGRHS :: (Outputable id, Outputable pat)
-	=> Bool -> GRHS id pat -> SDoc
+	=> HsMatchContext id -> GRHS id pat -> SDoc
 
-pprGRHS is_case (GRHS [ResultStmt expr _] locn)
- =  pp_rhs is_case expr
+pprGRHS ctxt (GRHS [ResultStmt expr _] locn)
+ =  pp_rhs ctxt expr
 
-pprGRHS is_case (GRHS guarded locn)
- = sep [char '|' <+> interpp'SP guards, pp_rhs is_case expr]
+pprGRHS ctxt (GRHS guarded locn)
+ = sep [char '|' <+> interpp'SP guards, pp_rhs ctxt expr]
  where
     ResultStmt expr _ = last guarded	-- Last stmt should be a ResultStmt for guards
     guards	      = init guarded
 
-pp_rhs is_case rhs = text (if is_case then "->" else "=") <+> pprDeeper (ppr rhs)
+pp_rhs ctxt rhs = ptext (matchSeparator ctxt) <+> pprDeeper (ppr rhs)
 \end{code}
 
 
@@ -596,7 +606,7 @@ pprStmt (ParStmt stmtss)
 pprStmt (ParStmtOut stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
 
-pprDo :: (Outputable id, Outputable pat) => HsMatchContext -> [Stmt id pat] -> SDoc
+pprDo :: (Outputable id, Outputable pat) => HsDoContext -> [Stmt id pat] -> SDoc
 pprDo DoExpr stmts   = hang (ptext SLIT("do")) 2 (vcat (map ppr stmts))
 pprDo ListComp stmts = brackets $
 		       hang (pprExpr expr <+> char '|')
@@ -644,30 +654,21 @@ pp_dotdot = ptext SLIT(" .. ")
 %************************************************************************
 
 \begin{code}
-data HsMatchContext	-- Context of a Match or Stmt
-  = ListComp		-- List comprehension
-  | DoExpr		-- Do Statment
-
-  | FunRhs Name		-- Function binding for f
+data HsMatchContext id	-- Context of a Match or Stmt
+  = DoCtxt HsDoContext	-- Do-stmt or list comprehension
+  | FunRhs id		-- Function binding for f
   | CaseAlt		-- Guard on a case alternative
   | LambdaExpr		-- Lambda
   | PatBindRhs		-- Pattern binding
   | RecUpd		-- Record update
   deriving ()
 
--- It's convenient to have FunRhs as a Name
--- throughout so that HsMatchContext doesn't
--- need to be parameterised.
--- In the RdrName world we never use the FunRhs variant.
+data HsDoContext = ListComp | DoExpr
 \end{code}
 
 \begin{code}
-isDoExpr DoExpr = True
-isDoExpr other  = False
-
-isDoOrListComp ListComp = True
-isDoOrListComp DoExpr   = True
-isDoOrListComp other    = False
+isDoExpr (DoCtxt DoExpr) = True
+isDoExpr other 		 = False
 \end{code}
 
 \begin{code}
@@ -675,17 +676,25 @@ matchSeparator (FunRhs _)   = SLIT("=")
 matchSeparator CaseAlt      = SLIT("->") 
 matchSeparator LambdaExpr   = SLIT("->") 
 matchSeparator PatBindRhs   = SLIT("=") 
-matchSeparator DoExpr       = SLIT("<-")  
-matchSeparator ListComp     = SLIT("<-")  
+matchSeparator (DoCtxt _)   = SLIT("<-")  
 matchSeparator RecUpd       = panic "When is this used?"
 \end{code}
 
 \begin{code}
-pprMatchContext (FunRhs fun) = ptext SLIT("In the definition of") <+> quotes (ppr fun)
-pprMatchContext CaseAlt	     = ptext SLIT("In a group of case alternatives beginning")
-pprMatchContext RecUpd	     = ptext SLIT("In a record-update construct")
-pprMatchContext PatBindRhs   = ptext SLIT("In a pattern binding")
-pprMatchContext LambdaExpr   = ptext SLIT("In a lambda abstraction")
-pprMatchContext DoExpr       = ptext SLIT("In a 'do' expression pattern binding")
-pprMatchContext ListComp     = ptext SLIT("In a 'list comprehension' pattern binding")
+pprMatchContext (FunRhs fun) 	  = ptext SLIT("In the definition of") <+> quotes (ppr fun)
+pprMatchContext CaseAlt	     	  = ptext SLIT("In a case alternative")
+pprMatchContext RecUpd	     	  = ptext SLIT("In a record-update construct")
+pprMatchContext PatBindRhs   	  = ptext SLIT("In a pattern binding")
+pprMatchContext LambdaExpr   	  = ptext SLIT("In a lambda abstraction")
+pprMatchContext (DoCtxt DoExpr)   = ptext SLIT("In a 'do' expression pattern binding")
+pprMatchContext (DoCtxt ListComp) = ptext SLIT("In a 'list comprehension' pattern binding")
+
+-- Used to generate the string for a *runtime* error message
+matchContextErrString (FunRhs fun)    	= "function " ++ showSDoc (ppr fun)
+matchContextErrString CaseAlt	      	= "case"
+matchContextErrString PatBindRhs      	= "pattern binding"
+matchContextErrString RecUpd	      	= "record update"
+matchContextErrString LambdaExpr      	=  "lambda"
+matchContextErrString (DoCtxt DoExpr)   = "'do' expression"
+matchContextErrString (DoCtxt ListComp) = "list comprehension"
 \end{code}

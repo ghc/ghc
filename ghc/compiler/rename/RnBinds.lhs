@@ -217,7 +217,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group,
 	-- and extend current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn (text "a binding group") 
+    bindLocatedLocalsRn (text "In a binding group") 
 			mbinders_w_srclocs	$ \ new_mbinders ->
     let
 	binder_set = mkNameSet new_mbinders
@@ -327,7 +327,7 @@ flattenMonoBinds sigs (FunMonoBind name inf matches locn)
 	names_bound_here = unitNameSet new_name
     in
     sigsForMe names_bound_here sigs			`thenRn` \ sigs_for_me ->
-    mapFvRn rnMatch matches				`thenRn` \ (new_matches, fvs) ->
+    mapFvRn (rnMatch (FunRhs name)) matches		`thenRn` \ (new_matches, fvs) ->
     mapRn_ (checkPrecMatch inf new_name) new_matches	`thenRn_`
     returnRn
       [(unitNameSet new_name,
@@ -387,12 +387,12 @@ rnMethodBinds gen_tyvars (FunMonoBind name inf matches locn)
 	-- Gruesome; bring into scope the correct members of the generic type variables
 	-- See comments in RnSource.rnSourceDecl(ClassDecl)
     rn_match match@(Match _ (TypePatIn ty : _) _ _)
-	= extendTyVarEnvFVRn gen_tvs (rnMatch match)
+	= extendTyVarEnvFVRn gen_tvs (rnMatch (FunRhs name) match)
 	where
 	  tvs     = map rdrNameOcc (extractHsTyRdrNames ty)
 	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
 
-    rn_match match = rnMatch match
+    rn_match match = rnMatch (FunRhs name) match
 	
 
 -- Can't handle method pattern-bindings which bind multiple methods.

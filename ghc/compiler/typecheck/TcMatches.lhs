@@ -13,13 +13,13 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatchLambda,
 import {-# SOURCE #-}	TcExpr( tcExpr )
 
 import HsSyn		( HsBinds(..), Match(..), GRHSs(..), GRHS(..),
-			  MonoBinds(..), Stmt(..), HsMatchContext(..),
+			  MonoBinds(..), Stmt(..), HsMatchContext(..), HsDoContext(..),
 			  pprMatch, getMatchLoc, pprMatchContext, isDoExpr,
 			  mkMonoBind, nullMonoBinds, collectSigTysFromPats
 			)
 import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedHsType,
-			  extractHsTyVars )
-import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
+			  RenamedMatchContext, extractHsTyVars )
+import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat, TypecheckedMatchContext )
 
 import TcMonad
 import TcMonoType	( kcHsSigTypes, tcScopedTyVars, checkSigTyVars, tcHsSigType, sigPatCtxt )
@@ -80,7 +80,7 @@ tcMatchesFun xve fun_name expected_ty matches@(first_match:_)
 	-- may show up as something wrong with the (non-existent) type signature
 
 	-- No need to zonk expected_ty, because unifyFunTy does that on the fly
-    tcMatches xve matches expected_ty (FunRhs fun_name)
+    tcMatches xve (FunRhs fun_name) matches expected_ty
 \end{code}
 
 @tcMatchesCase@ doesn't do the argument-count check because the
@@ -95,26 +95,26 @@ tcMatchesCase :: [RenamedMatch]		-- The case alternatives
 
 tcMatchesCase matches expr_ty
   = newTyVarTy openTypeKind 					`thenNF_Tc` \ scrut_ty ->
-    tcMatches [] matches (mkFunTy scrut_ty expr_ty) CaseAlt	`thenTc` \ (matches', lie) ->
+    tcMatches [] CaseAlt matches (mkFunTy scrut_ty expr_ty)	`thenTc` \ (matches', lie) ->
     returnTc (scrut_ty, matches', lie)
 
 tcMatchLambda :: RenamedMatch -> TcType -> TcM (TcMatch, LIE)
-tcMatchLambda match res_ty = tcMatch [] match res_ty LambdaExpr
+tcMatchLambda match res_ty = tcMatch [] LambdaExpr match res_ty
 \end{code}
 
 
 \begin{code}
 tcMatches :: [(Name,Id)]
+	  -> RenamedMatchContext 
 	  -> [RenamedMatch]
 	  -> TcType
-	  -> HsMatchContext 
 	  -> TcM ([TcMatch], LIE)
 
-tcMatches xve matches expected_ty fun_or_case
+tcMatches xve fun_or_case matches expected_ty
   = mapAndUnzipTc tc_match matches	`thenTc` \ (matches, lies) ->
     returnTc (matches, plusLIEs lies)
   where
-    tc_match match = tcMatch xve match expected_ty fun_or_case
+    tc_match match = tcMatch xve fun_or_case match expected_ty
 \end{code}
 
 
@@ -126,13 +126,13 @@ tcMatches xve matches expected_ty fun_or_case
 
 \begin{code}
 tcMatch :: [(Name,Id)]
+	-> RenamedMatchContext
 	-> RenamedMatch
 	-> TcType 		-- Expected result-type of the Match.
 				-- Early unification with this guy gives better error messages
-	-> HsMatchContext
 	-> TcM (TcMatch, LIE)
 
-tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
+tcMatch xve1 ctxt match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty
   = tcAddSrcLoc (getMatchLoc match)		$	-- At one stage I removed this;
     tcAddErrCtxt (matchCtxt ctxt match)		$	-- I'm not sure why, so I put it back
     
@@ -150,7 +150,7 @@ tcMatch xve1 match@(Match sig_tvs pats maybe_rhs_sig grhss) expected_ty ctxt
 
 		-- Typecheck the body
 		tcExtendLocalValEnv xve1 	$
-		tcGRHSs grhss rhs_ty ctxt	`thenTc` \ (grhss', lie) ->
+		tcGRHSs ctxt grhss rhs_ty	`thenTc` \ (grhss', lie) ->
 		returnTc ((pats', grhss'), lie)
 	  )
 
@@ -172,11 +172,11 @@ glue_on _ EmptyMonoBinds grhss = grhss		-- The common case
 glue_on is_rec mbinds (GRHSs grhss binds ty)
   = GRHSs grhss (mkMonoBind mbinds [] is_rec `ThenBinds` binds) ty
 
-tcGRHSs :: RenamedGRHSs
-	-> TcType -> HsMatchContext
+tcGRHSs :: RenamedMatchContext -> RenamedGRHSs
+	-> TcType
 	-> TcM (TcGRHSs, LIE)
 
-tcGRHSs (GRHSs grhss binds _) expected_ty ctxt
+tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
   = tcBindsAndThen glue_on binds (tc_grhss grhss)
   where
     tc_grhss grhss
@@ -337,7 +337,7 @@ tcStmts do_or_lc m_ty stmts
 
 tcStmtsAndThen
 	:: (TcStmt -> thing -> thing)	-- Combiner
-	-> HsMatchContext
+	-> RenamedMatchContext
         -> (TcType -> TcType, TcType)	-- m, the relationship type of pat and rhs in pat <- rhs
 					-- elt_ty, where type of the comprehension is (m elt_ty)
         -> [RenamedStmt]
@@ -384,7 +384,7 @@ tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
 
     loop ((bndrs,stmts) : pairs)
       = tcStmtsAndThen 
-		combine_par ListComp m_ty stmts
+		combine_par (DoCtxt ListComp) m_ty stmts
 			-- Notice we pass on m_ty; the result type is used only
 			-- to get escaping type variables for checkExistentialPat
 		(tcLookupLocalIds bndrs	`thenNF_Tc` \ bndrs' ->
@@ -451,25 +451,12 @@ sameNoOfArgs matches = length (nub (map args_in_match matches)) == 1
 \end{code}
 
 \begin{code}
-matchCtxt CaseAlt match
-  = hang (ptext SLIT("In a case alternative:"))
-	 4 (pprMatch (True,empty) {-is_case-} match)
-
-matchCtxt (FunRhs fun) match
-  = hang (hcat [ptext SLIT("In an equation for function "), quotes (ppr_fun), char ':'])
-	 4 (pprMatch (False, ppr_fun) {-not case-} match)
-  where
-    ppr_fun = ppr fun
-
-matchCtxt LambdaExpr match
-  = hang (ptext SLIT("In the lambda expression"))
-	 4 (pprMatch (True, empty) match)
+matchCtxt ctxt  match  = hang (pprMatchContext ctxt     <> colon) 4 (pprMatch ctxt match)
+stmtCtxt do_or_lc stmt = hang (pprMatchContext do_or_lc <> colon) 4 (ppr stmt)
 
 varyingArgsErr name matches
   = sep [ptext SLIT("Varying number of arguments for function"), quotes (ppr name)]
 
 lurkingRank2SigErr
   = ptext SLIT("Too few explicit arguments when defining a function with a rank-2 type")
-
-stmtCtxt do_or_lc stmt = hang (pprMatchContext do_or_lc <> colon) 4 (ppr stmt)
 \end{code}

@@ -159,9 +159,9 @@ rnPat (TypePatIn name) =
 ************************************************************************
 
 \begin{code}
-rnMatch :: RdrNameMatch -> RnMS (RenamedMatch, FreeVars)
+rnMatch :: HsMatchContext RdrName -> RdrNameMatch -> RnMS (RenamedMatch, FreeVars)
 
-rnMatch match@(Match _ pats maybe_rhs_sig grhss)
+rnMatch ctxt match@(Match _ pats maybe_rhs_sig grhss)
   = pushSrcLocRn (getMatchLoc match)	$
 
 	-- Bind pattern-bound type variables
@@ -170,8 +170,8 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
 				Nothing -> []
 				Just ty -> [ty]
 	pat_sig_tys = collectSigTysFromPats pats
-	doc_sig     = text "a result type-signature"
- 	doc_pat     = text "a pattern match"
+	doc_sig     = text "In a result type-signature"
+ 	doc_pat     = pprMatchContext ctxt
     in
     bindPatSigTyVars (rhs_sig_tys ++ pat_sig_tys)	$ \ sig_tyvars ->
 
@@ -212,7 +212,7 @@ bindPatSigTyVars tys thing_inside
     let
 	tyvars_in_sigs = extractHsTysRdrTyVars tys
 	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
-	doc_sig        = text "a pattern type-signature"
+	doc_sig        = text "In a pattern type-signature"
     in
     bindNakedTyVarsFVRn doc_sig forall_tyvars thing_inside
 \end{code}
@@ -306,7 +306,7 @@ rnExpr (HsOverLit lit)
     returnRn (HsOverLit lit', fvs)
 
 rnExpr (HsLam match)
-  = rnMatch match	`thenRn` \ (match', fvMatch) ->
+  = rnMatch LambdaExpr match	`thenRn` \ (match', fvMatch) ->
     returnRn (HsLam match', fvMatch)
 
 rnExpr (HsApp fun arg)
@@ -370,8 +370,8 @@ rnExpr (HsSCC lbl expr)
 
 rnExpr (HsCase expr ms src_loc)
   = pushSrcLocRn src_loc $
-    rnExpr expr		 	`thenRn` \ (new_expr, e_fvs) ->
-    mapFvRn rnMatch ms		`thenRn` \ (new_ms, ms_fvs) ->
+    rnExpr expr		 		`thenRn` \ (new_expr, e_fvs) ->
+    mapFvRn (rnMatch CaseAlt) ms	`thenRn` \ (new_ms, ms_fvs) ->
     returnRn (HsCase new_expr new_ms src_loc, e_fvs `plusFV` ms_fvs)
 
 rnExpr (HsLet binds expr)
@@ -594,7 +594,7 @@ rnStmt (BindStmt pat expr src_loc) thing_inside
     returnRn ((new_binders ++ rest_binders, result),
 	      fv_expr `plusFV` fvs `plusFV` fv_pat)
   where
-    doc = text "a pattern in do binding" 
+    doc = text "In a pattern in 'do' binding" 
 
 rnStmt (ExprStmt expr src_loc) thing_inside
   = pushSrcLocRn src_loc $

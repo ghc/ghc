@@ -11,7 +11,7 @@ module DsListComp ( dsListComp ) where
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
-import HsSyn		( OutPat(..), HsExpr(..), Stmt(..), HsMatchContext(..) )
+import HsSyn		( OutPat(..), HsExpr(..), Stmt(..), HsMatchContext(..), HsDoContext(..) )
 import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr )
 import DsHsSyn		( outPatType )
 import CoreSyn
@@ -193,7 +193,7 @@ deBindComp pat core_list1 quals core_list2
 	letrec_body = App (Var h) core_list1
     in
     deListComp quals core_fail			`thenDs` \ rest_expr ->
-    matchSimply (Var u2) ListComp pat
+    matchSimply (Var u2) (DoCtxt ListComp) pat
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
 	rhs = Lam u1 $
@@ -306,7 +306,8 @@ dfListComp c_id n_id (BindStmt pat list1 locn : quals)
     dfListComp c_id b quals			`thenDs` \ core_rest ->
 
     -- build the pattern match
-    matchSimply (Var x) ListComp pat core_rest (Var b)	`thenDs` \ core_expr ->
+    matchSimply (Var x) (DoCtxt ListComp) 
+		pat core_rest (Var b)		`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
     dsLookupGlobalValue foldrName		`thenDs` \ foldr_id ->

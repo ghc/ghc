@@ -21,6 +21,7 @@ module TcHsSyn (
 	TypecheckedMatch, TypecheckedHsModule,
 	TypecheckedGRHSs, TypecheckedGRHS,
 	TypecheckedRecordBinds, TypecheckedDictBinds,
+	TypecheckedMatchContext,
 
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
@@ -91,6 +92,7 @@ type TypecheckedHsExpr		= HsExpr	Id TypecheckedPat
 type TypecheckedArithSeqInfo	= ArithSeqInfo	Id TypecheckedPat
 type TypecheckedStmt		= Stmt		Id TypecheckedPat
 type TypecheckedMatch		= Match		Id TypecheckedPat
+type TypecheckedMatchContext	= HsMatchContext Id
 type TypecheckedGRHSs		= GRHSs		Id TypecheckedPat
 type TypecheckedGRHS		= GRHS		Id TypecheckedPat
 type TypecheckedRecordBinds	= HsRecordBinds Id TypecheckedPat

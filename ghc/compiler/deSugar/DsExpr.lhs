@@ -11,11 +11,12 @@ module DsExpr ( dsExpr, dsLet ) where
 
 import HsSyn		( failureFreePat,
 			  HsExpr(..), OutPat(..), HsLit(..), ArithSeqInfo(..),
-			  Stmt(..), HsMatchContext(..), Match(..), HsBinds(..), MonoBinds(..), 
+			  Stmt(..), HsMatchContext(..), HsDoContext(..), 
+			  Match(..), HsBinds(..), MonoBinds(..), 
 			  mkSimpleMatch, isDoExpr
 			)
 import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds,
-			  TypecheckedStmt
+			  TypecheckedStmt, TypecheckedMatchContext
 			)
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
@@ -122,14 +123,13 @@ dsExpr (HsLit lit)       = dsLit lit
 -- HsOverLit has been gotten rid of by the type checker
 
 dsExpr expr@(HsLam a_Match)
-  = matchWrapper LambdaExpr [a_Match] "lambda"	`thenDs` \ (binders, matching_code) ->
+  = matchWrapper LambdaExpr [a_Match]	`thenDs` \ (binders, matching_code) ->
     returnDs (mkLams binders matching_code)
 
 dsExpr expr@(HsApp fun arg)      
   = dsExpr fun		`thenDs` \ core_fun ->
     dsExpr arg		`thenDs` \ core_arg ->
     returnDs (core_fun `App` core_arg)
-
 \end{code}
 
 Operator sections.  At first it looks as if we can convert
@@ -204,7 +204,7 @@ dsExpr (HsCase discrim matches src_loc)
  | all ubx_tuple_match matches
  =  putSrcLocDs src_loc $
     dsExpr discrim			`thenDs` \ core_discrim ->
-    matchWrapper CaseAlt matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
+    matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
     case matching_code of
 	Case (Var x) bndr alts | x == discrim_var -> 
 		returnDs (Case core_discrim bndr alts)
@@ -216,7 +216,7 @@ dsExpr (HsCase discrim matches src_loc)
 dsExpr (HsCase discrim matches src_loc)
   = putSrcLocDs src_loc $
     dsExpr discrim			`thenDs` \ core_discrim ->
-    matchWrapper CaseAlt matches "case"	`thenDs` \ ([discrim_var], matching_code) ->
+    matchWrapper CaseAlt matches	`thenDs` \ ([discrim_var], matching_code) ->
     returnDs (bindNonRec discrim_var core_discrim matching_code)
 
 dsExpr (HsLet binds body)
@@ -430,8 +430,8 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
-    mapDs mk_alt cons_to_upd			`thenDs` \ alts ->
-    matchWrapper RecUpd alts "record update"	`thenDs` \ ([discrim_var], matching_code) ->
+    mapDs mk_alt cons_to_upd		`thenDs` \ alts ->
+    matchWrapper RecUpd alts		`thenDs` \ ([discrim_var], matching_code) ->
 
     returnDs (bindNonRec discrim_var record_expr' matching_code)
 
@@ -490,7 +490,7 @@ dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
 Basically does the translation given in the Haskell~1.3 report:
 
 \begin{code}
-dsDo	:: HsMatchContext
+dsDo	:: HsDoContext
 	-> [TypecheckedStmt]
 	-> Id		-- id for: return m
 	-> Id		-- id for: (>>=) m
@@ -501,6 +501,9 @@ dsDo	:: HsMatchContext
 dsDo do_or_lc stmts return_id then_id fail_id result_ty
   = let
 	(_, b_ty) = splitAppTy result_ty	-- result_ty must be of the form (m b)
+	is_do	  = case do_or_lc of
+			DoExpr   -> True
+			ListComp -> False
 	
 	-- For ExprStmt, see the comments near HsExpr.HsStmt about 
 	-- exactly what ExprStmts mean!
@@ -508,12 +511,12 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	-- In dsDo we can only see DoStmt and ListComp (no gaurds)
 
 	go [ResultStmt expr locn]
-	  | isDoExpr do_or_lc = do_expr expr locn
-	  | otherwise	      = do_expr expr locn	`thenDs` \ expr2 ->
-				returnDs (mkApps (Var return_id) [Type b_ty, expr2])
+	  | is_do     = do_expr expr locn
+	  | otherwise = do_expr expr locn	`thenDs` \ expr2 ->
+			returnDs (mkApps (Var return_id) [Type b_ty, expr2])
 
 	go (ExprStmt expr locn : stmts)
-	   | isDoExpr do_or_lc
+	  | is_do	-- Do expression
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    go stmts     		`thenDs` \ rest  ->
 	    let
@@ -556,8 +559,7 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 		      , mkSimpleMatch [WildPat a_ty] fail_expr (Just result_ty) locn
 		      ]
 	    in
-	    matchWrapper DoExpr the_matches match_msg
-				`thenDs` \ (binders, matching_code) ->
+	    matchWrapper (DoCtxt do_or_lc) the_matches	`thenDs` \ (binders, matching_code) ->
 	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2,
 				            mkLams binders matching_code])
     in
@@ -565,10 +567,6 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 
   where
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
-
-    match_msg = case do_or_lc of
-			DoExpr   -> "`do' statement"
-			ListComp -> "comprehension"
 \end{code}
 
 

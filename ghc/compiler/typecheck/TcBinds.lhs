@@ -674,7 +674,7 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	   complete_it xve = tcAddSrcLoc locn		 		$
 			     tcAddErrCtxt (patMonoBindsCtxt bind)	$
 			     tcExtendLocalValEnv xve			$
-			     tcGRHSs grhss pat_ty PatBindRhs		`thenTc` \ (grhss', lie) ->
+			     tcGRHSs PatBindRhs grhss pat_ty		`thenTc` \ (grhss', lie) ->
 			     returnTc (PatMonoBind pat' grhss' locn, lie)
 	in
 	returnTc (complete_it, lie_req, tvs, ids, lie_avail)

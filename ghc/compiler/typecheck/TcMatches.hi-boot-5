@@ -1,9 +1,8 @@
 __interface TcMatches 1 0 where
 __export TcMatches tcGRHSs tcMatchesFun;
-1 tcGRHSs :: 
-	      RnHsSyn.RenamedGRHSs
+1 tcGRHSs ::  HsExpr.HsMatchContext Name.Name
+	      -> RnHsSyn.RenamedGRHSs
 	      -> TcMonad.TcType
-	      -> HsExpr.HsMatchContext
 	      -> TcMonad.TcM (TcHsSyn.TcGRHSs, Inst.LIE) ;
 1 tcMatchesFun :: 
 		[(Name.Name,Var.Id)]
