@@ -154,7 +154,6 @@ INSTALL_DATAS += PrelGHC.$(way_)hi
 #-----------------------------------------------------------------------------
 # ILX stuff.  PLEASE IGNORE THIS UNLESS YOU'RE WORKING ON GHC.NET
 
-
 ilxstd:
 	$(MAKE) way=i std.dll std.i_vlb
 #	$(MAKE) way=ilx-Onot-mono std.ilx-Onot.mono.dll std.ilx-Onot.mono.vlb
@@ -181,12 +180,12 @@ ilxcheck:
 
 ifeq "$(ILXized)" "YES"
 
-SRC_HC_OPTS += -optI--assembly-name -optIstd.$(way_)o -optI--module -DILX
+SRC_HC_OPTS += -optI--assembly-name -optIstd.$(way_)o -optI--module -DILX -keep-il-file
 
 HS_ILX+=PrelGHC.$(way_)o
-PrelGHC.$(way_)o: PrelGHC.ilx.real
-	sed -e "s/'PrelBase.dll'/'PrelBase.$(way_)o'/g" $< > $@.tmp
-	$(ILX2IL) --module --assembly-name std.$(way_)o -o $@.il $@.tmp
+PrelGHC.il: PrelGHC.ilx.real
+#	sed -e "s/'PrelBase.dll'/'PrelBase.$(way_)o'/g" $< > $@.tmp
+	$(ILX2IL) --module --assembly-name std.dll -o $@ $<
 	$(ILASM) /QUIET /DLL /OUT=$@ $@.il
 #	mv $@.tmp $@
 
