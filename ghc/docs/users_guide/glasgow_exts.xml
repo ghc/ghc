@@ -825,68 +825,68 @@ This name is not supported by GHC.
             So the <option>-fno-implicit-prelude</option> flag causes
             the following pieces of built-in syntax to refer to
             <emphasis>whatever is in scope</emphasis>, not the Prelude
-            versions:</para>
+            versions:
 
 	    <itemizedlist>
 	      <listitem>
-		<para>Integer and fractional literals mean
-                "<literal>fromInteger 1</literal>" and
-                "<literal>fromRational 3.2</literal>", not the
-                Prelude-qualified versions; both in expressions and in
-                patterns. </para>
-		<para>However, the standard Prelude <literal>Eq</literal> class
-		is still used for the equality test necessary for literal patterns.</para>
-	      </listitem>
+		<para>An integer literal <literal>368</literal> means
+                "<literal>fromInteger (368::Integer)</literal>", rather than
+                "<literal>Prelude.fromInteger (368::Integer)</literal>".
+</para> </listitem>	    
+
+      <listitem><para>Fractional literals are handed in just the same way,
+	  except that the translation is 
+	      <literal>fromRational (3.68::Rational)</literal>.
+</para> </listitem>	    
+
+	  <listitem><para>The equality test in an overloaded numeric pattern
+	      uses whatever <literal>(==)</literal> is in scope.
+</para> </listitem>	    
+
+	  <listitem><para>The subtraction operation, and the
+	  greater-than-or-equal test, in <literal>n+k</literal> patterns
+	      use whatever <literal>(-)</literal> and <literal>(>=)</literal> are in scope.
+	      </para></listitem>
 
 	      <listitem>
 		<para>Negation (e.g. "<literal>- (f x)</literal>")
-		means "<literal>negate (f x)</literal>" (not
-		<literal>Prelude.negate</literal>).</para>
-	      </listitem>
-
-	      <listitem>
-		<para>In an n+k pattern, the standard Prelude
-                <literal>Ord</literal> class is still used for comparison,
-                but the necessary subtraction uses whatever
-                "<literal>(-)</literal>" is in scope (not
-                "<literal>Prelude.(-)</literal>").</para>
-	      </listitem>
+		means "<literal>negate (f x)</literal>", both in numeric
+		patterns, and expressions.
+	      </para></listitem>
 
 	      <listitem>
 	  <para>"Do" notation is translated using whatever
 	      functions <literal>(>>=)</literal>,
-	      <literal>(>>)</literal>, <literal>fail</literal>, and
-	      <literal>return</literal>, are in scope (not the Prelude
-	      versions).  List comprehensions, and parallel array
+	      <literal>(>>)</literal>, and <literal>fail</literal>,
+	      are in scope (not the Prelude
+	      versions).  List comprehensions, mdo (<xref linkend="mdo-notation"/>), and parallel array
 	      comprehensions, are unaffected.  </para></listitem>
 
 	      <listitem>
-		<para>Similarly recursive do notation (see
-		<xref linkend="mdo-notation"/>) uses whatever
-		<literal>mfix</literal> function is in scope, and arrow
+		<para>Arrow
 		notation (see <xref linkend="arrow-notation"/>)
 		uses whatever <literal>arr</literal>,
 		<literal>(>>>)</literal>, <literal>first</literal>,
 		<literal>app</literal>, <literal>(|||)</literal> and
-		<literal>loop</literal> functions are in scope.</para>
-	      </listitem>
+		<literal>loop</literal> functions are in scope. But unlike the
+		other constructs, the types of these functions must match the
+		Prelude types very closely.  Details are in flux; if you want
+		to use this, ask!
+	      </para></listitem>
 	    </itemizedlist>
-
-	     <para>The functions with these names that GHC finds in scope
-	     must have types matching those of the originals, namely:
-	     <screen>
-	        fromInteger  :: Integer  -> N
-		fromRational :: Rational -> N
-		negate       :: N -> N
-		(-)          :: N -> N -> N
-		(>>=)	     :: forall a b. M a -> (a -> M b) -> M b
-		(>>)	     :: forall a b. M a -> M b -> M b
-		return	     :: forall a.   a      -> M a
-		fail	     :: forall a.   String -> M a
-	     </screen>
-	     (Here <literal>N</literal> may be any type,
-	     and <literal>M</literal> any type constructor.)</para>
-
+In all cases (apart from arrow notation), the static semantics should be that of the desugared form,
+even if that is a little unexpected. For emample, the 
+static semantics of the literal <literal>368</literal>
+is exactly that of <literal>fromInteger (368::Integer)</literal>; it's fine for
+<literal>fromInteger</literal> to have any of the types:
+<programlisting>
+fromInteger :: Integer -> Integer
+fromInteger :: forall a. Foo a => Integer -> a
+fromInteger :: Num a => a -> Integer
+fromInteger :: Integer -> Bool -> Bool
+</programlisting>
+</para>
+	        
 	     <para>Be warned: this is an experimental facility, with
 	     fewer checks than usual.  Use <literal>-dcore-lint</literal>
 	     to typecheck the desugared program.  If Core Lint is happy
@@ -3488,7 +3488,7 @@ the result type of the <literal>case</literal> expression.  Hence the addition <
 <para>Notice that GADTs generalise existential types.  For example, these two declarations are equivalent:
 <programlisting>
   data T a = forall b. MkT b (b->a)
-  data T' a where { MKT :: b -> (b->a) -> T a }
+  data T' a where { MKT :: b -> (b->a) -> T' a }
 </programlisting>
 </para>
 </sect1>
