@@ -29,7 +29,7 @@ module TcMType (
   Rank, UserTypeCtxt(..), checkValidType, pprHsSigCtxt,
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, instTypeErr, checkAmbiguity,
-  arityErr, isRigidType,
+  arityErr, 
 
   --------------------------------
   -- Zonking
@@ -122,22 +122,6 @@ newTyFlexiVarTy kind
 newTyFlexiVarTys :: Int -> Kind -> TcM [TcType]
 newTyFlexiVarTys n kind = mappM newTyFlexiVarTy (nOfThem n kind)
 
-isRigidType :: TcType -> TcM Bool
--- Check that the type is rigid, *taking the type refinement into account*
--- In other words if a rigid type variable tv is refined to a wobbly type,
--- the answer should be False
--- ToDo: can this happen?
-isRigidType ty
-  = do	{ rigids <- mapM is_rigid (varSetElems (tyVarsOfType ty))
-	; return (and rigids) }
-  where
-    is_rigid tv = do { details <- lookupTcTyVar tv
-		     ; case details of
-			RigidTv 	   -> return True
-			IndirectTv True ty -> isRigidType ty
-			other 		   -> return False
-		     }
-
 newKindVar :: TcM TcKind
 newKindVar = do	{ uniq <- newUnique
 		; ref <- newMutVar Nothing
@@ -177,11 +161,9 @@ tcInstTyVars tyvars
 		-- they cannot possibly be captured by
 		-- any existing for-alls.  Hence zipTopTvSubst
 
-tcInstTyVar tyvar	-- Use the OccName of the tyvar we are instantiating
-			-- but make a System Name, so that it's updated in 
-			-- preference to a tcInstSigTyVar
+tcInstTyVar tyvar	-- Freshen the Name of the tyvar
   = do	{ uniq <- newUnique
-        ; newMetaTyVar (mkSystemName uniq (getOccName tyvar)) 
+        ; newMetaTyVar (setNameUnique (tyVarName tyvar) uniq)
 		       (tyVarKind tyvar) Flexi }
 
 tcInstType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
@@ -192,25 +174,24 @@ tcInstType ty = tc_inst_type (mappM tcInstTyVar) ty
 
 
 ---------------------------------------------
-tcInstSigType :: TcType -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type with fresh meta type variables, but
--- ones which have the same Name as the original type 
--- variable.  This is used for type signatures, where we must
--- instantiate with meta type variables, but we'd like to avoid
--- instantiating them were possible; and the unifier unifies
--- tyvars with System Names by preference
+tcInstSigType :: Name -> TcType -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type with fresh SigSkol variables
+-- See Note [Signature skolems] in TcType.
 -- 
+-- Tne new type variables have the sane Name as the original.
 -- We don't need a fresh unique, because the renamer has made them
 -- unique, and it's better not to do so because we extend the envt
 -- with them as scoped type variables, and we'd like to avoid spurious
 -- 's = s' bindings in error messages
-tcInstSigType ty = tc_inst_type tcInstSigTyVars ty
+tcInstSigType id_name ty = tc_inst_type (tcInstSigTyVars id_name) ty
 
-tcInstSigTyVars :: [TyVar] -> TcM [TcTyVar]
-tcInstSigTyVars tyvars
+tcInstSigTyVars :: Name -> [TyVar] -> TcM [TcTyVar]
+tcInstSigTyVars id_name tyvars
   = mapM new_tv tyvars
   where
-    new_tv tv = newMetaTyVar (tyVarName tv) (tyVarKind tv) Flexi
+    new_tv tv = do { ref <- newMutVar Flexi ;
+		   ; return (mkTcTyVar (tyVarName tv) (tyVarKind tv) 
+				       (SigSkolTv id_name ref)) }
 			    
 
 ---------------------------------------------
@@ -299,8 +280,7 @@ We return Nothing iff the original box was unbound.
 
 \begin{code}
 data LookupTyVarResult	-- The result of a lookupTcTyVar call
-  = FlexiTv
-  | RigidTv
+  = DoneTv TcTyVarDetails
   | IndirectTv Bool TcType
 	-- 	True  => This is a non-wobbly type refinement, 
 	--		 gotten from GADT match unification
@@ -311,17 +291,26 @@ lookupTcTyVar :: TcTyVar -> TcM LookupTyVarResult
 -- This function is the ONLY PLACE that we consult the 
 -- type refinement carried by the monad
 lookupTcTyVar tyvar 
-  = case tcTyVarDetails tyvar of
+  = let 
+	details =  tcTyVarDetails tyvar
+    in
+    case details of
+      MetaTv ref -> lookup_wobbly details ref
+
       SkolemTv _ -> do	{ type_reft <- getTypeRefinement
 			; case lookupVarEnv type_reft tyvar of
 			    Just ty -> return (IndirectTv True ty)
-			    Nothing -> return RigidTv
+			    Nothing -> return (DoneTv details)
 			}
-      MetaTv ref -> do 	{ details <- readMutVar ref
-			; case details of
-			    Indirect ty -> return (IndirectTv False ty)
-			    Flexi 	-> return FlexiTv
-			}
+
+	-- For SigSkolTvs try the refinement, and, failing that
+	-- see if it's been unified to anything.  It's a combination
+	-- of SkolemTv and MetaTv
+      SigSkolTv _  ref -> do { type_reft <- getTypeRefinement
+			     ; case lookupVarEnv type_reft tyvar of
+				Just ty -> return (IndirectTv True ty)
+				Nothing -> lookup_wobbly details ref
+			     }
 
 -- Look up a meta type variable, conditionally consulting 
 -- the current type refinement
@@ -329,13 +318,20 @@ condLookupTcTyVar :: Bool -> TcTyVar -> TcM LookupTyVarResult
 condLookupTcTyVar use_refinement tyvar 
   | use_refinement = lookupTcTyVar tyvar
   | otherwise
-  = case tcTyVarDetails tyvar of
-      SkolemTv _ -> return RigidTv
-      MetaTv ref -> do	{ details <- readMutVar ref
-			; case details of
-			    Indirect ty -> return (IndirectTv False ty)
-			    Flexi       -> return FlexiTv
-			}
+  = case details of
+      MetaTv ref      -> lookup_wobbly details ref
+      SkolemTv _      -> return (DoneTv details)
+      SigSkolTv _ ref -> lookup_wobbly details ref
+  where 
+    details = tcTyVarDetails tyvar
+
+lookup_wobbly :: TcTyVarDetails -> IORef MetaDetails -> TcM LookupTyVarResult
+lookup_wobbly details ref
+  = do	{ meta_details <- readMutVar ref
+	; case meta_details of
+	    Indirect ty -> return (IndirectTv False ty)
+	    Flexi       -> return (DoneTv details)
+	}
 
 {- 
 -- gaw 2004 We aren't shorting anything out anymore, at least for now
@@ -563,9 +559,9 @@ zonkTyVar unbound_var_fn rflag tyvar
           -- If b is true, the variable was refined, and therefore it is okay
           -- to continue refining inside.  Otherwise it was wobbly and we should
           -- not refine further inside.
-	  IndirectTv b ty -> zonkType unbound_var_fn b ty -- Bound flexi/refined rigid
-          FlexiTv         -> unbound_var_fn tyvar 	   -- Unbound flexi
-          RigidTv         -> return (TyVarTy tyvar)       -- Rigid, no zonking necessary
+	  IndirectTv b ty   -> zonkType unbound_var_fn b ty -- Bound flexi/refined rigid
+          DoneTv (MetaTv _) -> unbound_var_fn tyvar 	    -- Unbound meta type variable
+          DoneTv other      -> return (TyVarTy tyvar)       -- Rigid, no zonking necessary
 \end{code}
 
 

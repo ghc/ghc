@@ -34,9 +34,9 @@ import TypeRep		( Type(..), PredType(..), TyNote(..) )
 
 import TcRnMonad         -- TcType, amongst others
 import TcType		( TcKind, TcType, TcSigmaType, TcRhoType, TcTyVar, TcTauType,
-			  TcTyVarSet, TcThetaType, Expected(..), 
+			  TcTyVarSet, TcThetaType, Expected(..), TcTyVarDetails(..),
 			  SkolemInfo( GenSkol ), MetaDetails(..), 
-			  pprSkolemTyVar, isTauTy, isSigmaTy, mkFunTys, mkTyConApp,
+			  pprTcTyVar, isTauTy, isSigmaTy, mkFunTys, mkTyConApp,
 			  tcSplitAppTy_maybe, tcSplitTyConApp_maybe, 
 			  tyVarsOfType, mkPhiTy, mkTyVarTy, mkPredTy,
 			  typeKind, tcSplitFunTy_maybe, mkForAllTys, mkAppTy,
@@ -48,7 +48,7 @@ import Kind		( Kind(..), SimpleKind, KindVar, isArgTypeKind,
 			  isSubKind, pprKind, splitKindFunTys )
 import Inst		( newDicts, instToId, tcInstCall )
 import TcMType		( condLookupTcTyVar, LookupTyVarResult(..),
-                          putMetaTyVar, tcSkolType, newKindVar, tcInstTyVars, newMetaTyVar,
+                          tcSkolType, newKindVar, tcInstTyVars, newMetaTyVar,
 			  newTyFlexiVarTy, zonkTcKind, zonkType, zonkTcType,  zonkTcTyVarsAndFV, 
 			  readKindVar, writeKindVar )
 import TcSimplify	( tcSimplifyCheck )
@@ -827,31 +827,57 @@ uVar swapped r1 tv1 r2 ps_ty2 ty2
     case details of
 	IndirectTv r1' ty1 | swapped   -> uTys r2   ps_ty2 ty2 r1' ty1    ty1	-- Swap back
 		           | otherwise -> uTys r1' ty1     ty1 r2  ps_ty2 ty2	-- Same order
-	FlexiTv -> uFlexiVar swapped tv1 r2 ps_ty2 ty2
-	RigidTv -> uRigidVar swapped tv1 r2 ps_ty2 ty2
+	DoneTv details1 -> uDoneVar swapped tv1 details1 r2 ps_ty2 ty2
 
-	-- Expand synonyms; ignore FTVs
-uFlexiVar :: Bool -> TcTyVar -> 
-             Bool ->   -- Allow refinements to ty2
-             TcTauType -> TcTauType -> TcM ()
--- Invariant: tv1 is Flexi
-uFlexiVar swapped tv1 r2 ps_ty2 (NoteTy n2 ty2)
-  = uFlexiVar swapped tv1 r2 ps_ty2 ty2
+----------------
+uDoneVar :: Bool 			-- Args are swapped
+     	 -> TcTyVar -> TcTyVarDetails	-- Tyvar 1
+     	 -> Bool	 		-- Allow refinements to ty2
+     	 -> TcTauType -> TcTauType	-- Type 2
+     	 -> TcM ()
+-- Invariant: tyvar 1 is not unified with anything
 
-uFlexiVar swapped tv1 r2 ps_ty2 ty2@(TyVarTy tv2)
+uDoneVar swapped tv1 details1 r2 ps_ty2 (NoteTy n2 ty2)
+  = 	-- Expand synonyms; ignore FTVs
+    uDoneVar swapped tv1 details1 r2 ps_ty2 ty2
+
+uDoneVar swapped tv1 details1 r2 ps_ty2 ty2@(TyVarTy tv2)
 	-- Same type variable => no-op
   | tv1 == tv2
   = returnM ()
 
 	-- Distinct type variables
   | otherwise
-  = condLookupTcTyVar r2 tv2	`thenM` \ details ->
-    case details of
-	IndirectTv b ty2'    -> uFlexiVar swapped tv1 b ty2' ty2'
-	FlexiTv | update_tv2 -> putMetaTyVar tv2 (TyVarTy tv1)
-	        | otherwise  -> updateFlexi swapped tv1 ty2
-	RigidTv 	     -> updateFlexi swapped tv1 ty2
-	-- Note that updateFlexi does a sub-kind check
+  = do	{ lookup2 <- condLookupTcTyVar r2 tv2
+	; case lookup2 of
+		IndirectTv b ty2' -> uDoneVar  swapped tv1 details1 b ty2' ty2'
+		DoneTv details2	  -> uDoneVars swapped tv1 details1 tv2 details2
+	}
+
+uDoneVar swapped tv1 details1 r2 ps_ty2 non_var_ty2	-- ty2 is not a type variable
+  = case details1 of
+	MetaTv ref1 -> do {	-- Do the occurs check, and check that we are not
+				-- unifying a type variable with a polytype
+				-- Returns a zonked type ready for the update
+			    ty2 <- checkValue tv1 r2 ps_ty2 non_var_ty2
+			  ; updateMeta swapped tv1 ref1 ty2 }
+
+	skolem_details -> unifyMisMatch (TyVarTy tv1) ps_ty2
+
+
+----------------
+uDoneVars :: Bool 			-- Args are swapped
+      	  -> TcTyVar -> TcTyVarDetails	-- Tyvar 1
+      	  -> TcTyVar -> TcTyVarDetails	-- Tyvar 2
+      	  -> TcM ()
+-- Invarant: the type variables are distinct, 
+-- and are not already unified with anything
+
+uDoneVars swapped tv1 (MetaTv ref1) tv2 details2
+  = case details2 of
+	MetaTv ref2 | update_tv2 -> updateMeta (not swapped) tv2 ref2 (mkTyVarTy tv1)
+	other 	    		 -> updateMeta swapped 	     tv1 ref1 (mkTyVarTy tv2)
+	-- Note that updateMeta does a sub-kind check
 	-- We might unify (a b) with (c d) where b::*->* and d::*; this should fail
   where
     k1 = tyVarKind tv1
@@ -863,46 +889,27 @@ uFlexiVar swapped tv1 r2 ps_ty2 ty2@(TyVarTy tv2)
 	-- so we can choose which to do.
 
     nicer_to_update_tv2 = isSystemName (varName tv2)
-	-- Try to update sys-y type variables in preference to sig-y ones
+	-- Try to update sys-y type variables in preference to ones
+	-- gotten (say) by instantiating a polymorphic function with
+	-- a user-written type sig
+	
+uDoneVars swapped tv1 (SkolemTv _) tv2 details2
+  = case details2 of
+	MetaTv ref2 -> updateMeta (not swapped) tv2 ref2 (mkTyVarTy tv1)
+	other 	    -> unifyMisMatch (mkTyVarTy tv1) (mkTyVarTy tv2)
 
-  -- First one is flexi, second one isn't a type variable
-uFlexiVar swapped tv1 r2 ps_ty2 non_var_ty2
-  = 	-- Do the occurs check, and check that we are not
-	-- unifying a type variable with a polytype
-	-- Returns a zonked type ready for the update
-    do	{ ty2 <- checkValue tv1 r2 ps_ty2 non_var_ty2
-	; updateFlexi swapped tv1 ty2 }
+uDoneVars swapped tv1 (SigSkolTv _ ref1) tv2 details2
+  = case details2 of
+	MetaTv ref2   -> updateMeta (not swapped) tv2 ref2 (mkTyVarTy tv1)
+	SigSkolTv _ _ -> updateMeta swapped tv1 ref1 (mkTyVarTy tv2)
+	other	      -> unifyMisMatch (mkTyVarTy tv1) (mkTyVarTy tv2)
 
--- Ready to update tv1, which is flexi; occurs check is done
-updateFlexi swapped tv1 ty2
+----------------
+updateMeta :: Bool -> TcTyVar -> IORef MetaDetails -> TcType -> TcM ()
+-- Update tv1, which is flexi; occurs check is alrady done
+updateMeta swapped tv1 ref1 ty2
   = do	{ checkKinds swapped tv1 ty2
-	; putMetaTyVar tv1 ty2 }
-
-
-uRigidVar :: Bool -> TcTyVar
-          -> Bool -> -- Allow refinements to ty2
-             TcTauType -> TcTauType -> TcM ()
--- Invariant: tv1 is Rigid
-uRigidVar swapped tv1 r2 ps_ty2 (NoteTy n2 ty2)
-  = uRigidVar swapped tv1 r2 ps_ty2 ty2
-
-	-- The both-type-variable case
-uRigidVar swapped tv1 r2 ps_ty2 ty2@(TyVarTy tv2)
-	-- Same type variable => no-op
-  | tv1 == tv2
-  = returnM ()
-
-	-- Distinct type variables
-  | otherwise
-  = condLookupTcTyVar r2 tv2	`thenM` \ details ->
-    case details of
-	IndirectTv b ty2' -> uRigidVar swapped tv1 b ty2' ty2'
-	FlexiTv -> updateFlexi swapped tv2 (TyVarTy tv1)
-	RigidTv -> unifyMisMatch (TyVarTy tv1) (TyVarTy tv2) 
-
-	-- Second one isn't a type variable
-uRigidVar swapped tv1 r2 ps_ty2 non_var_ty2
-  = unifyMisMatch (TyVarTy tv1) ps_ty2
+	; writeMutVar ref1 (Indirect ty2) }
 \end{code}
 
 \begin{code}
@@ -919,7 +926,6 @@ checkKinds swapped tv1 ty2
 	-- 	unlifted type: e.g.  (id 3#) is illegal
   = addErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
     unifyKindMisMatch k1 k2
-
   where
     (k1,k2) | swapped   = (tk2,tk1)
 	    | otherwise = (tk1,tk2)
@@ -1186,7 +1192,7 @@ ppr_ty env ty
        ; case tidy_ty of
 	   TyVarTy tv 
 		| isSkolemTyVar tv -> return (env2, pp_rigid tv',
-					      pprSkolemTyVar tv')
+					      pprTcTyVar tv')
 		| otherwise -> return simple_result
 		where
 		  (env2, tv') = tidySkolemTyVar env1 tv

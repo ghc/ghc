@@ -50,7 +50,7 @@ import HscTypes		( FixityEnv,
 import Packages		( PackageId )
 import Type		( Type, TvSubstEnv, pprParendType, pprTyThingCategory )
 import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
-			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
+			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes, pprSkolInfo )
 import InstEnv		( DFunId, InstEnv )
 import IOEnv
 import RdrName		( GlobalRdrEnv, LocalRdrEnv )
@@ -779,8 +779,6 @@ data InstOrigin
 
 \begin{code}
 pprInstLoc :: InstLoc -> SDoc
-pprInstLoc (InstLoc (SigOrigin info) locn _) 
-  = text "arising from" <+> ppr info	-- I don't think this happens much, if at all
 pprInstLoc (InstLoc orig locn _)
   = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
   where
@@ -791,11 +789,11 @@ pprInstLoc (InstLoc orig locn _)
     pp_orig (LiteralOrigin lit)	 = hsep [ptext SLIT("the literal"), quotes (ppr lit)]
     pp_orig (ArithSeqOrigin seq) = hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
     pp_orig (PArrSeqOrigin seq)	 = hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
-    pp_orig InstSigOrigin	 =  ptext SLIT("instantiating a type signature")
-    pp_orig InstScOrigin	 =  ptext SLIT("the superclasses of an instance declaration")
+    pp_orig InstSigOrigin	 = ptext SLIT("instantiating a type signature")
+    pp_orig InstScOrigin	 = ptext SLIT("the superclasses of an instance declaration")
     pp_orig DerivOrigin	 	 = ptext SLIT("the 'deriving' clause of a data type declaration")
     pp_orig DefaultOrigin	 = ptext SLIT("a 'default' declaration")
-    pp_orig DoOrigin		 =  ptext SLIT("a do statement")
-    pp_orig ProcOrigin		 =  ptext SLIT("a proc expression")
-    pp_orig (SigOrigin info) 	 = ppr info
+    pp_orig DoOrigin		 = ptext SLIT("a do statement")
+    pp_orig ProcOrigin		 = ptext SLIT("a proc expression")
+    pp_orig (SigOrigin info) 	 = pprSkolInfo info
 \end{code}

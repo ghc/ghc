@@ -39,7 +39,7 @@ import TcMType		( newTyFlexiVarTy, zonkQuantifiedTyVar,
 import TcType		( TcTyVar, SkolemInfo(SigSkol), 
 			  TcTauType, TcSigmaType, 
 			  mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
-			  mkForAllTy, isUnLiftedType, tcGetTyVar_maybe, 
+			  mkForAllTy, isUnLiftedType, tcGetTyVar, 
 			  mkTyVarTys, tidyOpenTyVar, tidyOpenType )
 import Kind		( argTypeKind )
 import VarEnv		( TyVarEnv, emptyVarEnv, lookupVarEnv, extendVarEnv, emptyTidyEnv ) 
@@ -561,26 +561,7 @@ getMonoBindInfo tc_binds
 %*									*
 %************************************************************************
 
-Type signatures are tricky.  Consider
-
-  x :: [a]
-  y :: b
-  (x,y,z) = ([y,z], z, head x)
-
-Here, x and y have type sigs, which go into the environment.  We used to
-instantiate their types with skolem constants, and push those types into
-the RHS, so we'd typecheck the RHS with type
-	( [a*], b*, c )
-where a*, b* are skolem constants, and c is an ordinary meta type varible.
-
-The trouble is that the occurrences of z in the RHS force a* and b* to 
-be the *same*, so we can't make them into skolem constants that don't unify
-with each other.  Alas.
-
-Current solution: don't use skolems at all.  Instead, instantiate the type
-signatures with ordinary meta type variables, and check at the end that
-each group has remained distinct.
-
+Type signatures are tricky.  See Note [Signature skolems] in TcType
 
 \begin{code}
 tcTySigs :: [LSig Name] -> TcM [TcSigInfo]
@@ -612,8 +593,10 @@ tcTySig :: LSig Name -> TcM TcSigInfo
 tcTySig (L span (Sig (L _ name) ty))
   = setSrcSpan span		$
     do	{ sigma_ty <- tcHsSigType (FunSigCtxt name) ty
-	; let rigid_info = SigSkol name
-	      poly_id    = mkLocalId name sigma_ty
+	; (tvs, theta, tau) <- tcInstSigType name sigma_ty
+	; loc <- getInstLoc (SigOrigin (SigSkol name))
+
+	; let poly_id = mkLocalId name sigma_ty
 
 		-- The scoped names are the ones explicitly mentioned
 		-- in the HsForAll.  (There may be more in sigma_ty, because
@@ -622,8 +605,6 @@ tcTySig (L span (Sig (L _ name) ty))
 				L _ (HsForAllTy _ tvs _ _) -> hsLTyVarNames tvs
 				other 		    	   -> []
 
-	; (tvs, theta, tau) <- tcInstSigType sigma_ty
-	; loc <- getInstLoc (SigOrigin rigid_info)
 	; return (TcSigInfo { sig_id = poly_id, sig_scoped = scoped_names,
 			      sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
 			      sig_loc = loc }) }
@@ -721,26 +702,26 @@ checkDistinctTyVars sig_tvs
 	; return zonked_tvs }
   where
     zonk_one sig_tv = do { ty <- zonkTcTyVar sig_tv
-		         ; case tcGetTyVar_maybe ty of
-			     Just tv' -> return tv'
-			     Nothing  -> bomb_out sig_tv "a type" ty }
+		         ; return (tcGetTyVar "checkDistinctTyVars" ty) }
+	-- 'ty' is bound to be a type variable, because SigSkolTvs
+	-- can only be unified with type variables
 
     check_dup :: TyVarEnv TcTyVar -> (TcTyVar, TcTyVar) -> TcM (TyVarEnv TcTyVar)
 	-- The TyVarEnv maps each zonked type variable back to its
 	-- corresponding user-written signature type variable
     check_dup acc (sig_tv, zonked_tv)
 	= case lookupVarEnv acc zonked_tv of
-		Just sig_tv' -> bomb_out sig_tv "another quantified type variable" 
-						(mkTyVarTy sig_tv')
+		Just sig_tv' -> bomb_out sig_tv sig_tv'
 
 		Nothing -> return (extendVarEnv acc zonked_tv sig_tv)
 
-    bomb_out sig_tv doc ty 
-       = failWithTc (ptext SLIT("Quantified type variable") <+> quotes (ppr tidy_tv) 
-		     <+> ptext SLIT("is unified with") <+> text doc <+> ppr tidy_ty)
+    bomb_out sig_tv1 sig_tv2
+       = failWithTc (ptext SLIT("Quantified type variable") <+> quotes (ppr tidy_tv1) 
+		     <+> ptext SLIT("is unified with another quantified type variable") 
+		     <+> ppr tidy_tv2)
        where
-	 (env1,  tidy_tv) = tidyOpenTyVar emptyTidyEnv sig_tv
-	 (_env2, tidy_ty) = tidyOpenType  env1	       ty
+	 (env1,  tidy_tv1) = tidyOpenTyVar emptyTidyEnv sig_tv1
+	 (_env2, tidy_tv2) = tidyOpenTyVar env1	        sig_tv2
 \end{code}    
 
 

@@ -25,7 +25,7 @@ import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv2,
 			  tcLookupClass, tcLookupDataCon, tcLookupId )
 import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, readMetaTyVar )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
-			  SkolemInfo(PatSkol), isSkolemTyVar, isMetaTyVar, pprSkolemTyVar, 
+			  SkolemInfo(PatSkol), isSkolemTyVar, isMetaTyVar, pprTcTyVar, 
 			  TvSubst, mkOpenTvSubst, substTyVar, substTy, MetaDetails(..),
 			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy )
 import VarEnv		( mkVarEnv )	-- ugly
@@ -634,9 +634,7 @@ badTypePat pat = ptext SLIT("Illegal type pattern") <+> ppr pat
 lazyPatErr pat tvs
   = failWithTc $
     hang (ptext SLIT("A lazy (~) pattern connot bind existential type variables"))
-       2 (vcat (map get tvs))
-  where
-   get tv = ASSERT( isSkolemTyVar tv ) pprSkolemTyVar tv
+       2 (vcat (map pprTcTyVar tvs))
 
 inaccessibleAlt msg
   = hang (ptext SLIT("Inaccessible case alternative:")) 2 msg

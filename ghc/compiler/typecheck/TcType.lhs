@@ -23,9 +23,9 @@ module TcType (
   --------------------------------
   -- MetaDetails
   Expected(..), TcRef, TcTyVarDetails(..),
-  MetaDetails(Flexi, Indirect), SkolemInfo(..), pprSkolemTyVar,
-  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isExistentialTyVar, skolemTvInfo, metaTvRef,
-  isFlexi, isIndirect,
+  MetaDetails(Flexi, Indirect), SkolemInfo(..), pprTcTyVar, pprSkolInfo,
+  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isExistentialTyVar, metaTvRef,
+  isFlexi, isIndirect, 
 
   --------------------------------
   -- Builders
@@ -247,13 +247,45 @@ checking.  It's attached to mutable type variables only.
 It's knot-tied back to Var.lhs.  There is no reason in principle
 why Var.lhs shouldn't actually have the definition, but it "belongs" here.
 
+Note [Signature skolems]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this
+
+  x :: [a]
+  y :: b
+  (x,y,z) = ([y,z], z, head x)
+
+Here, x and y have type sigs, which go into the environment.  We used to
+instantiate their types with skolem constants, and push those types into
+the RHS, so we'd typecheck the RHS with type
+	( [a*], b*, c )
+where a*, b* are skolem constants, and c is an ordinary meta type varible.
+
+The trouble is that the occurrences of z in the RHS force a* and b* to 
+be the *same*, so we can't make them into skolem constants that don't unify
+with each other.  Alas.
+
+On the other hand, we *must* use skolems for signature type variables, 
+becuase GADT type refinement refines skolems only.  
+
+One solution woudl be insist that in the above defn the programmer uses
+the same type variable in both type signatures.  But that takes explanation.
+
+The alternative (currently implemented) is to have a special kind of skolem
+constant, SigSkokTv, which can unify with other SigSkolTvs.  
+
+
 \begin{code}
 type TcTyVar = TyVar  	-- Used only during type inference
 
 -- A TyVarDetails is inside a TyVar
 data TcTyVarDetails
-  = SkolemTv SkolemInfo		-- A skolem constant
-  | MetaTv (IORef MetaDetails)	-- A meta type variable stands for a tau-type
+  = MetaTv (IORef MetaDetails)		-- A meta type variable stands for a tau-type
+  | SkolemTv SkolemInfo			-- A skolem constant
+  | SigSkolTv Name (IORef MetaDetails)	-- Ditto, but from a type signature;
+					-- 	see Note [Signature skolems]
+					--	The MetaDetails, if filled in, will 
+					-- 	always be another SigSkolTv
 
 data SkolemInfo
   = SigSkol Name	-- Bound at a type signature
@@ -282,30 +314,34 @@ tidySkolemTyVar :: TidyEnv -> TcTyVar -> (TidyEnv, TcTyVar)
 -- Tidy the type inside a GenSkol, preparatory to printing it
 tidySkolemTyVar env tv
   = ASSERT( isSkolemTyVar tv )
-    (env1, mkTcTyVar (tyVarName tv) (tyVarKind tv) (SkolemTv info1))
+    (env1, mkTcTyVar (tyVarName tv) (tyVarKind tv) info1)
   where
-    (env1, info1) = case skolemTvInfo tv of
-		      GenSkol tvs ty loc -> (env2, GenSkol tvs1 ty1 loc)
+    (env1, info1) = case tcTyVarDetails tv of
+		      SkolemTv (GenSkol tvs ty loc) -> (env2, SkolemTv (GenSkol tvs1 ty1 loc))
 			    where
 			      (env1, tvs1) = tidyOpenTyVars env tvs
 			      (env2, ty1)  = tidyOpenType env1 ty
 		      info -> (env, info)
 		     
-pprSkolemTyVar :: TcTyVar -> SDoc
-pprSkolemTyVar tv
-  = ASSERT( isSkolemTyVar tv )
-    quotes (ppr tv) <+> ptext SLIT("is bound by") <+> ppr (skolemTvInfo tv)
-
-instance Outputable SkolemInfo where
-  ppr (SigSkol id)  = ptext SLIT("the type signature for") <+> quotes (ppr id)
-  ppr (ClsSkol cls) = ptext SLIT("the class declaration for") <+> quotes (ppr cls)
-  ppr (InstSkol df) = ptext SLIT("the instance declaration at") <+> ppr (getSrcLoc df)
-  ppr (ArrowSkol loc)  = ptext SLIT("the arrow form at") <+> ppr loc
-  ppr (PatSkol dc loc) = sep [ptext SLIT("the pattern for") <+> quotes (ppr dc),
-	       		    nest 2 (ptext SLIT("at") <+> ppr loc)]
-  ppr (GenSkol tvs ty loc) = sep [ptext SLIT("the polymorphic type") 
-			   	  <+> quotes (ppr (mkForAllTys tvs ty)),
-			          nest 2 (ptext SLIT("at") <+> ppr loc)]
+pprTcTyVar :: TcTyVar -> SDoc
+-- Print tyvar with info about its binding
+pprTcTyVar tv
+  = quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
+  where
+    ppr_details (MetaTv _)	 = ptext SLIT("is a meta type variable")
+    ppr_details (SigSkolTv id _) = ptext SLIT("is bound by") <+> pprSkolInfo (SigSkol id)
+    ppr_details (SkolemTv info)  = ptext SLIT("is bound by") <+> pprSkolInfo info
+ 
+pprSkolInfo :: SkolemInfo -> SDoc
+pprSkolInfo (SigSkol id)     = ptext SLIT("the type signature for") <+> quotes (ppr id)
+pprSkolInfo (ClsSkol cls)    = ptext SLIT("the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo (InstSkol df)    = ptext SLIT("the instance declaration at") <+> ppr (getSrcLoc df)
+pprSkolInfo (ArrowSkol loc)  = ptext SLIT("the arrow form at") <+> ppr loc
+pprSkolInfo (PatSkol dc loc) = sep [ptext SLIT("the pattern for") <+> quotes (ppr dc),
+           		            nest 2 (ptext SLIT("at") <+> ppr loc)]
+pprSkolInfo (GenSkol tvs ty loc) = sep [ptext SLIT("the polymorphic type") 
+				   	<+> quotes (ppr (mkForAllTys tvs ty)),
+				        nest 2 (ptext SLIT("at") <+> ppr loc)]
 
 instance Outputable MetaDetails where
   ppr Flexi 	    = ptext SLIT("Flexi")
@@ -319,8 +355,9 @@ isImmutableTyVar tv
 isSkolemTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	SkolemTv _ -> True
-	MetaTv _   -> False
+	SkolemTv _    -> True
+	SigSkolTv _ _ -> True
+	MetaTv _      -> False
 
 isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
   = ASSERT( isTcTyVar tv )
@@ -331,20 +368,15 @@ isExistentialTyVar tv 	-- Existential type variable, bound by a pattern
 isMetaTyVar tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	SkolemTv _ -> False
 	MetaTv _   -> True
-
-skolemTvInfo :: TyVar -> SkolemInfo
-skolemTvInfo tv 
-  = ASSERT( isTcTyVar tv )
-    case tcTyVarDetails tv of
-	SkolemTv info -> info
+	other      -> False
 
 metaTvRef :: TyVar -> IORef MetaDetails
 metaTvRef tv 
   = ASSERT( isTcTyVar tv )
     case tcTyVarDetails tv of
-	 MetaTv ref -> ref
+	MetaTv ref -> ref
+	other	   -> pprPanic "metaTvRef" (ppr tv)
 
 isFlexi, isIndirect :: MetaDetails -> Bool
 isFlexi Flexi = True
