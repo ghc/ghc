@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.42 2002/01/26 18:02:05 rje Exp $
+ * $Id: StgMiscClosures.h,v 1.43 2002/03/02 17:46:03 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -259,6 +259,8 @@ EF_(stg_gc_noregs);
 
 EI_(stg_gc_unpt_r1_info);
 EF_(stg_gc_unpt_r1);
+
+EI_(stg_ut_1_0_unreg_info);
 
 EI_(stg_gc_unbx_r1_info);
 EF_(stg_gc_unbx_r1);
