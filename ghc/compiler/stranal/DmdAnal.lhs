@@ -63,7 +63,10 @@ dmdAnalPgm dflags binds
 	      dmd_changes = get_changes binds_plus_dmds } ;
 	endPass dflags "Demand analysis" 
 	 	Opt_D_dump_stranal binds_plus_dmds ;
+#ifdef DEBUG
+	-- Only if DEBUG is on, because only then is the old strictness analyser run
 	printDump (text "Changes in demands" $$ dmd_changes) ;
+#endif
 	return binds_plus_dmds
     }
   where
@@ -268,7 +271,10 @@ dmdFix top_lvl sigs pairs
 		-- processing the RHSs with sigs (= sigs'), whereas pairs 
 		-- is the result of processing the RHSs with the *previous* 
 		-- iteration of sigs.
-      | n >= 5		    = pprTrace "dmdFix" (ppr n <+> (ppr [(id,lookup sigs id, lookup sigs' id) | (id,_) <- pairs] $$ ppr pairs))
+      | n >= 5		    = pprTrace "dmdFix" (ppr n <+> (vcat 
+				[ text "Sigs:" <+> ppr [(id,lookup sigs id, lookup sigs' id) | (id,_) <- pairs],
+				  text "env:" <+> ppr (ufmToList sigs),
+				  text "binds:" <+> ppr pairs]))
 			      (loop (n+1) sigs' pairs')
       | otherwise	    = {- pprTrace "dmdFixLoop" (ppr id_sigs) -} (loop (n+1) sigs' pairs')
       where
@@ -673,26 +679,26 @@ both :: Demand -> Demand -> Demand
 -- both Bot d = Bot
 
 -- The experimental one
+-- The idea is that (error x) places on x
+--	both demand Bot (like on all free vars)
+--	and demand Eval (for the arg to error)
+-- and we want the result to be Eval.
 both Bot Bot = Bot
 both Bot Abs = Bot
 both Bot d   = d
 
-
-both Abs Bot = Bot
 both Abs d   = d
 
-both Err Bot = Bot
+both Err Bot = Err
 both Err Abs = Err
 both Err d   = d
 
-both Lazy Bot 	         = Bot
+both Lazy Bot 	         = Lazy
 both Lazy Abs 	         = Lazy
 both Lazy Err 	         = Lazy 
 both Lazy (Seq k Now ds) = Seq Keep Now ds
 both Lazy d	         = d
 
--- Part of the Bot like Err experiment
--- both Eval Bot 	       = Bot
 both Eval (Seq k l ds) = Seq Keep Now ds
 both Eval (Call d)     = Call d
 both Eval d   	       = Eval
@@ -780,7 +786,7 @@ get_changes_expr (Note n e)   = get_changes_expr e
 get_changes_expr (App e1 e2)  = get_changes_expr e1 $$ get_changes_expr e2
 get_changes_expr (Lam b e)    = {- get_changes_var b $$ -} get_changes_expr e
 get_changes_expr (Let b e)    = get_changes_bind b $$ get_changes_expr e
-get_changes_expr (Case e b a) = get_changes_expr e $$ get_changes_var b $$ vcat (map get_changes_alt a)
+get_changes_expr (Case e b a) = get_changes_expr e $$ {- get_changes_var b $$ -} vcat (map get_changes_alt a)
 
 get_changes_alt (con,bs,rhs) = {- vcat (map get_changes_var bs) $$ -} get_changes_expr rhs
 
