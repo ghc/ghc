@@ -69,6 +69,9 @@
 #define hsc_offset(t, f) \
     printf("(%ld)", (long) offsetof (t, f));
 
+#define hsc_size(t) \
+    printf("(%ld)", (long) sizeof(t));
+
 #define hsc_enum(t, f, print_name, x)         \
     print_name;                               \
     printf (" :: %s\n", #t);                  \
