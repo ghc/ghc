@@ -7,6 +7,7 @@ SUBDIRS = \
 	codeGen \
 	deSugar \
 	deriving \
+	lib \
 	numeric \
 	reader \
 	rename \
