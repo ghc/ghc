@@ -35,7 +35,7 @@ import RdrName		( RdrName, mkRdrQual )
 import OccName		( OccName, pprOccName, mkSrcVarOcc )
 import TyCon		( TyCon, tyConArity )
 import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
-			  mkTyConTy, mkTyConApp, typePrimRep,
+			  mkTyConTy, mkTyConApp, typePrimRep,mkTyVarTy,
 			  splitFunTy_maybe, splitAlgTyConApp_maybe, splitTyConApp_maybe,
                           UsageAnn(..), mkUsgTy
 			)
@@ -1639,8 +1639,8 @@ In practice, you'll use the higher-level
 
 \begin{code}
 primOpInfo MkWeakOp
-  = mkGenPrimOp SLIT("mkWeak#") [alphaTyVar, betaTyVar, gammaTyVar] 
-	[alphaTy, betaTy, gammaTy, realWorldStatePrimTy]
+  = mkGenPrimOp SLIT("mkWeak#") [openAlphaTyVar, betaTyVar, gammaTyVar] 
+	[mkTyVarTy openAlphaTyVar, betaTy, gammaTy, realWorldStatePrimTy]
 	(unboxedPair [realWorldStatePrimTy, mkWeakPrimTy betaTy])
 \end{code}
 
