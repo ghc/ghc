@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.21 2002/11/18 10:45:45 simonmar Exp $
+# $Id: Makefile,v 1.22 2003/06/04 15:18:29 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -43,7 +43,7 @@ PKGCONF=$(libdir)/package.conf
 endif # BIN_DIST
 else
 GHCPKGBIN=$(FPTOOLS_TOP_ABS)/ghc/utils/ghc-pkg/$(HS_PROG)
-PKGCONF=$(FPTOOLS_TOP_ABS)/ghc/driver/package.conf.inplace
+PKGCONF=$(FPTOOLS_TOP_ABS_PLATFORM)/ghc/driver/package.conf.inplace
 endif
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"

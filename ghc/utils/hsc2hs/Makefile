@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.37 2003/02/07 22:26:08 sof Exp $
+# $Id: Makefile,v 1.38 2003/06/04 15:18:30 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -50,13 +50,13 @@ HSC2HS_EXTRA=--cc=$(bindir)/ghc-$(ProjectVersion)
 endif # BIN_DIST
 else
 HSC2HS_BINDIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
-HSC2HS_DIR=$(FPTOOLS_TOP_ABS)/$(CURRENT_DIR)
+HSC2HS_DIR=$(FPTOOLS_TOP_ABS_PLATFORM)/$(CURRENT_DIR)
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 endif
 
-HSC2HS_EXTRA="--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS)/$(INCLUDE_DIR)"
+HSC2HS_EXTRA="--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS_PLATFORM)/$(INCLUDE_DIR)"
 endif
 
 $(SCRIPT_PROG) : Makefile
