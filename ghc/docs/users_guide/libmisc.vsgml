@@ -239,6 +239,50 @@ accumulating any errors that occur.
 
 %************************************************************************
 %*                                                                      *
+<sect2>The @Memo@ library
+<label id="memo-library">
+<p>
+<nidx>Memo (GHC syslib)</nidx>
+%*                                                                      *
+%************************************************************************
+
+The @Memo@ library provides fast polymorphic memo functions using hash
+tables.  The interface is:
+
+<tscreen><verb>
+memo :: (a -> b) -> a -> b
+</verb></tscreen>
+
+So, for example, @memo f@ is a version of @f@ that caches the results
+of previous calls.  
+
+The searching is very fast, being based on pointer equality.  One
+consequence of this is that the caching will only be effective if
+<em/exactly the same argument is passed again to the memoised
+function/.  This means not just a copy of a previous argument, but the
+same instance.  It's not useful to memoise integer functions using
+this interface, because integers are generally copied a lot and two
+instances of '27' are unlikely to refer to the same object.
+
+This memoisation library works well when the keys are large (or even
+infinite).
+
+The memo table implementation uses weak pointers and stable names (see
+the GHC/Hugs library document) to avoid space leaks and allow hashing
+for arbitrary Haskell objects.  NOTE: while individual memo table
+entries will be garbage collected if the associated key becomes
+garbage, the memo table itself will not be collected if the function
+becomes garbage.  We plan to fix this in a future version.
+
+There's another version of @memo@ if you want to explicitly give a
+size for the hash table (the default size is 1001 buckets):
+
+<tscreen><verb>
+memo_sized :: Int -> (a -> b) -> a -> b
+</verb></tscreen>
+
+%************************************************************************
+%*                                                                      *
 <sect2>The @PackedString@ type
 <label id="PackedString">
 <p>
