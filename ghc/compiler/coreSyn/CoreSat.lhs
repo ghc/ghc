@@ -41,6 +41,7 @@ MAJOR CONSTRAINT:
 
 	So we must not change the arity of any top-level function,
 	because we've already fixed it and put it out into the interface file.
+	Nor must we change a value (e.g. constructor) into a thunk.
 
 	It's ok to introduce extra bindings, which don't appear in the
 	interface file.  We don't put arity info on these extra bindings,
@@ -418,6 +419,13 @@ mkBinds binds body
 
 deLam :: CoreExpr -> UniqSM CoreExpr	
 -- Remove top level lambdas by let-bindinig
+
+deLam (Note n expr)
+  =	-- You can get things like
+	-- 	case e of { p -> coerce t (\s -> ...) }
+    deLam expr	`thenUs` \ expr' ->
+    returnUs (Note n expr')
+
 deLam expr 
   | null bndrs = returnUs expr
   | otherwise  = case tryEta bndrs body of
@@ -426,6 +434,11 @@ deLam expr
 					 returnUs (Let (NonRec fn expr) (Var fn))
   where
     (bndrs,body) = collectBinders expr
+
+-- Why try eta reduction?  Hasn't the simplifier already done eta?
+-- But the simplifier only eta reduces if that leaves something
+-- trivial (like f, or f Int).  But for deLam it would be enough to
+-- get to a partial application, like (map f).
 
 tryEta bndrs expr@(App _ _)
   | ok_to_eta_reduce f &&
@@ -496,3 +509,5 @@ safeDem, onceDem :: RhsDemand
 safeDem = RhsDemand False False  -- always safe to use this
 onceDem = RhsDemand False True   -- used at most once
 \end{code}
+
+
