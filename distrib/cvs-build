@@ -29,6 +29,13 @@
 
 # Requires: autoconf, cvs, GNU tar, gnuopt
 
+# TODO
+# ----
+#
+# * cover other fptools
+# * it would be convenient to be able to specify an alternative .spec file 
+#   (instead of using that in the repository)
+
 # Default values
 # --------------
 
@@ -36,13 +43,19 @@
 #
 CVS_REPOSITORY=:pserver:anoncvs@glass.cse.ogi.edu:/cvs
 
-# We build the CVS head by default (indicated by an empty tag)
+# We build the CVS head by default (a date of `tomorrow' guarantees to catch
+# the most recent check ins in the presence of clock skews - `now' wouldn't do
+# that)
 #
-CVS_TAG=
+CVS_TAG="-D tomorrow"
 
 # This is where we let rpm do the actual build
 #
 BUILD_DIR=/tmp/cvs-build-$$
+
+# Works only for i386 for the moment...
+# !!!IMPROVE THIS
+ARCH=i386
 
 START_DIR=`pwd`
 
@@ -72,13 +85,13 @@ fi
 
 # Check the sources out of CVS
 #
-echo "*** Checking sources out of CVS... (will build in $BUILD_DIR)"
+echo "*** Exporting sources from CVS... (will build in $BUILD_DIR)"
 mkdir -p $BUILD_DIR || exit 1
 cd $BUILD_DIR
-cvs -d $CVS_REPOSITORY checkout $CVS_TAG fpconfig || exit 1
+cvs -d $CVS_REPOSITORY export $CVS_TAG fpconfig || exit 1
 cd fptools
-cvs checkout $CVS_TAG ghc    || exit 1
-cvs checkout $CVS_TAG hslibs || exit 1
+cvs -d $CVS_REPOSITORY export $CVS_TAG ghc    || exit 1
+cvs -d $CVS_REPOSITORY export $CVS_TAG hslibs || exit 1
 
 VERSION=`sed -e 's/.*\([0-9]\)\.\([0-9]*\).*/\1.\2/' ghc/VERSION`
 echo "*** ...got ghc $VERSION"
@@ -98,15 +111,12 @@ mkdir $BUILD_DIR/SPEC
 mkdir $BUILD_DIR/SOURCES
 mkdir $BUILD_DIR/BUILD
 mkdir $BUILD_DIR/RPMS
+mkdir $BUILD_DIR/RPMS/$ARCH
 mkdir $BUILD_DIR/SRPMS
-
-# !!!not nice
-mkdir $BUILD_DIR/RPMS/i386
 
 cp ghc/ghc.spec $BUILD_DIR/SPEC/ghc-${VERSION}.spec
 cd $BUILD_DIR
-tar -cz --exclude='*CVS' -f $BUILD_DIR/SOURCES/ghc-$VERSION-src.tar.gz fptools\
-  || exit 1
+tar -cz -f $BUILD_DIR/SOURCES/ghc-$VERSION-src.tar.gz fptools || exit 1
 rm -rf $BUILD_DIR/fptools
 
 # set up the configuration for rpm
@@ -135,7 +145,7 @@ echo "*** ...made the packages"
 echo "*** Cleaning up..."
 cd $START_DIR
 cp $BUILD_DIR/SOURCES/ghc-$VERSION-src.tar.gz .
-cp $BUILD_DIR/RPMS/ghc* .
+cp $BUILD_DIR/RPMS/$ARCH/ghc* .
 cp $BUILD_DIR/SRPMS/ghc* .
 rm -rf $BUILD_DIR
 
