@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.7 2001/07/13 11:48:52 rrt Exp $
+-- $Id: PrelIO.hsc,v 1.8 2001/08/04 06:10:04 ken Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -617,7 +617,7 @@ commitBuffer hdl raw sz count flush release = do
 foreign import "memcpy_wrap" unsafe 
    memcpy_off :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
 #def inline \
-void *memcpy_wrap(char *dst, int dst_off, char *src, size_t sz) \
+void *memcpy_wrap(char *dst, HsInt dst_off, const char *src, size_t sz) \
 { return memcpy(dst+dst_off, src, sz); }
 
 -- ---------------------------------------------------------------------------
