@@ -25,7 +25,7 @@ import RnHsSyn		( SYN_IE(RenamedHsModule), RenamedFixityDecl(..) )
 import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr),
 			  SYN_IE(TypecheckedDictBinds), SYN_IE(TcMonoBinds),
 			  SYN_IE(TypecheckedMonoBinds),
-			  TcIdOcc(..), zonkTopBinds )
+			  zonkTopBinds )
 
 import TcMonad
 import Inst		( Inst, emptyLIE, plusLIE )
@@ -44,7 +44,7 @@ import TcInstUtil	( buildInstanceEnvs, InstInfo )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls1 )
 import TcTyDecls	( mkDataBinds )
-import TcType		( SYN_IE(TcType), tcInstType )
+import TcType		( TcIdOcc(..), SYN_IE(TcType), tcInstType )
 import TcKind		( TcKind )
 
 import RnMonad		( RnNameSupply(..) )
