@@ -498,10 +498,9 @@ HAPPY_PREFIX    	= $(FPTOOLS_TOP)/happy/src/
 GREENCARD_PREFIX	= $(FPTOOLS_TOP)/green-card/src/
 
 UNLIT_PREFIX    	= $(FPTOOLS_TOP)/ghc/utils/unlit/
-STAT2RESID_PREFIX       = $(FPTOOLS_TOP)/ghc/utils/stat2resid/
 HP2PS_PREFIX            = $(FPTOOLS_TOP)/ghc/utils/hp2ps/
 HSTAGS_PREFIX           = $(FPTOOLS_TOP)/ghc/utils/hstags/
-
+HSC2HS_PREFIX		= $(FPTOOLS_TOP)/ghc/utils/hsc2hs/
 
 #-----------------------------------------------------------------------------
 # Haskell compilers and mkdependHS
@@ -725,10 +724,9 @@ LIT2TEXT 		= $(LITERATE_PREFIX)lit2text
 # Stuff from fptools/ghc/utils
 #
 UNLIT	 		= $(UNLIT_PREFIX)unlit$(EXE_SUFFIX)
-STAT2RESID		= $(STAT2RESID_PREFIX)stat2resid
 HP2PS			= $(HP2PS_PREFIX)hp2ps$(EXE_SUFFIX)
-HSCPP			= $(HSCPP_PREFIX)hscpp
 HSTAGS			= $(HSTAGS_PREFIX)hstags
+HSC2HS			= $(HSC2HS_PREFIX)hsc2hs-inplace
 
 #
 # Options for the compiling different `ways'. Various projects within
