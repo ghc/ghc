@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.12 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: Regs.h,v 1.13 2003/11/14 09:27:00 stolz Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -46,8 +46,8 @@ typedef struct StgRegTable_ {
   StgUnion   	  rR6;
   StgUnion   	  rR7;
   StgUnion   	  rR8;
-  StgUnion   	  rR9;		// used occasionally by heap/stack checks
-  StgUnion   	  rR10;		// used occasionally by heap/stack checks
+  StgUnion   	  rR9;		/* used occasionally by heap/stack checks */
+  StgUnion   	  rR10;		/* used occasionally by heap/stack checks */
   StgFloat 	  rF1;
   StgFloat 	  rF2;
   StgFloat 	  rF3;
@@ -62,9 +62,9 @@ typedef struct StgRegTable_ {
   StgTSO         *rCurrentTSO;
   struct _bdescr *rNursery;
   struct _bdescr *rCurrentNursery;
-  StgWord         rHpAlloc;	// number of words being allocated in heap 
+  StgWord         rHpAlloc;	/* number of words being allocated in heap */
 #if defined(SMP) || defined(PAR)
-  StgSparkPool   rSparks;	// per-task spark pool
+  StgSparkPool   rSparks;	/* per-task spark pool */
 #endif
 } StgRegTable;
 

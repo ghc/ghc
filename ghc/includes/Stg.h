@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.57 2003/11/12 17:27:04 sof Exp $
+ * $Id: Stg.h,v 1.58 2003/11/14 09:27:02 stolz Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -105,7 +105,7 @@
 /*
  * 'Portable' 
  */
-#if defined(__GNUC__)
+#if defined(__GNUC__) || defined(__TenDRA__)
 # define INLINE_HEADER static inline
 # define INLINE_ME inline
 # define STATIC_INLINE INLINE_HEADER

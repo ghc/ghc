@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.30 2003/11/12 17:27:00 sof Exp $
+ * $Id: InfoTables.h,v 1.31 2003/11/14 09:27:00 stolz Exp $
  * 
  * (c) The GHC Team, 1998-2002
  *
@@ -171,19 +171,19 @@ extern StgWord16 closure_flags[];
    the layout of a PAP to the GC).
    -------------------------------------------------------------------------- */
 
-//
-// Small bitmaps:  for a small bitmap, we store the size and bitmap in 
-// the same word, using the following macros.  If the bitmap doesn't
-// fit in a single word, we use a pointer to an StgLargeBitmap below.
-// 
+/*
+ Small bitmaps:  for a small bitmap, we store the size and bitmap in 
+ the same word, using the following macros.  If the bitmap doesn't
+ fit in a single word, we use a pointer to an StgLargeBitmap below.
+*/ 
 #define MK_SMALL_BITMAP(size,bits) (((bits)<<BITMAP_BITS_SHIFT) | (size))
 
 #define BITMAP_SIZE(bitmap) ((bitmap) & BITMAP_SIZE_MASK)
 #define BITMAP_BITS(bitmap) ((bitmap) >> BITMAP_BITS_SHIFT)
 
-//
-// A large bitmap.
-//
+/*
+ A large bitmap.
+*/
 typedef struct {
   StgWord size;
   StgWord bitmap[FLEXIBLE_ARRAY];
@@ -198,15 +198,15 @@ typedef struct {
    garbage-collect CAFs.
    -------------------------------------------------------------------------- */
 
-// An SRT is just an array of closure pointers:
+/* An SRT is just an array of closure pointers: */
 typedef StgClosure* StgSRT[];
 
-// Each info table refers to some subset of the closure pointers in an
-// SRT.  It does this using a pair of an StgSRT pointer and a
-// half-word bitmap.  If the half-word bitmap isn't large enough, then
-// we fall back to a large SRT, including an unbounded bitmap.  If the
-// half-word bitmap is set to all ones (0xffff), then the StgSRT
-// pointer instead points to an StgLargeSRT:
+/* Each info table refers to some subset of the closure pointers in an
+   SRT.  It does this using a pair of an StgSRT pointer and a
+   half-word bitmap.  If the half-word bitmap isn't large enough, then
+   we fall back to a large SRT, including an unbounded bitmap.  If the
+   half-word bitmap is set to all ones (0xffff), then the StgSRT
+   pointer instead points to an StgLargeSRT: */
 typedef struct StgLargeSRT_ {
     StgSRT *srt;
     StgLargeBitmap l;
@@ -216,30 +216,30 @@ typedef struct StgLargeSRT_ {
    Info Tables
    ------------------------------------------------------------------------- */
 
-//
-// Stuff describing the closure layout.  Well, actually, it might
-// contain the selector index for a THUNK_SELECTOR.  This union is one
-// word long.
-//
+/*
+   Stuff describing the closure layout.  Well, actually, it might
+   contain the selector index for a THUNK_SELECTOR.  This union is one
+   word long.
+*/
 typedef union {
-    struct {			// Heap closure payload layout:
-	StgHalfWord ptrs;	// number of pointers
-	StgHalfWord nptrs;	// number of non-pointers
+    struct {			/* Heap closure payload layout: */
+	StgHalfWord ptrs;	/* number of pointers */
+	StgHalfWord nptrs;	/* number of non-pointers */
     } payload;
     
-    StgWord bitmap;		  // word-sized bit pattern describing
-				  //  a stack frame: see below
+    StgWord bitmap;		  /* word-sized bit pattern describing */
+				  /*  a stack frame: see below */
 
-    StgLargeBitmap* large_bitmap; // pointer to large bitmap structure
+    StgLargeBitmap* large_bitmap; /* pointer to large bitmap structure */
     
-    StgWord selector_offset;	  // used in THUNK_SELECTORs
+    StgWord selector_offset;	  /* used in THUNK_SELECTORs */
 
 } StgClosureInfo;
 
 
-//
-// The "standard" part of an info table.  Every info table has this bit.
-//
+/*
+   The "standard" part of an info table.  Every info table has this bit.
+*/
 typedef struct _StgInfoTable {
 
 #ifndef TABLES_NEXT_TO_CODE
@@ -259,10 +259,10 @@ typedef struct _StgInfoTable {
     MAYBE_EMPTY_STRUCT(StgDebugInfo,debug)
 #endif
 
-    StgClosureInfo  layout;	// closure layout info (one word)
+    StgClosureInfo  layout;	/* closure layout info (one word) */
 
-    StgHalfWord     type;	// closure type
-    StgHalfWord     srt_bitmap;    // number of entries in SRT (or constructor tag)
+    StgHalfWord     type;	/* closure type */
+    StgHalfWord     srt_bitmap;    /* number of entries in SRT (or constructor tag) */
 
 #ifdef TABLES_NEXT_TO_CODE
     StgCode         code[FLEXIBLE_ARRAY];
@@ -287,19 +287,19 @@ typedef struct _StgInfoTable {
 
 typedef struct _StgFunInfoTable {
 #if defined(TABLES_NEXT_TO_CODE)
-    StgFun         *slow_apply; // apply to args on the stack
-    StgWord        bitmap;	// arg ptr/nonptr bitmap
-    StgSRT         *srt;	// pointer to the SRT table
-    StgHalfWord    fun_type;    // function type
-    StgHalfWord    arity;       // function arity
+    StgFun         *slow_apply; /* apply to args on the stack */
+    StgWord        bitmap;	/* arg ptr/nonptr bitmap */
+    StgSRT         *srt;	/* pointer to the SRT table */
+    StgHalfWord    fun_type;    /* function type */
+    StgHalfWord    arity;       /* function arity */
     StgInfoTable i;
 #else
     StgInfoTable i;
-    StgHalfWord    fun_type;    // function type
-    StgHalfWord    arity;       // function arity
-    StgSRT         *srt;	// pointer to the SRT table
-    StgWord        bitmap;	// arg ptr/nonptr bitmap
-    StgFun         *slow_apply; // apply to args on the stack
+    StgHalfWord    fun_type;    /* function type */
+    StgHalfWord    arity;       /* function arity */
+    StgSRT         *srt;	/* pointer to the SRT table */
+    StgWord        bitmap;	/* arg ptr/nonptr bitmap */
+    StgFun         *slow_apply; /* apply to args on the stack */
 #endif
 } StgFunInfoTable;
 
@@ -307,14 +307,14 @@ typedef struct _StgFunInfoTable {
    Return info tables
    -------------------------------------------------------------------------- */
 
-// When info tables are laid out backwards, we can omit the SRT
-// pointer iff srt_bitmap is zero.
+/* When info tables are laid out backwards, we can omit the SRT
+   pointer iff srt_bitmap is zero. */
 
 typedef struct _StgRetInfoTable {
 #if !defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
 #endif
-    StgSRT         *srt;	// pointer to the SRT table
+    StgSRT         *srt;	/* pointer to the SRT table */
 #if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
 #endif
@@ -327,14 +327,14 @@ typedef struct _StgRetInfoTable {
    Thunk info tables
    -------------------------------------------------------------------------- */
 
-// When info tables are laid out backwards, we can omit the SRT
-// pointer iff srt_bitmap is zero.
+/* When info tables are laid out backwards, we can omit the SRT
+   pointer iff srt_bitmap is zero. */
 
 typedef struct _StgThunkInfoTable {
 #if !defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
 #endif
-    StgSRT         *srt;	// pointer to the SRT table
+    StgSRT         *srt;	/* pointer to the SRT table */
 #if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
 #endif
