@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.25 2000/07/14 08:15:28 simonpj Exp $
+% $Id: Costs.lhs,v 1.26 2000/09/27 14:03:12 simonpj Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -364,7 +364,6 @@ gmpOps	=
     , IntegerQuotRemOp , IntegerDivModOp , IntegerNegOp
     , IntegerCmpOp
     , Integer2IntOp  , Int2IntegerOp
-    , Addr2IntegerOp
   ]
 
 
