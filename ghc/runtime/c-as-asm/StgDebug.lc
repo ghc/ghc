@@ -2062,8 +2062,8 @@ P_ node;
    if (node==NULL) {
      fprintf(stderr,"NULL\n");
      return;
-   } else if (node==Prelude_Z91Z93_closure) {
-     fprintf(stderr,"Prelude_Z91Z93_closure\n");
+   } else if (node==PrelBase_Z91Z93_closure) {
+     fprintf(stderr,"PrelBase_Z91Z93_closure\n");
      return;
    } else if (node==MUT_NOT_LINKED) {
      fprintf(stderr,"MUT_NOT_LINKED\n");
@@ -2206,7 +2206,7 @@ P_ node;
   if (verbose & 0x1) { G_PRINT_NODE(node); fprintf(stderr, "\n"); }
   else               fprintf(stderr, "0x%#lx, ", node);
 
-  if (node==NULL || node==Prelude_Z91Z93_closure || node==MUT_NOT_LINKED) {
+  if (node==NULL || node==PrelBase_Z91Z93_closure || node==MUT_NOT_LINKED) {
      return;
   }
   G_MUT(MUT_LINK(node), verbose);
@@ -2305,13 +2305,13 @@ I_ verbose;
  P_ x;
 
  fprintf(stderr,"Thread Queue: ");
- for (x=closure; x!=Prelude_Z91Z93_closure; x=TSO_LINK(x))
+ for (x=closure; x!=PrelBase_Z91Z93_closure; x=TSO_LINK(x))
    if (verbose) 
      G_TSO(x,0);
    else
      fprintf(stderr," %#lx",x);
 
- if (closure==Prelude_Z91Z93_closure)
+ if (closure==PrelBase_Z91Z93_closure)
    fprintf(stderr,"NIL\n");
  else
    fprintf(stderr,"\n");
@@ -2326,8 +2326,8 @@ P_ closure;
 I_ verbose;
 {
  
- if (closure==Prelude_Z91Z93_closure) {
-   fprintf(stderr,"TSO at %#lx is Prelude_Z91Z93_closure!\n");
+ if (closure==PrelBase_Z91Z93_closure) {
+   fprintf(stderr,"TSO at %#lx is PrelBase_Z91Z93_closure!\n");
    return;
  }
 
@@ -2913,13 +2913,13 @@ I_ verbose;
  P_ x;
 
  fprintf(stderr,"Thread Queue: ");
- for (x=closure; x!=Prelude_Z91Z93_closure; x=TSO_LINK(x))
+ for (x=closure; x!=PrelBase_Z91Z93_closure; x=TSO_LINK(x))
    if (verbose) 
      DEBUG_TSO(x,0);
    else
      fprintf(stderr," 0x%x",x);
 
- if (closure==Prelude_Z91Z93_closure)
+ if (closure==PrelBase_Z91Z93_closure)
    fprintf(stderr,"NIL\n");
  else
    fprintf(stderr,"\n");
@@ -2934,8 +2934,8 @@ P_ closure;
 I_ verbose;
 {
  
- if (closure==Prelude_Z91Z93_closure) {
-   fprintf(stderr,"TSO at 0x%x is Prelude_Z91Z93_closure!\n");
+ if (closure==PrelBase_Z91Z93_closure) {
+   fprintf(stderr,"TSO at 0x%x is PrelBase_Z91Z93_closure!\n");
    return;
  }
 

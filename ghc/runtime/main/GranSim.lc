@@ -494,9 +494,9 @@ eventq event;
 
   char str_tso[16], str_node[16];
 
-  sprintf(str_tso,((EVENT_TSO(event)==Prelude_Z91Z93_closure) ? "______" : "%#6lx"), 
+  sprintf(str_tso,((EVENT_TSO(event)==PrelBase_Z91Z93_closure) ? "______" : "%#6lx"), 
                   EVENT_TSO(event));
-  sprintf(str_node,((EVENT_NODE(event)==Prelude_Z91Z93_closure) ? "______" : "%#6lx"), 
+  sprintf(str_node,((EVENT_NODE(event)==PrelBase_Z91Z93_closure) ? "______" : "%#6lx"), 
                     EVENT_NODE(event));
 
   if (event==NULL)
@@ -528,7 +528,7 @@ print_spark(spark)
 { 
   char str[16];
 
-  sprintf(str,((SPARK_NODE(spark)==Prelude_Z91Z93_closure) ? "______" : "%#6lx"), 
+  sprintf(str,((SPARK_NODE(spark)==PrelBase_Z91Z93_closure) ? "______" : "%#6lx"), 
               (W_) SPARK_NODE(spark));
 
   if (spark==NULL)
@@ -577,18 +577,18 @@ First some auxiliary routines.
 void 
 ActivateNextThread (PROC proc)
 {
-  ASSERT(RunnableThreadsHd[proc]!=Prelude_Z91Z93_closure);
+  ASSERT(RunnableThreadsHd[proc]!=PrelBase_Z91Z93_closure);
 
   RunnableThreadsHd[proc] = TSO_LINK(RunnableThreadsHd[proc]);
-  if(RunnableThreadsHd[proc]==Prelude_Z91Z93_closure) {
+  if(RunnableThreadsHd[proc]==PrelBase_Z91Z93_closure) {
     MAKE_IDLE(proc);
-    RunnableThreadsTl[proc] = Prelude_Z91Z93_closure;
+    RunnableThreadsTl[proc] = PrelBase_Z91Z93_closure;
   } else {
     CurrentTime[proc] += RTSflags.GranFlags.gran_threadcontextswitchtime;
     if (RTSflags.GranFlags.granSimStats && 
 	(!RTSflags.GranFlags.Light || (RTSflags.GranFlags.debug & 0x20000))) 
       DumpRawGranEvent(proc,0,GR_SCHEDULE,RunnableThreadsHd[proc],
-                       Prelude_Z91Z93_closure,0);
+                       PrelBase_Z91Z93_closure,0);
   }
 }
 \end{code}
@@ -615,7 +615,7 @@ W_ liveness;
 
   if (RTSflags.GranFlags.granSimStats_Heap) {
       DumpRawGranEvent(CurrentProc,0,GR_ALLOC,CurrentTSO,
-                       Prelude_Z91Z93_closure,n);
+                       PrelBase_Z91Z93_closure,n);
   }
   
   TSO_EXECTIME(CurrentTSO) += RTSflags.GranFlags.gran_heapalloc_cost;
@@ -743,8 +743,8 @@ P_ node;
                     }
                   }
 #  endif
-                  TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;
-                  /* CurrentTSO = Prelude_Z91Z93_closure; */
+                  TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;
+                  /* CurrentTSO = PrelBase_Z91Z93_closure; */
 
                   /* ThreadQueueHd is now the next TSO to schedule or NULL */
                   /* CurrentTSO is pointed to by the FETCHNODE event */
@@ -772,7 +772,7 @@ P_ node;
                 } else {
                   TSO_TYPE(CurrentTSO) |= FETCH_MASK_TSO;
                 }
-                CurrentTSO = Prelude_Z91Z93_closure;
+                CurrentTSO = PrelBase_Z91Z93_closure;
               }
 #  endif
             }
@@ -794,13 +794,13 @@ P_ node;
 {
   /* ++SparksAvail;  Nope; do that in add_to_spark_queue */
   if(RTSflags.GranFlags.granSimStats_Sparks)
-    DumpRawGranEvent(CurrentProc,(PROC)0,SP_SPARK,Prelude_Z91Z93_closure,node,
+    DumpRawGranEvent(CurrentProc,(PROC)0,SP_SPARK,PrelBase_Z91Z93_closure,node,
 		       spark_queue_len(CurrentProc,ADVISORY_POOL)-1);
 
   /* Force the PE to take notice of the spark */
   if(RTSflags.GranFlags.DoAlwaysCreateThreads) {
     new_event(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
-             FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+             FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
     if (CurrentTime[CurrentProc]<TimeOfNextEvent)
       TimeOfNextEvent = CurrentTime[CurrentProc];
   }
@@ -834,7 +834,7 @@ I_ identifier;
 
   /* ++SparksAvail; Nope; do that in add_to_spark_queue */
   if(RTSflags.GranFlags.granSimStats_Sparks)
-    DumpRawGranEvent(proc,0,SP_SPARKAT,Prelude_Z91Z93_closure,SPARK_NODE(spark),
+    DumpRawGranEvent(proc,0,SP_SPARKAT,PrelBase_Z91Z93_closure,SPARK_NODE(spark),
 		     spark_queue_len(proc,ADVISORY_POOL));
 
   if (proc!=CurrentProc) {
@@ -850,10 +850,10 @@ I_ identifier;
     /* Need CurrentTSO in event field to associate costs with creating
        spark even in a GrAnSim Light setup */
     new_event(proc,CurrentProc,exporttime,
-	     MOVESPARK,CurrentTSO,Prelude_Z91Z93_closure,spark);
+	     MOVESPARK,CurrentTSO,PrelBase_Z91Z93_closure,spark);
   else
     new_event(proc,CurrentProc,exporttime,
-	     MOVESPARK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,spark);
+	     MOVESPARK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,spark);
   /* Bit of a hack to treat placed sparks the same as stolen sparks */
   ++OutstandingFishes[proc];
 
@@ -861,7 +861,7 @@ I_ identifier;
      MOVESPARK into the sparkq!) */
   if(RTSflags.GranFlags.DoAlwaysCreateThreads) {
     new_event(CurrentProc,CurrentProc,exporttime+1,
-              FINDWORK,Prelude_Z91Z93_closure,Prelude_Z91Z93_closure,NULL);
+              FINDWORK,PrelBase_Z91Z93_closure,PrelBase_Z91Z93_closure,NULL);
   }
 
   if (exporttime<TimeOfNextEvent)
@@ -895,7 +895,7 @@ GranSimBlock(P_ tso, PROC proc, P_ node)
 
   CurrentTime[proc] += RTSflags.GranFlags.gran_threadqueuetime;
   ActivateNextThread(proc);
-  TSO_LINK(tso) = Prelude_Z91Z93_closure;  /* not really necessary; only for testing */
+  TSO_LINK(tso) = PrelBase_Z91Z93_closure;  /* not really necessary; only for testing */
 }
 
 #endif  /* GRAN */
@@ -965,7 +965,7 @@ DumpGranEvent(name, tso)
 enum gran_event_types name;
 P_ tso;
 {
-    DumpRawGranEvent(CURRENT_PROC, (PROC)0, name, tso, Prelude_Z91Z93_closure, 0);
+    DumpRawGranEvent(CURRENT_PROC, (PROC)0, name, tso, PrelBase_Z91Z93_closure, 0);
 }
 
 void
@@ -984,8 +984,8 @@ I_ len;
 #endif
 
   id = tso == NULL ? -1 : TSO_ID(tso);
-  if (node==Prelude_Z91Z93_closure)
-      strcpy(node_str,"________");  /* "Prelude_Z91Z93_closure"); */
+  if (node==PrelBase_Z91Z93_closure)
+      strcpy(node_str,"________");  /* "PrelBase_Z91Z93_closure"); */
   else
       sprintf(node_str,"0x%-6lx",node);
 
@@ -1082,7 +1082,7 @@ I_ len;
     return;
 
   id = tso == NULL ? -1 : TSO_ID(tso);
-  if (node==Prelude_Z91Z93_closure)
+  if (node==PrelBase_Z91Z93_closure)
       strcpy(node_str,"________");  /* "Z91Z93_closure"); */
   else
       sprintf(node_str,"0x%-6lx",node);
@@ -1253,7 +1253,7 @@ TIME v;
       return;
 #endif
 
-    DumpGranEvent(GR_TERMINATE, Prelude_Z91Z93_closure);
+    DumpGranEvent(GR_TERMINATE, PrelBase_Z91Z93_closure);
 
     if (sizeof(TIME) == 4) {
 	putc('\0', gr_file);
