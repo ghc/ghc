@@ -18,7 +18,7 @@ import Id		( Id, idType, isDataConId_maybe, isPrimOpId_maybe, isFCallId,
 import ForeignCall	( ForeignCall(..), CCallTarget(..), CCallSpec(..) )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
-import FiniteMap	( FiniteMap, addListToFM, listToFM,
+import FiniteMap	( FiniteMap, addListToFM, listToFM, elemFM,
 			  addToFM, lookupFM, fmToList )
 import CoreSyn
 import PprCore		( pprCoreExpr )
@@ -90,7 +90,9 @@ byteCodeGen dflags binds local_tycons local_classes
 
         (BcM_State proto_bcos final_ctr mallocd, ())
            <- runBc (BcM_State [] 0 []) 
-                    (mapBc (schemeR True) flatBinds `thenBc_` returnBc ())
+                    (mapBc (schemeR True []) flatBinds `thenBc_` returnBc ())
+			--               ^^
+			-- better be no free vars in these top-level bindings
 
         when (not (null mallocd))
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
@@ -117,9 +119,12 @@ coreExprToBCOs dflags expr
 				     (panic "invented_id's type")
       let invented_name = idName invented_id
 
+      	  annexpr = freeVars expr
+	  fvs = filter (not.isTyVar) (varSetElems (fst annexpr))
+
       (BcM_State all_proto_bcos final_ctr mallocd, ()) 
          <- runBc (BcM_State [] 0 []) 
-                  (schemeR True (invented_id, freeVars expr))
+                  (schemeR True fvs (invented_id, annexpr))
 
       when (not (null mallocd))
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
@@ -207,8 +212,8 @@ mkProtoBCO nm instrs_ordlist origin mallocd_blocks
 -- variable to which this value was bound, so as to give the
 -- resulting BCO a name.  Bool indicates top-levelness.
 
-schemeR :: Bool -> (Id, AnnExpr Id VarSet) -> BcM ()
-schemeR is_top (nm, rhs) 
+schemeR :: Bool -> [Id] -> (Id, AnnExpr Id VarSet) -> BcM ()
+schemeR is_top fvs (nm, rhs) 
 {-
    | trace (showSDoc (
               (char ' '
@@ -219,7 +224,7 @@ schemeR is_top (nm, rhs)
    = undefined
 -}
    | otherwise
-   = schemeR_wrk is_top rhs nm (collect [] rhs)
+   = schemeR_wrk is_top fvs rhs nm (collect [] rhs)
 
 
 collect xs (_, AnnNote note e)
@@ -229,7 +234,7 @@ collect xs (_, AnnLam x e)
 collect xs not_lambda
    = (reverse xs, not_lambda)
 
-schemeR_wrk is_top original_body nm (args, body)
+schemeR_wrk is_top fvs original_body nm (args, body)
    | Just dcon <- maybe_toplevel_null_con_rhs
    = --trace ("nullary constructor! " ++ showSDocDebug (ppr nm)) (
      emitBc (mkProtoBCO (getName nm) (toOL [PACK dcon 0, ENTER])
@@ -237,8 +242,7 @@ schemeR_wrk is_top original_body nm (args, body)
      --)
 
    | otherwise
-   = let fvs       = filter (not.isTyVar) (varSetElems (fst original_body))
-         all_args  = reverse args ++ fvs
+   = let all_args  = reverse args ++ fvs
          szsw_args = map taggedIdSizeW all_args
          szw_args  = sum szsw_args
          p_init    = listToFM (zip all_args (mkStackOffsets 0 szsw_args))
@@ -307,7 +311,9 @@ schemeE d s p (fvs, AnnLet binds b)
    = let (xs,rhss) = case binds of AnnNonRec x rhs  -> ([x],[rhs])
                                    AnnRec xs_n_rhss -> unzip xs_n_rhss
          n     = length xs
-         fvss  = map (filter (not.isTyVar).varSetElems.fst) rhss
+
+	 is_local id = not (isTyVar id) && elemFM id p
+         fvss  = map (filter is_local . varSetElems . fst) rhss
 
          -- Sizes of tagged free vars, + 1 for the fn
          sizes = map (\rhs_fvs -> 1 + sum (map taggedIdSizeW rhs_fvs)) fvss
@@ -338,9 +344,13 @@ schemeE d s p (fvs, AnnLet binds b)
                         returnBc (concatOL tcodes)
 
          allocCode = toOL (map ALLOC sizes)
+
+	 schemeRs [] _ _ = returnBc ()
+	 schemeRs (fvs:fvss) (x:xs) (rhs:rhss) = 
+		schemeR False fvs (x,rhs) `thenBc_` schemeRs fvss xs rhss
      in
      schemeE d' s p' b   				`thenBc`  \ bodyCode ->
-     mapBc (schemeR False) (zip xs rhss)		`thenBc_`
+     schemeRs fvss xs rhss				`thenBc_`
      genThunkCode					`thenBc` \ thunkCode ->
      returnBc (allocCode `appOL` thunkCode `appOL` bodyCode)
 
