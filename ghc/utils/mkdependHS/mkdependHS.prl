@@ -193,16 +193,15 @@ foreach $sf (@Src_files) {
 }
 
 
-# OK, mangle the Makefile
-unlink("$Makefile.bak");
-
 #
-# If no output file exist as yet, create one.
+# Create backup version of output file.
 # 
-if ( ! -f $Makefile.bak ) {
-   system("touch $Makefile.bak");
-} 
-if ( -f $Makefile ) {
+if ( ! -f $Makefile ) {
+   # truncate() may not be implemented, so we
+   # play it safe here.
+   local(*TRUNC);
+   open(TRUNC,"> $Makefile.bak") && close(TRUNC);
+} else {
    rename($Makefile,"$Makefile.bak");
 }
 # now copy Makefile.bak into Makefile, rm'ing old dependencies
