@@ -26,7 +26,7 @@ import Rules		( RuleBase, ProtoCoreRule(..), pprProtoCoreRule, prepareLocalRuleB
 import CoreUnfold
 import PprCore		( pprCoreBindings )
 import OccurAnal	( occurAnalyseBinds )
-import CoreUtils	( exprIsTrivial, etaReduceExpr )
+import CoreUtils	( exprIsTrivial, etaReduceExpr, coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( findDefault, simplBinders )
 import SimplMonad
@@ -283,6 +283,9 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 		         | otherwise		   = empty
 
     iteration us iteration_no counts binds
+      -- Try and force thunks off the binds; significantly reduces
+      -- space usage, especially with -O.  JRS, 000620.
+      | let sz = coreBindsSize binds in sz == sz
       = do {
 		-- Occurrence analysis
 	   let { tagged_binds = _scc_ "OccAnal" occurAnalyseBinds binds } ;
