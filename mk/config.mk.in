@@ -399,10 +399,10 @@ endif
 
 FPTOOLS_TOP_ABS		= @hardtop@
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-FPTOOLS_TOP_ABS		= $(patsubst /cygdrive/%/,%:/,@hardtop@)
+FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
 endif
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-FPTOOLS_TOP_ABS		= $(patsubst /cygdrive/%/,%:/,@hardtop@)
+FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
 endif
 
 #
