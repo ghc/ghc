@@ -14,17 +14,17 @@ Defines classes for pretty-printing and forcing, both forms of
 module Outputable (
 	Outputable(..),			-- Class
 
-	PprStyle, CodeStyle(..),
+	PprStyle, CodeStyle(..), 
 	getPprStyle, withPprStyle, pprDeeper,
 	codeStyle, ifaceStyle, userStyle, debugStyle, asmStyle,
 	ifPprDebug, ifNotPprForUser,
 
 	SDoc, 		-- Abstract
-	interppSP, interpp'SP, pprQuotedList,
+	interppSP, interpp'SP, pprQuotedList, pprWithCommas,
 	empty, nest,
 	text, char, ptext,
 	int, integer, float, double, rational,
-	parens, brackets, braces, quotes, doubleQuotes,
+	parens, brackets, braces, quotes, doubleQuotes, angleBrackets,
 	semi, comma, colon, dcolon, space, equals, dot,
 	lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
 	(<>), (<+>), hcat, hsep, 
@@ -35,9 +35,10 @@ module Outputable (
 	speakNth, speakNTimes,
 
 	printSDoc, printErrs, printDump, 
-	printForC, printForAsm, printForIface,
+	printForC, printForAsm, printForIface, printForUser,
 	pprCode, pprCols,
-	showSDoc, showSDocDebug, showsPrecSDoc, pprFSAsString,
+	showSDoc, showSDocDebug, showSDocIface, showsPrecSDoc, 
+	pprFSAsString,
 
 
 	-- error handling
@@ -160,16 +161,15 @@ printErrs doc = printDoc PageMode stderr (final_doc user_style)
 		user_style = mkUserStyle (PartWay opt_PprUserLength)
 
 printDump :: SDoc -> IO ()
-printDump doc = printDoc PageMode stderr (final_doc user_style)
-	      where
-		final_doc = doc $$ text ""
-		user_style = mkUserStyle (PartWay opt_PprUserLength)
+printDump doc = printForUser stderr (doc $$ text "")
 		-- We used to always print in debug style, but I want
 		-- to try the effect of a more user-ish style (unless you
 		-- say -dppr-debug
 
+printForUser :: Handle -> SDoc -> IO ()
+printForUser handle doc = printDoc PageMode handle (doc (mkUserStyle AllTheWay))
 
--- printForC, printForAsm doe what they sound like
+-- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
 printForC handle doc = printDoc LeftMode handle (doc (PprCode CStyle))
 
@@ -189,6 +189,9 @@ pprCode cs d = withPprStyle (PprCode cs) d
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
 showSDoc d = show (d (mkUserStyle AllTheWay))
+
+showSDocIface :: SDoc -> String
+showSDocIface doc = showDocWith OneLineMode (doc PprInterface)
 
 showSDocDebug :: SDoc -> String
 showSDocDebug d = show (d PprDebug)
@@ -215,6 +218,7 @@ parens d sty       = Pretty.parens (d sty)
 braces d sty       = Pretty.braces (d sty)
 brackets d sty     = Pretty.brackets (d sty)
 doubleQuotes d sty = Pretty.doubleQuotes (d sty)
+angleBrackets d    = char '<' <> d <> char '>'
 
 -- quotes encloses something in single quotes...
 -- but it omits them if the thing ends in a single quote
@@ -331,10 +335,21 @@ printDoc mode hdl doc
     put (PStr s) next = hPutFS   hdl s >> next 
 
     done = hPutChar hdl '\n'
+
+showDocWith :: Mode -> Doc -> String
+showDocWith mode doc
+  = fullRender PageMode 100 1.5 put "" doc
+  where
+    put (Chr c)   s  = c:s
+    put (Str s1)  s2 = s1 ++ s2
+    put (PStr s1) s2 = _UNPK_ s1 ++ s2
 \end{code}
 
 
 \begin{code}
+pprWithCommas :: (a -> SDoc) -> [a] -> SDoc
+pprWithCommas pp xs = hsep (punctuate comma (map pp xs))
+
 interppSP  :: Outputable a => [a] -> SDoc
 interppSP  xs = hsep (map ppr xs)
 
