@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.29 2000/04/03 15:54:50 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.30 2000/04/19 12:42:48 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -31,12 +31,8 @@
 #include "Itimer.h"
 #endif
 
-#if HAVE_STDLIB_H
-#include <stdlib.h>
-#endif
-
-#ifdef HAVE_STRING_H
-#include <string.h>
+#ifdef HAVE_CTYPE_H
+#include <ctype.h>
 #endif
 
 extern struct RTS_FLAGS RtsFlags;
@@ -238,12 +234,6 @@ void initRtsFlagsDefaults(void)
 #ifdef PROFILING
     RtsFlags.ProfFlags.doHeapProfile = rtsFalse;
     RtsFlags.ProfFlags.showCCSOnException = rtsFalse;
-
-    RtsFlags.ProfFlags.ccSelector    = NULL;
-    RtsFlags.ProfFlags.modSelector   = NULL;
-    RtsFlags.ProfFlags.descrSelector = NULL;
-    RtsFlags.ProfFlags.typeSelector  = NULL;
-    RtsFlags.ProfFlags.kindSelector  = NULL;
 #elif defined(DEBUG)
     RtsFlags.ProfFlags.doHeapProfile = rtsFalse;
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.18 2000/04/05 15:21:28 simonmar Exp $
+ * $Id: Profiling.c,v 1.19 2000/04/19 12:42:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -46,10 +46,13 @@ rtsBool time_profiling = rtsFalse;
  */
 static lnat total_alloc, total_prof_ticks;
 
-/* Globals for opening the profiling log file
+/* Globals for opening the profiling log file(s)
  */
 static char *prof_filename; /* prof report file name = <program>.prof */
 FILE *prof_file;
+
+static char *hp_filename;	/* heap profile (hp2ps style) log file */
+FILE *hp_file;
 
 /* The Current Cost Centre Stack (for attributing costs)
  */
@@ -149,7 +152,7 @@ initProfiling1 (void)
 {
   /* for the benefit of allocate()... */
   CCCS = CCS_SYSTEM;
-
+  
   /* Initialize counters for IDs */
   CC_ID  = 1;
   CCS_ID = 1;
@@ -219,31 +222,45 @@ initProfiling2 (void)
 static void
 initProfilingLogFile(void)
 {
-  /* Initialise the log file name */
-  prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
-  sprintf(prof_filename, "%s.prof", prog_argv[0]);
+    /* Initialise the log file name */
+    prof_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+    sprintf(prof_filename, "%s.prof", prog_argv[0]);
 
-  /* open the log file */
-  if ((prof_file = fopen(prof_filename, "w")) == NULL) {
-    fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
-    RtsFlags.CcFlags.doCostCentres = 0;
-    return;
-  }
-
-  if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
-    /* dump the time, and the profiling interval */
-    fprintf(prof_file, "\"%s\"\n", time_str());
-    fprintf(prof_file, "\"%d ms\"\n", TICK_MILLISECS);
-    
-    /* declare all the cost centres */
-    {
-      CostCentre *cc;
-      for (cc = CC_LIST; cc != NULL; cc = cc->link) {
-	fprintf(prof_file, "%d %d \"%s\" \"%s\"\n",
-		CC_UQ, cc->ccID, cc->label, cc->module);
-      }
+    /* open the log file */
+    if ((prof_file = fopen(prof_filename, "w")) == NULL) {
+	fprintf(stderr, "Can't open profiling report file %s\n", prof_filename);
+	RtsFlags.CcFlags.doCostCentres = 0;
+	return;
     }
-  }
+
+    if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
+	/* dump the time, and the profiling interval */
+	fprintf(prof_file, "\"%s\"\n", time_str());
+	fprintf(prof_file, "\"%d ms\"\n", TICK_MILLISECS);
+	
+	/* declare all the cost centres */
+	{
+	    CostCentre *cc;
+	    for (cc = CC_LIST; cc != NULL; cc = cc->link) {
+		fprintf(prof_file, "%d %d \"%s\" \"%s\"\n",
+			CC_UQ, cc->ccID, cc->label, cc->module);
+	    }
+	}
+    }
+    
+    if (RtsFlags.ProfFlags.doHeapProfile) {
+	/* Initialise the log file name */
+	hp_filename = stgMallocBytes(strlen(prog_argv[0]) + 6, "initProfiling");
+	sprintf(hp_filename, "%s.hp", prog_argv[0]);
+	
+	/* open the log file */
+	if ((hp_file = fopen(hp_filename, "w")) == NULL) {
+	    fprintf(stderr, "Can't open profiling report file %s\n", 
+		    hp_filename);
+	    RtsFlags.ProfFlags.doHeapProfile = 0;
+	    return;
+	}
+    }
 }
 
 void

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.24 2000/04/03 15:54:50 simonmar Exp $
+ * $Id: RtsFlags.h,v 1.25 2000/04/19 12:42:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -100,12 +100,6 @@ struct PROFILING_FLAGS {
 # define DESCRchar 'D'
 # define TYPEchar  'Y'
 # define TIMEchar  'T'
-
-    char *ccSelector;
-    char *modSelector;
-    char *descrSelector;
-    char *typeSelector;
-    char *kindSelector;
 };
 #elif defined(DEBUG)
 # define NO_HEAP_PROFILING	0

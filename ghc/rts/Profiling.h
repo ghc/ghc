@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.1 2000/04/03 15:54:49 simonmar Exp $
+ * $Id: Profiling.h,v 1.2 2000/04/19 12:42:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -13,6 +13,7 @@ void initProfiling2 ( void );
 void endProfiling   ( void );
 
 extern FILE *prof_file;
+extern FILE *hp_file;
 #endif
 
 #ifdef PROFILING

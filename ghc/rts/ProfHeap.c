@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.11 2000/04/05 15:32:08 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.12 2000/04/19 12:42:48 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -31,8 +31,6 @@ static void initSymbolHash(void);
 static void clear_table_data(void);
 static void fprint_data(FILE *fp);
 #endif
-
-char prof_filename[128];	/* urk */
 
 /* -----------------------------------------------------------------------------
  * Hash tables.
@@ -148,7 +146,7 @@ reportCtrResid(FILE *fp)
 /* -------------------------------------------------------------------------- */
 
 #ifdef DEBUG_HEAP_PROF
-FILE *prof_file;
+FILE *hp_file;
 
 void initProfiling1( void )
 {
@@ -172,14 +170,14 @@ initHeapProfiling(void)
         return 0;
     }
 
-    fprintf(prof_file, "JOB \"%s\"\n", prog_argv[0]);
-    fprintf(prof_file, "DATE \"%s\"\n", time_str());
+    fprintf(hp_file, "JOB \"%s\"\n", prog_argv[0]);
+    fprintf(hp_file, "DATE \"%s\"\n", time_str());
 
-    fprintf(prof_file, "SAMPLE_UNIT \"seconds\"\n");
-    fprintf(prof_file, "VALUE_UNIT \"bytes\"\n");
+    fprintf(hp_file, "SAMPLE_UNIT \"seconds\"\n");
+    fprintf(hp_file, "VALUE_UNIT \"bytes\"\n");
 
-    fprintf(prof_file, "BEGIN_SAMPLE 0.00\n");
-    fprintf(prof_file, "END_SAMPLE 0.00\n");
+    fprintf(hp_file, "BEGIN_SAMPLE 0.00\n");
+    fprintf(hp_file, "END_SAMPLE 0.00\n");
 
 #ifdef DEBUG_HEAP_PROF
     DEBUG_LoadSymbols(prog_argv[0]);
@@ -203,9 +201,9 @@ endHeapProfiling(void)
     }
 
     seconds = mut_user_time();
-    fprintf(prof_file, "BEGIN_SAMPLE %0.2f\n", seconds);
-    fprintf(prof_file, "END_SAMPLE %0.2f\n", seconds);
-    fclose(prof_file);
+    fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", seconds);
+    fprintf(hp_file, "END_SAMPLE %0.2f\n", seconds);
+    fclose(hp_file);
 }
 
 #ifdef DEBUG_HEAP_PROF
@@ -483,7 +481,7 @@ heapCensus(void)
   bd = g0s0->to_space;
 
   time = mut_user_time_during_GC();
-  fprintf(prof_file, "BEGIN_SAMPLE %0.2f\n", time);
+  fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", time);
   
   while (bd != NULL) {
     p = bd->start;
@@ -602,10 +600,10 @@ heapCensus(void)
 #ifdef DEBUG_HEAP_PROF
   switch (RtsFlags.ProfFlags.doHeapProfile) {
   case HEAP_BY_INFOPTR:
-    fprint_data(prof_file);
+    fprint_data(hp_file);
     break;
   case HEAP_BY_CLOSURE_TYPE:
-    fprint_closure_types(prof_file);
+    fprint_closure_types(hp_file);
     break;
   }
 #endif
@@ -613,19 +611,19 @@ heapCensus(void)
 #ifdef PROFILING
   switch (RtsFlags.ProfFlags.doHeapProfile) {
   case HEAP_BY_CCS:
-      reportCCSResid(prof_file,CCS_MAIN);
+      reportCCSResid(hp_file,CCS_MAIN);
       break;
   case HEAP_BY_MOD:
   case HEAP_BY_DESCR:
   case HEAP_BY_TYPE:
-      reportCtrResid(prof_file);
+      reportCtrResid(hp_file);
       break;
   default:
       barf("heapCensus; doHeapProfile");
   }
 #endif
 
-  fprintf(prof_file, "END_SAMPLE %0.2f\n", time);
+  fprintf(hp_file, "END_SAMPLE %0.2f\n", time);
 }    
 
 #endif /* PROFILING || DEBUG_HEAP_PROF */
