@@ -143,7 +143,13 @@ package_details installing =
          package_deps   = [],
          extra_ghc_opts = [],
          extra_cc_opts  = [],
-         extra_ld_opts  = []
+         extra_ld_opts  = [
+#ifndef LEADING_UNDERSCORE
+		          "-u Addr_Azh_static_info"
+#else
+			  "-u _Addr_Azh_static_info"
+#endif
+			]
         },
 
          Package {
