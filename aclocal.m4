@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.28 1998/09/29 17:30:09 sof Exp $
+dnl $Id: aclocal.m4,v 1.29 1998/10/05 14:15:32 simonm Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -57,6 +57,11 @@ dnl underscore.
 dnl 
 dnl We assume that they _haven't_ if anything goes wrong.
 dnl
+dnl Some nlist implementations seem to try to be compatible by ignoring
+dnl a leading underscore sometimes (eg. FreeBSD).  We therefore have
+dnl to work around this by checking for *no* leading underscore first.
+dnl Sigh.  --SDM
+dnl
 AC_DEFUN(FPTOOLS_UNDERSCORE,
 [AC_CHECK_LIB(elf, nlist, LIBS="-lelf $LIBS")dnl
 AC_CACHE_CHECK([leading underscore in symbol names], fptools_cv_lead_uscore,
@@ -76,7 +81,8 @@ AC_TRY_RUN([#ifdef HAVE_NLIST_H
 #include <nlist.h>
 changequote(<<, >>)dnl
 <<
-struct nlist xYzzY[] = {{"_xYzzY", 0},{0}};
+struct nlist xYzzY1[] = {{"xYzzY1", 0},{0}};
+struct nlist xYzzY2[] = {{"_xYzzY2", 0},{0}};
 #endif
 
 main(argc, argv)
@@ -84,7 +90,9 @@ int argc;
 char **argv;
 {
 #ifdef HAVE_NLIST_H
-    if(nlist(argv[0], xYzzY) == 0 && xYzzY[0].n_value != 0)
+    if(nlist(argv[0], xYzzY1) == 0 && xYzzY1[0].n_value != 0)
+        exit(1);
+    if(nlist(argv[0], xYzzY2) == 0 && xYzzY2[0].n_value != 0)
         exit(0);>>
 changequote([, ])dnl
 #endif
