@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.81 2000/04/27 16:31:46 sewardj Exp $
+ * $Id: GC.c,v 1.82 2000/05/23 13:57:53 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -860,11 +860,15 @@ traverse_weak_ptr_list(void)
        * the list.
        */
       switch (t->what_next) {
+      case ThreadRelocated:
+	  next = t->link;
+	  *prev = next;
+	  continue;
       case ThreadKilled:
       case ThreadComplete:
-	next = t->global_link;
-	*prev = next;
-	continue;
+	  next = t->global_link;
+	  *prev = next;
+	  continue;
       default:
       }
 
