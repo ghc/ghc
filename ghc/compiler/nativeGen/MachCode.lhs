@@ -2752,10 +2752,6 @@ genCCall fn cconv ret_rep args
        | cconv == StdCallConv = '@':show tot_arg_size
        | otherwise            = ""
 
-    -- floats are always promoted to doubles when passed to a ccall
-    promote_size F  = DF
-    promote_size sz = sz
-
     arg_size DF = 8
     arg_size F  = 4
     arg_size _  = 4
@@ -2779,17 +2775,14 @@ genCCall fn cconv ret_rep args
       | otherwise
       = get_op arg			`thenNat` \ (code, reg, sz) ->
         getDeltaNat			`thenNat` \ delta ->
-	let 
-		real_sz = promote_size sz
-		size    = arg_size real_sz
- 	in
+        arg_size sz			`bind`    \ size ->
         setDeltaNat (delta-size)  	`thenNat` \ _ ->
-        if   (case real_sz of DF -> True; _ -> False)
+        if   (case sz of DF -> True; F -> True; _ -> False)
         then returnNat (size,
                         code `appOL`
                         toOL [SUB L (OpImm (ImmInt size)) (OpReg esp),
                               DELTA (delta-size),
-                              GST DF reg (AddrBaseIndex (Just esp) 
+                              GST sz reg (AddrBaseIndex (Just esp) 
                                                         Nothing 
                                                         (ImmInt 0))]
                        )
