@@ -14,4 +14,8 @@ ifeq "$(ghc_ge_504)" "NO"
 SRC_HC_OPTS +=  -package lang -package util -package text
 endif
 
+ifeq "$(GhcUnregisterised)" "YES"
+SRC_HC_OPTS += -DNO_REGS
+endif
+
 include $(TOP)/mk/target.mk
