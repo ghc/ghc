@@ -11,7 +11,7 @@ module HsPat (
 
 	mkPrefixConPat, mkCharLitPat, mkNilPat,
 
-	failureFreePat, isWildPat, 
+	isWildPat, 
 	patsAreAllCons, isConPat, isSigPat,
 	patsAreAllLits,	isLitPat,
 	collectPatBinders, collectPatsBinders,
@@ -111,7 +111,7 @@ data Pat id
   | SigPatOut	    (Pat id)		-- Pattern p
 		    Type		-- Type, t, of the whole pattern
 		    (HsExpr id)		-- Coercion function,
-						-- of type t -> typeof(p)
+					-- of type t -> typeof(p)
 
 	------------ Dictionary patterns (translation only) ---------------
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
@@ -249,34 +249,6 @@ A pattern is in {\em exactly one} of the above three categories; `as'
 patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
-\begin{code}
-failureFreePat :: OutPat id -> Bool
-
-failureFreePat (WildPat _) 		  = True
-failureFreePat (VarPat _)  		  = True
-failureFreePat (LazyPat	_) 		  = True
-failureFreePat (ParPat	_) 		  = True
-failureFreePat (AsPat _ pat)		  = failureFreePat pat
-
-failureFreePat (ListPat _ _)		  = False
-failureFreePat (PArrPat _ _)		  = False
-failureFreePat (TuplePat pats _)	  = all failureFreePat pats
-
-failureFreePat (ConPatOut con ps _ _ _)   = only_con con && failure_free_con ps
-
-failureFreePat (SigPatOut p _ _)	  = failureFreePat p
-
-failureFreePat (DictPat _ _)		  = True
-
-failureFreePat other_pat		  = False   -- Literals, NPat
-
-failure_free_con (PrefixCon pats) = all failureFreePat pats
-failure_free_con (InfixCon p1 p2) = failureFreePat p1 && failureFreePat p2
-failure_free_con (RecCon fs)      = all (failureFreePat . snd) fs
-
-only_con con = maybeToBool (maybeTyConSingleCon (dataConTyCon con))
-\end{code}
-
 \begin{code}
 isWildPat (WildPat _) = True
 isWildPat other	      = False

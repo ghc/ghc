@@ -15,7 +15,7 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall )
 import DsListComp	( dsListComp, dsPArrComp )
-import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr)
+import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr, selectMatchVar )
 import DsMonad
 
 #ifdef GHCI
@@ -23,8 +23,7 @@ import DsMonad
 import DsMeta		( dsBracket, dsReify )
 #endif
 
-import HsSyn		( failureFreePat,
-			  HsExpr(..), Pat(..), HsLit(..), ArithSeqInfo(..),
+import HsSyn		( HsExpr(..), Pat(..), HsLit(..), ArithSeqInfo(..),
 			  Stmt(..), HsMatchContext(..), HsStmtContext(..), 
 			  Match(..), HsBinds(..), MonoBinds(..), HsConDetails(..),
 			  mkSimpleMatch, isDoExpr
@@ -41,6 +40,7 @@ import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppArgs,
 			  mkAppTy )
 import Type		( splitFunTys )
 import CoreSyn
+import Literal		( Literal(..) )
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
 import FieldLabel	( FieldLabel, fieldLabelTyCon )
@@ -615,26 +615,20 @@ dsDo do_or_lc stmts ids result_ty
 	    dsLet binds	rest
 	    
 	go (BindStmt pat expr locn : stmts)
-	  = putSrcLocDs locn $
-	    dsExpr expr 	   `thenDs` \ expr2 ->
+	  = go stmts			`thenDs` \ body -> 
+	    putSrcLocDs locn 		$	-- Rest is associated with this location
+	    dsExpr expr 	 	`thenDs` \ rhs ->
+	    mkStringLit (mk_msg locn)	`thenDs` \ core_msg ->
 	    let
+		-- In a do expression, pattern-match failure just calls
+		-- the monadic 'fail' rather than throwing an exception
+		fail_expr  = mkApps (Var fail_id) [Type b_ty, core_msg]
 		a_ty       = hsPatType pat
-		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
-                                   (HsLit (HsString (mkFastString msg)))
-	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
-		main_match = mkSimpleMatch [pat] 
-					   (HsDo do_or_lc stmts ids result_ty locn)
-					   result_ty locn
-		the_matches
-		  | failureFreePat pat = [main_match]
-		  | otherwise	       =
-		      [ main_match
-		      , mkSimpleMatch [WildPat a_ty] fail_expr result_ty locn
-		      ]
 	    in
-	    matchWrapper (StmtCtxt do_or_lc) the_matches	`thenDs` \ (binders, matching_code) ->
-	    returnDs (mkApps (Var bind_id) [Type a_ty, Type b_ty, expr2,
-				            mkLams binders matching_code])
+	    selectMatchVar pat		 	 		`thenDs` \ var ->
+    	    matchSimply (Var var) (StmtCtxt do_or_lc) pat
+			body fail_expr				`thenDs` \ match_code ->
+	    returnDs (mkApps (Var bind_id) [Type a_ty, Type b_ty, rhs, Lam var match_code])
 
 	go (RecStmt rec_vars rec_stmts rec_rets : stmts)
 	  = go (bind_stmt : stmts)
@@ -646,6 +640,7 @@ dsDo do_or_lc stmts ids result_ty
 
   where
     do_expr expr locn = putSrcLocDs locn (dsExpr expr)
+    mk_msg locn = "Pattern match failure in do expression at " ++ showSDoc (ppr locn)
 \end{code}
 
 Translation for RecStmt's: 
