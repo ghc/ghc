@@ -1,4 +1,6 @@
---  $Id: PArr.hs,v 1.1 2002/02/11 17:11:12 simonmar Exp $
+{-# OPTIONS -fparr #-}
+
+--  $Id: PArr.hs,v 1.2 2002/02/12 10:50:37 simonmar Exp $
 --
 --  Copyright (c) [2001..2002] Manuel M T Chakravarty & Gabriele Keller
 --
@@ -64,8 +66,6 @@
 --
 --  * We might want to add bounds checks that can be deactivated.
 --
-
-{-# OPTIONS -fno-implicit-prelude #-}
 
 module GHC.PArr (
   [::],			-- abstract
@@ -136,11 +136,11 @@ module GHC.PArr (
   indexOfP		-- :: (a -> Bool) -> [:a:] -> [:Int:]
 ) where
 
-import PrelBase
-import PrelST   (ST(..), STRep, runST)
-import PrelList
-import PrelShow
-import PrelRead
+import Prelude
+
+import GHC.ST   ( ST(..), STRep, runST )
+import GHC.Exts	( Int#, Array#, Int(I#), MutableArray#, newArray#,
+		  unsafeFreezeArray#, indexArray#, writeArray# )
 
 infixl 9  !:
 infixr 5  +:+
