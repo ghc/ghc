@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.104 2000/10/31 08:08:38 simonpj Exp $
+# $Id: Makefile,v 1.105 2000/11/02 13:36:44 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -61,7 +61,6 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cRM                   = \"$(RM)\"" >> $(CONFIG_HS)
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> $(CONFIG_HS)
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
-	@echo "cGhcWithRegisterised  = \"$(GhcWithRegisterised)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> $(CONFIG_HS)
 	@echo "clibdir               = \"$(libdir)\"" >> $(CONFIG_HS)

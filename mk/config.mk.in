@@ -178,10 +178,6 @@ GhcHcOpts=-O
 # GhcWithHscBuiltViaC - build GHC compiler proper (\`hsc') from .hc files?
 GhcWithHscBuiltViaC=@BootingFromHc@
 
-# Build a registerised version of hsc and runtime
-# (unregisterised used for Hugs at the moment)
-GhcWithRegisterised=YES
-
 # Build a compiler with a native code generator backend
 # (as well as a C backend)
 #
