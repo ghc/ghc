@@ -3,10 +3,9 @@ include $(TOP)/mk/boilerplate.mk
 
 ifneq "$(BIN_DIST_NAME)" ""
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = hp2ps hscpp mkdependHS stat2resid unlit
+SUBDIRS = hp2ps mkdependHS stat2resid unlit
 else
 SUBDIRS = hp2ps		\
-	  hscpp		\
 	  mkdependHS	\
 	  parallel      \
 	  stat2resid	\
