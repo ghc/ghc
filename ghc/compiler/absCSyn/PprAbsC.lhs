@@ -207,10 +207,6 @@ pprAbsC (CSwitch discrim alts deflt) c -- general case
     -- Costs for addressing header of switch and cond. branching        -- HWL
     switch_head_cost = addrModeCosts discrim Rhs + (Cost (0, 1, 0, 0, 0))
 
-{-
-pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _) args vol_regs) _
-  = pprCCall op args results vol_regs
--}
 pprAbsC stmt@(COpStmt results op@(CCallOp _ _ _ _) args vol_regs) _
   = pprCCall op args results vol_regs
 
