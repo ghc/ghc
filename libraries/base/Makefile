@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 2002/02/06 11:51:12 simonmar Exp $
+# $Id: Makefile,v 1.11 2002/02/11 12:31:30 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -28,6 +28,7 @@ ALL_DIRS = \
 	Network \
 	NHC \
 	System \
+	System/Console \
 	System/Mem \
 	System/IO \
 	Text \
@@ -37,6 +38,8 @@ ALL_DIRS = \
 	Text/Show
 
 PKG = base
+
+SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
 
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
