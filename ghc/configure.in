@@ -43,7 +43,7 @@ dnl Uncomment links to HOpenGL docs if necessary
 AC_ARG_ENABLE(hopengl,
 [  --enable-hopengl
         Build HOpenGL, a Haskell binding for OpenGL/GLUT, too.
-        (This option is only relevant when hslibs are built.)
+        (NOTE: Work in progress, currently only GLUT is supported!)
 ],
 [
 HOpenGLHTMLStart=""
