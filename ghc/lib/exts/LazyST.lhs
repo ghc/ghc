@@ -106,10 +106,11 @@ unsafeFreezeSTArray (STArray arr) = strictToLazyST (unsafeFreezeArray arr)
 strictToLazyST :: PrelST.ST s a -> ST s a
 strictToLazyST (PrelST.ST m) = ST $ \s ->
         let 
-	    PrelST.S# s# = s
-	    PrelST.STret s2# r = m s# 
+  	   pr = case s of { PrelST.S# s# -> m s# }
+	   r  = case pr of { PrelST.STret s2# r -> r }
+	   s' = case pr of { PrelST.STret s2# r -> PrelST.S# s2# }
 	in
-	(r, PrelST.S# s2#)
+	(r, s')
 
 lazyToStrictST :: ST s a -> PrelST.ST s a
 lazyToStrictST (ST m) = PrelST.ST $ \s ->
