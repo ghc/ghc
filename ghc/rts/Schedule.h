@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.7 1999/09/10 11:11:52 simonmar Exp $
+ * $Id: Schedule.h,v 1.8 1999/10/19 15:39:08 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -47,7 +47,8 @@ extern StgTSO *MainTSO; /* temporary hack */
  * NOTE: tso->link should be END_TSO_QUEUE before calling this macro.
  */
 #define PUSH_ON_RUN_QUEUE(tso)			\
-    if (run_queue_hd == END_TSO_QUEUE) {        \
+    ASSERT(tso->link == END_TSO_QUEUE);		\
+    if (run_queue_hd == END_TSO_QUEUE) {	\
       run_queue_hd = tso;			\
     } else {					\
       run_queue_tl->link = tso;			\
@@ -55,6 +56,7 @@ extern StgTSO *MainTSO; /* temporary hack */
     run_queue_tl = tso;
 
 #define PUSH_ON_BLOCKED_QUEUE(tso)		\
+    ASSERT(tso->link == END_TSO_QUEUE);		\
     if (blocked_queue_hd == END_TSO_QUEUE) {    \
       blocked_queue_hd = tso;			\
     } else {					\
