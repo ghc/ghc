@@ -244,8 +244,10 @@ sweepUpDeadForeignObjs( ForeignObjList, base, bits )
       if ( !( bits[bit_index] & bit ) ) { /* dead */
 
 	TRACE_FOdies( FOptr );
-	(*(void (*)(StgAddr))((StgAddr)ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
-	ForeignObj_deaths++;
+        if (ForeignObj_CLOSURE_FINALISER(FOptr) != NULL) {
+           (*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
+           ForeignObj_deaths++;
+        }
 
 	temp = FOptr;
 	FOptr = ForeignObj_CLOSURE_LINK(FOptr);
@@ -328,8 +330,10 @@ reportDeadForeignObjs(oldFOList, new, newFOList)
 	/* can't have been forwarded - must be dead */
 
 	TRACE_FOdies(FOptr);
-	(*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
-	FO_deaths++;
+        if (ForeignObj_CLOSURE_FINALISER(FOptr) != NULL) {
+           (*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
+           FO_deaths++;
+        }
 
 	temp  = FOptr;
 	FOptr = ForeignObj_CLOSURE_LINK(FOptr);
@@ -411,8 +415,13 @@ freeForeigns(foList)
        if ((P_) INFO_PTR(FOptr) == ForeignObj_info ) {
           TRACE_ForeignObj(FOptr);
           TRACE_FOdies(FOptr);
-          (*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
-          FO_deaths++;
+          /* ForeignObjs can have a zapped-out finaliser field, in which
+	     case we'll just drop the object silently.
+	  */
+	  if (ForeignObj_CLOSURE_FINALISER(FOptr) != NULL) {
+             (*(void (*)(StgAddr))(ForeignObj_CLOSURE_FINALISER(FOptr)))((StgAddr)ForeignObj_CLOSURE_DATA(FOptr));
+             FO_deaths++;
+          }
 
           temp  = FOptr;
           FOptr = ForeignObj_CLOSURE_LINK(FOptr);
