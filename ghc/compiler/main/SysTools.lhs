@@ -278,30 +278,21 @@ initSysTools minusB_args
 	  -- On Win32, consult GetTempPath() for a temp dir.
 	  --  => it first tries TMP, TEMP, then finally the
 	  --   Windows directory(!). The directory is in short-path
-	  --   form and *does* have a trailing backslash.
+	  --   form.
 	; IO.try (do
 	        let len = (2048::Int)
 		buf  <- mallocArray len
 		ret  <- getTempPath len buf
 		tdir <-
 		  if ret == 0 then do
-		      -- failed, consult TEMP.
+		      -- failed, consult TMPDIR.
  	             free buf
-		     getEnv "TMP"
+		     getEnv "TMPDIR"
 		   else do
 		     s <- peekCString buf
 		     free buf
 		     return s
-		let
-	  	  -- strip the trailing backslash (awful, but 
-		  -- we only do this once).
-		  tmpdir =
-	            case last tdir of
-		      '/'  -> init tdir
-		      '\\' -> init tdir
-		      _   -> tdir
-		setTmpDir tmpdir
-		return ())
+		setTmpDir tdir)
 #endif
 
 	-- Check that the package config exists
@@ -627,7 +618,34 @@ GLOBAL_VAR(v_TmpDir,       cDEFAULT_TMPDIR,  String   )
 \end{code}
 
 \begin{code}
-setTmpDir dir = writeIORef v_TmpDir dir
+setTmpDir dir = writeIORef v_TmpDir (canonicalise dir)
+    where
+#if !defined(mingw32_HOST_OS)
+     canonicalise p = normalisePath p
+#else
+       -- canonicalisation of temp path under win32 is a bit more
+       -- involved: strip trailing slash, deal with /cygdrive-paths,
+       -- normalise slashes.
+     canonicalise path = normalisePath (xltCygdrive (removeTrailingSlash path))
+
+        -- if we're operating under cygwin, and TMP/TEMP is of
+	-- the form "/cygdrive/drive/path", translate this to
+	-- "drive:/path" (as GHC isn't a cygwin app and doesn't
+	-- understand /cygdrive paths.)
+     xltCygdrive path
+      | "/cygdrive/" `isPrefixOf` path = 
+	  case drop (length "/cygdrive/") path of
+	    drive:xs@('/':_) -> drive:':':xs
+	    _ -> path
+      | otherwise = path
+
+        -- strip the trailing backslash (awful, but we only do this once).
+     removeTrailingSlash path = 
+       case last path of
+         '/'  -> init path
+         '\\' -> init path
+         _    -> path
+#endif
 
 cleanTempFiles :: Int -> IO ()
 cleanTempFiles verb = do fs <- readIORef v_FilesToClean
