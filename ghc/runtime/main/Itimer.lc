@@ -8,7 +8,7 @@
 %************************************************************************
 
 The interval timer is used for profiling and for context switching in the
-threaded build.  Though POSIX 1003.4 includes a standard interface for
+threaded build.  Though POSIX 1003.1b includes a standard interface for
 such things, no one really seems to be implementing them yet.  Even 
 Solaris 2.3 only seems to provide support for @CLOCK_REAL@, whereas we're
 keen on getting access to @CLOCK_VIRTUAL@.
@@ -37,6 +37,56 @@ to support.  So much for standards.
 #   include <time.h>
 #  endif
 # endif
+\end{code}
+ 
+Handling timer events under cygwin32 is not done with signal/setitimer.
+Instead of the two steps of first registering a signal handler to handle
+\tr{SIGVTALRM} and then start generating them via @setitimer()@, we use
+the Multimedia API (MM) and its @timeSetEvent@. (Internally, the MM API
+creates a separate thread that will notify the main thread of timer
+expiry). -- SOF 7/96
+
+\begin{code}
+#if defined(cygwin32_TARGET_OS)
+
+#include <windows.h>  /* OK, bring it all in... */
+
+/*
+  vtalrm_handler is assigned and set up in
+  main/Signals.lc.
+
+  vtalrm_id (defined in main/Signals.lc) holds
+  the system id for the current timer (used to 
+  later block/kill the timer)
+*/
+extern I_ vtalrm_id;
+extern TIMECALLBACK *vtalrm_cback;
+ 
+int 
+initialize_virtual_timer(ms)
+int ms;
+{
+  /* VTALRM is currently not supported by  cygwin32, 
+     so we use the Timer support provided by the
+     MultiMedia API that is part of Win32. The
+     parameters to timeSetEvent may require some tweaking.
+  */
+  unsigned int delay,vtalrm_id;
+ 
+  delay = timeBeginPeriod(1);
+  if (delay == TIMERR_NOCANDO) { /* error of some sort. */
+     return delay;
+  }
+  vtalrm_id =
+    timeSetEvent(ms,     /* event every `delay' milliseconds. */
+ 	        1,       /* precision is within 5 millisecs. */
+ 	        (LPTIMECALLBACK)vtalrm_cback,
+ 		0,
+ 		TIME_PERIODIC);
+  return 0;
+}
+ 
+#else
 
 int
 initialize_virtual_timer(ms)
@@ -54,6 +104,8 @@ int ms;
     return (setitimer(ITIMER_VIRTUAL, &it, NULL));
 # endif
 }
+
+#endif /* !cygwin32_TARGET_OS */
 
 # if 0
 /* This is a potential POSIX version */

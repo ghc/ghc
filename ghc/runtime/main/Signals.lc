@@ -61,6 +61,10 @@ much pain.
 # include <siginfo.h>
 #endif
 
+#if defined(cygwin32_TARGET_OS)
+#include <windows.h>
+#endif
+
 \end{code}
 
 %************************************************************************
@@ -138,6 +142,44 @@ install_segv_handler(void)
 #   define si_addr _data._fault._addr
 #  endif
 
+#if defined(cygwin32_TARGET_OS)
+/*
+ The signal handlers in cygwin32 (beta14) are only passed the signal
+ number, no sigcontext/siginfo is passed as event data..sigh. For
+ SIGSEGV, to get at the violating address, we need to use the Win32's
+ WaitForDebugEvent() to get out any status information. 
+*/
+static void
+segv_handler(sig)
+ int sig;
+{
+    /* From gdb/win32-nat.c */
+    DEBUG_EVENT event;
+    BOOL t = TRUE; /* WaitForDebugEvent (&event, INFINITE); */
+
+    fflush(stdout);
+    if (t == FALSE) {
+        fprintf(stderr, "Segmentation fault caught, address unknown\n");
+    } else {
+        void *si_addr = event.u.Exception.ExceptionRecord.ExceptionAddress;
+        if (si_addr >= (void *) stks_space
+          && si_addr < (void *) (stks_space + RTSflags.GcFlags.stksSize))
+            StackOverflow();
+
+        fprintf(stderr, "Segmentation fault caught, address = %08lx\n", (W_)si_addr);
+    }
+    abort();
+}
+
+int
+install_segv_handler()
+{
+    return (int) signal(SIGSEGV, segv_handler) == -1;
+}
+
+
+#else /* !defined(cygwin32_TARGET_OS) */
+
 static void
 segv_handler(int sig, siginfo_t *sip)
   /* NB: the second "siginfo_t" argument is not really standard */
@@ -167,6 +209,8 @@ install_segv_handler(STG_NO_ARGS)
     return sigaction(SIGSEGV, &action, NULL);
 }
 
+#endif /* not cygwin32_TARGET_OS */
+
 # endif    /* not SunOS 4 */
 
 #endif	/* STACK_CHECK_BY_PAGE_FAULT */
@@ -195,8 +239,24 @@ extern I_ delayTicks;
 extern P_ CurrentTSO;
 #  endif
 
+/*
+ cygwin32 does not support VTALRM (sigh) - to do anything
+ sensible here we use the underlying Win32 calls.
+ (will this work??)
+*/
+#   if defined(cygwin32_TARGET_OS)
+/* windows.h already included */
+static VOID CALLBACK 
+vtalrm_handler(uID,uMsg,dwUser,dw1,dw2)
+int uID;
+unsigned int uMsg;
+unsigned int dwUser;
+unsigned int dw1;
+unsigned int dw2;
+#   else
 static void
 vtalrm_handler(int sig)
+#   endif
 {
 /*
    For the parallel world, currentTSO is set if there is any work
@@ -273,7 +333,63 @@ vtalrm_handler(int sig)
 
 # endif
 
-# if defined(sunos4_TARGET_OS)
+
+#if defined(cygwin32_TARGET_OS) /* really just Win32 */
+/* windows.h already included for the segv_handling above */
+
+I_ vtalrm_id;
+TIMECALLBACK *vtalrm_cback;
+
+#ifndef CONCURRENT
+void (*tick_handle)(STG_NO_ARGS);
+
+static VOID CALLBACK 
+tick_handler(uID,uMsg,dwUser,dw1,dw2)
+int uID;
+unsigned int uMsg;
+unsigned int dwUser;
+unsigned int dw1;
+unsigned int dw2;
+{
+ (*tick_handle)();
+}
+#endif
+
+int install_vtalrm_handler()
+{
+#  ifdef CONCURRENT
+    vtalrm_cback = vtalrm_handler;
+#  else
+     /*
+        Only turn on ticking 
+     */
+    vtalrm_cback = tick_handler;
+    if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
+     || RTSflags.ProfFlags.doHeapProfile)
+        tick_handle = handle_tick_serial;
+    else
+        tick_handle = handle_tick_noserial;
+#  endif
+    return (int)0;
+}  
+
+void
+blockVtAlrmSignal(STG_NO_ARGS)
+{
+ timeKillEvent(vtalrm_id);
+}
+
+void
+unblockVtAlrmSignal(STG_NO_ARGS)
+{
+#ifdef CONCURRENT
+ timeSetEvent(RTSflags.ConcFlags.ctxtSwitchTime,5,vtalrm_cback,NULL,TIME_PERIODIC);
+#else
+ timeSetEvent(RTSflags.CcFlags.msecsPerTick,5,vtalrm_cback,NULL,TIME_PERIODIC);
+#endif
+}
+
+#elif defined(sunos4_TARGET_OS)
 
 int
 install_vtalrm_handler(void)
@@ -396,8 +512,8 @@ sig_install(sig, spi, mask)
 
 # include <setjmp.h>
 
-StgPtr deRefStablePointer PROTO((StgStablePtr));
-void freeStablePointer PROTO((I_));
+extern StgPtr deRefStablePointer PROTO((StgStablePtr));
+extern void freeStablePointer PROTO((I_));
 extern jmp_buf restart_main;
 
 static I_ *handlers = NULL; /* Dynamically grown array of signal handlers */
