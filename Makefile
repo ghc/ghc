@@ -167,7 +167,7 @@ BIN_DIST_DIRS=$($(Project)BinDistDirs)
 binary-dist:: binary-dist-pre
 
 BIN_DIST_TOP= distrib/Makefile-bin.in \
-	      distrib/configure-bin.in \
+	      distrib/configure-bin.ac \
 	      distrib/INSTALL \
 	      $(BIN_DIST_MAIN_DIR)/ANNOUNCE \
 	      $(BIN_DIST_MAIN_DIR)/VERSION \
@@ -239,7 +239,7 @@ binary-dist::
 	echo "PACKAGE_LINKS = $($(Project)BinDistLinks)" >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	cat $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile-bin.in >> $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/Makefile.in
 	@echo "Generating a shippable configure script.."
-	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.in $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.in 
+	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure-bin.ac $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/configure.ac
 	( cd $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME); autoconf )
 	if test -x $(BIN_DIST_MAIN_DIR)/mk/post-install-script ; then \
 		cp $(BIN_DIST_MAIN_DIR)/mk/post-install-script \
@@ -349,7 +349,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 SRC_DIST_DIRS += docs distrib $(SUBDIRS)
 SRC_DIST_FILES += \
-	configure.in config.guess config.sub configure \
+	configure.ac config.guess config.sub configure \
 	aclocal.m4 acconfig.h README Makefile Makefile.config install-sh \
 	mk/bootstrap.mk \
 	mk/boilerplate.mk mk/config.h.in mk/config.mk.in mk/opts.mk \

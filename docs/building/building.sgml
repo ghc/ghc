@@ -1258,7 +1258,7 @@ $ cvs checkout nofib/spectral
 	  6.1.</para>
 
 	  <para>Autoconf builds the <command>configure</command>
-          script from <filename>configure.in</filename> and
+          script from <filename>configure.ac</filename> and
           <filename>aclocal.m4</filename>.  If you modify either of
           these files, you'll need <command>autoconf</command> to
           rebuild <filename>configure</filename>.</para>
@@ -1415,7 +1415,7 @@ $ make install
 	</listitem>
 
 	<listitem>
-	  <para><filename>configure.in</filename>,
+	  <para><filename>configure.ac</filename>,
           <filename>config.sub</filename>,
           <filename>config.guess</filename>: these files support the
           configuration process.</para>
@@ -1438,7 +1438,7 @@ $ make install
       only one project (<literal>happy</literal>, say), you must have
       a source tree whose root directory contains
       <filename>Makefile</filename>, <filename>mk/</filename>,
-      <filename>configure.in</filename>, and the project(s) you want
+      <filename>configure.ac</filename>, and the project(s) you want
       (<filename>happy/</filename> in this case).  You cannot get by
       with just the <filename>happy/</filename> directory.</para>
     </sect2>
@@ -1555,20 +1555,20 @@ $ make install
             issue the command
             <command>autoconf</command><indexterm><primary>autoconf</primary></indexterm>
             (with no arguments). This GNU program converts
-            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.in</filename>
+            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.ac</filename>
             to a shell script called
             <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure</filename>.
             </para>
 
 	    <para>Some projects, including GHC, have their own
             configure script.  If there's an
-            <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</constant>,
+            <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.ac</constant>,
             then you need to run <command>autoconf</command> in that
             directory too.</para>
 
 	    <para>Both these steps are completely
             platform-independent; they just mean that the
-            human-written file (<filename>configure.in</filename>) can
+            human-written file (<filename>configure.ac</filename>) can
             be short, although the resulting shell script,
             <command>configure</command>, and
             <filename>mk/config.h.in</filename>, are long.</para>

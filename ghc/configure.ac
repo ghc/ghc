@@ -21,7 +21,7 @@ AC_SUBST(version)
 AC_SUBST(patchlevel)
 
 dnl Uncomment links to unix docs if necessary dnl NOTE: This is a slight
-dnl hack: It needs to be synchronized with fptools/configure.in and
+dnl hack: It needs to be synchronized with fptools/configure.ac and
 dnl fptools/libraries/Makefile and should probably use target features
 dnl instead of host.
 AC_CANONICAL_HOST

@@ -1,5 +1,5 @@
 dnl == autoconf source for the Glasgow FP tools ==
-dnl (run "grep '^dnl \*' configure.in | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
+dnl (run "grep '^dnl \*' configure.ac | sed -e 's/dnl / /g; s/\*\*/   +/g;'"
 dnl  (or some such) to see the outline of this file)
 dnl
 #

@@ -37,7 +37,7 @@ $(TOP)/mk/config.mk : $(TOP)/mk/config.mk.in $(TOP)/mk/config.h.in $(TOP)/config
 	@echo "Running $(FPTOOLS_TOP)/config.status to update configuration info..."
 	@( cd $(FPTOOLS_TOP) && ./config.status )
 
-$(TOP)/configure : $(TOP)/configure.in $(TOP)/aclocal.m4
+$(TOP)/configure : $(TOP)/configure.ac $(TOP)/aclocal.m4
 	@echo "Regenerating $(FPTOOLS_TOP)/configure..."
 	@( cd $(FPTOOLS_TOP) && $(MAKE) -f Makefile.config ./configure )
 

@@ -1,10 +1,10 @@
-/* mk/config.h.in.  Generated from configure.in by autoheader.  */
+/* mk/config.h.in.  Generated from configure.ac by autoheader.  */
 /* acconfig.h
 
    Descriptive text for the C preprocessor macros that
    the fptools configuration script can define.
    The current version may not use all of them; autoheader copies the ones
-   your configure.in uses into your configuration header file templates.
+   your configure.ac uses into your configuration header file templates.
 
    The entries are in sort -df order: alphabetical, case insensitive,
    ignoring punctuation (such as underscores).  Although this order
