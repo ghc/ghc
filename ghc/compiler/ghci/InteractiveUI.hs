@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.5 2000/11/20 16:28:29 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.6 2000/11/20 16:51:35 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -91,7 +91,7 @@ uiLoop :: GHCi ()
 uiLoop = do
   st <- getGHCiState
 #ifndef NO_READLINE
-  l <- io (readline (mkPrompt (current_module st)  ++ "> "))
+  l <- io (readline (mkPrompt (current_module st) ++ "> "))
 #else
   l <- io (hGetLine stdin)
 #endif
@@ -105,7 +105,7 @@ uiLoop = do
   	  runCommand l
 	  uiLoop  
 
-mkPrompt Nothing = "> "
+mkPrompt Nothing = ""
 mkPrompt (Just mod_name) = moduleNameUserString mod_name
 
 -- Top level exception handler, just prints out the exception 
