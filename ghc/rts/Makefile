@@ -31,27 +31,7 @@ HC=$(GHC_INPLACE)
 # -----------------------------------------------------------------------------
 # RTS ways
 
-WAYS=$(GhcLibWays) thr debug
-
-ifneq "$(findstring p, $(GhcLibWays))" ""
-WAYS += thr_p debug_p
-endif
-
-# Way 'thr':
-WAY_thr_NAME=threaded
-WAY_thr_HC_OPTS=-optc-DTHREADED_RTS
-
-# Way 'thr_p':
-WAY_thr_p_NAME=threaded profiled
-WAY_thr_p_HC_OPTS=-optc-DTHREADED_RTS -prof
-
-# Way 'debug':
-WAY_debug_NAME=debug
-WAY_debug_HC_OPTS=-optc-DDEBUG
-
-# Way 'debug_p':
-WAY_debug_p_NAME=debug profiled
-WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
+WAYS=$(GhcLibWays) $(GhcRTSWays)
 
 ifneq "$(findstring debug, $(way))" ""
 GhcRtsHcOpts=
