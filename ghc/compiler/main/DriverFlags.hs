@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.48 2001/03/12 14:06:47 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.49 2001/03/15 15:53:28 simonmar Exp $
 --
 -- Driver flags
 --
@@ -20,7 +20,6 @@ module DriverFlags (
 
 #include "HsVersions.h"
 
-import PackageMaintenance
 import DriverState
 import DriverUtil
 import TmpFiles 	( v_TmpDir, kludgedSystem )
@@ -240,10 +239,6 @@ static_flags =
 
   ,  ( "package"        , HasArg (addPackage) )
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
-
-  ,  ( "-list-packages"  , NoArg (listPackages) )
-  ,  ( "-add-package"    , NoArg (newPackage) )
-  ,  ( "-delete-package" , SepArg (deletePackage) )
 
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg (writeIORef v_Pgm_L) )
