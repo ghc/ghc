@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.116 2002/02/28 10:15:47 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.117 2002/04/02 10:18:07 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -108,35 +108,36 @@ keepGoing a str = a str >> return False
 
 shortHelpText = "use :? for help.\n"
 
+-- NOTE: spaces at the end of each line to workaround CPP/string gap bug.
 helpText = "\ 
 \ Commands available from the prompt:\n\ 
-\\
-\   <stmt>		   evaluate/run <stmt>\n\ 
-\   :add <filename> ...    add module(s) to the current target set\n\ 
-\   :browse [*]<module>	   display the names defined by <module>\n\ 
-\   :cd <dir>		   change directory to <dir>\n\ 
-\   :def <cmd> <expr>      define a command :<cmd>\n\ 
-\   :help, :?		   display this list of commands\n\ 
-\   :info [<name> ...]     display information about the given names\n\ 
-\   :load <filename> ...   load module(s) and their dependents\n\ 
-\   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
-\   :reload		   reload the current module set\n\ 
 \\n\ 
-\   :set <option> ...	   set options\n\ 
-\   :set args <arg> ...	   set the arguments returned by System.getArgs\n\ 
-\   :set prog <progname>   set the value returned by System.getProgName\n\ 
+\   <stmt>		       evaluate/run <stmt>\n\ 
+\   :add <filename> ...        add module(s) to the current target set\n\ 
+\   :browse [*]<module>	       display the names defined by <module>\n\ 
+\   :cd <dir>		       change directory to <dir>\n\ 
+\   :def <cmd> <expr>          define a command :<cmd>\n\ 
+\   :help, :?		       display this list of commands\n\ 
+\   :info [<name> ...]         display information about the given names\n\ 
+\   :load <filename> ...       load module(s) and their dependents\n\ 
+\   :module [+/-] [*]<mod> ... set the context for expression evaluation\n\ 
+\   :reload		       reload the current module set\n\ 
 \\n\ 
-\   :show modules	   show the currently loaded modules\n\ 
-\   :show bindings	   show the current bindings made at the prompt\n\ 
+\   :set <option> ...	       set options\n\ 
+\   :set args <arg> ...	       set the arguments returned by System.getArgs\n\ 
+\   :set prog <progname>       set the value returned by System.getProgName\n\ 
 \\n\ 
-\   :type <expr>	   show the type of <expr>\n\ 
-\   :undef <cmd> 	   undefine user-defined command :<cmd>\n\ 
-\   :unset <option> ...	   unset options\n\ 
-\   :quit		   exit GHCi\n\ 
-\   :!<command>		   run the shell command <command>\n\ 
-\\ 
+\   :show modules	       show the currently loaded modules\n\ 
+\   :show bindings	       show the current bindings made at the prompt\n\ 
+\\n\ 
+\   :type <expr>	       show the type of <expr>\n\ 
+\   :undef <cmd> 	       undefine user-defined command :<cmd>\n\ 
+\   :unset <option> ...	       unset options\n\ 
+\   :quit		       exit GHCi\n\ 
+\   :!<command>		       run the shell command <command>\n\ 
+\\n\ 
 \ Options for `:set' and `:unset':\n\ 
-\\ 
+\\n\ 
 \    +r			revert top-level expressions after each evaluation\n\ 
 \    +s                 print timing/memory stats after each evaluation\n\ 
 \    +t			print type after evaluation\n\ 
@@ -597,7 +598,7 @@ setContextAfterLoad [] = setContext prel
 setContextAfterLoad (m:_) = do
   cmstate <- getCmState
   b <- io (cmModuleIsInterpreted cmstate m)
-  if b then setContext m else setContext ('*':m)
+  if b then setContext ('*':m) else setContext m
 
 modulesLoadedMsg ok mods dflags =
   when (verbosity dflags > 0) $ do
@@ -606,9 +607,9 @@ modulesLoadedMsg ok mods dflags =
 	| otherwise = hsep (
 	    punctuate comma (map text mods)) <> text "."
    case ok of
-    False -> 
+    False ->
        io (putStrLn (showSDoc (text "Failed, modules loaded: " <> mod_commas)))
-    True  -> 
+    True  ->
        io (putStrLn (showSDoc (text "Ok, modules loaded: " <> mod_commas)))
 
 
@@ -634,8 +635,8 @@ shellEscape str = io (system str >> return False)
 browseCmd :: String -> GHCi ()
 browseCmd m = 
   case words m of
-    ['*':m] | looksLikeModuleName m -> browseModule m True
-    [m]     | looksLikeModuleName m -> browseModule m False
+    ['*':m] | looksLikeModuleName m -> browseModule m False
+    [m]     | looksLikeModuleName m -> browseModule m True
     _ -> throwDyn (CmdLineError "syntax:  :browse <module>")
 
 browseModule m exports_only = do
@@ -716,10 +717,10 @@ newContext mods = do
   setCmState cms'
 
 separate cmstate []           as bs = return (as,bs)
-separate cmstate (('*':m):ms) as bs = separate cmstate ms as (m:bs)
+separate cmstate (('*':m):ms) as bs = separate cmstate ms (m:as) bs
 separate cmstate (m:ms)       as bs = do 
    b <- io (cmModuleIsInterpreted cmstate m)
-   if b then separate cmstate ms (m:as) bs
+   if b then separate cmstate ms as (m:bs)
    	else throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
 	
 prel = "Prelude"
