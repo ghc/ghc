@@ -120,6 +120,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc ghc/ANNOUNCE ghc/PATCHLEVEL ghc/README docs/ ghc/docs/ CONTRIB/
 %{prefix}/bin/ghc
 %{prefix}/bin/ghc-%{version}
+%{prefix}/bin/ghcprof
 %{prefix}/bin/hp2ps
 %{prefix}/bin/hstags
 %{prefix}/bin/stat2resid
