@@ -604,7 +604,7 @@ checkConfigAccess = do
   conf_file <- readIORef package_config
   access <- getPermissions conf_file
   unless (writable access)
-	throwDyn (OtherError "you don't have permission to modify the package configuration file")
+	(throwDyn (OtherError "you don't have permission to modify the package configuration file"))
 
 maybeRestoreOldConfig :: String -> IO () -> IO ()
 maybeRestoreOldConfig conf_file io
