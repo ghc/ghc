@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.30 2000/12/11 11:41:08 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.31 2000/12/11 12:15:15 simonmar Exp $
 --
 -- Driver flags
 --
@@ -22,7 +22,9 @@ import TmpFiles	 ( newTempName )
 import Directory ( removeFile )
 import Exception
 import IOExts
+
 import IO
+import Maybe
 import Monad
 import System
 import Char
@@ -262,9 +264,7 @@ static_flags =
   ,  ( "rdynamic"       , NoArg (return ()) ) -- ignored for compat w/ gcc
 
 	----- RTS opts ------------------------------------------------------
-#ifdef not_yet
   ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
-#endif
 
         ------ Compiler flags -----------------------------------------------
   ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
@@ -412,23 +412,6 @@ dynamic_flags = [
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting) )
   ,  ( "dusagesp-lint",        	 NoArg (setDynFlag Opt_DoUSPLinting) )
 
-	------ Warnings ----------------------------------------------------
-
-  ,  ( "fwarn-duplicate-exports", NoArg (setDynFlag Opt_WarnDuplicateExports) )
-  ,  ( "fwarn-hi-shadowing",      NoArg (setDynFlag Opt_WarnHiShadows) )
-  ,  ( "fwarn-incomplete-patterns",  NoArg (setDynFlag Opt_WarnIncompletePatterns) )
-  ,  ( "fwarn-missing-fields",    NoArg (setDynFlag Opt_WarnMissingFields) )
-  ,  ( "fwarn-missing-methods",   NoArg (setDynFlag Opt_WarnMissingMethods))
-  ,  ( "fwarn-missing-signatures", NoArg (setDynFlag Opt_WarnMissingSigs) )
-  ,  ( "fwarn-name-shadowing",    NoArg (setDynFlag Opt_WarnNameShadowing) )
-  ,  ( "fwarn-overlapping-patterns", NoArg (setDynFlag Opt_WarnOverlappingPatterns ) )
-  ,  ( "fwarn-simple-patterns",   NoArg (setDynFlag Opt_WarnSimplePatterns))
-  ,  ( "fwarn-type-defaults",     NoArg (setDynFlag Opt_WarnTypeDefaults) )
-  ,  ( "fwarn-unused-binds",      NoArg (setDynFlag Opt_WarnUnusedBinds) )
-  ,  ( "fwarn-unused-imports",    NoArg (setDynFlag Opt_WarnUnusedImports) )
-  ,  ( "fwarn-unused-matches",    NoArg (setDynFlag Opt_WarnUnusedMatches) )
-  ,  ( "fwarn-deprecations",      NoArg (setDynFlag Opt_WarnDeprecations) )
-
 	------ Machine dependant (-m<blah>) stuff ---------------------------
 
   ,  ( "monly-2-regs", 	NoArg (updateState (\s -> s{stolen_x86_regs = 2}) ))
@@ -437,24 +420,44 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
-  ,  ( "fasm"		   , AnySuffix (\_ -> setLang HscAsm) )
+  ,  ( "fasm",		AnySuffix (\_ -> setLang HscAsm) )
+  ,  ( "fvia-c",	NoArg (setLang HscC) )
+  ,  ( "fvia-C",	NoArg (setLang HscC) )
 
-  ,  ( "fvia-c"		   , NoArg (setLang HscC) )
-  ,  ( "fvia-C"		   , NoArg (setLang HscC) )
+	-- "active negatives"
+  ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )
 
-  ,  ( "fglasgow-exts", NoArg (setDynFlag Opt_GlasgowExts) )
-  ,  ( "fno-implicit-prelude", NoArg (setDynFlag Opt_NoImplicitPrelude) )
-
-  ,  ( "fallow-overlapping-instances",	
-		NoArg (setDynFlag Opt_AllowOverlappingInstances) )
-
-  ,  ( "fallow-undecidable-instances",
-		NoArg (setDynFlag Opt_AllowUndecidableInstances) )
-
-  ,  ( "fgenerics",  NoArg (setDynFlag Opt_Generics) )
-
-  ,  ( "freport-compile", NoArg (setDynFlag Opt_ReportCompile) )
+	-- the rest of the -f* and -fno-* flags
+  ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )
+  ,  ( "f".		PrefixPred (\f -> isFFlag f) (\f -> setDynFlag (getFFlag f)) )
  ]
+
+-- these -f<blah> flags can all be reversed with -fno-<blah>
+
+fFlags = [
+  ( "warn-duplicate-exports",    	Opt_WarnDuplicateExports ),
+  ( "warn-hi-shadowing",         	Opt_WarnHiShadows ),
+  ( "warn-incomplete-patterns",  	Opt_WarnIncompletePatterns ),
+  ( "warn-missing-fields",       	Opt_WarnMissingFields ),
+  ( "warn-missing-methods",      	Opt_WarnMissingMethods ),
+  ( "warn-missing-signatures",   	Opt_WarnMissingSigs ),
+  ( "warn-name-shadowing",       	Opt_WarnNameShadowing ),
+  ( "warn-overlapping-patterns", 	Opt_WarnOverlappingPatterns ),
+  ( "warn-simple-patterns",      	Opt_WarnSimplePatterns ),
+  ( "warn-type-defaults",        	Opt_WarnTypeDefaults ),
+  ( "warn-unused-binds",         	Opt_WarnUnusedBinds ),
+  ( "warn-unused-imports",       	Opt_WarnUnusedImports ),
+  ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
+  ( "warn-deprecations",         	Opt_WarnDeprecations ),
+  ( "glasgow-exts", 		 	Opt_GlasgowExts ),
+  ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
+  ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
+  ( "fgenerics",  			Opt_Generics ),
+  ( "report-compile", 		 	Opt_ReportCompile )
+  ]
+
+isFFlag f = f `elem` (map fst fFlags)
+getFFlag f = fromJust (lookup f fFlags)
 
 -----------------------------------------------------------------------------
 -- convert sizes like "3.5M" into integers
@@ -474,8 +477,11 @@ floatOpt :: IORef Double -> String -> IO ()
 floatOpt ref str
   = writeIORef ref (read str :: Double)
 
-#ifdef not_yet
+#if __GLASGOW_HASKELL__ >= 411
 foreign import "setHeapSize" unsafe setHeapSize :: Int -> IO ()
+#else
+setHeapSize :: Int -> IO ()		-- -H<size> is ignored
+setHeapSize _ = return ()
 #endif
 
 -----------------------------------------------------------------------------
