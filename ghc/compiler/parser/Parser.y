@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.81 2001/12/21 10:24:24 simonmar Exp $
+$Id: Parser.y,v 1.82 2002/01/29 09:58:18 simonpj Exp $
 
 Haskell grammar.
 
@@ -459,11 +459,15 @@ rule  	:: { RdrBinding }
 
 activation :: { Activation }           -- Omitted means AlwaysActive
         : {- empty -}                           { AlwaysActive }
-        | '[' INTEGER ']'                       { ActiveAfter (fromInteger $2) }
+        | explicit_activation                   { $1 }
 
 inverse_activation :: { Activation }   -- Omitted means NeverActive
         : {- empty -}                           { NeverActive }
-        | '[' INTEGER ']'                       { ActiveAfter (fromInteger $2) }
+        | explicit_activation                   { $1 }
+
+explicit_activation :: { Activation }  -- In brackets
+        : '[' INTEGER ']'                       { ActiveAfter  (fromInteger $2) }
+        | '[' '~' INTEGER ']'                   { ActiveBefore (fromInteger $3) }
 
 rule_forall :: { [RdrNameRuleBndr] }
 	: 'forall' rule_var_list '.'            { $2 }

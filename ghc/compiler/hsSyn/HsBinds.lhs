@@ -24,7 +24,7 @@ import PprCore		( {- instance Outputable (Expr a) -} )
 import Name		( Name )
 import PrelNames	( isUnboundName )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
-import BasicTypes	( RecFlag(..), Fixity, Activation(..), pprPhase )
+import BasicTypes	( RecFlag(..), Fixity, Activation(..) )
 import Outputable	
 import SrcLoc		( SrcLoc )
 import Var		( TyVar )
@@ -360,11 +360,7 @@ ppr_sig (InlineSig True var phase _)
       = hsep [text "{-# INLINE", ppr phase, ppr var, text "#-}"]
 
 ppr_sig (InlineSig False var phase _)
-      = hsep [text "{-# NOINLINE", pp_phase phase, ppr var, text "#-}"]
-      where
-	pp_phase NeverActive     = empty		-- NOINLINE f
-	pp_phase (ActiveAfter n) = pprPhase n		-- NOINLINE [2] f
-	pp_phase AlwaysActive    = text "ALWAYS?" 	-- Unexpected
+      = hsep [text "{-# NOINLINE", ppr phase, ppr var, text "#-}"]
 
 ppr_sig (SpecInstSig ty _)
       = hsep [text "{-# SPECIALIZE instance", ppr ty, text "#-}"]

@@ -155,6 +155,7 @@ import FastString	( tailFS )
  '<-'		{ ITlarrow }
  '->'		{ ITrarrow }
  '@'		{ ITat }
+ '~'		{ ITtilde }
  '=>'		{ ITdarrow }
  '-'		{ ITminus }
  '!'		{ ITbang }
@@ -428,6 +429,7 @@ rule	   : src_loc STRING activation rule_forall qvar_name
 activation :: { Activation }
 activation : {- empty -}                { AlwaysActive }
            | '[' INTEGER ']'            { ActiveAfter (fromInteger $2) }
+           | '[' '~' INTEGER ']'        { ActiveBefore (fromInteger $3) }
 
 rule_forall	:: { [UfBinder RdrName] }
 rule_forall	: '__forall' '{' core_bndrs '}'	{ $3 }

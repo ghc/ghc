@@ -43,7 +43,7 @@ module BasicTypes(
 
 	StrictnessMark(..), isMarkedUnboxed, isMarkedStrict,
 
-	CompilerPhase, pprPhase, 
+	CompilerPhase, 
 	Activation(..), isActive, isNeverActive, isAlwaysActive
    ) where
 
@@ -387,23 +387,23 @@ type CompilerPhase = Int	-- Compilation phase
 				-- Phases decrease towards zero
 				-- Zero is the last phase
 
-pprPhase :: CompilerPhase -> SDoc
-pprPhase n = brackets (int n)
-
 data Activation = NeverActive
 		| AlwaysActive
+		| ActiveBefore CompilerPhase	-- Active only *before* this phase
 		| ActiveAfter CompilerPhase	-- Active in this phase and later
 		deriving( Eq )			-- Eq used in comparing rules in HsDecls
 
 instance Outputable Activation where
-   ppr AlwaysActive    = empty		-- The default
-   ppr (ActiveAfter n) = pprPhase n
-   ppr NeverActive     = ptext SLIT("NEVER")
+   ppr AlwaysActive     = empty		-- The default
+   ppr (ActiveBefore n) = brackets (char '~' <> int n)
+   ppr (ActiveAfter n)  = brackets (int n)
+   ppr NeverActive      = ptext SLIT("NEVER")
     
 isActive :: CompilerPhase -> Activation -> Bool
-isActive p NeverActive     = False
-isActive p AlwaysActive    = True
-isActive p (ActiveAfter n) = p <= n
+isActive p NeverActive      = False
+isActive p AlwaysActive     = True
+isActive p (ActiveAfter n)  = p <= n
+isActive p (ActiveBefore n) = p >  n
 
 isNeverActive, isAlwaysActive :: Activation -> Bool
 isNeverActive NeverActive = True
