@@ -85,7 +85,7 @@ typedef unsigned long  *StgPtr;		/* StgPtr is a ptr to a heap object
 typedef StgPtr	       *StgPtrPtr;	/* used for A stack pointer */
 typedef long		StgInt;
 
-#if __GNUC__
+#if HAVE_LONG_LONG
 /* These types are only used to allow the passing of
    64-bit ints from Haskell to ccalls and to ease
    the implementation of the Int64 and Word64 libraries.
