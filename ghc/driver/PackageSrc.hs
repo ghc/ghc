@@ -397,8 +397,9 @@ package_details installing
          library_dirs   = if installing
                              then [ "$libdir" ]
                              else [ "$libdir/hslibs/win32" ],
-         hs_libraries      = [ "HSwin32" ],
-	 extra_libraries   = [ "user32",  "gdi32", "winmm" ],
+         hs_libraries      = [ "HSwin321", "HSwin322" ],
+	 extra_libraries   = [ "user32",  "gdi32", "winmm", 
+                               "kernel32", "advapi32" ],
          include_dirs   = [],
          c_includes     = [],           -- ???
          package_deps   = [ "lang" ], -- greencard now built in

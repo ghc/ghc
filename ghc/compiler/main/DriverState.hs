@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.55 2001/08/15 09:58:00 sewardj Exp $
+-- $Id: DriverState.hs,v 1.56 2001/09/04 16:35:02 sewardj Exp $
 --
 -- Settings for the driver
 --
@@ -474,13 +474,18 @@ getPackageLibraries = do
      -- different route (in InteractiveUI.linkPackage).
      -- See driver/PackageSrc.hs for the HSstd1/HSstd2 split definition.
      -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
+     -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
      hACK libs
 #      ifndef mingw32_TARGET_OS
        = libs
 #      else
        = if   "HSstd1" `elem` libs && "HSstd2" `elem` libs
          then "HSstd" : filter ((/= "HSstd").(take 5)) libs
-         else libs
+         else
+         if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
+         then "HSwin32" : filter ((/= "HSwin32").(take 7)) libs
+         else 
+         libs
 #      endif
 
 getPackageExtraGhcOpts :: IO [String]
