@@ -143,7 +143,7 @@ tcPolyExpr arg expected_arg_ty
     newDicts SignatureOrigin sig_theta		`thenNF_Tc` \ (sig_dicts, dict_ids) ->
 	-- ToDo: better origin
     tcSimplifyAndCheck 
-	(text "tcPolyExpr")
+	(text "the type signature of an expression")
 	(mkVarSet zonked_sig_tyvars)
 	sig_dicts lie_arg			`thenTc` \ (free_insts, inst_binds) ->
 
