@@ -29,7 +29,11 @@ module DsUtils (
     ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
+#else
+import {-# SOURCE #-} Match (match, matchSimply )
+#endif
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..), Fixity,
 			  Match, HsBinds, Stmt, DoOrListComp, HsType, ArithSeqInfo )
