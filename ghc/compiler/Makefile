@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.68 2000/01/24 09:25:36 simonmar Exp $
+# $Id: Makefile,v 1.69 2000/01/25 10:15:55 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -142,7 +142,7 @@ parser/Lex_HC_OPTS		= -K2m -H16m -fvia-C
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
 
-parser/Parser_HC_OPTS 		+= -Onot -H80m -K2m -fno-warn-incomplete-patterns
+parser/Parser_HC_OPTS 		+= -Onot -H80m -optCrts-M80m -K2m -fno-warn-incomplete-patterns
 parser/Parser_HAPPY_OPTS    	+= -g
 
 ifeq "$(TARGETPLATFORM)" "hppa1.1-hp-hpux9"
