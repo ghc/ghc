@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.42 2001/05/18 21:18:17 qrczak Exp $
+ * $Id: Linker.c,v 1.43 2001/06/06 14:03:41 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -439,15 +439,20 @@ static OpenedDLL* opened_dlls = NULL;
 
 
 char*
-addDLL ( char* dll_name )
+addDLL ( char* path, char* dll_name )
 {
 #  if defined(OBJFORMAT_ELF)
    void *hdl;
    char *buf;
    char *errmsg;
 
-   buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
-   sprintf(buf, "lib%s.so", dll_name);
+   if (path == NULL || strlen(path) == 0) {
+      buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
+      sprintf(buf, "lib%s.so", dll_name);
+   } else {
+      buf = stgMallocBytes(strlen(path) + 1 + strlen(dll_name) + 10, "addDll");
+      sprintf(buf, "%s/lib%s.so", path, dll_name);
+   }
    hdl = dlopen(buf, RTLD_NOW | RTLD_GLOBAL );
    free(buf);
    if (hdl == NULL) {
@@ -463,7 +468,7 @@ addDLL ( char* dll_name )
 
    /* Add this DLL to the list of DLLs in which to search for symbols.
       The first time through, also add the executable to the list,
-      since we need to search that too. */
+      since we need to search that too.  The path argument is ignored. */
    char*      buf;
    OpenedDLL* o_dll;
    HINSTANCE  instance;
