@@ -26,4 +26,8 @@ distclean: clean
 
 maintainer-clean: distclean
 
+all:
+
+boot:
+
 # End of file
