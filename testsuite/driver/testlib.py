@@ -41,6 +41,9 @@ class TestConfig:
         # What platform are we running on?
         self.platform = ''
 
+        # What is the wordsize (in bits) of this platform?
+        self.wordsize = ''
+
         # Verbosity level
         self.verbose = 1
 
@@ -415,7 +418,7 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    expected_stderr_file = platform_qualify(name, 'stderr')
+    expected_stderr_file = platform_wordsize_qualify(name, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
     actual_stderr = normalise_errmsg(open(actual_stderr_file).read())
 
@@ -575,7 +578,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     else:
         srcname = top_mod
         
-    scriptname = add_suffix(name, 'script')
+    scriptname = add_suffix(name, 'genscript')
     qscriptname = in_testdir(scriptname)
     rm_no_fail(qscriptname)
 
@@ -753,7 +756,7 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 
 def check_stdout_ok( name ):
    actual_stdout_file   = qualify(name, 'run.stdout')
-   expected_stdout_file = platform_qualify(name, 'stdout')
+   expected_stdout_file = platform_wordsize_qualify(name, 'stdout')
 
    if os.path.exists(expected_stdout_file):
        expected_stdout = open(expected_stdout_file).read()
@@ -778,7 +781,7 @@ def check_stdout_ok( name ):
 
 def check_stderr_ok( name ):
    actual_stderr_file   = qualify(name, 'run.stderr')
-   expected_stderr_file = platform_qualify(name, 'stderr')
+   expected_stderr_file = platform_wordsize_qualify(name, 'stderr')
 
    if os.path.exists(expected_stderr_file):
        expected_stderr = open(expected_stderr_file).read()
@@ -883,12 +886,16 @@ def in_testdir( name ):
 def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))
 
-# "foo" -> qualify("foo-platform") if it exists, or qualify("foo") otherwise
-def platform_qualify( name, suff ):
+# "foo" -> qualify("foo-platform") if it exists, otherwise
+# try qualify("foo-ws-wordsize") or finally qualify("foo")
+def platform_wordsize_qualify( name, suff ):
     path = qualify(name, suff)
     platform_path = path + '-' + config.platform
+    wordsize_path = path + '-ws-' + config.wordsize
     if os.path.exists(platform_path):
         return platform_path
+    elif os.path.exists(wordsize_path):
+        return wordsize_path
     else:
         return path
 

@@ -161,8 +161,10 @@ testEnumChar = do
   printTest ((map fromEnum ['X',minBound,maxBound]))
 
      -- [x..] aka enumFrom
-  printTest ((take 7 ['\NUL' .. ]))
-  printTest ((take 7 ['\250' .. ]))
+  -- printTest ((take 7 ['\NUL' .. ]))
+  do{ putStr ( "    " ++ "(take 7 ['\\NUL' .. ])" ++ " = " ) ; print (take 7 ['\NUL' .. ]) }
+  -- printTest ((take 7 ['\250' .. ]))
+  do{ putStr ( "    " ++ "(take 7 ['\\250' .. ])" ++ " = " ) ; print (take 7 ['\250' .. ]) }
   
      -- [x,y..] aka enumFromThen
   printTest ((take 7 ['a','b'..]))
@@ -171,19 +173,24 @@ testEnumChar = do
   printTest ((take 7 ['z','y'..]))
   printTest ((take 7 ['z','v'..]))
   let x = '\1'
-  printTest ((take 7 ['\1', '\0' ..]))
+  -- printTest ((take 7 ['\1', '\0' ..]))
+  do{ putStr ( "    " ++ "(take 7 ['\\1', '\\0' ..])" ++ " = " ) ; print (take 7 ['\1', '\0' ..]) }
   let x = '\5'
-  printTest ((take 7 ['\5', '\4' ..]))
+  -- printTest ((take 7 ['\5', '\4' ..]))
+  do{ putStr ( "    " ++ "(take 7 ['\\5', '\\4' ..])" ++ " = " ) ; print (take 7 ['\5', '\4' ..]) }
   let x = (maxBound::Int) - 5
-  printTest ((take 7 ['\250', '\251' ..]))
+  -- printTest ((take 7 ['\250', '\251' ..]))
+  do{ putStr ( "    " ++ "(take 7 ['\\250', '\\251' ..])" ++ " = " ) ; print (take 7 ['\250', '\251' ..]) }
 
      -- [x..y] aka enumFromTo
   printTest ((take 7 (['a' .. 'e'])))
   printTest ((take 4 (['a' .. 'a'])))
   printTest ((take 7 (['b' .. 'a'])))
   printTest ((take 7 (['e' .. 'a'])))
-  printTest ((take 7 (['\250' .. '\255'])))
-  printTest ((take 7 (['\5' .. '\0'])))
+  -- printTest ((take 7 (['\250' .. '\255'])))
+  do{ putStr ( "    " ++ "(take 7 (['\\250' .. '\\255']))" ++ " = " ) ; print (take 7 (['\250' .. '\255'])) }
+  -- printTest ((take 7 (['\5' .. '\0'])))
+  do{ putStr ( "    " ++ "(take 7 (['\\5' .. '\\0']))" ++ " = " ) ; print (take 7 (['\5' .. '\0'])) }
 
      -- [x,y..z] aka enumFromThenTo
   printTest ((take 7 ['f','e' .. 'b']))
@@ -193,8 +200,10 @@ testEnumChar = do
   printTest ((take 7 ['c','b' .. 'c']))
   printTest ((take 7 ['c','b' .. 'b']))
   printTest ((take 7 ['c','d' .. 'b']))
-  printTest ((take 7 ['\251', '\252' .. maxBound]))
-  printTest ((take 7 ['\5', '\4' .. minBound]))
+  -- printTest ((take 7 ['\251', '\252' .. maxBound]))
+  do{ putStr ( "    " ++ "(take 7 ['\\251', '\\252' .. maxBound])" ++ " = " ) ; print (take 7 ['\251', '\252' .. maxBound]) }
+  -- printTest ((take 7 ['\5', '\4' .. minBound]))
+  do{ putStr ( "    " ++ "(take 7 ['\\5', '\\4' .. minBound])" ++ " = " ) ; print (take 7 ['\5', '\4' .. minBound]) }
 
 
 testEnumUnit :: IO ()
@@ -323,8 +332,8 @@ testEnumBool = do
   printTest (take 7 ([False,True .. True]))
   printTest (take 7 ([True,False .. False]))
   printTest (take 7 ([True,False .. True]))
-  printTest (take 7 ([True,True ..  False]))
-  printTest (take 7 ([True,True ..  True]))
+  printTest (take 7 ([True,True .. False]))
+  printTest (take 7 ([True,True .. True]))
 
 
 testEnumInteger :: IO ()

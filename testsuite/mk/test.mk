@@ -15,6 +15,8 @@
 #
 # -----------------------------------------------------------------------------
 
+include $(TOP)/mk/wordsize.mk
+
 ifeq "$(PYTHON)" ""
 $(error Python must be installed in order to use the testsuite)
 endif
@@ -64,6 +66,7 @@ RUNTEST_OPTS +=  \
 	-e config.compiler=\"$(TEST_HC)\" \
 	-e config.compiler_always_flags.append"(\"$(EXTRA_HC_OPTS)\")" \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
+	-e config.wordsize=\"$(WORDSIZE)\" \
 	$(EXTRA_RUNTEST_OPTS)
 
 TESTS	     = 
