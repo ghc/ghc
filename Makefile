@@ -51,6 +51,7 @@ BIN_DIST_TOP= distrib/Makefile-bin.in \
 	      $(BIN_DIST_MAIN_DIR)/ANNOUNCE \
 	      $(BIN_DIST_MAIN_DIR)/PATCHLEVEL \
 	      $(BIN_DIST_MAIN_DIR)/RELEASE \
+	      $(BIN_DIST_MAIN_DIR)/LICENSE \
 	      glafp-utils/mkdirhier/mkdirhier \
 	      install-sh \
 	      config.guess \
