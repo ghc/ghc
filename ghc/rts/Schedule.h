@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.43 2003/12/12 16:35:21 simonmar Exp $
+ * $Id: Schedule.h,v 1.44 2004/02/26 16:14:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -151,7 +151,6 @@ extern  StgTSO *all_threads;
 #if defined(RTS_SUPPORTS_THREADS)
 /* Schedule.c has detailed info on what these do */
 extern Mutex       sched_mutex;
-extern Condition   thread_ready_cond;
 extern Condition   returning_worker_cond;
 extern nat         rts_n_waiting_workers;
 extern nat         rts_n_waiting_tasks;
