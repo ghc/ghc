@@ -6,7 +6,7 @@
 module AsmCodeGen ( nativeCodeGen ) where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
+#include "NCG.h"
 
 import List		( intersperse )
 
