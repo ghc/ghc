@@ -385,6 +385,8 @@ impdecl	:  importkey modid impspec
 		{ $$ = lsing(mkimport($3,1,mknothing(),$4,$1,startlineno)); }
 	|  importkey QUALIFIED modid AS modid impspec
 		{ $$ = lsing(mkimport($3,1,mkjust($5),$6,$1,startlineno)); }
+	|  importkey modid AS modid impspec
+		{ $$ = lsing(mkimport($3,1,mkjust($4),$5,$1,startlineno)); }
 	;
 
 impspec	:  /* empty */				  { $$ = mknothing(); }
