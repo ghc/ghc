@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.90 2001/07/17 14:48:04 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.91 2001/07/19 14:23:16 rrt Exp $
 --
 -- GHC Driver
 --
@@ -349,8 +349,8 @@ run_phase Cpp basename suff input_fn output_fn
 
 	    cmdline_include_paths <- readIORef v_Include_paths
 	    pkg_include_dirs <- getPackageIncludePath
-	    let include_paths = map (\p -> "-I"++p) (cmdline_include_paths
-							++ pkg_include_dirs)
+	    let include_paths = foldr (\ x xs -> "-I" : x : xs) []
+				  (cmdline_include_paths ++ pkg_include_dirs)
 
 	    verb <- getVerbFlag
 	    (md_c_flags, _) <- machdepCCOpts
@@ -542,7 +542,7 @@ run_phase Hsc basename suff input_fn output_fn
 run_phase cc_phase basename suff input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
    = do	cc_opts		     <- getOpts opt_c
-       	cmdline_include_dirs <- readIORef v_Include_paths
+       	cmdline_include_paths <- readIORef v_Include_paths
 
         let hcc = cc_phase == HCc
 
@@ -550,8 +550,8 @@ run_phase cc_phase basename suff input_fn output_fn
 		-- .c files; this is the Value Add(TM) that using
 		-- ghc instead of gcc gives you :)
         pkg_include_dirs <- getPackageIncludePath
-	let include_paths = map (\p -> "-I"++p) (cmdline_include_dirs 
-							++ pkg_include_dirs)
+        let include_paths = foldr (\ x xs -> "-I" : x : xs) []
+			      (cmdline_include_paths ++ pkg_include_dirs)
 
 	mangle <- readIORef v_Do_asm_mangling
 	(md_c_flags, md_regd_c_flags) <- machdepCCOpts

@@ -244,12 +244,13 @@ initSysTools minusB_args
 	--	pick up whatever happens to be lying around in the path,
 	--	possibly including those from a cygwin install on the target,
 	--	which is exactly what we're trying to avoid.
-	; let gcc_path 	| am_installed = installed_bin ("gcc -B\"" ++ installed "gcc-lib\\\"")
+	; let gcc_path 	| am_installed = installed_bin ("gcc -B\"" ++ installed "gcc-lib/\"")
 		       	| otherwise    = cGCC
-		-- The trailing "\\" is absolutely essential; gcc seems
+		-- The trailing "/" is absolutely essential; gcc seems
 		-- to construct file names simply by concatenating to this
-		-- -B path with no extra slash.
-		-- We use "\\" rather than "/" because gcc_path is in NATIVE format
+		-- -B path with no extra slash
+		-- We use "/" rather than "\\" because otherwise "\\\" is mangled
+		-- later on; although gcc_path is in NATIVE format, gcc can cope
 		--	(see comments with declarations of global variables)
 		--
 		-- The quotes round the -B argument are in case TopDir has spaces in it
@@ -263,8 +264,8 @@ initSysTools minusB_args
 
 	-- On Win32 we don't want to rely on #!/bin/perl, so we prepend 
 	-- a call to Perl to get the invocation of split and mangle
-	; let split_path  = perl_path ++ " " ++ split_script
-	      mangle_path = perl_path ++ " " ++ mangle_script
+	; let split_path  = perl_path ++ " \"" ++ split_script ++ "\""
+	      mangle_path = perl_path ++ " \"" ++ mangle_script ++ "\""
 
 	; let mkdll_path = cMKDLL
 #else
