@@ -158,14 +158,14 @@ testBits zero do_bitsize = do
   table2 ".|.  "            (.|.)         xs ys
   table2 "`xor`"            xor           xs ys
   table1 "complement"       complement    xs
-  table2 "`shiftL`"         shiftL        xs ([0..3] ++ [32])
-  table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32]) 
+  table2 "`shiftL`"         shiftL        xs ([0..3] ++ [32,64])
+  table2 "`shiftR`"         shiftR        xs ([0..3] ++ [32,64]) 
   table2 "`rotate`"         rotate        xs ([-3..3])
   table1 "bit"              (\ x -> (bit x) `asTypeOf` zero)   [(0::Int)..3]
-  table2 "`setBit`"         setBit        xs ([0..3] ++ [32])
-  table2 "`clearBit`"       clearBit      xs ([0..3] ++ [32])
-  table2 "`complementBit`"  complementBit xs ([0..3] ++ [32])
-  table2 "`testBit`"        testBit       xs ([0..3] ++ [32])
+  table2 "`setBit`"         setBit        xs ([0..3] ++ [32,64])
+  table2 "`clearBit`"       clearBit      xs ([0..3] ++ [32,64])
+  table2 "`complementBit`"  complementBit xs ([0..3] ++ [32,64])
+  table2 "`testBit`"        testBit       xs ([0..3] ++ [32,64])
   if do_bitsize then table1 "bitSize" bitSize xs else return ()
   table1 "isSigned"         isSigned      xs
  where
