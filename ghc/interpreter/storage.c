@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.41 $
- * $Date: 2000/02/08 15:32:30 $
+ * $Revision: 1.42 $
+ * $Date: 2000/02/08 17:50:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2942,6 +2942,11 @@ static String maybeTyconStr ( Tycon t )
    if (isTycon(t)) return textToStr(tycon(t).text); else return "??";
 }
 
+static String maybeClassStr ( Class c )
+{
+   if (isClass(c)) return textToStr(cclass(c).text); else return "??";
+}
+
 static String maybeText ( Text t )
 {
    if (isNull(t)) return "(nil)";
@@ -2963,8 +2968,7 @@ void dumpTycon ( Int t )
    printf ( "{\n" );
    printf ( "    text: %s\n",     textToStr(tycon(t).text) );
    printf ( "    line: %d\n",     tycon(t).line );
-   printf ( "     mod: %d %s\n",  tycon(t).mod, 
-                                  maybeModuleStr(tycon(t).mod));
+   printf ( "     mod: %s\n",     maybeModuleStr(tycon(t).mod));
    printf ( "   tuple: %d\n",     tycon(t).tuple);
    printf ( "   arity: %d\n",     tycon(t).arity);
    printf ( "    kind: ");        print100(tycon(t).kind);
@@ -2990,8 +2994,7 @@ void dumpName ( Int n )
    printf ( "{\n" );
    printf ( "    text: %s\n",     textToStr(name(n).text) );
    printf ( "    line: %d\n",     name(n).line );
-   printf ( "     mod: %d %s\n",  name(n).mod, 
-                                  maybeModuleStr(name(n).mod));
+   printf ( "     mod: %s\n",     maybeModuleStr(name(n).mod));
    printf ( "  syntax: %d\n",     name(n).syntax );
    printf ( "  parent: %d\n",     name(n).parent );
    printf ( "   arity: %d\n",     name(n).arity );
@@ -3017,8 +3020,7 @@ void dumpClass ( Int c )
    printf ( "{\n" );
    printf ( "    text: %s\n",     textToStr(cclass(c).text) );
    printf ( "    line: %d\n",     cclass(c).line );
-   printf ( "     mod: %d %s\n",  cclass(c).mod, 
-                                  maybeModuleStr(cclass(c).mod));
+   printf ( "     mod: %s\n",     maybeModuleStr(cclass(c).mod));
    printf ( "   arity: %d\n",     cclass(c).arity );
    printf ( "   level: %d\n",     cclass(c).level );
    printf ( "   kinds: ");        print100( cclass(c).kinds );
@@ -3045,7 +3047,15 @@ void dumpInst ( Int i )
       return;
    }
    printf ( "{\n" );
-//   printf ( "    text: %s\n",     textToStr(cclass(c)).text) );
+   printf ( "   class: %s\n",     maybeClassStr(inst(i).c) );
+   printf ( "    line: %d\n",     inst(i).line );
+   printf ( "     mod: %s\n",     maybeModuleStr(inst(i).mod));
+   printf ( "   kinds: ");        print100( inst(i).kinds );
+   printf ( "    head: ");        print100( inst(i).head );
+   printf ( "   specs: ");        print100( inst(i).specifics );
+   printf ( "  #specs: %d\n",     inst(i).numSpecifics );
+   printf ( "   impls: ");        print100( inst(i).implements );
+   printf ( " builder: %s\n",     maybeNameStr( inst(i).builder ) );
    printf ( "}\n" );
 }
 

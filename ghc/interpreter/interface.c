@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.28 $
- * $Date: 2000/02/08 15:32:30 $
+ * $Revision: 1.29 $
+ * $Date: 2000/02/08 17:50:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -566,7 +566,6 @@ static void* ifFindItblFor ( Name n )
    t = enZcodeThenFindText(buf);
    p = lookupOTabName ( name(n).mod, textToStr(t) );
 
-if (p) fprintf(stderr, "FOUND `%s'\n",textToStr(t));
    if (p) return p;
 
    if (name(n).arity == 0) {
@@ -575,7 +574,6 @@ if (p) fprintf(stderr, "FOUND `%s'\n",textToStr(t));
                      textToStr( name(n).text ) );
       t = enZcodeThenFindText(buf);
       p = lookupOTabName ( name(n).mod, textToStr(t) );
-if (p) fprintf(stderr, "FOUND `%s'\n",textToStr(t));
       if (p) return p;
    }
 
@@ -587,11 +585,14 @@ if (p) fprintf(stderr, "FOUND `%s'\n",textToStr(t));
 void ifLinkConstrItbl ( Name n )
 {
    /* name(n) is either a constructor or a field name.  
-      If the latter, ignore it.  Otherwise, find its info table
-      in the object code.
+      If the latter, ignore it.  If it is a non-nullary constructor,
+      find its info table in the object code.  If it's nullary,
+      we can skip the info table, since all accesses will go via
+      the _closure label.
    */
-   if (!islower(textToStr(name(n).text)[0]))
-      name(n).itbl = ifFindItblFor(n);
+   if (islower(textToStr(name(n).text)[0])) return;
+   if (name(n).arity == 0) return;
+   name(n).itbl = ifFindItblFor(n);
 }
 
 
@@ -1971,7 +1972,7 @@ static Class finishGHCClass ( Tycon cls_tyc )
     if (isNull(nw)) internal("finishGHCClass");
 
     line = cclass(nw).line;
-    ctr  = - length(cclass(nw).members);
+    ctr = -2;
     assert (currentModule == cclass(nw).mod);
 
     cclass(nw).level   = 0;
@@ -1986,10 +1987,9 @@ static Class finishGHCClass ( Tycon cls_tyc )
        Name n   = findName(txt);
        assert(nonNull(n));
        name(n).text   = txt;
-fprintf(stderr, "TEXT IS `%s'\n", textToStr(name(n).text));
        name(n).line   = cclass(nw).line;
        name(n).type   = ty;
-       name(n).number = ctr++;
+       name(n).number = ctr--;
        name(n).arity  = arityInclDictParams(name(n).type);
        name(n).parent = nw;
        hd(mems) = n;
@@ -2063,7 +2063,6 @@ VarId var; {   /* VarId */
 
     {
         Name b         = newName( /*inventText()*/ textOf(var),NIL);
-fprintf(stderr, "DICTIONARY NAME `%s'\n", textToStr(textOf(var)) );
         name(b).line   = line;
         name(b).arity  = length(spec); /* unused? */ /* and surely wrong */
         name(b).number = DFUNNAME;

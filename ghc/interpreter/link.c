@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.40 $
- * $Date: 2000/02/08 15:32:30 $
+ * $Revision: 1.41 $
+ * $Date: 2000/02/08 17:50:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -530,7 +530,7 @@ assert(nonNull(namePMFail));
 
 
                /* pmc                                   */
-               xyzzy(nameSel,            "_SEL");
+               pFun(nameSel,            "_SEL");
 
                /* strict constructors                   */
                xyzzy(nameFlip,           "flip"     );
