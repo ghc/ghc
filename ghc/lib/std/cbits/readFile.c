@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.4 1999/05/05 10:33:16 sof Exp $
+ * $Id: readFile.c,v 1.5 1999/07/01 13:12:09 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -278,7 +278,7 @@ StgForeignPtr ptr;
 {
     IOFileObject* fo= (IOFileObject*)ptr;
     int count,rc=0;
-    char c;
+    unsigned char c;
 
     /* Check if someone hasn't zapped us */
     if ( fo == NULL || fo->fd == -1)
