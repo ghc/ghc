@@ -33,7 +33,7 @@ import DsBinds		( dsMonoBinds, AutoScc(..) )
 import DsGRHSs		( dsGuarded )
 import DsCCall		( dsCCall, resultWrapper )
 import DsListComp	( dsListComp )
-import DsUtils		( mkErrorAppDs, mkDsLets, mkStringLit, mkStringLitFS, 
+import DsUtils		( mkErrorAppDs, mkStringLit, mkStringLitFS, 
 			  mkConsExpr, mkNilExpr, mkIntegerLit
 			)
 import Match		( matchWrapper, matchSimply )
@@ -106,9 +106,14 @@ dsLet (MonoBind (AbsBinds [] [] binder_triples inlines
 -- Ordinary case for bindings
 dsLet (MonoBind binds sigs is_rec) body
   = dsMonoBinds NoSccs binds []  `thenDs` \ prs ->
-    case is_rec of
-      Recursive    -> returnDs (Let (Rec prs) body)
-      NonRecursive -> returnDs (mkDsLets [NonRec b r | (b,r) <- prs] body)
+    returnDs (Let (Rec prs) body)
+	-- Use a Rec regardless of is_rec. 
+	-- Why? Because it allows the MonoBinds to be all
+	-- mixed up, which is what happens in one rare case
+	-- Namely, for an AbsBind with no tyvars and no dicts,
+	-- 	   but which does have dictionary bindings.
+	-- See notes with TcSimplify.inferLoop [NO TYVARS]
+	-- It turned out that wrapping a Rec here was the easiest solution
 \end{code}
 
 %************************************************************************

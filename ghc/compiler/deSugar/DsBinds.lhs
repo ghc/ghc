@@ -90,12 +90,16 @@ dsMonoBinds auto_scc (PatMonoBind pat grhss locn) rest
     returnDs (sel_binds ++ rest)
 
 	-- Common special case: no type or dictionary abstraction
+	-- For the (rare) case when there are some mixed-up
+	-- dictionary bindings (for which a Rec is convenient)
+	-- we reply on the enclosing dsBind to wrap a Rec around.
 dsMonoBinds auto_scc (AbsBinds [] [] exports inlines binds) rest
   = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
     let 
-	exports' = [(global, Var local) | (_, global, local) <- exports]
+	core_prs' = addLocalInlines exports inlines core_prs
+	exports'  = [(global, Var local) | (_, global, local) <- exports]
     in
-    returnDs (addLocalInlines exports inlines core_prs ++ exports' ++ rest)
+    returnDs (core_prs' ++ exports' ++ rest)
 
 	-- Another common case: one exported variable
 	-- Non-recursive bindings come through this way
@@ -106,22 +110,26 @@ dsMonoBinds auto_scc
     let 
 	-- Always treat the binds as recursive, because the typechecker
 	-- makes rather mixed-up dictionary bindings
-	core_binds = [Rec core_prs]
-	global'    = (global, mkInline (idName global `elemNameSet` inlines) $
+	core_bind = Rec core_prs
+
+	-- The mkInline does directly what the 
+	-- addLocalInlines do in the other cases
+	export'    = (global, mkInline (idName global `elemNameSet` inlines) $
 			      mkLams tyvars $ mkLams dicts $ 
-	                      mkDsLets core_binds (Var local))
+	                      Let core_bind (Var local))
     in
-    returnDs (global' : rest)
+    returnDs (export' : rest)
 
 dsMonoBinds auto_scc (AbsBinds all_tyvars dicts exports inlines binds) rest
   = dsMonoBinds (addSccs auto_scc exports) binds []`thenDs` \ core_prs ->
     let 
-	core_binds = [Rec (addLocalInlines exports inlines core_prs)]
+	-- Rec because of mixed-up dictionary bindings
+	core_bind = Rec (addLocalInlines exports inlines core_prs)
 
 	tup_expr      = mkTupleExpr locals
 	tup_ty	      = exprType tup_expr
 	poly_tup_expr = mkLams all_tyvars $ mkLams dicts $
-		        mkDsLets core_binds tup_expr
+		        Let core_bind tup_expr
 	locals        = [local | (_, _, local) <- exports]
 	local_tys     = map idType locals
     in
