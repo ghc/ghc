@@ -1371,8 +1371,10 @@ static int ocResolve_ELF ( ObjectCode* oc, int verb )
                          (void*)P, (void*)S, (void*)A ); 
             */
             switch (ELF32_R_TYPE(info)) {
+#              if defined(linux_TARGET_OS)
                case R_386_32:   *pP = S + A;     break;
                case R_386_PC32: *pP = S + A - P; break;
+#              endif
                default: fprintf(stderr, 
                                 "unhandled ELF relocation type %d\n",
                                 ELF32_R_TYPE(info));

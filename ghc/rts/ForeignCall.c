@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.13 2000/03/02 10:32:17 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.14 2000/04/11 16:49:20 sewardj Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -178,7 +178,7 @@ static void universal_call_c_generic
   unsigned int *p = (unsigned int*) args;
 
 #define ARG(n)  (p[n*2])
-#define CMP(str) ((n_args + 1 == strlen(str)) && \
+#define CMP(str) ((n_args + 1 == (int)strlen(str)) && \
 		  (!strncmp(str,argstr,n_args + 1)))
 
 #define CALL(retType,callTypes,callVals) \
@@ -248,7 +248,7 @@ int ccall ( CFunDescriptor*  d,
       return 1; /* unlikely, but ... */
 
    p = (unsigned int*) &arg_vec[1];
-   for (i = 0; i < d->num_args; i++) {
+   for (i = 0; i < (int)(d->num_args); i++) {
       switch (d->arg_tys[i]) {
 
          case INT_REP:
@@ -686,7 +686,7 @@ StgAddr createAdjThunk ( StgStablePtr stableptr,
       createAdjThunk_x86 ( stableptr, typestr, callconv );
 #else
       0;
-      #warn foreign export not implemented on this architecture
+#warning foreign export not implemented on this architecture
 #endif
 }
 

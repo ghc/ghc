@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.22 2000/04/03 16:26:01 simonmar Exp $
+ * $Id: Main.c,v 1.23 2000/04/11 16:49:20 sewardj Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -43,7 +43,7 @@ EXTFUN(__init_PrelMain);
 /* Hack: we assume that we're building a batch-mode system unless 
  * INTERPRETER is set
  */
-# ifndef INTERPRETER /* Hack */
+#ifndef INTERPRETER /* Hack */
 int main(int argc, char *argv[])
 {
     int exit_status;

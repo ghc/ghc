@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.50 $
- * $Date: 2000/04/10 15:24:26 $
+ * $Revision: 1.51 $
+ * $Date: 2000/04/11 16:49:20 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2609,7 +2609,6 @@ Type type; {
       SymX(lseek)                    \
       SymX(write)                    \
       Sym(getrusage)                 \
-      Sym(gettimeofday)              \
       SymX(realloc)                  \
       SymX(getcwd)                   \
       SymX(free)                     \
@@ -2676,7 +2675,10 @@ Type type; {
       SymX(gmtime)                   \
       Sym(setitimer)                 \
       Sym(chmod)                     \
+      Sym(gettimeofday)              \
 
+#define EXTERN_SYMS_solaris2         \
+      SymX(gettimeofday)             \
 
 
 #if defined(linux_TARGET_OS)
@@ -2717,7 +2719,6 @@ OSym rtsTab[]
 #undef SymX
 
 
-void init_stack;
 
 
 /* A kludge to assist Win32 debugging. */
