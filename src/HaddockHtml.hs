@@ -476,12 +476,6 @@ ppShortDataDecl summary is_newty
    )
   where do_constr c con = declBox (toHtml [c] <+> ppShortConstr summary con)
 
--- First, the abstract case:
-
-ppHsDataDecl summary inst_maps is_newty x 
-	(HsDataDecl loc ctx nm args [] drv doc) = 
-   declWithDoc summary doc (ppHsDataHeader summary is_newty nm args)
-
 -- The rest of the cases:
 
 ppHsDataDecl summary (_, ty_inst_map) is_newty 
@@ -492,8 +486,7 @@ ppHsDataDecl summary (_, ty_inst_map) is_newty
         = header </> 
 	    tda [theclass "body"] << vanillaTable << (
 		datadoc </> 
-		constr_hdr </>
-		(tda [theclass "body"] << constr_table << constrs) </>
+		constr_bit </>
 		instances_bit
             )
   where
@@ -506,8 +499,13 @@ ppHsDataDecl summary (_, ty_inst_map) is_newty
 	datadoc | isJust doc = ndocBox (docToHtml (fromJust doc))
 	  	| otherwise  = Html.emptyTable
 
-	constrs	| null cons = Html.emptyTable
-	  	| otherwise = aboves (map ppSideBySideConstr cons)
+	constr_bit 
+		| null cons = Html.emptyTable
+		| otherwise = 
+			constr_hdr </>
+			(tda [theclass "body"] << constr_table << 
+			 aboves (map ppSideBySideConstr cons)
+			)
 
 	no_constr_docs = all constr_has_no_doc cons
 
