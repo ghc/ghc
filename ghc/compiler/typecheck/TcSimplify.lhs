@@ -2394,7 +2394,8 @@ addNoInstanceErrs mb_what givens dicts
 		-- Insts for which it is worth suggesting an adding an instance declaration
 		-- Exclude implicit parameters, and tyvar dicts
 
-	add_ors :: [SDoc] -> [SDoc]
+	add_ors :: [SDoc] -> [SDoc]	-- The empty case should not happen
+	add_ors []      = ptext SLIT("[No suggested fixes]")	-- Strange
 	add_ors (f1:fs) = f1 : map (ptext SLIT("or") <+>) fs
 
 addTopAmbigErrs dicts
