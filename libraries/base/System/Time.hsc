@@ -316,7 +316,6 @@ gmtoff x    = (#peek struct tm,tm_gmtoff) x
 #  endif
 #  ifndef mingw32_TARGET_OS
 foreign import ccall unsafe "&tzname" tzname :: Ptr (Ptr CChar)
-foreign import ccall unsafe "timezone" timezone :: Ptr CLong
 #  else
 foreign import ccall unsafe "__hscore_timezone" timezone :: Ptr CLong
 foreign import ccall unsafe "__hscore_tzname"   tzname :: Ptr (Ptr CChar)
@@ -335,14 +334,15 @@ zone x = do
 #endif
 
 # if HAVE_ALTZONE
-foreign import ccall "&altzone"  :: Ptr CTime
-foreign import ccall "&timezone" :: Ptr CTime
+foreign import ccall "&altzone"  altzone  :: Ptr CTime
+foreign import ccall "&timezone" timezone :: Ptr CTime
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
   tz <- if dst then peek altzone else peek timezone
   return (fromIntegral tz)
 #  define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone )
 # else /* ! HAVE_ALTZONE */
+foreign import ccall unsafe "timezone" timezone :: Ptr CLong
 -- Assume that DST offset is 1 hour ...
 gmtoff x = do 
   dst <- (#peek struct tm,tm_isdst) x
