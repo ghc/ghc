@@ -14,7 +14,9 @@ module MagicUFs (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)		-- paranoia checking
+#endif
 
 import Id		( addInlinePragma )
 import CoreSyn
