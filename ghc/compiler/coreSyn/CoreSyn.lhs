@@ -478,7 +478,11 @@ collectArgs expr
 	(expr, tacc, vacc) }
 
     tyvars (App fun (TyArg t)) tacc = tyvars fun (t:tacc)
-    tyvars fun tacc		    = (expr, tacc)
+    tyvars fun tacc		    = (fun, tacc)
+     -- WAS: tyvars fun tacc	    = (expr, tacc)
+     --   This doesn't look right (i.e., Plain Wrong),
+     --   collectArgs should return the the function and
+     --   not the whole expr.      -- Laszlo 8/98
 \end{code}
 
 
