@@ -6,7 +6,7 @@
 \begin{code}
 module CmLink ( Linkable(..),  Unlinked(..),
 		filterModuleLinkables, 
-		findModuleLinkable,
+		findModuleLinkable_maybe,
 		modname_of_linkable, is_package_linkable,
 		LinkResult(..),
                 link, 
@@ -62,11 +62,12 @@ data LinkResult
    = LinkOK   PersistentLinkerState
    | LinkErrs PersistentLinkerState [SDoc]
 
-findModuleLinkable :: [Linkable] -> ModuleName -> Linkable
-findModuleLinkable lis mod 
+findModuleLinkable_maybe :: [Linkable] -> ModuleName -> Maybe Linkable
+findModuleLinkable_maybe lis mod 
    = case [LM nm us | LM nm us <- lis, nm == mod] of
-        [li] -> li
-        other -> pprPanic "findModuleLinkable" (ppr mod)
+        []   -> Nothing
+        [li] -> Just li
+        many -> pprPanic "findModuleLinkable" (ppr mod)
 
 
 emptyPLS :: IO PersistentLinkerState

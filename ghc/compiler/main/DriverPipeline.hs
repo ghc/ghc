@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.30 2000/11/19 19:40:08 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.31 2000/11/20 11:39:57 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -778,8 +778,8 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
    writeIORef v_Driver_state init_driver_state
 
    let location   = ms_location summary   
-   let input_fn   = unJust (ml_hs_file location) "compile:hs"
-   let input_fnpp = unJust (ml_hspp_file location) "compile:hspp"
+   let input_fn   = unJust "compile:hs" (ml_hs_file location) 
+   let input_fnpp = unJust "compile:hspp" (ml_hspp_file location)
 
    when verb (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
 

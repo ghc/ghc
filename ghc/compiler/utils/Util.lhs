@@ -138,9 +138,9 @@ nTimes n f = f . nTimes (n-1) f
 %************************************************************************
 
 \begin{code}
-unJust :: Maybe a -> String -> a
-unJust (Just x) who = x
-unJust Nothing  who = panic ("unJust of Nothing, called by " ++ who)
+unJust :: String -> Maybe a -> a
+unJust who (Just x) = x
+unJust who Nothing  = panic ("unJust of Nothing, called by " ++ who)
 \end{code}
 
 %************************************************************************

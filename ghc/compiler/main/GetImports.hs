@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: GetImports.hs,v 1.2 2000/11/17 13:33:17 sewardj Exp $
+-- $Id: GetImports.hs,v 1.3 2000/11/20 11:39:57 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -18,7 +18,7 @@ getImports s
    = f [{-accum source imports-}] [{-accum normal imports-}] 
        (mkModuleName "Main") (words (clean s))
      where
-        f si ni _  ("module" : me : ws) = f si ni (mkModuleName me) ws
+        f si ni _  ("module" : me : ws) = f si ni (mkMN me) ws
 
 	f si ni me ("foreign" : "import" : ws) = f si ni me ws
         f si ni me ("import" : "{-#" : "SOURCE" : "#-}" : "qualified" : m : ws) 

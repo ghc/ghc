@@ -103,7 +103,7 @@ hscMain ghci_mode dflags source_unchanged location maybe_old_iface hst hit pcs
 
       (pcs_ch, errs_found, (recomp_reqd, maybe_checked_iface))
          <- checkOldIface dflags hit hst pcs 
-		(unJust (ml_hi_file location) "hscMain")
+		(unJust "hscMain" (ml_hi_file location))
 		source_unchanged maybe_old_iface;
 
       if errs_found then
@@ -172,8 +172,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- PARSE
  	    -------------------
-	; maybe_parsed <- myParseModule dflags (unJust (ml_hspp_file location) 
-                                                       "hscRecomp:hspp")
+	; maybe_parsed <- myParseModule dflags 
+                             (unJust "hscRecomp:hspp" (ml_hspp_file location))
 	; case maybe_parsed of {
       	     Nothing -> return (HscFail pcs_ch);
       	     Just rdr_module -> do {
@@ -223,8 +223,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
 	; let new_details = mkModDetails env_tc local_insts tidy_binds 
  					 top_level_ids orphan_rules
-	; final_iface <- mkFinalIface dflags location maybe_checked_iface 
-				      new_iface new_details
+	; final_iface <- mkFinalIface ghci_mode dflags location 
+                                      maybe_checked_iface new_iface new_details
 
  	    -------------------
  	    -- COMPLETE CODE GENERATION
@@ -243,7 +243,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
 
 
 
-mkFinalIface dflags location maybe_old_iface new_iface new_details
+mkFinalIface ghci_mode dflags location maybe_old_iface new_iface new_details
  = case completeIface maybe_old_iface new_iface new_details of
       (new_iface, Nothing) -- no change in the interfacfe
          -> do when (dopt Opt_D_dump_hi_diffs dflags)
@@ -252,10 +252,14 @@ mkFinalIface dflags location maybe_old_iface new_iface new_details
                              "UNCHANGED FINAL INTERFACE" (pprIface new_iface)
 	       return new_iface
       (new_iface, Just sdoc_diffs)
-         -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "INTERFACE HAS CHANGED" sdoc_diffs
-               dumpIfSet_dyn dflags Opt_D_dump_hi "NEW FINAL INTERFACE" (pprIface new_iface)
+         -> do dumpIfSet_dyn dflags Opt_D_dump_hi_diffs "INTERFACE HAS CHANGED" 
+                                    sdoc_diffs
+               dumpIfSet_dyn dflags Opt_D_dump_hi "NEW FINAL INTERFACE" 
+                                    (pprIface new_iface)
                -- Write the interface file
-               writeIface (unJust (ml_hi_file location) "hscRecomp:hi") new_iface
+               when (ghci_mode /= Interactive) 
+                    (writeIface (unJust "hscRecomp:hi" (ml_hi_file location))
+                                new_iface)
                return new_iface
 
 

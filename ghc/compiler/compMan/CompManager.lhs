@@ -50,7 +50,6 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import List		( nub )
 import Maybe		( catMaybes, fromMaybe, isJust )
-
 import PrelGHC		( unsafeCoerce# )
 \end{code}
 
@@ -256,7 +255,8 @@ cmLoadModule cmstate1 rootname
               -- we could get the relevant linkables by filtering newLis, but
               -- it seems easier to drag them out of the updated, cleaned-up UI
               let linkables_to_link 
-                     = map (findModuleLinkable ui4) mods_to_keep_names
+                     = map (unJust "linkables_to_link" . findModuleLinkable_maybe ui4)
+                           mods_to_keep_names
 
               linkresult <- link ghci_mode False linkables_to_link pls1
               case linkresult of
@@ -365,15 +365,18 @@ upsweep_mods :: GhciMode
                     [ModSummary],     -- mods which succeeded
                     [Linkable])       -- new linkables
 
-upsweep_mods ghci_mode oldUI reachable_from source_changed threaded []
+upsweep_mods ghci_mode oldUI reachable_from source_changed threaded 
+     []
    = return (True, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI reachable_from source_changed threaded ((CyclicSCC ms):_)
+upsweep_mods ghci_mode oldUI reachable_from source_changed threaded 
+     ((CyclicSCC ms):_)
    = do hPutStrLn stderr ("ghc: module imports form a cycle for modules:\n\t" ++
                           unwords (map (moduleNameUserString.name_of_summary) ms))
         return (False, threaded, [], [])
 
-upsweep_mods ghci_mode oldUI reachable_from source_changed threaded ((AcyclicSCC mod):mods)
+upsweep_mods ghci_mode oldUI reachable_from source_changed threaded 
+     ((AcyclicSCC mod):mods)
    = do (threaded1, maybe_linkable) 
            <- upsweep_mod ghci_mode oldUI threaded mod 
                           (reachable_from (name_of_summary mod)) 
@@ -382,7 +385,8 @@ upsweep_mods ghci_mode oldUI reachable_from source_changed threaded ((AcyclicSCC
            Just linkable 
               -> -- No errors; do the rest
                  do (restOK, threaded2, modOKs, linkables) 
-                       <- upsweep_mods ghci_mode oldUI reachable_from source_changed threaded1 mods
+                       <- upsweep_mods ghci_mode oldUI reachable_from 
+                                       source_changed threaded1 mods
                     return (restOK, threaded2, mod:modOKs, linkable:linkables)
            Nothing -- we got a compilation error; give up now
               -> return (False, threaded1, [], [])
@@ -405,15 +409,18 @@ upsweep_mod ghci_mode oldUI threaded1 summary1
         let old_iface = lookupUFM hit1 (name_of_summary summary1)
 
         -- We *have* to compile it if we're in batch mode and we can't see
-        -- a previous linkable for it on disk.
+        -- a previous linkable for it on disk.  Or if we're in interpretive
+        -- and there's no old linkable in oldUI.
         compilation_mandatory 
-           <- if ghci_mode /= Batch then return False 
-              else case ml_obj_file (ms_location summary1) of
-                      Nothing     -> do --putStrLn "cmcm: object?!"
-                                        return True
-                      Just obj_fn -> do --putStrLn ("cmcm: old obj " ++ obj_fn)
-                                        b <- doesFileExist obj_fn
-                                        return (not b)
+           <- case ghci_mode of
+                 Batch -> case ml_obj_file (ms_location summary1) of
+                             Nothing     -> return True
+                             Just obj_fn -> do b <- doesFileExist obj_fn
+                                               return (not b)
+                 Interactive -> case findModuleLinkable_maybe oldUI mod_name of 
+                                   Nothing -> return True
+                                   Just li -> return False
+                 OneShot -> panic "upsweep_mod:compilation_mandatory"
 
         let compilation_might_be_needed 
                = source_might_have_changed || compilation_mandatory
@@ -439,11 +446,13 @@ upsweep_mod ghci_mode oldUI threaded1 summary1
                      threaded2    = CmThreaded pcs2 hst2 hit2
                      old_linkable 
                         | ghci_mode == Interactive 
-                        = findModuleLinkable oldUI mod_name
+                        = unJust "upsweep_mod(2)" 
+                                 (findModuleLinkable_maybe oldUI mod_name)
                         | otherwise
                         = LM mod_name
-                             [DotO (unJust (ml_obj_file (ms_location summary1)) 
-                                    "upsweep_mod")]
+                             [DotO (unJust "upsweep_mod(1)"
+                                           (ml_obj_file (ms_location summary1))
+                                   )]
                  in  return (threaded2, Just old_linkable)
 
            -- Compilation really did happen, and succeeded.  A new
@@ -581,7 +590,7 @@ downsweep rootNm
 summarise :: Module -> ModuleLocation -> IO ModSummary
 summarise mod location
    | isModuleInThisPackage mod
-   = do let hs_fn = unJust (ml_hs_file location) "summarise"
+   = do let hs_fn = unJust "summarise" (ml_hs_file location)
         hspp_fn <- preprocess hs_fn
         modsrc <- readFile hspp_fn
         let (srcimps,imps,mod_name) = getImports modsrc
