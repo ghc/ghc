@@ -8,7 +8,7 @@ dnl
 dnl
 AC_DEFUN(FP_READDIR_EOF_ERRNO,
 [AC_CACHE_CHECK([what readdir sets errno to upon EOF], fptools_cv_readdir_eof_errno,
-[AC_TRY_RUN([#include <dirent.h>
+[AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <dirent.h>
 #include <stdio.h>
 #include <errno.h>
 int
@@ -51,7 +51,7 @@ char **argv;
   closedir(dp);
   rmdir("testdir");
   return 0;
-}],fptools_cv_readdir_eof_errno=`cat conftestval`, fptools_cv_readdir_eof_errno=bogus, fptools_cv_readdir_eof_errno=0)])
+}]])],[fptools_cv_readdir_eof_errno=`cat conftestval`],[fptools_cv_readdir_eof_errno=bogus],[fptools_cv_readdir_eof_errno=0])])
 dnl the cross value is somewhat bogus.
 AC_DEFINE_UNQUOTED([READDIR_ERRNO_EOF], [$fptools_cv_readdir_eof_errno], [readdir() sets errno to this upon EOF])
 ])
@@ -67,7 +67,7 @@ dnl
 dnl
 AC_DEFUN(FP_DIRENT_FLAT_LAYOUT,
 [AC_CACHE_CHECK([if struct dirent layout is flat], fptools_cv_dirent_flat_layout,
-[AC_TRY_RUN([#include <dirent.h>
+[AC_RUN_IFELSE([AC_LANG_SOURCE([[#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 int
@@ -86,7 +86,7 @@ char **argv;
    */
   memset(&de,0,sizeof(struct dirent));
   return ((int)de.d_name == 0);
-}],fptools_cv_dirent_flat_layout=yes, fptools_cv_dirent_flat_layout=no, fptools_cv_dirent_flat_layout=yes)])
+}]])],[fptools_cv_dirent_flat_layout=yes],[fptools_cv_dirent_flat_layout=no],[fptools_cv_dirent_flat_layout=yes])])
 dnl the cross value is somewhat bogus.
 if test "$fptools_cv_dirent_flat_layout" = yes; then
 AC_DEFINE([STRUCT_DIRENT_FLAT_LAYOUT], [1], [Define to 1 if struct dirent is a flat structure])
