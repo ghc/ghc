@@ -26,7 +26,9 @@ import TcEnv		( TcIdOcc(..), GlobalValueEnv, tcAddImportedIdInfo,
 			  tcLookupClass, tcLookupTyVar, 
 			  tcExtendGlobalTyVars, tcExtendLocalValEnv
 			)
-import TcBinds		( tcBindWithSigs, checkSigTyVars, sigCtxt, tcPragmaSigs, TcSigInfo(..) )
+import TcBinds		( tcBindWithSigs, bindInstsOfLocalFuns, 
+			  checkSigTyVars, sigCtxt, tcPragmaSigs, TcSigInfo(..)
+			)
 import TcKind		( unifyKinds, TcKind )
 import TcMonad
 import TcMonoType	( tcHsType, tcContext )
@@ -493,7 +495,7 @@ tcMethodBind clas origin inst_tys inst_tyvars
    in
    tcExtendLocalValEnv [meth_name] [meth_id] (
 	tcPragmaSigs meth_prags
-   )						`thenTc` \ (prag_info_fn, prag_binds, prag_lie) ->
+   )						`thenTc` \ (prag_info_fn, prag_binds1, prag_lie) ->
 
 	-- Check that the signatures match
    tcExtendGlobalTyVars inst_tyvars (
@@ -501,6 +503,11 @@ tcMethodBind clas origin inst_tys inst_tyvars
      tcBindWithSigs NotTopLevel [meth_name] meth_bind [sig_info]
 		    NonRecursive prag_info_fn 	
    )							`thenTc` \ (binds, insts, _) ->
+
+	-- The prag_lie for a SPECIALISE pragma will mention the function
+	-- itself, so we have to simplify them away right now lest they float
+	-- outwards!
+   bindInstsOfLocalFuns prag_lie [meth_id]	`thenTc` \ (prag_lie', prag_binds2) ->
 
 	-- Now check that the instance type variables
 	-- (or, in the case of a class decl, the class tyvars)
@@ -510,8 +517,8 @@ tcMethodBind clas origin inst_tys inst_tyvars
      checkSigTyVars inst_tyvars (idType meth_id)
    )							`thenTc_` 
 
-   returnTc (binds `AndMonoBinds` prag_binds, 
-	     insts `plusLIE` prag_lie, 
+   returnTc (binds `AndMonoBinds` prag_binds1 `AndMonoBinds` prag_binds2, 
+	     insts `plusLIE` prag_lie', 
 	     meth)
  where
    sel_name = idName sel_id

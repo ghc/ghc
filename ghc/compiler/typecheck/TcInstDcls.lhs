@@ -381,10 +381,19 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
         methods_lie = plusLIEs insts_needed_s
     in
 
+	-- Ditto method bindings
+    tcAddErrCtxt methodCtxt (
+      tcSimplifyAndCheck
+		 (ptext SLIT("instance declaration context"))
+		 inst_tyvars_set			-- Local tyvars
+		 avail_insts
+		 methods_lie
+    )						 `thenTc` \ (const_lie1, lie_binds1) ->
+    
 	-- Check that we *could* construct the superclass dictionaries,
 	-- even though we are *actually* going to pass the superclass dicts in;
-	-- the check ensures that the caller will never have a problem building
-	-- them.
+	-- the check ensures that the caller will never have 
+	--a problem building them.
     tcAddErrCtxt superClassCtxt (
       tcSimplifyAndCheck
 		 (ptext SLIT("instance declaration context"))
@@ -395,26 +404,17 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     						-- Ignore the result; we're only doing
 						-- this to make sure it can be done.
 
-	-- Ditto method bindings
-    tcAddErrCtxt methodCtxt (
-      tcSimplifyAndCheck
-		 (ptext SLIT("instance declaration context"))
-		 inst_tyvars_set			-- Local tyvars
-		 avail_insts
-		 methods_lie
-    )						 `thenTc_`
-    
-		-- Now do the simplification again, this time to get the
-		-- bindings; this time we use an enhanced "avails"
-		-- Ignore errors because they come from the *previous* tcSimplifys
+	-- Now do the simplification again, this time to get the
+	-- bindings; this time we use an enhanced "avails"
+	-- Ignore errors because they come from the *previous* tcSimplify
     discardErrsTc (
 	tcSimplifyAndCheck
 		 (ptext SLIT("instance declaration context"))
 		 inst_tyvars_set
 		 dfun_arg_dicts		-- NB! Don't include this_dict here, else the sc_dicts
 					-- get bound by just selecting from this_dict!!
-		 (sc_dicts `plusLIE` methods_lie `plusLIE` prag_lie)
-    )						 `thenTc` \ (const_lie, lie_binds) ->
+		 sc_dicts
+    )						 `thenTc` \ (const_lie2, lie_binds2) ->
 	
 
 	-- Create the result bindings
@@ -451,12 +451,12 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 		 zonked_inst_tyvars
 		 dfun_arg_dicts_ids
 		 [(inst_tyvars', RealId final_dfun_id, this_dict_id)] 
-		 (lie_binds	`AndMonoBinds` 
+		 (lie_binds1	`AndMonoBinds` 
+		  lie_binds2	`AndMonoBinds`
 		  method_binds	`AndMonoBinds`
-		  prag_binds	`AndMonoBinds`
 		  dict_bind)
     in
-    returnTc (const_lie,
+    returnTc (const_lie1 `plusLIE` const_lie2 `plusLIE` prag_lie,
 	      main_bind `AndMonoBinds` prag_binds)
 \end{code}
 

@@ -4,7 +4,7 @@
 \section[TcBinds]{TcBinds}
 
 \begin{code}
-module TcBinds ( tcBindsAndThen, tcTopBindsAndThen,
+module TcBinds ( tcBindsAndThen, tcTopBindsAndThen, bindInstsOfLocalFuns,
 	         tcPragmaSigs, checkSigTyVars, tcBindWithSigs, 
 		 sigCtxt, TcSigInfo(..) ) where
 
