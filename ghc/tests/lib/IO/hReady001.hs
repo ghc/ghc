@@ -7,5 +7,6 @@ import IO
 
 main = do
  h <- openFile "hReady001.hs" ReadMode
+ hSetBinaryMode h True
  hSeek h SeekFromEnd 0
  hReady h >>= print

@@ -4,6 +4,7 @@ import IO
 
 main = do
     h  <- openFile "hSeek001.in" ReadMode
+    hSetBinaryMode h True
     True <- hIsSeekable h
     hSeek h SeekFromEnd (-1)
     z <- hGetChar h

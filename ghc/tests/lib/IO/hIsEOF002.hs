@@ -4,6 +4,7 @@ import IO
 
 main = do
   h <- openFile "hIsEOF002.hs" ReadMode
+  hSetBinaryMode h True
   hSetBuffering h NoBuffering
   hSeek h SeekFromEnd 0
   hIsEOF h >>= print
@@ -38,6 +39,7 @@ main = do
   hClose h
 
   h <- openFile "hIsEOF002.out" ReadWriteMode
+  hSetBinaryMode h True
   hSetBuffering h NoBuffering
   hSeek h SeekFromEnd 0
   hIsEOF h >>= print

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.5 2001/05/31 10:32:28 sewardj Exp $
+# $Id: Makefile,v 1.6 2001/06/01 13:07:36 sewardj Exp $
 
 TOP = ../..
 
@@ -17,7 +17,7 @@ hGetChar001_RUNTEST_OPTS      += -i hGetChar001.stdin
 openFile002_RUNTEST_OPTS      += -x 1
 IOError001_RUNTEST_OPTS       += -i IOError001.hs -o1 IOError001.stdout-mingw
 readwrite002_RUNTEST_OPTS     += -i readwrite002.hs
-hGetLine001_RUNTEST_OPTS      += -i hGetLine001.hs
+hGetLine001_RUNTEST_OPTS      += -i hGetLine001.hs -o1 hGetLine001.stdout-mingw
 hFileSize001_RUNTEST_OPTS     += -o1 hFileSize001.stdout-mingw
 hSeek004_RUNTEST_OPTS         += -o1 hSeek004.stdout-mingw
 

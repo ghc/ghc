@@ -15,6 +15,7 @@ bmo_ls = [NoBuffering, LineBuffering, BlockBuffering Nothing,
 
 main = do
   hdl  <- openFile "hSeek003.hs" ReadMode
+  hSetBinaryMode hdl True
   sequence (zipWith testPosns (repeat hdl) bmo_ls)
   hClose hdl
 

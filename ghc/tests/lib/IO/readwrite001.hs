@@ -9,6 +9,7 @@ main = do
   f <- doesFileExist "readwrite001.inout" 
   when f (removeFile "readwrite001.inout")
   hdl <- openFile "readwrite001.inout" ReadWriteMode
+  hSetBinaryMode hdl True
   hSetBuffering hdl LineBuffering
   hPutStr hdl "as"
   hSeek hdl AbsoluteSeek 0

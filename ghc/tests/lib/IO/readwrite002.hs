@@ -11,7 +11,7 @@ main = do
    f <- doesFileExist username
    when f (removeFile username)
    cd <- openFile username ReadWriteMode
---   hSetBinaryMode cd True
+   hSetBinaryMode cd True
    hSetBuffering stdin NoBuffering
    hSetBuffering stdout NoBuffering
    hSetBuffering cd NoBuffering

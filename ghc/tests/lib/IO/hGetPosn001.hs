@@ -9,9 +9,11 @@ import Directory (removeFile, doesFileExist)
 
 main = do
   hIn <- openFile "hGetPosn001.in" ReadMode
+  hSetBinaryMode hIn True
   f <- doesFileExist "hGetPosn001.out"
   when f (removeFile "hGetPosn001.out")
   hOut <- openFile "hGetPosn001.out" ReadWriteMode
+  hSetBinaryMode hOut True
   bof <- hGetPosn hIn
   copy hIn hOut
   hSetPosn bof

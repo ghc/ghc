@@ -10,6 +10,8 @@ main = do
   loop stdin 
 
   h <- openFile "hGetLine001.hs" ReadMode
+  hSetBinaryMode h True
+
   hSetBuffering h NoBuffering
   loop h
 

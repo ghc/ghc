@@ -7,6 +7,7 @@ import Directory ( removeFile )
 main :: IO ()
 main = do
    hdl <- openFile "hSeek002.hs" ReadMode
+   hSetBinaryMode hdl True
    flg <- hIsEOF hdl
    print flg
    hSeek hdl SeekFromEnd 0
