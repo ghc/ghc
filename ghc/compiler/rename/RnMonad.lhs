@@ -132,8 +132,9 @@ data SDown = SDown {
 			--   we can look up record field names
 
 		  rn_fixenv :: FixityEnv	-- Local fixities
-						-- The global ones are held in the
-						-- rn_ifaces field
+			-- The global fixities are held in the
+			-- rn_ifaces field.  Why?  See the comments
+			-- with RnIfaces.lookupFixity
 		}
 
 data RnMode	= SourceMode			-- Renaming source code
@@ -308,6 +309,7 @@ data Ifaces = Ifaces {
 		iDecls :: DeclsMap,	-- A single, global map of Names to decls
 
 		iFixes :: FixityEnv,	-- A single, global map of Names to fixities
+					-- See comments with RnIfaces.lookupFixity
 
 		iSlurp :: NameSet,
 		-- All the names (whether "big" or "small", whether wired-in or not,
