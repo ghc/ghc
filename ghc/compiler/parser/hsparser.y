@@ -279,7 +279,7 @@ BOOLEAN pat_check=TRUE;
 		gcon gconk gtycon itycon qop1 qvarop1 
 		ename iname
 
-%type <ubinding>  topdecl topdecls letdecls
+%type <ubinding>  topdecl topdecls topdecls1 letdecls
 		  typed datad newtd classd instd defaultd foreignd
 		  decl decls fixdecl fix_op fix_ops valdef
  		  maybe_where with_where where_body type_and_maybe_id
@@ -438,9 +438,13 @@ iname   :  var					{ $$ = mknoqual($1); }
 *                                                                     *
 **********************************************************************/
 
-topdecls :  topdecl
-	 |  topdecls SEMI  		{ $$ = $1; }
-	 |  topdecls SEMI topdecl
+topdecls : /* empty */                  { $$ = mknullbind(); }
+         | topdecls1
+	 ;
+
+topdecls1:  topdecl
+	 |  topdecls1 SEMI  		{ $$ = $1; }
+	 |  topdecls1 SEMI topdecl
 		{
 		  if($1 != NULL)
 		    if($3 != NULL)
@@ -1132,8 +1136,9 @@ list_rest : 	exp				{ $$ = lsing($1); }
 	   at it, it *will* do the wrong thing [WDP 94/06])
 	*/
 
-letdecls:  LET { pat_check = TRUE; }  ocurly decls  ccurly		{ $$ = $4; }
+letdecls:  LET { pat_check = TRUE; }  ocurly decls ccurly		{ $$ = $4; }
 	|  LET { pat_check = TRUE; } vocurly decls vccurly		{ $$ = $4; }
+	|  LET /* empty */						{ $$ = mknullbind(); }
 	;
 
 /*
