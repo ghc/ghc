@@ -36,6 +36,16 @@
 	  single qualified operator rather than the two lexemes
 	  <literal>M</literal> and <literal>.\</literal>.</para>
 	</listitem>
+
+	<listitem>
+	  <para>When <option>-fglasgow-exts</option> is on, GHC
+	  reserves several keywords beginning with two underscores.
+	  This is due to the fact that GHC uses the same lexical
+	  analyser for interface file parsing as it does for source
+	  file parsing, and these keywords are used in interface
+	  files.  Do not use any identifiers beginning with a double
+	  underscore in <option>-fglasgow-exts</option> mode.</para>
+	</listitem>
       </itemizedlist>
     </sect3>
       
