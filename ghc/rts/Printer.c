@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.54 2002/12/11 15:36:45 simonmar Exp $
+ * $Id: Printer.c,v 1.55 2002/12/19 18:00:42 panne Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -884,7 +884,7 @@ static void printZcoded( const char *raw )
  * rubbish like the obj-splitting symbols
  */
 
-static rtsBool isReal( flagword flags, const char *name )
+static rtsBool isReal( flagword flags STG_UNUSED, const char *name )
 {
 #if 0
     /* ToDo: make this work on BFD */
@@ -895,7 +895,6 @@ static rtsBool isReal( flagword flags, const char *name )
         return rtsFalse;
     }
 #else
-    (void)flags;   /* keep gcc -Wall happy */
     if (*name == '\0'  || 
 	(name[0] == 'g' && name[1] == 'c' && name[2] == 'c') ||
 	(name[0] == 'c' && name[1] == 'c' && name[2] == '.')) {
