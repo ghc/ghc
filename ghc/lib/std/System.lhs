@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: System.lhs,v 1.32 2001/08/10 13:48:06 simonmar Exp $
+-- $Id: System.lhs,v 1.33 2001/08/14 17:14:22 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -22,6 +22,7 @@ import PrelCError
 import PrelCString
 import PrelCTypes
 import PrelMarshalArray
+import PrelMarshalAlloc
 import PrelPtr
 import PrelStorable
 import PrelIOBase
@@ -34,21 +35,27 @@ import PrelConc
 -- line arguments (not including the program name).
 
 getArgs :: IO [String]
-getArgs = do
-  argv <- peek prog_argv_label
-  argc <- peek prog_argc_label
-  peekArray (fromIntegral argc - 1) (advancePtr argv 1) >>= mapM peekCString
-
-foreign label "prog_argv" prog_argv_label :: Ptr (Ptr (Ptr CChar))
-foreign label "prog_argc" prog_argc_label :: Ptr CInt
+getArgs = 
+  alloca $ \ p_argc ->  
+  alloca $ \ p_argv -> do
+   getProgArgv p_argc p_argv
+   p    <- peek p_argc
+   argv <- peek p_argv
+   peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
+   
+   
+foreign import "getProgArgv" getProgArgv :: Ptr Int -> Ptr (Ptr CString) -> IO ()
 
 -- Computation `getProgName' returns the name of the program
 -- as it was invoked.
 
 getProgName :: IO String
-getProgName = do
-  argv <- peek prog_argv_label
-  unpackProgName argv
+getProgName = 
+  alloca $ \ p_argc ->
+  alloca $ \ p_argv -> do
+     getProgArgv p_argc p_argv
+     argv <- peek p_argv
+     unpackProgName argv
 
 -- Computation `getEnv var' returns the value
 -- of the environment variable {\em var}.  
