@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/01/07 16:56:47 $
+ * $Revision: 1.24 $
+ * $Date: 2000/01/11 14:09:17 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1304,10 +1304,6 @@ void startGHCValue ( Int line, VarId vid, Type ty )
     }
     n = newName(v,NIL);
 
-    /* convert a leading run of DICTAPs into Hugs' internal Qualtype form, viz:
-       { C1 a } -> { C2 b } -> T            into
-       ap(QUALTYPE, ( [(C1,a),(C2,b)], T ))
-    */
     ty = dictapsToQualtype(ty);
 
     tvs = ifTyvarsIn(ty);
@@ -1886,17 +1882,15 @@ VarId var; {   /* VarId */
        inst(in).c = cl;
     }
 
-#if 0
-    Is this still needed?
     {
-        Name b         = newName(inventText(),NIL);
+        Name b         = newName( /*inventText()*/ textOf(var),NIL);
         name(b).line   = line;
-        name(b).arity  = length(ctxt); /* unused? */
+        name(b).arity  = length(spec); /* unused? */ /* and surely wrong */
         name(b).number = DFUNNAME;
         inst(in).builder = b;
-        bindNameToClosure(b, lookupGHCClosure(inst(in).mod,var));
+        /* bindNameToClosure(b, lookupGHCClosure(inst(in).mod,var)); */
     }
-#endif
+
     return in;
 }
 
