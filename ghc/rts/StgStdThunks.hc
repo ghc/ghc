@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.10 1999/11/09 15:46:58 simonmar Exp $
+ * $Id: StgStdThunks.hc,v 1.11 2000/04/19 10:53:11 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Canned "Standard Form" Thunks
  *
@@ -53,7 +53,7 @@
   }									\
 									\
   EF_(__sel_##offset##_upd_entry);					\
-  INFO_TABLE_SELECTOR(__sel_##offset##_upd_info, __sel_##offset##_upd_entry, offset,, EF_, 0,0);\
+  INFO_TABLE_SELECTOR(__sel_##offset##_upd_info, __sel_##offset##_upd_entry, offset,, EF_, "__sel" #offset "_upd_entry", "__sel" #offset "_upd_entry");\
   EF_(__sel_##offset##_upd_entry) {					\
     FB_									\
       STK_CHK_NP(UPD_FRAME_SIZE,1,);					\
@@ -97,7 +97,7 @@ SELECTOR_CODE_UPD(15);
   }									\
 									\
   EF_(__sel_##offset##_noupd_entry);					\
-  INFO_TABLE_SELECTOR(__sel_##offset##_noupd_info, __sel_##offset##_noupd_entry, offset,, EF_, 0,0);\
+  INFO_TABLE_SELECTOR(__sel_##offset##_noupd_info, __sel_##offset##_noupd_entry, offset,, EF_, "__sel" #offset "_noupd_entry", "__sel" #offset "_noupd_entry");\
   EF_(__sel_##offset##_noupd_entry) {					\
     FB_									\
       STK_CHK_NP(NOUPD_FRAME_SIZE,1,)					\
@@ -157,7 +157,7 @@ FN_(__ap_8_upd_entry);
  * in the compiler that means __ap_1 is generated occasionally (ToDo)
  */
 
-INFO_TABLE_SRT(__ap_1_upd_info,__ap_1_upd_entry,1,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_1_upd_info,__ap_1_upd_entry,1,0,0,0,0,THUNK,,EF_,"__ap_1_upd_info","__ap_1_upd_info");
 FN_(__ap_1_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame),1,);
@@ -170,7 +170,7 @@ FN_(__ap_1_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_2_upd_info,__ap_2_upd_entry,2,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_2_upd_info,__ap_2_upd_entry,2,0,0,0,0,THUNK,,EF_,"__ap_2_upd_info","__ap_2_upd_info");
 FN_(__ap_2_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+1,1,);
@@ -184,7 +184,7 @@ FN_(__ap_2_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_3_upd_info,__ap_3_upd_entry,3,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_3_upd_info,__ap_3_upd_entry,3,0,0,0,0,THUNK,,EF_,"__ap_3_upd_info","__ap_3_upd_info");
 FN_(__ap_3_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+2,1,);
@@ -199,7 +199,7 @@ FN_(__ap_3_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_4_upd_info,__ap_4_upd_entry,4,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_4_upd_info,__ap_4_upd_entry,4,0,0,0,0,THUNK,,EF_,"__ap_4_upd_info","__ap_4_upd_info");
 FN_(__ap_4_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+3,1,);
@@ -215,7 +215,7 @@ FN_(__ap_4_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_5_upd_info,__ap_5_upd_entry,5,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_5_upd_info,__ap_5_upd_entry,5,0,0,0,0,THUNK,,EF_,"__ap_5_upd_info","__ap_5_upd_info");
 FN_(__ap_5_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+4,1,);
@@ -232,7 +232,7 @@ FN_(__ap_5_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_6_upd_info,__ap_6_upd_entry,6,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_6_upd_info,__ap_6_upd_entry,6,0,0,0,0,THUNK,,EF_,"__ap_6_upd_info","__ap_6_upd_info");
 FN_(__ap_6_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+5,1,);
@@ -250,7 +250,7 @@ FN_(__ap_6_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_7_upd_info,__ap_7_upd_entry,7,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_7_upd_info,__ap_7_upd_entry,7,0,0,0,0,THUNK,,EF_,"__ap_7_upd_info","__ap_7_upd_info");
 FN_(__ap_7_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+6,1,);
@@ -269,7 +269,7 @@ FN_(__ap_7_upd_entry) {
   FE_
 }
 
-INFO_TABLE_SRT(__ap_8_upd_info,__ap_8_upd_entry,8,0,0,0,0,THUNK,,EF_,0,0);
+INFO_TABLE_SRT(__ap_8_upd_info,__ap_8_upd_entry,8,0,0,0,0,THUNK,,EF_,"__ap_8_upd_info","__ap_8_upd_info");
 FN_(__ap_8_upd_entry) {
   FB_
   STK_CHK_NP(sizeofW(StgUpdateFrame)+7,1,);
