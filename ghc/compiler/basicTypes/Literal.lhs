@@ -7,14 +7,14 @@
 module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
-	, mkMachInt64, mkMachWord64, mkStringLit,
+	, mkMachInt64, mkMachWord64, mkStringLit
 	, litSize
 	, litIsDupable, litIsTrivial
-	, literalType, 
+	, literalType
 	, hashLiteral
 
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
-	, isZeroLit,
+	, isZeroLit
 
 	, word2IntLit, int2WordLit
 	, narrow8IntLit, narrow16IntLit, narrow32IntLit
