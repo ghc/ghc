@@ -1820,23 +1820,36 @@ up a build tree. When you invoke the configure script, you'll have
 to tell the script about your intentions:
 
 <tscreen><verb>
-foo% ./configure --enable-hc-booting
+foo% ./configure --enable-hc-boot
 </verb></tscreen>
-<ncdx/--enable-hc-booting/
-<ncdx/--disable-hc-booting/
+<ncdx/--enable-hc-boot/
+<ncdx/--disable-hc-boot/
 
 Assuming it configures OK and you don't need to create @mk/build.mk@
 for any other purposes, the next step is to proceed with a @make boot@
-followed by @make all@.
+followed by @make all@. At the successful completion of @make all@,
+you should end up with a binary of the compiler proper,
+@ghc/compiler/hsc@, plus archives (but no @.hi@ files!) of the prelude
+libraries. To generate the Prelude interface files (and test drive the
+bootstrapped compiler), re-run the @configure@ script, but this time
+witout the @--enable-hc-boot@ option. After that re-create the
+contents of @ghc/lib@:
+
+<tscreen><verb>
+foo% ./configure
+ ....
+foo% cd ghc/lib
+foo% make clean
+foo% make boot
+foo% make all
+</verb></tscreen>
+
 
 That's the mechanics of the boot process, but, of course, if you're
 trying to boot on a platform that is not supported and significantly
 `different' from any of the supported ones, this is only the start of
 the adventure...(ToDo: porting tips - stuff to look out for, etc.)
 
-The end product of this will (hopefully) be a binary of the
-compiler proper, @ghc/compiler/hsc@ plus an archive of the Haskell
-Prelude libraries.
 
 <sect>Known pitfalls in building Glasgow Haskell
 <label id="sec:build-pitfalls">
