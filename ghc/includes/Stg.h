@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.53 2003/07/21 15:05:54 simonmar Exp $
+ * $Id: Stg.h,v 1.54 2003/07/22 13:23:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -118,13 +118,6 @@ void _stgAssert (char *, unsigned int);
 #define doNothing() do { } while (0)
 
 /* -----------------------------------------------------------------------------
-   System headers
-   -------------------------------------------------------------------------- */
-
-// Needed so that we can use NULL
-#include <stdlib.h>
-
-/* -----------------------------------------------------------------------------
    Global type definitions
    -------------------------------------------------------------------------- */
 
@@ -195,6 +188,13 @@ typedef StgWord64       LW_;
 
 /* RTS public interface */
 #include "RtsAPI.h"
+
+/* System headers: stdlib.h is eeded so that we can use NULL.  It must
+ * come after MachRegs.h, because stdlib.h might define some inline
+ * functions which may only be defined after register variables have
+ * been declared.
+ */
+#include <stdlib.h>
 
 #ifdef SMP
 #include <pthread.h>
