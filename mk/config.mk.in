@@ -137,8 +137,6 @@ GhcProjectName       =The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort  =ghc
 GhcProjectVersion    =2.07
 GhcProjectPatchLevel =0
-GhcBuildeeVersion    =207
-GhcBuilderVersion    =29
 
 #
 # Name variables for the fptools, for now equal to the above
