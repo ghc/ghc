@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.14 2003/09/23 15:38:35 simonmar Exp $
+ * $Id: Block.h,v 1.15 2003/11/12 17:27:00 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -82,7 +82,7 @@ typedef struct _bdescr {
 
 /* Finding the block descriptor for a given block -------------------------- */
 
-static inline bdescr *Bdescr(StgPtr p)
+INLINE_HEADER bdescr *Bdescr(StgPtr p)
 {
   return (bdescr *)
     ((((W_)p &  MBLOCK_MASK & ~BLOCK_MASK) >> (BLOCK_SHIFT-BDESCR_SHIFT)) 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.14 2002/12/19 14:25:04 simonmar Exp $
+ * $Id: Stable.h,v 1.15 2003/11/12 17:27:03 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -41,17 +41,18 @@ extern DLL_IMPORT_RTS snEntry *stable_ptr_table;
 
 extern void freeStablePtr(StgStablePtr sp);
 
-#ifndef RTS_STABLE_C
+#if defined(__GNUC__)
+# ifndef RTS_STABLE_C
 extern inline
-#endif
+# endif
 StgPtr deRefStablePtr(StgStablePtr sp)
 {
     ASSERT(stable_ptr_table[(StgWord)sp].ref > 0);
     return stable_ptr_table[(StgWord)sp].addr;
 }
-
-/* No deRefStableName, because the existence of a stable name doesn't
- * guarantee the existence of the object itself.
- */
+#else
+/* No support for 'extern inline' */
+extern StgPtr deRefStablePtr(StgStablePtr sp);
+#endif
 
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.33 2003/07/28 16:05:38 simonmar Exp $
+ * $Id: Updates.h,v 1.34 2003/11/12 17:27:06 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -32,8 +32,9 @@
 # define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
    UPD_PERM_IND(updclosure,heapptr); and_then
 #else
+#  define SEMI ;
 # define UPD_IND(updclosure, heapptr) \
-   UPD_REAL_IND(updclosure,&stg_IND_info,heapptr,)
+   UPD_REAL_IND(updclosure,&stg_IND_info,heapptr,SEMI)
 # define UPD_SPEC_IND(updclosure, ind_info, heapptr, and_then) \
    UPD_REAL_IND(updclosure,ind_info,heapptr,and_then)
 #endif

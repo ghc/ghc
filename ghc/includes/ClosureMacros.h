@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.37 2003/06/30 14:17:02 simonmar Exp $
+ * $Id: ClosureMacros.h,v 1.38 2003/11/12 17:27:00 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,7 +70,7 @@
 #define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)(info) - 1)
 #define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)(info) - 1)
 #define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)(info) - 1)
-static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
+INLINE_HEADER StgFunPtr get_entry(const StgInfoTable *itbl) {
     return (StgFunPtr)(itbl+1);
 }
 #define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(((StgInfoTable *)(i) + 1)) - 1)
@@ -83,7 +83,7 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 #define RET_INFO_PTR_TO_STRUCT(info) ((StgRetInfoTable *)info)
 #define FUN_INFO_PTR_TO_STRUCT(info) ((StgFunInfoTable *)info)
 #define THUNK_INFO_PTR_TO_STRUCT(info) ((StgThunkInfoTable *)info)
-static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
+INLINE_HEADER StgFunPtr get_entry(const StgInfoTable *itbl) {
     return itbl->entry;
 }
 #define itbl_to_fun_itbl(i) ((StgFunInfoTable *)(i))

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.22 2002/12/19 17:57:39 panne Exp $
+ * $Id: Rts.h,v 1.23 2003/11/12 17:27:03 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -96,12 +96,21 @@ extern void* GetFiberData ( void );
 #define STG_UNUSED
 #endif
 
+#if defined(__GNUC__)
+#define SUPPORTS_TYPEOF
+#endif
+
 /* -----------------------------------------------------------------------------
    Useful macros and inline functions
    -------------------------------------------------------------------------- */
 
+#if defined(SUPPORTS_TYPEOF)
 #define stg_min(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _a : _b; })
 #define stg_max(a,b) ({typeof(a) _a = (a), _b = (b); _a <= _b ? _b : _a; })
+#else
+#define stg_min(a,b) ((a) <= (b) ? (a) : (b))
+#define stg_max(a,b) ((a) <= (b) ? (b) : (a))
+#endif
 
 /* -------------------------------------------------------------------------- */
 

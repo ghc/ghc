@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: SchedAPI.h,v 1.18 2003/09/21 22:20:53 wolfgang Exp $
+ * $Id: SchedAPI.h,v 1.19 2003/11/12 17:27:03 sof Exp $
  *
  * (c) The GHC Team 1998-2002
  *
@@ -34,12 +34,12 @@ extern void scheduleThread(StgTSO *tso);
 extern SchedulerStatus scheduleWaitThread(StgTSO *tso, /*out*/HaskellObj* ret,
                                           Capability *initialCapability);
 
-static inline void pushClosure   (StgTSO *tso, StgWord c) {
+INLINE_HEADER void pushClosure   (StgTSO *tso, StgWord c) {
   tso->sp--;
   tso->sp[0] = (W_) c;
 }
 
-static inline StgTSO *
+INLINE_HEADER StgTSO *
 createGenThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
 #if defined(GRAN)
@@ -52,7 +52,7 @@ createGenThread(nat stack_size,  StgClosure *closure) {
   return t;
 }
 
-static inline StgTSO *
+INLINE_HEADER StgTSO *
 createIOThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
 #if defined(GRAN)
@@ -72,7 +72,7 @@ createIOThread(nat stack_size,  StgClosure *closure) {
  * to whnf while we're at it.
  */
 
-static inline StgTSO *
+INLINE_HEADER StgTSO *
 createStrictIOThread(nat stack_size,  StgClosure *closure) {
   StgTSO *t;
 #if defined(GRAN)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.56 2003/08/05 14:01:34 simonpj Exp $
+ * $Id: StgMacros.h,v 1.57 2003/11/12 17:27:04 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -483,24 +483,24 @@ EXTFUN_RTS(stg_gen_block);
               guaranteed to be StgWord aligned.
    -------------------------------------------------------------------------- */
 
-static inline void	  ASSIGN_FLT (W_ [], StgFloat);
-static inline StgFloat    PK_FLT     (W_ []);
+INLINE_HEADER void	  ASSIGN_FLT (W_ [], StgFloat);
+INLINE_HEADER StgFloat    PK_FLT     (W_ []);
 
 #if ALIGNMENT_FLOAT <= ALIGNMENT_LONG
 
-static inline void     ASSIGN_FLT(W_ p_dest[], StgFloat src) { *(StgFloat *)p_dest = src; }
-static inline StgFloat PK_FLT    (W_ p_src[])                { return *(StgFloat *)p_src; }
+INLINE_HEADER void     ASSIGN_FLT(W_ p_dest[], StgFloat src) { *(StgFloat *)p_dest = src; }
+INLINE_HEADER StgFloat PK_FLT    (W_ p_src[])                { return *(StgFloat *)p_src; }
 
 #else  /* ALIGNMENT_FLOAT > ALIGNMENT_UNSIGNED_INT */
 
-static inline void ASSIGN_FLT(W_ p_dest[], StgFloat src)
+INLINE_HEADER void ASSIGN_FLT(W_ p_dest[], StgFloat src)
 {
     float_thing y;
     y.f = src;
     *p_dest = y.fu;
 }
 
-static inline StgFloat PK_FLT(W_ p_src[])
+INLINE_HEADER StgFloat PK_FLT(W_ p_src[])
 {
     float_thing y;
     y.fu = *p_src;
@@ -511,11 +511,11 @@ static inline StgFloat PK_FLT(W_ p_src[])
 
 #if ALIGNMENT_DOUBLE <= ALIGNMENT_LONG
 
-static inline void	  ASSIGN_DBL (W_ [], StgDouble);
-static inline StgDouble   PK_DBL     (W_ []);
+INLINE_HEADER void	  ASSIGN_DBL (W_ [], StgDouble);
+INLINE_HEADER StgDouble   PK_DBL     (W_ []);
 
-static inline void      ASSIGN_DBL(W_ p_dest[], StgDouble src) { *(StgDouble *)p_dest = src; }
-static inline StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDouble *)p_src; }
+INLINE_HEADER void      ASSIGN_DBL(W_ p_dest[], StgDouble src) { *(StgDouble *)p_dest = src; }
+INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDouble *)p_src; }
 
 #else	/* ALIGNMENT_DOUBLE > ALIGNMENT_LONG */
 
@@ -541,8 +541,8 @@ static inline StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
 
 #else /* ! sparc_TARGET_ARCH */
 
-static inline void	  ASSIGN_DBL (W_ [], StgDouble);
-static inline StgDouble   PK_DBL     (W_ []);
+INLINE_HEADER void	  ASSIGN_DBL (W_ [], StgDouble);
+INLINE_HEADER StgDouble   PK_DBL     (W_ []);
 
 typedef struct
   { StgWord dhi;
@@ -554,7 +554,7 @@ typedef union
     unpacked_double du;
   } double_thing;
 
-static inline void ASSIGN_DBL(W_ p_dest[], StgDouble src)
+INLINE_HEADER void ASSIGN_DBL(W_ p_dest[], StgDouble src)
 {
     double_thing y;
     y.d = src;
@@ -570,7 +570,7 @@ static inline void ASSIGN_DBL(W_ p_dest[], StgDouble src)
 	*(p_dest+1) = ((double_thing) src).du.dlo \
 */
 
-static inline StgDouble PK_DBL(W_ p_src[])
+INLINE_HEADER StgDouble PK_DBL(W_ p_src[])
 {
     double_thing y;
     y.du.dhi = p_src[0];
@@ -599,7 +599,7 @@ typedef union
     unpacked_double_word wu;
   } word64_thing;
 
-static inline void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
+INLINE_HEADER void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
 {
     word64_thing y;
     y.w = src;
@@ -607,7 +607,7 @@ static inline void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
     p_dest[1] = y.wu.dlo;
 }
 
-static inline StgWord64 PK_Word64(W_ p_src[])
+INLINE_HEADER StgWord64 PK_Word64(W_ p_src[])
 {
     word64_thing y;
     y.wu.dhi = p_src[0];
@@ -615,7 +615,7 @@ static inline StgWord64 PK_Word64(W_ p_src[])
     return(y.w);
 }
 
-static inline void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
+INLINE_HEADER void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
 {
     int64_thing y;
     y.i = src;
@@ -623,7 +623,7 @@ static inline void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
     p_dest[1] = y.iu.dlo;
 }
 
-static inline StgInt64 PK_Int64(W_ p_src[])
+INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 {
     int64_thing y;
     y.iu.dhi = p_src[0];
@@ -633,22 +633,22 @@ static inline StgInt64 PK_Int64(W_ p_src[])
 
 #elif SIZEOF_VOID_P == 8
 
-static inline void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
+INLINE_HEADER void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
 {
 	p_dest[0] = src;
 }
 
-static inline StgWord64 PK_Word64(W_ p_src[])
+INLINE_HEADER StgWord64 PK_Word64(W_ p_src[])
 {
     return p_src[0];
 }
 
-static inline void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
+INLINE_HEADER void ASSIGN_Int64(W_ p_dest[], StgInt64 src)
 {
     p_dest[0] = src;
 }
 
-static inline StgInt64 PK_Int64(W_ p_src[])
+INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 {
     return p_src[0];
 }
@@ -710,7 +710,7 @@ extern DLL_IMPORT_RTS const StgPolyInfoTable stg_catch_frame_info;
 
 #if IN_STG_CODE
 
-static __inline__ void
+INLINE_HEADER void
 SaveThreadState(void)
 {
   StgTSO *tso;
@@ -732,7 +732,7 @@ SaveThreadState(void)
 #endif
 }
 
-static __inline__ void 
+INLINE_HEADER void 
 LoadThreadState (void)
 {
   StgTSO *tso;

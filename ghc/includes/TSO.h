@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.32 2003/09/21 22:20:53 wolfgang Exp $
+ * $Id: TSO.h,v 1.33 2003/11/12 17:27:05 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -41,15 +41,21 @@ typedef struct {
   CostCentreStack *CCCS;	/* thread's current CCS */
 } StgTSOProfInfo;
 #else /* !PROFILING */
+# if defined(SUPPORTS_EMPTY_STRUCTS)
 typedef struct {
+    /* empty */
 } StgTSOProfInfo;
+# endif
 #endif /* PROFILING */
 
 #if defined(PAR)
 typedef StgTSOStatBuf StgTSOParInfo;
 #else /* !PAR */
+# if defined(SUPPORTS_EMPTY_STRUCTS)
 typedef struct {
+    /* empty */
 } StgTSOParInfo;
+# endif
 #endif /* PAR */
 
 #if defined(DIST)
@@ -59,15 +65,21 @@ typedef struct {
   StgInt             revalSlot;
 } StgTSODistInfo;
 #else /* !DIST */
+# if defined(SUPPORTS_EMPTY_STRUCTS)
 typedef struct {
+    /* empty */
 } StgTSODistInfo;
+# endif
 #endif /* DIST */
 
 #if defined(GRAN)
 typedef StgTSOStatBuf StgTSOGranInfo;
 #else /* !GRAN */
+# if defined(SUPPORTS_EMPTY_STRUCTS)
 typedef struct {
+    /* empty */
 } StgTSOGranInfo;
+# endif
 #endif /* GRAN */
 
 
@@ -75,8 +87,11 @@ typedef struct {
 typedef struct {
 } StgTSOTickyInfo;
 #else /* !TICKY_TICKY */
+# if defined(SUPPORTS_EMPTY_STRUCTS)
 typedef struct {
+    /* empty */
 } StgTSOTickyInfo;
+# endif
 #endif /* TICKY_TICKY */
 
 typedef enum {
@@ -196,11 +211,11 @@ typedef struct StgTSO_ {
   StgThreadID        id;
   int                saved_errno;
   
-  StgTSOTickyInfo    ticky; 
-  StgTSOProfInfo     prof;
-  StgTSOParInfo      par;
-  StgTSOGranInfo     gran;
-  StgTSODistInfo     dist;
+  MAYBE_EMPTY_STRUCT(StgTSOTickyInfo,ticky)
+  MAYBE_EMPTY_STRUCT(StgTSOProfInfo,prof)
+  MAYBE_EMPTY_STRUCT(StgTSOParInfo,par)
+  MAYBE_EMPTY_STRUCT(StgTSOGranInfo,gran)
+  MAYBE_EMPTY_STRUCT(StgTSODistInfo,dist)
     
   /* The thread stack... */
   StgWord    	     stack_size;     /* stack size in *words* */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.19 2002/12/11 15:36:39 simonmar Exp $
+ * $Id: StgTypes.h,v 1.20 2003/11/12 17:27:05 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -61,8 +61,13 @@ typedef unsigned int             StgWord32;
 
 #ifdef SUPPORT_LONG_LONGS
 /* assume long long is 64 bits */
+# ifndef _MSC_VER
 typedef signed long long int   StgInt64;
 typedef unsigned long long int StgWord64;
+# else
+typedef __int64 StgInt64;
+typedef unsigned __int64 StgWord64;
+# endif
 #elif SIZEOF_LONG == 8
 typedef signed   long          StgInt64;
 typedef unsigned long          StgWord64;

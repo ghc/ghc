@@ -17,7 +17,13 @@ typedef unsigned long nat;           /* at least 32 bits (like int) */
 typedef unsigned int  nat;           /* at least 32 bits (like int) */
 #endif
 typedef unsigned long lnat;          /* at least 32 bits            */
+#ifndef _MSC_VER
 typedef unsigned long long ullong;   /* at least 32 bits            */
+typedef long long llong;
+#else
+typedef unsigned __int64   ullong;   /* at least 32 bits            */
+typedef __int64 llong;
+#endif
 
 /* ullong (64|128-bit) type: only include if needed (not ANSI) */
 #if defined(__GNUC__) 

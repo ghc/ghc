@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.106 2003/10/01 10:57:41 wolfgang Exp $
+ * $Id: PrimOps.h,v 1.107 2003/11/12 17:27:01 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -256,8 +256,7 @@ EXTFUN_RTS(catchzh_fast);
 EXTFUN_RTS(raisezh_fast);
 EXTFUN_RTS(raiseIOzh_fast);
 
-extern void stg_exit(int n)  __attribute__ ((noreturn));
-
+extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
 /* -----------------------------------------------------------------------------
    Stable Name / Stable Pointer  PrimOps

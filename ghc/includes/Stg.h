@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.56 2003/09/21 13:22:01 igloo Exp $
+ * $Id: Stg.h,v 1.57 2003/11/12 17:27:04 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -80,6 +80,41 @@
 #  define EAGER_BLACKHOLING
 #else
 #  define LAZY_BLACKHOLING
+#endif
+
+#if defined(__GNUC__)
+#define GNU_ATTRIBUTE(at) __attribute__((at))
+#else
+#define GNU_ATTRIBUTE(at)
+#endif
+
+/* 
+ * Empty structures isn't supported by all, so to define
+ * empty structures, please protect the defn with an
+ * #if SUPPORTS_EMPTY_STRUCTS. Similarly for use,
+ * employ the macro MAYBE_EMPTY_STRUCT():
+ *
+ *     MAYBE_EMPTY_STRUCT(structFoo, fieldName);
+ */
+#if SUPPORTS_EMPTY_STRUCTS
+# define MAYBE_EMPTY_STRUCT(a,b) a b;
+#else
+# define MAYBE_EMPTY_STRUCT(a,b) /* empty */
+#endif
+
+/*
+ * 'Portable' 
+ */
+#if defined(__GNUC__)
+# define INLINE_HEADER static inline
+# define INLINE_ME inline
+# define STATIC_INLINE INLINE_HEADER
+#elif defined(_MSC_VER)
+# define INLINE_HEADER __inline static
+# define INLINE_ME __inline
+# define STATIC_INLINE INLINE_HEADER
+#else
+# error "Don't know how to inline functions with your C compiler."
 #endif
 
 /* TABLES_NEXT_TO_CODE says whether to assume that info tables are
