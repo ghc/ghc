@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1999.
  *
  * $RCSfile: universal_call_c.S,v $
- * $Revision: 1.4 $
- * $Date: 1999/10/26 17:27:31 $
+ * $Revision: 1.5 $
+ * $Date: 1999/10/27 11:11:11 $
  * ------------------------------------------------------------------------*/
 	
 #include "config.h"
@@ -66,6 +66,9 @@
 #endif
 	
 #if i386_TARGET_ARCH
+
+# Tricky!  Calls the specified function using ccall convention,
+# *and* assumes that I myself was called using ccall.
 
 .globl universal_call_c_x86_ccall
 universal_call_c_x86_ccall:
@@ -138,6 +141,10 @@ cbye:
 	
 # Almost identical to the above piece of code
 # see comments near end for differences 
+
+# Even more tricky!  Calls the specified function using 
+# stdcall convention, *but* assumes that I myself was called 
+# using ccall.
 	
 .globl universal_call_c_x86_stdcall
 universal_call_c_x86_stdcall:
@@ -205,7 +212,8 @@ sbye:
 	popl %esi
 	popl %edi
 	leave
-	ret $16       # but we have to clear our own!
+	## ret $16       # but we have to clear our own! (no! we were ccall_d)
+	ret
 
 #endif /* i386_TARGET_ARCH */
 	
