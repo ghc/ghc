@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelConc.lhs,v 1.22 2001/02/13 15:23:33 rrt Exp $
+% $Id: PrelConc.lhs,v 1.23 2001/02/15 10:02:43 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -34,13 +34,14 @@ module PrelConc
 	, takeMVar 	-- :: MVar a -> IO a
 	, putMVar  	-- :: MVar a -> a -> IO ()
 	, tryTakeMVar   -- :: MVar a -> IO (Maybe a)
+	, tryPutMVar  	-- :: MVar a -> a -> IO Bool
 	, isEmptyMVar	-- :: MVar a -> IO Bool
 
     ) where
 
 import PrelBase
 import PrelMaybe
-import PrelErr ( parError, seqError )
+import PrelErr		( parError, seqError )
 import PrelIOBase	( IO(..), MVar(..) )
 import PrelBase		( Int(..) )
 import PrelException    ( Exception(..), AsyncException(..) )
@@ -127,6 +128,12 @@ putMVar  :: MVar a -> a -> IO ()
 putMVar (MVar mvar#) x = IO $ \ s# ->
     case putMVar# mvar# x s# of
         s2# -> (# s2#, () #)
+
+tryPutMVar  :: MVar a -> a -> IO Bool
+tryPutMVar (MVar mvar#) x = IO $ \ s# ->
+    case tryPutMVar# mvar# x s# of
+        (# s, 0# #) -> (# s, False #)
+        (# s, _  #) -> (# s, True #)
 
 newMVar :: a -> IO (MVar a)
 newMVar value =
