@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.19 2001/12/20 16:12:09 sewardj Exp $
+ * $Id: Stable.c,v 1.20 2002/04/09 12:56:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -236,13 +236,18 @@ getStablePtr(StgPtr p)
 void
 freeStablePtr(StgStablePtr sp)
 {
-    StgWord sn = (StgWord)sp;
+    snEntry *sn = &stable_ptr_table[(StgWord)sp];
     
-    ASSERT(sn < SPT_size
-	   && stable_ptr_table[sn].addr != NULL
-	   && stable_ptr_table[sn].ref > 0);
-    
-    stable_ptr_table[sn].ref --;
+    ASSERT((StgWord)sp < SPT_size  &&  sn->addr != NULL  &&  sn->ref > 0);
+
+    sn->ref--;
+
+    // If this entry has no StableName attached, then just free it
+    // immediately.  This is important; it might be a while before the
+    // next major GC which actually collects the entry.
+    if (sn->sn_obj == NULL) {
+	freeStableName(sn);
+    }
 }
 
 void
