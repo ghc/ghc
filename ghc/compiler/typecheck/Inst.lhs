@@ -56,7 +56,7 @@ import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType,
 import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
 		  PredType(..), TyVarDetails(VanillaTv),
 		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
-		  tcSplitPhiTy, isTyVarTy, tcSplitDFunTy,
+		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
@@ -622,7 +622,8 @@ lookupInst inst@(LitInst u (HsFractional f from_rat_name) ty loc)
 
 -- Dictionaries
 lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
-  | all isTyVarTy tys	 -- Common special case; no lookup
+  | all tcIsTyVarTy tys	 -- Common special case; no lookup
+			 -- NB: tcIsTyVarTy... don't look through newtypes!
   = returnM NoInstance
 	
   | otherwise
@@ -632,7 +633,10 @@ lookupInst dict@(Dict _ pred@(ClassP clas tys) loc)
 	; dflags  <- getDOpts
 	; case lookupInstEnv dflags (pkg_ie, tcg_inst_env tcg_env) clas tys of {
 	    ([(tenv, (_,_,dfun_id))], []) -> instantiate_dfun tenv dfun_id pred loc ;
-	    other 			  -> return NoInstance } }
+	    (matches, unifs)		  -> do
+	{ traceTc (text "lookupInst" <+> vcat [text "matches" <+> ppr matches,
+					       text "unifs" <+> ppr unifs])
+	; return NoInstance } } }
 		-- In the case of overlap (multiple matches) we report
 		-- NoInstance here.  That has the effect of making the 
 		-- context-simplifier return the dict as an irreducible one.
@@ -654,7 +658,6 @@ instantiate_dfun tenv dfun_id pred loc
     getStage						`thenM` \ use_stage ->
     checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
     		    (topIdLvl dfun_id) use_stage		`thenM_`
-    traceTc (text "lookupInst" <+> ppr dfun_id <+> ppr (topIdLvl dfun_id) <+> ppr use_stage) `thenM_`
     let
     	(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
     	mk_ty_arg tv  = case lookupSubstEnv tenv tv of

@@ -41,7 +41,7 @@ module Type (
 	applyTy, applyTys, isForAllTy, dropForAlls,
 
 	-- Source types
-	isPredTy, predTypeRep, mkPredTy, mkPredTys,
+	predTypeRep, mkPredTy, mkPredTys,
 
 	-- Newtypes
 	splitRecNewType_maybe,
@@ -182,8 +182,7 @@ invariant: use it.
 
 \begin{code}
 mkAppTy orig_ty1 orig_ty2
-  = ASSERT2( not (isPredTy orig_ty1), crudePprType orig_ty1 )	-- Source types are of kind *
-    mk_app orig_ty1
+  = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (NewTcApp tc tys) = NewTcApp tc (tys ++ [orig_ty2])
@@ -206,8 +205,7 @@ mkAppTys orig_ty1 []	    = orig_ty1
 	--   returns to (Ratio Integer), which has needlessly lost
 	--   the Rational part.
 mkAppTys orig_ty1 orig_tys2
-  = ASSERT( not (isPredTy orig_ty1) )	-- Source types are of kind *
-    mk_app orig_ty1
+  = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (NewTcApp tc tys) = NewTcApp tc (tys ++ orig_tys2)
@@ -555,11 +553,6 @@ predTypeRep (IParam _ ty)     = ty
 predTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- Result might be a NewTcApp, but the consumer will
 	-- look through that too if necessary
-
-isPredTy :: Type -> Bool
-isPredTy (NoteTy _ ty) = isPredTy ty
-isPredTy (PredTy sty)  = True
-isPredTy _	       = False
 \end{code}
 
 

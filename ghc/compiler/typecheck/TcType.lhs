@@ -59,7 +59,7 @@ module TcType (
   getClassPredTys_maybe, getClassPredTys, 
   isClassPred, isTyVarClassPred, 
   mkDictTy, tcSplitPredTy_maybe, 
-  isDictTy, tcSplitDFunTy, predTyUnique, 
+  isPredTy, isDictTy, tcSplitDFunTy, predTyUnique, 
   mkClassPred, isInheritablePred, isLinearPred, isIPPred, mkPredName, 
 
   ---------------------------------
@@ -96,7 +96,7 @@ module TcType (
 
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
-  isPrimitiveType, isTyVarTy, isPredTy,
+  isPrimitiveType, 
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars,
@@ -125,7 +125,7 @@ import Type		(	-- Re-exports
 			  mkTyConApp, mkGenTyConApp, mkAppTy,
 			  mkAppTys, mkSynTy, applyTy, applyTys,
 			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy,
-			  mkPredTys, isUnLiftedType, isPredTy,
+			  mkPredTys, isUnLiftedType, 
 			  isUnboxedTupleType, isPrimitiveType,
 			  splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes,
@@ -669,6 +669,12 @@ isOverloadedTy (ForAllTy tyvar ty) = isOverloadedTy ty
 isOverloadedTy (FunTy a b)	   = isPredTy a
 isOverloadedTy (NoteTy n ty)	   = isOverloadedTy ty
 isOverloadedTy _		   = False
+
+isPredTy :: Type -> Bool	-- Belongs in TcType because it does 
+				-- not look through newtypes, or predtypes (of course)
+isPredTy (NoteTy _ ty) = isPredTy ty
+isPredTy (PredTy sty)  = True
+isPredTy _	       = False
 \end{code}
 
 \begin{code}
