@@ -341,7 +341,7 @@ readIO s        =  case (do { (x,t) <- reads s ;
 -- 
 -- This operation may fail with:
 --
---  * 'isEOFError' if the end of file has been reached.
+--  * 'System.IO.Error.isEOFError' if the end of file has been reached.
 
 hReady		:: Handle -> IO Bool
 hReady h 	=  hWaitForInput h 0
@@ -359,9 +359,9 @@ hPutStrLn hndl str = do
 --
 -- This operation may fail with:
 --
---  * 'isFullError' if the device is full; or
+--  * 'System.IO.Error.isFullError' if the device is full; or
 --
---  * 'isPermissionError' if another system resource limit would be exceeded.
+--  * 'System.IO.Error.isPermissionError' if another system resource limit would be exceeded.
 
 hPrint		:: Show a => Handle -> a -> IO ()
 hPrint hdl 	=  hPutStrLn hdl . show
@@ -407,4 +407,4 @@ hSetBinaryMode _ _ = return ()
 -- the file until the entire contents of the file have been consumed.
 -- It follows that an attempt to write to a file (using 'writeFile', for
 -- example) that was earlier opened by 'readFile' will usually result in
--- failure with 'isAlreadyInUseError'.
+-- failure with 'System.IO.Error.isAlreadyInUseError'.
