@@ -1764,7 +1764,7 @@ opts =
 
   ,  ( "fvia-C"		   , NoArg (writeIORef hsc_lang HscC) )
 
-  ,  ( "fno-asm-mangling"  , NoArg (writeIORef do_asm_mangling True) )
+  ,  ( "fno-asm-mangling"  , NoArg (writeIORef do_asm_mangling False) )
 
   ,  ( "fmax-simplifier-iterations", 
 		Prefix (writeIORef opt_MaxSimplifierIterations . read) )
