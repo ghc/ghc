@@ -1,0 +1,3 @@
+
+mod131.hs:2:
+    The export items `Mod131_A.f' and `module Mod131_B' create conflicting exports for `f'

@@ -1,0 +1,2 @@
+
+mod120.hs:5: Data constructor not in scope: `Foo'

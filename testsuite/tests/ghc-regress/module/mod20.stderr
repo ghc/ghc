@@ -1,0 +1,5 @@
+
+mod20.hs:2:
+    Multiple declarations of `Main.m'
+	mod20.hs:2
+	mod20.hs:3

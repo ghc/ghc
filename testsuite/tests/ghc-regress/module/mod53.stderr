@@ -1,0 +1,4 @@
+
+mod53.hs:4:
+    Can't make a derived instance of `C T' (not a derivable class)
+    When deriving instances for type `T'

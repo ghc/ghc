@@ -1,0 +1,4 @@
+
+Duplicate instance declarations:
+  mod44.hs:4: Eq T
+  mod44.hs:5: Eq T

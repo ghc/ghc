@@ -1,0 +1,5 @@
+
+mod38.hs:2:
+    Multiple declarations of `M.C'
+	mod38.hs:3
+	mod38.hs:4

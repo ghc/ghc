@@ -1,0 +1,4 @@
+
+mod2.hs:3:
+    failed to load interface for `N':
+	Could not find interface file for `N'

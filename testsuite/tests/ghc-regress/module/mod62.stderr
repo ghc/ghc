@@ -1,0 +1,4 @@
+
+mod62.hs:3:
+    Invalid use of qualified name `M.y'
+    In the binding group for `M.y'

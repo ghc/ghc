@@ -1,0 +1,4 @@
+
+Duplicate instance declarations:
+  mod52.hs:3: Eq T
+  mod52.hs:4: Eq T

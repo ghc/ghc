@@ -1,0 +1,5 @@
+
+mod21.hs:2:
+    Multiple declarations of `Main.T'
+	mod21.hs:2
+	mod21.hs:3

@@ -1,0 +1,5 @@
+
+mod18.hs:2:
+    Multiple declarations of `Main.T'
+	mod18.hs:2
+	mod18.hs:3

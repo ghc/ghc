@@ -1,0 +1,5 @@
+
+mod46.hs:4:
+    No instance for (Eq T)
+    arising from the instance declaration at mod46.hs:4
+    In the instance declaration for `Ord T'

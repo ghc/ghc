@@ -1,0 +1,5 @@
+
+mod55.hs:3:
+    Can't make a derived instance of `Enum T'
+    (data type with all nullary constructors expected)
+    When deriving instances for type `T'

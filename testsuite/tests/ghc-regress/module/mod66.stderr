@@ -1,0 +1,5 @@
+
+mod66.hs:2:
+    Multiple declarations of `M.f'
+	mod66.hs:3
+	mod66.hs:5

@@ -1,0 +1,10 @@
+
+mod19.hs:2:
+    Multiple declarations of `Main.m'
+	mod19.hs:2
+	mod19.hs:3
+
+mod19.hs:2:
+    Multiple declarations of `Main.C'
+	mod19.hs:2
+	mod19.hs:3
