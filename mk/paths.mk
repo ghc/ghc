@@ -277,7 +277,7 @@ ifneq "$(BootingFromHc)" "YES"
 CLEAN_FILES += $(DERIVED_HC_SRCS)
 endif
 
-DIST_CLEAN_FILES 	+= .depend *.hp *.prof
+DIST_CLEAN_FILES 	+= .depend* *.hp *.prof
 
 MAINTAINER_CLEAN_FILES 	+= $(BOOT_SRCS) $(DERIVED_HAPPY_SRCS)
 
