@@ -28,10 +28,12 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
 }
 
+$tempfile = "$Tmp_prefix.i";
+
 sub quit_upon_signal { 
-  if (-f "$Tmp_prefix.i") {
-	print STDERR "Deleting $Tmp_prefix.i .. \n"; 
-	unlink "$Tmp_prefix.i"; 
+  if (-f $tempfile) {
+	print STDERR "Deleting $tempfile .. \n"; 
+	unlink $tempfile;
    }
 }
 $SIG{'INT'}  = 'quit_upon_signal';
@@ -150,7 +152,6 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 
     $fname = &tidy_dir_names($fname);
 
-    $tempfile = "$Tmp_prefix.i";
 
     # ${CPP} better be 'gcc -E', or the -x option will fail...
     $result = system("${CPP} $Include_dirs @Defines -x c $fname -o $tempfile");
@@ -159,7 +160,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 	exit($result);
     };
 
-    open($fhandle, $tempfile) || die "$Pgm: Can't open $fname: $!\n";
+    open($fhandle, $tempfile) || die "$Pgm: Can't open $tempfile: $!\n";
 
     line: while (<$fhandle>) {
 	next line if ! /^#/;
@@ -202,8 +203,8 @@ sub slurp_file { # follows an example in the `open' item in perl man page
 	$Depend_seen{$depend} = 1;
     }
     close($fhandle);
-    unlink($tempname);
-    $tempname = '';  # for quit_upon_signal
+    unlink($tempfile);
+    $tempfile = '';  # for quit_upon_signal
 }
 
 sub tidy_dir_names { # rm various pernicious dir-name combinations...
