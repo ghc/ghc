@@ -503,9 +503,9 @@ reservedWordsFM = listToUFM $
 
       	( "forall",	ITforall,	 bit glaExtsBit),
 	( "mdo",	ITmdo,		 bit glaExtsBit),
-	( "reifyDecl",  ITreifyDecl,	 bit glaExtsBit),
-	( "reifyType",  ITreifyType,	 bit glaExtsBit),
-	( "reifyFixity",ITreifyFixity,	 bit glaExtsBit),
+	( "reifyDecl",  ITreifyDecl,	 bit thBit),
+	( "reifyType",  ITreifyType,	 bit thBit),
+	( "reifyFixity",ITreifyFixity,	 bit thBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
