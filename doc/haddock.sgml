@@ -532,9 +532,6 @@ f  :: Int      -- ^ The 'Int' argument
    -> Float    -- ^ The 'Float' argument
    -> IO ()    -- ^ The return value
 </programlisting>
-
-	<para>NOTE: this feature isn't implemented in Haddock
-	0.2.</para>
       </section>
     </section>
 
@@ -923,6 +920,20 @@ module A where
 	<literal>T</literal> (if the output format supports
 	hyperlinking, of course; in a printed format it might instead
 	insert a page reference to the definition).</para>
+
+	<para>It is also possible to refer to entities that are not in
+	scope in the current module, by giving the full qualified name
+	of the entity:</para>
+
+<programlisting>
+-- | The identifier 'M.T' is not in scope
+</programlisting>
+
+	<para>If <literal>M.T</literal> is not otherwise in scope,
+	then Haddock will simply emit a link pointing to the entity
+	<literal>T</literal> exported from module <literal>M</literal>
+	(without checking to see whether either <literal>M</literal>
+	or <literal>M.T</literal> exist).</para>
 
 	<para>For compatibility with other systems, the following
 	alternative form of markup is accepted<footnote><para>
