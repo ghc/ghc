@@ -15,33 +15,10 @@
 
     <para>GHC comes with several packages (see <xref
     linkend="book-hslibs">), and packages can be added/removed from an
-    existing GHC installation.</para>
-
-    <sect2 id="listing-packages">
-      <title>Listing the available packages</title>
-      <indexterm><primary>packages</primary>
-	<secondary>listing</secondary></indexterm>
-
-      <para>To see what packages are currently installed, use the
-      <literal>--list-packages</literal> option:</para>
-      <indexterm><primary><literal>--list-packages</literal></primary>
-      </indexterm>
-
-<screen>
-  $ ghc --list-packages
-  gmp, rts, std, lang, concurrent, data, net, posix, text, util
-</screen>
-
-      <para>Note that your GHC installation might have a slightly
-      different set of packages installed.</para>
-
-      <para>The <literal>gmp</literal> and <literal>rts</literal>
-      packages are always present, and represent the multi-precision
-      integer and runtime system libraries respectively.  The
-      <literal>std</literal> package contains the Haskell prelude.
-      The rest of the packages are optional libraries.</para>
-
-    </sect2>
+    existing GHC installation, using the supplied
+    <literal>ghc-pkg</literal><indexterm><primary><literal>ghc-pkg</literal></primary>
+    </indexterm> tool, described in <xref
+    linkend="package-management">.</para>
 
     <sect2 id="using-packages">
       <title>Using a package</title>
@@ -49,15 +26,15 @@
 	<secondary>using</secondary></indexterm>
       
       <para>To use a package, add the <literal>-package</literal> flag
-      to the command line:</para>
+      to the GHC command line:</para>
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package &lt;lib&gt;</option></term>
-	  <indexterm><primary>-package &lt;lib&gt; option</primary></indexterm>
+	  <term><option>-package <replaceable>lib</replaceable></option></term>
+	  <indexterm><primary>-package <replaceable>lib</replaceable> option</primary></indexterm>
 	  <listitem>
 	    <para>This option brings into scope all the modules from
-	    package <literal>&lt;lib&gt;</literal> (they still have to
+	    package <literal><replaceable>lib</replaceable></literal> (they still have to
 	    be imported in your Haskell source, however).  It also
 	    causes the relevant libraries to be linked when linking is
 	    being done.</para>
@@ -118,7 +95,7 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-package-name &lt;foo&gt;</option></term>
+	  <term><option>-package-name <replaceable>foo</replaceable></option></term>
 	  <indexterm><primary><literal>-package-name</literal></primary>
 	    <secondary>option</secondary></indexterm>
 	  <listitem>
@@ -142,8 +119,8 @@
       indirection, intra-package references are cheaper than
       inter-package references. Of course, this applies to the
       <filename>Main</filename> package as well.</para>
-
     </sect2>
+
     <sect2 id="package-management">
       <title>Package management</title>
       <indexterm><primary>packages</primary>
@@ -152,14 +129,41 @@
       <para>GHC uses a package configuration file, called
       <literal>packages.conf</literal>, which can be found in your GHC
       install directory.  This file isn't intended to be edited
-      directly, instead GHC provides options for adding & removing
-      packages:</para>
+      directly, instead packages can be added or removed using GHC's
+      package management tool, <literal>ghc-pkg</literal>.</para>
 
       <variablelist>
 	<varlistentry>
+	  <term><option>--list-packages</option></term>
+	  <term><option>-l</option></term>
+	  <indexterm><primary><option>--list-packages</option></primary></indexterm>
+	  <listitem>
+	    <para>This option displays the list of currently installed
+	    packages.</para>
+
+<screen>
+  $ ghc-pkg --list-packages
+  gmp, rts, std, lang, concurrent, data, net, posix, text, util
+</screen>
+
+	    <para>Note that your GHC installation might have a
+            slightly different set of packages installed.</para>
+
+	    <para>The <literal>gmp</literal> and
+            <literal>rts</literal> packages are always present, and
+            represent the multi-precision integer and runtime system
+            libraries respectively.  The <literal>std</literal>
+            package contains the Haskell prelude and standard
+            libraries.  The rest of the packages are optional
+            libraries.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term><option>--add-package</option></term>
-	  <indexterm><primary><literal>--add-package</literal></primary>
-	      <secondary>option</secondary></indexterm>
+	  <term><option>-a</option></term>
+	  <indexterm><primary><option>--add-package</option></primary>
+	      </indexterm>
 	  <listitem>
 	    <para>Reads a package specification (see below) on stdin,
 	    and adds it to the database of installed packages.  The
@@ -169,9 +173,10 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--delete-package &lt;foo&gt;</option></term>
-	  <indexterm><primary><literal>--delete-package</literal></primary>
-	      <secondary>option</secondary></indexterm>
+	  <term><option>--remove-package <replaceable>foo</replaceable></option></term>
+	  <term><option>-r <replaceable>foo</replaceable></option></term>
+	  <indexterm><primary><option>--delete-package</option></primary>
+	      </indexterm>
 	  <listitem>
 	    <para>Removes the specified package from the installed
 	    configuration.</para>
@@ -191,6 +196,7 @@
   Package {
      name            = "mypkg",
      import_dirs     = ["/usr/local/lib/imports/mypkg"],
+     source_dirs     = [],
      library_dirs    = ["/usr/local/lib"],
      hs_libraries    = ["HSmypkg" ],
      extra_libraries = ["HSmypkg_cbits"],
@@ -226,6 +232,18 @@
 	  <listitem>
 	    <para>A list of directories containing interface files
 	    (<literal>.hi</literal> files) for this package.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>source_dirs</literal></term>
+	  <indexterm><primary><literal>source_dirs</literal></primary>
+	    <secondary>package specification</secondary></indexterm>
+	  <listitem>
+	    <para>A list of directories containing Haskell source
+	    files for this package.  This field isn't used by GHC, but
+	    could potentially be used by an all-interpreted system
+	    like Hugs.</para>
 	  </listitem>
 	</varlistentry>
 
