@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.130 2003/11/26 10:07:19 simonmar Exp $
+$Id: Parser.y,v 1.131 2003/11/27 13:26:39 simonmar Exp $
 
 Haskell grammar.
 
@@ -137,6 +137,7 @@ Conflicts: 29 shift/reduce, [SDM 19/9/2002]
  '{-# CORE'        { T _ _ ITcore_prag }              -- hdaume: annotated core
  '{-# SCC'	   { T _ _ ITscc_prag }
  '{-# DEPRECATED'  { T _ _ ITdeprecated_prag }
+ '{-# UNPACK'      { T _ _ ITunpack_prag }
  '#-}'		   { T _ _ ITclose_prag }
 
  '..'		{ T _ _ ITdotdot }  			-- reserved symbols
@@ -827,7 +828,7 @@ stype :: { RdrNameBangType }
 
 strict_mark :: { HsBang }
 	: '!'				{ HsStrict }
-	| '!' '!'			{ HsUnbox }
+	| '{-# UNPACK' '#-}' '!'	{ HsUnbox }
 
 deriving :: { Maybe RdrNameContext }
 	: {- empty -}			{ Nothing }

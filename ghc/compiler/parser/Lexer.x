@@ -174,6 +174,7 @@ $white_no_nl+ 				;
   					{ token ITdeprecated_prag }
   "{-#" $whitechar* (SCC|scc)		{ token ITscc_prag }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
+  "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
   
   "{-#" 				{ nested_comment }
 
@@ -349,6 +350,7 @@ data Token__
   | ITline_prag
   | ITscc_prag
   | ITcore_prag                 -- hdaume: core annotations
+  | ITunpack_prag
   | ITclose_prag
 
   | ITdotdot  			-- reserved symbols
