@@ -51,6 +51,8 @@ import Control.Exception	( bracket )
 #endif
 
 #ifdef __HUGS__
+import Hugs.Prelude		( IOException(IOError),
+				  IOErrorType(ResourceExhausted) )
 import Hugs.ForeignPtr		( FinalizerPtr )
 #endif
 
@@ -173,8 +175,8 @@ failWhenNULL :: String -> IO (Ptr a) -> IO (Ptr a)
 failWhenNULL name f = do
    addr <- f
    if addr == nullPtr
-#ifdef __GLASGOW_HASKELL__
-      then ioException (IOError Nothing ResourceExhausted name 
+#if __GLASGOW_HASKELL__ || __HUGS__
+      then ioError (IOError Nothing ResourceExhausted name 
 					"out of memory" Nothing)
 #else
       then ioError (userError (name++": out of memory"))
