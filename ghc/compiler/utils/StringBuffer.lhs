@@ -279,10 +279,10 @@ reAllocMem :: Addr -> Int -> IO Addr
 reAllocMem ptr sz = do
    chunk <- _ccall_ realloc ptr sz
    if chunk == nullAddr 
-#ifndef __HASKELL98__
-      then fail (userError "reAllocMem")
-#else
+#if __GLASGOW_HASKELL__ >= 400
       then fail "reAllocMem"
+#else
+      then fail (userError "reAllocMem")
 #endif
       else return chunk
 
