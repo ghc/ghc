@@ -532,7 +532,7 @@ Readline library.  As such, you will need to look at the GNU
 documentation (and have a @libreadline.a@ file around somewhere...)
 
 You'll need to link any Readlining program with @-lreadline -ltermcap@,
-besides the usual @-syslib misc@ (and @-fhaskell-1.3@).
+besides the usual @-syslib misc@.
 
 The main function you'll use is:
 <tscreen><verb>
