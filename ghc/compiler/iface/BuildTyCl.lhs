@@ -137,7 +137,7 @@ mkNewTyConRep :: TyCon		-- The original type constructor
 				-- (guaranteed not to be another newtype)
 
 -- Find the representation type for this newtype TyCon
--- Remember that the representation type is the ultimate representation
+-- Remember that the representation type is the *ultimate* representation
 -- type, looking through other newtypes.
 -- 
 -- The non-recursive newtypes are easy, because they look transparent
