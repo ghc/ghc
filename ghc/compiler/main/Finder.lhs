@@ -72,13 +72,19 @@ maybeHomeModule mod_name is_source = do
 	-- In compilation manager modes, we look for source files in the home
 	-- package because we can compile these automatically.  In one-shot
 	-- compilation mode we look for .hi files only.
+	--
+	-- When generating dependencies, we're interested in either category.
+	--
+       source_exts = 
+        	 [ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+		 , ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
+	         ]
+       hi_exts = [ (hisuf,  \ _ fName path -> mkHiOnlyModuleLocn mod_name fName) ]
+
        std_exts
-         | isCompManagerMode mode || mode == DoMkDependHS =
-        	[ ("hs",   \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-		, ("lhs",  \ _ fName path -> mkHomeModuleLocn mod_name path fName)
-	        ]
-	 | otherwise =
-		[ (hisuf,  \ _ fName path -> mkHiOnlyModuleLocn mod_name fName) ]
+         | mode == DoMkDependHS   = hi_exts ++ source_exts
+         | isCompManagerMode mode = source_exts
+	 | otherwise              = hi_exts
 
         -- last chance: .hi-boot-<ver> and .hi-boot
        hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion
