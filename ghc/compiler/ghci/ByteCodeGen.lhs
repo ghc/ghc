@@ -60,6 +60,7 @@ import Exception	( throwDyn )
 import PrelBase		( Int(..) )
 import PrelGHC		( ByteArray# )
 import PrelIOBase	( IO(..) )
+import Monad		( when )
 
 \end{code}
 
@@ -84,9 +85,12 @@ byteCodeGen dflags binds local_tycons local_classes
             getBind (NonRec bndr rhs) = [(bndr, freeVars rhs)]
             getBind (Rec binds)       = [(bndr, freeVars rhs) | (bndr,rhs) <- binds]
 
-        (BcM_State proto_bcos final_ctr, ())
-           <- runBc (BcM_State [] 0) 
+        (BcM_State proto_bcos final_ctr mallocd, ())
+           <- runBc (BcM_State [] 0 []) 
                     (mapBc (schemeR True) flatBinds `thenBc_` returnBc ())
+
+        when (not (null mallocd))
+             (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
            "Proto-bcos" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
@@ -110,9 +114,12 @@ coreExprToBCOs dflags expr
 				     (panic "invented_id's type")
       let invented_name = idName invented_id
 
-      (BcM_State all_proto_bcos final_ctr, ()) 
-         <- runBc (BcM_State [] 0) 
+      (BcM_State all_proto_bcos final_ctr mallocd, ()) 
+         <- runBc (BcM_State [] 0 []) 
                   (schemeR True (invented_id, freeVars expr))
+
+      when (not (null mallocd))
+           (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
 
       dumpIfSet_dyn dflags Opt_D_dump_BCOs
          "Proto-bcos" (vcat (intersperse (char ' ') (map ppr all_proto_bcos)))
@@ -156,8 +163,8 @@ ppBCEnv p
 
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
-mkProtoBCO nm instrs_ordlist origin
-   = ProtoBCO nm maybe_with_stack_check origin
+mkProtoBCO nm instrs_ordlist origin mallocd_blocks
+   = ProtoBCO nm maybe_with_stack_check origin mallocd_blocks
      where
         -- Overestimate the stack usage (in words) of this BCO,
         -- and if >= iNTERP_STACK_CHECK_THRESH, add an explicit
@@ -774,6 +781,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          ioToBc (mkMarshalCode cconv
                     (r_offW, r_rep) addr_offW
                     (zip args_offW a_reps))	`thenBc` \ addr_of_marshaller ->
+         recordMallocBc addr_of_marshaller	`thenBc_`
      let
          -- do the call
          do_call      = unitOL (CCALL addr_of_marshaller)
@@ -1038,9 +1046,10 @@ pushAtom False d p (AnnLit lit)
                             -- at the same time.
                             let n = I# l
                             -- CAREFUL!  Chars are 32 bits in ghc 4.09+
-                            in  ioToBc (
-                                   do (Ptr a#) <- mallocBytes (n+1)
-                                      strncpy (Ptr a#) ba (fromIntegral n)
+                            in  ioToBc (mallocBytes (n+1)) `thenBc` \ (Ptr a#) ->
+                                recordMallocBc (A# a#)     `thenBc_`
+                                ioToBc (
+                                   do strncpy (Ptr a#) ba (fromIntegral n)
                                       writeCharOffAddr (A# a#) n '\0'
                                       return (A# a#)
                                    )
@@ -1243,8 +1252,9 @@ bind x f    = f x
 \begin{code}
 data BcM_State 
    = BcM_State { bcos      :: [ProtoBCO Name],	-- accumulates completed BCOs
-                 nextlabel :: Int }		-- for generating local labels
-
+                 nextlabel :: Int,		-- for generating local labels
+                 malloced  :: [Addr] }		-- ptrs malloced for current BCO
+                                                -- Should be free()d when it is GCd
 type BcM r = BcM_State -> IO (BcM_State, r)
 
 ioToBc :: IO a -> BcM a
@@ -1278,9 +1288,20 @@ mapBc f (x:xs)
     mapBc f xs   `thenBc` \ rs ->
     returnBc (r:rs)
 
-emitBc :: ProtoBCO Name -> BcM ()
+emitBc :: ([Addr] -> ProtoBCO Name) -> BcM ()
 emitBc bco st
-   = return (st{bcos = bco : bcos st}, ())
+   = return (st{bcos = bco (malloced st) : bcos st, malloced=[]}, ())
+
+newbcoBc :: BcM ()
+newbcoBc st
+   | not (null (malloced st)) 
+   = panic "ByteCodeGen.newbcoBc: missed prior emitBc?"
+   | otherwise
+   = return (st, ())
+
+recordMallocBc :: Addr -> BcM ()
+recordMallocBc a st
+   = return (st{malloced = a : malloced st}, ())
 
 getLabelBc :: BcM Int
 getLabelBc st

@@ -37,8 +37,9 @@ data ProtoBCO a
 					-- what the BCO came from
               (Either [AnnAlt Id VarSet]
                       (AnnExpr Id VarSet))
+              [Addr]			-- malloc'd; free when BCO is GCd
 
-nameOfProtoBCO (ProtoBCO nm insns origin) = nm
+nameOfProtoBCO (ProtoBCO nm insns origin malloced) = nm
 
 type LocalLabel = Int
 
@@ -109,8 +110,8 @@ data BCInstr
 
 
 instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs origin)
-      = (text "ProtoBCO" <+> ppr name <> colon)
+   ppr (ProtoBCO name instrs origin malloced)
+      = (text "ProtoBCO" <+> ppr name <+> text (show malloced) <> colon)
         $$ nest 6 (vcat (map ppr instrs))
         $$ case origin of
               Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)

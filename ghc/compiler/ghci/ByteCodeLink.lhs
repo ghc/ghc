@@ -39,8 +39,9 @@ import MArray		( castSTUArray,
 			  newIntArray, writeIntArray,
 			  newAddrArray, writeAddrArray,
 			  readWordArray )
-import Foreign		( Word16, Ptr(..) )
-import Addr 		( Word, Addr, nullAddr )
+import Foreign		( Word16, Ptr(..), free )
+import Addr 		( Word, Addr(..), nullAddr )
+import Weak		( addFinalizer )
 import FiniteMap
 
 import PrelBase		( Int(..) )
@@ -116,20 +117,22 @@ data UnlinkedBCO
                  (SizedSeq Word)		 -- literals
                  (SizedSeq (Either Name PrimOp)) -- ptrs
                  (SizedSeq Name)		 -- itbl refs
+                 [Addr]                          -- malloc'd, free when BCO GC'd
 
-nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _) = nm
+nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _ _) = nm
 
 -- When translating expressions, we need to distinguish the root
 -- BCO for the expression
 type UnlinkedBCOExpr = (UnlinkedBCO, [UnlinkedBCO])
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm insns lits ptrs itbls)
+   ppr (UnlinkedBCO nm insns lits ptrs itbls malloced)
       = sep [text "BCO", ppr nm, text "with", 
              int (sizeSS insns), text "insns",
              int (sizeSS lits), text "lits",
              int (sizeSS ptrs), text "ptrs",
-             int (sizeSS itbls), text "itbls"]
+             int (sizeSS itbls), text "itbls",
+             int (length malloced), text "malloced"]
 
 
 -- these need a proper home
@@ -162,7 +165,7 @@ this BCO.
 -- Top level assembler fn.
 assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
 
-assembleBCO (ProtoBCO nm instrs origin)
+assembleBCO (ProtoBCO nm instrs origin malloced)
    = let
          -- pass 1: collect up the offsets of the local labels.
          -- Remember that the first insn starts at offset 1 since offset 0
@@ -189,7 +192,7 @@ assembleBCO (ProtoBCO nm instrs origin)
          (final_insns, final_lits, final_ptrs, final_itbls) 
             <- mkBits findLabel init_asm_state instrs         
 
-         return (UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls)
+         return (UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls malloced)
 
 -- instrs nonptrs ptrs itbls
 type AsmState = (SizedSeq Word16, SizedSeq Word, 
@@ -468,7 +471,7 @@ data BCO# = BCO# ByteArray# 		-- instrs   :: Array Word16#
                  ByteArray#		-- itbls    :: Array Addr#
 -}
 
-linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
+linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS malloced)
    = do insns    <- listFromSS insnsSS
         literals <- listFromSS literalsSS
         ptrs     <- listFromSS ptrsSS
@@ -509,8 +512,18 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
 
         -- WAS: return (unsafeCoerce# bco#)
         case mkApUpd0# (unsafeCoerce# bco#) of
-           (# final_bco #) -> return final_bco
-
+           (# final_bco #)
+              |  not (null malloced)
+              -> do addFinalizer final_bco (freeup malloced)
+                    return final_bco
+              |  otherwise
+              -> return final_bco
+        where
+           freeup :: [Addr] -> IO ()
+           freeup = mapM_ zonk
+           zonk a@(A# a#) 
+               = do -- putStrLn ("freeing malloced block at " ++ show a)
+                    free (Ptr a#)
 
 data BCO = BCO BCO#
 
