@@ -241,8 +241,16 @@ initSysTools minusB_args
 	--	pick up whatever happens to be lying around in the path,
 	--	possibly including those from a cygwin install on the target,
 	--	which is exactly what we're trying to avoid.
-	; let gcc_path 	| am_installed = installed_bin ("gcc -B" ++ "\"" ++ (installed "gcc-lib/") ++ "\"")
+	; let gcc_path 	| am_installed = installed_bin ("gcc -B\"" ++ installed "gcc-lib\\\"")
 		       	| otherwise    = cGCC
+		-- The trailing "\\" is absolutely essential; gcc seems
+		-- to construct file names simply by concatenating to this
+		-- -B path with no extra slash.
+		-- We use "\\" rather than "/" because gcc_path is in NATIVE format
+		--	(see comments with declarations of global variables)
+		--
+		-- The quotes round the -B argument are in case TopDir has spaces in it
+
 	      perl_path | am_installed = installed_bin cGHC_PERL
 		        | otherwise    = cGHC_PERL
 
