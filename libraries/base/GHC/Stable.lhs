@@ -71,7 +71,7 @@ deRefStablePtr (StablePtr sp) = IO $ \s -> deRefStablePtr# sp s
 -- it may be 'Foreign.Ptr.nullPtr').  Nevertheless, the call
 -- to 'castStablePtrToPtr' is guaranteed not to diverge.
 --
-foreign import ccall unsafe freeStablePtr :: StablePtr a -> IO ()
+foreign import ccall unsafe "hs_free_stable_ptr" freeStablePtr :: StablePtr a -> IO ()
 
 -- |
 -- Coerce a stable pointer to an address. No guarantees are made about
