@@ -19,7 +19,7 @@ module Text.Regex.Posix (
 	-- * The @Regex@ type
 	Regex,	 	-- abstract
 
-#if defined(HAVE_REGEX_H)
+#if !defined(__HUGS__) || defined(HAVE_REGEX_H)
 	-- * Compiling a regular expression
 	regcomp, 	-- :: String -> Int -> IO Regex
 
@@ -39,7 +39,7 @@ module Text.Regex.Posix (
 #endif
   ) where
 
-#if defined(HAVE_REGEX_H)
+#if !defined(__HUGS__) || defined(HAVE_REGEX_H)
 #include <sys/types.h>
 #include "regex.h"
 #endif
@@ -54,7 +54,7 @@ type CRegex    = ()
 -- | A compiled regular expression
 newtype Regex = Regex (ForeignPtr CRegex)
 
-#if defined(HAVE_REGEX_H) 
+#if !defined(__HUGS__) || defined(HAVE_REGEX_H)
 -- to the end
 -- -----------------------------------------------------------------------------
 -- regcomp
