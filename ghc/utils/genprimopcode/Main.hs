@@ -22,8 +22,7 @@ main = getArgs >>= \args ->
        do s <- getContents
           let pres = parse pTop "" s
           case pres of
-             Left err -> do putStr "parse error at "
-                            print err
+             Left err -> error ("parse error at " ++ (show err))
              Right p_o_specs
                 -> myseq (sanityTop p_o_specs) (
                    case head args of
@@ -78,8 +77,8 @@ main = getArgs >>= \args ->
                       "--make-haskell-wrappers" 
                          -> putStr (gen_wrappers p_o_specs)
 			
-		      "--make-latex-table"
-			 -> putStr (gen_latex_table p_o_specs)
+		      "--make-latex-doc"
+			 -> putStr (gen_latex_doc p_o_specs)
                    )
 
 
@@ -96,35 +95,163 @@ known_args
        "--primop-tag",
        "--primop-list",
        "--make-haskell-wrappers",
-       "--make-latex-table"
+       "--make-latex-doc"
      ]
 
 ------------------------------------------------------------------
 -- Code generators -----------------------------------------------
 ------------------------------------------------------------------
 
-gen_latex_table (Info defaults pos)
-   = "\\begin{tabular}{|l|l|}\n"
-     ++ "\\hline\nName &\t Type\\\\\n\\hline\n"
-     ++ (concat (map f pos))
-     ++ "\\end{tabular}"
-     where 
-       f spec = "@" ++ (encode (name spec)) ++ "@ &\t@" ++ (pty (ty spec)) ++ "@\\\\\n"
-       encode s = s
-       pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
-       pty t = pbty t
-       pbty (TyApp tc ts) = (encode tc) ++ (concat (map (' ':) (map paty ts)))
-       pbty (TyUTup ts) = (mkUtupnm (length ts)) ++ (concat (map (' ':) (map paty ts)))
-       pbty t = paty t
-       paty (TyVar tv) = encode tv
-       paty t = "(" ++ pty t ++ ")"
-       mkUtupnm 1 = "ZL#z32U#ZR"
-       mkUtupnm n = "Z" ++ (show (n-1)) ++ "U"
+gen_latex_doc (Info defaults entries)
+   = "\\primopdefaults{" 
+	 ++ mk_options defaults
+	 ++ "}\n"
+     ++ (concat (map mk_entry entries))
+     where mk_entry (PrimOpSpec {cons=cons,name=name,ty=ty,cat=cat,desc=desc,opts=opts}) =
+   		 "\\primopdesc{" 
+		 ++ latex_encode cons ++ "}{"
+		 ++ latex_encode name ++ "}{"
+		 ++ latex_encode (zencode name) ++ "}{"
+		 ++ latex_encode (show cat) ++ "}{"
+		 ++ latex_encode (mk_source_ty ty) ++ "}{"
+		 ++ latex_encode (mk_core_ty ty) ++ "}{"
+		 ++ desc ++ "}{"
+		 ++ mk_options opts
+		 ++ "}\n"
+           mk_entry (Section {title=title,desc=desc}) =
+		 "\\primopsection{" 
+		 ++ latex_encode title ++ "}{" 
+		 ++ desc ++ "}\n"
+	   mk_source_ty t = pty t
+	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+		   pty t = pbty t
+		   pbty (TyApp tc ts) = tc ++ (concat (map (' ':) (map paty ts)))
+		   pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
+		   pbty t = paty t
+		   paty (TyVar tv) = tv
+		   paty t = "(" ++ pty t ++ ")"
+	   
+	   mk_core_ty t = foralls ++ (pty t)
+	     where pty (TyF t1 t2) = pbty t1 ++ " -> " ++ pty t2
+		   pty t = pbty t
+		   pbty (TyApp tc ts) = (zencode tc) ++ (concat (map (' ':) (map paty ts)))
+		   pbty (TyUTup ts) = (zencode (utuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
+		   pbty t = paty t
+		   paty (TyVar tv) = zencode tv
+		   paty (TyApp tc []) = zencode tc
+		   paty t = "(" ++ pty t ++ ")"
+		   utuplenm 1 = "(# #)"
+		   utuplenm n = "(#" ++ (replicate (n-1) ',') ++ "#)"
+		   foralls = if tvars == [] then "" else "%forall " ++ (tbinds tvars)
+		   tvars = tvars_of t
+		   tbinds [] = ". " 
+		   tbinds ("o":tbs) = "(o::?) " ++ (tbinds tbs)
+		   tbinds (tv:tbs) = tv ++ " " ++ (tbinds tbs)
+	   tvars_of (TyF t1 t2) = tvars_of t1 `union` tvars_of t2
+	   tvars_of (TyApp tc ts) = foldl union [] (map tvars_of ts)
+	   tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
+	   tvars_of (TyVar tv) = [tv]
+	   
+           mk_options opts = 
+	     "\\primoptions{"
+	      ++ mk_has_side_effects opts ++ "}{"
+	      ++ mk_out_of_line opts ++ "}{"
+	      ++ mk_commutable opts ++ "}{"
+ 	      ++ mk_needs_wrapper opts ++ "}{"
+	      ++ mk_can_fail opts ++ "}{"
+	      ++ latex_encode (mk_strictness opts) ++ "}{"
+ 	      ++ latex_encode (mk_usage opts)
+	      ++ "}"
 
-gen_wrappers (Info defaults pos)
+  	   mk_has_side_effects opts = mk_bool_opt opts "has_side_effects" "Has side effects." "Has no side effects."
+	   mk_out_of_line opts = mk_bool_opt opts "out_of_line" "Implemented out of line." "Implemented in line."
+  	   mk_commutable opts = mk_bool_opt opts "commutable" "Commutable." "Not commutable."
+  	   mk_needs_wrapper opts = mk_bool_opt opts "needs_wrapper" "Needs wrapper." "Needs no wrapper."
+	   mk_can_fail opts = mk_bool_opt opts "can_fail" "Can fail." "Cannot fail."
+
+	   mk_bool_opt opts opt_name if_true if_false =
+	     case lookup_attrib opt_name opts of
+	       Just (OptionTrue _) -> if_true
+	       Just (OptionFalse _) -> if_false
+	       Nothing -> ""
+	   
+	   mk_strictness opts = 
+	     case lookup_attrib "strictness" opts of
+	       Just (OptionString _ s) -> s  -- for now
+	       Nothing -> "" 
+
+	   mk_usage opts = 
+	     case lookup_attrib "usage" opts of
+	       Just (OptionString _ s) -> s  -- for now
+	       Nothing -> "" 
+
+	   zencode cs = 
+	     case maybe_tuple cs of
+		Just n  -> n		-- Tuples go to Z2T etc
+		Nothing -> concat (map encode_ch cs)
+	     where
+	       maybe_tuple "(# #)" = Just("Z1H")
+	       maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
+						(n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
+						other		     -> Nothing
+	       maybe_tuple "()" = Just("Z0T")
+	       maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
+						(n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
+						other	       -> Nothing
+	       maybe_tuple other    	     = Nothing
+	       
+	       count_commas :: Int -> String -> (Int, String)
+	       count_commas n (',' : cs) = count_commas (n+1) cs
+	       count_commas n cs	  = (n,cs)
+	       
+	       unencodedChar :: Char -> Bool	-- True for chars that don't need encoding
+	       unencodedChar 'Z' = False
+	       unencodedChar 'z' = False
+	       unencodedChar c   = isAlphaNum c
+	       
+	       encode_ch :: Char -> String
+	       encode_ch c | unencodedChar c = [c]	-- Common case first
+	       
+	       -- Constructors
+	       encode_ch '('  = "ZL"	-- Needed for things like (,), and (->)
+	       encode_ch ')'  = "ZR"	-- For symmetry with (
+	       encode_ch '['  = "ZM"
+	       encode_ch ']'  = "ZN"
+	       encode_ch ':'  = "ZC"
+	       encode_ch 'Z'  = "ZZ"
+	       
+	       -- Variables
+	       encode_ch 'z'  = "zz"
+	       encode_ch '&'  = "za"
+	       encode_ch '|'  = "zb"
+	       encode_ch '^'  = "zc"
+	       encode_ch '$'  = "zd"
+	       encode_ch '='  = "ze"
+	       encode_ch '>'  = "zg"
+	       encode_ch '#'  = "zh"
+	       encode_ch '.'  = "zi"
+	       encode_ch '<'  = "zl"
+	       encode_ch '-'  = "zm"
+	       encode_ch '!'  = "zn"
+	       encode_ch '+'  = "zp"
+	       encode_ch '\'' = "zq"
+	       encode_ch '\\' = "zr"
+	       encode_ch '/'  = "zs"
+	       encode_ch '*'  = "zt"
+	       encode_ch '_'  = "zu"
+	       encode_ch '%'  = "zv"
+	       encode_ch c    = 'z' : shows (ord c) "U"
+		       
+	   latex_encode [] = []
+	   latex_encode (c:cs) | c `elem` "#$%&_^{}" = "\\" ++ c:(latex_encode cs)
+	   latex_encode ('~':cs) = "\\verb!~!" ++ (latex_encode cs)
+	   latex_encode ('\\':cs) = "$\\backslash$" ++ (latex_encode cs)
+	   latex_encode (c:cs) = c:(latex_encode cs)
+
+gen_wrappers (Info defaults entries)
    = "module PrelPrimopWrappers where\n" 
      ++ "import qualified PrelGHC\n" 
-     ++ unlines (map f (filter (not.dodgy) pos))
+     ++ unlines (map f (filter (not.dodgy) (filter is_primop entries)))
      where
         f spec = let args = map (\n -> "a" ++ show n) [1 .. arity (ty spec)]
                      src_name = wrap (name spec)
@@ -145,30 +272,30 @@ gen_wrappers (Info defaults pos)
              ]
 
 
-gen_primop_list (Info defaults pos)
+gen_primop_list (Info defaults entries)
    = unlines (
-        [      "   [" ++ cons (head pos)       ]
+        [      "   [" ++ cons first       ]
         ++
-        map (\pi -> "   , " ++ cons pi) (tail pos)
+        map (\pi -> "   , " ++ cons pi) rest
         ++ 
         [     "   ]"     ]
-     )
+     ) where (first:rest) = filter is_primop entries
 
-gen_primop_tag (Info defaults pos)
-   = unlines (zipWith f pos [1..])
+gen_primop_tag (Info defaults entries)
+   = unlines (zipWith f (filter is_primop entries) [1..])
      where
         f i n = "tagOf_PrimOp " ++ cons i 
                 ++ " = _ILIT(" ++ show n ++ ") :: FastInt"
 
-gen_data_decl (Info defaults pos)
-   = let conss = map cons pos
+gen_data_decl (Info defaults entries)
+   = let conss = map cons (filter is_primop entries)
      in  "data PrimOp\n   = " ++ head conss ++ "\n"
          ++ unlines (map ("   | "++) (tail conss))
 
 gen_switch_from_attribs :: String -> String -> Info -> String
-gen_switch_from_attribs attrib_name fn_name (Info defaults pos)
+gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
    = let defv = lookup_attrib attrib_name defaults
-         alts = catMaybes (map mkAlt pos)
+         alts = catMaybes (map mkAlt (filter is_primop entries))
 
          getAltRhs (OptionFalse _)    = "False"
          getAltRhs (OptionTrue _)     = "True"
@@ -179,9 +306,6 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults pos)
                  Nothing -> Nothing
                  Just xx -> Just (fn_name ++ " " ++ cons po ++ " = " ++ getAltRhs xx)
 
-         lookup_attrib nm [] = Nothing
-         lookup_attrib nm (a:as) 
-            = if get_attrib_name a == nm then Just a else lookup_attrib nm as
      in
          case defv of
             Nothing -> error ("gen_switch_from: " ++ attrib_name)
@@ -194,8 +318,8 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults pos)
 ------------------------------------------------------------------
 
 
-gen_primop_info (Info defaults pos)
-   = unlines (map mkPOItext pos)
+gen_primop_info (Info defaults entries)
+   = unlines (map mkPOItext (filter is_primop entries))
 
 mkPOItext i = mkPOI_LHS_text i ++ mkPOI_RHS_text i
 
@@ -237,9 +361,11 @@ ppTyVar "o" = "openAlphaTyVar"
 ppType (TyApp "Bool"        []) = "boolTy"
 
 ppType (TyApp "Int#"        []) = "intPrimTy"
+ppType (TyApp "Int32#"      []) = "int32PrimTy"
 ppType (TyApp "Int64#"      []) = "int64PrimTy"
 ppType (TyApp "Char#"       []) = "charPrimTy"
 ppType (TyApp "Word#"       []) = "wordPrimTy"
+ppType (TyApp "Word32#"     []) = "word32PrimTy"
 ppType (TyApp "Word64#"     []) = "word64PrimTy"
 ppType (TyApp "Addr#"       []) = "addrPrimTy"
 ppType (TyApp "Float#"      []) = "floatPrimTy"
@@ -304,17 +430,23 @@ arity = length . fst . flatTys
 
 -- info for all primops; the totality of the info in primops.txt(.pp)
 data Info
-   = Info [Option] [PrimOpSpec]   -- defaults, primops
+   = Info [Option] [Entry]   -- defaults, primops
      deriving Show
 
 -- info for one primop
-data PrimOpSpec
+data Entry
     = PrimOpSpec { cons  :: String,      -- PrimOp name
                    name  :: String,      -- name in prog text
                    ty    :: Ty,          -- type
                    cat   :: Category,    -- category
+		   desc  :: String,      -- description
                    opts  :: [Option] }   -- default overrides
+    | Section { title :: String,	 -- section title
+		desc  :: String }        -- description
     deriving Show
+
+is_primop (PrimOpSpec _ _ _ _ _ _) = True
+is_primop _ = False
 
 -- a binding of property to value
 data Option
@@ -360,8 +492,9 @@ myseqAll (():ys) x = myseqAll ys x
 myseqAll []      x = x
 
 sanityTop :: Info -> ()
-sanityTop (Info defs primops)
+sanityTop (Info defs entries)
    = let opt_names = map get_attrib_name defs
+	 primops = filter is_primop entries
      in  
      if   length opt_names /= length (nub opt_names)
      then error ("non-unique default attribute names: " ++ show opt_names ++ "\n")
@@ -398,6 +531,10 @@ get_attrib_name (OptionFalse nm) = nm
 get_attrib_name (OptionTrue nm)  = nm
 get_attrib_name (OptionString nm _) = nm
 
+lookup_attrib nm [] = Nothing
+lookup_attrib nm (a:as) 
+    = if get_attrib_name a == nm then Just a else lookup_attrib nm as
+
 ------------------------------------------------------------------
 -- The parser ----------------------------------------------------
 ------------------------------------------------------------------
@@ -405,9 +542,17 @@ get_attrib_name (OptionString nm _) = nm
 -- Due to lack of proper lexing facilities, a hack to zap any
 -- leading comments
 pTop :: Parser Info
-pTop = then4 (\_ ds ss _ -> Info ds ss) 
-             pCommentAndWhitespace pDefaults (many pPrimOpSpec)
+pTop = then4 (\_ ds es _ -> Info ds es) 
+             pCommentAndWhitespace pDefaults (many pEntry)
              (lit "thats_all_folks")
+
+pEntry :: Parser Entry
+pEntry 
+  = alts [pPrimOpSpec, pSection]
+
+pSection :: Parser Entry
+pSection = then3 (\_ n d -> Section {title = n, desc = d}) 
+		 (lit "section") stringLiteral pDesc
 
 pDefaults :: Parser [Option]
 pDefaults = then2 sel22 (lit "defaults") (many pOption)
@@ -421,12 +566,12 @@ pOption
               pName (lit "=") pStuffBetweenBraces
      ]
 
-pPrimOpSpec :: Parser PrimOpSpec
+pPrimOpSpec :: Parser Entry
 pPrimOpSpec
-   = then6 (\_ c n k t o -> PrimOpSpec { cons = c, name = n, ty = t, 
-                                         cat = k, opts = o } )
+   = then7 (\_ c n k t d o -> PrimOpSpec { cons = c, name = n, ty = t, 
+                                           cat = k, desc = d, opts = o } )
            (lit "primop") pConstructor stringLiteral 
-           pCategory pType pOptions
+           pCategory pType pDesc pOptions
 
 pOptions :: Parser [Option]
 pOptions = optdef [] (then2 sel22 (lit "with") (many pOption))
@@ -440,10 +585,28 @@ pCategory
         apply (const GenPrimOp) (lit "GenPrimOp")
      ]
 
+pDesc :: Parser String
+pDesc = optdef "" pStuffBetweenBraces
+
+pStuffBetweenBraces :: Parser String
 pStuffBetweenBraces
-    = lexeme (then3 sel23 
-                    (char '{') (many (satisfy (not . (== '}')))) 
-                    (char '}'))
+    = lexeme (
+	do char '{'
+	   ass <- many pInsides
+	   char '}'
+           return (concat ass) )
+
+pInsides :: Parser String
+pInsides 
+    = (do char '{' 
+	  stuff <- many pInsides
+          char '}'
+          return ("{" ++ (concat stuff) ++ "}"))
+      <|> 
+      (do c <- satisfy (/= '}')
+          return [c])
+
+
 
 -------------------
 -- Parsing types --
@@ -475,7 +638,7 @@ ppT = alts [apply TyVar pTyvar,
             apply (\tc -> TyApp tc []) pTycon
            ]
 
-pTyvar       = sat (`notElem` ["primop","with"]) pName
+pTyvar       = sat (`notElem` ["section","primop","with"]) pName
 pTycon       = pConstructor
 pName        = lexeme (then2 (:) lower (many isIdChar))
 pConstructor = lexeme (then2 (:) upper (many isIdChar))
@@ -508,6 +671,9 @@ then5 f p1 p2 p3 p4 p5
 then6 f p1 p2 p3 p4 p5 p6
    = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; x5 <- p5 ; x6 <- p6
         return (f x1 x2 x3 x4 x5 x6)
+then7 f p1 p2 p3 p4 p5 p6 p7
+   = do x1 <- p1 ; x2 <- p2 ; x3 <- p3 ; x4 <- p4 ; x5 <- p5 ; x6 <- p6 ; x7 <- p7
+        return (f x1 x2 x3 x4 x5 x6 x7)
 opt p
    = (do x <- p; return (Just x)) <|> return Nothing
 optdef d p

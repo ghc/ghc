@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.4 2001/08/17 17:18:53 apt Exp $
+-- $Id: primops.txt,v 1.25 2001/08/17 17:18:53 apt Exp $
 --
 -- Primitive Operations
 --
@@ -65,13 +65,1054 @@ defaults
 -- Currently, documentation is produced using latex, so contents of description fields
 -- should be legal latex. Descriptions can contain matched pairs of embedded curly brackets.
 
-#include "MachDeps.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 section "The word size story."
 	{Haskell98 specifies that signed integers (type {\tt Int}) must contain at least 30 
 	 bits. GHC always implements {\tt Int} using the primitive type {\tt Int\#}, whose
 	 size equals the {\tt MachDeps.h} constant {\tt WORD\_SIZE\_IN\_BITS}.  This
- 	 is normally set based on the {\tt config.h} parameter {\tt SIZEOF_LONG},
+ 	 is normally set based on the {\tt config.h} parameter {\tt 4},
 	 i.e., 32 bits on 32-bit machines, 64 bits on 64-bit machines.  However, it can
 	 also be explicitly set to a smaller number, e.g., 31 bits, to allow the possibility
 	 of using  tag bits. Currently GHC itself has only 32-bit and 64-bit variants,
@@ -116,21 +1157,21 @@ section "The word size story."
 	
 -- Define synonyms for indexing ops. 
 
-#if WORD_SIZE_IN_BITS < 32 
-#define INT32 Int32#
-#define WORD32 Word32#
-#else
-#define INT32 Int#
-#define WORD32 Word#
-#endif
 
-#if WORD_SIZE_IN_BITS < 64
-#define INT64 Int64#
-#define WORD64 Word64#
-#else
-#define INT64 Int#
-#define WORD64 Word#
-#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ------------------------------------------------------------------------
 section "Char#" 
@@ -279,35 +1320,10 @@ primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
 
 
-#if WORD_SIZE_IN_BITS < 32
-------------------------------------------------------------------------
-section "Int32#"
-	{Operations on 32-bit integers (Int32\#).  This type is only used
-         if plain Int\# has less than 32 bits.  In any case, the operations
-	 are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primop   Int32ToIntegerOp   "int32ToInteger#" GenPrimOp 
-   Int32# -> (# Int#, ByteArr# #)
-   with out_of_line = True
 
 
-------------------------------------------------------------------------
-section "Word32#"
-	{Operations on 32-bit unsigned words. This type is only used 
-	 if plain Word\# has less than 32 bits. In any case, the operations
-	 are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primop   Word32ToIntegerOp   "word32ToInteger#" GenPrimOp
-   Word32# -> (# Int#, ByteArr# #)
-   with out_of_line = True
 
 
-#endif 
-
-
-#if WORD_SIZE_IN_BITS < 64
 ------------------------------------------------------------------------
 section "Int64#"
 	{Operations on 64-bit unsigned words. This type is only used 
@@ -330,7 +1346,7 @@ primop   Word64ToIntegerOp   "word64ToInteger#" GenPrimOp
    Word64# -> (# Int#, ByteArr# #)
    with out_of_line = True
 
-#endif
+
 
 ------------------------------------------------------------------------
 section "Integer#"
@@ -413,21 +1429,21 @@ primop   Integer2WordOp   "integer2Word#"   GenPrimOp
    Int# -> ByteArr# -> Word#
    with needs_wrapper = True
 
-#if WORD_SIZE_IN_BITS < 32
-primop   IntegerToInt32Op   "integerToInt32#" GenPrimOp
-   Int# -> ByteArr# -> Int32#
 
-primop   IntegerToWord32Op   "integerToWord32#" GenPrimOp
-   Int# -> ByteArr# -> Word32#
-#endif
 
-#if WORD_SIZE_IN_BITS < 64
+
+
+
+
+
+
+
 primop   IntegerToInt64Op   "integerToInt64#" GenPrimOp
    Int# -> ByteArr# -> Int64#
 
 primop   IntegerToWord64Op   "integerToWord64#" GenPrimOp
    Int# -> ByteArr# -> Word64#
-#endif
+
 
 primop   IntegerAndOp  "andInteger#" GenPrimOp
    Int# -> ByteArr# -> Int# -> ByteArr# -> (# Int#, ByteArr# #)
@@ -785,10 +1801,10 @@ primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    ByteArr# -> Int# -> Int#
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
-   ByteArr# -> Int# -> INT32
+   ByteArr# -> Int# -> Int#
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
-   ByteArr# -> Int# -> INT64
+   ByteArr# -> Int# -> Int64#
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
    ByteArr# -> Int# -> Word#
@@ -797,10 +1813,10 @@ primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    ByteArr# -> Int# -> Word#
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
-   ByteArr# -> Int# -> WORD32
+   ByteArr# -> Int# -> Word#
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
-   ByteArr# -> Int# -> WORD64
+   ByteArr# -> Int# -> Word64#
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
    MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #)
@@ -835,10 +1851,10 @@ primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
    MutByteArr# s -> Int# -> State# s -> (# State# s, Int# #)
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, INT32 #)
+   MutByteArr# s -> Int# -> State# s -> (# State# s, Int# #)
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, INT64 #)
+   MutByteArr# s -> Int# -> State# s -> (# State# s, Int64# #)
 
 primop  ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
    MutByteArr# s -> Int# -> State# s -> (# State# s, Word# #)
@@ -847,10 +1863,10 @@ primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
    MutByteArr# s -> Int# -> State# s -> (# State# s, Word# #)
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, WORD32 #)
+   MutByteArr# s -> Int# -> State# s -> (# State# s, Word# #)
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> State# s -> (# State# s, WORD64 #)
+   MutByteArr# s -> Int# -> State# s -> (# State# s, Word64# #)
 
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
    MutByteArr# s -> Int# -> Char# -> State# s -> State# s
@@ -895,11 +1911,11 @@ primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> INT32 -> State# s -> State# s
+   MutByteArr# s -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> INT64 -> State# s -> State# s
+   MutByteArr# s -> Int# -> Int64# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
@@ -911,11 +1927,11 @@ primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
-   MutByteArr# s -> Int# -> WORD32 -> State# s -> State# s
+   MutByteArr# s -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
-   MutByteArr# s -> Int# -> WORD64 -> State# s -> State# s
+   MutByteArr# s -> Int# -> Word64# -> State# s -> State# s
    with has_side_effects = True
 
 ------------------------------------------------------------------------
@@ -934,12 +1950,12 @@ primop	 AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop	 AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
 	 {Return the remainder when the Addr\# arg, treated like an Int\#,
 	  is divided by the Int\# arg.}
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
+
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
 	{Coerce directly from address to int. Strongly deprecated.}
 primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
 	{Coerce directly from int to address. Strongly deprecated.}
-#endif
+
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Bool
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Bool
@@ -981,10 +1997,10 @@ primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32
+   Addr# -> Int# -> Int#
 
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT64
+   Addr# -> Int# -> Int64#
 
 primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
@@ -993,10 +2009,10 @@ primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
 
 primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32
+   Addr# -> Int# -> Word#
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD64
+   Addr# -> Int# -> Word64#
 
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
@@ -1031,10 +2047,10 @@ primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT32 #)
+   Addr# -> Int# -> State# s -> (# State# s, Int# #)
 
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, INT64 #)
+   Addr# -> Int# -> State# s -> (# State# s, Int64# #)
 
 primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
@@ -1043,10 +2059,10 @@ primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
+   Addr# -> Int# -> State# s -> (# State# s, Word# #)
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> State# s -> (# State# s, WORD64 #)
+   Addr# -> Int# -> State# s -> (# State# s, Word64# #)
 
 
 primop  WriteOffAddrOp_Char "writeCharOffAddr#" GenPrimOp
@@ -1094,11 +2110,11 @@ primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT32 -> State# s -> State# s
+   Addr# -> Int# -> Int# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
-   Addr# -> Int# -> INT64 -> State# s -> State# s
+   Addr# -> Int# -> Int64# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
@@ -1110,11 +2126,11 @@ primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD32 -> State# s -> State# s
+   Addr# -> Int# -> Word# -> State# s -> State# s
    with has_side_effects = True
 
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
-   Addr# -> Int# -> WORD64 -> State# s -> State# s
+   Addr# -> Int# -> Word64# -> State# s -> State# s
    with has_side_effects = True
 
 ------------------------------------------------------------------------
@@ -1180,10 +2196,10 @@ primop IndexOffForeignObjOp_Int16 "indexInt16OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Int#
 
 primop IndexOffForeignObjOp_Int32 "indexInt32OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> INT32
+   ForeignObj# -> Int# -> Int#
 
 primop IndexOffForeignObjOp_Int64 "indexInt64OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> INT64
+   ForeignObj# -> Int# -> Int64#
 
 primop IndexOffForeignObjOp_Word8 "indexWord8OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Word#
@@ -1192,10 +2208,10 @@ primop IndexOffForeignObjOp_Word16 "indexWord16OffForeignObj#" GenPrimOp
    ForeignObj# -> Int# -> Word#
 
 primop IndexOffForeignObjOp_Word32 "indexWord32OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> WORD32
+   ForeignObj# -> Int# -> Word#
 
 primop IndexOffForeignObjOp_Word64 "indexWord64OffForeignObj#" GenPrimOp
-   ForeignObj# -> Int# -> WORD64
+   ForeignObj# -> Int# -> Word64#
 
 
 

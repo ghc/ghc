@@ -15,11 +15,11 @@ module Literal
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
 
 	, word2IntLit, int2WordLit
-	, intToInt8Lit, intToInt16Lit, intToInt32Lit
-	, wordToWord8Lit, wordToWord16Lit, wordToWord32Lit
+	, narrow8IntLit, narrow16IntLit, narrow32IntLit
+	, narrow8WordLit, narrow16WordLit, narrow32WordLit
 	, char2IntLit, int2CharLit
 	, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-	, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
+	, nullAddrLit, float2DoubleLit, double2FloatLit
 	) where
 
 #include "HsVersions.h"
@@ -100,9 +100,9 @@ data Literal
 
   | MachAddr	Integer	-- Whatever this machine thinks is a "pointer"
 
-  | MachInt	Integer		-- Int#		At least 32 bits
+  | MachInt	Integer		-- Int#		At least WORD_SIZE_IN_BITS bits
   | MachInt64	Integer		-- Int64#	At least 64 bits
-  | MachWord	Integer		-- Word#	At least 32 bits
+  | MachWord	Integer		-- Word#	At least WORD_SIZE_IN_BITS bits
   | MachWord64	Integer		-- Word64#	At least 64 bits
 
   | MachFloat	Rational
@@ -163,11 +163,11 @@ inCharRange c =  c >= 0 && c <= tARGET_MAX_CHAR
 	~~~~~~~~~
 \begin{code}
 word2IntLit, int2WordLit,
-  intToInt8Lit, intToInt16Lit, intToInt32Lit,
-  wordToWord8Lit, wordToWord16Lit, wordToWord32Lit,
+  narrow8IntLit, narrow16IntLit, narrow32IntLit,
+  narrow8WordLit, narrow16WordLit, narrow32WordLit,
   char2IntLit, int2CharLit,
   float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
-  addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
+  float2DoubleLit, double2FloatLit
   :: Literal -> Literal
 
 word2IntLit (MachWord w) 
@@ -178,12 +178,12 @@ int2WordLit (MachInt i)
   | i < 0     = MachWord (1 + tARGET_MAX_WORD + i)	-- (-1)  --->  tARGET_MAX_WORD
   | otherwise = MachWord i
 
-intToInt8Lit    (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int8))
-intToInt16Lit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int16))
-intToInt32Lit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int32))
-wordToWord8Lit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word8))
-wordToWord16Lit (MachWord w) = MachWord (toInteger (fromInteger w :: Word16))
-wordToWord32Lit (MachWord w) = MachWord (toInteger (fromInteger w :: Word32))
+narrow8IntLit    (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int8))
+narrow16IntLit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int16))
+narrow32IntLit   (MachInt  i) = MachInt  (toInteger (fromInteger i :: Int32))
+narrow8WordLit   (MachWord w) = MachWord (toInteger (fromInteger w :: Word8))
+narrow16WordLit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word16))
+narrow32WordLit  (MachWord w) = MachWord (toInteger (fromInteger w :: Word32))
 
 char2IntLit (MachChar c) = MachInt  (toInteger c)
 int2CharLit (MachInt  i) = MachChar (fromInteger i)
@@ -194,11 +194,11 @@ int2FloatLit (MachInt   i) = MachFloat (fromInteger i)
 double2IntLit (MachDouble f) = MachInt    (truncate    f)
 int2DoubleLit (MachInt   i) = MachDouble (fromInteger i)
 
-addr2IntLit (MachAddr a) = MachInt  a
-int2AddrLit (MachInt  i) = MachAddr i
-
 float2DoubleLit (MachFloat  f) = MachDouble f
 double2FloatLit (MachDouble d) = MachFloat  d
+
+nullAddrLit :: Literal
+nullAddrLit = MachAddr 0
 \end{code}
 
 	Predicates

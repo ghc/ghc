@@ -177,6 +177,7 @@ genPipeline todo stop_flag persistent_output lang (filename,suffix)
 	HscILX  | split           -> not_valid
 		| otherwise       -> [ Unlit, Cpp, Hsc, Ilx2Il, Ilasm ]
 #endif
+	HscNothing 		  -> [ Unlit, Cpp, Hsc ]
 
       | cish      = [ Cc, As ]
 
@@ -535,13 +536,14 @@ run_phase Hsc basename suff input_fn output_fn
 	    HscRecomp pcs details iface stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
 
-	    -- deal with stubs
-	maybe_stub_o <- compileStub dyn_flags' stub_c_exists
-	case maybe_stub_o of
-		Nothing -> return ()
-		Just stub_o -> add v_Ld_inputs stub_o
-
-	return (Just output_fn)
+			    -- deal with stubs
+			    maybe_stub_o <- compileStub dyn_flags' stub_c_exists
+		  	    case maybe_stub_o of
+		 	      Nothing -> return ()
+		 	      Just stub_o -> add v_Ld_inputs stub_o
+			    case hscLang dyn_flags of
+                              HscNothing -> return Nothing
+			      _ -> return (Just output_fn)
     }
 
 -----------------------------------------------------------------------------
@@ -1034,6 +1036,7 @@ compile ghci_mode summary source_unchanged have_object
 	   HscILX              -> return (phaseInputExt Ilx2Il) 	
 #endif
 	   HscInterpreted      -> return (error "no output file")
+           HscNothing	       -> return (error "no output file")
 
    let dyn_flags' = dyn_flags { hscOutName = output_fn,
 				hscStubCOutName = basename ++ "_stub.c",

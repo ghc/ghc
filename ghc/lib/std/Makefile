@@ -65,7 +65,8 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 
 #-----------------------------------------------------------------------------
 # 	Pre-processing (.pp) files
-SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
+SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR) -traditional
+SRC_CPP_OPTS += ${GhcLibCppOpts}
 
 #-----------------------------------------------------------------------------
 # 	Rules

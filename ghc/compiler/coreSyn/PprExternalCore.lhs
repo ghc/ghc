@@ -135,7 +135,7 @@ pexp (Case e vb alts) = sep [text "%case" <+> paexp e,
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
 pexp (Coerce t e) = (text "%coerce" <+> paty t) $$ pexp e
 pexp (Note s e) = (text "%note" <+> pstring s) $$ pexp e
-pexp (Ccall n t) = (text "%ccall" <+> pstring n) $$ paty t
+pexp (External n t) = (text "%external" <+> pstring n) $$ paty t
 pexp e = pfexp e
 
 

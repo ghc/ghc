@@ -34,7 +34,7 @@ data Exp
   | Case Exp Vbind [Alt] {- non-empty list -}
   | Coerce Ty Exp 
   | Note String Exp
-  | Ccall String Ty
+  | External String Ty
 
 data Bind 
   = Vb Vbind

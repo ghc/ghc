@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.80 2001/08/08 10:50:37 simonmar Exp $
+ * $Id: PrimOps.h,v 1.81 2001/08/17 17:18:53 apt Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -9,6 +9,12 @@
 
 #ifndef PRIMOPS_H
 #define PRIMOPS_H
+
+#include "MachDeps.h"
+
+#if WORD_SIZE_IN_BITS < 32
+#error GHC C backend requires 32+-bit words
+#endif
 
 /* -----------------------------------------------------------------------------
    Helpers for the bytecode linker.             
@@ -225,17 +231,21 @@ typedef union {
    Explicitly sized Int# and Word# PrimOps.
    -------------------------------------------------------------------------- */
 
-#define intToInt8zh(r,a)	r=(StgInt8)(a)
-#define intToInt16zh(r,a)	r=(StgInt16)(a)
-#define intToInt32zh(r,a)	r=(StgInt32)(a)
-#define wordToWord8zh(r,a)	r=(StgWord8)(a)
-#define wordToWord16zh(r,a)	r=(StgWord16)(a)
-#define wordToWord32zh(r,a)	r=(StgWord32)(a)
+#define narrow8Intzh(r,a)	r=(StgInt8)(a)
+#define narrow16Intzh(r,a)	r=(StgInt16)(a)
+#define narrow32Intzh(r,a)	r=(StgInt32)(a)
+#define narrow8Wordzh(r,a)	r=(StgWord8)(a)
+#define narrow16Wordzh(r,a)	r=(StgWord16)(a)
+#define narrow32Wordzh(r,a)	r=(StgWord32)(a)
 
 /* -----------------------------------------------------------------------------
    Addr# PrimOps.
    -------------------------------------------------------------------------- */
 
+#define nullAddrzh(r,i)         r=(A_)(0)
+#define plusAddrzh(r,a,i)       r=((void *)(a)) + (i)
+#define minusAddrzh(r,a,b)      r=((void *)(a)) - ((void *)(b))
+#define remAddrzh(r,a,i)        r=((W_)(a))%(i)
 #define int2Addrzh(r,a) 	r=(A_)(a)
 #define addr2Intzh(r,a) 	r=(I_)(a)
 
@@ -249,13 +259,16 @@ typedef union {
 #define readStablePtrOffAddrzh(r,a,i)	r=((StgStablePtr *)(a))[i]
 #define readInt8OffAddrzh(r,a,i)	r=((StgInt8 *)(a))[i]
 #define readInt16OffAddrzh(r,a,i)	r=((StgInt16 *)(a))[i]
-#define readInt32OffAddrzh(r,a,i)	r=((StgInt32 *)(a))[i]
 #define readWord8OffAddrzh(r,a,i)	r=((StgWord8 *)(a))[i]
 #define readWord16OffAddrzh(r,a,i)	r=((StgWord16 *)(a))[i]
+#define readInt32OffAddrzh(r,a,i)	r=((StgInt32 *)(a))[i]
 #define readWord32OffAddrzh(r,a,i)	r=((StgWord32 *)(a))[i]
 #ifdef SUPPORT_LONG_LONGS
 #define readInt64OffAddrzh(r,a,i)	r=((LI_ *)(a))[i]
 #define readWord64OffAddrzh(r,a,i)	r=((LW_ *)(a))[i]
+#else
+#define readInt64OffAddrzh(r,a,i)	r=((I_ *)(a))[i]
+#define readWord64OffAddrzh(r,a,i)	r=((W_ *)(a))[i]
 #endif
 
 #define writeCharOffAddrzh(a,i,v)	((StgWord8 *)(a))[i] = (v)
@@ -276,6 +289,9 @@ typedef union {
 #ifdef SUPPORT_LONG_LONGS
 #define writeInt64OffAddrzh(a,i,v)	((LI_ *)(a))[i] = (v)
 #define writeWord64OffAddrzh(a,i,v)	((LW_ *)(a))[i] = (v)
+#else
+#define writeInt64OffAddrzh(a,i,v)	((I_ *)(a))[i] = (v)
+#define writeWord64OffAddrzh(a,i,v)	((W_ *)(a))[i] = (v)
 #endif
 
 #define indexCharOffAddrzh(r,a,i)   	r=((StgWord8 *)(a))[i]
@@ -295,6 +311,9 @@ typedef union {
 #ifdef SUPPORT_LONG_LONGS
 #define indexInt64OffAddrzh(r,a,i)  	r=((LI_ *)(a))[i]
 #define indexWord64OffAddrzh(r,a,i) 	r=((LW_ *)(a))[i]
+#else
+#define indexInt64OffAddrzh(r,a,i)  	r=((I_ *)(a))[i]
+#define indexWord64OffAddrzh(r,a,i) 	r=((W_ *)(a))[i]
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -538,7 +557,7 @@ LI_ stg_iShiftRL64 (StgInt64, StgInt);
 LI_ stg_iShiftRA64 (StgInt64, StgInt);
 
 LI_ stg_intToInt64    (StgInt);
-I_ stg_int64ToInt     (StgInt64);
+I_  stg_int64ToInt    (StgInt64);
 LW_ stg_int64ToWord64 (StgInt64);
 
 LW_ stg_wordToWord64  (StgWord);
@@ -593,10 +612,8 @@ extern I_ resetGenSymZh(void);
 #define readWord8Arrayzh(r,a,i)		indexWord8OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define readWord16Arrayzh(r,a,i)	indexWord16OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define readWord32Arrayzh(r,a,i)	indexWord32OffAddrzh(r,BYTE_ARR_CTS(a),i)
-#ifdef SUPPORT_LONG_LONGS
 #define readInt64Arrayzh(r,a,i)		indexInt64OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define readWord64Arrayzh(r,a,i)	indexWord64OffAddrzh(r,BYTE_ARR_CTS(a),i)
-#endif
 
 /* result ("r") arg ignored in write macros! */
 #define writeArrayzh(a,i,v)		((PP_) PTRS_ARR_CTS(a))[(i)]=(v)
@@ -615,10 +632,8 @@ extern I_ resetGenSymZh(void);
 #define writeWord8Arrayzh(a,i,v)	writeWord8OffAddrzh(BYTE_ARR_CTS(a),i,v)
 #define writeWord16Arrayzh(a,i,v)	writeWord16OffAddrzh(BYTE_ARR_CTS(a),i,v)
 #define writeWord32Arrayzh(a,i,v)	writeWord32OffAddrzh(BYTE_ARR_CTS(a),i,v)
-#ifdef SUPPORT_LONG_LONGS
 #define writeInt64Arrayzh(a,i,v)	writeInt64OffAddrzh(BYTE_ARR_CTS(a),i,v)
 #define writeWord64Arrayzh(a,i,v)	writeWord64OffAddrzh(BYTE_ARR_CTS(a),i,v)
-#endif
 
 #define indexArrayzh(r,a,i)		r=((PP_) PTRS_ARR_CTS(a))[(i)]
 
@@ -636,10 +651,8 @@ extern I_ resetGenSymZh(void);
 #define indexWord8Arrayzh(r,a,i)	indexWord8OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define indexWord16Arrayzh(r,a,i)	indexWord16OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define indexWord32Arrayzh(r,a,i)	indexWord32OffAddrzh(r,BYTE_ARR_CTS(a),i)
-#ifdef SUPPORT_LONG_LONGS
 #define indexInt64Arrayzh(r,a,i)	indexInt64OffAddrzh(r,BYTE_ARR_CTS(a),i)
 #define indexWord64Arrayzh(r,a,i)	indexWord64OffAddrzh(r,BYTE_ARR_CTS(a),i)
-#endif
 
 /* Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
@@ -932,10 +945,8 @@ EXTFUN_RTS(mkForeignObjzh_fast);
 #define indexWord8OffForeignObjzh(r,fo,i)	indexWord8OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexWord16OffForeignObjzh(r,fo,i)	indexWord16OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexWord32OffForeignObjzh(r,fo,i)	indexWord32OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#ifdef SUPPORT_LONG_LONGS
 #define indexInt64OffForeignObjzh(r,fo,i)	indexInt64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
 #define indexWord64OffForeignObjzh(r,fo,i)	indexWord64OffAddrzh(r,ForeignObj_CLOSURE_DATA(fo),i)
-#endif
 
 /* -----------------------------------------------------------------------------
    Constructor tags

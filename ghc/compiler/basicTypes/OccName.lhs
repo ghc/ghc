@@ -258,18 +258,19 @@ Here's our convention for splitting up the interface file name space:
 	$dm...		default methods
 	$p...		superclass selectors
 	$w...		workers
-	$T...		compiler-generated tycons for dictionaries
-	$D...		...ditto data cons
+	:T...		compiler-generated tycons for dictionaries
+	:D...		...ditto data cons
 	$sf..		specialised version of f
 
 	in encoded form these appear as Zdfxxx etc
 
 	:...		keywords (export:, letrec: etc.)
+--- I THINK THIS IS WRONG!
 
 This knowledge is encoded in the following functions.
 
 
-@mk_deriv@ generates an @OccName@ from the one-char prefix and a string.
+@mk_deriv@ generates an @OccName@ from the prefix and a string.
 NB: The string must already be encoded!
 
 \begin{code}
@@ -426,13 +427,12 @@ The basic encoding scheme is this.
 	foo##		foozhzh
 	foo##1		foozhzh1
 	fooZ		fooZZ	
-	:+		Zczp
-	()		Z0T
-	(,,,,)		Z4T	5-tuple
-	(#,,,,#)	Z4H	unboxed 5-tuple
-		(NB: the number is one different to the number of 
-		elements.  No real reason except that () is a zero-tuple,
-		while (,) is a 2-tuple.)
+	:+		ZCzp
+	()		Z0T	0-tuple
+	(,,,,)		Z5T	5-tuple  
+	(# #)           Z1H     unboxed 1-tuple	(note the space)
+	(#,,,,#)	Z5H	unboxed 5-tuple
+		(NB: There is no Z1T nor Z0H.)
 
 \begin{code}
 -- alreadyEncoded is used in ASSERTs to check for encoded
@@ -459,11 +459,13 @@ encode cs = case maybe_tuple cs of
 		go []     = []
 		go (c:cs) = encode_ch c ++ go cs
 
+maybe_tuple "(# #)" = Just("Z1H")
 maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-				 (n, '#' : ')' : cs) -> Just ('Z' : shows n "H")
+				 (n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
 				 other		     -> Nothing
+maybe_tuple "()" = Just("Z0T")
 maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-				 (n, ')' : cs) -> Just ('Z' : shows n "T")
+				 (n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
 				 other	       -> Nothing
 maybe_tuple other    	     = Nothing
 
@@ -565,8 +567,10 @@ decode_escape (c : rest)
   | isDigit c = go (digitToInt c) rest
   where
     go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
-    go n ('T' : rest)		= '(' : replicate n ',' ++ ')' : decode rest
-    go n ('H' : rest)		= '(' : '#' : replicate n ',' ++ '#' : ')' : decode rest
+    go 0 ('T' : rest) 		= "()" ++ (decode rest)
+    go n ('T' : rest)		= '(' : replicate (n-1) ',' ++ ')' : decode rest
+    go 1 ('H' : rest)		= "(# #)" ++ (decode rest)
+    go n ('H' : rest)		= '(' : '#' : replicate (n-1) ',' ++ '#' : ')' : decode rest
     go n ('U' : rest)           = chr n : decode rest
     go n other = pprPanic "decode_escape" (ppr n <+> text (c:rest))
 
@@ -576,7 +580,7 @@ decode_escape (c : rest) = pprTrace "decode_escape" (char c) (decode rest)
 
 %************************************************************************
 %*									*
-n\subsection{Lexical categories}
+\subsection{Lexical categories}
 %*									*
 %************************************************************************
 

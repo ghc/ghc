@@ -457,7 +457,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       AddrNeOp -> int_NE_code x y
       AddrLtOp -> trivialCode (CMP ULT) x y
       AddrLeOp -> trivialCode (CMP ULE) x y
-
+	
       FloatGtOp -> cmpF_code (FCMP TF LE) EQQ x y
       FloatGeOp -> cmpF_code (FCMP TF LTT) EQQ x y
       FloatEqOp -> cmpF_code (FCMP TF EQQ) NE x y
@@ -493,6 +493,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleSubOp -> trivialFCode  DoubleRep (FSUB TF) x y
       DoubleMulOp -> trivialFCode  DoubleRep (FMUL TF) x y
       DoubleDivOp -> trivialFCode  DoubleRep (FDIV TF) x y
+
+      AddrAddOp  -> trivialCode (ADD Q False) x y
+      AddrSubOp  -> trivialCode (SUB Q False) x y
+      AddrRemOp  -> trivialCode (REM Q True) x y
 
       AndOp  -> trivialCode AND x y
       OrOp   -> trivialCode OR  x y
@@ -764,6 +768,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleSubOp -> trivialFCode DoubleRep GSUB x y
       DoubleMulOp -> trivialFCode DoubleRep GMUL x y
       DoubleDivOp -> trivialFCode DoubleRep GDIV x y
+
+      AddrAddOp -> add_code L x y
+      AddrSubOp -> sub_code L x y
+      AddrRemOp -> trivialCode (IREM L) Nothing x y
 
       AndOp -> let op = AND L in trivialCode op (Just op) x y
       OrOp  -> let op = OR  L in trivialCode op (Just op) x y
@@ -1131,6 +1139,10 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       DoubleSubOp -> trivialFCode DoubleRep FSUB x y
       DoubleMulOp -> trivialFCode DoubleRep FMUL x y
       DoubleDivOp -> trivialFCode DoubleRep FDIV x y
+
+      AddrAddOp -> trivialCode (ADD False False) x y
+      AddrSubOp -> trivialCode (SUB False False) x y
+      AddrRemOp -> imul_div SLIT(".rem")  x y
 
       AndOp -> trivialCode (AND False) x y
       OrOp  -> trivialCode (OR  False) x y

@@ -7,6 +7,7 @@ module StixPrim ( primCode, amodeToStix, amodeToStix', foreignCallCode )
   where
 
 #include "HsVersions.h"
+#include "MachDeps.h"
 
 import MachMisc
 import Stix
@@ -140,33 +141,41 @@ primCode [res] Integer2IntOp arg@[sa,da]
 primCode [res] Integer2WordOp arg@[sa,da]
   = gmpInteger2Word res (sa,da)
 
-primCode [res] Int2AddrOp [arg]
-  = simpleCoercion AddrRep res arg
-
-primCode [res] Addr2IntOp [arg]
-  = simpleCoercion IntRep res arg
-
 primCode [res] Int2WordOp [arg]
   = simpleCoercion IntRep{-WordRep?-} res arg
 
 primCode [res] Word2IntOp [arg]
   = simpleCoercion IntRep res arg
 
+primCode [res] AddrNullOp [arg]
+  = let
+        assign = StAssign AddrRep (amodeToStix res) (StInt 0) 
+    in
+    returnUs (\xs -> assign : xs)
+
 primCode [res] AddrToHValueOp [arg]
   = simpleCoercion PtrRep res arg
 
-primCode [res] IntToInt8Op [arg]
+#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
+primCode [res] Int2AddrOp [arg]
+  = simpleCoercion AddrRep res arg
+
+primCode [res] Addr2IntOp [arg]
+  = simpleCoercion IntRep res arg
+#endif
+
+primCode [res] Narrow8IntOp [arg]
   = narrowingCoercion IntRep Int8Rep res arg
-primCode [res] IntToInt16Op [arg]
+primCode [res] Narrow16IntOp [arg]
   = narrowingCoercion IntRep Int16Rep res arg
-primCode [res] IntToInt32Op [arg]
+primCode [res] Narrow32IntOp [arg]
   = narrowingCoercion IntRep Int32Rep res arg
 
-primCode [res] WordToWord8Op [arg]
+primCode [res] Narrow8WordOp [arg]
   = narrowingCoercion WordRep Word8Rep res arg
-primCode [res] WordToWord16Op [arg]
+primCode [res] Narrow16WordOp [arg]
   = narrowingCoercion WordRep Word16Rep res arg
-primCode [res] WordToWord32Op [arg]
+primCode [res] Narrow32WordOp [arg]
   = narrowingCoercion WordRep Word32Rep res arg
 \end{code}
 

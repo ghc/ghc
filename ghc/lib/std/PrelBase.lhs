@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.50 2001/05/03 19:03:27 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.51 2001/08/17 17:18:54 apt Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -465,10 +465,15 @@ zeroInt, oneInt, twoInt, maxInt, minInt :: Int
 zeroInt = I# 0#
 oneInt  = I# 1#
 twoInt  = I# 2#
-#if WORD_SIZE_IN_BYTES == 4
+
+{- Seems clumsy. Should perhaps put minInt and MaxInt directly into MachDeps.h -}
+#if WORD_SIZE_IN_BITS == 31
+minInt  = I# (-0x40000000#)
+maxInt  = I# 0x3FFFFFFF#
+#elif WORD_SIZE_IN_BITS == 32
 minInt  = I# (-0x80000000#)
 maxInt  = I# 0x7FFFFFFF#
-#else
+#else 
 minInt  = I# (-0x8000000000000000#)
 maxInt  = I# 0x7FFFFFFFFFFFFFFF#
 #endif
@@ -657,10 +662,10 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "x# <=# x#" forall x#. x# <=# x# = True
   #-}
 
-#if WORD_SIZE_IN_BYTES == 4
+#if WORD_SIZE_IN_BITS == 32
 {-# RULES
-"intToInt32#"   forall x#. intToInt32#   x# = x#
-"wordToWord32#" forall x#. wordToWord32# x# = x#
+"narrow32Int#"  forall x#. narrow32Int#   x# = x#
+"narrow32Word#" forall x#. narrow32Word#   x# = x#
    #-}
 #endif
 

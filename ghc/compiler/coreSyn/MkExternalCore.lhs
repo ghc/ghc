@@ -128,8 +128,10 @@ make_exp :: CoreExpr -> C.Exp
 make_exp (Var v) =  
   case globalIdDetails v of
     DataConId _ -> C.Dcon (make_con_qid (Var.varName v))
-    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.Ccall (_UNPK_ nm) (make_ty (varType v))
+    FCallId (CCall (CCallSpec (StaticTarget nm) _ _)) -> C.External (_UNPK_ nm) (make_ty (varType v))
+    FCallId _ -> error "MkExternalCore died: can't handle non-static-C foreign call"
     _ -> C.Var (make_var_qid (Var.varName v))
+make_exp (Lit (l@(MachLabel s))) = C.External (_UNPK_ s) (make_ty (literalType l))
 make_exp (Lit l) = C.Lit (make_lit l)
 make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
@@ -163,7 +165,6 @@ make_lit l =
     MachWord64 i -> C.Lint i t
     MachFloat r -> C.Lrational r t
     MachDouble r -> C.Lrational r t
-    MachLabel s -> C.Lstring (_UNPK_ s) t
     _ -> error "MkExternalCore died: make_lit"
   where 
     t = make_ty (literalType l)
@@ -188,18 +189,17 @@ make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}
 
-{- Use encoded strings, except restore '#'s.
+{- Use encoded strings.
    Also, adjust casing to work around some badly-chosen internal names. -}
 make_id :: Bool -> Name -> C.Id
 make_id is_var nm = 
   case n of
-    c:cs -> if isUpper c && is_var then (toLower c):(decode cs) 
-	    else if isLower c && (not is_var) then (toUpper c):(decode cs)
-            else decode n
+    'Z':cs | is_var -> 'z':cs 
+    'z':cs | not is_var -> 'Z':cs 
+    c:cs | isUpper c && is_var -> 'z':'d':n
+    c:cs | isLower c && (not is_var) -> 'Z':'d':n
+    _ -> n
   where n = (occNameString . nameOccName) nm
-        decode ('z':'h':cs) = '#':(decode cs)
-        decode (c:cs) = c:(decode cs)
-        decode [] = []
 
 make_var_id :: Name -> C.Id
 make_var_id = make_id True

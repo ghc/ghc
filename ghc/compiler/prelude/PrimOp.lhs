@@ -325,7 +325,9 @@ primOpInfo op = pprPanic "primOpInfo:" (ppr op)
 Some PrimOps need to be called out-of-line because they either need to
 perform a heap check or they block.
 
+
 \begin{code}
+primOpOutOfLine :: PrimOp -> Bool
 #include "primop-out-of-line.hs-incl"
 \end{code}
 

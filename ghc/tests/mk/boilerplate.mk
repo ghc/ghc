@@ -22,7 +22,7 @@ TOP:=$(TEST_TOP)
 HC=$(GHC_INPLACE)
 
 # we don't want recompilation checking in here
-SRC_HC_OPTS += -no-recomp
+SRC_HC_OPTS += -no-recomp 
 
 # -----------------------------------------------------------------
 # Everything after this point

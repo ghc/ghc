@@ -331,6 +331,7 @@ data HscLang
   | HscJava
   | HscILX
   | HscInterpreted
+  | HscNothing
     deriving (Eq, Show)
 
 defaultDynFlags = DynFlags {

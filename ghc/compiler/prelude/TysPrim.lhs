@@ -38,6 +38,9 @@ module TysPrim(
 	foreignObjPrimTyCon,		foreignObjPrimTy,
 	threadIdPrimTyCon,		threadIdPrimTy,
 	
+	int32PrimTyCon,		int32PrimTy,
+	word32PrimTyCon,	word32PrimTy,
+
 	int64PrimTyCon,		int64PrimTy,
 	word64PrimTyCon,	word64PrimTy,
 
@@ -74,6 +77,7 @@ primTyCons
     , doublePrimTyCon
     , floatPrimTyCon
     , intPrimTyCon
+    , int32PrimTyCon
     , int64PrimTyCon
     , foreignObjPrimTyCon
     , bcoPrimTyCon
@@ -88,6 +92,7 @@ primTyCons
     , statePrimTyCon
     , threadIdPrimTyCon
     , wordPrimTyCon
+    , word32PrimTyCon
     , word64PrimTyCon
     ]
 \end{code}
@@ -163,11 +168,17 @@ charPrimTyCon	= pcPrimTyCon0 charPrimTyConName CharRep
 intPrimTy	= mkTyConTy intPrimTyCon
 intPrimTyCon	= pcPrimTyCon0 intPrimTyConName IntRep
 
+int32PrimTy	= mkTyConTy int32PrimTyCon
+int32PrimTyCon	= pcPrimTyCon0 int32PrimTyConName Int32Rep
+
 int64PrimTy	= mkTyConTy int64PrimTyCon
 int64PrimTyCon	= pcPrimTyCon0 int64PrimTyConName Int64Rep
 
 wordPrimTy	= mkTyConTy wordPrimTyCon
 wordPrimTyCon	= pcPrimTyCon0 wordPrimTyConName WordRep
+
+word32PrimTy	= mkTyConTy word32PrimTyCon
+word32PrimTyCon	= pcPrimTyCon0 word32PrimTyConName Word32Rep
 
 word64PrimTy	= mkTyConTy word64PrimTyCon
 word64PrimTyCon	= pcPrimTyCon0 word64PrimTyConName Word64Rep
@@ -362,7 +373,9 @@ primRepTyCon CharRep       = charPrimTyCon
 primRepTyCon Int8Rep       = charPrimTyCon
 primRepTyCon IntRep        = intPrimTyCon
 primRepTyCon WordRep       = wordPrimTyCon
+primRepTyCon Int32Rep      = int32PrimTyCon
 primRepTyCon Int64Rep      = int64PrimTyCon
+primRepTyCon Word32Rep     = word32PrimTyCon
 primRepTyCon Word64Rep     = word64PrimTyCon
 primRepTyCon AddrRep       = addrPrimTyCon
 primRepTyCon FloatRep      = floatPrimTyCon

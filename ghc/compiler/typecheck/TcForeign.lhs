@@ -260,9 +260,13 @@ checkCOrAsmOrDotNetOrInterp other
 
 checkCg check
  = getDOptsTc		`thenNF_Tc` \ dflags ->
-   case check (dopt_HscLang dflags) of
-	Nothing  -> returnNF_Tc ()
-	Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
+   let hscLang = dopt_HscLang dflags in
+   case hscLang of
+        HscNothing -> returnNF_Tc ()
+        otherwise ->
+ 	  case check hscLang of
+	       Nothing  -> returnNF_Tc ()
+	       Just err -> addErrTc (text "Illegal foreign declaration:" <+> err)
 \end{code} 
 			   
 Warnings

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelEnum.lhs,v 1.14 2001/07/24 06:31:35 ken Exp $
+% $Id: PrelEnum.lhs,v 1.15 2001/08/17 17:18:54 apt Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -314,7 +314,8 @@ instance  Enum Int  where
     fromEnum x = x
 
     {-# INLINE enumFrom #-}
-    enumFrom (I# x) = case maxInt of I# y -> eftInt x y
+    enumFrom (I# x) = eftInt x maxInt#
+        where I# maxInt# = maxInt
 	-- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}

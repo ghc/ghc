@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.29 2000/11/14 17:41:04 sewardj Exp $
+% $Id: CgRetConv.lhs,v 1.30 2001/08/17 17:18:52 apt Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -77,6 +77,8 @@ dataReturnConvPrim :: PrimRep -> MagicId
 
 dataReturnConvPrim IntRep	= VanillaReg IntRep  (_ILIT 1)
 dataReturnConvPrim WordRep	= VanillaReg WordRep (_ILIT 1)
+dataReturnConvPrim Int32Rep	= VanillaReg Int32Rep (_ILIT 1)
+dataReturnConvPrim Word32Rep	= VanillaReg Word32Rep (_ILIT 1)
 dataReturnConvPrim Int64Rep	= LongReg Int64Rep  (_ILIT 1)
 dataReturnConvPrim Word64Rep	= LongReg Word64Rep (_ILIT 1)
 dataReturnConvPrim AddrRep	= VanillaReg AddrRep (_ILIT 1)

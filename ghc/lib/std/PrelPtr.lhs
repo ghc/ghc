@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PrelPtr.lhs,v 1.2 2001/04/13 21:37:43 panne Exp $
+-- $Id: PrelPtr.lhs,v 1.3 2001/08/17 17:18:54 apt Exp $
 -- 
 -- (c) 2000
 -- 
@@ -17,23 +17,22 @@ import PrelBase
 data Ptr a = Ptr Addr# deriving (Eq, Ord)
 
 nullPtr :: Ptr a
-nullPtr = Ptr (int2Addr# 0#)
+nullPtr = Ptr (nullAddr# 0#)
 
 castPtr :: Ptr a -> Ptr b
 castPtr (Ptr addr) = Ptr addr
 
 plusPtr :: Ptr a -> Int -> Ptr b
-plusPtr (Ptr addr) (I# d) = Ptr (int2Addr# (addr2Int# addr +# d))
+plusPtr (Ptr addr) (I# d) = Ptr (plusAddr# addr d)
 
 alignPtr :: Ptr a -> Int -> Ptr a
 alignPtr addr@(Ptr a) (I# i)
-  = case addr2Int# a	of { ai ->
-    case remInt# ai i	of {
+  = case remAddr# a i of {
       0# -> addr;
-      n  -> Ptr (int2Addr# (ai +# (i -# n))) }}
+      n -> Ptr (plusAddr# a (i -# n)) }
 
 minusPtr :: Ptr a -> Ptr b -> Int
-minusPtr (Ptr a1) (Ptr a2) = I# (addr2Int# a1 -# addr2Int# a2)
+minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 
 instance CCallable   (Ptr a)
 instance CReturnable (Ptr a)
@@ -44,7 +43,7 @@ instance CReturnable (Ptr a)
 data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 
 nullFunPtr :: FunPtr a
-nullFunPtr = FunPtr (int2Addr# 0#)
+nullFunPtr = FunPtr (nullAddr# 0#)
 
 castFunPtr :: FunPtr a -> FunPtr b
 castFunPtr (FunPtr addr) = FunPtr addr
@@ -58,3 +57,4 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 instance CCallable   (FunPtr a)
 instance CReturnable (FunPtr a)
 \end{code}
+

@@ -202,6 +202,7 @@ hscRecomp ghci_mode dflags have_object
  = do	{
       	  -- what target are we shooting for?
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
+	; let toNothing = dopt_HscLang dflags == HscNothing
 
       	; when (verbosity dflags >= 1) $
 		hPutStrLn stderr ("Compiling " ++ 
@@ -359,19 +360,23 @@ hscRecomp ghci_mode dflags have_object
 			  mkFinalIface ghci_mode dflags location 
                                    maybe_checked_iface new_iface tidy_details
 
-		    ------------------  Code generation ------------------
-		    abstractC <- _scc_ "CodeGen"
-		    		  codeGen dflags this_mod imported_modules
-		    			 cost_centre_info fe_binders
-		    			 local_tycons stg_binds
-		    
-		    ------------------  Code output -----------------------
-		    (stub_h_exists, stub_c_exists)
-		       <- codeOutput dflags this_mod local_tycons
-		    	     binds stg_binds
-		    	     c_code h_code abstractC
-	      		
-	      	    return (stub_h_exists, stub_c_exists, Nothing, final_iface)
+		    if toNothing 
+                      then do
+			  return (False, False, Nothing, final_iface)
+	              else do
+		          ------------------  Code generation ------------------
+			  abstractC <- _scc_ "CodeGen"
+					codeGen dflags this_mod imported_modules
+					       cost_centre_info fe_binders
+					       local_tycons stg_binds
+			  
+			  ------------------  Code output -----------------------
+			  (stub_h_exists, stub_c_exists)
+			     <- codeOutput dflags this_mod local_tycons
+				   binds stg_binds
+				   c_code h_code abstractC
+			      
+			  return (stub_h_exists, stub_c_exists, Nothing, final_iface)
 
 	; let final_details = tidy_details {md_binds = []} 
 

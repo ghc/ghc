@@ -24,11 +24,11 @@ import Id		( mkWildId )
 import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
 			, literalType
 			, word2IntLit, int2WordLit
-			, intToInt8Lit, intToInt16Lit, intToInt32Lit
-			, wordToWord8Lit, wordToWord16Lit, wordToWord32Lit
+			, narrow8IntLit, narrow16IntLit, narrow32IntLit
+			, narrow8WordLit, narrow16WordLit, narrow32WordLit
 			, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
+			, nullAddrLit, float2DoubleLit, double2FloatLit
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
@@ -60,6 +60,7 @@ primOpRule op = fmap BuiltinRule (primop_rule op)
     -- ToDo:	something for integer-shift ops?
     --		NotOp
 
+    primop_rule AddrNullOp  = Just nullAddrRule	
     primop_rule SeqOp	    = Just seqRule
     primop_rule TagToEnumOp = Just tagToEnumRule
     primop_rule DataToTagOp = Just dataToTagRule
@@ -89,20 +90,18 @@ primOpRule op = fmap BuiltinRule (primop_rule op)
 	-- coercions
     primop_rule Word2IntOp 	= Just (oneLit (litCoerce word2IntLit     op_name))
     primop_rule Int2WordOp 	= Just (oneLit (litCoerce int2WordLit     op_name))
-    primop_rule IntToInt8Op 	= Just (oneLit (litCoerce intToInt8Lit    op_name))
-    primop_rule IntToInt16Op 	= Just (oneLit (litCoerce intToInt16Lit   op_name))
-    primop_rule IntToInt32Op 	= Just (oneLit (litCoerce intToInt32Lit   op_name))
-    primop_rule WordToWord8Op 	= Just (oneLit (litCoerce wordToWord8Lit  op_name))
-    primop_rule WordToWord16Op 	= Just (oneLit (litCoerce wordToWord16Lit op_name))
-    primop_rule WordToWord32Op 	= Just (oneLit (litCoerce wordToWord32Lit op_name))
+    primop_rule Narrow8IntOp 	= Just (oneLit (litCoerce narrow8IntLit   op_name))
+    primop_rule Narrow16IntOp 	= Just (oneLit (litCoerce narrow16IntLit  op_name))
+    primop_rule Narrow32IntOp 	= Just (oneLit (litCoerce narrow32IntLit  op_name))
+    primop_rule Narrow8WordOp 	= Just (oneLit (litCoerce narrow8WordLit  op_name))
+    primop_rule Narrow16WordOp 	= Just (oneLit (litCoerce narrow16WordLit op_name))
+    primop_rule Narrow32WordOp 	= Just (oneLit (litCoerce narrow32WordLit op_name))
     primop_rule OrdOp   	= Just (oneLit (litCoerce char2IntLit     op_name))
     primop_rule ChrOp    	= Just (oneLit (litCoerce int2CharLit     op_name))
     primop_rule Float2IntOp	= Just (oneLit (litCoerce float2IntLit    op_name))
     primop_rule Int2FloatOp	= Just (oneLit (litCoerce int2FloatLit    op_name))
     primop_rule Double2IntOp	= Just (oneLit (litCoerce double2IntLit   op_name))
     primop_rule Int2DoubleOp	= Just (oneLit (litCoerce int2DoubleLit   op_name))
-    primop_rule Addr2IntOp 	= Just (oneLit (litCoerce addr2IntLit     op_name))
-    primop_rule Int2AddrOp 	= Just (oneLit (litCoerce int2AddrLit     op_name))
 	-- SUP: Not sure what the standard says about precision in the following 2 cases
     primop_rule Float2DoubleOp 	= Just (oneLit (litCoerce float2DoubleLit op_name))
     primop_rule Double2FloatOp 	= Just (oneLit (litCoerce double2FloatLit op_name))
@@ -349,6 +348,10 @@ mkIntVal    i = Lit (mkMachInt  i)
 mkWordVal   w = Lit (mkMachWord w)
 mkFloatVal  f = Lit (convFloating (MachFloat  f))
 mkDoubleVal d = Lit (convFloating (MachDouble d))
+\end{code}
+
+\begin{code}
+nullAddrRule _ = Just(SLIT("nullAddr"), Lit(nullAddrLit))
 \end{code}
 
 						

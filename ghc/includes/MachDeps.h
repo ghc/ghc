@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachDeps.h,v 1.5 2001/07/19 09:01:40 simonmar Exp $
+ * $Id: MachDeps.h,v 1.6 2001/08/17 17:18:53 apt Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  * (c) The GHC Team, 1998-1999
@@ -16,10 +16,20 @@
 
 #include "config.h"
 
+
+
 #define CHAR_SIZE_IN_BYTES	1
 #define ADDR_SIZE_IN_BYTES	SIZEOF_VOID_P
 #define INT_SIZE_IN_BYTES	SIZEOF_LONG
 #define WORD_SIZE_IN_BYTES	SIZEOF_LONG
+
+#ifndef WORD_SIZE_IN_BITS
+#if WORD_SIZE_IN_BYTES == 4
+#define WORD_SIZE_IN_BITS       32
+#else 
+#define WORD_SIZE_IN_BITS       64
+#endif
+#endif
 
 #define FLOAT_SIZE_IN_BYTES 	SIZEOF_FLOAT
 #define DOUBLE_SIZE_IN_BYTES	SIZEOF_DOUBLE
@@ -35,10 +45,10 @@
 #define ALIGNMENT_WORD16        ALIGNMENT_UNSIGNED_SHORT
 
 #if SIZEOF_UNSIGNED_INT == 4
-#define SIZEOF_INT32            ALIGNMENT_INT
-#define ALIGNMENT_INT32         SIZEOF_INT
-#define SIZEOF_WORD32           ALIGNMENT_UNSIGNED_INT
-#define ALIGNMENT_WORD32        SIZEOF_UNSIGNED_INT
+#define SIZEOF_INT32            SIZEOF_INT
+#define ALIGNMENT_INT32         ALIGNMENT_INT
+#define SIZEOF_WORD32           SIZEOF_UNSIGNED_INT
+#define ALIGNMENT_WORD32        ALIGNMENT_UNSIGNED_INT
 #else
 #error GHC untested on this architecture: sizeof(unsigned int) != 4
 #endif
