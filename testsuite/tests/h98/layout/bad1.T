@@ -10,6 +10,8 @@ pass when
    && contents("bad1.comp.stdout") contains "parse error"
    && contents("bad1.comp.stdout") contains "possibly incorrect indentation"
 
--- put a pass clause here for NHC
+pass when 
+   $tool contains "nhc"
+   && contents("bad1.comp.stdout") contains "Found {-end-of-definition-} but"
 
 fail when otherwise
