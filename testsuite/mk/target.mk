@@ -1,1 +1,3 @@
-include $(FPTOOLS_TOP)/mk/target.mk
+TOP:=$(TOP)/..
+include $(TOP)/mk/target.mk
+TOP:=$(TESTSUITE_TOP)
