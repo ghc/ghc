@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.13 2000/03/07 11:35:36 simonmar Exp $
+ * $Id: StgCRun.c,v 1.14 2000/03/08 10:58:38 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -264,7 +264,33 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 #endif
 
 /* -----------------------------------------------------------------------------
-   sparc architecture
+   Sparc architecture
+
+   -- 
+   OLD COMMENT from GHC-3.02:
+
+   We want tailjumps to be calls, because `call xxx' is the only Sparc
+   branch that allows an arbitrary label as a target.  (Gcc's ``goto
+   *target'' construct ends up loading the label into a register and
+   then jumping, at the cost of two extra instructions for the 32-bit
+   load.)
+
+   When entering the threaded world, we stash our return address in a
+   known location so that \tr{%i7} is available as an extra
+   callee-saves register.  Of course, we have to restore this when
+   coming out of the threaded world.
+
+   I hate this god-forsaken architecture.  Since the top of the
+   reserved stack space is used for globals and the bottom is reserved
+   for outgoing arguments, we have to stick our return address
+   somewhere in the middle.  Currently, I'm allowing 100 extra
+   outgoing arguments beyond the first 6.  --JSM
+
+   Updated info (GHC 4.06): we don't appear to use %i7 any more, so
+   I'm not sure whether we still need to save it.  Incedentally, what
+   does the last paragraph above mean when it says "the top of the
+   stack is used for globals"?  What globals?  --SDM
+
    -------------------------------------------------------------------------- */
 	
 #ifdef sparc_TARGET_ARCH
@@ -276,10 +302,23 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
     register void *i7 __asm__("%i7");
     ((void **)(space))[100] = i7;
     f();
-    __asm__ volatile (".align 4\n"		
+    __asm__ volatile (
+	    ".align 4\n"		
             ".global " STG_RETURN "\n"
-       	    STG_RETURN ":\n"
-    	    "\tld %1,%0" : "=r" (i7) : "m" (((void **)(space))[100]));
+       	    STG_RETURN ":" 
+	    : : : "l0","l1","l2","l3","l4","l5","l6","l7");
+    /* we tell the C compiler that l0-l7 are clobbered on return to
+     * StgReturn, otherwise it tries to use these to save eg. the
+     * address of space[100] across the call.  The correct thing
+     * to do would be to save all the callee-saves regs, but we
+     * can't be bothered to do that.
+     *
+     * The code that gcc generates for this little fragment is now
+     * terrible.  We could do much better by coding it directly in
+     * assembler.
+     */
+    __asm__ volatile ("ld %1,%0" 
+		      : "=r" (i7) : "m" (((void **)(space))[100]));
     return (StgThreadReturnCode)R1.i;
 }
 
