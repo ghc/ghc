@@ -137,6 +137,15 @@ compile hsc_env this_mod location src_timestamp
 
    let (basename, _) = splitFilename input_fn
        
+  -- We add the directory in which the .hs files resides) to the import path.
+  -- This is needed when we try to compile the .hc file later, if it
+  -- imports a _stub.h file that we created here.
+   let current_dir = directoryOf basename
+   old_paths <- readIORef v_Include_paths
+   writeIORef v_Include_paths (current_dir : old_paths)
+   -- put back the old include paths afterward.
+   later (writeIORef v_Include_paths old_paths) $ do
+
    -- figure out what lang we're generating
    hsc_lang <- hscMaybeAdjustLang (hscLang dyn_flags)
    -- figure out what the next phase should be
