@@ -917,6 +917,7 @@ getDeclBinders new_name (SigD (IfaceSig var ty prags src_loc))
   = new_name var src_loc			`thenRn` \ var_name ->
     returnRn (Avail var_name)
 
+getDeclBinders new_name (ForD _)  = returnRn NotAvailable
 getDeclBinders new_name (DefD _)  = returnRn NotAvailable
 getDeclBinders new_name (InstD _) = returnRn NotAvailable
 
@@ -1083,8 +1084,8 @@ importDeclWarn mod name loc
   = sep [ptext SLIT("Compiler tried to import decl from interface file with same name as module."), 
 	 ptext SLIT("(possible cause: module name clashes with interface file already in scope.)")
 	] $$
-    hsep [ptext SLIT("Interface:"), quotes (pprModule mod), ptext SLIT(", name:"), quotes (ppr name), 
-	  ptext SLIT(", desired at:"), ppr loc
+    hsep [ptext SLIT("Interface:"), quotes (pprModule mod), comma, ptext SLIT("name:"), quotes (ppr name), 
+	  comma, ptext SLIT("desired at:"), ppr loc
          ]
 
 \end{code}
