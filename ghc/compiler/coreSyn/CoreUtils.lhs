@@ -945,7 +945,7 @@ eta_expand n us expr ty
 
     	case splitRecNewType_maybe ty of {
  	  Just ty' -> mkCoerce2 ty ty' (eta_expand n us (mkCoerce2 ty' ty expr) ty') ;
- 	  Nothing  -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
+ 	  Nothing  -> pprTrace "Bad eta expand" (ppr n $$ ppr expr $$ ppr ty) expr
     	}}}
 \end{code}
 

@@ -470,7 +470,7 @@ tcRnThing hsc_env ictxt rdr_name
 
 toIfaceDecl :: InteractiveContext -> TyThing -> IfaceDecl
 toIfaceDecl ictxt thing
-  = tyThingToIfaceDecl True {- Discard IdInfo -} (const False) {- Show data cons -} 
+  = tyThingToIfaceDecl True {- Discard IdInfo -} emptyNameSet {- Show data cons -} 
 		       ext_nm thing
   where
     unqual = icPrintUnqual ictxt

@@ -58,6 +58,7 @@ import OccName		( OccName, OccEnv, lookupOccEnv, emptyOccEnv,
 			  lookupOccEnv, extendOccEnv, emptyOccEnv,
 			  OccSet, unionOccSets, unitOccSet )
 import Name		( Name, NamedThing(..), getOccName, nameOccName, nameModuleName, isExternalName )
+import NameSet		( NameSet, elemNameSet )
 import Module		( ModuleName )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
@@ -399,7 +400,8 @@ ppr_hs_info (HsWorker w a)	= ptext SLIT("Worker:") <+> ppr w <+> int a
 
 		 
 \begin{code}
-tyThingToIfaceDecl :: Bool -> (TyCon -> Bool)
+tyThingToIfaceDecl :: Bool 
+		   -> NameSet		-- Tycons and classes to export abstractly
 		   -> (Name -> IfaceExtName) -> TyThing -> IfaceDecl
 tyThingToIfaceDecl discard_id_info _ ext (AnId id)
   = IfaceId { ifName   = getOccName id, 
@@ -435,7 +437,7 @@ tyThingToIfaceDecl _ _ ext (AClass clas)
 
     toIfaceFD (tvs1, tvs2) = (map getOccName tvs1, map getOccName tvs2)
 
-tyThingToIfaceDecl _ discard_data_cons ext (ATyCon tycon)
+tyThingToIfaceDecl _ abstract_tcs ext (ATyCon tycon)
   | isSynTyCon tycon
   = IfaceSyn {	ifName   = getOccName tycon,
 		ifTyVars = toIfaceTvBndrs tyvars,
@@ -474,7 +476,9 @@ tyThingToIfaceDecl _ discard_data_cons ext (ATyCon tycon)
     new_or_data | isNewTyCon tycon = NewType
 	        | otherwise	   = DataType
 
-    ifaceConDecls _ | discard_data_cons tycon = Unknown
+    abstract = getName tycon `elemNameSet` abstract_tcs
+
+    ifaceConDecls _ | abstract  = Unknown
     ifaceConDecls Unknown       = Unknown
     ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
 

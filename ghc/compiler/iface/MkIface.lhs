@@ -183,12 +183,11 @@ import LoadIface	( readIface, loadInterface, ifaceInstGates )
 import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( ImportAvails(..), mkModDeps )
-import HscTypes		( ModIface(..), 
+import HscTypes		( ModIface(..), TyThing(..),
 			  ModGuts(..), ModGuts, IfaceExport,
 			  GhciMode(..), 
 			  HscEnv(..), hscEPS,
 			  Dependencies(..), FixItem(..), 
-			  isImplicitTyThing, 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
 			  typeEnvElts, 
 			  Avails, AvailInfo, GenAvailInfo(..), availName, 
@@ -210,6 +209,7 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOc
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
 import TyCon		( visibleDataCons, tyConDataCons )
+import Class		( classSelIds )
 import DataCon		( dataConName )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS, moduleUserString,
@@ -264,11 +264,21 @@ mkIface hsc_env location maybe_old_iface
   = do	{ eps <- hscEPS hsc_env
 	; let	{ this_mod_name = moduleName this_mod
 		; ext_nm = mkExtNameFn hsc_env eps this_mod_name
-		; decls  = [ tyThingToIfaceDecl omit_prags omit_data_cons ext_nm thing 
-			   | thing <- typeEnvElts type_env
-			   , not (isImplicitTyThing thing) && not (isWiredInName (getName thing)) ]
+		; local_things = [thing | thing <- typeEnvElts type_env,
+					  not (isWiredInName (getName thing)) ]
+			-- Do not export anything about wired-in things
+			--  (GHC knows about them already)
+
+		; abstract_tcs :: NameSet -- TyCons and Classes whose representation is not exposed
+		; abstract_tcs
+		    | not omit_prags = emptyNameSet		-- In the -O case, nothing is abstract
+	    	    | otherwise	     = mkNameSet [ getName thing 
+						 | thing <- local_things
+				 		 , isAbstractThing exports thing]
+
+		; decls  = [ tyThingToIfaceDecl omit_prags abstract_tcs ext_nm thing 
+			   | thing <- local_things, wantDeclFor exports abstract_tcs thing ]
 			    	-- Don't put implicit Ids and class tycons in the interface file
-			    	-- Nor wired-in things (GHC knows about them already)
 
 		; fixities = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
 		; deprecs  = mkIfaceDeprec src_deprecs
@@ -328,11 +338,30 @@ mkIface hsc_env location maybe_old_iface
      ghci_mode = hsc_mode hsc_env
      hi_file_path = ml_hi_file location
      omit_prags = dopt Opt_OmitInterfacePragmas dflags
-     omit_data_cons tycon 	-- Don't expose data constructors if none are
-				-- exported and we are not optimising (i.e. not omit_prags)
-	| omit_prags = not (any exported_data_con (tyConDataCons tycon))
-	| otherwise  = False
+
+					      
+isAbstractThing :: NameSet -> TyThing -> Bool
+isAbstractThing exports (ATyCon tc) = not (any exported_data_con (tyConDataCons tc))
+  where	 	-- Don't expose rep if no datacons are exported
      exported_data_con con = dataConName con `elemNameSet` exports
+     		
+isAbstractThing exports (AClass cls) = not (any exported_class_op (classSelIds cls))
+  where	 	-- Don't expose rep if no classs op is exported
+     exported_class_op op = getName op `elemNameSet` exports
+
+isAbstractThing exports other = False
+
+wantDeclFor :: NameSet	-- User-exported things
+	    -> NameSet	-- Abstract things
+	    -> TyThing -> Bool
+wantDeclFor exports abstracts thing
+  | Just parent <- nameParent_maybe name	-- An implicit thing
+  = parent `elemNameSet` abstracts && name `elemNameSet` exports
+  | otherwise
+  = True
+  where
+    name = getName thing
+  
 
 deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
 
@@ -704,7 +733,7 @@ mk_usage_info pit hpt dir_imp_mods dep_mods proto_used_names
 mkIfaceExports :: NameSet -> [(ModuleName, [GenAvailInfo OccName])]
   -- Group by module and sort by occurrence
   -- This keeps the list in canonical order
-mkIfaceExports exports
+mkIfaceExports exports 
   = [ (mkSysModuleNameFS fs, eltsFM avails)
     | (fs, avails) <- fmToList groupFM
     ]
@@ -720,7 +749,7 @@ mkIfaceExports exports
 	occ    = nameOccName name
 	occ_fs = occNameFS occ
 	mod_fs = moduleNameFS (nameModuleName name)
-	avail | Just p <- nameParent_maybe name = AvailTC (nameOccName p) [occ]
+	avail | Just p <- nameParent_maybe name	= AvailTC (nameOccName p) [occ]
 	      | isTcOcc occ 			= AvailTC occ [occ]
 	      | otherwise			= Avail occ
 	avail_fs = occNameFS (availName avail)	    

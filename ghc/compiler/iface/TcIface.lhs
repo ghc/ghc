@@ -50,7 +50,7 @@ import DataCon		( dataConWorkId, dataConExistentialTyVars, dataConArgTys )
 import TysWiredIn	( tupleCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
 import Name		( Name, NamedThing(..), nameModuleName, nameModule, nameOccName, 
-			  isWiredInName, wiredInNameTyThing_maybe, nameParent )
+			  isWiredInName, wiredInNameTyThing_maybe, nameParent, nameParent_maybe )
 import NameEnv
 import OccName		( OccName )
 import Module		( Module, ModuleName, moduleName )
@@ -203,12 +203,28 @@ getThing name
 selectDecl :: ExternalPackageState -> Name -> (ExternalPackageState, Maybe IfaceDecl)
 -- Use nameParent to get the parent name of the thing
 selectDecl eps@(EPS { eps_decls = Pool decls_map n_in n_out}) name
-   = case lookupNameEnv decls_map main_name of
+   = case lookupNameEnv decls_map name of {
+		-- This first lookup will usually fail for subordinate names, because
+		-- the relevant decl is the parent decl.
+		-- But, if we export a data type decl abstractly, its selectors
+		-- get separate type signatures in the interface file
+	Just decl -> let 
+			decls' = delFromNameEnv decls_map name
+		     in
+		     (eps {eps_decls = Pool decls' n_in (n_out+1)}, Just decl) ;
+
+	Nothing -> 
+    case nameParent_maybe name of {
+	Nothing        -> (eps, Nothing ) ;	-- No "parent" 
+	Just main_name -> 			-- Has a parent; try that
+
+    case lookupNameEnv decls_map main_name of {
+	Just decl -> let 
+			decls' = delFromNameEnv decls_map main_name
+		     in
+		     (eps {eps_decls = Pool decls' n_in (n_out+1)}, Just decl) ;
 	Nothing   -> (eps, Nothing)
-	Just decl -> (eps {eps_decls = Pool decls' n_in (n_out+1)}, Just decl)
-   where
-     main_name = nameParent name
-     decls'    = delFromNameEnv decls_map main_name
+    }}}
 \end{code}
 
 %************************************************************************

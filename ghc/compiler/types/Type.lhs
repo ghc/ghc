@@ -531,6 +531,7 @@ splitRecNewType_maybe :: Type -> Maybe Type
 -- Sometimes we want to look through a recursive newtype, and that's what happens here
 -- Only applied to types of kind *, hence the newtype is always saturated
 splitRecNewType_maybe (NoteTy _ ty) = splitRecNewType_maybe ty  
+splitRecNewType_maybe (PredTy p)    = splitRecNewType_maybe (predTypeRep p)
 splitRecNewType_maybe (NewTcApp tc tys)
   | isRecursiveTyCon tc
   = ASSERT( tys `lengthIs` tyConArity tc && isNewTyCon tc )

@@ -28,7 +28,7 @@ module HscTypes (
 
 	FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
 
-	implicitTyThings, isImplicitTyThing,
+	implicitTyThings, 
 
 	TyThing(..), tyThingClass, tyThingTyCon, tyThingDataCon, tyThingId,
 	TypeEnv, lookupType, mkTypeEnv, emptyTypeEnv,
@@ -74,7 +74,7 @@ import Module
 import InstEnv		( InstEnv, DFunId )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
-import Id		( Id, isImplicitId )
+import Id		( Id )
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classTyCon )
@@ -431,12 +431,6 @@ unQualInScope env
 %************************************************************************
 
 \begin{code}
-isImplicitTyThing :: TyThing -> Bool
-isImplicitTyThing (ADataCon dc) = True
-isImplicitTyThing (AnId id)     = isImplicitId id
-isImplicitTyThing (ATyCon tc)   = isClassTyCon tc
-isImplicitTyThing other	        = False
-
 implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId id)   = []
 
