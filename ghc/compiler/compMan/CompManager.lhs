@@ -19,11 +19,12 @@ module CompManager (
 
     cmUnload,	   -- :: CmState -> DynFlags -> IO CmState
 
-    cmSetContext,  -- :: CmState -> String -> IO CmState
-
-    cmGetContext,  -- :: CmState -> IO String
-
 #ifdef GHCI
+    cmModuleIsInterpreted, -- :: CmState -> String -> IO Bool
+
+    cmSetContext,  -- :: CmState -> [String] -> [String] -> IO CmState
+    cmGetContext,  -- :: CmState -> IO ([String],[String])
+
     cmInfoThing,   -- :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
 
     CmRunResult(..),
@@ -58,6 +59,7 @@ import HscMain		( initPersistentCompilerState )
 import HscTypes
 import Name		( Name, NamedThing(..), nameRdrName, nameModule,
 			  isHomePackageName )
+import Rename		( mkGlobalContext )
 import RdrName		( emptyRdrEnv )
 import Module
 import GetImports
@@ -79,7 +81,6 @@ import Id		( idType, idName )
 import NameEnv
 import Type		( tidyType )
 import VarEnv		( emptyTidyEnv )
-import RnEnv		( unQualInScope, mkIfaceGlobalRdrEnv )
 import BasicTypes	( Fixity, defaultFixity )
 import Interpreter	( HValue )
 import HscMain		( hscStmt )
@@ -117,8 +118,8 @@ data CmState
         pls    :: PersistentLinkerState    -- link's persistent state
      }
 
-emptyCmState :: GhciMode -> Module -> IO CmState
-emptyCmState gmode mod
+emptyCmState :: GhciMode -> IO CmState
+emptyCmState gmode
     = do pcs     <- initPersistentCompilerState
          pls     <- emptyPLS
          return (CmState { hst    = emptySymbolTable,
@@ -126,17 +127,17 @@ emptyCmState gmode mod
                            ui     = emptyUI,
                            mg     = emptyMG, 
                            gmode  = gmode,
-			   ic     = emptyInteractiveContext mod,
+			   ic     = emptyInteractiveContext,
                            pcs    = pcs,
                            pls    = pls })
 
-emptyInteractiveContext mod
-  = InteractiveContext { ic_module = mod, 
-			 ic_rn_env = emptyRdrEnv,
+emptyInteractiveContext
+  = InteractiveContext { ic_toplev_scope = [],
+			 ic_exports = [],
+			 ic_rn_gbl_env = emptyRdrEnv,
+			 ic_print_unqual = alwaysQualify,
+			 ic_rn_local_env = emptyRdrEnv,
 			 ic_type_env = emptyTypeEnv }
-
-defaultCurrentModuleName = mkModuleName "Prelude"
-GLOBAL_VAR(defaultCurrentModule, error "no defaultCurrentModule", Module)
 
 -- CM internal types
 type UnlinkedImage = [Linkable]	-- the unlinked images (should be a set, really)
@@ -151,43 +152,64 @@ emptyMG = []
 -- Produce an initial CmState.
 
 cmInit :: GhciMode -> IO CmState
-cmInit mode = do
-   prel <- moduleNameToModule defaultCurrentModuleName
-   writeIORef defaultCurrentModule prel
-   emptyCmState mode prel
+cmInit mode = emptyCmState mode
 
 -----------------------------------------------------------------------------
 -- Setting the context doesn't throw away any bindings; the bindings
 -- we've built up in the InteractiveContext simply move to the new
 -- module.  They always shadow anything in scope in the current context.
 
-cmSetContext :: CmState -> String -> IO CmState
-cmSetContext cmstate str
-   = do let mn = mkModuleName str
-	    modules_loaded = [ (name_of_summary s, ms_mod s) | s <- mg cmstate ]
+cmSetContext
+	:: CmState -> DynFlags
+	-> [String]		-- take the top-level scopes of these modules
+	-> [String]		-- and the just the exports from these
+	-> IO CmState
+cmSetContext cmstate dflags toplevs exports = do 
+  let CmState{ hit=hit, hst=hst, pcs=pcs, ic=old_ic } = cmstate
 
-        m <- case lookup mn modules_loaded of
-		Just m  -> return m
-		Nothing -> do
-		   mod <- moduleNameToModule mn
-		   if isHomeModule mod 
-			then throwDyn (CmdLineError (showSDoc 
-				(quotes (ppr (moduleName mod))
- 				  <+> text "is not currently loaded")))
-		   	else return mod
+  toplev_mods <- mapM (getTopLevModule hit)    (map mkModuleName toplevs)
+  export_mods <- mapM (moduleNameToModule hit) (map mkModuleName exports)
 
-	return cmstate{ ic = (ic cmstate){ic_module=m} }
-		
-cmGetContext :: CmState -> IO String
-cmGetContext cmstate = return (moduleUserString (ic_module (ic cmstate)))
+  (new_pcs, print_unqual, maybe_env)
+      <- mkGlobalContext dflags hit hst pcs toplev_mods export_mods
 
-moduleNameToModule :: ModuleName -> IO Module
-moduleNameToModule mn
- = do maybe_stuff <- findModule mn
-      case maybe_stuff of
-	Nothing -> throwDyn (CmdLineError ("can't find module `"
+  case maybe_env of 
+    Nothing -> return cmstate
+    Just env -> return cmstate{ pcs = new_pcs,
+			        ic = old_ic{ ic_toplev_scope = toplev_mods,
+			      		     ic_exports = export_mods,
+			       		     ic_rn_gbl_env = env,
+			       		     ic_print_unqual = print_unqual } }
+
+getTopLevModule hit mn =
+  case lookupModuleEnvByName hit mn of
+    Just iface
+      | Just _ <- mi_globals iface -> return (mi_module iface)
+    _other -> throwDyn (CmdLineError (
+	  "cannot enter the top-level scope of a compiled module (module `" ++
+	   moduleNameUserString mn ++ "')"))
+
+moduleNameToModule :: HomeIfaceTable -> ModuleName -> IO Module
+moduleNameToModule hit mn = do
+  case lookupModuleEnvByName hit mn of
+    Just iface -> return (mi_module iface)
+    _not_a_home_module -> do
+	maybe_stuff <- findModule mn
+        case maybe_stuff of
+	  Nothing -> throwDyn (CmdLineError ("can't find module `"
 				    ++ moduleNameUserString mn ++ "'"))
-	Just (m,_) -> return m
+	  Just (m,_) -> return m
+
+cmGetContext :: CmState -> IO ([String],[String])
+cmGetContext CmState{ic=ic} = 
+  return (map moduleUserString (ic_toplev_scope ic), 
+	  map moduleUserString (ic_exports ic))
+
+cmModuleIsInterpreted :: CmState -> String -> IO Bool
+cmModuleIsInterpreted cmstate str 
+ = case lookupModuleEnvByName (hit cmstate) (mkModuleName str) of
+      Just iface         -> return (not (isNothing (mi_globals iface)))
+      _not_a_home_module -> return False
 
 -----------------------------------------------------------------------------
 -- cmInfoThing: convert a String to a TyThing
@@ -204,7 +226,7 @@ cmInfoThing cmstate dflags id
 	return (cmstate{ pcs=new_pcs }, unqual, pairs)
    where 
      CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
-     unqual = getUnqual pcs hit icontext
+     unqual = ic_print_unqual icontext
 
      getFixity :: PersistentCompilerState -> Name -> Fixity
      getFixity pcs name
@@ -232,8 +254,8 @@ cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
           dflags expr
    = do 
 	let InteractiveContext { 
-	       	ic_rn_env = rn_env, 
-	       	ic_type_env = type_env } = icontext
+	       	ic_rn_local_env = rn_env, 
+	       	ic_type_env     = type_env } = icontext
 
         (new_pcs, maybe_stuff) 
 	    <- hscStmt dflags hst hit pcs icontext expr False{-stmt-}
@@ -258,8 +280,8 @@ cmRunStmt cmstate@CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext }
 		    new_type_env = extendNameEnvList filtered_type_env 	
 			      		[ (getName id, AnId id)	| id <- ids]
 
-		    new_ic = icontext { ic_rn_env   = new_rn_env, 
-			  	  	ic_type_env = new_type_env }
+		    new_ic = icontext { ic_rn_local_env = new_rn_env, 
+			  	  	ic_type_env     = new_type_env }
 
 		-- link it
 		hval <- linkExpr pls bcos
@@ -334,21 +356,10 @@ cmTypeOfExpr cmstate dflags expr
 	   Just (_, ty, _) -> return (new_cmstate, Just str)
  	     where 
 		str = showSDocForUser unqual (ppr tidy_ty)
-		unqual  = getUnqual pcs hit ic
+		unqual  = ic_print_unqual ic
 		tidy_ty = tidyType emptyTidyEnv ty
    where
        CmState{ hst=hst, hit=hit, pcs=pcs, ic=ic } = cmstate
-
-getUnqual pcs hit ic
-   = case lookupIfaceByModName hit pit modname of
-	Nothing    -> alwaysQualify
-	Just iface -> 
-	   case mi_globals iface of
-	      Just env -> unQualInScope env
-	      Nothing  -> unQualInScope (mkIfaceGlobalRdrEnv (mi_exports iface))
-  where
-    pit = pcs_PIT pcs
-    modname = moduleName (ic_module ic)
 #endif
 
 -----------------------------------------------------------------------------
@@ -361,7 +372,7 @@ cmTypeOfName CmState{ hit=hit, pcs=pcs, ic=ic } name
 	Nothing -> return Nothing
 	Just (AnId id) -> return (Just str)
 	   where
-	     unqual = getUnqual pcs hit ic
+	     unqual = ic_print_unqual ic
 	     ty = tidyType emptyTidyEnv (idType id)
 	     str = showSDocForUser unqual (ppr ty)
 
@@ -376,9 +387,8 @@ cmCompileExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe HValue)
 cmCompileExpr cmstate dflags expr
    = do 
 	let InteractiveContext { 
-	       	ic_rn_env = rn_env, 
-	       	ic_type_env = type_env,
-	       	ic_module   = this_mod } = icontext
+	       	ic_rn_local_env = rn_env, 
+	       	ic_type_env     = type_env } = icontext
 
         (new_pcs, maybe_stuff) 
 	    <- hscStmt dflags hst hit pcs icontext 
@@ -630,16 +640,9 @@ cmLoadFinish ok (LinkFailed pls) hst hit ui mods ghci_mode pcs = do
 -- Empty the interactive context and set the module context to the topmost
 -- newly loaded module, or the Prelude if none were loaded.
 cmLoadFinish ok (LinkOK pls) hst hit ui mods ghci_mode pcs
-  = do def_mod <- readIORef defaultCurrentModule
-       let current_mod = case mods of 
-				[]    -> def_mod
-				(x:_) -> ms_mod x
-
-       	   new_ic = emptyInteractiveContext current_mod
-
-           new_cmstate = CmState{ hst=hst, hit=hit, ui=ui, mg=mods,
+  = do let new_cmstate = CmState{ hst=hst, hit=hit, ui=ui, mg=mods,
                                   gmode=ghci_mode, pcs=pcs, pls=pls,
-				  ic = new_ic }
+				  ic = emptyInteractiveContext }
            mods_loaded = map (moduleNameUserString.name_of_summary) mods
 
        return (new_cmstate, ok, mods_loaded)

@@ -28,7 +28,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 import RnMonad
 import Name		( Name, 
 			  getSrcLoc, nameIsLocalOrFrom,
-			  mkLocalName, mkGlobalName, nameModule,
+			  mkLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
 			  setNameModuleAndLoc
 			)
@@ -717,18 +717,6 @@ mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails deprecs
 	where
 	  occ  = nameOccName name
 	  elt  = GRE name (mk_provenance name) (lookupDeprec deprecs name)
-
-mkIfaceGlobalRdrEnv :: [(ModuleName,Avails)] -> GlobalRdrEnv
--- Used to construct a GlobalRdrEnv for an interface that we've
--- read from a .hi file.  We can't construct the original top-level
--- environment because we don't have enough info, but we compromise
--- by making an environment from its exports
-mkIfaceGlobalRdrEnv m_avails
-  = foldl add emptyRdrEnv m_avails
-  where
-    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True 
-								(\n -> LocalDef) avails NoDeprecs)
-		-- The NoDeprecs is a bit of a hack I suppose
 \end{code}
 
 \begin{code}

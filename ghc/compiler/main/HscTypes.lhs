@@ -292,10 +292,19 @@ lookupIfaceByModName hit pit mod
 \begin{code}
 data InteractiveContext 
   = InteractiveContext { 
-	ic_module :: Module,		-- The current module in which 
-					-- the  user is sitting
+	ic_toplev_scope :: [Module],	-- Include the "top-level" scope of
+					-- these modules
 
-	ic_rn_env :: LocalRdrEnv,	-- Lexical context for variables bound
+	ic_exports :: [Module],		-- Include just the exports of these
+					-- modules
+
+	ic_rn_gbl_env :: GlobalRdrEnv,	-- The cached GlobalRdrEnv, built from
+					-- ic_toplev_scope and ic_exports
+
+	ic_print_unqual :: PrintUnqualified,
+					-- cached PrintUnqualified, as above
+
+	ic_rn_local_env :: LocalRdrEnv,	-- Lexical context for variables bound
 					-- during interaction
 
 	ic_type_env :: TypeEnv		-- Ditto for types

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.105 2002/01/03 17:09:15 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.106 2002/01/09 12:41:47 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -83,6 +83,7 @@ builtin_commands = [
   ("help",	keepGoing help),
   ("?",		keepGoing help),
   ("info",      keepGoing info),
+  ("import",    keepGoing importModules),
   ("load",	keepGoing loadModule),
   ("module",	keepGoing setContext),
   ("reload",	keepGoing reloadModule),
@@ -157,6 +158,9 @@ interactiveUI cmstate paths cmdline_libs = do
    case maybe_hval of
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
+
+	-- initial context is just the Prelude
+   cmstate <- cmSetContext cmstate dflags [] ["Prelude"]
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
    Readline.initialize
@@ -268,8 +272,8 @@ checkPerms name =
 fileLoop :: Handle -> Bool -> GHCi ()
 fileLoop hdl prompt = do
    st <- getGHCiState
-   mod <- io (cmGetContext (cmstate st))
-   when prompt (io (putStr (mod ++ "> ")))
+   (mod,imports) <- io (cmGetContext (cmstate st))
+   when prompt (io (putStr (mkPrompt mod imports)))
    l <- io (IO.try (hGetLine hdl))
    case l of
 	Left e | isEOFError e -> return ()
@@ -289,13 +293,20 @@ stringLoop (s:ss) = do
 	l  -> do quit <- runCommand l
                  if quit then return () else stringLoop ss
 
+mkPrompt toplevs exports
+   =  concat (intersperse "," toplevs)
+   ++ (if not (null exports) 
+	then "[" ++ concat (intersperse "," exports) ++ "]" 
+	else "")
+   ++ "> "
+
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
 readlineLoop :: GHCi ()
 readlineLoop = do
    st <- getGHCiState
-   mod <- io (cmGetContext (cmstate st))
+   (mod,imports) <- io (cmGetContext (cmstate st))
    io yield
-   l <- io (readline (mod ++ "> "))
+   l <- io (readline (mkPrompt mod imports))
    case l of
 	Nothing -> return ()
 	Just l  ->
@@ -455,7 +466,6 @@ info s = do
   setGHCiState state{ cmstate = cms }
   return ()
 
-
 addModule :: String -> GHCi ()
 addModule str = do
   let files = words str
@@ -466,19 +476,8 @@ addModule str = do
   graph <- io (cmDepAnal (cmstate state) dflags new_targets)
   (cmstate1, ok, mods) <- io (cmLoadModules (cmstate state) dflags graph)
   setGHCiState state{ cmstate = cmstate1, targets = new_targets }
+  setContextAfterLoad mods
   modulesLoadedMsg ok mods
-
-setContext :: String -> GHCi ()
-setContext ""
-  = throwDyn (CmdLineError "syntax: `:m <module>'")
-setContext m | not (isUpper (head m)) || not (all isAlphaNumEx (tail m))
-  = throwDyn (CmdLineError ("strange looking module name: `" ++ m ++ "'"))
-    where
-       isAlphaNumEx c = isAlphaNum c || c == '_'
-setContext str
-  = do st <- getGHCiState
-       new_cmstate <- io (cmSetContext (cmstate st) str)
-       setGHCiState st{cmstate=new_cmstate}
 
 changeDirectory :: String -> GHCi ()
 changeDirectory ('~':d) = do
@@ -530,6 +529,11 @@ undefineMacro macro_name = do
 	else do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
+
+importModules :: String -> GHCi ()
+importModules str = return ()
+
+
 loadModule :: String -> GHCi ()
 loadModule str = timeIt (loadModule' str)
 
@@ -548,8 +552,9 @@ loadModule' str = do
 
   io (revertCAFs)  -- always revert CAFs on load.
   (cmstate2, ok, mods) <- io (cmLoadModules cmstate1 dflags graph)
-
   setGHCiState state{ cmstate = cmstate2, targets = files }
+
+  setContextAfterLoad mods
   modulesLoadedMsg ok mods
 
 
@@ -565,14 +570,16 @@ reloadModule "" = do
 	graph <- io (cmDepAnal (cmstate state) dflags paths)
 
 	io (revertCAFs)		-- always revert CAFs on reload.
-	(new_cmstate, ok, mods) 
+	(cmstate1, ok, mods) 
 		<- io (cmLoadModules (cmstate state) dflags graph)
-
-        setGHCiState state{ cmstate=new_cmstate }
+        setGHCiState state{ cmstate=cmstate1 }
+	setContextAfterLoad mods
 	modulesLoadedMsg ok mods
 
 reloadModule _ = noArgs ":reload"
 
+setContextAfterLoad [] = setContext prel
+setContextAfterLoad (m:_) = setContext m
 
 modulesLoadedMsg ok mods = do
   let mod_commas 
@@ -601,6 +608,62 @@ quit _ = return True
 
 shellEscape :: String -> GHCi Bool
 shellEscape str = io (system str >> return False)
+
+-----------------------------------------------------------------------------
+-- Setting the module context
+
+setContext str
+ | all sensible  mods = newContext mods	-- default is to set the empty context
+ | all plusminus mods = adjustContext mods
+ | otherwise
+   = throwDyn (CmdLineError "syntax:  :module M1 .. Mn | :module [+/-]M1 ... [+/-]Mn")
+ where
+    mods = words str
+
+    sensible (c:cs) = isUpper c && all isAlphaNumEx cs
+    isAlphaNumEx c = isAlphaNum c || c == '_'
+
+    plusminus ('-':mod) = sensible mod
+    plusminus ('+':mod) = sensible mod
+    plusminus _ = False
+
+newContext mods = do
+  state@GHCiState{cmstate=cmstate} <- getGHCiState
+  dflags <- io getDynFlags
+
+  let separate [] as bs = return (as,bs)
+      separate (m:ms) as bs = do 
+	 b <- io (cmModuleIsInterpreted cmstate m)
+ 	 if b then separate ms (m:as) bs
+	      else separate ms as (m:bs)
+				
+  (as,bs) <- separate mods [] []
+  let bs' = if null as && prel `notElem` bs then prel:bs else bs
+  cmstate' <- io (cmSetContext cmstate dflags as bs')
+  setGHCiState state{cmstate=cmstate'}
+
+prel = "Prelude"
+
+adjustContext mods = do
+  state@GHCiState{cmstate=cmstate} <- getGHCiState
+  dflags <- io getDynFlags
+
+  let adjust [] as bs = return (as,bs)
+      adjust (('-':m) : ms) as bs
+	| m `elem` as  = adjust ms (delete m as) bs
+	| m `elem` bs  = adjust ms as (delete m bs)
+ 	| otherwise = throwDyn (CmdLineError ("module `" ++ m ++ "' is not currently in scope"))
+      adjust (('+':m) : ms) as bs
+	| m `elem` as || m `elem` bs = adjust ms as bs -- continue silently
+	| otherwise = do b <- io (cmModuleIsInterpreted cmstate m)
+			 if b then adjust ms (m:as) bs
+			      else adjust ms as (m:bs)
+
+  (as,bs) <- io (cmGetContext cmstate)
+  (as,bs) <- adjust mods as bs
+  let bs' = if null as && prel `notElem` bs then prel:bs else bs
+  cmstate' <- io (cmSetContext cmstate dflags as bs')
+  setGHCiState state{cmstate=cmstate'}
 
 ----------------------------------------------------------------------------
 -- Code for `:set'

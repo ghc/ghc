@@ -5,7 +5,7 @@
 
 \begin{code}
 module Rename ( 
-	renameModule, renameStmt, renameRdrName, 
+	renameModule, renameStmt, renameRdrName, mkGlobalContext,
 	closeIfaceDecls, checkOldIface 
   ) where
 
@@ -33,13 +33,14 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 import RnHiFiles	( readIface, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs,
 			)
-import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
+import RnEnv		( availsToNameSet,
 			  unitAvailEnv, availEnvElts, availNames,
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
 			  lookupSrcName, getImplicitStmtFVs, 
 			  getImplicitModuleFVs, newGlobalName, unQualInScope,
-			  ubiquitousNames, lookupOccRn
+			  ubiquitousNames, lookupOccRn, 
+			  plusGlobalRdrEnv, mkGlobalRdrEnv
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
@@ -49,7 +50,7 @@ import Name		( Name, nameModule )
 import NameEnv
 import NameSet
 import RdrName		( foldRdrEnv, isQual )
-import PrelNames	( pRELUDE_Name )
+import PrelNames	( iNTERACTIVE, pRELUDE_Name )
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass, 
 			  printErrorsAndWarnings, errorsFound )
 import Bag		( bagToList )
@@ -62,8 +63,6 @@ import IO		( openFile, IOMode(..) )
 import HscTypes		-- lots of it
 import List		( partition, nub )
 \end{code}
-
-
 
 
 %*********************************************************
@@ -90,7 +89,6 @@ renameModule dflags hit hst pcs this_module rdr_module
 renameStmt :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
-	   -> Module			-- current module
 	   -> InteractiveContext
 	   -> RdrNameStmt		-- parsed stmt
 	   -> IO ( PersistentCompilerState, 
@@ -98,15 +96,20 @@ renameStmt :: DynFlags
 		   Maybe ([Name], (RenamedStmt, [RenamedHsDecl]))
                  )
 
-renameStmt dflags hit hst pcs this_module ic stmt
-  = renameSource dflags hit hst pcs this_module $
-    extendTypeEnvRn (ic_type_env ic)		$ 
+renameStmt dflags hit hst pcs ic stmt
+  = renameSource dflags hit hst pcs iNTERACTIVE $
 
 	-- load the context module
-    loadContextModule (ic_module ic) $ \ (rdr_env, print_unqual) ->
+    let InteractiveContext{ ic_rn_gbl_env   = rdr_env,
+			    ic_print_unqual = print_unqual,
+			    ic_rn_local_env = local_rdr_env,
+			    ic_type_env     = type_env } = ic
+    in
+
+    extendTypeEnvRn type_env  $ 
 
 	-- Rename the stmt
-    initRnMS rdr_env emptyAvailEnv (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode (
+    initRnMS rdr_env emptyAvailEnv local_rdr_env emptyLocalFixityEnv CmdLineMode (
 	rnStmt stmt	$ \ stmt' ->
 	returnRn (([], stmt'), emptyFVs)
     )					`thenRn` \ ((binders, stmt), fvs) -> 
@@ -148,7 +151,6 @@ renameRdrName
 	   :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
-	   -> Module			-- current module
 	   -> InteractiveContext
 	   -> [RdrName]			-- name to rename
 	   -> IO ( PersistentCompilerState, 
@@ -156,57 +158,87 @@ renameRdrName
 		   Maybe ([Name], [RenamedHsDecl])
                  )
 
-renameRdrName dflags hit hst pcs this_module ic rdr_names = 
-  renameSource dflags hit hst pcs this_module 	$
-  extendTypeEnvRn (ic_type_env ic)		$ 
-  loadContextModule (ic_module ic) $ \ (rdr_env, print_unqual) ->
+renameRdrName dflags hit hst pcs ic rdr_names = 
+    renameSource dflags hit hst pcs iNTERACTIVE $
 
-  -- rename the rdr_name
-  initRnMS rdr_env emptyAvailEnv (ic_rn_env ic) emptyLocalFixityEnv CmdLineMode
+	-- load the context module
+    let InteractiveContext{ ic_rn_gbl_env   = rdr_env,
+			    ic_print_unqual = print_unqual,
+			    ic_rn_local_env = local_rdr_env,
+			    ic_type_env     = type_env } = ic
+    in
+
+    extendTypeEnvRn type_env  $ 
+
+    -- rename the rdr_name
+    initRnMS rdr_env emptyAvailEnv local_rdr_env emptyLocalFixityEnv CmdLineMode
 	(mapRn (tryRn.lookupOccRn) rdr_names)	`thenRn` \ maybe_names ->
-  let 
+    let 
 	ok_names = [ a | Right a <- maybe_names ]
-  in
-  if null ok_names
+    in
+    if null ok_names
 	then let errs = head [ e | Left e <- maybe_names ]
 	     in setErrsRn errs 		  `thenRn_`
 	        doDump dflags ok_names [] `thenRn_` 
 		returnRn (print_unqual, Nothing)
 	else 
 
-  slurpImpDecls (mkNameSet ok_names)	`thenRn` \ decls ->
+    slurpImpDecls (mkNameSet ok_names)		`thenRn` \ decls ->
 
-  doDump dflags ok_names decls 		`thenRn_`
-  returnRn (print_unqual, Just (ok_names, decls))
+    doDump dflags ok_names decls 		`thenRn_`
+    returnRn (print_unqual, Just (ok_names, decls))
  where
      doDump :: DynFlags -> [Name] -> [RenamedHsDecl] -> RnMG (Either IOError ())
      doDump dflags names decls
 	= ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
 			(vcat [ppr names, text "",
 			       vcat (map ppr decls)]))
+\end{code}
 
+%*********************************************************
+%*						 	 *
+\subsection{Make up an interactive context}
+%*							 *
+%*********************************************************
 
--- Load the interface for the context module, so 
--- that we can get its top-level lexical environment
--- Bale out if we fail to do this
-loadContextModule scope_module thing_inside
-  = let doc = text "context for compiling expression"
-    in
-    loadInterface doc (moduleName scope_module) ImportByUser `thenRn` \ iface ->
+\begin{code}
+mkGlobalContext
+	:: DynFlags -> HomeIfaceTable -> HomeSymbolTable
+	-> PersistentCompilerState
+	-> [Module] -> [Module]
+        -> IO (PersistentCompilerState, PrintUnqualified, Maybe GlobalRdrEnv)
+mkGlobalContext dflags hit hst pcs toplevs exports
+  = renameSource dflags hit hst pcs iNTERACTIVE $
 
-	-- If this is a module we previously compiled, then mi_globals will
-	-- have its top-level environment.  If it is an imported module, then
-	-- we must invent a top-level environment from its exports.
-    let rdr_env | Just env <- mi_globals iface = env
-		| otherwise = mkIfaceGlobalRdrEnv (mi_exports iface)
-			  
-	print_unqual  = unQualInScope rdr_env
+    mapRn getTopLevScope   toplevs	`thenRn` \ toplev_envs ->
+    mapRn getModuleExports exports	`thenRn` \ export_envs ->
+    let full_env = foldr plusGlobalRdrEnv emptyRdrEnv
+			(toplev_envs ++ export_envs)
+	print_unqual = unQualInScope full_env
     in 
     checkErrsRn				`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	returnRn (print_unqual, Nothing)
     else
-	thing_inside (rdr_env, print_unqual)
+	returnRn (print_unqual, Just full_env)
+
+contextDoc = text "context for compiling statements"
+
+getTopLevScope :: Module -> RnM d GlobalRdrEnv
+getTopLevScope mod = 
+    loadInterface contextDoc (moduleName mod) ImportByUser `thenRn` \ iface ->
+    case mi_globals iface of
+	Nothing  -> panic "getTopLevScope"
+	Just env -> returnRn env
+
+getModuleExports :: Module -> RnM d GlobalRdrEnv
+getModuleExports mod = 
+    loadInterface contextDoc (moduleName mod) ImportByUser `thenRn` \ iface ->
+    returnRn (foldl add emptyRdrEnv (mi_exports iface))
+  where
+    prov_fn n = NonLocalDef ImplicitImport
+    add env (mod,avails) = 
+	plusGlobalRdrEnv env (mkGlobalRdrEnv mod True prov_fn avails NoDeprecs)
 \end{code}
 
 %*********************************************************

@@ -249,6 +249,7 @@ pREL_ERR     	= mkPrelModule pREL_ERR_Name
 pREL_NUM     	= mkPrelModule pREL_NUM_Name
 pREL_REAL    	= mkPrelModule pREL_REAL_Name
 pREL_FLOAT   	= mkPrelModule pREL_FLOAT_Name
+pRELUDE		= mkPrelModule pRELUDE_Name
 
 iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
 \end{code}

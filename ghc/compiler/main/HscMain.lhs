@@ -527,8 +527,7 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 
 		-- Rename it
 	  (pcs1, print_unqual, maybe_renamed_stmt)
-		 <- renameStmt dflags hit hst pcs0 
-			iNTERACTIVE icontext parsed_stmt
+		 <- renameStmt dflags hit hst pcs0 icontext parsed_stmt
 
 	; case maybe_renamed_stmt of
 		Nothing -> return (pcs0, Nothing)
@@ -644,7 +643,7 @@ hscThing dflags hst hit pcs0 icontext str
 		tccls_name = setRdrNameOcc rdr_name tccls_occ
 
 	(pcs, unqual, maybe_rn_result) <- 
-	   renameRdrName dflags hit hst pcs0 iNTERACTIVE icontext rdr_names
+	   renameRdrName dflags hit hst pcs0 icontext rdr_names
 
 	case maybe_rn_result of {
 	     Nothing -> return (pcs, []);
