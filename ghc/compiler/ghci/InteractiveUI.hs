@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.43 2001/02/12 12:25:50 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.44 2001/02/12 16:08:48 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -265,7 +265,7 @@ finishEvalExpr (Just (unqual,ty))
       io (when b revertCAFs)
       return True
 
--- Returned Bool indicates whether or not the expr was successfully
+-- Returned Maybe indicates whether or not the expr was successfully
 -- parsed, renamed and typechecked.
 evalExpr :: String -> GHCi (Maybe (PrintUnqualified,Type))
 evalExpr expr
