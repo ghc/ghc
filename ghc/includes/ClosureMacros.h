@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.18 1999/07/06 16:17:39 sewardj Exp $
+ * $Id: ClosureMacros.h,v 1.19 1999/08/03 15:44:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -65,7 +65,6 @@
 #define GET_ENTRY(c)     ((StgFunPtr)((c)->header.info))
 #define ENTRY_CODE(info) (info)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)(info) - 1)
-#define get_itbl(c)      (((c)->header.info) - 1)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return (StgFunPtr)(itbl+1);
 }
@@ -74,11 +73,12 @@ static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
 #define GET_ENTRY(c)     ((c)->header.info->entry)
 #define ENTRY_CODE(info) (((StgInfoTable *)info)->entry)
 #define INFO_PTR_TO_STRUCT(info) ((StgInfoTable *)info)
-#define get_itbl(c)      ((c)->header.info)
 static __inline__ StgFunPtr get_entry(const StgInfoTable *itbl) {
     return itbl->entry;
 }
 #endif
+
+#define get_itbl(c)      (INFO_PTR_TO_STRUCT((c)->header.info))
 
 /* -----------------------------------------------------------------------------
    Macros for distinguishing data pointers from code pointers
