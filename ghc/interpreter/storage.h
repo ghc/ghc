@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.36 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.37 $
+ * $Date: 2000/03/28 10:20:56 $
  * ------------------------------------------------------------------------*/
 
 #define DEBUG_STORAGE
@@ -146,7 +146,6 @@ extern  Syntax syntaxOf   ( Text );
  * ------------------------------------------------------------------------*/
 
 #define heapAlloc(s) (Heap)(farCalloc(s,sizeof(Cell)))
-#define heapBuilt()  (heapFst)
 extern  Int          heapSize;
 extern  Heap         heapFst, heapSnd;
 extern  Heap         heapTopFst;

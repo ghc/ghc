@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.49 $
- * $Date: 2000/03/24 14:32:03 $
+ * $Revision: 1.50 $
+ * $Date: 2000/03/28 10:20:55 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -29,6 +29,7 @@
 #include "Assembler.h"                                /* DEBUG_LoadSymbols */
 
 Bool haskell98 = TRUE;                  /* TRUE => Haskell 98 compatibility*/
+Bool initDone = FALSE;
 
 #if EXPLAIN_INSTANCE_RESOLUTION
 Bool showInstRes = FALSE;
@@ -284,6 +285,7 @@ String argv[]; {
               " combined mode\n\n" );
    }
 
+   initDone = TRUE;
    return initialModules;
 }
 
@@ -515,7 +517,7 @@ String s; {                             /* return FALSE if none found.     */
                 }
 
             default  : if (strcmp("98",s)==0) {
-                           if (heapBuilt() && ((state && !haskell98) ||
+                           if (initDone && ((state && !haskell98) ||
                                                (!state && haskell98))) {
                                FPrintf(stderr,
                                        "Haskell 98 compatibility cannot be changed"
@@ -540,7 +542,7 @@ String s; {
             hpSize = MINIMUMHEAP;
         else if (MAXIMUMHEAP && hpSize > MAXIMUMHEAP)
             hpSize = MAXIMUMHEAP;
-        if (heapBuilt() && hpSize != heapSize) {
+        if (initDone && hpSize != heapSize) {
             /* ToDo: should this use a message box in winhugs? */
 #if USE_REGISTRY
             FPrintf(stderr,"Change to heap size will not take effect until you rerun Hugs\n");
