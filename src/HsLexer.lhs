@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.1 2002/04/04 16:23:43 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.2 2002/04/09 11:23:24 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -219,6 +219,7 @@ lexer cont input (SrcLoc _ x) y col =
 	newLine cont s y =  tab (y+1) 1 True s
 
 	doc (' ':'|':_) = True
+	doc (' ':'/':_) = True
 	doc (' ':'^':_) = True
 	doc (' ':'*':_) = True
 	doc _ = False
@@ -277,6 +278,7 @@ lexToken cont s loc y x =
                               []       -> error "Internal error: empty context in lexToken"
 
 	'-':'-':' ':'|':s -> docComment DocCommentNext cont s loc y x
+	'-':'-':' ':'/':s -> docComment DocCommentNext cont s loc y x
 	'-':'-':' ':'^':s -> docComment DocCommentPrev cont s loc y x
 	'-':'-':' ':'*':s -> docSection cont ('*':s) loc y x
 
