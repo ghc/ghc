@@ -88,11 +88,11 @@ prel_readdir(HsAddr dirPtr, HsAddr pDirEnt)
   }
   if (nm_max == -1) {
 #ifdef NAME_MAX
-    nm_max = NAME_MAX;
+    nm_max = NAME_MAX + 1;
 #else
-    char* res;
-    nm_max = pathconf(res, _PC_NAME_MAX);
-    if (nm_max == -1) { nm_max = 256; }
+    nm_max = pathconf(".", _PC_NAME_MAX);
+    if (nm_max == -1) { nm_max = 255; }
+    nm_max++;
 #endif
   }
   p = (struct dirent*)malloc(sizeof(struct dirent) + nm_max);
