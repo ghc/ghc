@@ -9,16 +9,15 @@ module Weak (
 	Weak,	    		-- abstract
 	-- instance Eq (Weak v)  
 
-	mkWeak,      		-- :: k -> v -> IO () -> IO (Weak v)
+	mkWeak,      		-- :: k -> v -> Maybe (IO ()) -> IO (Weak v)
 	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
-	finalise,		-- :: Weak v -> IO ()
+	finalize,		-- :: Weak v -> IO ()
 	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
-	mkWeakNoFinaliser,	-- :: k -> v -> IO (Weak v)
 
-	mkWeakPtr, 		-- :: k -> IO () -> IO (Weak k)
-	mkWeakPair, 		-- :: k -> v -> IO () -> IO (Weak (k,v))
-	addFinaliser, 		-- :: key -> IO () -> IO ()
-	addForeignFinaliser 	-- :: ForeignObj -> IO () -> IO ()
+	mkWeakPtr, 		-- :: k -> Maybe (IO ()) -> IO (Weak k)
+	mkWeakPair, 		-- :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
+	addFinalizer, 		-- :: key -> IO () -> IO ()
+	addForeignFinalizer 	-- :: ForeignObj -> IO () -> IO ()
    ) where
 
 import PrelBase
@@ -33,16 +32,12 @@ deRefWeak (Weak w) = IO $ \s ->
 				0# -> (# s1, Nothing #)
 				_  -> (# s1, Just p #)
 
-mkWeakNoFinaliser key val = IO $ \s ->
-   -- zero is a valid finaliser argument to mkWeak#, and means "no finaliser"
-   case mkWeak# key val (unsafeCoerce# 0#) s of { (# s1, w #) ->
-   (# s1, Weak w #) }
+mkWeakPair :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
+mkWeakPair key val finalizer = mkWeak key (key,val) finalizer
 
-mkWeakPair :: k -> v -> IO () -> IO (Weak (k,v))
-mkWeakPair key val finaliser = mkWeak key (key,val) finaliser
-
-finalise :: Weak v -> IO ()
-finalise (Weak w) = IO $ \s ->
-   case finaliseWeak# w s of s1 -> (# s1, () #)
-
+finalize :: Weak v -> IO ()
+finalize (Weak w) = IO $ \s ->
+   case finalizeWeak# w s of 
+	(# s1, 0#, _ #) -> (# s1, () #)	-- already dead, or no finaliser
+	(# s1, _,  f #) -> f s1
 \end{code}

@@ -10,7 +10,7 @@ module Foreign
 	 ForeignObj       -- abstract, instance of: Eq
        , makeForeignObj   -- :: Addr{-obj-} -> IO ForeignObj
        , writeForeignObj  -- :: ForeignObj  -> Addr{-new obj-}   -> IO ()
-       , addForeignFinaliser -- :: ForeignObj -> IO () -> IO ()
+       , addForeignFinalizer -- :: ForeignObj -> IO () -> IO ()
        , foreignObjToAddr -- :: ForeignObj  -> IO Addr
            -- the coercion from a foreign obj. to an addr. is unsafe,
 	   -- and should not be used unless absolutely necessary.
@@ -30,7 +30,7 @@ import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#,
 		     indexDoubleOffForeignObj#
 		   )
 import PrelAddr    ( Addr(..), Word(..) )
-import PrelWeak    ( addForeignFinaliser )
+import PrelWeak    ( addForeignFinalizer )
 import Word 
    ( 
      indexWord8OffForeignObj
@@ -72,9 +72,9 @@ foreignObjToAddr fo = _casm_ `` %r=(StgAddr)%0; '' fo
 
 begin{code}
 makeForeignObj :: Addr -> Addr -> IO ForeignObj
-makeForeignObj obj finaliser = do
+makeForeignObj obj finalizer = do
    fobj <- PF.makeForeignObj obj
-   addForeignFinaliser fobj (app0 finaliser)
+   addForeignFinalizer fobj (app0 finalizer)
    return fobj
 
 foreign import dynamic unsafe app0 :: Addr -> IO ()

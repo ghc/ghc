@@ -24,7 +24,7 @@ import PrelMaybe	( Maybe(..) )
 import PrelAddr		( Addr, nullAddr )
 import PrelBounded      ()   -- get at Bounded Int instance.
 import PrelNum		( toInteger )
-import PrelWeak		( addForeignFinaliser )
+import PrelWeak		( addForeignFinalizer )
 #if __CONCURRENT_HASKELL__
 import PrelConc
 #endif
@@ -137,7 +137,7 @@ mkErrorHandle__ ioe =
 
 %*********************************************************
 %*							*
-\subsection{Handle Finalisers}
+\subsection{Handle Finalizers}
 %*							*
 %*********************************************************
 
@@ -188,7 +188,7 @@ stdout = unsafePerformIO (do
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
-	    addForeignFinaliser fo (freeStdFileObject fo)
+	    addForeignFinalizer fo (freeStdFileObject fo)
 #endif
 
 #ifdef __HUGS__
@@ -222,7 +222,7 @@ stdin = unsafePerformIO (do
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
-	    addForeignFinaliser fo (freeStdFileObject fo)
+	    addForeignFinalizer fo (freeStdFileObject fo)
 #endif
 	    (bm, bf_size) <- getBMode__ fo
 	    mkBuffer__ fo bf_size
@@ -254,7 +254,7 @@ stderr = unsafePerformIO (do
 
 #ifndef __PARALLEL_HASKELL__
             fo <- makeForeignObj fo
-	    addForeignFinaliser fo (freeStdFileObject fo)
+	    addForeignFinalizer fo (freeStdFileObject fo)
 #endif
             hdl <- newHandle (Handle__ fo WriteHandle NoBuffering "stderr")
 	    -- when stderr and stdout are both connected to a terminal, ensure
@@ -295,7 +295,7 @@ openFileEx f m = do
     if fo /= nullAddr then do
 #ifndef __PARALLEL_HASKELL__
 	fo  <- makeForeignObj fo
-	addForeignFinaliser fo (freeFileObject fo)
+	addForeignFinalizer fo (freeFileObject fo)
 #endif
 	(bm, bf_size)  <- getBMode__ fo
         mkBuffer__ fo bf_size
@@ -373,7 +373,7 @@ hClose handle =
              has been performed, the ForeignObj embedded in the Handle
              is still lying around in the heap, so care is taken
              to avoid closing the file object when the ForeignObj
-             is finalised. (we overwrite the file ptr in the underlying
+             is finalized. (we overwrite the file ptr in the underlying
 	     FileObject with a NULL as part of closeFile())
 	  -}
           if rc == (0::Int)

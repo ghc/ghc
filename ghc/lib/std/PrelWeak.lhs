@@ -11,6 +11,7 @@ module PrelWeak where
 
 import PrelGHC
 import PrelBase
+import PrelMaybe
 import PrelIOBase
 import PrelForeign
 
@@ -18,23 +19,24 @@ data Weak v = Weak (Weak# v)
 
 mkWeak  :: k				-- key
 	-> v				-- value
-	-> IO ()			-- finaliser
+	-> Maybe (IO ())		-- finalizer
 	-> IO (Weak v)			-- weak pointer
 
-mkWeak key val finaliser = IO $ \s ->
-   case mkWeak# key val finaliser s of { (# s1, w #) ->
-   (# s1, Weak w #) }
+mkWeak key val (Just finalizer) = IO $ \s ->
+   case mkWeak# key val finalizer s of { (# s1, w #) -> (# s1, Weak w #) }
+mkWeak key val Nothing = IO $ \s ->
+   case mkWeak# key val (unsafeCoerce# 0#) s of { (# s1, w #) -> (# s1, Weak w #) }
 
-mkWeakPtr :: k -> IO () -> IO (Weak k)
-mkWeakPtr key finaliser = mkWeak key key finaliser
+mkWeakPtr :: k -> Maybe (IO ()) -> IO (Weak k)
+mkWeakPtr key finalizer = mkWeak key key finalizer
 
-addFinaliser :: key -> IO () -> IO ()
-addFinaliser key finaliser = do
-   mkWeakPtr key finaliser		-- throw it away
+addFinalizer :: key -> IO () -> IO ()
+addFinalizer key finalizer = do
+   mkWeakPtr key (Just finalizer)	-- throw it away
    return ()
 
-addForeignFinaliser :: ForeignObj -> IO () -> IO ()
-addForeignFinaliser (ForeignObj fo) finaliser = addFinaliser fo finaliser
+addForeignFinalizer :: ForeignObj -> IO () -> IO ()
+addForeignFinalizer (ForeignObj fo) finalizer = addFinalizer fo finalizer
 
 {-
 instance Eq (Weak v) where
