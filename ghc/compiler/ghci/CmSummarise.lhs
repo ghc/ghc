@@ -17,7 +17,7 @@ import Char		( ord, isAlphaNum )
 import Finder
 import FastTypes
 
-import Module		( Module, ModuleName, mkModuleName)
+import Module
 import Outputable
 \end{code}
 
@@ -77,22 +77,20 @@ ms_get_imports summ
 
 type Fingerprint = Int
 
-summarise :: Module -> IO ModSummary
-summarise mod
-   = case mod_kind mod of
-        InPackage path -- if in a package, investigate no further
-           -> return (ModSummary mod Nothing Nothing)
-        SourceOnly path -- source; read, cache and get imports
-           -> readFile path >>= \ modsrc ->
-              let imps = getImports modsrc
-                  fp   = fingerprint modsrc
-              in  return (ModSummary mod (Just (path,fp)) (Just imps))
-        ObjectCode oPath hiPath -- can we get away with the src summariser
-                                -- for interface files?
-           -> readFile hiPath >>= \ hisrc ->
-              let imps = getImports hisrc
-              in  return (ModSummary mod Nothing (Just imps))
-
+summarise :: Module -> ModuleLocation -> IO ModSummary
+summarise mod location
+   = if isModuleInThisPackage mod
+	then do 
+	    let source_fn = hs_file location
+	    -- ToDo:
+	    -- ppsource_fn <- preprocess source_fn
+	    modsrc <- readFile source_fn
+            let imps = getImports modsrc
+                fp   = fingerprint modsrc
+            return (ModSummary mod location (Just (source_fn,fp)) (Just imps))
+	else
+           return (ModSummary mod location Nothing Nothing)
+	
 fingerprint :: String -> Int
 fingerprint s
    = dofp s (_ILIT 3) (_ILIT 3)
