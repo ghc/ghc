@@ -142,9 +142,15 @@ foreign import stdcall unsafe "closesocket"
 
 fdGetMode :: Int -> IO IOMode
 fdGetMode fd = do
+#ifdef mingw32_TARGET_OS
+    flags1 <- throwErrnoIfMinus1Retry "fdGetMode" 
+                (c__setmode (fromIntegral fd) (fromIntegral o_WRONLY))
+    flags  <- throwErrnoIfMinus1Retry "fdGetMode" 
+                (c__setmode (fromIntegral fd) (fromIntegral flags1))
+#else
     flags <- throwErrnoIfMinus1Retry "fdGetMode" 
 		(c_fcntl_read (fromIntegral fd) const_f_getfl)
-    
+#endif
     let
        wH  = (flags .&. o_WRONLY) /= 0
        aH  = (flags .&. o_APPEND) /= 0
@@ -411,6 +417,16 @@ foreign import ccall unsafe "utime"
 
 foreign import ccall unsafe "waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
+#else
+foreign import ccall unsafe "_setmode"
+   c__setmode :: CInt -> CInt -> IO CInt
+
+--   /* Set "stdin" to have binary mode: */
+--   result = _setmode( _fileno( stdin ), _O_BINARY );
+--   if( result == -1 )
+--      perror( "Cannot set mode" );
+--   else
+--      printf( "'stdin' successfully changed to binary mode\n" );
 #endif
 
 -- POSIX flags only:
