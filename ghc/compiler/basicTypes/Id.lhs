@@ -81,6 +81,8 @@ module Id {- (
 	showId,
 	pprIdInUnfolding,
 
+	nmbrId,
+
 	-- "Environments" keyed off of Ids, and sets of Ids
 	IdEnv(..),
 	lookupIdEnv, lookupNoFailIdEnv, nullIdEnv, unitIdEnv, mkIdEnv,
@@ -104,15 +106,17 @@ import Maybes		( maybeToBool )
 import Name		( appendRdr, nameUnique, mkLocalName, isLocalName,
 			  isLocallyDefinedName, isPreludeDefinedName,
 			  mkTupleDataConName, mkCompoundName,
-			  isLexSym, getLocalName,
+			  isLexSym, isLexSpecialSym, getLocalName,
 			  isLocallyDefined, isPreludeDefined,
 			  getOccName, moduleNamePair, origName, nameOf, 
 			  isExported, ExportFlag(..),
 			  RdrName(..), Name
 			)
-import FieldLabel	( fieldLabelName, FieldLabel{-instances-} )
+import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
+import PprEnv		-- ( NmbrM(..), NmbrEnv(..) )
 import PprType		( getTypeString, typeMaybeString, specMaybeTysSuffix,
+			  nmbrType, addTyVar,
 			  GenType, GenTyVar
 			)
 import PprStyle
@@ -127,8 +131,8 @@ import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, mkDictTy,
 import TyVar		( alphaTyVars, isEmptyTyVarSet, TyVarEnv(..) )
 import UniqFM
 import UniqSet		-- practically all of it
-import UniqSupply	( getBuiltinUniques )
-import Unique		( pprUnique, showUnique,
+import Unique		( getBuiltinUniques, pprUnique, showUnique,
+			  incrUnique,
 			  Unique{-instance Ord3-}
 			)
 import Util		( mapAccumL, nOfThem, zipEqual,
@@ -656,7 +660,7 @@ pprIdInUnfolding in_scopes v
 	    (m_str, n_str) = moduleNamePair v
 
 	    pp_n =
-	      if isLexSym n_str then
+	      if isLexSym n_str && not (isLexSpecialSym n_str) then
 		  ppBesides [ppLparen, ppPStr n_str, ppRparen]
 	      else
 		  ppPStr n_str
@@ -1937,4 +1941,70 @@ elementOfIdSet	= elementOfUniqSet
 minusIdSet	= minusUniqSet
 isEmptyIdSet	= isEmptyUniqSet
 mkIdSet		= mkUniqSet
+\end{code}
+
+\begin{code}
+addId, nmbrId :: Id -> NmbrM Id
+
+addId id@(Id u ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
+  = case (lookupUFM_Directly idenv u) of
+      Just xx -> _trace "addId: already in map!" $
+		 (nenv, xx)
+      Nothing ->
+	if toplevelishId id then
+	    _trace "addId: can't add toplevelish!" $
+	    (nenv, id)
+	else -- alloc a new unique for this guy
+	     -- and add an entry in the idenv
+	     -- NB: *** KNOT-TYING ***
+	    let
+		nenv_plus_id	= NmbrEnv (incrUnique ui) ut uu
+					  (addToUFM_Directly idenv u new_id)
+					  tvenv uvenv
+
+		(nenv2, new_ty)  = nmbrType     ty  nenv_plus_id
+		(nenv3, new_det) = nmbr_details det nenv2
+
+		new_id = Id ui new_ty new_det prag info
+	    in
+	    (nenv3, new_id)
+
+nmbrId id@(Id u ty det prag info) nenv@(NmbrEnv ui ut uu idenv tvenv uvenv)
+  = case (lookupUFM_Directly idenv u) of
+      Just xx -> (nenv, xx)
+      Nothing ->
+	if not (toplevelishId id) then
+	    _trace "nmbrId: lookup failed" $
+	    (nenv, id)
+	else
+	    let
+		(nenv2, new_ty)  = nmbrType     ty  nenv
+		(nenv3, new_det) = nmbr_details det nenv2
+
+		new_id = Id u new_ty new_det prag info
+	    in
+	    (nenv3, new_id)
+
+------------
+nmbr_details :: IdDetails -> NmbrM IdDetails
+
+nmbr_details (DataConId n tag marks fields tvs theta arg_tys tc)
+  = mapNmbr addTyVar   tvs	`thenNmbr` \ new_tvs ->
+    mapNmbr nmbrField  fields	`thenNmbr` \ new_fields ->
+    mapNmbr nmbr_theta theta	`thenNmbr` \ new_theta ->
+    mapNmbr nmbrType   arg_tys	`thenNmbr` \ new_arg_tys ->
+    returnNmbr (DataConId n tag marks new_fields new_tvs new_theta new_arg_tys tc)
+  where
+    nmbr_theta (c,t)
+      = --nmbrClass c	`thenNmbr` \ new_c ->
+        nmbrType  t	`thenNmbr` \ new_t ->
+	returnNmbr (c, new_t)
+
+    -- ToDo:add more cases as needed
+nmbr_details other_details = returnNmbr other_details
+
+------------
+nmbrField (FieldLabel n ty tag)
+  = nmbrType ty `thenNmbr` \ new_ty ->
+    returnNmbr (FieldLabel n new_ty tag)
 \end{code}

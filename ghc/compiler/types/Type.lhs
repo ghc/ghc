@@ -6,7 +6,8 @@ module Type (
 	mkTyVarTy, mkTyVarTys,
 	getTyVar, getTyVar_maybe, isTyVarTy,
 	mkAppTy, mkAppTys, splitAppTy,
-	mkFunTy, mkFunTys, splitFunTy, getFunTy_maybe,
+	mkFunTy, mkFunTys, splitFunTy, splitFunTyWithDictsAsArgs,
+	getFunTy_maybe,
 	mkTyConTy, getTyCon_maybe, applyTyCon,
 	mkSynTy,
 	mkForAllTy, mkForAllTys, getForAllTy_maybe, splitForAllTy,
@@ -210,17 +211,36 @@ getFunTy_maybe (AppTy (AppTy (TyConTy tycon _) arg) res)
 getFunTy_maybe (SynTy _ _ t)        = getFunTy_maybe t
 getFunTy_maybe other		    = Nothing
 
-splitFunTy :: GenType t u -> ([GenType t u], GenType t u)
+splitFunTy		  :: GenType t u -> ([GenType t u], GenType t u)
+splitFunTyWithDictsAsArgs :: Type	 -> ([Type], Type)
+  -- splitFunTy *must* have the general type given, which
+  -- means it *can't* do the DictTy jiggery-pokery that
+  -- *is* sometimes required.  The relationship between these
+  -- two functions is like that between eqTy and eqSimpleTy.
+
 splitFunTy t = go t []
   where
     go (FunTy arg res _) ts = go res (arg:ts)
     go (AppTy (AppTy (TyConTy tycon _) arg) res) ts
-	| isFunTyCon tycon
-	= go res (arg:ts)
-    go (SynTy _ _ t) ts
-	= go t ts
-    go t ts
-	= (reverse ts, t)
+	| isFunTyCon tycon  = go res (arg:ts)
+    go (SynTy _ _ t) ts     = go t ts
+    go t ts		    = (reverse ts, t)
+
+splitFunTyWithDictsAsArgs t = go t []
+  where
+    go (FunTy arg res _) ts = go res (arg:ts)
+    go (AppTy (AppTy (TyConTy tycon _) arg) res) ts
+	| isFunTyCon tycon  = go res (arg:ts)
+    go (SynTy _ _ t) ts     = go t ts
+
+	-- For a dictionary type we try expanding it to see if we get a simple
+	-- function; if so we thunder on; if not we throw away the expansion.
+    go t@(DictTy _ _ _) ts | null ts'  = (reverse ts, t)
+			   | otherwise = (reverse ts ++ ts', t')
+			   where
+			     (ts', t') = go (expandTy t) []
+
+    go t ts = (reverse ts, t)
 \end{code}
 
 \begin{code}
@@ -691,8 +711,16 @@ eqTy t1 t2 =
     -- Expand t2 just in case t1 matches that version
     eq tve uve t1 (AppTy (AppTy (TyConTy mkFunTyCon u2) f2) a2)
 
-  eq tve uve (DictTy c1 t1 u1) (DictTy c2 t2 u2) =
-    c1 == c2 && eq tve uve t1 t2 && eqUsage uve u1 u2
+  eq tve uve (DictTy c1 t1 u1) (DictTy c2 t2 u2) 
+    | c1 == c2 
+    = eq tve uve t1 t2 && eqUsage uve u1 u2
+	-- NB we use a guard for c1==c2 so that if they aren't equal we
+	-- fall through into expanding the type.  Why?  Because brain-dead
+	-- people might write
+	--	class Foo a => Baz a where {}
+	-- and that means that a Foo dictionary and a Baz dictionary are identical
+	-- Sigh.  Let's hope we don't spend too much time in here!
+
   eq tve uve t1@(DictTy _ _ _) t2 =
     eq tve uve (expandTy t1) t2  -- Expand the dictionary and try again
   eq tve uve t1 t2@(DictTy _ _ _) =

@@ -76,6 +76,9 @@ wwExpr   (CoTyApp f ty) =
 wwExpr   (SCC lab e) =
 	wwExpr e                `thenWw` \ e' ->
 	returnWw (SCC lab e')
+wwExpr   (Coerce c ty e) =
+	wwExpr e                `thenWw` \ e' ->
+	returnWw (Coerce c ty e')
 wwExpr   (Let bnds e) =
 	wwExpr e                `thenWw` \ e' ->
 	wwBind bnds             `thenWw` \ bnds' ->

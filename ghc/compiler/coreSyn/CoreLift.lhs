@@ -129,6 +129,10 @@ liftCoreExpr (SCC label expr)
   = liftCoreExpr expr		`thenL` \ expr ->
     returnL (SCC label expr)
 
+liftCoreExpr (Coerce coerce ty expr)
+  = liftCoreExpr expr		`thenL` \ expr ->
+    returnL (Coerce coerce ty expr) -- ToDo:right?:Coerce
+
 liftCoreExpr (Let (NonRec binder rhs) body) -- special case: no lifting
   = liftCoreExpr rhs	`thenL` \ rhs ->
     liftCoreExpr body	`thenL` \ body ->

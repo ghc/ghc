@@ -33,7 +33,7 @@ import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  GenId {-instance NamedThing -}
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
-import Name		( isLexVarSym, pprNonSym, moduleNamePair )
+import Name		( isLexVarSym, isLexSpecialSym, pprNonSym, moduleNamePair )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
 			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
@@ -354,8 +354,8 @@ pp_idspec sty pp_mod (_, id, tys, is_err)
     default_method_maybe = isDefaultMethodId_maybe id
     is_default_method_id = maybeToBool default_method_maybe
 
-    pp_clsop str | isLexVarSym str
-    	         = ppBesides [ppLparen, ppPStr str, ppRparen]
+    pp_clsop str | isLexVarSym str && not (isLexSpecialSym str)
+    	         = ppParens (ppPStr str)
     	         | otherwise
 		 = ppPStr str
 

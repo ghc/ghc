@@ -4,6 +4,8 @@
 \section[Kind]{The @Kind@ datatype}
 
 \begin{code}
+#include "HsVersions.h"
+
 module Kind (
 	Kind(..),		-- Only visible to friends: TcKind
 
@@ -12,13 +14,15 @@ module Kind (
 	mkUnboxedTypeKind,
 	mkBoxedTypeKind,
 
-	isSubKindOf,
-	resultKind, argKind
+	hasMoreBoxityInfo,
+	resultKind, argKind,
+
+	isUnboxedKind, isTypeKind
     ) where
 
 import Ubiq{-uitous-}
 
-import Util		( panic )
+import Util		( panic, assertPanic )
 --import Outputable	( Outputable(..) )
 import Pretty
 \end{code}
@@ -36,11 +40,31 @@ mkTypeKind  	  = TypeKind
 mkUnboxedTypeKind = UnboxedTypeKind
 mkBoxedTypeKind   = BoxedTypeKind
 
-isSubKindOf :: Kind -> Kind -> Bool
+isTypeKind :: Kind -> Bool
+isTypeKind TypeKind = True
+isTypeKind other    = False
 
-BoxedTypeKind   `isSubKindOf` TypeKind = True
-UnboxedTypeKind `isSubKindOf` TypeKind = True
-kind1		`isSubKindOf` kind2    = kind1 == kind2
+isUnboxedKind :: Kind -> Bool
+isUnboxedKind UnboxedTypeKind 	= True
+isUnboxedKind other		= False
+
+hasMoreBoxityInfo :: Kind -> Kind -> Bool
+
+BoxedTypeKind 	`hasMoreBoxityInfo` TypeKind	    = True
+BoxedTypeKind   `hasMoreBoxityInfo` BoxedTypeKind   = True
+
+UnboxedTypeKind `hasMoreBoxityInfo` TypeKind 	    = True
+UnboxedTypeKind `hasMoreBoxityInfo` UnboxedTypeKind = True
+
+TypeKind	`hasMoreBoxityInfo` TypeKind	    = True
+
+kind1	 	`hasMoreBoxityInfo` kind2    	    = ASSERT( notArrowKind kind1 &&
+							      notArrowKind kind2 )
+						      False
+
+-- Not exported
+notArrowKind (ArrowKind _ _) = False
+notArrowKind other_kind	     = True
 
 resultKind :: Kind -> Kind	-- Get result from arrow kind
 resultKind (ArrowKind _ res_kind) = res_kind

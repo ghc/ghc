@@ -20,16 +20,20 @@ import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE,
 import TcEnv		( tcGetGlobalTyVars )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck, tcSimplifyWithExtraGlobals )
 import TcType		( TcType(..), TcThetaType(..), TcTauType(..), 
-			  TcTyVarSet(..), TcTyVar(..), tcInstType, zonkTcType )
+			  TcTyVarSet(..), TcTyVar(..), tcInstType,
+			  newTyVarTy, zonkTcType
+			)
+import Unify		( unifyTauTy )
 
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), HsExpr, OutPat(..), 
 			  Sig, HsLit, ArithSeqInfo, InPat, GRHSsAndBinds, Match, Fake
 			)
-import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(..),				       tcIdType )
+import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(..), tcIdType )
 
 import Bag		( Bag, foldBag, bagToList, listToBag, isEmptyBag )
 import Class		( GenClass )
 import Id		( GenId, Id(..), mkUserId, idType )
+import Kind		( isUnboxedKind, isTypeKind, mkBoxedTypeKind )
 import ListSetOps	( minusList, unionLists, intersectLists )
 import Maybes		( Maybe(..), allMaybes )
 import Outputable	( interppSP, interpp'SP )
@@ -37,7 +41,7 @@ import Pretty
 import PprType		( GenClass, GenType, GenTyVar )
 import Type		( mkTyVarTy, splitSigmaTy, mkForAllTys, mkFunTys,
 			  getTyVar_maybe, tyVarsOfTypes, eqSimpleTheta )
-import TyVar		( GenTyVar, TyVar(..), minusTyVarSet, emptyTyVarSet,
+import TyVar		( GenTyVar, TyVar(..), tyVarKind, minusTyVarSet, emptyTyVarSet,
 			  elementOfTyVarSet, unionTyVarSets, tyVarSetToList )
 import Usage		( UVar(..) )
 import Unique		( Unique )
@@ -151,9 +155,27 @@ genBinds binder_names mono_ids bind lie sig_infos prag_info_fn
     resolveOverloading tyvars_to_gen lie bind sig_infos
 		 `thenTc` \ (lie', reduced_tyvars_to_gen, dict_binds, dicts_bound) ->
 
+	-- Check for generaliseation over unboxed types, and
+	-- default any TypeKind TyVars to BoxedTypeKind
+    let
+	tyvars = tyVarSetToList reduced_tyvars_to_gen	-- Commit to a particular order
+
+        unboxed_kind_tyvars    = filter (isUnboxedKind . tyVarKind) tyvars
+	unresolved_kind_tyvars = filter (isTypeKind    . tyVarKind) tyvars
+
+	box_it tyvar = newTyVarTy mkBoxedTypeKind	`thenNF_Tc` \ boxed_ty ->
+		       unifyTauTy (mkTyVarTy tyvar) boxed_ty
+
+    in
+    ASSERT( null unboxed_kind_tyvars )	-- The instCantBeGeneralised stuff in tcSimplify
+					-- should have dealt with unboxed type variables;
+					-- and it's better done there because we have more
+					-- precise origin information
+
+    mapTc box_it unresolved_kind_tyvars			`thenTc_`
+
 	 -- BUILD THE NEW LOCALS
     let
-	tyvars	    = tyVarSetToList reduced_tyvars_to_gen	-- Commit to a particular order
 	dict_tys    = map tcIdType dicts_bound
 	poly_tys    = map (mkForAllTys tyvars . mkFunTys dict_tys) mono_id_types
 	poly_ids    = zipWithEqual mk_poly binder_names poly_tys

@@ -444,14 +444,21 @@ Let expressions
 
 \begin{code}
 simplExpr env (Let bind body) args
-  | not (switchIsSet env SimplNoLetFromApp)		-- The common case
-  = simplBind env bind (\env -> simplExpr env body args)
-		       (computeResultType env body args)
 
-  | otherwise		-- No float from application
+{- OMIT this; it's a pain to do at the other sites wehre simplBind is called,
+   and it doesn't seem worth retaining the ability to not float applications
+   into let/case 
+
+  | switchIsSet env SimplNoLetFromApp
   = simplBind env bind (\env -> simplExpr env body [])
 		       (computeResultType env body [])	`thenSmpl` \ let_expr' ->
     returnSmpl (mkGenApp let_expr' args)
+
+  | otherwise		-- No float from application
+-}
+
+  = simplBind env bind (\env -> simplExpr env body args)
+		       (computeResultType env body args)
 \end{code}
 
 Case expressions
@@ -461,6 +468,14 @@ Case expressions
 simplExpr env expr@(Case scrut alts) args
   = simplCase env scrut alts (\env rhs -> simplExpr env rhs args)
 			     (computeResultType env expr args)
+\end{code}
+
+
+Coercions
+~~~~~~~~~
+\begin{code}
+simplExpr env (Coerce coercion ty body) args
+  = simplCoerce env coercion ty body args 
 \end{code}
 
 
@@ -654,6 +669,39 @@ simplLam env binders body min_no_of_args
 				[ty] | ty `eqTy` realWorldStateTy -> 1
 				other				  -> 0
 
+\end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection[Simplify-coerce]{Coerce expressions}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- (coerce (case s of p -> r)) args ==> case s of p -> (coerce r) args
+simplCoerce env coercion ty expr@(Case scrut alts) args
+  = simplCase env scrut alts (\env rhs -> simplCoerce env coercion ty rhs args)
+			     (computeResultType env expr args)
+
+-- (coerce (let defns in b)) args  ==> let defns' in (coerce b) args
+simplCoerce env coercion ty (Let bind body) args
+  = simplBind env bind (\env -> simplCoerce env coercion ty body args)
+		       (computeResultType env body args)
+
+-- Cancellation
+simplCoerce env (CoerceIn con1) ty (Coerce (CoerceOut con2) ty2 expr) args
+  | con1 == con2
+  = simplExpr env expr args
+simplCoerce env (CoerceOut con1) ty (Coerce (CoerceIn con2) ty2 expr) args
+  | con1 == con2
+  = simplExpr env expr args
+
+-- Default case
+simplCoerce env coercion ty expr args
+  = simplExpr env expr []	`thenSmpl` \ expr' ->
+    returnSmpl (mkGenApp (Coerce coercion (simplTy env ty) expr') args)
 \end{code}
 
 
@@ -1095,8 +1143,7 @@ completeLet
 	-> OutType		-- Type of body
 	-> SmplM OutExpr
 
-completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
-
+completeLet env binder old_rhs new_rhs body_c body_ty
   -- See if RHS is an atom, or a reusable constructor
   | maybeToBool maybe_atomic_rhs
   = let
@@ -1104,15 +1151,50 @@ completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
     in
     tick atom_tick_type			`thenSmpl_`
     body_c new_env
+  where
+    maybe_atomic_rhs :: Maybe (OutArg, TickType)
+    maybe_atomic_rhs = exprToAtom env new_rhs
+	-- If the RHS is atomic, we return Just (atom, tick type)
+	-- otherwise Nothing
+    Just (rhs_atom, atom_tick_type) = maybe_atomic_rhs
 
+completeLet env binder@(id,_) old_rhs new_rhs body_c body_ty
   -- Maybe the rhs is an application of error, and sure to be demanded
   | will_be_demanded &&
     maybeToBool maybe_error_app
   = tick CaseOfError			`thenSmpl_`
     returnSmpl retyped_error_app
+  where
+    will_be_demanded	   = willBeDemanded (getIdDemandInfo id)
+    maybe_error_app        = maybeErrorApp new_rhs (Just body_ty)
+    Just retyped_error_app = maybe_error_app
 
+{-
+completeLet env binder old_rhs (Coerce coercion ty rhs) body_c body_ty
+   -- Rhs is a coercion
+   | maybeToBool maybe_atomic_coerce_rhs
+   = tick tick_type		`thenSmpl_`
+     complete_coerce env rhs_atom rhs
+   where
+     maybe_atomic_coerce_rhs    = exprToAtom env rhs
+     Just (rhs_atom, tick_type) = maybe_atomic_coerce_rhs
+
+	  returnSmpl (CoerceForm coercion rhs_atom, env)
+	Nothing
+	  newId (coreExprType rhs)	`thenSmpl` \ inner_id ->
+	  
+     complete_coerce env atom rhs
+       = cloneId env binder			`thenSmpl` \ id' ->
+	 let
+	    env1    = extendIdEnvWithClone env binder id'
+	    new_env = extendUnfoldEnvGivenFormDetails env1 id' (CoerceForm coercion rhs_atom)
+	 in
+	 body_c new_env			`thenSmpl` \ body' ->
+	 returnSmpl (Let (NonRec id' (Coerce coercion ty rhs) body')
+-}   
+
+completeLet env binder old_rhs new_rhs body_c body_ty
   -- The general case
-  | otherwise
   = cloneId env binder			`thenSmpl` \ id' ->
     let
 	env1    = extendIdEnvWithClone env binder id'
@@ -1120,40 +1202,6 @@ completeLet env binder@(id,binder_info) old_rhs new_rhs body_c body_ty
     in
     body_c new_env			`thenSmpl` \ body' ->
     returnSmpl (Let (NonRec id' new_rhs) body')
-
-  where
-    will_be_demanded = willBeDemanded (getIdDemandInfo id)
-    try_to_reuse_constr   = switchIsSet env SimplReuseCon
-
-    Just (rhs_atom, atom_tick_type) = maybe_atomic_rhs
-
-    maybe_atomic_rhs :: Maybe (OutArg, TickType)
-	-- If the RHS is atomic, we return Just (atom, tick type)
-	-- otherwise Nothing
-
-    maybe_atomic_rhs
-      = case new_rhs of
-	  Var var -> Just (VarArg var, AtomicRhs)
-
-	  Lit lit | not (isNoRepLit lit)
-	    -> Just (LitArg lit, AtomicRhs)
-
-	  Con con con_args
-	    | try_to_reuse_constr
-		   -- Look out for
-		   --	let v = C args
-		   --	in
-		   --- ...(let w = C same-args in ...)...
-		   -- Then use v instead of w.	 This may save
-		   -- re-constructing an existing constructor.
-	     -> case (lookForConstructor env con con_args) of
-		  Nothing  -> Nothing
-		  Just var -> Just (VarArg var, ConReused)
-
-	  other -> Nothing
-
-    maybe_error_app        = maybeErrorApp new_rhs (Just body_ty)
-    Just retyped_error_app = maybe_error_app
 \end{code}
 
 %************************************************************************
@@ -1180,6 +1228,30 @@ simplArg env (VarArg id)
     VarArg id
 \end{code}
 
+
+\begin{code}
+exprToAtom env (Var var) 
+  = Just (VarArg var, AtomicRhs)
+
+exprToAtom env (Lit lit) 
+  | not (isNoRepLit lit)
+  = Just (LitArg lit, AtomicRhs)
+
+exprToAtom env (Con con con_args)
+  | switchIsSet env SimplReuseCon
+  -- Look out for
+  --	let v = C args
+  --	in
+  --- ...(let w = C same-args in ...)...
+  -- Then use v instead of w.	 This may save
+  -- re-constructing an existing constructor.
+  = case (lookForConstructor env con con_args) of
+		  Nothing  -> Nothing
+		  Just var -> Just (VarArg var, ConReused)
+
+exprToAtom env other
+  = Nothing
+\end{code}
 
 %************************************************************************
 %*									*

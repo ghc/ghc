@@ -18,7 +18,8 @@ module CoreUtils (
 	, maybeErrorApp
 	, nonErrorRHSs
 	, squashableDictishCcExpr
-{-	exprSmallEnoughToDup,
+	, exprSmallEnoughToDup
+{-	
 	coreExprArity,
 	isWrapperFor,
 
@@ -45,7 +46,7 @@ import Pretty		( ppAboves )
 import PrelInfo		( trueDataCon, falseDataCon,
 			  augmentId, buildId
 			)
-import PrimOp		( primOpType, PrimOp(..) )
+import PrimOp		( primOpType, fragilePrimOp, PrimOp(..) )
 import SrcLoc		( mkUnknownSrcLoc )
 import TyVar		( isNullTyVarEnv, TyVarEnv(..) )
 import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
@@ -79,6 +80,8 @@ coreExprType (Lit lit) = literalType lit
 coreExprType (Let _ body)	= coreExprType body
 coreExprType (SCC _ expr)	= coreExprType expr
 coreExprType (Case _ alts)	= coreAltsType alts
+
+coreExprType (Coerce _ ty _)	= ty -- that's the whole point!
 
 -- a Con is a fully-saturated application of a data constructor
 -- a Prim is <ditto> of a PrimOp
@@ -129,8 +132,12 @@ default_ty (BindDefault _ rhs) = coreExprType rhs
 \end{code}
 
 \begin{code}
-applyTypeToArgs op_ty args
-  = foldl applyTy op_ty [ ty | TyArg ty <- args ]
+applyTypeToArgs op_ty args	    = foldl applyTypeToArg op_ty args
+
+applyTypeToArg op_ty (TyArg ty)     = applyTy op_ty ty
+applyTypeToArg op_ty (UsageArg _)   = panic "applyTypeToArg: UsageArg"
+applyTypeToArg op_ty val_or_lit_arg = case (getFunTy_maybe op_ty) of
+					Just (_, res_ty) -> res_ty
 \end{code}
 
 %************************************************************************
@@ -205,13 +212,18 @@ argToExpr (LitArg lit) = Lit lit
 \end{code}
 
 \begin{code}
+exprSmallEnoughToDup (Con _ _)   = True	-- Could check # of args
+exprSmallEnoughToDup (Prim op _) = not (fragilePrimOp op) -- Could check # of args
+exprSmallEnoughToDup (Lit lit)   = not (isNoRepLit lit)
+exprSmallEnoughToDup expr
+  = case (collectArgs expr) of { (fun, _, _, vargs) ->
+    case fun of
+      Var v | length vargs == 0 -> True
+      _				-> False
+    }
+
 {- LATER:
-exprSmallEnoughToDup :: GenCoreExpr binder Id -> Bool
-
-exprSmallEnoughToDup (Con _ _ _)   = True	-- Could check # of args
-exprSmallEnoughToDup (Prim op _ _) = not (fragilePrimOp op)	-- Could check # of args
-exprSmallEnoughToDup (Lit lit) = not (isNoRepLit lit)
-
+WAS: MORE CLEVER:
 exprSmallEnoughToDup expr  -- for now, just: <var> applied to <args>
   = case (collectArgs expr) of { (fun, _, _, vargs) ->
     case fun of
@@ -233,12 +245,13 @@ left something out... [WDP]
 \begin{code}
 manifestlyWHNF :: GenCoreExpr bndr Id tyvar uvar -> Bool
 
-manifestlyWHNF (Var _)	  = True
-manifestlyWHNF (Lit _)	  = True
-manifestlyWHNF (Con _ _)  = True
-manifestlyWHNF (SCC _ e)  = manifestlyWHNF e
-manifestlyWHNF (Let _ e)  = False
-manifestlyWHNF (Case _ _) = False
+manifestlyWHNF (Var _)	      = True
+manifestlyWHNF (Lit _)	      = True
+manifestlyWHNF (Con _ _)      = True
+manifestlyWHNF (SCC _ e)      = manifestlyWHNF e
+manifestlyWHNF (Coerce _ _ e) = _trace "manifestlyWHNF:Coerce" $ manifestlyWHNF e
+manifestlyWHNF (Let _ e)      = False
+manifestlyWHNF (Case _ _)     = False
 
 manifestlyWHNF (Lam x e)  = if isValBinder x then True else manifestlyWHNF e
 
@@ -268,12 +281,13 @@ some point.  It isn't a disaster if it errs on the conservative side
 \begin{code}
 manifestlyBottom :: GenCoreExpr bndr Id tyvar uvar -> Bool
 
-manifestlyBottom (Var v)     = isBottomingId v
-manifestlyBottom (Lit _)     = False
-manifestlyBottom (Con  _ _)  = False
-manifestlyBottom (Prim _ _)  = False
-manifestlyBottom (SCC _ e)   = manifestlyBottom e
-manifestlyBottom (Let _ e)   = manifestlyBottom e
+manifestlyBottom (Var v)     	= isBottomingId v
+manifestlyBottom (Lit _)     	= False
+manifestlyBottom (Con  _ _)  	= False
+manifestlyBottom (Prim _ _)  	= False
+manifestlyBottom (SCC _ e)   	= manifestlyBottom e
+manifestlyBottom (Coerce _ _ e) = _trace "manifestlyBottom:Coerce" $ manifestlyBottom e
+manifestlyBottom (Let _ e)	= manifestlyBottom e
 
   -- We do not assume \x.bottom == bottom:
 manifestlyBottom (Lam x e) = if isValBinder x then False else manifestlyBottom e
@@ -413,6 +427,7 @@ bop_expr f (Prim op args)    = Prim op args
 bop_expr f (Lam binder expr) = Lam  (bop_binder f binder) (bop_expr f expr)
 bop_expr f (App expr arg)    = App  (bop_expr f expr) arg
 bop_expr f (SCC label expr)  = SCC  label (bop_expr f expr)
+bop_expr f (Coerce c ty e)   = Coerce c ty (bop_expr f e)
 bop_expr f (Let bind expr)   = Let  (bop_bind f bind) (bop_expr f expr)
 bop_expr f (Case expr alts)  = Case (bop_expr f expr) (bop_alts f alts)
 
@@ -768,4 +783,8 @@ do_CoreExpr venv tenv (Let core_bind expr)
 do_CoreExpr venv tenv (SCC label expr)
   = do_CoreExpr venv tenv expr	    	`thenUs` \ new_expr ->
     returnUs (SCC label new_expr)
+
+do_CoreExpr venv tenv (Coerce c ty expr)
+  = do_CoreExpr venv tenv expr	    	`thenUs` \ new_expr ->
+    returnUs (Coerce c (applyTypeEnvToTy tenv ty) new_expr)
 \end{code}

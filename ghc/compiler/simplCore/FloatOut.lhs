@@ -272,6 +272,10 @@ floatExpr env lvl (SCC cc expr)
 	-- Note: Nested SCC's are preserved for the benefit of
 	--       cost centre stack profiling (Durham)
 
+floatExpr env lvl (Coerce c ty expr)
+  = case (floatExpr env lvl expr)    of { (fs, floating_defns, expr') ->
+    (fs, floating_defns, Coerce c ty expr') }
+
 floatExpr env lvl (Let bind body)
   = case (floatBind env     lvl bind) of { (fsb, rhs_floats, bind', new_env) ->
     case (floatExpr new_env lvl body) of { (fse, body_floats, body') ->

@@ -2,8 +2,8 @@
 module TcKind (
 
 	Kind, mkTypeKind, mkBoxedTypeKind, mkUnboxedTypeKind, mkArrowKind, 
-	isSubKindOf,	-- Kind -> Kind -> Bool
-	resultKind,	-- Kind -> Kind
+	hasMoreBoxityInfo,	-- Kind -> Kind -> Bool
+	resultKind,		-- Kind -> Kind
 
 	TcKind, mkTcTypeKind, mkTcArrowKind, mkTcVarKind,
 	newKindVar,	-- NF_TcM s (TcKind s)

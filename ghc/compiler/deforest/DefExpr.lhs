@@ -127,6 +127,9 @@ This is extended by one rule only: reduction of a type application.
 >	mapArgs (\e -> tran sw p t e []) as	`thenUs` \as ->
 >	returnUs (mkGenApp (SCC l e) as)
 >
+> tran sw p t (Coerce c ty e) as =
+>	panic "DefExpr:tran:Coerce"
+>
 > tran sw p t (Case e ps) as =
 > 	tranCase sw p t e [] ps as
 >
@@ -245,6 +248,8 @@ Transformation for case expressions of the form (case e1..en of {..})
 >		tranAlts sw p t ps as			`thenUs` \ps ->
 >		returnUs (Case (mkGenApp (SCC l e) bs)
 >				  ps)
+>
+>	Coerce _ _ _ -> panic "DefExpr:tranCase:Coerce"
 >
 >	Case e ps' ->
 >		tranCase sw p t e []
@@ -502,6 +507,7 @@ Type Substitutions.
 >		Let (Rec (map substTyRecBind bs)) (substTy e)
 >		where substTyRecBind (v,e) = (applyTypeEnvToId p v, substTy e)
 >       SCC l e            -> SCC l (substTy e)
+>	Coerce _ _ _	   -> panic "DefExpr:applyTypeEnvToExpr:Coerce"
 
 >     substTyAtom :: DefAtom -> DefAtom
 >     substTyAtom (VarArg v) = VarArg (substTyArg v)

@@ -119,6 +119,8 @@ ToDo: make this better.
 >       SCC l e ->
 >		convExpr e			`thenUs` \e ->
 >		returnUs (SCC l e)
+>
+>	Coerce _ _ _ -> panic "TreelessForm:convExpr:Coerce"
 
 Mark all the recursive functions as deforestable.  Might as well,
 since they will be in treeless form anyway.  This helps to cope with

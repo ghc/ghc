@@ -49,7 +49,8 @@ import Name		( nameSrcLoc, isLocallyDefinedName, getSrcLoc,
 			)
 import Pretty
 import TyCon		( TyCon, NewOrData(..), mkSynTyCon, mkDataTyCon, isDataTyCon, 
-			  tyConDataCons )
+			  isNewTyCon, tyConDataCons
+			)
 import Type		( typeKind, getTyVar, tyVarsOfTypes, eqTy,
 			  applyTyCon, mkTyVarTys, mkForAllTys, mkFunTy,
 			  splitFunTy, mkTyVarTy, getTyVar_maybe
@@ -163,7 +164,7 @@ Generating constructor/selector bindings for data declarations
 \begin{code}
 mkDataBinds :: TyCon -> TcM s ([Id], TcHsBinds s)
 mkDataBinds tycon
-  = ASSERT( isDataTyCon tycon )
+  = ASSERT( isDataTyCon tycon || isNewTyCon tycon )
     mapAndUnzipTc mkConstructor data_cons		`thenTc` \ (con_ids, con_binds) ->	
     mapAndUnzipTc (mkRecordSelector tycon) groups	`thenTc` \ (sel_ids, sel_binds) ->
     returnTc (con_ids ++ sel_ids, 

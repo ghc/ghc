@@ -39,6 +39,7 @@ module Util (
 	IF_NOT_GHC(forall COMMA exists COMMA)
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy,
+	mapAndUnzip,
 	nOfThem, lengthExceeds, isSingleton,
 	startsWith, endsWith,
 #if defined(COMPILING_GHC)
@@ -182,6 +183,18 @@ zipWith4Equal _ _  _  _  _	=  panic "zipWith4Equal: unequal lists"
 zipLazy :: [a] -> [b] -> [(a,b)]
 zipLazy [] ys = []
 zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
+\end{code}
+
+\begin{code}
+mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])
+
+mapAndUnzip f [] = ([],[])
+mapAndUnzip f (x:xs)
+  = let
+	(r1,  r2)  = f x
+	(rs1, rs2) = mapAndUnzip f xs
+    in
+    (r1:rs1, r2:rs2)
 \end{code}
 
 \begin{code}

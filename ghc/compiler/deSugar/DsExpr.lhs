@@ -45,8 +45,11 @@ import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
 			  rEC_UPD_ERROR_ID
 			)
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
-import Type		( splitSigmaTy, splitFunTy, typePrimRep, getAppDataTyCon )
-import TyVar		( GenTyVar, nullTyVarEnv, addOneToTyVarEnv )
+import TyCon		( isDataTyCon, isNewTyCon )
+import Type		( splitSigmaTy, splitFunTy, typePrimRep,
+			  getAppDataTyCon, getAppTyCon, applyTy
+			)
+import TyVar		( nullTyVarEnv, addOneToTyVarEnv, GenTyVar{-instance Eq-} )
 import Usage		( UVar(..) )
 import Util		( zipEqual, pprError, panic, assertPanic )
 
@@ -308,9 +311,22 @@ dsExpr (ExplicitTuple expr_list)
 	    (map coreExprType core_exprs)
 	    core_exprs
 
+-- Two cases, one for ordinary constructors and one for newtype constructors
 dsExpr (HsCon con tys args)
+  | isDataTyCon tycon			-- The usual datatype case
   = mapDs dsExpr args	`thenDs` \ args_exprs ->
     mkConDs con tys args_exprs
+
+  | otherwise				-- The newtype case
+  = ASSERT( isNewTyCon tycon )
+    ASSERT( null rest_args )
+    dsExpr first_arg		`thenDs` \ arg_expr ->
+    returnDs (Coerce (CoerceIn con) result_ty arg_expr)
+
+  where
+    (first_arg:rest_args) = args
+    (args_tys, result_ty) = splitFunTy (foldl applyTy (idType con) tys)
+    (tycon,_) 	          = getAppTyCon result_ty
 
 dsExpr (ArithSeqOut expr (From from))
   = dsExpr expr		  `thenDs` \ expr2 ->

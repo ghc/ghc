@@ -124,6 +124,7 @@ tcIdType other     = panic "tcIdType"
 instance Eq (TcIdOcc s) where
   (TcId id1)   == (TcId id2)   = id1 == id2
   (RealId id1) == (RealId id2) = id1 == id2
+  _	       == _	       = False
 
 instance Outputable (TcIdOcc s) where
   ppr sty (TcId id)   = ppr sty id

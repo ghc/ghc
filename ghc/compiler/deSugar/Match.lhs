@@ -334,7 +334,7 @@ tidy1 v (RecPat con_id pat_ty rpats) match_result
     pats 	     = map mk_pat tagged_arg_tys
 
 	-- Boring stuff to find the arg-tys of the constructor
-    (_, inst_tys, _) = _trace "getAppDataTyCon.Match" $ getAppDataTyCon pat_ty
+    (_, inst_tys, _) = {-_trace "getAppDataTyCon.Match" $-} getAppDataTyCon pat_ty
     con_arg_tys'     = dataConArgTys con_id inst_tys 
     tagged_arg_tys   = con_arg_tys' `zip` allFieldLabelTags
 
@@ -513,21 +513,24 @@ matchUnmixedEqns :: [Id]
 matchUnmixedEqns [] _ _ = panic "matchUnmixedEqns: no names"
 
 matchUnmixedEqns all_vars@(var:vars) eqns_info shadows
-  | unfailablePats column_1_pats	-- Could check just one; we know they've been tidied, unmixed;
-					-- this way is (arguably) a sanity-check
-  =	-- Real true variables, just like in matchVar, SLPJ p 94
+  | unfailablePat first_pat
+  = ASSERT( unfailablePats column_1_pats )	-- Sanity check
+  	-- Real true variables, just like in matchVar, SLPJ p 94
     match vars remaining_eqns_info remaining_shadows
 
-  | patsAreAllCons column_1_pats	-- ToDo: maybe check just one...
-  = matchConFamily all_vars eqns_info shadows
+  | isConPat first_pat
+  = ASSERT( patsAreAllCons column_1_pats )
+    matchConFamily all_vars eqns_info shadows
 
-  | patsAreAllLits column_1_pats	-- ToDo: maybe check just one...
-  =	-- see notes in MatchLiteral
+  | isLitPat first_pat
+  = ASSERT( patsAreAllLits column_1_pats )
+  	-- see notes in MatchLiteral
 	-- not worried about the same literal more than once in a column
 	-- (ToDo: sort this out later)
     matchLiterals all_vars eqns_info shadows
 
   where
+    first_pat		= head column_1_pats
     column_1_pats 	= [pat                       | EqnInfo (pat:_)  _            <- eqns_info]
     remaining_eqns_info = [EqnInfo pats match_result | EqnInfo (_:pats) match_result <- eqns_info]
     remaining_shadows   = [EqnInfo pats match_result | EqnInfo (pat:pats) match_result <- shadows,

@@ -31,7 +31,7 @@
 > --import SrcLoc 	( mkUnknownSrcLoc )
 > --import StgSyn
 > --import UniqSet
-> --import UniqSupply 	( getBuiltinUniques )
+> --import Unique 	( getBuiltinUniques )
 > --import Util
 
 %-----------------------------------------------------------------------------

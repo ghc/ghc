@@ -196,14 +196,15 @@ libCase :: LibCaseEnv
 	-> CoreExpr
 	-> CoreExpr
 
-libCase env (Lit lit)		 = Lit lit
-libCase env (Var v)		 = mkCoLetsNoUnboxed (libCaseId env v) (Var v)
-libCase env (App fun arg)      = mkCoLetsNoUnboxed (libCaseAtom env arg) (App (libCase env fun) arg)
-libCase env (CoTyApp fun ty)     = CoTyApp (libCase env fun) ty
-libCase env (Con con tys args) = mkCoLetsNoUnboxed (libCaseAtoms env args) (Con con tys args)
-libCase env (Prim op tys args) = mkCoLetsNoUnboxed (libCaseAtoms env args) (Prim op tys args)
-libCase env (CoTyLam tyvar body) = CoTyLam tyvar (libCase env body)
-libCase env (SCC cc body)      = SCC cc (libCase env body)
+libCase env (Lit lit)		= Lit lit
+libCase env (Var v)		= mkCoLetsNoUnboxed (libCaseId env v) (Var v)
+libCase env (App fun arg)       = mkCoLetsNoUnboxed (libCaseAtom env arg) (App (libCase env fun) arg)
+libCase env (CoTyApp fun ty)    = CoTyApp (libCase env fun) ty
+libCase env (Con con tys args)  = mkCoLetsNoUnboxed (libCaseAtoms env args) (Con con tys args)
+libCase env (Prim op tys args)  = mkCoLetsNoUnboxed (libCaseAtoms env args) (Prim op tys args)
+libCase env (CoTyLam tv body)   = CoTyLam tv (libCase env body)
+libCase env (SCC cc body)       = SCC cc (libCase env body)
+libCase env (Coerce c ty body)	= Coerce c ty (libCase env body)
 
 libCase env (Lam binder body)
   = Lam binder (libCase (addBinders env [binder]) body)

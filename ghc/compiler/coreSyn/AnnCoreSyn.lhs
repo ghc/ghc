@@ -54,6 +54,10 @@ data AnnCoreExpr' val_bdr val_occ tyvar uvar annot
 
   | AnnSCC	CostCentre
 		(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
+
+  | AnnCoerce	Coercion
+		(GenType tyvar uvar)
+		(AnnCoreExpr val_bdr val_occ tyvar uvar annot)
 \end{code}
 
 \begin{code}
@@ -83,6 +87,7 @@ deAnnotate (_, AnnPrim	op args)    = Prim op args
 deAnnotate (_, AnnLam	binder body)= Lam binder (deAnnotate body)
 deAnnotate (_, AnnApp	fun arg)    = App (deAnnotate fun) arg
 deAnnotate (_, AnnSCC	lbl body)   = SCC lbl (deAnnotate body)
+deAnnotate (_, AnnCoerce c ty body) = Coerce c ty (deAnnotate body)
 
 deAnnotate (_, AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)

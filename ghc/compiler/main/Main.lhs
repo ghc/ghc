@@ -80,7 +80,7 @@ doIt (core_cmds, stg_cmds) input_pgm
 
     -- UniqueSupplies for later use (these are the only lower case uniques)
     mkSplitUniqSupply 'r'	>>= \ rn_uniqs ->	-- renamer
-    mkSplitUniqSupply 't'	>>= \ tc_uniqs ->	-- typechecker
+    mkSplitUniqSupply 'a'	>>= \ tc_uniqs ->	-- typechecker
     mkSplitUniqSupply 'd'	>>= \ ds_uniqs ->	-- desugarer
     mkSplitUniqSupply 's'	>>= \ sm_uniqs ->	-- core-to-core simplifier
     mkSplitUniqSupply 'c'	>>= \ c2s_uniqs ->	-- core-to-stg

@@ -263,6 +263,10 @@ lvlExpr ctxt_lvl envs (_, AnnSCC cc expr)
   = lvlExpr ctxt_lvl envs expr 		`thenLvl` \ expr' ->
     returnLvl (SCC cc expr')
 
+lvlExpr ctxt_lvl envs (_, AnnCoerce c ty expr)
+  = lvlExpr ctxt_lvl envs expr 		`thenLvl` \ expr' ->
+    returnLvl (Coerce c ty expr')
+
 lvlExpr ctxt_lvl envs@(venv, tenv) (_, AnnLam (ValBinder arg) rhs)
   = lvlMFE incd_lvl (new_venv, tenv) rhs `thenLvl` \ rhs' ->
     returnLvl (Lam (ValBinder (arg,incd_lvl)) rhs')

@@ -11,7 +11,7 @@ import CoreSyn		( CoreExpr(..), GenCoreExpr, GenCoreArg )
 import CoreUnfold 	( FormSummary(..), UnfoldingDetails(..), UnfoldingGuidance(..) )
 import CoreUtils	( unTagBinders )
 import Id		( externallyVisibleId, isDataCon, isWorkerId, isWrapperId,
-			  unfoldingUnfriendlyId, getIdInfo,
+			  unfoldingUnfriendlyId, getIdInfo, nmbrId,
 			  nullIdEnv, lookupIdEnv, IdEnv(..),
 			  Id(..), GenId
 			)
@@ -19,6 +19,7 @@ import IdInfo		( IdInfo )
 import Literal		( Literal )
 import MagicUFs		( mkMagicUnfoldingFun, MagicUnfoldingFun )
 import Outputable	( Outputable(..) )
+import PprEnv		( NmbrEnv )
 import PprStyle		( PprStyle )
 import PprType		( pprParendGenType )
 import Pretty		( PrettyRep )
@@ -39,6 +40,7 @@ getIdInfo		:: Id	    -> IdInfo
 nullIdEnv		:: UniqFM a
 lookupIdEnv		:: UniqFM b -> GenId a -> Maybe b
 mAX_WORKER_ARGS		:: Int
+nmbrId			:: Id -> NmbrEnv -> (NmbrEnv, Id)
 pprParendGenType		:: (Eq a, Outputable a, Eq b, Outputable b) => PprStyle -> GenType a b -> Int -> Bool -> PrettyRep
 unTagBinders :: GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), a) b c d -> GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) b c d
 
@@ -58,6 +60,7 @@ instance Outputable (GenTyVar a)
 instance (Outputable a) => Outputable (GenId a)
 instance (Eq a, Outputable a, Eq b, Outputable b) => Outputable (GenType a b)
 
+data NmbrEnv
 data MagicUnfoldingFun
 data FormSummary   = WhnfForm | BottomForm | OtherForm
 data UnfoldingDetails

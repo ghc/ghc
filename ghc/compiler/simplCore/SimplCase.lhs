@@ -36,7 +36,7 @@ import SimplUtils	( mkValLamTryingEta )
 import Type		( isPrimType, maybeAppDataTyCon, mkFunTys, eqTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
-import Util		( isIn, isSingleton, panic, assertPanic )
+import Util		( isIn, isSingleton, zipEqual, panic, assertPanic )
 \end{code}
 
 Float let out of case.
@@ -681,7 +681,7 @@ completeAlgCaseWithKnownCon env con con_args (AlgAlts alts deflt) rhs_c
       | alt_con == con
       = 	-- Matching alternative!
 	let
-	    new_env = extendIdEnvWithAtomList env (zip alt_args con_args)
+	    new_env = extendIdEnvWithAtomList env (zipEqual alt_args (filter isValArg con_args))
 	in
 	rhs_c new_env rhs
 

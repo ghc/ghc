@@ -62,7 +62,7 @@ data InPat name
 		    [(name, InPat name, Bool)]	-- True <=> source used punning
 
 data OutPat tyvar uvar id
-  = WildPat	    (GenType tyvar uvar)	 	    	-- wild card
+  = WildPat	    (GenType tyvar uvar)	-- wild card
 
   | VarPat	    id				-- variable (type is in the Id)
 
@@ -73,7 +73,7 @@ data OutPat tyvar uvar id
 
   | ConPat	    Id				-- Constructor is always an Id
 		    (GenType tyvar uvar)    	-- the type of the pattern
-		    [(OutPat tyvar uvar id)]
+		    [OutPat tyvar uvar id]
 
   | ConOpPat	    (OutPat tyvar uvar id)	-- just a special case...
 		    Id
@@ -81,9 +81,9 @@ data OutPat tyvar uvar id
 		    (GenType tyvar uvar)
   | ListPat		 	    		-- syntactic list
 		    (GenType tyvar uvar)	-- the type of the elements
-   	    	    [(OutPat tyvar uvar id)]
+   	    	    [OutPat tyvar uvar id]
 
-  | TuplePat	    [(OutPat tyvar uvar id)]	-- tuple
+  | TuplePat	    [OutPat tyvar uvar id]	-- tuple
 						-- UnitPat is TuplePat []
 
   | RecPat	    Id 				-- record constructor
@@ -150,7 +150,7 @@ pprInPat sty (ParPatIn pat)
 pprInPat sty (ListPatIn pats)
   = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
 pprInPat sty (TuplePatIn pats)
-  = ppBesides [ppLparen, interpp'SP sty pats, ppRparen]
+  = ppParens (interpp'SP sty pats)
 
 pprInPat sty (RecPatIn con rpats)
   = ppBesides [ppr sty con, ppSP, ppChar '{', ppInterleave ppComma (map (pp_rpat sty) rpats), ppChar '}']
@@ -188,7 +188,7 @@ pprOutPat sty (ConOpPat pat1 op pat2 ty)
 pprOutPat sty (ListPat ty pats)
   = ppBesides [ppLbrack, interpp'SP sty pats, ppRbrack]
 pprOutPat sty (TuplePat pats)
-  = ppBesides [ppLparen, interpp'SP sty pats, ppRparen]
+  = ppParens (interpp'SP sty pats)
 
 pprOutPat sty (RecPat con ty rpats)
   = ppBesides [ppr sty con, ppChar '{', ppInterleave ppComma (map (pp_rpat sty) rpats), ppChar '}']
@@ -254,6 +254,7 @@ isConPat (ConPat _ _ _)		= True
 isConPat (ConOpPat _ _ _ _)	= True
 isConPat (ListPat _ _)		= True
 isConPat (TuplePat _)		= True
+isConPat (RecPat _ _ _)		= True
 isConPat (DictPat ds ms)	= (length ds + length ms) > 1
 isConPat other			= False
 
@@ -275,8 +276,9 @@ irrefutablePat (WildPat _) 		  = True
 irrefutablePat (VarPat _)  		  = True
 irrefutablePat (LazyPat	_) 		  = True
 irrefutablePat (AsPat _ pat)		  = irrefutablePat pat
-irrefutablePat (ConPat con tys pats)	  = all irrefutablePat pats && only_con con
-irrefutablePat (ConOpPat pat1 con pat2 _) = irrefutablePat pat1 && irrefutablePat pat1 && only_con con
+irrefutablePat (ConPat con tys pats)	  = only_con con && all irrefutablePat pats
+irrefutablePat (ConOpPat pat1 con pat2 _) = only_con con && irrefutablePat pat1 && irrefutablePat pat1
+irrefutablePat (RecPat con _ fields)	  = only_con con && and [ irrefutablePat pat | (_,pat,_) <- fields ]
 irrefutablePat (ListPat _ _)		  = False
 irrefutablePat (TuplePat pats)		  = all irrefutablePat pats
 irrefutablePat (DictPat _ _)		  = True
@@ -295,6 +297,7 @@ collectPatBinders :: InPat a -> [a]
 
 collectPatBinders WildPatIn	      = []
 collectPatBinders (VarPatIn var)      = [var]
+collectPatBinders (LitPatIn _)	      = []
 collectPatBinders (LazyPatIn pat)     = collectPatBinders pat
 collectPatBinders (AsPatIn a pat)     = a : collectPatBinders pat
 collectPatBinders (ConPatIn c pats)   = concat (map collectPatBinders pats)

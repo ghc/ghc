@@ -249,6 +249,10 @@ data SigInfo
 			`thenTc` \ (tyvars_not_to_gen, tyvars_to_gen, lie_to_gen) ->
 
 
+	*** CHECK FOR UNBOXED TYVARS HERE! ***
+
+
+
 	-- Make poly_ids for all the binders that don't have type signatures
     let
 	tys_to_gen   = mkTyVarTys tyvars_to_gen

@@ -12,7 +12,7 @@ module TyCon(
 	Arity(..), NewOrData(..),
 
 	isFunTyCon, isPrimTyCon, isBoxedTyCon,
-	isDataTyCon, isSynTyCon,
+	isDataTyCon, isSynTyCon, isNewTyCon,
 
 	mkDataTyCon,
 	mkFunTyCon,
@@ -147,6 +147,9 @@ isBoxedTyCon = not . isPrimTyCon
 isDataTyCon (DataTyCon _ _ _ _ _ _ _ DataType) = True
 isDataTyCon (TupleTyCon _ _ _)		       = True
 isDataTyCon other 			       = False
+
+isNewTyCon (DataTyCon _ _ _ _ _ _ _ NewType) = True 
+isNewTyCon other			     = False
 
 isSynTyCon (SynTyCon _ _ _ _ _ _) = True
 isSynTyCon _			  = False

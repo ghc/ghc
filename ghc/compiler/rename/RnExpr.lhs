@@ -394,7 +394,7 @@ rnQuals (qual: quals)
   = rnQual qual				`thenRn` \ ((qual',  bs1), fvQuals1) ->
     extendSS2 bs1 (rnQuals quals)	`thenRn` \ ((quals', bs2), fvQuals2) ->
     returnRn
-       ((qual' : quals', bs2 ++ bs1),	-- The ones on the right (bs2) shadow the
+       ((qual' : quals', bs1 ++ bs2),	-- The ones on the right (bs2) shadow the
 					-- ones on the left (bs1)
 	fvQuals1 `unionUniqSets` fvQuals2)
 

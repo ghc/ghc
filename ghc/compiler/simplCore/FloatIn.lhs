@@ -200,6 +200,12 @@ fiExpr to_drop (_, AnnSCC cc expr)
   = mkCoLets' to_drop (SCC cc (fiExpr [] expr))
 \end{code}
 
+\begin{code}
+fiExpr to_drop (_, AnnCoerce c ty expr)
+  = _trace "fiExpr:Coerce:wimping out" $
+    mkCoLets' to_drop (Coerce c ty (fiExpr [] expr))
+\end{code}
+
 For @Lets@, the possible ``drop points'' for the \tr{to_drop}
 bindings are: (a)~in the body, (b1)~in the RHS of a NonRec binding,
 or~(b2), in each of the RHSs of the pairs of a @Rec@.

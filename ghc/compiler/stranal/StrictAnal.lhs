@@ -271,6 +271,10 @@ saExpr str_env abs_env (SCC cc expr)
   = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
     returnSa (SCC cc new_expr)
 
+saExpr str_env abs_env (Coerce c ty expr)
+  = saExpr str_env abs_env expr	`thenSa` \ new_expr ->
+    returnSa (Coerce c ty new_expr)
+
 saExpr str_env abs_env (Case expr (AlgAlts alts deflt))
   = saExpr    str_env abs_env expr  `thenSa` \ new_expr  ->
     saDefault str_env abs_env deflt `thenSa` \ new_deflt ->

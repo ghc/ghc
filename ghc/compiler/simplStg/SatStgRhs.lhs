@@ -71,7 +71,7 @@ import Id		( idType, getIdArity, addIdArity, mkSysLocal,
 			)
 import IdInfo		( arityMaybe )
 import SrcLoc		( mkUnknownSrcLoc )
-import Type		( splitSigmaTy, splitFunTy )
+import Type		( splitSigmaTy, splitForAllTy, splitFunTyWithDictsAsArgs )
 import UniqSupply	( returnUs, thenUs, mapUs, getUnique, UniqSM(..) )
 import Util		( panic, assertPanic )
 
@@ -166,9 +166,8 @@ satRhs top env (b, StgRhsClosure cc bi fv u args body)
 	    new_arity = num_args + needed_args
 
 	     -- get type info for this function:
-	    (_,rho_arg_tys,tau_ty) = splitSigmaTy (idType b)
-	    (tau_arg_tys, _) = splitFunTy tau_ty
-	    all_arg_tys = ASSERT(null rho_arg_tys) {-rho_arg_tys ++-} tau_arg_tys
+	    (_, rho_ty) = splitForAllTy (idType b)
+	    (all_arg_tys, _) = splitFunTyWithDictsAsArgs rho_ty
 
 	     -- now, we already have "args"; we drop that many types
 	    args_we_dont_have_tys = drop num_args all_arg_tys

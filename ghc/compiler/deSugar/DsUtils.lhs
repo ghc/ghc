@@ -46,9 +46,10 @@ import Id		( idType, dataConArgTys, mkTupleCon,
 			  pprId{-ToDo:rm-},
 			  DataCon(..), DictVar(..), Id(..), GenId )
 import Literal		( Literal(..) )
-import TyCon		( mkTupleTyCon )
+import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
 import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
-			  isUnboxedType, applyTyCon, getAppDataTyCon
+			  isUnboxedType, applyTyCon,
+			  getAppDataTyCon, getAppTyCon
 			)
 import UniqSet		( mkUniqSet, minusUniqSet, uniqSetToList, UniqSet(..) )
 import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
@@ -138,6 +139,11 @@ mkCoAlgCaseMatchResult :: Id				-- Scrutinee
 		    -> DsM MatchResult
 
 mkCoAlgCaseMatchResult var alts
+  | isNewTyCon tycon		-- newtype case; use a let
+  = ASSERT( newtype_sanity )
+    returnDs (mkCoLetsMatchResult [coercion_bind] match_result)
+
+  | otherwise			-- datatype case  
   =	    -- Find all the constructors in the type which aren't
 	    -- explicitly mentioned in the alternatives:
     case un_mentioned_constructors of
@@ -171,8 +177,21 @@ mkCoAlgCaseMatchResult var alts
 				      (mk_case alts (\fail_expr -> BindDefault wild fail_expr))
 				      cxt1)
   where
+	-- Common stuff
     scrut_ty = idType var
-    (tycon, tycon_arg_tys, data_cons) = pprTrace "CoAlgCase:" (pprType PprDebug scrut_ty) $ getAppDataTyCon scrut_ty
+    (tycon, tycon_arg_tys) = --pprTrace "CoAlgCase:" (pprType PprDebug scrut_ty) $ 
+			     getAppTyCon scrut_ty
+
+	-- Stuff for newtype
+    (con_id, arg_ids, match_result) = head alts
+    arg_id 	   		    = head arg_ids
+    coercion_bind		    = NonRec arg_id (Coerce (CoerceOut con_id) 
+							    (idType arg_id)
+							    (Var var))
+    newtype_sanity		    = null (tail alts) && null (tail arg_ids)
+
+	-- Stuff for data types
+    data_cons = tyConDataCons tycon
 
     un_mentioned_constructors
       = uniqSetToList (mkUniqSet data_cons `minusUniqSet` mkUniqSet [ con | (con, _, _) <- alts] )

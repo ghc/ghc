@@ -69,10 +69,10 @@ import PrimRep		( PrimRep(..) )
 import Stix		( sStLitLbl, StixTree(..), StixReg(..),
 			  CodeSegment
 			)
-import Unique		( Unique{-instance Ord3-} )
-import UniqSupply	( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
-			  getUnique, returnUs, thenUs, UniqSM(..)
+import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
+			  Unique{-instance Ord3-}
 			)
+import UniqSupply	( getUnique, returnUs, thenUs, UniqSM(..) )
 import Unpretty		( uppStr, Unpretty(..) )
 import Util		( panic )
 \end{code}

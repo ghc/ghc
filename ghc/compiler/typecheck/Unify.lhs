@@ -22,7 +22,7 @@ import TcType	( TcType(..), TcMaybe(..), TcTauType(..), TcTyVar(..),
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
 -- others:
-import Kind	( Kind, isSubKindOf, mkTypeKind )
+import Kind	( Kind, hasMoreBoxityInfo, mkTypeKind )
 import Usage	( duffUsage )
 import PprType	( GenTyVar, GenType )	-- instances
 import Pretty
@@ -232,10 +232,10 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1)
 	(DontBind,DontBind) 
 		     -> failTc (unifyDontBindErr tv1 ps_ty2)
 
-	(UnBound, _) |  kind2 `isSubKindOf` kind1
+	(UnBound, _) |  kind2 `hasMoreBoxityInfo` kind1
 		     -> tcWriteTyVar tv1 ty2		`thenNF_Tc_` returnTc ()
 	
-	(_, UnBound) |  kind1 `isSubKindOf` kind2
+	(_, UnBound) |  kind1 `hasMoreBoxityInfo` kind2
 		     -> tcWriteTyVar tv2 (TyVarTy tv1)	`thenNF_Tc_` returnTc ()
 
 	other	     -> failTc (unifyKindErr tv1 ps_ty2)
@@ -245,7 +245,7 @@ uUnboundVar tv1@(TyVar uniq1 kind1 name1 box1) maybe_ty1 ps_ty2 non_var_ty2
   = case maybe_ty1 of
 	DontBind -> failTc (unifyDontBindErr tv1 ps_ty2)
 
-	UnBound	 |  typeKind non_var_ty2 `isSubKindOf` kind1
+	UnBound	 |  typeKind non_var_ty2 `hasMoreBoxityInfo` kind1
 		 -> occur_check non_var_ty2			`thenTc_`
 		    tcWriteTyVar tv1 ps_ty2			`thenNF_Tc_`
 		    returnTc ()

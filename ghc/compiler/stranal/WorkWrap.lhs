@@ -114,6 +114,10 @@ wwExpr (SCC cc expr)
   = wwExpr expr			`thenUs` \ new_expr ->
     returnUs (SCC cc new_expr)
 
+wwExpr (Coerce c ty expr)
+  = wwExpr expr			`thenUs` \ new_expr ->
+    returnUs (Coerce c ty new_expr)
+
 wwExpr (Let bind expr)
   = wwBind False{-not top-level-} bind	`thenUs` \ intermediate_bind ->
     wwExpr expr				`thenUs` \ new_expr ->

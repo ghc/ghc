@@ -10,6 +10,7 @@ module CoreSyn (
 	GenCoreBinding(..), GenCoreExpr(..),
 	GenCoreArg(..), GenCoreBinder(..), GenCoreCaseAlts(..),
 	GenCoreCaseDefault(..),
+	Coercion(..),
 
 	bindersOf, pairsFromCoreBinds, rhssOfBind,
 
@@ -180,6 +181,21 @@ transformations of which we are unaware.
 \begin{code}
      | SCC	CostCentre				    -- label of scc
 		(GenCoreExpr val_bdr val_occ tyvar uvar)    -- scc expression
+\end{code}
+
+Coercions arise from uses of the constructor of a @newtype@
+declaration, either in construction (resulting in a @CoreceIn@) or
+pattern matching (resulting in a @CoerceOut@).
+
+\begin{code}
+    | Coerce	Coercion
+		(GenType tyvar uvar)		-- Type of the whole expression
+		(GenCoreExpr val_bdr val_occ tyvar uvar)
+\end{code}
+
+\begin{code}
+data Coercion	= CoerceIn Id		-- Apply this constructor
+		| CoerceOut Id		-- Strip this constructor
 \end{code}
 
 
@@ -484,32 +500,21 @@ collectArgs :: GenCoreExpr val_bdr val_occ tyvar uvar
 	        [GenCoreArg val_occ tyvar uvar]{-ValArgs-})
 
 collectArgs expr
-  = usages expr []
+  = valvars expr []
   where
-    usages (App fun (UsageArg u)) uacc = usages fun (u:uacc)
-    usages fun uacc
-      = case (tyvars fun []) of { (expr, tacc, vacc) ->
+    valvars (App fun v) vacc | isValArg v = valvars fun (v:vacc)
+    valvars fun vacc
+      = case (tyvars fun []) of { (expr, uacc, tacc) ->
 	(expr, uacc, tacc, vacc) }
 
     tyvars (App fun (TyArg t))    tacc = tyvars fun (t:tacc)
     tyvars fun tacc
-      = ASSERT(not (usage_app fun))
-	case (valvars fun []) of { (expr, vacc) ->
-	(expr, tacc, vacc) }
+      = case (usages fun []) of { (expr, uacc) ->
+	(expr, uacc, tacc) }
 
-    valvars (App fun v) vacc | isValArg v = valvars fun (v:vacc)
-    valvars fun vacc
-      = --ASSERT(not (usage_app fun))
-	--ASSERT(not (ty_app    fun))
-	(if (usage_app fun || ty_app fun) then trace "CoreSyn:valvars" {-(ppr PprDebug fun)-} else id) $
-	(fun, vacc)
-
-    ---------------------------------------
-    usage_app (App _ (UsageArg _)) = True
-    usage_app _			   = False
-
-    ty_app    (App _ (TyArg _))    = True
-    ty_app    _			   = False
+    usages (App fun (UsageArg u)) uacc = usages fun (u:uacc)
+    usages fun uacc
+      = (fun,uacc)
 \end{code}
 
 %************************************************************************

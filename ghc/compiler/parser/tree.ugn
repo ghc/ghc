@@ -8,8 +8,6 @@ import UgenUtil
 
 import U_constr		( U_constr )	-- interface only
 import U_binding
-import U_coresyn	( U_coresyn )	-- interface only
-import U_hpragma	( U_hpragma )	-- interface only
 import U_list
 import U_literal
 import U_maybe

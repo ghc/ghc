@@ -467,7 +467,7 @@ buildId
     buildTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [build_ty] (mkListTy alphaTy))
 	where
 	    build_ty = mkSigmaTy [betaTyVar] []
-			(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, betaTy] betaTy)
+			(mkFunTys [mkFunTys [alphaTy, betaTy] betaTy, betaTy] betaTy)
 \end{code}
 
 @mkBuild@ is sugar for building a build!
@@ -511,7 +511,7 @@ augmentId
     augmentTy = mkSigmaTy [alphaTyVar] [] (mkFunTys [aug_ty, mkListTy alphaTy] (mkListTy alphaTy))
 	where
 	    aug_ty = mkSigmaTy [betaTyVar] []
-			(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, betaTy] betaTy)
+			(mkFunTys [mkFunTys [alphaTy, betaTy] betaTy, betaTy] betaTy)
 \end{code}
 
 \begin{code}
@@ -520,7 +520,7 @@ foldrId = pcMiscPrelId foldrIdKey pRELUDE_FB{-not "List"-} SLIT("foldr")
   where
 	foldrTy =
 	  mkSigmaTy [alphaTyVar, betaTyVar] []
-		(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, betaTy, mkListTy alphaTy] betaTy)
+		(mkFunTys [mkFunTys [alphaTy, betaTy] betaTy, betaTy, mkListTy alphaTy] betaTy)
 
 	idInfo = (((((noIdInfo
 			`addInfo_UF` mkMagicUnfolding foldrIdKey)
@@ -534,7 +534,7 @@ foldlId = pcMiscPrelId foldlIdKey pRELUDE_FB{-not "List"-} SLIT("foldl")
   where
 	foldlTy =
 	  mkSigmaTy [alphaTyVar, betaTyVar] []
-		(mkFunTys [alphaTy, mkFunTys [betaTy] betaTy, alphaTy, mkListTy betaTy] alphaTy)
+		(mkFunTys [mkFunTys [alphaTy, betaTy] alphaTy, alphaTy, mkListTy betaTy] alphaTy)
 
 	idInfo = (((((noIdInfo
 			`addInfo_UF` mkMagicUnfolding foldlIdKey)

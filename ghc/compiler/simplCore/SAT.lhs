@@ -168,6 +168,10 @@ satExpr (Let (Rec binds) body)
 satExpr (SCC cc expr)
   = satExpr expr		    `thenSAT` \ expr2 ->
     returnSAT (SCC cc expr2)
+
+satExpr (Coerce c ty expr)
+  = satExpr expr		    `thenSAT` \ expr2 ->
+    returnSAT (Coerce c ty expr2)
 \end{code}
 
 \begin{code}

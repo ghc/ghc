@@ -16,7 +16,7 @@ import Ubiq
 import CoreSyn
 
 import Bag
-import Kind		( isSubKindOf, Kind{-instance-} )
+import Kind		( Kind{-instance-} )
 import Literal		( literalType, Literal{-instance-} )
 import Id		( idType, isBottomingId,
 			  dataConArgTys, GenId{-instances-}
@@ -184,6 +184,9 @@ lintCoreExpr :: CoreExpr -> LintM (Maybe Type)	-- Nothing if error found
 lintCoreExpr (Var var) = checkInScope var `seqL` returnL (Just (idType var))
 lintCoreExpr (Lit lit) = returnL (Just (literalType lit))
 lintCoreExpr (SCC _ expr) = lintCoreExpr expr
+lintCoreExpr (Coerce _ ty expr)
+  = _trace "lintCoreExpr:Coerce" $
+    lintCoreExpr expr `seqL` returnL (Just ty)
 
 lintCoreExpr (Let binds body)
   = lintCoreBinding binds `thenL` \binders ->
@@ -222,10 +225,7 @@ lintCoreExpr (Lam (TyBinder tyvar) expr)
 
 lintCoreExpr e@(Case scrut alts)
  = lintCoreExpr scrut `thenMaybeL` \ty ->
-   -- Check that it is a data type
-   case maybeAppDataTyCon ty of
-     Nothing -> addErrL (mkCaseDataConMsg e) `seqL` returnL Nothing
-     Just(tycon, _, _) -> lintCoreAlts alts ty tycon
+   lintCoreAlts alts ty
 \end{code}
 
 %************************************************************************
@@ -281,8 +281,10 @@ lintCoreArg checkTyApp e ty a@(TyArg arg_ty)
 	    tyvar_kind = tyVarKind tyvar
 	    argty_kind = typeKind arg_ty
 	in
-	if (tyvar_kind `isSubKindOf` argty_kind
-	 || argty_kind `isSubKindOf` tyvar_kind) then
+	if tyvar_kind == argty_kind
+-- SUSPICIOUS!	(tyvar_kind `isSubKindOf` argty_kind
+--		 || argty_kind `isSubKindOf` tyvar_kind)
+	 then
 	    returnL(Just(instantiateTy [(tyvar,arg_ty)] body))
 	else
 	    pprTrace "lintCoreArg:kinds:" (ppCat [ppr PprDebug tyvar_kind, ppr PprDebug argty_kind]) $
@@ -306,20 +308,20 @@ lintCoreArg _ e ty (UsageArg u)
 \begin{code}
 lintCoreAlts :: CoreCaseAlts
 	     -> Type  			-- Type of scrutinee
-	     -> TyCon			-- TyCon pinned on the case
+--	     -> TyCon			-- TyCon pinned on the case
 	     -> LintM (Maybe Type)	-- Type of alternatives
 
-lintCoreAlts whole_alts@(AlgAlts alts deflt) ty tycon
+lintCoreAlts whole_alts@(AlgAlts alts deflt) ty --tycon
   = -- Check tycon is not a primitive tycon
-    addErrIfL (isPrimTyCon tycon) (mkCasePrimMsg tycon)
-    `seqL`
+--    addErrIfL (isPrimTyCon tycon) (mkCasePrimMsg tycon)
+--    `seqL`
     -- Check we are scrutinising a proper datatype
     -- (ToDo: robustify)
-    addErrIfL (not (tyConFamilySize tycon >= 1)) (mkCaseAbstractMsg tycon)
-    `seqL`
+--    addErrIfL (not (tyConFamilySize tycon >= 1)) (mkCaseAbstractMsg tycon)
+--    `seqL`
     lintDeflt deflt ty
     `thenL` \maybe_deflt_ty ->
-    mapL (lintAlgAlt ty tycon) alts
+    mapL (lintAlgAlt ty {-tycon-}) alts
     `thenL` \maybe_alt_tys ->
     -- Check the result types
     case catMaybes (maybe_deflt_ty : maybe_alt_tys) of
@@ -330,10 +332,10 @@ lintCoreAlts whole_alts@(AlgAlts alts deflt) ty tycon
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
 
-lintCoreAlts whole_alts@(PrimAlts alts deflt) ty tycon
+lintCoreAlts whole_alts@(PrimAlts alts deflt) ty --tycon
   = -- Check tycon is a primitive tycon
-    addErrIfL (not (isPrimTyCon tycon)) (mkCaseNotPrimMsg tycon)
-    `seqL`
+--    addErrIfL (not (isPrimTyCon tycon)) (mkCaseNotPrimMsg tycon)
+--    `seqL`
     mapL (lintPrimAlt ty) alts
     `thenL` \maybe_alt_tys ->
     lintDeflt deflt ty
@@ -347,7 +349,7 @@ lintCoreAlts whole_alts@(PrimAlts alts deflt) ty tycon
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg whole_alts)
 
-lintAlgAlt scrut_ty tycon{-ToDo: use it!-} (con,args,rhs)
+lintAlgAlt scrut_ty {-tycon-ToDo: use it!-} (con,args,rhs)
   = (case maybeAppDataTyCon scrut_ty of
       Nothing ->
 	 addErrL (mkAlgAltMsg1 scrut_ty)

@@ -387,6 +387,11 @@ occAnal env (SCC cc body)
   where
     (usage, body') = occAnal env body
 
+occAnal env (Coerce c ty body)
+  = (usage, Coerce c ty body')
+  where
+    (usage, body') = occAnal env body
+
 occAnal env (App fun arg)
   = (fun_usage `combineUsageDetails` arg_usage, App fun' arg)
   where

@@ -341,35 +341,31 @@ relevant in error messages.
 \begin{code}
 instance Outputable (Inst s) where
     ppr sty (LitInst uniq lit ty orig loc)
-      = ppHang (ppSep [case lit of
+      = ppSep [case lit of
 			  OverloadedIntegral   i -> ppInteger i
 			  OverloadedFractional f -> ppRational f,
-		       ppStr "at",
-		       ppr sty ty,
-		       show_uniq sty uniq
-		])
-	  4 (show_origin sty orig)
+	       ppStr "at",
+	       ppr sty ty,
+	       show_uniq sty uniq
+	]
 
     ppr sty (Dict uniq clas ty orig loc)
-      = ppHang (ppSep [ppr sty clas, 
-		       ppStr "at",
-		       ppr sty ty,
-		       show_uniq sty uniq
-		])
-	  4 (show_origin sty orig)
+      = ppSep [ppr sty clas, 
+	       ppStr "at",
+	       ppr sty ty,
+	       show_uniq sty uniq
+	]
 
     ppr sty (Method uniq id tys rho orig loc)
-      = ppHang (ppSep [ppr sty id, 
-		       ppStr "at",
-		       ppr sty tys,
-		       show_uniq sty uniq
-		])
-	  4 (show_origin sty orig)
+      = ppSep [ppr sty id, 
+	       ppStr "at",
+	       ppr sty tys,
+	       show_uniq sty uniq
+	]
 
 show_uniq PprDebug uniq = ppr PprDebug uniq
 show_uniq sty	   uniq = ppNil
 
-show_origin sty orig    = ppBesides [ppLparen, pprOrigin sty orig, ppRparen]
 \end{code}
 
 Printing in error messages
@@ -412,7 +408,9 @@ lookupInst :: Inst s
 
 lookupInst dict@(Dict _ clas ty orig loc)
   = case lookupMEnv matchTy (get_inst_env clas orig) ty of
-      Nothing	-> failTc (noInstanceErr dict)
+      Nothing	-> tcAddSrcLoc loc		 $
+		   tcAddErrCtxt (pprOrigin orig) $
+		   failTc (noInstanceErr dict)
 
       Just (dfun_id, tenv) 
 	-> let
@@ -603,49 +601,49 @@ get_inst_env clas (InstanceSpecOrigin inst_mapper _ _)
 get_inst_env clas other_orig = classInstEnv clas
 
 
-pprOrigin :: PprStyle -> InstOrigin s -> Pretty
+pprOrigin :: InstOrigin s -> PprStyle -> Pretty
 
-pprOrigin sty (OccurrenceOf id)
+pprOrigin (OccurrenceOf id) sty
       = ppBesides [ppPStr SLIT("at a use of an overloaded identifier: `"),
 		   ppr sty id, ppChar '\'']
-pprOrigin sty (OccurrenceOfCon id)
+pprOrigin (OccurrenceOfCon id) sty
       = ppBesides [ppPStr SLIT("at a use of an overloaded constructor: `"),
 		   ppr sty id, ppChar '\'']
-pprOrigin sty (InstanceDeclOrigin)
+pprOrigin (InstanceDeclOrigin) sty
       = ppStr "in an instance declaration"
-pprOrigin sty (LiteralOrigin lit)
+pprOrigin (LiteralOrigin lit) sty
       = ppCat [ppStr "at an overloaded literal:", ppr sty lit]
-pprOrigin sty (ArithSeqOrigin seq)
+pprOrigin (ArithSeqOrigin seq) sty
       = ppCat [ppStr "at an arithmetic sequence:", ppr sty seq]
-pprOrigin sty (SignatureOrigin)
+pprOrigin (SignatureOrigin) sty
       = ppStr "in a type signature"
-pprOrigin sty (DoOrigin)
+pprOrigin (DoOrigin) sty
       = ppStr "in a do statement"
-pprOrigin sty (ClassDeclOrigin)
+pprOrigin (ClassDeclOrigin) sty
       = ppStr "in a class declaration"
-pprOrigin sty (DerivingOrigin _ clas tycon)
+pprOrigin (DerivingOrigin _ clas tycon) sty
       = ppBesides [ppStr "in a `deriving' clause; class `",
 			  ppr sty clas,
 			  ppStr "'; offending type `",
 		          ppr sty tycon,
 			  ppStr "'"]
-pprOrigin sty (InstanceSpecOrigin _ clas ty)
+pprOrigin (InstanceSpecOrigin _ clas ty) sty
       = ppBesides [ppStr "in a SPECIALIZE instance pragma; class \"",
 	 	   ppr sty clas, ppStr "\" type: ", ppr sty ty]
-pprOrigin sty (DefaultDeclOrigin)
+pprOrigin (DefaultDeclOrigin) sty
       = ppStr "in a `default' declaration"
-pprOrigin sty (ValSpecOrigin name)
+pprOrigin (ValSpecOrigin name) sty
       = ppBesides [ppStr "in a SPECIALIZE user-pragma for `",
 		   ppr sty name, ppStr "'"]
-pprOrigin sty (CCallOrigin clabel Nothing{-ccall result-})
+pprOrigin (CCallOrigin clabel Nothing{-ccall result-}) sty
       = ppBesides [ppStr "in the result of the _ccall_ to `",
 		   ppStr clabel, ppStr "'"]
-pprOrigin sty (CCallOrigin clabel (Just arg_expr))
+pprOrigin (CCallOrigin clabel (Just arg_expr)) sty
       = ppBesides [ppStr "in an argument in the _ccall_ to `",
 		  ppStr clabel, ppStr "', namely: ", ppr sty arg_expr]
-pprOrigin sty (LitLitOrigin s)
+pprOrigin (LitLitOrigin s) sty
       = ppBesides [ppStr "in this ``literal-literal'': ", ppStr s]
-pprOrigin sty UnknownOrigin
+pprOrigin UnknownOrigin sty
       = ppStr "in... oops -- I don't know where the overloading came from!"
 \end{code}
 

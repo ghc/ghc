@@ -617,6 +617,12 @@ coreExprToStg env (SCC cc expr)
     returnUs (StgSCC (coreExprType expr) cc stg_expr, binds)
 \end{code}
 
+\begin{code}
+coreExprToStg env (Coerce c ty expr)
+  = coreExprToStg env expr  -- `thenUs` \ (stg_expr, binds) ->
+--  returnUs (StgSCC (coreExprType expr) cc stg_expr, binds)
+\end{code}
+
 
 %************************************************************************
 %*									*

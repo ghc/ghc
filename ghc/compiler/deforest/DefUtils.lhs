@@ -61,6 +61,7 @@ its left hand side.  The result is a term with no labels.
 >       Let (Rec bs) e   ->
 >		Let (Rec [ (v, strip e) | (v,e) <- bs ]) (strip e)
 >       SCC l e            -> SCC l (strip e)
+>	Coerce _ _ _	   -> panic "DefUtils:strip:Coerce"
 
 > stripAtom :: DefAtom -> DefAtom
 > stripAtom (VarArg v) = VarArg (stripArg v)
@@ -113,6 +114,7 @@ but l is guranteed to be finite so we choose that one.
 >       	Let (Rec bs) e   -> free' vs (foldr free (free e fvs) es)
 >			where (vs,es) = unzip bs
 >       	SCC l e            -> free e fvs
+>		Coerce _ _ _	   -> panic "DefUtils.freeVars:Coerce"
 
 >	free' :: [Id] -> [Id] -> [Id]
 > 	free' vs fvs = filter (\x -> notElem x vs) fvs
@@ -157,6 +159,7 @@ but l is guranteed to be finite so we choose that one.
 >       	Let (NonRec v e) e' -> free e (freeId v (free e' tvs))
 >       	Let (Rec bs) e      -> foldr freeBind (free e tvs) bs
 >       	SCC l e               -> free e tvs
+>		Coerce _ _ _	      -> panic "DefUtils.freeTyVars:Coerce"
 >
 >	freeId id tvs = tyVarsOfType (idType id) `union` tvs
 >	freeTy t  tvs = tyVarsOfType t `union` tvs
@@ -282,6 +285,7 @@ with new uniques.  Free variables are left unchanged.
 > 		uniqueExpr p t e		`thenUs` \e ->
 > 		returnUs (SCC l e)
 >
+>	Coerce _ _ _ -> panic "DefUtils.uniqueExpr:Coerce"
 >
 > uniqueAtom :: IdEnv Id -> TypeEnv -> DefAtom -> UniqSM DefAtom
 > uniqueAtom p t (LitArg l) = returnUs (LitArg l) -- XXX
@@ -571,6 +575,8 @@ Substitutions.
 >					returnUs (v,e)
 >       SCC l e            -> sub e			`thenUs` \e ->
 >				returnUs (SCC l e)
+>
+>	Coerce _ _ _ -> panic "DefUtils.subst:Coerce"
 
 >     substAtom (VarArg v) =
 >     		substArg v `thenUs` \v ->

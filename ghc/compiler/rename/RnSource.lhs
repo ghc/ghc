@@ -29,6 +29,7 @@ import Name		( Name, isLocallyDefined, isLexVarId, getLocalName, ExportFlag(..),
 			  nameImportFlag, RdrName, pprNonSym )
 import Outputable -- ToDo:rm
 import PprStyle -- ToDo:rm 
+import PrelInfo		( consDataCon )
 import Pretty
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )
@@ -71,10 +72,10 @@ rnSource imp_mods unqual_imps imp_fixes
     rnExports (mod:imp_mods) unqual_imps exports	`thenRn` \ exported_fn ->
     rnFixes fixes					`thenRn` \ src_fixes ->
     let
-	pair_name inf = (nameFixDecl inf, inf)
+	all_fixes     = src_fixes ++ bagToList imp_fixes
+	all_fixes_fm  = listToUFM (map pair_name all_fixes)
 
-	all_fixes    = src_fixes ++ bagToList imp_fixes
-	all_fixes_fm = listToUFM (map pair_name all_fixes)
+	pair_name inf = (nameFixDecl inf, inf)
     in
     setExtraRn all_fixes_fm $
 

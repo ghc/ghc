@@ -73,10 +73,11 @@ import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 import PprStyle
 import Pretty
 import RnUtils		( RnEnv(..) )
-import TyCon		( derivedFor )
+import TyCon		( isSynTyCon, derivedFor )
 import Type		( GenType(..),  ThetaType(..), mkTyVarTys,
 			  splitSigmaTy, splitAppTy, isTyVarTy, matchTy, mkSigmaTy,
-			  getTyCon_maybe, maybeBoxedPrimType )
+			  getTyCon_maybe, maybeBoxedPrimType
+			)
 import TyVar		( GenTyVar, mkTyVarSet )
 import TysWiredIn	( stringTy )
 import Unique		( Unique )
@@ -889,7 +890,7 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 \begin{code}
 scrutiniseInstanceType from_here clas inst_tau
 	-- TYCON CHECK
-  | not (maybeToBool inst_tycon_maybe)
+  | not (maybeToBool inst_tycon_maybe) || isSynTyCon inst_tycon
   = failTc (instTypeErr inst_tau)
 
   	-- IMPORTED INSTANCES ARE OK (but see tcInstDecl1)

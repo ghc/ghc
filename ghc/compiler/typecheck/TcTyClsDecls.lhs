@@ -39,7 +39,7 @@ import UniqSet		( UniqSet(..), emptyUniqSet,
 			  unitUniqSet, unionUniqSets, 
 			  unionManyUniqSets, uniqSetToList ) 
 import SrcLoc		( SrcLoc )
-import TyCon		( TyCon, tyConDataCons, isDataTyCon )
+import TyCon		( TyCon, tyConDataCons, isDataTyCon, isSynTyCon )
 import Unique		( Unique )
 import Util		( panic, pprTrace )
 
@@ -121,7 +121,8 @@ tcGroup inst_mapper decls
 
 
 	-- Create any necessary record selector Ids and their bindings
-    mapAndUnzipTc mkDataBinds (filter isDataTyCon tycons)	`thenTc` \ (data_ids_s, binds) ->
+	-- "Necessary" includes data and newtype declarations
+    mapAndUnzipTc mkDataBinds (filter (not.isSynTyCon) tycons)	`thenTc` \ (data_ids_s, binds) ->
 	
 	-- Extend the global value environment with 
 	--	a) constructors

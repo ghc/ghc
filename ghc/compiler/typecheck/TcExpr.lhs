@@ -361,7 +361,7 @@ tcExpr (ExplicitTuple exprs)
 tcExpr (RecordCon (HsVar con) rbinds)
   = tcId con				`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
-	(_, record_ty)       = splitFunTy con_tau
+	(_, record_ty) = splitFunTy con_tau
     in
 	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (maybeAppDataTyCon record_ty ) )
@@ -708,6 +708,12 @@ tcListComp expr (qual@(GeneratorQual pat rhs) : quals)
       tcAddErrCtxt (qualCtxt qual) (
         tcPat pat				`thenTc` \ (pat',  lie_pat,  pat_ty)  ->
         tcExpr rhs				`thenTc` \ (rhs', lie_rhs, rhs_ty) ->
+		-- NB: the environment has been extended with the new binders
+		-- which the rhs can't "see", but the renamer should have made
+		-- sure that everything is distinct by now, so there's no problem.
+		-- Putting the tcExpr before the newMonoIds messes up the nesting
+		-- of error contexts, so I didn't  bother
+
         unifyTauTy (mkListTy pat_ty) rhs_ty	`thenTc_`
 	returnTc (GeneratorQual pat' rhs', 
 		  lie_pat `plusLIE` lie_rhs) 

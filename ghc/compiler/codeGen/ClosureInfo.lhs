@@ -92,7 +92,7 @@ import PprType		( GenType{-instance Outputable-} )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
 import SMRep		-- all of it
 import TyCon		( maybeTyConSingleCon, TyCon{-instance NamedThing-} )
-import Type		( isPrimType, splitForAllTy, splitFunTy, mkFunTys )
+import Type		( isPrimType, splitForAllTy, splitFunTyWithDictsAsArgs, mkFunTys )
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
 
 maybeCharLikeTyCon = panic "ClosureInfo.maybeCharLikeTyCon (ToDo)"
@@ -1163,7 +1163,7 @@ closureReturnsUnboxedType other_closure = False
 fun_result_ty arity id
   = let
 	(_, de_foralld_ty) = splitForAllTy (idType id)
-	(arg_tys, res_ty)  = splitFunTy{-w/ dicts as args?-} de_foralld_ty
+	(arg_tys, res_ty)  = splitFunTyWithDictsAsArgs de_foralld_ty
     in
     ASSERT(arity >= 0 && length arg_tys >= arity)
     mkFunTys (drop arity arg_tys) res_ty

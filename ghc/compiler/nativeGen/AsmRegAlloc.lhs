@@ -22,7 +22,7 @@ import OrdList		( mkEmptyList, mkUnitList, mkSeqList, mkParList,
 			  flattenOrdList, OrdList
 			)
 import Stix		( StixTree )
-import UniqSupply	( mkBuiltinUnique )
+import Unique		( mkBuiltinUnique )
 import Util		( mapAccumB, panic )
 \end{code}
 

@@ -246,12 +246,13 @@ which aren't WHNF but are ``cheap'' are:
 \begin{code}
 manifestlyCheap :: GenCoreExpr bndr Id tv uv -> Bool
 
-manifestlyCheap (Var _)     = True
-manifestlyCheap (Lit _)     = True
-manifestlyCheap (Con _ _)   = True
-manifestlyCheap (SCC _ e)   = manifestlyCheap e
-manifestlyCheap (Lam x e)   = if isValBinder x then True else manifestlyCheap e
-manifestlyCheap (Prim op _) = primOpIsCheap op
+manifestlyCheap (Var _)        = True
+manifestlyCheap (Lit _)        = True
+manifestlyCheap (Con _ _)      = True
+manifestlyCheap (SCC _ e)      = manifestlyCheap e
+manifestlyCheap (Coerce _ _ e) = manifestlyCheap e
+manifestlyCheap (Lam x e)      = if isValBinder x then True else manifestlyCheap e
+manifestlyCheap (Prim op _)    = primOpIsCheap op
 
 manifestlyCheap (Let bind body)
   = manifestlyCheap body && all manifestlyCheap (rhssOfBind bind)

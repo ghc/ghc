@@ -14,7 +14,7 @@ import Class		( GenClass, GenClassOp, Class(..), ClassOp )
 import ClosureInfo	( ClosureInfo, LambdaFormInfo )
 import CmdLineOpts	( SimplifierSwitch, SwitchResult )
 import CoreSyn		( GenCoreArg, GenCoreBinder, GenCoreBinding, GenCoreExpr,
-			  GenCoreCaseAlts, GenCoreCaseDefault
+			  GenCoreCaseAlts, GenCoreCaseDefault, Coercion
 			)
 import CoreUnfold	( UnfoldingDetails, UnfoldingGuidance )
 import CostCentre	( CostCentre )
@@ -79,6 +79,7 @@ data CLabel
 data ClassOpPragmas a
 data ClassPragmas a
 data ClosureInfo
+data Coercion
 data CostCentre
 data CSeq
 data DataPragmas a

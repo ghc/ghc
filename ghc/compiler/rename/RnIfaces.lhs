@@ -74,7 +74,10 @@ absolute-filename-for-that-interface.
 findHiFiles :: [FilePath] -> [FilePath] -> IO (FiniteMap Module FilePath)
 
 findHiFiles dirs sysdirs
-  = do_dirs emptyFM (dirs ++ sysdirs)
+  = hPutStr stderr "  findHiFiles "	>>
+    do_dirs emptyFM (dirs ++ sysdirs)	>>= \ result ->
+    hPutStr stderr " done\n"		>>
+    return result
   where
     do_dirs env [] = return env
     do_dirs env (dir:dirs)
@@ -82,7 +85,7 @@ findHiFiles dirs sysdirs
 	do_dirs new_env dirs
     -------
     do_dir env dir
-      = --trace ("Having a go on..."++dir) $
+      = hPutStr stderr "D" >>
 	getDirectoryContents dir    >>= \ entries ->
 	do_entries env entries
       where
@@ -94,6 +97,7 @@ findHiFiles dirs sysdirs
 	do_entry env e
 	  = case (acceptable_hi (reverse e)) of
 	      Nothing  -> --trace ("Deemed uncool:"++e) $
+			  hPutStr stderr "." >>
 			  return env
 	      Just mod ->
 		let
@@ -101,10 +105,12 @@ findHiFiles dirs sysdirs
 		in
 		case (lookupFM env pmod) of
 		  Nothing -> --trace ("Adding "++mod++" -> "++e) $
+			     hPutStr stderr "!" >>
 			     return (addToFM env pmod (dir ++ '/':e))
 			     -- ToDo: use DIR_SEP, not /
 
 		  Just xx -> ( if de_dot xx /= e then trace ("Already mapped!! "++mod++" -> "++xx++"; ignoring:"++e) else id) $
+			     hPutStr stderr "." >>
 			     return env
     -------
     acceptable_hi rev_e -- looking at pathname *backwards*
@@ -244,10 +250,14 @@ readIface :: FilePath -> Module
 	      -> IO (MaybeErr ParsedIface Error)
 
 readIface file mod
-  = readFile file   `thenPrimIO` \ read_result ->
+  = hPutStr stderr ("  reading "++file)	>>
+    readFile file		`thenPrimIO` \ read_result ->
     case read_result of
       Left  err      -> return (Failed (cannaeReadErr file err))
-      Right contents -> return (parseIface contents)
+      Right contents -> hPutStr stderr " parsing"   >>
+			let parsed = parseIface contents in
+			hPutStr stderr " done\n"    >>
+			return parsed
 \end{code}
 
 

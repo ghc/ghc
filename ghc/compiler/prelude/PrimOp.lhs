@@ -630,7 +630,7 @@ data PrimOpInfo
 		Type
   | Compare	FAST_STRING	-- string :: T -> T -> Bool
 		Type
-  | Coerce	FAST_STRING	-- string :: T1 -> T2
+  | Coercing	FAST_STRING	-- string :: T1 -> T2
 		Type
 		Type
 
@@ -734,8 +734,8 @@ primOpInfo DoubleLeOp = Compare SLIT("leDouble#") doublePrimTy
 %************************************************************************
 
 \begin{code}
-primOpInfo OrdOp = Coerce SLIT("ord#") charPrimTy intPrimTy
-primOpInfo ChrOp = Coerce SLIT("chr#") intPrimTy charPrimTy
+primOpInfo OrdOp = Coercing SLIT("ord#") charPrimTy intPrimTy
+primOpInfo ChrOp = Coercing SLIT("chr#") intPrimTy charPrimTy
 \end{code}
 
 %************************************************************************
@@ -781,8 +781,8 @@ primOpInfo ISraOp
 primOpInfo ISrlOp
   = PrimResult SLIT("iShiftRL#") [] [intPrimTy, intPrimTy] intPrimTyCon IntRep []
 
-primOpInfo Int2WordOp = Coerce SLIT("int2Word#") intPrimTy wordPrimTy
-primOpInfo Word2IntOp = Coerce SLIT("word2Int#") wordPrimTy intPrimTy
+primOpInfo Int2WordOp = Coercing SLIT("int2Word#") intPrimTy wordPrimTy
+primOpInfo Word2IntOp = Coercing SLIT("word2Int#") wordPrimTy intPrimTy
 \end{code}
 
 %************************************************************************
@@ -792,8 +792,8 @@ primOpInfo Word2IntOp = Coerce SLIT("word2Int#") wordPrimTy intPrimTy
 %************************************************************************
 
 \begin{code}
-primOpInfo Int2AddrOp = Coerce SLIT("int2Addr#") intPrimTy addrPrimTy
-primOpInfo Addr2IntOp = Coerce SLIT("addr2Int#") addrPrimTy intPrimTy
+primOpInfo Int2AddrOp = Coercing SLIT("int2Addr#") intPrimTy addrPrimTy
+primOpInfo Addr2IntOp = Coercing SLIT("addr2Int#") addrPrimTy intPrimTy
 \end{code}
 
 %************************************************************************
@@ -812,8 +812,8 @@ primOpInfo FloatMulOp	= Dyadic    SLIT("timesFloat#")   floatPrimTy
 primOpInfo FloatDivOp	= Dyadic    SLIT("divideFloat#")  floatPrimTy
 primOpInfo FloatNegOp	= Monadic   SLIT("negateFloat#")  floatPrimTy
 
-primOpInfo Float2IntOp	= Coerce SLIT("float2Int#") floatPrimTy intPrimTy
-primOpInfo Int2FloatOp	= Coerce SLIT("int2Float#") intPrimTy floatPrimTy
+primOpInfo Float2IntOp	= Coercing SLIT("float2Int#") floatPrimTy intPrimTy
+primOpInfo Int2FloatOp	= Coercing SLIT("int2Float#") intPrimTy floatPrimTy
 
 primOpInfo FloatExpOp	= Monadic   SLIT("expFloat#")	   floatPrimTy
 primOpInfo FloatLogOp	= Monadic   SLIT("logFloat#")	   floatPrimTy
@@ -846,11 +846,11 @@ primOpInfo DoubleMulOp	= Dyadic    SLIT("timesDouble#")  doublePrimTy
 primOpInfo DoubleDivOp	= Dyadic    SLIT("divideDouble#") doublePrimTy
 primOpInfo DoubleNegOp	= Monadic   SLIT("negateDouble#") doublePrimTy
 
-primOpInfo Double2IntOp	    = Coerce SLIT("double2Int#")   doublePrimTy intPrimTy
-primOpInfo Int2DoubleOp	    = Coerce SLIT("int2Double#")   intPrimTy doublePrimTy
+primOpInfo Double2IntOp	    = Coercing SLIT("double2Int#")   doublePrimTy intPrimTy
+primOpInfo Int2DoubleOp	    = Coercing SLIT("int2Double#")   intPrimTy doublePrimTy
 
-primOpInfo Double2FloatOp   = Coerce SLIT("double2Float#") doublePrimTy floatPrimTy
-primOpInfo Float2DoubleOp   = Coerce SLIT("float2Double#") floatPrimTy doublePrimTy
+primOpInfo Double2FloatOp   = Coercing SLIT("double2Float#") doublePrimTy floatPrimTy
+primOpInfo Float2DoubleOp   = Coercing SLIT("float2Double#") floatPrimTy doublePrimTy
 
 primOpInfo DoubleExpOp	= Monadic   SLIT("expDouble#")	   doublePrimTy
 primOpInfo DoubleLogOp	= Monadic   SLIT("logDouble#")	   doublePrimTy
@@ -1569,7 +1569,7 @@ primOp_str op
       Dyadic str _	       -> str
       Monadic str _	       -> str
       Compare str _	       -> str
-      Coerce str _ _	       -> str
+      Coercing str _ _	       -> str
       PrimResult str _ _ _ _ _ -> str
       AlgResult str _ _ _ _    -> str
 \end{code}
@@ -1584,7 +1584,7 @@ primOpType op
       Dyadic str ty ->	    dyadic_fun_ty ty
       Monadic str ty ->	    monadic_fun_ty ty
       Compare str ty ->	    compare_fun_ty ty
-      Coerce str ty1 ty2 -> mkFunTys [ty1] ty2
+      Coercing str ty1 ty2 -> mkFunTys [ty1] ty2
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->
 	mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon prim_tycon res_tys))
@@ -1608,7 +1608,7 @@ getPrimOpResultInfo op
       Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
       Monadic _ ty		 -> ReturnsPrim (typePrimRep ty)
       Compare _ ty		 -> ReturnsAlg  boolTyCon
-      Coerce  _ _ ty		 -> ReturnsPrim (typePrimRep ty)
+      Coercing  _ _ ty		 -> ReturnsPrim (typePrimRep ty)
       PrimResult _ _ _ _ kind _	 -> ReturnsPrim kind
       AlgResult _ _ _ tycon _	 -> ReturnsAlg  tycon
 

@@ -43,7 +43,7 @@ primOpId op
       Compare str ty ->
 	mk_prim_Id op pRELUDE_BUILTIN str [] [ty,ty] (compare_fun_ty ty) 2
 
-      Coerce str ty1 ty2 ->
+      Coercing str ty1 ty2 ->
 	mk_prim_Id op pRELUDE_BUILTIN str [] [ty1] (mkFunTys [ty1] ty2) 1
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->

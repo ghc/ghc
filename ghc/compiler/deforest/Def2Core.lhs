@@ -113,6 +113,8 @@
 >       SCC l e ->
 >		d2c e			`thenUs` \e' ->
 >		returnUs (SCC l e')
+>	Coerce _ _ _ ->
+>		panic "Def2Core:Coerce"
 
 > defCaseAlts2Core :: DefCaseAlternatives
 > 	-> UniqSM CoreCaseAlts

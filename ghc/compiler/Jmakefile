@@ -503,7 +503,7 @@ types/TyLoop.hi : types/TyLoop.lhi
 
 rename/ParseIface.hs : rename/ParseIface.y
 	$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
-	happy -i rename/ParseIface.hinfo rename/ParseIface.y
+	happy -g -i rename/ParseIface.hinfo rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
 
 compile(absCSyn/AbsCUtils,lhs,)

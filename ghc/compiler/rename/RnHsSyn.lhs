@@ -12,7 +12,7 @@ import Ubiq
 
 import HsSyn
 
-import Id		( GenId, Id(..) )
+import Id		( isDataCon, GenId, Id(..) )
 import Name		( isLocalName, nameUnique, Name, RdrName(..){-ToDo: rm ..-},
 			  mkLocalName{-ToDo:rm-}
 			)
@@ -75,6 +75,7 @@ isRnTyConOrClass (RnImplicitClass _) = True
 isRnTyConOrClass _                   = False
 
 isRnConstr (RnConstr _ _) = True
+isRnConstr (WiredInId id) = isDataCon id
 isRnConstr  _		  = False
 
 isRnField  (RnField _ _)  = True

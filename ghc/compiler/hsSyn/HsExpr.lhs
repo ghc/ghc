@@ -19,7 +19,7 @@ import HsTypes		( PolyType )
 
 -- others:
 import Id		( DictVar(..), GenId, Id(..) )
-import Name		( isSymLexeme, pprSym )
+import Name		( pprNonSym, pprSym )
 import Outputable	( interppSP, interpp'SP, ifnotPprForUser )
 import PprType		( pprGenType, pprParendGenType, GenType{-instance-} )
 import Pretty
@@ -197,8 +197,7 @@ instance (NamedThing id, Outputable id, Outputable pat,
 \end{code}
 
 \begin{code}
-pprExpr sty (HsVar v)
-  = (if (isSymLexeme v) then ppParens else id) (ppr sty v)
+pprExpr sty (HsVar v) = pprNonSym sty v
 
 pprExpr sty (HsLit    lit)   = ppr sty lit
 pprExpr sty (HsLitOut lit _) = ppr sty lit

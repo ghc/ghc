@@ -29,12 +29,18 @@ module Unique (
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
 
+	incrUnique,			-- Used for renumbering
+	initRenumberingUniques,
+
 	-- now all the built-in Uniques (and functions to make them)
 	-- [the Oh-So-Wonderful Haskell module system wins again...]
 	mkAlphaTyVarUnique,
 	mkPrimOpIdUnique,
 	mkTupleDataConUnique,
 	mkTupleTyConUnique,
+
+	getBuiltinUniques, mkBuiltinUnique,
+	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 
 	absentErrorIdKey,	-- alphabetical...
 	addrDataConKey,
@@ -224,25 +230,19 @@ Now come the functions which construct uniques from their pieces, and vice versa
 The stuff about unique *supplies* is handled further down this module.
 
 \begin{code}
-mkUnique		 :: Char -> Int -> Unique	-- Builds a unique from pieces
-unpkUnique		 :: Unique -> (Char, Int)	-- The reverse
-
-mkUnifiableTyVarUnique	 :: Int -> Unique	-- Injects a subst-array index into the Unique type
-unpkUnifiableTyVarUnique :: Unique -> Int	-- The reverse process
+mkUnique	:: Char -> Int -> Unique	-- Builds a unique from pieces
+unpkUnique	:: Unique -> (Char, Int)	-- The reverse
 
 mkUniqueGrimily :: Int# -> Unique		-- A trap-door for UniqSupply
+
+incrUnique	:: Unique -> Unique
 \end{code}
 
 
 \begin{code}
 mkUniqueGrimily x = MkUnique x
 
-mkUnifiableTyVarUnique i = mkUnique '_'{-MAGIC CHAR-} i
-
-unpkUnifiableTyVarUnique uniq
-  = case (unpkUnique uniq) of { (tag, i) ->
-    ASSERT(tag == '_'{-MAGIC CHAR-})
-    i }
+incrUnique (MkUnique i) = MkUnique (i +# 1#)
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
@@ -375,9 +375,10 @@ chars62
 %************************************************************************
 
 Allocation of unique supply characters:
-	a-z: lower case chars for unique supplies (see Main.lhs)
-	B:   builtin		(see UniqSupply.lhs)
-	C-E: pseudo uniques	(see UniqSupply.lhs)
+	v,t,u : for renumbering value-, type- and usage- vars.
+	other a-z: lower case chars for unique supplies (see Main.lhs)
+	B:   builtin
+	C-E: pseudo uniques	(used in native-code generator)
 	_:   unifiable tyvars   (above)
 	1-8: prelude things below
 
@@ -393,6 +394,19 @@ mkTupleDataConUnique a		= mkUnique '6' a	-- ditto (*may* be used in C labels)
 
 mkPrimOpIdUnique op		= mkUnique '7' op
 mkPreludeMiscIdUnique i		= mkUnique '8' i
+
+initRenumberingUniques = (mkUnique 'v' 1, mkUnique 't' 1, mkUnique 'u' 1)
+
+mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
+ mkBuiltinUnique :: Int -> Unique
+
+mkBuiltinUnique i = mkUnique 'B' i
+mkPseudoUnique1 i = mkUnique 'C' i -- used for uniqueOf on Regs
+mkPseudoUnique2 i = mkUnique 'D' i -- ditto
+mkPseudoUnique3 i = mkUnique 'E' i -- ditto
+
+getBuiltinUniques :: Int -> [Unique]
+getBuiltinUniques n = map (mkUnique 'B') [1 .. n]
 \end{code}
 
 %************************************************************************

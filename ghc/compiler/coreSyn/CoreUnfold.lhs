@@ -78,7 +78,7 @@ data UnfoldingDetails
 
   | ConForm
 	Id			-- The constructor
-	[CoreArg]		-- Value arguments; NB OutArgs, already cloned
+	[CoreArg]		-- Type/value arguments; NB OutArgs, already cloned
 
   | OtherConForm
 	[Id]			-- It definitely isn't one of these constructors
@@ -288,6 +288,8 @@ sizeExpr scc_s_OK bOMB_OUT_SIZE args expr
     size_up (SCC _ (Con _ _)) = Nothing -- **** HACK *****
     size_up (SCC lbl body)
       = if scc_s_OK then size_up body else Nothing
+
+    size_up (Coerce _ _ body) = size_up body
 
     size_up (Con con args) = -- 1 + # of val args
 			     sizeN (1 + numValArgs args)
@@ -582,6 +584,8 @@ ment_expr (SCC cc expr)
     )
     `thenUf_` ment_expr expr
 
+ment_expr (Coerce _ _ _) = panic "ment_expr:Coerce"
+
 -------------
 ment_ty ty
   = let
@@ -739,6 +743,8 @@ ppr_uf_Expr in_scopes (SCC cc body)
   = ASSERT(not (noCostCentreAttached cc))
     ASSERT(not (currentOrSubsumedCosts cc))
     ppBesides [ppStr "_scc_ { ", ppStr (showCostCentre ppr_Unfolding False{-not as string-} cc), ppStr " } ",  ppr_uf_Expr in_scopes body]
+
+ppr_uf_Expr in_scopes (Coerce _ _ _) = panic "ppr_uf_Expr:Coerce"
 \end{code}
 
 \begin{code}

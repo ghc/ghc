@@ -48,7 +48,7 @@ module Name (
 	getLocalName, ltLexical,
 
 	isSymLexeme, pprSym, pprNonSym,
-	isLexCon, isLexVar, isLexId, isLexSym,
+	isLexCon, isLexVar, isLexId, isLexSym, isLexSpecialSym,
 	isLexConId, isLexConSym, isLexVarId, isLexVarSym
     ) where
 
@@ -123,7 +123,6 @@ instance Outputable RdrName where
     ppr sty (Unqual n) = pp_name sty n
     ppr sty (Qual m n) = ppBeside (pp_mod sty m) (pp_name sty n)
 
-pp_mod PprInterface        m = ppNil
 pp_mod PprForC             m = ppBesides [identToC m, ppPStr cSEP]
 pp_mod (PprForAsm False _) m = ppBesides [identToC m, ppPStr cSEP]
 pp_mod (PprForAsm True  _) m = ppBesides [ppPStr cSEP, identToC m, ppPStr cSEP]
@@ -423,7 +422,8 @@ defined in the Haskell report.  Normally applied as in e.g. @isCon
 (getLocalName foo)@.
 
 \begin{code}
-isLexCon, isLexVar, isLexId, isLexSym, isLexConId, isLexConSym, isLexVarId, isLexVarSym :: FAST_STRING -> Bool
+isLexCon, isLexVar, isLexId, isLexSym, isLexConId, isLexConSym,
+ isLexVarId, isLexVarSym, isLexSpecialSym :: FAST_STRING -> Bool
 
 isLexCon cs = isLexConId  cs || isLexConSym cs
 isLexVar cs = isLexVarId  cs || isLexVarSym cs
@@ -449,10 +449,10 @@ isLexVarId cs
 
 isLexConSym cs
   | _NULL_ cs	= False
-  | otherwise	= c == ':'
-	       || c == '('	-- (), (,), (,,), ...
+  | otherwise	= c  == ':'
+--	       || c  == '('	-- (), (,), (,,), ...
 	       || cs == SLIT("->")
-	       || cs == SLIT("[]")
+--	       || cs == SLIT("[]")
   where
     c = _HEAD_ cs
 
@@ -460,7 +460,14 @@ isLexVarSym cs
   | _NULL_ cs = False
   | otherwise = isSymbolASCII c
 	     || isSymbolISO c
-	     || c == '('	-- (), (,), (,,), ...
+--	     || c  == '('	-- (), (,), (,,), ...
+--	     || cs == SLIT("[]")
+  where
+    c = _HEAD_ cs
+
+isLexSpecialSym cs
+  | _NULL_ cs = False
+  | otherwise = c  == '('	-- (), (,), (,,), ...
 	     || cs == SLIT("[]")
   where
     c = _HEAD_ cs
@@ -484,13 +491,16 @@ isSymLexeme v
 pprSym, pprNonSym :: (NamedThing name, Outputable name) => PprStyle -> name -> Pretty
 
 pprSym sty var
-  = if isSymLexeme var
+  = let
+	str = nameOf (origName var)
+    in
+    if isLexSym str && not (isLexSpecialSym str)
     then ppr sty var
     else ppBesides [ppChar '`', ppr sty var, ppChar '`']
 
 pprNonSym sty var
   = if isSymLexeme var
-    then ppBesides [ppLparen, ppr sty var, ppRparen]
+    then ppParens (ppr sty var)
     else ppr sty var
 
 #ifdef USE_ATTACK_PRAGMAS

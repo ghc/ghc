@@ -296,6 +296,13 @@ ppr_expr pe (Let bind expr)
 ppr_expr pe (SCC cc expr)
   = ppSep [ppCat [ppPStr SLIT("_scc_"), pSCC pe cc],
 	   ppr_parend_expr pe expr ]
+
+ppr_expr pe (Coerce c ty expr)
+  = ppSep [ppCat [ppPStr SLIT("_coerce_"), pp_coerce c],
+	   pTy pe ty, ppr_parend_expr pe expr ]
+  where
+    pp_coerce (CoerceIn  v) = ppBeside (ppStr "{-in-}")  (ppr (pStyle pe) v)
+    pp_coerce (CoerceOut v) = ppBeside (ppStr "{-out-}") (ppr (pStyle pe) v)
 \end{code}
 
 \begin{code}

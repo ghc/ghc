@@ -1423,6 +1423,8 @@ specExpr (SCC cc expr) args
     returnSM (applyBindUnlifts unlifts (mkGenApp scc_expr args),
 	      unionUDList args_uds_s `unionUDs` expr_uds)
 
+specExpr (Coerce _ _ _) args = panic "Specialise.specExpr:Coerce"
+
 -- ToDo: This may leave some unspec'd dictionaries!!
 \end{code}
 

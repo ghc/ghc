@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module Usage (
-	GenUsage, Usage(..), UVar(..), UVarEnv(..),
+	GenUsage(..), Usage(..), UVar(..), UVarEnv(..),
 	usageOmega, pprUVar, duffUsage,
 	nullUVarEnv, mkUVarEnv, addOneToUVarEnv,
 	growUVarEnvList, isNullUVarEnv, lookupUVarEnv,

@@ -50,8 +50,6 @@ module UniqFM (
 	lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
 	eltsUFM,
 	ufmToList
-
-	-- to make the interface self-sufficient
     ) where
 
 #if defined(COMPILING_GHC)

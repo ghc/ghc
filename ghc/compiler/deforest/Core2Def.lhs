@@ -115,6 +115,7 @@ ToDo:
 >               where recBind2def ((v,_),e) = (v, c2d p e)
 >
 >       SCC l e       -> SCC l (c2d p e)
+>	Coerce _ _ _ -> panic "Core2Def:Coerce"
 
 
 > coreCaseAlts2def

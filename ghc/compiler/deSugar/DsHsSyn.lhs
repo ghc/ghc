@@ -36,10 +36,12 @@ outPatType (TuplePat pats)	= mkTupleTy (length pats) (map outPatType pats)
 outPatType (RecPat _ ty _)      = ty
 outPatType (LitPat lit ty)	= ty
 outPatType (NPat lit ty _)	= ty
-outPatType (DictPat ds ms)      = case (length ds + length ms) of
+outPatType (DictPat ds ms)      = case (length ds_ms) of
 				    0 -> unitTy
-				    1 -> idType (head (ds ++ ms))
-				    n -> mkTupleTy n (map idType (ds ++ ms))
+				    1 -> idType (head ds_ms)
+				    n -> mkTupleTy n (map idType ds_ms)
+				   where
+				    ds_ms = ds ++ ms
 \end{code}
 
 
@@ -71,6 +73,7 @@ collectTypedPatBinders (ConPat _ _ pats)    = concat (map collectTypedPatBinders
 collectTypedPatBinders (ConOpPat p1 _ p2 _) = collectTypedPatBinders p1 ++ collectTypedPatBinders p2
 collectTypedPatBinders (ListPat t pats)     = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (TuplePat pats)	    = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (RecPat _ _ fields)  = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat) fields)
 collectTypedPatBinders (DictPat ds ms)	    = ds ++ ms
 collectTypedPatBinders any_other_pat	    = [ {-no binders-} ]
 \end{code}

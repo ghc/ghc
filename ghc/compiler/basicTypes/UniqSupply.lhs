@@ -18,11 +18,7 @@ module UniqSupply (
 	thenMaybeUs, mapAccumLUs,
 
 	mkSplitUniqSupply,
-	splitUniqSupply,
-
-	-- and the access functions for the `builtin' UniqueSupply
-	getBuiltinUniques, mkBuiltinUnique,
-	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3
+	splitUniqSupply
   ) where
 
 import Ubiq{-uitous-}
@@ -189,29 +185,4 @@ mapAccumLUs f b (x:xs)
   = f b x   	        	    `thenUs` \ (b__2, x__2) ->
     mapAccumLUs f b__2 xs   	    `thenUs` \ (b__3, xs__2) ->
     returnUs (b__3, x__2:xs__2)
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[UniqueSupplies-compiler]{@UniqueSupplies@ specific to the compiler}
-%*									*
-%************************************************************************
-
-\begin{code}
-mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
- mkBuiltinUnique :: Int -> Unique
-
-mkBuiltinUnique i = mkUnique 'B' i
-mkPseudoUnique1 i = mkUnique 'C' i -- used for uniqueOf on Regs
-mkPseudoUnique2 i = mkUnique 'D' i -- ditto
-mkPseudoUnique3 i = mkUnique 'E' i -- ditto
-
-getBuiltinUniques :: Int -> [Unique]
-getBuiltinUniques n = map (mkUnique 'B') [1 .. n]
-\end{code}
-
-The following runs a uniq monad expression, using builtin uniq values:
-\begin{code}
---runBuiltinUs :: UniqSM a -> a
---runBuiltinUs m = snd (initUs uniqSupply_B m)
 \end{code}

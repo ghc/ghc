@@ -295,6 +295,15 @@ fvExpr id_cands tyvar_cands (SCC label expr)
   = (fvinfo, AnnSCC label expr2)
   where
     expr2@(fvinfo,_) = fvExpr id_cands tyvar_cands expr
+
+fvExpr id_cands tyvar_cands (Coerce c ty expr)
+  = (FVInfo (freeVarsOf   expr2)
+	    (freeTyVarsOf expr2 `combine` tfvs)
+	    (leakinessOf  expr2),
+     AnnCoerce c ty expr2)
+  where
+    expr2 = fvExpr id_cands tyvar_cands expr
+    tfvs  = freeTy tyvar_cands ty
 \end{code}
 
 \begin{code}
@@ -475,6 +484,11 @@ addExprFVs fv_cand in_scope (Let binds body)
 
 addExprFVs fv_cand in_scope (SCC label expr)
   = (SCC label expr2, expr_fvs)
+  where
+    (expr2, expr_fvs) = addExprFVs fv_cand in_scope expr
+
+addExprFVs fv_cand in_scope (Coerce c ty expr)
+  = (Coerce c ty expr2, expr_fvs)
   where
     (expr2, expr_fvs) = addExprFVs fv_cand in_scope expr
 \end{code}
