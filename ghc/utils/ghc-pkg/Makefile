@@ -11,8 +11,9 @@ INSTALLING=1
 
 ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else echo NO; fi)
 
-SRC_HC_OPTS      += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
+SRC_HC_OPTS += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
 
+SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
