@@ -115,21 +115,21 @@ zipWith4Equal _ = zipWith4
 #else
 zipEqual msg []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
-zipEqual msg as     bs     = panic ("zipEqual: unequal lists:"++msg)
+zipEqual msg as     bs     = panic ("zipEqual: unequal lists: "++msg)
 
 zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
 zipWithEqual msg _ [] []	=  []
-zipWithEqual msg _ _ _		=  panic ("zipWithEqual: unequal lists:"++msg)
+zipWithEqual msg _ _ _		=  panic ("zipWithEqual: unequal lists: "++msg)
 
 zipWith3Equal msg z (a:as) (b:bs) (c:cs)
 				=  z a b c : zipWith3Equal msg z as bs cs
 zipWith3Equal msg _ [] []  []	=  []
-zipWith3Equal msg _ _  _   _	=  panic ("zipWith3Equal: unequal lists:"++msg)
+zipWith3Equal msg _ _  _   _	=  panic ("zipWith3Equal: unequal lists: "++msg)
 
 zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
 				=  z a b c d : zipWith4Equal msg z as bs cs ds
 zipWith4Equal msg _ [] [] [] []	=  []
-zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists:"++msg)
+zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists: "++msg)
 #endif
 \end{code}
 
