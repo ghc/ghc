@@ -12,7 +12,7 @@
 --
 -----------------------------------------------------------------------------
 
-#include "config.h"
+#include "ghcconfig.h"
 
 module System.Posix.Signals (
 #ifndef mingw32_TARGET_OS

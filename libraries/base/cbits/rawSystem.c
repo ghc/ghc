@@ -7,7 +7,7 @@
 /* The itimer stuff in this module is non-posix */
 /* #include "PosixSource.h" */
 
-#include "config.h"
+#include "ghcconfig.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -37,7 +37,7 @@ import NHC.FFI (Storable(..),Ptr,FunPtr,StablePtr
 import Control.Monad		( liftM )
 
 #include "MachDeps.h"
-#include "config.h"
+#include "ghcconfig.h"
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Storable

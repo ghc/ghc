@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 #ifdef __GLASGOW_HASKELL__
-#include "config.h"
+#include "ghcconfig.h"
 #endif
 
 module Debug.Trace (

@@ -9,7 +9,7 @@
 #ifndef __HSBASE_H__
 #define __HSBASE_H__
 
-#include "config.h"
+#include "ghcconfig.h"
 #include "HsFFI.h"
 
 #include <stdio.h>

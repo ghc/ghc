@@ -3,7 +3,7 @@
  *
  * Win32 Console API support
  */
-#include "config.h"
+#include "ghcconfig.h"
 #if defined(mingw32_TARGET_OS) || defined(cygwin32_TARGET_OS) || defined(__MINGW32__) || defined(_MSC_VER)
 /* to the end */
 

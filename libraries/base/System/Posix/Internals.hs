@@ -21,7 +21,7 @@
 -- #hide
 module System.Posix.Internals where
 
-#include "config.h"
+#include "ghcconfig.h"
 
 import Control.Monad
 import System.Posix.Types

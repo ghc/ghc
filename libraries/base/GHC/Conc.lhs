@@ -14,7 +14,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-#include "config.h"
+#include "ghcconfig.h"
 module GHC.Conc
 	( ThreadId(..)
 

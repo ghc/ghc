@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 -- ToDo: should have an interface using PackedStrings.
-#include "config.h"
+#include "ghcconfig.h"
 
 module Text.Regex.Posix (
 	-- * The @Regex@ type

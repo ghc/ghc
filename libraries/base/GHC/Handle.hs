@@ -51,7 +51,7 @@ module GHC.Handle (
 
  ) where
 
-#include "config.h"
+#include "ghcconfig.h"
 
 import Control.Monad
 import Data.Bits

@@ -4,7 +4,7 @@
  * Directory Runtime Support
  */
 
-#include "config.h"
+#include "ghcconfig.h"
 
 // The following is required on Solaris to force the POSIX versions of
 // the various _r functions instead of the Solaris versions.

@@ -13,7 +13,7 @@
 -- interface in "Text.Regex.Posix".
 --
 -----------------------------------------------------------------------------
-#include "config.h"
+#include "ghcconfig.h"
 module Text.Regex (
     -- * Regular expressions
     Regex,

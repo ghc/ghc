@@ -26,7 +26,7 @@ import Foreign
 import Foreign.C
 import System.Exit
 import GHC.IOBase
-#include "config.h"
+#include "ghcconfig.h"
 #endif
 
 #ifdef __HUGS__
