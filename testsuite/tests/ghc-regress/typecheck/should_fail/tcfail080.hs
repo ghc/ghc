@@ -1,4 +1,4 @@
-[-# -fglasgow-exts #-}
+{-# -fglasgow-exts #-}
 
 -- !!! Multi-param type classes test: ambiguity bug
 
