@@ -40,7 +40,7 @@ import CmdLineOpts	( DynFlags(..) )
 import Util
 
 #ifdef GHCI
-import Exception	( block )
+import Control.Exception	( block )
 #endif
 
 import DATA_IOREF	( IORef )
