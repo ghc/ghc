@@ -1010,7 +1010,6 @@ dnl ** do we have long longs?
 AC_CHECK_TYPES([long long])
 
 dnl ** check what fields struct msghdr contains
-AC_CHECK_HEADERS([sys/socket.h sys/uio.h])
 AC_CHECK_MEMBERS([struct msghdr.msg_control, struct msghdr.msg_accrights], [], [], [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
 #endif
