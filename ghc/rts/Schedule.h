@@ -82,7 +82,7 @@ void awaitEvent(rtsBool wait);  /* In Select.c */
  * Called from STG :  NO
  * Locks assumed   :  sched_mutex
  */
-rtsBool wakeUpSleepingThreads(nat);  /* In Select.c */
+rtsBool wakeUpSleepingThreads(lnat);  /* In Select.c */
 
 /* wakeBlockedWorkerThread()
  *
@@ -134,7 +134,7 @@ extern int RTS_VAR(context_switch);
 extern rtsBool RTS_VAR(interrupted);
 
 /* In Select.c */
-extern nat RTS_VAR(timestamp);
+extern lnat RTS_VAR(timestamp);
 
 /* Thread queues.
  * Locks required  : sched_mutex

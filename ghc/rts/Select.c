@@ -35,7 +35,7 @@
 #endif
 
 /* last timestamp */
-nat timestamp = 0;
+lnat timestamp = 0;
 
 /* There's a clever trick here to avoid problems when the time wraps
  * around.  Since our maximum delay is smaller than 31 bits of ticks
@@ -49,7 +49,7 @@ nat timestamp = 0;
  * (idea due to Andy Gill).
  */
 rtsBool
-wakeUpSleepingThreads(nat ticks)
+wakeUpSleepingThreads(lnat ticks)
 {
     StgTSO *tso;
     rtsBool flag = rtsFalse;

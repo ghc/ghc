@@ -196,13 +196,12 @@ unblock_vtalrm_signal(void)
 /* gettimeofday() takes around 1us on our 500MHz PIII.  Since we're
  * only calling it 50 times/s, it shouldn't have any great impact.
  */
-nat
+lnat
 getourtimeofday(void)
 {
   struct timeval tv;
   gettimeofday(&tv, (struct timezone *) NULL);
-  	// cast to nat because nat may be 64 bit when int is only 32 bit
-  return ((nat)tv.tv_sec * TICK_FREQUENCY +
-	  (nat)tv.tv_usec * TICK_FREQUENCY / 1000000);
+  	// cast to lnat because nat may be 64 bit when int is only 32 bit
+  return ((lnat)tv.tv_sec * TICK_FREQUENCY +
+	  (lnat)tv.tv_usec * TICK_FREQUENCY / 1000000);
 }
-
