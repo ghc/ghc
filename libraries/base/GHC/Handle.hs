@@ -1202,7 +1202,7 @@ hIsReadable handle =
       htype 		   -> return (isReadableHandleType htype)
 
 hIsWritable :: Handle -> IO Bool
-hIsWritable (DuplexHandle _ _) = return False
+hIsWritable (DuplexHandle _ _) = return True
 hIsWritable handle =
     withHandle_ "hIsWritable" handle $ \ handle_ -> do
     case haType handle_ of 
