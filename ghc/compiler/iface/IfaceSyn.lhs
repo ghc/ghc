@@ -245,10 +245,10 @@ pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono_ty, i
        4 (vcat [equals <+> ppr mono_ty,
 		pprVrcs vrcs])
 
-pprIfaceDecl (IfaceData {ifND = new_or_data, ifCtxt = context, ifName = tycon,
+pprIfaceDecl (IfaceData {ifND = new_or_data, ifCtxt = context, ifName = tycon, ifGeneric = gen,
 			 ifTyVars = tyvars, ifCons = condecls, ifRec = isrec, ifVrcs = vrcs})
   = hang (ppr new_or_data <+> pp_decl_head context tycon tyvars)
-       4 (vcat [pprVrcs vrcs, pprRec isrec, pp_condecls condecls])
+       4 (vcat [pprVrcs vrcs, pprRec isrec, pprGen gen, pp_condecls condecls])
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifSigs = sigs, ifVrcs = vrcs, ifRec = isrec})
@@ -259,6 +259,8 @@ pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars,
 
 pprVrcs vrcs = ptext SLIT("Variances") <+> ppr vrcs
 pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
+pprGen True  = ptext SLIT("Generics: yes")
+pprGen False = ptext SLIT("Generics: no")
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
