@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.84 2001/08/09 10:55:53 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.85 2001/08/13 15:49:37 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -164,31 +164,36 @@ interactiveUI cmstate paths cmdline_libs = do
 
 runGHCi :: GHCi ()
 runGHCi = do
-  -- Read in ./.ghci.
-  let file = "./.ghci"
-  exists <- io (doesFileExist file)
-  when exists $ do
-     dir_ok  <- io (checkPerms ".")
-     file_ok <- io (checkPerms file)
-     when (dir_ok && file_ok) $ do
-   	either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
-   	case either_hdl of
-   	   Left e    -> return ()
-   	   Right hdl -> fileLoop hdl False
-  
-  -- Read in $HOME/.ghci
-  either_dir <- io (IO.try (getEnv "HOME"))
-  case either_dir of
-     Left e -> return ()
-     Right dir -> do
-	cwd <- io (getCurrentDirectory)
-    	when (dir /= cwd) $ do
-	   let file = dir ++ "/.ghci"
-	   ok <- io (checkPerms file)
-       	   either_hdl <- io (IO.try (openFile file ReadMode))
-	   case either_hdl of
-		Left e    -> return ()
-		Right hdl -> fileLoop hdl False
+  read_dot_files <- io (readIORef v_Read_DotGHCi)
+
+  when (read_dot_files) $ do
+    -- Read in ./.ghci.
+    let file = "./.ghci"
+    exists <- io (doesFileExist file)
+    when exists $ do
+       dir_ok  <- io (checkPerms ".")
+       file_ok <- io (checkPerms file)
+       when (dir_ok && file_ok) $ do
+  	  either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
+  	  case either_hdl of
+  	     Left e    -> return ()
+  	     Right hdl -> fileLoop hdl False
+    
+  when (read_dot_files) $ do
+    -- Read in $HOME/.ghci
+    either_dir <- io (IO.try (getEnv "HOME"))
+    case either_dir of
+       Left e -> return ()
+       Right dir -> do
+  	  cwd <- io (getCurrentDirectory)
+  	  when (dir /= cwd) $ do
+  	     let file = dir ++ "/.ghci"
+  	     ok <- io (checkPerms file)
+  	     when ok $ do
+  	       either_hdl <- io (IO.try (openFile file ReadMode))
+  	       case either_hdl of
+  		  Left e    -> return ()
+  		  Right hdl -> fileLoop hdl False
 
   -- read commands from stdin
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
@@ -702,6 +707,12 @@ linkPackages cmdline_lib_specs pkgs
    = do sequence_ [ linkPackage (name p `elem` loaded) p | p <- reverse pkgs ]
         lib_paths <- readIORef v_Library_paths
         mapM_ (preloadLib lib_paths) cmdline_lib_specs
+	if (null cmdline_lib_specs)
+	   then return ()
+	   else do putStr "final link ... "
+		   ok <- resolveObjs
+		   if ok then putStrLn "done."
+	      		 else throwDyn (InstallationError "linking extra libraries/objects failed")
      where
 	-- Packages that are already linked into GHCi.  For mingw32, we only
 	-- skip gmp and rts, since std and after need to load the msvcrt.dll
@@ -719,7 +730,7 @@ linkPackages cmdline_lib_specs pkgs
                 case lib_spec of
                    Left static_ish
                       -> do b <- preload_static lib_paths static_ish
-                            putStrLn (if b then "done" else "not found")
+                            putStrLn (if b then "done." else "not found")
                    Right dll_unadorned
                       -> -- We add "" to the set of paths to try, so that
                          -- if none of the real paths match, we force addDLL
@@ -775,8 +786,9 @@ linkPackage loaded_in_ghci pkg
 
         mapM loadClassified sos_first
         putStr "linking ... "
-        resolveObjs
-        putStrLn "done."
+        ok <- resolveObjs
+	if ok then putStrLn "done."
+	      else panic ("can't load package `" ++ name pkg ++ "'")
      where
         isRight (Right _) = True
         isRight (Left _)  = False

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.52 2001/08/02 16:30:41 simonmar Exp $
+-- $Id: DriverState.hs,v 1.53 2001/08/13 15:49:38 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -12,7 +12,9 @@ module DriverState where
 #include "../includes/config.h"
 #include "HsVersions.h"
 
-import Packages		( PackageConfig(..) )
+import SysTools		( getTopDir )
+import ParsePkgConf	( loadPackageConfig )
+import Packages		( PackageConfig(..), mungePackagePaths )
 import CmdLineOpts
 import DriverPhases
 import DriverUtil
@@ -73,6 +75,7 @@ GLOBAL_VAR(v_Recomp,  			True,		Bool)
 GLOBAL_VAR(v_Collect_ghc_timing, 	False,		Bool)
 GLOBAL_VAR(v_Do_asm_mangling,		True,		Bool)
 GLOBAL_VAR(v_Excess_precision,		False,		Bool)
+GLOBAL_VAR(v_Read_DotGHCi,		True,		Bool)
 
 -----------------------------------------------------------------------------
 -- Splitting object files (for libraries)
@@ -404,6 +407,19 @@ GLOBAL_VAR(v_HCHeader, "", String)
 -- package list is maintained in dependency order
 GLOBAL_VAR(v_Packages, ("std":"rts":"gmp":[]), [String])
 
+readPackageConf :: String -> IO ()
+readPackageConf conf_file = do
+  proto_pkg_details <- loadPackageConfig conf_file
+  top_dir <- getTopDir
+  let pkg_details    = mungePackagePaths top_dir proto_pkg_details
+  old_pkg_details <- readIORef v_Package_details
+  let intersection = filter (`elem` map name old_pkg_details) 
+				(map name pkg_details)
+  if (not (null intersection))
+	then throwDyn (InstallationError ("package `" ++ head intersection ++ "' is already defined"))
+	else do
+  writeIORef v_Package_details (pkg_details ++ old_pkg_details)
+
 addPackage :: String -> IO ()
 addPackage package
   = do pkg_details <- readIORef v_Package_details
@@ -492,7 +508,7 @@ getPackageDetails ps = do
   pkg_details <- readIORef v_Package_details
   return [ pkg | p <- ps, Just pkg <- [ lookupPkg p pkg_details ] ]
 
-GLOBAL_VAR(v_Package_details, (error "package_details"), [PackageConfig])
+GLOBAL_VAR(v_Package_details, [], [PackageConfig])
 
 lookupPkg :: String -> [PackageConfig] -> Maybe PackageConfig
 lookupPkg nm ps
@@ -682,7 +698,7 @@ unregFlags =
    , "-fvia-C" ]
 
 -----------------------------------------------------------------------------
--- Programs for particular phases
+-- Options for particular phases
 
 GLOBAL_VAR(v_Opt_dep,    [], [String])
 GLOBAL_VAR(v_Anti_opt_C, [], [String])

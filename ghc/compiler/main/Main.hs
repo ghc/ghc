@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.85 2001/08/08 08:44:47 simonmar Exp $
+-- $Id: Main.hs,v 1.86 2001/08/13 15:49:38 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -25,9 +25,8 @@ import Finder		( initFinder )
 import CompManager	( cmInit, cmLoadModule )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
-import SysTools		( packageConfigPath, initSysTools, cleanTempFiles )
-import Packages		( showPackages, mungePackagePaths )
-import ParsePkgConf	( loadPackageConfig )
+import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
+import Packages		( showPackages )
 
 import DriverPipeline	( GhcMode(..), doLink, doMkDLL, genPipeline,
 			  getGhcMode, pipeLoop, v_GhcMode
@@ -36,7 +35,8 @@ import DriverState	( buildCoreToDo, buildStgToDo, defaultHscLang,
 			  findBuildTag, getPackageInfo, unregFlags, 
 			  v_Cmdline_libraries, v_Keep_tmp_files, v_Ld_inputs,
 			  v_OptLevel, v_Output_file, v_Output_hi, 
-			  v_Package_details, v_Ways, getPackageExtraGhcOpts
+			  v_Package_details, v_Ways, getPackageExtraGhcOpts,
+			  readPackageConf
 			)
 import DriverFlags	( dynFlag, buildStaticHscOpts, dynamic_flags,
 			  processArgs, static_flags)
@@ -151,10 +151,8 @@ main =
    top_dir <- initSysTools minusB_args
 
 	-- Read the package configuration
-   conf_file	     <- packageConfigPath
-   proto_pkg_details <- loadPackageConfig conf_file
-   let pkg_details    = mungePackagePaths top_dir proto_pkg_details
-   writeIORef v_Package_details pkg_details
+   conf_file <- getPackageConfigPath
+   readPackageConf conf_file
 
 	-- find the phase to stop after (i.e. -E, -C, -c, -S flags)
    (flags2, mode, stop_flag) <- getGhcMode argv'
@@ -245,10 +243,11 @@ main =
    when (verb >= 2) 
 	(hPutStrLn stderr ("Using package config file: " ++ conf_file))
 
+   pkg_details <- readIORef v_Package_details
+   showPackages pkg_details
+
    when (verb >= 3) 
 	(hPutStrLn stderr ("Hsc static flags: " ++ unwords static_opts))
-
-   showPackages pkg_details
 
 	-- initialise the finder
    pkg_avails <- getPackageInfo

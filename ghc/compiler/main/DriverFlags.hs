@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.63 2001/07/24 04:47:06 ken Exp $
+-- $Id: DriverFlags.hs,v 1.64 2001/08/13 15:49:38 simonmar Exp $
 --
 -- Driver flags
 --
@@ -167,6 +167,10 @@ static_flags =
       ------- verbosity ----------------------------------------------------
   ,  ( "n"              , NoArg setDryRun )
 
+	------- GHCi -------------------------------------------------------
+  ,  ( "ignore-dot-ghci", NoArg (writeIORef v_Read_DotGHCi False) )
+  ,  ( "read-dot-ghci"  , NoArg (writeIORef v_Read_DotGHCi True) )
+
 	------- recompilation checker --------------------------------------
   ,  ( "recomp"		, NoArg (writeIORef v_Recomp True) )
   ,  ( "no-recomp"  	, NoArg (writeIORef v_Recomp False) )
@@ -239,6 +243,7 @@ static_flags =
         ------- Packages ----------------------------------------------------
   ,  ( "package-name"   , HasArg (\s -> add v_Opt_C ("-inpackage="++s)) )
 
+  ,  ( "package-conf"   , HasArg (readPackageConf) )
   ,  ( "package"        , HasArg (addPackage) )
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
 

@@ -1,7 +1,9 @@
 -----------------------------------------------------------------------------
--- Access to system tools: gcc, cp, rm etc
+-- $Id: SysTools.lhs,v 1.48 2001/08/13 15:49:38 simonmar Exp $
 --
--- (c) The University of Glasgow 2000
+-- (c) The University of Glasgow 2001
+--
+-- Access to system tools: gcc, cp, rm etc
 --
 -----------------------------------------------------------------------------
 
@@ -13,8 +15,8 @@ module SysTools (
 				-- Command-line override
 	setDryRun,
 
-	packageConfigPath,	-- IO String	
-				-- Where package.conf is
+	getTopDir,		-- IO String	-- The value of $libdir
+	getPackageConfigPath,	-- IO String	-- Where package.conf is
 
 	-- Interface to system tools
 	runUnlit, runCpp, runCc, -- [Option] -> IO ()
@@ -163,8 +165,14 @@ GLOBAL_VAR(v_Pgm_CP,   error "pgm_CP", 	 String)	-- cp
 GLOBAL_VAR(v_Path_package_config, error "path_package_config", String)
 GLOBAL_VAR(v_Path_usage,  	  error "ghc_usage.txt",       String)
 
+GLOBAL_VAR(v_TopDir,	error "TopDir",	String)		-- -B<dir>
+
 -- Parallel system only
 GLOBAL_VAR(v_Pgm_sysman, error "pgm_sysman", String)	-- system manager
+
+-- ways to get at some of these variables from outside this module
+getPackageConfigPath = readIORef v_Path_package_config
+getTopDir	     = readIORef v_TopDir
 \end{code}
 
 
@@ -177,15 +185,15 @@ GLOBAL_VAR(v_Pgm_sysman, error "pgm_sysman", String)	-- system manager
 \begin{code}
 initSysTools :: [String]	-- Command-line arguments starting "-B"
 
-	     -> IO String	-- Set all the mutable variables above, holding 
+	     -> IO ()		-- Set all the mutable variables above, holding 
 				--	(a) the system programs
 				--	(b) the package-config file
 				--	(c) the GHC usage message
-				-- Return TopDir
 
 
 initSysTools minusB_args
-  = do  { (am_installed, top_dir) <- getTopDir minusB_args
+  = do  { (am_installed, top_dir) <- findTopDir minusB_args
+	; writeIORef v_TopDir top_dir
 		-- top_dir
 		-- 	for "installed" this is the root of GHC's support files
 		--	for "in-place" it is the root of the build tree
@@ -319,7 +327,7 @@ initSysTools minusB_args
 	; writeIORef v_Pgm_T   	 	   touch_path
 	; writeIORef v_Pgm_CP  	 	   cp_path
 
-	; return top_dir
+	; return ()
 	}
 \end{code}
 
@@ -362,11 +370,11 @@ setPgm pgm	   = unknownFlagErr ("-pgm" ++ pgm)
 --
 -- This is very gruesome indeed
 
-getTopDir :: [String]
+findTopDir :: [String]
 	  -> IO (Bool, 		-- True <=> am installed, False <=> in-place
 	         String)	-- TopDir (in Unix format '/' separated)
 
-getTopDir minusbs
+findTopDir minusbs
   = do { top_dir <- get_proto
         -- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
@@ -502,8 +510,6 @@ showGhcUsage = do { usage_path <- readIORef v_Path_usage
      dump ""	      = return ()
      dump ('$':'$':s) = hPutStr stderr progName >> dump s
      dump (c:s)	      = hPutChar stderr c >> dump s
-
-packageConfigPath = readIORef v_Path_package_config
 \end{code}
 
 
