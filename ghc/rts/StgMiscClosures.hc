@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.24 1999/05/21 14:46:19 sof Exp $
+ * $Id: StgMiscClosures.hc,v 1.25 1999/06/08 10:26:39 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -527,7 +527,7 @@ RET_BCO_ENTRY_TEMPLATE(ret_bco_5_entry);
 RET_BCO_ENTRY_TEMPLATE(ret_bco_6_entry);
 RET_BCO_ENTRY_TEMPLATE(ret_bco_7_entry);
 
-VEC_POLY_INFO_TABLE(ret_bco,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO);
+VEC_POLY_INFO_TABLE(ret_bco,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
 
 #endif /* INTERPRETER */
 
