@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getCPUTime.c,v 1.3 1998/12/02 13:27:36 simonm Exp $
+ * $Id: getCPUTime.c,v 1.4 1999/03/01 09:04:07 sof Exp $
  *
  * getCPUTime Runtime Support
  */
@@ -25,16 +25,20 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_SYS_TIMES_H
-#include <sys/times.h>
+#ifndef mingw32_TARGET_OS
+# ifdef HAVE_SYS_TIMES_H
+#  include <sys/times.h>
+# endif
 #endif
 
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
 
-#if defined(HAVE_SYS_RESOURCE_H) && ! irix_TARGET_OS
-#include <sys/resource.h>
+#if !defined(mingw32_TARGET_OS) && !defined(irix_TARGET_OS)
+# if defined(HAVE_SYS_RESOURCE_H)
+#  include <sys/resource.h>
+# endif
 #endif
 
 #ifdef HAVE_SYS_TIMEB_H
