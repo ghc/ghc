@@ -1,12 +1,11 @@
 
 tcfail076.hs:18:
     Inferred type is less polymorphic than expected
-	Quantified type variable `res' escapes
-	It unifies with `res1', which is mentioned in the environment
-	The following variables in the environment mention `res1'
-	  cont :: a -> m res1
+    Quantified type variable `res' escapes
+    It unifies with `res1', which is mentioned in the environment:
+      cont :: a -> m res1 (bound at tcfail076.hs:18)
     Signature type:     forall res. (a1 -> m1 res) -> m1 res
     Type to generalise: (b -> m res1) -> m res1
     When checking an expression type signature
     In the first argument of `KContT', namely `(\ cont' -> cont a)'
-    in a lambda abstraction: KContT (\ cont' -> cont a)
+    In a lambda abstraction: KContT (\ cont' -> cont a)
