@@ -140,7 +140,7 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
  | ghci_mode == OneShot
  = do {
       hPutStrLn stderr "compilation IS NOT required";
-      let bomb = panic "hscNoRecomp:OneShot";
+      let { bomb = panic "hscNoRecomp:OneShot" };
       return (HscNoRecomp pcs_ch bomb bomb)
       }
  | otherwise
