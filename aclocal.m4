@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.100 2002/05/05 17:03:54 panne Exp $
+dnl $Id: aclocal.m4,v 1.101 2002/05/17 09:03:13 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -224,7 +224,19 @@ AC_SUBST(HappyVersion)
 # 1.9 and later is required, assume that we can use the
 # "-agc" options. NOTE: The Master of Happy-ness says:
 # "Don't use -s! (yet)"
+
 HappyOpts="-agc"
+
+# Soon version 1.13 will be required.  To give people a chance to
+# switch over (and me a chance to actually release 1.13 :-) , we have
+# a dummy copy of GlaExts in fptools/libraries/base. 
+#
+# If 1.13 actually is installed, we turn on the --old-ghc option for
+# the time being.
+
+FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_happy_version],-ge,[1.13],
+  [HappyOpts="--old-ghc -ac"])
+
 AC_SUBST(HappyOpts)
 ])
 
