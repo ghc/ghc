@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.14 2002/07/01 15:16:33 simonmar Exp $
+# $Id: package.mk,v 1.15 2002/07/02 08:41:28 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -135,6 +135,8 @@ endif # way
 # -----------------------------------------------------------------------------
 # Doc building with Haddock
 
+ifneq "$(NO_HADDOCK_DOCS)" "YES"
+
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
 
 HTML_DIR = html
@@ -164,6 +166,7 @@ install-docs :: $(HTML_DOC)
 	done
 
 endif # HS_PPS
+endif # NO_HADDOCK_DOCS
 
 # -----------------------------------------------------------------------------
 
