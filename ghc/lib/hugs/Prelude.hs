@@ -107,7 +107,7 @@ module Prelude (
     , ThreadId, forkIO
     ,trace
 
-    , Ref, newRef, readRef, writeRef
+    , STRef, newSTRef, readSTRef, writeSTRef
 
     -- Arrrggghhh!!! Help! Help! Help!
     -- What?!  Prelude.hs doesn't even _define_ most of these things!
@@ -1889,16 +1889,18 @@ freeStablePtr    = primFreeStablePtr
 data PrimArray              a -- immutable arrays with Int indices
 data PrimByteArray
 
-data Ref                    a -- mutable variables
+data STRef                s a -- mutable variables
 data PrimMutableArray     s a -- mutable arrays with Int indices
 data PrimMutableByteArray s
 
-newRef   :: a -> IO (Ref a)
-newRef    = primNewRef
-readRef  :: Ref a -> IO a
-readRef   = primReadRef
-writeRef :: Ref a -> a -> IO ()
-writeRef  = primWriteRef
+newSTRef   :: a -> ST s (STRef s a)
+newSTRef    = primNewRef
+readSTRef  :: STRef s a -> ST s a
+readSTRef   = primReadRef
+writeSTRef :: STRef s a -> a -> ST s ()
+writeSTRef  = primWriteRef
+
+type IORef a = STRef RealWorld a
 
 
 ------------------------------------------------------------------------------

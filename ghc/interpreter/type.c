@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/19 13:54:49 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/19 15:42:08 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2579,7 +2579,7 @@ Char k; {
     case BARR_REP:
             return typePrimByteArray;
     case REF_REP:
-            return ap(typeRef,mkAlphaVar());
+            return ap2(typeRef,mkStateVar(),mkAlphaVar());
     case MUTARR_REP:
             return ap2(typePrimMutableArray,mkStateVar(),mkAlphaVar());     
     case MUTBARR_REP:

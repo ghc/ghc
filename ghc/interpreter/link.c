@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/18 12:10:19 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/19 15:42:07 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -279,7 +279,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         typeAddr         = linkTycon("Addr");
         typePrimArray            = linkTycon("PrimArray");
         typePrimByteArray        = linkTycon("PrimByteArray");
-        typeRef                  = linkTycon("Ref");
+        typeRef                  = linkTycon("STRef");
         typePrimMutableArray     = linkTycon("PrimMutableArray");
         typePrimMutableByteArray = linkTycon("PrimMutableByteArray");
         typeFloat        = linkTycon("Float");
@@ -342,7 +342,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
 #endif
         nameMkPrimArray            = addPrimCfunREP(findText("PrimArray#"),1,0,0);
         nameMkPrimByteArray        = addPrimCfunREP(findText("PrimByteArray#"),1,0,0);
-        nameMkRef                  = addPrimCfunREP(findText("Ref#"),1,0,0);
+        nameMkRef                  = addPrimCfunREP(findText("STRef#"),1,0,0);
         nameMkPrimMutableArray     = addPrimCfunREP(findText("PrimMutableArray#"),1,0,0);
         nameMkPrimMutableByteArray = addPrimCfunREP(findText("PrimMutableByteArray#"),1,0,0);
         nameMkPrimMVar             = addPrimCfunREP(findText("MVar#"),1,0,0);
