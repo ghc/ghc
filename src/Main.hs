@@ -321,6 +321,8 @@ mkInterface no_implicit_prelude mod_map filename
 		   buildImportEnv mod_map mod exported_visible_names 
 			implicit_imps
 
+  -- trace (show (fmToList orig_env)) $ do
+  -- trace (show (fmToList import_env)) $ do
   let
      final_decls = orig_decls
 
