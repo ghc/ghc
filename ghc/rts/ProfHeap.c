@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.30 2001/11/28 15:43:23 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.31 2001/11/28 17:45:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -451,7 +451,7 @@ endHeapProfiling(void)
 #endif
 
 #ifdef PROFILING
-    if (RtsFlags.ProfFlags.bioSelector != NULL) {
+    if (doingLDVProfiling()) {
 	nat t;
 	aggregateCensusInfo();
 	for (t = 1; t < era; t++) {
@@ -617,21 +617,6 @@ aggregateCensusInfo( void )
 	    ASSERT( censuses[t].drag_total < censuses[t].used );
 	}
 	
-	for (t = 1; t < era; t++) { // note: start at 1, not 0
-	    fprintf(hp_file, "MARK %f\n", censuses[t].time);
-	    fprintf(hp_file, "BEGIN_SAMPLE %f\n", censuses[t].time);
-	    fprintf(hp_file, "VOID\t%u\n", censuses[t].void_total * sizeof(W_));
-	    fprintf(hp_file, "LAG\t%u\n", 
-		    (censuses[t].not_used - censuses[t].void_total)
-		    * sizeof(W_));
-	    fprintf(hp_file, "USE\t%u\n", 
-		    (censuses[t].used - censuses[t].drag_total) * sizeof(W_));
-	    fprintf(hp_file, "INHERENT_USE\t%u\n", 
-		    censuses[t].prim * sizeof(W_));
-	    fprintf(hp_file, "DRAG\t%u\n", censuses[t].drag_total * sizeof(W_));
-	    fprintf(hp_file, "END_SAMPLE %f\n", censuses[t].time);
-	}
-	
 	return;
     }
 
@@ -705,6 +690,22 @@ dumpCensus( Census *census )
     int count;
 
     fprintf(hp_file, "BEGIN_SAMPLE %0.2f\n", census->time);
+
+#ifdef PROFILING
+    if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+	fprintf(hp_file, "VOID\t%u\n", census->void_total * sizeof(W_));
+	fprintf(hp_file, "LAG\t%u\n", 
+		(census->not_used - census->void_total) * sizeof(W_));
+	fprintf(hp_file, "USE\t%u\n", 
+		(census->used - census->drag_total) * sizeof(W_));
+	fprintf(hp_file, "INHERENT_USE\t%u\n", 
+		census->prim * sizeof(W_));
+	fprintf(hp_file, "DRAG\t%u\n", census->drag_total *
+		sizeof(W_));
+	fprintf(hp_file, "END_SAMPLE %0.2f\n", census->time);
+	return;
+    }
+#endif
 
     for (ctr = census->ctrs; ctr != NULL; ctr = ctr->next) {
 
