@@ -1346,10 +1346,10 @@ cyclicModuleErr ms
   = hang (ptext SLIT("Module imports form a cycle for modules:"))
        2 (vcat (map show_one ms))
   where
-    show_one ms = vcat [show_mod (ms_hsc_src ms) (ms_mod ms),
-			ptext SLIT("Imports:") <+> 
-				(pp_imps HsBootFile (ms_srcimps ms)
-				 $$ pp_imps HsSrcFile  (ms_imps ms))]
+    show_one ms = sep [ show_mod (ms_hsc_src ms) (ms_mod ms),
+			nest 2 $ ptext SLIT("imports:") <+> 
+				   (pp_imps HsBootFile (ms_srcimps ms)
+				   $$ pp_imps HsSrcFile  (ms_imps ms))]
     show_mod hsc_src mod = ppr mod <> text (hscSourceString hsc_src)
     pp_imps src mods = fsep (map (show_mod src) mods)
 \end{code}
