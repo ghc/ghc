@@ -49,7 +49,7 @@ import Panic		( progName, GhcException(..) )
 import Util		( global )
 import CmdLineOpts	( dynFlag, verbosity )
 
-import List		( intersperse, isPrefixOf )
+import List		( isPrefixOf )
 import Exception	( throw, throwDyn, catchAllIO )
 import IO		( hPutStr, hPutChar, hPutStrLn, hFlush, stderr )
 import IO		( openFile, IOMode(..), hClose )	-- For temp "system"
@@ -479,7 +479,7 @@ addFilesToClean files = mapM_ (add v_FilesToClean) files
 removeTmpFiles :: Int -> [FilePath] -> IO ()
 removeTmpFiles verb fs
   = traceCmd "Deleting temp files" 
-	     ("Deleting: " ++ concat (intersperse " " fs))
+	     ("Deleting: " ++ unwords fs)
 	     (mapM_ rm fs)
   where
     rm f = removeFile f `catchAllIO`
@@ -599,8 +599,8 @@ dosifyPath stuff
 #else
 
 --------------------- Unix version ---------------------
-dosifyPaths  xs = xs
-dosifyPaths  xs = xs
+dosifyPath   p  = p
+dosifyPaths  ps = ps
 unDosifyPath xs = subst '\\' '/' xs
 --------------------------------------------------------
 #endif
