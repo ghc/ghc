@@ -1318,7 +1318,7 @@ C.
 </Para>
 
 <Para>
-Please see <XRef LinkEnd="glasgow-stablePtrs"> for more details.
+Please see <XRef LinkEnd="sec-stable-pointers"> for more details.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -1334,7 +1334,7 @@ memory when you're done with it.&rdquo;
 </Para>
 
 <Para>
-Please see <XRef LinkEnd="glasgow-foreignObjs"> for more details.
+Please see <XRef LinkEnd="sec-ForeignObj"> for more details.
 </Para>
 </ListItem>
 </VarListEntry>
@@ -1476,14 +1476,61 @@ qualifier list has just one element, a boolean expression.
 </Para>
 </Sect1>
 
-<Sect1 id="sec-ffi">
-<Title>The foreign interface</Title>
+  <sect1 id="sec-ffi">
+    <title>The foreign interface</title>
 
-<Para>
-The foreign interface consists of language and library support. The former
-is described later in <XRef LinkEnd="ffi">; the latter is outlined below,
-and detailed in <XRef LinkEnd="sec-Foreign">.
-</Para>
+    <para>The foreign interface consists of the following components:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>The Foreign Function Interface language specification
+	(included in this manual, in <xref linkend="ffi">).</para>
+      </listitem>
+
+      <listitem>
+	<para>The <literal>Foreign</literal> module (see <xref
+	linkend="sec-Foreign">) collects together several interfaces
+	which are useful in specifying foreign language
+	interfaces, including the following:</para>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>The <literal>ForeignObj</literal> module (see <xref
+	    linkend="sec-ForeignObj">), for managing pointers from
+	    Haskell into the outside world.</para>
+	  </listitem>
+      
+	  <listitem>
+	    <para>The <literal>StablePtr</literal> module (see <xref
+	    linkend="sec-stable-pointers">), for managing pointers
+	    into Haskell from the outside world.</para>
+	  </listitem>
+      
+	  <listitem>
+	    <para>The <literal>CTypes</literal> module (see <xref
+	    linkend="sec-CTypes">) gives Haskell equivalents for the
+	    standard C datatypes, for use in making Haskell bindings
+	    to existing C libraries.</para>
+	  </listitem>
+      
+	  <listitem>
+	    <para>The <literal>CTypesISO</literal> module (see <xref
+	    linkend="sec-CTypesISO">) gives Haskell equivalents for C
+	    types defined by the ISO C standard.</para>
+	  </listitem>
+      
+	  <listitem>
+	    <para>The <literal>Storable</literal> library, for
+	    primitive marshalling of data types between Haskell and
+	    the foreign language.</para>
+	  </listitem>
+	</itemizedlist>
+
+      </listitem>
+    </itemizedlist>
+
+<para>The following sections also give some hints and tips on the use
+of the foreign function interface in GHC.</para>
 
 <Sect2 id="glasgow-foreign-headers">
 <Title>Using function headers
@@ -1526,590 +1573,6 @@ HsInt        lookupEFS (HsForeignObj a, HsInt i);
       sizeof(int *)</Literal> on your architecture) but is a Good
       Thing for anyone who cares about writing solid code.  You're
       crazy not to do it.</Para>
-
-</Sect2>
-
-<Sect2 id="glasgow-stablePtrs">
-<Title>Subverting automatic unboxing with &ldquo;stable pointers&rdquo;
-</Title>
-
-<Para>
-<IndexTerm><Primary>stable pointers (Glasgow extension)</Primary></IndexTerm>
-</Para>
-
-<Para>
-The arguments of a <Function>&lowbar;ccall&lowbar;</Function> automatically unboxed before the
-call.  There are two reasons why this is usually the Right Thing to
-do:
-</Para>
-
-<Para>
-
-<ItemizedList>
-<ListItem>
-
-<Para>
-C is a strict language: it would be excessively tedious to pass
-unevaluated arguments and require the C programmer to force their
-evaluation before using them.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- Boxed values are stored on the Haskell heap and may be moved
-within the heap if a garbage collection occurs&mdash;that is, pointers
-to boxed objects are not <Emphasis>stable</Emphasis>.
-</Para>
-</ListItem>
-
-</ItemizedList>
-
-</Para>
-
-<Para>
-It is possible to subvert the unboxing process by creating a &ldquo;stable
-pointer&rdquo; to a value and passing the stable pointer instead.  For
-example, to pass/return an integer lazily to C functions <Function>storeC</Function> and
-<Function>fetchC</Function> might write:
-</Para>
-
-<Para>
-
-<ProgramListing>
-storeH :: Int -> IO ()
-storeH x = makeStablePtr x              >>= \ stable_x ->
-           _ccall_ storeC stable_x
-
-fetchH :: IO Int
-fetchH x = _ccall_ fetchC               >>= \ stable_x ->
-           deRefStablePtr stable_x      >>= \ x ->
-           freeStablePtr stable_x       >>
-           return x
-</ProgramListing>
-
-</Para>
-
-<Para>
-The garbage collector will refrain from throwing a stable pointer away
-until you explicitly call one of the following from C or Haskell.
-</Para>
-
-<Para>
-
-<ProgramListing>
-void freeStablePointer( StgStablePtr stablePtrToToss )
-freeStablePtr :: StablePtr a -> IO ()
-</ProgramListing>
-
-</Para>
-
-<Para>
-As with the use of <Function>free</Function> in C programs, GREAT CARE SHOULD BE
-EXERCISED to ensure these functions are called at the right time: too
-early and you get dangling references (and, if you're lucky, an error
-message from the runtime system); too late and you get space leaks.
-</Para>
-
-<Para>
-And to force evaluation of the argument within <Function>fooC</Function>, one would
-call one of the following C functions (according to type of argument).
-</Para>
-
-<Para>
-
-<ProgramListing>
-void     performIO  ( StgStablePtr stableIndex /* StablePtr s (IO ()) */ );
-StgInt   enterInt   ( StgStablePtr stableIndex /* StablePtr s Int */ );
-StgFloat enterFloat ( StgStablePtr stableIndex /* StablePtr s Float */ );
-</ProgramListing>
-
-</Para>
-
-<Para>
-<IndexTerm><Primary>performIO</Primary></IndexTerm>
-<IndexTerm><Primary>enterInt</Primary></IndexTerm>
-<IndexTerm><Primary>enterFloat</Primary></IndexTerm>
-</Para>
-
-<Para>
-Nota Bene: <Function>&lowbar;ccall&lowbar;GC&lowbar;</Function><IndexTerm><Primary>&lowbar;ccall&lowbar;GC&lowbar;</Primary></IndexTerm> must be used if any of
-these functions are used.
-</Para>
-
-</Sect2>
-
-<Sect2 id="glasgow-foreignObjs">
-<Title>Foreign objects: pointing outside the Haskell heap
-</Title>
-
-<Para>
-<IndexTerm><Primary>foreign objects (Glasgow extension)</Primary></IndexTerm>
-</Para>
-
-<Para>
-There are two types that GHC programs can use to reference
-(heap-allocated) objects outside the Haskell world: <Literal>Addr</Literal> and
-<Literal>ForeignObj</Literal>.
-</Para>
-
-<Para>
-If you use <Literal>Addr</Literal>, it is up to you to the programmer to arrange
-allocation and deallocation of the objects.
-</Para>
-
-<Para>
-If you use <Literal>ForeignObj</Literal>, GHC's garbage collector will call upon the
-user-supplied <Emphasis>finaliser</Emphasis> function to free the object when the
-Haskell world no longer can access the object.  (An object is
-associated with a finaliser function when the abstract
-Haskell type <Literal>ForeignObj</Literal> is created). The finaliser function is
-expressed in C, and is passed as argument the object:
-</Para>
-
-<Para>
-
-<ProgramListing>
-void foreignFinaliser ( StgForeignObj fo )
-</ProgramListing>
-
-</Para>
-
-<Para>
-when the Haskell world can no longer access the object.  Since
-<Literal>ForeignObj</Literal>s only get released when a garbage collection occurs, we
-provide ways of triggering a garbage collection from within C and from
-within Haskell.
-</Para>
-
-<Para>
-
-<ProgramListing>
-void GarbageCollect()
-performGC :: IO ()
-</ProgramListing>
-
-</Para>
-
-<Para>
-More information on the programmers' interface to <Literal>ForeignObj</Literal> can be
-found in the library documentation.
-</Para>
-
-</Sect2>
-
-<Sect2 id="glasgow-avoiding-monads">
-<Title>Avoiding monads
-</Title>
-
-<Para>
-<IndexTerm><Primary>C calls to `pure C'</Primary></IndexTerm>
-<IndexTerm><Primary>unsafePerformIO</Primary></IndexTerm>
-</Para>
-
-<Para>
-The <Function>&lowbar;ccall&lowbar;</Function> construct is part of the <Literal>IO</Literal> monad because 9 out of 10
-uses will be to call imperative functions with side effects such as
-<Function>printf</Function>.  Use of the monad ensures that these operations happen in a
-predictable order in spite of laziness and compiler optimisations.
-</Para>
-
-<Para>
-To avoid having to be in the monad to call a C function, it is
-possible to use <Function>unsafePerformIO</Function>, which is available from the
-<Literal>IOExts</Literal> module.  There are three situations where one might like to
-call a C function from outside the IO world:
-</Para>
-
-<Para>
-
-<ItemizedList>
-<ListItem>
-
-<Para>
-Calling a function with no side-effects:
-
-<ProgramListing>
-atan2d :: Double -> Double -> Double
-atan2d y x = unsafePerformIO (_ccall_ atan2d y x)
-
-sincosd :: Double -> (Double, Double)
-sincosd x = unsafePerformIO $ do
-        da &#60;- newDoubleArray (0, 1)
-        _casm_ &ldquo;sincosd( %0, &amp;((double *)%1[0]), &amp;((double *)%1[1]) );&rdquo; x da
-        s &#60;- readDoubleArray da 0
-        c &#60;- readDoubleArray da 1
-        return (s, c)
-</ProgramListing>
-
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- Calling a set of functions which have side-effects but which can
-be used in a purely functional manner.
-
-For example, an imperative implementation of a purely functional
-lookup-table might be accessed using the following functions.
-
-
-<ProgramListing>
-empty  :: EFS x
-update :: EFS x -> Int -> x -> EFS x
-lookup :: EFS a -> Int -> a
-
-empty = unsafePerformIO (_ccall_ emptyEFS)
-
-update a i x = unsafePerformIO $
-        makeStablePtr x         >>= \ stable_x ->
-        _ccall_ updateEFS a i stable_x
-
-lookup a i = unsafePerformIO $
-        _ccall_ lookupEFS a i   >>= \ stable_x ->
-        deRefStablePtr stable_x
-</ProgramListing>
-
-
-You will almost always want to use <Literal>ForeignObj</Literal>s with this.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- Calling a side-effecting function even though the results will
-be unpredictable.  For example the <Function>trace</Function> function is defined by:
-
-
-<ProgramListing>
-trace :: String -> a -> a
-trace string expr
-  = unsafePerformIO (
-        ((_ccall_ PreTraceHook sTDERR{-msg-}):: IO ())  >>
-        fputs sTDERR string                             >>
-        ((_ccall_ PostTraceHook sTDERR{-msg-}):: IO ()) >>
-        return expr )
-  where
-    sTDERR = (&ldquo;stderr&rdquo; :: Addr)
-</ProgramListing>
-
-
-(This kind of use is not highly recommended&mdash;it is only really
-useful in debugging code.)
-</Para>
-</ListItem>
-
-</ItemizedList>
-
-</Para>
-
-</Sect2>
-
-<Sect2 id="ccall-gotchas">
-<Title>C-calling &ldquo;gotchas&rdquo; checklist
-</Title>
-
-<Para>
-<IndexTerm><Primary>C call dangers</Primary></IndexTerm>
-<IndexTerm><Primary>CCallable</Primary></IndexTerm>
-<IndexTerm><Primary>CReturnable</Primary></IndexTerm>
-</Para>
-
-<Para>
-And some advice, too.
-</Para>
-
-<Para>
-
-<ItemizedList>
-<ListItem>
-
-<Para>
- For modules that use <Function>&lowbar;ccall&lowbar;</Function>s, etc., compile with
-<Option>-fvia-C</Option>.<IndexTerm><Primary>-fvia-C option</Primary></IndexTerm> You don't have to, but you should.
-
-Also, use the <Option>-&num;include "prototypes.h"</Option> flag (hack) to inform the C
-compiler of the fully-prototyped types of all the C functions you
-call.  (<XRef LinkEnd="glasgow-foreign-headers"> says more about this&hellip;)
-
-This scheme is the <Emphasis>only</Emphasis> way that you will get <Emphasis>any</Emphasis>
-typechecking of your <Function>&lowbar;ccall&lowbar;</Function>s.  (It shouldn't be that way, but&hellip;).
-GHC will pass the flag <Option>-Wimplicit</Option> to <Command>gcc</Command> so that you'll get warnings
-if any <Function>&lowbar;ccall&lowbar;</Function>ed functions have no prototypes.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
-Try to avoid <Function>&lowbar;ccall&lowbar;</Function>s to C&nbsp;functions that take <Literal>float</Literal>
-arguments or return <Literal>float</Literal> results.  Reason: if you do, you will
-become entangled in (ANSI?) C's rules for when arguments/results are
-promoted to <Literal>doubles</Literal>.  It's a nightmare and just not worth it.
-Use <Literal>doubles</Literal> if possible.
-
-If you do use <Literal>floats</Literal>, check and re-check that the right thing is
-happening.  Perhaps compile with <Option>-keep-hc-file-too</Option> and look at
-the intermediate C (<Function>.hc</Function>).
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- The compiler uses two non-standard type-classes when
-type-checking the arguments and results of <Function>&lowbar;ccall&lowbar;</Function>: the arguments
-(respectively result) of <Function>&lowbar;ccall&lowbar;</Function> must be instances of the class
-<Literal>CCallable</Literal> (respectively <Literal>CReturnable</Literal>).  Both classes may be
-imported from the module <Literal>CCall</Literal>, but this should only be
-necessary if you want to define a new instance.  (Neither class
-defines any methods&mdash;their only function is to keep the
-type-checker happy.)
-
-The type checker must be able to figure out just which of the
-C-callable/returnable types is being used.  If it can't, you have to
-add type signatures. For example,
-
-
-<ProgramListing>
-f x = _ccall_ foo x
-</ProgramListing>
-
-
-is not good enough, because the compiler can't work out what type <VarName>x</VarName>
-is, nor what type the <Function>&lowbar;ccall&lowbar;</Function> returns.  You have to write, say:
-
-
-<ProgramListing>
-f :: Int -> IO Double
-f x = _ccall_ foo x
-</ProgramListing>
-
-
-This table summarises the standard instances of these classes.
-
-<InformalTable>
-<TGroup Cols="4">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
-<TBody>
-<Row>
-<Entry><Emphasis>Type</Emphasis> </Entry>
-<Entry><Emphasis>CCallable</Emphasis></Entry>
-<Entry><Emphasis>CReturnable</Emphasis> </Entry>
-<Entry><Emphasis>Which is probably&hellip;</Emphasis> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Char</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>unsigned char</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Int</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>long int</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Word</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>unsigned long int</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Addr</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>void *</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Float</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>float</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Double</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>double</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>()</Literal> </Entry>
-<Entry> No </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>void</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>[Char]</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> No </Entry>
-<Entry> <Literal>char *</Literal> (null-terminated) </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>Array</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> No </Entry>
-<Entry> <Literal>unsigned long *</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>ByteArray</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> No </Entry>
-<Entry> <Literal>unsigned long *</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>MutableArray</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> No </Entry>
-<Entry> <Literal>unsigned long *</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>MutableByteArray</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> No </Entry>
-<Entry> <Literal>unsigned long *</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>State</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> nothing!</Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>StablePtr</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> <Literal>unsigned long *</Literal> </Entry>
-</Row>
-<Row>
-<Entry>
-<Literal>ForeignObjs</Literal> </Entry>
-<Entry> Yes </Entry>
-<Entry> Yes </Entry>
-<Entry> see later </Entry>
-</Row>
-
-</TBody>
-
-</TGroup>
-</InformalTable>
-
-Actually, the <Literal>Word</Literal> type is defined as being the same size as a
-pointer on the target architecture, which is <Emphasis>probably</Emphasis>
-<Literal>unsigned long int</Literal>.
-
-The brave and careful programmer can add their own instances of these
-classes for the following types:
-
-
-<ItemizedList>
-<ListItem>
-
-<Para>
-A <Emphasis>boxed-primitive</Emphasis> type may be made an instance of both
-<Literal>CCallable</Literal> and <Literal>CReturnable</Literal>.
-
-A boxed primitive type is any data type with a
-single unary constructor with a single primitive argument.  For
-example, the following are all boxed primitive types:
-
-
-<ProgramListing>
-Int
-Double
-data XDisplay = XDisplay Addr#
-data EFS a = EFS# ForeignObj#
-</ProgramListing>
-
-
-
-<ProgramListing>
-instance CCallable   (EFS a)
-instance CReturnable (EFS a)
-</ProgramListing>
-
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- Any datatype with a single nullary constructor may be made an
-instance of <Literal>CReturnable</Literal>.  For example:
-
-
-<ProgramListing>
-data MyVoid = MyVoid
-instance CReturnable MyVoid
-</ProgramListing>
-
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- As at version 2.09, <Literal>String</Literal> (i.e., <Literal>[Char]</Literal>) is still
-not a <Literal>CReturnable</Literal> type.
-
-Also, the now-builtin type <Literal>PackedString</Literal> is neither
-<Literal>CCallable</Literal> nor <Literal>CReturnable</Literal>.  (But there are functions in
-the PackedString interface to let you get at the necessary bits&hellip;)
-</Para>
-</ListItem>
-
-</ItemizedList>
-
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- The code-generator will complain if you attempt to use <Literal>&percnt;r</Literal> in
-a <Literal>&lowbar;casm&lowbar;</Literal> whose result type is <Literal>IO ()</Literal>; or if you don't use <Literal>&percnt;r</Literal>
-<Emphasis>precisely</Emphasis> once for any other result type.  These messages are
-supposed to be helpful and catch bugs&mdash;please tell us if they wreck
-your life.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- If you call out to C code which may trigger the Haskell garbage
-collector or create new threads (examples of this later&hellip;), then you
-must use the <Function>&lowbar;ccall&lowbar;GC&lowbar;</Function><IndexTerm><Primary>&lowbar;ccall&lowbar;GC&lowbar; primitive</Primary></IndexTerm> or
-<Function>&lowbar;casm&lowbar;GC&lowbar;</Function><IndexTerm><Primary>&lowbar;casm&lowbar;GC&lowbar; primitive</Primary></IndexTerm> variant of C-calls.  (This
-does not work with the native code generator&mdash;use <Option>-fvia-C</Option>.) This
-stuff is hairy with a capital H!
-</Para>
-</ListItem>
-
-</ItemizedList>
-
-</Para>
 
 </Sect2>
 
