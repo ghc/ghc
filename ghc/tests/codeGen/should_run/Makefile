@@ -1,3 +1,6 @@
+#-----------------------------------------------------------------------------
+# $Id: Makefile,v 1.6 1998/07/02 08:46:15 simonm Exp $
+
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_run.mk
