@@ -22,9 +22,9 @@ import Name		( Name, NamedThing(..),
 			  getSrcLoc, 
 			  mkLocalName, mkImportedLocalName, mkGlobalName,
 			  mkIPName, nameOccName, nameModule_maybe,
-			  extendNameEnv_C, plusNameEnv_C, nameEnvElts,
 			  setNameModuleAndLoc
 			)
+import Name		( extendNameEnv_C, plusNameEnv_C, nameEnvElts )
 import NameSet
 import OccName		( OccName, occNameUserString, occNameFlavour )
 import Module		( ModuleName, moduleName, mkVanillaModule, mkSysModuleNameFS, moduleNameFS )

@@ -43,9 +43,8 @@ import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
 import Id		( Id, idType, idName )
 import Module		( Module )
-import Name		( Name, NamedThing(..), isFrom,
-			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
-			  plusNameEnv, nameEnvElts )
+import Name		( Name, NamedThing(..), isFrom )
+import Name		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, plusNameEnv, nameEnvElts )
 import NameSet		( emptyNameSet )
 import Outputable
 import Type		( Type, ClassContext, mkTyVarTys, mkDictTys, mkClassPred,

@@ -54,10 +54,9 @@ import RdrName		( RdrName, dummyRdrVarName, rdrNameModule, rdrNameOcc,
 			)
 import Name		( Name, OccName, NamedThing(..), getSrcLoc,
 			  nameOccName,
-			  decode, mkLocalName, mkKnownKeyGlobal,
-			  NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, 
-			  extendNameEnvList
+			  decode, mkLocalName, mkKnownKeyGlobal
 			)
+import Name		( NameEnv, lookupNameEnv, emptyNameEnv, unitNameEnv, extendNameEnvList )
 import Module		( Module, ModuleName, ModuleSet, emptyModuleSet )
 import NameSet		
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )

@@ -42,8 +42,8 @@ import ParseIface	( parseIface, IfaceStuff(..) )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, nameIsLocalOrFrom,
 			  NamedThing(..),
-			  mkNameEnv, extendNameEnv
 			 )
+import Name		( mkNameEnv, extendNameEnv )
 import Module		( Module, 
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),

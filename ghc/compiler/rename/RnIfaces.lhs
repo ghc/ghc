@@ -38,8 +38,8 @@ import TyCon		( isSynTyCon, getSynTyConDefn )
 import Name		( Name {-instance NamedThing-}, nameOccName,
 			  nameModule, isLocalName, nameUnique,
 			  NamedThing(..),
-			  elemNameEnv
 			 )
+import Name 		( elemNameEnv )
 import Module		( Module, ModuleEnv, 
 			  moduleName, isModuleInThisPackage,
 			  ModuleName, WhereFrom(..),

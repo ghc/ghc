@@ -39,9 +39,8 @@ import DataCon		( isNullaryDataCon )
 import Var		( varName )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name, NamedThing(..), NameEnv, getSrcLoc, 
-			  mkNameEnv, lookupNameEnv_NF, isTyVarName
-			)
+import Name		( Name, NamedThing(..), getSrcLoc, isTyVarName )
+import Name		( NameEnv, mkNameEnv, lookupNameEnv_NF )
 import NameSet
 import Outputable
 import Maybes		( mapMaybe )

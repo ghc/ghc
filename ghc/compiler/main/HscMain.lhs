@@ -57,7 +57,8 @@ import InterpSyn	( UnlinkedIBind )
 import StgInterp	( ItblEnv )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
-import Name		( Name, nameModule, emptyNameEnv, nameOccName, getName  )
+import Name		( Name, nameModule, nameOccName, getName  )
+import Name		( emptyNameEnv )
 import Module		( Module, lookupModuleEnvByName )
 
 \end{code}
@@ -258,22 +259,22 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
  = do (ibinds,itbl_env) 
          <- stgToInterpSyn (map fst stg_binds) local_tycons local_classes
       return (Nothing, Nothing, Just (ibinds,itbl_env))
+
  | otherwise
  = do --------------------------  Code generation -------------------------------
       show_pass dflags "CodeGen"
       -- _scc_     "CodeGen"
       abstractC <- codeGen dflags this_mod imported_modules
                            cost_centre_info fe_binders
-                           local_tycons local_classes stg_binds
+                           local_tycons stg_binds
 
       --------------------------  Code output -------------------------------
       show_pass dflags "CodeOutput"
       -- _scc_     "CodeOutput"
-      ncg_uniqs <- mkSplitUniqSupply 'n'
       (maybe_stub_h_name, maybe_stub_c_name)
-         <- codeOutput dflags this_mod local_tycons local_classes
+         <- codeOutput dflags this_mod local_tycons
                        oa_tidy_binds stg_binds
-                       c_code h_code abstractC ncg_uniqs
+                       c_code h_code abstractC
 
       return (maybe_stub_h_name, maybe_stub_c_name, Nothing)
  where

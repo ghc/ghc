@@ -38,7 +38,6 @@ import Id               ( Id, idName )
 import Module           ( Module )
 import PrimRep		( PrimRep(..) )
 import TyCon            ( TyCon, isDataTyCon )
-import Class		( Class, classTyCon )
 import BasicTypes	( TopLevelFlag(..) )
 import UniqSupply	( mkSplitUniqSupply )
 import ErrUtils		( dumpIfSet_dyn )
@@ -55,12 +54,12 @@ codeGen :: DynFlags
 	    [CostCentre],	-- "extern" cost-centres needing declaring
 	    [CostCentreStack])  -- Pre-defined "singleton" cost centre stacks
 	-> [Id]			-- foreign-exported binders
-	-> [TyCon] -> [Class]	-- Local tycons and classes
+	-> [TyCon] 		-- Local tycons, including ones from classes
 	-> [(StgBinding,[Id])]	-- Bindings to convert, with SRTs
 	-> IO AbstractC		-- Output
 
 codeGen dflags mod_name imported_modules cost_centre_info fe_binders
-	tycons classes stg_binds
+	tycons stg_binds
   = mkSplitUniqSupply 'f'	>>= \ fl_uniqs  -> -- absC flattener
     let
 	datatype_stuff 	  = genStaticConBits cinfo data_tycons
@@ -82,9 +81,7 @@ codeGen dflags mod_name imported_modules cost_centre_info fe_binders
     return flat_abstractC
 
   where
-    data_tycons = filter isDataTyCon (tycons ++ map classTyCon classes)
-			-- Generate info tables  for the data constrs arising
-			-- from class decls as well
+    data_tycons = filter isDataTyCon tycons
 
     maybe_split = if opt_EnsureSplittableC 
 		  then CSplitMarker 

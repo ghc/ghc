@@ -29,7 +29,7 @@ module Name (
 	-- Environment
 	NameEnv, mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, 
-	extendNameEnv_C, extendNameEnv, 
+	extendNameEnv_C, extendNameEnv, foldNameEnv,
 	plusNameEnv, plusNameEnv_C, extendNameEnv, extendNameEnvList,
 	lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, elemNameEnv, 
 
@@ -49,8 +49,8 @@ import RdrName		( RdrName, mkRdrQual, mkRdrUnqual, rdrNameOcc, rdrNameModule )
 import CmdLineOpts	( opt_Static, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, pprUnique, pprUnique10 )
-import Maybes		( expectJust )
 import FastTypes
+import Maybes		( expectJust )
 import UniqFM
 import Outputable
 \end{code}
@@ -430,8 +430,10 @@ unitNameEnv    	 :: Name -> a -> NameEnv a
 lookupNameEnv  	 :: NameEnv a -> Name -> Maybe a
 lookupNameEnv_NF :: NameEnv a -> Name -> a
 mapNameEnv	 :: (a->b) -> NameEnv a -> NameEnv b
+foldNameEnv	 :: (a -> b -> b) -> b -> NameEnv a -> b
 
 emptyNameEnv   	 = emptyUFM
+foldNameEnv	 = foldUFM
 mkNameEnv	 = listToUFM
 nameEnvElts    	 = eltsUFM
 extendNameEnv_C  = addToUFM_C

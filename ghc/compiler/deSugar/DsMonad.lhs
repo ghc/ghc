@@ -38,7 +38,8 @@ import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )
 import Util		( zipWithEqual )
-import Name		( Name, lookupNameEnv )
+import Name		( Name )
+import Name		( lookupNameEnv )
 import HscTypes		( HomeSymbolTable, PersistentCompilerState(..), 
 			  TyThing(..), TypeEnv, lookupType )
 import CmdLineOpts	( DynFlags )

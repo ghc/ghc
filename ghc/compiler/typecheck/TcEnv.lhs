@@ -60,10 +60,9 @@ import Class		( Class, ClassOpItem, ClassContext )
 import Subst		( substTy )
 import Name		( Name, OccName, NamedThing(..), 
 			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
-			  isLocalName, nameModule_maybe,
-			  NameEnv, lookupNameEnv, nameEnvElts, 
-			  extendNameEnvList, emptyNameEnv
+			  isLocalName, nameModule_maybe
 			)
+import Name		( NameEnv, lookupNameEnv, nameEnvElts, extendNameEnvList, emptyNameEnv )
 import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
 import HscTypes		( DFunId, TypeEnv, HomeSymbolTable, PackageTypeEnv )
 import Module		( Module )

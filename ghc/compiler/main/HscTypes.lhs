@@ -45,11 +45,9 @@ module HscTypes (
 #include "HsVersions.h"
 
 import RdrName		( RdrNameEnv, emptyRdrEnv )
-import Name		( Name, NameEnv, NamedThing,
-			  emptyNameEnv, extendNameEnv, 
-			  lookupNameEnv, emptyNameEnv, nameEnvElts,
-			  isLocallyDefined, getName, nameModule,
-			  nameSrcLoc )
+import Name		( Name, NamedThing, isLocallyDefined, 
+			  getName, nameModule, nameSrcLoc )
+import Name -- Env
 import NameSet		( NameSet )
 import OccName		( OccName )
 import Module		( Module, ModuleName, ModuleEnv,

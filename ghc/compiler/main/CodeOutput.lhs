@@ -47,16 +47,15 @@ import IO		( IOMode(..), hClose, openFile, Handle )
 \begin{code}
 codeOutput :: DynFlags
 	   -> Module
-	   -> [TyCon] -> [Class]	-- Local tycons and classes
+	   -> [TyCon]			-- Local tycons
 	   -> [CoreBind]		-- Core bindings
 	   -> [(StgBinding,[Id])]	-- The STG program with SRTs
 	   -> SDoc 		-- C stubs for foreign exported functions
 	   -> SDoc		-- Header file prototype for foreign exported functions
 	   -> AbstractC		-- Compiled abstract C
-	   -> UniqSupply
 	   -> IO (Maybe FilePath, Maybe FilePath)
-codeOutput dflags mod_name tycons classes core_binds stg_binds 
-	   c_code h_code flat_abstractC ncg_uniqs
+codeOutput dflags mod_name tycons core_binds stg_binds 
+	   c_code h_code flat_abstractC
   = -- You can have C (c_output) or assembly-language (ncg_output),
     -- but not both.  [Allowing for both gives a space leak on
     -- flat_abstractC.  WDP 94/10]
@@ -67,7 +66,7 @@ codeOutput dflags mod_name tycons classes core_binds stg_binds
        stub_names <- outputForeignStubs dflags c_code h_code
        case dopt_HscLang dflags of
           HscInterpreted -> return stub_names
-          HscAsm         -> outputAsm dflags filenm flat_abstractC ncg_uniqs
+          HscAsm         -> outputAsm dflags filenm flat_abstractC
                             >> return stub_names
           HscC           -> outputC dflags filenm flat_abstractC	
                             >> return stub_names
@@ -104,15 +103,18 @@ outputC dflags filenm flat_absC
 %************************************************************************
 
 \begin{code}
-outputAsm dflags filenm flat_absC ncg_uniqs
+outputAsm dflags filenm flat_absC
 
 #ifndef OMIT_NATIVE_CODEGEN
 
-  = do dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
+  = do ncg_uniqs <- mkSplitUniqSupply 'n'
+       let
+	    (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
+       in
+       dumpIfSet_dyn dflags Opt_D_dump_stix "Final stix code" stix_final
        dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" ncg_output_d
        doOutput filenm ( \f -> printForAsm f ncg_output_d)
   where
-    (stix_final, ncg_output_d) = nativeCodeGen flat_absC ncg_uniqs
 
 #else /* OMIT_NATIVE_CODEGEN */
 

@@ -36,7 +36,7 @@ import Class		( Class )
 
 -- others:
 import Maybes		( maybeToBool )
-import Name		( getOccString )
+import Name		( getOccString, getOccName )
 import Outputable
 import PprEnv
 import Unique		( Uniquable(..) )
@@ -121,11 +121,10 @@ ppr_ty env ctxt_prec ty@(TyConApp tycon tys)
 	-- 	type constructor (must be Boxed, Unboxed, AnyBox)
 	-- Otherwise print as (Type x)
     case ty1 of
-	TyConApp bx [] -> ppr bx
+	TyConApp bx [] -> ppr (getOccName bx)	-- Always unqualified
 	other	       -> maybeParen ctxt_prec tYCON_PREC 
 				     (sep [ppr tycon, nest 4 tys_w_spaces])
 		       
-	
 	-- TUPLE CASE (boxed and unboxed)
   |  isTupleTyCon tycon
   && length tys == tyConArity tycon	-- no magic if partially applied

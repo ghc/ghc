@@ -42,10 +42,9 @@ import CoreSyn		( CoreExpr, CoreBind, Bind(..), CoreRule(..), IdCoreRule,
 import CoreFVs		( exprSomeFreeVars, ruleSomeLhsFreeVars, ruleSomeFreeVars )
 import CoreUnfold	( okToUnfoldInHiFile, mkTopUnfolding, neverUnfold, unfoldingTemplate, noUnfolding )
 import Name		( isLocallyDefined, getName, 
-			  Name, NamedThing(..),
-			  plusNameEnv, lookupNameEnv, emptyNameEnv, mkNameEnv,
-			  extendNameEnv, lookupNameEnv_NF, nameEnvElts
+			  Name, NamedThing(..)
 			)
+import Name 	-- Env
 import OccName		( pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize
@@ -84,6 +83,14 @@ mkModDetails type_env dfun_ids tidy_binds stg_ids orphan_rules
 	-- 	a) keeping the types and classes
 	--	b) removing all Ids, and Ids with correct IdInfo
 	--		gotten from the bindings
+	-- From (b) we keep only those Ids with Global names, plus Ids
+	--	    accessible from them (notably via unfoldings)
+	-- This truncates the type environment to include only the 
+	-- exported Ids and things needed from them, which saves space
+	--
+	-- However, we do keep things like constructors, which should not appear 
+	-- in interface files, because they are needed by importing modules when
+	-- using the compilation manager
     new_type_env = mkNameEnv [(getName tycl, tycl) | tycl <- orig_type_env, isTyClThing tycl]
 			`plusNameEnv`
 		   mkNameEnv [(idName id, AnId id) | id <- final_ids]
@@ -136,7 +143,7 @@ completeIface maybe_old_iface new_iface mod_details
 			      dcl_rules = rule_dcls }
 
      inst_dcls   = map ifaceInstance (md_insts mod_details)
-     ty_cls_dcls = map ifaceTyCls (nameEnvElts (md_types mod_details))
+     ty_cls_dcls = foldNameEnv ifaceTyCls [] (md_types mod_details)
      rule_dcls   = map ifaceRule (md_rules mod_details)
 \end{code}
 
@@ -148,19 +155,21 @@ completeIface maybe_old_iface new_iface mod_details
 %************************************************************************
 
 \begin{code}
-ifaceTyCls :: TyThing -> RenamedTyClDecl
-ifaceTyCls (AClass clas)
-  = ClassDecl (toHsContext sc_theta)
-	      (getName clas)
-	      (toHsTyVars clas_tyvars)
-	      (toHsFDs clas_fds)
-	      (map toClassOpSig op_stuff)
-	      EmptyMonoBinds
-	      [] noSrcLoc
+ifaceTyCls :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
+ifaceTyCls (AClass clas) so_far
+  = cls_decl : so_far
   where
-     (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
+    cls_decl = ClassDecl (toHsContext sc_theta)
+			 (getName clas)		 
+			 (toHsTyVars clas_tyvars)
+			 (toHsFDs clas_fds)
+			 (map toClassOpSig op_stuff)
+			 EmptyMonoBinds
+			 [] noSrcLoc
 
-     toClassOpSig (sel_id, def_meth)
+    (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
+
+    toClassOpSig (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
 	  ClassOpSig (getName sel_id) (Just def_meth') (toHsType op_ty) noSrcLoc
 	where
@@ -170,22 +179,26 @@ ifaceTyCls (AClass clas)
 			 GenDefMeth -> GenDefMeth
 			 DefMeth id -> DefMeth (getName id)
 
-ifaceTyCls (ATyCon tycon)
-  | isSynTyCon tycon
-  = TySynonym (getName tycon)(toHsTyVars tyvars) (toHsType ty) noSrcLoc
+ifaceTyCls (ATyCon tycon) so_far
+  = ty_decl : so_far
+  
   where
-    (tyvars, ty) = getSynTyConDefn tycon
+    ty_decl | isSynTyCon tycon
+	    = TySynonym (getName tycon)(toHsTyVars tyvars) 
+			(toHsType syn_ty) noSrcLoc
 
-ifaceTyCls (ATyCon tycon)
-  | isAlgTyCon tycon
-  = TyData new_or_data (toHsContext (tyConTheta tycon))
-	   (getName tycon)
-	   (toHsTyVars tyvars)
-	   (map ifaceConDecl (tyConDataCons tycon))
-	   (tyConFamilySize tycon)
-	   Nothing noSrcLoc (panic "gen1") (panic "gen2")
-  where
-    tyvars = tyConTyVars tycon
+	    | isAlgTyCon tycon
+	    = TyData new_or_data (toHsContext (tyConTheta tycon))
+		     (getName tycon)      
+		     (toHsTyVars tyvars)
+		     (map ifaceConDecl (tyConDataCons tycon))
+		     (tyConFamilySize tycon)
+		     Nothing noSrcLoc (panic "gen1") (panic "gen2")
+
+	    | otherwise = pprPanic "ifaceTyCls" (ppr tycon)
+
+    tyvars      = tyConTyVars tycon
+    (_, syn_ty) = getSynTyConDefn tycon
     new_or_data | isNewTyCon tycon = NewType
 	        | otherwise	   = DataType
 
@@ -212,11 +225,12 @@ ifaceTyCls (ATyCon tycon)
     mk_field strict_mark field_label
 	= ([getName field_label], mk_bang_ty strict_mark (fieldLabelType field_label))
 
-ifaceTyCls (ATyCon tycon) = pprPanic "ifaceTyCls" (ppr tycon)
-
-ifaceTyCls (AnId id) 
-  = IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc
+ifaceTyCls (AnId id) so_far
+  | omitIfaceSigForId id = so_far
+  | otherwise 		 = iface_sig : so_far
   where
+    iface_sig = IfaceSig (getName id) (toHsType id_type) hs_idinfo noSrcLoc
+
     id_type = idType id
     id_info = idInfo id
 
@@ -326,17 +340,11 @@ bindsToIds needed_ids codegen_ids binds
 	| otherwise 		     = emitted
 
     go needed (NonRec id rhs : binds) emitted
-	| need_id needed id
-	= if omitIfaceSigForId id then
-	    go (needed `delVarSet` id) binds (id:emitted)
-	  else
-	    go ((needed `unionVarSet` extras) `delVarSet` id)
-	       binds
-	       (new_id:emitted)
-	| otherwise
-	= go needed binds emitted
+	| need_id needed id = go new_needed binds (new_id:emitted)
+	| otherwise	    = go needed     binds emitted
 	where
 	  (new_id, extras) = mkFinalId codegen_ids False id rhs
+	  new_needed       = (needed `unionVarSet` extras) `delVarSet` id
 
 	-- Recursive groups are a bit more of a pain.  We may only need one to
 	-- start with, but it may call out the next one, and so on.  So we
@@ -369,12 +377,15 @@ bindsToIds needed_ids codegen_ids binds
 
 \begin{code}
 mkFinalId :: IdSet		-- The Ids with arity info from the code generator
-	  -> Bool			-- True <=> recursive, so don't include unfolding
+	  -> Bool		-- True <=> recursive, so don't include unfolding
 	  -> Id
 	  -> CoreExpr		-- The Id's right hand side
-	  -> (Id, IdSet)		-- The emitted id, plus any *extra* needed Ids
+	  -> (Id, IdSet)	-- The emitted id, plus any *extra* needed Ids
 
 mkFinalId codegen_ids is_rec id rhs
+  | omitIfaceSigForId id 
+  = (id, emptyVarSet)		-- An optimisation for top-level constructors and suchlike
+  | otherwise
   = (id `setIdInfo` new_idinfo, new_needed_ids)
   where
     core_idinfo = idInfo id

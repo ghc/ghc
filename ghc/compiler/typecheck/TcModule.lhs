@@ -43,9 +43,8 @@ import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idUnfolding )
 import Module           ( Module )
-import Name		( Name, isLocallyDefined, 
-			  toRdrName, nameEnvElts, lookupNameEnv, 
-			)
+import Name		( Name, isLocallyDefined, toRdrName )
+import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
 import Maybes		( thenMaybe )
 import Util

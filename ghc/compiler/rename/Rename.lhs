@@ -39,8 +39,8 @@ import Module           ( Module, ModuleName, WhereFrom(..),
 import Name		( Name, NamedThing(..), getSrcLoc,
 			  nameIsLocalOrFrom,
 			  nameOccName, nameModule,
-			  mkNameEnv, nameEnvElts, extendNameEnv
 			)
+import Name		( mkNameEnv, nameEnvElts, extendNameEnv )
 import RdrName		( elemRdrEnv )
 import OccName		( occNameFlavour )
 import NameSet
