@@ -13,7 +13,7 @@ Package {
 # endif
 #else /* !INSTALLING */
         library_dirs	= [ "$libdir/ghc/rts"
-# ifdef HAVE_LIBGMP
+# ifndef HAVE_LIBGMP
 			  , "$libdir/ghc/rts/gmp"
 # endif
 			  ],
