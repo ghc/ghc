@@ -3094,10 +3094,12 @@ if test "$ac_cv_prog_gcc" = yes; then
   # Check if gcc -print-prog-name=ld gives a path.
   echo $ECHO_N "checking for ld used by GCC... $ECHO_C" 1>&6
 echo "configure:3090: checking for ld used by GCC" 1>&5
-  case $lt_target in
+  case $target in
   *-*-mingw*)
     # gcc leaves a trailing carriage return which upsets mingw
-    ac_prog=`($CC -print-prog-name=ld) 2>&5 | tr -d '\015'` ;;
+    ac_prog=`($CC -print-prog-name=ld) 2>&5 | tr -d '\015'`
+    # convert /mingw/mingw32/... into c:/mingw/mingw32/...
+    ac_prog="C:""$ac_prog" ;;
   *)
     ac_prog=`($CC -print-prog-name=ld) 2>&5` ;;
   esac
@@ -5148,7 +5150,7 @@ for ac_file in : $CONFIG_LINKS; do if test "x$ac_file" != x:; then
   ac_dest=`echo "$ac_file" | sed 's%:.*%%'`
   ac_source=`echo "$ac_file" | sed 's%[^:]*:%%'`
 
-  echo "linking $srcdir/$ac_source to $ac_dest"
+  echo "copying $srcdir/$ac_source to $ac_dest"
 
   if test ! -r $srcdir/$ac_source; then
     { echo "configure: error: $srcdir/$ac_source: File not found" 1>&2; exit 1; }
@@ -5174,10 +5176,11 @@ for ac_file in : $CONFIG_LINKS; do if test "x$ac_file" != x:; then
   esac
 
   # Make a symlink if possible; otherwise try a hard link.
-  if ln -s $ac_rel_source $ac_dest 2>/dev/null ||
-     ln $srcdir/$ac_source $ac_dest; then :
+  #if ln -s $ac_rel_source $ac_dest 2>/dev/null ||
+  #   ln $srcdir/$ac_source $ac_dest; then :
+  if cp $srcdir/$ac_source $ac_dest; then :
   else
-    { echo "configure: error: cannot link $ac_dest to $srcdir/$ac_source" 1>&2; exit 1; }
+    { echo "configure: error: cannot copy $ac_dest to $srcdir/$ac_source" 1>&2; exit 1; }
   fi
 fi; done
 EOF
