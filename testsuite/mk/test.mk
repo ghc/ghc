@@ -37,6 +37,11 @@ RUNTEST_OPTS = \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	$(EXTRA_RUNTEST_OPTS)
 
+ifeq "$(GhcWithNativeCodeGen)" "YES"
+RUNTEST_OPTS += -e config.compile_ways.append"(\"optasm\")"
+RUNTEST_OPTS += -e config.run_ways.append"(\"optasm\")"
+endif
+
 ifeq "$(filter p, $(GhcLibWays))" "p"
 RUNTEST_OPTS += -e config.compile_ways.append"(\"prof\")"
 RUNTEST_OPTS += -e config.run_ways.append"(\"prof\")"
