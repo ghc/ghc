@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hsc,v 1.5 2001/07/31 13:03:28 simonmar Exp $
+-- $Id: Handle.hsc,v 1.6 2001/09/14 11:25:24 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -426,9 +426,6 @@ flushWriteBuffer fd buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
 
 foreign import "write_wrap" unsafe
    write_off :: CInt -> RawBuffer -> Int -> CInt -> IO CInt
-#def inline \
-int write_wrap(int fd, void *ptr, HsInt off, int size) \
-{ return write(fd, ptr + off, size); }
 
 
 fillReadBuffer :: FD -> Bool -> Buffer -> IO Buffer
@@ -469,9 +466,6 @@ fillReadBufferLoop fd is_line buf b w size = do
  
 foreign import "read_wrap" unsafe
    read_off :: FD -> RawBuffer -> Int -> CInt -> IO CInt
-#def inline \
-int read_wrap(int fd, void *ptr, HsInt off, int size) \
-{ return read(fd, ptr + off, size); }
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles

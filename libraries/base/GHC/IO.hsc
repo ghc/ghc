@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hsc,v 1.2 2001/07/31 12:46:17 simonmar Exp $
+-- $Id: IO.hsc,v 1.3 2001/09/14 11:25:24 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -17,7 +17,6 @@
 module GHC.IO where
 
 #include "HsCore.h"
-#include "GHC/Handle_hsc.h"
 
 import Foreign
 import Foreign.C
@@ -25,7 +24,6 @@ import Foreign.C
 import Data.Maybe
 import Control.Monad
 
-import GHC.ByteArr
 import GHC.Enum
 import GHC.Base
 import GHC.Posix
@@ -420,13 +418,19 @@ writeLines hdl Buffer{ bufBuf=raw, bufSize=len } s =
 	-- check n == len first, to ensure that shoveString is strict in n.
    shoveString n cs | n == len = do
 	new_buf <- commitBuffer hdl raw len n True{-needs flush-} False
-	writeBlocks hdl new_buf cs
+	writeLines hdl new_buf cs
    shoveString n [] = do
 	commitBuffer hdl raw len n False{-no flush-} True{-release-}
 	return ()
    shoveString n (c:cs) = do
 	n' <- writeCharIntoBuffer raw n c
-	shoveString n' cs
+	-- we're line-buffered, so flush the buffer if we just got a newline
+	if (c == '\n')
+	  then do
+	    new_buf <- commitBuffer hdl raw len n' True{-needs flush-} False
+	    writeLines hdl new_buf cs
+	  else do
+	    shoveString n' cs
   in
   shoveString 0 s
 
@@ -672,92 +676,6 @@ slurpFile fname = do
     return (chunk, r)
 
 -- ---------------------------------------------------------------------------
--- hGetBufBA
-
-hGetBufBA :: Handle -> MutableByteArray RealWorld a -> Int -> IO Int
-hGetBufBA handle (MutableByteArray _ _ ptr) count
-  | count <= 0 = illegalBufferSize handle "hGetBuf" count
-  | otherwise = 
-      wantReadableHandle "hGetBuf" handle $ 
-	\ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
-	buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r } <- readIORef ref
-	if bufferEmpty buf
-	   then readChunkBA fd ptr 0 count
-	   else do 
-		let avail = w - r
-		copied <- if (count >= avail)
-		       	    then do 
-				memcpy_ba_baoff ptr raw r (fromIntegral avail)
-				writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
-				return avail
-		     	    else do 
-				memcpy_ba_baoff ptr raw r (fromIntegral count)
-				writeIORef ref buf{ bufRPtr = r + count }
-				return count
-
-		let remaining = count - copied
-		if remaining > 0 
-		   then do rest <- readChunkBA fd ptr copied remaining
-			   return (rest + count)
-		   else return count
-		
-readChunkBA :: FD -> RawBuffer -> Int -> Int -> IO Int
-readChunkBA fd ptr init_off bytes = loop init_off bytes 
- where
-  loop :: Int -> Int -> IO Int
-  loop off bytes | bytes <= 0 = return (off - init_off)
-  loop off bytes = do
-    r <- fromIntegral `liftM`
-	   throwErrnoIfMinus1RetryMayBlock "readChunk"
-	    (readBA (fromIntegral fd) ptr 
-		(fromIntegral off) (fromIntegral bytes))
-	    (threadWaitRead fd)
-    if r == 0
-	then return (off - init_off)
-	else loop (off + r) (bytes - r)
-
-foreign import "read_ba_wrap" unsafe
-   readBA :: FD -> RawBuffer -> Int -> CInt -> IO CInt
-#def inline \
-int read_ba_wrap(int fd, void *ptr, HsInt off, int size) \
-{ return read(fd, ptr + off, size); }
-
--- -----------------------------------------------------------------------------
--- hPutBufBA
-
-hPutBufBA
-	:: Handle			-- handle to write to
-	-> MutableByteArray RealWorld a -- buffer
-	-> Int				-- number of bytes of data in buffer
-	-> IO ()
-
-hPutBufBA handle (MutableByteArray _ _ raw) count
-  | count <= 0 = illegalBufferSize handle "hPutBufBA" count
-  | otherwise = do
-    wantWritableHandle "hPutBufBA" handle $ 
-      \ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
-
-        old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
-	  <- readIORef ref
-
-        -- enough room in handle buffer?
-        if (size - w > count)
-		-- There's enough room in the buffer:
-		-- just copy the data in and update bufWPtr.
-	    then do memcpy_baoff_ba old_raw w raw (fromIntegral count)
-		    writeIORef ref old_buf{ bufWPtr = w + count }
-		    return ()
-
-		-- else, we have to flush
-	    else do flushed_buf <- flushWriteBuffer fd old_buf
-		    writeIORef ref flushed_buf
-		    let this_buf = 
-			    Buffer{ bufBuf=raw, bufState=WriteBuffer, 
-				    bufRPtr=0, bufWPtr=count, bufSize=count }
-		    flushWriteBuffer fd this_buf
-		    return ()
-
--- ---------------------------------------------------------------------------
 -- memcpy wrappers
 
 foreign import "memcpy_wrap_src_off" unsafe 
@@ -768,14 +686,6 @@ foreign import "memcpy_wrap_dst_off" unsafe
    memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
 foreign import "memcpy_wrap_dst_off" unsafe 
    memcpy_baoff_ptr :: RawBuffer -> Int -> Ptr a -> CSize -> IO (Ptr ())
-
-#def inline \
-void *memcpy_wrap_dst_off(char *dst, int dst_off, char *src, size_t sz) \
-{ return memcpy(dst+dst_off, src, sz); }
-
-#def inline \
-void *memcpy_wrap_src_off(char *dst, char *src, int src_off, size_t sz) \
-{ return memcpy(dst, src+src_off, sz); }
 
 -----------------------------------------------------------------------------
 -- Internal Utils

@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: IO.hs,v 1.2 2001/09/14 11:25:23 simonmar Exp $
 --
 -- Mutable boxed/unboxed arrays in the IO monad.
 --
@@ -19,6 +19,8 @@ module Data.Array.IO (
    IOArray,		-- instance of: Eq, Typeable
    IOUArray,		-- instance of: Eq, Typeable
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
+   hGetArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO Int
+   hPutArray,		-- :: Handle -> IOUArray Int Word8 -> Int -> IO ()
  ) where
 
 import Prelude
@@ -29,6 +31,7 @@ import Data.Int
 import Data.Word
 import Data.Dynamic
 
+import Foreign.C
 import Foreign.Ptr		( Ptr, FunPtr )
 import Foreign.StablePtr	( StablePtr )
 
@@ -40,7 +43,10 @@ import GHC.Arr    	( STArray, freezeSTArray, unsafeFreezeSTArray,
                           thawSTArray, unsafeThawSTArray )
 
 import GHC.ST		( ST(..) )
-import GHC.IOBase	( stToIO )
+
+import GHC.IOBase
+import GHC.Handle
+import GHC.Conc
 
 import GHC.Base
 
@@ -361,5 +367,105 @@ castIOUArray :: IOUArray ix a -> IO (IOUArray ix b)
 castIOUArray (IOUArray marr) = stToIO $ do
     marr' <- castSTUArray marr
     return (IOUArray marr')
+
+-- ---------------------------------------------------------------------------
+-- hGetArray
+
+hGetArray :: Handle -> IOUArray Int Word8 -> Int -> IO Int
+hGetArray handle (IOUArray (STUArray l u ptr)) count
+  | count <= 0 || count > rangeSize (l,u)
+  = illegalBufferSize handle "hGetArray" count
+  | otherwise = do
+      wantReadableHandle "hGetArray" handle $ 
+	\ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
+	buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r } <- readIORef ref
+	if bufferEmpty buf
+	   then readChunkBA fd ptr 0 count
+	   else do 
+		let avail = w - r
+		copied <- if (count >= avail)
+		       	    then do 
+				memcpy_ba_baoff ptr raw r (fromIntegral avail)
+				writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
+				return avail
+		     	    else do 
+				memcpy_ba_baoff ptr raw r (fromIntegral count)
+				writeIORef ref buf{ bufRPtr = r + count }
+				return count
+
+		let remaining = count - copied
+		if remaining > 0 
+		   then do rest <- readChunkBA fd ptr copied remaining
+			   return (rest + count)
+		   else return count
+		
+readChunkBA :: FD -> RawBuffer -> Int -> Int -> IO Int
+readChunkBA fd ptr init_off bytes = loop init_off bytes 
+ where
+  loop :: Int -> Int -> IO Int
+  loop off bytes | bytes <= 0 = return (off - init_off)
+  loop off bytes = do
+    r' <- throwErrnoIfMinus1RetryMayBlock "readChunk"
+	    (readBA (fromIntegral fd) ptr 
+		(fromIntegral off) (fromIntegral bytes))
+	    (threadWaitRead fd)
+    let r = fromIntegral r'
+    if r == 0
+	then return (off - init_off)
+	else loop (off + r) (bytes - r)
+
+foreign import "read_ba_wrap" unsafe
+   readBA :: FD -> RawBuffer -> Int -> CInt -> IO CInt
+
+ -----------------------------------------------------------------------------
+-- hPutArray
+
+hPutArray
+	:: Handle			-- handle to write to
+	-> IOUArray Int Word8		-- buffer
+	-> Int				-- number of bytes of data to write
+	-> IO ()
+
+hPutArray handle (IOUArray (STUArray l u raw)) count
+  | count <= 0 || count > rangeSize (l,u)
+  = illegalBufferSize handle "hPutArray" count
+  | otherwise
+   = do wantWritableHandle "hPutArray" handle $ 
+          \ handle_@Handle__{ haFD=fd, haBuffer=ref } -> do
+
+          old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
+	    <- readIORef ref
+
+          -- enough room in handle buffer?
+          if (size - w > count)
+		-- There's enough room in the buffer:
+		-- just copy the data in and update bufWPtr.
+	    then do memcpy_baoff_ba old_raw w raw (fromIntegral count)
+		    writeIORef ref old_buf{ bufWPtr = w + count }
+		    return ()
+
+		-- else, we have to flush
+	    else do flushed_buf <- flushWriteBuffer fd old_buf
+		    writeIORef ref flushed_buf
+		    let this_buf = 
+			    Buffer{ bufBuf=raw, bufState=WriteBuffer, 
+				    bufRPtr=0, bufWPtr=count, bufSize=count }
+		    flushWriteBuffer fd this_buf
+		    return ()
+
+-----------------------------------------------------------------------------
+-- Internal Utils
+
+foreign import "memcpy_wrap_dst_off" unsafe 
+   memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
+foreign import "memcpy_wrap_src_off" unsafe 
+   memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
+
+illegalBufferSize :: Handle -> String -> Int -> IO a
+illegalBufferSize handle fn (sz :: Int) = 
+	ioException (IOError (Just handle)
+			    InvalidArgument  fn
+			    ("illegal buffer size " ++ showsPrec 9 sz [])
+			    Nothing)
 
 #endif /* __GLASGOW_HASKELL__ */
