@@ -765,6 +765,7 @@ runPhase cc_phase todo dflags basename suff input_fn get_output_fn maybe_loc
 			      (cmdline_include_paths ++ pkg_include_dirs)
 
 	(md_c_flags, md_regd_c_flags) <- machdepCCOpts dflags
+        pic_c_flags <- picCCOpts dflags
 
         let verb = getVerbFlag dflags
 
@@ -795,6 +796,7 @@ runPhase cc_phase todo dflags basename suff input_fn get_output_fn maybe_loc
 			]
 		       ++ map SysTools.Option (
 		          md_c_flags
+                       ++ pic_c_flags
 		       ++ (if hcc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])

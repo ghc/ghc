@@ -13,6 +13,7 @@ module DriverFlags (
 	addCmdlineHCInclude,
 	buildStaticHscOpts, 
 	machdepCCOpts,
+        picCCOpts,
 
 	processArgs, OptKind(..), -- for DriverMkDepend only
   ) where
@@ -711,23 +712,33 @@ machdepCCOpts dflags
       --     Disable Apple's precompiling preprocessor. It's a great thing
       --     for "normal" programs, but it doesn't support register variable
       --     declarations.
+        = return ( [], ["-no-cpp-precomp"] )
+#else
+	= return ( [], [] )
+#endif
+
+picCCOpts dflags
+#if darwin_TARGET_OS
+      -- Apple prefers to do things the other way round.
+      -- PIC is on by default.
       -- -mdynamic-no-pic:
-      --     Turn off PIC code generation to save space and time.
+      --     Turn off PIC code generation.
       -- -fno-common:
       --     Don't generate "common" symbols - these are unwanted
       --     in dynamic libraries.
 
-        = if opt_PIC
-            then return ( ["-no-cpp-precomp", "-fno-common"],
-                          ["-fno-common"] )
-            else return ( ["-no-cpp-precomp", "-mdynamic-no-pic"],
-                          ["-mdynamic-no-pic"] )
-
-#elif powerpc_TARGET_ARCH
-   | opt_PIC
-        = return ( ["-fPIC"], ["-fPIC"] )
-   | otherwise
-	= return ( [], [] )
+    | opt_PIC
+        = return ["-fno-common"]
+    | otherwise
+        = return ["-mdynamic-no-pic"]
+#elif mingw32_TARGET_OS
+      -- no -fPIC for Windows
+        = return []
+#else
+    | opt_PIC
+        = return ["-fPIC"]
+    | otherwise
+        = return []
 #endif
 
 -----------------------------------------------------------------------------
