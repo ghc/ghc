@@ -23,6 +23,7 @@ Main> main
 "hello world84"
 Main> 
 Main> -- touch a module + recompile
+Main> :! sleep 1
 Main> :! touch C.hs
 Main> :reload
 Ok, modules loaded: Main, B, C, D.

@@ -19,7 +19,7 @@ Prelude> :! rm *.o *.hi
 Prelude> :! cp D1.hs D.hs
 Prelude> 
 Prelude> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type a
 Int -> Int
 Main> a 42
@@ -28,7 +28,7 @@ Main>
 Main> -- sigh; sleep 1, because the comp manager only stores times in seconds
 Main> :! sleep 1; cp D2.hs D.hs
 Main> :reload
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -37,7 +37,7 @@ Main>
 Main> -- compile D, check that :reload doesn't pick it up
 Main> :! $HC $HC_OPTS -c D.hs
 Main> :reload
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -45,7 +45,7 @@ Main> a 42
 Main> 
 Main> -- pick up the compiled D now, with :load
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -54,7 +54,7 @@ Main>
 Main> -- D,C compiled
 Main> :! $HC $HC_OPTS -c C.hs
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -63,7 +63,7 @@ Main>
 Main> -- D,C,B compiled
 Main> :! $HC $HC_OPTS -c B.hs
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -72,7 +72,7 @@ Main>
 Main> -- D,C,B,A compiled
 Main> :! $HC $HC_OPTS -c A.hs
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (PrelFloat.Float -> PrelFloat.Float,
  PrelFloat.Float -> PrelFloat.Float,
@@ -84,7 +84,7 @@ Main>
 Main> -- D,C,A compiled  (better not use A.o)
 Main> :! rm B.o
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -93,7 +93,7 @@ Main>
 Main> -- D,A compiled  (better not use A.o)
 Main> :! rm C.o
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -102,7 +102,7 @@ Main>
 Main> -- A compiled  (better not use A.o)
 Main> :! rm D.o
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
@@ -112,7 +112,7 @@ Main> -- A,B,C compiled (better not use A.o, B.o, C.o)
 Main> :! $HC $HC_OPTS --make A
 Main> :! rm D.o
 Main> :load A
-Ok, modules loaded: Main, B, C, D.
+Ok, modules loaded: Main, C, B, D.
 Main> :type (Main.a,B.b,C.c,D.d)
 (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
 Main> a 42
