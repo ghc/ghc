@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.20 $
- * $Date: 1999/12/07 11:15:00 $
+ * $Revision: 1.21 $
+ * $Date: 1999/12/07 11:22:56 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -154,8 +154,6 @@ struct AsmBCO_ {
     /* abstract machine ("executed" during compilation) */
     AsmSp    sp;          /* stack ptr */
     AsmSp    max_sp;
-    StgWord  hp;          /* heap ptr  */
-    StgWord  max_hp;
     Instr    lastOpc;
 };
 
@@ -270,26 +268,6 @@ static StgClosure* asmAlloc( nat size )
     return o;
 }
 
-static void grabHpUpd( AsmBCO bco, nat size )
-{
-    /* ToDo: sometimes we should test for MIN_UPD_SIZE instead */
-    ASSERT( size >= MIN_UPD_SIZE + sizeofW(StgHeader) );
-    bco->hp += size;
-}
-
-static void grabHpNonUpd( AsmBCO bco, nat size )
-{
-    /* ToDo: sometimes we should test for MIN_UPD_SIZE instead */
-    ASSERT( size >= MIN_NONUPD_SIZE + sizeofW(StgHeader) );
-    bco->hp += size;
-}
-
-static void resetHp( AsmBCO bco, nat hp )
-{
-    bco->max_hp = stg_max(bco->hp,bco->max_hp);
-    bco->hp     = hp;
-}
-
 static void setSp( AsmBCO bco, AsmSp sp )
 {
     bco->max_sp = stg_max(bco->sp,bco->max_sp);
@@ -385,7 +363,6 @@ AsmBCO asmBeginBCO( int /*StgExpr*/ e )
 
     bco->stgexpr = e;
     bco->max_sp = bco->sp = 0;
-    bco->max_hp = bco->hp = 0;
     bco->lastOpc = i_INTERNAL_ERROR;
     return bco;
 }
@@ -408,7 +385,6 @@ void asmEndBCO( AsmBCO bco )
     {
         nat j = 0;
         bco->max_sp = stg_max(bco->sp,bco->max_sp);
-        bco->max_hp = stg_max(bco->hp,bco->max_hp);
 
         ASSERT(bco->max_sp <= 65535);
         if (bco->max_sp <= 255) {
@@ -793,8 +769,6 @@ void   asmEndArgCheck   ( AsmBCO bco, AsmSp last_arg )
     nat args = bco->sp - last_arg;
     if (args != 0) { /* optimisation */
         emiti_8(bco,i_ARG_CHECK,args);
-        grabHpNonUpd(bco,PAP_sizeW(args-1));
-        resetHp(bco,0);
     }
 }
 
@@ -903,32 +877,25 @@ AsmVar asmBox( AsmBCO bco, AsmRep rep )
     switch (rep) {
     case CHAR_REP:
             emiti_(bco,i_PACK_CHAR);
-            grabHpNonUpd(bco,Czh_sizeW);
             break;
     case INT_REP:
             emiti_(bco,i_PACK_INT);
-            grabHpNonUpd(bco,Izh_sizeW);
             break;
     case THREADID_REP:
     case WORD_REP:
             emiti_(bco,i_PACK_WORD);
-            grabHpNonUpd(bco,Wzh_sizeW);
             break;
     case ADDR_REP:
             emiti_(bco,i_PACK_ADDR);
-            grabHpNonUpd(bco,Azh_sizeW);
             break;
     case FLOAT_REP:
             emiti_(bco,i_PACK_FLOAT);
-            grabHpNonUpd(bco,Fzh_sizeW);
             break;
     case DOUBLE_REP:
             emiti_(bco,i_PACK_DOUBLE);
-            grabHpNonUpd(bco,Dzh_sizeW);
             break;
     case STABLE_REP:
             emiti_(bco,i_PACK_STABLE);
-            grabHpNonUpd(bco,Stablezh_sizeW);
             break;
 
     default:
@@ -1588,7 +1555,6 @@ AsmVar asmAllocCONSTR   ( AsmBCO bco, AsmInfo info )
     }
 
     incSp(bco, sizeofW(StgClosurePtr));
-    grabHpNonUpd(bco,sizeW_fromITBL(info));
     return bco->sp;
 }
 
@@ -1622,7 +1588,6 @@ AsmVar asmAllocAP( AsmBCO bco, AsmNat words )
 {
     emiti_8(bco,i_ALLOC_AP,words);
     incSp(bco, sizeofW(StgPtr));
-    grabHpUpd(bco,AP_sizeW(words));
     return bco->sp;
 }
 
