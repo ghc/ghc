@@ -24,7 +24,7 @@ function names:
 data *types*
   - These have a base class, so need to appear in the 
     same name space as other object. for example data Foo = Foo
-  - We add a postfix to types: "zdt" ($t)
+  - We add a postfix to types: "zdc" ($c)
   - Types are upper case, so never clash with keywords
 
 data constructors
@@ -54,7 +54,7 @@ import qualified CoreSyn
 import CoreSyn	( CoreBind, CoreExpr, CoreAlt, CoreBndr,
 		  Bind(..), Alt, AltCon(..), collectBinders, isValArg
 		)
-import CoreUtils( exprIsValue, exprIsTrivial )
+import qualified CoreUtils
 import Module	( Module, moduleString )
 import TyCon	( TyCon, isDataTyCon, tyConDataCons )
 import Outputable
@@ -97,23 +97,22 @@ javaTyCon tycon
   = tycon_jclass : concat (map constr_class constrs)
   where
     constrs = tyConDataCons tycon
-    tycon_jclass_jname =  javaGlobTypeName tycon ++ "zdc"
+    tycon_jclass_jname =  javaTyConTypeName tycon ++ "zdc"
     tycon_jclass = Class [Public] (shortName tycon_jclass_jname) [] [] []
 
     constr_class data_con
-	= [ Class [Public] (shortName constr_jname) [tycon_jclass_jname] []
+	= [ Class [Public] constr_jname [tycon_jclass_jname] []
 				(field_decls ++ [cons_meth,debug_meth])
 	  ]
 	where
-	  constr_jname = javaConstrWkrName data_con
-	  constr_jtype = javaConstrWkrType data_con
+	  constr_jname = shortName (javaConstrWkrName data_con)
 
 	  field_names  = constrToFields data_con
 	  field_decls  = [ Field [Public] n Nothing 
 			 | n <- field_names
 			 ]
 
-	  cons_meth    = mkCons (shortName constr_jname) field_names
+	  cons_meth    = mkCons constr_jname field_names
 
 	  debug_meth   = Method [Public] (Name "toString" stringType)
 					 []
@@ -148,15 +147,21 @@ javaTyCon tycon
 	  txt      = Name "__txt" stringType
 	 
 
+-- This checks to see the type is reasonable to call new with.
+-- primitives might use a static method later.
 mkNew :: Type -> [Expr] -> Expr
-mkNew t@(PrimType primType) [] = error "new primitive???"
+mkNew t@(PrimType primType) _  = error "new primitive -- fix it???"
 mkNew t@(Type _)            es = New t es Nothing
 mkNew _                     _  = error "new with strange arguments"
 
 constrToFields :: DataCon -> [Name]
 constrToFields cons = 
 	[ fieldName i t 
-	| (i,t) <- zip [1..] (map javaTauType (dataConRepArgTys cons))
+	| (i,t) <- zip [1..] (map primRepToType
+			          (map Type.typePrimRep
+				       (dataConRepArgTys cons)
+				  )
+			     )
 	]
 
 mkCons :: TypeName -> [Name] -> Decl
@@ -188,13 +193,15 @@ java_top_bind :: Id -> CoreExpr -> Decl
 --	  public Object ENTER() { ...translation of rhs... }
 --	}
 java_top_bind bndr rhs
-  = Class [Public] (shortName (javaGlobTypeName bndr)) 
+  = Class [Public] (shortName (javaIdTypeName bndr))
 		[] [codeName] [enter_meth]
   where
-    enter_meth = Method [Public] enterName [vmArg] [excName] 
+    enter_meth = Method [Public]
+			enterName
+			[vmArg]
+			[excName]
 			(javaExpr vmRETURN rhs)
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -204,26 +211,27 @@ java_top_bind bndr rhs
 
 \begin{code}
 javaVar :: Id -> Expr
-javaVar v | isGlobalName (idName v) = mkNew (javaGlobType v) []
-	  | otherwise	  	    = Var (javaName v)
+javaVar v | isGlobalName (idName v) = mkNew (javaIdType v) []
+	  | otherwise	  	    =   Var (javaName v)
 
 javaLit :: Literal.Literal -> Expr
 javaLit (MachInt i)  = Literal (IntLit (fromInteger i))
 javaLit (MachChar c) = Literal (CharLit c)             
 javaLit other	     = pprPanic "javaLit" (ppr other)
 
-javaExpr :: (Expr -> Expr) -> CoreExpr -> [Statement]
+-- Pass in the 'shape' of the result.
+javaExpr :: (Expr -> Statement) -> CoreExpr -> [Statement]
 -- Generate code to apply the value of 
 -- the expression to the arguments aleady on the stack
-javaExpr r (CoreSyn.Var v)   = [Return (r (javaVar v))]
-javaExpr r (CoreSyn.Lit l)   = [Return (r (javaLit l))]
+javaExpr r (CoreSyn.Var v)   = [r (javaVar v)]
+javaExpr r (CoreSyn.Lit l)   = [r (javaLit l)]
 javaExpr r (CoreSyn.App f a) = javaApp r f [a]
 javaExpr r e@(CoreSyn.Lam _ _) = javaLam r (collectBinders e)
 javaExpr r (CoreSyn.Case e x alts) = javaCase r e x alts
 javaExpr r (CoreSyn.Let bind body) = javaBind bind ++ javaExpr r body
 javaExpr r (CoreSyn.Note _ e)	 = javaExpr r e
 
-javaCase :: (Expr -> Expr) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
+javaCase :: (Expr -> Statement) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 -- 	case e of x { Nil      -> r1
 --		      Cons p q -> r2 }
 -- ==>
@@ -237,9 +245,17 @@ javaCase :: (Expr -> Expr) -> CoreExpr -> Id -> [CoreAlt] -> [Statement]
 --	} else return null
 
 javaCase r e x alts
-  =  [var [Final] (javaName x) (vmWHNF (javaArg e)),
-      IfThenElse (map mk_alt alts) Nothing]
+  -- TODO: This will need to map prims to "haskell.runtime.Value".
+  =  javaArg Nothing e ++
+     [ var [Final] (javaName x)
+	           (whnf primRep (vmPOP (primRepToType primRep)))
+     , IfThenElse (map mk_alt alts) (Just (Return javaNull))
+     ]
   where
+     primRep = idPrimRep x
+     whnf PtrRep = vmWHNF	-- needs evaluation
+     whnf _      = id
+
      mk_alt (DEFAULT, [], rhs)   = (true, 	    Block (javaExpr r rhs))
      mk_alt (DataAlt d, bs, rhs) = (instanceOf x d, Block (bind_args d bs ++ javaExpr r rhs))
      mk_alt alt@(LitAlt lit, [], rhs) 
@@ -250,14 +266,16 @@ javaCase r e x alts
      eqLit (MachInt n) = Op (Literal (IntLit n))
 			    "=="
 			    (Var (javaName x))
+     eqLit (MachChar n) = Op (Literal (CharLit n))
+			    "=="
+			    (Var (javaName x))
      eqLit other       = pprPanic "eqLit" (ppr other)
 
      bind_args d bs = [var [Final] (javaName b) 
 			   (Access (Cast (javaConstrWkrType d) (javaVar x)
 				   ) f
 			   )
-		      | (b,f) <- filter isId bs 
-				      `zip` (constrToFields d)
+		      | (b,f) <- filter isId bs `zip` (constrToFields d)
 		      , not (isDeadBinder b)
 		      ]
 
@@ -267,9 +285,12 @@ javaBind (NonRec x rhs)
   ==>
 	final Object x = new Thunk( new Code() { ...code for rhs_x... } )
 -}
-  = [var [Final] (javaLocName x objectType)
-		 (newThunk (newCode (javaExpr vmRETURN rhs)))
-    ]
+
+  = javaArg (Just name) rhs
+  where
+    name = case coreTypeToType rhs of
+	    ty@(PrimType _) -> javaName x `withType` ty
+	    _               -> javaName x `withType` thunkType
 
 javaBind (Rec prs)
 {- 	rec { x = ...rhs_x...; y = ...rhs_y... }
@@ -295,14 +316,14 @@ javaBind (Rec prs)
   where
     mk_class (b,r) = Declaration (Class [] class_name [] [codeName] stmts)
 		   where
-		     class_name = javaLocTypeName b
-		     stmts = [Field [] (javaLocName b codeType) Nothing | (b,_) <- prs] ++
+		     class_name = javaIdTypeName b
+		     stmts = [Field [] (javaName b `withType` codeType) Nothing | (b,_) <- prs] ++
 			     [Method [Public] enterName [vmArg] [excName] (javaExpr vmRETURN r)]	
 
     mk_inst (b,r) = var [Final] (javaInstName b)
-			(mkNew (javaGlobType b) [])
+			(mkNew (javaIdType b) [])
 
-    mk_thunk (b,r) = var [Final] (javaLocName b thunkType)
+    mk_thunk (b,r) = var [Final] (javaName b `withType` thunkType)
 			 (New thunkType [Var (javaInstName b)] Nothing)
 
     mk_knot (b,_) = [ ExprStatement (Assign lhs rhs) 
@@ -311,9 +332,8 @@ javaBind (Rec prs)
 		      let rhs = Var (javaName b')
 		    ]
 
-
--- We are needlessly 
-javaLam :: (Expr -> Expr) -> ([CoreBndr], CoreExpr) -> [Statement]
+-- We are needlessly
+javaLam :: (Expr -> Statement) -> ([CoreBndr], CoreExpr) -> [Statement]
 javaLam r (bndrs, body)
   | null val_bndrs = javaExpr r body
   | otherwise
@@ -323,28 +343,78 @@ javaLam r (bndrs, body)
   where
     val_bndrs = map javaName (filter isId bndrs)
 
-javaApp :: (Expr -> Expr) -> CoreExpr -> [CoreExpr] -> [Statement]
+javaApp :: (Expr -> Statement) -> CoreExpr -> [CoreExpr] -> [Statement]
 javaApp r (CoreSyn.App f a) as = javaApp r f (a:as)
 javaApp r (CoreSyn.Var f) as
   = case isDataConId_maybe f of {
 	Just dc | length as == dataConRepArity dc
 		-> 	-- Saturated constructors
-		   [Return (New (javaGlobType f) (javaArgs as) Nothing)]
+			-- never returning a primitive at this point
+		   javaArgs as ++
+		   [Return (New (javaIdType f) 
+				(javaPops as)
+				Nothing)]
     ; other ->   -- Not a saturated constructor
 	java_apply r (CoreSyn.Var f) as
     }
 	
 javaApp r f as = java_apply r f as
 
-java_apply :: (Expr -> Expr) -> CoreExpr -> [CoreExpr] -> [Statement]
-java_apply r f as = [ExprStatement (vmPUSH arg) | arg <- javaArgs as] ++ javaExpr r f
-javaArgs :: [CoreExpr] -> [Expr]
-javaArgs args = [javaArg a | a <- args, isValArg a]
+-- This means, given a expression an a list of arguments,
+-- generate code for "pushing the arguments on the stack,
+--  and the executing the expression."
 
-javaArg :: CoreExpr -> Expr
-javaArg (CoreSyn.Type t) = pprPanic "javaArg" (ppr t)
-javaArg e | exprIsValue e || exprIsTrivial e = newCode (javaExpr id e)
-	  | otherwise	 		     = newThunk (newCode (javaExpr id e))
+java_apply :: (Expr -> Statement) -> CoreExpr -> [CoreExpr] -> [Statement]
+java_apply r f as = javaArgs as ++ javaExpr r f
+
+-- This generates statements that have the net effect
+-- of pushing values (perhaps thunks) onto the stack.
+
+javaArgs :: [CoreExpr] -> [Statement]
+javaArgs args = concat [ javaArg Nothing a | a <- args, isValArg a]
+
+javaPops :: [CoreExpr] -> [Expr]
+javaPops args = [ vmPOP (primRepToType (Type.typePrimRep (CoreUtils.exprType a)))
+		| a <- args 
+		, isValArg a
+		]
+
+-- The arg's might or might not be thunkable.
+-- The result is a list of statments that have the effect of
+-- pushing onto the stack (via one of the VM.PUSH* commands)
+-- the argument, perhaps thunked.
+
+-- Later: this might take an argument that allows assignment
+-- into a variable rather than pushing onto the stack.
+
+javaArg :: Maybe Name -> CoreExpr -> [Statement]
+javaArg _ (CoreSyn.Type t) = pprPanic "javaArg" (ppr t)
+javaArg ret e 
+   | isPrim primty && CoreUtils.exprIsTrivial e = javaExpr push e
+   | isPrim primty = 
+ 	  let expr  = javaExpr vmRETURN e
+	      code  = access (vmWHNF (newCode expr)) (primRepToType primty)
+	  in [push code]
+   | otherwise =
+ 	  let expr  = javaExpr vmRETURN e
+	      code  = newCode expr
+	      code' = if CoreUtils.exprIsValue e 
+		      || CoreUtils.exprIsTrivial e 
+		      || isPrim primty
+		      then code
+		      else newThunk code
+	  in [push code']
+   where
+	push e = case ret of
+		  Just name -> var [Final] name e
+		  Nothing -> vmPUSH e
+	corety = CoreUtils.exprType e
+	primty = Type.typePrimRep corety
+	isPrim PtrRep  = False
+	isPrim IntRep  = True
+	isPrim CharRep = True
+
+coreTypeToType = primRepToType . Type.typePrimRep . CoreUtils.exprType
 \end{code}
 
 %************************************************************************
@@ -354,9 +424,10 @@ javaArg e | exprIsValue e || exprIsTrivial e = newCode (javaExpr id e)
 %************************************************************************
 
 \begin{code}
-true, this :: Expr
+true, this,javaNull :: Expr
 this = Var thisName 
 true = Var (Name "true" (PrimType PrimBoolean))
+javaNull = Var (Name "null" objectType)
 
 vmCOLLECT :: Int -> Expr -> [Statement]
 vmCOLLECT 0 e = []
@@ -371,16 +442,17 @@ vmCOLLECT n e = [ExprStatement
 vmPOP :: Type -> Expr 
 vmPOP ty = Call varVM (Name ("POP" ++ suffix ty) ty) []
 
-vmPUSH :: Expr -> Expr
-vmPUSH e = Call varVM (Name ("PUSH" ++ suffix (exprType e)) void) [e]
+vmPUSH :: Expr -> Statement
+vmPUSH e = ExprStatement 
+	     (Call varVM (Name ("PUSH" ++ suffix (exprType e)) void) [e])
 
-vmRETURN :: Expr -> Expr
-vmRETURN e = 
+vmRETURN :: Expr -> Statement
+vmRETURN e = Return (
      case ty of
-	PrimType _ -> Call varVM (Name ("RETURN" ++ suffix (exprType e))
+	PrimType _ -> Call varVM (Name ("RETURN" ++ suffix ty)
 				       valueType
-				  ) [e]
-	_ -> e
+				 ) [e]
+	_ -> e)
   where
 	ty = exprType e
 
@@ -428,7 +500,8 @@ exprType (Var (Name _ t)) = t
 exprType (Literal lit)    = litType lit
 exprType (Cast t _)       = t
 exprType (New t _ _)      = t
-exprType _                = error "can't figure out an expression type"
+exprType (Call _ (Name _ t) _) = t
+exprType expr = error ("can't figure out an expression type: " ++ show expr)
 
 litType (IntLit i)    = PrimType PrimInt
 litType (CharLit i)   = PrimType PrimChar
@@ -452,33 +525,32 @@ enterName   = Name "ENTER"   objectType
 vmName      = Name "VM"      vmType
 thisName    = Name "this"    (Type "<this>")
 collectName = Name "COLLECT" void
-whnfName    = Name "WNNF"    objectType
+whnfName    = Name "WHNF"    objectType
 
 fieldName :: Int -> Type -> Name	-- Names for fields of a constructor
 fieldName n ty = Name ("f" ++ show n) ty
 
--- TODO: change to idToJavaName :: Id -> Name
+withType :: Name -> Type -> Name
+withType (Name n _) t = Name n t
 
-javaLocName :: Id -> Type -> Name
-javaLocName n t = Name (getOccString n) t
-
+-- This maps (local only) names Ids to Names, 
+-- using the same string as the Id.
 javaName :: Id -> Name
-javaName n = if isGlobalName n'
-	     then Name (javaGlobTypeName n)
-		       (javaGlobType n)
-	     else Name (getOccString n)
-		       (Type "<loc?>")
+javaName n 
+  | isGlobalName (idName n) = error "useing javaName on global"
+  | otherwise = Name (getOccString n)
+		     (primRepToType (idPrimRep n))
+
+-- TypeName's are always global. This would typically return something
+-- like Test.foo or Test.Foozdc or PrelBase.foldr.
+
+javaIdTypeName :: Id -> TypeName
+javaIdTypeName n = (moduleString (nameModule n') ++ "." ++ getOccString n')
   where
 	     n' = getName n
 
--- TypeName's are always global
-javaGlobTypeName :: NamedThing a => a -> TypeName
-javaGlobTypeName n = (moduleString (nameModule n') ++ "." ++ getOccString n)
-  where
-	     n' = getName n
-
-javaLocTypeName :: NamedThing a => a -> TypeName
-javaLocTypeName n = (moduleString (nameModule n') ++ "." ++ getOccString n)
+javaTyConTypeName :: TyCon -> TypeName
+javaTyConTypeName n = (moduleString (nameModule n') ++ "." ++ getOccString n')
   where
 	     n' = getName n
 
@@ -487,12 +559,16 @@ shortName :: TypeName -> TypeName
 shortName = reverse . takeWhile (/= '.') . reverse
 
 -- The function that makes the constructor name
+-- The constructor "Foo ..." in module Test,
+-- would return the name "Test.Foo".
+
 javaConstrWkrName :: DataCon -> TypeName
-javaConstrWkrName con = javaGlobTypeName (dataConId con)
+javaConstrWkrName = javaIdTypeName . dataConId
 
 -- Makes x_inst for Rec decls
-javaInstName :: NamedThing a => a -> Name
-javaInstName n = Name (getOccString n ++ "_inst") (Type "<inst>")
+javaInstName :: Id -> Name
+javaInstName n = Name (getOccString n ++ "_inst")
+		      (primRepToType (idPrimRep n))
 \end{code}
 
 %************************************************************************
@@ -523,37 +599,33 @@ inttype = PrimType PrimInt
 chartype :: Type
 chartype = PrimType PrimChar
 
--- This is where we map from type to possible primitive
+-- This lets you get inside a possible "Value" type,
+-- to access the internal unboxed object.
+access :: Expr -> Type -> Expr
+access expr (PrimType prim) = accessPrim (Cast valueType expr) prim
+access expr other           = expr
+
+accessPrim expr PrimInt  = Call expr (Name "intValue" inttype) []
+accessPrim expr PrimChar = Call expr (Name "intValue" chartype) []
+
+-- This is where we map from typename to types,
+-- allowing to match possible primitive types.
+mkType :: TypeName -> Type
 mkType "PrelGHC.Intzh"  = inttype
 mkType "PrelGHC.Charzh" = chartype
 mkType other            = Type other
 
--- This mapping a global haskell name (typically a function name)
--- to the name of the class that handles it.
--- The name must be global. So foo in module Test maps to (Type "Test.foo")
--- TODO: change to Id
+-- Turns a (global) Id into a Type (fully qualified name).
+javaIdType :: Id -> Type
+javaIdType = mkType . javaIdTypeName
 
-javaGlobType :: NamedThing a => a -> Type
-javaGlobType n | '.' `notElem` name
-	       = error ("not using a fully qualified name for javaGlobalType: " ++ name)
-	       | otherwise
-	       = mkType name
-  where name = javaGlobTypeName n
+javaLocalIdType :: Id -> Type
+javaLocalIdType = primRepToType . idPrimRep
 
--- This takes an id, and finds the ids *type* (for example, Int, Bool, a, etc).
-javaType :: Id -> Type
-javaType id = case (idPrimRep id) of
-		IntRep -> inttype
-		_ -> if isGlobalName (idName id)
-		     then Type (javaGlobTypeName id)
-		     else objectType		-- TODO: ?? for now ??
-
--- This is used to get inside constructors, to find out the types
--- of the payload elements
-javaTauType :: Type.TauType -> Type
-javaTauType (TypeRep.TyConApp tycon _) = javaGlobType tycon
-javaTauType (TypeRep.NoteTy _ t)       = javaTauType t
-javaTauType _                          = objectType
+primRepToType ::PrimRep -> Type
+primRepToType PtrRep  = objectType
+primRepToType IntRep  = inttype
+primRepToType CharRep = chartype
 
 -- The function that makes the constructor name
 javaConstrWkrType :: DataCon -> Type

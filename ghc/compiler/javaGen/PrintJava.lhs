@@ -144,9 +144,9 @@ exprStatement e = e <> semi
 
 declStatement d = d
 
-ifthenelse ((e,s):ecs) ms = sep [text "if" <+> parens e <+> text "{", 
-			        indent s, 
-			      thenelse ecs ms]
+ifthenelse ((e,s):ecs) ms = sep [ text "if" <+> parens e <+> text "{", 
+			          indent s, 
+				  thenelse ecs ms]
 
 thenelse ((e,s):ecs) ms = sep [	text "} else if" <+> parens e <+> text "{", 
 				indent s,
