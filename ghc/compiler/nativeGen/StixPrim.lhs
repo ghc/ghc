@@ -69,7 +69,7 @@ rather than inheriting the calling convention of the thing which we're really
 calling.
 
 \begin{code}
-foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety is_asm)) rhs
+foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
   | not (playSafe safety) = returnUs (\xs -> ccall : xs)
 
   | otherwise
