@@ -357,6 +357,8 @@ the do-notation, and this extension provides the necessary syntactic support.
 Here is a simple (yet contrived) example:
 </para>
 <programlisting>
+import Control.Monad.Fix
+
 justOnes = mdo xs <- Just (1:xs)
                return xs
 </programlisting>
@@ -378,8 +380,9 @@ then that monad must be declared an instance of the <literal>MonadFix</literal> 
 For details, see the above mentioned reference.
 </para>
 <para>
-The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO, and
-state monads (both lazy and strict).
+The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO. 
+Furthermore, the Control.Monad.ST and Control.Monad.ST.Lazy modules provide the instances of the MonadFix class 
+for Haskell's internal state monad (strict and lazy, respectively).
 </para>
 <para>
 There are three important points in using the recursive-do notation:
@@ -390,14 +393,10 @@ than <literal>do</literal>).
 </para></listitem>
 
 <listitem><para>
-If you want to declare an instance of the <literal>MonadFix</literal> class for one of 
-your own monads, or you need to refer to the class name <literal>MonadFix</literal> in any other way (for 
-instance when writing a type constraint), then your program should 
-<literal>import Control.Monad.MonadFix</literal>.
-Otherwise, you don't need to import any special libraries to use the mdo-notation. That is,
-as long as you only use the predefined instances mentioned above, the mdo-notation will
-be automatically available. 
-To be on the safe side, of course, you can simply import it in all cases.
+You should <literal>import Control.Monad.Fix</literal>.
+(Note: Strictly speaking, this import is required only when you need to refer to the name
+<literal>MonadFix</literal> in your program, but the import is always safe, and the programmers
+are encouraged to always import this module when using the mdo-notation.)
 </para></listitem>
 
 <listitem><para>
@@ -407,15 +406,15 @@ As with other extensions, ghc should be given the flag <literal>-fglasgow-exts</
 </para>
 
 <para>
-Historical note: The old implementation of the mdo-notation (and most
-of the existing documents) used the name
-<literal>MonadRec</literal> for the class and the corresponding library.
-This name is no longer supported.
+The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb">http://www.cse.ogi.edu/PacSoft/projects/rmb</ulink>
+contains up to date information on recursive monadic bindings.
 </para>
 
 <para>
-The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb">http://www.cse.ogi.edu/PacSoft/projects/rmb</ulink>
-contains up to date information on recursive monadic bindings.
+Historical note: The old implementation of the mdo-notation (and most
+of the existing documents) used the name
+<literal>MonadRec</literal> for the class and the corresponding library.
+This name is not supported by GHC.
 </para>
 
 </sect2>
