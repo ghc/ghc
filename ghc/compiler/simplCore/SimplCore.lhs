@@ -24,7 +24,7 @@ import Rules		( RuleBase, emptyRuleBase, ruleBaseFVs, ruleBaseIds,
 import Module		( moduleEnvElts )
 import CoreUnfold
 import PprCore		( pprCoreBindings, pprIdCoreRule, pprCoreExpr )
-import OccurAnal	( occurAnalyseBinds )
+import OccurAnal	( occurAnalyseBinds, occurAnalyseGlobalExpr )
 import CoreUtils	( etaReduce, coreBindsSize )
 import Simplify		( simplTopBinds, simplExpr )
 import SimplUtils	( simplBinders )
@@ -99,6 +99,8 @@ simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
 	     -> HomeSymbolTable
 	     -> CoreExpr
 	     -> IO CoreExpr
+-- simplifyExpr is called by the driver to simplify an
+-- expression typed in at the interactive prompt
 simplifyExpr dflags pcs hst expr
   = do	{
 	; showPass dflags "Simplify"
@@ -106,9 +108,9 @@ simplifyExpr dflags pcs hst expr
 	; us <-  mkSplitUniqSupply 's'
 
 	; let (expr', _counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_all 	
-		                          (simplExpr expr)
+		                          (simplExprGently expr)
 
-	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplfied expression"
+	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
 			(pprCoreExpr expr')
 
 	; return expr'
@@ -284,20 +286,33 @@ simplRule rule@(id, BuiltinRule _)
   = returnSmpl rule
 simplRule rule@(id, Rule name bndrs args rhs)
   = simplBinders bndrs			$ \ bndrs' -> 
-    mapSmpl simpl_arg args		`thenSmpl` \ args' ->
-    simplExpr rhs			`thenSmpl` \ rhs' ->
+    mapSmpl simplExprGently args	`thenSmpl` \ args' ->
+    simplExprGently rhs			`thenSmpl` \ rhs' ->
     returnSmpl (id, Rule name bndrs' args' rhs')
 
-simpl_arg e 
---  I've seen rules in which a LHS like 
+-- It's important that simplExprGently does eta reduction.
+-- For example, in a rule like:
 --	augment g (build h) 
--- turns into
+-- we do not want to get
 --	augment (\a. g a) (build h)
--- So it's a help to eta-reduce the args as we simplify them.
--- Otherwise we don't match when given an argument like
+-- otherwise we don't match when given an argument like
 --	(\a. h a a)
-  = simplExpr e 	`thenSmpl` \ e' ->
-    returnSmpl (etaReduce e')
+--
+-- The simplifier does indeed do eta reduction (it's in
+-- Simplify.completeLam) but only if -O is on.
+\end{code}
+
+\begin{code}
+simplExprGently :: CoreExpr -> SimplM CoreExpr
+-- Simplifies an expression 
+-- 	does occurrence analysis, then simplification
+--	and repeats (twice currently) because one pass
+--	alone leaves tons of crud.
+-- Used (a) for user expressions typed in at the interactive prompt
+--	(b) the LHS and RHS of a RULE
+simplExprGently expr
+  = simplExpr (occurAnalyseGlobalExpr expr) 	`thenSmpl` \ expr1 ->
+    simplExpr (occurAnalyseGlobalExpr expr1)
 \end{code}
 
 
