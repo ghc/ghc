@@ -52,8 +52,8 @@ data StdGen
  = StdGen Int Int
 
 instance RandomGen StdGen where
-  next  = rand1
-  split = splitStdGen
+  next  = stdNext
+  split = stdSplit
 
 instance Show StdGen where
   showsPrec p (StdGen s1 s2) = 
@@ -65,13 +65,21 @@ instance Read StdGen where
   readsPrec p = \ r ->
      case try_read r of
        r@[_] -> r
-       _   -> [(unsafePerformIO (mkStdRNG 0), r)] -- because it shouldn't ever fail.
+       _   -> [stdFromString r] -- because it shouldn't ever fail.
     where 
       try_read r = do
          (s1, r1) <- readDec (dropWhile isSpace r)
 	 (s2, r2) <- readDec (dropWhile isSpace r1)
 	 return (StdGen s1 s2, r2)
 
+{-
+ If we cannot unravel the StdGen from a string, create
+ one based on the string given.
+-}
+stdFromString         :: String -> (StdGen, String)
+stdFromString s        = (mkStdGen num, rest)
+	where (cs, rest) = splitAt 6 s
+              num        = foldl (\a x -> x + 3 * a) 1 (map ord cs)
 \end{code}
 
 \begin{code}
@@ -93,25 +101,25 @@ createStdGen s
 
 \end{code}
 
-\begin{code}
+The class definition - see library report for details.
 
--- Q: do all of these merit class membership?
+\begin{code}
 class Random a where
-  randomR :: RandomGen g => (a,a) -> g -> (a,g)
+  -- Minimal complete definition: random and randomR
   random  :: RandomGen g => g -> (a, g)
+  randomR :: RandomGen g => (a,a) -> g -> (a,g)
   
-  randomRs :: RandomGen g => (a,a) -> g -> [a]
   randoms  :: RandomGen g => g -> [a]
+  randoms  g      = x : randoms g' where (x,g') = random g
+
+  randomRs :: RandomGen g => (a,a) -> g -> [a]
+  randomRs ival g = x : randomRs ival g' where (x,g') = randomR ival g
+
+  randomIO  :: IO a
+  randomIO	   = getStdRandom random
 
   randomRIO :: (a,a) -> IO a
-  randomIO  :: IO a
-  
-  randoms  g      = x : randoms g' where (x,g') = random g
-  randomRs ival g = x : randomRs ival g' where (x,g') = randomR ival g
-  
-  randomIO	   = getStdRandom random
   randomRIO range  = getStdRandom (randomR range)
-
 \end{code}
 
 \begin{code}
@@ -185,18 +193,20 @@ randomIvalDouble (l,h) fromDouble rng
          (x, rng') -> 
 	    let
 	     scaled_x = 
-		fromDouble l +
-		fromDouble (h-l) *
-		 (fromIntegral (x::Int) * 4.6566130638969828e-10)
-	          -- magic number stolen from old HBC code (Random.randomDoubles.)
+		fromDouble ((l+h)/2) + 
+                fromDouble ((h-l) / realToFrac intRange) *
+		fromIntegral (x::Int)
 	    in
 	    (scaled_x, rng')
+
+intRange :: Integer
+intRange  = toInteger (maxBound::Int) - toInteger (minBound::Int)
 
 iLogBase :: Integer -> Integer -> Integer
 iLogBase b i = if i < b then 1 else 1 + iLogBase b (i `div` b)
 
-rand1 :: StdGen -> (Int, StdGen)
-rand1 (StdGen s1 s2) = (z', StdGen s1'' s2'')
+stdNext :: StdGen -> (Int, StdGen)
+stdNext (StdGen s1 s2) = (z', StdGen s1'' s2'')
 	where	z'   = if z < 1 then z + 2147483562 else z
 		z    = s1'' - s2''
 
@@ -208,20 +218,8 @@ rand1 (StdGen s1 s2) = (z', StdGen s1'' s2'')
 		s2'  = 40692 * (s2 - k' * 52774) - k' * 3791
 		s2'' = if s2' < 0 then s2' + 2147483399 else s2'
 
-splitStdGen :: StdGen -> (StdGen, StdGen)
-splitStdGen std@(StdGen s1 s2) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
-{- StdGen new_s1 new_s2
-   where
-       -- simple in the extreme..
-      new_s1
-        | s2 == 2147483562 = 1
-	| otherwise	   = s2 + 1
-
-      new_s2
-        | s1 == 1	   = 2147483398
-	| otherwise	   = s1 - 1
--}
-   
+stdSplit :: StdGen -> (StdGen, StdGen)
+stdSplit std@(StdGen s1 s2) = (std, unsafePerformIO (mkStdRNG (fromInt s1)))
 	
 \end{code}
 
