@@ -10,7 +10,7 @@ module HaddockRename (
 	renameExportList, 
 	renameDecl,
 	renameExportItems,
-	renameDoc,
+	renameDoc, renameMaybeDoc,
   ) where
 
 import HaddockTypes

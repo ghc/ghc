@@ -222,10 +222,17 @@ mkInterface mod_map filename
 
      name_env = listToFM [ (nameOfQName n, n) | n <- exported_names ]
 
+  let
+     (orig_module_doc, missing_names4)
+        = runRnFM orig_env (renameMaybeDoc maybe_doc)
+
+     (final_module_doc, _missing_names5)
+        = runRnFM import_env (renameMaybeDoc orig_module_doc)
+
   -- report any names we couldn't find/resolve
 
-  let missing_names = missing_names1 ++ missing_names2
-			 --ignore missing_names3 for now,
+  let missing_names = missing_names1 ++ missing_names2 ++ missing_names4
+			 --ignore missing_names3 & missing_names5 for now
       name_strings = nub (map show missing_names)
 
   when (not (null name_strings)) $
@@ -242,7 +249,7 @@ mkInterface mod_map filename
 		   iface_insts	      = instances,
 		   iface_decls        = decl_map,
 		   iface_info	      = maybe_info,
-		   iface_doc          = maybe_doc,
+		   iface_doc          = final_module_doc,
 		   iface_options      = options
 		}
       	  )
