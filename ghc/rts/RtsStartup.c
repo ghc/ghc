@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.34 2000/03/14 14:34:47 sewardj Exp $
+ * $Id: RtsStartup.c,v 1.35 2000/03/21 14:33:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -187,8 +187,8 @@ startupHaskell(int argc, char *argv[])
 
    The code generator inserts a small function "__init_<module>" in each
    module and calls the registration functions in each of the modules
-   it imports.  So, if we call "__init_Main", each reachable module in the
-   program will be registered.
+   it imports.  So, if we call "__init_PrelMain", each reachable module in the
+   program will be registered (because PrelMain.mainIO calls Main.main).
 
    The init* functions are compiled in the same way as STG code,
    i.e. without normal C call/return conventions.  Hence we must use
