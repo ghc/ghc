@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.111 2000/11/07 14:07:09 simonmar Exp $
+# $Id: Makefile,v 1.112 2000/11/08 13:51:16 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -196,7 +196,7 @@ absCSyn/PprAbsC_HC_OPTS 	= -H10m
 basicTypes/IdInfo_HC_OPTS 	= -K2m
 codeGen/CgCase_HC_OPTS		= -fno-prune-tydecls
 hsSyn/HsExpr_HC_OPTS 		= -K2m
-main/Main_HC_OPTS 		= 
+main/Main_HC_OPTS 		= -fvia-C
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 ifeq "$(GhcReportCompiles)" "YES"
