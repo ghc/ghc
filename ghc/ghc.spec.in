@@ -68,9 +68,6 @@ the documentation is available online at
 
 %changelog
 
-* Mon Sep 16 2002 Manuel Chakravarty
-- Use external Haddock installation
-
 * Wed Sep 26 2001 Manuel Chakravarty
 - small changes for 5.04
 
@@ -133,7 +130,7 @@ END
 %build
 ./configure --prefix=%{prefix}
 make boot
-make HADDOCK_INPLACE=haddock all ps html
+make all ps html
  
 %install
 rm -rf $RPM_BUILD_ROOT
