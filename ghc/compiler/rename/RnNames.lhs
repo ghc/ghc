@@ -204,7 +204,7 @@ importsFromImportDecl this_mod
 		--	(a) remove this_mod (might be there as a hi-boot)
 		--	(b) add imp_mod itself
 		-- Take its dependent packages unchanged
-	     ((imp_mod_name, want_boot) : filter not_self (dep_mods deps), dep_pkgs deps)
+	     ((imp_mod_name, want_boot) : dep_mods deps, dep_pkgs deps)
 
 	   | otherwise	
  	   = 	-- Imported module is from another package

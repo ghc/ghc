@@ -14,7 +14,7 @@ module TypeRep (
 	funTyCon,
 
 	-- Pretty-printing
-	pprType, pprParendType,
+	pprType, pprParendType, pprTyThingCategory,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred,
 
 	-- Re-export fromKind
@@ -251,10 +251,13 @@ data TyThing = AnId     Id
 	     | AClass   Class
 
 instance Outputable TyThing where
-  ppr (AnId   id)   = ptext SLIT("AnId")     <+> ppr id
-  ppr (ATyCon tc)   = ptext SLIT("ATyCon")   <+> ppr tc
-  ppr (AClass cl)   = ptext SLIT("AClass")   <+> ppr cl
-  ppr (ADataCon dc) = ptext SLIT("ADataCon") <+> ppr (dataConName dc)
+  ppr thing = pprTyThingCategory thing <+> quotes (ppr (getName thing))
+
+pprTyThingCategory :: TyThing -> SDoc
+pprTyThingCategory (ATyCon _) 	= ptext SLIT("Type constructor")
+pprTyThingCategory (AClass _)   = ptext SLIT("Class")
+pprTyThingCategory (AnId   _)   = ptext SLIT("Identifier")
+pprTyThingCategory (ADataCon _) = ptext SLIT("Data constructor")
 
 instance NamedThing TyThing where	-- Can't put this with the type
   getName (AnId id)     = getName id	-- decl, because the DataCon instance

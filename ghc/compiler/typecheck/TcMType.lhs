@@ -52,7 +52,7 @@ import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see repres
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
 			  MetaDetails(..), SkolemInfo(..), isMetaTyVar, metaTvRef,
-			  tcEqType, tcCmpPred, isClassPred, 
+			  tcCmpPred, isClassPred, 
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcIsTyVarTy, tcSplitSigmaTy, tcIsTyVarTy,
@@ -70,7 +70,7 @@ import Type		( TvSubst, zipTopTvSubst, substTy )
 import Class		( Class, classArity, className )
 import TyCon		( TyCon, isSynTyCon, isUnboxedTupleTyCon, 
 			  tyConArity, tyConName )
-import Var		( TyVar, tyVarKind, tyVarName, isTyVar, 
+import Var		( TyVar, tyVarKind, tyVarName, 
 			  mkTyVar, mkTcTyVar, tcTyVarDetails, isTcTyVar )
 
 -- others:

@@ -65,7 +65,7 @@ import Name		( isSystemName, mkSysTvName )
 import ErrUtils		( Message )
 import SrcLoc		( noLoc )
 import BasicTypes	( Arity )
-import Util		( equalLength, notNull )
+import Util		( notNull )
 import Outputable
 \end{code}
 

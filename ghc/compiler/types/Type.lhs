@@ -73,7 +73,7 @@ module Type (
 	deShadowTy,
 
 	-- Pretty-printing
-	pprType, pprParendType,
+	pprType, pprParendType, pprTyThingCategory,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred
     ) where
 

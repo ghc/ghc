@@ -110,7 +110,7 @@ module TcType (
   tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 
   pprKind, pprParendKind,
-  pprType, pprParendType,
+  pprType, pprParendType, pprTyThingCategory,
   pprPred, pprTheta, pprThetaArrow, pprClassPred
 
   ) where
@@ -150,7 +150,7 @@ import Type		(	-- Re-exports
 
 			  typeKind, repType,
 			  pprKind, pprParendKind,
-			  pprType, pprParendType,
+			  pprType, pprParendType, pprTyThingCategory,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )

@@ -6,7 +6,7 @@
 \begin{code}
 module LoadIface (
 	loadHomeInterface, loadInterface,
-	loadSrcInterface, loadOrphanModules,
+	loadSrcInterface, loadOrphanModules, loadHiBootInterface,
 	readIface,	-- Used when reading the module's old interface
 	predInstGates, ifaceInstGates, ifaceStats, discardDeclPrags,
 	initExternalPackageState
@@ -50,7 +50,8 @@ import MkId		( seqId )
 import Packages		( basePackage )
 import Module		( Module, ModuleName, ModLocation(ml_hi_file),
 			  moduleName, isHomeModule, emptyModuleEnv, 
-			  extendModuleEnv, lookupModuleEnvByName, moduleUserString
+			  extendModuleEnv, lookupModuleEnvByName, lookupModuleEnv,
+			  moduleUserString
 			)
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
 			  mkSuperDictSelOcc, mkDataConWrapperOcc, mkDataConWorkerOcc )
@@ -98,6 +99,34 @@ loadSrcInterface doc mod_name want_boot
   where
     elaborate err = hang (ptext SLIT("Failed to load interface for") <+> 
 			 quotes (ppr mod_name) <> colon) 4 err
+
+loadHiBootInterface :: TcRn (Maybe ModIface)
+-- Load the hi-boot iface for the module being compiled,
+-- if it indeed exists in the transitive closure of imports
+loadHiBootInterface
+  = do 	{ eps <- getEps
+	; mod <- getModule
+
+	-- We're read all the direct imports by now, so eps_is_boot will
+	-- record if any of our imports mention us by way of hi-boot file
+	; case lookupModuleEnv (eps_is_boot eps) mod of
+	    Nothing             -> return Nothing	-- The typical case
+
+	    Just (mod_nm, True) -> 	-- There's a hi-boot interface below us
+		-- Load it (into the PTE), and return its interface
+		do { iface <- loadSrcInterface (mk_doc mod_nm) mod_nm True
+		   ; return (Just iface) }
+
+	    Just (_, False) -> 		-- Someone below us imported us!
+		-- This is a loop with no hi-boot in the way
+		failWithTc (moduleLoop mod)
+    }
+  where
+    mk_doc mod = ptext SLIT("Need the hi-boot interface for") <+> ppr mod
+		 <+> ptext SLIT("to compare against the Real Thing")
+
+    moduleLoop mod = ptext SLIT("Circular imports: module") <+> quotes (ppr mod) 
+		     <+> ptext SLIT("depends on itself")
 
 loadOrphanModules :: [ModuleName] -> TcM ()
 loadOrphanModules mods

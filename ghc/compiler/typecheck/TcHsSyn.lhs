@@ -36,10 +36,10 @@ import Id	( idType, setIdType, Id )
 
 import TcRnMonad
 import Type	  ( Type )
-import TcType	  ( TcType, TcTyVar, mkTyVarTy, tcGetTyVar, mkTyConApp, isImmutableTyVar )
+import TcType	  ( TcType, TcTyVar, mkTyVarTy, mkTyConApp, isImmutableTyVar )
 import Kind	  ( isLiftedTypeKind, liftedTypeKind, isSubKind )
 import qualified  Type
-import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, zonkTcTyVars,
+import TcMType	  ( zonkQuantifiedTyVar, zonkType, zonkTcType, 
 		    putMetaTyVar )
 import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
 		    doublePrimTy, addrPrimTy

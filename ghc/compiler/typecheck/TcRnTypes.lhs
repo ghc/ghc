@@ -111,14 +111,14 @@ type TcM  a = TcRn a		-- Historical
 data Env gbl lcl	-- Changes as we move into an expression
   = Env {
 	env_top	 :: HscEnv,	-- Top-level stuff that never changes
-				--   Includes all info about imported things
+				-- Includes all info about imported things
 
 	env_us   :: TcRef UniqSupply,	-- Unique supply for local varibles
 
 	env_gbl  :: gbl,	-- Info about things defined at the top level
-				--   of the module being compiled
+				-- of the module being compiled
 
-	env_lcl  :: lcl		-- Nested stuff -- changes as we go into 
+	env_lcl  :: lcl		-- Nested stuff; changes as we go into 
 				-- an expression
     }
 

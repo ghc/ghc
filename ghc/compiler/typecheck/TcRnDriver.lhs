@@ -33,7 +33,7 @@ import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv,
 import TcHsSyn		( zonkTopDecls )
 import TcExpr 		( tcInferRho )
 import TcRnMonad
-import TcType		( tidyTopType )
+import TcType		( tidyTopType, tcEqType, mkTyVarTys, substTyWith )
 import Inst		( showLIE )
 import TcBinds		( tcTopBinds )
 import TcDefaults	( tcDefaults )
@@ -44,7 +44,8 @@ import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
 import TcIface		( tcExtCoreBindings )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
-import LoadIface	( loadOrphanModules )
+import LoadIface	( loadOrphanModules, loadHiBootInterface )
+import IfaceEnv		( lookupOrig )
 import RnNames		( importsFromLocalDecls, rnImports, exportsFromAvail, 
 			  reportUnusedNames, reportDeprecations )
 import RnEnv		( lookupSrcOcc_maybe )
@@ -58,15 +59,16 @@ import Module           ( mkHomeModule, mkModuleName, moduleName, moduleEnvElts 
 import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName )
 import NameSet
-import TyCon		( tyConHasGenerics )
+import TyCon		( tyConHasGenerics, isSynTyCon, getSynTyConDefn, tyConKind )
 import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState(..),
 			  GhciMode(..), noDependencies, isOneShot,
-			  Deprecs( NoDeprecs ), plusDeprecs,
-			  ForeignStubs(NoStubs), TypeEnv, 
+			  Deprecs( NoDeprecs ), ModIface(..), plusDeprecs,
+			  ForeignStubs(NoStubs), TyThing(..), 
+			  TypeEnv, lookupTypeEnv,
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, 
-			  emptyFixityEnv
+			  emptyFixityEnv, availName
 			)
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
@@ -113,8 +115,8 @@ import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, retu
 import Module		( ModuleName, lookupModuleEnvByName )
 import HscTypes		( InteractiveContext(..), ExternalPackageState( eps_PTE ),
 			  HomeModInfo(..), typeEnvElts, typeEnvClasses,
-			  TyThing(..), availName, availNames, icPrintUnqual,
-			  ModIface(..), ModDetails(..), Dependencies(..) )
+			  availNames, icPrintUnqual,
+			  ModDetails(..), Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Bag		( unitBag )
 import ListSetOps	( removeDups )
@@ -321,7 +323,9 @@ tcRnSrcDecls :: [LHsDecl RdrName] -> TcM TcGblEnv
 	-- Returns the variables free in the decls
 	-- Reason: solely to report unused imports and bindings
 tcRnSrcDecls decls
- = do {  	-- Do all the declarations
+ = do { mb_boot_iface <- loadHiBootInterface ;
+
+	  	-- Do all the declarations
 	(tc_envs, lie) <- getLIE (tc_rn_src_decls decls) ;
 
 	     -- tcSimplifyTop deals with constant or ambiguous InstIds.  
@@ -347,6 +351,9 @@ tcRnSrcDecls decls
 							   rules fords ;
 
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids } ;
+
+	-- Compre the hi-boot iface (if any) with the real thing
+ 	checkHiBootIface final_type_env mb_boot_iface ;
 
 	-- Make the new type env available to stuff slurped from interface files
 	writeMutVar (tcg_type_env_var tcg_env) final_type_env ;
@@ -397,6 +404,75 @@ tc_rn_src_decls ds
 	tc_rn_src_decls (spliced_decls ++ rest_ds)
 #endif /* GHCI */
     }}}
+\end{code}
+
+%************************************************************************
+%*									*
+	Comparing the hi-boot interface with the real thing
+%*									*
+%************************************************************************
+
+In both one-shot mode and GHCi mode, hi-boot interfaces are demand-loaded
+into the External Package Table.  Once we've typechecked the body of the
+module, we want to compare what we've found (gathered in a TypeEnv) with
+the hi-boot stuff in the EPT.  We do so here, using the export list of 
+the hi-boot interface as our checklist.
+
+\begin{code}
+checkHiBootIface :: TypeEnv -> Maybe ModIface -> TcM ()
+-- Compare the hi-boot file for this module (if there is one)
+-- with the type environment we've just come up with
+checkHiBootIface env Nothing 		-- No hi-boot 
+  = return ()
+
+checkHiBootIface env (Just iface)
+  = mapM_ (check_one env) exports
+  where
+    exports = [ (mod, availName avail) | (mod,avails) <- mi_exports iface,
+			   		 avail <- avails]
+----------------
+check_one local_env (mod,occ)
+  = do	{ name <- lookupOrig mod occ
+ 	; eps  <- getEps
+
+		-- Look up the hi-boot one; 
+		-- it should jolly well be there (else GHC bug)
+       ; case lookupTypeEnv (eps_PTE eps) name of {
+	    Nothing -> pprPanic "checkHiBootIface" (ppr name) ;
+	    Just boot_thing ->
+
+		-- Look it up in the local type env
+		-- It should be there, but it's a programmer error if not
+         case lookupTypeEnv local_env name of
+	   Nothing 	   -> addErrTc (missingBootThing boot_thing)
+	   Just real_thing -> check_thing boot_thing real_thing
+    } }
+
+----------------
+check_thing (ATyCon boot_tc) (ATyCon real_tc)
+  | isSynTyCon boot_tc && isSynTyCon real_tc,
+    defn1 `tcEqType` substTyWith tvs2 (mkTyVarTys tvs1) defn2
+  = return ()
+
+  | tyConKind boot_tc == tyConKind real_tc
+  = return ()
+  where
+    (tvs1, defn1) = getSynTyConDefn boot_tc
+    (tvs2, defn2) = getSynTyConDefn boot_tc
+
+check_thing (AnId boot_id) (AnId real_id)
+  | idType boot_id `tcEqType` idType real_id
+  = return ()
+
+check_thing boot_thing real_thing	-- Default case; failure
+  = addErrAt (srcLocSpan (getSrcLoc real_thing))
+	     (bootMisMatch real_thing)
+
+----------------
+missingBootThing thing
+  = ppr thing <+> ptext SLIT("is defined in the hi-boot file, but not in the module")
+bootMisMatch thing
+  = ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hi-boot file")
 \end{code}
 
 

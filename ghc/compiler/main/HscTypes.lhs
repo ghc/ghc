@@ -120,10 +120,13 @@ data HscEnv
 		-- are compiling right now.
 		-- (In one-shot mode the current module is the only
 		--  home-package module, so hsc_HPT is empty.  All other
-		--  modules count as "external-package" modules.)
+		--  modules count as "external-package" modules.
+		--  However, even in GHCi mode, hi-boot interfaces are
+		--  demand-loadeded into the external-package table.)
+		--
 		-- hsc_HPT is not mutable because we only demand-load 
 		-- external packages; the home package is eagerly 
-		-- loaded by the compilation manager.
+		-- loaded, module by module, by the compilation manager.
 	
 		-- The next two are side-effected by compiling
 		-- to reflect sucking in interface files

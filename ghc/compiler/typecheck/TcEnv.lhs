@@ -52,7 +52,7 @@ import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
 import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, 
 			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
 			  getDFunTyKey, tcTyConAppTyCon, 
-			  tidyOpenType, tidyOpenTyVar
+			  tidyOpenType, tidyOpenTyVar, pprTyThingCategory
 			)
 import qualified Type	( getTyVar_maybe )
 import Id		( idName, isLocalId )
@@ -605,10 +605,7 @@ wrongThingErr expected thing name
   = failWithTc (pp_thing thing <+> quotes (ppr name) <+> 
 		ptext SLIT("used as a") <+> text expected)
   where
-    pp_thing (AGlobal (ATyCon _))   = ptext SLIT("Type constructor")
-    pp_thing (AGlobal (AClass _))   = ptext SLIT("Class")
-    pp_thing (AGlobal (AnId   _))   = ptext SLIT("Identifier")
-    pp_thing (AGlobal (ADataCon _)) = ptext SLIT("Data constructor")
-    pp_thing (ATyVar _) 	    = ptext SLIT("Type variable")
-    pp_thing (ATcId _ _ _)  	    = ptext SLIT("Local identifier")
+    pp_thing (AGlobal thing) = pprTyThingCategory thing
+    pp_thing (ATyVar _)      = ptext SLIT("Type variable")
+    pp_thing (ATcId _ _ _)   = ptext SLIT("Local identifier")
 \end{code}

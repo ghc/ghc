@@ -22,7 +22,7 @@ import HsSyn		( HsExpr(..), LHsExpr, HsLit(..), ArithSeqInfo(..), recBindFields,
 import TcHsSyn		( hsLitType, (<$>) )
 import TcRnMonad
 import TcUnify		( Expected(..), tcInfer, zapExpectedType, zapExpectedTo, tcSubExp, tcGen,
-			  unifyFunTys, zapToListTy, zapToTyConApp, readExpectedType )
+			  unifyFunTys, zapToListTy, zapToTyConApp )
 import BasicTypes	( isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  newOverloadedLit, newMethodFromName, newIPDict,

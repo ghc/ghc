@@ -22,7 +22,7 @@ import Name		( Name )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import TcEnv		( newLocalName, tcExtendIdEnv1, tcExtendTyVarEnv,
 			  tcLookupClass, tcLookupDataCon, tcLookupId )
-import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars, isRigidType )
+import TcMType 		( newTyFlexiVarTy, arityErr, tcSkolTyVars )
 import TcType		( TcType, TcTyVar, TcSigmaType, TcTauType, zipTopTvSubst,
 			  SkolemInfo(PatSkol), isSkolemTyVar, pprSkolemTyVar, 
 			  mkTyVarTys, mkClassPred, mkTyConApp, isOverloadedTy )

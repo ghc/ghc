@@ -47,6 +47,13 @@ import Outputable
 %*									*
 %************************************************************************
 
+Checking for class-decl loops is easy, because we don't allow class decls
+in interface files.
+
+We allow type synonyms in hi-boot files, but we *trust* hi-boot files, 
+so we don't check for loops that involve them.  So we only look for synonym
+loops in the module being compiled.
+
 We check for type synonym and class cycles on the *source* code.
 Main reasons: 
 
@@ -64,8 +71,9 @@ Main reasons:
 
 The main disadvantage is that a cycle that goes via a type synonym in an 
 .hi-boot file can lead the compiler into a loop, because it assumes that cycles
-only occur in source code.  But hi-boot files are trusted anyway, so this isn't
-much worse than (say) a kind error.
+only occur entirely within the source code of the module being compiled.  
+But hi-boot files are trusted anyway, so this isn't much worse than (say) 
+a kind error.
 
 [  NOTE ----------------------------------------------
 If we reverse this decision, this comment came from tcTyDecl1, and should
@@ -136,6 +144,14 @@ calcClassCycles decls
 %*									*
 %************************************************************************
 
+For newtypes, we label some as "recursive" such that
+
+    INVARIANT: there is no cycle of non-recursive newtypes
+
+In any loop, only one newtype need be marked as recursive; it is
+a "loop breaker".  Labelling more than necessary as recursive is OK,
+provided the invariant is maintained.
+
 A newtype M.T is defined to be "recursive" iff
 	(a) its rhs mentions an abstract (hi-boot) TyCon
    or	(b) one can get from T's rhs to T via type 
@@ -163,7 +179,7 @@ back to it.  (This is an error too.)
 
 Hi-boot types
 ~~~~~~~~~~~~~
-A data type read from an hi-boot file will have an Unknown in its data constructors,
+A data type read from an hi-boot file will have an AbstractTyCon as its AlgTyConRhs
 and will respond True to isHiBootTyCon. The idea is that we treat these as if one
 could get from these types to anywhere.  So when we see
 
