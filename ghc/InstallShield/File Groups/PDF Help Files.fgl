@@ -1,0 +1,8 @@
+[General]
+Type=FILELIST
+Version=1.10.000
+
+[TopDir]
+file0=C:\TEMP\fptools\docs\building.pdf
+file1=C:\TEMP\fptools\ghc\docs\set\set.pdf
+

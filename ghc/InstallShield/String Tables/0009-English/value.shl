@@ -1,0 +1,28 @@
+[Data]
+TITLE_MAIN=Glasgow Haskell Compiler - version 4.08.1 (September '00)
+HASKELL_REG_ROOT=Software\\Haskell
+GHC_SYSLIBS_WAYS=seq
+COMPANY_NAME=University of Glasgow
+ERROR_COMPONENT=Component:
+COMPANY_NAME16=University of Glasgow
+GHC_SYSLIBS=std lang data num util text net greencard win32
+PRODUCT_VERSION=4.08.1
+ERROR_MOVEDATA=An error occurred during the move data process: %d
+ERROR_FILEGROUP=File Group:
+PRODUCT_NAME_SHORT=ghc
+UNINST_KEY=Glasgow Haskell Compiler
+TITLE_CAPTIONBAR=Glasgow Haskell Compiler Setup
+PRODUCT_NAME16=Glasgow Haskell Compiler
+ERROR_VGARESOLUTION=This program requires VGA or better resolution.
+ERROR_FILE=File:
+FOLDER_NAME=GHC
+UNINST_DISPLAY_NAME=Glasgow Haskell Compiler - version 4.08.1 (September '00)
+PRODUCT_KEY=ghc-4.08.1
+PRODUCT_NAME=Glasgow Haskell Compiler
+ERROR_UNINSTSETUP=unInstaller setup failed to initialize.  You may not be able to uninstall this product.
+
+[General]
+Language=0009
+Type=STRINGTABLESPECIFIC
+Version=1.00.000
+
