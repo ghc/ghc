@@ -305,7 +305,7 @@ instance (Data a, Data b, Ord a) => Data (FiniteMap a b) where
   gfoldl f z fm = z listToFM `f` (fmToList fm)
   toConstr _    = error "toConstr"
   gunfold _ _   = error "gunfold"
-  dataTypeOf _  = mkNorepType "Data.Array.Array"
+  dataTypeOf _  = mkNorepType "Data.FiniteMap.FiniteMap"
 
 #endif
 
