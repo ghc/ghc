@@ -173,7 +173,7 @@ LIBMP_LT_AGE = 1
 
 AUTOMAKE_OPTIONS = gnu check-news no-dependencies ansi2knr
 
-SUBDIRS = mpn mpz mpq mpf mpbsd mpfr tests demos tune
+SUBDIRS = mpn mpz
 
 include_HEADERS = gmp.h $(MPBSD_HEADERS_OPTION) $(MPFR_HEADERS_OPTION)
 EXTRA_HEADERS = mp.h
@@ -183,18 +183,6 @@ lib_LTLIBRARIES = libgmp.la $(MPBSD_LTLIBRARIES_OPTION)
 EXTRA_DIST = .gdbinit gmp-impl.h longlong.h stack-alloc.h urandom.h doc macos
 
 DISTCLEANFILES = asm-syntax.h config.m4 @gmp_srclinks@
-
-MPF_OBJECTS = mpf/init.lo mpf/init2.lo mpf/set.lo mpf/set_ui.lo mpf/set_si.lo \
-  mpf/set_str.lo mpf/set_d.lo mpf/set_z.lo mpf/iset.lo mpf/iset_ui.lo \
-  mpf/iset_si.lo mpf/iset_str.lo mpf/iset_d.lo mpf/clear.lo mpf/get_str.lo \
-  mpf/dump.lo mpf/size.lo mpf/eq.lo mpf/reldiff.lo mpf/sqrt.lo mpf/random2.lo \
-  mpf/inp_str.lo mpf/out_str.lo mpf/add.lo mpf/add_ui.lo mpf/sub.lo \
-  mpf/sub_ui.lo mpf/ui_sub.lo mpf/mul.lo mpf/mul_ui.lo mpf/div.lo \
-  mpf/div_ui.lo mpf/cmp.lo mpf/cmp_ui.lo mpf/cmp_si.lo mpf/mul_2exp.lo \
-  mpf/div_2exp.lo mpf/abs.lo mpf/neg.lo mpf/set_q.lo mpf/get_d.lo \
-  mpf/set_dfl_prec.lo mpf/set_prc.lo mpf/set_prc_raw.lo mpf/get_prc.lo \
-  mpf/ui_div.lo mpf/sqrt_ui.lo mpf/floor.lo mpf/ceil.lo mpf/trunc.lo \
-  mpf/pow_ui.lo mpf/urandomb.lo mpf/swap.lo
 
 MPZ_OBJECTS = mpz/abs.lo mpz/add.lo mpz/add_ui.lo mpz/addmul_ui.lo mpz/and.lo \
   mpz/array_init.lo mpz/bin_ui.lo mpz/bin_uiui.lo mpz/cdiv_q.lo \
@@ -225,13 +213,6 @@ MPZ_OBJECTS = mpz/abs.lo mpz/add.lo mpz/add_ui.lo mpz/addmul_ui.lo mpz/and.lo \
   mpz/tdiv_r_ui.lo mpz/tstbit.lo mpz/ui_pow_ui.lo mpz/urandomb.lo \
   mpz/urandomm.lo mpz/xor.lo
 
-MPQ_OBJECTS = mpq/add.lo mpq/canonicalize.lo mpq/clear.lo mpq/cmp.lo \
-  mpq/cmp_ui.lo mpq/div.lo mpq/get_d.lo mpq/get_den.lo mpq/get_num.lo \
-  mpq/init.lo mpq/inv.lo mpq/mul.lo mpq/neg.lo mpq/out_str.lo \
-  mpq/set.lo mpq/set_den.lo \
-  mpq/set_num.lo mpq/set_si.lo mpq/set_ui.lo mpq/sub.lo mpq/equal.lo \
-  mpq/set_z.lo mpq/set_d.lo mpq/swap.lo
-
 MPN_OBJECTS = @mpn_objs_in_libgmp@
 
 MPBSD_OBJECTS = mpbsd/add.lo mpbsd/tdiv_qr.lo mpbsd/move.lo mpbsd/powm.lo \
@@ -240,25 +221,13 @@ MPBSD_OBJECTS = mpbsd/add.lo mpbsd/tdiv_qr.lo mpbsd/move.lo mpbsd/powm.lo \
   mpbsd/pow_ui.lo mpbsd/sdiv.lo mpbsd/sqrtrem.lo mpbsd/xtom.lo 
 
 
-# FIXME: Add mpfr/rnd_mode.lo when it's clean.
-MPFR_OBJECTS = mpfr/add.lo mpfr/div_2exp.lo mpfr/neg.lo mpfr/set_dfl_prec.lo \
-  mpfr/set_str_raw.lo mpfr/agm.lo mpfr/get_str.lo mpfr/print_raw.lo \
-  mpfr/set_dfl_rnd.lo mpfr/sqrt.lo mpfr/clear.lo mpfr/init.lo \
-  mpfr/set_f.lo mpfr/sub.lo mpfr/cmp.lo mpfr/mul.lo mpfr/round.lo \
-  mpfr/set_prec.lo mpfr/cmp_ui.lo mpfr/mul_2exp.lo mpfr/set.lo mpfr/set_si.lo \
-  mpfr/div.lo mpfr/mul_ui.lo mpfr/set_d.lo mpfr/pow.lo mpfr/out_str.lo \
-  mpfr/pi.lo mpfr/set_z.lo mpfr/add_ulp.lo mpfr/log2.lo mpfr/random.lo \
-  mpfr/log.lo mpfr/exp.lo mpfr/div_ui.lo mpfr/zeta.lo mpfr/karadiv.lo \
-  mpfr/karasqrt.lo mpfr/print_rnd_mode.lo
-
 
 @WANT_MPFR_TRUE@MPFR_HEADERS_OPTION = @WANT_MPFR_TRUE@mpfr/mpfr.h
 @WANT_MPFR_TRUE@MPFR_OBJECTS_OPTION = @WANT_MPFR_TRUE@$(MPFR_OBJECTS)
 @WANT_MPFR_TRUE@MPFR_LIBADD_OPTION = @WANT_MPFR_TRUE@-lm
 libgmp_la_SOURCES = assert.c compat.c errno.c memory.c mp_set_fns.c	 \
   mp_clz_tab.c mp_minv_tab.c						 \
-  rand.c randclr.c randlc.c randlc2x.c randraw.c randsd.c		 \
-  randsdui.c version.c stack-alloc.c mp_bpl.c extract-dbl.c insert-dbl.c
+  version.c stack-alloc.c mp_bpl.c extract-dbl.c insert-dbl.c
 
 libgmp_la_DEPENDENCIES = \
   $(MPF_OBJECTS) $(MPZ_OBJECTS) $(MPN_OBJECTS) $(MPQ_OBJECTS) \
@@ -314,7 +283,7 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES =  $(libgmp_la_SOURCES) $(libmp_la_SOURCES)
 TEXI2DVI = texi2dvi
-INFO_DEPS = gmp.info
+# INFO_DEPS = gmp.info
 DVIS = gmp.dvi
 TEXINFOS = gmp.texi
 HEADERS =  $(include_HEADERS)
@@ -536,8 +505,8 @@ distclean-vti:
 maintainer-clean-vti:
 	-@MAINTAINER_MODE_TRUE@rm -f $(srcdir)/stamp-vti $(srcdir)/version.texi
 
-gmp.info: gmp.texi version.texi
-gmp.dvi: gmp.texi version.texi
+# gmp.info: gmp.texi version.texi
+# gmp.dvi: gmp.texi version.texi
 
 
 DVIPS = dvips

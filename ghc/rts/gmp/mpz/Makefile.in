@@ -119,7 +119,7 @@ mpn_objs_in_libgmp = @mpn_objs_in_libgmp@
 
 AUTOMAKE_OPTIONS = gnu no-dependencies
 
-SUBDIRS = tests
+SUBDIRS =
 
 INCLUDES = -I$(top_srcdir) -DOPERATION_$*
 

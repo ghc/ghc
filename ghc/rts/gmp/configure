@@ -4600,10 +4600,7 @@ cat >$CONFIG_STATUS <<EOF
 
 # Files that config.status was made for.
 config_files="\\
-  Makefile mpf/Makefile mpz/Makefile mpn/Makefile mpq/Makefile
-  mpf/tests/Makefile mpz/tests/Makefile mpq/tests/Makefile mpn/tests/Makefile
-  tests/Makefile tests/rand/Makefile demos/Makefile tune/Makefile
-  mpbsd/Makefile mpbsd/tests/Makefile mpfr/Makefile mpfr/tests/Makefile"
+  Makefile mpn/Makefile mpz/Makefile"
 config_headers="\\
   config.h:config.in"
 config_links="\\
@@ -4693,22 +4690,8 @@ Try \\\`$CONFIG_STATUS --help' for more information."; exit 1 ;;
 
   # Handling of arguments.
   'Makefile' ) CONFIG_FILES="\$CONFIG_FILES Makefile" ;;
-  'mpf/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpf/Makefile" ;;
   'mpz/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpz/Makefile" ;;
   'mpn/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpn/Makefile" ;;
-  'mpq/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpq/Makefile" ;;
-  'mpf/tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpf/tests/Makefile" ;;
-  'mpz/tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpz/tests/Makefile" ;;
-  'mpq/tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpq/tests/Makefile" ;;
-  'mpn/tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpn/tests/Makefile" ;;
-  'tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES tests/Makefile" ;;
-  'tests/rand/Makefile' ) CONFIG_FILES="\$CONFIG_FILES tests/rand/Makefile" ;;
-  'demos/Makefile' ) CONFIG_FILES="\$CONFIG_FILES demos/Makefile" ;;
-  'tune/Makefile' ) CONFIG_FILES="\$CONFIG_FILES tune/Makefile" ;;
-  'mpbsd/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpbsd/Makefile" ;;
-  'mpbsd/tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpbsd/tests/Makefile" ;;
-  'mpfr/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpfr/Makefile" ;;
-  'mpfr/tests/Makefile' ) CONFIG_FILES="\$CONFIG_FILES mpfr/tests/Makefile" ;;
   '$gmp_links' ) CONFIG_LINKS="\$CONFIG_LINKS $gmp_links" ;;
   'default-1' ) CONFIG_COMMANDS="\$CONFIG_COMMANDS default-1" ;;
   'config.h' ) CONFIG_HEADERS="\$CONFIG_HEADERS config.h:config.in" ;;

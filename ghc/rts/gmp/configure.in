@@ -21,7 +21,7 @@ dnl  the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 dnl  MA 02111-1307, USA.
 
 
-AC_REVISION($Revision: 1.4 $)dnl
+AC_REVISION($Revision: 1.5 $)dnl
 AC_PREREQ(2.14)dnl
 AC_INIT(gmp-impl.h)
 
@@ -935,7 +935,4 @@ GMP_FINISH
 
 dnl  Create Makefiles
 dnl  FIXME: Upcoming version of autoconf/automake may not like broken lines.
-AC_OUTPUT(Makefile mpf/Makefile mpz/Makefile mpn/Makefile mpq/Makefile \
-  mpf/tests/Makefile mpz/tests/Makefile mpq/tests/Makefile mpn/tests/Makefile \
-  tests/Makefile tests/rand/Makefile demos/Makefile tune/Makefile \
-  mpbsd/Makefile mpbsd/tests/Makefile mpfr/Makefile mpfr/tests/Makefile)
+AC_OUTPUT(Makefile mpz/Makefile mpn/Makefile)
