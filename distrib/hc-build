@@ -1,0 +1,34 @@
+#/bin/sh
+
+# Manuel M. T. Chakravarty <chak@acm.org>, June 2000
+#
+# Script to build GHC from .hc files (must be run in the fptools/ root
+# directory into which the source and .hc files must already have been
+# unpacked).  All options are passed through to ./configure (especially
+# useful with --prefix).
+
+configopts="$*"
+
+# build configuration
+#
+cat >mk/build.mk <<END
+ProjectsToBuild = glafp-utils hslibs ghc
+GhcLibHcOpts = -O
+SRC_HAPPY_OPTS += -c
+GhcLibWays=
+END
+
+# touch happy generated files; so that in non-bootstrapping mode for
+# installation, no attempt is made to call happy
+#
+touch ghc/compiler/rename/ParseIface.hs
+touch ghc/compiler/parser/Parser.hs
+
+echo "*** Building hsc..."
+./configure --enable-hc-boot $configopts        || exit 1
+make boot all                                   || exit 1
+
+echo "*** Building library..."
+echo "GhcWithHscBuiltViaC=NO" >>mk/build.mk
+make -C ghc/lib clean boot all			|| exit 1
+make -C hslibs  clean boot all
