@@ -24,10 +24,10 @@ main = do
 	filenames <- getArgs
 	filedata <- mapM findthings filenames
 	ctagsfile <- openFile "tags" WriteMode
-	etagsfile <- openFile "TAGS" WriteMode
 	writectagsfile ctagsfile filedata
-	writeetagsfile etagsfile filedata
 	hClose ctagsfile
+	etagsfile <- openFile "TAGS" WriteMode
+	writeetagsfile etagsfile filedata
 	hClose etagsfile
 	
 type FileName = String
