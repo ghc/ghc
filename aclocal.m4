@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.91 2002/01/07 20:24:23 sof Exp $
+dnl $Id: aclocal.m4,v 1.92 2002/01/07 20:46:52 sof Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -636,7 +636,7 @@ AC_CACHE_VAL(AC_CV_NAME,
 typedef $1 testing;
 
 main() {
-  FILE *f=fopen("conftestval2", "w");
+  FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
   if (((testing)((int)((testing)1.4))) == ((testing)1.4)) {
     fprintf(f, "%s%d\n",
@@ -649,8 +649,7 @@ main() {
   }
   fclose(f);
   exit(0);
-}], AC_CV_NAME=`cat conftestval2`,
-echo $AC_CV_NAME
+}], AC_CV_NAME=`cat conftestval`,
 ifelse([$2], , AC_CV_NAME=NotReallyAType,      AC_CV_NAME=$2),
 ifelse([$3], , AC_CV_NAME=NotReallyATypeCross, AC_CV_NAME=$3))]) dnl
 AC_MSG_RESULT($AC_CV_NAME)
