@@ -721,10 +721,10 @@ AC_HEADER_STDC
 
 dnl ** check for specific header (.h) files that we are interested in
 AC_CHECK_HEADERS(Files.h arpa/inet.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h inttypes.h limits.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdint.h stdlib.h stddef.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netdb.h netinet/in.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/un.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h vfork.h bfd.h winsock.h pthread.h sys/uio.h)
-AC_CHECK_HEADER(unistd.h,AC_CHECK_FUNCS(lchown))
+AC_CHECK_HEADER(unistd.h,[AC_CHECK_FUNCS(lchown)])
 
-AC_CHECK_HEADER(readline/readline.h, HaveReadlineReadlineH=YES, HaveReadlineReadlineH=NO)
-AC_CHECK_HEADER(readline/history.h, HaveReadlineHistoryH=YES, HaveReadlineHistoryH=NO)
+AC_CHECK_HEADER(readline/readline.h, [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
+AC_CHECK_HEADER(readline/history.h, [HaveReadlineHistoryH=YES], [HaveReadlineHistoryH=NO])
 
 if test $HaveReadlineReadlineH = YES && test $HaveReadlineHistoryH = YES ; then
   HaveReadlineHeaders=YES
@@ -751,14 +751,14 @@ dnl dynamic loading include files
 AC_CHECK_HEADERS(dlfcn.h dl.h) 
 
 dnl ** check for farcalloc (in bcc)
-AC_CHECK_HEADER(alloc.h,AC_CHECK_FUNCS(farcalloc))
+AC_CHECK_HEADER(alloc.h,[AC_CHECK_FUNCS(farcalloc)])
 
 dnl ** check for valloc (in sunos, solaris, mips, amiga, next, minix, ultrix)
-AC_CHECK_HEADER(malloc.h,AC_CHECK_FUNCS(valloc))
+AC_CHECK_HEADER(malloc.h,[AC_CHECK_FUNCS(valloc)])
 
 dnl ** check for POSIX regex
 HavePosixRegex=NO
-AC_CHECK_HEADER(regex.h,AC_CHECK_FUNC(regcomp, HavePosixRegex=YES))
+AC_CHECK_HEADER(regex.h,[AC_CHECK_FUNC(regcomp, [HavePosixRegex=YES])])
 AC_SUBST(HavePosixRegex)
 
 dnl ** how do we get a timezone name, and UTC offset ?
