@@ -314,21 +314,19 @@ data Ifaces = Ifaces {
 		-- This is used to generate the "usage" information for this module.
 		-- Subset of the previous field.
 
-		iInsts :: Bag GatedDecl,
+		iInsts :: IfaceInsts,
 		-- The as-yet un-slurped instance decls; this bag is depleted when we
 		-- slurp an instance decl so that we don't slurp the same one twice.
 		-- Each is 'gated' by the names that must be available before
 		-- this instance decl is needed.
 
 		iRules :: IfaceRules,
-		-- Similar to instance decls, except that we track the version number of the
-		-- rules we import from each module
-		-- [We keep just one rule-version number for each module]
-		-- The Bool is True if we import any rules at all from that module
+		-- Similar to instance decls, only for rules
 
 		iDeprecs :: DeprecationEnv
 	}
 
+type IfaceInsts = Bag GatedDecl
 type IfaceRules = Bag GatedDecl
 
 type GatedDecl = (NameSet, (Module, RdrNameHsDecl))

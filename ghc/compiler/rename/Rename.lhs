@@ -26,7 +26,8 @@ import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, getInte
 			  getImportedRules, loadHomeInterface, getSlurped, removeContext,
 			  loadBuiltinRules, getDeferredDecls, ImportDeclResult(..)
 			)
-import RnEnv		( availName, availsToNameSet, unitAvailEnv, availEnvElts, plusAvailEnv, 
+import RnEnv		( availName, availsToNameSet, 
+			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, 
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupImplicitOccsRn, pprAvail, unknownNameErr,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
@@ -54,7 +55,9 @@ import Type		( namesOfType, funTyCon )
 import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( Version, initialVersion )
 import Bag		( isEmptyBag, bagToList )
-import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, addToFM_C )
+import FiniteMap	( FiniteMap, eltsFM, fmToList, emptyFM, lookupFM, 
+			  addToFM_C, elemFM, addToFM
+			)
 import UniqSupply	( UniqSupply )
 import UniqFM		( lookupUFM )
 import SrcLoc		( noSrcLoc )
@@ -192,7 +195,8 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_name direct_import_mods
 		      gbl_env global_avail_env
-		      export_avails source_fvs		`thenRn_`
+		      export_avails source_fvs
+		      rn_imp_decls			`thenRn_`
 
     returnRn (Just result, dump_action) }
   where
@@ -654,10 +658,12 @@ rnDeprecs gbl_env mod_deprec decls
 \begin{code}
 reportUnusedNames :: ModuleName -> [ModuleName] 
 		  -> GlobalRdrEnv -> AvailEnv
-		  -> Avails -> NameSet -> RnMG ()
+		  -> Avails -> NameSet -> [RenamedHsDecl] 
+		  -> RnMG ()
 reportUnusedNames mod_name direct_import_mods 
 		  gbl_env avail_env 
 		  export_avails mentioned_names
+		  imported_decls
   = let
 	used_names = mentioned_names `unionNameSets` availsToNameSet export_avails
 
@@ -682,7 +688,8 @@ reportUnusedNames mod_name direct_import_mods
 			    = case lookupNameEnv avail_env sub_name of
 				Just avail -> avail
 				Nothing -> WARN( isUserImportedName sub_name,
-						 text "reportUnusedName: not in avail_env" <+> ppr sub_name )
+						 text "reportUnusedName: not in avail_env" <+> 
+							ppr sub_name )
 					   Avail sub_name
 		      
 		    , case parent_avail of { AvailTC _ _ -> True; other -> False }
@@ -702,12 +709,35 @@ reportUnusedNames mod_name direct_import_mods
                                    not (isLocallyDefined n),
                                    Just txt <- [lookupNameEnv deprec_env n] ]
 
+	-- inst_mods are directly-imported modules that 
+	--	contain instance decl(s) that the renamer decided to suck in
+	-- It's not necessarily redundant to import such modules.
+	-- NOTE: import M () is not necessarily redundant, even if
+	-- 	 we suck in no instance decls from M (e.g. it contains 
+	--	 no instance decls).  It may be that we import M solely to
+	--	 ensure that M's orphan instance decls (or those in its imports)
+	--	 are visible to people who import this module.  Sigh. There's
+	-- 	 really no good way to detect this, so the error message is weakened
+	inst_mods = [m | InstD (InstDecl _ _ _ dfun _) <- imported_decls,
+			 let m = moduleName (nameModule dfun),
+			 m `elem` direct_import_mods
+		    ]
+
 	minimal_imports :: FiniteMap ModuleName AvailEnv
-	minimal_imports = foldNameSet add emptyFM really_used_names
-	add n acc = case maybeUserImportedFrom n of
-			Nothing -> acc
-			Just m  -> addToFM_C plusAvailEnv acc (moduleName m)
-					     (unitAvailEnv (mk_avail n))
+	minimal_imports0 = emptyFM
+	minimal_imports1 = foldNameSet add_name minimal_imports0 really_used_names
+	minimal_imports  = foldr   add_inst_mod minimal_imports1 inst_mods
+	
+	add_name n acc = case maybeUserImportedFrom n of
+			   Nothing -> acc
+			   Just m  -> addToFM_C plusAvailEnv acc (moduleName m)
+					        (unitAvailEnv (mk_avail n))
+	add_inst_mod m acc 
+	  | m `elemFM` acc = acc	-- We import something already
+	  | otherwise	   = addToFM acc m emptyAvailEnv
+		-- Add an empty collection of imports for a module
+		-- from which we have sucked only instance decls
+
 	mk_avail n = case lookupNameEnv avail_env n of
 			Just (AvailTC m _) | n==m      -> AvailTC n [n]
 					   | otherwise -> AvailTC m [n,m]

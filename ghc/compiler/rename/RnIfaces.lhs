@@ -364,9 +364,9 @@ loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
 -----------------------------------------------------
 
 loadInstDecl :: Module
-	     -> Bag GatedDecl
+	     -> IfaceInsts
 	     -> RdrNameInstDecl
-	     -> RnM d (Bag GatedDecl)
+	     -> RnM d IfaceInsts
 loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
   = 
 	-- Find out what type constructors and classes are "gates" for the

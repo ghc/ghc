@@ -763,8 +763,10 @@ warnUnusedModules mods
   | not opt_WarnUnusedImports = returnRn ()
   | otherwise 		      = mapRn_ (addWarnRn . unused_mod) mods
   where
-    unused_mod m = ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
-		   text "is imported, but nothing from it is used"
+    unused_mod m = vcat [ptext SLIT("Module") <+> quotes (pprModuleName m) <+> 
+			   text "is imported, but nothing from it is used",
+			 parens (ptext SLIT("except perhaps to re-export instances visible in") <+>
+				   quotes (pprModuleName m))]
 
 warnUnusedLocalBinds, warnUnusedImports, warnUnusedMatches :: [Name] -> RnM d ()
 warnUnusedImports names
