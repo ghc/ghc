@@ -183,3 +183,5 @@
 /* Define if you have extern char *tzname[2].  */
 #undef HAVE_TZNAME
 
+/* Define this if your time.h defines altzone */
+#undef HAVE_ALTZONE
