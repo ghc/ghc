@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: PrelTopHandler.lhs,v 1.4 2001/08/15 09:24:19 rrt Exp $
+-- $Id: PrelTopHandler.lhs,v 1.5 2001/08/17 11:13:04 rrt Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -70,7 +70,7 @@ reportError bombOut str = do
 #ifndef ILX
 foreign label "ErrorHdrHook" errorHdrHook :: Ptr ()
 #else
-foreign import "ErrorHdrHook" errorHdrHook :: Ptr ()
+foreign import "_ErrorHdrHook" errorHdrHook :: Ptr ()
 #endif
 
 foreign import ccall "writeErrString__" unsafe

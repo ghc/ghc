@@ -1,7 +1,7 @@
 /* 
  * (c) The GHC Team 2001
  *
- * $Id: ilxstubs.c,v 1.4 2001/08/15 10:16:46 rrt Exp $
+ * $Id: ilxstubs.c,v 1.5 2001/08/17 11:13:04 rrt Exp $
  *
  * ILX stubs for external function calls
  */
@@ -59,8 +59,14 @@ stackOverflow(void)
 {
 }
 
+void *
+_ErrorHdrHook(void)
+{
+  return &ErrorHdrHook;
+}
+
 void
-ErrorHdrHook (long fd)
+ErrorHdrHook(long fd)
 {
     const char msg[] = "\nFail: ";
     write(fd, msg, sizeof(msg)-1);
