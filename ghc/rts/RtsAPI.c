@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.50 2003/11/12 17:49:08 sof Exp $
+ * $Id: RtsAPI.c,v 1.51 2003/12/17 12:17:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -494,13 +494,13 @@ void
 rts_lock()
 {
 #ifdef RTS_SUPPORTS_THREADS
-	ACQUIRE_LOCK(&sched_mutex);
+    ACQUIRE_LOCK(&sched_mutex);
 	
-		// we request to get the capability immediately, in order to
-		// a) stop other threads from using allocate()
-		// b) wake the current worker thread from awaitEvent()
-		//       (so that a thread started by rts_eval* will start immediately)
-	grabReturnCapability(&sched_mutex,&rtsApiCapability);
+    // we request to get the capability immediately, in order to
+    // a) stop other threads from using allocate()
+    // b) wake the current worker thread from awaitEvent()
+    //       (so that a thread started by rts_eval* will start immediately)
+    waitForReturnCapability(&sched_mutex,&rtsApiCapability);
 #endif
 }
 
@@ -508,8 +508,9 @@ void
 rts_unlock()
 {
 #ifdef RTS_SUPPORTS_THREADS
-    if(rtsApiCapability)
+    if (rtsApiCapability) {
 	releaseCapability(rtsApiCapability);
+    }
     rtsApiCapability = NULL;
     RELEASE_LOCK(&sched_mutex);
 #endif
