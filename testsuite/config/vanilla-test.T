@@ -259,7 +259,8 @@ def vanilla-comp-test-actions ( $extra_compile_args )
    $actual_stderr = qualify("comp.stderr")
 
    if   exists($expected_stderr) && 
-        contents($actual_stderr) /= contents($expected_stderr)
+        (normalise_errmsg(contents($actual_stderr))
+             /= normalise_errmsg(contents($expected_stderr)))
    then return False 
    fi
 
