@@ -29,9 +29,49 @@
     <h2>To CPP or not to CPP?</h2>
 
     <p>We pass all the compiler sources through CPP.  The
-    <tt>-cpp</tt> flag is always added by the build system.  More
-    about what you're allowed to do in the way of CPP directives
-    later.
+    <tt>-cpp</tt> flag is always added by the build system.  
+
+    <p>The following CPP symbols are used throughout the compiler:
+    
+    <dl>
+      <dt><tt>DEBUG</tt></dt>
+
+      <dd>Used to enables extra checks and debugging output in the
+      compiler.  The <tt>ASSERT</tt> macro (see <tt>HsVersions.h</tt>)
+      provides assertions which disappear when <tt>DEBUG</tt> is not
+      defined.
+
+      <p>All debugging output should be placed inside <tt>#ifdef
+      DEBUG</tt>; we generally use this to provide warnings about
+      strange cases and things that might warrant investigation.  When
+      <tt>DEBUG</tt> is off, the compiler should normally be silent
+      unless something goes wrong (exception when the verbosity level
+      is greater than zero).
+
+      <p>A good rule of thumb is that <tt>DEBUG</tt> shouldn't add
+      more than about 10-20% to the compilation time.  This is the case
+      at the moment.  If it gets too expensive, we won't use it.  For
+      more expensive runtime checks, consider adding a flag - see for
+      example <tt>-dcore-lint</tt>.
+      </dd>
+
+      <dt><tt>GHCI</tt></dt>
+      
+      <dd>Enables GHCi support, including the byte code generator and
+      interactive user interface.  This isn't the default, because the
+      compiler needs to be bootstrapped with itself in order for GHCi
+      to work properly.  The reason is that the byte-code compiler and
+      linker are quite closely tied to the runtime system, so it is
+      essential that GHCi is linked with the most up-to-date RTS.
+      Another reason is that the representation of certain datatypes
+      must be consistent between GHCi and its libraries, and if these
+      were inconsistent then disaster could follow.
+      </dd>
+
+    </dl>
+
+    <p>More about what you're allowed to do in the way of CPP
+    directives later.
 
     <h2>Compiler versions</h2>
 
