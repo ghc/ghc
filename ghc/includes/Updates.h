@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.30 2003/03/27 13:54:31 simonmar Exp $
+ * $Id: Updates.h,v 1.31 2003/04/08 15:32:38 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -97,7 +97,7 @@
 	const StgInfoTable *info;					\
 	info = updclosure->header.info;					\
         AWAKEN_BQ(info,updclosure);					\
-	updateWithIndirection(info,					\
+	updateWithIndirection(info,&stg_IND_info,			\
 			      (StgClosure *)updclosure,			\
 			      (StgClosure *)heapptr,);			\
    }
@@ -119,9 +119,9 @@
 	const StgInfoTable *info;			\
 	info = ((StgClosure *)updclosure)->header.info;	\
         AWAKEN_BQ_NOLOCK(info,updclosure);		\
-	updateWithIndirection(info,			\
+	updateWithIndirection(info,&stg_IND_info,	\
 			      (StgClosure *)updclosure,	\
-			      (StgClosure *)heapptr);	\
+			      (StgClosure *)heapptr,);	\
    }
 # endif
 
