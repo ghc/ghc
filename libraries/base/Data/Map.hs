@@ -625,13 +625,13 @@ intersection m1 m2
   = intersectionWithKey (\k x y -> x) m1 m2
 
 -- | /O(n+m)/. Intersection with a combining function.
-intersectionWith :: Ord k => (a -> b -> a) -> Map k a -> Map k b -> Map k a
+intersectionWith :: Ord k => (a -> b -> c) -> Map k a -> Map k b -> Map k c
 intersectionWith f m1 m2
   = intersectionWithKey (\k x y -> f x y) m1 m2
 
 -- | /O(n+m)/. Intersection with a combining function.
 -- Intersection is more efficient on (bigset `intersection` smallset)
-intersectionWithKey :: Ord k => (k -> a -> b -> a) -> Map k a -> Map k b -> Map k a
+intersectionWithKey :: Ord k => (k -> a -> b -> c) -> Map k a -> Map k b -> Map k c
 intersectionWithKey f Tip t = Tip
 intersectionWithKey f t Tip = Tip
 intersectionWithKey f t1 t2
