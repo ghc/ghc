@@ -290,10 +290,10 @@ ppHtmlIndex odir doctitle ifaces = do
   indexElt (nm, entries) = 
      td << ppHsName nm
      <-> td << (hsep [ if defining then
-			 bold << anchor ! [href (linkId (Module mdl) nm)]
+			 bold << anchor ! [href (linkId (Module mdl) (Just nm))]
 			   << toHtml mdl
 		       else
-			 anchor ! [href (linkId (Module mdl) nm)] << toHtml mdl
+			 anchor ! [href (linkId (Module mdl) Nothing)] << toHtml mdl
 	             | (Module mdl, defining) <- entries ])
 
   initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
@@ -819,7 +819,7 @@ ppHsQName (UnQual str) = ppHsName str
 ppHsQName n@(Qual mdl str)
   | n == unit_con_name	= ppHsName str
   | isSpecial str	= ppHsName str
-  | otherwise		= anchor ! [href (linkId mdl str)] << ppHsName str
+  | otherwise		= anchor ! [href (linkId mdl (Just str))] << ppHsName str
 
 isSpecial :: HsName -> Bool
 isSpecial (HsTyClsName id0) | HsSpecial _ <- id0 = True
@@ -851,11 +851,14 @@ ppHsBindIdent (HsIdent str)   =  toHtml str
 ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
 ppHsBindIdent (HsSpecial str) =  toHtml str
 
-linkId :: Module -> HsName -> String
-linkId (Module mdl) str = moduleHtmlFile fp mdl ++ '#': hsNameStr str
-  where fp = case lookupFM html_xrefs (Module mdl) of
-		Just fp0 -> fp0 
+linkId :: Module -> Maybe HsName -> String
+linkId (Module mdl) mbStr = case mbStr of
+                               Nothing  -> mhf
+                               Just str -> mhf ++ '#': hsNameStr str
+  where mhf = moduleHtmlFile fp mdl
+        fp = case lookupFM html_xrefs (Module mdl) of
 		Nothing  -> ""
+		Just fp0 -> fp0 
 
 ppHsModule :: String -> Html
 ppHsModule mdl = anchor ! [href ((moduleHtmlFile fp modname) ++ ref)] << toHtml mdl
