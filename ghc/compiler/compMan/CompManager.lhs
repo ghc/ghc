@@ -1185,8 +1185,9 @@ downsweep roots old_summaries
 	checkDuplicates summaries = mapM_ check summaries
   	  where check summ = 
 		  case dups of
-			[] -> return ()
-			files -> multiRootsErr modl files
+			[]     -> return ()
+			[_one] -> return ()
+			many   -> multiRootsErr modl many
 		   where modl = ms_mod summ
 			 dups = 
 			   [ fromJust (ml_hs_file (ms_location summ'))
