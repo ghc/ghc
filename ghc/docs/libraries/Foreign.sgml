@@ -12,8 +12,10 @@ id="foreign-finalisers" name="Finalisation for foreign objects">).
 module Foreign where
 data ForeignObj  -- abstract, instance of: Eq
 
-makeForeignObj  :: Addr{-object-} -> IO ForeignObj
-writeForeignObj :: ForeignObj -> Addr{-new value-} -> IO ()
+makeForeignObj      :: Addr{-object-} -> Addr{-finaliser-} -> IO ForeignObj
+writeForeignObj     :: ForeignObj -> Addr{-new value-} -> IO ()
+mkForeignObj        :: Addr -> IO ForeignObj
+addForeignFinalizer :: ForeignObj -> IO () -> IO ()
 </verb> </tscreen>
 
 In addition to the above, the following operations for indexing via
@@ -23,6 +25,7 @@ over <tt/Addr/s:
 <tscreen><verb>
 indexCharOffForeignObj   :: ForeignObj -> Int -> Char
 indexIntOffForeignObj    :: ForeignObj -> Int -> Int
+indexWordOffForeignObj   :: ForeignObj -> Int -> Word
 indexAddrOffForeignObj   :: ForeignObj -> Int -> Addr
 indexFloatOffForeignObj  :: ForeignObj -> Int -> Float
 indexDoubleOffForeignObj :: ForeignObj -> Int -> Double
@@ -39,6 +42,7 @@ indexInt64OffForeignObj :: ForeignObj -> Int -> Int64
 -- read value out of mutable memory
 readCharOffForeignObj    :: ForeignObj -> Int -> IO Char
 readIntOffForeignObj     :: ForeignObj -> Int -> IO Int
+readWordOffForeignObj    :: ForeignObj -> Int -> IO Word
 readAddrOffForeignObj    :: ForeignObj -> Int -> IO Addr
 readFloatOffForeignObj   :: ForeignObj -> Int -> IO Float
 readDoubleOffForeignObj  :: ForeignObj -> Int -> IO Double
@@ -53,6 +57,7 @@ readInt64OffForeignObj   :: ForeignObj -> Int -> IO Int64
 
 writeCharOffForeignObj   :: ForeignObj -> Int -> Char   -> IO ()
 writeIntOffForeignObj    :: ForeignObj -> Int -> Int    -> IO ()
+writeWordOffForeignObj   :: ForeignObj -> Int -> Word   -> IO ()
 writeAddrOffForeignObj   :: ForeignObj -> Int -> Addr   -> IO ()
 writeFloatOffForeignObj  :: ForeignObj -> Int -> Float  -> IO ()
 writeDoubleOffForeignObj :: ForeignObj -> Int -> Double -> IO ()

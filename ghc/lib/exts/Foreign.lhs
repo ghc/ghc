@@ -21,6 +21,59 @@ module Foreign
        , makeStablePtr       -- :: a -> IO (StablePtr a)
        , deRefStablePtr      -- :: StablePtr a -> IO a
        , freeStablePtr       -- :: StablePtr a -> IO ()
+       
+       , indexCharOffForeignObj   -- :: ForeignObj -> Int -> Char
+
+       , indexIntOffForeignObj    -- :: ForeignObj -> Int -> Int
+       , indexInt8OffForeignObj   -- :: ForeignObj -> Int -> Int8
+       , indexInt16OffForeignObj  -- :: ForeignObj -> Int -> Int16
+       , indexInt32OffForeignObj  -- :: ForeignObj -> Int -> Int32
+       , indexInt64OffForeignObj  -- :: ForeignObj -> Int -> Int64
+
+       , indexWord8OffForeignObj   -- :: ForeignObj -> Int -> Word
+       , indexWord8OffForeignObj   -- :: ForeignObj -> Int -> Word8
+       , indexWord16OffForeignObj  -- :: ForeignObj -> Int -> Word16
+       , indexWord32OffForeignObj  -- :: ForeignObj -> Int -> Word32
+       , indexWord64OffForeignObj  -- :: ForeignObj -> Int -> Word64
+
+       , indexAddrOffForeignObj   -- :: ForeignObj -> Int -> Addr
+       , indexFloatOffForeignObj  -- :: ForeignObj -> Int -> Float
+       , indexDoubleOffForeignObj -- :: ForeignObj -> Int -> Double
+       
+       , readCharOffForeignObj    -- :: ForeignObj -> Int -> IO Char
+       , readIntOffForeignObj     -- :: ForeignObj -> Int -> IO Int
+       , readInt8OffForeignObj    -- :: ForeignObj -> Int -> IO Int8
+       , readInt16OffForeignObj   -- :: ForeignObj -> Int -> IO Int16
+       , readInt32OffForeignObj   -- :: ForeignObj -> Int -> IO Int32
+       , readInt64OffForeignObj   -- :: ForeignObj -> Int -> IO Int64
+
+       , readWordOffForeignObj    -- :: ForeignObj -> Int -> IO Word
+       , readWord8OffForeignObj   -- :: ForeignObj -> Int -> IO Word8
+       , readWord16OffForeignObj  -- :: ForeignObj -> Int -> IO Word16
+       , readWord32OffForeignObj  -- :: ForeignObj -> Int -> IO Word32
+       , readWord64OffForeignObj  -- :: ForeignObj -> Int -> IO Word64
+
+       , readAddrOffForeignObj    -- :: ForeignObj -> Int -> IO Addr
+       , readFloatOffForeignObj   -- :: ForeignObj -> Int -> IO Float
+       , readDoubleOffForeignObj  -- :: ForeignObj -> Int -> IO Double
+       
+       , writeCharOffForeignObj   -- :: ForeignObj -> Int -> Char   -> IO ()
+       , writeIntOffForeignObj    -- :: ForeignObj -> Int -> Int    -> IO ()
+       , writeInt8OffForeignObj   -- :: ForeignObj -> Int -> Int8   -> IO ()
+       , writeInt16OffForeignObj  -- :: ForeignObj -> Int -> Int16  -> IO ()
+       , writeInt32OffForeignObj  -- :: ForeignObj -> Int -> Int32  -> IO ()
+       , writeInt64OffForeignObj  -- :: ForeignObj -> Int -> Int64  -> IO ()
+
+       , writeWordOffForeignObj   -- :: ForeignObj -> Int -> Word   -> IO ()
+       , writeWord8OffForeignObj  -- :: ForeignObj -> Int -> Word8  -> IO ()
+       , writeWord16OffForeignObj -- :: ForeignObj -> Int -> Word16 -> IO ()
+       , writeWord32OffForeignObj -- :: ForeignObj -> Int -> Word32 -> IO ()
+       , writeWord64OffForeignObj -- :: ForeignObj -> Int -> Word64 -> IO ()
+
+       , writeAddrOffForeignObj   -- :: ForeignObj -> Int -> Addr   -> IO ()
+       , writeFloatOffForeignObj  -- :: ForeignObj -> Int -> Float  -> IO ()
+       , writeDoubleOffForeignObj -- :: ForeignObj -> Int -> Double -> IO ()
+
        ) where
 
 import PrelForeign hiding ( makeForeignObj )
@@ -29,7 +82,7 @@ import qualified PrelForeign as PF ( makeForeignObj )
 import PrelBase    ( Int(..), Double(..), Float(..), Char(..) )
 import PrelGHC     ( indexCharOffForeignObj#, indexIntOffForeignObj#, 
 		     indexAddrOffForeignObj#, indexFloatOffForeignObj#, 
-		     indexDoubleOffForeignObj#
+		     indexDoubleOffForeignObj#, indexWordOffForeignObj#
 		   )
 import PrelAddr    ( Addr(..), Word(..) )
 import PrelWeak    ( addForeignFinalizer )
@@ -93,6 +146,9 @@ indexCharOffForeignObj (ForeignObj fo#) (I# i#) = C# (indexCharOffForeignObj# fo
 
 indexIntOffForeignObj    :: ForeignObj -> Int -> Int
 indexIntOffForeignObj (ForeignObj fo#) (I# i#) = I# (indexIntOffForeignObj# fo# i#)
+
+indexWordOffForeignObj    :: ForeignObj -> Int -> Word
+indexWordOffForeignObj (ForeignObj fo#) (I# i#) = W# (indexWordOffForeignObj# fo# i#)
 
 indexAddrOffForeignObj   :: ForeignObj -> Int -> Addr
 indexAddrOffForeignObj (ForeignObj fo#) (I# i#) = A# (indexAddrOffForeignObj# fo# i#)
