@@ -74,7 +74,10 @@ module Data.FiniteMap (
 	IF_NOT_GHC(intersectFM_C COMMA)
 	IF_NOT_GHC(mapFM COMMA filterFM COMMA)
 
-	foldFM_GE, fmToList_GE, keysFM_GE, eltsFM_GE
+	foldFM_GE, fmToList_GE, keysFM_GE, eltsFM_GE,
+	foldFM_LE, fmToList_LE, keysFM_LE, eltsFM_LE,
+
+        minFM, maxFM,
 
 #ifdef COMPILING_GHC
 	, bagToFM
@@ -432,7 +435,7 @@ eltsFM fm   = foldFM (\ key elt rest -> elt : rest)       [] fm
 
 
 -- ---------------------------------------------------------------------------
--- Bulk operations on all keys >= a certain threshold
+-- Bulk operations on all keys >= or <=	a certain threshold
 
 -- | Fold through all elements greater than or equal to the supplied key,
 -- in increasing order.
@@ -457,6 +460,50 @@ keysFM_GE fm fr  = foldFM_GE (\ key elt rest -> key : rest)       [] fr fm
 -- key, in increasing order of key.
 eltsFM_GE       :: Ord key => FiniteMap key elt -> key -> [elt]
 eltsFM_GE fm fr  = foldFM_GE (\ key elt rest -> elt : rest)       [] fr fm
+
+-- | Fold through all elements less than or equal to the supplied key,
+-- in decreasing order.
+foldFM_LE       :: Ord key => (key -> elt -> a -> a) -> a -> key ->
+   FiniteMap key elt -> a
+foldFM_LE k z fr EmptyFM = z
+foldFM_LE k z fr (Branch key elt _ fm_l fm_r)
+  | key <= fr = foldFM_LE k (k key elt (foldFM_LE k z fr fm_l)) fr fm_r
+  | otherwise = foldFM_LE k z fr fm_l
+
+-- | List elements greater than or equal to the supplied key, in decreasing
+-- order
+fmToList_LE      :: Ord key => FiniteMap key elt -> key ->  [(key,elt)]
+fmToList_LE fm fr = foldFM_LE (\ key elt rest -> (key,elt) : rest) [] fr fm
+
+-- | List keys greater than or equal to the supplied key, in decreasing order
+keysFM_LE       :: Ord key => FiniteMap key elt -> key -> [key]
+keysFM_LE fm fr  = foldFM_LE (\ key elt rest -> key : rest)       [] fr fm
+
+-- | List elements corresponding to keys greater than or equal to the supplied
+-- key, in decreasing order of key.
+eltsFM_LE       :: Ord key => FiniteMap key elt -> key -> [elt]
+eltsFM_LE fm fr  = foldFM_LE (\ key elt rest -> elt : rest)       [] fr fm
+
+-- ---------------------------------------------------------------------------
+-- Getting minimum and maximum key out.
+-- ---------------------------------------------------------------------------
+
+-- | Extract minimum key, or Nothing if the map is empty.
+minFM :: Ord key => FiniteMap key elt -> Maybe key
+minFM EmptyFM = Nothing
+minFM (Branch key _ _ fm_l _) =
+   case minFM fm_l of
+      Nothing -> Just key
+      Just key1 -> Just key1
+
+-- | Extract maximum key, or Nothing if the map is empty.
+maxFM :: Ord key => FiniteMap key elt -> Maybe key
+maxFM EmptyFM = Nothing
+maxFM (Branch key _ _ _ fm_r) =
+   case maxFM fm_r of
+      Nothing -> Just key
+      Just key1 -> Just key1
+
 
 -- ---------------------------------------------------------------------------
 -- The implementation of balancing
