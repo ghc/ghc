@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.4 1999/02/03 17:08:25 sewardj Exp $                        #
+# $Id: Makefile,v 1.5 1999/03/01 14:58:56 sewardj Exp $                         #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -26,25 +26,40 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
      hugs.c dynamic.c stg.c
 
-SRC_CC_OPTS = -g -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -Wall -Wno-unused
+SRC_CC_OPTS = -g -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -Wall -Wstrict-prototypes -D_POSIX_C_SOURCE
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a $(TOP)/ghc/rts/gmp/libgmp.a
 GHC_DYN_CBITS_DIR = $(TOP)/ghc/lib/std/cbits
 GHC_DYN_CBITS = $(GHC_DYN_CBITS_DIR)/libHS_cbits.so
 
-all :: parser.c $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs Prelude.hs
+###all :: parser.c $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs Prelude.hs
+all :: parser.c $(GHC_LIBS_NEEDED) $(GHC_DYN_CBITS) hugs
 
-hugs: $(C_OBJS)
-	$(CC) -rdynamic -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -ldl -lm
+### EXTREMELY hacky
+hugs: $(C_OBJS) ../rts/Assembler.o ../rts/Disassembler.o ../rts/Evaluator.o ../rts/ForeignCall.o \
+                ../rts/Printer.o
+	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lbfd -liberty -ldl -lm
 
 $(GHC_DYN_CBITS):
-	(cd $(GHC_DYN_CBITS_DIR); make EXTRA_CC_OPTS=-optc-g ; gcc -shared -o libHS_cbits.so *.o)
+###	(cd $(GHC_DYN_CBITS_DIR); make EXTRA_CC_OPTS="-fpic -optc-g" ; gcc -shared -o libHS_cbits.so *.o)
+	(cd $(GHC_DYN_CBITS_DIR); rm -f *.o ; gcc -I../../../includes -fPIC -g -Wall -c *.c ; gcc -shared -o libHS_cbits.so *.o)
 	cp -f $(GHC_DYN_CBITS) .
 
 $(TOP)/ghc/rts/libHSrts.a:
 	(cd $(TOP)/ghc/rts ; make clean ; make)
 $(TOP)/ghc/rts/gmp/libgmp.a:
 	(cd $(TOP)/ghc/rts/gmp ; make clean ; make)
+
+cleanish:
+	/bin/rm *.o
+
+snapshot:
+	/bin/rm -f snapshot.tar
+	tar cvf snapshot.tar Makefile Prelude.hs *.[chy] *-ORIG-* \
+             ../rts/Assembler.c ../rts/Evaluator.c ../rts/Disassembler.c \
+             ../rts/ForeignCall.c ../rts/Printer.c \
+             ../includes/options.h ../includes/Assembler.h nHandle.c \
+             ../includes/Assembler.h ../rts/Bytecodes.h
 
 # --------------------------------------------------------------------- #
 # Prelude                                                               #
@@ -161,7 +176,7 @@ CLEAN_FILES += parser.c
 
 INSTALL_LIBEXECS = hugs
 
-clean :: prelclean
+###clean :: prelclean
 
 depend :: $(LOOPS) $(SRCS_UGNHS)
 
