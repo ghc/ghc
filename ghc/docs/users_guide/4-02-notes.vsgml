@@ -6,7 +6,8 @@
 
 <item> Full Haskell 98 language support.
 
-<item> Scoped type variables implemented.
+<item> Scoped type variables implemented (see Section <ref
+name="Scoped Type Variables" id="scoped-type-variables">).
 
 <item> Several bugs in _ccall_GC and foreign export fixed.
 
