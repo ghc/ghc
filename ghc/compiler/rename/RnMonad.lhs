@@ -551,6 +551,21 @@ warnWithRn res msg (RnDown {rn_errs = errs_var, rn_loc = loc}) l_down
   where
     warn = addShortWarnLocLine loc msg
 
+tryRn :: RnM d a -> RnM d (Either Messages a)
+tryRn try_this down@(RnDown {rn_errs = errs_var}) l_down
+  = do current_msgs <- readIORef errs_var
+       writeIORef errs_var (emptyBag,emptyBag)
+       a <- try_this down l_down
+       (warns, errs) <- readIORef errs_var
+       writeIORef errs_var current_msgs
+       if (isEmptyBag errs)
+	  then return (Right a)
+	  else return (Left (warns,errs))
+
+setErrsRn :: Messages -> RnM d ()
+setErrsRn msgs down@(RnDown {rn_errs = errs_var}) l_down
+  = do writeIORef errs_var msgs; return ()
+
 addErrRn :: Message -> RnM d ()
 addErrRn err = failWithRn () err
 

@@ -147,7 +147,7 @@ cmInit mode = do
 cmSetContext :: CmState -> String -> IO CmState
 cmSetContext cmstate str
    = do let mn = mkModuleName str
-	    modules_loaded = [ (name_of_summary s, ms_mod s)  | s <- mg cmstate ]
+	    modules_loaded = [ (name_of_summary s, ms_mod s) | s <- mg cmstate ]
 
         m <- case lookup mn modules_loaded of
 		Just m  -> return m
@@ -173,14 +173,24 @@ moduleNameToModule mn
 	Just (m,_) -> return m
 
 -----------------------------------------------------------------------------
+-- cmInfoThing: convert a String to a TyThing
+
+-- A string may refer to more than one TyThing (eg. a constructor,
+-- and type constructor), so we return a list of all the possible TyThings.
+
+cmInfoThing :: CmState -> DynFlags -> String 
+	-> IO (CmState, PrintUnqualified, [TyThing])
+cmInfoThing cmstate dflags id
+   = do (new_pcs, things) <- hscThing dflags hst hit pcs icontext id
+	return (cmstate{ pcs=new_pcs }, unqual, things)
+   where 
+     CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
+     unqual = getUnqual pcs hit icontext
+
+-----------------------------------------------------------------------------
 -- cmRunStmt:  Run a statement/expr.
 
 #ifdef GHCI
-cmInfoThing :: CmState -> DynFlags -> String -> IO (Maybe TyThing)
-cmInfoThing CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } dflags id
-   = do (pcs, thing) <- hscThing dflags hst hit pcs icontext id
-	return thing
-
 cmRunStmt :: CmState -> DynFlags -> String
 	-> IO (CmState,			-- new state
 	       [Name])			-- names bound by this evaluation
@@ -248,18 +258,22 @@ cmTypeOfExpr cmstate dflags expr
 
 	case maybe_stuff of
 	   Nothing -> return (new_cmstate, Nothing)
-	   Just (_, ty, _) ->
-	     let pit = pcs_PIT pcs
-	         modname = moduleName (ic_module ic)
-	         tidy_ty = tidyType emptyTidyEnv ty
-	         str = case lookupIfaceByModName hit pit modname of
-			  Nothing    -> showSDoc (ppr tidy_ty)
-			  Just iface -> showSDocForUser unqual (ppr tidy_ty)
-		  	     where unqual = unQualInScope (mi_globals iface)
-	     in return (new_cmstate, Just str)
+	   Just (_, ty, _) -> return (new_cmstate, Just str)
+ 	     where 
+		str = showSDocForUser unqual (ppr tidy_ty)
+		unqual  = getUnqual pcs hit ic
+		tidy_ty = tidyType emptyTidyEnv ty
    where
        CmState{ hst=hst, hit=hit, pcs=pcs, ic=ic } = cmstate
 #endif
+
+getUnqual pcs hit ic
+   = case lookupIfaceByModName hit pit modname of
+	Nothing    -> alwaysQualify
+	Just iface -> unQualInScope (mi_globals iface)
+ where
+    pit = pcs_PIT pcs
+    modname = moduleName (ic_module ic)
 
 -----------------------------------------------------------------------------
 -- cmTypeOfName: returns a string representing the type of a name.
@@ -269,15 +283,11 @@ cmTypeOfName :: CmState -> Name -> IO (Maybe String)
 cmTypeOfName CmState{ hit=hit, pcs=pcs, ic=ic } name
  = case lookupNameEnv (ic_type_env ic) name of
 	Nothing -> return Nothing
-	Just (AnId id) -> 
-	   let pit = pcs_PIT pcs
-	       modname = moduleName (ic_module ic)
-	       ty = tidyType emptyTidyEnv (idType id)
-	       str = case lookupIfaceByModName hit pit modname of
-			Nothing    -> showSDoc (ppr ty)
-			Just iface -> showSDocForUser unqual (ppr ty)
-		  	   where unqual = unQualInScope (mi_globals iface)
-	   in return (Just str)
+	Just (AnId id) -> return (Just str)
+	   where
+	     unqual = getUnqual pcs hit ic
+	     ty = tidyType emptyTidyEnv (idType id)
+	     str = showSDocForUser unqual (ppr ty)
 
 	_ -> panic "cmTypeOfName"
 #endif

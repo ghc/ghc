@@ -115,7 +115,7 @@ mkFinalIface ghci_mode dflags location
      hi_file_path = ml_hi_file location
      new_decls    = mkIfaceDecls ty_cls_dcls rule_dcls inst_dcls
      inst_dcls    = map ifaceInstance (md_insts new_details)
-     ty_cls_dcls  = foldNameEnv ifaceTyCls [] (md_types new_details)
+     ty_cls_dcls  = foldNameEnv ifaceTyCls_acc [] (md_types new_details)
      rule_dcls    = map ifaceRule (md_rules new_details)
      orphan_mod   = isOrphanModule (mi_module new_iface) new_details
 
@@ -137,10 +137,22 @@ isOrphanModule this_mod (ModDetails {md_insts = insts, md_rules = rules})
     no_locals names     = isEmptyNameSet (filterNameSet (nameIsLocalOrFrom this_mod) names)
 \end{code}
 
+Implicit Ids and class tycons aren't included in interface files, so
+we miss them out of the accumulating parameter here.
+
 \begin{code}
-ifaceTyCls :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
-ifaceTyCls (AClass clas) so_far
-  = cls_decl : so_far
+ifaceTyCls_acc :: TyThing -> [RenamedTyClDecl] -> [RenamedTyClDecl]
+ifaceTyCls_acc (AnId   id) so_far | isImplicitId id = so_far
+ifaceTyCls_acc (ATyCon id) so_far | isClassTyCon id = so_far
+ifaceTyCls_acc other so_far = ifaceTyCls other : so_far
+\end{code}
+
+Convert *any* TyThing into a RenamedTyClDecl.  Used both for
+generating interface files and for the ':info' command in GHCi.
+
+\begin{code}
+ifaceTyCls :: TyThing -> RenamedTyClDecl
+ifaceTyCls (AClass clas) = cls_decl
   where
     cls_decl = ClassDecl { tcdCtxt	= toHsContext sc_theta,
 			   tcdName	= getName clas,
@@ -167,9 +179,7 @@ ifaceTyCls (AClass clas) so_far
 			 GenDefMeth -> GenDefMeth
 			 DefMeth id -> DefMeth (getName id)
 
-ifaceTyCls (ATyCon tycon) so_far
-  | isClassTyCon tycon = so_far
-  | otherwise	       = ty_decl : so_far
+ifaceTyCls (ATyCon tycon) = ty_decl
   where
     ty_decl | isSynTyCon tycon
 	    = TySynonym { tcdName   = getName tycon,
@@ -221,9 +231,7 @@ ifaceTyCls (ATyCon tycon) so_far
     mk_field strict_mark field_label
 	= ([getName field_label], BangType strict_mark (toHsType (fieldLabelType field_label)))
 
-ifaceTyCls (AnId id) so_far
-  | isImplicitId id = so_far
-  | otherwise 	    = iface_sig : so_far
+ifaceTyCls (AnId id) = iface_sig
   where
     iface_sig = IfaceSig { tcdName   = getName id, 
 			   tcdType   = toHsType id_type,

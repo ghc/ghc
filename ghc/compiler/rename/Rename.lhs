@@ -4,7 +4,10 @@
 \section[Rename]{Renaming and dependency analysis passes}
 
 \begin{code}
-module Rename ( renameModule, renameStmt, closeIfaceDecls, checkOldIface ) where
+module Rename ( 
+	renameModule, renameStmt, renameRdrName, 
+	closeIfaceDecls, checkOldIface 
+  ) where
 
 #include "HsVersions.h"
 
@@ -34,8 +37,9 @@ import RnEnv		( availsToNameSet, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, 
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
-			  lookupSrcName, getImplicitStmtFVs, getImplicitModuleFVs, 
-			  newGlobalName, unQualInScope,, ubiquitousNames
+			  lookupSrcName, getImplicitStmtFVs, 
+			  getImplicitModuleFVs, newGlobalName, unQualInScope,
+			  ubiquitousNames, lookupOccRn
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
 			  moduleNameUserString, moduleName,
@@ -73,7 +77,7 @@ import List		( partition, nub )
 
 %*********************************************************
 %*						 	 *
-\subsection{The two main wrappers}
+\subsection{The main wrappers}
 %*							 *
 %*********************************************************
 
@@ -91,7 +95,6 @@ renameModule dflags hit hst pcs this_module rdr_module
     rename this_module rdr_module
 \end{code}
 
-
 \begin{code}
 renameStmt :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
@@ -108,9 +111,83 @@ renameStmt :: DynFlags
 renameStmt dflags hit hst pcs scope_module this_module local_env stmt
   = renameSource dflags hit hst pcs this_module $
 
-	-- Load the interface for the context module, so 
-	-- that we can get its top-level lexical environment
-	-- Bale out if we fail to do this
+	-- load the context module
+    loadContextModule scope_module $ \ (rdr_env, print_unqual) ->
+
+	-- Rename the stmt
+    initRnMS rdr_env local_env emptyLocalFixityEnv CmdLineMode (
+	rnStmt stmt	$ \ stmt' ->
+	returnRn (([], stmt'), emptyFVs)
+    )					`thenRn` \ ((binders, stmt), fvs) -> 
+
+	-- Bale out if we fail
+    checkErrsRn				`thenRn` \ no_errs_so_far ->
+    if not no_errs_so_far then
+        doDump dflags [] stmt [] `thenRn_` returnRn (print_unqual, Nothing)
+    else
+
+    slurpImplicitDecls fvs local_env 	`thenRn` \ decls ->
+
+    doDump dflags binders stmt decls   	`thenRn_`
+    returnRn (print_unqual, Just (binders, (stmt, decls)))
+
+  where
+     doDump :: DynFlags -> [Name] -> RenamedStmt -> [RenamedHsDecl]
+	 -> RnMG (Either IOError ())
+     doDump dflags bndrs stmt decls
+	= ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
+			(vcat [text "Binders:" <+> ppr bndrs,
+			       ppr stmt, text "",
+			       vcat (map ppr decls)]))
+
+
+renameRdrName
+	   :: DynFlags
+	   -> HomeIfaceTable -> HomeSymbolTable
+	   -> PersistentCompilerState 
+	   -> Module			-- current context (scope to compile in)
+	   -> Module			-- current module
+	   -> LocalRdrEnv		-- current context (temp bindings)
+	   -> [RdrName]			-- name to rename
+	   -> IO ( PersistentCompilerState, 
+		   PrintUnqualified,
+		   Maybe ([Name], [RenamedHsDecl])
+                 )
+
+renameRdrName dflags hit hst pcs scope_module this_module local_env rdr_names = 
+  renameSource dflags hit hst pcs this_module $
+  loadContextModule scope_module $ \ (rdr_env, print_unqual) ->
+
+  -- rename the rdr_name
+  initRnMS rdr_env local_env emptyLocalFixityEnv CmdLineMode
+	(mapRn (tryRn.lookupOccRn) rdr_names)	`thenRn` \ maybe_names ->
+  let 
+	ok_names = [ a | Right a <- maybe_names ]
+  in
+  if null ok_names
+	then let errs = head [ e | Left e <- maybe_names ]
+	     in setErrsRn errs 		  `thenRn_`
+	        doDump dflags ok_names [] `thenRn_` 
+		returnRn (print_unqual, Nothing)
+	else 
+
+  slurpImplicitDecls (mkNameSet ok_names) local_env `thenRn` \ decls ->
+  doDump dflags ok_names decls 		`thenRn_`
+  returnRn (print_unqual, Just (ok_names, decls))
+ where
+     doDump :: DynFlags -> [Name] -> [RenamedHsDecl] -> RnMG (Either IOError ())
+     doDump dflags names decls
+	= ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
+			(vcat [ppr names, text "",
+			       vcat (map ppr decls)]))
+
+
+-- Load the interface for the context module, so 
+-- that we can get its top-level lexical environment
+-- Bale out if we fail to do this
+loadContextModule scope_module thing_inside
+  = let doc = text "context for compiling expression"
+    in
     loadInterface doc (moduleName scope_module) ImportByUser `thenRn` \ iface ->
     let rdr_env       = mi_globals iface
 	print_unqual  = unQualInScope rdr_env
@@ -119,42 +196,17 @@ renameStmt dflags hit hst pcs scope_module this_module local_env stmt
     if not no_errs_so_far then
 	returnRn (print_unqual, Nothing)
     else
+	thing_inside (rdr_env, print_unqual)
 
-	-- Rename it
-    initRnMS rdr_env local_env emptyLocalFixityEnv CmdLineMode (
-	rnStmt stmt	$ \ stmt' ->
-	returnRn (([], stmt'), emptyFVs)
-    )						`thenRn` \ ((binders, stmt), fvs) -> 
-
-	-- Bale out if we fail
-    checkErrsRn					`thenRn` \ no_errs_so_far ->
-    if not no_errs_so_far then
-        doDump [] stmt [] `thenRn_` returnRn (print_unqual, Nothing)
-    else
-
-	-- Add implicit free vars, and close decls
-    getImplicitStmtFVs 				`thenRn` \ implicit_fvs ->
+-- Add implicit free vars, and close decls
+slurpImplicitDecls fvs local_env 
+ =  getImplicitStmtFVs 				`thenRn` \ implicit_fvs ->
     let
 	filtered_fvs = fvs `delListFromNameSet` rdrEnvElts local_env 
 	source_fvs   = implicit_fvs `plusFV` filtered_fvs
     in
-    slurpImpDecls source_fvs			`thenRn` \ decls ->
-
-    doDump binders stmt decls  `thenRn_`
-    returnRn (print_unqual, Just (binders, (stmt, decls)))
-
-  where
-     doc = text "context for compiling expression"
-
-     doDump :: [Name] -> RenamedStmt -> [RenamedHsDecl] -> RnMG (Either IOError ())
-     doDump bndrs stmt decls
-	= getDOptsRn  `thenRn` \ dflags ->
-	  ioToRnM (dumpIfSet_dyn dflags Opt_D_dump_rn "Renamer:" 
-			(vcat [text "Binders:" <+> ppr bndrs,
-			       ppr stmt, text "",
-			       vcat (map ppr decls)]))
+    slurpImpDecls source_fvs
 \end{code}
-
 
 %*********************************************************
 %*						 	 *

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.85 2001/08/13 15:49:37 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.86 2001/08/15 14:40:24 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -16,7 +16,7 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 import Packages
 import CompManager
-import HscTypes		( GhciMode(..) )
+import HscTypes		( GhciMode(..), TyThing(..) )
 import MkIface          ( ifaceTyCls )
 import ByteCodeLink
 import DriverFlags
@@ -25,7 +25,11 @@ import DriverUtil
 import Linker
 import Finder		( flushPackageCache )
 import Util
-import Name		( Name )
+import Id		( isDataConWrapId, idName )
+import Class		( className )
+import TyCon		( tyConName )
+import SrcLoc		( isGoodSrcLoc )
+import Name		( Name, isHomePackageName, nameSrcLoc )
 import Outputable
 import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, dopt_unset )
 import Panic		( GhcException(..) )
@@ -377,14 +381,42 @@ info :: String -> GHCi ()
 info "" = throwDyn (CmdLineError "syntax: `:i <thing-you-want-info-about>'")
 info s = do
   let names = words s
-  st <- getGHCiState
-  let cmst = cmstate st
+  state <- getGHCiState
   dflags <- io getDynFlags
-  things <- io (mapM (cmInfoThing cmst dflags) names)
-  let real_things = [ x | Just x <- things ]
-  let descs = map (`ifaceTyCls` []) real_things
-  let strings = map (showSDoc . ppr) descs
-  io (mapM_ putStr strings)
+  let 
+    infoThings cms [] = return cms
+    infoThings cms (name:names) = do
+      (cms, unqual, ty_things) <- io (cmInfoThing cms dflags name)
+      io (putStrLn (showSDocForUser unqual (
+	    vcat (intersperse (text "") (map showThing ty_things))))
+         )
+      infoThings cms names
+
+    showThing ty_thing = vcat [ text "-- " <> showTyThing ty_thing, 
+			        ppr (ifaceTyCls ty_thing) ]
+
+    showTyThing (AClass cl) 
+       = hcat [ppr cl, text " is a class", showSrcLoc (className cl)]
+    showTyThing (ATyCon ty)
+       = hcat [ppr ty, text " is a type constructor", showSrcLoc (tyConName ty)]
+    showTyThing (AnId   id)
+       | isDataConWrapId id 
+       = hcat [ppr id, text " is a data constructor", showSrcLoc (idName id)]
+       | otherwise
+       = hcat [ppr id, text " is a variable", showSrcLoc (idName id)]
+
+	-- also print out the source location for home things
+    showSrcLoc name
+	| isHomePackageName name && isGoodSrcLoc loc
+	= hsep [ text ", defined at", ppr loc ]
+	| otherwise
+	= empty
+	where loc = nameSrcLoc name
+
+  cms <- infoThings (cmstate state) names
+  setGHCiState state{ cmstate = cms }
+  return ()
+
 
 addModule :: String -> GHCi ()
 addModule str = do

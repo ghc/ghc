@@ -6,6 +6,7 @@
 \begin{code}
 module TcModule (
 	typecheckModule, typecheckIface, typecheckStmt, typecheckExpr,
+	typecheckExtraDecls,
 	TcResults(..)
     ) where
 
@@ -285,6 +286,33 @@ typecheckExpr dflags pcs hst ic_type_env unqual this_mod (expr, decls)
     get_fixity n = pprPanic "typecheckExpr" (ppr n)
 
     smpl_doc = ptext SLIT("main expression")
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Typechecking extra declarations}
+%*									*
+%************************************************************************
+
+\begin{code}
+typecheckExtraDecls 
+   :: DynFlags
+   -> PersistentCompilerState
+   -> HomeSymbolTable
+   -> PrintUnqualified	   -- For error printing
+   -> Module		   -- Is this really needed
+   -> [RenamedHsDecl]	   -- extra decls sucked in from interface files
+   -> IO (Maybe PersistentCompilerState)
+
+typecheckExtraDecls  dflags pcs hst unqual this_mod decls
+ = typecheck dflags pcs hst unqual $
+     fixTc (\ ~(unf_env, _, _, _, _) ->
+     	  tcImports unf_env pcs hst get_fixity this_mod decls
+     )	`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
+     ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
+     returnTc new_pcs
+ where
+    get_fixity n = pprPanic "typecheckExpr" (ppr n)
 \end{code}
 
 %************************************************************************

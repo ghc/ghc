@@ -17,11 +17,10 @@ module HscMain ( HscResult(..), hscMain,
 import ByteCodeGen	( byteCodeGen )
 import CoreTidy		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
-import SrcLoc           ( noSrcLoc )
-import Rename		( renameStmt )
-import RdrName          ( mkUnqual )
+import Rename		( renameStmt, renameRdrName )
+import RdrName          ( mkUnqual, mkQual )
 import RdrHsSyn		( RdrNameStmt )
-import OccName          ( dataName )
+import OccName          ( varName, dataName, tcClsName )
 import Type		( Type )
 import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
@@ -29,6 +28,8 @@ import HscTypes		( InteractiveContext(..) )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import FastString       ( mkFastString )
+import Char		( isLower )
+import DriverUtil	( split_longest_prefix )
 #endif
 
 import HsSyn
@@ -79,7 +80,7 @@ import Module		( Module )
 import IOExts		( newIORef, readIORef, writeIORef, unsafePerformIO )
 
 import Monad		( when )
-import Maybe		( isJust, fromJust )
+import Maybe		( isJust, fromJust, catMaybes )
 import IO
 
 import MkExternalCore	( emitExternalCore )
@@ -562,31 +563,6 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 
      }}}}}
 
-hscThing -- like hscStmt, but deals with a single identifier
-  :: DynFlags
-  -> HomeSymbolTable	
-  -> HomeIfaceTable
-  -> PersistentCompilerState    -- IN: persistent compiler state
-  -> InteractiveContext		-- Context for compiling
-  -> String			-- The identifier
-  -> IO ( PersistentCompilerState, 
-	  Maybe TyThing )
-hscThing dflags hst hit pcs0 icontext id
-   = let 
-	InteractiveContext { 
-	     ic_rn_env   = rn_env, 
-	     ic_type_env = type_env,
-	     ic_module   = scope_mod } = icontext
-	fname = mkFastString id
-	rn = mkUnqual dataName fname -- need to guess correct namespace
-	stmt = ResultStmt (HsVar rn) noSrcLoc
-     in
-     do { (pcs, err, maybe_stmt) <- renameStmt dflags hit hst pcs0 scope_mod scope_mod rn_env stmt
-	; case maybe_stmt of
-	     Nothing -> return (pcs, Nothing)
-	     Just (n:ns, _) -> return (pcs, lookupType hst type_env n)
-	}
-
 hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)
 hscParseStmt dflags str
  = do --------------------------  Parser  ----------------
@@ -617,6 +593,64 @@ hscParseStmt dflags str
       dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_stmt);
       return (Just rdr_stmt)
       }}
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Getting information about an identifer}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef GHCI
+hscThing -- like hscStmt, but deals with a single identifier
+  :: DynFlags
+  -> HomeSymbolTable
+  -> HomeIfaceTable
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> InteractiveContext		-- Context for compiling
+  -> String			-- The identifier
+  -> IO ( PersistentCompilerState,
+	  [TyThing] )
+
+hscThing dflags hst hit pcs0 icontext str
+   = do let 
+	  InteractiveContext {
+	     ic_rn_env   = rn_env,
+	     ic_type_env = type_env,
+	     ic_module   = scope_mod } = icontext
+
+	  rdr_names
+	     | '.' `elem` str 
+		= [ mkQual ns (fmod,fvar) | ns <- namespaces var ]
+	     | otherwise
+		= [ mkUnqual ns fstr | ns <- namespaces str ]
+ 	     where (mod,var) = split_longest_prefix str '.'
+		   fmod = mkFastString mod
+		   fvar = mkFastString var
+		   fstr = mkFastString str
+	  	   namespaces s | isLower (head s) = [ varName ]
+			        | otherwise        = [ tcClsName, dataName ]
+
+	(pcs, unqual, maybe_rn_result) <- 
+	   renameRdrName dflags hit hst pcs0 scope_mod scope_mod 
+		rn_env rdr_names
+
+	case maybe_rn_result of {
+	     Nothing -> return (pcs, []);
+	     Just (names, decls) -> do {
+
+	maybe_pcs <- typecheckExtraDecls dflags pcs hst unqual
+		   	iNTERACTIVE decls;
+
+	case maybe_pcs of {
+	     Nothing -> return (pcs, []);
+	     Just pcs ->
+		let maybe_ty_things = map (lookupType hst (pcs_PTE pcs)) names
+		in
+		return (pcs, catMaybes maybe_ty_things) }
+        }}
 #endif
 \end{code}
 
