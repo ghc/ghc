@@ -926,7 +926,7 @@ run_BCO:
 
 	case bci_ALLOC_AP: {
 	    StgAP* ap; 
-	    int n_payload = BCO_NEXT - 1;
+	    int n_payload = BCO_NEXT;
 	    int request   = PAP_sizeW(n_payload);
 	    ap = (StgAP*)allocate_UPD(request);
 	    Sp[-1] = (W_)ap;
@@ -939,7 +939,7 @@ run_BCO:
 	case bci_ALLOC_PAP: {
 	    StgPAP* pap; 
 	    int arity = BCO_NEXT;
-	    int n_payload = BCO_NEXT - 1;
+	    int n_payload = BCO_NEXT;
 	    int request   = PAP_sizeW(n_payload);
 	    pap = (StgPAP*)allocate_NONUPD(request);
 	    Sp[-1] = (W_)pap;
@@ -953,7 +953,7 @@ run_BCO:
 	case bci_MKAP: {
 	    int i;
 	    int stkoff = BCO_NEXT;
-	    int n_payload = BCO_NEXT - 1;
+	    int n_payload = BCO_NEXT;
 	    StgAP* ap = (StgAP*)Sp[stkoff];
 	    ASSERT((int)ap->n_args == n_payload);
 	    ap->fun = (StgClosure*)Sp[0];

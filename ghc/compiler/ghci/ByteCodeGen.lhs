@@ -380,8 +380,8 @@ schemeE d s p (AnnLet binds (_,body))
 
          fvss  = map (fvsToEnv p' . fst) rhss
 
-         -- Sizes of free vars, + 1 for the fn
-         sizes = map (\rhs_fvs -> 1 + sum (map idSizeW rhs_fvs)) fvss
+         -- Sizes of free vars
+         sizes = map (\rhs_fvs -> sum (map idSizeW rhs_fvs)) fvss
 
 	 -- the arity of each rhs
 	 arities = map (length . fst . collect []) rhss
@@ -397,7 +397,7 @@ schemeE d s p (AnnLet binds (_,body))
          -- ToDo: don't build thunks for things with no free variables
          build_thunk dd [] size bco off
             = returnBc (PUSH_BCO bco
-                        `consOL` unitOL (MKAP (off+size-1) size))
+                        `consOL` unitOL (MKAP (off+size) size))
          build_thunk dd (fv:fvs) size bco off = do
               (push_code, pushed_szw) <- pushAtom dd p' (AnnVar fv) 
               more_push_code <- build_thunk (dd+pushed_szw) fvs size bco off
