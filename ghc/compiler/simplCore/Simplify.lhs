@@ -13,8 +13,8 @@ import CmdLineOpts	( dopt, DynFlag(Opt_D_dump_inlinings),
 			)
 import SimplMonad
 import SimplUtils	( mkCase, mkLam, newId,
-			  simplBinder, simplLamBinders, simplBinders, simplRecIds, simplLetId,
-			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
+			  simplBinder, simplBinders, simplLamBndrs, simplRecBndrs, simplLetBndr,
+			  simplTopBndrs, SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 			  mkStop, mkBoringStop,  pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
@@ -24,7 +24,7 @@ import VarEnv
 import Id		( Id, idType, idInfo, idArity, isDataConId, 
 			  idUnfolding, setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo,
-			  setIdOccInfo, 
+			  setIdOccInfo, isLocalId,
 			  zapLamIdInfo, setOneShotLambda, 
 			)
 import IdInfo		( OccInfo(..), isLoopBreaker,
@@ -230,7 +230,7 @@ simplTopBinds env binds
 	-- so that if a transformation rule has unexpectedly brought
 	-- anything into scope, then we don't get a complaint about that.
 	-- It's rather as if the top-level binders were imported.
-    simplRecIds env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
+    simplTopBndrs env (bindersOfBinds binds)	`thenSmpl` \ (env, bndrs') -> 
     simpl_binds env binds bndrs'		`thenSmpl` \ (floats, _) ->
     freeTick SimplifierDone			`thenSmpl_`
     returnSmpl (floatBinds floats)
@@ -296,7 +296,7 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)	-- A strict let
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence in the substitution
-    simplLetId env bndr				`thenSmpl` \ (env, bndr') ->
+    simplLetBndr env bndr				`thenSmpl` \ (env, bndr') ->
     simplStrictArg env AnRhs rhs rhs_se cont_ty	$ \ env rhs1 ->
 
 	-- Now complete the binding and simplify the body
@@ -305,7 +305,7 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
   | otherwise							-- Normal, lazy case
   =  	-- Don't use simplBinder because that doesn't keep 
 	-- fragile occurrence in the substitution
-    simplLetId env bndr					`thenSmpl` \ (env, bndr') ->
+    simplLetBndr env bndr				`thenSmpl` \ (env, bndr') ->
     simplLazyBind env NotTopLevel NonRecursive
 		  bndr bndr' rhs rhs_se 		`thenSmpl` \ (floats, env) ->
     addFloats env floats thing_inside
@@ -565,7 +565,10 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
 		   | otherwise    = new_bndr_info `setUnfoldingInfo` unfolding
 	unfolding = mkUnfolding (isTopLevel top_lvl) new_rhs
 
-	final_id = new_bndr `setIdInfo` info_w_unf
+		-- Don't fiddle with the IdInfo of a constructor
+		-- wrapper or other GlobalId.
+	final_id | isLocalId new_bndr = new_bndr `setIdInfo` info_w_unf
+		 | otherwise	      = new_bndr
     in
 		-- These seqs forces the Id, and hence its IdInfo,
 		-- and hence any inner substitutions
@@ -669,7 +672,7 @@ simplExprF env (Case scrut bndr alts) cont
     case_cont = Select NoDup bndr alts env (mkBoringStop (contResultType cont))
 
 simplExprF env (Let (Rec pairs) body) cont
-  = simplRecIds env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
+  = simplRecBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
 	-- NB: bndrs' don't have unfoldings or spec-envs
 	-- We add them as we go down, using simplPrags
 
@@ -721,7 +724,7 @@ simplLam env fun cont
 
 	-- Not enough args, so there are real lambdas left to put in the result
     go env lam@(Lam _ _) cont
-      = simplLamBinders env bndrs	`thenSmpl` \ (env, bndrs') ->
+      = simplLamBndrs env bndrs		`thenSmpl` \ (env, bndrs') ->
 	simplExpr env body 		`thenSmpl` \ body' ->
 	mkLam env bndrs' body' cont	`thenSmpl` \ (floats, new_lam) ->
 	addFloats env floats		$ \ env -> 

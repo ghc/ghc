@@ -28,7 +28,7 @@ import Id		( idType, idInfo, idName, isExportedId,
 			  idNewStrictness, setIdNewStrictness
 			) 
 import IdInfo		{- loads of stuff -}
-import NewDemand	( isBottomingSig, topSig, isStrictDmd, isTopSig )
+import NewDemand	( isBottomingSig, topSig )
 import BasicTypes	( isNeverActive )
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, isGlobalName, setNameUnique
@@ -51,7 +51,7 @@ import UniqFM		( mapUFM )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import List		( partition )
 import Util		( mapAccumL )
-import Maybe		( isJust, fromJust, isNothing )
+import Maybe		( isJust )
 import Outputable
 \end{code}
 
@@ -639,18 +639,12 @@ tidyLetBndr env (id,rhs)
 	--
 	-- Similarly for the demand info - on a let binder, this tells 
 	-- CorePrep to turn the let into a case.
-    final_id
-	| totally_boring_info = new_id
-	| otherwise = new_id `setIdNewDemandInfo` dmd_info
-			     `setIdNewStrictness` new_strictness
+    final_id = new_id `setIdNewDemandInfo` idNewDemandInfo id
+		      `setIdNewStrictness` idNewStrictness id
 
-    -- override the env we get back from tidyId with the new IdInfo
+    -- Override the env we get back from tidyId with the new IdInfo
     -- so it gets propagated to the usage sites.
     new_var_env = extendVarEnv var_env id final_id
-
-    dmd_info		 = idNewDemandInfo id
-    new_strictness       = idNewStrictness id
-    totally_boring_info  = isTopSig new_strictness && not (isStrictDmd dmd_info) 
 
 tidyIdBndr :: TidyEnv -> Id -> (TidyEnv, Id)
 tidyIdBndr env@(tidy_env, var_env) id

@@ -21,7 +21,7 @@ module NewDemand(
 #include "HsVersions.h"
 
 import BasicTypes	( Arity )
-import VarEnv		( VarEnv, emptyVarEnv )
+import VarEnv		( VarEnv, emptyVarEnv, isEmptyVarEnv )
 import UniqFM		( ufmToList )
 import Outputable
 \end{code}
@@ -82,8 +82,8 @@ botDmdType = DmdType emptyDmdEnv [] BotRes
 
 isTopDmdType :: DmdType -> Bool
 -- Only used on top-level types, hence the assert
-isTopDmdType (DmdType _ [] TopRes) = ASSERT( isEmptyVarEnv env) True	
-isTopDmdType other		   = False
+isTopDmdType (DmdType env [] TopRes) = ASSERT( isEmptyVarEnv env) True	
+isTopDmdType other		     = False
 
 isBotRes :: DmdResult -> Bool
 isBotRes BotRes = True

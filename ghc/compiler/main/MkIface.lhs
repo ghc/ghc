@@ -20,6 +20,7 @@ import TysPrim		( alphaTyVars )
 import BasicTypes	( Fixity(..), NewOrData(..), Activation(..),
 			  Version, initialVersion, bumpVersion 
 			)
+import NewDemand	( isTopSig )
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
@@ -272,9 +273,10 @@ ifaceTyCls (AnId id) = iface_sig
 		   otherwise -> []
 
     ------------  Strictness  --------------
+	-- No point in explicitly exporting TopSig
     strict_hsinfo = case newStrictnessInfo id_info of
-			Nothing  -> []
-			Just sig -> [HsStrictness sig]
+			Just sig | not (isTopSig sig) -> [HsStrictness sig]
+			other			      -> []
 
     ------------  Worker  --------------
     work_info   = workerInfo id_info
