@@ -137,12 +137,22 @@ report b s = Q (qReport b s)
 recover :: Q a -> Q a -> Q a
 recover (Q r) (Q m) = Q (qRecover r m)
 
+-- | 'reify' looks up information about the 'Name'
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
+-- | 'currentModule' gives you the name of the module in which this 
+-- computation is spliced.
 currentModule :: Q String
 currentModule = Q qCurrentModule
 
+-- |The 'runIO' function lest you run an I/O computation in the 'Q' monad.
+-- Take care: you are guaranteed the ordering of calls to 'runIO' within 
+-- a single 'Q' computation, but not about the order in which splices are run.  
+--
+-- Note: for various murky reasons, stdout and stderr handles are not 
+-- necesarily flushed when the  compiler finishes running, so you should
+-- flush them yourself.
 runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
