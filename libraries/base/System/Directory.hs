@@ -136,7 +136,7 @@ getPermissions name = do
   read  <- c_access s r_OK
   write <- c_access s w_OK
   exec  <- c_access s x_OK
-  withFileStatus name $ \st -> do
+  withFileStatus "getPermissions" name $ \st -> do
   is_dir <- isDirectory st
   return (
     Permissions {
@@ -355,7 +355,7 @@ Either path refers to an existing non-directory object.
 
 renameDirectory :: FilePath -> FilePath -> IO ()
 renameDirectory opath npath =
-   withFileStatus opath $ \st -> do
+   withFileStatus "renameDirectory" opath $ \st -> do
    is_dir <- isDirectory st
    if (not is_dir)
 	then ioException (IOError Nothing InappropriateType "renameDirectory"
@@ -412,7 +412,7 @@ Either path refers to an existing directory.
 
 renameFile :: FilePath -> FilePath -> IO ()
 renameFile opath npath =
-   withFileOrSymlinkStatus opath $ \st -> do
+   withFileOrSymlinkStatus "renameFile" opath $ \st -> do
    is_dir <- isDirectory st
    if is_dir
 	then ioException (IOError Nothing InappropriateType "renameFile"
@@ -578,7 +578,7 @@ exists and is a directory, and 'False' otherwise.
 doesDirectoryExist :: FilePath -> IO Bool
 doesDirectoryExist name = 
  catch
-   (withFileStatus name $ \st -> isDirectory st)
+   (withFileStatus "doesDirectoryExist" name $ \st -> isDirectory st)
    (\ _ -> return False)
 
 {- |The operation 'doesFileExist' returns 'True'
@@ -588,7 +588,7 @@ if the argument file exists and is not a directory, and 'False' otherwise.
 doesFileExist :: FilePath -> IO Bool
 doesFileExist name = do 
  catch
-   (withFileStatus name $ \st -> do b <- isDirectory st; return (not b))
+   (withFileStatus "doesFileExist" name $ \st -> do b <- isDirectory st; return (not b))
    (\ _ -> return False)
 
 {- |The 'getModificationTime' operation returns the
@@ -605,23 +605,23 @@ The operation may fail with:
 
 getModificationTime :: FilePath -> IO ClockTime
 getModificationTime name =
- withFileStatus name $ \ st ->
+ withFileStatus "getModificationTime" name $ \ st ->
  modificationTime st
 
-withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
-withFileStatus name f = do
+withFileStatus :: String -> FilePath -> (Ptr CStat -> IO a) -> IO a
+withFileStatus loc name f = do
   modifyIOError (`ioeSetFileName` name) $
     allocaBytes sizeof_stat $ \p ->
       withCString (fileNameEndClean name) $ \s -> do
-        throwErrnoIfMinus1Retry_ "withFileStatus" (c_stat s p)
+        throwErrnoIfMinus1Retry_ loc (c_stat s p)
 	f p
 
-withFileOrSymlinkStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
-withFileOrSymlinkStatus name f = do
+withFileOrSymlinkStatus :: String -> FilePath -> (Ptr CStat -> IO a) -> IO a
+withFileOrSymlinkStatus loc name f = do
   modifyIOError (`ioeSetFileName` name) $
     allocaBytes sizeof_stat $ \p ->
       withCString name $ \s -> do
-        throwErrnoIfMinus1Retry_ "withFileOrSymlinkStatus" (lstat s p)
+        throwErrnoIfMinus1Retry_ loc (lstat s p)
 	f p
 
 modificationTime :: Ptr CStat -> IO ClockTime
