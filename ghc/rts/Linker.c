@@ -2199,7 +2199,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
 	    /* Newline first because the interactive linker has printed "linking..." */
             errorBelch("\n%s: unknown symbol `%s'", oc->fileName, symbol);
             return 0;
-           foundit:
+           foundit:;
          }
          checkProddableBlock(oc, pP);
          switch (reltab_j->Type) {
