@@ -365,7 +365,7 @@ hClose handle =
 	  ioError theError
       ClosedHandle -> do
           writeHandle handle handle_
-	  ioe_closedHandle "hClose" handle 
+	  return ()
       _ -> do
           rc      <- CCALL(closeFile) (haFO__ handle_) (1::Int){-flush if you can-}  -- ConcHask: SAFE, won't block
           {- We explicitly close a file object so that we can be told
