@@ -18,7 +18,7 @@
 >			)
 > import Digraph	( dfs )
 > import Id		( idType, updateIdType,
-> 			  getIdInfo, replaceIdInfo, eqId, Id
+> 			  addIdDeforestInfo, eqId, Id
 >			)
 > import IdInfo
 > import Outputable
@@ -144,8 +144,7 @@ type of the expression itself.
 >
 >		newDefId type_of_f	`thenUs` \f' ->
 >		let
-> 		       f = replaceIdInfo f'
->		       		(addDeforestInfo (getIdInfo f') DoDeforest)
+> 		       f = addIdDeforestInfo f' DoDeforest
 >		in
 >		loop ((f,e,val_args,ty_args):ls) e1
 >					`thenUs` \res@(ls',bs,bls,e') ->
