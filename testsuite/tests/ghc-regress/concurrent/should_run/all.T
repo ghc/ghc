@@ -5,10 +5,10 @@ include ($confdir ++ "/../vanilla-test.T")
 --                 extra run flags
 --                 expected process return value, if not zero
 
-def myvt ( $args_c, $args_r, $ret_res )
+def myvtr ( $args_c, $args_r, $ret_res )
 {
-   vt ( " -package concurrent -fglasgow-exts " ++ $args_c,
-        $args_r, $ret_res )
+   vtr ( " -package concurrent -fglasgow-exts " ++ $args_c,
+         $args_r, $ret_res )
 }
 
 --conc009_RUNTEST_OPTS = -x 1
