@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.44 2000/12/20 15:44:29 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.45 2001/01/03 11:13:43 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -13,7 +13,7 @@ module DriverPipeline (
 
 	-- interfaces for the batch-mode driver
    GhcMode(..), getGhcMode, v_GhcMode,
-   genPipeline, runPipeline,
+   genPipeline, runPipeline, pipeLoop,
 
 	-- interfaces for the compilation manager (interpreted/batch-mode)
    preprocess, compile, CompResult(..),
@@ -189,18 +189,6 @@ genPipeline todo stop_flag persistent_output lang filename
 				    ++ filename))
 	else do
 
-	-- if we can't find the phase we're supposed to stop before,
-	-- something has gone wrong.
-   case todo of
-	StopBefore phase -> 
-	   when (phase /= Ln 
-		 && phase `notElem` pipeline
-	   	 && not (phase == As && SplitAs `elem` pipeline)) $
-	      throwDyn (OtherError 
-		("flag " ++ stop_flag
-		 ++ " is incompatible with source file `" ++ filename ++ "'"))
-	_ -> return ()
-
    let
    ----------- -----  ----   ---   --   --  -  -  -
       myPhaseInputExt Ln = case osuf of Nothing -> phaseInputExt Ln
@@ -242,10 +230,22 @@ genPipeline todo stop_flag persistent_output lang filename
       phase_ne p (p1,_,_) = (p1 /= p)
    ----------- -----  ----   ---   --   --  -  -  -
 
-   return $
-     dropWhile (phase_ne start_phase) . 
-	foldr (\p ps -> if phase_ne stop_phase p then p:ps else [])  []
-		$ annotated_pipeline
+	-- if we can't find the phase we're supposed to stop before,
+	-- something has gone wrong.  This test carefully avoids the
+	-- case where we aren't supposed to do any compilation, because the file
+	-- is already in linkable form (for example).
+   if start_phase `elem` pipeline && 
+ 	(stop_phase /= Ln && stop_phase `notElem` pipeline)
+      then throwDyn (OtherError 
+		("flag " ++ stop_flag
+		 ++ " is incompatible with source file `" ++ filename ++ "'"))
+      else do
+
+   return (
+     takeWhile (phase_ne stop_phase ) $
+     dropWhile (phase_ne start_phase) $
+     annotated_pipeline
+    )
 
 
 runPipeline

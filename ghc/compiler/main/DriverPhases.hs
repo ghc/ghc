@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.3 2000/11/16 16:23:04 sewardj Exp $
+-- $Id: DriverPhases.hs,v 1.4 2001/01/03 11:13:43 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -53,7 +53,7 @@ data Phase
 -- by its suffix.
 startPhase "lhs"   = Unlit
 startPhase "hs"    = Cpp
-startPhase "hspp"  = Hsc	-- not sure this will work ...
+startPhase "hspp"  = Hsc
 startPhase "hc"    = HCc
 startPhase "c"     = Cc
 startPhase "raw_s" = Mangle
@@ -66,7 +66,7 @@ startPhase _       = Ln	   -- all unknown file types
 -- the input requirements of the next phase.
 phaseInputExt Unlit       = "lhs"
 phaseInputExt Cpp         = "lpp"	-- intermediate only
-phaseInputExt Hsc         = "hspp"	-- intermediate only
+phaseInputExt Hsc         = "hspp"
 phaseInputExt HCc         = "hc"
 phaseInputExt Cc          = "c"
 phaseInputExt Mangle      = "raw_s"
@@ -76,7 +76,7 @@ phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
 phaseInputExt MkDependHS  = "dep"
 
-haskellish_suffix = (`elem` [ "hs", "lhs", "hc" ])
+haskellish_suffix = (`elem` [ "hs", "hspp", "lhs", "hc" ])
 cish_suffix       = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
 
 haskellish_file f = haskellish_suffix suf where (_,suf) = splitFilename f

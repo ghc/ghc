@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.42 2001/01/02 15:30:57 simonmar Exp $
+-- $Id: Main.hs,v 1.43 2001/01/03 11:13:43 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -264,8 +264,6 @@ main =
 
    if null srcs then throwDyn (UsageError "no input files") else do
 
-   let lang = hscLang init_dyn_flags
-
    let compileFile src = do
 	  writeIORef v_Driver_state saved_driver_state
 	  writeIORef v_DynFlags init_dyn_flags
@@ -273,17 +271,20 @@ main =
 	  -- We compile in two stages, because the file may have an
 	  -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
 
-	  -- preprocess
-	  pp <- if mode == StopBefore Hsc then return src else do
-		phases <- genPipeline (StopBefore Hsc) "none" 
-			    False{-not persistent-} defaultHscLang src
-	  	runPipeline phases src False{-no linking-} False{-no -o flag-}
+	  let (basename, suffix) = splitFilename src
 
-	  -- compile
+	  -- just preprocess
+	  pp <- if mode == StopBefore Hsc then return src else do
+		phases <- genPipeline (StopBefore Hsc) stop_flag
+			    False{-not persistent-} defaultHscLang src
+	  	pipeLoop phases src False{-no linking-} False{-no -o flag-}
+			basename suffix
+
+	  -- rest of compilation
 	  dyn_flags <- readIORef v_DynFlags
 	  phases <- genPipeline mode stop_flag True (hscLang dyn_flags) pp
-	  r <- runPipeline phases pp False{-no linking-} False{-no -o flag-}
-
+	  r <- pipeLoop phases pp (mode==DoLink) True{-use -o flag-}
+			basename suffix
 	  return r
 
    o_files <- mapM compileFile srcs
