@@ -644,10 +644,9 @@ warnDeprecations my_mod_iface used_names
     mapRn_ warnDeprec deprecs
 
   where
-    mod	       = mi_module my_mod_iface
     my_deprecs = mi_deprecs my_mod_iface
     lookup_deprec hit pit n 
-	| isLocalThing mod n = lookupDeprec my_deprecs n
+	| isLocallyDefined n = lookupDeprec my_deprecs n
 	| otherwise	     = case lookupTable hit pit n of
 				 Just iface -> lookupDeprec (mi_deprecs iface) n
 				 Nothing    -> pprPanic "warnDeprecations:" (ppr n)
