@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
---  $Id: uri001.hs,v 1.3 2004/10/20 11:34:53 simonmar Exp $
+--  $Id: uri001.hs,v 1.4 2004/11/04 20:25:09 panne Exp $
 --
 --  Copyright (c) 2004, G. KLYNE.  All rights reserved.
 --  See end of this file for licence information.
@@ -28,8 +28,8 @@ module Main where
 
 import Network.URI
     ( URI(..), URIAuth(..)
-    , parseURI
-    , isUri, isUriReference, isRelativeUri, isAbsoluteUri
+    , parseURIReference
+    , isURI, isURIReference, isRelativeReference, isAbsoluteURI
     , isIPv6address, isIPv4address
     , relativeTo
     , relativeFrom
@@ -73,14 +73,14 @@ testEq lab a1 a2 = TestCase ( assertEqual lab a1 a2 )
 
 testURIRef :: URIType -> String -> Test
 testURIRef t u = TestList
-  [ testEq ("test_isURIReference:"++u) (isValidT t) (isUriReference u)
-  , testEq ("test_isRelativeURI:"++u)  (isRelRfT t) (isRelativeUri  u)
-  , testEq ("test_isAbsoluteURI:"++u)  (isAbsIdT t) (isAbsoluteUri  u)
+  [ testEq ("test_isURIReference:"++u)       (isValidT t) (isURIReference       u)
+  , testEq ("test_isRelativeReference:"++u)  (isRelRfT t) (isRelativeReference  u)
+  , testEq ("test_isAbsoluteURI:"++u)        (isAbsIdT t) (isAbsoluteURI        u)
   ]
 
 testURIRefComponents :: String -> (Maybe URI) -> String -> Test
 testURIRefComponents lab uv us =
-    testEq ("testURIRefComponents:"++us) uv (parseURI us)
+    testEq ("testURIRefComponents:"++us) uv (parseURIReference us)
 
 
 testURIRef001 = testURIRef AbsRf "http://example.org/aaa/bbb#ccc"
@@ -316,8 +316,8 @@ testRelSplit label base uabs urel =
         mkrel (Just u1) (Just u2) = show (u1 `relativeFrom` u2)
         mkrel Nothing   _         = "Invalid URI: "++urel
         mkrel _         Nothing   = "Invalid URI: "++uabs
-        puabs = parseURI uabs
-        pubas = parseURI base
+        puabs = parseURIReference uabs
+        pubas = parseURIReference base
 
 testRelJoin  :: String -> String -> String -> String -> Test
 testRelJoin label base urel uabs =
@@ -328,8 +328,8 @@ testRelJoin label base urel uabs =
         mkabs _         Nothing   = "Invalid URI: "++uabs
         shabs (Just u) = show u
         shabs Nothing  = "No result"
-        purel = parseURI urel
-        pubas = parseURI base
+        purel = parseURIReference urel
+        pubas = parseURIReference base
 
 testRelative :: String -> String -> String -> String -> Test
 testRelative label base uabs urel = TestList
@@ -800,9 +800,9 @@ rel  = testRelativeSuite
 rfc  = testRFC2396Suite
 oddb = testOddballSuite
 
-(Just bu02) = parseURI "http://example/x/y/z"
-(Just ou02) = parseURI "../abc"
-(Just ru02) = parseURI "http://example/x/abc"
+(Just bu02) = parseURIReference "http://example/x/y/z"
+(Just ou02) = parseURIReference "../abc"
+(Just ru02) = parseURIReference "http://example/x/abc"
 -- fileuri = testURIReference "file:///C:/DEV/Haskell/lib/HXmlToolbox-3.01/examples/"
 
 cu02 = ou02 `relativeTo` bu02
@@ -841,9 +841,12 @@ cu02 = ou02 `relativeTo` bu02
 --
 --------------------------------------------------------------------------------
 -- $Source: /srv/cvs/cvs.haskell.org/fptools/testsuite/tests/ghc-regress/lib/net/uri001.hs,v $
--- $Author: simonmar $
--- $Revision: 1.3 $
+-- $Author: panne $
+-- $Revision: 1.4 $
 -- $Log: uri001.hs,v $
+-- Revision 1.4  2004/11/04 20:25:09  panne
+-- Synched with latest Network.URI changes
+--
 -- Revision 1.3  2004/10/20 11:34:53  simonmar
 -- Update Network.URI test for new library.
 --
