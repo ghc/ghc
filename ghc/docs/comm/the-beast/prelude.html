@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+  <head>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+    <title>The GHC Commentary - Primitives and the Prelude</title>
+  </head>
+
+  <body BGCOLOR="FFFFFF">
+    <h1>The GHC Commentary - Primitives and the Prelude</h1>
+    <p>
+      Most of what the compiler has to have wired in about primitives and
+      prelude definitions is in
+      <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/"><code>fptools/ghc/compiler/prelude/</code></a>.
+    </p>
+
+    <h2>Primitives</h2>
+    <p>
+      Some types and functions have to be hardwired into the compiler as they
+      are atomic; all other code is essentially built around this primitive
+      functionality.  This includes basic arithmetic types, such as integers,
+      and their elementary operations as well as pointer types.  Primitive
+      types and functions often receive special treatment in the code
+      generator, which means that these entities have to be explicitly
+      represented in the compiler.  Moreover, many of these types receive some
+      explicit treatment in the runtime system, and so, there is some further
+      information about <a href="../rts-libs/primitives.html">primitives in
+      the RTS section</a> of this document.
+    <p>
+      The module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/TysPrim.lhs"><code>TysPrim</code></a>
+      exports a list of all primitive type constructors as <code>primTyCons ::
+      [TyCon]</code>.  All of these type constructors (of type
+      <code>TyCon</code>) are also exported as <code>intPrimTyCon</code>,
+      <code>stablePtrPrimTyCon</code>, and so on.  In addition, for each
+      nullary type constructor the corresponding type (of type
+      <code>Type</code>) is also exported; for example, we have
+      <code>intPrimTy :: Type</code>.  For all other type constructors, a
+      function is exported that constructs the type obtained by applying the
+      type constructors to an argument type (of type <code>Type</code>); for
+      example, we have <code>mkStablePtrPrimTy :: Type -> Type</code>.
+    <p>
+      As it is inconvenient to identify type that receive a special treatment
+      by the code generator by looking at their name, the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/PrimRep.lhs"><code>PrimRep</code></a>
+      exports a data type <code>PrimRep</code>, which lists all
+      machine-manipulable implementation types.  The module also exports a set
+      of query functions on <code>PrimRep</code> that define properties, such
+      as a type's byte size or whether a primitive type is a pointer type.
+      Moreover, the function <code>TysPrim.primRepTyCon :: PrimRep ->
+      TyCon</code> converts <code>PrimRep</code> values into the corresponding
+      type constructor.
+
+    <h2>The Prelude</h2>
+    <p>
+      In addition to entities that are primitive, as the compiler has to treat
+      them specially in the backend, there is a set of types, functions,
+      etc. that the Haskell language definition flags as essential to the
+      language by placing them into the special module <code>Prelude</code>
+      that is implicitly imported into each Haskell module.  For some of these
+      entities it suffices to define them (by standard Haskell definitions) in
+      a <code>Prelude</code> module and ensuring that this module is treated
+      specially by being always imported .
+    <p>
+      However, there is a set of entities (such as, for example, the list type
+      and the corresponding data constructors) that have an inbetween status:
+      They are not truly primitive (lists, for example, can easily be defined
+      by a <code>data</code> declaration), but the compiler has to have extra
+      knowledge about them, as they are associated with some particular
+      features of the language (in the case of lists, there is special syntax,
+      such as list comprehensions, associated with the type).  Another
+      example, for a special kind of entity are type classes that can be used
+      in a <code>deriving</code> clause.  All types that are not-primitive,
+      but about which the compiler nonetheless has to have some extra
+      knowledge are defined in the module <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/TysWiredIn.lhs"><code>TysWiredIn</code></a>.
+    <p>
+      All wired in type constructors are contained in <code>wiredInTyCons ::
+      [TyCon]</code>.  In addition to that list, <code>TysWiredIn</code>
+      exports variables bound to representations of all listed type
+      constructors and their data constructors.  So, for example, we have
+      <code>listTyCon</code> together with <code>nilDataCon</cons> and
+      </code>consDataCon</code>.  There are also convenience functions, such
+      as <code>mkListTy</code> and <code>mkTupleTy</code>, which construct
+      compound types.
+    <p>
+      All names of types, functions, etc. known to the compiler are defined in
+      <a
+      href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/PrelNames.lhs"><code>PrelNames</code></a>.
+      This includes the names of types and functions exported from
+      <code>TysWiredIn</code>, but also others.  In particular, this module
+      also fixes the names of all prelude modules; i.e., of the modules whose
+      name starts with <code>Prel</code>, which GHC's library uses to bring
+      some structure into the quite large number of <code>Prelude</code>
+      definitions.
+    <p>
+      <code>PrelNames.knownKeyNames :: [Name]</code> contains all names known
+      to the compiler, but the elements of the list are also exported
+      individually as variables, such as <code>floatTyConName</code> (having
+      the lexeme <code>Float</code>) and <code>floatDataConName</code> (having
+      the lexeme <code>F#</code>).  For each of these names,
+      <code>PrelNames</code> derfines a unique key with a definition, such as
+    <p>
+<blockquote><pre>
+floatPrimTyConKey = mkPreludeTyConUnique 11</pre>
+</blockquote>
+    <p>
+      that is, all unique keys for known prelude names are hardcoded into
+      <code>PrelNames</code> (and uniqueness has to be manually ensured in
+      that module).  To simplify matching the types of important groups of
+      type constructors, <code>PrelNames</code> also exports lists, such as
+      <code>numericTyKeys</code> (keys of all numeric types), that contain the
+      unique keys of all names in that group.  In addition, derivable type
+      classes and their structure is defined by
+      <code>derivableClassKeys</code> and related definitions.
+    <p>
+      In addition to names that have unique keys, <code>PrelNames</code> also
+      defines a set of names without uniqueness information.  These names end
+      on the suffix <code>_RDR</code> and are of type <code>RdrName</code> (an
+      example, is <code>times_RDR</code>, which represents the lexeme
+      <code>*</code>).  The names are used in locations where they pass
+      through the renamer anyway (e.g., code generated from deriving clauses),
+      which will take care of adding uniqueness information.
+    <p>
+      The module
+      <a href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/PrelInfo.lhs"><code>PrelInfo</code></a>
+      in some sense ties all the above together and provides a reasonably
+      restricted interface to these definition to the rest of the compiler.
+      However, from what I have seen, this doesn't quite work out and the
+      earlier mentioned modules are directly imported in many places.
+
+    <p><small>
+<!-- hhmts start -->
+Last modified: Mon Nov 26 19:29:33 EST 2001
+<!-- hhmts end -->
+    </small>
+  </body>
+</html>

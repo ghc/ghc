@@ -37,9 +37,11 @@
     <p>
       As of (about) the development version 4.11, the types and various
       properties of primitive operations are defined in the file <a
-	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/primops.txt"><code>primops.txt</code></a> 
+	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/compiler/prelude/primops.txt.pp"><code>primops.txt.pp</code></a>.
       (Personally, I don't think that the <code>.txt</code> suffix is really
-      appropriate, as the file is used for automatic code generation).
+      appropriate, as the file is used for automatic code generation; the
+      recent addition of <code>.pp</code> means that the file is now mangled
+      by cpp.)
     <p>
       The utility <a
 	href="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/ghc/utils/genprimopcode/"><code>genprimopcode</code></a> 
@@ -61,7 +63,7 @@
       for full details of how GHC is configured to cope with different machine word sizes.
     <p><small>
 <!-- hhmts start -->
-Last modified: Wed Aug  8 19:29:12 EST 2001
+Last modified: Mon Nov 26 18:03:16 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
