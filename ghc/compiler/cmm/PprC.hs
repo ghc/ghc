@@ -357,6 +357,12 @@ pprMachOpApp mop args
 
 pprLit :: CmmLit -> SDoc
 pprLit lit = case lit of
+    CmmInt i I64 | machRepByteWidth I32 == wORD_SIZE 
+		       -> pprHexVal i <> ptext SLIT("LL")
+	-- Append an 'LL' suffix to 64-bit integers on a 32-bit
+	-- platform.  This might not be strictly necessary (the
+	-- type will always be apparent from the context), but
+	-- it avoids some warnings from gcc.
     CmmInt i _rep      -> pprHexVal i
     CmmFloat f rep     -> parens (machRepCType rep) <> (rational f)
     CmmLabel clbl      -> mkW_ <> pprCLabel clbl
