@@ -3,4 +3,4 @@ _exports_
 TcEnv TcEnv initEnv;
 _declarations_
 1 data TcEnv a;
-1 initEnv _:_ _forall_ [a] => ArrBase.MutableArray a PrelBase.Int (UniqFM.UniqFM (TyVar.GenTyVar (ArrBase.MutableArray a PrelBase.Int (TcType.TcMaybe a)))) -> TcEnv.TcEnv a ;;
+1 initEnv _:_ _forall_ [a] => ArrBase.MutableVar a (TcType.TcTyVarSet a) -> TcEnv.TcEnv a ;;
