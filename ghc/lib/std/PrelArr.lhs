@@ -222,6 +222,7 @@ newCharArray, newIntArray, newAddrArray, newFloatArray, newDoubleArray
   #-}
 {-# SPECIALIZE newCharArray   :: IPr -> ST s (MutableByteArray s Int) #-}
 {-# SPECIALIZE newIntArray    :: IPr -> ST s (MutableByteArray s Int) #-}
+{-# SPECIALIZE newWordArray   :: IPr -> ST s (MutableByteArray s Int) #-}
 {-# SPECIALIZE newAddrArray   :: IPr -> ST s (MutableByteArray s Int) #-}
 {-# SPECIALIZE newFloatArray  :: IPr -> ST s (MutableByteArray s Int) #-}
 {-# SPECIALIZE newDoubleArray :: IPr -> ST s (MutableByteArray s Int) #-}
@@ -239,6 +240,11 @@ newCharArray ixs = ST $ \ s# ->
 newIntArray ixs = ST $ \ s# ->
     case rangeSize ixs              of { I# n# ->
     case (newIntArray# n# s#)	  of { StateAndMutableByteArray# s2# barr# ->
+    STret s2# (MutableByteArray ixs barr#) }}
+
+newWordArray ixs = ST $ \ s# ->
+    case rangeSize ixs              of { I# n# ->
+    case (newWordArray# n# s#)	  of { StateAndMutableByteArray# s2# barr# ->
     STret s2# (MutableByteArray ixs barr#) }}
 
 newAddrArray ixs = ST $ \ s# ->
@@ -269,6 +275,7 @@ readArray   	:: Ix ix => MutableArray s ix elt -> ix -> ST s elt
 
 readCharArray   :: Ix ix => MutableByteArray s ix -> ix -> ST s Char 
 readIntArray    :: Ix ix => MutableByteArray s ix -> ix -> ST s Int
+readWordArray   :: Ix ix => MutableByteArray s ix -> ix -> ST s Word
 readAddrArray   :: Ix ix => MutableByteArray s ix -> ix -> ST s Addr
 readFloatArray  :: Ix ix => MutableByteArray s ix -> ix -> ST s Float
 readDoubleArray :: Ix ix => MutableByteArray s ix -> ix -> ST s Double
@@ -297,6 +304,11 @@ readIntArray (MutableByteArray ixs barr#) n = ST $ \ s# ->
     case readIntArray# barr# n# s#	of { StateAndInt# s2# r# ->
     STret s2# (I# r#) }}
 
+readWordArray (MutableByteArray ixs barr#) n = ST $ \ s# ->
+    case (index ixs n)	    	    	of { I# n# ->
+    case readWordArray# barr# n# s#	of { StateAndWord# s2# r# ->
+    STret s2# (W# r#) }}
+
 readAddrArray (MutableByteArray ixs barr#) n = ST $ \ s# ->
     case (index ixs n)	    	    	of { I# n# ->
     case readAddrArray# barr# n# s#	of { StateAndAddr# s2# r# ->
@@ -315,6 +327,7 @@ readDoubleArray (MutableByteArray ixs barr#) n = ST $ \ s# ->
 --Indexing of ordinary @Arrays@ is standard Haskell and isn't defined here.
 indexCharArray   :: Ix ix => ByteArray ix -> ix -> Char 
 indexIntArray    :: Ix ix => ByteArray ix -> ix -> Int
+indexWordArray   :: Ix ix => ByteArray ix -> ix -> Word
 indexAddrArray   :: Ix ix => ByteArray ix -> ix -> Addr
 indexFloatArray  :: Ix ix => ByteArray ix -> ix -> Float
 indexDoubleArray :: Ix ix => ByteArray ix -> ix -> Double
@@ -335,6 +348,11 @@ indexIntArray (ByteArray ixs barr#) n
     case indexIntArray# barr# n# 	of { r# ->
     (I# r#)}}
 
+indexWordArray (ByteArray ixs barr#) n
+  = case (index ixs n)	    	    	of { I# n# ->
+    case indexWordArray# barr# n# 	of { r# ->
+    (W# r#)}}
+
 indexAddrArray (ByteArray ixs barr#) n
   = case (index ixs n)	    	    	of { I# n# ->
     case indexAddrArray# barr# n# 	of { r# ->
@@ -350,41 +368,10 @@ indexDoubleArray (ByteArray ixs barr#) n
     case indexDoubleArray# barr# n# 	of { r# ->
     (D# r#)}}
 
---Indexing off @Addrs@ is similar, and therefore given here.
-indexCharOffAddr   :: Addr -> Int -> Char
-indexIntOffAddr    :: Addr -> Int -> Int
-indexAddrOffAddr   :: Addr -> Int -> Addr
-indexFloatOffAddr  :: Addr -> Int -> Float
-indexDoubleOffAddr :: Addr -> Int -> Double
-
-indexCharOffAddr (A# addr#) n
-  = case n  	    		    	of { I# n# ->
-    case indexCharOffAddr# addr# n# 	of { r# ->
-    (C# r#)}}
-
-indexIntOffAddr (A# addr#) n
-  = case n  	    		    	of { I# n# ->
-    case indexIntOffAddr# addr# n# 	of { r# ->
-    (I# r#)}}
-
-indexAddrOffAddr (A# addr#) n
-  = case n  	    	    	    	of { I# n# ->
-    case indexAddrOffAddr# addr# n# 	of { r# ->
-    (A# r#)}}
-
-indexFloatOffAddr (A# addr#) n
-  = case n  	    		    	of { I# n# ->
-    case indexFloatOffAddr# addr# n# 	of { r# ->
-    (F# r#)}}
-
-indexDoubleOffAddr (A# addr#) n
-  = case n  	    	 	    	of { I# n# ->
-    case indexDoubleOffAddr# addr# n# 	of { r# ->
-    (D# r#)}}
-
 writeArray  	 :: Ix ix => MutableArray s ix elt -> ix -> elt -> ST s () 
 writeCharArray   :: Ix ix => MutableByteArray s ix -> ix -> Char -> ST s () 
 writeIntArray    :: Ix ix => MutableByteArray s ix -> ix -> Int  -> ST s () 
+writeWordArray   :: Ix ix => MutableByteArray s ix -> ix -> Word -> ST s () 
 writeAddrArray   :: Ix ix => MutableByteArray s ix -> ix -> Addr -> ST s () 
 writeFloatArray  :: Ix ix => MutableByteArray s ix -> ix -> Float -> ST s () 
 writeDoubleArray :: Ix ix => MutableByteArray s ix -> ix -> Double -> ST s () 
@@ -411,6 +398,11 @@ writeCharArray (MutableByteArray ixs barr#) n (C# ele) = ST $ \ s# ->
 writeIntArray (MutableByteArray ixs barr#) n (I# ele) = ST $ \ s# ->
     case (index ixs n)	    	    	    of { I# n# ->
     case writeIntArray# barr# n# ele s#     of { s2#   ->
+    STret s2# () }}
+
+writeWordArray (MutableByteArray ixs barr#) n (W# ele) = ST $ \ s# ->
+    case (index ixs n)	    	    	    of { I# n# ->
+    case writeWordArray# barr# n# ele s#    of { s2#   ->
     STret s2# () }}
 
 writeAddrArray (MutableByteArray ixs barr#) n (A# ele) = ST $ \ s# ->
@@ -440,6 +432,7 @@ writeDoubleArray (MutableByteArray ixs barr#) n (D# ele) = ST $ \ s# ->
 freezeArray	  :: Ix ix => MutableArray s ix elt -> ST s (Array ix elt)
 freezeCharArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeIntArray    :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
+freezeWordArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeAddrArray   :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeFloatArray  :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
 freezeDoubleArray :: Ix ix => MutableByteArray s ix -> ST s (ByteArray ix)
@@ -538,6 +531,36 @@ freezeIntArray (MutableByteArray ixs arr#) = ST $ \ s# ->
 	  | otherwise
 	    = case (readIntArray#  from# cur#     s#)  of { StateAndInt# s1# ele ->
 	      case (writeIntArray# to#   cur# ele s1#) of { s2# ->
+	      copy (cur# +# 1#) end# from# to# s2#
+	      }}
+
+freezeWordArray (MutableByteArray ixs arr#) = ST $ \ s# ->
+    case rangeSize ixs     of { I# n# ->
+    case freeze arr# n# s# of { StateAndByteArray# s2# frozen# ->
+    STret s2# (ByteArray ixs frozen#) }}
+  where
+    freeze  :: MutableByteArray# s	-- the thing
+	    -> Int#			-- size of thing to be frozen
+	    -> State# s			-- the Universe and everything
+	    -> StateAndByteArray# s
+
+    freeze arr# n# s#
+      = case (newWordArray# n# s#)    	   of { StateAndMutableByteArray# s2# newarr1# ->
+	case copy 0# n# arr# newarr1# s2#  of { StateAndMutableByteArray# s3# newarr2# ->
+	unsafeFreezeByteArray# newarr2# s3#
+	}}
+      where
+	copy :: Int# -> Int#
+	     -> MutableByteArray# s -> MutableByteArray# s
+	     -> State# s
+	     -> StateAndMutableByteArray# s
+
+	copy cur# end# from# to# s#
+	  | cur# ==# end#
+	    = StateAndMutableByteArray# s# to#
+	  | otherwise
+	    = case (readWordArray#  from# cur#     s#)  of { StateAndWord# s1# ele ->
+	      case (writeWordArray# to#   cur# ele s1#) of { s2# ->
 	      copy (cur# +# 1#) end# from# to# s2#
 	      }}
 
