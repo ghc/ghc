@@ -19,12 +19,11 @@ module PrelRules ( primOpRule, builtinRules ) where
 import CoreSyn
 import Id		( mkWildId )
 import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
-			, inIntRange, inWordRange, literalType
+			, literalType
 			, word2IntLit, int2WordLit, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
 			, addr2IntLit, int2AddrLit, float2DoubleLit, double2FloatLit
 			)
-import RdrName		( RdrName )
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataConsIfAvailable, isEnumerationTyCon, isNewTyCon )
@@ -32,7 +31,8 @@ import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( splitTyConApp_maybe )
 import OccName		( occNameUserString)
-import PrelNames	( unpackCStringFoldr_RDR, unpackCStringFoldrIdKey, hasKey )
+import PrelNames	( unpackCStringFoldrName, unpackCStringFoldrIdKey, hasKey )
+import Name		( Name )
 import Bits		( Bits(..) )
 import Word		( Word64 )
 import Outputable
@@ -423,10 +423,10 @@ dataToTagRule other = Nothing
 %************************************************************************
 
 \begin{code}
-builtinRules :: [(RdrName, CoreRule)]
+builtinRules :: [(Name, CoreRule)]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ (unpackCStringFoldr_RDR, BuiltinRule match_append_lit_str)
+  = [ (unpackCStringFoldrName, BuiltinRule match_append_lit_str)
     ]
 
 
