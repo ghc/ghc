@@ -699,6 +699,11 @@ AC_CHECK_HEADER(alloc.h,AC_CHECK_FUNCS(farcalloc))
 dnl ** check for valloc (in sunos, solaris, mips, amiga, next, minix, ultrix)
 AC_CHECK_HEADER(malloc.h,AC_CHECK_FUNCS(valloc))
 
+dnl ** check for POSIX regex
+HavePosixRegex=NO
+AC_CHECK_HEADER(regex.h,AC_CHECK_FUNC(regcomp, HavePosixRegex=YES))
+AC_SUBST(HavePosixRegex)
+
 dnl ** how do we get a timezone name, and UTC offset ?
 AC_STRUCT_TIMEZONE
 

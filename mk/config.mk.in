@@ -650,10 +650,11 @@ HaveLibGmp	= @HaveLibGmp@
 LibGmp		= @LibGmp@
 
 #-----------------------------------------------------------------------------
-# Regex library 
+# Regex libraries
 # (if present in libc use that one, otherwise use the one in the tree)
 #
-HaveRegex	= @HaveRegex@
+HavePosixRegex  = @HavePosixRegex@
+HaveGNURegex	= @HaveGNURegex@
 
 #-----------------------------------------------------------------------------
 # GTK+

@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.93 2002/01/17 09:52:18 sof Exp $
+dnl $Id: aclocal.m4,v 1.94 2002/02/13 11:51:40 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -86,11 +86,11 @@ AC_DEFUN(FPTOOLS_REGEX_IN_LIBC,
     re_search_2 (&patbuf, "", 0, "",0, 0,0,0,0); ],
 fptools_cv_have_regex=yes, fptools_cv_have_regex=no)])
 if test "$fptools_cv_have_regex" = yes; then
-	HaveRegex=YES
+	HaveGNURegex=YES
 else
-	HaveRegex=NO
+	HaveGNURegex=NO
 fi
-AC_SUBST(HaveRegex)
+AC_SUBST(HaveGNURegex)
 ])
 
 
