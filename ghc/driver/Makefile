@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.25 1999/10/27 09:43:25 simonmar Exp $
+# $Id: Makefile,v 1.26 1999/11/08 14:45:52 simonmar Exp $
 
 # We create two driver scripts: 
 #	- one to run in-place in the build tree for building libraries
@@ -36,6 +36,15 @@ SCRIPT_OBJS = ghc.prl
  
 INTERP=perl
 
+#
+# The driver needs to know the options and names for 
+# all possible ways, so we magically generate the
+# the make variable names for them here.
+#
+
+USER_WAY_NAMES = $(foreach way,$(USER_WAYS),WAY_$(way)_NAME)
+USER_WAY_OPTS  = $(foreach way,$(USER_WAYS),WAY_$(way)_REAL_OPTS)
+
 SCRIPT_SUBST_VARS := \
   INSTALLING \
   ProjectName ProjectVersion ProjectVersionInt \
@@ -44,7 +53,8 @@ SCRIPT_SUBST_VARS := \
   GHC_LIB_DIR GHC_RUNTIME_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
   GHC_UNLIT GHC_HSCPP GHC_MKDEPENDHS GHC_HSC GHC_SYSMAN EnableWin32DLLs \
-  CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised
+  CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised \
+  USER_WAY_NAMES USER_WAY_OPTS
 
 #
 # When creating a binary distribution, we prefix the driver script
