@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.71 2002/06/25 15:49:58 mthomas Exp $
+# $Id: Makefile,v 1.72 2002/07/10 08:34:19 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -38,14 +38,6 @@ NON_HS_PKG = YES
 
 # grab sources from these subdirectories
 ALL_DIRS = hooks parallel
-
-ifeq "$(HaveLibGmp)" "YES"
-PACKAGE_CPP_OPTS += -DHAVE_LIBGMP
-endif
-
-ifeq "$(HaveLibMingwEx)" "YES"
-PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
-endif
 
 ifneq "$(DLLized)" "YES"
 EXCLUDED_SRCS += RtsDllMain.c
@@ -127,8 +119,12 @@ endif
 endif
 
 # If -DDEBUG is in effect, adjust package conf accordingly..
-ifneq "$(strip $(filter -DDEBUG,$(GhcHcOpts)))" ""
-PACKAGE_CPP_OPTS += -DDEBUG -DUSING_LIBBFD
+ifneq "$(strip $(filter -optc-DDEBUG,$(GhcRtsHcOpts)))" ""
+PACKAGE_CPP_OPTS += -DDEBUG
+endif
+
+ifeq "$(HaveLibMingwEx)" "YES"
+PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
 #-----------------------------------------------------------------------------
