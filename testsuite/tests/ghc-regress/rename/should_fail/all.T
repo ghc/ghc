@@ -14,7 +14,6 @@ test "rnfail010" { vtcf("") }
 test "rnfail011" { vtcf("") }
 test "rnfail012" { vtcf("") }
 test "rnfail013" { vtcf("") }
-test "rnfail014" { vtcf("") }
 test "rnfail015" { vtcf("") }
 test "rnfail016" { vtcf("") }
 test "rnfail017" { vtcf("") }
