@@ -1159,16 +1159,11 @@ if test "$ac_cv_type_signal" = void; then
 fi
 
 dnl ** check for more functions
-AC_CHECK_FUNCS(strcasecmp _stricmp stricmp strcmpi)
-AC_CHECK_FUNCS(strcmp)
-AC_CHECK_FUNCS(realpath _fullpath)  
-AC_CHECK_FUNCS(PBHSetVolSync macsystem)  
-AC_CHECK_FUNCS(fgetpos fsetpos fseek ftell)
-AC_CHECK_FUNCS(vsnprintf _vsnprintf)
-AC_CHECK_FUNCS(snprintf  _snprintf )  
-AC_CHECK_FUNCS(popen     _popen )  
-AC_CHECK_FUNCS(pclose    _pclose )  
-AC_CHECK_FUNCS(setenv unsetenv)
+AC_CHECK_FUNCS([setenv unsetenv])
+dnl Note: The following test would make sense but the respective code
+dnl doesn't use HAVE_BLAH #ifdefs yet.
+dnl AC_CHECK_FUNCS([strcasecmp _stricmp], [break])
+dnl AC_CHECK_FUNCS([snprintf _snprintf], [break])  
 
 
 dnl ** check for specific library functions that we are interested in
