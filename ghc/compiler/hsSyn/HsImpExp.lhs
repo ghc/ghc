@@ -112,6 +112,7 @@ isOperator ppr_v
 	('[':s)   -> False		-- []
 	('$':c:s) -> not (isAlpha c)	-- Don't treat $d as an operator
 	(':':c:s) -> not (isAlpha c)	-- Don't treat :T as an operator
+	('_':s)   -> False		-- Not an operator
 	(c:s)     -> not (isAlpha c)	-- Starts with non-alpha
 	other     -> False
     -- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
