@@ -81,20 +81,20 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %changelog
 
-* Sat Oct 11 2003 Sven Panne <sven_panne@yahoo.com>
+* Sat Oct 11 2003 Sven Panne <sven.panne@aedion.de>
 - Include architecture-independent files in file list
 
-* Tue Aug 26 2003 Sven Panne <sven_panne@yahoo.com>
+* Tue Aug 26 2003 Sven Panne <sven.panne@aedion.de>
 - Use autoreconf instead of autoconf
 
-* Mon Jul 28 2003 Sven Panne <sven_panne@yahoo.com>
+* Mon Jul 28 2003 Sven Panne <sven.panne@aedion.de>
 - Updated to version 0.5
 - Automagically generate configure if it is not there
 
 * Tue Jul 23 2002 Simon Marlow <simonmar@microsoft.com>
 - Updated to version 0.4
 
-* Sun Jun 23 2002 Sven Panne <sven_panne@yahoo.com>
+* Sun Jun 23 2002 Sven Panne <sven.panne@aedion.de>
 - Cleaned up build root handling and added more docs
 
 * Wed May 01 2002 Tom Moertel <tom-rpms@moertel.com>
