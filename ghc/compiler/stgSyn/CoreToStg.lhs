@@ -391,6 +391,7 @@ coreToStgExpr (Case scrut bndr alts)
 			-- ToDo: remove the minusVarSet;
 			-- since escs won't include any of these binders
 	    )
+	vars_alg_alt other = pprPanic "vars_alg_alt" (ppr other)
 
      	vars_deflt Nothing
      	   = returnLne (StgNoDefault, emptyFVInfo, emptyVarSet)
@@ -873,9 +874,11 @@ minusFVBinders :: [Id] -> FreeVarsInfo -> FreeVarsInfo
 minusFVBinders vs fv = foldr minusFVBinder fv vs
 
 minusFVBinder :: Id -> FreeVarsInfo -> FreeVarsInfo
-minusFVBinder v fv | isId v    = (fv `delVarEnv` v) `unionFVInfo` 
-			    	 tyvarFVInfo (tyVarsOfType (idType v))
-		   | otherwise = fv `delVarEnv` v
+minusFVBinder v fv | isId v && opt_KeepStgTypes
+		   = (fv `delVarEnv` v) `unionFVInfo` 
+			 tyvarFVInfo (tyVarsOfType (idType v))
+		   | otherwise
+		   =  fv `delVarEnv` v
 	-- When removing a binder, remember to add its type variables
 	-- c.f. CoreFVs.delBinderFV
 
