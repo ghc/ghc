@@ -1162,11 +1162,11 @@ downsweep roots old_summaries
         getSummary (currentMod,nm)
            = do found <- findModule nm
 		case found of
-		   Just (mod, location) -> do
+		   Right (mod, location) -> do
 			let old_summary = findModInSummaries old_summaries mod
 			summarise mod location old_summary
 
-		   Nothing -> 
+		   Left _ -> 
 		        throwDyn (CmdLineError 
                                    ("can't find module `" 
                                      ++ showSDoc (ppr nm) ++ "' (while processing " 

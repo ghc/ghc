@@ -7,8 +7,11 @@
 module Finder (
     flushFinderCache,	-- :: IO ()
 
-    findModule,		-- :: ModuleName -> IO (Maybe (Module, ModLocation))
-    findPackageModule,  -- :: ModuleName -> IO (Maybe (Module, ModLocation))
+    findModule,		-- :: ModuleName 
+			--   -> IO (Either [FilePath] (Module, ModLocation))
+
+    findPackageModule,  -- :: ModuleName
+			--   -> IO (Either [FilePath] (Module, ModLocation))
 
     mkHomeModLocation,	-- :: ModuleName -> String -> FilePath 
 			--	-> IO ModLocation
@@ -24,7 +27,6 @@ module Finder (
 
 import Module
 import UniqFM		( filterUFM )
-import Packages		( PackageConfig(..) )
 import HscTypes		( Linkable(..), Unlinked(..) )
 import DriverState
 import DriverUtil	( split_longest_prefix, splitFilename3 )
@@ -86,28 +88,32 @@ lookupFinderCache mod_name = do
 -- The ModLocation contains the names of all the files associated with
 -- that module: its source file, .hi file, object file, etc.
 
-findModule :: ModuleName -> IO (Maybe (Module, ModLocation))
+findModule :: ModuleName -> IO (Either [FilePath] (Module, ModLocation))
 findModule name = do
   r <- lookupFinderCache name
   case r of
-   Just result -> return (Just result)
+   Just result -> return (Right result)
    Nothing -> do  
        j <- maybeHomeModule name
        case j of
-	 Just home_module -> return (Just home_module)
-	 Nothing	  -> findPackageMod name
+	 Right home_module -> return (Right home_module)
+	 Left home_files   -> do
+	    r <- findPackageMod name
+	    case r of
+		Right pkg_module -> return (Right pkg_module)
+		Left pkg_files   -> return (Left (home_files ++ pkg_files))
 
-findPackageModule :: ModuleName -> IO (Maybe (Module, ModLocation))
+findPackageModule :: ModuleName -> IO (Either [FilePath] (Module, ModLocation))
 findPackageModule name = do
   r <- lookupFinderCache name
   case r of
-   Just result -> return (Just result)
+   Just result -> return (Right result)
    Nothing     -> findPackageMod name
 
 hiBootExt = "hi-boot"
 hiBootVerExt = "hi-boot-" ++ cHscIfaceFileVersion
 
-maybeHomeModule :: ModuleName -> IO (Maybe (Module, ModLocation))
+maybeHomeModule :: ModuleName -> IO (Either [FilePath] (Module, ModLocation))
 maybeHomeModule mod_name = do
    home_path <- readIORef v_Import_paths
    hisuf     <- readIORef v_Hi_suf
@@ -142,7 +148,7 @@ maybeHomeModule mod_name = do
 -- -----------------------------------------------------------------------------
 -- Looking for a package module
 
-findPackageMod :: ModuleName -> IO (Maybe (Module, ModLocation))
+findPackageMod :: ModuleName -> IO (Either [FilePath] (Module, ModLocation))
 findPackageMod mod_name = do
   mode     <- readIORef v_GhcMode
   imp_dirs <- getPackageImportPath -- including the 'auto' ones
@@ -185,25 +191,28 @@ searchPathExts
 	String -> String -> String -> IO (Module, ModLocation)  -- action
        )
      ] 
-  -> IO (Maybe (Module, ModLocation))
+  -> IO (Either [FilePath] (Module, ModLocation))
 
-searchPathExts path mod_name exts = search path
+searchPathExts path mod_name exts = search to_search
   where
     mod_str = moduleNameUserString mod_name
     basename = map (\c -> if c == '.' then '/' else c) mod_str
 
-    search [] = return Nothing
-    search (p:ps) = loop exts
-      where	
-	base | p == "."  = basename
-	     | otherwise = p ++ '/':basename
+    to_search :: [(FilePath, IO (Module,ModLocation))]
+    to_search = [ (file, fn p basename ext)
+		| p <- path, 
+		  (ext,fn) <- exts,
+		  let base | p == "."  = basename
+	     	           | otherwise = p ++ '/':basename
+	              file = base ++ '.':ext
+		]
 
-	loop [] = search ps
-	loop ((ext,fn):exts) = do
-	    let file = base ++ '.':ext
-	    b <- doesFileExist file
-	    if b then Just `liftM` fn p basename ext
-		 else loop exts
+    search [] = return (Left (map fst to_search))
+    search ((file, result) : rest) = do
+      b <- doesFileExist file
+      if b 
+	then Right `liftM` result
+	else search rest
 
 -- -----------------------------------------------------------------------------
 -- Building ModLocations

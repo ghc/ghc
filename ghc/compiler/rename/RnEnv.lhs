@@ -147,14 +147,14 @@ newGlobalName2 mod_name occ
       Nothing   -> 	-- No names from this module yet
 	ioToTcRn (findModule mod_name)		`thenM` \ mb_loc ->
 	case mb_loc of
-	    Just (mod, _) -> new_name mod
-	    Nothing       -> addErr (noModule mod_name)	`thenM_`
-				-- Things have really gone wrong at this point,
-				-- so having the wrong package info in the 
-				-- Module is the least of our worries.
-			     new_name (mkHomeModule mod_name)
-  where
-    noModule mod_name = ptext SLIT("Can't find interface for module") <+> ppr mod_name
+	    Right (mod, _) -> new_name mod
+	    Left files     -> 
+		getDOpts `thenM` \ dflags ->
+	        addErr (noIfaceErr dflags mod_name False files)	`thenM_`
+			-- Things have really gone wrong at this point,
+			-- so having the wrong package info in the 
+			-- Module is the least of our worries.
+		new_name (mkHomeModule mod_name)
 
 
 newIPName rdr_name_ip
@@ -1053,6 +1053,16 @@ dupNamesErr descriptor ((name,loc) : dup_things)
     addErr ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
 	      descriptor)
+
+noIfaceErr dflags mod_name boot_file files
+  = ptext SLIT("Could not find interface file for") <+> quotes (ppr mod_name)
+    $$ extra
+  where 
+   extra
+    | verbosity dflags < 3 = 
+        text "(use -v to see a list of the files searched for)"
+    | otherwise =
+        hang (ptext SLIT("locations searched:")) 4 (vcat (map text files))
 
 warnDeprec :: GlobalRdrElt -> TcRn m ()
 warnDeprec (GRE {gre_name = name, gre_deprec = Just txt})

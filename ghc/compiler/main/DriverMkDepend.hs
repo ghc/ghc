@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.26 2002/11/08 12:52:51 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.27 2003/01/08 15:28:05 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -173,7 +173,7 @@ findDependency is_source src imp = do
       else do
 	r <- findModule imp
 	case r of 
-	   Just (mod,loc)
+	   Right (mod,loc)
 		-- not in this package: we don't need a dependency
 		| not (isHomeModule mod) && not include_prelude
 		-> return Nothing
@@ -198,6 +198,6 @@ findDependency is_source src imp = do
 			   then return (Just (boot_hi_file, not is_source))
 		   	   else return (Just (hi_file, not is_source))
 
-	   Nothing -> throwDyn (ProgramError 
+	   Left _ -> throwDyn (ProgramError 
 		(src ++ ": " ++ "can't locate import `" ++ imp_mod ++ "'" ++
 		 if is_source then " (SOURCE import)" else ""))

@@ -15,7 +15,7 @@ module RnHiFiles (
 
 import DriverState	( v_GhcMode, isCompManagerMode )
 import DriverUtil	( replaceFilenameSuffix )
-import CmdLineOpts	( opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_IgnoreIfacePragmas, verbosity )
 import Parser		( parseIface )
 import HscTypes		( ModIface(..), emptyModIface,
 			  ExternalPackageState(..), noDependencies,
@@ -568,11 +568,12 @@ findAndReadIface doc_str mod_name hi_boot_file
     ioToTcRn (findHiFile mod_name hi_boot_file)	`thenM` \ maybe_found ->
 
     case maybe_found of
-      Nothing -> 
+      Left files -> 
 	traceRn (ptext SLIT("...not found"))	`thenM_`
-	returnM (Left (noIfaceErr mod_name hi_boot_file))
+	getDOpts				`thenM` \ dflags ->
+	returnM (Left (noIfaceErr dflags mod_name hi_boot_file files))
 
-      Just (wanted_mod, file_path) -> 
+      Right (wanted_mod, file_path) -> 
 	traceRn (ptext SLIT("readIFace") <+> text file_path) 	`thenM_` 
 
 	readIface wanted_mod file_path hi_boot_file	`thenM` \ read_result ->
@@ -591,7 +592,8 @@ findAndReadIface doc_str mod_name hi_boot_file
 			   ppr mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 
-findHiFile :: ModuleName -> IsBootInterface -> IO (Maybe (Module, FilePath))
+findHiFile :: ModuleName -> IsBootInterface
+	   -> IO (Either [FilePath] (Module, FilePath))
 findHiFile mod_name hi_boot_file
  = do { 
 	-- In interactive or --make mode, we are *not allowed* to demand-load
@@ -607,9 +609,9 @@ findHiFile mod_name hi_boot_file
 			else findPackageModule mod_name ;
 
 	case maybe_found of {
-	  Nothing -> return Nothing ;
+	  Left files -> return (Left files) ;
 
-	  Just (mod,loc) -> do {
+	  Right (mod,loc) -> do {
 
 	-- Return the path to M.hi, M.hi-boot, or M.hi-boot-n as appropriate
 	let { hi_path            = ml_hi_file loc ;
@@ -618,11 +620,11 @@ findHiFile mod_name hi_boot_file
 	    };
 
 	if not hi_boot_file then
-	   return (Just (mod, hi_path))
+	   return (Right (mod, hi_path))
 	else do {
 		hi_ver_exists <- doesFileExist hi_boot_ver_path ;
-		if hi_ver_exists then return (Just (mod, hi_boot_ver_path))
-				 else return (Just (mod, hi_boot_path))
+		if hi_ver_exists then return (Right (mod, hi_boot_ver_path))
+				 else return (Right (mod, hi_boot_path))
 	}}}}
 \end{code}
 
@@ -699,12 +701,6 @@ ghcPrimIface = ParsedIface {
 %*********************************************************
 
 \begin{code}
-noIfaceErr mod_name boot_file
-  = ptext SLIT("Could not find interface file for") <+> quotes (ppr mod_name)
-	-- We used to print the search path, but we can't do that
-	-- now, because it's hidden inside the finder.
-	-- Maybe the finder should expose more functions.
-
 badIfaceFile file err
   = vcat [ptext SLIT("Bad interface file:") <+> text file, 
 	  nest 4 err]
