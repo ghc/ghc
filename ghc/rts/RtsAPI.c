@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.41 2003/02/06 09:56:10 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.42 2003/02/06 10:04:57 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -354,6 +354,15 @@ rts_getPtr (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Ptr_con_info ||
     //        p->header.info == Ptr_static_info);
+    return (void *)(p->payload[0]);
+}
+
+HsFunPtr
+rts_getFunPtr (HaskellObj p)
+{
+    // See comment above:
+    // ASSERT(p->header.info == FunPtr_con_info ||
+    //        p->header.info == FunPtr_static_info);
     return (void *)(p->payload[0]);
 }
 
