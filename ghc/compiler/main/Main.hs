@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.116 2002/12/18 16:29:30 simonmar Exp $
+-- $Id: Main.hs,v 1.117 2002/12/19 09:37:32 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -27,8 +27,9 @@ import CompManager	( cmInit, cmLoadModules, cmDepAnal )
 import HscTypes		( GhciMode(..) )
 import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
 import SysTools		( getPackageConfigPath, initSysTools, cleanTempFiles )
-import Packages		( showPackages, getPackageConfigMap )
-
+import Packages		( showPackages, getPackageConfigMap, basePackage,
+			  haskell98Package
+			)
 import DriverPipeline	( staticLink, doMkDLL, genPipeline, pipeLoop )
 import DriverState	( buildCoreToDo, buildStgToDo,
 			  findBuildTag, 
