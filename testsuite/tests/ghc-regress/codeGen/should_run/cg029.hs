@@ -3,7 +3,7 @@ module Main(main) where
 -- In 0.19, we lost the ability to do ccalls with more than 6 arguments
 -- on the Sparc.  Just to make sure it never happens again...
 
-import CString
+import Data.PackedString
 
 main = 
 	_ccall_ printf (packString "Testing %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n")

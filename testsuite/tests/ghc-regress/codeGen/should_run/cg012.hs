@@ -1,6 +1,6 @@
 -- !!! move arguments around on the stacks, mainly the B stack
 
-import PrelBase	( Float#, Double#, Int#, Int(..) )
+import GHC.Base	( Float#, Double#, Int#, Int(..) )
 
 
 main = print foo

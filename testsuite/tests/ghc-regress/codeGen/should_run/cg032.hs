@@ -1,6 +1,7 @@
 -- !! pattern-matching failure on functions that return Int#
 
-import PrelBase --ghc1.3
+--import PrelBase --ghc1.3
+import GHC.Base
 
 main = putStr (shows (I# (foo bar1 bar2)) "\n")
   where

@@ -1,6 +1,6 @@
 module Main (main) where
 
-import IOExts ( unsafePerformIO )
+import System.IO.Unsafe ( unsafePerformIO )
 
 c :: Double -> Double
 c x = cos x

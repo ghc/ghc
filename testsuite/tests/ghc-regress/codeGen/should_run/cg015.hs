@@ -1,6 +1,6 @@
 module Main ( main ) where
 
-import PrelBase
+import GHC.Base
 
 data CList = CNil | CCons Int# CList
 

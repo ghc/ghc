@@ -1,7 +1,7 @@
 -- !!! test of datatype with many unboxed fields
 --
-import PrelGHC( Float# )
-import PrelFloat
+import GHC.Base( Float# )
+import GHC.Float
 
 main = print (selectee1 + selectee2)
 

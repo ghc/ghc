@@ -28,27 +28,27 @@ test "cg020" { vtr("", "", "") }
 test "cg021" { vtr("", "", "") }
 test "cg022" { vtr("", "", "") }
 test "cg024" { vtr("", "", "") }
-test "cg025" { vtr("-package lang -package text", "cg025.hs", "1") }
-test "cg026" { vtr("-package lang -fglasgow-exts -fvia-C", "", "") }
+test "cg025" { vtr("", "cg025.hs", "1") }
+test "cg026" { vtr("-fglasgow-exts -fvia-C", "", "") }
 test "cg027" { vtr("", "", "") }
 test "cg028" { vtr("", "", "") }
-test "cg029" { vtr("-package lang -fglasgow-exts", "", "") }
-test "cg030" { vtr("-package lang -fglasgow-exts", "", "") }
+test "cg029" { vtr("-fglasgow-exts", "", "") }
+test "cg030" { vtr("-fglasgow-exts", "", "") }
 test "cg031" { vtr("-fglasgow-exts", "", "") }
 test "cg032" { vtr("-fglasgow-exts", "", "") }
 test "cg033" { vtr("-fglasgow-exts", "", "") }
 test "cg034" { vtr("", "", "") }
-test "cg035" { vtr("-package lang -fglasgow-exts", "", "") }
+test "cg035" { vtr("-fglasgow-exts", "", "") }
 test "cg036" { vtr("", "", "") }
 test "cg037" { vtr("", "", "") }
 test "cg038" { vtr("", "", "") }
 test "cg039" { vtr("", "", "") }
 test "cg040" { vtr("", "", "") }
-test "cg042" { vtr("-package lang -fglasgow-exts", "", "") }
+test "cg042" { vtr("-fglasgow-exts", "", "") }
 test "cg043" { vtr("", "", "") }
-test "cg044" { vtr("-cpp -package lang", "", "" ) }
+test "cg044" { vtr("-cpp", "", "" ) }
 
--- -O is tmporary, until we fix the problems with seq#...
+-- -O is temporary, until we fix the problems with seq#...
 test "cg045" { vtr( "-O", "", "1") }
 test "cg046" { vtr("", "", "") }
 test "cg047" { vtr("", "", "") }

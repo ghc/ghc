@@ -2,7 +2,7 @@
 module Main(main) where
 
 import Char
-import ST
+import GHC.ST
 import MutableArray
 
 reverse_if_bigendian :: [a] -> [a]

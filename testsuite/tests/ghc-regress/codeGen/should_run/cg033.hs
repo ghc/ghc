@@ -1,7 +1,8 @@
 -- !! worker/wrapper turns ( \ <absent> -> Int# ) function
 -- !! into Int# -- WRONG
 
-import PrelBase --ghc1.3
+--import PrelBase --ghc1.3
+import GHC.Base
 
 main = putStr (shows true_or_false "\n")
   where

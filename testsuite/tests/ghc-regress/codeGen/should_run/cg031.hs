@@ -3,7 +3,8 @@
 --
 module Main ( main ) where
 
-import PrelBase
+--import PrelBase
+import GHC.Base
 
 main = do
     putStr (shows (sum ([1..1{-30-}]++[1..1{-40-}]++[11,22])) "\n")

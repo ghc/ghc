@@ -2,8 +2,8 @@
 
 module Main (main,myseq) where
 
-import PrelGHC
-import PrelErr
+import GHC.Prim
+import GHC.Err
 
 main :: IO ()
 main = seq (error "hello world!" :: Int) (return ())
