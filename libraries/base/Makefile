@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.45 2003/07/24 12:19:57 ralf Exp $
+# $Id: Makefile,v 1.46 2003/07/24 13:53:20 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -57,6 +57,10 @@ SRC_HC_OPTS += -funbox-strict-fields
 
 # -----------------------------------------------------------------------------
 # PrimOpWrappers
+
+# These two lines are required for pre-processing ghc/compiler/prelude/primops.txt
+SRC_CPP_OPTS += -I$(GHC_INCLUDE_DIR)
+SRC_CPP_OPTS += ${GhcCppOpts}
 
 ifeq "$(BootingFromHc)" "YES"
 GHC/PrimopWrappers.hs:
