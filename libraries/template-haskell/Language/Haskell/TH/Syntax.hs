@@ -280,9 +280,8 @@ occString occ = unpackPS occ
 data Name = Name OccName NameFlavour
 
 data NameFlavour
-  = NameS 			-- Just a string; dynamically bound
-				-- The string can have a '.', thus "Foo.baz",
-				-- giving a dynamically-bound qualified name
+  = NameS 			-- An unqualified name; dynamically bound
+  | NameQ ModName		-- A qualified name; dynamically bound
 
   | NameU Int#			-- A unique local name
 
@@ -302,11 +301,26 @@ nameBase :: Name -> String
 nameBase (Name occ _) = occString occ
 
 nameModule :: Name -> Maybe String
+nameModule (Name _ (NameQ m))   = Just (modString m)
 nameModule (Name _ (NameG _ m)) = Just (modString m)
 nameModule other_name		= Nothing
 
 mkName :: String -> Name
-mkName s = Name (mkOccName s) NameS
+-- The string can have a '.', thus "Foo.baz",
+-- giving a dynamically-bound qualified name,
+-- in which case we want to generate a NameQ
+--
+-- Parse the string to see if it has a "." in it
+-- so we know whether to generate a qualified or unqualified name
+-- It's a bit tricky because we need to parse 
+--	Foo.Baz.x as Qual Foo.Baz x
+-- So we parse it from back to front
+mkName str
+  = split [] (reverse str)
+  where
+    split occ []        = Name (mkOccName occ) NameS
+    split occ ('.':rev)	= Name (mkOccName occ) (NameQ (mkModName (reverse rev)))
+    split occ (c:rev)   = split (c:occ) rev
 
 mkNameU :: String -> Uniq -> Name	-- Only used internally
 mkNameU s (I# u) = Name (mkOccName s) (NameU u)
@@ -330,10 +344,16 @@ instance Eq NameFlavour where
   f1 == f2 = cmpEq (f1 `compare` f2)
 
 instance Ord NameFlavour where
+	-- NameS < NameQ < NameU < NameG
   NameS `compare` NameS = EQ
   NameS `compare` other = LT
 
-  (NameU _)  `compare` NameS = GT
+  (NameQ _)  `compare` NameS      = GT
+  (NameQ m1) `compare` (NameQ m2) = m1 `compare` m2
+  (NameQ _)  `compare` other      = LT
+
+  (NameU _)  `compare` NameS      = GT
+  (NameU _)  `compare` (NameQ _)  = GT
   (NameU u1) `compare` (NameU u2) | u1  <# u2 = LT
 				  | u1 ==# u2 = EQ
 				  | otherwise = GT
@@ -344,9 +364,10 @@ instance Ord NameFlavour where
   (NameG _ _)    `compare` other	   = GT
 
 instance Show Name where
-  show (Name occ (NameU u))    = occString occ ++ "_" ++ show (I# u)
   show (Name occ NameS)        = occString occ
-  show (Name occ (NameG ns m)) = modString m ++ "." ++ occString occ
+  show (Name occ (NameQ m))    = modString m ++ "." ++ occString occ
+  show (Name occ (NameU u))    = occString occ ++ "_" ++ show (I# u)
+  show (Name occ (NameG ns m)) = modString m ++ ":" ++ occString occ
 
 
 -- 	Tuple data and type constructors
@@ -366,6 +387,8 @@ mk_tup_name n_commas space
   where
     occ = mkOccName ('(' : replicate n_commas ',' ++ ")")
     tup_mod = mkModName "GHC.Tuple"
+
+
 
 
 -----------------------------------------------------
