@@ -375,14 +375,24 @@ SCRIPT_SUBST=$(foreach val,$(SCRIPT_SUBST_VARS),"echo \"$$\"\"$(val)=\\\"$($(val
 
 all :: $(SCRIPT_PROG)
 
+#
+# #! support under cygwin32 is not quite there yet, 
+# so we rely on the eval `trick' instead. On all other
+# platforms, we prepend #!$(INTERP)  -- SOF 6/97
+# 
+
 $(SCRIPT_PROG) :: $(SCRIPT_OBJS)
 	$(RM) $@
 	@echo Creating $@...
 ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
-	@echo "#!/bin/sh -- # to stop perl from looping " > $@
-	@echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  >> $@
-	@echo "      if $$""running_under_some_shell;"         >> $@
+	@if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
+		echo "#! /bin/sh -- # to stop perl from looping "      > $@ ; \
+		echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  >> $@ ; \
+		echo "      if $$""running_under_some_shell;"         >> $@ ; \
+	 else \
+		echo "#! "$(PERL) > $@ ; \
+	fi;
 else
 	@touch $@
 endif
@@ -467,9 +477,13 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   @echo "#!/bin/sh -- # to stop perl from looping "        > $$i.tmp ; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
-	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
+	        echo "#! /bin/sh -- # to stop perl from looping "        > $$i.tmp  ; \
+	        echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"    >> $$i.tmp ; \
+	        echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	    else \
+		echo "#! $(PERL)" > $$i.tmp ; \
+	   fi; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
 	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
@@ -498,9 +512,13 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIB_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   @echo "#!/bin/sh -- # to stop perl from looping "        > $$i.tmp ; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
-	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
+	        echo "#! /bin/sh -- # to stop perl from looping "        > $$i.tmp  ; \
+	        echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"    >> $$i.tmp ; \
+	        echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   else \
+		echo "#! $(PERL)" > $$i.tmp ; \
+	   fi; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
 	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
@@ -529,9 +547,13 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   @echo "#!/bin/sh -- # to stop perl from looping "        > $$i.tmp ; \
-	   echo "eval 'exec $(PERL) -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
-	   echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
+	   if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
+	        echo "#! /bin/sh -- # to stop perl from looping "     > $$i.tmp  ; \
+	        echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
+	        echo "      if $$""running_under_some_shell;"        >> $$i.tmp ; \
+	   else \
+		echo "#! $(PERL)" > $$i.tmp ; \
+	   fi; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
 	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
