@@ -18,7 +18,7 @@ module Prelude (
     Bounded(..), 
     Enum(..), succ, pred, 
     Show(..), ShowS, shows, show, showChar, showString, showParen,
-    Eval(..), seq, strict,
+    seq, strict,
     Bool(..), (&&), (||), not, otherwise,
     Char, String, Int, Integer, Float, Double, Void,
     Maybe(..), maybe,

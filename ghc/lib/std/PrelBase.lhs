@@ -33,6 +33,8 @@ infixr 0  $
 
 \begin{code}
 {-
+-------------- Stage 1 -----------------------
+
 data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
 			  -- to avoid weird names like con2tag_[]#
 instance Functor [] where
@@ -42,8 +44,6 @@ instance Functor [] where
 class  Functor f  where
     map         :: (a -> b) -> f a -> f b
 
-class Eval a
-
 data Bool = False | True
 data Int = I# Int#
 data Double	= D# Double#
@@ -51,12 +51,15 @@ data  ()  =  ()  --easier to do explicitly: deriving (Eq, Ord, Enum, Show, Bound
 		 -- (avoids weird-named functions, e.g., con2tag_()#
 
 data  Maybe a  =  Nothing | Just a	
-data Ordering = LT | EQ | GT deriving( Eq, Ord )
+data Ordering = LT | EQ | GT -- deriving( Eq, Ord )
 
 type  String = [Char]
 
 data Char = C# Char#	
 
+y = let  f :: Char -> Int
+	 f x = x
+    in f
 
 -------------- Stage 2 -----------------------
 not True = False
@@ -141,7 +144,7 @@ shows           =  showsPrec True
 
 %*********************************************************
 %*							*
-\subsection{Standard classes @Eq@, @Ord@, @Bounded@, @Eval@}
+\subsection{Standard classes @Eq@, @Ord@, @Bounded@
 %*							*
 %*********************************************************
 
@@ -172,10 +175,6 @@ class  (Eq a) => Ord a  where
 
 class  Bounded a  where
     minBound, maxBound :: a
-
--- Leave this in for now; to make it easier to silently
--- discard Evals from Haskell 1.4 contexts
-class Eval a
 \end{code}
 
 %*********************************************************
