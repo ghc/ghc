@@ -42,8 +42,8 @@ setHeapSize( HsInt size )
 {
 #if __GLASGOW_HASKELL__ >= 408
     RtsFlags.GcFlags.heapSizeSuggestion = size / BLOCK_SIZE;
-    if (RtsFlags.GcFlags.heapSizeSuggestion > 
-	RtsFlags.GcFlags.maxHeapSize) {
+    if (RtsFlags.GcFlags.maxHeapSize != 0 &&
+	RtsFlags.GcFlags.heapSizeSuggestion > RtsFlags.GcFlags.maxHeapSize) {
 	RtsFlags.GcFlags.maxHeapSize = RtsFlags.GcFlags.heapSizeSuggestion;
     }
 #endif
