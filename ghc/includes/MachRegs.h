@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.18 2005/01/13 16:04:52 simonmar Exp $
+ * $Id: MachRegs.h,v 1.19 2005/01/13 16:21:14 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -209,6 +209,10 @@
 #define REG_Base    ebx
 #endif
 #define REG_Sp	    ebp
+
+#ifndef STOLEN_X86_REGS
+#define STOLEN_X86_REGS 4
+#endif
 
 #if STOLEN_X86_REGS >= 3
 # define REG_R1	    esi
