@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.50 2003/11/12 17:49:08 sof Exp $
+ * $Id: ProfHeap.c,v 1.51 2004/03/19 23:20:20 panne Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -430,10 +430,9 @@ initHeapProfiling(void)
 	int count;
 	for(count = 1; count < prog_argc; count++)
 	    fprintf(hp_file, " %s", prog_argv[count]);
-	fprintf(hp_file, " +RTS ");
+	fprintf(hp_file, " +RTS");
 	for(count = 0; count < rts_argc; count++)
-	    fprintf(hp_file, "%s ", rts_argv[count]);
-	fprintf(hp_file, "\n");
+	    fprintf(hp_file, " %s", rts_argv[count]);
     }
 #endif /* PROFILING */
 
