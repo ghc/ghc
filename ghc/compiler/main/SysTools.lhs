@@ -623,9 +623,11 @@ setTmpDir dir = writeIORef v_TmpDir (canonicalise dir)
 #if !defined(mingw32_HOST_OS)
      canonicalise p = normalisePath p
 #else
-       -- canonicalisation of temp path under win32 is a bit more
-       -- involved: strip trailing slash, deal with /cygdrive-paths,
-       -- normalise slashes.
+	-- Canonicalisation of temp path under win32 is a bit more
+	-- involved: (a) strip trailing slash, 
+	-- 	     (b) normalise slashes
+	--	     (c) just in case, if there is a prefix /cygdrive/x/, change to x:
+	-- 
      canonicalise path = normalisePath (xltCygdrive (removeTrailingSlash path))
 
         -- if we're operating under cygwin, and TMP/TEMP is of
