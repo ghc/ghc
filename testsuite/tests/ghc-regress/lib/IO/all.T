@@ -2,14 +2,20 @@
 def expect_fail_if_windows( opts ):
    return expect_fail_if_platform("i386-unknown-mingw32");
 
-test('IOError001',      set_stdin('IOError001.hs'), compile_and_run, [''])
+test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
+	compile_and_run, [''])
+
 test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
 test('hClose001',       normal, compile_and_run, [''])
 test('hFileSize001',    normal, compile_and_run, [''])
-test('hFileSize002',    normal, compile_and_run, [''])
+test('hFileSize002',    omit_ways(['ghci']), compile_and_run, [''])
 test('hFlush001',       normal, compile_and_run, [''])
-test('hGetBuffering001', set_stdin('hGetBuffering001.hs'), compile_and_run, [''])
+
+test('hGetBuffering001', 
+	compose(omit_ways(['ghci']), set_stdin('hGetBuffering001.hs')), 
+	compile_and_run, [''])
+
 test('hGetChar001', normal, compile_and_run, [''])
 test('hGetLine001', set_stdin('hGetLine001.hs'), compile_and_run, ['-cpp'])
 test('hGetLine002', normal, compile_and_run, [''])
@@ -28,7 +34,9 @@ test('hSeek004', normal, compile_and_run, ['-cpp'])
 
 test('hSetBuffering002', set_stdin('hSetBuffering002.hs'), compile_and_run, [''])
 
-test('hSetBuffering003', set_stdin('hSetBuffering003.hs'), compile_and_run, [''])
+test('hSetBuffering003', compose(omit_ways(['ghci']), 
+				 set_stdin('hSetBuffering003.hs')), 
+	compile_and_run, [''])
 
 test('ioeGetErrorString001', normal, compile_and_run, ['-cpp'])
 test('ioeGetFileName001',    normal, compile_and_run, ['-cpp'])
@@ -48,4 +56,6 @@ test('openFile007',  expect_fail_if_windows, compile_and_run, [''])
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001',  expect_fail_if_windows, compile_and_run, [''])
 test('readwrite001', normal, compile_and_run, ['-cpp'])
-test('readwrite002', set_stdin('readwrite002.hs'), compile_and_run, ['-cpp'])
+
+test('readwrite002', compose(omit_ways(['ghci']), set_stdin('readwrite002.hs')),
+	compile_and_run, ['-cpp'])
