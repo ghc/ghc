@@ -17,14 +17,14 @@ IMP_Ubiq(){-uitous-}
 import HsSyn		( TyDecl(..), ConDecl(..), ConDetails(..), BangType(..), HsExpr(..), 
 			  Match(..), GRHSsAndBinds(..), GRHS(..), OutPat(..), 
 			  HsBinds(..), HsLit, Stmt, DoOrListComp, ArithSeqInfo,
-			  SYN_IE(RecFlag), nonRecursive,
+			  SYN_IE(RecFlag), nonRecursive, andMonoBinds, 
 			  HsType, Fake, InPat, HsTyVar, Fixity,
 			  MonoBinds(..), Sig 
 			)
 import HsTypes		( getTyVarName )
 import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..)	)
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
-			  SYN_IE(TcHsBinds), TcIdOcc(..)
+			  SYN_IE(TcHsBinds), TcIdOcc(..), SYN_IE(TcMonoBinds)
 			)
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcHsTypeKind, tcHsType, tcContext )
@@ -168,13 +168,13 @@ Generating constructor/selector bindings for data declarations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-mkDataBinds :: [TyCon] -> TcM s ([Id], TcHsBinds s)
-mkDataBinds [] = returnTc ([], EmptyBinds)
+mkDataBinds :: [TyCon] -> TcM s ([Id], TcMonoBinds s)
+mkDataBinds [] = returnTc ([], EmptyMonoBinds)
 mkDataBinds (tycon : tycons) 
   | isSynTyCon tycon = mkDataBinds tycons
   | otherwise	     = mkDataBinds_one tycon	`thenTc` \ (ids1, b1) ->
 		       mkDataBinds tycons	`thenTc` \ (ids2, b2) ->
-		       returnTc (ids1++ids2, b1 `ThenBinds` b2)
+		       returnTc (ids1++ids2, b1 `AndMonoBinds` b2)
 
 mkDataBinds_one tycon
   = ASSERT( isAlgTyCon tycon )
@@ -189,9 +189,7 @@ mkDataBinds_one tycon
 		| data_id <- data_ids, isLocallyDefined data_id
 		]
     in	
-    returnTc (data_ids,
-	      MonoBind (foldr AndMonoBinds EmptyMonoBinds binds) [] nonRecursive
-	     )
+    returnTc (data_ids, andMonoBinds binds)
   where
     data_cons = tyConDataCons tycon
     fields = [ (con, field) | con   <- data_cons,

@@ -50,36 +50,34 @@ import Util		( panic{-, pprTrace-} )
 The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
-tcTyAndClassDecls1 :: InstanceMapper
+tcTyAndClassDecls1 :: TcEnv s -> InstanceMapper	-- Knot tying stuff
 		   -> [RenamedHsDecl]
 		   -> TcM s (TcEnv s)
 
-tcTyAndClassDecls1 inst_mapper decls
+tcTyAndClassDecls1 unf_env inst_mapper decls
   = sortByDependency decls 		`thenTc` \ groups ->
-    tcGroups inst_mapper groups
+    tcGroups unf_env inst_mapper groups
 
-tcGroups inst_mapper []
+tcGroups unf_env inst_mapper []
   = tcGetEnv	`thenNF_Tc` \ env ->
     returnTc env
 
-tcGroups inst_mapper (group:groups)
-  = tcGroup inst_mapper group	`thenTc` \ new_env ->
+tcGroups unf_env inst_mapper (group:groups)
+  = tcGroup unf_env inst_mapper group	`thenTc` \ new_env ->
 
 	-- Extend the environment using the new tycons and classes
     tcSetEnv new_env $
 
 	-- Do the remaining groups
-    tcGroups inst_mapper groups
+    tcGroups unf_env inst_mapper groups
 \end{code}
 
 Dealing with a group
 ~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcGroup :: InstanceMapper -> Bag RenamedHsDecl -> TcM s (TcEnv s)
-tcGroup inst_mapper decls
-  = -- pprTrace "tcGroup: " (hsep (map (fst.fmt_decl) (bagToList decls))) $
-
-	-- TIE THE KNOT
+tcGroup :: TcEnv s -> InstanceMapper -> Bag RenamedHsDecl -> TcM s (TcEnv s)
+tcGroup unf_env inst_mapper decls
+  = 	-- TIE THE KNOT
     fixTc ( \ ~(tycons,classes,_) ->
 
 		-- EXTEND TYPE AND CLASS ENVIRONMENTS
@@ -93,7 +91,7 @@ tcGroup inst_mapper decls
       tcTyVarScope tyvar_names 			( \ tyvars ->
 
 		-- DEAL WITH THE DEFINITIONS THEMSELVES
-	foldBag combine (tcDecl inst_mapper)
+	foldBag combine (tcDecl unf_env inst_mapper)
 		(returnTc (emptyBag, emptyBag))
 		decls
       )						`thenTc` \ (tycon_bag,class_bag) ->
@@ -122,16 +120,16 @@ tcGroup inst_mapper decls
 Dealing with one decl
 ~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-tcDecl  :: InstanceMapper
+tcDecl  :: TcEnv s -> InstanceMapper
 	-> RenamedHsDecl
 	-> TcM s (Bag TyCon, Bag Class)
 
-tcDecl inst_mapper (TyD decl)
+tcDecl unf_env inst_mapper (TyD decl)
   = tcTyDecl decl	`thenTc` \ tycon ->
     returnTc (unitBag tycon, emptyBag)
 
-tcDecl inst_mapper (ClD decl)
-  = tcClassDecl1 inst_mapper decl   `thenTc` \ clas ->
+tcDecl unf_env inst_mapper (ClD decl)
+  = tcClassDecl1 unf_env inst_mapper decl   `thenTc` \ clas ->
     returnTc (emptyBag, unitBag clas)
 \end{code}
 
