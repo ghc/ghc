@@ -23,7 +23,6 @@ module GHC.Enum(
 
    ) where
 
-import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
 import Data.Tuple	()		-- for dependencies
 default ()		-- Double isn't available yet
@@ -147,6 +146,7 @@ instance Enum () where
 \end{code}
 
 \begin{code}
+-- Report requires instances up to 15
 instance (Bounded a, Bounded b) => Bounded (a,b) where
    minBound = (minBound, minBound)
    maxBound = (maxBound, maxBound)
@@ -158,6 +158,82 @@ instance (Bounded a, Bounded b, Bounded c) => Bounded (a,b,c) where
 instance (Bounded a, Bounded b, Bounded c, Bounded d) => Bounded (a,b,c,d) where
    minBound = (minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e) => Bounded (a,b,c,d,e) where
+   minBound = (minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f)
+	=> Bounded (a,b,c,d,e,f) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g)
+	=> Bounded (a,b,c,d,e,f,g) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h)
+	=> Bounded (a,b,c,d,e,f,g,h) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i)
+	=> Bounded (a,b,c,d,e,f,g,h,i) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i, Bounded j)
+	=> Bounded (a,b,c,d,e,f,g,h,i,j) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i, Bounded j, Bounded k)
+	=> Bounded (a,b,c,d,e,f,g,h,i,j,k) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l)
+	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m)
+	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound, maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m, Bounded n)
+	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound, minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
+
+instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
+	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m, Bounded n, Bounded o)
+	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
+   minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
+	       minBound, minBound, minBound, minBound, minBound, minBound, minBound)
+   maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
+	       maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
 \end{code}
 
 
