@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/04/05 16:57:18 $
+ * $Revision: 1.28 $
+ * $Date: 2000/04/10 09:40:03 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -93,31 +93,6 @@ extern unsigned _stklen = 8000;         /* Allocate an 8k stack segment    */
 #if SYMANTEC_C
 int allow_break_count = 0;
 #endif
-
-/* --------------------------------------------------------------------------
- * Prototypes for registry reading
- * ------------------------------------------------------------------------*/
-
-#if USE_REGISTRY
-
-/* where have we hidden things in the registry? */
-#if HSCRIPT
-#define HScriptRoot ("SOFTWARE\\Haskell\\HaskellScript\\")
-#endif
-
-#define HugsRoot ("SOFTWARE\\Haskell\\Hugs\\" HUGS_VERSION "\\")
-#define ProjectRoot ("SOFTWARE\\Haskell\\Projects\\")
-
-static Bool   local createKey      ( HKEY, String, PHKEY, REGSAM );
-static Bool   local queryValue     ( HKEY, String, String, LPDWORD, LPBYTE, DWORD );
-static Bool   local setValue       ( HKEY, String, String, DWORD, LPBYTE, DWORD );
-static String local readRegString  ( HKEY, String, String, String );
-static Int    local readRegInt     ( String,Int );
-static Bool   local writeRegString ( String,String );
-static Bool   local writeRegInt    ( String,Int );
-
-static String local readRegChildStrings ( HKEY, String, String, Char, String );
-#endif /* USE_REGISTRY */
 
 /* --------------------------------------------------------------------------
  * Find information about a file:
@@ -500,14 +475,6 @@ String along;                   /* Return NULL if file does not exist      */
 String nm; {
     /* AC, 1/21/99: modified to search hugsPath first, then projectPath */
     String s = findMPathname(along,nm,hugsPath);
-#if USE_REGISTRY
-#if 0
- ToDo:
-    if (s==NULL) {
-        s = findMPathname(along,nm,projectPath);
-    }
-#endif /* 0 */
-#endif /* USE_REGISTRY */
     return s ? s : normPath(searchBuf);
 }
 
@@ -1366,124 +1333,6 @@ int snprintf(char* buffer, int count, const char* fmt, ...) {
 #endif
 }
 #endif /* HAVE_SNPRINTF */
-
-/* --------------------------------------------------------------------------
- * Read/write values from/to the registry
- *
- * All reads are from either HUGS_CURRENT_USER\\hugs_ROOT\\key or 
- * HUGS_LOCAL_MACHINE\\hugs_ROOT\\key.  (Machine entry is only used if
- * user entry doesn't exist).
- *
- * All writes are to HUGS_CURRENT_USER\\HugsRoot\\key
- * ------------------------------------------------------------------------*/
-
-#if USE_REGISTRY
-
-#define HugsRoot ("SOFTWARE\\Haskell\\Hugs\\" HUGS_VERSION "\\")
-
-static Bool   local createKey      ( HKEY, PHKEY, REGSAM );
-static Bool   local queryValue     ( HKEY, String, LPDWORD, LPBYTE, DWORD );
-static Bool   local setValue       ( HKEY, String, DWORD, LPBYTE, DWORD );
-
-static Bool local createKey(hKey, phRootKey, samDesired)
-HKEY    hKey;
-PHKEY   phRootKey; 
-REGSAM  samDesired; {
-    DWORD  dwDisp;
-    return RegCreateKeyEx(hKey, HugsRoot,
-                          0, "", REG_OPTION_NON_VOLATILE,
-                          samDesired, NULL, phRootKey, &dwDisp) 
-           == ERROR_SUCCESS;
-}
-
-static Bool local queryValue(hKey, regPath, var, type, buf, bufSize)
-HKEY    hKey;
-String  regPath;
-String  var;
-LPDWORD type;
-LPBYTE  buf;
-DWORD   bufSize; {
-    HKEY hRootKey;
-
-    if (!createKey(hKey, regPath, &hRootKey, KEY_READ)) {
-        return FALSE;
-    } else {
-        LONG res = RegQueryValueEx(hRootKey, var, NULL, type, buf, &bufSize);
-        RegCloseKey(hRootKey);
-        return (res == ERROR_SUCCESS);
-    }
-}
-
-static Bool local setValue(hKey, regPath, var, type, buf, bufSize)
-HKEY   hKey;
-String regPath;
-String var;
-DWORD  type;
-LPBYTE buf;
-DWORD  bufSize; {
-    HKEY hRootKey;
-
-    if (!createKey(hKey, regPath, &hRootKey, KEY_WRITE)) {
-        return FALSE;
-    } else {
-        LONG res = RegSetValueEx(hRootKey, var, 0, type, buf, bufSize);
-        RegCloseKey(hRootKey);
-        return (res == ERROR_SUCCESS);
-    }
-}
-
-static String local readRegString(key,regPath,var,def) /* read String from registry */
-HKEY   key;
-String regPath;
-String var; 
-String def; {
-    static char  buf[300];
-    DWORD type;
-    if (queryValue(key, regPath,var, &type, buf, sizeof(buf))
-        && type == REG_SZ) {
-        return (String)buf;
-    } else {
-        return def;
-    }
-}
-
-static Int local readRegInt(var, def)            /* read Int from registry */
-String var;
-Int    def; {
-    DWORD buf;
-    DWORD type;
-
-    if (queryValue(HKEY_CURRENT_USER, HugsRoot, var, &type, 
-                   (LPBYTE)&buf, sizeof(buf))
-        && type == REG_DWORD) {
-        return (Int)buf;
-    } else if (queryValue(HKEY_LOCAL_MACHINE, HugsRoot, var, &type, 
-                          (LPBYTE)&buf, sizeof(buf))
-               && type == REG_DWORD) {
-        return (Int)buf;
-    } else {
-        return def;
-    }
-}
-
-static Bool local writeRegString(var,val)      /* write String to registry */
-String var;                        
-String val; {
-    if (NULL == val) {
-        val = "";
-    }
-    return setValue(HKEY_CURRENT_USER, HugsRoot, var, 
-                    REG_SZ, (LPBYTE)val, lstrlen(val)+1);
-}
-
-static Bool local writeRegInt(var,val)         /* write String to registry */
-String var;                        
-Int    val; {
-    return setValue(HKEY_CURRENT_USER, HugsRoot, var, 
-                    REG_DWORD, (LPBYTE)&val, sizeof(val));
-}
-
-#endif /* USE_REGISTRY */
 
 /* --------------------------------------------------------------------------
  * Things to do with the argv/argc and the env

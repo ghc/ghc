@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.63 $
- * $Date: 2000/04/07 16:20:53 $
+ * $Revision: 1.64 $
+ * $Date: 2000/04/10 09:40:03 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -70,9 +70,6 @@ static Void   local listNames         ( Void );
 static Void   local toggleSet         ( Char,Bool );
 static Void   local togglesIn         ( Bool );
 static Void   local optionInfo        ( Void );
-#if USE_REGISTRY
-static String local optionsToStr      ( Void );
-#endif
 static Void   local readOptions       ( String );
 static Bool   local processOption     ( String );
 static Void   local setHeapSize       ( String );
@@ -221,12 +218,6 @@ String argv[]; {
 #endif
    hugsPath      = strCopy(HUGSPATH);
    readOptions("-p\"%s> \" -r$$");
-#if USE_REGISTRY
-   projectPath   = strCopy(readRegChildStrings(HKEY_LOCAL_MACHINE,ProjectRoot,
-                                                "HUGSPATH", PATHSEP, ""));
-   readOptions(readRegString(HKEY_LOCAL_MACHINE,HugsRoot,"Options",""));
-   readOptions(readRegString(HKEY_CURRENT_USER, HugsRoot,"Options",""));
-#endif /* USE_REGISTRY */
    readOptions(fromEnv("STGHUGSFLAGS",""));
 
    strncpy(argv_0_orig,argv[0],1000);   /* startupHaskell mangles argv[0] */
@@ -380,65 +371,6 @@ ToDo
     Putchar('\n');
 }
 
-#if USE_REGISTRY
-#define PUTC(c)                         \
-    *next++=(c)
-
-#define PUTS(s)                         \
-    strcpy(next,s);                     \
-    next+=strlen(next)
-
-#define PUTInt(optc,i)                  \
-    sprintf(next,"-%c%d",optc,i);       \
-    next+=strlen(next)
-
-#define PUTStr(c,s)                     \
-    next=PUTStr_aux(next,c,s)
-
-static String local PUTStr_aux ( String,Char, String));
-
-static String local PUTStr_aux(next,c,s)
-String next;
-Char   c;
-String s; {
-    if (s) { 
-        String t = 0;
-        sprintf(next,"-%c\"",c); 
-        next+=strlen(next);      
-        for(t=s; *t; ++t) {
-            PUTS(unlexChar(*t,'"'));
-        }
-        next+=strlen(next);      
-        PUTS("\" ");
-    }
-    return next;
-}
-
-static String local optionsToStr() {          /* convert options to string */
-    static char buffer[2000];
-    String next = buffer;
-
-    Int i;
-    for (i=0; toggle[i].c; ++i) {
-        PUTC(*toggle[i].flag ? '+' : '-');
-        PUTC(toggle[i].c);
-        PUTC(' ');
-    }
-    PUTS(haskell98 ? "+98 " : "-98 ");
-    PUTInt('h',hpSize);  PUTC(' ');
-    PUTStr('p',prompt);
-    PUTStr('r',repeatStr);
-    PUTStr('P',hugsPath);
-    PUTStr('E',hugsEdit);
-    PUTInt('c',cutoff);  PUTC(' ');
-#if USE_PREPROCESSOR  && (defined(HAVE_POPEN) || defined(HAVE__POPEN))
-    PUTStr('F',preprocessor);
-#endif
-    PUTC('\0');
-    return buffer;
-}
-#endif /* USE_REGISTRY */
-
 #undef PUTC
 #undef PUTS
 #undef PUTInt
@@ -545,11 +477,7 @@ String s; {
             hpSize = MAXIMUMHEAP;
         if (initDone && hpSize != heapSize) {
             /* ToDo: should this use a message box in winhugs? */
-#if USE_REGISTRY
-            FPrintf(stderr,"Change to heap size will not take effect until you rerun Hugs\n");
-#else
             FPrintf(stderr,"You cannot change heap size from inside Hugs\n");
-#endif
         } else {
             heapSize = hpSize;
         }
@@ -714,9 +642,6 @@ static Void local set() {               /* change command line options from*/
                 EEND_NO_LONGJMP;
             }
         } while ((s=readFilename())!=0);
-#if USE_REGISTRY
-        writeRegString("Options", optionsToStr());
-#endif
     }
     else
         optionInfo();

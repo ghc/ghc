@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.37 $
- * $Date: 2000/04/06 00:01:26 $
+ * $Revision: 1.38 $
+ * $Date: 2000/04/10 09:40:03 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -589,19 +589,6 @@ extern HugsBreakAction setBreakAction ( HugsBreakAction );
 /*---------------------------------------------------------------------------
  * Environment variables and the registry
  *-------------------------------------------------------------------------*/
-
-/* On Win32 we can use the registry to supplement info in environment 
- * variables.
- */
-/* AJG: Commented out for now for development */
-/* #define USE_REGISTRY (HAVE_WINDOWS_H && !__MSDOS__) */
-
-#ifdef USE_REGISTRY
-Bool 	writeRegString          ( String var, String val );
-String 	readRegString           ( String var, String def );
-Int 	readRegInt              ( String var, Int def );
-Bool 	writeRegInt             ( String var, Int val );
-#endif
 
 #define N_INSTALLDIR 200
 extern char installDir[N_INSTALLDIR];
