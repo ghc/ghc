@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.119 2002/04/11 08:39:27 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.120 2002/04/18 11:27:59 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -273,10 +273,10 @@ interactiveLoop is_tty = do
 
 checkPerms :: String -> IO Bool
 checkPerms name =
-  DriverUtil.handle (\_ -> return False) $ do
 #ifdef mingw32_TARGET_OS
-     doesFileExist name
+  return True
 #else
+  DriverUtil.handle (\_ -> return False) $ do
      st <- getFileStatus name
      me <- getRealUserID
      if fileOwner st /= me then do
