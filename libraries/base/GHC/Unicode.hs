@@ -77,6 +77,15 @@ isUpper                 :: Char -> Bool
 isLower                 :: Char -> Bool
 
 -- | Selects alphabetic Unicode characters (letters).
+--
+-- Note: the Haskell 98 definition of 'isAlpha' is:
+--
+-- >   isAlpha c = isUpper c || isLower c
+--
+-- the implementation here diverges from the Haskell 98
+-- definition in the sense that Unicode alphabetic characters which
+-- are neither upper nor lower case will still be identified as
+-- alphabetic by 'isAlpha'.
 isAlpha                 :: Char -> Bool
 
 -- | Selects alphabetic or numeric digit Unicode characters.
