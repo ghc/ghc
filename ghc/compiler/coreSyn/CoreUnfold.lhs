@@ -594,7 +594,7 @@ okToUnfoldInHiFile e = opt_UnfoldCasms || go e
 	      BindDefault _ rhs -> rhs:ls
 
     -- ok to unfold a PrimOp as long as it's not a _casm_
-    okToUnfoldPrimOp (CCallOp _ is_casm _ _ _ _) = not is_casm
-    okToUnfoldPrimOp _                           = True
+    okToUnfoldPrimOp (CCallOp _ is_casm _ _ _) = not is_casm
+    okToUnfoldPrimOp _                         = True
      
 \end{code}
