@@ -131,6 +131,16 @@ initTc hsc_env mod do_this
 	-- list, and there are no bindings in M, we don't bleat 
 	-- "unknown module M".
 
+initTcPrintErrors
+       :: HscEnv
+       -> Module 
+       -> TcM r
+       -> IO (Maybe r)
+initTcPrintErrors env mod todo = do
+  (msgs, res) <- initTc env mod todo
+  printErrorsAndWarnings msgs
+  return res
+
 mkImpInstEnv :: HscEnv -> InstEnv
 -- At the moment we (wrongly) build an instance environment from all the
 -- home-package modules we have already compiled.

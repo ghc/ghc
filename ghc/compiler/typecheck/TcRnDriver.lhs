@@ -228,7 +228,7 @@ tcRnStmt :: HscEnv
 		-- a list of the bound values, coerced to ().
 
 tcRnStmt hsc_env ictxt rdr_stmt
-  = initTc hsc_env iNTERACTIVE $ 
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext ictxt $ do {
 
     -- Rename; use CmdLineMode because tcRnStmt is only used interactively
@@ -400,7 +400,7 @@ tcRnExpr :: HscEnv
 	 -> LHsExpr RdrName
 	 -> IO (Maybe Type)
 tcRnExpr hsc_env ictxt rdr_expr
-  = initTc hsc_env iNTERACTIVE $ 
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext ictxt $ do {
 
     (rn_expr, fvs) <- rnLExpr rdr_expr ;
@@ -433,7 +433,7 @@ tcRnThing :: HscEnv
 -- *and* as a type or class constructor; 
 -- hence the call to dataTcOccs, and we return up to two results
 tcRnThing hsc_env ictxt rdr_name
-  = initTc hsc_env iNTERACTIVE $ 
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
     setInteractiveContext ictxt $ do {
 
 	-- If the identifier is a constructor (begins with an
@@ -804,7 +804,7 @@ mkExportEnv :: HscEnv -> [ModuleName]	-- Expose these modules' exports only
  	    -> IO GlobalRdrEnv
 
 mkExportEnv hsc_env exports
-  = do	{ mb_envs <- initTc hsc_env iNTERACTIVE $
+  = do	{ mb_envs <- initTcPrintErrors hsc_env iNTERACTIVE $
 		     mappM getModuleExports exports 
 	; case mb_envs of
 	     Just envs -> return (foldr plusGlobalRdrEnv emptyGlobalRdrEnv envs)
@@ -836,7 +836,7 @@ getModuleContents
   -> IO (Maybe [IfaceDecl])
 
 getModuleContents hsc_env ictxt mod exports_only
- = initTc hsc_env iNTERACTIVE (get_mod_contents exports_only)
+ = initTcPrintErrors hsc_env iNTERACTIVE (get_mod_contents exports_only)
  where
    get_mod_contents exports_only
       | not exports_only	-- We want the whole top-level type env
