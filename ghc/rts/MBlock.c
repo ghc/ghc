@@ -119,7 +119,7 @@ my_mmap (void *addr, lnat size)
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, TRUE);
 	
     if(err) // don't know what the error codes mean exactly
-	barf("memory allocation failed (requested %d bytes)", size);
+	barf("memory allocation failed (requested %lu bytes)", size);
     else
 	vm_protect(mach_task_self(),ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
 #else
@@ -132,7 +132,7 @@ my_mmap (void *addr, lnat size)
 	    (errno == EINVAL && sizeof(void*)==4 && size >= 0xc0000000)) {
 	    // If we request more than 3Gig, then we get EINVAL
 	    // instead of ENOMEM (at least on Linux).
-	    errorBelch("out of memory (requested %d bytes)", size);
+	    errorBelch("out of memory (requested %lu bytes)", size);
 	    stg_exit(EXIT_FAILURE);
 	} else {
 	    barf("getMBlock: mmap: %s", strerror(errno));

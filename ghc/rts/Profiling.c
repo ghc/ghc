@@ -663,7 +663,7 @@ report_per_cc_costs( void )
 	  );
       
       if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-	  fprintf(prof_file, "  %5lu %9llu", cc->time_ticks, cc->mem_alloc);
+	fprintf(prof_file, "  %5llu %9llu", (StgWord64)(cc->time_ticks), cc->mem_alloc);
       }
       fprintf(prof_file, "\n");
   }
@@ -777,7 +777,7 @@ reportCCS(CostCentreStack *ccs, nat indent)
 	    );
 
     if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
-      fprintf(prof_file, "  %5lu %9llu", ccs->time_ticks, ccs->mem_alloc*sizeof(W_));
+      fprintf(prof_file, "  %5llu %9llu", (StgWord64)(ccs->time_ticks), ccs->mem_alloc*sizeof(W_));
 #if defined(PROFILING_DETAIL_COUNTS)
       fprintf(prof_file, "  %8ld %8ld %8ld %8ld %8ld %8ld %8ld",
 	      ccs->mem_allocs, ccs->thunk_count,
@@ -893,8 +893,8 @@ reportCCS_XML(CostCentreStack *ccs)
 
   cc = ccs->cc;
   
-  fprintf(prof_file, " 1 %d %llu %lu %llu", 
-	  ccs->ccsID, ccs->scc_count, ccs->time_ticks, ccs->mem_alloc);
+  fprintf(prof_file, " 1 %d %llu %llu %llu", 
+	  ccs->ccsID, ccs->scc_count, (StgWord64)(ccs->time_ticks), ccs->mem_alloc);
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
     if (!i->back_edge) {

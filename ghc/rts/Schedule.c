@@ -216,7 +216,9 @@ void            addToBlockedQueue ( StgTSO *tso );
 static void     schedule          ( StgMainThread *mainThread, Capability *initialCapability );
        void     interruptStgRts   ( void );
 
+#if !defined(PAR) && !defined(RTS_SUPPORTS_THREADS)
 static void     detectBlackHoles  ( void );
+#endif
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* ToDo: carefully document the invariants that go together
@@ -3286,6 +3288,7 @@ resurrectThreads( StgTSO *threads )
  * Locks: sched_mutex is held upon entry and exit.
  * -------------------------------------------------------------------------- */
 
+#if !defined(PAR) && !defined(RTS_SUPPORTS_THREADS)
 static void
 detectBlackHoles( void )
 {
@@ -3336,6 +3339,7 @@ detectBlackHoles( void )
 	done: ;
     }
 }
+#endif
 
 /* ----------------------------------------------------------------------------
  * Debugging: why is a thread blocked

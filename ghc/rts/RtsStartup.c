@@ -88,8 +88,31 @@ __hscore_set_saved_termios(int fd, void* ts)
   }
 }
 
-#if i386_TARGET_ARCH
-static void x86_init_fpu ( void );
+/* -----------------------------------------------------------------------------
+   Initialise floating point unit on x86 (currently disabled. why?)
+   -------------------------------------------------------------------------- */
+
+#define X86_INIT_FPU 0
+
+#if X86_INIT_FPU
+static void
+x86_init_fpu ( void )
+{
+  __volatile unsigned short int fpu_cw;
+
+  // Grab the control word
+  __asm __volatile ("fnstcw %0" : "=m" (fpu_cw));
+
+#if 0
+  printf("fpu_cw: %x\n", fpu_cw);
+#endif
+
+  // Set bits 8-9 to 10 (64-bit precision).
+  fpu_cw = (fpu_cw & 0xfcff) | 0x0200;
+
+  // Store the new control word back
+  __asm __volatile ("fldcw %0" : : "m" (fpu_cw));
+}
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -204,8 +227,8 @@ hs_init(int *argc, char **argv[])
     setlocale(LC_CTYPE,"");
 #endif
 
-#if i386_TARGET_ARCH
-//    x86_init_fpu();
+#if X86_INIT_FPU
+    x86_init_fpu();
 #endif
 
     /* Record initialization times */
@@ -465,29 +488,3 @@ stg_exit(int n)
 #endif
   exit(n);
 }
-
-/* -----------------------------------------------------------------------------
-   Initialise floating point unit on x86
-   -------------------------------------------------------------------------- */
-
-#if i386_TARGET_ARCH
-static void
-x86_init_fpu ( void )
-{
-  __volatile unsigned short int fpu_cw;
-
-  // Grab the control word
-  __asm __volatile ("fnstcw %0" : "=m" (fpu_cw));
-
-#if 0
-  printf("fpu_cw: %x\n", fpu_cw);
-#endif
-
-  // Set bits 8-9 to 10 (64-bit precision).
-  fpu_cw = (fpu_cw & 0xfcff) | 0x0200;
-
-  // Store the new control word back
-  __asm __volatile ("fldcw %0" : : "m" (fpu_cw));
-}
-#endif
-
