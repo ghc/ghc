@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.48 1999/03/09 14:24:43 sewardj Exp $
+ * $Id: GC.c,v 1.49 1999/03/09 15:33:16 sewardj Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2036,6 +2036,18 @@ scavenge_mut_once_list(generation *gen)
       }
       continue;
 
+    case CAF_UNENTERED:
+      { 
+	StgCAF *caf = (StgCAF *)p;
+	caf->body  = evacuate(caf->body);
+	if (failed_to_evac) {
+	  failed_to_evac = rtsFalse;
+	  p->mut_link = new_list;
+	  new_list = p;
+	}
+      }
+      continue;
+
     default:
       /* shouldn't have anything else on the mutables list */
       barf("scavenge_mut_once_list: strange object?");
@@ -2569,6 +2581,7 @@ void RevertCAFs(void)
     caf->value = stgCast(StgClosure*,0xdeadbeef);
     caf->link  = stgCast(StgCAF*,0xdeadbeef);
   }
+  enteredCAFs = END_CAF_LIST;
 }
 
 void revert_dead_CAFs(void)
@@ -2576,8 +2589,9 @@ void revert_dead_CAFs(void)
     StgCAF* caf = enteredCAFs;
     enteredCAFs = END_CAF_LIST;
     while (caf != END_CAF_LIST) {
-        StgCAF* next = caf->link;
-        StgCAF* new = (StgCAF*)isAlive((StgClosure*)caf);
+        StgCAF *next, *new;
+        next = caf->link;
+        new = (StgCAF*)isAlive((StgClosure*)caf);
         if (new) {
            new->link = enteredCAFs;
            enteredCAFs = new;
