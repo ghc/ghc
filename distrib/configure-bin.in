@@ -118,7 +118,6 @@ dnl ** How to invoke cpp directly **
 AC_PROG_CC
 FPTOOLS_HAVE_GCC
 AC_PROG_CPP
-FPTOOLS_PROG_GNUCPP
 
 #
 AC_OUTPUT(Makefile)

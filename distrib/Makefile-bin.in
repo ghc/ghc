@@ -86,7 +86,6 @@ LN_S        = @LN_S@
 CHMOD       = chmod
 INSTALL	    = @INSTALL@
 exeext      = @exeext@
-RAWCPP      = @RAWCPP@
 SED	    = @SedCmd@
 TMPDIR      = /tmp
 
@@ -137,7 +136,6 @@ config-pkgs ::
 	   echo '$$'"libexecdir='$(real_libdir)';"               >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"datadir='$(real_datadir)';"                 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"SED='$(SED)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"RAWCPP='$(RAWCPP)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"TMPDIR='$(TMPDIR)';"		>> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.prl   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
@@ -155,7 +153,6 @@ config-pkgs ::
 	   echo '$$'"libexecdir='$(real_libdir)';" >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"datadir='$(real_datadir)';"   >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"SED='$(SED)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
-	   echo '$$'"RAWCPP='$(RAWCPP)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   echo '$$'"TMPDIR='$(TMPDIR)';"		 >> lib/$(platform)/$(package)-$(version)/$$i ; \
 	   cat lib/$(platform)/$(package)-$(version)/$$i.prl >> lib/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$(package)-$(version)/$$i; \
@@ -173,7 +170,6 @@ config-pkgs ::
 	   echo "libexecdir='$(real_libdir)'" >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "datadir='$(real_datadir)'"   >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "SED='$(SED)'"			 >> bin/$(platform)/$(package)-$(version)/$$i ; \
-	   echo "RAWCPP='$(RAWCPP)'"		 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   echo "TMPDIR='$(TMPDIR)'"		 >> bin/$(platform)/$(package)-$(version)/$$i ; \
 	   cat bin/$(platform)/$(package)-$(version)/$$i.sh >> bin/$(platform)/$(package)-$(version)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$(package)-$(version)/$$i; \
