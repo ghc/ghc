@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.46 2001/02/13 15:51:57 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.47 2001/02/13 17:13:39 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -8,7 +8,7 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS -#include "Linker.h" #-}
-module InteractiveUI (interactiveUI) where
+module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 #include "HsVersions.h"
 
@@ -109,7 +109,6 @@ helpText = "\
 
 interactiveUI :: CmState -> Maybe FilePath -> [String] -> IO ()
 interactiveUI cmstate mod cmdline_libs = do
-   hPutStrLn stdout ghciWelcomeMsg
    hFlush stdout
    hSetBuffering stdout NoBuffering
 

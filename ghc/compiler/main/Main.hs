@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.51 2001/02/13 15:51:57 sewardj Exp $
+-- $Id: Main.hs,v 1.52 2001/02/13 17:13:39 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -164,8 +164,25 @@ main =
    (flags2, mode, stop_flag) <- getGhcMode argv'
    writeIORef v_GhcMode mode
 
+	-- Show the GHCi banner?
+#  ifdef GHCI
+   when (mode == DoInteractive) $
+      hPutStrLn stdout ghciWelcomeMsg
+#  endif
+
 	-- process all the other arguments, and get the source files
    non_static <- processArgs static_flags flags2 []
+
+	-- -O and --interactive are not a good combination
+	-- ditto with any kind of way selection
+   orig_opt_level <- readIORef v_OptLevel
+   when (orig_opt_level > 0 && mode == DoInteractive) $
+      do putStr "warning: -O conflicts with --interactive; -O turned off.\n"
+         writeIORef v_OptLevel 0
+   orig_ways <- readIORef v_Ways
+   when (not (null orig_ways) && mode == DoInteractive) $
+      do throwDyn (OtherError 
+                   "--interactive can't be used with -prof, -ticky, -unreg or -smp.")
 
 	-- Find the build tag, and re-process the build-specific options.
 	-- Also add in flags for unregisterised compilation, if 
@@ -188,8 +205,8 @@ main =
 		  	W_all	  -> minusWallOpts
 		  	W_not     -> []
 
-	-- build the default DynFlags (these may be adjusted on a per
-	-- module basis by OPTIONS pragmas and settings in the interpreter).
+   -- build the default DynFlags (these may be adjusted on a per
+   -- module basis by OPTIONS pragmas and settings in the interpreter).
 
    core_todo <- buildCoreToDo
    stg_todo  <- buildStgToDo
@@ -198,6 +215,8 @@ main =
    -- by module basis, using only the -fvia-C and -fasm flags.  If the global
    -- HscLang is not HscC or HscAsm, -fvia-C and -fasm have no effect.
    opt_level  <- readIORef v_OptLevel
+
+
    let lang = case mode of 
 		 StopBefore HCc -> HscC
 		 DoInteractive  -> HscInterpreted
@@ -315,19 +334,18 @@ beginInteractive :: [String] -> IO ()
 beginInteractive = throwDyn (OtherError "not built for interactive use")
 #else
 beginInteractive fileish_args
-  = let is_libraryish nm
-           = let nmr = map toLower (reverse nm)
-                 in take 2 nmr == "o." ||
-                    take 3 nmr == "os." ||
-                    take 4 nmr == "lld."
-        libs = filter is_libraryish fileish_args
-        mods = filter (not.is_libraryish) fileish_args
-        mod = case mods of
-	         []    -> Nothing
-	         [mod] -> Just mod
-	         _     -> throwDyn (UsageError 
-                                    "only one module allowed with --interactive")
-    in
-    do state <- cmInit Interactive
+  = do let is_libraryish nm
+              = let nmr = map toLower (reverse nm)
+                    in take 2 nmr == "o." ||
+                       take 3 nmr == "os." ||
+                       take 4 nmr == "lld."
+           libs = filter is_libraryish fileish_args
+           mods = filter (not.is_libraryish) fileish_args
+           mod = case mods of
+	            []    -> Nothing
+	            [mod] -> Just mod
+	            _     -> throwDyn (UsageError 
+                                       "only one module allowed with --interactive")
+       state <- cmInit Interactive
        interactiveUI state mod libs
 #endif
