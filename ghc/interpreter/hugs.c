@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/10/20 02:15:59 $
+ * $Revision: 1.16 $
+ * $Date: 1999/10/29 13:41:24 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -300,8 +300,8 @@ String argv[]; {
    startupHaskell (argc,argv);
    argc = prog_argc; argv = prog_argv;
 
-    namesUpto = numScripts = 0;
-    addStackEntry("Prelude");
+   namesUpto = numScripts = 0;
+   addStackEntry("Prelude");
 
    for (i=1; i<argc; ++i) {            /* process command line arguments  */
         if (strcmp(argv[i], "--")==0) break;

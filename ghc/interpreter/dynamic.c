@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/10/28 14:32:06 $
+ * $Revision: 1.12 $
+ * $Date: 1999/10/29 13:41:23 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -22,19 +22,29 @@
 
 #include <windows.h>
 
-void* getDLLSymbol(line,dll0,symbol)  /* load dll and lookup symbol */
+void* getDLLSymbol(line,dll0,symbol0) /* load dll and lookup symbol */
 Int    line;
 String dll0;
-String symbol; {
+String symbol0; {
     void*      sym;
     char       dll[1000];
+    char       symbol[100];
     ObjectFile instance;
+
     if (strlen(dll0) > 996) {
-       ERRMSG(line) "Excessively long library name:\n%s\n",dll
+       ERRMSG(line) "Excessively long library name:\n%s\n",dll0
        EEND;
     }
     strcpy(dll,dll0);
     strcat(dll, ".dll");
+
+    if (strlen(symbol0) > 96) {
+       ERRMSG(line) "Excessively long symbol name:\n%s\n",symbol0
+       EEND;
+    }
+    strcpy(&(symbol[1]),symbol0); 
+    symbol[0] = '_';
+
     instance = LoadLibrary(dll);
     if (NULL == instance) {
         /* GetLastError allegedly provides more detail - in practice,
@@ -43,7 +53,8 @@ String symbol; {
         ERRMSG(line) "Can't open library \"%s\"", dll
         EEND;
     }
-    return GetProcAddress(instance,symbol);
+    sym = GetProcAddress(instance,symbol0);
+    return sym;
 }
 
 Bool stdcallAllowed ( void )
@@ -69,7 +80,7 @@ String symbol; {
     char       dll[1000];
     ObjectFile instance;
     if (strlen(dll0) > 996) {
-       ERRMSG(line) "Excessively long library name:\n%s\n",dll
+       ERRMSG(line) "Excessively long library name:\n%s\n",dll0
        EEND;
     }
     strcpy(dll,dll0);
@@ -114,7 +125,7 @@ String symbol; {
     ObjectFile instance = shl_load(dll,BIND_IMMEDIATE,0L);
     void* r;
     if (NULL == instance) {
-        ERRMSG(line) "Error while importing DLL \"%s\"", dll
+        ERRMSG(line) "Error while importing DLL \"%s\"", dll0
         EEND;
     }
     return (0 == shl_findsym(&instance,symbol,TYPE_PROCEDURE,&r)) ? r : 0;

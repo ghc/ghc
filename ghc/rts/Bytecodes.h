@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Bytecodes.h,v 1.8 1999/10/26 17:27:30 sewardj Exp $
+ * $Id: Bytecodes.h,v 1.9 1999/10/29 13:41:29 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -411,6 +411,10 @@ typedef enum
 
     /* foreign export dynamic support */
     , i_createAdjThunkARCH
+
+    /* misc handy hacks */
+    , i_getArgc
+    , i_getArgv
 
 #ifdef PROVIDE_CONCURRENT
     /* Concurrency operations */

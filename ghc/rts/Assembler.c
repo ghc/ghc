@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Assembler.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/10/26 17:27:28 $
+ * $Revision: 1.12 $
+ * $Date: 1999/10/29 13:41:27 $
  *
  * This module provides functions to construct BCOs and other closures
  * required by the bytecode compiler.
@@ -1367,6 +1367,10 @@ const AsmPrim asmPrimOps[] = {
 
     /* foreign export dynamic support */
     , { "primCreateAdjThunkARCH",    "sAC","A",  MONAD_IO, i_PRIMOP2, i_createAdjThunkARCH }
+
+    /* misc handy hacks */
+    , { "primGetArgc",               "",   "I",  MONAD_IO, i_PRIMOP2, i_getArgc }
+    , { "primGetArgv",               "I",  "A",  MONAD_IO, i_PRIMOP2, i_getArgv }
 
 #ifdef PROVIDE_PTREQUALITY
     , { "primReallyUnsafePtrEquality", "aa", "B",MONAD_Id, i_PRIMOP2, i_reallyUnsafePtrEquality }

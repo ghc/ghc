@@ -114,7 +114,9 @@ module Prelude (
 
     -- debugging hacks
     --,ST(..)
-    ,primIntToAddr
+    --,primIntToAddr
+    --,primGetArgc
+    --,primGetArgv
   ) where
 
 -- Standard value bindings {Prelude} ----------------------------------------
@@ -1718,8 +1720,8 @@ foreign import "nHandle" "nh_free"   nh_free   :: Addr -> IO ()
 foreign import "nHandle" "nh_store"  nh_store  :: Addr -> Int -> IO ()
 foreign import "nHandle" "nh_load"   nh_load   :: Addr -> IO Int
 
-foreign import "nHandle" "nh_argc"   nh_argc   :: IO Int
-foreign import "nHandle" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
+--foreign import "nHandle" "nh_argc"   nh_argc   :: IO Int
+--foreign import "nHandle" "nh_argvb"  nh_argvb  :: Int -> Int -> IO Int
 foreign import "nHandle" "nh_getenv" nh_getenv :: Addr -> IO Addr
 
 copy_String_to_cstring :: String -> IO Addr
@@ -1761,16 +1763,13 @@ writetohandle fname h (c:cs)
 
 primGetRawArgs :: IO [String]
 primGetRawArgs
-   = nh_argc >>= \argc ->
-     accumulate (map (get_one_arg 0) [0 .. argc-1])
+   = primGetArgc >>= \argc ->
+     accumulate (map get_one_arg [0 .. argc-1])
      where
-        get_one_arg :: Int -> Int -> IO String
-        get_one_arg offset argno
-           = nh_argvb argno offset >>= \cb ->
-             if   cb == 0 
-             then return [] 
-             else get_one_arg (offset+1) argno >>= \s -> 
-                  return ((primIntToChar cb):s)
+        get_one_arg :: Int -> IO String
+        get_one_arg argno
+           = primGetArgv argno >>= \a ->
+             copy_cstring_to_String a
 
 primGetEnv :: String -> IO String
 primGetEnv v

@@ -1,0 +1,15 @@
+EXPORTS
+nh_stdin
+nh_stdout
+nh_stderr
+nh_write
+nh_read
+nh_open
+nh_flush
+nh_close
+nh_errno
+nh_malloc
+nh_free
+nh_store
+nh_load
+nh_getenv

@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.12 1999/10/29 11:41:04 sewardj Exp $                        #
+# $Id: Makefile,v 1.13 1999/10/29 13:41:23 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -15,8 +15,10 @@ RTS_DIR = $(TOP)/ghc/rts
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
 DYN_EXT=.dll
+MNO_CYGWIN=
 else
 DYN_EXT=.so
+MNO_CYGWIN=
 endif
 
 YACC = bison -y
@@ -33,7 +35,7 @@ C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
      translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c interface.c
 
-SRC_CC_OPTS = -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
+SRC_CC_OPTS = $(MNO_CYGWIN) -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
 
 GHC_LIBS_NEEDED = $(TOP)/ghc/rts/libHSrts.a
 
@@ -48,8 +50,9 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
 
 nHandle.$(DYN_EXT): nHandle.c
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
-	gcc -O -Wall -o nHandle.o -c nHandle.c
-	dllwrap -o nHandle.dll nHandle.o
+	gcc -mno-cygwin -O -Wall -o nHandle.o -c nHandle.c
+	dllwrap -mno-cygwin --target=i386-mingw32 -o nHandle.dll \
+                -def nHandle.def nHandle.o
 else
 	gcc -O -Wall -shared -fPIC -o nHandle.so nHandle.c
 endif

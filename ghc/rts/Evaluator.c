@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.22 $
- * $Date: 1999/10/26 17:27:25 $
+ * $Revision: 1.23 $
+ * $Date: 1999/10/29 13:41:29 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -2888,6 +2888,20 @@ static void* enterBCO_primop2 ( int primop2code,
                 PushTaggedAddr(adj_thunk);
                 break;
             }     
+
+        case i_getArgc:
+            {
+                StgInt n = prog_argc;
+                PushTaggedInt(n);
+                break;
+            }
+        case i_getArgv:
+            {
+                StgInt  n = PopTaggedInt();
+                StgAddr a = (StgAddr)prog_argv[n];
+                PushTaggedAddr(a);
+                break;
+            }
 
 #ifdef PROVIDE_CONCURRENT
         case i_fork:
