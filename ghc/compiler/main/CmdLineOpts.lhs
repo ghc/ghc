@@ -10,6 +10,7 @@ module CmdLineOpts (
 	SimplifierSwitch(..),
 	StgToDo(..),
 	SwitchResult(..),
+	HscLang(..),
 	classifyOpts,
 
 	intSwitchSet,
@@ -137,17 +138,12 @@ module CmdLineOpts (
 	opt_NoImplicitPrelude,
 	opt_OmitBlackHoling,
 	opt_OmitInterfacePragmas,
-	opt_ProduceExportCStubs,
-	opt_ProduceExportHStubs,
 	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_ReportCompile,
 	opt_Static,
 	opt_Unregisterised,
 	opt_Verbose,
-
-	opt_OutputLanguage,
-	opt_OutputFile,
 
 	-- Code generation
 	opt_UseVanillaRegs,
@@ -319,11 +315,16 @@ data DynFlag
    | Opt_GlasgowExts
    deriving (Eq)
 
-newtype DynFlags = DynFlags (CoreToDo, StgToDo, [(DynFlag, SwitchResult)])
+data DynFlags = DynFlags {
+  coreToDo :: CoreToDo,
+  stgToDo  :: StgToDo,
+  hscLang  :: HscLang,
+  flags    :: [(DynFlag, SwitchResult)]
+ }
 
 boolOpt :: DynFlag -> DynFlags -> Bool
-boolOpt f (DynFlags (_, _, dflags))
-  = case lookup f dflags of
+boolOpt f dflags
+  = case lookup f (flags dflags) of
 	Nothing -> False
 	Just (SwBool b) -> b
 	_ -> panic "boolOpt"
@@ -372,10 +373,19 @@ dopt_AllowUndecidableInstances = boolOpt Opt_AllowUndecidableInstances
 dopt_GlasgowExts               = boolOpt Opt_GlasgowExts
 
 dopt_CoreToDo :: DynFlags -> CoreToDo
-dopt_CoreToDo (DynFlags (core_todo,_,_)) = core_todo
+dopt_CoreToDo = coreToDo
 
 dopt_StgToDo :: DynFlags -> StgToDo
-dopt_StgToDo (DynFlags (_,stg_todo,_)) = stg_todo
+dopt_StgToDo = stgToDo
+
+data HscLang
+  = HscC
+  | HscAsm
+  | HscJava
+  deriving Eq
+
+dopt_HscLang :: DynFlags -> HscLang
+dopt_HscLang = hscLang
 \end{code}
 
 %************************************************************************
@@ -505,18 +515,6 @@ opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
 opt_NoImplicitPrelude		= lookUp  SLIT("-fno-implicit-prelude")
 opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
 opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
-opt_ProduceExportCStubs		= lookup_str "-F="
-opt_ProduceExportHStubs		= lookup_str "-FH="
-
--- Language for output: "C", "asm", "java", maybe more
--- Nothing => don't output anything
-opt_OutputLanguage :: Maybe String
-opt_OutputLanguage = lookup_str "-olang="
-
-opt_OutputFile :: String
-opt_OutputFile 	   = case lookup_str "-ofile=" of
-			Nothing -> panic "No output file specified (-ofile=xxx)"
-			Just f  -> f
 
 -- Simplifier switches
 opt_SimplNoPreInlining		= lookUp SLIT("-fno-pre-inlining")
