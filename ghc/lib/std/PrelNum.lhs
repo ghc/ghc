@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelNum.lhs,v 1.42 2001/10/31 16:38:55 rrt Exp $
+% $Id: PrelNum.lhs,v 1.43 2001/12/13 10:48:29 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -442,7 +442,10 @@ dn_list x delta lim = go (x::Integer)
 \begin{code}
 instance Show Integer where
     showsPrec p n r
-        | n < 0 && p > 6 = '(' : jtos n (')' : r)
+        | p > 6 && n < 0 = '(' : jtos n (')' : r)
+		-- Minor point: testing p first gives better code 
+		-- in the not-uncommon case where the p argument
+		-- is a constant
         | otherwise      = jtos n r
     showList = showList__ (showsPrec 0)
 
