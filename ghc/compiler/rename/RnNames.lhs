@@ -17,7 +17,7 @@ import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..), HsBindGroup(..), 
 			  Sig(..), collectGroupBinders, tyClDeclNames 
 			)
-oimport RnEnv
+import RnEnv
 import IfaceEnv		( lookupAvail )
 import LoadIface	( loadSrcInterface )
 import TcRnMonad
