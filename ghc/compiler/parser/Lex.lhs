@@ -310,8 +310,6 @@ ghcExtensionKeywordsFM = listToUFM $
 	( "reifyType",  ITreifyType,	 bit glaExtsBit),
 	( "reifyFixity",ITreifyFixity,	 bit glaExtsBit),
 
-	( "rec",	ITrec,		 bit glaExtsBit .|. bit arrowsBit),
-
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
 	( "label",	ITlabel,	 bit ffiBit),
@@ -325,6 +323,7 @@ ghcExtensionKeywordsFM = listToUFM $
 
 	( "with",	ITwith,		 bit withBit),
 
+	( "rec",	ITrec,		 bit arrowsBit),
 	( "proc",	ITproc,		 bit arrowsBit),
 
 	-- On death row
