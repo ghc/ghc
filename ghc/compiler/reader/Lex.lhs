@@ -411,9 +411,21 @@ lex_scc buf =
 --                            let grp_name = lexemeToFastString buf'' in
 			    case untilChar# (stepOn (stepOverLexeme buf')) '\"'# of
 			     buf'' ->
-			       let cc_name = lexemeToFastString buf'' in
-			       (mkUserCC cc_name mod_name _NIL_{-grp_name-}, 
-			        stepOn (stepOverLexeme buf''))
+			       -- The label may contain arbitrary characters, so it
+			       -- may have been escaped etc., hence we `read' it in to get
+			       -- rid of these meta-chars in the string and then pack it (again.)
+			       -- ToDo: do the same for module name (single quotes allowed in m-names).
+			       -- BTW, the code in this module is totally gruesome..
+			       let upk_label = _UNPK_ (lexemeToFastString buf'') in
+			       case reads ('"':upk_label++"\"") of
+				((cc_label,_):_) -> 
+				    let cc_name = _PK_ cc_label in
+				    (mkUserCC cc_name mod_name _NIL_{-grp_name-}, 
+			             stepOn (stepOverLexeme buf''))
+				_ -> 
+				  trace ("trouble lexing scc label: " ++ upk_label ++ " , ignoring") 
+				  (mkUserCC _NIL_ mod_name _NIL_{-grp_name-}, 
+			           stepOn (stepOverLexeme buf''))
                       in
                       case prefixMatch (stepOn buf) "CAF:" of
                        Just buf' ->
