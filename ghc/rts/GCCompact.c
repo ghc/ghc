@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.10 2001/10/19 09:41:11 sewardj Exp $
+ * $Id: GCCompact.c,v 1.11 2001/12/11 12:03:23 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -510,7 +510,9 @@ static void
 update_fwd_compact( bdescr *blocks )
 {
     StgPtr p, q, free;
+#if 0
     StgWord m;
+#endif
     bdescr *bd, *free_bd;
     StgInfoTable *info;
     nat size;
@@ -735,7 +737,9 @@ static nat
 update_bkwd_compact( step *stp )
 {
     StgPtr p, free;
+#if 0
     StgWord m;
+#endif
     bdescr *bd, *free_bd;
     StgInfoTable *info;
     nat size, free_blocks;
