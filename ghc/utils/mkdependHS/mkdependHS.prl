@@ -2,7 +2,7 @@
 # perl script expect the following variables to be prepended:
 #
 #  RAWCPP TMPDIR TOP_PWD
-#  INSTALL_LIB_DIR INSTALL_DATA_DIR INSTALL_HSLIBS_DIR INSTALLING
+#  libdir datadir INSTALLING
 #  PROJECTVERSION SED 
 #
 # tries to work like mkdependC - capable of dealing with:
@@ -87,36 +87,12 @@ if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
 }
 
-#------------------------------------------------------------------------
-# If you are adjusting paths by hand for a binary GHC distribution,
-# de-commenting the line to set GLASGOW_HASKELL_ROOT should do.
-# Or you can leave it as is, and set the environment variable externally.
-#------------------------------------------------------------------------
-# $ENV{'GLASGOW_HASKELL_ROOT'} = '/some/absolute/path/name';
+$TopPwd	         = "${TOP_PWD}";
+$InstLibDirGhc   = "${libdir}";
+$InstHsLibDirGhc = "${libdir}/hslibs";
+$InstDataDirGhc  = "${datadir}";
 
-if (! $ENV{'GLASGOW_HASKELL_ROOT'}) { # good -- death to environment variables
-    $TopPwd	    = ${TOP_PWD};
-    $InstLibDirGhc  = ${INSTALL_LIB_DIR};
-    $InstDataDirGhc = ${INSTALL_DATA_DIR};
-} else {
-    $TopPwd = $ENV{'GLASGOW_HASKELL_ROOT'};
-
-    if (${INSTALL_LIB_DIR} =~ /.*(\/lib\/ghc\/\d\.\d\d\/[^-]+-[^-]+-[^-]+\/.*)/) {
-	$InstLibDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $1;
-    } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle ${INSTALL_LIB_DIR}.\n(Installation error)\n";
-	exit(1);
-    }
-
-    if (${INSTAL_DATA_DIR} =~ /.*(\/lib\/ghc\/\d\.\d\d\/.*)/) {
-	$InstDataDirGhc	= $ENV{'GLASGOW_HASKELL_ROOT'} . $2;
-    } else {
-	print STDERR "GLASGOW_HASKELL_ROOT environment variable is set;\nBut can't untangle ${INSTALL_DATA_DIR}.\n(Installation error)\n";
-	exit(1);
-    }
-}
-
-$Unlit = ${UNLIT_PROG};
+$Unlit = ($INSTALLING) ? "${InstLibDirGhc}/unlit" : "${TopPwd}/ghc/utils/unlit/unlit";
 
 $Begin_magic_str = "# DO NOT DELETE: Beginning of Haskell dependencies\n";
 $End_magic_str = "# DO NOT DELETE: End of Haskell dependencies\n";
@@ -129,13 +105,12 @@ $Import_dirs = '.';
 
 %IgnoreMe = ();
 # directories to considered stable.
-@Ignore_dirs = split(/:/,${PRELUDE_DIRS});
-
-#   ($INSTALLING) ? ("$InstLibDirGhc/imports")
-#		 : ("$TopPwd/ghc/lib/ghc",
-#		    "$TopPwd/ghc/lib/required",
-#		    "$TopPwd/ghc/lib/glaExts",
-#		    "$TopPwd/ghc/lib/concurrent");
+@Ignore_dirs = ($INSTALLING) ? 
+                   ("$InstLibDirGhc/imports")
+		 : ("$TopPwd/ghc/lib/ghc",
+		    "$TopPwd/ghc/lib/required",
+		    "$TopPwd/ghc/lib/glaExts",
+		    "$TopPwd/ghc/lib/concurrent");
 
 $Haskell_1 = 3; # assume Haskell 1.3. Changed by -fhaskell-1.?
 $Include_dirs = '-I.';
@@ -147,8 +122,8 @@ $Makefile = '';
 # set up array of ignored modules
 foreach $lib ( @Syslibs ) {
     local($dir) = 
-      ($INSTALLING) ? "${INSTALL_HSLIBS_DIR}/${lib}/imports" 
-	            : "$TopPwd/hslibs/${lib}/src";
+      ($INSTALLING) ? "${InstHsLibDirGhc}/${lib}/imports" 
+	            : "${TopPwd}/hslibs/${lib}/src";
     push(@Ignore_dirs,$dir);
 }
 

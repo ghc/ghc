@@ -1,0 +1,11 @@
+#
+# This is a script for generating `make' dependencies for
+# a set of Haskell source files.
+#
+# To configure this script to run on your system, you have
+# to set the following three variables (if they have not already
+# been set above):
+#
+#$libdir='/local/fp/bin/sparc-sun-solaris2/ghc-2.02';
+#$datadir='/local/fp/share/ghc-2.02';
+#
