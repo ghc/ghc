@@ -15,7 +15,6 @@ import VarEnv
 import TyCon	( TyCon,  tyConPrimRep, isUnboxedTupleTyCon, tyConDataCons, 
 		  newTyConRep, tyConTyVars, isDataTyCon, isAlgTyCon, tyConArity
 		)
-import Class	( Class )
 import Type	( liftedTypeKind, openTypeKind, unliftedTypeKind,
 		  isUnLiftedType, isTyVarTy, mkTyVarTy, predRepTy,
 		  splitForAllTys, splitFunTys, applyTy, applyTys
@@ -27,22 +26,24 @@ import PrelNames	-- Lots of keys
 import PrimOp		( PrimOp(..), CCallTarget(..),CCall(..) )
 import TysWiredIn	( mkTupleTy, tupleCon )
 import PrimRep		( PrimRep(..) )
-import Name		( nameModule, nameOccName, isGlobalName, isLocalName, isDllName, NamedThing(getName) )
+import Name		( nameModule, nameOccName, isGlobalName, isLocalName, NamedThing(getName) )
 import Subst   		( substTy, mkTyVarSubst )
 
 import Module		( Module, PackageName, ModuleName, moduleName, 
                           modulePackage, preludePackage,
-			  isPrelModule, isHomeModule, isVanillaModule,
+			  isHomeModule, isVanillaModule,
                           pprModuleName, mkHomeModule, mkModuleName
 			)
 
 import UniqFM
 import BasicTypes	( Boxity(..) )
-import CStrings		( pprCLabelString )
+import CStrings		( CLabelString, pprCLabelString )
+import CallConv		( CallConv )
 import Outputable
 import Char		( ord )
 import List		( partition, elem, insertBy,any  )
 import UniqSet
+import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
 
 import TysPrim  ( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 
@@ -50,7 +51,7 @@ import TysPrim  ( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
 -- versions of compiled Haskell code.  We add a ".O" to all assembly and module 
 -- names when this is set (because that's clue that -O was set).  
 -- One day this will be configured by the command line.
-import CmdLineOpts	( opt_Static, opt_InPackage, opt_SimplDoEtaReduction )
+import CmdLineOpts	( opt_InPackage, opt_SimplDoEtaReduction )
 
 \end{code}
 
@@ -69,16 +70,17 @@ ilxGen mod tycons binds_w_srts
   =  vcat [vcat (map (ilxImportPackage topenv) (uniqSetToList import_packages)),
             vcat (map (ilxImportModule topenv) (uniqSetToList import_modules)),
             vcat (map (ilxImportTyCon topenv) (uniqSetToList import_tycons)),
+            vcat (map (ilxImportCCall topenv) (map snd (ufmToList import_ccalls))),
             vcat (map (ilxTyCon topenv) data_tycons),
             vcat (map (ilxBindClosures topenv) binds),
 	    ilxTopBind mod topenv toppairs
 	 ]
     where
       binds = map fst binds_w_srts
-      (import_packages,import_modules,import_tycons) = importsBinds binds (importsPrelude emptyImpInfo)
       toppairs = ilxPairs binds
       topenv = extendIlxEnvWithTops (emptyIlxEnv False mod) mod toppairs
  	-- Generate info from class decls as well
+      (import_packages,import_modules,import_tycons,import_ccalls) = importsBinds topenv binds (importsPrelude emptyImpInfo)
       data_tycons = filter isDataTyCon tycons
 \end{code}
 
@@ -90,115 +92,133 @@ ilxGen mod tycons binds_w_srts
 
 \begin{code}
 
-importsBinds :: [StgBinding] -> ImportsInfo-> ImportsInfo
-importsBinds binds = foldR importsBind binds
+importsBinds :: IlxEnv -> [StgBinding] -> ImportsInfo-> ImportsInfo
+importsBinds env binds = foldR (importsBind env) binds
 
 importsNone :: ImportsInfo -> ImportsInfo
 importsNone sofar = sofar
 
-importsBind :: StgBinding -> ImportsInfo -> ImportsInfo
-importsBind (StgNonRec _ b rhs) = importsRhs rhs.importsVar b
-importsBind (StgRec _ pairs) = foldR (\(b,rhs) -> importsRhs rhs . importsVar b) pairs
+importsBind :: IlxEnv -> StgBinding -> ImportsInfo -> ImportsInfo
+importsBind env (StgNonRec _ b rhs) = importsRhs env rhs.importsVar env b
+importsBind env (StgRec _ pairs) = foldR (\(b,rhs) -> importsRhs env rhs . importsVar env b) pairs
 
-importsRhs (StgRhsCon _ con args) = importsDataCon con . importsStgArgs args
-importsRhs (StgRhsClosure _ _ _ upd args body) = importsExpr body. importsVars args
+importsRhs :: IlxEnv -> StgRhs -> ImportsInfo -> ImportsInfo
+importsRhs env (StgRhsCon _ con args) = importsDataCon env con . importsStgArgs env args
+importsRhs env (StgRhsClosure _ _ _ _ args body) = importsExpr env body. importsVars env args
 
-importsExpr :: StgExpr -> ImportsInfo -> ImportsInfo
-importsExpr (StgLit l) = importsNone
-importsExpr (StgApp f args) = importsVar f.importsStgArgs args
-importsExpr (StgConApp con args) = importsDataCon con.importsStgArgs args
-importsExpr (StgPrimApp op args res_ty) = importsType res_ty. importsStgArgs args
-importsExpr (StgSCC cc expr) = importsExpr expr
-importsExpr (StgCase scrut _ _ bndr srt alts)
-  = importsExpr scrut. imports_alts alts. importsVar bndr
+importsExpr :: IlxEnv -> StgExpr -> ImportsInfo -> ImportsInfo
+importsExpr env (StgLit _) = importsNone
+importsExpr env (StgApp f args) = importsVar env f.importsStgArgs env args
+importsExpr env (StgConApp con args) = importsDataCon env con.importsStgArgs env args
+importsExpr env (StgPrimApp (CCallOp (CCall (StaticTarget c) _ _ cc)) args rty)
+  = addCCallInfo (c,cc, map stgArgType tm_args, rty) . importsStgArgs env args
+  where 
+    (ty_args,tm_args) = splitTyArgs1 args 
+
+importsExpr env (StgPrimApp _ args res_ty) = importsType env res_ty. importsStgArgs env args
+
+
+importsExpr env (StgSCC _ expr) = importsExpr env expr
+importsExpr env (StgCase scrut _ _ bndr _ alts)
+  = importsExpr env scrut. imports_alts alts. importsVar env bndr
    where
-    imports_alts (StgAlgAlts _ alts deflt) 	-- The Maybe TyCon part is dealt with 
+    imports_alts (StgAlgAlts _ alg_alts deflt) 	-- The Maybe TyCon part is dealt with 
 						-- by the case-binder's type
-      = foldR imports_alg_alt alts .  imports_deflt deflt
+      = foldR imports_alg_alt alg_alts .  imports_deflt deflt
        where
         imports_alg_alt (con, bndrs, _, rhs)
-	  = importsExpr rhs . importsDataCon con. importsVars bndrs
+	  = importsExpr env rhs . importsDataCon env con. importsVars env bndrs
 
-    imports_alts (StgPrimAlts _ alts deflt)
-      = foldR imports_prim_alt alts . imports_deflt deflt
+    imports_alts (StgPrimAlts _ alg_alts deflt)
+      = foldR imports_prim_alt alg_alts . imports_deflt deflt
        where
-        imports_prim_alt (lit, rhs) = importsExpr rhs
+        imports_prim_alt (_, rhs) = importsExpr env rhs
     imports_deflt StgNoDefault = importsNone
-    imports_deflt (StgBindDefault rhs) = importsExpr rhs
+    imports_deflt (StgBindDefault rhs) = importsExpr env rhs
 
 
-importsExpr (StgLetNoEscape _ _ bind body) = importsExpr (StgLet bind body)
-importsExpr (StgLet bind body)
-  = importsBind bind .  importsExpr body
+importsExpr env (StgLetNoEscape _ _ bind body) = importsExpr env (StgLet bind body)
+importsExpr env (StgLet bind body)
+  = importsBind env bind .  importsExpr env body
 
-importsApp v args = importsVar v.  importsStgArgs args
-importsStgArgs args = foldR importsStgArg args
+importsApp env v args = importsVar env v.  importsStgArgs env args
+importsStgArgs env args = foldR (importsStgArg env) args
 
-importsStgArg :: StgArg -> ImportsInfo -> ImportsInfo
-importsStgArg (StgTypeArg ty) = importsType ty
-importsStgArg (StgVarArg v) = importsVar v
-importsStgArg _ = importsNone
+importsStgArg :: IlxEnv -> StgArg -> ImportsInfo -> ImportsInfo
+importsStgArg env (StgTypeArg ty) = importsType env ty
+importsStgArg env (StgVarArg v) = importsVar env v
+importsStgArg env _ = importsNone
 
-importsVars vs = foldR importsVar vs
-importsVar v = importsName (idName v). importsType (idType v)
+importsVars env vs = foldR (importsVar env) vs
+importsVar env v = importsName env (idName v). importsType env (idType v)
 
-importsName n
+importsName env n
    | isLocalName n = importsNone
-   | thisModule == nameModule n  = importsNone
+   | ilxEnvModule env == nameModule n  = importsNone
    | isHomeModule (nameModule n) =  addModuleImpInfo (moduleName (nameModule n))
-   | isVanillaModule (nameModule n) =  addPackageImpInfo preludePackage
+-- See HACK below
+   | isVanillaModule (nameModule n)  && not inPrelude =  importsPrelude
+   | isVanillaModule (nameModule n)  && inPrelude =   addModuleImpInfo (moduleName (nameModule n))
+-- End HACK
    | otherwise = addPackageImpInfo (modulePackage (nameModule n))
 
 
-importsModule m
-   | thisModule   == m = importsNone
-   | isHomeModule m =  trace "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" (addModuleImpInfo (moduleName m))
-   | isVanillaModule m =  addPackageImpInfo preludePackage
-   | otherwise       = addPackageImpInfo (modulePackage m)
+importsType :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
+importsType env ty = importsType2 env (deepIlxRepType ty)
 
-importsType :: Type -> ImportsInfo -> ImportsInfo
-importsType ty = importsType2 (deepIlxRepType ty)
+importsType2 :: IlxEnv -> Type -> ImportsInfo -> ImportsInfo
+importsType2 env (AppTy f x) =  importsType2 env f .  importsType2 env x
+importsType2 env (TyVarTy _) = importsNone
+importsType2 env (TyConApp tc args) =importsTyCon env tc . importsTypeArgs2 env args
+importsType2 env (FunTy arg res) =  importsType env arg .  importsType2 env res
+importsType2 env (ForAllTy tv body_ty) =  importsType2 env body_ty
+importsType2 env (NoteTy _ ty) = importsType2 env ty
+importsType2 _ _ = panic "IlxGen.lhs: importsType2 ty"
+importsTypeArgs2 env tys = foldR (importsType2 env) tys
 
-importsType2 :: Type -> ImportsInfo -> ImportsInfo
-importsType2 (AppTy f x) =  importsType2 f .  importsType2 x
-importsType2 (TyVarTy _) = importsNone
-importsType2 (TyConApp tc args) =importsTyCon tc . importsTypeArgs2 args
-importsType2 (FunTy arg res) =  importsType arg .  importsType2 res
-importsType2 (ForAllTy tv body_ty) =  importsType2 body_ty
-importsType2 (NoteTy _ ty) = importsType2 ty
-importsTypeArgs2 tys = foldR importsType2 tys
+importsDataCon env dcon = importsTyCon env (dataConTyCon dcon)
 
-importsDataCon dcon = importsTyCon (dataConTyCon dcon)
-
-importsMaybeTyCon Nothing   = importsNone
-importsMaybeTyCon (Just tc) = importsName (getName tc)
-
-importsTyCon tc | (not (isDataTyCon tc) || 
+importsTyCon env tc | (not (isDataTyCon tc) || 
                    isLocalName (getName tc) || 
-                   thisModule == nameModule (getName tc)) = importsNone
-importsTyCon tc | otherwise = importsName (getName tc) . addTyConImpInfo tc
+                   ilxEnvModule env == nameModule (getName tc)) = importsNone
+importsTyCon env tc | otherwise = importsName env (getName tc) . addTyConImpInfo tc
 
-importsPrelude | preludePackage == opt_InPackage = addModuleImpInfo (mkModuleName "PrelGHC")
-	       | otherwise			 = addPackageImpInfo preludePackage
+importsPrelude | inPrelude = addModuleImpInfo (mkModuleName "PrelGHC")
+	       | otherwise = addPackageImpInfo preludePackage
 
-type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon) 
-   -- (Packages, Modules, Datatypes)
+type StaticCCallInfo = (CLabelString,CallConv,[Type],Type)
+type ImportsInfo = (UniqSet PackageName, UniqSet ModuleName, UniqSet TyCon, UniqFM StaticCCallInfo)
+   -- (Packages, Modules, Datatypes, Imported CCalls)
 
 emptyImpInfo :: ImportsInfo
-emptyImpInfo = (emptyUniqSet, emptyUniqSet, emptyUniqSet)
-addPackageImpInfo p (w,x,y) = (addOneToUniqSet w p, x, y)
-addModuleImpInfo m (w,x,y) = (w, addOneToUniqSet x m, y)
-addTyConImpInfo tc (w,x,y) = (w, x, addOneToUniqSet y tc)
+emptyImpInfo = (emptyUniqSet, emptyUniqSet, emptyUniqSet, emptyUFM)
+addPackageImpInfo p (w,x,y,z) = (addOneToUniqSet w p, x, y,z)
+addModuleImpInfo m (w,x,y,z) = (w, addOneToUniqSet x m, y,z)
+addTyConImpInfo tc (w,x,y,z) = (w, x, addOneToUniqSet y tc,z)
+addCCallInfo info@(nm,a,b,c) (w,x,y,z) = (w, x, y,addToUFM z nm info)
 
 ilxImportTyCon :: IlxEnv -> TyCon -> SDoc
-ilxImportTyCon env tycon | isDataTyCon tycon = pprIlxTyConDef True env tycon
-ilxImportTyCon env tycon | otherwise =  empty
+ilxImportTyCon env tycon | isDataTyCon tycon = ilxTyConDef True env tycon
+ilxImportTyCon _ _ | otherwise =  empty
 
 ilxImportPackage :: IlxEnv -> PackageName -> SDoc
-ilxImportPackage env p = text ".assembly extern ilx" <+> singleQuotes (ppr p <> hscOptionQual) <+> text "{ }"
+ilxImportPackage _ p = text ".assembly extern ilx" <+> singleQuotes (ppr p <> hscOptionQual) <+> text "{ }"
 
 ilxImportModule :: IlxEnv -> ModuleName -> SDoc
-ilxImportModule env m = text ".module extern ilx" <+> singleQuotes (ppr m  <> hscOptionQual)
+ilxImportModule _ m = text ".module extern ilx" <+> singleQuotes (ppr m  <> hscOptionQual <> text ".dll")
+
+-- Emit a P/Invoke declaration for the imported C function
+-- TODO: emit the right DLL name
+ilxImportCCall :: IlxEnv -> StaticCCallInfo -> SDoc
+ilxImportCCall env (c,cc,args,ret) = 
+    text ".method static private pinvokeimpl" <+> 
+    parens (doubleQuotes (text "HSstd_cbits.dll") <+> text "cdecl") <+> retdoc <+> singleQuotes (pprCLabelString c) <+> 
+    pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) args)) <+> 
+    text "native managed { }"
+  where 
+    retdoc = 
+          if isVoidIlxRepType ret then text "void" 
+          else ilxTypeR env (deepIlxRepType ret)
 
 
 \end{code}
@@ -213,16 +233,16 @@ ilxImportModule env m = text ".module extern ilx" <+> singleQuotes (ppr m  <> hs
 
 
 ilxTyCon :: IlxEnv -> TyCon -> SDoc
-ilxTyCon env tycon =  pprIlxTyConDef False env tycon
+ilxTyCon env tycon =  ilxTyConDef False env tycon
 
 -- filter to get only dataTyCons?
-pprIlxTyConDef importing env tycon = 
+ilxTyConDef importing env tycon = 
 	vcat [empty $$ line,
 	      text ".classunion" <+> (if importing then text "extern" else empty) <+> text "thunk" 
                   <+> ((nameReference env (getName tycon)) <> (ppr tycon))   <+> tyvars_text <+> alts_text]
    where
      tyvars = tyConTyVars tycon
-     (ilx_tvs, non_ilx_tvs) = categorizeTyVars tyvars
+     (ilx_tvs, _) = categorizeTyVars tyvars
      alts_env = extendIlxEnvWithFormalTyVars env ilx_tvs 
      tyvars_text = pprTyVarBinders alts_env ilx_tvs 
      alts = vcat (map (pprIlxDataCon alts_env) (tyConDataCons tycon))
@@ -230,7 +250,7 @@ pprIlxTyConDef importing env tycon =
 
 pprIlxDataCon env dcon =
         text ".alternative" <+> pprId dcon <+> 
-        parens (pprSepWithCommas (pprIlxTypeL env) (map deepIlxRepType (filter (not. isVoidIlxRepType) (dataConRepArgTys dcon))))
+        parens (pprSepWithCommas (ilxTypeL env) (map deepIlxRepType (filter (not. isVoidIlxRepType) (dataConRepArgTys dcon))))
 \end{code}
 
 
@@ -249,14 +269,14 @@ ilxBindClosures env (StgRec _ pairs)
      new_env = extendIlxEnvWithBinds env pairs
 
 ---------------
-ilxRhsClosures env (bndr, StgRhsCon _ _ _)
+ilxRhsClosures _ (_, StgRhsCon _ _ _)
   = empty
 
 ilxRhsClosures env (bndr, StgRhsClosure _ _ fvs upd args rhs)
   = vcat [ilxExprClosures next_env rhs,
 
 	 empty $$ line,
-	 kind_text <+> squotes cloname <+>  free_vs_text,
+	 kind_text <+> singleQuotes cloname <+>  free_vs_text,
 	 nest 2 (braces (
 	    nest 2 (vcat [empty,
                           vcat [text ".apply" <+> closure_sig_text,
@@ -269,7 +289,7 @@ ilxRhsClosures env (bndr, StgRhsClosure _ _ fvs upd args rhs)
   where
     kind_of_thing = case upd of
 			  Updatable -> ASSERT( null args ) ".thunk"
-			  other	    -> ".closure"
+			  otherwise -> ".closure"
     kind_text = text kind_of_thing 
 		
     cloname = ilxEnvQualifyByModule env (ppr bndr)
@@ -280,8 +300,8 @@ ilxRhsClosures env (bndr, StgRhsClosure _ _ fvs upd args rhs)
     closure_sig_text =     
       vcat [ text "()",
              (case args of 
-               []    -> empty
-               other -> args_text),
+               []        -> empty
+               otherwise -> args_text),
              text "-->" <+>  rty_text]
 
     (args_text,env_with_args) = pprArgBinders env_with_fvs args
@@ -289,8 +309,10 @@ ilxRhsClosures env (bndr, StgRhsClosure _ _ fvs upd args rhs)
         -- Find the type returned, from the no. of args and the type of "bndr"
     rty_text = 
       case retType env_with_fvs (idIlxRepType bndr) args of
-       Just (env,ty) -> pprIlxTypeR env ty 
-       Nothing -> trace "WARNING!  IlxGen.trace could not find return type - see generated ILX for context where this occurs." (text "// Could not find return type:" <+> pprIlxTypeR env_with_fvs (idIlxRepType bndr)<+> text ", non representation: " <+> pprIlxTypeR env_with_fvs (idType bndr))
+       Just (env,ty) -> 
+          if isVoidIlxRepType ty  then  (text "void")
+          else ilxTypeR env ty 
+       Nothing -> trace "WARNING!  IlxGen.trace could not find return type - see generated ILX for context where this occurs." (text "// Could not find return type:" <+> ilxTypeR env_with_fvs (idIlxRepType bndr)<+> text ", non representation: " <+> ilxTypeR env_with_fvs (idType bndr))
 
     -- strip off leading ForAll and Fun type constructions
     -- up to the given number of arguments, extending the environment as
@@ -322,23 +344,23 @@ pprIlxLocals env vs
     nonVoidLocal (LocalId v,_) = not (isVoidIlxRepId v)
     nonVoidLocal _ = True
 
-pprIlxLocal env (LocalId v,_) = pprIlxTypeL env (idIlxRepType v) <+> pprId v
-pprIlxLocal env (LocalSDoc (ty,doc,pin),_) = pprIlxTypeL env (deepIlxRepType ty) <+> (if pin then text "pinned" else empty) <+> doc
+pprIlxLocal env (LocalId v,_) = ilxTypeL env (idIlxRepType v) <+> pprId v
+pprIlxLocal env (LocalSDoc (ty,doc,pin),_) = ilxTypeL env (deepIlxRepType ty) <+> (if pin then text "pinned" else empty) <+> doc
 
 
 pprFreeBinders env fvs 
     = (ilx_tvs_text <+> vs_text, env2)
     where   
-       (free_ilx_tvs, free_non_ilx_tvs,free_vs) = categorizeVars fvs
+       (free_ilx_tvs, _,free_vs) = categorizeVars fvs
        real_free_vs = filter (not . isVoidIlxRepId) free_vs
         -- ignore the higher order type parameters for the moment
        env1 = extendIlxEnvWithFreeTyVars env free_ilx_tvs 
        ilx_tvs_text = pprTyVarBinders env1 free_ilx_tvs
        vs_text = parens (pprSepWithCommas ppr_id real_free_vs)
-       ppr_id v = pprIlxTypeL env1 (idIlxRepType v) <+> pprId v 
+       ppr_id v = ilxTypeL env1 (idIlxRepType v) <+> pprId v 
        env2 = extendIlxEnvWithFreeVars env1 real_free_vs 
 
-pprIdBinder env v = parens (pprIlxTypeL env (idIlxRepType v) <+> pprId v)
+pprIdBinder env v = parens (ilxTypeL env (idIlxRepType v) <+> pprId v)
 
 	-- Declarations for the arguments of the main apply method
 pprArgBinders env [] = (empty,env)
@@ -351,7 +373,7 @@ pprArgBinders env (arg:args)
 -- We could probably omit some void argument binders, but
 -- don't...
 pprArgBinder env arg 
-  | isVoidIlxRepId arg = (text "(unit)", extendIlxEnvWithArgs env [arg])
+  | isVoidIlxRepId arg = (text "()", extendIlxEnvWithArgs env [arg])
   | otherwise 
       = if isTyVar arg then 
          let env' = extendIlxEnvWithTyArgs env [arg] in 
@@ -371,13 +393,13 @@ ilxExprLocals env (StgCase scrut _ _ bndr _ alts)
      = ilxExprLocals (ilxPlaceStgCaseScrut env) scrut ++ 
        (if isDeadBinder bndr then [] else [(LocalId bndr,Nothing)]) ++ 
        ilxAltsLocals env alts
-ilxExprLocals env (StgPrimApp (CCallOp (CCall (StaticTarget c) casm gc cconv)) args ret_ty) 
+ilxExprLocals env (StgPrimApp (CCallOp (CCall (StaticTarget _)_ _ _)) args _) 
      = concat (ilxMapPlaceArgs 0 ilxCCallArgLocals env args)
 ilxExprLocals _ _  = []
 
 -- Generate locals to use for pinning arguments as we cross the boundary
 -- to C.
-ilxCCallArgLocals env arg@(StgVarArg v) | pinCCallArg v = 
+ilxCCallArgLocals env (StgVarArg v) | pinCCallArg v = 
    [(LocalSDoc (idType v, ilxEnvQualifyByExact env (ppr v) <> text "pin", True), Nothing)]
 ilxCCallArgLocals _ _ | otherwise = []
 
@@ -387,10 +409,10 @@ ilxBindLocals env (StgRec _ pairs)    = map (\(x,y) -> (LocalId x,Just (env, y))
 ilxAltsLocals env (StgAlgAlts  _ alts deflt) = ilxDefltLocals env deflt ++ concat (ilxMapPlaceAlts ilxAlgAltLocals env alts)
 ilxAltsLocals env (StgPrimAlts _ alts deflt) = ilxDefltLocals env deflt ++ concat (ilxMapPlaceAlts ilxPrimAltLocals env alts)
 
-ilxAlgAltLocals env (con, bndrs, _, rhs) = map (\x -> (LocalId x,Nothing)) (filter (\v -> isId v && not (isDeadBinder v)) bndrs) ++ ilxExprLocals env rhs
-ilxPrimAltLocals env (lit, rhs)          = ilxExprLocals env rhs
+ilxAlgAltLocals env (_, bndrs, _, rhs) = map (\x -> (LocalId x,Nothing)) (filter (\v -> isId v && not (isDeadBinder v)) bndrs) ++ ilxExprLocals env rhs
+ilxPrimAltLocals env (_, rhs)          = ilxExprLocals env rhs
 
-ilxDefltLocals env StgNoDefault 	= []
+ilxDefltLocals _ StgNoDefault 	= []
 ilxDefltLocals env (StgBindDefault rhs) = ilxExprLocals (ilxPlaceStgBindDefault env) rhs
 
 --------------
@@ -409,7 +431,7 @@ ilxExprClosures env (StgCase scrut _ _ _ _ alts)
   = ilxExprClosures (ilxPlaceStgCaseScrut env) scrut $$ ilxAltsClosures env alts 
 ilxExprClosures env (StgLit lit) 
   = ilxGenLit env lit 
-ilxExprClosures env other 
+ilxExprClosures _ _ 
   = empty
 
 ilxAltsClosures env (StgAlgAlts _ alts deflt)
@@ -425,7 +447,7 @@ ilxAltsClosures env (StgPrimAlts _ alts deflt)
     ilxDefltClosures  env deflt
 
 ilxDefltClosures env (StgBindDefault rhs) = ilxExprClosures (ilxPlaceStgBindDefault env) rhs
-ilxDefltClosures env StgNoDefault	  = empty
+ilxDefltClosures _ StgNoDefault	  = empty
 
 ilxArgClosures env (StgLitArg lit) = ilxGenLit env lit 
 ilxArgClosures _ _ = empty
@@ -433,7 +455,7 @@ ilxArgClosures _ _ = empty
 
 
 ilxGenLit env (MachStr fs) 
-  = vcat [text ".field static assembly char "  <+> squotes nm <+> text "at" <+> nm <> text "L",
+  = vcat [text ".field static assembly char "  <+> singleQuotes nm <+> text "at" <+> nm <> text "L",
           text ".data" <+> nm <> text "L" <+> text "= char *("  <> pprFSInILStyle fs  <> text ")"
          ]
  where
@@ -469,28 +491,28 @@ ilxExpr :: IlxEEnv -> StgExpr
 	-> Sequel 	-- What to do at the end
 	-> SDoc
 
-ilxExpr eenv@(IlxEEnv env _) (StgApp fun args) sequel
+ilxExpr (IlxEEnv env _) (StgApp fun args) sequel
   = ilxFunApp env fun args (isReturn sequel) $$ ilxSequel sequel
 
 -- ilxExpr eenv (StgLit lit) sequel
-ilxExpr eenv@(IlxEEnv env _) (StgLit lit) sequel
+ilxExpr (IlxEEnv env _) (StgLit lit) sequel
   = pushLit env lit $$ ilxSequel sequel
 
 -- ilxExpr eenv (StgConApp data_con args) sequel
-ilxExpr eenv@(IlxEEnv env _) (StgConApp data_con args) sequel
+ilxExpr (IlxEEnv env _) (StgConApp data_con args) sequel
   = text " /* ilxExpr:StgConApp */ " <+>  ilxConApp env data_con args $$ ilxSequel sequel
 
 -- ilxExpr eenv (StgPrimApp primop args _) sequel
-ilxExpr eenv@(IlxEEnv env _) (StgPrimApp primop args ret_ty) sequel
+ilxExpr (IlxEEnv env _) (StgPrimApp primop args ret_ty) sequel
   = ilxPrimApp env primop args ret_ty $$ ilxSequel sequel
 
 --BEGIN TEMPORARY
 -- The following are versions of a peephole optimizations for "let t = \[] t2[fvs] in t"
 -- I think would be subsumed by a general treatmenet of let-no-rec bindings??
-ilxExpr eenv@(IlxEEnv env _) (StgLet (StgNonRec _ bndr (StgRhsClosure _ _ fvs upd [] rhs)) (StgApp fun [])) sequel 
+ilxExpr eenv@(IlxEEnv env _) (StgLet (StgNonRec _ bndr (StgRhsClosure _ _ _ _ [] rhs)) (StgApp fun [])) sequel 
               | (bndr == fun && null (ilxExprLocals env rhs)) -- TO DO???
   = ilxExpr eenv rhs sequel
-ilxExpr eenv@(IlxEEnv env _) (StgLetNoEscape _ _ (StgNonRec _ bndr (StgRhsClosure _ _ fvs upd [] rhs)) (StgApp fun [])) sequel 
+ilxExpr eenv@(IlxEEnv env _) (StgLetNoEscape _ _ (StgNonRec _ bndr (StgRhsClosure _ _ _ _ [] rhs)) (StgApp fun [])) sequel 
               | (bndr == fun && null (ilxExprLocals env rhs)) -- TO DO???
   = ilxExpr eenv rhs sequel
 --END TEMPORARY
@@ -503,34 +525,38 @@ ilxExpr eenv (StgLetNoEscape _ _ bind body) sequel -- TO DO???
   = ilxBind eenv bind $$ ilxExpr eenv body sequel
 
 -- StgCase: Special case 1 to avoid spurious branch.
-ilxExpr eenv@(IlxEEnv env live) (StgCase (StgApp fun args) live_in_case live_in_alts bndr _ alts) sequel
+ilxExpr eenv@(IlxEEnv env live) (StgCase (StgApp fun args) live_in_case _live_in_alts bndr _ alts) sequel
   = vcat [ilxWipe env (uniqSetToList (live `minusUniqSet` live_in_case)),
 	  ilxFunApp (ilxPlaceStgCaseScrut env) fun args False,
-          --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` live_in_alts)),
-	  --ilxAlts (IlxEEnv env live_in_alts) bndr alts sequel
+          --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` _live_in_alts)),
+	  --ilxAlts (IlxEEnv env _live_in_alts) bndr alts sequel
 	  ilxAlts (IlxEEnv env live_in_case) bndr alts sequel
     ]
 
 -- StgCase: Special case 2 to avoid spurious branch.
-ilxExpr eenv@(IlxEEnv env live) (StgCase (StgPrimApp primop args ret_ty) live_in_case live_in_alts bndr _ alts) sequel
+ilxExpr eenv@(IlxEEnv env live) (StgCase (StgPrimApp primop args ret_ty) live_in_case _live_in_alts bndr _ alts) sequel
   = vcat [ilxWipe env (uniqSetToList (live `minusUniqSet` live_in_case)),
 	  ilxPrimApp (ilxPlaceStgCaseScrut env) primop args ret_ty,
-          --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` live_in_alts)),
-	  --ilxAlts (IlxEEnv env live_in_alts) bndr alts sequel
+          --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` _live_in_alts)),
+	  --ilxAlts (IlxEEnv env _live_in_alts) bndr alts sequel
 	  ilxAlts (IlxEEnv env live_in_case) bndr alts sequel
     ]
 
 -- StgCase: Normal case.
-ilxExpr eenv@(IlxEEnv env live) (StgCase scrut live_in_case live_in_alts bndr _ alts) sequel
+ilxExpr eenv@(IlxEEnv env live) (StgCase scrut live_in_case _live_in_alts bndr _ alts) sequel
   = vcat [ilxWipe env (uniqSetToList (live `minusUniqSet` live_in_case)),
 	  ilxExpr (IlxEEnv (ilxPlaceStgCaseScrut env) live_in_case) scrut (Jump join_lbl),
 	  ilxLabel join_lbl,
-          --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` live_in_alts)),
-	  --ilxAlts (IlxEEnv env live_in_alts) bndr alts sequel
+          --ilxWipe env (uniqSetToList (live_in_case `minusUniqSet` _live_in_alts)),
+	  --ilxAlts (IlxEEnv env _live_in_alts) bndr alts sequel
 	  ilxAlts (IlxEEnv env live_in_case) bndr alts sequel
     ]
   where
     join_lbl = mkJoinLabel bndr
+
+ilxExpr _ _ _ 
+  = panic "ilxExpr:  Patterns not matched:(IlxEEnv _ _) (StgSCC _ _) _ (IlxEEnv _ _) (StgLam _ _ _) _"
+
 
 -- Wipe out locals and arguments that are no longer in use, to
 -- prevent space leaks. If the VM is implemented 100% correctly then
@@ -555,8 +581,8 @@ ilxWipe env ids
 
 ilxWipeOne env id
    = case lookupIlxVarEnv env id of
-	  Just Local  -> text "ldloca " <+> pprId id <+> text "initobj" <+> (pprIlxTypeL env (idIlxRepType id))
-	  Just Arg   -> text "deadarg " <+> pprId id <+> text "," <+> (pprIlxTypeL env (idIlxRepType id))
+	  Just Local  -> text "ldloca " <+> pprId id <+> text "initobj" <+> (ilxTypeL env (idIlxRepType id))
+	  Just Arg   -> text "deadarg " <+> pprId id <+> text "," <+> (ilxTypeL env (idIlxRepType id))
 	  Just (CloVar _)  -> ilxComment (text "not yet wiping closure variable" <+> pprId id )
 	  _ -> ilxComment (text "cannot wipe non-local/non-argument" <+> pprId id )
   where 
@@ -565,7 +591,7 @@ ilxWipeOne env id
 ----------------------
 
 ilxAlts :: IlxEEnv -> Id -> StgCaseAlts -> Sequel -> SDoc
-ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
+ilxAlts (IlxEEnv env live) bndr alts sequel
 	-- At the join label, the result is on top
 	-- of the stack
   = vcat [store_in_bndr,
@@ -613,13 +639,13 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
 
 
     do_alg_alts [(i, alt@(data_con,bndrs,used_flags, rhs))] StgNoDefault 
-            = vcat [text "castdata" <+> sep [pprIlxTypeR env scrut_rep_ty <> comma,
+            = vcat [text "castdata" <+> sep [ilxTypeR env scrut_rep_ty <> comma,
 		  			     ilxConRef env data_con],
  		do_alg_alt (IlxEEnv (ilxPlaceAlt env i) live) alt
 	      ]
 
     do_alg_alts alts deflt
-	= vcat [text "datacase" <+> sep [pprIlxTypeR env scrut_rep_ty,text ",",
+	= vcat [text "datacase" <+> sep [ilxTypeR env scrut_rep_ty,text ",",
 					 pprSepWithCommas pp_case labels_w_alts],
 		do_deflt deflt,
 		vcat (map do_labelled_alg_alt labels_w_alts)
@@ -675,9 +701,9 @@ ilxAlts eenv@(IlxEEnv env live) bndr alts sequel
     ld_data alt_env data_con reduced_fld_no bndr
       | isUnboxedTupleCon data_con
       = text "ldfld" <+> sep [text "!" <> integer reduced_fld_no,
-			      pprIlxTypeR alt_env scrut_rep_ty <> text "::fld" <> integer reduced_fld_no]
+			      ilxTypeR alt_env scrut_rep_ty <> text "::fld" <> integer reduced_fld_no]
       | otherwise 
-      = text "lddata" <+> sep [pprIlxTypeR alt_env scrut_rep_ty <> comma, 
+      = text "lddata" <+> sep [ilxTypeR alt_env scrut_rep_ty <> comma, 
 		               ilxConRef env data_con <> comma,
 			       integer reduced_fld_no]
 
@@ -703,7 +729,7 @@ ilxFunApp env fun args tail_call
   where
     known_clo =
       case lookupIlxBindEnv env fun of
-	  Just (place, StgRhsClosure  _ _ _ Updatable _ _) ->  Nothing 
+	  Just (_, StgRhsClosure  _ _ _ Updatable _ _) ->  Nothing 
 	  Just (place, StgRhsClosure  _ _ fvs _ args _)  -> Just (place,fun,args,fvs)
 	  _ ->  trace (show fun ++ " --> " ++ show (arityLowerBound (idArityInfo fun)))  Nothing 
 
@@ -711,9 +737,10 @@ ilxFunApp env fun args tail_call
 -- Recurse until we're done.
 ilxFunAppArgs env num_sofar funty args tail_call known_clo
  =   vcat [vcat (ilxMapPlaceArgs num_sofar pushArgWithVoids env now_args),
-	   call_instr <+> text "()" <+> now_args_text
+	   call_instr <+> (if num_sofar == 0 then text "() /* first step in every Haskell app. is to a thunk */ " else empty)
+                     <+> now_args_text
                      <+> text "-->" 
-                     <+> (pprIlxTypeR env_after_now_tyvs later_ty),
+                     <+> later_ty_text,
            later
           ]
   where
@@ -722,10 +749,14 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
         [] -> empty
         _ -> hsep (map (pprIlxArgInfo env_after_now_tyvs) now_arg_tys)
 
+    later_ty_text
+        | isVoidIlxRepType later_ty = text "void"
+        | otherwise = ilxTypeR env_after_now_tyvs later_ty
+
     (now_args,now_arg_tys,env_after_now_tyvs,later_args,later_ty) = 
 	case args of
           (StgTypeArg v:rest) -> get_type_args ilxBestTypeArity args env funty
-          _ -> get_term_args ilxBestTermArity args env funty
+          _ -> get_term_args 0 ilxBestTermArity args env funty
 
      -- Only apply up to maxArity real (non-type) arguments
      -- at a time.  ILX should, in principle, allow us to apply
@@ -761,21 +792,27 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
     get_type_args _ (StgTypeArg _:_) _ _ = trace "IlxGen Internal Error: get_type_args could not get ForAllTy for corresponding arg" ([],[],env,[],funty)
     get_type_args _ args env funty = ([],[],env,args,funty)
 
-    -- We could probably skip some  void-rep arguments.  Instead we
-    -- emit "ldvoid" for these and let ILXASM optimize them away.
-    -- get_term_args max (h@(StgVarArg v):t) env (FunTy dom ran) | isVoidIlxRepId v   
-        --  = get_term_args max t env ran
-    get_term_args max args env (NoteTy _ ty) =
-        -- Skip NoteTy types 
-          trace "IlxGen Internal Error: non representation type passed to get_term_args" (get_term_args max args env ty)
-    get_term_args 0 args env funty = ([],[],env,args,funty)
-        -- Stop if no more
-    get_term_args _ (args@(StgTypeArg _:_)) env funty = ([],[],env,args,funty)
-    get_term_args max (h:t) env (FunTy dom ran) = 
-          let (now,now_tys,env2,later,later_ty) = get_term_args (max - 1) t env ran in 
-          (h:now, (h,dom):now_tys,env2,later,later_ty)
-    get_term_args max (h:t) env funty = trace "IlxGen Internal Error: get_term_args could not get FunTy or ForAllTy for corresponding arg" ([],[],env,[],funty)
-    get_term_args max args env funty = ([],[],env,args,funty)
+    get_term_args n max args env (NoteTy _ ty)
+       -- Skip NoteTy types 
+       = trace "IlxGen Internal Error: non representation type passed to get_term_args" (get_term_args n max args env ty)
+    get_term_args n 0 args env funty
+       -- Stop if we've hit the maximum number of ILX arguments to apply n one hit.
+       = ([],[],env,args,funty)
+    get_term_args n max args env funty
+      | (case known_clo of
+           Just (_,_,needed,_) -> (length needed == n)
+           Nothing -> False)
+       -- Stop if we have the optimal number for a direct call
+       = ([],[],env,args,funty)
+    get_term_args _ _ (args@(StgTypeArg _:_)) env funty 
+       -- Stop if we hit a type arg.
+       = ([],[],env,args,funty)
+    get_term_args n max (h:t) env (FunTy dom ran)
+       -- Take an argument.
+       = let (now,now_tys,env2,later,later_ty) = get_term_args (n+1) (max - 1) t env ran in 
+         (h:now, (h,dom):now_tys,env2,later,later_ty)
+    get_term_args _ max (h:t) env funty = trace "IlxGen Internal Error: get_term_args could not get FunTy or ForAllTy for corresponding arg" ([],[],env,[],funty)
+    get_term_args _ max args env funty = ([],[],env,args,funty)
 
     -- Are there any remaining arguments?
     done  = case later_args of
@@ -805,11 +842,11 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
     -- the "callfunc" case.
     basic_call_instr =
       case known_clo of
-        Just (known_env,fun,needed,fvs) | (length needed == length args) && 
-                                          all (\x -> elemIlxTyVarEnv x env) free_ilx_tvs -> 
+        Just (known_env,fun,needed,fvs) | (length needed == length now_args) && 
+                                          all (\x -> elemIlxTyEnv x env) free_ilx_tvs -> 
            vcat [text "callclo class",
-                 nameReference env (idName fun) <+> squotes (ilxEnvQualifyByModule env (ppr fun)),
-                 pprTypeArgs pprIlxTypeR env (map mkTyVarTy free_ilx_tvs)]
+                 nameReference env (idName fun) <+> singleQuotes (ilxEnvQualifyByModule env (ppr fun)),
+                 pprTypeArgs ilxTypeR env (map mkTyVarTy free_ilx_tvs)]
            <> text ","
           where 
            (free_ilx_tvs, free_non_ilx_tvs,free_vs) = categorizeVars fvs
@@ -829,9 +866,9 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
 -- non-type args the actuals are on the stack, and we just give the
 -- formal type.
 pprIlxArgInfo env (StgTypeArg  arg,ty) =  
-    angleBrackets (pprIlxTypeR env (deepIlxRepType arg) <+> ilxComment (text "actual for tyvar")) <+> text "<class [mscorlib] System.Object>" 
+    angleBrackets (ilxTypeR env (deepIlxRepType arg) <+> ilxComment (text "actual for tyvar")) <+> text "<class [mscorlib] System.Object>" 
 pprIlxArgInfo env (_,ty) =  
-    parens (pprIlxTypeL env ty)
+    parens (ilxTypeL env ty)
 
 
 ----------------------------
@@ -967,14 +1004,14 @@ ilxTopRhs mod env (bndr, StgRhsCon _ data_con args)
     bndTy = idIlxRepType bndr
 
 pprFieldRef env (mod,ty,id) 
-  =  pprIlxTypeL env ty <+> moduleReference env mod <+> pprId mod <> text "::" <> pprId id
+  =  ilxTypeL env ty <+> moduleReference env mod <+> pprId mod <> text "::" <> pprId id
 
 ilxTopRhsStorage mod env (bndr, StgRhsClosure _ _ _ _ _ _) 
-  =   text ".field public static " <+> pprIlxTypeL env bndTy <+> pprId bndr
+  =   text ".field public static " <+> ilxTypeL env bndTy <+> pprId bndr
   where
     bndTy = idIlxRepType bndr
 ilxTopRhsStorage mod env (bndr, StgRhsCon _ _ _) 
-  =   text ".field public static " <+> pprIlxTypeL env bndTy <+> pprId bndr
+  =   text ".field public static " <+> ilxTypeL env bndTy <+> pprId bndr
   where
     bndTy = idIlxRepType bndr
 
@@ -999,7 +1036,7 @@ pushId = pushId_aux False
 
 pushId_aux :: Bool -> IlxEnv -> Id -> SDoc
 pushId_aux voids _ id | isVoidIlxRepId id =
-   if voids then  text "ldunit" else ilxComment (text "pushId: void rep skipped")
+   /* if voids then  text "ldunit" else */ ilxComment (text "pushId: void rep skipped")
 pushId_aux _ env var 
   = case lookupIlxVarEnv env var of
 	  Just Arg    -> text "ldarg"    <+> pprId var
@@ -1007,12 +1044,12 @@ pushId_aux _ env var
 	  Just Local  -> text "ldloc"    <+> pprId var
 	  Just (Top m)  -> 
              vcat [ilxComment (text "pushId (Top) " <+> pprId m), 
-                   text "ldsfld" <+> pprIlxTypeL env (idIlxRepType var)
+                   text "ldsfld" <+> ilxTypeL env (idIlxRepType var)
                       <+> moduleReference env m <+> pprId (moduleName m) <> text "::" <> pprId var]
 
 	  Nothing ->  
              vcat [ilxComment (text "pushId (import) " <+> pprIlxTopVar env var), 
-                   text "ldsfld" <+> pprIlxTypeL env (idIlxRepType var) 
+                   text "ldsfld" <+> ilxTypeL env (idIlxRepType var) 
                     <+> pprIlxTopVar env var]
 
 --------------------------------------
@@ -1026,11 +1063,11 @@ pushLit env (MachWord64 w) = text "ldc.i8" <+> integer w <+> text "conv.u8"
 pushLit env (MachFloat f)  = text "ldc.r4" <+> rational f
 pushLit env (MachDouble f) = text "ldc.r8" <+> rational f
 pushLit env (MachLitLit _ _) = trace "WARNING: Cannot compile MachLitLit to ILX in IlxGen.lhs" (text "// MachLitLit!!!  Not valid in ILX!!")
-pushLit env (MachAddr w) = text "ldc.i4 conv.i " <+> integer w
+pushLit env (MachAddr w) = text "ldc.i4" <+> integer w <+> text "conv.i"
 
 
 pprIlxTopVar env v
-  | isGlobalName n = (nameReference env n) <> pprId (nameModule n) <> text "::" <> squotes (ppr (nameModule n) <> text "_" <> ppr (nameOccName n))
+  | isGlobalName n = (nameReference env n) <> pprId (nameModule n) <> text "::" <> singleQuotes (ppr (nameModule n) <> text "_" <> ppr (nameOccName n))
   | otherwise	   = pprId (nameOccName n)
   where
     n = idName v
@@ -1066,12 +1103,15 @@ deepIlxRepType :: Type -> Type
 deepIlxRepType (FunTy l r)
   = FunTy (deepIlxRepType l) (deepIlxRepType r)
 
-deepIlxRepType (TyConApp tc tys) 
+deepIlxRepType ty@(TyConApp tc tys) 
   = case newTyConRep tc of
-	 Just rep_ty -> ASSERT( length tys == tyConArity tc )
+	 Just rep_ty -> 
+           let res = deepIlxRepType (applyTys rep_ty tys) in 
+           if not (length tys == tyConArity tc ) then 
+             pprTrace "deepIlxRepType" (text "length tys <> tyConArity tc, ty = " <+> pprType ty <+> text ", length tys = " <+> ppr (length tys) <+> text ", tyConArity = " <+> ppr (tyConArity tc)) res 
+           else res
 		-- The assert should hold because deepIlxRepType should
 		-- only be applied to *types* (of kind *)
-			deepIlxRepType (applyTys rep_ty tys)
 	 Nothing     -> 
            -- collapse UnboxedTupleTyCon down when it contains VoidRep types.
             if isUnboxedTupleTyCon tc then 
@@ -1092,20 +1132,20 @@ idIlxRepType id = deepIlxRepType (idType id)
 --------------------------
 -- Some primitive type constructors are not thunkable.
 -- Everything else needs to be marked thunkable.
-pprIlxTypeL :: IlxEnv -> Type -> SDoc
+ilxTypeL :: IlxEnv -> Type -> SDoc
 
-pprIlxTypeL env ty | isUnLiftedType ty ||  isVoidIlxRepType ty = pprIlxTypeR env ty
-pprIlxTypeL env ty = text "thunk" <> angleBrackets (pprIlxTypeR env ty)
+ilxTypeL env ty | isUnLiftedType ty ||  isVoidIlxRepType ty = ilxTypeR env ty
+ilxTypeL env ty = text "thunk" <> angleBrackets (ilxTypeR env ty)
 
 --------------------------
 -- Print non-thunkable version of type.
 --
 
-pprIlxTypeR :: IlxEnv -> Type -> SDoc
-pprIlxTypeR env ty | isVoidIlxRepType ty = text "unit"
-pprIlxTypeR env ty@(AppTy f _) | isTyVarTy f    = ilxComment (text "type app:" <+> pprId ty) <+> (text "class [mscorlib]System.Object")
-pprIlxTypeR env ty@(AppTy f x)     = trace "pprIlxTypeR: should I be beta reducing types?!" (ilxComment (text "pprIlxTypeR: should I be beta reducing types...") <+> pprIlxTypeR env (applyTy f x))
-pprIlxTypeR env (TyVarTy tv)       = pprIlxTyVar env tv
+ilxTypeR :: IlxEnv -> Type -> SDoc
+ilxTypeR env ty | isVoidIlxRepType ty = text "/* unit skipped */"
+ilxTypeR env ty@(AppTy f _) | isTyVarTy f    = ilxComment (text "type app:" <+> pprType ty) <+> (text "class [mscorlib]System.Object")
+ilxTypeR env ty@(AppTy f x)     = trace "ilxTypeR: should I be beta reducing types?!" (ilxComment (text "ilxTypeR: should I be beta reducing types...") <+> ilxTypeR env (applyTy f x))
+ilxTypeR env (TyVarTy tv)       = ilxTyVar env tv
 
 -- The following is a special rule for types constructed out of 
 -- higher kinds, e.g. Monad f or Functor f.  
@@ -1113,43 +1153,45 @@ pprIlxTypeR env (TyVarTy tv)       = pprIlxTyVar env tv
 -- The code below is not as general as it should be, but as I
 -- have no idea if this approach will even work, I'm going to
 -- just try it out on some simple cases arising from the prelude.
-pprIlxTypeR env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && null (tyConTyVars tc)
-   = ilxComment (text "what the fuck? 2") <+> (pprIlxTypeR env (TyConApp tc t))
-pprIlxTypeR env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && not (isIlxTyVar (hd (tyConTyVars tc)))
-   = pprIlxTypeR env (TyConApp tc t)
-pprIlxTypeR env (TyConApp tc args) = pprIlxTyConApp env tc args
+ilxTypeR env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && null (tyConTyVars tc)
+   = ilxComment (text "what on earth? 2") <+> (ilxTypeR env (TyConApp tc t))
+ilxTypeR env ty@(TyConApp tc (h:t)) | isAlgTyCon tc && not (isIlxTyVar (hd (tyConTyVars tc)))
+   = ilxTypeR env (TyConApp tc t)
+ilxTypeR env (TyConApp tc args) = ilxTyConApp env tc args
 
   -- nb. the only legitimate place for VoidIlxRepTypes to occur in normalized IlxRepTypes 
   -- is on the left of an arrow
   --  We could probably eliminate all but a final occurrence of these.
-pprIlxTypeR env (FunTy arg res)
-    = pprIlxFunTy (pprIlxTypeL env arg) (pprIlxTypeR env res)
+ilxTypeR env (FunTy arg res)| isVoidIlxRepType res 
+    = pprIlxFunTy (ilxTypeL env arg) (text "void")
+ilxTypeR env (FunTy arg res)
+    = pprIlxFunTy (ilxTypeL env arg) (ilxTypeR env res)
 
-pprIlxTypeR env ty@(ForAllTy tv body_ty) | isIlxTyVar tv
-  = parens (text "forall" <+> pprTyVarBinders env' [tv] <+> nest 2 (pprIlxTypeR env' body_ty))
+ilxTypeR env ty@(ForAllTy tv body_ty) | isIlxTyVar tv
+  = parens (text "forall" <+> pprTyVarBinders env' [tv] <+> nest 2 (ilxTypeR env' body_ty))
     where
        env' = extendIlxEnvWithFormalTyVars env [tv]
 
-pprIlxTypeR env ty@(ForAllTy tv body_ty) | otherwise
+ilxTypeR env ty@(ForAllTy tv body_ty) | otherwise
   = ilxComment (text "higher order type var " <+> pprId tv) <+>
-    pprIlxFunTy (text "class [mscorlib]System.Object") (pprIlxTypeR env body_ty)
+    pprIlxFunTy (text "class [mscorlib]System.Object") (ilxTypeR env body_ty)
 
-pprIlxTypeR env (NoteTy _ ty)       
-   = trace "WARNING! non-representation type given to pprIlxTypeR: see generated ILX for context where this occurs"
-     (vcat [text "/* WARNING! non-representation type given to pprIlxTypeR! */",
-           pprIlxTypeR env ty ])
+ilxTypeR env (NoteTy _ ty)       
+   = trace "WARNING! non-representation type given to ilxTypeR: see generated ILX for context where this occurs"
+     (vcat [text "/* WARNING! non-representation type given to ilxTypeR! */",
+           ilxTypeR env ty ])
 
 pprIlxFunTy dom ran = parens (hsep [text "func",parens dom,text "-->", ran])
 
-pprIlxTyConApp env tc args =
+ilxTyConApp env tc args =
    case lookupUFM tyPrimConTable (getUnique tc) of
-	Just f  -> f env args
+	Just f  -> f args env
         Nothing -> 
             (if isUnboxedTupleTyCon tc then pprIlxUnBoxedTyConApp else pprIlxBoxedTyConApp)
               env ((nameReference env (getName tc)) <> (ppr tc)) args
 
-pprIlxUnBoxedTyConApp env tcdoc args = text "value class" <+> tcdoc <> pprTypeArgs pprIlxTypeL env args
-pprIlxBoxedTyConApp env tcdoc args = text "class" <+> tcdoc <> pprTypeArgs pprIlxTypeR env args
+pprIlxUnBoxedTyConApp env tcdoc args = text "value class" <+> tcdoc <> pprTypeArgs ilxTypeL env args
+pprIlxBoxedTyConApp env tcdoc args = text "class" <+> tcdoc <> pprTypeArgs ilxTypeR env args
 
 -- Returns e.g: <Int32, Bool>
 pprTypeArgs f env tys = pprTypeArgs_aux f env (filter (not . isVoidIlxRepType) tys)
@@ -1170,14 +1212,14 @@ pprTyVarBinder env tv =
        angleBrackets (pprTyVarBinder_aux env tv)
     else
        ilxComment (text "higher order tyvar" <+> pprId tv <+> 
-                         text ":" <+> pprIlxTypeR env (tyVarKind tv)) <+>
+                         text ":" <+> ilxTypeR env (tyVarKind tv)) <+>
              ilxComment (text "omitted")
              -- parens (text "class [mscorlib]System.Object" <+> pprId tv)
 
 
 pprTyVarBinder_aux env tv = 
    ilxComment (text "tyvar" <+> pprId tv <+> text ":" <+> 
-                        pprIlxTypeR env (tyVarKind tv)) <+>
+                        ilxTypeR env (tyVarKind tv)) <+>
              (text "class [mscorlib]System.Object")
 
 -- Only a subset of Haskell types can be generalized using the type quantification
@@ -1198,8 +1240,7 @@ categorizeTyVars tyvs = partition isIlxTyVar tyvs
 
 pprValArgTys ppr_ty env tys = parens (pprSepWithCommas (ppr_ty env) tys)
 
-pprId id = squotes (ppr id)
-squotes s = text "'" <> s <> text "'"
+pprId id = singleQuotes (ppr id)
 
 \end{code}			
 
@@ -1223,21 +1264,6 @@ extendIlxTyEnvWithTyArgs env tyvars = env ++ mkIlxTyEnv tyvars -- bound by "<...
 formalIlxTyEnv tyvars = mkIlxTyEnv tyvars
 mkIlxTyEnv tyvars = [ v | v <- tyvars, isIlxTyVar v ]
 
-pprIlxTyVarInIlxTyEnv :: IlxTyEnv -> TyVar -> SDoc
-pprIlxTyVarInIlxTyEnv tv_env tv
-  = go 0 tv_env
-  where
-    go n [] 		    
-      = pprTrace "pprIlxTyVar" (pprId tv <+> text "tv_env = { "
-           <+> pprSepWithCommas (\x -> pprId x <+> text ":" 
-           <+> pprIlxTypeR (IlxEnv (thisModule, tv_env, emptyVarEnv, emptyVarEnv, (empty,empty),False)) (tyVarKind x)) tv_env <+> text "}") 
-        (char '!' <> pprId tv) 
-    go n (x:xs)
-      = {- pprTrace "go" (ppr (tyVarName tv) <+> ppr (tyVarName x)) -}
-        (if tyVarName x== tyVarName tv then  char '!' <> int n <+> ilxComment (char '!' <> pprId tv) 
-         else go (n+1) xs)
-
-
 data HowBound = Top Module 	-- Bound in a modules
 	      | Arg	-- Arguments to the enclosing closure
 	      | CloVar Int -- A free variable of the enclosing closure
@@ -1249,9 +1275,20 @@ data HowBound = Top Module 	-- Bound in a modules
 -- e.g. Foo_bar_baz when inside closure baz inside closure bar inside module Foo.
 data IlxEnv = IlxEnv (Module, IlxTyEnv, IdEnv HowBound,IdEnv (IlxEnv, StgRhs), Place,Bool)
 type Place = (SDoc,SDoc)
-thisModule = mkHomeModule (mkModuleName "")
 
-pprIlxTyVar (IlxEnv (_, tv_env, _, _,_,_)) tv = pprIlxTyVarInIlxTyEnv tv_env tv 
+ilxTyVar  env tv
+  = go 0 (ilxEnvTyEnv env)
+  where
+    go n [] 		    
+      = pprTrace "ilxTyVar" (pprId tv <+> text "tv_env = { "
+           <+> pprSepWithCommas
+	         (\x -> pprId x <+> text ":" <+> ilxTypeR env (tyVarKind x)) 
+               (ilxEnvTyEnv env) <+> text "}") 
+        (char '!' <> pprId tv) 
+    go n (x:xs)
+      = {- pprTrace "go" (ppr (tyVarName tv) <+> ppr (tyVarName x)) -}
+        (if tyVarName x== tyVarName tv then  char '!' <> int n <+> ilxComment (char '!' <> pprId tv) 
+         else go (n+1) xs)
 
 emptyIlxEnv :: Bool -> Module -> IlxEnv
 emptyIlxEnv trace mod = IlxEnv (mod, emptyIlxTyEnv, emptyVarEnv, emptyVarEnv, (ppr mod,empty),trace)
@@ -1259,6 +1296,7 @@ emptyIlxEnv trace mod = IlxEnv (mod, emptyIlxTyEnv, emptyVarEnv, emptyVarEnv, (p
 nextPlace place sdoc = place <> sdoc
 usePlace  place sdoc = place <> sdoc
 
+ilxEnvModule (IlxEnv (m, _, _,  _, _,_)) = m
 ilxEnvSetPlace (IlxEnv (m, tv_env, id_env,  bind_env, (mod,exact),tr)) sdoc 
    = IlxEnv (m, tv_env, id_env,  bind_env, (mod, sdoc),tr)
 ilxEnvNextPlace (IlxEnv (m, tv_env, id_env,  bind_env, (mod,exact),tr)) sdoc 
@@ -1320,10 +1358,12 @@ extendIlxEnvWithTops env@(IlxEnv (m, tv_env, id_env, bind_env, place,tr)) mod bi
 formalIlxEnv (IlxEnv (m, tv_env, id_env, bind_env, place, tr)) tyvars 
   = IlxEnv (m, formalIlxTyEnv tyvars, id_env, bind_env, place, tr)
 
-elemIlxTyVarEnv var env@(IlxEnv (_, tv_env, _,_,_,_)) = elem var tv_env 
-elemIlxVarEnv var env@(IlxEnv (_, _, id_env,_,_,_)) = elemVarEnv var id_env 
-lookupIlxVarEnv env@(IlxEnv (_, _, id_env,_,_,_)) var = lookupVarEnv id_env var
-lookupIlxBindEnv env@(IlxEnv (_, _, _, bind_env,_,_)) var = lookupVarEnv bind_env var
+ilxEnvTyEnv :: IlxEnv -> IlxTyEnv
+ilxEnvTyEnv (IlxEnv (_, tv_env, _,_,_,_)) = tv_env 
+elemIlxTyEnv var env = elem var (ilxEnvTyEnv env )
+elemIlxVarEnv var (IlxEnv (_, _, id_env,_,_,_)) = elemVarEnv var id_env 
+lookupIlxVarEnv (IlxEnv (_, _, id_env,_,_,_)) var = lookupVarEnv id_env var
+lookupIlxBindEnv (IlxEnv (_, _, _, bind_env,_,_)) var = lookupVarEnv bind_env var
 
 \end{code}
 
@@ -1358,23 +1398,35 @@ singleQuotes pp = char '\'' <> pp <> char '\''
 
 line = text "// ----------------------------------"
 
-hscOptionQual = if opt_SimplDoEtaReduction then text ".O" else text ".Onot"
+hscOptionQual = if opt_SimplDoEtaReduction then text ".ilx-O" else text ".ilx-Onot"
 
-nameReference (IlxEnv (thisMod, _, _, _, _, _)) n
+nameReference env n
   | isLocalName n = empty
-  | thisMod == nameModule n  = text ""
+  | ilxEnvModule env == nameModule n  = text ""
   | isHomeModule (nameModule n)   = moduleNameReference (moduleName (nameModule n))
-  | isVanillaModule (nameModule n) =  packageReference preludePackage
+-- HACK: no Vanilla modules should be around, but they are!!  This
+-- gets things working for the scenario "standard library linked as one
+-- assembly with multiple modules + a one module program running on top of this"
+-- Same applies to all other mentions of Vailla modules in this file
+  | isVanillaModule (nameModule n)  && not inPrelude =  preludePackageReference
+  | isVanillaModule (nameModule n)  && inPrelude =   moduleNameReference (moduleName (nameModule n))
+-- end hack
   | otherwise = packageReference (modulePackage (nameModule n))
 
 packageReference p = brackets ((text "ilx") <+> singleQuotes (ppr p  <> hscOptionQual))
-moduleNameReference m = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName m <> hscOptionQual))
+moduleNameReference m = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName m <> hscOptionQual <> text ".dll"))
 
-moduleReference (IlxEnv (thisMod, _, _, _, _, _)) m
-  | thisMod   == m = text ""
+moduleReference env m
+  | ilxEnvModule env   == m = text ""
   | isHomeModule m = moduleNameReference (moduleName m)
-  | isVanillaModule m =  packageReference preludePackage
+-- See hack above
+  | isVanillaModule m && not inPrelude =  preludePackageReference
+  | isVanillaModule m && inPrelude =  moduleNameReference (moduleName m)
+-- end hack
   | otherwise  =  packageReference (modulePackage m)
+
+preludePackageReference = packageReference preludePackage
+inPrelude = preludePackage == opt_InPackage
 
 ------------------------------------------------
 -- This code is copied from absCSyn/CString.lhs,
@@ -1465,9 +1517,9 @@ ilxConApp env data_con args
 
            vcat [vcat (ilxMapPlaceArgs 0 pushArg env tm_args'),
 	           sep [text "newobj void ",
-  		        pprIlxTyConApp env tycon' rep_ty_args',
+  		        ilxTyConApp env tycon' rep_ty_args',
                         text "::.ctor",
-                        pprValArgTys pprIlxTypeR formal_env' (map deepIlxRepType formal_arg_tys')
+                        pprValArgTys ilxTypeR formal_env' (map deepIlxRepType formal_arg_tys')
 	           ]
              ]
  | otherwise
@@ -1483,7 +1535,7 @@ ilxConApp env data_con args
 
        vcat [vcat (ilxMapPlaceArgs 0 pushArg env tm_args),
 	  sep [	text "newdata",
-		nest 2 (pprIlxTyConApp env tycon rep_ty_args <> comma),
+		nest 2 (ilxTyConApp env tycon rep_ty_args <> comma),
 		nest 2 (ilxConRef env data_con)
 	  ]
         ]
@@ -1508,33 +1560,13 @@ splitTyArgs1 l = ([],l)
  
 
 ilxConRef env data_con
-    = pprId data_con <> pprValArgTys pprIlxTypeL env' (map deepIlxRepType (filter (not . isVoidIlxRepType) arg_tys))
+    = pprId data_con <> pprValArgTys ilxTypeL env' (map deepIlxRepType (filter (not . isVoidIlxRepType) arg_tys))
   where
     (tyvars, tau_ty) = splitForAllTys (dataConRepType data_con)
     (arg_tys, _)     = splitFunTys tau_ty
     env' 	     = formalIlxEnv env tyvars
 
 
-tyPrimConTable :: UniqFM (IlxEnv -> [Type] -> SDoc)
-tyPrimConTable = listToUFM [(addrPrimTyConKey, 	(\_ _ -> repAddr)),
---			    (fileStreamPrimTyConKey, 	(\_ _ -> repFileStream)),
-			    (foreignObjPrimTyConKey, 	(\_ _ -> text "/* ForeignObj */ void *")),
---			    (stablePtrPrimTyConKey, 	(\_ _ -> text "/* StablePtr */ void *")),
-			    (charPrimTyConKey, 	(\_ _ -> repChar)),
-			    (wordPrimTyConKey, 	(\_ _ -> repWord)),
-	                    (byteArrayPrimTyConKey,	(\_ _ -> repByteArray)),
-			    (intPrimTyConKey, 	(\_ _ -> repInt)),
-			    (int64PrimTyConKey,	(\_ _ -> repInt64)),
-			    (word64PrimTyConKey,	(\_ _ -> repWord64)),
-			    (floatPrimTyConKey, 	(\_ _ -> text "float32")),
-			    (arrayPrimTyConKey, 	(\env [ty] -> pprIlxTypeL env ty <> text "[]")),
-			    (mutableArrayPrimTyConKey, 	(\env [_, ty] -> pprIlxTypeL env ty <> text "[]")),
-			    (mVarPrimTyConKey, 	(\env [_, ty] -> repMVar (pprIlxTypeL env ty))),
-			    (mutVarPrimTyConKey, 	(\env [ty1, ty2] -> repMutVar (pprIlxTypeL env ty1) (pprIlxTypeL env ty2))),
-	                    (mutableByteArrayPrimTyConKey,	(\_ _ -> repByteArray)),
-	                    (threadIdPrimTyConKey,	(\_ _ -> text "class [mscorlib]System.Threading.Thread /* ThreadId# */ ")),
-			    (doublePrimTyConKey,	(\_ _ -> text "float64"))
-	     ]
 
 
 \end{code}
@@ -1542,86 +1574,148 @@ tyPrimConTable = listToUFM [(addrPrimTyConKey, 	(\_ _ -> repAddr)),
 
 %************************************************************************
 %*									*
-\subsection{PrimOps}
-%*									*
+\subsection{PrimOps and Prim Representations}				*
 %************************************************************************
 
 \begin{code}
 
-
-
-prelGHCReference =
-   if preludePackage == opt_InPackage then 
-	brackets (text ".module ilx PrelGHC" <> hscOptionQual) 
-   else brackets (text "ilx" <+> text (_UNPK_ preludePackage)  <> hscOptionQual)
-
-
-prelBaseReference =
-   if preludePackage == opt_InPackage then 
-	brackets (text ".module ilx PrelBase" <> hscOptionQual) 
-   else brackets (text "ilx" <+> text (_UNPK_ preludePackage) <> hscOptionQual)
-
-
 ilxPrimApp env (CCallOp ccall) args ret_ty = ilxCCall env ccall args ret_ty
-ilxPrimApp env op 	       args ret_ty = ilxPrimOpTable op env args
+ilxPrimApp env op 	       args ret_ty = ilxPrimOpTable op args env
 
-ilxMkBool =  text "call class" <+> prelBaseReference <+> 
-             text "PrelBase_Bool" <+> 
-             prelGHCReference <+> text "GHC.support::mkBool(bool)"
-ilxCgt = text "cgt " <+> ilxMkBool
-ilxCge = text "clt ldc.i4 0 ceq " <+> ilxMkBool
-ilxClt = text "clt " <+> ilxMkBool
-ilxCle = text "cgt ldc.i4 0 ceq " <+> ilxMkBool
-ilxCeq = text "ceq " <+> ilxMkBool
-ilxCne = text "ceq ldc.i4 0 ceq "  <+> ilxMkBool
-ilxCgtUn = text "cgt.un " <+> ilxMkBool
-ilxCgeUn = text "clt.un ldc.i4 0 ceq " <+> ilxMkBool
-ilxCltUn = text "clt.un " <+> ilxMkBool
-ilxCleUn = text "cgt.un ldc.i4 0 ceq " <+> ilxMkBool
-ldDummyInteger = text " ldc.i4 0 ldnull newobj void" <+> ilxUnboxedPairRep  repInt repByteArray <+> text "::.ctor(!0,!1)"
-ldDummyInteger2 = text " ldc.i4 0 ldnull ldc.i4 0 ldnull newobj void" <+> ilxUnboxedQuadRep  repInt repByteArray repInt repByteArray <+> text "::.ctor(!0,!1,!2,!3)"
 
-repByteArray = text "unsigned int8[] /* ByteArr# */ "
-repFileStream = text "void * /* FileStream# */ "  -- text "class [mscorlib]System.IO.FileStream"
-repInt = text "int32"
-repWord = text "unsigned int32"
-repAddr = text "/* Addr */ void *"
-repInt64 = text "int64"
-repWord64 = text "unsigned int64"
-repChar = text "/* Char */ unsigned int8"
+type IlxTyFrag = IlxEnv -> SDoc
+ilxType s env = text s
+
+ilxTypeSeq :: [IlxTyFrag] -> IlxTyFrag
+ilxTypeSeq ops env = hsep (map (\x -> x env) ops)
+
+tyPrimConTable :: UniqFM ([Type] -> IlxTyFrag)
+tyPrimConTable = 
+  listToUFM [(addrPrimTyConKey, 	(\_ -> repAddr)),
+--	     (fileStreamPrimTyConKey, 	(\_ -> repFileStream)),
+	     (foreignObjPrimTyConKey, 	(\_ -> repForeign)),
+             (stablePtrPrimTyConKey, 	(\[ty] -> repStablePtr {- (ilxTypeL2 ty) -})),
+             (stableNamePrimTyConKey, 	(\[ty] -> repStableName {- (ilxTypeL2 ty) -} )),
+             (charPrimTyConKey, 	(\_ -> repChar)),
+	     (wordPrimTyConKey, 	(\_ -> repWord)),
+	     (byteArrayPrimTyConKey,	(\_ -> repByteArray)),
+	     (intPrimTyConKey, 	        (\_ -> repInt)),
+	     (int64PrimTyConKey,	(\_ -> repInt64)),
+	     (word64PrimTyConKey,	(\_ -> repWord64)),
+	     (floatPrimTyConKey, 	(\_ -> repFloat)),
+	     (doublePrimTyConKey,	(\_ -> repDouble)),
+	     (arrayPrimTyConKey, 	(\[ty] -> repArray (ilxTypeL2 ty))),
+	     (mutableArrayPrimTyConKey, 	(\[_, ty] -> repMutArray (ilxTypeL2 ty))),
+	     (mVarPrimTyConKey, 	(\[_, ty] -> repMVar (ilxTypeL2 ty))),
+	     (mutVarPrimTyConKey, 	(\[ty1, ty2] -> repMutVar (ilxTypeL2 ty1) (ilxTypeL2 ty2))),
+	     (mutableByteArrayPrimTyConKey,	(\_ -> repByteArray)),
+	     (threadIdPrimTyConKey,	(\_ -> repThread)),
+	     (bcoPrimTyConKey,	(\_ -> repBCO))
+	     ]
+
+ilxTypeL2 :: Type -> IlxTyFrag
+ilxTypeL2 ty env = ilxTypeL env ty
+ilxTypeR2 :: Type -> IlxTyFrag
+ilxTypeR2 ty env = ilxTypeR env ty
+
+ilxMethA = ilxType "!!0"
+ilxMethB = ilxType "!!1"
+prelGHCReference :: IlxTyFrag
+prelGHCReference env =
+   if ilxEnvModule env == mkHomeModule (mkModuleName "PrelGHC") then empty
+   else if inPrelude then moduleNameReference (mkModuleName "PrelGHC")
+   else preludePackageReference
+
+prelBaseReference :: IlxTyFrag
+prelBaseReference env =
+   if ilxEnvModule env == mkHomeModule (mkModuleName "PrelBase") then empty
+   else if inPrelude then moduleNameReference (mkModuleName "PrelBase")
+   else preludePackageReference
+
+repThread = ilxType "class [mscorlib]System.Threading.Thread /* ThreadId# */ "
+repByteArray = ilxType "unsigned int8[] /* ByteArr# */ "
+--repFileStream = text "void * /* FileStream# */ "  -- text "class [mscorlib]System.IO.FileStream"
+repInt = ilxType "int32"
+repWord = ilxType "unsigned int32"
+repAddr =ilxType "/* Addr */ void *"
+repInt64 = ilxType "int64"
+repWord64 = ilxType "unsigned int64"
+repFloat = ilxType "float32"
+repDouble = ilxType "float64"
+repChar = ilxType "/* Char */ unsigned int8"
+repForeign = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_Foreignzh"]
 repInteger = ilxUnboxedPairRep repInt repByteArray
 repIntegerPair = ilxUnboxedQuadRep repInt repByteArray repInt repByteArray
-repMVar ty = text "class " <+> prelGHCReference <+> text "PrelGHC_MVarzh" <+> ilxTyParams [ty]
-repMutVar _ ty2 = text "class " <+> prelGHCReference <+> text "PrelGHC_MutVarzh" <+> ilxTyParams [ty2]
-repWeak ty1 = text "class " <+> prelGHCReference <+> text "PrelGHC_Weakzh" <+> ilxTyParams [ty1]
-
-ilxParamsAux [] = empty
-ilxParamsAux [h] = h
-ilxParamsAux (h:t) = h <> text "," <+> ilxParamsAux t
-ilxParams [] = empty
-ilxParams l = parens (ilxParamsAux l)
-
-ilxTyParamsAux [] = empty
-ilxTyParamsAux [h] = h
-ilxTyParamsAux (h:t) = h <> text "," <+> ilxTyParamsAux t
-ilxTyParams [] = empty
-ilxTyParams l = angleBrackets (ilxTyParamsAux l)
-
-ilxMethA = text "!!0"
+repArray ty = ilxTypeSeq [ty,ilxType "[]"]
+repMutArray ty = ilxTypeSeq [ty,ilxType "[]"]
+repMVar ty = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_MVarzh",ilxTyParams [ty]]
+repMutVar _ ty2 = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_MutVarzh",ilxTyParams [ty2]]
+repWeak ty1 = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_Weakzh",ilxTyParams [ty1]]
+repStablePtr {- ty1 -} = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_StablePtrzh" {- ,ilxTyParams [ty1] -} ]
+repStableName {- ty1 -}  = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_StableNamezh" {- ,ilxTyParams [ty1] -} ]
+classWeak = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_Weakzh"]
+repBCO = ilxTypeSeq [ilxType "class ",prelGHCReference,ilxType "PrelGHC_BCOzh"]
 
 ilxTyPair l r = ilxTyParams [l,r]
 ilxTyTriple l m r = ilxTyParams [l,m,r]
 ilxTyQuad l m1 m2 r = ilxTyParams [l,m1,m2,r]
-ilxUnboxedPairRep l r = text "value class" <+> prelGHCReference <+> text "PrelGHC_ZLzhzx2czhZR" <+> ilxTyPair l r
-ilxUnboxedTripleRep l m r = text "value class" <+> prelGHCReference <+> text "PrelGHC_ZLzhzx2czx2czhZR" <+> ilxTyTriple l m r
-ilxUnboxedQuadRep l m1 m2 r = text "value class" <+> prelGHCReference <+> text "PrelGHC_ZLzhzx2czx2czx2czhZR" <+> ilxTyQuad l m1 m2 r
+ilxUnboxedPairRep l r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z1H",ilxTyPair l r]
+ilxUnboxedTripleRep l m r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z2H",ilxTyTriple l m r]
+ilxUnboxedQuadRep l m1 m2 r = ilxTypeSeq [ilxType "value class",prelGHCReference,ilxType "PrelGHC_Z3H",ilxTyQuad l m1 m2 r]
 
-ilxMethodRef rty cls nm tyargs args = rty <+> cls <+> text "::" <> squotes (text nm) <> ilxTyParams tyargs <> ilxParams args
+ilxTyParams :: [IlxTyFrag] -> IlxTyFrag
+ilxTyParams [] env = empty
+ilxTyParams l env = angleBrackets (ilxTyParamsAux l env)
+  where
+   ilxTyParamsAux [] env = empty
+   ilxTyParamsAux [h] env = h env
+   ilxTyParamsAux (h:t) env = h env <> text "," <+> ilxTyParamsAux t env
+   ilxTyParams [] env = empty
 
-ilxSupportClass = prelGHCReference <+> text "GHC.support"
+
+type IlxOpFrag = IlxEnv -> SDoc
+ilxOp :: String -> IlxOpFrag
+ilxOp s env = text s
+ilxOpSeq :: [IlxOpFrag] -> IlxOpFrag
+ilxOpSeq ops env = hsep (map (\x -> x env) ops)
+
+ilxParams :: [IlxOpFrag] -> IlxOpFrag
+ilxParams l env = parens (ilxParamsAux l env)
+  where
+   ilxParamsAux [] env = empty
+   ilxParamsAux [h] env = h env
+   ilxParamsAux (h:t) env = h env <> text "," <+> ilxParamsAux t env
+
+
+ilxMethodRef rty cls nm tyargs args = 
+    ilxOpSeq [rty,cls,ilxOp "::",ilxOp nm,
+              ilxTyParams tyargs,ilxParams args]
+
+ilxCall m = ilxOpSeq [ilxOp "call", m]
+
+ilxSupportClass = ilxOpSeq [prelGHCReference, ilxOp "'GHC.support'"]
 ilxSuppMeth rty nm tyargs args = ilxMethodRef rty ilxSupportClass nm tyargs args
 
-ilxPrimOpTable :: PrimOp -> IlxEnv -> [StgArg] -> SDoc
+ilxCallSuppMeth rty nm tyargs args  = ilxCall (ilxSuppMeth rty nm tyargs args)
+
+ilxMkBool :: IlxOpFrag
+ilxMkBool =  ilxOpSeq [ilxOp "call class",prelBaseReference,
+                       ilxOp "PrelBase_Bool",
+                       prelGHCReference,ilxOp "GHC.support::mkBool(bool)"]
+ilxCgt = ilxOpSeq [ilxOp "cgt",ilxMkBool]
+ilxCge = ilxOpSeq [ilxOp "clt ldc.i4 0 ceq ",ilxMkBool]
+ilxClt = ilxOpSeq [ilxOp "clt ",ilxMkBool]
+ilxCle = ilxOpSeq [ilxOp "cgt ldc.i4 0 ceq ",ilxMkBool]
+ilxCeq = ilxOpSeq [ilxOp "ceq ",ilxMkBool]
+ilxCne = ilxOpSeq [ilxOp "ceq ldc.i4 0 ceq " ,ilxMkBool]
+ilxCgtUn = ilxOpSeq [ilxOp "cgt.un ",ilxMkBool]
+ilxCgeUn  = ilxOpSeq [ilxOp "clt.un ldc.i4 0 ceq ",ilxMkBool]
+ilxCltUn = ilxOpSeq [ilxOp "clt.un ",ilxMkBool]
+ilxCleUn = ilxOpSeq [ilxOp "cgt.un ldc.i4 0 ceq ",ilxMkBool]
+
+ilxForeignToAddrOp = ilxOpSeq [ilxOp "ldfld void *" , repForeign, ilxOp "::contents"]
+
+ilxPrimOpTable :: PrimOp -> [StgArg] -> IlxOpFrag
 ilxPrimOpTable op
   = case op of
  	CharGtOp    -> simp_op ilxCgt
@@ -1631,8 +1725,8 @@ ilxPrimOpTable op
 	CharLtOp    -> simp_op ilxClt
 	CharLeOp    -> simp_op ilxCle
 
-	OrdOp       -> simp_op (text "conv.i4") -- chars represented by UInt32 (u4)
-	ChrOp       -> simp_op (text "conv.u4")
+	OrdOp       -> simp_op (ilxOp "conv.i4") -- chars represented by UInt32 (u4)
+	ChrOp       -> simp_op (ilxOp "conv.u4")
 
 	IntGtOp     -> simp_op ilxCgt
 	IntGeOp     -> simp_op ilxCge
@@ -1641,7 +1735,14 @@ ilxPrimOpTable op
 	IntLtOp     -> simp_op ilxClt
 	IntLeOp     -> simp_op ilxCle
 
-	WordGtOp     -> simp_op ilxCgtUn -- words represented by UInt32 (u4)
+        IntToInt8Op  -> simp_op  (ilxOp"conv.i1")
+        IntToInt16Op  -> simp_op (ilxOp "conv.i2")
+        IntToInt32Op  -> simp_op (ilxOp "conv.i4")
+        WordToWord8Op  -> simp_op (ilxOp "conv.u1")
+        WordToWord16Op  -> simp_op (ilxOp "conv.u2")
+        WordToWord32Op  -> simp_op (ilxOp "conv.u4")
+
+	WordGtOp     -> simp_op ilxCgtUn
 	WordGeOp     -> simp_op ilxCgeUn
 	WordEqOp     -> simp_op ilxCeq
 	WordNeOp     -> simp_op ilxCne
@@ -1670,237 +1771,302 @@ ilxPrimOpTable op
 	DoubleLeOp     -> simp_op ilxCle
 
     -- Int#-related ops:
-	IntAddOp    -> simp_op (text "add")
-	IntSubOp    -> simp_op (text "sub")
-	IntMulOp    -> simp_op (text "mul")
-	IntQuotOp   -> simp_op (text "div")
-	IntNegOp    -> simp_op (text "neg")
-	IntRemOp    -> simp_op (text "rem")
+	IntAddOp    -> simp_op (ilxOp "add")
+	IntSubOp    -> simp_op (ilxOp "sub")
+	IntMulOp    -> simp_op (ilxOp "mul")
+	IntQuotOp   -> simp_op (ilxOp "div")
+	IntNegOp    -> simp_op (ilxOp "neg")
+	IntRemOp    -> simp_op (ilxOp "rem")
 
-	Addr2IntOp  -> simp_op (text "conv.i4") -- Addresses are very dodgy for ILX.  They are used for both C-strings and 
-	Int2AddrOp  -> simp_op (text "conv.i")  -- the FFI.  This needs more work.
-	ISllOp      -> simp_op (text "shl")
-	ISraOp      -> simp_op (text "shr")
-	ISrlOp      -> simp_op (text "shr.un")
-	IntAddCOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntAddCOp" [] [repInt, repInt])
-	IntSubCOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntSubCOp" [] [repInt, repInt])
-	IntMulCOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt repInt) "IntMulCOp" [] [repInt, repInt])
-	IntGcdOp    -> simp_op (text "call" <+> ilxSuppMeth repInt "IntMulCOp" [] [repInt, repInt])
+    -- Word#-related ops:
+	WordAddOp    -> simp_op (ilxOp "add")
+	WordSubOp    -> simp_op (ilxOp "sub")
+	WordMulOp    -> simp_op (ilxOp "mul")
+	WordQuotOp   -> simp_op (ilxOp "div")
+	WordRemOp    -> simp_op (ilxOp "rem")
+
+	Addr2IntOp  -> simp_op (ilxOp "conv.i4") -- Addresses are very dodgy for ILX.  They are used for both C-strings and 
+	Int2AddrOp  -> simp_op (ilxOp "conv.i")  -- the FFI.  This needs more work.
+	ISllOp      -> simp_op (ilxOp "shl")
+	ISraOp      -> simp_op (ilxOp "shr")
+	ISrlOp      -> simp_op (ilxOp "shr.un")
+	IntAddCOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedPairRep repInt repInt) "IntAddCOp" [] [repInt, repInt])
+	IntSubCOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedPairRep repInt repInt) "IntSubCOp" [] [repInt, repInt])
+	IntMulCOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedPairRep repInt repInt) "IntMulCOp" [] [repInt, repInt])
+	IntGcdOp    -> simp_op (ilxCallSuppMeth repInt "IntGcdOp" [] [repInt, repInt])
 
 
     -- Word#-related ops:
-	AndOp  	    -> simp_op (text "and") 
-	OrOp   	    -> simp_op (text "or") 
-	NotOp  	    -> simp_op (text "not") 
-	XorOp  	    -> simp_op (text "xor") 
-	SllOp  	    -> simp_op (text "shl") 
-	SrlOp 	    -> simp_op (text "shr") 
-	Word2IntOp  -> simp_op (text "conv.i4")
-	Int2WordOp  -> simp_op (text "conv.u4")
+	AndOp  	    -> simp_op (ilxOp "and") 
+	OrOp   	    -> simp_op (ilxOp "or") 
+	NotOp  	    -> simp_op (ilxOp "not") 
+	XorOp  	    -> simp_op (ilxOp "xor") 
+	SllOp  	    -> simp_op (ilxOp "shl") 
+	SrlOp 	    -> simp_op (ilxOp "shr") 
+	Word2IntOp  -> simp_op (ilxOp "conv.i4")
+	Int2WordOp  -> simp_op (ilxOp "conv.u4")
 
     -- Float#-related ops:
-	FloatAddOp   -> simp_op (text "add")
-	FloatSubOp   -> simp_op (text "sub")
-	FloatMulOp   -> simp_op (text "mul")
-	FloatDivOp   -> simp_op (text "div")
-	FloatNegOp   -> simp_op (text "neg")
-	Float2IntOp  -> simp_op (text "conv.i4")
-	Int2FloatOp  -> simp_op (text "conv.r4")
+	FloatAddOp   -> simp_op (ilxOp "add")
+	FloatSubOp   -> simp_op (ilxOp "sub")
+	FloatMulOp   -> simp_op (ilxOp "mul")
+	FloatDivOp   -> simp_op (ilxOp "div")
+	FloatNegOp   -> simp_op (ilxOp "neg")
+	Float2IntOp  -> simp_op (ilxOp "conv.i4")
+	Int2FloatOp  -> simp_op (ilxOp "conv.r4")
 
-	DoubleAddOp   	-> simp_op (text "add")
-	DoubleSubOp   	-> simp_op (text "sub")
-	DoubleMulOp   	-> simp_op (text "mul")
-	DoubleDivOp   	-> simp_op (text "div")
-	DoubleNegOp   	-> simp_op (text "neg")
-	Double2IntOp  	-> simp_op (text "conv.i4")
-	Int2DoubleOp  	-> simp_op (text "conv.r4")
-	Double2FloatOp  -> simp_op (text "conv.r4")
-	Float2DoubleOp  -> simp_op (text "conv.r8")
-	DoubleDecodeOp  -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeDouble" [] [text "float64"])
-	FloatDecodeOp   -> simp_op (text "call" <+> ilxSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeFloat" [] [text "float32"])
+	DoubleAddOp   	-> simp_op (ilxOp "add")
+	DoubleSubOp   	-> simp_op (ilxOp "sub")
+	DoubleMulOp   	-> simp_op (ilxOp "mul")
+	DoubleDivOp   	-> simp_op (ilxOp "div")
+	DoubleNegOp   	-> simp_op (ilxOp "neg")
+	Double2IntOp  	-> simp_op (ilxOp "conv.i4")
+	Int2DoubleOp  	-> simp_op (ilxOp "conv.r4")
+	Double2FloatOp  -> simp_op (ilxOp "conv.r4")
+	Float2DoubleOp  -> simp_op (ilxOp "conv.r8")
+	DoubleDecodeOp  -> simp_op (ilxCallSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeDouble" [] [ilxType "float64"])
+	FloatDecodeOp   -> simp_op (ilxCallSuppMeth (ilxUnboxedTripleRep repInt repInt repByteArray) "decodeFloat" [] [ilxType "float32"])
 
-	FloatExpOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Exp(float64) conv.r4")
-	FloatLogOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Log(float64) conv.r4")
-	FloatSqrtOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sqrt(float64) conv.r4")
-	FloatSinOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sin(float64) conv.r4")
-	FloatCosOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Cos(float64) conv.r4")
-	FloatTanOp   -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Tan(float64) conv.r4")
-	FloatAsinOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Asin(float64) conv.r4")
-	FloatAcosOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Acos(float64) conv.r4")
-	FloatAtanOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Atan(float64) conv.r4")
-	FloatSinhOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Sinh(float64) conv.r4")
-	FloatCoshOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Cosh(float64) conv.r4")
-	FloatTanhOp  -> simp_op (text "conv.r8 call float64 [mscorlib]System.Math::Tanh(float64) conv.r4")
-	FloatPowerOp -> simp_op (text "call float64 [mscorlib]System.Math::Pow(float64, float64) conv.r4") -- ** op, make use of implicit cast to r8...
+	FloatExpOp   -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Exp(float64) conv.r4")
+	FloatLogOp   -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Log(float64) conv.r4")
+	FloatSqrtOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Sqrt(float64) conv.r4")
+	FloatSinOp   -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Sin(float64) conv.r4")
+	FloatCosOp   -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Cos(float64) conv.r4")
+	FloatTanOp   -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Tan(float64) conv.r4")
+	FloatAsinOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Asin(float64) conv.r4")
+	FloatAcosOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Acos(float64) conv.r4")
+	FloatAtanOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Atan(float64) conv.r4")
+	FloatSinhOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Sinh(float64) conv.r4")
+	FloatCoshOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Cosh(float64) conv.r4")
+	FloatTanhOp  -> simp_op (ilxOp "conv.r8 call float64 [mscorlib]System.Math::Tanh(float64) conv.r4")
+	FloatPowerOp -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Pow(float64, float64) conv.r4") -- ** op, make use of implicit cast to r8...
 
-	DoubleExpOp   -> simp_op (text "call float64 [mscorlib]System.Math::Exp(float64)")
-	DoubleLogOp   -> simp_op (text "call float64 [mscorlib]System.Math::Log(float64)")
-	DoubleSqrtOp  -> simp_op (text "call float64 [mscorlib]System.Math::Sqrt(float64)")
+	DoubleExpOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Exp(float64)")
+	DoubleLogOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Log(float64)")
+	DoubleSqrtOp  -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Sqrt(float64)")
           
-	DoubleSinOp   -> simp_op (text "call float64 [mscorlib]System.Math::Sin(float64)")
-	DoubleCosOp   -> simp_op (text "call float64 [mscorlib]System.Math::Cos(float64)")
-	DoubleTanOp   -> simp_op (text "call float64 [mscorlib]System.Math::Tan(float64)")
+	DoubleSinOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Sin(float64)")
+	DoubleCosOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Cos(float64)")
+	DoubleTanOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Tan(float64)")
           
-	DoubleAsinOp   -> simp_op (text "call float64 [mscorlib]System.Math::Asin(float64)")
-	DoubleAcosOp   -> simp_op (text "call float64 [mscorlib]System.Math::Acos(float64)")
-	DoubleAtanOp   -> simp_op (text "call float64 [mscorlib]System.Math::Atan(float64)")
+	DoubleAsinOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Asin(float64)")
+	DoubleAcosOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Acos(float64)")
+	DoubleAtanOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Atan(float64)")
           
-	DoubleSinhOp   -> simp_op (text "call float64 [mscorlib]System.Math::Sinh(float64)")
-	DoubleCoshOp   -> simp_op (text "call float64 [mscorlib]System.Math::Cosh(float64)")
-	DoubleTanhOp   -> simp_op (text "call float64 [mscorlib]System.Math::Tanh(float64)")
+	DoubleSinhOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Sinh(float64)")
+	DoubleCoshOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Cosh(float64)")
+	DoubleTanhOp   -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Tanh(float64)")
           
-	DoublePowerOp  -> simp_op (text "call float64 [mscorlib]System.Math::Pow(float64, float64)")
+	DoublePowerOp  -> simp_op (ilxOp "call float64 [mscorlib]System.Math::Pow(float64, float64)")
 
     -- Integer (and related...) ops: bail out to support routines
---	IntegerNegOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerNegOp" [] [repInt, repByteArray])
---	Addr2IntegerOp     -> simp_op (text "call" <+> ilxSuppMeth repInteger "Addr2IntegerOp" [] [repAddr])
-	IntegerAddOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerAddOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerSubOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerSubOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerMulOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerMulOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerGcdOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerGcdOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerQuotRemOp   -> simp_op (text "call" <+> ilxSuppMeth repIntegerPair "IntegerQuotRemOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerDivModOp    -> simp_op (text "call" <+> ilxSuppMeth repIntegerPair "IntegerDivModOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerIntGcdOp    -> simp_op (text "call" <+> ilxSuppMeth repInt "IntegerIntGcdOp" [] [repInt, repByteArray, repInt])
-	IntegerDivExactOp  -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerDivExactOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerQuotOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerQuotOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerRemOp   	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "IntegerRemOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerCmpOp   	   -> simp_op (text "call" <+> ilxSuppMeth repInt "IntegerCmpOp" [] [repInt, repByteArray, repInt, repByteArray])
-	IntegerCmpIntOp    -> simp_op (text "call" <+> ilxSuppMeth repInt "IntegerCmpIntOp" [] [repInt, repByteArray, repInt])
-	Integer2IntOp      -> simp_op (text "call" <+> ilxSuppMeth repInt "Integer2IntOp" [] [repInt, repByteArray])
-	Integer2WordOp     -> simp_op (text "call" <+> ilxSuppMeth repWord "Integer2WordOp" [] [repInt, repByteArray])
-	Int2IntegerOp  	   -> simp_op (text "call" <+> ilxSuppMeth repInteger "Int2IntegerOp" [] [repInt])
-	Word2IntegerOp     -> simp_op (text "call" <+> ilxSuppMeth repInteger "Word2IntegerOp" [] [repWord])
-	IntegerToInt64Op   -> simp_op (text "call" <+> ilxSuppMeth repAddr "IntegerToInt64Op" [] [repInt,repByteArray])
-	Int64ToIntegerOp   -> simp_op (text "call" <+> ilxSuppMeth repInteger "Int64ToIntegerOp" [] [repInt64])
-	IntegerToWord64Op  -> simp_op (text "call" <+> ilxSuppMeth repWord64 "IntegerToWord64Op" [] [repInt,repByteArray])
-	Word64ToIntegerOp  -> simp_op (text "call" <+> ilxSuppMeth repInteger "Word64ToIntegerOp" [] [repWord64])
-
-	IndexOffForeignObjOp_Char    -> simp_op (text "add ldind.u1")
-	IndexOffForeignObjOp_Int     -> simp_op (text "ldc.i4 4 mul add ldind.i4")
-	IndexOffForeignObjOp_Word    -> simp_op (text "ldc.i4 4 mul add ldind.u4")
-	IndexOffForeignObjOp_Addr    ->  warn_op "IndexOffForeignObjOp Addr: assuing 32 bit architecture" (simp_op (text "ldc.i4 4 mul add ldind.i  "))
-	IndexOffForeignObjOp_Float   -> simp_op (text "ldc.i4 4 mul add ldind.r4")
-	IndexOffForeignObjOp_Double  -> simp_op (text "ldc.i4 8 mul add ldind.r8")
-	IndexOffForeignObjOp_Int64   -> simp_op (text "ldc.i4 8 mul add ldind.i8")
-	IndexOffForeignObjOp_Word64  -> simp_op (text "ldc.i4 8 mul add ldind.u8")
-
-	IndexOffAddrOp_Char    -> simp_op (text "add ldind.u1")
-	IndexOffAddrOp_Int     -> simp_op (text "ldc.i4 4 mul add ldind.i4")
-	IndexOffAddrOp_Word    -> simp_op (text "ldc.i4 4 mul add ldind.u4")
-	IndexOffAddrOp_Addr    -> warn_op "IndexOffAddrOp Addr: assuing 32 bit architecture" (simp_op (text "ldc.i4 4 mul add ldind.i"))
-	IndexOffAddrOp_Float   -> simp_op (text "ldc.i4 4 mul add ldind.r4")
-	IndexOffAddrOp_Double  -> simp_op (text "ldc.i4 8 mul add ldind.r8")
-	IndexOffAddrOp_Int64   -> simp_op (text "ldc.i4 8 mul add ldind.i8")
-	IndexOffAddrOp_Word64  -> simp_op (text "ldc.i4 8 mul add ldind.u8")
+	IntegerAndOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerAndOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerOrOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerOrOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerXorOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerXorOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerComplementOp -> simp_op (ilxCallSuppMeth repInteger "IntegerComplementOp" [] [repInt, repByteArray])
+	IntegerAddOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerAddOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerSubOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerSubOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerMulOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerMulOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerGcdOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerGcdOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerQuotRemOp   -> simp_op (ilxCallSuppMeth repIntegerPair "IntegerQuotRemOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerDivModOp    -> simp_op (ilxCallSuppMeth repIntegerPair "IntegerDivModOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerIntGcdOp    -> simp_op (ilxCallSuppMeth repInt "IntegerIntGcdOp" [] [repInt, repByteArray, repInt])
+	IntegerDivExactOp  -> simp_op (ilxCallSuppMeth repInteger "IntegerDivExactOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerQuotOp  	   -> simp_op (ilxCallSuppMeth repInteger "IntegerQuotOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerRemOp   	   -> simp_op (ilxCallSuppMeth repInteger "IntegerRemOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerCmpOp   	   -> simp_op (ilxCallSuppMeth repInt "IntegerCmpOp" [] [repInt, repByteArray, repInt, repByteArray])
+	IntegerCmpIntOp    -> simp_op (ilxCallSuppMeth repInt "IntegerCmpIntOp" [] [repInt, repByteArray, repInt])
+	Integer2IntOp      -> simp_op (ilxCallSuppMeth repInt "Integer2IntOp" [] [repInt, repByteArray])
+	Integer2WordOp     -> simp_op (ilxCallSuppMeth repWord "Integer2WordOp" [] [repInt, repByteArray])
+	Int2IntegerOp  	   -> simp_op (ilxCallSuppMeth repInteger "Int2IntegerOp" [] [repInt])
+	Word2IntegerOp     -> simp_op (ilxCallSuppMeth repInteger "Word2IntegerOp" [] [repWord])
+	IntegerToInt64Op   -> simp_op (ilxCallSuppMeth repInt64 "IntegerToInt64Op" [] [repInt,repByteArray])
+	Int64ToIntegerOp   -> simp_op (ilxCallSuppMeth repInteger "Int64ToIntegerOp" [] [repInt64])
+	IntegerToWord64Op  -> simp_op (ilxCallSuppMeth repWord64 "IntegerToWord64Op" [] [repInt,repByteArray])
+	Word64ToIntegerOp  -> simp_op (ilxCallSuppMeth repInteger "Word64ToIntegerOp" [] [repWord64])
 
 
-	WriteOffAddrOp_Char   -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "add" <+> v <+> text "stind.u1")
-	WriteOffAddrOp_Int    -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.i4")
-	WriteOffAddrOp_Word   -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.u4")
-	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.i")
-	WriteOffAddrOp_Float  -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 4 mul add" <+> v <+> text "stind.r4")
-	WriteOffAddrOp_Double -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.r8")
-	WriteOffAddrOp_Int64  -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.i8")
-	WriteOffAddrOp_Word64 -> ty1_arg4_op (\sty addr n v s -> addr <+> n <+> text "ldc.i4 8 mul add" <+> v <+> text "stind.u8")
-                  {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
 
-	ReadOffAddrOp_Char   -> simp_op (text "add ldind.u1")
-	ReadOffAddrOp_Int    -> simp_op (text "ldc.i4 4 mul add ldind.i4")
-	ReadOffAddrOp_Word   -> simp_op (text "ldc.i4 4 mul add ldind.u4")
-	ReadOffAddrOp_Addr   -> simp_op (text "ldc.i4 4 mul add ldind.i")
-	ReadOffAddrOp_Float  -> simp_op (text "ldc.i4 4 mul add ldind.r4")
-	ReadOffAddrOp_Double -> simp_op (text "ldc.i4 8 mul add ldind.r8")
-	ReadOffAddrOp_Int64  -> simp_op (text "ldc.i4 8 mul add ldind.i8")
-	ReadOffAddrOp_Word64 -> simp_op (text "ldc.i4 8 mul add ldind.u8")
-                  {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
+	IndexByteArrayOp_Char  	   -> simp_op (ilxOp "ldelem.u1")
+	IndexByteArrayOp_WideChar  -> simp_op (ilxOp "ldelem.u4")
+	IndexByteArrayOp_Int   	   -> simp_op (ilxOp "ldelem.i4")
+	IndexByteArrayOp_Word  	   -> simp_op (ilxOp "ldelem.u4")
+	IndexByteArrayOp_Addr  	   -> simp_op (ilxOp "ldelem.u")
+	IndexByteArrayOp_Float 	   -> simp_op (ilxOp "ldelem.r4")
+	IndexByteArrayOp_Double    -> simp_op (ilxOp "ldelem.r8")
+	IndexByteArrayOp_StablePtr -> simp_op (ilxOp "ldelem.ref")
+	IndexByteArrayOp_Int8     -> simp_op (ilxOp "ldelem.i1")
+	IndexByteArrayOp_Int16     -> simp_op (ilxOp "ldelem.i2")
+	IndexByteArrayOp_Int32     -> simp_op (ilxOp "ldelem.i4")
+	IndexByteArrayOp_Int64     -> simp_op (ilxOp "ldelem.i8")
+	IndexByteArrayOp_Word8    -> simp_op (ilxOp "ldelem.u1")
+	IndexByteArrayOp_Word16    -> simp_op (ilxOp "ldelem.u2")
+	IndexByteArrayOp_Word32    -> simp_op (ilxOp "ldelem.u4")
+	IndexByteArrayOp_Word64    -> simp_op (ilxOp "ldelem.u8")
 
-	IndexByteArrayOp_Char  	   -> simp_op (text "ldelem.u1")
-	IndexByteArrayOp_Int   	   -> simp_op (text "ldelem.i4")
-	IndexByteArrayOp_Word  	   -> simp_op (text "ldelem.u4")
-	IndexByteArrayOp_Addr  	   -> simp_op (text "ldelem.u")
-	IndexByteArrayOp_Float 	   -> simp_op (text "ldelem.r4")
-	IndexByteArrayOp_Double    -> simp_op (text "ldelem.r8")
-	IndexByteArrayOp_StablePtr -> simp_op (text "ldelem.i4")
-	IndexByteArrayOp_Int64     -> simp_op (text "ldelem.i8")
-	IndexByteArrayOp_Word64    -> simp_op (text "ldelem.u8")
-
+            {- should be monadic??? -}
+	ReadByteArrayOp_Char   	  -> simp_op (ilxOp "ldelem.u1")
+	ReadByteArrayOp_WideChar  -> simp_op (ilxOp "ldelem.u4")
+	ReadByteArrayOp_Int    	  -> simp_op (ilxOp "ldelem.i4")
+	ReadByteArrayOp_Word   	  -> simp_op (ilxOp "ldelem.u4")
+	ReadByteArrayOp_Addr   	  -> simp_op (ilxOp "ldelem.u")
+	ReadByteArrayOp_Float  	  -> simp_op (ilxOp "ldelem.r4")
+	ReadByteArrayOp_Double 	  -> simp_op (ilxOp "ldelem.r8")
+	ReadByteArrayOp_StablePtr -> simp_op (ilxOp "ldelem.ref")
+	ReadByteArrayOp_Int8     -> simp_op (ilxOp "ldelem.i1")
+	ReadByteArrayOp_Int16     -> simp_op (ilxOp "ldelem.i2")
+	ReadByteArrayOp_Int32     -> simp_op (ilxOp "ldelem.i4")
+	ReadByteArrayOp_Int64     -> simp_op (ilxOp "ldelem.i8")
+	ReadByteArrayOp_Word8    -> simp_op (ilxOp "ldelem.u1")
+	ReadByteArrayOp_Word16    -> simp_op (ilxOp "ldelem.u2")
+	ReadByteArrayOp_Word32    -> simp_op (ilxOp "ldelem.u4")
+	ReadByteArrayOp_Word64    -> simp_op (ilxOp "ldelem.u8")
+                 {-   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #) -}
                  {- ByteArr# -> Int# -> Char# -}
 
-	WriteByteArrayOp_Char  	   -> simp_op (text "stelem.u1")
-	WriteByteArrayOp_Int   	   -> simp_op (text "stelem.i4")
-	WriteByteArrayOp_Word  	   -> simp_op (text "stelem.u4")
-	WriteByteArrayOp_Addr  	   -> simp_op (text "stelem.u")
-	WriteByteArrayOp_Float 	   -> simp_op (text "stelem.r4")
-	WriteByteArrayOp_Double    -> simp_op (text "stelem.r8")
-	WriteByteArrayOp_StablePtr -> simp_op (text "stelem.i4")
-	WriteByteArrayOp_Int64     -> simp_op (text "stelem.i8")
-	WriteByteArrayOp_Word64    -> simp_op (text "stelem.u8")
 
+	WriteByteArrayOp_Char  	   -> simp_op (ilxOp "stelem.u1")
+	WriteByteArrayOp_WideChar   -> simp_op (ilxOp "stelem.u4")
+	WriteByteArrayOp_Int   	   -> simp_op (ilxOp "stelem.i4")
+	WriteByteArrayOp_Word  	   -> simp_op (ilxOp "stelem.u4")
+	WriteByteArrayOp_Addr  	   -> simp_op (ilxOp "stelem.u")
+	WriteByteArrayOp_Float 	   -> simp_op (ilxOp "stelem.r4")
+	WriteByteArrayOp_Double    -> simp_op (ilxOp "stelem.r8")
+	WriteByteArrayOp_StablePtr -> simp_op (ilxOp "stelem.ref")
+	WriteByteArrayOp_Int8     -> simp_op (ilxOp "stelem.i1")
+	WriteByteArrayOp_Int16     -> simp_op (ilxOp "stelem.i2")
+	WriteByteArrayOp_Int32     -> simp_op (ilxOp "stelem.i4")
+	WriteByteArrayOp_Int64     -> simp_op (ilxOp "stelem.i8")
+	WriteByteArrayOp_Word8    -> simp_op (ilxOp "stelem.u1")
+	WriteByteArrayOp_Word16    -> simp_op (ilxOp "stelem.u2")
+	WriteByteArrayOp_Word32    -> simp_op (ilxOp "stelem.u4")
+	WriteByteArrayOp_Word64    -> simp_op (ilxOp "stelem.i8 /* nb. no stelem.u8 */")
                  {- MutByteArr# s -> Int# -> Char# -> State# s -> State# s -}
 
-            {- should be monadic??? -}
-	ReadByteArrayOp_Char   	  -> simp_op (text "ldelem.u1")
-	ReadByteArrayOp_Int    	  -> simp_op (text "ldelem.i4")
-	ReadByteArrayOp_Word   	  -> simp_op (text "ldelem.u4")
-	ReadByteArrayOp_Addr   	  -> simp_op (text "ldelem.u")
-	ReadByteArrayOp_Float  	  -> simp_op (text "ldelem.r4")
-	ReadByteArrayOp_Double 	  -> simp_op (text "ldelem.r8")
-	ReadByteArrayOp_StablePtr -> simp_op (text "ldelem.i4")
-	ReadByteArrayOp_Int64     -> simp_op (text "ldelem.i8")
-	ReadByteArrayOp_Word64    -> simp_op (text "ldelem.u8")
-                 {-   MutByteArr# s -> Int# -> State# s -> (# State# s, Char# #) -}
+	IndexOffAddrOp_Char    -> simp_op (ilxOp "sizeof unsigned int8 mul add ldind.u1")
+	IndexOffAddrOp_WideChar    -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
+	IndexOffAddrOp_Int     -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
+	IndexOffAddrOp_Word    -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
+	IndexOffAddrOp_Addr    -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.i")
+	IndexOffAddrOp_StablePtr   -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.ref")
+	IndexOffAddrOp_Float   -> simp_op (ilxOp "sizeof float32 mul add ldind.r4")
+	IndexOffAddrOp_Double  -> simp_op (ilxOp "sizeof float64 mul add ldind.r8")
+	IndexOffAddrOp_Int8   -> simp_op (ilxOp "sizeof int8 mul add ldind.i1")
+	IndexOffAddrOp_Int16   -> simp_op (ilxOp "sizeof int16 mul add ldind.i2")
+	IndexOffAddrOp_Int32   -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
+	IndexOffAddrOp_Int64   -> simp_op (ilxOp "sizeof int64 mul add ldind.i8")
+	IndexOffAddrOp_Word8  -> simp_op (ilxOp "sizeof unsigned int8 mul add ldind.u1")
+	IndexOffAddrOp_Word16 -> simp_op (ilxOp "sizeof unsigned int16 mul add ldind.u2")
+	IndexOffAddrOp_Word32  -> simp_op (ilxOp "sizeof unsigned int32 mul add ldind.u4")
+	IndexOffAddrOp_Word64  -> simp_op (ilxOp "sizeof int64 mul add ldind.u8")
+
+	-- ForeignObj: load the address inside the object first
+        -- TODO: is this remotely right?
+        IndexOffForeignObjOp_Char    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
+	IndexOffForeignObjOp_WideChar    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int32 mul add ldind.u4"])
+	IndexOffForeignObjOp_Int     -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
+	IndexOffForeignObjOp_Word    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
+	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof native unsigned int mul add ldind.i  "])
+	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof native unsigned int mul add ldind.ref  "])
+	IndexOffForeignObjOp_Float   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof float32 mul add ldind.r4"])
+	IndexOffForeignObjOp_Double  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof float64 mul add ldind.r8"])
+	IndexOffForeignObjOp_Int8   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int8 mul add ldind.i1"])
+	IndexOffForeignObjOp_Int16   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int16 mul add ldind.i2"])
+	IndexOffForeignObjOp_Int32   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
+	IndexOffForeignObjOp_Int64   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof int64 mul add ldind.i8"])
+	IndexOffForeignObjOp_Word8  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int8 mul add ldind.u1"])
+	IndexOffForeignObjOp_Word16  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int16 mul add ldind.u2"])
+	IndexOffForeignObjOp_Word32  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
+	IndexOffForeignObjOp_Word64  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxForeignToAddrOp, n, ilxOp "sizeof unsigned int64 mul add ldind.u8"])
+
+	ReadOffAddrOp_Char   -> simp_op (ilxOp "sizeof unsigned int8 mul add ldind.u1")
+	ReadOffAddrOp_WideChar -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
+	ReadOffAddrOp_Int    -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
+	ReadOffAddrOp_Word   -> simp_op (ilxOp "sizeof unsigned int32 mul add ldind.u4")
+	ReadOffAddrOp_Addr   -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.i")
+	ReadOffAddrOp_Float  -> simp_op (ilxOp "sizeof float32 mul add ldind.r4")
+	ReadOffAddrOp_Double -> simp_op (ilxOp "sizeof float64 mul add ldind.r8")
+	ReadOffAddrOp_StablePtr  -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.ref")
+	ReadOffAddrOp_Int8  -> simp_op (ilxOp "sizeof int8 mul add ldind.i1")
+	ReadOffAddrOp_Int16  -> simp_op (ilxOp "sizeof int16 mul add ldind.i2")
+	ReadOffAddrOp_Int32  -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
+	ReadOffAddrOp_Int64  -> simp_op (ilxOp "sizeof int64 mul add ldind.i8")
+	ReadOffAddrOp_Word8 -> simp_op (ilxOp "sizeof unsigned int8 mul add ldind.u1")
+	ReadOffAddrOp_Word16 -> simp_op (ilxOp "sizeof unsigned int16 mul add ldind.u2")
+	ReadOffAddrOp_Word32 -> simp_op (ilxOp "sizeof unsigned int32 mul add ldind.u4")
+	ReadOffAddrOp_Word64 -> simp_op (ilxOp "sizeof unsigned int64 mul add ldind.u8")
+                  {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
+
+	WriteOffAddrOp_Char   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "add", v, ilxOp "stind.u1"])
+	WriteOffAddrOp_WideChar   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.u4"])
+	WriteOffAddrOp_Int    -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.i4"])
+	WriteOffAddrOp_Word   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.u4"])
+	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.i"])
+	WriteOffAddrOp_ForeignObj   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.ref"])
+	WriteOffAddrOp_Float  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof float32 mul add", v,ilxOp "stind.r4"])
+	WriteOffAddrOp_StablePtr   -> ty2_arg4_op (\ty1 sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.ref"])
+	WriteOffAddrOp_Double -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof float64 mul add",v,ilxOp "stind.r8"])
+	WriteOffAddrOp_Int8  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int8 mul add",v,ilxOp "stind.i1"])
+	WriteOffAddrOp_Int16  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int16 mul add",v,ilxOp "stind.i2"])
+	WriteOffAddrOp_Int32  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int32 mul add",v,ilxOp "stind.i4"])
+	WriteOffAddrOp_Int64  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int64 mul add",v,ilxOp "stind.i8"])
+	WriteOffAddrOp_Word8 -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof unsigned int8 mul add",v,ilxOp "stind.u1"])
+	WriteOffAddrOp_Word16 -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof unsigned int16 mul add",v,ilxOp "stind.u2"])
+	WriteOffAddrOp_Word32 -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof unsigned int32 mul add",v,ilxOp "stind.u4"])
+	WriteOffAddrOp_Word64 -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof unsigned int64 mul add",v,ilxOp "stind.u8"])
+                  {-    Addr# -> Int# -> Char# -> State# s -> State# s -} 
 
             {- should be monadic??? -}
-	NewByteArrayOp_Char   	 -> simp_op (text "newarr [mscorlib]System.Byte")
---	NewByteArrayOp_Int    	 -> simp_op (text "newarr [mscorlib]System.Int32")
---	NewByteArrayOp_Word   	 -> simp_op (text "newarr [mscorlib]System.UInt32")
---	NewByteArrayOp_Addr   	 -> simp_op (text "newarr [mscorlib]System.UInt64")
---	NewByteArrayOp_Float  	 -> simp_op (text "newarr [mscorlib]System.Single")
---	NewByteArrayOp_Double 	 -> simp_op (text "newarr [mscorlib]System.Double")
---	NewByteArrayOp_StablePtr -> simp_op (text "newarr [mscorlib]System.UInt32")
---      NewByteArrayOp_Int64     -> simp_op (text "newarr [mscorlib]System.Int64")  TODO: there is no unique for this one -}
---      NewByteArrayOp_Word64    -> simp_op (text "newarr  [mscorlib]System.UInt64") -}
+	NewByteArrayOp_Char   	 -> simp_op (ilxOp "newarr [mscorlib]System.Byte")
+--	NewByteArrayOp_Int    	 -> simp_op (ilxOp "newarr [mscorlib]System.Int32")
+--	NewByteArrayOp_Word   	 -> simp_op (ilxOp "newarr [mscorlib]System.UInt32")
+--	NewByteArrayOp_Addr   	 -> simp_op (ilxOp "newarr [mscorlib]System.UInt64")
+--	NewByteArrayOp_Float  	 -> simp_op (ilxOp "newarr [mscorlib]System.Single")
+--	NewByteArrayOp_Double 	 -> simp_op (ilxOp "newarr [mscorlib]System.Double")
+--	NewByteArrayOp_StablePtr -> simp_op (ilxOp "newarr [mscorlib]System.UInt32")
+--      NewByteArrayOp_Int64     -> simp_op (ilxOp "newarr [mscorlib]System.Int64")  TODO: there is no unique for this one -}
+--      NewByteArrayOp_Word64    -> simp_op (ilxOp "newarr  [mscorlib]System.UInt64") -}
                   {- Int# -> State# s -> (# State# s, MutByteArr# s #) -}
 
-	UnsafeFreezeByteArrayOp ->   ty1_op (\ty1  -> text "nop ")
+	UnsafeFreezeByteArrayOp ->   ty1_op (\ty1  -> ilxOp "nop ")
                   {- MutByteArr# s -> State# s -> (# State# s, ByteArr# #) -}
-	SizeofByteArrayOp  -> simp_op (text "ldlen")
+	SizeofByteArrayOp  -> simp_op (ilxOp "ldlen")
                   {- ByteArr# -> Int# -}
 
-	SameMutableByteArrayOp -> ty1_op (\ty1  -> text "ceq " <+> ilxMkBool)
+	SameMutableByteArrayOp -> ty1_op (\ty1  -> ilxCeq)
                  {- MutByteArr# s -> MutByteArr# s -> Bool -}
-	SizeofMutableByteArrayOp -> ty1_op (\ty1  -> text "ldlen")
+	SizeofMutableByteArrayOp -> ty1_op (\ty1  -> ilxOp "ldlen")
                  {- MutByteArr# s -> Int# -}
 
-	SameMutVarOp -> ty2_op (\ty1 ty2 -> text "ceq " <+> ilxMkBool)
+	SameMutVarOp -> ty2_op (\ty1 ty2 -> ilxCeq)
                  {- MutVar# s a -> MutVar# s a -> Bool -}
-	NewMutVarOp -> ty2_op (\ty1 ty2 -> text "newobj void" <+> repMutVar ty1 ty2 <+> text "::.ctor(!0)")
+	NewMutVarOp -> ty2_op (\ty1 ty2 -> ilxOpSeq [ilxOp "newobj void" , repMutVar ty1 ty2 , ilxOp "::.ctor(!0)"])
                  {- a -> State# s -> (# State# s, MutVar# s a #) -}
-	ReadMutVarOp -> ty2_op (\ty1 ty2 ->  text "ldfld !0" <+> repMutVar ty1 ty2 <+> text "::contents")
+	ReadMutVarOp -> ty2_op (\ty1 ty2 ->  ilxOpSeq [ilxOp "ldfld !0" , repMutVar ty1 ty2 , ilxOp "::contents"])
                  {-  MutVar# s a -> State# s -> (# State# s, a #) -}
-	WriteMutVarOp -> ty2_op (\ty1 ty2 -> text "stfld !0" <+> repMutVar ty1 ty2 <+> text "::contents")
+	WriteMutVarOp -> ty2_op (\ty1 ty2 -> ilxOpSeq [ilxOp "stfld !0" , repMutVar ty1 ty2 , ilxOp "::contents"])
                  {- MutVar# s a -> a -> State# s -> State# s -}
 
-	NewArrayOp -> ty2_op (\ty1 ty2 -> text "call !!0[] " <+> ilxSupportClass <+> text "::newArray<" <> ty1 <> text ">(" <> repInt <> text ", !!0)")
+	NewArrayOp -> ty2_op (\ty1 ty2 -> ilxCallSuppMeth (ilxType "!!0[]") "newArray" [ty1] [repInt,ilxMethA])
                  {- Int# -> a -> State# s -> (# State# s, MutArr# s a #) -}
-	IndexArrayOp -> ty1_op (\ty1 -> text "ldelem.ref")
+	IndexArrayOp -> ty1_op (\ty1 -> ilxOp "ldelem.ref")
                  {- Array# a -> Int# -> (# a #) -}
-	WriteArrayOp -> ty2_op (\ty1 ty2 -> text "stelem.ref")
+	WriteArrayOp -> ty2_op (\ty1 ty2 -> ilxOp "stelem.ref")
                  {- MutArr# s a -> Int# -> a -> State# s -> State# s -}
-	ReadArrayOp -> ty2_op (\ty1 ty2 -> text "ldelem.ref")
+	ReadArrayOp -> ty2_op (\ty1 ty2 -> ilxOp "ldelem.ref")
                  {- MutArr# s a -> Int# -> State# s -> (# State# s, a #) -}
-	UnsafeFreezeArrayOp -> ty2_op (\ty1 ty2 -> text "nop")
+	UnsafeFreezeArrayOp -> ty2_op (\ty1 ty2 -> ilxOp "nop")
                  {-   MutArr# s a -> State# s -> (# State# s, Array# a #) -}
-	UnsafeThawArrayOp -> ty2_op (\ty1 ty2 -> text "nop")
+	UnsafeThawArrayOp -> ty2_op (\ty1 ty2 -> ilxOp "nop")
                  {-  Array# a -> State# s -> (# State# s, MutArr# s a #) -}
 
-	SameMutableArrayOp -> ty2_op (\ty1 ty2 -> text "ceq " <+> ilxMkBool)
+	SameMutableArrayOp -> ty2_op (\ty1 ty2 -> ilxCeq)
                  {- MutArr# s a -> MutArr# s a -> Bool -}
 
 
-	RaiseOp -> ty2_op (\ty1 ty2 -> text "throw")
+	RaiseOp -> ty2_op (\ty1 ty2 -> ilxOp "throw")
 	CatchOp -> ty2_op (\ty1 ty2 -> 
-			text "call" <+> ilxSuppMeth ilxMethA "catch" [ty1,ty2] [text "(func (unit) --> !!0)", text "(func (!!1) --> (func (unit) --> !!0))"])
+		ilxCallSuppMeth ilxMethA "'catch'" [ty1,ty2] [ilxOp "(func ( /* unit skipped */ ) --> !!0)", ilxOp "(func (!!1) --> (func ( /* unit skipped */ ) --> !!0))"])
 	                    {-        (State# RealWorld -> (# State# RealWorld, a #) )
 	                           -> (b -> State# RealWorld -> (# State# RealWorld, a #) ) 
 	                           -> State# RealWorld
@@ -1908,14 +2074,14 @@ ilxPrimOpTable op
 	                     -} 
 
 	BlockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [text "(func (unit) --> !!0)"])
+		ilxCallSuppMeth ilxMethA "blockAsyncExceptions" [ty1] [ilxOp "(func ( /* unit skipped */ ) --> !!0)"])
 
                 {-     (State# RealWorld -> (# State# RealWorld, a #))
                     -> (State# RealWorld -> (# State# RealWorld, a #))
                 -}
 
 	UnblockAsyncExceptionsOp -> ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [text "(func (unit) --> !!0)"])
+		ilxCallSuppMeth ilxMethA "unblockAsyncExceptions" [ty1] [ilxOp "(func ( /* unit skipped */ ) --> !!0)"])
 
                 {-
 		    State# RealWorld -> (# State# RealWorld, a #))
@@ -1923,110 +2089,157 @@ ilxPrimOpTable op
                 -}
  
 	NewMVarOp -> ty2_op (\sty ty -> 
-		text "newobj void " <+> repMVar ty <+> text "::.ctor()")
+		ilxOpSeq [ilxOp "newobj void " , repMVar ty , ilxOp "::.ctor()"])
                  {- State# s -> (# State# s, MVar# s a #) -}
 
 	TakeMVarOp -> ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth ilxMethA "takeMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth ilxMethA "takeMVar" [ty] [repMVar ilxMethA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	-- These aren't yet right
         TryTakeMVarOp -> ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth ilxMethA "tryTakeMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	TryPutMVarOp -> ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth ilxMethA "tryPutMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth repInt "tryPutMVar" [ty] [repMVar ilxMethA,ilxMethA])
                   {-  MVar# s a -> State# s -> (# State# s, a #) -}
 
 	PutMVarOp -> ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth (text "void") "putMVar" [ty] [repMVar ilxMethA, ilxMethA])
+		ilxCallSuppMeth (ilxOp "void") "putMVar" [ty] [repMVar ilxMethA, ilxMethA])
                    {- MVar# s a -> a -> State# s -> State# s -}
 
-	SameMVarOp -> ty2_op (\sty ty -> text "ceq " <+> ilxMkBool)
+	SameMVarOp -> ty2_op (\sty ty -> ilxCeq)
                    {- MVar# s a -> MVar# s a -> Bool -}
 
 --	TakeMaybeMVarOp -> ty2_op (\sty ty -> 
---		text "call" <+> ilxSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA])
+--		(ilxCallSuppMeth (ilxUnboxedPairRep repInt ilxMethA) "tryTakeMVar" [ty] [repMVar ilxMethA]))
 --              {- MVar# s a -> State# s -> (# State# s, Int#, a #) -}
 
 	IsEmptyMVarOp -> ty2_op (\sty ty -> 
-		text "call" <+> ilxSuppMeth repInt "isEmptyMVar" [ty] [repMVar ilxMethA])
+		ilxCallSuppMeth repInt "isEmptyMVar" [ty] [repMVar ilxMethA])
                {- MVar# s a -> State# s -> (# State# s, Int# #) -}
 
+	TouchOp -> warn_op "touch" (ty1_op (\ty1 -> ilxOp "pop /* PrimOp touch */ "))
+
+               {- a -> Int# -}
 	DataToTagOp -> ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth repInt "dataToTag" [ty1] [ilxMethA])
+		ilxCallSuppMeth repInt "dataToTag" [ty1] [ilxMethA])
                {- a -> Int# -}
 
 	TagToEnumOp -> ty1_op (\ty1 -> 
-		text "call" <+> ilxSuppMeth ilxMethA "tagToEnum" [ty1] [repInt])
+		ilxCallSuppMeth ilxMethA "tagToEnum" [ty1] [repInt])
                {- Int# -> a -}
 
-	MakeStablePtrOp -> ty1_op (\ty1 -> text "newobj void class " <+> prelGHCReference <+> text "PrelGHC_StablePtrzh<" <> ty1 <> text ">::.ctor(!0)")
+	MakeStablePtrOp -> ty1_op (\ty1 -> ilxOpSeq [ilxOp "box", ty1, ilxOp "newobj void", repStablePtr {- ty1 -}, ilxOp "::.ctor(class [mscorlib]System.Object)"])
                  {-   a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #) -}
+	MakeStableNameOp -> ty1_op (\ty1 -> ilxOpSeq [ilxOp "pop newobj void", repStableName {- ty1 -}, ilxOp "::.ctor()"])
+                        -- primOpInfo MakeStableNameOp = mkGenPrimOp SLIT("makeStableName#")  [alphaTyVar] [alphaTy, mkStatePrimTy realWorldTy] ((mkTupleTy Unboxed 2 [mkStatePrimTy realWorldTy, mkStableNamePrimTy alphaTy]))
 
-	DeRefStablePtrOp -> ty1_op (\ty1 ->  text "ldfld !0 class " <+> prelGHCReference <+> text "PrelGHC_StablePtrzh<" <> ty1  <> text ">::contents")
+        EqStableNameOp -> ty1_op (\ty1 -> ilxOp "ceq")
+               -- [alphaTyVar] [mkStableNamePrimTy alphaTy, mkStableNamePrimTy alphaTy] (intPrimTy)
+        StableNameToIntOp -> warn_op "StableNameToIntOp" (ty1_op (\ty1 -> ilxOp "pop ldc.i4 0"))
+               -- [alphaTyVar] [mkStableNamePrimTy alphaTy] (intPrimTy)
+
+	DeRefStablePtrOp -> ty1_op (\ty1 -> ilxOpSeq [ilxOp "ldfld class [mscorlib]System.Object", repStablePtr {- ty1 -}, ilxOp "::contents"])
                  {-  StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #) -}
 
-	EqStablePtrOp -> ty1_op (\ty1 -> text "ceq " <+> ilxMkBool)
+	EqStablePtrOp -> ty1_op (\ty1 -> ilxOp "ceq")
                  {-  StablePtr# a -> StablePtr# a -> Int# -}
 
-	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  text "call" <+> ilxMethodRef (repWeak (text "!!1")) (text "class " <+> prelGHCReference <+> text "PrelGHC_Weakzh") "bake" [ty1,ty2,ty3] [text "!!0", text "!!1", text "!!2"])
+	MkWeakOp -> ty3_op (\ty1 ty2 ty3 ->  ilxCall (ilxMethodRef (repWeak ilxMethB) classWeak "bake" [ty1,ty2,ty3] [ilxMethA, ilxMethB, ilxOp "!!2"]))
                  {- o -> b -> c -> State# RealWorld -> (# State# RealWorld, Weak# b #) -}
 
-	DeRefWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "!0")) (repWeak ty1) "deref" [] [])
-	FinalizeWeakOp -> ty1_op (\ty1 ->  text "call" <+> ilxMethodRef (ilxUnboxedPairRep repInt (text "(func (unit) --> class '()')")) (repWeak ty1) "finalizer" [] [])
+	DeRefWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt ilxMethA) classWeak "deref" [ty1] [repWeak ilxMethA]))
+	FinalizeWeakOp -> ty1_op (\ty1 ->  ilxCall (ilxMethodRef (ilxUnboxedPairRep repInt (ilxOp "(func ( /* unit skipped */ ) --> class '()')")) classWeak "finalizer" [ty1] [repWeak ilxMethA]))
                    {-    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, 
 	State# RealWorld -> (# State# RealWorld, Unit #)) #) -}
 
-	MkForeignObjOp -> simp_op (text "nop /* newobj void class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::.ctor(void *) */")
-	WriteForeignObjOp -> simp_op (text "pop /* stfld void * class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::contents */ ")
-             -- (ForeignObjToAddrOp -> simp_op (text "ldfld void * class " <+> prelGHCReference <+> text "PrelGHC_ForeignObjzh::contents"))
-	YieldOp -> simp_op (text "call class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() 
-                                call void class [mscorlib]System.Threading.Thread::Suspend()")
-	MyThreadIdOp -> simp_op (text "call default  class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() ")
-	KillThreadOp -> simp_op (text "call instance void class [mscorlib]System.Threading.Thread::Abort(class [mscorlib]System.Object) ")
+	MkForeignObjOp -> simp_op (ilxOpSeq [ilxOp "newobj void", repForeign, ilxOp "::.ctor(void *)"])
+	WriteForeignObjOp -> ty1_op (\sty -> ilxOpSeq [ilxOp "stfld void *", repForeign, ilxOp "::contents"])
+        ForeignObjToAddrOp -> simp_op ilxForeignToAddrOp
+	YieldOp -> simp_op (ilxOpSeq [ilxOp "call class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() 
+                                call instance void class [mscorlib]System.Threading.Thread::Suspend()"])
+	MyThreadIdOp -> simp_op (ilxOpSeq [ilxOp "call default  class [mscorlib]System.Threading.Thread class [mscorlib]System.Threading.Thread::get_CurrentThread() "])
+	KillThreadOp -> ty1_op (\ty -> ilxOpSeq [ilxOp "box", ty, ilxOp "call instance void class [mscorlib]System.Threading.Thread::Abort(class [mscorlib]System.Object) "])
               {-   ThreadId# -> a -> State# RealWorld -> State# RealWorld -}
 
-	ForkOp -> ty1_op (\ty -> text "call default class [mscorlib]System.Threading.Thread " <+> ilxSupportClass <+> text "::fork<" <> ty <> text ">(thunk<!0>)")
-
-	ParOp ->  warn_op "ParOp" (simp_op (text "/* ParOp skipped... */ pop ldc.i4 0"))
-
-	DelayOp -> simp_op (text "call void class [mscorlib]System.Threading.Thread::Sleep(int32) ")
+	ForkOp -> warn_op "ForkOp" (simp_op (ilxOp "/* ForkOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	ParOp ->  warn_op "ParOp" (simp_op (ilxOp "/* ParOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	DelayOp -> simp_op (ilxOp "call void class [mscorlib]System.Threading.Thread::Sleep(int32) ")
                  {-    Int# -> State# s -> State# s -}
 
-	WaitReadOp  -> warn_op "WaitReadOp" (simp_op (text "/* WaitReadOp skipped... */ pop"))
-   	WaitWriteOp -> warn_op "WaitWriteOp" (simp_op (text " /* WaitWriteOp skipped... */ pop"))
+	WaitReadOp  -> warn_op "WaitReadOp" (simp_op (ilxOp "/* WaitReadOp skipped... */ pop"))
+   	WaitWriteOp -> warn_op "WaitWriteOp" (simp_op (ilxOp " /* WaitWriteOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+        CCallOp _ ->  panic "CCallOp should already be done..."
+	ParAtForNowOp -> warn_op "ParAtForNowOp" (simp_op (ilxOp " /* ParAtForNowOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	ParAtRelOp -> warn_op "ParAtRelOp" (simp_op (ilxOp " /* ParAtRelOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	ParAtAbsOp -> warn_op "ParAtAbsOp" (simp_op (ilxOp " /* ParAtAbsOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	ParAtOp -> warn_op "ParAtOp" (simp_op (ilxOp " /* ParAtOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	ParLocalOp -> warn_op "ParLocalOp" (simp_op (ilxOp " /* ParLocalOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	ParGlobalOp -> warn_op "ParGlobalOp" (simp_op (ilxOp " /* ParGlobalOp skipped... */ newobj void [mscorlib]System.Object::.ctor() throw"))
+	SeqOp -> warn_op "SeqOp" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw "))
+	AddrToHValueOp -> warn_op "AddrToHValueOp" (simp_op (ilxOp "newobj void [mscorlib]System.Object::.ctor() throw"))
+	ReallyUnsafePtrEqualityOp -> simp_op (ilxOp "ceq")
 
-		-- DEFAULT CASE
-	other -> \env args -> ilxComment (simp_op (text "Unknown primop!:" <+> pprId op) env args)
+        MkApUpd0_Op ->  warn_op "MkApUpd0_Op" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw"))
+        NewBCOOp ->  warn_op "NewBCOOp" (simp_op (ilxOp " newobj void [mscorlib]System.Object::.ctor() throw"))
+                  -- ("newBCO#")  [alphaTyVar, deltaTyVar] [byteArrayPrimTy, byteArrayPrimTy, mkArrayPrimTy alphaTy, byteArrayPrimTy, mkStatePrimTy deltaTy] ((mkTupleTy Unboxed 2 [mkStatePrimTy deltaTy, bcoPrimTy]))
 
 
+ty1_op :: (IlxTyFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+ty1_op  op ((StgTypeArg ty1):rest)  = 
+      ilxOpSeq [getArgsStartingAt 1 rest, 
+                op (ilxTypeR2 (deepIlxRepType ty1))]
 
-ty1_op  op env ((StgTypeArg ty1):rest)  = 
-       vcat (ilxMapPlaceArgs 1 pushArg env rest) $$ op (pprIlxTypeR env (deepIlxRepType ty1)) 
---ty1_after1_op  op env (h:(StgTypeArg ty1):rest)  = 
---       vcat (ilxMapPlaceArgs 0 pushArg env [h]) $$  vcat (ilxMapPlaceArgs 2 pushArg env rest) $$ op (pprIlxTypeR env (deepIlxRepType ty1)) 
-ty2_op  op env ((StgTypeArg ty1):(StgTypeArg ty2):rest)  = 
-       vcat (ilxMapPlaceArgs 2 pushArg env rest) $$ op (pprIlxTypeR env (deepIlxRepType ty1)) (pprIlxTypeR env (deepIlxRepType ty2))
+ty2_op :: (IlxTyFrag -> IlxTyFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+ty2_op  op ((StgTypeArg ty1):(StgTypeArg ty2):rest)  = 
+      ilxOpSeq [getArgsStartingAt 2 rest, 
+                op (ilxTypeR2 (deepIlxRepType ty1)) 
+                   (ilxTypeR2 (deepIlxRepType ty2))]
 
-ty3_op  op env ((StgTypeArg ty1):(StgTypeArg ty2):(StgTypeArg ty3):rest)  = 
-       vcat (ilxMapPlaceArgs 2 pushArg env rest) $$ 
-      op (pprIlxTypeR env (deepIlxRepType ty1)) 
-         (pprIlxTypeR env (deepIlxRepType ty2))
-         (pprIlxTypeR env (deepIlxRepType ty3))
+ty3_op :: (IlxTyFrag -> IlxTyFrag -> IlxTyFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+ty3_op  op ((StgTypeArg ty1):(StgTypeArg ty2):(StgTypeArg ty3):rest) = 
+      ilxOpSeq [getArgsStartingAt 3 rest, 
+                op (ilxTypeR2 (deepIlxRepType ty1)) 
+                   (ilxTypeR2 (deepIlxRepType ty2))
+                   (ilxTypeR2 (deepIlxRepType ty3))]
 
-ty1_arg4_op  op env [(StgTypeArg ty1), a1, a2, a3, a4] = 
-       op (pprIlxTypeR env (deepIlxRepType ty1)) 
-          (hd2 (ilxMapPlaceArgs 1 pushArg env [a1]) )
-          (hd2 (ilxMapPlaceArgs 2 pushArg env [a2]) )
-          (hd2 (ilxMapPlaceArgs 3 pushArg env [a3]) )
-          (hd2 (ilxMapPlaceArgs 4 pushArg env [a4]) )
+arg2_op :: (IlxTyFrag -> IlxOpFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+arg2_op  op [a1, a2] = 
+       op (getAsArg 1 a1)
+          (getAsArg 2 a2)
+
+ty1_arg2_op :: (IlxTyFrag -> IlxOpFrag ->  IlxOpFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+ty1_arg2_op  op [(StgTypeArg ty1), a1, a2] = 
+       op (ilxTypeR2 (deepIlxRepType ty1)) 
+          (getAsArg 1 a1)
+          (getAsArg 2 a2)
+
+ty1_arg4_op :: (IlxTyFrag -> IlxOpFrag -> IlxOpFrag -> IlxOpFrag -> IlxOpFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+ty1_arg4_op  op [(StgTypeArg ty1), a1, a2, a3, a4] = 
+       op (ilxTypeR2 (deepIlxRepType ty1)) 
+          (getAsArg 1 a1)
+          (getAsArg 2 a2)
+          (getAsArg 3 a3)
+          (getAsArg 4 a4)
+
+ty2_arg4_op :: (IlxTyFrag -> IlxTyFrag -> IlxOpFrag -> IlxOpFrag -> IlxOpFrag -> IlxOpFrag -> IlxOpFrag) -> [StgArg] ->  IlxOpFrag 
+ty2_arg4_op  op [(StgTypeArg ty1), (StgTypeArg ty2),a1, a2, a3, a4] = 
+       op (ilxTypeR2 (deepIlxRepType ty1)) 
+          (ilxTypeR2 (deepIlxRepType ty2)) 
+          (getAsArg 2 a1)
+          (getAsArg 3 a2)
+          (getAsArg 4 a3)
+          (getAsArg 5 a4)
 
 hd (h:t) = h
-hd2 (h:t) = h
 
-simp_op  op env args    = vcat (ilxMapPlaceArgs 0 pushArg env args) $$ op
+getAsArg n a env = hd (ilxMapPlaceArgs n pushArg env [a])
+getArgsStartingAt n a env = vcat (ilxMapPlaceArgs n pushArg env a)
+
+simp_op :: IlxOpFrag -> [StgArg] -> IlxOpFrag
+simp_op  op args env    = vcat (ilxMapPlaceArgs 0 pushArg env args) $$ op env
 warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ warning) (f args)
 \end{code}
 
@@ -2038,18 +2251,19 @@ warn_op  warning f args = trace ("WARNING! IlxGen cannot translate primop " ++ w
 
 \begin{code}
 
--- We eliminate voids in and around an IL C Call.  We don't yet emit PInvoke stubs.
+-- Call the P/Invoke stub wrapper generated in the import section.
+-- We eliminate voids in and around an IL C Call.  
 -- We also do some type-directed translation for pinning Haskell-managed blobs
 -- of data as we throw them across the boundary.
 ilxCCall env (CCall (StaticTarget c) casm gc cconv) args ret_ty =
    ilxComment (text "C call <+> pprCLabelString c") <+> 
 	vcat [vcat (ilxMapPlaceArgs 0 pushCArg env args),
-              text "call" <+> retdoc <+> text "class " <+> prelGHCReference <+> text "PrelGHC::" <+> pprCLabelString c  <+> pprTypeArgs pprIlxTypeR env ty_args
-                    <+> pprCValArgTys pprIlxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
+              text "call" <+> retdoc <+> pprCLabelString c  <+> pprTypeArgs ilxTypeR env ty_args
+                    <+> pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) (map stgArgType tm_args))) ]
   where 
     retdoc = 
           if isVoidIlxRepType ret_ty then text "void" 
-          else pprIlxTypeR env (deepIlxRepType ret_ty)
+          else ilxTypeR env (deepIlxRepType ret_ty)
     (ty_args,tm_args) = splitTyArgs1 args 
 
 
@@ -2062,7 +2276,7 @@ pinCCallArg v = isByteArrayCArg v
 
 ilxAddrOfPinnedByteArr = text "ldc.i4 0 ldelema unsigned int8"
 
-pushCArg env arg@(StgVarArg v) | isByteArrayCArg v = pushArg env arg <+> text "dup stloc" <+> squotes (ilxEnvQualifyByExact env (ppr v) <> text "pin") <+> ilxAddrOfPinnedByteArr
+pushCArg env arg@(StgVarArg v) | isByteArrayCArg v = pushArg env arg <+> text "dup stloc" <+> singleQuotes (ilxEnvQualifyByExact env (ppr v) <> text "pin") <+> ilxAddrOfPinnedByteArr
 pushCArg env arg | otherwise = pushArg env arg
 
 pprCValArgTys f env tys = parens (pprSepWithCommas (pprCValArgTy f env) tys)
