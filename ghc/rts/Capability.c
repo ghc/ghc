@@ -137,7 +137,9 @@ static Capability *returning_capabilities;
  */ 
 void grabCapability(Capability** cap)
 {
+#ifdef RTS_SUPPORTS_THREADS
   ASSERT(rts_n_free_capabilities > 0);
+#endif
 #if !defined(SMP)
   rts_n_free_capabilities = 0;
   *cap = &MainCapability;
