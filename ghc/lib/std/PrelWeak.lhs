@@ -26,6 +26,11 @@ mkWeak key val finaliser = IO $ \s ->
    case mkWeak# key val finaliser s of { (# s1, w #) ->
    (# s1, Weak w #) }
 
+mkWeakNoFinaliser key val = IO $ \s ->
+   -- zero is a valid finaliser argument to mkWeak#, and means "no finaliser"
+   case mkWeak# key val (unsafeCoerce# 0#) s of { (# s1, w #) ->
+   (# s1, Weak w #) }
+
 deRefWeak :: Weak v -> IO (Maybe v)
 deRefWeak (Weak w) = IO $ \s ->
    case deRefWeak# w s of

@@ -15,6 +15,7 @@ module Weak (
 	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
 	-- finalise		-- :: Weak v -> IO ()
 	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
+	mkWeakNoFinaliser,	-- :: k -> v -> IO (Weak v)
 
 	mkWeakPtr, 		-- :: k -> IO () -> IO (Weak k)
 	mkWeakPair, 		-- :: k -> v -> IO () -> IO (Weak (k,v))

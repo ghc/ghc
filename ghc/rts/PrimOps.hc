@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.9 1999/01/27 14:51:20 simonpj Exp $
+ * $Id: PrimOps.hc,v 1.10 1999/02/01 18:05:34 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -313,7 +313,11 @@ FN_(mkWeakzh_fast)
 
   w->key        = R1.cl;
   w->value      = R2.cl;
-  w->finaliser  = R3.cl;
+  if (R3.cl) {
+     w->finaliser  = R3.cl;
+  } else
+     w->finaliser  = &NO_FINALISER_closure;
+  }
 
   w->link       = weak_ptr_list;
   weak_ptr_list = w;
@@ -324,20 +328,27 @@ FN_(mkWeakzh_fast)
   FE_
 }
 
-FN_(deRefWeakzh_fast)
+FN_(finaliseWeakzh_fast)
 {
   /* R1.p = weak ptr
    */
   StgWeak *w;
   FB_
-  
-  TICK_RET_UNBOXED_TUP(2);
+  TICK_RET_UNBOXED_TUP(0);
   w = (StgWeak *)R1.p;
-  if (w->header.info == &WEAK_info) {
-	RET_NP(1, w->value);
-  } else {
-	RET_NP(0, w);
+
+  if (w->finaliser != &NO_FINALISER_info) {
+#ifdef INTERPRETER
+      STGCALL2(StgTSO *, createGenThread,
+		RtsFlags.GcFlags.initialStkSize, w->finaliser);
+#else
+      STGCALL2(StgTSO *, createIOThread,
+		RtsFlags.GcFlags.initialStkSize, w->finaliser);
+#endif
   }
+  w->header.info = &DEAD_WEAK_info;
+
+  JMP_(ENTRY_CODE(Sp[0]));
   FE_
 }
 

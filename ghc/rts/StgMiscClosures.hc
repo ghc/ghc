@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.9 1999/01/27 14:51:22 simonpj Exp $
+ * $Id: StgMiscClosures.hc,v 1.10 1999/02/01 18:05:34 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -238,6 +238,19 @@ NON_ENTERABLE_ENTRY_CODE(WEAK);
 
 INFO_TABLE_CONSTR(DEAD_WEAK_info,DEAD_WEAK_entry,0,1,0,CONSTR,const,EF_,0,0);
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
+
+/* -----------------------------------------------------------------------------
+   NO_FINALISER
+
+   This is a static nullary constructor (like []) that we use to mark an empty
+   finaliser in a weak pointer object.
+   -------------------------------------------------------------------------- */
+
+INFO_TABLE_CONSTR(NO_FINALISER_info,NO_FINALISER_entry,0,0,0,CONSTR_NOCAF_STATIC,const,EF_,0,0);
+NON_ENTERABLE_ENTRY_CODE(NO_FINALISER);
+
+SET_STATIC_HDR(NO_FINALISER_closure,NO_FINALISER_info,0/*CC*/,,EI_)
+};
 
 /* -----------------------------------------------------------------------------
    Foreign Objects are unlifted and therefore never entered.
