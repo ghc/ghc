@@ -146,63 +146,32 @@ import List (nub,sort)
 import qualified List
 -}  
 
-#ifdef __GLASGOW_HASKELL__
-{--------------------------------------------------------------------
-  GHC: use unboxing to get @shiftRL@ inlined.
---------------------------------------------------------------------}
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.Word
 import GHC.Exts ( Word(..), Int(..), shiftRL# )
-#else
+#elif __GLASGOW_HASKELL__
 import Word
 import GlaExts ( Word(..), Int(..), shiftRL# )
+#else
+import Data.Word
 #endif
 
 infixl 9 \\{-This comment teaches CPP correct behaviour -}
 
-type Nat = Word
-
-natFromInt :: Key -> Nat
-natFromInt i = fromIntegral i
-
-intFromNat :: Nat -> Key
-intFromNat w = fromIntegral w
-
-shiftRL :: Nat -> Key -> Nat
-shiftRL (W# x) (I# i)
-  = W# (shiftRL# x i)
-
-#elif __HUGS__
+#if __HUGS__
 {--------------------------------------------------------------------
- Hugs: 
- * raises errors on boundary values when using 'fromIntegral'
-   but not with the deprecated 'fromInt/toInt'. 
- * Older Hugs doesn't define 'Word'.
- * Newer Hugs defines 'Word' in the Prelude but no operations.
+  Hugs:
+  * Older Hugs doesn't define 'Word'.
+  * Newer Hugs defines 'Word' in the Prelude but no operations.
 --------------------------------------------------------------------}
-import Data.Word
-infixl 9 \\
-
 type Nat = Word32   -- illegal on 64-bit platforms!
-
-natFromInt :: Key -> Nat
-natFromInt i = fromInt i
-
-intFromNat :: Nat -> Key
-intFromNat w = toInt w
-
-shiftRL :: Nat -> Key -> Nat
-shiftRL x i   = shiftR x i
-
 #else
 {--------------------------------------------------------------------
   'Standard' Haskell
   * A "Nat" is a natural machine word (an unsigned Int)
 --------------------------------------------------------------------}
-import Data.Word
-infixl 9 \\
-
 type Nat = Word
+#endif
 
 natFromInt :: Key -> Nat
 natFromInt i = fromIntegral i
@@ -211,10 +180,15 @@ intFromNat :: Nat -> Key
 intFromNat w = fromIntegral w
 
 shiftRL :: Nat -> Key -> Nat
-shiftRL w i   = shiftR w i
-
+#if __GLASGOW_HASKELL__
+{--------------------------------------------------------------------
+  GHC: use unboxing to get @shiftRL@ inlined.
+--------------------------------------------------------------------}
+shiftRL (W# x) (I# i)
+  = W# (shiftRL# x i)
+#else
+shiftRL x i   = shiftR x i
 #endif
-
 
 {--------------------------------------------------------------------
   Operators
