@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.11 1999/11/11 17:24:49 sewardj Exp $
+ * $Id: Schedule.h,v 1.12 2000/01/12 15:15:18 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -61,6 +61,7 @@ void awaitEvent(rtsBool wait);  /* In Select.c */
  * Locks required  : sched_mutex
  */
 extern nat context_switch;
+extern rtsBool interrupted;
 
 extern  nat ticks_since_select;
 

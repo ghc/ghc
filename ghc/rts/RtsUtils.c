@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.10 1999/11/09 10:46:26 simonmar Exp $
+ * $Id: RtsUtils.c,v 1.11 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -41,6 +41,18 @@ void barf(char *s, ...)
   fprintf(stderr, "\n");
   fflush(stderr);
   stg_exit(EXIT_FAILURE);
+}
+
+void prog_belch(char *s, ...)
+{
+  va_list ap;
+  va_start(ap,s);
+  /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+  if (prog_argv != NULL && prog_argv[0] != NULL) {
+    fprintf(stderr, "%s: ", prog_argv[0]);
+  } 
+  vfprintf(stderr, s, ap);
+  fprintf(stderr, "\n");
 }
 
 void belch(char *s, ...)

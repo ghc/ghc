@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.h,v 1.18 1999/11/29 12:02:45 keithw Exp $
+ * $Id: RtsFlags.h,v 1.19 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -120,25 +120,28 @@ struct PROFILING_FLAGS {
 #endif /* DEBUG || PROFILING */
 
 struct CONCURRENT_FLAGS {
-  int	  ctxtSwitchTime; /* in milliseconds */
-#ifdef SMP
-  nat     nNodes;         /* number of threads to run simultaneously */
-#endif
+  int ctxtSwitchTime; /* in milliseconds */
 };
 
 #ifdef PAR
 struct PAR_FLAGS {
-    rtsBool parallelStats; 	/* Gather parallel statistics */
-    rtsBool granSimStats;	/* Full .gr profile (rtsTrue) or only END events? */
-    rtsBool granSimStats_Binary;
-
-    rtsBool outputDisabled;	/* Disable output for performance purposes */
-    
-    unsigned int	    packBufferSize;
-    unsigned int	    maxLocalSparks;
+  rtsBool parallelStats; 	/* Gather parallel statistics */
+  rtsBool granSimStats;	   /* Full .gr profile (rtsTrue) or only END events? */
+  rtsBool granSimStats_Binary;
+  
+  rtsBool outputDisabled;	/* Disable output for performance purposes */
+  
+  unsigned int packBufferSize;
+  unsigned int maxLocalSparks;
 };
-
 #endif /* PAR */
+
+#ifdef SMP
+struct PAR_FLAGS {
+  nat            nNodes;         /* number of threads to run simultaneously */
+  unsigned int	 maxLocalSparks;
+};
+#endif
 
 #ifdef GRAN
 struct GRAN_FLAGS {
@@ -243,7 +246,7 @@ struct RTS_FLAGS {
 #if defined(PROFILING) || defined(DEBUG)
     struct PROFILING_FLAGS ProfFlags;
 #endif
-#ifdef PAR
+#if defined(SMP) || defined(PAR)
     struct PAR_FLAGS	ParFlags;
 #endif
 #ifdef GRAN

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.21 1999/11/29 12:02:44 keithw Exp $
+ * $Id: RtsFlags.c,v 1.22 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -103,19 +103,22 @@ void initRtsFlagsDefaults(void)
 #endif
 
     RtsFlags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
+
 #ifdef SMP
-    RtsFlags.ConcFlags.nNodes	= 1;
+    RtsFlags.ParFlags.nNodes	        = 1;
 #endif
+
 #ifdef PAR
     RtsFlags.ParFlags.parallelStats	= rtsFalse;
     RtsFlags.ParFlags.granSimStats	= rtsFalse;
     RtsFlags.ParFlags.granSimStats_Binary = rtsFalse;
-
     RtsFlags.ParFlags.outputDisabled	= rtsFalse;
-
     RtsFlags.ParFlags.packBufferSize	= 1024;
+#endif
+
+#if defined(PAR) || defined(SMP)
     RtsFlags.ParFlags.maxLocalSparks	= 4096;
-#endif /* PAR */
+#endif
 
 #ifdef GRAN
     RtsFlags.GranFlags.granSimStats	= rtsFalse;
@@ -281,6 +284,9 @@ usage_text[] = {
 "  -qb       Enable binary activity profile (output file /tmp/<program>.gb)",
 "  -Q<size>  Set pack-buffer size (default: 1024)",
 # endif
+# if defined(SMP) || defined(PAR)
+"  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
+#endif
 # ifdef PAR
 "  -d        Turn on PVM-ish debugging",
 "  -O        Disable output for performance measurement",
@@ -354,8 +360,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     for (arg = 0; arg < *rts_argc; arg++) {
 	if (rts_argv[arg][0] != '-') {
 	    fflush(stdout);
-	    fprintf(stderr, "setupRtsFlags: Unexpected RTS argument: %s\n",
-		    rts_argv[arg]);
+	    prog_belch("unexpected RTS argument: %s", rts_argv[arg]);
 	    error = rtsTrue;
 
         } else {
@@ -373,7 +378,7 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
 # define TICKY_BUILD_ONLY(x) x
 #else
 # define TICKY_BUILD_ONLY(x) \
-fprintf(stderr, "setupRtsFlags: GHC not built for: ticky-ticky stats\n"); \
+prog_belch("GHC not built for: ticky-ticky stats"); \
 error = rtsTrue;
 #endif
 
@@ -381,7 +386,7 @@ error = rtsTrue;
 # define COST_CENTRE_USING_BUILD_ONLY(x) x
 #else
 # define COST_CENTRE_USING_BUILD_ONLY(x) \
-fprintf(stderr, "setupRtsFlags: GHC not built for: -prof or -parallel\n"); \
+prog_belch("GHC not built for: -prof or -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -389,7 +394,15 @@ error = rtsTrue;
 # define PROFILING_BUILD_ONLY(x)   x
 #else
 # define PROFILING_BUILD_ONLY(x) \
-fprintf(stderr, "setupRtsFlags: GHC not built for: -prof\n"); \
+prog_belch("GHC not built for: -prof"); \
+error = rtsTrue;
+#endif
+
+#ifdef SMP
+# define SMP_BUILD_ONLY(x)      x
+#else
+# define SMP_BUILD_ONLY(x) \
+prog_belch("GHC not built for: -parallel"); \
 error = rtsTrue;
 #endif
 
@@ -397,7 +410,15 @@ error = rtsTrue;
 # define PAR_BUILD_ONLY(x)      x
 #else
 # define PAR_BUILD_ONLY(x) \
-fprintf(stderr, "setupRtsFlags: GHC not built for: -parallel\n"); \
+prog_belch("GHC not built for: -parallel"); \
+error = rtsTrue;
+#endif
+
+#if defined(SMP) || defined(PAR)
+# define PAR_OR_SMP_BUILD_ONLY(x)      x
+#else
+# define PAR_OR_SMP_BUILD_ONLY(x) \
+prog_belch("GHC not built for: -parallel or -smp"); \
 error = rtsTrue;
 #endif
 
@@ -405,7 +426,7 @@ error = rtsTrue;
 # define GRAN_BUILD_ONLY(x)     x
 #else
 # define GRAN_BUILD_ONLY(x) \
-fprintf(stderr, "setupRtsFlags: GHC not built for: -gransim\n"); \
+prog_belch("GHC not built for: -gransim"); \
 error = rtsTrue;
 #endif
 
@@ -580,8 +601,7 @@ error = rtsTrue;
 		    RtsFlags.ProfFlags.doHeapProfile = HEAP_BY_CLOSURE_TYPE;
 		    break;
 		  default:
-		    fprintf(stderr, "Invalid heap profile option: %s\n",
-			    rts_argv[arg]);
+		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
 #else
@@ -620,8 +640,7 @@ error = rtsTrue;
 		    }
 		    break;
 		  default:
-		    fprintf(stderr, "Invalid heap profile option: %s\n",
-			    rts_argv[arg]);
+		    prog_belch("invalid heap profile option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		}
 		) 
@@ -634,41 +653,43 @@ error = rtsTrue;
 		  case CCchar:
 		    max_cc_no = (hash_t) decode(rts_argv[arg]+3);
 		    if (max_cc_no == 0) {
-			fprintf(stderr, "Bad number of cost centres %s\n", rts_argv[arg]);
-			error = rtsTrue;
+		      prog_belch("bad number of cost centres %s", rts_argv[arg]);
+		      error = rtsTrue;
 		    }
 		    break;
 		  case MODchar:
 		    max_mod_no = (hash_t) decode(rts_argv[arg]+3);
 		    if (max_mod_no == 0) {
-			fprintf(stderr, "Bad number of modules %s\n", rts_argv[arg]);
-			error = rtsTrue;
+		      prog_belch("bad number of modules %s", rts_argv[arg]);
+		      error = rtsTrue;
 		    }
 		    break;
 		  case GRPchar:
 		    max_grp_no = (hash_t) decode(rts_argv[arg]+3);
 		    if (max_grp_no == 0) {
-			fprintf(stderr, "Bad number of groups %s\n", rts_argv[arg]);
-			error = rtsTrue;
+		      prog_belch("bad number of groups %s", rts_argv[arg]);
+		      error = rtsTrue;
 		    }
 		    break;
 		  case DESCRchar:
 		    max_descr_no = (hash_t) decode(rts_argv[arg]+3);
 		    if (max_descr_no == 0) {
-			fprintf(stderr, "Bad number of closure descriptions %s\n", rts_argv[arg]);
+			prog_belch("bad number of closure descriptions %s", 
+				   rts_argv[arg]);
 			error = rtsTrue;
 		    }
 		    break;
 		  case TYPEchar:
 		    max_type_no = (hash_t) decode(rts_argv[arg]+3);
 		    if (max_type_no == 0) {
-			fprintf(stderr, "Bad number of type descriptions %s\n", rts_argv[arg]);
+			prog_belch("bad number of type descriptions %s", 
+				   rts_argv[arg]);
 			error = rtsTrue;
 		    }
 		    break;
 		  default:
-		    fprintf(stderr, "Invalid index table size option: %s\n",
-			    rts_argv[arg]);
+		    prog_belch("invalid index table size option: %s",
+			       rts_argv[arg]);
 		    error = rtsTrue;
 		}
 		) break;
@@ -684,8 +705,9 @@ error = rtsTrue;
 		if (! left || ! right ||
 		        strrchr(rts_argv[arg], '{') != left ||
 		         strchr(rts_argv[arg], '}') != right) {
-		    fprintf(stderr, "Invalid heap profiling selection bracketing\n   %s\n", rts_argv[arg]);
-		    error = rtsTrue;
+		  prog_belch("invalid heap profiling selection bracketing: %s",
+			     rts_argv[arg]);
+		  error = rtsTrue;
 		} else {
 		    *right = '\0';
 		    switch (rts_argv[arg][1]) {
@@ -730,27 +752,26 @@ error = rtsTrue;
 
 #ifdef SMP
 	      case 'N':
+		SMP_BUILD_ONLY(
 		if (rts_argv[arg][2] != '\0') {
-		    RtsFlags.ConcFlags.nNodes
+		    RtsFlags.ParFlags.nNodes
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-		    if (RtsFlags.ConcFlags.nNodes <= 0) {
-			fprintf(stderr, "setupRtsFlags: bad value for -N\n");
-			error = rtsTrue;
+		    if (RtsFlags.ParFlags.nNodes <= 0) {
+		      prog_belch("bad value for -N");
+		      error = rtsTrue;
 		    }
 		}
-		break;
+		) break;
 #endif
 	      /* =========== PARALLEL =========================== */
 	      case 'e':
-		PAR_BUILD_ONLY(
-		if (rts_argv[arg][2] != '\0') { /* otherwise, stick w/ the default */
-
+		PAR_OR_SMP_BUILD_ONLY(
+		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.maxLocalSparks
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
-
 		    if (RtsFlags.ParFlags.maxLocalSparks <= 0) {
-			fprintf(stderr, "setupRtsFlags: bad value for -e\n");
-			error = rtsTrue;
+		      prog_belch("bad value for -e");
+		      error = rtsTrue;
 		    }
 		}
 		) break;
@@ -783,8 +804,8 @@ error = rtsTrue;
 		if (rts_argv[arg][2] != '\0') {
 		    RtsFlags.ParFlags.packBufferSize = decode(rts_argv[arg]+2);
 		} else {
-    	    	    fprintf(stderr, "setupRtsFlags: missing size of PackBuffer (for -Q)\n");
-    	    	    error = rtsTrue;
+		  prog_belch("missing size of PackBuffer (for -Q)");
+		  error = rtsTrue;
     	    	}
 		) break;
 
@@ -813,7 +834,7 @@ error = rtsTrue;
               case 'x': /* Extend the argument space */
                 switch(rts_argv[arg][2]) {
                   case '\0':
-		    fprintf(stderr, "setupRtsFlags: Incomplete RTS option: %s\n",rts_argv[arg]);
+		    prog_belch("incomplete RTS option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		    break;
 
@@ -825,7 +846,7 @@ error = rtsTrue;
                   /* The option prefix '-xx' is reserved for future extension.  KSW 1999-11. */
 
 	          default:
-		    fprintf(stderr, "setupRtsFlags: Unknown RTS option: %s\n",rts_argv[arg]);
+		    prog_belch("unknown RTS option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		    break;
                 }
@@ -833,7 +854,7 @@ error = rtsTrue;
 
 	      /* =========== OH DEAR ============================ */
 	      default:
-		fprintf(stderr, "setupRtsFlags: Unknown RTS option: %s\n",rts_argv[arg]);
+		prog_belch("unknown RTS option: %s",rts_argv[arg]);
 		error = rtsTrue;
 		break;
 	    }
@@ -844,10 +865,9 @@ error = rtsTrue;
 
         fflush(stdout);
 	for (p = usage_text; *p; p++)
-	    fprintf(stderr, "%s\n", *p);
+	    belch("%s", *p);
 	stg_exit(EXIT_FAILURE);
     }
-
 }
 
 static FILE *		/* return NULL on error */

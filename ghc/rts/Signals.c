@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Signals.c,v 1.10 1999/11/09 15:46:57 simonmar Exp $
+ * $Id: Signals.c,v 1.11 2000/01/12 15:15:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -218,10 +218,6 @@ start_signal_handlers(void)
 
     next_pending_handler--;
 
-    /* create*Thread  puts the thread on the head of the runnable
-     * queue, hence it will be run next.  Poor man's priority
-     * scheduling.
-     */
     createIOThread(RtsFlags.GcFlags.initialStkSize, 
 		   (StgClosure *) *next_pending_handler);
   }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.42 2000/01/07 10:27:33 sewardj Exp $
+ * $Id: PrimOps.h,v 1.43 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -733,6 +733,19 @@ EF_(unblockAsyncExceptionszh_fast);
 #define myThreadIdzh(t) (t = CurrentTSO)
 
 extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
+
+#if defined(SMP) || defined(PAR)
+#define parzh(r,node)					\
+{							\
+  if (closure_SHOULD_SPARK((StgClosure *)node) &&	\
+      SparkTl < SparkLim) {				\
+    *SparkTl++ = (StgClosure *)(node);			\
+  }							\
+  r = 1;						\
+}
+#else
+#define parzh(r,node) r = 1
+#endif
 
 /* Hmm, I'll think about these later. */
 /* -----------------------------------------------------------------------------

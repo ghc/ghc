@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.5 1999/11/24 16:39:33 simonmar Exp $
+ * $Id: Select.c,v 1.6 2000/01/12 15:15:18 simonmar Exp $
  *
  * (c) The GHC Team 1995-1999
  *
@@ -98,7 +98,7 @@ awaitEvent(rtsBool wait)
 
       case BlockedOnDelay:
 	{
-	  if ((int)tso->block_info.delay < min)
+	  if (tso->block_info.delay < min)
 	    min = tso->block_info.delay;
 	  continue;
 	}
@@ -131,13 +131,16 @@ awaitEvent(rtsBool wait)
     gettimeofday(&tv_before, (struct timezone *) NULL);
 #endif
 
-    while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
+    while (!interrupted &&
+	   (numFound = select(maxfd+1, &rfd, &wfd, NULL, &tv)) < 0) {
       if (errno != EINTR) {
 	/* fflush(stdout); */
+	perror("select");
 	fprintf(stderr, "awaitEvent: select failed\n");
 	stg_exit(EXIT_FAILURE);
       }
       ACQUIRE_LOCK(&sched_mutex);
+
       /* We got a signal; could be one of ours.  If so, we need
        * to start up the signal handler straight away, otherwise
        * we could block for a long time before the signal is
@@ -145,38 +148,36 @@ awaitEvent(rtsBool wait)
        */
       if (signals_pending()) {
 	start_signal_handlers();
-	return;
+	RELEASE_LOCK(&sched_mutex);
+	break;
       }
 
       /* If new runnable threads have arrived, stop waiting for
        * I/O and run them.
        */
       if (run_queue_hd != END_TSO_QUEUE) {
-	return;
+	RELEASE_LOCK(&sched_mutex);
+	break;
       }
+
       RELEASE_LOCK(&sched_mutex);
     }	
 
-    if (numFound != 0) { 
-      /* 
-	File descriptors ready, but we don't know how much time was spent
-	in the select(). To interpolate, we compare the time before
-	and after the select(). 
-      */
-
 #ifdef linux_TARGET_OS
-      /* on Linux, tv is set to indicate the amount of time not
-       * slept, so we don't need to gettimeofday() to find out.
-       */
-      delta += min - (tv.tv_sec * 1000000 + tv.tv_usec);
+    /* on Linux, tv is set to indicate the amount of time not
+     * slept, so we don't need to gettimeofday() to find out.
+     */
+    delta += min - (tv.tv_sec * 1000000 + tv.tv_usec);
 #else
-      gettimeofday(&tv_after, (struct timezone *) NULL);
-      delta += (tv_after.tv_sec - tv_before.tv_sec) * 1000000 +
-	        tv_after.tv_usec - tv_before.tv_usec;
+    gettimeofday(&tv_after, (struct timezone *) NULL);
+    delta += (tv_after.tv_sec - tv_before.tv_sec) * 1000000 +
+      tv_after.tv_usec - tv_before.tv_usec;
 #endif
-    } else {
-      delta += min;
-    }
+
+#if 0
+    if (delta != 0) { fprintf(stderr,"waited: %d %d %d\n", min, delta,
+			      interrupted); }
+#endif
 
     ACQUIRE_LOCK(&sched_mutex);
 

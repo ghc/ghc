@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.9 1999/11/09 15:47:08 simonmar Exp $
+ * $Id: Rts.h,v 1.10 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -47,10 +47,22 @@ typedef enum {
    Assertions and Debuggery
    -------------------------------------------------------------------------- */
 
-#ifndef DEBUG
-#define IF_DEBUG(c,s)  doNothing()
-#else
+#ifdef DEBUG
 #define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; }
+#else
+#define IF_DEBUG(c,s)  doNothing()
+#endif
+
+#if defined(GRAN) && defined(DEBUG)
+#define IF_GRAN_DEBUG(c,s)  if (RtsFlags.GranFlags.Debug.c) { s; }
+#else
+#define IF_GRAN_DEBUG(c,s)  doNothing()
+#endif
+
+#if defined(PAR) && defined(DEBUG)
+#define IF_PAR_DEBUG(c,s)  if (RtsFlags.ParFlags.Debug.c) { s; }
+#else
+#define IF_PAR_DEBUG(c,s)  doNothing()
 #endif
 
 /* -----------------------------------------------------------------------------

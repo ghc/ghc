@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.21 1999/11/09 15:46:59 simonmar Exp $
+ * $Id: Storage.c,v 1.22 2000/01/12 15:15:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -270,7 +270,7 @@ resetNurseries( void )
   Capability *cap;
   
   /* All tasks must be stopped */
-  ASSERT(n_free_capabilities == RtsFlags.ConcFlags.nNodes);
+  ASSERT(n_free_capabilities == RtsFlags.ParFlags.nNodes);
 
   for (cap = free_capabilities; cap != NULL; cap = cap->link) {
     for (bd = cap->rNursery; bd; bd = bd->link) {
@@ -491,7 +491,7 @@ calcAllocated( void )
      capabilities are owned by the scheduler, though: one or more
      tasks might have been stopped while they were running (non-main)
      threads. */
-  /*  ASSERT(n_free_capabilities == RtsFlags.ConcFlags.nNodes); */
+  /*  ASSERT(n_free_capabilities == RtsFlags.ParFlags.nNodes); */
 
   allocated = 
     n_free_capabilities * RtsFlags.GcFlags.minAllocAreaSize * BLOCK_SIZE_W

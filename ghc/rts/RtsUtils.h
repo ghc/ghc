@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.5 1999/11/09 10:46:25 simonmar Exp $
+ * $Id: RtsUtils.h,v 1.6 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,7 @@ extern void *stgReallocBytes(void *p, int n, char *msg);
 extern void *stgReallocWords(void *p, int n, char *msg);
 extern void barf(char *s, ...) __attribute__((__noreturn__)) ;
 extern void belch(char *s, ...);
+extern void prog_belch(char *s, ...);
 
 extern void _stgAssert (char *filename, unsigned int linenum);
 

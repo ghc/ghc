@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.7 1999/11/09 15:57:39 simonmar Exp $
+ * $Id: Regs.h,v 1.8 2000/01/12 15:15:17 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -24,6 +24,13 @@
  *        register, probably because there's a shortage of real registers.
  *     2) caller-saves registers are saved across a CCall
  */
+
+typedef struct StgSparkPool_ {
+  StgClosure **base;
+  StgClosure **lim;
+  StgClosure **hd;
+  StgClosure **tl;
+} StgSparkPool;
 
 typedef struct StgRegTable_ {
   StgUnion 	  rR1;
@@ -51,8 +58,11 @@ typedef struct StgRegTable_ {
   StgTSO         *rCurrentTSO;
   struct _bdescr *rNursery;
   struct _bdescr *rCurrentNursery;
-#ifdef SMP
-  struct StgRegTable_ *link;
+#if defined(SMP) || defined(PAR)
+  StgSparkPool   rSparks;	/* per-task spark pool */
+#endif
+#if defined(SMP)
+  struct StgRegTable_ *link;	/* per-task register tables are linked together */
 #endif
 } StgRegTable;
 
@@ -103,6 +113,12 @@ extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
 
 #define SAVE_CurrentTSO     (BaseReg->rCurrentTSO)
 #define SAVE_CurrentNursery (BaseReg->rCurrentNursery)
+#if defined(SMP) || defined(PAR)
+#define SAVE_SparkHd 	    (BaseReg->rSparks.hd)
+#define SAVE_SparkTl        (BaseReg->rSparks.tl)
+#define SAVE_SparkBase      (BaseReg->rSparks.base)
+#define SAVE_SparkLim 	    (BaseReg->rSparks.lim)
+#endif
 
 /* We sometimes need to save registers across a C-call, eg. if they
  * are clobbered in the standard calling convention.  We define the
@@ -302,6 +318,30 @@ GLOBAL_REG_DECL(StgTSO *,CurrentTSO,REG_CurrentTSO)
 GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
 #else
 #define CurrentNursery (BaseReg->rCurrentNursery)
+#endif
+
+#ifdef REG_SparkHd
+GLOBAL_REG_DECL(bdescr *,SparkHd,REG_SparkHd)
+#else
+#define SparkHd (BaseReg->rSparks.hd)
+#endif
+
+#ifdef REG_SparkTl
+GLOBAL_REG_DECL(bdescr *,SparkTl,REG_SparkTl)
+#else
+#define SparkTl (BaseReg->rSparks.tl)
+#endif
+
+#ifdef REG_SparkBase
+GLOBAL_REG_DECL(bdescr *,SparkBase,REG_SparkBase)
+#else
+#define SparkBase (BaseReg->rSparks.base)
+#endif
+
+#ifdef REG_SparkLim
+GLOBAL_REG_DECL(bdescr *,SparkLim,REG_SparkLim)
+#else
+#define SparkLim (BaseReg->rSparks.lim)
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -513,6 +553,38 @@ GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
 #define CALLER_RESTORE_CurrentNursery   /* nothing */
 #endif
 
+#ifdef CALLER_SAVES_SparkHd
+#define CALLER_SAVE_SparkHd   		SAVE_SparkHd = SparkHd;
+#define CALLER_RESTORE_SparkHd		SparkHd = SAVE_SparkHd;
+#else
+#define CALLER_SAVE_SparkHd   		/* nothing */
+#define CALLER_RESTORE_SparkHd   	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SparkTl
+#define CALLER_SAVE_SparkTl   		SAVE_SparkTl = SparkTl;
+#define CALLER_RESTORE_SparkTl		SparkTl = SAVE_SparkTl;
+#else
+#define CALLER_SAVE_SparkTl   		/* nothing */
+#define CALLER_RESTORE_SparkTl   	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SparkBase
+#define CALLER_SAVE_SparkBase   	SAVE_SparkBase = SparkBase;
+#define CALLER_RESTORE_SparkBase	SparkBase = SAVE_SparkBase;
+#else
+#define CALLER_SAVE_SparkBase   	/* nothing */
+#define CALLER_RESTORE_SparkBase   	/* nothing */
+#endif
+
+#ifdef CALLER_SAVES_SparkLim
+#define CALLER_SAVE_SparkLim   		SAVE_SparkLim = SparkLim;
+#define CALLER_RESTORE_SparkLim		SparkLim = SAVE_SparkLim;
+#else
+#define CALLER_SAVE_SparkLim   		/* nothing */
+#define CALLER_RESTORE_SparkLim   	/* nothing */
+#endif
+
 #endif /* IN_STG_CODE */
 
 /* ----------------------------------------------------------------------------
@@ -545,7 +617,11 @@ GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
   CALLER_SAVE_Hp				\
   CALLER_SAVE_HpLim				\
   CALLER_SAVE_CurrentTSO			\
-  CALLER_SAVE_CurrentNursery
+  CALLER_SAVE_CurrentNursery			\
+  CALLER_SAVE_SparkHd				\
+  CALLER_SAVE_SparkTl				\
+  CALLER_SAVE_SparkBase				\
+  CALLER_SAVE_SparkLim
 
 #define CALLER_RESTORE_USER			\
   CALLER_RESTORE_R1				\
@@ -572,7 +648,11 @@ GLOBAL_REG_DECL(bdescr *,CurrentNursery,REG_CurrentNursery)
   CALLER_RESTORE_Hp				\
   CALLER_RESTORE_HpLim				\
   CALLER_RESTORE_CurrentTSO			\
-  CALLER_RESTORE_CurrentNursery
+  CALLER_RESTORE_CurrentNursery			\
+  CALLER_RESTORE_SparkHd			\
+  CALLER_RESTORE_SparkTl			\
+  CALLER_RESTORE_SparkBase			\
+  CALLER_RESTORE_SparkLim
 
 #else /* not IN_STG_CODE */
 

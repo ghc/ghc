@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.19 1999/12/03 15:55:29 chak Exp $
+ * $Id: Stats.c,v 1.20 2000/01/12 15:15:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -420,7 +420,7 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 		    gc_time, 
 		    gc_etime,
 		    time,
-		    etime,
+		    etime - ElapsedTimeStart,
 		    faults - GC_start_faults,
 		    GC_start_faults - GC_end_faults,
 		    gen);
@@ -441,7 +441,7 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 	  nat i;
 	  pthread_t me = pthread_self();
 
-	  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+	  for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
 	    if (me == task_ids[i].id) {
 	      task_ids[i].gc_time += gc_time;
 	      task_ids[i].gc_etime += gc_etime;
@@ -479,7 +479,7 @@ stat_workerStop(void)
   nat i;
   pthread_t me = pthread_self();
 
-  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+  for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
     if (task_ids[i].id == me) {
       task_ids[i].mut_time = usertime() - task_ids[i].gc_time;
       task_ids[i].mut_etime = elapsedtime()
@@ -552,7 +552,7 @@ stat_exit(int alloc)
 	{
 	  nat i;
 	  MutUserTime = 0.0;
-	  for (i = 0; i < RtsFlags.ConcFlags.nNodes; i++) {
+	  for (i = 0; i < RtsFlags.ParFlags.nNodes; i++) {
 	    MutUserTime += task_ids[i].mut_time;
 	    fprintf(sf, "  Task %2d:  MUT time: %6.2fs  (%6.2fs elapsed)\n"
 		        "            GC  time: %6.2fs  (%6.2fs elapsed)\n\n", 
