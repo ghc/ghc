@@ -83,6 +83,13 @@ Using one stack instead of two reduces register pressure, reduces the
 size of update frames, and eliminates
 ``stack-stubbing'' instructions.)
 
+\item The ``return in registers'' return convention has been dropped
+because it was complicated and doesn't work well on register-poor
+architectures.  It has been partly replaced by unboxed
+tuples~\ref{sect:unboxed-tuples} which allow the programmer to
+explicitly state where results should be returned in registers (or on
+the stack) instead of on the heap.
+
 \end{itemize} 
 
 \subsection{Wish list}
@@ -141,7 +148,11 @@ Which garbage collector to use.  At the moment we
 only anticipate one, however.
 \end{itemize}
 
-\subsection{Terminology}
+\subsection{Glossary}
+
+\ToDo{This terminology is not used consistently within the document.
+If you find soemthing which disagrees with this terminology, fix the
+usage.}
 
 \begin{itemize}
 
@@ -151,12 +162,29 @@ or an unsigned int.
 \item A {\em pointer} is (at least) 32 bits and big enough to hold a
 function pointer or a data pointer.  
 
+\item A {\em boxed} type is one whose elements are heap allocated.
+
+\item An {\em unboxed} type is one whose elements are {\em not} heap allocated.
+
+\item A {\em pointed} type is one that contains $\bot$.  Variables with
+pointed types are the only things which can be lazily evaluated.  In
+the STG machine, this means that they are the only things that can be 
+{\em entered} or {\em updated} and it requires that they be boxed.
+
+\item An {\em unpointed} type is one that does not contains $\bot$.
+Variables with unpointed types are never delayed --- they are always
+evaluated when they are constructed.  In the STG machine, this means
+that they cannot be {\em entered} or {\em updated}.  Unpointed objects
+may be boxed (like @Array#@) or unboxed (like @Int#@).
+
 \item A {\em closure} is a (representation of) a value of a {\em pointed}
- type.  It may be in HNF or it may be unevaluated --- in either case, you can
- try to evaluate it again.
+type.  It may be in HNF or it may be unevaluated --- in either case, you can
+try to evaluate it again.
 
 \item A {\em thunk} is a (representation of) a value of a {\em pointed}
- type which is {\em not} in HNF.
+type which is {\em not} in HNF.
+
+\item A {\em value} is an object in HNF.  It can be pointed or unpointed.
 
 \end{itemize}
 
@@ -168,8 +196,10 @@ words and pointers are the same size.
 % More terminology to mention.
 % unboxed, unpointed
 
-There are a few other system invariants which need to be mentioned ---
-though not necessarily here:
+\subsection{Invariants}
+
+There are a few system invariants which need to be mentioned ---
+though this is probably the wrong place for them.
 
 \begin{itemize}
 
@@ -179,6 +209,56 @@ performing heap overflow checks by assuming that the amount added to
 the old generation is no bigger than the current new generation.
 
 \end{itemize}
+
+\section{Source Language}
+
+\subsection{Unboxed tuples}\label{sect:unboxed-tuples}
+
+Functions can take multiple arguments as easily as they can take one
+argument: there's no cost for adding another argument.  But functions
+can only return one result: the cost of adding a second ``result'' is
+that the function must construct a tuple of ``results'' on the heap.
+The assymetry is rather galling and can make certain programming
+styles quite expensive.  For example, consider a simple state transformer
+monad:
+@
+> type S a = State -> (a,State)
+> bindS m k s0 = case m s0 of { (a,s1) -> k a s1 }
+> returnS a s  = (a,s)
+> getS s       = (s,s)
+> setS s _     = ((),s)
+@
+Here, every use of @returnS@, @getS@ or @setS@ constructs a new tuple
+in the heap which is instantly taken apart (and becomes garbage) by
+the case analysis in @bind@.  Even a short state-transformer program
+will construct a lot of these temporary tuples.
+
+Unboxed tuples provide a way for the programmer to indicate that they
+do not expect a tuple to be shared and that they do not expect it to
+be allocated in the heap.  Syntactically, unboxed tuples are just like
+single constructor datatypes except for the annotation @unboxed@.
+@
+> data unboxed AAndState# a = AnS a State
+> type S a = State -> AAndState# a
+> bindS m k s0 = case m s0 of { AnS a s1 -> k a s1 }
+> returnS a s  = AnS a s
+> getS s       = AnS s s
+> setS s _     = AnS () s
+@
+Semantically, unboxed tuples are just unlifted tuples and are subject
+to the same restrictions as other unpointed types.
+
+Operationally, unboxed tuples are never built on the heap.  When
+unboxed tuples are returned, they are returned in multiple registers
+or multiple stack slots.  At first sight, this seems a little strange
+but it's no different from passing double precision floats in two
+registers.
+
+Note that unboxed tuples can only have one constructor and that
+thunks never have unboxed types --- so we'll never try to update an
+unboxed constructor.  The restriction to a single constructor is
+largely to avoid garbage collection complications.
+
 
 %-----------------------------------------------------------------------------
 \part{Evaluation Model}
@@ -310,7 +390,7 @@ and either builds a PAP or pops the arguments off the stack into
 \Arg{2} \ldots \Arg{m+1} and jumps to the fast entry point.
 
 
-\item {\em Unknown function closure or thunk.}
+\item {\em Unknown function closure, thunk or constructor.}
 
 Sometimes, the function being called is not statically identifiable.
 Consider, for example, the @compose@ function:
@@ -388,35 +468,18 @@ stack contains a valid activation record
 (section~\ref{sect:activation-records}) --- should a garbage collection
 be required.
 
-\item If @x@ has a pointed type (e.g.~a data constructor or a function),
+\item If @x@ has a boxed type (e.g.~a data constructor or a function),
 a pointer to @x@ is returned in \Arg{1}.
 
 \ToDo{Warn that components of E should be extracted as soon as
 possible to avoid a space leak.}
 
-\item If @x@ is an unpointed type (e.g.~@Int#@ or @Float#@), @x@ is
+\item If @x@ is an unboxed type (e.g.~@Int#@ or @Float#@), @x@ is
 returned in \Arg{1}
 
-\item If @x@ is an unpointed tuple constructor, the components of @x@
+\item If @x@ is an unboxed tuple constructor, the components of @x@
 are returned in \Arg{1} \ldots \Arg{n} but no object is constructed in
-the heap.  Unboxed tuple constructors are useful for functions which
-want to return multiple values such as those used in an (explicitly
-encoded) state monad:
-
-\ToDo{Move stuff about unboxed tuples to a separate section}
-
-@
-data unpointed AAndState a = AnS a State
-type S a = State -> AAndState a
-
-bindS m k s0 = case m s0 of { AnS s1 a -> k s1 a }
-returnS a s  = AnS a s
-@
-
-Note that unboxed datatypes can only have one constructor and that
-thunks never have unboxed types --- so we'll never try to update an
-unboxed constructor.  Unboxed tuples are \emph{never} built on the
-heap.
+the heap.  
 
 When passing an unboxed tuple to a function, the components are
 flattened out and passed in \Arg{1} \ldots \Arg{n} as usual.
@@ -498,7 +561,7 @@ that case there is no need to return a tag in \Arg{2}.
 \subsection{Updates}
 \label{sect:data-updates}
 
-The entry code for an updatable thunk (which must also be of arity 0):
+The entry code for an updatable thunk (which must be of arity 0):
 
 \begin{itemize}
 \item copies the free variables out of the thunk into registers or
@@ -590,8 +653,10 @@ of the scrutinee, and (c) returning by an indirect jump through the
 return address on the stack.
 
 If we knew that the scrutinee was already evaluated we could generate
-(better) code which simply jumps to the appropriate branch of the @case@
-with a pointer to the scrutinee in \Arg{1}.
+(better) code which simply jumps to the appropriate branch of the
+@case@ with a pointer to the scrutinee in \Arg{1}.  (For direct
+returns to multiconstructor datatypes, we might also load the tag into
+\Arg{2}).
 
 An obvious idea, therefore, is to test dynamically whether the heap
 closure is a value (using the tag in the info table).  If not, we
@@ -661,8 +726,15 @@ entering the garbage collector.
 
 \note{I reckon these deserve a subsection of their own}
 
-Don't move heap pointer before success occurs.
+The storage manager detects that it needs to garbage collect the old
+generation when the evaluator requests a garbage collection without
+having moved the heap pointer since the last garbage collection.  It
+is therefore important that the GC routines {\em not} move the heap
+pointer unless the heap check fails.  This is different from what
+happens in the current STG implementation.
+
 Talk about how stack check looks ahead into the branches of case expressions.
+
 
 \subsection{Handling interrupts/signals}
 
@@ -781,7 +853,7 @@ stack layout is shown in Figure \ref{fig:hugs-return-stack}.
 \begin{center}
 \input{hugs_ret.pstex_t}
 \end{center}
-\caption{Stack layout for a hugs return address}
+\caption{Stack layout for a Hugs return address}
 \label{fig:hugs-return-stack}
 \end{figure}
 
@@ -789,7 +861,7 @@ stack layout is shown in Figure \ref{fig:hugs-return-stack}.
 \begin{center}
 \input{hugs_ret2.pstex_t}
 \end{center}
-\caption{Stack layout on enterings a hugs return address}
+\caption{Stack layout on enterings a Hugs return address}
 \label{fig:hugs-return2}
 \end{figure}
 
@@ -853,8 +925,8 @@ while (threads_exist) {
   pick a runnable thread;
   do {
     switch (thread->whatNext) {
-      case (RunGHC  pc): status=runGHC(pc);  break;
-      case (RunHugs bc): status=runHugs(bc); break;
+      case (EnterGHC  pc): status=runGHC(pc);  break;
+      case (EnterHugs bc): status=runHugs(bc); break;
     }
     switch (status) {  // handle local problems
       case (StackOverflow): enlargeStack; break;
@@ -1003,11 +1075,16 @@ return itself to the return address using the GHC return convention.
 \label{fig:closure}
 \end{figure}
 
-Every {\em heap object}, or {\em closure} is a contiguous block
+Every {\em heap object} is a contiguous block
 of memory, consisting of a fixed-format {\em header} followed
 by zero or more {\em data words}.
-The header consists of
-the following fields:
+
+\ToDo{I absolutely do not believe that every heap object has a header
+like this - ADR.  I believe that they all have an info pointer but I
+see no readon why stack objects and unpointed heap objects would have
+an entry count since this will always be zero.}
+
+The header consists of the following fields:
 \begin{itemize}
 \item A one-word {\em info pointer}, which points to
 the object's static {\em info table}.
@@ -1243,9 +1320,9 @@ Section~\ref{sect:stacks}.
 A second useful classification is this:
 \begin{itemize}
 \item 
-{\em Executive closures}, such as thunks and data constructors,
+{\em Executive objects}, such as thunks and data constructors,
 participate directly in a program's execution.  They can be subdivided into
-two kinds of objects according to their type:
+three kinds of objects according to their type:
 \begin{itemize}
 \item 
 {\em Pointed objects}, represent values of a {\em pointed} type
@@ -1260,7 +1337,7 @@ once we support speculative evaluation.}
 
 \end{itemize}
 
-\item {\em Administrative closures}, such as stack objects and thread
+\item {\em Administrative objects}, such as stack objects and thread
 state objects, do not represent values in the original program.
 \end{itemize}
 
@@ -2645,7 +2722,7 @@ a case in point, as <.jones jfp leak.> points out.  Consider a thunk for
 the expression
 @
   let xs = [1..1000] in last xs
-@ 
+@
 where @last@ is a function that returns the last element of its
 argument list.  When the thunk is entered it will call @last@, which
 will consume @xs@ until it finds the last element.  Since the list
