@@ -2,10 +2,9 @@
 #include "rtsdefs.h"
 
 void
-ErrorHdrHook (FILE *where)
+ErrorHdrHook (StgInt fd)
 {
-    fflush( stdout );			/* Flush out any pending output */
-
-    fprintf(where, "\nFail: ");
+    const char msg[]="\nFail: ";
+    write(fd,msg,sizeof(msg)-1);
 }
 \end{code}

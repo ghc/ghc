@@ -2,10 +2,9 @@
 #include "rtsdefs.h"
 
 void
-IOErrorHdrHook (FILE *where)
+IOErrorHdrHook (StgInt fd)
 {
-    fflush( stdout );			/* Flush out any pending output */
-
-    fprintf(where, "\nI/O error: ");
+    const char msg[]="\nI/O error: ";
+    write(fd, msg, sizeof(msg)-1);
 }
 \end{code}
