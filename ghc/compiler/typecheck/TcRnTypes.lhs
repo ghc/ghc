@@ -595,10 +595,16 @@ data ImportAvails
 		-- combine stuff coming from different (unqualified) 
 		-- imports of the same module
 
-	imp_mods :: ModuleEnv (Module, Bool),
+	imp_mods :: ModuleEnv (Module, Maybe Bool),
 		-- Domain is all directly-imported modules
-		-- Bool is True if there was an unrestricted import
-		--	(i.e. not a selective list)
+		-- Maybe value answers the question "is the import restricted?"
+		--   Nothing    => unrestricted import (e.g., "import Foo")
+		--   Just True  => restricted import, at least one entity (e.g., "import Foo(x)")
+		--   Just False => fully restricted import (e.g., "import Foo ()")
+		--
+		--  A distinction is made between the first and the third in order
+		--  to more precisely emit warnings about unused imports.
+		--
 		-- We need the Module in the range because we can't get
 		-- 	the keys of a ModuleEnv
 		-- Used 

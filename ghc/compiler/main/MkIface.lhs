@@ -519,8 +519,8 @@ mkUsageInfo hsc_env eps
     pit = eps_PIT eps
     
     import_all mod = case lookupModuleEnv dir_imp_mods mod of
-    			Just (_,imp_all) -> imp_all
-    			Nothing		 -> False
+    			Just (_, Nothing) -> True
+			_                 -> False
     
     -- ent_map groups together all the things imported and used
     -- from a particular module in this package

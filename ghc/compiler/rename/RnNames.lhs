@@ -193,9 +193,10 @@ importsFromImportDecl this_mod
 	not_self (m, _) = m /= this_mod_name
 
 	import_all = case imp_spec of
-			(Just (False, _)) -> False	-- Imports are spec'd explicitly
-			other	   	  -> True	-- Everything is imported, 
-							-- (or almost everything [hiding])
+			Just (isHid, ls) -- Imports are spec'd explicitly
+			  | not isHid  -> Just (not (null ls)) 
+			_       -> Nothing	-- Everything is imported, 
+						-- (or almost everything [hiding])
 
 	qual_mod_name = case as_mod of
 			  Nothing  	    -> imp_mod_name
@@ -788,14 +789,21 @@ reportUnusedNames gbl_env dus
     direct_import_mods = map (moduleName . fst) 
 			     (moduleEnvElts (imp_mods imports))
 
+    hasEmptyImpList :: ModuleName -> Bool
+    hasEmptyImpList m = 
+       case lookupModuleEnvByName (imp_mods imports) m of
+	 Just (_,Just x) -> not x
+	 _ -> False
+
     -- unused_imp_mods are the directly-imported modules 
     -- that are not mentioned in minimal_imports1
     -- [Note: not 'minimal_imports', because that includes direcly-imported
     --	      modules even if we use nothing from them; see notes above]
     unused_imp_mods = [m | m <- direct_import_mods,
     		       isNothing (lookupFM minimal_imports1 m),
-    		       m /= pRELUDE_Name]
-    
+    		       m /= pRELUDE_Name,
+		       not (hasEmptyImpList m)]
+
     module_unused :: Module -> Bool
     module_unused mod = moduleName mod `elem` unused_imp_mods
 
