@@ -4,7 +4,7 @@
 \section[TcTyDecls]{Typecheck type declarations}
 
 \begin{code}
-module TcTyDecls ( tcTyDecl, checkValidTyCon, kcConDetails ) where
+module TcTyDecls ( tcTyDecl, kcConDetails ) where
 
 #include "HsVersions.h"
 
@@ -22,21 +22,19 @@ import TcEnv		( tcExtendTyVarEnv,
 			  TyThingDetails(..), RecTcEnv
 			)
 import TcType		( tcEqType, tyVarsOfTypes, tyVarsOfPred, ThetaType )
-import TcMType		( checkValidType, UserTypeCtxt(..), checkValidTheta, SourceTyCtxt(..) )
 import TcMonad
 
-import DataCon		( DataCon, mkDataCon, dataConFieldLabels, dataConWrapId, dataConName )
+import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
+import FieldLabel	( fieldLabelName, fieldLabelType, allFieldLabelTags, mkFieldLabel )
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
-import FieldLabel
-import Var		( TyVar, idType )
+import Var		( TyVar )
 import Name		( Name, NamedThing(..) )
 import Outputable
 import TyCon		( TyCon, DataConDetails(..), visibleDataCons,
-			  tyConName, tyConTheta, getSynTyConDefn, 
-			  tyConTyVars, tyConDataCons, isSynTyCon )
+			  tyConName, tyConTheta, 
+			  tyConTyVars, isSynTyCon )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
-import ListSetOps	( equivClasses )
 import List		( nubBy )
 \end{code}
 
@@ -85,58 +83,6 @@ mkRecordSelectors unf_env tycon data_cons
     unpack_id     = tcLookupRecId unf_env unpackCStringName
     unpackUtf8_id = tcLookupRecId unf_env unpackCStringUtf8Name
 \end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Validity check}
-%*									*
-%************************************************************************
-
-checkValidTyCon is called once the mutually-recursive knot has been
-tied, so we can look at things freely.
-
-\begin{code}
-checkValidTyCon :: TyCon -> TcM ()
-checkValidTyCon tc
-  | isSynTyCon tc = checkValidType (TySynCtxt name) syn_rhs
-  | otherwise
-  = 	-- Check the context on the data decl
-    checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenTc_` 
-	
-	-- Check arg types of data constructors
-    mapTc_ check_data_con data_cons			`thenTc_`
-
-	-- Check that fields with the same name share a type
-    mapTc_ check_fields groups
-
-  where
-    name         = tyConName tc
-    (_, syn_rhs) = getSynTyConDefn tc
-    data_cons    = tyConDataCons tc
-
-    fields = [field | con <- data_cons, field <- dataConFieldLabels con]
-    groups = equivClasses cmp_name fields
-    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
-
-    check_data_con con = checkValidType (ConArgCtxt (dataConName con)) 
-					(idType (dataConWrapId con))
-				-- This checks the argument types and
-				-- the existential context (if any)			 
-
-    check_fields fields@(first_field_label : other_fields)
-	-- These fields all have the same name, but are from
-	-- different constructors in the data type
-	= 	-- Check that all the fields in the group have the same type
-		-- NB: this check assumes that all the constructors of a given
-		-- data type use the same type variables
-	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
-	where
-	    field_ty   = fieldLabelType first_field_label
-	    field_name = fieldLabelName first_field_label
-	    other_tys  = map fieldLabelType other_fields
-\end{code}
-
 
 
 %************************************************************************
@@ -231,9 +177,6 @@ thinContext arg_tys ctxt
 
 
 \begin{code}
-fieldTypeMisMatch field_name
-  = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
-
 exRecConErr name
   = ptext SLIT("Can't combine named fields with locally-quantified type variables")
     $$

@@ -27,6 +27,7 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, pprUserTypeCtxt,
   SourceTyCtxt(..), checkValidTheta, 
+  checkValidTyCon, checkValidClass, 
   checkValidInstHead, instTypeErr, checkAmbiguity,
 
   --------------------------------
@@ -64,13 +65,17 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			)
 import qualified Type	( splitFunTys )
 import Subst		( Subst, mkTopTyVarSubst, substTy )
-import Class		( Class, classArity, className )
+import Class		( Class, DefMeth(..), classArity, className, classBigSig )
 import TyCon		( TyCon, mkPrimTyCon, isSynTyCon, isUnboxedTupleTyCon, 
-			  tyConArity, tyConName, tyConKind )
+			  tyConArity, tyConName, tyConKind, tyConTheta, 
+			  getSynTyConDefn, tyConDataCons )
+import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
+import FieldLabel	( fieldLabelName, fieldLabelType )
 import PrimRep		( PrimRep(VoidRep) )
-import Var		( TyVar, tyVarKind, tyVarName, isTyVar, mkTyVar, isMutTyVar )
+import Var		( TyVar, idType, idName, tyVarKind, tyVarName, isTyVar, mkTyVar, isMutTyVar )
 
 -- others:
+import Generics		( validGenericMethodType )
 import TcMonad          -- TcType, amongst others
 import TysWiredIn	( voidTy, listTyCon, tupleTyCon )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
@@ -86,7 +91,7 @@ import CmdLineOpts	( dopt, DynFlag(..) )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
 import Util		( nOfThem, isSingleton, equalLength )
-import ListSetOps	( removeDups )
+import ListSetOps	( equivClasses, removeDups )
 import Outputable
 \end{code}
 
@@ -939,6 +944,133 @@ dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pp
 checkThetaCtxt ctxt theta
   = vcat [ptext SLIT("In the context:") <+> pprTheta theta,
 	  ptext SLIT("While checking") <+> pprSourceTyCtxt ctxt ]
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Validity check for TyCons}
+%*									*
+%************************************************************************
+
+checkValidTyCon is called once the mutually-recursive knot has been
+tied, so we can look at things freely.
+
+\begin{code}
+checkValidTyCon :: TyCon -> TcM ()
+checkValidTyCon tc
+  | isSynTyCon tc = checkValidType (TySynCtxt name) syn_rhs
+  | otherwise
+  = 	-- Check the context on the data decl
+    checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenTc_` 
+	
+	-- Check arg types of data constructors
+    mapTc_ checkValidDataCon data_cons			`thenTc_`
+
+	-- Check that fields with the same name share a type
+    mapTc_ check_fields groups
+
+  where
+    name         = tyConName tc
+    (_, syn_rhs) = getSynTyConDefn tc
+    data_cons    = tyConDataCons tc
+
+    fields = [field | con <- data_cons, field <- dataConFieldLabels con]
+    groups = equivClasses cmp_name fields
+    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
+
+    check_fields fields@(first_field_label : other_fields)
+	-- These fields all have the same name, but are from
+	-- different constructors in the data type
+	= 	-- Check that all the fields in the group have the same type
+		-- NB: this check assumes that all the constructors of a given
+		-- data type use the same type variables
+	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
+	where
+	    field_ty   = fieldLabelType first_field_label
+	    field_name = fieldLabelName first_field_label
+	    other_tys  = map fieldLabelType other_fields
+
+checkValidDataCon :: DataCon -> TcM ()
+checkValidDataCon con
+  = checkValidType ctxt (idType (dataConWrapId con))	`thenTc_`
+		-- This checks the argument types and
+		-- ambiguity of the existential context (if any)
+    tcAddErrCtxt (existentialCtxt con)
+		 (checkFreeness ex_tvs ex_theta)
+  where
+    ctxt = ConArgCtxt (dataConName con) 
+    (_, _, ex_tvs, ex_theta, _, _) = dataConSig con
+
+
+fieldTypeMisMatch field_name
+  = sep [ptext SLIT("Different constructors give different types for field"), quotes (ppr field_name)]
+
+existentialCtxt con = ptext SLIT("When checking the existential context of constructor") 
+		      <+> ppr con
+\end{code}
+
+
+checkValidClass is called once the mutually-recursive knot has been
+tied, so we can look at things freely.
+
+\begin{code}
+checkValidClass :: Class -> TcM ()
+checkValidClass cls
+  = 	-- CHECK ARITY 1 FOR HASKELL 1.4
+    doptsTc Opt_GlasgowExts				`thenTc` \ gla_exts ->
+
+    	-- Check that the class is unary, unless GlaExs
+    checkTc (not (null tyvars))		(nullaryClassErr cls)	`thenTc_`
+    checkTc (gla_exts || unary) (classArityErr cls)	`thenTc_`
+
+   	-- Check the super-classes
+    checkValidTheta (ClassSCCtxt (className cls)) theta	`thenTc_`
+
+	-- Check the class operations
+    mapTc_ check_op op_stuff		`thenTc_`
+
+  	-- Check that if the class has generic methods, then the
+	-- class has only one parameter.  We can't do generic
+	-- multi-parameter type classes!
+    checkTc (unary || no_generics) (genericMultiParamErr cls)
+
+  where
+    (tyvars, theta, _, op_stuff) = classBigSig cls
+    unary 	= isSingleton tyvars
+    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
+
+    check_op (sel_id, dm) 
+	= checkValidTheta SigmaCtxt (tail theta) 	`thenTc_`
+		-- The 'tail' removes the initial (C a) from the
+		-- class itself, leaving just the method type
+
+	  checkValidType (FunSigCtxt op_name) tau	`thenTc_`
+
+		-- Check that for a generic method, the type of 
+		-- the method is sufficiently simple
+	  checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
+		  (badGenericMethodType op_name op_ty)
+	where
+	  op_name = idName sel_id
+	  op_ty   = idType sel_id
+	  (_,theta,tau) = tcSplitSigmaTy op_ty
+
+nullaryClassErr cls
+  = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
+
+classArityErr cls
+  = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
+	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
+
+genericMultiParamErr clas
+  = ptext SLIT("The multi-parameter class") <+> quotes (ppr clas) <+> 
+    ptext SLIT("cannot have generic methods")
+
+badGenericMethodType op op_ty
+  = hang (ptext SLIT("Generic method type is too complex"))
+       4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
+		ptext SLIT("You can only use type variables, arrows, and tuples")])
 \end{code}
 
 

@@ -4,7 +4,7 @@
 \section[TcClassDcl]{Typechecking class declarations}
 
 \begin{code}
-module TcClassDcl ( tcClassDecl1, checkValidClass, tcClassDecls2, 
+module TcClassDcl ( tcClassDecl1, tcClassDecls2, 
 		    tcMethodBind, mkMethodBind, badMethodErr
 		  ) where
 
@@ -39,7 +39,7 @@ import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar,
 			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitSigmaTy
 			)
 import TcMonad
-import Generics		( mkGenericRhs, validGenericMethodType )
+import Generics		( mkGenericRhs )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import Class		( classTyVars, classBigSig, classTyCon, className,
 			  Class, ClassOpItem, DefMeth (..) )
@@ -236,52 +236,6 @@ tcClassSig clas clas_tyvars maybe_dm_env
 				   Just False -> DefMeth dm_name
     in
     returnTc (local_ty, (sel_id, dm_info))
-\end{code}
-
-checkValidClass is called once the mutually-recursive knot has been
-tied, so we can look at things freely.
-
-\begin{code}
-checkValidClass :: Class -> TcM ()
-checkValidClass cls
-  = 	-- CHECK ARITY 1 FOR HASKELL 1.4
-    doptsTc Opt_GlasgowExts				`thenTc` \ gla_exts ->
-
-    	-- Check that the class is unary, unless GlaExs
-    checkTc (not (null tyvars))		(nullaryClassErr cls)	`thenTc_`
-    checkTc (gla_exts || unary) (classArityErr cls)	`thenTc_`
-
-   	-- Check the super-classes
-    checkValidTheta (ClassSCCtxt (className cls)) theta	`thenTc_`
-
-	-- Check the class operations
-    mapTc_ check_op op_stuff		`thenTc_`
-
-  	-- Check that if the class has generic methods, then the
-	-- class has only one parameter.  We can't do generic
-	-- multi-parameter type classes!
-    checkTc (unary || no_generics) (genericMultiParamErr cls)
-
-  where
-    (tyvars, theta, _, op_stuff) = classBigSig cls
-    unary 	= isSingleton tyvars
-    no_generics = null [() | (_, GenDefMeth) <- op_stuff]
-
-    check_op (sel_id, dm) 
-	= checkValidTheta SigmaCtxt (tail theta) 	`thenTc_`
-		-- The 'tail' removes the initial (C a) from the
-		-- class itself, leaving just the method type
-
-	  checkValidType (FunSigCtxt op_name) tau	`thenTc_`
-
-		-- Check that for a generic method, the type of 
-		-- the method is sufficiently simple
-	  checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
-		  (badGenericMethodType op_name op_ty)
-	where
-	  op_name = idName sel_id
-	  op_ty   = idType sel_id
-	  (_,theta,tau) = tcSplitSigmaTy op_ty
 \end{code}
 
 
@@ -633,13 +587,6 @@ find_prags sel_name meth_name (prag:prags) = find_prags sel_name meth_name prags
 Contexts and errors
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-nullaryClassErr cls
-  = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
-
-classArityErr cls
-  = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
-	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
-
 defltMethCtxt clas
   = ptext SLIT("When checking the default methods for class") <+> quotes (ppr clas)
 
@@ -653,11 +600,6 @@ badMethodErr clas op
 omittedMethodWarn sel_id
   = ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id)
 
-badGenericMethodType op op_ty
-  = hang (ptext SLIT("Generic method type is too complex"))
-       4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
-		ptext SLIT("You can only use type variables, arrows, and tuples")])
-
 badGenericInstance sel_id
   = sep [ptext SLIT("Can't derive generic code for") <+> quotes (ppr sel_id),
 	 ptext SLIT("because the instance declaration is not for a simple type (T a b c)"),
@@ -665,8 +607,4 @@ badGenericInstance sel_id
 
 mixedGenericErr op
   = ptext SLIT("Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)
-
-genericMultiParamErr clas
-  = ptext SLIT("The multi-parameter class") <+> quotes (ppr clas) <+> 
-    ptext SLIT("cannot have generic methods")
 \end{code}

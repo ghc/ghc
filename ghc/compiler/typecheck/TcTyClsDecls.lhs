@@ -25,11 +25,11 @@ import TcMonad
 import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
 			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv,
 			  isLocalThing )
-import TcTyDecls	( tcTyDecl, kcConDetails, checkValidTyCon )
-import TcClassDcl	( tcClassDecl1, checkValidClass )
+import TcTyDecls	( tcTyDecl, kcConDetails )
+import TcClassDcl	( tcClassDecl1 )
 import TcInstDcls	( tcAddDeclCtxt )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsLiftedSigType, kcHsContext, mkTyClTyVars )
-import TcMType		( newKindVar, zonkKindEnv )
+import TcMType		( newKindVar, zonkKindEnv, checkValidTyCon, checkValidClass )
 import TcUnify		( unifyKind )
 import TcType		( Type, Kind, TcKind, mkArrowKind, liftedTypeKind, zipFunTys )
 import Type		( splitTyConApp_maybe )

@@ -81,6 +81,10 @@ tcExpr :: RenamedHsExpr		-- Expession to type check
 	-> TcM (TcExpr, LIE)	-- Generalised expr with expected type, and LIE
 
 tcExpr expr expected_ty 
+  = traceTc (text "tcExpr" <+> (ppr expected_ty $$ ppr expr)) `thenNF_Tc_`
+    tc_expr' expr expected_ty
+
+tc_expr' expr expected_ty
   | not (isSigmaTy expected_ty)  -- Monomorphic case
   = tcMonoExpr expr expected_ty
 
