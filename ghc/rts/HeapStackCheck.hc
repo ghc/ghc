@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.25 2002/02/28 18:54:53 sof Exp $
+ * $Id: HeapStackCheck.hc,v 1.26 2002/03/02 17:43:44 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -669,14 +669,9 @@ INFO_TABLE_SRT_BITMAP(stg_gc_unpt_r1_info, stg_gc_unpt_r1_ret, 0/*BITMAP*/,
 EXTFUN(stg_gc_unpt_r1_ret)
 {
   FB_
-#ifdef REG_R1
   R1.w = Sp[0];
   Sp += 1;
   JMP_(ENTRY_CODE(Sp[0]));
-#else
-  /* Keep R1 on the stack */
-  JMP_(ENTRY_CODE(Sp[1]));
-#endif
   FE_
 }
 
@@ -687,6 +682,20 @@ EXTFUN(stg_gc_unpt_r1)
   Sp[1] = R1.w;
   Sp[0] = (W_)&stg_gc_unpt_r1_info;
   GC_GENERIC
+  FE_
+}
+
+/*-- Unboxed tuple return (unregisterised build only)------------------ */
+
+INFO_TABLE_SRT_BITMAP(stg_ut_1_0_unreg_info, stg_ut_1_0_unreg_ret, 0/*BITMAP*/, 
+		      0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		      RET_SMALL,, EF_, 0, 0);
+
+EXTFUN(stg_ut_1_0_unreg_ret)
+{
+  FB_
+  /* R1 is on the stack (*Sp) */
+  JMP_(ENTRY_CODE(Sp[1]));
   FE_
 }
 
