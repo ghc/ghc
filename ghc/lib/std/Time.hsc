@@ -3,7 +3,7 @@
 -- to compile on sparc-solaris.  Blargh.
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.18 2001/07/24 04:39:31 ken Exp $
+-- $Id: Time.hsc,v 1.19 2001/07/24 05:53:27 ken Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -387,9 +387,7 @@ throwAwayReturnPointer fun x y = fun x y >> return ()
 clockToCalendarTime_static :: (Ptr CTime -> IO (Ptr CTm)) -> Bool -> ClockTime
 	 -> IO CalendarTime
 clockToCalendarTime_static fun is_utc (TOD secs psec) = do
-  putStrLn ("clockToCalendarTime: TOD " ++ show secs ++ " " ++ show psec)
   withObject (fromIntegral secs :: CTime)  $ \ p_timer -> do
-    case p_timer of Ptr addr -> putStrLn ("const time_t * = " ++ show (I## (addr2Int## addr)))
     p_tm <- fun p_timer 	-- can't fail, according to POSIX
     clockToCalendarTime_aux is_utc p_tm psec
 
