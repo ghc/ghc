@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.15 2002/10/03 12:43:50 panne Exp $
+ * $Id: HsBase.h,v 1.16 2002/10/03 13:04:58 panne Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -118,6 +118,9 @@ HsInt rawSystemCmd(HsAddr cmd);
 
 /* in inputReady.c */
 int inputReady(int fd, int msecs, int isSock);
+
+/* in writeError.c */
+void writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len);
 
 /* -----------------------------------------------------------------------------
    64-bit operations, defined in longlong.c
