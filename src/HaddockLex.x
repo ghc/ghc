@@ -11,6 +11,7 @@ module HaddockLex (
  ) where
 
 import Char
+import Numeric
 import HsSyn
 import HsLexer hiding (Token)
 import HsParseMonad
@@ -19,6 +20,7 @@ import HsParseMonad
 
 $ws    = $white # \n
 $digit = [0-9]
+$hexdigit = [0-9a-fA-F]
 $special =  [\"\@\/]
 $alphanum = [A-Za-z0-9]
 $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
@@ -56,11 +58,13 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
   \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
   [\'\`] $ident+ [\'\`]		{ ident }
   \\ .				{ strtoken (TokString . tail) }
+  "&#" $digit+ \;		{ strtoken $ \s -> TokString [chr (read (init (drop 2 s)))] }
+  "&#x" $hexdigit+ \;		{ strtoken $ \s -> case readHex (init (drop 3 s)) of [(n,_)] -> TokString [chr n] }
   -- allow special characters through if they don't fit one of the previous
   -- patterns.
-  [\'\`\<\#\\]			{ strtoken TokString }
-  [^ $special \< \# \n \'\` \\ \]]* \n { strtoken TokString `andBegin` line }
-  [^ $special \< \# \n \'\` \\ \]]+    { strtoken TokString }
+  [\'\`\<\#\&\\]			{ strtoken TokString }
+  [^ $special \< \# \n \'\` \& \\ \]]* \n { strtoken TokString `andBegin` line }
+  [^ $special \< \# \n \'\` \& \\ \]]+    { strtoken TokString }
 }
 
 <def> {
