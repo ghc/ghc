@@ -127,7 +127,7 @@
 	  hand from the <literal>.a</literal> archive, it is possible
 	  to use GNU <command>ld</command> as follows:</para>
 
-<screen>ld -r --whole-archive -o HSfoo.o libHSfoo.a</screen>
+<screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
 	</listitem>
 
 	<listitem>
@@ -178,7 +178,7 @@
       added or removed from a package configuration file.  By default,
       the system-wide configuration file is used, but alternatively
       packages can be added or removed from a user-specified
-      configuration file using the <option>--config-file</option>
+      configuration file using the <option>&ndash;&ndash;config-file</option>
       option.  An empty package configuration file consists of the
       string <quote><literal>[]</literal></quote>.</para>
 
@@ -187,9 +187,9 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>--add-package</option></term>
+	  <term><option>&ndash;&ndash;add-package</option></term>
 	  <term><option>-a</option></term>
-	  <indexterm><primary><option>--add-package</option></primary></indexterm>
+	  <indexterm><primary><option>&ndash;&ndash;add-package</option></primary></indexterm>
 	  <listitem>
 	    <para>Reads package specification from the input (see below),
 	    and adds it to the database of installed packages.  The
@@ -199,9 +199,9 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--input-file=<replaceable>file</replaceable></option></term>
+	  <term><option>&ndash;&ndash;input-file=<replaceable>file</replaceable></option></term>
 	  <term><option>-i <replaceable>file</replaceable></option></term>
-	  <indexterm><primary><option>--input-file</option></primary></indexterm>
+	  <indexterm><primary><option>&ndash;&ndash;input-file</option></primary></indexterm>
 	  <listitem>
 	    <para>Read new package specifications from file
 	    <replaceable>file</replaceable>. If a value of
@@ -213,9 +213,9 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--auto-ghci-libs</option></term>
+	  <term><option>&ndash;&ndash;auto-ghci-libs</option></term>
 	  <term><option>-g</option></term>
-	  <indexterm><primary><option>--auto-ghci-libs</option></primary>
+	  <indexterm><primary><option>&ndash;&ndash;auto-ghci-libs</option></primary>
 	      </indexterm>
 	  <listitem>
 	    <para>Automatically generate the GHCi
@@ -235,9 +235,9 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--config-file <replaceable>file</replaceable></option></term>
+	  <term><option>&ndash;&ndash;config-file <replaceable>file</replaceable></option></term>
 	  <term><option>-f <replaceable>file</replaceable></option></term>
-	  <indexterm><primary><option>--config-file</option></primary>
+	  <indexterm><primary><option>&ndash;&ndash;config-file</option></primary>
 	      </indexterm>
 	  <listitem>
 	    <para>Use <replaceable>file</replaceable> instead of the
@@ -249,15 +249,15 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--list-packages</option></term>
+	  <term><option>&ndash;&ndash;list-packages</option></term>
 	  <term><option>-l</option></term>
-	  <indexterm><primary><option>--list-packages</option></primary></indexterm>
+	  <indexterm><primary><option>&ndash;&ndash;list-packages</option></primary></indexterm>
 	  <listitem>
 	    <para>This option displays the list of currently installed
 	    packages.</para>
 
 <screen>
-  $ ghc-pkg --list-packages
+  $ ghc-pkg &ndash;&ndash;list-packages
   gmp, rts, std, lang, concurrent, data, net, posix, text, util
 </screen>
 
@@ -275,9 +275,9 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>--remove-package <replaceable>foo</replaceable></option></term>
+	  <term><option>&ndash;&ndash;remove-package <replaceable>foo</replaceable></option></term>
 	  <term><option>-r <replaceable>foo</replaceable></option></term>
-	  <indexterm><primary><option>--delete-package</option></primary>
+	  <indexterm><primary><option>&ndash;&ndash;delete-package</option></primary>
 	      </indexterm>
 	  <listitem>
 	    <para>Removes the specified package from the installed
@@ -285,9 +285,9 @@
 	  </listitem>
 	</varlistentry>
 	<varlistentry>
-	  <term><option>--update-package</option></term>
+	  <term><option>&ndash;&ndash;update-package</option></term>
 	  <term><option>-u</option></term>
-	  <indexterm><primary><option>--update-package</option></primary></indexterm>
+	  <indexterm><primary><option>&ndash;&ndash;update-package</option></primary></indexterm>
 	  <listitem>
 	    <para>Reads package specification from the input, and
 	    adds it to the database of installed packages. If a package
@@ -335,7 +335,7 @@
 	  <listitem>
             <para>The package's name, for use with
             the <literal>-package</literal> flag and as listed in the
-            <literal>--list-packages</literal> list. 
+            <literal>&ndash;&ndash;list-packages</literal> list. 
             </para>
 	  </listitem>
 	</varlistentry>

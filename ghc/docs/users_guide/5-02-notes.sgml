@@ -119,7 +119,7 @@
 	multiple modules for the <literal>:add</literal> and
 	<literal>:load</literal> commands.  From the command line, you
 	may specify multiple modules when starting GHCi and when
-	compiling in <option>--make</option> mode.  See
+	compiling in <option>&ndash;&ndash;make</option> mode.  See
         <xref linkend="ghci-commands">.</para>
       </listitem>
 

@@ -158,7 +158,7 @@ Main> fac 17
       <para>or it can be set using the <literal>:set</literal> command
       from within GHCi (see <xref
       linkend="ghci-cmd-line-options">)<footnote><para>Note that in
-      GHCi, and <option>--make</option> mode, the <option>-i</option>
+      GHCi, and <option>&ndash;&ndash;make</option> mode, the <option>-i</option>
       option is used to specify the search path for
       <emphasis>source</emphasis> files, whereas in standard
       batch-compilation mode the <option>-i</option> option is used to
@@ -305,7 +305,7 @@ Ok, modules loaded: A, B, C, D.
     <para>HINT: since GHCi will only use a compiled object file if it
     can sure that the compiled version is up-to-date, a good technique
     when working on a large program is to occasionally run
-    <literal>ghc --make</literal> to compile the whole project (say
+    <literal>ghc &ndash;&ndash;make</literal> to compile the whole project (say
     before you go for lunch :-), then continue working in the
     interpreter.  As you modify code, the new modules will be
     interpreted, but the rest of the project will remain
@@ -543,10 +543,10 @@ Wed Mar 14 12:23:13 GMT 2001
   <sect1 id="ghci-invokation">
     <title>Invoking GHCi</title>
     <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
-    <indexterm><primary><option>--interactive</option></primary></indexterm>
+    <indexterm><primary><option>&ndash;&ndash;interactive</option></primary></indexterm>
 
     <para>GHCi is invoked with the command <literal>ghci</literal> or
-    <literal>ghc --interactive</literal>.  One or more modules or
+    <literal>ghc &ndash;&ndash;interactive</literal>.  One or more modules or
     filenames can also be specified on the command line; this
     instructs GHCi to load the specified modules or filenames (and all
     the modules they depend on), just as if you had said
@@ -728,11 +728,11 @@ Prelude> :mycd ..
 </screen>
 
 	  <para>Or I could define a simple way to invoke
-	  &ldquo;<literal>ghc --make Main</literal>&rdquo; in the
+	  &ldquo;<literal>ghc &ndash;&ndash;make Main</literal>&rdquo; in the
 	  current directory:</para>
 
 <screen>
-Prelude> :def make (\_ -> return ":! ghc --make Main")
+Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 </screen>
 
 	</listitem>

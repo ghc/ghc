@@ -9,7 +9,7 @@
 	been added (<xref linkend="ghci">).</para>
       </listitem>
       <listitem>
-	<para>New <option>--make</option> flag added (<xref
+	<para>New <option>&ndash;&ndash;make</option> flag added (<xref
 	linkend="make-mode">).</para>
       </listitem>
       <listitem>
@@ -160,7 +160,7 @@
       <listitem>
 	<para>The <literal>WithGhcHc</literal> setting in
 	<literal>build.mk</literal> has been replaced by the
-	<literal>--with-ghc=<replaceable>ghc</replaceable></literal>
+	<literal>&ndash;&ndash;with-ghc=<replaceable>ghc</replaceable></literal>
 	option to <literal>configure</literal>.  The new option
 	<emphasis>must</emphasis> be used if you intend to use
 	anything except &ldquo;<literal>ghc</literal>&rdquo; to

@@ -9,7 +9,7 @@
   <variablelist>
     <varlistentry>
       <term><cmdsynopsis><command>ghc</command>
-	  <arg choice=plain>--interactive</arg>
+	  <arg choice=plain>&ndash;&ndash;interactive</arg>
 	</cmdsynopsis></term>
       <indexterm><primary>interactive mode</primary>
       </indexterm>
@@ -24,11 +24,11 @@
 
     <varlistentry>
       <term><cmdsynopsis><command>ghc</command>
-	  <arg choice=plain>--make</arg>
+	  <arg choice=plain>&ndash;&ndash;make</arg>
 	</cmdsynopsis></term>
       <indexterm><primary>make mode</primary>
       </indexterm>
-      <indexterm><primary><option>--make</option></primary>
+      <indexterm><primary><option>&ndash;&ndash;make</option></primary>
       </indexterm>
       <listitem>
 	<para>In this mode, GHC will build a multi-module Haskell
@@ -252,10 +252,10 @@ module X where
 
     <variablelist>
       <varlistentry>
-	<term><option>--help</option></term>
+	<term><option>&ndash;&ndash;help</option></term>
 	<term><option>-?</option></term>
 	<indexterm><primary><option>-?</option></primary></indexterm>
-	<indexterm><primary><option>--help</option></primary></indexterm>
+	<indexterm><primary><option>&ndash;&ndash;help</option></primary></indexterm>
 	<listitem>
 	  <para>Cause GHC to spew a long usage message to standard
           output and then exit.</para>
@@ -304,8 +304,8 @@ module X where
 	      <listitem>
 		<para>Minimal verbosity: print one line per
 		compilation (this is the default when
-		<option>--make</option> or
-		<option>--interactive</option> is on).</para>
+		<option>&ndash;&ndash;make</option> or
+		<option>&ndash;&ndash;interactive</option> is on).</para>
 	      </listitem>
 	    </varlistentry>
 
@@ -341,24 +341,24 @@ module X where
       </varlistentry>
       
       <varlistentry>
-	<term><option>--version</option></term>
-	<indexterm><primary><option>--version</option></primary></indexterm>
+	<term><option>&ndash;&ndash;version</option></term>
+	<indexterm><primary><option>&ndash;&ndash;version</option></primary></indexterm>
 	<listitem>
 	  <para>Print a one-line string including GHC's version number.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>--numeric-version</option></term>
-	<indexterm><primary><option>--numeric-version</option></primary></indexterm>
+	<term><option>&ndash;&ndash;numeric-version</option></term>
+	<indexterm><primary><option>&ndash;&ndash;numeric-version</option></primary></indexterm>
 	<listitem>
 	  <para>Print GHC's numeric version number only.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>--print-libdir</option></term>
-	<indexterm><primary><option>--print-libdir</option></primary></indexterm>
+	<term><option>&ndash;&ndash;print-libdir</option></term>
+	<indexterm><primary><option>&ndash;&ndash;print-libdir</option></primary></indexterm>
 	<listitem>
 	  <para>Print the path to GHC's library directory.  This is
 	  the top of the directory tree containing GHC's libraries,
@@ -375,14 +375,14 @@ module X where
   </sect1>
 
   <sect1 id="make-mode">
-    <title>Using <command>ghc</command> <option>--make</option></title>
+    <title>Using <command>ghc</command> <option>&ndash;&ndash;make</option></title>
 
-    <indexterm><primary><option>--make</option></primary>
+    <indexterm><primary><option>&ndash;&ndash;make</option></primary>
     </indexterm>
     <indexterm><primary>separate compilation</primary>
     </indexterm>
     
-    <para>When given the <option>--make</option> option, GHC will
+    <para>When given the <option>&ndash;&ndash;make</option> option, GHC will
     build a multi-module Haskell program by following dependencies
     from a single root module (usually <literal>Main</literal>).  For
     example, if your <literal>Main</literal> module is in a file
@@ -390,7 +390,7 @@ module X where
     the program like this:</para>
 
 <screen>
-ghc --make Main.hs
+ghc &ndash;&ndash;make Main.hs
 </screen>
 
     <para>The command line must contain one source file or module
@@ -400,7 +400,7 @@ ghc --make Main.hs
     if the top module is <literal>Main</literal>, the program
     will also be linked into an executable.</para>
 
-    <para>The main advantages to using <literal>ghc --make</literal>
+    <para>The main advantages to using <literal>ghc &ndash;&ndash;make</literal>
     over traditional <literal>Makefile</literal>s are:</para>
 
     <itemizedlist>
@@ -408,7 +408,7 @@ ghc --make Main.hs
 	<para>GHC doesn't have to be restarted for each compilation,
 	which means it can cache information between compilations.
 	Compiling a muli-module program with <literal>ghc
-	--make</literal> can be up to twice as fast as running
+	&ndash;&ndash;make</literal> can be up to twice as fast as running
 	<literal>ghc</literal> individually on each source
 	file.</para>
       </listitem>
@@ -426,7 +426,7 @@ ghc --make Main.hs
     </itemizedlist>
 
     <para>Any of the command-line options described in the rest of
-    this chapter can be used with <option>--make</option>, but note
+    this chapter can be used with <option>&ndash;&ndash;make</option>, but note
     that any options you give on the command line will apply to all
     the source files compiled, so if you want any options to apply to
     a single source file only, you'll need to use an
@@ -446,9 +446,9 @@ ghc --make Main.hs
   </sect1>
   
   <Sect1 id="options-order">
-    <title>GHC without <option>--make</option></title>
+    <title>GHC without <option>&ndash;&ndash;make</option></title>
 
-    <para>Without <option>--make</option>, GHC will compile one or
+    <para>Without <option>&ndash;&ndash;make</option>, GHC will compile one or
     more source files given on the command line.</para>
 
     <para>The first phase to run is determined by each input-file

@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
         remember to include <filename>M_stub.o</filename> in the final
         link command line, or you'll get link errors for the missing
         function(s) (this isn't necessary when building your program
-        with <literal>ghc --make</literal>, as GHC will automatically
+        with <literal>ghc &ndash;&ndash;make</literal>, as GHC will automatically
         link in the correct bits).</para>
       </sect3>
     </sect2>

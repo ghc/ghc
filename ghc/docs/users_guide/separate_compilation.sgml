@@ -370,7 +370,7 @@ A.o : B.hi-boot
 	locate any imported modules that come from packages.  The
 	package modules won't be included in the dependencies
 	generated, though (but see the
-	<option>--include-prelude</option> option below).</para>
+	<option>&ndash;&ndash;include-prelude</option> option below).</para>
 
 	<para>The dependency generation phase of GHC can take some
         additional options, which you may find useful.  For historical
@@ -444,7 +444,7 @@ ghc -M -optdep-f -optdep.depend ...
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>--exclude-module=&lt;file&gt;</option></term>
+	    <term><option>&ndash;&ndash;exclude-module=&lt;file&gt;</option></term>
 	    <listitem>
 	      <para>Regard <filename>&lt;file&gt;</filename> as
               "stable"; i.e., exclude it from having dependencies on
@@ -455,12 +455,12 @@ ghc -M -optdep-f -optdep.depend ...
 	  <varlistentry>
 	    <term><option>-x</option></term>
 	    <listitem>
-	      <para>same as <option>--exclude-module</option></para>
+	      <para>same as <option>&ndash;&ndash;exclude-module</option></para>
 	    </listitem>
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>--exclude-directory=&lt;dirs&gt;</option></term>
+	    <term><option>&ndash;&ndash;exclude-directory=&lt;dirs&gt;</option></term>
 	    <listitem>
 	      <para>Regard the colon-separated list of directories
               <filename>&lt;dirs&gt;</filename> as containing stable,
@@ -470,17 +470,17 @@ ghc -M -optdep-f -optdep.depend ...
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>--include-module=&lt;file&gt;</option></term>
+	    <term><option>&ndash;&ndash;include-module=&lt;file&gt;</option></term>
 	    <listitem>
 	      <para>Regard <filename>&lt;file&gt;</filename> as not
               "stable"; i.e., generate dependencies on it (if
               any). This option is normally used in conjunction with
-              the <option>--exclude-directory</option> option.</para>
+              the <option>&ndash;&ndash;exclude-directory</option> option.</para>
 	    </listitem>
 	  </varlistentry>
 
 	  <varlistentry>
-	    <term><option>--include-prelude</option></term>
+	    <term><option>&ndash;&ndash;include-prelude</option></term>
 	    <listitem>
 	      <para>Regard modules imported from packages as unstable,
               i.e., generate dependencies on the package modules used

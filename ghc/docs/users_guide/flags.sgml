@@ -45,19 +45,19 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>--version</option></entry>
+	      <entry><option>&ndash;&ndash;version</option></entry>
 	      <entry>display GHC version</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>--numeric-version</option></entry>
+	      <entry><option>&ndash;&ndash;numeric-version</option></entry>
 	      <entry>display GHC version (numeric only)</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>--print-libdir</option></entry>
+	      <entry><option>&ndash;&ndash;print-libdir</option></entry>
 	      <entry>display GHC library directory</entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
