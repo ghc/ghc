@@ -42,11 +42,12 @@ import CoreSyn		( CoreExpr, CoreBind, Bind(..) )
 import CoreUtils	( exprSomeFreeVars )
 import CoreUnfold	( calcUnfoldingGuidance, UnfoldingGuidance(..), 
 			  Unfolding, okToUnfoldInHiFile )
+import Module		( moduleString, pprModule, pprModuleBoot )
 import Name		( isLocallyDefined, isWiredInName, nameRdrName, nameModule,
 			  isExported,
 			  Name, NamedThing(..)
 			)
-import OccName		( OccName, pprOccName, moduleString, pprModule, pprModuleBoot )
+import OccName		( OccName, pprOccName )
 import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 			  tyConTheta, tyConTyVars, tyConDataCons
 			)
@@ -543,7 +544,8 @@ ppr_decl_context []    = empty
 ppr_decl_context theta = pprIfaceTheta theta <+> ptext SLIT(" =>")
 
 pprIfaceTheta :: ThetaType -> SDoc	-- Use braces rather than parens in interface files
-pprIfaceTheta theta =  braces (hsep (punctuate comma [pprConstraint c tys | (c,tys) <- theta]))
+pprIfaceTheta []    = empty
+pprIfaceTheta theta = braces (hsep (punctuate comma [pprConstraint c tys | (c,tys) <- theta]))
 \end{code}
 
 %************************************************************************
