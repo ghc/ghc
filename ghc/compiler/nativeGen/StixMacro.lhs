@@ -166,19 +166,28 @@ macroCode SET_TAG [tag]
     case stgReg tagreg of
       Always _ -> returnUs id
       Save   _ -> returnUs (\ xs -> set_tag : xs)
+\end{code}
+
+-----------------------------------------------------------------------------
+
+\begin{code}
+macroCode REGISTER_IMPORT [arg]
+   = returnUs (
+	\xs -> StAssign WordRep (StInd WordRep stgSp) (amodeToStix arg)
+	     : StAssign PtrRep  stgSp (StPrim IntAddOp [stgSp, StInt 4])
+	     : xs
+     )
+
+macroCode REGISTER_FOREIGN_EXPORT [arg]
+   = returnUs (
+	\xs -> StCall SLIT("getStablePtr") cCallConv VoidRep [amodeToStix arg]
+	     : xs
+     )
 
 macroCode other args
    = case other of
-        ARGS_CHK -> error "foobarxyzzy1"
-        ARGS_CHK_LOAD_NODE -> error "foobarxyzzy2"
-        UPD_CAF -> error "foobarxyzzy3"
-        UPD_BH_UPDATABLE -> error "foobarxyzzy4"
-        UPD_BH_SINGLE_ENTRY -> error "foobarxyzzy5"
-        PUSH_UPD_FRAME -> error "foobarxyzzy6"
-        PUSH_SEQ_FRAME -> error "foobarxyzzy7"
-        UPDATE_SU_FROM_UPD_FRAME -> error "foobarxyzzy8"
-        SET_TAG -> error "foobarxyzzy9"
-
+        SET_TAG -> error "foobarxyzzy8"
+	_       -> error "StixMacro.macroCode: unknown macro/args"
 \end{code}
 
 

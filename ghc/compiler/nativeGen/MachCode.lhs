@@ -65,6 +65,7 @@ stmt2Instrs stmt = case stmt of
                                                        LABEL lab)))
     StFunEnd lab   -> IF_ARCH_alpha(returnNat (unitOL (FUNEND lab)),
                                     returnNat nilOL)
+
     StLabel lab	   -> returnNat (unitOL (LABEL lab))
 
     StJump arg		   -> genJump arg

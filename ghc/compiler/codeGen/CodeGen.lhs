@@ -22,7 +22,7 @@ module CodeGen ( codeGen ) where
 import StgSyn
 import CgMonad
 import AbsCSyn
-import CLabel		( CLabel, mkSRTLabel, mkClosureLabel )
+import CLabel		( CLabel, mkSRTLabel, mkClosureLabel, mkModuleInitLabel )
 
 import PprAbsC		( dumpRealC )
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts, flattenAbsC )
@@ -117,17 +117,16 @@ mkModuleInit fe_binders mod imps cost_centre_info
 
 	(cc_decls, cc_regs) = mkCostCentreStuff cost_centre_info
 
-	mk_reg_lbl mod_name
-	  = CLitLit (_PK_ ("__init_" ++ moduleNameString mod_name)) AddrRep
-
 	mk_import_register import_name
-	  = CMacroStmt REGISTER_IMPORT [mk_reg_lbl import_name]
+	  = CMacroStmt REGISTER_IMPORT [
+		CLbl (mkModuleInitLabel import_name) AddrRep
+	    ]
 
 	register_imports = map mk_import_register imps
     in
-    mkAbstractCs [ 
+    mkAbstractCs [
 	cc_decls,
-        CModuleInitBlock (mk_reg_lbl (Module.moduleName mod))
+        CModuleInitBlock (mkModuleInitLabel (Module.moduleName mod))
 		         (mkAbstractCs (register_fes ++
 				        cc_regs :
 				        register_imports))

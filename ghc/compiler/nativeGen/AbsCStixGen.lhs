@@ -23,7 +23,8 @@ import SMRep		( fixedItblSize,
 			)
 import Constants   	( mIN_UPD_SIZE )
 import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
-                          mkClosureTblLabel, mkStaticClosureLabel )
+                          mkClosureTblLabel, mkStaticClosureLabel,
+			  moduleRegdLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			  fastLabelFromCI, closureUpdReqd,
 			  staticClosureNeedsLink
@@ -150,10 +151,26 @@ Here we handle top-level things, like @CCodeBlock@s and
                                       (tyConDataCons tycon) )
              ]
 
+ gentopcode stmt@(CModuleInitBlock lbl absC)
+  = gencode absC			`thenUs` \ code ->
+    getUniqLabelNCG 	    	    	`thenUs` \ tmp_lbl ->
+    returnUs ( StSegment DataSegment
+	     : StLabel moduleRegdLabel
+	     : StData IntRep [StInt 0]
+	     : StSegment TextSegment
+	     : StLabel lbl
+	     : StCondJump tmp_lbl (StPrim IntNeOp [StCLbl moduleRegdLabel, 
+						   StInt 0])
+	     : StAssign IntRep (StInd IntRep (StCLbl moduleRegdLabel)) (StInt 1)
+	     : code 
+	     [ StLabel tmp_lbl
+	     , StAssign PtrRep stgSp (StPrim IntSubOp [stgSp, StInt 4])
+	     , StJump (StInd WordRep stgSp)
+	     ])
+
  gentopcode absC
   = gencode absC				`thenUs` \ code ->
     returnUs (StSegment TextSegment : code [])
-
 \end{code}
 
 \begin{code}

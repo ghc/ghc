@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.30 1999/12/02 17:57:13 simonmar Exp $
+% $Id: CLabel.lhs,v 1.31 2000/03/16 12:37:06 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -34,6 +34,8 @@ module CLabel (
 
 	mkAsmTempLabel,
 
+	mkModuleInitLabel,
+
 	mkErrorStdEntryLabel,
 	mkUpdInfoLabel,
 	mkTopTickyCtrLabel,
@@ -41,6 +43,8 @@ module CLabel (
         mkCAFBlackHoleInfoTableLabel,
         mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
+
+	moduleRegdLabel,
 
 	mkSelectorInfoLabel,
 	mkSelectorEntryLabel,
@@ -67,7 +71,7 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
-import Module		( isDynamicModule )
+import Module		( isDynamicModule, ModuleName, moduleNameString )
 import Name		( Name, getName, isExternallyVisibleName, nameModule, isLocallyDefinedName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
@@ -106,6 +110,8 @@ data CLabel
 				-- a 'Closure Table'.
 
   | AsmTempLabel    Unique
+
+  | ModuleInitLabel ModuleName
 
   | RtsLabel	    RtsLabelInfo
 
@@ -170,6 +176,8 @@ data RtsLabelInfo
 
   | RtsTopTickyCtr
 
+  | RtsModuleRegd
+
   deriving (Eq, Ord)
 
 -- Label Type: for generating C declarations.
@@ -211,6 +219,8 @@ mkClosureTblLabel tycon		= TyConLabel tycon
 
 mkAsmTempLabel 			= AsmTempLabel
 
+mkModuleInitLabel		= ModuleInitLabel
+
 	-- Some fixed runtime system labels
 
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
@@ -223,6 +233,8 @@ mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
                                   else  -- RTS won't have info table unless -ticky is on
                                     panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
+
+moduleRegdLabel			= RtsLabel RtsModuleRegd
 
 mkSelectorInfoLabel  upd off	= RtsLabel (RtsSelectorInfoTbl upd off)
 mkSelectorEntryLabel upd off	= RtsLabel (RtsSelectorEntry   upd off)
@@ -262,6 +274,7 @@ needsCDecl (CaseLabel _ _)		= False
 needsCDecl (TyConLabel _)		= True
 
 needsCDecl (AsmTempLabel _)		= False
+needsCDecl (ModuleInitLabel _)		= False
 needsCDecl (RtsLabel _)			= False
 needsCDecl (CC_Label _)			= False
 needsCDecl (CCS_Label _)		= False
@@ -284,6 +297,8 @@ externallyVisibleCLabel (DataConLabel _ _) = True
 externallyVisibleCLabel (TyConLabel tc)    = True
 externallyVisibleCLabel (CaseLabel _ _)	   = False
 externallyVisibleCLabel (AsmTempLabel _)   = False
+externallyVisibleCLabel (ModuleInitLabel _)= True
+externallyVisibleCLabel (RtsLabel RtsModuleRegd) = False --hack
 externallyVisibleCLabel (RtsLabel _)	   = True
 externallyVisibleCLabel (IdLabel id _)     = isExternallyVisibleName id
 externallyVisibleCLabel (CC_Label _)	   = False -- not strictly true
@@ -448,6 +463,9 @@ pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
 pprCLbl (RtsLabel (RtsPrimOp primop)) 
   = pprPrimOp primop <> ptext SLIT("_fast")
 
+pprCLbl (RtsLabel RtsModuleRegd)
+  = ptext SLIT("module_registered")
+
 pprCLbl (TyConLabel tc)
   = hcat [ppr tc, pp_cSEP, ptext SLIT("closure_tbl")]
 
@@ -456,6 +474,8 @@ pprCLbl (DataConLabel con flavor) = ppr con <> ppConFlavor flavor
 
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
+
+pprCLbl (ModuleInitLabel mod)	= ptext SLIT("__init_") <> ptext mod
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 

@@ -563,9 +563,9 @@ pprAbsC stmt@(CRetVector lbl amodes srt liveness) _
 		   LvLarge _ -> SLIT("RET_VEC_BIG")
 
 
-pprAbsC stmt@(CModuleInitBlock label code) _
+pprAbsC stmt@(CModuleInitBlock lbl code) _
   = vcat [
-	ptext SLIT("START_MOD_INIT") <> parens (ppr_amode label),
+	ptext SLIT("START_MOD_INIT") <> parens (pprCLabel lbl),
 	case (pprTempAndExternDecls stmt) of { (_, pp_exts) -> pp_exts },
 	pprAbsC code (costs code),
 	hcat [ptext SLIT("END_MOD_INIT"), lparen, rparen]
