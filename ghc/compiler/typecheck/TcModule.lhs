@@ -11,10 +11,10 @@ module TcModule (
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_D_dump_tc, opt_D_dump_types, opt_PprStyle_Debug )
+import CmdLineOpts	( DynFlag(..), DynFlags, opt_PprStyle_Debug )
 import HsSyn		( HsModule(..), HsBinds(..), MonoBinds(..), HsDecl(..) )
 import HsTypes		( toHsType )
-import RnHsSyn		( RenamedHsModule )
+import RnHsSyn		( RenamedHsModule, RenamedHsDecl )
 import TcHsSyn		( TypecheckedMonoBinds, 
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkForeignExports, zonkRules
@@ -25,41 +25,44 @@ import Inst		( emptyLIE, plusLIE )
 import TcBinds		( tcTopBinds )
 import TcClassDcl	( tcClassDecls2, mkImplicitClassBinds )
 import TcDefaults	( tcDefaults )
-import TcEnv		( tcExtendGlobalValEnv, tcLookupGlobal_maybe,
+import TcEnv		( TcEnv, tcExtendGlobalValEnv, tcLookupGlobal_maybe,
 			  tcEnvTyCons, tcEnvClasses, 
-			  tcSetEnv, tcSetInstEnv, initEnv
+			  tcSetEnv, tcSetInstEnv, initTcEnv, getTcGEnv
 			)
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcInstUtil	( InstInfo )
+import TcInstUtil	( InstInfo(..) )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import TcTyDecls	( mkImplicitDataBinds )
 
 import CoreUnfold	( unfoldingTemplate )
 import Type		( funResultTy, splitForAllTys )
-import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
-import ErrUtils		( printErrorsAndWarnings, dumpIfSet )
+import ErrUtils		( printErrorsAndWarnings, dumpIfSet_dyn )
 import Id		( idType, idName, idUnfolding )
-import Module           ( pprModuleName, mkThisModule, plusModuleEnv )
+import Module           ( Module, moduleName, {-mkThisModule,-} plusModuleEnv )
 import Name		( nameOccName, isLocallyDefined, isGlobalName,
-			  toRdrName, nameEnvElts, 
+			  toRdrName, nameEnvElts, emptyNameEnv
 			)
 import TyCon		( TyCon, isDataTyCon, tyConName, tyConGenInfo )
 import OccName		( isSysOcc )
 import TyCon		( TyCon, isClassTyCon )
 import Class		( Class )
-import PrelNames	( mAIN_Name, mainKey )
+import PrelNames	( mAIN_Name, mainName )
 import UniqSupply       ( UniqSupply )
 import Maybes		( maybeToBool )
 import Util
 import BasicTypes       ( EP(..) )
 import Bag		( Bag, isEmptyBag )
-vimport Outputable
-
+import Outputable
+import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, 
+			  PackageSymbolTable, DFunId, 
+			  TypeEnv, extendTypeEnv,
+		          TyThing(..), groupTyThings )
+import FiniteMap	( FiniteMap, delFromFM, lookupWithDefaultFM )
 \end{code}
 
 Outside-world interface:
@@ -74,32 +77,28 @@ data TcResults
 	tc_insts   :: [DFunId],			-- Instances, just for this module
 	tc_binds   :: TypecheckedMonoBinds,
 	tc_fords   :: [TypecheckedForeignDecl], -- Foreign import & exports.
-	tc_rules   :: [TypecheckedRuleDecl],	-- Transformation rules
+	tc_rules   :: [TypecheckedRuleDecl]	-- Transformation rules
     }
 
 ---------------
 typecheckModule
-	:: PersistentCompilerState
+	:: DynFlags
+	-> PersistentCompilerState
 	-> HomeSymbolTable
 	-> RenamedHsModule
-	-> IO (Maybe (PersistentCompilerState, TcResults))
+	-> IO (Maybe (TcEnv, TcResults))
 
-typecheckModule pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
-  = do { env <- initTcEnv global_symbol_table ;
-
-	 (_, (maybe_result, msgs)) <- initTc env src_loc tc_module
-		
-	 printErrorsAndWarnings msgs ;
-	
-	 printTcDumps maybe_result ;
-			
-	 if isEmptyBag errs then 
-	    return Nothing 
-	 else 
-	    return result
-    }
+typecheckModule dflags pcs hst (HsModule mod_name _ _ _ decls _ src_loc)
+  = do env <- initTcEnv global_symbol_table
+       (maybe_result, (errs,warns)) <- initTc dflags env src_loc tc_module
+       printErrorsAndWarnings (errs,warns)
+       printTcDump dflags maybe_result
+       if isEmptyBag errs then 
+          return Nothing 
+         else 
+          return maybe_result
   where
-    this_mod	        = mkThisModule
+    this_mod	        = panic "mkThisModule: unimp"  -- WAS: mkThisModule
     global_symbol_table = pcs_PST pcs `plusModuleEnv` hst
 
     tc_module = fixTc (\ ~(unf_env ,_) -> tcModule pcs hst this_mod decls unf_env)
@@ -112,7 +111,7 @@ tcModule :: PersistentCompilerState
 	 -> Module
 	 -> [RenamedHsDecl]
 	 -> TcEnv		-- The knot-tied environment
-	 -> TcM TcResults
+	 -> TcM (TcEnv, TcResults)
 
   -- (unf_env :: TcEnv) is used for type-checking interface pragmas
   -- which is done lazily [ie failure just drops the pragma
@@ -231,10 +230,10 @@ tcModule pcs hst this_mod decls unf_env
     
     
     let	groups :: FiniteMap Module TypeEnv
-    	groups = groupTyThings (nameEnvElts (tcGEnv final_env))
+    	groups = groupTyThings (nameEnvElts (getTcGEnv final_env))
     
     	local_type_env :: TypeEnv
-    	local_type_env = lookupWithDefaultFM groups this_mod emptyNameEnv
+    	local_type_env = lookupWithDefaultFM groups emptyNameEnv this_mod 
     
     	new_pst :: PackageSymbolTable
     	new_pst = extendTypeEnv (pcs_PST pcs) (delFromFM groups this_mod)
@@ -242,14 +241,14 @@ tcModule pcs hst this_mod decls unf_env
 	final_pcs :: PersistentCompilerState
 	final_pcs = pcs_with_insts {pcs_PST = new_pst}
     in  
-    returnTc (really_final_env, 
+    returnTc (final_env, -- WAS: really_final_env, 
 	      TcResults { tc_pcs     = final_pcs,
 			  tc_env     = local_type_env,
 			  tc_binds   = all_binds', 
-			  tc_insts   = map instInfoDfunId inst_infos,
+			  tc_insts   = map iDFunId inst_info,
 			  tc_fords   = foi_decls ++ foe_decls',
 			  tc_rules   = rules'
-    }))
+                        })
 
 get_binds decls = foldr ThenBinds EmptyBinds [binds | ValD binds <- decls]
 \end{code}
@@ -267,7 +266,7 @@ checkMain this_mod
   | otherwise = returnTc ()
 
 noMainErr
-  = hsep [ptext SLIT("Module"), quotes (pprModuleName mAIN_Name), 
+  = hsep [ptext SLIT("Module"), quotes (ppr mAIN_Name), 
 	  ptext SLIT("must include a definition for"), quotes (ptext SLIT("main"))]
 \end{code}
 
@@ -279,24 +278,26 @@ noMainErr
 %************************************************************************
 
 \begin{code}
-printTcDump Nothing = return ()
-printTcDump (Just results)
-  = do { dumpIfSet opt_D_dump_types "Type signatures" (dump_sigs results) ;
-         dumpIfSet opt_D_dump_tc    "Typechecked"     (dump_tc   results) 
-    }
+printTcDump dflags Nothing = return ()
+printTcDump dflags (Just (_,results))
+  = do dumpIfSet_dyn dflags Opt_D_dump_types 
+                     "Type signatures" (dump_sigs results)
+       dumpIfSet_dyn dflags Opt_D_dump_tc    
+                     "Typechecked" (dump_tc results) 
 
 dump_tc results
   = vcat [ppr (tc_binds results),
-	  pp_rules (tc_rules results),
-	  ppr_gen_tycons (tc_tycons results)
+	  pp_rules (tc_rules results) --,
+--	  ppr_gen_tycons (tc_tycons results)
     ]
 
 dump_sigs results	-- Print type signatures
   = 	-- Convert to HsType so that we get source-language style printing
 	-- And sort by RdrName
     vcat $ map ppr_sig $ sortLt lt_sig $
-    [(toRdrName id, toHsType (idType id)) | id <- nameEnvElts (tc_env results), 
-					    want_sig id
+    [(toRdrName id, toHsType (idType id))
+        | AnId id <- nameEnvElts (tc_env results), 
+          want_sig id
     ]
   where
     lt_sig (n1,_) (n2,_) = n1 < n2

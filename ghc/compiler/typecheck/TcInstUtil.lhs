@@ -13,7 +13,9 @@ module TcInstUtil (
 	-- Instance environment
 	InstEnv, emptyInstEnv, extendInstEnv,
 	lookupInstEnv, InstLookupResult(..),
-	classInstEnv, classDataCon
+	classInstEnv, classDataCon,
+
+	isLocalInst
     ) where
 
 #include "HsVersions.h"

@@ -20,9 +20,8 @@ import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, listTyCon_name )
 import BasicTypes	( RecFlag(..), NewOrData(..) )
 
 import TcMonad
-import TcEnv		( TcEnv, TyThing(..), TyThingDetails(..), tyThingKind,
-			  tcExtendTypeEnv, tcExtendKindEnv, tcLookupGlobal
-			)
+import TcEnv		( TcEnv, TyThing(..), TyThingDetails(..),
+			  tcExtendKindEnv, tcLookupGlobal, tcExtendGlobalEnv )
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsBoxedSigType, kcHsContext, mkTyClTyVars )
@@ -33,7 +32,8 @@ import TcInstDcls	( tcAddDeclCtxt )
 import Type		( Kind, mkArrowKind, boxedTypeKind, zipFunTys )
 import Variance         ( calcTyConArgVrcs )
 import Class		( Class, mkClass, classTyCon )
-import TyCon		( TyCon, ArgVrcs, AlgTyConFlavour(..), mkSynTyCon, mkAlgTyConRep, mkClassTyCon )
+import TyCon		( TyCon, tyConKind, ArgVrcs, AlgTyConFlavour(..), 
+			  mkSynTyCon, mkAlgTyConRep, mkClassTyCon )
 import DataCon		( isNullaryDataCon )
 import Var		( varName )
 import FiniteMap
@@ -49,6 +49,7 @@ import ErrUtils		( Message )
 import Unique		( Unique, Uniquable(..) )
 import HsDecls          ( fromClassDeclNameList )
 import Generics         ( mkTyConGenInfo )
+import CmdLineOpts	( DynFlags )
 \end{code}
 
 
@@ -113,7 +114,8 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 \begin{code}
 tcGroup :: TcEnv -> SCC RenamedTyClDecl -> TcM TcEnv
 tcGroup unf_env scc
-  = 	-- Step 1
+  = getDOptsTc							`thenTc` \ dflags ->
+	-- Step 1
     mapNF_Tc getInitialKind decls 				`thenNF_Tc` \ initial_kinds ->
 
 	-- Step 2
@@ -130,7 +132,8 @@ tcGroup unf_env scc
 	    rec_details = mkNameEnv rec_details_list
 
 	    tyclss, all_tyclss :: [(Name, TyThing)]
-	    tyclss = map (buildTyConOrClass is_rec kind_env rec_vrcs rec_details) decls
+	    tyclss = map (buildTyConOrClass dflags is_rec kind_env 
+				                   rec_vrcs rec_details) decls
 
 		-- Add the tycons that come from the classes
 		-- We want them in the environment because 
@@ -270,13 +273,14 @@ kcTyClDeclBody tc_name hs_tyvars thing_inside
 
 \begin{code}
 buildTyConOrClass 
-	:: RecFlag -> NameEnv Kind
+	:: DynFlags
+	-> RecFlag -> NameEnv Kind
 	-> FiniteMap TyCon ArgVrcs -> NameEnv TyThingDetails
 	-> RenamedTyClDecl -> (Name, TyThing)
 	-- Can't fail; the only reason it's in the monad 
 	-- is so it can zonk the kinds
 
-buildTyConOrClass is_rec kenv rec_vrcs rec_details
+buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
 	          (TySynonym tycon_name tyvar_names rhs src_loc)
   = (tycon_name, ATyCon tycon)
   where
@@ -287,7 +291,7 @@ buildTyConOrClass is_rec kenv rec_vrcs rec_details
 	SynTyDetails rhs_ty = lookupNameEnv_NF rec_details tycon_name
         argvrcs		    = lookupWithDefaultFM rec_vrcs bogusVrcs tycon
 
-buildTyConOrClass is_rec kenv rec_vrcs  rec_details
+buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ _ src_loc name1 name2)
   = (tycon_name, ATyCon tycon)
   where
@@ -295,7 +299,7 @@ buildTyConOrClass is_rec kenv rec_vrcs  rec_details
 			   data_cons nconstrs
 			   derived_classes
 			   flavour is_rec gen_info
-	gen_info = mkTyConGenInfo tycon name1 name2
+	gen_info = mkTyConGenInfo dflags tycon name1 name2
 
 	DataTyDetails ctxt data_cons derived_classes = lookupNameEnv_NF rec_details tycon_name
 
@@ -308,7 +312,7 @@ buildTyConOrClass is_rec kenv rec_vrcs  rec_details
 			DataType | all isNullaryDataCon data_cons -> EnumTyCon
 				 | otherwise			  -> DataTyCon
 
-buildTyConOrClass is_rec kenv rec_vrcs  rec_details
+buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                   (ClassDecl context class_name
 		             tyvar_names fundeps class_sigs def_methods pragmas
 		             name_list src_loc)

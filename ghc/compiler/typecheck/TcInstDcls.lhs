@@ -9,7 +9,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
 #include "HsVersions.h"
 
 
-import CmdLineOpts	( opt_GlasgowExts, opt_AllowUndecidableInstances, opt_D_dump_deriv )
+import CmdLineOpts	( DynFlag(..), dopt )
 
 import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..),
@@ -18,12 +18,12 @@ import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..),
 import HsTypes          ( HsType (..), HsTyVarBndr(..), toHsTyVar )
 import HsPat            ( InPat (..) )
 import HsMatches        ( Match (..) )
-import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, extractHsTyVars )
+import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl,
+			  extractHsTyVars )
 import TcHsSyn		( TcMonoBinds, mkHsConApp )
 import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, badMethodErr )
 import TcMonad       
-import RnMonad		( RnNameSupply, FixityEnv )
 import Inst		( InstOrigin(..),
 			  newDicts, newClassDicts,
 			  LIE, emptyLIE, plusLIE, plusLIEs )
@@ -33,10 +33,14 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			  tcAddImportedIdInfo, tcInstId, tcLookupClass,
 			  newDFunName, tcExtendTyVarEnv
 			)
-import TcInstUtil	( InstInfo(..), pprInstInfo, classDataCon, simpleInstInfoTyCon, simpleInstInfoTy )
+import TcInstUtil	( InstInfo(..), InstEnv, pprInstInfo, classDataCon, 
+ 			  simpleInstInfoTyCon, simpleInstInfoTy, isLocalInst,
+			  extendInstEnv )
 import TcMonoType	( tcTyVars, tcHsSigType, tcHsType, kcHsSigType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( zonkTcSigTyVars )
+import HscTypes		( PersistentCompilerState(..), HomeSymbolTable, DFunId,
+			  ModDetails(..) )
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			  foldBag, Bag, listToBag
@@ -46,12 +50,12 @@ import Var		( idName, idType )
 import Maybes 		( maybeToBool, expectJust )
 import MkId		( mkDictFunId )
 import Generics		( validGenericInstanceType )
-import Module		( Module )
+import Module		( Module, foldModuleEnv )
 import Name		( isLocallyDefined )
 import NameSet		( emptyNameSet, nameSetToList )
 import PrelInfo		( eRROR_ID )
 import PprType		( pprConstraint, pprPred )
-import TyCon		( isSynTyCon, tyConDerivings )
+import TyCon		( TyCon, isSynTyCon, tyConDerivings )
 import Type		( mkTyVarTys, splitSigmaTy, isTyVarTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,
 			  splitAlgTyConApp_maybe, classesToPreds, classesOfPreds,
@@ -71,12 +75,12 @@ import VarSet           ( varSetElems )
 import UniqFM           ( mapUFM )
 import Unique		( Uniquable(..) )
 import BasicTypes	( NewOrData(..) )
-import ErrUtils		( dumpIfSet )
+import ErrUtils		( dumpIfSet_dyn )
 import ListSetOps	( Assoc, emptyAssoc, plusAssoc_C, mapAssoc, 
 			  assocElts, extendAssoc_C,
 			  equivClassesByUniq, minusList
 			)
-import List             ( intersect, (\\) )
+import List             ( intersect, (\\), partition )
 import Outputable
 \end{code}
 
@@ -167,21 +171,22 @@ tcInstDecls1 :: PersistentCompilerState
 	     -> HomeSymbolTable		-- Contains instances
 	     -> TcEnv 			-- Contains IdInfo for dfun ids
 	     -> Module			-- Module for deriving
+	     -> [TyCon]
 	     -> [RenamedHsDecl]
 	     -> TcM (PersistentCompilerState, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 pcs hst unf_env this_mod decls mod
+tcInstDecls1 pcs hst unf_env mod local_tycons decls
   = let
 	inst_decls = [inst_decl | InstD inst_decl <- decls]
-	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl cl_decl]
+	clas_decls = [clas_decl | TyClD clas_decl <- decls, isClassDecl clas_decl]
     in
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 mod) inst_decls	     	`thenNF_Tc` \ inst_infos ->
+    mapNF_Tc (tcInstDecl1 mod unf_env) inst_decls    	`thenNF_Tc` \ inst_infos ->
 
 	-- (2) Instances from generic class declarations
-    getGenericInstances mod clas_decls			`thenTc` \ generic_inst_info -> 
+    getGenericInstances mod clas_decls		`thenTc` \ generic_inst_info -> 
 
-	-- Next, consruct the instance environment so far, consisting of
+	-- Next, construct the instance environment so far, consisting of
 	--	a) cached non-home-package InstEnv (gotten from pcs)	pcs_insts pcs
 	--	b) imported instance decls (not in the home package)	inst_env1
 	--	c) other modules in this package (gotten from hst)	inst_env2
@@ -189,25 +194,27 @@ tcInstDecls1 pcs hst unf_env this_mod decls mod
 	--	e) generic instances					inst_env4
 	-- The result of (b) replaces the cached InstEnv in the PCS
     let
-	(local_inst_info, imported_inst_info) = partition isLocalInst (concat inst_infos)
-	generic_inst_info = concat generic_inst_infos	-- All local
+	(local_inst_info, imported_inst_info)
+	   = partition isLocalInst (concat inst_infos)
 
-	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . instInfoDFun) imported_inst_info
+	imported_dfuns	 = map (tcAddImportedIdInfo unf_env . iDFunId) 
+			       imported_inst_info
 	hst_dfuns	 = foldModuleEnv ((++) . md_insts) [] hst
     in
     addInstDFuns (pcs_insts pcs) imported_dfuns	`thenNF_Tc` \ inst_env1 ->
     addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
     addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
     addInstInfos inst_env3 generic_inst_info	`thenNF_Tc` \ inst_env4 ->
-    in
 
 	-- (3) Compute instances from "deriving" clauses; 
 	--     note that we only do derivings for things in this module; 
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
 	-- needs to know about all the instances possible; hecne inst_env4
-    tcDeriving (pcs_PRS pcs) this_mod inst_env4 local_tycons	`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    addInstInfos inst_env4 deriv_inst_info			`thenNF_Tc` \ final_inst_env ->
+    tcDeriving (pcs_PRS pcs) mod inst_env4 local_tycons
+					`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    addInstInfos inst_env4 deriv_inst_info			
+					`thenNF_Tc` \ final_inst_env ->
 
     returnTc (pcs { pcs_insts = inst_env1 }, 
 	      final_inst_env, 
@@ -215,14 +222,17 @@ tcInstDecls1 pcs hst unf_env this_mod decls mod
 	      deriv_binds)
 
 addInstInfos :: InstEnv -> [InstInfo] -> NF_TcM InstEnv
-addInstInfos inst_env infos = addInstDfuns inst_env (map iDFun infos)
+addInstInfos inst_env infos = addInstDFuns inst_env (map iDFunId infos)
 
 addInstDFuns :: InstEnv -> [DFunId] -> NF_TcM InstEnv
 addInstDFuns dfuns infos
-  = addErrsTc errs	`thenNF_Tc_` 
+  = getDOptsTc				`thenTc` \ dflags ->
+    extendInstEnv dflags dfuns infos	`bind`   \ (inst_env', errs) ->
+    addErrsTc errs			`thenNF_Tc_` 
     returnTc inst_env'
   where
-    (inst_env', errs) = extendInstEnv env dfuns
+    bind x f = f x
+
 \end{code} 
 
 \begin{code}
@@ -302,12 +312,14 @@ gives rise to the instance declarations
 \begin{code}
 getGenericInstances :: Module -> [RenamedTyClDecl] -> TcM [InstInfo] 
 getGenericInstances mod class_decls
-  = mapTc (get_generics mod) class_decls			`thenTc` \ gen_inst_infos ->
+  = mapTc (get_generics mod) class_decls		`thenTc` \ gen_inst_infos ->
     let
 	gen_inst_info = concat gen_inst_infos
     in
-    ioToTc (dumpIfSet opt_D_dump_deriv "Generic instances" 
-		      (vcat (map pprInstInfo gen_inst_info)))	`thenNF_Tc_`
+    getDOptsTc						`thenTc`  \ dflags ->
+    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
+		      (vcat (map pprInstInfo gen_inst_info)))	
+							`thenNF_Tc_`
     returnTc gen_inst_info
 
 get_generics mod decl@(ClassDecl context class_name tyvar_names 
@@ -411,11 +423,13 @@ mkGenericInstance mod clas loc (hs_ty, binds)
 %************************************************************************
 
 \begin{code}
-tcInstDecls2 :: Bag InstInfo
+tcInstDecls2 :: [InstInfo]
 	     -> NF_TcM (LIE, TcMonoBinds)
 
 tcInstDecls2 inst_decls
-  = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyMonoBinds)) inst_decls
+--  = foldBag combine tcInstDecl2 (returnNF_Tc (emptyLIE, EmptyMonoBinds)) inst_decls
+  = foldr combine (returnNF_Tc (emptyLIE, EmptyMonoBinds)) 
+          (map tcInstDecl2 inst_decls)
   where
     combine tc1 tc2 = tc1 	`thenNF_Tc` \ (lie1, binds1) ->
 		      tc2	`thenNF_Tc` \ (lie2, binds2) ->
@@ -672,57 +686,64 @@ We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
 scrutiniseInstanceConstraint pred
-  | opt_AllowUndecidableInstances
-  = returnNF_Tc ()
+  = getDOptsTc `thenTc` \ dflags -> case () of
+    () 
+     |  dopt Opt_AllowUndecidableInstances dflags
+     -> returnNF_Tc ()
 
-  | Just (clas,tys) <- getClassTys_maybe pred,
-    all isTyVarTy tys
-  = returnNF_Tc ()
+     |  Just (clas,tys) <- getClassTys_maybe pred,
+        all isTyVarTy tys
+     -> returnNF_Tc ()
 
-  | otherwise
-  = addErrTc (instConstraintErr pred)
+     |  otherwise
+     -> addErrTc (instConstraintErr pred)
 
 scrutiniseInstanceHead clas inst_taus
-  |	-- CCALL CHECK
+  = getDOptsTc `thenTc` \ dflags -> case () of
+    () 
+     |	-- CCALL CHECK
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
-    (clas `hasKey` cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
-    (clas `hasKey` cReturnableClassKey && not (creturnable_type first_inst_tau))
-  = addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
+        (clas `hasKey` cCallableClassKey   
+            && not (ccallable_type dflags first_inst_tau)) 
+        ||
+        (clas `hasKey` cReturnableClassKey 
+            && not (creturnable_type first_inst_tau))
+     -> addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
 
   	-- DERIVING CHECK
 	-- It is obviously illegal to have an explicit instance
 	-- for something that we are also planning to `derive'
-  | maybeToBool alg_tycon_app_maybe && clas `elem` (tyConDerivings alg_tycon)
-  = addErrTc (derivingWhenInstanceExistsErr clas first_inst_tau)
+     |  maybeToBool alg_tycon_app_maybe && clas `elem` (tyConDerivings alg_tycon)
+     -> addErrTc (derivingWhenInstanceExistsErr clas first_inst_tau)
 	   -- Kind check will have ensured inst_taus is of length 1
 
 	-- Allow anything for AllowUndecidableInstances
-  | opt_AllowUndecidableInstances
-  = returnNF_Tc ()
+     |  dopt Opt_AllowUndecidableInstances dflags
+     -> returnNF_Tc ()
 
 	-- If GlasgowExts then check at least one isn't a type variable
-  | opt_GlasgowExts 
-  = if all isTyVarTy inst_taus then
-	addErrTc (instTypeErr clas inst_taus (text "There must be at least one non-type-variable in the instance head"))
-    else
-	returnNF_Tc ()
+     |  dopt Opt_GlasgowExts dflags
+     -> if   all isTyVarTy inst_taus
+        then addErrTc (instTypeErr clas inst_taus 
+             (text "There must be at least one non-type-variable in the instance head"))
+        else returnNF_Tc ()
 
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
-  |  not (length inst_taus == 1 &&
-	  maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
-          not (isSynTyCon tycon) &&		-- ...but not a synonym
-          all isTyVarTy arg_tys && 		-- Applied to type variables
-	  length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
-		 -- This last condition checks that all the type variables are distinct
-     )
-  = addErrTc (instTypeErr clas inst_taus
-			(text "the instance type must be of form (T a b c)" $$
-			 text "where T is not a synonym, and a,b,c are distinct type variables")
-    )
+     |  not (length inst_taus == 1 &&
+             maybeToBool maybe_tycon_app &&	-- Yes, there's a type constuctor
+             not (isSynTyCon tycon) &&		-- ...but not a synonym
+             all isTyVarTy arg_tys && 		-- Applied to type variables
+	     length (varSetElems (tyVarsOfTypes arg_tys)) == length arg_tys
+             -- This last condition checks that all the type variables are distinct
+            )
+     ->  addErrTc (instTypeErr clas inst_taus
+		     (text "the instance type must be of form (T a b c)" $$
+		      text "where T is not a synonym, and a,b,c are distinct type variables")
+         )
 
-  | otherwise
-  = returnNF_Tc ()
+     |  otherwise
+     -> returnNF_Tc ()
 
   where
     (first_inst_tau : _)       = inst_taus
@@ -736,8 +757,8 @@ scrutiniseInstanceHead clas inst_taus
 				-- The "Alg" part looks through synonyms
     Just (alg_tycon, _, _) = alg_tycon_app_maybe
  
-ccallable_type   ty = isFFIArgumentTy False {- Not safe call -} ty
-creturnable_type ty = isFFIResultTy ty
+    ccallable_type   dflags ty = isFFIArgumentTy dflags False {- Not safe call -} ty
+    creturnable_type        ty = isFFIResultTy ty
 \end{code}
 
 
