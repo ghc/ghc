@@ -34,7 +34,7 @@ import Id		( Id, idType, idInfo, omitIfaceSigForId, isDictFunId,
 			)
 import Var		( isId )
 import VarSet
-import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( StrictnessMark(..), dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import CoreSyn		( CoreBind, CoreRule(..), IdCoreRule, 
 			  isBuiltinRule, rulesRules, 
@@ -45,10 +45,10 @@ import CoreUnfold	( neverUnfold, unfoldingTemplate )
 import Name		( getName, nameModule, Name, NamedThing(..) )
 import Name 	-- Env
 import OccName		( pprOccName )
-import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
+import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon, tyConGenIds,
 			  tyConTheta, tyConTyVars, tyConDataCons, tyConFamilySize, isClassTyCon
 			)
-import Class		( classExtraBigSig, DefMeth(..) )
+import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
 import Type		( splitSigmaTy, tidyTopType, deNoteType )
 import SrcLoc		( noSrcLoc )
@@ -244,10 +244,14 @@ ifaceTyCls (AClass clas) so_far
 			   tcdFDs 	= toHsFDs clas_fds,
 			   tcdSigs	= map toClassOpSig op_stuff,
 			   tcdMeths	= Nothing, 
-			   tcdSysNames  = bogus_sysnames,
+			   tcdSysNames  = sys_names,
 			   tcdLoc	= noSrcLoc }
 
-    (clas_tyvars, clas_fds, sc_theta, _, op_stuff) = classExtraBigSig clas
+    (clas_tyvars, clas_fds, sc_theta, sc_sels, op_stuff) = classExtraBigSig clas
+    tycon     = classTyCon clas
+    data_con  = head (tyConDataCons tycon)
+    sys_names = mkClassDeclSysNames (getName tycon, getName data_con, 
+				     getName (dataConId data_con), map getName sc_sels)
 
     toClassOpSig (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
@@ -277,8 +281,8 @@ ifaceTyCls (ATyCon tycon) so_far
 			tcdCons   = map ifaceConDecl (tyConDataCons tycon),
 			tcdNCons  = tyConFamilySize tycon,
 			tcdDerivs = Nothing,
-		        tcdSysNames  = bogus_sysnames,
-			tcdLoc	  = noSrcLoc }
+		        tcdSysNames  = map getName (tyConGenIds tycon),
+			tcdLoc	     = noSrcLoc }
 
 	    | otherwise = pprPanic "ifaceTyCls" (ppr tycon)
 
@@ -386,8 +390,6 @@ ifaceRule (id, BuiltinRule _)
 ifaceRule (id, Rule name bndrs args rhs)
   = IfaceRule name (map toUfBndr bndrs) (getName id)
 	      (map toUfExpr args) (toUfExpr rhs) noSrcLoc
-
-bogus_sysnames = panic "Bogus sys names"
 
 bogusIfaceRule id
   = IfaceRule SLIT("bogus") [] (getName id) [] (UfVar (getName id)) noSrcLoc
