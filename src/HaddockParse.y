@@ -56,12 +56,7 @@ seq	:: { ParsedDoc }
 	| elem			{ $1 }
 
 elem	:: { ParsedDoc }
-	: STRING		{ DocString $1 }
-	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
-	| URL			{ DocURL $1 }
-	| SQUO STRING SQUO	{ DocIdentifier $2 }
-	| BQUO STRING SQUO	{ DocIdentifier $2 }
-	| DQUO STRING DQUO	{ DocModule $2 }
+	: elem1			{ $1 }
 	| '@' seq1 '@'		{ DocMonospaced $2 }
 
 seq1	:: { ParsedDoc }
@@ -72,9 +67,12 @@ elem1	:: { ParsedDoc }
 	: STRING		{ DocString $1 }
 	| '/' STRING '/'	{ DocEmphasis (DocString $2) }
 	| URL			{ DocURL $1 }
-	| SQUO STRING SQUO	{ DocIdentifier $2 }
-	| BQUO STRING SQUO	{ DocIdentifier $2 }
+	| squo STRING squo	{ DocIdentifier $2 }
 	| DQUO STRING DQUO	{ DocModule $2 }
+
+squo :: { () }
+	: SQUO			{ () }
+	| BQUO			{ () }
 
 {
 happyError :: [Token] -> Either String a
