@@ -1,0 +1,138 @@
+
+
+================================================================================
+Simplified:
+nrlit_sMT  :: 
+    [PrelBase.Char{-38,p-}]
+{-# L #-}
+nrlit_sMT =
+    PackedString.unpackCString#{-8F,p-}
+	"xxx"
+$d1{-rJ7,x-}  :: 
+    _forall_
+    [a{-r3g-} b{-r3h-} c{-r3i-}]
+    =>
+    {Foo{-r3j,x-} a{-r3g-}}
+    -> {Foo{-r3j,x-} b{-r3h-}}
+    -> {Foo{-r3j,x-} c{-r3i-}}
+    -> {Foo{-r3j,x-} (Wibble{-r3y,x-} a{-r3g-} b{-r3h-} c{-r3i-})}
+_A>_ 3 {-# L #-}
+$d1{-rJ7,x-} =
+    _/\_ a{-sMG-} b{-sMH-} c{-sMI-} -> \ d.Foo_sLN  :: 
+					     {Foo{-r3j,x-} a{-sMG-}}
+					 {-# L #-}
+					 d.Foo_sLN d.Foo_sLM  :: 
+						       {Foo{-r3j,x-} b{-sMH-}}
+						   {-# L #-}
+						   d.Foo_sLM d.Foo_sLL  :: 
+								 {Foo{-r3j,x-} c{-sMI-}}
+							     {-# L #-}
+							     d.Foo_sLL ->
+	let {
+	  op_sLp  :: 
+	      PrelBase.Int{-3g,p-}
+	      -> Wibble{-r3y,x-} a{-sMG-} b{-sMH-} c{-sMI-}
+	      -> PrelBase.Bool{-34,p-}
+	  _A>_ 2 {-# L #-}
+	  op_sLp =
+	      \ x_sLs  :: 
+		    PrelBase.Int{-3g,p-}
+		{-# L #-}
+		x_sLs y_sLq  :: 
+			  Wibble{-r3y,x-} a{-sMG-} b{-sMH-} c{-sMI-}
+		      {-# L #-}
+		      y_sLq ->
+		  IOBase.error{-87,p-}
+		      _@_ PrelBase.Bool{-34,p-} nrlit_sMT } in
+	let {
+	  op_sLO  :: 
+	      PrelBase.Int{-3g,p-}
+	      -> Wibble{-r3y,x-} a{-sMG-} b{-sMH-} c{-sMI-}
+	      -> PrelBase.Bool{-34,p-}
+	  _A>_ 2 {-# L #-}
+	  op_sLO =
+	      op_sLp } in
+	let {
+	  d.Foo_sLP  :: 
+	      {Foo{-r3j,x-} (Wibble{-r3y,x-} a{-sMG-} b{-sMH-} c{-sMI-})}
+	  _A>_ 2 {-# L #-}
+	  d.Foo_sLP =
+	      op_sLp
+	} in 
+	  op_sLp
+$d2{-rJ2,x-}  :: 
+    _forall_
+    [a{-r3s-} b{-r3t-} c{-r3u-}]
+    =>
+    {PrelBase.Eval{-24,p-} (Wibble{-r3y,x-} a{-r3s-} b{-r3t-} c{-r3u-})}
+_A>_ 0 {-# L #-}
+$d2{-rJ2,x-} =
+    _/\_ a{-sMV-} b{-sMW-} c{-sMX-} ->
+	let {
+	  d.Eval_sM2  :: 
+	      {PrelBase.Eval{-24,p-} (Wibble{-r3y,x-} a{-sMV-} b{-sMW-} c{-sMX-})}
+	  {-# L #-}
+	  d.Eval_sM2 =
+	      PrelBase.void{-8G,p-}
+	} in 
+	  PrelBase.void{-8G,p-}
+nrlit_sMU  :: 
+    [PrelBase.Char{-38,p-}]
+{-# L #-}
+nrlit_sMU =
+    PackedString.unpackCString#{-8F,p-}
+	"Class Foo Method op"
+$mop{-rIV,x-}  :: 
+    _forall_
+    [a{-r3w-}]
+    =>
+    {Foo{-r3j,x-} a{-r3w-}}
+    -> PrelBase.Int{-3g,p-}
+    -> a{-r3w-}
+    -> PrelBase.Bool{-34,p-}
+_A>_ 3 {-# L #-}
+$mop{-rIV,x-} =
+    _/\_ a{-sMJ-} -> \ d.Foo_sMg  :: 
+			   {Foo{-r3j,x-} a{-sMJ-}}
+		       {-# L #-}
+		       d.Foo_sMg ->
+	GHCerr.noDefaultMethodError{-8k,p-}
+	    _@_ (PrelBase.Int{-3g,p-} -> a{-sMJ-} -> PrelBase.Bool{-34,p-})
+	    nrlit_sMU
+op{-r3z,x-}  :: 
+    _forall_
+    [a{-r3w-}]
+    =>
+    {Foo{-r3j,x-} a{-r3w-}}
+    -> PrelBase.Int{-3g,p-}
+    -> a{-r3w-}
+    -> PrelBase.Bool{-34,p-}
+_A>_ 1 {-# L #-}
+op{-r3z,x-} =
+    _/\_ a{-sMK-} -> \ tpl_sMf  :: 
+			   {Foo{-r3j,x-} a{-sMK-}}
+		       {-# L #-}
+		       tpl_sMf ->
+	tpl_sMf
+MkWibble{-r3x,x-}{i}  :: 
+    _forall_
+    [a{-r3s-} b{-r3t-} c{-r3u-}]
+    =>
+    a{-r3s-}
+    -> b{-r3t-}
+    -> c{-r3u-}
+    -> Wibble{-r3y,x-} a{-r3s-} b{-r3t-} c{-r3u-}
+_A>_ 3 {-# L #-}
+MkWibble{-r3x,x-}{i} =
+    _/\_ a{-sMO-} b{-sMP-} c{-sMQ-} -> \ tpl_sML  :: 
+					     a{-sMO-}
+					 {-# L #-}
+					 tpl_sML tpl_sMM  :: 
+						     b{-sMP-}
+						 {-# L #-}
+						 tpl_sMM tpl_sMN  :: 
+							     c{-sMQ-}
+							 {-# L #-}
+							 tpl_sMN ->
+	MkWibble{-r3x,x-}{i}
+	    {_@_ a{-sMO-} _@_ b{-sMP-} _@_ c{-sMQ-} tpl_sML tpl_sMM tpl_sMN}
