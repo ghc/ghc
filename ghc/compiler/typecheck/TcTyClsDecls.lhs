@@ -388,13 +388,8 @@ bogusVrcs = panic "Bogus tycon arg variances"
 mkNewTyConRep :: TyCon		-- The original type constructor
 	      -> Type		-- Chosen representation type
 -- Find the representation type for this newtype TyCon
--- For a recursive type constructor we give an error thunk,
--- because we never look at the rep in that case
--- (see notes on newypes in types/TypeRep
-
-mkNewTyConRep tc
-  | isRecursiveTyCon tc = pprPanic "Attempt to get the rep of newtype" (ppr tc)
-  | otherwise		= head (dataConOrigArgTys (head (tyConDataCons tc)))
+-- See notes on newypes in types/TypeRep about newtypes.
+mkNewTyConRep tc = head (dataConOrigArgTys (head (tyConDataCons tc)))
 \end{code}
 
 

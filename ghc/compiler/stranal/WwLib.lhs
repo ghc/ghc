@@ -24,7 +24,7 @@ import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( tupleCon )
 import Type		( Type, isUnLiftedType, mkFunTys,
-			  splitForAllTys, splitFunTys,  isAlgType
+			  splitForAllTys, splitFunTys, splitNewType_maybe, isAlgType
 			)
 import BasicTypes	( Arity, Boxity(..) )
 import Var              ( Var, isId )
@@ -311,6 +311,10 @@ mkWWargs fun_ty arity demands res_bot one_shots
     let
       val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
+      n_args      | res_bot   = n_arg_tys 
+		  | otherwise = arity `min` n_arg_tys
+      new_fun_ty  | n_args == n_arg_tys = body_ty
+		  | otherwise  	        = mkFunTys (drop n_args arg_tys) body_ty
     in
     mkWWargs new_fun_ty
 	     (arity - n_args) 
@@ -322,17 +326,33 @@ mkWWargs fun_ty arity demands res_bot one_shots
 	      mkLams wrap_args . wrap_fn_args,
 	      work_fn_args . applyToVars wrap_args,
 	      res_ty)
+
+  | Just rep_ty <- splitNewType_maybe fun_ty,
+    arity >= 0
+   	-- The newtype case is for when the function has
+	-- a recursive newtype after the arrow (rare)
+	-- We check for arity >= 0 to avoid looping in the case
+	-- of a function whose type is, in effect, infinite
+	-- [Arity is driven by looking at the term, not just the type.]
+	--
+	-- It's also important when we have a function returning (say) a pair
+	-- wrapped in a recursive newtype, at least if CPR analysis can look 
+	-- through such newtypes, which it probably can since they are 
+	-- simply coerces.
+  = mkWWargs rep_ty arity demands res_bot one_shots	`thenUs` \ (wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
+    returnUs (wrap_args,
+	      Note (Coerce fun_ty rep_ty) . wrap_fn_args,
+	      work_fn_args . Note (Coerce rep_ty fun_ty),
+	      res_ty)
+
+  | otherwise
+  = returnUs ([], id, id, fun_ty)
+
   where
     (tyvars, tau)      	= splitForAllTys fun_ty
     (arg_tys, body_ty) 	= splitFunTys tau
     n_arg_tys		= length arg_tys
-    n_args		| res_bot   = n_arg_tys 
-			| otherwise = arity `min` n_arg_tys
-    new_fun_ty		| n_args == n_arg_tys = body_ty
-			| otherwise  	      = mkFunTys (drop n_args arg_tys) body_ty
 
-mkWWargs fun_ty arity demands res_bot one_shots
-  = returnUs ([], id, id, fun_ty)
 
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars

@@ -52,7 +52,7 @@ module Type (
 	SourceType(..), sourceTypeRep,
 
 	-- Newtypes
-	mkNewTyConApp,
+	splitNewType_maybe,
 
 	-- Lifting and boxity
 	isUnLiftedType, isUnboxedTupleType, isAlgType,
@@ -85,7 +85,7 @@ import TypeRep
 -- Other imports:
 
 import {-# SOURCE #-}	PprType( pprType )	-- Only called in debug messages
-import {-# SOURCE #-}   Subst  ( mkTyVarSubst, substTy )
+import {-# SOURCE #-}   Subst  ( substTyWith )
 
 -- friends:
 import Var	( Var, TyVar, tyVarKind, tyVarName, setTyVarName )
@@ -363,7 +363,7 @@ mkSynTy syn_tycon tys
   = ASSERT( isSynTyCon syn_tycon )
     ASSERT( length tyvars == length tys )
     NoteTy (SynNote (TyConApp syn_tycon tys))
-	   (substTy (mkTyVarSubst tyvars tys) body)
+	   (substTyWith tyvars tys body)
   where
     (tyvars, body) = getSynTyConDefn syn_tycon
 \end{code}
@@ -472,7 +472,7 @@ applyTy (NoteTy _ fun)                  arg = applyTy fun arg
 applyTy (ForAllTy tv ty)                arg = UASSERT2( not (isUTy arg),
                                                         ptext SLIT("applyTy")
                                                         <+> pprType ty <+> pprType arg )
-                                              substTy (mkTyVarSubst [tv] [arg]) ty
+                                              substTyWith [tv] [arg] ty
 applyTy (UsageTy u ty)                  arg = UsageTy u (applyTy ty arg)
 applyTy other		                arg = panic "applyTy"
 
@@ -482,7 +482,7 @@ applyTys fun_ty arg_tys
    (case mu of
       Just u  -> UsageTy u
       Nothing -> id) $
-   substTy (mkTyVarSubst tvs arg_tys) ty
+   substTyWith tvs arg_tys ty
  where
    (mu, tvs, ty) = split fun_ty arg_tys
    
@@ -598,18 +598,32 @@ sourceTypeRep :: SourceType -> Type
 sourceTypeRep (IParam n ty)     = ty
 sourceTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- Note the mkTyConApp; the classTyCon might be a newtype!
-sourceTypeRep (NType  tc tys)   = case newTyConRep tc of
-				    (tvs, rep_ty) -> substTy (mkTyVarSubst tvs tys) rep_ty
+sourceTypeRep (NType  tc tys)   = newTypeRep tc tys
 	-- ToDo: Consider caching this substitution in a NType
-
-mkNewTyConApp :: TyCon -> [Type] -> SourceType
-mkNewTyConApp tc tys = NType tc tys	-- Here is where we might cache the substitution
 
 isSourceTy :: Type -> Bool
 isSourceTy (NoteTy _ ty)  = isSourceTy ty
 isSourceTy (UsageTy _ ty) = isSourceTy ty
 isSourceTy (SourceTy sty) = True
 isSourceTy _	          = False
+
+
+splitNewType_maybe :: Type -> Maybe Type
+-- Newtypes that are recursive are reprsented by TyConApp, just
+-- as they always were.  Occasionally we want to find their representation type.
+-- NB: remember that in this module, non-recursive newtypes are transparent
+
+splitNewType_maybe ty
+  = case splitTyConApp_maybe ty of
+	Just (tc,tys) | isNewTyCon tc -> ASSERT( length tys == tyConArity tc )
+						-- The assert should hold because repType should
+						-- only be applied to *types* (of kind *)
+					 Just (newTypeRep tc tys)
+	other -> Nothing
+			
+-- A local helper function (not exported)
+newTypeRep new_tycon tys = case newTyConRep new_tycon of
+			     (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 \end{code}
 
 

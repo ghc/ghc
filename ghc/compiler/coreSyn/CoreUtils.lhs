@@ -60,7 +60,7 @@ import IdInfo		( LBVarInfo(..),
 import Demand		( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
-			  splitForAllTy_maybe, isForAllTy, eqType
+			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, eqType
 			)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
@@ -700,9 +700,8 @@ exprEtaExpandArity e
 
     go1 other = []
     
-    ok_note (Coerce _ _) = True
-    ok_note InlineCall   = True
-    ok_note other        = False
+    ok_note InlineMe = False
+    ok_note other    = True
 	    -- Notice that we do not look through __inline_me__
 	    -- This may seem surprising, but consider
 	    --	f = _inline_me (\x -> e)
@@ -727,13 +726,14 @@ etaExpand :: Int	  	-- Add this number of value args
 -- We should have
 --	ty = exprType e = exprType e'
 --
--- etaExpand deals with for-alls and coerces. For example:
+-- etaExpand deals with for-alls. For example:
 --		etaExpand 1 E
--- where  E :: forall a. T
---	  newtype T = MkT (A -> B)
---
+-- where  E :: forall a. a -> a
 -- would return
---	(/\b. coerce T (\y::A -> (coerce (A->B) (E b) y)
+--	(/\b. \y::a -> E b y)
+--
+-- It deals with coerces too, though they are now rare
+-- so perhaps the extra code isn't worth it
 
 etaExpand n us expr ty
   | n == 0 && 
@@ -761,8 +761,12 @@ etaExpand n us expr ty
  				   (us1, us2) = splitUniqSupply us
 				   uniq	      = uniqFromSupply us1 
 				   
-	; Nothing -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
-    	}}
+	; Nothing ->
+
+    	case splitNewType_maybe ty of {
+ 	  Just ty' -> mkCoerce ty ty' (etaExpand n us (mkCoerce ty' ty expr) ty') ;
+ 	  Nothing  -> pprTrace "Bad eta expand" (ppr expr $$ ppr ty) expr
+    	}}}
 \end{code}
 
 
@@ -792,16 +796,17 @@ And in any case it seems more robust to have exprArity be a bit more intelligent
 exprArity :: CoreExpr -> Int
 exprArity e = go e
 	    where
+	      go (Var v) 	       	   = idArity v
 	      go (Lam x e) | isId x    	   = go e + 1
 			   | otherwise 	   = go e
-	      go (Note _ e)	       	   = go e
+	      go (Note n e) 		   = go e
 	      go (App e (Type t))      	   = go e
 	      go (App f a) | exprIsCheap a = (go f - 1) `max` 0
-		-- Important!  f (fac x) does not have arity 2, 
-		-- 	       even if f does!
+		-- NB: exprIsCheap a!  
+		--	f (fac x) does not have arity 2, 
+		-- 	even if f has arity 3!
 		-- NB: `max 0`!  (\x y -> f x) has arity 2, even if f is
 		--		 unknown, hence arity 0
-	      go (Var v) 	       	   = idArity v
 	      go _		       	   = 0
 \end{code}
 
