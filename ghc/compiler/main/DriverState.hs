@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.64 2001/12/14 17:24:04 simonpj Exp $
+-- $Id: DriverState.hs,v 1.65 2001/12/15 12:03:08 panne Exp $
 --
 -- Settings for the driver
 --
@@ -279,7 +279,9 @@ buildCoreToDo = do
 	],
 	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
+#ifdef DEBUG
 	if cpr        then CoreDoCPResult   else CoreDoNothing,
+#endif
 	if strictness then CoreDoStrictness else CoreDoNothing,
 	CoreDoWorkerWrapper,
 	CoreDoGlomBinds,
