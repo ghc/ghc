@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.9 1999/03/09 14:27:06 sewardj Exp $
+ * $Id: RtsStartup.c,v 1.10 1999/04/27 12:30:26 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,21 +28,6 @@
 #include "ParInit.h"
 #include "Parallel.h"
 #include "LLC.h"
-#endif
-
-#ifdef COMPILER
-#ifndef aix_TARGET_OS /* AIX gives link errors with this as a const (RO assembler section) */
-const 
-#endif 
-  StgClosure *PrelBase_Bool_closure_tbl[] = {
-#ifndef HAVE_WIN32_DLL_SUPPORT
-    &False_closure,
-    &True_closure
-#else
-    &dummy_ret_closure,
-    &dummy_ret_closure
-#endif
-};
 #endif
 
 /*
