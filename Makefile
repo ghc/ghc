@@ -160,27 +160,28 @@ binary-dist::
 # Which documentation to build/install is hardcoded below.
 #
 
-BINDIST_DOCS = $($(Project)BinDistDocs)
-BINDIST_DOCS_WAYS = html ps
+BINDIST_DOC_WAYS = html ps
 
 binary-dist ::
-	@for way in $(BINDIST_DOCS_WAYS); do \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
-	   for dir in $(BINDIST_DOCS); do \
-	     echo Making $$way documentation in $$dir && \
-	     $(MAKE) -C $$dir --no-print-directory $(MFLAGS) $$way >.doclog  2>&1 && \
-	     if [ "$$way" = "html" ]; then \
-		for subdir in `perl -n -e '/output will be in ([_\-A-Za-z0-9]*)/ && do { print "$$1 "; };' <.doclog`; do \
-		   echo Copying HTML docs from $$subdir...; \
-		   cp -Rf $$dir/$$subdir $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
-		done \
-	     else \
-	        cp -f $$dir/*.$$way $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/$$way; \
-	     fi && \
-	     echo "Done."; \
-	   done; \
+	@for i in $(BIN_DIST_DIRS); do 		 	 	\
+	  if test -d "$$i"; then 			 	\
+	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
+	    echo $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="html ps" \
+		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
+		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
+		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
+		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
+		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+	    $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="html ps" \
+		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
+		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
+		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
+		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
+		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
+		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
+	  fi \
 	done
-	@rm -f .doclog
 
 # Rename scripts to $i.prl and $i.sh where necessary.
 # ToDo: do this in a cleaner way...
