@@ -3943,7 +3943,7 @@ Assertion failures can be caught, see the documentation for the
 
       <para>The DEPRECATED pragma lets you specify that a particular
       function, class, or type, is deprecated.  There are two
-      forms.</para>
+      forms.
 
       <itemizedlist>
 	<listitem>
@@ -3968,7 +3968,15 @@ Assertion failures can be caught, see the documentation for the
           message.</para>
 	</listitem>
       </itemizedlist>
-
+      Any use of the deprecated item, or of anything from a deprecated
+      module, will be flagged with an appropriate message.  However,
+      deprecations are not reported for
+      (a) uses of a deprecated function within its defining module, and
+      (b) uses of a deprecated function in an export list.
+      The latter reduces spurious complaints within a library
+      in which one module gathers together and re-exports 
+      the exports of several others.
+      </para>
       <para>You can suppress the warnings with the flag
       <option>-fno-warn-deprecations</option>.</para>
     </sect2>
