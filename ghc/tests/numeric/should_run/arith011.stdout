@@ -913,7 +913,502 @@ Int64   : [-2147483648,0,2147483647]
 Word8   : [0,0,255]
 Word16  : [0,0,65535]
 Word32  : [2147483648,0,2147483647]
-Word64  : [2147483648,0,2147483647]
+Word64  : [18446744071562067968,0,2147483647]
+testBits
+-3 .&.   -3 = -3
+-3 .&.   -2 = -4
+-3 .&.   -1 = -3
+-3 .&.   1 = 1
+-3 .&.   2 = 0
+-3 .&.   3 = 1
+ 
+-2 .&.   -3 = -4
+-2 .&.   -2 = -2
+-2 .&.   -1 = -2
+-2 .&.   1 = 0
+-2 .&.   2 = 2
+-2 .&.   3 = 2
+ 
+-1 .&.   -3 = -3
+-1 .&.   -2 = -2
+-1 .&.   -1 = -1
+-1 .&.   1 = 1
+-1 .&.   2 = 2
+-1 .&.   3 = 3
+ 
+0 .&.   -3 = 0
+0 .&.   -2 = 0
+0 .&.   -1 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   -3 = 1
+1 .&.   -2 = 0
+1 .&.   -1 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   -3 = 0
+2 .&.   -2 = 2
+2 .&.   -1 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   -3 = 1
+3 .&.   -2 = 2
+3 .&.   -1 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+-3 .|.   -3 = -3
+-3 .|.   -2 = -1
+-3 .|.   -1 = -1
+-3 .|.   1 = -3
+-3 .|.   2 = -1
+-3 .|.   3 = -1
+ 
+-2 .|.   -3 = -1
+-2 .|.   -2 = -2
+-2 .|.   -1 = -1
+-2 .|.   1 = -1
+-2 .|.   2 = -2
+-2 .|.   3 = -1
+ 
+-1 .|.   -3 = -1
+-1 .|.   -2 = -1
+-1 .|.   -1 = -1
+-1 .|.   1 = -1
+-1 .|.   2 = -1
+-1 .|.   3 = -1
+ 
+0 .|.   -3 = -3
+0 .|.   -2 = -2
+0 .|.   -1 = -1
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   -3 = -3
+1 .|.   -2 = -1
+1 .|.   -1 = -1
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   -3 = -1
+2 .|.   -2 = -2
+2 .|.   -1 = -1
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   -3 = -1
+3 .|.   -2 = -1
+3 .|.   -1 = -1
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+-3 `xor` -3 = 0
+-3 `xor` -2 = 3
+-3 `xor` -1 = 2
+-3 `xor` 1 = -4
+-3 `xor` 2 = -1
+-3 `xor` 3 = -2
+ 
+-2 `xor` -3 = 3
+-2 `xor` -2 = 0
+-2 `xor` -1 = 1
+-2 `xor` 1 = -1
+-2 `xor` 2 = -4
+-2 `xor` 3 = -3
+ 
+-1 `xor` -3 = 2
+-1 `xor` -2 = 1
+-1 `xor` -1 = 0
+-1 `xor` 1 = -2
+-1 `xor` 2 = -3
+-1 `xor` 3 = -4
+ 
+0 `xor` -3 = -3
+0 `xor` -2 = -2
+0 `xor` -1 = -1
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` -3 = -4
+1 `xor` -2 = -1
+1 `xor` -1 = -2
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` -3 = -1
+2 `xor` -2 = -4
+2 `xor` -1 = -3
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` -3 = -2
+3 `xor` -2 = -3
+3 `xor` -1 = -4
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement -3 = 2
+complement -2 = 1
+complement -1 = 0
+complement 0 = -1
+complement 1 = -2
+complement 2 = -3
+complement 3 = -4
+#
+-3 `shiftL` 0 = -3
+-3 `shiftL` 1 = -6
+-3 `shiftL` 2 = -12
+-3 `shiftL` 3 = -24
+-3 `shiftL` 32 = 0
+ 
+-2 `shiftL` 0 = -2
+-2 `shiftL` 1 = -4
+-2 `shiftL` 2 = -8
+-2 `shiftL` 3 = -16
+-2 `shiftL` 32 = 0
+ 
+-1 `shiftL` 0 = -1
+-1 `shiftL` 1 = -2
+-1 `shiftL` 2 = -4
+-1 `shiftL` 3 = -8
+-1 `shiftL` 32 = 0
+ 
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
+0 `shiftL` 32 = 0
+ 
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
+1 `shiftL` 32 = 0
+ 
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
+2 `shiftL` 32 = 0
+ 
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+3 `shiftL` 32 = 0
+ 
+#
+-3 `shiftR` 0 = -3
+-3 `shiftR` 1 = -2
+-3 `shiftR` 2 = -1
+-3 `shiftR` 3 = -1
+-3 `shiftR` 32 = -1
+ 
+-2 `shiftR` 0 = -2
+-2 `shiftR` 1 = -1
+-2 `shiftR` 2 = -1
+-2 `shiftR` 3 = -1
+-2 `shiftR` 32 = -1
+ 
+-1 `shiftR` 0 = -1
+-1 `shiftR` 1 = -1
+-1 `shiftR` 2 = -1
+-1 `shiftR` 3 = -1
+-1 `shiftR` 32 = -1
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+0 `shiftR` 32 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+1 `shiftR` 32 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+2 `shiftR` 32 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
+3 `shiftR` 32 = 0
+ 
+#
+-3 `rotate` -3 = -1073741825
+-3 `rotate` -2 = 2147483647
+-3 `rotate` -1 = -2
+-3 `rotate` 0 = -3
+-3 `rotate` 1 = -5
+-3 `rotate` 2 = -9
+-3 `rotate` 3 = -17
+ 
+-2 `rotate` -3 = -536870913
+-2 `rotate` -2 = -1073741825
+-2 `rotate` -1 = 2147483647
+-2 `rotate` 0 = -2
+-2 `rotate` 1 = -3
+-2 `rotate` 2 = -5
+-2 `rotate` 3 = -9
+ 
+-1 `rotate` -3 = -1
+-1 `rotate` -2 = -1
+-1 `rotate` -1 = -1
+-1 `rotate` 0 = -1
+-1 `rotate` 1 = -1
+-1 `rotate` 2 = -1
+-1 `rotate` 3 = -1
+ 
+0 `rotate` -3 = 0
+0 `rotate` -2 = 0
+0 `rotate` -1 = 0
+0 `rotate` 0 = 0
+0 `rotate` 1 = 0
+0 `rotate` 2 = 0
+0 `rotate` 3 = 0
+ 
+1 `rotate` -3 = 536870912
+1 `rotate` -2 = 1073741824
+1 `rotate` -1 = -2147483648
+1 `rotate` 0 = 1
+1 `rotate` 1 = 2
+1 `rotate` 2 = 4
+1 `rotate` 3 = 8
+ 
+2 `rotate` -3 = 1073741824
+2 `rotate` -2 = -2147483648
+2 `rotate` -1 = 1
+2 `rotate` 0 = 2
+2 `rotate` 1 = 4
+2 `rotate` 2 = 8
+2 `rotate` 3 = 16
+ 
+3 `rotate` -3 = 1610612736
+3 `rotate` -2 = -1073741824
+3 `rotate` -1 = -2147483647
+3 `rotate` 0 = 3
+3 `rotate` 1 = 6
+3 `rotate` 2 = 12
+3 `rotate` 3 = 24
+ 
+#
+bit 0 = 1
+bit 1 = 2
+bit 2 = 4
+bit 3 = 8
+#
+-3 `setBit` 0 = -3
+-3 `setBit` 1 = -1
+-3 `setBit` 2 = -3
+-3 `setBit` 3 = -3
+-3 `setBit` 32 = -3
+ 
+-2 `setBit` 0 = -1
+-2 `setBit` 1 = -2
+-2 `setBit` 2 = -2
+-2 `setBit` 3 = -2
+-2 `setBit` 32 = -2
+ 
+-1 `setBit` 0 = -1
+-1 `setBit` 1 = -1
+-1 `setBit` 2 = -1
+-1 `setBit` 3 = -1
+-1 `setBit` 32 = -1
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+0 `setBit` 32 = 0
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+1 `setBit` 32 = 1
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+2 `setBit` 32 = 2
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+3 `setBit` 32 = 3
+ 
+#
+-3 `clearBit` 0 = -4
+-3 `clearBit` 1 = -3
+-3 `clearBit` 2 = -7
+-3 `clearBit` 3 = -11
+-3 `clearBit` 32 = -3
+ 
+-2 `clearBit` 0 = -2
+-2 `clearBit` 1 = -4
+-2 `clearBit` 2 = -6
+-2 `clearBit` 3 = -10
+-2 `clearBit` 32 = -2
+ 
+-1 `clearBit` 0 = -2
+-1 `clearBit` 1 = -3
+-1 `clearBit` 2 = -5
+-1 `clearBit` 3 = -9
+-1 `clearBit` 32 = -1
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+0 `clearBit` 32 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+1 `clearBit` 32 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+2 `clearBit` 32 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+3 `clearBit` 32 = 3
+ 
+#
+-3 `complementBit` 0 = -4
+-3 `complementBit` 1 = -1
+-3 `complementBit` 2 = -7
+-3 `complementBit` 3 = -11
+-3 `complementBit` 32 = -3
+ 
+-2 `complementBit` 0 = -1
+-2 `complementBit` 1 = -4
+-2 `complementBit` 2 = -6
+-2 `complementBit` 3 = -10
+-2 `complementBit` 32 = -2
+ 
+-1 `complementBit` 0 = -2
+-1 `complementBit` 1 = -3
+-1 `complementBit` 2 = -5
+-1 `complementBit` 3 = -9
+-1 `complementBit` 32 = -1
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+0 `complementBit` 32 = 0
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+1 `complementBit` 32 = 1
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+2 `complementBit` 32 = 2
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+3 `complementBit` 32 = 3
+ 
+#
+-3 `testBit` 0 = True
+-3 `testBit` 1 = False
+-3 `testBit` 2 = True
+-3 `testBit` 3 = True
+-3 `testBit` 32 = False
+ 
+-2 `testBit` 0 = False
+-2 `testBit` 1 = True
+-2 `testBit` 2 = True
+-2 `testBit` 3 = True
+-2 `testBit` 32 = False
+ 
+-1 `testBit` 0 = True
+-1 `testBit` 1 = True
+-1 `testBit` 2 = True
+-1 `testBit` 3 = True
+-1 `testBit` 32 = False
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+0 `testBit` 32 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+1 `testBit` 32 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+2 `testBit` 32 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+3 `testBit` 32 = False
+ 
+#
+bitSize -3 = 32
+bitSize -2 = 32
+bitSize -1 = 32
+bitSize 0 = 32
+bitSize 1 = 32
+bitSize 2 = 32
+bitSize 3 = 32
+#
+isSigned -3 = True
+isSigned -2 = True
+isSigned -1 = True
+isSigned 0 = True
+isSigned 1 = True
+isSigned 2 = True
+isSigned 3 = True
+#
 --------------------------------
 --Testing Int8
 --------------------------------
@@ -1829,7 +2324,7 @@ Int64   : [-128,0,127]
 Word8   : [128,0,127]
 Word16  : [65408,0,127]
 Word32  : [4294967168,0,127]
-Word64  : [4294967168,0,127]
+Word64  : [18446744073709551488,0,127]
 testBits
 -3 .&.   -3 = -3
 -3 .&.   -2 = -4
@@ -3240,7 +3735,7 @@ Int64   : [-32768,0,32767]
 Word8   : [0,0,255]
 Word16  : [32768,0,32767]
 Word32  : [4294934528,0,32767]
-Word64  : [4294934528,0,32767]
+Word64  : [18446744073709518848,0,32767]
 testBits
 -3 .&.   -3 = -3
 -3 .&.   -2 = -4
@@ -3486,25 +3981,25 @@ complement 3 = -4
 3 `shiftR` 32 = 0
  
 #
--3 `rotate` -3 = -24545
--3 `rotate` -2 = 16447
--3 `rotate` -1 = -32642
+-3 `rotate` -3 = -16385
+-3 `rotate` -2 = 32767
+-3 `rotate` -1 = -2
 -3 `rotate` 0 = -3
 -3 `rotate` 1 = -5
 -3 `rotate` 2 = -9
 -3 `rotate` 3 = -17
  
--2 `rotate` -3 = -16353
--2 `rotate` -2 = -32705
--2 `rotate` -1 = 127
+-2 `rotate` -3 = -8193
+-2 `rotate` -2 = -16385
+-2 `rotate` -1 = 32767
 -2 `rotate` 0 = -2
 -2 `rotate` 1 = -3
 -2 `rotate` 2 = -5
 -2 `rotate` 3 = -9
  
--1 `rotate` -3 = -8161
--1 `rotate` -2 = -16321
--1 `rotate` -1 = -32641
+-1 `rotate` -3 = -1
+-1 `rotate` -2 = -1
+-1 `rotate` -1 = -1
 -1 `rotate` 0 = -1
 -1 `rotate` 1 = -1
 -1 `rotate` 2 = -1
@@ -4651,7 +5146,7 @@ Int64   : [-2147483648,0,2147483647]
 Word8   : [0,0,255]
 Word16  : [0,0,65535]
 Word32  : [2147483648,0,2147483647]
-Word64  : [2147483648,0,2147483647]
+Word64  : [18446744071562067968,0,2147483647]
 testBits
 -3 .&.   -3 = -3
 -3 .&.   -2 = -4
@@ -4897,29 +5392,29 @@ complement 3 = -4
 3 `shiftR` 32 = 0
  
 #
--3 `rotate` -3 = -1342177281
--3 `rotate` -2 = 1610612735
--3 `rotate` -1 = -1073741826
+-3 `rotate` -3 = -1073741825
+-3 `rotate` -2 = 2147483647
+-3 `rotate` -1 = -2
 -3 `rotate` 0 = -3
--3 `rotate` 1 = -6
--3 `rotate` 2 = -11
--3 `rotate` 3 = -21
+-3 `rotate` 1 = -5
+-3 `rotate` 2 = -9
+-3 `rotate` 3 = -17
  
--2 `rotate` -3 = -805306369
--2 `rotate` -2 = -1610612737
--2 `rotate` -1 = 1073741823
+-2 `rotate` -3 = -536870913
+-2 `rotate` -2 = -1073741825
+-2 `rotate` -1 = 2147483647
 -2 `rotate` 0 = -2
--2 `rotate` 1 = -4
--2 `rotate` 2 = -7
--2 `rotate` 3 = -13
+-2 `rotate` 1 = -3
+-2 `rotate` 2 = -5
+-2 `rotate` 3 = -9
  
--1 `rotate` -3 = -268435457
--1 `rotate` -2 = -536870913
--1 `rotate` -1 = -1073741825
+-1 `rotate` -3 = -1
+-1 `rotate` -2 = -1
+-1 `rotate` -1 = -1
 -1 `rotate` 0 = -1
--1 `rotate` 1 = -2
--1 `rotate` 2 = -3
--1 `rotate` 3 = -5
+-1 `rotate` 1 = -1
+-1 `rotate` 2 = -1
+-1 `rotate` 3 = -1
  
 0 `rotate` -3 = 0
 0 `rotate` -2 = 0
@@ -5138,6 +5633,1417 @@ bitSize 0 = 32
 bitSize 1 = 32
 bitSize 2 = 32
 bitSize 3 = 32
+#
+isSigned -3 = True
+isSigned -2 = True
+isSigned -1 = True
+isSigned 0 = True
+isSigned 1 = True
+isSigned 2 = True
+isSigned 3 = True
+#
+--------------------------------
+--Testing Int64
+--------------------------------
+testBounded
+(9223372036854775807,-9223372036854775808,-9223372036854775807)
+(9223372036854775806,9223372036854775807,-9223372036854775808)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[-3,-2,-1,0,1,2,3]
+[-3,-2,-1,0,1,2,3]
+testEq
+-3 == -3 = True
+-3 == -2 = False
+-3 == -1 = False
+-3 == 0 = False
+-3 == 1 = False
+-3 == 2 = False
+-3 == 3 = False
+ 
+-2 == -3 = False
+-2 == -2 = True
+-2 == -1 = False
+-2 == 0 = False
+-2 == 1 = False
+-2 == 2 = False
+-2 == 3 = False
+ 
+-1 == -3 = False
+-1 == -2 = False
+-1 == -1 = True
+-1 == 0 = False
+-1 == 1 = False
+-1 == 2 = False
+-1 == 3 = False
+ 
+0 == -3 = False
+0 == -2 = False
+0 == -1 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == -3 = False
+1 == -2 = False
+1 == -1 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == -3 = False
+2 == -2 = False
+2 == -1 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == -3 = False
+3 == -2 = False
+3 == -1 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+-3 /= -3 = False
+-3 /= -2 = True
+-3 /= -1 = True
+-3 /= 0 = True
+-3 /= 1 = True
+-3 /= 2 = True
+-3 /= 3 = True
+ 
+-2 /= -3 = True
+-2 /= -2 = False
+-2 /= -1 = True
+-2 /= 0 = True
+-2 /= 1 = True
+-2 /= 2 = True
+-2 /= 3 = True
+ 
+-1 /= -3 = True
+-1 /= -2 = True
+-1 /= -1 = False
+-1 /= 0 = True
+-1 /= 1 = True
+-1 /= 2 = True
+-1 /= 3 = True
+ 
+0 /= -3 = True
+0 /= -2 = True
+0 /= -1 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= -3 = True
+1 /= -2 = True
+1 /= -1 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= -3 = True
+2 /= -2 = True
+2 /= -1 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= -3 = True
+3 /= -2 = True
+3 /= -1 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+-3 <= -3 = True
+-3 <= -2 = True
+-3 <= -1 = True
+-3 <= 0 = True
+-3 <= 1 = True
+-3 <= 2 = True
+-3 <= 3 = True
+ 
+-2 <= -3 = False
+-2 <= -2 = True
+-2 <= -1 = True
+-2 <= 0 = True
+-2 <= 1 = True
+-2 <= 2 = True
+-2 <= 3 = True
+ 
+-1 <= -3 = False
+-1 <= -2 = False
+-1 <= -1 = True
+-1 <= 0 = True
+-1 <= 1 = True
+-1 <= 2 = True
+-1 <= 3 = True
+ 
+0 <= -3 = False
+0 <= -2 = False
+0 <= -1 = False
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= -3 = False
+1 <= -2 = False
+1 <= -1 = False
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= -3 = False
+2 <= -2 = False
+2 <= -1 = False
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= -3 = False
+3 <= -2 = False
+3 <= -1 = False
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+-3 <  -3 = False
+-3 <  -2 = True
+-3 <  -1 = True
+-3 <  0 = True
+-3 <  1 = True
+-3 <  2 = True
+-3 <  3 = True
+ 
+-2 <  -3 = False
+-2 <  -2 = False
+-2 <  -1 = True
+-2 <  0 = True
+-2 <  1 = True
+-2 <  2 = True
+-2 <  3 = True
+ 
+-1 <  -3 = False
+-1 <  -2 = False
+-1 <  -1 = False
+-1 <  0 = True
+-1 <  1 = True
+-1 <  2 = True
+-1 <  3 = True
+ 
+0 <  -3 = False
+0 <  -2 = False
+0 <  -1 = False
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  -3 = False
+1 <  -2 = False
+1 <  -1 = False
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  -3 = False
+2 <  -2 = False
+2 <  -1 = False
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  -3 = False
+3 <  -2 = False
+3 <  -1 = False
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+-3 >  -3 = False
+-3 >  -2 = False
+-3 >  -1 = False
+-3 >  0 = False
+-3 >  1 = False
+-3 >  2 = False
+-3 >  3 = False
+ 
+-2 >  -3 = True
+-2 >  -2 = False
+-2 >  -1 = False
+-2 >  0 = False
+-2 >  1 = False
+-2 >  2 = False
+-2 >  3 = False
+ 
+-1 >  -3 = True
+-1 >  -2 = True
+-1 >  -1 = False
+-1 >  0 = False
+-1 >  1 = False
+-1 >  2 = False
+-1 >  3 = False
+ 
+0 >  -3 = True
+0 >  -2 = True
+0 >  -1 = True
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  -3 = True
+1 >  -2 = True
+1 >  -1 = True
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  -3 = True
+2 >  -2 = True
+2 >  -1 = True
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  -3 = True
+3 >  -2 = True
+3 >  -1 = True
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+-3 >= -3 = True
+-3 >= -2 = False
+-3 >= -1 = False
+-3 >= 0 = False
+-3 >= 1 = False
+-3 >= 2 = False
+-3 >= 3 = False
+ 
+-2 >= -3 = True
+-2 >= -2 = True
+-2 >= -1 = False
+-2 >= 0 = False
+-2 >= 1 = False
+-2 >= 2 = False
+-2 >= 3 = False
+ 
+-1 >= -3 = True
+-1 >= -2 = True
+-1 >= -1 = True
+-1 >= 0 = False
+-1 >= 1 = False
+-1 >= 2 = False
+-1 >= 3 = False
+ 
+0 >= -3 = True
+0 >= -2 = True
+0 >= -1 = True
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= -3 = True
+1 >= -2 = True
+1 >= -1 = True
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= -3 = True
+2 >= -2 = True
+2 >= -1 = True
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= -3 = True
+3 >= -2 = True
+3 >= -1 = True
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+-3 `compare` -3 = EQ
+-3 `compare` -2 = LT
+-3 `compare` -1 = LT
+-3 `compare` 0 = LT
+-3 `compare` 1 = LT
+-3 `compare` 2 = LT
+-3 `compare` 3 = LT
+ 
+-2 `compare` -3 = GT
+-2 `compare` -2 = EQ
+-2 `compare` -1 = LT
+-2 `compare` 0 = LT
+-2 `compare` 1 = LT
+-2 `compare` 2 = LT
+-2 `compare` 3 = LT
+ 
+-1 `compare` -3 = GT
+-1 `compare` -2 = GT
+-1 `compare` -1 = EQ
+-1 `compare` 0 = LT
+-1 `compare` 1 = LT
+-1 `compare` 2 = LT
+-1 `compare` 3 = LT
+ 
+0 `compare` -3 = GT
+0 `compare` -2 = GT
+0 `compare` -1 = GT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` -3 = GT
+1 `compare` -2 = GT
+1 `compare` -1 = GT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` -3 = GT
+2 `compare` -2 = GT
+2 `compare` -1 = GT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` -3 = GT
+3 `compare` -2 = GT
+3 `compare` -1 = GT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+-3 + -3 = -6
+-3 + -2 = -5
+-3 + -1 = -4
+-3 + 0 = -3
+-3 + 1 = -2
+-3 + 2 = -1
+-3 + 3 = 0
+ 
+-2 + -3 = -5
+-2 + -2 = -4
+-2 + -1 = -3
+-2 + 0 = -2
+-2 + 1 = -1
+-2 + 2 = 0
+-2 + 3 = 1
+ 
+-1 + -3 = -4
+-1 + -2 = -3
+-1 + -1 = -2
+-1 + 0 = -1
+-1 + 1 = 0
+-1 + 2 = 1
+-1 + 3 = 2
+ 
+0 + -3 = -3
+0 + -2 = -2
+0 + -1 = -1
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + -3 = -2
+1 + -2 = -1
+1 + -1 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + -3 = -1
+2 + -2 = 0
+2 + -1 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + -3 = 0
+3 + -2 = 1
+3 + -1 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+-3 - -3 = 0
+-3 - -2 = -1
+-3 - -1 = -2
+-3 - 0 = -3
+-3 - 1 = -4
+-3 - 2 = -5
+-3 - 3 = -6
+ 
+-2 - -3 = 1
+-2 - -2 = 0
+-2 - -1 = -1
+-2 - 0 = -2
+-2 - 1 = -3
+-2 - 2 = -4
+-2 - 3 = -5
+ 
+-1 - -3 = 2
+-1 - -2 = 1
+-1 - -1 = 0
+-1 - 0 = -1
+-1 - 1 = -2
+-1 - 2 = -3
+-1 - 3 = -4
+ 
+0 - -3 = 3
+0 - -2 = 2
+0 - -1 = 1
+0 - 0 = 0
+0 - 1 = -1
+0 - 2 = -2
+0 - 3 = -3
+ 
+1 - -3 = 4
+1 - -2 = 3
+1 - -1 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = -1
+1 - 3 = -2
+ 
+2 - -3 = 5
+2 - -2 = 4
+2 - -1 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = -1
+ 
+3 - -3 = 6
+3 - -2 = 5
+3 - -1 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+-3 * -3 = 9
+-3 * -2 = 6
+-3 * -1 = 3
+-3 * 0 = 0
+-3 * 1 = -3
+-3 * 2 = -6
+-3 * 3 = -9
+ 
+-2 * -3 = 6
+-2 * -2 = 4
+-2 * -1 = 2
+-2 * 0 = 0
+-2 * 1 = -2
+-2 * 2 = -4
+-2 * 3 = -6
+ 
+-1 * -3 = 3
+-1 * -2 = 2
+-1 * -1 = 1
+-1 * 0 = 0
+-1 * 1 = -1
+-1 * 2 = -2
+-1 * 3 = -3
+ 
+0 * -3 = 0
+0 * -2 = 0
+0 * -1 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * -3 = -3
+1 * -2 = -2
+1 * -1 = -1
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * -3 = -6
+2 * -2 = -4
+2 * -1 = -2
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * -3 = -9
+3 * -2 = -6
+3 * -1 = -3
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate -3 = 3
+negate -2 = 2
+negate -1 = 1
+negate 0 = 0
+negate 1 = -1
+negate 2 = -2
+negate 3 = -3
+#
+testReal
+toRational -3 = -3 % 1
+toRational -2 = -2 % 1
+toRational -1 = -1 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+-3 `divMod`  -3 = (1,0)
+-3 `divMod`  -2 = (1,-1)
+-3 `divMod`  -1 = (3,0)
+-3 `divMod`  1 = (-3,0)
+-3 `divMod`  2 = (-2,1)
+-3 `divMod`  3 = (-1,0)
+ 
+-2 `divMod`  -3 = (0,-2)
+-2 `divMod`  -2 = (1,0)
+-2 `divMod`  -1 = (2,0)
+-2 `divMod`  1 = (-2,0)
+-2 `divMod`  2 = (-1,0)
+-2 `divMod`  3 = (-1,1)
+ 
+-1 `divMod`  -3 = (0,-1)
+-1 `divMod`  -2 = (0,-1)
+-1 `divMod`  -1 = (1,0)
+-1 `divMod`  1 = (-1,0)
+-1 `divMod`  2 = (-1,1)
+-1 `divMod`  3 = (-1,2)
+ 
+0 `divMod`  -3 = (0,0)
+0 `divMod`  -2 = (0,0)
+0 `divMod`  -1 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  -3 = (-1,-2)
+1 `divMod`  -2 = (-1,-1)
+1 `divMod`  -1 = (-1,0)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  -3 = (-1,-1)
+2 `divMod`  -2 = (-1,0)
+2 `divMod`  -1 = (-2,0)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  -3 = (-1,0)
+3 `divMod`  -2 = (-2,-1)
+3 `divMod`  -1 = (-3,0)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+-3 `div`     -3 = 1
+-3 `div`     -2 = 1
+-3 `div`     -1 = 3
+-3 `div`     1 = -3
+-3 `div`     2 = -2
+-3 `div`     3 = -1
+ 
+-2 `div`     -3 = 0
+-2 `div`     -2 = 1
+-2 `div`     -1 = 2
+-2 `div`     1 = -2
+-2 `div`     2 = -1
+-2 `div`     3 = -1
+ 
+-1 `div`     -3 = 0
+-1 `div`     -2 = 0
+-1 `div`     -1 = 1
+-1 `div`     1 = -1
+-1 `div`     2 = -1
+-1 `div`     3 = -1
+ 
+0 `div`     -3 = 0
+0 `div`     -2 = 0
+0 `div`     -1 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     -3 = -1
+1 `div`     -2 = -1
+1 `div`     -1 = -1
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     -3 = -1
+2 `div`     -2 = -1
+2 `div`     -1 = -2
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     -3 = -1
+3 `div`     -2 = -2
+3 `div`     -1 = -3
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+-3 `mod`     -3 = 0
+-3 `mod`     -2 = -1
+-3 `mod`     -1 = 0
+-3 `mod`     1 = 0
+-3 `mod`     2 = 1
+-3 `mod`     3 = 0
+ 
+-2 `mod`     -3 = -2
+-2 `mod`     -2 = 0
+-2 `mod`     -1 = 0
+-2 `mod`     1 = 0
+-2 `mod`     2 = 0
+-2 `mod`     3 = 1
+ 
+-1 `mod`     -3 = -1
+-1 `mod`     -2 = -1
+-1 `mod`     -1 = 0
+-1 `mod`     1 = 0
+-1 `mod`     2 = 1
+-1 `mod`     3 = 2
+ 
+0 `mod`     -3 = 0
+0 `mod`     -2 = 0
+0 `mod`     -1 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     -3 = -2
+1 `mod`     -2 = -1
+1 `mod`     -1 = 0
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     -3 = -1
+2 `mod`     -2 = 0
+2 `mod`     -1 = 0
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     -3 = 0
+3 `mod`     -2 = -1
+3 `mod`     -1 = 0
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+-3 `quotRem` -3 = (1,0)
+-3 `quotRem` -2 = (1,-1)
+-3 `quotRem` -1 = (3,0)
+-3 `quotRem` 1 = (-3,0)
+-3 `quotRem` 2 = (-1,-1)
+-3 `quotRem` 3 = (-1,0)
+ 
+-2 `quotRem` -3 = (0,-2)
+-2 `quotRem` -2 = (1,0)
+-2 `quotRem` -1 = (2,0)
+-2 `quotRem` 1 = (-2,0)
+-2 `quotRem` 2 = (-1,0)
+-2 `quotRem` 3 = (0,-2)
+ 
+-1 `quotRem` -3 = (0,-1)
+-1 `quotRem` -2 = (0,-1)
+-1 `quotRem` -1 = (1,0)
+-1 `quotRem` 1 = (-1,0)
+-1 `quotRem` 2 = (0,-1)
+-1 `quotRem` 3 = (0,-1)
+ 
+0 `quotRem` -3 = (0,0)
+0 `quotRem` -2 = (0,0)
+0 `quotRem` -1 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` -3 = (0,1)
+1 `quotRem` -2 = (0,1)
+1 `quotRem` -1 = (-1,0)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` -3 = (0,2)
+2 `quotRem` -2 = (-1,0)
+2 `quotRem` -1 = (-2,0)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` -3 = (-1,0)
+3 `quotRem` -2 = (-1,1)
+3 `quotRem` -1 = (-3,0)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+-3 `quot`    -3 = 1
+-3 `quot`    -2 = 1
+-3 `quot`    -1 = 3
+-3 `quot`    1 = -3
+-3 `quot`    2 = -1
+-3 `quot`    3 = -1
+ 
+-2 `quot`    -3 = 0
+-2 `quot`    -2 = 1
+-2 `quot`    -1 = 2
+-2 `quot`    1 = -2
+-2 `quot`    2 = -1
+-2 `quot`    3 = 0
+ 
+-1 `quot`    -3 = 0
+-1 `quot`    -2 = 0
+-1 `quot`    -1 = 1
+-1 `quot`    1 = -1
+-1 `quot`    2 = 0
+-1 `quot`    3 = 0
+ 
+0 `quot`    -3 = 0
+0 `quot`    -2 = 0
+0 `quot`    -1 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    -3 = 0
+1 `quot`    -2 = 0
+1 `quot`    -1 = -1
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    -3 = 0
+2 `quot`    -2 = -1
+2 `quot`    -1 = -2
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    -3 = -1
+3 `quot`    -2 = -1
+3 `quot`    -1 = -3
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+-3 `rem`     -3 = 0
+-3 `rem`     -2 = -1
+-3 `rem`     -1 = 0
+-3 `rem`     1 = 0
+-3 `rem`     2 = -1
+-3 `rem`     3 = 0
+ 
+-2 `rem`     -3 = -2
+-2 `rem`     -2 = 0
+-2 `rem`     -1 = 0
+-2 `rem`     1 = 0
+-2 `rem`     2 = 0
+-2 `rem`     3 = -2
+ 
+-1 `rem`     -3 = -1
+-1 `rem`     -2 = -1
+-1 `rem`     -1 = 0
+-1 `rem`     1 = 0
+-1 `rem`     2 = -1
+-1 `rem`     3 = -1
+ 
+0 `rem`     -3 = 0
+0 `rem`     -2 = 0
+0 `rem`     -1 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     -3 = 1
+1 `rem`     -2 = 1
+1 `rem`     -1 = 0
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     -3 = 2
+2 `rem`     -2 = 0
+2 `rem`     -1 = 0
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     -3 = 0
+3 `rem`     -2 = 1
+3 `rem`     -1 = 0
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testConversions
+Integer : [-9223372036854775808,0,9223372036854775807]
+Int     : [0,0,-1]
+Int8    : [0,0,-1]
+Int16   : [0,0,-1]
+Int32   : [0,0,-1]
+Int64   : [-9223372036854775808,0,9223372036854775807]
+Word8   : [0,0,255]
+Word16  : [0,0,65535]
+Word32  : [0,0,4294967295]
+Word64  : [9223372036854775808,0,9223372036854775807]
+testBits
+-3 .&.   -3 = -3
+-3 .&.   -2 = -4
+-3 .&.   -1 = -3
+-3 .&.   1 = 1
+-3 .&.   2 = 0
+-3 .&.   3 = 1
+ 
+-2 .&.   -3 = -4
+-2 .&.   -2 = -2
+-2 .&.   -1 = -2
+-2 .&.   1 = 0
+-2 .&.   2 = 2
+-2 .&.   3 = 2
+ 
+-1 .&.   -3 = -3
+-1 .&.   -2 = -2
+-1 .&.   -1 = -1
+-1 .&.   1 = 1
+-1 .&.   2 = 2
+-1 .&.   3 = 3
+ 
+0 .&.   -3 = 0
+0 .&.   -2 = 0
+0 .&.   -1 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   -3 = 1
+1 .&.   -2 = 0
+1 .&.   -1 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   -3 = 0
+2 .&.   -2 = 2
+2 .&.   -1 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   -3 = 1
+3 .&.   -2 = 2
+3 .&.   -1 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+-3 .|.   -3 = -3
+-3 .|.   -2 = -1
+-3 .|.   -1 = -1
+-3 .|.   1 = -3
+-3 .|.   2 = -1
+-3 .|.   3 = -1
+ 
+-2 .|.   -3 = -1
+-2 .|.   -2 = -2
+-2 .|.   -1 = -1
+-2 .|.   1 = -1
+-2 .|.   2 = -2
+-2 .|.   3 = -1
+ 
+-1 .|.   -3 = -1
+-1 .|.   -2 = -1
+-1 .|.   -1 = -1
+-1 .|.   1 = -1
+-1 .|.   2 = -1
+-1 .|.   3 = -1
+ 
+0 .|.   -3 = -3
+0 .|.   -2 = -2
+0 .|.   -1 = -1
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   -3 = -3
+1 .|.   -2 = -1
+1 .|.   -1 = -1
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   -3 = -1
+2 .|.   -2 = -2
+2 .|.   -1 = -1
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   -3 = -1
+3 .|.   -2 = -1
+3 .|.   -1 = -1
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+-3 `xor` -3 = 0
+-3 `xor` -2 = 3
+-3 `xor` -1 = 2
+-3 `xor` 1 = -4
+-3 `xor` 2 = -1
+-3 `xor` 3 = -2
+ 
+-2 `xor` -3 = 3
+-2 `xor` -2 = 0
+-2 `xor` -1 = 1
+-2 `xor` 1 = -1
+-2 `xor` 2 = -4
+-2 `xor` 3 = -3
+ 
+-1 `xor` -3 = 2
+-1 `xor` -2 = 1
+-1 `xor` -1 = 0
+-1 `xor` 1 = -2
+-1 `xor` 2 = -3
+-1 `xor` 3 = -4
+ 
+0 `xor` -3 = -3
+0 `xor` -2 = -2
+0 `xor` -1 = -1
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` -3 = -4
+1 `xor` -2 = -1
+1 `xor` -1 = -2
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` -3 = -1
+2 `xor` -2 = -4
+2 `xor` -1 = -3
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` -3 = -2
+3 `xor` -2 = -3
+3 `xor` -1 = -4
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement -3 = 2
+complement -2 = 1
+complement -1 = 0
+complement 0 = -1
+complement 1 = -2
+complement 2 = -3
+complement 3 = -4
+#
+-3 `shiftL` 0 = -3
+-3 `shiftL` 1 = -6
+-3 `shiftL` 2 = -12
+-3 `shiftL` 3 = -24
+-3 `shiftL` 32 = -12884901888
+ 
+-2 `shiftL` 0 = -2
+-2 `shiftL` 1 = -4
+-2 `shiftL` 2 = -8
+-2 `shiftL` 3 = -16
+-2 `shiftL` 32 = -8589934592
+ 
+-1 `shiftL` 0 = -1
+-1 `shiftL` 1 = -2
+-1 `shiftL` 2 = -4
+-1 `shiftL` 3 = -8
+-1 `shiftL` 32 = -4294967296
+ 
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
+0 `shiftL` 32 = 0
+ 
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
+1 `shiftL` 32 = 4294967296
+ 
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
+2 `shiftL` 32 = 8589934592
+ 
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+3 `shiftL` 32 = 12884901888
+ 
+#
+-3 `shiftR` 0 = -3
+-3 `shiftR` 1 = -2
+-3 `shiftR` 2 = -1
+-3 `shiftR` 3 = -1
+-3 `shiftR` 32 = -1
+ 
+-2 `shiftR` 0 = -2
+-2 `shiftR` 1 = -1
+-2 `shiftR` 2 = -1
+-2 `shiftR` 3 = -1
+-2 `shiftR` 32 = -1
+ 
+-1 `shiftR` 0 = -1
+-1 `shiftR` 1 = -1
+-1 `shiftR` 2 = -1
+-1 `shiftR` 3 = -1
+-1 `shiftR` 32 = -1
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+0 `shiftR` 32 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+1 `shiftR` 32 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+2 `shiftR` 32 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
+3 `shiftR` 32 = 0
+ 
+#
+-3 `rotate` -3 = -4611686018427387905
+-3 `rotate` -2 = 9223372036854775807
+-3 `rotate` -1 = -2
+-3 `rotate` 0 = -3
+-3 `rotate` 1 = -5
+-3 `rotate` 2 = -9
+-3 `rotate` 3 = -17
+ 
+-2 `rotate` -3 = -2305843009213693953
+-2 `rotate` -2 = -4611686018427387905
+-2 `rotate` -1 = 9223372036854775807
+-2 `rotate` 0 = -2
+-2 `rotate` 1 = -3
+-2 `rotate` 2 = -5
+-2 `rotate` 3 = -9
+ 
+-1 `rotate` -3 = -1
+-1 `rotate` -2 = -1
+-1 `rotate` -1 = -1
+-1 `rotate` 0 = -1
+-1 `rotate` 1 = -1
+-1 `rotate` 2 = -1
+-1 `rotate` 3 = -1
+ 
+0 `rotate` -3 = 0
+0 `rotate` -2 = 0
+0 `rotate` -1 = 0
+0 `rotate` 0 = 0
+0 `rotate` 1 = 0
+0 `rotate` 2 = 0
+0 `rotate` 3 = 0
+ 
+1 `rotate` -3 = 2305843009213693952
+1 `rotate` -2 = 4611686018427387904
+1 `rotate` -1 = -9223372036854775808
+1 `rotate` 0 = 1
+1 `rotate` 1 = 2
+1 `rotate` 2 = 4
+1 `rotate` 3 = 8
+ 
+2 `rotate` -3 = 4611686018427387904
+2 `rotate` -2 = -9223372036854775808
+2 `rotate` -1 = 1
+2 `rotate` 0 = 2
+2 `rotate` 1 = 4
+2 `rotate` 2 = 8
+2 `rotate` 3 = 16
+ 
+3 `rotate` -3 = 6917529027641081856
+3 `rotate` -2 = -4611686018427387904
+3 `rotate` -1 = -9223372036854775807
+3 `rotate` 0 = 3
+3 `rotate` 1 = 6
+3 `rotate` 2 = 12
+3 `rotate` 3 = 24
+ 
+#
+bit 0 = 1
+bit 1 = 2
+bit 2 = 4
+bit 3 = 8
+#
+-3 `setBit` 0 = -3
+-3 `setBit` 1 = -1
+-3 `setBit` 2 = -3
+-3 `setBit` 3 = -3
+-3 `setBit` 32 = -3
+ 
+-2 `setBit` 0 = -1
+-2 `setBit` 1 = -2
+-2 `setBit` 2 = -2
+-2 `setBit` 3 = -2
+-2 `setBit` 32 = -2
+ 
+-1 `setBit` 0 = -1
+-1 `setBit` 1 = -1
+-1 `setBit` 2 = -1
+-1 `setBit` 3 = -1
+-1 `setBit` 32 = -1
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+0 `setBit` 32 = 4294967296
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+1 `setBit` 32 = 4294967297
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+2 `setBit` 32 = 4294967298
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+3 `setBit` 32 = 4294967299
+ 
+#
+-3 `clearBit` 0 = -4
+-3 `clearBit` 1 = -3
+-3 `clearBit` 2 = -7
+-3 `clearBit` 3 = -11
+-3 `clearBit` 32 = -4294967299
+ 
+-2 `clearBit` 0 = -2
+-2 `clearBit` 1 = -4
+-2 `clearBit` 2 = -6
+-2 `clearBit` 3 = -10
+-2 `clearBit` 32 = -4294967298
+ 
+-1 `clearBit` 0 = -2
+-1 `clearBit` 1 = -3
+-1 `clearBit` 2 = -5
+-1 `clearBit` 3 = -9
+-1 `clearBit` 32 = -4294967297
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+0 `clearBit` 32 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+1 `clearBit` 32 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+2 `clearBit` 32 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+3 `clearBit` 32 = 3
+ 
+#
+-3 `complementBit` 0 = -4
+-3 `complementBit` 1 = -1
+-3 `complementBit` 2 = -7
+-3 `complementBit` 3 = -11
+-3 `complementBit` 32 = -4294967299
+ 
+-2 `complementBit` 0 = -1
+-2 `complementBit` 1 = -4
+-2 `complementBit` 2 = -6
+-2 `complementBit` 3 = -10
+-2 `complementBit` 32 = -4294967298
+ 
+-1 `complementBit` 0 = -2
+-1 `complementBit` 1 = -3
+-1 `complementBit` 2 = -5
+-1 `complementBit` 3 = -9
+-1 `complementBit` 32 = -4294967297
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+0 `complementBit` 32 = 4294967296
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+1 `complementBit` 32 = 4294967297
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+2 `complementBit` 32 = 4294967298
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+3 `complementBit` 32 = 4294967299
+ 
+#
+-3 `testBit` 0 = True
+-3 `testBit` 1 = False
+-3 `testBit` 2 = True
+-3 `testBit` 3 = True
+-3 `testBit` 32 = True
+ 
+-2 `testBit` 0 = False
+-2 `testBit` 1 = True
+-2 `testBit` 2 = True
+-2 `testBit` 3 = True
+-2 `testBit` 32 = True
+ 
+-1 `testBit` 0 = True
+-1 `testBit` 1 = True
+-1 `testBit` 2 = True
+-1 `testBit` 3 = True
+-1 `testBit` 32 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+0 `testBit` 32 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+1 `testBit` 32 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+2 `testBit` 32 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+3 `testBit` 32 = False
+ 
+#
+bitSize -3 = 64
+bitSize -2 = 64
+bitSize -1 = 64
+bitSize 0 = 64
+bitSize 1 = 64
+bitSize 2 = 64
+bitSize 3 = 64
 #
 isSigned -3 = True
 isSigned -2 = True
@@ -9381,8 +11287,1419 @@ isSigned 2 = False
 isSigned 3 = False
 #
 --------------------------------
+--Testing Word64
+--------------------------------
+testBounded
+(18446744073709551615,0,1)
+(18446744073709551614,18446744073709551615,0)
+testEnum
+[0,1,2,3,4,5,6,7,8,9]
+[0,2,4,6,8,10,12,14,16,18]
+[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+[0,2,4,6,8,10,12,14,16,18,20]
+testReadShow
+[18446744073709551613,18446744073709551614,18446744073709551615,0,1,2,3]
+[18446744073709551613,18446744073709551614,18446744073709551615,0,1,2,3]
+testEq
+18446744073709551613 == 18446744073709551613 = True
+18446744073709551613 == 18446744073709551614 = False
+18446744073709551613 == 18446744073709551615 = False
+18446744073709551613 == 0 = False
+18446744073709551613 == 1 = False
+18446744073709551613 == 2 = False
+18446744073709551613 == 3 = False
+ 
+18446744073709551614 == 18446744073709551613 = False
+18446744073709551614 == 18446744073709551614 = True
+18446744073709551614 == 18446744073709551615 = False
+18446744073709551614 == 0 = False
+18446744073709551614 == 1 = False
+18446744073709551614 == 2 = False
+18446744073709551614 == 3 = False
+ 
+18446744073709551615 == 18446744073709551613 = False
+18446744073709551615 == 18446744073709551614 = False
+18446744073709551615 == 18446744073709551615 = True
+18446744073709551615 == 0 = False
+18446744073709551615 == 1 = False
+18446744073709551615 == 2 = False
+18446744073709551615 == 3 = False
+ 
+0 == 18446744073709551613 = False
+0 == 18446744073709551614 = False
+0 == 18446744073709551615 = False
+0 == 0 = True
+0 == 1 = False
+0 == 2 = False
+0 == 3 = False
+ 
+1 == 18446744073709551613 = False
+1 == 18446744073709551614 = False
+1 == 18446744073709551615 = False
+1 == 0 = False
+1 == 1 = True
+1 == 2 = False
+1 == 3 = False
+ 
+2 == 18446744073709551613 = False
+2 == 18446744073709551614 = False
+2 == 18446744073709551615 = False
+2 == 0 = False
+2 == 1 = False
+2 == 2 = True
+2 == 3 = False
+ 
+3 == 18446744073709551613 = False
+3 == 18446744073709551614 = False
+3 == 18446744073709551615 = False
+3 == 0 = False
+3 == 1 = False
+3 == 2 = False
+3 == 3 = True
+ 
+#
+18446744073709551613 /= 18446744073709551613 = False
+18446744073709551613 /= 18446744073709551614 = True
+18446744073709551613 /= 18446744073709551615 = True
+18446744073709551613 /= 0 = True
+18446744073709551613 /= 1 = True
+18446744073709551613 /= 2 = True
+18446744073709551613 /= 3 = True
+ 
+18446744073709551614 /= 18446744073709551613 = True
+18446744073709551614 /= 18446744073709551614 = False
+18446744073709551614 /= 18446744073709551615 = True
+18446744073709551614 /= 0 = True
+18446744073709551614 /= 1 = True
+18446744073709551614 /= 2 = True
+18446744073709551614 /= 3 = True
+ 
+18446744073709551615 /= 18446744073709551613 = True
+18446744073709551615 /= 18446744073709551614 = True
+18446744073709551615 /= 18446744073709551615 = False
+18446744073709551615 /= 0 = True
+18446744073709551615 /= 1 = True
+18446744073709551615 /= 2 = True
+18446744073709551615 /= 3 = True
+ 
+0 /= 18446744073709551613 = True
+0 /= 18446744073709551614 = True
+0 /= 18446744073709551615 = True
+0 /= 0 = False
+0 /= 1 = True
+0 /= 2 = True
+0 /= 3 = True
+ 
+1 /= 18446744073709551613 = True
+1 /= 18446744073709551614 = True
+1 /= 18446744073709551615 = True
+1 /= 0 = True
+1 /= 1 = False
+1 /= 2 = True
+1 /= 3 = True
+ 
+2 /= 18446744073709551613 = True
+2 /= 18446744073709551614 = True
+2 /= 18446744073709551615 = True
+2 /= 0 = True
+2 /= 1 = True
+2 /= 2 = False
+2 /= 3 = True
+ 
+3 /= 18446744073709551613 = True
+3 /= 18446744073709551614 = True
+3 /= 18446744073709551615 = True
+3 /= 0 = True
+3 /= 1 = True
+3 /= 2 = True
+3 /= 3 = False
+ 
+#
+testOrd
+18446744073709551613 <= 18446744073709551613 = True
+18446744073709551613 <= 18446744073709551614 = True
+18446744073709551613 <= 18446744073709551615 = True
+18446744073709551613 <= 0 = False
+18446744073709551613 <= 1 = False
+18446744073709551613 <= 2 = False
+18446744073709551613 <= 3 = False
+ 
+18446744073709551614 <= 18446744073709551613 = False
+18446744073709551614 <= 18446744073709551614 = True
+18446744073709551614 <= 18446744073709551615 = True
+18446744073709551614 <= 0 = False
+18446744073709551614 <= 1 = False
+18446744073709551614 <= 2 = False
+18446744073709551614 <= 3 = False
+ 
+18446744073709551615 <= 18446744073709551613 = False
+18446744073709551615 <= 18446744073709551614 = False
+18446744073709551615 <= 18446744073709551615 = True
+18446744073709551615 <= 0 = False
+18446744073709551615 <= 1 = False
+18446744073709551615 <= 2 = False
+18446744073709551615 <= 3 = False
+ 
+0 <= 18446744073709551613 = True
+0 <= 18446744073709551614 = True
+0 <= 18446744073709551615 = True
+0 <= 0 = True
+0 <= 1 = True
+0 <= 2 = True
+0 <= 3 = True
+ 
+1 <= 18446744073709551613 = True
+1 <= 18446744073709551614 = True
+1 <= 18446744073709551615 = True
+1 <= 0 = False
+1 <= 1 = True
+1 <= 2 = True
+1 <= 3 = True
+ 
+2 <= 18446744073709551613 = True
+2 <= 18446744073709551614 = True
+2 <= 18446744073709551615 = True
+2 <= 0 = False
+2 <= 1 = False
+2 <= 2 = True
+2 <= 3 = True
+ 
+3 <= 18446744073709551613 = True
+3 <= 18446744073709551614 = True
+3 <= 18446744073709551615 = True
+3 <= 0 = False
+3 <= 1 = False
+3 <= 2 = False
+3 <= 3 = True
+ 
+#
+18446744073709551613 <  18446744073709551613 = False
+18446744073709551613 <  18446744073709551614 = True
+18446744073709551613 <  18446744073709551615 = True
+18446744073709551613 <  0 = False
+18446744073709551613 <  1 = False
+18446744073709551613 <  2 = False
+18446744073709551613 <  3 = False
+ 
+18446744073709551614 <  18446744073709551613 = False
+18446744073709551614 <  18446744073709551614 = False
+18446744073709551614 <  18446744073709551615 = True
+18446744073709551614 <  0 = False
+18446744073709551614 <  1 = False
+18446744073709551614 <  2 = False
+18446744073709551614 <  3 = False
+ 
+18446744073709551615 <  18446744073709551613 = False
+18446744073709551615 <  18446744073709551614 = False
+18446744073709551615 <  18446744073709551615 = False
+18446744073709551615 <  0 = False
+18446744073709551615 <  1 = False
+18446744073709551615 <  2 = False
+18446744073709551615 <  3 = False
+ 
+0 <  18446744073709551613 = True
+0 <  18446744073709551614 = True
+0 <  18446744073709551615 = True
+0 <  0 = False
+0 <  1 = True
+0 <  2 = True
+0 <  3 = True
+ 
+1 <  18446744073709551613 = True
+1 <  18446744073709551614 = True
+1 <  18446744073709551615 = True
+1 <  0 = False
+1 <  1 = False
+1 <  2 = True
+1 <  3 = True
+ 
+2 <  18446744073709551613 = True
+2 <  18446744073709551614 = True
+2 <  18446744073709551615 = True
+2 <  0 = False
+2 <  1 = False
+2 <  2 = False
+2 <  3 = True
+ 
+3 <  18446744073709551613 = True
+3 <  18446744073709551614 = True
+3 <  18446744073709551615 = True
+3 <  0 = False
+3 <  1 = False
+3 <  2 = False
+3 <  3 = False
+ 
+#
+18446744073709551613 >  18446744073709551613 = False
+18446744073709551613 >  18446744073709551614 = False
+18446744073709551613 >  18446744073709551615 = False
+18446744073709551613 >  0 = True
+18446744073709551613 >  1 = True
+18446744073709551613 >  2 = True
+18446744073709551613 >  3 = True
+ 
+18446744073709551614 >  18446744073709551613 = True
+18446744073709551614 >  18446744073709551614 = False
+18446744073709551614 >  18446744073709551615 = False
+18446744073709551614 >  0 = True
+18446744073709551614 >  1 = True
+18446744073709551614 >  2 = True
+18446744073709551614 >  3 = True
+ 
+18446744073709551615 >  18446744073709551613 = True
+18446744073709551615 >  18446744073709551614 = True
+18446744073709551615 >  18446744073709551615 = False
+18446744073709551615 >  0 = True
+18446744073709551615 >  1 = True
+18446744073709551615 >  2 = True
+18446744073709551615 >  3 = True
+ 
+0 >  18446744073709551613 = False
+0 >  18446744073709551614 = False
+0 >  18446744073709551615 = False
+0 >  0 = False
+0 >  1 = False
+0 >  2 = False
+0 >  3 = False
+ 
+1 >  18446744073709551613 = False
+1 >  18446744073709551614 = False
+1 >  18446744073709551615 = False
+1 >  0 = True
+1 >  1 = False
+1 >  2 = False
+1 >  3 = False
+ 
+2 >  18446744073709551613 = False
+2 >  18446744073709551614 = False
+2 >  18446744073709551615 = False
+2 >  0 = True
+2 >  1 = True
+2 >  2 = False
+2 >  3 = False
+ 
+3 >  18446744073709551613 = False
+3 >  18446744073709551614 = False
+3 >  18446744073709551615 = False
+3 >  0 = True
+3 >  1 = True
+3 >  2 = True
+3 >  3 = False
+ 
+#
+18446744073709551613 >= 18446744073709551613 = True
+18446744073709551613 >= 18446744073709551614 = False
+18446744073709551613 >= 18446744073709551615 = False
+18446744073709551613 >= 0 = True
+18446744073709551613 >= 1 = True
+18446744073709551613 >= 2 = True
+18446744073709551613 >= 3 = True
+ 
+18446744073709551614 >= 18446744073709551613 = True
+18446744073709551614 >= 18446744073709551614 = True
+18446744073709551614 >= 18446744073709551615 = False
+18446744073709551614 >= 0 = True
+18446744073709551614 >= 1 = True
+18446744073709551614 >= 2 = True
+18446744073709551614 >= 3 = True
+ 
+18446744073709551615 >= 18446744073709551613 = True
+18446744073709551615 >= 18446744073709551614 = True
+18446744073709551615 >= 18446744073709551615 = True
+18446744073709551615 >= 0 = True
+18446744073709551615 >= 1 = True
+18446744073709551615 >= 2 = True
+18446744073709551615 >= 3 = True
+ 
+0 >= 18446744073709551613 = False
+0 >= 18446744073709551614 = False
+0 >= 18446744073709551615 = False
+0 >= 0 = True
+0 >= 1 = False
+0 >= 2 = False
+0 >= 3 = False
+ 
+1 >= 18446744073709551613 = False
+1 >= 18446744073709551614 = False
+1 >= 18446744073709551615 = False
+1 >= 0 = True
+1 >= 1 = True
+1 >= 2 = False
+1 >= 3 = False
+ 
+2 >= 18446744073709551613 = False
+2 >= 18446744073709551614 = False
+2 >= 18446744073709551615 = False
+2 >= 0 = True
+2 >= 1 = True
+2 >= 2 = True
+2 >= 3 = False
+ 
+3 >= 18446744073709551613 = False
+3 >= 18446744073709551614 = False
+3 >= 18446744073709551615 = False
+3 >= 0 = True
+3 >= 1 = True
+3 >= 2 = True
+3 >= 3 = True
+ 
+#
+18446744073709551613 `compare` 18446744073709551613 = EQ
+18446744073709551613 `compare` 18446744073709551614 = LT
+18446744073709551613 `compare` 18446744073709551615 = LT
+18446744073709551613 `compare` 0 = GT
+18446744073709551613 `compare` 1 = GT
+18446744073709551613 `compare` 2 = GT
+18446744073709551613 `compare` 3 = GT
+ 
+18446744073709551614 `compare` 18446744073709551613 = GT
+18446744073709551614 `compare` 18446744073709551614 = EQ
+18446744073709551614 `compare` 18446744073709551615 = LT
+18446744073709551614 `compare` 0 = GT
+18446744073709551614 `compare` 1 = GT
+18446744073709551614 `compare` 2 = GT
+18446744073709551614 `compare` 3 = GT
+ 
+18446744073709551615 `compare` 18446744073709551613 = GT
+18446744073709551615 `compare` 18446744073709551614 = GT
+18446744073709551615 `compare` 18446744073709551615 = EQ
+18446744073709551615 `compare` 0 = GT
+18446744073709551615 `compare` 1 = GT
+18446744073709551615 `compare` 2 = GT
+18446744073709551615 `compare` 3 = GT
+ 
+0 `compare` 18446744073709551613 = LT
+0 `compare` 18446744073709551614 = LT
+0 `compare` 18446744073709551615 = LT
+0 `compare` 0 = EQ
+0 `compare` 1 = LT
+0 `compare` 2 = LT
+0 `compare` 3 = LT
+ 
+1 `compare` 18446744073709551613 = LT
+1 `compare` 18446744073709551614 = LT
+1 `compare` 18446744073709551615 = LT
+1 `compare` 0 = GT
+1 `compare` 1 = EQ
+1 `compare` 2 = LT
+1 `compare` 3 = LT
+ 
+2 `compare` 18446744073709551613 = LT
+2 `compare` 18446744073709551614 = LT
+2 `compare` 18446744073709551615 = LT
+2 `compare` 0 = GT
+2 `compare` 1 = GT
+2 `compare` 2 = EQ
+2 `compare` 3 = LT
+ 
+3 `compare` 18446744073709551613 = LT
+3 `compare` 18446744073709551614 = LT
+3 `compare` 18446744073709551615 = LT
+3 `compare` 0 = GT
+3 `compare` 1 = GT
+3 `compare` 2 = GT
+3 `compare` 3 = EQ
+ 
+#
+testNum
+18446744073709551613 + 18446744073709551613 = 18446744073709551610
+18446744073709551613 + 18446744073709551614 = 18446744073709551611
+18446744073709551613 + 18446744073709551615 = 18446744073709551612
+18446744073709551613 + 0 = 18446744073709551613
+18446744073709551613 + 1 = 18446744073709551614
+18446744073709551613 + 2 = 18446744073709551615
+18446744073709551613 + 3 = 0
+ 
+18446744073709551614 + 18446744073709551613 = 18446744073709551611
+18446744073709551614 + 18446744073709551614 = 18446744073709551612
+18446744073709551614 + 18446744073709551615 = 18446744073709551613
+18446744073709551614 + 0 = 18446744073709551614
+18446744073709551614 + 1 = 18446744073709551615
+18446744073709551614 + 2 = 0
+18446744073709551614 + 3 = 1
+ 
+18446744073709551615 + 18446744073709551613 = 18446744073709551612
+18446744073709551615 + 18446744073709551614 = 18446744073709551613
+18446744073709551615 + 18446744073709551615 = 18446744073709551614
+18446744073709551615 + 0 = 18446744073709551615
+18446744073709551615 + 1 = 0
+18446744073709551615 + 2 = 1
+18446744073709551615 + 3 = 2
+ 
+0 + 18446744073709551613 = 18446744073709551613
+0 + 18446744073709551614 = 18446744073709551614
+0 + 18446744073709551615 = 18446744073709551615
+0 + 0 = 0
+0 + 1 = 1
+0 + 2 = 2
+0 + 3 = 3
+ 
+1 + 18446744073709551613 = 18446744073709551614
+1 + 18446744073709551614 = 18446744073709551615
+1 + 18446744073709551615 = 0
+1 + 0 = 1
+1 + 1 = 2
+1 + 2 = 3
+1 + 3 = 4
+ 
+2 + 18446744073709551613 = 18446744073709551615
+2 + 18446744073709551614 = 0
+2 + 18446744073709551615 = 1
+2 + 0 = 2
+2 + 1 = 3
+2 + 2 = 4
+2 + 3 = 5
+ 
+3 + 18446744073709551613 = 0
+3 + 18446744073709551614 = 1
+3 + 18446744073709551615 = 2
+3 + 0 = 3
+3 + 1 = 4
+3 + 2 = 5
+3 + 3 = 6
+ 
+#
+18446744073709551613 - 18446744073709551613 = 0
+18446744073709551613 - 18446744073709551614 = 18446744073709551615
+18446744073709551613 - 18446744073709551615 = 18446744073709551614
+18446744073709551613 - 0 = 18446744073709551613
+18446744073709551613 - 1 = 18446744073709551612
+18446744073709551613 - 2 = 18446744073709551611
+18446744073709551613 - 3 = 18446744073709551610
+ 
+18446744073709551614 - 18446744073709551613 = 1
+18446744073709551614 - 18446744073709551614 = 0
+18446744073709551614 - 18446744073709551615 = 18446744073709551615
+18446744073709551614 - 0 = 18446744073709551614
+18446744073709551614 - 1 = 18446744073709551613
+18446744073709551614 - 2 = 18446744073709551612
+18446744073709551614 - 3 = 18446744073709551611
+ 
+18446744073709551615 - 18446744073709551613 = 2
+18446744073709551615 - 18446744073709551614 = 1
+18446744073709551615 - 18446744073709551615 = 0
+18446744073709551615 - 0 = 18446744073709551615
+18446744073709551615 - 1 = 18446744073709551614
+18446744073709551615 - 2 = 18446744073709551613
+18446744073709551615 - 3 = 18446744073709551612
+ 
+0 - 18446744073709551613 = 3
+0 - 18446744073709551614 = 2
+0 - 18446744073709551615 = 1
+0 - 0 = 0
+0 - 1 = 18446744073709551615
+0 - 2 = 18446744073709551614
+0 - 3 = 18446744073709551613
+ 
+1 - 18446744073709551613 = 4
+1 - 18446744073709551614 = 3
+1 - 18446744073709551615 = 2
+1 - 0 = 1
+1 - 1 = 0
+1 - 2 = 18446744073709551615
+1 - 3 = 18446744073709551614
+ 
+2 - 18446744073709551613 = 5
+2 - 18446744073709551614 = 4
+2 - 18446744073709551615 = 3
+2 - 0 = 2
+2 - 1 = 1
+2 - 2 = 0
+2 - 3 = 18446744073709551615
+ 
+3 - 18446744073709551613 = 6
+3 - 18446744073709551614 = 5
+3 - 18446744073709551615 = 4
+3 - 0 = 3
+3 - 1 = 2
+3 - 2 = 1
+3 - 3 = 0
+ 
+#
+18446744073709551613 * 18446744073709551613 = 9
+18446744073709551613 * 18446744073709551614 = 6
+18446744073709551613 * 18446744073709551615 = 3
+18446744073709551613 * 0 = 0
+18446744073709551613 * 1 = 18446744073709551613
+18446744073709551613 * 2 = 18446744073709551610
+18446744073709551613 * 3 = 18446744073709551607
+ 
+18446744073709551614 * 18446744073709551613 = 6
+18446744073709551614 * 18446744073709551614 = 4
+18446744073709551614 * 18446744073709551615 = 2
+18446744073709551614 * 0 = 0
+18446744073709551614 * 1 = 18446744073709551614
+18446744073709551614 * 2 = 18446744073709551612
+18446744073709551614 * 3 = 18446744073709551610
+ 
+18446744073709551615 * 18446744073709551613 = 3
+18446744073709551615 * 18446744073709551614 = 2
+18446744073709551615 * 18446744073709551615 = 1
+18446744073709551615 * 0 = 0
+18446744073709551615 * 1 = 18446744073709551615
+18446744073709551615 * 2 = 18446744073709551614
+18446744073709551615 * 3 = 18446744073709551613
+ 
+0 * 18446744073709551613 = 0
+0 * 18446744073709551614 = 0
+0 * 18446744073709551615 = 0
+0 * 0 = 0
+0 * 1 = 0
+0 * 2 = 0
+0 * 3 = 0
+ 
+1 * 18446744073709551613 = 18446744073709551613
+1 * 18446744073709551614 = 18446744073709551614
+1 * 18446744073709551615 = 18446744073709551615
+1 * 0 = 0
+1 * 1 = 1
+1 * 2 = 2
+1 * 3 = 3
+ 
+2 * 18446744073709551613 = 18446744073709551610
+2 * 18446744073709551614 = 18446744073709551612
+2 * 18446744073709551615 = 18446744073709551614
+2 * 0 = 0
+2 * 1 = 2
+2 * 2 = 4
+2 * 3 = 6
+ 
+3 * 18446744073709551613 = 18446744073709551607
+3 * 18446744073709551614 = 18446744073709551610
+3 * 18446744073709551615 = 18446744073709551613
+3 * 0 = 0
+3 * 1 = 3
+3 * 2 = 6
+3 * 3 = 9
+ 
+#
+negate 18446744073709551613 = 3
+negate 18446744073709551614 = 2
+negate 18446744073709551615 = 1
+negate 0 = 0
+negate 1 = 18446744073709551615
+negate 2 = 18446744073709551614
+negate 3 = 18446744073709551613
+#
+testReal
+toRational 18446744073709551613 = 18446744073709551613 % 1
+toRational 18446744073709551614 = 18446744073709551614 % 1
+toRational 18446744073709551615 = 18446744073709551615 % 1
+toRational 0 = 0 % 1
+toRational 1 = 1 % 1
+toRational 2 = 2 % 1
+toRational 3 = 3 % 1
+#
+testIntegral
+18446744073709551613 `divMod`  18446744073709551613 = (1,0)
+18446744073709551613 `divMod`  18446744073709551614 = (0,18446744073709551613)
+18446744073709551613 `divMod`  18446744073709551615 = (0,18446744073709551613)
+18446744073709551613 `divMod`  1 = (18446744073709551613,0)
+18446744073709551613 `divMod`  2 = (9223372036854775806,1)
+18446744073709551613 `divMod`  3 = (6148914691236517204,1)
+ 
+18446744073709551614 `divMod`  18446744073709551613 = (1,1)
+18446744073709551614 `divMod`  18446744073709551614 = (1,0)
+18446744073709551614 `divMod`  18446744073709551615 = (0,18446744073709551614)
+18446744073709551614 `divMod`  1 = (18446744073709551614,0)
+18446744073709551614 `divMod`  2 = (9223372036854775807,0)
+18446744073709551614 `divMod`  3 = (6148914691236517204,2)
+ 
+18446744073709551615 `divMod`  18446744073709551613 = (1,2)
+18446744073709551615 `divMod`  18446744073709551614 = (1,1)
+18446744073709551615 `divMod`  18446744073709551615 = (1,0)
+18446744073709551615 `divMod`  1 = (18446744073709551615,0)
+18446744073709551615 `divMod`  2 = (9223372036854775807,1)
+18446744073709551615 `divMod`  3 = (6148914691236517205,0)
+ 
+0 `divMod`  18446744073709551613 = (0,0)
+0 `divMod`  18446744073709551614 = (0,0)
+0 `divMod`  18446744073709551615 = (0,0)
+0 `divMod`  1 = (0,0)
+0 `divMod`  2 = (0,0)
+0 `divMod`  3 = (0,0)
+ 
+1 `divMod`  18446744073709551613 = (0,1)
+1 `divMod`  18446744073709551614 = (0,1)
+1 `divMod`  18446744073709551615 = (0,1)
+1 `divMod`  1 = (1,0)
+1 `divMod`  2 = (0,1)
+1 `divMod`  3 = (0,1)
+ 
+2 `divMod`  18446744073709551613 = (0,2)
+2 `divMod`  18446744073709551614 = (0,2)
+2 `divMod`  18446744073709551615 = (0,2)
+2 `divMod`  1 = (2,0)
+2 `divMod`  2 = (1,0)
+2 `divMod`  3 = (0,2)
+ 
+3 `divMod`  18446744073709551613 = (0,3)
+3 `divMod`  18446744073709551614 = (0,3)
+3 `divMod`  18446744073709551615 = (0,3)
+3 `divMod`  1 = (3,0)
+3 `divMod`  2 = (1,1)
+3 `divMod`  3 = (1,0)
+ 
+#
+18446744073709551613 `div`     18446744073709551613 = 1
+18446744073709551613 `div`     18446744073709551614 = 0
+18446744073709551613 `div`     18446744073709551615 = 0
+18446744073709551613 `div`     1 = 18446744073709551613
+18446744073709551613 `div`     2 = 9223372036854775806
+18446744073709551613 `div`     3 = 6148914691236517204
+ 
+18446744073709551614 `div`     18446744073709551613 = 1
+18446744073709551614 `div`     18446744073709551614 = 1
+18446744073709551614 `div`     18446744073709551615 = 0
+18446744073709551614 `div`     1 = 18446744073709551614
+18446744073709551614 `div`     2 = 9223372036854775807
+18446744073709551614 `div`     3 = 6148914691236517204
+ 
+18446744073709551615 `div`     18446744073709551613 = 1
+18446744073709551615 `div`     18446744073709551614 = 1
+18446744073709551615 `div`     18446744073709551615 = 1
+18446744073709551615 `div`     1 = 18446744073709551615
+18446744073709551615 `div`     2 = 9223372036854775807
+18446744073709551615 `div`     3 = 6148914691236517205
+ 
+0 `div`     18446744073709551613 = 0
+0 `div`     18446744073709551614 = 0
+0 `div`     18446744073709551615 = 0
+0 `div`     1 = 0
+0 `div`     2 = 0
+0 `div`     3 = 0
+ 
+1 `div`     18446744073709551613 = 0
+1 `div`     18446744073709551614 = 0
+1 `div`     18446744073709551615 = 0
+1 `div`     1 = 1
+1 `div`     2 = 0
+1 `div`     3 = 0
+ 
+2 `div`     18446744073709551613 = 0
+2 `div`     18446744073709551614 = 0
+2 `div`     18446744073709551615 = 0
+2 `div`     1 = 2
+2 `div`     2 = 1
+2 `div`     3 = 0
+ 
+3 `div`     18446744073709551613 = 0
+3 `div`     18446744073709551614 = 0
+3 `div`     18446744073709551615 = 0
+3 `div`     1 = 3
+3 `div`     2 = 1
+3 `div`     3 = 1
+ 
+#
+18446744073709551613 `mod`     18446744073709551613 = 0
+18446744073709551613 `mod`     18446744073709551614 = 18446744073709551613
+18446744073709551613 `mod`     18446744073709551615 = 18446744073709551613
+18446744073709551613 `mod`     1 = 0
+18446744073709551613 `mod`     2 = 1
+18446744073709551613 `mod`     3 = 1
+ 
+18446744073709551614 `mod`     18446744073709551613 = 1
+18446744073709551614 `mod`     18446744073709551614 = 0
+18446744073709551614 `mod`     18446744073709551615 = 18446744073709551614
+18446744073709551614 `mod`     1 = 0
+18446744073709551614 `mod`     2 = 0
+18446744073709551614 `mod`     3 = 2
+ 
+18446744073709551615 `mod`     18446744073709551613 = 2
+18446744073709551615 `mod`     18446744073709551614 = 1
+18446744073709551615 `mod`     18446744073709551615 = 0
+18446744073709551615 `mod`     1 = 0
+18446744073709551615 `mod`     2 = 1
+18446744073709551615 `mod`     3 = 0
+ 
+0 `mod`     18446744073709551613 = 0
+0 `mod`     18446744073709551614 = 0
+0 `mod`     18446744073709551615 = 0
+0 `mod`     1 = 0
+0 `mod`     2 = 0
+0 `mod`     3 = 0
+ 
+1 `mod`     18446744073709551613 = 1
+1 `mod`     18446744073709551614 = 1
+1 `mod`     18446744073709551615 = 1
+1 `mod`     1 = 0
+1 `mod`     2 = 1
+1 `mod`     3 = 1
+ 
+2 `mod`     18446744073709551613 = 2
+2 `mod`     18446744073709551614 = 2
+2 `mod`     18446744073709551615 = 2
+2 `mod`     1 = 0
+2 `mod`     2 = 0
+2 `mod`     3 = 2
+ 
+3 `mod`     18446744073709551613 = 3
+3 `mod`     18446744073709551614 = 3
+3 `mod`     18446744073709551615 = 3
+3 `mod`     1 = 0
+3 `mod`     2 = 1
+3 `mod`     3 = 0
+ 
+#
+18446744073709551613 `quotRem` 18446744073709551613 = (1,0)
+18446744073709551613 `quotRem` 18446744073709551614 = (0,18446744073709551613)
+18446744073709551613 `quotRem` 18446744073709551615 = (0,18446744073709551613)
+18446744073709551613 `quotRem` 1 = (18446744073709551613,0)
+18446744073709551613 `quotRem` 2 = (9223372036854775806,1)
+18446744073709551613 `quotRem` 3 = (6148914691236517204,1)
+ 
+18446744073709551614 `quotRem` 18446744073709551613 = (1,1)
+18446744073709551614 `quotRem` 18446744073709551614 = (1,0)
+18446744073709551614 `quotRem` 18446744073709551615 = (0,18446744073709551614)
+18446744073709551614 `quotRem` 1 = (18446744073709551614,0)
+18446744073709551614 `quotRem` 2 = (9223372036854775807,0)
+18446744073709551614 `quotRem` 3 = (6148914691236517204,2)
+ 
+18446744073709551615 `quotRem` 18446744073709551613 = (1,2)
+18446744073709551615 `quotRem` 18446744073709551614 = (1,1)
+18446744073709551615 `quotRem` 18446744073709551615 = (1,0)
+18446744073709551615 `quotRem` 1 = (18446744073709551615,0)
+18446744073709551615 `quotRem` 2 = (9223372036854775807,1)
+18446744073709551615 `quotRem` 3 = (6148914691236517205,0)
+ 
+0 `quotRem` 18446744073709551613 = (0,0)
+0 `quotRem` 18446744073709551614 = (0,0)
+0 `quotRem` 18446744073709551615 = (0,0)
+0 `quotRem` 1 = (0,0)
+0 `quotRem` 2 = (0,0)
+0 `quotRem` 3 = (0,0)
+ 
+1 `quotRem` 18446744073709551613 = (0,1)
+1 `quotRem` 18446744073709551614 = (0,1)
+1 `quotRem` 18446744073709551615 = (0,1)
+1 `quotRem` 1 = (1,0)
+1 `quotRem` 2 = (0,1)
+1 `quotRem` 3 = (0,1)
+ 
+2 `quotRem` 18446744073709551613 = (0,2)
+2 `quotRem` 18446744073709551614 = (0,2)
+2 `quotRem` 18446744073709551615 = (0,2)
+2 `quotRem` 1 = (2,0)
+2 `quotRem` 2 = (1,0)
+2 `quotRem` 3 = (0,2)
+ 
+3 `quotRem` 18446744073709551613 = (0,3)
+3 `quotRem` 18446744073709551614 = (0,3)
+3 `quotRem` 18446744073709551615 = (0,3)
+3 `quotRem` 1 = (3,0)
+3 `quotRem` 2 = (1,1)
+3 `quotRem` 3 = (1,0)
+ 
+#
+18446744073709551613 `quot`    18446744073709551613 = 1
+18446744073709551613 `quot`    18446744073709551614 = 0
+18446744073709551613 `quot`    18446744073709551615 = 0
+18446744073709551613 `quot`    1 = 18446744073709551613
+18446744073709551613 `quot`    2 = 9223372036854775806
+18446744073709551613 `quot`    3 = 6148914691236517204
+ 
+18446744073709551614 `quot`    18446744073709551613 = 1
+18446744073709551614 `quot`    18446744073709551614 = 1
+18446744073709551614 `quot`    18446744073709551615 = 0
+18446744073709551614 `quot`    1 = 18446744073709551614
+18446744073709551614 `quot`    2 = 9223372036854775807
+18446744073709551614 `quot`    3 = 6148914691236517204
+ 
+18446744073709551615 `quot`    18446744073709551613 = 1
+18446744073709551615 `quot`    18446744073709551614 = 1
+18446744073709551615 `quot`    18446744073709551615 = 1
+18446744073709551615 `quot`    1 = 18446744073709551615
+18446744073709551615 `quot`    2 = 9223372036854775807
+18446744073709551615 `quot`    3 = 6148914691236517205
+ 
+0 `quot`    18446744073709551613 = 0
+0 `quot`    18446744073709551614 = 0
+0 `quot`    18446744073709551615 = 0
+0 `quot`    1 = 0
+0 `quot`    2 = 0
+0 `quot`    3 = 0
+ 
+1 `quot`    18446744073709551613 = 0
+1 `quot`    18446744073709551614 = 0
+1 `quot`    18446744073709551615 = 0
+1 `quot`    1 = 1
+1 `quot`    2 = 0
+1 `quot`    3 = 0
+ 
+2 `quot`    18446744073709551613 = 0
+2 `quot`    18446744073709551614 = 0
+2 `quot`    18446744073709551615 = 0
+2 `quot`    1 = 2
+2 `quot`    2 = 1
+2 `quot`    3 = 0
+ 
+3 `quot`    18446744073709551613 = 0
+3 `quot`    18446744073709551614 = 0
+3 `quot`    18446744073709551615 = 0
+3 `quot`    1 = 3
+3 `quot`    2 = 1
+3 `quot`    3 = 1
+ 
+#
+18446744073709551613 `rem`     18446744073709551613 = 0
+18446744073709551613 `rem`     18446744073709551614 = 18446744073709551613
+18446744073709551613 `rem`     18446744073709551615 = 18446744073709551613
+18446744073709551613 `rem`     1 = 0
+18446744073709551613 `rem`     2 = 1
+18446744073709551613 `rem`     3 = 1
+ 
+18446744073709551614 `rem`     18446744073709551613 = 1
+18446744073709551614 `rem`     18446744073709551614 = 0
+18446744073709551614 `rem`     18446744073709551615 = 18446744073709551614
+18446744073709551614 `rem`     1 = 0
+18446744073709551614 `rem`     2 = 0
+18446744073709551614 `rem`     3 = 2
+ 
+18446744073709551615 `rem`     18446744073709551613 = 2
+18446744073709551615 `rem`     18446744073709551614 = 1
+18446744073709551615 `rem`     18446744073709551615 = 0
+18446744073709551615 `rem`     1 = 0
+18446744073709551615 `rem`     2 = 1
+18446744073709551615 `rem`     3 = 0
+ 
+0 `rem`     18446744073709551613 = 0
+0 `rem`     18446744073709551614 = 0
+0 `rem`     18446744073709551615 = 0
+0 `rem`     1 = 0
+0 `rem`     2 = 0
+0 `rem`     3 = 0
+ 
+1 `rem`     18446744073709551613 = 1
+1 `rem`     18446744073709551614 = 1
+1 `rem`     18446744073709551615 = 1
+1 `rem`     1 = 0
+1 `rem`     2 = 1
+1 `rem`     3 = 1
+ 
+2 `rem`     18446744073709551613 = 2
+2 `rem`     18446744073709551614 = 2
+2 `rem`     18446744073709551615 = 2
+2 `rem`     1 = 0
+2 `rem`     2 = 0
+2 `rem`     3 = 2
+ 
+3 `rem`     18446744073709551613 = 3
+3 `rem`     18446744073709551614 = 3
+3 `rem`     18446744073709551615 = 3
+3 `rem`     1 = 0
+3 `rem`     2 = 1
+3 `rem`     3 = 0
+ 
+#
+testConversions
+Integer : [0,0,18446744073709551615]
+Int     : [0,0,-1]
+Int8    : [0,0,-1]
+Int16   : [0,0,-1]
+Int32   : [0,0,-1]
+Int64   : [0,0,-1]
+Word8   : [0,0,255]
+Word16  : [0,0,65535]
+Word32  : [0,0,4294967295]
+Word64  : [0,0,18446744073709551615]
+testBits
+18446744073709551613 .&.   18446744073709551613 = 18446744073709551613
+18446744073709551613 .&.   18446744073709551614 = 18446744073709551612
+18446744073709551613 .&.   18446744073709551615 = 18446744073709551613
+18446744073709551613 .&.   1 = 1
+18446744073709551613 .&.   2 = 0
+18446744073709551613 .&.   3 = 1
+ 
+18446744073709551614 .&.   18446744073709551613 = 18446744073709551612
+18446744073709551614 .&.   18446744073709551614 = 18446744073709551614
+18446744073709551614 .&.   18446744073709551615 = 18446744073709551614
+18446744073709551614 .&.   1 = 0
+18446744073709551614 .&.   2 = 2
+18446744073709551614 .&.   3 = 2
+ 
+18446744073709551615 .&.   18446744073709551613 = 18446744073709551613
+18446744073709551615 .&.   18446744073709551614 = 18446744073709551614
+18446744073709551615 .&.   18446744073709551615 = 18446744073709551615
+18446744073709551615 .&.   1 = 1
+18446744073709551615 .&.   2 = 2
+18446744073709551615 .&.   3 = 3
+ 
+0 .&.   18446744073709551613 = 0
+0 .&.   18446744073709551614 = 0
+0 .&.   18446744073709551615 = 0
+0 .&.   1 = 0
+0 .&.   2 = 0
+0 .&.   3 = 0
+ 
+1 .&.   18446744073709551613 = 1
+1 .&.   18446744073709551614 = 0
+1 .&.   18446744073709551615 = 1
+1 .&.   1 = 1
+1 .&.   2 = 0
+1 .&.   3 = 1
+ 
+2 .&.   18446744073709551613 = 0
+2 .&.   18446744073709551614 = 2
+2 .&.   18446744073709551615 = 2
+2 .&.   1 = 0
+2 .&.   2 = 2
+2 .&.   3 = 2
+ 
+3 .&.   18446744073709551613 = 1
+3 .&.   18446744073709551614 = 2
+3 .&.   18446744073709551615 = 3
+3 .&.   1 = 1
+3 .&.   2 = 2
+3 .&.   3 = 3
+ 
+#
+18446744073709551613 .|.   18446744073709551613 = 18446744073709551613
+18446744073709551613 .|.   18446744073709551614 = 18446744073709551615
+18446744073709551613 .|.   18446744073709551615 = 18446744073709551615
+18446744073709551613 .|.   1 = 18446744073709551613
+18446744073709551613 .|.   2 = 18446744073709551615
+18446744073709551613 .|.   3 = 18446744073709551615
+ 
+18446744073709551614 .|.   18446744073709551613 = 18446744073709551615
+18446744073709551614 .|.   18446744073709551614 = 18446744073709551614
+18446744073709551614 .|.   18446744073709551615 = 18446744073709551615
+18446744073709551614 .|.   1 = 18446744073709551615
+18446744073709551614 .|.   2 = 18446744073709551614
+18446744073709551614 .|.   3 = 18446744073709551615
+ 
+18446744073709551615 .|.   18446744073709551613 = 18446744073709551615
+18446744073709551615 .|.   18446744073709551614 = 18446744073709551615
+18446744073709551615 .|.   18446744073709551615 = 18446744073709551615
+18446744073709551615 .|.   1 = 18446744073709551615
+18446744073709551615 .|.   2 = 18446744073709551615
+18446744073709551615 .|.   3 = 18446744073709551615
+ 
+0 .|.   18446744073709551613 = 18446744073709551613
+0 .|.   18446744073709551614 = 18446744073709551614
+0 .|.   18446744073709551615 = 18446744073709551615
+0 .|.   1 = 1
+0 .|.   2 = 2
+0 .|.   3 = 3
+ 
+1 .|.   18446744073709551613 = 18446744073709551613
+1 .|.   18446744073709551614 = 18446744073709551615
+1 .|.   18446744073709551615 = 18446744073709551615
+1 .|.   1 = 1
+1 .|.   2 = 3
+1 .|.   3 = 3
+ 
+2 .|.   18446744073709551613 = 18446744073709551615
+2 .|.   18446744073709551614 = 18446744073709551614
+2 .|.   18446744073709551615 = 18446744073709551615
+2 .|.   1 = 3
+2 .|.   2 = 2
+2 .|.   3 = 3
+ 
+3 .|.   18446744073709551613 = 18446744073709551615
+3 .|.   18446744073709551614 = 18446744073709551615
+3 .|.   18446744073709551615 = 18446744073709551615
+3 .|.   1 = 3
+3 .|.   2 = 3
+3 .|.   3 = 3
+ 
+#
+18446744073709551613 `xor` 18446744073709551613 = 0
+18446744073709551613 `xor` 18446744073709551614 = 3
+18446744073709551613 `xor` 18446744073709551615 = 2
+18446744073709551613 `xor` 1 = 18446744073709551612
+18446744073709551613 `xor` 2 = 18446744073709551615
+18446744073709551613 `xor` 3 = 18446744073709551614
+ 
+18446744073709551614 `xor` 18446744073709551613 = 3
+18446744073709551614 `xor` 18446744073709551614 = 0
+18446744073709551614 `xor` 18446744073709551615 = 1
+18446744073709551614 `xor` 1 = 18446744073709551615
+18446744073709551614 `xor` 2 = 18446744073709551612
+18446744073709551614 `xor` 3 = 18446744073709551613
+ 
+18446744073709551615 `xor` 18446744073709551613 = 2
+18446744073709551615 `xor` 18446744073709551614 = 1
+18446744073709551615 `xor` 18446744073709551615 = 0
+18446744073709551615 `xor` 1 = 18446744073709551614
+18446744073709551615 `xor` 2 = 18446744073709551613
+18446744073709551615 `xor` 3 = 18446744073709551612
+ 
+0 `xor` 18446744073709551613 = 18446744073709551613
+0 `xor` 18446744073709551614 = 18446744073709551614
+0 `xor` 18446744073709551615 = 18446744073709551615
+0 `xor` 1 = 1
+0 `xor` 2 = 2
+0 `xor` 3 = 3
+ 
+1 `xor` 18446744073709551613 = 18446744073709551612
+1 `xor` 18446744073709551614 = 18446744073709551615
+1 `xor` 18446744073709551615 = 18446744073709551614
+1 `xor` 1 = 0
+1 `xor` 2 = 3
+1 `xor` 3 = 2
+ 
+2 `xor` 18446744073709551613 = 18446744073709551615
+2 `xor` 18446744073709551614 = 18446744073709551612
+2 `xor` 18446744073709551615 = 18446744073709551613
+2 `xor` 1 = 3
+2 `xor` 2 = 0
+2 `xor` 3 = 1
+ 
+3 `xor` 18446744073709551613 = 18446744073709551614
+3 `xor` 18446744073709551614 = 18446744073709551613
+3 `xor` 18446744073709551615 = 18446744073709551612
+3 `xor` 1 = 2
+3 `xor` 2 = 1
+3 `xor` 3 = 0
+ 
+#
+complement 18446744073709551613 = 2
+complement 18446744073709551614 = 1
+complement 18446744073709551615 = 0
+complement 0 = 18446744073709551615
+complement 1 = 18446744073709551614
+complement 2 = 18446744073709551613
+complement 3 = 18446744073709551612
+#
+18446744073709551613 `shiftL` 0 = 18446744073709551613
+18446744073709551613 `shiftL` 1 = 18446744073709551610
+18446744073709551613 `shiftL` 2 = 18446744073709551604
+18446744073709551613 `shiftL` 3 = 18446744073709551592
+18446744073709551613 `shiftL` 32 = 18446744060824649728
+ 
+18446744073709551614 `shiftL` 0 = 18446744073709551614
+18446744073709551614 `shiftL` 1 = 18446744073709551612
+18446744073709551614 `shiftL` 2 = 18446744073709551608
+18446744073709551614 `shiftL` 3 = 18446744073709551600
+18446744073709551614 `shiftL` 32 = 18446744065119617024
+ 
+18446744073709551615 `shiftL` 0 = 18446744073709551615
+18446744073709551615 `shiftL` 1 = 18446744073709551614
+18446744073709551615 `shiftL` 2 = 18446744073709551612
+18446744073709551615 `shiftL` 3 = 18446744073709551608
+18446744073709551615 `shiftL` 32 = 18446744069414584320
+ 
+0 `shiftL` 0 = 0
+0 `shiftL` 1 = 0
+0 `shiftL` 2 = 0
+0 `shiftL` 3 = 0
+0 `shiftL` 32 = 0
+ 
+1 `shiftL` 0 = 1
+1 `shiftL` 1 = 2
+1 `shiftL` 2 = 4
+1 `shiftL` 3 = 8
+1 `shiftL` 32 = 4294967296
+ 
+2 `shiftL` 0 = 2
+2 `shiftL` 1 = 4
+2 `shiftL` 2 = 8
+2 `shiftL` 3 = 16
+2 `shiftL` 32 = 8589934592
+ 
+3 `shiftL` 0 = 3
+3 `shiftL` 1 = 6
+3 `shiftL` 2 = 12
+3 `shiftL` 3 = 24
+3 `shiftL` 32 = 12884901888
+ 
+#
+18446744073709551613 `shiftR` 0 = 18446744073709551613
+18446744073709551613 `shiftR` 1 = 9223372036854775806
+18446744073709551613 `shiftR` 2 = 4611686018427387903
+18446744073709551613 `shiftR` 3 = 2305843009213693951
+18446744073709551613 `shiftR` 32 = 4294967295
+ 
+18446744073709551614 `shiftR` 0 = 18446744073709551614
+18446744073709551614 `shiftR` 1 = 9223372036854775807
+18446744073709551614 `shiftR` 2 = 4611686018427387903
+18446744073709551614 `shiftR` 3 = 2305843009213693951
+18446744073709551614 `shiftR` 32 = 4294967295
+ 
+18446744073709551615 `shiftR` 0 = 18446744073709551615
+18446744073709551615 `shiftR` 1 = 9223372036854775807
+18446744073709551615 `shiftR` 2 = 4611686018427387903
+18446744073709551615 `shiftR` 3 = 2305843009213693951
+18446744073709551615 `shiftR` 32 = 4294967295
+ 
+0 `shiftR` 0 = 0
+0 `shiftR` 1 = 0
+0 `shiftR` 2 = 0
+0 `shiftR` 3 = 0
+0 `shiftR` 32 = 0
+ 
+1 `shiftR` 0 = 1
+1 `shiftR` 1 = 0
+1 `shiftR` 2 = 0
+1 `shiftR` 3 = 0
+1 `shiftR` 32 = 0
+ 
+2 `shiftR` 0 = 2
+2 `shiftR` 1 = 1
+2 `shiftR` 2 = 0
+2 `shiftR` 3 = 0
+2 `shiftR` 32 = 0
+ 
+3 `shiftR` 0 = 3
+3 `shiftR` 1 = 1
+3 `shiftR` 2 = 0
+3 `shiftR` 3 = 0
+3 `shiftR` 32 = 0
+ 
+#
+18446744073709551613 `rotate` -3 = 13835058055282163711
+18446744073709551613 `rotate` -2 = 9223372036854775807
+18446744073709551613 `rotate` -1 = 18446744073709551614
+18446744073709551613 `rotate` 0 = 18446744073709551613
+18446744073709551613 `rotate` 1 = 18446744073709551611
+18446744073709551613 `rotate` 2 = 18446744073709551607
+18446744073709551613 `rotate` 3 = 18446744073709551599
+ 
+18446744073709551614 `rotate` -3 = 16140901064495857663
+18446744073709551614 `rotate` -2 = 13835058055282163711
+18446744073709551614 `rotate` -1 = 9223372036854775807
+18446744073709551614 `rotate` 0 = 18446744073709551614
+18446744073709551614 `rotate` 1 = 18446744073709551613
+18446744073709551614 `rotate` 2 = 18446744073709551611
+18446744073709551614 `rotate` 3 = 18446744073709551607
+ 
+18446744073709551615 `rotate` -3 = 18446744073709551615
+18446744073709551615 `rotate` -2 = 18446744073709551615
+18446744073709551615 `rotate` -1 = 18446744073709551615
+18446744073709551615 `rotate` 0 = 18446744073709551615
+18446744073709551615 `rotate` 1 = 18446744073709551615
+18446744073709551615 `rotate` 2 = 18446744073709551615
+18446744073709551615 `rotate` 3 = 18446744073709551615
+ 
+0 `rotate` -3 = 0
+0 `rotate` -2 = 0
+0 `rotate` -1 = 0
+0 `rotate` 0 = 0
+0 `rotate` 1 = 0
+0 `rotate` 2 = 0
+0 `rotate` 3 = 0
+ 
+1 `rotate` -3 = 2305843009213693952
+1 `rotate` -2 = 4611686018427387904
+1 `rotate` -1 = 9223372036854775808
+1 `rotate` 0 = 1
+1 `rotate` 1 = 2
+1 `rotate` 2 = 4
+1 `rotate` 3 = 8
+ 
+2 `rotate` -3 = 4611686018427387904
+2 `rotate` -2 = 9223372036854775808
+2 `rotate` -1 = 1
+2 `rotate` 0 = 2
+2 `rotate` 1 = 4
+2 `rotate` 2 = 8
+2 `rotate` 3 = 16
+ 
+3 `rotate` -3 = 6917529027641081856
+3 `rotate` -2 = 13835058055282163712
+3 `rotate` -1 = 9223372036854775809
+3 `rotate` 0 = 3
+3 `rotate` 1 = 6
+3 `rotate` 2 = 12
+3 `rotate` 3 = 24
+ 
+#
+bit 0 = 1
+bit 1 = 2
+bit 2 = 4
+bit 3 = 8
+#
+18446744073709551613 `setBit` 0 = 18446744073709551613
+18446744073709551613 `setBit` 1 = 18446744073709551615
+18446744073709551613 `setBit` 2 = 18446744073709551613
+18446744073709551613 `setBit` 3 = 18446744073709551613
+18446744073709551613 `setBit` 32 = 18446744073709551613
+ 
+18446744073709551614 `setBit` 0 = 18446744073709551615
+18446744073709551614 `setBit` 1 = 18446744073709551614
+18446744073709551614 `setBit` 2 = 18446744073709551614
+18446744073709551614 `setBit` 3 = 18446744073709551614
+18446744073709551614 `setBit` 32 = 18446744073709551614
+ 
+18446744073709551615 `setBit` 0 = 18446744073709551615
+18446744073709551615 `setBit` 1 = 18446744073709551615
+18446744073709551615 `setBit` 2 = 18446744073709551615
+18446744073709551615 `setBit` 3 = 18446744073709551615
+18446744073709551615 `setBit` 32 = 18446744073709551615
+ 
+0 `setBit` 0 = 1
+0 `setBit` 1 = 2
+0 `setBit` 2 = 4
+0 `setBit` 3 = 8
+0 `setBit` 32 = 4294967296
+ 
+1 `setBit` 0 = 1
+1 `setBit` 1 = 3
+1 `setBit` 2 = 5
+1 `setBit` 3 = 9
+1 `setBit` 32 = 4294967297
+ 
+2 `setBit` 0 = 3
+2 `setBit` 1 = 2
+2 `setBit` 2 = 6
+2 `setBit` 3 = 10
+2 `setBit` 32 = 4294967298
+ 
+3 `setBit` 0 = 3
+3 `setBit` 1 = 3
+3 `setBit` 2 = 7
+3 `setBit` 3 = 11
+3 `setBit` 32 = 4294967299
+ 
+#
+18446744073709551613 `clearBit` 0 = 18446744073709551612
+18446744073709551613 `clearBit` 1 = 18446744073709551613
+18446744073709551613 `clearBit` 2 = 18446744073709551609
+18446744073709551613 `clearBit` 3 = 18446744073709551605
+18446744073709551613 `clearBit` 32 = 18446744069414584317
+ 
+18446744073709551614 `clearBit` 0 = 18446744073709551614
+18446744073709551614 `clearBit` 1 = 18446744073709551612
+18446744073709551614 `clearBit` 2 = 18446744073709551610
+18446744073709551614 `clearBit` 3 = 18446744073709551606
+18446744073709551614 `clearBit` 32 = 18446744069414584318
+ 
+18446744073709551615 `clearBit` 0 = 18446744073709551614
+18446744073709551615 `clearBit` 1 = 18446744073709551613
+18446744073709551615 `clearBit` 2 = 18446744073709551611
+18446744073709551615 `clearBit` 3 = 18446744073709551607
+18446744073709551615 `clearBit` 32 = 18446744069414584319
+ 
+0 `clearBit` 0 = 0
+0 `clearBit` 1 = 0
+0 `clearBit` 2 = 0
+0 `clearBit` 3 = 0
+0 `clearBit` 32 = 0
+ 
+1 `clearBit` 0 = 0
+1 `clearBit` 1 = 1
+1 `clearBit` 2 = 1
+1 `clearBit` 3 = 1
+1 `clearBit` 32 = 1
+ 
+2 `clearBit` 0 = 2
+2 `clearBit` 1 = 0
+2 `clearBit` 2 = 2
+2 `clearBit` 3 = 2
+2 `clearBit` 32 = 2
+ 
+3 `clearBit` 0 = 2
+3 `clearBit` 1 = 1
+3 `clearBit` 2 = 3
+3 `clearBit` 3 = 3
+3 `clearBit` 32 = 3
+ 
+#
+18446744073709551613 `complementBit` 0 = 18446744073709551612
+18446744073709551613 `complementBit` 1 = 18446744073709551615
+18446744073709551613 `complementBit` 2 = 18446744073709551609
+18446744073709551613 `complementBit` 3 = 18446744073709551605
+18446744073709551613 `complementBit` 32 = 18446744069414584317
+ 
+18446744073709551614 `complementBit` 0 = 18446744073709551615
+18446744073709551614 `complementBit` 1 = 18446744073709551612
+18446744073709551614 `complementBit` 2 = 18446744073709551610
+18446744073709551614 `complementBit` 3 = 18446744073709551606
+18446744073709551614 `complementBit` 32 = 18446744069414584318
+ 
+18446744073709551615 `complementBit` 0 = 18446744073709551614
+18446744073709551615 `complementBit` 1 = 18446744073709551613
+18446744073709551615 `complementBit` 2 = 18446744073709551611
+18446744073709551615 `complementBit` 3 = 18446744073709551607
+18446744073709551615 `complementBit` 32 = 18446744069414584319
+ 
+0 `complementBit` 0 = 1
+0 `complementBit` 1 = 2
+0 `complementBit` 2 = 4
+0 `complementBit` 3 = 8
+0 `complementBit` 32 = 4294967296
+ 
+1 `complementBit` 0 = 0
+1 `complementBit` 1 = 3
+1 `complementBit` 2 = 5
+1 `complementBit` 3 = 9
+1 `complementBit` 32 = 4294967297
+ 
+2 `complementBit` 0 = 3
+2 `complementBit` 1 = 0
+2 `complementBit` 2 = 6
+2 `complementBit` 3 = 10
+2 `complementBit` 32 = 4294967298
+ 
+3 `complementBit` 0 = 2
+3 `complementBit` 1 = 1
+3 `complementBit` 2 = 7
+3 `complementBit` 3 = 11
+3 `complementBit` 32 = 4294967299
+ 
+#
+18446744073709551613 `testBit` 0 = True
+18446744073709551613 `testBit` 1 = False
+18446744073709551613 `testBit` 2 = True
+18446744073709551613 `testBit` 3 = True
+18446744073709551613 `testBit` 32 = True
+ 
+18446744073709551614 `testBit` 0 = False
+18446744073709551614 `testBit` 1 = True
+18446744073709551614 `testBit` 2 = True
+18446744073709551614 `testBit` 3 = True
+18446744073709551614 `testBit` 32 = True
+ 
+18446744073709551615 `testBit` 0 = True
+18446744073709551615 `testBit` 1 = True
+18446744073709551615 `testBit` 2 = True
+18446744073709551615 `testBit` 3 = True
+18446744073709551615 `testBit` 32 = True
+ 
+0 `testBit` 0 = False
+0 `testBit` 1 = False
+0 `testBit` 2 = False
+0 `testBit` 3 = False
+0 `testBit` 32 = False
+ 
+1 `testBit` 0 = True
+1 `testBit` 1 = False
+1 `testBit` 2 = False
+1 `testBit` 3 = False
+1 `testBit` 32 = False
+ 
+2 `testBit` 0 = False
+2 `testBit` 1 = True
+2 `testBit` 2 = False
+2 `testBit` 3 = False
+2 `testBit` 32 = False
+ 
+3 `testBit` 0 = True
+3 `testBit` 1 = True
+3 `testBit` 2 = False
+3 `testBit` 3 = False
+3 `testBit` 32 = False
+ 
+#
+bitSize 18446744073709551613 = 64
+bitSize 18446744073709551614 = 64
+bitSize 18446744073709551615 = 64
+bitSize 0 = 64
+bitSize 1 = 64
+bitSize 2 = 64
+bitSize 3 = 64
+#
+isSigned 18446744073709551613 = False
+isSigned 18446744073709551614 = False
+isSigned 18446744073709551615 = False
+isSigned 0 = False
+isSigned 1 = False
+isSigned 2 = False
+isSigned 3 = False
+#
+--------------------------------
 --Testing Integer
-  putStrLn $ 
+--------------------------------
 testEnum
 [0,1,2,3,4,5,6,7,8,9]
 [0,2,4,6,8,10,12,14,16,18]
