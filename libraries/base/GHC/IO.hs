@@ -21,9 +21,6 @@ module GHC.IO (
    commitBuffer',	-- hack, see below
    hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
    hGetBuf, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking, slurpFile,
-{- NOTE: As far as I can tell, not defined.
-   createPipe, createPipeEx,
--}
    memcpy_ba_baoff,
    memcpy_ptr_baoff,
    memcpy_baoff_ba,
@@ -49,7 +46,6 @@ import GHC.Num
 import GHC.Show
 import GHC.List
 import GHC.Exception    ( ioError, catch )
-import GHC.Conc
 
 -- ---------------------------------------------------------------------------
 -- Simple input operations
@@ -63,6 +59,11 @@ import GHC.Conc
 -- waits until input is available on handle @hdl@.
 -- It returns 'True' as soon as input is available on @hdl@,
 -- or 'False' if no input is available within @t@ milliseconds.
+--
+-- If @t@ is less than zero, then @hWaitForInput@ waits indefinitely.
+-- NOTE: in the current implementation, this is the only case that works
+-- correctly (if @t@ is non-zero, then all other concurrent threads are
+-- blocked until data is available).
 --
 -- This operation may fail with:
 --
@@ -78,9 +79,15 @@ hWaitForInput h msecs = do
 	then return True
 	else do
 
-  r <- throwErrnoIfMinus1Retry "hWaitForInput"
-	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs) (haIsStream handle_))
-  return (r /= 0)
+  if msecs < 0 
+	then do buf' <- fillReadBuffer (haFD handle_) True 
+				(haIsStream handle_) buf
+	        writeIORef ref buf'
+		return True
+	else do r <- throwErrnoIfMinus1Retry "hWaitForInput" $
+	  		inputReady (fromIntegral (haFD handle_)) 
+			   (fromIntegral msecs) (haIsStream handle_)
+		return (r /= 0)
 
 foreign import ccall unsafe "inputReady"
   inputReady :: CInt -> CInt -> Bool -> IO CInt
@@ -751,38 +758,32 @@ writeChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes
 -- is closed, 'hGetBuf' will behave as if EOF was reached.
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
-hGetBuf h ptr count = hGetBuf' h ptr count True
-
-hGetBufNonBlocking :: Handle -> Ptr a -> Int -> IO Int
-hGetBufNonBlocking h ptr count = hGetBuf' h ptr count False
-
-hGetBuf' :: Handle -> Ptr a -> Int -> Bool -> IO Int
-hGetBuf' handle ptr count can_block
+hGetBuf h ptr count
   | count == 0 = return 0
-  | count <  0 = illegalBufferSize handle "hGetBuf" count
+  | count <  0 = illegalBufferSize h "hGetBuf" count
   | otherwise = 
-      wantReadableHandle "hGetBuf" handle $ 
+      wantReadableHandle "hGetBuf" h $ 
 	\ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
-	    bufRead fd ref is_stream ptr 0 count can_block
+	    bufRead fd ref is_stream ptr 0 count
 
-bufRead fd ref is_stream ptr so_far count can_block =
+-- small reads go through the buffer, large reads are satisfied by
+-- taking data first from the buffer and then direct from the file
+-- descriptor.
+bufRead fd ref is_stream ptr so_far count =
   seq fd $ seq so_far $ seq count $ do -- strictness hack
   buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r, bufSize=sz } <- readIORef ref
   if bufferEmpty buf
-     then if so_far > 0 then return so_far else
-	  if count < sz
-	 	then do 
-		   mb_buf <- maybeFillReadBuffer fd (not can_block) is_stream buf
-		   case mb_buf of
-		       Nothing -> return 0
-		       Just new_buf -> do 
-			  writeIORef ref new_buf
-		   	  bufRead fd ref is_stream ptr so_far count can_block
-		else if can_block 
-			then readChunk fd is_stream ptr count
-			else readChunkNonBlocking fd is_stream ptr count
+     then if count > sz  -- small read?
+		then do rest <- readChunk fd is_stream ptr count
+			return (so_far + rest)
+	 	else do mb_buf <- maybeFillReadBuffer fd True is_stream buf
+			case mb_buf of
+		          Nothing -> return so_far -- got nothing, we're done
+		          Just new_buf -> do 
+			    writeIORef ref new_buf
+		   	    bufRead fd ref is_stream ptr so_far count
      else do 
-	let avail = w - r
+  	let avail = w - r
 	if (count == avail)
 	   then do 
 		memcpy_ptr_baoff ptr raw r (fromIntegral count)
@@ -795,21 +796,16 @@ bufRead fd ref is_stream ptr so_far count can_block =
 		writeIORef ref buf{ bufRPtr = r + count }
 		return (so_far + count)
 	   else do
-
-	memcpy_ptr_baoff ptr raw r (fromIntegral avail)
-	writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
-
+  
 	let remaining = count - avail
 	    so_far' = so_far + avail
 	    ptr' = ptr `plusPtr` avail
 
 	if remaining < sz
-	   then bufRead fd ref is_stream ptr' so_far' remaining can_block
+	   then bufRead fd ref is_stream ptr' so_far' remaining
 	   else do 
 
-	rest <- if can_block 
-			then readChunk fd is_stream ptr' remaining
-			else readChunkNonBlocking fd is_stream ptr' remaining
+	rest <- readChunk fd is_stream ptr' remaining
 	return (so_far' + rest)
 
 readChunk :: FD -> Bool -> Ptr a -> Int -> IO Int
@@ -825,33 +821,94 @@ readChunk fd is_stream ptr bytes = loop 0 bytes
 	then return off
 	else loop (off + r) (bytes - r)
 
+
+-- | 'hGetBufNonBlocking' @hdl buf count@ reads data from the handle @hdl@
+-- into the buffer @buf@ until either EOF is reached, or
+-- @count@ 8-bit bytes have been read, or there is no more data available
+-- to read immediately.
+--
+-- 'hGetBufNonBlocking' is identical to 'hGetBuf', except that it will
+-- never block waiting for data to become available, instead it returns
+-- only whatever data is available.  To wait for data to arrive before
+-- calling 'hGetBufNonBlocking', use 'hWaitForInput'.
+--
+-- If the handle is a pipe or socket, and the writing end
+-- is closed, 'hGetBufNonBlocking' will behave as if EOF was reached.
+--
+hGetBufNonBlocking :: Handle -> Ptr a -> Int -> IO Int
+hGetBufNonBlocking h ptr count
+  | count == 0 = return 0
+  | count <  0 = illegalBufferSize h "hGetBufNonBlocking" count
+  | otherwise = 
+      wantReadableHandle "hGetBufNonBlocking" h $ 
+	\ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
+	    bufReadNonBlocking fd ref is_stream ptr 0 count
+
+bufReadNonBlocking fd ref is_stream ptr so_far count =
+  seq fd $ seq so_far $ seq count $ do -- strictness hack
+  buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r, bufSize=sz } <- readIORef ref
+  if bufferEmpty buf
+     then if count > sz  -- large read?
+		then do rest <- readChunkNonBlocking fd is_stream ptr count
+			return (so_far + rest)
+	 	else do buf' <- fillReadBufferWithoutBlocking fd is_stream buf
+			case buf' of { Buffer{ bufWPtr=w }  ->
+			if (w == 0) 
+			   then return so_far
+			   else do writeIORef ref buf'
+				   bufReadNonBlocking fd ref is_stream ptr
+					 so_far (min count w)
+				  -- NOTE: new count is 'min count w'
+				  -- so we will just copy the contents of the
+				  -- buffer in the recursive call, and not
+				  -- loop again.
+			}
+     else do
+  	let avail = w - r
+	if (count == avail)
+	   then do 
+		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
+		return (so_far + count)
+	   else do
+	if (count < avail)
+	   then do 
+		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		writeIORef ref buf{ bufRPtr = r + count }
+		return (so_far + count)
+	   else do
+
+	let remaining = count - avail
+	    so_far' = so_far + avail
+	    ptr' = ptr `plusPtr` avail
+
+	-- we haven't attempted to read anything yet if we get to here.
+	if remaining < sz
+	   then bufReadNonBlocking fd ref is_stream ptr' so_far' remaining
+	   else do 
+
+	rest <- readChunkNonBlocking fd is_stream ptr' remaining
+	return (so_far' + rest)
+
+
 readChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
-readChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes 
- where
-  loop :: Int -> Int -> IO Int
-  loop off bytes | bytes <= 0 = return off
-  loop off bytes = do
+readChunkNonBlocking fd is_stream ptr bytes = do
 #ifndef mingw32_TARGET_OS
-    ssize <- c_read (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
+    ssize <- c_read (fromIntegral fd) (castPtr ptr) (fromIntegral bytes)
     let r = fromIntegral ssize :: Int
     if (r == -1)
       then do errno <- getErrno
 	      if (errno == eAGAIN || errno == eWOULDBLOCK)
-		 then return off
+		 then return 0
 		 else throwErrno "readChunk"
-      else if (r == 0)
-		then return off
-		else loop (off + r) (bytes - r)
+      else return r
 #else
     (ssize, rc) <- asyncRead fd (fromIntegral $ fromEnum is_stream)
-   			       (fromIntegral bytes)
-   			       (ptr `plusPtr` off)
+   			       (fromIntegral bytes) ptr
     let r = fromIntegral ssize :: Int
     if r == (-1)
      then ioError (errnoToIOError "hGetBufNonBlocking" (Errno (fromIntegral rc)) Nothing Nothing)
-     else if (r  == 0)
-       then return off
-       else loop (off + r) (bytes - r)
+     else return r
 #endif
 
 slurpFile :: FilePath -> IO (Ptr (), Int)
