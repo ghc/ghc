@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.4 2001/11/26 20:04:00 sof Exp $
+-- $Id: PrelHandle.hs,v 1.5 2001/11/26 23:55:27 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -310,9 +310,9 @@ handleFinalizer m = do
   -- ToDo: closesocket() for a WINSOCK socket?
   when (fd /= -1) 
 #ifdef mingw32_TARGET_OS
-       (c_close fd >> return ())
+       (closeFd (haIsStream handle_) fd >> return ())
 #else
-       (closeFd (haIsStream handle_ fd >> return ())
+       (c_close fd >> return ())
 #endif
   return ()
 
@@ -769,7 +769,12 @@ hClose_help handle_ =
 	  -- close the file descriptor, but not when this is the read side
 	  -- of a duplex handle.
 	  case haOtherSide handle_ of
-	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" (closeFd (haIsStream handle_) fd)
+	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" 
+#ifdef mingw32_TARGET_OS
+	    					(closeFd (haIsStream handle_) fd)
+#else
+	    					(c_close fd)
+#endif
 	    Just _  -> return ()
 
 	  -- free the spare buffers
