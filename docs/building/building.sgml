@@ -1142,6 +1142,23 @@ $ cvs checkout nofib/spectral
     <variablelist>
 
       <varlistentry>
+	<term>GHC</term>
+	<indexterm><primary>pre-supposed: GHC</primary></indexterm>
+	<indexterm><primary>GHC, pre-supposed</primary></indexterm>
+	<listitem>
+	  <para>GHC is required to build many of the tools, including
+	  GHC itself.  If you need to port GHC to your platform
+	  because there isn't a binary distribution of GHC available,
+	  then see <xref linkend="sec-porting-ghc">.</para>
+
+	  <para>Which version of GHC you need will depend on the
+	  packages you intend to build.  GHC itself will normally
+	  build using one of several older versions of itself - check
+	  the announcement or release notes for details.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term>Perl</term>
 	<indexterm><primary>pre-supposed: Perl</primary></indexterm>
 	<indexterm><primary>Perl, pre-supposed</primary></indexterm>
