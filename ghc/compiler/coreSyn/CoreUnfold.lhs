@@ -571,7 +571,9 @@ callSiteInline dflags black_listed inline_call occ id arg_infos interesting_cont
 		-- Note: there used to be a '&& not top_level' in the guard above,
 		--	 but that stopped us inlining top-level functions used only once,
 		--	 which is stupid
-	  = not in_lam || not (null arg_infos) || interesting_cont
+	  = WARN( not in_lam, ppr id )	-- If (not in_lam) && one_br then PreInlineUnconditionally
+					-- should have caught it, shouldn't it?
+	    not (null arg_infos) || interesting_cont
 
 	  | otherwise
 	  = case guidance of
