@@ -11,19 +11,18 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
-import HsSyn		( HsDecl(..), TyClDecl(..),
-			  HsTyVarBndr,
-			  ConDecl(..), 
-			  Sig(..), HsPred(..), 
+import HsSyn		( TyClDecl(..),  HsTyVarBndr,
+			  ConDecl(..),   Sig(..), HsPred(..), 
 			  tyClDeclName, hsTyVarNames, 
 			  isIfaceSigDecl, isClassDecl, isSynDecl, isClassOpSig
 			)
-import RnHsSyn		( RenamedHsDecl, RenamedTyClDecl, tyClDeclFVs )
+import RnHsSyn		( RenamedTyClDecl, tyClDeclFVs )
 import BasicTypes	( RecFlag(..), NewOrData(..), isRec )
+import HscTypes		( implicitTyThingIds )
 
 import TcMonad
 import TcEnv		( TcEnv, RecTcEnv, TcTyThing(..), TyThing(..), TyThingDetails(..),
-			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv )
+			  tcExtendKindEnv, tcLookup, tcExtendGlobalEnv, tcExtendGlobalValEnv )
 import TcTyDecls	( tcTyDecl1, kcConDetails, mkNewTyConRep )
 import TcClassDcl	( tcClassDecl1 )
 import TcMonoType	( kcHsTyVars, kcHsType, kcHsBoxedSigType, kcHsContext, mkTyClTyVars )
@@ -40,7 +39,7 @@ import DataCon		( isNullaryDataCon )
 import Var		( varName )
 import FiniteMap
 import Digraph		( stronglyConnComp, SCC(..) )
-import Name		( Name, NamedThing(..), getSrcLoc, isTyVarName )
+import Name		( Name, getSrcLoc, isTyVarName )
 import Name		( NameEnv, mkNameEnv, lookupNameEnv_NF )
 import NameSet
 import Outputable
@@ -61,7 +60,7 @@ The main function
 ~~~~~~~~~~~~~~~~~
 \begin{code}
 tcTyAndClassDecls :: RecTcEnv		-- Knot tying stuff
-		  -> [RenamedHsDecl]
+		  -> [RenamedTyClDecl]
 		  -> TcM TcEnv
 
 tcTyAndClassDecls unf_env decls
@@ -114,6 +113,10 @@ Step 6:		tcTyClDecl1 again
 	like whether a function argument is an unboxed tuple, looking
 	through type synonyms properly.  We can't do that in Step 5.
 
+Step 7:		Extend environment
+	We extend the type environment with bindings not only for the TyCons and Classes,
+	but also for their "implicit Ids" like data constructors and class selectors
+
 The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
@@ -131,45 +134,50 @@ tcGroup unf_env scc
     zonkKindEnv initial_kinds			`thenNF_Tc` \ final_kinds ->
 
 	-- Tie the knot
-    fixTc ( \ ~(rec_details_list,  _) ->
+    fixTc ( \ ~(rec_details_list, _, _) ->
 		-- Step 4 
  	let
 	    kind_env    = mkNameEnv final_kinds
 	    rec_details = mkNameEnv rec_details_list
 
-	    tyclss, all_tyclss :: [(Name, TyThing)]
+	    tyclss, all_tyclss :: [TyThing]
 	    tyclss = map (buildTyConOrClass dflags is_rec kind_env 
 				                   rec_vrcs rec_details) decls
 
 		-- Add the tycons that come from the classes
 		-- We want them in the environment because 
 		-- they are mentioned in interface files
-	    all_tyclss  = [ (getName tycon, ATyCon tycon) | (_, AClass clas) <- tyclss,
-							    let tycon = classTyCon clas
-			  ] ++ tyclss
+	    all_tyclss  = [ ATyCon (classTyCon clas) | AClass clas <- tyclss]
+			  ++ tyclss
 
 		-- Calculate variances, and (yes!) feed back into buildTyConOrClass.
-            rec_vrcs    = calcTyConArgVrcs [tc | (_, ATyCon tc) <- all_tyclss]
+            rec_vrcs    = calcTyConArgVrcs [tc | ATyCon tc <- all_tyclss]
 	in
 		-- Step 5
 	tcExtendGlobalEnv all_tyclss			$
 	mapTc (tcTyClDecl1 is_rec unf_env) decls	`thenTc` \ tycls_details ->
 
 		-- Return results
-	tcGetEnv					`thenNF_Tc` \ env -> 
-	returnTc (tycls_details, env)
-    )						`thenTc` \ (_, env) ->
+	tcGetEnv					`thenNF_Tc` \ env ->
+	returnTc (tycls_details, all_tyclss, env)
+    )						`thenTc` \ (_, all_tyclss, env) ->
+
+    tcSetEnv env				$
 
 	-- Step 6
 	-- For a recursive group, check all the types again,
 	-- this time with the wimp flag off
     (if isRec is_rec then
-	tcSetEnv env (mapTc_ (tcTyClDecl1 NonRecursive unf_env) decls)
+	mapTc_ (tcTyClDecl1 NonRecursive unf_env) decls
      else
 	returnTc ()
     )						`thenTc_`
 
-    returnTc env
+	-- Step 7
+	-- Extend the environment with the final TyCons/Classes 
+	-- and their implicit Ids
+    tcExtendGlobalValEnv (implicitTyThingIds all_tyclss) tcGetEnv
+
   where
     is_rec = case scc of
 		AcyclicSCC _ -> NonRecursive
@@ -181,7 +189,7 @@ tcGroup unf_env scc
 
 tcTyClDecl1 is_rec unf_env decl
   | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 is_rec unf_env decl)
-  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl1    is_rec         decl)
+  | otherwise	     = tcAddDeclCtxt decl (tcTyDecl1    is_rec unf_env decl)
 \end{code}
 
 
@@ -292,13 +300,11 @@ buildTyConOrClass
 	:: DynFlags
 	-> RecFlag -> NameEnv Kind
 	-> FiniteMap TyCon ArgVrcs -> NameEnv TyThingDetails
-	-> RenamedTyClDecl -> (Name, TyThing)
-	-- Can't fail; the only reason it's in the monad 
-	-- is so it can zonk the kinds
+	-> RenamedTyClDecl -> TyThing
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
 	          (TySynonym tycon_name tyvar_names rhs src_loc)
-  = (tycon_name, ATyCon tycon)
+  = ATyCon tycon
   where
 	tycon = mkSynTyCon tycon_name tycon_kind arity tyvars rhs_ty argvrcs
 	tycon_kind	    = lookupNameEnv_NF kenv tycon_name
@@ -309,16 +315,16 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs rec_details
 
 buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
 	          (TyData data_or_new context tycon_name tyvar_names _ nconstrs _ src_loc name1 name2)
-  = (tycon_name, ATyCon tycon)
+  = ATyCon tycon
   where
 	tycon = mkAlgTyCon tycon_name tycon_kind tyvars ctxt argvrcs
-			   data_cons nconstrs
+			   data_cons nconstrs sel_ids
 			   flavour is_rec gen_info
 
 	gen_info | not (dopt Opt_Generics dflags) = Nothing
 		 | otherwise = mkTyConGenInfo tycon name1 name2
 
-	DataTyDetails ctxt data_cons = lookupNameEnv_NF rec_details tycon_name
+	DataTyDetails ctxt data_cons sel_ids = lookupNameEnv_NF rec_details tycon_name
 
 	tycon_kind = lookupNameEnv_NF kenv tycon_name
 	tyvars	   = mkTyClTyVars tycon_kind tyvar_names
@@ -333,7 +339,7 @@ buildTyConOrClass dflags is_rec kenv rec_vrcs  rec_details
                   (ClassDecl context class_name
 		             tyvar_names fundeps class_sigs def_methods
 		             name_list src_loc)
-  = (class_name, AClass clas)
+  = AClass clas
   where
         (tycon_name, _, _, _) = getClassDeclSysNames name_list
  	clas = mkClass class_name tyvars fds
@@ -376,7 +382,7 @@ bogusVrcs = panic "Bogus tycon arg variances"
 Dependency analysis
 ~~~~~~~~~~~~~~~~~~~
 \begin{code}
-sortByDependency :: [RenamedHsDecl] -> TcM [SCC RenamedTyClDecl]
+sortByDependency :: [RenamedTyClDecl] -> TcM [SCC RenamedTyClDecl]
 sortByDependency decls
   = let		-- CHECK FOR CLASS CYCLES
 	cls_sccs   = stronglyConnComp (mapMaybe mkClassEdges tycl_decls)
@@ -397,7 +403,7 @@ sortByDependency decls
     in
     returnTc decl_sccs
   where
-    tycl_decls = [d | TyClD d <- decls, not (isIfaceSigDecl d)]
+    tycl_decls = filter (not . isIfaceSigDecl) decls
     edges      = map mkEdges tycl_decls
     
     is_syn_decl (d, _, _) = isSynDecl d

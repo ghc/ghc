@@ -5,44 +5,36 @@
 
 \begin{code}
 module TcTyDecls (
-	tcTyDecl1, 
-	kcConDetails, 
-	mkImplicitDataBinds, mkNewTyConRep
+	tcTyDecl1, kcConDetails, mkNewTyConRep
     ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( MonoBinds(..), 
-			  TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
+import HsSyn		( TyClDecl(..), ConDecl(..), ConDetails(..), BangType(..),
 			  getBangType, conDetailsTys
 			)
 import RnHsSyn		( RenamedTyClDecl, RenamedConDecl, RenamedContext )
-import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
-import BasicTypes	( NewOrData(..), RecFlag )
+import BasicTypes	( NewOrData(..), RecFlag, isRec )
 
 import TcMonoType	( tcHsRecType, tcHsTyVars, tcRecClassContext,
 			  kcHsContext, kcHsSigType, kcHsBoxedSigType
 			)
 import TcEnv		( tcExtendTyVarEnv, 
-			  tcLookupTyCon, tcLookupGlobalId, 
-			  TyThingDetails(..)
+			  tcLookupTyCon, tcLookupRecId, 
+			  TyThingDetails(..), RecTcEnv
 			)
 import TcMonad
 
 import Class		( ClassContext )
-import DataCon		( DataCon, mkDataCon, 
-			  dataConFieldLabels, dataConId, dataConWrapId,
-			  markedStrict, notMarkedStrict, markedUnboxed, dataConRepType
+import DataCon		( DataCon, mkDataCon, dataConFieldLabels,  markedStrict, 
+		 	  notMarkedStrict, markedUnboxed, dataConRepType
 			)
 import MkId		( mkDataConId, mkDataConWrapId, mkRecordSelId )
 import FieldLabel
-import Var		( Id, TyVar )
-import Module		( Module )
-import Name		( Name, NamedThing(..), isFrom )
+import Var		( TyVar )
+import Name		( Name, NamedThing(..) )
 import Outputable
-import TyCon		( TyCon, isSynTyCon, isNewTyCon,
-			  tyConDataConsIfAvailable, tyConTyVars, tyConGenIds
-			)
+import TyCon		( TyCon, isNewTyCon, tyConTyVars )
 import Type		( tyVarsOfTypes, splitFunTy, applyTys,
 			  mkTyConApp, mkTyVarTys, mkForAllTys, 
 			  splitAlgTyConApp_maybe, Type
@@ -60,8 +52,8 @@ import ListSetOps	( equivClasses )
 %************************************************************************
 
 \begin{code}
-tcTyDecl1 :: RecFlag -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcTyDecl1 is_rec (TySynonym tycon_name tyvar_names rhs src_loc)
+tcTyDecl1 :: RecFlag -> RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcTyDecl1 is_rec unf_env (TySynonym tycon_name tyvar_names rhs src_loc)
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     tcExtendTyVarEnv (tyConTyVars tycon)	$
     tcHsRecType is_rec rhs			`thenTc` \ rhs_ty ->
@@ -79,7 +71,7 @@ tcTyDecl1 is_rec (TySynonym tycon_name tyvar_names rhs src_loc)
 
     returnTc (tycon_name, SynTyDetails rhs_ty)
 
-tcTyDecl1 is_rec (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc name1 name2)
+tcTyDecl1 is_rec unf_env (TyData new_or_data context tycon_name _ con_decls _ derivings src_loc name1 name2)
   = tcLookupTyCon tycon_name			`thenNF_Tc` \ tycon ->
     let
 	tyvars = tyConTyVars tycon
@@ -89,7 +81,8 @@ tcTyDecl1 is_rec (TyData new_or_data context tycon_name _ con_decls _ derivings 
 	-- Typecheck the pieces
     tcRecClassContext is_rec context					`thenTc` \ ctxt ->
     mapTc (tcConDecl is_rec new_or_data tycon tyvars ctxt) con_decls	`thenTc` \ data_cons ->
-    returnTc (tycon_name, DataTyDetails ctxt data_cons)
+    tcRecordSelectors is_rec unf_env tycon data_cons			`thenTc` \ sel_ids -> 
+    returnTc (tycon_name, DataTyDetails ctxt data_cons sel_ids)
 \end{code}
 
 \begin{code}
@@ -158,8 +151,8 @@ tcConDecl is_rec new_or_data tycon tyvars ctxt (ConDecl name wkr_name ex_tvs ex_
 	let
 	    field_labels = concat field_labels_s
 	    arg_stricts = [str | (ns, bty) <- fields, 
-				  let str = getBangStrictness bty, 
-				  n <- ns		-- One for each.  E.g   x,y,z :: !Int
+				 let str = getBangStrictness bty, 
+				 n <- ns		-- One for each.  E.g   x,y,z :: !Int
 			  ]
 	in
 	mk_data_con ex_tyvars ex_theta arg_stricts 
@@ -197,73 +190,54 @@ getBangStrictness (Unpacked _) = markedUnboxed
 \end{code}
 
 
-
 %************************************************************************
 %*									*
-\subsection{Generating constructor/selector bindings for data declarations}
+\subsection{Record selectors}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkImplicitDataBinds :: Module -> [TyCon] -> TcM ([Id], TcMonoBinds)
-mkImplicitDataBinds this_mod [] = returnTc ([], EmptyMonoBinds)
-mkImplicitDataBinds this_mod (tycon : tycons) 
-  | isSynTyCon tycon = mkImplicitDataBinds this_mod tycons
-  | otherwise	     = mkImplicitDataBinds_one this_mod tycon	`thenTc` \ (ids1, b1) ->
-		       mkImplicitDataBinds this_mod tycons	`thenTc` \ (ids2, b2) ->
-		       returnTc (ids1++ids2, b1 `AndMonoBinds` b2)
-
-mkImplicitDataBinds_one this_mod tycon
-  = mapTc (mkRecordSelector tycon) groups	`thenTc` \ sel_ids ->
-    let
-	unf_ids = sel_ids ++ data_con_wrapper_ids ++ gen_ids
-	all_ids = map dataConId data_cons ++ unf_ids
-
-	-- For the locally-defined things
-	-- we need to turn the unfoldings inside the selector Ids into bindings,
-	-- and build bindigns for the constructor wrappers
-	binds | isFrom this_mod tycon = idsToMonoBinds unf_ids
-	      | otherwise 	      = EmptyMonoBinds
-    in	
-    returnTc (all_ids, binds)
+tcRecordSelectors is_rec unf_env tycon data_cons
+  = mapTc tc_group groups
   where
-    data_cons = tyConDataConsIfAvailable tycon
-	-- Abstract types mean we don't bring the 
-	-- data cons into scope, which should be fine
-    gen_ids = tyConGenIds tycon
-    data_con_wrapper_ids = map dataConWrapId data_cons
-
     fields = [ (con, field) | con   <- data_cons,
-			      field <- dataConFieldLabels con
-	     ]
+			      field <- dataConFieldLabels con ]
 
 	-- groups is list of fields that share a common name
     groups = equivClasses cmp_name fields
     cmp_name (_, field1) (_, field2) 
 	= fieldLabelName field1 `compare` fieldLabelName field2
+
+    tc_group fields@((first_con, first_field_label) : other_fields)
+	-- These fields all have the same name, but are from
+	-- different constructors in the data type
+	= 	-- Check that all the fields in the group have the same type
+		-- Wimp out (omit check) if the group is recursive; 
+		-- TcTyClsDecls.tcGroup will repeat with NonRecursive once we
+		-- have tied the knot
+		-- NB: this check assumes that all the constructors of a given
+		-- data type use the same type variables
+	  checkTc (not (isRec is_rec) && all (== field_ty) other_tys)
+		  (fieldTypeMisMatch field_name)	`thenTc_`
+	  returnTc (mkRecordSelId tycon first_field_label unpack_id unpackUtf8_id)
+	where
+	    field_ty   = fieldLabelType first_field_label
+	    field_name = fieldLabelName first_field_label
+	    other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
+
+    unpack_id     = tcLookupRecId unf_env unpackCStringName
+    unpackUtf8_id = tcLookupRecId unf_env unpackCStringUtf8Name
 \end{code}
 
-\begin{code}
-mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
-		-- These fields all have the same name, but are from
-		-- different constructors in the data type
-	-- Check that all the fields in the group have the same type
-	-- This check assumes that all the constructors of a given
-	-- data type use the same type variables
-  = checkTc (all (== field_ty) other_tys)
-	    (fieldTypeMisMatch field_name)	`thenTc_`
-    tcLookupGlobalId unpackCStringName		`thenTc` \ unpack_id ->
-    tcLookupGlobalId unpackCStringUtf8Name	`thenTc` \ unpackUtf8_id ->
-    returnTc (mkRecordSelId tycon first_field_label unpack_id unpackUtf8_id)
-  where
-    field_ty   = fieldLabelType first_field_label
-    field_name = fieldLabelName first_field_label
-    other_tys  = [fieldLabelType fl | (_, fl) <- other_fields]
-\end{code}
 
 
-Errors and contexts
-~~~~~~~~~~~~~~~~~~~
+%************************************************************************
+%*									*
+\subsection{Errors and contexts}
+%*									*
+%************************************************************************
+
+
 \begin{code}
 fieldTypeMisMatch field_name
   = sep [ptext SLIT("Declared types differ for field"), quotes (ppr field_name)]

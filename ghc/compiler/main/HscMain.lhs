@@ -9,17 +9,18 @@ module HscMain ( HscResult(..), hscMain, hscExpr,
 
 #include "HsVersions.h"
 
-import Maybe		( isJust )
-import IO		( hPutStrLn, stderr )
+#ifdef GHCI
+import RdrHsSyn		( RdrNameHsExpr )
+import CoreToStg	( coreToStgExpr )
+import StringBuffer	( stringToStringBuffer, freeStringBuffer )
+#endif
+
 import HsSyn
 
-import StringBuffer	( hGetStringBuffer, 
-			  stringToStringBuffer, freeStringBuffer )
+import StringBuffer	( hGetStringBuffer )
 import Parser
-import RdrHsSyn		( RdrNameHsExpr )
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
-
 import Rename
 import Rules		( emptyRuleBase )
 import PrelInfo		( wiredInThingEnv, wiredInThings )
@@ -33,7 +34,7 @@ import SimplCore
 import OccurAnal	( occurAnalyseBinds )
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
-import CoreToStg	( topCoreBindsToStg, coreToStgExpr )
+import CoreToStg	( topCoreBindsToStg )
 import StgSyn		( collectFinalStgBinders )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -47,7 +48,7 @@ import UniqSupply	( mkSplitUniqSupply )
 
 import Bag		( emptyBag )
 import Outputable
-import Interpreter
+import Interpreter	( stgBindsToInterpSyn, UnlinkedIExpr, UnlinkedIBind, ItblEnv )
 import CmStaticInfo	( GhciMode(..) )
 import HscStats		( ppSourceStats )
 import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
@@ -62,6 +63,8 @@ import Name		( emptyNameEnv )
 import Module		( Module, lookupModuleEnvByName )
 
 import Monad		( when )
+import Maybe		( isJust )
+import IO		( hPutStrLn, stderr )
 \end{code}
 
 
@@ -131,7 +134,6 @@ hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
  | otherwise
  = do {
       hPutStrLn stderr "COMPILATION NOT REQUIRED";
-      let this_mod = mi_module old_iface
       ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
@@ -391,6 +393,11 @@ hscExpr
   -> String			-- The expression
   -> IO ( PersistentCompilerState, Maybe UnlinkedIExpr )
 
+#ifndef GHCI
+hscExpr dflags hst hit pcs this_module expr
+  = panic "hscExpr: non-interactive build"
+#else 
+
 hscExpr dflags hst hit pcs0 this_module expr
   = do	{ 	-- Parse it
 	maybe_parsed <- hscParseExpr dflags expr;
@@ -406,7 +413,7 @@ hscExpr dflags hst hit pcs0 this_module expr
 		Just (print_unqual, rn_expr) -> do {
 
 		-- Typecheck it
-	maybe_tc_expr <- typecheckExpr dflags pcs1 hst print_unqual rn_expr;
+	maybe_tc_expr <- typecheckExpr dflags pcs1 hst print_unqual this_module rn_expr;
 	case maybe_tc_expr of
 		Nothing -> return (pcs1, Nothing)
 		Just tc_expr -> do {
@@ -460,6 +467,7 @@ hscParseExpr dflags str
       
       return (Just rdr_expr)
       }}
+#endif
 \end{code}
 
 %************************************************************************

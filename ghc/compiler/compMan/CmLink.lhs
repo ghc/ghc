@@ -12,7 +12,9 @@ module CmLink ( Linkable(..),  Unlinked(..),
                 link, 
 		unload,
                 PersistentLinkerState{-abstractly!-}, emptyPLS,
+#ifdef GHCI
 		linkExpr
+#endif
   ) where
 
 

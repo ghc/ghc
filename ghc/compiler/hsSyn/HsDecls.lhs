@@ -282,7 +282,6 @@ instance (NamedThing name, Ord name) => Eq (TyClDecl name pat) where
 
   (==) _ _ = False	-- default case
 
-
 eq_hsFD env (ns1,ms1) (ns2,ms2)
   = eqListBy (eq_hsVar env) ns1 ns2 && eqListBy (eq_hsVar env) ms1 ms2
 

@@ -5,7 +5,9 @@
 
 \begin{code}
 module CompManager ( cmInit, cmLoadModule,
+#ifdef GHCI
                      cmGetExpr, cmRunExpr,
+#endif
                      CmState, emptyCmState  -- abstract
                    )
 where
@@ -15,8 +17,6 @@ where
 import CmLink
 import CmTypes
 import HscTypes
-import HscMain		( hscExpr )
-import Interpreter	( HValue )
 import Module		( ModuleName, moduleName,
 			  isModuleInThisPackage, moduleEnvElts,
 			  moduleNameUserString )
@@ -26,7 +26,6 @@ import GetImports
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
 import Name		( lookupNameEnv )
-import RdrName
 import Module
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
@@ -36,10 +35,17 @@ import UniqFM		( emptyUFM, lookupUFM, addToUFM, delListFromUFM,
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp )
 import DriverUtil	( BarfKind(..), splitFilename3 )
-import CmdLineOpts	( DynFlags )
 import Util
 import Outputable
 import Panic		( panic )
+
+#ifdef GHCI
+import CmdLineOpts	( DynFlags )
+import Interpreter	( HValue )
+import HscMain		( hscExpr )
+import RdrName
+import PrelGHC		( unsafeCoerce# )
+#endif
 
 -- lang
 import Exception	( throwDyn )
@@ -50,7 +56,6 @@ import Directory        ( getModificationTime, doesFileExist )
 import IO
 import List		( nub )
 import Maybe		( catMaybes, fromMaybe, isJust )
-import PrelGHC		( unsafeCoerce# )
 \end{code}
 
 
@@ -59,6 +64,7 @@ cmInit :: PackageConfigInfo -> GhciMode -> IO CmState
 cmInit raw_package_info gmode
    = emptyCmState raw_package_info gmode
 
+#ifdef GHCI
 cmGetExpr :: CmState
 	  -> DynFlags
           -> ModuleName
@@ -83,6 +89,7 @@ cmRunExpr :: HValue -> IO ()
 cmRunExpr hval
    = do unsafeCoerce# hval :: IO ()
 	-- putStrLn "done."
+#endif
 
 -- Persistent state just for CM, excluding link & compile subsystems
 data PersistentCMState

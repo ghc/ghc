@@ -32,15 +32,14 @@ module PrelInfo (
 import PrelNames	-- Prelude module names
 
 import PrimOp		( PrimOp(..), allThePrimOps, primOpRdrName )
-import DataCon		( DataCon, dataConId, dataConWrapId )
+import DataCon		( DataCon )
 import MkId		( mkPrimOpId, wiredInIds )
 import MkId		-- All of it, for re-export
 import TysPrim		( primTyCons )
 import TysWiredIn	( wiredInTyCons )
-import HscTypes 	( TyThing(..), TypeEnv, mkTypeEnv )
+import HscTypes 	( TyThing(..), implicitTyThingIds, TypeEnv, mkTypeEnv )
 
 -- others:
-import TyCon		( tyConDataConsIfAvailable, tyConGenIds, TyCon )
 import Class	 	( Class, classKey )
 import Type		( funTyCon )
 import Util		( isIn )
@@ -59,8 +58,9 @@ We have two ``builtin name funs,'' one to look up @TyCons@ and
 wiredInThings :: [TyThing]
 wiredInThings
   = concat
-    [		-- Wired in TyCons
-	  concat (map wiredInTyConThings ([funTyCon] ++ primTyCons ++ wiredInTyCons))
+    [		-- Wired in TyCons and their implicit Ids
+	  tycon_things
+	, map AnId (implicitTyThingIds tycon_things)
 
 		-- Wired in Ids
 	, map AnId wiredInIds
@@ -68,16 +68,8 @@ wiredInThings
 		-- PrimOps
 	, map (AnId . mkPrimOpId) allThePrimOps
     ]
-
-wiredInTyConThings :: TyCon -> [TyThing]
--- This is a bit of a cheat (c.f. TcTyDecls.mkImplicitDataBinds
--- It assumes that wired in tycons have no record selectors
-wiredInTyConThings tc
-   = [ATyCon tc] 
-   ++ [ AnId i | i <- tyConGenIds tc ]
-   ++ [ AnId n | dc <- tyConDataConsIfAvailable tc, 
-                 n  <- [dataConId dc, dataConWrapId dc] ] 
-			-- Synonyms return empty list of constructors
+  where
+    tycon_things = map ATyCon ([funTyCon] ++ primTyCons ++ wiredInTyCons)
 
 wiredInThingEnv :: TypeEnv
 wiredInThingEnv = mkTypeEnv wiredInThings

@@ -18,7 +18,7 @@ module CoreFVs (
 #include "HsVersions.h"
 
 import CoreSyn
-import Id		( Id, idName, idType, isLocalId, hasNoBinding, idSpecialisation )
+import Id		( Id, idType, isLocalId, hasNoBinding, idSpecialisation )
 import VarSet
 import Var		( Var, isId )
 import Type		( tyVarsOfType )

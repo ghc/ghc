@@ -24,7 +24,6 @@ module TcHsSyn (
 
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
-	idsToMonoBinds,
 
 	-- re-exported from TcEnv
 	TcId, tcInstId,
@@ -39,7 +38,7 @@ module TcHsSyn (
 import HsSyn	-- oodles of it
 
 -- others:
-import Id	( idName, idType, isLocalId, idUnfolding, setIdType, isIP, Id )
+import Id	( idName, idType, isLocalId, setIdType, isIP, Id )
 import DataCon	( dataConWrapId )	
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv,
 		  TcEnv, TcId, tcInstId
@@ -49,7 +48,6 @@ import TcMonad
 import TcType	( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars
 		)
 import CoreSyn  ( Expr )
-import CoreUnfold( unfoldingTemplate )
 import BasicTypes ( RecFlag(..) )
 import Bag
 import Outputable
@@ -118,12 +116,6 @@ mkHsLet EmptyMonoBinds expr = expr
 mkHsLet mbinds	       expr = HsLet (MonoBind mbinds [] Recursive) expr
 
 mkHsConApp data_con tys args = foldl HsApp (HsVar (dataConWrapId data_con) `mkHsTyApp` tys) args
-
-idsToMonoBinds :: [Id] -> TcMonoBinds 
-idsToMonoBinds ids
-  = andMonoBindList [ CoreMonoBind id (unfoldingTemplate (idUnfolding id))
-		    | id <- ids
-		    ]
 \end{code}
 
 %************************************************************************

@@ -13,8 +13,10 @@ module StringBuffer
 
 	 -- creation/destruction
         hGetStringBuffer,     -- :: FilePath     -> IO StringBuffer
+#ifdef GHCI
 	stringToStringBuffer, -- :: String       -> IO StringBuffer
 	freeStringBuffer,     -- :: StringBuffer -> IO ()
+#endif
 
          -- Lookup
 	currentChar,      -- :: StringBuffer -> Char
@@ -180,6 +182,7 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
 -- Turn a String into a StringBuffer
 
 \begin{code}
+#ifdef GHCI
 stringToStringBuffer :: String -> IO StringBuffer
 stringToStringBuffer str =
   do let sz@(I# sz#) = length str + 1
@@ -195,6 +198,7 @@ stringToStringBuffer str =
 
 freeStringBuffer :: StringBuffer -> IO ()
 freeStringBuffer (StringBuffer a# _ _ _) = Foreign.free (Ptr (A# a#))
+#endif
 \end{code}
 
 -----------------------------------------------------------------------------

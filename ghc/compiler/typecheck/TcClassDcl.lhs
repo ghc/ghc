@@ -4,13 +4,13 @@
 \section[TcClassDcl]{Typechecking class declarations}
 
 \begin{code}
-module TcClassDcl ( tcClassDecl1, tcClassDecls2, mkImplicitClassBinds,
+module TcClassDcl ( tcClassDecl1, tcClassDecls2, 
 		    tcMethodBind, badMethodErr
 		  ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
+import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..), 
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isClassDecl, isClassOpSig, isPragSig,
@@ -19,10 +19,10 @@ import HsSyn		( HsDecl(..), TyClDecl(..), Sig(..), MonoBinds(..),
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, 
 			  RenamedClassOpSig, RenamedMonoBinds,
-			  RenamedContext, RenamedHsDecl, RenamedSig, 
+			  RenamedContext, RenamedSig, 
 			  maybeGenericMatch
 			)
-import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
+import TcHsSyn		( TcMonoBinds )
 
 import Inst		( InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
 			  newDicts, newMethod )
@@ -37,7 +37,7 @@ import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcSigTyVars )
 import TcMonad
 import Generics		( mkGenericRhs, validGenericMethodType )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, classSelIds, classTyCon, 
+import Class		( classTyVars, classBigSig, classTyCon, 
 			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
@@ -294,34 +294,6 @@ tcClassSig is_rec unf_env clas clas_tyvars dm_info
 
 %************************************************************************
 %*									*
-\subsection[ClassDcl-pass2]{Class decls pass 2: default methods}
-%*									*
-%************************************************************************
-
-@mkImplicitClassBinds@ produces a binding for the selector function for each method
-and superclass dictionary.
-
-\begin{code}
-mkImplicitClassBinds :: Module -> [Class] -> NF_TcM ([Id], TcMonoBinds)
-mkImplicitClassBinds this_mod classes
-  = returnNF_Tc (concat cls_ids_s, andMonoBindList binds_s)
-	-- The selector binds are already in the selector Id's unfoldings
-	-- We don't return the data constructor etc from the class,
-	-- because that's done via the class's TyCon
-  where
-    (cls_ids_s, binds_s) = unzip (map mk_implicit classes)
-
-    mk_implicit clas = (sel_ids, binds)
-		     where
-			sel_ids = classSelIds clas
-			binds | isFrom this_mod clas = idsToMonoBinds sel_ids
-			      | otherwise 	     = EmptyMonoBinds
-\end{code}
-
-
-
-%************************************************************************
-%*									*
 \subsection[Default methods]{Default methods}
 %*									*
 %************************************************************************
@@ -385,12 +357,12 @@ The function @tcClassDecls2@ just arranges to apply @tcClassDecl2@ to
 each local class decl.
 
 \begin{code}
-tcClassDecls2 :: Module -> [RenamedHsDecl] -> NF_TcM (LIE, TcMonoBinds)
+tcClassDecls2 :: Module -> [RenamedTyClDecl] -> NF_TcM (LIE, TcMonoBinds)
 
 tcClassDecls2 this_mod decls
   = foldr combine
 	  (returnNF_Tc (emptyLIE, EmptyMonoBinds))
-	  [tcClassDecl2 cls_decl | TyClD cls_decl <- decls, 
+	  [tcClassDecl2 cls_decl | cls_decl <- decls, 
 				   isClassDecl cls_decl,
 				   isFrom this_mod (tyClDeclName cls_decl)]
   where

@@ -167,11 +167,10 @@ tcInstDecls1 :: PackageInstEnv
 	     -> TcEnv 			-- Contains IdInfo for dfun ids
 	     -> (Name -> Maybe Fixity)	-- for deriving Show and Read
 	     -> Module			-- Module for deriving
-	     -> [TyCon]
 	     -> [RenamedHsDecl]
 	     -> TcM (PackageInstEnv, InstEnv, [InstInfo], RenamedHsBinds)
 
-tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod tycons decls
+tcInstDecls1 inst_env0 prs hst unf_env get_fixity mod decls
   = let
 	inst_decls = [inst_decl | InstD inst_decl <- decls]	
 	tycl_decls = [decl      | TyClD decl <- decls]

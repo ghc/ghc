@@ -29,8 +29,8 @@ module TyCon(
 	tyConUnique,
 	tyConTyVars,
 	tyConArgVrcs_maybe,
-	tyConDataCons, tyConDataConsIfAvailable,
-	tyConFamilySize,
+	tyConDataCons, tyConDataConsIfAvailable, tyConFamilySize,
+	tyConSelIds,
 	tyConTheta,
 	tyConPrimRep,
 	tyConArity,
@@ -101,6 +101,8 @@ data TyCon
 		--		   the constructors, or
 		--	       (b) in a quest for fast compilation we don't import 
 		--		   the constructors
+
+	selIds :: [Id],	-- Its record selectors (if any)
 
 	noOfDataCons :: Int,	-- Number of data constructors
 				-- Usually this is the same as the length of the
@@ -238,7 +240,7 @@ tyConGenIds tycon = case tyConGenInfo tycon of
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars theta argvrcs cons ncons flavour rec 
+mkAlgTyCon name kind tyvars theta argvrcs cons ncons sels flavour rec 
 	      gen_info
   = AlgTyCon {	
 	tyConName 		= name,
@@ -249,6 +251,7 @@ mkAlgTyCon name kind tyvars theta argvrcs cons ncons flavour rec
 	tyConArgVrcs		= argvrcs,
 	algTyConTheta		= theta,
 	dataCons		= cons, 
+	selIds			= sels,
 	noOfDataCons		= ncons,
 	algTyConClass		= False,
 	algTyConFlavour 	= flavour,
@@ -266,6 +269,7 @@ mkClassTyCon name kind tyvars argvrcs con clas flavour
 	tyConArgVrcs		= argvrcs,
 	algTyConTheta		= [],
 	dataCons		= [con],
+	selIds			= [],
 	noOfDataCons		= 1,
 	algTyConClass		= True,
 	algTyConFlavour		= flavour,
@@ -401,6 +405,12 @@ tyConFamilySize (TupleTyCon {}) 	      = 1
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
 
+tyConSelIds :: TyCon -> [Id]
+tyConSelIds (AlgTyCon {selIds = sels}) = sels
+tyConSelIds other_tycon		       = []
+\end{code}
+
+\begin{code}
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
 tyConPrimRep _			              = PtrRep

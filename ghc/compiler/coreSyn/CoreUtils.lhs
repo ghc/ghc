@@ -54,10 +54,8 @@ import IdInfo		( LBVarInfo(..),
 			  IdFlavour(..),
 			  megaSeqIdInfo )
 import Demand		( appIsBottom )
-import Type		( Type, mkFunTy, mkForAllTy,
-			  splitFunTy_maybe, tyVarsOfType, tyVarsOfTypes,
-			  applyTys, isUnLiftedType, seqType,
-                          mkUTy
+import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
+			  applyTys, isUnLiftedType, seqType, mkUTy
 			)
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )

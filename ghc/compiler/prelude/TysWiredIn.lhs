@@ -168,7 +168,8 @@ pcTyCon new_or_data is_rec name tyvars argvrcs cons
                 []              -- No context
                 argvrcs
                 cons
-                (length cons)
+                (length cons) 
+		[]		-- No record selectors
                 new_or_data
                 is_rec
 		gen_info

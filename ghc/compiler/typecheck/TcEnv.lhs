@@ -27,7 +27,7 @@ module TcEnv(
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	-- Random useful things
-	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcInstId,
+	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcLookupRecId_maybe, tcInstId,
 
 	-- New Ids
 	newLocalId, newSpecPragmaId,
@@ -165,7 +165,7 @@ getTcGEnv (TcEnv { tcGEnv = genv }) = genv
 -- This data type is used to help tie the knot
 -- when type checking type and class declarations
 data TyThingDetails = SynTyDetails Type
-		    | DataTyDetails ClassContext [DataCon]
+		    | DataTyDetails ClassContext [DataCon] [Id]
 		    | ClassDetails ClassContext [Id] [ClassOpItem] DataCon
 \end{code}
 
@@ -205,16 +205,20 @@ tcAddImportedIdInfo env id
   = id `lazySetIdInfo` new_info
 	-- The Id must be returned without a data dependency on maybe_id
   where
-    new_info = case tcLookupRecId env (idName id) of
+    new_info = case tcLookupRecId_maybe env (idName id) of
 		  Nothing	   -> constantIdInfo
 		  Just imported_id -> idInfo imported_id
 		-- ToDo: could check that types are the same
 
-tcLookupRecId :: RecTcEnv -> Name -> Maybe Id
-tcLookupRecId env name = case lookup_global env name of
-			   Just (AnId id) -> Just id
-			   other	  -> Nothing
+tcLookupRecId_maybe :: RecTcEnv -> Name -> Maybe Id
+tcLookupRecId_maybe env name = case lookup_global env name of
+				   Just (AnId id) -> Just id
+				   other	  -> Nothing
 
+tcLookupRecId ::  RecTcEnv -> Name -> Id
+tcLookupRecId env name = case lookup_global env name of
+				Just (AnId id) -> id
+				Nothing	       -> pprPanic "tcLookupRecId" (ppr name)
 \end{code}
 
 %************************************************************************
@@ -304,17 +308,21 @@ isLocalThing mod thing = case nameModule_maybe (getName thing) of
 %************************************************************************
 
 \begin{code}
-tcExtendGlobalEnv :: [(Name, TyThing)] -> TcM r -> TcM r
-tcExtendGlobalEnv bindings thing_inside
+tcExtendGlobalEnv :: [TyThing] -> TcM r -> TcM r
+tcExtendGlobalEnv things thing_inside
   = tcGetEnv				`thenNF_Tc` \ env ->
     let
-	ge' = extendNameEnvList (tcGEnv env) bindings
+	ge' = extendNameEnvList (tcGEnv env) [(getName thing, thing) | thing <- things]
     in
     tcSetEnv (env {tcGEnv = ge'}) thing_inside
 
 tcExtendGlobalValEnv :: [Id] -> TcM a -> TcM a
 tcExtendGlobalValEnv ids thing_inside
-  = tcExtendGlobalEnv [(getName id, AnId id) | id <- ids] thing_inside
+  = tcGetEnv				`thenNF_Tc` \ env ->
+    let
+	ge' = extendNameEnvList (tcGEnv env) [(getName id, AnId id) | id <- ids]
+    in
+    tcSetEnv (env {tcGEnv = ge'}) thing_inside
 \end{code}
 
 

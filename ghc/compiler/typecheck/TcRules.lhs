@@ -4,13 +4,13 @@
 \section[TcRules]{Typechecking transformation rules}
 
 \begin{code}
-module TcRules ( tcRules ) where
+module TcRules ( tcIfaceRules, tcSourceRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), RuleDecl(..), RuleBndr(..) )
+import HsSyn		( RuleDecl(..), RuleBndr(..) )
 import CoreSyn		( CoreRule(..) )
-import RnHsSyn		( RenamedHsDecl, RenamedRuleDecl )
+import RnHsSyn		( RenamedRuleDecl )
 import HscTypes		( PackageRuleBase )
 import TcHsSyn		( TypecheckedRuleDecl, mkHsLet )
 import TcMonad
@@ -21,7 +21,7 @@ import TcMonoType	( kcHsSigType, tcHsSigType, tcTyVars, checkSigTyVars )
 import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
 import Rules		( extendRuleBase )
-import Inst		( LIE, emptyLIE, plusLIEs, instToId )
+import Inst		( LIE, plusLIEs, instToId )
 import Id		( idType, idName, mkVanillaId )
 import Module		( Module )
 import VarSet
@@ -32,15 +32,15 @@ import Outputable
 \end{code}
 
 \begin{code}
-tcRules :: PackageRuleBase -> Module -> [RenamedHsDecl] 
-	-> TcM (PackageRuleBase, LIE, [TypecheckedRuleDecl])
-tcRules pkg_rule_base mod decls 
-  = mapAndUnzipTc tcRule [rule | RuleD rule <- decls]	`thenTc` \ (lies, new_rules) ->
+tcIfaceRules :: PackageRuleBase -> Module -> [RenamedRuleDecl] 
+	     -> TcM (PackageRuleBase, [TypecheckedRuleDecl])
+tcIfaceRules pkg_rule_base mod decls 
+  = mapTc tcIfaceRule decls		`thenTc` \ new_rules ->
     let
 	(local_rules, imported_rules) = partition is_local new_rules
 	new_rule_base = foldl add pkg_rule_base imported_rules
     in
-    returnTc (new_rule_base, plusLIEs lies, local_rules)
+    returnTc (new_rule_base, local_rules)
   where
     add rule_base (IfaceRuleOut id rule) = extendRuleBase rule_base (id, rule)
 
@@ -49,18 +49,24 @@ tcRules pkg_rule_base mod decls
     is_local (IfaceRuleOut n _) = isLocalThing mod n
     is_local other		= True
 
-tcRule :: RenamedRuleDecl -> TcM (LIE, TypecheckedRuleDecl)
+tcIfaceRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
   -- No zonking necessary!
-tcRule (IfaceRule name vars fun args rhs src_loc)
+tcIfaceRule (IfaceRule name vars fun args rhs src_loc)
   = tcAddSrcLoc src_loc 		$
     tcAddErrCtxt (ruleCtxt name)	$
     tcVar fun				`thenTc` \ fun' ->
     tcCoreLamBndrs vars			$ \ vars' ->
     mapTc tcCoreExpr args		`thenTc` \ args' ->
     tcCoreExpr rhs			`thenTc` \ rhs' ->
-    returnTc (emptyLIE, IfaceRuleOut fun' (Rule name vars' args' rhs'))
+    returnTc (IfaceRuleOut fun' (Rule name vars' args' rhs'))
 
-tcRule (HsRule name sig_tvs vars lhs rhs src_loc)
+
+tcSourceRules :: [RenamedRuleDecl] -> TcM (LIE, [TypecheckedRuleDecl])
+tcSourceRules decls
+  = mapAndUnzipTc tcSourceRule decls	`thenTc` \ (lies, decls') ->
+    returnTc (plusLIEs lies, decls')
+
+tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$
     tcAddErrCtxt (ruleCtxt name)			$
     newTyVarTy openTypeKind				`thenNF_Tc` \ rule_ty ->

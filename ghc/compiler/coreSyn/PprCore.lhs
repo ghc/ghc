@@ -27,7 +27,7 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  specInfo, cprInfo, ppCprInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
-			  cprInfo, ppCprInfo, lbvarInfo,
+			  cprInfo, ppCprInfo, 
 			  workerInfo, ppWorkerInfo,
                           tyGenInfo, ppTyGenInfo
 			)

@@ -101,7 +101,7 @@ renameExpr :: DynFlags
 	   -> HomeIfaceTable -> HomeSymbolTable
 	   -> PersistentCompilerState 
 	   -> Module -> RdrNameHsExpr
-	   -> IO (PersistentCompilerState, Maybe (PrintUnqualified, RenamedHsExpr))
+	   -> IO (PersistentCompilerState, Maybe (PrintUnqualified, (RenamedHsExpr, [RenamedHsDecl])))
 
 renameExpr dflags hit hst pcs this_module expr
   | Just iface <- lookupModuleEnv hit this_module
@@ -109,13 +109,11 @@ renameExpr dflags hit hst pcs this_module expr
 	; let print_unqual = unQualInScope rdr_env
 	  
 	; renameSource dflags hit hst pcs this_module $
-	  initRnMS rdr_env emptyLocalFixityEnv SourceMode $
-	  ( rnExpr expr `thenRn` \ (e,_) -> 
-
-	    doptRn Opt_D_dump_rn `thenRn` \ dump_rn ->
-	    ioToRnM (dumpIfSet dump_rn "Renamer:" (ppr e)) `thenRn_`
-
-	    returnRn (Just (print_unqual, e)))
+	  initRnMS rdr_env emptyLocalFixityEnv SourceMode (rnExpr expr)	`thenRn` \ (e,fvs) -> 
+	  closeDecls [] fvs						`thenRn` \ decls ->
+	  doptRn Opt_D_dump_rn						`thenRn` \ dump_rn ->
+	  ioToRnM (dumpIfSet dump_rn "Renamer:" (ppr e))		`thenRn_`
+	  returnRn (Just (print_unqual, (e, decls)))
 	}
 
   | otherwise

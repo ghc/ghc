@@ -17,7 +17,7 @@ module HscTypes (
 
 	VersionInfo(..), initialVersionInfo,
 
-	TyThing(..), isTyClThing,
+	TyThing(..), isTyClThing, implicitTyThingIds,
 
 	TypeEnv, lookupType, mkTypeEnv, extendTypeEnvList, 
 	typeEnvClasses, typeEnvTyCons,
@@ -54,8 +54,9 @@ import Module		( Module, ModuleName, ModuleEnv,
 import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
 import Id		( Id )
-import Class		( Class )
-import TyCon		( TyCon )
+import Class		( Class, classSelIds )
+import TyCon		( TyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
+import DataCon		( dataConId, dataConWrapId )
 
 import BasicTypes	( Version, initialVersion, Fixity )
 
@@ -259,6 +260,18 @@ instance NamedThing TyThing where
 typeEnvClasses env = [cl | AClass cl <- nameEnvElts env]
 typeEnvTyCons  env = [tc | ATyCon tc <- nameEnvElts env] 
 
+implicitTyThingIds :: [TyThing] -> [Id]
+-- Add the implicit data cons and selectors etc 
+implicitTyThingIds things
+  = concat (map go things)
+  where
+    go (AnId f)    = []
+    go (AClass cl) = classSelIds cl
+    go (ATyCon tc) = tyConGenIds tc ++
+		     tyConSelIds tc ++
+		     [ n | dc <- tyConDataConsIfAvailable tc, 
+			   n  <- [dataConId dc, dataConWrapId dc] ] 
+		-- Synonyms return empty list of constructors and selectors
 \end{code}
 
 

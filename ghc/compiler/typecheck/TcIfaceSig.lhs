@@ -8,7 +8,7 @@ module TcIfaceSig ( tcInterfaceSigs, tcVar, tcCoreExpr, tcCoreLamBndrs ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( HsDecl(..), TyClDecl(..), HsTupCon(..) )
+import HsSyn		( TyClDecl(..), HsTupCon(..) )
 import TcMonad
 import TcMonoType	( tcHsType )
 				-- NB: all the tyars in interface files are kinded,
@@ -17,10 +17,10 @@ import TcMonoType	( tcHsType )
 
 import TcEnv		( TcEnv, RecTcEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetEnv,
-			  tcLookupGlobal_maybe, tcLookupRecId
+			  tcLookupGlobal_maybe, tcLookupRecId_maybe
 			)
 
-import RnHsSyn		( RenamedHsDecl )
+import RnHsSyn		( RenamedTyClDecl )
 import HsCore
 import Literal		( Literal(..) )
 import CoreSyn
@@ -52,13 +52,13 @@ signatures.
 
 \begin{code}
 tcInterfaceSigs :: RecTcEnv		-- Envt to use when checking unfoldings
-		-> [RenamedHsDecl]	-- Ignore non-sig-decls in these decls
+		-> [RenamedTyClDecl]	-- Ignore non-sig-decls in these decls
 		-> TcM [Id]
 		
 
 tcInterfaceSigs unf_env decls
   = listTc [ do_one name ty id_infos src_loc
-	   | TyClD (IfaceSig name ty id_infos src_loc) <- decls]
+	   | IfaceSig name ty id_infos src_loc <- decls]
   where
     in_scope_vars = []	-- I think this will be OK
 
@@ -108,7 +108,7 @@ tcWorkerInfo unf_env ty info worker_name
   = uniqSMToTcM (mkWrapper ty arity demands res_bot cpr_info) `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on unf_env too eagerly!
-	info' = case tcLookupRecId unf_env worker_name of
+	info' = case tcLookupRecId_maybe unf_env worker_name of
 		  Just worker_id -> info `setUnfoldingInfo`  mkTopUnfolding (wrap_fn worker_id)
                                          `setWorkerInfo`     HasWorker worker_id arity
 

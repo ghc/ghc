@@ -32,14 +32,12 @@ import Var	( TyVar )
 import VarEnv
 import VarSet
 
-import Name	( Name, mkGlobalName, mkKindOccFS, tcName )
-import OccName	( tcName )
+import Name	( Name, tcName )
 import TyCon	( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
 import Class	( Class )
 
 -- others
-import SrcLoc		( builtinSrcLoc )
-import PrelNames	( pREL_GHC, superKindName, superBoxityName, boxedConName, 
+import PrelNames	( superKindName, superBoxityName, boxedConName, 
 			  unboxedConName, typeConName, openKindConName, funTyConName,
 			  usageKindConName, usOnceTyConName, usManyTyConName
 			)
@@ -228,14 +226,6 @@ in two situations:
     present in an inferred type.
 
 
-\begin{code}
-mk_kind_name key str = mkGlobalName key pREL_GHC (mkKindOccFS tcName str) builtinSrcLoc
-	-- mk_kind_name is a bit of a hack
-	-- The LocalDef means that we print the name without
-	-- a qualifier, which is what we want for these kinds.
-	-- It's used for both Kinds and Boxities
-\end{code}
-
 ------------------------------------------
 Define  KX, the type of a kind
 	BX, the type of a boxity
@@ -305,8 +295,7 @@ funTyCon = mkFunTyCon funTyConName (mkArrowKinds [boxedTypeKind, boxedTypeKind] 
 Usage tycons @.@ and @!@
 
 The usage tycons are of kind usageTypeKind (`$').  The types contain
-no values, and are used purely for usage annotation.  mk_kind_name is
-used (hackishly) to avoid z-encoding of the names.
+no values, and are used purely for usage annotation.  
 
 \begin{code}
 usOnceTyCon     = mkKindCon usOnceTyConName usageTypeKind
