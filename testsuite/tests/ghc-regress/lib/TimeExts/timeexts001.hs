@@ -1,6 +1,6 @@
 module Main(main) where
 
-import Time
+import System.Time
 import TimeExts
 
 start = toClockTime(
