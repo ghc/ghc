@@ -141,4 +141,43 @@ Used for variables, but not type variables.
 
 </Sect1>
 
+<Sect1><Title>Tables</Title>
+
+<Para>
+Tables are quite complicated to write in SGML (as in HTML, there are lots of fiddly tags), so here's an example you can cannibalise. In the spirit of the LaTeX short introduction I don't repeat all the markup verbatim; you have to look at the source for that.
+</Para>
+
+<Para>
+<InformalTable>
+<TGroup cols="3">
+<ColSpec Colname="one" Align="Left" Colsep="0">
+<ColSpec Colname="two" Align="Center" Colsep="0">
+<ColSpec Colname="three" Align="Right" Colsep="0">
+<TBody>
+
+<Row>
+<Entry>Here's</Entry>
+<Entry>a sample</Entry>
+<Entry>table</Entry>
+</Row>
+
+<Row>
+<Entry>With differently</Entry>
+<Entry>aligned</Entry>
+<Entry>cells</Entry>
+</Row>
+
+<Row>
+<Entry namest="one" nameend="three" morerows="1"><Para>
+There's not much else to it. Entries can span both extra rows and extra columns; just be careful when using block markup (such as <SGMLTag class="starttag">Para</SGMLTag>s) within an <SGMLTag class="starttag">Entry</SGMLTag> that there is no space between the open and close <SGMLTag class="starttag">Entry</SGMLTag> tags and the adjacent text, as otherwise you will suffer from <ULink URL="http://www.docbook.org/tdg/html/entry.html">Pernicious Mixed Content</ULink> (the parser will think you're using inline markup).</Para></Entry>
+</Row>
+
+</TBody>
+
+</TGroup>
+</InformalTable>
+</Para>
+
+</Sect1>
+
 </Article>
