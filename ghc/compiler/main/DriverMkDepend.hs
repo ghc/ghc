@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.15 2001/08/03 07:44:47 sof Exp $
+-- $Id: DriverMkDepend.hs,v 1.16 2001/12/04 19:26:17 sof Exp $
 --
 -- GHC Driver
 --
@@ -53,14 +53,14 @@ depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 
 -- for compatibility with the old mkDependHS, we accept options of the form
 -- -optdep-f -optdep.depend, etc.
-dep_opts = [
-   (  "s", 			SepArg (add v_Dep_suffixes) ),
-   (  "f", 			SepArg (writeIORef v_Dep_makefile) ),
-   (  "w", 			NoArg (writeIORef v_Dep_warnings False) ),
-   (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) )
---   (  "-exclude-module=",       Prefix (add v_Dep_exclude_mods) )
---   (  "x",                      Prefix (add v_Dep_exclude_mods) )
- ]
+dep_opts = 
+   [ (  "s", 			SepArg (add v_Dep_suffixes) )
+   , (  "f", 			SepArg (writeIORef v_Dep_makefile) )
+   , (  "w", 			NoArg (writeIORef v_Dep_warnings False) )
+   , (  "-include-prelude",  	NoArg (writeIORef v_Dep_include_prelude True) )
+   , (  "-exclude-module=",       Prefix (add v_Dep_exclude_mods) )
+   , (  "x",                      Prefix (add v_Dep_exclude_mods) )
+   ]
 
 beginMkDependHS :: IO ()
 beginMkDependHS = do
