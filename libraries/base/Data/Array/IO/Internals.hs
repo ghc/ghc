@@ -41,18 +41,6 @@ import GHC.IOBase
 import GHC.Base
 #endif /* __GLASGOW_HASKELL__ */
 
-#ifdef __HUGS__
-instance HasBounds IOArray where
-    bounds = boundsIOArray
-
-instance MArray IOArray e IO where
-    newArray    = newIOArray
-    unsafeRead  = unsafeReadIOArray
-    unsafeWrite = unsafeWriteIOArray
-
-type IOUArray = StorableArray
-#endif /* __HUGS__ */
-
 iOArrayTc :: TyCon
 iOArrayTc = mkTyCon "IOArray"
 
@@ -60,21 +48,32 @@ instance (Typeable a, Typeable b) => Typeable (IOArray a b) where
   typeOf a = mkAppTy iOArrayTc [typeOf ((undefined :: IOArray a b -> a) a),
 				typeOf ((undefined :: IOArray a b -> b) a)]
 
-#ifdef __GLASGOW_HASKELL__
--- GHC only to the end of file
-
 -----------------------------------------------------------------------------
 -- | Instance declarations for 'IOArray's
 
+#ifdef __GLASGOW_HASKELL__
 instance HasBounds IOArray where
     {-# INLINE bounds #-}
     bounds (IOArray marr) = bounds marr
+#endif
+
+#ifdef __HUGS__
+instance HasBounds IOArray where
+    bounds      = boundsIOArray
+#endif
 
 instance MArray IOArray e IO where
     newArray    = newIOArray
     unsafeRead  = unsafeReadIOArray
     unsafeWrite = unsafeWriteIOArray
 
+
+#ifdef __HUGS__
+type IOUArray = StorableArray
+#endif
+
+#ifdef __GLASGOW_HASKELL__
+-- GHC only to the end of file
 
 -----------------------------------------------------------------------------
 -- Flat unboxed mutable arrays (IO monad)
