@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.18 2000/08/25 13:12:07 simonmar Exp $
+ * $Id: TSO.h,v 1.19 2000/12/14 15:19:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -80,7 +80,7 @@ typedef enum {
 typedef enum {
   ThreadEnterGHC,		/* enter top thunk on stack */
   ThreadRunGHC,			/* return to address on top of stack */
-  ThreadEnterHugs,		/* enter top thunk on stack (w/ interpreter) */
+  ThreadEnterInterp,		/* enter top thunk on stack (w/ interpreter) */
   ThreadKilled,			/* thread has died, don't run it */
   ThreadRelocated,		/* thread has moved, link points to new locn */
   ThreadComplete		/* thread has finished */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.h,v 1.5 1999/11/09 15:57:42 simonmar Exp $
+ * $Id: HeapStackCheck.h,v 1.6 2000/12/14 15:19:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -46,7 +46,7 @@ EXTFUN(stg_gen_chk);
 EXTFUN(stg_gen_hp);
 EXTFUN(stg_gen_yield);
 EXTFUN(stg_yield_noregs);
-EXTFUN(stg_yield_to_Hugs);
+EXTFUN(stg_yield_to_interpreter);
 EXTFUN(stg_gen_block);
 EXTFUN(stg_block_noregs);
 EXTFUN(stg_block_1);

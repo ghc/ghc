@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Evaluator.h,v 1.8 2000/10/09 11:21:18 daan Exp $
+ * $Id: Evaluator.h,v 1.9 2000/12/14 15:19:47 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -26,7 +26,7 @@
  * 
  * ------------------------------------------------------------------------*/
 
-extern StgThreadReturnCode enter ( Capability* cap, StgClosurePtr obj );
+extern StgThreadReturnCode interpretBCO ( Capability* cap );
 
 extern nat marshall   ( char arg_ty, void* arg );
 extern nat unmarshall ( char res_ty, void* res );

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.53 2000/12/11 12:37:00 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.54 2000/12/14 15:19:48 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -48,235 +48,102 @@ STGFUN(stg_##type##_entry)							\
 
 
 /* -----------------------------------------------------------------------------
-   Support for the metacircular interpreter.
+   Support for the bytecode interpreter.
    -------------------------------------------------------------------------- */
 
 #ifdef GHCI
 
 /* 9 bits of return code for constructors created by mci_make_constr. */
-FN_(stg_mci_constr_entry) 
+FN_(stg_bco_constr_entry) 
 { 
   /* R1 points at the constructor */
   FB_ 
-    STGCALL2(fprintf,stderr,"mci_constr_entry (direct return)!\n");
+    STGCALL2(fprintf,stderr,"stg_bco_constr_entry (direct return)!\n");
     /* Pointless, since SET_TAG doesn't do anything */
     SET_TAG( GET_TAG(GET_INFO(R1.cl))); 
     JMP_(ENTRY_CODE((P_)(*Sp))); 
   FE_ 
 }
 
-FN_(stg_mci_constr1_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),0)); FE_ }
-FN_(stg_mci_constr2_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),1)); FE_ }
-FN_(stg_mci_constr3_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),2)); FE_ }
-FN_(stg_mci_constr4_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),3)); FE_ }
-FN_(stg_mci_constr5_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),4)); FE_ }
-FN_(stg_mci_constr6_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),5)); FE_ }
-FN_(stg_mci_constr7_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),6)); FE_ }
-FN_(stg_mci_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
+FN_(stg_bco_constr1_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),0)); FE_ }
+FN_(stg_bco_constr2_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),1)); FE_ }
+FN_(stg_bco_constr3_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),2)); FE_ }
+FN_(stg_bco_constr4_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),3)); FE_ }
+FN_(stg_bco_constr5_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),4)); FE_ }
+FN_(stg_bco_constr6_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),5)); FE_ }
+FN_(stg_bco_constr7_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),6)); FE_ }
+FN_(stg_bco_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
  
+/* Some info tables to be used when compiled code returns a value to
+   the interpreter, i.e. the interpreter pushes one of these onto the
+   stack before entering a value.  What the code does is to
+   impedance-match the compiled return convention (in R1/F1/D1 etc) to
+   the interpreter's convention (returned value is on top of stack),
+   and then cause the scheduler to enter the interpreter.
 
-/* Since this stuff is ostensibly in some other module, we need
-   to supply an __init_ function.
+   On entry, the stack (growing down) looks like this:
+
+      ptr to BCO holding return continuation
+      ptr to one of these info tables.
+ 
+   The info table code, both direct and vectored, must:
+      * push R1/F1/D1 on the stack
+      * push the BCO (so it's now on the stack twice)
+      * Yield, ie, go to the scheduler.
+
+   Scheduler examines the t.o.s, discovers it is a BCO, and proceeds
+   directly to the bytecode interpreter.  That pops the top element
+   (the BCO, containing the return continuation), and interprets it.
+   Net result: return continuation gets interpreted, with the
+   following stack:
+
+      ptr to this BCO
+      ptr to the info table just jumped thru
+      return value
+
+   which is just what we want -- the "standard" return layout for the
+   interpreter.  Hurrah!
+
+   Don't ask me how unboxed tuple returns are supposed to work.  We
+   haven't got a good story about that yet.
 */
-EXTFUN(__init_MCIzumakezuconstr);
-START_MOD_INIT(__init_MCIzumakezuconstr)
-END_MOD_INIT()
+
+/* When the returned value is in R1 ... */
+#define STG_BCORET_R1_Template(label) 	\
+   IFN_(label)			        \
+   {                                    \
+      StgPtr bco;                       \
+      FB_				\
+      bco = ((StgPtr*)Sp)[1];           \
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = R1.p;		\
+      Sp -= 1;				\
+      ((StgPtr*)Sp)[0] = bco;		\
+      JMP_(stg_yield_to_interpreter);   \
+      FE_                               \
+   }
+
+STG_BCORET_R1_Template(stg_bcoret_R1_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_0_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_1_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_2_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_3_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_4_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_5_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_6_entry);
+STG_BCORET_R1_Template(stg_bcoret_R1_7_entry);
+
+VEC_POLY_INFO_TABLE(stg_bcoret_R1,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
 
 
-INFO_TABLE(mci_make_constr_info,   mci_make_constr_entry,   0,0,FUN_STATIC,static,EF_,0,0);
-INFO_TABLE(mci_make_constr0_info,  mci_make_constr0_entry,  0,0,FUN_STATIC,static,EF_,0,0);
-INFO_TABLE(mci_make_constrI_info,  mci_make_constrI_entry,  0,0,FUN_STATIC,static,EF_,0,0);
-INFO_TABLE(mci_make_constrP_info,  mci_make_constrP_entry,  0,0,FUN_STATIC,static,EF_,0,0);
-INFO_TABLE(mci_make_constrPP_info, mci_make_constrPP_entry, 0,0,FUN_STATIC,static,EF_,0,0);
-INFO_TABLE(mci_make_constrPPP_info,mci_make_constrPPP_entry,0,0,FUN_STATIC,static,EF_,0,0);
-
-SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstr_closure,
-               mci_make_constr_info,0,,EI_)
-   ,{ /* payload */ }
-};
-SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstr0_closure,
-               mci_make_constr0_info,0,,EI_)
-   ,{ /* payload */ }
-};
-SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrI_closure,
-               mci_make_constrI_info,0,,EI_)
-   ,{ /* payload */ }
-};
-SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrP_closure,
-               mci_make_constrP_info,0,,EI_)
-   ,{ /* payload */ }
-};
-SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrPP_closure,
-               mci_make_constrPP_info,0,,EI_)
-   ,{ /* payload */ }
-};
-SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrPPP_closure,
-               mci_make_constrPPP_info,0,,EI_)
-   ,{ /* payload */ }
-};
-
-
-/* Make a constructor with no args. */
-STGFUN(mci_make_constr0_entry)
-{
-  nat size, np, nw;
-  StgClosure* con;
-  StgInfoTable* itbl;
+/* Entering a BCO.  Heave it on the stack and defer to the
+   scheduler. */
+INFO_TABLE(stg_BCO_info,stg_BCO_entry,3,0,BCO,,EF_,"BCO","BCO");
+STGFUN(stg_BCO_entry) {
   FB_
-    /* Sp[0 & 1] are tag, Addr#
-    */
-    itbl = ((StgInfoTable**)Sp)[1];
-    np   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
-    nw   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
-    size = sizeofW(StgHeader) + stg_max(MIN_NONUPD_SIZE, np+nw);
-    /* STGCALL5(fprintf,stderr,"np %d  nw %d  size %d\n",np,nw,size); */
-
-    /* The total number of words to copy off the stack is np + nw.
-       That doesn't include tag words, tho.
-    */
-    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
-    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
-    CCS_ALLOC(CCCS,size); /* ccs prof */
-
-    con = (StgClosure*)(Hp + 1 - size);
-    SET_HDR(con, itbl,CCCS);
-
-    Sp = Sp +2; /* Zap the Addr# arg */
-    R1.cl = con;
-
-    JMP_(ENTRY_CODE(GET_INFO(R1.cl)));
-  FE_
-}
-
-/* Make a constructor with 1 Int# arg */
-STGFUN(mci_make_constrI_entry)
-{
-  nat size, np, nw;
-  StgClosure* con;
-  StgInfoTable* itbl;
-  FB_
-    /* Sp[0 & 1] are tag, Addr#
-       Sp[2 & 3] are tag, Int#
-    */
-    itbl = ((StgInfoTable**)Sp)[1];
-    np   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
-    nw   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
-    size = sizeofW(StgHeader) + stg_max(MIN_NONUPD_SIZE, np+nw);
-    /* STGCALL5(fprintf,stderr,"np %d  nw %d  size %d\n",np,nw,size); */
-
-    /* The total number of words to copy off the stack is np + nw.
-       That doesn't include tag words, tho.
-    */
-    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constrI_entry, );
-    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
-    CCS_ALLOC(CCCS,size); /* ccs prof */
-
-    con = (StgClosure*)(Hp + 1 - size);
-    SET_HDR(con, itbl,CCCS);
-
-    con->payload[0] = ((StgClosure**)Sp)[3];
-    Sp = Sp +1/*word*/ +1/*tag*/;  /* Zap the Int# arg */
-    Sp = Sp +2; /* Zap the Addr# arg */
-    R1.cl = con;
-
-    JMP_(ENTRY_CODE(GET_INFO(R1.cl)));
-  FE_
-}
-
-STGFUN(mci_make_constrP_entry)
-{
-  FB_
-  DUMP_ERRMSG("mci_make_constrP_entry: unimplemented!\n");
-  STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);
-  return 0;
-  FE_
-}
-
-
-/* Make a constructor with 2 pointer args. */
-STGFUN(mci_make_constrPP_entry)
-{
-  nat size, np, nw;
-  StgClosure* con;
-  StgInfoTable* itbl;
-  FB_
-    /* Sp[0 & 1] are tag, Addr#
-       Sp[2]     first arg
-       Sp[3]     second arg
-    */
-    itbl = ((StgInfoTable**)Sp)[1];
-    np   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
-    nw   = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
-    size = sizeofW(StgHeader) + stg_max(MIN_NONUPD_SIZE, np+nw);
-    /* STGCALL5(fprintf,stderr,"np %d  nw %d  size %d\n",np,nw,size); */
-
-    /* The total number of words to copy off the stack is np + nw.
-       That doesn't include tag words, tho.
-    */
-    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constrPP_entry, );
-    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
-    CCS_ALLOC(CCCS,size); /* ccs prof */
-
-    con = (StgClosure*)(Hp + 1 - size);
-    SET_HDR(con, itbl,CCCS);
-
-    con->payload[0] = ((StgClosure**)Sp)[2];
-    con->payload[1] = ((StgClosure**)Sp)[3];
-    Sp = Sp +2; /* Zap 2 ptr args */
-    Sp = Sp +2; /* Zap the Addr# arg */
-    R1.cl = con;
-
-    JMP_(GET_ENTRY(R1.cl));
-  FE_
-}
-
-
-STGFUN(mci_make_constrPPP_entry)
-{
-  FB_
-  DUMP_ERRMSG("mci_make_constrPPP_entry: unimplemented!\n");
-  STGCALL1(shutdownHaskellAndExit, EXIT_FAILURE);
-  return 0;
-  FE_
-}
-
-/* It would be nice if this worked, but it doesn't.  Yet. */
-STGFUN(mci_make_constr_entry)
-{
-  nat size, np, nw_heap, nw_really, i;
-  StgClosure* con;
-  StgInfoTable* itbl;
-  FB_
-    /* Sp[0] should be the tag for the itbl */
-    itbl      = ((StgInfoTable**)Sp)[1];
-
-    np        = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
-    nw_really = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
-
-    nw_heap   = stg_max((int)nw_really, MIN_NONUPD_SIZE-np);
-    size      = CONSTR_sizeW( np, nw_heap );
-
-#if 0
-     fprintf(stderr, "np = %d, nw_really = %d, nw_heap = %d, size = %d\n",
-	    np, nw_really, nw_heap, size);
-#endif
-
-    HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
-    TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
-    CCS_ALLOC(CCCS,size); /* ccs prof */
-
-    con = (StgClosure*)(Hp + 1 - size);
-    SET_HDR(con, itbl,CCCS);
-
-    /* set the pointer fields */
-    for (i = 0; i < np; i++) {
-	con->payload[i] = &stg_dummy_ret_closure;
-    }
-
-    Sp += 2;
-
-    R1.cl = con;
-    JMP_(GET_ENTRY(R1.cl));
+    Sp -= 1;
+    Sp[0] = R1.w;
+    JMP_(stg_yield_to_interpreter);
   FE_
 }
 
@@ -405,7 +272,7 @@ STGFUN(stg_CAF_UNENTERED_entry)
     /* ToDo: implement directly in GHC */
     Sp -= 1;
     Sp[0] = R1.w;
-    JMP_(stg_yield_to_Hugs);
+    JMP_(stg_yield_to_interpreter);
     FE_
 }
 
@@ -656,18 +523,6 @@ STGFUN(stg_WHITEHOLE_entry)
 #endif
 
 /* -----------------------------------------------------------------------------
-   The code for a BCO returns to the scheduler
-   -------------------------------------------------------------------------- */
-INFO_TABLE(stg_BCO_info,stg_BCO_entry,3,0,BCO,,EF_,"BCO","BCO");
-STGFUN(stg_BCO_entry) {				
-  FB_	
-    Sp -= 1;
-    Sp[0] = R1.w;
-    JMP_(stg_yield_to_Hugs);
-  FE_								
-}
-
-/* -----------------------------------------------------------------------------
    Some static info tables for things that don't get entered, and
    therefore don't need entry code (i.e. boxed but unpointed objects)
    NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file
@@ -908,42 +763,6 @@ FN_(stg_forceIO_entry)
 SET_STATIC_HDR(stg_forceIO_closure,stg_forceIO_info,CCS_DONT_CARE,,EI_)
 , /*payload*/{} };
 
-
-/* -----------------------------------------------------------------------------
-   Standard Infotables (for use in interpreter)
-   -------------------------------------------------------------------------- */
-
-#ifdef INTERPRETER
-
-STGFUN(stg_Hugs_CONSTR_entry)
-{
-    /* R1 points at the constructor */
-    JMP_(ENTRY_CODE(((StgPtr*)Sp)[0]));
-}
-
-#define RET_BCO_ENTRY_TEMPLATE(label) 	\
-   IFN_(label)			        \
-   {                                    \
-      FB_				\
-      Sp -= 1;				\
-      ((StgPtr*)Sp)[0] = R1.p;		\
-      JMP_(stg_yield_to_Hugs);          \
-      FE_                               \
-   }
-
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_entry  );
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_0_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_1_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_2_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_3_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_4_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_5_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_6_entry);
-RET_BCO_ENTRY_TEMPLATE(stg_ret_bco_7_entry);
-
-VEC_POLY_INFO_TABLE(stg_ret_bco,0, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, RET_BCO,, EF_);
-
-#endif /* INTERPRETER */
 
 /* -----------------------------------------------------------------------------
    CHARLIKE and INTLIKE closures.  

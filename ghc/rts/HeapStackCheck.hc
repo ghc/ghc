@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.14 2000/03/31 03:09:36 hwloidl Exp $
+ * $Id: HeapStackCheck.hc,v 1.15 2000/12/14 15:19:48 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -105,9 +105,9 @@
   R1.i = ThreadYielding;		\
   JMP_(StgReturn);
 
-#define YIELD_TO_HUGS			  \
+#define YIELD_TO_INTERPRETER		  \
   SaveThreadState();			  \
-  CurrentTSO->what_next = ThreadEnterHugs; \
+  CurrentTSO->what_next = ThreadEnterInterp; \
   R1.i = ThreadYielding;		  \
   JMP_(StgReturn);
 
@@ -1177,11 +1177,11 @@ FN_(stg_yield_noregs)
   FE_
 }
 
-FN_(stg_yield_to_Hugs)
+FN_(stg_yield_to_interpreter)
 {
   FB_
   /* No need to save everything - no live registers */
-  YIELD_TO_HUGS
+  YIELD_TO_INTERPRETER
   FE_
 }
 

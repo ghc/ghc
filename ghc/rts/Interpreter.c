@@ -1,3 +1,5 @@
+
+
 #if 0
 /* -----------------------------------------------------------------------------
  * Bytecode evaluator
@@ -5,8 +7,8 @@
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.2 $
- * $Date: 2000/12/11 17:59:01 $
+ * $Revision: 1.3 $
+ * $Date: 2000/12/14 15:19:48 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -20,7 +22,6 @@
 #include "SchedAPI.h" /* for createGenThread */
 #include "Schedule.h" /* for context_switch  */
 #include "Bytecodes.h"
-#include "Assembler.h" /* for CFun stuff */
 #include "ForeignCall.h"
 #include "PrimOps.h"   /* for __{encode,decode}{Float,Double} */
 #include "Prelude.h"
@@ -44,6 +45,13 @@
 
 #endif /* 0 */
 
+#include <stdio.h>
+int /*StgThreadReturnCode*/ interpretBCO ( void* /* Capability* */ cap )
+{
+   fprintf(stderr, "Greetings, earthlings.  I am not yet implemented.  Bye!\n");
+   exit(1);
+}
+
 #if 0
 /* --------------------------------------------------------------------------
  * The new bytecode interpreter
@@ -56,7 +64,7 @@
 #define BCO_PTR(n)    bco_ptrs[n]
 
 
-StgThreadReturnCode enter ( Capability* cap )
+StgThreadReturnCode interpretBCO ( Capability* cap )
 {
    /* On entry, the closure to interpret is on the top of the
       stack. */
@@ -156,20 +164,20 @@ StgThreadReturnCode enter ( Capability* cap )
               case bci_PUSH_AS: {
                  int o_bco  = BCO_NEXT;
                  int o_itbl = BCO_NEXT;
-                 StackWord(-1) = BCO_LITW(o_itbl);
+                 StackWord(-1) = BCO_LIT(o_itbl);
                  StackWord(-2) = BCO_PTR(o_bco);
                  Sp -= 2;
-                 goto nextInsn;
-              }
-              case bci_PUSH_LIT:{
-                 int o = BCO_NEXT;
-                 StackWord(-1) = BCO_LIT(o);
-                 Sp --;
                  goto nextInsn;
               }
               case bci_PUSH_TAG: {
                  W_ tag = (W_)(BCO_NEXT);
                  StackWord(-1) = tag;
+                 Sp --;
+                 goto nextInsn;
+              }
+              case bci_PUSH_LIT:{
+                 int o = BCO_NEXT;
+                 StackWord(-1) = BCO_LIT(o);
                  Sp --;
                  goto nextInsn;
               }

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.83 2000/12/04 12:31:21 simonmar Exp $
+ * $Id: Schedule.c,v 1.84 2000/12/14 15:19:48 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -267,7 +267,7 @@ rtsTime TimeOfLastYield;
 char *whatNext_strs[] = {
   "ThreadEnterGHC",
   "ThreadRunGHC",
-  "ThreadEnterHugs",
+  "ThreadEnterInterp",
   "ThreadKilled",
   "ThreadComplete"
 };
@@ -886,14 +886,11 @@ schedule( void )
     case ThreadRunGHC:
       ret = StgRun((StgFunPtr) stg_returnToStackTop, cap);
       break;
-    case ThreadEnterHugs:
-#ifdef INTERPRETER
+    case ThreadEnterInterp:
+#ifdef GHCI
       {
-         StgClosure* c;
-	 IF_DEBUG(scheduler,sched_belch("entering Hugs"));
-	 c = (StgClosure *)(cap->rCurrentTSO->sp[0]);
-	 cap->rCurrentTSO->sp += 1;
-	 ret = enter(cap,c);
+	 IF_DEBUG(scheduler,sched_belch("entering interpreter"));
+	 ret = interpretBCO(cap);
          break;
       }
 #else
@@ -986,7 +983,7 @@ schedule( void )
        * GC is finished.
        */
       IF_DEBUG(scheduler,
-               if (t->what_next == ThreadEnterHugs) {
+               if (t->what_next == ThreadEnterInterp) {
 		   /* ToDo: or maybe a timer expired when we were in Hugs?
 		    * or maybe someone hit ctrl-C
                     */

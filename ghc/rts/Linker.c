@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.4 2000/12/14 10:36:49 sewardj Exp $
+ * $Id: Linker.c,v 1.5 2000/12/14 15:19:48 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -192,7 +192,7 @@ static int ocResolve_PEi386     ( ObjectCode* oc );
       SymX(stable_ptr_table)			\
       SymX(shutdownHaskellAndExit)		\
       Sym(stg_enterStackTop)			\
-      Sym(stg_yield_to_Hugs)			\
+      Sym(stg_yield_to_interpreter)		\
       Sym(StgReturn)				\
       Sym(init_stack)				\
       SymX(blockAsyncExceptionszh_fast)		\
