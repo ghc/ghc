@@ -211,6 +211,7 @@ Here's the deal.  (We distinguish the two cases because source-code decls
 have (Just binds) in the tcdMeths field, whereas interface decls have Nothing.
 
 In *source-code* class declarations:
+
  - When parsing, every ClassOpSig gets a DefMeth with a suitable RdrName
    This is done by RdrHsSyn.mkClassOpSigDM
 

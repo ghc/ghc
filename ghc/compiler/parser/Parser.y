@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.117 2003/05/06 10:25:32 simonpj Exp $
+$Id: Parser.y,v 1.118 2003/05/19 15:10:40 simonpj Exp $
 
 Haskell grammar.
 
@@ -452,7 +452,7 @@ tycl_decl :: { RdrNameTyClDecl }
 		{ let 
 			(binds,sigs) = cvMonoBindsAndSigs $5 
 		  in
-	 	  mkClassDecl $3 $4 (map cvClassOpSig sigs) (Just binds) $1 }
+	 	  mkClassDecl $3 $4 sigs (Just binds) $1 }
 
 syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an infix
 						-- type synonym declaration. Oh well.

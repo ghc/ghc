@@ -83,8 +83,8 @@ cvt_top (Data ctxt tc tvs constrs derivs)
 
 cvt_top (Class ctxt cl tvs decs)
   = Left $ TyClD (mkClassDecl (cvt_context ctxt, tconName cl, cvt_tvs tvs)
-                              noFunDeps
-                              sigs (Just binds) loc0)
+                              noFunDeps sigs
+			      (Just binds) loc0)
   where
     (binds,sigs) = cvtBindsAndSigs decs
 

@@ -48,7 +48,7 @@ module RdrHsSyn (
 	extractHsTyRdrNames,  extractHsTyRdrTyVars, 
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
-	mkHsOpApp, mkClassDecl, mkClassOpSigDM, 
+	mkHsOpApp, mkClassDecl, 
 	mkHsNegApp, mkNPlusKPat, mkHsIntegral, mkHsFractional,
 	mkHsDo, mkHsSplice, mkSigDecls,
         mkTyData, mkPrefixCon, mkRecCon,
@@ -58,7 +58,6 @@ module RdrHsSyn (
 	cvBinds,
 	cvMonoBindsAndSigs,
 	cvTopDecls,
-	cvClassOpSig, 
 	findSplice, addImpDecls, emptyGroup, mkGroup,
 
 	-- Stuff to do with Foreign declarations
@@ -245,7 +244,9 @@ Similarly for mkConDecl, mkClassOpSig and default-method names.
 \begin{code}
 mkClassDecl (cxt, cname, tyvars) fds sigs mbinds loc
   = ClassDecl { tcdCtxt = cxt, tcdName = cname, tcdTyVars = tyvars,
-		tcdFDs = fds,  tcdSigs = sigs,  tcdMeths = mbinds,
+		tcdFDs = fds,  
+		tcdSigs = map cvClassOpSig sigs,  	-- Convert to class-op sigs
+		tcdMeths = mbinds,
 		tcdLoc = loc }
 
 mkTyData new_or_data (context, tname, tyvars) data_cons maybe src
@@ -253,10 +254,13 @@ mkTyData new_or_data (context, tname, tyvars) data_cons maybe src
 	     tcdTyVars = tyvars,  tcdCons = data_cons, 
 	     tcdDerivs = maybe,   tcdLoc = src, tcdGeneric = Nothing }
 
-mkClassOpSigDM op ty loc
-  = ClassOpSig op (DefMeth dm_rn) ty loc
+cvClassOpSig :: RdrNameSig -> RdrNameSig
+cvClassOpSig (Sig var poly_ty src_loc) 
+  = ClassOpSig var (DefMeth dm_rn) poly_ty src_loc
   where
-    dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
+    dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc var))
+cvClassOpSig sig 
+  = sig
 \end{code}
 
 \begin{code}
@@ -321,22 +325,6 @@ data RdrMatch
 	     (Maybe RdrNameHsType)
 	     RdrNameGRHSs
 \end{code}
-
-%************************************************************************
-%*									*
-\subsection[cvDecls]{Convert various top-level declarations}
-%*									*
-%************************************************************************
-
-We make a point not to throw any user-pragma ``sigs'' at
-these conversion functions:
-
-\begin{code}
-cvClassOpSig :: RdrNameSig -> RdrNameSig
-cvClassOpSig (Sig var poly_ty src_loc) = mkClassOpSigDM var poly_ty src_loc
-cvClassOpSig sig 		       = sig
-\end{code}
-
 
 %************************************************************************
 %*									*
