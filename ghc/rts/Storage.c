@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.10 1999/02/05 14:45:43 simonm Exp $
+ * $Id: Storage.c,v 1.11 1999/02/05 14:48:01 simonm Exp $
  *
  * Storage manager front end
  *
@@ -71,7 +71,7 @@ initStorage (void)
     gen->mut_once_list = END_MUT_LIST;
     gen->collections = 0;
     gen->failed_promotions = 0;
-    gen->max_blocks = RtsFlags.GcFlags.minOldGenSize;
+    gen->max_blocks = 0;
   }
 
   /* A couple of convenience pointers */
