@@ -85,9 +85,13 @@ void freeHashTable PROTO((HashTable *table, void (*freeDataFun) PROTO((void *dat
 HashTable *allocHashTable(STG_NO_ARGS);
 void *removeHashTable PROTO((HashTable *table, StgWord key, void *data));
 
+/*
+  Redefining exit is more trouble than its worth, IMO -- SOF 
+*/
 extern void myexit PROTO((I_));
 #  define EXIT myexit
-#  define exit : error : Wrong exit!
+/* #  define exit : error : Wrong exit! */
+
 # else
 #  define EXIT exit
 # endif
