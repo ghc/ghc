@@ -38,7 +38,7 @@ module TcType (
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcSplitSigmaTy,
-  tcSplitMethodTy, tcGetTyVar_maybe, tcGetTyVar,
+  tcGetTyVar_maybe, tcGetTyVar,
 
   ---------------------------------
   -- Predicates. 
@@ -480,24 +480,6 @@ tcGetTyVar msg ty = expectJust msg (tcGetTyVar_maybe ty)
 
 tcIsTyVarTy :: Type -> Bool
 tcIsTyVarTy ty = maybeToBool (tcGetTyVar_maybe ty)
-\end{code}
-
-The type of a method for class C is always of the form:
-	Forall a1..an. C a1..an => sig_ty
-where sig_ty is the type given by the method's signature, and thus in general
-is a ForallTy.  At the point that splitMethodTy is called, it is expected
-that the outer Forall has already been stripped off.  splitMethodTy then
-returns (C a1..an, sig_ty') where sig_ty' is sig_ty with any Notes stripped off.
-
-\begin{code}
-tcSplitMethodTy :: Type -> (PredType, Type)
-tcSplitMethodTy ty = split ty
- where
-  split (FunTy arg res) = case tcSplitPredTy_maybe arg of
-			    Just p  -> (p, res)
-			    Nothing -> panic "splitMethodTy"
-  split (NoteTy n ty)	= split ty
-  split _               = panic "splitMethodTy"
 
 tcSplitDFunTy :: Type -> ([TyVar], [PredType], Class, [Type])
 -- Split the type of a dictionary function
