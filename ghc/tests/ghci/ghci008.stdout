@@ -1,0 +1,66 @@
+   ___         ___ _
+  / _ \ /\  /\/ __(_)
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.01, for Haskell 98.
+/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
+\____/\/ /_/\____/|_|      Type :? for help.
+
+Loading package std ... linking ... done.
+Prelude> -- testing :info
+Prelude> :info +
+-- + is a method in class Num
+infixl 6 +
+(+) :: forall a. (Num a) => a -> a -> a
+Prelude> :info (+)
+-- + is a method in class Num
+infixl 6 +
+(+) :: forall a. (Num a) => a -> a -> a
+Prelude> :info Complex.:+
+-- Complex.:+ is a data constructor
+infix 6 Complex.:+
+(Complex.:+) :: forall a. (RealFloat a) =>
+		a -> a -> Complex.Complex a
+Prelude> :info (Complex.:+)
+-- Complex.:+ is a data constructor
+infix 6 Complex.:+
+(Complex.:+) :: forall a. (RealFloat a) =>
+		a -> a -> Complex.Complex a
+Prelude> :info RealFloat
+-- RealFloat is a class
+class (RealFrac a, Floating a) => RealFloat a where {
+    floatRadix :: a -> Integer;
+    floatDigits :: a -> Int;
+    floatRange :: a -> (Int, Int);
+    decodeFloat :: a -> (Integer, Int);
+    encodeFloat :: Integer -> Int -> a;
+    exponent :: a -> Int {- has default method -};
+    significand :: a -> a {- has default method -};
+    scaleFloat :: Int -> a -> a {- has default method -};
+    isInfinite :: a -> Bool;
+    isDenormalized :: a -> Bool;
+    isNegativeZero :: a -> Bool;
+    isIEEE :: a -> Bool;
+    isNaN :: a -> Bool;
+    atan2 :: a -> a -> a {- has default method -};
+    }
+Prelude> :info []
+-- [] is a data constructor
+[] :: forall t_12. [t_12]
+
+-- [] is a type constructor
+data [] t_12 = [] | : t_12 [t_12]
+Prelude> :info ()
+-- () is a data constructor
+() :: ()
+
+-- () is a type constructor
+data () = ()
+Prelude> :info (,)
+-- (,) is a data constructor
+(,) :: forall t_12 t_13. t_12 -> t_13 -> (t_12, t_13)
+
+-- (,) is a type constructor
+data (,) t_12 t_13 = (,) t_12 t_13
+Prelude> :info `List.isPrefixOf`
+-- List.isPrefixOf is a variable
+List.isPrefixOf :: forall a. (Eq a) => [a] -> [a] -> Bool
+Prelude> Leaving GHCi.
