@@ -37,7 +37,12 @@ typedef void (*CompletionProc)(unsigned int requestID,
 			       void* buf,
 			       int   errCode);
 
-typedef void (*DoProcProc)(void *param);
+/* 
+ * Asynchronous procedure calls executed by a worker thread
+ * take a generic state argument pointer and return an int by 
+ * default. 
+ */
+typedef int (*DoProcProc)(void *param);
 
 typedef union workData {
     struct {

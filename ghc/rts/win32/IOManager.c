@@ -120,8 +120,7 @@ IOWorkerProc(PVOID param)
 		/* The procedure is assumed to encode result + success/failure
 		 * via its param.
 		 */
-		work->workData.procData.proc(work->workData.procData.param);
-		errCode=0;
+		errCode=work->workData.procData.proc(work->workData.procData.param);
 	    } else {
 		errCode=1;
 	    }
@@ -234,9 +233,11 @@ AddIORequest ( int   fd,
 #endif
   if ( ioMan->workersIdle == 0 ) {
     ioMan->numWorkers++;
+    LeaveCriticalSection(&ioMan->manLock);
     NewIOWorkerThread(ioMan);
+  } else {
+      LeaveCriticalSection(&ioMan->manLock);
   }
-  LeaveCriticalSection(&ioMan->manLock);
   
   if (SubmitWork(ioMan->workQueue,wItem)) {
     return wItem->requestID;
@@ -263,11 +264,16 @@ AddDelayRequest ( unsigned int   msecs,
   wItem->requestID    = ioMan->requestID++;
 
   EnterCriticalSection(&ioMan->manLock);
+#if 0
+  fprintf(stderr, "AddDelayRequest: %d\n", ioMan->workersIdle); fflush(stderr);
+#endif
   if ( ioMan->workersIdle == 0 ) {
     ioMan->numWorkers++;
+    LeaveCriticalSection(&ioMan->manLock);
     NewIOWorkerThread(ioMan);
+  } else {
+      LeaveCriticalSection(&ioMan->manLock);
   }
-  LeaveCriticalSection(&ioMan->manLock);
   
   if (SubmitWork(ioMan->workQueue,wItem)) {
     return wItem->requestID;
@@ -296,11 +302,16 @@ AddProcRequest ( void* proc,
   wItem->requestID    = ioMan->requestID++;
 
   EnterCriticalSection(&ioMan->manLock);
+#if 0
+  fprintf(stderr, "AddProcRequest: %d\n", ioMan->workersIdle); fflush(stderr);
+#endif
   if ( ioMan->workersIdle == 0 ) {
     ioMan->numWorkers++;
+    LeaveCriticalSection(&ioMan->manLock);
     NewIOWorkerThread(ioMan);
+  } else {
+      LeaveCriticalSection(&ioMan->manLock);
   }
-  LeaveCriticalSection(&ioMan->manLock);
   
   if (SubmitWork(ioMan->workQueue,wItem)) {
     return wItem->requestID;

@@ -205,7 +205,7 @@ start:
 	     */
 	    tso->block_info.async_result->len = completedTable[i].len;
 	    tso->block_info.async_result->errCode = completedTable[i].errCode;
-	      
+
 	    /* Drop the matched TSO from blocked_queue */
 	    if (prev) {
 	      prev->link = tso->link;
