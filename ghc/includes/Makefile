@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 2000/08/07 16:07:53 rrt Exp $
+# $Id: Makefile,v 1.14 2000/12/08 11:47:00 rrt Exp $
 #
 
 TOP = ..
@@ -27,7 +27,7 @@ gmp.h : $(FPTOOLS_TOP)/ghc/rts/gmp/gmp.h
 # and puts it in fptools/mk/config.h. We copy it down to here, prepending
 # some make variables specifying cpp platform variables.
 #
-$(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h
+$(H_CONFIG) : $(FPTOOLS_TOP)/mk/config.h $(FPTOOLS_TOP)/mk/config.mk
 
 $(H_CONFIG) :
 	@echo "Creating $@..."
