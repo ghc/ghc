@@ -13,7 +13,6 @@ ghc_ge_504 = $(shell if (test $(GhcCanonVersion) -ge 504); then echo YES; else e
 
 SRC_HC_OPTS += -cpp -Wall -fno-warn-name-shadowing -fno-warn-unused-matches
 
-SRC_HC_OPTS += -I$(FPTOOLS_TOP)/libraries
 SRC_HC_OPTS += -i$(GHC_LIB_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_LIB_COMPAT_DIR) -lghccompat
 
@@ -37,6 +36,17 @@ else
 HS_PROG           = ghc-pkg.bin
 INSTALL_LIBEXECS += $(HS_PROG)
 endif
+
+# This is horrible.  We ought to be able to omit the entire directory
+# from mkDependHS.
+SRC_MKDEPENDHS_OPTS += \
+	-optdep--exclude-module=Compat.Directory \
+	-optdep--exclude-module=Distribution.Compat.ReadP \
+	-optdep--exclude-module=Distribution.Package \
+	-optdep--exclude-module=Distribution.InstalledPackageInfo \
+	-optdep--exclude-module=Distribution.Package \
+	-optdep--exclude-module=Distribution.License \
+	-optdep--exclude-module=Distribution.Version
 
 # -----------------------------------------------------------------------------=
 # Create the Version.hs file
