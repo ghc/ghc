@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.c,v 1.4 2000/03/24 15:19:29 sewardj Exp $
+ * $Id: Prelude.c,v 1.5 2000/04/03 17:27:10 sewardj Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -12,12 +12,12 @@
 #include "Prelude.h"
 
 #if defined(INTERPRETER)
-const StgClosure *ind_True_static_closure;
-const StgClosure *ind_False_static_closure;
+const StgClosure *ind_True_closure;
+const StgClosure *ind_False_closure;
 const StgClosure *ind_unpackCString_closure;
 const StgClosure *ind_stackOverflow_closure;
 const StgClosure *ind_heapOverflow_closure;
-const StgClosure *ind_PutFullMVar_static_closure;
+const StgClosure *ind_PutFullMVar_closure;
 const StgClosure *ind_BlockedOnDeadMVar_closure;
 const StgClosure *ind_NonTermination_closure;
 const StgClosure *ind_mainIO_closure;
@@ -99,11 +99,11 @@ void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
   if (ask_hugs_dynamic_linker == NULL) {
 
     /* Hugs standalone mode. */
-    ind_True_static_closure        = NULL; /* True_static_closure; */
-    ind_False_static_closure       = NULL; /* False_static_closure; */
-    ind_PutFullMVar_static_closure = NULL; /* PutFullMVar_static_closure; */
-    ind_BlockedOnDeadMVar_closure  = NULL; /* BlockedOnDeadMVar_static_closure; */
-    ind_NonTermination_closure     = NULL; /* NonTermination_static_closure; */
+    ind_True_closure               = NULL; /* True__closure; */
+    ind_False_closure              = NULL; /* False_closure; */
+    ind_PutFullMVar_closure        = NULL; /* PutFullMVar_closure; */
+    ind_BlockedOnDeadMVar_closure  = NULL; /* BlockedOnDeadMVar_closure; */
+    ind_NonTermination_closure     = NULL; /* NonTermination_closure; */
     ind_unpackCString_closure      = NULL; /* unpackCString_closure; */
 
     ind_stackOverflow_closure = stackOverflow_closure;
@@ -131,12 +131,12 @@ void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
     /* Hugs combined mode. */
     void*(*ask)(char*) = ask_hugs_dynamic_linker;
 
-    ind_True_static_closure           
-       = ask("PrelBase_True_static_closure");
-    ind_False_static_closure          
-       = ask("PrelBase_False_static_closure");
-    ind_PutFullMVar_static_closure    
-       = ask("PrelException_PutFullMVar_static_closure");
+    ind_True_closure           
+       = ask("PrelBase_True_closure");
+    ind_False_closure          
+       = ask("PrelBase_False_closure");
+    ind_PutFullMVar_closure    
+       = ask("PrelException_PutFullMVar_closure");
     ind_BlockedOnDeadMVar_closure    
        = ask("PrelException_BlockedOnDeadMVar_closure");
     ind_NonTermination_closure 

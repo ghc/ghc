@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.29 2000/03/31 04:13:27 andy Exp $                      #
+# $Id: Makefile,v 1.30 2000/04/03 17:27:10 sewardj Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -53,7 +53,7 @@ all :: parser.c $(GHC_LIBS_NEEDED) nHandle$(DYN_EXT) hugs
 ### EXTREMELY hacky
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o   \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
-      ../rts/StgCRun.o ../rts/PrimOps.o ../rts/libHSrts.a
+      ../rts/StgCRun.o ../rts/PrimOps.o ../rts/Prelude.o ../rts/libHSrts.a
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
 		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) \
 		 $(LIB_GMP) -lm

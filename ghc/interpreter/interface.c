@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.42 $
- * $Date: 2000/03/23 14:54:21 $
+ * $Revision: 1.43 $
+ * $Date: 2000/04/03 17:27:10 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2653,6 +2653,7 @@ Type type; {
       SymX(timezone)                 \
       SymX(mktime)                   \
       SymX(gmtime)                   \
+      Sym(setitimer)                 \
 
 
 

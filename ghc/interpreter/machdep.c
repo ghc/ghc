@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/24 14:51:50 $
+ * $Revision: 1.25 $
+ * $Date: 2000/04/03 17:27:10 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -714,6 +714,7 @@ Bool findFilesForModule (
       strcpy(searchBuf+nPath, ".u_hi");
       if (readable(searchBuf)) {
          *iAvail = TRUE;
+         *sExt = ".u_hi";
          getFileInfo(searchBuf, iTime, iSize);
       }
 
