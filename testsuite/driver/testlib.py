@@ -655,7 +655,7 @@ def split_file(in_fn, delimiter, out1_fn, out2_fn):
 
     line = infile.readline()
     line = re.sub('\r', '', line) # ignore Windows EOL
-    while (line != delimiter and line != ''):
+    while (re.sub('^\s*','',line) != delimiter and line != ''):
         out1.write(line)
         line = infile.readline()
 
@@ -774,6 +774,7 @@ def check_stdout_ok( name ):
    # On Windows, remove '\r' characters from the output
    if config.platform == 'i386-unknown-mingw32':
        actual_stdout = re.sub('\r', '', actual_stdout)
+       expected_stdout = re.sub('\r', '', expected_stdout)
 
    if actual_stdout != expected_stdout:
        return outputs_differ( 'stdout', expected_stdout_file, actual_stdout_file )
@@ -799,6 +800,7 @@ def check_stderr_ok( name ):
    # On Windows, remove '\r' characters from the output
    if config.platform == 'i386-unknown-mingw32':
        actual_stderr = re.sub('\r', '', actual_stderr)
+       expected_stderr = re.sub('\r', '', expected_stderr)
 
    if actual_stderr != expected_stderr:
        return outputs_differ( 'stderr', expected_stderr_file, actual_stderr_file )
