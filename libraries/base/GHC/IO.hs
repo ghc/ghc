@@ -98,7 +98,9 @@ hGetChar handle =
 	new_buf <- fillReadBuffer fd True (haIsStream handle_) buf
 	hGetcBuffered fd ref new_buf
     BlockBuffering _ -> do
-	new_buf <- fillReadBuffer fd False (haIsStream handle_) buf
+	new_buf <- fillReadBuffer fd True (haIsStream handle_) buf
+		--		     ^^^^
+		-- don't wait for a completely full buffer.
 	hGetcBuffered fd ref new_buf
     NoBuffering -> do
 	-- make use of the minimal buffer we already have
