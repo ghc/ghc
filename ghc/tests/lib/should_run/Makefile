@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.15 1999/12/08 14:14:32 simonmar Exp $
+# $Id: Makefile,v 1.16 2000/01/18 12:48:13 simonmar Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -7,7 +7,7 @@ include $(TOP)/mk/should_run.mk
 
 SRC_HC_OPTS += -dcore-lint
 
-packedstring001_HC_OPTS = -syslib misc
+packedstring001_HC_OPTS = -syslib lang
 
 exceptions001_HC_OPTS   = -fglasgow-exts -fno-warn-missing-methods
 stableptr002_HC_OPTS    = -fglasgow-exts
@@ -30,15 +30,15 @@ addr001_HC_OPTS = -fglasgow-exts
 ioexts001_HC_OPTS 	= -fglasgow-exts -O
 ioexts001_RUNTEST_OPTS  = +RTS -K8m
 
-memo001_HC_OPTS		= -syslib misc
+memo001_HC_OPTS		= -syslib lang
 # stress the garbage collector a bit, to make sure weak pointers are being
 # finalized properly, and stable names are GC'd etc.
 memo001_RUNTEST_OPTS    = +RTS -A10k -G1
 
-memo002_HC_OPTS		= -syslib misc
+memo002_HC_OPTS		= -syslib lang
 memo002_RUNTEST_OPTS	= 20
 
-SRC_MKDEPENDHS_OPTS += -syslib misc -syslib exts 
+SRC_MKDEPENDHS_OPTS += -syslib lang
 
 include $(TOP)/mk/target.mk
 
