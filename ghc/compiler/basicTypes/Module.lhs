@@ -136,7 +136,7 @@ data PackageInfo
 type PackageName = FastString		-- No encoding at all
 
 preludePackage :: PackageName
-preludePackage = FSLIT("std")
+preludePackage = FSLIT("base")
 
 packageInfoPackage :: PackageInfo -> PackageName
 packageInfoPackage ThisPackage        = opt_InPackage
