@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.100 2001/10/23 22:20:33 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.101 2001/10/31 12:51:08 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -138,15 +138,6 @@ interactiveUI cmstate paths cmdline_libs = do
    initLinker
    linkPackages cmdline_libs pkgs
 
-   (cmstate, ok, mods) <-
-   	case paths of
-	     [] -> return (cmstate, True, [])
-	     _  -> cmLoadModule cmstate paths
-
-#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
-   Readline.initialize
-#endif
-
    dflags <- getDynFlags
 
    (cmstate, maybe_hval) 
@@ -167,11 +158,16 @@ interactiveUI cmstate paths cmdline_libs = do
 	Just hval -> writeIORef flush_stdout (unsafeCoerce# hval :: IO ())
 	_ -> panic "interactiveUI:stdout"
 
-   startGHCi runGHCi GHCiState{ progname = "<interactive>",
-				args = [],
-				targets = paths,
-			        cmstate = cmstate,
-			        options = [] }
+#if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
+   Readline.initialize
+#endif
+
+   startGHCi (runGHCi paths) 
+	GHCiState{ progname = "<interactive>",
+		   args = [],
+		   targets = paths,
+		   cmstate = cmstate,
+		   options = [] }
 
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
    Readline.resetTerminal Nothing
@@ -180,8 +176,8 @@ interactiveUI cmstate paths cmdline_libs = do
    return ()
 
 
-runGHCi :: GHCi ()
-runGHCi = do
+runGHCi :: [FilePath] -> GHCi ()
+runGHCi paths = do
   read_dot_files <- io (readIORef v_Read_DotGHCi)
 
   when (read_dot_files) $ do
@@ -213,6 +209,12 @@ runGHCi = do
   		  Left e    -> return ()
   		  Right hdl -> fileLoop hdl False
 
+  -- perform a :load for files given on the GHCi command line
+  when (not (null paths)) $
+     ghciHandle showException $
+	loadModule (unwords paths)
+
+  -- enter the interactive loop
   interactiveLoop
 
   -- and finally, exit
@@ -223,6 +225,7 @@ interactiveLoop = do
   -- ignore ^C exceptions caught here
   ghciHandleDyn (\e -> case e of Interrupted -> ghciUnblock interactiveLoop
 			         _other      -> return ()) $ do
+
   -- read commands from stdin
 #if HAVE_READLINE_HEADERS && HAVE_READLINE_LIBS
   readlineLoop
