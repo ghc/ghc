@@ -103,9 +103,9 @@ Testing Enum ():
     (toEnum 1)::() = error "Prelude.Enum.().toEnum: bad argument"
     (fromEnum ()) = 0
     (take 7 [()..]) = [()]
-    (take 7 [(),()..]) = [()]
+    (take 7 [(),()..]) = [(),(),(),(),(),(),()]
     (take 7 [()..()]) = [()]
-    (take 7 [(),()..()]) = [()]
+    (take 7 [(),()..()]) = [(),(),(),(),(),(),()]
 Testing Enum Ordering (derived): 
     (succ LT) = EQ
     (succ (minBound::Ordering)) = EQ
