@@ -581,6 +581,41 @@ ghc --make Main.hs
       </varlistentry>
 
       <varlistentry>
+	<term><option>-ohi</option>  <replaceable>file</replaceable></term>
+	<indexterm><primary><option>-ohi</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>The interface output may be directed to another file
+          <filename>bar2/Wurble.iface</filename> with the option
+          <option>-ohi bar2/Wurble.iface</option> (not
+          recommended).</para>
+
+	  <para>WARNING: if you redirect the interface file somewhere
+	  that GHC can't find it, then the recompilation checker may
+	  get confused (at the least, you won't get any recompilation
+	  avoidance).  We recommend using a combination of
+	  <option>-hidir</option> and <option>-hisuf</option> options
+	  instead, if possible.</para>
+
+	  <para>To avoid generating an interface at all, you could use
+          this option to redirect the interface into the bit bucket:
+          <literal>-ohi /dev/null</literal>, for example.</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term><option>-hidir</option>  <replaceable>directory</replaceable></term>
+	<indexterm><primary><option>-hidir</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>Redirects all generated interface files into
+	  <replaceable>directory</replaceable>, instead of the default
+	  which is to place the interface file in the same directory
+	  as the source file.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-osuf</option> <replaceable>suffix</replaceable></term>
 	<term><option>-hisuf</option> <replaceable>suffix</replaceable></term>
 	<term><option>-hcsuf</option> <replaceable>suffix</replaceable></term>

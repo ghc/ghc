@@ -125,6 +125,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-hidir</option> <replaceable>dir</replaceable></entry>
+	      <entry>set directory for interface files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-hisuf</option> <replaceable>suffix</replaceable></entry>
 	      <entry>set the suffix to use for interface files</entry>
 	      <entry>static</entry>
@@ -275,12 +281,6 @@
 	    </row>
 	  </thead>
 	  <tbody>
-	    <row>
-	      <entry><option>-ohi</option> <replaceable>file</replaceable></entry>
-	      <entry>Put the interface file in <replaceable>file</replaceable></entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
 	    <row>
 	      <entry><option>-ddump-hi</option></entry>
 	      <entry>Dump the new interface to stdout</entry>

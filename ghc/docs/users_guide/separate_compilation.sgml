@@ -123,19 +123,6 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><option>-ohi</option>  <replaceable>file</replaceable></term>
-	  <indexterm><primary><option>-ohi</option></primary>
-	  </indexterm>
-	  <listitem>
-	    <para>The interface output may be directed to another file
-            <filename>bar2/Wurble.iface</filename> with the option
-            <option>-ohi bar2/Wurble.iface</option> (not recommended).
-            To avoid generating an interface at all, you can say
-            <literal>-ohi /dev/null</literal>, for example.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
 	  <term><option>-ddump-hi</option></term>
 	  <indexterm><primary><option>-ddump-hi</option></primary>
 	  </indexterm>
