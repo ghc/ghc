@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.61 2001/07/03 16:45:15 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.62 2001/07/24 04:46:37 ken Exp $
 --
 -- Driver flags
 --
@@ -472,7 +472,7 @@ buildStaticHscOpts = do
 
 machdepCCOpts 
    | prefixMatch "alpha"   cTARGETPLATFORM  
-	= return ( ["-static"], [] )
+	= return ( ["-static", "-Xlinker -noprefix_recognition"], [] )
 
    | prefixMatch "hppa"    cTARGETPLATFORM  
         -- ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
