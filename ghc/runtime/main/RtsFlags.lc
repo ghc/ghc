@@ -92,7 +92,7 @@ initRtsFlagsDefaults (STG_NO_ARGS)
     RTSflags.ConcFlags.maxLocalSparks	= 65536;
 #endif /* CONCURRENT only */
 
-#if GRAN
+#ifdef GRAN
     RTSflags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
     RTSflags.ConcFlags.maxThreads	= 32;
     RTSflags.ConcFlags.stkChunkSize	= 1024;
@@ -1082,10 +1082,10 @@ process_gran_option(int arg, int *rts_argc, char *rts_argv[], rtsBool *error)
 	  RTSflags.GranFlags.DoReScheduleOnFetch = rtsTrue;
 	  if (rts_argv[arg][3] != '\0')
 	    RTSflags.GranFlags.FetchStrategy = decode(rts_argv[arg]+3);
+	  else
+	    RTSflags.GranFlags.FetchStrategy = 2;
 	  if (RTSflags.GranFlags.FetchStrategy == 0)
 	    RTSflags.GranFlags.DoReScheduleOnFetch = rtsFalse;
-	  else
-	    RTSflags.GranFlags.FetchStrategy = 2; /* default: fetch everything */
 	  break;
 	  
         case 'K':   /* sort overhead (per elem in spark list) */
@@ -1130,7 +1130,7 @@ allowed\n",
 	  if (rts_argv[arg][3] != '\0')
 	    RTSflags.GranFlags.max_fishes = decode(rts_argv[arg]+3);
 	  else
-	    RTSflags.GranFlags.max_fishes = 1;
+	    RTSflags.GranFlags.max_fishes = MAX_FISHES;
 	  break;
 	  
         case 'w':
