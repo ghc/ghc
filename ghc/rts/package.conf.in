@@ -3,7 +3,7 @@
 #include "ghcconfig.h"
 #include "RtsConfig.h"
 
-name:		rts
+name:		PACKAGE
 version:	1.0
 license:	BSD3
 maintainer:	glasgow-haskell-users@haskell.org
@@ -15,15 +15,15 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		"$libdir"
+library-dirs:		LIB_DIR
 # ifdef mingw32_TARGET_OS
-			, "$libdir/gcc-lib"
+			, LIB_DIR"/gcc-lib"
 			/* force the dist-provided gcc-lib/ into scope. */
 # endif
 #else /* !INSTALLING */
-library-dirs:		"$libdir/ghc/rts"
+library-dirs:		FPTOOLS_TOP_ABS"/ghc/rts"
 # ifndef HAVE_LIBGMP
-			, "$libdir/ghc/rts/gmp"
+			, FPTOOLS_TOP_ABS"/ghc/rts/gmp"
 # endif
 #endif
 
@@ -52,12 +52,12 @@ extra-libs:		"m"		/* for ldexp() */
 #endif
 
 #ifdef INSTALLING
-include-dirs:		"$libdir/include"
+include-dirs:		INCLUDE_DIR
 # ifdef mingw32_TARGET_OS
-			, "$libdir/include/mingw"
+			, INCLUDE_DIR"/mingw"
 # endif
 #else /* !INSTALLING */
-include-dirs:		"$libdir/ghc/includes"
+include-dirs:		FPTOOLS_TOP_ABS"/ghc/includes"
 #endif
 
 includes:		Stg.h
