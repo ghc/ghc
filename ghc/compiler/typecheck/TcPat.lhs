@@ -34,7 +34,6 @@ import Id		( GenId, idType, SYN_IE(Id) )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import Maybes		( maybeToBool )
 import PprType		( GenType, GenTyVar )
---import PprStyle--ToDo:rm
 import Pretty
 import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
 			  getFunTy_maybe, maybeAppDataTyCon,
