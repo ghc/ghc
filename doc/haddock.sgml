@@ -10,12 +10,12 @@
     </author>
     <address><email>simonmar@microsoft.com</email></address>
     <copyright>
-      <year>2002</year>
+      <year>2004</year>
       <holder>Simon Marlow</holder>
     </copyright>
     <abstract>
-      <para>This document describes Haddock, a Haskell documentation
-      tool.</para>
+      <para>This document describes Haddock version 0.6, a Haskell
+      documentation tool.</para>
     </abstract>
   </bookinfo>
 
