@@ -57,6 +57,7 @@ magnitude (x:+y) =  scaleFloat k
 		    where k  = max (exponent x) (exponent y)
 		          mk = - k
 
+phase (0 :+ 0)   = 0		-- SLPJ July 97 from John Peterson
 phase (x:+y)	 =  atan2 y x
 \end{code}
 
