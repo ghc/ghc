@@ -27,7 +27,7 @@ import TcSimplify	( tcSimplifyTop )
 import TcType		( TcType, openTypeKind, mkAppTy )
 import TcEnv		( spliceOK, tcMetaTy )
 import TcRnTypes	( TopEnv(..) )
-import TcMType		( newTyVarTy )
+import TcMType		( newTyVarTy, zapToType )
 import Name		( Name )
 import TcRnMonad
 
@@ -99,11 +99,12 @@ tcSpliceExpr name expr res_ty
 	Brack _ ps_var lie_var ->  
 
 	-- A splice inside brackets
-  	-- NB: ignore res_ty
+  	-- NB: ignore res_ty, apart from zapping it to a mono-type
 	-- e.g.   [| reverse $(h 4) |]
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
+    zapToType res_ty				`thenM_`
     tcMetaTy exprTyConName			`thenM` \ meta_exp_ty ->
     setStage (Splice next_level) (
 	setLIEVar lie_var	   $
