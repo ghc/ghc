@@ -150,6 +150,9 @@ grow preds fixed_tvs
 ----------
 type Equation = (TyVarSet, Type, Type)	-- These two types should be equal, for some
 					-- substitution of the tyvars in the tyvar set
+	-- To "execute" the equation, make fresh type variable for each tyvar in the set,
+	-- instantiate the two types with these fresh variables, and then unify.
+	--
 	-- For example, ({a,b}, (a,Int,b), (Int,z,Bool))
 	-- We unify z with Int, but since a and b are quantified we do nothing to them
 	-- We usually act on an equation by instantiating the quantified type varaibles
@@ -280,6 +283,7 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 -- to make the types match.  For example, given
 --	class C a b | a->b where ...
 --	instance C (Maybe x) (Tree x) where ..
+--
 -- and an Inst of form (C (Maybe t1) t2), 
 -- then we will call checkClsFD with
 --
@@ -287,7 +291,7 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 --		    tys2 = [Maybe t1, t2]
 --
 -- We can instantiate x to t1, and then we want to force
--- 	Tree x [t1/x]  :=:   t2
+-- 	(Tree x) [t1/x]  :=:   t2
 
 -- We use 'unify' even though we are often only matching
 -- unifyTyListsX will only bind variables in qtvs, so it's OK!
@@ -311,6 +315,12 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 		    qtvs' = filterVarSet (\v -> not (v `elemSubstEnv` unif)) qtvs
 			-- qtvs' are the quantified type variables
 			-- that have not been substituted out
+			--	
+			-- Eg. 	class C a b | a -> b
+			--	instance C Int [y]
+			-- Given constraint C Int z
+			-- we generate the equation
+			--	({y}, [y], z)
   where
     (ls1, rs1) = instFD fd clas_tvs tys1
     (ls2, rs2) = instFD fd clas_tvs tys2
