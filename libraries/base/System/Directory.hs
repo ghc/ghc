@@ -33,9 +33,10 @@ module System.Directory
     -- * Actions on files
     , removeFile		-- :: FilePath -> IO ()
     , renameFile                -- :: FilePath -> FilePath -> IO ()
-#ifdef __GLASGOW_HASKELL__
     , copyFile                  -- :: FilePath -> FilePath -> IO ()
-#endif
+    
+    , canonicalizePath
+    , findExecutable
 
     -- * Existence tests
     , doesFileExist		-- :: FilePath -> IO Bool
@@ -63,12 +64,10 @@ module System.Directory
 
 #ifdef __NHC__
 import Directory
-import System (getEnv)
 #endif /* __NHC__ */
 
 #ifdef __HUGS__
 import Hugs.Directory
-import System.Environment (getEnv)
 #endif /* __HUGS__ */
 
 #ifdef __GLASGOW_HASKELL__
@@ -81,14 +80,12 @@ import System.Posix.Internals
 import System.Time             ( ClockTime(..) )
 import System.IO
 import System.IO.Error
+import System.FilePath
+import System.Environment (getEnv)
 import Foreign
 import Foreign.C
 
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
-
-#ifndef mingw32_TARGET_OS
-import System.Environment
-#endif
 
 {- $intro
 A directory contains a series of entries, each of which is a named
@@ -450,10 +447,17 @@ Neither path may refer to an existing directory.
 -}
 copyFile :: FilePath -> FilePath -> IO ()
 copyFile fromFPath toFPath =
+#if (!(defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ > 600))
+	do readFile fromFPath >>= writeFile toFPath
+	   try (getPermissions fromFPath >>= setPermissions toFPath)
+	   return ()
+#else
 	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
 	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
-	 allocaBytes bufferSize $ \buffer ->
-		copyContents hFrom hTo buffer) `catch` (ioError . changeFunName)
+	 allocaBytes bufferSize $ \buffer -> do
+		copyContents hFrom hTo buffer
+		try (getPermissions fromFPath >>= setPermissions toFPath)
+		return ()) `catch` (ioError . changeFunName)
 	where
 		bufferSize = 1024
 		
@@ -464,6 +468,64 @@ copyFile fromFPath toFPath =
 			when (count > 0) $ do
 				hPutBuf hTo buffer count
 				copyContents hFrom hTo buffer
+#endif
+
+-- | Given path referring to a file or directory, returns a
+-- canonicalized path, with the intent that two paths referring
+-- to the same file\/directory will map to the same canonicalized
+-- path. Note that it is impossible to guarantee that the
+-- implication (same file\/dir <=> same canonicalizedPath) holds
+-- in either direction: this function can make only a best-effort
+-- attempt.
+canonicalizePath :: FilePath -> IO FilePath
+canonicalizePath fpath =
+  withCString fpath $ \pInPath ->
+  allocaBytes long_path_size $ \pOutPath ->
+#if defined(mingw32_TARGET_OS)
+  alloca $ \ppFilePart ->
+    do c_GetFullPathName pInPath (fromIntegral long_path_size) pOutPath ppFilePart
+#else
+    do c_realpath pInPath pOutPath
+#endif
+       peekCString pOutPath
+
+#if defined(mingw32_TARGET_OS)
+foreign import stdcall unsafe "GetFullPathName"
+            c_GetFullPathName :: CString
+                              -> CInt
+                              -> CString
+                              -> Ptr CString
+                              -> IO CInt
+#else
+foreign import ccall unsafe "realpath"
+                   c_realpath :: CString
+                              -> CString
+                              -> IO CString
+#endif
+
+-- | Given an executable file name, searches for such file
+-- in the directories listed in system PATH. The returned value 
+-- is the path to the found executable or Nothing if there isn't
+-- such executable. For example (findExecutable \"ghc\")
+-- gives you the path to GHC.
+findExecutable :: String -> IO (Maybe FilePath)
+findExecutable binary = do
+  path <- getEnv "PATH"
+  search (parseSearchPath path)
+  where
+#ifdef mingw32_TARGET_OS
+    fileName = binary `joinFileExt` "exe"
+#else
+    fileName = binary
+#endif
+
+    search :: [FilePath] -> IO (Maybe FilePath)
+    search [] = return Nothing
+    search (d:ds) = do
+	let path = d `joinFileName` fileName
+	b <- doesFileExist path
+	if b then return (Just path)
+             else search ds
 
 
 {- |@'getDirectoryContents' dir@ returns a list of /all/ entries
