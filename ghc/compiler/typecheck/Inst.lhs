@@ -377,13 +377,7 @@ instToIdBndr (Dict u clas ty orig loc)
   = mkUserLocal (mkDictOcc (getOccName clas)) u (mkDictTy clas ty) loc
 
 instToIdBndr (Method u id tys theta tau orig loc)
-  = mkUserLocal (getOccName id) u tau loc
-	-- We used to call mkMethodOcc here, but that gives rise to bad
-	-- error messages when we print the function name or pattern
-	-- of an instance-decl binding.  Why? Because the binding is zapped
-	-- to use the method name in place of the selector name.
-	-- The way it is now, -ddump-xx output may look confusing, but
-	-- you can always say -dppr-debug to get the uniques
+  = mkUserLocal (mkMethodOcc (getOccName id)) u tau loc
     
 instToIdBndr (LitInst u list ty orig loc)
   = mkSysLocal SLIT("lit") u ty

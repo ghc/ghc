@@ -394,13 +394,12 @@ mk_deriv occ_sp sys_prefix str = mkSysOcc occ_sp (encode sys_prefix ++ str)
 \end{code}
 
 \begin{code}
-mkDictOcc, mkWorkerOcc, mkMethodOcc, mkDefaultMethodOcc,
+mkDictOcc, mkWorkerOcc, mkDefaultMethodOcc,
  	   mkClassTyConOcc, mkClassDataConOcc, mkSpecOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
 mkWorkerOcc        = mk_simple_deriv varName  "$w"
-mkMethodOcc	   = mk_simple_deriv varName  "$m"
 mkDefaultMethodOcc = mk_simple_deriv varName  "$dm"
 mkClassTyConOcc    = mk_simple_deriv tcName   ":T"	-- The : prefix makes sure it classifies
 mkClassDataConOcc  = mk_simple_deriv dataName ":D"	-- as a tycon/datacon
@@ -435,6 +434,31 @@ mkDFunOcc cls_occ tycon_occ index
     tycon_str = occNameString tycon_occ
     show_index | index == 0 = ""
    	       | otherwise  = show index
+\end{code}
+
+We used to add a '$m' to indicate a method, but that gives rise to bad
+error messages from the type checker when we print the function name or pattern
+of an instance-decl binding.  Why? Because the binding is zapped
+to use the method name in place of the selector name.
+(See TcClassDcl.tcMethodBind)
+
+The way it is now, -ddump-xx output may look confusing, but
+you can always say -dppr-debug to get the uniques.
+
+However, we *do* have to zap the first character to be lower case,
+because overloaded constructors (blarg) generate methods too.
+And convert to VarName space
+
+e.g. a call to constructor MkFoo where
+	data (Ord a) => Foo a = MkFoo a
+
+If this is necessary, we do it by prefixing '$m'.  These 
+guys never show up in error messages.  What a hack.
+
+\begin{code}
+mkMethodOcc :: OccName -> OccName
+mkMethodOcc occ@(OccName VarName fs) = occ
+mkMethodOcc occ			     = mk_simple_deriv varName "$m"
 \end{code}
 
 
