@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.40 2001/05/15 15:29:03 sewardj Exp $
+ * $Id: Linker.c,v 1.41 2001/05/16 09:40:11 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -81,6 +81,22 @@ typedef struct _RtsSymbolVal {
 
 #define RTS_POSIX_ONLY_SYMBOLS
 #define RTS_MINGW_ONLY_SYMBOLS                  \
+      SymX(abort)                               \
+      Sym(_alloca)                              \
+      Sym(isxdigit)                             \
+      Sym(isupper)                              \
+      Sym(ispunct)                              \
+      Sym(islower)                              \
+      Sym(isspace)                              \
+      Sym(isprint)                              \
+      Sym(isdigit)                              \
+      Sym(iscntrl)                              \
+      Sym(isalpha)                              \
+      Sym(isalnum)                              \
+      SymX(memset)                              \
+      SymX(strncpy)                             \
+      SymX(strcpy)                              \
+      SymX(strcmp)                              \
       Sym(mktime)                               \
       Sym(gmtime)                               \
       Sym(strftime)                             \
@@ -444,26 +460,42 @@ addDLL ( char* dll_name )
    ASSERT(0); /*NOTREACHED*/
 #  elif defined(OBJFORMAT_PEi386)
 
-   HINSTANCE instance;
-   char* buf;
-   char* errmsg;
+   /* Add this DLL to the list of DLLs in which to search for symbols.
+      The first time through, also add the executable to the list,
+      since we need to search that too. */
+   char*      buf;
    OpenedDLL* o_dll;
-
+   HINSTANCE  instance;
    /* fprintf(stderr, "addDLL %s\n", dll_name ); */
+
+#if 0
+   /* Later ... can't figure out why this doesn't work.  So retain the
+      RTS_MINGW_ONLY_SYMBOLS hack for the time being.  */
+   if (opened_dlls == NULL) {
+      /* First time through ... */
+      instance = GetModuleHandle(NULL);
+      if (instance == NULL)
+         return "addDLL: can't get handle to the executable";
+      o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL-init" );
+      o_dll->instance = instance;
+      o_dll->next     = opened_dlls;
+      opened_dlls     = o_dll;
+   }
+#endif
+
    buf = stgMallocBytes(strlen(dll_name) + 10, "addDll");
    sprintf(buf, "%s.DLL", dll_name);
    instance = LoadLibrary(buf);
    free(buf);
    if (instance == NULL) {
      /* LoadLibrary failed; return a ptr to the error msg. */
-     errmsg = "addDLL: unknown error";
-     return errmsg;
+     return "addDLL: unknown error";
    }
 
    o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
    o_dll->instance = instance;
-   o_dll->next = opened_dlls;
-   opened_dlls = o_dll;
+   o_dll->next     = opened_dlls;
+   opened_dlls     = o_dll;
 
    return NULL;
 #  else
