@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.c,v 1.12 2000/02/17 17:19:42 simonmar Exp $
+ * $Id: Profiling.c,v 1.13 2000/02/29 16:58:09 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -125,7 +125,15 @@ static rtsBool ccs_to_ignore       ( CostCentreStack *ccs );
 static    void count_ticks         ( CostCentreStack *ccs );
 static    void reportCCS           ( CostCentreStack *ccs, nat indent );
 static    void DecCCS              ( CostCentreStack *ccs );
+static    void DecBackEdge ( CostCentreStack *ccs, CostCentreStack *oldccs );
+static    CostCentreStack *CheckLoop ( CostCentreStack *ccs, CostCentre *cc );
 static    CostCentreStack *pruneCCSTree ( CostCentreStack *ccs );
+
+static    CostCentreStack *ActualPush ( CostCentreStack *, CostCentre * );
+static    CostCentreStack *IsInIndexTable ( IndexTable *, CostCentre * );
+static    IndexTable *AddToIndexTable ( IndexTable *, CostCentreStack *, 
+					CostCentre *, unsigned int );
+
 #ifdef DEBUG
 static    void printCCS            ( CostCentreStack *ccs );
 #endif
@@ -349,17 +357,32 @@ PushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
       if (temp_ccs != EMPTY_STACK)
 	return temp_ccs;
       else {
-	/* remove the CC to avoid loops */
-	ccs = RemoveCC(ccs,cc);
-	/* have a different stack now, need to check the memo table again */
-	temp_ccs = IsInIndexTable(ccs->indexTable,cc);
-	if (temp_ccs != EMPTY_STACK)
+	temp_ccs = CheckLoop(ccs,cc);
+	if (temp_ccs != NULL) {
+	  /* we have recursed to an older CCS.  Mark this in
+	   * the index table, and emit a "back edge" into the
+	   * log file.
+	   */
+	  ccs->indexTable = AddToIndexTable(ccs->indexTable,temp_ccs,cc,1);
+	  DecBackEdge(temp_ccs,ccs);
 	  return temp_ccs;
-	else
+	} else {
 	  return ActualPush(ccs,cc);
+	}
       }
     }
   }
+}
+
+static CostCentreStack *
+CheckLoop ( CostCentreStack *ccs, CostCentre *cc )
+{
+  while (ccs != EMPTY_STACK) {
+    if (ccs->cc == cc)
+      return ccs;
+    ccs = ccs->prevStack;
+  }
+  return NULL;
 }
 
 /* Append ccs1 to ccs2 (ignoring any CAF cost centre at the root of ccs1 */
@@ -386,12 +409,6 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
 {
   CostCentreStack *ccs = NULL;
 
-  /* Optimisation: if we attempt to append a CCS to itself, we're
-   * going to end up with the same ccs after a great deal of pushing
-   * and removing of cost centres.  Furthermore, we'll generate a lot
-   * of intermediate CCSs which would not otherwise be generated.  So:
-   * let's cope with this common case first.
-   */
   if (ccs1 == ccs2) {
     return ccs1;
   }
@@ -407,7 +424,7 @@ AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
   return PushCostCentre(ccs,ccs2->cc);
 }
 
-CostCentreStack *
+static CostCentreStack *
 ActualPush ( CostCentreStack *ccs, CostCentre *cc )
 {
   CostCentreStack *new_ccs;
@@ -442,10 +459,12 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
   new_ccs->mem_alloc = 0;
   
   new_ccs->root = ccs->root;
+  new_ccs->emitted = 0;
 
   /* update the memoization table for the parent stack */
   if (ccs != EMPTY_STACK)
-    ccs->indexTable = AddToIndexTable(ccs->indexTable, new_ccs, cc);
+    ccs->indexTable = AddToIndexTable(ccs->indexTable, new_ccs, cc, 
+				      0/*not a back edge*/);
   
   /* make sure this CC is declared at the next heap/time sample */
   DecCCS(new_ccs);
@@ -455,31 +474,7 @@ ActualPush_ ( CostCentreStack *ccs, CostCentre *cc, CostCentreStack *new_ccs )
 }
 
 
-CostCentreStack *
-RemoveCC(CostCentreStack *ccs, CostCentre *cc)
-{
-  CostCentreStack *del_ccs;
-  
-  if (ccs == EMPTY_STACK) {
-    return EMPTY_STACK;
-  } else {
-    if (ccs->cc == cc) {
-      return ccs->prevStack;
-    } else {
-      {
-	del_ccs = RemoveCC(ccs->prevStack, cc);	
-	
-	if (del_ccs == EMPTY_STACK)
-	  return ccs;
-	else
-	  return PushCostCentre(del_ccs,ccs->cc);
-      }
-    }
-  }
-}
-
-
-CostCentreStack *
+static CostCentreStack *
 IsInIndexTable(IndexTable *it, CostCentre *cc)
 {
   while (it!=EMPTY_TABLE)
@@ -495,8 +490,9 @@ IsInIndexTable(IndexTable *it, CostCentre *cc)
 }
 
 
-IndexTable *
-AddToIndexTable(IndexTable *it, CostCentreStack *new_ccs, CostCentre *cc)
+static IndexTable *
+AddToIndexTable(IndexTable *it, CostCentreStack *new_ccs, 
+		CostCentre *cc, unsigned int back_edge)
 {
   IndexTable *new_it;
   
@@ -505,6 +501,7 @@ AddToIndexTable(IndexTable *it, CostCentreStack *new_ccs, CostCentre *cc)
   new_it->cc = cc;
   new_it->ccs = new_ccs;
   new_it->next = it;
+  new_it->back_edge = back_edge;
   return new_it;
 }
 
@@ -545,6 +542,19 @@ DecCCS(CostCentreStack *ccs)
   }
 }
 
+static void
+DecBackEdge( CostCentreStack *ccs, CostCentreStack *oldccs )
+{
+  if (prof_file && RtsFlags.CcFlags.doCostCentres == COST_CENTRES_XML) {
+    if (ccs->prevStack == EMPTY_STACK)
+      fprintf(prof_file, "%d %d 1 %d\n", CCS_UQ, 
+	      ccs->ccsID, ccs->cc->ccID);
+    else
+      fprintf(prof_file, "%d %d 2 %d %d\n", CCS_UQ, 
+	      ccs->ccsID, ccs->cc->ccID, oldccs->ccsID);
+  }
+}
+
 /* -----------------------------------------------------------------------------
    Generating a time & allocation profiling report.
    -------------------------------------------------------------------------- */
@@ -564,7 +574,9 @@ aggregate_cc_costs( CostCentreStack *ccs )
   ccs->cc->time_ticks += ccs->time_ticks;
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
-    aggregate_cc_costs(i->ccs);
+    if (!i->back_edge) {
+      aggregate_cc_costs(i->ccs);
+    }
   }
 }
 
@@ -755,7 +767,9 @@ reportCCS(CostCentreStack *ccs, nat indent)
   }
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
-    reportCCS(i->ccs, indent+1);
+    if (!i->back_edge) {
+      reportCCS(i->ccs, indent+1);
+    }
   }
 }
 
@@ -772,7 +786,9 @@ count_ticks(CostCentreStack *ccs)
     total_prof_ticks += ccs->time_ticks;
   }
   for (i = ccs->indexTable; i != NULL; i = i->next)
-    count_ticks(i->ccs);
+    if (!i->back_edge) {
+      count_ticks(i->ccs);
+    }
 }
 
 /* return rtsTrue if it is one of the ones that
@@ -800,6 +816,8 @@ pruneCCSTree( CostCentreStack *ccs )
   
   prev = &ccs->indexTable;
   for (i = ccs->indexTable; i != 0; i = i->next) {
+    if (i->back_edge) { continue; }
+
     ccs1 = pruneCCSTree(i->ccs);
     if (ccs1 == NULL) {
       *prev = i->next;
@@ -854,7 +872,9 @@ reportCCS_XML(CostCentreStack *ccs)
 	  ccs->ccsID, ccs->scc_count, ccs->time_ticks, ccs->mem_alloc);
 
   for (i = ccs->indexTable; i != 0; i = i->next) {
-    reportCCS_XML(i->ccs);
+    if (!i->back_edge) {
+      reportCCS_XML(i->ccs);
+    }
   }
 }
 

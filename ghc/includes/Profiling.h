@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Profiling.h,v 1.6 1999/09/15 13:45:14 simonmar Exp $
+ * $Id: Profiling.h,v 1.7 2000/02/29 16:58:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -102,19 +102,10 @@ typedef struct _IndexTable {
   CostCentre *cc;
   CostCentreStack *ccs;
   struct _IndexTable *next;
+  unsigned int back_edge;
 } IndexTable;
 
      
-/*
- * CCSDeclist
- */
-
-typedef struct _CCSDecList {
-	CostCentreStack *ccs;
-	struct _CCSDecList *nextList;
-} CCSDecList;
-
-
 /* -----------------------------------------------------------------------------
    Pre-defined cost centres and cost centre stacks
    -------------------------------------------------------------------------- */
@@ -165,11 +156,6 @@ extern hash_t max_type_no;                      /* Hash on type description */
 CostCentreStack *EnterFunCCS ( CostCentreStack *cccs, CostCentreStack *ccsfn );
 CostCentreStack *PushCostCentre ( CostCentreStack *, CostCentre * );
 CostCentreStack *AppendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
-CostCentreStack *ActualPush ( CostCentreStack *, CostCentre * );
-CostCentreStack *RemoveCC ( CostCentreStack *, CostCentre * );
-
-CostCentreStack *IsInIndexTable ( IndexTable *, CostCentre * );
-IndexTable *AddToIndexTable ( IndexTable *, CostCentreStack *, CostCentre * );
 
 extern unsigned int entering_PAP;
 
