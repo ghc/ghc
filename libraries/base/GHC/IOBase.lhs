@@ -552,7 +552,7 @@ data Exception
   | ExitException	ExitCode
 	-- ^The 'ExitException' exception is thrown by 'System.Exit.exitWith' (and
 	-- 'System.Exit.exitFailure').  The 'ExitCode' argument is the value passed 
-	-- to 'System.exitWith'.  An unhandled 'ExitException' exception in the
+	-- to 'System.Exit.exitWith'.  An unhandled 'ExitException' exception in the
 	-- main thread will cause the program to be terminated with the given 
 	-- exit code.
   | IOException 	IOException
