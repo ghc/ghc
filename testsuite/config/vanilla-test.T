@@ -172,10 +172,12 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
 		  then $extra_hc_flags 
 		  else ""
 	     fi
-          ++ if $compile_only 
-                  then " -c " 
-                  else " -o " ++ $exename ++ " " 
-             fi
+          ++ if defined $compile_to_hc && $compile_to_hc
+		  then " -C "
+	     	  else if $compile_only 
+                  	then " -c " 
+                  	else " -o " ++ $exename ++ " " 
+             fi fi
           ++ $srcname ++ " &> " ++ $errname
    $res = runCmd($cmd)
    return $res
