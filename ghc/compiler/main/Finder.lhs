@@ -6,9 +6,7 @@
 \begin{code}
 module Finder (
     initFinder, 	-- :: PackageConfigInfo -> IO (), 
-    findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
-    ModuleLocation(..),
-    mkHomeModuleLocn,
+    findModule		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
   ) where
 
 #include "HsVersions.h"
