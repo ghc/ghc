@@ -93,9 +93,23 @@ boot ::
 	for i in $(ALL_DIRS); do \
 	    $(MKDIRHIER) stage$(stage)/$$i; \
 	done
+# On Windows, we can't use symbolic links for the -hi-boot files
+# because GHC itself is a Mingw program and does not understand
+# symbolic links.  So we have to copy the files instead of link them.
+# That means that if you modify a .hi-boot file in Windows, you
+# have to to say 'make boot' again.
+#
+# PS: 'ln -s foo baz' takes 'foo' relative to the path to 'baz'
+#     whereas 'cp foo baz' treats the two paths independently.
+#     Hence the "../.." in the ln command line
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+	for i in */*hi-boot*; do \
+	done
+else
 	for i in */*hi-boot*; do \
 	    $(LN_S) -f ../../$$i stage$(stage)/$$i; \
 	done
+endif
 
 ifeq "$(stage)" ""
 stage=1
@@ -527,6 +541,7 @@ MKDEPENDHS=$(HC)
 depend :: $(HS_SRCS) $(C_SRCS)
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
 	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
-	$(PERL) -pe 's@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g' <.depend-BASE >.depend-$(stage)
+	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g' <.depend-BASE >.depend-$(stage)
+# The binmode stuff tells perl not to add stupid ^M's to the output
 
 -include .depend-$(stage)

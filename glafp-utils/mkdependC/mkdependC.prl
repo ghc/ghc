@@ -73,6 +73,9 @@ rename($Makefile,"$Makefile.bak");
 # and adding the new
 open(OMKF,"< $Makefile.bak") || die "$Pgm: can't open $Makefile.bak: $!\n";
 open(NMKF,"> $Makefile") || die "$Pgm: can't open $Makefile: $!\n";
+binmode(OMKF);	# Do not add stupid ^M's to the output on Win32
+binmode(NMKF);	# Do not add stupid ^M's to the output on Win32
+
 select(NMKF);
 $_ = <OMKF>;
 while ($_ && $_ ne $Begin_magic_str) { # copy through, 'til Begin_magic_str
