@@ -20,13 +20,13 @@ module Control.Concurrent (
 
 	-- * Basic concurrency operations
 
-#ifndef __HUGS__
         ThreadId,
+#ifdef __GLASGOW_HASKELL__
 	myThreadId,
 #endif
 
 	forkIO,
-#ifndef __HUGS__
+#ifdef __GLASGOW_HASKELL__
 	killThread,
 	throwTo,
 #endif
@@ -99,6 +99,10 @@ import Control.Concurrent.QSem
 import Control.Concurrent.QSemN
 import Control.Concurrent.SampleVar
 
+#ifdef __HUGS__
+type ThreadId = ()
+#endif
+
 {- $conc_intro
 
 The concurrency extension for Haskell is described in the paper
@@ -113,8 +117,8 @@ doesn't make use of any operating system-supplied thread packages.
 Haskell threads can communicate via 'MVar's, a kind of synchronised
 mutable variable (see "Control.Concurrent.MVar").  Several common
 concurrency abstractions can be built from 'MVar's, and these are
-provided by the "Control.Concurrent" library.  Threads may also
-communicate via exceptions. 
+provided by the "Control.Concurrent" library.
+In GHC, threads may also communicate via exceptions.
 -}
 
 {- $conc_scheduling

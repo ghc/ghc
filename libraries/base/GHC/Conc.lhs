@@ -87,16 +87,19 @@ the 'Ord' instance implements an arbitrary total ordering over
 useful when debugging or diagnosing the behaviour of a concurrent
 program.
 
-NOTE: in GHC, if you have a 'ThreadId', you essentially have
+/Note/: in GHC, if you have a 'ThreadId', you essentially have
 a pointer to the thread itself.  This means the thread itself can\'t be
 garbage collected until you drop the 'ThreadId'.
 This misfeature will hopefully be corrected at a later date.
+
+/Note/: Hugs does not provide any operations on other threads;
+it defines 'ThreadId' as a synonym for ().
 -}
 
 --forkIO has now been hoisted out into the Concurrent library.
 
-{- | 'killThread' terminates the given thread (Note: 'killThread' is
-not implemented in Hugs).  Any work already done by the thread isn\'t
+{- | 'killThread' terminates the given thread (GHC only).
+Any work already done by the thread isn\'t
 lost: the computation is suspended until required by another thread.
 The memory used by the thread will be garbage collected if it isn\'t
 referenced from anywhere.  The 'killThread' function is defined in
@@ -108,7 +111,7 @@ terms of 'throwTo':
 killThread :: ThreadId -> IO ()
 killThread tid = throwTo tid (AsyncException ThreadKilled)
 
-{- | 'throwTo' raises an arbitrary exception in the target thread.
+{- | 'throwTo' raises an arbitrary exception in the target thread (GHC only).
 
 'throwTo' does not return until the exception has been raised in the
 target thread.  The calling thread can thus be certain that the target
@@ -120,7 +123,7 @@ throwTo :: ThreadId -> Exception -> IO ()
 throwTo (ThreadId id) ex = IO $ \ s ->
    case (killThread# id ex s) of s1 -> (# s1, () #)
 
--- | Returns the 'ThreadId' of the calling thread.
+-- | Returns the 'ThreadId' of the calling thread (GHC only).
 myThreadId :: IO ThreadId
 myThreadId = IO $ \s ->
    case (myThreadId# s) of (# s1, id #) -> (# s1, ThreadId id #)
@@ -272,7 +275,7 @@ isEmptyMVar (MVar mv#) = IO $ \ s# ->
     case isEmptyMVar# mv# s# of
         (# s2#, flg #) -> (# s2#, not (flg ==# 0#) #)
 
--- |Add a finalizer to an 'MVar'.  See "Foreign.ForeignPtr" and
+-- |Add a finalizer to an 'MVar' (GHC only).  See "Foreign.ForeignPtr" and
 -- "System.Mem.Weak" for more about finalizers.
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer (MVar m) finalizer = 
@@ -292,18 +295,20 @@ specified file descriptor is available for reading (just like select).
 
 \begin{code}
 -- |The 'threadDelay' operation will cause the current thread to
--- suspend for a given number of microseconds.  Note that the resolution
+-- suspend for a given number of microseconds (GHC only).
+--
+-- Note that the resolution
 -- used by the Haskell runtime system\'s internal timer together with the
 -- fact that the thread may take some time to be rescheduled after the
 -- time has expired, means that the accuracy is more like 1\/50 second.
 threadDelay :: Int -> IO ()
 
 -- | Block the current thread until data is available to read on the
--- given file descriptor.
+-- given file descriptor (GHC only).
 threadWaitRead :: Int -> IO ()
 
 -- | Block the current thread until data can be written to the
--- given file descriptor.
+-- given file descriptor (GHC only).
 threadWaitWrite :: Int -> IO ()
 
 threadDelay     (I# ms) = IO $ \s -> case delay# ms s     of s -> (# s, () #)

@@ -107,7 +107,9 @@ type ReadS a = String -> [(a,String)]
 class Read a where
   readsPrec    :: Int -> ReadS a
   readList     :: ReadS [a]
+  -- | Proposed replacement for 'readsPrec' using new-style parsers (GHC only).
   readPrec     :: ReadPrec a
+  -- | Proposed replacement for 'readList' using new-style parsers (GHC only).
   readListPrec :: ReadPrec [a]
   
   -- default definitions
@@ -117,13 +119,13 @@ class Read a where
   readListPrec = readS_to_Prec (\_ -> readList)
 
 readListDefault :: Read a => ReadS [a]
--- ^ Use this to define the 'readList' method, if you
---   don't want a special case
+-- ^ Use this to define the 'readList' method, if you don't want a special
+--   case (GHC only; for other systems the default suffices).
 readListDefault = readPrec_to_S readListPrec 0
 
 readListPrecDefault :: Read a => ReadPrec [a]
 -- ^ Use this to define the 'readListPrec' method, if you
---   don't want a special case
+--   don't want a special case (GHC only).
 readListPrecDefault = list readPrec
 
 ------------------------------------------------------------------------

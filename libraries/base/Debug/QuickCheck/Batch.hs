@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (uses Control.Exception, Control.Concurrent)
 --
--- This is a batch driver for runing QuickCheck.
+-- This is a batch driver for running QuickCheck (GHC only).
 --
 -----------------------------------------------------------------------------
 

@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Data types for generic definitions.
+-- Data types for generic definitions (GHC only).
 --
 -----------------------------------------------------------------------------
 

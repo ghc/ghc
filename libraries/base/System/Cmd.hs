@@ -71,8 +71,9 @@ system cmd =
 foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
 
 {- | 
-The same as 'system', but bypasses the shell.  Will behave more portably between
-systems, because there is no interpretation of shell metasyntax.
+The same as 'system', but bypasses the shell (GHC only).
+Will behave more portably between systems,
+because there is no interpretation of shell metasyntax.
 -}
 
 rawSystem :: String -> IO ExitCode

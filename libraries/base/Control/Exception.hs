@@ -288,7 +288,7 @@ throwDyn exception = throw (DynException (toDyn exception))
 
 #ifdef __GLASGOW_HASKELL__
 -- | A variant of 'throwDyn' that throws the dynamic exception to an
--- arbitrary thread (c.f. 'throwTo').
+-- arbitrary thread (GHC only: c.f. 'throwTo').
 throwDynTo :: Typeable exception => ThreadId -> exception -> IO ()
 throwDynTo t exception = throwTo t (DynException (toDyn exception))
 #endif /* __GLASGOW_HASKELL__ */

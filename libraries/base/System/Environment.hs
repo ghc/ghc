@@ -126,14 +126,15 @@ foreign import ccall unsafe "getenv"
 
 {-|
 @withArgs args act@ - while executing action @act@, have 'System.getArgs'
-return @args@.
+return @args@ (GHC only).
 -}
 withArgs xs act = do
    p <- System.Environment.getProgName
    withArgv (p:xs) act
 
 {-|
-@withProgName name act@ - while executing action @act@, have 'System.getProgName'return @name@.
+@withProgName name act@ - while executing action @act@,
+have 'System.getProgName' return @name@ (GHC only).
 -}
 withProgName nm act = do
    xs <- System.Environment.getArgs

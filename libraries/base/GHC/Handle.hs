@@ -1248,10 +1248,9 @@ hIsSeekable handle =
 						|| tEXT_MODE_SEEK_ALLOWED))
 
 -- -----------------------------------------------------------------------------
--- Changing echo status
+-- Changing echo status (Non-standard GHC extensions)
 
--- Non-standard GHC extension is to allow the echoing status
--- of a handles connected to terminals to be reconfigured:
+-- | Set the echoing status of a handle connected to a terminal (GHC only).
 
 hSetEcho :: Handle -> Bool -> IO ()
 hSetEcho handle on = do
@@ -1264,6 +1263,8 @@ hSetEcho handle on = do
          ClosedHandle -> ioe_closedHandle
          _            -> setEcho (haFD handle_) on
 
+-- | Get the echoing status of a handle connected to a terminal (GHC only).
+
 hGetEcho :: Handle -> IO Bool
 hGetEcho handle = do
     isT   <- hIsTerminalDevice handle
@@ -1274,6 +1275,8 @@ hGetEcho handle = do
        case haType handle_ of 
          ClosedHandle -> ioe_closedHandle
          _            -> getEcho (haFD handle_)
+
+-- | Is the handle connected to a terminal? (GHC only)
 
 hIsTerminalDevice :: Handle -> IO Bool
 hIsTerminalDevice handle = do
