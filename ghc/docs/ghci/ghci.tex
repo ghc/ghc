@@ -117,7 +117,7 @@ visibility.  Subsequent sections elaborate who can see what.
       unlinked translations of home modules only.
 \item {\bf Module Graph (MG)} (owner: CM) is the current module graph.
 \item {\bf Static Info (SI)} (owner: CM) is the package configuration
-      information and compiler flags.
+      information (PCI) and compiler flags (FLAGS).
 \item {\bf Persistent Compiler State (PCS)} (owner: @compile@)
       is @compile@'s private cache of information about package
       modules.
@@ -147,7 +147,7 @@ maps, so they are given a @Unique@.
 \end{verbatim}
 
 A @ModLocation@ says where a module is, what it's called and in what
-form it it.
+form it is.
 \begin{verbatim}
    data ModLocation = SourceOnly Module Path         -- .hs
                     | ObjectCode Module Path Path    -- .o, .hi
@@ -254,7 +254,7 @@ inspecting them.
    to other entities, regardless of module boundaries.  HST only holds
    information for home modules; the corresponding wired-up details
    for package (non-home) modules are created on demand in the package
-   symbol table (PST) inside the persistent compiler's state (PST).
+   symbol table (PST) inside the persistent compiler's state (PCS).
 
    CM maintains the HST, which is passed to, but not modified by,
    @compile@.  If compilation of a module is successful, @compile@
@@ -304,8 +304,8 @@ inspecting them.
    single @Linkable@ -- as is the case for any module from a
    multi-module package.  For these reasons it seems appropriate to
    keep the two concepts distinct.  @Linkable@s also provide
-   information about the sequence in which individual package package
-   components should be linked, and that insn't the business of any
+   information about the sequence in which individual package
+   components should be linked, and that isn't the business of any
    specific module to know.
 
    CM passes @compile@ a module's old @ModIFace@, if it has one, in
