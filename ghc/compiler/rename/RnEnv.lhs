@@ -347,7 +347,9 @@ lookupSrcName global_env rdr_name
 
 lookupOrigName :: RdrName -> RnM d Name 
 lookupOrigName rdr_name
-  = ASSERT( isOrig rdr_name )
+  = -- NO: ASSERT( isOrig rdr_name )
+    -- Now that .hi-boot files are read by the main parser, they contain
+    -- ordinary qualified names (which we treat as Orig names here).
     newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
 
 lookupIfaceUnqual :: RdrName -> RnM d Name

@@ -19,6 +19,7 @@ module RnHiFiles (
 import DriverState	( v_GhcMode, isCompManagerMode )
 import DriverUtil	( splitFilename )
 import CmdLineOpts	( opt_IgnoreIfacePragmas )
+import Parser		( parseIface )
 import HscTypes		( ModuleLocation(..),
 			  ModIface(..), emptyModIface,
 			  VersionInfo(..), ImportedModuleInfo,
@@ -37,7 +38,6 @@ import BasicTypes	( Version, defaultFixity )
 import RnTypes		( rnHsType )
 import RnEnv
 import RnMonad
-import ParseIface	( parseIface )
 
 import PrelNames	( gHC_PRIM_Name, gHC_PRIM )
 import Name		( Name {-instance NamedThing-}, 

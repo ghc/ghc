@@ -1,12 +1,14 @@
-__interface HsExpr 1 0 where
-__export HsExpr HsExpr pprExpr Match GRHSs pprPatBind pprFunBind ;
+module HsExpr where
 
-1 data HsExpr i p ;
-1 pprExpr :: __forall [i p] {Outputable.Outputable i, Outputable.Outputable p} => HsExpr.HsExpr i p -> Outputable.SDoc ;
+data HsExpr i p
+data Match a b
+data GRHSs a b
 
-1 data Match a b ;
-1 data GRHSs a b ;
+pprExpr :: (Outputable.Outputable i, Outputable.Outputable p) => 
+	HsExpr.HsExpr i p -> Outputable.SDoc
 
-1 pprPatBind :: __forall [i p] {Outputable.Outputable i, Outputable.Outputable p} => p -> HsExpr.GRHSs i p -> Outputable.SDoc ;
-1 pprFunBind :: __forall [i p] {Outputable.Outputable i, Outputable.Outputable p} => i -> [HsExpr.Match i p] -> Outputable.SDoc ;
+pprPatBind :: (Outputable.Outputable i, Outputable.Outputable p) => 
+	p -> HsExpr.GRHSs i p -> Outputable.SDoc
 
+pprFunBind :: (Outputable.Outputable i, Outputable.Outputable p) => 
+	i -> [HsExpr.Match i p] -> Outputable.SDoc

@@ -1,8 +1,8 @@
+module TcUnify where
+
 -- This boot file exists only to tie the knot between
 --		TcUnify and TcSimplify
 
-__interface TcUnify 1 0 where
-__export TcUnify unifyTauTy ;
-1 unifyTauTy :: TcType.TcTauType -> TcType.TcTauType -> TcMonad.TcM GHCziBase.Z0T ;
+unifyTauTy :: TcType.TcTauType -> TcType.TcTauType -> TcMonad.TcM GHC.Base.()
 
 

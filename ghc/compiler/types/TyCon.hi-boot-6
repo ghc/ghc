@@ -1,7 +1,8 @@
-__interface TyCon 1 0 where
-__export TyCon TyCon isTupleTyCon isUnboxedTupleTyCon isFunTyCon setTyConName ;
-1 data TyCon ;
-1 isTupleTyCon :: TyCon -> GHCziBase.Bool ;
-1 isUnboxedTupleTyCon :: TyCon -> GHCziBase.Bool ;
-1 isFunTyCon :: TyCon -> GHCziBase.Bool ;
-1 setTyConName :: TyCon -> Name.Name -> TyCon ;
+module TyCon where
+
+data TyCon
+
+isTupleTyCon :: TyCon -> GHC.Base.Bool
+isUnboxedTupleTyCon :: TyCon -> GHC.Base.Bool
+isFunTyCon :: TyCon -> GHC.Base.Bool
+setTyConName :: TyCon -> Name.Name -> TyCon

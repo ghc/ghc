@@ -1,8 +1,8 @@
-__interface IdInfo 1 0 where
-__export IdInfo IdInfo GlobalIdDetails notGlobalId seqIdInfo vanillaIdInfo ;
-1 data IdInfo ;
-1 data GlobalIdDetails ;
-1 notGlobalId :: GlobalIdDetails ;
-1 seqIdInfo :: IdInfo -> GHCziBase.Z0T ;
-1 vanillaIdInfo :: IdInfo ;
+module IdInfo where
 
+data IdInfo
+data GlobalIdDetails
+
+notGlobalId :: GlobalIdDetails
+seqIdInfo :: IdInfo -> GHC.Base.()
+vanillaIdInfo :: IdInfo

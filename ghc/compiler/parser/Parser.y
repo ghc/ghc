@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.92 2002/03/04 17:01:31 simonmar Exp $
+$Id: Parser.y,v 1.93 2002/03/14 15:47:54 simonmar Exp $
 
 Haskell grammar.
 
@@ -9,12 +9,13 @@ Author(s): Simon Marlow, Sven Panne 1997, 1998, 1999
 -}
 
 {
-module Parser ( parseModule, parseStmt, parseIdentifier ) where
+module Parser ( parseModule, parseStmt, parseIdentifier, parseIface ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
 
 import RdrHsSyn
+import RnMonad		( ParsedIface(..) )
 import Lex
 import ParseUtil
 import RdrName
@@ -28,7 +29,7 @@ import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import TyCon		( DataConDetails(..) )
 import SrcLoc		( SrcLoc )
 import Module
-import CmdLineOpts	( opt_SccProfilingOn )
+import CmdLineOpts	( opt_SccProfilingOn, opt_InPackage )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  NewOrData(..), StrictnessMark(..), Activation(..) )
@@ -222,6 +223,7 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 %name parseModule module
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
+%name parseIface iface
 %tokentype { Token }
 %%
 
@@ -256,6 +258,56 @@ top 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
 
 cvtopdecls :: { [RdrNameHsDecl] }
 	: topdecls				{ cvTopDecls (groupBindings $1)}
+
+-----------------------------------------------------------------------------
+-- Interfaces (.hi-boot files)
+
+iface   :: { ParsedIface }
+	: 'module' modid 'where' ifacebody
+	  {	    ParsedIface {
+			pi_mod     = $2,
+			pi_pkg     = opt_InPackage,
+			pi_vers    = 1, 		-- Module version
+			pi_orphan  = False,
+			pi_exports = (1,[($2,mkIfaceExports $4)]),
+			pi_usages  = [],
+			pi_fixity  = [],
+			pi_insts   = [],
+			pi_decls   = map (\x -> (1,x)) $4,
+		 	pi_rules   = (1,[]),
+		 	pi_deprecs = Nothing
+	   	    }
+	   }
+
+ifacebody :: { [RdrNameTyClDecl] }
+	:  '{'            ifacedecls '}'		{ $2 }
+ 	|      layout_on  ifacedecls close		{ $2 }
+
+ifacedecls :: { [RdrNameTyClDecl] }
+	: ifacedecl ';' ifacedecls			{ $1 : $3 }
+	| ';' ifacedecls				{ $2 }
+	| ifacedecl					{ [$1] }
+	| {- empty -}					{ [] }
+
+ifacedecl :: { RdrNameTyClDecl }
+	: srcloc 'data' tycl_hdr constrs 
+	  { mkTyData DataType $3 (DataCons (reverse $4)) Nothing $1 }
+
+	| srcloc 'newtype' tycl_hdr '=' newconstr
+	  { mkTyData NewType $3 (DataCons [$5]) Nothing $1 }
+
+	| srcloc 'class' tycl_hdr fds where
+		{ let 
+			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig 
+					(groupBindings $5) 
+		   in
+	 	   mkClassDecl $3 $4 sigs (Just binds) $1 }
+
+ 	| srcloc 'type' tycon tv_bndrs '=' ctype	
+	  { TySynonym $3 $4 $6 $1 }
+
+	| srcloc var '::' sigtype
+	  { IfaceSig $2 $4 [] $1 }
 
 -----------------------------------------------------------------------------
 -- The Export List

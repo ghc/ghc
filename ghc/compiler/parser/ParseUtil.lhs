@@ -11,6 +11,8 @@ module ParseUtil (
 	, mkRecConstrOrUpdate -- HsExp -> [HsFieldUpdate] -> P HsExp
 	, groupBindings
 	
+	, mkIfaceExports      -- :: [RdrNameTyClDecl] -> [RdrExportItem]
+
 	, CallConv(..)
 	, mkImport            -- CallConv -> Safety 
 			      -- -> (FAST_STRING, RdrName, RdrNameHsType)
@@ -39,17 +41,12 @@ module ParseUtil (
 import List		( isSuffixOf )
 
 import Lex
+import HscTypes		( RdrAvailInfo, GenAvailInfo(..) )
 import HsSyn		-- Lots of it
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..))
 import SrcLoc
-import RdrHsSyn		( RdrBinding(..),
-			  RdrNameHsType, RdrNameBangType, RdrNameContext,
-			  RdrNameHsTyVar, RdrNamePat, RdrNameHsExpr,
-			  RdrNameGRHSs, RdrNameHsRecordBinds,
-			  RdrNameMonoBinds, RdrNameConDetails, RdrNameHsDecl,
-			  mkNPlusKPat
-			)
+import RdrHsSyn
 import RdrName
 import PrelNames	( unitTyCon_RDR )
 import OccName  	( dataName, varName, tcClsName,
@@ -439,4 +436,18 @@ groupBindings binds = group Nothing binds
 	    = case bind of
 		RdrValBinding b@(FunMonoBind _ _ _ _) -> group (Just b) binds
 		other -> bind `RdrAndBindings` group Nothing binds
+
+-- ---------------------------------------------------------------------------
+-- Make the export list for an interface
+
+mkIfaceExports :: [RdrNameTyClDecl] -> [RdrAvailInfo]
+mkIfaceExports decls = map getExport decls
+  where getExport d = case d of
+			TyData{}    -> tc_export
+			ClassDecl{} -> tc_export
+			_other      -> var_export
+          where 
+		tc_export  = AvailTC (rdrNameOcc (tcdName d)) 
+				(map (rdrNameOcc.fst) (tyClDeclNames d))
+		var_export = Avail (rdrNameOcc (tcdName d))
 \end{code}

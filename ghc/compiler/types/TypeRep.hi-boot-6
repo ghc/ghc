@@ -1,7 +1,6 @@
-__interface TypeRep 1 0 where
-__export TypeRep Type PredType Kind SuperKind ;
-1 data Type ;
-1 data PredType ;
-1 type Kind = Type ;
-1 type SuperKind = Type ;
+module TypeRep where
 
+data Type
+data PredType
+type Kind = Type
+type SuperKind = Type

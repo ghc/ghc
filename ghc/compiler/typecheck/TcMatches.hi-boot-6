@@ -1,13 +1,14 @@
-__interface TcMatches 1 0 where
-__export TcMatches tcGRHSs tcMatchesFun;
-1 tcGRHSs ::  HsExpr.HsMatchContext Name.Name
+module TcMatches where
+
+tcGRHSs ::  HsExpr.HsMatchContext Name.Name
 	      -> RnHsSyn.RenamedGRHSs
 	      -> TcType.TcType
-	      -> TcMonad.TcM (TcHsSyn.TcGRHSs, Inst.LIE) ;
-1 tcMatchesFun :: 
+	      -> TcMonad.TcM (TcHsSyn.TcGRHSs, Inst.LIE)
+
+tcMatchesFun :: 
 		[(Name.Name,Var.Id)]
 	     ->	Name.Name
 	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
-	     -> TcMonad.TcM ([TcHsSyn.TcMatch], Inst.LIE) ;
+	     -> TcMonad.TcM ([TcHsSyn.TcMatch], Inst.LIE)
 

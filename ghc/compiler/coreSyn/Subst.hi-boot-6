@@ -1,5 +1,4 @@
-__interface Subst 2 0 where
-__export Subst Subst substTyWith ;
-1 data Subst;
-1 substTyWith :: [Var.TyVar] -> [TypeRep.Type] -> TypeRep.Type -> TypeRep.Type ;
+module Subst where
 
+data Subst
+substTyWith :: [Var.TyVar] -> [TypeRep.Type] -> TypeRep.Type -> TypeRep.Type

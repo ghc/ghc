@@ -1,3 +1,6 @@
-__interface RnBinds 1 0 where
-__export RnBinds rnBinds;
-1 rnBinds :: __forall [b] => RdrHsSyn.RdrNameHsBinds -> (RnHsSyn.RenamedHsBinds -> RnMonad.RnMS (b, NameSet.FreeVars)) -> RnMonad.RnMS (b, NameSet.FreeVars) ;
+module RnBinds where
+
+rnBinds :: forall b . RdrHsSyn.RdrNameHsBinds
+	-> (RnHsSyn.RenamedHsBinds
+ 	-> RnMonad.RnMS (b, NameSet.FreeVars))
+	-> RnMonad.RnMS (b, NameSet.FreeVars)

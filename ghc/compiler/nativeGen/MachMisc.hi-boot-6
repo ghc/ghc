@@ -1,6 +1,7 @@
-__interface MachMisc 1 0 where
-__export MachMisc Instr fixedHdrSize fmtAsmLbl underscorePrefix;
-1 fixedHdrSize :: GHCziBase.Int ;
-2 fmtAsmLbl :: GHCziBase.String -> GHCziBase.String ;
-1 underscorePrefix :: GHCziBase.Bool ;
-1 data Instr ;
+module MachMisc where
+
+data Instr
+
+fixedHdrSize :: GHC.Base.Int
+fmtAsmLbl :: GHC.Base.String -> GHC.Base.String
+underscorePrefix :: GHC.Base.Bool

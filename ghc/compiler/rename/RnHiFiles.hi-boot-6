@@ -1,3 +1,7 @@
-__interface RnHiFiles 1 0 where
-__export RnHiFiles loadInterface;
-1 loadInterface :: __forall [d] => Outputable.SDoc -> Module.ModuleName -> Module.WhereFrom -> RnMonad.RnM d HscTypes.ModIface;
+module RnHiFiles where
+
+loadInterface
+	:: Outputable.SDoc
+	-> Module.ModuleName
+	-> Module.WhereFrom
+	-> RnMonad.RnM d HscTypes.ModIface

@@ -16,14 +16,14 @@ An example that provokes the error is
 --------------------------------------------------------
 
 \begin{code}
-
+{-# OPTIONS -#include "hs_ctype.h" #-}
 module Lex (
 
-	ifaceParseErr, srcParseErr,
+	srcParseErr,
 
 	-- Monad for parser
 	Token(..), lexer, ParseResult(..), PState(..),
-	checkVersion, ExtFlags(..), mkPState, 
+	ExtFlags(..), mkPState, 
 	StringBuffer,
 
 	P, thenP, thenP_, returnP, mapP, failP, failMsgP,
@@ -33,14 +33,10 @@ module Lex (
 
 #include "HsVersions.h"
 
-import Char 		( isSpace, toUpper )
-import List             ( isSuffixOf )
+import Char 		( toUpper )
 
 import PrelNames	( mkTupNameStr )
-import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import ForeignCall	( Safety(..) )
-import NewDemand	( StrictSig(..), Demand(..), Demands(..),
-			  DmdResult(..), mkTopDmdType, evalDmd, lazyDmd )
 import UniqFM           ( listToUFM, lookupUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
@@ -133,41 +129,7 @@ data Token
   | ITstdcallconv
   | ITccallconv
   | ITdotnet
-
-  | ITinterface			-- interface keywords
-  | IT__export
-  | ITdepends
-  | IT__forall
-  | ITletrec 
-  | ITcoerce
-  | ITinlineMe
-  | ITinlineCall
   | ITccall (Bool,Bool,Safety)	-- (is_dyn, is_casm, may_gc)
-  | ITdefaultbranch
-  | ITbottom
-  | ITinteger_lit 
-  | ITfloat_lit
-  | ITword_lit
-  | ITword64_lit
-  | ITint64_lit
-  | ITrational_lit
-  | ITaddr_lit
-  | ITlabel_lit
-  | ITlit_lit
-  | ITstring_lit
-  | ITtypeapp
-  | ITusage
-  | ITfuall
-  | ITarity 
-  | ITspecialise
-  | ITnocaf
-  | ITunfold
-  | ITstrict StrictSig
-  | ITrules
-  | ITcprinfo
-  | ITdeprecated
-  | IT__scc
-  | ITsccAllCafs
 
   | ITspecialise_prag		-- Pragmas
   | ITsource_prag
@@ -331,50 +293,7 @@ ghcExtensionKeywordsFM = listToUFM $
         ("_ccall_",	ITccall (False, False, PlayRisky)),
         ("_ccall_GC_",	ITccall (False, False, PlaySafe False)),
         ("_casm_",	ITccall (False, True,  PlayRisky)),
-        ("_casm_GC_",	ITccall (False, True,  PlaySafe False)),
-
-	-- interface keywords
-        ("__interface",		ITinterface),
-	("__export",		IT__export),
-	("__depends",		ITdepends),
-	("__forall",		IT__forall),
-	("__letrec",		ITletrec),
-	("__coerce",		ITcoerce),
-	("__inline_me",		ITinlineMe),
-	("__inline_call",	ITinlineCall),
-	("__depends",		ITdepends),
-	("__DEFAULT",		ITdefaultbranch),
-	("__bot",		ITbottom),
-	("__integer",		ITinteger_lit),
-	("__float",		ITfloat_lit),
-	("__int64",		ITint64_lit),
-	("__word",		ITword_lit),
-	("__word64",		ITword64_lit),
-	("__rational",		ITrational_lit),
-	("__addr",		ITaddr_lit),
-	("__label",		ITlabel_lit),
-	("__litlit",		ITlit_lit),
-	("__string",		ITstring_lit),
-	("__a",			ITtypeapp),
-	("__u",			ITusage),
-	("__fuall",		ITfuall),
-	("__A",			ITarity),
-	("__P",			ITspecialise),
-	("__C",			ITnocaf),
-	("__R",			ITrules),
-        ("__D",			ITdeprecated),
-        ("__U",			ITunfold),
-	
-        ("__ccall",		ITccall (False, False, PlayRisky)),
-        ("__ccall_GC",		ITccall (False, False, PlaySafe False)),
-        ("__dyn_ccall",		ITccall (True,  False, PlayRisky)),
-        ("__dyn_ccall_GC",	ITccall (True,  False, PlaySafe False)),
-        ("__casm",		ITccall (False, True,  PlayRisky)),
-        ("__dyn_casm",		ITccall (True,  True,  PlayRisky)),
-        ("__casm_GC",		ITccall (False, True,  PlaySafe False)),
-        ("__dyn_casm_GC",	ITccall (True,  True,  PlaySafe False)),
-
-        ("/\\",			ITbiglam)
+        ("_casm_GC_",	ITccall (False, True,  PlaySafe False))
      ]
 
 
@@ -453,7 +372,6 @@ lexer cont buf s@(PState{
 		-- processing if necessary).
             '{'# | lookAhead# buf 1# `eqChar#` '-'# ->
 		if lookAhead# buf 2# `eqChar#` '#'# then
-		  if lookAhead# buf 3# `eqChar#` '#'# then is_a_token else
 		  case expandWhile# is_space (setCurrentPos# buf 3#) of { buf1->
 		  case expandWhile# is_ident (stepOverLexeme buf1)   of { buf2->
 		  let lexeme = mkFastString -- ToDo: too slow
@@ -633,42 +551,18 @@ lexToken cont exts buf =
 	 | otherwise
 	   	-> cont ITbackquote (incLexeme buf)
 
-    '{'# ->	-- look for "{-##" special iface pragma   -- for Emacs: -}
+    '{'# ->   -- for Emacs: -}
             case lookAhead# buf 1# of
            '|'# | glaExtsEnabled exts 
                 -> cont ITocurlybar (setCurrentPos# buf 2#)
 	   '-'# -> case lookAhead# buf 2# of
-		    '#'# -> case lookAhead# buf 3# of
-				'#'# -> 
-				   lexPragma
-				      cont
-				      (\ cont lexeme buf' -> cont (ITpragma lexeme) buf')
-				      0#
-				      (stepOnBy# (stepOverLexeme buf) 4#)
-				_ -> lex_prag cont (setCurrentPos# buf 3#)
+		    '#'# -> lex_prag cont (setCurrentPos# buf 3#)
 	   	    _    -> cont ITocurly (incLexeme buf) 
 	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf) 
 
     -- strings/characters -------------------------------------------------
     '\"'#{-"-} -> lex_string cont exts [] (incLexeme buf)
     '\''#      -> lex_char (char_end cont) exts (incLexeme buf)
-
-    -- strictness and cpr pragmas and __scc treated specially.
-    '_'# | glaExtsEnabled exts ->
-	 case lookAhead# buf 1# of
-	   '_'# -> case lookAhead# buf 2# of
-	   	    'S'# -> 
-			lex_demand cont (stepOnUntil (not . isSpace) 
-		                        (stepOnBy# buf 3#)) -- past __S
-	   	    'M'# -> 
-			cont ITcprinfo (stepOnBy# buf 3#)	-- past __M
-
-	   	    's'# -> 
-			case prefixMatch (stepOnBy# buf 3#) "cc" of
-		               Just buf' -> lex_scc cont (stepOverLexeme buf')
-		     	       Nothing   -> lex_id cont exts buf
-		    _ -> lex_id cont exts buf
-	   _    -> lex_id cont exts buf
 
 	-- Hexadecimal and octal constants
     '0'# | (ch `eqChar#` 'x'# || ch `eqChar#` 'X'#) && is_hexdigit ch2
@@ -862,56 +756,6 @@ silly_escape_chars = [
 	("DEL", '\DEL')
 	]
 
--------------------------------------------------------------------------------
-
-lex_demand cont buf = 
- case read_em [] buf of { (ls,buf') -> 
- case currentChar# buf' of
-   'b'# -> cont (ITstrict (StrictSig (mkTopDmdType ls BotRes))) (incLexeme buf')
-   'm'# -> cont (ITstrict (StrictSig (mkTopDmdType ls RetCPR))) (incLexeme buf')
-   _    -> cont (ITstrict (StrictSig (mkTopDmdType ls TopRes))) buf'
- }
- where
-  read_em acc buf = 
-   case currentChar# buf of
-    'T'# -> read_em (Top     : acc) (stepOn buf)
-    'L'# -> read_em (lazyDmd : acc) (stepOn buf)
-    'A'# -> read_em (Abs     : acc) (stepOn buf)
-    'V'# -> read_em (evalDmd : acc) (stepOn buf)	-- Temporary, until
-							-- we've recompiled prelude etc
-    'C'# -> do_unary Call  acc (stepOnBy# buf 2#)	-- Skip 'C('
-
-    'U'# -> do_seq1 Eval	 acc (stepOnBy# buf 1#)
-    'D'# -> do_seq1 Defer	 acc (stepOnBy# buf 1#)
-    'S'# -> do_seq1 (Box . Eval) acc (stepOnBy# buf 1#)
-
-    _    -> (reverse acc, buf)
-
-  do_seq1 fn acc buf
-    = case currentChar# buf of
-	'('# -> do_seq2 fn acc (stepOnBy# buf 1#)
-	_    -> read_em (fn (Poly Abs) : acc) buf
-
-  do_seq2 fn acc buf
-    = case read_em [] buf of { (dmds, buf) -> 
-      case currentChar# buf of
-	')'# -> read_em (fn (Prod dmds) : acc)
-			(stepOn buf) 
-	'*'# -> ASSERT( length dmds == 1 )
-		read_em (fn (Poly (head dmds)) : acc)
-			(stepOnBy# buf 2#)	-- Skip '*)'
-      }
-	
-  do_unary fn acc buf
-    = case read_em [] buf of
-        ([dmd], rest) -> read_em (fn dmd : acc) (stepOn rest)	-- Skip ')'
-
-------------------
-lex_scc cont buf =
- case currentChar# buf of
-  'C'# -> cont ITsccAllCafs (incLexeme buf)
-  other -> cont ITscc buf
-
 -----------------------------------------------------------------------------
 -- Numbers
 
@@ -986,10 +830,11 @@ lex_id cont exts buf =
  case (if glaExtsEnabled exts 
 	then expandWhile# (eqChar# '#'#) buf1 -- slurp trailing hashes
 	else buf1) 				of { buf' ->
+ seq buf' $
 
  let lexeme  = lexemeToFastString buf' in
 
- case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
+ case _scc_ "haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
  	Just kwd_token -> --trace ("hkeywd: "++_UNPK_(lexeme)) $
 			  cont kwd_token buf';
  	Nothing        -> 
@@ -1108,7 +953,7 @@ lex_id3 cont exts mod buf just_a_conid
       new_buf     = mergeLexemes buf buf'
       is_a_qvarid = cont (mk_qvar_token mod lexeme) new_buf
      in
-     case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
+     case _scc_ "haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
     	    Nothing          -> is_a_qvarid ;
 
     	    Just kwd_token | isSpecial kwd_token   -- special ids (as, qualified, hiding) shouldn't be
@@ -1165,57 +1010,6 @@ lex_ubx_tuple cont mod buf back_off =
 				 (stepOnBy# buf 2#)
 	        _    -> back_off
       _    -> back_off
-\end{code}
-
------------------------------------------------------------------------------
-'lexPragma' rips along really fast, looking for a '##-}', 
-indicating the end of the pragma we're skipping
-
-\begin{code}
-lexPragma cont contf inStr buf =
- case currentChar# buf of
-   '#'# | inStr ==# 0# ->
-       case lookAhead# buf 1# of { '#'# -> 
-       case lookAhead# buf 2# of { '-'# ->
-       case lookAhead# buf 3# of { '}'# -> 
-           contf cont (lexemeToBuffer buf)
-	   	      (stepOverLexeme (setCurrentPos# buf 4#));
-	_    -> lexPragma cont contf inStr (incLexeme buf) };
-        _    -> lexPragma cont contf inStr (incLexeme buf) };
-        _    -> lexPragma cont contf inStr (incLexeme buf) }
-
-   '"'# ->
-       let
-        odd_slashes buf flg i# =
-          case lookAhead# buf i# of
-	   '\\'# -> odd_slashes buf (not flg) (i# -# 1#)
-	   _     -> flg
-
-	not_inStr = if inStr ==# 0# then 1# else 0#
-       in
-       case lookAhead# buf (negateInt# 1#) of --backwards, actually
-	 '\\'# -> -- escaping something..
-	   if odd_slashes buf True (negateInt# 2#) 
-		then  -- odd number of slashes, " is escaped.
-	      	      lexPragma cont contf inStr (incLexeme buf)
-	        else  -- even number of slashes, \ is escaped.
-	      	      lexPragma cont contf not_inStr (incLexeme buf)
-         _ -> lexPragma cont contf not_inStr (incLexeme buf)
-
-   '\''# | inStr ==# 0# ->
-	case lookAhead# buf 1# of { '"'# ->
-	case lookAhead# buf 2# of { '\''# ->
-	   lexPragma cont contf inStr (setCurrentPos# buf 3#);
-	_ -> lexPragma cont contf inStr (incLexeme buf) };
-	_ -> lexPragma cont contf inStr (incLexeme buf) }
-
-    -- a sign that the input is ill-formed, since pragmas are
-    -- assumed to always be properly closed (in .hi files).
-   '\NUL'# -> trace "lexPragma: unexpected end-of-file" $ 
-	      cont (ITunknown "\NUL") buf
-
-   _ -> lexPragma cont contf inStr (incLexeme buf)
-
 \end{code}
 
 -----------------------------------------------------------------------------
@@ -1359,30 +1153,6 @@ popContext = \ buf s@(PState{ context = ctx, loc = loc }) ->
 	(_:tl) -> POk s{ context = tl } ()
 	[]     -> PFailed (srcParseErr buf loc)
 
-{- 
- Note that if the name of the file we're processing ends
- with `hi-boot', we accept it on faith as having the right
- version. This is done so that .hi-boot files that comes
- with hsc don't have to be updated before every release,
- *and* it allows us to share .hi-boot files with versions
- of hsc that don't have .hi version checking (e.g., ghc-2.10's)
-
- If the version number is 0, the checking is also turned off.
- (needed to deal with GHC.hi only!)
-
- Once we can assume we're compiling with a version of ghc that
- supports interface file checking, we can drop the special
- pleading
--}
-checkVersion :: Maybe Integer -> P ()
-checkVersion mb@(Just v) buf s@(PState{loc = loc})
- | (v==0) || (v == fromIntegral opt_HiVersion) || opt_NoHiCheck = POk s ()
- | otherwise = PFailed (ifaceVersionErr mb loc ([]::[Token]){-Todo-})
-checkVersion mb@Nothing  buf s@(PState{loc = loc})
- | "hi-boot" `isSuffixOf` (_UNPK_ (srcLocFile loc)) = POk s ()
- | otherwise = PFailed (ifaceVersionErr mb loc ([]::[Token]){-Todo-})
-
-
 -- for reasons of efficiency, flags indicating language extensions (eg,
 -- -fglasgow-exts or -fparr) are represented by a bitmap stored in an unboxed
 -- integer
@@ -1426,24 +1196,6 @@ mkPState loc exts  = PState {
 		       setBitIf :: Int -> Bool -> Int32
 		       b `setBitIf` cond | cond      = bit b
 					 | otherwise = 0
-
-
------------------------------------------------------------------
-
-ifaceParseErr :: StringBuffer -> SrcLoc -> Message
-ifaceParseErr s l
-  = hsep [ppr l, ptext SLIT("Interface file parse error; on input `"),
-          text (lexemeToString s), char '\'']
-
-ifaceVersionErr hi_vers l toks
-  = hsep [ppr l, ptext SLIT("Interface file version error;"),
-          ptext SLIT("Expected"), int opt_HiVersion, 
-	  ptext SLIT("found "), pp_version]
-    where
-     pp_version =
-      case hi_vers of
-        Nothing -> ptext SLIT("pre ghc-3.02 version")
-	Just v  -> ptext SLIT("version") <+> integer v
 
 -----------------------------------------------------------------------------
 
