@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.24 2003/01/28 17:05:43 simonmar Exp $
+ * $Id: Stable.c,v 1.25 2003/03/31 19:19:34 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -258,8 +258,8 @@ enlargeStablePtrTable(void)
   if (SPT_size == 0) {
     // 1st time
     SPT_size = INIT_SPT_SIZE;
-    stable_ptr_table = stgMallocWords(SPT_size * sizeof(snEntry), 
-				      "initStablePtrTable");
+    stable_ptr_table = stgMallocBytes(SPT_size * sizeof(snEntry), 
+				      "enlargeStablePtrTable");
     
     /* we don't use index 0 in the stable name table, because that
      * would conflict with the hash table lookup operations which
@@ -272,9 +272,10 @@ enlargeStablePtrTable(void)
     // 2nd and subsequent times
     SPT_size *= 2;
     stable_ptr_table = 
-      stgReallocWords(stable_ptr_table, SPT_size * sizeof(snEntry),
+      stgReallocBytes(stable_ptr_table, 
+		      SPT_size * sizeof(snEntry),
 		      "enlargeStablePtrTable");
-    
+
     initFreeList(stable_ptr_table + old_SPT_size, old_SPT_size, NULL);
   }
 }

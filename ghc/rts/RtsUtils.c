@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.c,v 1.32 2003/03/25 17:58:49 sof Exp $
+ * $Id: RtsUtils.c,v 1.33 2003/03/31 19:19:34 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -106,18 +106,6 @@ stgReallocBytes (void *p, int n, char *msg)
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
-}
-
-void *
-stgMallocWords (int n, char *msg)
-{
-  return(stgMallocBytes(n * sizeof(W_), msg));
-}
-
-void *
-stgReallocWords (void *p, int n, char *msg)
-{
-  return(stgReallocBytes(p, n * sizeof(W_), msg));
 }
 
 void *

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.15 2003/03/25 17:58:50 sof Exp $
+ * $Id: RtsUtils.h,v 1.16 2003/03/31 19:19:34 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,10 +7,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
+/* (Checked) dynamic allocation: */
 extern void *stgMallocBytes(int n, char *msg);
-extern void *stgMallocWords(int n, char *msg);
 extern void *stgReallocBytes(void *p, int n, char *msg);
-extern void *stgReallocWords(void *p, int n, char *msg);
 extern void *stgCallocBytes(int n, int m, char *msg);
 extern void stgFree(void* p);
 
