@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.23 2003/01/25 15:54:50 wolfgang Exp $
+ * $Id: Select.c,v 1.24 2003/02/21 05:34:16 sof Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -28,6 +28,7 @@
 
 # ifdef mingw32_TARGET_OS
 #  include <windows.h>
+#  include "win32/AsyncIO.h"
 # endif
 
 #include <errno.h>
@@ -235,7 +236,9 @@ awaitEvent(rtsBool wait)
 #endif
       RELEASE_LOCK(&sched_mutex);
       while (1) {
-	  Sleep(0); /* don't busy wait */
+	  if (!awaitRequests(wait)) {
+	    Sleep(0); /* don't busy wait */
+	  }
 #endif /* mingw32_TARGET_OS */
 	  ACQUIRE_LOCK(&sched_mutex);
 #ifdef RTS_SUPPORTS_THREADS

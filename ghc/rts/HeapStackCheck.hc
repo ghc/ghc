@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.27 2002/12/11 15:36:42 simonmar Exp $
+ * $Id: HeapStackCheck.hc,v 1.28 2003/02/21 05:34:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1020,3 +1020,36 @@ FN_(stg_block_putmvar)
   BLOCK_GENERIC;
   FE_
 }
+
+#ifdef mingw32_TARGET_OS
+INFO_TABLE_RET( stg_block_async_info,  stg_block_async_ret,
+	       	MK_SMALL_BITMAP(0/*framesize*/, 0/*bitmap*/),
+		0/*SRT*/, 0/*SRT_OFF*/, 0/*SRT_LEN*/, 
+		RET_SMALL,, IF_, 0, 0);
+
+IF_(stg_block_async_ret)
+{
+  StgAsyncIOResult* ares;
+  int len,errC;
+  FB_
+  ares = CurrentTSO->block_info.async_result;
+  len  = ares->len;
+  errC = ares->errCode;
+  CurrentTSO->block_info.async_result = NULL;
+  STGCALL1(free,ares);
+  R1.w = len;
+  *Sp = (W_)errC;
+  JMP_(ENTRY_CODE(Sp[1]));
+  FE_
+}
+
+FN_(stg_block_async)
+{
+  FB_
+  Sp -= 1;
+  Sp[0] = (W_)&stg_block_async_info;
+  BLOCK_GENERIC;
+  FE_
+}
+
+#endif

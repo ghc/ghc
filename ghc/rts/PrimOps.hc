@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.103 2002/12/11 15:36:45 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.104 2003/02/21 05:34:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -27,6 +27,11 @@
 #endif
 
 #include <stdlib.h>
+
+#ifdef mingw32_TARGET_OS
+#include <windows.h>
+#include "win32/AsyncIO.h"
+#endif
 
 /* ** temporary **
 
@@ -1629,3 +1634,48 @@ FN_(delayzh_fast)
   FE_
 }
 
+#ifdef mingw32_TARGET_OS
+FN_(asyncReadzh_fast)
+{
+  StgAsyncIOResult* ares;
+  unsigned int reqID;
+  FB_
+    /* args: R1.i = fd, R2.i = isSock, R3.i = len, R4.p = buf */
+    ASSERT(CurrentTSO->why_blocked == NotBlocked);
+    CurrentTSO->why_blocked = BlockedOnRead;
+    ACQUIRE_LOCK(&sched_mutex);
+    /* could probably allocate this on the heap instead */
+    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncWritezh_fast");
+    reqID = RET_STGCALL5(W_,addIORequest,R1.i,FALSE,R2.i,R3.i,(char*)R4.p);
+    ares->reqID   = reqID;
+    ares->len     = 0;
+    ares->errCode = 0;
+    CurrentTSO->block_info.async_result = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    RELEASE_LOCK(&sched_mutex);
+    JMP_(stg_block_async);
+  FE_
+}
+
+FN_(asyncWritezh_fast)
+{
+  StgAsyncIOResult* ares;
+  unsigned int reqID;
+  FB_
+    /* args: R1.i */
+    /* args: R1.i = fd, R2.i = isSock, R3.i = len, R4.p = buf */
+    ASSERT(CurrentTSO->why_blocked == NotBlocked);
+    CurrentTSO->why_blocked = BlockedOnWrite;
+    ACQUIRE_LOCK(&sched_mutex);
+    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncWritezh_fast");
+    reqID = RET_STGCALL5(W_,addIORequest,R1.i,TRUE,R2.i,R3.i,(char*)R4.p);
+    ares->reqID   = reqID;
+    ares->len     = 0;
+    ares->errCode = 0;
+    CurrentTSO->block_info.async_result = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    RELEASE_LOCK(&sched_mutex);
+    JMP_(stg_block_async);
+  FE_
+}
+#endif

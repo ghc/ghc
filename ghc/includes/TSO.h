@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.29 2003/01/25 15:54:48 wolfgang Exp $
+ * $Id: TSO.h,v 1.30 2003/02/21 05:34:15 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -150,10 +150,22 @@ typedef enum {
 #endif
 } StgTSOBlockReason;
 
+#ifdef mingw32_TARGET_OS
+/* results from an async I/O request + it's ID. */
+typedef struct {
+  unsigned int reqID;
+  int          len;
+  int          errCode;
+} StgAsyncIOResult;
+#endif
+
 typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
   int fd;
+#ifdef mingw32_TARGET_OS
+  StgAsyncIOResult* async_result;
+#endif
   unsigned int target;
 } StgTSOBlockInfo;
 

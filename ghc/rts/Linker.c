@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.114 2003/02/10 23:35:03 wolfgang Exp $
+ * $Id: Linker.c,v 1.115 2003/02/21 05:34:15 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -221,6 +221,8 @@ typedef struct _RtsSymbolVal {
 /* These are statically linked from the mingw libraries into the ghc
    executable, so we have to employ this hack. */
 #define RTS_MINGW_ONLY_SYMBOLS                  \
+      SymX(asyncReadzh_fast)			\
+      SymX(asyncWritezh_fast)			\
       SymX(memset)                              \
       SymX(inet_ntoa)                           \
       SymX(inet_addr)                           \

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.24 2003/02/04 12:40:00 simonpj Exp $
+-- $Id: primops.txt.pp,v 1.25 2003/02/21 05:34:14 sof Exp $
 --
 -- Primitive Operations
 --
@@ -1414,6 +1414,24 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    needs_wrapper    = True
    has_side_effects = True
    out_of_line      = True
+
+#ifdef mingw32_TARGET_OS
+primop  AsyncReadOp "asyncRead#" GenPrimOp
+   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+   {Asynchronously read bytes from specified file descriptor.}
+   with
+   needs_wrapper    = True
+   has_side_effects = True
+   out_of_line      = True
+
+primop  AsyncWriteOp "asyncWrite#" GenPrimOp
+   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+   {Asynchronously write bytes from specified file descriptor.}
+   with
+   needs_wrapper    = True
+   has_side_effects = True
+   out_of_line      = True
+#endif
 
 ------------------------------------------------------------------------
 section "Concurrency primitives"

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.45 2003/01/07 09:29:24 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.46 2003/02/21 05:34:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -282,4 +282,6 @@ EF_(stg_block_noregs);
 EF_(stg_block_1);
 EF_(stg_block_takemvar);
 EF_(stg_block_putmvar);
-
+#ifdef mingw32_TARGET_OS
+EF_(stg_block_async);
+#endif

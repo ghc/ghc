@@ -36,6 +36,10 @@ NON_HS_PACKAGE = YES
 # grab sources from these subdirectories
 ALL_DIRS = hooks parallel
 
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ALL_DIRS += win32
+endif
+
 ifneq "$(DLLized)" "YES"
 EXCLUDED_SRCS += RtsDllMain.c
 else
@@ -81,6 +85,10 @@ WARNING_OPTS += -Wbad-function-cast
 STANDARD_OPTS += -I../includes -I. -Iparallel
 # COMPILING_RTS is only used when building Win32 DLL support.
 STANDARD_OPTS += -DCOMPILING_RTS
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+STANDARD_OPTS += -Iwin32
+endif
 
 # HC_OPTS is included in both .c and .hc compilations, whereas CC_OPTS is
 # only included in .c compilations.  HC_OPTS included the WAY_* opts, which

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.70 2003/01/30 10:19:07 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.71 2003/02/21 05:34:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -48,6 +48,10 @@
 #if defined(PAR)
 # include "Parallel.h"
 # include "LLC.h"
+#endif
+
+#if defined(mingw32_TARGET_OS)
+#include "win32/AsyncIO.h"
 #endif
 
 #include <stdlib.h>
@@ -153,6 +157,10 @@ hs_init(int *argc, char **argv[])
     initDefaultHandlers();
 #endif
  
+#if defined(mingw32_TARGET_OS)
+    startupAsyncIO();
+#endif
+
 #ifdef RTS_GTK_FRONTPANEL
     if (RtsFlags.GcFlags.frontpanel) {
 	initFrontPanel();
@@ -342,6 +350,10 @@ hs_exit(void)
     
 #if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.showTickyStats) PrintTickyInfo();
+#endif
+
+#if defined(mingw32_TARGET_OS)
+    shutdownAsyncIO();
 #endif
 }
 
