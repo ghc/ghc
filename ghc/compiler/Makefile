@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.70 2000/02/04 17:29:24 sewardj Exp $
+# $Id: Makefile,v 1.71 2000/02/14 11:59:27 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -222,6 +222,10 @@ SRC_C_OPTS     += -O -I. -IcodeGen
 parser/hschooks.o : parser/hschooks.c
 	@$(RM) $@
 	$(HC) -c -o $@ $(HC_OPTS) parser/hschooks.c
+
+parser/ctypes.o : parser/ctypes.c
+	@$(RM) $@
+	$(HC) -c -o $@ $(HC_OPTS) parser/ctypes.c
 
 
 # Interface-file parser uses Happy
