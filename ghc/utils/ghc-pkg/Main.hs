@@ -104,6 +104,7 @@ data Flag
   | FlagConfig	FilePath
   | FlagGlobalConfig FilePath
   | FlagForce
+  | FlagAutoGHCiLibs
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -118,6 +119,8 @@ flags = [
 	"location of the global package config",
   Option [] ["force"] (NoArg FlagForce)
  	"ignore missing dependencies, directories, and libraries",
+  Option ['g'] ["auto-ghci-libs"] (NoArg FlagAutoGHCiLibs)
+	"automatically build libs for GHCi (with register)",
   Option ['?'] ["help"] (NoArg FlagHelp)
 	"display this help and exit",
    Option ['V'] ["version"] (NoArg FlagVersion)
@@ -175,13 +178,14 @@ runit cli nonopts = do
   db_stack <- mapM readParseDatabase dbs
   let
 	force = FlagForce `elem` cli
+	auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
   --
   -- first, parse the command
   case nonopts of
     ["register", filename] -> 
-	registerPackage filename [] db_stack False False force
+	registerPackage filename [] db_stack auto_ghci_libs False force
     ["update", filename] -> 
-	registerPackage filename [] db_stack False True force
+	registerPackage filename [] db_stack auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
 	pkgid <- readPkgId pkgid_str
 	unregisterPackage db_stack pkgid
