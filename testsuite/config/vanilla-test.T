@@ -247,7 +247,7 @@ def vanilla-run-test-actions ( $extra_compile_args,
 {
    pretest_cleanup()
 
-   $res = simple_build_Main_WRK( $extra_compile_args )
+   $res = simple_build_Main_WRK( $extra_compile_args, False )
    -- If the compiler barf'd, fail.
    if   $res /= "0" 
    then say_fail_because_compiler_barfd ( $res )
