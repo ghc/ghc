@@ -1,0 +1,24 @@
+This dreadful little .hc file accounts for the fact that,
+when profiling, modules that import (say) IdLoop will
+try to register the _regIdLoop cost centre.  But there is
+no IdLoop module really, so it generates unresolved
+references by the ton.  
+
+What we do here is simply to satisfy the unresolved references
+
+\begin{code}
+
+STGFUN(_regUbiq){}
+STGFUN(_regAbsCLoop){}
+STGFUN(_regNcgLoop){}
+STGFUN(_regDsLoop){}
+STGFUN(_regIdLoop){}
+STGFUN(_regPrelLoop){}
+STGFUN(_regTyLoop){}
+STGFUN(_regHsLoop){}
+STGFUN(_regSpecLoop){}
+STGFUN(_regTcMLoop){}
+STGFUN(_regTcLoop){}
+STGFUN(_regRnLoop){}
+
+\end{code}
