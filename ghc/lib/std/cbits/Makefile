@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.11 1999/12/07 15:49:53 simonmar Exp $
+# $Id: Makefile,v 1.12 1999/12/08 15:47:07 simonmar Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -15,7 +15,7 @@ C_SRCS= $(wildcard *.c)
 
 C_OBJS  = $(C_SRCS:.c=.$(way_)o)
 LIBOBJS = $(C_OBJS)
-SRC_CC_OPTS += -O -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) $(GhcLibCcOpts)
+SRC_CC_OPTS += -O -I$(GHC_INCLUDE_DIR) -I$(GHC_RUNTIME_DIR) $(GhcLibCcOpts) -Wall
 
 ifneq "$(way)" "dll"
 SRC_CC_OPTS += -static
@@ -36,7 +36,7 @@ SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -
 #
 # Compile the files using the Haskell compiler (ghc really).
 # 
-CC=$(GHC_INPLACE)
+# CC=$(GHC_INPLACE)
 
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 

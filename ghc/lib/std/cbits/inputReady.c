@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.5 1999/09/12 16:24:46 sof Exp $
+ * $Id: inputReady.c,v 1.6 1999/12/08 15:47:08 simonmar Exp $
  *
  * hReady Runtime Support
  */
@@ -56,7 +56,7 @@ StgForeignPtr ptr;
 StgInt msecs;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    int c, fd, maxfd, ready;
+    int fd, maxfd, ready;
 #ifndef mingw32_TARGET_OS
     fd_set rfd;
     struct timeval tv;

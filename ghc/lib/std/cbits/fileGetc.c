@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileGetc.c,v 1.4 1999/11/26 16:25:55 simonmar Exp $
+ * $Id: fileGetc.c,v 1.5 1999/12/08 15:47:07 simonmar Exp $
  *
  * hGetChar Runtime Support
  */
@@ -17,7 +17,7 @@ fileGetc(ptr)
 StgForeignPtr ptr;
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    int l,rc=0;
+    int rc=0;
     unsigned char c;
     
 #if 0

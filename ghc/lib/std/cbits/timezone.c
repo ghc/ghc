@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.c,v 1.5 1999/09/19 19:22:14 sof Exp $
+ * $Id: timezone.c,v 1.6 1999/12/08 15:47:08 simonmar Exp $
  *
  * Timezone Runtime Support
  */
@@ -22,7 +22,8 @@ StgInt get_tm_isdst ( StgAddr x ) { return ((struct tm*)x)->tm_isdst; }
 StgAddr prim_ZONE    ( StgAddr x ) { return ZONE(x);   }
 StgInt prim_GMTOFF  ( StgAddr x ) { return GMTOFF(x); }
 
-StgInt prim_SETZONE ( StgAddr x, StgAddr y )
+void 
+prim_SETZONE ( StgAddr x, StgAddr y )
 {
   SETZONE(x,y);
 }

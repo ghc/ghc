@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getLock.c,v 1.6 1999/05/05 10:33:16 sof Exp $
+ * $Id: getLock.c,v 1.7 1999/12/08 15:47:07 simonmar Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
@@ -134,7 +134,7 @@ int
 unlockFile(fd)
 int fd;
 {
-    int i, rc;
+    int i;
 
     for (i = 0; i < readLocks; i++)
 	if (readLock[i].fd == fd) {

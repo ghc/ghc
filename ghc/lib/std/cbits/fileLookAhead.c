@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: fileLookAhead.c,v 1.4 1999/11/25 16:54:14 simonmar Exp $
+ * $Id: fileLookAhead.c,v 1.5 1999/12/08 15:47:07 simonmar Exp $
  *
  * hLookAhead Runtime Support
  */
@@ -47,7 +47,7 @@ StgInt
 ungetChar(StgForeignPtr ptr, StgChar c)
 {
   IOFileObject* fo = (IOFileObject*)ptr;
-  int rc = 0, sz = 0;
+  int sz = 0;
 
 #if 0
   fprintf(stderr, "ug: %d %d %c\n",fo->bufRPtr, fo->bufWPtr,(char)c, fo->flags);

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: writeFile.c,v 1.11 1999/11/26 16:25:57 simonmar Exp $
+ * $Id: writeFile.c,v 1.12 1999/12/08 15:47:08 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -23,8 +23,6 @@ writeFileObject(StgForeignPtr ptr, StgInt bytes)
     int rc=0;
     IOFileObject* fo = (IOFileObject*)ptr;
 
-    char *p = (char *) fo->buf;
-
     /* If we've got a r/w file object in our hand, flush the
        (input) buffer contents first.
     */
@@ -40,7 +38,7 @@ writeFileObject(StgForeignPtr ptr, StgInt bytes)
 StgInt
 writeBuffer(StgForeignPtr ptr, StgInt bytes)
 {
-    int count, rc=0;
+    int count;
     IOFileObject* fo = (IOFileObject*)ptr;
 
     char *pBuf = (char *) fo->buf + fo->bufStart;

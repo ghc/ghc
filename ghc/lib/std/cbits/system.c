@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.5 1999/03/01 08:57:57 sof Exp $
+ * $Id: system.c,v 1.6 1999/12/08 15:47:08 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -28,8 +28,7 @@
 #endif
 
 StgInt
-systemCmd(cmd)
-StgByteArray cmd;
+systemCmd(StgByteArray cmd)
 {
 #if defined(mingw32_TARGET_OS)
   if (system(cmd) < 0) {

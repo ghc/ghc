@@ -600,7 +600,7 @@ type MBytes = MutableByteArray RealWorld Int
 
 foreign import "libHS_cbits" "sizeof_time_t"    sizeof_time_t    :: Int
 
-foreign import "libHS_cbits" "prim_SETZONE" unsafe prim_SETZONE :: MBytes -> MBytes -> IO Int
+foreign import "libHS_cbits" "prim_SETZONE" unsafe prim_SETZONE :: MBytes -> MBytes -> IO ()
 #ifdef __HUGS__
 foreign import "libHS_cbits" "prim_toLocalTime"  unsafe prim_toLocalTime :: Int64 -> MBytes -> IO Int
 foreign import "libHS_cbits" "prim_toUTCTime"    unsafe prim_toUTCTime   :: Int64 -> MBytes -> IO Int

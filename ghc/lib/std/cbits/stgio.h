@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.15 1999/11/26 16:25:56 simonmar Exp $
+ * $Id: stgio.h,v 1.16 1999/12/08 15:47:08 simonmar Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -199,22 +199,22 @@ StgInt showTime (StgInt, StgByteArray, StgInt, StgByteArray);
 StgInt	systemCmd (StgByteArray);
 
 /* timezone.c */
-StgInt get_tm_sec   ( StgAddr );
-StgInt get_tm_min   ( StgAddr );
-StgInt get_tm_hour  ( StgAddr );
-StgInt get_tm_mday  ( StgAddr );
-StgInt get_tm_mon   ( StgAddr );
-StgInt get_tm_year  ( StgAddr );
-StgInt get_tm_wday  ( StgAddr );
-StgInt get_tm_yday  ( StgAddr );
-StgInt get_tm_isdst ( StgAddr );
-StgAddr prim_ZONE    ( StgAddr );
-StgInt prim_GMTOFF  ( StgAddr );
-StgInt prim_SETZONE ( StgAddr, StgAddr );
-StgInt sizeof_word      ( void ); 
-StgInt sizeof_struct_tm	( void );
-StgInt sizeof_time_t    ( void );
-char*  get_ZONE     ( StgAddr );
+StgInt  get_tm_sec       ( StgAddr );
+StgInt  get_tm_min       ( StgAddr );
+StgInt  get_tm_hour      ( StgAddr );
+StgInt  get_tm_mday      ( StgAddr );
+StgInt  get_tm_mon       ( StgAddr );
+StgInt  get_tm_year      ( StgAddr );
+StgInt  get_tm_wday      ( StgAddr );
+StgInt  get_tm_yday      ( StgAddr );
+StgInt  get_tm_isdst     ( StgAddr );
+StgAddr prim_ZONE        ( StgAddr );
+StgInt  prim_GMTOFF      ( StgAddr );
+void    prim_SETZONE     ( StgAddr, StgAddr );
+StgInt  sizeof_word      ( void ); 
+StgInt  sizeof_struct_tm ( void );
+StgInt  sizeof_time_t    ( void );
+char*   get_ZONE         ( StgAddr );
 
 /* toLocalTime.c */
 StgAddr toLocalTime (StgInt, StgByteArray, StgByteArray);

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePosn.c,v 1.5 1999/09/20 08:36:35 panne Exp $
+ * $Id: filePosn.c,v 1.6 1999/12/08 15:47:07 simonmar Exp $
  *
  * hGetPosn and hSetPosn Runtime Support
  */
@@ -57,13 +57,10 @@ StgForeignPtr ptr;
    (this is ensured by making the Haskell file posn. type abstract.)
 */
 StgInt
-setFilePosn(ptr, size, d)
-StgForeignPtr ptr;
-StgInt size;
-StgByteArray d;
+setFilePosn(StgForeignPtr ptr, StgInt size, StgByteArray d)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
-    int rc, mode;
+    int rc;
     off_t offset;
 
     /*

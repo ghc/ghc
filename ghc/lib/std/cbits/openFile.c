@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.13 1999/12/08 14:04:32 simonmar Exp $
+ * $Id: openFile.c,v 1.14 1999/12/08 15:47:08 simonmar Exp $
  *
  * openFile Runtime Support
  */
@@ -33,9 +33,7 @@
 #endif
 
 IOFileObject*
-openStdFile(fd,rd)
-StgInt fd;
-StgInt rd;
+openStdFile(StgInt fd, StgInt rd)
 {
     IOFileObject* fo;
     long fd_flags;
@@ -69,12 +67,8 @@ StgInt rd;
 #define OPENFILE_READ_WRITE 3
 
 IOFileObject*
-openFile(file, how, binary)
-StgByteArray file;
-StgInt how;
-StgInt binary;
+openFile(StgByteArray file, StgInt how, StgInt binary)
 {
-    FILE *fp;
     int fd;
     int oflags;
     int for_writing;
@@ -290,10 +284,9 @@ StgInt binary;
 
 /* `Lock' file descriptor and return file object. */
 IOFileObject*
-openFd(StgInt fd,StgInt oflags,StgInt flags)
+openFd(StgInt fd, StgInt oflags, StgInt flags)
 {
     int for_writing;
-    FILE* fp;
     IOFileObject* fo;
 
     for_writing = ( ((oflags & O_WRONLY) || (oflags & O_RDWR)) ? 1 : 0);
