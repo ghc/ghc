@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.14 1999/11/02 15:05:52 simonmar Exp $
+ * $Id: StgMacros.h,v 1.15 1999/11/02 17:04:28 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -702,14 +702,14 @@ LoadThreadState (void)
 # endif
 }
 
+#endif /* NO_REGS */
+
 /* 
  * Suspending/resuming threads for doing external C-calls (_ccall_GC).
  * These functions are defined in rts/Schedule.c.
  */
 StgInt        suspendThread ( StgRegTable *cap );
 StgRegTable * resumeThread  ( StgInt );
-
-#endif /* NO_REGS */
 
 #endif /* STGMACROS_H */
 
