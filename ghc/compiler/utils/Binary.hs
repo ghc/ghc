@@ -60,7 +60,7 @@ import Exception
 import GlaExts hiding (ByteArray, newByteArray, freezeByteArray)
 import Array
 import IO
-import PrelIOBase		( IOError(..), IOErrorType(..) )
+import PrelIOBase		( IOError(..), IOErrorType(..), IOException(..) )
 import PrelReal			( Ratio(..) )
 import PrelIOBase	 	( IO(..) )
 #else
@@ -88,13 +88,19 @@ type BinArray = MutableByteArray RealWorld Int
 newArray_ bounds     = stToIO (newCharArray bounds)
 unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
 unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
+#if __GLASGOW_HASKELL__ < 411
 newByteArray#        = newCharArray#
+#endif
 hPutArray h arr sz   = hPutBufBAFull h arr sz
 hGetArray h sz       = hGetBufBAFull h sz
 
 mkIOError :: IOErrorType -> String -> Maybe Handle -> Maybe FilePath -> Exception
 mkIOError t location maybe_hdl maybe_filename
-  = IOException (IOError maybe_hdl t location "")
+  = IOException (IOError maybe_hdl t location ""
+#if __GLASGOW_HASKELL__ > 411
+		         maybe_filename
+#endif
+  		)
 
 eofErrorType = EOF
 
