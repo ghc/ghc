@@ -293,7 +293,7 @@ these are turned off by -Wnot.
 		     '-fwarn-missing-methods',
 		     '-fwarn-missing-fields',
 		     '-fwarn-deprecations',
-		     '-fwarn-hi-shadowing',
+# DISABLE DUE TO DUPLICATE INCLUDE PATHS (ToDo): '-fwarn-hi-shadowing',
 		     '-fwarn-duplicate-exports');
 @MinusWOpts    	  = (@StandardWarnings, 
 		     '-fwarn-unused-binds',
