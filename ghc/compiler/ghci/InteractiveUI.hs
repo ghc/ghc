@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.128 2002/07/02 16:27:38 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.129 2002/07/17 13:49:15 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -262,7 +262,7 @@ interactiveLoop is_tty = do
 	then readlineLoop
 	else fileLoop stdin False  -- turn off prompt for non-TTY input
 #else
-  fileLoop stdin True
+  fileLoop stdin is_tty
 #endif
 
 
