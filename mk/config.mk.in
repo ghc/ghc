@@ -365,7 +365,12 @@ NoFibHcOpts = -O
 # this in build.mk or set your environment variable "TMPDIR" to point
 # to somewhere with more space.  (TMPDIR=. is a good choice).
 
-TMPDIR			= /tmp
+# DEFAULT_TMPDIR isn't called TMPDIR because GNU make tends to
+# override the environment variable with the value of the make
+# variable when executing sub-processes, so setting the TMPDIR env var
+# would have no effect in the build tree.
+
+DEFAULT_TMPDIR		= /tmp
 
 # FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
 

@@ -81,7 +81,7 @@ CHMOD       = chmod
 INSTALL	    = @INSTALL@
 exeext      = @exeext@
 SED	    = @SedCmd@
-TMPDIR      = /tmp
+DEFAULT_TMPDIR = /tmp
 
 # sigh
 INSTALL_DIR  = ./mkdirhier
@@ -130,7 +130,7 @@ config-pkgs ::
 	   echo '$$'"libexecdir='$(libdir)';"       >> bin/$(platform)/$$i ; \
 	   echo '$$'"datadir='$(datadir)';"         >> bin/$(platform)/$$i ; \
 	   echo '$$'"SED='$(SED)';"		    >> bin/$(platform)/$$i ; \
-	   echo '$$'"TMPDIR='$(TMPDIR)';"	    >> bin/$(platform)/$$i ; \
+	   echo '$$'"DEFAULT_TMPDIR='$(DEFAULT_TMPDIR)';" >> bin/$(platform)/$$i ; \
 	   cat bin/$(platform)/$$i.prl   	    >> bin/$(platform)/$$i ; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$$i; \
 	   echo "Done."; \
@@ -147,7 +147,7 @@ config-pkgs ::
 	   echo '$$'"libexecdir='$(libdir)';"      >> lib/$(platform)/$$i ; \
 	   echo '$$'"datadir='$(datadir)';"        >> lib/$(platform)/$$i ; \
 	   echo '$$'"SED='$(SED)';"		   >> lib/$(platform)/$$i ; \
-	   echo '$$'"TMPDIR='$(TMPDIR)';"	   >> lib/$(platform)/$$i ; \
+	   echo '$$'"DEFAULT_TMPDIR='$(DEFAULT_TMPDIR)';"  >> lib/$(platform)/$$i ; \
 	   cat lib/$(platform)/$$i.prl >> lib/$(platform)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) lib/$(platform)/$$i; \
 	   echo "Done."; \
@@ -164,7 +164,7 @@ config-pkgs ::
 	   echo "libexecdir='$(libdir)'"        >> bin/$(platform)/$$i ; \
 	   echo "datadir='$(datadir)'"          >> bin/$(platform)/$$i ; \
 	   echo "SED='$(SED)'"			>> bin/$(platform)/$$i ; \
-	   echo "TMPDIR='$(TMPDIR)'"		>> bin/$(platform)/$$i ; \
+	   echo "DEFAULT_TMPDIR='$(DEFAULT_TMPDIR)'" >> bin/$(platform)/$$i ; \
 	   cat bin/$(platform)/$$i.sh >> bin/$(platform)/$$i; \
 	   $(CHMOD) $(BIN_PERMS) bin/$(platform)/$$i; \
 	   echo "Done."; \

@@ -1,7 +1,7 @@
 #
 # The perl script requires bindings for the following
 # variables to be prepended:
-#     TMPDIR
+#     DEFAULT_TMPDIR
 #     CONTEXTDIFF
 #
 
@@ -37,8 +37,8 @@ if (-f $ARGV[0]) {
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} ;
 } else {
-    $Tmp_prefix ="$TMPDIR";
-    $ENV{'TMPDIR'} = "$TMPDIR"; # set the env var as well
+    $Tmp_prefix ="$DEFAULT_TMPDIR";
+    $ENV{'TMPDIR'} = "$DEFAULT_TMPDIR"; # set the env var as well
 }
 
 sub rm_temp_files {

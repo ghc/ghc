@@ -2,7 +2,7 @@
 # The perl script requires the following variables to be bound
 # to something meaningful before it will operate correctly:
 #   
-#   TMPDIR
+#   DEFAULT_TMPDIR
 #   CONTEXT_DIFF
 #   RM
 #
@@ -51,8 +51,8 @@ $PgmStdinFile  = '/dev/null';
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $TmpPrefix = $ENV{'TMPDIR'};
 } else {
-    $TmpPrefix ="$TMPDIR";
-    $ENV{'TMPDIR'} = "$TMPDIR"; # set the env var as well
+    $TmpPrefix ="$DEFAULT_TMPDIR";
+    $ENV{'TMPDIR'} = "$DEFAULT_TMPDIR"; # set the env var as well
 }
 $ScriptFile = "$TmpPrefix/run_me$$";
 $DefaultStdoutFile = "$TmpPrefix/no_stdout$$"; # can't use /dev/null (e.g. Alphas)

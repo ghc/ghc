@@ -17,7 +17,7 @@ SCRIPT_SUBST_VARS=\
  ProjectVersionInt
 
 ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir libexecdir TMPDIR
+SCRIPT_SUBST_VARS += libdir libexecdir DEFAULT_TMPDIR
 endif
 
 #

@@ -2,7 +2,7 @@
 # This stub of perl assumes that the following two
 # variables are prepended:
 #
-# TMPDIR CPP
+# DEFAULT_TMPDIR CPP
 #
 # ToDo: strip out all the .h junk
 #
@@ -26,8 +26,8 @@ $baseName='';
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $Tmp_prefix = $ENV{'TMPDIR'} . "/mkdependC$$";
 } else {
-    $Tmp_prefix ="${TMPDIR}/mkdependC$$";
-    $ENV{'TMPDIR'} = "${TMPDIR}"; # set the env var as well
+    $Tmp_prefix ="${DEFAULT_TMPDIR}/mkdependC$$";
+    $ENV{'TMPDIR'} = "${DEFAULT_TMPDIR}"; # set the env var as well
 }
 
 $tempfile = '';

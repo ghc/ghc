@@ -3,7 +3,7 @@
 # set:
 #
 #   INSTALLING
-#   TMPDIR
+#   DEFAULT_TMPDIR
 #   TOP_PWD
 #   libdir
 #   libexecdir
@@ -13,8 +13,8 @@
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $tmp = $ENV{'TMPDIR'} . "/$$.eht";
 } else {
-    $tmp ="${TMPDIR}/$$.eht";
-    $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
+    $tmp ="${DEFAULT_TMPDIR}/$$.eht";
+    $ENV{'TMPDIR'} = ${DEFAULT_TMPDIR}; # set the env var as well
 }
 
 $TopPwd         = "${TOP_PWD}"; # *Only* needed when using it in-situ (i.e., INSTALLING=0).

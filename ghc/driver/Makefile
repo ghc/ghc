@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.43 2000/08/02 15:27:25 simonmar Exp $
+# $Id: Makefile,v 1.44 2000/09/05 10:16:41 simonmar Exp $
 #
 
 TOP=..
@@ -37,40 +37,40 @@ Config.hs : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@$(RM) -f Config.hs
 	@echo -n "Creating Config.hs ... "
 	@echo "module Config where" >>Config.hs
-	@echo "cProjectName          = \"$(ProjectName)\"" >> Config.hs            
-	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> Config.hs         
-	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> Config.hs      
-	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> Config.hs      
-	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> Config.hs           
-	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> Config.hs         
-	@echo "cCURRENT_DIR          = \"$(CURRENT_DIR)\"" >> Config.hs            
-	@echo "cGHC_LIB_DIR          = \"$(GHC_LIB_DIR)\"" >> Config.hs            
-	@echo "cGHC_RUNTIME_DIR      = \"$(GHC_RUNTIME_DIR)\"" >> Config.hs        
-	@echo "cGHC_UTILS_DIR        = \"$(GHC_UTILS_DIR)\"" >> Config.hs          
-	@echo "cGHC_INCLUDE_DIR      = \"$(GHC_INCLUDE_DIR)\"" >> Config.hs        
-	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> Config.hs        
+	@echo "cProjectName          = \"$(ProjectName)\"" >> Config.hs
+	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> Config.hs
+	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> Config.hs
+	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> Config.hs
+	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> Config.hs
+	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> Config.hs
+	@echo "cCURRENT_DIR          = \"$(CURRENT_DIR)\"" >> Config.hs
+	@echo "cGHC_LIB_DIR          = \"$(GHC_LIB_DIR)\"" >> Config.hs
+	@echo "cGHC_RUNTIME_DIR      = \"$(GHC_RUNTIME_DIR)\"" >> Config.hs
+	@echo "cGHC_UTILS_DIR        = \"$(GHC_UTILS_DIR)\"" >> Config.hs
+	@echo "cGHC_INCLUDE_DIR      = \"$(GHC_INCLUDE_DIR)\"" >> Config.hs
+	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> Config.hs
 	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> Config.hs
-	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> Config.hs   
-	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> Config.hs      
-	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> Config.hs              
-	@echo "cGHC_HSC              = \"$(GHC_HSC)\"" >> Config.hs                
+	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> Config.hs
+	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> Config.hs
+	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> Config.hs
+	@echo "cGHC_HSC              = \"$(GHC_HSC)\"" >> Config.hs
 	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> Config.hs
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> Config.hs
 	@echo "cGHC_STATS            = \"$(GHC_STATS)\"" >> Config.hs
-	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> Config.hs             
-	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> Config.hs        
-	@echo "cCP                   = \"$(CP)\"" >> Config.hs                     
-	@echo "cRM                   = \"$(RM)\"" >> Config.hs                     
-	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> Config.hs           
+	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> Config.hs
+	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> Config.hs
+	@echo "cCP                   = \"$(CP)\"" >> Config.hs
+	@echo "cRM                   = \"$(RM)\"" >> Config.hs
+	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> Config.hs
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> Config.hs
-	@echo "cGhcWithRegisterised  = \"$(GhcWithRegisterised)\"" >> Config.hs    
-	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> Config.hs         
-	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> Config.hs          
-	@echo "clibdir               = \"$(libdir)\"" >> Config.hs                 
-	@echo "clibexecdir           = \"$(libexecdir)\"" >> Config.hs             
-	@echo "cdatadir              = \"$(datadir)\"" >> Config.hs                
-	@echo "cbindir               = \"$(bindir)\"" >> Config.hs                 
-	@echo "cTMPDIR               = \"$(TMPDIR)\"" >> Config.hs                 
+	@echo "cGhcWithRegisterised  = \"$(GhcWithRegisterised)\"" >> Config.hs
+	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> Config.hs
+	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> Config.hs
+	@echo "clibdir               = \"$(libdir)\"" >> Config.hs
+	@echo "clibexecdir           = \"$(libexecdir)\"" >> Config.hs
+	@echo "cdatadir              = \"$(datadir)\"" >> Config.hs
+	@echo "cbindir               = \"$(bindir)\"" >> Config.hs
+	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> Config.hs
 	@echo "cFPTOOLS_TOP_ABS      = \"$(FPTOOLS_TOP_ABS)\"" >> Config.hs
 	@echo "cRAWCPP               = \"$(RAWCPP)\"" >> Config.hs
 	@echo done.

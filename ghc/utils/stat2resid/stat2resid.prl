@@ -3,7 +3,7 @@
 #
 # Perl script expect bindings for the following variables to be prepended
 #
-#   TMPDIR libdir
+#   DEFAULT_TMPDIR libdir
 #
 # without them, not much success :-(
 #
@@ -14,8 +14,8 @@ $outsuffix = ".resid.ps";	# change as appropriate
 if ( $ENV{'TMPDIR'} ) { # where to make tmp file names
     $tmpfile = $ENV{'TMPDIR'} . "/$$.resid.data";
 } else {
-    $tmpfile ="${TMPDIR}/$$.resid.data";
-    $ENV{'TMPDIR'} = ${TMPDIR}; # set the env var as well
+    $tmpfile ="${DEFAULT_TMPDIR}/$$.resid.data";
+    $ENV{'TMPDIR'} = ${DEFAULT_TMPDIR}; # set the env var as well
 }
 
 @INC = ( ${libdir} );
