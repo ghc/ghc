@@ -161,10 +161,14 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls mod_deprec l
     getIfacesRn 			`thenRn` \ ifaces ->
     let
 	direct_import_mods :: [Module]
-	direct_import_mods = [m | (_, _, Just (m, _, _, _, ImportByUser, _))
-				  <- eltsFM (iImpModInfo ifaces)]
-		-- Pick just the non-back-edge imports
-		-- (Back edges are ImportByUserSource)
+	direct_import_mods = [m | (_, _, Just (m, _, _, _, imp, _))
+				  <- eltsFM (iImpModInfo ifaces), user_import imp]
+
+		-- *don't* just pick the forward edges.  It's entirely possible
+		-- that a module is only reachable via back edges.
+	user_import ImportByUser = True
+	user_import ImportByUserSource = True
+	user_import _ = False
 
 	this_module	   = mkThisModule mod_name
 
