@@ -220,7 +220,7 @@ else
 	myexit=\$?
 	diffsShown=1
     fi
-    if [ $SaveStdout = 1 ] && [ \$progexit = $PgmExitStatus ] && 
+    if [ $SaveStdout = 1 ] && 
        [ $PgmStdoutFile[0] != $DefaultStdoutFile ] && [ -s $TmpPrefix/runtest$$.1 ]; then
 	echo Saving away stdout output in $PgmStdoutFile[0] ...
 	if [ -f $PgmStdoutFile[0] ]; then
@@ -248,7 +248,7 @@ if [ \$hit = 'NO' ] ; then
     myexit=\$?
     diffsShown=1
 fi
-if [ $SaveStderr = 1 ] && [ \$progexit = $PgmExitStatus ] && 
+if [ $SaveStderr = 1 ] &&
    [ $PgmStderrFile[0] != $DefaultStderrFile ] && [ -s $TmpPrefix/runtest$$.2 ]; then
 	echo Saving away stderr output in $PgmStderrFile[0] ...
 	if [ -f $PgmStderrFile[0] ]; then
