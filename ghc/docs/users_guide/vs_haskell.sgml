@@ -221,6 +221,19 @@ main = print (array (1,1) [(1,2), (1,3)])</programlisting>
 	  writing <literal>0xffffffff :: Int</literal> preserves the
 	  bit-pattern in the resulting <literal>Int</literal>.</para>
 
+
+	   <para>Negative literals, such as <literal>-3</literal>, are
+             specified by (a careful reading of) the Haskell Report as 
+             meaning <literal>Prelude.negate (Prelude.fromInteger 3)</literal>.
+	     So <literal>-2147483648</literal> means <literal>negate (fromInteger 2147483648)</literal>.
+	     Since <literal>fromInteger</literal> takes the lower 32 bits of the representation,
+	     <literal>fromInteger (2147483648::Integer)</literal>, computed at type <literal>Int</literal> is
+	     <literal>-2147483648::Int</literal>.  The <literal>negate</literal> operation then
+	     overflows, but it is unchecked, so <literal>negate (-2147483648::Int)</literal> is just
+	     <literal>-2147483648</literal>.  In short, one can write <literal>minBound::Int</literal> as
+	     a literal with the expected meaning (but that is not in general guaranteed.
+             </para>
+
 	  <para>The <literal>fromIntegral</literal> function also
 	  preserves bit-patterns when converting between the sized
 	  integral types (<literal>Int8</literal>,

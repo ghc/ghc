@@ -130,7 +130,7 @@ program), you may wish to check if there are libraries that provide a
             module namespace is flat, and you must not conflict with
             any Prelude module.)</para>
 
-	    <para>Even though you have not imported the Prelude, all
+	    <para>Even though you have not imported the Prelude, most of
             the built-in syntax still refers to the built-in Haskell
             Prelude types and values, as specified by the Haskell
             Report.  For example, the type <literal>[Int]</literal>
@@ -139,51 +139,9 @@ program), you may wish to check if there are libraries that provide a
             translation for list comprehensions continues to use
             <literal>Prelude.map</literal> etc.</para>
 
-	    <para> With one group of exceptions!  You may want to
-            define your own numeric class hierarchy.  It completely
-            defeats that purpose if the literal "1" means
-            "<literal>Prelude.fromInteger 1</literal>", which is what
-            the Haskell Report specifies.  So the
-            <option>-fno-implicit-prelude</option> flag causes the
-            following pieces of built-in syntax to refer to <emphasis>whatever
-            is in scope</emphasis>, not the Prelude versions:</para>
-
-	    <itemizedlist>
-	      <listitem>
-		<para>Integer and fractional literals mean
-                "<literal>fromInteger 1</literal>" and
-                "<literal>fromRational 3.2</literal>", not the
-                Prelude-qualified versions; both in expressions and in
-                patterns.</para>
-	      </listitem>
-
-	      <listitem>
-		<para>Negation (e.g. "<literal>- (f x)</literal>")
-		means "<literal>negate (f x)</literal>" (not
-		<literal>Prelude.negate</literal>).</para>
-	      </listitem>
-
-	      <listitem>
-		<para>In an n+k pattern, the standard Prelude
-                <literal>Ord</literal> class is still used for comparison,
-                but the necessary subtraction uses whatever
-                "<literal>(-)</literal>" is in scope (not
-                "<literal>Prelude.(-)</literal>").</para>
-	      </listitem>
-	    </itemizedlist>
-
-	     <para>Note: Negative literals, such as <literal>-3</literal>, are
-             specified by (a careful reading of) the Haskell Report as 
-             meaning <literal>Prelude.negate (Prelude.fromInteger 3)</literal>.
-             However, GHC deviates from this slightly, and treats them as meaning
-             <literal>fromInteger (-3)</literal>.  One particular effect of this
-             slightly-non-standard reading is that there is no difficulty with
-             the literal <literal>-2147483648</literal> at type <literal>Int</literal>;
-             it means <literal>fromInteger (-2147483648)</literal>.  The strict interpretation
-             would be <literal>negate (fromInteger 2147483648)</literal>,
-             and the call to <literal>fromInteger</literal> would overflow
-             (at type <literal>Int</literal>, remember).
-             </para>
+	    <para>However, <option>-fno-implicit-prelude</option> does
+	    change the handling of certain built-in syntax: see
+	    <xref LinkEnd="rebindable-syntax">.</para>
 
 	  </listitem>
 	</varlistentry>
@@ -2407,9 +2365,13 @@ for the details.
 
 </sect1>
 
+
+<sect1 id="syntax-extns">
+<title>Syntactic extensions</title>
+
 <!-- ====================== PATTERN GUARDS =======================  -->
 
-<sect1 id="pattern-guards">
+<sect2 id="pattern-guards">
 <title>Pattern guards</title>
 
 <para>
@@ -2534,11 +2496,11 @@ f x | [y] <- x
 Haskell's current guards therefore emerge as a special case, in which the
 qualifier list has just one element, a boolean expression.
 </para>
-</sect1>
+</sect2>
 
 <!-- ===================== PARALLEL LIST COMPREHENSIONS ===================  -->
 
-  <sect1 id="parallel-list-comprehensions">
+  <sect2 id="parallel-list-comprehensions">
     <title>Parallel List Comprehensions</title>
     <indexterm><primary>list comprehensions</primary><secondary>parallel</secondary>
     </indexterm>
@@ -2586,7 +2548,73 @@ qualifier list has just one element, a boolean expression.
     <para>where `zipN' is the appropriate zip for the given number of
     branches.</para>
 
-  </sect1>
+  </sect2>
+
+<sect2 id="rebindable-syntax">
+<title>Rebindable syntax</title>
+
+
+	    <para> Your may want to
+            define your own numeric class hierarchy.  It completely
+            defeats that purpose if the literal "1" means
+            "<literal>Prelude.fromInteger 1</literal>", which is what
+            the Haskell Report specifies.  So the
+            <option>-fno-implicit-prelude</option> flag causes the
+            following pieces of built-in syntax to refer to <emphasis>whatever
+            is in scope</emphasis>, not the Prelude versions:</para>
+
+	    <itemizedlist>
+	      <listitem>
+		<para>Integer and fractional literals mean
+                "<literal>fromInteger 1</literal>" and
+                "<literal>fromRational 3.2</literal>", not the
+                Prelude-qualified versions; both in expressions and in
+                patterns. </para>
+	      </listitem>
+
+	      <listitem>
+		<para>Negation (e.g. "<literal>- (f x)</literal>")
+		means "<literal>negate (f x)</literal>" (not
+		<literal>Prelude.negate</literal>).</para>
+	      </listitem>
+
+	      <listitem>
+		<para>In an n+k pattern, the standard Prelude
+                <literal>Ord</literal> class is still used for comparison,
+                but the necessary subtraction uses whatever
+                "<literal>(-)</literal>" is in scope (not
+                "<literal>Prelude.(-)</literal>").</para>
+	      </listitem>
+
+	      <listitem>
+	      <para>"Do" notation is translated using whatever functions
+	      <literal>(>>=)</literal>, <literal>(>>)</literal>, <literal>fail</literal>, 
+	      and <literal>return</literal>, are in scope (not the Prelude versions).
+	      List comprehensions, and parallel array comprehensions, are unaffected.
+	     </para></listitem>
+	    </itemizedlist>
+
+	     <para>Be warned: this is an experimental facility, with fewer checks than
+	     usual.  In particular, it is essential that the functions GHC finds in scope
+	     must have the appropriate types, namely:
+	     <screen>
+	        fromInteger  :: forall a. (...) => Integer  -> a
+		fromRational :: forall a. (...) => Rational -> a
+		negate       :: forall a. (...) => a -> a
+		(-)          :: forall a. (...) => a -> a -> a
+		(>>=)	     :: forall m a. (...) => m a -> (a -> m b) -> m b
+		(>>)	     :: forall m a. (...) => m a -> m b -> m b
+		return	     :: forall m a. (...) => a      -> m a
+		fail	     :: forall m a. (...) => String -> m a
+	     </screen>
+	     (The (...) part can be any context including the empty context; that part 
+	     is up to you.)
+	     If the functions don't have the right type, very peculiar things may 
+	     happen.  Use <literal>-dcore-lint</literal> to
+	     typecheck the desugared program.  If Core Lint is happy you should be all right.</para>
+
+</sect2>
+</sect1>
 
 <!-- =============================== PRAGMAS ===========================  -->
 
