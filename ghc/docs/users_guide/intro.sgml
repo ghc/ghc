@@ -358,11 +358,18 @@
 
 	  <para>Snapshot releases are named
 	  <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.YYYYMMDD</literal>
-	  where <literal>y</literal> is <emphasis>odd</emphasis>, and
-	  <literal>YYYYMMDD</literal> is the date of the sources from
-	  which the snapshot was built.  In theory, you can check out
-	  the exact same sources from the CVS repository using this
-	  date.</para>
+	  where <literal>YYYYMMDD</literal> is the date of the sources
+	  from which the snapshot was built.  In theory, you can check
+	  out the exact same sources from the CVS repository using
+	  this date.</para>
+
+	  <para>If <replaceable>y</replaceable> is odd, then this is a
+	  snapshot of the CVS HEAD (the main development branch).  If
+	  <replaceable>y</replaceable> is even, then it is a snapshot
+	  of the stable branch between patchlevel releases.  For
+	  example, <literal>6.3.20040225</literal> would be a snapshot
+	  of the HEAD, but <literal>6.2.20040225</literal> would be a
+	  snapshot of the <literal>6.2</literal> branch.</para>
 
 	  <para>The value of <literal>__GLASGOW_HASKELL__</literal>
 	  for a snapshot release is the integer
