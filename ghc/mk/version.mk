@@ -19,9 +19,9 @@
 # ProjectVersion    is treated as a *string*
 # ProjectVersionInt is treated as an *integer* (for cpp defines)
 
-# Versioning scheme: A.BB.C
-#         A: major version, any number of digits
-#         B: minor version, two digits padded with leading zeros
+# Versioning scheme: A.B.C
+#         A: major version, decimal, any number of digits
+#         B: minor version, decimal, any number of digits
 #	  C: patchlevel, one digit, omitted if zero.
 #
 # ProjectVersionInt does *not* contain the patchlevel (rationale: this
@@ -36,8 +36,8 @@
 
 ProjectName       = The Glorious Glasgow Haskell Compilation System
 ProjectNameShort  = ghc
-ProjectVersion    = 5.05
-ProjectVersionInt = 505
+ProjectVersion    = 6.0
+ProjectVersionInt = 600
 ProjectPatchLevel = 0
 
 # Interface file version (hi-boot files only)
