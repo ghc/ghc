@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.76 2000/05/08 17:24:10 panne Exp $
+# $Id: Makefile,v 1.77 2000/05/10 13:07:43 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -142,6 +142,7 @@ usageSP/UsageSPInf_HC_OPTS	= -Onot
 
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
 parser/Lex_HC_OPTS		= -fvia-C -K2m -H16m 
+parser/Ctype_HC_OPTS		= -K2m -fvia-C
 
 rename/ParseIface_HC_OPTS 	+= -Onot -H45m -K2m -fno-warn-incomplete-patterns
 rename/ParseIface_HAPPY_OPTS    += -g
