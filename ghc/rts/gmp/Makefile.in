@@ -61,7 +61,7 @@ FLAGS_TO_PASS = "CC=$(CC)" "CFLAGS=$(CFLAGS)" "XCFLAGS=$(XCFLAGS)"
 
 all: libgmp.a
 
-.c.o:
+%.o : %.c
 	$(CC) -c $(INCLUDES) $(CFLAGS) $(XCFLAGS) $<
 
 libgmp.a: mpn/libmpn.a mpz/libmpz.a $(OBJS)
