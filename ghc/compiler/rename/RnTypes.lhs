@@ -8,7 +8,7 @@ module RnTypes ( rnHsType, rnContext,
 		 rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs, 
 		 rnPat, rnPats, rnPatsAndThen,	-- Here because it's not part 
 		 rnOverLit, litFVs,		-- of any mutual recursion	
-		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr
+		 precParseErr, sectionPrecErr, dupFieldErr, patSigErr, checkTupSize
   ) where
 
 import CmdLineOpts	( DynFlag(Opt_WarnMisc, Opt_WarnUnusedMatches, Opt_GlasgowExts) )
@@ -27,6 +27,7 @@ import TcRnMonad
 import PrelNames( cCallishClassKeys, eqStringName, eqClassName, ordClassName, 
 		  negateName, minusName, lengthPName, indexPName, plusIntegerName, fromIntegerName,
 		  timesIntegerName, ratioDataConName, fromRationalName, cCallableClassName )
+import Constants	( mAX_TUPLE_SIZE )
 import TysWiredIn	( intTyCon )
 import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon, 
 			  floatPrimTyCon, doublePrimTyCon )
@@ -402,10 +403,12 @@ rnPat (PArrPat pats _)
     implicit_fvs = mkFVs [lengthPName, indexPName]
 
 rnPat (TuplePat pats boxed)
-  = rnPats pats			`thenM` \ (patslist, fvs) ->
+  = checkTupSize tup_size	`thenM_`
+    rnPats pats			`thenM` \ (patslist, fvs) ->
     returnM (TuplePat patslist boxed, fvs `addOneFV` tycon_name)
   where
-    tycon_name = tupleTyCon_name boxed (length pats)
+    tup_size   = length pats
+    tycon_name = tupleTyCon_name boxed tup_size
 
 rnPat (TypePat name) =
     rnHsTypeFVs (text "In a type pattern") name	`thenM` \ (name', fvs) ->
@@ -545,8 +548,16 @@ rnOverLit (HsFractional i _)
 %*							*
 %*********************************************************
 
-\end{code}
 \begin{code}
+checkTupSize :: Int -> RnM ()
+checkTupSize tup_size
+  | tup_size <= mAX_TUPLE_SIZE 
+  = returnM ()
+  | otherwise		       
+  = addErr (sep [ptext SLIT("A") <+> int tup_size <> ptext SLIT("-tuple is too large for GHC"),
+		 nest 2 (parens (ptext SLIT("max size is") <+> int mAX_TUPLE_SIZE)),
+		 nest 2 (ptext SLIT("Workaround: use nested tuples or define a data type"))])
+
 forAllWarn doc ty tyvar
   = ifOptM Opt_WarnUnusedMatches 	$
     getModeRn				`thenM` \ mode ->

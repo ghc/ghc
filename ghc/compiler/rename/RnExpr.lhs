@@ -30,7 +30,7 @@ import TcRnMonad
 import RnEnv
 import RnNames		( importsFromLocalDecls )
 import RnTypes		( rnHsTypeFVs, rnPat, litFVs, rnOverLit, rnPatsAndThen,
-			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr )
+			  dupFieldErr, precParseErr, sectionPrecErr, patSigErr, checkTupSize )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..),
 			  defaultFixity, negateFixity, compareFixity )
@@ -322,11 +322,13 @@ rnExpr (ExplicitPArr _ exps)
     returnM  (ExplicitPArr placeHolderType exps', 
 	       fvs `addOneFV` toPName `addOneFV` parrTyCon_name)
 
-rnExpr (ExplicitTuple exps boxity)
-  = rnExprs exps	 			`thenM` \ (exps', fvs) ->
+rnExpr e@(ExplicitTuple exps boxity)
+  = checkTupSize tup_size			`thenM_`
+    rnExprs exps	 			`thenM` \ (exps', fvs) ->
     returnM (ExplicitTuple exps' boxity, fvs `addOneFV` tycon_name)
   where
-    tycon_name = tupleTyCon_name boxity (length exps)
+    tup_size   = length exps
+    tycon_name = tupleTyCon_name boxity tup_size
 
 rnExpr (RecordCon con_id rbinds)
   = lookupOccRn con_id 			`thenM` \ conname ->
