@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.41 1999/02/24 17:24:07 simonm Exp $
+ * $Id: GC.c,v 1.42 1999/02/25 17:52:33 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -856,6 +856,13 @@ static void addBlock(step *step)
   new_blocks++;
 }
 
+static __inline__ void 
+upd_evacuee(StgClosure *p, StgClosure *dest)
+{
+  p->header.info = &EVACUATED_info;
+  ((StgEvacuated *)p)->evacuee = dest;
+}
+
 static __inline__ StgClosure *
 copy(StgClosure *src, nat size, step *step)
 {
@@ -888,6 +895,7 @@ copy(StgClosure *src, nat size, step *step)
 
   dest = step->hp;
   step->hp = to;
+  upd_evacuee(src,(StgClosure *)dest);
   return (StgClosure *)dest;
 }
 
@@ -920,16 +928,8 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *step)
   
   dest = step->hp;
   step->hp += size_to_reserve;
+  upd_evacuee(src,(StgClosure *)dest);
   return (StgClosure *)dest;
-}
-
-static __inline__ void 
-upd_evacuee(StgClosure *p, StgClosure *dest)
-{
-  StgEvacuated *q = (StgEvacuated *)p;
-
-  SET_INFO(q,&EVACUATED_info);
-  q->evacuee = dest;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1090,46 +1090,46 @@ loop:
   switch (info -> type) {
 
   case BCO:
-    to = copy(q,bco_sizeW(stgCast(StgBCO*,q)),step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,bco_sizeW(stgCast(StgBCO*,q)),step);
 
   case MUT_VAR:
     ASSERT(q->header.info != &MUT_CONS_info);
   case MVAR:
     to = copy(q,sizeW_fromITBL(info),step);
-    upd_evacuee(q,to);
     recordMutable((StgMutClosure *)to);
     return to;
 
   case STABLE_NAME:
     stable_ptr_table[((StgStableName *)q)->sn].keep = rtsTrue;
-    to = copy(q,sizeofW(StgStableName),step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,sizeofW(StgStableName),step);
 
   case FUN_1_0:
   case FUN_0_1:
   case CONSTR_1_0:
   case CONSTR_0_1:
-    to = copy(q,sizeofW(StgHeader)+1,step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,sizeofW(StgHeader)+1,step);
 
   case THUNK_1_0:		/* here because of MIN_UPD_SIZE */
   case THUNK_0_1:
-  case FUN_1_1:
-  case FUN_0_2:
-  case FUN_2_0:
   case THUNK_1_1:
   case THUNK_0_2:
   case THUNK_2_0:
+#ifdef NO_PROMOTE_THUNKS
+    if (bd->gen->no == 0 && 
+	bd->step->no != 0 &&
+	bd->step->no == bd->gen->n_steps-1) {
+      step = bd->step;
+    }
+#endif
+    return copy(q,sizeofW(StgHeader)+2,step);
+
+  case FUN_1_1:
+  case FUN_0_2:
+  case FUN_2_0:
   case CONSTR_1_1:
   case CONSTR_0_2:
   case CONSTR_2_0:
-    to = copy(q,sizeofW(StgHeader)+2,step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,sizeofW(StgHeader)+2,step);
 
   case FUN:
   case THUNK:
@@ -1140,19 +1140,14 @@ loop:
   case CAF_ENTERED:
   case WEAK:
   case FOREIGN:
-    to = copy(q,sizeW_fromITBL(info),step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,sizeW_fromITBL(info),step);
 
   case CAF_BLACKHOLE:
   case BLACKHOLE:
-    to = copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),step);
-    upd_evacuee(q,to);
-    return to;
+    return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),step);
 
   case BLACKHOLE_BQ:
     to = copy(q,BLACKHOLE_sizeW(),step); 
-    upd_evacuee(q,to);
     recordMutable((StgMutClosure *)to);
     return to;
 
@@ -1239,9 +1234,7 @@ loop:
 	barf("evacuate: THUNK_SELECTOR: strange selectee");
       }
     }
-    to = copy(q,THUNK_SELECTOR_sizeW(),step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,THUNK_SELECTOR_sizeW(),step);
 
   case IND:
   case IND_OLDGEN:
@@ -1299,9 +1292,7 @@ loop:
   case PAP:
     /* these are special - the payload is a copy of a chunk of stack,
        tagging and all. */
-    to = copy(q,pap_sizeW(stgCast(StgPAP*,q)),step);
-    upd_evacuee(q,to);
-    return to;
+    return copy(q,pap_sizeW(stgCast(StgPAP*,q)),step);
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
@@ -1330,9 +1321,7 @@ loop:
 	return q;
       } else {
 	/* just copy the block */
-	to = copy(q,size,step);
-	upd_evacuee(q,to);
-	return to;
+	return copy(q,size,step);
       }
     }
 
@@ -1347,7 +1336,6 @@ loop:
       } else {
 	/* just copy the block */
 	to = copy(q,size,step);
-	upd_evacuee(q,to);
 	if (info->type == MUT_ARR_PTRS) {
 	  recordMutable((StgMutClosure *)to);
 	}
@@ -1381,7 +1369,6 @@ loop:
 	new_tso->splim = (StgPtr)new_tso->splim + diff;
 	
 	relocate_TSO(tso, new_tso);
-	upd_evacuee(q,(StgClosure *)new_tso);
 
 	recordMutable((StgMutClosure *)new_tso);
 	return (StgClosure *)new_tso;
@@ -2273,12 +2260,10 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	  case CAF_BLACKHOLE:
 	    to = copyPart(frame->updatee, BLACKHOLE_sizeW(), 
 			  sizeofW(StgHeader), step);
-	    upd_evacuee(frame->updatee,to);
 	    frame->updatee = to;
 	    continue;
 	  case BLACKHOLE_BQ:
 	    to = copy(frame->updatee, BLACKHOLE_sizeW(), step);
-	    upd_evacuee(frame->updatee,to);
 	    frame->updatee = to;
 	    recordMutable((StgMutClosure *)to);
 	    continue;
