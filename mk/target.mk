@@ -381,10 +381,15 @@ all :: $(SCRIPT_PROG)
 $(SCRIPT_PROG) :: $(SCRIPT_OBJS)
 	$(RM) $@
 	@echo Creating $@...
+ifeq "$(INTERP)" "perl"
+	@echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  > $@
+	@echo "      if $$""running_under_some_shell;"     >> $@
+else
 ifneq "$(INTERP)" ""
 	@echo "#!"$(INTERP) > $@
 else
 	@touch $@
+endif
 endif
 ifneq "$(SCRIPT_PREFIX_FILES)" ""
 	@cat $(SCRIPT_PREFIX_FILES) >> $@
@@ -392,6 +397,7 @@ endif
 	@eval $(SCRIPT_SUBST) 
 	@cat $(SCRIPT_OBJS) >> $@
 	@chmod a+x $@
+	@echo Done.
 endif
 
 
@@ -583,12 +589,12 @@ binary-dist-pre::
 	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
 	  if (test -d "$$i"); then 			 \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) \
-	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion) \
-	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion) \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM); \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion); \
+	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
+	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
 	   echo $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
 	   $(MAKE) -C $$i $(MFLAGS) install BIN_DIST=1 BIN_DIST_NAME=$(BIN_DIST_NAME) prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$$i-$(ProjectVersion) datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share/$$i-$(ProjectVersion); \
 	  fi; \
@@ -648,7 +654,7 @@ show:
 
 .PHONY: dvi ps html info txt
 
-info:: $(filter %.texinfo, $(DOC_SRCS)) $(filter %.texi,$(DOC_SRCS))
+info:: $(DOC_INFO)
 dvi:: $(DOC_DVI)
 ps::  $(DOC_PS)
 html:: $(DOC_HTML)
