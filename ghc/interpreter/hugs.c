@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.62 $
- * $Date: 2000/04/07 10:00:28 $
+ * $Revision: 1.63 $
+ * $Date: 2000/04/07 16:20:53 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -711,7 +711,7 @@ static Void local set() {               /* change command line options from*/
         do {
             if (!processOption(s)) {
                 ERRMSG(0) "Option string must begin with `+' or `-'"
-                EEND;
+                EEND_NO_LONGJMP;
             }
         } while ((s=readFilename())!=0);
 #if USE_REGISTRY
