@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.108 2001/07/25 09:14:21 simonmar Exp $
+ * $Id: GC.c,v 1.109 2001/07/25 12:18:26 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -516,12 +516,6 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	scavenge_static();
     }
 
-    // scavenge objects in compacted generation
-    if (mark_stack_bdescr != NULL && !mark_stack_empty()) {
-	scavenge_mark_stack();
-	flag = rtsTrue;
-    }
-
     /* When scavenging the older generations:  Objects may have been
      * evacuated from generations <= N into older generations, and we
      * need to scavenge these objects.  We're going to try to ensure that
@@ -535,7 +529,14 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     { 
       long gen;
       int st; 
+
     loop2:
+      // scavenge objects in compacted generation
+      if (mark_stack_bdescr != NULL && !mark_stack_empty()) {
+	  scavenge_mark_stack();
+	  flag = rtsTrue;
+      }
+
       for (gen = RtsFlags.GcFlags.generations; --gen >= 0; ) {
 	for (st = generations[gen].n_steps; --st >= 0; ) {
 	  if (gen == 0 && st == 0 && RtsFlags.GcFlags.generations > 1) { 
@@ -2367,7 +2368,6 @@ scavenge_mark_stack(void)
 	case CONSTR_2_0:
 	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
-	    mark(p+1,Bdescr(p));
 	    break;
 	
 	case FUN_1_0:
@@ -2378,7 +2378,6 @@ scavenge_mark_stack(void)
 	case CONSTR_1_0:
 	case CONSTR_1_1:
 	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
-	    mark(p+1,Bdescr(p));
 	    break;
 	
 	case FUN_0_1:
@@ -2388,7 +2387,6 @@ scavenge_mark_stack(void)
 	    scavenge_srt(info);
 	case CONSTR_0_1:
 	case CONSTR_0_2:
-	    mark(p+1,Bdescr(p));
 	    break;
 	
 	case FUN:
@@ -2425,7 +2423,6 @@ scavenge_mark_stack(void)
 		recordOldToNewPtrs((StgMutClosure *)p);
 	    }
 	    failed_to_evac = rtsFalse;
-	    mark(p+1,Bdescr(p));
 	    break;
 
 	case MUT_VAR:
@@ -2433,7 +2430,6 @@ scavenge_mark_stack(void)
 	    ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
 	    evac_gen = saved_evac_gen;
 	    failed_to_evac = rtsFalse;
-	    mark(p+1,Bdescr(p));
 	    break;
 
 	case MUT_CONS:
