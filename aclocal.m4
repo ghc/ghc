@@ -405,77 +405,123 @@ AC_SUBST(LdXFlag)
 ])
 
 
-dnl *** Checking for ar and its arguments + whether we need ranlib.
-dnl
-dnl ArCmd, ArSupportsInput and RANLIB are AC_SUBST'ed
-dnl On Digital UNIX, we test for the -Z (compress) and
-dnl -input (take list of files from external file) flags.
-dnl 
-AC_DEFUN(FPTOOLS_PROG_AR_AND_RANLIB,
-[AC_PATH_PROG(ArCmdRaw,ar)
-if test -z "$ArCmdRaw"; then
-    echo "You don't seem to have ar in your PATH...I have no idea how to make a library"
-    exit 1;
+# FP_PROG_AR
+# ----------
+# Sets fp_prog_ar_raw to the full path of ar and fp_prog_ar to a non-Cygwin
+# version of it. Exits if no ar can be found
+AC_DEFUN([FP_PROG_AR],
+[AC_PATH_PROG([fp_prog_ar_raw], [ar])
+if test -z "$fp_prog_ar_raw"; then
+  AC_MSG_ERROR([cannot find ar in your PATH, no idea how to make a library])
 fi
-dnl GNU ar needs special treatment: it appears to have problems with
-dnl object files with the same name if you use the 's' modifier, but
-dnl simple 'ar q' works fine, and doesn't need a separate ranlib.
-if $ArCmdRaw --version | grep 'GNU' >/dev/null 2>/dev/null; then
-    ArCmdArgs='q'
-    NeedRanLib=''
-elif $ArCmdRaw clqsZ conftest.a >/dev/null 2>/dev/null; then
-    ArCmdArgs="clqsZ"
-    NeedRanLib=''
-elif $ArCmdRaw clqs conftest.a >/dev/null 2>/dev/null; then
-    ArCmdArgs="clqs"
-    NeedRanLib=''
-elif $ArCmdRaw cqs conftest.a >/dev/null 2>/dev/null; then
-    ArCmdArgs="cqs"
-    NeedRanLib=''
-elif $ArCmdRaw clq conftest.a >/dev/null 2>/dev/null; then
-    ArCmdArgs="clq"
-    NeedRanLib='YES'
-elif $ArCmdRaw cq conftest.a >/dev/null 2>/dev/null; then
-    ArCmdArgs="cq"
-    NeedRanLib='YES'
-elif $ArCmdRaw cq conftest.a 2>&1 | grep 'no archive members specified' >/dev/null 2>/dev/null; then
-    ArCmdArgs="cq"
-    NeedRanLib='YES'
-else
-    echo "I can't figure out how to use your $ArCmd"
-    exit 1
-fi
-rm -rf conftest*
+fp_prog_ar=$fp_prog_ar_raw
 case $HostPlatform in
- *mingw32) 
-	  if test ${OSTYPE} == "msys"
-	   then
-	     ArCmd="${ArCmdRaw} ${ArCmdArgs}"
-	   else
- 	     ArCmd="`cygpath -w ${ArCmdRaw} | sed -e 's@\\\\@/@g' ` ${ArCmdArgs}"
-	  fi
- 	  ;;
- *) ArCmd="${ArCmdRaw} ${ArCmdArgs}"
-    ;;
+  *mingw32) if test x${OSTYPE} != xmsys; then
+ 	      fp_prog_ar="`cygpath -w ${fp_prog_ar_raw} | sed -e 's@\\\\@/@g'`"
+              AC_MSG_NOTICE([normalized ar command to $fp_prog_ar])
+            fi
+            ;;
 esac
-test -n "$ArCmd" && test -n "$verbose" && echo "        setting ArCmd to $ArCmd"
-AC_SUBST(ArCmd)
-if $ArCmd conftest.a -input /dev/null >/dev/null 2>/dev/null; then
-    ArSupportsInput='-input'
+])# FP_PROG_AR
+
+
+# FP_PROG_AR_IS_GNU
+# -----------------
+# Sets fp_prog_ar_is_gnu to yes or no, depending on whether it is GNU ar or not.
+AC_DEFUN([FP_PROG_AR_IS_GNU],
+[AC_REQUIRE([FP_PROG_AR])
+AC_CACHE_CHECK([whether $fp_prog_ar_raw is GNU ar], [fp_cv_prog_ar_is_gnu],
+[if $fp_prog_ar_raw --version | grep "GNU" > /dev/null 2> /dev/null; then
+  fp_cv_prog_ar_is_gnu=yes
 else
-    ArSupportsInput=''
-fi
-rm -rf conftest*
-test -n "$ArSupportsInput" && test -n "$verbose" && echo "        setting ArSupportsInput to $ArSupportsInput"
-AC_SUBST(ArSupportsInput)
-if test -z "$NeedRanLib"; then
-    RANLIB=':'
-    test -n "$verbose" && echo "        setting RANLIB to $RANLIB"
-    AC_SUBST(RANLIB)
+  fp_cv_prog_ar_is_gnu=no
+fi])
+fp_prog_ar_is_gnu=$fp_cv_prog_ar_is_gnu
+])# FP_PROG_AR_IS_GNU
+
+
+# FP_PROG_AR_ARGS
+# ---------------
+# Sets fp_prog_ar_args to the arguments for ar and the output variable ArCmd
+# to a non-Cygwin invocation of ar including these arguments.
+AC_DEFUN([FP_PROG_AR_ARGS],
+[AC_REQUIRE([FP_PROG_AR_IS_GNU])
+AC_CACHE_CHECK([for ar arguments], [fp_cv_prog_ar_args],
+[
+# GNU ar needs special treatment: it appears to have problems with
+# object files with the same name if you use the 's' modifier, but
+# simple 'ar q' works fine, and doesn't need a separate ranlib.
+if test $fp_prog_ar_is_gnu = yes; then
+  fp_cv_prog_ar_args="q"
 else
-    AC_PROG_RANLIB
+  touch conftest.dummy
+  for fp_var in clqsZ clqs cqs clq cq ; do
+     rm -f conftest.a
+     if $fp_prog_ar_raw $fp_var conftest.a conftest.dummy > /dev/null 2> /dev/null; then
+        fp_cv_prog_ar_args=$fp_var
+        break
+     fi
+  done
+  rm -f conftest*
+  if test -z "$fp_cv_prog_ar_args"; then
+    AC_MSG_ERROR([cannot figure out how to use your $fp_prog_ar_raw])
+  fi
+fi])
+fp_prog_ar_args=$fp_cv_prog_ar_args
+AC_SUBST([ArCmd], ["$fp_prog_ar $fp_prog_ar_args"])
+
+])# FP_PROG_AR_ARGS
+
+
+# FP_PROG_AR_NEEDS_RANLIB
+# -----------------------
+# Sets the output variable RANLIB to "ranlib" if it is needed and found,
+# to ":" otherwise.
+AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],
+[AC_REQUIRE([FP_PROG_AR_IS_GNU])
+AC_REQUIRE([FP_PROG_AR_ARGS])
+AC_CACHE_CHECK([whether ranlib is needed], [fp_cv_prog_ar_needs_ranlib],
+[if test $fp_prog_ar_is_gnu = yes; then
+  fp_cv_prog_ar_needs_ranlib=no
+elif echo $fp_prog_ar_args | grep "s" > /dev/null 2> /dev/null; then
+  fp_cv_prog_ar_needs_ranlib=no
+else
+  fp_cv_prog_ar_needs_ranlib=yes
+fi])
+if test $fp_cv_prog_ar_needs_ranlib = yes; then
+   AC_PROG_RANLIB
+else
+  RANLIB=":"
+  AC_SUBST([RANLIB])
 fi
-])
+])# FP_PROG_AR_NEEDS_RANLIB
+
+
+# FP_PROG_AR_SUPPORTS_INPUT
+# -------------------------
+# Sets the output variable ArSupportsInput to "-input" or "", depending on
+# whether ar supports -input flag is supported or not.
+AC_DEFUN([FP_PROG_AR_SUPPORTS_INPUT],
+[AC_REQUIRE([FP_PROG_AR_IS_GNU])
+AC_REQUIRE([FP_PROG_AR_ARGS])
+AC_CACHE_CHECK([whether $fp_prog_ar_raw supports -input], [fp_cv_prog_ar_supports_input],
+[fp_cv_prog_ar_supports_input=no
+if test $fp_prog_ar_is_gnu = no; then
+  rm -f conftest*
+  touch conftest.lst
+  if $fp_prog_ar_raw $fp_prog_ar_args conftest.a -input conftest.lst > /dev/null 2> /dev/null; then
+    fp_cv_prog_ar_supports_input=yes
+  fi
+  rm -f conftest*
+fi])
+if test $fp_cv_prog_ar_supports_input = yes; then
+    ArSupportsInput="-input"
+else
+    ArSupportsInput=""
+fi
+AC_SUBST([ArSupportsInput])
+])# FP_PROG_AR_SUPPORTS_INPUT
+
 
 dnl
 dnl AC_SHEBANG_PERL - can we she-bang perl?
