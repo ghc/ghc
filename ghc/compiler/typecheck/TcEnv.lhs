@@ -47,7 +47,6 @@ import Name		( Name, OccName(..), getSrcLoc, occNameString,
 			  maybeWiredInTyConName, maybeWiredInIdName,
 			  NamedThing(..)
 			)
-import PprStyle
 import Pretty
 import Unique		( pprUnique10{-, pprUnique ToDo:rm-}, Unique )
 import UniqFM	     
