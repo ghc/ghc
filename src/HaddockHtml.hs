@@ -294,7 +294,7 @@ ppHtmlIndex odir doctitle ifaces = do
      <-> td << (hsep [ if defining then
 			 bold << linkId (Module mdl) (Just nm) << toHtml mdl
 		       else
-			 linkId (Module mdl) Nothing << toHtml mdl
+			 linkId (Module mdl) (Just nm) << toHtml mdl
 	             | (Module mdl, defining) <- entries ])
 
   initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
