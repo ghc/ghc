@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.8 1999/02/05 12:41:32 sof Exp $
+ * $Id: InfoTables.h,v 1.9 1999/02/05 15:25:02 simonm Exp $
  * 
  * Info Tables
  *
@@ -146,8 +146,6 @@ typedef enum {
     , MVAR
 
     , ARR_WORDS
-    , MUT_ARR_WORDS
-
     , MUT_ARR_PTRS
     , MUT_ARR_PTRS_FROZEN
 
@@ -225,7 +223,6 @@ typedef enum {
 #define FLAGS_IND_STATIC	   (              _STA                   )	
 #define FLAGS_EVACUATED		   0
 #define FLAGS_ARR_WORDS		   (_HNF|     _NS|              _UPT     )	
-#define FLAGS_MUT_ARR_WORDS	   (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_MUT_ARR_PTRS	   (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_MUT_ARR_PTRS_FROZEN  (_HNF|     _NS|         _MUT|_UPT     )	
 #define FLAGS_MUT_VAR		   (_HNF|     _NS|         _MUT|_UPT     )	

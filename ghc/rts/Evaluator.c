@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/02/05 10:29:21 $
+ * $Revision: 1.7 $
+ * $Date: 1999/02/05 15:25:05 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -2249,7 +2249,7 @@ enterLoop:
                                 StgWord size  = sizeofW(StgArrWords) + words;
                                 nat i;
                                 StgArrWords* arr  = stgCast(StgArrWords*,allocate(size));
-                                SET_HDR(arr,&MUT_ARR_WORDS_info,CCCS);
+                                SET_HDR(arr,&ARR_WORDS_info,CCCS);
                                 arr->words = words;
 #ifdef DEBUG
                                 for (i = 0; i < n; ++i) {

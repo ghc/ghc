@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.11 1999/02/02 14:21:32 simonm Exp $
+ * $Id: StgMiscClosures.hc,v 1.12 1999/02/05 15:25:09 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -327,7 +327,6 @@ INFO_TABLE(type##_info, type##_entry, 0, 0, type, const, EF_,0,0);	\
 NON_ENTERABLE_ENTRY_CODE(type);
 
 ArrayInfo(ARR_WORDS);
-ArrayInfo(MUT_ARR_WORDS);
 ArrayInfo(MUT_ARR_PTRS);
 ArrayInfo(MUT_ARR_PTRS_FROZEN);
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.14 1999/02/02 14:19:49 simonm Exp $
+ * $Id: PrimOps.h,v 1.15 1999/02/05 15:25:03 simonm Exp $
  *
  * Macros for primitive operations in STG-ish C code.
  *
@@ -415,8 +415,7 @@ LI_ stg_word64ToInt64 (StgNat64);
 
 #ifdef DEBUG
 #define BYTE_ARR_CTS(a)				  \
- ({ ASSERT((GET_INFO(a) == &ARR_WORDS_info) 	  \
-        || (GET_INFO(a) == &MUT_ARR_WORDS_info)); \
+ ({ ASSERT(GET_INFO(a) == &ARR_WORDS_info); 	  \
     REAL_BYTE_ARR_CTS(a); })
 #define PTRS_ARR_CTS(a)				  \
  ({ ASSERT((GET_INFO(a) == &ARR_PTRS_info)	  \

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.25 1999/02/05 14:49:22 simonm Exp $
+ * $Id: GC.c,v 1.26 1999/02/05 15:25:07 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -1276,7 +1276,6 @@ loop:
     }
     return ((StgEvacuated*)q)->evacuee;
 
-  case MUT_ARR_WORDS:
   case ARR_WORDS:
     {
       nat size = arr_words_sizeW(stgCast(StgArrWords*,q)); 
@@ -1648,7 +1647,6 @@ scavenge(step *step)
       }
       
     case ARR_WORDS:
-    case MUT_ARR_WORDS:
       /* nothing to follow */
       p += arr_words_sizeW(stgCast(StgArrWords*,p));
       break;
@@ -2339,7 +2337,6 @@ scavenge_large(step *step)
     /* only certain objects can be "large"... */
 
     case ARR_WORDS:
-    case MUT_ARR_WORDS:
       /* nothing to follow */
       continue;
 

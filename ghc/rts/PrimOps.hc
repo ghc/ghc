@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.11 1999/02/02 14:17:05 simonm Exp $
+ * $Id: PrimOps.hc,v 1.12 1999/02/05 15:25:09 simonm Exp $
  *
  * Primitive functions / data
  *
@@ -197,7 +197,7 @@ const
      size = sizeofW(StgArrWords)+ stuff_size;		\
      p = (StgArrWords *)RET_STGCALL1(P_,allocate,size);	\
      TICK_ALLOC_PRIM(sizeofW(StgArrWords),stuff_size,0); \
-     SET_HDR(p, &MUT_ARR_WORDS_info, CCCS);		\
+     SET_HDR(p, &ARR_WORDS_info, CCCS);		\
      p->words = stuff_size;				\
      TICK_RET_UNBOXED_TUP(1)				\
      RET_P(p);						\

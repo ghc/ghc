@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.7 1999/02/01 18:05:31 simonm Exp $
+ * $Id: StgMiscClosures.h,v 1.8 1999/02/05 15:25:03 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -33,7 +33,6 @@ STGFUN(TSO_entry);
 STGFUN(FULL_MVAR_entry);
 STGFUN(EMPTY_MVAR_entry);
 STGFUN(ARR_WORDS_entry);
-STGFUN(MUT_ARR_WORDS_entry);
 STGFUN(MUT_ARR_PTRS_entry);
 STGFUN(MUT_ARR_PTRS_FROZEN_entry);
 STGFUN(MUT_VAR_entry);
@@ -65,7 +64,6 @@ extern const StgInfoTable FULL_MVAR_info;
 extern const StgInfoTable EMPTY_MVAR_info;
 extern const StgInfoTable TSO_info;
 extern const StgInfoTable ARR_WORDS_info;
-extern const StgInfoTable MUT_ARR_WORDS_info;
 extern const StgInfoTable MUT_ARR_PTRS_info;
 extern const StgInfoTable MUT_ARR_PTRS_FROZEN_info;
 extern const StgInfoTable MUT_VAR_info;
