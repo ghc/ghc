@@ -21,6 +21,11 @@ much pain.
 \begin{code}
 #include "config.h"
 
+/* Treat nexttep3 and sunos4 alike. CaS */
+#if defined(nextstep3_TARGET_OS)
+# define NON_POSIX_SOURCE
+#endif
+ 
 #if defined(sunos4_TARGET_OS)
     /* The sigaction in SunOS 4.1.X does not grok SA_SIGINFO */
 # define NON_POSIX_SOURCE
@@ -45,6 +50,13 @@ much pain.
 
 #if defined(HAVE_SYS_TYPES_H)
 # include <sys/types.h>
+#endif
+
+	/* This is useful with the particular set of header files on my NeXT.
+	 * CaS
+	 */
+#if defined(HAVE_SYS_SIGNAL_H)
+# include <sys/signal.h>
 #endif
 
 #if defined(HAVE_SIGNAL_H)
@@ -97,6 +109,7 @@ fault.
 
 \begin{code}
 #if STACK_CHECK_BY_PAGE_FAULT
+	/* NB: At the moment, this is always false on nextstep3. CaS. */
 
 extern P_ stks_space;	    /* Where the stacks live, from SMstacks.lc */
 \end{code}
