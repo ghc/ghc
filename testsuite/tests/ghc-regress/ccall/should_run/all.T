@@ -13,6 +13,8 @@ test "ffi001"   { vtr("-fglasgow-exts",        "", "") }
 test "ffi002"   { skip when True
 		  vtr("ffi002.c -fglasgow-exts -no-hs-main", "", "") }
 
-test "ffi003"   { vtr("-fglasgow-exts", "", "") }
+test "ffi003"   { skip when $platform == "alpha-dec-osf3" -- no NCG on Alpha yet
+		  vtr("-fglasgow-exts", "", "") }
+
 test "ffi004"   { vtr("-fglasgow-exts", "", "") }
 
