@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.27 2002/03/26 23:56:45 sof Exp $
+ * $Id: MBlock.c,v 1.28 2002/04/12 04:00:35 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -76,7 +76,7 @@ getMBlocks(nat n)
   
   if (ret == (void *)-1) {
     if (errno == ENOMEM) {
-      barf("getMBlock: out of memory");
+      barf("getMBlock: out of memory (blocks requested: %d)", n);
     } else {
       barf("GetMBlock: mmap failed");
     }
