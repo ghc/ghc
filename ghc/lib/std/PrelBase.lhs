@@ -575,11 +575,16 @@ timesInt(I# x) (I# y) = I# (x *# y)
 quotInt	(I# x) (I# y) = I# (quotInt# x y)
 remInt	(I# x) (I# y) = I# (remInt#  x y)
 
-gcdInt  (I# 0#) (I# 0#) = error "PrelBase.gcdInt: gcd 0 0 is undefined"
-gcdInt  a       (I# 0#) = a
-gcdInt  (I# 0#) b       = b
-gcdInt  (I# a)  (I# b)  = I# (gcdInt# (absInt a) (absInt b))
-   where absInt x = if x <# 0# then negateInt# x else x
+gcdInt (I# a) (I# b) = g a b
+   where g 0# 0# = error "PrelBase.gcdInt: gcd 0 0 is undefined"
+         g 0# _  = I# absB
+         g _  0# = I# absA
+         g _  _  = I# (gcdInt# absA absB)
+
+         absInt x = if x <# 0# then negateInt# x else x
+
+         absA     = absInt a
+         absB     = absInt b
 
 negateInt :: Int -> Int
 negateInt (I# x) = I# (negateInt# x)
