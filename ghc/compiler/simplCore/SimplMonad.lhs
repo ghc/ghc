@@ -12,7 +12,7 @@ module SimplMonad (
 	mapSmpl, mapAndUnzipSmpl,
 
 	-- Counting
-	SimplCount{-abstract-}, TickType(..), tick, tickN,
+	SimplCount{-abstract-}, TickType(..), tick, tickN, tickUnfold,
 	simplCount, detailedSimplCount,
 	zeroSimplCount, showSimplCount, combineSimplCounts,
 
@@ -25,15 +25,19 @@ IMPORT_1_3(Ix)
 
 IMPORT_DELOOPER(SmplLoop)		-- well, cheating sort of
 
-import Id		( mkSysLocal, mkIdWithNewUniq )
+import Id		( GenId, mkSysLocal, mkIdWithNewUniq, SYN_IE(Id) )
 import CoreUnfold	( SimpleUnfolding )
 import SimplEnv
 import SrcLoc		( noSrcLoc )
-import TyVar		( cloneTyVar )
+import TyVar		( cloneTyVar, SYN_IE(TyVar) )
+import Type             ( SYN_IE(Type) )
 import UniqSupply	( getUnique, getUniques, splitUniqSupply,
 			  UniqSupply
 			)
-import Util		( zipWithEqual, panic )
+import Util		( zipWithEqual, panic, SYN_IE(Eager), appEager, pprTrace )
+import Pretty
+import PprStyle
+import Outputable	( Outputable(..) )
 
 infixr 9  `thenSmpl`, `thenSmpl_`
 \end{code}
@@ -114,6 +118,11 @@ a mutable array through @SimplM@.
 data SimplCount
   = SimplCount	FAST_INT	    -- number of ticks
 		[(TickType, Int)]   -- assoc list of all diff kinds of ticks
+		UnfoldingHistory
+
+type UnfoldingHistory = (Int,		-- N
+		         [(Id,Int)], 	-- Last N unfoldings
+		         [(Id,Int)])	-- The MaxUnfoldHistory unfoldings before that
 
 data TickType
   = UnfoldingDone    | MagicUnfold	| ConReused
@@ -190,16 +199,22 @@ instance Text TickType where
 
 showSimplCount :: SimplCount -> String
 
-showSimplCount (SimplCount _ stuff)
-  = shw stuff
+showSimplCount (SimplCount _ stuff (_, unf1, unf2))
+  = shw stuff ++ "\nMost recent unfoldings: " ++ show (ppr PprDebug (reverse unf2 ++ reverse unf1))
   where
     shw []	    = ""
     shw ((t,n):tns) | n /= 0	= show t ++ ('\t' : show n) ++ ('\n' : shw tns)
 		    | otherwise = shw tns
 
+	-- ToDo: move to Outputable
+instance Outputable Int where
+   ppr sty n = int n
+
 zeroSimplCount :: SimplCount
 zeroSimplCount
-  = SimplCount ILIT(0)
+  = SimplCount ILIT(0) stuff (0, [], [])
+  where
+    stuff =
       [ (UnfoldingDone, 0),
 	(MagicUnfold, 0),
 	(ConReused, 0),
@@ -242,48 +257,68 @@ Counting-related monad functions:
 \begin{code}
 tick :: TickType -> SmplM ()
 
-tick tick_type us (SimplCount n stuff)
+tick tick_type us (SimplCount n stuff unf)
+  = -- pprTrace "Tick: " (text (show tick_type)) $
 #ifdef OMIT_SIMPL_COUNTS
-  = ((), SimplCount (n _ADD_ ILIT(1) stuff))		    stuff -- don't change anything
+    ((), SimplCount (n _ADD_ ILIT(1) stuff unf))		    stuff -- don't change anything
 #else
-  = case inc_tick stuff of
-      [] -> ((), SimplCount (n _ADD_ ILIT(1)) [])
-      ls -> ((), SimplCount (n _ADD_ ILIT(1)) ls)
+    new_stuff `seqL`
+    ((), SimplCount (n _ADD_ ILIT(1)) new_stuff unf)
   where
-    inc_tick [] = panic "couldn't inc_tick!"
-    inc_tick (x@(ttype, I# cnt#) : xs)
-      = if ttype == tick_type then
-	    case cnt# +# 1# of { incd -> (ttype, IBOX(incd)) : xs }
-	else
-	    case inc_tick xs of { [] -> [x]; ls -> x:ls }
-
+    new_stuff = inc_tick tick_type ILIT(1) stuff
 #endif
+
+maxUnfoldHistory :: Int
+maxUnfoldHistory = 20
+
+tickUnfold :: Id -> SmplM ()
+tickUnfold id us (SimplCount n stuff (n_unf, unf1, unf2))
+  = -- pprTrace "Unfolding: " (ppr PprDebug id) $
+    new_stuff `seqL`
+    new_unf   `seqTriple`
+    ((), SimplCount (n _ADD_ ILIT(1)) new_stuff new_unf)
+  where
+     new_stuff = inc_tick UnfoldingDone ILIT(1) stuff
+
+     new_unf | n_unf >= maxUnfoldHistory = (1, [unf_item], unf1)
+	     | otherwise 		 = (n_unf+1, unf_item:unf1, unf2)
+	     
+     unf_item = (id, IBOX(n))
+
+
+    -- force list to avoid getting a chain of @inc_tick@ applications
+    -- building up on the heap. (Only true when not dumping stats).
+seqL []    y = y
+seqL (_:_) y = y
+
+seqTriple (_,_,_) y = y
 
 tickN :: TickType -> Int -> SmplM ()
 
 tickN tick_type 0 us counts 
   = ((), counts)
-tickN tick_type IBOX(increment) us (SimplCount n stuff)
+tickN tick_type IBOX(increment) us (SimplCount n stuff unf)
+  = -- pprTrace "Tick: " (text (show tick_type)) $
 #ifdef OMIT_SIMPL_COUNTS
-  = ((), SimplCount (n _ADD_ increment) stuff) -- don't change anything
+    ((), SimplCount (n _ADD_ increment) stuff) -- don't change anything
 #else
-    -- force list to avoid getting a chain of @inc_tick@ applications
-    -- building up on the heap. (Only true when not dumping stats).
-  = case inc_tick stuff of
-      [] -> ((), SimplCount (n _ADD_ increment) [] )
-      ls -> ((), SimplCount (n _ADD_ increment) ls )
-  where
-    inc_tick [] = panic "couldn't inc_tick!"
-    inc_tick (x@(ttype, I# cnt#) : xs)
-      = if ttype == tick_type then
-	    case cnt# +# increment of
-              incd -> (ttype,IBOX(incd)) : xs
-	else
-	    case inc_tick xs of { [] -> [x]; ls -> x:ls }
+    new_stuff	`seqL`
+    ((), SimplCount (n _ADD_ increment) new_stuff unf)
+  where   
+    new_stuff = inc_tick tick_type increment stuff
+
+
+inc_tick tick_type n [] = panic "couldn't inc_tick!"
+
+inc_tick tick_type n (x@(ttype, I# cnt#) : xs)
+  | ttype == tick_type = case cnt# +# n of
+		              incd -> (ttype,IBOX(incd)) : xs
+
+  | otherwise	       = case inc_tick tick_type n xs of { [] -> [x]; ls -> x:ls }
 #endif
 
 simplCount :: SmplM Int
-simplCount us sc@(SimplCount n _) = (IBOX(n), sc)
+simplCount us sc@(SimplCount n _ _) = (IBOX(n), sc)
 
 detailedSimplCount :: SmplM SimplCount
 detailedSimplCount us sc = (sc, sc)
@@ -291,14 +326,16 @@ detailedSimplCount us sc = (sc, sc)
 combineSimplCounts :: SimplCount -> SimplCount -> SimplCount
 
 #ifdef OMIT_SIMPL_COUNTS
-combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
+combineSimplCounts (SimplCount n1 stuff1 unf1) (SimplCount n2 stuff2 unf2)
   = SimplCount (n1 _ADD_ n2)
-	       stuff1 -- just pick one
+	       stuff2 -- just pick one
+	       unf2
 #else
-combineSimplCounts (SimplCount n1 stuff1) (SimplCount n2 stuff2)
-  = case (zipWithEqual "combineSimplCounts" (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2) of
-      [] -> SimplCount (n1 _ADD_ n2) []
-      ls -> SimplCount (n1 _ADD_ n2) ls
+combineSimplCounts (SimplCount n1 stuff1 unf1) (SimplCount n2 stuff2 unf2)
+  = new_stuff `seqL`
+    SimplCount (n1 _ADD_ n2) new_stuff unf2	-- Just pick the second for unfold history
+  where
+    new_stuff = zipWithEqual "combineSimplCounts" (\ (t1,c1) (t2,c2) -> (t1,c1+c2)) stuff1 stuff2
 #endif
 \end{code}
 
@@ -332,9 +369,9 @@ cloneTyVarSmpl tyvar us sc
 
 cloneId :: SimplEnv -> InBinder -> SmplM OutId
 cloneId env (id,_) us sc
-  = (mkIdWithNewUniq id_with_new_ty uniq, sc)
+  = simplTyInId env id	`appEager` \ id_with_new_ty ->
+    (mkIdWithNewUniq id_with_new_ty uniq, sc)
   where
-    id_with_new_ty = simplTyInId env id
     uniq = getUnique us
 
 cloneIds :: SimplEnv -> [InBinder] -> SmplM [OutId]
