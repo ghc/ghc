@@ -16,6 +16,7 @@ import StgSyn
 import LambdaLift	( liftProgram )
 import Name		( isLocallyDefined )
 import UniqSet          ( UniqSet(..), mapUniqSet )
+import CostCentre       ( CostCentre )
 import SCCfinal		( stgMassageForProfiling )
 import StgLint		( lintStgBindings )
 import StgStats	        ( showStgStats )
@@ -30,14 +31,17 @@ import CmdLineOpts	( opt_SccGroup, --Not used:opt_EnsureSplittableC,
 import Id		( nullIdEnv, lookupIdEnv, addOneToIdEnv,
 			  growIdEnvList, isNullIdEnv, SYN_IE(IdEnv),
 			  setIdVisibility,
-			  GenId{-instance Eq/Outputable -}
+			  GenId{-instance Eq/Outputable -}, SYN_IE(Id)
 			)
 import Maybes		( maybeToBool )
 import PprType		( GenType{-instance Outputable-} )
-import Pretty		( ppShow, ppAbove, ppAboves, ppStr, ppPStr )
-import UniqSupply	( splitUniqSupply )
+import PprStyle         ( PprStyle )
+import Pretty		( Doc, ($$), vcat, text, ptext )
+import UniqSupply	( splitUniqSupply, UniqSupply )
 import Util		( mapAccumL, panic, assertPanic )
-
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 \end{code}
 
 \begin{code}
@@ -56,9 +60,9 @@ stg2stg stg_todos module_name ppr_style us binds
 
     (if do_verbose_stg2stg then
 	hPutStr stderr "VERBOSE STG-TO-STG:\n" >>
-	hPutStr stderr (ppShow 1000
-	(ppAbove (ppPStr SLIT("*** Core2Stg:"))
-		 (ppAboves (map (ppr ppr_style) (setStgVarInfo False binds)))
+	hPutStr stderr (show
+	(($$) (ptext SLIT("*** Core2Stg:"))
+		 (vcat (map (ppr ppr_style) (setStgVarInfo False binds)))
 	))
      else return ()) >>
 
@@ -169,9 +173,9 @@ stg2stg stg_todos module_name ppr_style us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if do_verbose_stg2stg then
-	    hPutStr stderr (ppShow 1000
-	    (ppAbove (ppStr ("*** "++what++":"))
-		     (ppAboves (map (ppr ppr_style) binds2))
+	    hPutStr stderr (show
+	    (($$) (text ("*** "++what++":"))
+		     (vcat (map (ppr ppr_style) binds2))
 	    ))
 	 else return ()) >>
 	let
