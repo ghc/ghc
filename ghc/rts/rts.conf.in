@@ -27,7 +27,7 @@ Package {
 			      ,"winmm"		/* for the threadDelay timer */
 			      ,"wsock32"	/* for the linker */
 #endif
-#ifdef USING_LIBBFD
+#if defined(DEBUG) && defined(HAVE_LIBBFD)
 			      ,"bfd", "iberty"	/* for debugging */
 #endif
 #ifdef HAVE_LIBMINGWEX
