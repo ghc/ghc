@@ -1,0 +1,5 @@
+
+rnfail022.hs:8: Variable not in scope: `intersperse'
+
+Compilation had errors
+
