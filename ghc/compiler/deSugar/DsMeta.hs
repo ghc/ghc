@@ -541,7 +541,7 @@ repE (RecordUpd e flds _ _)
         repRecUpd x fs }
 
 repE (ExprWithTySig e ty) = do { e1 <- repLE e; t1 <- repLTy ty; repSigExp e1 t1 }
-repE (ArithSeqIn aseq) =
+repE (ArithSeq _ aseq) =
   case aseq of
     From e              -> do { ds1 <- repLE e; repFrom ds1 }
     FromThen e1 e2      -> do 
@@ -557,7 +557,7 @@ repE (ArithSeqIn aseq) =
 			     ds2 <- repLE e2
 			     ds3 <- repLE e3
 			     repFromThenTo ds1 ds2 ds3
-repE (PArrSeqOut _ aseq)  = panic "DsMeta.repE: parallel array seq.s missing"
+repE (PArrSeq _ aseq)     = panic "DsMeta.repE: parallel array seq.s missing"
 repE (HsCoreAnn _ _)      = panic "DsMeta.repE: Can't represent CoreAnn" -- hdaume: core annotations
 repE (HsSCC _ _)          = panic "DsMeta.repE: Can't represent SCC"
 repE (HsBracketOut _ _)   = panic "DsMeta.repE: Can't represent Oxford brackets"
@@ -773,7 +773,7 @@ rep_bind (L loc (VarBind v e))
 -- (\ p1 .. pn -> exp) by causing an error.  
 
 repLambda :: LMatch Name -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [])] [])))
+repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [] e)] [])))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
@@ -1107,7 +1107,7 @@ repNormalGE :: Core TH.ExpQ -> Core TH.ExpQ -> DsM (Core (TH.Q (TH.Guard, TH.Exp
 repNormalGE (MkC g) (MkC e) = rep2 normalGEName [g, e]
 
 repPatGE :: Core [TH.StmtQ] -> Core TH.ExpQ -> DsM (Core (TH.Q (TH.Guard, TH.Exp)))
-repPatGE (MkC ss) = rep2 patGName [ss]
+repPatGE (MkC ss) (MkC e) = rep2 patGEName [ss, e]
 
 ------------- Stmts -------------------
 repBindSt :: Core TH.PatQ -> Core TH.ExpQ -> DsM (Core TH.StmtQ)
