@@ -140,12 +140,12 @@ showVersion (Version branch tags)
 
 -- | A parser for versions in the format produced by 'showVersion'.
 --
-#if __GLASGOW_HASKELL__ <= 602 && !__HUGS__ && !__NHC__
-parseVersion :: ReadP r Version
+#if __GLASGOW_HASKELL__ >= 603 || __HUGS__
+parseVersion :: ReadP Version
 #elif __NHC__
 parseVersion :: ReadPN r Version
 #else
-parseVersion :: ReadP Version
+parseVersion :: ReadP r Version
 #endif
 parseVersion = do branch <- sepBy1 (liftM read $ munch1 isDigit) (char '.')
                   tags   <- many (char '-' >> munch1 isAlphaNum)
