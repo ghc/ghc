@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.37 2004/02/24 15:51:33 simonmar Exp $
+# $Id: package.mk,v 1.38 2004/03/27 09:57:58 panne Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -211,7 +211,7 @@ ifneq "$(NO_HADDOCK_DOCS)" "YES"
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS))))
 
 HTML_DIR = html
-HTML_DOC = $(HTML_DIR)/haddock.css
+HTML_DOC = $(HTML_DIR)/haddock.css $(HTML_DIR)/haddock.js
 
 ifneq "$(HS_PPS)" ""
 
