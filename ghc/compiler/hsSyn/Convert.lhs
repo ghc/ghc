@@ -49,6 +49,9 @@ convertToHsDecls ds = map cvt_top ds
 cvt_top d@(Val _ _ _) = ValD (cvtd d)
 cvt_top d@(Fun _ _)   = ValD (cvtd d)
  
+cvt_top (TySyn tc tvs rhs)
+  = TyClD (TySynonym (tconName tc) (cvt_tvs tvs) (cvtType rhs) loc0)
+
 cvt_top (Data tc tvs constrs derivs)
   = TyClD (mkTyData DataType 
 		    (noContext, tconName tc, cvt_tvs tvs)

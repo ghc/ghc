@@ -60,6 +60,7 @@ import OccName	  ( mkOccFS )
 import NameEnv
 import NameSet
 import Type       ( Type, TyThing(..), mkGenTyConApp )
+import TcType	  ( tcTyConAppArgs )
 import TyCon	  ( DataConDetails(..) )
 import TysWiredIn ( stringTy )
 import CoreSyn
@@ -196,22 +197,28 @@ repTyClD :: TyClDecl Name -> DsM (Maybe (Core M.Decl))
 
 repTyClD (TyData { tcdND = DataType, tcdCtxt = [], 
 		   tcdName = tc, tcdTyVars = tvs, 
-		   tcdCons = DataCons cons, tcdDerivs = mb_derivs }) =
-  do 
-    tc1 <- lookupOcc tc			-- See note [Binders and occurrences] 
-    dec <- addTyVarBinds decTyConName tvs $ \bndrs -> do
-      cons1   <- mapM repC cons
-      cons2   <- coreList consTyConName cons1
-      derivs1 <- repDerivs mb_derivs
-      repData tc1 (coreList' stringTy bndrs) cons2 derivs1
-    return $ Just dec
+		   tcdCons = DataCons cons, tcdDerivs = mb_derivs }) 
+ = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
+        dec <- addTyVarBinds tvs $ \bndrs -> do {
+      	       cons1   <- mapM repC cons ;
+      	       cons2   <- coreList consTyConName cons1 ;
+      	       derivs1 <- repDerivs mb_derivs ;
+      	       repData tc1 (coreList' stringTy bndrs) cons2 derivs1 } ;
+        return $ Just dec }
+
+repTyClD (TySynonym { tcdName = tc, tcdTyVars = tvs, tcdSynRhs = ty })
+ = do { tc1 <- lookupOcc tc ;		-- See note [Binders and occurrences] 
+        dec <- addTyVarBinds tvs $ \bndrs -> do {
+	       ty1 <- repTy ty ;
+	       repTySyn tc1 (coreList' stringTy bndrs) ty1 } ;
+ 	return (Just dec) }
 
 repTyClD (ClassDecl { tcdCtxt = cxt, tcdName = cls, 
 		      tcdTyVars = tvs, tcdFDs = [], 
 		      tcdSigs = sigs, tcdMeths = Just binds }) =
   do 
     cls1 <- lookupOcc cls		-- See note [Binders and occurrences] 
-    dec  <- addTyVarBinds decTyConName tvs $ \bndrs -> do
+    dec  <- addTyVarBinds tvs $ \bndrs -> do
 	      cxt1   <- repContext cxt
 	      sigs1  <- rep_sigs sigs
 	      binds1 <- rep_monobind binds
@@ -307,18 +314,17 @@ repTvs tvs = do { tvs1 <- mapM (localVar . hsTyVarName) tvs ;
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *original* names as an argument
 --
-addTyVarBinds :: Name			         -- type constructor for 'a'
-	      -> [HsTyVarBndr Name]	         -- the binders to be added
+addTyVarBinds :: [HsTyVarBndr Name]	         -- the binders to be added
 	      -> ([Core String] -> DsM (Core (M.Q a))) -- action in the ext env
 	      -> DsM (Core (M.Q a))
-addTyVarBinds resTyName tvs m =
+addTyVarBinds tvs m =
   do
     let names = map hsTyVarName tvs
     freshNames <- mkGenSyms names
     term       <- addBinds freshNames $ do
 		    bndrs <- mapM lookupBinder names 
 		    m bndrs
-    wrapGenSyns resTyName freshNames term
+    wrapGenSyns freshNames term
 
 -- represent a type context
 --
@@ -347,10 +353,11 @@ repTys tys = mapM repTy tys
 --
 repTy :: HsType Name -> DsM (Core M.Type)
 repTy (HsForAllTy bndrs ctxt ty)  = 
-  addTyVarBinds typTyConName (fromMaybe [] bndrs) $ \bndrs' -> do
+  addTyVarBinds (fromMaybe [] bndrs) $ \bndrs' -> do
     ctxt'  <- repContext ctxt
     ty'    <- repTy ty
     repTForall (coreList' stringTy bndrs') ctxt' ty'
+
 repTy (HsTyVar n)
   | isTvOcc (nameOccName n)       = do 
 				      tv1 <- lookupBinder n
@@ -444,16 +451,16 @@ repE (HsIf x y z loc)     = do
 repE (HsLet bs e)         = do { (ss,ds) <- repBinds bs
 			       ; e2 <- addBinds ss (repE e)
 			       ; z <- repLetE ds e2
-			       ; wrapGenSyns expTyConName ss z }
+			       ; wrapGenSyns ss z }
 -- FIXME: I haven't got the types here right yet
 repE (HsDo DoExpr sts _ ty loc) 
  = do { (ss,zs) <- repSts sts; 
         e       <- repDoE (nonEmptyCoreList zs);
-        wrapGenSyns expTyConName ss e }
+        wrapGenSyns ss e }
 repE (HsDo ListComp sts _ ty loc) 
  = do { (ss,zs) <- repSts sts; 
         e       <- repComp (nonEmptyCoreList zs);
-        wrapGenSyns expTyConName ss e }
+        wrapGenSyns ss e }
 repE (HsDo _ _ _ _ _) = panic "DsMeta.repE: Can't represent mdo and [: :] yet"
 repE (ExplicitList ty es) = do { xs <- repEs es; repListExp xs } 
 repE (ExplicitPArr ty es) = 
@@ -507,7 +514,7 @@ repMatchTup (Match [p] ty (GRHSs guards wheres ty2)) =
      ; addBinds ss2 $ do {
      ; gs    <- repGuards guards
      ; match <- repMatch p1 gs ds
-     ; wrapGenSyns matTyConName (ss1++ss2) match }}}
+     ; wrapGenSyns (ss1++ss2) match }}}
 
 repClauseTup ::  Match Name -> DsM (Core M.Clse)
 repClauseTup (Match ps ty (GRHSs guards wheres ty2)) = 
@@ -518,7 +525,7 @@ repClauseTup (Match ps ty (GRHSs guards wheres ty2)) =
      ; addBinds ss2 $ do {
        gs <- repGuards guards
      ; clause <- repClause ps1 gs ds
-     ; wrapGenSyns clsTyConName (ss1++ss2) clause }}}
+     ; wrapGenSyns (ss1++ss2) clause }}}
 
 repGuards ::  [GRHS Name] ->  DsM (Core M.Rihs)
 repGuards [GRHS [ResultStmt e loc] loc2] 
@@ -678,7 +685,7 @@ repLambda (Match ps _ (GRHSs [GRHS [ResultStmt e _ ] _ ]
       ; ss <- mkGenSyms bndrs
       ; lam <- addBinds ss (
 		do { xs <- repPs ps; body <- repE e; repLam xs body })
-      ; wrapGenSyns expTyConName ss lam }
+      ; wrapGenSyns ss lam }
 
 repLambda z = panic "Can't represent a guarded lambda in Template Haskell"  
 
@@ -795,16 +802,19 @@ lookupType tc_name = do { tc <- dsLookupTyCon tc_name ;
 --	    bindQ (gensym nm2 (\ id2 -> 
 --	    y))
 
-wrapGenSyns :: Name 	-- Name of the type (consructor) for 'a'
-	    -> [GenSymBind] 
+wrapGenSyns :: [GenSymBind] 
 	    -> Core (M.Q a) -> DsM (Core (M.Q a))
-wrapGenSyns tc_name binds body@(MkC b)
-  = do { elt_ty <- lookupType tc_name
-       ; go elt_ty binds }
+wrapGenSyns binds body@(MkC b)
+  = go binds
   where
-    go elt_ty [] = return body
-    go elt_ty ((name,id) : binds)
-      = do { MkC body'  <- go elt_ty binds
+    [elt_ty] = tcTyConAppArgs (exprType b) 
+	-- b :: Q a, so we can get the type 'a' by looking at the
+	-- argument type. NB: this relies on Q being a data/newtype,
+	-- not a type synonym
+
+    go [] = return body
+    go ((name,id) : binds)
+      = do { MkC body'  <- go binds
 	   ; lit_str    <- localVar name
 	   ; gensym_app <- repGensym lit_str
 	   ; repBindQ stringTy elt_ty 
@@ -977,6 +987,9 @@ repFun (MkC nm) (MkC b) = rep2 funName [nm, b]
 repData :: Core String -> Core [String] -> Core [M.Cons] -> Core [String] -> DsM (Core M.Decl)
 repData (MkC nm) (MkC tvs) (MkC cons) (MkC derivs) = rep2 dataDName [nm, tvs, cons, derivs]
 
+repTySyn :: Core String -> Core [String] -> Core M.Type -> DsM (Core M.Decl)
+repTySyn (MkC nm) (MkC tvs) (MkC rhs) = rep2 tySynDName [nm, tvs, rhs]
+
 repInst :: Core M.Ctxt -> Core M.Type -> Core [M.Decl] -> DsM (Core M.Decl)
 repInst (MkC cxt) (MkC ty) (MkC ds) = rep2 instName [cxt, ty, ds]
 
@@ -1121,7 +1134,7 @@ templateHaskellNames
 		fromName, fromThenName, fromToName, fromThenToName,
 		funName, valName, liftName,
 	  	gensymName, returnQName, bindQName, sequenceQName,
-		matchName, clauseName, funName, valName, dataDName, classDName,
+		matchName, clauseName, funName, valName, tySynDName, dataDName, classDName,
 		instName, protoName, tforallName, tvarName, tconName, tappName,
 		arrowTyConName, tupleTyConName, listTyConName, namedTyConName,
 		ctxtName, constrName,
@@ -1195,6 +1208,7 @@ clauseName     = varQual FSLIT("clause")        clauseIdKey
 funName        = varQual FSLIT("fun")           funIdKey
 valName        = varQual FSLIT("val")           valIdKey
 dataDName      = varQual FSLIT("dataD")         dataDIdKey
+tySynDName     = varQual FSLIT("tySynD")        tySynDIdKey
 classDName     = varQual FSLIT("classD")        classDIdKey
 instName       = varQual FSLIT("inst")          instIdKey
 protoName      = varQual FSLIT("proto")         protoIdKey
@@ -1276,6 +1290,7 @@ instIdKey       = mkPreludeMiscIdUnique 216
 dataDIdKey      = mkPreludeMiscIdUnique 217
 
 sequenceQIdKey  = mkPreludeMiscIdUnique 218
+tySynDIdKey      = mkPreludeMiscIdUnique 219
 
 plitIdKey       = mkPreludeMiscIdUnique 220
 pvarIdKey       = mkPreludeMiscIdUnique 221
