@@ -65,17 +65,13 @@ identifiers, expressions, rules, and their operations.</strong>
 <p><li>
 	Type (loop DataCon.DataCon, loop Subst.substTy)
 <p><li>
-	FieldLabel( Type) <br> 
+	FieldLabel(Type) <br> 
 	TysPrim(Type) <br> 
-	PprEnv (loop DataCon.DataCon, Type)
-<p><li>
-	Unify <br> 
-	PprType (PprEnv)
 <p><li>
 	Literal (TysPrim, PprType) <br> 
-	DataCon (loop PprType)
+	DataCon (loop PprType, loop Subst.substTyWith, FieldLabel.FieldLabel)
 <p><li>
-	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId, loop Generics.mkGenInfo)
+	TysWiredIn (loop MkId.mkDataConWorkId, loop Generics.mkGenInfo, DataCon.mkDataCon)
 <p><li>
 	TcType( lots of TysWiredIn stuff)
 <p><li>
