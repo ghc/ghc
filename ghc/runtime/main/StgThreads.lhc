@@ -356,7 +356,7 @@ DO_RETURN_TEMPLATE(UnderflowVect7, ((P_)RetReg)[RVREL(7)])
 
 DO_RETURN_TEMPLATE(StackUnderflowEnterNode, EnterNodeCode)
 
-#else
+#else /* PAR */
 
 \end{code}
 
@@ -436,6 +436,9 @@ STGFUN(PrimUnderflow)
  * because R2 is dead, and R1 points to a PAP.  Only R1 is live.
  */
 
+#if 0
+
+/* old version of the code */
 STGFUN(StackUnderflowEnterNode)
 {
     FB_
@@ -445,7 +448,49 @@ STGFUN(StackUnderflowEnterNode)
     FE_
 }
 
+#else
+
+/*
+   We've inlined CommonUnderFlow because setting RetReg would zap
+   the return vector that the node needs.
+   We pick up the RetReg from the STkO header instead.
+   KH/HWL 14/2/97
+*/
+
+STGFUN(StackUnderflowEnterNode)
+{
+    P_ temp;
+    FB_
+    RetReg = STKO_RETURN(StkOReg); /* pick up return code from the StkO hdr
+                                      needed because we come from UpdatePAP */
+    LivenessReg = LIVENESS_R1;
+
+    temp = STKO_LINK(StkOReg);
+
+    /*? fprintf(stderr,"Stk Underflow from: %lx to: %lx size abandoned: %d\n",StkOReg,temp,STKO_CLOSURE_CTS_SIZE(StkOReg)); ?*/
+
+    /* change the guy we are abandoning into something
+       that will not be "interesting" on the mutables
+       list.  (As long as it is there, it will be
+       scavenged in GC, and we cannot guarantee that
+       it is still a "sane" StkO object).  (And, besides,
+       why continue to keep it [and all it pts to] alive?)
+       Will & Phil 95/10
+    */
+    FREEZE_MUT_HDR(StkOReg, ImMutArrayOfPtrs_info);
+    MUTUPLE_CLOSURE_SIZE(StkOReg) = MUTUPLE_VHS;
+
+    StkOReg = temp;
+    /* ToDo: Fetch the remote stack object here! */
+    RestoreStackStgRegs();
+    JMP_(EnterNodeCode);  /* this will enter a PAP containing the old stkos
+			     A and B stacks */
+    FE_
+}
 #endif
+
+
+#endif /* !PAR */
 
 const W_
 vtbl_Underflow[] = {
