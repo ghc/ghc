@@ -117,11 +117,11 @@ pprBasicBlock (BasicBlock (BlockId id) instrs) =
 pprUserReg :: Reg -> Doc
 pprUserReg = pprReg IF_ARCH_i386(I32,) IF_ARCH_x86_64(I64,)
 
-pprReg :: IF_ARCH_i386(MachRep ->, IF_ARCH_x86_64(MachRep ->,)) Reg -> Doc
+pprReg :: IF_ARCH_i386(MachRep ->,) IF_ARCH_x86_64(MachRep ->,) Reg -> Doc
 
-pprReg IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) r
+pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
   = case r of
-      RealReg i      -> ppr_reg_no IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) i
+      RealReg i      -> ppr_reg_no IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) i
       VirtualRegI  u  -> text "%vI_" <> asmSDoc (pprUnique u)
       VirtualRegHi u  -> text "%vHi_" <> asmSDoc (pprUnique u)
       VirtualRegF  u  -> text "%vF_" <> asmSDoc (pprUnique u)
@@ -263,8 +263,9 @@ pprReg IF_ARCH_i386(s, IF_ARCH_x86_64(s,)) r
 	22 -> SLIT("%xmm6");   23 -> SLIT("%xmm7");
 	24 -> SLIT("%xmm8");   25 -> SLIT("%xmm9");
 	26 -> SLIT("%xmm10");  27 -> SLIT("%xmm11");
-	28 -> SLIT("%xmm12");  28 -> SLIT("%xmm13");
-	30 -> SLIT("%xmm13");  31 -> SLIT("%xmm15")
+	28 -> SLIT("%xmm12");  29 -> SLIT("%xmm13");
+	30 -> SLIT("%xmm14");  31 -> SLIT("%xmm15");
+	_  -> SLIT("very naughty x86_64 register")
       })
 #endif
 
