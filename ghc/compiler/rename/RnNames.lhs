@@ -27,21 +27,21 @@ import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst )
 
 
 import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
-			  unionManyBags, mapBag, listToBag, bagToList )
+			  unionManyBags, mapBag, filterBag, listToBag, bagToList )
 import CmdLineOpts	( opt_NoImplicitPrelude )
 import ErrUtils		( Error(..), Warning(..), addErrLoc, addShortErrLocLine )
 import FiniteMap	( emptyFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
-import Name		( RdrName(..), Name, isQual, mkTopLevName,
+import Name		( RdrName(..), Name, isQual, mkTopLevName, origName,
 			  mkImportedName, nameExportFlag, nameImportFlag,
-			  getLocalName, getSrcLoc, pprNonSym, moduleNamePair,
-			  isLexCon, isRdrLexCon, ExportFlag(..)
+			  getLocalName, getSrcLoc, getImpLocs, moduleNamePair,
+			  pprNonSym, isLexCon, isRdrLexCon, ExportFlag(..)
 			)
 import PrelInfo		( BuiltinNames(..), BuiltinKeys(..) )
 import PrelMods		( fromPrelude, pRELUDE )
 import Pretty
-import SrcLoc		( SrcLoc, mkIfaceSrcLoc )
+import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
 import TyCon		( tyConDataCons )
 import UniqFM		( emptyUFM, addListToUFM_C, lookupUFM )
 import UniqSupply	( splitUniqSupply )
@@ -81,17 +81,20 @@ getGlobalNames iface_cache info us
 	\ (imp_vals, imp_tcs, imp_mods, unqual_imps, imp_fixes, imp_errs, imp_warns) ->
 
     let
-        unqual_vals = mapBag (\rn -> (Unqual (getLocalName rn), rn)) src_vals
-        unqual_tcs  = mapBag (\rn -> (Unqual (getLocalName rn), rn)) src_tcs
+        unqual_vals = map (\rn -> (Unqual (getLocalName rn), rn)) (bagToList src_vals)
+        unqual_tcs  = map (\rn -> (Unqual (getLocalName rn), rn)) (bagToList src_tcs)
 
-	all_vals = bagToList (unqual_vals `unionBags` imp_vals)
-	all_tcs  = bagToList (unqual_tcs  `unionBags` imp_tcs)
+        (src_env, src_dups) = extendGlobalRnEnv emptyRnEnv unqual_vals unqual_tcs
+	(all_env, imp_dups) = extendGlobalRnEnv src_env (bagToList imp_vals) (bagToList imp_tcs)
 
-        (all_env, dups) = extendGlobalRnEnv emptyRnEnv all_vals all_tcs
+	-- remove dups of the same imported thing
+	diff_imp_dups = filterBag diff_orig imp_dups
+	diff_orig (_,rn1,rn2) = origName rn1 /= origName rn2
 
-	dup_errs = map dup_err (equivClasses cmp_rdr (bagToList dups))
+	all_dups = bagToList (src_dups `unionBags` diff_imp_dups)
+	dup_errs = map dup_err (equivClasses cmp_rdr all_dups)
 	cmp_rdr (rdr1,_,_) (rdr2,_,_) = cmp rdr1 rdr2
-	dup_err ((_,rn,rn'):rest) = globalDupNamesErr (rn:rn': [rn|(_,_,rn)<-rest])
+	dup_err ((rdr,rn1,rn2):rest) = globalDupNamesErr rdr (rn1:rn2: [rn|(_,_,rn)<-rest])
 
 	all_errs  = src_errs  `unionBags` imp_errs `unionBags` listToBag dup_errs
 	all_warns = src_warns `unionBags` imp_warns
@@ -303,7 +306,7 @@ newGlobalName locn maybe_exp rdr
 type ImportNameInfo = (GlobalNameInfo,
 		       FiniteMap (Module,FAST_STRING) RnName,	-- values imported so far
 		       FiniteMap (Module,FAST_STRING) RnName,	-- tycons/classes imported so far
-		       Name -> ExportFlag)			-- import flag
+		       Name -> (ExportFlag, [SrcLoc]))		-- import flag and src locns
 		
 type RnM_IInfo s r = RnMonad ImportNameInfo s r
 
@@ -321,14 +324,15 @@ doImportDecls ::
 	       Bag Warning)
 
 doImportDecls iface_cache g_info us src_imps
-  = fixIO ( \ ~(_, _, _, _, _, _, rec_imp_flags) ->
+  = fixIO ( \ ~(_, _, _, _, _, _, rec_imp_stuff) ->
 	let
-	    rec_imp_fm = addListToUFM_C lubExportFlag emptyUFM (bagToList rec_imp_flags)
+	    rec_imp_fm = addListToUFM_C add_stuff emptyUFM (bagToList rec_imp_stuff)
+	    add_stuff (imp1,locns1) (imp2,locns2) = (lubExportFlag imp1 imp2, locns1 `unionBags` locns2)
 
-    	    rec_imp_fn :: Name -> ExportFlag
+    	    rec_imp_fn :: Name -> (ExportFlag, [SrcLoc])
 	    rec_imp_fn n = case lookupUFM rec_imp_fm n of
-		             Nothing   -> panic "RnNames:rec_imp_fn"
-		             Just flag -> flag
+		             Nothing            -> panic "RnNames:rec_imp_fn"
+		             Just (flag, locns) -> (flag, bagToList locns)
 
 	    i_info = (g_info, emptyFM, emptyFM, rec_imp_fn)
 	in
@@ -336,35 +340,37 @@ doImportDecls iface_cache g_info us src_imps
     ) >>= \ (vals, tcs, unquals, fixes, errs, warns, _) ->
 
     return (vals, tcs, imp_mods, unquals, fixes,
-	    imp_errs  `unionBags` errs,
-	    imp_warns `unionBags` warns)
+	    errs, imp_warns `unionBags` warns)
   where
-    (ok_imps, src_qprels) = partition not_qual_prel src_imps
-    the_imps = prel_imp ++ ok_imps
-    all_imps = qprel_imp ++ the_imps
+    (src_qprels, ok_imps) = partition qual_prel src_imps
+    the_imps = ok_imps ++ prel_imp
+    all_imps = the_imps ++ qprel_imp
 
-    not_qual_prel (ImportDecl mod qual _ _ _) = not (fromPrelude mod && qual)
+    qual_prel (ImportDecl mod qual imp_as _ _)
+      = fromPrelude mod && qual && not (maybeToBool imp_as)
 
     explicit_prelude_import
-      = null [() | (ImportDecl mod qual _ _ _) <- ok_imps,
-		   fromPrelude mod && not qual]
+      = null [() | (ImportDecl mod qual _ _ _) <- ok_imps, fromPrelude mod]
 
     qprel_imp = if opt_NoImplicitPrelude
 		then [{-the flag really means it: *NO* implicit "import Prelude" -}]
-		else [ImportDecl pRELUDE True Nothing Nothing mkIfaceSrcLoc]
+		else [ImportDecl pRELUDE True Nothing Nothing prel_loc]
 
     prel_imp  = if not explicit_prelude_import || opt_NoImplicitPrelude
 		then
 		   [{- no "import Prelude" -}]
 	        else
-	           [ImportDecl pRELUDE False Nothing Nothing mkIfaceSrcLoc]
+	           [ImportDecl pRELUDE False Nothing Nothing prel_loc]
+
+    prel_loc = mkBuiltinSrcLoc
 
     (uniq_imps, imp_dups) = removeDups cmp_mod the_imps
     cmp_mod (ImportDecl m1 _ _ _ _) (ImportDecl m2 _ _ _ _) = cmpPString m1 m2
 
     imp_mods  = [ mod | ImportDecl mod _ _ _ _ <- uniq_imps ]
     imp_warns = listToBag (map dupImportWarn imp_dups)
-    imp_errs  = listToBag (map qualPreludeImportErr src_qprels)
+    		`unionBags`
+		listToBag (map qualPreludeImportWarn src_qprels)
 
 
 doImports iface_cache i_info us []
@@ -399,13 +405,13 @@ doImport :: IfaceCache
 	 -> ImportNameInfo
 	 -> UniqSupply
 	 -> RdrNameImportDecl
-	 -> IO (Bag (RdrName,RnName),		-- values
-		Bag (RdrName,RnName),		-- tycons/classes
-		Bag (Module,RnName),		-- unqual imports
+	 -> IO (Bag (RdrName,RnName),			-- values
+		Bag (RdrName,RnName),			-- tycons/classes
+		Bag (Module,RnName),			-- unqual imports
 		Bag RenamedFixityDecl,
                 Bag Error,
 		Bag Warning,
-		Bag (RnName,ExportFlag))	-- import flags
+		Bag (RnName,(ExportFlag,Bag SrcLoc)))	-- import flags and src locs
 
 doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
   = cachedIface iface_cache mod 	>>= \ maybe_iface ->
@@ -440,9 +446,10 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
 		          `unionBags` errs `unionBags` unionManyBags fix_errs
 	    final_warns = mapBag (\ warn -> warn mod src_loc) (unionManyBags chk_warns)
 		          `unionBags` warns
+	    imp_stuff   = mapBag (\ (n,imp) -> (n,(imp,unitBag src_loc))) imp_flags
         in
 	return (final_vals, final_tcs, unquals, final_fixes,
-		final_errs, final_warns, imp_flags)
+		final_errs, final_warns, imp_stuff)
   where
     as_mod = case maybe_as of {Nothing -> mod; Just as_this -> as_this}
     mk_occ str = if qual then Qual as_mod str else Unqual str
@@ -451,6 +458,10 @@ doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
     pair_occ rn	      = (mk_occ (getLocalName rn), rn)
     pair_as  rn       = (as_mod, rn)
 
+
+getBuiltins _ mod maybe_spec
+  | not (fromPrelude mod)
+  = (emptyBag, emptyBag, maybe_spec)
 
 getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) mod maybe_spec
   = case maybe_spec of 
@@ -547,14 +558,14 @@ doOrigIEs iface_cache info mod src_loc us []
 
 doOrigIEs iface_cache info mod src_loc us (ie:ies)
   = doOrigIE iface_cache info mod src_loc us1 ie 
-	>>= \ (vals1, tcs1, errs1, warns1, imps1) ->
+	>>= \ (vals1, tcs1, imps1, errs1, warns1) ->
     doOrigIEs iface_cache info mod src_loc us2 ies
-	>>= \ (vals2, tcs2, errs2, warns2, imps2) ->
+	>>= \ (vals2, tcs2, imps2, errs2, warns2) ->
     return (vals1    `unionBags` vals2,
 	    tcs1     `unionBags` tcs2,
+	    imps1    `unionBags` imps2,
 	    errs1    `unionBags` errs2,
-	    warns1   `unionBags` warns2,
-	    imps1    `unionBags` imps2)
+	    warns1   `unionBags` warns2)
   where
     (us1, us2) = splitUniqSupply us
 
@@ -743,33 +754,35 @@ newImportedName tycon_or_class locn maybe_exp maybe_imp rdr
 
 	    imp  = case maybe_imp of
 	    	     Just imp -> imp
-	       	     Nothing  -> imp_fn n
+	       	     Nothing  -> imp_flag
 
-	    n = mkImportedName uniq rdr imp locn exp (occ_fn n)
+	    (imp_flag, imp_locs) = imp_fn n
+
+	    n = mkImportedName uniq rdr imp locn imp_locs exp (occ_fn n)
 	in
 	returnRn n
 \end{code}
 
 \begin{code}
-globalDupNamesErr (rn1:dup_rns) sty
-  = ppAboves (item1 : map dup_item dup_rns)
+globalDupNamesErr rdr rns sty
+  = ppAboves (message : map pp_dup rns)
   where
-    item1 = addShortErrLocLine (getSrcLoc rn1) (\ sty ->
-	    ppBesides [ppStr "multiple declarations of `", 
-		       pprNonSym sty rn1, ppStr "' ", pp_descrip rn1]) sty
+    message   = ppBesides [ppStr "multiple declarations of `", pprNonSym sty rdr, ppStr "'"]
 
-    dup_item rn
-          = addShortErrLocLine (getSrcLoc rn) (\ sty ->
-            ppBesides [ppStr "here was another declaration of `",
-		       pprNonSym sty rn, ppStr "' ", pp_descrip rn]) sty
+    pp_dup rn = addShortErrLocLine (get_loc rn) (\ sty ->
+	        ppBesides [pp_descrip rn, pprNonSym sty rn]) sty
 
-    pp_descrip (RnName _)      = ppStr "(as a value)"
-    pp_descrip (RnSyn  _)      = ppStr "(as a type synonym)"
-    pp_descrip (RnData _ _ _)  = ppStr "(as a data type)"
-    pp_descrip (RnConstr _ _)  = ppStr "(as a data constructor)"
-    pp_descrip (RnField _ _)   = ppStr "(as a record field)"
-    pp_descrip (RnClass _ _)   = ppStr "(as a class)"
-    pp_descrip (RnClassOp _ _) = ppStr "(as a class method)"
+    get_loc rn = case getImpLocs rn of
+		     []   -> getSrcLoc rn
+	 	     locs -> head locs
+
+    pp_descrip (RnName _)      = ppStr "a value"
+    pp_descrip (RnSyn  _)      = ppStr "a type synonym"
+    pp_descrip (RnData _ _ _)  = ppStr "a data type"
+    pp_descrip (RnConstr _ _)  = ppStr "a data constructor"
+    pp_descrip (RnField _ _)   = ppStr "a record field"
+    pp_descrip (RnClass _ _)   = ppStr "a class"
+    pp_descrip (RnClassOp _ _) = ppStr "a class method"
     pp_descrip _               = ppNil 
 
 dupImportWarn (ImportDecl m1 _ _ _ locn1 : dup_imps) sty
@@ -782,9 +795,9 @@ dupImportWarn (ImportDecl m1 _ _ _ locn1 : dup_imps) sty
           = addShortErrLocLine locn (\ sty ->
             ppCat [ppStr "here was another import from module", ppPStr m]) sty
 
-qualPreludeImportErr (ImportDecl m _ _ _ locn)
+qualPreludeImportWarn (ImportDecl m _ _ _ locn)
   = addShortErrLocLine locn (\ sty ->
-    ppCat [ppStr "qualified import form prelude module", ppPStr m])
+    ppCat [ppStr "qualified import of prelude module", ppPStr m])
 
 unknownImpSpecErr ie imp_mod locn
   = addShortErrLocLine locn (\ sty ->

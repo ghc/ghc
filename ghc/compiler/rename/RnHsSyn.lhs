@@ -91,6 +91,12 @@ isRnImplicit _			 = False
 isRnUnbound (RnUnbound _) = True
 isRnUnbound _		  = False
 
+isRnDecl (RnName _)	= True
+isRnDecl (RnSyn _)	= True
+isRnDecl (RnData _ _ _)	= True
+isRnDecl (RnClass _ _)	= True
+isRnDecl _		= False
+
 -- Very general NamedThing comparison, used when comparing
 -- Uniquable things with different types
 

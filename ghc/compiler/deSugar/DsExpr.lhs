@@ -46,7 +46,7 @@ import PrelInfo		( mkTupleTy, unitTy, nilDataCon, consDataCon,
 			)
 import Pretty		( ppShow, ppBesides, ppPStr, ppStr )
 import Type		( splitSigmaTy, splitFunTy, typePrimRep, getAppDataTyCon )
-import TyVar		( nullTyVarEnv, addOneToTyVarEnv )
+import TyVar		( GenTyVar, nullTyVarEnv, addOneToTyVarEnv )
 import Usage		( UVar(..) )
 import Util		( zipEqual, pprError, panic, assertPanic )
 
@@ -358,26 +358,23 @@ before printing it as
 dsExpr (RecordCon con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
-	con_id   = get_con_id con_expr'
+	con_id       = get_con con_expr'
+	(arg_tys, _) = splitFunTy (coreExprType con_expr')
 
-	mk_arg lbl
+	mk_arg (arg_ty, lbl)
 	  = case [rhs | (sel_id,rhs,_) <- rbinds,
 			lbl == recordSelectorFieldLabel sel_id] of
 	      (rhs:rhss) -> ASSERT( null rhss )
 		 	    dsExpr rhs
-	      []         -> mkErrorAppDs rEC_CON_ERROR_ID (fieldLabelType lbl) (showForErr lbl)
-
-	-- ToDo Bug: fieldLabelType lbl needs to be instantiated with appropriate type args
-	--           problem also arises if ty is extraced by splitting the type of the con_id
+	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showForErr lbl)
     in
-    mapDs mk_arg (dataConFieldLabels con_id) `thenDs` \ con_args ->
+    mapDs mk_arg (arg_tys `zipEqual` dataConFieldLabels con_id) `thenDs` \ con_args ->
     mkAppDs con_expr' [] con_args
   where
-	-- The "con_expr'" is simply an application of the constructor Id
-	-- to types and (perhaps) dictionaries.  This boring little 
-	-- function gets the constructor out.
-    get_con_id (App fun _) = get_con_id fun
-    get_con_id (Var con)   = con
+	-- "con_expr'" is simply an application of the constructor Id
+	-- to types and (perhaps) dictionaries. This gets the constructor...
+    get_con (Var con)   = con
+    get_con (App fun _) = get_con fun
 \end{code}
 
 Record update is a little harder. Suppose we have the decl:

@@ -36,13 +36,15 @@ module Name (
 	nameOrigName,
 	nameExportFlag,
 	nameSrcLoc,
+	nameImpLocs,
 	nameImportFlag,
 	isLocallyDefinedName,
 	isPreludeDefinedName,
 
 	origName, moduleOf, nameOf, moduleNamePair,
 	getOccName, getExportFlag,
-	getSrcLoc, isLocallyDefined, isPreludeDefined,
+	getSrcLoc, getImpLocs,
+	isLocallyDefined, isPreludeDefined,
 	getLocalName, ltLexical,
 
 	isSymLexeme, pprSym, pprNonSym,
@@ -157,7 +159,7 @@ data Provenance
 
   | Imported ExportFlag	  -- how it was imported
 	     SrcLoc       -- *original* source location
-         --  [SrcLoc]     -- any import source location(s)
+             [SrcLoc]     -- any import source location(s)
 
   | Implicit
   | Builtin
@@ -167,7 +169,7 @@ data Provenance
 mkLocalName = Local
 
 mkTopLevName   u orig locn exp occs = Global u orig (LocalDef locn) exp occs
-mkImportedName u orig imp locn exp occs = Global u orig (Imported imp locn) exp occs
+mkImportedName u orig imp locn imp_locs exp occs = Global u orig (Imported imp locn imp_locs) exp occs
 
 mkImplicitName :: Unique -> RdrName -> Name
 mkImplicitName u o = Global u o Implicit NotExported []
@@ -274,23 +276,26 @@ nameOccName (Global   _ orig _ _ occs) = head occs
 nameExportFlag (Local    _ _ _)	      = NotExported
 nameExportFlag (Global   _ _ _ exp _) = exp
 
-nameSrcLoc (Local  _ _ loc)	             = loc
-nameSrcLoc (Global _ _ (LocalDef loc)   _ _) = loc
-nameSrcLoc (Global _ _ (Imported _ loc) _ _) = loc
-nameSrcLoc (Global _ _ Implicit         _ _) = mkUnknownSrcLoc
-nameSrcLoc (Global _ _ Builtin          _ _) = mkBuiltinSrcLoc
+nameSrcLoc (Local  _ _ loc)	               = loc
+nameSrcLoc (Global _ _ (LocalDef loc)     _ _) = loc
+nameSrcLoc (Global _ _ (Imported _ loc _) _ _) = loc
+nameSrcLoc (Global _ _ Implicit           _ _) = mkUnknownSrcLoc
+nameSrcLoc (Global _ _ Builtin            _ _) = mkBuiltinSrcLoc
+  
+nameImpLocs (Global _ _ (Imported _ _ locs) _ _) = locs
+nameImpLocs _ 					 = []
 
-nameImportFlag (Local _ _ _)                     = NotExported
-nameImportFlag (Global _ _ (LocalDef _)     _ _) = ExportAll
-nameImportFlag (Global _ _ (Imported exp _) _ _) = exp
-nameImportFlag (Global _ _ Implicit         _ _) = ExportAll
-nameImportFlag (Global _ _ Builtin          _ _) = ExportAll
+nameImportFlag (Local _ _ _)                       = NotExported
+nameImportFlag (Global _ _ (LocalDef _)       _ _) = ExportAll
+nameImportFlag (Global _ _ (Imported exp _ _) _ _) = exp
+nameImportFlag (Global _ _ Implicit           _ _) = ExportAll
+nameImportFlag (Global _ _ Builtin            _ _) = ExportAll
 
-isLocallyDefinedName (Local  _ _ _)	             = True
-isLocallyDefinedName (Global _ _ (LocalDef _)   _ _) = True
-isLocallyDefinedName (Global _ _ (Imported _ _) _ _) = False
-isLocallyDefinedName (Global _ _ Implicit       _ _) = False
-isLocallyDefinedName (Global _ _ Builtin        _ _) = False
+isLocallyDefinedName (Local  _ _ _)	               = True
+isLocallyDefinedName (Global _ _ (LocalDef _)     _ _) = True
+isLocallyDefinedName (Global _ _ (Imported _ _ _) _ _) = False
+isLocallyDefinedName (Global _ _ Implicit         _ _) = False
+isLocallyDefinedName (Global _ _ Builtin          _ _) = False
 
 isPreludeDefinedName (Local    _ n _)        = False
 isPreludeDefinedName (Global   _ orig _ _ _) = isUnqual orig
@@ -375,6 +380,7 @@ getOccName	    :: NamedThing a => a -> RdrName
 getLocalName	    :: NamedThing a => a -> FAST_STRING
 getExportFlag	    :: NamedThing a => a -> ExportFlag
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
+getImpLocs	    :: NamedThing a => a -> [SrcLoc]
 isLocallyDefined    :: NamedThing a => a -> Bool
 isPreludeDefined    :: NamedThing a => a -> Bool
 
@@ -393,6 +399,7 @@ getLocalName	    = nameOf . origName
 getOccName	    = nameOccName  	   . getName
 getExportFlag	    = nameExportFlag	   . getName
 getSrcLoc	    = nameSrcLoc	   . getName
+getImpLocs	    = nameImpLocs	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName
 isPreludeDefined    = isPreludeDefinedName . getName
 \end{code}

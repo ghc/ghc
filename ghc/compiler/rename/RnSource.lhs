@@ -135,7 +135,7 @@ rnExports mods unqual_imps (Just exps)
 
 	mod_fm = addListToFM_C unionBags emptyFM
 		 [(mod, unitBag (getName rn, nameImportFlag (getName rn)))
-		  | (mod,rn) <- bagToList unqual_imps]
+		  | (mod,rn) <- bagToList unqual_imps, isRnDecl rn]
 
         add_mod_names (exp_map, empty) mod
 	  = case lookupFM mod_fm mod of
@@ -586,8 +586,10 @@ rnPolyType tv_env (HsPreForAllTy ctxt ty)
   = rn_poly_help tv_env forall_tyvars ctxt ty
   where
     mentioned_tyvars = extractCtxtTyNames ctxt `unionLists` extractMonoTyNames is_tyvar_name ty
-    forall_tyvars    = --pprTrace "mentioned:" (ppCat (map (ppr PprShowAll) mentioned_tyvars)) $
-		       --pprTrace "from_ty:" (ppCat (map (ppr PprShowAll) (extractMonoTyNames is_tyvar_name ty))) $
+    forall_tyvars    = {-
+		       pprTrace "mentioned:" (ppCat (map (ppr PprShowAll) mentioned_tyvars)) $
+		       pprTrace "from_ty:" (ppCat (map (ppr PprShowAll) (extractMonoTyNames is_tyvar_name ty))) $
+		       -}
 		       mentioned_tyvars `minusList` domTyVarNamesEnv tv_env
 
 ------------
@@ -598,11 +600,13 @@ rn_poly_help :: TyVarNamesEnv
 	     -> RnM_Fixes s RenamedPolyType
 
 rn_poly_help tv_env tyvars ctxt ty
-  = --pprTrace "rnPolyType:" (ppCat [ppCat (map (ppr PprShowAll . snd) tv_env),
-    --				   ppStr ";tvs=", ppCat (map (ppr PprShowAll) tyvars),
-    --				   ppStr ";ctxt=", ppCat (map (ppr PprShowAll) ctxt),
-    --				   ppStr ";ty=", ppr PprShowAll ty]
-    --			   ) $
+  = {-
+    pprTrace "rnPolyType:"
+ 	(ppCat [ppCat (map (ppr PprShowAll . snd) tv_env),
+    		ppStr ";tvs=", ppCat (map (ppr PprShowAll) tyvars),
+    		ppStr ";ctxt=", ppCat (map (ppr PprShowAll) ctxt),
+    		ppStr ";ty=", ppr PprShowAll ty]) $
+    -}
     getSrcLocRn 				`thenRn` \ src_loc ->
     mkTyVarNamesEnv src_loc tyvars	 	`thenRn` \ (tv_env1, new_tyvars) ->
     let
