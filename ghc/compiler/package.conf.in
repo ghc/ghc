@@ -19,7 +19,6 @@ Package {
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/stgSyn",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/simplStg",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/codeGen",
-			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/absCSyn",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/main",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/profiling",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/parser",
