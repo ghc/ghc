@@ -923,13 +923,13 @@ mkSearchPath Nothing = [(".",".hi")]
 mkSearchPath (Just s)
   = go s
   where
+    go "" = []
     go s  = 
       case span (/= '%') s of
        (dir,'%':rs) ->
          case span (/= ':') rs of
           (hisuf,_:rest) -> (dir,hisuf):go rest
           (hisuf,[])     -> [(dir,hisuf)]
-
 \end{code}
 
 %*********************************************************

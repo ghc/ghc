@@ -22,7 +22,7 @@
 #     Note, if you specify /usr/foo/lib for libdir,
 #     the library files for your fptools package will be
 #     installed in  /usr/foo/lib/<package>-<version>, e.g.,
-#     /usr/foo/lib/ghc-2.02. If you don't want the package/version
+#     /usr/foo/lib/ghc-2.03. If you don't want the package/version
 #     directory appended, you'll have to modify $(real_libdir)
 #     below.
 #
@@ -78,7 +78,7 @@ real_libdir      = $(libdir)/$(package)-$(version)
 real_datadir     = $(datadir)/$(package)-$(version)
 
 package     = ghc
-version     = 2.02
+version     = 2.03
 PERL        = @PerlCmd@
 RM          = rm -f
 MV          = mv
@@ -91,7 +91,7 @@ INSTALL_DIR  = ./mkdirhier
 
 #
 # Set of package scripts for which you'd like a name-<version> symlink
-# to be created, i.e., create a symlink, ghc-2.02, pointing to ghc to
+# to be created, i.e., create a symlink, ghc-$(version), pointing to ghc to
 # avoid version vertigo.
 #
 VERSION_SYMLINKS_FOR=ghc
@@ -184,7 +184,7 @@ in-place ::
 install-dirs ::
 	$(INSTALL_DIR) $(bindir)
 	(cd lib/$(platform)/$(package)-$(version); find . -type d -exec sh -c '../../../$(INSTALL_DIR) $$0 $(real_libdir)/$$0' {} \; )
-	(cd share/$(package)-$(version); find . -type d -exec sh -c '../../$(INSTALL_DIR) $$0 $(real_datadir)/$$0' {} \; )
+	(cd share/$(package)-$(version); find . -type d -exec sh -c '../../$(INSTALL_DIR) $(real_datadir)/$$0' {} \; )
 
 install :: config-pkgs mk-version-symlinks install-dirs install-bin install-libs install-datas
 

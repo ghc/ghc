@@ -390,15 +390,27 @@ lex_scc buf =
 	               buf'' -> ITscc (mkAllDictsCC (lexemeToFastString buf'') _NIL_ True): 
 	                        lexIface (stepOn (stepOverLexeme buf''))
                      Nothing ->
+		      let
+		       match_user_cc buf =
+	                case untilChar# buf '/'# of
+	                 buf' -> 
+                          let mod_name = lexemeToFastString buf' in
+	                  case untilChar# (stepOn (stepOverLexeme buf')) '/'# of
+	                   buf'' -> 
+                            let grp_name = lexemeToFastString buf'' in
+			    case untilChar# (stepOn (stepOverLexeme buf'')) '\"'# of
+			     buf''' ->
+			       let cc_name = lexemeToFastString buf''' in
+			       (mkUserCC cc_name mod_name grp_name, 
+			        stepOn (stepOverLexeme buf'''))
+                      in
                       case prefixMatch (stepOn buf) "CAF:" of
-                       Just buf' ->		  
-	                case untilChar# (stepOverLexeme buf') '\"'# of
-	                 buf'' -> ITscc (cafifyCC (mkUserCC (lexemeToFastString buf'') _NIL_ _NIL_)): 
-	                          lexIface (stepOn (stepOverLexeme buf''))
+                       Just buf' ->
+			 case match_user_cc (stepOverLexeme buf') of
+			  (cc, buf'') -> ITscc (cafifyCC cc) : lexIface buf''
                        Nothing ->
-	                case untilChar# (stepOn buf) '\"'# of
-	                   buf' -> ITscc (mkUserCC (lexemeToFastString buf') _NIL_ _NIL_): 
-                                   lexIface (stepOn (stepOverLexeme buf'))
+	                 case match_user_cc (stepOn buf) of
+			  (cc, buf'') -> ITscc cc : lexIface buf''
   c -> ITunknown [C# c] : lexIface (stepOn buf)
 
 

@@ -21,9 +21,8 @@ import Name		( Name, OccName(..), Provenance(..), DefnInfo(..), ExportFlag(..),
 			  occNameString, occNameFlavour,
 			  SYN_IE(NameSet), emptyNameSet, addListToNameSet,
 			  mkLocalName, mkGlobalName, modAndOcc, isLocallyDefinedName,
-			  nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
-			  pprProvenance, pprOccName, pprModule, pprNameProvenance,
-			  NamedThing(..)
+			  isWiredInName, nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
+			  pprProvenance, pprOccName, pprModule, pprNonSymOcc, pprNameProvenance
 			)
 import TyCon		( TyCon )
 import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )

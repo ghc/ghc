@@ -388,10 +388,13 @@ uppCostCentre sty print_as_string cc
 
     do_cc (NormalCC kind mod_name grp_name is_dupd is_caf)
       = let
-	    basic_kind = do_caf is_caf ++ do_kind kind
+	    basic_kind = do_caf is_caf           ++ 
+	                 moduleString mod_name   ++ 
+			 ('/' : _UNPK_ grp_name) ++ 
+			 ('/' : do_kind kind)
 	in
 	if friendly_sty then
-	    do_dupd is_dupd (basic_kind ++ ('/': moduleString mod_name) ++ ('/': _UNPK_ grp_name))
+	    do_dupd is_dupd basic_kind
 	else
 	    basic_kind
       where
@@ -402,11 +405,12 @@ uppCostCentre sty print_as_string cc
 	do_kind (AutoCC id)   = do_id id ++ (if friendly_sty then "/AUTO" else "")
 	do_kind (DictCC id)   = do_id id ++ (if friendly_sty then "/DICT" else "")
 
+        {-
+	 do_id is only applied in a (not print_as_string) context for local ids,
+	 hence using the occurrence name is enough.
+	-}
 	do_id :: Id -> String
-	do_id id
-	  = if print_as_string
-	    then  getOccString id		-- use occ name
-	    else showId sty id	 		-- we really do
+	do_id id = getOccString id
 
     ---------------
     do_dupd ADupdCC str = if friendly_sty then str ++ "/DUPD" else str

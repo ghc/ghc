@@ -45,12 +45,11 @@ import TcType		( SYN_IE(TcType), TcMaybe(..),
 import TcKind		( TcKind )
 
 import Class		( SYN_IE(Class), classSig )
-import FieldLabel	( fieldLabelName, fieldLabelType )
+import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType )
 import Id		( idType, dataConFieldLabels, dataConSig, recordSelectorFieldLabel,
 			  isRecordSelector,
 			  SYN_IE(Id), GenId
 			)
-import FieldLabel	( FieldLabel )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( Name{-instance Eq-} )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
@@ -422,7 +421,6 @@ tcExpr (RecordUpd record_expr rbinds)
 	-- Check for bad fields
     checkTc (any (null . badFields rbinds) data_cons)
 	    (badFieldsUpd rbinds)		`thenTc_`
-
 	-- STEP 3
 	-- Typecheck the update bindings.
 	-- (Do this after checking for bad fields in case there's a field that

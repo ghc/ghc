@@ -1,161 +1,68 @@
-This is the pre-mangled text of the 2.02-specific part of the 
-GHC release notes.
+This is the release notes for GHC-2.03, describing what's new since the
+previous release:
 
-======================================================================
-Release~2.02 is the first release of Glasgow Haskell for Haskell~1.4.
+GHC 2.03 is a minor upgrade of GHC 2.02.  It differs in the following
+ways:
 
-The announcement for this release is distributed as \tr{ANNOUNCE-2.02}
-in the top-level directory.  It contains very important caveats about
-2.02, which we do not repeat here!
+* A slew of small bugs are fixed.  You can find the complete list at
 
-Information about ``what's ported to which machine'' is in the
-Installation Guide.  Since 2.01, we've added support for Win32
-(Windows NT and Windows 95).
+    http://www.cse.ogi.edu/~simonpj/ghc-bugs.html
 
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-config]{New configuration things in 2.02}
-%*                                                                      *
-%************************************************************************
+  One bug remains un-fixed, namely the crash when there's an empty
+  comment at the end of file.It's wierd!
 
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-user-visible]{User-visible changes in 2.02, including incompatibilities}
-%*                                                                      *
-%************************************************************************
+* Last-minute language changes have been implemented (minor changes
+  to the libraries, and to module export/hiding scope rules)
 
-GHC~2.02 is a compiler for Haskell~1.4 and, as such, introduces a
-bunch of user-visible changes.  The GHC user's guide has a section to
-help you upgrade your programs to Haskell~1.4 from 1.2; all
-user-visible changes are described there (and not repeated here).
+* It is only available as a source distribution.  If you want to
+  use it you'll have to build it from source.  Nowadays this is
+  a well-documented process (see the build and installation guide, but
+  note that this release is still not self-booting, you still need
+  to have The Good Old Compiler (0.29) at your disposal).
 
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-options]{New or changed GHC command-line options}
-%*                                                                      *
-%************************************************************************
+None of the bugs in GHC 2.02 are show-stoppers, so you'll only want
+to upgrade if you are a build-from-source junkie and the bugs are 
+irritating you.
 
-\begin{itemize}
-\item GHC now warns of possibly-incomplete patterns in case expressions
-and function bindings.  You can suppress these warnings with @-fno-warn-incomplete-patterns@.
+Apart from bug-fixes, which are itemized elsewhere, 
+the exact language and standard-library changes are as follows:
 
-GHC also warns of completely overlapped patterns.  You can't switch this off.
+* A hiding clause hides the unqualified name, but not the qualified name.
 
-\item GHC can warn of shadowed names, though it does not do so by default.  
-Just occasionally this shows up 
-an otherwise hard-to-find bug.  To warn of shadowed names use @-fwarn-name-shadowing@
+* There's a new @Numeric@ library, containing mostly mildly marginal
+  code for showing and reading numbers.  Parts of its exports used to be
+  exported by @Prelude@, but now you'll have to import them explicitly.
+  It also defines some functions that weren't provided before; have a
+  look in the Haskell library report for details of complete interface.
 
-\item You can now generate `make' dependencies via the compiler
-driver, use the option @-M@ together with the list source files to compute
-the dependencies for. By default, the dependencies will be appended to
-the file \tr{Makefile} in the current directory.
+* The following extra functions are exported from IO:
+ 
+     try, bracket, bracket_, hGetLine, hWaitForInput
 
-\item For hackers, the flag @-dshow-rn-trace@ shows what the renamer is up to.
-Sit back and marvel.
-
-\end{itemize}
+In addition, we've made following changes to GHC libraries/GHC's
+implementation of the Haskell standard prelude:
 
 
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-new-in-compiler]{New in the compiler proper}
-%*                                                                      *
-%************************************************************************
+* The function fromRational__, exported from PrelNum, is now called fromRat
+  (And it's exported by @Numeric@).
 
-\begin{itemize}
-\item
-Completely new ``make-world'' system, properly documented (at last) in the
-installation guide.  No Jmakefiles; but you *need* Gnu make
-(gmake). The more recent the better (v 3.70+).
+* Documentation for the Glasgow specific interfaces plus the system
+  libraries have been re-instated. Posix library documentation
+  included also.
 
-\item
-The ``renamer''---the part of the compiler that implements
-the Haskell module system---has been completely rewritten, again.
+* `maybe' is now exported from Prelude, as it should have been in 2.02.
 
-The format of interface files has changed significantly.  Interface files
-generated by 2.01 will not work with 2.02.
+* Equality on IO.Handle is now defined as specified by the library report.
 
-\item
-Even less special pleading for the Prelude than in 2.01.  If you wanted
-to write your own Prelude and drop it in, you would have
-a really good chance now.
-\end{itemize}
+* Ix.rangeSize returns `0' on an empty range;previously it failed.
 
+* The new interface GlaExts which is meant to be the gateway to the
+  various Glasgow extensions has now been documented.
 
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-new-in-libraries]{In the libraries}
-%*                                                                      *
-%************************************************************************
+* GlaExts now exports the representation of Char
 
-The libraries have been completely reorganised.  There's a description in
-\sectionref{syslibs}.
+* The mutable variable interface, MutVar, has also been documented,
+  together with ByteArray, MutableArray and Foreign.
 
-
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-new-in-syslibs]{In ``hslibs'' libraries}
-%*                                                                      *
-%************************************************************************
-
-
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-new-in-rts]{In the runtime system}
-%*                                                                      *
-%************************************************************************
-
-\begin{itemize}
-\item @ForeignObjs@ are properly deallocated when execution halts, as well
-as when the garbage collector spots the @ForeignObj@ as being unreferenced.
-This is important if you are using a @ForeignObj@ to refer to
-a @COM@ object or other remote resource. You want that resource to be relased
-when the program terminates.
-
-\item Files handles in the IO prelude are implemented using
-@ForeignObjs@, and closed when the file handle is unreferenced.  This
-means that if you open zillions of files then just letting go of the
-file handle is enough to close it. 
-\end{itemize}
-
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-new-elsewhere]{Other new stuff}
-%*                                                                      *
-%************************************************************************
-
-2.02 is released together with Green Card, a foreign-language
-interface generator for Haskell. More details elsewhere...
-
-
-%************************************************************************
-%*                                                                      *
-\subsection[2-02-troublespots]{Known troublespots}
-%*                                                                      *
-%************************************************************************
-
-The 2.02 compiler has the following known deficiencies:
-
-\begin{description}
-\item[native code generator, x86:]
-
-The native code generator for x86 platforms is by default switched
-off, as the code the compiler produces with it enabled was discovered
-just before releaseing to be wonky. Rather than delay the release
-further, GHC on x86 platforms rely on \tr{GCC} as their
-backend for now. Hopefully fixed soon.
-
-\item[Simplifier looping:]
-
-The simplifier(Glasgow-speak for optimiser) has been observed to get
-into a loop in one or two cases. If you should observe this, please
-report it as a bug - the work around is to turn off optimisation.
-
-\item[Undefined @*_vap_info@ symbols:]
-
-If the linker complains about some undefined @*_vap_info@ symbols when
-linking 2.02 compiled programs (very unlikely) - fix this by compiling
-the module where the references are coming from with
-@-fno-lambda-lifting@.
-
-\end{description}
+* Added documentation on how to compile mutually recursive modules with
+  2.03.

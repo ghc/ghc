@@ -19,9 +19,16 @@ import UniqFM           ( SYN_IE(Uniquable) )
 
 \begin{code}
 data FieldLabel
-  = FieldLabel	Name		-- Also used as the Name of the field selector Id
-		Type
-		FieldLabelTag
+  = FieldLabel	Name	        -- Also used as the Name of the field selector Id
+		Type		-- Type of the field; may have free type variables that
+				-- are the tyvar of the constructor
+				-- e.g.  data T a = MkT { op1 :: a -> a, op2 :: a -> Int }
+				-- The type in the FieldLabel for op1 will be simply (a->a).
+
+		FieldLabelTag	-- Indicates position within constructor
+				-- If the same field occurs in more than one constructor
+				-- then it'll have a separate FieldLabel on each occasion,
+				-- but with a single name (and presumably the same type!)
 
 type FieldLabelTag = Int
 

@@ -1,5 +1,4 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.13 1997/05/19 00:22:33 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -364,6 +363,7 @@ SRC_HSTAGS_OPTS += -fglasgow-exts -cpp
 # 		Include target-rule boilerplate
 
 include $(TOP)/mk/target.mk
+
 
 #
 # Special extra dependencies for yukky ugen stuff

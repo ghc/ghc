@@ -97,7 +97,7 @@ doesn't work any more.
 
 \item[The CVS repository.]
 We make source distributions at the same time as binary distributions;
-i.e. infrequently.  They should, however, be pretty throughly tested.
+i.e. infrequently.  They should, however, be pretty thoroughly tested.
 If you want more up-to-the minute (but less tested) source code then you 
 need to get access to our CVS repository.
 
@@ -184,9 +184,8 @@ A ``platform'' is a
 architecture/manufacturer/operating-system combination,
 such as @sparc-sun-solaris2.5.1@.  Other common ones are
 @alpha-dec-osf2@, @hppa1.1-hp-hpux9@, @i386-unknown-linux@,
-@i386-unknown-solaris2@, @i386-unknown-freebsd@,
-@m68k-sun-sunos4@, @mips-sgi-irix5@,
-@sparc-sun-sunos4@, @sparc-sun-solaris2@.
+@i386-unknown-solaris2@, @i386-unknown-freebsd@, @i386-unknown-cygwin32@,
+@m68k-sun-sunos4@, @mips-sgi-irix5@, @sparc-sun-sunos4@, @sparc-sun-solaris2@.
 
 Bear in mind that certain ``bundles'', e.g. parallel Haskell, may not
 work on all machines for which basic Haskell compiling is supported.
@@ -216,7 +215,7 @@ unsurprisingly.  Both have native-code generators, for quicker
 compilations.  The native-code generator for iX86 platforms (e.g.,
 Linux ELF) is {\em nearly} working; but is not turned on by default.
 
-Here's everything that's known about GHC ports, as of 2.01. We
+Here's everything that's known about GHC ports, as of 2.02. We
 identify platforms by their ``canonical GNU-style'' names.
 
 Note that some ports are fussy about which GCC version you use; or
@@ -432,15 +431,14 @@ to run the @configure@ script by changing your directory to @fptools@.
 That should convert @Makefile.in@ to @Makefile@.
 
 You can now either start using the tools {\em in-situ} without going
-through any installation process, just type @make config@ to set the
-tools up for this (you have to be in the @fptools@ directory). You'll
-also want to add the path which @make@ echoes to your @PATH@
-environment variable. This option is useful if you simply want to try
-out the package or you don't have the necessary priviledges (or
+through any installation process, just type @make in-place@ to set the
+tools up for this (you have to be in the @fptools@ directory for
+this). You'll also want to add the path which @make@ will now echo to
+your @PATH@ environment variable. This option is useful if you simply want
+to try out the package and/or you don't have the necessary priviledges (or
 inclination) to properly install the tools locally. Note that if you
 do decide to install the package `properly' at a later date, you have
-to go through the installation steps that 
-follows.
+to go through the installation steps that follows.
 
 To install an @fptools@ package, you'll have to do the following:
 
@@ -1003,11 +1001,15 @@ In any directory you should be able to make the following:
 for the real work.  Notably, it does @gmake depend@ in all directories
 that contain programs.  But @boot@ does more.  For example, you can't
 do @gmake depend@ in a directory of C program until you have converted
-the literate @.lh@ header files into standard @.h@ header files.  Similarly, you convert a literate file to illiterate
-form until you have built the @literate@ tools.  @boot@ takes care of these
+the literate @.lh@ header files into standard @.h@ header files.
+Similarly, you convert a literate file to illiterate form until you
+have built the @literate@ tools.  @boot@ takes care of these
 inter-directory dependencies.
 
-You should say @gmake boot@ right after configuring your build tree.
+You should say @gmake boot@ right after configuring your build tree,
+but note that this is a one-off, i.e., there's no need to re-do
+@gmake boot@ if you should re-configure your build tree at a later
+stage (no harm caused if you do though).
 
 \item[@all@:] makes all the final target(s) for this Makefile.
 Depending on which directory you are in a ``final target''

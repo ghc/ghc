@@ -150,6 +150,7 @@ tcBindsAndThen combiner (MonoBind bind sigs is_rec) do_next
   where
     binder_names = map fst (bagToList (collectMonoBinders bind))
     ty_sigs      = [sig  | sig@(Sig name _ _) <- sigs]
+
 \end{code}
 
 An aside.  The original version of @tcBindsAndThen@ which lacks a

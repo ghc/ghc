@@ -10,7 +10,7 @@ Haskell is "the" standard lazy functional programming language; the
 current language version is 1.4, agreed in March, 1997.  The Haskell
 Report is online at
 
-	http://haskell.cs.yale.edu/1.4/
+	http://haskell.org/report/
 
 GHC 2.02 is a beta-quality release:
 
@@ -20,14 +20,17 @@ GHC 2.02 is a beta-quality release:
     because we don't have a comprehensive set (Donations of Haskell 1.4
     programs to our test suite are most welcome).
 
-  * It should generate good code.
+  * It should generate reasonably good code.
     All the optimisations that GHC 0.29 used to do are back in, with 
     the exception of specialisation.  It ought to be the case that
     GHC 2.02 outperforms GHC 0.29, because it has a much better
-    handle on cross-module inlining, but there's a good chance that
-    there are performance "holes" lurking.  We have yet to make
-    a systematic comparison.  (Please send us programs where 2.02
-    does noticeably worse than 0.29.)
+    handle on cross-module inlining, but we know for certain that
+    this isn't always the case.  We have yet to make a systematic 
+    comparison.  In short, this is not the moment to switch from 0.29
+    if you Really Care about performance.  2.02 does, however,
+    generate much better code than 2.01.
+
+    (Please send us programs where 2.02 does noticeably worse than 0.29.)  
 
   * It is more expensive than it should be.
     GHC 2.02 has received even less attention to its own performance.
@@ -112,12 +115,20 @@ comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 ======================================================================
 How to get GHC 2.02:
 
-This release is available by anonymous FTP from the main Haskell
+The easy way is to go to the WWW GHC distribution page, which is
+self-explanatory:
+
+	ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/README.html
+
+----------------------------------------------------------------------
+Otherwise you can use the old anonymous FTP method from the main Haskell
 archive sites, in the directory pub/haskell/glasgow:
 
 	ftp.dcs.gla.ac.uk   (130.209.240.50)
 	ftp.cs.chalmers.se  (129.16.227.140)
 	haskell.cs.yale.edu (128.36.11.43)
+
+	[BUT: the latter two sites may take a while to get up to date.]
 
 The Glasgow site is mirrored by src.doc.ic.ac.uk (146.169.43.1), in
 computing/programming/languages/haskell/glasgow.

@@ -1,0 +1,32 @@
+	     The Glasgow Haskell Compiler -- version 2.03
+	     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We are pleased to announce the Glasgow Haskell Compiler version 2.03.  
+
+GHC 2.03 is a minor upgrade of GHC 2.02.  It differs in the following
+ways:
+
+  * A slew of small bugs are fixed.  You can find the complete list
+    at	http://www.cse.ogi.edu/~simonpj/ghc-bugs.html
+
+  * Last-minute language changes have been implemented (minor changes
+    to the libraries, and to module export/hiding scope rules)
+
+  * It is only available as a source distribution.  If you want to
+    use it you'll have to build it from source.  Nowadays this is
+    a well-documented process (see the build & installation guide).
+
+None of the bugs in GHC 2.02 are show-stoppers, so you'll only want
+to upgrade if you are a build-from-source junkie and the bugs are 
+irritating you.
+
+Simon Peyton Jones
+Sigbjorn Finne
+
+======================================================================
+How to get GHC 2.03:
+
+The easy way is to go to the WWW GHC distribution page, which is
+self-explanatory:
+
+	ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/README.html
