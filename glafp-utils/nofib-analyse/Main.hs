@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.6 2002/02/28 18:50:40 keithw Exp $
+-- $Id: Main.hs,v 1.7 2002/08/21 12:58:56 simonmar Exp $
 
 -- (c) Simon Marlow 1997-1999
 -----------------------------------------------------------------------------
@@ -395,7 +395,7 @@ class Num a => Result a where
 
 instance Result Int where
 	convert_to_percentage 0 size = 100
-	convert_to_percentage base size = (fromInt size / fromInt base) * 100
+	convert_to_percentage base size = (fromIntegral size / fromIntegral base) * 100
 
 	result_to_string n = show (n `div` 1024) ++ "k"
 
@@ -489,7 +489,7 @@ calc_gmsd :: [BoxValue a] -> (BoxValue Float, BoxValue Float, BoxValue Float)
 calc_gmsd xs 
   | null percentages = (RunFailed NotDone, RunFailed NotDone, RunFailed NotDone)
   | otherwise        = let sqr x = x * x
-                           len   = fromInt (length percentages)
+                           len   = fromIntegral (length percentages)
                            logs  = map log percentages
                            lbar  = sum logs / len
                            devs  = map (sqr . (lbar-)) logs
