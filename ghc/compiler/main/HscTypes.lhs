@@ -5,7 +5,7 @@
 
 \begin{code}
 module HscTypes ( 
-	Finder, ModuleLocation(..),
+	ModuleLocation(..),
 
 	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
@@ -80,13 +80,11 @@ import UniqSupply	( UniqSupply )
 
 %************************************************************************
 %*									*
-\subsection{The Finder type}
+\subsection{Module locations}
 %*									*
 %************************************************************************
 
 \begin{code}
-type Finder = ModuleName -> IO (Maybe (Module, ModuleLocation))
-
 data ModuleLocation
    = ModuleLocation {
 	hs_file  :: FilePath,

@@ -5,7 +5,7 @@
 
 \begin{code}
 module Finder (
-    newFinder, 		-- :: PackageConfigInfo -> IO (), 
+    initFinder, 	-- :: PackageConfigInfo -> IO (), 
     findModule,		-- :: ModuleName -> IO (Maybe (Module, ModuleLocation))
     ModuleLocation(..),
     mkHomeModuleLocn,
@@ -43,8 +43,8 @@ GLOBAL_VAR(v_PkgDirCache,    error "no pkg cache!",  FiniteMap String (PackageNa
 GLOBAL_VAR(v_HomeDirCache,   Nothing,  Maybe (FiniteMap String FilePath))
 
 
-newFinder :: PackageConfigInfo -> IO ()
-newFinder (PackageConfigInfo pkgs) = do
+initFinder :: PackageConfigInfo -> IO ()
+initFinder (PackageConfigInfo pkgs) = do
   -- expunge our home cache
   writeIORef v_HomeDirCache Nothing
 
@@ -52,8 +52,8 @@ newFinder (PackageConfigInfo pkgs) = do
   writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
 
   
-findModule :: [Package] -> ModuleName -> IO (Maybe (Module, ModuleLocation))
-findModule pkgs name = do
+findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+findModule name = do
   j <- maybeHomeModule name
   case j of
 	Just home_module -> return (Just home_module)

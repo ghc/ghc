@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.97 2000/10/27 09:39:35 sewardj Exp $
+# $Id: Makefile,v 1.98 2000/10/27 11:48:54 sewardj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -207,7 +207,9 @@ nativeGen/MachCode_HC_OPTS 	= -H10m
 usageSP/UsageSPInf_HC_OPTS	= -Onot
 
 prelude/PrimOp_HC_OPTS 		= -H12m -K3m
-prelude/PrelRules_HC_OPTS	= 
+
+# because the NCG can't handle the 64-bit math in here
+prelude/PrelRules_HC_OPTS	= -fvia-C
 
 parser/Lex_HC_OPTS		= -K2m -H16m 
 parser/Ctype_HC_OPTS		= -K2m

@@ -58,7 +58,7 @@ import UniqFM		( lookupUFM )
 import Maybes		( maybeToBool, catMaybes )
 import Outputable
 import IO		( openFile, IOMode(..) )
-import HscTypes		( Finder, PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
+import HscTypes		( PersistentCompilerState, HomeIfaceTable, HomeSymbolTable, 
 			  ModIface(..), WhatsImported(..), 
 			  VersionInfo(..), ImportVersion, IfaceDecls(..),
 			  GlobalRdrEnv, AvailEnv, Avails, GenAvailInfo(..), AvailInfo, 
@@ -77,18 +77,18 @@ import List		( partition, nub )
 %*********************************************************
 
 \begin{code}
-renameModule :: DynFlags -> Finder 
+renameModule :: DynFlags
 	     -> HomeIfaceTable -> HomeSymbolTable
 	     -> PersistentCompilerState 
 	     -> Module -> RdrNameHsModule 
 	     -> IO (PersistentCompilerState, Maybe (ModIface, [RenamedHsDecl]))
 	-- Nothing => some error occurred in the renamer
 
-renameModule dflags finder hit hst old_pcs this_module rdr_module
+renameModule dflags hit hst old_pcs this_module rdr_module
   = 	-- Initialise the renamer monad
     do {
 	(new_pcs, errors_found, maybe_rn_stuff) 
-	   <- initRn dflags finder hit hst old_pcs this_module (rename this_module rdr_module) ;
+	   <- initRn dflags hit hst old_pcs this_module (rename this_module rdr_module) ;
 
 	-- Return results.  No harm in updating the PCS
 	if errors_found then
@@ -351,7 +351,7 @@ rnDeprecs gbl_env Nothing decls
 %************************************************************************
 
 \begin{code}
-checkOldIface :: DynFlags -> Finder
+checkOldIface :: DynFlags
 	      -> HomeIfaceTable -> HomeSymbolTable
 	      -> PersistentCompilerState
 	      -> Module 
@@ -360,8 +360,8 @@ checkOldIface :: DynFlags -> Finder
 	      -> IO (PersistentCompilerState, Bool, (RecompileRequired, Maybe ModIface))
 				-- True <=> errors happened
 
-checkOldIface dflags finder hit hst pcs mod source_unchanged maybe_iface
-  = initRn dflags finder hit hst pcs mod $
+checkOldIface dflags hit hst pcs mod source_unchanged maybe_iface
+  = initRn dflags hit hst pcs mod $
 	
 	-- Load the old interface file, if we havn't already got it
     loadOldIface mod maybe_iface			`thenRn` \ maybe_iface ->
@@ -477,15 +477,15 @@ Suppose we discover we don't need to recompile.   Then we start from the
 IfaceDecls in the ModIface, and fluff them up by sucking in all the decls they need.
 
 \begin{code}
-closeIfaceDecls :: DynFlags -> Finder
+closeIfaceDecls :: DynFlags
 	      	-> HomeIfaceTable -> HomeSymbolTable
 	      	-> PersistentCompilerState
 	      	-> ModIface 	-- Get the decls from here
 	      	-> IO (PersistentCompilerState, Bool, [RenamedHsDecl])
 				-- True <=> errors happened
-closeIfaceDecls dflags finder hit hst pcs
+closeIfaceDecls dflags hit hst pcs
 		mod_iface@(ModIface { mi_module = mod, mi_decls = iface_decls })
-  = initRn dflags finder hit hst pcs mod $
+  = initRn dflags hit hst pcs mod $
 
     let
 	rule_decls = dcl_rules iface_decls

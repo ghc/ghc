@@ -24,7 +24,7 @@ import HscTypes		( VersionInfo(..), IfaceDecls(..), ModIface(..), ModDetails(..)
 			  TyThing(..), DFunId, TypeEnv, isTyClThing, Avails,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..), 
-			  Finder, ModuleLocation(..)
+			  ModuleLocation(..)
 			)
 
 import CmdLineOpts
@@ -56,6 +56,7 @@ import Type		( splitSigmaTy, tidyTopType, deNoteType )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName, moduleName )
+import Finder		( findModule )
 
 import List		( partition )
 import IO		( IOMode(..), openFile, hClose )
@@ -604,12 +605,12 @@ diffDecls old_vers old_fixities new_fixities old new
 %************************************************************************
 
 \begin{code}
-writeIface :: Finder -> Maybe ModIface -> IO ()
-writeIface finder Nothing
+writeIface :: Maybe ModIface -> IO ()
+writeIface Nothing
   = return ()
 
-writeIface finder (Just mod_iface)
-  = do	{ maybe_found <- finder mod_name ;
+writeIface (Just mod_iface)
+  = do	{ maybe_found <- findModule mod_name ;
 	; case maybe_found of {
 	    Nothing -> printErrs (text "Can't write interface file for" <+> ppr mod_name) ;
 	    Just (_, locn) ->

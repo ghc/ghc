@@ -100,7 +100,6 @@ module CmdLineOpts (
 import Array	( array, (//) )
 import GlaExts
 import IOExts	( IORef, readIORef )
-import Argv
 import Constants	-- Default values for some flags
 import Util
 import FastTypes

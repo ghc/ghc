@@ -49,6 +49,7 @@ import Maybes		( maybeToBool, orElse )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
+import Finder		( findModule )
 import Lex
 import FiniteMap
 import Outputable
@@ -487,9 +488,7 @@ findAndReadIface :: SDoc -> ModuleName
 
 findAndReadIface doc_str mod_name hi_boot_file
   = traceRn trace_msg			`thenRn_`
-
-    getFinderRn				`thenRn` \ finder ->
-    ioToRnM (finder mod_name)		`thenRn` \ maybe_found ->
+    ioToRnM (findModule mod_name)	`thenRn` \ maybe_found ->
 
     case maybe_found of
       Right (Just (mod,locn))

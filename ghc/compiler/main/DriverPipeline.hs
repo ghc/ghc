@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.8 2000/10/26 16:21:02 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.9 2000/10/27 11:48:55 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -30,7 +30,6 @@ import DriverMkDepend
 import DriverPhases
 import DriverFlags
 import HscMain
-import Finder
 import TmpFiles
 import HscTypes
 import Outputable
@@ -391,6 +390,8 @@ run_phase MkDependHS basename suff input_fn _output_fn = do
 -----------------------------------------------------------------------------
 -- Hsc phase
 
+-- Compilation of a single module, in "legacy" mode (_not_ under
+-- the direction of the compilation manager).
 run_phase Hsc basename suff input_fn output_fn
   = do
 	
@@ -436,6 +437,8 @@ run_phase Hsc basename suff input_fn output_fn
 
    -- build a bogus ModSummary to pass to hscMain.
 	let summary = ModSummary {
+			ms_mod = (mkModuleInThisPackage . mkModuleName)
+                                    {-ToDo: modname!!-}basename,
 			ms_location = error "no loc",
 			ms_ppsource = Just (input_fn, error "no fingerprint"),
 			ms_imports = error "no imports"
@@ -447,7 +450,6 @@ run_phase Hsc basename suff input_fn output_fn
   -- run the compiler!
         pcs <- initPersistentCompilerState
 	result <- hscMain dyn_flags{ hscOutName = output_fn }
-			  (error "no Finder!")
 			  summary 
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
@@ -689,8 +691,9 @@ preprocess filename =
   do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
 
+
 -----------------------------------------------------------------------------
--- Compile a single module.
+-- Compile a single module, under the control of the compilation manager.
 --
 -- This is the interface between the compilation manager and the
 -- compiler proper (hsc), where we deal with tedious details like
@@ -703,8 +706,7 @@ preprocess filename =
 -- the .hs file if necessary, and compiling up the .stub_c files to
 -- generate Linkables.
 
-compile :: Finder                  -- to find modules
-        -> ModSummary              -- summary, including source
+compile :: ModSummary              -- summary, including source
         -> Maybe ModIface          -- old interface, if available
         -> HomeSymbolTable         -- for home module ModDetails
 	-> HomeIfaceTable	   -- for home module Ifaces
@@ -721,7 +723,7 @@ data CompResult
    | CompErrs PersistentCompilerState	-- updated PCS
 
 
-compile finder summary old_iface hst hit pcs = do 
+compile summary old_iface hst hit pcs = do 
    verb <- readIORef v_Verbose
    when verb (hPutStrLn stderr 
                  (showSDoc (text "compile: compiling" 
@@ -749,7 +751,7 @@ compile finder summary old_iface hst hit pcs = do
 
    -- run the compiler
    hsc_result <- hscMain dyn_flags{ hscOutName = output_fn } 
-                         finder summary old_iface hst hit pcs
+                         summary old_iface hst hit pcs
 
    case hsc_result of {
       HscFail pcs -> return (CompErrs pcs);

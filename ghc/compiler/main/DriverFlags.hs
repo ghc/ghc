@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.9 2000/10/26 16:21:02 sewardj Exp $
+-- $Id: DriverFlags.hs,v 1.10 2000/10/27 11:48:55 sewardj Exp $
 --
 -- Driver flags
 --
@@ -61,13 +61,14 @@ data OptKind
 processArgs :: [(String,OptKind)] -> [String] -> [String]
    -> IO [String]  -- returns spare args
 processArgs _spec [] spare = return (reverse spare)
-processArgs spec args@(arg@('-':_):args') spare = do
+processArgs spec args@(('-':arg):args') spare = do
+  putStrLn ( "processArg: " ++ arg)
   case findArg spec arg of
     Just (rest,action) -> 
       do args' <- processOneArg action rest args
 	 processArgs spec args' spare
     Nothing -> 
-      processArgs spec args' (arg:spare)
+      processArgs spec args' (('-':arg):spare)
 processArgs spec (arg:args) spare = 
   processArgs spec args (arg:spare)
 
@@ -114,9 +115,10 @@ processOneArg action rest (dash_arg@('-':arg):args) =
 
 findArg :: [(String,OptKind)] -> String -> Maybe (String,OptKind)
 findArg spec arg
-  = case [ (remove_spaces rest, k) 
+  = trace ("findArg: " ++ arg) $
+    case [ (remove_spaces rest, k) 
 	 | (pat,k) <- spec, Just rest <- [my_prefix_match pat arg],
-	   arg_ok k arg rest ] 
+	   arg_ok k rest arg ] 
     of
 	[]      -> Nothing
 	(one:_) -> Just one

@@ -66,7 +66,6 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 import RnMonad		( ExportItem, ParsedIface(..) )
 import CmSummarise	( ModSummary(..), name_of_summary, ms_get_imports,
 			  mimp_name )
-import Finder		( Finder )
 import InterpSyn	( UnlinkedIBind )
 import StgInterp	( ItblEnv )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
@@ -100,7 +99,6 @@ data HscResult
 
 hscMain
   :: DynFlags
-  -> Finder
   -> ModSummary       -- summary, including source filename
   -> Maybe ModIface   -- old interface, if available
   -> HomeSymbolTable		-- for home module ModDetails
@@ -108,13 +106,13 @@ hscMain
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> IO HscResult
 
-hscMain dflags finder summary maybe_old_iface hst hit pcs
+hscMain dflags summary maybe_old_iface hst hit pcs
  = do {
       -- ????? source_unchanged :: Bool -- extracted from summary?
       let source_unchanged = trace "WARNING: source_unchanged?!" False
       ;
       (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
-         <- checkOldIface dflags finder hit hst pcs (ms_mod summary)
+         <- checkOldIface dflags hit hst pcs (ms_mod summary)
 			  source_unchanged maybe_old_iface;
       if check_errs then
          return (HscFail pcs_ch)
@@ -124,12 +122,12 @@ hscMain dflags finder summary maybe_old_iface hst hit pcs
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
-      what_next dflags finder summary maybe_checked_iface
+      what_next dflags summary maybe_checked_iface
                 hst hit pcs_ch
       }}
 
 
-hscNoRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
+hscNoRecomp dflags summary maybe_checked_iface hst hit pcs_ch
  = do {
       -- we definitely expect to have the old interface available
       let old_iface = case maybe_checked_iface of 
@@ -138,7 +136,7 @@ hscNoRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
       ;
       -- CLOSURE
       (pcs_cl, closure_errs, cl_hs_decls) 
-         <- closeIfaceDecls dflags finder hit hst pcs_ch old_iface ;
+         <- closeIfaceDecls dflags hit hst pcs_ch old_iface ;
       if closure_errs then 
          return (HscFail pcs_cl) 
       else do {
@@ -167,7 +165,7 @@ hscNoRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
       }}}}
 
 
-hscRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
+hscRecomp dflags summary maybe_checked_iface hst hit pcs_ch
  = do {
       -- what target are we shooting for?
       let toInterp = dopt_HscLang dflags == HscInterpreted
@@ -182,7 +180,7 @@ hscRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
       -- RENAME
       show_pass dflags "Renamer";
       (pcs_rn, maybe_rn_result) 
-         <- renameModule dflags finder hit hst pcs_ch this_mod rdr_module;
+         <- renameModule dflags hit hst pcs_ch this_mod rdr_module;
       case maybe_rn_result of {
          Nothing -> return (HscFail pcs_rn);
          Just (new_iface, rn_hs_decls) -> do {
@@ -221,7 +219,7 @@ hscRecomp dflags finder summary maybe_checked_iface hst hit pcs_ch
                   Just (fif, sdoc) -> Just fif; Nothing -> Nothing
       ;
       -- Write the interface file
-      writeIface finder maybe_final_iface
+      writeIface maybe_final_iface
       ;
       -- do the rest of code generation/emission
       (maybe_stub_h_filename, maybe_stub_c_filename, maybe_ibinds)

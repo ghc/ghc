@@ -35,8 +35,7 @@ import IOExts		( IORef, newIORef, readIORef, writeIORef, unsafePerformIO )
 import HsSyn		
 import RdrHsSyn
 import RnHsSyn		( RenamedFixitySig )
-import HscTypes		( Finder,
-			  AvailEnv, lookupTypeEnv,
+import HscTypes		( AvailEnv, lookupTypeEnv,
 			  OrigNameEnv(..), OrigNameNameEnv, OrigNameIParamEnv,
 			  WhetherHasOrphans, ImportVersion, 
 			  PersistentRenamerState(..), IsBootInterface, Avails,
@@ -120,7 +119,6 @@ data RnDown
 	rn_mod     :: Module,		-- This module
 	rn_loc     :: SrcLoc,		-- Current locn
 
-	rn_finder  :: Finder,
 	rn_dflags  :: DynFlags,
 
 	rn_hit     :: HomeIfaceTable,
@@ -286,7 +284,7 @@ type IsLoaded = Bool
 %************************************************************************
 
 \begin{code}
-initRn :: DynFlags       -> Finder 
+initRn :: DynFlags
        -> HomeIfaceTable -> HomeSymbolTable
        -> PersistentCompilerState
        -> Module
@@ -294,7 +292,7 @@ initRn :: DynFlags       -> Finder
        -> IO (PersistentCompilerState, Bool, t)	
 		-- True <=> found errors
 
-initRn dflags finder hit hst pcs mod do_rn
+initRn dflags hit hst pcs mod do_rn
   = do 
 	let prs = pcs_PRS pcs
 	let pst = pcs_PST pcs
@@ -319,7 +317,6 @@ initRn dflags finder hit hst pcs mod do_rn
 	let rn_down = RnDown { rn_mod = mod,
 			       rn_loc = noSrcLoc, 
 	
-			       rn_finder = finder,
 			       rn_dflags = dflags,
 			       rn_hit    = hit,
 			       rn_done   = is_done hst pst,
@@ -399,7 +396,7 @@ renameSourceCode dflags mod prs m
 			       rn_errs = errs_var, 
 			       rn_mod = mod, 
 			       rn_done   = bogus "rn_done",	rn_hit    = bogus "rn_hit",
-			       rn_ifaces = bogus "rn_ifaces",   rn_finder = bogus "rn_finder"
+			       rn_ifaces = bogus "rn_ifaces"
 			     }
 	    s_down = SDown { rn_mode = InterfaceMode,
 			       -- So that we can refer to PrelBase.True etc
@@ -576,9 +573,6 @@ getSrcLocRn down l_down
 %=====================
 
 \begin{code}
-getFinderRn :: RnM d Finder
-getFinderRn down l_down = return (rn_finder down)
-
 getHomeIfaceTableRn :: RnM d HomeIfaceTable
 getHomeIfaceTableRn down l_down = return (rn_hit down)
 

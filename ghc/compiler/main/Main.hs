@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.11 2000/10/26 16:51:44 sewardj Exp $
+-- $Id: Main.hs,v 1.12 2000/10/27 11:48:55 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -23,6 +23,8 @@ import DriverUtil
 import DriverPhases	( Phase(..) )
 import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
 import TmpFiles
+import Finder		( initFinder )
+import CmStaticInfo	( mkPCI )
 import Config
 import Util
 import Panic
@@ -42,7 +44,6 @@ import List
 import System
 import Maybe
 
-import CompManager
 
 -----------------------------------------------------------------------------
 -- Changes:
@@ -114,7 +115,7 @@ main =
    argv'  <- setTopDir argv
    top_dir <- readIORef v_TopDir
 
-   let installed s = top_dir ++ s
+   let installed s = top_dir ++ '/':s
        inplace s   = top_dir ++ '/':cCURRENT_DIR ++ '/':s
 
        installed_pkgconfig = installed ("package.conf")
@@ -209,6 +210,11 @@ main =
 	         hPutStrLn stderr booter_version)
 
    when verb (hPutStrLn stderr ("Using package config file: " ++ conf_file))
+
+	-- initialise the finder
+   pkg_details <- readIORef v_Package_details
+   pci         <- mkPCI pkg_details
+   initFinder pci
 
 	-- mkdependHS is special
    when (mode == DoMkDependHS) beginMkDependHS
