@@ -9,6 +9,8 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
+-- This library defines parser combinators for precedence parsing.
+
 -----------------------------------------------------------------------------
 
 module Text.ParserCombinators.ReadPrec
@@ -19,20 +21,21 @@ module Text.ParserCombinators.ReadPrec
   Prec,          -- :: *; = Int
   minPrec,       -- :: Prec; = 0
 
-  -- * Primitive operations
+  -- * Precedence operations
   lift,          -- :: ReadP a -> ReadPrec a
   prec,          -- :: Prec -> ReadPrec a -> ReadPrec a
   step,          -- :: ReadPrec a -> ReadPrec a
   reset,         -- :: ReadPrec a -> ReadPrec a
 
   -- * Other operations
+  -- All are based directly on their similarly-naned 'ReadP' counterparts.
   get,           -- :: ReadPrec Char
   look,          -- :: ReadPrec String
   (+++),         -- :: ReadPrec a -> ReadPrec a -> ReadPrec a
   pfail,         -- :: ReadPrec a
   choice,        -- :: [ReadPrec a] -> ReadPrec a
 
-  -- converters
+  -- * Converters
   readPrec_to_P, -- :: ReadPrec a       -> (Int -> ReadP a)
   readP_to_Prec, -- :: (Int -> ReadP a) -> ReadPrec a
   readPrec_to_S, -- :: ReadPrec a       -> (Int -> ReadS a)
@@ -89,21 +92,22 @@ minPrec = 0
 -- Operations over ReadPrec
 
 lift :: ReadP a -> ReadPrec a
+-- ^ Lift a predence-insensitive 'ReadP' to a 'ReadPrec'
 lift m = P (\_ -> m)
 
 step :: ReadPrec a -> ReadPrec a
--- Increases the precedence context by one
+-- ^ Increases the precedence context by one
 step (P f) = P (\n -> f (n+1))
 
 reset :: ReadPrec a -> ReadPrec a
--- Resets the precedence context to zero
+-- ^ Resets the precedence context to zero
 reset (P f) = P (\n -> f minPrec)
 
 prec :: Prec -> ReadPrec a -> ReadPrec a
--- (prec n p) checks that the precedence context is 
+-- ^ @(prec n p)@ checks that the precedence context is 
 --			  less than or equal to n,
--- 	if not, fails
---	if so, parses p in context n
+--   * if not, fails
+--   * if so, parses p in context n
 prec n (P f) = P (\c -> if c <= n then f n else ReadP.pfail)
 
 -- ---------------------------------------------------------------------------

@@ -482,13 +482,7 @@ instance (Ix a, Show a, Show b) => Show (Array a b) where
         showChar ' ' .
         shows (assocs a)
 
-{-
-instance  (Ix a, Read a, Read b) => Read (Array a b)  where
-    readsPrec p = readParen (p > 9)
-	   (\r -> [(array b as, u) | ("array",s) <- lex r,
-				     (b,t)       <- reads s,
-				     (as,u)      <- reads t   ])
--}
+-- The Read instance is in GHC.Read
 \end{code}
 
 

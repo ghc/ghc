@@ -38,6 +38,7 @@ module GHC.Read
   , parens     -- :: ReadPrec a -> ReadPrec a
   , list       -- :: ReadPrec a -> ReadPrec [a]
   , choose     -- :: [(String, ReadPrec a)] -> ReadPrec a
+  , readListDefault, readListPrecDefault,
 
   -- Temporary
   , readList__
@@ -54,8 +55,10 @@ import Text.ParserCombinators.ReadP
   )
 
 import qualified Text.Read.Lex as L
-
-import Text.Read.Lex  ( Lexeme(..) )
+-- Lex exports 'lex', which is also defined here,
+-- hence the qualified import.
+-- We can't import *anything* unqualified, because that
+-- confuses Haddock.
 
 import Text.ParserCombinators.ReadPrec
 
@@ -69,6 +72,7 @@ import GHC.Float
 import GHC.List
 import GHC.Show		-- isAlpha etc
 import GHC.Base
+import GHC.Arr
 
 ratioPrec = 7 	-- Precedence of ':%' constructor
 appPrec   = 10	-- Precedence of applictaion
@@ -133,9 +137,13 @@ class Read a where
   readListPrec = readS_to_Prec (\_ -> readList)
 
 readListDefault :: Read a => ReadS [a]
+-- ^ Use this to define the 'readList' method, if you
+--   don't want a special case
 readListDefault = readPrec_to_S readListPrec 0
 
 readListPrecDefault :: Read a => ReadPrec [a]
+-- ^ Use this to define the 'readListPrec' method, if you
+--   don't want a special case
 readListPrecDefault = list readPrec
 
 ------------------------------------------------------------------------
@@ -170,11 +178,11 @@ lex s  = readP_to_S L.hsLex s
 
 lexLitChar :: ReadS String	-- As defined by H98
 lexLitChar = readP_to_S (do { P.skipSpaces ;
-			      (s, Char _) <- P.gather L.lex ;
+			      (s, L.Char _) <- P.gather L.lex ;
 			      return s })
 
 readLitChar :: ReadS Char	-- As defined by H98
-readLitChar = readP_to_S (do { Char c <- L.lex ;
+readLitChar = readP_to_S (do { L.Char c <- L.lex ;
 			       return c })
 
 lexDigits :: ReadS String
@@ -183,35 +191,38 @@ lexDigits = readP_to_S (P.munch1 isDigit)
 ------------------------------------------------------------------------
 -- utility parsers
 
-lexP :: ReadPrec Lexeme
+lexP :: ReadPrec L.Lexeme
+-- ^ Parse a single lexeme
 lexP = lift L.lex
 
 paren :: ReadPrec a -> ReadPrec a
--- (paren p) parses (P0) 
---	where p parses P0 in precedence context zero
-paren p = do Punc "(" <- lexP
-	     x        <- reset p
-	     Punc ")" <- lexP
+-- ^ @(paren p)@ parses "(P0)"
+--	where @p@ parses "P0" in precedence context zero
+paren p = do L.Punc "(" <- lexP
+	     x          <- reset p
+	     L.Punc ")" <- lexP
 	     return x
 
 parens :: ReadPrec a -> ReadPrec a
--- (parens p) parses P, (P0), ((P0)), etc, 
---	where p parses P  in the current precedence context
---	        parses P0 in precedence context zero
+-- ^ @(parens p)@ parses "P", "(P0)", "((P0))", etc, 
+--	where @p@ parses "P"  in the current precedence context
+--	        parses "P0" in precedence context zero
 parens p = optional
  where
   optional  = p +++ mandatory
   mandatory = paren optional
 
 list :: ReadPrec a -> ReadPrec [a]
+-- ^ @(list p)@ parses a list of things parsed by @p@,
+-- using the usual square-bracket syntax.
 list readx =
   parens
-  ( do Punc "[" <- lexP
+  ( do L.Punc "[" <- lexP
        (listRest False +++ listNext)
   )
  where
   listRest started =
-    do Punc c <- lexP
+    do L.Punc c <- lexP
        case c of
          "]"           -> return []
          "," | started -> listNext
@@ -223,11 +234,12 @@ list readx =
        return (x:xs)
 
 choose :: [(String, ReadPrec a)] -> ReadPrec a
--- Parse the specified lexeme and continue as specified
--- Esp useful for nullary constructors
+-- ^ Parse the specified lexeme and continue as specified.
+-- Esp useful for nullary constructors; e.g.
+--    @choose [("A", return A), ("B", return B)]@
 choose sps = foldr ((+++) . try_one) pfail sps
 	   where
-	     try_one (s,p) = do { Ident s' <- lexP ;
+	     try_one (s,p) = do { L.Ident s' <- lexP ;
 				  if s == s' then p else pfail }
 \end{code}
 
@@ -242,13 +254,13 @@ choose sps = foldr ((+++) . try_one) pfail sps
 instance Read Char where
   readPrec =
     parens
-    ( do Char c <- lexP
+    ( do L.Char c <- lexP
          return c
     )
 
   readListPrec =
     parens
-    ( do String s <- lexP	-- Looks for "foo"
+    ( do L.String s <- lexP	-- Looks for "foo"
          return s
      +++
       readListPrecDefault	-- Looks for ['f','o','o']
@@ -259,7 +271,7 @@ instance Read Char where
 instance Read Bool where
   readPrec =
     parens
-    ( do Ident s <- lexP
+    ( do L.Ident s <- lexP
          case s of
            "True"  -> return True
            "False" -> return False
@@ -272,7 +284,7 @@ instance Read Bool where
 instance Read Ordering where
   readPrec =
     parens
-    ( do Ident s <- lexP
+    ( do L.Ident s <- lexP
          case s of
            "LT" -> return LT
            "EQ" -> return EQ
@@ -317,10 +329,10 @@ instance Read a => Read (Maybe a) where
   readPrec =
     parens
     ( prec appPrec
-      ( do Ident "Nothing" <- lexP
+      ( do L.Ident "Nothing" <- lexP
            return Nothing
        +++
-        do Ident "Just" <- lexP
+        do L.Ident "Just" <- lexP
            x            <- step readPrec
            return (Just x)
       )
@@ -333,11 +345,11 @@ instance (Read a, Read b) => Read (Either a b) where
   readPrec =
     parens
     ( prec appPrec
-      ( do Ident "Left" <- lexP
+      ( do L.Ident "Left" <- lexP
            x            <- step readPrec
            return (Left x)
        +++
-        do Ident "Right" <- lexP
+        do L.Ident "Right" <- lexP
            y             <- step readPrec
            return (Right y)
       )
@@ -351,7 +363,17 @@ instance Read a => Read [a] where
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
-instance Read Lexeme where
+instance  (Ix a, Read a, Read b) => Read (Array a b)  where
+    readPrec = parens $ prec appPrec $
+	       do L.Ident "array" <- lexP
+		  bounds <- step readPrec
+		  vals   <- step readPrec
+		  return (array bounds vals)
+
+    readListPrec = readListPrecDefault
+    readList     = readListDefault
+
+instance Read L.Lexeme where
   readPrec     = lexP
   readListPrec = readListPrecDefault
   readList     = readListDefault
@@ -365,28 +387,28 @@ instance Read Lexeme where
 %*********************************************************
 
 \begin{code}
-readNumber :: Num a => (Lexeme -> Maybe a) -> ReadPrec a
+readNumber :: Num a => (L.Lexeme -> Maybe a) -> ReadPrec a
 -- Read a signed number
 readNumber convert =
   parens
   ( do x <- lexP
        case x of
-         Symbol "-" -> do n <- readNumber convert
-                          return (negate n)
+         L.Symbol "-" -> do n <- readNumber convert
+                            return (negate n)
        
          _   -> case convert x of
                    Just n  -> return n
                    Nothing -> pfail
   )
 
-convertInt :: Num a => Lexeme -> Maybe a
-convertInt (Int i) = Just (fromInteger i)
-convertInt _       = Nothing
+convertInt :: Num a => L.Lexeme -> Maybe a
+convertInt (L.Int i) = Just (fromInteger i)
+convertInt _         = Nothing
 
-convertFrac :: Fractional a => Lexeme -> Maybe a
-convertFrac (Int i) = Just (fromInteger i)
-convertFrac (Rat r) = Just (fromRational r)
-convertFrac _       = Nothing
+convertFrac :: Fractional a => L.Lexeme -> Maybe a
+convertFrac (L.Int i) = Just (fromInteger i)
+convertFrac (L.Rat r) = Just (fromRational r)
+convertFrac _         = Nothing
 
 instance Read Int where
   readPrec     = readNumber convertInt
@@ -412,9 +434,9 @@ instance (Integral a, Read a) => Read (Ratio a) where
   readPrec =
     parens
     ( prec ratioPrec
-      ( do x          <- step readPrec
-           Symbol "%" <- lexP
-           y          <- step readPrec
+      ( do x            <- step readPrec
+           L.Symbol "%" <- lexP
+           y            <- step readPrec
            return (x % y)
       )
     )
@@ -447,7 +469,7 @@ instance (Read a, Read b) => Read (a,b) where
     parens
     ( paren
       ( do x <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            y <- readPrec
            return (x,y)
       )
@@ -462,9 +484,9 @@ instance (Read a, Read b, Read c) => Read (a, b, c) where
     parens
     ( paren
       ( do x <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            y <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            z <- readPrec
            return (x,y,z)
       )
@@ -478,11 +500,11 @@ instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
     parens
     ( paren
       ( do w <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            x <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            y <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            z <- readPrec
            return (w,x,y,z)
       )
@@ -496,13 +518,13 @@ instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
     parens
     ( paren
       ( do v <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            w <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            x <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            y <- readPrec
-           Punc "," <- lexP
+           L.Punc "," <- lexP
            z <- readPrec
            return (v,w,x,y,z)
       )
