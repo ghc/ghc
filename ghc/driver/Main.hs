@@ -1690,7 +1690,7 @@ run_something phase_name cmd
    unless n $ do 
 
    -- and run it!
-   exit_code <- system ("sh -c \"" ++ cmd ++ "\"")  `catchAllIO` 
+   exit_code <- system cmd `catchAllIO` 
 		   (\e -> throwDyn (PhaseFailed phase_name (ExitFailure 1)))
 
    if exit_code /= ExitSuccess
