@@ -713,8 +713,8 @@ file).
 
     <para>Unregisterised compilation can be useful when porting GHC to
     a new machine, since it reduces the prerequisite tools to
-    <program>gcc</program>, <program>as</program>, and
-    <program>ld</program> and nothing more, and furthermore the amount
+    <command>gcc</command>, <command>as</command>, and
+    <command>ld</command> and nothing more, and furthermore the amount
     of platform-specific code that needs to be written in order to get
     unregisterised compilation going is usually fairly small.</para>
 
