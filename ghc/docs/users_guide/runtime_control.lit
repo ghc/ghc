@@ -230,17 +230,40 @@ Turn {\em off} ``update-frame squeezing'' at garbage-collection time.
 
 %************************************************************************
 %*                                                                      *
-\subsection[rts-hooks]{``Hooks'' to change RTS failure messages}
+\subsection[rts-hooks]{``Hooks'' to change RTS behaviour}
 \index{hooks, RTS}
 \index{RTS hooks}
+\index{RTS behaviour, changing}
 %*                                                                      *
 %************************************************************************
 
-GHC lets you exercise rudimentary control over the messages printed
-when the runtime system ``blows up,'' e.g., on stack overflow.
+GHC lets you exercise rudimentary control over the RTS settings for
+any given program, by compiling in a ``hook'' that is called by the
+run-time system.  The RTS contains stub definitions for all these
+hooks, but by writing your own version and linking it on the GHC
+command line, you can override the defaults.
 
-Simply write some of the following procedures in C and then make sure
-they get linked in preference to those in the RTS library:
+The function @defaultsHook@\index{defaultHook} lets you change various
+RTS options.  The commonest use for this is to give your program a
+default heap and/or stack size that is greater than the default.  For
+example, to set @-H8m -K1m@:
+
+\begin{verbatim}
+#include "rtsdefs.h"
+void defaultsHook (void) {
+   RTSflags.GcFlags.stksSize =  1000002 / sizeof(W_);
+   RTSflags.GcFlags.heapSize =  8000002 / sizeof(W_);
+}
+\end{verbatim}
+
+Don't use powers of two for heap/stack sizes: these are more likely to
+interact badly with direct-mapped caches.  The full set of flags is
+defined in @ghc/includes/RtsFlags.lh@ the the GHC source tree.
+
+You can also change the messages printed when the runtime system
+``blows up,'' e.g., on stack overflow.  The hooks for these are as
+follows:
+
 \begin{description}
 \item[\tr{void ErrorHdrHook (FILE *)}:]
 \index{ErrorHdrHook}
