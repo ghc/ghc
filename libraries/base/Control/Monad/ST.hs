@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: ST.hs,v 1.1 2001/06/28 14:15:02 simonmar Exp $
+-- $Id: ST.hs,v 1.2 2001/06/29 09:41:37 simonmar Exp $
 --
 -- The State Transformer Monad, ST
 --
@@ -37,9 +37,7 @@ import GHC.Prim		( unsafeCoerce#, RealWorld )
 import GHC.IOBase 	( IO(..), stToIO )
 
 unsafeIOToST        :: IO a -> ST s a
-unsafeIOToST (IO io) = ST $ \ s ->
-    case ((unsafeCoerce# io) s) of
-      (#  new_s, a #) -> unsafeCoerce# (STret new_s a)
+unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
 #endif
 
 -- ---------------------------------------------------------------------------
