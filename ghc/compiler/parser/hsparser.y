@@ -1069,8 +1069,7 @@ aexp	:  qvar					{ $$ = mkident($1); }
 	|  OBRACK list_exps CBRACK		{ $$ = mkllist($2); }
 	|  OPAREN exp COMMA texps CPAREN	{ $$ = mktuple(mklcons($2,$4)); }
         /* unboxed tuples */
-	|  OUNBOXPAREN exp COMMA texps CUNBOXPAREN 
-						{ $$ = mkutuple(mklcons($2,$4)); }
+	|  OUNBOXPAREN texps CUNBOXPAREN 	{ $$ = mkutuple($2); }
 
 	/* only in expressions ... */
 	|  aexp OCURLY rbinds1 CCURLY		{ $$ = mkrupdate($1,$3); }
@@ -1278,7 +1277,7 @@ apatc	:  qvar		 			{ $$ = mkident($1); }
 	|  lit_constant				{ $$ = mklit($1); }
 	|  OPAREN pat CPAREN			{ $$ = mkpar($2); }
 	|  OPAREN pat COMMA pats CPAREN 	{ $$ = mktuple(mklcons($2,$4)); }
-	|  OUNBOXPAREN pat COMMA pats CUNBOXPAREN { $$ = mkutuple(mklcons($2,$4)); }
+	|  OUNBOXPAREN pats CUNBOXPAREN 	{ $$ = mkutuple($2); }
 	|  OBRACK pats CBRACK			{ $$ = mkllist($2); }
 	|  LAZY apat				{ $$ = mklazyp($2); }
 	;
