@@ -109,7 +109,7 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 	done
 else
 	for i in */*hi-boot*; do \
-	    $(LN_S) -f ../../$$i stage$(stage)/$$i; \
+	    $(LN_S) -f ../../$$i stage$(stage)/$$i || true ; \
 	done
 endif
 
@@ -183,7 +183,7 @@ boot :: $(CONFIG_HS)
 
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@$(RM) -f $(CONFIG_HS)
-	@echo -n "Creating $(CONFIG_HS) ... "
+	@echo "Creating $(CONFIG_HS) ... "
 	@echo "module Config where" >>$(CONFIG_HS)
 	@echo "cProjectName          = \"$(ProjectName)\"" >> $(CONFIG_HS)
 	@echo "cProjectVersion       = \"$(ProjectVersion)\"" >> $(CONFIG_HS)
