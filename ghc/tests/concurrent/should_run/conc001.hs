@@ -7,9 +7,9 @@ import Concurrent
 main = do
   s <- newEmptyMVar
   let 
-    reader = do
-	str <- takeMVar s
-  	putStr str
+    write = do
+	putMVar s "hello world\n"
 
-  forkIO reader
-  putMVar s "hello world\n"
+  forkIO write
+  str <- takeMVar s
+  putStr str
