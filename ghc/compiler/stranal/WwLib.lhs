@@ -25,7 +25,7 @@ import PrelInfo		( realWorldPrimId, aBSENT_ERROR_ID )
 import TysPrim		( realWorldStatePrimTy )
 import TysWiredIn	( unboxedTupleCon, unboxedTupleTyCon )
 import Type		( isUnLiftedType, mkTyVarTys, mkTyVarTy, mkFunTys,
-			  splitForAllTys, splitFunTysN,
+			  splitForAllTys, splitFunTys, splitFunTysN,
 			  splitAlgTyConApp_maybe, mkTyConApp,
 			  Type
 			)
@@ -440,7 +440,7 @@ mk_cpr_case (ty, cpr_info@(CPRInfo ci_args))
     | isNewTyCon tycon  -- a new type: under the coercions must be a 
                         -- constructed product
     = ASSERT ( null $ tail inst_con_arg_tys )
-      mk_cpr_case (head inst_con_arg_tys, cpr_info) 
+      mk_cpr_case (target_of_from_type, cpr_info) 
                                  `thenUs`  \(arg, tup, exp) ->
       getUniqueUs                `thenUs`  \id_uniq   ->
       let id_id = mk_ww_local id_uniq ty 
@@ -466,6 +466,9 @@ mk_cpr_case (ty, cpr_info@(CPRInfo ci_args))
         returnUs (id_id, new_tup, new_exp_case)
     where
       (data_con, tycon, tycon_arg_tys, inst_con_arg_tys) = splitType "mk_cpr_case" ty
+      from_type = head inst_con_arg_tys
+      -- if coerced from a function 'look through' to find result type
+      target_of_from_type = (snd.splitFunTys.snd.splitForAllTys) from_type
 
 \end{code}
 
@@ -499,7 +502,7 @@ mk_cpr_let (ty, NoCPRInfo)
 mk_cpr_let (ty, cpr_info@(CPRInfo ci_args))
     | isNewTyCon tycon   -- a new type: must coerce the argument to this type
     = ASSERT ( null $ tail inst_con_arg_tys )
-      mk_cpr_let (head inst_con_arg_tys, cpr_info) 
+      mk_cpr_let (target_of_from_type, cpr_info) 
                                  `thenUs`  \(arg, tup, exp) ->
       getUniqueUs                `thenUs`  \id_uniq   ->
       let id_id = mk_ww_local id_uniq ty 
@@ -521,6 +524,10 @@ mk_cpr_let (ty, cpr_info@(CPRInfo ci_args))
         returnUs (id_id, new_tup, new_exp)
     where
       (data_con, tycon, tycon_arg_tys, inst_con_arg_tys) = splitType "mk_cpr_let" ty
+      from_type = head inst_con_arg_tys
+      -- if coerced from a function 'look through' to find result type
+      target_of_from_type = (snd.splitFunTys.snd.splitForAllTys) from_type
+
 
 splitType :: String -> Type -> (DataCon, TyCon, [Type], [Type])
 splitType fname ty = (data_con, tycon, tycon_arg_tys, dataConArgTys data_con tycon_arg_tys) 
