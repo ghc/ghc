@@ -481,7 +481,7 @@ mk_uniq :: Int# -> Unique
 mk_uniq u = mkUniqueGrimily (I# u)
 
 notInScope :: TH.Name -> SDoc
-notInScope th_name = quotes (text (show (TH.ppr th_name))) <+> 
+notInScope th_name = quotes (text (TH.pprint th_name)) <+> 
 		     ptext SLIT("is not in scope at a reify")
 	-- Ugh! Rather an indirect way to display the name
 

@@ -230,7 +230,7 @@ cvtd (TH.ValD p body ds)
   = noLoc $ PatBind (cvtlp p) (GRHSs (cvtguard body) (cvtdecs ds) void)
 
 cvtd d = cvtPanic "Illegal kind of declaration in where clause" 
-		  (text (show (TH.ppr d)))
+		  (text (TH.pprint d))
 
 
 cvtclause :: TH.Clause -> Hs.LMatch RdrName
@@ -311,7 +311,7 @@ cvt_pred :: TH.Type -> LHsPred RdrName
 cvt_pred ty = case split_ty_app ty of
 	   	(ConT tc, tys) -> noLoc (HsClassP (tconName tc) (map cvtType tys))
 	   	(VarT tv, tys) -> noLoc (HsClassP (tName tv) (map cvtType tys))
-		other -> cvtPanic "Malformed predicate" (text (show (TH.ppr ty)))
+		other -> cvtPanic "Malformed predicate" (text (TH.pprint ty))
 
 convertToHsType = cvtType
 
