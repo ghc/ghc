@@ -41,7 +41,7 @@ import Addr		( Word )
 import PrelBase		( Int(..) )
 import PrelAddr		( Addr(..) )
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
-			  ByteArray#, Array#, addrToHValue# )
+			  ByteArray#, Array#, addrToHValue#, mkApUpd0# )
 import IOExts		( IORef, fixIO, readIORef, writeIORef )
 import ArrayBase	
 import PrelArr		( Array(..) )
@@ -453,6 +453,8 @@ linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
         BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
 
         return (unsafeCoerce# bco#)
+        --case mkApUpd0# (unsafeCoerce# bco#) of
+        --   (# final_bco #) -> return final_bco
 
 
 data BCO = BCO BCO#
