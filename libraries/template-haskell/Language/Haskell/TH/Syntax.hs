@@ -532,6 +532,7 @@ data Strict = IsStrict | NotStrict
 data Con = NormalC Name [StrictType]
          | RecC Name [VarStrictType]
          | InfixC StrictType Name StrictType
+         | ForallC [Name] Cxt Con
          deriving( Show, Eq )
 
 type StrictType = (Strict, Type)

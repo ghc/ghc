@@ -329,6 +329,9 @@ infixC st1 con st2 = do st1' <- st1
                         st2' <- st2
                         return $ InfixC st1' con st2'
 
+forallC :: [Name] -> CxtQ -> ConQ -> ConQ
+forallC ns ctxt con = liftM2 (ForallC ns) ctxt con
+
 
 -------------------------------------------------------------------------------
 --     Type

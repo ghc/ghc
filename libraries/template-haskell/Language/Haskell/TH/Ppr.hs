@@ -243,6 +243,8 @@ instance Ppr Con where
     ppr (RecC c vsts)
         = ppr c <+> braces (hsep (punctuate comma $ map pprVarStrictType vsts))
     ppr (InfixC st1 c st2) = pprStrictType st1 <+> ppr c <+> pprStrictType st2
+    ppr (ForallC ns ctxt con) = text "forall" <+> hsep (map ppr ns)
+                            <+> char '.' <+> pprCxt ctxt <+> ppr con
 
 ------------------------------
 pprVarStrictType :: (Name, Strict, Type) -> Doc
