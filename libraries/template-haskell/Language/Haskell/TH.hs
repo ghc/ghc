@@ -24,9 +24,23 @@ module Language.Haskell.TH(
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Library functions
-	module Language.Haskell.TH.Lib,
-    -- Pretty-printer
-	module Language.Haskell.TH.Ppr,
+	InfoQ, ExpQ, DecQ, ConQ, TypeQ, CxtQ, MatchQ, ClauseQ, BodyQ,
+	StmtQ, RangeQ, StrictTypeQ, VarStrictTypeQ,
+	intPrimL, floatPrimL, doublePrimL, integerL, charL, stringL, rationalL, 
+	litP, varP, tupP, conP, tildeP, asP, wildP, recP, listP, fieldPat, 
+	bindS, letS, noBindS, parS, 
+	fromR, fromThenR, fromToR, fromThenToR, 
+	normalB, guardedB, match, clause, 
+	dyn, global, varE, conE, litE, appE, infixE, infixApp, sectionL, sectionR, 
+	lamE, lam1E, tupE, condE, letE, caseE, doE, compE, arithSeqE, 
+	fromE, fromThenE, fromThenToE, listE, sigE, recConE, recUpdE, stringE, fieldExp,
+	valD, funD, tySynD, dataD, newtypeD, classD, instanceD, sigD, forImpD,
+	normalC, recC, 
+	cxt, varT, conT, appT, arrowT, tupleT, isStrict, notStrict, strictType, varStrictType,
+	cCall, stdCall, unsafe, safe, threadsafe,
+
+	-- Pretty-printer
+	Ppr(..), pprint, pprExp, pprLit, pprPat, pprParendType
 	
    ) where
 

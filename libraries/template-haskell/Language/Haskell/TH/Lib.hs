@@ -126,6 +126,9 @@ clause ps r ds = do { r' <- r;
 ---------------------------------------------------------------------------
 --     Exp
 
+dyn :: String -> Q Exp 
+dyn s = return (VarE (mkName s))
+
 global :: Name -> ExpQ
 global s = return (VarE s)
 
