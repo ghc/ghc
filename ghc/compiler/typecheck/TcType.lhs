@@ -73,6 +73,7 @@ module TcType (
   isFFILabelTy,        -- :: Type -> Bool
   isFFIDotnetTy,       -- :: DynFlags -> Type -> Bool
   isFFIDotnetObjTy,    -- :: Type -> Bool
+  isFFITy,	       -- :: Type -> Bool
   
   toDNType,            -- :: Type -> DNType
 
@@ -770,6 +771,10 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
+isFFITy :: Type -> Bool
+-- True for any TyCon that can possibly be an arg or result of an FFI call
+isFFITy ty = checkRepTyCon legalFFITyCon ty
+
 isFFIArgumentTy :: DynFlags -> Safety -> Type -> Bool
 -- Checks for valid argument type for a 'foreign import'
 isFFIArgumentTy dflags safety ty 
@@ -908,6 +913,11 @@ legalOutgoingTyCon dflags safety tc
   = False
   | otherwise
   = marshalableTyCon dflags tc
+
+legalFFITyCon :: TyCon -> Bool
+-- True for any TyCon that can possibly be an arg or result of an FFI call
+legalFFITyCon tc
+  = isUnLiftedTyCon tc || boxedMarshalableTyCon tc || tc == unitTyCon
 
 marshalableTyCon dflags tc
   =  (dopt Opt_GlasgowExts dflags && isUnLiftedTyCon tc)

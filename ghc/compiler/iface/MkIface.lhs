@@ -183,6 +183,7 @@ import LoadIface	( readIface, loadInterface, ifaceInstGates )
 import BasicTypes	( Version, initialVersion, bumpVersion )
 import TcRnMonad
 import TcRnTypes	( ImportAvails(..), mkModDeps )
+import TcType		( isFFITy )
 import HscTypes		( ModIface(..), TyThing(..),
 			  ModGuts(..), ModGuts, IfaceExport,
 			  GhciMode(..), 
@@ -208,9 +209,10 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOc
 			  extendOccSet, extendOccSetList,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
-import TyCon		( visibleDataCons, tyConDataCons, isNewTyCon )
+import TyCon		( visibleDataCons, tyConDataCons, isNewTyCon, newTyConRep )
 import Class		( classSelIds )
-import DataCon		( dataConName )
+import DataCon		( dataConName, dataConFieldLabels )
+import FieldLabel	( fieldLabelName )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS, moduleUserString,
 			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
@@ -274,7 +276,7 @@ mkIface hsc_env location maybe_old_iface
 		    | not omit_prags = emptyNameSet		-- In the -O case, nothing is abstract
 	    	    | otherwise	     = mkNameSet [ getName thing 
 						 | thing <- local_things
-				 		 , isAbstractThing exports thing]
+				 		 , not (mustExposeThing exports thing)]
 
 		; decls  = [ tyThingToIfaceDecl omit_prags abstract_tcs ext_nm thing 
 			   | thing <- local_things, wantDeclFor exports abstract_tcs thing ]
@@ -340,24 +342,33 @@ mkIface hsc_env location maybe_old_iface
      omit_prags = dopt Opt_OmitInterfacePragmas dflags
 
 					      
-isAbstractThing :: NameSet -> TyThing -> Bool
-isAbstractThing exports (ATyCon tc) 
-  =  not (isNewTyCon tc)  
-	-- Always expose the rep for newtypes.  This is for a
-	-- very annoying reason.  'Foreign import' is meant to
+mustExposeThing :: NameSet -> TyThing -> Bool
+-- We are compiling without -O, and thus trying to write as little as 
+-- possible into the interface file.  But we must expose the details of
+-- any data types and classes whose constructors, fields, methods are 
+-- visible to an importing module
+mustExposeThing exports (ATyCon tc) 
+  =  any exported_data_con (tyConDataCons tc)
+	-- Expose rep if any datacon or field is exported
+
+  || (isNewTyCon tc && isFFITy (snd (newTyConRep tc)))
+	-- Expose the rep for newtypes if the rep is an FFI type.  
+	-- For a very annoying reason.  'Foreign import' is meant to
 	-- be able to look through newtypes transparently, but it
 	-- can only do that if it can "see" the newtype representation
-	-- So, for now anyway, we always expose the rep of newtypes. Sigh.
-  && not (any exported_data_con (tyConDataCons tc))
-	-- Don't expose rep if no datacons are exported
   where	 	
-     exported_data_con con = dataConName con `elemNameSet` exports
+     exported_data_con con 
+	= any (`elemNameSet` exports) (dataConName con : field_names)
+	where
+	  field_names = map fieldLabelName (dataConFieldLabels con)
      		
-isAbstractThing exports (AClass cls) = not (any exported_class_op (classSelIds cls))
-  where	 	-- Don't expose rep if no classs op is exported
+mustExposeThing exports (AClass cls) 
+  = any exported_class_op (classSelIds cls)
+  where	 	-- Expose rep if any classs op is exported
      exported_class_op op = getName op `elemNameSet` exports
 
-isAbstractThing exports other = False
+mustExposeThing exports other = False
+
 
 wantDeclFor :: NameSet	-- User-exported things
 	    -> NameSet	-- Abstract things
