@@ -60,9 +60,9 @@ regcomp pattern flags = do
   r <- withCString pattern $ \cstr ->
     	 withForeignPtr regex_fptr $ \p ->
            c_regcomp p cstr (fromIntegral flags)
-  addForeignPtrFinalizer regex_fptr ptr_regfree
   if (r == 0)
-     then return (Regex regex_fptr)
+     then do addForeignPtrFinalizer regex_fptr ptr_regfree
+	     return (Regex regex_fptr)
      else error "Text.Regex.Posix.regcomp: error in pattern" -- ToDo
 
 -- -----------------------------------------------------------------------------
