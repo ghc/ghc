@@ -435,7 +435,7 @@ If the /new/ file already exists, it is atomically replaced by the /old/ file.
 Neither path may refer to an existing directory.
 -}
 copyFile :: FilePath -> FilePath -> IO ()
-copyFile fromFPath toFPath = handle (changeFunName) $
+copyFile fromFPath toFPath =
 	(bracket (openBinaryFile fromFPath ReadMode) hClose $ \hFrom ->
 	 bracket (openBinaryFile toFPath WriteMode) hClose $ \hTo ->
 	 allocaBytes bufferSize $ \buffer ->
@@ -444,7 +444,6 @@ copyFile fromFPath toFPath = handle (changeFunName) $
 		bufferSize = 1024
 		
 		changeFunName (IOError h iot fun str mb_fp) = IOError h iot "copyFile" str mb_fp
-		changeFunName e                             = e
 		
 		copyContents hFrom hTo buffer = do
 			count <- hGetBuf hFrom buffer bufferSize
