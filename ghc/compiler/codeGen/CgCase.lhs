@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.22 1999/01/27 14:51:31 simonpj Exp $
+% $Id: CgCase.lhs,v 1.23 1999/01/27 16:54:18 simonpj Exp $
 %
 %********************************************************
 %*							*
@@ -547,9 +547,12 @@ Tag is held in a temporary.
 \begin{code}
 cgInlineAlts bndr (StgAlgAlts ty alts deflt)
   =	   -- bind the default binder (it covers all the alternatives)
-    (if (isDeadBinder bndr)
-	then nopC
-	else bindNewToReg bndr node mkLFArgument)	`thenC`
+
+	-- ToDo: BUG! bndr isn't bound in the alternatives
+	-- Shows up when compiling Word.lhs
+	--	case cmp# a b of r {
+	--		True  -> f1 r
+	--		False -> f2 r
 
     cgAlgAlts NoGC uniq AbsCNop{-restore_cc-} False{-no semi-tagging-}
 		False{-not poly case-} alts deflt
