@@ -127,6 +127,16 @@ FLOATING_TYPE(CDouble,tyConCDouble,"CDouble",HTYPE_DOUBLE)
 -- HACK: Currently no long double in the FFI, so we simply re-use double
 FLOATING_TYPE(CLDouble,tyConCLDouble,"CLDouble",HTYPE_DOUBLE)
 
+{-# RULES
+"realToFrac/a->CFloat"    realToFrac = \x -> CFloat   (realToFrac x)
+"realToFrac/a->CDouble"   realToFrac = \x -> CDouble  (realToFrac x)
+"realToFrac/a->CLDouble"  realToFrac = \x -> CLDouble (realToFrac x)
+
+"realToFrac/CFloat->a"    realToFrac = \(CFloat   x) -> realToFrac x
+"realToFrac/CDouble->a"   realToFrac = \(CDouble  x) -> realToFrac x
+"realToFrac/CLDouble->a"  realToFrac = \(CLDouble x) -> realToFrac x
+ #-}
+
 INTEGRAL_TYPE(CPtrdiff,tyConCPtrdiff,"CPtrdiff",HTYPE_PTRDIFF_T)
 INTEGRAL_TYPE(CSize,tyConCSize,"CSize",HTYPE_SIZE_T)
 INTEGRAL_TYPE(CWchar,tyConCWchar,"CWchar",HTYPE_WCHAR_T)
