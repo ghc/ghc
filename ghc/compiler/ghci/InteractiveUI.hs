@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.171 2004/08/12 13:06:51 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.172 2004/08/12 13:10:35 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -77,12 +77,12 @@ import System.Posix.Internals ( setNonBlockingFD )
 
 -----------------------------------------------------------------------------
 
-ghciWelcomeMsg = "\ 
-\   ___         ___ _\n\ 
-\  / _ \\ /\\  /\\/ __(_)\n\ 
-\ / /_\\// /_/ / /  | |      GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n\ 
-\/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n\ 
-\\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
+ghciWelcomeMsg =
+ "   ___         ___ _\n"++
+ "  / _ \\ /\\  /\\/ __(_)\n"++
+ " / /_\\// /_/ / /  | |      GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n"++
+ "/ /_\\\\/ __  / /___| |      http://www.haskell.org/ghc/\n"++
+ "\\____/\\/ /_/\\____/|_|      Type :? for help.\n"
 
 GLOBAL_VAR(commands, builtin_commands, [(String, String -> GHCi Bool)])
 

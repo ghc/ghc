@@ -428,8 +428,7 @@ mk'indexOfP ty a1 a2  = mkFunApp indexOfPName [Type ty, a1, a2]
 --
 ctxtVarErr   :: FlattenState -> Var
 ctxtVarErr s  = case ctxtVar s of
-		  Nothing -> panic "FlattenMonad.ctxtVarErr: No context \
-				   \variable available!"
+		  Nothing -> panic "FlattenMonad.ctxtVarErr: No context variable available!"
 		  Just v  -> v
 
 -- given the name of a known function and a set of arguments (needs to include

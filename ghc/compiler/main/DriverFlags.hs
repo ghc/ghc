@@ -254,8 +254,7 @@ static_flags =
 				    then do writeIORef v_Split_object_files True
 					    add v_Opt_C "-fglobalise-toplev-names"
 				    else hPutStrLn stderr
-					    "warning: don't know how to  split \ 
-					    \object files on this architecture"
+					    "warning: don't know how to  split object files on this architecture"
 				) )
 
 	------- Include/Import Paths ----------------------------------------

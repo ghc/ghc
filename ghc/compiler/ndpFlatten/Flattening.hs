@@ -651,8 +651,7 @@ dftbpBinders indexBnds exprBnds =
 	return ((fBnd, (newBnd:restBnds)), liftTy ty)
 
     dftbpBinders'  _ _ _ = 
-      panic "Flattening.dftbpBinders: index and expression binder lists \ 
-	    \have different length!"
+      panic "Flattening.dftbpBinders: index and expression binder lists have different length!"
 
 getExprOfBind:: CoreBind -> CoreExpr
 getExprOfBind (NonRec _ expr) = expr
