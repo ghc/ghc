@@ -741,6 +741,6 @@ the auto packages required for linking without further assistance.
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; mode: xml ***
-     ;;; sgml-parent-document: ("using.sgml" "book" "chapter") ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->

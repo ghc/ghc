@@ -1084,6 +1084,6 @@ GHC considers it an orphan module.
 <!-- Emacs stuff:
      ;;; Local Variables: ***
      ;;; mode: xml ***
-     ;;; sgml-parent-document: ("using.sgml" "book" "chapter") ***
+     ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
      ;;; End: ***
  -->
