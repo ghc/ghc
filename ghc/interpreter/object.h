@@ -69,8 +69,12 @@ typedef
       void      (*errMsg)(char*);
 
       /* proc to call to resolve symbols not defined in this module, 
-         when asked to resolve symbols in this module */
+         when asked to resolve symbols in this module (in ocResolve) */
       void*     (*clientLookup)(char*);
+
+      /* proc used during ocGetNames to ask client if it wants to
+         acquire a given symbol from the obj file. */
+      int       (*clientWantsSymbol)(char*);
 
       /* ptr to malloc'd lump of memory holding the obj file */
       void*     oImage;
@@ -94,8 +98,9 @@ typedef
 
 
 /* The API */
-extern ObjectCode*  ocNew ( void  (*errMsg)(char*),
-                            void* (*clientLookup)(char*),
+extern ObjectCode*  ocNew ( void   (*errMsg)(char*),
+                            void*  (*clientLookup)(char*),
+                            int    (*clientWantsSymbol)(char*),
                             char*  objFileName,
                             int    objFileSize );
                             

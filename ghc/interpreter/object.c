@@ -39,12 +39,13 @@ static int   sortSymbols ( ObjectCode* oc );
  * Arch-independent interface to the runtime linker
  * ------------------------------------------------------------------------*/
 
-ObjectCode*  ocNew ( void  (*errMsg)(char*),
-                     void* (*clientLookup)(char*),
+ObjectCode*  ocNew ( void   (*errMsg)(char*),
+                     void*  (*clientLookup)(char*),
+                     int    (*clientWantsSymbol)(char*),
                      char*  objFileName,
                      int    objFileSize )
 {
-   ObjectCode* oc     = malloc(sizeof(ObjectCode));
+   ObjectCode* oc        = malloc(sizeof(ObjectCode));
    if (!oc) {
       errMsg("ocNew: can't allocate memory for object code record");
       return NULL;
@@ -60,25 +61,26 @@ ObjectCode*  ocNew ( void  (*errMsg)(char*),
    return NULL;
 #  endif
 
-   oc->status         = OBJECT_NOTINUSE;
-   oc->objFileName    = objFileName;
-   oc->objFileSize    = objFileSize;
-   oc->errMsg         = errMsg;
-   oc->clientLookup   = clientLookup;
+   oc->status            = OBJECT_NOTINUSE;
+   oc->objFileName       = objFileName;
+   oc->objFileSize       = objFileSize;
+   oc->errMsg            = errMsg;
+   oc->clientLookup      = clientLookup;
+   oc->clientWantsSymbol = clientWantsSymbol;
 
-   oc->oImage         = malloc ( objFileSize );
+   oc->oImage            = malloc ( objFileSize );
    if (!oc->oImage) {
       free(oc);
       errMsg("ocNew: can't allocate memory for object code");
       return NULL;
    }
-   oc->oTab           = NULL;
-   oc->sizeoTab       = 0;
-   oc->usedoTab       = 0;
-   oc->sectionTab     = NULL;
-   oc->sizesectionTab = 0;
-   oc->usedsectionTab = 0;
-   oc->next           = NULL;
+   oc->oTab              = NULL;
+   oc->sizeoTab          = 0;
+   oc->usedoTab          = 0;
+   oc->sectionTab        = NULL;
+   oc->sizesectionTab    = 0;
+   oc->usedsectionTab    = 0;
+   oc->next              = NULL;
 
    return oc;
 }
@@ -212,7 +214,12 @@ static void* genericExpand ( void* tab,
 /* returns 1 if success, 0 if error */
 static int addSymbol ( ObjectCode* oc, char* nm, void* ad )
 {
-   OSym* newTab
+   OSym* newTab;
+
+   if (oc->clientWantsSymbol && !oc->clientWantsSymbol(nm))
+      return 1;
+
+   newTab
       = genericExpand ( oc->oTab, 
                         &(oc->sizeoTab),
                         oc->usedoTab,
@@ -273,7 +280,8 @@ static int sortSymbols ( ObjectCode* oc )
          return 0;
       }
       if (j == 0) {
-         oc->errMsg("sortSymbols: duplicate symbols in object file");
+         oc->errMsg("sortSymbols: duplicate symbols in object file:");
+         oc->errMsg(oc->oTab[i].nm);
          return 0;
       }
    }

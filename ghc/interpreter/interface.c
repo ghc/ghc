@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.40 $
- * $Date: 2000/03/22 18:14:22 $
+ * $Revision: 1.41 $
+ * $Date: 2000/03/23 12:19:22 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1085,11 +1085,18 @@ static void* startGHCModule_clientLookup ( char* sym )
    return lookupObjName ( sym );
 }
 
+static int /*Bool*/ startGHCModule_clientWantsSymbol ( char* sym )
+{
+   if (strcmp(sym,"ghc_cc_ID")==0) return 0;
+   return 1;
+}
+
 static ObjectCode* startGHCModule_partial_load ( String objNm, Int objSz )
 {
    ObjectCode* oc
       = ocNew ( startGHCModule_errMsg,
                 startGHCModule_clientLookup,
+                startGHCModule_clientWantsSymbol,
                 objNm, objSz );
     
     if (!oc) {
