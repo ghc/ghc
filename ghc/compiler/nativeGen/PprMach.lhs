@@ -1006,11 +1006,13 @@ pprInstr (CALL imm)
 -- Simulating a flat register set on the x86 FP stack is tricky.
 -- you have to free %st(7) before pushing anything on the FP reg stack
 -- so as to preclude the possibility of a FP stack overflow exception.
--- ToDo: make gpop into a single instruction, FST
-pprInstr g@(GMOV src dst) 
+pprInstr g@(GMOV src dst)
+   | src == dst
+   = empty
+   | otherwise 
    = pprG g (hcat [gtab, gpush src 0, gsemi, gpop dst 1])
 
--- GLD sz addr dst ==> FFREE %st(7) ; FLDsz addr ; FXCH (dst+1) ; FINCSTP
+-- GLD sz addr dst ==> FFREE %st(7) ; FLDsz addr ; FSTP (dst+1)
 pprInstr g@(GLD sz addr dst)
  = pprG g (hcat [gtab, text "ffree %st(7) ; fld", pprSize sz, gsp, 
                  pprAddr addr, gsemi, gpop dst 1])
@@ -1069,7 +1071,7 @@ pprInstr g@(GDIV sz src1 src2 dst)
 gpush reg offset
    = hcat [text "ffree %st(7) ; fld ", greg reg offset]
 gpop reg offset
-   = hcat [text "fxch ", greg reg offset, gsemi, text "fincstp"]
+   = hcat [text "fstp ", greg reg offset]
 
 bogus = text "\tbogus"
 greg reg offset = text "%st(" <> int (gregno reg - 8+offset) <> char ')'
