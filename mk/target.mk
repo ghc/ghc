@@ -33,103 +33,6 @@
 # 
 #
 
-
-##################################################################
-#
-# 		Recursive stuff
-#
-# At the top of the file so that recursive makes happen before
-# makes in the main directory. This is needed for some targets,
-# e.g. when building DLLs in hslibs.
-#
-##################################################################
-
-# Here are the diabolically clever rules that
-# 
-# (a) for each "recursive target" <t>
-#     propagates "make <t>" to directories in SUBDIRS
-#
-# (b) when SUBDIRS is empty,
-#     for each "multi-way-target" <t>
-#     calls "make way=w <t>" for each w in $(WAYS)
-#
-#     This has the effect of making the standard target
-#     in each of the specified ways (as well as in the normal way
-
-# Controlling variables
-#	WAYS    = extra (beyond the normal way) ways to build things in
-# 	SUBDIRS = subdirectories to recurse into
-
-# No ways, so iterate over the SUBDIRS
-
-# note about recursively invoking make: we'd like make to drop all the
-# way back to the top level if it fails in any of the
-# sub(sub-...)directories.  This is done by setting the -e flag to the
-# shell during the loop, which causes an immediate failure if any of
-# the shell commands fail.
-
-# One exception: if the user gave the -i or -k flag to make in the
-# first place, we'd like to reverse this behaviour.  So we check for
-# these flags, and set the -e flag appropriately.  NOTE: watch out for
-# the --no-print-directory flag which is passed to recursive
-# invocations of make.
-#
-ifneq "$(SUBDIRS)" ""
-
-# we override the 'boot', 'all' and 'install' targets in the top
-# level Makefile. Some of the sub-projects also set 'boot' to empty.
-
-ifeq "$(NO_ALL_TARGET)" "YES"
-ALL_TARGET     =
-else
-ALL_TARGET     = all
-endif
-
-ifeq "$(NO_BOOT_TARGET)" "YES"
-BOOT_TARGET    =
-else
-BOOT_TARGET    = boot
-endif
-
-ifeq "$(NO_INSTALL_TARGET)" "YES"
-INSTALL_TARGET =
-INSTALL_DOCS_TARGET =
-else
-INSTALL_TARGET = install
-INSTALL_DOCS_TARGET = install-docs
-endif
-
-$(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html ps dvi txt::
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-# Don't rely on -e working, instead we check exit return codes from sub-makes.
-	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS); do \
-	  echo "------------------------------------------------------------------------"; \
-	  echo "==fptools== $(MAKE) $@ $(MFLAGS);"; \
-	  echo " in $(shell pwd)/$$i"; \
-	  echo "------------------------------------------------------------------------"; \
-	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
-	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
-	done
-	@echo "------------------------------------------------------------------------"
-	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
-	@echo "PWD = $(shell pwd)"
-	@echo "------------------------------------------------------------------------"
-
-endif
-
-#
-# Selectively building subdirectories.
-#
-#
-ifneq "$(SUBDIRS)" ""
-$(SUBDIRS) ::
-	  $(MAKE) -C $@ $(MFLAGS)
-endif
-
 ##################################################################
 # 		FPtools standard targets
 #
@@ -1240,4 +1143,105 @@ all docs TAGS clean distclean mostlyclean maintainer-clean install ::
 	@echo "------------------------------------------------------------------------"
 
 endif
+endif
+
+
+##################################################################
+#
+# 		Recursive stuff
+#
+# This was once at the top of the file, allegedly because it was
+# needed for some targets, e.g. when building DLLs in hslibs.  But
+# since this reason is a little short on information, and I'm having
+# trouble with subdirectory builds happening before the current
+# directory when building hslibs (bad interaction with including
+# _hsc.o files in the cbits lib) so I'm moving the recursive makes to
+# the end --SDM 12/12/2001
+#
+##################################################################
+
+# Here are the diabolically clever rules that
+# 
+# (a) for each "recursive target" <t>
+#     propagates "make <t>" to directories in SUBDIRS
+#
+# (b) when SUBDIRS is empty,
+#     for each "multi-way-target" <t>
+#     calls "make way=w <t>" for each w in $(WAYS)
+#
+#     This has the effect of making the standard target
+#     in each of the specified ways (as well as in the normal way
+
+# Controlling variables
+#	WAYS    = extra (beyond the normal way) ways to build things in
+# 	SUBDIRS = subdirectories to recurse into
+
+# No ways, so iterate over the SUBDIRS
+
+# note about recursively invoking make: we'd like make to drop all the
+# way back to the top level if it fails in any of the
+# sub(sub-...)directories.  This is done by setting the -e flag to the
+# shell during the loop, which causes an immediate failure if any of
+# the shell commands fail.
+
+# One exception: if the user gave the -i or -k flag to make in the
+# first place, we'd like to reverse this behaviour.  So we check for
+# these flags, and set the -e flag appropriately.  NOTE: watch out for
+# the --no-print-directory flag which is passed to recursive
+# invocations of make.
+#
+ifneq "$(SUBDIRS)" ""
+
+# we override the 'boot', 'all' and 'install' targets in the top
+# level Makefile. Some of the sub-projects also set 'boot' to empty.
+
+ifeq "$(NO_ALL_TARGET)" "YES"
+ALL_TARGET     =
+else
+ALL_TARGET     = all
+endif
+
+ifeq "$(NO_BOOT_TARGET)" "YES"
+BOOT_TARGET    =
+else
+BOOT_TARGET    = boot
+endif
+
+ifeq "$(NO_INSTALL_TARGET)" "YES"
+INSTALL_TARGET =
+INSTALL_DOCS_TARGET =
+else
+INSTALL_TARGET = install
+INSTALL_DOCS_TARGET = install-docs
+endif
+
+$(ALL_TARGET) docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html ps dvi txt::
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Recursively making \`$@' in $(SUBDIRS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+# Don't rely on -e working, instead we check exit return codes from sub-makes.
+	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
+	for i in $(SUBDIRS); do \
+	  echo "------------------------------------------------------------------------"; \
+	  echo "==fptools== $(MAKE) $@ $(MFLAGS);"; \
+	  echo " in $(shell pwd)/$$i"; \
+	  echo "------------------------------------------------------------------------"; \
+	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) $@; \
+	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
+	done
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Finished making \`$@' in $(SUBDIRS) ..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+
+endif
+
+#
+# Selectively building subdirectories.
+#
+#
+ifneq "$(SUBDIRS)" ""
+$(SUBDIRS) ::
+	  $(MAKE) -C $@ $(MFLAGS)
 endif
