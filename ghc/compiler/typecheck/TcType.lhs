@@ -188,8 +188,11 @@ fresh type variables, splits off the dictionary part, and returns the results.
 tcInstType :: TcType -> NF_TcM ([TcTyVar], TcThetaType, TcType)
 tcInstType ty
   = case splitForAllTys ty of
-	([],     rho) -> tcSplitRhoTy rho			`thenNF_Tc` \ (theta, tau) ->
+	([],     rho) -> 	-- There may be overloading but no type variables;
+				-- 	(?x :: Int) => Int -> Int
+			 tcSplitRhoTy rho			`thenNF_Tc` \ (theta, tau) ->
 			 returnNF_Tc ([], theta, tau)
+
 	(tyvars, rho) -> tcInstTyVars tyvars			`thenNF_Tc` \ (tyvars', _, tenv)  ->
 			 tcSplitRhoTy (substTy tenv rho)	`thenNF_Tc` \ (theta, tau) ->
 			 returnNF_Tc (tyvars', theta, tau)
