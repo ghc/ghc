@@ -19,22 +19,15 @@ import HsSyn		( ForeignDecl(..), ForeignExport(..),
 			  ForeignImport(..), CImportSpec(..) )
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
-import Id		( Id, idType, idName, mkVanillaGlobal, mkSysLocal,
-			  setInlinePragma )
-import IdInfo		( vanillaIdInfo )
+import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
-import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
-			  mkForeignExportOcc, isLocalName,
-			  NamedThing(..),
-			)
+import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
 import Type		( repType, eqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
-			  mkFunTy, applyTy, 
+			  mkFunTy, tcSplitTyConApp_maybe, 
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
-			  tcSplitTyConApp_maybe, tcSplitAppTy,
-			  tcFunResultTy
 			)
 
 import ForeignCall	( ForeignCall(..), CCallSpec(..), 
@@ -44,11 +37,9 @@ import ForeignCall	( ForeignCall(..), CCallSpec(..),
 			  ccallConvAttribute
 			)
 import CStrings		( CLabelString )
-import TysWiredIn	( addrTy, unitTy, stablePtrTyCon )
+import TysWiredIn	( unitTy, stablePtrTyCon )
 import TysPrim		( addrPrimTy )
-import PrelNames	( hasKey, ioTyConKey, deRefStablePtrName, newStablePtrName,
-			  bindIOName, returnIOName
-			)
+import PrelNames	( hasKey, ioTyConKey, newStablePtrName, bindIOName )
 import BasicTypes	( Activation( NeverActive ) )
 import ErrUtils         ( addShortWarnLocLine )
 import Outputable
@@ -439,7 +430,7 @@ mkFExportCBits mod_nm c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   the_cfun
      = case maybe_target of
           Nothing    -> text "(StgClosure*)deRefStablePtr(the_stableptr)"
-          Just hs_fn -> ppr hs_fn <> text "_closure"
+          Just hs_fn -> char '&' <> ppr hs_fn <> text "_closure"
 
   -- the expression we give to rts_evalIO
   expr_to_run
@@ -459,7 +450,7 @@ mkFExportCBits mod_nm c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   extern_decl
      = case maybe_target of
           Nothing -> empty
-          Just hs_fn -> text "extern StgClosure* " <> ppr hs_fn <> text "_closure" <> semi
+          Just hs_fn -> text "extern StgClosure " <> ppr hs_fn <> text "_closure" <> semi
 
   -- finally, the whole darn thing
   c_bits =
