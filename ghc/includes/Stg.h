@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.2 1998/12/02 13:21:33 simonm Exp $
+ * $Id: Stg.h,v 1.3 1999/01/18 14:37:43 sof Exp $
  *
  * Top-level include file for everything STG-ish.  
  *
@@ -104,5 +104,12 @@ extern char **prog_argv;	/* so we can get at these from Haskell */
 extern int    prog_argc;
 
 extern char **environ;
+
+/* Creating and destroying an adjustor thunk.
+   I cannot make myself creating a separate .h file
+   for these two (sof.)
+*/
+extern void* createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr);
+extern void  freeHaskellFunctionPtr(void* ptr);
 
 #endif /* STG_H */
