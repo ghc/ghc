@@ -487,16 +487,18 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 		    tcdTyVars = tyvars, tcdCons = condecls, 
-		    tcdDerivs = derivs})
+		    tcdKindSig = sig, tcdDerivs = derivs})
   | is_vanilla	-- Normal Haskell data type decl
-  = bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
+  = ASSERT( isNothing sig )	-- In normal H98 form, kind signature on the 
+				-- data type is syntactically illegal
+    bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
     do	{ tycon' <- lookupLocatedTopBndrRn tycon
 	; context' <- rnContext data_doc context
 	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; checkDupNames data_doc con_names
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', tcdLName = tycon',
-			   tcdTyVars = tyvars', tcdCons = condecls', 
+			   tcdTyVars = tyvars', tcdKindSig = Nothing, tcdCons = condecls', 
 			   tcdDerivs = derivs'}, 
 		   delFVs (map hsLTyVarName tyvars')	$
 	     	   extractHsCtxtTyNames context'	`plusFV`
@@ -515,7 +517,7 @@ rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
 	; checkDupNames data_doc con_names
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], tcdLName = tycon',
-			   tcdTyVars = tyvars', tcdCons = condecls', 
+			   tcdTyVars = tyvars', tcdCons = condecls', tcdKindSig = sig,
 			   tcdDerivs = derivs'}, 
 	     	   plusFVs (map conDeclFVs condecls') `plusFV` deriv_fvs) }
 

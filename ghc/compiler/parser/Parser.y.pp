@@ -332,13 +332,13 @@ ifacedecl :: { HsDecl RdrName }
  	| 'type' syn_hdr '=' ctype	
  		{ let (tc,tvs) = $2 in TyClD (TySynonym tc tvs $4) }
 	| 'data' tycl_hdr constrs	-- No deriving in hi-boot
-		{ TyClD (mkTyData DataType (unLoc $2) (reverse (unLoc $3)) Nothing) }
+		{ TyClD (mkTyData DataType $2 Nothing (reverse (unLoc $3)) Nothing) }
         | 'data' tycl_hdr 'where' gadt_constrlist	
-		{ TyClD (mkTyData DataType (unLoc $2) (reverse (unLoc $4)) Nothing) }
+		{ TyClD (mkTyData DataType $2 Nothing (reverse (unLoc $4)) Nothing) }
 	| 'newtype' tycl_hdr 		-- Constructor is optional
-		{ TyClD (mkTyData NewType (unLoc $2) [] Nothing) }
+		{ TyClD (mkTyData NewType $2 Nothing [] Nothing) }
 	| 'newtype' tycl_hdr '=' newconstr
-		{ TyClD (mkTyData NewType (unLoc $2) [$4] Nothing) }
+		{ TyClD (mkTyData NewType $2 Nothing [$4] Nothing) }
 	| 'class' tycl_hdr fds
 		{ TyClD (mkClassDecl (unLoc $2) (unLoc $3) [] emptyBag) }
 
@@ -455,15 +455,15 @@ tycl_decl :: { LTyClDecl RdrName }
 
 	| 'data' tycl_hdr constrs deriving
 		{ L (comb4 $1 $2 $3 $4)
-		    (mkTyData DataType (unLoc $2) (reverse (unLoc $3)) (unLoc $4)) }
+		    (mkTyData DataType $2 Nothing (reverse (unLoc $3)) (unLoc $4)) }
 
-        | 'data' tycl_hdr 'where' gadt_constrlist	-- No deriving for GADTs
-		{ L (comb4 $1 $2 $3 $4)
-		    (mkTyData DataType (unLoc $2) (reverse (unLoc $4)) Nothing) }
+        | 'data' tycl_hdr opt_kind_sig 'where' gadt_constrlist	-- No deriving for GADTs
+		{ L (comb4 $1 $2 $4 $5)
+		    (mkTyData DataType $2 $3 (reverse (unLoc $5)) Nothing) }
 
 	| 'newtype' tycl_hdr '=' newconstr deriving
 		{ L (comb3 $1 $4 $5)
-		    (mkTyData NewType (unLoc $2) [$4] (unLoc $5)) }
+		    (mkTyData NewType $2 Nothing [$4] (unLoc $5)) }
 
 	| 'class' tycl_hdr fds where
 		{ let 
@@ -471,6 +471,10 @@ tycl_decl :: { LTyClDecl RdrName }
 		  in
 	 	  L (comb4 $1 $2 $3 $4) (mkClassDecl (unLoc $2) (unLoc $3) sigs 
 					  binds) }
+
+opt_kind_sig :: { Maybe Kind }
+	: 				{ Nothing }
+	| '::' kind			{ Just $2 }
 
 syn_hdr :: { (Located RdrName, [LHsTyVarBndr RdrName]) }
 		-- We don't retain the syntax of an infix

@@ -78,14 +78,14 @@ cvt_top (TySynD tc tvs rhs)
 
 cvt_top (DataD ctxt tc tvs constrs derivs)
   = Left $ TyClD (mkTyData DataType 
-                           (cvt_context ctxt, noLoc (tconName tc), cvt_tvs tvs)
-                           (map mk_con constrs)
+                           (noLoc (cvt_context ctxt, noLoc (tconName tc), cvt_tvs tvs))
+                           Nothing (map mk_con constrs)
                            (mk_derivs derivs))
 
 cvt_top (NewtypeD ctxt tc tvs constr derivs)
   = Left $ TyClD (mkTyData NewType 
-                           (cvt_context ctxt, noLoc (tconName tc), cvt_tvs tvs)
-                           [mk_con constr]
+                           (noLoc (cvt_context ctxt, noLoc (tconName tc), cvt_tvs tvs))
+                           Nothing [mk_con constr]
                            (mk_derivs derivs))
 
 cvt_top (ClassD ctxt cl tvs decs)

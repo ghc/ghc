@@ -36,6 +36,7 @@ import HsImpExp		( pprHsVar )
 import HsTypes
 import HscTypes		( DeprecTxt )
 import CoreSyn		( RuleName )
+import Kind		( Kind, pprKind )
 import BasicTypes	( Activation(..) )
 import ForeignCall	( CCallTarget(..), DNCallSpec, CCallConv, Safety,
 			  CExportSpec(..), CLabelString ) 
@@ -302,7 +303,13 @@ data TyClDecl name
 		tcdCtxt   :: LHsContext name,	 	-- Context
 		tcdLName  :: Located name,	 	-- Type constructor
 		tcdTyVars :: [LHsTyVarBndr name], 	-- Type variables
+		tcdKindSig :: Maybe Kind,		-- Optional kind sig; 
+							-- (only for the 'where' form)
+
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
+			-- For data T a = T1 | T2 a          the LConDecls are all ConDecls
+			-- For data T a where { T1 :: T a }  the LConDecls are all GadtDecls
+
 		tcdDerivs :: Maybe [LHsType name]
 			-- Derivings; Nothing => not specified
 			-- 	      Just [] => derive exactly what is asked
@@ -401,11 +408,14 @@ instance OutputableBndr name
 	     4 (ppr mono_ty)
 
     ppr (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = ltycon,
-		 tcdTyVars = tyvars, tcdCons = condecls, 
+		 tcdTyVars = tyvars, tcdKindSig = mb_sig, tcdCons = condecls, 
 		 tcdDerivs = derivings})
-      = pp_tydecl (ppr new_or_data <+> pp_decl_head (unLoc context) ltycon tyvars)
+      = pp_tydecl (ppr new_or_data <+> pp_decl_head (unLoc context) ltycon tyvars <+> ppr_sig mb_sig)
 		  (pp_condecls condecls)
 		  derivings
+      where
+	ppr_sig Nothing = empty
+	ppr_sig (Just kind) = dcolon <+> pprKind kind
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars, tcdFDs = fds,
 		    tcdSigs = sigs, tcdMeths = methods})

@@ -322,8 +322,14 @@ kcTyClDeclBody decl thing_inside
     do 	{ tc_ty_thing <- tcLookupLocated (tcdLName decl)
 	; let tc_kind = case tc_ty_thing of { AThing k -> k }
 	; unifyKind tc_kind (foldr (mkArrowKind . kindedTyVarKind) 
-				   liftedTypeKind kinded_tvs)
+				   (result_kind decl)
+				   kinded_tvs)
 	; thing_inside kinded_tvs }
+  where
+    result_kind (TyData { tcdKindSig = Just kind }) = kind
+    result_kind other				   = liftedTypeKind
+	-- On GADT-style declarations we allow a kind signature
+	--	data T :: *->* where { ... }
 
 kindedTyVarKind (L _ (KindedTyVar _ k)) = k
 \end{code}
