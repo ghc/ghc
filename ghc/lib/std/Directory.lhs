@@ -17,7 +17,7 @@ some operating systems, it may also be possible to have paths which
 are relative to the current directory.
 
 \begin{code}
-{-# OPTIONS -#include <sys/stat.h> -#include <dirent.h> #-}
+{-# OPTIONS -#include <sys/stat.h> -#include <dirent.h> -#include "cbits/stgio.h" #-}
 module Directory 
    ( 
     Permissions(Permissions),
