@@ -14,7 +14,7 @@ module CoreTidy (
 import CmdLineOpts	( DynFlags, DynFlag(..), opt_OmitInterfacePragmas )
 import CoreSyn
 import CoreUnfold	( noUnfolding, mkTopUnfolding, okToUnfoldInHiFile )
-import CoreUtils	( exprArity, exprIsValue )
+import CoreUtils	( exprArity )
 import CoreFVs		( ruleSomeFreeVars, exprSomeFreeVars )
 import CoreLint		( showPass, endPass )
 import VarEnv
@@ -22,7 +22,7 @@ import VarSet
 import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId,
 			  idCafInfo, mkId, isLocalId, isImplicitId,
-			  idFlavour, modifyIdInfo
+			  idFlavour, modifyIdInfo, idArity
 			) 
 import IdInfo		{- loads of stuff -}
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
@@ -654,13 +654,33 @@ cafRefss p (e:es) = cafRefs p e `fastOr` cafRefss p es
 -- in an SRT or not.
 
 isCAF :: CoreExpr -> Bool
-isCAF e 
-  | exprIsValue e = False
-  | otherwise     = True
+isCAF e = not (rhsIsNonUpd e)
   {- ToDo: check type for onceness, i.e. non-updatable thunks? -}
 
--- we're assuming here that anything for which exprIsValue is True
--- will be non-updatable.  This is true for functions and
--- constructors, but we must make sure that partial applications are
--- compiled as non-updatable closures (which CoreToStg does).
+rhsIsNonUpd :: CoreExpr -> Bool	-- True => Value-lambda, constructor, PAP
+rhsIsNonUpd (Lam b e)          = isId b || rhsIsNonUpd e
+rhsIsNonUpd (Note (SCC _) e)   = False
+rhsIsNonUpd (Note _ e)         = rhsIsNonUpd e
+rhsIsNonUpd other_expr
+  = go other_expr 0
+  where
+    go (Var f) n_args = idAppIsNonUpd f n_args
+	
+    go (App f a) n_args
+	| isTypeArg a = go f n_args
+	| otherwise   = go f (n_args + 1) 
+
+    go (Note (SCC _) f) n_args = False
+    go (Note _ f) n_args       = go f n_args
+
+    go other n_args = False
+
+idAppIsNonUpd :: Id -> Int -> Bool
+idAppIsNonUpd id n_val_args 
+  = case idFlavour id of
+	DataConId _ -> True
+	other       -> n_val_args < idArity id
+
+-- We consider partial applications to be non-updatable.  NOTE: this
+-- must match how CoreToStg marks the closure.
 \end{code}
