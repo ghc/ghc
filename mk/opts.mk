@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.9 1999/02/02 14:16:28 sof Exp $
+# 	$Id: opts.mk,v 1.10 1999/05/04 08:38:53 sof Exp $
 #
 #################################################################################
 
@@ -66,6 +66,10 @@ WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
 # 
 SRC_TEXI2HTML_OPTS +=-menu -verbose -glossary
 
+#
+# Default fptools options for dllwrap.
+#
+SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32 --export-all
 
 #################################################################################
 #
@@ -85,6 +89,7 @@ RUNTEST_OPTS       = $(SRC_RUNTEST_OPTS) $(WAY$(_way)_RUNTEST_OPTS) \
 
 AR_OPTS            = $(SRC_AR_OPTS) $(WAY$(_way)_AR_OPTS) $(EXTRA_AR_OPTS)
 AS_OPTS            = $(SRC_AS_OPTS) $(WAY$(_way)_AS_OPTS) $(EXTRA_AS_OPTS)
+BLD_DLL_OPTS       = $(SRC_BLD_DLL_OPTS) $(WAY$(_way)_BLD_DLL_OPTS) $($*_HC_OPTS) $(EXTRA_BLD_DLL_OPTS)
 CPP_OPTS           = $(SRC_CPP_OPTS) $(WAY$(_way)_CPP_OPTS) $(EXTRA_CPP_OPTS)
 CTAGS_OPTS         = $(SRC_CTAGS_OPTS) $(WAY$(_way)_CTAGS_OPTS) $(EXTRA_CTAGS_OPTS)
 CC_OPTS            = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
