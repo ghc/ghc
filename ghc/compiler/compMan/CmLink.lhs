@@ -14,13 +14,12 @@ where
 
 
 import Interpreter
-import CmStaticInfo	( PackageConfigInfo )
+import CmStaticInfo	( PackageConfigInfo, GhciMode(..) )
 import Module		( ModuleName, PackageName )
 import Outputable	( SDoc )
 import Digraph		( SCC(..), flattenSCC, flattenSCCs )
 import Outputable
 import Panic		( panic )
-import BasicTypes	( GhciMode(..) )
 
 #include "HsVersions.h"
 \end{code}

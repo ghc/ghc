@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.21 2000/11/14 16:28:38 simonmar Exp $
+-- $Id: Main.hs,v 1.22 2000/11/15 10:49:54 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -21,6 +21,7 @@ import DriverState
 import DriverFlags
 import DriverMkDepend
 import DriverUtil
+import Panic
 import DriverPhases	( Phase(..) )
 import CmdLineOpts	( HscLang(..), DynFlags(..), v_Static_hsc_opts )
 import Module		( mkModuleName )
@@ -29,7 +30,6 @@ import Finder		( initFinder )
 import CmStaticInfo
 import Config
 import Util
-import Panic
 
 import Concurrent
 #ifndef mingw32_TARGET_OS
@@ -198,6 +198,7 @@ main =
 		  stgToDo  = stg_todo,
                   hscLang  = lang,
 		  -- leave out hscOutName for now
+                  hscOutName = panic "Main.main:hscOutName not set",
 		  flags = [] }
 
 	-- the rest of the arguments are "dynamic"
@@ -274,7 +275,7 @@ beginMake :: PackageConfigInfo -> [String] -> IO ()
 beginMake pkg_details mods
   = do case mods of
 	 []    -> throwDyn (UsageError "no input files")
-	 [mod] -> do state <- cmInit pkg_details
+	 [mod] -> do state <- cmInit pkg_details Batch
 		     cmLoadModule state (mkModuleName mod)
 		     return ()
 	 _     -> throwDyn (UsageError "only one module allowed with --make")
@@ -282,7 +283,7 @@ beginMake pkg_details mods
 beginInteractive pkg_details mods
   = do case mods of
 	 []    -> return ()
-	 [mod] -> do state <- cmInit pkg_details
+	 [mod] -> do state <- cmInit pkg_details Interactive
 		     cmLoadModule state (mkModuleName mod)
 		     return ()
 	 _     -> throwDyn (UsageError 

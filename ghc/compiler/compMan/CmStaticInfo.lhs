@@ -4,7 +4,7 @@
 \section[CmStaticInfo]{Session-static info for the Compilation Manager}
 
 \begin{code}
-module CmStaticInfo ( Package(..), PackageConfigInfo )
+module CmStaticInfo ( GhciMode(..), Package(..), PackageConfigInfo )
 where
 
 #include "HsVersions.h"
@@ -12,6 +12,8 @@ where
 \end{code}
 
 \begin{code}
+data GhciMode = Batch | Interactive
+
 type PackageConfigInfo = [Package]
 
 -- copied from the driver

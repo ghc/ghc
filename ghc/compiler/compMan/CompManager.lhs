@@ -27,10 +27,10 @@ import CmLink 		( PersistentLinkerState, emptyPLS, Linkable(..),
 import Interpreter	( HValue )
 import CmSummarise	( summarise, ModSummary(..), 
 			  name_of_summary, deps_of_summary,
-			  mimp_name, ms_get_imports, is_source_import )
+			  mimp_name, ms_get_imports {-, is_source_import-} )
 import Module		( ModuleName, moduleName, packageOfModule, 
 			  isModuleInThisPackage, PackageName, moduleEnvElts )
-import CmStaticInfo	( Package(..), PackageConfigInfo )
+import CmStaticInfo	( Package(..), PackageConfigInfo, GhciMode )
 import DriverPipeline 	( compile, preprocess, doLink, CompResult(..) )
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState, ModDetails(..) )
@@ -38,7 +38,6 @@ import Name		( lookupNameEnv )
 import PrelNames	( mainName )
 import HscMain		( initPersistentCompilerState )
 import Finder		( findModule, emptyHomeDirCache )
-import BasicTypes	( GhciMode(..) )
 import DriverUtil	( BarfKind(..) )
 import Exception	( throwDyn )
 \end{code}
@@ -46,9 +45,9 @@ import Exception	( throwDyn )
 
 
 \begin{code}
-cmInit :: PackageConfigInfo -> IO CmState
-cmInit raw_package_info
-   = emptyCmState raw_package_info
+cmInit :: PackageConfigInfo -> GhciMode -> IO CmState
+cmInit raw_package_info gmode
+   = emptyCmState raw_package_info gmode
 
 cmGetExpr :: CmState
           -> ModuleName
@@ -65,17 +64,19 @@ cmRunExpr hval
 -- Persistent state just for CM, excluding link & compile subsystems
 data PersistentCMState
    = PersistentCMState {
-        hst :: HomeSymbolTable,    -- home symbol table
-        hit :: HomeIfaceTable,     -- home interface table
-        ui  :: UnlinkedImage,      -- the unlinked images
-        mg  :: ModuleGraph,        -- the module graph
-        pci :: PackageConfigInfo   -- NEVER CHANGES
+        hst   :: HomeSymbolTable,    -- home symbol table
+        hit   :: HomeIfaceTable,     -- home interface table
+        ui    :: UnlinkedImage,      -- the unlinked images
+        mg    :: ModuleGraph,        -- the module graph
+        pci   :: PackageConfigInfo,  -- NEVER CHANGES
+        gmode :: GhciMode            -- NEVER CHANGES
      }
 
-emptyPCMS :: PackageConfigInfo -> PersistentCMState
-emptyPCMS pci 
+emptyPCMS :: PackageConfigInfo -> GhciMode -> PersistentCMState
+emptyPCMS pci gmode
   = PersistentCMState { hst = emptyHST, hit = emptyHIT,
-                        ui  = emptyUI,  mg  = emptyMG, pci = pci }
+                        ui  = emptyUI,  mg  = emptyMG, 
+                        pci = pci, gmode = gmode }
 
 emptyHIT :: HomeIfaceTable
 emptyHIT = emptyUFM
@@ -92,9 +93,9 @@ data CmState
         pls    :: PersistentLinkerState    -- link's persistent state
      }
 
-emptyCmState :: PackageConfigInfo -> IO CmState
-emptyCmState pci
-    = do let pcms = emptyPCMS pci
+emptyCmState :: PackageConfigInfo -> GhciMode -> IO CmState
+emptyCmState pci gmode
+    = do let pcms = emptyPCMS pci gmode
          pcs     <- initPersistentCompilerState
          pls     <- emptyPLS
          return (CmState { pcms   = pcms,
@@ -123,15 +124,16 @@ cmLoadModule :: CmState
 
 cmLoadModule cmstate1 modname
    = do -- version 1's are the original, before downsweep
-        let pcms1   = pcms   cmstate1
-        let pls1    = pls    cmstate1
-        let pcs1    = pcs    cmstate1
-        let mg1     = mg     pcms1
-        let hst1    = hst    pcms1
-        let hit1    = hit    pcms1
-        let ui1     = ui     pcms1
+        let pcms1     = pcms   cmstate1
+        let pls1      = pls    cmstate1
+        let pcs1      = pcs    cmstate1
+        let mg1       = mg     pcms1
+        let hst1      = hst    pcms1
+        let hit1      = hit    pcms1
+        let ui1       = ui     pcms1
    
-        let pcii    = pci    pcms1 	-- this never changes
+        let pcii      = pci   pcms1 -- this never changes
+        let ghci_mode = gmode pcms1 -- ToDo: fix!
 
         -- do the downsweep to reestablish the module graph
         -- then generate version 2's by removing from HIT,HST,UI any
@@ -168,7 +170,6 @@ cmLoadModule cmstate1 modname
 
         -- Try and do linking in some form, depending on whether the
         -- upsweep was completely or only partially successful.
-        let ghci_mode = Batch  -- ToDo: fix!
 
         if upsweepOK
 
@@ -191,7 +192,8 @@ cmLoadModule cmstate1 modname
                     -> panic "cmLoadModule: link failed (1)"
                  LinkOK pls3 
                     -> do let pcms3 = PersistentCMState { hst=hst3, hit=hit3, 
-                                                          ui=ui3, mg=mg2, pci=pcii }
+                                                          ui=ui3, mg=mg2, 
+                                                          pci=pcii, gmode=ghci_mode }
                           let cmstate3 
                                  = CmState { pcms=pcms3, pcs=pcs3, pls=pls3 }
                           return (cmstate3, Just modname)
@@ -213,7 +215,8 @@ cmLoadModule cmstate1 modname
                     -> panic "cmLoadModule: link failed (2)"
                  LinkOK pls4
                     -> do let pcms4 = PersistentCMState { hst=hst4, hit=hit4, 
-                                                          ui=ui4, mg=mg2, pci=pcii }
+                                                          ui=ui4, mg=mg2,
+                                                          pci=pcii, gmode=ghci_mode }
                           let cmstate4 
                                  = CmState { pcms=pcms4, pcs=pcs3, pls=pls4 }
                           return (cmstate4, Just modname)
