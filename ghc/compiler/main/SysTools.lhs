@@ -720,7 +720,16 @@ runSomething phase_name pgm args
 	      -- NOT REACHED
               return ExitSuccess
             Just child -> do -- Parent
+#if __GLASGOW_HASKELL__ <= 504
+              -- avoid interaction with broken getProcessStatus-FFI:
+              oldHandler <- installHandler sigCONT Ignore Nothing
+#endif
               Just (Exited res) <- getProcessStatus True False child
+#if __GLASGOW_HASKELL__ <= 504
+              -- restore handler
+              installHandler sigCONT oldHandler Nothing
+#endif
+
               return res
 #else
           exit_code <- rawSystem cmd_line
