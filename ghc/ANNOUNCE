@@ -22,6 +22,9 @@ of the 2.xx line.
 Major new things in this release:
 
 	* better -fwarn-overlapping-patterns checking,
+	* Happy is no longer included in binary distributions:
+	  we're making separate Happy binaries, see
+	  ftp://ftp.dcs.gla.ac.uk/pub/haskell/happy
 	* lots of bug fixes.
 
 The next release will likely be GHC 3.00, containing mult-parameter
