@@ -19,6 +19,9 @@
   NOTE: Very tiresomely, we must apply this substitution to
 	the rules stored inside a variable too.
 
+  We do *not* clone top-level bindings, because some of them must not change,
+  but we *do* clone bindings that are heading for the top level
+
 
 
 \begin{code}
@@ -43,6 +46,7 @@ import VarEnv
 import Subst
 import VarSet
 import Type		( isUnLiftedType, mkTyVarTys, mkForAllTys, Type )
+import BasicTypes	( TopLevelFlag(..) )
 import VarSet
 import VarEnv
 import UniqSupply
@@ -174,11 +178,11 @@ setLevels binds us
     	returnLvl (lvld_bind ++ lvld_binds)
 
 lvlTopBind (NonRec binder rhs)
-  = lvlBind Top initialEnv (AnnNonRec binder (freeVars rhs))
+  = lvlBind TopLevel Top initialEnv (AnnNonRec binder (freeVars rhs))
 					-- Rhs can have no free vars!
 
 lvlTopBind (Rec pairs)
-  = lvlBind Top initialEnv (AnnRec [(b,freeVars rhs) | (b,rhs) <- pairs])
+  = lvlBind TopLevel Top initialEnv (AnnRec [(b,freeVars rhs) | (b,rhs) <- pairs])
 \end{code}
 
 %************************************************************************
@@ -190,20 +194,22 @@ lvlTopBind (Rec pairs)
 The binding stuff works for top level too.
 
 \begin{code}
-lvlBind :: Level
+lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
+	-> Level		-- Context level; might be Top even for bindings nested in the RHS
+				-- of a top level binding
 	-> LevelEnv
 	-> CoreBindWithFVs
 	-> LvlM ([LevelledBind], LevelEnv)
 
-lvlBind ctxt_lvl env (AnnNonRec bndr rhs)
+lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs)
   = setFloatLevel (Just bndr) ctxt_lvl env rhs ty 	`thenLvl` \ (final_lvl, rhs') ->
-    cloneVar ctxt_lvl env bndr final_lvl		`thenLvl` \ (new_env, new_bndr) ->
+    cloneVar top_lvl env bndr final_lvl		`thenLvl` \ (new_env, new_bndr) ->
     returnLvl ([NonRec (new_bndr, final_lvl) rhs'], new_env)
   where
     ty = idType bndr
 
 
-lvlBind ctxt_lvl env (AnnRec pairs) = lvlRecBind ctxt_lvl env pairs
+lvlBind top_lvl ctxt_lvl env (AnnRec pairs) = lvlRecBind top_lvl ctxt_lvl env pairs
 \end{code}
 
 %************************************************************************
@@ -283,8 +289,8 @@ lvlExpr ctxt_lvl env (_, AnnLam bndr rhs)
     go body		    = ([], body)
 
 lvlExpr ctxt_lvl env (_, AnnLet bind body)
-  = lvlBind ctxt_lvl env bind		`thenLvl` \ (binds', new_env) ->
-    lvlExpr ctxt_lvl new_env body	`thenLvl` \ body' ->
+  = lvlBind NotTopLevel ctxt_lvl env bind	`thenLvl` \ (binds', new_env) ->
+    lvlExpr ctxt_lvl new_env body		`thenLvl` \ body' ->
     returnLvl (mkLets binds' body')
 
 lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
@@ -518,7 +524,7 @@ but differ in their level numbers; here the ab are the newly-introduced
 type lambdas.
 
 \begin{code}
-lvlRecBind ctxt_lvl env pairs
+lvlRecBind top_lvl ctxt_lvl env pairs
   | ids_only_lvl `ltLvl` tyvars_only_lvl
   = 	-- Abstract wrt tyvars;
 	-- offending_tyvars is definitely non-empty
@@ -531,7 +537,7 @@ lvlRecBind ctxt_lvl env pairs
     in
     mapLvl (lvlExpr incd_lvl rhs_env) rhss	`thenLvl` \ rhss' ->
     mapLvl newLvlVar poly_tys			`thenLvl` \ poly_vars ->
-    cloneVars ctxt_lvl env bndrs ctxt_lvl	`thenLvl` \ (new_env, new_bndrs) ->
+    cloneVars top_lvl env bndrs ctxt_lvl	`thenLvl` \ (new_env, new_bndrs) ->
     let
 		-- The "d_rhss" are the right-hand sides of "D" and "D'"
 		-- in the documentation above
@@ -558,7 +564,7 @@ lvlRecBind ctxt_lvl env pairs
 
   | otherwise
   =	-- Let it float freely
-    cloneVars ctxt_lvl env bndrs expr_lvl		`thenLvl` \ (new_env, new_bndrs) ->
+    cloneVars top_lvl env bndrs expr_lvl		`thenLvl` \ (new_env, new_bndrs) ->
     let
 	bndrs_w_lvls = new_bndrs `zip` repeat expr_lvl
     in
@@ -649,10 +655,10 @@ newLvlVar ty = getUniqueUs	`thenLvl` \ uniq ->
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.
 
-cloneVar :: Level -> LevelEnv -> Id -> Level -> LvlM (LevelEnv, Id)
-cloneVar Top env v lvl
+cloneVar :: TopLevelFlag -> LevelEnv -> Id -> Level -> LvlM (LevelEnv, Id)
+cloneVar TopLevel env v lvl
   = returnUs (env, v)	-- Don't clone top level things
-cloneVar _   (lvl_env, subst_env) v lvl
+cloneVar NotTopLevel (lvl_env, subst_env) v lvl
   = getUniqueUs	`thenLvl` \ uniq ->
     let
       subst	 = mkSubst emptyVarSet subst_env
@@ -663,10 +669,10 @@ cloneVar _   (lvl_env, subst_env) v lvl
     in
     returnUs ((lvl_env', subst_env'), v'')
 
-cloneVars :: Level -> LevelEnv -> [Id] -> Level -> LvlM (LevelEnv, [Id])
-cloneVars Top env vs lvl 
+cloneVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> LvlM (LevelEnv, [Id])
+cloneVars TopLevel env vs lvl 
   = returnUs (env, vs)	-- Don't clone top level things
-cloneVars _   (lvl_env, subst_env) vs lvl
+cloneVars NotTopLevel   (lvl_env, subst_env) vs lvl
   = getUniquesUs (length vs)	`thenLvl` \ uniqs ->
     let
       subst	 = mkSubst emptyVarSet subst_env'
