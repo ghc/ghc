@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.39 2003/01/25 15:54:49 wolfgang Exp $
+ * $Id: RtsAPI.c,v 1.40 2003/01/27 11:08:16 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -468,10 +468,10 @@ rts_checkSchedStatus ( char* site, SchedulerStatus rc )
     }
 }
 
-#ifdef RTS_SUPPORTS_THREADS
 void
 rts_lock()
 {
+#ifdef RTS_SUPPORTS_THREADS
 	Capability *cap;
 	ACQUIRE_LOCK(&sched_mutex);
 	
@@ -490,11 +490,13 @@ rts_lock()
 		// If there is already a task available (waiting for the work capability),
 		// this will do nothing.
 	startSchedulerTask();
+#endif
 }
 
 void
 rts_unlock()
 {
+#ifdef RTS_SUPPORTS_THREADS
 	RELEASE_LOCK(&sched_mutex);
-}
 #endif
+}
