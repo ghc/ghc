@@ -119,6 +119,7 @@ ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.lit,  . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.verb, . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.hsc,  . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.gc,   . $(ALL_DIRS)) \
 	       )) $(EXTRA_SRCS)
 
 # ALL_SRCS is computed once and for all into PRE_SRCS at the top of
@@ -130,10 +131,15 @@ ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 PRE_HS_SRCS  = $(filter %.hs,  $(PRE_SRCS))
 PRE_LHS_SRCS = $(filter %.lhs, $(PRE_SRCS))
 
+GC_SRCS       = $(filter %.gc,  $(PRE_SRCS))
 HSC_SRCS      = $(filter %.hsc, $(PRE_SRCS))
 HAPPY_Y_SRCS  = $(filter %.y,   $(PRE_SRCS))
 HAPPY_LY_SRCS = $(filter %.ly,   $(PRE_SRCS))
 HAPPY_SRCS    = $(HAPPY_Y_SRCS) $(HAPPY_LY_SRCS)
+
+DERIVED_GC_SRCS       = $(patsubst %.gc,  %.hs, $(GC_SRCS)) \
+			$(patsubst %.gc, %_stub_ffi.c, $(GC_SRCS)) \
+			$(patsubst %.gc, %_stub_ffi.h, $(GC_SRCS)) \
 
 DERIVED_HSC_SRCS      = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
@@ -146,11 +152,13 @@ DERIVED_HAPPY_SRCS    = $(patsubst %.y,   %.hs, $(HAPPY_Y_SRCS)) \
 DERIVED_HC_SRCS       = $(patsubst %.hs,  %.hc, $(PRE_HS_SRCS)) \
 			$(patsubst %.lhs, %.hc, $(PRE_LHS_SRCS))
 
-DERIVED_SRCS	      = $(DERIVED_HSC_SRCS) \
+DERIVED_SRCS	      = $(DERIVED_GC_SRCS) \
+			$(DERIVED_HSC_SRCS) \
 			$(DERIVED_HAPPY_SRCS) \
 			$(DERIVED_HC_SRCS)
 
 # EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
+EXCLUDED_GC_SRCS       = $(filter %.gc,  $(EXCLUDED_SRCS))
 EXCLUDED_HSC_SRCS      = $(filter %.hsc, $(EXCLUDED_SRCS))
 EXCLUDED_HAPPY_Y_SRCS  = $(filter %.y,   $(EXCLUDED_SRCS))
 EXCLUDED_HAPPY_LY_SRCS = $(filter %.ly,  $(EXCLUDED_SRCS))
@@ -161,7 +169,9 @@ EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %.hc, $(EXCLUDED_HSC_SRCS)) \
-			$(patsubst %.y,   %.hs, $(EXCLUDED_HAPPY_Y_SRCS)) \
+			$(patsubst %.gc, %_stub_ffi.c, $(EXCLUDED_GC_SRCS)) \
+			$(patsubst %.gc, %_stub_ffi.h, $(EXCLUDED_GC_SRCS)) \
+                        $(patsubst %.y,   %.hs, $(EXCLUDED_HAPPY_Y_SRCS)) \
 			$(patsubst %.ly,  %.hs, $(EXCLUDED_HAPPY_LY_SRCS)) \
 			$(patsubst %.hs,  %.hc, $(EXCLUDED_HS_SRCS)) \
 			$(patsubst %.lhs, %.hc, $(EXCLUDED_LHS_SRCS)) \
@@ -184,7 +194,9 @@ HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
 
 # Always remove $(EXCLUDED_C_SRCS) from C_SRCS
 EXCLUDED_C_SRCS = $(patsubst %.lhs, %_stub.c, $(HS_SRCS)) \
-		  $(patsubst %.hs,  %_stub.c, $(HS_SRCS))
+		  $(patsubst %.hs,  %_stub.c, $(HS_SRCS)) \
+		  $(patsubst %.gc, %_stub_ffi.c, $(GC_SRCS)) \
+		  $(patsubst %.gc, %_stub_ffi.h, $(GC_SRCS))
 
 
 C_SRCS      = $(filter-out $(EXCLUDED_C_SRCS),$(filter %.c,$(SRCS)))
@@ -223,6 +235,8 @@ endif
 
 MKDEPENDC_SRCS=$(C_SRCS)
 
+MKDEPENDGC_SRCS = $(GC_SRCS)
+
 #------------------------------------------------------------------
 #
 # make TAGS defaults
@@ -252,6 +266,7 @@ MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) a.out \
 		      $(DERIVED_HSC_SRCS) \
+		      $(DERIVED_GC_SRCS) \
 		      $(patsubst %,%/*.$(way_)hi, . $(ALL_DIRS))
 
 # we delete *all* the .hi files we can find, rather than just
