@@ -20,6 +20,7 @@ data Token
   | TokSpecial Char
   | TokString String
   | TokURL String
+  | TokBirdTrack
   deriving Show
 
 -- simple finite-state machine for tokenising the doc string
@@ -41,7 +42,8 @@ tokenise_url cs =
 tokenise_newline cs =
  case dropWhile nonNewlineSpace cs of
    '\n':cs -> TokPara : tokenise_para cs -- paragraph break
-   _other -> tokenise_string "\n" cs
+   '>':cs  -> TokBirdTrack : tokenise cs -- bird track
+   _other  -> tokenise_string "\n" cs
 
 tokenise_para cs =
   case dropWhile nonNewlineSpace cs of   
@@ -50,6 +52,8 @@ tokenise_para cs =
 	-- bullet: '-'
    '-':cs  -> TokBullet  : tokenise cs
 	-- enumerated item: '1.'
+   '>':cs  -> TokBirdTrack : tokenise cs
+	-- bird track
    str | (ds,'.':cs) <- span isDigit str, not (null ds)
 		-> TokNumber : tokenise cs
 	-- enumerated item: '(1)'
@@ -72,5 +76,7 @@ tokenise_string str cs =
 tokenise_string_newline str cs =
   case dropWhile nonNewlineSpace cs  of
    '\n':cs -> TokString (reverse str) : TokPara : tokenise_para cs
-   _other -> tokenise_string ('\n':str) cs  -- don't throw away whitespace
+   '>':cs  -> TokString (reverse ('\n':str)) : TokBirdTrack : tokenise cs
+		 -- bird track
+   _other  -> tokenise_string ('\n':str) cs  -- don't throw away whitespace
 

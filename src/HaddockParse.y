@@ -15,6 +15,7 @@ import HaddockTypes
 	URL	{ TokURL $$ }
 	'*'	{ TokBullet }
 	'(n)'	{ TokNumber }
+	'>'	{ TokBirdTrack }
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
 
@@ -44,9 +45,14 @@ olpara  :: { ParsedDoc }
 
 para    :: { ParsedDoc }
 	: seq			{ docParagraph $1 }
+	| codepara		{ DocCodeBlock $1 }
+
+codepara :: { ParsedDoc }
+	: '>' seq codepara	{ docAppend $2 $3 }
+	| '>' seq		{ $2 }
 
 seq	:: { ParsedDoc }
-	: elem seq		{ DocAppend $1 $2 }
+	: elem seq		{ docAppend $1 $2 }
 	| elem			{ $1 }
 
 elem	:: { ParsedDoc }
