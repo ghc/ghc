@@ -1033,10 +1033,7 @@ of perl instead, a <ULink URL="http://cygutils.netpedia.net/">cygwin port</ULink
 <Title>Building the documentation</Title>
 
 <Para>
-We use the DocBook DTD, which is widely used; however, shrink-wrapped
-distributions of DocBook are few and far between, and getting it to work out
-of the box can be tricky. There are currently three supported ways of using
-DocBook: installing from sources yourself, various flavours of RPM installation, and installing binaries on Windows (with some care).
+We use the DocBook DTD, which is widely used. Most shrink-wrapped distributions seem to be broken in one way or another; thanks to heroic efforts by Sven Panne and Manuel Chakravarty, we now support most of them, plus properly installed versions.
 </Para>
 
 <Para>
@@ -1138,12 +1135,7 @@ entities</ULink> into <Filename>/usr/[local/]lib/sgml</Filename>.
 <Title>Configuring the DocBook tools</Title>
 
 <Para>
-You should either edit one of the <Filename>CATALOG</Filename> files in
-<Filename>fptools/glafp-utils/docbook</Filename> to suit your system, or set <Constant>SGML_CATALOG_FILES</Constant> to point to a valid catalog. SuSE systems should work out of the box. <Filename>CATALOG.generic</Filename> should work on most Unix systems when the files have been installed as per these instructions; <Filename>CATALOG.cygnus</Filename> is for systems with the Cygnus DocBook tools. <Filename>CATALOG.windows</Filename> is for Windows systems following the special instructions for that special OS. You may need to edit the paths so they match your system. The edited file should be called <Filename>CATALOG</Filename>, and placed in the same directory.
-</Para>
-
-<Para>
-One day there will be properly-working DocBook distributions everywhere and the world will be a better and a quieter place, whose people will have more time for interesting things.
+Once the DocBook tools are installed, the configure script will detect them and set up the build system accordingly. If you have a system that isn't supported, let us know, and we'll try to help.
 </Para>
 
 </Sect2>
