@@ -36,6 +36,7 @@ import Name		( OccName, getOccString, moduleString, nameString )
 import Outputable	( PprStyle(..), codeStyle, ifaceStyle )
 import Pretty
 import Util	        ( panic, panic#, assertPanic, cmpPString, thenCmp, Ord3(..) )
+import CmdLineOpts      ( all_toplev_ids_visible )
 
 pprIdInUnfolding = panic "Whoops"
 \end{code}
@@ -399,13 +400,10 @@ uppCostCentre sty print_as_string cc
 			  ('/' : _UNPK_ grp_str) ++ 
 			  ('/' : basic_kind))
 	in
-        case sty of
-          PprForC -> do_caf is_caf basic_kind
-          _ ->
-	    if friendly_sty then
-	      do_dupd is_dupd full_kind
-	    else
-	      module_kind
+        if friendly_sty then
+	   do_dupd is_dupd full_kind
+	else
+	    module_kind
       where
 	do_caf IsCafCC ls = "CAF:" ++ ls
 	do_caf _       ls = ls
@@ -491,7 +489,7 @@ uppCostCentreDecl sty is_local cc
 	    pp_str mod_name, comma,
 	    pp_str grp_name, comma,
 	    text is_subsumed, comma,
-	    if externally_visible then empty else ptext SLIT("static"),
+	    if externally_visible || all_toplev_ids_visible then empty else ptext SLIT("static"),
 	    text ");"]
     else
 	hcat [ ptext SLIT("CC_EXTERN"),char '(', upp_ident, text ");" ]
