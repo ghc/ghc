@@ -34,6 +34,8 @@ test('rn039', normal, compile, [''])
 test('rn040', expect_fail, compile, [''])
 test('rn041', normal, compile, [''])
 test('rn042', normal, multimod_compile, ['rn042', '-v0'])
+test('rn043', normal, multimod_compile, ['rn042', '-v0'])
+test('rn044', normal, multimod_compile, ['rn042', '-v0'])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
