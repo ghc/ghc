@@ -17,9 +17,9 @@ module SysTools (
 				-- Where package.conf is
 
 	-- Interface to system tools
-	runUnlit, runCpp, runCc, -- [String] -> IO ()
-	runMangle, runSplit,	 -- [String] -> IO ()
-	runAs, runLink,		 -- [String] -> IO ()
+	runUnlit, runCpp, runCc,-- [String] -> IO ()
+	runMangle, runSplit,	-- [String] -> IO ()
+	runAs, runLink,		-- [String] -> IO ()
 	runMkDLL,
 
 	touch,			-- String -> String -> IO ()
@@ -34,7 +34,7 @@ module SysTools (
 
 	-- System interface
 	getProcessID,		-- IO Int
-	system, 		-- String -> IO Int
+	system, 		-- String -> IO ExitCode
 
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
@@ -54,18 +54,19 @@ import IO
 import Directory	( doesFileExist, removeFile )
 import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
-import System		( system, ExitCode(..), exitWith, getEnv )
+import System		( ExitCode(..), exitWith, getEnv, system )
 import CString
 import Int
 import Addr
     
 #include "../includes/config.h"
 
-#if !defined(mingw32_TARGET_OS)
+#ifndef mingw32_TARGET_OS
 import qualified Posix
 #else
 import List		( isPrefixOf )
 import MarshalArray
+import SystemExts       ( rawSystem )
 #endif
 
 #include "HsVersions.h"
@@ -553,7 +554,12 @@ runSomething :: String		-- For -v message
 
 runSomething phase_name pgm args
  = traceCmd phase_name cmd_line $
-   do   { exit_code <- system cmd_line
+   do   {
+#ifndef mingw32_TARGET_OS
+	  exit_code <- system cmd_line
+#else
+          exit_code <- rawSystem cmd_line
+#endif
 	; if exit_code /= ExitSuccess
 	  then throwDyn (PhaseFailed phase_name exit_code)
   	  else return ()

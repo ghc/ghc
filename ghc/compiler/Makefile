@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.181 2001/08/04 06:19:54 ken Exp $
+# $Id: Makefile,v 1.182 2001/08/07 08:16:48 rrt Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -113,6 +113,7 @@ compiling_with_4xx=NO
 else
 bootstrapped = $(shell if (test $(CANON_HC_VERSION) -ge $(ProjectVersionInt)0); then echo YES; else echo NO; fi)
 compiling_with_4xx = $(shell if (test $(CANON_HC_VERSION) -lt 5000); then echo YES; else echo NO; fi)
+ghc_502_at_least = $(shell if (test $(CANON_HC_VERSION) -ge 5020); then echo YES; else echo NO; fi)
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
@@ -126,26 +127,27 @@ endif
 # Enable code that assumes a MSDOSish subshell. See mk/config.mk.in
 # for explanatory comment as to what this does.
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -gt 5000); then echo YES; else echo NO; fi)
+ghc_501_at_least = $(shell if (test $(CANON_HC_VERSION) -ge 5010); then echo YES; else echo NO; fi)
 
 # -----------------------------------------------
-# GHCi calls the C procedure 'system', but alas GHC 4.08's 
-# implementation of this (in the library System) didn't work 
-# properly on Windows.  Everything is fine if you are compiling
-# GHC with GHC 5.01 or better, but lacking that we have the following
+# GHCi calls the C procedure 'rawSystem'; but alas GHC 4.08 
+# does not have this.  Everything is fine if you are compiling
+# GHC with GHC 5.02 or better, but lacking that we have the following
 # hack: 
-#	copy system.c from lib/std (where it is correct) 
-#	into main/system.c (where it'll be compiled and
-#			    linked with the compiler)
+#	copy rawSystem.c from hslibs/lang/cbits
+#       and SystemExts.lhs from hslibs/lang
+#	into main/ (where they'll be compiled and linked with the compiler)
 
-ifneq "$(ghc_501_at_least)" "YES"
-C_SRCS += main/system.c
+ifneq "$(ghc_502_at_least)" "YES"
+C_SRCS += main/rawSystem.c
+HS_SRCS += main/SystemExts.lhs
 SRC_CC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
 SRC_MKDEPENDC_OPTS += -I$(GHC_LIB_DIR)/std/cbits
-HS_OBJS += main/system.o
-
-main/system.c : ../lib/std/cbits/system.c
-	$(CP) ../lib/std/cbits/system.c main
+HS_OBJS += main/rawSystem.o
+main/rawSystem.c : $(FPTOOLS_TOP)/hslibs/lang/cbits/rawSystem.c
+	$(CP) $< main
+main/SystemExts.lhs: $(FPTOOLS_TOP)/hslibs/lang/SystemExts.lhs
+	$(CP) $< main
 endif
 endif
 #		End of system hack
