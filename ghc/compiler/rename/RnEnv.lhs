@@ -647,21 +647,21 @@ warnUnusedLocalBinds, warnUnusedTopNames, warnUnusedMatches :: [Name] -> RnM s d
 
 warnUnusedTopNames names
   | not opt_WarnUnusedBinds && not opt_WarnUnusedImports = returnRn ()	-- Don't force ns unless necessary
-  | otherwise						 = warnUnusedBinds names
+  | otherwise						 = warnUnusedBinds (\ is_local -> not is_local) names
 
 warnUnusedLocalBinds ns
   | not opt_WarnUnusedBinds = returnRn ()
-  | otherwise		    = warnUnusedBinds ns
+  | otherwise		    = warnUnusedBinds (\ is_local -> is_local) ns
 
 warnUnusedMatches names
-  | opt_WarnUnusedMatches = warnUnusedGroup names
+  | opt_WarnUnusedMatches = warnUnusedGroup (const True) names
   | otherwise 		  = returnRn ()
 
 -------------------------
 
-warnUnusedBinds :: [Name] -> RnM s d ()
-warnUnusedBinds names
-  = mapRn warnUnusedGroup groups	`thenRn_`
+warnUnusedBinds :: (Bool -> Bool) -> [Name] -> RnM s d ()
+warnUnusedBinds warn_when_local names
+  = mapRn (warnUnusedGroup warn_when_local) groups	`thenRn_`
     returnRn ()
   where
 	-- Group by provenance
@@ -677,13 +677,12 @@ warnUnusedBinds names
 
 -------------------------
 
-warnUnusedGroup :: [Name] -> RnM s d ()
-warnUnusedGroup []
+warnUnusedGroup :: (Bool -> Bool) -> [Name] -> RnM s d ()
+warnUnusedGroup _ []
   = returnRn ()
 
-warnUnusedGroup names
-  | is_local     && not opt_WarnUnusedBinds   = returnRn ()
-  | not is_local && not opt_WarnUnusedImports = returnRn ()
+warnUnusedGroup emit_warning names
+  | not (emit_warning is_local) = returnRn ()
   | otherwise
   = pushSrcLocRn def_loc	$
     addWarnRn			$
