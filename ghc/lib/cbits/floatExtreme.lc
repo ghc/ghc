@@ -6,6 +6,11 @@ Stubs to check for extremities of (IEEE) floats,
 the tests have been (artfully) lifted from the hbc-0.9999.3 (lib/fltcode.c)
 source.
 
+ToDo:
+  - avoid hard-wiring the fact that on an
+    Alpha we repr. a StgFloat as a double.
+    (introduce int equivalent of {ASSIGN,PK}_FLT? )
+
 \begin{code}
 
 #include "rtsdefs.h"
@@ -80,49 +85,75 @@ StgDouble d;
     return (u.i[H] == 0x80000000 && u.i[L] == 0);
 }
 
+/* Same tests, this time for StgFloats. */
+
 StgInt
 isFloatNaN(f) 
 StgFloat f;
 {
-    int ix;
+#if !defined(alpha_TARGET_OS)
+    /* StgFloat = double on alphas */
+    return (isDoubleNaN(f));
+#else
+    union { StgFloat f; int i; } u;
     int r;
+    u.f = f;
 
-    ix = (int)f;
-    ix &= 0x7fffffff;
-    ix = 0x7f800000 - ix;
-    r = (int)(((unsigned int)(ix))>>31);
+    u.i &= 0x7fffffff;
+    u.i = 0x7f800000 - u.i;
+    r = (int)(((unsigned int)(u.i))>>31);
     return (r);
+#endif
 }
 
 StgInt
 isFloatInfinite(f) 
 StgFloat f;
 {
+#if !defined(alpha_TARGET_OS)
+    /* StgFloat = double on alphas */
+    return (isDoubleInfinite(f));
+#else
     int ix;
+    union { StgFloat f; int i; } u;
+    u.f = f;
 
-    ix = (int)f;
-    ix &= 0x7fffffff;
-    ix ^= 0x7f800000;
-    return (ix == 0);
+    u.i &= 0x7fffffff;
+    u.i ^= 0x7f800000;
+    return (u.i == 0);
+#endif
 }
 
 StgInt
 isFloatDenormalized(f) 
 StgFloat f;
 {
-    int high, iexp;
+#if !defined(alpha_TARGET_OS)
+    /* StgFloat = double on alphas */
+    return (isDoubleDenormalized(f));
+#else
+    int iexp;
+    union { StgFloat f; int i; } u;
+    u.f = f;
 
-    high = (int)f;
-    iexp = high & (0xff << 23);
+    iexp = u.i & (0xff << 23);
     return (iexp == 0);
+#endif
 }
 
 StgInt
 isFloatNegativeZero(f) 
 StgFloat f;
 {
-    int high = (int)f;
-    return (high == 0x80000000);
+#if !defined(alpha_TARGET_OS)
+    /* StgFloat = double on alphas */
+    return (isDoubleNegativeZero(f));
+#else
+    union { StgFloat f; int i; } u;
+    u.f = f;
+
+    return (u.i  == (int)0x80000000);
+#endif
 }
 
 
