@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.115 2002/02/04 20:40:36 sof Exp $
+ * $Id: Schedule.c,v 1.116 2002/02/04 20:56:53 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1531,6 +1531,7 @@ resumeThread( StgInt tok )
   StgTSO *tso, **prev;
   Capability *cap;
 
+#if defined(THREADED_RTS)
   IF_DEBUG(scheduler, sched_belch("thread %d returning, waiting for sched. lock.\n", tok));
   ACQUIRE_LOCK(&sched_mutex);
   ext_threads_waiting++;
@@ -1541,6 +1542,7 @@ resumeThread( StgInt tok )
   ACQUIRE_LOCK(&rts_mutex);
   ext_threads_waiting--;
   IF_DEBUG(scheduler, sched_belch("thread %d acquired RTS lock...\n", tok));
+#endif
 
 #if defined(THREADED_RTS)
   /* Free up any RTS-blocked threads. */
