@@ -19,8 +19,12 @@
 #define SETZONE(x,z)     (((struct tm *)x)->tm_zone = z)
 #define GMTOFF(x)        (((struct tm *)x)->tm_gmtoff)
 #else /* ! HAVE_TM_ZONE */
-# if HAVE_TZNAME
+# if HAVE_TZNAME || cygwin32_TARGET_OS
+#if cygwin32_TARGET_OS
+extern char *tzname;
+#else
 extern char *tzname[2];
+#endif
 #  define ZONE(x)	 (((struct tm *)x)->tm_isdst ? tzname[1] : tzname[0])
 #  define SETZONE(x,z)
 # else /* ! HAVE_TZNAME */

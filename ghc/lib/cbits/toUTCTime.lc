@@ -9,6 +9,11 @@
 #include "timezone.h"
 #include "stgio.h"
 
+#ifdef cygwin32_TARGET_OS
+extern char *_tzname;
+char *tzname;
+#endif
+
 StgAddr 
 toUTCTime(I_ size, StgByteArray d, StgByteArray res)
 {
