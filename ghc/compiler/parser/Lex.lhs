@@ -232,7 +232,7 @@ data Token
 
   | ITunknown String		-- Used when the lexer can't make sense of it
   | ITeof			-- end of file token
-  deriving Text -- debugging
+  deriving Show -- debugging
 \end{code}
 
 -----------------------------------------------------------------------------
