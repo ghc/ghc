@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.47 2001/01/09 17:16:35 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.48 2001/01/16 21:05:51 qrczak Exp $
 --
 -- GHC Driver
 --
@@ -338,7 +338,7 @@ run_phase Cpp basename suff input_fn output_fn
 
 	    runSomething "C pre-processor" 
 		(unwords
-       	    	   (["echo '{-# LINE 1 \"" ++ input_fn ++ "\" -}'", ">", output_fn, "&&",
+       	    	   (["echo '{-# LINE 1 \"" ++ input_fn ++ "\" #-}'", ">", output_fn, "&&",
 		     cpp, verb] 
 		    ++ include_paths
 		    ++ hs_src_cpp_opts
@@ -347,7 +347,7 @@ run_phase Cpp basename suff input_fn output_fn
 		   ))
 	  else do
 	    runSomething "Ineffective C pre-processor"
-	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" -}' > " 
+	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" #-}' > " 
 		    ++ output_fn ++ " && cat " ++ input_fn
 		    ++ " >> " ++ output_fn)
        return True
