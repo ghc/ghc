@@ -3,7 +3,7 @@
 
 HS_SRCS = $(wildcard *.hs)
 BINS = $(patsubst %.o,%.bin,$(HS_OBJS))
-RUNTESTS = $(patsubst %.bin,%.run,$(BINS))
+RUNTESTS = $(filter-out $(OMITTED_RUNTESTS), $(patsubst %.bin,%.run,$(BINS)))
 
 SRC_RUNTEST_OPTS += -o1 $*.stdout -o2 $*.stderr -x 0
 
