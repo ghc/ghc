@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.11 2001/03/01 19:10:16 qrczak Exp $
+% $Id: PrelReal.lhs,v 1.12 2001/03/28 22:14:02 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -353,10 +353,17 @@ integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
 integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]
 
 integralEnumFromThen :: (Integral a, Bounded a) => a -> a -> [a]
-integralEnumFromThen n1 n2 
+integralEnumFromThen n1 n2
   | i_n2 >= i_n1  = map fromInteger [i_n1, i_n2 .. toInteger (maxBound `asTypeOf` n1)]
   | otherwise     = map fromInteger [i_n1, i_n2 .. toInteger (minBound `asTypeOf` n1)]
   where
     i_n1 = toInteger n1
     i_n2 = toInteger n2
+
+integralEnumFromTo :: (Integral a, Bounded a) => a -> a -> [a]
+integralEnumFromTo n m = map fromInteger [toInteger n .. toInteger m]
+
+integralEnumFromThenTo :: (Integral a, Bounded a) => a -> a -> a -> [a]
+integralEnumFromThenTo n1 n2 m
+  = map fromInteger [toInteger n1, toInteger n2 .. toInteger m]
 \end{code}

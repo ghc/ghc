@@ -98,6 +98,8 @@ instance Enum Word where
         | otherwise     = fromEnumError "Word" x
     enumFrom            = integralEnumFrom
     enumFromThen        = integralEnumFromThen
+    enumFromTo          = integralEnumFromTo
+    enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Word where
     quot    x@(W# x#) y@(W# y#)
@@ -421,14 +423,16 @@ instance Enum Word32 where
                         = W32# (int2Word# i#)
         | otherwise     = toEnumError "Word32" i (minBound::Word32, maxBound::Word32)
 #if WORD_SIZE_IN_BYTES == 4
-    fromEnum (W32# x#)  = I# (word2Int# x#)
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-#else
     fromEnum x@(W32# x#)
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# x#)
         | otherwise     = fromEnumError "Word32" x
+    enumFrom            = integralEnumFrom
+    enumFromThen        = integralEnumFromThen
+    enumFromTo          = integralEnumFromTo
+    enumFromThenTo      = integralEnumFromThenTo
+#else
+    fromEnum (W32# x#)  = I# (word2Int# x#)
     enumFrom            = boundedEnumFrom
     enumFromThen        = boundedEnumFromThen
 #endif
@@ -545,6 +549,8 @@ instance Enum Word64 where
         | otherwise     = fromEnumError "Word64" x
     enumFrom            = integralEnumFrom
     enumFromThen        = integralEnumFromThen
+    enumFromTo          = integralEnumFromTo
+    enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Word64 where
     quot    x@(W64# x#) y@(W64# y#)
@@ -647,6 +653,8 @@ instance Enum Word64 where
         | otherwise     = fromEnumError "Word64" x
     enumFrom            = integralEnumFrom
     enumFromThen        = integralEnumFromThen
+    enumFromTo          = integralEnumFromTo
+    enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Word64 where
     quot    x@(W64# x#) y@(W64# y#)

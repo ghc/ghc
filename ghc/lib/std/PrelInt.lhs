@@ -393,6 +393,8 @@ instance Enum Int64 where
         | otherwise     = fromEnumError "Int64" x
     enumFrom            = integralEnumFrom
     enumFromThen        = integralEnumFromThen
+    enumFromTo          = integralEnumFromTo
+    enumFromThenTo      = integralEnumFromThenTo
 
 instance Integral Int64 where
     quot    x@(I64# x#) y@(I64# y#)
