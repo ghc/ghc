@@ -853,8 +853,8 @@ copyIdInfo :: IdInfo	-- f_local
 copyIdInfo f_local f = f { newStrictnessInfo = newStrictnessInfo f_local,
 #ifdef DEBUG
 			   strictnessInfo = strictnessInfo f_local,
-			   cprInfo        = cprInfo        f_local
+			   cprInfo        = cprInfo        f_local,
 #endif
-			   workerInfo     = workerInfo     f_local,
+			   workerInfo     = workerInfo     f_local
 			  }
 \end{code}

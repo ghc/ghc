@@ -73,7 +73,7 @@ dmdAnalPgm dflags binds
 #ifdef DEBUG
 	-- Only if DEBUG is on, because only then is the old
 	-- strictness analyser run
-	let dmd_changes = get_changes binds_plus_dmds ;
+	let { dmd_changes = get_changes binds_plus_dmds } ;
 	printDump (text "Changes in demands" $$ dmd_changes) ;
 #endif
 	return binds_plus_dmds
