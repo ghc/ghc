@@ -1,115 +1,87 @@
 
-include ($confdir ++ "/" ++ $conffile)
+$diff = "diff -c2"
+$rm   = "rm -f"
+$cp   = "cp"
 
-def qualify ( $_filename )
+-- Gotta do some pretty basic stuff :)
+def not ( $_bool )
 {
-   return $testdir ++ "/" ++ $_filename
+        if $_bool == "True" then return False
+   else if $_bool == "False" then return True
+   else framefail ("not(): invalid input: " ++ $_bool )
+   fi fi
 }
 
+def runCmd( $cmd )
+{
+   if defined $verbose then
+	print $cmd
+   fi
+   $res = run $cmd
+   return $res
+}
+
+def runCmdDontFail( $cmd )
+{
+   $res = runCmd($cmd)
+   if $res /= "0"
+	then framefail ("unexpected cmd failure: " ++ $cmd)
+   fi
+}
+
+-- Delete a file and abort if that doesn't work.
 def rm_or_fail ( $_files )
 {
-   $cmd = "rm -f " ++ $_files
-   $res = run $cmd
+   $cmd = $rm ++ " " ++ $_files
+   $res = runCmd($cmd)
    if $res /= "0" then framefail ("rm_or_fail: can't rm: " ++ $_files) fi
 }
 
+-- Delete a file but keep going antidisirregardless of the outcome.
 def rm_nofail ( $_files )
 {
-   $cmd = "rm -f " ++ $_files
-   $res = run $cmd
+   $cmd = $rm ++ " " ++ $_files
+   $res = runCmd($cmd)
 }
 
-def pretest_cleanup()
+-- Pipe an error message through normalise_errmsg.
+def normalise_errmsg ( $errmsg )
 {
-   rm_nofail(qualify("comp.stderr"))
-   rm_nofail(qualify("comp.stdout"))
-   rm_nofail(qualify("run.stderr"))
-   rm_nofail(qualify("run.stdout"))
-   -- not interested in the return code
+   $unpathify = $confdir ++ "/../../utils/normalise_errmsg/normalise_errmsg"
+   $normd = $errmsg | $unpathify
+   return $normd
 }
 
--- Guess flags suitable for the compiler.
-def guess_compiler_flags()
+-- Give hints as to why a test is failing.
+def say_fail_because_noteq ( $filename1, $filename2 )
 {
-   if   $tool contains "ghc"
-   then 
-        return "-no-recomp"
-   else 
-   if   $tool contains "nhc"
-   then 
-        return "-98"
-   else
-   if   $tool contains "hbc"
-   then
-        return ""
-   else
-        framefail ("Can't guess what kind of Haskell compiler " ++ 
-                   "you're testing: $tool = " ++ $tool)
+   print "--- FAIL because the following files differ:"
+   print "---      " ++ $filename1
+   print "---      " ++ $filename2
+   if defined $accept then
+	print "--- (accepting new output)"
+	runCmdDontFail($cp ++ " " ++ $filename2 ++ " " ++ $filename1)
    fi
-   fi
+   if defined $verbose then
+	$ignore = runCmd($diff ++ " " ++ $filename1 ++ " " ++ $filename2)
    fi
 }
 
--- Compile Main.hs into main; comp errors -> comp.stdout.
--- Used for run tests, so framefail if compilation fails.
-def simple_build_Main() 
+def say_fail_because_nonempty ( $filename1 )
 {
-   $flags = guess_compiler_flags()
-   rm_or_fail(qualify("comp.stdout"))
-   rm_or_fail(qualify("Main.hi"))
-   rm_or_fail(qualify("Main.o"))
-   rm_or_fail(qualify("main"))
-   $cmd = $tool ++ " " ++ $flags 
-          ++ " -o " ++ qualify("main") ++ " " 
-          ++ qualify("Main.hs") 
-          ++ " &> " ++ qualify("comp.stdout")
-   $res = run $cmd
-   if $res /= "0" then framefail "simple_build_Main: failed" fi
+   print "--- FAIL because the following file is non-empty:"
+   print "---      " ++ $filename1
+   print "--- contents:"
+   print (contents $filename1)
+   print ("--- end of " ++ $filename1)
 }
 
-
--- Just try to compile Main.hs to Main.o; no attempt at linking.
--- Is used for compile-only tests, so don't framefail if compilation
--- fails.
-def simple_compile_Main() 
+def say_fail_because_compiler_barfd ( $res )
 {
-   $flags = guess_compiler_flags()
-   rm_or_fail(qualify("comp.stdout"))
-   rm_or_fail(qualify("Main.hi"))
-   rm_or_fail(qualify("Main.o"))
-   $cmd = $tool ++ " " ++ $flags 
-          ++ " -c " ++ qualify("Main.hs") 
-          ++ " &> " ++ qualify("comp.stdout")
-   $res = run $cmd
-   return $res
+   print "--- FAIL because the compiler returned non-zero exit code = " ++ $res
+   $comp_stderr = qualify("comp.stderr")
+   if   exists($comp_stderr)
+   then print "--- Error messages:"
+        print contents(qualify("comp.stderr"))
+   fi
 }
-
--- Run main > run.stdout 2> run.stderr 
--- Returns the exit code of the run.
-def simple_run_main_no_stdin ( )
-{
-   rm_or_fail(qualify("run.stdout"))
-   rm_or_fail(qualify("run.stderr"))
-   $cmd = qualify("main") 
-          ++ " > " ++ qualify("run.stdout")
-          ++ " 2> " ++ qualify("run.stderr")
-   $res = run $cmd
-   return $res
-}
-
-
--- Run main < run.stdin > run.stdout 2> run.stderr 
--- Returns the exit code of the run.
-def simple_run_main ( )
-{
-   rm_or_fail(qualify("run.stdout"))
-   rm_or_fail(qualify("run.stderr"))
-   $cmd = qualify("main") 
-          ++ " < " ++ qualify("run.stdin")
-          ++ " > " ++ qualify("run.stdout")
-          ++ " 2> " ++ qualify("run.stderr")
-   $res = run $cmd
-   return $res
-}
-
-
