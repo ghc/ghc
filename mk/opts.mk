@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.21 2001/04/03 16:50:11 rrt Exp $
+# 	$Id: opts.mk,v 1.22 2001/05/16 09:46:43 rrt Exp $
 #
 #################################################################################
 
@@ -48,6 +48,28 @@
 
 #################################################################################
 #
+#		Global option flags for utilities
+#
+#################################################################################
+
+# These flags make flex 8-bit
+SRC_FLEX_OPTS	+= -8
+
+SRC_INSTALL_BIN_OPTS	+= -s
+
+# lint gets all CPP's flags too
+SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
+WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
+
+# Default fptools options for dllwrap.
+SRC_BLD_DLL_OPTS += -mno-cygwin -mwin32 --target=i386-mingw32
+
+# Flags for CPP when running GreenCard on .pgc files
+GC_CPP_OPTS += -P -E -x c -traditional -D__GLASGOW_HASKELL__
+
+
+#################################################################################
+#
 #		Absolutely standard glue
 #
 #################################################################################
@@ -68,6 +90,9 @@ BLD_DLL_OPTS       = $(SRC_BLD_DLL_OPTS) $(WAY$(_way)_BLD_DLL_OPTS) $($*_HC_OPTS
 CPP_OPTS           = $(SRC_CPP_OPTS) $(WAY$(_way)_CPP_OPTS) $(EXTRA_CPP_OPTS)
 CTAGS_OPTS         = $(SRC_CTAGS_OPTS) $(WAY$(_way)_CTAGS_OPTS) $(EXTRA_CTAGS_OPTS)
 CC_OPTS            = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+CC_OPTS += -mno-cygwin -mwin32
+endif
 FLEX_OPTS          = $(SRC_FLEX_OPTS) $(WAY$(_way)_FLEX_OPTS) $(EXTRA_FLEX_OPTS)
 HAPPY_OPTS         = $(SRC_HAPPY_OPTS) $(WAY$(_way)_HAPPY_OPTS) $($*_HAPPY_OPTS) $(EXTRA_HAPPY_OPTS)
 GC_OPTS            = $(SRC_GC_OPTS) $(WAY$(_way)_GC_OPTS) $($*_GC_OPTS) $(EXTRA_GC_OPTS)
