@@ -21,7 +21,9 @@ module BasicTypes(
 	Unused, unused,
 
 	Fixity(..), FixityDirection(..),
-	defaultFixity, maxPrecedence, negateFixity, negatePrecedence,
+	defaultFixity, maxPrecedence, 
+	arrowFixity, negateFixity, negatePrecedence,
+	compareFixity,
 
 	IPName(..), ipNameName, mapIPName,
 
@@ -156,8 +158,37 @@ defaultFixity = Fixity maxPrecedence InfixL
 negateFixity :: Fixity
 negateFixity     = Fixity negatePrecedence InfixL  	-- Precedence of unary negate is wired in as infixl 6!
 
+arrowFixity :: Fixity 	-- Fixity of '->' in types
+arrowFixity = Fixity 0 InfixR
+
 negatePrecedence :: Int
 negatePrecedence = 6
+\end{code}
+
+Consider
+
+\begin{verbatim}
+	a `op1` b `op2` c
+\end{verbatim}
+@(compareFixity op1 op2)@ tells which way to arrange appication, or
+whether there's an error.
+
+\begin{code}
+compareFixity :: Fixity -> Fixity
+	      -> (Bool,		-- Error please
+		  Bool)		-- Associate to the right: a op1 (b op2 c)
+compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
+  = case prec1 `compare` prec2 of
+	GT -> left
+	LT -> right
+	EQ -> case (dir1, dir2) of
+			(InfixR, InfixR) -> right
+			(InfixL, InfixL) -> left
+			_		 -> error_please
+  where
+    right	 = (False, True)
+    left         = (False, False)
+    error_please = (True,  False)
 \end{code}
 
 

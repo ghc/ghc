@@ -44,7 +44,7 @@ import RnEnv		( availsToNameSet,
 			  unitAvailEnv, availEnvElts, availNames,
 			  plusAvailEnv, groupAvails, warnUnusedImports, 
 			  warnUnusedLocalBinds, warnUnusedModules, 
-			  lookupSrcName, getImplicitStmtFVs, 
+			  lookupSrcName, getImplicitStmtFVs, mkTopFixityEnv,
 			  getImplicitModuleFVs, newGlobalName, unQualInScope,
 			  ubiquitousNames, lookupOccRn, checkMain,
 			  plusGlobalRdrEnv, mkGlobalRdrEnv
@@ -223,12 +223,12 @@ renameExtCore dflags hit hst pcs this_module
     recordLocalSlurps binders					`thenRn_`
     closeDecls rn_local_decls fvs    				`thenRn` \ final_decls ->		  
 
-	-- Bail out if we fail
+	-- Bail out if we fail (but dump debug output anyway for debugging)
+    rnDump final_decls 			`thenRn_` 
     checkErrsRn				`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
         returnRn (print_unqualified, Nothing)
     else
-    rnDump final_decls []		`thenRn_` 
     let
 	mod_iface = ModIface {	mi_module   = this_module,
 			        mi_package  = opt_InPackage,
@@ -426,7 +426,6 @@ rename ghci_mode this_module
     checkErrsRn				`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	-- Found errors already, so exit now
-	rnDump [] []		`thenRn_`
 	returnRn (print_unqualified, Nothing)
     else
 	
@@ -476,13 +475,12 @@ rename ghci_mode this_module
     checkErrsRn					`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	-- Found errors already, so exit now
-        rnDump [] rn_local_decls		`thenRn_` 
+        rnDump rn_local_decls			`thenRn_` 
 	returnRn (print_unqualified, Nothing)
     else
 
 	-- SLURP IN ALL THE NEEDED DECLARATIONS
     slurpImpDecls needed_fvs			`thenRn` \ rn_imp_decls ->
-    rnDump rn_imp_decls rn_local_decls		`thenRn_` 
 
 	-- GENERATE THE VERSION/USAGE INFO
     mkImportInfo mod_name imports 		`thenRn` \ my_usages ->
@@ -530,6 +528,9 @@ rename ghci_mode this_module
 			       rr_main     = maybe_main_name }
     in
 
+    rnDump final_decls 			`thenRn_` 
+    rnStats rn_imp_decls		`thenRn_`
+
 	-- REPORT UNUSED NAMES, AND DEBUG DUMP 
     reportUnusedNames mod_iface print_unqualified 
 		      imports full_avail_env gbl_env
@@ -553,31 +554,14 @@ rename ghci_mode this_module
 \begin{code}
 fixitiesFromLocalDecls :: GlobalRdrEnv -> [RdrNameHsDecl] -> RnMG LocalFixityEnv
 fixitiesFromLocalDecls gbl_env decls
-  = foldlRn getFixities emptyNameEnv decls				`thenRn` \ env -> 
+  = mkTopFixityEnv gbl_env (foldr get_fix_sigs [] decls)		`thenRn` \ env ->
     traceRn (text "fixity env" <+> vcat (map ppr (nameEnvElts env)))	`thenRn_`
     returnRn env
   where
-    getFixities :: LocalFixityEnv -> RdrNameHsDecl -> RnMG LocalFixityEnv
-    getFixities acc (FixD fix)
-      = fix_decl acc fix
-
-    getFixities acc (TyClD (ClassDecl { tcdSigs = sigs}))
-      = foldlRn fix_decl acc [sig | FixSig sig <- sigs]
-		-- Get fixities from class decl sigs too.
-    getFixities acc other_decl
-      = returnRn acc
-
-    fix_decl acc sig@(FixitySig rdr_name fixity loc)
-	= 	-- Check for fixity decl for something not declared
-	  pushSrcLocRn loc 			$
-	  lookupSrcName gbl_env rdr_name	`thenRn` \ name ->
-
-		-- Check for duplicate fixity decl
-	  case lookupNameEnv acc name of
-	    Just (FixitySig _ _ loc') -> addErrRn (dupFixityDecl rdr_name loc loc')	`thenRn_`
-					 returnRn acc ;
-
-	    Nothing		      -> returnRn (extendNameEnv acc name (FixitySig name fixity loc))
+    get_fix_sigs (FixD fix) acc = fix:acc
+    get_fix_sigs (TyClD (ClassDecl { tcdSigs = sigs})) acc
+       = [sig | FixSig sig <- sigs] ++ acc	-- Get fixities from class decl sigs too.
+    get_fix_sigs other_decl acc = acc
 \end{code}
 
 
@@ -793,21 +777,21 @@ closeIfaceDecls dflags hit hst pcs
 		map TyClD tycl_decls
 	needed = unionManyNameSets (map ruleDeclFVs rule_decls) `unionNameSets`
 		 unionManyNameSets (map instDeclFVs inst_decls) `unionNameSets`
-		 unionManyNameSets (map tyClDeclFVs tycl_decls)
+		 unionManyNameSets (map tyClDeclFVs tycl_decls) `unionNameSets`
+		 ubiquitousNames
+			-- Data type decls with record selectors,
+			-- which may appear in the decls, need unpackCString
+			-- and friends. It's easier to just grab them right now.
+
 	local_names    = foldl add emptyNameSet tycl_decls
 	add names decl = addListToNameSet names (map fst (tyClDeclSysNames decl ++ tyClDeclNames decl))
     in
-
     recordLocalSlurps local_names	`thenRn_`
 
 	-- Do the transitive closure
-    closeDecls decls (needed `plusFV` implicit_fvs) `thenRn` \closed_decls ->
-    rnDump [] closed_decls `thenRn_`
+    closeDecls decls needed		`thenRn` \closed_decls ->
+    rnDump closed_decls			`thenRn_`
     returnRn closed_decls
-  where
-    implicit_fvs = ubiquitousNames	-- Data type decls with record selectors,
-					-- which may appear in the decls, need unpackCString
-					-- and friends. It's easier to just grab them right now.
 \end{code}
 
 %*********************************************************
@@ -979,23 +963,31 @@ printMinimalImports this_mod unqual imps
 	where
 	  n_mod = moduleName (nameModule n)
 
-rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
-	-> [RenamedHsDecl] 	-- Renamed local decls
+rnDump  :: [RenamedHsDecl] 	-- Renamed decls
 	-> RnMG ()
-rnDump imp_decls local_decls
+rnDump decls
   = doptRn Opt_D_dump_rn_trace 	`thenRn` \ dump_rn_trace ->
     doptRn Opt_D_dump_rn_stats 	`thenRn` \ dump_rn_stats ->
     doptRn Opt_D_dump_rn 	`thenRn` \ dump_rn ->
     getIfacesRn			`thenRn` \ ifaces ->
 
-    ioToRnM (do { dumpIfSet (dump_rn_trace || dump_rn_stats || dump_rn)
-			    "Renamer statistics"
-			    (getRnStats imp_decls ifaces) ;
+    ioToRnM ( dumpIfSet dump_rn "Renamer:" 
+		        (vcat (map ppr decls)) )
+    				`thenRn_`
 
-		  dumpIfSet dump_rn "Renamer:" 
-			    (vcat (map ppr (local_decls ++ imp_decls)))
-    })				`thenRn_`
+    returnRn ()
 
+rnStats :: [RenamedHsDecl]	-- Imported decls
+	-> RnMG ()
+rnStats imp_decls
+  = doptRn Opt_D_dump_rn_trace 	`thenRn` \ dump_rn_trace ->
+    doptRn Opt_D_dump_rn_stats 	`thenRn` \ dump_rn_stats ->
+    doptRn Opt_D_dump_rn 	`thenRn` \ dump_rn ->
+    getIfacesRn			`thenRn` \ ifaces ->
+
+    ioToRnM (dumpIfSet (dump_rn_trace || dump_rn_stats || dump_rn)
+		       "Renamer statistics"
+			(getRnStats imp_decls ifaces))	`thenRn_`
     returnRn ()
 \end{code}
 
@@ -1048,11 +1040,6 @@ getRnStats imported_decls ifaces
 %************************************************************************
 
 \begin{code}
-dupFixityDecl rdr_name loc1 loc2
-  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
-	  ptext SLIT("at ") <+> ppr loc1,
-	  ptext SLIT("and") <+> ppr loc2]
-
 badDeprec d
   = sep [ptext SLIT("Illegal deprecation when whole module is deprecated"),
 	 nest 4 (ppr d)]

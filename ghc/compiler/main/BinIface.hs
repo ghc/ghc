@@ -615,6 +615,17 @@ instance (Binary name) => Binary (HsTupCon name) where
 	  ac <- get bh
 	  return (HsTupCon aa ab ac)
 
+instance (Binary name) => Binary (HsTyOp name) where
+    put_ bh HsArrow    = putByte bh 0
+    put_ bh (HsTyOp n) = do putByte bh 1
+			    put_ bh n
+
+    get bh = do h <- getByte bh
+		case h of
+		  0 -> return HsArrow
+		  1 -> do a <- get bh
+		          return (HsTyOp a)
+
 instance (Binary name) => Binary (HsType name) where
     put_ bh (HsForAllTy aa ab ac) = do
 	    putByte bh 0

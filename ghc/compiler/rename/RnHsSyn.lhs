@@ -82,7 +82,8 @@ extractHsTyNames ty
     get (HsFunTy ty1 ty2)      = get ty1 `unionNameSets` get ty2
     get (HsPredTy p)	       = extractHsPredTyNames p
     get (HsOpTy ty1 tycon ty2) = get ty1 `unionNameSets` get ty2 `unionNameSets`
-				 unitNameSet tycon
+				 case tycon of { HsTyOp n -> unitNameSet n ; 
+						 HsArrow  -> emptyNameSet }
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
     get (HsKindSig ty k)       = get ty

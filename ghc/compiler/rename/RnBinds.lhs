@@ -27,7 +27,7 @@ import RnMonad
 import RnTypes		( rnHsSigType, rnHsType )
 import RnExpr		( rnMatch, rnGRHSs, rnPat, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupBndrRn, lookupInstDeclBndr,
-			  lookupSigOccRn, bindPatSigTyVars,
+			  lookupSigOccRn, bindPatSigTyVars, extendNestedFixityEnv,
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
 			)
 import CmdLineOpts	( DynFlag(..) )
@@ -233,7 +233,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
     let
 	fixity_sigs = [(name,sig) | FixSig sig@(FixitySig name _ _) <- siglist ]
     in
-    extendFixityEnv fixity_sigs $
+    extendNestedFixityEnv fixity_sigs $
 
     rn_mono_binds siglist mbinds	   `thenRn` \ (binds, bind_fvs) ->
 

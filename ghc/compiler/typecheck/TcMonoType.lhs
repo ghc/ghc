@@ -18,7 +18,7 @@ module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta, tcHsPred,
 
 #include "HsVersions.h"
 
-import HsSyn		( HsType(..), HsTyVarBndr(..),
+import HsSyn		( HsType(..), HsTyVarBndr(..), HsTyOp(..),
                           Sig(..), HsPred(..), pprParendHsType, HsTupCon(..), hsTyVarNames )
 import RnHsSyn		( RenamedHsType, RenamedHsPred, RenamedContext, RenamedSig, extractHsTyVars )
 import TcHsSyn		( TcId )
@@ -287,10 +287,12 @@ kcHsType (HsFunTy ty1 ty2)
     kcTypeType ty2	`thenTc_`
     returnTc liftedTypeKind
 
-kcHsType (HsNumTy _)		-- The unit type for generics
-  = returnTc liftedTypeKind
+kcHsType (HsOpTy ty1 HsArrow ty2)
+  = kcTypeType ty1	`thenTc_`
+    kcTypeType ty2	`thenTc_`
+    returnTc liftedTypeKind
 
-kcHsType ty@(HsOpTy ty1 op ty2)
+kcHsType ty@(HsOpTy ty1 (HsTyOp op) ty2)
   = kcTyVar op				`thenTc` \ op_kind ->
     kcHsType ty1			`thenTc` \ ty1_kind ->
     kcHsType ty2			`thenTc` \ ty2_kind ->
@@ -298,6 +300,9 @@ kcHsType ty@(HsOpTy ty1 op ty2)
     kcAppKind op_kind  ty1_kind		`thenTc` \ op_kind' ->
     kcAppKind op_kind' ty2_kind
    
+kcHsType (HsNumTy _)		-- The unit type for generics
+  = returnTc liftedTypeKind
+
 kcHsType (HsPredTy pred)
   = kcHsPred pred		`thenTc_`
     returnTc liftedTypeKind
@@ -426,14 +431,19 @@ tc_type (HsFunTy ty1 ty2)
     tc_type ty2			`thenTc` \ tau_ty2 ->
     returnTc (mkFunTy tau_ty1 tau_ty2)
 
-tc_type (HsNumTy n)
-  = ASSERT(n== 1)
-    returnTc (mkTyConApp genUnitTyCon [])
+tc_type (HsOpTy ty1 HsArrow ty2)
+  = tc_type ty1 `thenTc` \ tau_ty1 ->
+    tc_type ty2 `thenTc` \ tau_ty2 ->
+    returnTc (mkFunTy tau_ty1 tau_ty2)
 
-tc_type (HsOpTy ty1 op ty2)
+tc_type (HsOpTy ty1 (HsTyOp op) ty2)
   = tc_type ty1 `thenTc` \ tau_ty1 ->
     tc_type ty2 `thenTc` \ tau_ty2 ->
     tc_fun_type op [tau_ty1,tau_ty2]
+
+tc_type (HsNumTy n)
+  = ASSERT(n== 1)
+    returnTc (mkTyConApp genUnitTyCon [])
 
 tc_type (HsAppTy ty1 ty2) = tc_app ty1 [ty2]
 

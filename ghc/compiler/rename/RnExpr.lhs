@@ -24,12 +24,11 @@ import RdrHsSyn
 import RnHsSyn
 import RnMonad
 import RnEnv
-import RnTypes		( rnHsTypeFVs )
-import RnHiFiles	( lookupFixityRn )
+import RnTypes		( rnHsTypeFVs, precParseErr, sectionPrecErr )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
 import Literal		( inIntRange, inCharRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), IPName(..),
-			  defaultFixity, negateFixity )
+			  defaultFixity, negateFixity, compareFixity )
 import PrelNames	( hasKey, assertIdKey, 
 			  eqClassName, foldrName, buildName, eqStringName,
 			  cCallableClassName, cReturnableClassName, 
@@ -155,8 +154,8 @@ rnPat (RecPatIn con rpats)
     rnRpats rpats	`thenRn` \ (rpats', fvs) ->
     returnRn (RecPatIn con' rpats', fvs `addOneFV` con')
 
-rnPat (TypePatIn name) =
-    rnHsTypeFVs (text "type pattern") name	`thenRn` \ (name', fvs) ->
+rnPat (TypePatIn name)
+  = rnHsTypeFVs (text "type pattern") name	`thenRn` \ (name', fvs) ->
     returnRn (TypePatIn name', fvs)
 \end{code}
 
@@ -444,7 +443,7 @@ rnExpr (HsType a)
   = rnHsTypeFVs doc a	`thenRn` \ (t, fvT) -> 
     returnRn (HsType t, fvT)
   where 
-    doc = text "renaming a type pattern"
+    doc = text "in a type argument"
 
 rnExpr (ArithSeqIn seq)
   = rn_seq seq	 			`thenRn` \ (new_seq, fvs) ->
@@ -811,30 +810,6 @@ checkSectionPrec direction section op arg
 		  (pp_arg_op, arg_fix) section)
 \end{code}
 
-Consider
-\begin{verbatim}
-	a `op1` b `op2` c
-\end{verbatim}
-@(compareFixity op1 op2)@ tells which way to arrange appication, or
-whether there's an error.
-
-\begin{code}
-compareFixity :: Fixity -> Fixity
-	      -> (Bool,		-- Error please
-		  Bool)		-- Associate to the right: a op1 (b op2 c)
-compareFixity (Fixity prec1 dir1) (Fixity prec2 dir2)
-  = case prec1 `compare` prec2 of
-	GT -> left
-	LT -> right
-	EQ -> case (dir1, dir2) of
-			(InfixR, InfixR) -> right
-			(InfixL, InfixL) -> left
-			_		 -> error_please
-  where
-    right	 = (False, True)
-    left         = (False, False)
-    error_please = (True,  False)
-\end{code}
 
 %************************************************************************
 %*									*
@@ -932,24 +907,12 @@ mkAssertExpr =
 
 \begin{code}
 ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
-ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 pp_prefix_minus = ptext SLIT("prefix `-'")
 
 dupFieldErr str (dup:rest)
   = hsep [ptext SLIT("duplicate field name"), 
           quotes (ppr dup),
 	  ptext SLIT("in record"), text str]
-
-precParseErr op1 op2 
-  = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
-	       ppr_opfix op2,
-	       ptext SLIT("in the same infix expression")])
-
-sectionPrecErr op arg_op section
- = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
-	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
-	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
 
 nonStdGuardErr guard
   = hang (ptext

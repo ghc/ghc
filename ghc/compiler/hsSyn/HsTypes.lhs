@@ -5,7 +5,7 @@
 
 \begin{code}
 module HsTypes (
-	  HsType(..), HsTyVarBndr(..),
+	  HsType(..), HsTyVarBndr(..), HsTyOp(..),
 	, HsContext, HsPred(..)
 	, HsTupCon(..), hsTupParens, mkHsTupCon,
         , hsUsOnce, hsUsMany
@@ -102,9 +102,9 @@ data HsType name
 
   | HsTupleTy		(HsTupCon name)
 			[HsType name]	-- Element types (length gives arity)
-  -- Generics
-  | HsOpTy		(HsType name) name (HsType name)
-  | HsNumTy             Integer
+
+  | HsOpTy		(HsType name) (HsTyOp name) (HsType name)
+  | HsNumTy             Integer		-- Generics only
 
   -- these next two are only used in interfaces
   | HsPredTy		(HsPred name)
@@ -112,6 +112,11 @@ data HsType name
   | HsKindSig		(HsType name)	-- (ty :: kind)
 			Kind		-- A type with a kind signature
 
+
+data HsTyOp name = HsArrow | HsTyOp name
+	-- Function arrows from *source* get read in as HsOpTy t1 HsArrow t2
+	-- But when we generate or parse interface files, we use HsFunTy.
+	-- This keeps interfaces a bit smaller, because there are a lot of arrows
 
 -----------------------
 hsUsOnce, hsUsMany :: HsType RdrName
@@ -208,6 +213,10 @@ NB: these types get printed into interface files, so
 \begin{code}
 instance (Outputable name) => Outputable (HsType name) where
     ppr ty = pprHsType ty
+
+instance (Outputable name) => Outputable (HsTyOp name) where
+    ppr HsArrow    = ftext FSLIT("->")
+    ppr (HsTyOp n) = ppr n
 
 instance (Outputable name) => Outputable (HsTyVarBndr name) where
     ppr (UserTyVar name)       = ppr name
@@ -475,10 +484,14 @@ eq_hsType env (HsPredTy p1) (HsPredTy p2)
   = eq_hsPred env p1 p2
 
 eq_hsType env (HsOpTy lty1 op1 rty1) (HsOpTy lty2 op2 rty2)
-  = eq_hsVar env op1 op2 && eq_hsType env lty1 lty2 && eq_hsType env rty1 rty2
+  = eq_hsOp env op1 op2 && eq_hsType env lty1 lty2 && eq_hsType env rty1 rty2
 
 eq_hsType env ty1 ty2 = False
 
+
+eq_hsOp env (HsTyOp n1) (HsTyOp n2) = eq_hsVar env n1 n2
+eq_hsOp env HsArrow     HsArrow     = True
+eq_hsOp env op1		op2	    = False
 
 -------------------
 eq_hsContext env a b = eqListBy (eq_hsPred env) a b

@@ -182,12 +182,7 @@ isCmdLineMode CmdLineMode = True
 isCmdLineMode _ = False
 \end{code}
 
-%===================================================
-\subsubsection{		ENVIRONMENTS}
-%===================================================
-
 \begin{code}
---------------------------------
 type LocalFixityEnv = NameEnv RenamedFixitySig
 	-- We keep the whole fixity sig so that we
 	-- can report line-number info when there is a duplicate
@@ -195,13 +190,8 @@ type LocalFixityEnv = NameEnv RenamedFixitySig
 
 emptyLocalFixityEnv :: LocalFixityEnv
 emptyLocalFixityEnv = emptyNameEnv
-
-lookupLocalFixity :: LocalFixityEnv -> Name -> Fixity
-lookupLocalFixity env name
-  = case lookupNameEnv env name of 
-	Just (FixitySig _ fix _) -> fix
-	Nothing		  	 -> defaultFixity
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -731,13 +721,9 @@ getFixityEnv :: RnMS LocalFixityEnv
 getFixityEnv rn_down (SDown {rn_fixenv = fixity_env})
   = return fixity_env
 
-extendFixityEnv :: [(Name, RenamedFixitySig)] -> RnMS a -> RnMS a
-extendFixityEnv fixes enclosed_scope
-	        rn_down l_down@(SDown {rn_fixenv = fixity_env})
-  = let
-	new_fixity_env = extendNameEnvList fixity_env fixes
-    in
-    enclosed_scope rn_down (l_down {rn_fixenv = new_fixity_env})
+setFixityEnv :: LocalFixityEnv -> RnMS a -> RnMS a
+setFixityEnv fixes enclosed_scope rn_down l_down
+  = enclosed_scope rn_down (l_down {rn_fixenv = fixes})
 \end{code}
 
 %================

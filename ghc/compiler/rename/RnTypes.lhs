@@ -4,14 +4,15 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-module RnTypes (  rnHsType, rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs, rnContext ) where
+module RnTypes (  rnHsType, rnHsSigType, rnHsTypeFVs, rnHsSigTypeFVs, 
+		  rnContext, precParseErr, sectionPrecErr ) where
 
-import CmdLineOpts	( DynFlag(Opt_WarnMisc, Opt_WarnUnusedMatches) )
+import CmdLineOpts	( DynFlag(Opt_WarnMisc, Opt_WarnUnusedMatches, Opt_GlasgowExts) )
 
 import HsSyn
 import RdrHsSyn	( RdrNameContext, RdrNameHsType, extractHsTyRdrTyVars, extractHsCtxtRdrTyVars )
 import RnHsSyn	( RenamedContext, RenamedHsType, extractHsTyNames, tupleTyCon_name )
-import RnEnv	( lookupOccRn, newIPName, bindTyVarsRn )
+import RnEnv	( lookupOccRn, newIPName, bindTyVarsRn, lookupFixityRn )
 import RnMonad
 
 import PrelInfo	( cCallishClassKeys )
@@ -19,6 +20,7 @@ import RdrName	( elemRdrEnv )
 import NameSet	( FreeVars )
 import Unique	( Uniquable(..) )
 
+import BasicTypes	( compareFixity, arrowFixity )
 import List		( nub )
 import ListSetOps	( removeDupsEq )
 import Outputable
@@ -97,11 +99,17 @@ rnHsType doc (HsTyVar tyvar)
   = lookupOccRn tyvar 		`thenRn` \ tyvar' ->
     returnRn (HsTyVar tyvar')
 
-rnHsType doc (HsOpTy ty1 opname ty2)
-  = lookupOccRn opname	`thenRn` \ name' ->
-    rnHsType doc ty1	`thenRn` \ ty1' ->
-    rnHsType doc ty2	`thenRn` \ ty2' -> 
-    returnRn (HsOpTy ty1' name' ty2')
+rnHsType doc (HsOpTy ty1 op ty2)
+  = (case op of
+	HsArrow  -> returnRn HsArrow
+	HsTyOp n -> lookupOccRn n    `thenRn` \ n' ->
+		    returnRn (HsTyOp n')
+    )				`thenRn` \ op' ->
+    rnHsType doc ty1		`thenRn` \ ty1' ->
+    rnHsType doc ty2		`thenRn` \ ty2' -> 
+    lookupTyFixityRn op'	`thenRn` \ fix ->
+    mkHsOpTyRn op' fix ty1' ty2'
+
 
 rnHsType doc (HsNumTy i)
   | i == 1    = returnRn (HsNumTy i)
@@ -151,6 +159,7 @@ rnHsType doc (HsPredTy pred)
 rnHsTypes doc tys = mapRn (rnHsType doc) tys
 \end{code}
 
+
 \begin{code}
 rnForAll doc forall_tyvars ctxt ty
   = bindTyVarsRn doc forall_tyvars	$ \ new_tyvars ->
@@ -158,6 +167,69 @@ rnForAll doc forall_tyvars ctxt ty
     rnHsType doc ty			`thenRn` \ new_ty ->
     returnRn (mkHsForAllTy (Just new_tyvars) new_ctxt new_ty)
 \end{code}
+
+
+%*********************************************************
+%*							*
+\subsection{Fixities}
+%*							*
+%*********************************************************
+
+Infix types are read in a *right-associative* way, so that
+	a `op` b `op` c
+is always read in as
+	a `op` (b `op` c)
+
+mkHsOpTyRn rearranges where necessary.  The two arguments
+have already been renamed and rearranged.  It's made rather tiresome
+by the presence of ->
+
+\begin{code}
+lookupTyFixityRn HsArrow    = returnRn arrowFixity
+lookupTyFixityRn (HsTyOp n) 
+  = doptRn Opt_GlasgowExts 			`thenRn` \ glaExts ->
+    warnCheckRn glaExts (infixTyConWarn n)	`thenRn_`
+    lookupFixityRn n
+
+-- Building (ty1 `op1` (ty21 `op2` ty22))
+mkHsOpTyRn :: HsTyOp Name -> Fixity 
+	   -> RenamedHsType -> RenamedHsType 
+	   -> RnMS RenamedHsType
+
+mkHsOpTyRn op1 fix1 ty1 ty2@(HsOpTy ty21 op2 ty22)
+  = lookupTyFixityRn op2		`thenRn` \ fix2 ->
+    let
+	(nofix_error, associate_right) = compareFixity fix1 fix2
+    in
+    if nofix_error then
+	addErrRn (precParseErr (quotes (ppr op1),fix1) 
+			       (quotes (ppr op2),fix2))	`thenRn_`
+	returnRn (HsOpTy ty1 op1 ty2)
+    else 
+    if not associate_right then
+	-- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
+	mkHsOpTyRn op1 fix1 ty1 ty21		`thenRn` \ new_ty ->
+	returnRn (HsOpTy new_ty op2 ty22)
+    else
+    returnRn (HsOpTy ty1 op1 ty2)
+
+mkHsOpTyRn op fix ty1 ty2 			-- Default case, no rearrangment
+  = ASSERT( not_op_ty ty1 )
+    returnRn (HsOpTy ty1 op ty2)
+
+mkHsFunTyRn ty1 ty2			-- Precedence of function arrow is 0
+  = returnRn (HsFunTy ty1 ty2)		-- so no rearrangement reqd.  Change
+					-- this if fixity of -> increases.
+
+not_op_ty (HsOpTy _ _ _) = False
+not_op_ty other   	 = True
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Contexts and predicates}
+%*							*
+%*********************************************************
 
 \begin{code}
 rnContext :: SDoc -> RdrNameContext -> RnMS RenamedContext
@@ -201,6 +273,13 @@ rnPred doc (HsIParam n ty)
     returnRn (HsIParam name ty')
 \end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Errors}
+%*							*
+%*********************************************************
+
 \end{code}
 \begin{code}
 forAllWarn doc ty tyvar
@@ -230,4 +309,20 @@ dupClassAssertWarn ctxt (assertion : dups)
 naughtyCCallContextErr (HsClassP clas _)
   = sep [ptext SLIT("Can't use class") <+> quotes (ppr clas), 
 	 ptext SLIT("in a context")]
+
+precParseErr op1 op2 
+  = hang (ptext SLIT("precedence parsing error"))
+      4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
+	       ppr_opfix op2,
+	       ptext SLIT("in the same infix expression")])
+
+sectionPrecErr op arg_op section
+ = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
+	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
+	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
+
+infixTyConWarn op
+  = ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op)
+
+ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 \end{code}

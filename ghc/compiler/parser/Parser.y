@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.97 2002/05/10 13:34:18 simonpj Exp $
+$Id: Parser.y,v 1.98 2002/05/27 15:28:08 simonpj Exp $
 
 Haskell grammar.
 
@@ -48,24 +48,16 @@ import Outputable
 -----------------------------------------------------------------------------
 Conflicts: 21 shift/reduce, -=chak[4Feb2]
 
-9 for abiguity in 'if x then y else z + 1'
+11 for abiguity in 'if x then y else z + 1'		[State 128]
 	(shift parses as 'if x then y else (z + 1)', as per longest-parse rule)
 	8 because op might be: - ! * . `x` VARSYM CONSYM QVARSYM QCONSYM
-1 for ambiguity in 'if x then y else z :: T'
-	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
-1 for ambiguity in 'if x then y else z with ?x=3'
-	(shift parses as 'if x then y else (z with ?x=3)'
 
-3 for ambiguity in 'case x of y :: a -> b'
-	(don't know whether to reduce 'a' as a btype or shift the '->'.
-	 conclusion:  bogus expression anyway, doesn't matter)
-
-1 for ambiguity in '{-# RULES "name" [ ... #-}
+1 for ambiguity in '{-# RULES "name" [ ... #-}		[State 210]
 	we don't know whether the '[' starts the activation or not: it
   	might be the start of the declaration with the activation being
 	empty.  --SDM 1/4/2002
 
-1 for ambiguity in '{-# RULES "name" forall = ... #-}' 
+1 for ambiguity in '{-# RULES "name" forall = ... #-}' 	[State 412]
 	since 'forall' is a valid variable name, we don't know whether
 	to treat a forall on the input as the beginning of a quantifier
 	or the beginning of the rule itself.  Resolving to shift means
@@ -73,13 +65,28 @@ Conflicts: 21 shift/reduce, -=chak[4Feb2]
 	This saves explicitly defining a grammar for the rule lhs that
 	doesn't include 'forall'.
 
-1 for ambiguity in 'let ?x ...'
+1 for ambiguity in 'let ?x ...'				[State 278]
 	the parser can't tell whether the ?x is the lhs of a normal binding or
 	an implicit binding.  Fortunately resolving as shift gives it the only
 	sensible meaning, namely the lhs of an implicit binding.
 
-6 for conflicts between `fdecl' and `fdeclDEPRECATED', which are resolved
-  correctly, and moreover, should go away when `fdeclDEPRECATED' is removed.
+
+8 for ambiguity in 'e :: a `b` c'.  Does this mean 	[States 238,267]
+	(e::a) `b` c, or 
+	(e :: (a `b` c))
+
+6 for conflicts between `fdecl' and `fdeclDEPRECATED', 	[States 402,403]
+  which are resolved correctly, and moreover, 
+  should go away when `fdeclDEPRECATED' is removed.
+
+1 for ambiguity in 'if x then y else z :: T'
+	(shift parses as 'if x then y else (z :: T)', as per longest-parse rule)
+1 for ambiguity in 'if x then y else z with ?x=3'
+	(shift parses as 'if x then y else (z with ?x=3)'
+3 for ambiguity in 'case x of y :: a -> b'
+	(don't know whether to reduce 'a' as a btype or shift the '->'.
+	 conclusion:  bogus expression anyway, doesn't matter)
+
 
 -----------------------------------------------------------------------------
 -}
@@ -407,12 +414,13 @@ topdecls :: { [RdrBinding] }
 	| topdecl			{ [$1] }
 
 topdecl :: { RdrBinding }
- 	: srcloc 'type' tycon tv_bndrs '=' ctype	
+ 	: srcloc 'type' syn_hdr '=' ctype	
 		-- Note ctype, not sigtype.
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
 		-- Instead we just say b is out of scope
- 		{ RdrHsDecl (TyClD (TySynonym $3 $4 $6 $1)) }
+ 		{ let (tc,tvs) = $3
+		  in RdrHsDecl (TyClD (TySynonym tc tvs $5 $1)) }
 
 
 	| srcloc 'data' tycl_hdr constrs deriving
@@ -442,6 +450,11 @@ topdecl :: { RdrBinding }
 	| '{-# RULES' rules '#-}'		 	{ $2 }
       	| decl						{ $1 }
 
+syn_hdr :: { (RdrName, [RdrNameHsTyVar]) }	-- We don't retain the syntax of an infix
+						-- type synonym declaration. Oh well.
+	: tycon tv_bndrs		{ ($1, $2) }
+	| tv_bndr tyconop tv_bndr 	{ ($2, [$1,$3]) }
+
 -- tycl_hdr parses the header of a type or class decl,
 -- which takes the form
 --	T a b
@@ -449,6 +462,12 @@ topdecl :: { RdrBinding }
 --	(Eq a, Ord b) => T a b
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
+	: context '=>' type		{% checkTyClHdr $3	`thenP` \ (tc,tvs) ->
+					   returnP ($1, tc, tvs) }
+	| type				{% checkTyClHdr $1	`thenP` \ (tc,tvs) ->
+					   returnP ([], tc, tvs) }
+
+{-
 	: '(' comma_types1 ')' '=>' gtycon tv_bndrs
 		{% mapP checkPred $2	`thenP` \ cxt ->
 		  returnP (cxt, $5, $6) }
@@ -476,6 +495,15 @@ tycl_hdr :: { (RdrNameContext, RdrName, [RdrNameHsTyVar]) }
 		-- the Prelude modules.  (So, it would be a good idea to raise
 		-- an error in the renamer if some non-H98 form is used and
 		-- -fglasgow-exts is not given.)  -=chak 
+
+atypes0	:: { [RdrNameHsType] }
+	: atypes1			{ $1 }
+	| {- empty -}			{ [] }
+
+atypes1	:: { [RdrNameHsType] }
+	: atype				{ [$1] }
+	| atype atypes1			{ $1 : $2 }
+-}
 
 decls 	:: { [RdrBinding] }
 	: decls ';' decl		{ $3 : $1 }
@@ -760,14 +788,13 @@ context :: { RdrNameContext }
 	: btype 			{% checkContext $1 }
 
 type :: { RdrNameHsType }
-	: gentype '->' type		{ HsFunTy $1 $3 }
-	| ipvar '::' type		{ mkHsIParamTy $1 $3 }
+	: ipvar '::' gentype		{ mkHsIParamTy $1 $3 }
 	| gentype			{ $1 }
 
 gentype :: { RdrNameHsType }
         : btype                         { $1 }
--- Generics
-        | atype tyconop atype           { HsOpTy $1 $2 $3 }
+        | btype qtyconop gentype        { HsOpTy $1 (HsTyOp $2) $3 }
+	| btype '->' gentype		{ HsOpTy $1 HsArrow $3 }
 
 btype :: { RdrNameHsType }
 	: btype atype			{ HsAppTy $1 $2 }
@@ -799,14 +826,6 @@ comma_types0  :: { [RdrNameHsType] }
 comma_types1	:: { [RdrNameHsType] }
 	: type				{ [$1] }
 	| type  ',' comma_types1	{ $1 : $3 }
-
-atypes0	:: { [RdrNameHsType] }
-	: atypes1			{ $1 }
-	| {- empty -}			{ [] }
-
-atypes1	:: { [RdrNameHsType] }
-	: atype				{ [$1] }
-	| atype atypes1			{ $1 : $2 }
 
 tv_bndrs :: { [RdrNameHsTyVar] }
 	 : tv_bndr tv_bndrs		{ $1 : $2 }
@@ -1009,11 +1028,7 @@ aexp1	:: { RdrNameHsExpr }
         : aexp1 '{' fbinds '}' 			{% (mkRecConstrOrUpdate $1 
 							(reverse $3)) }
   	| aexp2					{ $1 }
-
--- Here was the syntax for type applications that I was planning
--- but there are difficulties (e.g. what order for type args)
--- so it's not enabled yet.
--- 	| var_or_con '{|' gentype '|}'          { (HsApp $1 (HsType $3)) }
+ 	| var_or_con '{|' gentype '|}'          { HsApp $1 (HsType $3) }
 
 
 var_or_con :: { RdrNameHsExpr }
@@ -1273,6 +1288,26 @@ qconop :: { RdrName }
 	| '`' qconid '`'	{ $2 }
 
 -----------------------------------------------------------------------------
+-- Type constructors
+
+tycon 	:: { RdrName }	-- Unqualified
+	: CONID			{ mkUnqual tcClsName $1 }
+
+tyconop	:: { RdrName }	-- Unqualified
+	: CONSYM		{ mkUnqual tcClsName $1 }
+	| '`' tyvar '`'		{ $2 }
+	| '`' tycon '`'		{ $2 }
+
+qtycon :: { RdrName }	-- Qualified or unqualified
+	: QCONID		{ mkQual tcClsName $1 }
+	| tycon			{ $1 }
+
+qtyconop :: { RdrName }	-- Qualified or unqualified
+	  : QCONSYM		{ mkQual tcClsName $1 }
+	  | '`' QCONID '`'	{ mkQual tcClsName $2 }
+	  | tyconop		{ $1 }
+
+-----------------------------------------------------------------------------
 -- Any operator
 
 op	:: { RdrName }   -- used in infix decls
@@ -1327,27 +1362,7 @@ special_id
 	| 'ccall'               { FSLIT("ccall") }
 
 -----------------------------------------------------------------------------
--- ConIds
-
-qconid :: { RdrName }	-- Qualified or unqualifiedb
-	: conid			{ $1 }
-	| QCONID		{ mkQual dataName $1 }
-
-conid 	:: { RdrName }
-	: CONID			{ mkUnqual dataName $1 }
-
------------------------------------------------------------------------------
--- ConSyms
-
-qconsym :: { RdrName }	-- Qualified or unqualifiedb
-	: consym		{ $1 }
-	| QCONSYM		{ mkQual dataName $1 }
-
-consym :: { RdrName }
-	: CONSYM		{ mkUnqual dataName $1 }
-
------------------------------------------------------------------------------
--- VarSyms
+-- Variables 
 
 qvarsym :: { RdrName }
 	: varsym		{ $1 }
@@ -1374,6 +1389,24 @@ special_sym :: { UserFS }
 special_sym : '!'	{ FSLIT("!") }
 	    | '.' 	{ FSLIT(".") }
  	    | '*' 	{ FSLIT("*") }
+
+-----------------------------------------------------------------------------
+-- Data constructors
+
+qconid :: { RdrName }	-- Qualified or unqualifiedb
+	: conid			{ $1 }
+	| QCONID		{ mkQual dataName $1 }
+
+conid 	:: { RdrName }
+	: CONID			{ mkUnqual dataName $1 }
+
+qconsym :: { RdrName }	-- Qualified or unqualified
+	: consym		{ $1 }
+	| QCONSYM		{ mkQual dataName $1 }
+
+consym :: { RdrName }
+	: CONSYM		{ mkUnqual dataName $1 }
+
 
 -----------------------------------------------------------------------------
 -- Literals
@@ -1410,20 +1443,6 @@ modid 	:: { ModuleName }
 				     (unpackFS (fst $1) ++ 
 					'.':unpackFS (snd $1)))
 				}
-
-tycon 	:: { RdrName }
-	: CONID			{ mkUnqual tcClsName $1 }
-
-tyconop	:: { RdrName }
-	: CONSYM		{ mkUnqual tcClsName $1 }
-
-qtycon :: { RdrName }	-- Qualified or unqualified
-	: QCONID		{ mkQual tcClsName $1 }
-	| tycon			{ $1 }
-
-qtyconop :: { RdrName }	-- Qualified or unqualified
-	  : QCONSYM		{ mkQual tcClsName $1 }
-	  | tyconop		{ $1 }
 
 commas :: { Int }
 	: commas ','			{ $1 + 1 }

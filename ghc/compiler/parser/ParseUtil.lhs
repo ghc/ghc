@@ -28,6 +28,7 @@ module ParseUtil (
 	, checkContext	      -- HsType -> P HsContext
 	, checkPred	      -- HsType -> P HsPred
 	, checkTyVars	      -- [HsTyVar] -> P [HsType]
+	, checkTyClHdr	      -- HsType -> (name,[tyvar])
 	, checkInstType	      -- HsType -> P HsType
 	, checkPattern	      -- HsExp -> P HsPat
 	, checkPatterns	      -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -116,6 +117,23 @@ checkTyVars tvs = mapP chk tvs
 		  chk (HsKindSig (HsTyVar tv) k) = returnP (IfaceTyVar tv k)
 		  chk (HsTyVar tv) 	         = returnP (UserTyVar tv)
 		  chk other	 		 = parseError "Type found where type variable expected"
+
+checkTyClHdr :: RdrNameHsType -> P (RdrName, [RdrNameHsTyVar])
+-- The header of a type or class decl should look like
+--	(C a, D b) => T a b
+-- or	T a b
+-- or	a + b
+-- etc
+checkTyClHdr ty
+  = go ty []
+  where
+    go (HsTyVar tc) acc 
+	| not (isRdrTyVar tc) = checkTyVars acc		`thenP` \ tvs ->
+				returnP (tc, tvs)
+    go (HsOpTy t1 (HsTyOp tc) t2) acc  = checkTyVars (t1:t2:acc)	`thenP` \ tvs ->
+				         returnP (tc, tvs)
+    go (HsAppTy t1 t2) acc    = go t1 (t2:acc)
+    go other	       acc    = parseError "Malformed LHS to type of class declaration"
 
 checkContext :: RdrNameHsType -> P RdrNameContext
 checkContext (HsTupleTy _ ts) 	-- (Eq a, Ord b) shows up as a tuple type

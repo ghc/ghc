@@ -9,8 +9,6 @@ module RnHiFiles (
 	tryLoadInterface, loadOrphanModules,
 	loadExports, loadFixDecls, loadDeprecs,
 
-	lookupFixityRn, 
-
 	getTyClDeclBinders
    ) where
 
@@ -34,7 +32,7 @@ import HsSyn		( TyClDecl(..), InstDecl(..), RuleDecl(..),
 			)
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl )
 import RnHsSyn		( extractHsTyNames_s )
-import BasicTypes	( Version, defaultFixity )
+import BasicTypes	( Version )
 import RnTypes		( rnHsType )
 import RnEnv
 import RnMonad
@@ -48,7 +46,7 @@ import NameSet
 import Module
 import RdrName		( rdrNameOcc )
 import SrcLoc		( mkSrcLoc )
-import Maybes		( maybeToBool, orElse )
+import Maybes		( maybeToBool )
 import StringBuffer     ( hGetStringBuffer )
 import FastString	( mkFastString )
 import ErrUtils         ( Message )
@@ -610,58 +608,6 @@ myTry = Exception.tryAllIO
 myTry = Exception.try
 #endif
 \end{code}
-
-%*********************************************************
-%*							*
-\subsection{Looking up fixities}
-%*							*
-%*********************************************************
-
-@lookupFixityRn@ has to be in RnIfaces (or RnHiFiles), instead of
-its obvious home in RnEnv,  because it calls @loadHomeInterface@.
-
-lookupFixity is a bit strange.  
-
-* Nested local fixity decls are put in the local fixity env, which we
-  find with getFixtyEnv
-
-* Imported fixities are found in the HIT or PIT
-
-* Top-level fixity decls in this module may be for Names that are
-    either  Global	   (constructors, class operations)
-    or 	    Local/Exported (everything else)
-  (See notes with RnNames.getLocalDeclBinders for why we have this split.)
-  We put them all in the local fixity environment
-
-\begin{code}
-lookupFixityRn :: Name -> RnMS Fixity
-lookupFixityRn name
-  = getModuleRn				`thenRn` \ this_mod ->
-    if nameIsLocalOrFrom this_mod name
-    then	-- It's defined in this module
-	getFixityEnv			`thenRn` \ local_fix_env ->
-	returnRn (lookupLocalFixity local_fix_env name)
-
-    else	-- It's imported
-      -- For imported names, we have to get their fixities by doing a
-      -- loadHomeInterface, and consulting the Ifaces that comes back
-      -- from that, because the interface file for the Name might not
-      -- have been loaded yet.  Why not?  Suppose you import module A,
-      -- which exports a function 'f', thus;
-      --        module CurrentModule where
-      --	  import A( f )
-      -- 	module A( f ) where
-      --	  import B( f )
-      -- Then B isn't loaded right away (after all, it's possible that
-      -- nothing from B will be used).  When we come across a use of
-      -- 'f', we need to know its fixity, and it's then, and only
-      -- then, that we load B.hi.  That is what's happening here.
-  	loadHomeInterface doc name		`thenRn` \ iface ->
-	returnRn (lookupNameEnv (mi_fixities iface) name `orElse` defaultFixity)
-  where
-    doc      = ptext SLIT("Checking fixity for") <+> ppr name
-\end{code}
-
 
 %*********************************************************
 %*						 	 *
