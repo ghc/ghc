@@ -41,40 +41,48 @@ endif
 # this case.
 ifneq "$(BootingFromHc)" "YES"
 
-%.$(way_)o : %.hs
+# The $(odir) support is for building GHC, where we need to build three
+# different versions from the same sources.  See ghc/compiler/Makefile.
+ifneq "$(odir)" ""
+odir_ = $(odir)/
+else
+odir_ =
+endif
+
+$(odir_)%.$(way_)o : %.hs
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@
+	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi
 	$(HC_POST_OPTS)
 
-%.$(way_)o : %.lhs	 
+$(odir_)%.$(way_)o : %.lhs	 
 	$(HC_PRE_OPTS)
-	$(HC) $(HC_OPTS) -c $< -o $@
+	$(HC) $(HC_OPTS) -c $< -o $@  -ohi $(basename $@).$(way_)hi
 	$(HC_POST_OPTS)
 
-%.$(way_)hc : %.lhs	 
+$(odir_)%.$(way_)hc : %.lhs	 
 	$(RM) $@
 	$(HC) $(HC_OPTS) -C $< -o $@
 
-%.$(way_)hc : %.hs	 
+$(odir_)%.$(way_)hc : %.hs	 
 	$(RM) $@
 	$(HC) $(HC_OPTS) -C $< -o $@
 
-%.$(way_)o : %.$(way_)hc 
+$(odir_)%.$(way_)o : %.$(way_)hc 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
-%.$(way_)o : %.hc 
+$(odir_)%.$(way_)o : %.hc 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -c $< -o $@
 	$(HC_POST_OPTS)
 
-%.$(way_)s : %.$(way_)hc 
+$(odir_)%.$(way_)s : %.$(way_)hc 
 	$(HC_PRE_OPTS)
 	$(HC) $(HC_OPTS) -S $< -o $@
 	$(HC_POST_OPTS)
 
-%.$(way_)hc : %.lhc
+$(odir_)%.$(way_)hc : %.lhc
 	@$(RM) $@
 	$(UNLIT) $< $@
 	@chmod 444 $@
@@ -95,7 +103,7 @@ ifneq "$(BootingFromHc)" "YES"
 	else exit 0 ; \
 	fi							
 
-%.$(way_)hi : %.$(way_)hc
+$(odir_)%.$(way_)hi : %.$(way_)hc
 	@if [ ! -f $@ ] ; then \
 	    echo Panic! $< exists, but $@ does not.; \
 	    exit 1; \
@@ -151,37 +159,37 @@ endif
 
 ifeq "$(UseGhcForCc)" "YES"
 
-%.$(way_)o : %.$(way_)s
+$(odir_)%.$(way_)o : %.$(way_)s
 	@$(RM) $@
 	$(HC) $(GHC_CC_OPTS) -c $< -o $@
 
-%.$(way_)o : %.c
+$(odir_)%.$(way_)o : %.c
 	@$(RM) $@
 	$(HC) $(GHC_CC_OPTS) -c $< -o $@
 
-%.$(way_)o : %.S
+$(odir_)%.$(way_)o : %.S
 	@$(RM) $@
 	$(HC) $(GHC_CC_OPTS) -c $< -o $@
 
-%.$(way_)s : %.c
+$(odir_)%.$(way_)s : %.c
 	@$(RM) $@
 	$(HC) $(GHC_CC_OPTS) -S $< -o $@
 
 else
 
-%.$(way_)o : %.$(way_)s
+$(odir_)%.$(way_)o : %.$(way_)s
 	@$(RM) $@
 	$(AS) $(AS_OPTS) -o $@ $<
 
-%.$(way_)o : %.c
+$(odir_)%.$(way_)o : %.c
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -c $< -o $@
 
-%.$(way_)o : %.S
+$(odir_)%.$(way_)o : %.S
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -c $< -o $@
 
-%.$(way_)s : %.c
+$(odir_)%.$(way_)s : %.c
 	@$(RM) $@
 	$(CC) $(CC_OPTS) -S $< -o $@
 

@@ -646,6 +646,9 @@ MKDEPENDHS	= $(GHC)
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
 GHC_INPLACE 	= $(FPTOOLS_TOP)/ghc/compiler/ghc-inplace
+GHC_STAGE1 	= $(FPTOOLS_TOP)/ghc/compiler/stage1/ghc-inplace
+GHC_STAGE2 	= $(FPTOOLS_TOP)/ghc/compiler/stage2/ghc-inplace
+GHC_STAGE3 	= $(FPTOOLS_TOP)/ghc/compiler/stage3/ghc-inplace
 
 #-----------------------------------------------------------------------------
 # C compiler

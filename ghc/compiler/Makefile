@@ -1,5 +1,19 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.224 2002/10/09 15:03:48 simonpj Exp $
+# Main ghc/compiler Makefile
+
+# Targets:
+#
+#	all	builds stage1 compiler
+#
+#	boot stage=N   generate build dirs and dependencies for stage N.
+#		       NB. Must be done before 'make stageN'.
+#		       NB. Cannot 'make boot stage=2' until stage1 has
+#		           been built (similarly for stage3).
+#
+#	stage1  (or stage=1) builds stage1 compiler
+#	stage2  (or stage=2) builds stage2 compiler
+#	stage3  (or stage=3) builds stage3 compiler
+#
 
 TOP = ..
 
@@ -11,13 +25,117 @@ endif
 
 include $(TOP)/mk/boilerplate.mk
 
+#-----------------------------------------------------------------------------
+# Counting source code lines
+
 USER_SRCS = $(filter-out $(DERIVED_SRCS),$(SRCS))
 count :
 	./count_lines $(USER_SRCS)
 
 #-----------------------------------------------------------------------------
 # Building ghc different ways (default is just `normal' sequential)
+
 WAYS=$(GhcCompilerWays)
+
+# -----------------------------------------------------------------------------
+# Bootstrapping
+
+# The stage1/stage2/stage3 business is quite delicate.  Here's how it works:
+# 
+#  - the variable $(stage) holds the current stage number.  To build a 
+#    particular stage, you say 'make stage=N' where N is 1, 2, or 3.
+#    N defaults to 1.
+#
+#  - for stage N, object files and .hi files are placed inside 
+#    the directory stageN, in subdirectories as per the sources.
+#
+#  - .hi-boot files are *linked* into the stageN tree, because in GHC 5.05+
+#    the .hi-boot file must reside in the same place as the .hi file.
+#
+#  - we use explicit -o and -ohi options to direct the output from C & 
+#    Haskell compilations.
+#
+#  - we generate a different .depend file for each build.  They need to be
+#    different, because each stage might include different files: stage1
+#    might not include GHCi, for example.  For each stage, a normal .depend
+#    file is generated, and then post-processed to add the correct stageN/
+#    prefix to each object and .hi filename.  The resulting .depend file
+#    is named .depend-$(stage).  See the end of this Makefile for details.
+#
+#  - normal implicit rules don't work any more, because they're of the form
+#
+#        %.o : %.hs 
+#
+#    whereas we really need 
+#
+#	 stageN/%.o : %.hs
+#
+#    so suffix.mk now defines the appropriate suffix rules when
+#    $(odir) is set to a non-empty value.  Here we set $(odir) to
+#    stage1, stage2, or stage3.
+#
+#  There are other plausible designs that might work, but each has different
+#  problems:
+#
+#  - using -odir and -hidir: GHC <= 4.08 doesn't support -hidir, and
+#    anyway -odir puts all the objects in one directory (strips off the
+#    subdirectory part), which eventually forces us to use VPATH to find
+#    the sources.  I have a really bad feeling about VPATH.
+#
+#  - invoke make in the stageN subdirectory.  This probably requires VPATH
+#    too.
+#
+#  - create a link tree.  The problem with requiring link trees is that 
+#    Windows doesn't support symbolic links.
+
+boot ::
+	$(MKDIRHIER) stage$(stage)
+	for i in $(ALL_DIRS); do \
+	    $(MKDIRHIER) stage$(stage)/$$i; \
+	done
+	for i in */*hi-boot*; do \
+	    $(LN_S) -f ../../$$i stage$(stage)/$$i; \
+	done
+
+ifeq "$(stage)" ""
+stage=1
+endif
+
+ifeq "$(stage)" "1"
+HC=$(GHC)
+endif
+
+ifeq "$(stage)" "2"
+HC=$(GHC_STAGE1)
+endif
+
+ifeq "$(stage)" "3"
+HC=$(GHC_STAGE2)
+endif
+
+stage1 :
+	$(MAKE) stage=1
+
+stage2 : 
+	$(MAKE) stage=2
+
+stage3 : 
+	$(MAKE) stage=3
+
+odir=stage$(stage)
+
+SRC_HC_OPTS += $(patsubst %, -i$(odir)/%, $(ALL_DIRS))
+
+HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
+C_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(C_SRCS))))
+
+CLEAN_FILES += $(odir)/*/*.hi
+
+ifeq "$(stage)" "1"
+mostlyclean clean distclean maintainer-clean ::
+	$(MAKE) $@ stage=2
+	$(MAKE) $@ stage=3
+endif
 
 # -----------------------------------------------------------------------------
 #		Set HS_PROG
@@ -30,12 +148,12 @@ WAYS=$(GhcCompilerWays)
 #
 ifneq "$(way)" "dll"
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-HS_PROG=ghc$(_way)-$(ProjectVersion)
+HS_PROG=$(odir)/ghc$(_way)-$(ProjectVersion)
 else
-HS_PROG=ghc$(_way)
+HS_PROG=$(odir)/ghc$(_way)
 endif
 else
-HS_PROG=ghc-$(ProjectVersion)
+HS_PROG=$(odir)/ghc-$(ProjectVersion)
 endif
 
 # -----------------------------------------------------------------------------
@@ -130,8 +248,13 @@ ifeq "$(BootingFromHc)" "YES"
 bootstrapped = YES
 compiling_with_4xx=NO
 else
+ifneq "$(findstring $(stage), 2 3)" ""
+bootstrapped = YES
+compiling_with_4xx = NO
+else
 bootstrapped = $(shell if (test $(GhcCanonVersion) -ge $(ProjectVersionInt) -a $(GhcPatchLevel) -ge $(ProjectPatchLevel)); then echo YES; else echo NO; fi)
 compiling_with_4xx = $(shell if (test $(GhcCanonVersion) -lt 500); then echo YES; else echo NO; fi)
+endif
 endif
 
 # Only include GHCi if we're bootstrapping with at least version 411
@@ -161,21 +284,9 @@ SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(GHC_INCLUDE
 # -----------------------------------------------------------------------------
 # 		Haskell compilations
 
-#
-# Compiler to use for building ghc, use the build tree
-# driver when booting.
-#
-HC=$(GHC)
-
-# magic from GNU make manual to convert a list of values
-# into a colon-separated list
-empty:=
-space:= $(empty) $(empty)
-
 SRC_HC_OPTS += \
   -cpp -fglasgow-exts -Rghc-timing \
-  -I. -IcodeGen -InativeGen -Iparser \
-  $(patsubst %, -i%, $(ALL_DIRS))
+  -I. -IcodeGen -InativeGen -Iparser
 
 # Omitted: 	-I$(GHC_INCLUDE_DIR)
 # We should have -I$(GHC_INCLUDE_DIR) in SRC_HC_OPTS, 
@@ -344,15 +455,18 @@ SRC_LD_OPTS += -no-link-chk
 # -----------------------------------------------------------------------------
 # create ghc-inplace, a convenient way to run ghc from the build tree...
 
-all :: ghc-inplace
+all :: $(odir)/ghc-inplace ghc-inplace
 
-ghc-inplace : $(HS_PROG)
+$(odir)/ghc-inplace : $(HS_PROG)
 	@$(RM) $@
 	echo '#!/bin/sh' >>$@
 	echo exec $(FPTOOLS_TOP_ABS)/ghc/compiler/$(HS_PROG) '-B$(subst \,\\,$(FPTOOLS_TOP_ABS_PLATFORM))' '"$$@"' >>$@
 	chmod 755 $@
 
-CLEAN_FILES += ghc-inplace
+ghc-inplace : stage1/ghc-inplace
+	$(LN_S) $< $@
+
+CLEAN_FILES += $(odir)/ghc-inplace ghc-inplace
 
 #-----------------------------------------------------------------------------
 # 		install
@@ -391,4 +505,23 @@ MAINTAINER_CLEAN_FILES += parser/Parser.info main/ParsePkgConf.info
 #-----------------------------------------------------------------------------
 # 		Include target-rule boilerplate
 
+# Don't use the default MKDEPENDHS stuff... we'll do our own, below
+MKDEPENDHS_SRCS =
+MKDEPENDC_SRCS =
+
 include $(TOP)/mk/target.mk
+
+# -----------------------------------------------------------------------------
+# Dependencies
+
+MKDEPENDHS_HC_OPTS = $(shell echo $(HC_OPTS) | sed -e s@$(odir)/@@g)
+
+MKDEPENDHS=$(HC)
+
+# Must do this *after* including target.mk, because $(HS_SRCS) isn't set yet.
+depend :: $(HS_SRCS) $(C_SRCS)
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
+	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
+	$(PERL) -pe 's@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g' <.depend-BASE >.depend-$(stage)
+
+-include .depend-$(stage)

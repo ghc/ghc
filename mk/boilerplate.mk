@@ -61,9 +61,6 @@ include $(TOP)/mk/opts.mk
 # Variables that control the option flags for all the
 # language processors
 
-include $(TOP)/mk/suffix.mk
-# Suffix rules for Haskell, C and literate 
-
 ifeq "$(BootingFromHc)" "YES"
 include $(TOP)/mk/bootstrap.mk
 endif

@@ -44,6 +44,11 @@ PRE_SRCS := $(ALL_SRCS)
 
 include $(TOP)/mk/package.mk
 
+###################################################################
+# Suffix rules for Haskell, C and literate 
+
+include $(TOP)/mk/suffix.mk
+
 ##################################################################
 # 		FPtools standard targets
 #

@@ -345,6 +345,18 @@ boot ::
 	@echo "Please use \`make all' only from the top-level, or \`make boot' followed"
 	@echo "by \`make all' in an individual project subdirectory (ghc, hslibs etc.)."
 
+bootstrap : bootstrap2
+bootstrap2 : all stage2
+bootstrap3 : bootstrap2 stage3
+
+stage2 :
+	$(MAKE) -C ghc/compiler boot stage=2
+	$(MAKE) -C ghc/compiler stage=2
+
+stage3 :
+	$(MAKE) -C ghc/compiler boot stage=3
+	$(MAKE) -C ghc/compiler stage=3
+
 install ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(filter-out $(ProjectsDontInstall), $(SUBDIRS)); do \
