@@ -4156,6 +4156,7 @@ Which is which?  The criterion is this.  In the ifdefs in GHC's source code:
 </itemizedlist>
 For a stage-2 compiler, in which GHCi is available, the "host" and "target" systems must be the same.
 So then it doesn't really matter whether you use the HOST_OS or TARGET_OS cpp macros.
+
 </para>
 </sect3>
 
