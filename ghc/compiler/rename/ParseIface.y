@@ -714,13 +714,24 @@ core_alt	: core_pat '->' core_expr	{ (fst $1, snd $1, $3) }
 core_pat	:: { (UfCon RdrName, [RdrName]) }
 core_pat	: core_lit			{ (UfLitCon  $1, []) }
 		| '__litlit' STRING atype	{ (UfLitLitCon $2 $3, []) }
-		| qdata_name var_names		{ (UfDataCon $1, $2) }
+		| qdata_name core_pat_names	{ (UfDataCon $1, $2) }
 		| '(' comma_var_names1 ')' 	{ (UfDataCon (mkTupConRdrName (length $2)), $2) }
 		| '(#' comma_var_names1 '#)'	{ (UfDataCon (mkUbxTupConRdrName (length $2)), $2) }
 		| '__DEFAULT'			{ (UfDefault, []) }
 		| '(' core_pat ')'		{ $2 }
 
+core_pat_names :: { [RdrName] }
+core_pat_names : 				{ [] }
+		| core_pat_name core_pat_names	{ $1 : $2 }
 
+-- Tyvar names and variable names live in different name spaces
+-- so they need to be signalled separately.  But we don't record 
+-- types or kinds in a pattern; we work that out from the type 
+-- of the case scrutinee
+core_pat_name	:: { RdrName }
+core_pat_name	: var_name			{ $1 }
+		| '@' tv_name			{ $2 }
+	
 comma_var_names1 :: { [RdrName] }	-- One or more
 comma_var_names1 : var_name					{ [$1] }
 		 | var_name ',' comma_var_names1		{ $1 : $3 }

@@ -120,9 +120,11 @@ instance Outputable name => Outputable (UfExpr name) where
       = hsep [ptext SLIT("_NOTE_ [ToDo]>"), ppr body]
 
 instance Outputable name => Outputable (UfCon name) where
-    ppr UfDefault	= text "DEFAULT"
-    ppr (UfDataCon d)	= ppr d
-    ppr (UfPrimOp p)	= ppr p
+    ppr UfDefault	   = text "DEFAULT"
+    ppr (UfLitCon l)       = ppr l
+    ppr (UfLitLitCon l ty) = ppr l
+    ppr (UfDataCon d)	   = ppr d
+    ppr (UfPrimOp p)	   = ppr p
     ppr (UfCCallOp str is_dyn is_casm can_gc)
       =	hcat [before, ptext str, after]
       where
@@ -150,9 +152,9 @@ data IfaceSig name
 		SrcLoc
 
 instance (Outputable name) => Outputable (IfaceSig name) where
-    ppr (IfaceSig var ty _ _)
+    ppr (IfaceSig var ty info _)
       = hang (hsep [ppr var, dcolon])
-	     4 (ppr ty)
+	     4 (ppr ty $$ ifPprDebug (vcat (map ppr info)))
 
 data HsIdInfo name
   = HsArity		ArityInfo
@@ -163,6 +165,10 @@ data HsIdInfo name
   | HsNoCafRefs
   | HsCprInfo           CprInfo
   | HsWorker		name		-- Worker, if any
+
+instance Outputable name => Outputable (HsIdInfo name) where
+  ppr (HsUnfold _ unf) = ptext (SLIT("Unfolding:")) <+> ppr unf
+  ppr other	       = empty	-- Havn't got around to this yet
 
 data HsStrictnessInfo
   = HsStrictnessInfo ([Demand], Bool)

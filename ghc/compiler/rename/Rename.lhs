@@ -72,18 +72,13 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc
   = 	-- Initialise the renamer monad
     initRn mod_name us (mkSearchPath opt_HiMap) loc
 	   (rename this_mod)				>>=
-	\ (maybe_rn_stuff, rn_errs_bag, rn_warns_bag) ->
+	\ ((maybe_rn_stuff, dump_action), rn_errs_bag, rn_warns_bag) ->
 
 	-- Check for warnings
     printErrorsAndWarnings rn_errs_bag rn_warns_bag	>>
 
-	-- Dump output, if any
-    (case maybe_rn_stuff of
-	Nothing  -> return ()
-	Just results@(_, rn_mod, _, _, _)
-		 -> dumpIfSet opt_D_dump_rn "Renamer:"
-			      (ppr rn_mod)
-    )							>>
+	-- Dump any debugging output
+    dump_action 					>>
 
 	-- Return results
     if not (isEmptyBag rn_errs_bag) then
@@ -101,8 +96,8 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
 	-- CHECK FOR EARLY EXIT
     if not (maybeToBool maybe_stuff) then
 	-- Everything is up to date; no need to recompile further
-	rnStats []		`thenRn_`
-	returnRn Nothing
+	rnDump [] []		`thenRn` \ dump_action ->
+	returnRn (Nothing, dump_action)
     else
     let
   	Just (export_env, gbl_env, fixity_env, global_avail_env) = maybe_stuff
@@ -122,13 +117,16 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
 		-- override the implicit ones. 
     in
     slurpImpDecls real_source_fvs	`thenRn` \ rn_imp_decls ->
+    let
+	rn_all_decls	   = rn_imp_decls ++ rn_local_decls 
+    in
 
 	-- EXIT IF ERRORS FOUND
-    checkErrsRn				`thenRn` \ no_errs_so_far ->
+    checkErrsRn					`thenRn` \ no_errs_so_far ->
     if not no_errs_so_far then
 	-- Found errors already, so exit now
-	rnStats []		`thenRn_`
-	returnRn Nothing
+	rnDump rn_imp_decls rn_all_decls	`thenRn` \ dump_action ->
+	returnRn (Nothing, dump_action)
     else
 
 	-- GENERATE THE VERSION/USAGE INFO
@@ -144,18 +142,17 @@ rename this_mod@(HsModule mod_name vers exports imports local_decls loc)
     let
 	has_orphans        = any isOrphanDecl rn_local_decls
 	direct_import_mods = [mod | ImportDecl mod _ _ _ _ _ <- imports]
-	rn_all_decls	   = rn_imp_decls ++ rn_local_decls 
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports
 				  rn_all_decls
 			          loc
     in
-    rnStats rn_imp_decls	`thenRn_`
+    rnDump rn_imp_decls	rn_all_decls		`thenRn` \ dump_action ->
     returnRn (Just (mkThisModule mod_name,
 		    renamed_module, 
 		    (has_orphans, my_usages, export_env),
 		    name_supply,
-		    direct_import_mods))
+		    direct_import_mods), dump_action)
   where
     trashed_exports  = {-trace "rnSource:trashed_exports"-} Nothing
     trashed_imports  = {-trace "rnSource:trashed_imports"-} []
@@ -517,18 +514,20 @@ reportableUnusedName name
     explicitlyImported other			             = False
 	-- Don't report others
 
-rnStats :: [RenamedHsDecl] -> RnMG ()
-rnStats imp_decls
+rnDump  :: [RenamedHsDecl] 	-- Renamed imported decls
+	-> [RenamedHsDecl] 	-- Renamed local decls
+	-> RnMG (IO ())
+rnDump imp_decls decls
         | opt_D_dump_rn_trace || 
 	  opt_D_dump_rn_stats ||
 	  opt_D_dump_rn 
- 	= getRnStats imp_decls		`thenRn` \ msg ->
-	  ioToRnM (printErrs msg)	`thenRn_`
-	  returnRn ()
+ 	= getRnStats imp_decls		`thenRn` \ stats_msg ->
 
-	| otherwise = returnRn ()
+	  returnRn (printErrs stats_msg >> 
+		    dumpIfSet opt_D_dump_rn "Renamer:" (vcat (map ppr decls)))
+
+	| otherwise = returnRn (return ())
 \end{code}
-
 
 
 %*********************************************************

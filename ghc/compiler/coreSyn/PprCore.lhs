@@ -321,7 +321,7 @@ pprIfaceBinder CaseBind binder = pprUntypedBinder binder
 pprIfaceBinder other    binder = pprTypedBinder binder
 
 pprUntypedBinder binder
-  | isTyVar binder = pprTyVarBndr binder
+  | isTyVar binder = ptext SLIT("@") <+> pprTyVarBndr binder
   | otherwise      = pprIdBndr binder
 
 pprTypedBinder binder
