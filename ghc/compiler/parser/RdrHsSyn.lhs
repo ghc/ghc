@@ -771,10 +771,14 @@ checkValDef lhs opt_sig (L rhs_span grhss)
 	then parseError (getLoc f) ("Qualified name in function definition: "  ++ 
 					showRdrName (unLoc f))
 	else do ps <- checkPatterns es
-		return (FunBind f inf [L rhs_span (Match ps opt_sig grhss)])
+		let match_span = combineSrcSpans (getLoc lhs) rhs_span
+		return (FunBind f inf [L match_span (Match ps opt_sig grhss)])
+	-- the span of the match covers the entire equation.  That isn't
+	-- quite right, but it'll do for now.
   | otherwise = do
 	lhs <- checkPattern lhs
 	return (PatBind lhs grhss)
+	
 
 checkValSig
 	:: LHsExpr RdrName
