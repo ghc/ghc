@@ -55,8 +55,8 @@ import UniqFM
 import Unique		( Uniquable )
 import Digraph		( SCC(..), stronglyConnComp, flattenSCC )
 import ErrUtils		( showPass )
+import SysTools		( cleanTempFilesExcept )
 import Util
-import TmpFiles
 import Outputable
 import Panic
 import CmdLineOpts	( DynFlags(..) )

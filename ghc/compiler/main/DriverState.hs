@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.43 2001/06/13 10:23:23 simonmar Exp $
+-- $Id: DriverState.hs,v 1.44 2001/06/14 12:50:06 simonpj Exp $
 --
 -- Settings for the driver
 --
@@ -19,10 +19,6 @@ import Util
 import Config
 import Exception
 import IOExts
-#ifdef mingw32_TARGET_OS
-import TmpFiles	( newTempName )
-import Directory ( removeFile )
-#endif
 import Panic
 
 import List
@@ -36,9 +32,6 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 
 -----------------------------------------------------------------------------
 -- Global compilation flags
-
--- location of compiler-related files
-GLOBAL_VAR(v_TopDir,  error "no TOPDIR", String)
 
 -- Cpp-related flags
 v_Hs_source_cpp_opts = global
@@ -58,7 +51,6 @@ GLOBAL_VAR(v_Keep_tmp_files, 		False, 		Bool)
 
 -- Misc
 GLOBAL_VAR(v_Scale_sizes_by,    	1.0,		Double)
-GLOBAL_VAR(v_Dry_run, 			False,		Bool)
 GLOBAL_VAR(v_Static, 			True,		Bool)
 GLOBAL_VAR(v_NoHsMain, 			False, 		Bool)
 GLOBAL_VAR(v_Recomp,  			True,		Bool)
@@ -70,8 +62,9 @@ GLOBAL_VAR(v_Excess_precision,		False,		Bool)
 -- Splitting object files (for libraries)
 
 GLOBAL_VAR(v_Split_object_files,	False,		Bool)
-GLOBAL_VAR(v_Split_prefix,		"",		String)
-GLOBAL_VAR(v_N_split_files,		0,		Int)
+GLOBAL_VAR(v_Split_info,		("",0),		(String,Int))
+	-- The split prefix and number of files
+
 	
 can_split :: Bool
 can_split =  prefixMatch "i386"    cTARGETPLATFORM
@@ -325,8 +318,6 @@ GLOBAL_VAR(v_HCHeader, "", String)
 
 -----------------------------------------------------------------------------
 -- Packages
-
-GLOBAL_VAR(v_Path_package_config, error "path_package_config", String)
 
 -- package list is maintained in dependency order
 GLOBAL_VAR(v_Packages, ("std":"rts":"gmp":[]), [String])
@@ -589,19 +580,6 @@ unregFlags =
 
 -----------------------------------------------------------------------------
 -- Programs for particular phases
-
-GLOBAL_VAR(v_Pgm_L,   error "pgm_L", String)
-GLOBAL_VAR(v_Pgm_P,   cRAWCPP,       String)
-GLOBAL_VAR(v_Pgm_c,   cGCC,          String)
-GLOBAL_VAR(v_Pgm_m,   error "pgm_m", String)
-GLOBAL_VAR(v_Pgm_s,   error "pgm_s", String)
-GLOBAL_VAR(v_Pgm_a,   cGCC,          String)
-GLOBAL_VAR(v_Pgm_l,   cGCC,          String)
-GLOBAL_VAR(v_Pgm_dll, cMkDLL,        String)
-
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-GLOBAL_VAR(v_Pgm_T,   cTOUCH,        String)
-#endif
 
 GLOBAL_VAR(v_Opt_dep,    [], [String])
 GLOBAL_VAR(v_Anti_opt_C, [], [String])

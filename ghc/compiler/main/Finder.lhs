@@ -19,12 +19,8 @@ import HscTypes		( ModuleLocation(..) )
 import CmStaticInfo
 import DriverPhases
 import DriverState
-import DriverUtil
 import Module
-import FiniteMap
 import FastString
-import Util
-import Panic		( panic )
 import Config
 
 import IOExts

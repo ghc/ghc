@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.155 2001/05/28 03:31:19 sof Exp $
+# $Id: Makefile,v 1.156 2001/06/14 12:50:06 simonpj Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -25,6 +25,9 @@ endif
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration
+#
+# The 'echo' commands simply spit the values of various make variables
+# into Config.hs, whence they can be compiled and used by GHC itself
 
 CURRENT_DIR	= ghc/compiler
 CONFIG_HS 	= main/Config.hs
@@ -41,41 +44,31 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cHOSTPLATFORM         = \"$(HOSTPLATFORM)\"" >> $(CONFIG_HS)
 	@echo "cTARGETPLATFORM       = \"$(TARGETPLATFORM)\"" >> $(CONFIG_HS)
-	@echo "cCURRENT_DIR          = \"$(CURRENT_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_LIB_DIR          = \"$(GHC_LIB_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_RUNTIME_DIR      = \"$(GHC_RUNTIME_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_UTILS_DIR        = \"$(GHC_UTILS_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_INCLUDE_DIR      = \"$(GHC_INCLUDE_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $(CONFIG_HS)
-	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
-	@echo "cMkDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)
+	@echo "cRAWCPP               = \"$(GHC_RAWCPP)\"" >> $(CONFIG_HS)
+	@echo "cGCC                  = \"$(WhatGccIsCalled)\"" >> $(CONFIG_HS)
+	@echo "cMkDLL                = \"$(BLD_DLL)\"" >> $(CONFIG_HS)
+	@echo "cGHC_DRIVER_DIR       = \"$(GHC_DRIVER_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_TOUCHY           = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
+	@echo "cGHC_TOUCHY_DIR       = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
 	@echo "cGHC_UNLIT            = \"$(GHC_UNLIT)\"" >> $(CONFIG_HS)
+	@echo "cGHC_UNLIT_DIR        = \"$(GHC_UNLIT_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_MANGLER          = \"$(GHC_MANGLER)\"" >> $(CONFIG_HS)
+	@echo "cGHC_MANGLER_DIR      = \"$(GHC_MANGLER_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_SPLIT            = \"$(GHC_SPLIT)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SPLIT_DIR        = \"$(GHC_SPLIT_DIR)\"" >> $(CONFIG_HS)
 	@echo "cGHC_SYSMAN           = \"$(GHC_SYSMAN)\"" >> $(CONFIG_HS)
+	@echo "cGHC_SYSMAN_DIR       = \"$(GHC_SYSMAN_DIR)\"" >> $(CONFIG_HS)
+	@echo "cGHC_CP               = \"$(GHC_CP)\"" >> $(CONFIG_HS)
+	@echo "cGHC_PERL             = \"$(GHC_PERL)\"" >> $(CONFIG_HS)
 	@echo "cEnableWin32DLLs      = \"$(EnableWin32DLLs)\"" >> $(CONFIG_HS)
-ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
-	@echo "cCP                   = \"copy /y\"" >> $(CONFIG_HS)
-	@echo "cRM                   = \"del /F /Q\"" >> $(CONFIG_HS)
-	@echo "cTOUCH                = \"$(GHC_TOUCHY)\"" >> $(CONFIG_HS)
-else
-	@echo "cCP                   = \"$(CP)\"" >> $(CONFIG_HS)
-	@echo "cRM                   = \"$(RM)\"" >> $(CONFIG_HS)
-	@echo "cTOUCH                = \"touch\"" >> $(CONFIG_HS)
-endif
 	@echo "cCONTEXT_DIFF         = \"$(CONTEXT_DIFF)\"" >> $(CONFIG_HS)
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> $(CONFIG_HS)
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
-ifeq "$(TARGETPLATFORM) and $(MinimalUnixDeps)" "i386-unknown-mingw32 and YES"
-	@echo "cRAWCPP               = \"$(subst -mwin32,,$(RAWCPP))\"" >> $(CONFIG_HS)
-else
-	@echo "cRAWCPP               = \"$(RAWCPP)\"" >> $(CONFIG_HS)
-endif
 	@echo done.
 
 CLEAN_FILES += $(CONFIG_HS)
@@ -250,7 +243,7 @@ main/DriverPipeline_HC_OPTS	= -fno-cse
 main/DriverState_HC_OPTS	= -fno-cse
 main/DriverUtil_HC_OPTS		= -fno-cse
 main/Finder_HC_OPTS		= -fno-cse
-main/TmpFiles_HC_OPTS		= -fno-cse
+main/SysTools_HC_OPTS		= -fno-cse
 
 # ----------------------------------------------------------------------------
 #		C compilations

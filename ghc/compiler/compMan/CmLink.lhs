@@ -35,9 +35,8 @@ import FiniteMap
 import Outputable
 import ErrUtils		( showPass )
 import CmdLineOpts	( DynFlags(..) )
-import Panic		( panic, GhcException(..) )
+import Panic		( panic )
 
-import Exception
 import List
 import Monad
 import IO
@@ -218,9 +217,6 @@ link' Interactive dflags batch_attempt_linking linkables pls
 	 let (objs, bcos) = partition (isObject.head.linkableUnlinked) linkables
 	 linkObjs (objs ++ bcos) pls
 	   -- get the objects first
-
-ppLinkableSCC :: SCC Linkable -> SDoc
-ppLinkableSCC = ppr . flattenSCC
 
 filterModuleLinkables :: (ModuleName -> Bool) -> [Linkable] -> [Linkable]
 filterModuleLinkables p [] = []

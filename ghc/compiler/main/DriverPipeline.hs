@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.77 2001/06/14 11:46:55 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.78 2001/06/14 12:50:06 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -34,8 +34,9 @@ import DriverUtil
 import DriverMkDepend
 import DriverPhases
 import DriverFlags
+import SysTools		( newTempName, addFilesToClean, getSysMan )
+import qualified SysTools	
 import HscMain
-import TmpFiles
 import Finder
 import HscTypes
 import Outputable
@@ -308,13 +309,8 @@ pipeLoop ((phase, keep, o_suffix):phases)
 -- Unlit phase 
 
 run_phase Unlit _basename _suff input_fn output_fn
-  = do unlit <- readIORef v_Pgm_L
-       unlit_flags <- getOpts opt_L
-       runSomething "Literate pre-processor"
-       	  (unlit ++ unwords unlit_flags ++ 
-	  	    " -h " ++ input_fn ++ 
-		    ' ':input_fn ++ 
-		    ' ':output_fn)
+  = do unlit_flags <- getOpts opt_L
+       SysTools.runUnlit (unlit_flags ++ ["-h", input_fn, input_fn, output_fn])
        return True
 
 -------------------------------------------------------------------------------
@@ -328,8 +324,7 @@ run_phase Cpp basename suff input_fn output_fn
        do_cpp <- dynFlag cppFlag
        if do_cpp
           then do
-       	    cpp <- readIORef v_Pgm_P >>= prependToolDir
-	    hscpp_opts <- getOpts opt_P
+	    hscpp_opts	    <- getOpts opt_P
        	    hs_src_cpp_opts <- readIORef v_Hs_source_cpp_opts
 
 	    cmdline_include_paths <- readIORef v_Include_paths
@@ -340,15 +335,13 @@ run_phase Cpp basename suff input_fn output_fn
 	    verb <- getVerbFlag
 	    (md_c_flags, _) <- machdepCCOpts
 
-	    runSomething "C pre-processor" 
-		(unwords
-       	    	   ([cpp, verb] 
-		    ++ include_paths
-		    ++ hs_src_cpp_opts
-		    ++ hscpp_opts
-		    ++ md_c_flags
-		    ++ [ "-x", "c", input_fn, "-o", output_fn ]
-		   ))
+	    SysTools.runCpp ([verb]
+			    ++ include_paths
+			    ++ hs_src_cpp_opts
+			    ++ hscpp_opts
+			    ++ md_c_flags
+			    ++ [ "-x", "c", input_fn, "-o", output_fn ])
+
 	-- ToDo: switch away from using 'echo' alltogether (but need
 	-- a faster alternative than what's done below).
 #if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
@@ -362,10 +355,10 @@ run_phase Cpp basename suff input_fn output_fn
 	    	        (\_ -> throwDyn (PhaseFailed "Ineffective C pre-processor" (ExitFailure 1)))
 #else
 	  else do
-	    runSomething "Ineffective C pre-processor"
+	    SysTools.runSomething "Ineffective C pre-processor"
 	           ("echo '{-# LINE 1 \""  ++ input_fn ++ "\" #-}' > " 
 		    ++ output_fn ++ " && cat " ++ input_fn
-		    ++ " >> " ++ output_fn)
+		    ++ " >> " ++ output_fn) []
 #endif
        return True
 
@@ -374,7 +367,7 @@ run_phase Cpp basename suff input_fn output_fn
 
 run_phase MkDependHS basename suff input_fn _output_fn = do 
    src <- readFile input_fn
-   let (import_sources, import_normals, module_name) = getImports src
+   let (import_sources, import_normals, _) = getImports src
 
    let orig_fn = basename ++ '.':suff
    deps_sources <- mapM (findDependency True  orig_fn) import_sources
@@ -500,7 +493,7 @@ run_phase Hsc basename suff input_fn output_fn
 				  else return False
 
   -- get the DynFlags
-        dyn_flags <- readIORef v_DynFlags
+        dyn_flags <- getDynFlags
 
         let dyn_flags' = dyn_flags { hscOutName = output_fn,
 		   		     hscStubCOutName = basename ++ "_stub.c",
@@ -523,16 +516,8 @@ run_phase Hsc basename suff input_fn output_fn
 
 	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1));
 
-            HscNoRecomp pcs details iface -> 
-	        do {
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-		  touch <- readIORef v_Pgm_T;
-		  runSomething "Touching object file" (unwords [dosifyPath touch, dosifyPath o_file]);
-#else
-		  runSomething "Touching object file" (unwords [cTOUCH, o_file]);
-#endif
-		  return False;
-		};
+            HscNoRecomp pcs details iface -> do { SysTools.touch "Touching object file" o_file
+						; return False } ;
 
 	    HscRecomp pcs details iface stub_h_exists stub_c_exists
 		      _maybe_interpreted_code -> do
@@ -554,8 +539,7 @@ run_phase Hsc basename suff input_fn output_fn
 
 run_phase cc_phase basename suff input_fn output_fn
    | cc_phase == Cc || cc_phase == HCc
-   = do	cc  <- readIORef v_Pgm_c >>= prependToolDir >>= appendInstallDir
-       	cc_opts <- (getOpts opt_c)
+   = do	cc_opts		     <- getOpts opt_c
        	cmdline_include_dirs <- readIORef v_Include_paths
 
         let hcc = cc_phase == HCc
@@ -583,20 +567,19 @@ run_phase cc_phase basename suff input_fn output_fn
 		      | otherwise         = [ ]
 
 	excessPrecision <- readIORef v_Excess_precision
-	runSomething "C Compiler"
-	 (unwords ([ cc, "-x", "c", input_fn, "-o", output_fn ]
-		   ++ md_c_flags
-		   ++ (if cc_phase == HCc && mangle
-			 then md_regd_c_flags
-			 else [])
-		   ++ [ verb, "-S", "-Wimplicit", opt_flag ]
-		   ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
-		   ++ cc_opts
-		   ++ split_opt
-		   ++ (if excessPrecision then [] else [ "-ffloat-store" ])
-		   ++ include_paths
-		   ++ pkg_extra_cc_opts
-		   ))
+	SysTools.runCc ([ "-x", "c", input_fn, "-o", output_fn ]
+		       ++ md_c_flags
+		       ++ (if cc_phase == HCc && mangle
+		  	     then md_regd_c_flags
+		  	     else [])
+		       ++ [ verb, "-S", "-Wimplicit", opt_flag ]
+		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
+		       ++ cc_opts
+		       ++ split_opt
+		       ++ (if excessPrecision then [] else [ "-ffloat-store" ])
+		       ++ include_paths
+		       ++ pkg_extra_cc_opts
+		       )
 	return True
 
 	-- ToDo: postprocess the output from gcc
@@ -605,97 +588,67 @@ run_phase cc_phase basename suff input_fn output_fn
 -- Mangle phase
 
 run_phase Mangle _basename _suff input_fn output_fn
-  = do mangler <- readIORef v_Pgm_m
-       mangler_opts <- getOpts opt_m
-       machdep_opts <-
-	 if (prefixMatch "i386" cTARGETPLATFORM)
-	    then do n_regs <- dynFlag stolen_x86_regs
-		    return [ show n_regs ]
-	    else return []
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-       perl_path <- prependToolDir ("perl")
-       let real_mangler = unwords [perl_path, mangler]
-#else
-       let real_mangler = mangler
-#endif
-       runSomething "Assembly Mangler"
-	(unwords (real_mangler : mangler_opts
-		  ++ [ input_fn, output_fn ]
-		  ++ machdep_opts
-		))
+  = do mangler_opts <- getOpts opt_m
+       machdep_opts <- if (prefixMatch "i386" cTARGETPLATFORM)
+		       then do n_regs <- dynFlag stolen_x86_regs
+			       return [ show n_regs ]
+		       else return []
+
+       SysTools.runMangle (mangler_opts
+		          ++ [ input_fn, output_fn ]
+		          ++ machdep_opts)
        return True
 
 -----------------------------------------------------------------------------
 -- Splitting phase
 
 run_phase SplitMangle _basename _suff input_fn _output_fn
-  = do  splitter <- readIORef v_Pgm_s
-	-- this is the prefix used for the split .s files
-	tmp_pfx <- readIORef v_TmpDir
-	x <- myGetProcessID
-	let split_s_prefix = tmp_pfx ++ "/ghc" ++ show x
-	writeIORef v_Split_prefix split_s_prefix
-	addFilesToClean [split_s_prefix ++ "__*"] -- d:-)
+  = do  -- tmp_pfx is the prefix used for the split .s files
+	-- We also use it as the file to contain the no. of split .s files (sigh)
+	split_s_prefix <- SysTools.newTempName "split"
+	let n_files_fn = split_s_prefix
 
-	-- allocate a tmp file to put the no. of split .s files in (sigh)
-	n_files <- newTempName "n_files"
+	SysTools.runSplit [input_fn, split_s_prefix, n_files_fn]
 
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-        perl_path <- prependToolDir ("perl")
-        let real_splitter = unwords [perl_path, splitter]
-#else
-        let real_splitter = splitter
-#endif
-	runSomething "Split Assembly File"
-	 (unwords [ real_splitter
-		  , input_fn
-		  , split_s_prefix
-		  , n_files ]
-	 )
+	-- Save the number of split files for future references
+	s <- readFile n_files_fn
+	let n_files = read s :: Int
+	writeIORef v_Split_info (split_s_prefix, n_files)
 
-	-- save the number of split files for future references
-	s <- readFile n_files
-	let n = read s :: Int
-	writeIORef v_N_split_files n
+	-- Remember to delete all these files
+	addFilesToClean [ split_s_prefix ++ "__" ++ show n ++ ".s"
+			| n <- [1..n_files]]
+
 	return True
 
 -----------------------------------------------------------------------------
 -- As phase
 
 run_phase As _basename _suff input_fn output_fn
-  = do	as <- readIORef v_Pgm_a >>= prependToolDir >>= appendInstallDir
-        as_opts <- getOpts opt_a
-
+  = do	as_opts		      <- getOpts opt_a
         cmdline_include_paths <- readIORef v_Include_paths
-        let cmdline_include_flags = map (\p -> "-I"++p) cmdline_include_paths
-        runSomething "Assembler"
-	   (unwords (as : as_opts
-		       ++ cmdline_include_flags
-		       ++ [ "-c", input_fn, "-o",  output_fn ]
-		    ))
+
+	SysTools.runAs (as_opts
+		       ++ [ "-I" ++ p | p <- cmdline_include_paths ]
+		       ++ [ "-c", input_fn, "-o",  output_fn ])
 	return True
 
 run_phase SplitAs basename _suff _input_fn _output_fn
-  = do  as <- readIORef v_Pgm_a
-        as_opts <- getOpts opt_a
+  = do  as_opts <- getOpts opt_a
 
-	split_s_prefix <- readIORef v_Split_prefix
-	n <- readIORef v_N_split_files
+	(split_s_prefix, n) <- readIORef v_Split_info
 
 	odir <- readIORef v_Output_dir
 	let real_odir = case odir of
 				Nothing -> basename
 				Just d  -> d
 
-	let assemble_file n = do
-		    let input_s  = split_s_prefix ++ "__" ++ show n ++ ".s"
+	let assemble_file n
+	      = do  let input_s  = split_s_prefix ++ "__" ++ show n ++ ".s"
 		    let output_o = newdir real_odir 
 					(basename ++ "__" ++ show n ++ ".o")
 		    real_o <- osuf_ify output_o
-		    runSomething "Assembler" 
-			    (unwords (as : as_opts
-				      ++ [ "-c", "-o", real_o, input_s ]
-			    ))
+		    SysTools.runAs (as_opts ++ ["-c", "-o", real_o, input_s])
 	
 	mapM_ assemble_file [1..n]
 	return True
@@ -713,13 +666,12 @@ run_phase SplitAs basename _suff _input_fn _output_fn
 
 run_phase_MoveBinary input_fn
   = do	
-        top_dir <- readIORef v_TopDir
+        sysMan   <- getSysMan
         pvm_root <- getEnv "PVM_ROOT"
         pvm_arch <- getEnv "PVM_ARCH"
         let 
            pvm_executable_base = "=" ++ input_fn
            pvm_executable = pvm_root ++ "/bin/" ++ pvm_arch ++ "/" ++ pvm_executable_base
-           sysMan = top_dir ++ "/ghc/rts/parallel/SysMan";
         -- nuke old binary; maybe use configur'ed names for cp and rm?
         system ("rm -f " ++ pvm_executable)
         -- move the newly created binary into PVM land
@@ -799,10 +751,8 @@ checkProcessArgsResult flags basename suff
 
 doLink :: [String] -> IO ()
 doLink o_files = do
-    ln <- readIORef v_Pgm_l >>= prependToolDir >>= appendInstallDir
-    verb <- getVerbFlag
-    static <- readIORef v_Static
-    let imp = if static then "" else "_imp"
+    verb       <- getVerbFlag
+    static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
 
     o_file <- readIORef v_Output_file
@@ -815,7 +765,8 @@ doLink o_files = do
     let lib_path_opts = map ("-L"++) lib_paths
 
     pkg_libs <- getPackageLibraries
-    let pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
+    let imp	     = if static then "" else "_imp"
+        pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
 
     libs <- readIORef v_Cmdline_libraries
     let lib_opts = map ("-l"++) (reverse libs)
@@ -831,53 +782,39 @@ doLink o_files = do
 
     rts_pkg <- getPackageDetails ["rts"]
     std_pkg <- getPackageDetails ["std"]
-#ifdef mingw32_TARGET_OS
     let extra_os = if static || no_hs_main
                    then []
                    else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
                           head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
-#endif
+
     (md_c_flags, _) <- machdepCCOpts
-    runSomething "Linker"
-       (unwords
-	 ([ ln, verb, "-o", output_fn ]
-	 ++ md_c_flags
-	 ++ o_files
-#ifdef mingw32_TARGET_OS
-	 ++ extra_os
-#endif
-	 ++ extra_ld_inputs
-	 ++ lib_path_opts
-	 ++ lib_opts
-	 ++ pkg_lib_path_opts
-	 ++ pkg_lib_opts
-	 ++ pkg_extra_ld_opts
-	 ++ extra_ld_opts
-#ifdef mingw32_TARGET_OS
-         ++ if static then [ "-u _PrelMain_mainIO_closure" , "-u ___init_PrelMain"] else []
-#else
-	 ++ [ "-u PrelMain_mainIO_closure" , "-u __init_PrelMain"]
-#endif
-	)
-       )
+    SysTools.runLink ( [verb, "-o", output_fn]
+		      ++ md_c_flags
+	 	      ++ o_files
+		      ++ extra_os
+		      ++ extra_ld_inputs
+	 	      ++ lib_path_opts
+	 	      ++ lib_opts
+	 	      ++ pkg_lib_path_opts
+	 	      ++ pkg_lib_opts
+	 	      ++ pkg_extra_ld_opts
+	 	      ++ extra_ld_opts
+	              ++ if static then [ "-u _PrelMain_mainIO_closure" , "-u ___init_PrelMain"] else [])
+
     -- parallel only: move binary to another dir -- HWL
     ways_ <- readIORef v_Ways
-    when (WayPar `elem` ways_) (do 
-                                  success <- run_phase_MoveBinary output_fn
-                                  if success then return ()
-                                             else throwDyn (InstallationError ("cannot move binary to PVM dir")))
+    when (WayPar `elem` ways_)
+	 (do success <- run_phase_MoveBinary output_fn
+             if success then return ()
+                        else throwDyn (InstallationError ("cannot move binary to PVM dir")))
 
 -----------------------------------------------------------------------------
--- Making a DLL
+-- Making a DLL (only for Win32)
 
--- only for Win32, but bits that are #ifdefed in doLn are still #ifdefed here
--- in a vain attempt to aid future portability
 doMkDLL :: [String] -> IO ()
 doMkDLL o_files = do
-    ln <- readIORef v_Pgm_dll >>= prependToolDir >>= appendInstallDir
-    verb <- getVerbFlag
-    static <- readIORef v_Static
-    let imp = if static then "" else "_imp"
+    verb       <- getVerbFlag
+    static     <- readIORef v_Static
     no_hs_main <- readIORef v_NoHsMain
 
     o_file <- readIORef v_Output_file
@@ -890,7 +827,8 @@ doMkDLL o_files = do
     let lib_path_opts = map ("-L"++) lib_paths
 
     pkg_libs <- getPackageLibraries
-    let pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
+    let imp = if static then "" else "_imp"
+        pkg_lib_opts = map (\lib -> "-l" ++ lib ++ imp) pkg_libs
 
     libs <- readIORef v_Cmdline_libraries
     let lib_opts = map ("-l"++) (reverse libs)
@@ -906,22 +844,19 @@ doMkDLL o_files = do
 
     rts_pkg <- getPackageDetails ["rts"]
     std_pkg <- getPackageDetails ["std"]
-#ifdef mingw32_TARGET_OS
+
     let extra_os = if static || no_hs_main
                    then []
                    else [ head (library_dirs (head rts_pkg)) ++ "/Main.dll_o",
                           head (library_dirs (head std_pkg)) ++ "/PrelMain.dll_o" ]
-#endif
+
     (md_c_flags, _) <- machdepCCOpts
-    runSomething "DLL creator"
-       (unwords
-	 ([ ln, verb, "-o", output_fn ]
+    SysTools.runMkDLL
+	 ([ verb, "-o", output_fn ]
 	 ++ md_c_flags
 	 ++ o_files
-#ifdef mingw32_TARGET_OS
 	 ++ extra_os
 	 ++ [ "--target=i386-mingw32" ]
-#endif
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ lib_opts
@@ -933,7 +868,6 @@ doMkDLL o_files = do
 	       Just _  -> [ "" ])
 	 ++ extra_ld_opts
 	)
-       )
 
 -----------------------------------------------------------------------------
 -- Just preprocess a file, put the result in a temp. file (used by the
@@ -942,10 +876,9 @@ doMkDLL o_files = do
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_src_file filename) 
-  do init_dyn_flags <- readIORef v_InitDynFlags
-     writeIORef v_DynFlags init_dyn_flags
+  do restoreDynFlags	-- Restore to state of last save
      pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
-			defaultHscLang filename
+			     defaultHscLang filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
 
 -----------------------------------------------------------------------------
@@ -987,13 +920,13 @@ data CompResult
 
 compile ghci_mode summary source_unchanged have_object 
 	old_iface hst hit pcs = do 
-   init_dyn_flags <- readIORef v_InitDynFlags
-   writeIORef v_DynFlags init_dyn_flags
+   dyn_flags <- restoreDynFlags		-- Restore to the state of the last save
 
-   showPass init_dyn_flags 
+
+   showPass dyn_flags 
 	(showSDoc (text "Compiling" <+> ppr (name_of_summary summary)))
 
-   let verb = verbosity init_dyn_flags
+   let verb	  = verbosity dyn_flags
    let location   = ms_location summary
    let input_fn   = unJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = unJust "compile:hspp" (ml_hspp_file location)
@@ -1002,9 +935,9 @@ compile ghci_mode summary source_unchanged have_object
 
    opts <- getOptionsFromSource input_fnpp
    processArgs dynamic_flags opts []
-   dyn_flags <- readIORef v_DynFlags
+   dyn_flags <- getDynFlags
 
-   let hsc_lang = hscLang dyn_flags
+   let hsc_lang      = hscLang dyn_flags
        (basename, _) = splitFilename input_fn
        
    output_fn <- case hsc_lang of

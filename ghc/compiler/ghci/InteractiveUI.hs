@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.73 2001/06/07 16:00:18 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.74 2001/06/14 12:50:06 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -24,7 +24,7 @@ import Finder		( flushPackageCache )
 import Util
 import Name		( Name )
 import Outputable
-import CmdLineOpts	( DynFlag(..), dopt_unset )
+import CmdLineOpts	( DynFlag(..), getDynFlags, saveDynFlags, restoreDynFlags, dopt_unset )
 import Panic		( GhcException(..) )
 import Config
 
@@ -302,7 +302,7 @@ runStmt stmt
  = return Nothing
  | otherwise
  = do st <- getGHCiState
-      dflags <- io (getDynFlags)
+      dflags <- io getDynFlags
       let dflags' = dopt_unset dflags Opt_WarnUnusedBinds
       (new_cmstate, names) <- io (cmRunStmt (cmstate st) dflags' stmt)
       setGHCiState st{cmstate = new_cmstate}
@@ -396,7 +396,7 @@ defineMacro s = do
 
   -- compile the expression
   st <- getGHCiState
-  dflags <- io (getDynFlags)
+  dflags <- io getDynFlags
   (new_cmstate, maybe_hv) <- io (cmCompileExpr (cmstate st) dflags new_expr)
   setGHCiState st{cmstate = new_cmstate}
   case maybe_hv of
@@ -427,7 +427,7 @@ loadModule path = timeIt (loadModule' path)
 
 loadModule' path = do
   state <- getGHCiState
-  dflags <- io (getDynFlags)
+  dflags <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, target = Nothing }
   io (revertCAFs)			-- always revert CAFs on load.
@@ -464,7 +464,7 @@ modulesLoadedMsg ok mods = do
 typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do st <- getGHCiState
-       dflags <- io (getDynFlags)
+       dflags <- io getDynFlags
        (new_cmstate, maybe_tystr) <- io (cmTypeOfExpr (cmstate st) dflags str)
        setGHCiState st{cmstate = new_cmstate}
        case maybe_tystr of
@@ -513,11 +513,9 @@ setOptions str
 
       -- then, dynamic flags
       io $ do 
-	dyn_flags <- readIORef v_InitDynFlags
-        writeIORef v_DynFlags dyn_flags
+	restoreDynFlags
         leftovers <- processArgs dynamic_flags leftovers []
-        dyn_flags <- readIORef v_DynFlags
-        writeIORef v_InitDynFlags dyn_flags
+	saveDynFlags
 
         if (not (null leftovers))
 		then throwDyn (CmdLineError ("unrecognised flags: " ++ 
@@ -572,7 +570,7 @@ optToStr RevertCAFs = "r"
 
 newPackages new_pkgs = do
   state <- getGHCiState
-  dflags <- io (getDynFlags)
+  dflags <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, target = Nothing }
 

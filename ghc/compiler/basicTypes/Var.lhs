@@ -104,6 +104,8 @@ LocalId and GlobalId
 A GlobalId is
   * always a constant (top-level)
   * imported, or data constructor, or primop, or record selector
+  * has a Unique that is globally unique across the whole
+    GHC invocation (a single invocation may compile multiple modules)
 
 A LocalId is 
   * bound within an expression (lambda, case, local let(rec))

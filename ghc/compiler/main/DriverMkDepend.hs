@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.11 2001/05/28 03:31:19 sof Exp $
+-- $Id: DriverMkDepend.hs,v 1.12 2001/06/14 12:50:06 simonpj Exp $
 --
 -- GHC Driver
 --
@@ -14,7 +14,8 @@ module DriverMkDepend where
 import DriverState
 import DriverUtil
 import DriverFlags
-import TmpFiles
+import SysTools		( newTempName )
+import qualified SysTools
 import Module
 import Config
 import Util
@@ -158,14 +159,12 @@ endMkDependHS = do
 
   hClose tmp_hdl  -- make sure it's flushed
 
-	-- create a backup of the original makefile
-  when (isJust makefile_hdl) $
-     runSomething ("Backing up " ++ makefile)
-	(unwords [ cCP, dosifyPath makefile, dosifyPath $ makefile++".bak" ])
+	-- Create a backup of the original makefile
+  when (isJust makefile_hdl)
+       (SysTools.copy ("Backing up " ++ makefile) makefile (makefile++".bak"))
 
-  	-- copy the new makefile in place
-  runSomething "Installing new makefile"
-	(unwords [ cCP, dosifyPath tmp_file, dosifyPath makefile ])
+  	-- Copy the new makefile in place
+  SysTools.copy "Installing new makefile" tmp_file makefile
 
 
 findDependency :: Bool -> FilePath -> ModuleName -> IO (Maybe (String, Bool))

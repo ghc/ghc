@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.69 2001/06/13 10:25:37 simonmar Exp $
+-- $Id: Main.hs,v 1.70 2001/06/14 12:50:06 simonpj Exp $
 --
 -- GHC Driver program
 --
@@ -17,40 +17,57 @@ module Main (main) where
 
 
 #ifdef GHCI
-import InteractiveUI
+import InteractiveUI(ghciWelcomeMsg, interactiveUI)
 #endif
 
-#ifndef mingw32_TARGET_OS
-import Dynamic
-import Posix
-#endif
 
-import CompManager
-import ParsePkgConf
-import DriverPipeline
-import DriverState
-import DriverFlags
-import DriverMkDepend
-import DriverUtil
-import Panic
-import DriverPhases	( Phase(..), haskellish_src_file, objish_file )
-import CmdLineOpts
-import TmpFiles
 import Finder		( initFinder )
-import CmStaticInfo
-import Config
+import CompManager	( cmInit, cmLoadModule )
+import CmStaticInfo	( GhciMode(..), PackageConfig(..) )
+import Config		( cBooterVersion, cGhcUnregisterised, cProjectVersion )
+import SysTools		( packageConfigPath, initSysTools, cleanTempFiles )
+import ParsePkgConf	( parsePkgConf )
+
+import DriverPipeline	( GhcMode(..), doLink, doMkDLL, genPipeline,
+			  getGhcMode, pipeLoop, v_GhcMode
+			)
+import DriverState	( buildCoreToDo, buildStgToDo, defaultHscLang,
+			  findBuildTag, getPackageInfo, unregFlags, v_Cmdline_libraries,
+			  v_Keep_tmp_files, v_Ld_inputs, v_OptLevel, v_Output_file,
+			  v_Output_hi, v_Package_details, v_Ways
+			)
+import DriverFlags	( dynFlag, buildStaticHscOpts, dynamic_flags, processArgs, static_flags)
+
+import DriverMkDepend	( beginMkDependHS, endMkDependHS )
+import DriverPhases	( Phase(Hsc, HCc), haskellish_src_file, objish_file )
+
+import DriverUtil	( add, handle, handleDyn, later, splitFilename, unknownFlagErr, my_prefix_match )
+import CmdLineOpts	( dynFlag,
+			  DynFlags(verbosity, stgToDo, hscOutName, hscLang, coreToDo),
+			  HscLang(HscInterpreted, HscC), 
+			  defaultDynFlags, restoreDynFlags, saveDynFlags, setDynFlags, 
+			  v_Static_hsc_opts
+			)
+
 import Outputable
 import Util
+import Panic		( GhcException(..), panic )
 
-import Concurrent
-import Directory
-import IOExts
-import Exception
-
+-- Standard Haskell libraries
 import IO
+import Concurrent	( myThreadId, throwTo )
+import Directory	( doesFileExist )
+import IOExts		( readIORef, writeIORef )
+import Exception	( throwTo, throwDyn, Exception(DynException) )
+import System		( getArgs, exitWith, ExitCode(..) )
+
+#ifndef mingw32_TARGET_OS
+import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
+import Dynamic		( toDyn )
+#endif
+
 import Monad
 import List
-import System
 import Maybe
 
 
@@ -120,49 +137,13 @@ main =
    argv   <- getArgs
 
 	-- grab any -B options from the command line first
-   argv'  <- setTopDir argv
-   top_dir <- readIORef v_TopDir
+   let (top_dir, argv') = getTopDir argv
 
-   let installed s = top_dir ++ '/':s
-       inplace s   = top_dir ++ '/':cCURRENT_DIR ++ '/':s
-
-       installed_pkgconfig = installed ("package.conf")
-       inplace_pkgconfig   = inplace (cGHC_DRIVER_DIR ++ "/package.conf.inplace")
-
-	-- discover whether we're running in a build tree or in an installation,
-	-- by looking for the package configuration file.
-   am_installed <- doesFileExist installed_pkgconfig
-
-   if am_installed
-	then writeIORef v_Path_package_config installed_pkgconfig
-	else do am_inplace <- doesFileExist inplace_pkgconfig
-	        if am_inplace
-		    then writeIORef v_Path_package_config inplace_pkgconfig
-		    else throwDyn (InstallationError 
-			             ("Can't find package.conf in " ++ 
-				      inplace_pkgconfig))
-
-	-- set the location of our various files
-   if am_installed
-	then do writeIORef v_Path_usage (installed "ghc-usage.txt")
-		writeIORef v_Pgm_L (installed "unlit")
-		writeIORef v_Pgm_m (installed "ghc-asm")
-		writeIORef v_Pgm_s (installed "ghc-split")
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-		writeIORef v_Pgm_T (installed cTOUCH)
-#endif
-
-	else do writeIORef v_Path_usage (inplace (cGHC_DRIVER_DIR ++ "/ghc-usage.txt"))
-		writeIORef v_Pgm_L (inplace cGHC_UNLIT)
-		writeIORef v_Pgm_m (inplace cGHC_MANGLER)
-		writeIORef v_Pgm_s (inplace cGHC_SPLIT)
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-		writeIORef v_Pgm_T (inplace cTOUCH)
-#endif
+   initSysTools top_dir
 
 	-- read the package configuration
-   conf_file <- readIORef v_Path_package_config
-   r <- parsePkgConf conf_file
+   conf_file <- packageConfigPath
+   r	     <- parsePkgConf conf_file
    case r of {
 	Left err -> throwDyn (InstallationError (showSDoc err));
 	Right pkg_details -> do
@@ -223,24 +204,23 @@ main =
 		 _other        | opt_level >= 1  -> HscC  -- -O implies -fvia-C 
 			       | otherwise       -> defaultHscLang
 
-   writeIORef v_DynFlags 
-	defaultDynFlags{ coreToDo = core_todo,
-		  	 stgToDo  = stg_todo,
-                  	 hscLang  = lang,
-		  	 -- leave out hscOutName for now
-                  	 hscOutName = panic "Main.main:hscOutName not set",
+   setDynFlags (defaultDynFlags{ coreToDo = core_todo,
+			  	 stgToDo  = stg_todo,
+                  		 hscLang  = lang,
+			  	 -- leave out hscOutName for now
+	                  	 hscOutName = panic "Main.main:hscOutName not set",
 
-		  	 verbosity = case mode of
-					DoInteractive -> 1
-					DoMake	      -> 1
-					_other        -> 0,
-			}
+			  	 verbosity = case mode of
+						DoInteractive -> 1
+						DoMake	      -> 1
+						_other        -> 0,
+				})
 
 	-- the rest of the arguments are "dynamic"
    srcs <- processArgs dynamic_flags (way_non_static ++ non_static) []
+
 	-- save the "initial DynFlags" away
-   init_dyn_flags <- readIORef v_DynFlags
-   writeIORef v_InitDynFlags init_dyn_flags
+   saveDynFlags
 
     	-- complain about any unknown flags
    mapM unknownFlagErr [ f | f@('-':_) <- srcs ]
@@ -286,7 +266,7 @@ main =
    if null srcs then throwDyn (UsageError "no input files") else do
 
    let compileFile src = do
-	  writeIORef v_DynFlags init_dyn_flags
+	  restoreDynFlags
 
 	  exists <- doesFileExist src
           when (not exists) $ 
@@ -305,8 +285,8 @@ main =
 			basename suffix
 
 	  -- rest of compilation
-	  dyn_flags <- readIORef v_DynFlags
-	  phases <- genPipeline mode stop_flag True (hscLang dyn_flags) pp
+	  hsc_lang <- dynFlag hscLang
+	  phases <- genPipeline mode stop_flag True hsc_lang pp
 	  r <- pipeLoop phases pp (mode==DoLink || mode==DoMkDLL) True{-use -o flag-}
 			basename suffix
 	  return r
@@ -318,16 +298,14 @@ main =
    when (mode == DoMkDLL) (doMkDLL o_files)
   }
 
-
--- grab the last -B option on the command line, and
--- set topDir to its value.
-setTopDir :: [String] -> IO [String]
-setTopDir args = do
-  let (minusbs, others) = partition (prefixMatch "-B") args
-  (case minusbs of
-    []   -> throwDyn (InstallationError ("missing -B<dir> option"))
-    some -> writeIORef v_TopDir (drop 2 (last some)))
-  return others
+	-- grab the last -B option on the command line, and
+	-- set topDir to its value.
+getTopDir :: [String] -> (String, [String])
+getTopDir args
+  | null minusbs = throwDyn (InstallationError ("missing -B<dir> option"))
+  | otherwise	 = (drop 2 (last minusbs), others)
+  where
+    (minusbs, others) = partition (prefixMatch "-B") args
 
 
 -- replace the string "$libdir" at the beginning of a path with the

@@ -12,7 +12,7 @@ you will screw up the layout where they are used in case expressions!
 
 #ifdef __GLASGOW_HASKELL__
 #define GLOBAL_VAR(name,value,ty)  \
-name = global (value) :: IORef (ty); \
+name = Util.global (value) :: IORef (ty); \
 {-# NOINLINE name #-}
 #endif
 

@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.57 2001/06/13 15:50:25 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.58 2001/06/14 12:50:06 simonpj Exp $
 --
 -- Driver flags
 --
@@ -11,10 +11,9 @@
 
 module DriverFlags ( 
 	processArgs, OptKind(..), static_flags, dynamic_flags, 
-	v_InitDynFlags, v_DynFlags, getDynFlags, dynFlag, 
+	getDynFlags, dynFlag, 
 	getOpts, getVerbFlag, addCmdlineHCInclude,
 	buildStaticHscOpts, 
-	runSomething,
 	machdepCCOpts
   ) where
 
@@ -22,7 +21,7 @@ module DriverFlags (
 
 import DriverState
 import DriverUtil
-import TmpFiles 	( v_TmpDir )
+import SysTools		( setTmpDir, setPgm, setDryRun, showGhcUsage )
 import CmdLineOpts
 import Config
 import Util
@@ -30,11 +29,11 @@ import Panic
 
 import Exception
 import IOExts
+import System		( exitWith, ExitCode(..) )
 
 import IO
 import Maybe
 import Monad
-import System
 import Char
 
 -----------------------------------------------------------------------------
@@ -71,15 +70,15 @@ data OptKind
 	| AnySuffixPred (String -> Bool) (String -> IO ())
 
 processArgs :: [(String,OptKind)] -> [String] -> [String]
-   -> IO [String]  -- returns spare args
+	    -> IO [String]  -- returns spare args
 processArgs _spec [] spare = return (reverse spare)
+
 processArgs spec args@(('-':arg):args') spare = do
   case findArg spec arg of
-    Just (rest,action) -> 
-      do args' <- processOneArg action rest args
-	 processArgs spec args' spare
-    Nothing -> 
-      processArgs spec args' (('-':arg):spare)
+    Just (rest,action) ->  do args' <- processOneArg action rest args
+			      processArgs spec args' spare
+    Nothing	       -> processArgs spec args' (('-':arg):spare)
+
 processArgs spec (arg:args) spare = 
   processArgs spec args (arg:spare)
 
@@ -127,7 +126,8 @@ processOneArg action rest (dash_arg@('-':arg):args) =
 findArg :: [(String,OptKind)] -> String -> Maybe (String,OptKind)
 findArg spec arg
   = case [ (remove_spaces rest, k) 
-	 | (pat,k) <- spec, Just rest <- [my_prefix_match pat arg],
+	 | (pat,k)   <- spec, 
+	   Just rest <- [my_prefix_match pat arg],
 	   arg_ok k rest arg ] 
     of
 	[]      -> Nothing
@@ -152,8 +152,8 @@ arg_ok (AnySuffixPred p _)  rest arg = p arg
 
 static_flags = 
   [  ------- help -------------------------------------------------------
-     ( "?"    		, NoArg long_usage)
-  ,  ( "-help"		, NoArg long_usage)
+     ( "?"    		, NoArg showGhcUsage)
+  ,  ( "-help"		, NoArg showGhcUsage)
   
 
       ------- version ----------------------------------------------------
@@ -164,7 +164,7 @@ static_flags =
 				     exitWith ExitSuccess))
 
       ------- verbosity ----------------------------------------------------
-  ,  ( "n"              , NoArg (writeIORef v_Dry_run True) )
+  ,  ( "n"              , NoArg setDryRun )
 
 	------- recompilation checker --------------------------------------
   ,  ( "recomp"		, NoArg (writeIORef v_Recomp True) )
@@ -210,7 +210,7 @@ static_flags =
   ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
   ,  ( "hidir"		, HasArg (writeIORef v_Hi_dir . Just) )
   ,  ( "buildtag"	, HasArg (writeIORef v_Build_tag) )
-  ,  ( "tmpdir"		, HasArg (writeIORef v_TmpDir . (++ "/")) )
+  ,  ( "tmpdir"		, HasArg setTmpDir)
   ,  ( "ohi"		, HasArg (writeIORef v_Output_hi   . Just) )
 	-- -odump?
 
@@ -242,13 +242,7 @@ static_flags =
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
 
         ------- Specific phases  --------------------------------------------
-  ,  ( "pgmL"           , HasArg (writeIORef v_Pgm_L) )
-  ,  ( "pgmP"           , HasArg (writeIORef v_Pgm_P) )
-  ,  ( "pgmc"           , HasArg (writeIORef v_Pgm_c) )
-  ,  ( "pgmm"           , HasArg (writeIORef v_Pgm_m) )
-  ,  ( "pgms"           , HasArg (writeIORef v_Pgm_s) )
-  ,  ( "pgma"           , HasArg (writeIORef v_Pgm_a) )
-  ,  ( "pgml"           , HasArg (writeIORef v_Pgm_l) )
+  ,  ( "pgm"           , HasArg setPgm )
 
   ,  ( "optdep"		, HasArg (add v_Opt_dep) )
   ,  ( "optl"		, HasArg (add v_Opt_l) )
@@ -292,73 +286,6 @@ static_flags =
 	-- Pass all remaining "-f<blah>" options to hsc
   ,  ( "f", 			AnySuffixPred (isStaticHscFlag) (add v_Opt_C) )
   ]
-
------------------------------------------------------------------------------
--- parse the dynamic arguments
-
--- v_InitDynFlags 
---	is the "baseline" dynamic flags, initialised from
--- 	the defaults and command line options, and updated by the
---	':s' command in GHCi.
---
--- v_DynFlags
---	is the dynamic flags for the current compilation.  It is reset
---	to the value of v_InitDynFlags before each compilation, then
---	updated by reading any OPTIONS pragma in the current module.
-
-GLOBAL_VAR(v_InitDynFlags, defaultDynFlags, DynFlags)
-GLOBAL_VAR(v_DynFlags,     defaultDynFlags, DynFlags)
-
-updDynFlags f = do
-   dfs <- readIORef v_DynFlags
-   writeIORef v_DynFlags (f dfs)
-
-getDynFlags :: IO DynFlags
-getDynFlags = readIORef v_DynFlags
-
-dynFlag :: (DynFlags -> a) -> IO a
-dynFlag f = do dflags <- readIORef v_DynFlags; return (f dflags)
-
-setDynFlag f   = updDynFlags (\dfs -> dopt_set dfs f)
-unSetDynFlag f = updDynFlags (\dfs -> dopt_unset dfs f)
-
-addOpt_L     a = updDynFlags (\s -> s{opt_L =  a : opt_L s})
-addOpt_P     a = updDynFlags (\s -> s{opt_P =  a : opt_P s})
-addOpt_c     a = updDynFlags (\s -> s{opt_c =  a : opt_c s})
-addOpt_a     a = updDynFlags (\s -> s{opt_a =  a : opt_a s})
-addOpt_m     a = updDynFlags (\s -> s{opt_m =  a : opt_m s})
-
-addCmdlineHCInclude a = 
-   updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
-
-	-- we add to the options from the front, so we need to reverse the list
-getOpts :: (DynFlags -> [a]) -> IO [a]
-getOpts opts = dynFlag opts >>= return . reverse
-
--- we can only change HscC to HscAsm and vice-versa with dynamic flags 
--- (-fvia-C and -fasm).
--- NB: we can also set the new lang to ILX, via -filx.  I hope this is right
-setLang l = do
-   dfs <- readIORef v_DynFlags
-   case hscLang dfs of
-	HscC   -> writeIORef v_DynFlags dfs{ hscLang = l }
-	HscAsm -> writeIORef v_DynFlags dfs{ hscLang = l }
-	HscILX -> writeIORef v_DynFlags dfs{ hscLang = l }
-	_      -> return ()
-
-setVerbosityAtLeast n =
-  updDynFlags (\dfs -> if verbosity dfs < n 
-			  then dfs{ verbosity = n }
-			  else dfs)
-
-setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
-setVerbosity n 
-  | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
-  | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
-
-getVerbFlag = do
-   verb <- dynFlag verbosity
-   if verb >= 3  then return  "-v" else return ""
 
 dynamic_flags = [
 
@@ -488,8 +415,6 @@ decodeSize str
         n      = read m  :: Double
 	pred c = isDigit c || c == '.'
 
-floatOpt :: IORef Double -> String -> IO ()
-floatOpt ref str = writeIORef ref (read str :: Double)
 
 -----------------------------------------------------------------------------
 -- RTS Hooks
@@ -525,30 +450,6 @@ buildStaticHscOpts = do
 					      else return "")
 
   return ( static : filtered_opts )
-
------------------------------------------------------------------------------
--- Running an external program
-
--- sigh, here because both DriverMkDepend & DriverPipeline need it.
-
-runSomething phase_name cmd
- = do
-   verb <- dynFlag verbosity
-   when (verb >= 2) $ hPutStrLn stderr ("*** " ++ phase_name)
-   when (verb >= 3) $ hPutStrLn stderr cmd
-   hFlush stderr
-
-   -- test for -n flag
-   n <- readIORef v_Dry_run
-   unless n $ do 
-
-   -- and run it!
-   exit_code <- system cmd
-
-   if exit_code /= ExitSuccess
-	then throwDyn (PhaseFailed phase_name exit_code)
-	else do when (verb >= 3) (hPutStr stderr "\n")
-	        return ()
 
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff
@@ -599,3 +500,35 @@ machdepCCOpts
 
    | otherwise
 	= return ( [], [] )
+
+
+
+addOpt_L a = updDynFlags (\s -> s{opt_L =  a : opt_L s})
+addOpt_P a = updDynFlags (\s -> s{opt_P =  a : opt_P s})
+addOpt_c a = updDynFlags (\s -> s{opt_c =  a : opt_c s})
+addOpt_a a = updDynFlags (\s -> s{opt_a =  a : opt_a s})
+addOpt_m a = updDynFlags (\s -> s{opt_m =  a : opt_m s})
+
+addCmdlineHCInclude a = updDynFlags (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
+
+getOpts :: (DynFlags -> [a]) -> IO [a]
+	-- We add to the options from the front, so we need to reverse the list
+getOpts opts = dynFlag opts >>= return . reverse
+
+-- we can only change HscC to HscAsm and vice-versa with dynamic flags 
+-- (-fvia-C and -fasm).
+-- NB: we can also set the new lang to ILX, via -filx.  I hope this is right
+setLang l = updDynFlags (\ dfs -> case hscLang dfs of
+					HscC   -> dfs{ hscLang = l }
+					HscAsm -> dfs{ hscLang = l }
+					HscILX -> dfs{ hscLang = l }
+					_      -> dfs)
+
+setVerbosity "" = updDynFlags (\dfs -> dfs{ verbosity = 3 })
+setVerbosity n 
+  | all isDigit n = updDynFlags (\dfs -> dfs{ verbosity = read n })
+  | otherwise     = throwDyn (UsageError "can't parse verbosity flag (-v<n>)")
+
+getVerbFlag = do
+   verb <- dynFlag verbosity
+   if verb >= 3  then return  "-v" else return ""

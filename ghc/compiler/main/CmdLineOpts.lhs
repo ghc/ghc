@@ -14,7 +14,6 @@ module CmdLineOpts (
 	HscLang(..),
 	DynFlag(..),	-- needed non-abstractly by DriverFlags
 	DynFlags(..),
-	defaultDynFlags,
 
 	v_Static_hsc_opts,
 
@@ -22,25 +21,34 @@ module CmdLineOpts (
 	switchIsOn,
 	isStaticHscFlag,
 
-	opt_PprStyle_NoPrags,
-	opt_PprStyle_RawTypes,
-	opt_PprUserLength,
-	opt_PprStyle_Debug,
+	-- Manipulating DynFlags
+	defaultDynFlags,		-- DynFlags
+	dopt,				-- DynFlag -> DynFlags -> Bool
+	dopt_set, dopt_unset,		-- DynFlags -> DynFlag -> DynFlags
+	dopt_CoreToDo,			-- DynFlags -> [CoreToDo]
+	dopt_StgToDo,			-- DynFlags -> [StgToDo]
+	dopt_HscLang,			-- DynFlags -> HscLang
+	dopt_OutName,			-- DynFlags -> String
 
-	dopt,
-	dopt_set,
-	dopt_unset,
-
-	-- other dynamic flags
-	dopt_CoreToDo,
-	dopt_StgToDo,
-	dopt_HscLang,
-	dopt_OutName,
+	-- Manipulating the DynFlags state
+	getDynFlags,			-- IO DynFlags
+	setDynFlags,			-- DynFlags -> IO ()
+	updDynFlags, 			-- (DynFlags -> DynFlags) -> IO ()
+	dynFlag,			-- (DynFlags -> a) -> IO a
+	setDynFlag, unSetDynFlag,	-- DynFlag -> IO ()
+	saveDynFlags, 		 	-- IO ()
+	restoreDynFlags,		-- IO DynFlags
 
 	-- sets of warning opts
  	standardWarnings,
 	minusWOpts,
 	minusWallOpts,
+
+	-- Output style options
+	opt_PprStyle_NoPrags,
+	opt_PprStyle_RawTypes,
+	opt_PprUserLength,
+	opt_PprStyle_Debug,
 
 	-- profiling opts
 	opt_AutoSccsOnAllToplevs,
@@ -108,7 +116,7 @@ module CmdLineOpts (
 
 import Array	( array, (//) )
 import GlaExts
-import IOExts	( IORef, readIORef )
+import IOExts	( IORef, readIORef, writeIORef )
 import Constants	-- Default values for some flags
 import Util
 import FastTypes
@@ -312,6 +320,14 @@ data DynFlags = DynFlags {
   flags      		:: [DynFlag]
  }
 
+data HscLang
+  = HscC
+  | HscAsm
+  | HscJava
+  | HscILX
+  | HscInterpreted
+    deriving (Eq, Show)
+
 defaultDynFlags = DynFlags {
   coreToDo = [], stgToDo = [], 
   hscLang = HscC, 
@@ -353,23 +369,60 @@ dopt_StgToDo = stgToDo
 dopt_OutName :: DynFlags -> String
 dopt_OutName = hscOutName
 
+dopt_HscLang :: DynFlags -> HscLang
+dopt_HscLang = hscLang
+
 dopt_set :: DynFlags -> DynFlag -> DynFlags
 dopt_set dfs f = dfs{ flags = f : flags dfs }
 
 dopt_unset :: DynFlags -> DynFlag -> DynFlags
 dopt_unset dfs f = dfs{ flags = filter (/= f) (flags dfs) }
-
-data HscLang
-  = HscC
-  | HscAsm
-  | HscJava
-  | HscILX
-  | HscInterpreted
-    deriving (Eq, Show)
-
-dopt_HscLang :: DynFlags -> HscLang
-dopt_HscLang = hscLang
 \end{code}
+
+-----------------------------------------------------------------------------
+-- Mess about with the mutable variables holding the dynamic arguments
+
+-- v_InitDynFlags 
+--	is the "baseline" dynamic flags, initialised from
+-- 	the defaults and command line options, and updated by the
+--	':s' command in GHCi.
+--
+-- v_DynFlags
+--	is the dynamic flags for the current compilation.  It is reset
+--	to the value of v_InitDynFlags before each compilation, then
+--	updated by reading any OPTIONS pragma in the current module.
+
+\begin{code}
+GLOBAL_VAR(v_InitDynFlags, defaultDynFlags, DynFlags)
+GLOBAL_VAR(v_DynFlags,     defaultDynFlags, DynFlags)
+
+setDynFlags :: DynFlags -> IO ()
+setDynFlags dfs = writeIORef v_DynFlags dfs
+
+saveDynFlags :: IO ()
+saveDynFlags = do dfs <- readIORef v_DynFlags
+		  writeIORef v_InitDynFlags dfs
+
+restoreDynFlags :: IO DynFlags
+restoreDynFlags = do dfs <- readIORef v_InitDynFlags
+		     writeIORef v_DynFlags dfs
+		     return dfs
+
+getDynFlags :: IO DynFlags
+getDynFlags = readIORef v_DynFlags
+
+updDynFlags :: (DynFlags -> DynFlags) -> IO ()
+updDynFlags f = do dfs <- readIORef v_DynFlags
+		   writeIORef v_DynFlags (f dfs)
+
+dynFlag :: (DynFlags -> a) -> IO a
+dynFlag f = do dflags <- readIORef v_DynFlags; return (f dflags)
+
+setDynFlag, unSetDynFlag :: DynFlag -> IO ()
+setDynFlag f   = updDynFlags (\dfs -> dopt_set dfs f)
+unSetDynFlag f = updDynFlags (\dfs -> dopt_unset dfs f)
+\end{code}
+
 
 %************************************************************************
 %*									*

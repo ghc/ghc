@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.23 2001/06/02 09:45:51 qrczak Exp $
+-- $Id: DriverUtil.hs,v 1.24 2001/06/14 12:50:06 simonpj Exp $
 --
 -- Utils for the driver
 --
@@ -22,29 +22,13 @@ import RegexString
 
 import Directory	( getDirectoryContents )
 import IO
-import System
 import List
 import Char
 import Monad
 
-#ifndef mingw32_TARGET_OS
-import Posix
-#endif
 
 -----------------------------------------------------------------------------
 -- Errors
-
-GLOBAL_VAR(v_Path_usage,  "",  String)
-
-long_usage = do
-  usage_path <- readIORef v_Path_usage
-  usage <- readFile usage_path
-  dump usage
-  exitWith ExitSuccess
-  where
-     dump "" = return ()
-     dump ('$':'$':s) = hPutStr stderr progName >> dump s
-     dump (c:s) = hPutChar stderr c >> dump s
 
 -----------------------------------------------------------------------------
 -- Reading OPTIONS pragmas
@@ -96,8 +80,8 @@ my_partition p (a:as)
 	Just b  -> ((a,b):bs,cs)
 
 my_prefix_match :: String -> String -> Maybe String
-my_prefix_match [] rest = Just rest
-my_prefix_match (_:_) [] = Nothing
+my_prefix_match []    rest = Just rest
+my_prefix_match (_:_) []   = Nothing
 my_prefix_match (p:pat) (r:rest)
   | p == r    = my_prefix_match pat rest
   | otherwise = Nothing
@@ -132,14 +116,20 @@ addNoDups var x = do
   xs <- readIORef var
   unless (x `elem` xs) $ writeIORef var (x:xs)
 
-splitFilename :: String -> (String,String)
+------------------------------------------------------
+--		Filename manipulation
+------------------------------------------------------
+		
+type Suffix = String
+
+splitFilename :: String -> (String,Suffix)
 splitFilename f = split_longest_prefix f '.'
 
-getFileSuffix :: String -> String
+getFileSuffix :: String -> Suffix
 getFileSuffix f = drop_longest_prefix f '.'
 
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
-splitFilename3 :: String -> (String,String,String)
+splitFilename3 :: String -> (String,String,Suffix)
 splitFilename3 str
    = let (dir, rest) = split_longest_prefix str '/'
 	 (name, ext) = splitFilename rest
@@ -147,7 +137,7 @@ splitFilename3 str
 		  | otherwise = dir
      in  (real_dir, name, ext)
 
-remove_suffix :: Char -> String -> String
+remove_suffix :: Char -> String -> Suffix
 remove_suffix c s
   | null pre  = reverse suf
   | otherwise = reverse pre
@@ -171,7 +161,7 @@ split_longest_prefix s c
 	(_:pre) -> (reverse pre, reverse suf)
   where (suf,pre) = break (==c) (reverse s)
 
-newsuf :: String -> String -> String
+newsuf :: String -> Suffix -> String
 newsuf suf s = remove_suffix '.' s ++ suf
 
 -- getdir strips the filename off the input string, returning the directory.
@@ -186,55 +176,3 @@ remove_spaces :: String -> String
 remove_spaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 
 
-ghcToolDir :: String
-prependToolDir :: String -> IO String
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-ghcToolDir = unsafePerformIO $ do
-		bs <- getEnv "GHC_TOOLDIR" `IO.catch` (\ _ -> return "")
-		case bs of
-		  "" -> return bs
-		  ls -> 
-		    let
-		     term = last ls
-		     bs' 
-		      | term `elem` ['/', '\\'] = bs
-		      | otherwise = bs ++ ['/']
-		    in
-		    return bs'
-
-prependToolDir x = return (dosifyPath (ghcToolDir ++ x))
-#else
-ghcToolDir = ""
-prependToolDir x = return x
-#endif
-
-appendInstallDir :: String -> IO String
-appendInstallDir cmd = 
-  case ghcToolDir of
-    "" -> return cmd
-    _  -> return (unwords [cmd, '-':'B':ghcToolDir])
-
--- convert filepath into MSDOS form.
-dosifyPath :: String -> String
-#if defined(mingw32_TARGET_OS) && defined(MINIMAL_UNIX_DEPS)
-dosifyPath stuff = subst '/' '\\' real_stuff
- where
-   -- fully convince myself that /cygdrive/ prefixes cannot
-   -- really appear here.
-  cygdrive_prefix = "/cygdrive/"
-
-  real_stuff
-    | "/cygdrive/" `isPrefixOf` stuff = drop (length cygdrive_prefix) stuff
-    | otherwise = stuff
-   
-  subst a b ls = map (\ x -> if x == a then b else x) ls
-#else
-dosifyPath x = x
-#endif
-
-#ifdef mingw32_TARGET_OS
-foreign import "_getpid" myGetProcessID :: IO Int 
-#else
-myGetProcessID :: IO Int
-myGetProcessID = Posix.getProcessID
-#endif
