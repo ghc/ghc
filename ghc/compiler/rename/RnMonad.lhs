@@ -22,6 +22,7 @@ module RnMonad(
 
 import SST
 import GlaExts		( RealWorld, stToIO )
+import List		( intersperse )
 
 import HsSyn		
 import RdrHsSyn
@@ -30,22 +31,24 @@ import SrcLoc		( noSrcLoc )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  pprBagOfErrors, ErrMsg, WarnMsg
 			)
+import Maybes	        ( seqMaybe, mapMaybe )			
 import Name		( Module, Name, OccName, PrintUnqualified, NameSet, emptyNameSet,
 			  isLocallyDefinedName,
 			  modAndOcc, NamedThing(..)
 			)
-import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas )
+import CmdLineOpts	( opt_D_show_rn_trace, opt_IgnoreIfacePragmas, opt_WarnHiShadows )
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )
 import Unique		( Unique )
 import UniqFM		( UniqFM )
-import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM )
+import FiniteMap	( FiniteMap, emptyFM, bagToFM, lookupFM, addToFM, addListToFM_C )
 import Bag		( Bag, mapBag, emptyBag, isEmptyBag, snocBag )
 import UniqSet
 import UniqSupply
 import Util
 import Outputable
+import DirUtils		( getDirectoryContents )
 
 infixr 9 `thenRn`, `thenRn_`
 \end{code}
@@ -105,7 +108,7 @@ data Necessity = Compulsory | Optional		-- We *must* find definitions for
 
 	-- For getting global names
 data GDown = GDown
-		SearchPath
+		ModuleHiMap
 		(SSTRWRef Ifaces)
 
 	-- For renaming source code
@@ -130,6 +133,11 @@ data RnSMode	= SourceMode			-- Renaming source code
 
 type SearchPath = [(String,String)]	-- List of (directory,suffix) pairs to search 
                                         -- for interface files.
+
+type ModuleHiMap = FiniteMap String String 
+   -- mapping from module name to the file path of its corresponding
+   -- interface file.
+
 type FreeVars	= NameSet
 \end{code}
 
@@ -283,22 +291,22 @@ initRn :: Module -> UniqSupply -> SearchPath -> SrcLoc
        -> RnMG r
        -> IO (r, Bag ErrMsg, Bag WarnMsg)
 
-initRn mod us dirs loc do_rn
-  = sstToIO $
-    newMutVarSST (us, emptyFM, builtins) `thenSST` \ names_var ->
-    newMutVarSST (emptyBag,emptyBag)	 `thenSST` \ errs_var ->
-    newMutVarSST (emptyIfaces mod)	 `thenSST` \ iface_var -> 
-    newMutVarSST initOccs		 `thenSST` \ occs_var ->
-    let
-	rn_down = RnDown loc names_var errs_var occs_var
-	g_down  = GDown dirs iface_var
-    in
+initRn mod us dirs loc do_rn = do
+  names_var <- sstToIO (newMutVarSST (us, emptyFM, builtins))
+  errs_var  <- sstToIO (newMutVarSST (emptyBag,emptyBag))
+  iface_var <- sstToIO (newMutVarSST (emptyIfaces mod))
+  occs_var  <- sstToIO (newMutVarSST initOccs)
+  himap     <- mkModuleHiMap dirs
+  let
+        rn_down = RnDown loc names_var errs_var occs_var
+	g_down  = GDown himap iface_var
+
 	-- do the buisness
-    do_rn rn_down g_down		`thenSST` \ res ->
+  res <- sstToIO (do_rn rn_down g_down)
 
 	-- grab errors and return
-    readMutVarSST errs_var			`thenSST` \ (warns,errs) ->
-    returnSST (res, errs, warns)
+  (warns, errs) <- sstToIO (readMutVarSST errs_var)
+  return (res, errs, warns)
 
 
 initRnMS :: RnEnv -> Module -> RnSMode -> RnMS RealWorld r -> RnMG r
@@ -324,6 +332,62 @@ initOccs = ([(getName boolTyCon, noSrcLoc)], [])
 	-- to do as much as possible explicitly.
 \end{code}
 
+\begin{code}
+mkModuleHiMap :: SearchPath -> IO ModuleHiMap
+mkModuleHiMap dirs = do
+  lss <- mapM (uncurry getAllFilesMatching) dirs
+  let ls = concat lss
+  if opt_WarnHiShadows
+   then return (addListToFM_C conflict env ls)
+   else return (addListToFM_C (\ old new -> old) env ls)
+ where
+  env = emptyFM
+
+  conflict old_path new_path
+    | old_path /= new_path = 
+        pprTrace "Warning: " (text "Identically named interface files present on import path, " $$
+			      text (show old_path) <+> text "shadows" $$
+			      text (show new_path) $$
+			      text "on the import path: " <+> 
+			      text (concat (intersperse ":" (map fst dirs))))
+        old_path
+    | otherwise = old_path  -- don't warn about innocous shadowings.
+
+getAllFilesMatching :: FilePath -> String -> IO [(String, FilePath)]
+getAllFilesMatching dir_path suffix = do
+  fpaths <- getDirectoryContents dir_path
+  -- fpaths entries do not have dir_path prepended
+  return (mapMaybe withSuffix fpaths)
+ where
+   xiffus = reverse dotted_suffix 
+  
+   dotted_suffix =
+    case suffix of
+      [] -> []
+      ('.':xs) -> suffix
+      ls -> '.':ls
+
+    -- filter out files that have the desired suffix
+   withSuffix nm = go ""  xiffus rev_nm     `seqMaybe` 
+                   go "b" "toob-ih." rev_nm
+    where
+     rev_nm  = reverse nm
+
+     -- the prefix is needed to distinguish between a .hi-boot
+     -- file and a normal interface file, i.e., I'm not willing
+     -- to guarantee that the presence of the SOURCE pragma
+     --
+     --   import {-# SOURCE #-} Foo (x)
+     --   import Bar
+     --
+     -- will not cause Foo.hi to somehow be looked at when
+     -- slurping in Bar.
+     -- 
+     go pre [] xs     = Just (pre ++ reverse xs, dir_path ++'/':nm)
+     go _ _  []       = Nothing
+     go pre (x:xs) (y:ys) 
+       | x == y       = go pre xs ys 
+       | otherwise    = Nothing
 \end{code}
 
 
@@ -697,9 +761,16 @@ setIfacesRn :: Ifaces -> RnMG ()
 setIfacesRn ifaces rn_down (GDown dirs iface_var)
   = writeMutVarSST iface_var ifaces
 
+{-
 getSearchPathRn :: RnMG SearchPath
 getSearchPathRn rn_down (GDown dirs iface_var)
   = returnSST dirs
+-}
+
+getModuleHiMap :: RnMG ModuleHiMap
+getModuleHiMap rn_down (GDown himap iface_var)
+  = returnSST himap
+
 \end{code}
 
 %************************************************************************

@@ -948,15 +948,30 @@ findAndReadIface :: SDoc -> Module
 	-- Just x  <=> successfully found and parsed 
 findAndReadIface doc_str mod_name as_source
   = traceRn trace_msg			`thenRn_`
+    getModuleHiMap			`thenRn` \ himap ->
+    case (lookupFM himap real_mod_name) of
+      Nothing    ->
+         traceRn (ptext SLIT("...failed"))	`thenRn_`
+	 returnRn Nothing
+      Just fpath ->
+         readIface fpath
+{-
     getSearchPathRn			`thenRn` \ dirs ->
-    try dirs dirs
+    try dirs
+-}
   where
+    real_mod_name = 
+     case as_source of
+        HiBootFile -> 'b':moduleString mod_name
+	HiFile     -> moduleString mod_name
+
     trace_msg = sep [hsep [ptext SLIT("Reading"), 
 			   case as_source of { HiBootFile -> ptext SLIT("[boot]"); other -> empty},
 			   ptext SLIT("interface for"), 
 			   ptext mod_name <> semi],
 		     nest 4 (ptext SLIT("reason:") <+> doc_str)]
 
+{-
 	-- For import {-# SOURCE #-} Foo, "as_source" will be True
 	-- and we read Foo.hi-boot, not Foo.hi.  This is used to break
 	-- loops among modules.
@@ -964,17 +979,18 @@ findAndReadIface doc_str mod_name as_source
 			HiBootFile -> ".hi-boot" -- Ignore `ways' for boot files.
 			HiFile     -> hi
 
-    try all_dirs [] = traceRn (ptext SLIT("...failed"))	`thenRn_`
-		      returnRn Nothing
+    try [] = traceRn (ptext SLIT("...failed"))	`thenRn_`
+	     returnRn Nothing
 
-    try all_dirs ((dir,hisuf):dirs)
+    try ((dir,hisuf):dirs)
 	= readIface file_path	`thenRn` \ read_result ->
 	  case read_result of
-	      Nothing    -> try all_dirs dirs
+	      Nothing    -> try dirs
 	      Just iface -> traceRn (ptext SLIT("...done"))	`thenRn_`
 			    returnRn (Just iface)
 	where
 	  file_path = dir ++ '/' : moduleString mod_name ++ (mod_suffix hisuf)
+-}
 \end{code}
 
 @readIface@ tries just the one file.
