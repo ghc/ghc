@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.6 2001/03/27 12:59:18 simonmar Exp $
+# $Id: bootstrap.mk,v 1.7 2001/04/24 15:06:32 simonmar Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -50,7 +50,7 @@ endif
 
 PLATFORM_CC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt) 
 
-HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) -D__GLASGOW_HASKELL__=411 $(CC_OPTS)
+HC_BOOT_CC_OPTS = $(PLATFORM_HC_BOOT_CC_OPTS) $(PLATFORM_CC_OPTS) $(CC_OPTS)
 
 SRC_CC_OPTS += -I$(FPTOOLS_TOP_ABS)/ghc/includes -I$(FPTOOLS_TOP_ABS)/ghc/lib/std/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/lang/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/posix/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/util/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/text/cbits -I$(FPTOOLS_TOP_ABS)/hslibs/hssource/cbits
 
