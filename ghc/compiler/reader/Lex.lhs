@@ -563,7 +563,7 @@ is_id_char (C# c#) =
   0# -> False
   1# -> True
 
---is_id_char c@(C# c#)  = isAlphanum c || is_sym c#
+--OLD: is_id_char c@(C# c#)  = isAlphanum c || is_sym c#
 
 is_sym c#=
  case c# of {
@@ -655,11 +655,13 @@ lex_id cont buf =
 lex_id2 cont module_dot buf =
 -- _trace ("lex_id2: "++[C# (currentChar# buf)]) $
  case currentChar# buf of
-  '['# -> 
+
+  '['# -> 	-- Special case for []
     case lookAhead# buf 1# of
      ']'# -> end_lex_id cont module_dot (ITconid SLIT("[]")) (stepOnBy# buf 2#)
      _    -> lex_id3 cont module_dot buf
-  '('# ->
+
+  '('# ->	-- Special case for (,,,)
     case lookAhead# buf 1# of
      ')'# -> end_lex_id cont module_dot (ITconid SLIT("()")) (stepOnBy# buf 2#)
      ','# -> lex_tuple cont module_dot (stepOnBy# buf 2#)
@@ -685,7 +687,7 @@ lex_id3 cont module_dot buf =
   buf' ->
     case module_dot of
      Just _ ->
-       end_lex_id cont module_dot (mk_var_token lexeme) (stepOverLexeme buf')
+       end_lex_id cont module_dot (mk_var_token lexeme) new_buf
      Nothing ->
        case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of
          Just kwd_token -> cont kwd_token new_buf
@@ -748,8 +750,18 @@ end_lex_id cont (Just (m,hif)) token buf =
    ITconid n  -> cont (ITqconid  (m,n,hif))         buf
    ITvarid n  -> cont (ITqvarid  (m,n,hif))         buf
    ITconsym n -> cont (ITqconsym (m,n,hif))         buf
+	
+	-- Special case for ->
+	-- "->" by itself is a special token (ITrarrow),
+	-- but M.-> is a ITqconid
+   ITvarsym n |  n == SLIT("->")
+	      -> cont (ITqconsym (m,n,hif))	    buf
+
    ITvarsym n -> cont (ITqvarsym (m,n,hif))         buf
-   ITbang     -> cont (ITqvarsym (m,SLIT("!"),hif)) buf
+
+-- ITbang can't happen here I think
+--   ITbang     -> cont (ITqvarsym (m,SLIT("!"),hif)) buf
+
    _	      -> cont (ITunknown (show token))      buf
 
 ------------
@@ -814,7 +826,7 @@ haskellKeywordsFM = listToUFM $
        ]
 
 
--- doDiscard rips along really fast looking for a double semicolon, 
+-- doDiscard rips along really fast, looking for a double semicolon, 
 -- indicating the end of the pragma we're skipping
 doDiscard inStr buf =
 -- _trace (show (C# (currentChar# buf))) $
