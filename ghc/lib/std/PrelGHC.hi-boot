@@ -18,6 +18,10 @@ __export PrelGHC
 -- Magical assert thingy
   assert
 
+  -- constructor tags
+  tagToEnumzh
+  dataToTagzh
+
   -- I/O primitives
   RealWorld
   realWorldzh
