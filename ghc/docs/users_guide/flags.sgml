@@ -688,7 +688,7 @@
 	    <row>
 	      <entry><option>-O</option><replaceable>n</replaceable></entry>
 	      <entry>Set optimisation level <replaceable>n</replaceable></entry>
-	      <entry>dyanamic</entry>
+	      <entry>dynamic</entry>
 	      <entry><option>-O0</option></entry>
 	    </row>
 	  </tbody>
