@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 1999/10/08 14:16:15 simonmar Exp $
+# $Id: Makefile,v 1.15 1999/10/29 13:50:16 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -94,8 +94,8 @@ unexport CC
 #
 #  Building DLLs is only supported on mingw32 at the moment.
 # 
-ifeq "$(way)" "dll"
 DLL_NAME          = HSrts.dll
+ifeq "$(way)" "dll"
 DLL_IMPLIB_NAME   = libHSrts_imp.a
 SRC_BLD_DLL_OPTS += --def HSrts.def -lwinmm -lHS_imp_stub -lgmp -L. -Lgmp
 
@@ -175,7 +175,7 @@ INSTALL_LIBS += $(LIBRARY)
 ifeq "$(EnableWin32DLLs)" "YES"
 INSTALL_PROGS += $(DLL_NAME) gmp/gmp.dll
 INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
-INSTALL_LIBS += gmp/libgmp_imp.a Main.o
+INSTALL_LIBS += gmp/libgmp_imp.a Main.dll_o
 endif
 
 include $(TOP)/mk/target.mk
