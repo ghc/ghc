@@ -149,9 +149,11 @@ mkProtoBCO
    -> Int
    -> Int
    -> [StgWord]
+   -> Bool   	-- True <=> is a return point, rather than a function
    -> [Ptr ()]
    -> ProtoBCO name
-mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap mallocd_blocks
+mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap
+  is_ret mallocd_blocks
    = ProtoBCO {
 	protoBCOName = nm,
 	protoBCOInstrs = maybe_with_stack_check,
@@ -170,16 +172,19 @@ mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap mallocd_blocks
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
+	   | is_ret = peep_d
+		-- don't do stack checks at return points;
+		-- everything is aggregated up to the top BCO
+		-- (which must be a function)
            | stack_overest >= 65535
            = pprPanic "mkProtoBCO: stack use won't fit in 16 bits" 
                       (int stack_overest)
            | stack_overest >= iNTERP_STACK_CHECK_THRESH
-           = (STKCHECK stack_overest) : peep_d
+           = STKCHECK stack_overest : peep_d
            | otherwise
            = peep_d	-- the supposedly common case
              
         stack_overest = sum (map bciStackUse peep_d)
-                        + 10 {- just to be really really sure -}
 
         -- Merge local pushes
         peep_d = peep (fromOL instrs_ordlist)
@@ -244,7 +249,7 @@ schemeTopBind (id, rhs)
 	-- by just re-using the single top-level definition.  So
 	-- for the wrapper itself, we must allocate it directly.
     emitBc (mkProtoBCO (getName id) (toOL [PACK data_con 0, ENTER])
-                       (Right rhs) 0 0 [{-no bitmap-}])
+                       (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
   = schemeR [{- No free variables -}] (id, rhs)
@@ -302,7 +307,7 @@ schemeR_wrk fvs nm original_body (args, body)
      in
      schemeE szw_args 0 p_init body 		`thenBc` \ body_code ->
      emitBc (mkProtoBCO (getName nm) body_code (Right original_body)
-		arity bitmap_size bitmap)
+		arity bitmap_size bitmap False{-not alts-})
 
 
 fvsToEnv :: BCEnv -> VarSet -> [Id]
@@ -768,7 +773,7 @@ doCase d s p (_,scrut)
      let 
          alt_bco_name = getName bndr
          alt_bco = mkProtoBCO alt_bco_name alt_final (Left alts)
-			0{-no arity-} d{-bitmap size-} bitmap
+			0{-no arity-} d{-bitmap size-} bitmap True{-is alts-}
      -- in
 --     trace ("case: bndr = " ++ showSDocDebug (ppr bndr) ++ "\ndepth = " ++ show d ++ "\nenv = \n" ++ showSDocDebug (ppBCEnv p) ++
 --	     "\n      bitmap = " ++ show bitmap) $ do

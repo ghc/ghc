@@ -206,6 +206,15 @@ instance Outputable BCInstr where
 -- The stack use, in words, of each bytecode insn.  These _must_ be
 -- correct, or overestimates of reality, to be safe.
 
+-- NOTE: we aggregate the stack use from case alternatives too, so that
+-- we can do a single stack check at the beginning of a function only.
+
+-- This could all be made more accurate by keeping track of a proper
+-- stack high water mark, but it doesn't seem worth the hassle.
+
+protoBCOStackUse :: ProtoBCO a -> Int
+protoBCOStackUse bco = sum (map bciStackUse (protoBCOInstrs bco))
+
 bciStackUse :: BCInstr -> Int
 bciStackUse STKCHECK{}            = 0
 bciStackUse PUSH_L{}       	  = 1
@@ -214,8 +223,8 @@ bciStackUse PUSH_LLL{}            = 3
 bciStackUse PUSH_G{} 		  = 1
 bciStackUse PUSH_PRIMOP{}         = 1
 bciStackUse PUSH_BCO{}    	  = 1
-bciStackUse PUSH_ALTS{}           = 2
-bciStackUse PUSH_ALTS_UNLIFTED{}  = 2
+bciStackUse (PUSH_ALTS bco)       = 2 + protoBCOStackUse bco
+bciStackUse (PUSH_ALTS_UNLIFTED bco _) = 2 + protoBCOStackUse bco
 bciStackUse (PUSH_UBX _ nw)       = nw
 bciStackUse PUSH_APPLY_N{}	  = 1
 bciStackUse PUSH_APPLY_V{}	  = 1

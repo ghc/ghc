@@ -672,12 +672,8 @@ run_BCO_return:
 	Sp--; Sp[0] = (W_)&stg_enter_info;
 	RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
     }
-    
-    // "Standard" stack check
-    if (Sp - (INTERP_STACK_CHECK_THRESH+1) < SpLim) {
-	Sp--; Sp[0] = (W_)&stg_enter_info;
-	RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
-    }
+    // Stack checks aren't necessary at return points, the stack use
+    // is aggregated into the enclosing function entry point.
     goto run_BCO;
     
 run_BCO_return_unboxed:
@@ -685,11 +681,8 @@ run_BCO_return_unboxed:
     if (doYouWantToGC()) {
 	RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
     }
-    
-    // "Standard" stack check
-    if (Sp - (INTERP_STACK_CHECK_THRESH+1) < SpLim) {
-	RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
-    }
+    // Stack checks aren't necessary at return points, the stack use
+    // is aggregated into the enclosing function entry point.
     goto run_BCO;
     
 run_BCO_fun:
@@ -709,8 +702,8 @@ run_BCO_fun:
 	RETURN_TO_SCHEDULER(ThreadInterpret, HeapOverflow);
     }
     
-    // "Standard" stack check
-    if (Sp - (INTERP_STACK_CHECK_THRESH+1) < SpLim) {
+    // Stack check
+    if (Sp - INTERP_STACK_CHECK_THRESH < SpLim) {
 	Sp -= 2; 
 	Sp[1] = (W_)obj; 
 	Sp[0] = (W_)&stg_apply_interp_info; // placeholder, really
@@ -766,15 +759,19 @@ run_BCO:
 
 	switch (BCO_NEXT) {
 
-	case bci_STKCHECK: 
-	{
-	    // An explicit stack check; we hope these will be rare.
+	case bci_STKCHECK: {
+	    // Explicit stack check at the beginning of a function
+	    // *only* (stack checks in case alternatives are
+	    // propagated to the enclosing function).
 	    int stk_words_reqd = BCO_NEXT + 1;
 	    if (Sp - stk_words_reqd < SpLim) {
-		Sp--; Sp[0] = (W_)obj;
+		Sp -= 2; 
+		Sp[1] = (W_)obj; 
+		Sp[0] = (W_)&stg_apply_interp_info;
 		RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
+	    } else {
+		goto nextInsn;
 	    }
-	    goto nextInsn;
 	}
 
 	case bci_PUSH_L: {
