@@ -291,7 +291,7 @@ tcClassSig is_rec unf_env clas clas_tyvars maybe_dm_env
 	DefMeth dm_name = sig_dm
 
 	dm_info = case maybe_dm_env of
-		    Nothing      -> iface_dm_info
+		    Nothing     -> iface_dm_info
 		    Just dm_env -> mk_src_dm_info dm_env
 
 	iface_dm_info = case sig_dm of 
