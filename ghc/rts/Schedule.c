@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.31 1999/11/09 15:46:54 simonmar Exp $
+ * $Id: Schedule.c,v 1.32 1999/11/11 17:19:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -187,6 +187,68 @@ schedule( void )
   ACQUIRE_LOCK(&sched_mutex);
 
   while (1) {
+
+    /* If we're interrupted (the user pressed ^C, or some other
+     * termination condition occurred), kill all the currently running
+     * threads.
+     */
+    if (interrupted) {
+      IF_DEBUG(scheduler,belch("schedule: interrupted"));
+      for (t = run_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+	deleteThread(t);
+      }
+      for (t = blocked_queue_hd; t != END_TSO_QUEUE; t = t->link) {
+	deleteThread(t);
+      }
+      run_queue_hd = run_queue_tl = END_TSO_QUEUE;
+      blocked_queue_hd = blocked_queue_tl = END_TSO_QUEUE;
+    }
+
+    /* Go through the list of main threads and wake up any
+     * clients whose computations have finished.  ToDo: this
+     * should be done more efficiently without a linear scan
+     * of the main threads list, somehow...
+     */
+#ifdef SMP
+    { 
+      StgMainThread *m, **prev;
+      prev = &main_threads;
+      for (m = main_threads; m != NULL; m = m->link) {
+	if (m->tso->whatNext == ThreadComplete) {
+	  if (m->ret) {
+	    *(m->ret) = (StgClosure *)m->tso->sp[0];
+	  }
+	  *prev = m->link;
+	  m->stat = Success;
+	  pthread_cond_broadcast(&m->wakeup);
+	}
+	if (m->tso->whatNext == ThreadKilled) {
+	  *prev = m->link;
+	  m->stat = Killed;
+	  pthread_cond_broadcast(&m->wakeup);
+	}
+      }
+    }
+#else
+    /* If our main thread has finished or been killed, return.
+     */
+    {
+      StgMainThread *m = main_threads;
+      if (m->tso->whatNext == ThreadComplete
+	  || m->tso->whatNext == ThreadKilled) {
+	main_threads = main_threads->link;
+	if (m->tso->whatNext == ThreadComplete) {
+	  /* we finished successfully, fill in the return value */
+	  if (m->ret) { *(m->ret) = (StgClosure *)m->tso->sp[0]; };
+	  m->stat = Success;
+	  return;
+	} else {
+	  m->stat = Killed;
+	  return;
+	}
+      }
+    }
+#endif
 
     /* Check whether any waiting threads need to be woken up.  If the
      * run queue is empty, and there are no other tasks running, we
@@ -449,56 +511,6 @@ schedule( void )
       pthread_cond_broadcast(&gc_pending_cond);
 #endif
     }
-    
-    /* Go through the list of main threads and wake up any
-     * clients whose computations have finished.  ToDo: this
-     * should be done more efficiently without a linear scan
-     * of the main threads list, somehow...
-     */
-#ifdef SMP
-    { 
-      StgMainThread *m, **prev;
-      prev = &main_threads;
-      for (m = main_threads; m != NULL; m = m->link) {
-	if (m->tso->whatNext == ThreadComplete) {
-	  if (m->ret) {
-	    *(m->ret) = (StgClosure *)m->tso->sp[0];
-	  }
-	  *prev = m->link;
-	  m->stat = Success;
-	  pthread_cond_broadcast(&m->wakeup);
-	}
-	if (m->tso->whatNext == ThreadKilled) {
-	  *prev = m->link;
-	  m->stat = Killed;
-	  pthread_cond_broadcast(&m->wakeup);
-	}
-      }
-    }
-#else
-    /* If our main thread has finished or been killed, return.
-     * If we were re-entered as a result of a _ccall_gc, then
-     * pop the blocked thread off the ccalling_threads stack back
-     * into CurrentTSO.
-     */
-    {
-      StgMainThread *m = main_threads;
-      if (m->tso->whatNext == ThreadComplete
-	  || m->tso->whatNext == ThreadKilled) {
-	main_threads = main_threads->link;
-	if (m->tso->whatNext == ThreadComplete) {
-	  /* we finished successfully, fill in the return value */
-	  if (m->ret) { *(m->ret) = (StgClosure *)m->tso->sp[0]; };
-	  m->stat = Success;
-	  return;
-	} else {
-	  m->stat = Killed;
-	  return;
-	}
-      }
-    }
-#endif
-
   } /* end of while(1) */
 }
 
