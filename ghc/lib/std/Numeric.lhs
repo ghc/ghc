@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Numeric.lhs,v 1.9 2000/06/30 13:39:35 simonmar Exp $
+% $Id: Numeric.lhs,v 1.10 2000/12/16 17:46:57 qrczak Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -78,6 +78,16 @@ implements the formatting itself is in @PrelNum@ to avoid
 mutual module deps.
 
 \begin{code}
+{-# SPECIALIZE showEFloat ::
+	Maybe Int -> Float  -> ShowS,
+	Maybe Int -> Double -> ShowS #-}
+{-# SPECIALIZE showFFloat ::
+	Maybe Int -> Float  -> ShowS,
+	Maybe Int -> Double -> ShowS #-}
+{-# SPECIALIZE showGFloat ::
+	Maybe Int -> Float  -> ShowS,
+	Maybe Int -> Double -> ShowS #-}
+
 showEFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 showFFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 showGFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelReal.lhs,v 1.6 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelReal.lhs,v 1.7 2000/12/16 17:46:57 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -212,10 +212,12 @@ instance  Integral Integer where
 
 \begin{code}
 instance  (Integral a)	=> Ord (Ratio a)  where
+    {-# SPECIALIZE instance Ord Rational #-}
     (x:%y) <= (x':%y')	=  x * y' <= x' * y
     (x:%y) <  (x':%y')	=  x * y' <  x' * y
 
 instance  (Integral a)	=> Num (Ratio a)  where
+    {-# SPECIALIZE instance Num Rational #-}
     (x:%y) + (x':%y')	=  reduce (x*y' + x'*y) (y*y')
     (x:%y) - (x':%y')	=  reduce (x*y' - x'*y) (y*y')
     (x:%y) * (x':%y')	=  reduce (x * x') (y * y')
@@ -225,18 +227,22 @@ instance  (Integral a)	=> Num (Ratio a)  where
     fromInteger x	=  fromInteger x :% 1
 
 instance  (Integral a)	=> Fractional (Ratio a)  where
+    {-# SPECIALIZE instance Fractional Rational #-}
     (x:%y) / (x':%y')	=  (x*y') % (y*x')
     recip (x:%y)	=  if x < 0 then (-y) :% (-x) else y :% x
     fromRational (x:%y) =  fromInteger x :% fromInteger y
 
 instance  (Integral a)	=> Real (Ratio a)  where
+    {-# SPECIALIZE instance Real Rational #-}
     toRational (x:%y)	=  toInteger x :% toInteger y
 
 instance  (Integral a)	=> RealFrac (Ratio a)  where
+    {-# SPECIALIZE instance RealFrac Rational #-}
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
 			  where (q,r) = quotRem x y
 
 instance  (Integral a)  => Show (Ratio a)  where
+    {-# SPECIALIZE instance Show Rational #-}
     showsPrec p (x:%y)	=  showParen (p > ratio_prec)
     	    	    	       (shows x . showString " % " . shows y)
 
@@ -244,6 +250,7 @@ ratio_prec :: Int
 ratio_prec = 7
 
 instance  (Integral a)	=> Enum (Ratio a)  where
+    {-# SPECIALIZE instance Enum Rational #-}
     succ x	        =  x + 1
     pred x	        =  x - 1
 
@@ -287,7 +294,7 @@ x ^ n | n > 0	=  f x (n-1) x
 				         | otherwise = f b (i-1) (b*y)
 _ ^ _		= error "Prelude.^: negative exponent"
 
-{- SPECIALISE (^^) ::
+{-# SPECIALISE (^^) ::
 	Rational -> Int -> Rational #-}
 (^^)		:: (Fractional a, Integral b) => a -> b -> a
 x ^^ n		=  if n >= 0 then x^n else recip (x^(negate n))
