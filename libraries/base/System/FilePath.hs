@@ -229,9 +229,10 @@ isAbsolutePath (c:_)       | isPathSeparator c = True
 #endif
 isAbsolutePath _ = False
 
--- | If the function is applied to an absolute path then it returns a local path droping
--- the absolute prefix in the path. Under Windows the prefix is \"\\\", \"c:\" or \"c:\\\". Under
--- Unix the prefix is always \"/\".
+-- | If the function is applied to an absolute path then it returns a
+-- local path obtained by dropping the absolute prefix from the path.
+-- Under Windows the prefix is @\"\\\"@, @\"c:\"@ or @\"c:\\\"@.
+-- Under Unix the prefix is always @\"\/\"@.
 dropAbsolutePrefix :: FilePath -> FilePath
 dropAbsolutePrefix (c:cs) | isPathSeparator c = cs
 #ifdef mingw32_TARGET_OS
