@@ -1,0 +1,37 @@
+<sect1 id="release-5-02">
+  <title>Release notes for version 5.02</title>
+
+  <sect2>
+    <title>User-visible compiler changes</title>
+  </sect2>
+
+  <sect2>
+    <title>New experimental features</title>
+  </sect2>
+
+  <sect2>
+    <title>User-visible library changes</title>
+    <itemizedlist>
+      <listitem>
+	<para>New function: <function>Exception.throwDynTo</function>.
+	See <xref linkend="sec-Dynamic-Exceptions">.</para>
+      </listitem>
+    </itemizedlist>
+  </sect2>
+
+  <sect2>
+    <title>Build system changes</title>
+  </sect2>
+
+  <sect2>
+    <title>Internal changes</title>
+  </sect2>
+
+</sect1>
+
+<!-- Emacs stuff:
+     ;;; Local Variables: ***
+     ;;; mode: sgml ***
+     ;;; sgml-parent-document: ("users_guide.sgml" "book" "chapter" "sect1") ***
+     ;;; End: ***
+ -->
