@@ -10,6 +10,12 @@ module TcMatches ( tcMatchesFun, tcMatchesCase, tcMatch ) where
 
 IMP_Ubiq()
 
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
+#else
+import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
+#endif
+
 import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
 			  HsExpr, HsBinds, OutPat, Fake, Stmt,
 			  collectPatBinders, pprMatch )
@@ -19,7 +25,6 @@ import TcHsSyn		( TcIdOcc(..), SYN_IE(TcMatch) )
 import TcMonad
 import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcEnv		( newMonoIds )
-IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcPat		( tcPat )
 import TcType		( SYN_IE(TcType), TcMaybe, zonkTcType )
 import Unify		( unifyTauTy, unifyTauTyList )
