@@ -19,6 +19,8 @@ ghcpkg01 :
 	$(GHC_PKG) register --force test2.pkg
 	$(GHC_PKG) list
 	$(GHC_PKG) describe testpkg-2.0
+	$(GHC_PKG) describe testpkg-*
+	$(GHC_PKG) field testpkg-* version
 
 	@: # cannot use testpkg as a package name, it is ambiguous now
 	if $(GHC_PKG) describe testpkg; then false; else true; fi
@@ -28,6 +30,8 @@ ghcpkg01 :
 	$(GHC_PKG) field testpkg-1.2.3.4 exposed | grep False
 	$(GHC_PKG) expose testpkg-2.0
 	$(GHC_PKG) field testpkg-2.0 exposed | grep True
+	$(GHC_PKG) hide testpkg-*
+	$(GHC_PKG) field testpkg-* exposed
 
 	@: # test3.pkg  depends on testpkg-2.0
 	$(GHC_PKG) register test3.pkg
@@ -35,7 +39,7 @@ ghcpkg01 :
 
 	$(GHC_PKG) unregister testpkg-2.0
 	$(GHC_PKG) describe testpkg
-	$(GHC_PKG) unregister testpkg-1.2.3.4
+	$(GHC_PKG) unregister testpkg-*
 	$(GHC_PKG) list
 
 	@: # registering test3.pkg should fail now, its dependency has gone
