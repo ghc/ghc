@@ -263,7 +263,9 @@ expandBin (BinMem _ ix_r sz_r arr_r) off = do
  	     | i <- [ 0 .. sz-1 ] ]
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
-   hPutStrLn stderr ("expanding to size: " ++ show sz')
+#ifdef DEBUG
+   hPutStrLn stderr ("Binary: expanding to size: " ++ show sz')
+#endif
    return ()
 expandBin (BinIO _ _ _) _ = return ()
 	-- no need to expand a file, we'll assume they expand by themselves.
