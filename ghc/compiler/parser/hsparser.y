@@ -185,7 +185,8 @@ BOOLEAN inpat;
 
 %token  INTERFACE_UPRAGMA SPECIALISE_UPRAGMA
 %token  INLINE_UPRAGMA MAGIC_UNFOLDING_UPRAGMA
-%token  DEFOREST_UPRAGMA END_UPRAGMA
+%token  DEFOREST_UPRAGMA END_UPRAGMA 
+%token  SOURCE_UPRAGMA
 
 /**********************************************************************
 *                                                                     *
@@ -283,7 +284,7 @@ BOOLEAN inpat;
 
 %type <uentid>	  export import
 
-%type <ulong>     commas
+%type <ulong>     commas importkey
 
 /**********************************************************************
 *                                                                     *
@@ -380,11 +381,11 @@ impdecls:  impdecl				{ $$ = $1; }
 
 
 impdecl	:  importkey modid impspec
-		{ $$ = lsing(mkimport($2,0,mknothing(),$3,startlineno)); }
+		{ $$ = lsing(mkimport($2,0,mknothing(),$3,$1,startlineno)); }
 	|  importkey QUALIFIED modid impspec
-		{ $$ = lsing(mkimport($3,1,mknothing(),$4,startlineno)); }
+		{ $$ = lsing(mkimport($3,1,mknothing(),$4,$1,startlineno)); }
 	|  importkey QUALIFIED modid AS modid impspec
-		{ $$ = lsing(mkimport($3,1,mkjust($5),$6,startlineno)); }
+		{ $$ = lsing(mkimport($3,1,mkjust($5),$6,$1,startlineno)); }
 	;
 
 impspec	:  /* empty */				  { $$ = mknothing(); }
@@ -1341,7 +1342,8 @@ gconk	:  qconk
 *                                                                     *
 **********************************************************************/
 
-importkey:  IMPORT	{ setstartlineno(); }
+importkey: IMPORT	         { setstartlineno(); $$ = 0; }
+        |  IMPORT SOURCE_UPRAGMA { setstartlineno(); $$ = 1; }
 	;
 
 datakey	:   DATA	{ setstartlineno();
