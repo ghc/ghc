@@ -1,0 +1,10 @@
+illegal operation
+Action: hGetChar
+Handle: {loc=stdin,type=semi-closed,buffering=block (512)}
+
+Reason: handle is closed
+illegal operation
+Action: hGetChar
+Handle: {loc=stdin,type=semi-closed,buffering=block (512)}
+
+Reason: handle is closed

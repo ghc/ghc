@@ -6,10 +6,8 @@ import CPUTime
 
 main = do
     t <- getCPUTime
-    print t
     print (nfib 30)
     t <- getCPUTime
-    print t
     print (length (show t)) -- printing the CPU time itself is un-cool if you want to diff the output..
 
 nfib :: Integer -> Integer
