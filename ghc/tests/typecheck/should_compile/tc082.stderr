@@ -1,21 +1,19 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [tary] [] [([tary], f{-r3p,x-}, f_arl)]
-    d.Normal_arA = $d1{-rrW,x-} [GHC.Void{-3T,W-}, GHC.Void{-3T,W-}]
-    normal_arX =
-	normal{-r3r,x-} (GHC.Void{-3T,W-} -> GHC.Void{-3T,W-}) d.Normal_arA
-    f_arl x_r3f = normal_arX PrelBase.id{-r9U,p-} GHC.Void{-3T,W-}
+==================== Typechecked ====================
+AbsBinds [tarE] [] [([tarE], f{-r3p,x-}, f_arp)]
+    d.Normal_arG = $d1{-rs3,x-} [GHC.Void{-3T,W-}, GHC.Void{-3T,W-}]
+    normal_as2 =
+	normal{-r3q,x-} (GHC.Void{-3T,W-} -> GHC.Void{-3T,W-}) d.Normal_arG
+    f_arp x_r3f = normal_as2 PrelBase.id{-r9U,p-} GHC.Void{-3T,W-}
 AbsBinds
-[tarP, tarQ]
+[tarV, tarW]
 []
-[([tarP, tarQ], $d1{-rrW,x-}, d.Normal_arI)]
-    AbsBinds [] [] [([], normal_arY, normal_arM)]
-	normal_arM _ = PrelBase.True{-5E,w-}{i}
-    d.Normal_arI = ({-dict-} [] [normal_arY])
-normal{-r3r,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [tarV] [d.Normal_arU] []
+[([tarV, tarW], $d1{-rs3,x-}, d.Normal_arO)]
+    AbsBinds [] [] [([], normal_as4, normal_arS)]
+	normal_arS _ = PrelBase.True{-5E,w-}{i}
+    d.Normal_arO = ({-dict-} [] [normal_as4])
+normal{-r3q,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [tas1] [d.Normal_as0] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

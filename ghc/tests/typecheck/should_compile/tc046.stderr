@@ -1,16 +1,14 @@
-
-
-================================================================================
-Typechecked:
-scsel_BShouldSucceedC{-akS,x-} =
+==================== Typechecked ====================
+scsel_BShouldSucceedC{-akW,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-op2{-r3n,x-} =
+op2{-r3l,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [takQ] [d.B_akM] []
-op1{-r3m,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [takR] [d.C_akP] []
+AbsBinds [takU] [d.B_akQ] []
+op1{-r3n,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [takV] [d.C_akT] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

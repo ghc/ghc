@@ -1,41 +1,4 @@
  
-tcfail036.hs:9: Class used as a type constructor: `PrelBase.Num'
- 
-tcfail036.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Num NUM' at tcfail036.hs:7 and tcfail036.hs:8
- 
-tcfail036.hs:8: No instance for: `PrelBase.Eq NUM'
-    arising from an instance declaration at tcfail036.hs:8
-    When checking methods of an instance declaration
- 
-tcfail036.hs:8: No instance for: `PrelBase.Show NUM'
-    arising from an instance declaration at tcfail036.hs:8
-    When checking methods of an instance declaration
- 
-tcfail036.hs:8: No instance for: `PrelBase.Eq NUM'
-    arising from an instance declaration at tcfail036.hs:8
-    When checking superclass constraints of an instance declaration
- 
-tcfail036.hs:8: No instance for: `PrelBase.Show NUM'
-    arising from an instance declaration at tcfail036.hs:8
-    When checking superclass constraints of an instance declaration
- 
-tcfail036.hs:7: No instance for: `PrelBase.Eq NUM'
-    arising from an instance declaration at tcfail036.hs:7
-    When checking methods of an instance declaration
- 
-tcfail036.hs:7: No instance for: `PrelBase.Show NUM'
-    arising from an instance declaration at tcfail036.hs:7
-    When checking methods of an instance declaration
- 
-tcfail036.hs:7: No instance for: `PrelBase.Eq NUM'
-    arising from an instance declaration at tcfail036.hs:7
-    When checking superclass constraints of an instance declaration
- 
-tcfail036.hs:7: No instance for: `PrelBase.Show NUM'
-    arising from an instance declaration at tcfail036.hs:7
-    When checking superclass constraints of an instance declaration
- 
 tcfail036.hs:8: No explicit method nor default method for `PrelBase.+'
 		in an instance declaration for `PrelBase.Num'
  
@@ -68,5 +31,64 @@ tcfail036.hs:7: No explicit method nor default method for `PrelBase.signum'
  
 tcfail036.hs:7: No explicit method nor default method for `PrelBase.fromInteger'
 		in an instance declaration for `PrelBase.Num'
+ 
+tcfail036.hs:9: Class used as a type constructor: `PrelBase.Num'
+ 
+tcfail036.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail036.hs:7 and tcfail036.hs:8
+ 
+tcfail036.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail036.hs:7 and tcfail036.hs:8
+ 
+tcfail036.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail036.hs:7 and tcfail036.hs:8
+ 
+tcfail036.hs:8: No instance for: `PrelBase.Eq NUM'
+    arising from an instance declaration at tcfail036.hs:8
+    When checking methods of an instance declaration
+ 
+tcfail036.hs:8: No instance for: `PrelBase.Show NUM'
+    arising from an instance declaration at tcfail036.hs:8
+    When checking methods of an instance declaration
+ 
+tcfail036.hs:8: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail036.hs:8
+    When checking methods of an instance declaration
+ 
+tcfail036.hs:8: No instance for: `PrelBase.Eq NUM'
+    arising from an instance declaration at tcfail036.hs:8
+    When checking superclass constraints of an instance declaration
+ 
+tcfail036.hs:8: No instance for: `PrelBase.Show NUM'
+    arising from an instance declaration at tcfail036.hs:8
+    When checking superclass constraints of an instance declaration
+ 
+tcfail036.hs:8: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail036.hs:8
+    When checking superclass constraints of an instance declaration
+ 
+tcfail036.hs:7: No instance for: `PrelBase.Eq NUM'
+    arising from an instance declaration at tcfail036.hs:7
+    When checking methods of an instance declaration
+ 
+tcfail036.hs:7: No instance for: `PrelBase.Show NUM'
+    arising from an instance declaration at tcfail036.hs:7
+    When checking methods of an instance declaration
+ 
+tcfail036.hs:7: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail036.hs:7
+    When checking methods of an instance declaration
+ 
+tcfail036.hs:7: No instance for: `PrelBase.Eq NUM'
+    arising from an instance declaration at tcfail036.hs:7
+    When checking superclass constraints of an instance declaration
+ 
+tcfail036.hs:7: No instance for: `PrelBase.Show NUM'
+    arising from an instance declaration at tcfail036.hs:7
+    When checking superclass constraints of an instance declaration
+ 
+tcfail036.hs:7: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail036.hs:7
+    When checking superclass constraints of an instance declaration
 
 Compilation had errors

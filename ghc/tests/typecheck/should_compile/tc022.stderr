@@ -1,11 +1,9 @@
+==================== Typechecked ====================
+AbsBinds [takI] [] [([takI], iD{-r3f,x-}, iD_aky)]
+    iD_aky x_r3e = x_r3e
+AbsBinds [takQ] [] [([takQ], main{-r3g,x-}, main_akK)]
+    main_akK = iD{-r3f,x-} (takQ -> takQ) iD{-r3f,x-} takQ
 
-
-================================================================================
-Typechecked:
-AbsBinds [takD] [] [([takD], iD{-r3f,x-}, iD_aku)]
-    iD_aku x_r3e = x_r3e
-AbsBinds [takL] [] [([takL], main{-r3g,x-}, main_akF)]
-    main_akF = iD{-r3f,x-} (takL -> takL) iD{-r3f,x-} takL
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,11 +1,9 @@
+==================== Typechecked ====================
+AbsBinds [takQ] [] [([takQ], f{-r3g,x-}, f_aky)]
+    f_aky PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} takQ
+    f_aky (x_r3e PrelBase.:{-55,w-}{i} xs_r3f)
+	  = PrelBase.:{-55,w-}{i} takQ x_r3e (f_aky xs_r3f)
 
-
-================================================================================
-Typechecked:
-AbsBinds [takL] [] [([takL], f{-r3g,x-}, f_aku)]
-    f_aku PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} takL
-    f_aku (x_r3e PrelBase.:{-55,w-}{i} xs_r3f)
-	  = PrelBase.:{-55,w-}{i} takL x_r3e (f_aku xs_r3f)
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

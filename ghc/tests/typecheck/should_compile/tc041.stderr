@@ -1,17 +1,15 @@
+==================== Typechecked ====================
+AbsBinds [] [] [([], f{-r1,x-}, f_akQ)]
+    f_akQ x_r3h y_r3i = op1_alg x_r3h x_r3h
+AbsBinds [] [] [([], $d1{-rlh,x-}, d.H_al2)]
+    AbsBinds [] [] [([], op1_ali, op1_al6)]
+	op1_al6 x_r3n y_r3o = y_r3o
+    d.H_al2 = ({-dict-} [] [op1_ali])
+op1{-r3s,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [talf] [d.H_alc] []
+d.H_ale = $d1{-rlh,x-}
+op1_alg = op1{-r3s,x-} PrelBase.Bool{-34,W-} d.H_ale
 
-
-================================================================================
-Typechecked:
-AbsBinds [] [] [([], f{-r1,x-}, f_akM)]
-    f_akM x_r3h y_r3i = op1_ald x_r3h x_r3h
-AbsBinds [] [] [([], $d1{-rlc,x-}, d.H_akY)]
-    AbsBinds [] [] [([], op1_ale, op1_al2)]
-	op1_al2 x_r3n y_r3o = y_r3o
-    d.H_akY = ({-dict-} [] [op1_ale])
-op1{-r3t,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [talb] [d.H_al8] []
-d.H_ala = $d1{-rlc,x-}
-op1_ald = op1{-r3t,x-} PrelBase.Bool{-34,W-} d.H_ala
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

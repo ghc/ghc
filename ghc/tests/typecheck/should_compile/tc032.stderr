@@ -1,14 +1,12 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 Node{-r4,x-}{i} =
     _/\_ b_tr3h -> \ tpl_B1 tpl_B2 ->
 	Node{-r4,x-}{i} {_@_ b_tr3h tpl_B1 tpl_B2}
 Other{-r3,x-}{i} =
     _/\_ b_tr3h -> \ tpl_B1 -> Other{-r3,x-}{i} {_@_ b_tr3h tpl_B1}
-AbsBinds [taQa] [] [([taQa], $d1{-rQd,x-}, d.Eval_aQ9)]
-    d.Eval_aQ9 = ({-dict-} [] [])
+AbsBinds [taQi] [] [([taQi], $d1{-rQl,x-}, d.Eval_aQh)]
+    d.Eval_aQh = ({-dict-} [] [])
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

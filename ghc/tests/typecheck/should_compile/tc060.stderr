@@ -1,25 +1,23 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [] [] [([], $d1{-rlE,x-}, d.Eq2_akU)]
-    AbsBinds [] [] [([], deq_alF, deq_akY)]
-	deq_akY x_r3h y_r3i = PrelBase.True{-5E,w-}{i}
-    d.Eq2_akU = ({-dict-} [] [deq_alF])
-AbsBinds [tali] [d.Eq2_alu] [([tali], $d2{-rlG,x-}, d.Eq2_al7)]
-    d.Eq2_aly = d.Eq2_alu
-    deq_alH = deq{-r3x,x-} tali d.Eq2_aly
-    deq_alI = deq_alJ
-    AbsBinds [] [] [([], deq_alJ, deq_alb)]
-	deq_alb (a_r3q PrelBase.:{-55,w-}{i} as_r3r)
+==================== Typechecked ====================
+AbsBinds [] [] [([], $d1{-rlI,x-}, d.Eq2_akY)]
+    AbsBinds [] [] [([], deq_alJ, deq_al2)]
+	deq_al2 x_r3h y_r3i = PrelBase.True{-5E,w-}{i}
+    d.Eq2_akY = ({-dict-} [] [deq_alJ])
+AbsBinds [talm] [d.Eq2_aly] [([talm], $d2{-rlK,x-}, d.Eq2_alb)]
+    d.Eq2_alC = d.Eq2_aly
+    deq_alN = deq{-r3x,x-} talm d.Eq2_alC
+    deq_alM = deq_alL
+    AbsBinds [] [] [([], deq_alL, deq_alf)]
+	deq_alf (a_r3q PrelBase.:{-55,w-}{i} as_r3r)
 		(b_r3s PrelBase.:{-55,w-}{i} bs_r3t)
-		= if deq_alH a_r3q b_r3s then
-		      deq_alI as_r3r bs_r3t
+		= if deq_alN a_r3q b_r3s then
+		      deq_alM as_r3r bs_r3t
 		  else
 		      PrelBase.False{-58,w-}{i}
-    d.Eq2_al7 = ({-dict-} [] [deq_alJ])
+    d.Eq2_alb = ({-dict-} [] [deq_alL])
 deq{-r3x,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [talD] [d.Eq2_alC] []
+AbsBinds [talH] [d.Eq2_alG] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,23 +1,21 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [taC6] [d.Num_aCa] [([taC6], a{-r3h,x-}, a_aBO)]
-    +_aCe = PrelBase.+{-r3g,p-} taC6 d.Num_aCa
-    d.Num_aCd = d.Num_aCa
-    fromInt_aCf = PrelBase.fromInt{-8R,p-} taC6 d.Num_aCd
-    lit_aCg = fromInt_aCf PrelBase.I#{-5b,w-}{i} 2#
-    +_aCh = +_aCe
-    fromInt_aCj = fromInt_aCf
-    lit_aCk = fromInt_aCj PrelBase.I#{-5b,w-}{i} 3#
-    a_aBO x_r3d
-	  = y_r3f +_aCe lit_aCg
+==================== Typechecked ====================
+AbsBinds [taCe] [d.Num_aCi] [([taCe], a{-r3h,x-}, a_aBW)]
+    +_aCs = PrelBase.+{-r3g,p-} taCe d.Num_aCi
+    d.Num_aCl = d.Num_aCi
+    fromInt_aCr = PrelBase.fromInt{-8R,p-} taCe d.Num_aCl
+    lit_aCq = fromInt_aCr PrelBase.I#{-5b,w-}{i} 2#
+    +_aCp = +_aCs
+    fromInt_aCo = fromInt_aCr
+    lit_aCm = fromInt_aCo PrelBase.I#{-5b,w-}{i} 3#
+    a_aBW x_r3d
+	  = y_r3f +_aCs lit_aCq
 	  where
 	      {- nonrec -}
-	      AbsBinds [] [] [([], y_r3f, y_aBW)]
-		  y_aBW = x_r3d +_aCh lit_aCk
+	      AbsBinds [] [] [([], y_r3f, y_aC6)]
+		  y_aC6 = x_r3d +_aCp lit_aCm
 	      {- nonrec -}
 	      {- nonrec -}
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,93 +1,90 @@
-
-
-================================================================================
-Typechecked:
-scsel_RingShouldSucceedGroup{-aFJ,x-} =
+==================== Typechecked ====================
+scsel_RingShouldSucceedGroup{-aFR,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-*{-r6D,l-} =
+*{-r6w,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [taE5] [d.Ring_aFn] [([taE5], $m*{-rFK,x-}, *_aFL)]
-    d.Group_aFk = scsel_RingShouldSucceedGroup{-aFJ,x-} taE5 d.Ring_aFn
-    AbsBinds [] [] [([], *_aFL, *_aE2)]
-	*_aE2 a_r6L b_r6M
-	      = multiply_aFO a_r6L b_r6M
+AbsBinds [taEd] [d.Ring_aFv] [([taEd], $m*{-rFS,x-}, *_aFT)]
+    d.Group_aFs = scsel_RingShouldSucceedGroup{-aFR,x-} taEd d.Ring_aFv
+    AbsBinds [] [] [([], *_aFT, *_aEa)]
+	*_aEa a_r6L b_r6M
+	      = multiply_aFW a_r6L b_r6M
 	      where
 		  {- rec -}
 		  AbsBinds
-		  [taEe]
-		  [d.Group_aF3]
-		  [([taEe], multiply_r6O, multiply_aEb)]
-		      d.Group_aF5 = d.Group_aF3
-		      compare_aFP = compare{-r6w,l-} taEe d.Group_aF5
-		      d.Group_aF7 = d.Group_aF3
-		      zero_aFQ = zero{-r6A,l-} taEe d.Group_aF7
-		      zero_aFR = zero_aFQ
-		      d.Group_aF9 = d.Group_aF3
-		      -_aFS = -{-r6z,l-} taEe d.Group_aF9
-		      zero_aFT = zero_aFQ
-		      d.Group_aFb = d.Group_aF3
-		      multiply_aFU = multiply_r6O taEe d.Group_aFb
-		      -_aFV = -_aFS
-		      zero_aFW = zero_aFQ
-		      compare_aFX = compare_aFP
-		      d.Group_aFd = d.Group_aF3
-		      one_aFY = one{-r6B,l-} taEe d.Group_aFd
-		      d.Group_aFf = d.Group_aF3
-		      +_aFZ = +{-r6y,l-} taEe d.Group_aFf
-		      multiply_aG0 = multiply_aFU
-		      -_aG1 = -_aFS
-		      one_aG2 = one_aFY
-		      multiply_aEb a_r6S b_r6T
-				   = case compare_aFP a_r6S zero_aFQ of
-				       PrelBase.EQ{-r2a,p-}{i} -> zero_aFR
-				       PrelBase.LT{-r28,p-}{i}
-				       -> zero_aFT -_aFS (multiply_aFU zero_aFW -_aFV a_r6S b_r6T)
-				       PrelBase.GT{-r2c,p-}{i}
-				       -> case compare_aFX a_r6S one_aFY of
-					    PrelBase.EQ{-r2a,p-}{i} -> b_r6T
+		  [taEm]
+		  [d.Group_aFb]
+		  [([taEm], multiply_r6O, multiply_aEj)]
+		      d.Group_aFd = d.Group_aFb
+		      compare_aGa = compare{-r6D,l-} taEm d.Group_aFd
+		      d.Group_aFf = d.Group_aFb
+		      zero_aG9 = zero{-r6z,l-} taEm d.Group_aFf
+		      zero_aG8 = zero_aG9
+		      d.Group_aFh = d.Group_aFb
+		      -_aG7 = -{-r6A,l-} taEm d.Group_aFh
+		      zero_aG6 = zero_aG9
+		      d.Group_aFj = d.Group_aFb
+		      multiply_aG5 = multiply_r6O taEm d.Group_aFj
+		      -_aG4 = -_aG7
+		      zero_aG3 = zero_aG9
+		      compare_aG2 = compare_aGa
+		      d.Group_aFl = d.Group_aFb
+		      one_aG1 = one{-r6y,l-} taEm d.Group_aFl
+		      d.Group_aFn = d.Group_aFb
+		      +_aG0 = +{-r6B,l-} taEm d.Group_aFn
+		      multiply_aFZ = multiply_aG5
+		      -_aFY = -_aG7
+		      one_aFX = one_aG1
+		      multiply_aEj a_r6S b_r6T
+				   = case compare_aGa a_r6S zero_aG9 of
+				       PrelBase.EQ{-r5J,p-}{i} -> zero_aG8
+				       PrelBase.LT{-r5K,p-}{i}
+				       -> zero_aG6 -_aG7 (multiply_aG5 zero_aG3 -_aG4 a_r6S b_r6T)
+				       PrelBase.GT{-r5I,p-}{i}
+				       -> case compare_aG2 a_r6S one_aG1 of
+					    PrelBase.EQ{-r5J,p-}{i} -> b_r6T
 					    _
-					    -> b_r6T +_aFZ (multiply_aG0 a_r6S -_aG1 one_aG2 b_r6T)
+					    -> b_r6T +_aG0 (multiply_aFZ a_r6S -_aFY one_aFX b_r6T)
 		  {- nonrec -}
-		  multiply_aFO = multiply_r6O taE5 d.Group_aFk
+		  multiply_aFW = multiply_r6O taEd d.Group_aFs
 		  {- nonrec -}
-compare{-r6w,l-} =
+compare{-r6D,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
 	tpl_B1;}
-fromInteger{-r6x,l-} =
+fromInteger{-r6C,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
 	tpl_B2;}
-+{-r6y,l-} =
++{-r6B,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
 	tpl_B3;}
--{-r6z,l-} =
+-{-r6A,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
 	tpl_B4;}
-zero{-r6A,l-} =
+zero{-r6z,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
 	tpl_B5;}
-one{-r6B,l-} =
+one{-r6y,l-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
@@ -95,18 +92,19 @@ one{-r6B,l-} =
 	PrelTup.(,,,,,){-66,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5 tpl_B6  ->
 	tpl_B6;}
 AbsBinds
-[taFt]
-[d.Group_aFG]
-[([taFt], $mzero{-rFM,x-}, zero_aG3), ([taFt],
-				       $mone{-rFN,x-},
-				       one_aG6)]
-    d.Group_aFI = d.Group_aFG
-    fromInteger_aG4 = fromInteger{-r6x,l-} taFt d.Group_aFI
-    fromInteger_aG5 = fromInteger_aG4
-    AbsBinds [] [] [([], zero_aG3, zero_aFs)]
-	zero_aFs = fromInteger_aG4 0
-    AbsBinds [] [] [([], one_aG6, one_aFA)]
-	one_aFA = fromInteger_aG5 1
+[taFB]
+[d.Group_aFO]
+[([taFB], $mzero{-rFV,x-}, zero_aGb), ([taFB],
+				       $mone{-rFU,x-},
+				       one_aGc)]
+    d.Group_aFQ = d.Group_aFO
+    fromInteger_aGe = fromInteger{-r6C,l-} taFB d.Group_aFQ
+    fromInteger_aGd = fromInteger_aGe
+    AbsBinds [] [] [([], zero_aGb, zero_aFA)]
+	zero_aFA = fromInteger_aGe 0
+    AbsBinds [] [] [([], one_aGc, one_aFI)]
+	one_aFI = fromInteger_aGd 1
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,42 +1,40 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
-[taCQ, taCN]
-[d.Ord2_aCV, d.Num_aCY]
-[([taCQ, taCN], f{-r3M,x-}, f_aCx)]
-    d.Eq2_aCU = scsel_Ord2ShouldSucceedEq2{-aDW,x-} taCN d.Ord2_aCV
-    d.Eq2_aCS = $d1{-rDT,x-} taCN [d.Eq2_aCU, d.Ord2_aCV]
-    doubleeq_aDX = doubleeq{-r3N,x-} [taCN] d.Eq2_aCS
-    fromInt_aDY = PrelBase.fromInt{-8R,p-} taCN d.Num_aCY
-    lit_aDZ = fromInt_aDY PrelBase.I#{-5b,w-}{i} 1#
-    f_aCx x_r3h y_r3i = doubleeq_aDX x_r3h [lit_aDZ] (taCN)
+[taD1, taCY]
+[d.Ord2_aD6, d.Num_aD9]
+[([taD1, taCY], f{-r3M,x-}, f_aCF)]
+    d.Eq2_aD5 = scsel_Ord2ShouldSucceedEq2{-aE7,x-} taCY d.Ord2_aD6
+    d.Eq2_aD3 = $d1{-rEa,x-} taCY [d.Eq2_aD5, d.Ord2_aD6]
+    doubleeq_aE6 = doubleeq{-r3O,x-} [taCY] d.Eq2_aD3
+    fromInt_aE5 = PrelBase.fromInt{-8R,p-} taCY d.Num_aD9
+    lit_aE4 = fromInt_aE5 PrelBase.I#{-5b,w-}{i} 1#
+    f_aCF x_r3h y_r3i = doubleeq_aE6 x_r3h [lit_aE4] (taCY)
 AbsBinds
-[taDc]
-[d.Eq2_aDf, d.Ord2_aDg]
-[([taDc], $d1{-rDT,x-}, d.Eq2_aD5)]
-    AbsBinds [] [] [([], doubleeq_aE0, doubleeq_aD9)]
-	doubleeq_aD9 xs_r3q ys_r3r = PrelBase.True{-5E,w-}{i}
-    d.Eq2_aD5 = ({-dict-} [] [doubleeq_aE0])
-AbsBinds [] [] [([], $d2{-rDU,x-}, d.Ord2_aDo)]
-    d.Eq2_aDt = $d3{-rDV,x-}
-    AbsBinds [] [] [([], lt_aE1, lt_aDs)]
-	lt_aDs x_r3x y_r3y = PrelBase.True{-5E,w-}{i}
-    d.Ord2_aDo = ({-dict-} [d.Eq2_aDt] [lt_aE1])
-AbsBinds [] [] [([], $d3{-rDV,x-}, d.Eq2_aDD)]
-    AbsBinds [] [] [([], doubleeq_aE2, doubleeq_aDH)]
-	doubleeq_aDH x_r3E y_r3F = PrelBase.True{-5E,w-}{i}
-    d.Eq2_aDD = ({-dict-} [] [doubleeq_aE2])
-scsel_Ord2ShouldSucceedEq2{-aDW,x-} =
+[taDn]
+[d.Eq2_aDq, d.Ord2_aDr]
+[([taDn], $d1{-rEa,x-}, d.Eq2_aDg)]
+    AbsBinds [] [] [([], doubleeq_aEb, doubleeq_aDk)]
+	doubleeq_aDk xs_r3q ys_r3r = PrelBase.True{-5E,w-}{i}
+    d.Eq2_aDg = ({-dict-} [] [doubleeq_aEb])
+AbsBinds [] [] [([], $d2{-rE9,x-}, d.Ord2_aDz)]
+    d.Eq2_aDE = $d3{-rE8,x-}
+    AbsBinds [] [] [([], lt_aEc, lt_aDD)]
+	lt_aDD x_r3x y_r3y = PrelBase.True{-5E,w-}{i}
+    d.Ord2_aDz = ({-dict-} [d.Eq2_aDE] [lt_aEc])
+AbsBinds [] [] [([], $d3{-rE8,x-}, d.Eq2_aDO)]
+    AbsBinds [] [] [([], doubleeq_aEd, doubleeq_aDS)]
+	doubleeq_aDS x_r3E y_r3F = PrelBase.True{-5E,w-}{i}
+    d.Eq2_aDO = ({-dict-} [] [doubleeq_aEd])
+scsel_Ord2ShouldSucceedEq2{-aE7,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-lt{-r3O,x-} =
+lt{-r3N,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [taDR] [d.Ord2_aDN] []
-doubleeq{-r3N,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taDS] [d.Eq2_aDQ] []
+AbsBinds [taE2] [d.Ord2_aDY] []
+doubleeq{-r3O,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taE3] [d.Eq2_aE1] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

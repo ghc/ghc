@@ -1,35 +1,33 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
-[taCH, taCC]
-[d.Ord'_aCJ, d.Num_aCM]
-[([taCH, taCC], f{-r3D,x-}, f_aCo)]
-    lt_aDm = lt{-r3G,x-} taCC d.Ord'_aCJ
-    fromInt_aDq = PrelBase.fromInt{-8R,p-} taCC d.Num_aCM
-    lit_aDr = fromInt_aDq PrelBase.I#{-5b,w-}{i} 1#
-    f_aCo x_r3h y_r3i
-	  | lt_aDm x_r3h lit_aDr = PrelBase.True{-5E,w-}{i}
+[taCS, taCN]
+[d.Ord'_aCU, d.Num_aCX]
+[([taCS, taCN], f{-r3D,x-}, f_aCw)]
+    lt_aDz = lt{-r3E,x-} taCN d.Ord'_aCU
+    fromInt_aDy = PrelBase.fromInt{-8R,p-} taCN d.Num_aCX
+    lit_aDx = fromInt_aDy PrelBase.I#{-5b,w-}{i} 1#
+    f_aCw x_r3h y_r3i
+	  | lt_aDz x_r3h lit_aDx = PrelBase.True{-5E,w-}{i}
 	  | PrelBase.otherwise{-818,p-} = PrelBase.False{-58,w-}{i}
-AbsBinds [] [] [([], $d1{-rDn,x-}, d.Ord'_aCR)]
-    d.Eq'_aCW = $d2{-rDo,x-}
-    AbsBinds [] [] [([], lt_aDs, lt_aCV)]
-	lt_aCV x_r3n y_r3o = PrelBase.True{-5E,w-}{i}
-    d.Ord'_aCR = ({-dict-} [d.Eq'_aCW] [lt_aDs])
-AbsBinds [] [] [([], $d2{-rDo,x-}, d.Eq'_aD6)]
-    AbsBinds [] [] [([], doubleeq_aDt, doubleeq_aDa)]
-	doubleeq_aDa x_r3u y_r3v = PrelBase.True{-5E,w-}{i}
-    d.Eq'_aD6 = ({-dict-} [] [doubleeq_aDt])
-scsel_Ord'ShouldSucceedEq'{-aDp,x-} =
+AbsBinds [] [] [([], $d1{-rDC,x-}, d.Ord'_aD2)]
+    d.Eq'_aD7 = $d2{-rDB,x-}
+    AbsBinds [] [] [([], lt_aDD, lt_aD6)]
+	lt_aD6 x_r3n y_r3o = PrelBase.True{-5E,w-}{i}
+    d.Ord'_aD2 = ({-dict-} [d.Eq'_aD7] [lt_aDD])
+AbsBinds [] [] [([], $d2{-rDB,x-}, d.Eq'_aDh)]
+    AbsBinds [] [] [([], doubleeq_aDE, doubleeq_aDl)]
+	doubleeq_aDl x_r3u y_r3v = PrelBase.True{-5E,w-}{i}
+    d.Eq'_aDh = ({-dict-} [] [doubleeq_aDE])
+scsel_Ord'ShouldSucceedEq'{-aDA,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-lt{-r3G,x-} =
+lt{-r3E,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [taDk] [d.Ord'_aDg] []
-doubleeq{-r3F,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taDl] [d.Eq'_aDj] []
+AbsBinds [taDv] [d.Ord'_aDr] []
+doubleeq{-r3G,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taDw] [d.Eq'_aDu] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -5,5 +5,4 @@ tcfail009.hs:3: Couldn't match the type
     Inferred: `PrelBase.Int'
     In an expression with a type signature: `2 :: PrelBase.Integer'
 
-
 Compilation had errors

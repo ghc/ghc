@@ -1,10 +1,8 @@
+==================== Typechecked ====================
+AbsBinds [] [] [([], h{-r1,x-}, h_aBS)]
+    h_aBS = PrelBase.:{-55,w-}{i} PrelBase.Int{-3g,W-} lit_aC4 h_aBS
+lit_aC4 = PrelBase.I#{-5b,w-}{i} 1#
 
-
-================================================================================
-Typechecked:
-AbsBinds [] [] [([], h{-r1,x-}, h_aBK)]
-    h_aBK = PrelBase.:{-55,w-}{i} PrelBase.Int{-3g,W-} lit_aBW h_aBK
-lit_aBW = PrelBase.I#{-5b,w-}{i} 1#
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,9 +1,8 @@
  
 tcfail004.hs:3: Couldn't match the type
-		    `PrelTup.(,,) taS7' against `PrelTup.(,)'
-    Expected: `(taS7, taS9, taSb)'
-    Inferred: `(taS1, taS4)'
+		    `PrelTup.(,,) taSf' against `PrelTup.(,)'
+    Expected: `(taSf, taSh, taSj)'
+    Inferred: `(taS9, taSc)'
     In a pattern binding: `(f, g) = (1, 2, 3)'
-
 
 Compilation had errors

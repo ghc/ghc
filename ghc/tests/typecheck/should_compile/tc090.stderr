@@ -1,17 +1,15 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
-[taBh]
-[d.Ord_aBq]
-[([taBh], a{-r3h,x-}, a_aBf), ([taBh], b{-r3i,x-}, b_aBg)]
-    d.Ord_aBs = d.Ord_aBq
-    b_aBv = b{-r3i,x-} taBh d.Ord_aBs
-    d.Ord_aBu = d.Ord_aBq
-    a_aBw = a{-r3h,x-} taBh d.Ord_aBu
-    a_aBf = b_aBv
-    b_aBg = a_aBw
+[taBp]
+[d.Ord_aBy]
+[([taBp], a{-r3h,x-}, a_aBn), ([taBp], b{-r3i,x-}, b_aBo)]
+    d.Ord_aBA = d.Ord_aBy
+    b_aBE = b{-r3i,x-} taBp d.Ord_aBA
+    d.Ord_aBC = d.Ord_aBy
+    a_aBD = a{-r3h,x-} taBp d.Ord_aBC
+    a_aBn = b_aBE
+    b_aBo = a_aBD
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -5,5 +5,4 @@ tcfail062.hs:33:
 tcfail062.hs:33:
     Type variable not in scope: `behaviouralExpression'
 
-
 Compilation had errors

@@ -1,18 +1,16 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [] [] [([], g{-r3j,x-}, g_akx)]
-    g_akx x_r3d
+==================== Typechecked ====================
+AbsBinds [] [] [([], g{-r3j,x-}, g_akB)]
+    g_akB x_r3d
 	  = f_r3f PrelBase.Bool{-34,W-} f_r3f
 					    PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i} x_r3d
 					x_r3d
 	  where
 	      {- rec -}
-	      AbsBinds [takV] [] [([takV], f_r3f, f_akF)]
-		  f_akF x_r3h y_r3i = if x_r3h then y_r3i else f_akF x_r3h y_r3i
+	      AbsBinds [tal1] [] [([tal1], f_r3f, f_akL)]
+		  f_akL x_r3h y_r3i = if x_r3h then y_r3i else f_akL x_r3h y_r3i
 	      {- nonrec -}
 	      {- nonrec -}
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

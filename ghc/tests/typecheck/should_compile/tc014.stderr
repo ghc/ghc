@@ -1,12 +1,10 @@
+==================== Typechecked ====================
+AbsBinds [] [] [([], t{-rS,x-}, t_aBS)]
+    t_aBS = lit_aCb +_aCc t_aBS
+d.Num_aCa = PrelBase.$d4{-rao,p-}
++_aCc = PrelBase.+{-rR,p-} PrelBase.Int{-3g,W-} d.Num_aCa
+lit_aCb = PrelBase.I#{-5b,w-}{i} 1#
 
-
-================================================================================
-Typechecked:
-AbsBinds [] [] [([], t{-rS,x-}, t_aBK)]
-    t_aBK = lit_aC4 +_aC3 t_aBK
-d.Num_aC2 = PrelBase.$d4{-rao,p-}
-+_aC3 = PrelBase.+{-rR,p-} PrelBase.Int{-3g,W-} d.Num_aC2
-lit_aC4 = PrelBase.I#{-5b,w-}{i} 1#
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

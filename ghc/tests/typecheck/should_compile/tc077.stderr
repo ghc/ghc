@@ -1,26 +1,24 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 ONE{-r7,x-}{i} = ONE{-r7,x-}{i} {}
 TWO{-r6,x-}{i} = TWO{-r6,x-}{i} {}
-AbsBinds [] [] [([], $d1{-rCq,x-}, d.Eval_aCf)]
-    d.Eval_aCf = ({-dict-} [] [])
-scsel_EQShouldSucceedORD{-aCr,x-} =
+AbsBinds [] [] [([], $d1{-rCy,x-}, d.Eval_aCn)]
+    d.Eval_aCn = ({-dict-} [] [])
+scsel_EQShouldSucceedORD{-aCB,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
 	tpl_B1;}
-scsel_EQPrelBaseShow{-aCs,x-} =
+scsel_EQPrelBaseShow{-aCA,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
 	tpl_B2;}
-==={-r3r,x-} =
+==={-r3p,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,,){-63,w-}{i} tpl_B1 tpl_B2 tpl_B3  ->
 	tpl_B3;}
-AbsBinds [taCm] [d.EQ_aCi] []
-scsel_ORDPrelBaseNum{-aCt,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taCn] [d.ORD_aCl] []
+AbsBinds [taCu] [d.EQ_aCq] []
+scsel_ORDPrelBaseNum{-aCz,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taCv] [d.ORD_aCt] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

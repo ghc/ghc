@@ -1,8 +1,8 @@
  
 tcfail014.hs:5: Cannot construct the infinite type (occur check)
-		    `oaCj' = `oaCj -> oaCi'
-    Expected: `oaCj -> oaCi'
-    Inferred: `oaCj'
+		    `oaCu' = `oaCu -> oaCw'
+    Expected: `oaCu -> oaCw'
+    Inferred: `oaCu'
     In an equation for function `h': `h z = z z'
     In an equation for function `g':
 	`g y
@@ -18,8 +18,7 @@ tcfail014.hs:5: Cannot construct the infinite type (occur check)
 		 where
 		     h z = z z'
  
-tcfail014.hs:5: No instance for: `PrelBase.Num (taCG -> taCI)'
+tcfail014.hs:5: No instance for: `PrelBase.Num (taCQ -> taCS)'
     arising from use of `PrelBase.+' at tcfail014.hs:5
-
 
 Compilation had errors

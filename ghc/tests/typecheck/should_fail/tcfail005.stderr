@@ -1,9 +1,8 @@
  
 tcfail005.hs:3: Couldn't match the type
-		    `PrelTup.(,) taRl' against `PrelBase.[]'
-    Expected: `(taRl, taRn)'
-    Inferred: `[taRh]'
+		    `PrelTup.(,) taRt' against `PrelBase.[]'
+    Expected: `(taRt, taRv)'
+    Inferred: `[taRp]'
     In a pattern binding: `(h PrelBase.: i) = (1, ('a'))'
-
 
 Compilation had errors

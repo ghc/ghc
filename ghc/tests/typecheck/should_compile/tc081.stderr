@@ -1,0 +1,107 @@
+==================== Typechecked ====================
+AbsBinds
+[taTE]
+[d.Num_aTM, d.Ord_aTR]
+[([taTE], f3{-r3A,x-}, f3_aT2)]
+    +_aVR = PrelBase.+{-rfD,p-} taTE d.Num_aTM
+    d.Num_aTP = d.Num_aTM
+    fromInt_aVQ = PrelBase.fromInt{-8R,p-} taTE d.Num_aTP
+    lit_aVP = fromInt_aVQ PrelBase.I#{-5b,w-}{i} 1#
+    <_aVO = PrelBase.<{-ra4,p-} taTE d.Ord_aTR
+    fromInt_aVN = fromInt_aVQ
+    lit_aVM = fromInt_aVN PrelBase.I#{-5b,w-}{i} 3#
+    d.Ord_aTU = d.Ord_aTR
+    >_aVL = PrelBase.>{-rfK,p-} taTE d.Ord_aTU
+    fromInt_aVK = fromInt_aVQ
+    lit_aVJ = fromInt_aVK PrelBase.I#{-5b,w-}{i} 2#
+    f3_aT2 x_r3t
+	   = (x_r3t +_aVR lit_aVP,
+	      x_r3t <_aVO lit_aVM,
+	      g3_r3v PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i},
+	      g3_r3v PrelBase.Char{-38,W-} 'c')
+	   where
+	       {- nonrec -}
+	       AbsBinds [taTi] [] [([taTi], g3_r3v, g3_aTc)]
+		   g3_aTc
+		       = \ y_r3x
+			   -> if x_r3t >_aVL lit_aVJ then
+				  PrelBase.[]{-5i,w-}{i} taTi
+			      else
+				  [y_r3x] (taTi)
+	       {- nonrec -}
+	       {- nonrec -}
+AbsBinds
+[taUx]
+[d.Num_aUF, d.Ord_aUK]
+[([taUx], f2{-r3B,x-}, f2_aTX)]
+    +_aW0 = PrelBase.+{-rfD,p-} taUx d.Num_aUF
+    d.Num_aUI = d.Num_aUF
+    fromInt_aVZ = PrelBase.fromInt{-8R,p-} taUx d.Num_aUI
+    lit_aVY = fromInt_aVZ PrelBase.I#{-5b,w-}{i} 1#
+    <_aVX = PrelBase.<{-ra4,p-} taUx d.Ord_aUK
+    fromInt_aVW = fromInt_aVZ
+    lit_aVV = fromInt_aVW PrelBase.I#{-5b,w-}{i} 3#
+    d.Ord_aUN = d.Ord_aUK
+    >_aVU = PrelBase.>{-rfK,p-} taUx d.Ord_aUN
+    fromInt_aVT = fromInt_aVZ
+    lit_aVS = fromInt_aVT PrelBase.I#{-5b,w-}{i} 2#
+    f2_aTX x_r3l
+	   = (x_r3l +_aW0 lit_aVY,
+	      x_r3l <_aVX lit_aVV,
+	      g2_r3n PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i},
+	      g2_r3n PrelBase.Char{-38,W-} 'c')
+	   where
+	       {- nonrec -}
+	       AbsBinds [taUc] [] [([taUc], g2_r3n, g2_aU9)]
+		   g2_aU9 y_r3r
+			  = if x_r3l >_aVU lit_aVS then
+				PrelBase.[]{-5i,w-}{i} taUc
+			    else
+				[y_r3r] (taUc)
+	       {- nonrec -}
+	       {- nonrec -}
+AbsBinds
+[taVs]
+[d.Num_aVA, d.Ord_aVF]
+[([taVs], f{-r3C,x-}, f_aUQ)]
+    +_aWa = PrelBase.+{-rfD,p-} taVs d.Num_aVA
+    d.Num_aVD = d.Num_aVA
+    fromInt_aW9 = PrelBase.fromInt{-8R,p-} taVs d.Num_aVD
+    lit_aW8 = fromInt_aW9 PrelBase.I#{-5b,w-}{i} 1#
+    <_aW7 = PrelBase.<{-ra4,p-} taVs d.Ord_aVF
+    fromInt_aW6 = fromInt_aW9
+    lit_aW5 = fromInt_aW6 PrelBase.I#{-5b,w-}{i} 3#
+    d.Ord_aVI = d.Ord_aVF
+    >_aW4 = PrelBase.>{-rfK,p-} taVs d.Ord_aVI
+    fromInt_aW3 = fromInt_aW9
+    lit_aW1 = fromInt_aW3 PrelBase.I#{-5b,w-}{i} 2#
+    f_aUQ x_r3f
+	  = (x_r3f +_aWa lit_aW8,
+	     x_r3f <_aW7 lit_aW5,
+	     g_r3h PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i},
+	     g_r3h PrelBase.Char{-38,W-} 'c')
+	  where
+	      {- nonrec -}
+	      AbsBinds [taVe] [] [([taVe], g_r3h, g_aV0)]
+		  g_aV0 y_r3j
+			= if x_r3f >_aW4 lit_aW1 then
+			      PrelBase.[]{-5i,w-}{i} taVe
+			  else
+			      [y_r3j] (taVe)
+	      {- nonrec -}
+	      {- nonrec -}
+
+ghc: module version changed to 1; reason: no old .hi file
+_interface_ ShouldSucceed 1
+_instance_modules_
+ArrBase IO PrelNum
+_usages_
+PrelBase 1 :: $d1 1 $d12 1 $d15 1 $d16 1 $d2 1 $d22 1 $d27 1 $d28 1 $d3 1 $d33 1 $d34 1 $d35 1 $d38 1 $d39 1 $d4 1 $d40 1 $d42 1 $d43 1 $d45 1 $d46 1 $d47 1 $d50 1 $d51 1 $d52 1 $d55 1 $d56 1 $d7 1 $d8 1 $d9 1 $m- 1 $m/= 1 $m< 1 $m<= 1 $m> 1 $m>= 1 $mcompare 1 $mfromInt 1 $mmax 1 $mmin 1 $mshowList 1 Eq 1 Eval 1 Num 1 Ord 1 Ordering 1 Show 1 String 1;
+PrelNum 1 :: $d10 1 $d16 1 $d17 1 $d18 1 $d29 1 $d33 1 $d34 1 $d35 1;
+PrelTup 1 :: $d11 1 $d15 1 $d2 1 $d51 1;
+_exports_
+ShouldSucceed f f2 f3;
+_declarations_
+1 f _:_ _forall_ [ta] {PrelBase.Num ta, PrelBase.Ord ta} => ta -> (ta, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
+1 f2 _:_ _forall_ [ta] {PrelBase.Num ta, PrelBase.Ord ta} => ta -> (ta, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;
+1 f3 _:_ _forall_ [ta] {PrelBase.Num ta, PrelBase.Ord ta} => ta -> (ta, PrelBase.Bool, [PrelBase.Bool], [PrelBase.Char]) ;;

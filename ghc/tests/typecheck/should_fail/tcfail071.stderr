@@ -1,8 +1,8 @@
  
 tcfail071.hs:10: Couldn't match the signature/existential type variable
-		     `taCS' with the type `taD6 -> taD3 -> taD3'
-    Expected: `taCS'
-    Inferred: `taD6 -> taD3 -> taD3'
+		     `taD0' with the type `taDe -> taDb -> taDb'
+    Expected: `taD0'
+    Inferred: `taDe -> taDb -> taDb'
     In a pattern binding:
 	`p = PrelBase.foldr (f c) PrelBase.[] PrelBase.[]'
     In an equation for function `g':
@@ -14,6 +14,5 @@ tcfail071.hs:10: Couldn't match the signature/existential type variable
 tcfail071.hs:8: Mismatched contexts
     When matching the contexts of the signatures for `f' and `g'
 	(the signature contexts in a mutually recursive group should all be identical)
-
 
 Compilation had errors

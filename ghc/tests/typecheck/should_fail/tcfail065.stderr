@@ -1,8 +1,7 @@
  
 tcfail065.hs:29: A type signature is more polymorphic than the inferred type
-		     Can't for-all the type variable(s) `taI7'
-		     in the inferred type `taI7 -> X taI7 -> X taI7'
+		     Can't for-all the type variable(s) `taIg'
+		     in the inferred type `taIg -> X taIg -> X taIg'
     When checking signature for `setX'
-
 
 Compilation had errors

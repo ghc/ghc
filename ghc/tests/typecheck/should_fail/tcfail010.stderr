@@ -1,9 +1,8 @@
  
-tcfail010.hs:3: No instance for: `PrelBase.Num [taBS]'
+tcfail010.hs:3: No instance for: `PrelBase.Num [taC3]'
     arising from use of `PrelBase.+' at tcfail010.hs:3
  
-tcfail010.hs:3: No instance for: `PrelBase.Num [taBS]'
+tcfail010.hs:3: No instance for: `PrelBase.Num [taC3]'
     arising from use of `PrelBase.+' at tcfail010.hs:3
-
 
 Compilation had errors

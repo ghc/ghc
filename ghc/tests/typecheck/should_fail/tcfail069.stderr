@@ -1,7 +1,7 @@
  
 tcfail069.hs:21: Couldn't match the type
-		     `PrelTup.(,) taCl' against `PrelBase.[]'
-    Expected: `[taCp]'
+		     `PrelTup.(,) taCp' against `PrelBase.[]'
+    Expected: `[taCt]'
     Inferred: `([PrelBase.Int], [PrelBase.Int])'
     In a "case" branch: `PrelBase.[]' -> `IOBase.error "foo"'
     In the case expression
@@ -12,6 +12,5 @@ tcfail069.hs:21: Couldn't match the type
 		  where
 		      list2 = ds
 		      list1 = ds'
-
 
 Compilation had errors

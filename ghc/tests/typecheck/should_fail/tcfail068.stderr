@@ -40,5 +40,4 @@ tcfail068.hs:42: Value not in scope: `seqStrictlyST'
  
 tcfail068.hs:41: Value not in scope: `thenStrictlyST'
 
-
 Compilation had errors

@@ -1,42 +1,40 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 X{-r9,x-}{i} = _/\_ b_tr3U -> X{-r9,x-}{i} {_@_ b_tr3U}
 Y{-r8,x-}{i} =
     _/\_ b_tr3U -> \ tpl_B1 -> Y{-r8,x-}{i} {_@_ b_tr3U tpl_B1}
 D{-r7,x-}{i} =
     _/\_ a_tr3W -> \ tpl_B1 -> D{-r7,x-}{i} {_@_ a_tr3W tpl_B1}
 C{-r6,x-}{i} = _/\_ a_tr3W -> C{-r6,x-}{i} {_@_ a_tr3W}
-AbsBinds [taDA] [] [([taDA], $d3{-rDE,x-}, d.Eval_aBV)]
-    d.Eval_aBV = ({-dict-} [] [])
-AbsBinds [taDB] [] [([taDB], $d4{-rDG,x-}, d.Eval_aC1)]
-    d.Eval_aC1 = ({-dict-} [] [])
-AbsBinds [taCe] [d.Eq_aCH] [([taCe], $d1{-rDH,x-}, d.Eq_aC7)]
-    d.Eq_aCL = d.Eq_aCH
-    ==_aDJ = PrelBase.=={-8Y,p-} taCe d.Eq_aCL
-    ==_aDK = ==_aDL
-    AbsBinds [] [] [([], ==_aDL, ==_aCb)]
-	==_aCb X{-r9,x-}{i} X{-r9,x-}{i} = PrelBase.True{-5E,w-}{i}
-	==_aCb (Y{-r8,x-}{i} a_r3r) (Y{-r8,x-}{i} b_r3s)
-	       = a_r3r ==_aDJ b_r3s
-	==_aCb a_r3u b_r3v = PrelBase.False{-58,w-}{i}
-    AbsBinds [] [] [([], /=_aDM, /=_aCA)]
-	/=_aCA a_r3z b_r3A = PrelBase.not{-rgM,p-} a_r3z ==_aDK b_r3A
-    d.Eq_aC7 = ({-dict-} [] [==_aDL, /=_aDM])
-AbsBinds [taD1] [d.Eq_aDs] [([taD1], $d2{-rDI,x-}, d.Eq_aCS)]
-    d.Eq_aDy = d.Eq_aDs
-    d.Eq_aDw = $d1{-rDH,x-} taD1 d.Eq_aDy
-    ==_aDN = PrelBase.=={-8Y,p-} (B{-r3X,x-} taD1) d.Eq_aDw
-    ==_aDO = ==_aDP
-    AbsBinds [] [] [([], ==_aDP, ==_aCW)]
-	==_aCW (D{-r7,x-}{i} x_r3H) (D{-r7,x-}{i} y_r3I)
-	       = x_r3H ==_aDN y_r3I
-	==_aCW C{-r6,x-}{i} C{-r6,x-}{i} = PrelBase.True{-5E,w-}{i}
-	==_aCW a_r3L b_r3M = PrelBase.False{-58,w-}{i}
-    AbsBinds [] [] [([], /=_aDQ, /=_aDl)]
-	/=_aDl a_r3Q b_r3R = PrelBase.not{-rgM,p-} a_r3Q ==_aDO b_r3R
-    d.Eq_aCS = ({-dict-} [] [==_aDP, /=_aDQ])
+AbsBinds [taDI] [] [([taDI], $d3{-rDM,x-}, d.Eval_aC3)]
+    d.Eval_aC3 = ({-dict-} [] [])
+AbsBinds [taDJ] [] [([taDJ], $d4{-rDQ,x-}, d.Eval_aC9)]
+    d.Eval_aC9 = ({-dict-} [] [])
+AbsBinds [taCm] [d.Eq_aCP] [([taCm], $d1{-rDO,x-}, d.Eq_aCf)]
+    d.Eq_aCT = d.Eq_aCP
+    ==_aDU = PrelBase.=={-8Y,p-} taCm d.Eq_aCT
+    ==_aDT = ==_aDS
+    AbsBinds [] [] [([], ==_aDS, ==_aCj)]
+	==_aCj X{-r9,x-}{i} X{-r9,x-}{i} = PrelBase.True{-5E,w-}{i}
+	==_aCj (Y{-r8,x-}{i} a_r3r) (Y{-r8,x-}{i} b_r3s)
+	       = a_r3r ==_aDU b_r3s
+	==_aCj a_r3u b_r3v = PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], /=_aDR, /=_aCI)]
+	/=_aCI a_r3z b_r3A = PrelBase.not{-rgM,p-} a_r3z ==_aDT b_r3A
+    d.Eq_aCf = ({-dict-} [] [==_aDS, /=_aDR])
+AbsBinds [taD9] [d.Eq_aDA] [([taD9], $d2{-rDN,x-}, d.Eq_aD0)]
+    d.Eq_aDG = d.Eq_aDA
+    d.Eq_aDE = $d1{-rDO,x-} taD9 d.Eq_aDG
+    ==_aDY = PrelBase.=={-8Y,p-} (B{-r3X,x-} taD9) d.Eq_aDE
+    ==_aDX = ==_aDW
+    AbsBinds [] [] [([], ==_aDW, ==_aD4)]
+	==_aD4 (D{-r7,x-}{i} x_r3H) (D{-r7,x-}{i} y_r3I)
+	       = x_r3H ==_aDY y_r3I
+	==_aD4 C{-r6,x-}{i} C{-r6,x-}{i} = PrelBase.True{-5E,w-}{i}
+	==_aD4 a_r3L b_r3M = PrelBase.False{-58,w-}{i}
+    AbsBinds [] [] [([], /=_aDV, /=_aDt)]
+	/=_aDt a_r3Q b_r3R = PrelBase.not{-rgM,p-} a_r3Q ==_aDX b_r3R
+    d.Eq_aD0 = ({-dict-} [] [==_aDW, /=_aDV])
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

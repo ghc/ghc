@@ -1,19 +1,17 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
-[tal1]
+[tala]
 []
-[([tal1], f{-r3n,x-}, f_akC), ([tal1], g{-r3m,x-}, g_akD)]
-    f_akC x_r3h y_r3i = if x_r3h then y_r3i else g_akD y_r3i x_r3h
-    g_akD y_r3k x_r3l = if x_r3l then y_r3k else f_akC x_r3l y_r3k
-AbsBinds [] [] [([], h{-r3o,x-}, h_al3)]
-    h_al3 x_r3f
+[([tala], f{-r3n,x-}, f_akG), ([tala], g{-r3m,x-}, g_akH)]
+    f_akG x_r3h y_r3i = if x_r3h then y_r3i else g_akH y_r3i x_r3h
+    g_akH y_r3k x_r3l = if x_r3l then y_r3k else f_akG x_r3l y_r3k
+AbsBinds [] [] [([], h{-r3o,x-}, h_alc)]
+    h_alc x_r3f
 	  = f{-r3n,x-} PrelBase.Bool{-34,W-} f{-r3n,x-}
 						 PrelBase.Bool{-34,W-} PrelBase.True{-5E,w-}{i}
 								       x_r3f
 					     x_r3f
+
 
 NOTE: Simplifier still going after 4 iterations; bailing out.
 ghc: module version changed to 1; reason: no old .hi file

@@ -1,10 +1,8 @@
+==================== Typechecked ====================
+FooData{-r2,l-}{i} = FooData{-r2,l-}{i} {}
+AbsBinds [] [] [([], $d1{-rBz,x-}, d.Eval_aBw)]
+    d.Eval_aBw = ({-dict-} [] [])
 
-
-================================================================================
-Typechecked:
-FooData{-r5,l-}{i} = FooData{-r5,l-}{i} {}
-AbsBinds [] [] [([], $d1{-rBr,x-}, d.Eval_aBo)]
-    d.Eval_aBo = ({-dict-} [] [])
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

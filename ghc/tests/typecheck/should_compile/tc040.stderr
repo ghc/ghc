@@ -1,22 +1,20 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [taAV] [d.Eq_aBd] [([taAV], f{-r3e,x-}, f_aAS)]
-    d.Eq_aBf = d.Eq_aBd
-    ==_aBg = PrelBase.=={-8Y,p-} taAV d.Eq_aBf
-    f_aAS x_r3g
+==================== Typechecked ====================
+AbsBinds [taB3] [d.Eq_aBk] [([taB3], f{-r3e,x-}, f_aB0)]
+    d.Eq_aBm = d.Eq_aBk
+    ==_aBn = PrelBase.=={-8Y,p-} taB3 d.Eq_aBm
+    f_aB0 x_r3g
 	  = g_r3i x_r3g
 	  where
 	      {- nonrec -}
-	      AbsBinds [] [] [([], g_r3i, g_aAX)]
-		  g_aAX y_r3k
-			= if y_r3k ==_aBg x_r3g then
-			      PrelBase.[]{-5i,w-}{i} taAV
+	      AbsBinds [] [] [([], g_r3i, g_aB5)]
+		  g_aB5 y_r3k
+			= if y_r3k ==_aBn x_r3g then
+			      PrelBase.[]{-5i,w-}{i} taB3
 			  else
-			      [y_r3k] (taAV)
+			      [y_r3k] (taB3)
 	      {- nonrec -}
 	      {- nonrec -}
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -9,5 +9,4 @@ tcfail043.hs:16:
 	Imported from Prelude at tcfail043.hs:16
 	Defined at tcfail043.hs:57
 
-
 Compilation had errors

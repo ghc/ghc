@@ -1,15 +1,13 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
-[taRr, taRH]
-[d.Num_aRM]
-[([taRr, taRH], g{-r3j,x-}, g_aRj)]
-    fromInt_aRN = PrelBase.fromInt{-8R,p-} taRr d.Num_aRM
-    lit_aRO = fromInt_aRN PrelBase.I#{-5b,w-}{i} 2#
-    g_aRj ((x_r3d PrelBase.:{-55,w-}{i} z_r3e), y_r3f) = x_r3d
-    g_aRj (x_r3h, y_r3i) = lit_aRO
+[taRC, taRQ]
+[d.Num_aRV]
+[([taRC, taRQ], g{-r3j,x-}, g_aRr)]
+    fromInt_aRX = PrelBase.fromInt{-8R,p-} taRC d.Num_aRV
+    lit_aRW = fromInt_aRX PrelBase.I#{-5b,w-}{i} 2#
+    g_aRr ((x_r3d PrelBase.:{-55,w-}{i} z_r3e), y_r3f) = x_r3d
+    g_aRr (x_r3h, y_r3i) = lit_aRW
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

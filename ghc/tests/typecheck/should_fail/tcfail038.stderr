@@ -5,5 +5,4 @@ tcfail038.hs:8:
 tcfail038.hs:7:
     Conflicting definitions for `==' in the bindings in an instance declaration
 
-
 Compilation had errors

@@ -1,25 +1,23 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
 []
 []
-[([], al{-r3i,x-}, al_aS2), ([], am{-r3h,x-}, am_aS3)]
-    lit_aTo = lit_aTp
-    (al_aS2 PrelBase.:{-55,w-}{i} am_aS3)
-	= [y_r3e +_aTr lit_aTo |
-	       (y_r3e, z_r3f) <- [(lit_aTp,
-				   lit_aTq)] ((PrelBase.Int{-3g,W-}, PrelBase.Int{-3g,W-}))]
-lit_aTp = PrelBase.I#{-5b,w-}{i} 1#
-lit_aTq = PrelBase.I#{-5b,w-}{i} 2#
-d.Num_aTe = PrelBase.$d4{-rat,p-}
-+_aTr = PrelBase.+{-r3g,p-} PrelBase.Int{-3g,W-} d.Num_aTe
-d.Monad_aTh = PrelBase.$d25{-rad,p-}
->>=_aTs = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_aTh
-d.Monad_aTk = d.Monad_aTh
+[([], al{-r3i,x-}, al_aSa), ([], am{-r3h,x-}, am_aSb)]
+    lit_aTs = lit_aTx
+    (al_aSa PrelBase.:{-55,w-}{i} am_aSb)
+	= [y_r3e +_aTv lit_aTs |
+	       (y_r3e, z_r3f) <- [(lit_aTx,
+				   lit_aTw)] ((PrelBase.Int{-3g,W-}, PrelBase.Int{-3g,W-}))]
+lit_aTx = PrelBase.I#{-5b,w-}{i} 1#
+lit_aTw = PrelBase.I#{-5b,w-}{i} 2#
+d.Num_aTi = PrelBase.$d4{-rat,p-}
++_aTv = PrelBase.+{-r3g,p-} PrelBase.Int{-3g,W-} d.Num_aTi
+d.Monad_aTl = PrelBase.$d25{-rad,p-}
+>>=_aTu = PrelBase.>>={-811,p-} PrelBase.[]{-3j,W-} d.Monad_aTl
+d.Monad_aTo = d.Monad_aTl
 return_aTt =
-    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_aTk
+    PrelBase.return{-816,p-} PrelBase.[]{-3j,W-} d.Monad_aTo
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

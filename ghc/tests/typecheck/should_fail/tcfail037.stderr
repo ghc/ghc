@@ -4,5 +4,4 @@ tcfail037.hs:3:
 	Imported from Prelude at tcfail037.hs:3
 	Defined at tcfail037.hs:10
 
-
 Compilation had errors

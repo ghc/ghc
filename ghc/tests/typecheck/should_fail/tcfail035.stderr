@@ -1,7 +1,4 @@
  
-tcfail035.hs:3: Duplicate or overlapping instance declarations
-    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
- 
 tcfail035.hs:9: No explicit method nor default method for `PrelBase.showsPrec'
 		in an instance declaration for `PrelBase.Show'
  
@@ -43,5 +40,30 @@ tcfail035.hs:6: No explicit method nor default method for `PrelBase.signum'
  
 tcfail035.hs:6: No explicit method nor default method for `PrelBase.fromInteger'
 		in an instance declaration for `PrelBase.Num'
+ 
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+ 
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+ 
+tcfail035.hs:3: Duplicate or overlapping instance declarations
+    for `PrelBase.Num NUM' at tcfail035.hs:6 and tcfail035.hs:7
+ 
+tcfail035.hs:7: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail035.hs:7
+    When checking methods of an instance declaration
+ 
+tcfail035.hs:7: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail035.hs:7
+    When checking superclass constraints of an instance declaration
+ 
+tcfail035.hs:6: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail035.hs:6
+    When checking methods of an instance declaration
+ 
+tcfail035.hs:6: No instance for: `PrelBase.Eval NUM'
+    arising from an instance declaration at tcfail035.hs:6
+    When checking superclass constraints of an instance declaration
 
 Compilation had errors

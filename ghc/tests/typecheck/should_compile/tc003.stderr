@@ -1,22 +1,20 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
 []
 []
-[([], c{-r5,x-}, c_aRg), ([], d{-r4,x-}, d_aRh), ([],
+[([], c{-r5,x-}, c_aRo), ([], d{-r4,x-}, d_aRp), ([],
 						  e{-r3,x-},
-						  e_aRi)]
-    lit_aRS = lit_aRT
-    (c_aRg@(d_aRh, e_aRi))
+						  e_aRq)]
+    lit_aRS = lit_aRV
+    (c_aRo@(d_aRp, e_aRq))
 	= if PrelBase.True{-5E,w-}{i} then
-	      (lit_aRT, lit_aRU)
+	      (lit_aRV, lit_aRU)
 	  else
-	      (lit_aRS, lit_aRV)
-lit_aRT = PrelBase.I#{-5b,w-}{i} 1#
+	      (lit_aRS, lit_aRT)
+lit_aRV = PrelBase.I#{-5b,w-}{i} 1#
 lit_aRU = PrelBase.I#{-5b,w-}{i} 2#
-lit_aRV = PrelBase.I#{-5b,w-}{i} 3#
+lit_aRT = PrelBase.I#{-5b,w-}{i} 3#
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

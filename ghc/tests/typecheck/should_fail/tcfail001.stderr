@@ -2,8 +2,10 @@
 tcfail001.hs:9:warning:
     Duplicated class assertion `A a' in context: `(A a, A a)'
  
-tcfail001.hs:9: Function type expected, but found the type `[takz]'
+tcfail001.hs:9: Couldn't match the type
+		    `GHC.-> oakH' against `PrelBase.[]'
+    Expected: `oakH -> oakI'
+    Inferred: `[takF]'
     In an equation for function `op': `op PrelBase.[] = PrelBase.[]'
-
 
 Compilation had errors

@@ -1,43 +1,41 @@
-
-
-================================================================================
-Typechecked:
-MkAFE{-r3X,x-}{i} =
+==================== Typechecked ====================
+MkAFE{-r3S,x-}{i} =
     _/\_ n_tr3K a_tr3L b_tr3M -> \ tpl_B1 ->
-	MkAFE{-r3X,x-}{i} {_@_ n_tr3K _@_ a_tr3L _@_ b_tr3M tpl_B1}
-MkFG{-r3W,x-}{i} =
+	MkAFE{-r3S,x-}{i} {_@_ n_tr3K _@_ a_tr3L _@_ b_tr3M tpl_B1}
+MkFG{-r3U,x-}{i} =
     _/\_ a_tr3O b_tr3P -> \ tpl_B1 ->
-	MkFG{-r3W,x-}{i} {_@_ a_tr3O _@_ b_tr3P tpl_B1}
-MkOL{-r3V,x-}{i} =
-    _/\_ a_tr3R -> \ tpl_B1 -> MkOL{-r3V,x-}{i} {_@_ a_tr3R tpl_B1}
-AbsBinds [taR8, taRb] [] [([taR8, taRb], sNd{-r3v,x-}, sNd_aR1)]
-    sNd_aR1 (f_r3F, s_r3G) = s_r3G
-AbsBinds [taRA, taRE] [] [([taRA, taRE], mAp{-r3u,x-}, mAp_aRg)]
-    mAp_aRg f_r3z PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} taRE
-    mAp_aRg f_r3B (x_r3C PrelBase.:{-55,w-}{i} xs_r3D)
-	    = PrelBase.:{-55,w-}{i} taRE (f_r3B x_r3C) (mAp_aRg f_r3B xs_r3D)
+	MkFG{-r3U,x-}{i} {_@_ a_tr3O _@_ b_tr3P tpl_B1}
+MkOL{-r3W,x-}{i} =
+    _/\_ a_tr3R -> \ tpl_B1 -> MkOL{-r3W,x-}{i} {_@_ a_tr3R tpl_B1}
+AbsBinds [taRj, taRm] [] [([taRj, taRm], sNd{-r3u,x-}, sNd_aR9)]
+    sNd_aR9 (f_r3F, s_r3G) = s_r3G
+AbsBinds [taRL, taRP] [] [([taRL, taRP], mAp{-r3v,x-}, mAp_aRp)]
+    mAp_aRp f_r3z PrelBase.[]{-5i,w-}{i} = PrelBase.[]{-5i,w-}{i} taRP
+    mAp_aRp f_r3B (x_r3C PrelBase.:{-55,w-}{i} xs_r3D)
+	    = PrelBase.:{-55,w-}{i} taRP (f_r3B x_r3C) (mAp_aRp f_r3B xs_r3D)
 AbsBinds
-[taRU, taRV]
+[taS5, taS6]
 []
-[([taRU, taRV], ranOAL{-r3s,x-}, ranOAL_aRP)]
-    ranOAL_aRP (MkOL{-r3V,x-}{i} xs_r3x)
-	       = mAp{-r3u,x-} [(taRU, taRV), taRV] sNd{-r3v,x-} [taRU, taRV]
+[([taS5, taS6], ranOAL{-r3s,x-}, ranOAL_aS0)]
+    ranOAL_aS0 (MkOL{-r3W,x-}{i} xs_r3x)
+	       = mAp{-r3v,x-} [(taS5, taS6), taS6] sNd{-r3u,x-} [taS5, taS6]
 						   xs_r3x
 AbsBinds
-[taSn, taSo, taSp]
+[taSy, taSz, taSA]
 []
-[([taSn, taSo, taSp], ranAFE{-r3t,x-}, ranAFE_aSe)]
-    ranAFE_aSe (MkAFE{-r3X,x-}{i} nfs_r3I)
-	       = ranOAL{-r3s,x-} [taSn, FG{-r3T,x-} taSo taSp] nfs_r3I
+[([taSy, taSz, taSA], ranAFE{-r3t,x-}, ranAFE_aSp)]
+    ranAFE_aSp (MkAFE{-r3S,x-}{i} nfs_r3I)
+	       = ranOAL{-r3s,x-} [taSy, FG{-r3V,x-} taSz taSA] nfs_r3I
 AbsBinds
-[taSQ, taSR, taSS]
+[taT1, taT3, taT2]
 []
-[([taSQ, taSR, taSS], $d1{-rSY,x-}, d.Eval_aSC)]
-    d.Eval_aSC = ({-dict-} [] [])
-AbsBinds [taST, taSU] [] [([taST, taSU], $d2{-rT0,x-}, d.Eval_aSJ)]
-    d.Eval_aSJ = ({-dict-} [] [])
-AbsBinds [taSV] [] [([taSV], $d3{-rT2,x-}, d.Eval_aSP)]
-    d.Eval_aSP = ({-dict-} [] [])
+[([taT1, taT3, taT2], $d1{-rTd,x-}, d.Eval_aSN)]
+    d.Eval_aSN = ({-dict-} [] [])
+AbsBinds [taT4, taT5] [] [([taT4, taT5], $d2{-rTc,x-}, d.Eval_aSU)]
+    d.Eval_aSU = ({-dict-} [] [])
+AbsBinds [taT6] [] [([taT6], $d3{-rTb,x-}, d.Eval_aT0)]
+    d.Eval_aT0 = ({-dict-} [] [])
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

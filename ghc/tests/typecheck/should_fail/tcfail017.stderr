@@ -1,7 +1,6 @@
  
-tcfail017.hs:11: No instance for: `C [takH]'
+tcfail017.hs:11: No instance for: `C [takL]'
     arising from an instance declaration at tcfail017.hs:11
     When checking superclass constraints of an instance declaration
-
 
 Compilation had errors

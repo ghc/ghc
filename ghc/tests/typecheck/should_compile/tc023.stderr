@@ -1,19 +1,17 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [takP, takR] [] [([takP, takR], k{-r3l,x-}, k_akB)]
-    k_akB x_r3j y_r3k = x_r3j
+==================== Typechecked ====================
+AbsBinds [takV, takX] [] [([takV, takX], k{-r3l,x-}, k_akF)]
+    k_akF x_r3j y_r3k = x_r3j
 AbsBinds
-[taln, talp, talr]
+[talx, talz, talB]
 []
-[([taln, talp, talr], s{-r3m,x-}, s_akT)]
-    s_akT f_r3f g_r3g x_r3h = f_r3f x_r3h g_r3g x_r3h
-AbsBinds [talA] [] [([talA], main{-r3n,x-}, main_alt)]
-    main_alt
-	= s{-r3m,x-} [talA, GHC.Void{-3T,W-} -> talA, talA] k{-r3l,x-}
-								[GHC.Void{-3T,W-} -> talA, talA]
-							    k{-r3l,x-} [GHC.Void{-3T,W-}, talA]
+[([talx, talz, talB], s{-r3m,x-}, s_akZ)]
+    s_akZ f_r3f g_r3g x_r3h = f_r3f x_r3h g_r3g x_r3h
+AbsBinds [talJ] [] [([talJ], main{-r3n,x-}, main_alD)]
+    main_alD
+	= s{-r3m,x-} [talJ, talJ, GHC.Void{-3T,W-} -> talJ] k{-r3l,x-}
+								[GHC.Void{-3T,W-} -> talJ, talJ]
+							    k{-r3l,x-} [GHC.Void{-3T,W-}, talJ]
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
@@ -23,4 +21,4 @@ ShouldSucceed k main s;
 _declarations_
 1 k _:_ _forall_ [ta tb] => tb -> ta -> tb ;;
 1 main _:_ _forall_ [ta] => ta -> ta ;;
-1 s _:_ _forall_ [ta tb tc] => (tc -> tb -> ta) -> (tc -> tb) -> tc -> ta ;;
+1 s _:_ _forall_ [ta tb tc] => (tb -> tc -> ta) -> (tb -> tc) -> tb -> ta ;;

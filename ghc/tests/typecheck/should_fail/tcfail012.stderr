@@ -1,9 +1,8 @@
  
 tcfail012.hs:3: Couldn't match the type
-		    `[tak1]' against `PrelBase.Bool'
-    Expected: `[tak1]'
+		    `[tak5]' against `PrelBase.Bool'
+    Expected: `[tak5]'
     Inferred: `PrelBase.Bool'
     In a pattern binding: `PrelBase.True = PrelBase.[]'
-
 
 Compilation had errors

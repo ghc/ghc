@@ -1,40 +1,38 @@
  
 tc056.hs:15:warning:
     Duplicated class assertion `Eq' a' in context: `(Eq' a, Eq' a)'
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
-[taCJ, taCG]
-[d.Eq'_aCN, d.Num_aCR]
-[([taCJ, taCG], f{-r3E,x-}, f_aCq)]
-    d.Eq'_aCO = d.Eq'_aCN
-    d.Eq'_aCL = $d1{-rDw,x-} taCG [d.Eq'_aCN, d.Eq'_aCO]
-    doubleeq_aDz = doubleeq{-r3G,x-} [taCG] d.Eq'_aCL
-    fromInt_aDA = PrelBase.fromInt{-8R,p-} taCG d.Num_aCR
-    lit_aDB = fromInt_aDA PrelBase.I#{-5b,w-}{i} 1#
-    f_aCq x_r3h y_r3i = doubleeq_aDz x_r3h [lit_aDB] (taCG)
+[taCU, taCR]
+[d.Eq'_aCY, d.Num_aD2]
+[([taCU, taCR], f{-r3E,x-}, f_aCy)]
+    d.Eq'_aCZ = d.Eq'_aCY
+    d.Eq'_aCW = $d1{-rDM,x-} taCR [d.Eq'_aCY, d.Eq'_aCZ]
+    doubleeq_aDJ = doubleeq{-r3H,x-} [taCR] d.Eq'_aCW
+    fromInt_aDI = PrelBase.fromInt{-8R,p-} taCR d.Num_aD2
+    lit_aDH = fromInt_aDI PrelBase.I#{-5b,w-}{i} 1#
+    f_aCy x_r3h y_r3i = doubleeq_aDJ x_r3h [lit_aDH] (taCR)
 AbsBinds
-[taD4]
-[d.Eq'_aD7, d.Eq'_aD8]
-[([taD4], $d1{-rDw,x-}, d.Eq'_aCX)]
-    AbsBinds [] [] [([], doubleeq_aDC, doubleeq_aD1)]
-	doubleeq_aD1 x_r3p y_r3q = PrelBase.True{-5E,w-}{i}
-    d.Eq'_aCX = ({-dict-} [] [doubleeq_aDC])
-AbsBinds [] [] [([], $d2{-rDx,x-}, d.Eq'_aDg)]
-    AbsBinds [] [] [([], doubleeq_aDD, doubleeq_aDk)]
-	doubleeq_aDk x_r3w y_r3x = PrelBase.True{-5E,w-}{i}
-    d.Eq'_aDg = ({-dict-} [] [doubleeq_aDD])
-scsel_Ord'ShouldSucceedEq'{-aDy,x-} =
+[taDf]
+[d.Eq'_aDi, d.Eq'_aDj]
+[([taDf], $d1{-rDM,x-}, d.Eq'_aD8)]
+    AbsBinds [] [] [([], doubleeq_aDN, doubleeq_aDc)]
+	doubleeq_aDc x_r3p y_r3q = PrelBase.True{-5E,w-}{i}
+    d.Eq'_aD8 = ({-dict-} [] [doubleeq_aDN])
+AbsBinds [] [] [([], $d2{-rDL,x-}, d.Eq'_aDr)]
+    AbsBinds [] [] [([], doubleeq_aDO, doubleeq_aDv)]
+	doubleeq_aDv x_r3w y_r3x = PrelBase.True{-5E,w-}{i}
+    d.Eq'_aDr = ({-dict-} [] [doubleeq_aDO])
+scsel_Ord'ShouldSucceedEq'{-aDK,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-lt{-r3H,x-} =
+lt{-r3F,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [taDu] [d.Ord'_aDq] []
-doubleeq{-r3G,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taDv] [d.Eq'_aDt] []
+AbsBinds [taDF] [d.Ord'_aDB] []
+doubleeq{-r3H,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taDG] [d.Eq'_aDE] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

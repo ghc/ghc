@@ -2,6 +2,12 @@
 tcfail023.hs:2: Duplicate or overlapping instance declarations
     for `A B' at tcfail023.hs:8 and tcfail023.hs:11
  
+tcfail023.hs:2: Duplicate or overlapping instance declarations
+    for `A B' at tcfail023.hs:8 and tcfail023.hs:11
+ 
+tcfail023.hs:2: Duplicate or overlapping instance declarations
+    for `A B' at tcfail023.hs:8 and tcfail023.hs:11
+ 
 tcfail023.hs:11: Couldn't match the type
 		     `PrelBase.Bool' against `B'
     Expected: `PrelBase.Bool'
@@ -14,6 +20,5 @@ tcfail023.hs:8: Couldn't match the type `PrelBase.Bool' against `B'
     In an equation for function `op': `op C = PrelBase.True'
  
 tcfail023.hs:2: Module Main must include a definition for `Main.main'
-
 
 Compilation had errors

@@ -1,28 +1,26 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [taCy, taCu] [d.A_aCA] [([taCy, taCu], f{-r3B,x-}, f_aCm)]
-    op1_aDr = op1{-r3D,x-} taCu d.A_aCA
-    f_aCm x_r3h = op1_aDr
-AbsBinds [taCN] [d.B_aD3] [([taCN], $d1{-rDs,x-}, d.B_aCG)]
-    op2_aDw = op2_aDx
-    AbsBinds [] [] [([], op2_aDx, op2_aCK)]
-	op2_aCK PrelBase.[]{-5i,w-}{i} = PrelBase.I#{-5b,w-}{i} 0#
-	op2_aCK (x_r3p PrelBase.:{-55,w-}{i} xs_r3q)
-		= lit_aDv +_aDu (op2_aDw xs_r3q)
-    d.B_aCG = ({-dict-} [] [op2_aDx])
-AbsBinds [] [] [([], $d2{-rDt,x-}, d.A_aDb)]
-    AbsBinds [] [] [([], op1_aDy, op1_aDf)]
-	op1_aDf = PrelBase.I#{-5b,w-}{i} 2#
-    d.A_aDb = ({-dict-} [] [op1_aDy])
-op2{-r3E,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taDp] [d.B_aDj] []
+==================== Typechecked ====================
+AbsBinds [taCH, taCE] [d.A_aCJ] [([taCH, taCE], f{-r3B,x-}, f_aCu)]
+    op1_aDA = op1{-r3D,x-} taCE d.A_aCJ
+    f_aCu x_r3h = op1_aDA
+AbsBinds [taCW] [d.B_aDc] [([taCW], $d1{-rDE,x-}, d.B_aCP)]
+    op2_aDG = op2_aDF
+    AbsBinds [] [] [([], op2_aDF, op2_aCT)]
+	op2_aCT PrelBase.[]{-5i,w-}{i} = PrelBase.I#{-5b,w-}{i} 0#
+	op2_aCT (x_r3p PrelBase.:{-55,w-}{i} xs_r3q)
+		= lit_aDB +_aDC (op2_aDG xs_r3q)
+    d.B_aCP = ({-dict-} [] [op2_aDF])
+AbsBinds [] [] [([], $d2{-rDD,x-}, d.A_aDk)]
+    AbsBinds [] [] [([], op1_aDH, op1_aDo)]
+	op1_aDo = PrelBase.I#{-5b,w-}{i} 2#
+    d.A_aDk = ({-dict-} [] [op1_aDH])
+op2{-r3C,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [taDy] [d.B_aDs] []
 op1{-r3D,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [taDq] [d.A_aDm] []
-d.Num_aDo = PrelBase.$d4{-raQ,p-}
-+_aDu = PrelBase.+{-rfF,p-} PrelBase.Int{-3g,W-} d.Num_aDo
-lit_aDv = PrelBase.I#{-5b,w-}{i} 1#
+AbsBinds [taDz] [d.A_aDv] []
+d.Num_aDx = PrelBase.$d4{-raQ,p-}
++_aDC = PrelBase.+{-rfF,p-} PrelBase.Int{-3g,W-} d.Num_aDx
+lit_aDB = PrelBase.I#{-5b,w-}{i} 1#
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

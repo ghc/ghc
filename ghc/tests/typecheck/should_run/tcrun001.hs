@@ -1,6 +1,6 @@
 --!! Test for (->) instances
 
-module ShouldRun where
+module Main where
 
 class Flob k where
   twice :: k a a  -> k a a

@@ -1,101 +1,98 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 Null{-rf,x-}{i} =
     _/\_ t_ar59 a_tr5a -> Null{-rf,x-}{i} {_@_ t_ar59 _@_ a_tr5a}
 Cons{-re,x-}{i} =
     _/\_ t_ar59 a_tr5a -> \ tpl_B1 tpl_B2 ->
 	Cons{-re,x-}{i} {_@_ t_ar59 _@_ a_tr5a tpl_B1 tpl_B2}
-AbsBinds [ta13I] [d.Num_a13T] [([ta13I], out{-r4v,x-}, out_a13F)]
-    d.Eq_a13V = PrelBase.scsel_NumPrelBaseEq{-a19a,p-} ta13I d.Num_a13T
-    ==_a196 = PrelBase.=={-8Y,p-} ta13I d.Eq_a13V
-    d.Num_a13X = d.Num_a13T
-    sum_a197 = PrelList.sum{-ro0,p-} ta13I d.Num_a13X
-    d.Num_a140 = d.Num_a13T
-    fromInt_a198 = PrelBase.fromInt{-8R,p-} ta13I d.Num_a140
-    lit_a199 = fromInt_a198 PrelBase.I#{-5b,w-}{i} 0#
-    out_a13F x_r4O
-	     | (sum_a197 x_r4O) ==_a196 lit_a199 = PrelIO.putStr{-riO,p-} "ok\n"
+AbsBinds [ta13Q] [d.Num_a141] [([ta13Q], out{-r4v,x-}, out_a13N)]
+    d.Eq_a143 = PrelBase.scsel_NumPrelBaseEq{-a19j,p-} ta13Q d.Num_a141
+    ==_a18Z = PrelBase.=={-8Y,p-} ta13Q d.Eq_a143
+    d.Num_a145 = d.Num_a141
+    sum_a18Y = PrelList.sum{-ro0,p-} ta13Q d.Num_a145
+    d.Num_a148 = d.Num_a141
+    fromInt_a18X = PrelBase.fromInt{-8R,p-} ta13Q d.Num_a148
+    lit_a18W = fromInt_a18X PrelBase.I#{-5b,w-}{i} 0#
+    out_a13N x_r4O
+	     | (sum_a18Y x_r4O) ==_a18Z lit_a18W = PrelIO.putStr{-riO,p-} "ok\n"
 	     | PrelBase.otherwise{-818,p-} = PrelIO.putStr{-riO,p-} "ok\n"
-out_a18N = out{-r4v,x-} PrelBase.Int{-3g,W-} d.Num_a18n
-out_a18O = out{-r4v,x-} PrelBase.Double{-3a,W-} d.Num_a18o
+out_a19i = out{-r4v,x-} PrelBase.Int{-3g,W-} d.Num_a18w
+out_a19h = out{-r4v,x-} PrelBase.Double{-3a,W-} d.Num_a18x
 AbsBinds
-[ta14p, aa14q]
-[d.PriorityQueue_a14u, d.Ord_a14w]
-[([ta14p, aa14q], insertMany{-r4x,x-}, insertMany_a143)]
-    insert_a14r = insert{-r5d,x-} aa14q d.PriorityQueue_a14u
-    insert_a19b = insert_a14r ta14p d.Ord_a14w
-    insertMany_a143 x_r4G q_r4H
-		    = PrelBase.foldr{-89,w-} [ta14p, aa14q ta14p] insert_a19b
+[ta14z, aa14A]
+[d.PriorityQueue_a14E, d.Ord_a14G]
+[([ta14z, aa14A], insertMany{-r4x,x-}, insertMany_a14b)]
+    insert_a14B = insert{-r5d,x-} aa14A d.PriorityQueue_a14E
+    insert_a19k = insert_a14B ta14z d.Ord_a14G
+    insertMany_a14b x_r4G q_r4H
+		    = PrelBase.foldr{-89,w-} [ta14z, aa14A ta14z] insert_a19k
 								  q_r4H
 								  x_r4G
 AbsBinds
-[aa153, ta155]
-[d.PriorityQueue_a158, d.Ord_a15a]
-[([aa153, ta155], toOrderedList{-r4w,x-}, toOrderedList_a14y)]
-    splitMin_a156 = splitMin{-r5f,x-} aa153 d.PriorityQueue_a158
-    splitMin_a19c = splitMin_a156 ta155 d.Ord_a15a
-    toOrderedList_a14y q_r4A
-		       = case splitMin_a19c q_r4A of
-			   Null{-rf,x-}{i} -> PrelBase.[]{-5i,w-}{i} ta155
+[aa15e, ta15g]
+[d.PriorityQueue_a15j, d.Ord_a15l]
+[([aa15e, ta15g], toOrderedList{-r4y,x-}, toOrderedList_a14I)]
+    splitMin_a15h = splitMin{-r5b,x-} aa15e d.PriorityQueue_a15j
+    splitMin_a19l = splitMin_a15h ta15g d.Ord_a15l
+    toOrderedList_a14I q_r4A
+		       = case splitMin_a19l q_r4A of
+			   Null{-rf,x-}{i} -> PrelBase.[]{-5i,w-}{i} ta15g
 			   (Cons{-re,x-}{i} a_r4D q_r4E)
-			   -> PrelBase.:{-55,w-}{i} ta155 a_r4D (toOrderedList_a14y q_r4E)
+			   -> PrelBase.:{-55,w-}{i} ta15g a_r4D (toOrderedList_a14I q_r4E)
 AbsBinds
-[aa15w, ta15x]
-[d.PriorityQueue_a15A, d.Ord_a15B]
-[([aa15w, ta15x], pqSort{-r4y,x-}, pqSort_a15c)]
-    toOrderedList_a19d =
-	toOrderedList{-r4w,x-} [aa15w, ta15x]
-	    [d.PriorityQueue_a15A, d.Ord_a15B]
-    d.PriorityQueue_a15D = d.PriorityQueue_a15A
-    d.Ord_a15E = d.Ord_a15B
-    insertMany_a19e =
-	insertMany{-r4x,x-} [ta15x, aa15w]
-	    [d.PriorityQueue_a15D, d.Ord_a15E]
-    pqSort_a15c q_r4J x_r4K
-		= toOrderedList_a19d insertMany_a19e x_r4K q_r4J
+[aa15J, ta15K]
+[d.PriorityQueue_a15N, d.Ord_a15O]
+[([aa15J, ta15K], pqSort{-r4w,x-}, pqSort_a15n)]
+    toOrderedList_a19n =
+	toOrderedList{-r4y,x-} [aa15J, ta15K]
+	    [d.PriorityQueue_a15N, d.Ord_a15O]
+    d.PriorityQueue_a15Q = d.PriorityQueue_a15N
+    d.Ord_a15R = d.Ord_a15O
+    insertMany_a19m =
+	insertMany{-r4x,x-} [ta15K, aa15J]
+	    [d.PriorityQueue_a15Q, d.Ord_a15R]
+    pqSort_a15n q_r4J x_r4K
+		= toOrderedList_a19n insertMany_a19m x_r4K q_r4J
 AbsBinds
-[aa15R]
-[d.PriorityQueue_a16G]
-[([aa15R], check{-r4u,x-}, check_a15N)]
-    d.PriorityQueue_a17d = d.PriorityQueue_a16G
-    d.Ord_a17e = PrelBase.$d7{-rcM,p-}
-    pqSort_a19f =
-	pqSort{-r4y,x-} [aa15R, PrelBase.Int{-3g,W-}]
-	    [d.PriorityQueue_a17d, d.Ord_a17e]
-    d.Ord_a16H = d.Ord_a17e
-    d.PriorityQueue_a17l = d.PriorityQueue_a16G
-    d.Ord_a17m = PrelNum.$d17{-rwV,p-}
-    pqSort_a19g =
-	pqSort{-r4y,x-} [aa15R, PrelBase.Double{-3a,W-}]
-	    [d.PriorityQueue_a17l, d.Ord_a17m]
-    d.Ord_a16I = d.Ord_a17m
-    check_a15N empty_r4M
+[aa164]
+[d.PriorityQueue_a16P]
+[([aa164], check{-r4u,x-}, check_a160)]
+    d.PriorityQueue_a17m = d.PriorityQueue_a16P
+    d.Ord_a17n = PrelBase.$d7{-rcM,p-}
+    pqSort_a19p =
+	pqSort{-r4w,x-} [aa164, PrelBase.Int{-3g,W-}]
+	    [d.PriorityQueue_a17m, d.Ord_a17n]
+    d.Ord_a16Q = d.Ord_a17n
+    d.PriorityQueue_a17u = d.PriorityQueue_a16P
+    d.Ord_a17v = PrelNum.$d17{-rwV,p-}
+    pqSort_a19o =
+	pqSort{-r4w,x-} [aa164, PrelBase.Double{-3a,W-}]
+	    [d.PriorityQueue_a17u, d.Ord_a17v]
+    d.Ord_a16R = d.Ord_a17v
+    check_a160 empty_r4M
 	       = do
 		   PrelIO.putStr{-riO,p-} "*** sorting\n"
-		   out_a18N pqSort_a19f empty_a19h
-					[(enumFromTo_a18W) lit_a18U .. lit_a18V]
-		   out_a18O pqSort_a19g empty_a19i
-					[(enumFromThenTo_a193) lit_a18Y, lit_a190 .. lit_a192]
+		   out_a19i pqSort_a19p empty_a19r
+					[(enumFromTo_a199) lit_a19b .. lit_a19a]
+		   out_a19h pqSort_a19o empty_a19q
+					[(enumFromThenTo_a192) lit_a197, lit_a195 .. lit_a193]
 	       where
 		   {- nonrec -}
-		   empty_a19h = empty_r4M PrelBase.Int{-3g,W-} d.Ord_a16H
-		   empty_a19i = empty_r4M PrelBase.Double{-3a,W-} d.Ord_a16I
+		   empty_a19r = empty_r4M PrelBase.Int{-3g,W-} d.Ord_a16Q
+		   empty_a19q = empty_r4M PrelBase.Double{-3a,W-} d.Ord_a16R
 		   {- nonrec -}
 AbsBinds
-[aa18I, ta18J]
+[aa18R, ta18S]
 []
-[([aa18I, ta18J], $d1{-r18S,x-}, d.Eval_a17F)]
-    d.Eval_a17F = ({-dict-} [] [])
-empty{-r5b,x-} =
+[([aa18R, ta18S], $d1{-r19g,x-}, d.Eval_a17O)]
+    d.Eval_a17O = ({-dict-} [] [])
+empty{-r5f,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
 	tpl_B1;}
-single{-r5c,x-} =
+single{-r5e,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
@@ -109,14 +106,14 @@ insert{-r5d,x-} =
 	of {
 	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
 	tpl_B3;}
-meld{-r5e,x-} =
+meld{-r5c,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
 	of {
 	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
 	tpl_B4;}
-splitMin{-r5f,x-} =
+splitMin{-r5b,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case
 	    tpl_B1
@@ -124,43 +121,44 @@ splitMin{-r5f,x-} =
 	PrelTup.(,,,,){-65,w-}{i} tpl_B1 tpl_B2 tpl_B3 tpl_B4 tpl_B5  ->
 	tpl_B5;}
 AbsBinds
-[aa17N]
-[d.PriorityQueue_a18i]
-[([aa17N], $minsert{-r18T,x-}, insert_a19j)]
-    d.PriorityQueue_a18k = d.PriorityQueue_a18i
-    meld_a189 = meld{-r5e,x-} aa17N d.PriorityQueue_a18k
-    d.PriorityQueue_a18m = d.PriorityQueue_a18i
-    single_a188 = single{-r5c,x-} aa17N d.PriorityQueue_a18m
-    AbsBinds [ta17Q] [d.Ord_a18c] [([ta17Q], insert_a19j, insert_a17L)]
-	d.Ord_a18e = d.Ord_a18c
-	meld_a19k = meld_a189 ta17Q d.Ord_a18e
-	d.Ord_a18g = d.Ord_a18c
-	single_a19l = single_a188 ta17Q d.Ord_a18g
-	insert_a17L a_r56 q_r57 = (single_a19l a_r56) meld_a19k q_r57
-d.Num_a18n = PrelBase.$d4{-rcq,p-}
-lit_a18U = PrelBase.I#{-5b,w-}{i} 1#
-lit_a18V = PrelBase.I#{-5b,w-}{i} 99#
-d.Enum_a18r = PrelBase.$d6{-rcL,p-}
-enumFromTo_a18W =
-    PrelBase.enumFromTo{-8W,p-} PrelBase.Int{-3g,W-} d.Enum_a18r
-d.Num_a18o = PrelNum.$d16{-rwU,p-}
-d.Fractional_a18w = PrelNum.$d14{-rwS,p-}
-fromRational_a18X =
+[aa17W]
+[d.PriorityQueue_a18r]
+[([aa17W], $minsert{-r19c,x-}, insert_a19s)]
+    d.PriorityQueue_a18t = d.PriorityQueue_a18r
+    meld_a18i = meld{-r5c,x-} aa17W d.PriorityQueue_a18t
+    d.PriorityQueue_a18v = d.PriorityQueue_a18r
+    single_a18h = single{-r5e,x-} aa17W d.PriorityQueue_a18v
+    AbsBinds [ta17Z] [d.Ord_a18l] [([ta17Z], insert_a19s, insert_a17U)]
+	d.Ord_a18n = d.Ord_a18l
+	meld_a19u = meld_a18i ta17Z d.Ord_a18n
+	d.Ord_a18p = d.Ord_a18l
+	single_a19t = single_a18h ta17Z d.Ord_a18p
+	insert_a17U a_r56 q_r57 = (single_a19t a_r56) meld_a19u q_r57
+d.Num_a18w = PrelBase.$d4{-rcq,p-}
+lit_a19b = PrelBase.I#{-5b,w-}{i} 1#
+lit_a19a = PrelBase.I#{-5b,w-}{i} 99#
+d.Enum_a18A = PrelBase.$d6{-rcL,p-}
+enumFromTo_a199 =
+    PrelBase.enumFromTo{-8W,p-} PrelBase.Int{-3g,W-} d.Enum_a18A
+d.Num_a18x = PrelNum.$d16{-rwU,p-}
+d.Fractional_a18F = PrelNum.$d14{-rwS,p-}
+fromRational_a198 =
     PrelNum.fromRational{-8T,p-} PrelBase.Double{-3a,W-}
-	d.Fractional_a18w
-lit_a18Y = fromRational_a18X 1.0000000000000000
-fromRational_a18Z = fromRational_a18X
-lit_a190 = fromRational_a18Z 1.1000000000000001
-fromRational_a191 = fromRational_a18X
-lit_a192 = fromRational_a191 99.900000000000006
-d.Enum_a18B = PrelNum.$d8{-rxr,p-}
-enumFromThenTo_a193 =
-    PrelBase.enumFromThenTo{-8X,p-} PrelBase.Double{-3a,W-} d.Enum_a18B
-d.Monad_a18E = IOBase.$d3{-rm9,p-}
->>=_a194 = PrelBase.>>={-811,p-} IOBase.IO{-3e,p-} d.Monad_a18E
-d.Monad_a18H = d.Monad_a18E
-return_a195 =
-    PrelBase.return{-816,p-} IOBase.IO{-3e,p-} d.Monad_a18H
+	d.Fractional_a18F
+lit_a197 = fromRational_a198 1.0
+fromRational_a196 = fromRational_a198
+lit_a195 = fromRational_a196 1.1
+fromRational_a194 = fromRational_a198
+lit_a193 = fromRational_a194 99.9
+d.Enum_a18K = PrelNum.$d8{-rxr,p-}
+enumFromThenTo_a192 =
+    PrelBase.enumFromThenTo{-8X,p-} PrelBase.Double{-3a,W-} d.Enum_a18K
+d.Monad_a18N = IOBase.$d3{-rm9,p-}
+>>=_a191 = PrelBase.>>={-811,p-} IOBase.IO{-3e,p-} d.Monad_a18N
+d.Monad_a18Q = d.Monad_a18N
+return_a190 =
+    PrelBase.return{-816,p-} IOBase.IO{-3e,p-} d.Monad_a18Q
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

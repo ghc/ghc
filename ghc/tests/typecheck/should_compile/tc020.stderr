@@ -1,16 +1,14 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [takG] [] [([takG], f{-r3g,x-}, f_aku)]
-    f_aku x_r3d
+==================== Typechecked ====================
+AbsBinds [takM] [] [([takM], f{-r3g,x-}, f_aky)]
+    f_aky x_r3d
 	  = a_r3f
 	  where
 	      {- rec -}
-	      AbsBinds [] [] [([], a_r3f, a_akC)]
-		  a_akC = PrelBase.:{-55,w-}{i} takG x_r3d a_akC
+	      AbsBinds [] [] [([], a_r3f, a_akI)]
+		  a_akI = PrelBase.:{-55,w-}{i} takM x_r3d a_akI
 	      {- nonrec -}
 	      {- nonrec -}
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,28 +1,26 @@
-
-
-================================================================================
-Typechecked:
-AbsBinds [tald] [] [([tald], $d1{-rlI,x-}, d.C_al6)]
-    AbsBinds [] [] [([], op1_alJ, op1_ala)]
-	op1_ala xs_r3k = xs_r3k
-    d.C_al6 = ({-dict-} [] [op1_alJ])
+==================== Typechecked ====================
+AbsBinds [talh] [] [([talh], $d1{-rlM,x-}, d.C_ala)]
+    AbsBinds [] [] [([], op1_alN, op1_ale)]
+	op1_ale xs_r3k = xs_r3k
+    d.C_ala = ({-dict-} [] [op1_alN])
 AbsBinds
-[talr]
-[d.B_alv, d.C_alw]
-[([talr], $d2{-rlK,x-}, d.B_alk)]
-    d.C_alu = d.C_alw
-    AbsBinds [] [] [([], op2_alM, op2_alo)]
-	op2_alo xs_r3s ys_r3t = xs_r3s
-    d.B_alk = ({-dict-} [d.C_alu] [op2_alM])
-scsel_BShouldSucceedC{-alL,x-} =
+[talv]
+[d.B_aly, d.C_alz]
+[([talv], $d2{-rlP,x-}, d.B_alo)]
+    d.C_alA = d.C_alz
+    AbsBinds [] [] [([], op2_alQ, op2_als)]
+	op2_als xs_r3s ys_r3t = xs_r3s
+    d.B_alo = ({-dict-} [d.C_alA] [op2_alQ])
+scsel_BShouldSucceedC{-alO,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B1;}
-op2{-r3C,x-} =
+op2{-r3B,x-} =
     _/\_ t12 -> \ tpl_B1 ->
 	case tpl_B1 of { PrelTup.(,){-62,w-}{i} tpl_B1 tpl_B2  -> tpl_B2;}
-AbsBinds [talG] [d.B_alC] []
-op1{-r3B,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
-AbsBinds [talH] [d.C_alF] []
+AbsBinds [talK] [d.B_alG] []
+op1{-r3C,x-} = _/\_ t12 -> \ tpl_B1 -> tpl_B1
+AbsBinds [talL] [d.C_alJ] []
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

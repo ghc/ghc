@@ -1,14 +1,12 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 AbsBinds
 [tayU, tayW]
 []
-[([tayU, tayW], x{-r3i,x-}, x_ayt), ([tayU, tayW],
+[([tayU, tayW], x{-r3i,x-}, x_ayx), ([tayU, tayW],
 				     y{-r3h,x-},
-				     y_ayu)]
-    (x_ayt, y_ayu) = (\ p_r3e -> p_r3e, \ q_r3g -> q_r3g)
+				     y_ayy)]
+    (x_ayx, y_ayy) = (\ p_r3e -> p_r3e, \ q_r3g -> q_r3g)
+
 
 NOTE: Simplifier still going after 4 iterations; bailing out.
 ghc: module version changed to 1; reason: no old .hi file

@@ -11,5 +11,4 @@ tcfail044.hs:20: No instance for: `PrelBase.Num (PrelBase.Float
 						 -> PrelBase.Float)'
     arising from use of `PrelBase.+' at tcfail044.hs:20
 
-
 Compilation had errors

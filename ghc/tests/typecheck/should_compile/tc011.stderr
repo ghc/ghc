@@ -1,9 +1,7 @@
+==================== Typechecked ====================
+AbsBinds [takw] [] [([takw], x{-r1,x-}, x_aku)]
+    (x_aku@_) = x_aku
 
-
-================================================================================
-Typechecked:
-AbsBinds [taks] [] [([taks], x{-r1,x-}, x_akq)]
-    (x_akq@_) = x_akq
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,21 +1,19 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 Var{-r5,x-}{i} =
     _/\_ a_tr3q -> \ tpl_B1 -> Var{-r5,x-}{i} {_@_ a_tr3q tpl_B1}
 App{-r4,x-}{i} =
     _/\_ a_tr3q -> \ tpl_B1 tpl_B2 ->
 	App{-r4,x-}{i} {_@_ a_tr3q tpl_B1 tpl_B2}
-AbsBinds [taRI] [] [([taRI], g{-r3t,x-}, g_aRm)]
-    g_aRm (a_r3j, (Var{-r5,x-}{i} name_r3k))
+AbsBinds [taRR] [] [([taRR], g{-r3t,x-}, g_aRu)]
+    g_aRu (a_r3j, (Var{-r5,x-}{i} name_r3k))
 	  = [name_r3k] ([PrelBase.Char{-38,W-}])
-    g_aRm (a_r3m, (App{-r4,x-}{i} e1_r3n e2_r3o))
-	  = ++_aS9 [PrelBase.Char{-38,W-}] (g_aRm e1_r3n) (g_aRm e2_r3o)
-AbsBinds [taS5] [] [([taS5], $d1{-rS8,x-}, d.Eval_aS2)]
-    d.Eval_aS2 = ({-dict-} [] [])
-d.MonadPlus_aS4 = PrelBase.$d23{-rpi,p-}
-++_aS9 = PrelBase.++{-ruo,p-} PrelBase.[]{-3j,W-} d.MonadPlus_aS4
+    g_aRu (a_r3m, (App{-r4,x-}{i} e1_r3n e2_r3o))
+	  = ++_aSf [PrelBase.Char{-38,W-}] (g_aRu e1_r3n) (g_aRu e2_r3o)
+AbsBinds [taSe] [] [([taSe], $d1{-rSi,x-}, d.Eval_aSb)]
+    d.Eval_aSb = ({-dict-} [] [])
+d.MonadPlus_aSd = PrelBase.$d23{-rpi,p-}
+++_aSf = PrelBase.++{-ruo,p-} PrelBase.[]{-3j,W-} d.MonadPlus_aSd
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_

@@ -1,24 +1,22 @@
-
-
-================================================================================
-Typechecked:
+==================== Typechecked ====================
 ANull{-r6,x-}{i} = _/\_ a_tr3p -> ANull{-r6,x-}{i} {_@_ a_tr3p}
 ANode{-r5,x-}{i} =
     _/\_ a_tr3p -> \ tpl_B1 tpl_B2 ->
 	ANode{-r5,x-}{i} {_@_ a_tr3p tpl_B1 tpl_B2}
-AbsBinds [taCx] [d.Num_aCA] [([taCx], g{-r3q,x-}, g_aC9)]
-    fromInt_aCK = PrelBase.fromInt{-8R,p-} taCx d.Num_aCA
-    lit_aCO = fromInt_aCK PrelBase.I#{-5b,w-}{i} 2#
-    fromInt_aCP = fromInt_aCK
-    lit_aCQ = fromInt_aCP PrelBase.I#{-5b,w-}{i} 3#
-    fromInt_aCR = fromInt_aCK
-    lit_aCS = fromInt_aCR PrelBase.I#{-5b,w-}{i} 4#
-    g_aC9 ANull{-r6,x-}{i} = lit_aCO
-    g_aC9 (ANode{-r5,x-}{i} b_r3k (ANode{-r5,x-}{i} c_r3l d_r3m))
-	  | b_r3k = lit_aCQ
-	  | PrelBase.True{-5E,w-}{i} = lit_aCS
-AbsBinds [taCJ] [] [([taCJ], $d1{-rCN,x-}, d.Eval_aCI)]
-    d.Eval_aCI = ({-dict-} [] [])
+AbsBinds [taCG] [d.Num_aCJ] [([taCG], g{-r3q,x-}, g_aCh)]
+    fromInt_aCY = PrelBase.fromInt{-8R,p-} taCG d.Num_aCJ
+    lit_aCX = fromInt_aCY PrelBase.I#{-5b,w-}{i} 2#
+    fromInt_aCW = fromInt_aCY
+    lit_aCV = fromInt_aCW PrelBase.I#{-5b,w-}{i} 3#
+    fromInt_aCU = fromInt_aCY
+    lit_aCT = fromInt_aCU PrelBase.I#{-5b,w-}{i} 4#
+    g_aCh ANull{-r6,x-}{i} = lit_aCX
+    g_aCh (ANode{-r5,x-}{i} b_r3k (ANode{-r5,x-}{i} c_r3l d_r3m))
+	  | b_r3k = lit_aCV
+	  | PrelBase.True{-5E,w-}{i} = lit_aCT
+AbsBinds [taCS] [] [([taCS], $d1{-rD1,x-}, d.Eval_aCR)]
+    d.Eval_aCR = ({-dict-} [] [])
+
 ghc: module version changed to 1; reason: no old .hi file
 _interface_ ShouldSucceed 1
 _instance_modules_
