@@ -27,11 +27,12 @@ import Var		( IdOrTyVar, isId, isTyVar )
 import VarSet
 import VarEnv
 import Name		( isLocallyDefined, hashName )
-import Const		( Con, isWHNFCon, conIsTrivial, conIsCheap, conIsDupable,
-			  conType, conOkForSpeculation, conStrictness, hashCon
+import Const		( Con(..), isWHNFCon, conIsTrivial, conIsCheap, conIsDupable,
+			  conType, hashCon
 			)
+import PrimOp		( primOpOkForSpeculation, primOpStrictness )
 import Id		( Id, idType, setIdType, idUnique, idAppIsBottom,
-			  getIdArity, idName,
+			  getIdArity, idName, isPrimitiveId_maybe,
 			  getIdSpecialisation, setIdSpecialisation,
 			  getInlinePragma, setInlinePragma,
 			  getIdUnfolding, setIdUnfolding, idInfo
@@ -249,14 +250,32 @@ exprOkForSpeculation :: CoreExpr -> Bool
 exprOkForSpeculation (Var v)        	  = isUnLiftedType (idType v)
 exprOkForSpeculation (Note _ e)     	  = exprOkForSpeculation e
 
-exprOkForSpeculation (Con con args)
-  = conOkForSpeculation con &&
-    and (zipWith ok (filter isValArg args) (fst (conStrictness con)))
+exprOkForSpeculation (Con (Literal _) args) = True
+exprOkForSpeculation (Con (DataCon _) args) = True
+	-- The strictness of the constructor has already
+	-- been expressed by its "wrapper", so we don't need
+	-- to take the arguments into account
+
+exprOkForSpeculation (Con (PrimOp op) args)
+  = prim_op_ok_for_spec op args
+
+exprOkForSpeculation (App fun arg)	-- Might be application of a primop
+  = go fun [arg]
   where
-    ok arg demand | isLazy demand = True
-		  | otherwise	  = exprOkForSpeculation arg
+    go (App fun arg) args = go fun (arg:args)
+    go (Var v) 	     args = case isPrimitiveId_maybe v of
+				Just op -> prim_op_ok_for_spec op args
+				Nothing -> False
+    go other args = False
 
 exprOkForSpeculation other = False	-- Conservative
+
+prim_op_ok_for_spec op args
+ = primOpOkForSpeculation op &&
+   and (zipWith ok (filter isValArg args) (fst (primOpStrictness op)))
+ where
+   ok arg demand | isLazy demand = True
+		  | otherwise	  = exprOkForSpeculation arg
 \end{code}
 
 

@@ -11,7 +11,7 @@ module CoreSyn (
 
 	mkLets, mkLams,
 	mkApps, mkTyApps, mkValApps, mkVarApps,
-	mkLit, mkStringLit, mkConApp, mkPrimApp, mkNote,
+	mkLit, mkStringLit, mkStringLitFS, mkConApp, mkPrimApp, mkNote,
 	bindNonRec, mkIfThenElse, varToCoreExpr,
 
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, isDeadBinder, isTyVar, isId,
@@ -34,6 +34,7 @@ module CoreSyn (
 	-- Core rules
 	CoreRules(..), 	-- Representation needed by friends
 	CoreRule(..),	-- CoreSubst, CoreTidy, CoreFVs, PprCore only
+	RuleName,
 	emptyCoreRules, isEmptyCoreRules, rulesRhsFreeVars, rulesRules
     ) where
 
@@ -46,8 +47,9 @@ import VarEnv
 import Id		( mkWildId, getIdOccInfo, idInfo )
 import Type		( Type, UsageAnn, mkTyVarTy, isUnLiftedType, seqType )
 import IdInfo		( OccInfo(..), megaSeqIdInfo )
-import Const	        ( Con(..), DataCon, Literal(NoRepStr), PrimOp )
+import Const	        ( Con(..), DataCon, Literal(MachStr), mkMachInt, PrimOp )
 import TysWiredIn	( trueDataCon, falseDataCon )
+import ThinAir		( unpackCStringId, unpackCString2Id, addr2IntegerId )
 import VarSet
 import Outputable
 \end{code}
@@ -118,11 +120,17 @@ data CoreRules
   = Rules [CoreRule]
 	  IdOrTyVarSet		-- Locally-defined free vars of RHSs
 
+type RuleName = FAST_STRING
+
 data CoreRule
-  = Rule FAST_STRING	-- Rule name
+  = Rule RuleName
 	 [CoreBndr]	-- Forall'd variables
 	 [CoreExpr]	-- LHS args
 	 CoreExpr	-- RHS
+
+  | BuiltinRule		-- Built-in rules are used for constant folding
+			-- and suchlike.  It has no free variables.
+	([CoreExpr] -> Maybe (RuleName, CoreExpr))
 
 emptyCoreRules :: CoreRules
 emptyCoreRules = Rules [] emptyVarSet
@@ -184,15 +192,31 @@ mkTyApps  f args = foldl (\ e a -> App e (Type a)) f args
 mkValApps f args = foldl (\ e a -> App e a)	   f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 
-mkLit       :: Literal -> Expr b
-mkStringLit :: String  -> Expr b
-mkConApp    :: DataCon -> [Arg b] -> Expr b
-mkPrimApp   :: PrimOp  -> [Arg b] -> Expr b
+mkLit         :: Literal -> Expr b
+mkStringLit   :: String  -> Expr b
+mkStringLitFS :: FAST_STRING  -> Expr b
+mkConApp      :: DataCon -> [Arg b] -> Expr b
+mkPrimApp     :: PrimOp  -> [Arg b] -> Expr b
 
 mkLit lit	  = Con (Literal lit) []
-mkStringLit str	  = Con (Literal (NoRepStr (_PK_ str) stringTy)) []
 mkConApp con args = Con (DataCon con) args
 mkPrimApp op args = Con (PrimOp op)   args
+
+mkStringLit str	= mkStringLitFS (_PK_ str)
+
+mkStringLitFS str
+  | any is_NUL (_UNPK_ str)
+  = 	 -- Must cater for NULs in literal string
+    mkApps (Var unpackCString2Id)
+		[mkLit (MachStr str),
+		 mkLit (mkMachInt (toInteger (_LENGTH_ str)))]
+
+  | otherwise
+  =	-- No NULs in the string
+    App (Var unpackCStringId) (mkLit (MachStr str))
+
+  where
+    is_NUL c = c == '\0'
 
 varToCoreExpr :: CoreBndr -> CoreExpr
 varToCoreExpr v | isId v    = Var v
@@ -430,6 +454,7 @@ seqRules (Rules rules fvs) = seq_rules rules `seq` seqVarSet fvs
 
 seq_rules [] = ()
 seq_rules (Rule fs bs es e : rules) = seqBndrs bs `seq` seqExprs (e:es) `seq` seq_rules rules
+seq_rules (BuiltinRule _ : rules) = seq_rules rules
 \end{code}
 
 \begin{code}

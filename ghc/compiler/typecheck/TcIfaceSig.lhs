@@ -35,7 +35,7 @@ import WorkWrap		( mkWrapper )
 import PrimOp		( PrimOp(..) )
 
 import Id		( Id, mkId, mkVanillaId,
-			  isPrimitiveId_maybe, isDataConId_maybe
+			  isDataConId_maybe
 			)
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
@@ -201,18 +201,18 @@ tcCoreExpr (UfVar name)
     returnTc (Var id)
 
 tcCoreExpr (UfCon con args) 
-  = tcUfCon con			`thenTc` \ con' ->
-    mapTc tcCoreExpr args	`thenTc` \ args' ->
-    returnTc (Con con' args')
+  = mapTc tcCoreExpr args	`thenTc` \ args' ->
+    tcUfCon con args'
 
 tcCoreExpr (UfTuple name args) 
-  = tcUfDataCon name		`thenTc` \ con ->
+  = 	-- See notes with tcUfCon (UfDataCon ...)
+    tcVar name			`thenTc` \ con_id ->
     mapTc tcCoreExpr args	`thenTc` \ args' ->
     let
 	-- Put the missing type arguments back in
 	con_args = map (Type . unUsgTy . coreExprType) args' ++ args'
     in
-    returnTc (Con con con_args)
+    returnTc (mkApps (Var con_id) con_args)
 
 tcCoreExpr (UfLam bndr body)
   = tcCoreLamBndr bndr 		$ \ bndr' ->
@@ -262,50 +262,54 @@ tcCoreNote (UfSCC cc)   = returnTc (SCC cc)
 tcCoreNote UfInlineCall = returnTc InlineCall 
 
 
--- rationalTy isn't built in so, we have to construct it
--- (the "ty" part of the incoming literal is simply bottom)
-tcUfCon (UfLitCon (NoRepRational lit _)) 
-  = tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
-    let
-	rational_ty  = mkSynTy rational_tycon []
-    in
-    returnTc (Literal (NoRepRational lit rational_ty)) 
-
--- Similarly for integers and strings, except that they are wired in
-tcUfCon (UfLitCon (NoRepInteger lit _)) 
-  = returnTc (Literal (NoRepInteger lit integerTy))
-tcUfCon (UfLitCon (NoRepStr lit _))
-  = returnTc (Literal (NoRepStr lit stringTy))
-
-tcUfCon (UfLitCon other_lit)
-  = returnTc (Literal other_lit)
+----------------------------------
+tcUfCon (UfLitCon lit) args
+  = ASSERT( null args)
+    tcUfLit lit		`thenTc` \ lit ->
+    returnTc (Con (Literal lit) [])
 
 -- The dreaded lit-lits are also similar, except here the type
 -- is read in explicitly rather than being implicit
-tcUfCon (UfLitLitCon lit ty)
-  = tcHsType ty		`thenTc` \ ty' ->
-    returnTc (Literal (MachLitLit lit ty'))
+tcUfCon (UfLitLitCon lit ty) args
+  = ASSERT( null args )
+    tcHsType ty		`thenTc` \ ty' ->
+    returnTc (Con (Literal (MachLitLit lit ty')) [])
 
-tcUfCon (UfDataCon name) = tcUfDataCon name
+-- Primops are reverse-engineered
+-- into applications of their Ids.  In this way, any
+-- RULES that apply to the Id will work when this thing is unfolded.
+-- It's a bit of a hack, but it works nicely
+-- Can't do it for datacons, because the data con Id doesn't necessarily
+-- have the same type as the data con (existentials)
 
-tcUfCon (UfPrimOp name)
-  = tcVar name		`thenTc` \ op_id ->
-    case isPrimitiveId_maybe op_id of
-	Just op -> returnTc (PrimOp op)
-	Nothing -> failWithTc (badPrimOp name)
+tcUfCon (UfPrimOp name)  args = tcVar name		`thenTc` \ op_id ->
+				returnTc (mkApps (Var op_id) args)
 
-tcUfCon (UfCCallOp str is_dyn casm gc)
-  = case is_dyn of
-       True  -> 
-          tcGetUnique `thenNF_Tc` \ u ->
-	  returnTc (PrimOp (CCallOp (Right u) casm gc cCallConv))
-       False -> returnTc (PrimOp (CCallOp (Left str) casm gc cCallConv))
-
-tcUfDataCon name
+tcUfCon (UfDataCon name) args
   = tcVar name		`thenTc` \ con_id ->
     case isDataConId_maybe con_id of
-	Just con -> returnTc (DataCon con)
+	Just con -> returnTc (mkConApp con args)
 	Nothing  -> failWithTc (badCon name)
+
+tcUfCon (UfCCallOp str is_dyn casm gc) args
+  | is_dyn    = tcGetUnique `thenNF_Tc` \ u ->
+	        returnTc (Con (PrimOp (CCallOp (Right u) casm gc cCallConv)) args)
+  | otherwise = returnTc (Con (PrimOp (CCallOp (Left str) casm gc cCallConv)) args)
+
+----------------------------------
+tcUfLit (NoRepRational lit _)
+  =	-- rationalTy isn't built in so, we have to construct it
+	-- (the "ty" part of the incoming literal is simply bottom)
+    tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
+    let
+	rational_ty  = mkSynTy rational_tycon []
+    in
+    returnTc (NoRepRational lit rational_ty)
+
+-- Similarly for integers and strings, except that they are wired in
+tcUfLit (NoRepInteger lit _) = returnTc (NoRepInteger lit integerTy)
+tcUfLit (NoRepStr lit _)     = returnTc (NoRepStr lit stringTy)
+tcUfLit other_lit	     = returnTc other_lit
 \end{code}
 
 \begin{code}

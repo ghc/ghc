@@ -68,11 +68,14 @@ Primitives for converting Addrs pointing to external
 sequence of bytes into a list of @Char@s:
 
 \begin{code}
-unpackCString  :: Addr{- ptr. to NUL terminated string-} -> [Char]
+unpackCString :: Addr -> [Char]
 unpackCString a@(A# addr)
   | a == nullAddr  = []
   | otherwise	   = unpackCString# addr
      
+unpackNBytes :: Addr -> Int -> [Char]
+unpackNBytes (A# addr) (I# l) = unpackNBytes# addr l
+
 unpackCStringST  :: Addr{- ptr. to NUL terminated string-} -> ST s [Char]
 unpackCStringST a@(A# addr)
   | a == nullAddr  = return []
@@ -86,36 +89,11 @@ unpackCStringST a@(A# addr)
       where
 	ch = indexCharOffAddr# addr nh
 
-unpackCString# :: Addr#  -> [Char]
-unpackCString# addr 
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = []
-      | otherwise	   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
-
-unpackNBytes :: Addr -> Int -> [Char]
-unpackNBytes (A# addr) (I# l) = unpackNBytes# addr l
-
 unpackNBytesST :: Addr -> Int -> ST s [Char]
 unpackNBytesST (A# addr) (I# l) = unpackNBytesAccST# addr l []
 
 unpackNBytesAccST :: Addr -> Int -> [Char] -> ST s [Char]
 unpackNBytesAccST (A# addr) (I# l) rest = unpackNBytesAccST# addr l rest
-
-unpackNBytes#      :: Addr# -> Int#   -> [Char]
-  -- This one is called by the compiler to unpack literal strings with NULs in them; rare.
-  -- It's strict!
-unpackNBytes# _addr 0#   = []
-unpackNBytes#  addr len# = unpack [] (len# -# 1#)
-    where
-     unpack acc i#
-      | i# <# 0#  = acc
-      | otherwise = 
-	 case indexCharOffAddr# addr i# of
-	    ch -> unpack (C# ch : acc) (i# -# 1#)
 
 unpackNBytesST# :: Addr# -> Int# -> ST s [Char]
 unpackNBytesST# addr# l#   = unpackNBytesAccST# addr# l# []
@@ -248,32 +226,3 @@ freeze_ps_array (MutableByteArray _ _ arr#) len# = ST $ \ s# ->
 \end{code}
 
 
-%********************************************************
-%*							*
-\subsection{Misc}
-%*							*
-%********************************************************
-
-The compiler may emit these two
-
-\begin{code}
-unpackAppendCString# :: Addr# -> [Char] -> [Char]
-unpackAppendCString# addr rest
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = rest
-      | otherwise	   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
-
-unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
-unpackFoldrCString# addr f z 
-  = unpack 0#
-  where
-    unpack nh
-      | ch `eqChar#` '\0'# = z
-      | otherwise	   = C# ch `f` unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
-\end{code}

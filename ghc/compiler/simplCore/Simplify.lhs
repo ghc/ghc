@@ -214,9 +214,11 @@ simplExprF expr@(Con (PrimOp op) args) cont
 	--	case (eqChar# x 'a') of ...
 	-- ==>  
 	-- 	case (case x of 'a' -> True; other -> False) of ...
-     case tryPrimOp op args2 of
+
+    case tryPrimOp op args2 of
 	  Just e' -> zapSubstEnv (simplExprF e' cont2)
 	  Nothing -> rebuild (Con (PrimOp op) args2) cont2
+
 
 simplExprF (Con con@(DataCon _) args) cont
   = simplConArgs args		$ \ args' ->
@@ -790,9 +792,9 @@ completeCall black_list_fn in_scope occ var cont
     else
 	-- Try rules first
     case lookupRule in_scope var args' of
-	Just (rule_name, rule_rhs, rule_args) -> 
+	Just (rule_name, rule_rhs) -> 
 		tick (RuleFired rule_name)			`thenSmpl_`
-		zapSubstEnv (simplExprF rule_rhs (pushArgs emptySubstEnv rule_args cont'))
+		zapSubstEnv (simplExprF rule_rhs cont')
 			-- See note above about zapping the substitution here
 	
 	Nothing -> rebuild (mkApps (Var var) args') cont'
@@ -1050,66 +1052,9 @@ rebuild expr (CoerceIt to_ty cont)
 rebuild expr (InlinePlease cont)
   = rebuild (Note InlineCall expr) cont
 
--- 	Case of known constructor or literal
-rebuild expr@(Con con args) (Select _ bndr alts se cont)
-  | conOkForAlt con	-- Knocks out PrimOps and NoRepLits
-  = knownCon expr con args bndr alts se cont
-
-
----------------------------------------------------------
--- 	The other Select cases
-
 rebuild scrut (Select _ bndr alts se cont)
-  | 	-- Check that the RHSs are all the same, and
-	-- don't use the binders in the alternatives
-	-- This test succeeds rapidly in the common case of
-	-- a single DEFAULT alternative
-    all (cheapEqExpr rhs1) other_rhss && all binders_unused alts
-
-	-- Check that the scrutinee can be let-bound instead of case-bound
-    && (   exprOkForSpeculation scrut
-		-- OK not to evaluate it
-		-- This includes things like (==# a# b#)::Bool
-		-- so that we simplify 
-		-- 	case ==# a# b# of { True -> x; False -> x }
-		-- to just
-		--	x
-		-- This particular example shows up in default methods for
-		-- comparision operations (e.g. in (>=) for Int.Int32)
-	|| exprIsValue scrut			-- It's already evaluated
-	|| var_demanded_later scrut		-- It'll be demanded later
-
---      || not opt_SimplPedanticBottoms)	-- Or we don't care!
---	We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
--- 	but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
--- 	its argument:  case x of { y -> dataToTag# y }
---	Here we must *not* discard the case, because dataToTag# just fetches the tag from
---	the info pointer.  So we'll be pedantic all the time, and see if that gives any
--- 	other problems
-       )
-
---    && opt_SimplDoCaseElim
---	[June 99; don't test this flag.  The code generator dies if it sees
---		case (\x.e) of f -> ...  
---	so better to always do it
-
-   	-- Get rid of the case altogether
-	-- See the extensive notes on case-elimination below
-	-- Remember to bind the binder though!
-  = tick (CaseElim bndr)			`thenSmpl_` (
-    setSubstEnv se				$			
-    simplBinder bndr				$ \ bndr' ->
-    completeBinding bndr bndr' False False scrut 	$
-    simplExprF rhs1 cont)
-
-  | otherwise
   = rebuild_case scrut bndr alts se cont
-  where
-    (rhs1:other_rhss)		 = [rhs | (_,_,rhs) <- alts]
-    binders_unused (_, bndrs, _) = all isDeadBinder bndrs
 
-    var_demanded_later (Var v) = isStrict (getIdDemandInfo bndr)	-- It's going to be evaluated later
-    var_demanded_later other   = False
 \end{code}
 
 Case elimination [see the code above]
@@ -1194,6 +1139,67 @@ If so, then we can replace the case with one of the rhss.
 Blob of helper functions for the "case-of-something-else" situation.
 
 \begin{code}
+
+---------------------------------------------------------
+-- 	Case of known constructor or literal
+
+rebuild_case scrut@(Con con args) bndr alts se cont
+  | conOkForAlt con	-- Knocks out PrimOps and NoRepLits
+  = knownCon scrut con args bndr alts se cont
+
+---------------------------------------------------------
+-- 	Eliminate the case if possible
+
+rebuild_case scrut bndr alts se cont
+  | 	-- Check that the RHSs are all the same, and
+	-- don't use the binders in the alternatives
+	-- This test succeeds rapidly in the common case of
+	-- a single DEFAULT alternative
+    all (cheapEqExpr rhs1) other_rhss && all binders_unused alts
+
+	-- Check that the scrutinee can be let-bound instead of case-bound
+    && (   exprOkForSpeculation scrut
+		-- OK not to evaluate it
+		-- This includes things like (==# a# b#)::Bool
+		-- so that we simplify 
+		-- 	case ==# a# b# of { True -> x; False -> x }
+		-- to just
+		--	x
+		-- This particular example shows up in default methods for
+		-- comparision operations (e.g. in (>=) for Int.Int32)
+	|| exprIsValue scrut			-- It's already evaluated
+	|| var_demanded_later scrut		-- It'll be demanded later
+
+--      || not opt_SimplPedanticBottoms)	-- Or we don't care!
+--	We used to allow improving termination by discarding cases, unless -fpedantic-bottoms was on,
+-- 	but that breaks badly for the dataToTag# primop, which relies on a case to evaluate
+-- 	its argument:  case x of { y -> dataToTag# y }
+--	Here we must *not* discard the case, because dataToTag# just fetches the tag from
+--	the info pointer.  So we'll be pedantic all the time, and see if that gives any
+-- 	other problems
+       )
+
+--    && opt_SimplDoCaseElim
+--	[June 99; don't test this flag.  The code generator dies if it sees
+--		case (\x.e) of f -> ...  
+--	so better to always do it
+
+   	-- Get rid of the case altogether
+	-- See the extensive notes on case-elimination above
+	-- Remember to bind the binder though!
+  = tick (CaseElim bndr)			`thenSmpl_` (
+    setSubstEnv se				$			
+    simplBinder bndr				$ \ bndr' ->
+    completeBinding bndr bndr' False False scrut 	$
+    simplExprF rhs1 cont)
+
+  where
+    (rhs1:other_rhss)		 = [rhs | (_,_,rhs) <- alts]
+    binders_unused (_, bndrs, _) = all isDeadBinder bndrs
+
+    var_demanded_later (Var v) = isStrict (getIdDemandInfo bndr)	-- It's going to be evaluated later
+    var_demanded_later other   = False
+
 ---------------------------------------------------------
 -- 	Case of something else
 

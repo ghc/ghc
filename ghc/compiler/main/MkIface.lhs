@@ -212,10 +212,10 @@ ifaceRules if_hdl rules emitted
 	
 	return ()
   where
-    orphan_rule_pretties =  [ pprCoreRule (Just fn) rule <+> semi
+    orphan_rule_pretties =  [ pprCoreRule (Just fn) rule
 			    | ProtoCoreRule _ fn rule <- rules
 			    ]
-    local_id_pretties = [ pprCoreRule (Just fn) rule <+> semi
+    local_id_pretties = [ pprCoreRule (Just fn) rule
  		        | fn <- varSetElems emitted, 
 			  rule <- rulesRules (getIdSpecialisation fn),
 			  all (`elemVarSet` emitted) (varSetElems (ruleSomeLhsFreeVars interestingId rule))

@@ -144,6 +144,7 @@ rulesSomeFreeVars interesting (Rules rules _)
   = foldr (unionVarSet . ruleSomeFreeVars interesting) emptyVarSet rules
 
 ruleSomeFreeVars :: InterestingVarFun -> CoreRule -> IdOrTyVarSet
+ruleSomeFreeVars interesting (BuiltinRule _) = noFVs
 ruleSomeFreeVars interesting (Rule _ tpl_vars tpl_args rhs)
   = rule_fvs interesting emptyVarSet
   where
@@ -151,6 +152,7 @@ ruleSomeFreeVars interesting (Rule _ tpl_vars tpl_args rhs)
 	       foldr (union . expr_fvs) (expr_fvs rhs) tpl_args
 
 ruleSomeLhsFreeVars :: InterestingVarFun -> CoreRule -> IdOrTyVarSet
+ruleSomeLhsFreeVars fn (BuiltinRule _) = noFVs
 ruleSomeLhsFreeVars fn (Rule _ tpl_vars tpl_args rhs)
   = foldl delVarSet (exprsSomeFreeVars fn tpl_args) tpl_vars
 \end{code}

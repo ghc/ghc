@@ -243,7 +243,16 @@ augment g xs = g (:) xs
 
 "foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
 "foldr/nil"	forall k z.	 foldr k z []     = z 
+
+"augment/build" forall (g::forall b. (a->b->b) -> b -> b)
+		       (h::forall b. (a->b->b) -> b -> b) .
+		       augment g (build h) = build (\c n -> g c (h c n))
+"augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .
+			augment g [] = build g
  #-}
+
+-- This rule is true, but not (I think) useful:
+--	augment g (augment h t) = augment (\cn -> g c (h c n)) t
 \end{code}
 
 
@@ -545,3 +554,71 @@ ltInt	(I# x) (I# y) = x <# y
 leInt	(I# x) (I# y) = x <=# y
 \end{code}
 
+
+%********************************************************
+%*							*
+\subsection{Unpacking C strings}
+%*							*
+%********************************************************
+
+This code is needed for virtually all programs, since it's used for
+unpacking the strings of error messages.
+
+\begin{code}
+unpackCString#  :: Addr# -> [Char]
+{-# INLINE unpackCString# #-}
+unpackCString# a = build (unpackFoldrCString# a)
+
+unpackCStringList#  :: Addr# -> [Char]
+unpackCStringList# addr 
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = []
+      | otherwise	   = C# ch : unpack (nh +# 1#)
+      where
+	ch = indexCharOffAddr# addr nh
+
+unpackAppendCString# :: Addr# -> [Char] -> [Char]
+unpackAppendCString# addr rest
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = rest
+      | otherwise	   = C# ch : unpack (nh +# 1#)
+      where
+	ch = indexCharOffAddr# addr nh
+
+unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
+unpackFoldrCString# addr f z 
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = z
+      | otherwise	   = C# ch `f` unpack (nh +# 1#)
+      where
+	ch = indexCharOffAddr# addr nh
+
+unpackNBytes#      :: Addr# -> Int#   -> [Char]
+  -- This one is called by the compiler to unpack literal 
+  -- strings with NULs in them; rare. It's strict!
+  -- We don't try to do list deforestation for this one
+
+unpackNBytes# _addr 0#   = []
+unpackNBytes#  addr len# = unpack [] (len# -# 1#)
+    where
+     unpack acc i#
+      | i# <# 0#  = acc
+      | otherwise = 
+	 case indexCharOffAddr# addr i# of
+	    ch -> unpack (C# ch : acc) (i# -# 1#)
+
+{-# RULES
+"unpack-list"    forall a   . unpackFoldrCString# a (:) [] = unpackCStringList# a
+"unpack-append"  forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
+
+-- There's a built-in rule (in PrelRules.lhs) for
+-- 	unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
+
+  #-}
+\end{code}

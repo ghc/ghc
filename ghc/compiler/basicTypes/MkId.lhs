@@ -39,6 +39,8 @@ import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy,
 			)
 import TysWiredIn	( boolTy, charTy, mkListTy )
 import PrelMods		( pREL_ERR, pREL_GHC )
+import PrelRules	( primOpRule )
+import Rules		( addRule )
 import Type		( Type, ThetaType,
 			  mkDictTy, mkTyConApp, mkTyVarTys, mkFunTys, mkFunTy, mkSigmaTy,
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfTypes,
@@ -59,7 +61,7 @@ import Name		( mkDerivedName, mkWiredInIdName, mkLocalName,
 			  Name, NamedThing(..),
 			)
 import OccName		( mkSrcVarOcc )
-import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
+import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName, primOpArity, primOpStrictness )
 import Demand		( wwStrict )
 import DataCon		( DataCon, StrictnessMark(..), dataConStrictMarks, dataConFieldLabels, 
 			  dataConArgTys, dataConSig, dataConRawArgTys
@@ -70,7 +72,7 @@ import Id		( idType, mkId,
 			)
 import IdInfo		( vanillaIdInfo, mkIdInfo,
 			  exactArity, setUnfoldingInfo, setCafInfo,
-			  setArityInfo, setInlinePragInfo,
+			  setArityInfo, setInlinePragInfo, setSpecInfo,
 			  mkStrictnessInfo, setStrictnessInfo,
 			  IdFlavour(..), InlinePragInfo(..), CafInfo(..), IdInfo
 			)
@@ -421,6 +423,20 @@ mkPrimitiveId prim_op
 		
     info = mkIdInfo (ConstantId (PrimOp prim_op))
 	   `setUnfoldingInfo`	unfolding
+
+-- Not yet... 
+--	   `setSpecInfo`	rules
+--	   `setArityInfo` 	exactArity arity
+--	   `setStrictnessInfo`	strict_info
+
+    arity 		= primOpArity prim_op
+    (dmds, result_bot)	= primOpStrictness prim_op
+    strict_info		= mkStrictnessInfo (take arity dmds, result_bot)
+	-- primOpStrictness can return an infinite list of demands
+	-- (cheap hack) but Ids mustn't have such things.
+	-- What a mess.
+
+    rules = addRule id emptyCoreRules (primOpRule prim_op)
 
     unfolding = mkCompulsoryUnfolding rhs
 		-- The mkCompulsoryUnfolding says that this Id absolutely 

@@ -6,8 +6,8 @@
 \begin{code}
 module PrimOp (
 	PrimOp(..), allThePrimOps,
-	primOpType, primOpSig, primOpUsg,
-	mkPrimOpIdName, primOpRdrName, primOpTag,
+	primOpType, primOpSig, primOpUsg, primOpArity,
+	mkPrimOpIdName, primOpRdrName, primOpTag, primOpOcc,
 
 	commutableOp,
 
@@ -40,6 +40,7 @@ import Type		( Type, mkForAllTys, mkForAllTy, mkFunTy, mkFunTys, mkTyVarTys,
                           UsageAnn(..), mkUsgTy
 			)
 import Unique		( Unique, mkPrimOpIdUnique )
+import BasicTypes	( Arity )
 import PrelMods		( pREL_GHC, pREL_GHC_Name )
 import Outputable
 import Util		( assoc, zipWithEqual )
@@ -2200,6 +2201,14 @@ primOpNeedsWrapper other_op 	    	= False
 \end{code}
 
 \begin{code}
+primOpArity :: PrimOp -> Arity
+primOpArity op 
+  = case (primOpInfo op) of
+      Monadic occ ty			  -> 1
+      Dyadic occ ty			  -> 2
+      Compare occ ty 			  -> 2
+      GenPrimOp occ tyvars arg_tys res_ty -> length arg_tys
+		
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case (primOpInfo op) of

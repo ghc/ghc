@@ -374,13 +374,16 @@ pprIfaceCoreRules :: CoreRules -> SDoc
 pprIfaceCoreRules (Rules rules _) = vcat (map (pprCoreRule Nothing) rules)
 
 pprCoreRule :: Maybe Id -> CoreRule -> SDoc
+pprCoreRule maybe_fn (BuiltinRule _)
+  = ifPprDebug (ptext SLIT("A built in rule"))
+
 pprCoreRule maybe_fn (Rule name tpl_vars tpl_args rhs)
   = doubleQuotes (ptext name) <+> 
     sep [
 	  ptext SLIT("__forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
 	  nest 4 (pp_fn <+> sep (map pprIfaceArg tpl_args)),
 	  nest 4 (ptext SLIT("=") <+> pprIfaceUnfolding rhs)
-    ]
+    ] <+> semi
   where
     pp_fn = case maybe_fn of
 	    	Just id -> ppr id

@@ -43,8 +43,8 @@ import Name		( mkLocalName, tidyOccName, tidyTopName,
 			  NamedThing(..), OccName
 			)
 import TyCon		( TyCon, isDataTyCon )
-import PrimOp		( PrimOp(..) )
 import PrelInfo		( unpackCStringId, unpackCString2Id, addr2IntegerId )
+import PrelRules	( builtinRules )
 import Type		( Type, splitAlgTyConApp_maybe, 
 			  isUnLiftedType,
 			  tidyType, tidyTypes, tidyTopType, tidyTyVar, tidyTyVars,
@@ -94,7 +94,10 @@ core2core core_todos binds rules
 
         better_rules <- simplRules ru_us rules binds
 
-	let (binds1, rule_base) = prepareRuleBase binds better_rules
+	let all_rules = builtinRules ++ better_rules
+	-- Here is where we add in the built-in rules
+
+	let (binds1, rule_base) = prepareRuleBase binds all_rules
 
 	-- Do the main business
 	(stats, processed_binds) <- doCorePasses zeroSimplCount cp_us binds1 
@@ -184,9 +187,20 @@ simplRule rule@(ProtoCoreRule is_local id (Rule name bndrs args rhs))
   = returnSmpl rule	-- No need to fiddle with imported rules
   | otherwise
   = simplBinders bndrs			$ \ bndrs' -> 
-    mapSmpl simplExpr args		`thenSmpl` \ args' ->
+    mapSmpl simpl_arg args		`thenSmpl` \ args' ->
     simplExpr rhs			`thenSmpl` \ rhs' ->
     returnSmpl (ProtoCoreRule is_local id (Rule name bndrs' args' rhs'))
+
+simpl_arg e 
+--  I've seen rules in which a LHS like 
+--	augment g (build h) 
+-- turns into
+--	augment (\a. g a) (build h)
+-- So it's a help to eta-reduce the args as we simplify them.
+-- Otherwise we don't match when given an argument like
+--	(\a. h a a)
+  = simplExpr e 	`thenSmpl` \ e' ->
+    returnSmpl (etaCoreExpr e')
 \end{code}
 
 %************************************************************************

@@ -526,6 +526,7 @@ substRules subst (Rules rules rhs_fvs)
     new_rules = Rules (map do_subst rules)
 		      (subst_fvs (substEnv subst) rhs_fvs)
 
+    do_subst rule@(BuiltinRule _) = rule
     do_subst (Rule name tpl_vars lhs_args rhs)
 	= Rule name tpl_vars' 
 	       (map (substExpr subst') lhs_args)

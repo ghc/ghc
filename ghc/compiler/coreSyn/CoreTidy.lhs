@@ -252,6 +252,7 @@ tidyRules env (Rules rules fvs)
     tidy_set_elem var new_set = extendVarSet new_set (tidyVarOcc env var)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
+tidyRule env rule@(BuiltinRule _) = rule
 tidyRule env (Rule name vars tpl_args rhs)
   = (Rule name vars' (map (tidyExpr env') tpl_args) (tidyExpr env' rhs))
   where

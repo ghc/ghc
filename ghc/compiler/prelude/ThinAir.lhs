@@ -59,12 +59,13 @@ thinAirIdNames
 
 	-- String literals
     , (varQual pREL_PACK_Name SLIT("packCString#"),   packCStringIdKey)
-    , (varQual pREL_PACK_Name SLIT("unpackCString#"), unpackCStringIdKey)
-    , (varQual pREL_PACK_Name SLIT("unpackNBytes#"),  unpackCString2IdKey)
-    , (varQual pREL_PACK_Name SLIT("unpackAppendCString#"), unpackCStringAppendIdKey)
-    , (varQual pREL_PACK_Name SLIT("unpackFoldrCString#"),  unpackCStringFoldrIdKey)
 
 	-- Folds and builds; introduced by desugaring list comprehensions
+    , (varQual pREL_BASE_Name SLIT("unpackNBytes#"),  unpackCString2IdKey)
+    , (varQual pREL_BASE_Name SLIT("unpackCString#"), unpackCStringIdKey)
+    , (varQual pREL_BASE_Name SLIT("unpackAppendCString#"), unpackCStringAppendIdKey)
+    , (varQual pREL_BASE_Name SLIT("unpackFoldrCString#"),  unpackCStringFoldrIdKey)
+
     , (varQual pREL_BASE_Name SLIT("foldr"), foldrIdKey)
     , (varQual pREL_BASE_Name SLIT("build"), buildIdKey)
     ]

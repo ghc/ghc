@@ -32,7 +32,7 @@ module Id (
 
 	isSpecPragmaId,	isRecordSelector,
 	isPrimitiveId_maybe, isDataConId_maybe,
-	isConstantId, isBottomingId, idAppIsBottom,
+	isConstantId, isConstantId_maybe, isBottomingId, idAppIsBottom,
 	isExportedId, isUserExportedId,
 	mayHaveNoBinding,
 
@@ -216,6 +216,10 @@ isDataConId_maybe id = case idFlavour id of
 isConstantId id = case idFlavour id of
 		    ConstantId _ -> True
 		    other	 -> False
+
+isConstantId_maybe id = case idFlavour id of
+		  	  ConstantId const -> Just const
+			  other	           -> Nothing
 
 isSpecPragmaId id = case idFlavour id of
 			SpecPragmaId -> True

@@ -49,7 +49,8 @@ import OccurAnal	( occurAnalyseGlobalExpr )
 import BinderInfo	( )
 import CoreUtils	( coreExprType, exprIsTrivial, exprIsValue, exprIsCheap )
 import Id		( Id, idType, idUnique, isId, getIdWorkerInfo,
-			  getIdSpecialisation, getInlinePragma, getIdUnfolding
+			  getIdSpecialisation, getInlinePragma, getIdUnfolding,
+			  isConstantId_maybe
 			)
 import VarSet
 import Name		( isLocallyDefined )
@@ -277,7 +278,7 @@ sizeExpr :: Int 	    -- Bomb out if it gets bigger than this
 	 -> CoreExpr
 	 -> ExprSize
 
-sizeExpr (I# bOMB_OUT_SIZE) args expr
+sizeExpr (I# bOMB_OUT_SIZE) top_args expr
   = size_up expr
   where
     size_up (Type t)	      = sizeZero	-- Types cost nothing
@@ -288,7 +289,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     size_up (App fun (Type t))  = size_up fun
     size_up (App fun arg)       = size_up_app fun [arg]
 
-    size_up (Con con args) = foldr (addSize . size_up) 
+    size_up (Con con args) = foldr (addSize . nukeScrutDiscount . size_up) 
 				   (size_up_con con args)
 				   args
 
@@ -324,16 +325,25 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
     ------------ 
     size_up_app (App fun arg) args   = size_up_app fun (arg:args)
     size_up_app fun 	      args   = foldr (addSize . nukeScrutDiscount . size_up) 
-					     (size_up_fun fun)
+					     (size_up_fun fun args)
 					     args
 
 	-- A function application with at least one value argument
 	-- so if the function is an argument give it an arg-discount
 	-- Also behave specially if the function is a build
-    size_up_fun (Var fun) | idUnique fun == buildIdKey   = buildSize
-    			  | idUnique fun == augmentIdKey = augmentSize
-    			  | fun `is_elem` args	 	 = scrutArg fun `addSize` sizeOne
-    size_up_fun other					 = size_up other
+	-- Also if the function is a constant Id (constr or primop)
+	-- compute discounts as if it were actually a Con; in the early
+	-- stages these constructors and primops may not yet be inlined
+    size_up_fun (Var fun) args | idUnique fun == buildIdKey   = buildSize
+    			       | idUnique fun == augmentIdKey = augmentSize
+    			       | fun `is_elem` top_args	      = scrutArg fun `addSize` fun_size
+			       | otherwise		      = fun_size
+			  where
+			    fun_size = case isConstantId_maybe fun of
+					     Just con -> size_up_con con args
+					     Nothing  -> sizeOne
+
+    size_up_fun other args = size_up other
 
     ------------ 
     size_up_alt (con, bndrs, rhs) = size_up rhs
@@ -353,8 +363,8 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 		| otherwise 	     = opt_UF_DearOp
 
 	-- We want to record if we're case'ing, or applying, an argument
-    arg_discount (Var v) | v `is_elem` args = scrutArg v
-    arg_discount other			    = sizeZero
+    arg_discount (Var v) | v `is_elem` top_args = scrutArg v
+    arg_discount other			        = sizeZero
 
     ------------
     is_elem :: Id -> [Id] -> Bool
@@ -529,7 +539,11 @@ callSiteInline black_listed inline_call occ id arg_infos interesting_cont
   = case getIdUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon _  -> Nothing ;
-	CompulsoryUnfolding unf_template -> Just unf_template ;
+	CompulsoryUnfolding unf_template | black_listed -> Nothing 
+					 | otherwise 	-> Just unf_template ;
+		-- Primops have compulsory unfoldings, but
+		-- may have rules, in which case they are 
+		-- black listed till later
 	CoreUnfolding unf_template is_top is_cheap _ guidance ->
 
     let
@@ -701,7 +715,7 @@ blackListed rule_vars (Just 0)
 			-- local inlinings first.  For example in fish/Main.hs
 			-- it's advantageous to inline scale_vec2 before inlining
 			-- wrappers from PrelNum that make it look big.
-	  not (isLocallyDefined v)	-- This seems best at the moment
+	  not (isLocallyDefined v) || normal_case rule_vars 0 v		-- This seems best at the moment
 
 blackListed rule_vars (Just phase)
   = \v -> normal_case rule_vars phase v

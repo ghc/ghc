@@ -157,32 +157,11 @@ dsExpr (HsLitOut (HsString s) _)
 
 -- "_" => build (\ c n -> c 'c' n)	-- LATER
 
--- "str" ==> build (\ c n -> foldr charTy T c n "str")
-
-{- LATER:
-dsExpr (HsLitOut (HsString str) _)
-  = newTyVarsDs [alphaTyVar]		`thenDs` \ [new_tyvar] ->
-    let
- 	new_ty = mkTyVarTy new_tyvar
-    in
-    newSysLocalsDs [
-		charTy `mkFunTy` (new_ty `mkFunTy` new_ty),
-		new_ty,
-		       mkForallTy [alphaTyVar]
-			       ((charTy `mkFunTy` (alphaTy `mkFunTy` alphaTy))
-			       	        `mkFunTy` (alphaTy `mkFunTy` alphaTy))
-		]			`thenDs` \ [c,n,g] ->
-     returnDs (mkBuild charTy new_tyvar c n g (
-	foldl App
-	  (CoTyApp (CoTyApp (Var foldrId) charTy) new_ty) *** ensure non-prim type ***
-   	  [VarArg c,VarArg n,LitArg (NoRepStr str)]))
--}
-
 -- otherwise, leave it as a NoRepStr;
 -- the Core-to-STG pass will wrap it in an application of "unpackCStringId".
 
 dsExpr (HsLitOut (HsString str) _)
-  = returnDs (mkLit (NoRepStr str stringTy))
+  = returnDs (mkStringLitFS str)
 
 dsExpr (HsLitOut (HsLitLit str) ty)
   | isUnLiftedType ty

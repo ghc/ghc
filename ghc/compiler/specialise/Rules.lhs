@@ -5,7 +5,7 @@
 
 \begin{code}
 module Rules (
-	RuleBase, prepareRuleBase, lookupRule, 
+	RuleBase, prepareRuleBase, lookupRule, addRule,
 	addIdSpecialisations,
 	ProtoCoreRule(..), pprProtoCoreRule,
 	orphanRule
@@ -14,11 +14,12 @@ module Rules (
 #include "HsVersions.h"
 
 import CoreSyn		-- All of it
+import Const		( Con(..), Literal(..) )
 import OccurAnal	( occurAnalyseExpr, tagBinders, UsageDetails )
 import BinderInfo	( markMany )
 import CoreFVs		( exprFreeVars, idRuleVars, ruleSomeLhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
-import CoreUtils	( eqExpr )
+import CoreUtils	( eqExpr, cheapEqExpr )
 import PprCore		( pprCoreRule )
 import Subst		( Subst, InScopeSet, substBndr, lookupSubst, extendSubst,
 			  mkSubst, substEnv, setSubstEnv, emptySubst, isInScope,
@@ -88,7 +89,7 @@ where pi' :: Lift Int# is the specialised version of pi.
 %************************************************************************
 
 \begin{code}
-matchRules :: InScopeSet -> [CoreRule] -> [CoreExpr] -> Maybe (FAST_STRING, CoreExpr, [CoreExpr])
+matchRules :: InScopeSet -> [CoreRule] -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 -- See comments on matchRule
 matchRules in_scope [] args = Nothing
 matchRules in_scope (rule:rules) args
@@ -97,11 +98,11 @@ matchRules in_scope (rule:rules) args
 	Nothing	    -> matchRules in_scope rules args
 
 
-matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (FAST_STRING, CoreExpr, [CoreExpr])
+matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 
--- If (matchRule rule args) returns Just (name,rhs,args')
+-- If (matchRule rule args) returns Just (name,rhs)
 -- then (f args) matches the rule, and the corresponding
--- rewritten RHS is (rhs args').
+-- rewritten RHS is rhs
 --
 -- The bndrs and rhs is occurrence-analysed
 --
@@ -116,7 +117,7 @@ matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (FAST_STRING, CoreExp
 --		 map (f.g) x)		-- rhs
 --	  
 -- Then the call: matchRule the_rule [e1,map e2 e3]
---	  = Just ("map/map", \f,g,x -> rhs, [e1,e2,e3])
+--	  = Just ("map/map", (\f,g,x -> rhs) e1 e2 e3)
 --
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
@@ -142,6 +143,8 @@ matchRule :: InScopeSet -> CoreRule -> [CoreExpr] -> Maybe (FAST_STRING, CoreExp
 --	(\x->E)	matches (\x->F x)
 
 
+matchRule in_scope rule@(BuiltinRule match_fn) args = match_fn args
+
 matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
   = go tpl_args args emptySubst
 	-- We used to use the in_scope set, but I don't think that's necessary
@@ -154,14 +157,25 @@ matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
    go (tpl_arg:tpl_args) (arg:args) subst = match tpl_arg arg tpl_var_set (go tpl_args args) subst
 
 	-- Two easy ways to terminate
-   go []		 []	    subst = Just (rn, mkLams tpl_vars rhs, mk_result_args subst tpl_vars)
-   go []		 args	    subst = Just (rn, mkLams tpl_vars rhs, mk_result_args subst tpl_vars ++ args)
+   go [] []	    subst = Just (rn, app_match subst (mkLams tpl_vars rhs) tpl_vars)
+   go [] args	    subst = Just (rn, app_match subst (mkLams tpl_vars rhs) tpl_vars `mkApps` args)
 
 	-- One tiresome way to terminate: check for excess unmatched
 	-- template arguments
-   go tpl_args		 []	    subst = Nothing	-- Failure
+   go tpl_args []   subst = Nothing	-- Failure
 
 
+   -----------------------
+   app_match subst fn vs = foldl go fn vs
+	where	
+	  senv    = substEnv subst
+	  go fn v = case lookupSubstEnv senv v of
+			Just (DoneEx ex)  -> fn `App` ex 
+			Just (DoneTy ty)  -> fn `App` Type ty
+			-- Substitution should bind them all!
+
+
+   -----------------------
 {-	The code below tries to match even if there are more 
 	template args than real args.
 
@@ -199,15 +213,6 @@ matchRule in_scope rule@(Rule rn tpl_vars tpl_args rhs) args
 
    eta_complete other vars = Nothing
 -}
-
-   -----------------------
-   mk_result_args subst vs = map go vs
-	where	
-	  senv = substEnv subst
-	  go v = case lookupSubstEnv senv v of
-			Just (DoneEx ex)  -> ex
-			Just (DoneTy ty)  -> Type ty
-			-- Substitution should bind them all!
 
 
 zapOccInfo bndr | isTyVar bndr = bndr
@@ -399,6 +404,10 @@ addRule :: Id -> CoreRules -> CoreRule -> CoreRules
 -- We make no check for rules that unify without one dominating
 -- the other.   Arguably this would be a bug.
 
+addRule id (Rules rules rhs_fvs) rule@(BuiltinRule _)
+  = Rules (rule:rules) rhs_fvs
+	-- Put it at the start for lack of anything better
+
 addRule id (Rules rules rhs_fvs) (Rule str tpl_vars tpl_args rhs)
   = Rules (insert rules) (rhs_fvs `unionVarSet` new_rhs_fvs)
   where
@@ -451,7 +460,7 @@ data ProtoCoreRule
 
 pprProtoCoreRule (ProtoCoreRule _ fn rule) = pprCoreRule (Just fn) rule
 
-lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (FAST_STRING, CoreExpr, [CoreExpr])
+lookupRule :: InScopeSet -> Id -> [CoreExpr] -> Maybe (RuleName, CoreExpr)
 lookupRule in_scope fn args
   = case getIdSpecialisation fn of
 	Rules rules _ -> matchRules in_scope rules args
@@ -480,10 +489,10 @@ type RuleBase = (IdSet,		-- Imported Ids that have rules attached
 -- so that the opportunity to apply the rule isn't lost too soon
 
 prepareRuleBase :: [CoreBind] -> [ProtoCoreRule] -> ([CoreBind], RuleBase)
-prepareRuleBase binds rules
+prepareRuleBase binds all_rules
   = (map zap_bind binds, (imported_rule_ids, rule_lhs_fvs))
   where
-    (rule_ids, rule_lhs_fvs) = foldr add_rule (emptyVarSet, emptyVarSet) rules
+    (rule_ids, rule_lhs_fvs) = foldr add_rule (emptyVarSet, emptyVarSet) all_rules
     imported_rule_ids = filterVarSet (not . isLocallyDefined) rule_ids
 
 	-- rule_fvs is the set of all variables mentioned in rules
@@ -526,4 +535,3 @@ add_rule (ProtoCoreRule _ id rule)
 
 addRuleToId id rule = setIdSpecialisation id (addRule id (getIdSpecialisation id) rule)
 \end{code}
-
