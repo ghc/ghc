@@ -401,7 +401,8 @@ instance NamedThing Name where
 instance Outputable Name where
     ppr sty (Local u n _) | codeStyle sty ||
 			    ifaceStyle sty = pprUnique u
-			  | otherwise      = ppBesides [ppPStr (occNameString n), ppPStr SLIT("_"), pprUnique u]
+    ppr PprForUser (Local _ n _) = ppPStr (occNameString n)
+    ppr other_sty  (Local u n _) = ppBesides [ppPStr (occNameString n), ppPStr SLIT("_"), pprUnique u]
 
     ppr sty (Global u m n _ _) = ppBesides [pp_name, pp_uniq sty u]
 			       where

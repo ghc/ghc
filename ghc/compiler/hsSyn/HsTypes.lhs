@@ -25,7 +25,9 @@ IMP_Ubiq()
 
 import Outputable	( interppSP, ifnotPprForUser )
 import Kind		( Kind {- instance Outputable -} )
+import Name		( nameOccName )
 import Pretty
+import PprStyle		( PprStyle(..) )
 import Util		( thenCmp, cmpList, isIn, panic# )
 \end{code}
 
@@ -104,9 +106,13 @@ instance (Outputable name) => Outputable (HsType name) where
     ppr = pprHsType
 
 instance (Outputable name) => Outputable (HsTyVar name) where
-    ppr sty (UserTyVar name) = ppr sty name
-    ppr sty (IfaceTyVar name kind) = ppCat [ppr sty name, ppStr "::", ppr sty kind]
+    ppr sty (UserTyVar name) = ppr_hs_tyvar sty name
+    ppr sty (IfaceTyVar name kind) = ppCat [ppr_hs_tyvar sty name, ppStr "::", ppr sty kind]
 
+
+-- Here
+ppr_hs_tyvar PprInterface tv_name = ppr PprForUser tv_name
+ppr_hs_tyvar other_sty    tv_name = ppr other_sty tv_name
 
 ppr_forall sty ctxt_prec [] [] ty
    = ppr_mono_ty sty ctxt_prec ty
@@ -142,7 +148,7 @@ pprParendHsType sty ty = ppr_mono_ty sty pREC_CON ty
 ppr_mono_ty sty ctxt_prec (HsPreForAllTy ctxt ty)     = ppr_forall sty ctxt_prec [] ctxt ty
 ppr_mono_ty sty ctxt_prec (HsForAllTy tvs ctxt ty)    = ppr_forall sty ctxt_prec tvs ctxt ty
 
-ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr sty name
+ppr_mono_ty sty ctxt_prec (MonoTyVar name) = ppr_hs_tyvar sty name
 
 ppr_mono_ty sty ctxt_prec (MonoFunTy ty1 ty2)
   = let p1 = ppr_mono_ty sty pREC_FUN ty1
