@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.16 2000/01/30 10:16:09 simonmar Exp $
+ * $Id: Sanity.c,v 1.17 2000/03/17 13:30:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -471,12 +471,12 @@ checkTSO(StgTSO *tso)
     StgOffset stack_size = tso->stack_size;
     StgPtr stack_end = stack + stack_size;
 
-    if (tso->whatNext == ThreadRelocated) {
+    if (tso->what_next == ThreadRelocated) {
       checkTSO(tso->link);
       return;
     }
 
-    if (tso->whatNext == ThreadComplete || tso->whatNext == ThreadKilled) {
+    if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
       /* The garbage collector doesn't bother following any pointers
        * from dead threads, so don't check sanity here.  
        */

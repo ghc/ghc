@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.54 2000/03/16 17:33:04 simonmar Exp $
+ * $Id: Schedule.c,v 1.55 2000/03/17 13:30:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -342,7 +342,7 @@ schedule( void )
       StgMainThread *m, **prev;
       prev = &main_threads;
       for (m = main_threads; m != NULL; m = m->link) {
-	switch (m->tso->whatNext) {
+	switch (m->tso->what_next) {
 	case ThreadComplete:
 	  if (m->ret) {
 	    *(m->ret) = (StgClosure *)m->tso->sp[0];
@@ -370,10 +370,10 @@ schedule( void )
      */
     {
       StgMainThread *m = main_threads;
-      if (m->tso->whatNext == ThreadComplete
-	  || m->tso->whatNext == ThreadKilled) {
+      if (m->tso->what_next == ThreadComplete
+	  || m->tso->what_next == ThreadKilled) {
 	main_threads = main_threads->link;
-	if (m->tso->whatNext == ThreadComplete) {
+	if (m->tso->what_next == ThreadComplete) {
 	  /* we finished successfully, fill in the return value */
 	  if (m->ret) { *(m->ret) = (StgClosure *)m->tso->sp[0]; };
 	  m->stat = Success;
@@ -641,7 +641,7 @@ schedule( void )
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     /* Run the current thread 
      */
-    switch (cap->rCurrentTSO->whatNext) {
+    switch (cap->rCurrentTSO->what_next) {
     case ThreadKilled:
     case ThreadComplete:
       /* Thread already finished, return to scheduler. */
@@ -667,7 +667,7 @@ schedule( void )
       barf("Panic: entered a BCO but no bytecode interpreter in this build");
 #endif
     default:
-      barf("schedule: invalid whatNext field");
+      barf("schedule: invalid what_next field");
     }
     /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
     
@@ -739,7 +739,7 @@ schedule( void )
        * GC is finished.
        */
       IF_DEBUG(scheduler,
-	       if (t->whatNext == ThreadEnterHugs) {
+	       if (t->what_next == ThreadEnterHugs) {
 		 /* ToDo: or maybe a timer expired when we were in Hugs?
 		  * or maybe someone hit ctrl-C
 		  */
@@ -779,7 +779,7 @@ schedule( void )
        * we get a new one.
        */
       IF_DEBUG(scheduler,belch("thread %ld finished", t->id));
-      t->whatNext = ThreadComplete;
+      t->what_next = ThreadComplete;
 #if defined(GRAN)
       // ToDo: endThread(t, CurrentProc); // clean-up the thread
 #elif defined(PAR)
@@ -1033,7 +1033,7 @@ createThread_(nat size, rtsBool have_lock)
 #if defined(GRAN)
   SET_GRAN_HDR(tso, ThisPE);
 #endif
-  tso->whatNext     = ThreadEnterGHC;
+  tso->what_next     = ThreadEnterGHC;
 
   /* tso->id needs to be unique.  For now we use a heavyweight mutex to
    * protect the increment operation on next_thread_id.
@@ -1675,7 +1675,7 @@ threadStackOverflow(StgTSO *tso)
    * of the stack, so we don't attempt to scavenge any part of the
    * dead TSO's stack.
    */
-  tso->whatNext = ThreadRelocated;
+  tso->what_next = ThreadRelocated;
   tso->link = dest;
   tso->sp = (P_)&(tso->stack[tso->stack_size]);
   tso->su = (StgUpdateFrame *)tso->sp;
@@ -2149,7 +2149,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
   StgPtr          sp = tso->sp;
   
   /* Thread already dead? */
-  if (tso->whatNext == ThreadComplete || tso->whatNext == ThreadKilled) {
+  if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
     return;
   }
 
@@ -2218,7 +2218,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
        */
       sp[0] = (W_)ap;
       tso->sp = sp;
-      tso->whatNext = ThreadEnterGHC;
+      tso->what_next = ThreadEnterGHC;
       return;
     }
 
@@ -2322,7 +2322,7 @@ raiseAsync(StgTSO *tso, StgClosure *exception)
       /* We've stripped the entire stack, the thread is now dead. */
       sp += sizeofW(StgStopFrame) - 1;
       sp[0] = (W_)exception;	/* save the exception */
-      tso->whatNext = ThreadKilled;
+      tso->what_next = ThreadKilled;
       tso->su = (StgUpdateFrame *)(sp+1);
       tso->sp = sp;
       return;
@@ -2419,7 +2419,7 @@ printThreadBlockage(StgTSO *tso)
 void
 printThreadStatus(StgTSO *tso)
 {
-  switch (tso->whatNext) {
+  switch (tso->what_next) {
   case ThreadKilled:
     fprintf(stderr,"has been killed");
     break;

@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.40 $
- * $Date: 2000/03/14 14:34:47 $
+ * $Revision: 1.41 $
+ * $Date: 2000/03/17 13:30:23 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -1343,7 +1343,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
     case SE_CAF_BLACKHOLE:
         {
             /* Let the scheduler figure out what to do :-) */
-            cap->rCurrentTSO->whatNext = ThreadEnterGHC;
+            cap->rCurrentTSO->what_next = ThreadEnterGHC;
             xPushCPtr(obj);
             RETURN(ThreadYielding);
         }
@@ -1454,7 +1454,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
                 case RET_VEC_SMALL:
                 case RET_BIG:
                 case RET_VEC_BIG:
-                        cap->rCurrentTSO->whatNext = ThreadEnterGHC;
+                        cap->rCurrentTSO->what_next = ThreadEnterGHC;
                         xPushCPtr(obj);
                         RETURN(ThreadYielding);
                 default:
@@ -1475,7 +1475,7 @@ StgThreadReturnCode enter( Capability* cap, StgClosure* obj0 )
             //fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
             //printObj(obj);
             //LLL;
-            cap->rCurrentTSO->whatNext = ThreadEnterGHC;
+            cap->rCurrentTSO->what_next = ThreadEnterGHC;
             xPushCPtr(obj); /* code to restart with */
             RETURN(ThreadYielding);
         }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.12 2000/03/17 09:53:19 simonmar Exp $
+ * $Id: TSO.h,v 1.13 2000/03/17 13:30:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -72,7 +72,7 @@ typedef enum {
 } StgTSOState;
 
 /*
- * The whatNext field of a TSO indicates how the thread is to be run. 
+ * The what_next field of a TSO indicates how the thread is to be run. 
  */
 typedef enum {
   ThreadEnterGHC,		/* enter top thunk on stack */
@@ -149,7 +149,7 @@ typedef struct StgTSO_ {
   StgMutClosure *    mut_link;	     /* TSO's are mutable of course! */
   struct StgTSO_*    global_link;    /* Links all threads together */
   
-  StgTSOWhatNext     whatNext;
+  StgTSOWhatNext     what_next;
   StgTSOBlockReason  why_blocked;
   StgTSOBlockInfo    block_info;
   struct StgTSO_*    blocked_exceptions;
@@ -203,12 +203,12 @@ typedef struct StgTSO_ {
 
    A zombie thread has the following properties:
       
-      tso->whatNext == ThreadComplete or ThreadKilled
+      tso->what_next == ThreadComplete or ThreadKilled
       tso->link     ==  (could be on some queue somewhere)
       tso->su       ==  tso->stack + tso->stack_size
       tso->sp       ==  tso->stack + tso->stack_size - 1 (i.e. top stack word)
-      tso->sp[0]    ==  return value of thread, if whatNext == ThreadComplete,
-                        exception             , if whatNext == ThreadKilled
+      tso->sp[0]    ==  return value of thread, if what_next == ThreadComplete,
+                        exception             , if what_next == ThreadKilled
 
       (tso->sp is left pointing at the top word on the stack so that
       the return value or exception will be retained by a GC).

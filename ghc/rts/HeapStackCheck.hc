@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HeapStackCheck.hc,v 1.12 2000/03/02 10:11:50 sewardj Exp $
+ * $Id: HeapStackCheck.hc,v 1.13 2000/03/17 13:30:24 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -64,7 +64,7 @@
     R1.i = StackOverflow;				\
   }							\
   SaveThreadState();					\
-  CurrentTSO->whatNext = ThreadRunGHC;			\
+  CurrentTSO->what_next = ThreadRunGHC;			\
   JMP_(StgReturn);
 
 #define GC_ENTER					\
@@ -84,42 +84,42 @@
     R1.i = StackOverflow;				\
   }							\
   SaveThreadState();					\
-  CurrentTSO->whatNext = ThreadEnterGHC;		\
+  CurrentTSO->what_next = ThreadEnterGHC;		\
   JMP_(StgReturn);
 
 #define HP_GENERIC			\
   SaveThreadState();			\
-  CurrentTSO->whatNext = ThreadRunGHC;	\
+  CurrentTSO->what_next = ThreadRunGHC;	\
   R1.i = HeapOverflow;			\
   JMP_(StgReturn);
 
 #define STK_GENERIC 			\
   SaveThreadState();			\
-  CurrentTSO->whatNext = ThreadRunGHC;	\
+  CurrentTSO->what_next = ThreadRunGHC;	\
   R1.i = StackOverflow;			\
   JMP_(StgReturn);
 
 #define YIELD_GENERIC			\
   SaveThreadState();			\
-  CurrentTSO->whatNext = ThreadRunGHC;	\
+  CurrentTSO->what_next = ThreadRunGHC;	\
   R1.i = ThreadYielding;		\
   JMP_(StgReturn);
 
 #define YIELD_TO_HUGS			  \
   SaveThreadState();			  \
-  CurrentTSO->whatNext = ThreadEnterHugs; \
+  CurrentTSO->what_next = ThreadEnterHugs; \
   R1.i = ThreadYielding;		  \
   JMP_(StgReturn);
 
 #define BLOCK_GENERIC			\
   SaveThreadState();			\
-  CurrentTSO->whatNext = ThreadRunGHC;	\
+  CurrentTSO->what_next = ThreadRunGHC;	\
   R1.i = ThreadBlocked;			\
   JMP_(StgReturn);
 
 #define BLOCK_ENTER			\
   SaveThreadState();			\
-  CurrentTSO->whatNext = ThreadEnterGHC;\
+  CurrentTSO->what_next = ThreadEnterGHC;\
   R1.i = ThreadBlocked;			\
   JMP_(StgReturn);
 
@@ -166,7 +166,7 @@ EXTFUN(stg_gc_enter_1_hponly)
   Sp[0] = R1.w;
   R1.i = HeapOverflow;
   SaveThreadState();
-  CurrentTSO->whatNext = ThreadEnterGHC;
+  CurrentTSO->what_next = ThreadEnterGHC;
   JMP_(StgReturn);
   FE_
 }
@@ -289,7 +289,7 @@ EXTFUN(gran_yield_0)
 {
   FB_
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -301,7 +301,7 @@ EXTFUN(gran_yield_1)
   Sp -= 1;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -316,7 +316,7 @@ EXTFUN(gran_yield_2)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -332,7 +332,7 @@ EXTFUN(gran_yield_3)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -349,7 +349,7 @@ EXTFUN(gran_yield_4)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -367,7 +367,7 @@ EXTFUN(gran_yield_5)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -386,7 +386,7 @@ EXTFUN(gran_yield_6)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -406,7 +406,7 @@ EXTFUN(gran_yield_7)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -427,7 +427,7 @@ EXTFUN(gran_yield_8)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadYielding;
   JMP_(StgReturn);
   FE_
@@ -441,7 +441,7 @@ EXTFUN(gran_block_1)
   Sp -= 1;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -456,7 +456,7 @@ EXTFUN(gran_block_2)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -472,7 +472,7 @@ EXTFUN(gran_block_3)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -489,7 +489,7 @@ EXTFUN(gran_block_4)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -507,7 +507,7 @@ EXTFUN(gran_block_5)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -526,7 +526,7 @@ EXTFUN(gran_block_6)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -546,7 +546,7 @@ EXTFUN(gran_block_7)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -567,7 +567,7 @@ EXTFUN(gran_block_8)
   Sp[1] = R2.w;
   Sp[0] = R1.w;
   SaveThreadState();					
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_
@@ -596,7 +596,7 @@ EXTFUN(par_block_1_no_jump)
 EXTFUN(par_jump)
 {
   FB_
-  CurrentTSO->whatNext = ThreadEnterGHC;		
+  CurrentTSO->what_next = ThreadEnterGHC;		
   R1.i = ThreadBlocked;
   JMP_(StgReturn);
   FE_

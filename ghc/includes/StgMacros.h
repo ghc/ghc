@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.23 2000/03/16 12:40:40 simonmar Exp $
+ * $Id: StgMacros.h,v 1.24 2000/03/17 13:30:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -365,7 +365,7 @@ EF_(stg_gen_block);
 
 #define THREAD_RETURN(ptrs)                      \
   ASSERT(ptrs==1);                               \
-  CurrentTSO->whatNext = ThreadEnterGHC;         \
+  CurrentTSO->what_next = ThreadEnterGHC;        \
   R1.i = ThreadBlocked;                          \
   JMP_(StgReturn);                               
 #endif

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.9 2000/03/17 10:24:44 simonmar Exp $
+ * $Id: Exception.hc,v 1.10 2000/03/17 13:30:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -152,7 +152,7 @@ FN_(killThreadzh_fast)
   /* This thread may have been relocated.
    * (see Schedule.c:threadStackOverflow)
    */
-  while (R1.t->whatNext == ThreadRelocated) {
+  while (R1.t->what_next == ThreadRelocated) {
     R1.t = R1.t->link;
   }
 
@@ -188,12 +188,12 @@ FN_(killThreadzh_fast)
   if (R1.t == CurrentTSO) {
 	SaveThreadState();	/* inline! */
 	STGCALL2(raiseAsync, R1.t, R2.cl);
-	if (CurrentTSO->whatNext == ThreadKilled) {
+	if (CurrentTSO->what_next == ThreadKilled) {
 		R1.w = ThreadYielding;
 		JMP_(StgReturn);
 	}
 	LoadThreadState();
-	if (CurrentTSO->whatNext == ThreadEnterGHC) {
+	if (CurrentTSO->what_next == ThreadEnterGHC) {
 		R1.w = Sp[0];
 		Sp++;
 		JMP_(GET_ENTRY(R1.cl));

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.73 2000/03/16 17:27:12 simonmar Exp $
+ * $Id: GC.c,v 1.74 2000/03/17 13:30:24 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -856,7 +856,7 @@ traverse_weak_ptr_list(void)
       /* Threads which have finished or died get dropped from
        * the list.
        */
-      switch (t->whatNext) {
+      switch (t->what_next) {
       case ThreadKilled:
       case ThreadComplete:
 	next = t->global_link;
@@ -1005,7 +1005,7 @@ isAlive(StgClosure *p)
       goto large;
 
     case TSO:
-      if (((StgTSO *)p)->whatNext == ThreadRelocated) {
+      if (((StgTSO *)p)->what_next == ThreadRelocated) {
 	p = (StgClosure *)((StgTSO *)p)->link;
 	continue;
       }
@@ -1591,7 +1591,7 @@ loop:
 
       /* Deal with redirected TSOs (a TSO that's had its stack enlarged).
        */
-      if (tso->whatNext == ThreadRelocated) {
+      if (tso->what_next == ThreadRelocated) {
 	q = (StgClosure *)tso->link;
 	goto loop;
       }
