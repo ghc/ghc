@@ -18,9 +18,6 @@ This guide is intended for people who want to install or modify
 programs from the Glasgow @fptools@ suite (as distinct from those
 who merely want to <em/run/ them).
 
-The whole install-and-make system was completely re-done between GHC
-2.01 and 2.02, so it will be worth your while to re-read this guide
-even if you have read earlier versions.
 </abstract>
 
 <toc>
@@ -83,10 +80,9 @@ confidence will work well by having tested it (more) thoroughly.
 
 Source-only distributions are either bugfix releases or snapshots of
 current state of development. The release has undergone some testing.
-Source releases of 2.0x can be compiled up using 2.07 (or subsequent
-bugfix releases) or the Good Old Compiler, GHC~0.29. Compiling with
-0.29 is recommended if you're a performance junkie, as 0.29 (still)
-generates zippier code, but GHC~2.0x is catching up.
+Source releases of 3.xx can be compiled up using 2.10 or later.
+Compiling with version 0.29 won't work any more: we use Haskell 1.4
+features in the compiler.
 
 <tag/Build GHC from intermediate C @.hc@ files<nidx/hc files/:/ You
 need a working GHC to use a source distribution. What if you don't
@@ -357,10 +353,9 @@ Concurrent/Parallel Haskell probably won't work (yet).
 <nidx>m68k-next-nextstep3: concurrent---no</nidx>
 <nidx>m68k-next-nextstep3: parallel---no</nidx>
 
-<tag/m68k-sun-sunos4 (Sun3):/
-<nidx>m68k-sun-sunos4: registerised port</nidx>
-GHC 2.0x hasn't been tried on a Sun3.  GHC~0.26 worked registerised.
-No native-code generator.
+<tag/m68k-sun-sunos4 (Sun3):/ <nidx>m68k-sun-sunos4: registerised
+port</nidx> GHC 2.0x and 3.0x haven't been tried on a Sun3.  GHC~0.26
+worked registerised.  No native-code generator.
 
 Concurrent/Parallel Haskell probably don't work (yet).
 <nidx>m68k-sun-sunos4: concurrent---no</nidx>
