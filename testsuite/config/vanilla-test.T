@@ -102,7 +102,7 @@ def check_stderr_ok()
    if   not ( exists($s_stderr) )
    then if ((contents $r_stderr) == "")
 	   then return True
-	   else say_fail_because_output_produced($r_stdout)
+	   else say_fail_because_nonempty($r_stderr)
 		return False
 	fi
    fi
