@@ -758,10 +758,10 @@ Anyway:
 \begin{verbatim}
    data PLS -- as described above; opaque to everybody except the linker
 
-   link :: PCI -> ??? -> [[Linkable]] -> LinkState -> IO LinkResult
+   link :: PCI -> ??? -> [[Linkable]] -> PLS -> IO LinkResult
 
-   data LinkResult = LinkOK   LinkState
-                   | LinkErrs LinkState [SDoc]
+   data LinkResult = LinkOK   PLS
+                   | LinkErrs PLS [SDoc]
 
    emptyPLS :: IO PLS     -- since CM has no other way to make one
 \end{verbatim}
@@ -803,7 +803,7 @@ it may not be possible to link recursive groups containing libraries.
 \end{itemize}
 
 If linking in of a group should fail for some reason, @link@ should
-not modify its @LinkState@ at all.  In other words, linking each group
+not modify its PLS at all.  In other words, linking each group
 is atomic; it either succeeds or fails.
 
 \subsubsection*{\mbox{\tt Unlinked} and \mbox{\tt Linkable}}
