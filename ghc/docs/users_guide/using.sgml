@@ -682,12 +682,16 @@ ghc &ndash;&ndash;make Main.hs
           intermediate C files.</para>
 
 	  <para>The <option>-hisuf</option>/<option>-osuf</option>
-          game is useful if you want to compile a program with both
-          GHC and HBC (say) in the same directory.  Let HBC use the
-          standard <filename>.hi</filename>/<filename>.o</filename>
-          suffixes; add <option>-hisuf g&lowbar;hi -osuf
-          g&lowbar;o</option> to your <command>make</command> rule for
-          GHC compiling&hellip;</para>
+          game is particularly useful if you want to compile a program both with and without
+	    profiling, in the same directory.  You can say:
+	    <Screen>
+	      ghc ... 
+	    </Screen>
+	    to get the ordinary version, and
+	    <Screen>
+	      ghc ... -osuf prof.o -hisuf prof.hi -prof -auto-all
+	    </Screen>
+	    to get the profiled version.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
