@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCString.lhs,v 1.2 2001/01/11 19:48:28 qrczak Exp $
+% $Id: PrelCString.lhs,v 1.3 2001/04/14 22:28:46 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -12,13 +12,10 @@ module PrelCString where
 import Monad
 
 import PrelMarshalArray
-import PrelMarshalAlloc
-import PrelException
 import PrelPtr
 import PrelStorable
 import PrelCTypes
-import PrelCTypesISO
-import PrelInt
+import PrelWord
 import PrelByteArr
 import PrelPack
 import PrelBase
@@ -120,11 +117,7 @@ charsToCChars :: [Char] -> [CChar]
 charsToCChars  = map castCharToCChar
 
 castCCharToChar :: CChar -> Char
--- castCCharToChar ch = chr (fromIntegral (fromIntegral ch :: Word8))
--- The above produces horrible code. Word and Int modules really
--- should be cleaned up... Here is an ugly but fast version:
-castCCharToChar ch = case fromIntegral (fromIntegral ch :: Int32) of
-    I# i# -> C# (chr# (word2Int# (int2Word# i# `and#` int2Word# 0xFF#)))
+castCCharToChar ch = unsafeChr (fromIntegral (fromIntegral ch :: Word8))
 
 castCharToCChar :: Char -> CChar
 castCharToCChar ch = fromIntegral (ord ch)
@@ -133,6 +126,7 @@ castCharToCChar ch = fromIntegral (ord ch)
 -- unsafe CStrings
 -- ---------------
 
+withUnsafeCString :: String -> (UnsafeCString -> IO a) -> IO a
 #if __GLASGOW_HASKELL__
 newtype UnsafeCString = UnsafeCString (ByteArray Int)
 withUnsafeCString s f = f (UnsafeCString (packString s))
