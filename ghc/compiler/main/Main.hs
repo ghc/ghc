@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.7 2000/10/24 15:58:02 simonmar Exp $
+-- $Id: Main.hs,v 1.8 2000/10/24 16:08:16 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -157,20 +157,30 @@ main =
    _ <- processArgs static_flags more_opts []
  
 	-- give the static flags to hsc
-   build_hsc_opts
+   static_opts <- buildStaticHscOpts
+   writeIORef static_hsc_opts static_opts
 
 	-- build the default DynFlags (these may be adjusted on a per
 	-- module basis by OPTIONS pragmas and settings in the interpreter).
 
    core_todo <- buildCoreToDo
+   stg_todo  <- buildStgToDo
 
    lang <- readIORef hsc_lang
    writeIORef v_DynFlags 
-	DynFlags{ coreToDo =  core_todo,
-		  stgToDo  = error "ToDo: stgToDo"
+	DynFlags{ coreToDo = core_todo,
+		  stgToDo  = stg_todo,
                   hscLang  = lang,
 		  -- leave out hscOutName for now
 		  flags = [] }
+
+	-- warnings
+    warn_level <- readIORef warning_opt
+    let warn_opts =  case warn_level of
+		  	W_default -> standardWarnings
+		  	W_        -> minusWOpts
+		  	W_all	  -> minusWallOpts
+		  	W_not     -> []
 
 	-- the rest of the arguments are "dynamic"
    srcs <- processArgs dynamic_flags non_static []

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.5 2000/10/24 15:58:02 simonmar Exp $
+-- $Id: DriverState.hs,v 1.6 2000/10/24 16:08:16 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -392,6 +392,19 @@ buildCoreToDo = do
 		-- No -finline-phase: allow all Ids to be inlined now
 	])
      ]
+
+buildStgToDo :: IO [ StgToDo ]
+buildStgToDo = do
+  stg_stats <- readIORef v_StgStats
+  let flags1 | stg_stats = [ D_stg_stats ]
+	     | otherwise = [ ]
+
+	-- STG passes
+  ways_ <- readIORef ways
+  let flags2 | WayProf `elem` ways_ = StgDoMassageForProfiling : flags1
+	     | otherwise            = flags1
+
+  return flags2
 
 -----------------------------------------------------------------------------
 -- Paths & Libraries

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.7 2000/10/24 15:58:02 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.8 2000/10/24 16:08:16 simonmar Exp $
 --
 -- Driver flags
 --
@@ -424,17 +424,10 @@ floatOpt ref str
 -----------------------------------------------------------------------------
 -- Build the Hsc static command line opts
 
-build_hsc_opts :: IO [String]
-build_hsc_opts = do
-  opt_C_ <- getStaticOpts opt_C		-- misc hsc opts
+buildStaticHscOpts :: IO [String]
+buildStaticHscOpts = do
 
-	-- warnings
-  warn_level <- readIORef warning_opt
-  let warn_opts =  case warn_level of
-		  	W_default -> standardWarnings
-		  	W_        -> minusWOpts
-		  	W_all	  -> minusWallOpts
-		  	W_not     -> []
+  opt_C_ <- getStaticOpts opt_C		-- misc hsc opts
 
 	-- optimisation
   minus_o <- readIORef v_OptLevel
@@ -446,44 +439,19 @@ build_hsc_opts = do
 	    _ -> error "unknown opt level"
 	    -- ToDo: -Ofile
  
-	-- STG passes
-  ways_ <- readIORef ways
-  let stg_massage | WayProf `elem` ways_ =  "-fmassage-stg-for-profiling"
-	          | otherwise            = ""
-
-  stg_stats <- readIORef v_StgStats
-  let stg_stats_flag | stg_stats = "-dstg-stats"
-		     | otherwise = ""
-
-  let stg_opts = [ stg_massage, stg_stats_flag, "-flet-no-escape" ]
+  let stg_opts = [ "-flet-no-escape" ]
 	-- let-no-escape always on for now
 
 	-- take into account -fno-* flags by removing the equivalent -f*
 	-- flag from our list.
   anti_flags <- getStaticOpts anti_opt_C
-  let basic_opts = opt_C_ ++ warn_opts ++ optimisation_opts ++ stg_opts
+  let basic_opts = opt_C_ ++ optimisation_opts ++ stg_opts
       filtered_opts = filter (`notElem` anti_flags) basic_opts
 
   verb <- is_verbose
   let hi_vers = "-fhi-version="++cProjectVersionInt
 
-  static <- (do s <- readIORef static; if s then return "-static" else return "")
+  static <- (do s <- readIORef static; if s then return "-static" 
+					    else return "")
 
-  -- get hi-file suffix
-  hisuf <- readIORef hi_suf
-
-  -- hi-suffix for packages depends on the build tag.
-  package_hisuf <-
-	do tag <- readIORef build_tag
-	   if null tag
-		then return "hi"
-		else return (tag ++ "_hi")
-
-  import_dirs <- readIORef import_paths
-  package_import_dirs <- getPackageImportPath
-  
-  return 
-	(  
-	filtered_opts
-	++ [ hi_vers, static, verb ]
-	)
+  return ( filtered_opts ++ [ hi_vers, static, verb ] )
