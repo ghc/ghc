@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.171 2003/07/03 15:14:58 sof Exp $
+ * $Id: Schedule.c,v 1.172 2003/07/12 00:09:15 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3144,7 +3144,7 @@ unblockThread(StgTSO *tso)
 	  goto done;
 	}
       }
-      barf("unblockThread (I/O): TSO not found");
+      barf("unblockThread (delay): TSO not found");
     }
 
   default:
@@ -3272,7 +3272,7 @@ unblockThread(StgTSO *tso)
 	  goto done;
 	}
       }
-      barf("unblockThread (I/O): TSO not found");
+      barf("unblockThread (delay): TSO not found");
     }
 
   default:
