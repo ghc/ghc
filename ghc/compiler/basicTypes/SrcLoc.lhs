@@ -65,20 +65,6 @@ data SrcLoc
   | ImportedLoc	String		-- Module name
 
   | UnhelpfulLoc FastString	-- Just a general indication
-
-{-
-data SrcSpan
-  = WiredInSpan
-
-	-- A precise source file span
-  | SrcSpan	FastString 	-- file name
-		FastInt		-- beginning line
-		FastInt		-- beginning column
-		FastInt		-- end line
-		FastInt		-- end column		
-
-  | UnhelpfulSrcSpan FastString	-- Just a general indication
--}
 \end{code}
 
 Note that an entity might be imported via more than one route, and
