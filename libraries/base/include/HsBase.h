@@ -128,7 +128,7 @@ HsInt rawSystem(HsAddr cmd, HsAddr args);
 int inputReady(int fd, int msecs, int isSock);
 
 /* in writeError.c */
-void writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len);
+void writeErrString__(HsAddr msg, HsInt len);
 
 /* in Signals.c */
 extern HsInt nocldstop;
@@ -390,7 +390,7 @@ __hscore_setmode( HsInt fd, HsBool toBin )
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
-#endif  
+#endif
 }
 
 INLINE HsInt
@@ -467,7 +467,7 @@ INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
 #if !defined(_MSC_VER)
 INLINE HsAddr
 __hscore_d_name( struct dirent* d )
-{ 
+{
 #if !defined(mingw32_TARGET_OS) && !defined(_MSC_VER)
   return (HsAddr)(&d->d_name);
 #else
@@ -483,7 +483,7 @@ __hscore_end_of_dir( void )
   return 0;
 #else
   return ENOENT;
-#endif  
+#endif
 }
 
 INLINE void
@@ -513,7 +513,7 @@ INLINE void
 __hscore_poke_lflag( struct termios* ts, tcflag_t t ) { ts->c_lflag = t; }
 
 INLINE unsigned char*
-__hscore_ptr_c_cc( struct termios* ts ) 
+__hscore_ptr_c_cc( struct termios* ts )
 { return (unsigned char*) &ts->c_cc; }
 
 INLINE HsInt

@@ -1,7 +1,7 @@
-/* 
+/*
  * (c) The University of Glasgow 2002
  *
- * $Id: writeError.c,v 1.5 2002/02/07 11:13:30 simonmar Exp $
+ * $Id: writeError.c,v 1.6 2004/02/12 21:23:49 krasimir Exp $
  *
  * hPutStr Runtime Support
  */
@@ -21,7 +21,7 @@ implementation in one or two places.)
 #include "HsBase.h"
 
 void
-writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len)
+writeErrString__(HsAddr msg, HsInt len)
 {
   int count = 0;
   char* p  = (char*)msg;
@@ -30,11 +30,6 @@ writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len)
 #ifndef DLLized
   resetNonBlockingFd(2);
 #endif
-
-  /* Print error msg header */
-  if (msg_hdr) {
-    ((void (*)(int))msg_hdr)(2/*stderr*/);
-  }
 
   while ( (count = write(2,p,len)) < len) {
      if (errno != EINTR ) {

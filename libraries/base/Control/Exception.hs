@@ -105,14 +105,18 @@ module Control.Exception (
 	bracket_, 	-- :: IO a -> IO b -> IO c -> IO ()
 
 	finally, 	-- :: IO a -> IO b -> IO a
-
+	
+	setUncatchedExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
+	getUncatchedExceptionHandler       -- :: IO (Exception -> IO ())
   ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base		( assert )
 import GHC.Exception 	as ExceptionBase hiding (catch)
 import GHC.Conc		( throwTo, ThreadId )
-import GHC.IOBase	( IO(..) )
+import GHC.IOBase	( IO(..), IORef(..), newIORef, readIORef, writeIORef )
+import GHC.Handle       ( stdout, hFlush )
+import Foreign.C.String ( CString, withCStringLen )
 #endif
 
 #ifdef __HUGS__
@@ -505,3 +509,26 @@ assert :: Bool -> a -> a
 assert True x = x
 assert False _ = throw (AssertionFailed "")
 #endif
+
+
+{-# NOINLINE uncatchedExceptionHandler #-}
+uncatchedExceptionHandler :: IORef (Exception -> IO ())
+uncatchedExceptionHandler = unsafePerformIO (newIORef defaultHandler)
+   where
+      defaultHandler :: Exception -> IO ()
+      defaultHandler ex = do
+         (hFlush stdout) `catchException` (\ _ -> return ())
+         let msg = case ex of
+               Deadlock    -> "no threads to run:  infinite loop or deadlock?"
+               ErrorCall s -> s
+               other       -> showsPrec 0 other "\n"
+         withCStringLen ("Fail: "++msg) $ \(cstr,len) -> writeErrString cstr len
+         
+foreign import ccall unsafe "writeErrString__"
+	writeErrString :: CString -> Int -> IO ()
+
+setUncatchedExceptionHandler :: (Exception -> IO ()) -> IO ()
+setUncatchedExceptionHandler = writeIORef uncatchedExceptionHandler
+
+getUncatchedExceptionHandler :: IO (Exception -> IO ())
+getUncatchedExceptionHandler = readIORef uncatchedExceptionHandler

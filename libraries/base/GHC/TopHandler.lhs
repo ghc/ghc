@@ -15,12 +15,13 @@
 -----------------------------------------------------------------------------
 
 module GHC.TopHandler (
-   runIO, runNonIO, reportStackOverflow, reportError 
+   runIO, runNonIO, reportStackOverflow, reportError
   ) where
 
 import Prelude
 
 import System.IO
+import Control.Exception
 
 import Foreign.C.String
 import Foreign.Ptr
@@ -60,11 +61,8 @@ real_handler ex =
 	ExitException ExitSuccess     -> safe_exit 0
 	ExitException (ExitFailure n) -> safe_exit n
 
-	Deadlock    -> reportError True 
-			"no threads to run:  infinite loop or deadlock?"
-  
-	ErrorCall s -> reportError True s
-	other       -> reportError True (showsPrec 0 other "\n")
+	other       -> reportError True other
+	   
 
 reportStackOverflow :: Bool -> IO a
 reportStackOverflow bombOut = do
@@ -74,23 +72,13 @@ reportStackOverflow bombOut = do
 	then exit 2
 	else return undefined
 
-reportError :: Bool -> String -> IO a
-reportError bombOut str = do
-   (hFlush stdout) `catchException` (\ _ -> return ())
-   withCStringLen str $ \(cstr,len) -> do
-     writeErrString errorHdrHook cstr len
-     if bombOut 
-	then exit 1
-        else return undefined
-
-#ifndef ILX
-foreign import ccall "&ErrorHdrHook" errorHdrHook :: Ptr ()
-#else
-foreign import ccall "ErrorHdrHook" errorHdrHook :: Ptr ()
-#endif
-
-foreign import ccall unsafe "writeErrString__"
-	writeErrString :: Ptr () -> CString -> Int -> IO ()
+reportError :: Bool -> Exception -> IO a
+reportError bombOut ex = do
+   handler <- getUncatchedExceptionHandler
+   handler ex
+   if bombOut
+      then exit 1
+      else return undefined
 
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.

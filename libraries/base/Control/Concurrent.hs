@@ -229,8 +229,7 @@ real_handler ex =
 
 	-- report all others:
 	AsyncException StackOverflow -> reportStackOverflow False
-	ErrorCall s -> reportError False s
-	other       -> reportError False (showsPrec 0 other "\n")
+	other       -> reportError False other
 
 #endif /* __GLASGOW_HASKELL__ */
 
