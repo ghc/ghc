@@ -211,7 +211,7 @@ sub readHiFile {
     hi_line: while (<HIFILE>) {
 	next if /^ *$/; # blank line
 
-	if ( /^__interface ("[A-Za-z]*"\s*)([A-Z]\S*) (\d+) (\!)?/ ) {
+	if ( /^__interface ("[A-Za-z]*"\s*)([A-Z]\S*)\s+(\d+)?\s*(\!)?/ ) {
 	    if ( $mod ne 'new' ) {
 		# Reading old .hi file
 		$ModuleVersion{$mod} = $3;
