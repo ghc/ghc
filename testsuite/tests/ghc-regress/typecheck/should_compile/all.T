@@ -199,6 +199,8 @@ test('tc186', normal, compile, [''])
 test('tc187', normal, compile, [''])
 test('tc188', normal, compile, [''])
 test('tc189', normal, compile, [''])
+test('tc190', normal, compile, [''])
+test('tc191', normal, compile, [''])
 
 test('LoopOfTheDay1', normal, compile, [''])
 test('LoopOfTheDay2', normal, compile, [''])
