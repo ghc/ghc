@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.36 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Stats.c,v 1.37 2001/11/23 10:27:58 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -229,6 +229,7 @@ mut_user_time( void )
     return TICK_TO_DBL(CurrentUserTime - GC_tot_time - RP_tot_time - LDV_tot_time);
 }
 
+#ifdef PROFILING
 /*
   mut_user_time_during_RP() is similar to mut_user_time_during_GC();
   it returns the MUT time during retainer profiling.
@@ -245,6 +246,7 @@ mut_user_time_during_LDV( void )
 {
   return TICK_TO_DBL(LDV_start_time - GC_tot_time - RP_tot_time - LDV_tot_time);
 }
+#endif // PROFILING
 
 static nat
 pageFaults(void)
@@ -497,17 +499,23 @@ stat_endGC(lnat alloc, lnat collect, lnat live, lnat copied, lnat gen)
 /* -----------------------------------------------------------------------------
    Called at the beginning of each Retainer Profiliing
    -------------------------------------------------------------------------- */
-void stat_startRP(void)
+#ifdef PROFILING
+void
+stat_startRP(void)
 {
   getTimes();
   RP_start_time = CurrentUserTime;
   RPe_start_time = CurrentElapsedTime;
 }
+#endif // PROFILING
 
 /* -----------------------------------------------------------------------------
    Called at the end of each Retainer Profiliing
    -------------------------------------------------------------------------- */
-void stat_endRP(
+
+#ifdef PROFILING
+void
+stat_endRP(
   nat retainerGeneration,
 #ifdef DEBUG_RETAINER
   nat maxCStackSize,
@@ -531,26 +539,33 @@ void stat_endRP(
   fprintf(prof_file, "\tCurrent total costs in bytes = %u\n", allCost * sizeof(StgWord));
   fprintf(prof_file, "\tNumber of retainer sets = %u\n\n", numSet);
 }
+#endif // PROFILING
 
 /* -----------------------------------------------------------------------------
    Called at the beginning of each LDV Profiliing
    -------------------------------------------------------------------------- */
-void stat_startLDV(void)
+#ifdef PROFILING
+void
+stat_startLDV(void)
 {
   getTimes();
   LDV_start_time = CurrentUserTime;
   LDVe_start_time = CurrentElapsedTime;
 }
+#endif // PROFILING
 
 /* -----------------------------------------------------------------------------
    Called at the end of each LDV Profiliing
    -------------------------------------------------------------------------- */
-void stat_endLDV(void) 
+#ifdef PROFILING
+void
+stat_endLDV(void) 
 {
   getTimes();
   LDV_tot_time += CurrentUserTime - LDV_start_time;
   LDVe_tot_time += CurrentElapsedTime - LDVe_start_time;
 }
+#endif // PROFILING
 
 /* -----------------------------------------------------------------------------
    stat_workerStop
@@ -737,6 +752,7 @@ stat_exit(int alloc)
 
    Produce some detailed info on the state of the generational GC.
    -------------------------------------------------------------------------- */
+#ifdef DEBUG
 void
 statDescribeGens(void)
 {
@@ -779,6 +795,7 @@ statDescribeGens(void)
   }
   fprintf(stderr,"\n");
 }
+#endif
 
 /* -----------------------------------------------------------------------------
    Stats available via a programmatic interface, so eg. GHCi can time
