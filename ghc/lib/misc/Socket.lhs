@@ -134,7 +134,7 @@ accept :: Socket 		-- Listening Socket
 accept sock = do
  ~(sock', (SockAddrInet _ haddr)) <- SocketPrim.accept sock
  (HostEntry peer _ _ _)           <- getHostByAddr AF_INET haddr
- handle				  <- socketToHandle sock ReadWriteMode
+ handle				  <- socketToHandle sock' ReadWriteMode
  return (handle, peer)
 
 \end{code}
