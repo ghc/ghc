@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.55 2001/02/26 15:06:59 simonmar Exp $
+$Id: Parser.y,v 1.56 2001/04/05 11:54:37 simonpj Exp $
 
 Haskell grammar.
 
@@ -328,7 +328,11 @@ topdecls :: { [RdrBinding] }
 	| topdecl			{ [$1] }
 
 topdecl :: { RdrBinding }
-	: srcloc 'type' simpletype '=' sigtype	
+	: srcloc 'type' simpletype '=' ctype	
+		-- Note ctype, not sigtype.
+		-- We allow an explicit for-all but we don't insert one
+		-- in 	type Foo a = (b,b)
+		-- Instead we just say b is out of scope
 		{ RdrHsDecl (TyClD (TySynonym (fst $3) (snd $3) $5 $1)) }
 
 	| srcloc 'data' ctype '=' constrs deriving

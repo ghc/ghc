@@ -315,7 +315,7 @@ rnTyClDecl (TySynonym {tcdName = name, tcdTyVars = tyvars, tcdSynRhs = ty, tcdLo
 	-- Silently discard context... but the tyvars in the rest won't be in scope
 	-- In interface files all types are quantified, so this is a no-op
     unquantify glaExts (HsForAllTy Nothing ctxt ty) | glaExts = ty
-    unquantify glaExys ty			     	      = ty
+    unquantify glaExts ty			     	      = ty
 
 rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname, 
 		       tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs, 
