@@ -65,7 +65,7 @@
 #define LENENDPSEUDOCODE 16
 #endif
 
-typedef enum { START, BLANK, TEXT, DEFN, BEGIN, /*PSEUDO,*/ END, HASH } line;
+typedef enum { START, BLANK, TEXT, DEFN, BEGIN, /*PSEUDO,*/ END, HASH, SHEBANG } line;
 #define isWhitespace(c)  (c==' '  || c=='\t')
 #define isLineTerm(c)    (c=='\n' || c==EOF)
 
@@ -73,6 +73,7 @@ static int noisy  = 1;   /* 0 => keep quiet about errors, 1 => report errors */
 static int errors = 0;   /* count the number of errors reported              */
 static int crunchnl = 0; /* don't print \n for removed lines                 */
 static int leavecpp = 1; /* leave preprocessor lines */
+static int ignore_shebang = 1; /* Leave out shebang (#!) lines */
 
 /* complain(file,line,what)
  *
@@ -147,19 +148,32 @@ FILE *istream;
 
 line readline(istream,ostream)
 FILE *istream, *ostream; {
-    int c = egetc(istream);
+    int c, c1;
     char buf[100];
     int i;
 
+    c = egetc(istream);
+
     if (c==EOF)
         return END;
-
-    if (leavecpp && c=='#') {
+  
+    if ( c == '#' ) {
+      if ( ignore_shebang ) {
+         c1 = egetc(istream);
+         if ( c1 == '!' ) {
+           while (c=egetc(istream), !isLineTerm(c)) ;
+           return SHEBANG;
+	 }
+	 putc(c, ostream);
+	 c=c1;
+      }
+      if ( leavecpp ) {
 	putc(c, ostream);
         while (c=egetc(istream), !isLineTerm(c))
             putc(c,ostream);
         putc('\n',ostream);
         return HASH;
+      }
     }
 
     if (c==DEFNCHAR) {
@@ -268,6 +282,7 @@ FILE *ostream; {
  * Main program.  Processes command line arguments, looking for leading:
  *  -q  quiet mode - do not complain about bad literate script files
  *  -n  noisy mpde - complain about bad literate script files.
+ *  -r  remove cpp droppings in output.
  * Expects two additional arguments, a file name for the input and a file
  * name for the output file.  These two names must normally be distinct.
  * An exception is made for the special name "-" which can be used in either
@@ -287,6 +302,8 @@ char **argv; {
             noisy = 0;
         else if (strcmp(*argv,"-c")==0)
 	    crunchnl = 1;
+        else if (strcmp(*argv,"-#")==0)
+	    ignore_shebang = 0;
         else
             break;
 
