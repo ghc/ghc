@@ -795,7 +795,7 @@ checkAmbiguity forall_tyvars theta tau
 ambigErr pred
   = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprPred pred),
 	 nest 4 (ptext SLIT("At least one of the forall'd type variables mentioned by the constraint") $$
-		 ptext SLIT("must be reachable from the type after the =>"))]
+		 ptext SLIT("must be reachable from the type after the '=>'"))]
 
 
 freeErr pred
