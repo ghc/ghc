@@ -119,7 +119,7 @@ module Prelude (
     , stToIO , ioToST
     , unsafePerformIO
     , primReallyUnsafePtrEquality
-    ,hugsprimCompAux,PrimArray,primRunST,primNewArray,primWriteArray
+    ,hugsprimCompAux,PrimArray, primNewArray,primWriteArray
     ,primReadArray, primIndexArray, primSizeMutableArray
     ,primSizeArray
     ,primUnsafeFreezeArray,primIndexArray,primGetRawArgs,primGetEnv
@@ -1576,7 +1576,7 @@ hugsprimPmFail        = error "Pattern Match Failure"
 -- contains a version used in combined mode.  That version takes care of
 -- switching between the GHC and Hugs IO representations, which are different.
 hugsprimMkIO :: (RealWorld -> (a,RealWorld)) -> IO a
-hugsprimMkIO = ST
+hugsprimMkIO = IO
 
 hugsprimCreateAdjThunk :: (a -> b) -> String -> Char -> IO Addr
 hugsprimCreateAdjThunk fun typestr callconv
@@ -1637,7 +1637,7 @@ userError s = primRaise (ErrorCall s)
 
 catch :: IO a -> (IOError -> IO a) -> IO a
 catch m k 
-  = ST (\s -> unST m s `primCatch` \ err -> unST (k (e2ioe err)) s)
+  = IO (\s -> unIO m s `primCatch` \ err -> unIO (k (e2ioe err)) s)
     where
        e2ioe (IOExcept s) = IOError s
        e2ioe other        = IOError (show other)
@@ -1818,21 +1818,17 @@ primGetEnv v
 
 
 ------------------------------------------------------------------------------
--- ST, IO --------------------------------------------------------------------
+-- ST ------------------------------------------------------------------------
 ------------------------------------------------------------------------------
 
 newtype ST s a = ST (s -> (a,s))
-
-primRunST :: ST RealWorld a -> a
-primRunST m = fst (unST m theWorld)
-   where
-      theWorld :: RealWorld
-      theWorld = error "primRunST: entered the RealWorld"
+unST (ST a) = a
+data RealWorld
 
 runST :: (__forall s . ST s a) -> a
 runST m = fst (unST m alpha)
    where
-      alpha = error "primRunST: entered the RealWorld"
+      alpha = error "runST: entered the RealWorld"
 
 fixST :: (a -> ST s a) -> ST s a
 fixST m = ST (\ s -> 
@@ -1840,22 +1836,6 @@ fixST m = ST (\ s ->
 		   (r,s) = unST (m r) s
 		in
 		   (r,s))
-
-unST (ST a) = a
-
-data RealWorld
--- Should IO not be abstract? 
--- Is "instance (IO a)" allowed, for example ?
-type IO a = ST RealWorld a
-
-stToIO	      :: ST RealWorld a -> IO a
-stToIO = id
-
-ioToST	      :: IO a -> ST RealWorld a
-ioToST = id
-
-unsafePerformIO :: IO a -> a
-unsafePerformIO m = primRunST (ioToST m)
 
 instance Functor (ST s) where
    fmap f x  = x >>= (return . f)
@@ -1865,6 +1845,35 @@ instance Monad (ST s) where
    return x  = ST (\s -> (x,s))
    m >>= k   = ST (\s -> case unST m s of { (a,s') -> unST (k a) s' })
 
+unsafeInterleaveST :: ST s a -> ST s a
+unsafeInterleaveST m = ST (\ s -> (fst (unST m s), s))
+
+------------------------------------------------------------------------------
+-- IO ------------------------------------------------------------------------
+------------------------------------------------------------------------------
+
+newtype IO a = IO (RealWorld -> (a,RealWorld))
+unIO (IO a) = a
+
+stToIO	      :: ST RealWorld a -> IO a
+stToIO (ST fn) = IO fn
+
+ioToST	      :: IO a -> ST RealWorld a
+ioToST (IO fn) = ST fn
+
+unsafePerformIO :: IO a -> a
+unsafePerformIO m = fst (unIO m theWorld)
+   where
+      theWorld :: RealWorld
+      theWorld = error "unsafePerformIO: entered the RealWorld"
+
+instance Functor IO where
+   fmap f x  = x >>= (return . f)
+
+instance Monad IO where
+   m >> k    = IO (\s -> case unIO m s of { (a,s') -> unIO k s' })
+   return x  = IO (\s -> (x,s))
+   m >>= k   = IO (\s -> case unIO m s of { (a,s') -> unIO (k a) s' })
 
 -- Library IO has a global variable which accumulates Handles
 -- as they are opened.  We keep here a second global variable
@@ -1874,12 +1883,12 @@ instance Monad (ST s) where
 -- Doing it like this means the Prelude does not have to know
 -- anything about the grotty details of the Handle implementation.
 prelCleanupAfterRunAction :: IORef (Maybe (IO ()))
-prelCleanupAfterRunAction = primRunST (newIORef Nothing)
+prelCleanupAfterRunAction = unsafePerformIO (newIORef Nothing)
 
 -- used when Hugs invokes top level function
 hugsprimRunIO_toplevel :: IO a -> ()
 hugsprimRunIO_toplevel m
-   = protect 5 (fst (unST composite_action realWorld))
+   = protect 5 (fst (unIO composite_action realWorld))
      where
         composite_action
            = do writeIORef prelCleanupAfterRunAction Nothing
@@ -1895,20 +1904,16 @@ hugsprimRunIO_toplevel m
            = comp
         protect n comp
            = primCatch (protect (n-1) comp)
-                       (\e -> fst (unST (putStr (show e ++ "\n")) realWorld))
+                       (\e -> fst (unIO (putStr (show e ++ "\n")) realWorld))
 
 trace, trace_quiet :: String -> a -> a
 trace s x
    = trace_quiet ("trace: " ++ s) x
 trace_quiet s x
-   = (primRunST (putStr (s ++ "\n"))) `seq` x
-
-unsafeInterleaveST :: ST s a -> ST s a
-unsafeInterleaveST m = ST (\ s -> (fst (unST m s), s))
+   = (unsafePerformIO (putStr (s ++ "\n"))) `seq` x
 
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO = unsafeInterleaveST
-
+unsafeInterleaveIO m = IO (\ s -> (fst (unIO m s), s))
 
 ------------------------------------------------------------------------------
 -- Word, Addr, StablePtr, Prim*Array -----------------------------------------
@@ -1966,13 +1971,13 @@ readSTRef   = primReadRef
 writeSTRef :: STRef s a -> a -> ST s ()
 writeSTRef  = primWriteRef
 
-type IORef a = STRef RealWorld a
+newtype IORef a = IORef (STRef RealWorld a)
 newIORef   :: a -> IO (IORef a)
-newIORef    = primNewRef
+newIORef   a = stToIO (primNewRef a >>= \ ref ->return (IORef ref))
 readIORef  :: IORef a -> IO a
-readIORef   = primReadRef
+readIORef  (IORef ref) = stToIO (primReadRef ref)
 writeIORef :: IORef a -> a -> IO ()
-writeIORef  = primWriteRef
+writeIORef  (IORef ref) a = stToIO (primWriteRef ref a)
 
 
 ------------------------------------------------------------------------------
@@ -1989,7 +1994,7 @@ putMVar = primPutMVar
 
 takeMVar :: MVar a -> IO a
 takeMVar m
-   = ST (\world -> primTakeMVar m cont world)
+   = IO (\world -> primTakeMVar m cont world)
      where
         -- cont :: a -> RealWorld -> (a,RealWorld)
         -- where 'a' is as in the top-level signature
@@ -2048,12 +2053,12 @@ instance Ord ThreadId where
 forkIO :: IO a -> IO ThreadId
 -- Simple version; doesn't catch exceptions in computation
 -- forkIO computation 
---    = primForkIO (primRunST computation)
+--    = primForkIO (unsafePerformIO computation)
 
 forkIO computation
    = primForkIO (
         primCatch
-           (unST computation realWorld `primSeq` ())
+           (unIO computation realWorld `primSeq` ())
            (\e -> trace_quiet ("forkIO: uncaught exception: " ++ show e) ())
      )
      where
