@@ -507,10 +507,10 @@ simplLazyBind env top_lvl is_rec bndr bndr' rhs rhs_se
 		-- There's a subtlety here.  There may be a binding (x* = e) in the
 		-- floats, where the '*' means 'will be demanded'.  So is it safe
 		-- to float it out?  Answer no, but it won't matter because
-		-- we only float if arg' is a WHNF,
+		-- we only float if (a) arg' is a WHNF, or (b) it's going to top level
 		-- and so there can't be any 'will be demanded' bindings in the floats.
-		-- Hence the assert
-        WARN( any demanded_float (floatBinds floats), 
+		-- Hence the warning
+        WARN( not is_top_level && any demanded_float (floatBinds floats), 
 	      ppr (filter demanded_float (floatBinds floats)) )
 
 	tick LetFloatFromLet			`thenSmpl_` (
@@ -1047,11 +1047,14 @@ simplifyArg env fn_ty (val_arg, arg_se, is_strict) cont_ty thing_inside
   | is_strict 
   = simplStrictArg AnArg env val_arg arg_se arg_ty cont_ty thing_inside
 
-  | otherwise
-  = simplExprF (setInScope arg_se env) val_arg
-	       (mkStop arg_ty AnArg)		`thenSmpl` \ (floats, arg1) ->
-    addFloats env floats			$ \ env ->
-    thing_inside env arg1
+  | otherwise	-- Lazy argument
+		-- DO NOT float anything outside, hence simplExprC
+		-- There is no benefit (unlike in a let-binding), and we'd
+		-- have to be very careful about bogus strictness through 
+		-- floating a demanded let.
+  = simplExprC (setInScope arg_se env) val_arg
+	       (mkStop arg_ty AnArg)		`thenSmpl` \ arg1 ->
+   thing_inside env arg1
   where
     arg_ty = funArgTy fn_ty
 
