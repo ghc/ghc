@@ -1,6 +1,6 @@
 <!doctype linuxdoc system [
 	<!ENTITY intro      	SYSTEM "intro.sgml" >
-	<!ENTITY relnotes 	SYSTEM "4-03-notes.sgml" >
+	<!ENTITY relnotes 	SYSTEM "4-04-notes.sgml" >
 	<!ENTITY using      	SYSTEM "using.sgml" >
 	<!ENTITY runtime  	SYSTEM "runtime_control.sgml" >
 	<!ENTITY prof   	SYSTEM "profiling.sgml" >
