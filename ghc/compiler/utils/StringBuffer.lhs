@@ -77,7 +77,7 @@ import PackBase 	( unpackCStringBA )
 #else
 # if __GLASGOW_HASKELL__ <= 302
 import PrelIOBase	( IOError(..), IOErrorType(..) )
-import PrelHandle	( readHandle, writeHandle )
+import PrelHandle	( readHandle, writeHandle, filePtr )
 # endif
 import PrelPack		( unpackCStringBA )
 #endif
