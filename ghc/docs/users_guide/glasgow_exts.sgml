@@ -2157,6 +2157,8 @@ In particular, it is in scope at the type signature for <VarName>y</VarName>.
 </para>
 
 <para>
+ Pattern type signatures are completely orthogonal to ordinary, separate
+type signatures.  The two can be used independently or together.
 At ordinary type signatures, such as that for <VarName>ys</VarName>, any type variables
 mentioned in the type signature <emphasis>that are not in scope</emphasis> are
 implicitly universally quantified.  (If there are no type variables in
@@ -2179,6 +2181,47 @@ So much for the basic idea.  Here are the details.
 </para>
 
 <sect2>
+<title>What a pattern type signature means</title>
+<para>
+A type variable brought into scope by a pattern type signature is simply
+the name for a type.   The restriction they express is that all occurrences
+of the same name mean the same type.  For example:
+<programlisting>
+  f :: [Int] -> Int -> Int
+  f (xs::[a]) (y::a) = (head xs + y) :: a
+</programlisting>
+The pattern type signatures on the left hand side of
+<literal>f</literal> express the fact that <literal>xs</literal>
+must be a list of things of some type <literal>a</literal>; and that <literal>y</literal>
+must have this same type.  The type signature on the expression <literal>(head xs)</literal>
+specifies that this expression must have the same type <literal>a</literal>.
+<emphasis>There is no requirement that the type named by "<literal>a</literal>" is
+in fact a type variable.  Indeed, in this case, the type named by "<literal>a</literal>" is
+<literal>Int</literal>.  (This is a slight liberalisation from the original rather complex
+rules, which specified that a pattern-bound type variable should be universally quantified.)
+For example, all of these are legal:
+
+<programlisting>
+  t (x::a) (y::a) = x+y*2
+
+  f (x::a) (y::b) = [x,y]       -- a unifies with b
+
+  g (x::a) = x + 1::Int         -- a unifies with Int
+
+  h x = let k (y::a) = [x,y]    -- a is free in the
+        in k x                  -- environment
+
+  k (x::a) True    = ...        -- a unifies with Int
+  k (x::Int) False = ...
+
+  w :: [b] -> [b]
+  w (x::a) = x                  -- a unifies with [b]
+</programlisting>
+
+</para>
+</sect2>
+
+<sect2>
 <title>Scope and implicit quantification</title>
 
 <para>
@@ -2187,10 +2230,10 @@ So much for the basic idea.  Here are the details.
 <listitem>
 
 <para>
- All the type variables mentioned in the patterns for a single
-function definition equation, that are not already in scope,
-are brought into scope by the patterns.  We describe this set as
-the <emphasis>type variables bound by the equation</emphasis>.
+ All the type variables mentioned in a pattern,
+that are not already in scope,
+are brought into scope by the pattern.  We describe this set as
+the <emphasis>type variables bound by the pattern</emphasis>.
 
 </para>
 </listitem>
@@ -2211,6 +2254,7 @@ signature that is in scope is <emphasis>not</emphasis> universally quantified.
 
 </para>
 </listitem>
+
 <listitem>
 
 <para>
@@ -2269,103 +2313,6 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 </sect2>
 
 <sect2>
-<title>Polymorphism</title>
-
-<para>
-
-<itemizedlist>
-<listitem>
-
-<para>
- Pattern type signatures are completely orthogonal to ordinary, separate
-type signatures.  The two can be used independently or together.  There is
-no scoping associated with the names of the type variables in a separate type signature.
-
-
-<programlisting>
-   f :: [a] -> [a]
-   f (xs::[b]) = reverse xs
-</programlisting>
-
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- The function must be polymorphic in the type variables
-bound by all its equations.  Operationally, the type variables bound
-by one equation must not:
-
-
-<itemizedlist>
-<listitem>
-
-<para>
- Be unified with a type (such as <literal>Int</literal>, or <literal>[a]</literal>).
-</para>
-</listitem>
-<listitem>
-
-<para>
- Be unified with a type variable free in the environment.
-</para>
-</listitem>
-<listitem>
-
-<para>
- Be unified with each other.  (They may unify with the type variables
-bound by another equation for the same function, of course.)
-</para>
-</listitem>
-
-</itemizedlist>
-
-
-For example, the following all fail to type check:
-
-
-<programlisting>
-  f (x::a) (y::b) = [x,y]       -- a unifies with b
-
-  g (x::a) = x + 1::Int         -- a unifies with Int
-
-  h x = let k (y::a) = [x,y]    -- a is free in the
-        in k x                  -- environment
-
-  k (x::a) True    = ...        -- a unifies with Int
-  k (x::Int) False = ...
-
-  w :: [b] -> [b]
-  w (x::a) = x                  -- a unifies with [b]
-</programlisting>
-
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- The pattern-bound type variable may, however, be constrained
-by the context of the principal type, thus:
-
-
-<programlisting>
-  f (x::a) (y::a) = x+y*2
-</programlisting>
-
-
-gets the inferred type: <literal>forall a. Num a =&gt; a -&gt; a -&gt; a</literal>.
-</para>
-</listitem>
-
-</itemizedlist>
-
-</para>
-
-</sect2>
-
-<sect2>
 <title>Result type signatures</title>
 
 <para>
@@ -2409,13 +2356,13 @@ Result type signatures are not yet implemented in Hugs.
 </sect2>
 
 <sect2>
-<title>Pattern signatures on other constructs</title>
+<title>Where a pattern type signature can occur</title>
 
-<para>
-
+A pattern type signature can occur in any pattern, but there
+are restrictions on pattern bindings:
 <itemizedlist>
-<listitem>
 
+<listitem>
 <para>
  A pattern type signature can be on an arbitrary sub-pattern, not
 just on a variable:
@@ -2434,28 +2381,9 @@ just on a variable:
  Pattern type signatures, including the result part, can be used
 in lambda abstractions:
 
-
 <programlisting>
   (\ (x::a, y) :: a -> x)
 </programlisting>
-
-
-Type variables bound by these patterns must be polymorphic in
-the sense defined above.
-For example:
-
-
-<programlisting>
-  f1 (x::c) = f1 x      -- ok
-  f2 = \(x::c) -> f2 x  -- not ok
-</programlisting>
-
-
-Here, <function>f1</function> is OK, but <function>f2</function> is not, because <VarName>c</VarName> gets unified
-with a type variable free in the environment, in this
-case, the type of <function>f2</function>, which is in the environment when
-the lambda abstraction is checked.
-
 </para>
 </listitem>
 <listitem>
@@ -2468,28 +2396,6 @@ in <literal>case</literal> expressions:
 <programlisting>
   case e of { (x::a, y) :: a -> x }
 </programlisting>
-
-
-The pattern-bound type variables must, as usual,
-be polymorphic in the following sense: each case alternative,
-considered as a lambda abstraction, must be polymorphic.
-Thus this is OK:
-
-
-<programlisting>
-  case (True,False) of { (x::a, y) -> x }
-</programlisting>
-
-
-Even though the context is that of a pair of booleans,
-the alternative itself is polymorphic.  Of course, it is
-also OK to say:
-
-
-<programlisting>
-  case (True,False) of { (x::Bool, y) -> x }
-</programlisting>
-
 
 </para>
 </listitem>
@@ -2509,10 +2415,32 @@ consider how one would parse this:
 
 </para>
 </listitem>
+
 <listitem>
 
 <para>
- Pattern type signatures that bind new type variables
+ Pattern type signatures can bind existential type variables.
+For example:
+
+
+<programlisting>
+  data T = forall a. MkT [a]
+
+  f :: T -> T
+  f (MkT [t::a]) = MkT t3
+                 where
+                   t3::[a] = [t,t,t]
+</programlisting>
+
+
+</para>
+</listitem>
+
+
+<listitem>
+
+<para>
+Pattern type signatures that bind new type variables
 may not be used in pattern bindings at all.
 So this is illegal:
 
@@ -2566,37 +2494,6 @@ would get a monomorphic type.
 
 </sect2>
 
-<sect2>
-<title>Existentials</title>
-
-<para>
-
-<itemizedlist>
-<listitem>
-
-<para>
- Pattern type signatures can bind existential type variables.
-For example:
-
-
-<programlisting>
-  data T = forall a. MkT [a]
-
-  f :: T -> T
-  f (MkT [t::a]) = MkT t3
-                 where
-                   t3::[a] = [t,t,t]
-</programlisting>
-
-
-</para>
-</listitem>
-
-</itemizedlist>
-
-</para>
-
-</sect2>
 
 </sect1>
 
