@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.104 2002/06/25 08:32:19 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.105 2002/07/15 16:43:34 panne Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -1177,7 +1177,7 @@ dnl    AC_ARG_ENABLE(Mesa, $with_Mesa_help_string, use_Mesa=$enableval, use_Mesa
   AC_LANG_C
 
 dnl If we are running under X11 then add in the appropriate libraries.
-  if ! test x"$no_x" = xyes; then
+  if test x"$no_x" != xyes; then
 dnl Add everything we need to compile and link X programs to GL_CFLAGS
 dnl and GL_X_LIBS.
     GL_CFLAGS="$X_CFLAGS"
@@ -1189,10 +1189,10 @@ dnl and GL_X_LIBS.
   GL_save_LIBS="$LIBS"
   LIBS="$GL_X_LIBS"
 
-  FPTOOLS_SEARCH_LIBS([#include <GL/gl.h>],   glEnd,           $GL_search_list,  have_GL=yes,   have_GL=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>],  gluNewQuadric,   $GLU_search_list, have_GLU=yes,  have_GLU=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXChooseVisual, $GLX_search_list, have_GLX=yes,  have_GLX=no)
-  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,    glut glut32,      have_glut=yes, have_glut=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/gl.h>],   glEnd,         $GL_search_list,  have_GL=yes,   have_GL=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glu.h>],  gluNewQuadric, $GLU_search_list, have_GLU=yes,  have_GLU=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glx.h>],  glXWaitX,      $GLX_search_list, have_GLX=yes,  have_GLX=no)
+  FPTOOLS_SEARCH_LIBS([#include <GL/glut.h>], glutMainLoop,  glut glut32,      have_glut=yes, have_glut=no)
 
   if test -n "$LIBS"; then
     GL_LIBS="$LIBS"
