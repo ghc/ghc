@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.4 1999/03/01 09:23:58 sof Exp $
+ * $Id: inputReady.c,v 1.5 1999/09/12 16:24:46 sof Exp $
  *
  * hReady Runtime Support
  */
@@ -71,7 +71,7 @@ StgInt msecs;
     }
 
 #ifdef mingw32_TARGET_OS
-    return 0;
+    return 1;
 #else
     fd = fo->fd;
 
