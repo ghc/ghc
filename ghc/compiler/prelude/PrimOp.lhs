@@ -1967,36 +1967,56 @@ primOpOutOfLine op
 	_           		-> False
 \end{code}
 
+
+primOpOkForSpeculation
+~~~~~~~~~~~~~~~~~~~~~~
 Sometimes we may choose to execute a PrimOp even though it isn't
 certain that its result will be required; ie execute them
 ``speculatively''.  The same thing as ``cheap eagerness.'' Usually
 this is OK, because PrimOps are usually cheap, but it isn't OK for
 (a)~expensive PrimOps and (b)~PrimOps which can fail.
 
+PrimOps that have side effects also should not be executed speculatively.
+
+Ok-for-speculation also means that it's ok *not* to execute the
+primop. For example
+	case op a b of
+	  r -> 3
+Here the result is not used, so we can discard the primop.  Anything
+that has side effects mustn't be dicarded in this way, of course!
+
 See also @primOpIsCheap@ (below).
 
-PrimOps that have side effects also should not be executed speculatively
-or by data dependencies.
 
 \begin{code}
 primOpOkForSpeculation :: PrimOp -> Bool
+	-- See comments with CoreUtils.exprOkForSpeculation
 primOpOkForSpeculation op 
   = not (primOpCanFail op || primOpHasSideEffects op || primOpOutOfLine op)
 \end{code}
 
+
+primOpIsCheap
+~~~~~~~~~~~~~
 @primOpIsCheap@, as used in \tr{SimplUtils.lhs}.  For now (HACK
 WARNING), we just borrow some other predicates for a
 what-should-be-good-enough test.  "Cheap" means willing to call it more
 than once.  Evaluation order is unaffected.
 
 \begin{code}
+primOpIsCheap :: PrimOp -> Bool
+	-- See comments with CoreUtils.exprOkForSpeculation
 primOpIsCheap op = not (primOpHasSideEffects op || primOpOutOfLine op)
 \end{code}
 
+primOpIsDupable
+~~~~~~~~~~~~~~~
 primOpIsDupable means that the use of the primop is small enough to
 duplicate into different case branches.  See CoreUtils.exprIsDupable.
 
 \begin{code}
+primOpIsDupable :: PrimOp -> Bool
+	-- See comments with CoreUtils.exprIsDupable
 primOpIsDupable (CCallOp _ _ might_gc _) = not might_gc
 	-- If the ccall can't GC then the call is pretty cheap, and
 	-- we're happy to duplicate
@@ -2035,11 +2055,6 @@ duplicated.
 \begin{code}
 primOpHasSideEffects :: PrimOp -> Bool
 
-primOpHasSideEffects TakeMVarOp        = True
-primOpHasSideEffects DelayOp           = True
-primOpHasSideEffects WaitReadOp        = True
-primOpHasSideEffects WaitWriteOp       = True
-
 primOpHasSideEffects ParOp	       = True
 primOpHasSideEffects ForkOp	       = True
 primOpHasSideEffects KillThreadOp      = True
@@ -2055,6 +2070,27 @@ primOpHasSideEffects MakeStablePtrOp   = True
 primOpHasSideEffects MakeStableNameOp  = True
 primOpHasSideEffects EqStablePtrOp     = True  -- SOF
 primOpHasSideEffects DeRefStablePtrOp  = True  -- ??? JSM & ADR
+
+-- In general, writes are considered a side effect, but 
+--	reads and variable allocations are not
+-- Why?  Because writes must not be omitted, but reads can be if their result is not used.
+-- (Sequencing of reads is maintained by data dependencies on the resulting
+-- world state.)
+primOpHasSideEffects WriteArrayOp	   = True
+primOpHasSideEffects (WriteByteArrayOp _)  = True
+primOpHasSideEffects (WriteOffAddrOp _)	   = True
+primOpHasSideEffects WriteMutVarOp	   = True
+
+primOpHasSideEffects UnsafeFreezeArrayOp	= True
+primOpHasSideEffects UnsafeFreezeByteArrayOp	= True
+primOpHasSideEffects UnsafeThawArrayOp		= True
+primOpHasSideEffects UnsafeThawByteArrayOp	= True
+
+primOpHasSideEffects TakeMVarOp        = True
+primOpHasSideEffects PutMVarOp         = True
+primOpHasSideEffects DelayOp           = True
+primOpHasSideEffects WaitReadOp        = True
+primOpHasSideEffects WaitWriteOp       = True
 
 primOpHasSideEffects ParGlobalOp	= True
 primOpHasSideEffects ParLocalOp		= True
