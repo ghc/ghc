@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.23 $
- * $Date: 2000/03/20 04:26:24 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/22 18:17:12 $
  * ------------------------------------------------------------------------*/
 
 
@@ -55,11 +55,6 @@
  * User interface options
  * ------------------------------------------------------------------------*/
 
-/* Define if you want to use the "Hugs for Windows" GUI.
- * (Windows 3.1 and compatibles only)
- */
-#define HUGS_FOR_WINDOWS 0
-
 /* Define if you want filenames to be converted to normal form by:
  * o replacing relative pathnames with absolute pathnames and
  *   eliminating .. and . where possible.
@@ -70,12 +65,6 @@
 /* Define if you want the small startup banner.
  */
 #define SMALL_BANNER 0
-
-/* Define if you want to be able to redirect stdout/stderr to a buffer.
- * Only necessary for the Hugs server interface (which is used in the
- * Netscape plugin and the standalone evaluator "runhugs"). 
- */
-#define REDIRECT_OUTPUT (!HUGS_FOR_WINDOWS)
 
 
 /* --------------------------------------------------------------------------
@@ -97,9 +86,7 @@
  * Various table sizes
  * ------------------------------------------------------------------------*/
 
-#define NUM_SYNTAX         100
 #define NUM_TUPLES         37
-#define NUM_OFFSETS        1024
 #define NUM_CHARS          256
 #if TREX
 #define NUM_EXT            100
@@ -108,15 +95,9 @@
 
 #define MINIMUMHEAP        19000
 #define MAXIMUMHEAP        0
-#define DEFAULTHEAP        350000
+#define DEFAULTHEAP        1000000 /*350000*/
 
-#define NUM_SCRIPTS        100
-#define NUM_MODULE         NUM_SCRIPTS
-#define NUM_TYCON          400
-#define NUM_NAME           16000
-#define NUM_CLASSES        80
-#define NUM_INSTS          600
-#define NUM_TEXT           100000
+#define TEXT_SIZE          100000
 #define NUM_TEXTH          10
 #define NUM_TYVARS         4000
 #define NUM_STACK          16000
@@ -130,20 +111,6 @@
 #define bitsPerWord        32
 #define wordShift          5
 #define wordMask           31
-
-/* Define to force a fixed size (NUM_TYVARS) for the current substitution.
- * Setting this flag places a limit on the maximum complexity of
- * expressions handled by the typechecker.  It is normally turned off
- * but may be required for small machines/configurations.
- */
-#define FIXED_SUBST 0 
-
-/* Define this to allocate tables dynamically.
- * This is currently just a memory saving trick, but this may be
- * extended at a later stage to allow at least some of the tables
- * to be extended dynamically at run-time to avoid exhausted space errors.
- */
-#define DYN_TABLES 0
 
 /* Should quantifiers be displayed in error messages.
  * Warning: not consistently used.
