@@ -466,7 +466,8 @@ okToUnfoldInHiFile e = opt_UnfoldCasms || go e
     go (App fun arg)          = go fun && go arg
     go (Lam _ body)           = go body
     go (Let binds body)       = and (map go (body :rhssOfBind binds))
-    go (Case scrut bndr alts) = and (map go (scrut:rhssOfAlts alts))
+    go (Case scrut bndr alts) = and (map go (scrut:rhssOfAlts alts)) &&
+				not (any isLitLitLit [ lit | (LitAlt lit, _, _) <- alts ])
     go (Note _ body)          = go body
     go (Type _)		      = True
 
