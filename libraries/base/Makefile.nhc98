@@ -21,8 +21,8 @@ SRCS	= \
 	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
 	Foreign/ForeignPtr.hs Foreign/C/Types.hs Foreign/C/TypesISO.hs \
 	Foreign/Marshal/Alloc.hs Foreign/Marshal/Array.hs \
-	Foreign/Marshal/Utils.hs Foreign/Marshal/Error.hs \
-	Foreign/C/String.hs Foreign/C/Error.hs Foreign/C.hs \
+	Foreign/Marshal/Utils.hs Foreign/Marshal/Error.hs Foreign/Marshal.hs \
+	Foreign/C/String.hs Foreign/C/Error.hs Foreign/C.hs Foreign.hs \
 	Text/ParserCombinators/Parsec/Char.hs \
 	Text/ParserCombinators/Parsec/Combinator.hs \
 	Text/ParserCombinators/Parsec/Error.hs \
