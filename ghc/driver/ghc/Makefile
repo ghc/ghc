@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2001/03/26 22:42:42 qrczak Exp $
+# $Id: Makefile,v 1.3 2001/06/23 12:54:18 panne Exp $
 #
 
 TOP=../..
@@ -9,10 +9,10 @@ include $(TOP)/mk/boilerplate.mk
 # ghc script
 
 ifeq "$(BIN_DIST)"   "1"
-GHCBIN=$$\"\"libdir/ghc-$(ProjectVersion)
+GHCBIN=$$\"\"libexecdir/ghc-$(ProjectVersion)
 GHCLIB=$$\"\"libdir
 else
-GHCBIN=$(libdir)/ghc-$(ProjectVersion)
+GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)
 GHCLIB=$(libdir)
 endif # BIN_DIST
 

@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.7 2001/03/27 13:38:03 simonmar Exp $
+# $Id: Makefile,v 1.8 2001/06/23 12:54:18 panne Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -21,10 +21,10 @@ INSTALL_LIBEXECS = $(HS_PROG)
 
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
-GHCPKGBIN=$$\"\"libdir/$(HS_PROG)
+GHCPKGBIN=$$\"\"libexecdir/$(HS_PROG)
 PKGCONF=$$\"\"libdir/package.conf
 else
-GHCPKGBIN=$(libdir)/$(HS_PROG)
+GHCPKGBIN=$(libexecdir)/$(HS_PROG)
 PKGCONF=$(libdir)/package.conf
 endif # BIN_DIST
 else
