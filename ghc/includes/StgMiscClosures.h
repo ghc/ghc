@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.29 2000/12/19 16:48:58 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.30 2000/12/20 14:47:22 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,6 +70,12 @@ STGFUN(stg_interp_constr8_entry);
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_R1_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_F1_info;
 extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_D1_info;
+
+/* Used by the interpreter to return an unboxed value on the stack to
+   compiled code. */
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_info;
+extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_info;
 #endif
 
 #if defined(PAR) || defined(GRAN)

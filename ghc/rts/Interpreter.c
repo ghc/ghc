@@ -1,69 +1,43 @@
 
-
-#if 0
 /* -----------------------------------------------------------------------------
  * Bytecode evaluator
  *
  * Copyright (c) 1994-2000.
  *
  * $RCSfile: Interpreter.c,v $
- * $Revision: 1.4 $
- * $Date: 2000/12/19 16:48:35 $
+ * $Revision: 1.5 $
+ * $Date: 2000/12/20 14:47:22 $
  * ---------------------------------------------------------------------------*/
 
+#ifdef GHCI
+
 #include "Rts.h"
-
-
-
-#include "RtsFlags.h"
+#include "RtsAPI.h"
 #include "RtsUtils.h"
-#include "Updates.h"
+#include "Closures.h"
+#include "TSO.h"
+#include "Schedule.h"
+#include "RtsFlags.h"
 #include "Storage.h"
-#include "SchedAPI.h" /* for createGenThread */
-#include "Schedule.h" /* for context_switch  */
-#include "Bytecodes.h"
-#include "ForeignCall.h"
-#include "PrimOps.h"   /* for __{encode,decode}{Float,Double} */
-#include "Prelude.h"
-#include "Itimer.h"
-#include "Evaluator.h"
-#include "sainteger.h"
+#include "Updates.h"
 
-#ifdef DEBUG
+#include "Bytecodes.h"
 #include "Printer.h"
 #include "Disassembler.h"
-#include "Sanity.h"
-#include "StgRun.h"
-#endif
+#include "Interpreter.h"
 
-#include <math.h>    /* These are for primops */
-#include <limits.h>  /* These are for primops */
-#include <float.h>   /* These are for primops */
-#ifdef HAVE_IEEE754_H
-#include <ieee754.h> /* These are for primops */
-#endif
 
-#endif /* 0 */
-
-#include <stdio.h>
-
-int /*StgThreadReturnCode*/ interpretBCO ( void* /* Capability* */ cap )
-{
-   fprintf(stderr, "Greetings, earthlings.  I am not yet implemented.  Bye!\n");
-   exit(1);
-}
-
-#if 0
 /* --------------------------------------------------------------------------
  * The new bytecode interpreter
  * ------------------------------------------------------------------------*/
 
 /* Sp points to the lowest live word on the stack. */
 
-#define StackWord(n)  ((W_*)iSp)[n]
-#define BCO_NEXT      bco_instrs[bciPtr++]
-#define BCO_PTR(n)    bco_ptrs[n]
-
+#define StackWord(n)  iSp[n]
+#define BCO_NEXT      instrs[bciPtr++]
+#define BCO_PTR(n)    (W_)ptrs[n]
+#define BCO_LIT(n)    (W_)literals[n]
+#define BCO_ITBL(n)   itbls[n]
 
 StgThreadReturnCode interpretBCO ( Capability* cap )
 {
@@ -73,7 +47,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
    /* Use of register here is primarily to make it clear to compilers
       that these entities are non-aliasable.
    */
-    register StgPtr           iSp;    /* local state -- stack pointer */
+    register W_*              iSp;    /* local state -- stack pointer */
     register StgUpdateFrame*  iSu;    /* local state -- frame pointer */
     register StgPtr           iSpLim; /* local state -- stack lim pointer */
     register StgClosure*      obj;
@@ -83,11 +57,10 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
     iSpLim = cap->rCurrentTSO->stack + RESERVED_STACK_WORDS;
 
     IF_DEBUG(evaluator,
-             enterCountI++;
              fprintf(stderr, 
              "\n---------------------------------------------------------------\n");
-             fprintf(stderr,"Entering: ",); printObj(obj);
-             fprintf(stderr,"xSp = %p\txSu = %p\n", xSp, xSu);
+             fprintf(stderr,"Entering: "); printObj((StgClosure*)StackWord(0));
+             fprintf(stderr,"iSp = %p\tiSu = %p\n", iSp, iSu);
              fprintf(stderr, "\n" );
              printStack(iSp,cap->rCurrentTSO->stack+cap->rCurrentTSO->stack_size,iSu);
              fprintf(stderr, "\n\n");
@@ -97,45 +70,70 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
        stack. */
     nextEnter:
 
-    obj = StackWord(0); iSp++;
+    obj = (StgClosure*)StackWord(0); iSp++;
 
     switch ( get_itbl(obj)->type ) {
        case INVALID_OBJECT:
-               barf("Invalid object %p",obj);
+               barf("Invalid object %p",(StgPtr)obj);
 
-       case BCO: bco_entry:
+       case BCO:
 
        /* ---------------------------------------------------- */
        /* Start of the bytecode interpreter                    */
        /* ---------------------------------------------------- */
        {
-          register StgWord8* bciPtr; /* instruction pointer */
-          register StgBCO*   bco = (StgBCO*)obj;
+          register int       bciPtr     = 1; /* instruction pointer */
+          register StgBCO*   bco        = (StgBCO*)obj;
+          register UShort*   instrs     = (UShort*)(&bco->instrs->payload[0]);
+          register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
+          register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
+          register StgInfoTable** itbls = (StgInfoTable**)
+                                             (&bco->itbls->payload[0]);
+
           if (doYouWantToGC()) {
-	     iSp--; StackWord(0) = bco;
+	     iSp--; StackWord(0) = (W_)bco;
              return HeapOverflow;
           }
 
           nextInsn:
 
-          ASSERT((StgWord)(PC) < bco->n_instrs);
+          ASSERT(bciPtr <= instrs[0]);
           IF_DEBUG(evaluator,
-          fprintf(stderr,"Sp = %p\tSu = %p\tpc = %d\t", xSp, xSu, PC);
-                  disInstr(bco,PC);
+          fprintf(stderr,"iSp = %p\tiSu = %p\tpc = %d\t", iSp, iSu, bciPtr);
+                  disInstr(bco,bciPtr);
                   if (0) { int i;
                            fprintf(stderr,"\n");
                            for (i = 8; i >= 0; i--) 
-                              fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(gSp+i)));
+                              fprintf(stderr, "%d  %p\n", i, (StgPtr)(*(iSp+i)));
                          }
                   fprintf(stderr,"\n");
                  );
 
           switch (BCO_NEXT) {
 
+              case bci_ARGCHECK: {
+                 int i;
+                 StgPAP* pap;
+                 int arg_words_reqd = BCO_NEXT;
+                 int arg_words_avail = ((W_*)iSu) - ((W_*)iSp);
+                 if (arg_words_avail >= arg_words_reqd) goto nextInsn;
+                 /* Handle arg check failure.  Copy the spare args
+                    into a PAP frame. */
+                 pap = (StgPAP*)allocate(PAP_sizeW(arg_words_avail));
+                 SET_HDR(pap,&stg_PAP_info,CC_pap);
+                 pap->n_args = arg_words_avail;
+                 for (i = 0; i < arg_words_avail; i++)
+                    pap->payload[i] = (StgClosure*)StackWord(i);
+                 /* Push on the stack and defer to the scheduler. */
+                 iSp = (StgPtr)iSu;
+                 iSp --;
+                 StackWord(0) = (W_)pap;
+                 return ThreadEnterGHC;
+              }
               case bci_PUSH_L: {
                  int o1 = BCO_NEXT;
                  StackWord(-1) = StackWord(o1);
-                 Sp--;
+                 iSp--;
                  goto nextInsn;
               }
               case bci_PUSH_LL: {
@@ -143,7 +141,7 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int o2 = BCO_NEXT;
                  StackWord(-1) = StackWord(o1);
                  StackWord(-2) = StackWord(o2);
-                 Sp -= 2;
+                 iSp -= 2;
                  goto nextInsn;
               }
               case bci_PUSH_LLL: {
@@ -153,13 +151,13 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  StackWord(-1) = StackWord(o1);
                  StackWord(-2) = StackWord(o2);
                  StackWord(-3) = StackWord(o3);
-                 Sp -= 3;
+                 iSp -= 3;
                  goto nextInsn;
               }
               case bci_PUSH_G: {
                  int o1 = BCO_NEXT;
                  StackWord(-1) = BCO_PTR(o1);
-                 Sp -= 3;
+                 iSp -= 1;
                  goto nextInsn;
               }
               case bci_PUSH_AS: {
@@ -167,98 +165,166 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
                  int o_itbl = BCO_NEXT;
                  StackWord(-1) = BCO_LIT(o_itbl);
                  StackWord(-2) = BCO_PTR(o_bco);
-                 Sp -= 2;
+                 iSp -= 2;
+                 goto nextInsn;
+              }
+              case bci_PUSH_UBX: {
+                 int o_lits = BCO_NEXT;
+                 int n_words = BCO_NEXT;
+                 for (; n_words > 0; n_words--) {
+                    iSp --;
+                    StackWord(0) = BCO_LIT(o_lits);
+                    o_lits++;
+                 }
                  goto nextInsn;
               }
               case bci_PUSH_TAG: {
                  W_ tag = (W_)(BCO_NEXT);
                  StackWord(-1) = tag;
-                 Sp --;
-                 goto nextInsn;
-              }
-              case bci_PUSH_LIT:{
-                 int o = BCO_NEXT;
-                 StackWord(-1) = BCO_LIT(o);
-                 Sp --;
+                 iSp --;
                  goto nextInsn;
               }
               case bci_SLIDE: {
                  int n  = BCO_NEXT;
                  int by = BCO_NEXT;
-                 ASSERT(Sp+n+by <= (StgPtr)xSu);
+                 ASSERT(iSp+n+by <= (W_*)iSu);
                  /* a_1, .. a_n, b_1, .. b_by, s => a_1, .. a_n, s */
                  while(--n >= 0) {
                     StackWord(n+by) = StackWord(n);
                  }
-                 Sp += by;
+                 iSp += by;
                  goto nextInsn;
               }
               case bci_ALLOC: {
                  int n_payload = BCO_NEXT;
                  P_ p = allocate(AP_sizeW(n_payload));
-                 StackWord(-1) = p;
-                 Sp --;
+                 StackWord(-1) = (W_)p;
+                 iSp --;
                  goto nextInsn;
               }
-              case bci_MKAP:        {
-                 int off = BCO_NEXT;
+              case bci_MKAP: {
+                 int i;
+                 int stkoff = BCO_NEXT;
                  int n_payload = BCO_NEXT - 1;
-                 StgAP_UPD* ap = StackWord(off);
+                 StgAP_UPD* ap = (StgAP_UPD*)StackWord(stkoff);
                  ap->n_args = n_payload;
                  ap->fun = (StgClosure*)StackWord(0);
                  for (i = 0; i < n_payload; i++)
-                    ap->payload[i] = StackWord(i+1);
-                 Sp += n_payload+1;
+                    ap->payload[i] = (StgClosure*)StackWord(i+1);
+                 iSp += n_payload+1;
                  goto nextInsn;
               }
               case bci_UNPACK: {
                  /* Unpack N ptr words from t.o.s constructor */
                  /* The common case ! */
+                 int i;
                  int n_words = BCO_NEXT;
-                 StgClosure* con = StackWord(0);
-                 Sp -= n_words;
+                 StgClosure* con = (StgClosure*)StackWord(0);
+                 iSp -= n_words;
                  for (i = 0; i < n_words; i++)
-                    StackWord(i) = con->payload[i];
+                    StackWord(i) = (W_)con->payload[i];
                  goto nextInsn;
               }
-              case bci_UNPACK_BX: {
+              case bci_UPK_TAG: {
                  /* Unpack N (non-ptr) words from offset M in the
                     constructor K words down the stack, and then push
                     N as a tag, on top of it.  Slow but general; we
                     hope it will be the rare case. */
+                 int i;                
                  int n_words = BCO_NEXT;
                  int con_off = BCO_NEXT;
                  int stk_off = BCO_NEXT;
-                 StgClosure* con = StackWord(stk_off);
-                 Sp -= n_words;
+                 StgClosure* con = (StgClosure*)StackWord(stk_off);
+                 iSp -= n_words;
                  for (i = 0; i < n_words; i++) 
-                    StackWord(i) = con->payload[con_off + i];
-                 Sp --;
+                    StackWord(i) = (W_)con->payload[con_off + i];
+                 iSp --;
                  StackWord(0) = n_words;
                  goto nextInsn;
               }
-              case bci_PACK:
+              case bci_PACK: {
+                 int i;
+                 int o_itbl         = BCO_NEXT;
+                 int n_words        = BCO_NEXT;
+                 StgInfoTable* itbl = BCO_ITBL(o_itbl);
+                 /* A bit of a kludge since n_words = n_p + n_np */
+                 int request        = CONSTR_sizeW( n_words, 0 );
+                 StgClosure* con = (StgClosure*)allocate(request);
+                 SET_HDR(con, itbl, ??);
+                 for (i = 0; i < n_words; i++)
+                    con->payload[i] = (StgClosure*)StackWord(i);
+                 iSp += n_words;
+                 iSp --;
+                 StackWord(0) = (W_)con;
+                 goto nextInsn;
+              }
+              case bci_TESTLT_P: {
+                 int discr  = BCO_NEXT;
+                 int failto = BCO_NEXT;
+                 StgClosure* con = (StgClosure*)StackWord(0);
+                 if (constrTag(con) < discr)
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
+              case bci_TESTEQ_P: {
+                 int discr  = BCO_NEXT;
+                 int failto = BCO_NEXT;
+                 StgClosure* con = (StgClosure*)StackWord(0);
+                 if (constrTag(con) != discr)
+                    bciPtr = failto;
+                 goto nextInsn;
+              }
+
+              /* Control-flow ish things */
+              case bci_ENTER: {
+                 goto nextEnter;
+              }
+              case bci_RETURN: {
+                 /* Figure out whether returning to interpreted or
+                    compiled code. */
+                 int           o_itoc_itbl = BCO_NEXT;
+                 int           tag         = StackWord(0);
+                 StgInfoTable* ret_itbl    = (StgInfoTable*)StackWord(tag+1 +1);
+                 ASSERT(tag <= 2); /* say ... */
+                 if (ret_itbl == (StgInfoTable*)&stg_ctoi_ret_R1_info
+                     /* || ret_itbl == stg_ctoi_ret_F1_info
+                        || ret_itbl == stg_ctoi_ret_D1_info */) {
+                     /* Returning to interpreted code.  Interpret the BCO 
+                        immediately underneath the itbl. */
+                     StgBCO* ret_bco = (StgBCO*)StackWord(tag+1 +1+1);
+                     iSp --;
+                     StackWord(0) = (W_)ret_bco;
+                     goto nextEnter;
+                 } else {
+                     /* Returning (unboxed value) to compiled code.
+                        Replace tag with a suitable itbl and ask the
+                        scheduler to run it.  The itbl code will copy
+                        the TOS value into R1/F1/D1 and do a standard
+                        compiled-code return. */
+                     StgInfoTable* magic_itbl = BCO_ITBL(o_itoc_itbl);
+                     StackWord(0) = (W_)magic_itbl;
+                     return ThreadRunGHC;
+                 }
+              }
+        
+              case bci_CASEFAIL:
+                 barf("interpretBCO: hit a CASEFAIL");
+
+              /* As yet unimplemented */
               case bci_TESTLT_I:
               case bci_TESTEQ_I:
               case bci_TESTLT_F:
               case bci_TESTEQ_F:
               case bci_TESTLT_D:
               case bci_TESTEQ_D:
-              case bci_TESTLT_P:
-              case bci_TESTEQ_P:
-              case bci_CASEFAIL:
-   
-              /* Control-flow ish things */
-              case bci_ARGCHECK:
-              case bci_ENTER:
-              case bci_RETURN:
-        
+
               /* Errors */
-              case bci_LABEL:
-              default: barf
+              default: 
+                 barf("interpretBCO: unknown or unimplemented opcode");
 
           } /* switch on opcode */
-	  goto nextEnter;
+
+	  barf("interpretBCO: fell off end of insn loop");
 
        }
        /* ---------------------------------------------------- */
@@ -270,13 +336,12 @@ StgThreadReturnCode interpretBCO ( Capability* cap )
           fprintf(stderr, "entering unknown closure -- yielding to sched\n"); 
           printObj(obj);
           cap->rCurrentTSO->what_next = ThreadEnterGHC;
-          iSp--; StackWord(0) = obj;
+          iSp--; StackWord(0) = (W_)obj;
           return ThreadYielding;
        }
     } /* switch on object kind */
 
-    barf("fallen off end of switch in enter()");
+    barf("fallen off end of object-type switch in interpretBCO()");
 }
 
-
-#endif /* 0 */
+#endif /* GHCI */
