@@ -4,4 +4,5 @@ tcfail055.hs:3:
 	Expected type: Float
 	Inferred type: Int
     When checking the type signature of the expression: x + 1 :: Int
-    In the definition of `f': (x + 1 :: Int) :: Float
+    When checking the type signature of the expression:
+	  (x + 1 :: Int) :: Float
