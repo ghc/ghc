@@ -46,13 +46,18 @@ Haskell side.
 #include <windows.h>
 #endif
 
-#if defined(openbsd_HOST_OS)
+#if defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/mman.h>
 
 /* no C99 header stdint.h on OpenBSD? */
+#if defined(openbsd_HOST_OS)
 typedef unsigned long my_uintptr_t;
+#else
+#include <stdint.h>
+typedef uintptr_t my_uintptr_t;
+#endif
 #endif
 
 #if defined(powerpc_HOST_ARCH) && defined(linux_HOST_OS)
@@ -80,7 +85,7 @@ mallocBytesRWX(int len)
     barf("mallocBytesRWX: failed to protect 0x%p; error=%lu; old protection: %lu\n",
          addr, (unsigned long)GetLastError(), (unsigned long)dwOldProtect);
   }
-#elif defined(openbsd_HOST_OS)
+#elif defined(openbsd_HOST_OS) || defined(linux_HOST_OS)
   /* malloced memory isn't executable by default on OpenBSD */
   my_uintptr_t pageSize         = sysconf(_SC_PAGESIZE);
   my_uintptr_t mask             = ~(pageSize - 1);
@@ -116,6 +121,16 @@ __asm__ (
    ".globl obscure_ccall_ret_code\n"
    "obscure_ccall_ret_code:\n\t"
    "addl $0x4, %esp\n\t"
+   "ret"
+  );
+extern void obscure_ccall_ret_code(void);
+#endif
+
+#if defined(x86_64_TARGET_ARCH)
+__asm__ (
+   ".globl obscure_ccall_ret_code\n"
+   "obscure_ccall_ret_code:\n\t"
+   "addq $0x8, %rsp\n\t"
    "ret"
   );
 extern void obscure_ccall_ret_code(void);
@@ -218,7 +233,7 @@ void*
 createAdjustor(int cconv, StgStablePtr hptr,
 	       StgFunPtr wptr,
 	       char *typeString
-#if !defined(powerpc_HOST_ARCH) && !defined(powerpc64_HOST_ARCH)
+#if !defined(powerpc_HOST_ARCH) && !defined(powerpc64_HOST_ARCH) && !defined(x86_64_TARGET_ARCH)
 	          STG_UNUSED
 #endif
               )
@@ -301,6 +316,111 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
+    }
+#elif defined(x86_64_HOST_ARCH)
+    /*
+      stack at call:
+               argn
+	       ...
+	       arg7
+               return address
+	       %rdi,%rsi,%rdx,%rcx,%r8,%r9 = arg0..arg6
+
+      if there are <6 integer args, then we can just push the
+      StablePtr into %edi and shuffle the other args up.
+
+      If there are >=6 integer args, then we have to flush one arg
+      to the stack, and arrange to adjust the stack ptr on return.
+      The stack will be rearranged to this:
+
+             argn
+	     ...
+	     arg7
+	     return address  *** <-- dummy arg in stub fn.
+	     arg6
+	     obscure_ccall_ret_code
+
+      This unfortunately means that the type of the stub function
+      must have a dummy argument for the original return address
+      pointer inserted just after the 6th integer argument.
+
+      Code for the simple case:
+
+   0:   4d 89 c1                mov    %r8,%r9
+   3:   49 89 c8                mov    %rcx,%r8
+   6:   48 89 d1                mov    %rdx,%rcx
+   9:   48 89 f2                mov    %rsi,%rdx
+   c:   48 89 fe                mov    %rdi,%rsi
+   f:   48 8b 3d 0a 00 00 00    mov    10(%rip),%rdi
+  16:   e9 00 00 00 00          jmpq   stub_function
+  ... 
+  20: .quad 0  # aligned on 8-byte boundary
+
+
+  And the version for >=6 integer arguments:
+
+   0:   41 51                   push   %r9
+   2:   68 00 00 00 00          pushq  $obscure_ccall_ret_code
+   7:   4d 89 c1                mov    %r8,%r9
+   a:   49 89 c8                mov    %rcx,%r8
+   d:   48 89 d1                mov    %rdx,%rcx
+  10:   48 89 f2                mov    %rsi,%rdx
+  13:   48 89 fe                mov    %rdi,%rsi
+  16:   48 8b 3d 0b 00 00 00    mov    11(%rip),%rdi
+  1d:   e9 00 00 00 00          jmpq   stub_function
+  ...
+  28: .quad 0  # aligned on 8-byte boundary
+    */
+
+    /* we assume the small code model (gcc -mcmmodel=small) where
+     * all symbols are <2^32, so hence wptr should fit into 32 bits.
+     */
+    ASSERT(((long)wptr >> 32) == 0);
+
+    {  
+	int i = 0;
+	char *c;
+
+	// determine whether we have 6 or more integer arguments,
+	// and therefore need to flush one to the stack.
+	for (c = typeString; *c != '\0'; c++) {
+	    if (*c == 'i' || *c == 'l') i++;
+	    if (i == 6) break;
+	}
+
+	if (i < 6) {
+	    adjustor = mallocBytesRWX(40);
+
+	    *(StgInt32 *)adjustor      = 0x49c1894d;
+	    *(StgInt32 *)(adjustor+4)  = 0x8948c889;
+	    *(StgInt32 *)(adjustor+8)  = 0xf28948d1;
+	    *(StgInt32 *)(adjustor+12) = 0x48fe8948;
+	    *(StgInt32 *)(adjustor+16) = 0x000a3d8b;
+	    *(StgInt32 *)(adjustor+20) = 0x00e90000;
+	    
+	    *(StgInt32 *)(adjustor+23) = 
+		(StgInt32)((StgInt64)wptr - (StgInt64)adjustor - 27);
+	    *(StgInt64 *)(adjustor+32) = (StgInt64)hptr;
+	}
+	else
+	{
+	    adjustor = mallocBytesRWX(48);
+
+	    *(StgInt32 *)adjustor      = 0x00685141;
+	    *(StgInt32 *)(adjustor+4)  = 0x4d000000;
+	    *(StgInt32 *)(adjustor+8)  = 0x8949c189;
+	    *(StgInt32 *)(adjustor+12) = 0xd18948c8;
+	    *(StgInt32 *)(adjustor+16) = 0x48f28948;
+	    *(StgInt32 *)(adjustor+20) = 0x8b48fe89;
+	    *(StgInt32 *)(adjustor+24) = 0x00000b3d;
+	    *(StgInt32 *)(adjustor+28) = 0x0000e900;
+	    
+	    *(StgInt32 *)(adjustor+3) = 
+		(StgInt32)(StgInt64)obscure_ccall_ret_code;
+	    *(StgInt32 *)(adjustor+30) = 
+		(StgInt32)((StgInt64)wptr - (StgInt64)adjustor - 34);
+	    *(StgInt64 *)(adjustor+40) = (StgInt64)hptr;
+	}
     }
 #elif defined(sparc_HOST_ARCH)
   /* Magic constant computed by inspecting the code length of the following
@@ -871,7 +991,16 @@ freeHaskellFunctionPtr(void* ptr)
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x01)));
  } else {
     freeStablePtr(*((StgStablePtr*)((unsigned char*)ptr + 0x02)));
- }    
+ }
+#elif defined(x86_64_HOST_ARCH)
+ if ( *(StgWord16 *)ptr == 0x894d ) {
+     freeStablePtr(*(StgStablePtr*)(ptr+32));
+ } else if ( *(StgWord16 *)ptr == 0x5141 ) {
+     freeStablePtr(*(StgStablePtr*)(ptr+40));
+ } else {
+   errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);
+   return;
+ }
 #elif defined(sparc_HOST_ARCH)
  if ( *(unsigned long*)ptr != 0x9C23A008UL ) {
    errorBelch("freeHaskellFunctionPtr: not for me, guv! %p\n", ptr);

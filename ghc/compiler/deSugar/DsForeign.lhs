@@ -24,14 +24,14 @@ import DataCon		( dataConSourceArity )
 import Type		( isUnLiftedType )
 #endif
 import MachOp		( machRepByteWidth, MachRep(..) )
-import SMRep		( argMachRep, primRepToCgRep )
+import SMRep		( argMachRep, typeCgRep )
 import CoreUtils	( exprType, mkInlineMe )
 import Id		( Id, idType, idName, mkSysLocal, setInlinePragma )
 import Literal		( Literal(..), mkStringLit )
 import Module		( moduleString )
 import Name		( getOccString, NamedThing(..) )
 import OccName		( encodeFS )
-import Type		( repType, coreEqType, typePrimRep )
+import Type		( repType, coreEqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, tcSplitTyConApp_maybe, 
 			  tcSplitForAllTys, tcSplitFunTys, tcTyConAppArgs,
@@ -52,7 +52,7 @@ import PrelNames	( hasKey, ioTyConKey, stablePtrTyConName, newStablePtrName, bin
 import BasicTypes	( Activation( NeverActive ) )
 import SrcLoc		( Located(..), unLoc )
 import Outputable
-import Maybe 		( fromJust )
+import Maybe 		( fromJust, isNothing )
 import FastString
 \end{code}
 
@@ -95,7 +95,7 @@ dsForeigns fos
   combine (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
 	  (L loc (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)) depr))
     = dsFExport id (idType id) 
-		ext_nm cconv False                 `thenDs` \(h, c, _) ->
+		ext_nm cconv False                 `thenDs` \(h, c, _, _) ->
       warnDepr depr loc				   `thenDs` \_              ->
       returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) acc_hdrs (id:acc_feb), 
 		acc_f)
@@ -292,7 +292,8 @@ dsFExport :: Id			-- Either the exported Id,
 				-- 	   the first argument's stable pointer
 	  -> DsM ( SDoc		-- contents of Module_stub.h
 		 , SDoc		-- contents of Module_stub.c
-		 , [Type]       -- primitive arguments expected by stub function.
+		 , [MachRep]    -- primitive arguments expected by stub function
+		 , Int		-- size of args to stub function
 		 )
 
 dsFExport fn_id ty ext_name cconv isDyn
@@ -371,7 +372,8 @@ dsFExportDynamic id cconv
      in
      dsLookupGlobalId bindIOName		`thenDs` \ bindIOId ->
      newSysLocalDs stable_ptr_ty		`thenDs` \ stbl_value ->
-     dsFExport id export_ty fe_nm cconv True  	`thenDs` \ (h_code, c_code, stub_args) ->
+     dsFExport id export_ty fe_nm cconv True  	
+		`thenDs` \ (h_code, c_code, arg_reps, args_size) ->
      let
       stbl_app cont ret_ty = mkApps (Var bindIOId)
 				    [ Type stable_ptr_ty
@@ -395,9 +397,7 @@ dsFExportDynamic id cconv
 	-- (probably in the RTS.) 
       adjustor	 = FSLIT("createAdjustor")
       
-      arg_type_info = drop 2 $ map (repCharCode.argMachRep
-                                   .primRepToCgRep.typePrimRep)
-                                   stub_args
+      arg_type_info = map repCharCode arg_reps
       repCharCode F32 = 'f'
       repCharCode F64 = 'd'
       repCharCode I64 = 'l'
@@ -407,17 +407,9 @@ dsFExportDynamic id cconv
 	-- so that we can attach the '@N' suffix to its label if it is a
 	-- stdcall on Windows.
       mb_sz_args = case cconv of
-		      StdCallConv -> Just (sum (map ty_size stub_args))
+		      StdCallConv -> Just args_size
 		      _ 	  -> Nothing
 
-	-- NB. the calculation here isn't strictly speaking correct.
-	-- We have a primitive Haskell type (eg. Int#, Double#), and
-	-- we want to know the size, when passed on the C stack, of
-	-- the associated C type (eg. HsInt, HsDouble).  We don't have
-	-- this information to hand, but we know what GHC's conventions
-	-- are for passing around the primitive Haskell types, so we
-	-- use that instead.  I hope the two coincide --SDM
-      ty_size = machRepByteWidth.argMachRep.primRepToCgRep.typePrimRep
      in
      dsCCall adjustor adj_args PlayRisky io_res_ty	`thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
@@ -464,33 +456,33 @@ mkFExportCBits :: FastString
 	       -> CCallConv 
 	       -> (SDoc, 
 		   SDoc,
-		   [Type] 	-- the *primitive* argument types
+		   [MachRep], 	-- the argument reps
+		   Int		-- total size of arguments
 		  )
 mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
- = (header_bits, c_bits, all_prim_arg_tys)
+ = (header_bits, c_bits, 
+    [rep | (_,_,_,rep) <- arg_info],  -- just the real args
+    sum [ machRepByteWidth rep | (_,_,_,rep) <- aug_arg_info] -- all the args
+    )
  where
-  -- Create up types and names for the real args
-  arg_cnames, arg_ctys :: [SDoc]
-  arg_cnames = mkCArgNames 1 arg_htys
-  arg_ctys   = map showStgType arg_htys
+  -- list the arguments to the C function
+  arg_info :: [(SDoc, 		-- arg name
+		SDoc,		-- C type
+	        Type,		-- Haskell type
+		MachRep)]	-- the MachRep
+  arg_info  = [ (text ('a':show n), showStgType ty, ty, 
+		 typeMachRep (getPrimTyOf ty))
+	      | (ty,n) <- zip arg_htys [1..] ]
 
-  -- and also for auxiliary ones; the stable ptr in the dynamic case, and
-  -- a slot for the dummy return address in the dynamic + ccall case
-  extra_cnames_and_tys
-     = case maybe_target of
-          Nothing -> [((text "the_stableptr", text "StgStablePtr"), mkStablePtrPrimTy alphaTy)]
-          other   -> []
-       ++
-       case (maybe_target, cc) of
-          (Nothing, CCallConv) -> [((text "original_return_addr", text "void*"), addrPrimTy)]
-          other                -> []
+  -- add some auxiliary args; the stable ptr in the wrapper case, and
+  -- a slot for the dummy return address in the wrapper + ccall case
+  aug_arg_info
+    | isNothing maybe_target = stable_ptr_arg : insertRetAddr cc arg_info
+    | otherwise              = arg_info
 
-  all_cnames_and_ctys :: [(SDoc, SDoc)]
-  all_cnames_and_ctys 
-     = map fst extra_cnames_and_tys ++ zip arg_cnames arg_ctys
-
-  all_prim_arg_tys
-     = map snd extra_cnames_and_tys ++ map getPrimTyOf arg_htys
+  stable_ptr_arg = 
+	(text "the_stableptr", text "StgStablePtr", undefined,
+	 typeMachRep (mkStablePtrPrimTy alphaTy))
 
   -- stuff to do with the return type of the C function
   res_hty_is_unit = res_hty `coreEqType` unitTy	-- Look through any newtypes
@@ -506,8 +498,8 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
   header_bits = ptext SLIT("extern") <+> fun_proto <> semi
 
   fun_proto = cResType <+> pprCconv <+> ftext c_nm <>
-	      parens (hsep (punctuate comma (map (\(nm,ty) -> ty <+> nm) 
-                                                 all_cnames_and_ctys)))
+	      parens (hsep (punctuate comma (map (\(nm,ty,_,_) -> ty <+> nm) 
+                                                 aug_arg_info)))
 
   -- the target which will form the root of what we ask rts_evalIO to run
   the_cfun
@@ -517,9 +509,9 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   -- the expression we give to rts_evalIO
   expr_to_run
-     = foldl appArg the_cfun (zip arg_cnames arg_htys)
+     = foldl appArg the_cfun arg_info -- NOT aug_arg_info
        where
-          appArg acc (arg_cname, arg_hty) 
+          appArg acc (arg_cname, _, arg_hty, _) 
              = text "rts_apply" 
                <> parens (acc <> comma <> mkHObj arg_hty <> parens arg_cname)
 
@@ -570,9 +562,14 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      , rbrace
      ]
 
-
-mkCArgNames :: Int -> [a] -> [SDoc]
-mkCArgNames n as = zipWith (\ _ n -> text ('a':show n)) as [n..] 
+-- NB. the calculation here isn't strictly speaking correct.
+-- We have a primitive Haskell type (eg. Int#, Double#), and
+-- we want to know the size, when passed on the C stack, of
+-- the associated C type (eg. HsInt, HsDouble).  We don't have
+-- this information to hand, but we know what GHC's conventions
+-- are for passing around the primitive Haskell types, so we
+-- use that instead.  I hope the two coincide --SDM
+typeMachRep ty = argMachRep (typeCgRep ty)
 
 mkHObj :: Type -> SDoc
 mkHObj t = text "rts_mk" <> text (showFFIType t)
@@ -589,6 +586,26 @@ showFFIType t = getOccString (getName tc)
   tc = case tcSplitTyConApp_maybe (repType t) of
 	    Just (tc,_) -> tc
 	    Nothing	-> pprPanic "showFFIType" (ppr t)
+
+#if !defined(x86_64_TARGET_ARCH)
+insertRetAddr CCallConv args = ret_addr_arg : args
+insertRetAddr _ args = args
+#else
+-- On x86_64 we insert the return address after the 6th
+-- integer argument, because this is the point at which we
+-- need to flush a register argument to the stack (See rts/Adjustor.c for
+-- details).
+insertRetAddr CCallConv args = go 0 args
+  where  go 6 args = ret_addr_arg : args
+	 go n (arg@(_,_,_,rep):args)
+	  | I64 <- rep = arg : go (n+1) args
+	  | otherwise  = arg : go n     args
+	 go n [] = []
+insertRetAddr _ args = args
+#endif
+
+ret_addr_arg = (text "original_return_addr", text "void*", undefined, 
+		typeMachRep addrPrimTy)
 
 -- This function returns the primitive type associated with the boxed
 -- type argument to a foreign export (eg. Int ==> Int#).  It assumes
