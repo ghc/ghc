@@ -25,8 +25,7 @@ import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, renameSigsFVs )
 import RnEnv		( lookupTopBndrRn, lookupOccRn, lookupIfaceName,
 			  lookupOrigNames, lookupSysBinder, newLocalsRn,
 			  bindLocalsFVRn, bindPatSigTyVars,
-			  bindTyVarsRn, bindTyVars2Rn,
-			  extendTyVarEnvFVRn,
+			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindCoreLocalRn, bindCoreLocalsRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames, mapFvRn
 			)
@@ -341,7 +340,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
     mapRn lookupSysBinder names			`thenRn` \ names' ->
 
 	-- Tyvars scope over bindings and context
-    bindTyVars2Rn cls_doc tyvars		$ \ clas_tyvar_names tyvars' ->
+    bindTyVarsRn cls_doc tyvars			$ \ tyvars' ->
 
 	-- Check the superclasses
     rnContext cls_doc context			`thenRn` \ context' ->
@@ -355,8 +354,8 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
 	(op_sigs, non_op_sigs) = partition isClassOpSig sigs
 	sig_rdr_names_w_locs   = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     in
-    checkDupOrQualNames sig_doc sig_rdr_names_w_locs		`thenRn_` 
-    mapRn (rnClassOp cname' clas_tyvar_names fds') op_sigs	`thenRn` \ sigs' ->
+    checkDupOrQualNames sig_doc sig_rdr_names_w_locs	`thenRn_` 
+    mapRn (rnClassOp cname' fds') op_sigs		`thenRn` \ sigs' ->
     let
 	binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
     in
@@ -374,7 +373,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdName = cname,
     cls_doc  = text "In the declaration for class" 	<+> ppr cname
     sig_doc  = text "In the signatures for class"  	<+> ppr cname
 
-rnClassOp clas clas_tyvars clas_fds sig@(ClassOpSig op dm_stuff ty locn)
+rnClassOp clas clas_fds sig@(ClassOpSig op dm_stuff ty locn)
   = pushSrcLocRn locn $
     lookupTopBndrRn op			`thenRn` \ op_name ->
     

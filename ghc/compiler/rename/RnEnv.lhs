@@ -611,20 +611,12 @@ bindTyVarsRn :: SDoc -> [HsTyVarBndr RdrName]
 	      -> ([HsTyVarBndr Name] -> RnMS a)
 	      -> RnMS a
 bindTyVarsRn doc_str tyvar_names enclosed_scope
-  = bindTyVars2Rn doc_str tyvar_names 	$ \ names tyvars ->
-    enclosed_scope tyvars
-
--- Gruesome name: return Names as well as HsTyVars
-bindTyVars2Rn :: SDoc -> [HsTyVarBndr RdrName]
-	      -> ([Name] -> [HsTyVarBndr Name] -> RnMS a)
-	      -> RnMS a
-bindTyVars2Rn doc_str tyvar_names enclosed_scope
   = getSrcLocRn					`thenRn` \ loc ->
     let
 	located_tyvars = [(hsTyVarName tv, loc) | tv <- tyvar_names] 
     in
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
-    enclosed_scope names (zipWith replaceTyVarName tyvar_names names)
+    enclosed_scope (zipWith replaceTyVarName tyvar_names names)
 
 bindPatSigTyVars :: [RdrNameHsType]
 		 -> RnMS (a, FreeVars)
