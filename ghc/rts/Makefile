@@ -156,6 +156,7 @@ ifneq "$(GTK_CONFIG)" ""
 ifeq "$(GhcRtsWithFrontPanel)" "YES"
 SRC_HC_OPTS 		+= `$(GTK_CONFIG) --cflags` -optc-DRTS_GTK_FRONTPANEL
 VisCallbacks_CC_OPTS 	+= -Wno-unused
+SRC_MKDEPENDC_OPTS	+= `$(GTK_CONFIG) --cflags`
 else # GhcRtsWithFrontPanel
 EXCLUDED_SRCS		+= $(wildcard Vis*.c)
 endif
