@@ -401,6 +401,8 @@ getMonoBind (FunMonoBind f1 inf1 mtchs1 loc1) binds
 	-- and use loc2 as the final location
     go mtchs loc binds = (FunMonoBind f1 inf1 mtchs loc, binds)
 
+getMonoBind bind binds = (bind, binds)
+
 has_args ((Match args _ _) : _) = not (null args)
 	-- Don't group together FunMonoBinds if they have
 	-- no arguments.  This is necessary now that variable bindings
