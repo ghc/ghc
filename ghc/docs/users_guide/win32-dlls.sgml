@@ -10,6 +10,11 @@ dynamic link libraries (DLLs) containing ghc-compiled code. This
 section shows you how to make use of this facility.
 </Para>
 
+<Para>
+<Command>strip</Command> seems not to work reliably on DLLs, so it's probably best not to.
+</Para>
+
+
 <Sect1 id="win32-dlls-link">
 <Title>Linking with DLLs
 </Title>
@@ -93,6 +98,10 @@ line.
 </Para>
 
 <Para>
+To create a `static' DLL, i.e. one that does not depend on the GHC DLLs, compile up your Haskell code using <Option>-static</Option>, and write a <Filename>.def</Filename> file containing the entry points you want to expose (see <XRef LinkEnd="win32-dlls-foreign"> for an example). Then link the DLL adding the <Option>-static</Option> flag, and <Option>-optdll--def=foo.def</Option>, where <Filename>foo.def</Filename> is the name of your <Filename>.def</Filename> file.
+</Para>
+
+<Para>
 A couple of things to notice:
 </Para>
 
@@ -100,18 +109,15 @@ A couple of things to notice:
 
 <ItemizedList>
 <ListItem>
-
 <Para>
-
 Since DLLs correspond to packages (see <XRef LinkEnd="packages">) you need
 to use <Option>-package-name dll-name</Option> when compiling modules that
 belong to a DLL. If you don't, Haskell code that calls entry points in that
 DLL will do so incorrectly, and a crash will result.
-
 </Para>
 </ListItem>
-<ListItem>
 
+<ListItem>
 <Para>
 By default, the entry points of all the object files will
 be exported from the DLL when using <Option>--mk-dll</Option>. Should you want to constrain this, you can specify the <Emphasis>module definition file</Emphasis> to use on the command line as follows:
@@ -131,38 +137,141 @@ EXPORTS
  DllRegisterServer   = DllRegisterServer@0
  DllUnregisterServer = DllUnregisterServer@0
 </ProgramListing>
-
-
 </Para>
 </ListItem>
-<ListItem>
 
+<ListItem>
 <Para>
-In addition to creating a DLL, the <Option>--mk-dll</Option> option will also
-create an import library. The import library name is derived from the
+In addition to creating a DLL, the <Option>--mk-dll</Option> option also
+creates an import library. The import library name is derived from the
 name of the DLL, as follows:
 
 <ProgramListing>
 DLL: HScool.dll  ==&#62; import lib: libHScool_imp.a
 </ProgramListing>
 
-
 The naming scheme may look a bit weird, but it has the purpose of
 allowing the co-existence of import libraries with ordinary static
 libraries (e.g., <Filename>libHSfoo.a</Filename> and <Filename>libHSfoo&lowbar;imp.a</Filename>.
 
-Additionally, when the compiler driver is linking in non-static mode,
-it will rewrite occurrence of <Option>-lHSfoo</Option> on the command line to
-<Option>-lHSfoo&lowbar;imp</Option>. By doing this for you, switching from non-static
-to static linking is simply a question of adding <Option>-static</Option> to
-your command line.
+Additionally, when the compiler driver is linking in non-static mode, it
+will rewrite occurrence of <Option>-lHSfoo</Option> on the command line to
+<Option>-lHSfoo&lowbar;imp</Option>. By doing this for you, switching from
+non-static to static linking is simply a question of adding
+<Option>-static</Option> to your command line.
+
+</Para>
+</ListItem>
+</ItemizedList>
+</Para>
+
+</Sect1>
+
+
+<Sect1 id="win32-dlls-foreign">
+<Title>Making DLLs to be called from other languages</Title>
+
+<Para>
+
+If you want to package up Haskell code to be called from other languages,
+such as Visual Basic or C++, there are some extra things it is useful to
+know. The dirty details are in the <Emphasis>Foreign Function
+Interface</Emphasis> definition, but it can be tricky to work out how to
+combine this with DLL building, so here's an example:
+
+</Para>
+
+<ItemizedList>
+
+<ListItem>
+<Para>
+Use <Literal>foreign export</Literal> declarations to export the Haskell functions you want to call from the outside. For example,
+
+<ProgramListing>
+module Adder where
+
+adder :: Int -> Int -> IO Int  -- gratuitous use of IO
+adder x y = return (x+y)
+
+foreign export stdcall adder :: Int -> Int -> IO Int
+</ProgramListing>
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Compile it up:
+
+<Screen>
+ghc -c adder.hs -fglasgow-exts
+</Screen>
+  
+This will produce two files, adder.o and adder_stub.o
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+compile up a <Function>DllMain()</Function> that starts up the Haskell RTS---a possible implementation is:
+
+<ProgramListing>
+#include &lt;windows.h&gt;
+
+extern void startupHaskell(int , char** );
+
+static char* args[] = { "ghcDll" };
+
+BOOL
+STDCALL
+DllMain
+   ( HANDLE hModule
+   , DWORD reason
+   , void* reserved
+   )
+{
+  if (reason == DLL_PROCESS_ATTACH) {
+      /* By now, the RTS DLL should have been hoisted in, but we need to start it up. */
+      startupHaskell(1, args);
+      return TRUE;
+  }
+  return TRUE;
+}
+</ProgramListing>
+
+Compile this up:
+
+<Screen>
+gcc -c dllMain.c
+</Screen>
+</Para>
+</ListItem>
+
+<ListItem>
+<Para>
+Construct the DLL:
+
+<Screen>
+ghc --mk-dll -o adder.dll adder.o adder_stub.o dllMain.o
+</Screen>
 
 </Para>
 </ListItem>
 
-</ItemizedList>
+<ListItem>
+<Para>
+Start using <Function>adder</Function> from VBA---here's how I would <Constant>Declare</Constant> it:
 
+<ProgramListing>
+Private Declare adder Lib "adder.dll" Alias "adder@8"
+      (ByVal x As Long, ByVal y As Long) As Long
+</ProgramListing>
+
+Since this Haskell DLL depends on a couple of the DLLs that come with GHC,
+make sure that they are in scope/visible.
 </Para>
+</ListItem>
+
+</ItemizedList>
 
 </Sect1>
 
