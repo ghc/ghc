@@ -32,7 +32,7 @@ clean(['hIsEOF002.out'])
 # hReady doesn't work at the end of a file in GHC
 test('hReady001', expect_fail_if_compiler_type('ghc'), compile_and_run, ['-cpp'])
 
-test('hSeek001', normal, compile_and_run, ['-cpp'])
+test('hSeek001', normal, compile_and_run, [''])
 test('hSeek002', normal, compile_and_run, ['-cpp'])
 test('hSeek003', normal, compile_and_run, ['-cpp'])
 test('hSeek004', normal, compile_and_run, ['-cpp'])
