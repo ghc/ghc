@@ -178,7 +178,7 @@ sub slurp_file { # follows an example in the `open' item in perl man page
        $dep_contents .= $_;
     }
     ($deps = $dep_contents) =~ s|^[^:]+:(.*)$|$1|g;
-    $deps =~ s|\\| |g;
+    $deps =~ s| \\| |g;
     
     @Deps = split(/ +/, $deps);
     
