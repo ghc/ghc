@@ -158,6 +158,7 @@ cvt (Lit l)
 
 cvt (App x y)     = HsApp (cvt x) (cvt y)
 cvt (Lam ps e)    = HsLam (mkSimpleMatch (map cvtp ps) (cvt e) void loc0)
+cvt (Tup [e])	  = cvt e
 cvt (Tup es)	  = ExplicitTuple(map cvt es) Boxed
 cvt (Cond x y z)  = HsIf (cvt x) (cvt y) (cvt z) loc0
 cvt (Let ds e)	  = HsLet (cvtdecs ds) (cvt e)
@@ -253,6 +254,7 @@ cvtp (Plit l)
 							-- about that!
   | otherwise	    = LitPat (cvtLit l)
 cvtp (Pvar s)     = VarPat(vName s)
+cvtp (Ptup [p])   = cvtp p
 cvtp (Ptup ps)    = TuplePat (map cvtp ps) Boxed
 cvtp (Pcon s ps)  = ConPatIn (cName s) (PrefixCon (map cvtp ps))
 cvtp (Ptilde p)   = LazyPat (cvtp p)
