@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.6 1999/05/11 16:47:59 keithw Exp $
+ * $Id: Ticky.c,v 1.7 1999/05/11 16:49:44 keithw Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -573,3 +573,4 @@ printRegisteredCounterInfo (FILE *tf)
 #endif
 
 #endif /* TICKY_TICKY */
+
