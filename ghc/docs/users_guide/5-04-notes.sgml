@@ -5,7 +5,9 @@
     <title>User-visible compiler changes</title>
     <itemizedlist>
       <listitem>
-	<para>MacOS X support (Wolfgang, please fill in).</para>
+	<para>Full support for MacOS X, including fully optimized compilation, has been added. Only a native
+	code generator and support for <option>-split-objs</option> is still missing.
+	Everything else needs more testing, but should work.</para>
       </listitem>
       <listitem>
 	<para><literal>ghc-pkg</literal>: new options
