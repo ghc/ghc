@@ -62,7 +62,7 @@ import {-# SOURCE #-} TyCon ( TyCon )
 #endif
 
 import CStrings		( identToC, modnameToC, cSEP )
-import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC )
+import CmdLineOpts	( opt_OmitInterfacePragmas, opt_EnsureSplittableC, all_toplev_ids_visible )
 import BasicTypes	( SYN_IE(Module), IfaceFlavour(..), moduleString, pprModule )
 
 import Outputable	( Outputable(..), PprStyle(..), codeStyle, ifaceStyle )
@@ -326,8 +326,6 @@ uniqToOccName uniq = VarOcc (_PK_ ('$':showUnique uniq))
 not_top_level (Just m) = False
 not_top_level Nothing  = True
 
-all_toplev_ids_visible = not opt_OmitInterfacePragmas ||  -- Pragmas can make them visible
-			 opt_EnsureSplittableC            -- Splitting requires visiblilty
 \end{code}
 
 %************************************************************************
