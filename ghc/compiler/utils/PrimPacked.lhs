@@ -13,14 +13,12 @@ module PrimPacked
         strLength,          -- :: _Addr -> Int
         copyPrefixStr,      -- :: _Addr -> Int -> ByteArray Int
         copySubStr,         -- :: _Addr -> Int -> Int -> ByteArray Int
-        copySubStrFO,       -- :: ForeignObj -> Int -> Int -> ByteArray Int
         copySubStrBA,       -- :: ByteArray Int -> Int -> Int -> ByteArray Int
 
         eqStrPrefix,        -- :: Addr# -> ByteArray# -> Int# -> Bool
         eqCharStrPrefix,    -- :: Addr# -> Addr# -> Int# -> Bool
         eqStrPrefixBA,      -- :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
         eqCharStrPrefixBA,  -- :: Addr# -> ByteArray# -> Int# -> Int# -> Bool
-        eqStrPrefixFO,      -- :: ForeignObj# -> ByteArray# -> Int# -> Int# -> Bool
 
         addrOffset#         -- :: Addr# -> Int# -> Addr# 
        ) where
@@ -31,13 +29,13 @@ module PrimPacked
 #include "HsVersions.h"
 
 import GlaExts
+#if __GLASGOW_HASKELL__ < 411
 import PrelAddr	( Addr(..) )
+#else
+import Addr	( Addr(..) )
+#endif
 import ST
 import Foreign
--- ForeignObj is now exported abstractly.
-#if __GLASGOW_HASKELL__ >= 303
-import PrelForeign   ( ForeignObj(..) )
-#endif
 
 #if __GLASGOW_HASKELL__ < 301
 import ArrBase  	( StateAndMutableByteArray#(..), 
@@ -110,33 +108,6 @@ copySubStr a start length =
     _casm_ `` %r= (char *)((char *)%0 + (int)%1); '' a start 
                                                      >>= \ a_start ->
     return (copyPrefixStr a_start length))
-\end{code}
-
-pCopying a sub-string out of a ForeignObj
-
-\begin{code}
-copySubStrFO :: ForeignObj -> Int -> Int -> ByteArray Int
-copySubStrFO (ForeignObj fo) (I# start#) len@(I# length#) =
- runST (
-  {- allocate an array that will hold the string
-    (not forgetting the NUL at the end)
-  -}
-  new_ps_array (length# +# 1#)  >>= \ ch_array ->
-   -- fill in packed string from "addr"
-  fill_in ch_array 0#   >>
-   -- freeze the puppy:
-  freeze_ps_array ch_array length#)
-  where
-    fill_in :: MutableByteArray s Int -> Int# -> ST s ()
-
-    fill_in arr_in# idx
-      | idx ==# length#
-      = write_ps_array arr_in# idx (chr# 0#) >>
-	return ()
-      | otherwise
-      = case (indexCharOffForeignObj# fo (idx +# start#)) of { ch ->
-	write_ps_array arr_in# idx ch >>
-	fill_in arr_in# (idx +# 1#) }
 
 -- step on (char *) pointer by x units.
 addrOffset# :: Addr# -> Int# -> Addr# 
@@ -299,25 +270,4 @@ eqCharStrPrefixBA a# b2# start# len# =
    bot :: Int
 #endif
    bot = error "eqCharStrPrefixBA"
-
-eqStrPrefixFO :: ForeignObj# -> ByteArray# -> Int# -> Int# -> Bool
-eqStrPrefixFO fo# barr# start# len# = 
-  unsafePerformIO (
-   _casm_ ``%r=(int)strncmp((char *)%0+(int)%1,%2,%3); '' 
-	  (ForeignObj fo#) 
-	  (I# start#) 
-#if __GLASGOW_HASKELL__ < 405
-          (ByteArray bot barr#) 
-#else
-          (ByteArray bot bot barr#) 
-#endif
-          (I# len#)                  >>= \ (I# x#) ->
-   return (x# ==# 0#))
-  where
-#if __GLASGOW_HASKELL__ < 405
-   bot :: (Int,Int)
-#else
-   bot :: Int
-#endif
-   bot = error "eqStrPrefixFO"
 \end{code}

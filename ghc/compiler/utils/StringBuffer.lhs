@@ -70,7 +70,11 @@ module StringBuffer
 #include "HsVersions.h"
 
 import GlaExts
+#if __GLASGOW_HASKELL__ < 411
 import PrelAddr 	( Addr(..) )
+#else
+import Addr		( Addr(..) )
+#endif
 import Foreign
 import Char		( chr )
 
@@ -89,6 +93,9 @@ import Addr
 #else
 import IO		( openFile, hFileSize, hClose, IOMode(..) )
 import Addr
+#endif
+#if __GLASGOW_HASKELL__ >= 411
+import Ptr		( Ptr(..) )
 #endif
 
 #if __GLASGOW_HASKELL__ < 301
@@ -135,7 +142,13 @@ hGetStringBuffer :: Bool -> FilePath -> IO StringBuffer
 hGetStringBuffer expand_tabs fname = do
    (a, read) <- if expand_tabs 
 				then slurpFileExpandTabs fname 
+#if __GLASGOW_HASKELL__ < 411
 				else slurpFile fname
+#else
+				else do
+				    (Ptr a#, read) <- slurpFile fname
+				    return (A# a#, read)
+#endif
 
    let (A# a#) = a;  (I# read#) = read
 

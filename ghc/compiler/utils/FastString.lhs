@@ -14,7 +14,6 @@ module FastString
          --names?
         mkFastString,       -- :: String -> FastString
         mkFastSubString,    -- :: Addr -> Int -> Int -> FastString
-        mkFastSubStringFO,  -- :: ForeignObj -> Int -> Int -> FastString
 
 	-- These ones hold on to the Addr after they return, and aren't hashed; 
 	-- they are used for literals
@@ -25,7 +24,6 @@ module FastString
 	mkFastString#,      -- :: Addr# -> Int# -> FastString
         mkFastSubStringBA#, -- :: ByteArray# -> Int# -> Int# -> FastString
         mkFastSubString#,   -- :: Addr# -> Int# -> Int# -> FastString
-        mkFastSubStringFO#, -- :: ForeignObj# -> Int# -> Int# -> FastString
 
         mkFastStringInt,    -- :: [Int] -> FastString
 
@@ -88,19 +86,17 @@ import PrelIOBase	( Handle__(..), IOError, IOErrorType(..),
 
 import PrimPacked
 import GlaExts
+#if __GLASGOW_HASKELL__ < 411
 import PrelAddr		( Addr(..) )
+#else
+import Addr		( Addr(..) )
+import Ptr		( Ptr(..) )
+#endif
 #if __GLASGOW_HASKELL__ < 407
 import MutableArray	( MutableArray(..) )
 #else
 import PrelArr		( STArray(..), newSTArray )
 import IOExts		( hPutBufFull, hPutBufBAFull )
-#endif
-
--- ForeignObj is now exported abstractly.
-#if __GLASGOW_HASKELL__ >= 303
-import PrelForeign      ( ForeignObj(..) )
-#else
-import Foreign		( ForeignObj(..) )
 #endif
 
 import IOExts		( IORef, newIORef, readIORef, writeIORef )
@@ -339,52 +335,6 @@ mkFastString# a# len# =
 mkFastSubString# :: Addr# -> Int# -> Int# -> FastString
 mkFastSubString# a# start# len# = mkFastCharString2 (A# (addrOffset# a# start#)) (I# len#)
 
-mkFastSubStringFO# :: ForeignObj# -> Int# -> Int# -> FastString
-mkFastSubStringFO# fo# start# len# =
- unsafePerformIO  (
-  readIORef string_table >>= \ ft@(FastStringTable uid# tbl#) ->
-  let
-   h = hashSubStrFO fo# start# len#
-  in
-  lookupTbl ft h	>>= \ lookup_result ->
-  case lookup_result of
-    [] -> 
-       -- no match, add it to table by copying out the
-       -- the string into a ByteArray
-       case copySubStrFO (ForeignObj fo#) (I# start#) (I# len#) of
-#if __GLASGOW_HASKELL__ < 405
-	 (ByteArray _ barr#) ->  
-#else
-	 (ByteArray _ _ barr#) ->  
-#endif
-	   let f_str = FastString uid# len# barr# in
-           updTbl string_table ft h [f_str]       >>
-	   return f_str
-    ls -> 
-       -- non-empty `bucket', scan the list looking
-       -- entry with same length and compare byte by byte.
-       case bucket_match ls start# len# fo# of
-	 Nothing -> 
-           case copySubStrFO (ForeignObj fo#) (I# start#) (I# len#) of
-#if __GLASGOW_HASKELL__ < 405
-	     (ByteArray _ barr#) ->  
-#else
-	     (ByteArray _ _ barr#) ->  
-#endif
-              let f_str = FastString uid# len# barr# in
-              updTbl string_table ft  h (f_str:ls) >>
-	      ( {- _trace ("new: " ++ show f_str) $ -} return f_str)
-	 Just v  -> {- _trace ("re-use: "++show v) $ -} return v)
-  where
-   bucket_match [] _ _ _ = Nothing
-   bucket_match (v@(FastString _ l# barr#):ls) start# len# fo# =
-      if len# ==# l# && eqStrPrefixFO fo# barr# start# len# then
-	 Just v
-      else
-	 bucket_match ls start# len# fo#
-   bucket_match (UnicodeStr _ _ : ls) start# len# fo# =
-      bucket_match ls start# len# fo#
-
 mkFastSubStringBA# :: ByteArray# -> Int# -> Int# -> FastString
 mkFastSubStringBA# barr# start# len# =
  unsafePerformIO  (
@@ -521,10 +471,6 @@ mkFastStringInt str = if all good str
 mkFastSubString :: Addr -> Int -> Int -> FastString
 mkFastSubString (A# a#) (I# start#) (I# len#) =
  mkFastString# (addrOffset# a# start#) len#
-
-mkFastSubStringFO :: ForeignObj -> Int -> Int -> FastString
-mkFastSubStringFO (ForeignObj fo#) (I# start#) (I# len#) =
- mkFastSubStringFO# fo# start# len#
 \end{code}
 
 \begin{code}
@@ -544,23 +490,6 @@ hashStr a# len# =
     c1 = indexCharOffAddr# a# 1#
     c2 = indexCharOffAddr# a# 2#
 -}
-
-hashSubStrFO  :: ForeignObj# -> Int# -> Int# -> Int#
- -- use the FO to produce a hash value between 0 & m (inclusive)
-hashSubStrFO fo# start# len# =
-  case len# of
-   0# -> 0#
-   1# -> ((ord# c0 *# 631#) +# len#) `remInt#` hASH_TBL_SIZE#
-   2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
-   _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
-  where
-    c0 = indexCharOffForeignObj# fo# 0#
-    c1 = indexCharOffForeignObj# fo# (len# `quotInt#` 2# -# 1#)
-    c2 = indexCharOffForeignObj# fo# (len# -# 1#)
-
---    c1 = indexCharOffFO# fo# 1#
---    c2 = indexCharOffFO# fo# 2#
-
 
 hashSubStrBA  :: ByteArray# -> Int# -> Int# -> Int#
  -- use the byte array to produce a hash value between 0 & m (inclusive)
@@ -739,8 +668,10 @@ hPutFS handle (CharStr a# l#)
   | l# ==# 0#  = return ()
 #if __GLASGOW_HASKELL__ < 407
   | otherwise  = hPutBuf handle (A# a#) (I# l#)
-#else
+#elif __GLASGOW_HASKELL__ < 411
   | otherwise  = hPutBufFull handle (A# a#) (I# l#)
+#else
+  | otherwise  = hPutBufFull handle (Ptr a#) (I# l#)
 #endif
 
 #endif
