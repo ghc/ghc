@@ -272,12 +272,14 @@ warnings that you get all the time are
 	
 	-fwarn-overlapping-patterns
 	-fwarn-missing-methods
+	-fwarn-duplicate-exports
 
 these are turned off by -Wnot.
 
 \begin{code}
 @StandardWarnings = ('-fwarn-overlapping-patterns', 
-		     '-fwarn-missing-methods');
+		     '-fwarn-missing-methods',
+		     '-fwarn-duplicate-exports');
 @MinusWOpts    	  = (@StandardWarnings, 
 		     '-fwarn-incomplete-patterns', 
 		     '-fwarn-unused-names');
