@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.30 1999/02/11 17:40:26 simonm Exp $
+ * $Id: GC.c,v 1.31 1999/02/15 14:27:19 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1932,10 +1932,9 @@ static void
 scavenge_mutable_list(generation *gen)
 {
   StgInfoTable *info;
-  StgMutClosure *p, *next, *new_list;
+  StgMutClosure *p, *next;
 
   p = gen->saved_mut_list;
-  new_list = gen->mut_list;
   next = p->mut_link;
 
   evac_gen = 0;
@@ -1966,16 +1965,16 @@ scavenge_mutable_list(generation *gen)
 
 	if (failed_to_evac) {
 	  failed_to_evac = rtsFalse;
-	  p->mut_link = new_list;
-	  new_list = p;
+	  p->mut_link = gen->mut_list;
+	  gen->mut_list = p;
 	} 
 	continue;
       }
 
     case MUT_ARR_PTRS:
       /* follow everything */
-      p->mut_link = new_list;
-      new_list = p;
+      p->mut_link = gen->mut_list;
+      gen->mut_list = p;
       {
 	StgPtr end, q;
 	
@@ -1993,8 +1992,8 @@ scavenge_mutable_list(generation *gen)
        */
       ASSERT(p->header.info != &MUT_CONS_info);
       ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-      p->mut_link = new_list;
-      new_list = p;
+      p->mut_link = gen->mut_list;
+      gen->mut_list = p;
       continue;
       
     case MVAR:
@@ -2003,8 +2002,8 @@ scavenge_mutable_list(generation *gen)
 	(StgClosure *)mvar->head = evacuate((StgClosure *)mvar->head);
 	(StgClosure *)mvar->tail = evacuate((StgClosure *)mvar->tail);
 	(StgClosure *)mvar->value = evacuate((StgClosure *)mvar->value);
-	p->mut_link = new_list;
-	new_list = p;
+	p->mut_link = gen->mut_list;
+	gen->mut_list = p;
 	continue;
       }
 
@@ -2027,8 +2026,8 @@ scavenge_mutable_list(generation *gen)
 	 * point to some younger objects (because we set evac_gen to 0
 	 * above). 
 	 */
-	tso->mut_link = new_list;
-	new_list = (StgMutClosure *)tso;
+	tso->mut_link = gen->mut_list;
+	gen->mut_list = (StgMutClosure *)tso;
 	continue;
       }
       
@@ -2037,8 +2036,8 @@ scavenge_mutable_list(generation *gen)
 	StgBlockingQueue *bh = (StgBlockingQueue *)p;
 	(StgClosure *)bh->blocking_queue = 
 	  evacuate((StgClosure *)bh->blocking_queue);
-	p->mut_link = new_list;
-	new_list = p;
+	p->mut_link = gen->mut_list;
+	gen->mut_list = p;
 	continue;
       }
 
@@ -2047,8 +2046,6 @@ scavenge_mutable_list(generation *gen)
       barf("scavenge_mut_list: strange object?");
     }
   }
-
-  gen->mut_list = new_list;
 }
 
 static void
