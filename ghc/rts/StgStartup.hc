@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStartup.hc,v 1.3 1999/02/05 16:03:00 simonm Exp $
+ * $Id: StgStartup.hc,v 1.4 1999/03/15 17:11:27 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -79,8 +79,8 @@ STGFUN(stg_stop_thread_entry)
     /* Move Su just off the end of the stack, we're about to spam the
      * STOP_FRAME with the return value.
      */
-    Su = stgCast(StgUpdateFrame*,Sp+1);  
-    *stgCast(StgClosure**,Sp) = R1.cl;
+    Su = (StgUpdateFrame *)(Sp+1);  
+    Sp[0] = R1.w;
 
     SaveThreadState();	/* inline! */
 
