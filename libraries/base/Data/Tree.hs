@@ -18,11 +18,19 @@ module Data.Tree(
 	drawTree, drawForest,
 	-- * Extraction
 	flatten, levels,
+	-- * Building trees
+	unfoldTree, unfoldForest,
+	unfoldTreeM, unfoldForestM,
+	unfoldTreeM_BF, unfoldForestM_BF,
     ) where
 
 #ifdef __HADDOCK__
 import Prelude
 #endif
+
+import Control.Monad
+import Data.Maybe
+import Data.Queue
 
 -- | Multi-way trees, also known as /rose trees/.
 data Tree a   = Node {
@@ -72,3 +80,56 @@ levels :: Tree a -> [[a]]
 levels t = map (map rootLabel) $
 		takeWhile (not . null) $
 		iterate (concatMap subForest) [t]
+
+-- | Build a tree from a seed value
+unfoldTree :: (b -> (a, [b])) -> b -> Tree a
+unfoldTree f b = let (a, bs) = f b in Node a (unfoldForest f bs)
+
+-- | Build a forest from a list of seed values
+unfoldForest :: (b -> (a, [b])) -> [b] -> Forest a
+unfoldForest f = map (unfoldTree f)
+
+-- | Monadic tree builder, in depth-first order
+unfoldTreeM :: Monad m => (b -> m (a, [b])) -> b -> m (Tree a)
+unfoldTreeM f b = do
+	(a, bs) <- f b
+	ts <- unfoldForestM f bs
+	return (Node a ts)
+
+-- | Monadic forest builder, in depth-first order
+unfoldForestM :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
+unfoldForestM f = mapM (unfoldTreeM f)
+
+-- | Monadic tree builder, in breadth-first order,
+-- using an algorithm adapted from
+-- /Breadth­First Numbering: Lessons from a Small Exercise in Algorithm Design/,
+-- by Chris Okasaki, /ICFP'00/.
+unfoldTreeM_BF :: Monad m => (b -> m (a, [b])) -> b -> m (Tree a)
+unfoldTreeM_BF f b = liftM (fst . fromJust . deQueue) $
+	unfoldForestQ f (listToQueue [b])
+
+-- | Monadic forest builder, in breadth-first order,
+-- using an algorithm adapted from
+-- /Breadth­First Numbering: Lessons from a Small Exercise in Algorithm Design/,
+-- by Chris Okasaki, /ICFP'00/.
+unfoldForestM_BF :: Monad m => (b -> m (a, [b])) -> [b] -> m (Forest a)
+unfoldForestM_BF f = liftM (reverseOnto []) . unfoldForestQ f . listToQueue
+  where reverseOnto :: [a] -> Queue a -> [a]
+	reverseOnto as q = case deQueue q of
+		Nothing -> as
+		Just (a, q') -> reverseOnto (a:as) q'
+
+-- takes a queue of seeds
+-- produces a queue of trees of the same length, but in the reverse order
+unfoldForestQ :: Monad m => (b -> m (a, [b])) -> Queue b -> m (Queue (Tree a))
+unfoldForestQ f aQ = case deQueue aQ of
+	Nothing -> return emptyQueue
+	Just (a, aQ) -> do
+		(b, as) <- f a
+		tQ <- unfoldForestQ f (foldl addToQueue aQ as)
+		let (ts, tQ') = splitOnto [] as tQ
+		return (addToQueue tQ' (Node b ts))
+  where splitOnto :: [a] -> [b] -> Queue a -> ([a], Queue a)
+	splitOnto as [] q = (as, q)
+	splitOnto as (_:bs) q = case fromJust (deQueue q) of
+		(a, q') -> splitOnto (a:as) bs q'
