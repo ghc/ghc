@@ -51,7 +51,7 @@ import VarSet
 import VarEnv
 import Var		( setVarUnique, isId )
 import Id		( idType, setIdType, idOccInfo, zapFragileIdInfo )
-import IdInfo		( IdInfo, isFragileOccInfo,
+import IdInfo		( IdInfo, isFragileOcc,
 			  specInfo, setSpecInfo, 
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
 			)
@@ -75,12 +75,13 @@ import Util		( mapAccumL, foldl2, seqList, ($!) )
 data InScopeSet = InScope (VarEnv Var) Int#
 	-- The Int# is a kind of hash-value used by uniqAway
 	-- For example, it might be the size of the set
+	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyVarSet 0#
+emptyInScopeSet = InScope emptyVarSet 1#
 
 mkInScopeSet :: VarEnv Var -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope 0#
+mkInScopeSet in_scope = InScope in_scope 1#
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# 1#)
@@ -123,11 +124,16 @@ uniqAway :: InScopeSet -> Var -> Var
 -- in the hope that it won't have to change it, nad thereafter uses a combination
 -- of that and the hash-code found in the in-scope set
 uniqAway (InScope set n) var
-  | not (var `elemVarSet` set) = var	-- Nothing to do
+  | not (var `elemVarSet` set) = var				-- Nothing to do
   | otherwise		       = try 1#
   where
     orig_unique = getUnique var
-    try k | uniq `elemUniqSet_Directly` set = try (k +# 1#)
+    try k 
+#ifdef DEBUG
+	  | k ># 1000#
+	  = pprPanic "uniqAway loop:" (ppr (I# k) <+> text "tries" <+> ppr var <+> int (I# n)) 
+#endif			    
+	  | uniq `elemUniqSet_Directly` set = try (k +# 1#)
 #ifdef DEBUG
 	  | opt_PprStyle_Debug && k ># 3#
 	  = pprTrace "uniqAway:" (ppr (I# k) <+> text "tries" <+> ppr var <+> int (I# n)) 
@@ -242,7 +248,7 @@ lookupIdSubst (Subst in_scope env) v
 	Just res	     -> res
 	Nothing  	     -> DoneId v' (idOccInfo v')
 				-- We don't use DoneId for LoopBreakers, so the idOccInfo is
-				-- very important!  If isFragileOccInfo returned True for
+				-- very important!  If isFragileOcc returned True for
 				-- loop breakers we could avoid this call, but at the expense
 				-- of adding more to the substitution, and building new Ids
 				-- in substId a bit more often than really necessary
@@ -531,7 +537,7 @@ substId subst@(Subst in_scope env) old_id
 	-- Extend the substitution if the unique has changed,
 	-- or there's some useful occurrence information
 	-- See the notes with substTyVar for the delSubstEnv
-    new_env | new_id /= old_id || isFragileOccInfo occ_info 
+    new_env | new_id /= old_id || isFragileOcc occ_info 
 	    = extendSubstEnv env old_id (DoneId new_id occ_info)
 	    | otherwise 
 	    = delSubstEnv env old_id

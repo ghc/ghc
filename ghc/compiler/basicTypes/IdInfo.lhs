@@ -48,7 +48,7 @@ module IdInfo (
 	isNeverInlinePrag, neverInlinePrag,
 
 	-- Occurrence info
-	OccInfo(..), isFragileOccInfo,
+	OccInfo(..), isFragileOcc, isDeadOcc, isLoopBreaker,
 	InsideLam, OneBranch, insideLam, notInsideLam, oneBranch, notOneBranch,
 	occInfo, setOccInfo, 
 
@@ -75,7 +75,7 @@ module IdInfo (
 import CoreSyn
 import PrimOp	 	( PrimOp )
 import Var              ( Id )
-import BasicTypes	( OccInfo(..), isFragileOccInfo, seqOccInfo,
+import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBreaker,
 			  InsideLam, insideLam, notInsideLam, 
 			  OneBranch, oneBranch, notOneBranch,
 			  Arity
@@ -286,7 +286,11 @@ data ArityInfo
 			-- function; it's already been compiled and we know its
 			-- arity for sure.
 
-  | ArityAtLeast Arity	-- Arity is this or greater.  We attach this arity to 
+  | ArityAtLeast Arity	-- A partial application of this Id to up to n-1 value arguments
+			-- does essentially no work.  That is not necessarily the
+			-- same as saying that it has n leading lambdas, because coerces
+			-- may get in the way.
+
 			-- functions in the module being compiled.  Their arity
 			-- might increase later in the compilation process, if
 			-- an extra lambda floats up to the binding site.
@@ -373,9 +377,7 @@ There might not be a worker, even for a strict function, because:
 data WorkerInfo = NoWorker
 		| HasWorker Id Arity
 	-- The Arity is the arity of the *wrapper* at the moment of the
-	-- w/w split. It had better be the same as the arity of the wrapper
-	-- at the moment it is spat into the interface file.
-	-- This Arity just lets us make a (hopefully redundant) sanity check
+	-- w/w split. See comments in MkIface.ifaceId, with the 'Worker' code.
 
 seqWorker :: WorkerInfo -> ()
 seqWorker (HasWorker id _) = id `seq` ()
@@ -581,7 +583,7 @@ zapFragileInfo info@(IdInfo {occInfo		= occ,
 			     workerInfo		= wrkr,
 			     specInfo		= rules, 
 			     unfoldingInfo	= unfolding})
-  |  not (isFragileOccInfo occ)
+  |  not (isFragileOcc occ)
         -- We must forget about whether it was marked safe-to-inline,
 	-- because that isn't necessarily true in the simplified expression.
 	-- This is important because expressions may  be re-simplified
