@@ -59,7 +59,7 @@ import StgSyn		( StgOp(..) )
 import BitSet		( BitSet, intBS )
 import Outputable
 import GlaExts
-import Util		( nOfThem, lengthExceeds, listLengthCmp )
+import Util		( lengthExceeds, listLengthCmp )
 import Maybe		( isNothing, maybeToList )
 
 import ST
@@ -442,8 +442,9 @@ pprAbsC (CInitHdr cl_info amode cost_centre size) _
 		pp_paren_semi ]
   where
     info_lbl	= infoTableLabelFromCI cl_info
-  
-pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
+
+
+pprAbsC stmt@(CStaticClosure cl_info cost_centre amodes) _
   = case (pprTempAndExternDecls stmt) of { (_, pp_exts) ->
     vcat [
 	pp_exts,
@@ -456,11 +457,12 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 		ppLocalnessMacro True{-include dyn-} info_lbl,
 		char ')'
 		],
-	nest 2 (ppr_payload (amodes ++ padding_wds ++ static_link_field)),
+	nest 2 (ppr_payload amodes),
 	ptext SLIT("};") ]
     }
   where
-    info_lbl = infoTableLabelFromCI cl_info
+    closure_lbl = closureLabelFromCI cl_info
+    info_lbl    = infoTableLabelFromCI cl_info
 
     ppr_payload [] = empty
     ppr_payload ls = comma <+> 
@@ -475,18 +477,6 @@ pprAbsC stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
       where 
 	rep = getAmodeRep item
 
-    upd_reqd = closureUpdReqd cl_info
-
-    padding_wds
-	| not upd_reqd = []
-	| otherwise    = case max 0 (mIN_UPD_SIZE - length amodes) of { still_needed ->
-	    	         nOfThem still_needed (mkIntCLit 0) } -- a bunch of 0s
-
-	-- always have a static link field, it's used to save the closure's
-	-- info pointer when we're reverting CAFs (see comment in Storage.c)
-    static_link_field
-	| upd_reqd || staticClosureNeedsLink cl_info = [mkIntCLit 0]
-	| otherwise 	     		             = []
 
 pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
   = vcat [
@@ -1732,7 +1722,7 @@ ppr_decls_AbsC (CCallProfCtrMacro   _ amodes)	= ppr_decls_Amodes [] -- *****!!!
   -- no real reason to, anyway.
 ppr_decls_AbsC (CCallProfCCMacro    _ amodes)	= ppr_decls_Amodes amodes
 
-ppr_decls_AbsC (CStaticClosure closure_lbl closure_info cost_centre amodes)
+ppr_decls_AbsC (CStaticClosure closure_info cost_centre amodes)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = ppr_decls_Amodes amodes
 

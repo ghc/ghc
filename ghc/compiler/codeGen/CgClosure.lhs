@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.53 2001/11/23 11:47:12 simonmar Exp $
+% $Id: CgClosure.lhs,v 1.54 2002/01/02 12:32:18 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -86,30 +86,18 @@ cgTopRhsClosure id ccs binder_info srt args body lf_info
     let
     	name          = idName id
 	closure_info  = layOutStaticNoFVClosure name lf_info srt_info
-    	closure_label = mkClosureLabel name
+	closure_label = mkClosureLabel name
     	cg_id_info    = stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info
     in
 
 	-- BUILD THE OBJECT (IF NECESSARY)
-    ({- if staticClosureRequired name binder_info lf_info
-     then -}
-	(if opt_SccProfilingOn 
-	  then
-	     absC (CStaticClosure
-		closure_label	-- Labelled with the name on lhs of defn
-		closure_info
-	    	(mkCCostCentreStack ccs)
-		[])		-- No fields
-	  else
-	     absC (CStaticClosure
-		closure_label	-- Labelled with the name on lhs of defn
-		closure_info
-	    	(panic "absent cc")
-		[])		-- No fields
-	)
-
-     {- else
+    (
+     ({- if staticClosureRequired name binder_info lf_info
+      then -}
+	absC (mkStaticClosure closure_info ccs [] True)
+      {- else
 	nopC -}
+     )
     							`thenC`
 
 	-- GENERATE THE INFO TABLE (IF NECESSARY)

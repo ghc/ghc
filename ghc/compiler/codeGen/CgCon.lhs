@@ -40,7 +40,7 @@ import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
 import CLabel		( mkClosureLabel )
 import ClosureInfo	( mkConLFInfo, mkLFArgument, closureLFInfo,
 			  layOutDynConstr, layOutDynClosure,
-			  layOutStaticConstr, closureSize
+			  layOutStaticConstr, closureSize, mkStaticClosure
 			)
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
@@ -48,7 +48,8 @@ import DataCon		( DataCon, dataConName, dataConTag,
 			  isUnboxedTupleCon, isNullaryDataCon, dataConId, 
 			  dataConWrapId, dataConRepArity
 			)
-import Id		( Id, idName, idPrimRep )
+import Id		( Id, idName, idPrimRep, idCafInfo )
+import IdInfo		( mayHaveCafRefs )
 import Literal		( Literal(..) )
 import PrelInfo		( maybeCharLikeCon, maybeIntLikeCon )
 import PrimRep		( PrimRep(..), isFollowableRep )
@@ -77,19 +78,19 @@ cgTopRhsCon id con args
 
     let
 	name          = idName id
-    	closure_label = mkClosureLabel name
 	lf_info	      = closureLFInfo closure_info
-	(closure_info, amodes_w_offsets) = layOutStaticConstr name con getAmodeRep amodes
+    	closure_label = mkClosureLabel name
+	(closure_info, amodes_w_offsets) 
+		= layOutStaticConstr name con getAmodeRep amodes
     in
 
 	-- BUILD THE OBJECT
-    absC (CStaticClosure
-	    closure_label		-- Labelled with the name on lhs of defn
-	    closure_info		-- Closure is static
-	    (mkCCostCentreStack dontCareCCS) -- because it's static data
-	    (map fst amodes_w_offsets)) -- Sorted into ptrs first, then nonptrs
-
-    							`thenC`
+    absC (mkStaticClosure
+	    closure_info
+	    dontCareCCS			-- because it's static data
+	    (map fst amodes_w_offsets)  -- Sorted into ptrs first, then nonptrs
+	    (mayHaveCafRefs (idCafInfo id))
+	  )					`thenC`
 
 	-- RETURN
     returnFC (id, stableAmodeIdInfo id (CLbl closure_label PtrRep) lf_info)

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: Costs.lhs,v 1.30 2001/11/23 11:58:00 simonmar Exp $
+% $Id: Costs.lhs,v 1.31 2002/01/02 12:32:19 simonmar Exp $
 %
 % Only needed in a GranSim setup -- HWL
 % ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ costs absC =
 
    CCallTypedef _ _ _ _ _    -> nullCosts
 
-   CStaticClosure _ _ _ _    -> nullCosts
+   CStaticClosure _ _ _      -> nullCosts
 
    CSRT _ _                  -> nullCosts
 

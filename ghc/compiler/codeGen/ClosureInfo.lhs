@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.50 2001/10/25 02:13:11 sof Exp $
+% $Id: ClosureInfo.lhs,v 1.51 2002/01/02 12:32:19 simonmar Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -25,7 +25,7 @@ module ClosureInfo (
 
 	layOutDynClosure, layOutDynConstr, layOutStaticClosure,
 	layOutStaticNoFVClosure, layOutStaticConstr,
-	mkVirtHeapOffsets,
+	mkVirtHeapOffsets, mkStaticClosure,
 
 	nodeMustPointToIt, getEntryConvention, 
 	FCode, CgInfoDownwards, CgState, 
@@ -56,7 +56,7 @@ module ClosureInfo (
 
 #include "HsVersions.h"
 
-import AbsCSyn		( MagicId, node, VirtualHeapOffset, HeapOffset, C_SRT(..), needsSRT )
+import AbsCSyn		
 import StgSyn
 import CgMonad
 
@@ -418,6 +418,46 @@ layOutStaticNoFVClosure name lf_info srt_info
   where
     rep = GenericRep is_static 0 0 (getClosureType is_static 0 0 lf_info)
     is_static = True
+
+
+-- make a static closure, adding on any extra padding needed for CAFs,
+-- and adding a static link field if necessary.
+
+mkStaticClosure closure_info ccs fields cafrefs
+  | opt_SccProfilingOn =
+	     CStaticClosure
+		closure_info
+	    	(mkCCostCentreStack ccs)
+		all_fields
+  | otherwise =
+	     CStaticClosure
+		closure_info
+	    	(panic "absent cc")
+		all_fields
+
+   where
+    all_fields = fields ++ padding_wds ++ static_link_field
+
+    upd_reqd = closureUpdReqd closure_info
+
+    padding_wds
+	| not upd_reqd = []
+	| otherwise    = replicate n (mkIntCLit 0) -- a bunch of 0s
+	where n = max 0 (mIN_UPD_SIZE - length fields)
+
+	-- We always have a static link field for a thunk, it's used to
+	-- save the closure's info pointer when we're reverting CAFs
+	-- (see comment in Storage.c)
+    static_link_field
+	| upd_reqd || staticClosureNeedsLink closure_info = [static_link_value]
+	| otherwise 	     		                  = []
+
+	-- for a static constructor which has NoCafRefs, we set the
+	-- static link field to a non-zero value so the garbage
+	-- collector will ignore it.
+    static_link_value
+	| cafrefs	= mkIntCLit 0
+	| otherwise	= mkIntCLit 1
 \end{code}
 
 %************************************************************************
@@ -730,19 +770,27 @@ staticClosureNeedsLink :: ClosureInfo -> Bool
 -- A static closure needs a link field to aid the GC when traversing
 -- the static closure graph.  But it only needs such a field if either
 -- 	a) it has an SRT
---	b) it's a non-nullary constructor
+--	b) it's a constructor with one or more pointer fields
 -- In case (b), the constructor's fields themselves play the role
 -- of the SRT.
-staticClosureNeedsLink (MkClosureInfo { closureName = name, closureSRT = srt, closureLFInfo = info })
-  = needsSRT srt || constructor_srt
+staticClosureNeedsLink (MkClosureInfo { closureName = name, 
+					closureSRT = srt, 
+					closureLFInfo = lf_info,
+					closureSMRep = sm_rep })
+  = needsSRT srt || (constr_with_fields && not_nocaf_constr)
   where
-    constructor_srt 
-      = case info of
+    not_nocaf_constr = 
+	case sm_rep of 
+	   GenericRep _ _ _ CONSTR_NOCAF -> False
+	   _other			 -> True
+
+    constr_with_fields =
+	case lf_info of
 	  LFThunk _ _ _ _ _    -> False
 	  LFReEntrant _ _ _ _  -> False
 	  LFCon   _ is_nullary -> not is_nullary
 	  LFTuple _ is_nullary -> not is_nullary
-	  other		       -> pprPanic "staticClosureNeedsLink" (ppr name)
+	  _other	       -> pprPanic "staticClosureNeedsLink" (ppr name)
 \end{code}
 
 Avoiding generating entries and info tables

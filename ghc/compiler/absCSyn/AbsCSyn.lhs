@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.43 2001/12/14 15:26:14 sewardj Exp $
+% $Id: AbsCSyn.lhs,v 1.44 2002/01/02 12:32:19 simonmar Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -115,7 +115,7 @@ stored in a mixed type location.)
   | CInitHdr		-- to initialise the header of a closure (both fixed/var parts)
 	ClosureInfo
 	CAddrMode	-- address of the info ptr
-	CAddrMode	-- cost centre to place in closure
+	!CAddrMode	-- cost centre to place in closure
 			--   CReg CurCostCentre or CC_HDR(R1.p{-Node-})
 	Int		-- size of closure, for profiling
 
@@ -192,8 +192,7 @@ stored in a mixed type location.)
   -- *** the next three [or so...] are DATA (those above are CODE) ***
 
   | CStaticClosure
-	CLabel	-- The (full, not base) label to use for labelling the closure.
-	ClosureInfo
+	ClosureInfo		-- Todo: maybe info_lbl & closure_lbl instead?
 	CAddrMode		-- cost centre identifier to place in closure
 	[CAddrMode]		-- free vars; ptrs, then non-ptrs.
 
@@ -375,6 +374,8 @@ data CAddrMode
            CAddrMode	-- specified address
 
   | CBytesPerWord	-- Word size, in bytes, on this platform
+			-- required for: half-word loads (used in fishing tags
+			-- out of info tables), and sizeofByteArray#.
 \end{code}
 
 Various C macros for values which are dependent on the back-end layout.

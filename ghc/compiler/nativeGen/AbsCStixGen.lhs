@@ -26,8 +26,7 @@ import CLabel           ( CLabel, mkReturnInfoLabel, mkReturnPtLabel,
                           mkClosureTblLabel, mkClosureLabel,
 			  labelDynamic, mkSplitMarkerLabel )
 import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
-			  fastLabelFromCI, closureUpdReqd,
-			  staticClosureNeedsLink
+			  closureLabelFromCI, fastLabelFromCI
 			)
 import Literal		( Literal(..), word2IntLit )
 import Maybes	    	( maybeToBool )
@@ -89,7 +88,7 @@ Here we handle top-level things, like @CCodeBlock@s and
   = gencode absC				`thenUs` \ code ->
     returnUs (StSegment TextSegment : StFunBegin lbl : code [StFunEnd lbl])
 
- gentopcode stmt@(CStaticClosure lbl _ _ _)
+ gentopcode stmt@(CStaticClosure closure_info _ _)
   = genCodeStaticClosure stmt			`thenUs` \ code ->
     returnUs (
        if   opt_Static
@@ -99,6 +98,8 @@ Here we handle top-level things, like @CCodeBlock@s and
             : StData PtrRep [StInt 0] -- DLLised world, need extra zero word
             : StLabel lbl : code []
     )
+  where
+	lbl = closureLabelFromCI closure_info
 
  gentopcode stmt@(CRetVector lbl _ _ _)
   = genCodeVecTbl stmt				`thenUs` \ code ->
@@ -110,8 +111,8 @@ Here we handle top-level things, like @CCodeBlock@s and
        -- for ensuring the GC works correctly, although GC crashes due to
        -- misclassification are much more likely to show up in the interactive 
        -- system than in compile code.  For details see comment near line 1164 
-       -- of ghc/driver/mangler/ghc-asm.lprl, which contains an analogous fix for 
-       -- the mangled via-C route.
+       -- of ghc/driver/mangler/ghc-asm.lprl, which contains an analogous fix
+       -- for the mangled via-C route.
        vtbl_post_label_word = StData PtrRep [StInt 0]
 
  gentopcode stmt@(CRetDirect uniq absC srt liveness)
@@ -226,12 +227,11 @@ Here we handle top-level things, like @CCodeBlock@s and
     :: AbstractC
     -> UniqSM StixTreeList
  -}
- genCodeStaticClosure (CStaticClosure _ cl_info cost_centre amodes)
+ genCodeStaticClosure (CStaticClosure cl_info cost_centre amodes)
   = returnUs (\xs -> table ++ xs)
   where
     table = StData PtrRep [StCLbl (infoTableLabelFromCI cl_info)] : 
-	    map do_one_amode amodes ++
-	    [StData PtrRep (padding_wds ++ static_link)]
+	    map do_one_amode amodes
 
     do_one_amode amode 
        = StData (promote_to_word (getAmodeRep amode)) [a2stix amode]
@@ -240,25 +240,6 @@ Here we handle top-level things, like @CCodeBlock@s and
     promote_to_word pk 
        | getPrimRepArrayElemSize pk >= getPrimRepArrayElemSize IntRep  = pk
        | otherwise                                                     = IntRep
-
-    upd_reqd = closureUpdReqd cl_info
-
-    padding_wds
-	| upd_reqd  = take (max 0 (mIN_UPD_SIZE - length amodes)) zeros
-	| otherwise = []
-
-    static_link | upd_reqd || staticClosureNeedsLink cl_info = [StInt 0]
-	        | otherwise                                  = []
-
-    zeros = StInt 0 : zeros
-
-    {- needed??? --SDM
-    	-- Watch out for VoidKinds...cf. PprAbsC
-    amodeZeroVoid item
-      | getAmodeRep item == VoidRep = StInt 0
-      | otherwise = a2stix item
-    -}
-
 \end{code}
 
 Now the individual AbstractC statements.
