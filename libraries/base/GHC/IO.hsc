@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hsc,v 1.1 2001/06/28 14:15:03 simonmar Exp $
+-- $Id: IO.hsc,v 1.2 2001/07/31 12:46:17 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -179,6 +179,16 @@ hGetLineBufferedLoop handle_ ref
 		     hGetLineBufferedLoop handle_ ref new_buf (xs:xss)
 
 
+maybeFillReadBuffer fd is_line buf
+  = catch 
+     (do buf <- fillReadBuffer fd is_line buf
+	 return (Just buf)
+     )
+     (\e -> do if isEOFError e 
+		  then return Nothing 
+		  else throw e)
+
+
 unpack :: RawBuffer -> Int -> Int -> IO [Char]
 unpack buf r 0   = return ""
 unpack buf (I## r) (I## len) = IO $ \s -> unpack [] (len -## 1##) s
@@ -225,12 +235,8 @@ hGetLineUnBuffered h = do
 -- carry on writing to it afterwards.
 
 hGetContents :: Handle -> IO String
-hGetContents handle@(DuplexHandle r w) 
-  = withHandle' "hGetContents" handle r (hGetContents' handle)
-hGetContents handle@(FileHandle m) 
-  = withHandle' "hGetContents" handle m (hGetContents' handle)
-
-hGetContents' handle handle_ = 
+hGetContents handle = 
+    withHandle "hGetContents" handle $ \handle_ ->
     case haType handle_ of 
       ClosedHandle 	   -> ioe_closedHandle
       SemiClosedHandle 	   -> ioe_closedHandle
@@ -246,9 +252,9 @@ hGetContents' handle handle_ =
 lazyRead :: Handle -> IO String
 lazyRead handle = 
    unsafeInterleaveIO $
-	withHandle_ "lazyRead" handle $ \ handle_ -> do
+	withHandle "lazyRead" handle $ \ handle_ -> do
 	case haType handle_ of
-	  ClosedHandle     -> return ""
+	  ClosedHandle     -> return (handle_, "")
 	  SemiClosedHandle -> lazyRead' handle handle_
 	  _ -> ioException 
 	 	  (IOError (Just handle) IllegalOperation "lazyRead"
@@ -262,7 +268,7 @@ lazyRead' h handle_ = do
   -- (see hLookAhead)
   buf <- readIORef ref
   if not (bufferEmpty buf)
-	then lazyReadBuffered h fd ref buf
+	then lazyReadHaveBuffer h handle_ fd ref buf
 	else do
 
   case haBufferMode handle_ of
@@ -270,41 +276,36 @@ lazyRead' h handle_ = do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	    fd  = haFD handle_
-	r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
+	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
 	        (read_off (fromIntegral fd) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
-	   then return ""
+	   then do handle_ <- hClose_help handle_ 
+		   return (handle_, "")
 	   else do (c,_) <- readCharFromBuffer raw 0
 		   rest <- lazyRead h
-		   return (c : rest)
+		   return (handle_, c : rest)
 
-     LineBuffering    -> lazyReadBuffered h fd ref buf
-     BlockBuffering _ -> lazyReadBuffered h fd ref buf
+     LineBuffering    -> lazyReadBuffered h handle_ fd ref buf
+     BlockBuffering _ -> lazyReadBuffered h handle_ fd ref buf
 
 -- we never want to block during the read, so we call fillReadBuffer with
 -- is_line==True, which tells it to "just read what there is".
-lazyReadBuffered h fd ref buf = do
-   maybe_new_buf <- 
-	if bufferEmpty buf 
-      	   then maybeFillReadBuffer fd True buf
-	   else return (Just buf)
-   case maybe_new_buf of
-	Nothing  -> return ""
-	Just buf -> do
-	   more <- lazyRead h
-	   writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
-	   unpackAcc (bufBuf buf) (bufRPtr buf) (bufWPtr buf) more
+lazyReadBuffered h handle_ fd ref buf = do
+   catch 
+   	(do buf <- fillReadBuffer fd True{-is_line-} buf
+	    lazyReadHaveBuffer h handle_ fd ref buf
+     	)
+	-- all I/O errors are discarded.  Additionally, we close the handle.
+     	(\e -> do handle_ <- hClose_help handle_
+		  return (handle_, "")
+	)
 
-
-maybeFillReadBuffer fd is_line buf
-  = catch 
-     (do buf <- fillReadBuffer fd is_line buf
-	 return (Just buf)
-     )
-     (\e -> if isEOFError e 
-		then return Nothing 
-		else throw e)
+lazyReadHaveBuffer h handle_ fd ref buf = do
+   more <- lazyRead h
+   writeIORef ref buf{ bufRPtr=0, bufWPtr=0 }
+   s <- unpackAcc (bufBuf buf) (bufRPtr buf) (bufWPtr buf) more
+   return (handle_, s)
 
 
 unpackAcc :: RawBuffer -> Int -> Int -> [Char] -> IO [Char]
