@@ -925,8 +925,10 @@ lex_num cont exts acc buf =
 		    do_exponent 
 			= let buf3 = incLexeme buf2 in
 			  case currentChar# buf3 of
-				'-'# -> expandWhile# is_digit (incLexeme buf3)
-				'+'# -> expandWhile# is_digit (incLexeme buf3)
+				'-'# | is_digit (lookAhead# buf 1#)
+				   -> expandWhile# is_digit (incLexeme buf3)
+				'+'# | is_digit (lookAhead# buf 1#)
+				   -> expandWhile# is_digit (incLexeme buf3)
 				x | is_digit x -> expandWhile# is_digit buf3
 				_ -> buf2
 
