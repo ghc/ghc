@@ -885,7 +885,7 @@ Some floating-point format info, made with the \tr{enquire} program
 /* yes, it is IEEE floating point */
 #include "ieee-flpt.h"
 
-#if alpha_dec_osf1_TARGET	\
+#if alpha_TARGET_ARCH	\
  || i386_TARGET_ARCH		\
  || mipsel_TARGET_ARCH
 
@@ -902,7 +902,7 @@ Some floating-point format info, made with the \tr{enquire} program
 \end{code}
 
 \begin{code}
-#if alpha_dec_osf1_TARGET
+#if alpha_TARGET_ARCH
 #define encodeFloatZh(r, hp, aa,sa,da, expon)	encodeDoubleZh(r, hp, aa,sa,da, expon)
 #else
 #define encodeFloatZh(r, hp, aa,sa,da, expon)	\
@@ -928,7 +928,7 @@ Some floating-point format info, made with the \tr{enquire} program
   r = SAFESTGCALL2(StgDouble,(void *, MP_INT *, I_), __encodeDouble,&arg,(expon));\
 }
 
-#if alpha_dec_osf1_TARGET
+#if alpha_TARGET_ARCH
 #define decodeFloatZh(exponr, ar,sr,dr, hp, f)	decodeDoubleZh(exponr, ar,sr,dr, hp, f)
 #else
 #define decodeFloatZh(exponr, ar,sr,dr, hp, f)				\

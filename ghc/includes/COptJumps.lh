@@ -60,7 +60,7 @@ It seems that \tr{_procedure} can't be declared within the body of the
 \tr{JMP_} macro...at least, not if we want it to be \$27, which we do!
 
 \begin{code}
-#if alpha_dec_osf1_TARGET
+#if alpha_TARGET_ARCH
     /* ToDo: less specific? */
 
 /*

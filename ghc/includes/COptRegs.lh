@@ -242,7 +242,7 @@ all available registers, with the normal callee-saves conventions.
 
 This is a HACK here; see comment in COptJumps.lh.
 \begin{code}
-#if alpha_dec_osf1_TARGET && defined(__STG_TAILJUMPS__) && defined(__GNUC__)
+#if alpha_TARGET_ARCH && defined(__STG_TAILJUMPS__) && defined(__GNUC__)
 register void *_procedure __asm__("$27");
 #endif
 #if (mipsel_TARGET_ARCH || mipseb_TARGET_ARCH) && defined(__STG_TAILJUMPS__) && defined(__GNUC__)

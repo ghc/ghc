@@ -62,9 +62,12 @@ AC_CACHE_CHECK([leading underscore in symbol names], ac_cv_lead_uscore,
 # Hack!: nlist() under Digital UNIX insist on there being an _,
 # but symbol table listings show none. What is going on here?!?
 #
-if test $HostPlatform = "alpha-dec-osf1"; then
-   ac_cv_lead_uscore='no'
-else
+changequote(<<, >>)dnl
+<<
+case $HostPlatform in
+alpha-dec-osf*) ac_cv_lead_uscore='no';;
+*) >>
+changequote([, ])dnl
 AC_TRY_RUN([#ifdef HAVE_NLIST_H
 #include <nlist.h>
 changequote(<<, >>)dnl
@@ -83,7 +86,8 @@ changequote([, ])dnl
 #endif
     exit(1);
 }], ac_cv_lead_uscore=yes, ac_cv_lead_uscore=no, ac_cv_lead_uscore=NO)
-fi);
+;;
+esac);
 LeadingUnderscore=`echo $ac_cv_lead_uscore | sed 'y/yesno/YESNO/'`
 AC_SUBST(LeadingUnderscore)
 ])

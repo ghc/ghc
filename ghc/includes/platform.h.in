@@ -3,6 +3,7 @@
 
 #define alpha_dec_osf1		10
 #define alpha_unknown_linux	11
+#define alpha_dec_osf3		12
 #define hppa1_1_hp_hpux		20
 #define i386_next_nextstep3	30
 #define i386_unknown_bsdi	31

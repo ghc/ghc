@@ -55,7 +55,12 @@ you will screw up the layout where they are used in case expressions!
 # define BYTES_PER_WORD 8
 # define BYTES_PER_WORD_STR "8"
 
-# include "../../includes/alpha-dec-osf1.h"
+# if osf1_TARGET_OS
+#  include "../../includes/alpha-dec-osf1.h"
+# endif
+# if osf3_TARGET_OS
+#  include "../../includes/alpha-dec-osf3.h"
+# endif
 #endif
 
 #if i386_TARGET_ARCH
