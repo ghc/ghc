@@ -151,6 +151,7 @@ magicIdPrimRep CurCostCentre	    = CostCentreRep
 magicIdPrimRep VoidReg		    = VoidRep
 magicIdPrimRep CurrentTSO	    = ThreadIdRep
 magicIdPrimRep CurrentNursery	    = PtrRep
+magicIdPrimRep HpAlloc              = WordRep
 \end{code}
 
 %************************************************************************
