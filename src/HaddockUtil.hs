@@ -9,7 +9,7 @@ module HaddockUtil (
 
   -- * Misc utilities
   nameOfQName, collectNames, declBinders, declMainBinder, splitTyConApp,
-  restrictTo, declDoc, parseModuleHeader, freeTyCons,
+  restrictTo, declDoc, parseModuleHeader, freeTyCons, unbang,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -36,13 +36,16 @@ nameOfQName (UnQual n) = n
 collectNames :: [HsDecl] -> [HsName]
 collectNames ds = concat (map declBinders ds)
 
+unbang (HsUnBangedTy ty) = ty
+unbang (HsBangedTy   ty) = ty
+
 declMainBinder :: HsDecl -> Maybe HsName
 declMainBinder d = 
    case d of
      HsTypeDecl _ n _ _ _          -> Just n
      HsDataDecl _ _ n _ cons _ _   -> Just n
      HsNewTypeDecl _ _ n _ _ _  _  -> Just n
-     HsClassDecl _ qt _ decls _    -> Just (exQtNm qt)
+     HsClassDecl _ _ n _ _ decls _ -> Just n
      HsTypeSig _ [n] _ _           -> Just n
      HsTypeSig _ ns _ _            -> error "declMainBinder"
      HsForeignImport _ _ _ _ n _ _ -> Just n
@@ -54,7 +57,7 @@ declBinders d =
      HsTypeDecl _ n _ _ _          -> [n]
      HsDataDecl _ _ n _ cons _ _   -> n : concat (map conDeclBinders cons)
      HsNewTypeDecl _ _ n _ con _ _ -> n : conDeclBinders con
-     HsClassDecl _ qt _ decls _    -> exQtNm qt : collectNames decls
+     HsClassDecl _ _ n _ _ decls _ -> n : collectNames decls
      HsTypeSig _ ns _ _            -> ns
      HsForeignImport _ _ _ _ n _ _ -> [n]
      _                             -> []
@@ -95,8 +98,8 @@ restrictTo names decl = case decl of
 	HsDataDecl loc ctxt n xs (restrictCons names cons) drv doc
      HsNewTypeDecl loc ctxt n xs con drv doc ->
 	HsDataDecl loc ctxt n xs (restrictCons names [con]) drv	doc
-     HsClassDecl loc qt fds decls doc ->
-	HsClassDecl loc qt fds (restrictDecls names decls) doc
+     HsClassDecl loc ctxt n tys fds decls doc ->
+	HsClassDecl loc ctxt n tys fds (restrictDecls names decls) doc
      _ -> decl
    
 restrictCons :: [HsName] -> [HsConDecl] -> [HsConDecl]
@@ -116,7 +119,7 @@ restrictDecls names decls = filter keep decls
 declDoc (HsTypeDecl _ _ _ _ d)          = d
 declDoc (HsDataDecl _ _ _ _ _ _ d)      = d
 declDoc (HsNewTypeDecl _ _ _ _ _ _ d)   = d
-declDoc (HsClassDecl _ _ _ _ d)         = d
+declDoc (HsClassDecl _ _ _ _ _ _ d)     = d
 declDoc (HsTypeSig _ _ _ d)             = d
 declDoc (HsForeignImport _ _ _ _ _ _ d) = d
 declDoc _ = Nothing

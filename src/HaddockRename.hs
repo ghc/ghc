@@ -92,11 +92,11 @@ renameDecl decl
 	    con <- renameConDecl con
 	    doc <- renameMaybeDoc doc
 	    return (HsNewTypeDecl loc ctx t args con drv doc)
-        HsClassDecl loc qt fds decls doc -> do
-	    qt <- renameClassHead qt
+        HsClassDecl loc ctxt nm tvs fds decls doc -> do
+	    ctxt <- mapM renamePred ctxt
 	    decls <- mapM renameDecl decls
 	    doc <- renameMaybeDoc doc
-	    return (HsClassDecl loc qt fds decls doc)
+	    return (HsClassDecl loc ctxt nm tvs fds decls doc)
 	HsTypeSig loc fs qt doc -> do
 	    qt <- renameType qt
 	    doc <- renameMaybeDoc doc
@@ -114,12 +114,6 @@ renameDecl decl
 	    return (HsDocCommentNamed loc name doc)
 	_ -> 
 	    return decl
-
-renameClassHead (HsForAllType tvs ctx ty) = do
-  ctx <- mapM renamePred ctx
-  return (HsForAllType tvs ctx ty)
-renameClassHead ty = do
-  return ty
 
 renameConDecl (HsConDecl loc nm tvs ctxt tys doc) = do
   tys <- mapM renameBangTy tys

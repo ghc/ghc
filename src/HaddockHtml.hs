@@ -438,7 +438,7 @@ doDecl summary inst_maps x decl = do_decl decl
      do_decl decl@(HsDataDecl loc ctx nm args cons drv doc)
 	= ppHsDataDecl summary inst_maps False{-not newtype-} x decl
 
-     do_decl decl@(HsClassDecl _ _ _ _ _)
+     do_decl decl@(HsClassDecl{})
 	= ppHsClassDecl summary inst_maps x decl
 
      do_decl (HsDocGroup loc lev str)
@@ -611,15 +611,21 @@ ppHsBangType (HsUnBangedTy ty) = ppHsAType ty
 -- -----------------------------------------------------------------------------
 -- Class declarations
 
-ppClassHdr ty fds = 
-  keyword "class" <+> ppHsType ty <+>
+ppClassHdr [] n tvs fds = 
+  keyword "class" <+> ppHsAsst (UnQual n, map HsTyVar tvs) <+> ppFds fds
+ppClassHdr ctxt n tvs fds = 
+  keyword "class" <+> ppHsContext ctxt <+> darrow <+> 
+	ppHsAsst (UnQual n, map HsTyVar tvs) <+> ppFds fds
+
+ppFds fds =
   if null fds then noHtml else 
 	char '|' <+> hsep (punctuate comma (map fundep fds))
   where
 	fundep (vars1,vars2) = hsep (map ppHsName vars1) <+> toHtml "->" <+>
 			       hsep (map ppHsName vars2)
 
-ppShortClassDecl summary inst_maps decl@(HsClassDecl loc ty fds decls doc) = 
+ppShortClassDecl summary inst_maps 
+	decl@(HsClassDecl loc ctxt nm tvs fds decls doc) = 
   if null decls
     then declBox hdr
     else declBox (hdr <+> keyword "where")
@@ -633,11 +639,11 @@ ppShortClassDecl summary inst_maps decl@(HsClassDecl loc ty fds decls doc) =
          
    where
 	Just c = declMainBinder decl
-	hdr | not summary = linkTarget c +++ ppClassHdr ty fds
-	    | otherwise   = ppClassHdr ty fds
+	hdr | not summary = linkTarget c +++ ppClassHdr ctxt nm tvs fds
+	    | otherwise   = ppClassHdr ctxt nm tvs fds
 
 ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c 
-	decl@(HsClassDecl loc ty fds decls doc)
+	decl@(HsClassDecl loc ctxt nm tvs fds decls doc)
   | summary = ppShortClassDecl summary inst_maps decl
 
   | otherwise
@@ -650,9 +656,10 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 	Just c = declMainBinder decl
 
 	header
-	   | null decls = declBox (linkTarget c +++ ppClassHdr ty fds)
-	   | otherwise  = declBox (linkTarget c +++ ppClassHdr ty fds <+> 
-					keyword "where")
+	   | null decls = declBox (linkTarget c +++ ppClassHdr ctxt nm tvs fds)
+	   | otherwise  = declBox (linkTarget c +++ 
+				    ppClassHdr ctxt nm tvs fds <+> 
+				    keyword "where")
 
 	classdoc
 	   | Just d <- doc = ndocBox (docToHtml d)
@@ -685,7 +692,7 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 
 ppInstHead	       :: InstHead -> Html
 ppInstHead ([],asst)   =  ppHsAsst asst
-ppInstHead (ctxt,asst) =  ppHsContext ctxt <+> toHtml "=>" <+> ppHsAsst asst
+ppInstHead (ctxt,asst) =  ppHsContext ctxt <+> darrow <+> ppHsAsst asst
 
 -- ----------------------------------------------------------------------------
 -- Type signatures
@@ -732,10 +739,6 @@ ppFunSig summary nm ty doc
 	do_args leader ty
 	  = declBox (leader <+> ppHsBType ty) <-> rdocBox (noHtml)
 
-	dcolon = toHtml "::"
-	arrow  = toHtml "->"
-	darrow = toHtml "=>"
-
 -- -----------------------------------------------------------------------------
 -- Types and contexts
 
@@ -747,12 +750,12 @@ ppHsContext []      =  empty
 ppHsContext context =  parenList (map ppHsAsst context)
 
 ppHsForAll Nothing context = 
-  hsep [ ppHsContext context, toHtml "=>" ]
+  hsep [ ppHsContext context, darrow ]
 ppHsForAll (Just tvs) [] = 
   hsep (keyword "forall" : map ppHsName tvs ++ [toHtml "."])
 ppHsForAll (Just tvs) context =
   hsep (keyword "forall" : map ppHsName tvs ++ 
-	  [toHtml ".", ppHsContext context, toHtml "=>"])
+	  [toHtml ".", ppHsContext context, darrow])
 
 ppHsType :: HsType -> Html
 ppHsType (HsForAllType maybe_tvs context htype) =
@@ -930,6 +933,10 @@ spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
 meth_hdr   = tda [ theclass "section4" ] << toHtml "Methods"
 inst_hdr   = tda [ theclass "section4" ] << toHtml "Instances"
+
+dcolon = toHtml "::"
+arrow  = toHtml "->"
+darrow = toHtml "=>"
 
 s8, s15 :: HtmlTable
 s8  = tda [ theclass "s8" ]  << noHtml

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsParseUtils.lhs,v 1.3 2002/05/27 09:03:52 simonmar Exp $
+-- $Id: HsParseUtils.lhs,v 1.4 2002/06/03 13:05:58 simonmar Exp $
 --
 -- (c) The GHC Team 1997-2000
 --
@@ -18,8 +18,8 @@ module HsParseUtils (
 	, checkContext		-- HsType -> P HsContext
 	, checkAssertion	-- HsType -> P HsAsst
 	, checkInstHeader	-- HsType -> P (HsContext, HsAsst)
+	, checkClassHeader	-- HsType -> P (HsContext, HsName, [HsType])
 	, checkDataHeader	-- HsType -> P (HsContext,HsName,[HsName])
-	, checkSimple		-- HsType -> [HsName] -> P ((HsName,[HsName]))
 	, checkPattern		-- HsExp -> P HsPat
 	, checkPatterns		-- [HsExp] -> P [HsPat]
 	, checkExpr		-- HsExp -> P HsExp
@@ -73,7 +73,6 @@ checkAssertion = checkAssertion' []
 		checkAssertion' ts (HsTyApp a t) = checkAssertion' (t:ts) a
 		checkAssertion' _ _ = parseError "Illegal class assertion"
 
-
 checkInstHeader :: HsType -> P (HsContext, HsAsst)
 checkInstHeader (HsForAllType Nothing ctxt ty) =
   checkAssertion ty `thenP` \asst ->
@@ -84,17 +83,26 @@ checkInstHeader ty =
 
 checkDataHeader :: HsType -> P (HsContext,HsName,[HsName])
 checkDataHeader (HsForAllType Nothing cs t) =
-   checkSimple t []	     `thenP` \(c,ts) ->
-   returnP (cs,c,ts)
-checkDataHeader t =
-   checkSimple t []	     `thenP` \(c,ts) ->
-   returnP ([],c,ts)
+	checkSimple "data/newtype" t [] `thenP` \(c,ts) ->
+	returnP (cs,c,ts)
+checkDataHeader ty =
+	checkSimple "data/newtype" ty [] `thenP` \(c,ts) ->
+	returnP ([],c,ts)
 
-checkSimple :: HsType -> [HsName] -> P ((HsName,[HsName]))
-checkSimple (HsTyApp l (HsTyVar a)) xs = checkSimple l (a:xs)
-checkSimple (HsTyCon (UnQual t))    xs = returnP (t,xs)
-checkSimple (HsTyCon (Qual m t))    xs = returnP (t,xs)
-checkSimple _ _ = parseError "Illegal data/newtype declaration"
+checkClassHeader :: HsType -> P (HsContext,HsName,[HsName])
+checkClassHeader (HsForAllType Nothing cs t) = 
+	checkSimple "class" t [] `thenP` \(c,ts) ->
+	returnP (cs,c,ts)
+checkClassHeader ty = 
+	checkSimple "class" ty [] `thenP` \(c,ts) ->
+	returnP ([],c,ts)
+
+checkSimple :: String -> HsType -> [HsName] -> P ((HsName,[HsName]))
+checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
+checkSimple _kw (HsTyCon (UnQual t))   xs = returnP (t,xs)
+checkSimple kw (HsTyCon (Qual m t))    xs
+  | m == prelude_mod = returnP (t,xs)	-- for "special" declarations
+checkSimple kw _ _ = failP ("Illegal " ++ kw ++ " declaration")
 
 -----------------------------------------------------------------------------
 -- Checking Patterns.

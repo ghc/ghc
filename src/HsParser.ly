@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.12 2002/05/27 09:03:52 simonmar Exp $
+$Id: HsParser.ly,v 1.13 2002/06/03 13:05:58 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -304,7 +304,8 @@ shift/reduce-conflict, so we don't handle this case here, but in bodyaux.
 >		{% checkDataHeader $2 `thenP` \(cs,c,t) ->
 >		   returnP (HsNewTypeDecl $3 cs c t $5 $6 Nothing) }
 >	| 'class' srcloc ctype fds optcbody
->		{ HsClassDecl $2 $3 $4 $5 Nothing}
+>		{% checkClassHeader $3 `thenP` \(ctxt,n,tys) ->
+>		   returnP (HsClassDecl $2 ctxt n tys $4 $5 Nothing) }
 >	| 'instance' srcloc ctype optvaldefs
 >		{% checkInstHeader $3 `thenP` \(ctxt,asst) ->
 >		   returnP (HsInstDecl $2 ctxt asst $4) }

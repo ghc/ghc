@@ -284,7 +284,8 @@ mkExportItems mod_map mod decl_map decls options maybe_exps
 
     lookupExport (HsEVar x) 
 	| Just decl <- findDecl x
-	= return [ ExportDecl x decl ]
+	= return [ ExportDecl x (extractDecl (nameOfQName x) x_mod decl) ]
+        where x_mod | Qual m _ <- x = m
 	  -- ToDo: cope with record selectors here
     lookupExport (HsEAbs t)
 	| Just decl <- findDecl t
@@ -341,6 +342,45 @@ keepDecl HsDataDecl{}    = True
 keepDecl HsClassDecl{}   = True
 keepDecl HsDocGroup{}	 = True
 keepDecl _ = False
+
+-- Sometimes the declaration we want to export is not the "main" declaration:
+-- it might be an individual record selector or a class method.  In these
+-- cases we have to extract the required declaration (and somehow cobble 
+-- together a type signature for it...)
+
+extractDecl :: HsName -> Module -> HsDecl -> HsDecl
+extractDecl name mod decl
+  | Just n <- declMainBinder decl, n == name  =  decl
+  | otherwise  =  
+	case decl of
+	    HsClassDecl loc ctxt n tvs fds decls mb_doc ->
+		case [ d | d@HsTypeSig{} <- decls, 
+			   declMainBinder d == Just name ] of
+		  [decl] -> extractClassDecl n mod tvs decl
+		  _ -> error "internal: extractDecl"
+
+	    HsDataDecl loc ctxt t tvs cons drvs mb_doc ->
+		extractRecSel name mod t tvs cons
+
+extractClassDecl c mod tvs (HsTypeSig loc [n] ty doc)
+ = case ty of
+ 	HsForAllType tvs ctxt' ty' -> 
+	  HsTypeSig loc [n] (HsForAllType tvs (ctxt ++ ctxt') ty') doc
+	ty -> 
+	  HsTypeSig loc [n] (HsForAllType Nothing ctxt ty) doc
+ where
+  ctxt = [(Qual mod c, map HsTyVar tvs)]
+
+extractRecSel nm mod t tvs [] = error "extractRecSel: selector not found"
+extractRecSel nm mod t tvs (HsRecDecl loc c _tvs ctxt fields _mb_doc : rest)
+  | (HsFieldDecl ns ty mb_doc : _) <- matching_fields
+	= HsTypeSig loc [nm] (HsTyFun data_ty (unbang ty)) mb_doc
+  | otherwise = extractRecSel nm mod t tvs rest
+  where
+	matching_fields = [ f | f@(HsFieldDecl ns ty mb_doc) <- fields,
+			        nm `elem` ns ]
+
+	data_ty = foldl HsTyApp (HsTyCon (Qual mod t)) (map HsTyVar tvs)
 
 -- -----------------------------------------------------------------------------
 -- Pruning
@@ -455,8 +495,8 @@ buildImportEnv mod_map this_mod exported_names imp_decls
 
 expandDecl :: HsDecl -> [HsDecl]
 expandDecl (HsTypeSig loc fs qt doc) = [ HsTypeSig loc [f] qt doc | f <- fs ]
-expandDecl (HsClassDecl loc ty fds decls doc)
-  = [ HsClassDecl loc ty fds (concat (map expandDecl decls)) doc ]
+expandDecl (HsClassDecl loc ctxt n tvs fds decls doc)
+  = [ HsClassDecl loc ctxt n tvs fds (concat (map expandDecl decls)) doc ]
 expandDecl d = [ d ]
 
 -----------------------------------------------------------------------------
@@ -495,16 +535,16 @@ finishedDoc d doc rest = d' : rest
 		HsDataDecl loc ctxt n ns cons drv (Just doc)
 	  HsNewTypeDecl loc ctxt n ns con drv _ -> 
 		HsNewTypeDecl loc ctxt n ns con drv (Just doc)
-	  HsClassDecl loc ty fds meths _ -> 
-		HsClassDecl loc ty fds meths (Just doc)
+	  HsClassDecl loc ctxt n tvs fds meths _ -> 
+		HsClassDecl loc ctxt n tvs fds meths (Just doc)
 	  HsTypeSig loc ns ty _ -> 
 		HsTypeSig loc ns ty (Just doc)
 	  HsForeignImport loc cc sf str n ty _ ->
 		HsForeignImport loc cc sf str n ty (Just doc)
 	  _other -> d
 
-collectInDecl (HsClassDecl loc ty fds meths doc)
-  = HsClassDecl loc ty fds (collect Nothing DocEmpty meths) doc
+collectInDecl (HsClassDecl loc ctxt n tvs fds meths doc)
+  = HsClassDecl loc ctxt n tvs fds (collect Nothing DocEmpty meths) doc
 collectInDecl decl
   = decl
 

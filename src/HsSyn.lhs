@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.10 2002/05/27 09:03:52 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.11 2002/06/03 13:05:58 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -142,7 +142,7 @@ data HsDecl
   | HsNewTypeDecl SrcLoc HsContext HsName [HsName] HsConDecl [HsQName]
  		  (Maybe Doc)
  
-  | HsClassDecl SrcLoc HsType [HsFunDep] [HsDecl] (Maybe Doc)
+  | HsClassDecl SrcLoc HsContext HsName [HsName] [HsFunDep] [HsDecl] (Maybe Doc)
  
   | HsInstDecl SrcLoc HsContext HsAsst [HsDecl]
  
