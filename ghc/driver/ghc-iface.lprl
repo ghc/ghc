@@ -178,7 +178,7 @@ sub readHiFile {
 	} elsif ( /^instance / ) {
 	    $Stuff{"$mod:instances"} .= $_;
 
-	} elsif ( /^--.*/ ) { # silently ignore comment lines.
+	} elsif ( /^-[-]+ .*/ ) { # silently ignore comment lines.
 	    ;
 	} else {  # We're in a declaration
 
