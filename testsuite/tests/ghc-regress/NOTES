@@ -15,4 +15,12 @@ rename/should_compile
    rn037 issues
 
 stranal/should_compile
+   There are some failures in here due to unexpected stdouts
+   (the compiler isn't asked to generate any?)
+
+specialise/
+   Contains complete progs.  Not done yet.
+
+simpleCore/should_compile
+   simpl006 has extra bits
 
