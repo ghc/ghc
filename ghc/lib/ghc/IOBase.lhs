@@ -8,9 +8,8 @@ Definitions for the @IO@ monad and its friends.  Everything is exported
 concretely; the @IO@ module itself exports abstractly.
 
 \begin{code}
-#include "error.h"
-
 {-# OPTIONS -fno-implicit-prelude #-}
+#include "error.h"
 
 module IOBase where
 
@@ -23,7 +22,7 @@ import PrelRead
 import GHC
 import ArrBase	( ByteArray(..), MutableVar(..) )
 
-infixr 1 `thenIO_Prim`
+infixr 1 `thenIO_Prim`, `seqIO_Prim`
 \end{code}
 
 %*********************************************************
@@ -45,13 +44,13 @@ instance  Monad IO  where
     m >> k      =  m >>= \ _ -> k
     return x	= IO $ ST $ \ s@(S# _) -> (Right x, s)
 
-    (IO (ST m)) >>= k
-      = IO $ ST $ \ s ->
+    (IO (ST m)) >>= k =
+        IO (ST ( \ s ->
 	let  (r, new_s) = m s  in
 	case r of
 	  Left err -> (Left err, new_s)
 	  Right  x -> case (k x) of { IO (ST k2) ->
-		      k2 new_s }
+		        k2 new_s }))
 
 fixIO :: (a -> IO a) -> IO a
     -- not required but worth having around
@@ -114,12 +113,16 @@ ioToST (IO (ST io)) = ST $ \ s ->
 
 \begin{code}
 thenIO_Prim :: PrimIO a -> (a -> IO b) -> IO b
+seqIO_Prim  :: PrimIO a -> IO b -> IO b
 {-# INLINE thenIO_Prim   #-}
+{-# INLINE seqIO_Prim   #-}
 
 thenIO_Prim (ST m) k = IO $ ST $ \ s ->
     case (m s)     of { (m_res, new_s)    ->
     case (k m_res) of { (IO (ST k_m_res)) ->
     k_m_res new_s }}
+
+seqIO_Prim m k = thenIO_Prim m (\ _ -> k)
 \end{code}
 
 
@@ -193,15 +196,6 @@ trace string expr
 %*							*
 %*********************************************************
 
-The construct $try comp$ exposes errors which occur within a
-computation, and which are not fully handled.  It always succeeds.
-This one didn't make it into the 1.3 defn
-
-\begin{code}
-tryIO :: IO a -> IO (Either IOError a) 
-tryIO p = catch (p >>= (return . Right)) (return . Left)
-\end{code}
-
 I'm not sure why this little function is here...
 
 \begin{code}
@@ -234,9 +228,6 @@ data IOError
      IOErrorType     -- what it was.
      String          -- error type specific information.
 
-instance Eq IOError where
-  (IOError h1 e1 str1) == (IOError h2 e2 str2) = 
-    e1==e2 && str1==str2 && h1==h2
 
 data IOErrorType
   = AlreadyExists        | HardwareFault
@@ -414,9 +405,8 @@ data Handle__
 #endif
 
 -- Standard Instances as defined by the Report..
-
-instance Eq Handle {-partain:????-}
-instance Show Handle where {showsPrec p h = showString "<<Handle>>"}
+-- instance Eq Handle   (defined in IO)
+-- instance Show Handle    ""
 
 \end{code}
 
