@@ -5,22 +5,25 @@ between DsExpr/DsBinds and various things.
 interface DsLoop where
 
 import CoreSyn	( CoreBinding(..), CoreExpr(..) )
-import DsMonad	( DsM(..) )
+import DsMonad	( DsM(..), DsMatchKind(..) )
 import DsBinds	( dsBinds )
 import DsExpr	( dsExpr )
 import DsUtils	( EquationInfo, MatchResult )
 import FastString ( FastString )
 import Id	( Id(..) )
-import Match	( match, matchSimply )
+import Match	( matchExport, match, matchSimply )
 import PreludeStdIO ( Maybe )
 import TcHsSyn	( TypecheckedHsBinds(..), TypecheckedHsExpr(..), TypecheckedPat(..) )
 import Type	( Type(..) )
 match :: [Id]		  -- Variables rep'ing the exprs we're matching with
       -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
-      -> [EquationInfo]	  -- Potentially shadowing equations above this one
+      -> DsM MatchResult  -- Desugared result!
+matchExport :: [Id]	-- Variables rep'ing	 the exprs we're matching with
+      -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
       -> DsM MatchResult  -- Desugared result!
 
 matchSimply :: CoreExpr			-- Scrutinee
+            -> DsMatchKind              -- Type of Match
 	    -> TypecheckedPat		-- Pattern it should match
 	    -> Type			-- Type of result
 	    -> CoreExpr			-- Return this if it matches
