@@ -67,26 +67,28 @@ __hscore_getFolderPath(HWND hwndOwner,
     static int loaded_dll = 0;
     static HMODULE hMod = (HMODULE)NULL;
     static HSCORE_GETAPPFOLDERFUNTY funcPtr = NULL;
+    /* The DLLs to try loading entry point from */
+    char* dlls[] = { "shell32.dll", "shfolder.dll" };
     
     if (loaded_dll < 0) {
 	return (-1);
     } else if (loaded_dll == 0) {
-	hMod = LoadLibrary("shell32.dll");
-	if (hMod == NULL) {
+	int i;
+	for(i=0;i < sizeof(dlls); i++) {
+	    hMod = LoadLibrary(dlls[i]);
+	    if ( hMod != NULL &&
+		 (funcPtr = (HSCORE_GETAPPFOLDERFUNTY)GetProcAddress(hMod, "SHGetFolderPathA")) ) {
+		loaded_dll = 1;
+		break;
+	    }
+	}
+	if (loaded_dll == 0) {
 	    loaded_dll = (-1);
 	    return (-1);
-	} else {
-	    funcPtr = (HSCORE_GETAPPFOLDERFUNTY)GetProcAddress(hMod, "SHGetFolderPathA");
-	    if (!funcPtr) {
-		loaded_dll = (-1);
-		return (-1);
-	    } else {
-		loaded_dll = 1;
-	    }
 	}
     }
     /* OK, if we got this far the function has been bound */
     return (int)funcPtr(hwndOwner,nFolder,hToken,dwFlags,pszPath);
-    /* ToDo: unload the DLL? */
+    /* ToDo: unload the DLL on shutdown? */
 }
 #endif
