@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.136 2001/02/11 17:14:48 simonmar Exp $
+# $Id: Makefile,v 1.137 2001/02/12 10:15:19 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -103,13 +103,14 @@ ghc_411_at_least = $(shell expr "$(GhcMinVersion)" \>= 11)
 # Only include GHCi if we're bootstrapping with at least version 411
 ifeq "$(GhcWithInterpreter)" "YES"
 ifeq "$(ghc_411_at_least)" "1"
-SRC_HC_OPTS += -DGHCI -optc-DGHCI
+SRC_HC_OPTS += -DGHCI
 DIRS += ghci
 endif
 endif
 
 HS_SRCS := $(foreach dir,$(DIRS),$(wildcard $(dir)/*.lhs) $(wildcard $(dir)/*.hs))
-HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs, $(HS_SRCS))
+HS_SRCS := $(filter-out rename/ParseIface.hs parser/Parser.hs $(CONFIG_HS), $(HS_SRCS))
+HS_SRCS += $(CONFIG_HS)
 
 ifneq "$(GhcWithHscBuiltViaC)" "YES"
 HS_SRCS += rename/ParseIface.hs parser/Parser.hs
@@ -243,7 +244,7 @@ PRIMOP_BITS=primop-data-decl.hs-incl \
             primop-usage.hs-incl  \
             primop-primop-info.hs-incl
 
-prelude/PrimOp.o: $(PRIMOP_BITS)
+prelude/PrimOp.lhs: $(PRIMOP_BITS)
 
 depend :: $(PRIMOP_BITS)
 
