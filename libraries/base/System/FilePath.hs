@@ -375,11 +375,7 @@ mkSearchPath paths = concat (intersperse [searchPathSeparator] paths)
 -- operating system also accepts a slash (\"\/\") since DOS 2, the function
 -- checks for it on this platform, too.
 isPathSeparator :: Char -> Bool
-#ifdef mingw32_TARGET_OS
-isPathSeparator ch = ch == '/' || ch == '\\'
-#else
-isPathSeparator ch = ch == '/'
-#endif
+isPathSeparator ch = ch == pathSeparator || ch == '/'
 
 -- | Provides a platform-specific character used to separate directory levels in
 -- a path string that reflects a hierarchical file system organization. The
@@ -392,6 +388,7 @@ pathSeparator = '\\'
 pathSeparator = '/'
 #endif
 
+-- ToDo: This should be determined via autoconf (PATH_SEPARATOR)
 -- | A platform-specific character used to separate search path strings in
 -- environment variables. The separator is a colon (@\":\"@) on Unix and
 -- Macintosh, and a semicolon (@\";\"@) on the Windows operating system.
