@@ -190,11 +190,11 @@ endif
 
 # Include GHCi in the compiler.  Default to NO for the time being.
 
-# ifneq "$(findstring $(HostOS_CPP), linux solaris freebsd netbsd openbsd)" ""
-# GhcWithInterpreter=YES
-# else 
+ifneq "$(findstring $(HostOS_CPP), linux solaris freebsd netbsd openbsd)" ""
+GhcWithInterpreter=YES
+else 
 GhcWithInterpreter=NO
-# endif
+endif
 
 #
 # Building various ways?
