@@ -46,11 +46,11 @@ module Data.Generics.Aliases (
         gunfoldB,
         gunfoldR,
 
-	-- * Type extension for lists
-	extListT, 
-	extListM,
-	extListQ,
-	extListR
+	-- * Type extension for unary type constructors
+	ext1T, 
+	ext1M,
+	ext1Q,
+	ext1R
 
   ) where
 
@@ -260,9 +260,9 @@ data Generic' c = Generic' { unGeneric' :: Generic c }
 
 
 -- | Other first-class polymorphic wrappers
-newtype GenericT'   = GenericT' { unGenericT' :: Data a => a -> a }
-newtype GenericQ' r = GenericQ' { unGenericQ' :: GenericQ r }
-newtype GenericM' m = GenericM' { unGenericM' :: Data a => a -> m a }
+newtype GenericT'   = GT { unGT :: Data a => a -> a }
+newtype GenericQ' r = GQ { unGQ :: GenericQ r }
+newtype GenericM' m = GM { unGM :: Data a => a -> m a }
 
 
 -- | Left-biased choice on maybies
@@ -331,41 +331,41 @@ gunfoldR c f = gmapM (const f) $ fromConstr c
 
 ------------------------------------------------------------------------------
 --
---	Type extension for lists
+--	Type extension for unary type constructors
 --
 ------------------------------------------------------------------------------
 
 
--- | Type extension of transformations for lists
-extListT :: Data d
-         => (forall d. Data d => d -> d)
-         -> (forall d. Data d => [d] -> [d])
-         -> d -> d
-extListT def ext = unT ((T def) `ext1` (T ext))
+-- | Type extension of transformations for unary type constructors
+ext1T :: (Data d, Typeable1 t)
+      => (forall d. Data d => d -> d)
+      -> (forall d. Data d => t d -> t d)
+      -> d -> d
+ext1T def ext = unT ((T def) `ext1` (T ext))
 
 
--- | Type extension of monadic transformations for lists
-extListM :: (Monad m, Data d)
-         => (forall d. Data d => d -> m d)
-         -> (forall d. Data d => [d] -> m [d])
-         -> d -> m d
-extListM def ext = unM ((M def) `ext1` (M ext))
+-- | Type extension of monadic transformations for type constructors
+ext1M :: (Monad m, Data d, Typeable1 t)
+      => (forall d. Data d => d -> m d)
+      -> (forall d. Data d => t d -> m (t d))
+      -> d -> m d
+ext1M def ext = unM ((M def) `ext1` (M ext))
 
 
--- | Type extension of queries for lists
-extListQ :: Data d
-         => (d -> q)
-         -> (forall d. Data d => [d] -> q)
-         -> d -> q
-extListQ def ext = unQ ((Q def) `ext1` (Q ext))
+-- | Type extension of queries for type constructors
+ext1Q :: (Data d, Typeable1 t)
+      => (d -> q)
+      -> (forall d. Data d => t d -> q)
+      -> d -> q
+ext1Q def ext = unQ ((Q def) `ext1` (Q ext))
 
 
--- | Type extension of readers for lists
-extListR :: (Monad m, Data d)
-         => m d
-         -> (forall d. Data d => m [d])
-         -> m d
-extListR def ext = unR ((R def) `ext1` (R ext))
+-- | Type extension of readers for type constructors
+ext1R :: (Monad m, Data d, Typeable1 t)
+      => m d
+      -> (forall d. Data d => m (t d))
+      -> m d
+ext1R def ext = unR ((R def) `ext1` (R ext))
 
 
 

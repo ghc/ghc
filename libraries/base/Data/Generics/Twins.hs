@@ -45,6 +45,10 @@ import Prelude
 import Data.Generics.Basics
 import Data.Generics.Aliases
 
+#ifdef __GLASGOW_HASKELL__
+import Prelude hiding ( GT )
+#endif
+
 ------------------------------------------------------------------------------
 
 
@@ -83,8 +87,7 @@ gfoldlAccum k z a d = unA (gfoldl k' z' d) a
 
 
 -- | A type constructor for accumulation
-newtype A a c d = A (a -> (a, c d))
-unA (A f) = f
+newtype A a c d = A { unA :: a -> (a, c d) }
 
 
 -- | gmapT with accumulation
@@ -99,7 +102,7 @@ gmapAccumT f a d = let (a',d') = gfoldlAccum k z a d
   z a x = (a, ID x)
 
 
--- | gmapT with accumulation
+-- | gmapM with accumulation
 gmapAccumM :: (Data d, Monad m)
            => (forall d. Data d => a -> d -> (a, m d))
            -> a -> d -> (a, m d)
@@ -179,8 +182,8 @@ gzipWithT f x y = case gmapAccumT perkid funs y of
                     ([], c) -> c
                     _       -> error "gzipWithT" 
  where
-  perkid a d = (tail a, unGenericT' (head a) d)
-  funs = gmapQ (\k -> GenericT' (f k)) x
+  perkid a d = (tail a, unGT (head a) d)
+  funs = gmapQ (\k -> GT (f k)) x
 
 
 
@@ -190,18 +193,18 @@ gzipWithM f x y = case gmapAccumM perkid funs y of
                     ([], c) -> c
                     _       -> error "gzipWithM" 
  where
-  perkid a d = (tail a, unGenericM' (head a) d)
-  funs = gmapQ (\k -> GenericM' (f k)) x
+  perkid a d = (tail a, unGM (head a) d)
+  funs = gmapQ (\k -> GM (f k)) x
 
 
--- | Twin map for monadic transformation 
+-- | Twin map for queries
 gzipWithQ :: GenericQ (GenericQ r) -> GenericQ (GenericQ [r])
 gzipWithQ f x y = case gmapAccumQ perkid funs y of
                    ([], r) -> r
                    _       -> error "gzipWithQ" 
  where
-  perkid a d = (tail a, unGenericQ' (head a) d)
-  funs = gmapQ (\k -> GenericQ' (f k)) x
+  perkid a d = (tail a, unGQ (head a) d)
+  funs = gmapQ (\k -> GQ (f k)) x
 
 
 

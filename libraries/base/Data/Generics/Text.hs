@@ -28,7 +28,6 @@ import Prelude
 #endif
 import Control.Monad
 import Data.Maybe
-import Data.Typeable
 import Data.Generics.Basics
 import Data.Generics.Aliases
 import Text.ParserCombinators.ReadP
@@ -68,22 +67,26 @@ gread = readP_to_S gread'
 
  where
 
+  -- Helper for recursive read
   gread' :: Data a => ReadP a
-  gread' = gdefault `extR` scase
-
+  gread' = allButString `extR` stringCase
 
    where
 
     -- A specific case for strings
-    scase :: ReadP String
-    scase = readS_to_P reads
+    stringCase :: ReadP String
+    stringCase = readS_to_P reads
 
+    -- Determine result type
+    myDataType = dataTypeOf (getArg allButString)
+     where
+      getArg :: ReadP a -> a
+      getArg = undefined
 
     -- The generic default for gread
-    -- gdefault :: Data a => ReadP a
-    gdefault =
+    allButString =
       do
-		-- Drop "  (  "
+ 		-- Drop "  (  "
          skipSpaces			-- Discard leading space
          char '('			-- Parse '('
          skipSpaces			-- Discard following space
@@ -100,29 +103,22 @@ gread = readP_to_S gread'
 
          return x
 
-     where
+    -- Turn string into constructor driven by the requested result type,
+    -- failing in the monad if it isn't a constructor of this data type
+    str2con :: String -> ReadP Constr	
+    str2con = maybe mzero return
+            . stringCon myDataType
 
-	-- Get the datatype for the type at hand;
-	-- use gdefault to provide the type at hand.
-	myDataTypeOf :: Data a => ReadP a -> DataType
-	myDataTypeOf (_::ReadP a) = dataTypeOf (undefined::a)
-
-	-- Turn string into constructor driven by gdefault's type,
-	-- failing in the monad if it isn't a constructor of this data type
-	str2con :: String -> ReadP Constr	
-	str2con = maybe mzero return
-                . stringCon (myDataTypeOf gdefault)
-
-	-- Get a Constr's string at the front of an input string
-	parseConstr :: ReadP String
-	parseConstr =  
+    -- Get a Constr's string at the front of an input string
+    parseConstr :: ReadP String
+    parseConstr =  
                string "[]"     -- Compound lexeme "[]"
           <++  infixOp	       -- Infix operator in parantheses
           <++  readS_to_P lex  -- Ordinary constructors and literals
 
-	-- Handle infix operators such as (:)
-	infixOp :: ReadP String
-        infixOp = do c1  <- char '('
-                     str <- munch1 (not . (==) ')')
-	             c2  <- char ')'
-	             return $ [c1] ++ str ++ [c2]
+    -- Handle infix operators such as (:)
+    infixOp :: ReadP String
+    infixOp = do c1  <- char '('
+                 str <- munch1 (not . (==) ')')
+	         c2  <- char ')'
+                 return $ [c1] ++ str ++ [c2]
