@@ -30,6 +30,7 @@ typedef enum {
 typedef struct { Tliteral tag; } *literal;
 
 #ifdef __GNUC__
+Tliteral tliteral(literal t);
 extern __inline__ Tliteral tliteral(literal t)
 {
 	return(t -> tag);
@@ -108,6 +109,8 @@ struct Snoreps {
 extern literal mkinteger PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rginteger PROTO((struct Sinteger *));
+
 extern __inline__ stringId *Rginteger(struct Sinteger *t)
 {
 #ifdef UGEN_DEBUG
@@ -124,6 +127,8 @@ extern stringId *Rginteger PROTO((struct Sinteger *));
 
 extern literal mkintprim PROTO((stringId));
 #ifdef __GNUC__
+
+stringId *Rgintprim PROTO((struct Sintprim *));
 
 extern __inline__ stringId *Rgintprim(struct Sintprim *t)
 {
@@ -142,6 +147,8 @@ extern stringId *Rgintprim PROTO((struct Sintprim *));
 extern literal mkfloatr PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgfloatr PROTO((struct Sfloatr *));
+
 extern __inline__ stringId *Rgfloatr(struct Sfloatr *t)
 {
 #ifdef UGEN_DEBUG
@@ -158,6 +165,8 @@ extern stringId *Rgfloatr PROTO((struct Sfloatr *));
 
 extern literal mkdoubleprim PROTO((stringId));
 #ifdef __GNUC__
+
+stringId *Rgdoubleprim PROTO((struct Sdoubleprim *));
 
 extern __inline__ stringId *Rgdoubleprim(struct Sdoubleprim *t)
 {
@@ -176,6 +185,8 @@ extern stringId *Rgdoubleprim PROTO((struct Sdoubleprim *));
 extern literal mkfloatprim PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgfloatprim PROTO((struct Sfloatprim *));
+
 extern __inline__ stringId *Rgfloatprim(struct Sfloatprim *t)
 {
 #ifdef UGEN_DEBUG
@@ -192,6 +203,8 @@ extern stringId *Rgfloatprim PROTO((struct Sfloatprim *));
 
 extern literal mkcharr PROTO((hstring));
 #ifdef __GNUC__
+
+hstring *Rgchar PROTO((struct Scharr *));
 
 extern __inline__ hstring *Rgchar(struct Scharr *t)
 {
@@ -210,6 +223,8 @@ extern hstring *Rgchar PROTO((struct Scharr *));
 extern literal mkcharprim PROTO((hstring));
 #ifdef __GNUC__
 
+hstring *Rgcharprim PROTO((struct Scharprim *));
+
 extern __inline__ hstring *Rgcharprim(struct Scharprim *t)
 {
 #ifdef UGEN_DEBUG
@@ -226,6 +241,8 @@ extern hstring *Rgcharprim PROTO((struct Scharprim *));
 
 extern literal mkstring PROTO((hstring));
 #ifdef __GNUC__
+
+hstring *Rgstring PROTO((struct Sstring *));
 
 extern __inline__ hstring *Rgstring(struct Sstring *t)
 {
@@ -244,6 +261,8 @@ extern hstring *Rgstring PROTO((struct Sstring *));
 extern literal mkstringprim PROTO((hstring));
 #ifdef __GNUC__
 
+hstring *Rgstringprim PROTO((struct Sstringprim *));
+
 extern __inline__ hstring *Rgstringprim(struct Sstringprim *t)
 {
 #ifdef UGEN_DEBUG
@@ -261,6 +280,8 @@ extern hstring *Rgstringprim PROTO((struct Sstringprim *));
 extern literal mkclitlit PROTO((stringId, stringId));
 #ifdef __GNUC__
 
+stringId *Rgclitlit PROTO((struct Sclitlit *));
+
 extern __inline__ stringId *Rgclitlit(struct Sclitlit *t)
 {
 #ifdef UGEN_DEBUG
@@ -275,6 +296,8 @@ extern stringId *Rgclitlit PROTO((struct Sclitlit *));
 
 #define gclitlit(xyzxyz) (*Rgclitlit((struct Sclitlit *) (xyzxyz)))
 #ifdef __GNUC__
+
+stringId *Rgclitlit_kind PROTO((struct Sclitlit *));
 
 extern __inline__ stringId *Rgclitlit_kind(struct Sclitlit *t)
 {
@@ -293,6 +316,8 @@ extern stringId *Rgclitlit_kind PROTO((struct Sclitlit *));
 extern literal mknorepi PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgnorepi PROTO((struct Snorepi *));
+
 extern __inline__ stringId *Rgnorepi(struct Snorepi *t)
 {
 #ifdef UGEN_DEBUG
@@ -310,6 +335,8 @@ extern stringId *Rgnorepi PROTO((struct Snorepi *));
 extern literal mknorepr PROTO((stringId, stringId));
 #ifdef __GNUC__
 
+stringId *Rgnorepr_n PROTO((struct Snorepr *));
+
 extern __inline__ stringId *Rgnorepr_n(struct Snorepr *t)
 {
 #ifdef UGEN_DEBUG
@@ -324,6 +351,8 @@ extern stringId *Rgnorepr_n PROTO((struct Snorepr *));
 
 #define gnorepr_n(xyzxyz) (*Rgnorepr_n((struct Snorepr *) (xyzxyz)))
 #ifdef __GNUC__
+
+stringId *Rgnorepr_d PROTO((struct Snorepr *));
 
 extern __inline__ stringId *Rgnorepr_d(struct Snorepr *t)
 {
@@ -341,6 +370,8 @@ extern stringId *Rgnorepr_d PROTO((struct Snorepr *));
 
 extern literal mknoreps PROTO((hstring));
 #ifdef __GNUC__
+
+hstring *Rgnoreps PROTO((struct Snoreps *));
 
 extern __inline__ hstring *Rgnoreps(struct Snoreps *t)
 {

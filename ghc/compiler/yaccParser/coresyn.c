@@ -702,7 +702,7 @@ coresyn *Rgcoprim_rhs(t)
 
 /************** conodeflt ******************/
 
-coresyn mkconodeflt()
+coresyn mkconodeflt(void)
 {
 	register struct Sconodeflt *pp =
 		(struct Sconodeflt *) malloc(sizeof(struct Sconodeflt));
@@ -1162,7 +1162,7 @@ coresyn *Rgco_dictcc_cafd(t)
 
 /************** co_scc_noncaf ******************/
 
-coresyn mkco_scc_noncaf()
+coresyn mkco_scc_noncaf(void)
 {
 	register struct Sco_scc_noncaf *pp =
 		(struct Sco_scc_noncaf *) malloc(sizeof(struct Sco_scc_noncaf));
@@ -1172,7 +1172,7 @@ coresyn mkco_scc_noncaf()
 
 /************** co_scc_caf ******************/
 
-coresyn mkco_scc_caf()
+coresyn mkco_scc_caf(void)
 {
 	register struct Sco_scc_caf *pp =
 		(struct Sco_scc_caf *) malloc(sizeof(struct Sco_scc_caf));
@@ -1182,7 +1182,7 @@ coresyn mkco_scc_caf()
 
 /************** co_scc_nondupd ******************/
 
-coresyn mkco_scc_nondupd()
+coresyn mkco_scc_nondupd(void)
 {
 	register struct Sco_scc_nondupd *pp =
 		(struct Sco_scc_nondupd *) malloc(sizeof(struct Sco_scc_nondupd));
@@ -1192,7 +1192,7 @@ coresyn mkco_scc_nondupd()
 
 /************** co_scc_dupd ******************/
 
-coresyn mkco_scc_dupd()
+coresyn mkco_scc_dupd(void)
 {
 	register struct Sco_scc_dupd *pp =
 		(struct Sco_scc_dupd *) malloc(sizeof(struct Sco_scc_dupd));

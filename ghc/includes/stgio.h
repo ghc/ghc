@@ -14,7 +14,7 @@ StgInt closeFile PROTO((StgAddr));
 StgInt createDirectory PROTO((StgByteArray));
 
 /* env.lc */
-char *	strdup		PROTO((char *));
+char *	strDup		PROTO((const char *));
 int	setenviron	PROTO((char **));
 int	copyenv		(STG_NO_ARGS);
 int	setenv		PROTO((char *));

@@ -44,6 +44,7 @@ typedef enum {
 typedef struct { Ttree tag; } *tree;
 
 #ifdef __GNUC__
+Ttree ttree(tree t);
 extern __inline__ Ttree ttree(tree t)
 {
 	return(t -> tag);
@@ -212,6 +213,8 @@ struct Snegate {
 extern tree mkhmodule PROTO((stringId, list, list, binding, long));
 #ifdef __GNUC__
 
+stringId *Rghname PROTO((struct Shmodule *));
+
 extern __inline__ stringId *Rghname(struct Shmodule *t)
 {
 #ifdef UGEN_DEBUG
@@ -226,6 +229,8 @@ extern stringId *Rghname PROTO((struct Shmodule *));
 
 #define ghname(xyzxyz) (*Rghname((struct Shmodule *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rghimplist PROTO((struct Shmodule *));
 
 extern __inline__ list *Rghimplist(struct Shmodule *t)
 {
@@ -242,6 +247,8 @@ extern list *Rghimplist PROTO((struct Shmodule *));
 #define ghimplist(xyzxyz) (*Rghimplist((struct Shmodule *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rghexplist PROTO((struct Shmodule *));
+
 extern __inline__ list *Rghexplist(struct Shmodule *t)
 {
 #ifdef UGEN_DEBUG
@@ -257,6 +264,8 @@ extern list *Rghexplist PROTO((struct Shmodule *));
 #define ghexplist(xyzxyz) (*Rghexplist((struct Shmodule *) (xyzxyz)))
 #ifdef __GNUC__
 
+binding *Rghmodlist PROTO((struct Shmodule *));
+
 extern __inline__ binding *Rghmodlist(struct Shmodule *t)
 {
 #ifdef UGEN_DEBUG
@@ -271,6 +280,8 @@ extern binding *Rghmodlist PROTO((struct Shmodule *));
 
 #define ghmodlist(xyzxyz) (*Rghmodlist((struct Shmodule *) (xyzxyz)))
 #ifdef __GNUC__
+
+long *Rghmodline PROTO((struct Shmodule *));
 
 extern __inline__ long *Rghmodline(struct Shmodule *t)
 {
@@ -289,6 +300,8 @@ extern long *Rghmodline PROTO((struct Shmodule *));
 extern tree mkident PROTO((unkId));
 #ifdef __GNUC__
 
+unkId *Rgident PROTO((struct Sident *));
+
 extern __inline__ unkId *Rgident(struct Sident *t)
 {
 #ifdef UGEN_DEBUG
@@ -305,6 +318,8 @@ extern unkId *Rgident PROTO((struct Sident *));
 
 extern tree mklit PROTO((literal));
 #ifdef __GNUC__
+
+literal *Rglit PROTO((struct Slit *));
 
 extern __inline__ literal *Rglit(struct Slit *t)
 {
@@ -323,6 +338,8 @@ extern literal *Rglit PROTO((struct Slit *));
 extern tree mktuple PROTO((list));
 #ifdef __GNUC__
 
+list *Rgtuplelist PROTO((struct Stuple *));
+
 extern __inline__ list *Rgtuplelist(struct Stuple *t)
 {
 #ifdef UGEN_DEBUG
@@ -340,6 +357,8 @@ extern list *Rgtuplelist PROTO((struct Stuple *));
 extern tree mkap PROTO((tree, tree));
 #ifdef __GNUC__
 
+tree *Rgfun PROTO((struct Sap *));
+
 extern __inline__ tree *Rgfun(struct Sap *t)
 {
 #ifdef UGEN_DEBUG
@@ -354,6 +373,8 @@ extern tree *Rgfun PROTO((struct Sap *));
 
 #define gfun(xyzxyz) (*Rgfun((struct Sap *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgarg PROTO((struct Sap *));
 
 extern __inline__ tree *Rgarg(struct Sap *t)
 {
@@ -372,6 +393,8 @@ extern tree *Rgarg PROTO((struct Sap *));
 extern tree mklambda PROTO((list, tree, long));
 #ifdef __GNUC__
 
+list *Rglampats PROTO((struct Slambda *));
+
 extern __inline__ list *Rglampats(struct Slambda *t)
 {
 #ifdef UGEN_DEBUG
@@ -387,6 +410,8 @@ extern list *Rglampats PROTO((struct Slambda *));
 #define glampats(xyzxyz) (*Rglampats((struct Slambda *) (xyzxyz)))
 #ifdef __GNUC__
 
+tree *Rglamexpr PROTO((struct Slambda *));
+
 extern __inline__ tree *Rglamexpr(struct Slambda *t)
 {
 #ifdef UGEN_DEBUG
@@ -401,6 +426,8 @@ extern tree *Rglamexpr PROTO((struct Slambda *));
 
 #define glamexpr(xyzxyz) (*Rglamexpr((struct Slambda *) (xyzxyz)))
 #ifdef __GNUC__
+
+long *Rglamline PROTO((struct Slambda *));
 
 extern __inline__ long *Rglamline(struct Slambda *t)
 {
@@ -419,6 +446,8 @@ extern long *Rglamline PROTO((struct Slambda *));
 extern tree mklet PROTO((binding, tree));
 #ifdef __GNUC__
 
+binding *Rgletvdeflist PROTO((struct Slet *));
+
 extern __inline__ binding *Rgletvdeflist(struct Slet *t)
 {
 #ifdef UGEN_DEBUG
@@ -433,6 +462,8 @@ extern binding *Rgletvdeflist PROTO((struct Slet *));
 
 #define gletvdeflist(xyzxyz) (*Rgletvdeflist((struct Slet *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgletvexpr PROTO((struct Slet *));
 
 extern __inline__ tree *Rgletvexpr(struct Slet *t)
 {
@@ -451,6 +482,8 @@ extern tree *Rgletvexpr PROTO((struct Slet *));
 extern tree mkcasee PROTO((tree, list));
 #ifdef __GNUC__
 
+tree *Rgcaseexpr PROTO((struct Scasee *));
+
 extern __inline__ tree *Rgcaseexpr(struct Scasee *t)
 {
 #ifdef UGEN_DEBUG
@@ -465,6 +498,8 @@ extern tree *Rgcaseexpr PROTO((struct Scasee *));
 
 #define gcaseexpr(xyzxyz) (*Rgcaseexpr((struct Scasee *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgcasebody PROTO((struct Scasee *));
 
 extern __inline__ list *Rgcasebody(struct Scasee *t)
 {
@@ -483,6 +518,8 @@ extern list *Rgcasebody PROTO((struct Scasee *));
 extern tree mkife PROTO((tree, tree, tree));
 #ifdef __GNUC__
 
+tree *Rgifpred PROTO((struct Sife *));
+
 extern __inline__ tree *Rgifpred(struct Sife *t)
 {
 #ifdef UGEN_DEBUG
@@ -498,6 +535,8 @@ extern tree *Rgifpred PROTO((struct Sife *));
 #define gifpred(xyzxyz) (*Rgifpred((struct Sife *) (xyzxyz)))
 #ifdef __GNUC__
 
+tree *Rgifthen PROTO((struct Sife *));
+
 extern __inline__ tree *Rgifthen(struct Sife *t)
 {
 #ifdef UGEN_DEBUG
@@ -512,6 +551,8 @@ extern tree *Rgifthen PROTO((struct Sife *));
 
 #define gifthen(xyzxyz) (*Rgifthen((struct Sife *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgifelse PROTO((struct Sife *));
 
 extern __inline__ tree *Rgifelse(struct Sife *t)
 {
@@ -530,6 +571,8 @@ extern tree *Rgifelse PROTO((struct Sife *));
 extern tree mkpar PROTO((tree));
 #ifdef __GNUC__
 
+tree *Rgpare PROTO((struct Spar *));
+
 extern __inline__ tree *Rgpare(struct Spar *t)
 {
 #ifdef UGEN_DEBUG
@@ -547,6 +590,8 @@ extern tree *Rgpare PROTO((struct Spar *));
 extern tree mkas PROTO((unkId, tree));
 #ifdef __GNUC__
 
+unkId *Rgasid PROTO((struct Sas *));
+
 extern __inline__ unkId *Rgasid(struct Sas *t)
 {
 #ifdef UGEN_DEBUG
@@ -561,6 +606,8 @@ extern unkId *Rgasid PROTO((struct Sas *));
 
 #define gasid(xyzxyz) (*Rgasid((struct Sas *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgase PROTO((struct Sas *));
 
 extern __inline__ tree *Rgase(struct Sas *t)
 {
@@ -579,6 +626,8 @@ extern tree *Rgase PROTO((struct Sas *));
 extern tree mklazyp PROTO((tree));
 #ifdef __GNUC__
 
+tree *Rglazyp PROTO((struct Slazyp *));
+
 extern __inline__ tree *Rglazyp(struct Slazyp *t)
 {
 #ifdef UGEN_DEBUG
@@ -596,6 +645,8 @@ extern tree *Rglazyp PROTO((struct Slazyp *));
 extern tree mkplusp PROTO((tree, literal));
 #ifdef __GNUC__
 
+tree *Rgplusp PROTO((struct Splusp *));
+
 extern __inline__ tree *Rgplusp(struct Splusp *t)
 {
 #ifdef UGEN_DEBUG
@@ -611,6 +662,8 @@ extern tree *Rgplusp PROTO((struct Splusp *));
 #define gplusp(xyzxyz) (*Rgplusp((struct Splusp *) (xyzxyz)))
 #ifdef __GNUC__
 
+literal *Rgplusi PROTO((struct Splusp *));
+
 extern __inline__ literal *Rgplusi(struct Splusp *t)
 {
 #ifdef UGEN_DEBUG
@@ -625,10 +678,12 @@ extern literal *Rgplusi PROTO((struct Splusp *));
 
 #define gplusi(xyzxyz) (*Rgplusi((struct Splusp *) (xyzxyz)))
 
-extern tree mkwildp PROTO(());
+extern tree mkwildp PROTO((void));
 
 extern tree mkrestr PROTO((tree, ttype));
 #ifdef __GNUC__
+
+tree *Rgrestre PROTO((struct Srestr *));
 
 extern __inline__ tree *Rgrestre(struct Srestr *t)
 {
@@ -644,6 +699,8 @@ extern tree *Rgrestre PROTO((struct Srestr *));
 
 #define grestre(xyzxyz) (*Rgrestre((struct Srestr *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgrestrt PROTO((struct Srestr *));
 
 extern __inline__ ttype *Rgrestrt(struct Srestr *t)
 {
@@ -662,6 +719,8 @@ extern ttype *Rgrestrt PROTO((struct Srestr *));
 extern tree mkcomprh PROTO((tree, list));
 #ifdef __GNUC__
 
+tree *Rgcexp PROTO((struct Scomprh *));
+
 extern __inline__ tree *Rgcexp(struct Scomprh *t)
 {
 #ifdef UGEN_DEBUG
@@ -676,6 +735,8 @@ extern tree *Rgcexp PROTO((struct Scomprh *));
 
 #define gcexp(xyzxyz) (*Rgcexp((struct Scomprh *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgcquals PROTO((struct Scomprh *));
 
 extern __inline__ list *Rgcquals(struct Scomprh *t)
 {
@@ -694,6 +755,8 @@ extern list *Rgcquals PROTO((struct Scomprh *));
 extern tree mkqual PROTO((tree, tree));
 #ifdef __GNUC__
 
+tree *Rgqpat PROTO((struct Squal *));
+
 extern __inline__ tree *Rgqpat(struct Squal *t)
 {
 #ifdef UGEN_DEBUG
@@ -708,6 +771,8 @@ extern tree *Rgqpat PROTO((struct Squal *));
 
 #define gqpat(xyzxyz) (*Rgqpat((struct Squal *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgqexp PROTO((struct Squal *));
 
 extern __inline__ tree *Rgqexp(struct Squal *t)
 {
@@ -726,6 +791,8 @@ extern tree *Rgqexp PROTO((struct Squal *));
 extern tree mkguard PROTO((tree));
 #ifdef __GNUC__
 
+tree *Rggexp PROTO((struct Sguard *));
+
 extern __inline__ tree *Rggexp(struct Sguard *t)
 {
 #ifdef UGEN_DEBUG
@@ -742,6 +809,8 @@ extern tree *Rggexp PROTO((struct Sguard *));
 
 extern tree mkdef PROTO((tree));
 #ifdef __GNUC__
+
+tree *Rggdef PROTO((struct Sdef *));
 
 extern __inline__ tree *Rggdef(struct Sdef *t)
 {
@@ -760,6 +829,8 @@ extern tree *Rggdef PROTO((struct Sdef *));
 extern tree mktinfixop PROTO((infixTree));
 #ifdef __GNUC__
 
+infixTree *Rgdummy PROTO((struct Stinfixop *));
+
 extern __inline__ infixTree *Rgdummy(struct Stinfixop *t)
 {
 #ifdef UGEN_DEBUG
@@ -777,6 +848,8 @@ extern infixTree *Rgdummy PROTO((struct Stinfixop *));
 extern tree mklsection PROTO((tree, unkId));
 #ifdef __GNUC__
 
+tree *Rglsexp PROTO((struct Slsection *));
+
 extern __inline__ tree *Rglsexp(struct Slsection *t)
 {
 #ifdef UGEN_DEBUG
@@ -791,6 +864,8 @@ extern tree *Rglsexp PROTO((struct Slsection *));
 
 #define glsexp(xyzxyz) (*Rglsexp((struct Slsection *) (xyzxyz)))
 #ifdef __GNUC__
+
+unkId *Rglsop PROTO((struct Slsection *));
 
 extern __inline__ unkId *Rglsop(struct Slsection *t)
 {
@@ -809,6 +884,8 @@ extern unkId *Rglsop PROTO((struct Slsection *));
 extern tree mkrsection PROTO((unkId, tree));
 #ifdef __GNUC__
 
+unkId *Rgrsop PROTO((struct Srsection *));
+
 extern __inline__ unkId *Rgrsop(struct Srsection *t)
 {
 #ifdef UGEN_DEBUG
@@ -823,6 +900,8 @@ extern unkId *Rgrsop PROTO((struct Srsection *));
 
 #define grsop(xyzxyz) (*Rgrsop((struct Srsection *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgrsexp PROTO((struct Srsection *));
 
 extern __inline__ tree *Rgrsexp(struct Srsection *t)
 {
@@ -841,6 +920,8 @@ extern tree *Rgrsexp PROTO((struct Srsection *));
 extern tree mkeenum PROTO((tree, list, list));
 #ifdef __GNUC__
 
+tree *Rgefrom PROTO((struct Seenum *));
+
 extern __inline__ tree *Rgefrom(struct Seenum *t)
 {
 #ifdef UGEN_DEBUG
@@ -856,6 +937,8 @@ extern tree *Rgefrom PROTO((struct Seenum *));
 #define gefrom(xyzxyz) (*Rgefrom((struct Seenum *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgestep PROTO((struct Seenum *));
+
 extern __inline__ list *Rgestep(struct Seenum *t)
 {
 #ifdef UGEN_DEBUG
@@ -870,6 +953,8 @@ extern list *Rgestep PROTO((struct Seenum *));
 
 #define gestep(xyzxyz) (*Rgestep((struct Seenum *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgeto PROTO((struct Seenum *));
 
 extern __inline__ list *Rgeto(struct Seenum *t)
 {
@@ -888,6 +973,8 @@ extern list *Rgeto PROTO((struct Seenum *));
 extern tree mkllist PROTO((list));
 #ifdef __GNUC__
 
+list *Rgllist PROTO((struct Sllist *));
+
 extern __inline__ list *Rgllist(struct Sllist *t)
 {
 #ifdef UGEN_DEBUG
@@ -905,6 +992,8 @@ extern list *Rgllist PROTO((struct Sllist *));
 extern tree mkccall PROTO((stringId, stringId, list));
 #ifdef __GNUC__
 
+stringId *Rgccid PROTO((struct Sccall *));
+
 extern __inline__ stringId *Rgccid(struct Sccall *t)
 {
 #ifdef UGEN_DEBUG
@@ -920,6 +1009,8 @@ extern stringId *Rgccid PROTO((struct Sccall *));
 #define gccid(xyzxyz) (*Rgccid((struct Sccall *) (xyzxyz)))
 #ifdef __GNUC__
 
+stringId *Rgccinfo PROTO((struct Sccall *));
+
 extern __inline__ stringId *Rgccinfo(struct Sccall *t)
 {
 #ifdef UGEN_DEBUG
@@ -934,6 +1025,8 @@ extern stringId *Rgccinfo PROTO((struct Sccall *));
 
 #define gccinfo(xyzxyz) (*Rgccinfo((struct Sccall *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgccargs PROTO((struct Sccall *));
 
 extern __inline__ list *Rgccargs(struct Sccall *t)
 {
@@ -952,6 +1045,8 @@ extern list *Rgccargs PROTO((struct Sccall *));
 extern tree mkscc PROTO((hstring, tree));
 #ifdef __GNUC__
 
+hstring *Rgsccid PROTO((struct Sscc *));
+
 extern __inline__ hstring *Rgsccid(struct Sscc *t)
 {
 #ifdef UGEN_DEBUG
@@ -966,6 +1061,8 @@ extern hstring *Rgsccid PROTO((struct Sscc *));
 
 #define gsccid(xyzxyz) (*Rgsccid((struct Sscc *) (xyzxyz)))
 #ifdef __GNUC__
+
+tree *Rgsccexp PROTO((struct Sscc *));
 
 extern __inline__ tree *Rgsccexp(struct Sscc *t)
 {
@@ -983,6 +1080,8 @@ extern tree *Rgsccexp PROTO((struct Sscc *));
 
 extern tree mknegate PROTO((tree));
 #ifdef __GNUC__
+
+tree *Rgnexp PROTO((struct Snegate *));
 
 extern __inline__ tree *Rgnexp(struct Snegate *t)
 {

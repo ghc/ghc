@@ -9,7 +9,7 @@ import U_hpragma
 import U_list
 import U_literal	( U_literal ) -- for interfaces only
 import U_ttype
-data U_binding = U_tbind U_list U_ttype U_list U_list U_long U_hpragma | U_nbind U_ttype U_ttype U_long U_hpragma | U_pbind U_list U_long | U_fbind U_list U_long | U_abind U_binding U_binding | U_lbind U_binding U_binding | U_ebind U_list U_binding U_long | U_hbind U_list U_binding U_long | U_ibind U_list U_unkId U_ttype U_binding U_long U_hpragma | U_dbind U_list U_long | U_cbind U_list U_ttype U_binding U_long U_hpragma | U_sbind U_list U_ttype U_long U_hpragma | U_mbind U_stringId U_list U_list U_long | U_nullbind | U_import U_stringId U_list U_list U_binding U_stringId U_long | U_hiding U_stringId U_list U_list U_binding U_stringId U_long | U_vspec_uprag U_unkId U_list U_long | U_vspec_ty_and_id U_ttype U_list | U_ispec_uprag U_unkId U_ttype U_long | U_inline_uprag U_unkId U_list U_long | U_deforest_uprag U_unkId U_long | U_magicuf_uprag U_unkId U_stringId U_long | U_abstract_uprag U_unkId U_long | U_dspec_uprag U_unkId U_list U_long 
+data U_binding = U_tbind U_list U_ttype U_list U_list U_long U_hpragma | U_nbind U_ttype U_ttype U_long U_hpragma | U_pbind U_list U_long | U_fbind U_list U_long | U_abind U_binding U_binding | U_ibind U_list U_unkId U_ttype U_binding U_long U_hpragma | U_dbind U_list U_long | U_cbind U_list U_ttype U_binding U_long U_hpragma | U_sbind U_list U_ttype U_long U_hpragma | U_mbind U_stringId U_list U_list U_long | U_nullbind | U_import U_stringId U_list U_list U_binding U_stringId U_long | U_hiding U_stringId U_list U_list U_binding U_stringId U_long | U_vspec_uprag U_unkId U_list U_long | U_vspec_ty_and_id U_ttype U_list | U_ispec_uprag U_unkId U_ttype U_long | U_inline_uprag U_unkId U_list U_long | U_deforest_uprag U_unkId U_long | U_magicuf_uprag U_unkId U_stringId U_long | U_abstract_uprag U_unkId U_long | U_dspec_uprag U_unkId U_list U_long 
 
 rdU_binding :: _Addr -> UgnM U_binding
 rdU_binding t
@@ -56,28 +56,6 @@ rdU_binding t
 	ioToUgnM (_ccall_ gabindsnd t) `thenUgn` \ x_gabindsnd ->
 	rdU_binding x_gabindsnd `thenUgn` \ y_gabindsnd ->
 	returnUgn (U_abind y_gabindfst y_gabindsnd)
-    else if tag == ``lbind'' then
-	ioToUgnM (_ccall_ glbindfst t) `thenUgn` \ x_glbindfst ->
-	rdU_binding x_glbindfst `thenUgn` \ y_glbindfst ->
-	ioToUgnM (_ccall_ glbindsnd t) `thenUgn` \ x_glbindsnd ->
-	rdU_binding x_glbindsnd `thenUgn` \ y_glbindsnd ->
-	returnUgn (U_lbind y_glbindfst y_glbindsnd)
-    else if tag == ``ebind'' then
-	ioToUgnM (_ccall_ gebindl t) `thenUgn` \ x_gebindl ->
-	rdU_list x_gebindl `thenUgn` \ y_gebindl ->
-	ioToUgnM (_ccall_ gebind t) `thenUgn` \ x_gebind ->
-	rdU_binding x_gebind `thenUgn` \ y_gebind ->
-	ioToUgnM (_ccall_ geline t) `thenUgn` \ x_geline ->
-	rdU_long x_geline `thenUgn` \ y_geline ->
-	returnUgn (U_ebind y_gebindl y_gebind y_geline)
-    else if tag == ``hbind'' then
-	ioToUgnM (_ccall_ ghbindl t) `thenUgn` \ x_ghbindl ->
-	rdU_list x_ghbindl `thenUgn` \ y_ghbindl ->
-	ioToUgnM (_ccall_ ghbind t) `thenUgn` \ x_ghbind ->
-	rdU_binding x_ghbind `thenUgn` \ y_ghbind ->
-	ioToUgnM (_ccall_ ghline t) `thenUgn` \ x_ghline ->
-	rdU_long x_ghline `thenUgn` \ y_ghline ->
-	returnUgn (U_hbind y_ghbindl y_ghbind y_ghline)
     else if tag == ``ibind'' then
 	ioToUgnM (_ccall_ gibindc t) `thenUgn` \ x_gibindc ->
 	rdU_list x_gibindc `thenUgn` \ y_gibindc ->

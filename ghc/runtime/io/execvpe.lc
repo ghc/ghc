@@ -79,7 +79,7 @@ char **envp;
 	}
 #endif
     } else
-	cur = path = strdup(path);
+	cur = path = strDup(path);
 
     if (path == NULL || (bp = buf = malloc(strlen(path)+strlen(name)+2)) == NULL)
 	goto done;

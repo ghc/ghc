@@ -61,6 +61,7 @@ typedef enum {
 typedef struct { Tcoresyn tag; } *coresyn;
 
 #ifdef __GNUC__
+Tcoresyn tcoresyn(coresyn t);
 extern __inline__ Tcoresyn tcoresyn(coresyn t)
 {
 	return(t -> tag);
@@ -335,6 +336,8 @@ struct Sco_wrkrid {
 extern coresyn mkcobinder PROTO((unkId, ttype));
 #ifdef __GNUC__
 
+unkId *Rgcobinder_v PROTO((struct Scobinder *));
+
 extern __inline__ unkId *Rgcobinder_v(struct Scobinder *t)
 {
 #ifdef UGEN_DEBUG
@@ -349,6 +352,8 @@ extern unkId *Rgcobinder_v PROTO((struct Scobinder *));
 
 #define gcobinder_v(xyzxyz) (*Rgcobinder_v((struct Scobinder *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgcobinder_ty PROTO((struct Scobinder *));
 
 extern __inline__ ttype *Rgcobinder_ty(struct Scobinder *t)
 {
@@ -367,6 +372,8 @@ extern ttype *Rgcobinder_ty PROTO((struct Scobinder *));
 extern coresyn mkcolit PROTO((literal));
 #ifdef __GNUC__
 
+literal *Rgcolit PROTO((struct Scolit *));
+
 extern __inline__ literal *Rgcolit(struct Scolit *t)
 {
 #ifdef UGEN_DEBUG
@@ -383,6 +390,8 @@ extern literal *Rgcolit PROTO((struct Scolit *));
 
 extern coresyn mkcolocal PROTO((coresyn));
 #ifdef __GNUC__
+
+coresyn *Rgcolocal_v PROTO((struct Scolocal *));
 
 extern __inline__ coresyn *Rgcolocal_v(struct Scolocal *t)
 {
@@ -401,6 +410,8 @@ extern coresyn *Rgcolocal_v PROTO((struct Scolocal *));
 extern coresyn mkcononrec PROTO((coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcononrec_b PROTO((struct Scononrec *));
+
 extern __inline__ coresyn *Rgcononrec_b(struct Scononrec *t)
 {
 #ifdef UGEN_DEBUG
@@ -415,6 +426,8 @@ extern coresyn *Rgcononrec_b PROTO((struct Scononrec *));
 
 #define gcononrec_b(xyzxyz) (*Rgcononrec_b((struct Scononrec *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcononrec_rhs PROTO((struct Scononrec *));
 
 extern __inline__ coresyn *Rgcononrec_rhs(struct Scononrec *t)
 {
@@ -433,6 +446,8 @@ extern coresyn *Rgcononrec_rhs PROTO((struct Scononrec *));
 extern coresyn mkcorec PROTO((list));
 #ifdef __GNUC__
 
+list *Rgcorec PROTO((struct Scorec *));
+
 extern __inline__ list *Rgcorec(struct Scorec *t)
 {
 #ifdef UGEN_DEBUG
@@ -450,6 +465,8 @@ extern list *Rgcorec PROTO((struct Scorec *));
 extern coresyn mkcorec_pair PROTO((coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcorec_b PROTO((struct Scorec_pair *));
+
 extern __inline__ coresyn *Rgcorec_b(struct Scorec_pair *t)
 {
 #ifdef UGEN_DEBUG
@@ -464,6 +481,8 @@ extern coresyn *Rgcorec_b PROTO((struct Scorec_pair *));
 
 #define gcorec_b(xyzxyz) (*Rgcorec_b((struct Scorec_pair *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcorec_rhs PROTO((struct Scorec_pair *));
 
 extern __inline__ coresyn *Rgcorec_rhs(struct Scorec_pair *t)
 {
@@ -482,6 +501,8 @@ extern coresyn *Rgcorec_rhs PROTO((struct Scorec_pair *));
 extern coresyn mkcovar PROTO((coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcovar PROTO((struct Scovar *));
+
 extern __inline__ coresyn *Rgcovar(struct Scovar *t)
 {
 #ifdef UGEN_DEBUG
@@ -498,6 +519,8 @@ extern coresyn *Rgcovar PROTO((struct Scovar *));
 
 extern coresyn mkcoliteral PROTO((literal));
 #ifdef __GNUC__
+
+literal *Rgcoliteral PROTO((struct Scoliteral *));
 
 extern __inline__ literal *Rgcoliteral(struct Scoliteral *t)
 {
@@ -516,6 +539,8 @@ extern literal *Rgcoliteral PROTO((struct Scoliteral *));
 extern coresyn mkcocon PROTO((coresyn, list, list));
 #ifdef __GNUC__
 
+coresyn *Rgcocon_con PROTO((struct Scocon *));
+
 extern __inline__ coresyn *Rgcocon_con(struct Scocon *t)
 {
 #ifdef UGEN_DEBUG
@@ -531,6 +556,8 @@ extern coresyn *Rgcocon_con PROTO((struct Scocon *));
 #define gcocon_con(xyzxyz) (*Rgcocon_con((struct Scocon *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgcocon_tys PROTO((struct Scocon *));
+
 extern __inline__ list *Rgcocon_tys(struct Scocon *t)
 {
 #ifdef UGEN_DEBUG
@@ -545,6 +572,8 @@ extern list *Rgcocon_tys PROTO((struct Scocon *));
 
 #define gcocon_tys(xyzxyz) (*Rgcocon_tys((struct Scocon *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgcocon_args PROTO((struct Scocon *));
 
 extern __inline__ list *Rgcocon_args(struct Scocon *t)
 {
@@ -563,6 +592,8 @@ extern list *Rgcocon_args PROTO((struct Scocon *));
 extern coresyn mkcoprim PROTO((coresyn, list, list));
 #ifdef __GNUC__
 
+coresyn *Rgcoprim_op PROTO((struct Scoprim *));
+
 extern __inline__ coresyn *Rgcoprim_op(struct Scoprim *t)
 {
 #ifdef UGEN_DEBUG
@@ -578,6 +609,8 @@ extern coresyn *Rgcoprim_op PROTO((struct Scoprim *));
 #define gcoprim_op(xyzxyz) (*Rgcoprim_op((struct Scoprim *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgcoprim_tys PROTO((struct Scoprim *));
+
 extern __inline__ list *Rgcoprim_tys(struct Scoprim *t)
 {
 #ifdef UGEN_DEBUG
@@ -592,6 +625,8 @@ extern list *Rgcoprim_tys PROTO((struct Scoprim *));
 
 #define gcoprim_tys(xyzxyz) (*Rgcoprim_tys((struct Scoprim *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgcoprim_args PROTO((struct Scoprim *));
 
 extern __inline__ list *Rgcoprim_args(struct Scoprim *t)
 {
@@ -610,6 +645,8 @@ extern list *Rgcoprim_args PROTO((struct Scoprim *));
 extern coresyn mkcolam PROTO((list, coresyn));
 #ifdef __GNUC__
 
+list *Rgcolam_vars PROTO((struct Scolam *));
+
 extern __inline__ list *Rgcolam_vars(struct Scolam *t)
 {
 #ifdef UGEN_DEBUG
@@ -624,6 +661,8 @@ extern list *Rgcolam_vars PROTO((struct Scolam *));
 
 #define gcolam_vars(xyzxyz) (*Rgcolam_vars((struct Scolam *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcolam_body PROTO((struct Scolam *));
 
 extern __inline__ coresyn *Rgcolam_body(struct Scolam *t)
 {
@@ -642,6 +681,8 @@ extern coresyn *Rgcolam_body PROTO((struct Scolam *));
 extern coresyn mkcotylam PROTO((list, coresyn));
 #ifdef __GNUC__
 
+list *Rgcotylam_tvs PROTO((struct Scotylam *));
+
 extern __inline__ list *Rgcotylam_tvs(struct Scotylam *t)
 {
 #ifdef UGEN_DEBUG
@@ -656,6 +697,8 @@ extern list *Rgcotylam_tvs PROTO((struct Scotylam *));
 
 #define gcotylam_tvs(xyzxyz) (*Rgcotylam_tvs((struct Scotylam *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcotylam_body PROTO((struct Scotylam *));
 
 extern __inline__ coresyn *Rgcotylam_body(struct Scotylam *t)
 {
@@ -674,6 +717,8 @@ extern coresyn *Rgcotylam_body PROTO((struct Scotylam *));
 extern coresyn mkcoapp PROTO((coresyn, list));
 #ifdef __GNUC__
 
+coresyn *Rgcoapp_fun PROTO((struct Scoapp *));
+
 extern __inline__ coresyn *Rgcoapp_fun(struct Scoapp *t)
 {
 #ifdef UGEN_DEBUG
@@ -688,6 +733,8 @@ extern coresyn *Rgcoapp_fun PROTO((struct Scoapp *));
 
 #define gcoapp_fun(xyzxyz) (*Rgcoapp_fun((struct Scoapp *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgcoapp_args PROTO((struct Scoapp *));
 
 extern __inline__ list *Rgcoapp_args(struct Scoapp *t)
 {
@@ -706,6 +753,8 @@ extern list *Rgcoapp_args PROTO((struct Scoapp *));
 extern coresyn mkcotyapp PROTO((coresyn, ttype));
 #ifdef __GNUC__
 
+coresyn *Rgcotyapp_e PROTO((struct Scotyapp *));
+
 extern __inline__ coresyn *Rgcotyapp_e(struct Scotyapp *t)
 {
 #ifdef UGEN_DEBUG
@@ -720,6 +769,8 @@ extern coresyn *Rgcotyapp_e PROTO((struct Scotyapp *));
 
 #define gcotyapp_e(xyzxyz) (*Rgcotyapp_e((struct Scotyapp *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgcotyapp_t PROTO((struct Scotyapp *));
 
 extern __inline__ ttype *Rgcotyapp_t(struct Scotyapp *t)
 {
@@ -738,6 +789,8 @@ extern ttype *Rgcotyapp_t PROTO((struct Scotyapp *));
 extern coresyn mkcocase PROTO((coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcocase_s PROTO((struct Scocase *));
+
 extern __inline__ coresyn *Rgcocase_s(struct Scocase *t)
 {
 #ifdef UGEN_DEBUG
@@ -752,6 +805,8 @@ extern coresyn *Rgcocase_s PROTO((struct Scocase *));
 
 #define gcocase_s(xyzxyz) (*Rgcocase_s((struct Scocase *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcocase_alts PROTO((struct Scocase *));
 
 extern __inline__ coresyn *Rgcocase_alts(struct Scocase *t)
 {
@@ -770,6 +825,8 @@ extern coresyn *Rgcocase_alts PROTO((struct Scocase *));
 extern coresyn mkcolet PROTO((coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcolet_bind PROTO((struct Scolet *));
+
 extern __inline__ coresyn *Rgcolet_bind(struct Scolet *t)
 {
 #ifdef UGEN_DEBUG
@@ -784,6 +841,8 @@ extern coresyn *Rgcolet_bind PROTO((struct Scolet *));
 
 #define gcolet_bind(xyzxyz) (*Rgcolet_bind((struct Scolet *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcolet_body PROTO((struct Scolet *));
 
 extern __inline__ coresyn *Rgcolet_body(struct Scolet *t)
 {
@@ -802,6 +861,8 @@ extern coresyn *Rgcolet_body PROTO((struct Scolet *));
 extern coresyn mkcoscc PROTO((coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcoscc_scc PROTO((struct Scoscc *));
+
 extern __inline__ coresyn *Rgcoscc_scc(struct Scoscc *t)
 {
 #ifdef UGEN_DEBUG
@@ -816,6 +877,8 @@ extern coresyn *Rgcoscc_scc PROTO((struct Scoscc *));
 
 #define gcoscc_scc(xyzxyz) (*Rgcoscc_scc((struct Scoscc *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcoscc_body PROTO((struct Scoscc *));
 
 extern __inline__ coresyn *Rgcoscc_body(struct Scoscc *t)
 {
@@ -834,6 +897,8 @@ extern coresyn *Rgcoscc_body PROTO((struct Scoscc *));
 extern coresyn mkcoalg_alts PROTO((list, coresyn));
 #ifdef __GNUC__
 
+list *Rgcoalg_alts PROTO((struct Scoalg_alts *));
+
 extern __inline__ list *Rgcoalg_alts(struct Scoalg_alts *t)
 {
 #ifdef UGEN_DEBUG
@@ -848,6 +913,8 @@ extern list *Rgcoalg_alts PROTO((struct Scoalg_alts *));
 
 #define gcoalg_alts(xyzxyz) (*Rgcoalg_alts((struct Scoalg_alts *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcoalg_deflt PROTO((struct Scoalg_alts *));
 
 extern __inline__ coresyn *Rgcoalg_deflt(struct Scoalg_alts *t)
 {
@@ -866,6 +933,8 @@ extern coresyn *Rgcoalg_deflt PROTO((struct Scoalg_alts *));
 extern coresyn mkcoalg_alt PROTO((coresyn, list, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgcoalg_con PROTO((struct Scoalg_alt *));
+
 extern __inline__ coresyn *Rgcoalg_con(struct Scoalg_alt *t)
 {
 #ifdef UGEN_DEBUG
@@ -881,6 +950,8 @@ extern coresyn *Rgcoalg_con PROTO((struct Scoalg_alt *));
 #define gcoalg_con(xyzxyz) (*Rgcoalg_con((struct Scoalg_alt *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgcoalg_bs PROTO((struct Scoalg_alt *));
+
 extern __inline__ list *Rgcoalg_bs(struct Scoalg_alt *t)
 {
 #ifdef UGEN_DEBUG
@@ -895,6 +966,8 @@ extern list *Rgcoalg_bs PROTO((struct Scoalg_alt *));
 
 #define gcoalg_bs(xyzxyz) (*Rgcoalg_bs((struct Scoalg_alt *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcoalg_rhs PROTO((struct Scoalg_alt *));
 
 extern __inline__ coresyn *Rgcoalg_rhs(struct Scoalg_alt *t)
 {
@@ -913,6 +986,8 @@ extern coresyn *Rgcoalg_rhs PROTO((struct Scoalg_alt *));
 extern coresyn mkcoprim_alts PROTO((list, coresyn));
 #ifdef __GNUC__
 
+list *Rgcoprim_alts PROTO((struct Scoprim_alts *));
+
 extern __inline__ list *Rgcoprim_alts(struct Scoprim_alts *t)
 {
 #ifdef UGEN_DEBUG
@@ -927,6 +1002,8 @@ extern list *Rgcoprim_alts PROTO((struct Scoprim_alts *));
 
 #define gcoprim_alts(xyzxyz) (*Rgcoprim_alts((struct Scoprim_alts *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcoprim_deflt PROTO((struct Scoprim_alts *));
 
 extern __inline__ coresyn *Rgcoprim_deflt(struct Scoprim_alts *t)
 {
@@ -945,6 +1022,8 @@ extern coresyn *Rgcoprim_deflt PROTO((struct Scoprim_alts *));
 extern coresyn mkcoprim_alt PROTO((literal, coresyn));
 #ifdef __GNUC__
 
+literal *Rgcoprim_lit PROTO((struct Scoprim_alt *));
+
 extern __inline__ literal *Rgcoprim_lit(struct Scoprim_alt *t)
 {
 #ifdef UGEN_DEBUG
@@ -960,6 +1039,8 @@ extern literal *Rgcoprim_lit PROTO((struct Scoprim_alt *));
 #define gcoprim_lit(xyzxyz) (*Rgcoprim_lit((struct Scoprim_alt *) (xyzxyz)))
 #ifdef __GNUC__
 
+coresyn *Rgcoprim_rhs PROTO((struct Scoprim_alt *));
+
 extern __inline__ coresyn *Rgcoprim_rhs(struct Scoprim_alt *t)
 {
 #ifdef UGEN_DEBUG
@@ -974,10 +1055,12 @@ extern coresyn *Rgcoprim_rhs PROTO((struct Scoprim_alt *));
 
 #define gcoprim_rhs(xyzxyz) (*Rgcoprim_rhs((struct Scoprim_alt *) (xyzxyz)))
 
-extern coresyn mkconodeflt PROTO(());
+extern coresyn mkconodeflt PROTO((void));
 
 extern coresyn mkcobinddeflt PROTO((coresyn, coresyn));
 #ifdef __GNUC__
+
+coresyn *Rgcobinddeflt_v PROTO((struct Scobinddeflt *));
 
 extern __inline__ coresyn *Rgcobinddeflt_v(struct Scobinddeflt *t)
 {
@@ -993,6 +1076,8 @@ extern coresyn *Rgcobinddeflt_v PROTO((struct Scobinddeflt *));
 
 #define gcobinddeflt_v(xyzxyz) (*Rgcobinddeflt_v((struct Scobinddeflt *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgcobinddeflt_rhs PROTO((struct Scobinddeflt *));
 
 extern __inline__ coresyn *Rgcobinddeflt_rhs(struct Scobinddeflt *t)
 {
@@ -1011,6 +1096,8 @@ extern coresyn *Rgcobinddeflt_rhs PROTO((struct Scobinddeflt *));
 extern coresyn mkco_primop PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgco_primop PROTO((struct Sco_primop *));
+
 extern __inline__ stringId *Rgco_primop(struct Sco_primop *t)
 {
 #ifdef UGEN_DEBUG
@@ -1028,6 +1115,8 @@ extern stringId *Rgco_primop PROTO((struct Sco_primop *));
 extern coresyn mkco_ccall PROTO((stringId, long, list, ttype));
 #ifdef __GNUC__
 
+stringId *Rgco_ccall PROTO((struct Sco_ccall *));
+
 extern __inline__ stringId *Rgco_ccall(struct Sco_ccall *t)
 {
 #ifdef UGEN_DEBUG
@@ -1042,6 +1131,8 @@ extern stringId *Rgco_ccall PROTO((struct Sco_ccall *));
 
 #define gco_ccall(xyzxyz) (*Rgco_ccall((struct Sco_ccall *) (xyzxyz)))
 #ifdef __GNUC__
+
+long *Rgco_ccall_may_gc PROTO((struct Sco_ccall *));
 
 extern __inline__ long *Rgco_ccall_may_gc(struct Sco_ccall *t)
 {
@@ -1058,6 +1149,8 @@ extern long *Rgco_ccall_may_gc PROTO((struct Sco_ccall *));
 #define gco_ccall_may_gc(xyzxyz) (*Rgco_ccall_may_gc((struct Sco_ccall *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgco_ccall_arg_tys PROTO((struct Sco_ccall *));
+
 extern __inline__ list *Rgco_ccall_arg_tys(struct Sco_ccall *t)
 {
 #ifdef UGEN_DEBUG
@@ -1072,6 +1165,8 @@ extern list *Rgco_ccall_arg_tys PROTO((struct Sco_ccall *));
 
 #define gco_ccall_arg_tys(xyzxyz) (*Rgco_ccall_arg_tys((struct Sco_ccall *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgco_ccall_res_ty PROTO((struct Sco_ccall *));
 
 extern __inline__ ttype *Rgco_ccall_res_ty(struct Sco_ccall *t)
 {
@@ -1090,6 +1185,8 @@ extern ttype *Rgco_ccall_res_ty PROTO((struct Sco_ccall *));
 extern coresyn mkco_casm PROTO((literal, long, list, ttype));
 #ifdef __GNUC__
 
+literal *Rgco_casm PROTO((struct Sco_casm *));
+
 extern __inline__ literal *Rgco_casm(struct Sco_casm *t)
 {
 #ifdef UGEN_DEBUG
@@ -1104,6 +1201,8 @@ extern literal *Rgco_casm PROTO((struct Sco_casm *));
 
 #define gco_casm(xyzxyz) (*Rgco_casm((struct Sco_casm *) (xyzxyz)))
 #ifdef __GNUC__
+
+long *Rgco_casm_may_gc PROTO((struct Sco_casm *));
 
 extern __inline__ long *Rgco_casm_may_gc(struct Sco_casm *t)
 {
@@ -1120,6 +1219,8 @@ extern long *Rgco_casm_may_gc PROTO((struct Sco_casm *));
 #define gco_casm_may_gc(xyzxyz) (*Rgco_casm_may_gc((struct Sco_casm *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgco_casm_arg_tys PROTO((struct Sco_casm *));
+
 extern __inline__ list *Rgco_casm_arg_tys(struct Sco_casm *t)
 {
 #ifdef UGEN_DEBUG
@@ -1134,6 +1235,8 @@ extern list *Rgco_casm_arg_tys PROTO((struct Sco_casm *));
 
 #define gco_casm_arg_tys(xyzxyz) (*Rgco_casm_arg_tys((struct Sco_casm *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgco_casm_res_ty PROTO((struct Sco_casm *));
 
 extern __inline__ ttype *Rgco_casm_res_ty(struct Sco_casm *t)
 {
@@ -1152,6 +1255,8 @@ extern ttype *Rgco_casm_res_ty PROTO((struct Sco_casm *));
 extern coresyn mkco_preludedictscc PROTO((coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgco_preludedictscc_dupd PROTO((struct Sco_preludedictscc *));
+
 extern __inline__ coresyn *Rgco_preludedictscc_dupd(struct Sco_preludedictscc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1169,6 +1274,8 @@ extern coresyn *Rgco_preludedictscc_dupd PROTO((struct Sco_preludedictscc *));
 extern coresyn mkco_alldictscc PROTO((hstring, hstring, coresyn));
 #ifdef __GNUC__
 
+hstring *Rgco_alldictscc_m PROTO((struct Sco_alldictscc *));
+
 extern __inline__ hstring *Rgco_alldictscc_m(struct Sco_alldictscc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1184,6 +1291,8 @@ extern hstring *Rgco_alldictscc_m PROTO((struct Sco_alldictscc *));
 #define gco_alldictscc_m(xyzxyz) (*Rgco_alldictscc_m((struct Sco_alldictscc *) (xyzxyz)))
 #ifdef __GNUC__
 
+hstring *Rgco_alldictscc_g PROTO((struct Sco_alldictscc *));
+
 extern __inline__ hstring *Rgco_alldictscc_g(struct Sco_alldictscc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1198,6 +1307,8 @@ extern hstring *Rgco_alldictscc_g PROTO((struct Sco_alldictscc *));
 
 #define gco_alldictscc_g(xyzxyz) (*Rgco_alldictscc_g((struct Sco_alldictscc *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgco_alldictscc_dupd PROTO((struct Sco_alldictscc *));
 
 extern __inline__ coresyn *Rgco_alldictscc_dupd(struct Sco_alldictscc *t)
 {
@@ -1216,6 +1327,8 @@ extern coresyn *Rgco_alldictscc_dupd PROTO((struct Sco_alldictscc *));
 extern coresyn mkco_usercc PROTO((hstring, hstring, hstring, coresyn, coresyn));
 #ifdef __GNUC__
 
+hstring *Rgco_usercc_n PROTO((struct Sco_usercc *));
+
 extern __inline__ hstring *Rgco_usercc_n(struct Sco_usercc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1230,6 +1343,8 @@ extern hstring *Rgco_usercc_n PROTO((struct Sco_usercc *));
 
 #define gco_usercc_n(xyzxyz) (*Rgco_usercc_n((struct Sco_usercc *) (xyzxyz)))
 #ifdef __GNUC__
+
+hstring *Rgco_usercc_m PROTO((struct Sco_usercc *));
 
 extern __inline__ hstring *Rgco_usercc_m(struct Sco_usercc *t)
 {
@@ -1246,6 +1361,8 @@ extern hstring *Rgco_usercc_m PROTO((struct Sco_usercc *));
 #define gco_usercc_m(xyzxyz) (*Rgco_usercc_m((struct Sco_usercc *) (xyzxyz)))
 #ifdef __GNUC__
 
+hstring *Rgco_usercc_g PROTO((struct Sco_usercc *));
+
 extern __inline__ hstring *Rgco_usercc_g(struct Sco_usercc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1261,6 +1378,8 @@ extern hstring *Rgco_usercc_g PROTO((struct Sco_usercc *));
 #define gco_usercc_g(xyzxyz) (*Rgco_usercc_g((struct Sco_usercc *) (xyzxyz)))
 #ifdef __GNUC__
 
+coresyn *Rgco_usercc_dupd PROTO((struct Sco_usercc *));
+
 extern __inline__ coresyn *Rgco_usercc_dupd(struct Sco_usercc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1275,6 +1394,8 @@ extern coresyn *Rgco_usercc_dupd PROTO((struct Sco_usercc *));
 
 #define gco_usercc_dupd(xyzxyz) (*Rgco_usercc_dupd((struct Sco_usercc *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgco_usercc_cafd PROTO((struct Sco_usercc *));
 
 extern __inline__ coresyn *Rgco_usercc_cafd(struct Sco_usercc *t)
 {
@@ -1293,6 +1414,8 @@ extern coresyn *Rgco_usercc_cafd PROTO((struct Sco_usercc *));
 extern coresyn mkco_autocc PROTO((coresyn, hstring, hstring, coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgco_autocc_i PROTO((struct Sco_autocc *));
+
 extern __inline__ coresyn *Rgco_autocc_i(struct Sco_autocc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1307,6 +1430,8 @@ extern coresyn *Rgco_autocc_i PROTO((struct Sco_autocc *));
 
 #define gco_autocc_i(xyzxyz) (*Rgco_autocc_i((struct Sco_autocc *) (xyzxyz)))
 #ifdef __GNUC__
+
+hstring *Rgco_autocc_m PROTO((struct Sco_autocc *));
 
 extern __inline__ hstring *Rgco_autocc_m(struct Sco_autocc *t)
 {
@@ -1323,6 +1448,8 @@ extern hstring *Rgco_autocc_m PROTO((struct Sco_autocc *));
 #define gco_autocc_m(xyzxyz) (*Rgco_autocc_m((struct Sco_autocc *) (xyzxyz)))
 #ifdef __GNUC__
 
+hstring *Rgco_autocc_g PROTO((struct Sco_autocc *));
+
 extern __inline__ hstring *Rgco_autocc_g(struct Sco_autocc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1338,6 +1465,8 @@ extern hstring *Rgco_autocc_g PROTO((struct Sco_autocc *));
 #define gco_autocc_g(xyzxyz) (*Rgco_autocc_g((struct Sco_autocc *) (xyzxyz)))
 #ifdef __GNUC__
 
+coresyn *Rgco_autocc_dupd PROTO((struct Sco_autocc *));
+
 extern __inline__ coresyn *Rgco_autocc_dupd(struct Sco_autocc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1352,6 +1481,8 @@ extern coresyn *Rgco_autocc_dupd PROTO((struct Sco_autocc *));
 
 #define gco_autocc_dupd(xyzxyz) (*Rgco_autocc_dupd((struct Sco_autocc *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgco_autocc_cafd PROTO((struct Sco_autocc *));
 
 extern __inline__ coresyn *Rgco_autocc_cafd(struct Sco_autocc *t)
 {
@@ -1370,6 +1501,8 @@ extern coresyn *Rgco_autocc_cafd PROTO((struct Sco_autocc *));
 extern coresyn mkco_dictcc PROTO((coresyn, hstring, hstring, coresyn, coresyn));
 #ifdef __GNUC__
 
+coresyn *Rgco_dictcc_i PROTO((struct Sco_dictcc *));
+
 extern __inline__ coresyn *Rgco_dictcc_i(struct Sco_dictcc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1384,6 +1517,8 @@ extern coresyn *Rgco_dictcc_i PROTO((struct Sco_dictcc *));
 
 #define gco_dictcc_i(xyzxyz) (*Rgco_dictcc_i((struct Sco_dictcc *) (xyzxyz)))
 #ifdef __GNUC__
+
+hstring *Rgco_dictcc_m PROTO((struct Sco_dictcc *));
 
 extern __inline__ hstring *Rgco_dictcc_m(struct Sco_dictcc *t)
 {
@@ -1400,6 +1535,8 @@ extern hstring *Rgco_dictcc_m PROTO((struct Sco_dictcc *));
 #define gco_dictcc_m(xyzxyz) (*Rgco_dictcc_m((struct Sco_dictcc *) (xyzxyz)))
 #ifdef __GNUC__
 
+hstring *Rgco_dictcc_g PROTO((struct Sco_dictcc *));
+
 extern __inline__ hstring *Rgco_dictcc_g(struct Sco_dictcc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1414,6 +1551,8 @@ extern hstring *Rgco_dictcc_g PROTO((struct Sco_dictcc *));
 
 #define gco_dictcc_g(xyzxyz) (*Rgco_dictcc_g((struct Sco_dictcc *) (xyzxyz)))
 #ifdef __GNUC__
+
+coresyn *Rgco_dictcc_dupd PROTO((struct Sco_dictcc *));
 
 extern __inline__ coresyn *Rgco_dictcc_dupd(struct Sco_dictcc *t)
 {
@@ -1430,6 +1569,8 @@ extern coresyn *Rgco_dictcc_dupd PROTO((struct Sco_dictcc *));
 #define gco_dictcc_dupd(xyzxyz) (*Rgco_dictcc_dupd((struct Sco_dictcc *) (xyzxyz)))
 #ifdef __GNUC__
 
+coresyn *Rgco_dictcc_cafd PROTO((struct Sco_dictcc *));
+
 extern __inline__ coresyn *Rgco_dictcc_cafd(struct Sco_dictcc *t)
 {
 #ifdef UGEN_DEBUG
@@ -1444,16 +1585,18 @@ extern coresyn *Rgco_dictcc_cafd PROTO((struct Sco_dictcc *));
 
 #define gco_dictcc_cafd(xyzxyz) (*Rgco_dictcc_cafd((struct Sco_dictcc *) (xyzxyz)))
 
-extern coresyn mkco_scc_noncaf PROTO(());
+extern coresyn mkco_scc_noncaf PROTO((void));
 
-extern coresyn mkco_scc_caf PROTO(());
+extern coresyn mkco_scc_caf PROTO((void));
 
-extern coresyn mkco_scc_nondupd PROTO(());
+extern coresyn mkco_scc_nondupd PROTO((void));
 
-extern coresyn mkco_scc_dupd PROTO(());
+extern coresyn mkco_scc_dupd PROTO((void));
 
 extern coresyn mkco_id PROTO((stringId));
 #ifdef __GNUC__
+
+stringId *Rgco_id PROTO((struct Sco_id *));
 
 extern __inline__ stringId *Rgco_id(struct Sco_id *t)
 {
@@ -1472,6 +1615,8 @@ extern stringId *Rgco_id PROTO((struct Sco_id *));
 extern coresyn mkco_orig_id PROTO((stringId, stringId));
 #ifdef __GNUC__
 
+stringId *Rgco_orig_id_m PROTO((struct Sco_orig_id *));
+
 extern __inline__ stringId *Rgco_orig_id_m(struct Sco_orig_id *t)
 {
 #ifdef UGEN_DEBUG
@@ -1486,6 +1631,8 @@ extern stringId *Rgco_orig_id_m PROTO((struct Sco_orig_id *));
 
 #define gco_orig_id_m(xyzxyz) (*Rgco_orig_id_m((struct Sco_orig_id *) (xyzxyz)))
 #ifdef __GNUC__
+
+stringId *Rgco_orig_id_n PROTO((struct Sco_orig_id *));
 
 extern __inline__ stringId *Rgco_orig_id_n(struct Sco_orig_id *t)
 {
@@ -1504,6 +1651,8 @@ extern stringId *Rgco_orig_id_n PROTO((struct Sco_orig_id *));
 extern coresyn mkco_sdselid PROTO((unkId, unkId));
 #ifdef __GNUC__
 
+unkId *Rgco_sdselid_c PROTO((struct Sco_sdselid *));
+
 extern __inline__ unkId *Rgco_sdselid_c(struct Sco_sdselid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1518,6 +1667,8 @@ extern unkId *Rgco_sdselid_c PROTO((struct Sco_sdselid *));
 
 #define gco_sdselid_c(xyzxyz) (*Rgco_sdselid_c((struct Sco_sdselid *) (xyzxyz)))
 #ifdef __GNUC__
+
+unkId *Rgco_sdselid_sc PROTO((struct Sco_sdselid *));
 
 extern __inline__ unkId *Rgco_sdselid_sc(struct Sco_sdselid *t)
 {
@@ -1536,6 +1687,8 @@ extern unkId *Rgco_sdselid_sc PROTO((struct Sco_sdselid *));
 extern coresyn mkco_classopid PROTO((unkId, unkId));
 #ifdef __GNUC__
 
+unkId *Rgco_classopid_c PROTO((struct Sco_classopid *));
+
 extern __inline__ unkId *Rgco_classopid_c(struct Sco_classopid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1550,6 +1703,8 @@ extern unkId *Rgco_classopid_c PROTO((struct Sco_classopid *));
 
 #define gco_classopid_c(xyzxyz) (*Rgco_classopid_c((struct Sco_classopid *) (xyzxyz)))
 #ifdef __GNUC__
+
+unkId *Rgco_classopid_o PROTO((struct Sco_classopid *));
 
 extern __inline__ unkId *Rgco_classopid_o(struct Sco_classopid *t)
 {
@@ -1568,6 +1723,8 @@ extern unkId *Rgco_classopid_o PROTO((struct Sco_classopid *));
 extern coresyn mkco_defmid PROTO((unkId, unkId));
 #ifdef __GNUC__
 
+unkId *Rgco_defmid_c PROTO((struct Sco_defmid *));
+
 extern __inline__ unkId *Rgco_defmid_c(struct Sco_defmid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1582,6 +1739,8 @@ extern unkId *Rgco_defmid_c PROTO((struct Sco_defmid *));
 
 #define gco_defmid_c(xyzxyz) (*Rgco_defmid_c((struct Sco_defmid *) (xyzxyz)))
 #ifdef __GNUC__
+
+unkId *Rgco_defmid_op PROTO((struct Sco_defmid *));
 
 extern __inline__ unkId *Rgco_defmid_op(struct Sco_defmid *t)
 {
@@ -1600,6 +1759,8 @@ extern unkId *Rgco_defmid_op PROTO((struct Sco_defmid *));
 extern coresyn mkco_dfunid PROTO((unkId, ttype));
 #ifdef __GNUC__
 
+unkId *Rgco_dfunid_c PROTO((struct Sco_dfunid *));
+
 extern __inline__ unkId *Rgco_dfunid_c(struct Sco_dfunid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1614,6 +1775,8 @@ extern unkId *Rgco_dfunid_c PROTO((struct Sco_dfunid *));
 
 #define gco_dfunid_c(xyzxyz) (*Rgco_dfunid_c((struct Sco_dfunid *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgco_dfunid_ty PROTO((struct Sco_dfunid *));
 
 extern __inline__ ttype *Rgco_dfunid_ty(struct Sco_dfunid *t)
 {
@@ -1632,6 +1795,8 @@ extern ttype *Rgco_dfunid_ty PROTO((struct Sco_dfunid *));
 extern coresyn mkco_constmid PROTO((unkId, unkId, ttype));
 #ifdef __GNUC__
 
+unkId *Rgco_constmid_c PROTO((struct Sco_constmid *));
+
 extern __inline__ unkId *Rgco_constmid_c(struct Sco_constmid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1647,6 +1812,8 @@ extern unkId *Rgco_constmid_c PROTO((struct Sco_constmid *));
 #define gco_constmid_c(xyzxyz) (*Rgco_constmid_c((struct Sco_constmid *) (xyzxyz)))
 #ifdef __GNUC__
 
+unkId *Rgco_constmid_op PROTO((struct Sco_constmid *));
+
 extern __inline__ unkId *Rgco_constmid_op(struct Sco_constmid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1661,6 +1828,8 @@ extern unkId *Rgco_constmid_op PROTO((struct Sco_constmid *));
 
 #define gco_constmid_op(xyzxyz) (*Rgco_constmid_op((struct Sco_constmid *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgco_constmid_ty PROTO((struct Sco_constmid *));
 
 extern __inline__ ttype *Rgco_constmid_ty(struct Sco_constmid *t)
 {
@@ -1679,6 +1848,8 @@ extern ttype *Rgco_constmid_ty PROTO((struct Sco_constmid *));
 extern coresyn mkco_specid PROTO((coresyn, list));
 #ifdef __GNUC__
 
+coresyn *Rgco_specid_un PROTO((struct Sco_specid *));
+
 extern __inline__ coresyn *Rgco_specid_un(struct Sco_specid *t)
 {
 #ifdef UGEN_DEBUG
@@ -1693,6 +1864,8 @@ extern coresyn *Rgco_specid_un PROTO((struct Sco_specid *));
 
 #define gco_specid_un(xyzxyz) (*Rgco_specid_un((struct Sco_specid *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgco_specid_tys PROTO((struct Sco_specid *));
 
 extern __inline__ list *Rgco_specid_tys(struct Sco_specid *t)
 {
@@ -1710,6 +1883,8 @@ extern list *Rgco_specid_tys PROTO((struct Sco_specid *));
 
 extern coresyn mkco_wrkrid PROTO((coresyn));
 #ifdef __GNUC__
+
+coresyn *Rgco_wrkrid_un PROTO((struct Sco_wrkrid *));
 
 extern __inline__ coresyn *Rgco_wrkrid_un(struct Sco_wrkrid *t)
 {

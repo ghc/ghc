@@ -19,6 +19,7 @@ typedef enum {
 typedef struct { Tlist tag; } *list;
 
 #ifdef __GNUC__
+Tlist tlist(list t);
 extern __inline__ Tlist tlist(list t)
 {
 	return(t -> tag);
@@ -40,6 +41,8 @@ struct Slnil {
 extern list mklcons PROTO((VOID_STAR, list));
 #ifdef __GNUC__
 
+VOID_STAR *Rlhd PROTO((struct Slcons *));
+
 extern __inline__ VOID_STAR *Rlhd(struct Slcons *t)
 {
 #ifdef UGEN_DEBUG
@@ -55,6 +58,8 @@ extern VOID_STAR *Rlhd PROTO((struct Slcons *));
 #define lhd(xyzxyz) (*Rlhd((struct Slcons *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rltl PROTO((struct Slcons *));
+
 extern __inline__ list *Rltl(struct Slcons *t)
 {
 #ifdef UGEN_DEBUG
@@ -69,6 +74,6 @@ extern list *Rltl PROTO((struct Slcons *));
 
 #define ltl(xyzxyz) (*Rltl((struct Slcons *) (xyzxyz)))
 
-extern list mklnil PROTO(());
+extern list mklnil PROTO((void));
 
 #endif

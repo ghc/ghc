@@ -3,14 +3,12 @@
 module U_finfot where
 import UgenUtil
 import Util
-data U_finfot = U_nofinfo | U_finfo U_stringId U_stringId 
+data U_finfot = U_finfo U_stringId U_stringId 
 
 rdU_finfot :: _Addr -> UgnM U_finfot
 rdU_finfot t
   = ioToUgnM (_ccall_ tfinfot t) `thenUgn` \ tag@(I# _) ->
-    if tag == ``nofinfo'' then
-	returnUgn (U_nofinfo )
-    else if tag == ``finfo'' then
+    if tag == ``finfo'' then
 	ioToUgnM (_ccall_ fi1 t) `thenUgn` \ x_fi1 ->
 	rdU_stringId x_fi1 `thenUgn` \ y_fi1 ->
 	ioToUgnM (_ccall_ fi2 t) `thenUgn` \ x_fi2 ->

@@ -23,6 +23,7 @@ typedef enum {
 typedef struct { Tentidt tag; } *entidt;
 
 #ifdef __GNUC__
+Tentidt tentidt(entidt t);
 extern __inline__ Tentidt tentidt(entidt t)
 {
 	return(t -> tag);
@@ -66,6 +67,8 @@ struct Sentmod {
 extern entidt mkentid PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgentid PROTO((struct Sentid *));
+
 extern __inline__ stringId *Rgentid(struct Sentid *t)
 {
 #ifdef UGEN_DEBUG
@@ -82,6 +85,8 @@ extern stringId *Rgentid PROTO((struct Sentid *));
 
 extern entidt mkenttype PROTO((stringId));
 #ifdef __GNUC__
+
+stringId *Rgitentid PROTO((struct Senttype *));
 
 extern __inline__ stringId *Rgitentid(struct Senttype *t)
 {
@@ -100,6 +105,8 @@ extern stringId *Rgitentid PROTO((struct Senttype *));
 extern entidt mkenttypeall PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgatentid PROTO((struct Senttypeall *));
+
 extern __inline__ stringId *Rgatentid(struct Senttypeall *t)
 {
 #ifdef UGEN_DEBUG
@@ -117,6 +124,8 @@ extern stringId *Rgatentid PROTO((struct Senttypeall *));
 extern entidt mkenttypecons PROTO((stringId, list));
 #ifdef __GNUC__
 
+stringId *Rgctentid PROTO((struct Senttypecons *));
+
 extern __inline__ stringId *Rgctentid(struct Senttypecons *t)
 {
 #ifdef UGEN_DEBUG
@@ -131,6 +140,8 @@ extern stringId *Rgctentid PROTO((struct Senttypecons *));
 
 #define gctentid(xyzxyz) (*Rgctentid((struct Senttypecons *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgctentcons PROTO((struct Senttypecons *));
 
 extern __inline__ list *Rgctentcons(struct Senttypecons *t)
 {
@@ -149,6 +160,8 @@ extern list *Rgctentcons PROTO((struct Senttypecons *));
 extern entidt mkentclass PROTO((stringId, list));
 #ifdef __GNUC__
 
+stringId *Rgcentid PROTO((struct Sentclass *));
+
 extern __inline__ stringId *Rgcentid(struct Sentclass *t)
 {
 #ifdef UGEN_DEBUG
@@ -163,6 +176,8 @@ extern stringId *Rgcentid PROTO((struct Sentclass *));
 
 #define gcentid(xyzxyz) (*Rgcentid((struct Sentclass *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgcentops PROTO((struct Sentclass *));
 
 extern __inline__ list *Rgcentops(struct Sentclass *t)
 {
@@ -180,6 +195,8 @@ extern list *Rgcentops PROTO((struct Sentclass *));
 
 extern entidt mkentmod PROTO((stringId));
 #ifdef __GNUC__
+
+stringId *Rgmentid PROTO((struct Sentmod *));
 
 extern __inline__ stringId *Rgmentid(struct Sentmod *t)
 {

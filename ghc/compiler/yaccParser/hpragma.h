@@ -38,6 +38,7 @@ typedef enum {
 typedef struct { Thpragma tag; } *hpragma;
 
 #ifdef __GNUC__
+Thpragma thpragma(hpragma t);
 extern __inline__ Thpragma thpragma(hpragma t)
 {
 	return(t -> tag);
@@ -170,10 +171,12 @@ struct Sidata_pragma_4s {
 	list Xgprag_data_spec;
 };
 
-extern hpragma mkno_pragma PROTO(());
+extern hpragma mkno_pragma PROTO((void));
 
 extern hpragma mkidata_pragma PROTO((list, list));
 #ifdef __GNUC__
+
+list *Rgprag_data_constrs PROTO((struct Sidata_pragma *));
 
 extern __inline__ list *Rgprag_data_constrs(struct Sidata_pragma *t)
 {
@@ -190,6 +193,8 @@ extern list *Rgprag_data_constrs PROTO((struct Sidata_pragma *));
 #define gprag_data_constrs(xyzxyz) (*Rgprag_data_constrs((struct Sidata_pragma *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgprag_data_specs PROTO((struct Sidata_pragma *));
+
 extern __inline__ list *Rgprag_data_specs(struct Sidata_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -204,10 +209,12 @@ extern list *Rgprag_data_specs PROTO((struct Sidata_pragma *));
 
 #define gprag_data_specs(xyzxyz) (*Rgprag_data_specs((struct Sidata_pragma *) (xyzxyz)))
 
-extern hpragma mkitype_pragma PROTO(());
+extern hpragma mkitype_pragma PROTO((void));
 
 extern hpragma mkiclas_pragma PROTO((list));
 #ifdef __GNUC__
+
+list *Rgprag_clas PROTO((struct Siclas_pragma *));
 
 extern __inline__ list *Rgprag_clas(struct Siclas_pragma *t)
 {
@@ -226,6 +233,8 @@ extern list *Rgprag_clas PROTO((struct Siclas_pragma *));
 extern hpragma mkiclasop_pragma PROTO((hpragma, hpragma));
 #ifdef __GNUC__
 
+hpragma *Rgprag_dsel PROTO((struct Siclasop_pragma *));
+
 extern __inline__ hpragma *Rgprag_dsel(struct Siclasop_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -240,6 +249,8 @@ extern hpragma *Rgprag_dsel PROTO((struct Siclasop_pragma *));
 
 #define gprag_dsel(xyzxyz) (*Rgprag_dsel((struct Siclasop_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_defm PROTO((struct Siclasop_pragma *));
 
 extern __inline__ hpragma *Rgprag_defm(struct Siclasop_pragma *t)
 {
@@ -258,6 +269,8 @@ extern hpragma *Rgprag_defm PROTO((struct Siclasop_pragma *));
 extern hpragma mkiinst_simpl_pragma PROTO((stringId, hpragma));
 #ifdef __GNUC__
 
+stringId *Rgprag_imod_simpl PROTO((struct Siinst_simpl_pragma *));
+
 extern __inline__ stringId *Rgprag_imod_simpl(struct Siinst_simpl_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -272,6 +285,8 @@ extern stringId *Rgprag_imod_simpl PROTO((struct Siinst_simpl_pragma *));
 
 #define gprag_imod_simpl(xyzxyz) (*Rgprag_imod_simpl((struct Siinst_simpl_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_dfun_simpl PROTO((struct Siinst_simpl_pragma *));
 
 extern __inline__ hpragma *Rgprag_dfun_simpl(struct Siinst_simpl_pragma *t)
 {
@@ -290,6 +305,8 @@ extern hpragma *Rgprag_dfun_simpl PROTO((struct Siinst_simpl_pragma *));
 extern hpragma mkiinst_const_pragma PROTO((stringId, hpragma, list));
 #ifdef __GNUC__
 
+stringId *Rgprag_imod_const PROTO((struct Siinst_const_pragma *));
+
 extern __inline__ stringId *Rgprag_imod_const(struct Siinst_const_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -305,6 +322,8 @@ extern stringId *Rgprag_imod_const PROTO((struct Siinst_const_pragma *));
 #define gprag_imod_const(xyzxyz) (*Rgprag_imod_const((struct Siinst_const_pragma *) (xyzxyz)))
 #ifdef __GNUC__
 
+hpragma *Rgprag_dfun_const PROTO((struct Siinst_const_pragma *));
+
 extern __inline__ hpragma *Rgprag_dfun_const(struct Siinst_const_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -319,6 +338,8 @@ extern hpragma *Rgprag_dfun_const PROTO((struct Siinst_const_pragma *));
 
 #define gprag_dfun_const(xyzxyz) (*Rgprag_dfun_const((struct Siinst_const_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgprag_constms PROTO((struct Siinst_const_pragma *));
 
 extern __inline__ list *Rgprag_constms(struct Siinst_const_pragma *t)
 {
@@ -337,6 +358,8 @@ extern list *Rgprag_constms PROTO((struct Siinst_const_pragma *));
 extern hpragma mkiinst_spec_pragma PROTO((stringId, hpragma, list));
 #ifdef __GNUC__
 
+stringId *Rgprag_imod_spec PROTO((struct Siinst_spec_pragma *));
+
 extern __inline__ stringId *Rgprag_imod_spec(struct Siinst_spec_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -352,6 +375,8 @@ extern stringId *Rgprag_imod_spec PROTO((struct Siinst_spec_pragma *));
 #define gprag_imod_spec(xyzxyz) (*Rgprag_imod_spec((struct Siinst_spec_pragma *) (xyzxyz)))
 #ifdef __GNUC__
 
+hpragma *Rgprag_dfun_spec PROTO((struct Siinst_spec_pragma *));
+
 extern __inline__ hpragma *Rgprag_dfun_spec(struct Siinst_spec_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -366,6 +391,8 @@ extern hpragma *Rgprag_dfun_spec PROTO((struct Siinst_spec_pragma *));
 
 #define gprag_dfun_spec(xyzxyz) (*Rgprag_dfun_spec((struct Siinst_spec_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgprag_inst_specs PROTO((struct Siinst_spec_pragma *));
 
 extern __inline__ list *Rgprag_inst_specs(struct Siinst_spec_pragma *t)
 {
@@ -384,6 +411,8 @@ extern list *Rgprag_inst_specs PROTO((struct Siinst_spec_pragma *));
 extern hpragma mkigen_pragma PROTO((hpragma, hpragma, hpragma, hpragma, hpragma, list));
 #ifdef __GNUC__
 
+hpragma *Rgprag_arity PROTO((struct Sigen_pragma *));
+
 extern __inline__ hpragma *Rgprag_arity(struct Sigen_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -398,6 +427,8 @@ extern hpragma *Rgprag_arity PROTO((struct Sigen_pragma *));
 
 #define gprag_arity(xyzxyz) (*Rgprag_arity((struct Sigen_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_update PROTO((struct Sigen_pragma *));
 
 extern __inline__ hpragma *Rgprag_update(struct Sigen_pragma *t)
 {
@@ -414,6 +445,8 @@ extern hpragma *Rgprag_update PROTO((struct Sigen_pragma *));
 #define gprag_update(xyzxyz) (*Rgprag_update((struct Sigen_pragma *) (xyzxyz)))
 #ifdef __GNUC__
 
+hpragma *Rgprag_deforest PROTO((struct Sigen_pragma *));
+
 extern __inline__ hpragma *Rgprag_deforest(struct Sigen_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -428,6 +461,8 @@ extern hpragma *Rgprag_deforest PROTO((struct Sigen_pragma *));
 
 #define gprag_deforest(xyzxyz) (*Rgprag_deforest((struct Sigen_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_strictness PROTO((struct Sigen_pragma *));
 
 extern __inline__ hpragma *Rgprag_strictness(struct Sigen_pragma *t)
 {
@@ -444,6 +479,8 @@ extern hpragma *Rgprag_strictness PROTO((struct Sigen_pragma *));
 #define gprag_strictness(xyzxyz) (*Rgprag_strictness((struct Sigen_pragma *) (xyzxyz)))
 #ifdef __GNUC__
 
+hpragma *Rgprag_unfolding PROTO((struct Sigen_pragma *));
+
 extern __inline__ hpragma *Rgprag_unfolding(struct Sigen_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -458,6 +495,8 @@ extern hpragma *Rgprag_unfolding PROTO((struct Sigen_pragma *));
 
 #define gprag_unfolding(xyzxyz) (*Rgprag_unfolding((struct Sigen_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgprag_specs PROTO((struct Sigen_pragma *));
 
 extern __inline__ list *Rgprag_specs(struct Sigen_pragma *t)
 {
@@ -476,6 +515,8 @@ extern list *Rgprag_specs PROTO((struct Sigen_pragma *));
 extern hpragma mkiarity_pragma PROTO((numId));
 #ifdef __GNUC__
 
+numId *Rgprag_arity_val PROTO((struct Siarity_pragma *));
+
 extern __inline__ numId *Rgprag_arity_val(struct Siarity_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -493,6 +534,8 @@ extern numId *Rgprag_arity_val PROTO((struct Siarity_pragma *));
 extern hpragma mkiupdate_pragma PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgprag_update_val PROTO((struct Siupdate_pragma *));
+
 extern __inline__ stringId *Rgprag_update_val(struct Siupdate_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -507,10 +550,12 @@ extern stringId *Rgprag_update_val PROTO((struct Siupdate_pragma *));
 
 #define gprag_update_val(xyzxyz) (*Rgprag_update_val((struct Siupdate_pragma *) (xyzxyz)))
 
-extern hpragma mkideforest_pragma PROTO(());
+extern hpragma mkideforest_pragma PROTO((void));
 
 extern hpragma mkistrictness_pragma PROTO((hstring, hpragma));
 #ifdef __GNUC__
+
+hstring *Rgprag_strict_spec PROTO((struct Sistrictness_pragma *));
 
 extern __inline__ hstring *Rgprag_strict_spec(struct Sistrictness_pragma *t)
 {
@@ -526,6 +571,8 @@ extern hstring *Rgprag_strict_spec PROTO((struct Sistrictness_pragma *));
 
 #define gprag_strict_spec(xyzxyz) (*Rgprag_strict_spec((struct Sistrictness_pragma *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_strict_wrkr PROTO((struct Sistrictness_pragma *));
 
 extern __inline__ hpragma *Rgprag_strict_wrkr(struct Sistrictness_pragma *t)
 {
@@ -544,6 +591,8 @@ extern hpragma *Rgprag_strict_wrkr PROTO((struct Sistrictness_pragma *));
 extern hpragma mkimagic_unfolding_pragma PROTO((stringId));
 #ifdef __GNUC__
 
+stringId *Rgprag_magic_str PROTO((struct Simagic_unfolding_pragma *));
+
 extern __inline__ stringId *Rgprag_magic_str(struct Simagic_unfolding_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -561,6 +610,8 @@ extern stringId *Rgprag_magic_str PROTO((struct Simagic_unfolding_pragma *));
 extern hpragma mkiunfolding_pragma PROTO((hpragma, coresyn));
 #ifdef __GNUC__
 
+hpragma *Rgprag_unfold_guide PROTO((struct Siunfolding_pragma *));
+
 extern __inline__ hpragma *Rgprag_unfold_guide(struct Siunfolding_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -576,6 +627,8 @@ extern hpragma *Rgprag_unfold_guide PROTO((struct Siunfolding_pragma *));
 #define gprag_unfold_guide(xyzxyz) (*Rgprag_unfold_guide((struct Siunfolding_pragma *) (xyzxyz)))
 #ifdef __GNUC__
 
+coresyn *Rgprag_unfold_core PROTO((struct Siunfolding_pragma *));
+
 extern __inline__ coresyn *Rgprag_unfold_core(struct Siunfolding_pragma *t)
 {
 #ifdef UGEN_DEBUG
@@ -590,10 +643,12 @@ extern coresyn *Rgprag_unfold_core PROTO((struct Siunfolding_pragma *));
 
 #define gprag_unfold_core(xyzxyz) (*Rgprag_unfold_core((struct Siunfolding_pragma *) (xyzxyz)))
 
-extern hpragma mkiunfold_always PROTO(());
+extern hpragma mkiunfold_always PROTO((void));
 
 extern hpragma mkiunfold_if_args PROTO((numId, numId, stringId, numId));
 #ifdef __GNUC__
+
+numId *Rgprag_unfold_if_t_args PROTO((struct Siunfold_if_args *));
 
 extern __inline__ numId *Rgprag_unfold_if_t_args(struct Siunfold_if_args *t)
 {
@@ -610,6 +665,8 @@ extern numId *Rgprag_unfold_if_t_args PROTO((struct Siunfold_if_args *));
 #define gprag_unfold_if_t_args(xyzxyz) (*Rgprag_unfold_if_t_args((struct Siunfold_if_args *) (xyzxyz)))
 #ifdef __GNUC__
 
+numId *Rgprag_unfold_if_v_args PROTO((struct Siunfold_if_args *));
+
 extern __inline__ numId *Rgprag_unfold_if_v_args(struct Siunfold_if_args *t)
 {
 #ifdef UGEN_DEBUG
@@ -625,6 +682,8 @@ extern numId *Rgprag_unfold_if_v_args PROTO((struct Siunfold_if_args *));
 #define gprag_unfold_if_v_args(xyzxyz) (*Rgprag_unfold_if_v_args((struct Siunfold_if_args *) (xyzxyz)))
 #ifdef __GNUC__
 
+stringId *Rgprag_unfold_if_con_args PROTO((struct Siunfold_if_args *));
+
 extern __inline__ stringId *Rgprag_unfold_if_con_args(struct Siunfold_if_args *t)
 {
 #ifdef UGEN_DEBUG
@@ -639,6 +698,8 @@ extern stringId *Rgprag_unfold_if_con_args PROTO((struct Siunfold_if_args *));
 
 #define gprag_unfold_if_con_args(xyzxyz) (*Rgprag_unfold_if_con_args((struct Siunfold_if_args *) (xyzxyz)))
 #ifdef __GNUC__
+
+numId *Rgprag_unfold_if_size PROTO((struct Siunfold_if_args *));
 
 extern __inline__ numId *Rgprag_unfold_if_size(struct Siunfold_if_args *t)
 {
@@ -657,6 +718,8 @@ extern numId *Rgprag_unfold_if_size PROTO((struct Siunfold_if_args *));
 extern hpragma mkiname_pragma_pr PROTO((unkId, hpragma));
 #ifdef __GNUC__
 
+unkId *Rgprag_name_pr1 PROTO((struct Siname_pragma_pr *));
+
 extern __inline__ unkId *Rgprag_name_pr1(struct Siname_pragma_pr *t)
 {
 #ifdef UGEN_DEBUG
@@ -671,6 +734,8 @@ extern unkId *Rgprag_name_pr1 PROTO((struct Siname_pragma_pr *));
 
 #define gprag_name_pr1(xyzxyz) (*Rgprag_name_pr1((struct Siname_pragma_pr *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_name_pr2 PROTO((struct Siname_pragma_pr *));
 
 extern __inline__ hpragma *Rgprag_name_pr2(struct Siname_pragma_pr *t)
 {
@@ -689,6 +754,8 @@ extern hpragma *Rgprag_name_pr2 PROTO((struct Siname_pragma_pr *));
 extern hpragma mkitype_pragma_pr PROTO((list, numId, hpragma));
 #ifdef __GNUC__
 
+list *Rgprag_type_pr1 PROTO((struct Sitype_pragma_pr *));
+
 extern __inline__ list *Rgprag_type_pr1(struct Sitype_pragma_pr *t)
 {
 #ifdef UGEN_DEBUG
@@ -704,6 +771,8 @@ extern list *Rgprag_type_pr1 PROTO((struct Sitype_pragma_pr *));
 #define gprag_type_pr1(xyzxyz) (*Rgprag_type_pr1((struct Sitype_pragma_pr *) (xyzxyz)))
 #ifdef __GNUC__
 
+numId *Rgprag_type_pr2 PROTO((struct Sitype_pragma_pr *));
+
 extern __inline__ numId *Rgprag_type_pr2(struct Sitype_pragma_pr *t)
 {
 #ifdef UGEN_DEBUG
@@ -718,6 +787,8 @@ extern numId *Rgprag_type_pr2 PROTO((struct Sitype_pragma_pr *));
 
 #define gprag_type_pr2(xyzxyz) (*Rgprag_type_pr2((struct Sitype_pragma_pr *) (xyzxyz)))
 #ifdef __GNUC__
+
+hpragma *Rgprag_type_pr3 PROTO((struct Sitype_pragma_pr *));
 
 extern __inline__ hpragma *Rgprag_type_pr3(struct Sitype_pragma_pr *t)
 {
@@ -736,6 +807,8 @@ extern hpragma *Rgprag_type_pr3 PROTO((struct Sitype_pragma_pr *));
 extern hpragma mkiinst_pragma_3s PROTO((list, numId, hpragma, list));
 #ifdef __GNUC__
 
+list *Rgprag_inst_pt1 PROTO((struct Siinst_pragma_3s *));
+
 extern __inline__ list *Rgprag_inst_pt1(struct Siinst_pragma_3s *t)
 {
 #ifdef UGEN_DEBUG
@@ -750,6 +823,8 @@ extern list *Rgprag_inst_pt1 PROTO((struct Siinst_pragma_3s *));
 
 #define gprag_inst_pt1(xyzxyz) (*Rgprag_inst_pt1((struct Siinst_pragma_3s *) (xyzxyz)))
 #ifdef __GNUC__
+
+numId *Rgprag_inst_pt2 PROTO((struct Siinst_pragma_3s *));
 
 extern __inline__ numId *Rgprag_inst_pt2(struct Siinst_pragma_3s *t)
 {
@@ -766,6 +841,8 @@ extern numId *Rgprag_inst_pt2 PROTO((struct Siinst_pragma_3s *));
 #define gprag_inst_pt2(xyzxyz) (*Rgprag_inst_pt2((struct Siinst_pragma_3s *) (xyzxyz)))
 #ifdef __GNUC__
 
+hpragma *Rgprag_inst_pt3 PROTO((struct Siinst_pragma_3s *));
+
 extern __inline__ hpragma *Rgprag_inst_pt3(struct Siinst_pragma_3s *t)
 {
 #ifdef UGEN_DEBUG
@@ -780,6 +857,8 @@ extern hpragma *Rgprag_inst_pt3 PROTO((struct Siinst_pragma_3s *));
 
 #define gprag_inst_pt3(xyzxyz) (*Rgprag_inst_pt3((struct Siinst_pragma_3s *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgprag_inst_pt4 PROTO((struct Siinst_pragma_3s *));
 
 extern __inline__ list *Rgprag_inst_pt4(struct Siinst_pragma_3s *t)
 {
@@ -797,6 +876,8 @@ extern list *Rgprag_inst_pt4 PROTO((struct Siinst_pragma_3s *));
 
 extern hpragma mkidata_pragma_4s PROTO((list));
 #ifdef __GNUC__
+
+list *Rgprag_data_spec PROTO((struct Sidata_pragma_4s *));
 
 extern __inline__ list *Rgprag_data_spec(struct Sidata_pragma_4s *t)
 {

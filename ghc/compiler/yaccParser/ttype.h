@@ -28,6 +28,7 @@ typedef enum {
 typedef struct { Tttype tag; } *ttype;
 
 #ifdef __GNUC__
+Tttype tttype(ttype t);
 extern __inline__ Tttype tttype(ttype t)
 {
 	return(t -> tag);
@@ -98,6 +99,8 @@ struct Sty_maybe_just {
 extern ttype mktname PROTO((unkId, list));
 #ifdef __GNUC__
 
+unkId *Rgtypeid PROTO((struct Stname *));
+
 extern __inline__ unkId *Rgtypeid(struct Stname *t)
 {
 #ifdef UGEN_DEBUG
@@ -112,6 +115,8 @@ extern unkId *Rgtypeid PROTO((struct Stname *));
 
 #define gtypeid(xyzxyz) (*Rgtypeid((struct Stname *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rgtypel PROTO((struct Stname *));
 
 extern __inline__ list *Rgtypel(struct Stname *t)
 {
@@ -130,6 +135,8 @@ extern list *Rgtypel PROTO((struct Stname *));
 extern ttype mknamedtvar PROTO((unkId));
 #ifdef __GNUC__
 
+unkId *Rgnamedtvar PROTO((struct Snamedtvar *));
+
 extern __inline__ unkId *Rgnamedtvar(struct Snamedtvar *t)
 {
 #ifdef UGEN_DEBUG
@@ -146,6 +153,8 @@ extern unkId *Rgnamedtvar PROTO((struct Snamedtvar *));
 
 extern ttype mktllist PROTO((ttype));
 #ifdef __GNUC__
+
+ttype *Rgtlist PROTO((struct Stllist *));
 
 extern __inline__ ttype *Rgtlist(struct Stllist *t)
 {
@@ -164,6 +173,8 @@ extern ttype *Rgtlist PROTO((struct Stllist *));
 extern ttype mkttuple PROTO((list));
 #ifdef __GNUC__
 
+list *Rgttuple PROTO((struct Sttuple *));
+
 extern __inline__ list *Rgttuple(struct Sttuple *t)
 {
 #ifdef UGEN_DEBUG
@@ -181,6 +192,8 @@ extern list *Rgttuple PROTO((struct Sttuple *));
 extern ttype mktfun PROTO((ttype, ttype));
 #ifdef __GNUC__
 
+ttype *Rgtfun PROTO((struct Stfun *));
+
 extern __inline__ ttype *Rgtfun(struct Stfun *t)
 {
 #ifdef UGEN_DEBUG
@@ -195,6 +208,8 @@ extern ttype *Rgtfun PROTO((struct Stfun *));
 
 #define gtfun(xyzxyz) (*Rgtfun((struct Stfun *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgtarg PROTO((struct Stfun *));
 
 extern __inline__ ttype *Rgtarg(struct Stfun *t)
 {
@@ -213,6 +228,8 @@ extern ttype *Rgtarg PROTO((struct Stfun *));
 extern ttype mkcontext PROTO((list, ttype));
 #ifdef __GNUC__
 
+list *Rgtcontextl PROTO((struct Scontext *));
+
 extern __inline__ list *Rgtcontextl(struct Scontext *t)
 {
 #ifdef UGEN_DEBUG
@@ -227,6 +244,8 @@ extern list *Rgtcontextl PROTO((struct Scontext *));
 
 #define gtcontextl(xyzxyz) (*Rgtcontextl((struct Scontext *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgtcontextt PROTO((struct Scontext *));
 
 extern __inline__ ttype *Rgtcontextt(struct Scontext *t)
 {
@@ -245,6 +264,8 @@ extern ttype *Rgtcontextt PROTO((struct Scontext *));
 extern ttype mkunidict PROTO((unkId, ttype));
 #ifdef __GNUC__
 
+unkId *Rgunidict_clas PROTO((struct Sunidict *));
+
 extern __inline__ unkId *Rgunidict_clas(struct Sunidict *t)
 {
 #ifdef UGEN_DEBUG
@@ -259,6 +280,8 @@ extern unkId *Rgunidict_clas PROTO((struct Sunidict *));
 
 #define gunidict_clas(xyzxyz) (*Rgunidict_clas((struct Sunidict *) (xyzxyz)))
 #ifdef __GNUC__
+
+ttype *Rgunidict_ty PROTO((struct Sunidict *));
 
 extern __inline__ ttype *Rgunidict_ty(struct Sunidict *t)
 {
@@ -277,6 +300,8 @@ extern ttype *Rgunidict_ty PROTO((struct Sunidict *));
 extern ttype mkunityvartemplate PROTO((unkId));
 #ifdef __GNUC__
 
+unkId *Rgunityvartemplate PROTO((struct Sunityvartemplate *));
+
 extern __inline__ unkId *Rgunityvartemplate(struct Sunityvartemplate *t)
 {
 #ifdef UGEN_DEBUG
@@ -294,6 +319,8 @@ extern unkId *Rgunityvartemplate PROTO((struct Sunityvartemplate *));
 extern ttype mkuniforall PROTO((list, ttype));
 #ifdef __GNUC__
 
+list *Rguniforall_tv PROTO((struct Suniforall *));
+
 extern __inline__ list *Rguniforall_tv(struct Suniforall *t)
 {
 #ifdef UGEN_DEBUG
@@ -309,6 +336,8 @@ extern list *Rguniforall_tv PROTO((struct Suniforall *));
 #define guniforall_tv(xyzxyz) (*Rguniforall_tv((struct Suniforall *) (xyzxyz)))
 #ifdef __GNUC__
 
+ttype *Rguniforall_ty PROTO((struct Suniforall *));
+
 extern __inline__ ttype *Rguniforall_ty(struct Suniforall *t)
 {
 #ifdef UGEN_DEBUG
@@ -323,10 +352,12 @@ extern ttype *Rguniforall_ty PROTO((struct Suniforall *));
 
 #define guniforall_ty(xyzxyz) (*Rguniforall_ty((struct Suniforall *) (xyzxyz)))
 
-extern ttype mkty_maybe_nothing PROTO(());
+extern ttype mkty_maybe_nothing PROTO((void));
 
 extern ttype mkty_maybe_just PROTO((ttype));
 #ifdef __GNUC__
+
+ttype *Rgty_maybe PROTO((struct Sty_maybe_just *));
 
 extern __inline__ ttype *Rgty_maybe(struct Sty_maybe_just *t)
 {

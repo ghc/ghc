@@ -252,132 +252,6 @@ binding *Rgabindsnd(t)
 	return(& t -> Xgabindsnd);
 }
 
-/************** lbind ******************/
-
-binding mklbind(PPglbindfst, PPglbindsnd)
- binding PPglbindfst;
- binding PPglbindsnd;
-{
-	register struct Slbind *pp =
-		(struct Slbind *) malloc(sizeof(struct Slbind));
-	pp -> tag = lbind;
-	pp -> Xglbindfst = PPglbindfst;
-	pp -> Xglbindsnd = PPglbindsnd;
-	return((binding)pp);
-}
-
-binding *Rglbindfst(t)
- struct Slbind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != lbind)
-		fprintf(stderr,"glbindfst: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xglbindfst);
-}
-
-binding *Rglbindsnd(t)
- struct Slbind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != lbind)
-		fprintf(stderr,"glbindsnd: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xglbindsnd);
-}
-
-/************** ebind ******************/
-
-binding mkebind(PPgebindl, PPgebind, PPgeline)
- list PPgebindl;
- binding PPgebind;
- long PPgeline;
-{
-	register struct Sebind *pp =
-		(struct Sebind *) malloc(sizeof(struct Sebind));
-	pp -> tag = ebind;
-	pp -> Xgebindl = PPgebindl;
-	pp -> Xgebind = PPgebind;
-	pp -> Xgeline = PPgeline;
-	return((binding)pp);
-}
-
-list *Rgebindl(t)
- struct Sebind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != ebind)
-		fprintf(stderr,"gebindl: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgebindl);
-}
-
-binding *Rgebind(t)
- struct Sebind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != ebind)
-		fprintf(stderr,"gebind: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgebind);
-}
-
-long *Rgeline(t)
- struct Sebind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != ebind)
-		fprintf(stderr,"geline: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xgeline);
-}
-
-/************** hbind ******************/
-
-binding mkhbind(PPghbindl, PPghbind, PPghline)
- list PPghbindl;
- binding PPghbind;
- long PPghline;
-{
-	register struct Shbind *pp =
-		(struct Shbind *) malloc(sizeof(struct Shbind));
-	pp -> tag = hbind;
-	pp -> Xghbindl = PPghbindl;
-	pp -> Xghbind = PPghbind;
-	pp -> Xghline = PPghline;
-	return((binding)pp);
-}
-
-list *Rghbindl(t)
- struct Shbind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != hbind)
-		fprintf(stderr,"ghbindl: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xghbindl);
-}
-
-binding *Rghbind(t)
- struct Shbind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != hbind)
-		fprintf(stderr,"ghbind: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xghbind);
-}
-
-long *Rghline(t)
- struct Shbind *t;
-{
-#ifdef UGEN_DEBUG
-	if(t -> tag != hbind)
-		fprintf(stderr,"ghline: illegal selection; was %d\n", t -> tag);
-#endif /* UGEN_DEBUG */
-	return(& t -> Xghline);
-}
-
 /************** ibind ******************/
 
 binding mkibind(PPgibindc, PPgibindid, PPgibindi, PPgibindw, PPgiline, PPgipragma)
@@ -682,7 +556,7 @@ long *Rgmline(t)
 
 /************** nullbind ******************/
 
-binding mknullbind()
+binding mknullbind(void)
 {
 	register struct Snullbind *pp =
 		(struct Snullbind *) malloc(sizeof(struct Snullbind));

@@ -1335,9 +1335,9 @@ case $WithGhcHc in
 	    ;;
     ghc* | glhc* )
 	    WithGhcHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc,$WithGhcHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc"; then
-                echo "Can't find Glasgow Haskell to compile with: $WithGhcHc"
+            AC_CHECK_PROG(have_ghc_ghc,$WithGhcHc,$ac_dir/$ac_word)
+            if test -z "$have_ghc_ghc"; then
+                echo "Can't find Glasgow Haskell to compile GHC with: $WithGhcHc"
 		exit 1
 	    else
                 touch conftest.o
@@ -1589,9 +1589,9 @@ case $WithHappyHc in
 	    ;;
     ghc* | glhc* )
 	    WithHappyHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc,$WithHappyHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc"; then
-                echo "Can't find Glasgow Haskell to compile with: $WithHappyHc"
+            AC_CHECK_PROG(have_ghc_happy,$WithHappyHc,$ac_dir/$ac_word)
+            if test -z "$have_ghc_happy"; then
+                echo "Can't find Glasgow Haskell to compile Happy with: $WithHappyHc"
 		exit 1
             fi
             ;;
@@ -1664,9 +1664,9 @@ case $WithHaggisHc in
 	    ;;
     ghc* | glhc* )
 	    WithHaggisHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc,$WithHaggisHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc"; then
-                echo "Can't find Glasgow Haskell to compile with: $WithHaggisHc"
+            AC_CHECK_PROG(have_ghc_haggis,$WithHaggisHc,$ac_dir/$ac_word)
+            if test -z "$have_ghc_haggis"; then
+                echo "Can't find Glasgow Haskell to compile Haggis with: $WithHaggisHc"
 		exit 1
             fi
             ;;
@@ -1759,9 +1759,9 @@ case $WithNoFibHc in
 	    ;;
     ghc* | glhc* )
 	    WithNoFibHcType='HC_GLASGOW_GHC'
-            AC_CHECK_PROG(have_ghc,$WithNoFibHc,$ac_dir/$ac_word)
-            if test -z "$have_ghc"; then
-                echo "Can't find Glasgow Haskell to compile with: $WithNoFibHc"
+            AC_CHECK_PROG(have_ghc_nofib,$WithNoFibHc,$ac_dir/$ac_word)
+            if test -z "$have_ghc_nofib"; then
+                echo "Can't find Glasgow Haskell to compile NoFib with: $WithNoFibHc"
 		exit 1
             fi
             ;;
@@ -1769,7 +1769,7 @@ case $WithNoFibHc in
 	    WithNoFibHcType='HC_CHALMERS_HBC'
             AC_CHECK_PROG(have_hbc,$WithNoFibHc,YES,NO)
             if test $have_hbc = 'NO' ; then
-                echo "Can't find Chalmers HBC to compile with: $WithNoFibHc"
+                echo "Can't find Chalmers HBC to compile NoFib with: $WithNoFibHc"
                 exit 1
             fi
             ;;
@@ -1777,7 +1777,7 @@ case $WithNoFibHc in
 	    WithNoFibHcType='HC_ROJEMO_NHC'
             AC_CHECK_PROG(have_nhc,$WithNoFibHc,YES,NO)
             if test $have_nhc = 'NO' ; then
-                echo "Can't find Niklas Rojemo's NHC to compile with: $WithNoFibHc"
+                echo "Can't find Niklas Rojemo's NHC to compile NoFib with: $WithNoFibHc"
                 exit 1
             fi
             ;;

@@ -1,5 +1,5 @@
 
-/*  A Bison parser, made from yaccParser/hsparser.y with Bison version GNU Bison version 1.21
+/*  A Bison parser, made from yaccParser/hsparser.y with Bison version GNU Bison version 1.24
   */
 
 #define YYBISON 1  /* Identify Bison output.  */
@@ -143,7 +143,7 @@
 *                                                                     *
 **********************************************************************/
 
-BOOLEAN expect_ccurly = FALSE; /* Used to signal that a CCURLY could be inserted here */
+static BOOLEAN expect_ccurly = FALSE; /* Used to signal that a CCURLY could be inserted here */
 
 extern BOOLEAN nonstandardFlag;
 extern BOOLEAN etags;
@@ -185,7 +185,7 @@ extern int startlineno;
 *                                                                     *
 **********************************************************************/
 
-list fixlist;
+/* OLD 95/08: list fixlist; */
 static int Fixity = 0, Precedence = 0;
 struct infix;
 
@@ -583,74 +583,74 @@ static const short yyrline[] = { 0,
   1364,  1368,  1394,  1408,  1411,  1412,  1415,  1416,  1419,  1421,
   1422,  1425,  1429,  1430,  1439,  1440,  1441,  1450,  1451,  1461,
   1462,  1469,  1477,  1480,  1486,  1487,  1490,  1493,  1494,  1497,
-  1498,  1499,  1500,  1501,  1502,  1503,  1504,  1507,  1521,  1526,
-  1527,  1530,  1531,  1541,  1542,  1543,  1544,  1545,  1546,  1549,
-  1550,  1551,  1552,  1555,  1556,  1557,  1590,  1591,  1605,  1606,
-  1626,  1627,  1631,  1632,  1635,  1636,  1640,  1641,  1644,  1645,
-  1646,  1647,  1648,  1649,  1650,  1654,  1655,  1656,  1657,  1658,
-  1661,  1662,  1663,  1664,  1665,  1666,  1667,  1671,  1672,  1673,
-  1674,  1675,  1685,  1691,  1695,  1696,  1706,  1707,  1710,  1712,
-  1727,  1728,  1731,  1734,  1735,  1738,  1738,  1739,  1757,  1758,
-  1761,  1762,  1765,  1768,  1771,  1774,  1775,  1778,  1779,  1782,
-  1783,  1786,  1787,  1791,  1792,  1795,  1796,  1797,  1798,  1801,
-  1802,  1805,  1806,  1809,  1810,  1811,  1812,  1813,  1814,  1818,
-  1819,  1820,  1821,  1822,  1825,  1827,  1828,  1829,  1830,  1831,
-  1832,  1833,  1834,  1835,  1836,  1837,  1838,  1839,  1845,  1848,
-  1858,  1868,  1879,  1882,  1892,  1895,  1905,  1908,  1911,  1917,
-  1918,  1921,  1922,  1925,  1926,  1930,  1931,  1932,  1935,  1936,
-  1939,  1940,  1941,  1944,  1947,  1950,  1951,  1954,  1955,  1959,
-  1960,  1963,  1964,  1967,  1968,  1972,  1973,  1977,  1978,  1981,
-  1984,  1990,  1993,  1997,  1999,  2002,  2005,  2013,  2013,  2016,
-  2022
+  1498,  1499,  1500,  1501,  1502,  1503,  1504,  1507,  1518,  1523,
+  1524,  1527,  1528,  1538,  1539,  1540,  1541,  1542,  1543,  1546,
+  1547,  1548,  1549,  1552,  1553,  1554,  1567,  1568,  1582,  1583,
+  1603,  1604,  1608,  1609,  1612,  1613,  1617,  1618,  1621,  1622,
+  1623,  1624,  1625,  1626,  1627,  1631,  1632,  1633,  1634,  1635,
+  1638,  1639,  1640,  1641,  1642,  1643,  1644,  1648,  1649,  1650,
+  1651,  1652,  1656,  1662,  1671,  1672,  1682,  1683,  1686,  1688,
+  1703,  1704,  1707,  1710,  1711,  1714,  1714,  1715,  1735,  1736,
+  1739,  1740,  1743,  1746,  1749,  1752,  1753,  1756,  1757,  1760,
+  1761,  1764,  1765,  1769,  1770,  1773,  1774,  1775,  1776,  1779,
+  1780,  1783,  1784,  1787,  1788,  1789,  1790,  1791,  1792,  1796,
+  1797,  1798,  1799,  1800,  1803,  1805,  1806,  1807,  1808,  1809,
+  1810,  1811,  1812,  1813,  1814,  1815,  1816,  1817,  1823,  1826,
+  1836,  1846,  1857,  1860,  1870,  1873,  1883,  1886,  1889,  1895,
+  1896,  1899,  1900,  1903,  1904,  1908,  1909,  1910,  1913,  1914,
+  1917,  1918,  1919,  1922,  1925,  1928,  1929,  1932,  1933,  1937,
+  1938,  1941,  1942,  1945,  1946,  1950,  1951,  1955,  1956,  1959,
+  1962,  1968,  1971,  1975,  1977,  1980,  1983,  1991,  1991,  1994,
+  2000
 };
 
-static const char * const yytname[] = {   "$","error","$illegal.","VARID","CONID",
-"VARSYM","CONSYM","MINUS","INTEGER","FLOAT","CHAR","STRING","CHARPRIM","STRINGPRIM",
-"INTPRIM","FLOATPRIM","DOUBLEPRIM","CLITLIT","OCURLY","CCURLY","VCCURLY","SEMI",
-"OBRACK","CBRACK","OPAREN","CPAREN","COMMA","BQUOTE","RARROW","VBAR","EQUAL",
-"DARROW","DOTDOT","DCOLON","LARROW","WILDCARD","AT","LAZY","LAMBDA","LET","IN",
-"WHERE","CASE","OF","TYPE","DATA","CLASS","INSTANCE","DEFAULT","INFIX","INFIXL",
-"INFIXR","MODULE","IMPORT","INTERFACE","HIDING","CCALL","CCALL_GC","CASM","CASM_GC",
-"SCC","IF","THEN","ELSE","RENAMING","DERIVING","TO","LEOF","GHC_PRAGMA","END_PRAGMA",
-"NO_PRAGMA","NOINFO_PRAGMA","ABSTRACT_PRAGMA","SPECIALISE_PRAGMA","MODNAME_PRAGMA",
-"ARITY_PRAGMA","UPDATE_PRAGMA","STRICTNESS_PRAGMA","KIND_PRAGMA","UNFOLDING_PRAGMA",
-"MAGIC_UNFOLDING_PRAGMA","DEFOREST_PRAGMA","SPECIALISE_UPRAGMA","INLINE_UPRAGMA",
-"MAGIC_UNFOLDING_UPRAGMA","ABSTRACT_UPRAGMA","DEFOREST_UPRAGMA","END_UPRAGMA",
-"TYLAMBDA","COCON","COPRIM","COAPP","COTYAPP","FORALL","TYVAR_TEMPLATE_ID","CO_ALG_ALTS",
-"CO_PRIM_ALTS","CO_NO_DEFAULT","CO_LETREC","CO_SDSEL_ID","CO_METH_ID","CO_DEFM_ID",
-"CO_DFUN_ID","CO_CONSTM_ID","CO_SPEC_ID","CO_WRKR_ID","CO_ORIG_NM","UNFOLD_ALWAYS",
-"UNFOLD_IF_ARGS","NOREP_INTEGER","NOREP_RATIONAL","NOREP_STRING","CO_PRELUDE_DICTS_CC",
-"CO_ALL_DICTS_CC","CO_USER_CC","CO_AUTO_CC","CO_DICT_CC","CO_CAF_CC","CO_DUPD_CC",
-"PLUS","pmodule","module","@1","@2","body","maybeexports","export_list","export",
-"impspec","maybeimpspec","import_list","import","idata_pragma","idata_pragma_specs",
-"idata_pragma_specslist","idata_pragma_spectypes","itype_pragma","iclas_pragma",
-"iclasop_pragma","iinst_pragma","modname_pragma","restof_iinst_spec","ival_pragma",
-"gen_pragma","arity_pragma","update_pragma","deforest_pragma","strictness_pragma",
-"worker_info","unfolding_pragma","unfolding_guidance","gen_pragma_list","type_pragma_pairs_maybe",
-"type_pragma_pairs","type_pragma_pair","type_instpragma_pairs","type_instpragma_pair",
-"type_maybes","type_maybe","maybe_name_pragma_pairs","name_pragma_pairs","name_pragma_pair",
-"core_expr","core_case_alts","core_alg_alts","core_alg_alt","core_prim_alts",
-"core_prim_alt","core_default","corec_binds","corec_bind","co_scc","co_caf",
-"co_dupd","core_id","co_primop","core_binders","core_binder","core_atoms","core_atom_list",
-"core_atom","core_tyvars","core_tv_templates","core_types","core_type_list",
-"core_type","core_type_maybes","core_type_maybe","readpreludecore","@3","readprelude",
-"@4","maybeimpdecls","impdecls","impdecl","@5","impdecl_rest","readinterface",
-"renamings","renaming_list","renaming","maybeiimports","iimports","iimport",
-"interface","@6","ibody","maybefixes","fixes","fix","@7","@8","@9","@10","@11",
-"@12","ops","topdecls","topdecl","typed","datad","classd","cbody","instd","rinst",
-"inst","defaultd","dtypes","decls","decl","howto_inline_maybe","types_and_maybe_ids",
-"type_and_maybe_id","itopdecls","itopdecl","ivarsd","ityped","idatad","iclassd",
-"iinstd","class","types","type","btype","atypes","ttype","atype","ntatype","simple",
-"simple_long","constrs","constr","tyclses","tycls_list","context","context_list",
-"instdefs","instdef","vars","varsrest","cons","valdef","@13","valrhs","valrhs1",
-"gdrhs","maybe_where","gd","lampats","exp","oexp","dexp","kexp","@14","@15",
-"fexp","cexp","aexp","opatk","opat","dpat","fpat","dpatk","fpatk","aapat","aapatk",
-"tuple","texps","list","list_exps","sequence","comprehension","quals","qual",
-"@16","@17","qualrest","alts","alt","@18","altrest","gdpat","upto","pats","pat",
-"bpat","conpat","apat","apatc","lit_constant","importkey","datakey","typekey",
-"instkey","defaultkey","classkey","minuskey","modulekey","oparenkey","obrackkey",
-"lazykey","op1","op","varop","varop1","conop","varsym","minus","plus","var",
-"vark","con","conk","ccallid","atype_list","tyvars","tyvar","tycls","tycon",
+static const char * const yytname[] = {   "$","error","$undefined.","VARID",
+"CONID","VARSYM","CONSYM","MINUS","INTEGER","FLOAT","CHAR","STRING","CHARPRIM",
+"STRINGPRIM","INTPRIM","FLOATPRIM","DOUBLEPRIM","CLITLIT","OCURLY","CCURLY",
+"VCCURLY","SEMI","OBRACK","CBRACK","OPAREN","CPAREN","COMMA","BQUOTE","RARROW",
+"VBAR","EQUAL","DARROW","DOTDOT","DCOLON","LARROW","WILDCARD","AT","LAZY","LAMBDA",
+"LET","IN","WHERE","CASE","OF","TYPE","DATA","CLASS","INSTANCE","DEFAULT","INFIX",
+"INFIXL","INFIXR","MODULE","IMPORT","INTERFACE","HIDING","CCALL","CCALL_GC",
+"CASM","CASM_GC","SCC","IF","THEN","ELSE","RENAMING","DERIVING","TO","LEOF",
+"GHC_PRAGMA","END_PRAGMA","NO_PRAGMA","NOINFO_PRAGMA","ABSTRACT_PRAGMA","SPECIALISE_PRAGMA",
+"MODNAME_PRAGMA","ARITY_PRAGMA","UPDATE_PRAGMA","STRICTNESS_PRAGMA","KIND_PRAGMA",
+"UNFOLDING_PRAGMA","MAGIC_UNFOLDING_PRAGMA","DEFOREST_PRAGMA","SPECIALISE_UPRAGMA",
+"INLINE_UPRAGMA","MAGIC_UNFOLDING_UPRAGMA","ABSTRACT_UPRAGMA","DEFOREST_UPRAGMA",
+"END_UPRAGMA","TYLAMBDA","COCON","COPRIM","COAPP","COTYAPP","FORALL","TYVAR_TEMPLATE_ID",
+"CO_ALG_ALTS","CO_PRIM_ALTS","CO_NO_DEFAULT","CO_LETREC","CO_SDSEL_ID","CO_METH_ID",
+"CO_DEFM_ID","CO_DFUN_ID","CO_CONSTM_ID","CO_SPEC_ID","CO_WRKR_ID","CO_ORIG_NM",
+"UNFOLD_ALWAYS","UNFOLD_IF_ARGS","NOREP_INTEGER","NOREP_RATIONAL","NOREP_STRING",
+"CO_PRELUDE_DICTS_CC","CO_ALL_DICTS_CC","CO_USER_CC","CO_AUTO_CC","CO_DICT_CC",
+"CO_CAF_CC","CO_DUPD_CC","PLUS","pmodule","module","@1","@2","body","maybeexports",
+"export_list","export","impspec","maybeimpspec","import_list","import","idata_pragma",
+"idata_pragma_specs","idata_pragma_specslist","idata_pragma_spectypes","itype_pragma",
+"iclas_pragma","iclasop_pragma","iinst_pragma","modname_pragma","restof_iinst_spec",
+"ival_pragma","gen_pragma","arity_pragma","update_pragma","deforest_pragma",
+"strictness_pragma","worker_info","unfolding_pragma","unfolding_guidance","gen_pragma_list",
+"type_pragma_pairs_maybe","type_pragma_pairs","type_pragma_pair","type_instpragma_pairs",
+"type_instpragma_pair","type_maybes","type_maybe","maybe_name_pragma_pairs",
+"name_pragma_pairs","name_pragma_pair","core_expr","core_case_alts","core_alg_alts",
+"core_alg_alt","core_prim_alts","core_prim_alt","core_default","corec_binds",
+"corec_bind","co_scc","co_caf","co_dupd","core_id","co_primop","core_binders",
+"core_binder","core_atoms","core_atom_list","core_atom","core_tyvars","core_tv_templates",
+"core_types","core_type_list","core_type","core_type_maybes","core_type_maybe",
+"readpreludecore","@3","readprelude","@4","maybeimpdecls","impdecls","impdecl",
+"@5","impdecl_rest","readinterface","renamings","renaming_list","renaming","maybeiimports",
+"iimports","iimport","interface","@6","ibody","maybefixes","fixes","fix","@7",
+"@8","@9","@10","@11","@12","ops","topdecls","topdecl","typed","datad","classd",
+"cbody","instd","rinst","inst","defaultd","dtypes","decls","decl","howto_inline_maybe",
+"types_and_maybe_ids","type_and_maybe_id","itopdecls","itopdecl","ivarsd","ityped",
+"idatad","iclassd","iinstd","class","types","type","btype","atypes","ttype",
+"atype","ntatype","simple","simple_long","constrs","constr","tyclses","tycls_list",
+"context","context_list","instdefs","instdef","vars","varsrest","cons","valdef",
+"@13","valrhs","valrhs1","gdrhs","maybe_where","gd","lampats","exp","oexp","dexp",
+"kexp","@14","@15","fexp","cexp","aexp","opatk","opat","dpat","fpat","dpatk",
+"fpatk","aapat","aapatk","tuple","texps","list","list_exps","sequence","comprehension",
+"quals","qual","@16","@17","qualrest","alts","alt","@18","altrest","gdpat","upto",
+"pats","pat","bpat","conpat","apat","apatc","lit_constant","importkey","datakey",
+"typekey","instkey","defaultkey","classkey","minuskey","modulekey","oparenkey",
+"obrackkey","lazykey","op1","op","varop","varop1","conop","varsym","minus","plus",
+"var","vark","con","conk","ccallid","atype_list","tyvars","tyvar","tycls","tycon",
 "modid","ocurly","vocurly","layout","ccurly","vccurly","@19","vccurly1",""
 };
 #endif
@@ -1601,14 +1601,14 @@ static const short yycheck[] = {    29,
     -1,    -1,   109,   110,   111
 };
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
-#line 3 "/usr/local/gnu/lib/bison.simple"
+#line 3 "/usr/local/gnu/share/bison.simple"
 
 /* Skeleton output parser for bison,
-   Copyright (C) 1984, 1989, 1990 Bob Corbett and Richard Stallman
+   Copyright (C) 1984, 1989, 1990 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 1, or (at your option)
+   the Free Software Foundation; either version 2, or (at your option)
    any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -1620,6 +1620,10 @@ static const short yycheck[] = {    29,
    along with this program; if not, write to the Free Software
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
+/* As a special exception, when this file is copied by Bison into a
+   Bison output file, you may use that output file without restriction.
+   This special exception was added by the Free Software Foundation
+   in version 1.24 of Bison.  */
 
 #ifndef alloca
 #ifdef __GNUC__
@@ -1641,7 +1645,7 @@ extern "C" {
 void *alloca (unsigned int);
 };
 #else /* not __cplusplus */
-void *alloca (unsigned int);
+void *alloca ();
 #endif /* not __cplusplus */
 #endif /* __hpux */
 #endif /* not _AIX */
@@ -1693,10 +1697,18 @@ while (0)
 
 #ifdef YYPURE
 #ifdef YYLSP_NEEDED
+#ifdef YYLEX_PARAM
+#define YYLEX		yylex(&yylval, &yylloc, YYLEX_PARAM)
+#else
 #define YYLEX		yylex(&yylval, &yylloc)
+#endif
+#else /* not YYLSP_NEEDED */
+#ifdef YYLEX_PARAM
+#define YYLEX		yylex(&yylval, YYLEX_PARAM)
 #else
 #define YYLEX		yylex(&yylval)
 #endif
+#endif /* not YYLSP_NEEDED */
 #endif
 
 /* If nonreentrant, generate the variables here */
@@ -1744,14 +1756,14 @@ int yyparse (void);
 #endif
 
 #if __GNUC__ > 1		/* GNU C and GNU C++ define this.  */
-#define __yy_bcopy(FROM,TO,COUNT)	__builtin_memcpy(TO,FROM,COUNT)
+#define __yy_memcpy(FROM,TO,COUNT)	__builtin_memcpy(TO,FROM,COUNT)
 #else				/* not GNU C or C++ */
 #ifndef __cplusplus
 
 /* This is the most reliable way to avoid incompatibilities
    in available built-in functions on various systems.  */
 static void
-__yy_bcopy (from, to, count)
+__yy_memcpy (from, to, count)
      char *from;
      char *to;
      int count;
@@ -1769,7 +1781,7 @@ __yy_bcopy (from, to, count)
 /* This is the most reliable way to avoid incompatibilities
    in available built-in functions on various systems.  */
 static void
-__yy_bcopy (char *from, char *to, int count)
+__yy_memcpy (char *from, char *to, int count)
 {
   register char *f = from;
   register char *t = to;
@@ -1782,16 +1794,31 @@ __yy_bcopy (char *from, char *to, int count)
 #endif
 #endif
 
-#line 184 "/usr/local/gnu/lib/bison.simple"
+#line 192 "/usr/local/gnu/share/bison.simple"
+
+/* The user can define YYPARSE_PARAM as the name of an argument to be passed
+   into yyparse.  The argument should have type void *.
+   It should actually point to an object.
+   Grammar actions can access the variable by casting it
+   to the proper pointer type.  */
+
+#ifdef YYPARSE_PARAM
+#define YYPARSE_PARAM_DECL void *YYPARSE_PARAM;
+#else
+#define YYPARSE_PARAM
+#define YYPARSE_PARAM_DECL
+#endif
+
 int
-yyparse()
+yyparse(YYPARSE_PARAM)
+     YYPARSE_PARAM_DECL
 {
   register int yystate;
   register int yyn;
   register short *yyssp;
   register YYSTYPE *yyvsp;
   int yyerrstatus;	/*  number of tokens to shift before error messages enabled */
-  int yychar1;		/*  lookahead token as an internal (translated) token number */
+  int yychar1 = 0;		/*  lookahead token as an internal (translated) token number */
 
   short	yyssa[YYINITDEPTH];	/*  the state stack			*/
   YYSTYPE yyvsa[YYINITDEPTH];	/*  the semantic value stack		*/
@@ -1870,13 +1897,20 @@ yynewstate:
 #ifdef yyoverflow
       /* Each stack pointer address is followed by the size of
 	 the data in use in that stack, in bytes.  */
+#ifdef YYLSP_NEEDED
+      /* This used to be a conditional around just the two extra args,
+	 but that might be undefined if yyoverflow is a macro.  */
       yyoverflow("parser stack overflow",
 		 &yyss1, size * sizeof (*yyssp),
 		 &yyvs1, size * sizeof (*yyvsp),
-#ifdef YYLSP_NEEDED
 		 &yyls1, size * sizeof (*yylsp),
-#endif
 		 &yystacksize);
+#else
+      yyoverflow("parser stack overflow",
+		 &yyss1, size * sizeof (*yyssp),
+		 &yyvs1, size * sizeof (*yyvsp),
+		 &yystacksize);
+#endif
 
       yyss = yyss1; yyvs = yyvs1;
 #ifdef YYLSP_NEEDED
@@ -1893,12 +1927,12 @@ yynewstate:
       if (yystacksize > YYMAXDEPTH)
 	yystacksize = YYMAXDEPTH;
       yyss = (short *) alloca (yystacksize * sizeof (*yyssp));
-      __yy_bcopy ((char *)yyss1, (char *)yyss, size * sizeof (*yyssp));
+      __yy_memcpy ((char *)yyss1, (char *)yyss, size * sizeof (*yyssp));
       yyvs = (YYSTYPE *) alloca (yystacksize * sizeof (*yyvsp));
-      __yy_bcopy ((char *)yyvs1, (char *)yyvs, size * sizeof (*yyvsp));
+      __yy_memcpy ((char *)yyvs1, (char *)yyvs, size * sizeof (*yyvsp));
 #ifdef YYLSP_NEEDED
       yyls = (YYLTYPE *) alloca (yystacksize * sizeof (*yylsp));
-      __yy_bcopy ((char *)yyls1, (char *)yyls, size * sizeof (*yylsp));
+      __yy_memcpy ((char *)yyls1, (char *)yyls, size * sizeof (*yylsp));
 #endif
 #endif /* no yyoverflow */
 
@@ -2037,7 +2071,8 @@ yydefault:
 /* Do a reduction.  yyn is the number of a rule to reduce with.  */
 yyreduce:
   yylen = yyr2[yyn];
-  yyval = yyvsp[1-yylen]; /* implement default value of the action */
+  if (yylen > 0)
+    yyval = yyvsp[1-yylen]; /* implement default value of the action */
 
 #if YYDEBUG != 0
   if (yydebug)
@@ -2900,7 +2935,7 @@ case 192:
     break;}
 case 193:
 #line 930 "yaccParser/hsparser.y"
-{ fixlist = Lnil;
+{ /* OLD 95/08: fixlist = Lnil; */
 		  strcpy(iface_name, id_to_string(yyvsp[0].uid));
 		;
     break;}
@@ -3689,10 +3724,7 @@ case 377:
     break;}
 case 378:
 #line 1508 "yaccParser/hsparser.y"
-{ extern BOOLEAN ignoreSCC;
-		  extern BOOLEAN warnSCC;
-
-		  if (ignoreSCC) {
+{ if (ignoreSCC) {
 		    if (warnSCC)
 			fprintf(stderr,
 				"\"%s\", line %d: _scc_ (`set [profiling] cost centre') ignored\n",
@@ -3704,67 +3736,67 @@ case 378:
 		;
     break;}
 case 380:
-#line 1526 "yaccParser/hsparser.y"
+#line 1523 "yaccParser/hsparser.y"
 { yyval.utree = mkap(yyvsp[-1].utree,yyvsp[0].utree); ;
     break;}
 case 382:
-#line 1530 "yaccParser/hsparser.y"
+#line 1527 "yaccParser/hsparser.y"
 { yyval.ulist = lapp(yyvsp[-1].ulist,yyvsp[0].utree); ;
     break;}
 case 383:
-#line 1531 "yaccParser/hsparser.y"
+#line 1528 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(yyvsp[0].utree); ;
     break;}
 case 384:
-#line 1541 "yaccParser/hsparser.y"
+#line 1538 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 385:
-#line 1542 "yaccParser/hsparser.y"
+#line 1539 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 386:
-#line 1543 "yaccParser/hsparser.y"
+#line 1540 "yaccParser/hsparser.y"
 { yyval.utree = mklit(yyvsp[0].uliteral); ;
     break;}
 case 387:
-#line 1544 "yaccParser/hsparser.y"
+#line 1541 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[-1].utree); ;
     break;}
 case 388:
-#line 1545 "yaccParser/hsparser.y"
+#line 1542 "yaccParser/hsparser.y"
 { checkprec(yyvsp[-2].utree,yyvsp[-1].uid,FALSE); yyval.utree = mklsection(yyvsp[-2].utree,yyvsp[-1].uid); ;
     break;}
 case 389:
-#line 1546 "yaccParser/hsparser.y"
+#line 1543 "yaccParser/hsparser.y"
 { checkprec(yyvsp[-1].utree,yyvsp[-2].uid,TRUE);  yyval.utree = mkrsection(yyvsp[-2].uid,yyvsp[-1].utree); ;
     break;}
 case 391:
-#line 1550 "yaccParser/hsparser.y"
+#line 1547 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[0].utree); ;
     break;}
 case 392:
-#line 1551 "yaccParser/hsparser.y"
+#line 1548 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[0].utree); ;
     break;}
 case 393:
-#line 1552 "yaccParser/hsparser.y"
+#line 1549 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[0].utree); ;
     break;}
 case 394:
-#line 1555 "yaccParser/hsparser.y"
+#line 1552 "yaccParser/hsparser.y"
 { checkinpat();  yyval.utree = mkas(yyvsp[-2].uid,yyvsp[0].utree); ;
     break;}
 case 395:
-#line 1556 "yaccParser/hsparser.y"
+#line 1553 "yaccParser/hsparser.y"
 { checkinpat();  yyval.utree = mkwildp();   ;
     break;}
 case 396:
-#line 1557 "yaccParser/hsparser.y"
+#line 1554 "yaccParser/hsparser.y"
 { checkinpat();  yyval.utree = mklazyp(yyvsp[0].utree); ;
     break;}
 case 398:
-#line 1592 "yaccParser/hsparser.y"
+#line 1569 "yaccParser/hsparser.y"
 {
 		  yyval.utree = mkinfixop(yyvsp[-1].uid,yyvsp[-2].utree,yyvsp[0].utree);
 
@@ -3778,7 +3810,7 @@ case 398:
 		;
     break;}
 case 400:
-#line 1607 "yaccParser/hsparser.y"
+#line 1584 "yaccParser/hsparser.y"
 {
 		  yyval.utree = mkinfixop(yyvsp[-1].uid,yyvsp[-2].utree,yyvsp[0].utree);
 
@@ -3792,119 +3824,119 @@ case 400:
 		;
     break;}
 case 401:
-#line 1626 "yaccParser/hsparser.y"
+#line 1603 "yaccParser/hsparser.y"
 { yyval.utree = mknegate(yyvsp[0].utree); ;
     break;}
 case 403:
-#line 1631 "yaccParser/hsparser.y"
+#line 1608 "yaccParser/hsparser.y"
 { yyval.utree = mkap(yyvsp[-1].utree,yyvsp[0].utree); ;
     break;}
 case 405:
-#line 1635 "yaccParser/hsparser.y"
+#line 1612 "yaccParser/hsparser.y"
 { yyval.utree = mknegate(yyvsp[0].utree); ;
     break;}
 case 407:
-#line 1640 "yaccParser/hsparser.y"
+#line 1617 "yaccParser/hsparser.y"
 { yyval.utree = mkap(yyvsp[-1].utree,yyvsp[0].utree); ;
     break;}
 case 409:
-#line 1644 "yaccParser/hsparser.y"
+#line 1621 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 410:
-#line 1645 "yaccParser/hsparser.y"
+#line 1622 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 411:
-#line 1646 "yaccParser/hsparser.y"
+#line 1623 "yaccParser/hsparser.y"
 { yyval.utree = mkas(yyvsp[-2].uid,yyvsp[0].utree); ;
     break;}
 case 412:
-#line 1647 "yaccParser/hsparser.y"
+#line 1624 "yaccParser/hsparser.y"
 { yyval.utree = mklit(yyvsp[0].uliteral); ;
     break;}
 case 413:
-#line 1648 "yaccParser/hsparser.y"
+#line 1625 "yaccParser/hsparser.y"
 { yyval.utree = mkwildp(); ;
     break;}
 case 414:
-#line 1649 "yaccParser/hsparser.y"
+#line 1626 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(Lnil); ;
     break;}
 case 415:
-#line 1650 "yaccParser/hsparser.y"
+#line 1627 "yaccParser/hsparser.y"
 { yyval.utree = mkplusp(mkident(yyvsp[-3].uid),mkinteger(yyvsp[-1].ustring)); ;
     break;}
 case 416:
-#line 1654 "yaccParser/hsparser.y"
+#line 1631 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[-1].utree); ;
     break;}
 case 417:
-#line 1655 "yaccParser/hsparser.y"
+#line 1632 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(mklcons(yyvsp[-3].utree,yyvsp[-1].ulist)); ;
     break;}
 case 418:
-#line 1656 "yaccParser/hsparser.y"
+#line 1633 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(yyvsp[-1].ulist); ;
     break;}
 case 419:
-#line 1657 "yaccParser/hsparser.y"
+#line 1634 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(Lnil); ;
     break;}
 case 420:
-#line 1658 "yaccParser/hsparser.y"
+#line 1635 "yaccParser/hsparser.y"
 { yyval.utree = mklazyp(yyvsp[0].utree); ;
     break;}
 case 421:
-#line 1661 "yaccParser/hsparser.y"
+#line 1638 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 422:
-#line 1662 "yaccParser/hsparser.y"
+#line 1639 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 423:
-#line 1663 "yaccParser/hsparser.y"
+#line 1640 "yaccParser/hsparser.y"
 { yyval.utree = mkas(yyvsp[-2].uid,yyvsp[0].utree); ;
     break;}
 case 424:
-#line 1664 "yaccParser/hsparser.y"
+#line 1641 "yaccParser/hsparser.y"
 { yyval.utree = mklit(yyvsp[0].uliteral); setstartlineno(); ;
     break;}
 case 425:
-#line 1665 "yaccParser/hsparser.y"
+#line 1642 "yaccParser/hsparser.y"
 { yyval.utree = mkwildp(); setstartlineno(); ;
     break;}
 case 426:
-#line 1666 "yaccParser/hsparser.y"
+#line 1643 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(Lnil); ;
     break;}
 case 427:
-#line 1667 "yaccParser/hsparser.y"
+#line 1644 "yaccParser/hsparser.y"
 { yyval.utree = mkplusp(mkident(yyvsp[-3].uid),mkinteger(yyvsp[-1].ustring)); ;
     break;}
 case 428:
-#line 1671 "yaccParser/hsparser.y"
+#line 1648 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[-1].utree); ;
     break;}
 case 429:
-#line 1672 "yaccParser/hsparser.y"
+#line 1649 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(mklcons(yyvsp[-3].utree,yyvsp[-1].ulist)); ;
     break;}
 case 430:
-#line 1673 "yaccParser/hsparser.y"
+#line 1650 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(yyvsp[-1].ulist); ;
     break;}
 case 431:
-#line 1674 "yaccParser/hsparser.y"
+#line 1651 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(Lnil); ;
     break;}
 case 432:
-#line 1675 "yaccParser/hsparser.y"
+#line 1652 "yaccParser/hsparser.y"
 { yyval.utree = mklazyp(yyvsp[0].utree); ;
     break;}
 case 433:
-#line 1686 "yaccParser/hsparser.y"
+#line 1657 "yaccParser/hsparser.y"
 { if (ttree(yyvsp[-1].utree) == tuple)
 		    yyval.utree = mktuple(mklcons(yyvsp[-3].utree, gtuplelist((struct Stuple *) yyvsp[-1].utree)));
 		else
@@ -3912,15 +3944,15 @@ case 433:
 		;
     break;}
 case 434:
-#line 1692 "yaccParser/hsparser.y"
+#line 1663 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(Lnil); ;
     break;}
 case 435:
-#line 1695 "yaccParser/hsparser.y"
+#line 1671 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[0].utree); ;
     break;}
 case 436:
-#line 1697 "yaccParser/hsparser.y"
+#line 1673 "yaccParser/hsparser.y"
 { if (ttree(yyvsp[0].utree) == tuple)
 		    yyval.utree = mktuple(mklcons(yyvsp[-2].utree, gtuplelist((struct Stuple *) yyvsp[0].utree)));
 		else
@@ -3928,260 +3960,262 @@ case 436:
 		;
     break;}
 case 437:
-#line 1706 "yaccParser/hsparser.y"
+#line 1682 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(Lnil); ;
     break;}
 case 438:
-#line 1707 "yaccParser/hsparser.y"
+#line 1683 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(yyvsp[-1].ulist); ;
     break;}
 case 439:
-#line 1711 "yaccParser/hsparser.y"
+#line 1687 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(yyvsp[0].utree); ;
     break;}
 case 440:
-#line 1712 "yaccParser/hsparser.y"
+#line 1688 "yaccParser/hsparser.y"
 { yyval.ulist = mklcons(yyvsp[-2].utree, yyvsp[0].ulist); ;
     break;}
 case 441:
-#line 1727 "yaccParser/hsparser.y"
+#line 1703 "yaccParser/hsparser.y"
 {yyval.utree = mkeenum(yyvsp[-5].utree,lsing(yyvsp[-3].utree),yyvsp[-1].ulist);;
     break;}
 case 442:
-#line 1728 "yaccParser/hsparser.y"
+#line 1704 "yaccParser/hsparser.y"
 { yyval.utree = mkeenum(yyvsp[-3].utree,Lnil,yyvsp[-1].ulist); ;
     break;}
 case 443:
-#line 1731 "yaccParser/hsparser.y"
+#line 1707 "yaccParser/hsparser.y"
 { yyval.utree = mkcomprh(yyvsp[-3].utree,yyvsp[-1].ulist); ;
     break;}
 case 444:
-#line 1734 "yaccParser/hsparser.y"
+#line 1710 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(yyvsp[0].utree); ;
     break;}
 case 445:
-#line 1735 "yaccParser/hsparser.y"
+#line 1711 "yaccParser/hsparser.y"
 { yyval.ulist = lapp(yyvsp[-2].ulist,yyvsp[0].utree); ;
     break;}
 case 446:
-#line 1738 "yaccParser/hsparser.y"
+#line 1714 "yaccParser/hsparser.y"
 { inpat = TRUE; ;
     break;}
 case 447:
-#line 1738 "yaccParser/hsparser.y"
+#line 1714 "yaccParser/hsparser.y"
 { inpat = FALSE; ;
     break;}
 case 448:
-#line 1739 "yaccParser/hsparser.y"
-{ if (yyvsp[0].utree == NULL)
+#line 1715 "yaccParser/hsparser.y"
+{ if (yyvsp[0].utree == NULL) {
+		    patternOrExpr(/*wanted:*/ LEGIT_EXPR,yyvsp[-2].utree);
 		    yyval.utree = mkguard(yyvsp[-2].utree);
-		  else
-		    {
-		      checkpatt(yyvsp[-2].utree);
-		      if(ttree(yyvsp[0].utree)==def)
+		  } else {
+		    patternOrExpr(/*wanted:*/ LEGIT_PATT,yyvsp[-2].utree);
+		    yyval.utree = mkqual(yyvsp[-2].utree,yyvsp[0].utree);
+/* OLD: WDP 95/08
+		      if(ttree($4)==def)
 			{
 			  tree prevpatt_save = PREVPATT;
-			  PREVPATT = yyvsp[-2].utree;
-			  yyval.utree = mkdef((tree) mkpbind(lsing(createpat(lsing(mktruecase(ggdef((struct Sdef *) yyvsp[0].utree))),mknullbind())),hsplineno));
+			  PREVPATT = $2;
+			  $$ = mkdef((tree) mkpbind(lsing(createpat(lsing(mktruecase(ggdef((struct Sdef *) $4))),mknullbind())),hsplineno));
 			  PREVPATT = prevpatt_save;
 			}
 		      else
-			yyval.utree = mkqual(yyvsp[-2].utree,yyvsp[0].utree);
-		    }
+*/
+		  }
 		;
     break;}
 case 449:
-#line 1757 "yaccParser/hsparser.y"
+#line 1735 "yaccParser/hsparser.y"
 { yyval.utree = yyvsp[0].utree; ;
     break;}
 case 450:
-#line 1758 "yaccParser/hsparser.y"
+#line 1736 "yaccParser/hsparser.y"
 { yyval.utree = NULL; ;
     break;}
 case 451:
-#line 1761 "yaccParser/hsparser.y"
+#line 1739 "yaccParser/hsparser.y"
 { yyval.ulist = yyvsp[0].ulist; ;
     break;}
 case 452:
-#line 1762 "yaccParser/hsparser.y"
+#line 1740 "yaccParser/hsparser.y"
 { yyval.ulist = lconc(yyvsp[-2].ulist,yyvsp[0].ulist); ;
     break;}
 case 453:
-#line 1766 "yaccParser/hsparser.y"
+#line 1744 "yaccParser/hsparser.y"
 { PREVPATT = yyvsp[0].utree; ;
     break;}
 case 454:
-#line 1768 "yaccParser/hsparser.y"
+#line 1746 "yaccParser/hsparser.y"
 { yyval.ulist = yyvsp[0].ulist;
 		  PREVPATT = NULL;
 		;
     break;}
 case 455:
-#line 1771 "yaccParser/hsparser.y"
+#line 1749 "yaccParser/hsparser.y"
 { yyval.ulist = Lnil; ;
     break;}
 case 456:
-#line 1774 "yaccParser/hsparser.y"
+#line 1752 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(createpat(yyvsp[-1].ulist, yyvsp[0].ubinding)); ;
     break;}
 case 457:
-#line 1775 "yaccParser/hsparser.y"
+#line 1753 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(createpat(lsing(mktruecase(yyvsp[-1].utree)), yyvsp[0].ubinding)); ;
     break;}
 case 458:
-#line 1778 "yaccParser/hsparser.y"
+#line 1756 "yaccParser/hsparser.y"
 { yyval.ulist = mklcons(ldub(yyvsp[-3].utree,yyvsp[-1].utree),yyvsp[0].ulist);  ;
     break;}
 case 459:
-#line 1779 "yaccParser/hsparser.y"
+#line 1757 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(ldub(yyvsp[-2].utree,yyvsp[0].utree)); ;
     break;}
 case 460:
-#line 1782 "yaccParser/hsparser.y"
+#line 1760 "yaccParser/hsparser.y"
 { yyval.ulist = Lnil; ;
     break;}
 case 461:
-#line 1783 "yaccParser/hsparser.y"
+#line 1761 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(yyvsp[0].utree); ;
     break;}
 case 462:
-#line 1786 "yaccParser/hsparser.y"
+#line 1764 "yaccParser/hsparser.y"
 { yyval.ulist = mklcons(yyvsp[-2].utree, yyvsp[0].ulist); ;
     break;}
 case 463:
-#line 1787 "yaccParser/hsparser.y"
+#line 1765 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(yyvsp[0].utree); ;
     break;}
 case 465:
-#line 1792 "yaccParser/hsparser.y"
+#line 1770 "yaccParser/hsparser.y"
 { yyval.utree = mkinfixop(yyvsp[-1].uid,yyvsp[-2].utree,yyvsp[0].utree); precparse(yyval.utree); ;
     break;}
 case 468:
-#line 1797 "yaccParser/hsparser.y"
+#line 1775 "yaccParser/hsparser.y"
 { yyval.utree = mklit(mkinteger(ineg(yyvsp[0].ustring))); ;
     break;}
 case 469:
-#line 1798 "yaccParser/hsparser.y"
+#line 1776 "yaccParser/hsparser.y"
 { yyval.utree = mklit(mkfloatr(ineg(yyvsp[0].ustring))); ;
     break;}
 case 470:
-#line 1801 "yaccParser/hsparser.y"
+#line 1779 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 471:
-#line 1802 "yaccParser/hsparser.y"
+#line 1780 "yaccParser/hsparser.y"
 { yyval.utree = mkap(yyvsp[-1].utree,yyvsp[0].utree); ;
     break;}
 case 472:
-#line 1805 "yaccParser/hsparser.y"
+#line 1783 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 474:
-#line 1809 "yaccParser/hsparser.y"
+#line 1787 "yaccParser/hsparser.y"
 { yyval.utree = mkident(yyvsp[0].uid); ;
     break;}
 case 475:
-#line 1810 "yaccParser/hsparser.y"
+#line 1788 "yaccParser/hsparser.y"
 { yyval.utree = mkas(yyvsp[-2].uid,yyvsp[0].utree); ;
     break;}
 case 476:
-#line 1811 "yaccParser/hsparser.y"
+#line 1789 "yaccParser/hsparser.y"
 { yyval.utree = mklit(yyvsp[0].uliteral); ;
     break;}
 case 477:
-#line 1812 "yaccParser/hsparser.y"
+#line 1790 "yaccParser/hsparser.y"
 { yyval.utree = mkwildp(); ;
     break;}
 case 478:
-#line 1813 "yaccParser/hsparser.y"
+#line 1791 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(Lnil); ;
     break;}
 case 479:
-#line 1814 "yaccParser/hsparser.y"
+#line 1792 "yaccParser/hsparser.y"
 { yyval.utree = mkplusp(mkident(yyvsp[-3].uid),mkinteger(yyvsp[-1].ustring)); ;
     break;}
 case 480:
-#line 1818 "yaccParser/hsparser.y"
+#line 1796 "yaccParser/hsparser.y"
 { yyval.utree = mkpar(yyvsp[-1].utree); ;
     break;}
 case 481:
-#line 1819 "yaccParser/hsparser.y"
+#line 1797 "yaccParser/hsparser.y"
 { yyval.utree = mktuple(mklcons(yyvsp[-3].utree,yyvsp[-1].ulist)); ;
     break;}
 case 482:
-#line 1820 "yaccParser/hsparser.y"
+#line 1798 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(yyvsp[-1].ulist); ;
     break;}
 case 483:
-#line 1821 "yaccParser/hsparser.y"
+#line 1799 "yaccParser/hsparser.y"
 { yyval.utree = mkllist(Lnil); ;
     break;}
 case 484:
-#line 1822 "yaccParser/hsparser.y"
+#line 1800 "yaccParser/hsparser.y"
 { yyval.utree = mklazyp(yyvsp[0].utree); ;
     break;}
 case 485:
-#line 1826 "yaccParser/hsparser.y"
+#line 1804 "yaccParser/hsparser.y"
 { yyval.uliteral = mkinteger(yyvsp[0].ustring); ;
     break;}
 case 486:
-#line 1827 "yaccParser/hsparser.y"
+#line 1805 "yaccParser/hsparser.y"
 { yyval.uliteral = mkfloatr(yyvsp[0].ustring); ;
     break;}
 case 487:
-#line 1828 "yaccParser/hsparser.y"
+#line 1806 "yaccParser/hsparser.y"
 { yyval.uliteral = mkcharr(yyvsp[0].uhstring); ;
     break;}
 case 488:
-#line 1829 "yaccParser/hsparser.y"
+#line 1807 "yaccParser/hsparser.y"
 { yyval.uliteral = mkstring(yyvsp[0].uhstring); ;
     break;}
 case 489:
-#line 1830 "yaccParser/hsparser.y"
+#line 1808 "yaccParser/hsparser.y"
 { yyval.uliteral = mkcharprim(yyvsp[0].uhstring); ;
     break;}
 case 490:
-#line 1831 "yaccParser/hsparser.y"
+#line 1809 "yaccParser/hsparser.y"
 { yyval.uliteral = mkstringprim(yyvsp[0].uhstring); ;
     break;}
 case 491:
-#line 1832 "yaccParser/hsparser.y"
+#line 1810 "yaccParser/hsparser.y"
 { yyval.uliteral = mkintprim(yyvsp[0].ustring); ;
     break;}
 case 492:
-#line 1833 "yaccParser/hsparser.y"
+#line 1811 "yaccParser/hsparser.y"
 { yyval.uliteral = mkfloatprim(yyvsp[0].ustring); ;
     break;}
 case 493:
-#line 1834 "yaccParser/hsparser.y"
+#line 1812 "yaccParser/hsparser.y"
 { yyval.uliteral = mkdoubleprim(yyvsp[0].ustring); ;
     break;}
 case 494:
-#line 1835 "yaccParser/hsparser.y"
+#line 1813 "yaccParser/hsparser.y"
 { yyval.uliteral = mkclitlit(yyvsp[0].ustring, ""); ;
     break;}
 case 495:
-#line 1836 "yaccParser/hsparser.y"
+#line 1814 "yaccParser/hsparser.y"
 { yyval.uliteral = mkclitlit(yyvsp[-2].ustring, yyvsp[0].uid); ;
     break;}
 case 496:
-#line 1837 "yaccParser/hsparser.y"
+#line 1815 "yaccParser/hsparser.y"
 { yyval.uliteral = mknorepi(yyvsp[0].ustring); ;
     break;}
 case 497:
-#line 1838 "yaccParser/hsparser.y"
+#line 1816 "yaccParser/hsparser.y"
 { yyval.uliteral = mknorepr(yyvsp[-1].ustring, yyvsp[0].ustring); ;
     break;}
 case 498:
-#line 1839 "yaccParser/hsparser.y"
+#line 1817 "yaccParser/hsparser.y"
 { yyval.uliteral = mknoreps(yyvsp[0].uhstring); ;
     break;}
 case 499:
-#line 1845 "yaccParser/hsparser.y"
+#line 1823 "yaccParser/hsparser.y"
 { setstartlineno(); ;
     break;}
 case 500:
-#line 1848 "yaccParser/hsparser.y"
+#line 1826 "yaccParser/hsparser.y"
 { setstartlineno();
 			  if(etags)
 #if 1/*etags*/
@@ -4192,7 +4226,7 @@ case 500:
 			;
     break;}
 case 501:
-#line 1858 "yaccParser/hsparser.y"
+#line 1836 "yaccParser/hsparser.y"
 { setstartlineno();
 			  if(etags)
 #if 1/*etags*/
@@ -4203,7 +4237,7 @@ case 501:
 			;
     break;}
 case 502:
-#line 1868 "yaccParser/hsparser.y"
+#line 1846 "yaccParser/hsparser.y"
 { setstartlineno();
 #if 1/*etags*/
 /* OUT:			  if(etags)
@@ -4215,11 +4249,11 @@ case 502:
 			;
     break;}
 case 503:
-#line 1879 "yaccParser/hsparser.y"
+#line 1857 "yaccParser/hsparser.y"
 { setstartlineno(); ;
     break;}
 case 504:
-#line 1882 "yaccParser/hsparser.y"
+#line 1860 "yaccParser/hsparser.y"
 { setstartlineno();
 			  if(etags)
 #if 1/*etags*/
@@ -4230,11 +4264,11 @@ case 504:
 			;
     break;}
 case 505:
-#line 1892 "yaccParser/hsparser.y"
+#line 1870 "yaccParser/hsparser.y"
 { setstartlineno(); ;
     break;}
 case 506:
-#line 1895 "yaccParser/hsparser.y"
+#line 1873 "yaccParser/hsparser.y"
 { setstartlineno();
 			  if(etags)
 #if 1/*etags*/
@@ -4245,117 +4279,117 @@ case 506:
 			;
     break;}
 case 507:
-#line 1905 "yaccParser/hsparser.y"
+#line 1883 "yaccParser/hsparser.y"
 { setstartlineno(); ;
     break;}
 case 508:
-#line 1908 "yaccParser/hsparser.y"
+#line 1886 "yaccParser/hsparser.y"
 { setstartlineno(); ;
     break;}
 case 509:
-#line 1911 "yaccParser/hsparser.y"
+#line 1889 "yaccParser/hsparser.y"
 { setstartlineno(); ;
     break;}
 case 515:
-#line 1926 "yaccParser/hsparser.y"
+#line 1904 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 518:
-#line 1932 "yaccParser/hsparser.y"
+#line 1910 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 520:
-#line 1936 "yaccParser/hsparser.y"
+#line 1914 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 524:
-#line 1944 "yaccParser/hsparser.y"
+#line 1922 "yaccParser/hsparser.y"
 { yyval.uid = install_literal("-"); ;
     break;}
 case 525:
-#line 1947 "yaccParser/hsparser.y"
+#line 1925 "yaccParser/hsparser.y"
 { yyval.uid = install_literal("+"); ;
     break;}
 case 527:
-#line 1951 "yaccParser/hsparser.y"
+#line 1929 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 528:
-#line 1954 "yaccParser/hsparser.y"
+#line 1932 "yaccParser/hsparser.y"
 { setstartlineno(); yyval.uid = yyvsp[0].uid; ;
     break;}
 case 529:
-#line 1955 "yaccParser/hsparser.y"
+#line 1933 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 531:
-#line 1960 "yaccParser/hsparser.y"
+#line 1938 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 532:
-#line 1963 "yaccParser/hsparser.y"
+#line 1941 "yaccParser/hsparser.y"
 { setstartlineno(); yyval.uid = yyvsp[0].uid; ;
     break;}
 case 533:
-#line 1964 "yaccParser/hsparser.y"
+#line 1942 "yaccParser/hsparser.y"
 { yyval.uid = yyvsp[-1].uid; ;
     break;}
 case 536:
-#line 1972 "yaccParser/hsparser.y"
+#line 1950 "yaccParser/hsparser.y"
 { yyval.ulist = mklcons(yyvsp[-2].uttype,lsing(yyvsp[0].uttype)); ;
     break;}
 case 537:
-#line 1973 "yaccParser/hsparser.y"
+#line 1951 "yaccParser/hsparser.y"
 { yyval.ulist = mklcons(yyvsp[-2].uttype,yyvsp[0].ulist); ;
     break;}
 case 538:
-#line 1977 "yaccParser/hsparser.y"
+#line 1955 "yaccParser/hsparser.y"
 { yyval.ulist = lsing(yyvsp[0].uttype); ;
     break;}
 case 539:
-#line 1978 "yaccParser/hsparser.y"
+#line 1956 "yaccParser/hsparser.y"
 { yyval.ulist = lapp(yyvsp[-1].ulist, yyvsp[0].uttype); ;
     break;}
 case 540:
-#line 1981 "yaccParser/hsparser.y"
+#line 1959 "yaccParser/hsparser.y"
 { yyval.uttype = mknamedtvar(yyvsp[0].uid); ;
     break;}
 case 544:
-#line 1997 "yaccParser/hsparser.y"
+#line 1975 "yaccParser/hsparser.y"
 { hsincindent(); ;
     break;}
 case 545:
-#line 1999 "yaccParser/hsparser.y"
+#line 1977 "yaccParser/hsparser.y"
 { hssetindent(); ;
     break;}
 case 546:
-#line 2002 "yaccParser/hsparser.y"
+#line 1980 "yaccParser/hsparser.y"
 { hsindentoff(); ;
     break;}
 case 547:
-#line 2007 "yaccParser/hsparser.y"
+#line 1985 "yaccParser/hsparser.y"
 {
 		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
 		  hsendindent();
 		;
     break;}
 case 548:
-#line 2013 "yaccParser/hsparser.y"
+#line 1991 "yaccParser/hsparser.y"
 { expect_ccurly = 1; ;
     break;}
 case 549:
-#line 2013 "yaccParser/hsparser.y"
+#line 1991 "yaccParser/hsparser.y"
 { expect_ccurly = 0; ;
     break;}
 case 550:
-#line 2018 "yaccParser/hsparser.y"
+#line 1996 "yaccParser/hsparser.y"
 {
 		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
 		  hsendindent();
 		;
     break;}
 case 551:
-#line 2023 "yaccParser/hsparser.y"
+#line 2001 "yaccParser/hsparser.y"
 {
 		  yyerrok;
 		  FN = NULL; SAMEFN = 0; PREVPATT = NULL;
@@ -4364,7 +4398,7 @@ case 551:
     break;}
 }
    /* the action file gets copied in in place of this dollarsign */
-#line 457 "/usr/local/gnu/lib/bison.simple"
+#line 487 "/usr/local/gnu/share/bison.simple"
 
   yyvsp -= yylen;
   yyssp -= yylen;
@@ -4560,7 +4594,7 @@ yyerrhandle:
   yystate = yyn;
   goto yynewstate;
 }
-#line 2030 "yaccParser/hsparser.y"
+#line 2008 "yaccParser/hsparser.y"
 
 
 /**********************************************************************
@@ -4596,13 +4630,13 @@ hsperror(s)
     yyerror(s);
 }
 
+extern char *yytext;
+extern int yyleng;
+
 void
 yyerror(s)
   char *s;
 {
-    extern char *yytext;
-    extern int yyleng;
-
     /* We want to be able to distinguish 'error'-raised yyerrors
        from yyerrors explicitly coded by the parser hacker.
     */

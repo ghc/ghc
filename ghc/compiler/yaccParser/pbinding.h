@@ -18,6 +18,7 @@ typedef enum {
 typedef struct { Tpbinding tag; } *pbinding;
 
 #ifdef __GNUC__
+Tpbinding tpbinding(pbinding t);
 extern __inline__ Tpbinding tpbinding(pbinding t)
 {
 	return(t -> tag);
@@ -38,6 +39,8 @@ struct Spgrhs {
 extern pbinding mkpgrhs PROTO((tree, list, binding, stringId, long));
 #ifdef __GNUC__
 
+tree *Rggpat PROTO((struct Spgrhs *));
+
 extern __inline__ tree *Rggpat(struct Spgrhs *t)
 {
 #ifdef UGEN_DEBUG
@@ -52,6 +55,8 @@ extern tree *Rggpat PROTO((struct Spgrhs *));
 
 #define ggpat(xyzxyz) (*Rggpat((struct Spgrhs *) (xyzxyz)))
 #ifdef __GNUC__
+
+list *Rggdexprs PROTO((struct Spgrhs *));
 
 extern __inline__ list *Rggdexprs(struct Spgrhs *t)
 {
@@ -68,6 +73,8 @@ extern list *Rggdexprs PROTO((struct Spgrhs *));
 #define ggdexprs(xyzxyz) (*Rggdexprs((struct Spgrhs *) (xyzxyz)))
 #ifdef __GNUC__
 
+binding *Rggbind PROTO((struct Spgrhs *));
+
 extern __inline__ binding *Rggbind(struct Spgrhs *t)
 {
 #ifdef UGEN_DEBUG
@@ -83,6 +90,8 @@ extern binding *Rggbind PROTO((struct Spgrhs *));
 #define ggbind(xyzxyz) (*Rggbind((struct Spgrhs *) (xyzxyz)))
 #ifdef __GNUC__
 
+stringId *Rggfuncname PROTO((struct Spgrhs *));
+
 extern __inline__ stringId *Rggfuncname(struct Spgrhs *t)
 {
 #ifdef UGEN_DEBUG
@@ -97,6 +106,8 @@ extern stringId *Rggfuncname PROTO((struct Spgrhs *));
 
 #define ggfuncname(xyzxyz) (*Rggfuncname((struct Spgrhs *) (xyzxyz)))
 #ifdef __GNUC__
+
+long *Rggline PROTO((struct Spgrhs *));
 
 extern __inline__ long *Rggline(struct Spgrhs *t)
 {

@@ -10,16 +10,6 @@ Tfinfot tfinfot(t)
 }
 
 
-/************** nofinfo ******************/
-
-finfot mknofinfo()
-{
-	register struct Snofinfo *pp =
-		(struct Snofinfo *) malloc(sizeof(struct Snofinfo));
-	pp -> tag = nofinfo;
-	return((finfot)pp);
-}
-
 /************** finfo ******************/
 
 finfot mkfinfo(PPfi1, PPfi2)

@@ -12,7 +12,7 @@ Thpragma thpragma(t)
 
 /************** no_pragma ******************/
 
-hpragma mkno_pragma()
+hpragma mkno_pragma(void)
 {
 	register struct Sno_pragma *pp =
 		(struct Sno_pragma *) malloc(sizeof(struct Sno_pragma));
@@ -56,7 +56,7 @@ list *Rgprag_data_specs(t)
 
 /************** itype_pragma ******************/
 
-hpragma mkitype_pragma()
+hpragma mkitype_pragma(void)
 {
 	register struct Sitype_pragma *pp =
 		(struct Sitype_pragma *) malloc(sizeof(struct Sitype_pragma));
@@ -374,7 +374,7 @@ stringId *Rgprag_update_val(t)
 
 /************** ideforest_pragma ******************/
 
-hpragma mkideforest_pragma()
+hpragma mkideforest_pragma(void)
 {
 	register struct Sideforest_pragma *pp =
 		(struct Sideforest_pragma *) malloc(sizeof(struct Sideforest_pragma));
@@ -474,7 +474,7 @@ coresyn *Rgprag_unfold_core(t)
 
 /************** iunfold_always ******************/
 
-hpragma mkiunfold_always()
+hpragma mkiunfold_always(void)
 {
 	register struct Siunfold_always *pp =
 		(struct Siunfold_always *) malloc(sizeof(struct Siunfold_always));

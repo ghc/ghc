@@ -270,7 +270,7 @@ ttype *Rguniforall_ty(t)
 
 /************** ty_maybe_nothing ******************/
 
-ttype mkty_maybe_nothing()
+ttype mkty_maybe_nothing(void)
 {
 	register struct Sty_maybe_nothing *pp =
 		(struct Sty_maybe_nothing *) malloc(sizeof(struct Sty_maybe_nothing));

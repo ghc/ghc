@@ -12,13 +12,13 @@
 #endif
 
 typedef enum {
-	nofinfo,
 	finfo
 } Tfinfot;
 
 typedef struct { Tfinfot tag; } *finfot;
 
 #ifdef __GNUC__
+Tfinfot tfinfot(finfot t);
 extern __inline__ Tfinfot tfinfot(finfot t)
 {
 	return(t -> tag);
@@ -27,20 +27,16 @@ extern __inline__ Tfinfot tfinfot(finfot t)
 extern Tfinfot tfinfot PROTO((finfot));
 #endif /* ! __GNUC__ */
 
-struct Snofinfo {
-	Tfinfot tag;
-};
-
 struct Sfinfo {
 	Tfinfot tag;
 	stringId Xfi1;
 	stringId Xfi2;
 };
 
-extern finfot mknofinfo PROTO(());
-
 extern finfot mkfinfo PROTO((stringId, stringId));
 #ifdef __GNUC__
+
+stringId *Rfi1 PROTO((struct Sfinfo *));
 
 extern __inline__ stringId *Rfi1(struct Sfinfo *t)
 {
@@ -56,6 +52,8 @@ extern stringId *Rfi1 PROTO((struct Sfinfo *));
 
 #define fi1(xyzxyz) (*Rfi1((struct Sfinfo *) (xyzxyz)))
 #ifdef __GNUC__
+
+stringId *Rfi2 PROTO((struct Sfinfo *));
 
 extern __inline__ stringId *Rfi2(struct Sfinfo *t)
 {

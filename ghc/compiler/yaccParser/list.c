@@ -46,7 +46,7 @@ list *Rltl(t)
 
 /************** lnil ******************/
 
-list mklnil()
+list mklnil(void)
 {
 	register struct Slnil *pp =
 		(struct Slnil *) malloc(sizeof(struct Slnil));

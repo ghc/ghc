@@ -69,12 +69,12 @@ Email: glasgow-haskell-\{request,bugs\}\@dcs.glasgow.ac.uk}
 
 %************************************************************************
 %*									*
-%\section[Reduction-counts]{Definitions for reduction counting}
+%\section[Ticky-counts]{Definitions for ``ticky-ticky'' profiling}
 %*									*
 %************************************************************************
 
 \downsection
-\input{RednCounts.lh}
+\input{Ticky.lh}
 \upsection
 
 %------------------------------------------------------------------------

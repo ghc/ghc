@@ -18,6 +18,7 @@ typedef enum {
 typedef struct { Tatype tag; } *atype;
 
 #ifdef __GNUC__
+Tatype tatype(atype t);
 extern __inline__ Tatype tatype(atype t)
 {
 	return(t -> tag);
@@ -36,6 +37,8 @@ struct Satc {
 extern atype mkatc PROTO((unkId, list, long));
 #ifdef __GNUC__
 
+unkId *Rgatcid PROTO((struct Satc *));
+
 extern __inline__ unkId *Rgatcid(struct Satc *t)
 {
 #ifdef UGEN_DEBUG
@@ -51,6 +54,8 @@ extern unkId *Rgatcid PROTO((struct Satc *));
 #define gatcid(xyzxyz) (*Rgatcid((struct Satc *) (xyzxyz)))
 #ifdef __GNUC__
 
+list *Rgatctypel PROTO((struct Satc *));
+
 extern __inline__ list *Rgatctypel(struct Satc *t)
 {
 #ifdef UGEN_DEBUG
@@ -65,6 +70,8 @@ extern list *Rgatctypel PROTO((struct Satc *));
 
 #define gatctypel(xyzxyz) (*Rgatctypel((struct Satc *) (xyzxyz)))
 #ifdef __GNUC__
+
+long *Rgatcline PROTO((struct Satc *));
 
 extern __inline__ long *Rgatcline(struct Satc *t)
 {

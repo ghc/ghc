@@ -454,7 +454,7 @@ literal *Rgplusi(t)
 
 /************** wildp ******************/
 
-tree mkwildp()
+tree mkwildp(void)
 {
 	register struct Swildp *pp =
 		(struct Swildp *) malloc(sizeof(struct Swildp));

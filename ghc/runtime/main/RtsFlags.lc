@@ -458,20 +458,18 @@ error = rtsTrue;
 		)
 	      case 'p': /* cost centre profiling (time/alloc) */
 		COST_CENTRE_USING_BUILD_ONLY(
-		{ char ch;
 		RTSflags.CcFlags.doCostCentres++;
 
-		for (ch = 2; rts_argv[arg][ch]; ch++) {
 		switch (rts_argv[arg][2]) {
 		  case SORTCC_LABEL:
 		  case SORTCC_TIME:
 		  case SORTCC_ALLOC:
-			RTSflags.CcFlags.sortBy = rts_argv[arg][ch];
+			RTSflags.CcFlags.sortBy = rts_argv[arg][2];
 		    break;
 		  default:
 		    fprintf(stderr, "Invalid profiling sort option %s\n", rts_argv[arg]);
 		    error = 1;
-		}}}
+		}
 		) break;
 
 	      case 'i': /* serial profiling -- initial timer interval */
