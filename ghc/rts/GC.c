@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.128 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: GC.c,v 1.129 2001/11/28 15:42:05 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -608,7 +608,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 #ifdef PROFILING
   // We call processHeapClosureForDead() on every closure destroyed during
   // the current garbage collection, so we invoke LdvCensusForDead().
-  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV)
+  if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
+      || RtsFlags.ProfFlags.bioSelector != NULL)
     LdvCensusForDead(N);
 #endif
 
