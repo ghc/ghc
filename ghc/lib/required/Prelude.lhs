@@ -16,8 +16,8 @@ module Prelude (
     Num(..), 
     Eval(..), seq, strict,
     Bool(..), (&&), (||), not, otherwise,
-    Char, String, Int, Integer, Float, Double,
-    Maybe(..), 
+    Char, String, Int, Integer, Float, Double, Void,
+    Maybe(..), maybe,
     Either(..), either,
     ()(..),		-- The unit type
 
@@ -73,6 +73,7 @@ strict      :: Eval a => (a -> b) -> a -> b
 strict f x  = x `seq` f x
 
 {-# INLINE seq  #-}
+seq :: Eval a => a -> b -> b
 #ifdef __CONCURRENT_HASKELL__
 seq  x y = case (seq#  x) of { 0# -> parError; _ -> y }
 #else
