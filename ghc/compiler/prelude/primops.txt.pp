@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.2 2001/08/08 10:50:36 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.3 2001/08/17 00:14:49 sof Exp $
 --
 -- Primitive Operations
 --
@@ -22,13 +22,13 @@
 --	        ghc/includes/PrimOps.h (just add the declaration)
 --		ghc/rts/PrimOps.hc     (define it here)
 --
---	- the User's Guide
+--	- the Users Guide
 --
 
 #include "config.h"
 #include "Derived.h"
 
--- The default attribute values which apply if you don't specify
+-- The default attribute values which apply if you dont specify
 -- other ones.  Attribute values can be True, False, or arbitrary
 -- text between curly brackets.  This is a kludge to enable 
 -- processors of this file to easily get hold of simple info
@@ -1041,7 +1041,7 @@ primop  CatchOp "catch#" GenPrimOp
    with
    strictness = { \ arity -> StrictnessInfo [wwLazy, wwLazy, wwPrim] False }
 	-- Catch is actually strict in its first argument
-	-- but we don't want to tell the strictness
+	-- but we dont want to tell the strictness
 	-- analyser about that!
    usage = { mangle CatchOp [mkM, mkM . (inFun CatchOp mkM mkM), mkP] mkM }
         --     [mkO, mkO . (inFun mkM mkO)] mkO
@@ -1305,7 +1305,7 @@ primop  ParOp "par#" GenPrimOp
 --   name, granularity info, size of result, degree of parallelism
 --      Same  structure as _seq_ i.e. returns Int#
 -- KSW: v, the second arg in parAt# and parAtForNow#, is used only to determine
---   `the processor containing the expression v'; it is not evaluated
+--   "the processor containing the expression v"; it is not evaluated
 
 primop  ParGlobalOp  "parGlobal#"  GenPrimOp
    a -> Int# -> Int# -> Int# -> Int# -> b -> Int#
