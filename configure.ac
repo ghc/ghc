@@ -206,6 +206,15 @@ ia64-*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
+x86_64-*-linux*)
+        HostPlatform=x86_64-unknown-linux
+        TargetPlatform=x86_64-unknown-linux
+        BuildPlatform=x86_64-unknown-linux
+        HostPlatform_CPP='x86_64_unknown_linux'
+        HostArch_CPP='x86_64'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='linux'
+	;;
 m68k-next-nextstep2)
         HostPlatform_CPP='m68k_next_nextstep2'
         HostArch_CPP='m68k'
