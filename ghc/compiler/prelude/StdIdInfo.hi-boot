@@ -1,5 +1,0 @@
-_interface_ StdIdInfo 1
-_exports_
-StdIdInfo addStandardIdInfo;
-_declarations_
-1 addStandardIdInfo _:_ Id.Id -> Id.Id ;;
