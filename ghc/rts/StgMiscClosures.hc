@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.36 2000/03/01 16:57:57 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.37 2000/03/13 10:53:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -15,6 +15,7 @@
 #include "Storage.h"
 #include "StoragePriv.h"
 #include "ProfRts.h"
+#include "Prelude.h"
 #include "SMP.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"      /* for DumpRawGranEvent */

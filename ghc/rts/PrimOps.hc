@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.43 2000/02/28 13:59:43 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.44 2000/03/13 10:53:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -19,6 +19,7 @@
 #include "StablePriv.h"
 #include "HeapStackCheck.h"
 #include "StgRun.h"
+#include "Prelude.h"
 
 /* ** temporary **
 
@@ -903,7 +904,8 @@ FN_(putMVarzh_fast)
 #endif
 
   if (info == &FULL_MVAR_info) {
-    barf("putMVar#: MVar already full");
+    R1.cl = (StgClosure *)&PutFullMVar_closure;
+    JMP_(raisezh_fast);
   }
   
   mvar->value = R2.cl;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.22 2000/01/13 14:34:01 hwloidl Exp $
+ * $Id: Stg.h,v 1.23 2000/03/13 10:53:55 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -155,9 +155,6 @@ void _stgAssert (char *, unsigned int);
 
 /* GNU mp library */
 #include "gmp.h"
-
-/* Wired-in Prelude identifiers */
-#include "Prelude.h"
 
 /* Storage Manager */
 #include "StgStorage.h"

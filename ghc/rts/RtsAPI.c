@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.10 1999/11/02 15:05:59 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.11 2000/03/13 10:53:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,6 +13,7 @@
 #include "SchedAPI.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
+#include "Prelude.h"
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.

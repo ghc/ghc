@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.50 2000/03/13 09:57:16 simonmar Exp $
+ * $Id: Schedule.c,v 1.51 2000/03/13 10:53:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -72,6 +72,7 @@
 #include "Sanity.h"
 #include "Stats.h"
 #include "Sparks.h"
+#include "Prelude.h"
 #if defined(GRAN) || defined(PAR)
 # include "GranSimRts.h"
 # include "GranSim.h"
