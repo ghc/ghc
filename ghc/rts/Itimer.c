@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.32 2003/02/22 04:51:50 sof Exp $
+ * $Id: Itimer.c,v 1.33 2003/03/28 23:46:39 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -136,6 +136,8 @@ stopTicker()
 }
 # endif
 
+#if 0
+/* Currently unused */
 void
 block_vtalrm_signal(void)
 {
@@ -157,6 +159,7 @@ unblock_vtalrm_signal(void)
 
     (void) sigprocmask(SIG_UNBLOCK, &signals, NULL);
 }
+#endif
 
 /* gettimeofday() takes around 1us on our 500MHz PIII.  Since we're
  * only calling it 50 times/s, it shouldn't have any great impact.
