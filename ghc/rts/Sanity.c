@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.11 1999/03/03 19:07:39 sof Exp $
+ * $Id: Sanity.c,v 1.12 1999/03/26 14:55:05 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -84,7 +84,7 @@ checkStackClosure( StgClosure* c )
     switch (info->type) {
     case RET_DYN: /* Dynamic bitmap: the mask is stored on the stack */
 	{
-	    StgRetDyn* r = stgCast(StgRetDyn*,c);
+	    StgRetDyn* r = (StgRetDyn *)c;
 	    return sizeofW(StgRetDyn) + 
 	           checkSmallBitmap(r->payload,r->liveness);
 	}
@@ -95,13 +95,10 @@ checkStackClosure( StgClosure* c )
     case CATCH_FRAME:
     case STOP_FRAME:
     case SEQ_FRAME:
-	    return sizeofW(StgClosure) + 
-	           checkSmallBitmap((StgPtr)c->payload,info->layout.bitmap);
+	    return 1 + checkSmallBitmap((StgPtr)c + 1,info->layout.bitmap);
     case RET_BIG: /* large bitmap (> 32 entries) */
     case RET_VEC_BIG:
-	    return sizeofW(StgClosure) + 
-	           checkLargeBitmap((StgPtr)c->payload,
-				    info->layout.large_bitmap);
+	    return 1 + checkLargeBitmap((StgPtr)c + 1,info->layout.large_bitmap);
     case FUN:
     case FUN_STATIC: /* probably a slow-entry point return address: */
 	    return 1;
@@ -109,7 +106,7 @@ checkStackClosure( StgClosure* c )
        	    /* if none of the above, maybe it's a closure which looks a
        	     * little like an infotable
        	     */
-	    checkClosureShallow(*stgCast(StgClosure**,c));
+	    checkClosureShallow(*(StgClosure **)c);
 	    return 1;
 	    /* barf("checkStackClosure: weird activation record found on stack (%p).",c); */
     }
