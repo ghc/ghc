@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.32 2001/01/16 12:02:04 simonmar Exp $
+ * $Id: Storage.c,v 1.33 2001/01/24 15:46:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -216,6 +216,16 @@ newCAF(StgClosure* caf)
   ((StgMutClosure *)caf)->mut_link = oldest_gen->mut_once_list;
   oldest_gen->mut_once_list = (StgMutClosure *)caf;
 
+#ifdef GHCI
+  /* For dynamically-loaded code, we retain all the CAFs.  There is no
+   * way of knowing which ones we'll need in the future.
+   */
+  if (is_dynamically_loaded_rwdata_ptr((StgPtr)caf)) {
+      caf->payload[2] = caf_list; /* IND_STATIC_LINK2() */
+      caf_list = caf;
+  }
+#endif
+
 #ifdef INTERPRETER
   /* If we're Hugs, we also have to put it in the CAF table, so that
      the CAF can be reverted.  When reverting, CAFs created by compiled
@@ -230,6 +240,18 @@ newCAF(StgClosure* caf)
 
   RELEASE_LOCK(&sm_mutex);
 }
+
+#ifdef GHCI
+void
+markCafs( void )
+{
+    StgClosure *p;
+
+    for (p = caf_list; p != NULL; p = STATIC_LINK2(get_itbl(p),p)) {
+	MarkRoot(p);
+    }
+}
+#endif /* GHCI */
 
 #ifdef INTERPRETER
 void

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.21 2001/01/09 17:36:21 sewardj Exp $
+ * $Id: Storage.h,v 1.22 2001/01/24 15:46:19 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -81,6 +81,11 @@ extern void PleaseStopAllocating(void);
 extern void   GarbageCollect(void (*get_roots)(void),rtsBool force_major_gc);
 extern StgClosure *MarkRoot(StgClosure *p);
 
+/* Temporary measure to ensure we retain all the dynamically-loaded CAFs */
+#ifdef GHCI
+extern void markCafs( void );
+#endif
+
 /* -----------------------------------------------------------------------------
    Generational garbage collection support
 
@@ -98,6 +103,9 @@ extern StgClosure *MarkRoot(StgClosure *p);
 
    -------------------------------------------------------------------------- */
 
+/* ToDo: shouldn't recordMutable and recordOldToNewPtrs acquire some
+ * kind of lock in the SMP case?
+ */
 static inline void
 recordMutable(StgMutClosure *p)
 {
@@ -141,8 +149,10 @@ recordOldToNewPtrs(StgMutClosure *p)
     } else {								\
       ((StgIndOldGen *)p1)->indirectee = p2;				\
       if (info != &stg_BLACKHOLE_BQ_info) {				\
+        ACQUIRE_LOCK(&sm_mutex);					\
         ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
         bd->gen->mut_once_list = (StgMutClosure *)p1;			\
+        RELEASE_LOCK(&sm_mutex);					\
       }									\
       SET_INFO(p1,&stg_IND_OLDGEN_info);				\
       TICK_UPD_OLD_IND();						\
@@ -172,8 +182,10 @@ recordOldToNewPtrs(StgMutClosure *p)
 	     ((StgClosure *)p1)->payload[i] = 0;			\
           }								\
         }								\
+        ACQUIRE_LOCK(&sm_mutex);					\
         ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;	\
         bd->gen->mut_once_list = (StgMutClosure *)p1;			\
+        RELEASE_LOCK(&sm_mutex);					\
       }									\
       ((StgIndOldGen *)p1)->indirectee = p2;				\
       SET_INFO(p1,&stg_IND_OLDGEN_info);				\
@@ -181,6 +193,22 @@ recordOldToNewPtrs(StgMutClosure *p)
     }									\
   }
 #endif
+
+/* Static objects all live in the oldest generation
+ */
+#define updateWithStaticIndirection(info, p1, p2)			\
+  {									\
+    ASSERT( ((StgMutClosure*)p1)->mut_link == NULL );			\
+									\
+    ACQUIRE_LOCK(&sm_mutex);						\
+    ((StgMutClosure *)p1)->mut_link = oldest_gen->mut_once_list;	\
+    oldest_gen->mut_once_list = (StgMutClosure *)p1;			\
+    RELEASE_LOCK(&sm_mutex);						\
+									\
+    ((StgInd *)p1)->indirectee = p2;					\
+    SET_INFO((StgInd *)p1, &stg_IND_STATIC_info);			\
+    TICK_UPD_STATIC_IND();						\
+  }
 
 #if defined(TICKY_TICKY) || defined(PROFILING)
 static inline void
@@ -196,8 +224,10 @@ updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *
   } else {
     ((StgIndOldGen *)p1)->indirectee = p2;
     if (info != &stg_BLACKHOLE_BQ_info) {
+      ACQUIRE_LOCK(&sm_mutex);
       ((StgIndOldGen *)p1)->mut_link = bd->gen->mut_once_list;
       bd->gen->mut_once_list = (StgMutClosure *)p1;
+      RELEASE_LOCK(&sm_mutex);
     }
     SET_INFO(p1,&stg_IND_OLDGEN_PERM_info);
     TICK_UPD_OLD_PERM_IND();
