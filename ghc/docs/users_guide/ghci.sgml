@@ -1,7 +1,8 @@
 <chapter id="ghci">
   <title>Using GHCi</title>
   <indexterm><primary>GHCi</primary></indexterm>
-  <indexterm><primary>interpreter</primary></indexterm>
+  <indexterm><primary>interpreter</primary><see>GHCi</see></indexterm>
+  <indexterm><primary>interactive</primary><see>GHCi</see></indexterm>
   
   <para>GHCi<footnote>
       <para>The &lsquo;i&rsquo; stands for &ldquo;Interactive&rdquo;</para>
@@ -13,6 +14,8 @@
   also has support for interactively loading compiled code, as well as
   supporting all<footnote><para>except the FFI, at the moment</para>
   </footnote>the language extensions that GHC provides.</para>
+  <indexterm><primary>FFI</primary><secondary>GHCi support</secondary></indexterm>
+  <indexterm><primary>Foreign Function Interface</primary><secondary>GHCi support</secondary></indexterm>
 
   <sect1>
     <title>Introduction to GHCi</title>
@@ -96,6 +99,7 @@ fac n = n * fac (n-1)
 
     <para>To load a Haskell source file into GHCi, use the
     <literal>:load</literal> command:</para>
+    <indexterm><primary><literal>:load</literal></primary></indexterm>
 
 <screen>
 Prelude> :load Main
@@ -127,6 +131,8 @@ Main> fac 17
 
     <sect2>
       <title>Modules vs. filenames</title>
+      <indexterm><primary>modules</primary><secondary>and filenames</secondary></indexterm>
+      <indexterm><primary>filenames</primary><secondary>of modules</secondary></indexterm>
       
       <para>Question: How does GHC find the filename which contains
       module <replaceable>M</replaceable>?  Answer: it looks for the
@@ -151,6 +157,7 @@ Main> fac 17
 
     <sect2>
       <title>Making changes and recompilation</title>
+      <indexterm><primary><literal>:reload</literal></primary></indexterm>
 
       <para>If you make some changes to the source code and want GHCi
       to recompile the program, give the <literal>:reload</literal>
@@ -164,6 +171,7 @@ Main> fac 17
 
   <sect1 id="ghci-compiled">
     <title>Loading compiled code</title>
+    <indexterm><primary>compiled code</primary><secondary>in GHCi</secondary></indexterm>
 
     <para>When you load a Haskell source module into GHCi, it is
     normally converted to byte-code and run using the interpreter.
@@ -300,11 +308,14 @@ hello
     <para>What actually happens is that GHCi typechecks the
     expression, and if it doesn't have an <literal>IO</literal> type,
     then it transforms it as follows: an expression
-    <replaceable>e</replaceable> turns into <literal>let it =
-    <replaceable>e</replaceable> in print it</literal>.  It then runs
-    the new expression as an IO-action.</para>
+    <replaceable>e</replaceable> turns into 
+<screen>     
+             let it = <replaceable>e</replaceable>;
+             print it
+</screen>
+    which is then run as an IO-action.</para>
 
-    <para>Hence the original expression must have a type which is an
+    <para>Hence, the original expression must have a type which is an
     instance of the <literal>Show</literal> class, or GHCi will
     complain:</para>
 
@@ -329,8 +340,8 @@ in a `do' expression pattern binding: print it
       <para>The context module is shown in the prompt: for example,
       the prompt <literal>Prelude></literal> indicates that the
       current context for evaluating expressions is the Haskell
-      <literal>Prelude</literal> module.  This is the default context
-      when you start up GHCi.</para>
+      <literal>Prelude</literal> module.  The Prelude is the default
+      context when you start up GHCi.</para>
       <indexterm><primary><literal>Prelude</literal></primary></indexterm>
 
       <para>Exactly which entities are in scope in a given context
@@ -379,6 +390,8 @@ in a `do' expression pattern binding: print it
   
     <sect2>
       <title>Using <literal>do-</literal>notation at the prompt</title>
+      <indexterm><primary>do-notation</primary><secondary>in GHCi</secondary></indexterm>
+      <indexterm><primary>statements</primary><secondary>in GHCi</secondary></indexterm>
       
       <para>GHCi actually accepts <firstterm>statements</firstterm>
       rather than just expressions at the prompt.  This means you can
@@ -443,6 +456,7 @@ Prelude>
       <para>HINT: if you turn on the <literal>+t</literal> option,
       GHCi will show the type of each variable bound by a statement.
       For example:</para>
+      <indexterm><primary><literal>+t</literal></primary></indexterm>
 <screen>
 Prelude> :set +t
 Prelude> let (x:xs) = [1..]
@@ -467,6 +481,16 @@ Prelude> it * 2
 6
 </screen>
 
+      <para>This is a result of the translation mentioned earlier,
+      namely that an expression <replaceable>e</replaceable> is
+      translated to
+<screen>     
+             let it = <replaceable>e</replaceable>;
+             print it
+</screen>
+      before execution, resulting in a binding for
+      <literal>it</literal>.</para>
+
       <para>If the expression was of type <literal>IO a</literal> for
       some <literal>a</literal>, then <literal>it</literal> will be
       bound to the result of the <literal>IO</literal> computation,
@@ -477,6 +501,13 @@ Prelude> print it
 Wed Mar 14 12:23:13 GMT 2001
 </screen>
 
+      <para>The corresponding translation for an IO-typed
+      <replaceable>e</replaceable> is
+<screen>     
+             it <- <replaceable>e</replaceable>
+</screen>
+      </para>
+
       <para>Note that <literal>it</literal> is shadowed by the new
       value each time you evaluate a new expression, and the old value
       of <literal>it</literal> is lost.</para>
@@ -486,13 +517,15 @@ Wed Mar 14 12:23:13 GMT 2001
 
   <sect1>
     <title>Invoking GHCi</title>
+    <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
+    <indexterm><primary><option>--interactive</option></primary></indexterm>
 
     <para>GHCi is invoked with the command <literal>ghci</literal> or
     <literal>ghc --interactive</literal>.  A module or filename can
     also be specified on the command line; this instructs GHCi to load
     the that module or filename (and all the modules it depends on),
-    just as if you had said 
-    <literal>:load <replaceable>module</replaceable></literal> at the GHCi prompt
+    just as if you had said <literal>:load
+    <replaceable>module</replaceable></literal> at the GHCi prompt
     (see <xref linkend="ghci-commands">).  For example, to start GHCi
     and load the program whose topmost module is in the file
     <literal>Main.hs</literal>, we could say:</para>
@@ -512,6 +545,7 @@ $ ghci Main.hs
 
     <sect2>
       <title>Packages</title>
+      <indexterm><primary>packages</primary><secondary>with GHCi</secondary></indexterm>
 
       <para>GHCi can make use of all the packages that come with GHC,
       but note: packages <emphasis>must</emphasis> be specified on the
@@ -542,6 +576,7 @@ Prelude>
 
     <sect2>
       <title>Extra libraries</title>
+      <indexterm><primary>libraries</primary><secondary>with GHCi</secondary></indexterm>
       
       <para>Extra libraries may be specified on the command line using
       the normal <literal>-l<replaceable>lib</replaceable></literal>
@@ -581,6 +616,7 @@ $ ghci -lm
     <variablelist>
       <varlistentry>
 	<term><literal>:cd</literal> <replaceable>dir</replaceable></term>
+	<indexterm><primary><literal>:cd</literal></primary></indexterm>
 	<listitem>
 	  <para>Changes the current working directory to
 	  <replaceable>dir</replaceable>.  A
@@ -593,6 +629,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:def</literal></term>
+	<indexterm><primary><literal>:def</literal></primary></indexterm>
 	<listitem>
 	  <para>ToDo.</para>
 	</listitem>
@@ -600,7 +637,9 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:help</literal></term>
+	<indexterm><primary><literal>:help</literal></primary></indexterm>
 	<term><literal>:?</literal></term>
+	<indexterm><primary><literal>:?</literal></primary></indexterm>
 	<listitem>
 	  <para>Displays a list of the available commands.</para>
 	</listitem>
@@ -608,6 +647,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:load</literal> <replaceable>module</replaceable></term>
+	<indexterm><primary><literal>:load</literal></primary></indexterm>
 	<listitem>
 	  <para>Recursively loads <replaceable>module</replaceable>
 	  (which may be a module name or filename), and all the
@@ -619,6 +659,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:module</literal> <replaceable>module</replaceable></term>
+	<indexterm><primary><literal>:module</literal></primary></indexterm>
 	<listitem>
 	  <para>Sets the current context for statements typed at the
 	  prompt to <replaceable>module</replaceable>, which must be a
@@ -631,6 +672,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:quit</literal> <replaceable>module</replaceable></term>
+	<indexterm><primary><literal>:quit</literal></primary></indexterm>
 	<listitem>
 	  <para>Quits GHCi.  You can also quit by typing a control-D
 	  at the prompt.</para>
@@ -639,6 +681,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:reload</literal></term>
+	<indexterm><primary><literal>:reload</literal></primary></indexterm>
 	<listitem>
 	  <para>Attempts to reload the current target (see
 	  <literal>:load</literal>) if it, or any module it depends
@@ -650,6 +693,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:set</literal> <optional><replaceable>option</replaceable>...</optional></term>
+	<indexterm><primary><literal>:set</literal></primary></indexterm>
 	<listitem>
 	  <para>Sets various options.  See <xref linkend="ghci-set">
 	  for a list of available options.  The
@@ -660,6 +704,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:type</literal> <replaceable>expression</replaceable></term>
+	<indexterm><primary><literal>:type</literal></primary></indexterm>
 	<listitem>
 	  <para>Infers and prints the type of
 	  <replaceable>expression</replaceable>, including explicit
@@ -671,6 +716,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:unset</literal> <replaceable>option</replaceable>...</term>
+	<indexterm><primary><literal>:unset</literal></primary></indexterm>
 	<listitem>
 	  <para>Unsets certain options.  See <xref linkend="ghci-set">
 	  for a list of available options.</para>
@@ -679,6 +725,8 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>:!</literal> <replaceable>command</replaceable>...</term>
+	<indexterm><primary><literal>:!</literal></primary></indexterm>
+	<indexterm><primary>shell commands</primary><secondary>in GHCi</secondary></indexterm>
 	<listitem>
 	  <para>Executes the shell command
 	  <replaceable>command</replaceable>.</para>
@@ -690,6 +738,7 @@ $ ghci -lm
 
   <sect1 id="ghci-set">
     <title>The <literal>:set</literal> command</title>
+    <indexterm><primary><literal>:set</literal></primary></indexterm>
 
     <para>The <literal>:set</literal> command sets two types of
     options: GHCi options, which begin with
@@ -703,6 +752,9 @@ $ ghci -lm
     <variablelist>
       <varlistentry>
 	<term><literal>+r</literal></term>
+	<indexterm><primary><literal>+r</literal></primary></indexterm>
+	<indexterm><primary>CAFs</primary><secondary>in GHCi</secondary></indexterm>
+	<indexterm><primary>Constant Applicative Form</primary><see>CAFs</see></indexterm>
 	<listitem>
 	  <para>Normally, any evaluation of top-level expressions
 	  (otherwise known as CAFs or Constant Applicative Forms) in
@@ -720,6 +772,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>+s</literal></term>
+	<indexterm><primary><literal>+s</literal></primary></indexterm>
 	<listitem>
 	  <para>Display some stats after evaluating each expression,
 	  including the elapsed time and number of bytes allocated.
@@ -732,6 +785,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term><literal>+t</literal></term>
+	<indexterm><primary><literal>+t</literal></primary></indexterm>
 	<listitem>
 	  <para>Display the type of each variable bound after a
 	  statement is entered at the prompt.  If the statement is a
@@ -748,6 +802,8 @@ $ ghci -lm
     (<option>-I</option>, <option>-i</option>, and <option>-l</option>
     in particular) will also work, but may not take effect until the
     next reload.</para>
+    <indexterm><primary>dynamic</primary><secondary>options</secondary></indexterm>
+    <indexterm><primary>static</primary><secondary>options</secondary></indexterm>
   </sect1>
 
   <sect1>
@@ -788,6 +844,8 @@ $ ghci -lm
     <variablelist>
       <varlistentry>
 	<term><literal>System.exit</literal> causes GHCi to exit!</term>
+	<indexterm><primary><literal>System.exit</literal></primary><secondary>in
+	GHCi</secondary></indexterm>
 	<listitem>
 	  <para>Yes, it does.</para>
 	</listitem>
