@@ -329,7 +329,20 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 		adj_code[11] = 0x4e800420;	//bctr
 		adj_code[12] = (unsigned long)hptr;
 		
-		//MakeDataExecutable(adjustor,4*13);	// don't know if it is _really_ necessary
+		// Flush the Instruction cache:
+		//	MakeDataExecutable(adjustor,4*13);
+			/* This would require us to link with CoreServices.framework */
+		{		/* this should do the same: */
+			int n = 13;
+			unsigned long *p = adj_code;
+			while(n--)
+			{
+				__asm__ volatile ("dcbf 0,%0\n\tsync\n\ticbi 0,%0"
+						    : : "g" (p));
+				p++;
+			}
+			__asm__ volatile ("sync\n\tisync");
+		}
 	}
 #else
 #error Adjustor creation is not supported on this platform.
