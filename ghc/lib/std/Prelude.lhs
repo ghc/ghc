@@ -66,7 +66,7 @@ module Prelude (
   ) where
 
 import PrelBase
-import PrelList hiding ( takeUInt )
+import PrelList hiding ( takeUInt_append )
 import PrelRead
 import PrelNum
 import PrelNumExtra

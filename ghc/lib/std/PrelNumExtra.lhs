@@ -551,7 +551,7 @@ prR n r e0
 	s@(h:t) = show ((round (r * 10^n))::Integer)
 	e       = e0+1
 	
-	takeN (I# n#) ls rs = takeUInt n# ls rs
+	takeN (I# n#) ls rs = takeUInt_append n# ls rs
 
 drop0 :: String -> String -> String
 drop0     [] rs = rs
