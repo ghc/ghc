@@ -170,6 +170,7 @@ pprAbsC (CSwitch discrim [(tag,alt_code)] deflt) c -- only one alt
       Just dc ->		-- make it an "if"
 		 do_if_stmt discrim tag alt_code dc c
 
+-- What problem is the re-ordering trying to solve ?
 pprAbsC (CSwitch discrim [(tag1@(MachInt i1 _), alt_code1),
 			      (tag2@(MachInt i2 _), alt_code2)] deflt) c
   | empty_deflt && ((i1 == 0 && i2 == 1) || (i1 == 1 && i2 == 0))
@@ -625,9 +626,23 @@ do_if_stmt discrim tag alt_code deflt c
 				      deflt alt_code
 				      (addrModeCosts discrim Rhs) c
       other              -> let
-			       cond = hcat [ pprAmode discrim,
-					  ptext SLIT(" == "),
-					  pprAmode (CLit tag) ]
+			       cond = hcat [ pprAmode discrim
+					   , ptext SLIT(" == ")
+					   , tcast
+					   , pprAmode (CLit tag)
+					   ]
+				-- to be absolutely sure that none of the 
+				-- conversion rules hit, e.g.,
+				--
+				--     minInt is different to (int)minInt
+			        --
+				-- in C (when minInt is a number not a constant
+				--  expression which evaluates to it.)
+				-- 
+			       tcast =
+			         case other of
+				   MachInt _ signed | signed    -> ptext SLIT("(I_)")
+				   _ -> empty
 			    in
 			    ppr_if_stmt cond
 					 alt_code deflt
