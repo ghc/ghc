@@ -721,6 +721,9 @@ AC_CHECK_LIB(gmp,  mpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
 
+dnl ** check whether this machine has GNU regex in libc.
+FPTOOLS_REGEX_IN_LIBC
+
 dnl ** check whether this machine has BFD and liberty installed (used for debugging)
 dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)

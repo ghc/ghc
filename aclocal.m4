@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.50 2000/06/15 20:22:53 panne Exp $
+dnl $Id: aclocal.m4,v 1.51 2000/06/29 13:40:17 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -70,6 +70,25 @@ fptools_cv_altzone=yes, fptools_cv_altzone=no)])
 if test "$fptools_cv_altzone" = yes; then
   AC_DEFINE(HAVE_ALTZONE)
 fi
+])
+
+
+dnl *** Does libc contain GNU regex? ***
+dnl 
+AC_DEFUN(FPTOOLS_REGEX_IN_LIBC,
+[AC_CACHE_CHECK([for GNU regex in libc], fptools_cv_have_regex,
+[AC_TRY_LINK([#if HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#include <regex.h>
+],[ struct re_pattern_buffer patbuf; re_compile_pattern("",0,&patbuf); ],
+fptools_cv_have_regex=yes, fptools_cv_have_regex=no)])
+if test "$fptools_cv_have_regex" = yes; then
+	HaveRegex=YES
+else
+	HaveRegex=NO
+fi
+AC_SUBST(HaveRegex)
 ])
 
 
