@@ -207,7 +207,7 @@ hscRecomp ghci_mode dflags have_object
       	; let toInterp = dopt_HscLang dflags == HscInterpreted
 	; let toNothing = dopt_HscLang dflags == HscNothing
 
-      	; when (verbosity dflags >= 1) $
+      	; when (ghci_mode /= OneShot && verbosity dflags >= 1) $
 		hPutStrLn stderr ("Compiling " ++ 
 			compMsg (not toInterp) mod location);
 

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.87 2001/08/14 13:40:08 sewardj Exp $
+-- $Id: Main.hs,v 1.88 2001/10/22 13:45:15 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -211,10 +211,7 @@ main =
 			  	 -- leave out hscOutName for now
 	                  	 hscOutName = panic "Main.main:hscOutName not set",
 
-			  	 verbosity = case mode of
-						DoInteractive -> 1
-						DoMake	      -> 1
-						_other        -> 0,
+			  	 verbosity = 1
 				})
 
 	-- the rest of the arguments are "dynamic"
