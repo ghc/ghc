@@ -227,6 +227,15 @@ tags:
 	    <para>Output version information.</para>
 	  </listitem>
 	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>--no-compile</literal></term>
+	  <listitem>
+	    <para>Stop after writing out the intermediate C program to disk.
+	    The file name for the intermediate C program is the input file name
+	    with <literal>.hsc</literal> replaced with <literal>_hsc_make.c</literal>.</para>
+	  </listitem>
+	</varlistentry>
       </variablelist>
 
       <para>The input file should end with .hsc. Output files by
