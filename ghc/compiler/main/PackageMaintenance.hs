@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PackageMaintenance.hs,v 1.1 2000/10/11 11:54:58 simonmar Exp $
+-- $Id: PackageMaintenance.hs,v 1.2 2000/10/11 15:26:18 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -46,7 +46,7 @@ newPackage = do
 	then throwDyn (OtherError ("package `" ++ name new_pkg ++ 
 					"' already installed"))
 	else do
-  conf_file <- readIORef package_config
+  conf_file <- readIORef path_package_config
   savePackageConfig conf_file
   maybeRestoreOldConfig conf_file $ do
   writeNewConfig conf_file ( ++ [new_pkg])
@@ -59,7 +59,7 @@ deletePackage pkg = do
   if (pkg `notElem` map name details)
 	then throwDyn (OtherError ("package `" ++ pkg ++ "' not installed"))
 	else do
-  conf_file <- readIORef package_config
+  conf_file <- readIORef path_package_config
   savePackageConfig conf_file
   maybeRestoreOldConfig conf_file $ do
   writeNewConfig conf_file (filter ((/= pkg) . name))
@@ -67,7 +67,7 @@ deletePackage pkg = do
 
 checkConfigAccess :: IO ()
 checkConfigAccess = do
-  conf_file <- readIORef package_config
+  conf_file <- readIORef path_package_config
   access <- getPermissions conf_file
   unless (writable access)
 	(throwDyn (OtherError "you don't have permission to modify the package configuration file"))

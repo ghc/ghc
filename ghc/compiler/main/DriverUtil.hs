@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.2 2000/10/11 14:08:52 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.3 2000/10/11 15:26:18 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -21,7 +21,6 @@ import RegexString
 
 import IO
 import System
-import Directory
 import List
 import Char
 import Monad
@@ -132,6 +131,12 @@ addNoDups :: Eq a => IORef [a] -> a -> IO ()
 addNoDups var x = do
   xs <- readIORef var
   unless (x `elem` xs) $ writeIORef var (x:xs)
+
+splitFilename :: String -> (String,String)
+splitFilename f = (reverse (stripDot rev_basename), reverse rev_ext)
+  where (rev_ext, rev_basename) = span ('.' /=) (reverse f)
+        stripDot ('.':xs) = xs
+        stripDot xs       = xs
 
 remove_suffix :: Char -> String -> String
 remove_suffix c s

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.1 2000/10/11 11:54:58 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.2 2000/10/11 15:26:18 simonmar Exp $
 --
 -- Driver flags
 --
@@ -399,3 +399,95 @@ decodeSize str
 floatOpt :: IORef Double -> String -> IO ()
 floatOpt ref str
   = writeIORef ref (read str :: Double)
+
+-----------------------------------------------------------------------------
+-- Build the Hsc static command line opts
+
+build_hsc_opts :: IO [String]
+build_hsc_opts = do
+  opt_C_ <- getStaticOpts opt_C		-- misc hsc opts
+
+	-- warnings
+  warn_level <- readIORef warning_opt
+  let warn_opts =  case warn_level of
+		  	W_default -> standardWarnings
+		  	W_        -> minusWOpts
+		  	W_all	  -> minusWallOpts
+		  	W_not     -> []
+
+	-- optimisation
+  minus_o <- readIORef opt_level
+  optimisation_opts <-
+        case minus_o of
+	    0 -> hsc_minusNoO_flags
+	    1 -> hsc_minusO_flags
+	    2 -> hsc_minusO2_flags
+	    _ -> error "unknown opt level"
+	    -- ToDo: -Ofile
+ 
+	-- STG passes
+  ways_ <- readIORef ways
+  let stg_massage | WayProf `elem` ways_ =  "-fmassage-stg-for-profiling"
+	          | otherwise            = ""
+
+  stg_stats <- readIORef opt_StgStats
+  let stg_stats_flag | stg_stats = "-dstg-stats"
+		     | otherwise = ""
+
+  let stg_opts = [ stg_massage, stg_stats_flag, "-flet-no-escape" ]
+	-- let-no-escape always on for now
+
+	-- take into account -fno-* flags by removing the equivalent -f*
+	-- flag from our list.
+  anti_flags <- getStaticOpts anti_opt_C
+  let basic_opts = opt_C_ ++ warn_opts ++ optimisation_opts ++ stg_opts
+      filtered_opts = filter (`notElem` anti_flags) basic_opts
+
+  verb <- is_verbose
+  let hi_vers = "-fhi-version="++cProjectVersionInt
+
+  static <- (do s <- readIORef static; if s then return "-static" else return "")
+
+  l <- readIORef hsc_lang
+  let lang = case l of
+		HscC    -> "-olang=C"
+		HscAsm  -> "-olang=asm"
+		HscJava -> "-olang=java"
+
+  -- get hi-file suffix
+  hisuf <- readIORef hi_suf
+
+  -- hi-suffix for packages depends on the build tag.
+  package_hisuf <-
+	do tag <- readIORef build_tag
+	   if null tag
+		then return "hi"
+		else return (tag ++ "_hi")
+
+  import_dirs <- readIORef import_paths
+  package_import_dirs <- getPackageImportPath
+  
+  let hi_map = "-himap=" ++
+		makeHiMap import_dirs hisuf 
+			 package_import_dirs package_hisuf
+		   	 split_marker
+
+      hi_map_sep = "-himap-sep=" ++ [split_marker]
+
+  return 
+	(  
+	filtered_opts
+	++ [ hi_vers, static, verb, lang, hi_map, hi_map_sep ]
+	)
+
+makeHiMap 
+  (import_dirs         :: [String])
+  (hi_suffix           :: String)
+  (package_import_dirs :: [String])
+  (package_hi_suffix   :: String)   
+  (split_marker        :: Char)
+  = foldr (add_dir hi_suffix) 
+	(foldr (add_dir package_hi_suffix) "" package_import_dirs)
+	import_dirs
+  where
+     add_dir hisuf dir str = dir ++ "%." ++ hisuf ++ split_marker : str

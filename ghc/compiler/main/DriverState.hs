@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.2 2000/10/11 14:08:52 simonmar Exp $
+-- $Id: DriverState.hs,v 1.3 2000/10/11 15:26:18 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -671,6 +671,9 @@ GLOBAL_VAR(opt_C,      [], [String])
 GLOBAL_VAR(opt_l,      [], [String])
 GLOBAL_VAR(opt_dll,    [], [String])
 
+getStaticOpts :: IORef [String] -> IO [String]
+getStaticOpts ref = readIORef ref >>= return . reverse
+
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff
 
@@ -756,17 +759,3 @@ run_something phase_name cmd
 	else do when verb (putStr "\n")
 	        return ()
 
------------------------------------------------------------------------------
--- File suffixes & things
-
--- the output suffix for a given phase is uniquely determined by
--- the input requirements of the next phase.
-
-unlitInputExt       = "lhs"
-cppInputExt         = "lpp"
-hscInputExt         = "cpp"
-hccInputExt         = "hc"
-ccInputExt          = "c"
-mangleInputExt      = "raw_s"
-asInputExt          = "s"
-lnInputExt          = "o"
