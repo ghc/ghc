@@ -1,10 +1,13 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.50 2000/12/20 10:42:54 simonmar Exp $
+# $Id: Makefile,v 1.51 2001/02/11 16:32:48 simonmar Exp $
 #
 
 TOP=..
 CURRENT_DIR=ghc/driver
 include $(TOP)/mk/boilerplate.mk
+
+# hack for ghci-inplace script, see below
+INSTALLING=1
 
 ifeq "$(GhcWithHscBuiltViaC)" "YES"
 HC=$(GHC_INPLACE)
@@ -21,7 +24,9 @@ else
 SRC_HC_OPTS += -fglasgow-exts -cpp -syslib concurrent -syslib posix -syslib misc
 endif
 
+ifeq "$(INSTALLING)" "1"	
 SUBDIRS = mangler split
+endif
 
 # -----------------------------------------------------------------------------
 # Create compiler configuration
@@ -65,6 +70,46 @@ package.conf : pkgconf
 INSTALL_DATAS += package.conf
 
 CLEAN_FILES += pkgconf package.conf.inplace package.conf
+
+# -----------------------------------------------------------------------------
+# ghci script
+
+ifeq "$(INSTALLING)" "1"
+ifeq "$(BIN_DIST)"   "1"
+GHCBIN=$$\"\"bindir/ghc
+else
+GHCBIN=$(bindir)/ghc
+endif # BIN_DIST
+else
+GHCBIN=$(FPTOOLS_TOP_ABS)/ghc/compiler/ghc
+endif
+
+INSTALLED_SCRIPT_PROG  = ghci-$(ProjectVersion)
+INPLACE_SCRIPT_PROG    = ghci-inplace
+
+ifeq "$(INSTALLING)" "1"
+TOP_PWD 	:= $(prefix)
+SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
+SCRIPT_LINK 	=  ghci
+else
+TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
+SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
+endif
+
+SCRIPT_OBJS=ghci.sh
+
+INTERP=$(SHELL)
+
+SCRIPT_SUBST_VARS = GHCBIN
+
+INSTALL_SCRIPTS += $(SCRIPT_PROG)
+
+# don't recurse on 'make install'
+#
+ifeq "$(INSTALLING)" "1"
+all clean distclean maintainer-clean ::
+	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+endif
 
 # -----------------------------------------------------------------------------
 # installation...
