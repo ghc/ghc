@@ -260,6 +260,10 @@ StripLibraries=NO
 GhcRtsHcOpts=-O2
 GhcRtsCcOpts=-O2 -optc-fomit-frame-pointer
 
+# If you intend to bootstrap GHCi using this compiler...
+# GhcRtsHcOpts += -optc-DGHCI
+# GhcRtsCcOpts += -DGHCI
+
 # Include the front panel code?  Needs GTK+.
 GhcRtsWithFrontPanel = NO
 
