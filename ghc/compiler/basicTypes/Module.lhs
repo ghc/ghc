@@ -29,6 +29,7 @@ module Module
 
     , moduleNameString		-- :: ModuleName -> EncodedString
     , moduleNameUserString	-- :: ModuleName -> UserString
+    , moduleNameFS		-- :: ModuleName -> EncodedFS
 
     , moduleString		-- :: Module -> EncodedString
     , moduleUserString		-- :: Module -> UserString
@@ -167,6 +168,9 @@ instance Outputable ModuleName where
 
 pprModuleName :: ModuleName -> SDoc
 pprModuleName (ModuleName nm) = pprEncodedFS nm
+
+moduleNameFS :: ModuleName -> EncodedFS
+moduleNameFS (ModuleName mod) = mod
 
 moduleNameString :: ModuleName -> EncodedString
 moduleNameString (ModuleName mod) = _UNPK_ mod

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.38 2000/08/02 14:13:26 rrt Exp $
+% $Id: CLabel.lhs,v 1.39 2000/10/12 15:17:07 sewardj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -84,7 +84,8 @@ import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
-import Module		( ModuleName, moduleName, Module, isLocalModule )
+import Module		( ModuleName, moduleName, moduleNameFS, 
+			  Module, isLocalModule )
 import Name		( Name, getName, isDllName, isExternallyVisibleName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
@@ -525,7 +526,8 @@ pprCLbl (DataConLabel con flavor) = ppr con <> ppConFlavor flavor
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
-pprCLbl (ModuleInitLabel mod)	= ptext SLIT("__init_") <> ptext (moduleName mod)
+pprCLbl (ModuleInitLabel mod)	
+   = ptext SLIT("__init_") <> ptext (moduleNameFS (moduleName mod))
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.26 2000/09/07 13:25:28 simonpj Exp $
+% $Id: CgRetConv.lhs,v 1.27 2000/10/12 15:17:08 sewardj Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -30,7 +30,7 @@ import Maybes		( catMaybes )
 import PrimRep		( isFloatingRep, PrimRep(..), is64BitRep )
 import TyCon		( TyCon, tyConFamilySize )
 import Util		( isn'tIn )
-
+import FastTypes
 import Outputable
 \end{code}
 
@@ -75,26 +75,26 @@ ctrlReturnConvAlg tycon
 \begin{code}
 dataReturnConvPrim :: PrimRep -> MagicId
 
-dataReturnConvPrim IntRep	= VanillaReg IntRep  ILIT(1)
-dataReturnConvPrim WordRep	= VanillaReg WordRep ILIT(1)
-dataReturnConvPrim Int64Rep	= LongReg Int64Rep  ILIT(1)
-dataReturnConvPrim Word64Rep	= LongReg Word64Rep ILIT(1)
-dataReturnConvPrim AddrRep	= VanillaReg AddrRep ILIT(1)
-dataReturnConvPrim CharRep	= VanillaReg CharRep ILIT(1)
-dataReturnConvPrim Int8Rep	= VanillaReg Int8Rep ILIT(1)
-dataReturnConvPrim FloatRep	= FloatReg  ILIT(1)
-dataReturnConvPrim DoubleRep	= DoubleReg ILIT(1)
+dataReturnConvPrim IntRep	= VanillaReg IntRep  (_ILIT 1)
+dataReturnConvPrim WordRep	= VanillaReg WordRep (_ILIT 1)
+dataReturnConvPrim Int64Rep	= LongReg Int64Rep  (_ILIT 1)
+dataReturnConvPrim Word64Rep	= LongReg Word64Rep (_ILIT 1)
+dataReturnConvPrim AddrRep	= VanillaReg AddrRep (_ILIT 1)
+dataReturnConvPrim CharRep	= VanillaReg CharRep (_ILIT 1)
+dataReturnConvPrim Int8Rep	= VanillaReg Int8Rep (_ILIT 1)
+dataReturnConvPrim FloatRep	= FloatReg  (_ILIT 1)
+dataReturnConvPrim DoubleRep	= DoubleReg (_ILIT 1)
 dataReturnConvPrim VoidRep	= VoidReg
 
 -- Return a primitive-array pointer in the usual register:
-dataReturnConvPrim ArrayRep     = VanillaReg ArrayRep     ILIT(1)
-dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep ILIT(1)
-dataReturnConvPrim PrimPtrRep   = VanillaReg PrimPtrRep   ILIT(1)
-dataReturnConvPrim ThreadIdRep  = VanillaReg ThreadIdRep  ILIT(1)
+dataReturnConvPrim ArrayRep     = VanillaReg ArrayRep     (_ILIT 1)
+dataReturnConvPrim ByteArrayRep = VanillaReg ByteArrayRep (_ILIT 1)
+dataReturnConvPrim PrimPtrRep   = VanillaReg PrimPtrRep   (_ILIT 1)
+dataReturnConvPrim ThreadIdRep  = VanillaReg ThreadIdRep  (_ILIT 1)
 
-dataReturnConvPrim StablePtrRep  = VanillaReg StablePtrRep  ILIT(1)
-dataReturnConvPrim ForeignObjRep = VanillaReg ForeignObjRep ILIT(1)
-dataReturnConvPrim WeakPtrRep    = VanillaReg WeakPtrRep    ILIT(1)
+dataReturnConvPrim StablePtrRep  = VanillaReg StablePtrRep  (_ILIT 1)
+dataReturnConvPrim ForeignObjRep = VanillaReg ForeignObjRep (_ILIT 1)
+dataReturnConvPrim WeakPtrRep    = VanillaReg WeakPtrRep    (_ILIT 1)
 
 #ifdef DEBUG
 dataReturnConvPrim rep		= pprPanic "dataReturnConvPrim:" (ppr rep)
@@ -148,21 +148,26 @@ assign_reg (VoidRep:ks) acc supply
 	= assign_reg ks (VoidReg:acc) supply 
 	-- one VoidReg is enough for everybody!
 
-assign_reg (FloatRep:ks) acc (vanilla_rs, IBOX(f):float_rs, double_rs, long_rs)
-	= assign_reg ks (FloatReg f:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+assign_reg (FloatRep:ks) acc (vanilla_rs, f:float_rs, double_rs, long_rs)
+	= assign_reg ks (FloatReg (iUnbox f):acc) 
+                        (vanilla_rs, float_rs, double_rs, long_rs)
 
-assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, IBOX(d):double_rs, long_rs)
-	= assign_reg ks (DoubleReg d:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+assign_reg (DoubleRep:ks) acc (vanilla_rs, float_rs, d:double_rs, long_rs)
+	= assign_reg ks (DoubleReg (iUnbox d):acc) 
+                        (vanilla_rs, float_rs, double_rs, long_rs)
 
-assign_reg (Word64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(u):long_rs)
-	= assign_reg ks (LongReg Word64Rep u:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+assign_reg (Word64Rep:ks) acc (vanilla_rs, float_rs, double_rs, u:long_rs)
+	= assign_reg ks (LongReg Word64Rep (iUnbox u):acc) 
+                        (vanilla_rs, float_rs, double_rs, long_rs)
 
-assign_reg (Int64Rep:ks) acc (vanilla_rs, float_rs, double_rs, IBOX(l):long_rs)
-	= assign_reg ks (LongReg Int64Rep l:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+assign_reg (Int64Rep:ks) acc (vanilla_rs, float_rs, double_rs, l:long_rs)
+	= assign_reg ks (LongReg Int64Rep (iUnbox l):acc) 
+                        (vanilla_rs, float_rs, double_rs, long_rs)
 
-assign_reg (k:ks) acc (IBOX(v):vanilla_rs, float_rs, double_rs, long_rs)
+assign_reg (k:ks) acc (v:vanilla_rs, float_rs, double_rs, long_rs)
 	| not (isFloatingRep k || is64BitRep k)
-	= assign_reg ks (VanillaReg k v:acc) (vanilla_rs, float_rs, double_rs, long_rs)
+	= assign_reg ks (VanillaReg k (iUnbox v):acc) 
+                        (vanilla_rs, float_rs, double_rs, long_rs)
 
 -- The catch-all.  It can happen because either
 --	(a) we've assigned all the regs so leftover_ks is []
@@ -218,13 +223,13 @@ mkRegTbl' regs_in_use vanillas floats doubles longs
     ok_long    = catMaybes (map (select (LongReg Int64Rep))    longs)   
 				    -- rep isn't looked at, hence we can use any old rep.
 
-    select :: (FAST_INT -> MagicId) -> Int{-cand-} -> Maybe Int
+    select :: (FastInt -> MagicId) -> Int{-cand-} -> Maybe Int
 	-- one we've unboxed the Int, we make a MagicId
 	-- and see if it is already in use; if not, return its number.
 
-    select mk_reg_fun cand@IBOX(i)
+    select mk_reg_fun cand
       = let
-	    reg = mk_reg_fun i
+	    reg = mk_reg_fun (iUnbox cand)
 	in
 	if reg `not_elem` regs_in_use
 	then Just cand

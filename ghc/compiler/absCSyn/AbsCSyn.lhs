@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.34 2000/10/12 13:11:46 simonmar Exp $
+% $Id: AbsCSyn.lhs,v 1.35 2000/10/12 15:17:07 sewardj Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -50,6 +50,7 @@ import Unique           ( Unique )
 import StgSyn		( SRT(..) )
 import TyCon		( TyCon )
 import BitSet				-- for liveness masks
+import FastTypes
 
 \end{code}
 
@@ -388,16 +389,16 @@ data ReturnInfo
 hpRel :: VirtualHeapOffset 	-- virtual offset of Hp
       -> VirtualHeapOffset 	-- virtual offset of The Thing
       -> RegRelative		-- integer offset
-hpRel _IBOX(hp) _IBOX(off) = HpRel (hp _SUB_ off)
+hpRel hp off = HpRel (iUnbox (hp - off))
 
 spRel :: VirtualSpOffset 	-- virtual offset of Sp
       -> VirtualSpOffset 	-- virtual offset of The Thing
       -> RegRelative		-- integer offset
-spRel sp off = SpRel (case spRelToInt sp off of { _IBOX(i) -> i })
+spRel sp off = SpRel (iUnbox (spRelToInt sp off))
 
 nodeRel :: VirtualHeapOffset
         -> RegRelative
-nodeRel _IBOX(off) = NodeRel off
+nodeRel off = NodeRel (iUnbox off)
 
 \end{code}
 
@@ -476,8 +477,8 @@ data MagicId
   | CurrentNursery	-- pointer to allocation area
 
 
-node 	= VanillaReg PtrRep     _ILIT(1) -- A convenient alias for Node
-tagreg  = VanillaReg WordRep    _ILIT(2) -- A convenient alias for TagReg
+node 	= VanillaReg PtrRep     (_ILIT 1) -- A convenient alias for Node
+tagreg  = VanillaReg WordRep    (_ILIT 2) -- A convenient alias for TagReg
 
 nodeReg = CReg node
 \end{code}
