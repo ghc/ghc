@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.56 1999/03/25 13:14:05 simonm Exp $
+ * $Id: GC.c,v 1.57 1999/03/26 10:29:04 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2313,10 +2313,10 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
    */
 
   while (p < stack_end) {
-    q = *stgCast(StgPtr*,p);
+    q = *(P_ *)p;
 
     /* If we've got a tag, skip over that many words on the stack */
-    if (IS_ARG_TAG(stgCast(StgWord,q))) {
+    if (IS_ARG_TAG((W_)q)) {
       p += ARG_SIZE(q);
       p++; continue;
     }
@@ -2342,14 +2342,14 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
      * record.  All activation records have 'bitmap' style layout
      * info.
      */
-    info  = get_itbl(stgCast(StgClosure*,p));
+    info  = get_itbl((StgClosure *)p);
       
     switch (info->type) {
 	
       /* Dynamic bitmap: the mask is stored on the stack */
     case RET_DYN:
       bitmap = ((StgRetDyn *)p)->liveness;
-      p      = (P_)((StgRetDyn *)p)->payload[0];
+      p      = (P_)&((StgRetDyn *)p)->payload[0];
       goto small_bitmap;
 
       /* probably a slow-entry point return address: */

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.5 1999/02/05 16:02:21 simonm Exp $
+ * $Id: Constants.h,v 1.6 1999/03/26 10:29:02 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -103,12 +103,6 @@
 #define NOSCC_UF_SIZE 	3
 #define SCC_UF_SIZE	4
 
-#if defined(PROFILING)
-#define UF_SIZE	SCC_UF_SIZE
-#else
-#define UF_SIZE NOSCC_UF_SIZE
-#endif
-
 #define UF_RET		0
 #define UF_SU		1
 #define UF_UPDATEE	2
@@ -116,13 +110,12 @@
 
 /* -----------------------------------------------------------------------------
    SEQ frame size
+
+   I don't think seq frames really need sccs --SDM
    -------------------------------------------------------------------------- */
 
-#if defined(PROFILING)
-#define SEQ_FRAME_SIZE 3
-#else
-#define SEQ_FRAME_SIZE 2
-#endif
+#define NOSCC_SEQ_FRAME_SIZE 2
+#define SCC_SEQ_FRAME_SIZE   3
 
 /* -----------------------------------------------------------------------------
    STG Registers.

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStdThunks.hc,v 1.3 1999/02/05 16:03:00 simonm Exp $
+ * $Id: StgStdThunks.hc,v 1.4 1999/03/26 10:29:05 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -144,6 +144,8 @@ FN_(__ap_5_upd_entry);
 FN_(__ap_6_upd_entry);
 FN_(__ap_7_upd_entry);
 FN_(__ap_8_upd_entry);
+
+#define UF_SIZE (sizeofW(StgUpdateFrame))
 
 /* __ap_1_upd_info is a bit redundant, but there appears to be a bug
  * in the compiler that means __ap_1 is generated occasionally (ToDo)

@@ -11,7 +11,7 @@ module CgUpdate ( pushUpdateFrame, reserveSeqFrame, pushSeqFrame ) where
 import CgMonad
 import AbsCSyn
 
-import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE )
+import Constants	( uF_SIZE, sCC_UF_SIZE, sEQ_FRAME_SIZE, sCC_SEQ_FRAME_SIZE )
 import PrimRep		( PrimRep(..) )
 import CgStackery	( allocUpdateFrame )
 import CgUsages		( getSpRelOffset )
@@ -71,13 +71,16 @@ args_sp.  When the scrutinee comes around to pushing a return address,
 it will also push the SEQ frame, using pushSeqFrame.
 
 \begin{code}
+seq_frame_size | opt_SccProfilingOn = sCC_SEQ_FRAME_SIZE
+	       | otherwise          = sEQ_FRAME_SIZE
+
 reserveSeqFrame :: EndOfBlockInfo -> EndOfBlockInfo
 reserveSeqFrame (EndOfBlockInfo args_sp (CaseAlts amode stuff)) 
-  = EndOfBlockInfo (args_sp + sEQ_FRAME_SIZE) (SeqFrame amode stuff)
+  = EndOfBlockInfo (args_sp + seq_frame_size) (SeqFrame amode stuff)
 
 pushSeqFrame :: VirtualSpOffset -> FCode VirtualSpOffset
 pushSeqFrame args_sp
   = getSpRelOffset args_sp  `thenFC` \ sp_rel ->
     absC (CMacroStmt PUSH_SEQ_FRAME [CAddr sp_rel]) `thenC`
-    returnFC (args_sp - sEQ_FRAME_SIZE)
+    returnFC (args_sp - seq_frame_size)
 \end{code}

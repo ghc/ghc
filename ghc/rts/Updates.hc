@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.12 1999/03/25 13:14:08 simonm Exp $
+ * $Id: Updates.hc,v 1.13 1999/03/26 10:29:06 simonm Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -227,11 +227,7 @@ EXTFUN(stg_update_PAP)
 
 #if defined(PROFILING)
     /* set "CC_pap" to go in the updatee (see Sansom thesis, p 183) */
-
-    CCS_pap = (CostCentreStack *) Fun->header.prof.ccs;
-    if (IS_CAF_OR_SUB_CCS(CCS_pap)) {
-	CCS_pap = CCCS;
-    }
+    CCS_pap = Fun->header.prof.ccs;
 #endif
 
     if (Words == 0) { 
@@ -467,7 +463,7 @@ SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_5_entry,ENTRY_CODE(Sp[0]));
 SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_6_entry,ENTRY_CODE(Sp[0]));
 SEQ_FRAME_ENTRY_TEMPLATE(seq_frame_7_entry,ENTRY_CODE(Sp[0]));
 
-VEC_POLY_INFO_TABLE(seq_frame,1, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, SEQ_FRAME);
+VEC_POLY_INFO_TABLE(seq_frame, UPD_FRAME_BITMAP, NULL/*srt*/, 0/*srt_off*/, 0/*srt_len*/, SEQ_FRAME);
 
 /* -----------------------------------------------------------------------------
  * The seq infotable
@@ -485,7 +481,7 @@ STGFUN(seq_entry)
 {
   FB_
   STK_CHK_GEN(sizeofW(StgSeqFrame), NO_PTRS, seq_entry, );
-  Sp -= sizeof(StgSeqFrame);
+  Sp -= sizeofW(StgSeqFrame);
   PUSH_SEQ_FRAME(Sp);
   R1.cl = R1.cl->payload[0];
   JMP_(ENTRY_CODE(*R1.p));         

@@ -50,6 +50,7 @@ module Constants (
 	uF_CCS,
 
 	sEQ_FRAME_SIZE,
+	sCC_SEQ_FRAME_SIZE,
 
 	mAX_Vanilla_REG,
 	mAX_Float_REG,
@@ -186,8 +187,11 @@ uF_UPDATEE     = (UF_UPDATEE::Int)
 uF_CCS         = (UF_CCS::Int)
 \end{code}
 
+Seq frame sizes.
+
 \begin{code}
-sEQ_FRAME_SIZE = (SEQ_FRAME_SIZE::Int)
+sEQ_FRAME_SIZE = (NOSCC_SEQ_FRAME_SIZE::Int)
+sCC_SEQ_FRAME_SIZE = (SCC_SEQ_FRAME_SIZE::Int)
 \end{code}
 
 \begin{code}
