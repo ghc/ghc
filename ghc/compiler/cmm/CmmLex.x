@@ -61,6 +61,7 @@ $namechar  = [$namebegin $digit]
 cmm :-
 
 $white_no_nl+		;
+^\# pragma .* \n        ; -- Apple GCC 3.3 CPP generates pragmas in its output
 
 ^\# (line)? 		{ begin line_prag }
 
