@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/06 08:38:05 $
+ * $Revision: 1.25 $
+ * $Date: 2000/03/06 10:12:57 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1983,12 +1983,13 @@ Inst in; {                              /* member functions for instance in*/
        for (j = 0; i<FILENAME_MAX && str[j]!='\0'; i++, j++) {
           buf[i] = str[j];
        }
-       for (; nonNull(pp); pp=tl(pp)) {
+       if (nonNull(pp)) {
           qq = hd(pp);
           while (isAp(qq)) qq = fun(qq);
           switch (whatIs(qq)) {
-             case TYCON: str = textToStr(tycon(qq).text); break;
-             case TUPLE: str = textToStr(ghcTupleText(qq)); break;
+             case TYCON:  str = textToStr(tycon(qq).text); break;
+             case TUPLE:  str = textToStr(ghcTupleText(qq)); break;
+             case OFFSET: sprintf(str,"%d",offsetOf(qq)); break;
              default: internal("typeInstDefn: making GHC name"); break;
           }
           for (j = 0; i<FILENAME_MAX && str[j]!='\0'; i++, j++) {
