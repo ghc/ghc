@@ -27,6 +27,7 @@ ALL_DIRS = \
 	System/IO \
 	System/Posix \
 	System/Process \
+	System/Directory \
 	Text \
 	Text/Html \
 	Text/PrettyPrint \
