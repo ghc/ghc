@@ -47,6 +47,7 @@ import Module		( Module, mkModule )
 import UniqFM
 import UniqSet
 import Util
+import Maybes		( expectJust )
 import Panic
 import Outputable
 
@@ -60,7 +61,7 @@ import Distribution.InstalledPackageInfo
 import Distribution.Package
 import Distribution.Version
 import System.IO	( hPutStrLn, stderr )
-import Data.Maybe	( fromJust, isNothing )
+import Data.Maybe	( isNothing )
 import System.Directory	( doesFileExist )
 import Control.Monad	( when, foldM )
 import Data.List	( nub, partition )
@@ -177,7 +178,7 @@ extendPackageConfigMap pkg_map new_pkgs
   where add pkg_map p = addToUFM pkg_map (packageConfigId p) p
 
 getPackageDetails :: PackageState -> PackageId -> PackageConfig
-getPackageDetails dflags ps = fromJust (lookupPackage (pkgIdMap dflags) ps)
+getPackageDetails dflags ps = expectJust "getPackageDetails" (lookupPackage (pkgIdMap dflags) ps)
 
 -- ----------------------------------------------------------------------------
 -- Loading the package config files and building up the package state
@@ -354,7 +355,7 @@ mkPackageState dflags pkg_db = do
   let
 	extend_modmap modmap pkgname = do
 	  let 
-		pkg = fromJust (lookupPackage pkg_db pkgname)
+		pkg = expectJust "mkPackageState" (lookupPackage pkg_db pkgname)
 	        exposed_mods = map mkModule (exposedModules pkg)
 	        hidden_mods  = map mkModule (hiddenModules pkg)
 		all_mods = exposed_mods ++ hidden_mods

@@ -13,7 +13,8 @@ module Finder (
     mkHomeModLocation2,		-- :: ModuleName -> FilePath -> String -> IO ModLocation
     addHomeModuleToFinder, 	-- :: HscEnv -> Module -> ModLocation -> IO ()
 
-    findLinkable,	-- :: ModuleName -> ModLocation -> IO (Maybe Linkable)
+    findObjectLinkableMaybe,
+    findObjectLinkable,
 
     cantFindError, 	-- :: DynFlags -> Module -> FindResult -> SDoc
   ) where
@@ -37,6 +38,7 @@ import System.IO
 import Control.Monad
 import Maybes		( MaybeErr(..) )
 import Data.Maybe	( isNothing )
+import Time		( ClockTime )
 
 
 type FileExt = String	-- Filename extension
@@ -391,20 +393,24 @@ mkHiPath dflags basename mod_basename
 -- findLinkable isn't related to the other stuff in here, 
 -- but there's no other obvious place for it
 
-findLinkable :: Module -> ModLocation -> IO (Maybe Linkable)
-findLinkable mod locn
+findObjectLinkableMaybe :: Module -> ModLocation -> IO (Maybe Linkable)
+findObjectLinkableMaybe mod locn
    = do let obj_fn = ml_obj_file locn
-	obj_exist <- doesFileExist obj_fn
-        if not obj_exist 
-         then return Nothing 
-         else 
-         do let stub_fn = case splitFilename3 obj_fn of
-                             (dir, base, ext) -> dir ++ "/" ++ base ++ "_stub.o"
-            stub_exist <- doesFileExist stub_fn
-            obj_time <- getModificationTime obj_fn
-            if stub_exist
-             then return (Just (LM obj_time mod [DotO obj_fn, DotO stub_fn]))
-             else return (Just (LM obj_time mod [DotO obj_fn]))
+	maybe_obj_time <- modificationTimeIfExists obj_fn
+	case maybe_obj_time of
+	  Nothing -> return Nothing
+	  Just obj_time -> liftM Just (findObjectLinkable mod obj_fn obj_time)
+
+-- Make an object linkable when we know the object file exists, and we know
+-- its modification time.
+findObjectLinkable :: Module -> FilePath -> ClockTime -> IO Linkable
+findObjectLinkable mod obj_fn obj_time = do
+  let stub_fn = case splitFilename3 obj_fn of
+			(dir, base, ext) -> dir ++ "/" ++ base ++ "_stub.o"
+  stub_exist <- doesFileExist stub_fn
+  if stub_exist
+	then return (LM obj_time mod [DotO obj_fn, DotO stub_fn])
+	else return (LM obj_time mod [DotO obj_fn])
 
 -- -----------------------------------------------------------------------------
 -- Utils

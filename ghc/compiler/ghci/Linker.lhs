@@ -1,5 +1,5 @@
 %
-% (c) The University of Glasgow 2000
+% (c) The University of Glasgow 2005
 %
 
 -- --------------------------------------
@@ -30,7 +30,7 @@ import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 import Packages
 import DriverPhases	( isObjectFilename, isDynLibFilename )
 import Util		( getFileSuffix )
-import Finder		( findModule, findLinkable, FindResult(..) )
+import Finder		( findModule, findObjectLinkableMaybe, FindResult(..) )
 import HscTypes
 import Name		( Name, nameModule, isExternalName, isWiredInName )
 import NameEnv
@@ -54,6 +54,7 @@ import System.IO	( putStr, putStrLn, hPutStrLn, stderr, fixIO )
 import System.Directory	( doesFileExist )
 
 import Control.Exception ( block, throwDyn )
+import Maybe		( isJust, fromJust )
 
 #if __GLASGOW_HASKELL__ >= 503
 import GHC.IOBase	( IO(..) )
@@ -400,7 +401,8 @@ getLinkDeps hsc_env hpt pit mods
 
     get_linkable mod_name	-- A home-package module
 	| Just mod_info <- lookupModuleEnv hpt mod_name 
-	= return (hm_linkable mod_info)
+	= ASSERT(isJust (hm_linkable mod_info))
+	  return (fromJust (hm_linkable mod_info))
 	| otherwise	
 	=	-- It's not in the HPT because we are in one shot mode, 
 		-- so use the Finder to get a ModLocation...
@@ -412,7 +414,7 @@ getLinkDeps hsc_env hpt pit mods
 
     found loc mod_name = do {
 		-- ...and then find the linkable for it
-	       mb_lnk <- findLinkable mod_name loc ;
+	       mb_lnk <- findObjectLinkableMaybe mod_name loc ;
 	       case mb_lnk of {
 		  Nothing -> no_obj mod_name ;
 		  Just lnk -> return lnk

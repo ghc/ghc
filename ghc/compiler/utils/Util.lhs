@@ -56,6 +56,7 @@ module Util (
 	-- IO-ish utilities
 	createDirectoryHierarchy,
 	doesDirNameExist,
+	modificationTimeIfExists,
 
 	later, handleDyn, handle,
 
@@ -89,10 +90,12 @@ import List		( zipWith4 )
 #endif
 
 import Monad		( when )
-import IO		( catch )
+import IO		( catch, isDoesNotExistError )
 import Directory	( doesDirectoryExist, createDirectory )
 import Char		( isUpper, isAlphaNum, isSpace, ord, isDigit )
 import Ratio		( (%) )
+import Time		( ClockTime )
+import Directory	( getModificationTime )
 
 infixr 9 `thenCmp`
 \end{code}
@@ -838,6 +841,16 @@ handle h f = f `Exception.catch` \e -> case e of
     ExitException _ -> throw e
     _               -> h e
 #endif
+
+-- --------------------------------------------------------------
+-- check existence & modification time at the same time
+
+modificationTimeIfExists :: FilePath -> IO (Maybe ClockTime)
+modificationTimeIfExists f = do
+  (do t <- getModificationTime f; return (Just t))
+	`IO.catch` \e -> if isDoesNotExistError e 
+			then return Nothing 
+			else ioError e
 
 -- --------------------------------------------------------------
 -- Filename manipulation

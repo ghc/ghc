@@ -87,26 +87,27 @@ preprocess dflags filename =
 
 compile :: HscEnv
 	-> ModSummary
-	-> Bool			-- True <=> source unchanged
-	-> Bool			-- True <=> have object
+	-> Maybe Linkable	-- Just linkable <=> source unchanged
         -> Maybe ModIface       -- Old interface, if available
         -> IO CompResult
 
 data CompResult
-   = CompOK   ModDetails 		-- New details
-              ModIface			-- New iface
-              (Maybe Linkable)	-- New code; Nothing => compilation was not reqd
-		                --			(old code is still valid)
+   = CompOK   ModDetails 	-- New details
+              ModIface		-- New iface
+              (Maybe Linkable)	-- a Maybe, for the same reasons as hm_linkable
 
    | CompErrs 
 
 
-compile hsc_env mod_summary
-	source_unchanged have_object old_iface = do 
+compile hsc_env mod_summary maybe_old_linkable old_iface = do 
 
    let dflags0     = hsc_dflags hsc_env
        this_mod    = ms_mod mod_summary
        src_flavour = ms_hsc_src mod_summary
+
+       have_object 
+	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
+	       | otherwise = False
 
    showPass dflags0 ("Compiling " ++ showModMsg have_object mod_summary)
 
@@ -149,17 +150,19 @@ compile hsc_env mod_summary
 
    -- -no-recomp should also work with --make
    let do_recomp = dopt Opt_RecompChecking dflags
-       source_unchanged' = source_unchanged && do_recomp
+       source_unchanged = isJust maybe_old_linkable && do_recomp
        hsc_env' = hsc_env { hsc_dflags = dflags' }
 
    -- run the compiler
    hsc_result <- hscMain hsc_env' printErrorsAndWarnings mod_summary
-			 source_unchanged' have_object old_iface
+			 source_unchanged have_object old_iface
 
    case hsc_result of
       HscFail -> return CompErrs
 
-      HscNoRecomp details iface -> return (CompOK details iface Nothing)
+      HscNoRecomp details iface -> 
+	  ASSERT(isJust maybe_old_linkable)
+	  return (CompOK details iface maybe_old_linkable)
 
       HscRecomp details iface
 		stub_h_exists stub_c_exists maybe_interpreted_code 
@@ -254,7 +257,7 @@ link BatchCompile dflags batch_attempt_linking hpt
 	    pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
 
 	    -- the linkables to link
-	    linkables = map hm_linkable home_mod_infos
+	    linkables = map (fromJust.hm_linkable) home_mod_infos
 
         when (verb >= 3) $ do
 	     hPutStrLn stderr "link: linkables are ..."

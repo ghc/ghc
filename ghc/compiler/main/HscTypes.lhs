@@ -11,7 +11,7 @@ module HscTypes (
 	Target(..), TargetId(..), pprTarget, pprTargetId,
 	ModuleGraph, emptyMG,
 
-	ModDetails(..),	
+	ModDetails(..),	emptyModDetails,
 	ModGuts(..), ModImports(..), ForeignStubs(..),
 
 	ModSummary(..), showModMsg, isBootSummary,
@@ -214,9 +214,15 @@ emptyHomePackageTable  = emptyModuleEnv
 emptyPackageIfaceTable = emptyModuleEnv
 
 data HomeModInfo 
-  = HomeModInfo { hm_iface    :: ModIface,
-		  hm_details  :: ModDetails,
-		  hm_linkable :: Linkable }
+  = HomeModInfo { hm_iface    :: !ModIface,
+		  hm_details  :: !ModDetails,
+		  hm_linkable :: !(Maybe Linkable) }
+		-- hm_linkable might be Nothing if:
+		--   a) this is an .hs-boot module
+		--   b) temporarily during compilation if we pruned away
+		--      the old linkable because it was out of date.
+		-- after a complete compilation (GHC.load), all hm_linkable
+		-- fields in the HPT will be Just.
 \end{code}
 
 Simple lookups in the symbol table.
@@ -357,6 +363,10 @@ data ModDetails
         md_insts    :: ![DFunId],	-- Dfun-ids for the instances in this module
         md_rules    :: ![IdCoreRule]	-- Domain may include Ids from other modules
      }
+
+emptyModDetails = ModDetails { md_types = emptyTypeEnv,
+			       md_insts = [],
+			       md_rules = [] }
 
 -- A ModGuts is carried through the compiler, accumulating stuff as it goes
 -- There is only one ModGuts at any time, the one for the module
@@ -940,7 +950,8 @@ data ModSummary
         ms_mod       :: Module,			-- Name of the module
 	ms_hsc_src   :: HscSource,		-- Source is Haskell, hs-boot, external core
         ms_location  :: ModLocation,		-- Location
-        ms_hs_date   :: ClockTime,		-- Timestamp of summarised file
+        ms_hs_date   :: ClockTime,		-- Timestamp of source file
+	ms_obj_date  :: Maybe ClockTime,	-- Timestamp of object, maybe
         ms_srcimps   :: [Module],		-- Source imports
         ms_imps      :: [Module],		-- Non-source imports
         ms_hspp_file :: Maybe FilePath,		-- Filename of preprocessed source,
