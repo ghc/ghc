@@ -12,8 +12,8 @@ module TcDeriv ( tcDeriving ) where
 
 import HsSyn		( HsBinds(..), MonoBinds(..), collectLocatedMonoBinders )
 import RdrHsSyn		( RdrNameMonoBinds )
-import RnHsSyn		( RenamedHsBinds )
-import CmdLineOpts	( DynFlag(..) )
+import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
+import CmdLineOpts	( DynFlag(..), DynFlags )
 
 import TcMonad
 import TcEnv		( TcEnv, tcSetInstEnv, getTcGST, newDFunName )
@@ -30,9 +30,9 @@ import HscTypes		( DFunId, GlobalSymbolTable, PersistentRenamerState )
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
-import ErrUtils		( dumpIfSet, Message )
+import ErrUtils		( dumpIfSet_dyn, Message )
 import MkId		( mkDictFunId )
-import Id		( mkVanillaId )
+import Id		( mkVanillaId, idType )
 import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
@@ -45,7 +45,7 @@ import TyCon		( tyConTyVars, tyConDataCons, tyConDerivings,
 			  tyConTheta, maybeTyConSingleCon, isDataTyCon,
 			  isEnumerationTyCon, isAlgTyCon, TyCon
 			)
-import Type		( TauType, mkTyVarTys, mkTyConApp,
+import Type		( TauType, PredType(..), mkTyVarTys, mkTyConApp,
 			  mkSigmaTy, splitSigmaTy, splitDictTy, mkDictTy, 
 			  isUnboxedType, splitAlgTyConApp, classesToPreds
 			)
@@ -148,6 +148,7 @@ type DerivEqn = (Name, Class, TyCon, [TyVar], DerivRhs)
 		-- The tyvars bind all the variables in the RHS
 
 type DerivRhs = [(Class, [TauType])]	-- Same as a ThetaType!
+		--[PredType]   -- ... | Class Class [Type==TauType]
 
 type DerivSoln = DerivRhs
 \end{code}
@@ -187,6 +188,7 @@ context to the instance decl.  The "offending classes" are
 tcDeriving  :: PersistentRenamerState
 	    -> Module			-- name of module under scrutiny
 	    -> InstEnv			-- What we already know about instances
+	    -> [TyCon]			-- "local_tycons" ???
 	    -> TcM ([InstInfo],		-- The generated "instance decls".
 		    RenamedHsBinds)	-- Extra generated bindings
 
@@ -195,7 +197,7 @@ tcDeriving prs mod inst_env_in local_tycons
 
   	-- Fish the "deriving"-related information out of the TcEnv
 	-- and make the necessary "equations".
-    makeDerivEqns local_tycons			    	`thenTc` \ eqns ->
+    makeDerivEqns mod local_tycons	    	`thenTc` \ eqns ->
     if null eqns then
 	returnTc ([], EmptyBinds)
     else
@@ -214,6 +216,7 @@ tcDeriving prs mod inst_env_in local_tycons
     gen_taggery_Names new_dfuns			`thenTc` \ nm_alist_etc ->
 
     tcGetEnv					`thenNF_Tc` \ env ->
+    getDOptsTc					`thenTc` \ dflags ->
     let
 	extra_mbind_list = map gen_tag_n_con_monobind nm_alist_etc
 	extra_mbinds     = foldr AndMonoBinds EmptyMonoBinds extra_mbind_list
@@ -224,17 +227,18 @@ tcDeriving prs mod inst_env_in local_tycons
 	-- The only tricky bit is that the extra_binds must scope over the
 	-- method bindings for the instances.
 	(rn_method_binds_s, rn_extra_binds)
-		= renameSourceCode mod prs (
+		= renameSourceCode dflags mod prs (
 			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ (rn_extra_binds, _) ->
 			mapRn rn_meths method_binds_s		`thenRn` \ rn_method_binds_s ->
 			returnRn (rn_method_binds_s, rn_extra_binds)
 		  )
-    in
-    mapNF_Tc gen_inst_info (new_dfuns `zip` rn_method_binds_s)	`thenNF_Tc` \ new_inst_infos ->
 
-    ioToTc (dumpIfSet Opt_D_dump_deriv "Derived instances" 
-		      (ddump_deriving new_inst_infos rn_extra_binds))	`thenTc_`
+	new_inst_infos = map gen_inst_info (new_dfuns `zip` rn_method_binds_s)
+    in
+
+    ioToTc (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
+	      (ddump_deriving new_inst_infos rn_extra_binds))	`thenTc_`
 
     returnTc (new_inst_infos, rn_extra_binds)
   where
@@ -244,14 +248,16 @@ tcDeriving prs mod inst_env_in local_tycons
       where
 
 	-- Make a Real dfun instead of the dummy one we have so far
+    gen_inst_info :: (DFunId, RenamedMonoBinds) -> InstInfo
     gen_inst_info (dfun, binds)
       = InstInfo { iLocal = True,
 		   iClass = clas, iTyVars = tyvars, 
 		   iTys = tys, iTheta = theta, 
-		   iDFunId = dfun, iBinds = binds,
+		   iDFunId = dfun, 
+		   iBinds = binds,
 		   iLoc = getSrcLoc dfun, iPrags = [] }
         where
-	 (tyvars, theta, tau) = splitSigmaTy dfun
+	 (tyvars, theta, tau) = splitSigmaTy (idType dfun)
 	 (clas, tys)	      = splitDictTy tau
 
     rn_meths meths = rnMethodBinds [] meths `thenRn` \ (meths', _) -> returnRn meths'
@@ -404,7 +410,8 @@ solveDerivEqns inst_env_in orig_eqns
 	-- It fails if any iteration fails
     iterateDeriv :: [DerivSoln] ->TcM [DFunId]
     iterateDeriv current_solns
-      = checkNoErrsTc (iterateOnce current_solns)	`thenTc` \ (new_dfuns, new_solns) ->
+      = checkNoErrsTc (iterateOnce current_solns)
+						`thenTc` \ (new_dfuns, new_solns) ->
 	if (current_solns == new_solns) then
 	    returnTc new_dfuns
 	else
@@ -414,15 +421,16 @@ solveDerivEqns inst_env_in orig_eqns
     iterateOnce current_solns
       =	    -- Extend the inst info from the explicit instance decls
 	    -- with the current set of solutions, giving a
-
-	add_solns inst_env_in orig_eqns current_solns	`thenNF_Tc` \ (new_dfuns, inst_env) ->
-
+	getDOptsTc				`thenTc` \ dflags ->
+        let (new_dfuns, inst_env) =
+		add_solns dflags inst_env_in orig_eqns current_solns
+        in
 	    -- Simplify each RHS
 	tcSetInstEnv inst_env (
 	  listTc [ tcAddErrCtxt (derivCtxt tc) $
 		   tcSimplifyThetas deriv_rhs
 	         | (_, _,tc,_,deriv_rhs) <- orig_eqns ]  
-	)						`thenTc` \ next_solns ->
+	)					`thenTc` \ next_solns ->
 
 	    -- Canonicalise the solutions, so they compare nicely
 	let canonicalised_next_solns = [ sortLt (<) next_soln | next_soln <- next_solns ]
@@ -431,23 +439,27 @@ solveDerivEqns inst_env_in orig_eqns
 \end{code}
 
 \begin{code}
-add_solns :: InstEnv				-- The global, non-derived ones
+add_solns :: DynFlags
+	  -> InstEnv				-- The global, non-derived ones
 	  -> [DerivEqn] -> [DerivSoln]
 	  -> ([DFunId], InstEnv)
     -- the eqns and solns move "in lockstep"; we have the eqns
     -- because we need the LHS info for addClassInstance.
 
-add_solns inst_env_in eqns solns
+add_solns dflags inst_env_in eqns solns
   = (new_dfuns, inst_env)
     where
       new_dfuns     = zipWithEqual "add_solns" mk_deriv_dfun eqns solns
-      (inst_env, _) = extendInstEnv inst_env_in 	
+      (inst_env, _) = extendInstEnv dflags inst_env_in new_dfuns
 	-- Ignore the errors about duplicate instances.
 	-- We don't want repeated error messages
 	-- They'll appear later, when we do the top-level extendInstEnvs
 
       mk_deriv_dfun (dfun_name, clas, tycon, tyvars, _) theta
-        = mkDictFunId dfun_name clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)] theta
+        = mkDictFunId dfun_name clas tyvars [mkTyConApp tycon (mkTyVarTys tyvars)] 
+		      (map pair2PredType theta)
+
+      pair2PredType (clas, tautypes) = Class clas tautypes
 \end{code}
 
 %************************************************************************

@@ -20,7 +20,7 @@ import Bag		( Bag, bagToList, isEmptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Util		( sortLt )
 import Outputable
-import CmdLineOpts	( DynFlags )
+import CmdLineOpts	( DynFlags, DynFlag, dopt )
 
 import System		( ExitCode(..), exitWith )
 import IO		( hPutStr, stderr )
@@ -97,9 +97,9 @@ doIfSet :: Bool -> IO () -> IO ()
 doIfSet flag action | flag      = action
 		    | otherwise = return ()
 
-doIfSet_dyn :: DynFlags -> (DynFlags -> Bool) -> IO () -> IO()
-doIfSet_dyn dflags flag action | flag dflags = action
-		               | otherwise   = return ()
+doIfSet_dyn :: DynFlags -> DynFlag -> IO () -> IO()
+doIfSet_dyn dflags flag action | dopt flag dflags = action
+		               | otherwise        = return ()
 \end{code}
 
 \begin{code}
@@ -108,10 +108,10 @@ dumpIfSet flag hdr doc
   | not flag   = return ()
   | otherwise  = printDump (dump hdr doc)
 
-dumpIfSet_dyn :: DynFlags -> (DynFlags -> Bool) -> String -> SDoc -> IO ()
+dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
-  | not (flag dflags)  = return ()
-  | otherwise          = printDump (dump hdr doc)
+  | not (dopt flag dflags)  = return ()
+  | otherwise               = printDump (dump hdr doc)
 
 dump hdr doc 
    = vcat [text "", 

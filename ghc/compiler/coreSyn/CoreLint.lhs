@@ -156,7 +156,7 @@ lintCoreBindings dflags whoDunnit binds
 				  returnL ()
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
-    done_lint = doIfSet_dyn dflags (dopt Opt_D_show_passes)
+    done_lint = doIfSet_dyn dflags Opt_D_show_passes
 		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
     warn warnings
       = vcat [
