@@ -21,14 +21,12 @@ import RnHsSyn
 import HsCore
 
 import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, unknownSigErr )
-import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, getIPName,
-			  lookupImplicitOccRn, lookupImplicitOccsRn,
+import RnEnv		( bindTyVarsRn, lookupTopBndrRn, lookupOccRn, newIPName,
+			  lookupOrigName, lookupOrigNames, lookupSysBinder,
 			  bindLocalsRn, bindLocalRn, bindLocalsFVRn, bindUVarRn,
 			  bindTyVarsFVRn, bindTyVarsFV2Rn, extendTyVarEnvFVRn,
 			  bindCoreLocalFVRn, bindCoreLocalsFVRn, bindLocalNames,
 			  checkDupOrQualNames, checkDupNames,
-			  mkImportedGlobalName, mkImportedGlobalFromRdrName,
-			  newDFunName, getDFunKey, newImplicitBinder,
 			  FreeVars, emptyFVs, plusFV, plusFVs, unitFV, 
 			  addOneFV, mapFvRn
 			)
@@ -114,7 +112,7 @@ rnDecl (ValD binds) = rnTopBinds binds	`thenRn` \ (new_binds, fvs) ->
 
 rnDecl (SigD (IfaceSig name ty id_infos loc))
   = pushSrcLocRn loc $
-    mkImportedGlobalFromRdrName name	`thenRn` \ name' ->
+    lookupTopBndrRn name		`thenRn` \ name' ->
     rnHsType doc_str ty			`thenRn` \ (ty',fvs1) ->
     mapFvRn rnIdInfo id_infos		`thenRn` \ (id_infos', fvs2) -> 
     returnRn (SigD (IfaceSig name' ty' id_infos' loc), fvs1 `plusFV` fvs2)
@@ -144,7 +142,7 @@ However, we can also do some scoping checks at the same time.
 \begin{code}
 rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivings pragmas src_loc))
   = pushSrcLocRn src_loc $
-    lookupBndrRn tycon			    	`thenRn` \ tycon' ->
+    lookupTopBndrRn tycon		    	`thenRn` \ tycon' ->
     bindTyVarsFVRn data_doc tyvars		$ \ tyvars' ->
     rnContext data_doc context 			`thenRn` \ (context', cxt_fvs) ->
     checkDupOrQualNames data_doc con_names	`thenRn_`
@@ -160,7 +158,7 @@ rnDecl (TyClD (TyData new_or_data context tycon tyvars condecls nconstrs derivin
 
 rnDecl (TyClD (TySynonym name tyvars ty src_loc))
   = pushSrcLocRn src_loc $
-    lookupBndrRn name				`thenRn` \ name' ->
+    lookupTopBndrRn name			`thenRn` \ name' ->
     bindTyVarsFVRn syn_doc tyvars 		$ \ tyvars' ->
     rnHsType syn_doc (unquantify ty)		`thenRn` \ (ty', ty_fvs) ->
     returnRn (TyClD (TySynonym name' tyvars' ty' src_loc), ty_fvs)
@@ -176,7 +174,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
                tname dname dwname snames src_loc))
   = pushSrcLocRn src_loc $
 
-    lookupBndrRn cname					`thenRn` \ cname' ->
+    lookupTopBndrRn cname			`thenRn` \ cname' ->
 
 	-- Deal with the implicit tycon and datacon name
 	-- They aren't in scope (because they aren't visible to the user)
@@ -185,10 +183,10 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 	-- So the 'Imported' part of this call is not relevant. 
 	-- Unclean; but since these two are the only place this happens
 	-- I can't work up the energy to do it more beautifully
-    mkImportedGlobalFromRdrName tname			`thenRn` \ tname' ->
-    mkImportedGlobalFromRdrName dname			`thenRn` \ dname' ->
-    mkImportedGlobalFromRdrName dwname			`thenRn` \ dwname' ->
-    mapRn mkImportedGlobalFromRdrName snames		`thenRn` \ snames' ->
+    lookupSysBinder tname			`thenRn` \ tname' ->
+    lookupSysBinder dname			`thenRn` \ dname' ->
+    lookupSysBinder dwname			`thenRn` \ dwname' ->
+    mapRn lookupSysBinder snames		`thenRn` \ snames' ->
 
 	-- Tyvars scope over bindings and context
     bindTyVarsFV2Rn cls_doc tyvars		( \ clas_tyvar_names tyvars' ->
@@ -207,14 +205,13 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
     checkDupOrQualNames sig_doc sig_rdr_names_w_locs 	  `thenRn_` 
     mapFvRn (rn_op cname' clas_tyvar_names fds') op_sigs  `thenRn` \ (sigs', sig_fvs) ->
     let
-     binders = mkNameSet [ nm | (ClassOpSig nm _ _ _ _) <- sigs' ]
+     binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
     in
     renameSigs (okClsDclSig binders) non_op_sigs	  `thenRn` \ (non_ops', fix_fvs) ->
 
 	-- Check the methods
     checkDupOrQualNames meth_doc meth_rdr_names_w_locs	`thenRn_`
-    rnMethodBinds mbinds
-    `thenRn` \ (mbinds', meth_fvs) ->
+    rnMethodBinds mbinds				`thenRn` \ (mbinds', meth_fvs) ->
 
 	-- Typechecker is responsible for checking that we only
 	-- give default-method bindings for things in this class.
@@ -236,13 +233,12 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
     sig_doc  = text "the signatures for class"  	<+> ppr cname
     meth_doc = text "the default-methods for class"	<+> ppr cname
 
-    sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ _ locn <- sigs]
+    sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
     meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
-    meth_rdr_names	  = map fst meth_rdr_names_w_locs
 
-    rn_op clas clas_tyvars clas_fds sig@(ClassOpSig op dm_rdr_name explicit_dm ty locn)
+    rn_op clas clas_tyvars clas_fds sig@(ClassOpSig op maybe_dm_stuff ty locn)
       = pushSrcLocRn locn $
- 	lookupBndrRn op				`thenRn` \ op_name ->
+ 	lookupTopBndrRn op			`thenRn` \ op_name ->
 
 		-- Check the signature
 	rnHsSigType (quotes (ppr op)) ty	`thenRn` \ (new_ty, op_ty_fvs)  ->
@@ -254,23 +250,21 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
         mapRn_ check_in_op_ty clas_tyvars		 `thenRn_`
 
 		-- Make the default-method name
-	getModeRn					`thenRn` \ mode ->
-	(case mode of 
-	    SourceMode -> -- Source class decl
-		   newImplicitBinder (mkDefaultMethodOcc (rdrNameOcc op)) locn	   `thenRn` \ dm_name ->
-		   returnRn (dm_name, op `elem` meth_rdr_names, emptyFVs)
+	(case maybe_dm_stuff of 
+	    Nothing -> returnRn (Nothing, emptyFVs)		-- Source-file class decl
 
-	    InterfaceMode
+	    Just (dm_rdr_name, explicit_dm)
 		-> 	-- Imported class that has a default method decl
 			-- See comments with tname, snames, above
-		    lookupImplicitOccRn dm_rdr_name 	`thenRn` \ dm_name ->
-		    returnRn (dm_name, explicit_dm, if explicit_dm then unitFV dm_name else emptyFVs)
+		    lookupSysBinder dm_rdr_name 	`thenRn` \ dm_name ->
+		    returnRn (Just (dm_name, explicit_dm), 
+			      if explicit_dm then unitFV dm_name else emptyFVs)
 			-- An imported class decl for a class decl that had an explicit default
 			-- method, mentions, rather than defines,
 			-- the default method, so we must arrange to pull it in
-	)						`thenRn` \ (dm_name, final_explicit_dm, dm_fvs) ->
+	)						`thenRn` \ (maybe_dm_stuff', dm_fvs) ->
 
-	returnRn (ClassOpSig op_name dm_name final_explicit_dm new_ty locn, op_ty_fvs `plusFV` dm_fvs)
+	returnRn (ClassOpSig op_name maybe_dm_stuff' new_ty locn, op_ty_fvs `plusFV` dm_fvs)
 \end{code}
 
 
@@ -281,7 +275,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars fds sigs mbinds pragmas
 %*********************************************************
 
 \begin{code}
-rnDecl (InstD (InstDecl inst_ty mbinds uprags dfun_rdr_name src_loc))
+rnDecl (InstD (InstDecl inst_ty mbinds uprags maybe_dfun_rdr_name src_loc))
   = pushSrcLocRn src_loc $
     rnHsSigType (text "an instance decl") inst_ty `thenRn` \ (inst_ty', inst_fvs) ->
     let
@@ -313,18 +307,15 @@ rnDecl (InstD (InstDecl inst_ty mbinds uprags dfun_rdr_name src_loc))
        renameSigs (okInstDclSig binder_set) uprags
     )							`thenRn` \ (new_uprags, prag_fvs) ->
 
-    getModeRn		`thenRn` \ mode ->
-    (case mode of
-	InterfaceMode -> lookupImplicitOccRn dfun_rdr_name	`thenRn` \ dfun_name ->
-			 returnRn (dfun_name, unitFV dfun_name)
-	SourceMode    -> newDFunName (getDFunKey inst_ty') src_loc
-                         `thenRn` \ dfun_name ->
-			 returnRn (dfun_name, emptyFVs)
-    )
-    `thenRn` \ (dfun_name, dfun_fv) ->
+    (case maybe_dfun_rdr_name of
+	Nothing		   -> returnRn (Nothing, emptyFVs)
+
+	Just dfun_rdr_name -> lookupSysBinder dfun_rdr_name	`thenRn` \ dfun_name ->
+			      returnRn (Just dfun_name, unitFV dfun_name)
+    )							`thenRn` \ (maybe_dfun_name, dfun_fv) ->
 
     -- The typechecker checks that all the bindings are for the right class.
-    returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags dfun_name src_loc),
+    returnRn (InstD (InstDecl inst_ty' mbinds' new_uprags maybe_dfun_name src_loc),
 	      inst_fvs `plusFV` meth_fvs `plusFV` prag_fvs `plusFV` dfun_fv)
   where
     meth_doc = text "the bindings in an instance declaration"
@@ -358,11 +349,10 @@ rnDecl (ForD (ForeignDecl name imp_exp ty ext_nm cconv src_loc))
     lookupOccRn name		        `thenRn` \ name' ->
     let 
 	extra_fvs FoExport 
-	  | isDyn = 
-		lookupImplicitOccsRn [makeStablePtr_RDR, deRefStablePtr_RDR,
-				      bindIO_RDR, returnIO_RDR]
-	  | otherwise = 
-		lookupImplicitOccsRn [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
+	  | isDyn = lookupOrigNames [makeStablePtr_RDR, deRefStablePtr_RDR,
+				     bindIO_RDR, returnIO_RDR]
+	  | otherwise =
+		lookupOrigNames [bindIO_RDR, returnIO_RDR] `thenRn` \ fvs ->
 		returnRn (addOneFV fvs name')
 	extra_fvs other = returnRn emptyFVs
     in
@@ -465,10 +455,10 @@ conDeclName (ConDecl n _ _ _ _ l) = (n,l)
 rnConDecl :: RdrNameConDecl -> RnMS (RenamedConDecl, FreeVars)
 rnConDecl (ConDecl name wkr tvs cxt details locn)
   = pushSrcLocRn locn $
-    checkConName name			`thenRn_` 
-    lookupBndrRn name			`thenRn` \ new_name ->
+    checkConName name		`thenRn_` 
+    lookupTopBndrRn name	`thenRn` \ new_name ->
 
-    mkImportedGlobalFromRdrName wkr	`thenRn` \ new_wkr ->
+    lookupSysBinder wkr		`thenRn` \ new_wkr ->
 	-- See comments with ClassDecl
 
     bindTyVarsFVRn doc tvs 		$ \ new_tyvars ->
@@ -495,7 +485,7 @@ rnConDetails doc locn (NewCon ty mb_field)
   where
     rn_field Nothing  = returnRn Nothing
     rn_field (Just f) =
-       lookupBndrRn f	    `thenRn` \ new_f ->
+       lookupTopBndrRn f	    `thenRn` \ new_f ->
        returnRn (Just new_f)
 
 rnConDetails doc locn (RecCon fields)
@@ -506,7 +496,7 @@ rnConDetails doc locn (RecCon fields)
     field_names = [(fld, locn) | (flds, _) <- fields, fld <- flds]
 
 rnField doc (names, ty)
-  = mapRn lookupBndrRn names	`thenRn` \ new_names ->
+  = mapRn lookupTopBndrRn names	`thenRn` \ new_names ->
     rnBangTy doc ty		`thenRn` \ (new_ty, fvs) ->
     returnRn ((new_names, new_ty), fvs) 
 
@@ -697,7 +687,7 @@ rnPred doc (HsPClass clas tys)
     returnRn (HsPClass clas_name tys', fvs `addOneFV` clas_name)
 
 rnPred doc (HsPIParam n ty)
-  = getIPName n			`thenRn` \ name ->
+  = newIPName n			`thenRn` \ name ->
     rnHsType doc ty		`thenRn` \ (ty', fvs) ->
     returnRn (HsPIParam name ty', fvs)
 \end{code}

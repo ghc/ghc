@@ -50,7 +50,7 @@ import Id		( Id, idType, idFlavour, isId, idWorkerInfo,
 			  isPrimOpId_maybe
 			)
 import VarSet
-import Literal		( isLitLitLit )
+import Literal		( isLitLitLit, litIsDupable )
 import PrimOp		( PrimOp(..), primOpIsDupable, primOpOutOfLine, ccallIsCasm )
 import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), IdFlavour(..), CprInfo(..), 
 			  insideLam, workerExists, isNeverInlinePrag
@@ -192,7 +192,8 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
     size_up (App fun (Type t))  = size_up fun
     size_up (App fun arg)     = size_up_app fun [arg]
 
-    size_up (Lit lit) = sizeOne
+    size_up (Lit lit) | litIsDupable lit = sizeOne
+		      | otherwise	 = sizeN opt_UF_DearOp	-- For lack of anything better
 
     size_up (Lam b e) | isId b    = lamScrutDiscount (size_up e `addSizeN` 1)
 		      | otherwise = size_up e
@@ -211,40 +212,39 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
       where
 	rhs_size = foldr (addSize . size_up . snd) sizeZero pairs
 
-	-- We want to make wrapper-style evaluation look cheap, so that
-	-- when we inline a wrapper it doesn't make call site (much) bigger
-	-- Otherwise we get nasty phase ordering stuff: 
-	--	f x = g x x
-	--	h y = ...(f e)...
-	-- If we inline g's wrapper, f looks big, and doesn't get inlined
-	-- into h; if we inline f first, while it looks small, then g's 
-	-- wrapper will get inlined later anyway.  To avoid this nasty
-	-- ordering difference, we make (case a of (x,y) -> ...) look free.
-    size_up (Case (Var v) _ [alt]) 
-	| v `elem` top_args
-	= size_up_alt alt `addSize` SizeIs 0# (unitBag (v, 1)) 0#
+    size_up (Case (Var v) _ alts) 
+	| v `elem` top_args		-- We are scrutinising an argument variable
+	= case alts of
+		[alt] -> size_up_alt alt `addSize` SizeIs 0# (unitBag (v, 1)) 0#
+		-- We want to make wrapper-style evaluation look cheap, so that
+		-- when we inline a wrapper it doesn't make call site (much) bigger
+		-- Otherwise we get nasty phase ordering stuff: 
+		--	f x = g x x
+		--	h y = ...(f e)...
+		-- If we inline g's wrapper, f looks big, and doesn't get inlined
+		-- into h; if we inline f first, while it looks small, then g's 
+		-- wrapper will get inlined later anyway.  To avoid this nasty
+		-- ordering difference, we make (case a of (x,y) -> ...), 
+		-- *where a is one of the arguments* look free.
+
+		other -> alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
+				   (foldr1 maxSize alt_sizes)
+
 		-- Good to inline if an arg is scrutinised, because
 		-- that may eliminate allocation in the caller
 		-- And it eliminates the case itself
-	| otherwise	
-	= size_up_alt alt
 
-	-- Scrutinising one of the argument variables,
-	-- with more than one alternative
-    size_up (Case (Var v) _ alts)
-	| v `elem` top_args
-	= alts_size (foldr addSize sizeOne alt_sizes)	-- The 1 is for the scrutinee
-		    (foldr1 maxSize alt_sizes)
 	where
 	  alt_sizes = map size_up_alt alts
 
+		-- alts_size tries to compute a good discount for
+		-- the case when we are scrutinising an argument variable
 	  alts_size (SizeIs tot tot_disc tot_scrut)		-- Size of all alternatives
 		    (SizeIs max max_disc max_scrut)		-- Size of biggest alternative
 	 	= SizeIs tot (unitBag (v, I# (1# +# tot -# max)) `unionBags` max_disc) max_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of rh largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
-
 	  alts_size tot_size _ = tot_size
 
 
@@ -306,7 +306,7 @@ sizeExpr (I# bOMB_OUT_SIZE) top_args expr
     ------------
 	-- We want to record if we're case'ing, or applying, an argument
     fun_discount v | v `elem` top_args = SizeIs 0# (unitBag (v, opt_UF_FunAppDiscount)) 0#
-    fun_discount other			  = sizeZero
+    fun_discount other		       = sizeZero
 
     ------------
 	-- These addSize things have to be here because

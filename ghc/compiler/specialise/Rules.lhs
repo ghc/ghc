@@ -19,9 +19,9 @@ import CoreFVs		( exprFreeVars, idRuleVars, ruleRhsFreeVars, ruleSomeLhsFreeVars
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import PprCore		( pprCoreRule )
-import Subst		( Subst, InScopeSet, lookupSubst, extendSubst,
+import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
 			  substEnv, setSubstEnv, emptySubst, isInScope,
-			  bindSubstList, unBindSubstList, substInScope
+			  bindSubstList, unBindSubstList, substInScope, uniqAway
 			)
 import Id		( Id, idUnfolding, zapLamIdInfo, 
 			  idSpecialisation, setIdSpecialisation,
@@ -416,7 +416,7 @@ addRule id (Rules rules rhs_fvs) rule
 insertRule rules new_rule@(Rule _ tpl_vars tpl_args _)
   = go rules
   where
-    tpl_var_set = mkVarSet tpl_vars
+    tpl_var_set = mkInScopeSet (mkVarSet tpl_vars)
 	-- Actually we should probably include the free vars of tpl_args,
 	-- but I can't be bothered
 

@@ -60,9 +60,9 @@ newTopBinder mod occ
   = 	-- First check the cache
     traceRn (text "newTopBinder" <+> ppr mod <+> ppr occ) `thenRn_`
 
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+    getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let 
-	key          = (moduleName mod, occ)
+	key = (moduleName mod, occ)
     in
     case lookupFM cache key of
 
@@ -89,7 +89,7 @@ newTopBinder mod occ
 			new_name  = setNameModule name mod
 			new_cache = addToFM cache key new_name
 		     in
-		     setNameSupplyRn (us, inst_ns, new_cache, ipcache)	`thenRn_`
+		     setNameSupplyRn (us, new_cache, ipcache)	`thenRn_`
 		     traceRn (text "newTopBinder: overwrite" <+> ppr new_name) `thenRn_`
 		     returnRn new_name
 		     
@@ -103,17 +103,20 @@ newTopBinder mod occ
 			new_name   = mkGlobalName uniq mod occ implicitImportProvenance
 			new_cache  = addToFM cache key new_name
 		   in
-		   setNameSupplyRn (us', inst_ns, new_cache, ipcache)	`thenRn_`
+		   setNameSupplyRn (us', new_cache, ipcache)	`thenRn_`
 		   traceRn (text "newTopBinder: new" <+> ppr new_name) `thenRn_`
 		   returnRn new_name
 
 
-mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
+newGlobalName :: ModuleName -> OccName -> RnM d Name
   -- Used for *occurrences*.  We make a place-holder Name, really just
   -- to agree on its unique, which gets overwritten when we read in
   -- the binding occurence later (newImportedBinder)
   -- The place-holder Name doesn't have the right Provenance, and its
-  -- Module won't have the right Package either
+  -- Module won't have the right Package either.
+  --
+  -- (We have to pass a ModuleName, not a Module, because we may be
+  -- simply looking at an occurrence M.x in an interface file.)
   --
   -- This means that a renamed program may have incorrect info
   -- on implicitly-imported occurrences, but the correct info on the 
@@ -123,16 +126,17 @@ mkImportedGlobalName :: ModuleName -> OccName -> RnM d Name
   -- it doesn't matter that we get the correct info in place till later,
   -- (but since it affects DLL-ery it does matter that we get it right
   --  in the end).
-mkImportedGlobalName mod_name occ
-  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+newGlobalName mod_name occ
+  = getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let
 	key = (mod_name, occ)
     in
     case lookupFM cache key of
-	Just name -> traceRn (text "mkImportedGlobalName: hit" <+> ppr name) `thenRn_`
+	Just name -> traceRn (text "newGlobalName: hit" <+> ppr name) `thenRn_`
 		     returnRn name
-	Nothing   -> setNameSupplyRn (us', inst_ns, new_cache, ipcache)		`thenRn_`
-		     traceRn (text "mkImportedGlobalName: new" <+> ppr name)	`thenRn_`
+
+	Nothing   -> setNameSupplyRn (us', new_cache, ipcache)		`thenRn_`
+		     traceRn (text "newGlobalName: new" <+> ppr name)	`thenRn_`
 		     returnRn name
 		  where
 		     (us', us1) = splitUniqSupply us
@@ -140,6 +144,20 @@ mkImportedGlobalName mod_name occ
 		     mod        = mkVanillaModule mod_name
 		     name       = mkGlobalName uniq mod occ implicitImportProvenance
 		     new_cache  = addToFM cache key name
+
+
+newIPName rdr_name
+  = getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
+    case lookupFM ipcache key of
+	Just name -> returnRn name
+	Nothing   -> setNameSupplyRn (us', cache, new_ipcache)	`thenRn_`
+		     returnRn name
+		  where
+		     (us', us1)  = splitUniqSupply us
+		     uniq   	 = uniqFromSupply us1
+		     name        = mkIPName uniq key
+		     new_ipcache = addToFM ipcache key name
+    where key = (rdrNameOcc rdr_name)
 
 updateProvenances :: [Name] -> RnM d ()
 -- Update the provenances of everything that is in scope.
@@ -159,8 +177,8 @@ updateProvenances :: [Name] -> RnM d ()
 -- Step 3 must not destroy package info recorded in Step 2.
 
 updateProvenances names
-  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
-    setNameSupplyRn (us, inst_ns, foldr update cache names, ipcache)
+  = getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
+    setNameSupplyRn (us, foldr update cache names, ipcache)
   where
     update name cache = addToFM_C update_prov cache key name
 		      where
@@ -168,76 +186,161 @@ updateProvenances names
 
     update_prov name_in_cache name_with_prov
 	= setNameProvenance name_in_cache (getNameProvenance name_with_prov)
-			
+\end{code}
 
-mkImportedGlobalFromRdrName :: RdrName -> RnM d Name 
-mkImportedGlobalFromRdrName rdr_name
+%*********************************************************
+%*							*
+\subsection{Looking up names}
+%*							*
+%*********************************************************
+
+Looking up a name in the RnEnv.
+
+\begin{code}
+lookupBndrRn rdr_name
+  = getLocalNameEnv		`thenRn` \ local_env ->
+    case lookupRdrEnv local_env rdr_name of 
+	  Just name -> returnRn name
+	  Nothing   -> lookupTopBndrRn rdr_name
+
+lookupTopBndrRn rdr_name
+  = getModeRn	`thenRn` \ mode ->
+    case mode of 
+	InterfaceMode -> 	-- Look in the global name cache
+			    lookupOrigName rdr_name	
+
+	SourceMode    -> -- Source mode, so look up a *qualified* version
+			 -- of the name, so that we get the right one even
+			 -- if there are many with the same occ name
+			 -- There must *be* a binding
+		getModuleRn		`thenRn` \ mod ->
+		getGlobalNameEnv	`thenRn` \ global_env ->
+		case lookupRdrEnv global_env (qualifyRdrName (moduleName mod) rdr_name) of
+		  Just (name:rest) -> ASSERT( null rest )
+				      returnRn name 
+		  Nothing	   -> 	-- Almost always this case is a compiler bug.
+					-- But consider a type signature that doesn't have 
+					-- a corresponding binder: 
+					--	module M where { f :: Int->Int }
+					-- We use lookupSigOccRn, which uses lookupBndrRn (for good reasons)
+					-- and we don't want to panic.  So we report an out-of-scope error
+					failWithRn (mkUnboundName rdr_name)
+						   (unknownNameErr rdr_name)
+
+-- lookupSigOccRn is used for type signatures and pragmas
+-- Is this valid?
+--   module A
+--	import M( f )
+--	f :: Int -> Int
+--	f x = x
+-- It's clear that the 'f' in the signature must refer to A.f
+-- The Haskell98 report does not stipulate this, but it will!
+-- So we must treat the 'f' in the signature in the same way
+-- as the binding occurrence of 'f', using lookupBndrRn
+lookupSigOccRn :: RdrName -> RnMS Name
+lookupSigOccRn = lookupBndrRn
+
+-- lookupOccRn looks up an occurrence of a RdrName
+lookupOccRn :: RdrName -> RnMS Name
+lookupOccRn rdr_name
+  = getLocalNameEnv			`thenRn` \ local_env ->
+    case lookupRdrEnv local_env rdr_name of
+	  Just name -> returnRn name
+	  Nothing   -> lookupGlobalOccRn rdr_name
+
+-- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
+-- environment.  It's used only for
+--	record field names
+--	class op names in class and instance decls
+lookupGlobalOccRn rdr_name
+  = getModeRn	`thenRn` \ mode ->
+    case mode of {
+		-- When processing interface files, the global env 
+		-- is always empty, so go straight to the name cache
+	InterfaceMode -> lookupOrigName rdr_name ;
+
+	SourceMode ->
+
+    getGlobalNameEnv	`thenRn` \ global_env ->
+    case lookupRdrEnv global_env rdr_name of
+	Just [name]	    -> returnRn name
+	Just stuff@(name:_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
+			       returnRn name
+	Nothing -> 	-- Not found when processing source code; so fail
+			failWithRn (mkUnboundName rdr_name)
+				   (unknownNameErr rdr_name)
+    }
+\end{code}
+%
+
+@lookupOrigName@ takes an RdrName representing an {\em original}
+name, and adds it to the occurrence pool so that it'll be loaded
+later.  This is used when language constructs (such as monad
+comprehensions, overloaded literals, or deriving clauses) require some
+stuff to be loaded that isn't explicitly mentioned in the code.
+
+This doesn't apply in interface mode, where everything is explicit,
+but we don't check for this case: it does no harm to record an
+``extra'' occurrence and @lookupOrigNames@ isn't used much in
+interface mode (it's only the @Nothing@ clause of @rnDerivs@ that
+calls it at all I think).
+
+  \fbox{{\em Jan 98: this comment is wrong: @rnHsType@ uses it quite a bit.}}
+
+For List and Tuple types it's important to get the correct
+@isLocallyDefined@ flag, which is used in turn when deciding
+whether there are any instance decls in this module are ``special''.
+The name cache should have the correct provenance, though.
+
+\begin{code}
+lookupOrigName :: RdrName -> RnM d Name 
+lookupOrigName rdr_name
   | isQual rdr_name
-  = mkImportedGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
+  = newGlobalName (rdrNameModule rdr_name) (rdrNameOcc rdr_name)
 
   | otherwise
   =	-- An Unqual is allowed; interface files contain 
 	-- unqualified names for locally-defined things, such as
 	-- constructors of a data type.
-    getModuleRn 			`thenRn ` \ mod_name ->
-    mkImportedGlobalName mod_name (rdrNameOcc rdr_name)
+    getModuleRn 			`thenRn ` \ mod ->
+    newGlobalName (moduleName mod) (rdrNameOcc rdr_name)
 
-
-getIPName rdr_name
-  = getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
-    case lookupFM ipcache key of
-	Just name -> returnRn name
-	Nothing   -> setNameSupplyRn (us', inst_ns, cache, new_ipcache)	`thenRn_`
-		     returnRn name
-		  where
-		     (us', us1)  = splitUniqSupply us
-		     uniq   	 = uniqFromSupply us1
-		     name        = mkIPName uniq key
-		     new_ipcache = addToFM ipcache key name
-    where key = (rdrNameOcc rdr_name)
+lookupOrigNames :: [RdrName] -> RnM d NameSet
+lookupOrigNames rdr_names
+  = mapRn lookupOrigName rdr_names	`thenRn` \ names ->
+    returnRn (mkNameSet names)
 \end{code}
 
-%*********************************************************
-%*							*
-\subsection{Dfuns and default methods}
-%*							*
-%*********************************************************
-
-@newImplicitBinder@ is used for
-	(a) dfuns		(RnSource.rnDecl on InstDecls)
-	(b) default methods	(RnSource.rnDecl on ClassDecls)
-when these dfuns/default methods are defined in the module being compiled
+lookupSysBinder is used for the "system binders" of a type, class, or instance decl.
+It ensures that the module is set correctly in the name cache, and sets the provenance
+on the returned name too.  The returned name will end up actually in the type, class,
+or instance.
 
 \begin{code}
-newImplicitBinder occ src_loc
-  = getModuleRn				`thenRn` \ mod_name ->
-    newTopBinder (mkThisModule mod_name) occ 	`thenRn` \ name ->
-    returnRn (setNameProvenance name (LocalDef src_loc Exported))
+lookupSysBinder rdr_name
+  = ASSERT( isUnqual rdr_name )
+    getModuleRn					`thenRn` \ mod ->
+    newTopBinder mod (rdrNameOcc rdr_name) 	`thenRn` \ name ->
+    getModeRn					`thenRn` \ mode ->
+    case mode of
+	SourceMode    -> getSrcLocRn		`thenRn` \ loc ->
+			 returnRn (setNameProvenance name (LocalDef loc Exported))
+	InterfaceMode -> returnRn name
 \end{code}
 
-Make a name for the dict fun for an instance decl
+@unQualInScope@ returns a function that takes a @Name@ and tells whether
+its unqualified name is in scope.  This is put as a boolean flag in
+the @Name@'s provenance to guide whether or not to print the name qualified
+in error messages.
 
 \begin{code}
-newDFunName :: (OccName, OccName) -> SrcLoc -> RnMS Name
-newDFunName key@(cl_occ, tycon_occ) loc
-  = newInstUniq string	`thenRn` \ inst_uniq ->
-    newImplicitBinder (mkDFunOcc string inst_uniq) loc
+unQualInScope :: GlobalRdrEnv -> Name -> Bool
+unQualInScope env
+  = lookup
   where
-	-- Any string that is somewhat unique will do
-    string = occNameString cl_occ ++ occNameString tycon_occ
-\end{code}
-
-\begin{code}
-getDFunKey :: RenamedHsType -> (OccName, OccName)	-- Used to manufacture DFun names
-getDFunKey (HsForAllTy _ _ ty)              = getDFunKey ty
-getDFunKey (HsFunTy _ ty)                   = getDFunKey ty
-getDFunKey (HsPredTy (HsPClass cls (ty:_))) = (nameOccName cls, get_tycon_key ty)
-
-get_tycon_key (HsTyVar tv)		     = getOccName tv
-get_tycon_key (HsAppTy ty _)		     = get_tycon_key ty
-get_tycon_key (HsTupleTy (HsTupCon n _) tys) = getOccName n
-get_tycon_key (HsListTy _)   		     = getOccName listTyCon
-get_tycon_key (HsFunTy _ _)		     = getOccName funTyCon
+    lookup name = case lookupRdrEnv env (mkRdrUnqual (nameOccName name)) of
+			   Just [name'] -> name == name'
+			   other        -> False
 \end{code}
 
 
@@ -248,7 +351,6 @@ get_tycon_key (HsFunTy _ _)		     = getOccName funTyCon
 %*********************************************************
 
 \begin{code}
--------------------------------------
 bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 	   	    -> [(RdrName,SrcLoc)]
 	    	    -> ([Name] -> RnMS a)
@@ -265,7 +367,7 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 	other				   -> returnRn ()
     )					`thenRn_`
 	
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+    getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let
 	n	   = length rdr_names_w_loc
 	(us', us1) = splitUniqSupply us
@@ -279,7 +381,7 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
 		     -- Keep track of whether the name originally came from 
 		     -- an interface file.
     in
-    setNameSupplyRn (us', inst_ns, cache, ipcache)	`thenRn_`
+    setNameSupplyRn (us', cache, ipcache)	`thenRn_`
 
     let
 	new_name_env = addListToRdrEnv name_env (map fst rdr_names_w_loc `zip` names)
@@ -304,13 +406,13 @@ bindCoreLocalFVRn :: RdrName -> (Name -> RnMS (a, FreeVars))
 bindCoreLocalFVRn rdr_name enclosed_scope
   = getSrcLocRn 		`thenRn` \ loc ->
     getLocalNameEnv		`thenRn` \ name_env ->
-    getNameSupplyRn		`thenRn` \ (us, inst_ns, cache, ipcache) ->
+    getNameSupplyRn		`thenRn` \ (us, cache, ipcache) ->
     let
 	(us', us1) = splitUniqSupply us
 	uniq	   = uniqFromSupply us1
 	name	   = mkImportedLocalName uniq (rdrNameOcc rdr_name) loc
     in
-    setNameSupplyRn (us', inst_ns, cache, ipcache)	`thenRn_`
+    setNameSupplyRn (us', cache, ipcache)	`thenRn_`
     let
 	new_name_env = extendRdrEnv name_env rdr_name name
     in
@@ -419,145 +521,6 @@ checkDupNames doc_str rdr_names_w_loc
 \end{code}
 
 
-%*********************************************************
-%*							*
-\subsection{Looking up names}
-%*							*
-%*********************************************************
-
-Looking up a name in the RnEnv.
-
-\begin{code}
-lookupBndrRn rdr_name
-  = traceRn (text "lookupBndrRn" <+> ppr rdr_name) 	`thenRn_`
-    getNameEnvs		`thenRn` \ (global_env, local_env) ->
-
-	-- Try local env
-    case lookupRdrEnv local_env rdr_name of {
-	  Just name -> returnRn name ;
-	  Nothing   ->
-
-    getModeRn	`thenRn` \ mode ->
-    case mode of 
-	InterfaceMode -> 	-- Look in the global name cache
-			    mkImportedGlobalFromRdrName rdr_name		`thenRn` \ n ->
-			    traceRn (text "lookupBndrRn result:" <+> ppr n) 	`thenRn_` 
-			    returnRn n
-
-	SourceMode    -> -- Source mode, so look up a *qualified* version
-			 -- of the name, so that we get the right one even
-			 -- if there are many with the same occ name
-			 -- There must *be* a binding
-		getModuleRn		`thenRn` \ mod ->
-		case lookupRdrEnv global_env (qualifyRdrName mod rdr_name) of
-		  Just (name:rest) -> ASSERT( null rest )
-				      returnRn name 
-		  Nothing	   -> 	-- Almost always this case is a compiler bug.
-					-- But consider a type signature that doesn't have 
-					-- a corresponding binder: 
-					--	module M where { f :: Int->Int }
-					-- We use lookupSigOccRn, which uses lookupBndrRn (for good reasons)
-					-- and we don't want to panic.  So we report an out-of-scope error
-					failWithRn (mkUnboundName rdr_name)
-						   (unknownNameErr rdr_name)
-    }
-
--- lookupOccRn looks up an occurrence of a RdrName
-lookupOccRn :: RdrName -> RnMS Name
-lookupOccRn rdr_name
-  = getNameEnvs				`thenRn` \ (global_env, local_env) ->
-    lookup_occ global_env local_env rdr_name
-
--- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global 
--- environment.  It's used only for
---	record field names
---	class op names in class and instance decls
-lookupGlobalOccRn :: RdrName -> RnMS Name
-lookupGlobalOccRn rdr_name
-  = getNameEnvs				`thenRn` \ (global_env, local_env) ->
-    lookup_global_occ global_env rdr_name
-
--- lookupSigOccRn is used for type signatures and pragmas
--- Is this valid?
---   module A
---	import M( f )
---	f :: Int -> Int
---	f x = x
--- It's clear that the 'f' in the signature must refer to A.f
--- The Haskell98 report does not stipulate this, but it will!
--- So we must treat the 'f' in the signature in the same way
--- as the binding occurrence of 'f', using lookupBndrRn
-lookupSigOccRn :: RdrName -> RnMS Name
-lookupSigOccRn = lookupBndrRn
-
-
--- Look in both local and global env
-lookup_occ global_env local_env rdr_name
-  = case lookupRdrEnv local_env rdr_name of
-	  Just name -> returnRn name
-	  Nothing   -> lookup_global_occ global_env rdr_name
-
--- Look in global env only
-lookup_global_occ global_env rdr_name
-  = case lookupRdrEnv global_env rdr_name of
-	Just [name]	    -> returnRn name
-	Just stuff@(name:_) -> addNameClashErrRn rdr_name stuff	`thenRn_`
-			       returnRn name
-	Nothing -> getModeRn	`thenRn` \ mode ->
-		   case mode of 
-			-- Not found when processing source code; so fail
-			SourceMode    -> failWithRn (mkUnboundName rdr_name)
-						    (unknownNameErr rdr_name)
-		
-			-- Not found when processing an imported declaration,
-			-- so we create a new name for the purpose
-			InterfaceMode -> mkImportedGlobalFromRdrName rdr_name
-\end{code}
-%
-@lookupImplicitOccRn@ takes an RdrName representing an {\em original} name,
-and adds it to the occurrence pool so that it'll be loaded later.
-This is used when language constructs
-(such as monad comprehensions, overloaded literals, or deriving clauses)
-require some stuff to be loaded that isn't explicitly mentioned in the code.
-
-This doesn't apply in interface mode, where everything is explicit,
-but we don't check for this case:
-it does no harm to record an ``extra'' occurrence
-and @lookupImplicitOccRn@ isn't used much in interface mode
-(it's only the @Nothing@ clause of @rnDerivs@ that calls it at all I think).
-
-  \fbox{{\em Jan 98: this comment is wrong: @rnHsType@ uses it quite a bit.}}
-
-For List and Tuple types it's important to get the correct
-@isLocallyDefined@ flag, which is used in turn when deciding
-whether there are any instance decls in this module are ``special''.
-The name cache should have the correct provenance, though.
-
-\begin{code}
-lookupImplicitOccRn :: RdrName -> RnM d Name 
-lookupImplicitOccRn rdr_name = mkImportedGlobalFromRdrName rdr_name
-
-lookupImplicitOccsRn :: [RdrName] -> RnM d NameSet
-lookupImplicitOccsRn rdr_names
-  = mapRn lookupImplicitOccRn rdr_names	`thenRn` \ names ->
-    returnRn (mkNameSet names)
-\end{code}
-
-@unQualInScope@ returns a function that takes a @Name@ and tells whether
-its unqualified name is in scope.  This is put as a boolean flag in
-the @Name@'s provenance to guide whether or not to print the name qualified
-in error messages.
-
-\begin{code}
-unQualInScope :: GlobalRdrEnv -> Name -> Bool
-unQualInScope env
-  = lookup
-  where
-    lookup name = case lookupRdrEnv env (mkRdrUnqual (nameOccName name)) of
-			   Just [name'] -> name == name'
-			   other        -> False
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection{Envt utility functions}
@@ -593,6 +556,7 @@ is_duplicate :: Name -> Name -> Bool
 is_duplicate n1 n2 | isLocallyDefined n1 && isLocallyDefined n2 = False
 		   | otherwise 		                        = n1 == n2
 \end{code}
+
 We treat two bindings of a locally-defined name as a duplicate,
 because they might be two separate, local defns and we want to report
 and error for that, {\em not} eliminate a duplicate.

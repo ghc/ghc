@@ -15,6 +15,7 @@ import Id		( Id, idType )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr )
 import DataCon		( isUnboxedTupleCon )
 import Type		( splitTyConApp_maybe )
+import Subst		( InScopeSet, uniqAway, emptyInScopeSet, extendInScopeSet, elemInScopeSet )
 import CoreSyn
 import VarEnv	
 import CoreLint		( beginPass, endPass )
@@ -42,21 +43,26 @@ so that a subsequent binding
 	y2 = C y1 b
 will get transformed to C x1 b, and then to x2.  
 
-So we carry an extra var->var mapping which we apply *before* looking up in the
+So we carry an extra var->var substitution which we apply *before* looking up in the
 reverse mapping.
 
 
 IMPORTANT NOTE
 ~~~~~~~~~~~~~~
-This pass relies on the no-shadowing invariant, so it must run
-immediately after the simplifier.
-
+We have to be careful about shadowing.
 For example, consider
 	f = \x -> let y = x+x in
 	              h = \x -> x+x
 	          in ...
 
-Here we must *not* do CSE on the inner x+x!
+Here we must *not* do CSE on the inner x+x!  The simplifier used to guarantee no
+shadowing, but it doesn't any more (it proved too hard), so we clone as we go.
+We can simply add clones to the substitution already described.
+
+However, we do NOT clone type variables.  It's just too hard, because then we need
+to run the substitution over types and IdInfo.  No no no.  Instead, we just throw
+away the entire reverse mapping if this unusual situation ever shows up.   
+(In fact, I think the simplifier does guarantee no-shadowing for type variables.)
 
 
 Another important wrinkle
@@ -72,7 +78,8 @@ But that's not quite obvious.  In general we want to keep it as (wild1:as),
 but for CSE purpose that's a bad idea.
 
 So we add the binding (wild1 -> a) to the extra var->var mapping.
-
+Notice this is exactly backwards to what the simplifier does, which is
+to try to replaces uses of a with uses of wild1
 
 Yet another wrinkle
 ~~~~~~~~~~~~~~~~~~~
@@ -82,7 +89,10 @@ Consider
 We'd like to replace (h x) in the alternative, by y.  But because of
 the preceding "Another important wrinkle", we only want to add the mapping
 	scrutinee -> case binder
-to the CSE mapping if the scrutinee is a non-trivial expression.
+to the reverse CSE mapping if the scrutinee is a non-trivial expression.
+(If the scrutinee is a simple variable we want to add the mapping
+	case binder -> scrutinee 
+to the substitution
 
 
 %************************************************************************
@@ -118,11 +128,11 @@ cseBind env (Rec pairs)  = let (env', pairs') = mapAccumL do_one env pairs
 			 
 
 do_one env (id, rhs) = case lookupCSEnv env rhs' of
-		    	  Just other_id -> (extendSubst env id other_id, (id, Var other_id))
-			  Nothing       -> (addCSEnvItem env id rhs',    (id, rhs'))
+		    	  Just other_id -> (extendSubst env' id other_id, (id', Var other_id))
+			  Nothing       -> (addCSEnvItem env' id' rhs',   (id', rhs'))
 		     where
-	 	        rhs' = cseExpr env rhs
-
+			(env', id') = addBinder env id
+	 	        rhs' 	    = cseExpr env' rhs
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
 tryForCSE env (Type t) = Type t
@@ -138,24 +148,26 @@ cseExpr env (Lit lit)		   = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
-cseExpr env (Lam b e)	     	   = Lam b (cseExpr env e)
-cseExpr env (Let bind e)    	   = let (env1, bind') = cseBind env bind
-				     in Let bind' (cseExpr env1 e)
-cseExpr env (Case scrut bndr alts) = Case scrut' bndr (cseAlts env scrut' bndr alts)
+cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
+				     in Lam b' (cseExpr env' e)
+cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
+				     in Let bind' (cseExpr env' e)
+cseExpr env (Case scrut bndr alts) = Case scrut' bndr' (cseAlts env' scrut' bndr bndr' alts)
 				   where
 				     scrut' = tryForCSE env scrut
+				     (env', bndr') = addBinder env bndr
 
 
-cseAlts env new_scrut bndr alts
+cseAlts env scrut' bndr bndr' alts
   = map cse_alt alts
   where
     (con_target, alt_env)
-	= case new_scrut of
-		Var v -> (v,    extendSubst env bndr v)		-- See "another important wrinkle"
-								-- map: bndr -> v
+	= case scrut' of
+		Var v' -> (v',    extendSubst env bndr v')	-- See "another important wrinkle"
+								-- map: bndr -> v'
 
-		other -> (bndr, extendCSEnv env bndr new_scrut)	-- See "yet another wrinkle"
-								-- map: new_scrut -> bndr
+		other ->  (bndr', extendCSEnv env bndr' scrut')	-- See "yet another wrinkle"
+								-- map: scrut' -> bndr'
 
     arg_tys = case splitTyConApp_maybe (idType bndr) of
 		Just (_, arg_tys) -> arg_tys
@@ -169,12 +181,15 @@ cseAlts env new_scrut bndr alts
 		-- Don't replace True by x!  
 		-- Hence the 'null args', which also deal with literals and DEFAULT
 		-- And we can't CSE on unboxed tuples
-	= (DataAlt con, args, tryForCSE new_env rhs)
+	= (DataAlt con, args', tryForCSE new_env rhs)
 	where
-	  new_env = extendCSEnv alt_env con_target (mkAltExpr (DataAlt con) args arg_tys)
+	  (env', args') = addBinders alt_env args
+	  new_env       = extendCSEnv env' con_target (mkAltExpr (DataAlt con) args' arg_tys)
 
     cse_alt (con, args, rhs)
-	= (con, args, tryForCSE alt_env rhs)
+	= (con, args', tryForCSE env' rhs)
+	where
+	  (env', args') = addBinders alt_env args
 \end{code}
 
 
@@ -185,13 +200,18 @@ cseAlts env new_scrut bndr alts
 %************************************************************************
 
 \begin{code}
-data CSEnv = CS (UniqFM [(Id, CoreExpr)])	-- The expr in the range has already been CSE'd
-	        (IdEnv Id)			-- Simple substitution
+data CSEnv = CS CSEMap InScopeSet (IdEnv Id)
+			-- Simple substitution
 
-emptyCSEnv = CS emptyUFM emptyVarEnv
+type CSEMap = UniqFM [(Id, CoreExpr)]	-- This is the reverse mapping
+	-- It maps the hash-code of an expression to list of (x,e) pairs
+	-- This means that it's good to replace e by x
+	-- INVARIANT: The expr in the range has already been CSE'd
+
+emptyCSEnv = CS emptyUFM emptyInScopeSet emptyVarEnv
 
 lookupCSEnv :: CSEnv -> CoreExpr -> Maybe Id
-lookupCSEnv (CS cs _) expr
+lookupCSEnv (CS cs _ _) expr
   = case lookupUFM cs (hashExpr expr) of
 	Nothing -> Nothing
 	Just pairs -> lookup_list pairs expr
@@ -204,8 +224,8 @@ lookup_list ((x,e):es) expr | cheapEqExpr e expr = Just x
 addCSEnvItem env id expr | exprIsBig expr = env
 			 | otherwise      = extendCSEnv env id expr
 
-extendCSEnv (CS cs sub) id expr
-  = CS (addToUFM_C combine cs hash [(id, expr)]) sub
+extendCSEnv (CS cs in_scope sub) id expr
+  = CS (addToUFM_C combine cs hash [(id, expr)]) in_scope sub
   where
     hash   = hashExpr expr
     combine old new = WARN( length result > 4, text "extendCSEnv: long list:" <+> ppr result )
@@ -213,9 +233,24 @@ extendCSEnv (CS cs sub) id expr
 		    where
 		      result = new ++ old
 
-lookupSubst (CS _ sub) x = case lookupVarEnv sub x of
-			     Just y  -> y
-			     Nothing -> x
+lookupSubst (CS _ _ sub) x = case lookupVarEnv sub x of
+			       Just y  -> y
+			       Nothing -> x
 
-extendSubst (CS cs sub) x y = CS cs (extendVarEnv sub x y)
+extendSubst (CS cs in_scope sub) x y = CS cs in_scope (extendVarEnv sub x y)
+
+addBinder :: CSEnv -> Id -> (CSEnv, Id)
+addBinder env@(CS cs in_scope sub) v
+  | not (v `elemInScopeSet` in_scope) = (CS cs (extendInScopeSet in_scope v)  sub,		       v)
+  | isId v			      = (CS cs (extendInScopeSet in_scope v') (extendVarEnv sub v v'), v')
+  | not (isId v)		      = WARN( True, ppr v )
+				        (CS emptyUFM in_scope		      sub,		       v)
+	-- This last case is the unusual situation where we have shadowing of
+	-- a type variable; we have to discard the CSE mapping
+	-- See "IMPORTANT NOTE" at the top 
+  where
+    v' = uniqAway in_scope v
+
+addBinders :: CSEnv -> [Id] -> (CSEnv, [Id])
+addBinders env vs = mapAccumL addBinder env vs
 \end{code}

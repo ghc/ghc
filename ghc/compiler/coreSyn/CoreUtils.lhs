@@ -42,7 +42,7 @@ import Var		( Var, isId, isTyVar )
 import VarSet
 import VarEnv
 import Name		( isLocallyDefined, hashName )
-import Literal		( Literal, hashLiteral, literalType )
+import Literal		( Literal, hashLiteral, literalType, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap, 
 			  primOpIsDupable )
@@ -271,7 +271,7 @@ exprIsTrivial other	      	       = False
 \begin{code}
 exprIsDupable (Type _)	     = True
 exprIsDupable (Var v)	     = True
-exprIsDupable (Lit lit)      = True
+exprIsDupable (Lit lit)      = litIsDupable lit
 exprIsDupable (Note _ e)     = exprIsDupable e
 exprIsDupable expr	     
   = go expr 0

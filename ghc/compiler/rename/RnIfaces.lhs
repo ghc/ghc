@@ -163,9 +163,9 @@ tryLoadInterface doc_str mod_name from
 	--     If we do loadExport first the wrong info gets into the cache (unless we
 	-- 	explicitly tag each export which seems a bit of a bore)
 
-    getModuleRn 		`thenRn` \ this_mod_nm ->
+    getModuleRn 		`thenRn` \ this_mod ->
     let
-	mod = pi_mod   iface
+	mod = pi_mod iface
     in
 	-- Sanity check.  If we're system-importing a module we know nothing at all
 	-- about, it should be from a different package to this one
@@ -173,12 +173,12 @@ tryLoadInterface doc_str mod_name from
 	  case from of { ImportBySystem -> True; other -> False } &&
 	  isLocalModule mod,
 	  ppr mod )
-    foldlRn (loadDecl mod)	   (iDecls ifaces)   (pi_decls iface)	`thenRn` \ new_decls ->
-    foldlRn (loadInstDecl mod)	   (iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
-    loadRules mod		   (iRules ifaces)   (pi_rules iface)	`thenRn` \ new_rules ->
-    loadFixDecls mod_name	   (iFixes ifaces)   (pi_fixity iface)	`thenRn` \ new_fixities ->
-    foldlRn (loadDeprec mod)	   (iDeprecs ifaces) (pi_deprecs iface)	`thenRn` \ new_deprecs ->
-    mapRn (loadExport this_mod_nm) (pi_exports iface)			`thenRn` \ avails_s ->
+    foldlRn (loadDecl mod)	(iDecls ifaces)   (pi_decls iface)	`thenRn` \ new_decls ->
+    foldlRn (loadInstDecl mod)	(iInsts ifaces)   (pi_insts iface)	`thenRn` \ new_insts ->
+    loadRules mod		(iRules ifaces)   (pi_rules iface)	`thenRn` \ new_rules ->
+    loadFixDecls mod_name	(iFixes ifaces)   (pi_fixity iface)	`thenRn` \ new_fixities ->
+    foldlRn (loadDeprec mod)	(iDeprecs ifaces) (pi_deprecs iface)	`thenRn` \ new_deprecs ->
+    mapRn (loadExport this_mod) (pi_exports iface)			`thenRn` \ avails_s ->
     let
 	-- For an explicit user import, add to mod_map info about
 	-- the things the imported module depends on, extracted
@@ -240,9 +240,9 @@ addModDeps mod new_deps mod_deps
 --	Loading the export list
 -----------------------------------------------------
 
-loadExport :: ModuleName -> ExportItem -> RnM d [AvailInfo]
+loadExport :: Module -> ExportItem -> RnM d [AvailInfo]
 loadExport this_mod (mod, entities)
-  | mod == this_mod = returnRn []
+  | mod == moduleName this_mod = returnRn []
 	-- If the module exports anything defined in this module, just ignore it.
 	-- Reason: otherwise it looks as if there are two local definition sites
 	-- for the thing, and an error gets reported.  Easiest thing is just to
@@ -262,7 +262,7 @@ loadExport this_mod (mod, entities)
   | otherwise
   = mapRn (load_entity mod) entities
   where
-    new_name mod occ = mkImportedGlobalName mod occ
+    new_name mod occ = newGlobalName mod occ
 
     load_entity mod (Avail occ)
       =	new_name mod occ	`thenRn` \ name ->
@@ -347,7 +347,7 @@ loadFixDecls mod_name fixity_env (version, decls)
     returnRn (extendNameEnvList fixity_env to_add)
 
 loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
-  = mkImportedGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
+  = newGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
     returnRn (name, FixitySig name fixity loc)
 
 
@@ -374,8 +374,8 @@ loadInstDecl mod insts decl@(InstDecl inst_ty binds uprags dfun_name src_loc)
 	munged_inst_ty = removeContext inst_ty
 	free_names     = extractHsTyRdrNames munged_inst_ty
     in
-    setModuleRn (moduleName mod) $
-    mapRn mkImportedGlobalFromRdrName free_names	`thenRn` \ gate_names ->
+    setModuleRn mod $
+    mapRn lookupOrigName free_names	`thenRn` \ gate_names ->
     returnRn ((mkNameSet gate_names, (mod, InstD decl)) `consBag` insts)
 
 
@@ -401,17 +401,15 @@ loadRules mod rule_bag (version, rules)
   | null rules || opt_IgnoreIfacePragmas 
   = returnRn rule_bag
   | otherwise
-  = setModuleRn mod_name	 	$
+  = setModuleRn mod		 	$
     mapRn (loadRule mod) rules		`thenRn` \ new_rules ->
     returnRn (rule_bag `unionBags` listToBag new_rules)
-  where
-    mod_name = moduleName mod
 
 loadRule :: Module -> RdrNameRuleDecl -> RnM d GatedDecl
 -- "Gate" the rule simply by whether the rule variable is
 -- needed.  We can refine this later.
 loadRule mod decl@(IfaceRule _ _ var _ _ src_loc)
-  = mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
+  = lookupOrigName var		`thenRn` \ var_name ->
     returnRn (unitNameSet var_name, (mod, RuleD decl))
 
 loadBuiltinRules :: [(RdrName, CoreRule)] -> RnMG ()
@@ -421,7 +419,7 @@ loadBuiltinRules builtin_rules
     setIfacesRn (ifaces { iRules = iRules ifaces `unionBags` listToBag rule_decls })
 
 loadBuiltinRule (var, rule)
-  = mkImportedGlobalFromRdrName var		`thenRn` \ var_name ->
+  = lookupOrigName var		`thenRn` \ var_name ->
     returnRn (unitNameSet var_name, (nameModule var_name, RuleD (IfaceRuleOut var rule)))
 
 
@@ -436,8 +434,8 @@ loadDeprec mod deprec_env (Deprecation (IEModuleContents _) txt _)
     returnRn deprec_env
 
 loadDeprec mod deprec_env (Deprecation ie txt _)
-  = setModuleRn (moduleName mod) $
-    mapRn mkImportedGlobalFromRdrName (ieNames ie) `thenRn` \ names ->
+  = setModuleRn mod					$
+    mapRn lookupOrigName (ieNames ie)		`thenRn` \ names ->
     traceRn (text "loaded deprecation(s) for" <+> hcat (punctuate comma (map ppr names)) <> colon <+> ppr txt) `thenRn_`
     returnRn (extendNameEnvList deprec_env (zip names (repeat txt)))
 \end{code}
@@ -529,7 +527,7 @@ checkEntityUsage mod decls []
   = returnRn upToDate	-- Yes!  All up to date!
 
 checkEntityUsage mod decls ((occ_name,old_vers) : rest)
-  = mkImportedGlobalName mod occ_name 	`thenRn` \ name ->
+  = newGlobalName mod occ_name 	`thenRn` \ name ->
     case lookupNameEnv decls name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
@@ -1051,8 +1049,8 @@ getDeclBinders new_name (ForD (ForeignDecl nm kind _ dyn _ loc))
   = new_name nm loc		    `thenRn` \ name ->
     returnRn (Just (Avail name))
 
-  | otherwise -- a foreign export
-  = lookupImplicitOccRn nm `thenRn_` 
+  | otherwise 		-- a foreign export
+  = lookupOrigName nm `thenRn_` 
     returnRn Nothing
 
 getDeclBinders new_name (DefD _)  = returnRn Nothing
@@ -1083,7 +1081,7 @@ getConFieldNames new_name (ConDecl con _ _ _ condecl src_loc : rest)
 
 getConFieldNames new_name [] = returnRn []
 
-getClassOpNames new_name (ClassOpSig op _ _ _ src_loc) = new_name op src_loc
+getClassOpNames new_name (ClassOpSig op _ _ src_loc) = new_name op src_loc
 \end{code}
 
 @getDeclSysBinders@ gets the implicit binders introduced by a decl.

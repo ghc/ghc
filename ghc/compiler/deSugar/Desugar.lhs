@@ -14,7 +14,7 @@ import TcHsSyn		( TypecheckedRuleDecl )
 import TcModule		( TcResults(..) )
 import CoreSyn
 import Rules		( ProtoCoreRule(..), pprProtoCoreRule )
-import Subst		( substExpr, mkSubst )
+import Subst		( substExpr, mkSubst, mkInScopeSet )
 import DsMonad
 import DsExpr		( dsExpr )
 import DsBinds		( dsMonoBinds, AutoScc(..) )
@@ -110,7 +110,7 @@ dsRule in_scope (HsRule name sig_tvs vars lhs rhs loc)
 			    (Rule name tpl_vars args core_rhs))
   where
     tpl_vars = sig_tvs ++ [var | RuleBndr var <- vars]
-    all_vars = in_scope `unionVarSet` mkVarSet tpl_vars
+    all_vars = mkInScopeSet (in_scope `unionVarSet` mkVarSet tpl_vars)
 
 ds_lhs all_vars lhs
   = let

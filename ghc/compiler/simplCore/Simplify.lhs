@@ -9,14 +9,15 @@ module Simplify ( simplTopBinds, simplExpr ) where
 #include "HsVersions.h"
 
 import CmdLineOpts	( switchIsOn, opt_SimplDoEtaReduction,
-			  opt_SimplNoPreInlining, opt_DictsStrict,
+			  opt_SimplNoPreInlining, 
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, transformRhs, findAlt,
+import SimplUtils	( mkCase, transformRhs, findAlt, 
 			  simplBinder, simplBinders, simplIds, findDefault,
-			  SimplCont(..), DupFlag(..), contResultType, analyseCont, 
-			  discardInline, countArgs, countValArgs, discardCont, contIsDupable
+			  SimplCont(..), DupFlag(..), 
+			  contResultType, discardInline, countArgs, contIsDupable,
+			  getContArgs, interestingCallContext, interestingArg, isStrictType
 			)
 import Var		( mkSysTyVar, tyVarKind )
 import VarEnv
@@ -24,13 +25,13 @@ import Id		( Id, idType, idInfo, isDataConId,
 			  idUnfolding, setIdUnfolding, isExportedId, isDeadBinder,
 			  idDemandInfo, setIdInfo,
 			  idOccInfo, setIdOccInfo,
-			  zapLamIdInfo, idStrictness, setOneShotLambda, 
+			  zapLamIdInfo, setOneShotLambda, 
 			)
-import IdInfo		( OccInfo(..), StrictnessInfo(..), ArityInfo(..),
+import IdInfo		( OccInfo(..), ArityInfo(..),
 			  setArityInfo, setUnfoldingInfo,
 			  occInfo
 			)
-import Demand		( Demand, isStrict, wwLazy )
+import Demand		( Demand, isStrict )
 import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			  dataConSig, dataConArgTys
 			)
@@ -48,25 +49,33 @@ import Rules		( lookupRule )
 import CostCentre	( currentCCS )
 import Type		( mkTyVarTys, isUnLiftedType, seqType,
 			  mkFunTy, splitFunTy, splitTyConApp_maybe, 
-			  funResultTy, isDictTy, isDataType, applyTy 
+			  funResultTy
 			)
 import Subst		( mkSubst, substTy, substExpr,
 			  isInScope, lookupIdSubst, substIdInfo
 			)
-import TyCon		( isDataTyCon, tyConDataConsIfAvailable, 
-			  isDataTyCon
-			)
+import TyCon		( isDataTyCon, tyConDataConsIfAvailable	)
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( isLoopBreaker )
 import Maybes		( maybeToBool )
-import Util		( zipWithEqual, lengthExceeds )
+import Util		( zipWithEqual )
 import Outputable
 \end{code}
 
 
 The guts of the simplifier is in this module, but the driver
 loop for the simplifier is in SimplCore.lhs.
+
+
+-----------------------------------------
+	*** IMPORTANT NOTE ***
+-----------------------------------------
+The simplifier used to guarantee that the output had no shadowing, but
+it does not do so any more.   (Actually, it never did!)  The reason is
+documented with simplifyArgs.
+
+
 
 
 %************************************************************************
@@ -295,7 +304,7 @@ simplExprF (Note InlineMe e) cont
   = case cont of
 	Stop _ -> 	-- Totally boring continuation
 			-- Don't inline inside an INLINE expression
-		  switchOffInlining (simplExpr e)	`thenSmpl` \ e' ->
+		  setBlackList noInlineBlackList (simplExpr e)	`thenSmpl` \ e' ->
 		  rebuild (mkInlineMe e') cont
 
 	other  -> 	-- Dissolve the InlineMe note if there's
@@ -421,11 +430,14 @@ simplBeta bndr rhs rhs_se cont_ty thing_inside
   | otherwise
   =  	-- Simplify the RHS
     simplBinder bndr					$ \ bndr' ->
-    simplValArg (idType bndr') (idDemandInfo bndr)
-	        rhs rhs_se cont_ty			$ \ rhs' ->
+    let
+	bndr_ty'  = idType bndr'
+	is_strict = isStrict (idDemandInfo bndr) || isStrictType bndr_ty'
+    in
+    simplValArg bndr_ty' is_strict rhs rhs_se cont_ty	$ \ rhs' ->
 
 	-- Now complete the binding and simplify the body
-    if needsCaseBinding (idType bndr') rhs' then
+    if needsCaseBinding bndr_ty' rhs' then
 	addCaseBind bndr' rhs' thing_inside
     else
 	completeBinding bndr bndr' False False rhs' thing_inside
@@ -442,26 +454,23 @@ simplTyArg ty_arg se
     seqType ty_arg'	`seq`
     returnSmpl ty_arg'
 
-simplValArg :: OutType		-- Type of arg
-	    -> Demand		-- Demand on the argument
+simplValArg :: OutType		-- rhs_ty: Type of arg; used only occasionally
+	    -> Bool		-- True <=> evaluate eagerly
 	    -> InExpr -> SubstEnv
-	    -> OutType		-- Type of thing computed by the context
-	    -> (OutExpr -> SimplM OutExprStuff)
-	    -> SimplM OutExprStuff
+	    -> OutType		-- cont_ty: Type of thing computed by the context
+	    -> (OutExpr -> SimplM OutExprStuff)	
+				-- Takes an expression of type rhs_ty, 
+				-- returns an expression of type cont_ty
+	    -> SimplM OutExprStuff	-- An expression of type cont_ty
 
-simplValArg arg_ty demand arg arg_se cont_ty thing_inside
-  | isStrict demand || 
-    isUnLiftedType arg_ty || 
-    (opt_DictsStrict && isDictTy arg_ty && isDataType arg_ty)
-	-- Return true only for dictionary types where the dictionary
-	-- has more than one component (else we risk poking on the component
-	-- of a newtype dictionary)
+simplValArg arg_ty is_strict arg arg_se cont_ty thing_inside
+  | is_strict
   = transformRhs arg			`thenSmpl` \ t_arg ->
     getEnv 				`thenSmpl` \ env ->
     setSubstEnv arg_se 				$
     simplExprF t_arg (ArgOf NoDup cont_ty 	$ \ rhs' ->
     setAllExceptInScope env			$
-    etaFirst thing_inside rhs')
+    thing_inside (etaFirst rhs'))
 
   | otherwise
   = simplRhs False {- Not top level -} 
@@ -470,17 +479,14 @@ simplValArg arg_ty demand arg arg_se cont_ty thing_inside
 	     thing_inside
    
 -- Do eta-reduction on the simplified RHS, if eta reduction is on
--- NB: etaFirst only eta-reduces if that results in something trivial
-etaFirst | opt_SimplDoEtaReduction = \ thing_inside rhs -> thing_inside (etaCoreExprToTrivial rhs)
-	 | otherwise		   = \ thing_inside rhs -> thing_inside rhs
-
--- Try for eta reduction, but *only* if we get all
--- the way to an exprIsTrivial expression.    We don't want to remove
--- extra lambdas unless we are going to avoid allocating this thing altogether
-etaCoreExprToTrivial rhs | exprIsTrivial rhs' = rhs'
-			 | otherwise	      = rhs
-			 where
-			   rhs' = etaReduceExpr rhs
+-- But *only* if we get all the way to an exprIsTrivial expression.    
+-- We don't want to remove extra lambdas unless we are going 
+-- to avoid allocating this thing altogether
+etaFirst rhs 
+  | opt_SimplDoEtaReduction && exprIsTrivial rhs' = rhs'
+  | otherwise	  				  = rhs
+ where
+   rhs' = etaReduceExpr rhs
 \end{code}
 
 
@@ -546,7 +552,7 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 	-- Making loop breakers not have an unfolding at all 
 	-- means that we can avoid tests in exprIsConApp, for example.
 	-- This is important: if exprIsConApp says 'yes' for a recursive
-	-- thing we can get into an infinite loop
+	-- thing, then we can get into an infinite loop
 	info_w_unf | isLoopBreaker (occInfo old_info) = new_bndr_info
 		   | otherwise = new_bndr_info `setUnfoldingInfo` mkUnfolding top_lvl new_rhs
 
@@ -602,7 +608,7 @@ simplLazyBind top_lvl bndr bndr' rhs thing_inside
 
   	-- Simplify the RHS
     getSubstEnv 					`thenSmpl` \ rhs_se ->
-    simplRhs top_lvl False {- Not ok to float unboxed -}
+    simplRhs top_lvl False {- Not ok to float unboxed (conservative) -}
 	     (idType bndr')
 	     rhs rhs_se  				$ \ rhs' ->
 
@@ -615,7 +621,8 @@ simplLazyBind top_lvl bndr bndr' rhs thing_inside
 \begin{code}
 simplRhs :: Bool		-- True <=> Top level
 	 -> Bool		-- True <=> OK to float unboxed (speculative) bindings
-	 -> OutType -> InExpr -> SubstEnv
+	 -> OutType 		-- Type of RHS; used only occasionally
+	 -> InExpr -> SubstEnv
 	 -> (OutExpr -> SimplM (OutStuff a))
 	 -> SimplM (OutStuff a)
 simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
@@ -628,8 +635,7 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 
 	-- Float lets out of RHS
     let
-	(floats_out, rhs'') | float_ubx = (floats, rhs')
-			    | otherwise	= splitFloats floats rhs' 
+	(floats_out, rhs'') = splitFloats float_ubx floats rhs'
     in
     if (top_lvl || wantToExpose 0 rhs') && 	-- Float lets if (a) we're at the top level
         not (null floats_out)			-- or 		 (b) the resulting RHS is one we'd like to expose
@@ -646,12 +652,12 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 	WARN( any demanded_float floats_out, ppr floats_out )
 	addLetBinds floats_out 	$
 	setInScope in_scope'	$
-	etaFirst thing_inside rhs''
+	thing_inside (etaFirst rhs'')
 		-- in_scope' may be excessive, but that's OK;
 		-- it's a superset of what's in scope
     else	
 		-- Don't do the float
-	etaFirst thing_inside (mkLets floats rhs')
+	thing_inside (etaFirst (mkLets floats rhs'))
 
 -- In a let-from-let float, we just tick once, arbitrarily
 -- choosing the first floated binder to identify it
@@ -662,11 +668,17 @@ demanded_float (NonRec b r) = isStrict (idDemandInfo b) && not (isUnLiftedType (
 		-- Unlifted-type (cheap-eagerness) lets may well have a demanded flag on them
 demanded_float (Rec _)	    = False
 
--- Don't float any unlifted bindings out, because the context
+-- If float_ubx is true we float all the bindings, otherwise
+-- we just float until we come across an unlifted one.
+-- Remember that the unlifted bindings in the floats are all for
+-- guaranteed-terminating non-exception-raising unlifted things,
+-- which we are happy to do speculatively.  However, we may still
+-- not be able to float them out, because the context
 -- is either a Rec group, or the top level, neither of which
 -- can tolerate them.
-splitFloats floats rhs
-  = go floats
+splitFloats float_ubx floats rhs
+  | float_ubx = (floats, rhs)		-- Float them all
+  | otherwise = go floats
   where
     go []		    = ([], rhs)
     go (f:fs) | must_stay f = ([], mkLets (f:fs) rhs)
@@ -738,30 +750,35 @@ simplVar var cont
 --	Dealing with a call
 
 completeCall var occ cont
-  = getBlackList	`thenSmpl` \ black_list_fn ->
-    getInScope		`thenSmpl` \ in_scope ->
-    getSwitchChecker 	`thenSmpl` \ chkr ->
+  = getBlackList		`thenSmpl` \ black_list_fn ->
+    getInScope			`thenSmpl` \ in_scope ->
+    getContArgs var cont	`thenSmpl` \ (args, call_cont, inline_call) ->
     let
-	dont_use_rules	   = switchIsOn chkr DontApplyRules
-	no_case_of_case	   = switchIsOn chkr NoCaseOfCase
 	black_listed       = black_list_fn var
+	arg_infos	   = [ interestingArg in_scope arg subst 
+			     | (arg, subst, _) <- args, isValArg arg]
 
-	(arg_infos, interesting_cont, inline_call) = analyseCont in_scope cont
-	discard_inline_cont | inline_call = discardInline cont
-		            | otherwise   = cont
+	interesting_cont = interestingCallContext (not (null args)) 
+						  (not (null arg_infos))
+						  call_cont
+
+	inline_cont | inline_call = discardInline cont
+		    | otherwise   = cont
 
 	maybe_inline = callSiteInline black_listed inline_call occ
 				      var arg_infos interesting_cont
     in
 	-- First, look for an inlining
-
     case maybe_inline of {
 	Just unfolding  	-- There is an inlining!
 	  ->  tick (UnfoldingDone var)		`thenSmpl_`
-	      simplExprF unfolding discard_inline_cont
+	      simplExprF unfolding inline_cont
 
 	;
 	Nothing -> 		-- No inlining!
+
+
+    simplifyArgs (isDataConId var) args (contResultType call_cont)  $ \ args' ->
 
 	-- Next, look for rules or specialisations that match
 	--
@@ -777,133 +794,110 @@ completeCall var occ cont
 	-- won't occur for things that have specialisations till a later phase, so
 	-- it's ok to try for inlining first.
 
-    prepareArgs no_case_of_case var cont	$ \ args' cont' ->
+    getSwitchChecker 	`thenSmpl` \ chkr ->
     let
-	maybe_rule | dont_use_rules = Nothing
-		   | otherwise	    = lookupRule in_scope var args' 
+	maybe_rule | switchIsOn chkr DontApplyRules = Nothing
+		   | otherwise			    = lookupRule in_scope var args' 
     in
     case maybe_rule of {
 	Just (rule_name, rule_rhs) -> 
 		tick (RuleFired rule_name)			`thenSmpl_`
-		simplExprF rule_rhs cont' ;
+		simplExprF rule_rhs call_cont ;
 	
 	Nothing -> 		-- No rules
 
 	-- Done
-    rebuild (mkApps (Var var) args') cont'
+    rebuild (mkApps (Var var) args') call_cont
     }}
-\end{code}		   
 
 
-\begin{code}
 ---------------------------------------------------------
---	Preparing arguments for a call
+--	Simplifying the arguments of a call
 
-prepareArgs :: Bool 	-- True if the no-case-of-case switch is on
-	    -> OutId -> SimplCont
-	    -> ([OutExpr] -> SimplCont -> SimplM OutExprStuff)
-	    -> SimplM OutExprStuff
-prepareArgs no_case_of_case fun orig_cont thing_inside
-  = go [] demands orig_fun_ty orig_cont
-  where
-    orig_fun_ty = idType fun
-    is_data_con = isDataConId fun
+simplifyArgs :: Bool 				-- It's a data constructor
+	     -> [(InExpr, SubstEnv, Bool)]	-- Details of the arguments
+	     -> OutType				-- Type of the continuation
+	     -> ([OutExpr] -> SimplM OutExprStuff)
+	     -> SimplM OutExprStuff
 
-    (demands, result_bot)
-      | no_case_of_case = ([], False)	-- Ignore strictness info if the no-case-of-case
-					-- flag is on.  Strictness changes evaluation order
-					-- and that can change full laziness
-      | otherwise
-      = case idStrictness fun of
-	  StrictnessInfo demands result_bot 
-		| not (demands `lengthExceeds` countValArgs orig_cont)
-		-> 	-- Enough args, use the strictness given.
-			-- For bottoming functions we used to pretend that the arg
-			-- is lazy, so that we don't treat the arg as an
-			-- interesting context.  This avoids substituting
-			-- top-level bindings for (say) strings into 
-			-- calls to error.  But now we are more careful about
-			-- inlining lone variables, so its ok (see SimplUtils.analyseCont)
-		   (demands, result_bot)
+-- Simplify the arguments to a call.
+-- This part of the simplifier may break the no-shadowing invariant
+-- Consider
+--	f (...(\a -> e)...) (case y of (a,b) -> e')
+-- where f is strict in its second arg
+-- If we simplify the innermost one first we get (...(\a -> e)...)
+-- Simplifying the second arg makes us float the case out, so we end up with
+--	case y of (a,b) -> f (...(\a -> e)...) e'
+-- So the output does not have the no-shadowing invariant.  However, there is
+-- no danger of getting name-capture, because when the first arg was simplified
+-- we used an in-scope set that at least mentioned all the variables free in its
+-- static environment, and that is enough.
+--
+-- We can't just do innermost first, or we'd end up with a dual problem:
+--	case x of (a,b) -> f e (...(\a -> e')...)
+--
+-- I spent hours trying to recover the no-shadowing invariant, but I just could
+-- not think of an elegant way to do it.  The simplifier is already knee-deep in
+-- continuations.  We have to keep the right in-scope set around; AND we have
+-- to get the effect that finding (error "foo") in a strict arg position will
+-- discard the entire application and replace it with (error "foo").  Getting
+-- all this at once is TOO HARD!
 
-	  other -> ([], False)	-- Not enough args, or no strictness
+simplifyArgs is_data_con args cont_ty thing_inside
+  | not is_data_con
+  = go args thing_inside
 
-	-- Main game plan: loop through the arguments, simplifying
-	-- each of them in turn.  We carry with us a list of demands,
-	-- and the type of the function-applied-to-earlier-args
-
-	-- We've run out of demands, and the result is now bottom
-	-- This deals with
-	--	* case (error "hello") of { ... }
-	--	* (error "Hello") arg
-	--	* f (error "Hello") where f is strict
-	--	etc
-    go acc [] fun_ty cont 
-	| result_bot
-	= tick_case_of_error cont		`thenSmpl_`
-	  thing_inside (reverse acc) (discardCont cont)
-
-	-- Type argument
-    go acc ds fun_ty (ApplyTo _ arg@(Type ty_arg) se cont)
-	= simplTyArg ty_arg se	`thenSmpl` \ new_ty_arg ->
-	  go (Type new_ty_arg : acc) ds (applyTy fun_ty new_ty_arg) cont
-
-	-- Value argument
-    go acc ds fun_ty (ApplyTo _ val_arg se cont)
-	| not is_data_con	-- Function isn't a data constructor
-	= simplValArg arg_ty dem val_arg se (contResultType cont) 	$ \ new_arg ->
-	  go (new_arg : acc) ds' res_ty cont
-
-	| exprIsTrivial val_arg	-- Function is a data contstructor, arg is trivial
-	= getInScope		`thenSmpl` \ in_scope ->
-	  let
-		new_arg = substExpr (mkSubst in_scope se) val_arg
-		-- Simplify the RHS with inlining switched off, so that
-		-- only absolutely essential things will happen.
+  | otherwise	-- It's a data constructor, so we want 
+		-- to switch off inlining in the arguments
 		-- If we don't do this, consider:
 		--	let x = +# p q in C {x}
 		-- Even though x get's an occurrence of 'many', its RHS looks cheap,
 		-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
-		--
-		-- It's important that the substitution *does* deal with case-binder synonyms:
-		--	case x of y { True -> (x,1) }
-		-- Here we must be sure to substitute y for x when simplifying the args of the pair,
-		-- to increase the chances of being able to inline x.  The substituter will do
-		-- that because the x->y mapping is held in the in-scope set.
-	  in
-		-- It's not always the case that the new arg will be trivial
-		-- Consider		f x
-		-- where, in one pass, f gets substituted by a constructor,
-		-- but x gets substituted by an expression (assume this is the
-		-- unique occurrence of x).  It doesn't really matter -- it'll get
-		-- fixed up next pass.  And it happens for dictionary construction,
-		-- which mentions the wrapper constructor to start with.
+  = getBlackList				`thenSmpl` \ old_bl ->
+    setBlackList noInlineBlackList		$
+    go args					$ \ args' ->
+    setBlackList old_bl				$
+    thing_inside args'
 
-	  go (new_arg : acc) ds' res_ty cont
+  where
+    go []	  thing_inside = thing_inside []
+    go (arg:args) thing_inside = simplifyArg is_data_con arg cont_ty 	$ \ arg' ->
+				 go args 				$ \ args' ->
+				 thing_inside (arg':args')
 
-	| otherwise
-	= simplValArg arg_ty dem val_arg se (contResultType cont) 	$ \ new_arg ->
-		    -- A data constructor whose argument is now non-trivial;
-		    -- so let/case bind it.
-	  newId SLIT("a") arg_ty				$ \ arg_id ->
-	  addNonRecBind arg_id new_arg				$
-	  go (Var arg_id : acc) ds' res_ty cont
+simplifyArg is_data_con (Type ty_arg, se, _) cont_ty thing_inside
+  = simplTyArg ty_arg se	`thenSmpl` \ new_ty_arg ->
+    thing_inside (Type new_ty_arg)
 
-	where
-	  (arg_ty, res_ty) = splitFunTy fun_ty
-	  (dem, ds') = case ds of 
-			[]     -> (wwLazy, [])
-			(d:ds) -> (d,ds)
+simplifyArg is_data_con (val_arg, se, is_strict) cont_ty thing_inside
+  = getInScope		`thenSmpl` \ in_scope ->
+    let
+	arg_ty = substTy (mkSubst in_scope se) (exprType val_arg)
+    in
+    if not is_data_con then
+	-- An ordinary function
+	simplValArg arg_ty is_strict val_arg se cont_ty thing_inside
+    else
+	-- A data constructor
+	-- simplifyArgs has already switched off inlining, so 
+	-- all we have to do here is to let-bind any non-trivial argument
 
-	-- We're run out of arguments and the result ain't bottom
-    go acc ds fun_ty cont = thing_inside (reverse acc) cont
-
--- Boring: we must only record a tick if there was an interesting
---	   continuation to discard.  If not, we tick forever.
-tick_case_of_error (Stop _)		 = returnSmpl ()
-tick_case_of_error (CoerceIt _ (Stop _)) = returnSmpl ()
-tick_case_of_error other		 = tick BottomFound
-\end{code}
+	-- It's not always the case that new_arg will be trivial
+	-- Consider		f x
+	-- where, in one pass, f gets substituted by a constructor,
+	-- but x gets substituted by an expression (assume this is the
+	-- unique occurrence of x).  It doesn't really matter -- it'll get
+	-- fixed up next pass.  And it happens for dictionary construction,
+	-- which mentions the wrapper constructor to start with.
+	simplValArg arg_ty is_strict val_arg se cont_ty 	$ \ arg' ->
+	
+	if exprIsTrivial arg' then
+	     thing_inside arg'
+	else
+	newId SLIT("a") (exprType arg')		$ \ arg_id ->
+	addNonRecBind arg_id arg'		$
+	thing_inside (Var arg_id)
+\end{code}		   
 
 
 %************************************************************************
@@ -1448,7 +1442,8 @@ mkDupableCont join_arg_ty (ArgOf _ cont_ty cont_fn) thing_inside
 	-- Build the join Id and continuation
 	-- We give it a "$j" name just so that for later amusement
 	-- we can identify any join points that don't end up as let-no-escapes
-    newId SLIT("$j") (exprType join_rhs)		$ \ join_id ->
+	-- [NOTE: the type used to be exprType join_rhs, but this seems more elegant.]
+    newId SLIT("$j") (mkFunTy join_arg_ty cont_ty)	$ \ join_id ->
     let
 	new_cont = ArgOf OkToDup cont_ty
 			 (\arg' -> rebuild_done (App (Var join_id) arg'))
@@ -1491,7 +1486,7 @@ mkDupableCont ty (Select _ case_bndr alts se cont) thing_inside
 	returnSmpl (concat alt_binds_s, alts')
     )					`thenSmpl` \ (alt_binds, alts') ->
 
-    extendInScopes [b | NonRec b _ <- alt_binds]		$
+    addNewInScopeIds [b | NonRec b _ <- alt_binds]		$
 
 	-- NB that the new alternatives, alts', are still InAlts, using the original
 	-- binders.  That means we can keep the case_bndr intact. This is important

@@ -107,7 +107,7 @@ type RnMG r  = RnM ()    r		-- Getting global names etc
 
 	-- Common part
 data RnDown = RnDown {
-		  rn_mod     :: ModuleName,
+		  rn_mod     :: Module,
 		  rn_loc     :: SrcLoc,
 		  rn_ns      :: IORef RnNameSupply,
 		  rn_errs    :: IORef (Bag WarnMsg, Bag ErrMsg),
@@ -174,19 +174,6 @@ type DeprecationEnv = NameEnv DeprecTxt
 --------------------------------
 type RnNameSupply
  = ( UniqSupply
-
-   , FiniteMap String Int
-	-- This is used as a name supply for dictionary functions
-	-- From the inst decl we derive a string, usually by glomming together
-	-- the class and tycon name -- but it doesn't matter exactly how;
-	-- this map then gives a unique int for each inst decl with that
-	-- string.  (In Haskell 98 there can only be one,
-	-- but not so in more extended versions; also class CC type T
-	-- and class C type TT might both give the string CCT
-	--	
-	-- We could just use one Int for all the instance decls, but this
-	-- way the uniques change less when you add an instance decl,	
-	-- hence less recompilation
 
    , FiniteMap (ModuleName, OccName) Name
 	-- Ensures that one (module,occname) pair gets one unique
@@ -363,13 +350,13 @@ type DeclsMap = NameEnv (Version, AvailInfo, Bool, (Module, RdrNameHsDecl))
 %************************************************************************
 
 \begin{code}
-initRn :: ModuleName -> UniqSupply -> SearchPath -> SrcLoc
+initRn :: Module -> UniqSupply -> SearchPath -> SrcLoc
        -> RnMG r
        -> IO (r, Bag ErrMsg, Bag WarnMsg)
 
 initRn mod us dirs loc do_rn = do
   himaps    <- mkModuleHiMaps dirs
-  names_var <- newIORef (us, emptyFM, builtins, emptyFM)
+  names_var <- newIORef (us, builtins, emptyFM)
   errs_var  <- newIORef (emptyBag,emptyBag)
   iface_var <- newIORef emptyIfaces 
   let
@@ -399,7 +386,7 @@ initRnMS rn_env fixity_env mode thing_inside rn_down g_down
 initIfaceRnMS :: Module -> RnMS r -> RnM d r
 initIfaceRnMS mod thing_inside 
   = initRnMS emptyRdrEnv emptyNameEnv InterfaceMode $
-    setModuleRn (moduleName mod) thing_inside
+    setModuleRn mod thing_inside
 
 emptyIfaces :: Ifaces
 emptyIfaces = Ifaces { iImpModInfo = emptyFM,
@@ -432,12 +419,12 @@ The @RnNameSupply@ includes a @UniqueSupply@, so if you call it more than
 once you must either split it, or install a fresh unique supply.
 
 \begin{code}
-renameSourceCode :: ModuleName
+renameSourceCode :: Module
 		 -> RnNameSupply
 	         -> RnMS r
 	         -> r
 
-renameSourceCode mod_name name_supply m
+renameSourceCode mod name_supply m
   = unsafePerformIO (
 	-- It's not really unsafe!  When renaming source code we
 	-- only do any I/O if we need to read in a fixity declaration;
@@ -449,7 +436,7 @@ renameSourceCode mod_name name_supply m
     	let
 	    rn_down = RnDown { rn_loc = mkGeneratedSrcLoc, rn_ns = names_var,
 			       rn_errs = errs_var, rn_hi_maps = himaps,
-			       rn_mod = mod_name, 
+			       rn_mod = mod, 
 			       rn_ifaces = panic "rnameSourceCode: rn_ifaces"  -- Not required
 			     }
 	    s_down = SDown { rn_mode = InterfaceMode,
@@ -625,26 +612,13 @@ setNameSupplyRn :: RnNameSupply -> RnM d ()
 setNameSupplyRn names' (RnDown {rn_ns = names_var}) l_down
   = writeIORef names_var names'
 
--- See comments with RnNameSupply above.
-newInstUniq :: String -> RnM d Int
-newInstUniq key (RnDown {rn_ns = names_var}) l_down
-  = readIORef names_var				>>= \ (us, mapInst, cache, ipcache) ->
-    let
-	uniq = case lookupFM mapInst key of
-		   Just x  -> x+1
-		   Nothing -> 0
-	mapInst' = addToFM mapInst key uniq
-    in
-    writeIORef names_var (us, mapInst', cache, ipcache) >>
-    return uniq
-
 getUniqRn :: RnM d Unique
 getUniqRn (RnDown {rn_ns = names_var}) l_down
- = readIORef names_var >>= \ (us, mapInst, cache, ipcache) ->
+ = readIORef names_var >>= \ (us, cache, ipcache) ->
    let
      (us1,us') = splitUniqSupply us
    in
-   writeIORef names_var (us', mapInst, cache, ipcache)  >>
+   writeIORef names_var (us', cache, ipcache)  >>
    return (uniqFromSupply us1)
 \end{code}
 
@@ -653,11 +627,11 @@ getUniqRn (RnDown {rn_ns = names_var}) l_down
 %=====================
 
 \begin{code}
-getModuleRn :: RnM d ModuleName
-getModuleRn (RnDown {rn_mod = mod_name}) l_down
-  = return mod_name
+getModuleRn :: RnM d Module
+getModuleRn (RnDown {rn_mod = mod}) l_down
+  = return mod
 
-setModuleRn :: ModuleName -> RnM d a -> RnM d a
+setModuleRn :: Module -> RnM d a -> RnM d a
 setModuleRn new_mod enclosed_thing rn_down l_down
   = enclosed_thing (rn_down {rn_mod = new_mod}) l_down
 \end{code}
@@ -681,6 +655,10 @@ getNameEnvs rn_down (SDown {rn_genv = global_env, rn_lenv = local_env})
 getLocalNameEnv :: RnMS LocalRdrEnv
 getLocalNameEnv rn_down (SDown {rn_lenv = local_env})
   = return local_env
+
+getGlobalNameEnv :: RnMS GlobalRdrEnv
+getGlobalNameEnv rn_down (SDown {rn_genv = global_env})
+  = return global_env
 
 setLocalNameEnv :: LocalRdrEnv -> RnMS a -> RnMS a
 setLocalNameEnv local_env' m rn_down l_down

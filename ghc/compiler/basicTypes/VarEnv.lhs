@@ -23,7 +23,7 @@ module VarEnv (
 	SubstEnv, TyVarSubstEnv, SubstResult(..),
 	emptySubstEnv, 
 	mkSubstEnv, lookupSubstEnv, extendSubstEnv, extendSubstEnvList,
-	delSubstEnv, noTypeSubst, isEmptySubstEnv
+	delSubstEnv, delSubstEnvList, noTypeSubst, isEmptySubstEnv
     ) where
 
 #include "HsVersions.h"
@@ -102,6 +102,9 @@ extendSubstEnvList (SE env nt) (b:bs) (r:rs) = extendSubstEnvList (SE (extendVar
 
 delSubstEnv :: SubstEnv -> Var -> SubstEnv
 delSubstEnv (SE s nt) v = SE (delVarEnv s v) nt
+
+delSubstEnvList :: SubstEnv -> [Var] -> SubstEnv
+delSubstEnvList (SE s nt) vs = SE (delVarEnvList s vs) nt
 \end{code}
 
 

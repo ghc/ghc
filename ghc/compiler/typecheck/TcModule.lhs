@@ -45,12 +45,12 @@ import RnMonad		( RnNameSupply, FixityEnv )
 import Bag		( isEmptyBag )
 import ErrUtils		( Message, printErrorsAndWarnings, dumpIfSet )
 import Id		( Id, idType, idName )
-import Module           ( pprModuleName )
+import Module           ( pprModuleName, mkThisModule )
 import OccName		( isSysOcc )
 import Name		( Name, nameUnique, nameOccName, isLocallyDefined, 
 			  toRdrName, nameEnvElts, NamedThing(..)
 			)
-import TyCon		( TyCon, tyConKind )
+import TyCon		( TyCon, tyConKind, tyConClass_maybe )
 import Class		( Class, classSelIds, classTyCon )
 import PrelInfo		( mAIN_Name )
 import Unique		( Unique, mainKey )
@@ -151,17 +151,22 @@ tcModule rn_name_supply fixities
 	tcSetEnv env $
 
 	tcInstDecls1 unf_env decls 
-		     mod_name fixities 
-		     rn_name_supply	`thenTc` \ (inst_info, deriv_binds) ->
+		     (mkThisModule mod_name)
+		     fixities rn_name_supply	`thenTc` \ (inst_info, deriv_binds) ->
     
     	buildInstanceEnv inst_info	`thenNF_Tc` \ inst_env ->
 
 	tcSetInstEnv inst_env $
     	let
-    	    tycons       = getEnvTyCons env
     	    classes      = getEnvClasses env
-	    local_tycons  = filter isLocallyDefined tycons
+    	    tycons       = getEnvTyCons env	-- INCLUDES tycons derived from classes
 	    local_classes = filter isLocallyDefined classes
+	    local_tycons  = [ tc | tc <- tycons,
+				   isLocallyDefined tc,
+				   Nothing <- [tyConClass_maybe tc]
+			    ]
+				-- For local_tycons, filter out the ones derived from classes
+				-- Otherwise the latter show up in interface files
     	in
     	
     	    -- Default declarations

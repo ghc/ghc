@@ -27,7 +27,7 @@ import TcHsSyn		( TcMonoBinds, idsToMonoBinds )
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, newDicts, newMethod )
 import TcEnv		( TcId, ValueEnv, TyThing(..), TyThingDetails(..), tcAddImportedIdInfo,
 			  tcLookupTy, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
-			  tcExtendLocalValEnv, tcExtendTyVarEnv
+			  tcExtendLocalValEnv, tcExtendTyVarEnv, newDefaultMethodName
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
 import TcTyDecls	( mkNewTyConRep )
@@ -44,7 +44,7 @@ import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon, dataConId, dataConWrapId, notMarkedStrict )
 import Id		( Id, setInlinePragma, idUnfolding, idType, idName )
 import Name		( Name, nameOccName, isLocallyDefined, NamedThing(..) )
-import NameSet		( emptyNameSet )
+import NameSet		( NameSet, mkNameSet, elemNameSet, emptyNameSet )
 import Outputable
 import Type		( Type, ThetaType, ClassContext,
 			  mkFunTy, mkTyVarTy, mkTyVarTys, mkDictTy, mkDictTys,
@@ -55,6 +55,7 @@ import Var		( tyVarKind, TyVar )
 import VarSet		( mkVarSet, emptyVarSet )
 import TyCon		( AlgTyConFlavour(..), mkClassTyCon )
 import Maybes		( seqMaybe )
+import SrcLoc		( SrcLoc )
 import FiniteMap        ( lookupWithDefaultFM )
 \end{code}
 
@@ -113,6 +114,8 @@ tcClassDecl1 rec_env
     tcLookupTy class_name				`thenTc` \ (AClass clas) ->
     let
 	tyvars = classTyVars clas
+	dm_bndrs_w_locs = bagToList (collectMonoBinders def_methods)
+	dm_bndr_set	= mkNameSet (map fst dm_bndrs_w_locs)
     in
     tcExtendTyVarEnv tyvars			$ 
 	
@@ -121,7 +124,7 @@ tcClassDecl1 rec_env
 		   context sc_sel_names		`thenTc` \ (sc_theta, sc_sel_ids) ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env clas tyvars) 
+    mapTc (tcClassSig rec_env dm_bndr_set clas tyvars) 
 	  (filter isClassOpSig class_sigs)		`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
@@ -182,6 +185,7 @@ tcSuperClasses class_name clas context sc_sel_names
 
 
 tcClassSig :: ValueEnv		-- Knot tying only!
+	   -> NameSet		-- Names bound in the default-method bindings
 	   -> Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> RenamedClassOpSig
@@ -189,8 +193,8 @@ tcClassSig :: ValueEnv		-- Knot tying only!
 		     ClassOpItem)	-- Selector Id, default-method Id, True if explicit default binding
 
 
-tcClassSig rec_env clas clas_tyvars
-	   (ClassOpSig op_name dm_name explicit_dm op_ty src_loc)
+tcClassSig rec_env dm_bind_names clas clas_tyvars
+	   (ClassOpSig op_name maybe_dm_stuff op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
 	-- Check the type signature.  NB that the envt *already has*
@@ -206,10 +210,20 @@ tcClassSig rec_env clas clas_tyvars
 
 	-- Build the selector id and default method id
 	sel_id      = mkDictSelId op_name clas
-	dm_id	    = mkDefaultMethodId dm_name clas global_ty
-	final_dm_id = tcAddImportedIdInfo rec_env dm_id
     in
-    returnTc (local_ty, (sel_id, final_dm_id, explicit_dm))
+    (case maybe_dm_stuff of
+	Nothing ->	-- Source-file class declaration
+	    newDefaultMethodName op_name src_loc	`thenNF_Tc` \ dm_name ->
+	    returnNF_Tc (mkDefaultMethodId dm_name clas global_ty, op_name `elemNameSet` dm_bind_names)
+
+	Just (dm_name, explicit_dm) ->	-- Interface-file class decl
+	    let
+		dm_id = mkDefaultMethodId dm_name clas global_ty
+	    in
+	    returnNF_Tc (tcAddImportedIdInfo rec_env dm_id, explicit_dm)
+    )				`thenNF_Tc` \ (dm_id, explicit_dm) ->
+
+    returnTc (local_ty, (sel_id, dm_id, explicit_dm))
 \end{code}
 
 
@@ -274,17 +288,15 @@ mkImplicitClassBinds :: [Class] -> NF_TcM s ([Id], TcMonoBinds)
 mkImplicitClassBinds classes
   = returnNF_Tc (concat cls_ids_s, andMonoBindList binds_s)
 	-- The selector binds are already in the selector Id's unfoldings
+	-- We don't return the data constructor etc from the class,
+	-- because that's done via the class's TyCon
   where
     (cls_ids_s, binds_s) = unzip (map mk_implicit classes)
 
-    mk_implicit clas = (all_cls_ids, binds)
+    mk_implicit clas = (sel_ids, binds)
 		     where
-			dict_con    = classDataCon clas
-			all_cls_ids = dataConId dict_con : cls_ids
-			cls_ids     = dataConWrapId dict_con : classSelIds clas
-
-			-- The wrapper and selectors get bindings, the worker does not
-			binds | isLocallyDefined clas = idsToMonoBinds cls_ids
+			sel_ids = classSelIds clas
+			binds | isLocallyDefined clas = idsToMonoBinds sel_ids
 			      | otherwise	      = EmptyMonoBinds
 \end{code}
 
@@ -358,7 +370,7 @@ tcDefaultMethodBinds
 
 tcDefaultMethodBinds clas default_binds sigs
   = 	-- Check that the default bindings come from this class
-    checkFromThisClass clas op_items default_binds	`thenNF_Tc_`
+    checkFromThisClass clas default_binds	`thenNF_Tc_`
 
 	-- Do each default method separately
 	-- For Hugs compatibility we make a default-method for every
@@ -426,17 +438,17 @@ tcDefaultMethodBinds clas default_binds sigs
 \end{code}
 
 \begin{code}
-checkFromThisClass :: Class -> [ClassOpItem] -> RenamedMonoBinds -> NF_TcM s ()
-checkFromThisClass clas op_items mono_binds
-  = mapNF_Tc check_from_this_class bndrs	`thenNF_Tc_`
+checkFromThisClass :: Class -> RenamedMonoBinds -> NF_TcM s ()
+checkFromThisClass clas mbinds
+  = mapNF_Tc check_from_this_class bndrs_w_locs	`thenNF_Tc_`
     returnNF_Tc ()
   where
     check_from_this_class (bndr, loc)
 	  | nameOccName bndr `elem` sel_names = returnNF_Tc ()
 	  | otherwise			      = tcAddSrcLoc loc $
 						addErrTc (badMethodErr bndr clas)
-    sel_names = [getOccName sel_id | (sel_id,_,_) <- op_items]
-    bndrs = bagToList (collectMonoBinders mono_binds)
+    sel_names    = map getOccName (classSelIds clas)
+    bndrs_w_locs = bagToList (collectMonoBinders mbinds)
 \end{code}
     
 

@@ -64,7 +64,7 @@ import Type	( Type, PredType(..), ThetaType,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 		  mkSynTy, tidyOpenType, tidyOpenTypes
 		)
-import Subst	( emptyInScopeSet, mkSubst,
+import Subst	( emptyInScopeSet, mkSubst, mkInScopeSet,
 		  substTy, substClasses, mkTyVarSubst, mkTopTyVarSubst
 		)
 import Literal	( inIntRange )
@@ -640,7 +640,7 @@ lookupInst dict@(Dict _ (Class clas tys) loc)
 
       FoundInst tenv dfun_id
 	-> let
-		subst	      = mkSubst (tyVarsOfTypes tys) tenv
+		subst	      = mkSubst (mkInScopeSet (tyVarsOfTypes tys)) tenv
 		(tyvars, rho) = splitForAllTys (idType dfun_id)
 		ty_args	      = map subst_tv tyvars
 		dfun_rho      = substTy subst rho

@@ -97,12 +97,10 @@ where exp is exported, and loc is not, then we replace it with this:
 	exp = <expression>
 	...
 
-Without this we never get rid of the exp = loc thing.
-This save a gratuitous jump
-(from \tr{x_exported} to \tr{x_local}), and makes strictness
-information propagate better.
-This used to happen in the final phase, but it's tidier to do it here.
-
+Without this we never get rid of the exp = loc thing.  This save a
+gratuitous jump (from \tr{x_exported} to \tr{x_local}), and makes
+strictness information propagate better.  This used to happen in the
+final phase, but it's tidier to do it here.
 
 If more than one exported thing is equal to a local thing (i.e., the
 local thing really is shared), then we do one only:
@@ -144,7 +142,10 @@ occurAnalyseBinds binds
     go :: OccEnv -> [CoreBind]
        -> (UsageDetails, 	-- Occurrence info
 	   IdEnv Id,		-- Indirection elimination info
-	   [CoreBind])
+				--   Maps local-id -> exported-id, but it embodies
+				--   bindings of the form exported-id = local-id in
+				--   the argument to go
+	   [CoreBind])		-- Occ-analysed bindings, less the exported-id=local-id ones
 
     go env [] = (emptyDetails, emptyVarEnv, [])
 
@@ -449,13 +450,24 @@ reOrderRec env (CyclicSCC (bind : binds))
 	  
     score :: Node Details2 -> Int	-- Higher score => less likely to be picked as loop breaker
     score ((bndr, rhs), _, _)
-	| exprIsTrivial rhs && 
-	  not (isExportedId bndr)  = 3		-- Practically certain to be inlined
-	| inlineCandidate bndr rhs = 3		-- Likely to be inlined
-	| not_fun_ty (idType bndr) = 2		-- Data types help with cases
+	| exprIsTrivial rhs 	   = 4	-- Practically certain to be inlined
+		-- Used to have also: && not (isExportedId bndr)
+		-- But I found this sometimes cost an extra iteration when we have
+		--	rec { d = (a,b); a = ...df...; b = ...df...; df = d }
+		-- where df is the exported dictionary. Then df makes a really
+		-- bad choice for loop breaker
+	  
+	| not_fun_ty (idType bndr) = 3	-- Data types help with cases
+		-- This used to have a lower score than inlineCandidate, but
+		-- it's *really* helpful if dictionaries get inlined fast,
+		-- so I'm experimenting with giving higher priority to data-typed things
+
+	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
+
 	| not (isEmptyCoreRules (idSpecialisation bndr)) = 1
 		-- Avoid things with specialisations; we'd like
 		-- to take advantage of them in the subsequent bindings
+
 	| otherwise = 0
 
     inlineCandidate :: Id -> CoreExpr -> Bool

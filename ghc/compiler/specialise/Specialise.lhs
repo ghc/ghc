@@ -21,7 +21,7 @@ import Type		( Type, mkTyVarTy, splitSigmaTy, splitFunTysN,
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfTheta, applyTys,
 			  mkForAllTys, boxedTypeKind
 			)
-import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList,
+import Subst		( Subst, mkSubst, substTy, mkSubst, substBndrs, extendSubstList, mkInScopeSet,
 			  substId, substAndCloneId, substAndCloneIds, lookupIdSubst, substInScope
 			) 
 import Var		( TyVar, mkSysTyVar, setVarUnique )
@@ -599,7 +599,7 @@ specProgram us binds
 	-- accidentally re-use a unique that's already in use
 	-- Easiest thing is to do it all at once, as if all the top-level
 	-- decls were mutually recursive
-    top_subst	    = mkSubst (mkVarSet (bindersOfBinds binds)) emptySubstEnv
+    top_subst	    = mkSubst (mkInScopeSet (mkVarSet (bindersOfBinds binds))) emptySubstEnv
 
     go []	    = returnSM ([], emptyUDs)
     go (bind:binds) = go binds 				`thenSM` \ (binds', uds) ->

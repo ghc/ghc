@@ -29,7 +29,7 @@ import RnIfaces		( getImportedInstDecls, importDecl, mkImportExportInfo, getInte
 import RnEnv		( availName, availsToNameSet, 
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, 
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
-			  lookupImplicitOccsRn, unknownNameErr,
+			  lookupOrigNames, unknownNameErr,
 			  FreeVars, plusFVs, plusFV, unitFV, emptyFVs, isEmptyFVs, addOneFV
 			)
 import Module           ( Module, ModuleName, WhereFrom(..),
@@ -83,7 +83,9 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls _ l
   = 	-- Initialise the renamer monad
     do {
 	((maybe_rn_stuff, dump_action), rn_errs_bag, rn_warns_bag) 
-	   <- initRn mod_name us (mkSearchPath opt_HiMap) loc (rename this_mod) ;
+	   <- initRn (mkThisModule mod_name) us 
+		     (mkSearchPath opt_HiMap) loc
+		     (rename this_mod) ;
 
 	-- Check for warnings
 	printErrorsAndWarnings rn_errs_bag rn_warns_bag ;
@@ -210,7 +212,7 @@ mentioned explicitly, but which might be needed by the type checker.
 
 \begin{code}
 implicitFVs mod_name decls
-  = lookupImplicitOccsRn implicit_occs		`thenRn` \ implicit_names ->
+  = lookupOrigNames implicit_occs			`thenRn` \ implicit_names ->
     returnRn (mkNameSet (map getName default_tycons)	`plusFV`
 	      implicit_names)
   where
@@ -494,7 +496,7 @@ getGates source_fvs (TyClD (ClassDecl ctxt cls tvs _ sigs _ _ _ _ _ _ _))
      `addOneToNameSet` cls)
     `plusFV` maybe_double
   where
-    get (ClassOpSig n _ _ ty _) 
+    get (ClassOpSig n _ ty _) 
 	| n `elemNameSet` source_fvs = extractHsTyNames ty
 	| otherwise		     = emptyFVs
 
@@ -724,7 +726,7 @@ reportUnusedNames mod_name direct_import_mods
 	--	 import This.  Sigh. 
 	--	 There's really no good way to detect this, so the error message 
 	--	 in RnEnv.warnUnusedModules is weakened instead
-	inst_mods = [m | InstD (InstDecl _ _ _ dfun _) <- imported_decls,
+	inst_mods = [m | InstD (InstDecl _ _ _ (Just dfun) _) <- imported_decls,
 			 let m = moduleName (nameModule dfun),
 			 m `elem` direct_import_mods
 		    ]

@@ -26,6 +26,7 @@ module TcEnv(
 	valueEnvIds,
 
 	newLocalId, newSpecPragmaId,
+	newDefaultMethodName, newDFunName,
 	tcGetGlobalTyVars, tcExtendGlobalTyVars,
 
 	InstEnv, emptyInstEnv, addToInstEnv, 
@@ -50,7 +51,7 @@ import VarSet
 import Type	( Kind, Type, superKind,
 		  tyVarsOfType, tyVarsOfTypes,
 		  splitForAllTys, splitRhoTy, splitFunTys,
-		  splitAlgTyConApp_maybe, getTyVar
+		  splitAlgTyConApp_maybe, getTyVar, getDFunTyKey
 		)
 import Subst	( substTy )
 import UsageSPUtils ( unannotTy )
@@ -62,12 +63,14 @@ import TcMonad
 
 import BasicTypes	( Arity )
 import IdInfo		( vanillaIdInfo )
-import Name		( Name, OccName, nameOccName, getSrcLoc,
+import Name		( Name, OccName, Provenance(..), ExportFlag(..), NamedThing(..), 
+			  nameOccName, nameModule, getSrcLoc, mkGlobalName,
 			  maybeWiredInTyConName, maybeWiredInIdName, isLocallyDefined,
-			  NamedThing(..), 
 			  NameEnv, emptyNameEnv, lookupNameEnv, nameEnvElts, 
 				   extendNameEnv, extendNameEnvList
 			)
+import OccName		( mkDFunOcc, mkDefaultMethodOcc, occNameString )
+import Module		( Module )
 import Unify		( unifyTyListsX, matchTys )
 import Unique		( pprUnique10, Unique, Uniquable(..) )
 import UniqFM
@@ -736,6 +739,27 @@ addToInstEnv overlap_ok inst_env clas ins_tvs ins_tys value
 	identical = ins_item_more_specific && cur_item_more_specific
 \end{code}
 
+Make a name for the dict fun for an instance decl
+
+\begin{code}
+newDFunName :: Module -> Class -> [Type] -> SrcLoc -> NF_TcM s Name
+newDFunName mod clas (ty:_) loc
+  = tcGetDFunUniq dfun_string	`thenNF_Tc` \ inst_uniq ->
+    tcGetUnique			`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkGlobalName uniq mod
+			      (mkDFunOcc dfun_string inst_uniq) 
+			      (LocalDef loc Exported))
+  where
+	-- Any string that is somewhat unique will do
+    dfun_string = occNameString (getOccName clas) ++ occNameString (getDFunTyKey ty)
+
+newDefaultMethodName :: Name -> SrcLoc -> NF_TcM s Name
+newDefaultMethodName op_name loc
+  = tcGetUnique			`thenNF_Tc` \ uniq ->
+    returnNF_Tc (mkGlobalName uniq (nameModule op_name)
+			      (mkDefaultMethodOcc (getOccName op_name))
+			      (LocalDef loc Exported))
+\end{code}
 
 
 %************************************************************************

@@ -85,7 +85,7 @@ rnPat (SigPatIn pat ty)
     
 rnPat (LitPatIn lit) 
   = litOccurrence lit			`thenRn` \ fvs1 ->
-    lookupImplicitOccRn eqClass_RDR	`thenRn` \ eq   ->	-- Needed to find equality on pattern
+    lookupOrigName eqClass_RDR	`thenRn` \ eq   ->	-- Needed to find equality on pattern
     returnRn (LitPatIn lit, fvs1 `addOneFV` eq)
 
 rnPat (LazyPatIn pat)
@@ -139,7 +139,7 @@ rnPat (ParPatIn pat)
 
 rnPat (NPlusKPatIn name lit)
   = litOccurrence lit			`thenRn` \ fvs ->
-    lookupImplicitOccRn ordClass_RDR	`thenRn` \ ord ->
+    lookupOrigName ordClass_RDR	`thenRn` \ ord ->
     lookupBndrRn name			`thenRn` \ name' ->
     returnRn (NPlusKPatIn name' lit, fvs `addOneFV` ord)
 
@@ -288,7 +288,7 @@ rnExpr (HsVar v)
        returnRn (HsVar name, unitFV name)
 
 rnExpr (HsIPVar v)
-  = getIPName v			`thenRn` \ name ->
+  = newIPName v			`thenRn` \ name ->
     returnRn (HsIPVar name, emptyFVs)
 
 -- Special case for integral literals with a large magnitude:
@@ -338,7 +338,7 @@ rnExpr (NegApp (HsLit (HsDoublePrim i)) _) = rnExpr (HsLit (HsDoublePrim (-i)))
 
 rnExpr (NegApp e n)
   = rnExpr e				`thenRn` \ (e', fv_e) ->
-    lookupImplicitOccRn negate_RDR	`thenRn` \ neg ->
+    lookupOrigName negate_RDR	`thenRn` \ neg ->
     mkNegAppRn e' (HsVar neg)		`thenRn` \ final_e ->
     returnRn (final_e, fv_e `addOneFV` neg)
 
@@ -360,7 +360,7 @@ rnExpr section@(SectionR op expr)
 
 rnExpr (HsCCall fun args may_gc is_casm fake_result_ty)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
-  = lookupImplicitOccsRn [ccallableClass_RDR, 
+  = lookupOrigNames [ccallableClass_RDR, 
 			  creturnableClass_RDR, 
 			  ioDataCon_RDR]	`thenRn` \ implicit_fvs ->
     rnExprs args				`thenRn` \ (args', fvs_args) ->
@@ -389,7 +389,7 @@ rnExpr (HsWith expr binds)
 
 rnExpr e@(HsDo do_or_lc stmts src_loc)
   = pushSrcLocRn src_loc $
-    lookupImplicitOccsRn implicit_rdr_names	`thenRn` \ implicit_fvs ->
+    lookupOrigNames implicit_rdr_names	`thenRn` \ implicit_fvs ->
     rnStmts rnExpr stmts			`thenRn` \ (stmts', fvs) ->
 	-- check the statement list ends in an expression
     case last stmts' of {
@@ -438,7 +438,7 @@ rnExpr (HsIf p b1 b2 src_loc)
     returnRn (HsIf p' b1' b2' src_loc, plusFVs [fvP, fvB1, fvB2])
 
 rnExpr (ArithSeqIn seq)
-  = lookupImplicitOccRn enumClass_RDR	`thenRn` \ enum ->
+  = lookupOrigName enumClass_RDR	`thenRn` \ enum ->
     rn_seq seq	 			`thenRn` \ (new_seq, fvs) ->
     returnRn (ArithSeqIn new_seq, fvs `addOneFV` enum)
   where
@@ -535,7 +535,7 @@ rnRpats rpats
 \begin{code}
 rnIPBinds [] = returnRn ([], emptyFVs)
 rnIPBinds ((n, expr) : binds)
-  = getIPName n			`thenRn` \ name ->
+  = newIPName n			`thenRn` \ name ->
     rnExpr expr			`thenRn` \ (expr',fvExpr) ->
     rnIPBinds binds		`thenRn` \ (binds',fvBinds) ->
     returnRn ((name, expr') : binds', fvExpr `plusFV` fvBinds)
@@ -835,11 +835,11 @@ litOccurrence (HsStringPrim _)
   = returnRn (unitFV (getName addrPrimTyCon))
 
 litOccurrence (HsInt _)
-  = lookupImplicitOccsRn [numClass_RDR, addr2Integer_RDR]
+  = lookupOrigNames [numClass_RDR, addr2Integer_RDR]
     -- Int and Integer are forced in by Num
 
 litOccurrence (HsFrac _)
-  = lookupImplicitOccsRn [fractionalClass_RDR,ratioDataCon_RDR,addr2Integer_RDR]
+  = lookupOrigNames [fractionalClass_RDR,ratioDataCon_RDR,addr2Integer_RDR]
 	-- We have to make sure that the Ratio type is imported with
 	-- its constructor, because literals of type Ratio t are
 	-- built with that constructor.
@@ -856,7 +856,7 @@ litOccurrence (HsDoublePrim _)
   = returnRn (unitFV (getName doublePrimTyCon))
 
 litOccurrence (HsLitLit _)
-  = lookupImplicitOccRn ccallableClass_RDR	`thenRn` \ cc ->
+  = lookupOrigName ccallableClass_RDR	`thenRn` \ cc ->
     returnRn (unitFV cc)
 \end{code}
 
@@ -869,8 +869,8 @@ litOccurrence (HsLitLit _)
 \begin{code}
 mkAssertExpr :: RnMS (RenamedHsExpr, FreeVars)
 mkAssertExpr =
-  mkImportedGlobalFromRdrName assertErr_RDR		`thenRn` \ name ->
-  getSrcLocRn           				`thenRn` \ sloc ->
+  lookupOrigName assertErr_RDR		`thenRn` \ name ->
+  getSrcLocRn    			`thenRn` \ sloc ->
 
     -- if we're ignoring asserts, return (\ _ e -> e)
     -- if not, return (assertError "src-loc")

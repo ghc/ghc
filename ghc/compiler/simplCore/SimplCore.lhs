@@ -16,7 +16,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			  opt_D_dump_rules,
 			  opt_D_verbose_core2core,
 			  opt_D_dump_occur_anal,
-                          opt_UsageSPOn,
+                          opt_UsageSPOn
 			)
 import CoreLint		( beginPass, endPass )
 import CoreSyn

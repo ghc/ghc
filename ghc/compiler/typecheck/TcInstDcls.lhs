@@ -25,7 +25,7 @@ import Inst		( Inst, InstOrigin(..),
 			  LIE, emptyLIE, plusLIE, plusLIEs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( ValueEnv, tcExtendGlobalValEnv, tcExtendTyVarEnvForMeths,
-			  tcAddImportedIdInfo, tcInstId
+			  tcAddImportedIdInfo, tcInstId, newDFunName
 			)
 import TcInstUtil	( InstInfo(..), classDataCon )
 import TcMonoType	( tcHsSigType )
@@ -40,7 +40,7 @@ import Class		( classBigSig, Class )
 import Var		( idName, idType, Id, TyVar )
 import Maybes 		( maybeToBool, catMaybes, expectJust )
 import MkId		( mkDictFunId )
-import Module		( ModuleName )
+import Module		( Module )
 import Name		( isLocallyDefined, NamedThing(..)	)
 import NameSet		( emptyNameSet )
 import PrelInfo		( eRROR_ID )
@@ -136,15 +136,15 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 \begin{code}
 tcInstDecls1 :: ValueEnv		-- Contains IdInfo for dfun ids
 	     -> [RenamedHsDecl]
-	     -> ModuleName			-- module name for deriving
-	     -> FixityEnv
-	     -> RnNameSupply			-- for renaming derivings
+	     -> Module			-- Module for deriving
+	     -> FixityEnv		-- For derivings
+	     -> RnNameSupply		-- For renaming derivings
 	     -> TcM s (Bag InstInfo,
 		       RenamedHsBinds)
 
-tcInstDecls1 unf_env decls mod_name fixs rn_name_supply
+tcInstDecls1 unf_env decls mod fixs rn_name_supply
   = 	-- Do the ordinary instance declarations
-    mapNF_Tc (tcInstDecl1 unf_env) 
+    mapNF_Tc (tcInstDecl1 mod unf_env) 
 	     [inst_decl | InstD inst_decl <- decls]	`thenNF_Tc` \ inst_info_bags ->
     let
 	decl_inst_info = unionManyBags inst_info_bags
@@ -152,7 +152,7 @@ tcInstDecls1 unf_env decls mod_name fixs rn_name_supply
 	-- Handle "derived" instances; note that we only do derivings
 	-- for things in this module; we ignore deriving decls from
 	-- interfaces!
-    tcDeriving mod_name fixs rn_name_supply decl_inst_info
+    tcDeriving mod fixs rn_name_supply decl_inst_info
 		    	`thenTc` \ (deriv_inst_info, deriv_binds) ->
 
     let
@@ -161,9 +161,9 @@ tcInstDecls1 unf_env decls mod_name fixs rn_name_supply
     returnTc (full_inst_info, deriv_binds)
 
 
-tcInstDecl1 :: ValueEnv -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
+tcInstDecl1 :: Module -> ValueEnv -> RenamedInstDecl -> NF_TcM s (Bag InstInfo)
 
-tcInstDecl1 unf_env (InstDecl poly_ty binds uprags dfun_name src_loc)
+tcInstDecl1 mod unf_env (InstDecl poly_ty binds uprags maybe_dfun_name src_loc)
   = 	-- Prime error recovery, set source location
     recoverNF_Tc (returnNF_Tc emptyBag)	$
     tcAddSrcLoc src_loc			$
@@ -178,28 +178,30 @@ tcInstDecl1 unf_env (InstDecl poly_ty binds uprags dfun_name src_loc)
 				     Nothing -> pprPanic "tcInstDecl1" (ppr poly_ty)
     in
 
-	-- Check for respectable instance type, and context
-	-- but only do this for non-imported instance decls.
-	-- Imported ones should have been checked already, and may indeed
-	-- contain something illegal in normal Haskell, notably
-	--	instance CCallable [Char] 
-    (if isLocallyDefined dfun_name then
-	scrutiniseInstanceHead clas inst_tys	`thenNF_Tc_`
-	mapNF_Tc scrutiniseInstanceConstraint constr
-     else
-	returnNF_Tc []
-     )						`thenNF_Tc_`
+    (case maybe_dfun_name of
+	Nothing ->	-- A source-file instance declaration
 
-	-- Make the dfun id
-    let
-	dfun_id = mkDictFunId dfun_name clas tyvars inst_tys constr
+		-- Check for respectable instance type, and context
+		-- but only do this for non-imported instance decls.
+		-- Imported ones should have been checked already, and may indeed
+		-- contain something illegal in normal Haskell, notably
+		--	instance CCallable [Char] 
+	    scrutiniseInstanceHead clas inst_tys		`thenNF_Tc_`
+	    mapNF_Tc scrutiniseInstanceConstraint constr	`thenNF_Tc_`
 
-	-- Add info from interface file
-	final_dfun_id = tcAddImportedIdInfo unf_env dfun_id
-    in
-    returnTc (unitBag (InstInfo clas tyvars inst_tys constr
-				final_dfun_id
-			     	binds src_loc uprags))
+		-- Make the dfun id and return it
+	    newDFunName mod clas inst_tys src_loc		`thenNF_Tc` \ dfun_name ->
+	    returnNF_Tc (mkDictFunId dfun_name clas tyvars inst_tys constr)
+
+	Just dfun_name -> 	-- An interface-file instance declaration
+    		-- Make the dfun id and add info from interface file
+	    let
+		dfun_id = mkDictFunId dfun_name clas tyvars inst_tys constr
+	    in
+	    returnNF_Tc (tcAddImportedIdInfo unf_env dfun_id)
+    )						`thenNF_Tc` \ dfun_id ->
+
+    returnTc (unitBag (InstInfo clas tyvars inst_tys constr dfun_id binds src_loc uprags))
 \end{code}
 
 
@@ -299,21 +301,13 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
   | not (isLocallyDefined dfun_id)
   = returnNF_Tc (emptyLIE, EmptyMonoBinds)
 
-{-
-  -- I deleted this "optimisation" because when importing these
-  -- instance decls the renamer would look for the dfun bindings and they weren't there.
-  -- This would be fixable, but it seems simpler just to produce a tiny void binding instead,
-  -- even though it's never used.
-
-	-- This case deals with CCallable etc, which don't need any bindings
-  | isNoDictClass clas			
-  = returnNF_Tc (emptyLIE, EmptyBinds)
--}
-
   | otherwise
   =	 -- Prime error recovery
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
     tcAddSrcLoc locn					   $
+
+	 -- Check that all the method bindings come from this class
+    checkFromThisClass clas monobinds			`thenNF_Tc_`
 
 	-- Instantiate the instance decl with tc-style type variables
     tcInstId dfun_id		`thenNF_Tc` \ (inst_tyvars', dfun_theta', dict_ty') ->
@@ -338,9 +332,6 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     newDicts origin dfun_theta'		`thenNF_Tc` \ (dfun_arg_dicts,  dfun_arg_dicts_ids)  ->
     newClassDicts origin inst_decl_theta' `thenNF_Tc` \ (inst_decl_dicts, _) ->
     newClassDicts origin [(clas,inst_tys')] `thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
-
-	 -- Check that all the method bindings come from this class
-    checkFromThisClass clas op_items monobinds		`thenNF_Tc_`
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
  	tcExtendGlobalValEnv dm_ids (

@@ -16,13 +16,13 @@ import RnHsSyn		( RenamedHsBinds, RenamedMonoBinds )
 import CmdLineOpts	( opt_D_dump_deriv )
 
 import TcMonad
-import TcEnv		( InstEnv, getEnvTyCons, tcSetInstEnv )
+import TcEnv		( InstEnv, getEnvTyCons, tcSetInstEnv, newDFunName )
 import TcGenDeriv	-- Deriv stuff
 import TcInstUtil	( InstInfo(..), buildInstanceEnv )
 import TcSimplify	( tcSimplifyThetas )
 
 import RnBinds		( rnMethodBinds, rnTopMonoBinds )
-import RnEnv		( newDFunName, bindLocatedLocalsRn )
+import RnEnv		( bindLocatedLocalsRn )
 import RnMonad		( RnNameSupply, 
 			  renameSourceCode, thenRn, mapRn, returnRn )
 
@@ -34,7 +34,7 @@ import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon, isExistentialDataCon )
 import PrelInfo		( needsDataDeclCtxtClassKeys )
 import Maybes		( maybeToBool, catMaybes )
-import Module		( ModuleName )
+import Module		( Module )
 import Name		( isLocallyDefined, getSrcLoc,
 			  Name, NamedThing(..),
 			  OccName, nameOccName
@@ -185,14 +185,14 @@ context to the instance decl.  The "offending classes" are
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: ModuleName		-- name of module under scrutiny
+tcDeriving  :: Module			-- name of module under scrutiny
 	    -> FixityEnv		-- for the deriving code (Show/Read.)
 	    -> RnNameSupply		-- for "renaming" bits of generated code
 	    -> Bag InstInfo		-- What we already know about instances
 	    -> TcM s (Bag InstInfo,	-- The generated "instance decls".
 		      RenamedHsBinds)	-- Extra generated bindings
 
-tcDeriving modname fixs rn_name_supply inst_decl_infos_in
+tcDeriving mod fixs rn_name_supply inst_decl_infos_in
   = recoverTc (returnTc (emptyBag, EmptyBinds)) $
 
   	-- Fish the "deriving"-related information out of the TcEnv
@@ -225,26 +225,18 @@ tcDeriving modname fixs rn_name_supply inst_decl_infos_in
 	-- Rename to get RenamedBinds.
 	-- The only tricky bit is that the extra_binds must scope over the
 	-- method bindings for the instances.
-	(dfun_names_w_method_binds, rn_extra_binds)
-		= renameSourceCode modname rn_name_supply (
+	(rn_method_binds_s, rn_extra_binds)
+		= renameSourceCode mod rn_name_supply (
 			bindLocatedLocalsRn (ptext (SLIT("deriving"))) mbinders	$ \ _ ->
 			rnTopMonoBinds extra_mbinds []		`thenRn` \ (rn_extra_binds, _) ->
-			mapRn rn_one method_binds_s		`thenRn` \ dfun_names_w_method_binds ->
-			returnRn (dfun_names_w_method_binds, rn_extra_binds)
+			mapRn rn_meths method_binds_s		`thenRn` \ rn_method_binds_s ->
+			returnRn (rn_method_binds_s, rn_extra_binds)
 		  )
-	rn_one (cl_nm, tycon_nm, meth_binds) 
-	        = newDFunName (cl_nm, tycon_nm)
-		              mkGeneratedSrcLoc	        `thenRn` \ dfun_name ->
-		  rnMethodBinds meth_binds		`thenRn` \ (rn_meth_binds, _) ->
-		  returnRn (dfun_name, rn_meth_binds)
-
-	really_new_inst_infos = zipWith gen_inst_info
-			  	        new_inst_infos
-					dfun_names_w_method_binds
-
-	ddump_deriv = ddump_deriving really_new_inst_infos rn_extra_binds
     in
-    ioToTc (dumpIfSet opt_D_dump_deriv "Derived instances" ddump_deriv)	`thenTc_`
+    mapNF_Tc gen_inst_info (new_inst_infos `zip` rn_method_binds_s)	`thenNF_Tc` \ really_new_inst_infos ->
+
+    ioToTc (dumpIfSet opt_D_dump_deriv "Derived instances" 
+		      (ddump_deriving really_new_inst_infos rn_extra_binds))	`thenTc_`
 
     returnTc (listToBag really_new_inst_infos, rn_extra_binds)
   where
@@ -257,6 +249,18 @@ tcDeriving modname fixs rn_name_supply inst_decl_infos_in
 	    $$
 	    ppr mbinds
 	    where inst_decl_theta' = classesToPreds inst_decl_theta
+
+	-- Paste the dfun id and method binds into the InstInfo
+    gen_inst_info (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _, meth_binds)
+      = newDFunName mod clas tys locn 	`thenNF_Tc` \ dfun_name ->
+	let
+	    dfun_id = mkDictFunId dfun_name clas tyvars tys inst_decl_theta
+	in
+	returnNF_Tc (InstInfo clas tyvars tys inst_decl_theta
+			      dfun_id meth_binds locn [])
+
+    rn_meths meths = rnMethodBinds meths `thenRn` \ (meths', _) -> returnRn meths'
+	-- Ignore the free vars returned
 \end{code}
 
 
@@ -292,7 +296,6 @@ makeDerivEqns
 
 	think_about_deriving = need_deriving local_data_tycons
 	(derive_these, _)    = removeDups cmp_deriv think_about_deriving
-	eqns		     = map mk_eqn derive_these
     in
     if null local_data_tycons then
 	returnTc []	-- Bale out now
@@ -551,17 +554,13 @@ the renamer.  What a great hack!
 -- Generate the method bindings for the required instance
 -- (paired with class name, as we need that when generating dict
 --  names.)
-gen_bind :: FixityEnv -> InstInfo -> ({-class-}OccName, {-tyCon-}OccName, RdrNameMonoBinds)
+gen_bind :: FixityEnv -> InstInfo -> RdrNameMonoBinds
 gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
-  | not from_here 
-  = (clas_nm, tycon_nm, EmptyMonoBinds)
-  |  clas `hasKey` showClassKey 
-  = (clas_nm, tycon_nm, gen_Show_binds fixities tycon)
-  |  clas `hasKey` readClassKey 
-  = (clas_nm, tycon_nm, gen_Read_binds fixities tycon)
+  | not from_here		= EmptyMonoBinds
+  | clas `hasKey` showClassKey  = gen_Show_binds fixities tycon
+  | clas `hasKey` readClassKey  = gen_Read_binds fixities tycon
   | otherwise
-  = (clas_nm, tycon_nm,
-     assoc "gen_bind:bad derived class"
+  = assoc "gen_bind:bad derived class"
 	   [(eqClassKey,      gen_Eq_binds)
 	   ,(ordClassKey,     gen_Ord_binds)
 	   ,(enumClassKey,    gen_Enum_binds)
@@ -569,30 +568,10 @@ gen_bind fixities (InstInfo clas _ [ty] _ _ _ _ _)
 	   ,(ixClassKey,      gen_Ix_binds)
 	   ]
 	   (classKey clas)
-	   tycon)
+	   tycon
   where
-      clas_nm     = nameOccName (getName clas)
-      tycon_nm    = nameOccName (getName tycon)
       from_here   = isLocallyDefined tycon
       (tycon,_,_) = splitAlgTyConApp ty	
-
-gen_inst_info :: InstInfo
-	      -> (Name, RenamedMonoBinds)
-	      -> InstInfo				-- the gen'd (filled-in) "instance decl"
-
-gen_inst_info (InstInfo clas tyvars tys@(ty:_) inst_decl_theta _ _ locn _) 
-	      (dfun_name, meth_binds)
-  =
-	-- Generate the various instance-related Ids
-    InstInfo clas tyvars tys inst_decl_theta
-	       dfun_id
-	       meth_binds
-	       locn []
-  where
-   dfun_id = mkDictFunId dfun_name clas tyvars tys inst_decl_theta
-
-   from_here = isLocallyDefined tycon
-   (tycon,_,_) = splitAlgTyConApp ty
 \end{code}
 
 

@@ -15,7 +15,7 @@ module SimplMonad (
 	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
 
 	-- The inlining black-list
-	getBlackList,
+	setBlackList, getBlackList, noInlineBlackList,
 
         -- Unique supply
         getUniqueSmpl, getUniquesSmpl,
@@ -37,10 +37,9 @@ module SimplMonad (
 	getEnv, setAllExceptInScope,
 	getSubst, setSubst,
 	getSubstEnv, extendSubst, extendSubstList,
-	getInScope, setInScope, extendInScope, extendInScopes, modifyInScope,
+	getInScope, setInScope, modifyInScope, addNewInScopeIds,
 	setSubstEnv, zapSubstEnv,
-	getSimplBinderStuff, setSimplBinderStuff,
-	switchOffInlining
+	getSimplBinderStuff, setSimplBinderStuff
     ) where
 
 #include "HsVersions.h"
@@ -56,7 +55,7 @@ import VarEnv
 import VarSet
 import qualified Subst
 import Subst		( Subst, mkSubst, substEnv, 
-			  InScopeSet, substInScope, isInScope
+			  InScopeSet, mkInScopeSet, substInScope, isInScope
 			)
 import Type             ( Type )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
@@ -124,11 +123,13 @@ type SimplM result		-- We thread the unique supply because
   -> SimplCount 
   -> (result, UniqSupply, SimplCount)
 
+type BlackList = Id -> Bool	-- True =>  don't inline this Id
+
 data SimplEnv
   = SimplEnv {
 	seChkr      :: SwitchChecker,
 	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
-	seBlackList :: Id -> Bool,	-- True =>  don't inline this Id
+	seBlackList :: BlackList,
 	seSubst     :: Subst		-- The current substitution
     }
 	-- The range of the substitution is OutType and OutExpr resp
@@ -153,7 +154,7 @@ data SimplEnv
 initSmpl :: SwitchChecker
 	 -> UniqSupply		-- No init count; set to 0
 	 -> VarSet		-- In scope (usually empty, but useful for nested calls)
-	 -> (Id -> Bool)	-- Black-list function
+	 -> BlackList		-- Black-list function
 	 -> SimplM a
 	 -> (a, SimplCount)
 
@@ -494,7 +495,7 @@ getSimplIntSwitch chkr switch
 \end{code}
 
 
-@switchOffInlining@ is used to prepare the environment for simplifying
+@setBlackList@ is used to prepare the environment for simplifying
 the RHS of an Id that's marked with an INLINE pragma.  It is going to
 be inlined wherever they are used, and then all the inlining will take
 effect.  Meanwhile, there isn't much point in doing anything to the
@@ -521,10 +522,7 @@ and 	(b) Consider the following example
 	then we won't get deforestation at all.
 	We havn't solved this problem yet!
 
-We prepare the envt by simply modifying the in_scope_env, which has all the
-unfolding info. At one point we did it by modifying the chkr so that
-it said "EssentialUnfoldingsOnly", but that prevented legitmate, and
-important, simplifications happening in the body of the RHS.
+We prepare the envt by simply modifying the black list.
 
 6/98 update: 
 
@@ -544,31 +542,27 @@ must-inlineable. We don't generate any code for a superclass
 selector, so failing to inline it in the RHS of `f' will
 leave a reference to a non-existent id, with bad consequences.
 
-ALSO NOTE that we do all this by modifing the inline-pragma,
+ALSO NOTE that we do all this by modifing the black list
 not by zapping the unfolding.  The latter may still be useful for
 knowing when something is evaluated.
 
-June 98 update: I've gone back to dealing with this by adding
-the EssentialUnfoldingsOnly switch.  That doesn't stop essential
-unfoldings, nor inlineUnconditionally stuff; and the thing's going
-to be inlined at every call site anyway.  Running over the whole
-environment seems like wild overkill.
-
 \begin{code}
-switchOffInlining :: SimplM a -> SimplM a
-switchOffInlining m env us sc
-  = m (env { seBlackList = \v -> not (isCompulsoryUnfolding (idUnfolding v)) &&
-				 not (isDataConWrapId v) &&
-				 ((v `isInScope` subst) || not (isLocallyDefined v))
-	   }) us sc
-	
+setBlackList :: BlackList -> SimplM a -> SimplM a
+setBlackList black_list m env us sc = m (env { seBlackList = black_list }) us sc
+
+getBlackList :: SimplM BlackList
+getBlackList env us sc = (seBlackList env, us, sc)
+
+noInlineBlackList :: BlackList
 	-- Inside inlinings, black list anything that is in scope or imported.
 	-- except for things that must be unfolded (Compulsory)
 	-- and data con wrappers.  The latter is a hack, like the one in
-	-- SimplCore.simplRules, to make wrappers inline in rule LHSs.  We
-	-- may as well do the same here.
-  where
-    subst	   = seSubst env
+	-- SimplCore.simplRules, to make wrappers inline in rule LHSs.
+	-- We may as well do the same here.
+noInlineBlackList v = not (isCompulsoryUnfolding (idUnfolding v)) &&
+		      not (isDataConWrapId v)
+	--				((v `isInScope` subst) || not (isLocallyDefined v))
+	-- I don't see why we have these conditions
 \end{code}
 
 
@@ -595,12 +589,12 @@ setEnclosingCC cc m env us sc = m (env { seCC = cc }) us sc
 
 
 \begin{code}
-emptySimplEnv :: SwitchChecker -> InScopeSet -> (Id -> Bool) -> SimplEnv
+emptySimplEnv :: SwitchChecker -> VarSet -> (Id -> Bool) -> SimplEnv
 
 emptySimplEnv sw_chkr in_scope black_list
   = SimplEnv { seChkr = sw_chkr, seCC = subsumedCCS,
 	       seBlackList = black_list,
-	       seSubst = mkSubst in_scope emptySubstEnv }
+	       seSubst = mkSubst (mkInScopeSet in_scope) emptySubstEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
 
 getEnv :: SimplM SimplEnv
@@ -614,22 +608,16 @@ setAllExceptInScope new_env@(SimplEnv {seSubst = new_subst}) m
 getSubst :: SimplM Subst
 getSubst env us sc = (seSubst env, us, sc)
 
-getBlackList :: SimplM (Id -> Bool)
-getBlackList env us sc = (seBlackList env, us, sc)
-
 setSubst :: Subst -> SimplM a -> SimplM a
 setSubst subst m env us sc = m (env {seSubst = subst}) us sc
 
 getSubstEnv :: SimplM SubstEnv
 getSubstEnv env us sc = (substEnv (seSubst env), us, sc)
 
-extendInScope :: CoreBndr -> SimplM a -> SimplM a
-extendInScope v m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env {seSubst = Subst.extendInScope subst v}) us sc
-
-extendInScopes :: [CoreBndr] -> SimplM a -> SimplM a
-extendInScopes vs m env@(SimplEnv {seSubst = subst}) us sc
-  = m (env {seSubst = Subst.extendInScopes subst vs}) us sc
+addNewInScopeIds :: [CoreBndr] -> SimplM a -> SimplM a
+	-- The new Ids are guaranteed to be freshly allocated
+addNewInScopeIds  vs m env@(SimplEnv {seSubst = subst}) us sc
+  = m (env {seSubst = Subst.extendNewInScopeList subst vs}) us sc
 
 getInScope :: SimplM InScopeSet
 getInScope env us sc = (substInScope (seSubst env), us, sc)
@@ -673,14 +661,14 @@ newId :: UserFS -> Type -> (Id -> SimplM a) -> SimplM a
 	-- Extends the in-scope-env too
 newId fs ty m env@(SimplEnv {seSubst = subst}) us sc
   =  case splitUniqSupply us of
-	(us1, us2) -> m v (env {seSubst = Subst.extendInScope subst v}) us2 sc
+	(us1, us2) -> m v (env {seSubst = Subst.extendNewInScope subst v}) us2 sc
 		   where
 		      v = mkSysLocal fs (uniqFromSupply us1) ty
 
 newIds :: UserFS -> [Type] -> ([Id] -> SimplM a) -> SimplM a
 newIds fs tys m env@(SimplEnv {seSubst = subst}) us sc
   =  case splitUniqSupply us of
-	(us1, us2) -> m vs (env {seSubst = Subst.extendInScopes subst vs}) us2 sc
+	(us1, us2) -> m vs (env {seSubst = Subst.extendNewInScopeList subst vs}) us2 sc
 		   where
 		      vs = zipWithEqual "newIds" (mkSysLocal fs) 
 					(uniqsFromSupply (length tys) us1) tys

@@ -333,13 +333,9 @@ completeIface new_iface local_tycons local_classes
      orphan_rule_ids = unionVarSets [ ruleSomeFreeVars interestingId rule 
 				    | ProtoCoreRule _ _ rule <- tidy_orphan_rules]
 
-lt_inst_decl (InstDecl _ _ _ dfun_id1 _) (InstDecl _ _ _ dfun_id2 _)
-   = dfun_id1 < dfun_id2
-	-- The dfuns are assigned names df1, df2, etc, 
-	-- in order of original textual
-	-- occurrence, and this makes as good a sort order as any
-
-lt_decl d1 d2 = hsDeclName d1 < hsDeclName d2
+lt_decl      d1 d2 = hsDeclName   d1 < hsDeclName d2
+lt_inst_decl d1 d2 = instDeclName d1 < instDeclName d2
+	-- Even instance decls have names, namely the dfun name
 \end{code}
 
 
@@ -396,7 +392,7 @@ ifaceInstances inst_infos
 				      (deNoteType (mkDictTy clas tys))
 	    tidy_ty = tidyTopType forall_ty
 	in			 
-	InstDecl (toHsType tidy_ty) EmptyMonoBinds [] (toRdrName dfun_id) noSrcLoc 
+	InstDecl (toHsType tidy_ty) EmptyMonoBinds [] (Just (toRdrName dfun_id)) noSrcLoc 
 \end{code}
 
 \begin{code}
@@ -464,7 +460,7 @@ ifaceClass clas
 
      toClassOpSig (sel_id, dm_id, explicit_dm)
 	= ASSERT( sel_tyvars == clas_tyvars)
-	  ClassOpSig (toRdrName sel_id) bogus explicit_dm (toHsType op_ty) noSrcLoc
+	  ClassOpSig (toRdrName sel_id) (Just (bogus, explicit_dm)) (toHsType op_ty) noSrcLoc
 	where
 	  (sel_tyvars, _, op_ty) = splitSigmaTy (idType sel_id)
 \end{code}

@@ -15,7 +15,14 @@
 
 3. We clone the binders of any floatable let-binding, so that when it is
    floated out it will be unique.  (This used to be done by the simplifier
-   but the latter now only ensures that there's no shadowing.)
+   but the latter now only ensures that there's no shadowing; indeed, even 
+   that may not be true.)
+
+   NOTE: this can't be done using the uniqAway idea, because the variable
+ 	 must be unique in the whole program, not just its current scope,
+	 because two variables in different scopes may float out to the
+	 same top level place
+
    NOTE: Very tiresomely, we must apply this substitution to
 	 the rules stored inside a variable too.
 
@@ -441,6 +448,8 @@ lvlFloatRhs abs_vars dest_lvl env rhs
 \begin{code}
 lvlLamBndrs :: Level -> [CoreBndr] -> (Level, [(CoreBndr, Level)])
 -- Compute the levels for the binders of a lambda group
+-- The binders returned are exactly the same as the ones passed,
+-- but they are now paired with a level
 lvlLamBndrs lvl [] 
   = (lvl, [])
 
@@ -527,7 +536,8 @@ isFunction other 		       = False
 \begin{code}
 type LevelEnv = (Bool, 				-- True <=> Float lambdas too
 		 VarEnv Level, 			-- Domain is *post-cloned* TyVars and Ids
-	         SubstEnv, 			-- Domain is pre-cloned Ids
+	         Subst, 			-- Domain is pre-cloned Ids; tracks the in-scope set
+						-- 	so that subtitution is capture-avoiding
 	         IdEnv ([Var], LevelledExpr))	-- Domain is pre-cloned Ids
 	-- We clone let-bound variables so that they are still
 	-- distinct when floated out; hence the SubstEnv/IdEnv.
@@ -535,7 +545,7 @@ type LevelEnv = (Bool, 				-- True <=> Float lambdas too
 	-- We also use these envs when making a variable polymorphic
 	-- because we want to float it out past a big lambda.
 	--
-	-- The two Envs always implement the same mapping, but the
+	-- The SubstEnv and IdEnv always implement the same mapping, but the
 	-- SubstEnv maps to CoreExpr and the IdEnv to LevelledExpr
 	-- Since the range is always a variable or type application,
 	-- there is never any difference between the two, but sadly
@@ -551,25 +561,25 @@ type LevelEnv = (Bool, 				-- True <=> Float lambdas too
 	-- The domain of the VarEnv Level is the *post-cloned* Ids
 
 initialEnv :: Bool -> LevelEnv
-initialEnv float_lams = (float_lams, emptyVarEnv, emptySubstEnv, emptyVarEnv)
+initialEnv float_lams = (float_lams, emptyVarEnv, emptySubst, emptyVarEnv)
 
 floatLams :: LevelEnv -> Bool
 floatLams (float_lams, _, _, _) = float_lams
 
 extendLvlEnv :: LevelEnv -> [(Var,Level)] -> LevelEnv
 -- Used when *not* cloning
-extendLvlEnv (float_lams, lvl_env, subst_env, id_env) prs
+extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
   = (float_lams,
      foldl add_lvl lvl_env prs,
-     foldl del_subst subst_env prs,
+     foldl del_subst subst prs,
      foldl del_id id_env prs)
   where
     add_lvl   env (v,l) = extendVarEnv env v l
-    del_subst env (v,_) = delSubstEnv env v
+    del_subst env (v,_) = extendInScope env v
     del_id    env (v,_) = delVarEnv env v
   -- We must remove any clone for this variable name in case of
-  -- shadowing.  This bit me in the following case (in
-  -- nofib/real/gg/Spark.hs):
+  -- shadowing.  This bit me in the following case
+  -- (in nofib/real/gg/Spark.hs):
   -- 
   --   case ds of wild {
   --     ... -> case e of wild {
@@ -588,25 +598,25 @@ extendCaseBndrLvlEnv env scrut case_bndr lvl
 	Var v -> extendCloneLvlEnv lvl env [(case_bndr, v)]
 	other -> extendLvlEnv          env [(case_bndr,lvl)]
 
-extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst_env, id_env) abs_vars bndr_pairs
+extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pairs
   = (float_lams,
-     foldl add_lvl   lvl_env   bndr_pairs,
-     foldl add_subst subst_env bndr_pairs,
-     foldl add_id    id_env    bndr_pairs)
+     foldl add_lvl   lvl_env bndr_pairs,
+     foldl add_subst subst   bndr_pairs,
+     foldl add_id    id_env  bndr_pairs)
   where
-     add_lvl   env (v,v') = extendVarEnv   env v' dest_lvl
-     add_subst env (v,v') = extendSubstEnv env v (DoneEx (mkVarApps (Var v') abs_vars))
-     add_id    env (v,v') = extendVarEnv   env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
+     add_lvl   env (v,v') = extendVarEnv env v' dest_lvl
+     add_subst env (v,v') = extendSubst  env v (DoneEx (mkVarApps (Var v') abs_vars))
+     add_id    env (v,v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
-extendCloneLvlEnv lvl (float_lams, lvl_env, subst_env, id_env) bndr_pairs
+extendCloneLvlEnv lvl (float_lams, lvl_env, subst, id_env) bndr_pairs
   = (float_lams,
-     foldl add_lvl lvl_env bndr_pairs,
-     foldl add_subst subst_env bndr_pairs,
-     foldl add_id    id_env    bndr_pairs)
+     foldl add_lvl   lvl_env bndr_pairs,
+     foldl add_subst subst   bndr_pairs,
+     foldl add_id    id_env  bndr_pairs)
   where
-     add_lvl   env (v,v') = extendVarEnv   env v' lvl
-     add_subst env (v,v') = extendSubstEnv env v (DoneEx (Var v'))
-     add_id    env (v,v') = extendVarEnv   env v ([v'], Var v')
+     add_lvl   env (v,v') = extendVarEnv env v' lvl
+     add_subst env (v,v') = extendSubst  env v (DoneEx (Var v'))
+     add_id    env (v,v') = extendVarEnv env v ([v'], Var v')
 
 
 maxIdLevel :: LevelEnv -> VarSet -> Level
@@ -718,11 +728,9 @@ cloneVars NotTopLevel env vs ctxt_lvl dest_lvl
     in
     returnUs (env', vs'')
 
-subst_id_info (_, _, subst_env, _) ctxt_lvl dest_lvl v
+subst_id_info (_, _, subst, _) ctxt_lvl dest_lvl v
     = modifyIdInfo (\info -> substIdInfo subst info (zap_dmd info)) v
   where
-    subst = mkSubst emptyVarSet subst_env
-
 	-- VERY IMPORTANT: we must zap the demand info 
 	-- if the thing is going to float out past a lambda
     zap_dmd info

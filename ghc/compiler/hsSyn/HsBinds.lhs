@@ -236,9 +236,10 @@ data Sig name
 		SrcLoc
 
   | ClassOpSig	name		-- Selector name
-		name		-- Default-method name (if any)
-		Bool		-- True <=> there is an explicit, programmer-supplied
-				-- default declaration in the class decl
+		(Maybe 		-- Nothing for source-file class signatures
+		      (name,		-- Default-method name (if any)
+		       Bool))		-- True <=> there is an explicit, programmer-supplied
+					-- 	    default declaration in the class decl
 		(HsType name)
 		SrcLoc
 
@@ -269,7 +270,7 @@ instance Eq name => Eq (FixitySig name) where
 
 \begin{code}
 okBindSig :: NameSet -> Sig Name -> Bool
-okBindSig ns (ClassOpSig _ _ _ _ _)				= False
+okBindSig ns (ClassOpSig _ _ _ _)				= False
 okBindSig ns sig = sigForThisGroup ns sig
 
 okClsDclSig :: NameSet -> Sig Name -> Bool
@@ -290,7 +291,7 @@ sigForThisGroup ns sig
 
 sigName :: Sig name -> Maybe name
 sigName (Sig         n _ _)             = Just n
-sigName (ClassOpSig  n _ _ _ _)         = Just n
+sigName (ClassOpSig  n _ _ _)           = Just n
 sigName (SpecSig     n _ _)             = Just n
 sigName (InlineSig   n _   _)           = Just n
 sigName (NoInlineSig n _   _)           = Just n
@@ -302,8 +303,8 @@ isFixitySig (FixSig _) = True
 isFixitySig _	       = False
 
 isClassOpSig :: Sig name -> Bool
-isClassOpSig (ClassOpSig _ _ _ _ _) = True
-isClassOpSig _			    = False
+isClassOpSig (ClassOpSig _ _ _ _) = True
+isClassOpSig _			  = False
 
 isPragSig :: Sig name -> Bool
 	-- Identifies pragmas 
@@ -316,7 +317,7 @@ isPragSig other		      = False
 
 \begin{code}
 hsSigDoc (Sig        _ _ loc) 	      = (SLIT("type signature"),loc)
-hsSigDoc (ClassOpSig _ _ _ _ loc)     = (SLIT("class-method type signature"), loc)
+hsSigDoc (ClassOpSig _ _ _ loc)       = (SLIT("class-method type signature"), loc)
 hsSigDoc (SpecSig    _ _ loc) 	      = (SLIT("SPECIALISE pragma"),loc)
 hsSigDoc (InlineSig  _ _    loc)      = (SLIT("INLINE pragma"),loc)
 hsSigDoc (NoInlineSig  _ _  loc)      = (SLIT("NOINLINE pragma"),loc)
@@ -332,10 +333,12 @@ ppr_sig :: Outputable name => Sig name -> SDoc
 ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
-ppr_sig (ClassOpSig var _ dm ty _)
+ppr_sig (ClassOpSig var dm ty _)
       = sep [ppr var <+> pp_dm <+> dcolon, nest 4 (ppr ty)]
       where
-	pp_dm = if dm then equals else empty	-- Default-method indicator
+	pp_dm = case dm of 
+		  Just (_, True) -> equals 	-- Default-method indicator
+		  other		 -> empty
 
 ppr_sig (SpecSig var ty _)
       = sep [ hsep [text "{-# SPECIALIZE", ppr var, dcolon],

@@ -612,7 +612,6 @@ tcMonoBinds :: RenamedMonoBinds
 tcMonoBinds mbinds tc_ty_sigs is_rec
   = tc_mb_pats mbinds		`thenTc` \ (complete_it, lie_req_pat, tvs, ids, lie_avail) ->
     let
-	tv_list		  = bagToList tvs
 	id_list 	  = bagToList ids
 	(names, mono_ids) = unzip id_list
 

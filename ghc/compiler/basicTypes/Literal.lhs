@@ -8,7 +8,7 @@ module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
 	, mkMachInt64, mkMachWord64
-	, isLitLitLit, maybeLitLit
+	, isLitLitLit, maybeLitLit, litIsDupable,
 	, literalType, literalPrimRep
 	, hashLiteral
 
@@ -183,6 +183,12 @@ isLitLitLit _	    	     = False
 
 maybeLitLit (MachLitLit s t) = Just (s,t)
 maybeLitLit _		     = Nothing
+
+litIsDupable :: Literal -> Bool
+	-- True if code space does not go bad if we duplicate this literal
+	-- False principally of strings
+litIsDupable (MachStr _) = False
+litIsDupable other	 = True
 \end{code}
 
 	Types

@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.33 2000/07/06 14:08:31 simonmar Exp $
+$Id: Parser.y,v 1.34 2000/08/01 09:08:27 simonpj Exp $
 
 Haskell grammar.
 
@@ -229,8 +229,8 @@ body 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
  	|      layout_on  top close		{ $2 }
 
 top 	:: { ([RdrNameImportDecl], [RdrNameHsDecl]) }
-	: importdecls ';' cvtopdecls		{ (reverse $1,$3) }
-	| importdecls				{ (reverse $1,[]) }
+	: importdecls				{ (reverse $1,[]) }
+	| importdecls ';' cvtopdecls		{ (reverse $1,$3) }
 	| cvtopdecls				{ ([],$1) }
 
 cvtopdecls :: { [RdrNameHsDecl] }
@@ -345,9 +345,8 @@ topdecl :: { RdrBinding }
 
 	| srcloc 'class' ctype fds where
 		{% checkDataHeader $3 `thenP` \(cs,c,ts) ->
-		   let (binds,sigs) 
-			   = cvMonoBindsAndSigs cvClassOpSig 
-				(groupBindings $5) 
+		   let 
+			(binds,sigs) = cvMonoBindsAndSigs cvClassOpSig (groupBindings $5) 
 		   in
 	 	   returnP (RdrHsDecl (TyClD
 		      (mkClassDecl cs c ts $4 sigs binds 
@@ -357,8 +356,7 @@ topdecl :: { RdrBinding }
 		{ let (binds,sigs) 
 			= cvMonoBindsAndSigs cvInstDeclSig 
 				(groupBindings $4)
-		  in RdrHsDecl (InstD
-			        (InstDecl $3 binds sigs dummyRdrVarName $1)) }
+		  in RdrHsDecl (InstD (InstDecl $3 binds sigs Nothing $1)) }
 
 	| srcloc 'default' '(' types0 ')'
 		{ RdrHsDecl (DefD (DefaultDecl $4 $1)) }
@@ -526,13 +524,6 @@ atype :: { RdrNameHsType }
 	| '(#' types '#)'		{ HsTupleTy (mkHsTupCon tcName Unboxed     $2) (reverse $2)	 }
 	| '[' type ']'			{ HsListTy $2 }
 	| '(' ctype ')'			{ $2 }
-
-gtycon 	:: { RdrName }
-	: qtycon			{ $1 }
-	| '(' ')'			{ unitTyCon_RDR }
-	| '(' '->' ')'			{ funTyCon_RDR }
-	| '[' ']'			{ listTyCon_RDR }
-	| '(' commas ')'		{ tupleTyCon_RDR $2 }
 
 -- An inst_type is what occurs in the head of an instance decl
 --	e.g.  (Foo a, Gaz b) => Wibble a b
@@ -750,10 +741,6 @@ aexp1	:: { RdrNameHsExpr }
 	| '_'				{ EWildPat }
 	| '~' aexp1			{ ELazyPat $2 }
 
-commas :: { Int }
-	: commas ','			{ $1 + 1 }
-	| ','				{ 2 }
-
 texps :: { [RdrNameHsExpr] }
 	: texps ',' exp			{ $3 : $1 }
 	| exp				{ [$1] }
@@ -880,6 +867,13 @@ dbind	: ipvar '=' exp			{ ($1, $3) }
 
 -----------------------------------------------------------------------------
 -- Variables, Constructors and Operators.
+
+gtycon 	:: { RdrName }
+	: qtycon			{ $1 }
+	| '(' ')'			{ unitTyCon_RDR }
+	| '(' '->' ')'			{ funTyCon_RDR }
+	| '[' ']'			{ listTyCon_RDR }
+	| '(' commas ')'		{ tupleTyCon_RDR $2 }
 
 gcon 	:: { RdrName }
 	: '(' ')'		{ unitCon_RDR }
@@ -1080,6 +1074,10 @@ tyvar 	:: { RdrName }
 	| 'stdcall'             { stdcall_tyvar_RDR }
 	| 'ccall'               { ccall_tyvar_RDR }
 	-- NOTE: no 'forall'
+
+commas :: { Int }
+	: commas ','			{ $1 + 1 }
+	| ','				{ 2 }
 
 -----------------------------------------------------------------------------
 

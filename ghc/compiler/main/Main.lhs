@@ -309,7 +309,7 @@ ppSourceStats short (HsModule name version exports imports decls _ src_loc)
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
     sig_info (Sig _ _ _)            = (1,0,0,0)
-    sig_info (ClassOpSig _ _ _ _ _) = (0,1,0,0)
+    sig_info (ClassOpSig _ _ _ _)   = (0,1,0,0)
     sig_info (SpecSig _ _ _)        = (0,0,1,0)
     sig_info (InlineSig _ _ _)      = (0,0,0,1)
     sig_info (NoInlineSig _ _ _)    = (0,0,0,1)

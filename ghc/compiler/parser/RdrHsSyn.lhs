@@ -217,7 +217,7 @@ mkClassDecl cxt cname tyvars fds sigs mbinds prags loc
       --  superclasses both called C!)
 
 mkClassOpSig has_default_method op ty loc
-  = ClassOpSig op dm_rn has_default_method ty loc
+  = ClassOpSig op (Just (dm_rn, has_default_method)) ty loc
   where
     dm_rn = mkRdrUnqual (mkDefaultMethodOcc (rdrNameOcc op))
 
@@ -285,9 +285,7 @@ cvValSig      sig = sig
 
 cvInstDeclSig sig = sig
 
-cvClassOpSig (Sig var poly_ty src_loc) = ClassOpSig var (panic "cvClassOpSig:dm_name")
-							False
-							poly_ty src_loc
+cvClassOpSig (Sig var poly_ty src_loc) = ClassOpSig var Nothing poly_ty src_loc
 cvClassOpSig sig 		       = sig
 \end{code}
 

@@ -26,7 +26,7 @@ module TcMonad(
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
-	tcGetUnique, tcGetUniques,
+	tcGetUnique, tcGetUniques, tcGetDFunUniq,
 
 	tcAddSrcLoc, tcGetSrcLoc, tcGetInstLoc,
 	tcAddErrCtxtM, tcSetErrCtxtM,
@@ -62,6 +62,7 @@ import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
 			  UniqSM, initUs_ )
 import SrcLoc		( SrcLoc, noSrcLoc )
+import FiniteMap	( FiniteMap, lookupFM, addToFM, emptyFM )
 import UniqFM		( UniqFM, emptyUFM )
 import Unique		( Unique )
 import BasicTypes	( Unused )
@@ -126,11 +127,12 @@ initTc :: UniqSupply
 initTc us initenv do_this
   = do {
       us_var   <- newIORef us ;
+      dfun_var <- newIORef emptyFM ;
       errs_var <- newIORef (emptyBag,emptyBag) ;
       tvs_var  <- newIORef emptyUFM ;
 
       let
-          init_down = TcDown [] us_var
+          init_down = TcDown [] us_var dfun_var
 			     noSrcLoc
 			     [] errs_var
 	  init_env  = initenv tvs_var
@@ -246,7 +248,7 @@ We throw away any error messages!
 
 \begin{code}
 forkNF_Tc :: NF_TcM s r -> NF_TcM s r
-forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
+forkNF_Tc m (TcDown deflts u_var df_var src_loc err_cxt err_var) env
   = do
 	-- Get a fresh unique supply
     	us <- readIORef u_var
@@ -257,7 +259,7 @@ forkNF_Tc m (TcDown deflts u_var src_loc err_cxt err_var) env
 		us_var'  <- newIORef us2 ;
 	      	err_var' <- newIORef (emptyBag,emptyBag) ;
       		tv_var'  <- newIORef emptyUFM ;
-		let { down' = TcDown deflts us_var' src_loc err_cxt err_var' } ;
+		let { down' = TcDown deflts us_var' df_var src_loc err_cxt err_var' } ;
 		m down' env
 			-- ToDo: optionally dump any error messages
 		})
@@ -532,6 +534,23 @@ uniqSMToTcM m down env
 \end{code}
 
 
+\section{Dictionary function name supply
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+tcGetDFunUniq :: String -> NF_TcM s Int
+tcGetDFunUniq key down env
+  = do dfun_supply <- readIORef d_var
+       let uniq = case lookupFM dfun_supply key of
+		      Just x  -> x+1
+		      Nothing -> 0
+       let dfun_supply' = addToFM dfun_supply key uniq
+       writeIORef d_var dfun_supply'
+       return uniq
+  where
+    d_var = getDFunSupplyVar down
+\end{code}
+
+
 \section{TcDown}
 %~~~~~~~~~~~~~~~
 
@@ -541,35 +560,49 @@ data TcDown
 	[Type]			-- Types used for defaulting
 
 	(TcRef UniqSupply)	-- Unique supply
+	(TcRef DFunNameSupply)	-- Name supply for dictionary function names
 
 	SrcLoc			-- Source location
 	ErrCtxt			-- Error context
-	(TcRef (Bag WarnMsg, 
-		  Bag ErrMsg))
+	(TcRef (Bag WarnMsg, Bag ErrMsg))
 
 type ErrCtxt = [TidyEnv -> NF_TcM Unused (TidyEnv, Message)]	
 			-- Innermost first.  Monadic so that we have a chance
 			-- to deal with bound type variables just before error
 			-- message construction
+
+type DFunNameSupply = FiniteMap String Int
+	-- This is used as a name supply for dictionary functions
+	-- From the inst decl we derive a string, usually by glomming together
+	-- the class and tycon name -- but it doesn't matter exactly how;
+	-- this map then gives a unique int for each inst decl with that
+	-- string.  (In Haskell 98 there can only be one,
+	-- but not so in more extended versions; also class CC type T
+	-- and class C type TT might both give the string CCT
+	--	
+	-- We could just use one Int for all the instance decls, but this
+	-- way the uniques change less when you add an instance decl,	
+	-- hence less recompilation
 \end{code}
 
 -- These selectors are *local* to TcMonad.lhs
 
 \begin{code}
-getTcErrs (TcDown def us loc ctxt errs)      = errs
-setTcErrs (TcDown def us loc ctxt _   ) errs = TcDown def us loc ctxt errs
+getTcErrs (TcDown def us ds loc ctxt errs)      = errs
+setTcErrs (TcDown def us ds loc ctxt _   ) errs = TcDown def us ds loc ctxt errs
 
-getDefaultTys (TcDown def us loc ctxt errs)     = def
-setDefaultTys (TcDown _   us loc ctxt errs) def = TcDown def us loc ctxt errs
+getDefaultTys (TcDown def us ds loc ctxt errs)     = def
+setDefaultTys (TcDown _   us ds loc ctxt errs) def = TcDown def us ds loc ctxt errs
 
-getLoc (TcDown def us loc ctxt errs)     = loc
-setLoc (TcDown def us _   ctxt errs) loc = TcDown def us loc ctxt errs
+getLoc (TcDown def us ds loc ctxt errs)     = loc
+setLoc (TcDown def us ds _   ctxt errs) loc = TcDown def us ds loc ctxt errs
 
-getUniqSupplyVar (TcDown def us loc ctxt errs) = us
+getUniqSupplyVar (TcDown def us ds loc ctxt errs) = us
+getDFunSupplyVar (TcDown def us ds loc ctxt errs) = ds
 
-setErrCtxt (TcDown def us loc ctxt errs) msg = TcDown def us loc [msg]      errs
-addErrCtxt (TcDown def us loc ctxt errs) msg = TcDown def us loc (msg:ctxt) errs
-getErrCtxt (TcDown def us loc ctxt errs)     = ctxt
+setErrCtxt (TcDown def us ds loc ctxt errs) msg = TcDown def us ds loc [msg]      errs
+addErrCtxt (TcDown def us ds loc ctxt errs) msg = TcDown def us ds loc (msg:ctxt) errs
+getErrCtxt (TcDown def us ds loc ctxt errs)     = ctxt
 \end{code}
 
 

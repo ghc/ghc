@@ -47,6 +47,7 @@ module Type (
 	getClassTys_maybe, ipName_maybe, classesToPreds, classesOfPreds,
 	isTauTy, mkRhoTy, splitRhoTy,
 	mkSigmaTy, isSigmaTy, splitSigmaTy,
+	getDFunTyKey,
 
 	-- Lifting and boxity
 	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType, isNewType,
@@ -86,8 +87,7 @@ import Var	( TyVar, Var, UVar,
 import VarEnv
 import VarSet
 
-import Name	( Name, NamedThing(..), mkLocalName, tidyOccName
-		)
+import Name	( Name, NamedThing(..), OccName, mkLocalName, tidyOccName )
 import NameSet
 import Class	( classTyCon, Class, ClassPred, ClassContext )
 import TyCon	( TyCon,
@@ -760,6 +760,17 @@ splitSigmaTy ty =
  where
   (tyvars,rho) = splitForAllTys ty
   (theta,tau)  = splitRhoTy rho
+\end{code}
+
+\begin{code}
+getDFunTyKey :: Type -> OccName	-- Get some string from a type, to be used to 
+				-- construct a dictionary function name
+getDFunTyKey (TyVarTy tv)    = getOccName tv
+getDFunTyKey (TyConApp tc _) = getOccName tc
+getDFunTyKey (AppTy fun _)   = getDFunTyKey fun
+getDFunTyKey (NoteTy _ t)    = getDFunTyKey t
+getDFunTyKey (FunTy arg _)   = getOccName funTyCon
+getDFunTyKey (ForAllTy _ t)  = getDFunTyKey t
 \end{code}
 
 

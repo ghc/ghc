@@ -353,7 +353,7 @@ inst_decl	:  src_loc 'instance' type '=' var_name ';'
 			{ InstDecl $3
 				   EmptyMonoBinds	{- No bindings -}
 				   []    		{- No user pragmas -}
-				   $5			{- Dfun id -}
+				   (Just $5)		{- Dfun id -}
 				   $1
 			}
 

@@ -240,7 +240,7 @@ kcTyClDecl decl@(ClassDecl context class_name
     kcHsContext context			`thenTc_`
     mapTc_ kc_sig (filter isClassOpSig class_sigs)
   where
-    kc_sig (ClassOpSig _ _ _ op_ty loc) = tcAddSrcLoc loc (kcHsBoxedSigType op_ty)
+    kc_sig (ClassOpSig _ _ op_ty loc) = tcAddSrcLoc loc (kcHsBoxedSigType op_ty)
 
 kcTyClDeclBody :: Name -> [HsTyVarBndr Name] 	-- Kind of the tycon/cls and its tyvars
 	       -> (Kind -> TcM s a)		-- Thing inside
@@ -452,8 +452,8 @@ get_tys tys = unionManyUniqSets (map get_ty tys)
 get_sigs sigs
   = unionManyUniqSets (map get_sig sigs)
   where 
-    get_sig (ClassOpSig _ _ _ ty _) = get_ty ty
-    get_sig (FixSig _)		    = emptyUniqSet
+    get_sig (ClassOpSig _ _ ty _) = get_ty ty
+    get_sig (FixSig _)		  = emptyUniqSet
     get_sig other = panic "TcTyClsDecls:get_sig"
 
 ----------------------------------------------------

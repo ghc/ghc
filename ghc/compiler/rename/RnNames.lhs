@@ -82,7 +82,6 @@ getGlobalNames (HsModule this_mod _ exports imports decls _ mod_loc)
 	   rec_exp_fn :: Name -> ExportFlag
 	   rec_exp_fn = mk_export_fn (availsToNameSet rec_export_avails)
 	in
-	setModuleRn this_mod			$
 
 		-- PROCESS LOCAL DECLS
 		-- Do these *first* so that the correct provenance gets
@@ -255,7 +254,7 @@ improveAvails imp_mod iloc explicits is_unqual avails
 
 \begin{code}
 importsFromLocalDecls mod_name rec_exp_fn decls
-  = mapRn (getLocalDeclBinders newLocalName) decls	`thenRn` \ avails_s ->
+  = mapRn (getLocalDeclBinders mod rec_exp_fn) decls	`thenRn` \ avails_s ->
 
     let
 	avails = concat avails_s
@@ -282,38 +281,33 @@ importsFromLocalDecls mod_name rec_exp_fn decls
   where
     mod = mkThisModule mod_name
 
-    newLocalName rdr_name loc 
-	= check_unqual rdr_name loc 			`thenRn_`
-	  newTopBinder mod (rdrNameOcc rdr_name) 	`thenRn` \ name ->
-	  returnRn (setNameProvenance name (LocalDef loc (rec_exp_fn name)))
+getLocalDeclBinders :: Module -> (Name -> ExportFlag)
+		    -> RdrNameHsDecl -> RnMG Avails
+getLocalDeclBinders mod rec_exp_fn (ValD binds)
+  = mapRn do_one (bagToList (collectTopBinders binds))
+  where
+    do_one (rdr_name, loc) = newLocalName mod rec_exp_fn rdr_name loc	`thenRn` \ name ->
+			     returnRn (Avail name)
 
+getLocalDeclBinders mod rec_exp_fn decl
+  = getDeclBinders (newLocalName mod rec_exp_fn) decl	`thenRn` \ maybe_avail ->
+    case maybe_avail of
+	Nothing    -> returnRn []		-- Instance decls and suchlike
+	Just avail -> returnRn [avail]
+
+newLocalName mod rec_exp_fn rdr_name loc 
+  = check_unqual rdr_name loc 			`thenRn_`
+    newTopBinder mod (rdrNameOcc rdr_name) 	`thenRn` \ name ->
+    returnRn (setNameProvenance name (LocalDef loc (rec_exp_fn name)))
+  where
 	-- There should never be a qualified name in a binding position (except in instance decls)
 	-- The parser doesn't check this because the same parser parses instance decls
     check_unqual rdr_name loc
 	| isUnqual rdr_name = returnRn ()
 	| otherwise	    = qualNameErr (text "the binding for" <+> quotes (ppr rdr_name)) 
 				          (rdr_name,loc)
-
-getLocalDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)	-- New-name function
-		    -> RdrNameHsDecl
-		    -> RnMG Avails
-getLocalDeclBinders new_name (ValD binds)
-  = mapRn do_one (bagToList (collectTopBinders binds))
-  where
-    do_one (rdr_name, loc) = new_name rdr_name loc	`thenRn` \ name ->
-			     returnRn (Avail name)
-
-getLocalDeclBinders new_name decl
-  = getDeclBinders new_name decl	`thenRn` \ maybe_avail ->
-    case maybe_avail of
-	Nothing    -> returnRn []		-- Instance decls and suchlike
-	Just avail -> getDeclSysBinders new_sys_name decl		`thenRn_`  
-		      returnRn [avail]
-  where
-	-- The getDeclSysBinders is just to get the names of superclass selectors
-	-- etc, into the cache
-    new_sys_name rdr_name loc = newImplicitBinder (rdrNameOcc rdr_name) loc
 \end{code}
+
 
 %************************************************************************
 %*									*

@@ -15,7 +15,7 @@ module HsDecls (
 	BangType(..), getBangType,
 	IfaceSig(..),  SpecDataSig(..), 
 	DeprecDecl(..), DeprecTxt,
-	hsDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule
+	hsDeclName, instDeclName, tyClDeclName, isClassDecl, isSynDecl, isDataDecl, countTyClDecls, toHsRule
     ) where
 
 #include "HsVersions.h"
@@ -79,20 +79,24 @@ data HsDecl name pat
 hsDeclName :: (Outputable name, Outputable pat)
 	   => HsDecl name pat -> name
 #endif
-hsDeclName (TyClD decl)				  = tyClDeclName decl
-hsDeclName (SigD    (IfaceSig name _ _ _))	  = name
-hsDeclName (InstD   (InstDecl _ _ _ name _))      = name
-hsDeclName (ForD    (ForeignDecl name _ _ _ _ _)) = name
-hsDeclName (FixD    (FixitySig name _ _))	  = name
+hsDeclName (TyClD decl)				    = tyClDeclName decl
+hsDeclName (InstD   decl)			    = instDeclName decl
+hsDeclName (SigD    (IfaceSig name _ _ _))	    = name
+hsDeclName (ForD    (ForeignDecl name _ _ _ _ _))   = name
+hsDeclName (FixD    (FixitySig name _ _))	    = name
 -- Others don't make sense
 #ifdef DEBUG
 hsDeclName x				      = pprPanic "HsDecls.hsDeclName" (ppr x)
 #endif
 
+
 tyClDeclName :: TyClDecl name pat -> name
 tyClDeclName (TyData _ _ name _ _ _ _ _ _)          = name
 tyClDeclName (TySynonym name _ _ _)                 = name
 tyClDeclName (ClassDecl _ name _ _ _ _ _ _ _ _ _ _) = name
+
+instDeclName :: InstDecl name pat -> name
+instDeclName (InstDecl _ _ _ (Just name) _) = name
 \end{code}
 
 \begin{code}
@@ -125,6 +129,48 @@ instance Ord name => Eq (HsDecl name pat) where
 \subsection[TyDecl]{@data@, @newtype@ or @type@ (synonym) type declaration}
 %*									*
 %************************************************************************
+
+Type and class declarations carry 'implicit names'.  In particular:
+
+Type A.  
+~~~~~~~
+  Each data type decl defines 
+	a worker name for each constructor
+	to-T and from-T convertors
+  Each class decl defines
+	a tycon for the class
+	a data constructor for that tycon
+	the worker for that constructor
+	a selector for each superclass
+
+All have occurrence names that are derived uniquely from their parent declaration.
+
+None of these get separate definitions in an interface file; they are
+fully defined by the data or class decl.  But they may *occur* in
+interface files, of course.  Any such occurrence must haul in the
+relevant type or class decl.
+
+Plan of attack:
+ - Make up their occurrence names immediately
+
+ - Ensure they "point to" the parent data/class decl 
+   when loading that decl from an interface file
+
+ - When renaming the decl look them up in the name cache,
+   ensure correct module and provenance is set
+
+Type B: Default methods and dictionary functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Have their own binding in an interface file.
+
+Default methods : occurrence name is derived uniquely from the class decl.
+Dict functions  : occurrence name is derived from the instance decl, plus a unique number.
+
+Plan of attack: 
+  - Do *not* make them point to the parent class decl
+  - Interface-file decls: treat just like Type A
+  - Source-file decls:    the names aren't in the decl at all; 
+			  instead the typechecker makes them up
 
 \begin{code}
 data TyClDecl name pat
@@ -189,8 +235,16 @@ instance Ord name => Eq (TyClDecl name pat) where
 eq_hsFD env (ns1,ms1) (ns2,ms2)
   = eqListBy (eq_hsVar env) ns1 ns2 && eqListBy (eq_hsVar env) ms1 ms2
 
-eq_cls_sig env (ClassOpSig n1 _ b1 ty1 _) (ClassOpSig n2 _ b2 ty2 _)
-  = n1==n2 && b1==b2 && eq_hsType env ty1 ty2
+eq_cls_sig env (ClassOpSig n1 dm1 ty1 _) (ClassOpSig n2 dm2 ty2 _)
+  = n1==n2 && dm1 `eq_dm` dm2 && eq_hsType env ty1 ty2
+  where
+	-- Ignore the name of the default method.
+	-- This is used for comparing declarations before putting
+	-- them into interface files, and the name of the default 
+	-- method isn't relevant
+    (Just (_,explicit_dm1)) `eq_dm` (Just (_,explicit_dm2)) = explicit_dm1 == explicit_dm2
+    Nothing		    `eq_dm` Nothing		    = True
+    dm1			    `eq_dm` dm2			    = False
 \end{code}
 
 \begin{code}
@@ -400,7 +454,8 @@ data InstDecl name pat
 
 		[Sig name]		-- User-supplied pragmatic info
 
-		name			-- Name for the dictionary function
+		(Maybe name)		-- Name for the dictionary function
+					-- Nothing for source-file instance decls
 
 		SrcLoc
 \end{code}
@@ -409,14 +464,18 @@ data InstDecl name pat
 instance (Outputable name, Outputable pat)
 	      => Outputable (InstDecl name pat) where
 
-    ppr (InstDecl inst_ty binds uprags dfun_name src_loc)
+    ppr (InstDecl inst_ty binds uprags maybe_dfun_name src_loc)
       = getPprStyle $ \ sty ->
         if ifaceStyle sty then
-           hsep [ptext SLIT("instance"), ppr inst_ty, equals, ppr dfun_name]
+           hsep [ptext SLIT("instance"), ppr inst_ty, equals, pp_dfun]
 	else
 	   vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
 	         nest 4 (ppr uprags),
 	         nest 4 (ppr binds) ]
+      where
+	pp_dfun = case maybe_dfun_name of
+		    Just df -> ppr df
+		    Nothing -> empty
 \end{code}
 
 \begin{code}

@@ -1,3 +1,23 @@
+Notes July 00
+~~~~~~~~~~~~~~
+Time.lhs: fails with too many arguments to C function
+works with native code gen
+
+CTypes.lhs: fails with
+    /tmp/ghc2840.hc:42413: fixed or forbidden register 3 (bx) was spilled for class GENERAL_REGS.
+    This may be due to a compiler bug or to impossible asm statements or clauses.
+works without -O
+
+posix/* fails with
+      ghc1653.c:4: `#include' expects "FILENAME" or <FILENAME>
+      ghc1653.c:6: `#include' expects "FILENAME" or <FILENAME>
+works when one fixes the makefile
+
+make depend needs the -osuf o removed.
+
+CTypes also has a Subst-worker WARNING.
+
+
 Notes June 99
 ~~~~~~~~~~~~~
 * In nofib/spectral/mandel2/Main.check_radius, there's a call to (fromIntegral m), where

@@ -6,7 +6,7 @@ module TcImprove ( tcImprove ) where
 import Name		( Name )
 import Class		( Class, FunDep, className, classExtraBigSig )
 import Unify		( unifyTyListsX, matchTys )
-import Subst		( mkSubst, substTy )
+import Subst		( mkSubst, emptyInScopeSet, substTy )
 import TcEnv		( tcGetInstEnv, classInstEnv )
 import TcMonad
 import TcType		( TcType, TcTyVar, TcTyVarSet, zonkTcType, zonkTcTypes )
@@ -104,8 +104,9 @@ checkFd free (t_x, t_y) (s_x, s_y)
   = zonkUnifyTys free t_x s_x `thenTc` \ msubst ->
     case msubst of
       Just subst ->
-	let t_y' = map (substTy (mkSubst emptyVarEnv subst)) t_y
-	    s_y' = map (substTy (mkSubst emptyVarEnv subst)) s_y
+	let full_subst = mkSubst emptyInScopeSet subst
+  	    t_y' = map (substTy full_subst) t_y
+	    s_y' = map (substTy full_subst) s_y
 	in
 	    zonkEqTys t_y' s_y' `thenTc` \ eq ->
 	    if eq then

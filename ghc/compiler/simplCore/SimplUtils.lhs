@@ -11,33 +11,39 @@ module SimplUtils (
 
 	-- The continuation type
 	SimplCont(..), DupFlag(..), contIsDupable, contResultType,
-	pushArgs, discardCont, countValArgs, countArgs,
-	analyseCont, discardInline
+	countValArgs, countArgs,
+	getContArgs, interestingCallContext, interestingArg, isStrictType, discardInline
 
     ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
+import CmdLineOpts	( switchIsOn, SimplifierSwitch(..),
+			  opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge, opt_DictsStrict
+			)
 import CoreSyn
 import CoreUnfold	( isValueUnfolding )
 import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap, exprEtaExpandArity, bindNonRec )
 import Subst		( InScopeSet, mkSubst, substBndrs, substBndr, substIds, lookupIdSubst )
 import Id		( Id, idType, isId, idName, 
-			  idOccInfo, idUnfolding,
+			  idOccInfo, idUnfolding, idStrictness,
 			  mkId, idInfo
 			)
-import IdInfo		( arityLowerBound, setOccInfo, vanillaIdInfo )
+import IdInfo		( StrictnessInfo(..), arityLowerBound, setOccInfo, vanillaIdInfo )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( isLocalName, setNameUnique )
+import Demand		( Demand, isStrict, wwLazy, wwLazy )
 import SimplMonad
 import Type		( Type, tyVarsOfType, tyVarsOfTypes, mkForAllTys, seqType, repType,
-			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys
+			  splitTyConApp_maybe, mkTyVarTys, applyTys, splitFunTys, mkFunTys,
+			  isDictTy, isDataType, applyTy, splitFunTy, isUnLiftedType,
+			  splitRepFunTys
 			)
 import TyCon		( tyConDataConsIfAvailable )
 import DataCon		( dataConRepArity )
 import VarSet
 import VarEnv		( SubstEnv, SubstResult(..) )
+import Util		( lengthExceeds )
 import Outputable
 \end{code}
 
@@ -69,11 +75,12 @@ data SimplCont		-- Strict contexts
   | ArgOf    DupFlag		-- An arbitrary strict context: the argument 
   	     			-- 	of a strict function, or a primitive-arg fn
 				-- 	or a PrimOp
-	     OutType		-- The type of the expression being sought by the context
+	     OutType		-- cont_ty: the type of the expression being sought by the context
 				--	f (error "foo") ==> coerce t (error "foo")
 				-- when f is strict
 				-- We need to know the type t, to which to coerce.
 	     (OutExpr -> SimplM OutExprStuff)	-- What to do with the result
+				-- The result expression in the OutExprStuff has type cont_ty
 
 instance Outputable SimplCont where
   ppr (Stop _)        		     = ptext SLIT("Stop")
@@ -90,6 +97,7 @@ instance Outputable DupFlag where
   ppr OkToDup = ptext SLIT("ok")
   ppr NoDup   = ptext SLIT("nodup")
 
+-------------------
 contIsDupable :: SimplCont -> Bool
 contIsDupable (Stop _)       		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
@@ -99,9 +107,18 @@ contIsDupable (CoerceIt _ cont)          = contIsDupable cont
 contIsDupable (InlinePlease cont)	 = contIsDupable cont
 contIsDupable other			 = False
 
-pushArgs :: SubstEnv -> [InExpr] -> SimplCont -> SimplCont
-pushArgs se []         cont = cont
-pushArgs se (arg:args) cont = ApplyTo NoDup arg se (pushArgs se args cont)
+-------------------
+discardInline :: SimplCont -> SimplCont
+discardInline (InlinePlease cont)  = cont
+discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
+discardInline cont		   = cont
+
+-------------------
+discardableCont :: SimplCont -> Bool
+discardableCont (Stop _)	    = False
+discardableCont (CoerceIt _ cont)   = discardableCont cont
+discardableCont (InlinePlease cont) = discardableCont cont
+discardableCont other		    = True
 
 discardCont :: SimplCont	-- A continuation, expecting
 	    -> SimplCont	-- Replace the continuation with a suitable coerce
@@ -110,6 +127,7 @@ discardCont cont	 = CoerceIt to_ty (Stop to_ty)
 			 where
 			   to_ty = contResultType cont
 
+-------------------
 contResultType :: SimplCont -> OutType
 contResultType (Stop to_ty)	     = to_ty
 contResultType (ArgOf _ to_ty _)     = to_ty
@@ -118,6 +136,7 @@ contResultType (CoerceIt _ cont)     = contResultType cont
 contResultType (InlinePlease cont)   = contResultType cont
 contResultType (Select _ _ _ _ cont) = contResultType cont
 
+-------------------
 countValArgs :: SimplCont -> Int
 countValArgs (ApplyTo _ (Type ty) se cont) = countValArgs cont
 countValArgs (ApplyTo _ val_arg   se cont) = 1 + countValArgs cont
@@ -129,8 +148,132 @@ countArgs other			  = 0
 \end{code}
 
 
-Comment about analyseCont
-~~~~~~~~~~~~~~~~~~~~~~~~~
+\begin{code}
+getContArgs :: OutId -> SimplCont 
+	    -> SimplM ([(InExpr, SubstEnv, Bool)],	-- Arguments; the Bool is true for strict args
+			SimplCont,			-- Remaining continuation
+			Bool)				-- Whether we came across an InlineCall
+-- getContArgs id k = (args, k', inl)
+-- 	args are the leading ApplyTo items in k
+--	(i.e. outermost comes first)
+--	augmented with demand info from the functionn
+getContArgs fun orig_cont
+  = getSwitchChecker 	`thenSmpl` \ chkr ->
+    let
+		-- Ignore strictness info if the no-case-of-case
+		-- flag is on.  Strictness changes evaluation order
+		-- and that can change full laziness
+	stricts | switchIsOn chkr NoCaseOfCase = vanilla_stricts
+		| otherwise		       = computed_stricts
+    in
+    go [] stricts False orig_cont
+  where
+    ----------------------------
+
+	-- Type argument
+    go acc ss inl (ApplyTo _ arg@(Type _) se cont)
+	= go ((arg,se,False) : acc) ss inl cont
+		-- NB: don't bother to instantiate the function type
+
+	-- Value argument
+    go acc (s:ss) inl (ApplyTo _ arg se cont)
+	= go ((arg,se,s) : acc) ss inl cont
+
+	-- An Inline continuation
+    go acc ss inl (InlinePlease cont)
+	= go acc ss True cont
+
+	-- We're run out of arguments, or else we've run out of demands
+	-- The latter only happens if the result is guaranteed bottom
+	-- This is the case for
+	--	* case (error "hello") of { ... }
+	--	* (error "Hello") arg
+	--	* f (error "Hello") where f is strict
+	--	etc
+    go acc ss inl cont 
+	| null ss && discardableCont cont = tick BottomFound	`thenSmpl_`
+					    returnSmpl (reverse acc, discardCont cont, inl)
+	| otherwise			  = returnSmpl (reverse acc, cont, 	       inl)
+
+    ----------------------------
+    vanilla_stricts, computed_stricts :: [Bool]
+    vanilla_stricts  = repeat False
+    computed_stricts = zipWith (||) fun_stricts arg_stricts
+
+    ----------------------------
+    (val_arg_tys, _) = splitRepFunTys (idType fun)
+    arg_stricts      = map isStrictType val_arg_tys ++ repeat False
+	-- These argument types are used as a cheap and cheerful way to find
+	-- unboxed arguments, which must be strict.  But it's an InType
+	-- and so there might be a type variable where we expect a function
+	-- type (the substitution hasn't happened yet).  And we don't bother
+	-- doing the type applications for a polymorphic function.
+	-- Hence the split*Rep*FunTys
+
+    ----------------------------
+	-- If fun_stricts is finite, it means the function returns bottom
+	-- after that number of value args have been consumed
+	-- Otherwise it's infinite, extended with False
+    fun_stricts
+      = case idStrictness fun of
+	  StrictnessInfo demands result_bot 
+		| not (demands `lengthExceeds` countValArgs orig_cont)
+		-> 	-- Enough args, use the strictness given.
+			-- For bottoming functions we used to pretend that the arg
+			-- is lazy, so that we don't treat the arg as an
+			-- interesting context.  This avoids substituting
+			-- top-level bindings for (say) strings into 
+			-- calls to error.  But now we are more careful about
+			-- inlining lone variables, so its ok (see SimplUtils.analyseCont)
+		   if result_bot then
+			map isStrict demands		-- Finite => result is bottom
+		   else
+			map isStrict demands ++ vanilla_stricts
+
+	  other -> vanilla_stricts	-- Not enough args, or no strictness
+
+
+-------------------
+isStrictType :: Type -> Bool
+	-- isStrictType computes whether an argument (or let RHS) should
+	-- be computed strictly or lazily, based only on its type
+isStrictType ty
+  | isUnLiftedType ty				    = True
+  | opt_DictsStrict && isDictTy ty && isDataType ty = True
+  | otherwise					    = False 
+	-- Return true only for dictionary types where the dictionary
+	-- has more than one component (else we risk poking on the component
+	-- of a newtype dictionary)
+
+-------------------
+interestingArg :: InScopeSet -> InExpr -> SubstEnv -> Bool
+	-- An argument is interesting if it has *some* structure
+	-- We are here trying to avoid unfolding a function that
+	-- is applied only to variables that have no unfolding
+	-- (i.e. they are probably lambda bound): f x y z
+	-- There is little point in inlining f here.
+interestingArg in_scope arg subst
+  = analyse arg
+  where
+    analyse (Var v)
+	= case lookupIdSubst (mkSubst in_scope subst) v of
+	    DoneId v' _ -> hasSomeUnfolding (idUnfolding v')
+					-- was: isValueUnfolding (idUnfolding v')
+					-- But that seems over-pessimistic
+
+	    other	-> True		-- was: False
+					-- But that is *definitely* too pessimistic.
+					-- E.g. 	let x = 3 in f 
+					-- Here, x will be unconditionally substituted, via
+					-- the substitution!
+    analyse (Type _)	      = False
+    analyse (App fn (Type _)) = analyse fn
+    analyse (Note _ a)	      = analyse a
+    analyse other	      = True
+\end{code}
+
+Comment about interestingCallContext
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to avoid inlining an expression where there can't possibly be
 any gain, such as in an argument position.  Hence, if the continuation
 is interesting (eg. a case scrutinee, application etc.) then we
@@ -163,13 +306,9 @@ contIsInteresting looks for case expressions with just a single
 default case.
 
 \begin{code}
-analyseCont :: InScopeSet -> SimplCont
-	    -> ([Bool],		-- Arg-info flags; one for each value argument
-		Bool,		-- Context of the result of the call is interesting
-		Bool)		-- There was an InlinePlease 
-
-analyseCont in_scope cont 
-  = case cont of
+interestingCallContext :: Bool 		-- False <=> no args at all
+		       -> Bool		-- False <=> no value args
+		       -> SimplCont -> Bool
 	-- The "lone-variable" case is important.  I spent ages
 	-- messing about with unsatisfactory varaints, but this is nice.
 	-- The idea is that if a variable appear all alone
@@ -197,59 +336,23 @@ analyseCont in_scope cont
 	-- However, even a type application isn't a lone variable.  Consider
 	--	case $fMonadST @ RealWorld of { :DMonad a b c -> c }
 	-- We had better inline that sucker!  The case won't see through it.
+	--
+	-- For now, I'm treating treating a variable applied to types as
+	-- "lone". The motivating example was
+	--	f = /\a. \x. BIG
+	--	g = /\a. \y.  h (f a)
+	-- There's no advantage in inlining f here, and perhaps
+	-- a significant disadvantage.  Hence some_val_args in the Stop case
 
-      (Stop _)           	  -> boring_result		-- Don't inline a lone variable
-      (Select _ _ _ _ _) 	  -> boring_result		-- Ditto
-      (ArgOf _ _ _)      	  -> boring_result		-- Ditto
-      (ApplyTo _ (Type _) _ cont) -> analyse_ty_app cont
-      other		 	  -> analyse_app cont
+interestingCallContext some_args some_val_args cont
+  = interesting cont
   where
-    boring_result = ([], False, False)
-
-		-- For now, I'm treating not treating a variable applied to types as
-		-- "lone". The motivating example was
-		--	f = /\a. \x. BIG
-		--	g = /\a. \y.  h (f a)
-		-- There's no advantage in inlining f here, and perhaps
-		-- a significant disadvantage.
-    analyse_ty_app (Stop _)			= boring_result
-    analyse_ty_app (ArgOf _ _ _)      		= boring_result
-    analyse_ty_app (Select _ _ _ _ _) 		= ([], True, False)	-- See the $fMonadST example above
-    analyse_ty_app (ApplyTo _ (Type _) _ cont)	= analyse_ty_app cont
-    analyse_ty_app cont				= analyse_app cont
-
-    analyse_app (InlinePlease cont)  
-	= case analyse_app cont of
-		 (infos, icont, inline) -> (infos, icont, True)
-
-    analyse_app (ApplyTo _ arg subst cont) 
-	| isValArg arg = case analyse_app cont of
-			   (infos, icont, inline) -> (analyse_arg subst arg : infos, icont, inline)
-	| otherwise    = analyse_app cont
-
-    analyse_app cont = ([], interesting_call_context cont, False)
-
-	-- An argument is interesting if it has *some* structure
-	-- We are here trying to avoid unfolding a function that
-	-- is applied only to variables that have no unfolding
-	-- (i.e. they are probably lambda bound): f x y z
-	-- There is little point in inlining f here.
-    analyse_arg :: SubstEnv -> InExpr -> Bool
-    analyse_arg subst (Var v)	        = case lookupIdSubst (mkSubst in_scope subst) v of
-						DoneId v' _ -> isValueUnfolding (idUnfolding v')
-						other	    -> False
-    analyse_arg subst (Type _)	        = False
-    analyse_arg subst (App fn (Type _)) = analyse_arg subst fn
-    analyse_arg subst (Note _ a)	= analyse_arg subst a
-    analyse_arg subst other	        = True
-
-    interesting_call_context (Stop ty)	     		 = canUpdateInPlace ty
-    interesting_call_context (InlinePlease _)	         = True
-    interesting_call_context (Select _ _ _ _ _)          = True
-    interesting_call_context (CoerceIt _ cont)           = interesting_call_context cont
-    interesting_call_context (ApplyTo _ (Type _) _ cont) = interesting_call_context cont
-    interesting_call_context (ApplyTo _ _	 _ _)    = True
-    interesting_call_context (ArgOf _ _ _)		 = True
+    interesting (InlinePlease _)   = True
+    interesting (ApplyTo _ _ _ _)  = some_args	-- Can happen if we have (coerce t (f x)) y
+    interesting (Select _ _ _ _ _) = some_args
+    interesting (ArgOf _ _ _)	   = some_val_args
+    interesting (Stop ty) 	   = some_val_args && canUpdateInPlace ty
+    interesting (CoerceIt _ cont)  = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -266,11 +369,8 @@ analyseCont in_scope cont
 	-- the context for (f x) is not totally uninteresting.
 
 
-discardInline :: SimplCont -> SimplCont
-discardInline (InlinePlease cont)  = cont
-discardInline (ApplyTo d e s cont) = ApplyTo d e s (discardInline cont)
-discardInline cont		   = cont
-
+-------------------
+canUpdateInPlace :: Type -> Bool
 -- Consider   let x = <wurble> in ...
 -- If <wurble> returns an explicit constructor, we might be able
 -- to do update in place.  So we treat even a thunk RHS context
@@ -502,10 +602,10 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		-- 
 		-- It's even right to retain single-occurrence or dead-var info:
 		-- Suppose we started with  /\a -> let x = E in B
-		-- where x occurs once in E. Then we transform to:
+		-- where x occurs once in B. Then we transform to:
 		--	let x' = /\a -> E in /\a -> let x* = x' a in B
 		-- where x* has an INLINE prag on it.  Now, once x* is inlined,
-		-- the occurrences of x' will be just the occurrences originaly
+		-- the occurrences of x' will be just the occurrences originally
 		-- pinned on x.
 	    poly_info = vanillaIdInfo `setOccInfo` idOccInfo var
 
@@ -514,8 +614,7 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 	returnSmpl (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tyvars_here))
 
     mk_silly_bind var rhs = NonRec var rhs
-		-- The Inline note is really important!  If we don't say 
-		-- INLINE on these silly little bindings then look what happens!
+		-- We need to be careful about inlining.
 		-- Suppose we start with:
 		--
 		--	x = let g = /\a -> \x -> f x x
@@ -523,11 +622,13 @@ mkRhsTyLam tyvars body			-- Only does something if there's a let
 		--	    /\ b -> let g* = g b in E
 		--
 		-- Then: 	* the binding for g gets floated out
-		-- 		* but then it gets inlined into the rhs of g*
+		-- 		* but then it MIGHT get inlined into the rhs of g*
 		--		* then the binding for g* is floated out of the /\b
 		--		* so we're back to square one
-		-- The silly binding for g* must be INLINEd, so that
-		-- we simply substitute for g* throughout.
+		-- We rely on the simplifier not to inline g into the RHS of g*,
+		-- because it's a "lone" occurrence, and there is no benefit in
+		-- inlining.  But it's a slightly delicate property, and there's
+		-- a danger of making the simplifier loop here.
 \end{code}
 
 
