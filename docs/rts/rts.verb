@@ -25,7 +25,7 @@
 \newcommand{\note}[1]{{{\bf Note:}\sl #1}}
 \newcommand{\ToDo}[1]{{{\bf ToDo:}\sl #1}}
 \newcommand{\Arg}[1]{\mbox{${\tt arg}_{#1}$}}
-\newcommand{\bottom}{bottom} % foo, can't remember the symbol name
+\newcommand{\bottom}{\perp}
 
 \newcommand{\secref}[1]{Section~\ref{sec:#1}}
 \newcommand{\figref}[1]{Figure~\ref{fig:#1}}
@@ -221,6 +221,8 @@ words and pointers are the same size.  \ToDo{GHC currently makes words
 the same size as pointers to reduce complexity in the code
 generator/RTS.  It would be useful to relax this restriction, and have
 eg. 32-bit Ints on a 64-bit machine.}
+
+% should define terms like SRT, CAF, PAP, etc. here?  --KSW 1999-03
 
 \subsection{Subtle Dependencies}
 
@@ -925,7 +927,7 @@ the scheduler.
 
 We avoid the need to test return addresses in the machine code
 evaluator by pushing a special return address on top of a pointer to
-the bytecode return continuation.  \figref{hugs-return-stack}
+the bytecode return continuation.  \figref{hugs-return-stack1}
 shows the state of the stack just before evaluating the scrutinee.
 
 \begin{figure}[ht]
@@ -941,7 +943,7 @@ shows the state of the stack just before evaluating the scrutinee.
 %\input{hugs_return1.pstex_t}
 \end{center}
 \caption{Stack layout for evaluating a scrutinee}
-\label{fig:hugs-return-stack}
+\label{fig:hugs-return-stack1}
 \end{figure}
 
 This return address rearranges the stack so that the bco pointer is
@@ -1094,6 +1096,8 @@ Indirections are shorted out.
 
 Update frames pointing to unreachable objects are squeezed out.
 
+\ToDo{Part IV suggests this doesn't happen.}
+
 \item
 
 Adjacent update frames (for different closures) are compressed to a
@@ -1179,7 +1183,7 @@ An initialisation routine.  (Might also be used for finalisation.)
 \item
 A table of symbols it exports.
 Entries in this table consist of the symbol name and the address of the
-names value.
+name's value.
 \item
 A table of symbols it imports.
 Entries in this table consist of the symbol name and a list of references
@@ -1237,7 +1241,7 @@ described in the previous part.
 
 The major components of the system are:
 \begin{itemize}
-\item The scheduler (\secref{storage-manager-internals})
+\item The scheduler (\secref{scheduler-internals})
 \item The storage manager (\secref{storage-manager-internals})
 \item The evaluators
 \item The loader
@@ -1429,6 +1433,20 @@ and is only present for the following closure types:
 	\item @RET_*@
 	\end{itemize}
 
+\ToDo{Expand the following explanation.}
+
+An SRT is basically a vector of pointers to static closures.  A
+top-level function or thunk will have an SRT (which might be empty),
+which points to all the static closures referenced by that function or
+thunk.  Every non-top-level thunk or function also has an SRT, but
+it'll be a sub-sequence of the top-level SRT, so we just store a
+pointer and a length in the info table - the pointer points into the
+middle of the larger SRT.
+
+At GC time, the garbage collector traverses the transitive closure of
+all the SRTs reachable from the roots, and thereby discovers which
+CAFs are live.
+  
 \item \emph{Profiling info\/}
 
 \ToDo{The profiling info is completely bogus.  I've not deleted it
@@ -2016,7 +2034,9 @@ special.]
 
 There is a fixed set of pre-compiled selector thunks built into the
 RTS, representing offsets from 0 to @MAX_SPEC_SELECTOR_THUNK@.  The
-info tables are labelled @sel_info_$n$@ where $n$ is the offset.
+info tables are labelled @__sel_$n$_upd_info@ where $n$ is the offset.
+Non-updating versions are also built in, with info tables labelled
+@__sel_$n$_noupd_info@.
 
 \end{itemize}
 
@@ -2173,7 +2193,7 @@ It contains a \emph{mutable link field} that is used to string together
 mutable objects in each old generation.
 
 \item[@IND_PERM@]
-for lexical profiling, it is necessary to maintain cost centre
+For lexical profiling, it is necessary to maintain cost centre
 information in an indirection, so ``permanent indirections'' are
 retained forever.  Otherwise they are just like vanilla indirections.
 \note{If a permanent indirection points to another permanent
@@ -2662,6 +2682,7 @@ top, traversing pending-argument sections and activation records
 alternately.  Next we discuss how it finds the pointers in each of
 these two stack regions.
 
+
 \Subsubsection{Activation records}{activation-records}
 
 An \emph{activation record} is a contiguous chunk of stack,
@@ -2714,7 +2735,7 @@ The garbage collector traverses a pending argument section from the
 top (i.e. lowest memory address).  It looks at each word in turn:
 
 \begin{itemize}
-\item If it is less than or equal to a small constant @MAX_STACK_TAG@
+\item If it is less than or equal to a small constant @ARGTAG_MAX@
 then it treats it as a tag heralding zero or more words of
 non-pointers, so it just skips over them.
 
@@ -2855,7 +2876,7 @@ when it is no longer live because, whilst it might not be required in
 the evaluation of the current expression, it might be required in the
 next evaluation.
 
-There are two possible behaviours we migth want:
+There are two possible behaviours we might want:
 \begin{enumerate}
 \item
 When a CAF is no longer required for the current evaluation, the CAF
@@ -3073,7 +3094,7 @@ by compiled code:
 \item
 
 Whereas compiled code has five different ways of entering a closure
-(\secref{entering-closures}), interpreted code has only one.
+(\secref{ghc-fun-call}), interpreted code has only one.
 The entry point for interpreted code behaves like slow entry points for
 compiled code.
 
@@ -3292,6 +3313,7 @@ stack layout is shown in \figref{hugs-return-stack}.
 \end{center}
 \caption{Stack layout for a Hugs return address}
 \label{fig:hugs-return-stack}
+% this figure apparently duplicates {fig:hugs-return-stack1} earlier.
 \end{figure}
 
 \begin{figure}[ht]
@@ -3321,7 +3343,7 @@ stack layout is shown in \figref{hugs-return-stack}.
 %\input{hugs_ret2.pstex_t}
 \end{center}
 \caption{Stack layout on entering a Hugs return address with an unboxed value}
-\label{fig:hugs-return-int}
+\label{fig:hugs-return-int1}
 \end{figure}
 
 \begin{figure}[ht]
