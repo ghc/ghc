@@ -10,7 +10,9 @@ module Rename ( renameModule ) where
 
 import HsSyn
 import RdrHsSyn		( RdrNameHsModule )
-import RnHsSyn		( RenamedHsModule, RenamedHsDecl, extractHsTyNames, extractHsCtxtTyNames )
+import RnHsSyn		( RenamedHsModule, RenamedHsDecl, 
+			  extractHsTyNames, extractHsCtxtTyNames
+			)
 
 import CmdLineOpts	( opt_HiMap, opt_D_dump_rn_trace,
 			  opt_D_dump_rn, opt_D_dump_rn_stats,
