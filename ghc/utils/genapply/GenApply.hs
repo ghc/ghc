@@ -135,6 +135,22 @@ mkBitmap args = foldr f 0 args
 -- -----------------------------------------------------------------------------
 -- Generating the application functions
 
+-- A SUBTLE POINT about stg_ap functions (can't think of a better
+-- place to put this comment --SDM):
+--
+-- The entry convention to an stg_ap_ function is as follows: all the
+-- arguments are on the stack (we might revisit this at some point,
+-- but it doesn't make any difference on x86), and THERE IS AN EXTRA
+-- EMPTY STACK SLOT at the top of the stack.  
+--
+-- Why?  Because in several cases, stg_ap_* will need an extra stack
+-- slot, eg. to push a return address in the THUNK case, and this is a
+-- way of pushing the stack check up into the caller which is probably
+-- doing one anyway.  Allocating the extra stack slot in the caller is
+-- also probably free, because it will be adjusting Sp after pushing
+-- the args anyway (this might not be true of register-rich machines
+-- when we start passing args to stg_ap_* in regs).
+
 mkApplyRetName args
   = text "stg_ap_" <> text (map showArg args) <> text "_ret"
 
@@ -149,6 +165,9 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
   where
     n_args = length args
 
+    -- offset of args on the stack, see large comment above.
+    arg_sp_offset = 1
+
 -- The SMALLER ARITY cases:
 --	if (arity == 1) {
 --	    Sp[0] = Sp[1];
@@ -161,8 +180,8 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
         =  text "if (arity == " <> int arity <> text ") {" $$
 	   let
 	     (reg_doc, sp')
-		| stack_apply = (empty, 1)
-		| otherwise   = loadRegArgs 1 these_args
+		| stack_apply = (empty, arg_sp_offset)
+		| otherwise   = loadRegArgs arg_sp_offset these_args
 	   in
            nest 4 (vcat [
 	     reg_doc,
@@ -197,8 +216,8 @@ genMkPAP macro jump stack_apply is_pap args all_args_size fun_info_label
 	= text "if (arity == " <> int n_args <> text ") {" $$
 	  let
 	     (reg_doc, sp')
-		| stack_apply = (empty, 1)
-		| otherwise   = loadRegArgs 1 args
+		| stack_apply = (empty, arg_sp_offset)
+		| otherwise   = loadRegArgs arg_sp_offset args
 	  in
 	  nest 4 (vcat [
 	    reg_doc,
