@@ -187,8 +187,11 @@ new_ps_array size = ST $ \ s ->
 #elif __GLASGOW_HASKELL__ < 405
     case (newCharArray# size s)	  of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray bot barr# #) }
-#else
+#elif __GLASGOW_HASKELL__ < 411
     case (newCharArray# size s)	  of { (# s2#, barr# #) ->
+    (# s2#, MutableByteArray bot bot barr# #) }
+#else /* 411 and higher */
+    case (newByteArray# size s)	  of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray bot bot barr# #) }
 #endif
   where
