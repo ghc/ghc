@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.34 2003/03/29 00:00:41 sof Exp $
+ * $Id: Itimer.c,v 1.35 2003/03/29 00:27:11 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -42,7 +42,7 @@
 
 static
 int
-install_vtalrm_handler(void)
+install_vtalrm_handler(TickProc handle_tick)
 {
     struct sigaction action;
 
@@ -55,7 +55,7 @@ install_vtalrm_handler(void)
 }
 
 int
-startTicker(nat ms)
+startTicker(nat ms, TickProc handle_tick)
 {
 # ifndef HAVE_SETITIMER
   /*    fprintf(stderr, "No virtual timer on this system\n"); */
@@ -63,7 +63,7 @@ startTicker(nat ms)
 # else
     struct itimerval it;
 
-    install_vtalrm_handler();
+    install_vtalrm_handler(handle_tick);
 
     timestamp = getourtimeofday();
 

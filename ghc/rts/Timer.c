@@ -35,6 +35,7 @@ static int ticks_to_ctxt_switch = 0;
  * At each occurrence of a tick, the OS timer will invoke
  * handle_tick().
  */
+static
 void
 handle_tick(int unused STG_UNUSED)
 {
@@ -57,7 +58,7 @@ startTimer(nat ms)
   initProfTimer();
 #endif
 
-  return startTicker(ms);
+  return startTicker(ms, handle_tick);
 }
 
 int

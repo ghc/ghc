@@ -16,7 +16,8 @@
  */
 #define CS_MIN_MILLISECS TICK_MILLISECS       /* milliseconds per slice */
 
-extern void handle_tick(int unused);
+typedef void (*TickProc)(int);
+
 extern int startTimer(nat ms);
 extern int stopTimer(void);
 #endif /* __TIMER_H__ */

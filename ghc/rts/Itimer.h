@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.12 2003/03/28 23:46:40 sof Exp $
+ * $Id: Itimer.h,v 1.13 2003/03/29 00:27:11 sof Exp $
  *
  * (c) The GHC Team 1998-2001
  *
@@ -9,7 +9,7 @@
 #ifndef __ITIMER_H__
 #define __ITIMER_H__
 
-extern int startTicker( nat ms );
+extern int startTicker( nat ms, TickProc handle_tick);
 extern int stopTicker ( void );
 
 extern unsigned int getourtimeofday   ( void );

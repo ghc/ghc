@@ -21,6 +21,8 @@
  */
 static HANDLE hStopEvent = INVALID_HANDLE_VALUE;
 
+static TickProc tickProc = NULL;
+
 /*
  * Ticking is done by a separate thread which periodically
  * wakes up to handle a tick.
@@ -48,11 +50,12 @@ TimerProc(PVOID param)
     switch (waitRes) {
     case WAIT_OBJECT_0:
       /* event has become signalled */
+      tickProc = NULL;
       CloseHandle(hStopEvent);
       return 0;
     case WAIT_TIMEOUT:
       /* tick */
-      handle_tick(0);
+      tickProc(0);
       break;
     default:
       fprintf(stderr, "timer: unexpected result %lu\n", waitRes); fflush(stderr);
@@ -64,7 +67,7 @@ TimerProc(PVOID param)
 
 
 int
-startTicker(nat ms)
+startTicker(nat ms, TickProc handle_tick)
 {
   unsigned threadId;
   /* 'hStopEvent' is a manual-reset event that's signalled upon
@@ -77,6 +80,7 @@ startTicker(nat ms)
   if (hStopEvent == INVALID_HANDLE_VALUE) {
     return 0;
   }
+  tickProc = handle_tick;
   return ( 0 != _beginthreadex(NULL,
 			       0,
 			       TimerProc,
