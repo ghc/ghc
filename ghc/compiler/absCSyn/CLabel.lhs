@@ -311,14 +311,18 @@ pprCLabel_asm = pprCLabel
 
 pprCLabel :: CLabel -> SDoc
 
+#if ! OMIT_NATIVE_CODEGEN
 pprCLabel (AsmTempLabel u)
   = text (fmtAsmLbl (showUnique u))
+#endif
 
-pprCLabel lbl
-  = getPprStyle $ \ sty ->
+pprCLabel lbl = 
+#if ! OMIT_NATIVE_CODEGEN
+    getPprStyle $ \ sty ->
     if asmStyle sty && underscorePrefix then
        pp_cSEP <> pprCLbl lbl
     else
+#endif
        pprCLbl lbl
 
 
