@@ -33,7 +33,6 @@ module Control.Monad.ST
 import Prelude
 
 import Control.Monad.Fix
-import Data.Typeable
 
 #include "Typeable.h"
 
@@ -58,7 +57,3 @@ import GHC.IOBase 	( stToIO, unsafeIOToST )
 instance MonadFix (ST s) where
 	mfix = fixST
 
--- ---------------------------------------------------------------------------
--- Typeable instance
-
-INSTANCE_TYPEABLE2(ST,sTTc,"ST")
