@@ -17,7 +17,7 @@ module HsDecls (
 	hsDeclName, instDeclName, 
 	tyClDeclName, tyClDeclNames, tyClDeclSysNames, tyClDeclTyVars,
 	isClassDecl, isSynDecl, isDataDecl, isIfaceSigDecl, countTyClDecls,
-	mkClassDeclSysNames, isIfaceRuleDecl, isIfaceInstDecl, ifaceRuleDeclName,
+	mkClassDeclSysNames, isSourceInstDecl, ifaceRuleDeclName,
 	getClassDeclSysNames, conDetailsTys,
 	collectRuleBndrSigTys
     ) where
@@ -47,7 +47,7 @@ import Util		( eqListBy, count )
 import SrcLoc		( SrcLoc )
 import FastString
 
-import Maybe		( isNothing, isJust, fromJust )	
+import Maybe		( isNothing, fromJust )	
 \end{code}
 
 
@@ -660,8 +660,8 @@ data InstDecl name pat
 
 		SrcLoc
 
-isIfaceInstDecl :: InstDecl name pat -> Bool
-isIfaceInstDecl (InstDecl _ _ _ maybe_dfun _) = isJust maybe_dfun
+isSourceInstDecl :: InstDecl name pat -> Bool
+isSourceInstDecl (InstDecl _ _ _ maybe_dfun _) = isNothing maybe_dfun
 \end{code}
 
 \begin{code}
@@ -787,10 +787,6 @@ data RuleDecl name pat
   | IfaceRuleOut		-- Post typecheck
 	name			-- Head of LHS
 	CoreRule
-
-isIfaceRuleDecl :: RuleDecl name pat -> Bool
-isIfaceRuleDecl (HsRule _ _ _ _ _ _) = False
-isIfaceRuleDecl other		     = True
 
 ifaceRuleDeclName :: RuleDecl name pat -> name
 ifaceRuleDeclName (IfaceRule _ _ _ n _ _ _) = n

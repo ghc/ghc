@@ -68,7 +68,8 @@ The main function
 tcTyAndClassDecls :: RecTcEnv		-- Knot tying stuff
 		  -> Module 		-- Current module
 		  -> [RenamedTyClDecl]
-		  -> TcM TcEnv
+		  -> TcM [TyThing]	-- Returns newly defined things:
+					-- types, classes and implicit Ids
 
 tcTyAndClassDecls unf_env this_mod decls
   = sortByDependency decls 		`thenTc` \ groups ->
@@ -76,12 +77,13 @@ tcTyAndClassDecls unf_env this_mod decls
 
 tcGroups unf_env this_mod []
   = tcGetEnv	`thenNF_Tc` \ env ->
-    returnTc env
+    returnTc []
 
 tcGroups unf_env this_mod (group:groups)
-  = tcGroup unf_env this_mod group	`thenTc` \ env ->
+  = tcGroup unf_env this_mod group	`thenTc` \ (env, new_things1) ->
     tcSetEnv env			$
-    tcGroups unf_env this_mod groups
+    tcGroups unf_env this_mod groups	`thenTc` \ new_things2 ->
+    returnTc (new_things1 ++ new_things2)
 \end{code}
 
 Dealing with a group
@@ -128,7 +130,10 @@ The knot-tying parameters: @rec_details_list@ is an alist mapping @Name@s to
 @TyThing@s.  @rec_vrcs@ is a finite map from @Name@s to @ArgVrcs@s.
 
 \begin{code}
-tcGroup :: RecTcEnv -> Module -> SCC RenamedTyClDecl -> TcM TcEnv
+tcGroup :: RecTcEnv -> Module -> SCC RenamedTyClDecl 
+	-> TcM (TcEnv, 		-- Input env extended by types and classes only
+		[TyThing])	-- Things defined by this group
+					
 tcGroup unf_env this_mod scc
   = getDOptsTc							`thenNF_Tc` \ dflags ->
 	-- Step 1
@@ -150,12 +155,12 @@ tcGroup unf_env this_mod scc
 
 	    tyclss, all_tyclss :: [TyThing]
 	    tyclss = map (buildTyConOrClass dflags is_rec kind_env 
-				                   rec_vrcs rec_details) decls
+				            rec_vrcs rec_details) decls
 
 		-- Add the tycons that come from the classes
 		-- We want them in the environment because 
 		-- they are mentioned in interface files
-	    all_tyclss  = [ ATyCon (classTyCon clas) | AClass clas <- tyclss]
+	    all_tyclss  = [ATyCon (classTyCon clas) | AClass clas <- tyclss]
 			  ++ tyclss
 
 		-- Calculate variances, and (yes!) feed back into buildTyConOrClass.
@@ -164,18 +169,13 @@ tcGroup unf_env this_mod scc
 		-- Step 5
 		-- Extend the environment with the final 
 		-- TyCons/Classes and check the decls
-	tcExtendGlobalEnv all_tyclss				$
-	mapTc (tcTyClDecl1 unf_env) decls			`thenTc` \ tycls_details ->
-
-		-- Step 6
-		-- Extend the environment with implicit Ids
-	tcExtendGlobalValEnv (implicitTyThingIds all_tyclss)	$
+	tcExtendGlobalEnv all_tyclss			$
+	mapTc (tcTyClDecl1 unf_env) decls		`thenTc` \ tycls_details ->
 
 		-- Return results
-	tcGetEnv				`thenNF_Tc` \ env ->
-	returnTc (tycls_details, tyclss, env)
-    )						`thenTc` \ (_, tyclss, env) ->
-
+	tcGetEnv					`thenNF_Tc` \ env ->
+	returnTc (tycls_details, env, all_tyclss)
+    )						`thenTc` \ (_, env, all_tyclss) ->
 
 	-- Step 7: Check validity
     traceTc (text "ready for validity check")	`thenTc_`
@@ -184,7 +184,11 @@ tcGroup unf_env this_mod scc
     )						`thenTc_`
     traceTc (text "done")			`thenTc_`
    
-    returnTc env
+    let
+	implicit_things = [AnId id | id <- implicitTyThingIds all_tyclss]
+	new_things      = all_tyclss ++ implicit_things
+    in
+    returnTc (env, new_things)
 
   where
     is_rec = case scc of
@@ -196,9 +200,11 @@ tcGroup unf_env this_mod scc
 		CyclicSCC decls -> decls
 
 tcTyClDecl1 unf_env decl
-  | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 unf_env decl)
+  | isClassDecl decl = tcAddDeclCtxt decl (tcClassDecl1 decl)
   | otherwise	     = tcAddDeclCtxt decl (tcTyDecl     unf_env decl)
 
+-- We do the validity check over declarations, rather than TyThings
+-- only so that we can add a nice context with tcAddDeclCtxt
 checkValidTyCl this_mod decl
   = tcLookup (tcdName decl)	`thenNF_Tc` \ (AGlobal thing) ->
     if not (isLocalThing this_mod thing) then

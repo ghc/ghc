@@ -20,9 +20,8 @@ import TcType		( tyVarsOfTypes, openTypeKind )
 import TcIfaceSig	( tcCoreExpr, tcCoreLamBndrs, tcVar, tcDelay )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
 import TcExpr		( tcExpr )
-import TcEnv		( RecTcEnv, tcExtendLocalValEnv, isLocalThing )
-import Rules		( extendRuleBase )
-import Inst		( LIE, plusLIEs, instToId )
+import TcEnv		( RecTcEnv, tcExtendLocalValEnv, isLocalThing, tcLookupId )
+import Inst		( LIE, plusLIEs, emptyLIE, instToId )
 import Id		( idName, idType, mkLocalId )
 import Module		( Module )
 import List		( partition )
@@ -30,27 +29,8 @@ import Outputable
 \end{code}
 
 \begin{code}
-tcIfaceRules :: RecTcEnv -> PackageRuleBase -> Module -> [RenamedRuleDecl] 
-	     -> TcM (PackageRuleBase, [TypecheckedRuleDecl])
-tcIfaceRules unf_env pkg_rule_base mod decls 
-  = tcDelay unf_env doc [] (
-	-- We need the recursive env because the built-in rules show up as
-	-- IfaceOut rules, sot they get typechecked by tcIfaceRules 
-	mapTc tcIfaceRule decls
-    )				`thenTc` \ new_rules ->
-    let
-	(local_rules, imported_rules) = partition is_local new_rules
-	new_rule_base = foldl add pkg_rule_base imported_rules
-    in
-    returnTc (new_rule_base, local_rules)
-  where
-    doc = text "tcIfaceRules"
-    add rule_base (IfaceRuleOut id rule) = extendRuleBase rule_base (id, rule)
-
-	-- When relinking this module from its interface-file decls
-	-- we'll have IfaceRules that are in fact local to this module
-    is_local (IfaceRuleOut n _) = isLocalThing mod n
-    is_local other		= True
+tcIfaceRules :: [RenamedRuleDecl] -> TcM [TypecheckedRuleDecl]
+tcIfaceRules decls = mapTc tcIfaceRule decls
 
 tcIfaceRule :: RenamedRuleDecl -> TcM TypecheckedRuleDecl
   -- No zonking necessary!
@@ -71,6 +51,11 @@ tcSourceRules :: [RenamedRuleDecl] -> TcM (LIE, [TypecheckedRuleDecl])
 tcSourceRules decls
   = mapAndUnzipTc tcSourceRule decls	`thenTc` \ (lies, decls') ->
     returnTc (plusLIEs lies, decls')
+
+tcSourceRule (IfaceRuleOut fun rule)	-- Built-in rules come this way
+					-- if they are from the module being compiled
+  = tcLookupId fun			`thenTc` \ fun' ->
+    returnTc (emptyLIE, IfaceRuleOut fun' rule)   
 
 tcSourceRule (HsRule name act vars lhs rhs src_loc)
   = tcAddSrcLoc src_loc 				$

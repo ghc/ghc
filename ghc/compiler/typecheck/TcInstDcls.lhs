@@ -4,7 +4,8 @@
 \section[TcInstDecls]{Typechecking instance declarations}
 
 \begin{code}
-module TcInstDcls ( tcInstDecls1, tcInstDecls2, tcAddDeclCtxt ) where
+module TcInstDcls ( tcInstDecls1, tcIfaceInstDecls1, addInstDFuns, 
+		    tcInstDecls2, tcAddDeclCtxt ) where
 
 #include "HsVersions.h"
 
@@ -14,7 +15,7 @@ import CmdLineOpts	( DynFlag(..) )
 import HsSyn		( HsDecl(..), InstDecl(..), TyClDecl(..), HsType(..),
 			  MonoBinds(..), HsExpr(..),  HsLit(..), Sig(..), HsTyVarBndr(..),
 			  andMonoBindList, collectMonoBinders, 
-			  isClassDecl, isIfaceInstDecl, toHsType
+			  isClassDecl, toHsType
 			)
 import RnHsSyn		( RenamedHsBinds, RenamedInstDecl, RenamedHsDecl, 
 			  RenamedMonoBinds, RenamedTyClDecl, RenamedHsType, 
@@ -43,8 +44,8 @@ import PprType		( pprClassPred )
 import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
-import HscTypes		( HomeSymbolTable, DFunId,
-			  ModDetails(..), PackageInstEnv, PersistentRenamerState
+import HscTypes		( HomeSymbolTable, DFunId, PersistentCompilerState(..),
+			  ModDetails(..), PackageInstEnv
 			)
 import Subst		( substTy, substTheta )
 import DataCon		( classDataCon )
@@ -158,33 +159,31 @@ and $dbinds_super$ bind the superclass dictionaries sd1 \ldots sdm.
 Gather up the instance declarations from their various sources
 
 \begin{code}
-tcInstDecls1
-   :: PackageInstEnv
-   -> PersistentRenamerState	
+tcInstDecls1	-- Deal with source-code instance decls
+   :: PersistentCompilerState	
    -> HomeSymbolTable		-- Contains instances
    -> TcEnv 			-- Contains IdInfo for dfun ids
    -> (Name -> Maybe Fixity)	-- for deriving Show and Read
    -> Module			-- Module for deriving
-   -> [RenamedHsDecl]
-   -> TcM (PackageInstEnv,	-- cached package inst env
-	   InstEnv,		-- the full inst env
-	   [InstInfo],		-- instance decls to process
-	   [DFunId],		-- instances from this module, for its iface
+   -> [RenamedTyClDecl]		-- For deriving stuff
+   -> [RenamedInstDecl]		-- Source code instance decls
+   -> TcM (InstEnv,		-- the full inst env
+	   [InstInfo],		-- instance decls to process; contains all dfuns
+				-- for this module
 	   RenamedHsBinds)	-- derived instances
 
-tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
+tcInstDecls1 pcs hst unf_env get_fixity 
+	     this_mod tycl_decls inst_decls
   = let
-	inst_decls = [inst_decl | InstD inst_decl <- decls]	
-	tycl_decls = [decl      | TyClD decl <- decls]
+	pkg_inst_env = pcs_insts pcs
+	prs	     = pcs_PRS   pcs
 	clas_decls = filter isClassDecl tycl_decls
-	(iface_inst_ds, local_inst_ds) = partition isIfaceInstDecl inst_decls
     in
    	-- (1) Do the ordinary instance declarations
-    mapNF_Tc tcLocalInstDecl1 local_inst_ds   `thenNF_Tc` \ local_inst_infos ->
-    mapNF_Tc tcImportedInstDecl1 iface_inst_ds `thenNF_Tc` \ iface_dfuns ->
+    mapNF_Tc tcLocalInstDecl1 inst_decls	`thenNF_Tc` \ local_inst_infos ->
 
 	-- (2) Instances from generic class declarations
-    getGenericInstances clas_decls	      `thenTc` \ generic_inst_info -> 
+    getGenericInstances clas_decls		`thenTc` \ generic_inst_info -> 
 
 	-- Next, construct the instance environment so far, consisting of
 	--	a) cached non-home-package InstEnv (gotten from pcs) inst_env0
@@ -208,33 +207,26 @@ tcInstDecls1 inst_env0 prs hst unf_env get_fixity this_mod decls
 	-- the compilation manager.
     let
 	local_inst_info = catMaybes local_inst_infos
-	(local_iface_dfuns, pkg_iface_dfuns)
-		= partition (isLocalThing this_mod) iface_dfuns
 	hst_dfuns = foldModuleEnv ((++) . md_insts) [] hst
     in 
 
 --    pprTrace "tcInstDecls" (vcat [ppr imported_dfuns, ppr hst_dfuns]) $
 
-    addInstDFuns inst_env0 pkg_iface_dfuns	`thenNF_Tc` \ inst_env1 ->
-    addInstDFuns inst_env1 hst_dfuns		`thenNF_Tc` \ inst_env2 ->
-    addInstDFuns inst_env2 local_iface_dfuns	`thenNF_Tc` \ inst_env3 ->
-    addInstInfos inst_env3 local_inst_info	`thenNF_Tc` \ inst_env4 ->
-    addInstInfos inst_env4 generic_inst_info	`thenNF_Tc` \ inst_env5 ->
+    addInstDFuns pkg_inst_env hst_dfuns		`thenNF_Tc` \ inst_env2 ->
+    addInstInfos inst_env2 local_inst_info	`thenNF_Tc` \ inst_env3 ->
+    addInstInfos inst_env3 generic_inst_info	`thenNF_Tc` \ inst_env4 ->
 
 	-- (3) Compute instances from "deriving" clauses; 
 	--     note that we only do derivings for things in this module; 
 	--     we ignore deriving decls from interfaces!
 	-- This stuff computes a context for the derived instance decl, so it
-	-- needs to know about all the instances possible; hence inst_env5
-    tcDeriving prs this_mod inst_env5 get_fixity tycl_decls
-				`thenTc` \ (deriv_inst_info, deriv_binds) ->
-    addInstInfos inst_env5 deriv_inst_info  `thenNF_Tc` \ final_inst_env ->
-    let inst_info = generic_inst_info ++ deriv_inst_info ++ local_inst_info in
+	-- needs to know about all the instances possible; hence inst_env4
+    tcDeriving prs this_mod inst_env4 
+	       get_fixity tycl_decls		`thenTc` \ (deriv_inst_info, deriv_binds) ->
+    addInstInfos inst_env4 deriv_inst_info	`thenNF_Tc` \ final_inst_env ->
 
-    returnTc (inst_env1, 
-	      final_inst_env, 
-	      inst_info,
-	      local_iface_dfuns ++ map iDFunId inst_info,
+    returnTc (final_inst_env, 
+	      generic_inst_info ++ deriv_inst_info ++ local_inst_info,
 	      deriv_binds)
 
 addInstInfos :: InstEnv -> [InstInfo] -> NF_TcM InstEnv
@@ -254,12 +246,15 @@ addInstDFuns inst_env dfuns
 \end{code} 
 
 \begin{code}
-tcImportedInstDecl1 :: RenamedInstDecl -> NF_TcM DFunId
+tcIfaceInstDecls1 :: [RenamedInstDecl] -> NF_TcM [DFunId]
+tcIfaceInstDecls1 decls = mapNF_Tc tcIfaceInstDecl1 decls
+
+tcIfaceInstDecl1 :: RenamedInstDecl -> NF_TcM DFunId
 	-- An interface-file instance declaration
 	-- Should be in scope by now, because we should
 	-- have sucked in its interface-file definition
 	-- So it will be replete with its unfolding etc
-tcImportedInstDecl1 decl@(InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
+tcIfaceInstDecl1 decl@(InstDecl poly_ty binds uprags (Just dfun_name) src_loc)
   = tcLookupId dfun_name
 
 

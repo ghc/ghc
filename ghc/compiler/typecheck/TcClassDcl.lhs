@@ -102,9 +102,8 @@ Death to "ExpandingDicts".
 
 \begin{code}
 
-tcClassDecl1 :: RecTcEnv -> RenamedTyClDecl -> TcM (Name, TyThingDetails)
-tcClassDecl1 rec_env
-      	     (ClassDecl {tcdCtxt = context, tcdName = class_name,
+tcClassDecl1 :: RenamedTyClDecl -> TcM (Name, TyThingDetails)
+tcClassDecl1 (ClassDecl {tcdCtxt = context, tcdName = class_name,
 			 tcdTyVars = tyvar_names, tcdFDs = fundeps,
 			 tcdSigs = class_sigs, tcdMeths = def_methods,
 			 tcdSysNames = sys_names, tcdLoc = src_loc})
@@ -125,10 +124,10 @@ tcClassDecl1 rec_env
 	-- only the type variable of the class decl.
 	-- Context is already kind-checked
     ASSERT( equalLength context sc_sel_names )
-    tcHsTheta context						`thenTc` \ sc_theta ->
+    tcHsTheta context					`thenTc` \ sc_theta ->
 
 	-- CHECK THE CLASS SIGNATURES,
-    mapTc (tcClassSig rec_env clas tyvars mb_dm_env) op_sigs	`thenTc` \ sig_stuff ->
+    mapTc (tcClassSig clas tyvars mb_dm_env) op_sigs	`thenTc` \ sig_stuff ->
 
 	-- MAKE THE CLASS DETAILS
     let
@@ -200,8 +199,7 @@ checkDefaultBinds clas ops (Just mbs)
 
 
 \begin{code}
-tcClassSig :: RecTcEnv			-- Knot tying only!
-	   -> Class	    		-- ...ditto...
+tcClassSig :: Class	    		-- ...ditto...
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> Maybe (NameEnv Bool)	-- Info about default methods; 
 					--	Nothing => imported class defn with no method binds
@@ -214,7 +212,7 @@ tcClassSig :: RecTcEnv			-- Knot tying only!
 -- so we distinguish them in checkDefaultBinds, and pass this knowledge in the
 -- Class.DefMeth data structure. 
 
-tcClassSig unf_env clas clas_tyvars maybe_dm_env
+tcClassSig clas clas_tyvars maybe_dm_env
 	   (ClassOpSig op_name sig_dm op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
