@@ -950,13 +950,12 @@ newtype GHC.IOBase.IO a
 	</listitem>
 
 <listitem> <para>For <literal>data</literal> or <literal>newtype</literal> declaration, you may omit all
-the constructors, thus:
+the constructors, by omitting the '=' and everything that follows it:
 <ProgramListing>
 module A where
   data TA
 </ProgramListing>
-      (You must write all the type parameters, but omit the
-      '=' and everything that follows it.)  In a <emphasis>source</emphasis> program
+	    In a <emphasis>source</emphasis> program
 	  this would declare TA to have no constructors (a GHC extension: see <xref linkend="nullary-types">),
 	  but in an hi-boot file it means "I don't know or care what the construtors are".
 	    This is the most common form of data type declaration, because it's easy to get right.</para>
@@ -969,6 +968,11 @@ module A where
 	  assumed that you express the <emphasis>outcome</emphasis> of this decision.  
 	    (So in the cases where GHC decided not to unpack, you must not use the pragma.)
 	    Tread with care.</para>
+	  <para>
+	    Regardless of whether you write the constructors, you must write all the type parameters, 
+	    <emphasis>including their kinds</emphasis> 
+	    if they are not '*'.  (You can give explicit kinds in source files too (<xref linkend="sec-kinding">), 
+	    but you <emphasis>must</emphasis> do so in hi-boot files.)</para>
 	</listitem>
 
 <listitem> <para>For <literal>class</literal> declaration, you may not specify any class
