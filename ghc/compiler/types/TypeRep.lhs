@@ -352,11 +352,17 @@ openTypeKind    = TyConApp openKindCon []
 isLiftedTypeKind, isUnliftedTypeKind, isOpenTypeKind :: Kind -> Bool
 isLiftedTypeKind (TyConApp tc [TyConApp bc []])   = tyConName tc == typeConName && 
 						    tyConName bc == liftedConName
+isLiftedTypeKind other = False
+
 isUnliftedTypeKind (TyConApp tc [TyConApp bc []]) = tyConName tc == typeConName && 
 						    tyConName bc == unliftedConName
+isUnliftedTypeKind other = False
+
 isOpenTypeKind (TyConApp tc []) = tyConName tc == openKindConName
+isOpenTypeKind other = False
 
 isSuperKind (TyConApp tc []) = tyConName tc == superKindName
+isSuperTypeKind other = False
 \end{code}
 
 ------------------------------------------
