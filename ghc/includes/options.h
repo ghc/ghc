@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.26 $
- * $Date: 2000/04/13 23:03:12 $
+ * $Revision: 1.27 $
+ * $Date: 2000/04/14 15:10:20 $
  * ------------------------------------------------------------------------*/
 
 
@@ -152,6 +152,7 @@
  * and EAGER_BLACKHOLING has been introduced also.  KSW 1999-01.
  */
 
+
 /* Turn miniinterpreter on/off.
  * 
  * The mininterpreter is portable but slow - if you turn it off, 
@@ -165,7 +166,7 @@
  * If you turn this off, you'll probably need to provide some
  * assembly language support for your architecture.
  */
-#define NO_MACHREGS
+#define NO_REGS
 
 
 /* Define if :xplain should be enabled					   */

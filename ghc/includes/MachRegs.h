@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.7 2000/04/13 23:03:12 sewardj Exp $
+ * $Id: MachRegs.h,v 1.8 2000/04/14 15:10:20 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -15,11 +15,11 @@
  * only in here please.
  */
 
-/* define NO_MACHREGS to omit register declarations - used in RTS C code
+/* define NO_REGS to omit register declarations - used in RTS C code
  * that needs all the STG definitions but not the global register 
  * settings.
  */
-#ifndef NO_MACHREGS
+#ifndef NO_REGS
 
 /* ----------------------------------------------------------------------------
    Caller saves and callee-saves regs.
@@ -482,6 +482,6 @@
 #define MAX_REAL_DOUBLE_REG 2
 #endif
 
-#endif /* NO_MACHREGS */
+#endif /* NO_REGS */
 
 #endif /* MACHREGS_H */
