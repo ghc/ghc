@@ -76,6 +76,7 @@ Version.hs : Makefile $(TOP)/mk/version.mk
 	@$(RM) -f $(VERSION_HS)
 	@echo "Creating $(VERSION_HS) ... "
 	@echo "module Version where" >>$(VERSION_HS)
+	@echo "version, targetOS, targetARCH :: String" >>$(VERSION_HS)
 	@echo "version    = \"$(ProjectVersion)\"" >> $(VERSION_HS)
 	@echo "targetOS   = \"$(TargetOS_CPP)\"" >> $(VERSION_HS)
 	@echo "targetARCH = \"$(TargetArch_CPP)\"" >> $(VERSION_HS)

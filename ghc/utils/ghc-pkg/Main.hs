@@ -18,12 +18,11 @@ module Main (main) where
 import Version	( version, targetOS, targetARCH )
 import Distribution.InstalledPackageInfo
 import Distribution.Compat.ReadP
-import Distribution.ParseUtils	( showError, ParseResult(..) )
+import Distribution.ParseUtils	( showError )
 import Distribution.Package
 import Distribution.Version
 import Compat.Directory 	( getAppUserDataDirectory, createDirectoryIfMissing )
 import Compat.RawSystem 	( rawSystem )
-import Control.Exception	( evaluate )
 
 import Prelude
 
@@ -225,6 +224,7 @@ parseGlobPackageId =
       return (PackageIdentifier{ pkgName = n, pkgVersion = globVersion }))
 
 -- globVersion means "all versions"
+globVersion :: Version
 globVersion = Version{ versionBranch=[], versionTags=["*"] }
 
 -- -----------------------------------------------------------------------------
@@ -281,8 +281,8 @@ getPkgDatabases modify flags = do
 	-- If we are not modifying (eg. list, describe etc.) then
 	-- the user database is included by default.
 	databases
-	  | modify     = foldl addDB [global_conf] flags
-	  | not modify = foldl addDB [user_conf,global_conf] flags
+	  | modify    = foldl addDB [global_conf] flags
+	  | otherwise = foldl addDB [user_conf,global_conf] flags
 
 	-- implement the following rules:
 	-- 	--user means overlap with the user database
@@ -302,7 +302,7 @@ readParseDatabase :: PackageDBName -> IO (PackageDBName,PackageDB)
 readParseDatabase filename = do
   str <- readFile filename
   let packages = read str
-  evaluate packages
+  Exception.evaluate packages
     `Exception.catch` \_ -> 
 	die (filename ++ ": parse error in package config file")
   return (filename,packages)
@@ -834,6 +834,7 @@ oldRunit clis = do
 	prog <- getProgramName
 	die (usageInfo (usageHeader prog) flags)
 
+my_head :: String -> [a] -> a
 my_head s [] = error s
 my_head s (x:xs) = x
 
