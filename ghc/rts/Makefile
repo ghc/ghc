@@ -1,16 +1,15 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.21 2000/03/15 15:03:20 simonmar Exp $
+# $Id: Makefile,v 1.22 2000/04/17 11:57:55 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
 #
-#  We create two libraries.  One, libHSrts<tag>.a, is built separately
-#  for each "way".  The other, libHSclib.a is built once: it is just
-#  .lc files that end up the same no matter what, i.e. completely
-#  ordinary C.
-
+#  .c  files are vanilla C,
+#  .hc files are "Haskellized-C", compiled using the C compiler and
+#      (possibly) the assembly-mangler.  The GHC driver script
+#      knows how to compile this stuff.
+#
 #  Other sorta independent, compile-once subdirs are:
-
 #	gmp		-- GNU multi-precision library (for Integer)
 
 #-----------------------------------------------------------------------------
@@ -18,6 +17,8 @@
 TOP=..
 DoingRTS=YES
 include $(TOP)/mk/boilerplate.mk
+
+SplitObjs=NO
 
 WAYS=$(GhcLibWays)
 
