@@ -312,17 +312,27 @@ getAllFilesMatching dirs hims (dir_path, suffix) = ( do
 
    addModules is_dll his@(hi_env, hib_env) filename = fromMaybe his $ 
         FMAP add_hi   (go xiffus		 rev_fname)	`seqMaybe`
+
         FMAP add_vhib (go hi_boot_version_xiffus rev_fname)	`seqMaybe`
+		-- If there's a Foo.hi-boot-N file then override any Foo.hi-boot
+
 	FMAP add_hib  (go hi_boot_xiffus	 rev_fname)
-    where
-     rev_fname = reverse filename
-     path      = dir_path ++ '/':filename
+     where
+	rev_fname = reverse filename
+	path      = dir_path ++ '/':filename
 
-     mk_module mod_nm = Module mod_nm is_sys is_dll
-     add_hi    mod_nm = (addToFM_C addNewOne hi_env mod_nm (path, mk_module mod_nm), hib_env)
-     add_vhib  mod_nm = (hi_env, addToFM_C overrideNew hib_env mod_nm (path, mk_module mod_nm))
-     add_hib   mod_nm = (hi_env, addToFM_C addNewOne   hib_env mod_nm (path, mk_module mod_nm))
+	  -- In these functions file_nm is the base of the filename,
+	  -- with the path and suffix both stripped off.  The filename
+	  -- is the *unencoded* module name (else 'make' gets confused).
+	  -- But the domain of the HiMaps is ModuleName which is encoded.
+	add_hi    file_nm = (add_to_map addNewOne hi_env file_nm,   hib_env)
+	add_vhib  file_nm = (hi_env, add_to_map overrideNew hib_env file_nm)
+	add_hib   file_nm = (hi_env, add_to_map addNewOne   hib_env file_nm)
 
+	add_to_map combiner env file_nm 
+	  = addToFM_C combiner env mod_nm (path, mkModule mod_nm is_sys is_dll)
+	  where
+     	    mod_nm = mkSrcModuleFS file_nm
 
    -- go prefix (prefix ++ stuff) == Just (reverse stuff)
    go [] xs        		= Just (_PK_ (reverse xs))
