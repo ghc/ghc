@@ -149,6 +149,8 @@ module System.IO (
     hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
     hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
     hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
+    hPutBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
+    hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
     module System.IO.Error,
