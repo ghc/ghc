@@ -21,7 +21,7 @@ import DsUtils		( EquationInfo(..),
  			)
 import Id		( idType )
 import DataCon		( DataCon, isTupleCon, isUnboxedTupleCon,
-			  dataConSourceArity )
+			  dataConSourceArity, dataConFieldLabels )
 import Name             ( Name, mkLocalName, getOccName, isDataSymOcc, getName, mkSrcVarOcc )
 import Type		( Type, 
                           isUnboxedType, 
@@ -164,7 +164,6 @@ untidy _ (NPlusKPatIn name lit) = panic "Check.untidy: NPlusKPatIn"
 untidy _ (NegPatIn ipat)        = panic "Check.untidy: NegPatIn"
 untidy _ (ParPatIn pat)         = panic "Check.untidy: ParPatIn"
 untidy _ (RecPatIn name fields) = panic "Check.untidy: RecPatIn"
---		    [(name, InPat name, Bool)]	-- True <=> source used punning
 
 pars :: NeedPars -> WarningPat -> WarningPat
 pars True p = ParPatIn p
@@ -210,10 +209,10 @@ check' []                                              = ([([],[])],emptyUniqSet
 check' [EqnInfo n ctx ps (MatchResult CanFail _)] 
    | all_vars ps  = ([(take (length ps) (repeat new_wild_pat),[])],  unitUniqSet n)
 
-check' qs@((EqnInfo n ctx ps (MatchResult CanFail _)):_) 
+check' qs@((EqnInfo n ctx ps (MatchResult CanFail _)):rs)
    | all_vars ps  = (pats,  addOneToUniqSet indexs n)
   where
-    (pats,indexs) = check' (tail qs)
+    (pats,indexs) = check' rs
 
 check' qs@((EqnInfo n ctx ps result):_) 
    | all_vars ps  = ([],  unitUniqSet n)
@@ -222,13 +221,15 @@ check' qs@((EqnInfo n ctx ps result):_)
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
-   | otherwise    = panic "Check.check': Not implemented :-("
+   | otherwise    = panic ("Check.check': Not implemented :-(")
   where
+     -- Note: RecPats will have been simplified to ConPats
+     --       at this stage.
     constructors = or (map is_con qs)
     literals     = or (map is_lit qs)    
+    only_vars    = and (map is_var qs) 
 --    npat         = or (map is_npat qs)
 --    nplusk       = or (map is_nplusk qs)
-    only_vars    = and (map is_var qs) 
 \end{code}
 
 Here begins the code to deal with literals, we need to split the matrix
@@ -406,7 +407,7 @@ remove_dups (x:xs) | or (map (\y -> compare_cons x y) xs) = remove_dups  xs
                    | otherwise                            = x : remove_dups xs
 
 get_used_cons :: [EquationInfo] -> [TypecheckedPat]
-get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPat _ _ _ _ _):_) _) <- qs]
+get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPat _ _ _ _ _):_) _) <- qs ]
 
 remove_dups' :: [HsLit] -> [HsLit] 
 remove_dups' []                   = []
@@ -434,8 +435,9 @@ get_unused_cons used_cons = unused_cons
        (ConPat _ ty _ _ _) = head used_cons
        Just (ty_con,_) 	   = splitTyConApp_maybe ty
        all_cons        	   = tyConDataCons ty_con
-       used_cons_as_id 	   = map (\ (ConPat id _ _ _ _) -> id) used_cons
+       used_cons_as_id 	   = map (\ (ConPat d _ _ _ _) -> d) used_cons
        unused_cons     	   = uniqSetToList (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
+
 
 all_vars :: [TypecheckedPat] -> Bool
 all_vars []              = True
@@ -448,7 +450,7 @@ remove_var _                                     = panic "Check:remove_var: equa
 
 is_con :: EquationInfo -> Bool
 is_con (EqnInfo _ _ ((ConPat _ _ _ _ _):_) _) = True
-is_con _                                  = False
+is_con _                                      = False
 
 is_lit :: EquationInfo -> Bool
 is_lit (EqnInfo _ _ ((LitPat _ _):_) _) = True
@@ -601,16 +603,30 @@ simplify_pat (TuplePat ps False)
   where
     arity = length ps
 
-simplify_pat (RecPat id ty tvs dicts [])   
-  = ConPat id ty tvs dicts [wild_pat]
+simplify_pat (RecPat dc ty tvs dicts [])   
+  = ConPat dc ty tvs dicts all_wild_pats
   where
-    wild_pat = WildPat gt
-    gt = panic "Check.symplify_pat: gessing gt"
+    all_wild_pats = map (\ _ -> WildPat gt) (dataConFieldLabels dc)
+    gt = panic "Check.symplify_pat{RecPat-1}"
 
-simplify_pat (RecPat id ty tvs dicts idps) 
-  = ConPat id ty tvs dicts pats
+simplify_pat (RecPat dc ty tvs dicts idps) 
+  = ConPat dc ty tvs dicts pats
   where
-    pats = map (\ (id,p,_)-> simplify_pat p) idps
+    pats = map (simplify_pat.snd) all_pats
+
+     -- pad out all the missing fields with WildPats.
+    field_pats = map (\ f -> (getName f, WildPat (panic "simplify_pat(RecPat-2)")))
+		     (dataConFieldLabels dc)
+    all_pats = 
+      foldr
+       ( \ (id,p,_) acc -> insertNm (getName id) p acc)
+       field_pats
+       idps
+       
+    insertNm nm p [] = [(nm,p)]
+    insertNm nm p (x@(n,_):xs)
+      | nm == n    = (nm,p):xs
+      | otherwise  = x : insertNm nm p xs
 
 simplify_pat pat@(LitPat lit lit_ty) 
   | isUnboxedType lit_ty = pat
