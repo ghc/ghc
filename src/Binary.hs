@@ -53,6 +53,9 @@ module Binary
     -- re-export for the benefit of other modules.
    openBinaryFile 
 
+  FormatVersion,
+  nullFormatVersion,
+  mkFormatVersion,
   ) where
 
 #include "MachDeps.h"
@@ -315,6 +318,20 @@ getWord8 (BinIO _ ix_r h) = do
     writeFastMutInt ix_r (ix+1)
     return $! (fromIntegral (ord c))	-- XXX not really correct
 
+-- | Get the next byte, but don't change the pointer.
+peekWord8 :: BinHandle -> IO Word8
+peekWord8 (BinMem _ ix_r sz_r0 arr_r0) = do
+    ix <- readFastMutInt ix_r
+    sz <- readFastMutInt sz_r0
+    when (ix >= sz)  $
+	ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
+    arr <- readIORef arr_r0
+    w <- unsafeRead arr ix
+    return w
+peekWord8 (BinIO _ ix_r h) = do
+    c <- hLookAhead h
+    return $! (fromIntegral (ord c))	-- XXX not really correct
+
 putByte :: BinHandle -> Word8 -> IO ()
 putByte bh w = put_ bh w
 
@@ -496,6 +513,17 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary 
                          f <- get bh
                          return (a,b,c,d,e,f)
 
+instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f,Binary g) => Binary (a,b,c,d,e,f,g) where
+    put_ bh (a,b,c,d,e,f,g) = do put_ bh a; put_ bh b; put_ bh c; put_ bh d; put_ bh e; put_ bh f; put_ bh g
+    get bh          = do a <- get bh
+                         b <- get bh
+                         c <- get bh
+                         d <- get bh
+                         e <- get bh
+                         f <- get bh
+                         g <- get bh
+                         return (a,b,c,d,e,f,g)
+
 instance Binary a => Binary (Maybe a) where
     put_ bh Nothing  = putByte bh 0
     put_ bh (Just a) = do putByte bh 1; put_ bh a
@@ -618,3 +646,44 @@ lazyGet bh = do
     a <- unsafeInterleaveIO (getAt bh p_a)
     seekBin bh p -- skip over the object for now
     return a
+
+-- -----------------------------------------------------------------------------
+-- FormatVersion's.  
+-- The FormatVersion is always non-negative.  Furthermore, if the 
+-- FormatVersion is 0, nothing is output.
+-- 
+-- FormatVersion should only be encoded before something we KNOW to have
+-- an encoding which never begins with a negative byte, such as a non-negative
+-- integer or a list.
+-- 
+-- The advantage of this is that we can read a FormatVersion (which will
+-- be the nullFormatVersion) even when we didn't write one in the first
+-- place, such as from earlier versions of this program, just so long
+-- as we did at any rate write a list.
+
+newtype FormatVersion = FormatVersion Int deriving (Eq,Ord)
+
+nullFormatVersion :: FormatVersion
+nullFormatVersion = mkFormatVersion 0
+
+mkFormatVersion :: Int -> FormatVersion
+mkFormatVersion i = FormatVersion i
+
+instance Binary FormatVersion where
+   put_ bh (FormatVersion i) =
+      case compare i 0 of
+         EQ -> return ()
+         GT -> put_ bh (-i)
+         LT -> error (
+            "Binary.hs: negative FormatVersion " ++ show i 
+               ++ " is not allowed")
+   get bh =
+      do
+         w8 <- peekWord8 bh   
+         if testBit w8 7
+            then
+               do
+                  i <- get bh
+                  return (FormatVersion (-i))
+            else
+               return nullFormatVersion
