@@ -77,6 +77,60 @@ import CmdLineOpts
 %************************************************************************
 
 	--------------------------------------
+	Notes on functional dependencies (a bug)
+	--------------------------------------
+
+| > class Foo a b | a->b
+| >
+| > class Bar a b | a->b
+| >
+| > data Obj = Obj
+| >
+| > instance Bar Obj Obj
+| >
+| > instance (Bar a b) => Foo a b
+| >
+| > foo:: (Foo a b) => a -> String
+| > foo _ = "works"
+| >
+| > runFoo:: (forall a b. (Foo a b) => a -> w) -> w
+| > runFoo f = f Obj
+| 
+| *Test> runFoo foo
+| 
+| <interactive>:1:
+|     Could not deduce (Bar a b) from the context (Foo a b)
+|       arising from use of `foo' at <interactive>:1
+|     Probable fix:
+|         Add (Bar a b) to the expected type of an expression
+|     In the first argument of `runFoo', namely `foo'
+|     In the definition of `it': it = runFoo foo
+| 
+| Why all of the sudden does GHC need the constraint Bar a b? The
+| function foo didn't ask for that... 
+
+The trouble is that to type (runFoo foo), GHC has to solve the problem:
+
+	Given constraint	Foo a b
+	Solve constraint	Foo a b'
+
+Notice that b and b' aren't the same.  To solve this, just do
+improvement and then they are the same.  But GHC currently does
+	simplify constraints
+	apply improvement
+	and loop
+
+That is usually fine, but it isn't here, because it sees that Foo a b is
+not the same as Foo a b', and so instead applies the instance decl for
+instance Bar a b => Foo a b.  And that's where the Bar constraint comes
+from.
+
+The Right Thing is to improve whenever the constraint set changes at
+all.  Not hard in principle, but it'll take a bit of fiddling to do.  
+
+
+
+	--------------------------------------
 		Notes on quantification
 	--------------------------------------
 
@@ -303,6 +357,36 @@ The definitely-ambiguous can then float out, and get smashed at top level
 Here the principal type of f is (forall a. a->a)
 but we'll produce the non-principal type
     f :: forall a. C Int => a -> a
+
+
+	--------------------------------------
+	The need for forall's in constraints
+	--------------------------------------
+
+[Exchange on Haskell Cafe 5/6 Dec 2000]
+
+  class C t where op :: t -> Bool
+  instance C [t] where op x = True
+
+  p y = (let f :: c -> Bool; f x = op (y >> return x) in f, y ++ [])
+  q y = (y ++ [], let f :: c -> Bool; f x = op (y >> return x) in f)
+
+The definitions of p and q differ only in the order of the components in
+the pair on their right-hand sides.  And yet:
+
+  ghc and "Typing Haskell in Haskell" reject p, but accept q;
+  Hugs rejects q, but accepts p;
+  hbc rejects both p and q;
+  nhc98 ... (Malcolm, can you fill in the blank for us!).
+
+The type signature for f forces context reduction to take place, and
+the results of this depend on whether or not the type of y is known,
+which in turn depends on which component of the pair the type checker
+analyzes first.  
+
+Solution: if y::m a, float out the constraints
+	Monad m, forall c. C (m c)
+When m is later unified with [], we can solve both constraints.
 
 
 	--------------------------------------
