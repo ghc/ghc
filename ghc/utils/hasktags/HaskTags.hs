@@ -48,6 +48,7 @@ data FoundThing = FoundThing ThingName Pos
 
 -- Data we have obtained from a file
 data FileData = FileData FileName [FoundThing]
+	deriving Show
 
 data Token = Token String Pos
 	deriving Show
@@ -121,13 +122,15 @@ withline filename words fullline i =
 -- comments stripping
 
 stripslcomments :: [String] -> [String]
-stripslcomments ("--":xs) = []
-stripslcomments (x:xs) = x : stripslcomments xs 
+stripslcomments (x:xs) | isPrefixOf "--" x = []
+					   | otherwise = x : stripslcomments xs
 stripslcomments [] = []
 
 stripblockcomments :: [Token] -> [Token]
-stripblockcomments ((Token "\\end{code}" _):xs) = afterlitend xs
-stripblockcomments ((Token "{-" _):xs) = afterblockcomend xs
+stripblockcomments ((Token "\\end{code}" _):xs) = 
+	stripblockcomments $ afterlitend xs
+stripblockcomments ((Token "{-" _):xs) = 
+	stripblockcomments $ afterblockcomend xs
 stripblockcomments (x:xs) = x:stripblockcomments xs
 stripblockcomments [] = []
 
