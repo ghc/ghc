@@ -1,4 +1,4 @@
---!!! Dynamic library tests
+-- !!! Dynamic library regression tests
 module Main(main) where
 
 import Dynamic

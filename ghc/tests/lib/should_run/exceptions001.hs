@@ -13,7 +13,7 @@ main = do
   dynTest
 
 ioTest :: IO ()
-ioTest = catchIO justIoErrors (fail (userError "wibble")) 
+ioTest = catchIO justIoErrors (ioError (userError "wibble")) 
 	   (\ex -> if isUserError ex then putStr "io exception caught\n" 
 				     else error "help!")
 
