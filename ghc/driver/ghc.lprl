@@ -380,8 +380,7 @@ $Haskell1Version = 5; # i.e., Haskell 1.4
 	( "-D__HASKELL1__=$Haskell1Version"
 	, "-D__GLASGOW_HASKELL__=$ProjectVersionInt"
 	, "-D__HASKELL98__"
-	# not yet -- SDM
-	# , "-D__CONCURRENT_HASKELL__"
+	, "-D__CONCURRENT_HASKELL__"
 	);
 
 @UserLibrary_dir= ();	#-L things;...
