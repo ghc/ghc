@@ -327,8 +327,10 @@ endif
 ifneq "$($(Project)BinDistShScripts)" ""
 binary-dist::
 	@for i in $($(Project)BinDistShScripts); do \
-	     echo "Renaming $$i to $$i.sh"; \
-	    $(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i.sh; \
+	    if test -x $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i ; then \
+	    	echo "Renaming $$i to $$i.sh"; \
+	    	$(MV) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$$i.sh; \
+	    fi \
 	done
 endif
 
