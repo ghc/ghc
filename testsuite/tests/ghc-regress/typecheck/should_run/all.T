@@ -11,10 +11,7 @@ test "tcrun003" { vtr("-fglasgow-exts", "", "") }
 test "tcrun004" { vtr("-fglasgow-exts", "", "") }
 test "tcrun005" { vtr("", "", "") }
 test "tcrun006" { vtr("", "", "") }
-
--- expect failure, because the prelude isn't compiled with generic support yet
-test "tcrun007" { $expect = "fail" vtr("", "", "") }
-
+test "tcrun007" { vtr("", "", "") }
 test "tcrun008" { vtr("", "", "") }
 test "tcrun009" { vtr("", "", "") }
 test "tcrun010" { vtr("", "", "") }
