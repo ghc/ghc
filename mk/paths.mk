@@ -109,17 +109,24 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-PRE_SRCS    = $(patsubst ./%, %, \
-		$(wildcard $(patsubst %, %/*.hs, .   $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.lhs, .  $(ALL_DIRS))) \
-		$(wildcard $(patsubst %, %/*.y,   .  $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.c, .    $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.prl, .  $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.lprl, . $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.lit, .  $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.verb, . $(ALL_DIRS))) \
-	        $(wildcard $(patsubst %, %/*.hsc, .  $(ALL_DIRS))) \
-              )
+# NB. use := rather than = here, otherwise the wildcard will get re-computed
+# every time PRE_SRCS is expanded (this happens a lot).
+PRE_SRCS    := $(wildcard $(patsubst ./%, %,  \
+		   $(patsubst %,%/*.hs,   . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.lhs,  . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.y,    . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.c,    . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.hc,   . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.S,    . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.prl,  . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.lprl, . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.lit,  . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.verb, . $(ALL_DIRS)) \
+		   $(patsubst %,%/*.hsc,  . $(ALL_DIRS)) \
+	       ))
+
+PRE_HS_SRCS  = $(filter %.hs,  $(PRE_SRCS))
+PRE_LHS_SRCS = $(filter %.lhs, $(PRE_SRCS))
 
 HSC_SRCS     = $(filter %.hsc, $(PRE_SRCS))
 HAPPY_SRCS   = $(filter %.y,   $(PRE_SRCS))
@@ -127,15 +134,21 @@ HAPPY_SRCS   = $(filter %.y,   $(PRE_SRCS))
 DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
 	       $(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
 	       $(patsubst %.hsc, %_hsc.h, $(HSC_SRCS)) \
-	       $(patsubst %.y, %.hs, $(HAPPY_SRCS))
+	       $(patsubst %.y, %.hs, $(HAPPY_SRCS)) \
+	       $(patsubst %.hs, %.hc, $(PRE_HS_SRCS)) \
+	       $(patsubst %.lhs, %.hc, $(PRE_LHS_SRCS))
 
 # EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
 EXCLUDED_HSC_SRCS     = $(filter %.hsc, $(EXCLUDED_SRCS))
 EXCLUDED_HAPPY_SRCS   = $(filter %.y,   $(EXCLUDED_SRCS))
+EXCLUDED_HS_SRCS      = $(filter %.hs,  $(EXCLUDED_SRCS))
+EXCLUDED_LHS_SRCS     = $(filter %.lhs, $(EXCLUDED_SRCS))
 EXCLUDED_DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.h, $(EXCLUDED_HSC_SRCS)) \
 			$(patsubst %.hsc, %_hsc.c, $(EXCLUDED_HSC_SRCS)) \
-			$(patsubst %.y, %.hs, $(EXCLUDED_HAPPY_SRCS))
+			$(patsubst %.y, %.hs, $(EXCLUDED_HAPPY_SRCS)) \
+			$(patsubst %.hs, %.hc, $(EXCLUDED_HS_SRCS)) \
+			$(patsubst %.lhs, %.hc, $(EXCLUDED_LHS_SRCS))
 # Exclude _hsc.c files; they get built as part of the cbits library,
 # not part of the main library
 
@@ -144,10 +157,8 @@ CLOSED_EXCLUDED_SRCS  = $(sort $(EXCLUDED_SRCS) $(EXCLUDED_DERIVED_SRCS))
 SRCS        = $(filter-out $(CLOSED_EXCLUDED_SRCS), \
 	        $(sort $(PRE_SRCS) $(DERIVED_SRCS)))
 
-HS_SRCS	    = $(filter %.lhs %.hs %.hc,$(sort $(SRCS) $(BOOT_SRCS)))
+HS_SRCS	    = $(filter %.lhs %.hs, $(sort $(SRCS) $(BOOT_SRCS)))
 HS_OBJS     = $(addsuffix .$(way_)o,$(basename $(HS_SRCS)))
-HS_HCS      = $(addsuffix .$(way_)hc,$(basename $(HS_SRCS)))
-HS_SS       = $(addsuffix .$(way_)s,$(basename $(HS_SRCS)))
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_SRCS)))
 
 HSC_C_OBJS  = $(addsuffix _hsc.$(way_)o,$(basename $(filter %.hsc,$(SRCS))))
@@ -212,12 +223,14 @@ TAGS_C_SRCS=$(C_SRCS)
 #
 MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
-		      $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_SS) a.out \
-		      $(DERIVED_SRCS)
+		      $(PROG) $(LIBRARY) $(HS_IFACES) a.out \
+		      $(CLEAN_DERIVED_SRCS)
 
 # Don't clean the .hc files if we're bootstrapping
 ifneq "$(BootingFromHc)" "YES"
-CLEAN_FILES += $(HS_HCS)
+CLEAN_DERIVED_SRCS = $(filter-out %.hc, $(DERIVED_SRCS))
+else
+CLEAN_DERIVED_SRCS = $(DERIVED_SRCS)
 endif
 
 DIST_CLEAN_FILES += .depend
