@@ -2441,65 +2441,6 @@ findElfSection ( void* objImage, Elf_Word sh_type )
    return ptr;
 }
 
-static int
-findElfSectionIndexByName( ObjectCode *oc, const char *sh_name,
-                           Elf_Word expected_type, Elf_Word expected_entsize )
-{
-  Elf_Ehdr *ehdr = (Elf_Ehdr *) oc->image;
-  Elf_Shdr *shdr = (Elf_Shdr *) (oc->image + ehdr->e_shoff);
-  char *sectnames = oc->image + shdr[ehdr->e_shstrndx].sh_offset;
-  int i;
-
-  for( i = 0; i < ehdr->e_shnum; i++ )
-    if( !strcmp( sectnames + shdr[i].sh_name, sh_name ) )
-    {
-      if( shdr[i].sh_type != expected_type )
-      {
-        errorBelch( "The entry type (%d) of the '%s' section isn't %d\n",
-                    shdr[i].sh_type, sh_name, expected_type );
-        return -1;
-      }
-
-      if( shdr[i].sh_entsize != expected_entsize )
-      {
-        errorBelch( "The entry size (%d) of the '%s' section isn't %d\n",
-                    shdr[i].sh_entsize, sh_name, expected_entsize );
-
-        return -1;
-      }
-
-      return i;
-    }
-
-  errorBelch( "This ELF file contains no '%s' section", sh_name );
-  return -1;
-}
-
-static char *
-findElfSectionByName( ObjectCode *oc, const char *sh_name,
-                      Elf_Word expected_type, int expected_entsize,
-                      int *num_entries )
-{
-  Elf_Ehdr *ehdr = (Elf_Ehdr *) oc->image;
-  Elf_Shdr *shdr = (Elf_Shdr *) (oc->image + ehdr->e_shoff);
-  int section;
-
-  section = findElfSectionIndexByName( oc, sh_name, expected_type,
-                                       expected_entsize );
-
-  if( section < 0 )
-    return NULL;
-
-  /* allow for meaningful results in num_entries even when entsize is 0 */
-  if( expected_entsize == 0 )
-    expected_entsize = 1;
-
-  if( num_entries )
-    *num_entries = shdr[section].sh_size / expected_entsize;
-
-  return oc->image + shdr[section].sh_offset;
-}
-
 #if defined(ia64_HOST_ARCH)
 static Elf_Addr
 findElfSegment ( void* objImage, Elf_Addr vaddr )

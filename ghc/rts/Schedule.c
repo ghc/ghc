@@ -222,10 +222,6 @@ void            addToBlockedQueue ( StgTSO *tso );
 static void     schedule          ( StgMainThread *mainThread, Capability *initialCapability );
        void     interruptStgRts   ( void );
 
-#if !defined(PAR) && !defined(RTS_SUPPORTS_THREADS)
-static void     detectBlackHoles  ( void );
-#endif
-
 static void     raiseAsync_(StgTSO *tso, StgClosure *exception, rtsBool stop_at_atomically);
 
 #if defined(RTS_SUPPORTS_THREADS)
