@@ -423,10 +423,11 @@ schemeT d s p app
          (args_r_to_l_raw, fn) = chomp app
          chomp expr
             = case snd expr of
-                 AnnVar v   -> ([], v)
-                 AnnApp f a -> case chomp f of (az, f) -> (snd a:az, f)
-                 other      -> pprPanic "schemeT" 
-                                  (ppr (deAnnotate (panic "schemeT.chomp", other)))
+                 AnnVar v    -> ([], v)
+                 AnnApp f a  -> case chomp f of (az, f) -> (snd a:az, f)
+                 AnnNote n e -> chomp e
+                 other       -> pprPanic "schemeT" 
+                                   (ppr (deAnnotate (panic "schemeT.chomp", other)))
          
          args_r_to_l = filter (not.isTypeAtom) args_r_to_l_raw
          isTypeAtom (AnnType _) = True
