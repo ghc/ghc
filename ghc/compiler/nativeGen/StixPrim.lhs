@@ -278,7 +278,7 @@ primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
 	    case getAmodeRep x of
 	      ArrayRep      -> StIndex PtrRep base arrPtrsHS
 	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
-	      ForeignObjRep -> StIndex PtrRep base fixedHS
+	      ForeignObjRep -> StInd PtrRep (StIndex PtrRep base fixedHS)
 	      _ -> base
 
     ccall = case lhs of
