@@ -76,24 +76,38 @@ import Hugs.Weak
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base
-import GHC.IOBase
 import GHC.Weak
+#endif
+
+-- | A specialised version of 'mkWeak', where the key and the value are
+-- the same object:
+--
+-- > mkWeakPtr key finalizer = mkWeak key key finalizer
+--
+mkWeakPtr :: k -> Maybe (IO ()) -> IO (Weak k)
+mkWeakPtr key finalizer = mkWeak key key finalizer
 
 {-|
-Dereferences a weak pointer.  If the key is still alive, then
-@'Just' v@ is returned (where @v@ is the /value/ in the weak pointer), otherwise
-'Nothing' is returned.
+  A specialised version of 'mkWeakPtr', where the 'Weak' object
+  returned is simply thrown away (however the finalizer will be
+  remembered by the garbage collector, and will still be run
+  when the key becomes unreachable).
 
-The return value of 'deRefWeak' depends on when the garbage collector
-runs, hence it is in the 'IO' monad.
+  Note: adding a finalizer to a 'Foreign.ForeignPtr.ForeignPtr' using
+  'addFinalizer' won't work as well as using the specialised version
+  'Foreign.ForeignPtr.addForeignPtrFinalizer' because the latter
+  version adds the finalizer to the primitive 'ForeignPtr#' object
+  inside, whereas the generic 'addFinalizer' will add the finalizer to
+  the box.  Optimisations tend to remove the box, which may cause the
+  finalizer to run earlier than you intended.  The same motivation
+  justifies the existence of
+  'Control.Concurrent.MVar.addMVarFinalizer' and
+  'Data.IORef.mkWeakIORef' (the non-unformity is accidental).
 -}
-deRefWeak :: Weak v -> IO (Maybe v)
-deRefWeak (Weak w) = IO $ \s ->
-   case deRefWeak# w s of
-	(# s1, flag, p #) -> case flag of
-				0# -> (# s1, Nothing #)
-				_  -> (# s1, Just p #)
+addFinalizer :: key -> IO () -> IO ()
+addFinalizer key finalizer = do
+   mkWeakPtr key (Just finalizer)	-- throw it away
+   return ()
 
 -- | A specialised version of 'mkWeak' where the value is actually a pair
 -- of the key and value passed to 'mkWeakPair':
@@ -104,15 +118,6 @@ deRefWeak (Weak w) = IO $ \s ->
 -- in addition to the value.
 mkWeakPair :: k -> v -> Maybe (IO ()) -> IO (Weak (k,v))
 mkWeakPair key val finalizer = mkWeak key (key,val) finalizer
-
--- | Causes a the finalizer associated with a weak pointer to be run
--- immediately.
-finalize :: Weak v -> IO ()
-finalize (Weak w) = IO $ \s ->
-   case finalizeWeak# w s of 
-	(# s1, 0#, _ #) -> (# s1, () #)	-- already dead, or no finaliser
-	(# s1, _,  f #) -> f s1
-#endif
 
 #include "Dynamic.h"
 INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
