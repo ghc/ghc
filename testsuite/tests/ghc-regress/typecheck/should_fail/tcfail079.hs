@@ -4,7 +4,7 @@ module ShouldFail where
 
 -- !!! unboxed field in newtype declaration
 
-import GlaExts ( Int# )
+import GHC.Exts ( Int# )
 
 newtype Unboxed = Unboxed Int#
 
