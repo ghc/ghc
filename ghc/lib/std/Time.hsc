@@ -1,6 +1,6 @@
 
 -- -----------------------------------------------------------------------------
--- $Id: Time.hsc,v 1.21 2001/09/06 15:38:16 sewardj Exp $
+-- $Id: Time.hsc,v 1.22 2001/11/06 11:11:07 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1995-2001
 --
@@ -208,7 +208,7 @@ getClockTime = do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
     sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO CTime
     usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CTime
-    return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000))
+    return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000000))
  
 #elif HAVE_FTIME
 getClockTime = do
@@ -216,7 +216,7 @@ getClockTime = do
   ftime p_timeb
   sec  <- (#peek struct timeb,time) p_timeb :: IO CTime
   msec <- (#peek struct timeb,millitm) p_timeb :: IO CUShort
-  return (TOD (fromIntegral sec) (fromIntegral msec * 1000{-ToDo: correct???-}))
+  return (TOD (fromIntegral sec) (fromIntegral msec * 1000000000))
 
 #else /* use POSIX time() */
 getClockTime = do
@@ -471,7 +471,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec
         -- 
         gmtoff <- gmtoff p_tm
 	let res = fromIntegral t - tz + fromIntegral gmtoff
-	return (TOD (fromIntegral res) 0)
+	return (TOD (fromIntegral res) psec)
 
 -- -----------------------------------------------------------------------------
 -- Converting time values to strings.
