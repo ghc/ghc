@@ -553,17 +553,17 @@ ifaceClass clas
 	   semi
 	  ]
    where
-     (clas_tyvars, sc_theta, _, sel_ids, defms) = classBigSig clas
+     (clas_tyvars, sc_theta, _, op_stuff) = classBigSig clas
 
-     pp_ops | null sel_ids  = empty
-	    | otherwise = hsep [ptext SLIT("where"),
-				 braces (hsep (punctuate semi (zipWith ppr_classop sel_ids defms)))
-			  ]
+     pp_ops | null op_stuff  = empty
+	    | otherwise      = hsep [ptext SLIT("where"),
+				     braces (hsep (punctuate semi (map ppr_classop op_stuff)))
+			       ]
 
-     ppr_classop sel_id maybe_defm
+     ppr_classop (sel_id, dm_id, explicit_dm)
 	= ASSERT( sel_tyvars == clas_tyvars)
 	  hsep [ppr (getOccName sel_id),
-		if maybeToBool maybe_defm then equals else empty,
+		if explicit_dm then equals else empty,
 	        dcolon,
 		ppr op_ty
 	  ]

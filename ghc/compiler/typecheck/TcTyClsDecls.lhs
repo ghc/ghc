@@ -31,7 +31,7 @@ import TcType		( TcKind, newKindVar, newKindVars, kindToTcKind, zonkTcKindToKind
 
 import Type		( mkArrowKind, boxedTypeKind, mkDictTy )
 
-import Class		( Class, classBigSig )
+import Class		( Class )
 import Var		( TyVar, tyVarKind )
 import FiniteMap
 import Bag	
@@ -345,8 +345,8 @@ get_tys tys
 get_sigs sigs
   = unionManyUniqSets (map get_sig sigs)
   where 
-    get_sig (ClassOpSig _ _ ty _) = get_ty ty
-    get_sig (FixSig _)		  = emptyUniqSet
+    get_sig (ClassOpSig _ _ _ ty _) = get_ty ty
+    get_sig (FixSig _)		    = emptyUniqSet
     get_sig other = panic "TcTyClsDecls:get_sig"
 
 ----------------------------------------------------

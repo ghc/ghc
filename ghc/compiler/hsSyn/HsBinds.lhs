@@ -218,7 +218,9 @@ data Sig name
 		SrcLoc
 
   | ClassOpSig	name		-- Selector name
-		(Maybe name)	-- Default-method name (if any)
+		name		-- Default-method name (if any)
+		Bool		-- True <=> there is an explicit, programmer-supplied
+				-- default declaration in the class decl
 		(HsType name)
 		SrcLoc
 
@@ -250,7 +252,7 @@ sigsForMe f sigs
   = filter sig_for_me sigs
   where
     sig_for_me (Sig         n _ _)    	  = f n
-    sig_for_me (ClassOpSig  n _ _ _)  	  = f n
+    sig_for_me (ClassOpSig  n _ _ _ _) 	  = f n
     sig_for_me (SpecSig     n _ _)  	  = f n
     sig_for_me (InlineSig   n _   _)  	  = f n  
     sig_for_me (NoInlineSig n _   _)  	  = f n  
@@ -262,8 +264,8 @@ isFixitySig (FixSig _) = True
 isFixitySig _	       = False
 
 isClassOpSig :: Sig name -> Bool
-isClassOpSig (ClassOpSig _ _ _ _) = True
-isClassOpSig _			  = False
+isClassOpSig (ClassOpSig _ _ _ _ _) = True
+isClassOpSig _			    = False
 
 isPragSig :: Sig name -> Bool
 	-- Identifies pragmas 
@@ -285,7 +287,7 @@ instance Outputable name => Outputable (FixitySig name) where
 ppr_sig (Sig var ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
-ppr_sig (ClassOpSig var _ ty _)
+ppr_sig (ClassOpSig var _ _ ty _)
       = sep [ppr var <+> dcolon, nest 4 (ppr ty)]
 
 ppr_sig (SpecSig var ty _)

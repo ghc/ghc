@@ -404,7 +404,7 @@ getGates source_fvs (TyClD (ClassDecl ctxt cls tvs sigs _ _ _ _ _ _))
 		       (map getTyVarName tvs)
     `addOneToNameSet` cls
   where
-    get (ClassOpSig n _ ty _) 
+    get (ClassOpSig n _ _ ty _) 
 	| n `elemNameSet` source_fvs = extractHsTyNames ty
 	| otherwise		     = emptyFVs
 

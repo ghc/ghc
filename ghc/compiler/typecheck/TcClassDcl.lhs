@@ -40,7 +40,7 @@ import TcType		( TcType, TcTyVar, tcInstTyVars, zonkTcTyVarBndr, tcGetTyVar )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
 import FieldLabel	( firstFieldLabelTag )
 import Bag		( unionManyBags, bagToList )
-import Class		( mkClass, classBigSig, Class )
+import Class		( mkClass, classBigSig, classSelIds, Class, ClassOpItem )
 import CmdLineOpts      ( opt_GlasgowExts, opt_WarnMissingMethods )
 import MkId		( mkDictSelId, mkDataConId, mkDefaultMethodId )
 import DataCon		( mkDataCon, notMarkedStrict )
@@ -125,7 +125,7 @@ kcClassDecl (ClassDecl	context class_name
   where
     the_class_sigs = filter isClassOpSig class_sigs
   
-    kc_sig (ClassOpSig _ _ op_ty loc) = tcAddSrcLoc loc (tcHsType op_ty)
+    kc_sig (ClassOpSig _ _ _ op_ty loc) = tcAddSrcLoc loc (tcHsType op_ty)
 \end{code}
 
 
@@ -158,10 +158,10 @@ tcClassDecl1 rec_env rec_inst_mapper rec_vrcs
 
 	-- MAKE THE CLASS OBJECT ITSELF
     let
-	(op_tys, op_sel_ids, defm_ids) = unzip3 sig_stuff
+	(op_tys, op_items) = unzip sig_stuff
 	rec_class_inst_env = rec_inst_mapper rec_class
 	clas = mkClass class_name tyvars
-		       sc_theta sc_sel_ids op_sel_ids defm_ids
+		       sc_theta sc_sel_ids op_items
 		       tycon
 		       rec_class_inst_env
 
@@ -250,13 +250,12 @@ tcClassSig :: ValueEnv		-- Knot tying only!
 	   -> [TyVar]		 	-- The class type variable, used for error check only
 	   -> RenamedClassOpSig
 	   -> TcM s (Type,		-- Type of the method
-		     Id,		-- selector id
-		     Maybe Id)		-- default-method ids
+		     ClassOpItem)	-- Selector Id, default-method Id, True if explicit default binding
+
 
 tcClassSig rec_env rec_clas rec_clas_tyvars
-	   (ClassOpSig op_name maybe_dm_name
-		       op_ty
-		       src_loc)
+	   (ClassOpSig op_name dm_name explicit_dm
+		       op_ty src_loc)
   = tcAddSrcLoc src_loc $
 
 	-- Check the type signature.  NB that the envt *already has*
@@ -273,15 +272,11 @@ tcClassSig rec_env rec_clas rec_clas_tyvars
 
 	-- Build the selector id and default method id
 	sel_id      = mkDictSelId op_name rec_clas global_ty
-	maybe_dm_id = case maybe_dm_name of
-			   Nothing      -> Nothing
-			   Just dm_name -> let 
-					     dm_id = mkDefaultMethodId dm_name rec_clas global_ty
-					   in
-					   Just (tcAddImportedIdInfo rec_env dm_id)
+	dm_id	    = mkDefaultMethodId dm_name rec_clas global_ty
+	final_dm_id = tcAddImportedIdInfo rec_env dm_id
     in
 --  traceTc (text "tcClassSig done" <+> ppr op_name)	`thenTc_`
-    returnTc (local_ty, sel_id, maybe_dm_id)
+    returnTc (local_ty, (sel_id, final_dm_id, explicit_dm))
 \end{code}
 
 
@@ -341,11 +336,9 @@ tcClassDecl2 (ClassDecl context class_name
 	-- Get the relevant class
     tcLookupClass class_name				`thenNF_Tc` \ clas ->
     let
-	(tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
-
 	-- The selector binds are already in the selector Id's unfoldings
 	sel_binds = [ CoreMonoBind sel_id (unfoldingTemplate (getIdUnfolding sel_id))
-		    | sel_id <- sc_sel_ids ++ op_sel_ids 
+		    | sel_id <- classSelIds clas
 		    ]
     in
 	-- Generate bindings for the default methods
@@ -425,20 +418,21 @@ tcDefaultMethodBinds
 
 tcDefaultMethodBinds clas default_binds sigs
   = 	-- Check that the default bindings come from this class
-    checkFromThisClass clas op_sel_ids default_binds	`thenNF_Tc_`
+    checkFromThisClass clas op_items default_binds	`thenNF_Tc_`
 
 	-- Do each default method separately
-    mapAndUnzipTc tc_dm sel_ids_w_dms			`thenTc` \ (defm_binds, const_lies) ->
+	-- For Hugs compatibility we make a default-method for every
+	-- class op, regardless of whether or not the programmer supplied an
+	-- explicit default decl for the class.  GHC will actually never
+	-- call the default method for such operations, because it'll whip up
+	-- a more-informative default method at each instance decl.
+    mapAndUnzipTc tc_dm op_items		`thenTc` \ (defm_binds, const_lies) ->
 
     returnTc (plusLIEs const_lies, andMonoBindList defm_binds)
   where
     prags = filter isPragSig sigs
 
-    (tyvars, sc_theta, sc_sel_ids, op_sel_ids, defm_ids) = classBigSig clas
-
-    sel_ids_w_dms = [pair | pair@(_, Just _) <- op_sel_ids `zip` defm_ids]
-			-- Just the ones for which there is an explicit
-			-- user default declaration
+    (tyvars, _, _, op_items) = classBigSig clas
 
     origin = ClassDeclOrigin
 
@@ -451,7 +445,7 @@ tcDefaultMethodBinds clas default_binds sigs
     -- And since ds is big, it doesn't get inlined, so we don't get good
     -- default methods.  Better to make separate AbsBinds for each
     
-    tc_dm sel_id_w_dm@(_, Just dm_id)
+    tc_dm op_item@(_, dm_id, _)
       = tcInstTyVars tyvars		`thenNF_Tc` \ (clas_tyvars, inst_tys, _) ->
 	let
 	    theta = [(clas,inst_tys)]
@@ -463,7 +457,7 @@ tcDefaultMethodBinds clas default_binds sigs
 	tcExtendTyVarEnvForMeths tyvars clas_tyvars (
 	    tcMethodBind clas origin clas_tyvars inst_tys theta
 		         default_binds prags False
-		         sel_id_w_dm	
+		         op_item
         )					`thenTc` \ (defm_bind, insts_needed, (_, local_dm_id)) ->
     
 	tcAddErrCtxt (defltMethCtxt clas) $
@@ -492,8 +486,8 @@ tcDefaultMethodBinds clas default_binds sigs
 \end{code}
 
 \begin{code}
-checkFromThisClass :: Class -> [Id] -> RenamedMonoBinds -> NF_TcM s ()
-checkFromThisClass clas op_sel_ids mono_binds
+checkFromThisClass :: Class -> [ClassOpItem] -> RenamedMonoBinds -> NF_TcM s ()
+checkFromThisClass clas op_items mono_binds
   = mapNF_Tc check_from_this_class bndrs	`thenNF_Tc_`
     returnNF_Tc ()
   where
@@ -501,7 +495,7 @@ checkFromThisClass clas op_sel_ids mono_binds
 	  | nameOccName bndr `elem` sel_names = returnNF_Tc ()
 	  | otherwise			      = tcAddSrcLoc loc $
 						addErrTc (badMethodErr bndr clas)
-    sel_names = map getOccName op_sel_ids
+    sel_names = [getOccName sel_id | (sel_id,_,_) <- op_items]
     bndrs = bagToList (collectMonoBinders mono_binds)
 \end{code}
     
@@ -525,15 +519,13 @@ tcMethodBind
 				--  the caller;  here, it's just used for the error message
 	-> RenamedMonoBinds	-- Method binding (pick the right one from in here)
 	-> [RenamedSig]		-- Pramgas (just for this one)
-	-> Bool			-- True <=> supply default decl if no explicit decl
-				--		This is true for instance decls, 
-				--		false for class decls
-	-> (Id, Maybe Id)	-- The method selector and default-method Id
+	-> Bool			-- True <=> This method is from an instance declaration
+	-> ClassOpItem		-- The method selector and default-method Id
 	-> TcM s (TcMonoBinds, LIE, (LIE, TcId))
 
 tcMethodBind clas origin inst_tyvars inst_tys inst_theta
-	     meth_binds prags supply_default_bind
-	     (sel_id, maybe_dm_id)
+	     meth_binds prags is_inst_decl
+	     (sel_id, dm_id, explicit_dm)
  = tcGetSrcLoc 		`thenNF_Tc` \ loc -> 
 
    newMethod origin sel_id inst_tys	`thenNF_Tc` \ meth@(_, meth_id) ->
@@ -544,7 +536,6 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
      maybe_user_bind = find_bind meth_name meth_binds
 
      no_user_bind    = case maybe_user_bind of {Nothing -> True; other -> False}
-     no_user_default = case maybe_dm_id     of {Nothing -> True; other -> False}
 
      meth_bind = case maybe_user_bind of
 		 	Just bind -> bind
@@ -554,10 +545,7 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
    in
 
 	-- Warn if no method binding, only if -fwarn-missing-methods
-   if no_user_bind && not supply_default_bind then
-	pprPanic "tcMethodBind" (ppr clas <+> ppr inst_tys)
-   else
-   warnTc (opt_WarnMissingMethods && no_user_bind && no_user_default)
+   warnTc (is_inst_decl && opt_WarnMissingMethods && no_user_bind && not explicit_dm)
 	  (omittedMethodWarn sel_id clas)		`thenNF_Tc_`
 
 	-- Check the bindings; first add inst_tyvars to the envt
@@ -623,9 +611,8 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 		    loc
 
    default_expr loc 
-      = case maybe_dm_id of
-	  Just dm_id -> HsVar (getName dm_id)	-- There's a default method
-   	  Nothing    -> error_expr loc		-- No default method
+	| explicit_dm = HsVar (getName dm_id)	-- There's a default method
+   	| otherwise   = error_expr loc		-- No default method
 
    error_expr loc = HsApp (HsVar (getName nO_METHOD_BINDING_ERROR_ID)) 
 	                  (HsLit (HsString (_PK_ (error_msg loc))))

@@ -324,9 +324,9 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 
 	origin			= InstanceDeclOrigin
 
-        (class_tyvars,
-	 sc_theta, sc_sel_ids,
-	 op_sel_ids, defm_ids)  = classBigSig clas
+        (class_tyvars, sc_theta, sc_sel_ids, op_items) = classBigSig clas
+
+	dm_ids = [dm_id | (_, dm_id, _) <- op_items]
 
 	-- Instantiate the theta found in the original instance decl
 	inst_decl_theta' = substTheta (mkTopTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars'))
@@ -342,15 +342,15 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     newDicts origin [(clas,inst_tys')]	`thenNF_Tc` \ (this_dict,       [this_dict_id]) ->
 
 	 -- Check that all the method bindings come from this class
-    checkFromThisClass clas op_sel_ids monobinds	`thenNF_Tc_`
+    checkFromThisClass clas op_items monobinds		`thenNF_Tc_`
 
     tcExtendTyVarEnvForMeths inst_tyvars inst_tyvars' (
- 	tcExtendGlobalValEnv (catMaybes defm_ids) (
+ 	tcExtendGlobalValEnv dm_ids (
 		-- Default-method Ids may be mentioned in synthesised RHSs 
 
 	mapAndUnzip3Tc (tcMethodBind clas origin inst_tyvars' inst_tys' inst_decl_theta'
 				     monobinds uprags True) 
-		       (op_sel_ids `zip` defm_ids)
+		       op_items
     ))		 	`thenTc` \ (method_binds_s, insts_needed_s, meth_lies_w_ids) ->
 
 	-- Deal with SPECIALISE instance pragmas by making them

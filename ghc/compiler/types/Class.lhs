@@ -5,11 +5,10 @@
 
 \begin{code}
 module Class (
-	Class,
+	Class, ClassOpItem,
 
-	mkClass,
+	mkClass, classTyVars,
 	classKey, classSelIds, classTyCon,
-	classSuperClassTheta,
 	classBigSig, classInstEnv
     ) where
 
@@ -36,26 +35,28 @@ A @Class@ corresponds to a Greek kappa in the static semantics:
 
 \begin{code}
 data Class
-  = Class
-	Unique		-- Key for fast comparison
-	Name
+  = Class {
+	classKey  :: Unique,			-- Key for fast comparison
+	className :: Name,
+	
+	classTyVars :: [TyVar],			-- The class type variables
 
-	[TyVar]			-- The class type variables
+	classSCTheta :: [(Class,[Type])],	-- Immediate superclasses, and the
+	classSCSels  :: [Id],			-- corresponding selector functions to
+						-- extract them from a dictionary of this
+						-- class
 
-	[(Class,[Type])]	-- Immediate superclasses, and the
-	[Id]			-- corresponding selector functions to
-				-- extract them from a dictionary of this
-			  	-- class
+	classOpStuff :: [ClassOpItem],		-- Ordered by tag
 
-	[Id]			--	 * selector functions
-	[Maybe Id]		--	 * default methods
-				-- They are all ordered by tag.  The
-				-- selector ids contain unfoldings.
+	classInstEnv :: InstEnv,	-- All the instances of this class
 
-	InstEnv			-- All the instances of this class
+	classTyCon :: TyCon		-- The data type constructor for dictionaries
+  }					-- of this class
 
-	TyCon			-- The data type constructor for dictionaries
-				-- of this class
+type ClassOpItem = (Id, 	--   Selector function; contains unfolding
+		    Id, 	--   Default methods
+		    Bool)	--   True <=> an explicit default method was 
+				--	      supplied in the class decl
 \end{code}
 
 The @mkClass@ function fills in the indirect superclasses.
@@ -63,18 +64,21 @@ The @mkClass@ function fills in the indirect superclasses.
 \begin{code}
 mkClass :: Name -> [TyVar]
 	-> [(Class,[Type])] -> [Id]
-	-> [Id] -> [Maybe Id]
+	-> [(Id, Id, Bool)]
 	-> TyCon
 	-> InstEnv
 	-> Class
 
 mkClass name tyvars super_classes superdict_sels
-	dict_sels defms tycon class_insts
-  = Class (getUnique name) name tyvars
-	  super_classes superdict_sels
-  	  dict_sels defms
-	  class_insts
-	  tycon
+	op_stuff tycon class_insts
+  = Class {	classKey = getUnique name, 
+		className = name,
+		classTyVars = tyvars,
+		classSCTheta = super_classes,
+		classSCSels = superdict_sels,
+		classOpStuff = op_stuff,
+		classInstEnv = class_insts,
+		classTyCon = tycon }
 \end{code}
 
 %************************************************************************
@@ -86,14 +90,12 @@ mkClass name tyvars super_classes superdict_sels
 The rest of these functions are just simple selectors.
 
 \begin{code}
-classKey	     (Class key _ _ _ _ _ _ _ _)  = key
-classSuperClassTheta (Class _ _ _ scs _ _ _ _ _)  = scs
-classSelIds  	     (Class _ _ _ _ sc_sels op_sels _ _ _) = sc_sels ++ op_sels
-classTyCon   	     (Class _ _ _ _ _ _ _ _ tc)   = tc
-classInstEnv 	     (Class _ _ _ _ _ _ _ env _)  = env
+classSelIds (Class {classSCSels = sc_sels, classOpStuff = op_stuff})
+  = sc_sels ++ [op_sel | (op_sel, _, _) <- op_stuff]
 
-classBigSig (Class _ _ tyvars super_classes sdsels sels defms _ _)
-  = (tyvars, super_classes, sdsels, sels, defms)
+classBigSig (Class {classTyVars = tyvars, classSCTheta = sc_theta, 
+	 	    classSCSels = sc_sels, classOpStuff = op_stuff})
+  = (tyvars, sc_theta, sc_sels, op_stuff)
 \end{code}
 
 
@@ -123,7 +125,7 @@ instance Uniquable Class where
     getUnique c = classKey c
 
 instance NamedThing Class where
-    getName (Class _ n _ _ _ _ _ _ _) = n
+    getName clas = className clas
 
 instance Outputable Class where
     ppr c = ppr (getName c)

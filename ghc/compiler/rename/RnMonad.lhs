@@ -44,7 +44,7 @@ import Module		( Module, ModuleName, ModuleHiMap, SearchPath, WhereFrom,
 			)
 import NameSet		
 import RdrName		( RdrName, dummyRdrVarName, rdrNameOcc )
-import CmdLineOpts	( opt_D_dump_rn_trace, opt_IgnoreIfacePragmas, opt_HiMap )
+import CmdLineOpts	( opt_D_dump_rn_trace, opt_HiMap )
 import PrelInfo		( builtinNames )
 import TysWiredIn	( boolTyCon )
 import SrcLoc		( SrcLoc, mkGeneratedSrcLoc )

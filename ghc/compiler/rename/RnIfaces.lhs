@@ -839,7 +839,7 @@ getConFieldNames new_name (ConDecl con _ _ condecl src_loc : rest)
 
 getConFieldNames new_name [] = returnRn []
 
-getClassOpNames new_name (ClassOpSig op _ _ src_loc) = new_name op src_loc
+getClassOpNames new_name (ClassOpSig op _ _ _ src_loc) = new_name op src_loc
 \end{code}
 
 @getDeclSysBinders@ gets the implicit binders introduced by a decl.

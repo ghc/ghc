@@ -192,7 +192,7 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
     `thenRn` \ (sigs', sig_fvs) ->
     mapRn_  (unknownSigErr) non_sigs			`thenRn_`
     let
-     binders = mkNameSet [ nm | (ClassOpSig nm _ _ _) <- sigs' ]
+     binders = mkNameSet [ nm | (ClassOpSig nm _ _ _ _) <- sigs' ]
     in
     renameSigs False binders lookupOccRn fix_sigs
     `thenRn` \ (fixs', fix_fvs) ->
@@ -221,11 +221,11 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
     sig_doc  = text "the signatures for class"  	<+> ppr cname
     meth_doc = text "the default-methods for class"	<+> ppr cname
 
-    sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ locn <- sigs]
+    sig_rdr_names_w_locs  = [(op,locn) | ClassOpSig op _ _ _ locn <- sigs]
     meth_rdr_names_w_locs = bagToList (collectMonoBinders mbinds)
     meth_rdr_names	  = map fst meth_rdr_names_w_locs
 
-    rn_op clas clas_tyvars sig@(ClassOpSig op maybe_dm ty locn)
+    rn_op clas clas_tyvars sig@(ClassOpSig op dm_rdr_name explicit_dm ty locn)
       = pushSrcLocRn locn $
  	lookupBndrRn op				`thenRn` \ op_name ->
 
@@ -240,32 +240,22 @@ rnDecl (TyClD (ClassDecl context cname tyvars sigs mbinds pragmas
 
 		-- Make the default-method name
 	getModeRn					`thenRn` \ mode ->
-	(case (mode, maybe_dm) of 
-	    (SourceMode, _)
-		| op `elem` meth_rdr_names
-		-> -- Source class decl with an explicit method decl
-		   newImplicitBinder (mkDefaultMethodOcc (rdrNameOcc op)) locn
-   	 	   `thenRn` \ dm_name ->
-		   returnRn (Just dm_name, emptyFVs)
+	(case mode of 
+	    SourceMode -> -- Source class decl
+		   newImplicitBinder (mkDefaultMethodOcc (rdrNameOcc op)) locn	   `thenRn` \ dm_name ->
+		   returnRn (dm_name, op `elem` meth_rdr_names, emptyFVs)
 
-		| otherwise	
-		->	-- Source class dec, no explicit method decl
-			returnRn (Nothing, emptyFVs)
-
-	    (InterfaceMode, Just dm_rdr_name)
+	    InterfaceMode
 		-> 	-- Imported class that has a default method decl
 			-- See comments with tname, snames, above
 		    lookupImplicitOccRn dm_rdr_name 	`thenRn` \ dm_name ->
-		    returnRn (Just dm_name, unitFV dm_name)
-			    -- An imported class decl mentions, rather than defines,
-			    -- the default method, so we must arrange to pull it in
+		    returnRn (dm_name, explicit_dm, if explicit_dm then unitFV dm_name else emptyFVs)
+			-- An imported class decl for a class decl that had an explicit default
+			-- method, mentions, rather than defines,
+			-- the default method, so we must arrange to pull it in
+	)						`thenRn` \ (dm_name, final_explicit_dm, dm_fvs) ->
 
-	    (InterfaceMode, Nothing)
-	    		-- Imported class with no default metho
-		-> 	returnRn (Nothing, emptyFVs)
-	)						`thenRn` \ (maybe_dm_name, dm_fvs) ->
-
-	returnRn (ClassOpSig op_name maybe_dm_name new_ty locn, op_ty_fvs `plusFV` dm_fvs)
+	returnRn (ClassOpSig op_name dm_name final_explicit_dm new_ty locn, op_ty_fvs `plusFV` dm_fvs)
 \end{code}
 
 

@@ -50,7 +50,7 @@ import Module		( Module )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding )
 import Subst		( mkTopTyVarSubst, substTheta )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isDataTyCon )
-import Class		( Class, classBigSig, classTyCon )
+import Class		( Class, classBigSig, classTyCon, classTyVars, classSelIds )
 import Var		( Id, TyVar )
 import VarSet		( isEmptyVarSet )
 import Const		( Con(..) )
@@ -374,7 +374,7 @@ mkDictSelId name clas ty
   where
     sel_id    = mkId name ty info
     field_lbl = mkFieldLabel name ty tag
-    tag       = assoc "MkId.mkDictSelId" ((sc_sel_ids ++ op_sel_ids) `zip` allFieldLabelTags) sel_id
+    tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id
 
     info      = mkIdInfo (RecordSelId field_lbl)
 		`setUnfoldingInfo`  unfolding
@@ -384,7 +384,7 @@ mkDictSelId name clas ty
 
     unfolding = mkTopUnfolding rhs
 
-    (tyvars, _, sc_sel_ids, op_sel_ids, defms) = classBigSig clas
+    tyvars  = classTyVars clas
 
     tycon      = classTyCon clas
     [data_con] = tyConDataCons tycon
@@ -450,7 +450,7 @@ mkDictFunId :: Name		-- Name to use for the dict fun;
 mkDictFunId dfun_name clas inst_tyvars inst_tys inst_decl_theta
   = mkVanillaId dfun_name dfun_ty
   where
-    (class_tyvars, sc_theta, _, _, _) = classBigSig clas
+    (class_tyvars, sc_theta, _, _) = classBigSig clas
     sc_theta' = substTheta (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
 
     dfun_theta = case inst_decl_theta of

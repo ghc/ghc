@@ -601,7 +601,7 @@ unknownSigErr sig
     (what_it_is, loc) = sig_doc sig
 
 sig_doc (Sig        _ _ loc) 	     = (SLIT("type signature"),loc)
-sig_doc (ClassOpSig _ _ _ loc) 	     = (SLIT("class-method type signature"), loc)
+sig_doc (ClassOpSig _ _ _ _ loc)     = (SLIT("class-method type signature"), loc)
 sig_doc (SpecSig    _ _ loc) 	     = (SLIT("SPECIALISE pragma"),loc)
 sig_doc (InlineSig  _ _    loc)	     = (SLIT("INLINE pragma"),loc)
 sig_doc (NoInlineSig  _ _  loc)	     = (SLIT("NOINLINE pragma"),loc)

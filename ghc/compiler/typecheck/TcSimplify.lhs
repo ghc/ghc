@@ -711,7 +711,7 @@ addSuperClasses avails dict
   where
     (clas, tys) = getDictClassTys dict
     
-    (tyvars, sc_theta, sc_sels, _, _) = classBigSig clas
+    (tyvars, sc_theta, sc_sels, _) = classBigSig clas
     sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
 
     add_sc avails ((super_clas, super_tys), sc_sel)
@@ -856,7 +856,7 @@ addNonIrred givens ct
 addSCs givens ct@(clas,tys)
  = foldl add givens sc_theta
  where
-   (tyvars, sc_theta_tmpl, _, _, _) = classBigSig clas
+   (tyvars, sc_theta_tmpl, _, _) = classBigSig clas
    sc_theta = substTheta (mkTopTyVarSubst tyvars tys) sc_theta_tmpl
 
    add givens ct = case lookupFM givens ct of
