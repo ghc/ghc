@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: readFile.c,v 1.11 2000/03/10 15:23:40 simonmar Exp $
+ * $Id: readFile.c,v 1.12 2000/03/21 11:22:35 simonmar Exp $
  *
  * hGetContents Runtime Support
  */
@@ -155,24 +155,29 @@ readChunk(StgForeignPtr ptr, StgAddr buf, StgInt off, StgInt len)
     }
     fo->flags = (fo->flags & ~FILEOBJ_RW_WRITE) | FILEOBJ_RW_READ;
 
+    p = buf+off;
+
     /* copy the unread parts of the file buffer..*/
     if ( FILEOBJ_READABLE(fo) && 
     	 fo->bufRPtr > 0      &&
 	 fo->bufWPtr >= fo->bufRPtr ) {
-	count = ( len < (fo->bufWPtr - fo->bufRPtr)) ? len : (fo->bufWPtr - fo->bufRPtr);
-	memcpy(buf,fo->buf, count);
-	fo->bufWPtr=0;
-	fo->bufRPtr=0;
-	
+
+        if (fo->bufWPtr - fo->bufRPtr >= len) {
+            /* buffer has enough data to fulfill the request */
+	    memcpy(buf, fo->buf + fo->bufRPtr, len);
+            fo->bufRPtr += len;
+            return len;
+        } else {
+            /* can only partially fulfill the request from the buffer */
+            count = fo->bufWPtr - fo->bufRPtr;
+	    memcpy(buf, fo->buf + fo->bufRPtr, count);
+            fo->bufWPtr=0;
+	    fo->bufRPtr=0;
+            len -= count;
+            p += count;
+            total_count = count;
+        }
     }
-
-    if (len - count <= 0)
-       return count;
-
-    len -= count;
-    p = buf+off;
-    p += count;
-    total_count = count;
 
     while ((count =
              (
