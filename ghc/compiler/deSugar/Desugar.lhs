@@ -24,13 +24,11 @@ import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)
 import CoreSyn
 import Name             ( isExported )
 import DsMonad
-import DsBinds		( dsBinds, dsMonoBinds )
+import DsBinds		( dsBinds )
 import DsUtils
 
 import Bag		( unionBags )
-import CmdLineOpts	( opt_DoCoreLinting, opt_AutoSccsOnAllToplevs, 
-		          opt_AutoSccsOnExportedToplevs, opt_SccGroup
-			   )
+import CmdLineOpts	( opt_DoCoreLinting, opt_SccGroup )
 import CostCentre       ( IsCafCC(..), mkAutoCC )
 import CoreLift		( liftCoreBindings )
 import CoreLint		( lintCoreBindings )
@@ -72,23 +70,23 @@ deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst
 		    	Nothing -> mod_name	-- default: module name
 
 	(core_const_binds, shadows1)
-	    = initDs us0 nullIdEnv mod_name (dsBinds const_inst_binds)
+	    = initDs us0 nullIdEnv mod_name (dsBinds Nothing const_inst_binds)
 	core_const_prs = pairsFromCoreBinds core_const_binds
 
 	(core_clas_binds, shadows2)
-			= initDs us1 nullIdEnv mod_name (dsBinds clas_binds)
+			= initDs us1 nullIdEnv mod_name (dsBinds Nothing clas_binds)
 	core_clas_prs	= pairsFromCoreBinds core_clas_binds
 
 	(core_inst_binds, shadows3)
-			= initDs us2 nullIdEnv mod_name (dsBinds inst_binds)
+			= initDs us2 nullIdEnv mod_name (dsBinds Nothing inst_binds)
 	core_inst_prs	= pairsFromCoreBinds core_inst_binds
 
 	(core_val_binds, shadows4)
-			= initDs us3 nullIdEnv mod_name (dsBinds val_binds)
-	core_val_pairs	= map (addAutoScc module_and_group) (pairsFromCoreBinds core_val_binds)
+			= initDs us3 nullIdEnv mod_name (dsBinds (Just module_and_group) val_binds)
+	core_val_pairs	= pairsFromCoreBinds core_val_binds
 
 	(core_recsel_binds, shadows5)
-			= initDs us4 nullIdEnv mod_name (dsBinds recsel_binds)
+			= initDs us4 nullIdEnv mod_name (dsBinds Nothing recsel_binds)
 	core_recsel_prs	= pairsFromCoreBinds core_recsel_binds
 
     	final_binds
@@ -111,30 +109,4 @@ deSugar us mod_name (recsel_binds, clas_binds, inst_binds, val_binds, const_inst
 		  shadows3 `unionBags` shadows4 `unionBags` shadows5
     in
     (really_final_binds, shadows)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[addAutoScc]{Adding automatic sccs}
-%*									*
-%************************************************************************
-
-\begin{code}
-addAutoScc :: (FAST_STRING, FAST_STRING)	-- Module and group
-	   -> (Id, CoreExpr)
-	   -> (Id,CoreExpr)
-
-addAutoScc (mod, grp) pair@(bndr, core_expr)
-  | worthSCC core_expr &&
-    (opt_AutoSccsOnAllToplevs ||
-     (isExported bndr && opt_AutoSccsOnExportedToplevs))
-  = (bndr, SCC (mkAutoCC bndr mod grp IsNotCafCC) core_expr)
-
-  | otherwise
-  = pair
-
-worthSCC (SCC _ _) = False
-worthSCC (Con _ _) = False
-worthSCC core_expr = True
 \end{code}
