@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.49 2000/08/04 09:45:20 simonmar Exp $
+-- $Id: Main.hs,v 1.50 2000/08/04 12:04:08 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -1346,6 +1346,7 @@ genPipeline todo stop_flag filename
 	-- in the pipeline, so we add linking to the end of the pipeline
 	-- to force the output from the final phase to be a .o file.
       stop_phase = case todo of StopBefore phase -> phase
+				DoMkDependHS	 -> Ln
 				DoLink           -> Ln
       annotated_pipeline = annotatePipeline (pipeline ++ [ Ln ]) stop_phase
 
