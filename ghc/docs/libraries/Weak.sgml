@@ -58,7 +58,7 @@ alive for ever.  One way to solve this is to purge the table
 occasionally, by deleting entries whose keys have died.
 
 The weak pointers in this library
-support another approach, called <em/finalisation/.
+support another approach, called <em/finalization/.
 When the key referred to by a weak pointer dies, the storage manager
 arranges to run a programmer-specified finalizer.  In the case of memo
 tables, for example, the finalizer could remove the key/value pair
@@ -121,7 +121,7 @@ subsequently.
 Every finalizer will eventually be run, exactly once, either
 soon after the object dies, or at the end of the program.
 There is no requirement for the programmer to hold onto the
-weak pointer itself; finalisation is completely unaffected by
+weak pointer itself; finalization is completely unaffected by
 whether the weak pointer itself is alive.
 <item>
 There may be multiple weak pointers to a single object.
@@ -207,7 +207,7 @@ The behaviour is simply this:
 <itemize>
 <item> If a weak pointer (object) refers to an <em/unreachable/
 key, it may be finalized.
-<item> Finalisation means (a) arrange that subsequent calls
+<item> Finalization means (a) arrange that subsequent calls
 to <tt/deRefWeak/ return <tt/Nothing/; and (b) run the finalizer.
 </itemize>
 
@@ -243,7 +243,7 @@ and the finalizer are reachable, and so, therefore, are any other
 keys they refer to directly or indirectly.
 
 
-<sect1>Finalisation for foreign objects
+<sect1>Finalization for foreign objects
 <label id="foreign-finalizers">
 <p>
 
@@ -268,8 +268,8 @@ To avoid this somewhat subtle race condition, we use another type of
 foreign address, called <tt/ForeignObj/ (see Section <ref
 id="sec:Foreign" name="Foreign">).  Historical note: <tt/ForeignObj/
 is identical to the old <tt/ForeignObj/ except that it no longer
-supports finalisation - that's provided by the weak
-pointer/finalisation mechanism above.
+supports finalization - that's provided by the weak
+pointer/finalization mechanism above.
 
 A <tt/ForeignObj/ is basically an address, but the <tt/ForeignObj/
 itself is a heap-resident object and can therefore be watched by weak
