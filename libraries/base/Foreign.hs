@@ -10,10 +10,7 @@
 -- Portability :  portable
 --
 -- A collection of data types, classes, and functions for interfacing
--- with another programming language. This is only a convenience module
--- in the future, but currently it has the additional task of hiding
--- those entities exported from other modules, which are not part of the
--- FFI proposal.
+-- with another programming language.
 --
 -----------------------------------------------------------------------------
 
