@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.57 $
- * $Date: 2000/03/31 04:13:27 $
+ * $Revision: 1.58 $
+ * $Date: 2000/04/03 23:43:13 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -105,7 +105,7 @@ Cell v; {
         case VARIDCELL  :
         case VAROPCELL  : 
         case CONIDCELL  :
-        case CONOPCELL  : return text+textOf(v);
+        case CONOPCELL  : return textToStr(textOf(v));
 
         case QUALIDENT  : {   String qmod = textToStr(qmodOf(v));
 	                      String qtext = textToStr(qtextOf(v));
