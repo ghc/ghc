@@ -152,8 +152,7 @@ ppHtmlContents odir title source_url mods = do
 	header (thetitle (toHtml title) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
-        body <<  
-	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
+        body << vanillaTable << (
    	    simpleHeader title </>
 	    ppModuleTree title tree </>
 	    footer
@@ -211,8 +210,7 @@ ppHtmlIndex odir title ifaces = do
 	header (thetitle (toHtml (title ++ " (Index)")) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
-        body <<  
-	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
+        body << vanillaTable << (
 	    simpleHeader title </>
 	    tda [theclass "section1"] << toHtml "Type/Class Index" </>
 	    index_html tycls_index 't' </>
@@ -247,8 +245,7 @@ ppHtmlIndex odir title ifaces = do
       html = header (thetitle (toHtml (title ++ " (" ++ descr ++ "Index)")) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
-             body <<  
-	      table ! [width "100%", cellpadding 0, cellspacing 1] << (
+             body << vanillaTable << (
 	        simpleHeader title </>
 	        tda [theclass "section1"] << 
 	      	toHtml (descr ++ " Index (" ++ c:")") </>
@@ -302,8 +299,7 @@ ppHtmlModule odir title source_url (Module mod,iface) = do
 	header (thetitle (toHtml mod) +++
 		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"]) +++
-        body <<  
-	  table ! [width "100%", cellpadding 0, cellspacing 1] << (
+        body << vanillaTable << (
 	    pageHeader mod iface title source_url </>
 	    ifaceToHtml mod iface </>
 	    footer
@@ -330,7 +326,7 @@ ifaceToHtml mod iface
 	description
          | Just doc <- iface_doc iface
          = (tda [theclass "section1"] << toHtml "Description") </>
-	   docBox (markup htmlMarkup doc)
+	   docBox (docToHtml doc)
 	 | otherwise
 	 = Html.emptyTable
 
@@ -364,7 +360,7 @@ ppModuleContents exports
     | lev <= n  = ( [], items )
     | otherwise = ( html:sections, rest2 )
     where
-	html = (dterm << anchor ! [href ('#':id)] << markup htmlMarkup doc)
+	html = (dterm << anchor ! [href ('#':id)] << docToHtml doc)
 		 +++ mk_subsections subsections
 	(subsections, rest1) = process lev rest
 	(sections,    rest2) = process n   rest1
@@ -386,12 +382,12 @@ numberSectionHeadings exports = go 1 exports
 processExport :: Bool -> ExportItem -> HtmlTable
 processExport summary (ExportGroup lev id doc)
   | summary   = Html.emptyTable
-  | otherwise = ppDocGroup lev (anchor ! [name id] << markup htmlMarkup doc)
+  | otherwise = ppDocGroup lev (anchor ! [name id] << docToHtml doc)
 processExport summary (ExportDecl decl)
   = doDecl summary decl
 processExport summary (ExportDoc doc)
   | summary = Html.emptyTable
-  | otherwise = docBox (markup htmlMarkup doc)
+  | otherwise = docBox (docToHtml doc)
 processExport summary (ExportModule (Module mod))
   = declBox (toHtml "module" <+> ppHsModule mod)
 
@@ -410,7 +406,7 @@ declWithDoc False Nothing    html_decl = declBox html_decl
 declWithDoc False (Just doc) html_decl = 
 	tda [width "100%"] << 
 	    vanillaTable << 
-		(declBox html_decl </> docBox (markup htmlMarkup doc))
+		(declBox html_decl </> docBox (docToHtml doc))
 
 doDecl :: Bool -> HsDecl -> HtmlTable
 doDecl summary decl = do_decl decl
@@ -439,7 +435,7 @@ doDecl summary decl = do_decl decl
 
      do_decl (HsDocGroup loc lev str)
 	= if summary then Html.emptyTable 
-		     else ppDocGroup lev (markup htmlMarkup str)
+		     else ppDocGroup lev (docToHtml str)
 
      do_decl _ = error ("do_decl: " ++ show decl)
 
@@ -465,14 +461,12 @@ ppShortDataDecl summary is_newty
 ppShortDataDecl summary is_newty
 	(HsDataDecl loc ctx nm args cons drv _doc) = 
    vanillaTable << (
-     aboves (
-	(declBox (ppHsDataHeader summary is_newty nm args) :
- 	zipWith do_constr ('=':repeat '|') cons
-     )
-    )
-  )
-  where do_constr c con = tda [theclass "condecl"] << (
-				toHtml [c] <+> ppShortConstr summary con)
+	declBox (ppHsDataHeader summary is_newty nm args) </>
+	tda [theclass "body"] << vanillaTable << (
+	  aboves (zipWith do_constr ('=':repeat '|') cons)
+        )
+   )
+  where do_constr c con = declBox (toHtml [c] <+> ppShortConstr summary con)
 
 -- First, the abstract case:
 
@@ -482,29 +476,33 @@ ppHsDataDecl summary is_newty (HsDataDecl loc ctx nm args [] drv doc) =
 -- The rest of the cases:
 
 ppHsDataDecl summary is_newty decl@(HsDataDecl loc ctx nm args cons drv doc)
-  | summary || no_constr_docs
+  | summary || (isNothing doc && no_constr_docs)
 	= declWithDoc summary doc (ppShortDataDecl summary is_newty decl)
 
   | otherwise
-        = td << vanillaTable << (header </> datadoc </> constrs)
+        = td << vanillaTable << (
+	    header </> 
+	    tda [theclass "body"] << vanillaTable << (
+		datadoc </> 
+		constr_hdr </>
+		(tda [theclass "body"] << table << constrs))
+	  )
   where
 	header = declBox (ppHsDataHeader False is_newty nm args)
 
+	table 
+	  | any isRecDecl cons  = spacedTable5
+	  | otherwise           = spacedTable1
+
 	datadoc 
-	  | isJust doc = docBox (markup htmlMarkup (fromJust doc))
+	  | isJust doc = ndocBox (docToHtml (fromJust doc))
 	  | otherwise  = Html.emptyTable
 
 	constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
 
 	constrs
 	  | null cons = Html.emptyTable
-	  | otherwise = 
-		tda [theclass "databody"] << (
-	    	    table ! [width "100%", cellpadding 0, cellspacing 10] <<
-			aboves (constr_hdr : map do_constr cons)
-           	  )
-
-	do_constr con = ppHsFullConstr con
+	  | otherwise = aboves (map ppSideBySideConstr cons)
 
 	no_constr_docs = all constr_has_no_doc cons
 
@@ -516,6 +514,8 @@ ppHsDataDecl summary is_newty decl@(HsDataDecl loc ctx nm args cons drv doc)
  	field_has_no_doc (HsFieldDecl nms _ doc)
 	   = isNothing doc
 
+isRecDecl (HsRecDecl pos nm tvs ctxt fields maybe_doc) = True
+isRecDecl _ = False
 
 ppShortConstr :: Bool -> HsConDecl -> Html
 ppShortConstr summary (HsConDecl pos nm tvs ctxt typeList _maybe_doc) = 
@@ -533,6 +533,21 @@ ppHsConstrHdr tvs ctxt
    +++
    (if null ctxt then noHtml else ppHsContext ctxt <+> toHtml "=> ")
 
+ppSideBySideConstr (HsConDecl pos nm tvs ctxt typeList doc) =
+  narrowDeclBox (hsep ((ppHsConstrHdr tvs ctxt +++ 
+		ppHsBinder False nm) : map ppHsBangType typeList)) <->
+  maybeRDocBox doc
+ppSideBySideConstr (HsRecDecl pos nm tvs ctxt fields doc) =
+  narrowDeclBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm) <->
+  maybeRDocBox doc </>
+  (tda [theclass "body"] << spacedTable1 <<
+     aboves (map ppSideBySideField fields))
+
+ppSideBySideField (HsFieldDecl ns ty doc) =
+  declBox (hsep (punctuate comma (map (ppHsBinder False) ns))
+	   <+> toHtml "::" <+> ppHsBangType ty) <->
+  maybeRDocBox doc
+
 ppHsFullConstr (HsConDecl pos nm tvs ctxt typeList doc) = 
      declWithDoc False doc (
 	hsep ((ppHsConstrHdr tvs ctxt +++ 
@@ -548,7 +563,7 @@ ppHsFullConstr (HsRecDecl pos nm tvs ctxt fields doc) =
   where hdr = declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm)
 
 	constr_doc	
-	  | isJust doc = docBox (markup htmlMarkup (fromJust doc))
+	  | isJust doc = docBox (docToHtml (fromJust doc))
 	  | otherwise  = Html.emptyTable
 
 	fields_html = 
@@ -624,7 +639,7 @@ ppHsClassDecl summary decl@(HsClassDecl loc ty fds decls doc)
 					keyword "where")
 
 	classdoc
-	   | Just d <- doc = docBox (markup htmlMarkup d)
+	   | Just d <- doc = docBox (docToHtml d)
 	   | otherwise     = Html.emptyTable
 
 	meth_hdr = tda [ theclass "section4" ] << toHtml "Methods"
@@ -651,9 +666,9 @@ ppFunSig summary nm ty doc
   | otherwise   = 
       td << vanillaTable << (
 	declBox (ppHsBinder False nm) </>
-	(tda [theclass "body"] << narrowTable <<  (
+	(tda [theclass "body"] << vanillaTable <<  (
 	   (if (isJust doc) 
-		then ndocBox (markup htmlMarkup (fromJust doc))
+		then ndocBox (docToHtml (fromJust doc))
 		else Html.emptyTable)  </>
 	   do_args True ty
 	 ))
@@ -667,20 +682,21 @@ ppFunSig summary nm ty doc
 
 	do_args :: Bool -> HsType -> HtmlTable
 	do_args first (HsForAllType maybe_tvs ctxt ty)
-	  = declBox (leader first <+> ppHsForAll maybe_tvs ctxt) </> 
+	  = narrowDeclBox (leader first <+> ppHsForAll maybe_tvs ctxt) </> 
 	    do_args False ty
 	do_args first (HsTyFun (HsTyDoc ty doc) r)
-	  = (declBox (leader first <+> ppHsBType ty) <-> 
-	     rdocBox (markup htmlMarkup doc)) </>
+	  = (narrowDeclBox (leader first <+> ppHsBType ty) <-> 
+	     rdocBox (docToHtml doc)) </>
 	    do_args False r
 	do_args first (HsTyFun ty r)
-	  = (declBox (leader first <+> ppHsBType ty) <->
+	  = (narrowDeclBox (leader first <+> ppHsBType ty) <->
 	     rdocBox noHtml) </>
 	    do_args False r
 	do_args first (HsTyDoc ty doc)
-	  = (declBox (leader first <+> ppHsBType ty) <-> 
-	     rdocBox (markup htmlMarkup doc))
-	do_args first _ = declBox (leader first <+> ppHsBType ty)
+	  = (narrowDeclBox (leader first <+> ppHsBType ty) <-> 
+	     rdocBox (docToHtml doc))
+	do_args first ty = declBox (leader first <+> ppHsBType ty) <->
+			   rdocBox (noHtml)
 
 	leader True  = toHtml "::"
 	leader False = toHtml "->"
@@ -787,6 +803,11 @@ htmlMarkup = Markup {
   markupURL	      = \url -> anchor ! [href url] << toHtml url
   }
 
+-- If the doc is a single paragraph, don't surround it with <P> (this causes
+-- ugly extra whitespace with some browsers).
+docToHtml (DocParagraph p) = docToHtml p
+docToHtml doc = markup htmlMarkup doc
+
 -- -----------------------------------------------------------------------------
 -- * Misc
 
@@ -830,6 +851,10 @@ text   = strAttr "TEXT"
 declBox :: Html -> HtmlTable
 declBox html = tda [theclass "decl"] << html
 
+-- a horrible hack to keep a box from expanding width-wise
+narrowDeclBox :: Html -> HtmlTable
+narrowDeclBox html = tda [theclass "decl", width "1"] << html
+
 -- a box for displaying documentation, 
 -- indented and with a little padding at the top
 docBox :: Html -> HtmlTable
@@ -843,9 +868,18 @@ ndocBox html = tda [theclass "ndoc"] << html
 rdocBox :: Html -> HtmlTable
 rdocBox html = tda [theclass "rdoc"] << html
 
+maybeRDocBox :: Maybe Doc -> HtmlTable
+maybeRDocBox Nothing = rdocBox (noHtml)
+maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
+
 -- a box for the buttons at the top of the page
 topButBox html = tda [theclass "topbut"] << html
 
-vanillaTable = table ! [width "100%", cellpadding 0, cellspacing 0, border 0]
+-- a vanilla table has width 100%, no border, no padding, no spacing
+-- a narrow table is the same but without width 100%.
+vanillaTable = table ! [theclass "vanilla", cellspacing 0, cellpadding 0]
+narrowTable  = table ! [theclass "narrow",  cellspacing 0, cellpadding 0]
 
-narrowTable = table ! [cellpadding 0, cellspacing 0, border 0]
+spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
+spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
+
