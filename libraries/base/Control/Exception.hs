@@ -107,8 +107,8 @@ module Control.Exception (
 	finally, 	-- :: IO a -> IO b -> IO a
 	
 #ifdef __GLASGOW_HASKELL__
-	setUncatchedExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
-	getUncatchedExceptionHandler       -- :: IO (Exception -> IO ())
+	setUncaughtExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
+	getUncaughtExceptionHandler       -- :: IO (Exception -> IO ())
 #endif
   ) where
 
@@ -515,9 +515,9 @@ assert False _ = throw (AssertionFailed "")
 
 
 #ifdef __GLASGOW_HASKELL__
-{-# NOINLINE uncatchedExceptionHandler #-}
-uncatchedExceptionHandler :: IORef (Exception -> IO ())
-uncatchedExceptionHandler = unsafePerformIO (newIORef defaultHandler)
+{-# NOINLINE uncaughtExceptionHandler #-}
+uncaughtExceptionHandler :: IORef (Exception -> IO ())
+uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
       defaultHandler :: Exception -> IO ()
       defaultHandler ex = do
@@ -531,9 +531,9 @@ uncatchedExceptionHandler = unsafePerformIO (newIORef defaultHandler)
 foreign import ccall unsafe "writeErrString__"
 	writeErrString :: CString -> Int -> IO ()
 
-setUncatchedExceptionHandler :: (Exception -> IO ()) -> IO ()
-setUncatchedExceptionHandler = writeIORef uncatchedExceptionHandler
+setUncaughtExceptionHandler :: (Exception -> IO ()) -> IO ()
+setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
-getUncatchedExceptionHandler :: IO (Exception -> IO ())
-getUncatchedExceptionHandler = readIORef uncatchedExceptionHandler
+getUncaughtExceptionHandler :: IO (Exception -> IO ())
+getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler
 #endif

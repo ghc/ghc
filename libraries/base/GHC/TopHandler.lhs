@@ -74,7 +74,7 @@ reportStackOverflow bombOut = do
 
 reportError :: Bool -> Exception -> IO a
 reportError bombOut ex = do
-   handler <- getUncatchedExceptionHandler
+   handler <- getUncaughtExceptionHandler
    handler ex
    if bombOut
       then exit 1
