@@ -1,5 +1,7 @@
 import System.Posix.Signals
 
+#include "config.h"
+
 main = do
   print (testMembers emptySignalSet)
   print (testMembers emptyset)
@@ -26,7 +28,9 @@ fullset = internalAbort `addSignal`
 	  backgroundWrite `addSignal`
 	  userDefinedSignal1 `addSignal`
 	  userDefinedSignal2 `addSignal`
+#if HAVE_SIGPOLL
 	  pollableEvent `addSignal`
+#endif
 	  profilingTimerExpired `addSignal`
 	  badSystemCall `addSignal`
 	  breakpointTrap `addSignal`
@@ -56,7 +60,9 @@ emptyset = internalAbort `deleteSignal`
 	  backgroundWrite `deleteSignal`
 	  userDefinedSignal1 `deleteSignal`
 	  userDefinedSignal2 `deleteSignal`
+#if HAVE_SIGPOLL
 	  pollableEvent `deleteSignal`
+#endif
 	  profilingTimerExpired `deleteSignal`
 	  badSystemCall `deleteSignal`
 	  breakpointTrap `deleteSignal`
@@ -87,7 +93,9 @@ testMembers set = [
 	  backgroundWrite `inSignalSet` set,
 	  userDefinedSignal1 `inSignalSet` set,
 	  userDefinedSignal2 `inSignalSet` set,
+#if HAVE_SIGPOLL
 	  pollableEvent `inSignalSet` set,
+#endif
 	  profilingTimerExpired `inSignalSet` set,
 	  badSystemCall `inSignalSet` set,
 	  breakpointTrap `inSignalSet` set,
