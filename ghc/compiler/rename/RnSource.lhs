@@ -41,7 +41,6 @@ import NameEnv
 import Outputable
 import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import CmdLineOpts	( DynFlag(..) )
-import DriverPhases	( isHsBoot )
 import Maybes		( seqMaybe )
 import Maybe            ( catMaybes, isNothing )
 \end{code}

@@ -18,7 +18,7 @@ import RnHsSyn		( maybeGenericMatch, extractHsTyVars )
 import RnExpr		( rnLExpr )
 import RnEnv		( lookupTopBndrRn, lookupImportedName )
 
-import Inst		( Inst, InstOrigin(..), instToId, newDicts, newDictsAtLoc, newMethod )
+import Inst		( instToId, newDicts, newDictsAtLoc, newMethod )
 import TcEnv		( tcLookupLocatedClass, tcExtendIdEnv2, 
 			  tcExtendTyVarEnv, 
 			  InstInfo(..), pprInstInfoDetails,

@@ -39,9 +39,9 @@ import TcUnify		( unifyFunKind, checkExpectedKind )
 import TcType		( Type, PredType(..), ThetaType, 
 			  MetaDetails(Flexi), hoistForAllTys,
 			  TcType, TcTyVar, TcKind, TcThetaType, TcTauType,
-		 	  mkForAllTys, mkFunTys, tcEqType, isPredTy, mkFunTy, 
+		 	  mkFunTy, 
 			  mkSigmaTy, mkPredTy, mkGenTyConApp, mkTyConApp, mkAppTys, 
-			  tcSplitFunTy_maybe, tcSplitForAllTys, typeKind )
+			  typeKind )
 import Kind 		( Kind, isLiftedTypeKind, liftedTypeKind, ubxTupleKind, 
 			  openTypeKind, argTypeKind, splitKindFunTys )
 import Id		( idName )
@@ -52,14 +52,12 @@ import Name		( Name, mkInternalName )
 import OccName		( mkOccName, tvName )
 import NameSet
 import PrelNames	( genUnitTyConName )
-import Type		( deShadowTy )
 import TysWiredIn	( mkListTy, mkPArrTy, mkTupleTy )
 import Bag		( bagToList )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( Located(..), unLoc, noLoc, srcSpanStart )
 import UniqSupply	( uniqsFromSupply )
 import Outputable
-import List		( nubBy )
 \end{code}
 
 

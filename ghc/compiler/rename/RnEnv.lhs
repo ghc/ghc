@@ -32,9 +32,11 @@ module RnEnv (
 
 import LoadIface	( loadHomeInterface, loadSrcInterface )
 import IfaceEnv		( lookupOrig, newGlobalBinder, newIPName )
-import HsSyn
+import HsSyn		( FixitySig(..), ReboundNames, HsExpr(..), 
+			  HsType(..), HsExplicitForAll(..), LHsTyVarBndr, LHsType, 
+			  LSig, Sig(..), Fixity, hsLTyVarName, hsLTyVarLocNames, replaceTyVarName )
 import RdrHsSyn		( extractHsTyRdrTyVars )
-import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
+import RdrName		( RdrName, rdrNameModule, isQual, isUnqual, isOrig,
 			  mkRdrUnqual, setRdrNameSpace, rdrNameOcc,
 			  pprGlobalRdrEnv, lookupGRE_RdrName, 
 			  isExact_maybe, isSrcRdrName,
@@ -42,7 +44,6 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  isLocalGRE, extendLocalRdrEnv, elemLocalRdrEnv, lookupLocalRdrEnv,
 			  Provenance(..), pprNameProvenance, ImportSpec(..) 
 			)
-import HsTypes		( replaceTyVarName )
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, 
@@ -60,7 +61,6 @@ import Util		( sortLe )
 import ListSetOps	( removeDups )
 import List		( nubBy )
 import CmdLineOpts
-import FastString	( FastString )
 \end{code}
 
 %*********************************************************
