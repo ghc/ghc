@@ -476,11 +476,12 @@ instance (Ix i, Ord e) => Ord (Array i e) where
 
 instance (Ix a, Show a, Show b) => Show (Array a b) where
     showsPrec p a =
-        showParen (p > 9) $
+        showParen (p > appPrec) $
         showString "array " .
-        shows (bounds a) .
+        showsPrec appPrec1 (bounds a) .
         showChar ' ' .
-        shows (assocs a)
+        showsPrec appPrec1 (assocs a)
+	-- Precedence of 'array' is the precedence of application
 
 -- The Read instance is in GHC.Read
 \end{code}

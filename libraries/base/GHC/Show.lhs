@@ -24,6 +24,7 @@ module GHC.Show
 	shows, showChar, showString, showParen, showList__, showSpace,
 	showLitChar, protectEsc, 
 	intToDigit, digitToInt, showSignedInt,
+	appPrec, appPrec1,
 
 	-- Character operations
 	isAscii, isLatin1, isControl, isPrint, isSpace, isUpper,
@@ -74,6 +75,12 @@ showList__ showx (x:xs) s = '[' : showx x (showl xs)
   where
     showl []     = ']' : s
     showl (y:ys) = ',' : showx y (showl ys)
+
+appPrec, appPrec1 :: Int
+	-- Use unboxed stuff because we don't have overloaded numerics yet
+appPrec = I# 10#	-- Precedence of application:
+			--   one more than the maximum operator precedence of 9
+appPrec1 = I# 11#	-- appPrec + 1
 \end{code}
 
 %*********************************************************
@@ -117,19 +124,18 @@ instance Show Int where
 
 instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
-    showsPrec (I# p#) (Just x) s
-                          = (showParen (p# >=# 10#) $ 
+    showsPrec p (Just x) s
+                          = (showParen (p > appPrec) $ 
     			     showString "Just " . 
-			     showsPrec (I# 10#) x) s
+			     showsPrec appPrec1 x) s
 
 instance (Show a, Show b) => Show (Either a b) where
-    showsPrec (I# p#) e s =
-       (showParen (p# >=# 10#) $
+    showsPrec p e s =
+       (showParen (p > appPrec) $
         case e of
-         Left  a -> showString "Left "  . showsPrec (I# 10#) a
-	 Right b -> showString "Right " . showsPrec (I# 10#) b)
+         Left  a -> showString "Left "  . showsPrec appPrec1 a
+	 Right b -> showString "Right " . showsPrec appPrec1 b)
        s
-
 \end{code}
 
 

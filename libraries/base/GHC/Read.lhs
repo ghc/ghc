@@ -73,10 +73,8 @@ import GHC.List
 import GHC.Show		-- isAlpha etc
 import GHC.Base
 import GHC.Arr
-
-ratioPrec = 7 	-- Precedence of ':%' constructor
-appPrec   = 10	-- Precedence of applictaion
 \end{code}
+
 -------------------------------------------------------
 	TEMPORARY UNTIL I DO DERIVED READ
 

@@ -46,6 +46,10 @@ data  (Integral a)	=> Ratio a = !a :% !a  deriving (Eq)
 -- the '%' operator.
 type  Rational		=  Ratio Integer
 
+ratioPrec, ratioPrec1 :: Int
+ratioPrec  = 7 	-- Precedence of ':%' constructor
+ratioPrec1 = ratioPrec + 1
+
 infinity, notANumber :: Rational
 infinity   = 1 :% 0
 notANumber = 0 :% 0
@@ -246,11 +250,10 @@ instance  (Integral a)	=> RealFrac (Ratio a)  where
 
 instance  (Integral a)  => Show (Ratio a)  where
     {-# SPECIALIZE instance Show Rational #-}
-    showsPrec p (x:%y)	=  showParen (p > ratio_prec)
-    	    	    	       (shows x . showString " % " . shows y)
-
-ratio_prec :: Int
-ratio_prec = 7
+    showsPrec p (x:%y)	=  showParen (p > ratioPrec) $
+			   showsPrec ratioPrec1 x . 
+			   showString " % " . 
+			   showsPrec ratioPrec1 y
 
 instance  (Integral a)	=> Enum (Ratio a)  where
     {-# SPECIALIZE instance Enum Rational #-}
