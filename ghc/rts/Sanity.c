@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.7 1999/01/26 11:12:47 simonm Exp $
+ * $Id: Sanity.c,v 1.8 1999/02/02 12:37:14 simonm Exp $
  *
  * Sanity checking code for the heap and stack.
  *
@@ -203,9 +203,32 @@ checkClosure( StgClosure* p )
 	return sizeofW(StgMVar);
       }
 
-    case FUN:
     case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_2_0:
+      {
+	nat i;
+	for (i = 0; i < info->layout.payload.ptrs; i++) {
+	  ASSERT(LOOKS_LIKE_PTR(payloadPtr(p,i)));
+	}
+	return stg_max(sizeW_fromITBL(info), sizeofW(StgHeader) + MIN_UPD_SIZE);
+      }
+
+    case FUN:
+    case FUN_1_0:
+    case FUN_0_1:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_2_0:
     case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_2_0:
     case IND_PERM:
     case IND_OLDGEN:
     case IND_OLDGEN_PERM:
