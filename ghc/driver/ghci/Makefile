@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.2 2001/03/26 22:42:42 qrczak Exp $
+# $Id: Makefile,v 1.3 2001/03/27 09:36:53 simonmar Exp $
 #
 
 TOP=../..
@@ -20,7 +20,7 @@ GHCBIN=$(libdir)/ghc-$(ProjectVersion)
 GHCLIB=$(libdir)
 endif # BIN_DIST
 else
-GHCBIN=$(FPTOOLS_TOP_ABS)/ghc/compiler/ghc
+GHCBIN=$(FPTOOLS_TOP_ABS)/ghc/compiler/ghc-$(ProjectVersion)
 GHCLIB=$(FPTOOLS_TOP_ABS)
 endif
 
