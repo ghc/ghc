@@ -563,7 +563,7 @@ strmod = "\
             as part of another (non-Haskell) program, the RTS will not
             be supplying its definition of <function>main()</function>
             at link-time, you will have to. To signal that to the
-            driver script when linking, use
+            compiler when linking, use
             <option>-no-hs-main</option>.</para>
 
 	    <para>Notice that since the command-line passed to the
@@ -573,6 +573,13 @@ strmod = "\
             though, just try linking once with <option>-v</option> on
             to see what options the driver passes through to the
             linker.</para>
+
+	    <para>The <option>-no-hs-main</option> flag can also be
+	    used to persuade the compiler to do the link step in
+	    <option>--make</option> mode when there is no Haskell
+	    <literal>Main</literal> module present (normally the
+	    compiler will not attempt linking when there is no
+	    <literal>Main</literal>).</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
