@@ -5,7 +5,7 @@ echo "runallnofib: Can't cd to nofibtmp"
 exit
 fi
 
-TROOT=/home/v-julsew/Mar09
+TROOT=/home/v-julsew/Oct11
 NROOT=$TROOT/fpO/nofib
 
 cd nofibtmp
