@@ -2497,7 +2497,7 @@ sub add_syslib {
 	       ? "$InstLibDirGhc"
 	       : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/misc/cbits"
 	  )
-	, 'exts' # Syslib dependencies
+	, 'exts concurrent' # Syslib dependencies
 	, ''     # extra ghc opts
 	, ''     # extra cc opts
 	, ( $TargetPlatform =~ /-solaris2$/  ? '-lnsl -lsocket' : '')
