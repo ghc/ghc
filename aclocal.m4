@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.98 2002/03/12 09:23:01 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.99 2002/04/10 09:41:16 simonmar Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -214,7 +214,7 @@ else
 fi;
 changequote([, ])dnl
 ])
-if test -d $srcdir/ghc; then
+if test -d $srcdir/ghc -a ! -f $srcdir/ghc/compiler/parser/Parser.hs; then
   FPTOOLS_PROG_CHECK_VERSION([$fptools_cv_happy_version],-lt,[1.9],
   [AC_MSG_ERROR([Happy version 1.9 or later is required to compile GHC.])])dnl
 fi
