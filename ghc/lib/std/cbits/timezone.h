@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: timezone.h,v 1.7 1999/03/02 20:14:02 sof Exp $
+ * $Id: timezone.h,v 1.8 1999/03/03 17:17:05 simonm Exp $
  *
  * Time-zone support header
  */
@@ -41,6 +41,10 @@
  * our own that test for POSIX-compliant time support first, then
  * BSD-style time stuff.
  */
+#endif
+
+#ifdef solaris2_TARGET_OS
+#undef HAVE_TIMEZONE
 #endif
 
 #if TIME_WITH_SYS_TIME
