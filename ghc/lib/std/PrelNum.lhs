@@ -1021,9 +1021,8 @@ floatToDigits base x =
 	-- Haskell promises that p-1 <= logBase b f < p.
 	(p - 1 + e0) * 3 `div` 10
      else
-        ceiling ((log (fromInteger (f+1)) +
-	         fromInt e * log (fromInteger b)) /
-		  fromInt e * log (fromInteger b))
+        ceiling ((log (fromInteger (f+1)) + fromInt e * log (fromInteger b)) /
+		  log (fromInteger base))
 
     fixup n =
       if n >= 0 then
@@ -1189,15 +1188,11 @@ fromRat' x = r
 
 -- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
 scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
-scaleRat b minExp xMin xMax p x =
-    if p <= minExp then
-        (x, p)
-    else if x >= xMax then
-        scaleRat b minExp xMin xMax (p+1) (x/b)
-    else if x < xMin  then
-        scaleRat b minExp xMin xMax (p-1) (x*b)
-    else
-        (x, p)
+scaleRat b minExp xMin xMax p x
+    | p <= minExp = (x, p)
+    | x >= xMax   = scaleRat b minExp xMin xMax (p+1) (x/b)
+    | x < xMin    = scaleRat b minExp xMin xMax (p-1) (x*b)
+    | otherwise   = (x, p)
 
 -- Exponentiation with a cache for the most common numbers.
 minExpt = 0::Int
