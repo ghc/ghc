@@ -80,11 +80,10 @@ import PrelVals		( nO_EXPLICIT_METHOD_ERROR_ID )
 import PprType		( GenType, GenTyVar, GenClass, GenClassOp, TyCon,
 			  pprParendGenType
 			)
-import PprStyle
 import Outputable
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Pretty
-import TyCon		( isSynTyCon, derivedFor )
+import TyCon		( isSynTyCon, isDataTyCon, derivedClasses )
 import Type		( GenType(..), SYN_IE(ThetaType), mkTyVarTys, isPrimType,
 			  splitSigmaTy, splitAppTys, isTyVarTy, matchTy, mkSigmaTy,
 			  getTyCon_maybe, maybeAppTyCon, SYN_IE(Type),
@@ -398,8 +397,8 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_ty
 	avail_insts	 -- These insts are in scope; quite a few, eh?
 	  = this_dict `plusLIE` dfun_arg_dicts `plusLIE`  unionManyBags meth_lies
     in
-    tcAddErrCtxt (bindSigCtxt meth_ids) (
-	tcSimplifyAndCheck
+    tcAddErrCtxt bindSigCtxt (
+        tcSimplifyAndCheck
 		 inst_tyvars_set'			-- Local tyvars
 		 avail_insts
 		 (sc_dicts `unionBags` 
@@ -675,7 +674,7 @@ scrutiniseInstanceType dfun_name clas inst_tau
 	-- for something that we are also planning to `derive'
 	-- Though we can have an explicit instance which is more
 	-- specific than the derived instance
-  | clas `derivedFor` inst_tycon
+  | clas `elem` (derivedClasses inst_tycon)
     && all isTyVarTy arg_tys
   = failTc (derivingWhenInstanceExistsErr clas inst_tycon)
 
@@ -703,15 +702,11 @@ ccallable_type   ty = isPrimType ty ||				-- Allow CCallable Int# etc
 		      byte_arr_thing
   where
     byte_arr_thing = case maybeAppDataTyCon ty of
-			Just (tycon, ty_args, [data_con]) -> 
---			 	pprTrace "cc1" (sep [ppr PprDebug tycon, ppr PprDebug data_con,
---						       sep (map (ppr PprDebug) data_con_arg_tys)])(
+			Just (tycon, ty_args, [data_con]) | isDataTyCon tycon -> 
 		     		length data_con_arg_tys == 2 &&
 				maybeToBool maybe_arg2_tycon &&
---			 	pprTrace "cc2" (sep [ppr PprDebug arg2_tycon]) (
 				(arg2_tycon == byteArrayPrimTyCon ||
 				 arg2_tycon == mutableByteArrayPrimTyCon)
---				))
 			     where
 				data_con_arg_tys = dataConArgTys data_con ty_args
 				(data_con_arg_ty1 : data_con_arg_ty2 : _) = data_con_arg_tys
@@ -780,11 +775,10 @@ methodSigCtxt name ty sty
 	               ppr sty name, ptext SLIT("to its signature :") ])
 	 4 (ppr sty ty)
 
-bindSigCtxt method_ids sty
-  = hang (ptext SLIT("When checking type signatures for: "))
-	 4 (hsep (punctuate comma (map (ppr sty) method_ids)))
+bindSigCtxt sty
+  = ptext SLIT("When checking methods of an instance declaration")
 
 superClassSigCtxt sty
-  = ptext SLIT("When checking superclass constraints on instance declaration")
+  = ptext SLIT("When checking superclass constraints of an instance declaration")
 
 \end{code}
