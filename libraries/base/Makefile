@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.25 2002/04/26 13:26:39 simonmar Exp $
+# $Id: Makefile,v 1.26 2002/05/09 10:43:42 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -90,7 +90,6 @@ endif # TARGETPLATFORM = i386-unknown-mingw32
 # Doc building with Haddock
 
 EXCLUDED_HADDOCK_SRCS = \
-	GHC/Err.lhs \
 	Data/Generics.hs \
 	GHC/PArr.hs
 
