@@ -642,14 +642,14 @@ YACC			= @YaccCmd@
 
 SGML2DVI		= db2dvi
 SGML2HTML		= db2html
-SGML2INFO		= db2info
+SGML2PS			= db2ps
 SGML2RTF		= db2rtf
 
 SGMLSTYLESHEET          = $(FPTOOLS_TOP_ABS)/docs/fptools-both.dsl
 
 SRC_SGML2DVI_OPTS       = -d $(SGMLSTYLESHEET)
 SRC_SGML2HTML_OPTS      = -d $(SGMLSTYLESHEET)
-SRC_SGML2INFO_OPTS      = -d $(SGMLSTYLESHEET)
+SRC_SGML2PS_OPTS      	= -d $(SGMLSTYLESHEET)
 SRC_SGML2RTF_OPTS       = -d $(SGMLSTYLESHEET)
 
 #-----------------------------------------------------------------------------

@@ -206,9 +206,9 @@ endif
 	@$(RM) $@
 	$(SGML2HTML) $(SGML2HTML_OPTS) $<
 
-%.info : %.sgml
+%.ps : %.sgml
 	@$(RM) $@
-	$(SGML2INFO) $(SGML2INFO_OPTS) $<
+	$(SGML2PS) $(SGML2PS_OPTS) $<
 
 %.rtf : %.sgml
 	@$(RM) $@
