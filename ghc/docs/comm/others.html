@@ -14,6 +14,7 @@
       probably incomplete list:
     <p>
     <ul>
+
       <li>The <a
       href="http://www.cee.hw.ac.uk/~dsg/gph/docs/StgSurvival.ps.gz">STG
 	  Survival Sheet</a> has -- according to its header -- been written by
@@ -22,12 +23,22 @@
 	  act of contemplating the inner workings of the STG runtime system.
 	  This document discusses GHC's runtime system with a focus on
 	  support for parallel processing (aka GUM).
+
       <li>Instructions on <a
       href="http://www-users.cs.york.ac.uk/~olaf/PUBLICATIONS/extendGHC.html">Adding 
 	  an Optimisation Pass to the Glasgow Haskell Compiler</a> 
 	have been compiled by <a
 	href="http://www-users.cs.york.ac.uk/~olaf/">Olaf Chitil</a>.
 	Unfortunately, this document is already a little aged.
+
+      <li><a href="http://www.cs.pdx.edu/~apt/">Andrew Tolmach</a> has defined 
+	<a href="http://www.haskell.org/ghc/docs/papers/core.ps.gz">an external
+	  representation of
+	  GHC's <em>Core</em> language</a> and also implemented a GHC pass
+	that emits the intermediate form into <code>.hcr</code> files.  The
+	option <code>-fext-core</code> triggers GHC to emit Core code after
+	optimisation; in addition, <code>-fno-code</code> is often used to
+	stop compilation after Core has been emitted.
 
 	<!-- Add references to other background texts listed on the GHC docu
 	page 
@@ -42,7 +53,7 @@
 
     <p><small>
 <!-- hhmts start -->
-Last modified: Wed Aug  8 00:47:05 EST 2001
+Last modified: Tue Nov 13 10:56:57 EST 2001
 <!-- hhmts end -->
     </small>
   </body>
