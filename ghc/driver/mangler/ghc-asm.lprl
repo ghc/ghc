@@ -1265,8 +1265,7 @@ sub print_doctored {
     #   jmp  *<bad-reg>
     #
 
-# Because of Perl bug, needed separate cases for eax, ebx, ecx, edx in the past
-    s/^\tmovl \$${T_US}(.*),(\%e[abcd]x)\n\tjmp \*$2/\tjmp $T_US$1/g;
+    s/^\tmovl\s+\$${T_US}(.*),(\%e[abcd]x)\n\tjmp\s+\*\2/\tjmp $T_US$1/g;
 
     if ($StolenX86Regs <= 2 ) { # YURGH! spurious uses of esi?
 	s/^\tmovl\s+(.*),\s*\%esi\n\tjmp\s+\*%esi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
