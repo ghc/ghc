@@ -37,8 +37,12 @@ import Control.Monad.Fix
 #include "Typeable.h"
 
 #ifdef __HUGS__
+import Data.Typeable
 import Hugs.ST
 import qualified Hugs.LazyST as LazyST
+
+INSTANCE_TYPEABLE2(ST,sTTc,"ST")
+INSTANCE_TYPEABLE0(RealWorld,realWorldTc,"RealWorld")
 
 fixST :: (a -> ST s a) -> ST s a
 fixST f = LazyST.lazyToStrictST (LazyST.fixST (LazyST.strictToLazyST . f))

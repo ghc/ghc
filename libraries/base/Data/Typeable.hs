@@ -105,7 +105,6 @@ import GHC.Stable       -- So we can give Typeable instance for StablePtr
 import Hugs.Prelude
 import Hugs.IO
 import Hugs.IORef
-import Hugs.ST
 import Hugs.IOExts
 #endif
 
@@ -465,7 +464,9 @@ INSTANCE_TYPEABLE1(Ratio,ratioTc,"Ratio")
 INSTANCE_TYPEABLE2(Either,eitherTc,"Either")
 INSTANCE_TYPEABLE2((->),funTc,"->")
 INSTANCE_TYPEABLE1(IO,ioTc,"IO")
+#ifdef __GLASGOW_HASKELL__
 INSTANCE_TYPEABLE2(ST,stTc,"ST")
+#endif
 INSTANCE_TYPEABLE0((),unitTc,"()")
 #ifndef __NHC__
 INSTANCE_TYPEABLE2((,),pairTc,",")
