@@ -159,7 +159,7 @@ maybePackageModule mod_name = do
 	    return (Just (mkModule mod_name pkg_name,
 			  ModuleLocation{ 
 				hs_file  = "error:_package_module;_no_source",
-				hi_file  = hi,
+				hi_file  = path ++ '/':hi,
 				obj_file = "error:_package_module;_no_object"
 			   }
 		   ))
