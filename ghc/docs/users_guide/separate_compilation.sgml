@@ -631,7 +631,9 @@ newtype GHC.IOBase.IO a
 	<listitem>
 	  <para>Only <literal>data</literal>, <literal>type</literal>,
 	  <literal>newtype</literal>, <literal>class</literal>, and
-	  type signature declarations may be included.</para>
+	  type signature declarations may be included. You cannot declare
+	  <literal>instances</literal> or derive them automatically.
+</para>
 	</listitem>
       </itemizedlist>
 
