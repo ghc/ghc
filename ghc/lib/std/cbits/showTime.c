@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: showTime.c,v 1.7 1999/11/23 12:19:20 simonmar Exp $
+ * $Id: showTime.c,v 1.8 2000/04/06 17:54:01 rrt Exp $
  *
  * ClockTime.showsPrec Runtime Support
  */
@@ -41,6 +41,10 @@ showTime(I_ size, StgByteArray d, I_ maxsize, StgByteArray buf)
 	    return (-1);
 	}
     tm = localtime(&t);
+#ifdef cygwin32_TARGET_OS
+    /* Same as in timezone.c: tzset() isn't called automatically */
+    tzset();
+#endif
     if (tm != NULL && strftime(buf, maxsize, "%a %b %d %H:%M:%S %Z %Y", tm) > 0) {
        return 1;
     } else {

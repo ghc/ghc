@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: getCPUTime.c,v 1.6 1999/09/30 15:50:02 sof Exp $
+ * $Id: getCPUTime.c,v 1.7 2000/04/06 17:54:01 rrt Exp $
  *
  * getCPUTime Runtime Support
  */
@@ -155,11 +155,11 @@ getCPUTime(StgByteArray cpuStruct)
 
     FT2usecs(uT, userTime);
     FT2usecs(kT, kernelTime);
-    
+
     cpu[0] = (unsigned int)(uT / NS_PER_SEC);
-    cpu[1] = (unsigned int)(uT * 100);
-    cpu[0] = (unsigned int)(kT / NS_PER_SEC);
-    cpu[1] = (unsigned int)(kT * 100);
+    cpu[1] = (unsigned int)((uT - cpu[0] * NS_PER_SEC) * 100);
+    cpu[2] = (unsigned int)(kT / NS_PER_SEC);
+    cpu[3] = (unsigned int)((kT - cpu[2] * NS_PER_SEC) * 100);
     return 1;
 }
 
