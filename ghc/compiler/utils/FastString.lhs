@@ -50,39 +50,8 @@ module FastString
 #define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
-#if __GLASGOW_HASKELL__ < 301
-import PackBase
-import STBase		( StateAndPtr#(..) )
-import IOHandle		( filePtr, readHandle, writeHandle )
-import IOBase		( Handle__(..), IOError(..), IOErrorType(..),
-		  	  IOResult(..), IO(..),
-		  	  constructError
-			)
-#else
 import PrelPack
-#if __GLASGOW_HASKELL__ < 400
-import PrelST		( StateAndPtr#(..) )
-#endif
-
-#if __GLASGOW_HASKELL__ <= 303
-import PrelHandle	( readHandle, 
-# if __GLASGOW_HASKELL__ < 303
-			  filePtr,
-# endif
-			  writeHandle
-			)
-#endif
-
-import PrelIOBase	( Handle__(..), IOError, IOErrorType(..),
-#if __GLASGOW_HASKELL__ < 400
-		  	  IOResult(..), 
-#endif
-			  IO(..),
-#if __GLASGOW_HASKELL__ >= 301 && __GLASGOW_HASKELL__ <= 302
-		  	  constructError
-#endif
-			)
-#endif
+import PrelIOBase	( IO(..) )
 
 import PrimPacked
 import GlaExts
@@ -104,10 +73,6 @@ import IO
 import Char             ( chr, ord )
 
 #define hASH_TBL_SIZE 993
-
-#if __GLASGOW_HASKELL__ >= 400
-#define IOok STret
-#endif
 \end{code} 
 
 @FastString@s are packed representations of strings
@@ -266,21 +231,12 @@ string_table =
 lookupTbl :: FastStringTable -> Int# -> IO [FastString]
 lookupTbl (FastStringTable _ arr#) i# =
   IO ( \ s# ->
-#if __GLASGOW_HASKELL__ < 400
-  case readArray# arr# i# s# of { StateAndPtr# s2# r ->
-  IOok s2# r })
-#else
   readArray# arr# i# s#)
-#endif
 
 updTbl :: FastStringTableVar -> FastStringTable -> Int# -> [FastString] -> IO ()
 updTbl fs_table_var (FastStringTable uid# arr#) i# ls =
  IO (\ s# -> case writeArray# arr# i# ls s# of { s2# -> 
-#if __GLASGOW_HASKELL__ < 400
-	IOok s2# () })	>>
-#else
 	(# s2#, () #) }) >>
-#endif
  writeIORef fs_table_var (FastStringTable (uid# +# 1#) arr#)
 
 mkFastString# :: Addr# -> Int# -> FastString
@@ -587,68 +543,6 @@ Outputting @FastString@s is quick, just block copying the chunk (using
 
 \begin{code}
 hPutFS :: Handle -> FastString -> IO ()
-#if __GLASGOW_HASKELL__ <= 302
-hPutFS handle (FastString _ l# ba#) =
- if l# ==# 0# then
-    return ()
- else
-    readHandle handle				    >>= \ htype ->
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  fail MkIOError(handle,IllegalOperation,"handle is closed")
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  fail MkIOError(handle,IllegalOperation,"handle is closed")
-      ReadHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail MkIOError(handle,IllegalOperation,"handle is not open for writing")
-      other -> 
-          let fp = filePtr htype in
-	   -- here we go..
-#if __GLASGOW_HASKELL__ < 405
-          _ccall_ writeFile (ByteArray ((error "")::(Int,Int)) ba#) fp (I# l#) >>= \rc ->
-#else
-          _ccall_ writeFile (ByteArray ((error "")::Int) ((error "")::Int) ba#) fp (I# l#) >>= \rc ->
-#endif
-          if rc==0 then
-              return ()
-          else
-              constructError "hPutFS"   >>= \ err ->
-	      fail err
-hPutFS handle (CharStr a# l#) =
- if l# ==# 0# then
-    return ()
- else
-    readHandle handle				    >>= \ htype ->
-    case htype of 
-      ErrorHandle ioError ->
-	  writeHandle handle htype		    >>
-          fail ioError
-      ClosedHandle ->
-	  writeHandle handle htype		    >>
-	  fail MkIOError(handle,IllegalOperation,"handle is closed")
-      SemiClosedHandle _ _ ->
-	  writeHandle handle htype		    >>
-	  fail MkIOError(handle,IllegalOperation,"handle is closed")
-      ReadHandle _ _ _ ->
-	  writeHandle handle htype		    >>
-	  fail MkIOError(handle,IllegalOperation,"handle is not open for writing")
-      other -> 
-          let fp = filePtr htype in
-	   -- here we go..
-          _ccall_ writeFile (A# a#) fp (I# l#)	>>= \rc ->
-          if rc==0 then
-              return ()
-          else
-              constructError "hPutFS"   	>>= \ err ->
-	      fail err
-
-
-#else
 hPutFS handle (FastString _ l# ba#)
   | l# ==# 0#  = return ()
 #if __GLASGOW_HASKELL__ < 405
@@ -658,7 +552,6 @@ hPutFS handle (FastString _ l# ba#)
 #else
   | otherwise  = do mba <- stToIO $ unsafeThawByteArray (ByteArray (bot::Int) bot ba#)
                     hPutBufBAFull  handle mba (I# l#)
-#endif
  where
   bot = error "hPutFS.ba"
 
