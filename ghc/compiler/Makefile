@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.198 2001/11/08 18:53:44 sof Exp $
+# $Id: Makefile,v 1.199 2001/11/09 17:02:09 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -260,9 +260,11 @@ prelude/PrimOp_HC_OPTS 		= -no-recomp -H80m
 # because the NCG can't handle the 64-bit math in here
 prelude/PrelRules_HC_OPTS	= -fvia-C
 
-rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns
-parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns
 main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
+# Use -fvia-C since the NCG can't handle the narrow16Int# (and intToInt16#?)
+# primops on all platforms.
+rename/ParseIface_HC_OPTS 	+= -Onot -H45m -fno-warn-incomplete-patterns -fvia-C
+parser/Parser_HC_OPTS 		+= -Onot -fno-warn-incomplete-patterns -fvia-C
 
 # The latest GHC version doesn't have a -K option yet, and it doesn't
 # seem to be necessary anymore for the modules below.
