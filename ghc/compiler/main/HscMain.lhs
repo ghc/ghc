@@ -34,6 +34,7 @@ import PrelInfo		( wiredInThingEnv, wiredInThings )
 import PrelNames	( vanillaSyntaxMap, knownKeyNames, iNTERACTIVE )
 import MkIface		( completeIface, mkModDetailsFromIface, mkModDetails,
 			  writeIface, pprIface )
+import Type		( Type )
 import TcModule
 import InstEnv		( emptyInstEnv )
 import Desugar
@@ -417,9 +418,11 @@ hscStmt
   -> PersistentCompilerState    -- IN: persistent compiler state
   -> InteractiveContext		-- Context for compiling
   -> String			-- The statement
+  -> Bool			-- just treat it as an expression
   -> IO ( PersistentCompilerState, 
 	  Maybe ( [Id], 
-		 UnlinkedBCOExpr) )
+		  Type, 
+		  UnlinkedBCOExpr) )
 \end{code}
 
 When the UnlinkedBCOExpr is linked you get an HValue of type
@@ -449,7 +452,7 @@ A naked expression returns a singleton Name [it].
 	  result not showable)	==>	error
 
 \begin{code}
-hscStmt dflags hst hit pcs0 icontext stmt
+hscStmt dflags hst hit pcs0 icontext stmt just_expr
    = let 
 	InteractiveContext { 
 	     ic_rn_env   = rn_env, 
@@ -461,6 +464,15 @@ hscStmt dflags hst hit pcs0 icontext stmt
       	     Nothing -> return (pcs0, Nothing)
       	     Just parsed_stmt -> do {
 
+	   let { notExprStmt (ExprStmt _ _) = False;
+	         notExprStmt _              = True 
+	       };
+
+	   if (just_expr && notExprStmt parsed_stmt)
+		then do hPutStrLn stderr ("not an expression: `" ++ stmt ++ "'")
+		        return (pcs0, Nothing)
+		else do {
+
 		-- Rename it
 	  (pcs1, print_unqual, maybe_renamed_stmt)
 		 <- renameStmt dflags hit hst pcs0 scope_mod 
@@ -471,12 +483,17 @@ hscStmt dflags hst hit pcs0 icontext stmt
 		Just (bound_names, rn_stmt) -> do {
 
 		-- Typecheck it
-	  maybe_tc_return 
-		<- typecheckStmt dflags pcs1 hst type_env
-				   print_unqual iNTERACTIVE bound_names rn_stmt
-	; case maybe_tc_return of {
-		Nothing -> return (pcs0, Nothing) ;
-		Just (pcs2, tc_expr, bound_ids) -> do {
+	  maybe_tc_return <- 
+	    if just_expr 
+		then case rn_stmt of { (syn, ExprStmt e _, decls) -> 
+		     typecheckExpr dflags pcs1 hst type_env
+			   print_unqual iNTERACTIVE (syn,e,decls) }
+		else typecheckStmt dflags pcs1 hst type_env
+			   print_unqual iNTERACTIVE bound_names rn_stmt
+
+	; case maybe_tc_return of
+		Nothing -> return (pcs0, Nothing)
+		Just (pcs2, tc_expr, bound_ids, ty) ->  do {
 
 		-- Desugar it
 	  ds_expr <- deSugarExpr dflags pcs2 hst iNTERACTIVE print_unqual tc_expr
@@ -505,7 +522,8 @@ hscStmt dflags hst hit pcs0 icontext stmt
 		 = modifyIdInfo (`setFlavourInfo` makeConstantFlavour 
 					(idFlavour id)) id
 
-	; return (pcs2, Just (constant_bound_ids, bcos))
+	; return (pcs2, Just (constant_bound_ids, ty, bcos))
+
      }}}}}
 
 hscParseStmt :: DynFlags -> String -> IO (Maybe RdrNameStmt)

@@ -5,7 +5,8 @@
 
 \begin{code}
 module TcModule (
-	typecheckModule, typecheckIface, typecheckStmt, TcResults(..)
+	typecheckModule, typecheckIface, typecheckStmt, typecheckExpr,
+	TcResults(..)
     ) where
 
 #include "HsVersions.h"
@@ -21,7 +22,8 @@ import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName,
 			  itName
 			)
 import MkId		( unsafeCoerceId )
-import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedStmt )
+import RnHsSyn		( RenamedHsBinds, RenamedHsDecl, RenamedStmt,
+			  RenamedHsExpr )
 import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			  TypecheckedForeignDecl, TypecheckedRuleDecl,
 			  zonkTopBinds, zonkForeignExports, zonkRules, mkHsLet,
@@ -29,6 +31,7 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 			)
 
 
+import TcExpr 		( tcMonoExpr )
 import TcMonad
 import TcType		( newTyVarTy, zonkTcType, tcInstType )
 import TcMatches	( tcStmtsAndThen )
@@ -46,13 +49,12 @@ import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcSimplify	( tcSimplifyTop )
+import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
 
 import CoreUnfold	( unfoldingTemplate, hasUnfolding )
 import TysWiredIn	( mkListTy, unitTy )
-import Type		( funResultTy, splitForAllTys, 
-			  liftedTypeKind, mkTyConApp, tidyType )
+import Type
 import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
 import Id		( Id, idType, idName, isLocalId, idUnfolding )
 import Module           ( Module, moduleName )
@@ -81,19 +83,23 @@ import VarSet
 %************************************************************************
 
 \begin{code}
-typecheckStmt :: DynFlags
-	      -> PersistentCompilerState
-	      -> HomeSymbolTable
-	      -> TypeEnv		-- The interactive context's type envt 
-	      -> PrintUnqualified	-- For error printing
-	      -> Module			-- Is this really needed
-	      -> [Name]			-- Names bound by the Stmt (empty for expressions)
-	      -> (SyntaxMap,
-		  RenamedStmt, 		-- The stmt itself
-	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
-	      -> IO (Maybe (PersistentCompilerState, TypecheckedHsExpr, [Id]))
-			-- The returned [Name] is the same as the input except for
-			-- ExprStmt, in which case the returned [Name] is [itName]
+typecheckStmt
+   :: DynFlags
+   -> PersistentCompilerState
+   -> HomeSymbolTable
+   -> TypeEnv		   -- The interactive context's type envt 
+   -> PrintUnqualified	   -- For error printing
+   -> Module		   -- Is this really needed
+   -> [Name]		   -- Names bound by the Stmt (empty for expressions)
+   -> (SyntaxMap,
+       RenamedStmt, 	   -- The stmt itself
+       [RenamedHsDecl])	   -- Plus extra decls it sucked in from interface files
+   -> IO (Maybe (PersistentCompilerState, 
+		 TypecheckedHsExpr, 
+		 [Id],
+		 Type))
+		-- The returned [Id] is the same as the input except for
+		-- ExprStmt, in which case the returned [Name] is [itName]
 
 typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (syn_map, stmt, iface_decls)
   = typecheck dflags syn_map pcs hst unqual $
@@ -120,11 +126,11 @@ typecheckStmt dflags pcs hst ic_type_env unqual this_mod names (syn_map, stmt, i
     ioToTc (dumpIfSet_dyn dflags Opt_D_dump_tc "Bound Ids" (vcat (map ppr zonked_ids)))	`thenNF_Tc_`
     ioToTc (dumpIfSet_dyn dflags Opt_D_dump_tc "Typechecked" (ppr zonked_expr))		`thenNF_Tc_`
 
-    returnTc (new_pcs, zonked_expr, zonked_ids)
+    returnTc (new_pcs, zonked_expr, zonked_ids, error "typecheckStmt: no type")
 
   where
     get_fixity :: Name -> Maybe Fixity
-    get_fixity n = pprPanic "typecheckExpr" (ppr n)
+    get_fixity n = pprPanic "typecheckStmt" (ppr n)
 \end{code}
 
 Here is the grand plan, implemented in tcUserStmt
@@ -211,6 +217,72 @@ tc_stmts names stmts
     combine stmt (ids, stmts) = (ids, stmt:stmts)
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Typechecking an expression}
+%*									*
+%************************************************************************
+
+\begin{code}
+typecheckExpr :: DynFlags
+	      -> PersistentCompilerState
+	      -> HomeSymbolTable
+	      -> TypeEnv	   -- The interactive context's type envt 
+	      -> PrintUnqualified	-- For error printing
+	      -> Module
+	      -> (SyntaxMap,
+		  RenamedHsExpr, 	-- The expression itself
+	          [RenamedHsDecl])	-- Plus extra decls it sucked in from interface files
+	      -> IO (Maybe (PersistentCompilerState, 
+			    TypecheckedHsExpr, 
+			    [Id],	-- always empty (matches typecheckStmt)
+			    Type))
+
+typecheckExpr dflags pcs hst ic_type_env unqual this_mod (syn_map, expr, decls)
+  = typecheck dflags syn_map pcs hst unqual $
+
+ 	 -- use the default default settings, i.e. [Integer, Double]
+    tcSetDefaultTys defaultDefaultTys $
+
+	-- Typecheck the extra declarations
+    fixTc (\ ~(unf_env, _, _, _, _) ->
+	tcImports unf_env pcs hst get_fixity this_mod decls
+    )			`thenTc` \ (env, new_pcs, local_inst_info, deriv_binds, local_rules) ->
+    ASSERT( null local_inst_info && nullBinds deriv_binds && null local_rules )
+
+	-- Now typecheck the expression
+    tcSetEnv env			$
+    tcExtendGlobalTypeEnv ic_type_env	$
+
+    newTyVarTy openTypeKind		`thenTc` \ ty ->
+    tcMonoExpr expr ty 			`thenTc` \ (e', lie) ->
+    tcSimplifyInfer smpl_doc (varSetElems (tyVarsOfType ty)) lie 
+    		    	`thenTc` \ (qtvs, lie_free, dict_binds, dict_ids) ->
+    tcSimplifyTop lie_free		`thenTc` \ const_binds ->
+
+    let all_expr = mkHsLet const_binds	$
+    		   TyLam qtvs  		$
+    		   DictLam dict_ids	$
+    		   mkHsLet dict_binds	$	
+    		   e'
+
+    	all_expr_ty = mkForAllTys qtvs 	$
+    		      mkFunTys (map idType dict_ids) $
+    		      ty
+    in
+
+    zonkExpr all_expr				`thenNF_Tc` \ zonked_expr ->
+    zonkTcType all_expr_ty			`thenNF_Tc` \ zonked_ty ->
+    ioToTc (dumpIfSet_dyn dflags 
+		Opt_D_dump_tc "Typechecked" (ppr zonked_expr)) `thenNF_Tc_`
+    returnTc (new_pcs, zonked_expr, [], zonked_ty) 
+
+  where
+    get_fixity :: Name -> Maybe Fixity
+    get_fixity n = pprPanic "typecheckExpr" (ppr n)
+
+    smpl_doc = ptext SLIT("main expression")
+\end{code}
 
 %************************************************************************
 %*									*

@@ -186,11 +186,11 @@ cmRunStmt cmstate dflags expr
 	       	ic_module   = this_mod } = icontext
 
         (new_pcs, maybe_stuff) 
-	    <- hscStmt dflags hst hit pcs icontext expr
+	    <- hscStmt dflags hst hit pcs icontext expr False{-stmt-}
 
         case maybe_stuff of
 	   Nothing -> return (cmstate{ pcs=new_pcs }, [])
-	   Just (ids, bcos) -> do
+	   Just (ids, _, bcos) -> do
 
 		-- update the interactive context
 	        let 
@@ -227,12 +227,24 @@ cmRunStmt cmstate dflags expr
 #ifdef GHCI
 cmTypeOfExpr :: CmState -> DynFlags -> String -> IO (CmState, Maybe String)
 cmTypeOfExpr cmstate dflags expr
-  = do (new_cmstate, names)
-	   <- cmRunStmt cmstate dflags ("let __cmTypeOfExpr = " ++ expr)
-       case names of
-	 [name] -> do maybe_tystr <- cmTypeOfName new_cmstate name
-		      return (new_cmstate, maybe_tystr)
-	 _other -> return (new_cmstate, Nothing)
+   = do (new_pcs, maybe_stuff) 
+	  <- hscStmt dflags hst hit pcs ic expr True{-just an expr-}
+
+	let new_cmstate = cmstate{pcs = new_pcs}
+
+	case maybe_stuff of
+	   Nothing -> return (new_cmstate, Nothing)
+	   Just (_, ty, _) ->
+	     let pit = pcs_PIT pcs
+	         modname = moduleName (ic_module ic)
+	         tidy_ty = tidyType emptyTidyEnv ty
+	         str = case lookupIfaceByModName hit pit modname of
+			  Nothing    -> showSDoc (ppr tidy_ty)
+			  Just iface -> showSDocForUser unqual (ppr tidy_ty)
+		  	     where unqual = unQualInScope (mi_globals iface)
+	     in return (new_cmstate, Just str)
+   where
+       CmState{ hst=hst, hit=hit, pcs=pcs, ic=ic } = cmstate
 #endif
 
 -----------------------------------------------------------------------------
@@ -270,11 +282,11 @@ cmCompileExpr cmstate dflags expr
 
         (new_pcs, maybe_stuff) 
 	    <- hscStmt dflags hst hit pcs icontext 
-		  ("let __cmCompileExpr = "++expr)
+		  ("let __cmCompileExpr = "++expr) False{-stmt-}
 
         case maybe_stuff of
 	   Nothing -> return (cmstate{ pcs=new_pcs }, Nothing)
-	   Just (ids, bcos) -> do
+	   Just (ids, _, bcos) -> do
 
 		-- link it
 		hval <- linkExpr pls bcos
@@ -801,8 +813,13 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
 
             source_unchanged = isJust maybe_old_linkable
 
+	   -- in interactive mode, all home modules below us *must* have an
+	   -- interface in the HIT.  We never demand-load home interfaces in
+	   -- interactive mode.
             (hst1_strictDC, hit1_strictDC)
-               = retainInTopLevelEnvs 
+               = ASSERT(ghci_mode == Batch || 
+		        all (`elemUFM` hit1) reachable_from_here)
+		 retainInTopLevelEnvs 
                     (filter (/= (name_of_summary summary1)) reachable_from_here)
                     (hst1,hit1)
 
