@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.16 1999/01/19 17:22:55 simonm Exp $
+ * $Id: GC.c,v 1.17 1999/01/20 16:07:40 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -411,6 +411,7 @@ void GarbageCollect(void (*get_roots)(void))
 	     (int)oldest_gen->steps[0].to_blocks) < 
 	    (RtsFlags.GcFlags.pcFreeHeap *
 	     RtsFlags.GcFlags.maxHeapSize / 200)) {
+	  heapOverflow();
 	}
       }
     }
@@ -2382,15 +2383,16 @@ threadLazyBlackHole(StgTSO *tso)
       /* if the thunk is already blackholed, it means we've also
        * already blackholed the rest of the thunks on this stack,
        * so we can stop early.
+       *
+       * The blackhole made for a CAF is a CAF_BLACKHOLE, so they
+       * don't interfere with this optimisation.
        */
+      if (bh->header.info == &BLACKHOLE_info) {
+	return;
+      }
 
-      /* Don't for now: when we enter a CAF, we create a black hole on
-       * the heap and make the update frame point to it.  Thus the
-       * above optimisation doesn't apply.
-       */
-      if (bh->header.info != &BLACKHOLE_info
-	  && bh->header.info != &BLACKHOLE_BQ_info
-	  && bh->header.info != &CAF_BLACKHOLE_info) {
+      if (bh->header.info != &BLACKHOLE_BQ_info &&
+	  bh->header.info != &CAF_BLACKHOLE_info) {
 	SET_INFO(bh,&BLACKHOLE_info);
       }
 
@@ -2440,8 +2442,8 @@ threadSqueezeStack(StgTSO *tso)
    * added to the stack, rather than the way we see them in this
    * walk. (It makes the next loop less confusing.)  
    *
-   * Could stop if we find an update frame pointing to a black hole,
-   * but see comment in threadLazyBlackHole().
+   * Stop if we find an update frame pointing to a black hole 
+   * (see comment in threadLazyBlackHole()).
    */
   
   next_frame = NULL;
@@ -2450,6 +2452,10 @@ threadSqueezeStack(StgTSO *tso)
     frame->link = next_frame;
     next_frame = frame;
     frame = prev_frame;
+    if (get_itbl(frame)->type == UPDATE_FRAME
+	&& frame->updatee->header.info == &BLACKHOLE_info) {
+        break;
+    }
   }
 
   /* Now, we're at the bottom.  Frame points to the lowest update
@@ -2547,10 +2553,8 @@ threadSqueezeStack(StgTSO *tso)
        */
       if (is_update_frame) {
 	StgBlockingQueue *bh = (StgBlockingQueue *)frame->updatee;
-	if (bh->header.info != &BLACKHOLE_info
-	    && bh->header.info != &BLACKHOLE_BQ_info
-	    && bh->header.info != &CAF_BLACKHOLE_info
-	    ) {
+	if (bh->header.info != &BLACKHOLE_BQ_info &&
+	    bh->header.info != &CAF_BLACKHOLE_info) {
 	  SET_INFO(bh,&BLACKHOLE_info);
 	}
       }

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.22 1998/12/18 17:40:34 simonpj Exp $
+% $Id: CLabel.lhs,v 1.23 1999/01/20 16:07:43 simonm Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -393,7 +393,7 @@ pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
 
 pprCLbl (RtsLabel RtsUpdEntry) = ptext SLIT("Upd_frame_entry")
 
-pprCLbl (RtsLabel RtsBlackHoleInfoTbl) = ptext SLIT("BLACKHOLE_info")
+pprCLbl (RtsLabel RtsBlackHoleInfoTbl) = ptext SLIT("CAF_BLACKHOLE_info")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
   = hcat [ptext SLIT("__sel_"), text (show offset),
