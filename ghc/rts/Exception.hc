@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.hc,v 1.13 2000/04/26 09:44:18 simonmar Exp $
+ * $Id: Exception.hc,v 1.14 2000/05/25 09:16:56 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -329,7 +329,7 @@ FN_(catchzh_fast)
  * It is used in raisezh_fast to update thunks on the update list
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE(raise_info,raise_entry,1,0,FUN,,EF_,0,0);
+INFO_TABLE(raise_info,raise_entry,1,0,THUNK,,EF_,0,0);
 STGFUN(raise_entry)
 {
   FB_
