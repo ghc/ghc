@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.31 2002/06/08 13:11:27 panne Exp $
+# $Id: Makefile,v 1.32 2002/06/13 23:26:55 sof Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -15,6 +15,7 @@ ALL_DIRS = \
 	Control/Monad/ST \
 	Data \
 	Data/Array \
+	Data/STRef \
 	Database \
 	Debug \
 	Debug/QuickCheck \

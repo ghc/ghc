@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.STRef
+-- Module      :  Data.STRef.Lazy
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
@@ -8,26 +8,30 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires non-portable module ST)
 --
--- Mutable references in the (strict) ST monad.
+-- Mutable references in the lazy ST monad.
 --
 -----------------------------------------------------------------------------
-
-module Data.STRef (
+module Data.STRef.Lazy (
 	-- * STRefs
-	STRef,		-- abstract, instance Eq
+	ST.STRef,	-- abstract, instance Eq
 	newSTRef,	-- :: a -> ST s (STRef s a)
 	readSTRef,	-- :: STRef s a -> ST s a
 	writeSTRef,	-- :: STRef s a -> a -> ST s ()
 	modifySTRef	-- :: STRef s a -> (a -> a) -> ST s ()
  ) where
 
-import Prelude
+import Control.Monad.ST.Lazy
+import qualified Data.STRef as ST
+import qualified Control.Monad.ST as ST
 
-#ifdef __GLASGOW_HASKELL__
-import GHC.STRef
-#endif
+newSTRef    :: a -> ST s (ST.STRef s a)
+readSTRef   :: ST.STRef s a -> ST s a
+writeSTRef  :: ST.STRef s a -> a -> ST s ()
+modifySTRef :: ST.STRef s a -> (a -> a) -> ST s ()
 
-import Data.Dynamic
+newSTRef   = strictToLazyST . ST.newSTRef
+readSTRef  = strictToLazyST . ST.readSTRef
+writeSTRef r a = strictToLazyST (ST.writeSTRef r a)
+modifySTRef r f = strictToLazyST (ST.modifySTRef r f)
 
-#include "Dynamic.h"
-INSTANCE_TYPEABLE2(STRef,stRefTc,"STRef")
+
