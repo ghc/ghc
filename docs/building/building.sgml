@@ -2468,7 +2468,7 @@ WARNINGS about pitfalls and known ``problems'':
 
 <para>
 One difficulty that comes up from time to time is running out of space
-in <filename>/tmp</filename>.  (It is impossible for the configuration stuff to
+in <literal>TMPDIR</literal>.  (It is impossible for the configuration stuff to
 compensate for the vagaries of different sysadmin approaches to temp
 space.)
 <IndexTerm><Primary>tmp, running out of space in</Primary></IndexTerm>
