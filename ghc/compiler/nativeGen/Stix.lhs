@@ -150,7 +150,8 @@ data StixExpr
   | StMachOp MachOp [StixExpr]
 
     -- Calls to C functions
-  | StCall FAST_STRING CCallConv PrimRep [StixExpr]
+  | StCall (Either FAST_STRING StixExpr) -- Left: static, Right: dynamic
+           CCallConv PrimRep [StixExpr]
 
 
 -- What's the PrimRep of the value denoted by this StixExpr?
@@ -206,10 +207,14 @@ pprStixExpr t
        StReg reg        -> pprStixReg reg
        StMachOp op args -> pprMachOp op 
                            <> parens (hsep (punctuate comma (map pprStixExpr args)))
-       StCall nm cc k args
-                        -> parens (text "Call" <+> ptext nm <+>
+       StCall fn cc k args
+                        -> parens (text "Call" <+> targ <+>
                                    ppr cc <+> ppr k <+> 
                                    hsep (map pprStixExpr args))
+                           where
+                              targ = case fn of
+                                        Left  t_static -> ptext t_static
+                                        Right t_dyn    -> parens (pprStixExpr t_dyn)
 
 pprStixStmt :: StixStmt -> SDoc
 pprStixStmt t 
@@ -341,7 +346,8 @@ stixExpr_CountTempUses u t
         StIndex    pk t1 t2       -> qe t1 + qe t2
         StInd      pk t1          -> qe t1
         StMachOp   mop ts         -> sum (map qe ts)
-        StCall     nm cconv pk ts -> sum (map qe ts)
+        StCall     (Left nm) cconv pk ts -> sum (map qe ts)
+        StCall     (Right f) cconv pk ts -> sum (map qe ts) + qe f
         StInt _          -> 0
         StFloat _        -> 0
         StDouble _       -> 0
@@ -403,7 +409,8 @@ stixExpr_MapUniques f t
         StIndex    pk t1 t2       -> StIndex    pk (qe t1) (qe t2)
         StInd      pk t1          -> StInd      pk (qe t1)
         StMachOp   mop args       -> StMachOp   mop (map qe args)
-        StCall     nm cconv pk ts -> StCall     nm cconv pk (map qe ts)
+        StCall     (Left nm) cconv pk ts -> StCall (Left nm) cconv pk (map qe ts)
+        StCall     (Right f) cconv pk ts -> StCall (Right (qe f)) cconv pk (map qe ts)
         StInt _          -> t
         StFloat _        -> t
         StDouble _       -> t

@@ -971,8 +971,8 @@ pprInstr (POP size op) = pprSizeOp SLIT("pop") size op
 pprInstr PUSHA = ptext SLIT("\tpushal")
 pprInstr POPA = ptext SLIT("\tpopal")
 
-pprInstr (NOP) = ptext SLIT("\tnop")
-pprInstr (CLTD) = ptext SLIT("\tcltd")
+pprInstr NOP = ptext SLIT("\tnop")
+pprInstr CLTD = ptext SLIT("\tcltd")
 
 pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand B op)
 
@@ -980,7 +980,8 @@ pprInstr (JXX cond lab) = pprCondInstr SLIT("j") cond (pprCLabel_asm lab)
 
 pprInstr (JMP dsts (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
 pprInstr (JMP dsts op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand L op)
-pprInstr (CALL imm)             = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
+pprInstr (CALL (Left imm))      = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
+pprInstr (CALL (Right reg))     = (<>) (ptext SLIT("\tcall *")) (pprReg L reg)
 
 -- First bool indicates signedness; second whether quot or rem
 pprInstr (IQUOT sz src dst) = pprInstr_quotRem True True sz src dst

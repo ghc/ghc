@@ -63,6 +63,11 @@ order.
 type InstrBlock = OrdList Instr
 
 x `bind` f = f x
+
+isLeft (Left _)  = True
+isLeft (Right _) = False
+
+unLeft (Left x) = x
 \end{code}
 
 Code extractor for an entire stix tree---stix statement level.
@@ -156,7 +161,8 @@ derefDLL tree
                 StIndex pk base offset -> StIndex pk (qq base) (qq offset)
                 StMachOp mop args      -> StMachOp mop (map qq args)
                 StInd pk addr          -> StInd pk (qq addr)
-                StCall who cc pk args  -> StCall who cc pk (map qq args)
+                StCall (Left nm) cc pk args -> StCall (Left nm) cc pk (map qq args)
+                StCall (Right f) cc pk args -> StCall (Right (qq f)) cc pk (map qq args)
                 StInt    _             -> t
                 StFloat  _             -> t
                 StDouble _             -> t
@@ -878,8 +884,8 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       other_op 
          -> getRegister (
                (if is_float_op then demote else id)
-               (StCall fn CCallConv DoubleRep 
-                          [(if is_float_op then promote else id) x])
+               (StCall (Left fn) CCallConv DoubleRep 
+                       [(if is_float_op then promote else id) x])
             )
       where
         integerExtend signed nBits x
@@ -991,11 +997,11 @@ getRegister (StMachOp mop [x, y]) -- dyadic MachOps
       MO_Nat_Sar  -> shift_code (SAR L) x y {-False-}
 
       MO_Flt_Pwr  -> getRegister (demote 
-                                 (StCall SLIT("pow") CCallConv DoubleRep 
-                                           [promote x, promote y])
+                                 (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+                                         [promote x, promote y])
                                  )
-      MO_Dbl_Pwr -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
-                                           [x, y])
+      MO_Dbl_Pwr -> getRegister (StCall (Left SLIT("pow")) CCallConv DoubleRep 
+                                        [x, y])
       other -> pprPanic "getRegister(x86) - binary StMachOp (1)" (pprMachOp mop)
   where
     promote x = StMachOp MO_Flt_to_Dbl [x]
@@ -2617,7 +2623,7 @@ register allocator.
 
 \begin{code}
 genCCall
-    :: FAST_STRING	-- function to call
+    :: (Either FAST_STRING StixExpr)	-- function to call
     -> CCallConv
     -> PrimRep		-- type of the result
     -> [StixExpr]	-- arguments (of mixed type)
@@ -2698,12 +2704,12 @@ genCCall fn cconv kind args
 #if i386_TARGET_ARCH
 
 genCCall fn cconv ret_rep [StInt i]
-  | fn == SLIT ("PerformGC_wrapper")
+  | isLeft fn && unLeft fn == SLIT ("PerformGC_wrapper")
   = let call = toOL [
                   MOV L (OpImm (ImmInt (fromInteger i))) (OpReg eax),
-	          CALL (ImmLit (ptext (if   underscorePrefix 
+	          CALL (Left (ImmLit (ptext (if   underscorePrefix 
                                        then (SLIT ("_PerformGC_wrapper"))
-                                       else (SLIT ("PerformGC_wrapper")))))
+                                       else (SLIT ("PerformGC_wrapper"))))))
                ]
     in
     returnNat call
@@ -2711,32 +2717,41 @@ genCCall fn cconv ret_rep [StInt i]
 
 genCCall fn cconv ret_rep args
   = mapNat push_arg
-           (reverse args)  `thenNat` \ sizes_n_codes ->
-    getDeltaNat            `thenNat` \ delta ->
-    let (sizes, codes) = unzip sizes_n_codes
-        tot_arg_size   = sum sizes
-	code2          = concatOL codes
-	call = toOL (
-                  [CALL (fn__2 tot_arg_size)]
-                  ++
+           (reverse args)  	`thenNat` \ sizes_n_codes ->
+    getDeltaNat            	`thenNat` \ delta ->
+    let (sizes, push_codes) = unzip sizes_n_codes
+        tot_arg_size        = sum sizes
+    in
+    -- deal with static vs dynamic call targets
+    (case fn of
+        Left t_static 
+           -> returnNat (unitOL (CALL (Left (fn__2 tot_arg_size))))
+        Right dyn 
+           -> get_op dyn `thenNat` \ (dyn_c, dyn_r, dyn_rep) ->
+              ASSERT(dyn_rep == L)
+              returnNat (dyn_c `snocOL` CALL (Right dyn_r))
+    ) 
+				`thenNat` \ callinsns ->
+    let	push_code = concatOL push_codes
+	call = callinsns `appOL`
+               toOL (
 			-- Deallocate parameters after call for ccall;
 			-- but not for stdcall (callee does it)
                   (if cconv == StdCallConv then [] else 
 		   [ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp)])
                   ++
-
                   [DELTA (delta + tot_arg_size)]
                )
     in
     setDeltaNat (delta + tot_arg_size) `thenNat` \ _ ->
-    returnNat (code2 `appOL` call)
+    returnNat (push_code `appOL` call)
 
   where
     -- function names that begin with '.' are assumed to be special
     -- internally generated names like '.mul,' which don't get an
     -- underscore prefix
     -- ToDo:needed (WDP 96/03) ???
-    fn_u  = _UNPK_ fn
+    fn_u  = _UNPK_ (unLeft fn)
     fn__2 tot_arg_size
        | head fn_u == '.'
        = ImmLit (text (fn_u ++ stdcallsize tot_arg_size))

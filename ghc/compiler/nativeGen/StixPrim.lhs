@@ -64,7 +64,7 @@ rather than inheriting the calling convention of the thing which we're really
 calling.
 
 \begin{code}
-foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
+foreignCallCode lhs call@(CCall (CCallSpec ctarget cconv safety)) rhs
 
   | not (playSafe safety) 
   = returnUs (\xs -> ccall : xs)
@@ -77,16 +77,25 @@ foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
        id  = StixTemp (StixVReg uniq IntRep)
     
        suspend = StAssignReg IntRep id 
-   		 (StCall SLIT("suspendThread") {-no:cconv-} CCallConv
+   		 (StCall (Left SLIT("suspendThread")) {-no:cconv-} CCallConv
                          IntRep [StReg stgBaseReg])
        resume  = StVoidable 
-                 (StCall SLIT("resumeThread") {-no:cconv-} CCallConv
+                 (StCall (Left SLIT("resumeThread")) {-no:cconv-} CCallConv
                          VoidRep [StReg id])
     in
     returnUs (\xs -> save (suspend : ccall : resume : load xs))
 
   where
-    args = map amodeCodeForCCall rhs
+    (cargs, stix_target)
+        = case ctarget of
+             StaticTarget nm -> (rhs, Left nm)
+             DynamicTarget |  not (null rhs) -- an assertion
+                           -> (tail rhs, Right (amodeToStix (head rhs)))
+             CasmTarget _
+                -> ncgPrimopMoan "Native code generator can't handle foreign call" 
+                                 (ppr call)
+
+    stix_args = map amodeCodeForCCall cargs
     amodeCodeForCCall x =
 	let base = amodeToStix' x
 	in
@@ -94,11 +103,11 @@ foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
 	      ArrayRep      -> StIndex PtrRep base arrPtrsHS
 	      ByteArrayRep  -> StIndex IntRep base arrWordsHS
 	      ForeignObjRep -> StInd PtrRep (StIndex PtrRep base fixedHS)
-	      _ -> base
+	      other         -> base
 
     ccall = case lhs of
-      []    -> StVoidable (StCall fn cconv VoidRep args)
-      [lhs] -> mkStAssign pk lhs' (StCall fn cconv pk args)
+      []    -> StVoidable (StCall stix_target cconv VoidRep stix_args)
+      [lhs] -> mkStAssign pk lhs' (StCall stix_target cconv pk stix_args)
 	    where
 	       lhs' = amodeToStix lhs
 	       pk   = case getAmodeRep lhs of
@@ -107,9 +116,6 @@ foreignCallCode lhs (CCall (CCallSpec (StaticTarget fn) cconv safety)) rhs
                         Int64Rep  -> Int64Rep
                         Word64Rep -> Word64Rep
                         other     -> IntRep
-
-foreignCallCode lhs call rhs
-  = ncgPrimopMoan "Native code generator can't handle foreign call" (ppr call)
 \end{code}
 
 %************************************************************************

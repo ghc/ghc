@@ -259,7 +259,8 @@ regUsage instr = case instr of
     SETCC  cond op	-> mkRU [] (def_W op)
     JXX    cond lbl	-> mkRU [] []
     JMP    dsts op	-> mkRU (use_R op) []
-    CALL   imm		-> mkRU [] callClobberedRegs
+    CALL   (Left imm)	-> mkRU [] callClobberedRegs
+    CALL   (Right reg)	-> mkRU [reg] callClobberedRegs
     CLTD		-> mkRU [eax] [edx]
     NOP			-> mkRU [] []
 
@@ -679,6 +680,9 @@ patchRegs instr env = case instr of
     GCOS sz src dst	-> GCOS sz (env src) (env dst)
     GTAN sz src dst	-> GTAN sz (env src) (env dst)
 
+    CALL (Left imm)	-> instr
+    CALL (Right reg)	-> CALL (Right (env reg))
+
     COMMENT _		-> instr
     SEGMENT _ 		-> instr
     LABEL _		-> instr
@@ -686,7 +690,6 @@ patchRegs instr env = case instr of
     DATA _ _		-> instr
     DELTA _ 		-> instr
     JXX _ _		-> instr
-    CALL _		-> instr
     CLTD		-> instr
     _			-> pprPanic "patchRegs(x86)" empty
 

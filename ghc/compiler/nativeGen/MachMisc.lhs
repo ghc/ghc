@@ -572,7 +572,7 @@ but we don't care, since it doesn't get used much.  We hope.
 
 	      | JMP	      DestInfo Operand -- possible dests, target
 	      | JXX	      Cond CLabel -- target
-	      | CALL	      Imm
+	      | CALL	      (Either Imm Reg)
 
 -- Other things.
 
