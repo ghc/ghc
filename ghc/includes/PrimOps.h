@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.59 2000/07/21 09:11:19 rrt Exp $
+ * $Id: PrimOps.h,v 1.60 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -221,7 +221,8 @@ typedef union {
 #define int2Addrzh(r,a) 	r=(A_)(a)
 #define addr2Intzh(r,a) 	r=(I_)(a)
 
-#define readCharOffAddrzh(r,a,i)   	r= ((C_ *)(a))[i]
+#define readCharOffAddrzh(r,a,i)   	r= ((unsigned char *)(a))[i]
+/* unsigned char is for compatibility: the index is still in bytes. */
 #define readIntOffAddrzh(r,a,i)    	r= ((I_ *)(a))[i]
 #define readWordOffAddrzh(r,a,i)    	r= ((W_ *)(a))[i]
 #define readAddrOffAddrzh(r,a,i)   	r= ((PP_)(a))[i]
@@ -233,7 +234,8 @@ typedef union {
 #define readWord64OffAddrzh(r,a,i) 	r= ((LW_ *)(a))[i]
 #endif
 
-#define writeCharOffAddrzh(a,i,v)       ((C_ *)(a))[i] = (v)
+#define writeCharOffAddrzh(a,i,v)       ((unsigned char *)(a))[i] = (unsigned char)(v)
+/* unsigned char is for compatibility: the index is still in bytes. */
 #define writeIntOffAddrzh(a,i,v)        ((I_ *)(a))[i] = (v)
 #define writeWordOffAddrzh(a,i,v)       ((W_ *)(a))[i] = (v)
 #define writeAddrOffAddrzh(a,i,v)       ((PP_)(a))[i] = (v)
@@ -246,7 +248,8 @@ typedef union {
 #define writeWord64OffAddrzh(a,i,v)  ((LW_ *)(a))[i] = (v)
 #endif
 
-#define indexCharOffAddrzh(r,a,i)   	r= ((C_ *)(a))[i]
+#define indexCharOffAddrzh(r,a,i)   	r= ((unsigned char *)(a))[i]
+/* unsigned char is for compatibility: the index is still in bytes. */
 #define indexIntOffAddrzh(r,a,i)    	r= ((I_ *)(a))[i]
 #define indexWordOffAddrzh(r,a,i)   	r= ((W_ *)(a))[i]
 #define indexAddrOffAddrzh(r,a,i)   	r= ((PP_)(a))[i]
@@ -542,7 +545,8 @@ extern I_ resetGenSymZh(void);
 /* result ("r") arg ignored in write macros! */
 #define writeArrayzh(a,i,v)	((PP_) PTRS_ARR_CTS(a))[(i)]=(v)
 
-#define writeCharArrayzh(a,i,v)	  ((C_ *)(BYTE_ARR_CTS(a)))[i] = (v)
+#define writeCharArrayzh(a,i,v)	  ((unsigned char *)(BYTE_ARR_CTS(a)))[i] = (unsigned char)(v)
+/* unsigned char is for compatibility: the index is still in bytes. */
 #define writeIntArrayzh(a,i,v)	  ((I_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeWordArrayzh(a,i,v)	  ((W_ *)(BYTE_ARR_CTS(a)))[i] = (v)
 #define writeAddrArrayzh(a,i,v)	  ((PP_)(BYTE_ARR_CTS(a)))[i] = (v)

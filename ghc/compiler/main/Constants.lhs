@@ -57,6 +57,7 @@ module Constants (
 	oTHER_TAG,
 
 	mAX_INTLIKE, mIN_INTLIKE,
+	mAX_CHARLIKE, mIN_CHARLIKE,
 
 	spRelToInt,
 
@@ -120,6 +121,10 @@ oTHER_TAG = (INFO_OTHER_TAG :: Integer)	-- (-1) unevaluated, probably
 mIN_INTLIKE, mAX_INTLIKE :: Integer	-- Only used to compare with (MachInt Integer)
 mIN_INTLIKE = MIN_INTLIKE
 mAX_INTLIKE = MAX_INTLIKE
+
+mIN_CHARLIKE, mAX_CHARLIKE :: Int	-- Only used to compare with (MachChar Int)
+mIN_CHARLIKE = MIN_CHARLIKE
+mAX_CHARLIKE = MAX_CHARLIKE
 \end{code}
 
 A little function that abstracts the stack direction.  Note that most

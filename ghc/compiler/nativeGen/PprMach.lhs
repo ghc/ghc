@@ -165,7 +165,7 @@ pprSize x = ptext (case x of
 	 BU -> SLIT("bu")
 --	 W  -> SLIT("w") UNUSED
 --	 WU -> SLIT("wu") UNUSED
---	 L  -> SLIT("l") UNUSED
+	 L  -> SLIT("l")
 	 Q  -> SLIT("q")
 --	 FF -> SLIT("f") UNUSED
 --	 DF -> SLIT("d") UNUSED

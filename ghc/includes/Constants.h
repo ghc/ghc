@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: Constants.h,v 1.13 2000/08/03 11:28:35 simonmar Exp $
+ * $Id: Constants.h,v 1.14 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -166,10 +166,16 @@
 
 #define MAX_VECTORED_RTN 8
 
-/*---- Range of built-in table of static small int-like closures. */
+/*---- Range of built-in table of static small int-like and char-like closures. */
 
-#define MAX_INTLIKE 		(16)
+#define MAX_INTLIKE 		16
 #define MIN_INTLIKE 		(-16)
+
+#define MAX_CHARLIKE		255
+#define MIN_CHARLIKE		0
+
+/* You can change these constants (I hope) but be sure to modify
+   rts/StgMiscClosures.hs accordingly. */
 
 /*---- Minimum number of words left in heap after GC to carry on */
 

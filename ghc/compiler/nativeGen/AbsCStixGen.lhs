@@ -146,7 +146,7 @@ Here we handle top-level things, like @CCodeBlock@s and
        mk_StCLbl_for_SRT :: CLabel -> StixTree
        mk_StCLbl_for_SRT label
           | labelDynamic label
-          = StIndex CharRep (StCLbl label) (StInt 1)
+          = StIndex Int8Rep (StCLbl label) (StInt 1)
           | otherwise
           = StCLbl label
 
@@ -223,7 +223,8 @@ Here we handle top-level things, like @CCodeBlock@s and
        = StData (promote_to_word (getAmodeRep amode)) [a2stix amode]
 
     -- We need to promote any item smaller than a word to a word
-    promote_to_word CharRep = WordRep
+    promote_to_word Int8Rep = IntRep
+    promote_to_word CharRep = IntRep
     promote_to_word other   = other
 
     -- always at least one padding word: this is the static link field
@@ -473,7 +474,7 @@ be tuned.)
 \begin{code}
 
  intTag :: Literal -> Integer
- intTag (MachChar c)  = toInteger (ord c)
+ intTag (MachChar c)  = toInteger c
  intTag (MachInt i)   = i
  intTag (MachWord w)  = intTag (word2IntLit (MachWord w))
  intTag _             = panic "intTag"

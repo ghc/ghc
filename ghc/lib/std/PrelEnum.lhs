@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelEnum.lhs,v 1.11 2000/06/30 13:39:35 simonmar Exp $
+% $Id: PrelEnum.lhs,v 1.12 2000/08/07 23:37:23 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -180,11 +180,11 @@ instance Enum Ordering where
 \begin{code}
 instance  Bounded Char  where
     minBound =  '\0'
-    maxBound =  '\255'
+    maxBound =  '\x7FFFFFFF'
 
 instance  Enum Char  where
     succ (C# c#)
-       | not (ord# c# ==# 255#) = C# (chr# (ord# c# +# 1#))
+       | not (ord# c# ==# 0x7FFFFFFF#) = C# (chr# (ord# c# +# 1#))
        | otherwise	        = error ("Prelude.Enum.Char.succ: bad argument")
     pred (C# c#)
        | not (ord# c# ==# 0#)   = C# (chr# (ord# c# -# 1#))
@@ -194,7 +194,7 @@ instance  Enum Char  where
     fromEnum = ord
 
     {-# INLINE enumFrom #-}
-    enumFrom (C# x) = eftChar (ord# x) 255#
+    enumFrom (C# x) = eftChar (ord# x) 0x7FFFFFFF#
 	-- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
@@ -235,13 +235,13 @@ eftCharList x y | x ># y    = []
 
 -- For enumFromThenTo we give up on inlining
 efdCharFB c n x1 x2
-  | delta >=# 0# = go_up_char_fb c n x1 delta 255#
+  | delta >=# 0# = go_up_char_fb c n x1 delta 0x7FFFFFFF#
   | otherwise    = go_dn_char_fb c n x1 delta 0#
   where
     delta = x2 -# x1
 
 efdCharList x1 x2
-  | delta >=# 0# = go_up_char_list x1 delta 255#
+  | delta >=# 0# = go_up_char_list x1 delta 0x7FFFFFFF#
   | otherwise    = go_dn_char_list x1 delta 0#
   where
     delta = x2 -# x1

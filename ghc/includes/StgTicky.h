@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.9 1999/11/11 17:50:47 simonpj Exp $
+ * $Id: StgTicky.h,v 1.10 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -142,8 +142,8 @@ typedef struct _StgEntCounter {
     		arity:16,	/* arity (static info) */
     		stk_args:16;	/* # of args off stack */
 				/* (rest of args are in registers) */
-    StgChar	*str;		/* name of the thing */
-    StgChar	*arg_kinds;	/* info about the args types */
+    char   	*str;		/* name of the thing */
+    char   	*arg_kinds;	/* info about the args types */
     I_		entry_count;	  /* Trips to fast entry code */
     I_		slow_entry_count; /* Trips to slow entry code */
     I_          allocs;         /* number of allocations by this fun */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.52 2000/05/10 11:02:00 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.53 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -263,13 +263,14 @@ W_ GHC_ZCCReturnable_static_info[0];
    FE_							\
  }
 
-newByteArray(Char,   sizeof(C_))
-newByteArray(Int,    sizeof(I_));
-newByteArray(Word,   sizeof(W_));
-newByteArray(Addr,   sizeof(P_));
-newByteArray(Float,  sizeof(StgFloat));
-newByteArray(Double, sizeof(StgDouble));
-newByteArray(StablePtr, sizeof(StgStablePtr));
+newByteArray(Char,   1)
+/* Char arrays really contain only 8-bit bytes for compatibility. */
+newByteArray(Int,    sizeof(I_))
+newByteArray(Word,   sizeof(W_))
+newByteArray(Addr,   sizeof(P_))
+newByteArray(Float,  sizeof(StgFloat))
+newByteArray(Double, sizeof(StgDouble))
+newByteArray(StablePtr, sizeof(StgStablePtr))
 
 FN_(newArrayzh_fast)
 {

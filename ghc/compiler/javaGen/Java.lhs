@@ -131,7 +131,7 @@ instance Ord Name where
 
 data Lit
   = IntLit Integer	-- unboxed
-  | CharLit Char	-- unboxed
+  | CharLit Int 	-- unboxed
   | StringLit String	-- java string
   deriving Show
 

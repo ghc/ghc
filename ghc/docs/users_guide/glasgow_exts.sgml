@@ -364,8 +364,8 @@ Literals for these types may be written as follows:
 1#              an Int#
 1.2#            a Float#
 1.34##          a Double#
-'a'#            a Char#; for weird characters, use '\o&#60;octal&#62;'#
-"a"#            an Addr# (a `char *')
+'a'#            a Char#; for weird characters, use e.g. '\o&#60;octal&#62;'#
+"a"#            an Addr# (a `char *'); only characters '\0'..'\255' allowed
 </ProgramListing>
 
 <IndexTerm><Primary>literals, primitive</Primary></IndexTerm>

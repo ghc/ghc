@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsFFI.h,v 1.3 2000/04/13 15:37:11 panne Exp $
+ * $Id: HsFFI.h,v 1.4 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -63,8 +63,8 @@ typedef void*			HsForeignObj;   /* ... and this StgForeignPtr       */
 typedef void*			HsStablePtr;
 
 /* this should correspond to the type of StgChar in StgTypes.h */
-#define HS_CHAR_MIN		(0)
-#define HS_CHAR_MAX		UINT8_MAX
+#define HS_CHAR_MIN		0
+#define HS_CHAR_MAX		INT32_MAX
 
 /* this mirrors the distinction of cases in StgTypes.h */
 #if   SIZEOF_VOID_P == 8

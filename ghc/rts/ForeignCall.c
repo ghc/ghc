@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: ForeignCall.c,v 1.17 2000/05/26 10:14:34 sewardj Exp $
+ * $Id: ForeignCall.c,v 1.18 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team 1994-1999.
  *
@@ -431,7 +431,7 @@ unpackArgsAndCallHaskell_x86_nocallconv_wrk ( StgStablePtr stableptr,
    while (*argp) {
       switch (*argp) {
          case CHAR_REP:
-            node = rts_apply ( node, rts_mkChar ( *(char*)args ) );
+            node = rts_apply ( node, rts_mkChar ( *(unsigned int*)args ) );
             args += 4;
             break;
          case INT_REP:

@@ -605,6 +605,7 @@ suffix _            = ""
 primName :: PrimType -> String
 primName PrimInt       = "int"
 primName PrimChar      = "char"
+primName PrimByte      = "byte"
 primName PrimBoolean   = "boolean"
 primName _             = error "unsupported primitive"
 
@@ -803,6 +804,9 @@ inttype = PrimType PrimInt
 chartype :: Type
 chartype = PrimType PrimChar
 
+bytetype :: Type
+bytetype = PrimType PrimByte
+
 -- This lets you get inside a possible "Value" type,
 -- to access the internal unboxed object.
 access :: Expr -> Type -> Expr
@@ -811,6 +815,7 @@ access expr other           = expr
 
 accessPrim expr PrimInt  = Call expr (Name "intValue" inttype) []
 accessPrim expr PrimChar = Call expr (Name "charValue" chartype) []
+accessPrim expr PrimByte = Call expr (Name "byteValue" bytetype) []
 accessPrim expr other    = pprPanic "accessPrim" (text (show other))
 
 -- This is where we map from typename to types,
@@ -831,6 +836,7 @@ primRepToType ::PrimRep -> Type
 primRepToType PtrRep  = objectType
 primRepToType IntRep  = inttype
 primRepToType CharRep = chartype
+primRepToType Int8Rep = bytetype
 primRepToType AddrRep = objectType
 primRepToType other   = pprPanic "primRepToType" (ppr other)
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.18 2000/04/17 14:46:31 sewardj Exp $
+ * $Id: StgCRun.c,v 1.19 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -238,7 +238,7 @@ EXTFUN(StgReturn)
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
-    StgChar space[ RESERVED_C_STACK_BYTES + 4*sizeof(void *) ];
+    unsigned char space[ RESERVED_C_STACK_BYTES + 4*sizeof(void *) ];
     StgThreadReturnCode r;
 
     __asm__ volatile (
@@ -321,7 +321,7 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
-    StgChar space[RESERVED_C_STACK_BYTES+sizeof(void *)];
+    unsigned char space[RESERVED_C_STACK_BYTES+sizeof(void *)];
     register void *i7 __asm__("%i7");
     ((void **)(space))[100] = i7;
     f();

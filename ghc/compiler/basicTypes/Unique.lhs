@@ -177,7 +177,7 @@ module Unique (
 	trueDataConKey,
 	unboundKey,
 	unboxedConKey,
-	unpackCString2IdKey,
+	unpackCStringUtf8IdKey,
 	unpackCStringAppendIdKey,
 	unpackCStringFoldrIdKey,
 	unpackCStringIdKey,
@@ -630,7 +630,7 @@ realWorldPrimIdKey	      = mkPreludeMiscIdUnique 23
 recConErrorIdKey	      = mkPreludeMiscIdUnique 24
 recUpdErrorIdKey	      = mkPreludeMiscIdUnique 25
 traceIdKey		      = mkPreludeMiscIdUnique 26
-unpackCString2IdKey	      = mkPreludeMiscIdUnique 27
+unpackCStringUtf8IdKey	      = mkPreludeMiscIdUnique 27
 unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 28
 unpackCStringFoldrIdKey	      = mkPreludeMiscIdUnique 29
 unpackCStringIdKey	      = mkPreludeMiscIdUnique 30

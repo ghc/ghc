@@ -155,13 +155,17 @@ import qualified FastString
 # define _NIL_		(FastString.mkFastString "")
 # define _CONS_		FastString.consFS
 # define _HEAD_		FastString.headFS
+# define _HEAD_INT_	FastString.headIntFS
 # define _TAIL_		FastString.tailFS
 # define _LENGTH_	FastString.lengthFS
 # define _PK_		FastString.mkFastString
+# define _PK_INT_	FastString.mkFastStringInt
 # define _UNPK_		FastString.unpackFS
+# define _UNPK_INT_	FastString.unpackIntFS
 # define _APPEND_	`FastString.appendFS`
 # define _CONCAT_	FastString.concatFS
 #else
+# error I think that FastString is now always used. If not, fix this.
 # define FAST_STRING String
 # define SLIT(x)      (x)
 # define _CMP_STRING_ cmpString

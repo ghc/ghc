@@ -100,7 +100,7 @@ sizeOf :: PrimRep -> Integer{-in bytes-}
     -- the result is an Integer only because it's more convenient
 
 sizeOf pr = case (primRepToSize pr) of
-  IF_ARCH_alpha({B -> 1; BU -> 1; {-W -> 2; WU -> 2; L -> 4; SF -> 4;-} _ -> 8},)
+  IF_ARCH_alpha({B -> 1; BU -> 1; {-W -> 2; WU -> 2;-} L -> 4; {-SF -> 4;-} _ -> 8},)
   IF_ARCH_sparc({B -> 1; BU -> 1; {-HW -> 2; HWU -> 2;-} W -> 4; {-D -> 8;-} F -> 4; DF -> 8},)
   IF_ARCH_i386( {B -> 1; {-S -> 2;-} L -> 4; F -> 4; DF -> 8 },)
 \end{code}
@@ -239,7 +239,7 @@ data Size
     | BU
 --  | W	    -- word (2 bytes): UNUSED
 --  | WU    -- : UNUSED
---  | L	    -- longword (4 bytes): UNUSED
+    | L	    -- longword (4 bytes)
     | Q	    -- quadword (8 bytes)
 --  | FF    -- VAX F-style floating pt: UNUSED
 --  | GF    -- VAX G-style floating pt: UNUSED
@@ -274,7 +274,8 @@ primRepToSize CodePtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc(
 primRepToSize DataPtrRep    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize RetRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize CostCentreRep = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
-primRepToSize CharRep	    = IF_ARCH_alpha( BU, IF_ARCH_i386( B, IF_ARCH_sparc( BU,)))
+primRepToSize CharRep	    = IF_ARCH_alpha( L,  IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
+primRepToSize Int8Rep	    = IF_ARCH_alpha( B,  IF_ARCH_i386( B, IF_ARCH_sparc( B ,)))
 primRepToSize IntRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize WordRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))
 primRepToSize AddrRep	    = IF_ARCH_alpha( Q,	 IF_ARCH_i386( L, IF_ARCH_sparc( W ,)))

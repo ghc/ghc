@@ -50,7 +50,7 @@ import Type		( getTyVar, tyVarsOfTypes, splitFunTy, applyTys,
 import TysWiredIn	( unitTy )
 import Var		( tyVarKind )
 import VarSet		( intersectVarSet, isEmptyVarSet )
-import Unique		( unpackCStringIdKey )
+import Unique		( unpackCStringIdKey, unpackCStringUtf8IdKey )
 import Util		( equivClasses )
 import FiniteMap        ( FiniteMap, lookupWithDefaultFM )
 \end{code}
@@ -282,7 +282,8 @@ mkRecordSelector tycon fields@((first_con, first_field_label) : other_fields)
   = checkTc (all (== field_ty) other_tys)
 	    (fieldTypeMisMatch field_name)	`thenTc_`
     tcLookupValueByKey unpackCStringIdKey	`thenTc` \ unpack_id ->
-    returnTc (mkRecordSelId tycon first_field_label unpack_id)
+    tcLookupValueByKey unpackCStringUtf8IdKey	`thenTc` \ unpackUtf8_id ->
+    returnTc (mkRecordSelId tycon first_field_label unpack_id unpackUtf8_id)
   where
     field_ty   = fieldLabelType first_field_label
     field_name = fieldLabelName first_field_label

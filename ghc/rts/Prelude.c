@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.c,v 1.8 2000/06/15 13:23:52 daan Exp $
+ * $Id: Prelude.c,v 1.9 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -193,10 +193,10 @@ void fixupRTStoPreludeRefs ( void*(*ask_hugs_dynamic_linker)(char*) )
   {
     int i;
   
-    for(i=0;i<=255;i++)
+    for(i=0; i<=MAX_CHARLIKE-MIN_CHARLIKE; i++)
       (CHARLIKE_closure[i]).header.info = Czh_static_info;
     
-    for(i=0;i<=32;i++)
+    for(i=0; i<=MAX_INTLIKE-MIN_INTLIKE; i++)
       (INTLIKE_closure[i]).header.info = Izh_static_info;
   }
 #endif

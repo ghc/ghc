@@ -160,7 +160,8 @@ mangleIndexTree (StIndex pk base off)
       ]
   where
     shift DoubleRep 	= 3::Integer
-    shift CharRep       = 0::Integer
+    shift CharRep       = 2::Integer
+    shift Int8Rep       = 0::Integer
     shift _ 	       	= IF_ARCH_alpha(3,2)
 \end{code}
 
@@ -3249,13 +3250,15 @@ coerceFP2Int x
 %*									*
 %************************************************************************
 
-Integer to character conversion.  Where applicable, we try to do this
-in one step if the original object is in memory.
+Integer to character conversion.
 
 \begin{code}
 chrCode :: StixTree -> NatM Register
 
 #if alpha_TARGET_ARCH
+
+-- TODO: This is probably wrong, but I don't know Alpha assembler.
+-- It should coerce a 64-bit value to a 32-bit value.
 
 chrCode x
   = getRegister x		`thenNat` \ register ->
@@ -3273,47 +3276,23 @@ chrCode x
 
 chrCode x
   = getRegister x		`thenNat` \ register ->
-    let
-    	code__2 dst = let
-    	                  code = registerCode register dst
-    	                  src  = registerName register dst
-		      in code `appOL`
-			 if   isFixed register && src /= dst
-			 then toOL [MOV L (OpReg src) (OpReg dst),
-			            AND L (OpImm (ImmInt 255)) (OpReg dst)]
-			 else unitOL (AND L (OpImm (ImmInt 255)) (OpReg src))
-    in
-    returnNat (Any IntRep code__2)
+    returnNat (
+    case register of
+    	Fixed _ reg code -> Fixed IntRep reg code
+    	Any   _ code     -> Any   IntRep code
+    )
 
 #endif {- i386_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
-chrCode (StInd pk mem)
-  = getAmode mem		`thenNat` \ amode ->
-    let
-    	code    = amodeCode amode
-    	src     = amodeAddr amode
-    	src_off = addrOffset src 3
-    	src__2  = case src_off of Just x -> x
-    	code__2 dst = if maybeToBool src_off then
-    	    	    	code `snocOL` LD BU src__2 dst
-    	    	    else
-    	    	    	code `snocOL`
-    	    	    	LD (primRepToSize pk) src dst  `snocOL`
-    	    	    	AND False dst (RIImm (ImmInt 255)) dst
-    in
-    returnNat (Any pk code__2)
-
 chrCode x
   = getRegister x		`thenNat` \ register ->
-    getNewRegNCG IntRep		`thenNat` \ reg ->
-    let
-    	code = registerCode register reg
-    	src  = registerName register reg
-    	code__2 dst = code `snocOL` AND False src (RIImm (ImmInt 255)) dst
-    in
-    returnNat (Any IntRep code__2)
+    returnNat (
+    case register of
+    	Fixed _ reg code -> Fixed IntRep reg code
+    	Any   _ code     -> Any   IntRep code
+    )
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}

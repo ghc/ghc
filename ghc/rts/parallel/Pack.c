@@ -1,6 +1,6 @@
 /* 
    Time-stamp: <Thu Mar 30 2000 22:53:32 Stardate: [-30]4584.56 hwloidl>
-   $Id: Pack.c,v 1.4 2000/03/31 03:09:37 hwloidl Exp $
+   $Id: Pack.c,v 1.5 2000/08/07 23:37:24 qrczak Exp $
 
    Graph packing and unpacking code for sending it to another processor
    and retrieving the original graph structure from the packet.
@@ -722,12 +722,21 @@ StgClosure *closure;
   switch (info->type) {
 
   case CONSTR_CHARLIKE:
-    IF_PAR_DEBUG(pack,
-		 belch("*>^^ Packing a charlike closure %d", 
-		       ((StgIntCharlikeClosure*)closure)->data));
-    
-    PackPLC((StgPtr)CHARLIKE_CLOSURE(((StgIntCharlikeClosure*)closure)->data));
-    return;
+    {
+      StgChar val = ((StgIntCharlikeClosure*)closure)->data;
+      
+      if ((val <= MAX_CHARLIKE) && (val >= MIN_CHARLIKE)) {
+	IF_PAR_DEBUG(pack,
+		     belch("*>^^ Packing a small charlike %d as a PLC", val));
+	PackPLC((StgPtr)CHARLIKE_CLOSURE(val));
+      } else {
+	IF_PAR_DEBUG(pack,
+		     belch("*>^^ Packing a big charlike %d as a normal closure", 
+			   val));
+	PackGeneric(closure);
+      }
+      return;
+    }
       
   case CONSTR_INTLIKE:
     {
@@ -737,14 +746,13 @@ StgClosure *closure;
 	IF_PAR_DEBUG(pack,
 		     belch("*>^^ Packing a small intlike %d as a PLC", val));
 	PackPLC((StgPtr)INTLIKE_CLOSURE(val));
-	return;
       } else {
 	IF_PAR_DEBUG(pack,
 		     belch("*>^^ Packing a big intlike %d as a normal closure", 
 			   val));
 	PackGeneric(closure);
-	return;
       }
+      return;
     }
 
   case CONSTR:
@@ -1200,13 +1208,23 @@ PackPAP(StgPAP *pap) {
       /* distinguish static closure (PLC) from other closures (FM) */
       switch (get_itbl((StgClosure*)q)->type) {
       case CONSTR_CHARLIKE:
-	IF_PAR_DEBUG(pack,
-		     belch("*>** PackPAP: packing a charlike closure %d", 
-			   ((StgIntCharlikeClosure*)q)->data));
-    
-	PackPLC((StgPtr)CHARLIKE_CLOSURE(((StgIntCharlikeClosure*)q)->data));
-	p++;
-	break;
+	{
+	  StgChar val = ((StgIntCharlikeClosure*)q)->data;
+      
+	  if ((val <= MAX_CHARLIKE) && (val >= MIN_CHARLIKE)) {
+	    IF_PAR_DEBUG(pack,
+			 belch("*>** PackPAP: Packing ptr to a small charlike %d as a PLC", val));
+	    PackPLC((StgPtr)CHARLIKE_CLOSURE(val));
+	  } else {
+	    IF_PAR_DEBUG(pack,
+			 belch("*>** PackPAP: Packing a ptr to a big charlike %d as a FM", 
+			       val));
+	    Pack((StgWord)(ARGTAG_MAX+1));
+	    PackFetchMe((StgClosure *)q);
+	  }
+	  p++;
+	  break;
+	}
       
       case CONSTR_INTLIKE:
 	{
@@ -1216,17 +1234,15 @@ PackPAP(StgPAP *pap) {
 	    IF_PAR_DEBUG(pack,
 			 belch("*>** PackPAP: Packing ptr to a small intlike %d as a PLC", val));
 	    PackPLC((StgPtr)INTLIKE_CLOSURE(val));
-	    p++;
-	    break;
 	  } else {
 	    IF_PAR_DEBUG(pack,
 			 belch("*>** PackPAP: Packing a ptr to a big intlike %d as a FM", 
 			       val));
 	    Pack((StgWord)(ARGTAG_MAX+1));
 	    PackFetchMe((StgClosure *)q);
-	    p++;
-	    break;
 	  }
+	  p++;
+	  break;
 	}
 	case THUNK_STATIC:       // ToDo: check whether that's ok
 	case FUN_STATIC:       // ToDo: check whether that's ok

@@ -58,7 +58,8 @@ module PrelNames
 	concat_RDR, filter_RDR, zip_RDR, augment_RDR,
 	otherwiseId_RDR, assert_RDR, runSTRep_RDR,
 
-	unpackCString_RDR, unpackCString2_RDR, unpackCStringAppend_RDR, unpackCStringFoldr_RDR,
+	unpackCString_RDR, unpackCStringAppend_RDR, unpackCStringFoldr_RDR,
+        unpackCStringUtf8_RDR,
 	numClass_RDR, fractionalClass_RDR, eqClass_RDR, 
 	ccallableClass_RDR, creturnableClass_RDR,
 	monadClass_RDR, enumClass_RDR, ordClass_RDR,
@@ -209,9 +210,9 @@ augment_RDR	   = varQual pREL_BASE_Name SLIT("augment")
 
 -- Strings
 unpackCString_RDR       = varQual pREL_BASE_Name SLIT("unpackCString#")
-unpackCString2_RDR      = varQual pREL_BASE_Name SLIT("unpackNBytes#")
 unpackCStringAppend_RDR = varQual pREL_BASE_Name SLIT("unpackAppendCString#")
 unpackCStringFoldr_RDR  = varQual pREL_BASE_Name SLIT("unpackFoldrCString#")
+unpackCStringUtf8_RDR   = varQual pREL_BASE_Name SLIT("unpackCStringUtf8#")
 
 -- Classes Eq and Ord
 eqClass_RDR		= clsQual pREL_BASE_Name SLIT("Eq")

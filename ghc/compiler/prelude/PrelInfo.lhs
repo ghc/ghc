@@ -266,9 +266,9 @@ knownKeyNames
     , (map_RDR,			mapIdKey)
     , (append_RDR,		appendIdKey)
     , (unpackCString_RDR, 	unpackCStringIdKey)
-    , (unpackCString2_RDR,  	unpackCString2IdKey)
     , (unpackCStringAppend_RDR,	unpackCStringAppendIdKey)
     , (unpackCStringFoldr_RDR,	unpackCStringFoldrIdKey)
+    , (unpackCStringUtf8_RDR,  	unpackCStringUtf8IdKey)
 
 	-- List operations
     , (concat_RDR,		concatIdKey)

@@ -190,7 +190,7 @@ pprUfExpr :: Outputable name => (SDoc -> SDoc) -> UfExpr name -> SDoc
 
 pprUfExpr add_par (UfVar v)       = ppr v
 pprUfExpr add_par (UfLit l)       = ppr l
-pprUfExpr add_par (UfLitLit l ty) = add_par (hsep [ptext SLIT("__litlit"), pprFSAsString l, pprParendHsType ty])
+pprUfExpr add_par (UfLitLit l ty) = add_par (hsep [ptext SLIT("__litlit"), pprHsString l, pprParendHsType ty])
 pprUfExpr add_par (UfCCall cc ty) = braces (pprCCallOp cc <+> ppr ty)
 pprUfExpr add_par (UfType ty)     = char '@' <+> pprParendHsType ty
 
@@ -238,7 +238,7 @@ instance Outputable name => Outputable (UfNote name) where
 instance Outputable name => Outputable (UfConAlt name) where
     ppr UfDefault	   = text "__DEFAULT"
     ppr (UfLitAlt l)       = ppr l
-    ppr (UfLitLitAlt l ty) = parens (hsep [ptext SLIT("__litlit"), pprFSAsString l, pprParendHsType ty])
+    ppr (UfLitLitAlt l ty) = parens (hsep [ptext SLIT("__litlit"), pprHsString l, pprParendHsType ty])
     ppr (UfDataAlt d)	   = ppr d
 
 instance Outputable name => Outputable (UfBinder name) where

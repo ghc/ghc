@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: filePutc.c,v 1.11 1999/12/08 15:47:07 simonmar Exp $
+ * $Id: filePutc.c,v 1.12 2000/08/07 23:37:23 qrczak Exp $
  *
  * hPutChar Runtime Support
  */
@@ -24,6 +24,7 @@ filePutc(StgForeignPtr ptr, StgChar c)
 {
     IOFileObject* fo = (IOFileObject*)ptr;
     int rc = 0;
+    unsigned char byte = (unsigned char) c;
 
     /* What filePutc needs to do:
 
@@ -46,6 +47,9 @@ filePutc(StgForeignPtr ptr, StgChar c)
      flush(i.e., empty) the buffer first. (We could be smarter about this,
      but aren't!)
 
+     Only the lower 8 bits of a character are written. The data are supposed
+     to be already converted to the stream's 8-bit encoding.
+
     */
 
     if ( FILEOBJ_READABLE(fo) && FILEOBJ_JUST_READ(fo) ) {
@@ -60,7 +64,7 @@ filePutc(StgForeignPtr ptr, StgChar c)
         ; 
     } else {
 	/* We're buffered, add it to the pack */
-       ((char*)fo->buf)[fo->bufWPtr] = (char)c;
+       ((unsigned char*)fo->buf)[fo->bufWPtr] = byte;
        fo->bufWPtr++;
       /* If the buffer filled up as a result, *or*
          the added character terminated a line
@@ -79,10 +83,10 @@ filePutc(StgForeignPtr ptr, StgChar c)
     while ((rc = (
 #ifdef USE_WINSOCK
 	         fo->flags & FILEOBJ_WINSOCK ?
-		 send(fo->fd, &c, 1, 0) :
-		 write(fo->fd, &c, 1))) <= 0) {
+		 send(fo->fd, &byte, 1, 0) :
+		 write(fo->fd, &byte, 1))) <= 0) {
 #else
-  	         write(fo->fd, &c, 1))) <= 0) {
+  	         write(fo->fd, &byte, 1))) <= 0) {
 #endif
 
         if ( rc == -1 && errno == EAGAIN) {

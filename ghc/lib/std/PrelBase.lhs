@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.34 2000/08/02 14:13:27 rrt Exp $
+% $Id: PrelBase.lhs,v 1.35 2000/08/07 23:37:23 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -124,14 +124,14 @@ otherwise = True
 build = error "urk"
 foldr = error "urk"
 
-unpackCString#  :: Addr# -> [Char]
-unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
+unpackCString# :: Addr# -> [Char]
+unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
-unpackNBytes#      :: Addr# -> Int#   -> [Char]
-unpackNBytes# a b = error "urk"
+unpackCStringUtf8# :: Addr# -> [Char]
 unpackCString# a = error "urk"
 unpackFoldrCString# a = error "urk"
 unpackAppendCString# a = error "urk"
+unpackCStringUtf8# a = error "urk"
 -}
 \end{code}
 
@@ -185,7 +185,7 @@ class  (Eq a) => Ord a  where
 
 \begin{code}
 class  Functor f  where
-    fmap         :: (a -> b) -> f a -> f b
+    fmap        :: (a -> b) -> f a -> f b
 
 class  Monad m  where
     (>>=)       :: m a -> (a -> m b) -> m b
@@ -440,7 +440,11 @@ instance Ord Char where
   (C# c1) <  (C# c2) = c1 `ltChar#` c2
 
 chr :: Int -> Char
-chr (I# i) | i >=# 0# && i <=# 255# = C# (chr# i)
+chr (I# i) | i >=# 0#
+#if INT_SIZE_IN_BYTES > 4
+             && i <=# 0x7FFFFFFF#
+#endif
+             = C# (chr# i)
 	   | otherwise = error ("Prelude.chr: bad argument")
 
 unsafeChr :: Int -> Char
@@ -623,10 +627,10 @@ This code is needed for virtually all programs, since it's used for
 unpacking the strings of error messages.
 
 \begin{code}
-unpackCString#  :: Addr# -> [Char]
+unpackCString# :: Addr# -> [Char]
 unpackCString# a = unpackCStringList# a
 
-unpackCStringList#  :: Addr# -> [Char]
+unpackCStringList# :: Addr# -> [Char]
 unpackCStringList# addr 
   = unpack 0#
   where
@@ -646,7 +650,7 @@ unpackAppendCString# addr rest
       where
 	ch = indexCharOffAddr# addr nh
 
-unpackFoldrCString#  :: Addr# -> (Char  -> a -> a) -> a -> a 
+unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
 unpackFoldrCString# addr f z 
   = unpack 0#
   where
@@ -656,11 +660,42 @@ unpackFoldrCString# addr f z
       where
 	ch = indexCharOffAddr# addr nh
 
-unpackNBytes#      :: Addr# -> Int#   -> [Char]
-  -- This one is called by the compiler to unpack literal 
-  -- strings with NULs in them; rare. It's strict!
-  -- We don't try to do list deforestation for this one
+unpackCStringUtf8# :: Addr# -> [Char]
+unpackCStringUtf8# addr 
+  = unpack 0#
+  where
+    unpack nh
+      | ch `eqChar#` '\0'# = []
+      | ch `leChar#` '\x7F'# = C# ch : unpack (nh +# 1#)
+      | ch `leChar#` '\xDF'# = C# (chr# ((ord# ch                                  `iShiftL#`  6#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 1#))) -# 0x3080#))
+                               : unpack (nh +# 2#)
+      | ch `leChar#` '\xEF'# = C# (chr# ((ord# ch                                  `iShiftL#` 12#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#`  6#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 2#))) -# 0xE2080#))
+                               : unpack (nh +# 3#)
+      | ch `leChar#` '\xF7'# = C# (chr# ((ord# ch                                  `iShiftL#` 18#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 12#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#`  6#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 3#))) -# 0x3C82080#))
+                               : unpack (nh +# 4#)
+      | ch `leChar#` '\xFB'# = C# (chr# ((ord# ch                                  `iShiftL#` 24#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 18#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#` 12#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 3#)) `iShiftL#`  6#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 4#))) -# 0xFA082080#))
+                               : unpack (nh +# 5#)
+      | otherwise           = C# (chr# (((ord# ch -# 0xFC#)                        `iShiftL#` 30#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 24#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#` 18#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 3#)) `iShiftL#` 12#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 4#)) `iShiftL#`  6#) +#
+                                         (ord# (indexCharOffAddr# addr (nh +# 5#))) -# 0x82082080#))
+                               : unpack (nh +# 6#)
+      where
+	ch = indexCharOffAddr# addr nh
 
+unpackNBytes# :: Addr# -> Int# -> [Char]
 unpackNBytes# _addr 0#   = []
 unpackNBytes#  addr len# = unpack [] (len# -# 1#)
     where

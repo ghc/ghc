@@ -38,7 +38,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_GranMacros )
 import CostCentre	( pprCostCentreDecl, pprCostCentreStackDecl )
 
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
-import CStrings		( stringToC, pprCLabelString )
+import CStrings		( pprStringInCStyle, pprCLabelString )
 import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import Literal		( Literal(..) )
 import TyCon		( tyConDataCons )
@@ -498,8 +498,8 @@ pprAbsC stmt@(CClosureInfoAndCode cl_info slow maybe_fast cl_descr) _
 
     type_str = pprSMRep (closureSMRep cl_info)
 
-    pp_descr = hcat [char '"', text (stringToC cl_descr), char '"']
-    pp_type  = hcat [char '"', text (stringToC (closureTypeDescr cl_info)), char '"']
+    pp_descr = pprStringInCStyle cl_descr
+    pp_type  = pprStringInCStyle (closureTypeDescr cl_info)
 
 pprAbsC stmt@(CClosureTbl tycon) _
   = vcat (
@@ -1289,6 +1289,7 @@ pprUnionTag RetRep 	    	= char 'p'
 pprUnionTag CostCentreRep	= panic "pprUnionTag:CostCentre?"
 
 pprUnionTag CharRep		= char 'c'
+pprUnionTag Int8Rep		= ptext SLIT("i8")
 pprUnionTag IntRep		= char 'i'
 pprUnionTag WordRep		= char 'w'
 pprUnionTag AddrRep		= char 'a'
@@ -1534,9 +1535,8 @@ ppr_decls_Amode (CLit _)	= returnTE (Nothing, Nothing)
 -- CIntLike must be a literal -- no decls
 ppr_decls_Amode (CIntLike int)	= returnTE (Nothing, Nothing)
 
--- CCharLike may have be arbitrary value -- may have decls
-ppr_decls_Amode (CCharLike char)
-  = ppr_decls_Amode char
+-- CCharLike too
+ppr_decls_Amode (CCharLike char) = returnTE (Nothing, Nothing)
 
 -- now, the only place where we actually print temps/externs...
 ppr_decls_Amode (CTemp uniq kind)

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.15 2000/06/27 09:18:04 sewardj Exp $
+ * $Id: RtsAPI.h,v 1.16 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,7 @@ extern void getProgArgv            ( int *argc, char **argv[] );
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
-HaskellObj   rts_mkChar       ( char c );
+HaskellObj   rts_mkChar       ( unsigned int c );
 HaskellObj   rts_mkInt        ( int i );
 HaskellObj   rts_mkInt8       ( int i );
 HaskellObj   rts_mkInt16      ( int i );
@@ -71,7 +71,7 @@ HaskellObj   rts_apply        ( HaskellObj, HaskellObj );
 /* ----------------------------------------------------------------------------
    Deconstructing Haskell objects
    ------------------------------------------------------------------------- */
-char         rts_getChar      ( HaskellObj );
+unsigned int rts_getChar      ( HaskellObj );
 int          rts_getInt       ( HaskellObj );
 int          rts_getInt32     ( HaskellObj );
 unsigned int rts_getWord      ( HaskellObj );

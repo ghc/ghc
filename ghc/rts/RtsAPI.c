@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.17 2000/04/26 10:17:41 simonmar Exp $
+ * $Id: RtsAPI.c,v 1.18 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -19,11 +19,11 @@
    Building Haskell objects from C datatypes.
    ------------------------------------------------------------------------- */
 HaskellObj
-rts_mkChar (char c)
+rts_mkChar (unsigned int c)
 {
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,1));
   p->header.info = Czh_con_info;
-  p->payload[0]  = (StgClosure *)((StgInt)c);
+  p->payload[0]  = (StgClosure *)(StgChar)c;
   return p;
 }
 
@@ -207,12 +207,12 @@ rts_apply (HaskellObj f, HaskellObj arg)
    Deconstructing Haskell objects
    ------------------------------------------------------------------------- */
 
-char
+unsigned int
 rts_getChar (HaskellObj p)
 {
   if ( p->header.info == Czh_con_info || 
        p->header.info == Czh_static_info) {
-    return (char)(StgWord)(p->payload[0]);
+    return (StgChar)(StgWord)(p->payload[0]);
   } else {
     barf("getChar: not a Char");
   }

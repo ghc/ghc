@@ -52,7 +52,7 @@ import FastString
 import StringBuffer
 import GlaExts
 import Ctype
-import Char		( chr )
+import Char		( chr, ord )
 import PrelRead 	( readRational__ ) -- Glasgow non-std
 \end{code}
 
@@ -209,12 +209,12 @@ data Token
 
   | ITpragma StringBuffer
 
-  | ITchar       Char 
+  | ITchar       Int
   | ITstring     FAST_STRING
-  | ITinteger    Integer 
+  | ITinteger    Integer
   | ITrational   Rational
 
-  | ITprimchar   Char
+  | ITprimchar   Int
   | ITprimstring FAST_STRING
   | ITprimint    Integer
   | ITprimfloat  Rational
@@ -571,7 +571,7 @@ lexToken cont glaexts buf =
 	   _ -> (layoutOff `thenP_` cont ITocurly)  (incLexeme buf)
 
     -- strings/characters -------------------------------------------------
-    '\"'#{-"-} -> lex_string cont glaexts "" (incLexeme buf)
+    '\"'#{-"-} -> lex_string cont glaexts [] (incLexeme buf)
     '\''#      -> lex_char (char_end cont) glaexts (incLexeme buf)
 
     -- strictness and cpr pragmas and __scc treated specially.
@@ -639,9 +639,11 @@ lex_prag cont buf
 lex_string cont glaexts s buf
   = case currentChar# buf of
 	'"'#{-"-} -> 
-	   let buf' = incLexeme buf; s' = mkFastString (reverse s) in
+	   let buf' = incLexeme buf; s' = mkFastStringInt (reverse s) in
 	   case currentChar# buf' of
-		'#'# | flag glaexts -> cont (ITprimstring s') (incLexeme buf')
+		'#'# | flag glaexts -> if all (<= 0xFF) s
+                    then cont (ITprimstring s') (incLexeme buf')
+                    else lexError "primitive string literal must contain only characters <= '\xFF'" buf'
 		_                   -> cont (ITstring s') buf'
 
 	-- ignore \& in a string, deal with string gaps
@@ -666,11 +668,11 @@ lex_stringgap cont glaexts s buf
 
 lex_next_string cont s glaexts c buf = lex_string cont glaexts (c:s) buf
 
-lex_char :: (Int# -> Char -> P a) -> Int# -> P a
+lex_char :: (Int# -> Int -> P a) -> Int# -> P a
 lex_char cont glaexts buf
   = case currentChar# buf of
 	'\\'# -> lex_escape (cont glaexts) (incLexeme buf)
-	c | is_any c -> cont glaexts (C# c) (incLexeme buf)
+	c | is_any c -> cont glaexts (I# (ord# c)) (incLexeme buf)
 	other -> charError buf
 
 char_end cont glaexts c buf
@@ -685,19 +687,19 @@ char_end cont glaexts c buf
 lex_escape cont buf
   = let buf' = incLexeme buf in
     case currentChar# buf of
-	'a'#	   -> cont '\a' buf'
-	'b'#	   -> cont '\b' buf'
-	'f'#	   -> cont '\f' buf'
-	'n'#	   -> cont '\n' buf'
-	'r'#	   -> cont '\r' buf'
-	't'#	   -> cont '\t' buf'
-	'v'#	   -> cont '\v' buf'
-	'\\'#      -> cont '\\' buf'
-	'"'#       -> cont '\"' buf'
-	'\''#      -> cont '\'' buf'
+	'a'#	   -> cont (ord '\a') buf'
+	'b'#	   -> cont (ord '\b') buf'
+	'f'#	   -> cont (ord '\f') buf'
+	'n'#	   -> cont (ord '\n') buf'
+	'r'#	   -> cont (ord '\r') buf'
+	't'#	   -> cont (ord '\t') buf'
+	'v'#	   -> cont (ord '\v') buf'
+	'\\'#      -> cont (ord '\\') buf'
+	'"'#       -> cont (ord '\"') buf'
+	'\''#      -> cont (ord '\'') buf'
 	'^'#	   -> let c = currentChar# buf' in
 		      if c `geChar#` '@'# && c `leChar#` '_'#
-			then cont (C# (chr# (ord# c -# ord# '@'#))) (incLexeme buf')
+			then cont (I# (ord# c -# ord# '@'#)) (incLexeme buf')
 			else charError buf'
 
 	'x'#      -> readNum (after_charnum cont) buf' is_hexdigit 16 hex
@@ -707,13 +709,12 @@ lex_escape cont buf
 
 	_          -> case [ (c,buf2) | (p,c) <- silly_escape_chars,
 				       Just buf2 <- [prefixMatch buf p] ] of
-			    (c,buf2):_ -> cont c buf2
+			    (c,buf2):_ -> cont (ord c) buf2
 			    [] -> charError buf'
 
-after_charnum cont i buf 
-  = let int = fromInteger i in
-    if i >= 0 && i <= 255 
-	then cont (chr int) buf
+after_charnum cont i buf
+  = if i >= 0 && i <= 0x7FFFFFFF
+	then cont (fromInteger i) buf
 	else charError buf
 
 readNum cont buf is_digit base conv = read buf 0
@@ -951,7 +952,7 @@ lex_qid cont glaexts mod buf just_a_conid =
      _    -> just_a_conid
 
   '-'# -> case lookAhead# buf 1# of
-            '>'# -> cont (ITqconid (mod,SLIT("->"))) (setCurrentPos# buf 2#)
+            '>'# -> cont (ITqconid (mod,SLIT("(->)"))) (setCurrentPos# buf 2#)
             _    -> lex_id3 cont glaexts mod buf just_a_conid
   _    -> lex_id3 cont glaexts mod buf just_a_conid
 

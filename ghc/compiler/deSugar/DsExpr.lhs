@@ -148,7 +148,7 @@ dsExpr (HsLitOut (HsString s) _)
 
   | _LENGTH_ s == 1
   = let
-	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_ s))]
+	the_char = mkConApp charDataCon [mkLit (MachChar (_HEAD_INT_ s))]
 	the_nil  = mkNilExpr charTy
 	the_cons = mkConsExpr charTy the_char the_nil
     in

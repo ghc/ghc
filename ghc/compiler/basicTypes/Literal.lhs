@@ -27,7 +27,7 @@ import TysPrim		( charPrimTy, addrPrimTy, floatPrimTy, doublePrimTy,
 import PrimRep		( PrimRep(..) )
 import Type		( Type, typePrimRep )
 import PprType		( pprParendType )
-import CStrings		( charToC, charToEasyHaskell, pprFSInCStyle )
+import CStrings		( pprFSInCStyle )
 
 import Outputable
 import Util		( thenCmp )
@@ -85,7 +85,7 @@ function applications, etc., etc., has not yet been done.
 data Literal
   =	------------------
 	-- First the primitive guys
-    MachChar	Char
+    MachChar	Int             -- Char#        At least 31 bits
   | MachStr	FAST_STRING
 
   | MachAddr	Integer	-- Whatever this machine thinks is a "pointer"
@@ -159,8 +159,8 @@ int2WordLit (MachInt i)
   | i < 0     = MachWord (1 + tARGET_MAX_WORD + i)	-- (-1)  --->  tARGET_MAX_WORD
   | otherwise = MachWord i
 
-char2IntLit (MachChar c) = MachInt  (toInteger (ord c))
-int2CharLit (MachInt  i) = MachChar (chr (fromInteger i))
+char2IntLit (MachChar c) = MachInt  (toInteger c)
+int2CharLit (MachInt  i) = MachChar (fromInteger i)
 
 float2IntLit (MachFloat f) = MachInt   (truncate    f)
 int2FloatLit (MachInt   i) = MachFloat (fromInteger i)
@@ -268,13 +268,13 @@ pprLit lit
       iface_style = ifaceStyle sty
     in
     case lit of
-      MachChar ch | code_style  -> hcat [ptext SLIT("(C_)"), char '\'', 
-					 text (charToC ch), char '\'']
-	          | iface_style -> char '\'' <> text (charToEasyHaskell ch) <> char '\''
-		  | otherwise   -> text ['\'', ch, '\'']
+      MachChar ch | code_style -> hcat [ptext SLIT("(C_)"), text (show ch)]
+	          | otherwise  -> pprHsChar ch
 
       MachStr s | code_style -> pprFSInCStyle s
-	        | otherwise  -> pprFSAsString s
+	        | otherwise  -> pprHsString s
+      -- Warning: printing MachStr in code_style assumes it contains
+      -- only characters '\0'..'\xFF'!
 
       MachInt i | code_style && i == tARGET_MIN_INT -> parens (integer (i+1) <> text "-1")
 				-- Avoid a problem whereby gcc interprets
@@ -300,11 +300,11 @@ pprLit lit
 	         | otherwise  -> ptext SLIT("__addr") <+> integer p
 
       MachLabel l | code_style -> ptext SLIT("(&") <> ptext l <> char ')'
-		  | otherwise  -> ptext SLIT("__label") <+> pprFSAsString l
+		  | otherwise  -> ptext SLIT("__label") <+> pprHsString l
 
       MachLitLit s ty | code_style  -> ptext s
 		      | otherwise   -> parens (hsep [ptext SLIT("__litlit"), 
-						     pprFSAsString s,
+						     pprHsString s,
 						     pprParendType ty])
 
 pprIntVal :: Integer -> SDoc
@@ -337,7 +337,7 @@ Hash values should be zero or a positive integer.  No negatives please.
 
 \begin{code}
 hashLiteral :: Literal -> Int
-hashLiteral (MachChar c)    	= ord c + 1000	-- Keep it out of range of common ints
+hashLiteral (MachChar c)    	= c + 1000	-- Keep it out of range of common ints
 hashLiteral (MachStr s)     	= hashFS s
 hashLiteral (MachAddr i)    	= hashInteger i
 hashLiteral (MachInt i)   	= hashInteger i

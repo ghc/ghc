@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: AbsCSyn.lhs,v 1.32 2000/08/02 14:13:26 rrt Exp $
+% $Id: AbsCSyn.lhs,v 1.33 2000/08/07 23:37:19 qrczak Exp $
 %
 \section[AbstractC]{Abstract C: the last stop before machine code}
 
@@ -315,7 +315,7 @@ data CAddrMode
 
   | CCharLike CAddrMode	-- The address of a static char-like closure for
 			-- the specified character.  It is guaranteed to be in
-			-- the range 0..255.
+			-- the range mIN_CHARLIKE..mAX_CHARLIKE
 
   | CIntLike CAddrMode	-- The address of a static int-like closure for the
 			-- specified small integer.  It is guaranteed to be in

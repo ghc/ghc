@@ -92,6 +92,8 @@ import Unique
 import Maybe            ( isJust )
 import Outputable
 import Util		( assoc )
+import UnicodeUtil      ( stringToUtf8 )
+import Char             ( ord )
 \end{code}		
 
 
@@ -371,7 +373,7 @@ Similarly for newtypes
 	unN = /\a -> \n:N -> coerce (a->a) n
 
 \begin{code}
-mkRecordSelId tycon field_label unpack_id
+mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	-- Assumes that all fields with the same field label have the same type
 	--
 	-- Annoyingly, we have to pass in the unpackCString# Id, because
@@ -442,7 +444,16 @@ mkRecordSelId tycon field_label unpack_id
 
     error_expr = mkApps (Var rEC_SEL_ERROR_ID) [Type (unUsgTy field_tau), err_string]
        -- preserves invariant that type args are *not* usage-annotated on top.  KSW 1999-04.
-    err_string = App (Var unpack_id) (Lit (MachStr (_PK_ full_msg)))
+    err_string
+        | all safeChar full_msg
+            = App (Var unpack_id) (Lit (MachStr (_PK_ full_msg)))
+        | otherwise
+            = App (Var unpackUtf8_id) (Lit (MachStr (_PK_ (stringToUtf8 (map ord full_msg)))))
+        where
+        safeChar c = c >= '\1' && c <= '\xFF'
+        -- TODO: Putting this Unicode stuff here is ugly. Find a better
+        -- generic place to make string literals. This logic is repeated
+        -- in DsUtils.
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 \end{code}
 

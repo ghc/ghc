@@ -21,8 +21,8 @@ import Ratio	( Rational )
 
 \begin{code}
 data HsLit
-  = HsChar	    Char	-- characters
-  | HsCharPrim	    Char	-- unboxed char literals
+  = HsChar	    Int		-- characters
+  | HsCharPrim	    Int		-- unboxed char literals
   | HsString	    FAST_STRING	-- strings
   | HsStringPrim    FAST_STRING	-- packed string
 
@@ -57,10 +57,10 @@ negLiteral (HsFrac f) = HsFrac (-f)
 \begin{code}
 instance Outputable HsLit where
 	-- Use "show" because it puts in appropriate escapes
-    ppr (HsChar c)	 = text (show c)
-    ppr (HsCharPrim c)	 = text (show c) <> char '#'
-    ppr (HsStringPrim s) = pprFSAsString s <> char '#'
-    ppr (HsString s)	 = pprFSAsString s
+    ppr (HsChar c)	 = pprHsChar c
+    ppr (HsCharPrim c)	 = pprHsChar c <> char '#'
+    ppr (HsString s)	 = pprHsString s
+    ppr (HsStringPrim s) = pprHsString s <> char '#'
     ppr (HsInt i)	 = integer i
     ppr (HsFrac f)	 = rational f
     ppr (HsFloatPrim f)	 = rational f <> char '#'

@@ -122,7 +122,7 @@ numeric types if this stuff keeps you awake at night.
 This code fragment <Emphasis>should</Emphasis> elicit a fatal error, but it does not:
 
 <ProgramListing>
-main = print (array (1,1) [ 1:=2, 1:=3 ])
+main = print (array (1,1) [(1,2), (1,3)])
 </ProgramListing>
 
 </Para>
@@ -155,15 +155,6 @@ HOWEVER: standard instances for tuples (<Literal>Eq</Literal>, <Literal>Ord</Lit
 <Para>
 These limitations are easily subvertible, so please ask if you get
 stuck on them.
-</Para>
-</ListItem>
-</VarListEntry>
-<VarListEntry>
-<Term>Unicode character set:</Term>
-<ListItem>
-<Para>
-Haskell 98 embraces the Unicode character set, but GHC doesn't
-handle it. Yet.
 </Para>
 </ListItem>
 </VarListEntry>

@@ -26,16 +26,18 @@ module FastString
         mkFastSubStringBA#, -- :: ByteArray# -> Int# -> Int# -> FastString
         mkFastSubString#,   -- :: Addr# -> Int# -> Int# -> FastString
         mkFastSubStringFO#, -- :: ForeignObj# -> Int# -> Int# -> FastString
-       
+
+        mkFastStringInt,    -- :: [Int] -> FastString
+
         uniqueOfFS,	    -- :: FastString -> Int#
 	lengthFS,	    -- :: FastString -> Int
 	nullFastString,     -- :: FastString -> Bool
 
-	getByteArray#,	    -- :: FastString -> ByteArray#
-        getByteArray,       -- :: FastString -> _ByteArray Int
 	unpackFS,	    -- :: FastString -> String
+	unpackIntFS,	    -- :: FastString -> [Int]
 	appendFS,	    -- :: FastString -> FastString -> FastString
         headFS,		    -- :: FastString -> Char
+        headIntFS,	    -- :: FastString -> Int
         tailFS,		    -- :: FastString -> FastString
 	concatFS,	    -- :: [FastString] -> FastString
         consFS,             -- :: Char -> FastString -> FastString
@@ -103,6 +105,7 @@ import Foreign		( ForeignObj(..) )
 
 import IOExts		( IORef, newIORef, readIORef, writeIORef )
 import IO
+import Char             ( chr, ord )
 
 #define hASH_TBL_SIZE 993
 
@@ -130,6 +133,10 @@ data FastString
       Addr#      -- pointer to the (null-terminated) bytes in C land.
       Int#       -- length  (cached)
 
+  | UnicodeStr   -- if contains characters outside '\1'..'\xFF'
+      Int#       -- unique id
+      [Int]      -- character numbers
+
 instance Eq FastString where
   a == b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> False }
   a /= b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
@@ -145,23 +152,16 @@ instance Ord FastString where
             | otherwise	=  y
     compare a b = cmpFS a b
 
-getByteArray# :: FastString -> ByteArray#
-getByteArray# (FastString _ _ ba#) = ba#
-
-getByteArray :: FastString -> ByteArray Int
-#if __GLASGOW_HASKELL__ < 405
-getByteArray (FastString _ l# ba#) = ByteArray (0,I# l#) ba#
-#else
-getByteArray (FastString _ l# ba#) = ByteArray 0 (I# l#) ba#
-#endif
-
 lengthFS :: FastString -> Int
 lengthFS (FastString _ l# _) = I# l#
 lengthFS (CharStr a# l#) = I# l#
+lengthFS (UnicodeStr _ s) = length s
 
 nullFastString :: FastString -> Bool
 nullFastString (FastString _ l# _) = l# ==# 0#
 nullFastString (CharStr _ l#) = l# ==# 0#
+nullFastString (UnicodeStr _ []) = True
+nullFastString (UnicodeStr _ (_:_)) = False
 
 unpackFS :: FastString -> String
 unpackFS (FastString _ l# ba#) = unpackNBytesBA# ba# l#
@@ -173,18 +173,29 @@ unpackFS (CharStr addr len#) =
       | otherwise   = C# ch : unpack (nh +# 1#)
       where
 	ch = indexCharOffAddr# addr nh
+unpackFS (UnicodeStr _ s) = map chr s
+
+unpackIntFS :: FastString -> [Int]
+unpackIntFS (UnicodeStr _ s) = s
+unpackIntFS fs = map ord (unpackFS fs)
 
 appendFS :: FastString -> FastString -> FastString
-appendFS fs1 fs2 = mkFastString (unpackFS fs1 ++ unpackFS fs2)
+appendFS fs1 fs2 = mkFastStringInt (unpackIntFS fs1 ++ unpackIntFS fs2)
 
 concatFS :: [FastString] -> FastString
-concatFS ls = mkFastString (concat (map (unpackFS) ls)) -- ToDo: do better
+concatFS ls = mkFastStringInt (concat (map unpackIntFS ls)) -- ToDo: do better
 
 headFS :: FastString -> Char
-headFS f@(FastString _ l# ba#) = 
- if l# ># 0# then C# (indexCharArray# ba# 0#) else error ("headFS: empty FS: " ++ unpackFS f)
-headFS f@(CharStr a# l#) = 
- if l# ># 0# then C# (indexCharOffAddr# a# 0#) else error ("headFS: empty FS: " ++ unpackFS f)
+headFS (FastString _ l# ba#) = 
+ if l# ># 0# then C# (indexCharArray# ba# 0#) else error ("headFS: empty FS")
+headFS (CharStr a# l#) = 
+ if l# ># 0# then C# (indexCharOffAddr# a# 0#) else error ("headFS: empty FS")
+headFS (UnicodeStr _ (c:_)) = chr c
+headFS (UnicodeStr _ []) = error ("headFS: empty FS")
+
+headIntFS :: FastString -> Int
+headIntFS (UnicodeStr _ (c:_)) = c
+headIntFS fs = ord (headFS fs)
 
 indexFS :: FastString -> Int -> Char
 indexFS f i@(I# i#) =
@@ -195,14 +206,16 @@ indexFS f i@(I# i#) =
    CharStr a# l#
      | l# ># 0# && l# ># i#  -> C# (indexCharOffAddr# a# i#)
      | otherwise	     -> error (msg (I# l#))
+   UnicodeStr _ s	     -> chr (s!!i)
  where
   msg l =  "indexFS: out of range: " ++ show (l,i)
 
 tailFS :: FastString -> FastString
 tailFS (FastString _ l# ba#) = mkFastSubStringBA# ba# 1# (l# -# 1#)
+tailFS fs = mkFastStringInt (tail (unpackIntFS fs))
 
 consFS :: Char -> FastString -> FastString
-consFS c fs = mkFastString (c:unpackFS fs)
+consFS c fs = mkFastStringInt (ord c : unpackIntFS fs)
 
 uniqueOfFS :: FastString -> Int#
 uniqueOfFS (FastString u# _ _) = u#
@@ -219,12 +232,17 @@ uniqueOfFS (CharStr a# l#)     = case mkFastString# a# l# of { FastString u# _ _
      works, but causes the CharStr to be looked up in the hash
      table each time it is accessed..
    -}
+uniqueOfFS (UnicodeStr u# _) = u#
 \end{code}
 
 Internally, the compiler will maintain a fast string symbol
 table, providing sharing and fast comparison. Creation of
 new @FastString@s then covertly does a lookup, re-using the
 @FastString@ if there was a hit.
+
+Caution: mkFastStringUnicode assumes that if the string is in the
+table, it sits under the UnicodeStr constructor. Other mkFastString
+variants analogously assume the FastString constructor.
 
 \begin{code}
 data FastStringTable = 
@@ -315,6 +333,8 @@ mkFastString# a# len# =
 	 Just v
       else
 	 bucket_match ls len# a#
+   bucket_match (UnicodeStr _ _ : ls) len# a# =
+      bucket_match ls len# a#
 
 mkFastSubString# :: Addr# -> Int# -> Int# -> FastString
 mkFastSubString# a# start# len# = mkFastCharString2 (A# (addrOffset# a# start#)) (I# len#)
@@ -362,7 +382,8 @@ mkFastSubStringFO# fo# start# len# =
 	 Just v
       else
 	 bucket_match ls start# len# fo#
-
+   bucket_match (UnicodeStr _ _ : ls) start# len# fo# =
+      bucket_match ls start# len# fo#
 
 mkFastSubStringBA# :: ByteArray# -> Int# -> Int# -> FastString
 mkFastSubStringBA# barr# start# len# =
@@ -421,6 +442,44 @@ mkFastSubStringBA# barr# start# len# =
 	 Just v
       else
 	 bucket_match ls start# len# ba#
+     UnicodeStr _ _ -> bucket_match ls start# len# ba#
+
+mkFastStringUnicode :: [Int] -> FastString
+mkFastStringUnicode s =
+ unsafePerformIO  (
+  readIORef string_table	>>= \ ft@(FastStringTable uid# tbl#) ->
+  let
+   h = hashUnicode s
+  in
+--  _trace ("hashed(b): "++show (I# h)) $
+  lookupTbl ft h		>>= \ lookup_result ->
+  case lookup_result of
+    [] -> 
+       -- no match, add it to table by copying out the
+       -- the string into a [Int]
+          let f_str = UnicodeStr uid# s in
+          updTbl string_table ft h [f_str]     >>
+          -- _trace ("new(b): " ++ show f_str)   $
+	  return f_str
+    ls -> 
+       -- non-empty `bucket', scan the list looking
+       -- entry with same length and compare byte by byte. 
+       -- _trace ("non-empty bucket(b)"++show ls) $
+       case bucket_match ls of
+	 Nothing -> 
+              let f_str = UnicodeStr uid# s in
+              updTbl string_table ft h (f_str:ls) >>
+	      -- _trace ("new(b): " ++ show f_str)   $
+	      return f_str
+	 Just v  -> 
+              -- _trace ("re-use(b): "++show v) $
+	      return v
+  )
+ where
+   bucket_match [] = Nothing
+   bucket_match (v@(UnicodeStr _ s'):ls) =
+       if s' == s then Just v else bucket_match ls
+   bucket_match (FastString _ _ _ : ls) = bucket_match ls
 
 mkFastCharString :: Addr -> FastString
 mkFastCharString a@(A# a#) = 
@@ -433,8 +492,8 @@ mkFastCharString# a# =
 mkFastCharString2 :: Addr -> Int -> FastString
 mkFastCharString2 a@(A# a#) (I# len#) = CharStr a# len#
 
-mkFastString :: String -> FastString
-mkFastString str = 
+mkFastStringNarrow :: String -> FastString
+mkFastStringNarrow str =
  case packString str of
 #if __GLASGOW_HASKELL__ < 405
   (ByteArray (_,I# len#) frozen#) -> 
@@ -444,6 +503,20 @@ mkFastString str =
     mkFastSubStringBA# frozen# 0# len#
     {- 0-indexed array, len# == index to one beyond end of string,
        i.e., (0,1) => empty string.    -}
+
+mkFastString :: String -> FastString
+mkFastString str = if all good str
+    then mkFastStringNarrow str
+    else mkFastStringUnicode (map ord str)
+    where
+    good c = c >= '\1' && c <= '\xFF'
+
+mkFastStringInt :: [Int] -> FastString
+mkFastStringInt str = if all good str
+    then mkFastStringNarrow (map chr str)
+    else mkFastStringUnicode str
+    where
+    good c = c >= 1 && c <= 0xFF
 
 mkFastSubString :: Addr -> Int -> Int -> FastString
 mkFastSubString (A# a#) (I# start#) (I# len#) =
@@ -505,10 +578,26 @@ hashSubStrBA ba# start# len# =
 --    c1 = indexCharArray# ba# 1#
 --    c2 = indexCharArray# ba# 2#
 
+hashUnicode :: [Int] -> Int#
+ -- use the Addr to produce a hash value between 0 & m (inclusive)
+hashUnicode [] = 0#
+hashUnicode [I# c0] = ((c0 *# 631#) +# 1#) `remInt#` hASH_TBL_SIZE#
+hashUnicode [I# c0, I# c1] = ((c0 *# 631#) +# (c1 *# 217#) +# 2#) `remInt#` hASH_TBL_SIZE#
+hashUnicode s = ((c0 *# 631#) +# (c1 *# 217#) +# (c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
+  where
+    I# len# = length s
+    I# c0 = s !! 0
+    I# c1 = s !! (I# (len# `quotInt#` 2# -# 1#))
+    I# c2 = s !! (I# (len# -# 1#))
+
 \end{code}
 
 \begin{code}
 cmpFS :: FastString -> FastString -> Ordering
+cmpFS (UnicodeStr u1# s1) (UnicodeStr u2# s2) = if u1# ==# u2# then EQ
+    else compare s1 s2
+cmpFS (UnicodeStr _ s1) s2 = compare s1 (unpackIntFS s2)
+cmpFS s1 (UnicodeStr _ s2) = compare (unpackIntFS s1) s2
 cmpFS (FastString u1# _ b1#) (FastString u2# _ b2#) = -- assume non-null chars
   if u1# ==# u2# then
      EQ

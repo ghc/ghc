@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelRead.lhs,v 1.15 2000/06/30 13:39:36 simonmar Exp $
+% $Id: PrelRead.lhs,v 1.16 2000/08/07 23:37:23 qrczak Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -14,7 +14,7 @@ Instances of the Read class.
 module PrelRead where
 
 import PrelErr		( error )
-import PrelEnum		( Enum(..) )
+import PrelEnum		( Enum(..), maxBound )
 import PrelNum
 import PrelReal
 import PrelFloat
@@ -272,7 +272,7 @@ lexLitChar ('\\':s)     =  do
         fromAsciiLab (x:y:ls)   | isUpper y &&
 				   [x,y]   `elem` asciiEscTab = return ([x,y], ls)
         fromAsciiLab _					      = mzero
-				   
+
         asciiEscTab = "DEL" : asciiTab
 
 	 {-
@@ -284,8 +284,7 @@ lexLitChar ('\\':s)     =  do
 	 -}
         checkSize base f str = do
 	   (num, res) <- f str
-	      -- Note: this is assumes that a Char is 8 bits long.
-	   if (toAnInt base num) > 255 then 
+	   if toAnInteger base num > toInteger (ord maxBound) then 
 	      mzero
 	    else
 	      case base of
@@ -293,7 +292,7 @@ lexLitChar ('\\':s)     =  do
 	         16 -> return ('x':num, res)
 		 _  -> return (num, res)
 
-	toAnInt base xs = foldl (\ acc n -> acc*base + n) 0 (map digitToInt xs)
+	toAnInteger base = foldl (\ acc n -> acc*base + toInteger (digitToInt n)) 0
 
 
 lexLitChar (c:s)        =  return ([c],s)

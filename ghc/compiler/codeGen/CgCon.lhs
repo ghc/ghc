@@ -33,7 +33,8 @@ import CgUsages		( getRealSp, getVirtSp, setRealAndVirtualSp,
 			  getSpRelOffset )
 import CgClosure	( cgTopRhsClosure )
 import CgRetConv	( assignRegs )
-import Constants	( mAX_INTLIKE, mIN_INTLIKE, mIN_UPD_SIZE )
+import Constants	( mAX_INTLIKE, mIN_INTLIKE, mAX_CHARLIKE, mIN_CHARLIKE,
+			  mIN_UPD_SIZE )
 import CgHeapery	( allocDynClosure, inPlaceAllocDynClosure )
 import CgTailCall	( performReturn, mkStaticAlgReturnCode, doTailCall,
 			  mkUnboxedTupleReturnCode )
@@ -143,6 +144,12 @@ buildDynCon binder cc con []
     				(mkConLFInfo con))
 \end{code}
 
+The following three paragraphs about @Char@-like and @Int@-like
+closures are obsolete, but I don't understand the details well enough
+to properly word them, sorry. I've changed the treatment of @Char@s to
+be analogous to @Int@s: only a subset is preallocated, because @Char@
+has now 31 bits. Only literals are handled here. -- Qrczak
+
 Now for @Char@-like closures.  We generate an assignment of the
 address of the closure to a temporary.  It would be possible simply to
 generate no code, and record the addressing mode in the environment,
@@ -160,18 +167,22 @@ Because of this, we use can safely return an addressing mode.
 
 \begin{code}
 buildDynCon binder cc con [arg_amode]
-
-  | maybeCharLikeCon con
-  = absC (CAssign temp_amode (CCharLike arg_amode))	`thenC`
-    returnFC temp_id_info
-
   | maybeIntLikeCon con && in_range_int_lit arg_amode
   = returnFC (stableAmodeIdInfo binder (CIntLike arg_amode) (mkConLFInfo con))
   where
     (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
 
     in_range_int_lit (CLit (MachInt val)) = val <= mAX_INTLIKE && val >= mIN_INTLIKE
-    in_range_int_lit other_amode	  = False
+    in_range_int_lit _other_amode	  = False
+
+buildDynCon binder cc con [arg_amode]
+  | maybeCharLikeCon con && in_range_char_lit arg_amode
+  = returnFC (stableAmodeIdInfo binder (CCharLike arg_amode) (mkConLFInfo con))
+  where
+    (temp_amode, temp_id_info) = newTempAmodeAndIdInfo binder (mkConLFInfo con)
+
+    in_range_char_lit (CLit (MachChar val)) = val <= mAX_CHARLIKE && val >= mIN_CHARLIKE
+    in_range_char_lit _other_amode	    = False
 \end{code}
 
 Now the general case.
@@ -296,7 +307,6 @@ cgReturnDataCon con amodes
 	-- do update in place...
       UpdateCode
 	|  not (isNullaryDataCon con)  -- no nullary constructors, please
-	&& not (maybeCharLikeCon con)  -- no chars please (these are all static)
 	&& not (any isFollowableRep (map getAmodeRep amodes))
 					-- no ptrs please (generational gc...)
 	&& closureSize closure_info <= mIN_UPD_SIZE

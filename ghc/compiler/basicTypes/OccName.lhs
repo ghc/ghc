@@ -39,7 +39,7 @@ module OccName (
 
 #include "HsVersions.h"
 
-import Char	( isDigit, isAlpha, isUpper, isLower, ISALPHANUM, ord, chr, digitToInt, intToDigit )
+import Char	( isDigit, isAlpha, isUpper, isLower, ISALPHANUM, ord, chr, digitToInt )
 import Util	( thenCmp )
 import FiniteMap ( FiniteMap, emptyFM, lookupFM, addToFM, elemFM )
 import Outputable
@@ -438,8 +438,8 @@ The basic encoding scheme is this.
 * Most other printable characters translate to 'zx' or 'Zx' for some
 	alphabetic character x
 
-* The others translate as 'zxdd' where 'dd' is exactly two hexadecimal
-	digits for the ord of the character
+* The others translate as 'znnnU' where 'nnn' is the decimal number
+        of the character
 
 	Before		After
 	--------------------------
@@ -532,9 +532,7 @@ encode_ch '/'  = "zs"
 encode_ch '*'  = "zt"
 encode_ch '_'  = "zu"
 encode_ch '%'  = "zv"
-encode_ch c    = ['z', 'x', intToDigit hi, intToDigit lo]
-	       where
-		 (hi,lo) = ord c `quotRem` 16
+encode_ch c    = 'z' : shows (ord c) "U"
 \end{code}
 
 Decode is used for user printing.
@@ -577,14 +575,15 @@ decode_escape ('s' : rest) = '/' : decode rest
 decode_escape ('t' : rest) = '*' : decode rest
 decode_escape ('u' : rest) = '_' : decode rest
 decode_escape ('v' : rest) = '%' : decode rest
-decode_escape ('x' : d1 : d2 : rest) = chr (digitToInt d1 * 16 + digitToInt d2)  : decode rest
 
 -- Tuples are coded as Z23T
+-- Characters not having a specific code are coded as z224U
 decode_escape (c : rest)
   | isDigit c = go (digitToInt c) rest
   where
     go n (c : rest) | isDigit c = go (10*n + digitToInt c) rest
     go n ('T' : rest)		= '(' : replicate n ',' ++ ')' : decode rest
+    go n ('U' : rest)           = chr n : decode rest
     go n other = pprPanic "decode_escape" (ppr n <+> text (c:rest))
 
 decode_escape (c : rest) = pprTrace "decode_escape" (char c) (decode rest)

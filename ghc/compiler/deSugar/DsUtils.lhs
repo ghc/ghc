@@ -70,8 +70,9 @@ import TysWiredIn	( nilDataCon, consDataCon,
 			)
 import BasicTypes	( Boxity(..) )
 import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
-import Unique		( unpackCStringIdKey, unpackCString2IdKey )
+import Unique		( unpackCStringIdKey, unpackCStringUtf8IdKey )
 import Outputable
+import UnicodeUtil      ( stringToUtf8 )
 \end{code}
 
 
@@ -123,7 +124,7 @@ tidyLitPat lit lit_ty default_pat
 
     mk_list (HsString s)     = foldr
 	(\c pat -> ConPat consDataCon lit_ty [] [] [mk_char_lit c,pat])
-	(ConPat nilDataCon lit_ty [] [] []) (_UNPK_ s)
+	(ConPat nilDataCon lit_ty [] [] []) (_UNPK_INT_ s)
 
     mk_char_lit c            = ConPat charDataCon charTy [] [] [LitPat (HsCharPrim c) charPrimTy]
 \end{code}
@@ -390,20 +391,19 @@ mkStringLit str	= mkStringLitFS (_PK_ str)
 
 mkStringLitFS :: FAST_STRING  -> DsM CoreExpr
 mkStringLitFS str
-  | any is_NUL (_UNPK_ str)
-  = 	 -- Must cater for NULs in literal string
-    dsLookupGlobalValue unpackCString2IdKey	`thenDs` \ unpack_id ->
-    returnDs (mkApps (Var unpack_id)
-		     [Lit (MachStr str),
-		     mkIntLitInt (_LENGTH_ str)])
-
-  | otherwise
-  =	-- No NULs in the string
+  | all safeChar chars
+  =
     dsLookupGlobalValue unpackCStringIdKey	`thenDs` \ unpack_id ->
     returnDs (App (Var unpack_id) (Lit (MachStr str)))
 
+  | otherwise
+  =
+    dsLookupGlobalValue unpackCStringUtf8IdKey	`thenDs` \ unpack_id ->
+    returnDs (App (Var unpack_id) (Lit (MachStr (_PK_ (stringToUtf8 chars)))))
+
   where
-    is_NUL c = c == '\0'
+    chars = _UNPK_INT_ str
+    safeChar c = c >= 1 && c <= 0xFF
 \end{code}
 
 %************************************************************************

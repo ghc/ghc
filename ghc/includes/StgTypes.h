@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.12 2000/06/12 11:04:12 simonmar Exp $
+ * $Id: StgTypes.h,v 1.13 2000/08/07 23:37:23 qrczak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -89,7 +89,7 @@ typedef void*              StgAddr;
  * Other commonly-used STG datatypes.
  */
 
-typedef StgWord8           StgChar;
+typedef StgWord32          StgChar;
 typedef int                StgBool;
 /*
  * If a double fits in an StgWord, don't bother using floats.
@@ -160,7 +160,8 @@ typedef StgFunPtr StgFun(void);
 typedef union {
     StgWord        w;
     StgAddr        a;
-    StgWord        c;
+    StgChar        c;
+    StgInt8        i8;
     StgFloat       f;
     StgInt         i;
     StgPtr         p;

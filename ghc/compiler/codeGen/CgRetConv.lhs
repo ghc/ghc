@@ -1,7 +1,7 @@
 %
 % (c) The GRASP Project, Glasgow University, 1992-1998
 %
-% $Id: CgRetConv.lhs,v 1.23 2000/07/11 16:03:37 simonmar Exp $
+% $Id: CgRetConv.lhs,v 1.24 2000/08/07 23:37:20 qrczak Exp $
 %
 \section[CgRetConv]{Return conventions for the code generator}
 
@@ -81,6 +81,7 @@ dataReturnConvPrim Int64Rep	= LongReg Int64Rep  ILIT(1)
 dataReturnConvPrim Word64Rep	= LongReg Word64Rep ILIT(1)
 dataReturnConvPrim AddrRep	= VanillaReg AddrRep ILIT(1)
 dataReturnConvPrim CharRep	= VanillaReg CharRep ILIT(1)
+dataReturnConvPrim Int8Rep	= VanillaReg Int8Rep ILIT(1)
 dataReturnConvPrim FloatRep	= FloatReg  ILIT(1)
 dataReturnConvPrim DoubleRep	= DoubleReg ILIT(1)
 dataReturnConvPrim VoidRep	= VoidReg

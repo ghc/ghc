@@ -34,11 +34,11 @@ module Outputable (
 	hang, punctuate,
 	speakNth, speakNTimes,
 
-	printSDoc, printErrs, printDump, 
+	printSDoc, printErrs, printDump,
 	printForC, printForAsm, printForIface, printForUser,
 	pprCode, pprCols,
-	showSDoc, showSDocDebug, showSDocIface, showsPrecSDoc, 
-	pprFSAsString,
+	showSDoc, showSDocDebug, showSDocIface, showsPrecSDoc,
+	pprHsChar, pprHsString,
 
 
 	-- error handling
@@ -57,6 +57,7 @@ import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
 import Panic
 import ST		( runST )
 import Foreign
+import Char             ( chr, ord, isDigit )
 \end{code}
 
 
@@ -317,8 +318,43 @@ instance Outputable FastString where
     ppr fs = text (unpackFS fs)		-- Prints an unadorned string,
 					-- no double quotes or anything
 
-pprFSAsString :: FastString -> SDoc			-- The Char instance of Show prints
-pprFSAsString fs = text (showList (unpackFS fs) "")	-- strings with double quotes and escapes
+#if __GLASGOW_HASKELL__ < 410
+-- Assume we have only 8-bit Chars.
+
+pprHsChar :: Int -> SDoc
+pprHsChar c = char '\'' <> text (showCharLit c "") <> char '\''
+
+pprHsString :: FAST_STRING -> SDoc
+pprHsString fs = doubleQuotes (text (foldr showCharLit "" (_UNPK_INT_ fs)))
+
+showCharLit :: Int -> String -> String
+showCharLit c rest
+    | c == ord '\"' = "\\\"" ++ rest
+    | c == ord '\'' = "\\\'" ++ rest
+    | c == ord '\\' = "\\\\" ++ rest
+    | c >= 0x20 && c <= 0x7E = chr c : rest
+    | c == ord '\a' = "\\a" ++ rest
+    | c == ord '\b' = "\\b" ++ rest
+    | c == ord '\f' = "\\f" ++ rest
+    | c == ord '\n' = "\\n" ++ rest
+    | c == ord '\r' = "\\r" ++ rest
+    | c == ord '\t' = "\\t" ++ rest
+    | c == ord '\v' = "\\v" ++ rest
+    | otherwise     = ('\\':) $ shows c $ case rest of
+        d:_ | isDigit d -> "\\&" ++ rest
+        _               -> rest
+
+#else
+-- We have 31-bit Chars and will simply use Show instances
+-- of Char and String.
+
+pprHsChar :: Int -> SDoc
+pprHsChar c = text (show (chr c))
+
+pprHsString :: FastString -> SDoc
+pprHsString fs = text (show (unpackFS fs))
+
+#endif
 
 instance Show FastString  where
     showsPrec p fs = showsPrecSDoc p (ppr fs)

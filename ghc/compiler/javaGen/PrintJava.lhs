@@ -220,7 +220,7 @@ call e n es = e <> dot <> n <> parens (hsep (punctuate comma (map expr es)))
 literal = \l ->
   case l of
     { IntLit i    -> text (show i)
-    ; CharLit c   -> text (show c)
+    ; CharLit c   -> text "(char)" <+> text (show c)
     ; StringLit s -> text ("\"" ++ s ++ "\"")	-- strings are already printable
     }
 

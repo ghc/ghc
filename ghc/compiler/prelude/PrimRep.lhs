@@ -47,6 +47,7 @@ data PrimRep
   | CostCentreRep	-- Pointer to a cost centre
 
   | CharRep		-- Machine characters
+  | Int8Rep             --         8 bit integers
   | IntRep		--	   integers (same size as ptr on this arch)
   | WordRep		--	   ditto (but *unsigned*)
   | AddrRep		--	   addresses ("C pointers")
@@ -54,7 +55,13 @@ data PrimRep
   | DoubleRep		--	   doubles
   | Word64Rep	        --    guaranteed to be 64 bits (no more, no less.)
   | Int64Rep	        --    guaranteed to be 64 bits (no more, no less.)
-
+  
+  -- Perhaps all sized integers and words should be primitive types.
+  
+  -- Int8Rep is currently used to simulate some old CharRep usages
+  -- when Char changed size from 8 to 31 bits. It does not correspond
+  -- to a Haskell unboxed type, in particular it's not used by Int8.
+  
   | WeakPtrRep
   | ForeignObjRep	
   | BCORep
@@ -113,7 +120,7 @@ isFollowableRep ForeignObjRep = True	-- 	''
 isFollowableRep StableNameRep = True    --      ''
 isFollowableRep ThreadIdRep   = True	-- pointer to a TSO
 
-isFollowableRep other	    	= False
+isFollowableRep other	      = False
 
 separateByPtrFollowness :: (a -> PrimRep) -> [a] -> ([a], [a])
 
@@ -171,11 +178,12 @@ retPrimRepSize = getPrimRepSize RetRep
 -- size in bytes, ToDo: cpp in the right vals.
 -- (used in some settings to figure out how many bytes
 -- we have to push onto the stack when calling external
--- entry points (e.g., stdcalling on win32))
+-- entry points (e.g., stdcalling on win32)
 getPrimRepSizeInBytes :: PrimRep -> Int
 getPrimRepSizeInBytes pr =
  case pr of
-    CharRep        ->    1
+    CharRep        ->    4
+    Int8Rep        ->    1
     IntRep         ->    4
     AddrRep        ->    4
     FloatRep       ->    4
@@ -211,6 +219,7 @@ showPrimRep DataPtrRep     = "D_"
 showPrimRep RetRep         = "P_"
 showPrimRep CostCentreRep  = "CostCentre"
 showPrimRep CharRep	   = "C_"
+showPrimRep Int8Rep	   = "StgInt8"
 showPrimRep IntRep	   = "I_"	-- short for StgInt
 showPrimRep WordRep	   = "W_"	-- short for StgWord
 showPrimRep Int64Rep       = "LI_"       -- short for StgLongInt
@@ -228,6 +237,7 @@ showPrimRep ForeignObjRep  = "StgAddr"
 showPrimRep VoidRep	   = "!!VOID_KIND!!"
 
 primRepString CharRep   	= "Char"
+primRepString Int8Rep   	= "Char" -- To have names like newCharArray#
 primRepString IntRep    	= "Int"
 primRepString WordRep   	= "Word"
 primRepString Int64Rep  	= "Int64"

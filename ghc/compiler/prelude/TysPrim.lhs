@@ -324,6 +324,7 @@ primitive TyCon for a given PrimRep.
 
 \begin{code}
 primRepTyCon CharRep   = charPrimTyCon
+primRepTyCon Int8Rep   = charPrimTyCon
 primRepTyCon IntRep    = intPrimTyCon
 primRepTyCon WordRep   = wordPrimTyCon
 primRepTyCon Int64Rep  = int64PrimTyCon
