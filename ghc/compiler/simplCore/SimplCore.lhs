@@ -107,7 +107,7 @@ simplifyExpr dflags pcs hst expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let (expr', _counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_all 	
+	; let (expr', _counts) = initSmpl dflags sw_chkr us emptyVarSet black_list_nothing 	
 		                          (simplExprGently expr)
 
 	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
@@ -116,8 +116,8 @@ simplifyExpr dflags pcs hst expr
 	; return expr'
 	}
   where
-    sw_chkr any	     = SwBool False	-- A bit bogus
-    black_list_all v = True		-- Black list everything
+    sw_chkr any	         = SwBool False	-- A bit bogus
+    black_list_nothing v = False	-- Black list nothing
 
 
 doCorePasses :: DynFlags
