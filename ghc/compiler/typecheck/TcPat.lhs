@@ -348,8 +348,7 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
     newMethodFromName origin pat_ty geName	`thenNF_Tc` \ ge ->
 
 	-- The '-' part is re-mappable syntax
-    tcGetInstLoc origin					`thenNF_Tc` \ loc ->
-    tcSyntaxName loc pat_ty minusName minus_name	`thenTc` \ (minus_expr, minus_lie, _) ->
+    tcSyntaxName origin pat_ty minusName minus_name	`thenTc` \ (minus_expr, minus_lie, _) ->
 
     returnTc (NPlusKPat bndr_id i pat_ty
 			(SectionR (HsVar (instToId ge)) over_lit_expr)

@@ -28,7 +28,7 @@ module Subst (
 
 	-- Type stuff
 	mkTyVarSubst, mkTopTyVarSubst, 
-	substTyWith, substTy, substTheta,
+	substTyWith, substTy, substTheta, deShadowTy,
 
 	-- Expression stuff
 	substExpr
@@ -406,6 +406,9 @@ substTyWith tvs tys = substTy (mkTyVarSubst tvs tys)
 substTy :: Subst -> Type  -> Type
 substTy subst ty | isEmptySubst subst = ty
 	         | otherwise	      = subst_ty subst ty
+
+deShadowTy :: Type -> Type		-- Remove any shadowing from the type
+deShadowTy ty = subst_ty emptySubst ty
 
 substTheta :: TyVarSubst -> ThetaType -> ThetaType
 substTheta subst theta
