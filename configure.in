@@ -35,17 +35,6 @@ if test x"$srcdir" != 'x.' ; then
     exit 1
 fi
 
-#
-# Remove common automounter nonsense + convert from UNC to DOS style paths
-# (UNC awareness isn't quite there yet for cygwin32-beta18 and consituent tools.)
-#
-hardtop=`pwd`
-hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|' | sed 's|^//\(.\)/|\1:/|' `
-
-echo ''
-echo "*** The top of your build tree is: $hardtop"
-AC_SUBST(hardtop)
-
 dnl--------------------------------------------------------------------
 dnl * Choose host(/target/build) platform
 dnl--------------------------------------------------------------------
@@ -335,6 +324,30 @@ dnl AC_SUBST(BuildVendor_CPP)
 dnl AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
+
+#
+# Remove common automounter nonsense + convert from UNC to DOS style paths
+# (UNC awareness isn't quite there yet for cygwin32-beta18 and consituent tools.)
+#
+hardtop=`pwd`
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^/grasp_tmp|/local/grasp_tmp|' | sed 's|^//\(.\)/|\1:/|' `
+
+echo ''
+echo "*** The top of your build tree is: $hardtop"
+case $HostPlatform in
+  i386-unknown-mingw32)
+  	hardtop_plat=`cygpath -w ${hardtop}`
+	;;
+  i386-unknown-cygwin32)
+  	hardtop_plat=`cygpath -w ${hardtop}`
+	;;
+  *)
+  	hardtop_plat=${hardtop}
+	;;
+esac
+AC_SUBST(hardtop)
+# The native format (i.e., right kind of slashes on a Win32 box).
+AC_SUBST(hardtop_plat)
 
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
