@@ -6,6 +6,7 @@
 module StixInfo ( genCodeInfoTable, genBitmapInfoTable ) where
 
 #include "HsVersions.h"
+#include "../includes/config.h"
 
 import AbsCSyn		( AbstractC(..), Liveness(..) )
 import CLabel		( CLabel )
@@ -49,10 +50,18 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ srt cl_descr)
 		, StInt (toInteger type_info)
 		]
 
+	-- sigh: building up the info table is endian-dependent.
+	-- ToDo: do this using .byte and .word directives.
 	type_info :: Word32
+#ifdef WORDS_BIGENDIAN
         type_info = (fromInt flags `shiftL` 24) .|.
 		    (fromInt closure_type `shiftL` 16) .|.
 		    (fromInt srt_len)
+#else 
+        type_info = (fromInt flags) .|.
+		    (fromInt closure_type `shiftL` 8) .|.
+		    (fromInt srt_len `shiftL` 16)
+#endif	     
 	     
 	(srt_label,srt_len) = 
 	     case srt of
@@ -62,7 +71,11 @@ genCodeInfoTable (CClosureInfoAndCode cl_info _ _ srt cl_descr)
 				(StInt (toInteger off)), len)
 
 	layout_info :: Word32
+#ifdef WORDS_BIGENDIAN
 	layout_info = (fromInt ptrs `shiftL` 16) .|. fromInt nptrs
+#else 
+	layout_info = (fromInt ptrs) .|. (fromInt nptrs `shiftL` 16)
+#endif	     
 
     	ptrs    = closurePtrsSize cl_info
 	nptrs	= size - ptrs
@@ -102,10 +115,16 @@ genBitmapInfoTable liveness srt closure_type include_srt
 			LvLarge lbl  -> StCLbl lbl
 
 	type_info :: Word32
+#ifdef WORDS_BIGENDIAN
         type_info = (fromInt flags `shiftL` 24) .|.
 		    (fromInt closure_type `shiftL` 16) .|.
 		    (fromInt srt_len)
-	     
+#else 
+        type_info = (fromInt flags) .|.
+		    (fromInt closure_type `shiftL` 8) .|.
+		    (fromInt srt_len `shiftL` 16)
+#endif	     
+
 	(srt_label,srt_len) = 
 	     case srt of
 		(lbl, NoSRT) -> (StInt 0, 0)
