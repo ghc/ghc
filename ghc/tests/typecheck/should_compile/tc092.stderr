@@ -1,9 +1,7 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed e0 e1 e2 q Empty{Empty};
-_declarations_
-1 data Empty $r3H :: (* -> *) = Empty (_forall_ [$r3K] {PrelBase.Ord $r3K} => $r3H $r3K) ;
-1 e0 _:_ Empty PrelBase.[] ;;
-1 e1 _:_ Empty PrelBase.[] ;;
-1 e2 _:_ Empty PrelBase.[] ;;
-1 q _:_ _forall_ [$a] {PrelBase.Ord $a} => [$a] ;;
+__export ShouldSucceed e0 e1 e2 q Empty{Empty};
+1 data Empty q :: (* -> *) = Empty (__forall [a] {PrelBase.Ord a} => q a) ;
+1 e0 :: Empty PrelBase.[] ;
+1 e1 :: Empty PrelBase.[] ;
+1 e2 :: Empty PrelBase.[] ;
+1 q :: __forall [a] {PrelBase.Ord a} => [a] ;

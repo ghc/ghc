@@ -1,4 +1,4 @@
---!!! scoping in list comprehensions right way 'round?
+-- !!! scoping in list comprehensions right way 'round?
 -- a bug reported by Jon Hill
 --
 module ShouldSucceed where

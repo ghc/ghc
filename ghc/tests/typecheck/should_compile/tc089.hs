@@ -1,4 +1,4 @@
---!!! Stress test for type checker
+-- !!! Stress test for type checker
 
 module ShouldSucceed where
 

@@ -1,10 +1,9 @@
  
 tcfail071.hs:8:
     Inferred type is less polymorphic than expected
-	Quantified type variable `c' is unified with `$a -> [$0] -> [$0]'
-    When checking the type signature for `g'
-	Signature: c -> c
-	Inferred:  ($a -> [$0] -> [$0]) -> $a -> [$0] -> [$0]
+	Quantified type variable `c' is unified with `a -> [t] -> [t]'
+    When checking the type signature g :: forall _99. _99 -> _99
 
 
 Compilation had errors
+

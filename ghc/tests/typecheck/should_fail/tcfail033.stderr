@@ -1,9 +1,10 @@
  
 tcfail033.hs:4:
-    Occurs check: cannot construct the infinite type: $0 = ($0, $1)
-	Expected type: ($0, $1)
-	Inferred type: $0
+    Occurs check: cannot construct the infinite type: t = (t, _116)
+	Expected type: (t, _116)
+	Inferred type: t
     In a list-comprehension qualifier: return x
 
 
 Compilation had errors
+

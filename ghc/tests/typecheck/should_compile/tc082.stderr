@@ -1,9 +1,6 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f Normal{:Normal :Normal normal};
-_instances_
-instance _forall_ [$a $b] => {Normal ($a -> $b)} = $dNormal0;
-_declarations_
-1 $dNormal0 _:_ _forall_ [$a $b] => {Normal ($a -> $b)} ;;
-1 class Normal $r3D where {normal :: $r3D -> PrelBase.Bool} ;
-1 f _:_ _forall_ [$a] => $a -> PrelBase.Bool ;;
+__export ShouldSucceed f Normal{normal};
+instance __forall [a b] => {Normal (a -> b)} = _gNormalmg;
+1 _gNormalmg :: __forall [a b] => {Normal (a -> b)} ;
+1 class Normal a where {normal :: a -> PrelBase.Bool} ;
+1 f :: __forall [t] => t -> PrelBase.Bool ;

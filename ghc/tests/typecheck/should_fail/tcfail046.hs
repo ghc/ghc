@@ -1,4 +1,4 @@
---!! function types in deriving Eq things
+-- !! function types in deriving Eq things
 -- From a bug report by Dave Harrison <D.A.Harrison@newcastle.ac.uk>
 
 module ShouldFail where

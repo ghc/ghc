@@ -1,4 +1,4 @@
---!!! PreludeCore entities cannot be redefined at the top-level
+-- !!! PreludeCore entities cannot be redefined at the top-level
 --
 module ShouldFail where
 

@@ -33,7 +33,7 @@ data HappyAbsSyn t1 t2 t3
 	| HappyAbsSyn2 t2
 	| HappyAbsSyn3 t3
 
-action_0 (6) = happyShift action_3        ---*****
+action_0 (6) = happyShift action_3        --- *****
 action_0 (1) = happyGoto action_1
 action_0 (2) = happyGoto action_2
 action_0 _ = happyFail
@@ -106,7 +106,7 @@ data Token  =
             deriving Show
 
 main = print (myparser [] [])
--- $Id: tc095.hs,v 1.1 1998/02/23 15:35:31 simonm Exp $
+-- $Id: tc095.hs,v 1.2 1999/01/23 17:58:16 sof Exp $
 
 {-
 	The stack is in the following order throughout the parse:

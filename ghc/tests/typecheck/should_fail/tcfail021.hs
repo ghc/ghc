@@ -1,4 +1,4 @@
---!!! Illegally giving methods in a pattern binding (for no v good reason...)
+-- !!! Illegally giving methods in a pattern binding (for no v good reason...)
 
 module ShouldFail where
 

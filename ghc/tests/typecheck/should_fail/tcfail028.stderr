@@ -1,10 +1,11 @@
  
 tcfail028.hs:4:
-    Couldn't match `*?' against `$0 -> *'
-	Expected kind: *?
-	Inferred kind: $0 -> *
-    In the type `A a'
-    In the data declaration for `A'
+    Couldn't match `Type t' against `k -> *'
+	Expected kind: Type t
+	Inferred kind: k -> *
+    When checking that `A a' is a type
+    In the newtype declaration for `A'
 
 
 Compilation had errors
+

@@ -1,6 +1,6 @@
 module ShouldSucceed where
 
---!!! tests the deduction of contexts.
+-- !!! tests the deduction of contexts.
 
 f :: (Eq a) => a -> [a]
 

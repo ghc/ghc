@@ -1,4 +1,4 @@
---!!! space leak from overloading !!!
+-- !!! space leak from overloading !!!
 module Main where
 
 -- This program develops a space leak if sfoldl isn't compiled with some

@@ -1,8 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-_instances_
-instance _forall_ [$a $b] {PrelBase.Eq $b} => {PrelBase.Eq ($a -> $b)} = $dEq0;
-instance _forall_ [$a $b] {PrelBase.Num $b} => {PrelBase.Num ($a -> $b)} = $dNum0;
-_declarations_
-1 $dEq0 _:_ _forall_ [$a $b] {PrelBase.Eq $b} => {PrelBase.Eq ($a -> $b)} ;;
-1 $dNum0 _:_ _forall_ [$a $b] {PrelBase.Num $b, PrelBase.Eq ($a -> $b), PrelBase.Show ($a -> $b)} => {PrelBase.Num ($a -> $b)} ;;
+instance __forall [a b] {PrelBase.Eq b} => {PrelBase.Eq (a -> b)} = _gEqmg;
+instance __forall [a b] {PrelBase.Num b} => {PrelBase.Num (a -> b)} = _gNummg;
+1 _gEqmg :: __forall [a b] {PrelBase.Eq b} => {PrelBase.Eq (a -> b)} ;
+1 _gNummg :: __forall [a b] {PrelBase.Num b, PrelBase.Eq (a -> b), PrelBase.Show (a -> b)} => {PrelBase.Num (a -> b)} ;

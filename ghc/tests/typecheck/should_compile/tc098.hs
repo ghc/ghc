@@ -1,4 +1,4 @@
---!!! Ambiguity in local declarations
+-- !!! Ambiguity in local declarations
 
 module ShouldSucceed where
 

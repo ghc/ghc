@@ -1,4 +1,4 @@
---!!! trying to have a polymorphic type sig where inappropriate
+-- !!! trying to have a polymorphic type sig where inappropriate
 --
 module Digraph where
 

@@ -1,8 +1,6 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed j k l m;
-_declarations_
-1 j _:_ PrelBase.Int ;;
-1 k _:_ [PrelBase.Int] ;;
-1 l _:_ [PrelBase.Int] ;;
-1 m _:_ PrelBase.Int ;;
+__export ShouldSucceed j k l m;
+1 j :: PrelBase.Integer ;
+1 k :: [PrelBase.Integer] ;
+1 l :: [PrelBase.Integer] ;
+1 m :: PrelBase.Integer ;

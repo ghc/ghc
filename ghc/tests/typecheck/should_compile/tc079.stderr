@@ -1,12 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed Foo{:Foo :Foo op2 op1};
-_instances_
-instance _forall_ [$a] {Foo $a} => {Foo [$a]} = $dFoo0;
-instance {Foo PrelBase.Int} = $dFooInt0;
-_declarations_
-1 $dFoo0 _:_ _forall_ [$a] {Foo $a} => {Foo [$a]} ;;
-1 $dFooInt0 _:_ {Foo PrelBase.Int} ;;
-1 $mop1 _:_ _forall_ [$a] {Foo $a} => $a -> PrelBase.Bool ;;
-1 $mop2 _:_ _forall_ [$a] {Foo $a} => _forall_ [$b] {PrelBase.Ord $b} => $a -> $b -> $b -> $b ;;
-1 class Foo $r3z where {op2 = :: _forall_ [$r3B] {PrelBase.Ord $r3B} => $r3z -> $r3B -> $r3B -> $r3B; op1 = :: $r3z -> PrelBase.Bool} ;
+__export ShouldSucceed Foo{op2 op1};
+instance {Foo PrelBase.Int} = _fFooInt;
+instance __forall [a] {Foo a} => {Foo [a]} = _gFoo_91_93;
+1 _fFooInt :: {Foo PrelBase.Int} ;
+1 _gFoo_91_93 :: __forall [a] {Foo a} => {Foo [a]} ;
+1 _mop1 :: __forall [a] {Foo a} => a -> PrelBase.Bool ;
+1 _mop2 :: __forall [a] {Foo a} => __forall [b] {PrelBase.Ord b} => a -> b -> b -> b ;
+1 class Foo a where {op2 = :: __forall [b] {PrelBase.Ord b} => a -> b -> b -> b; op1 = :: a -> PrelBase.Bool} ;

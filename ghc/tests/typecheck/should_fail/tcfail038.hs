@@ -1,4 +1,4 @@
---!!! duplicate class-method declarations
+-- !!! duplicate class-method declarations
 
 module ShouldFail where
 

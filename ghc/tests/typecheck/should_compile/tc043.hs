@@ -1,6 +1,6 @@
 module ShouldSucceed where
 
---!!! another simple test of class and instance code.
+-- !!! another simple test of class and instance code.
 
 class A a where
  op1 :: a

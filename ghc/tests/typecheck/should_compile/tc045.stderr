@@ -1,11 +1,8 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed B{:B :B op2} C{:C :C op1};
-_instances_
-instance _forall_ [$a] {B $a} => {B [$a]} = $dB0;
-instance _forall_ [$a] => {C [$a]} = $dC0;
-_declarations_
-1 $dB0 _:_ _forall_ [$a] {B $a, C [$a]} => {B [$a]} ;;
-1 $dC0 _:_ _forall_ [$a] => {C [$a]} ;;
-1 class {C $r3I}  => B $r3I where {op2 :: $r3I -> $r3I -> $r3I} ;
-1 class C $r3L where {op1 :: $r3L -> $r3L} ;
+__export ShouldSucceed B{op2} C{op1};
+instance __forall [a] {B a} => {B [a]} = _gB_91_93;
+instance __forall [a] => {C [a]} = _gC_91_93;
+1 _gB_91_93 :: __forall [a] {B a, C [a]} => {B [a]} ;
+1 _gC_91_93 :: __forall [a] => {C [a]} ;
+1 class {C a}  => B a where {op2 :: a -> a -> a} ;
+1 class C a where {op1 :: a -> a} ;

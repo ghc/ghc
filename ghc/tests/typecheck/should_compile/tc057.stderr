@@ -1,12 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed dand f Eq'{:Eq' :Eq' deq};
-_instances_
-instance _forall_ [$a] {Eq' $a} => {Eq' [$a]} = $dEq'0;
-instance {Eq' PrelBase.Int} = $dEq'Int0;
-_declarations_
-1 $dEq'0 _:_ _forall_ [$a] {Eq' $a} => {Eq' [$a]} ;;
-1 $dEq'Int0 _:_ {Eq' PrelBase.Int} ;;
-1 class Eq' $r3W where {deq :: $r3W -> $r3W -> PrelBase.Bool} ;
-1 dand _:_ PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;;
-1 f _:_ _forall_ [$a] {Eq' $a} => $a -> $a -> PrelBase.Bool ;;
+__export ShouldSucceed dand f Eq'{deq};
+instance {Eq' PrelBase.Int} = _fEq'Int;
+instance __forall [a] {Eq' a} => {Eq' [a]} = _gEq'_91_93;
+1 _fEq'Int :: {Eq' PrelBase.Int} ;
+1 _gEq'_91_93 :: __forall [a] {Eq' a} => {Eq' [a]} ;
+1 class Eq' a where {deq :: a -> a -> PrelBase.Bool} ;
+1 dand :: PrelBase.Bool -> PrelBase.Bool -> PrelBase.Bool ;
+1 f :: __forall [a] {Eq' a} => a -> a -> PrelBase.Bool ;

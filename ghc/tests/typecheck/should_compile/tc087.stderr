@@ -1,12 +1,10 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed check insertMany out pqSort toOrderedList PriorityQueue{:PriorityQueue :PriorityQueue splitMin meld insert single empty} SeqView{Null Cons};
-_declarations_
-1 $minsert _:_ _forall_ [$a :: (* -> *)] {PriorityQueue $a} => _forall_ [$b] {PrelBase.Ord $b} => $b -> $a $b -> $a $b ;;
-1 check _:_ _forall_ [$a :: (* -> *)] {PriorityQueue $a} => (_forall_ [$b] {PrelBase.Ord $b} => $a $b) -> PrelIOBase.IO PrelBase.() ;;
-1 class PriorityQueue $r4c :: (* -> *) where {splitMin :: _forall_ [$r4e] {PrelBase.Ord $r4e} => $r4c $r4e -> SeqView $r4c $r4e; meld :: _forall_ [$r4h] {PrelBase.Ord $r4h} => $r4c $r4h -> $r4c $r4h -> $r4c $r4h; insert = :: _forall_ [$r4j] {PrelBase.Ord $r4j} => $r4j -> $r4c $r4j -> $r4c $r4j; single :: _forall_ [$r4m] {PrelBase.Ord $r4m} => $r4m -> $r4c $r4m; empty :: _forall_ [$r4o] {PrelBase.Ord $r4o} => $r4c $r4o} ;
-1 data SeqView $r4v :: (* -> *) $r4w = Null |  Cons $r4w ($r4v $r4w) ;
-1 insertMany _:_ _forall_ [$a $b :: (* -> *)] {PrelBase.Ord $a, PriorityQueue $b} => [$a] -> $b $a -> $b $a ;;
-1 out _:_ _forall_ [$a] {PrelBase.Num $a} => [$a] -> PrelIOBase.IO PrelBase.() ;;
-1 pqSort _:_ _forall_ [$a :: (* -> *) $b] {PriorityQueue $a, PrelBase.Ord $b} => $a $b -> [$b] -> [$b] ;;
-1 toOrderedList _:_ _forall_ [$a :: (* -> *) $b] {PrelBase.Ord $b, PriorityQueue $a} => $a $b -> [$b] ;;
+__export ShouldSucceed check insertMany out pqSort toOrderedList PriorityQueue{splitMin meld insert single empty} SeqView{Null Cons};
+1 _minsert :: __forall [q :: (* -> *)] {PriorityQueue q} => __forall [a] {PrelBase.Ord a} => a -> q a -> q a ;
+1 check :: __forall [q :: (* -> *)] {PriorityQueue q} => (__forall [a] {PrelBase.Ord a} => q a) -> PrelIOBase.IO PrelBase.() ;
+1 class PriorityQueue q :: (* -> *) where {splitMin :: __forall [a] {PrelBase.Ord a} => q a -> SeqView q a; meld :: __forall [a] {PrelBase.Ord a} => q a -> q a -> q a; insert = :: __forall [a] {PrelBase.Ord a} => a -> q a -> q a; single :: __forall [a] {PrelBase.Ord a} => a -> q a; empty :: __forall [a] {PrelBase.Ord a} => q a} ;
+1 data SeqView t :: (* -> *) a = Null |  Cons a (t a) ;
+1 insertMany :: __forall [a q :: (* -> *)] {PrelBase.Ord a, PriorityQueue q} => [a] -> q a -> q a ;
+1 out :: __forall [a] {PrelBase.Num a} => [a] -> PrelIOBase.IO PrelBase.() ;
+1 pqSort :: __forall [q :: (* -> *) a] {PriorityQueue q, PrelBase.Ord a} => q a -> [a] -> [a] ;
+1 toOrderedList :: __forall [q :: (* -> *) a] {PrelBase.Ord a, PriorityQueue q} => q a -> [a] ;

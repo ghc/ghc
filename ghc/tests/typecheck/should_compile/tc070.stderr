@@ -1,6 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed idb Boolean{FF TT};
-_declarations_
+__export ShouldSucceed idb Boolean{FF TT};
 1 data Boolean = FF |  TT ;
-1 idb _:_ Boolean -> Boolean ;;
+1 idb :: Boolean -> Boolean ;

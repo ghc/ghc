@@ -1,8 +1,6 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f mp sd OL;
-_declarations_
-1 f _:_ _forall_ [$a $b $c] => $a -> [($b, $c)] -> [$c] ;;
-1 mp _:_ _forall_ [$a $b] => ($a -> $b) -> [$a] -> [$b] ;;
-1 sd _:_ _forall_ [$a $b] => ($a, $b) -> $b ;;
-1 type OL $r3K = [$r3K] ;
+__export ShouldSucceed f mp sd OL;
+1 f :: __forall [t _116 _1161] => t -> [(_116, _1161)] -> [_1161] ;
+1 mp :: __forall [t _116] => (_116 -> t) -> [_116] -> [t] ;
+1 sd :: __forall [t _116] => (_116, t) -> t ;
+1 type OL a = [a] ;

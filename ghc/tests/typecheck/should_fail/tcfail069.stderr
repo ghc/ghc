@@ -1,10 +1,11 @@
  
 tcfail069.hs:20:
-    Couldn't match `[$0]' against `($1, $2)'
-	Expected type: [$0]
-	Inferred type: ($1, $2)
+    Couldn't match `[t]' against `(_116, _1161)'
+	Expected type: [t]
+	Inferred type: (_116, _1161)
     In the scrutinee of a case expression: (list1, list2)
     In the case expression: case (list1, list2) of [] -> error "foo"
 
 
 Compilation had errors
+

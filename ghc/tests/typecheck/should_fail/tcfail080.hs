@@ -1,4 +1,4 @@
---!!! Multi-param type classes test: ambiguity bug
+-- !!! Multi-param type classes test: ambiguity bug
 module ShouldFail where
 
 class Collection c a where

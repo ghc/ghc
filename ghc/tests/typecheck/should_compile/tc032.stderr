@@ -1,5 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed AList{Node Other};
-_declarations_
-1 data AList $r3u = Node $r3u [$r3u] |  Other ($r3u, PrelBase.Char) ;
+__export ShouldSucceed AList{Node Other};
+1 data AList b = Node b [b] |  Other (b, PrelBase.Char) ;

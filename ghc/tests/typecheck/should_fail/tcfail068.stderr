@@ -1,30 +1,25 @@
  
-tcfail068.hs:45:
+tcfail068.hs:12:
     Inferred type is less polymorphic than expected
-	Quantified type variable `$a' escapes; i.e. unifies with something more global
-    When checking the type signature for an expression
-	Signature: ST $b $a1
-	Inferred:  ST $a (c, IndTree $a b)
-    In the first argument of `runST', namely `(itrapstate' i k s)'
-    In the right-hand side of an equation for `itrapstate':
-	runST (itrapstate' i k s)
+	Quantified type variable `s' escapes
+	It unifies with `_115', which is mentioned in the environment
+	The following variables in the environment mention `_115'
+    In an expression with expected type: forall
+					 _1151.
+					 PrelST.ST _1151 a
+    In the first argument of `runST', namely `(newArray ((1, 1), n) x)'
+    In the right-hand side of an equation for `itgen':
+	runST (newArray ((1, 1), n) x)
  
-tcfail068.hs:32:
+tcfail068.hs:17:
     Inferred type is less polymorphic than expected
-	Quantified type variable `$a' escapes; i.e. unifies with something more global
-    When checking the type signature for an expression
-	Signature: ST $b $a1
-	Inferred:  ST $a (IndTree $a a)
-    In the first argument of `runST', namely `(itrap' i k)'
-    In the right-hand side of an equation for `itrap':
-	runST (itrap' i k)
- 
-tcfail068.hs:21:
-    Inferred type is less polymorphic than expected
-	Quantified type variable `$a' escapes; i.e. unifies with something more global
-    When checking the type signature for an expression
-	Signature: ST $b $a1
-	Inferred:  ST $a (IndTree $a a)
+	Quantified type variable `s' escapes
+	It unifies with `_115', which is mentioned in the environment
+	The following variables in the environment mention `_115'
+	    arr :: IndTree _115 a
+    In an expression with expected type: forall
+					 _1151.
+					 PrelST.ST _1151 _97
     In the first argument of `runST', namely
 	`((readArray arr i)
 	  >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))'
@@ -32,15 +27,42 @@ tcfail068.hs:21:
 	runST ((readArray arr i)
 	       >>= (\ val -> (writeArray arr i (f val)) >> (return arr)))
  
-tcfail068.hs:14:
+tcfail068.hs:24:
     Inferred type is less polymorphic than expected
-	Quantified type variable `$c' escapes; i.e. unifies with something more global
-    When checking the type signature for an expression
-	Signature: ST $b $a
-	Inferred:  ST $c (IndTree $c $b1)
-    In the first argument of `runST', namely `(newArray ((1, 1), n) x)'
-    In the right-hand side of an equation for `itgen':
-	runST (newArray ((1, 1), n) x)
+	Quantified type variable `s' escapes
+	It unifies with `_115', which is mentioned in the environment
+	The following variables in the environment mention `_115'
+	    arr :: IndTree _115 a
+	    itrap' :: Int -> Int -> PrelST.ST _115 (IndTree _115 a)
+	    itrapsnd :: Int -> Int -> PrelST.ST _115 (IndTree _115 a)
+    In an expression with expected type: forall
+					 _1151.
+					 PrelST.ST _1151 _97
+    In the first argument of `runST', namely `(itrap' i k)'
+    In the right-hand side of an equation for `itrap':
+	runST (itrap' i k)
+ 
+tcfail068.hs:36:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It unifies with `_115', which is mentioned in the environment
+	The following variables in the environment mention `_115'
+	    arr :: IndTree _115 b
+	    itrapstate' :: Int
+			   -> Int
+			   -> c
+			   -> PrelST.ST _115 (c, IndTree _115 b)
+	    itrapstatesnd :: Int
+			     -> Int
+			     -> c
+			     -> PrelST.ST _115 (c, IndTree _115 b)
+    In an expression with expected type: forall
+					 _1151.
+					 PrelST.ST _1151 a
+    In the first argument of `runST', namely `(itrapstate' i k s)'
+    In the right-hand side of an equation for `itrapstate':
+	runST (itrapstate' i k s)
 
 
 Compilation had errors
+

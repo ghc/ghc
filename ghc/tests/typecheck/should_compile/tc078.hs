@@ -1,4 +1,4 @@
---!!! instance decls with no binds
+-- !!! instance decls with no binds
 --
 module ShouldFail where
 

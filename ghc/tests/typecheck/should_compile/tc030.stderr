@@ -1,6 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed G H;
-_declarations_
+__export ShouldSucceed G H;
 1 type G = (H, PrelBase.Char) ;
 1 type H = [PrelBase.Bool] ;

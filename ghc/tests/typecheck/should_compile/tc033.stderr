@@ -1,7 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed F Twine{Twine2} Twist{Twist2};
-_declarations_
+__export ShouldSucceed F Twine{Twine2} Twist{Twist2};
 1 data Twine = Twine2 Twist ;
 1 data Twist = Twist2 Twine ;
 1 type F = Twine ;

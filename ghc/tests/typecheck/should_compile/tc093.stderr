@@ -1,20 +1,15 @@
-
-uniqAway: 1 tries
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed bindState foo unState unitState St State{State} TS{TS vs};
-_instances_
-instance {PrelBase.Eq TS} = $dEqTS0;
-instance _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Monad (State $a)} = $dMonadState0;
-instance {PrelBase.Show TS} = $dShowTS0;
-_declarations_
-1 $dEqTS0 _:_ {PrelBase.Eq TS} ;;
-1 $dMonadState0 _:_ _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Monad (State $a)} ;;
-1 $dShowTS0 _:_ {PrelBase.Show TS} ;;
-1 bindState _:_ _forall_ [$a $b $c] => State $a $b -> ($b -> State $a $c) -> State $a $c ;;
-1 data State $r4h $r4i = State ($r4h -> ($r4i, $r4h)) ;
+__export ShouldSucceed bindState foo unState unitState St State{State} TS{TS vs};
+instance {PrelBase.Eq TS} = _fEqTS;
+instance __forall [c] {PrelBase.Eq c} => {PrelBase.Monad (State c)} = _fMonadState;
+instance {PrelBase.Show TS} = _fShowTS;
+1 _fEqTS :: {PrelBase.Eq TS} ;
+1 _fMonadState :: __forall [c] {PrelBase.Eq c} => {PrelBase.Monad (State c)} ;
+1 _fShowTS :: {PrelBase.Show TS} ;
+1 bindState :: __forall [c a b] => State c a -> (a -> State c b) -> State c b ;
+1 data State c a = State (c -> (a, c)) ;
 1 data TS = TS {vs :: PrelBase.Int} ;
-1 foo _:_ PrelBase.Int -> State TS PrelBase.Int ;;
-1 type St = State TS ;
-1 unState _:_ _forall_ [$a $b] => State $a $b -> $a -> ($b, $a) ;;
-1 unitState _:_ _forall_ [$a $b] => $a -> State $b $a ;;
+1 foo :: PrelBase.Int -> St PrelBase.Int ;
+1 type St a = State TS a ;
+1 unState :: __forall [c a] => State c a -> c -> (a, c) ;
+1 unitState :: __forall [a c] => a -> State c a ;

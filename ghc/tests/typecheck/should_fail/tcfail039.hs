@@ -1,4 +1,4 @@
---!!! bogus re-use of prelude class-method name (==)
+-- !!! bogus re-use of prelude class-method name (==)
 --
 module ShouldFail where
 

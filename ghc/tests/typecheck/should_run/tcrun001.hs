@@ -1,4 +1,4 @@
---!! Test for (->) instances
+-- !! Test for (->) instances
 
 module Main where
 

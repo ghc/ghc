@@ -25,7 +25,7 @@ SPJ note: the type signature on "multiply" should be
 module ShouldSucceed( Group, Ring ) where
 
 import qualified Prelude( Ord(..), Eq(..), Num(..) )
-import Prelude hiding( Ord(..), Eq(..), Num(..), MonadZero( zero ) )
+import Prelude hiding( Ord(..), Eq(..), Num(..) )
 
 class Group a where
   compare     :: a -> a -> Prelude.Ordering
@@ -50,7 +50,7 @@ class Group a where
 class (Group a) => Ring a where
   (*) :: a -> a -> a
   (*) a b = multiply a b
-          where multiply :: Group a => a -> a ->a 
+          where multiply :: Group b => b -> b -> b
                 multiply a b
                   = case (compare a zero) of
                       EQ -> zero

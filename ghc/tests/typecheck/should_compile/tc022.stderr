@@ -1,6 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed iD main;
-_declarations_
-1 iD _:_ _forall_ [$a] => $a -> $a ;;
-1 main _:_ _forall_ [$a] => $a -> $a ;;
+__export ShouldSucceed iD main;
+1 iD :: __forall [t] => t -> t ;
+1 main :: __forall [t] => t -> t ;

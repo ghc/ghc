@@ -1,4 +1,4 @@
---!!! tests for CycleErr in classes
+-- !!! tests for CycleErr in classes
 
 class (B a) => A a where
  op1 :: a -> a

@@ -1,5 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed foo;
-_declarations_
-1 foo _:_ _forall_ [a] => a -> (PrelBase.Int, PrelBase.Int) ;;
+__export ShouldSucceed foo;
+1 foo :: __forall [t] => t -> (PrelBase.Integer, PrelBase.Integer) ;

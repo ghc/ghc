@@ -1,4 +1,4 @@
---!!! prelude class name in an instance-tycon position
+-- !!! prelude class name in an instance-tycon position
 --
 module ShouldFail where
 

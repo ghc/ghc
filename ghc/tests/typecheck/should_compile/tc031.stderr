@@ -1,5 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed Rec{Node};
-_declarations_
+__export ShouldSucceed Rec{Node};
 1 data Rec = Node PrelBase.Int Rec ;

@@ -1,31 +1,35 @@
  
 Digraph.hs:19:
     Inferred type is less polymorphic than expected
-	Quantified type variable `vertex' escapes; i.e. unifies with something more global
-    When checking the type signature for `reversed_edges'
-	Signature: [Edge v]
-	Inferred:  [Edge vertex]
+	Quantified type variable `v' escapes
+	It unifies with `vertex', which is mentioned in the environment
+	The following variables in the environment mention `vertex'
+	    es :: [Edge vertex]
+	    vs :: [vertex]
+    When checking the type signature
+	reversed_edges :: forall _118. {PrelBase.Eq _118} => [Edge _118]
     In an equation for function `stronglyConnComp':
 	stronglyConnComp es vs
-			 = snd (span_tree (new_range reversed_edges)
-					  ([], [])
-					  (snd (dfs (new_range es) ([], []) vs)))
-			 where
-			     span_tree r (vs, ns) [] = (vs, ns)
-			     span_tree r (vs, ns) (x : xs)
-				       | x `elem` vs = span_tree r (vs, ns) xs
-				       | otherwise = span_tree r (vs', (x : ns') : ns) xs
-				       where
-					   (vs', ns') = dfs r (x : vs, []) (r x)
-			     new_range [] w = []
-			     new_range ((x, y) : xys) w
-				       = if x == w then
-					     (y : (new_range xys w))
-					 else
-					     (new_range xys w)
-			     swap (x, y) = (y, x)
-			     reversed_edges :: forall v. (PrelBase.Eq v) => [Edge v]
-			     reversed_edges = map swap es
+			   = snd (span_tree (new_range reversed_edges)
+					    ([], [])
+					    (snd (dfs (new_range es) ([], []) vs)))
+			   where
+			       span_tree r (vs, ns) [] = (vs, ns)
+			       span_tree r (vs, ns) (x : xs)
+					   | x `elem` vs = span_tree r (vs, ns) xs
+					   | otherwise = span_tree r (vs', (x : ns') : ns) xs
+					   where
+					       (vs', ns') = dfs r (x : vs, []) (r x)
+			       new_range [] w = []
+			       new_range ((x, y) : xys) w
+					   = if x == w then
+						 (y : (new_range xys w))
+					     else
+						 (new_range xys w)
+			       swap (x, y) = (y, x)
+			       reversed_edges :: forall v. (Eq v) => [Edge v]
+			       reversed_edges = map swap es
 
 
 Compilation had errors
+

@@ -1,12 +1,17 @@
  
 tcfail032.hs:14:
     Inferred type is less polymorphic than expected
-	Quantified type variable `a' escapes; i.e. unifies with something more global
-    When checking the type signature for an expression
-	Signature: a -> Int
-	Inferred:  a -> Int
+	Quantified type variable `a' escapes
+	It is mentioned in the environment
+	The following variables in the environment mention `a'
+	    x :: a -> Int
+    In an expression with expected type: forall
+					 _97.
+					 {PrelBase.Eq _97} =>
+					 _97 -> Int
     In an expression with a type signature:
-	  x :: forall a. (PrelBase.Eq a) => a -> Int
+	  x :: forall a. (Eq a) => a -> Int
 
 
 Compilation had errors
+

@@ -1,6 +1,6 @@
 module ShouldFail where
 
---!!! weird class/instance examples off the haskell list
+-- !!! weird class/instance examples off the haskell list
 --
 
 class Foo a          where foo :: a -> a

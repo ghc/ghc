@@ -1,10 +1,11 @@
  
 tcfail070.hs:13:
-    Couldn't match `*' against `* -> $0'
+    Couldn't match `*' against `* -> k'
 	Expected kind: *
-	Inferred kind: * -> $0
-    In the type `[Int] Bool'
-    In the type declaration for `State'
+	Inferred kind: * -> k
+    When checking kinds in `[Int] Bool'
+    In the type synonym declaration for `State'
 
 
 Compilation had errors
+

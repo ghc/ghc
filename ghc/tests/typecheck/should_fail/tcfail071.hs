@@ -1,4 +1,4 @@
---!!! Mis-matched contexts in a mutually recursive group
+-- !!! Mis-matched contexts in a mutually recursive group
 
 module ShouldFail where
 

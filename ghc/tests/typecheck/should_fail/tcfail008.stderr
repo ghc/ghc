@@ -1,13 +1,14 @@
  
 tcfail008.hs:3:
-    Ambiguous type variable(s) `$0'
-	in the constraint `Num [$0]'
+    Ambiguous type variable(s) `t'
+	in the constraint `PrelBase.Num [t]'
 	arising from the literal `2' at tcfail008.hs:3
  
 tcfail008.hs:3:
-    Ambiguous type variable(s) `$0'
-	in the constraint `Num $0'
+    Ambiguous type variable(s) `t'
+	in the constraint `PrelBase.Num t'
 	arising from the literal `1' at tcfail008.hs:3
 
 
 Compilation had errors
+

@@ -1,8 +1,8 @@
  
 tcfail078.hs:5:
     Type constructor used as a class: Integer
-    In the context `(Integer i) =>'
-    In the type `forall i. (Integer i) => i'
+    When checking kinds in `Integer i'
 
 
 Compilation had errors
+

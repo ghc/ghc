@@ -1,13 +1,10 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed Eq'{:Eq' :Eq' doubleeq} Ord'{:Ord' :Ord' lt};
-_instances_
-instance _forall_ [$a] {Eq' $a} => {Eq' [$a]} = $dEq'0;
-instance {Eq' PrelBase.Int} = $dEq'Int0;
-instance {Ord' PrelBase.Int} = $dOrd'Int0;
-_declarations_
-1 $dEq'0 _:_ _forall_ [$a] {Eq' $a} => {Eq' [$a]} ;;
-1 $dEq'Int0 _:_ {Eq' PrelBase.Int} ;;
-1 $dOrd'Int0 _:_ {Ord' PrelBase.Int} ;;
-1 class Eq' $r3Q where {doubleeq :: $r3Q -> $r3Q -> PrelBase.Bool} ;
-1 class {Eq' $r3N}  => Ord' $r3N where {lt :: $r3N -> $r3N -> PrelBase.Bool} ;
+__export ShouldSucceed Eq'{doubleeq} Ord'{lt};
+instance {Eq' PrelBase.Int} = _fEq'Int;
+instance {Ord' PrelBase.Int} = _fOrd'Int;
+instance __forall [a] {Eq' a} => {Eq' [a]} = _gEq'_91_93;
+1 _fEq'Int :: {Eq' PrelBase.Int} ;
+1 _fOrd'Int :: {Ord' PrelBase.Int} ;
+1 _gEq'_91_93 :: __forall [a] {Eq' a} => {Eq' [a]} ;
+1 class Eq' a where {doubleeq :: a -> a -> PrelBase.Bool} ;
+1 class {Eq' a}  => Ord' a where {lt :: a -> a -> PrelBase.Bool} ;

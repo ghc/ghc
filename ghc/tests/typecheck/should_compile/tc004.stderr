@@ -1,5 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f;
-_declarations_
-1 f _:_ PrelBase.Bool -> PrelBase.Bool ;;
+__export ShouldSucceed f;
+1 f :: PrelBase.Bool -> PrelBase.Bool ;

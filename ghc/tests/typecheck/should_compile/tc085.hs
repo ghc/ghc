@@ -1,6 +1,6 @@
 {-# OPTIONS -fglasgow-exts #-}
---!!! From a bug report from Satnam.
---!!! To do with re-exporting importees from PreludeGla* modules.
+-- !!! From a bug report from Satnam.
+-- !!! To do with re-exporting importees from PreludeGla* modules.
 module ShouldSucceed ( module IOExts, module PrelGHC ) where
 
 --OLD:   import GlaExts

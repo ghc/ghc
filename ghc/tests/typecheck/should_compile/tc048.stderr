@@ -1,11 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed mAp ranAFE ranOAL sNd AFE{MkAFE} FG{MkFG} OL{MkOL};
-_declarations_
-1 data AFE $r3X $r3Y $r3Z = MkAFE (OL ($r3X, FG $r3Y $r3Z)) ;
-1 data FG $r42 $r43 = MkFG (OL ($r42, $r43)) ;
-1 data OL $r46 = MkOL [$r46] ;
-1 mAp _:_ _forall_ [$a $b] => ($a -> $b) -> [$a] -> [$b] ;;
-1 ranAFE _:_ _forall_ [$a $b $c] => AFE $a $b $c -> [FG $b $c] ;;
-1 ranOAL _:_ _forall_ [$a $b] => OL ($a, $b) -> [$b] ;;
-1 sNd _:_ _forall_ [$a $b] => ($a, $b) -> $b ;;
+__export ShouldSucceed mAp ranAFE ranOAL sNd AFE{MkAFE} FG{MkFG} OL{MkOL};
+1 data AFE n a b = MkAFE (OL (n, FG a b)) ;
+1 data FG a b = MkFG (OL (a, b)) ;
+1 data OL a = MkOL [a] ;
+1 mAp :: __forall [t _116] => (_116 -> t) -> [_116] -> [t] ;
+1 ranAFE :: __forall [n a b] => AFE n a b -> [FG a b] ;
+1 ranOAL :: __forall [a v] => OL (a, v) -> [v] ;
+1 sNd :: __forall [t _116] => (_116, t) -> t ;

@@ -1,6 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f g;
-_declarations_
-1 f _:_ _forall_ [$a] => PrelBase.Bool -> $a -> $a ;;
-1 g _:_ PrelBase.Bool -> PrelBase.Bool ;;
+__export ShouldSucceed f g;
+1 f :: __forall [t] => PrelBase.Bool -> t -> t ;
+1 g :: PrelBase.Bool -> PrelBase.Bool ;

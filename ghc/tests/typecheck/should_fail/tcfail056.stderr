@@ -1,14 +1,10 @@
  
-tcfail056.hs:10: Warning:
-    No explicit method nor default method for `=='
-    in an instance declaration for `Eq'
-
- 
 tcfail056.hs:1:
     Duplicate or overlapping instance declarations
-	for `Eq Foo' at tcfail056.hs:10 and tcfail056.hs:6
+	for `PrelBase.Eq Foo' at tcfail056.hs:6 and tcfail056.hs:10
  
-tcfail056.hs:10: Class `Eq' does not have a method `<='
+tcfail056.hs:10: Class `PrelBase.Eq' does not have a method `<='
 
 
 Compilation had errors
+

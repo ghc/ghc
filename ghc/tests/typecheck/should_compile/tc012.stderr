@@ -1,5 +1,3 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed q;
-_declarations_
-1 q _:_ _forall_ [$a] => $a -> $a ;;
+__export ShouldSucceed q;
+1 q :: __forall [t] => t -> t ;

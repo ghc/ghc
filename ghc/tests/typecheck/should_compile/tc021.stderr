@@ -1,7 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed a f x;
-_declarations_
-1 a _:_ _forall_ [$a $b] => ($a, $b) ;;
-1 f _:_ _forall_ [$a $b $c] => $a -> ($b, $c) ;;
-1 x _:_ _forall_ [$a] => $a ;;
+__export ShouldSucceed a f x;
+1 a :: __forall [t _116] => (t, _116) ;
+1 f :: __forall [t _116 _1161] => t -> (_116, _1161) ;
+1 x :: __forall [t] => t ;

@@ -1,12 +1,9 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f g Foo{:Foo :Foo o_and};
-_instances_
-instance {Foo PrelBase.Bool} = $dFooBool0;
-instance {Foo PrelBase.Int} = $dFooInt0;
-_declarations_
-1 $dFooBool0 _:_ {Foo PrelBase.Bool} ;;
-1 $dFooInt0 _:_ {Foo PrelBase.Int} ;;
-1 class Foo $r3Q where {o_and :: $r3Q -> $r3Q -> $r3Q} ;
-1 f _:_ _forall_ [$a] => PrelBase.Bool -> $a -> PrelBase.Bool ;;
-1 g _:_ _forall_ [$a $b] {PrelBase.Num $b, Foo $b} => $b -> $a -> $b ;;
+__export ShouldSucceed f g Foo{o_and};
+instance {Foo PrelBase.Bool} = _fFooBool;
+instance {Foo PrelBase.Int} = _fFooInt;
+1 _fFooBool :: {Foo PrelBase.Bool} ;
+1 _fFooInt :: {Foo PrelBase.Int} ;
+1 class Foo a where {o_and :: a -> a -> a} ;
+1 f :: __forall [t] => PrelBase.Bool -> t -> PrelBase.Bool ;
+1 g :: __forall [t a] {PrelBase.Num a, Foo a} => a -> t -> a ;

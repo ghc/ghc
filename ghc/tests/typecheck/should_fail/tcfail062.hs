@@ -1,4 +1,4 @@
---!!! bug report from Satnam
+-- !!! bug report from Satnam
 --
 module ShouldFail
 where
@@ -32,6 +32,6 @@ data BehaviouralExpression
 
 type BehaviouralRelation
   = (behaviouralExpression, behaviouralExpression)
------^ typo ----------------^ typo (but so what?)
+---- ^ typo ----------------^ typo (but so what?)
 
 type BehaviouralRelationList = [BehaviouralRelation]

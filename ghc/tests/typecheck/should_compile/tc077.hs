@@ -1,4 +1,4 @@
---!!! make sure context of EQ is minimised in interface file.
+-- !!! make sure context of EQ is minimised in interface file.
 --
 module ShouldSucceed where
 

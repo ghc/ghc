@@ -1,7 +1,11 @@
  
 tcfail079.hs:9:
-    Newtype constructor field has an unboxed type: `Int#'
-    In the newtype declaration for `Unboxed'
+    Couldn't match `*' against `#'
+	Expected kind: *
+	Inferred kind: #
+    When checking that `Int#' is a type
+    In the data type declaration for `Unboxed'
 
 
 Compilation had errors
+

@@ -1,5 +1,5 @@
---!!! a file mailed us by Ryzard Kubiak. This provides a good test of the code
---!!! handling type signatures and recursive data types.
+-- !!! a file mailed us by Ryzard Kubiak. This provides a good test of the code
+-- !!! handling type signatures and recursive data types.
 
 module ShouldSucceed where
 

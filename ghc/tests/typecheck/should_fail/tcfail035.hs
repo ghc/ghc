@@ -1,4 +1,4 @@
---!!! instances with empty where parts: duplicate
+-- !!! instances with empty where parts: duplicate
 --
 module ShouldFail where
 

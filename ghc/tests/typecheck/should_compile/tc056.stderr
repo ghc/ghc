@@ -3,14 +3,11 @@ tc056.hs:15: Warning:
     Duplicate class assertion `Eq' a' in the context: (Eq' a, Eq' a) =>
 
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f Eq'{:Eq' :Eq' doubleeq} Ord'{:Ord' :Ord' lt};
-_instances_
-instance _forall_ [$a] {Eq' $a, Eq' $a} => {Eq' [$a]} = $dEq'0;
-instance {Eq' PrelBase.Int} = $dEq'Int0;
-_declarations_
-1 $dEq'0 _:_ _forall_ [$a] {Eq' $a} => {Eq' [$a]} ;;
-1 $dEq'Int0 _:_ {Eq' PrelBase.Int} ;;
-1 class Eq' $r3R where {doubleeq :: $r3R -> $r3R -> PrelBase.Bool} ;
-1 class {Eq' $r3O}  => Ord' $r3O where {lt :: $r3O -> $r3O -> PrelBase.Bool} ;
-1 f _:_ _forall_ [$a $b] {PrelBase.Num $b, Eq' [$b]} => [$b] -> $a -> PrelBase.Bool ;;
+__export ShouldSucceed f Eq'{doubleeq} Ord'{lt};
+instance {Eq' PrelBase.Int} = _fEq'Int;
+instance __forall [a] {Eq' a, Eq' a} => {Eq' [a]} = _gEq'_91_93;
+1 _fEq'Int :: {Eq' PrelBase.Int} ;
+1 _gEq'_91_93 :: __forall [a] {Eq' a} => {Eq' [a]} ;
+1 class Eq' a where {doubleeq :: a -> a -> PrelBase.Bool} ;
+1 class {Eq' a}  => Ord' a where {lt :: a -> a -> PrelBase.Bool} ;
+1 f :: __forall [t _116] {PrelBase.Num _116, Eq' [_116]} => [_116] -> t -> PrelBase.Bool ;

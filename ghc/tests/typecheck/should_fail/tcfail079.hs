@@ -2,7 +2,7 @@
 
 module ShouldFail where
 
---!!! unboxed field in newtype declaration
+-- !!! unboxed field in newtype declaration
 
 import GlaExts ( Int# )
 

@@ -1,4 +1,4 @@
---!!! tc082: an instance for functions
+-- !!! tc082: an instance for functions
 --
 module ShouldSucceed where
 

@@ -1,4 +1,4 @@
---!! signature bugs exposed by Sigbjorne Finne
+-- !! signature bugs exposed by Sigbjorn Finne
 --
 module ShouldFail where
 

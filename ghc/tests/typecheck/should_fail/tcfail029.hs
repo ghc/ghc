@@ -1,4 +1,4 @@
---!!! tests for InstOpErr
+-- !!! tests for InstOpErr
 module ShouldFail where
 
 data Foo = Bar | Baz

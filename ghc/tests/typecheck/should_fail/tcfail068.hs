@@ -1,5 +1,5 @@
---!! Make sure that state threads don't escape
---!! (example from Neil Ashton at York)
+-- !! Make sure that state threads don't escape
+-- !! (example from Neil Ashton at York)
 --
 module ShouldFail where
 

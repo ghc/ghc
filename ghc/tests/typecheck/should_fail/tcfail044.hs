@@ -1,4 +1,4 @@
---!!! tcfail044: duplicated type variable in instance decls
+-- !!! tcfail044: duplicated type variable in instance decls
 --
 module ShouldFail where
 

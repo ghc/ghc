@@ -1,4 +1,4 @@
---!!! an example Simon made up
+-- !!! an example Simon made up
 --
 module ShouldSucceed where
 

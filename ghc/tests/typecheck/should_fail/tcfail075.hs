@@ -1,4 +1,4 @@
---!! Test top-level unboxed types
+-- !! Test top-level unboxed types
 
 {-# OPTIONS -fglasgow-exts #-}
 

@@ -1,8 +1,9 @@
  
 tcfail010.hs:3:
-    Ambiguous type variable(s) `$0'
-	in the constraint `Num [$0]'
-	arising from use of `+' at tcfail010.hs:3
+    Ambiguous type variable(s) `t'
+	in the constraint `PrelBase.Num [t]'
+	arising from use of `PrelBase.+' at tcfail010.hs:3
 
 
 Compilation had errors
+

@@ -1,13 +1,54 @@
  
 tcfail043.hs:16:
-    Conflicting definitions for `and'
-	Imported from `Prelude' at tcfail043.hs:16
-	Defined at tcfail043.hs:42
+    Ambiguous occurrence `and'
+    It could refer to: and: defined at tcfail043.hs:42
+		       PrelList.and: imported from Prelude at tcfail043.hs:16
  
 tcfail043.hs:16:
-    Conflicting definitions for `null'
-	Imported from `Prelude' at tcfail043.hs:16
-	Defined at tcfail043.hs:57
+    Ambiguous occurrence `null'
+    It could refer to: null: defined at tcfail043.hs:57
+		       PrelList.null: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:24:
+    Ambiguous occurrence `null'
+    It could refer to: null: defined at tcfail043.hs:57
+		       PrelList.null: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:24:
+    Ambiguous occurrence `null'
+    It could refer to: null: defined at tcfail043.hs:57
+		       PrelList.null: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:26:
+    Ambiguous occurrence `null'
+    It could refer to: null: defined at tcfail043.hs:57
+		       PrelList.null: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:26:
+    Ambiguous occurrence `and'
+    It could refer to: and: defined at tcfail043.hs:42
+		       PrelList.and: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:41:
+    Ambiguous occurrence `and'
+    It could refer to: and: defined at tcfail043.hs:42
+		       PrelList.and: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:42:
+    Ambiguous occurrence `and'
+    It could refer to: and: defined at tcfail043.hs:42
+		       PrelList.and: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:56:
+    Ambiguous occurrence `null'
+    It could refer to: null: defined at tcfail043.hs:57
+		       PrelList.null: imported from Prelude at tcfail043.hs:16
+ 
+tcfail043.hs:57:
+    Ambiguous occurrence `null'
+    It could refer to: null: defined at tcfail043.hs:57
+		       PrelList.null: imported from Prelude at tcfail043.hs:16
 
 
 Compilation had errors
+

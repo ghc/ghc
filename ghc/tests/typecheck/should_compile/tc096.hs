@@ -1,6 +1,6 @@
 module ShouldSucceed where
 
---!!! monomorphism restriction and defaulting
+-- !!! monomorphism restriction and defaulting
 
 x = 3
 

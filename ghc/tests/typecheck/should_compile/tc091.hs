@@ -1,4 +1,4 @@
---!!! Test polymorphic recursion
+-- !!! Test polymorphic recursion
 
 
 -- With polymorphic recursion this one becomes legal

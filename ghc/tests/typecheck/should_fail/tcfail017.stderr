@@ -2,10 +2,11 @@
 tcfail017.hs:11:
     Could not deduce `C [a]'
 	(arising from an instance declaration at tcfail017.hs:11)
-	from the context (B a)
+	from the context: (B a)
     Probable cause: missing `C [a]' in instance declaration context
 		    or missing instance declaration for `C [a]'
     When checking the superclasses of an instance declaration
 
 
 Compilation had errors
+

@@ -1,4 +1,4 @@
---!!! a bad _CCallable thing (from a bug from Satnam)
+-- !!! a bad _CCallable thing (from a bug from Satnam)
 --
 module ShouldFail where
 

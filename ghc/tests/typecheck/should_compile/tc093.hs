@@ -19,7 +19,7 @@ instance Eq c => Monad (State c) where
 
 data TS = TS { vs::Int } deriving (Show,Eq)
 
-type St = State TS
+type St a = State TS a
 
 foo :: Int -> St Int  -- it works if this line is not given
 foo x = return x

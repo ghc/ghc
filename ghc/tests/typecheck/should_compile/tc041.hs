@@ -1,4 +1,4 @@
---!!! a very simple test of class and instance declarations
+-- !!! a very simple test of class and instance declarations
 
 module ShouldSucceed where
 

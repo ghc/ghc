@@ -1,11 +1,8 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed B{X Y} T{D C};
-_instances_
-instance _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (B $a)} = $dEqB0;
-instance _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (T $a)} = $dEqT0;
-_declarations_
-1 $dEqB0 _:_ _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (B $a)} ;;
-1 $dEqT0 _:_ _forall_ [$a] {PrelBase.Eq $a} => {PrelBase.Eq (T $a)} ;;
-1 data B $r40 = X |  Y $r40 ;
-1 data T $r44 = D (B $r44) |  C ;
+__export ShouldSucceed B{X Y} T{D C};
+instance __forall [b] {PrelBase.Eq b} => {PrelBase.Eq (B b)} = _fEqB;
+instance __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} = _fEqT;
+1 _fEqB :: __forall [b] {PrelBase.Eq b} => {PrelBase.Eq (B b)} ;
+1 _fEqT :: __forall [a] {PrelBase.Eq a} => {PrelBase.Eq (T a)} ;
+1 data B b = X |  Y b ;
+1 data T a = D (B a) |  C ;

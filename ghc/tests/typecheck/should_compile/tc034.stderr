@@ -1,7 +1,5 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed g AList{ANull ANode} IntList;
-_declarations_
-1 data AList $r3C = ANull |  ANode $r3C (AList $r3C) ;
-1 g _:_ _forall_ [$a] {PrelBase.Num $a} => AList PrelBase.Bool -> $a ;;
+__export ShouldSucceed g AList{ANull ANode} IntList;
+1 data AList a = ANull |  ANode a (AList a) ;
+1 g :: __forall [t] {PrelBase.Num t} => AList PrelBase.Bool -> t ;
 1 type IntList = AList PrelBase.Int ;

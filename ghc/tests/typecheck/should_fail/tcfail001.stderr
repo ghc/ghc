@@ -4,11 +4,12 @@ tcfail001.hs:9: Warning:
 
  
 tcfail001.hs:9:
-    Couldn't match `[a]' against `$0 -> $1'
+    Couldn't match `[a]' against `t -> _116'
 	Expected type: [a]
-	Inferred type: $0 -> $1
+	Inferred type: t -> _116
     In an equation for function `op': op [] = []
     In the definition for method `op'
 
 
 Compilation had errors
+

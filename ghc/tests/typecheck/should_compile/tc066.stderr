@@ -1,6 +1,4 @@
 ghc: module version changed to 1; reason: no old .hi file
-_exports_
-ShouldSucceed f Pair{MkPair};
-_declarations_
-1 data Pair $r3x $r3y = MkPair $r3x $r3y ;
-1 f _:_ _forall_ [$a :: (* -> *) $b $c] {PrelBase.Monad $a} => $a (Pair $b $c) -> $a $c ;;
+__export ShouldSucceed f Pair{MkPair};
+1 data Pair a b = MkPair a b ;
+1 f :: __forall [a b] => [Pair a b] -> [b] ;

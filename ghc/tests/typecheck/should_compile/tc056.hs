@@ -1,4 +1,4 @@
---!!! Duplicate class assertion
+-- !!! Duplicate class assertion
 
 module ShouldSucceed where
 

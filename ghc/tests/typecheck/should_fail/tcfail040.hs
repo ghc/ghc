@@ -1,4 +1,4 @@
---!!! instances of functions
+-- !!! instances of functions
 --
 module ShouldFail where
 

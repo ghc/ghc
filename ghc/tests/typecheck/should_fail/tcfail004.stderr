@@ -1,9 +1,10 @@
  
 tcfail004.hs:3:
-    Couldn't match `($0, $1)' against `($2, $3, $4)'
-	Expected type: ($0, $1)
-	Inferred type: ($2, $3, $4)
+    Couldn't match `(t, _116)' against `(_1161, _1162, _1163)'
+	Expected type: (t, _116)
+	Inferred type: (_1161, _1162, _1163)
     In the right-hand side of a pattern binding: (1, 2, 3)
 
 
 Compilation had errors
+

@@ -1,8 +1,9 @@
  
-tcfail039.hs:3:
-    Conflicting definitions for `=='
-	Imported from `Prelude' at tcfail039.hs:3
-	Defined at tcfail039.hs:7
+tcfail039.hs:7:
+    Ambiguous occurrence `=='
+    It could refer to: ==: defined at tcfail039.hs:7
+		       PrelBase.==: imported from Prelude at tcfail039.hs:3
 
 
 Compilation had errors
+

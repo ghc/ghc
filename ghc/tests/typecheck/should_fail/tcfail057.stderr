@@ -1,7 +1,8 @@
  
 tcfail057.hs:5:
     Class used as a type constructor: RealFrac
-    In the type `forall a. RealFrac a -> a -> a'
+    When checking kinds in `RealFrac a'
 
 
 Compilation had errors
+

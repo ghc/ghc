@@ -1,4 +1,4 @@
---!!! Local universal quantification.
+-- !!! Local universal quantification.
 module ShouldSucceed where
 
 import PrelGHC -- to get at All
