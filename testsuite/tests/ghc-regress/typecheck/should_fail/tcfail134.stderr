@@ -1,0 +1,4 @@
+
+tcfail134.hs:5:18:
+    Class `XML' used as a type
+    In the class declaration for `XML'
