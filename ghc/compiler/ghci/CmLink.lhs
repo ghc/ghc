@@ -89,20 +89,6 @@ link :: PackageConfigInfo
      -> PersistentLinkerState 
      -> IO LinkResult
 
-#ifndef GHCI_NOTYET
---link = panic "CmLink.link: not implemented"
-link pci groups pls1
-   = do putStrLn "Hello from the Linker!"
-        putStrLn (showSDoc (vcat (map ppLinkableSCC groups)))
-        putStrLn "Bye-bye from the Linker!"
-        return (LinkOK pls1)
-
-ppLinkableSCC :: SCC Linkable -> SDoc
-ppLinkableSCC (CyclicSCC xs) = ppr xs
-ppLinkableSCC (AcyclicSCC x) = ppr [x]
-
-
-#else
 link pci [] pls = return (LinkOK pls)
 link pci (group:groups) pls = do
    -- the group is either all objects or all interpretable, for now
@@ -120,7 +106,6 @@ link pci (group:groups) pls = do
 				   itbl_env=new_itbl_env})
     else
 	return (LinkErrs pls (ptext SLIT("linker: group must contain all objects or all interpreted modules")))
-#endif
 
 modname_of_linkable (LM nm _) = nm
 modname_of_linkable (LP _)    = panic "modname_of_linkable: package"

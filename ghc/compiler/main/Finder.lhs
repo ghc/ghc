@@ -24,6 +24,7 @@ import Directory
 import List
 import IO
 import Monad
+import Outputable	( showSDoc, ppr )	-- debugging only
 \end{code}
 
 The Finder provides a thin filesystem abstraction to the rest of the
@@ -45,13 +46,22 @@ initFinder :: PackageConfigInfo -> IO ()
 initFinder (PackageConfigInfo pkgs) = do
   -- expunge our home cache
   writeIORef v_HomeDirCache Nothing
-
   -- lazilly fill in the package cache
   writeIORef v_PkgDirCache (unsafePerformIO (newPkgCache pkgs))
+  pkg_dbg_info <- readIORef v_PkgDirCache
+  putStrLn (unlines (map show (fmToList pkg_dbg_info)))
 
-  
 findModule :: ModuleName -> IO (Maybe (Module, ModuleLocation))
 findModule name = do
+  hPutStr stderr ("findModule: " ++ moduleNameUserString name ++ " ... ")
+  maybe_m <- findModule_wrk name
+  case maybe_m of
+     Nothing -> hPutStrLn stderr "Not Found"
+     Just mm -> hPutStrLn stderr (showSDoc (ppr (snd mm)))
+  return maybe_m
+  
+findModule_wrk :: ModuleName -> IO (Maybe (Module, ModuleLocation))
+findModule_wrk name = do
   j <- maybeHomeModule name
   case j of
 	Just home_module -> return (Just home_module)
@@ -148,9 +158,9 @@ maybePackageModule mod_name = do
 	Just (pkg_name,path) -> 
 	    return (Just (mkModule mod_name pkg_name,
 			  ModuleLocation{ 
-				hs_file  = error "package module; no source",
+				hs_file  = "error:_package_module;_no_source",
 				hi_file  = hi,
-				obj_file = error "package module; no object"
+				obj_file = "error:_package_module;_no_object"
 			   }
 		   ))
 

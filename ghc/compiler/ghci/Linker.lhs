@@ -6,22 +6,30 @@
 \begin{code}
 {-# OPTIONS -#include "Linker.h" #-}
 module Linker ( 
-#ifdef GHCI
    loadObj,      -- :: String -> IO ()
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe Addr)
    resolveObjs,  -- :: IO ()
    linkPrelude -- tmp
-#endif
   )  where
 
 import IO
 import Exception
 import Addr
 import PrelByteArr
-import PrelPack (packString)
+import PrelPack 	(packString)
+import Panic		( panic )
 
-#ifdef GHCI
+#if __GLASGOW_HASKELL__ <= 408
+loadObj      = bogus "loadObj"
+unloadObj    = bogus "unloadObj"
+lookupSymbol = bogus "lookupSymbol"
+resolveObjs  = bogus "resolveObjs"
+linkPrelude  = bogus "linkPrelude"
+bogus f = panic ("Linker." ++ f ++ ": this hsc was built without an interpreter.")
+
+#else
+
 linkPrelude = do
   hPutStr stderr "Loading HSstd_cbits.o..."
   loadObj "/home/simonmar/builds/i386-unknown-linux-boot/ghc/lib/std/cbits/HSstd_cbits.o"
@@ -86,5 +94,5 @@ foreign import "unloadObj" unsafe
 foreign import "resolveObjs" unsafe
    c_resolveObjs :: IO Int
 
-#endif /* GHCI */
+#endif /* __GLASGOW_HASKELL__ <= 408 */
 \end{code}

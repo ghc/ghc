@@ -9,7 +9,6 @@ module StgInterp (
     ClosureEnv, ItblEnv,
     linkIModules,
     stgToInterpSyn,
---    runStgI  -- tmp, for testing
  ) where
 
 {- -----------------------------------------------------------------------------
@@ -30,7 +29,16 @@ module StgInterp (
 
 #include "HsVersions.h"
 
-#ifdef GHCI
+#if __GLASGOW_HASKELL__ <= 408
+
+import Panic ( panic )
+type ItblEnv = ()
+type ClosureEnv = ()
+linkIModules   = panic "StgInterp.linkIModules: this hsc was not built with an interpreter"
+stgToInterpSyn = panic "StgInterp.linkIModules: this hsc was not built with an interpreter"
+
+#else
+
 import Linker
 import Id 		( Id, idPrimRep )
 import Outputable
@@ -61,7 +69,6 @@ import CTypes
 import FastString
 import GlaExts		( Int(..) )
 import Module		( moduleNameFS )
-#endif
 
 import TyCon		( TyCon, isDataTyCon, tyConDataCons, tyConFamilySize )
 import Class		( Class, classTyCon )
@@ -1227,5 +1234,6 @@ load addr = do x <- peek addr
 
 foreign import "strncpy" strncpy :: Addr -> ByteArray# -> CInt -> IO ()
 
+#endif /* #if __GLASGOW_HASKELL__ <= 408 */
 \end{code}
 

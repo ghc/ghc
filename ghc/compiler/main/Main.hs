@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.12 2000/10/27 11:48:55 sewardj Exp $
+-- $Id: Main.hs,v 1.13 2000/10/27 13:50:25 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -259,16 +259,3 @@ setTopDir args = do
   return others
 
 beginMake = panic "`ghc --make' unimplemented"
-
------------------------------------------------------------------------------
--- compatibility code
-
-#if __GLASGOW_HASKELL__ <= 408
-catchJust = catchIO
-ioErrors  = justIoErrors
-throwTo   = raiseInThread
-#endif
-
-#ifdef mingw32_TARGET_OS
-foreign import "_getpid" getProcessID :: IO Int 
-#endif

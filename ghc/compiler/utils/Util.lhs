@@ -53,16 +53,26 @@ module Util (
 #endif
 
 	, global
+	, myProcessID
+
+#if __GLASGOW_HASKELL__ <= 408
+	, catchJust
+	, ioErrors
+	, throwTo
+#endif
 
     ) where
 
 #include "HsVersions.h"
 
+import IO		( hPutStrLn, stderr )
 import List		( zipWith4 )
 import Panic		( panic )
 import IOExts		( IORef, newIORef, unsafePerformIO )
 import FastTypes
-
+#if __GLASGOW__HASKELL__ <= 408
+import Exception	( catchIO, justIoErrors, raiseInThread )
+#endif
 infixr 9 `thenCmp`
 \end{code}
 
@@ -704,3 +714,20 @@ global :: a -> IORef a
 global a = unsafePerformIO (newIORef a)
 \end{code}
 
+Compatibility stuff:
+
+\begin{code}
+#if __GLASGOW_HASKELL__ <= 408
+catchJust = catchIO
+ioErrors  = justIoErrors
+throwTo   = raiseInThread
+#endif
+
+#ifdef mingw32_TARGET_OS
+foreign import "_getpid" myProcessID :: IO Int 
+#else
+myProcessID :: IO Int
+myProcessID = do hPutStrLn stderr "Warning:myProcessID"
+                 return 12345
+#endif
+\end{code}

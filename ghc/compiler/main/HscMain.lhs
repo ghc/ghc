@@ -62,7 +62,7 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  GenAvailInfo(..), RdrAvailInfo, OrigNameEnv(..),
 			  PackageRuleBase, HomeIfaceTable, PackageIfaceTable,
 			  extendTypeEnv, groupTyThings, TypeEnv, TyThing,
-			  typeEnvClasses, typeEnvTyCons )
+			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
 import RnMonad		( ExportItem, ParsedIface(..) )
 import CmSummarise	( ModSummary(..), name_of_summary, ms_get_imports,
 			  mimp_name )
@@ -111,6 +111,7 @@ hscMain dflags summary maybe_old_iface hst hit pcs
       -- ????? source_unchanged :: Bool -- extracted from summary?
       let source_unchanged = trace "WARNING: source_unchanged?!" False
       ;
+      putStrLn "checking old iface ...";
       (pcs_ch, check_errs, (recomp_reqd, maybe_checked_iface))
          <- checkOldIface dflags hit hst pcs (ms_mod summary)
 			  source_unchanged maybe_old_iface;
@@ -122,6 +123,7 @@ hscMain dflags summary maybe_old_iface hst hit pcs
           what_next | recomp_reqd || no_old_iface = hscRecomp 
                     | otherwise                   = hscNoRecomp
       ;
+      putStrLn "doing what_next ...";
       what_next dflags summary maybe_checked_iface
                 hst hit pcs_ch
       }}
@@ -376,7 +378,8 @@ initPersistentCompilerState :: IO PersistentCompilerState
 initPersistentCompilerState 
   = do prs <- initPersistentRenamerState
        return (
-        PCS { pcs_PST   = initPackageDetails,
+        PCS { pcs_PIT   = emptyIfaceTable,
+              pcs_PST   = initPackageDetails,
 	      pcs_insts = emptyInstEnv,
 	      pcs_rules = emptyRuleBase,
 	      pcs_PRS   = prs

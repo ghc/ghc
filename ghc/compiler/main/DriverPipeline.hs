@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.9 2000/10/27 11:48:55 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.10 2000/10/27 13:50:25 sewardj Exp $
 --
 -- GHC Driver
 --
@@ -39,11 +39,9 @@ import Config
 import Util
 import MkIface		( pprIface )
 
-import Posix
 import Directory
 import System
 import IOExts
--- import Posix		commented out temp by SLPJ to get going on windows
 import Exception
 
 import IO
@@ -574,7 +572,7 @@ run_phase SplitMangle _basename _suff input_fn _output_fn
 
 	-- this is the prefix used for the split .s files
 	tmp_pfx <- readIORef v_TmpDir
-	x <- getProcessID
+	x <- myGetProcessID
 	let split_s_prefix = tmp_pfx ++ "/ghc" ++ show x
 	writeIORef v_Split_prefix split_s_prefix
 	addFilesToClean [split_s_prefix ++ "__*"] -- d:-)

@@ -9,7 +9,7 @@ module HscTypes (
 
 	ModDetails(..),	ModIface(..), GlobalSymbolTable, 
 	HomeSymbolTable, PackageSymbolTable,
-	HomeIfaceTable, PackageIfaceTable, 
+	HomeIfaceTable, PackageIfaceTable, emptyIfaceTable,
 	lookupTable, lookupTableByModName,
 
 	IfaceDecls(..), 
@@ -71,7 +71,7 @@ import Type		( Type )
 import FiniteMap	( FiniteMap, emptyFM, addToFM, lookupFM, foldFM )
 import Bag		( Bag )
 import Maybes		( seqMaybe )
-import UniqFM 		( UniqFM )
+import UniqFM 		( UniqFM, emptyUFM )
 import Outputable
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
 import Util		( thenCmp )
@@ -90,7 +90,11 @@ data ModuleLocation
 	hs_file  :: FilePath,
 	hi_file  :: FilePath,
 	obj_file :: FilePath
-      }
+     }
+     deriving Show
+
+instance Outputable ModuleLocation where
+   ppr = text . show
 \end{code}
 
 For a module in another package, the hs_file and obj_file
@@ -181,6 +185,9 @@ type PackageIfaceTable  = IfaceTable
 type HomeSymbolTable    = SymbolTable	-- Domain = modules in the home package
 type PackageSymbolTable = SymbolTable	-- Domain = modules in the some other package
 type GlobalSymbolTable  = SymbolTable	-- Domain = all modules
+
+emptyIfaceTable :: IfaceTable
+emptyIfaceTable = emptyUFM
 \end{code}
 
 Simple lookups in the symbol table.
