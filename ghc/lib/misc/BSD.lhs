@@ -77,9 +77,7 @@ import PrelIOBase ( IOError (..), IOErrorType(..) )
 
 import Foreign
 import Addr
-import PackedString ( cByteArrayToPS, unpackPS, unpackCStringIO )
-  
-import Util  ( unvectorize )
+import CString ( unpackCStringIO, unpackCStringBA, unvectorize )
 import SocketPrim
 
 \end{code}
@@ -373,7 +371,8 @@ getHostName = do
   ba  <- stToIO (unsafeFreezeByteArray ptr)
   if rc == -1 
      then fail (userError "getHostName: unable to determine host name")
-     else return (unpackPS (cByteArrayToPS ba))
+     else do
+       return (unpackCStringBA ba)
 \end{code}
 
 Helper function used by the exported functions that provides a
