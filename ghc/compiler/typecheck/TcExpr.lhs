@@ -6,12 +6,13 @@
 \begin{code}
 #include "HsVersions.h"
 
-module TcExpr ( tcExpr, tcId ) where
+module TcExpr ( tcExpr, tcStmt, tcId ) where
 
 IMP_Ubiq()
 
 import HsSyn		( HsExpr(..), Stmt(..), DoOrListComp(..), 
-			  HsBinds(..), Bind(..), MonoBinds(..), 
+			  HsBinds(..),  MonoBinds(..), 
+			  SYN_IE(RecFlag), nonRecursive,
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
 			  Match, Fake, InPat, OutPat, HsType, Fixity,
 			  pprParendExpr, failureFreePat, collectPatBinders )
@@ -30,7 +31,7 @@ import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
 import TcBinds		( tcBindsAndThen, checkSigTyVars )
 import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			  tcLookupGlobalValueByKey, newMonoIds, tcGetGlobalTyVars,
-			  tcExtendGlobalTyVars
+			  tcExtendGlobalTyVars, tcLookupGlobalValueMaybe 
 			)
 import SpecEnv		( SpecEnv )
 import TcMatches	( tcMatchesCase, tcMatch )
@@ -38,23 +39,27 @@ import TcMonoType	( tcHsType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
 import TcType		( SYN_IE(TcType), TcMaybe(..),
-			  tcInstId, tcInstType, tcInstSigTcType,
-			  tcInstSigType, tcInstTcType, tcInstTheta,
-			  newTyVarTy, zonkTcTyVars, zonkTcType )
+			  tcInstId, tcInstType, tcInstSigTcType, tcInstTyVars,
+			  tcInstSigType, tcInstTcType, tcInstTheta, tcSplitRhoTy,
+			  newTyVarTy, newTyVarTys, zonkTcTyVars, zonkTcType )
 import TcKind		( TcKind )
 
 import Class		( SYN_IE(Class), classSig )
-import FieldLabel	( fieldLabelName )
-import Id		( idType, dataConFieldLabels, dataConSig, SYN_IE(Id), GenId )
+import FieldLabel	( fieldLabelName, fieldLabelType )
+import Id		( idType, dataConFieldLabels, dataConSig, recordSelectorFieldLabel,
+			  isRecordSelector,
+			  SYN_IE(Id), GenId
+			)
+import FieldLabel	( FieldLabel )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
 import Name		( Name{-instance Eq-} )
 import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
-			  getTyVar_maybe, getFunTy_maybe, instantiateTy,
+			  getTyVar_maybe, getFunTy_maybe, instantiateTy, applyTyCon,
 			  splitForAllTy, splitRhoTy, splitSigmaTy, splitFunTy,
-			  isTauTy, mkFunTys, tyVarsOfType, getForAllTy_maybe,
+			  isTauTy, mkFunTys, tyVarsOfType, tyVarsOfTypes, getForAllTy_maybe,
 			  getAppDataTyCon, maybeAppDataTyCon
 			)
-import TyVar		( GenTyVar, SYN_IE(TyVarSet), unionTyVarSets, mkTyVarSet )
+import TyVar		( GenTyVar, SYN_IE(TyVarSet), unionTyVarSets, elementOfTyVarSet, mkTyVarSet )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
 			  floatPrimTy, addrPrimTy, realWorldTy
 			)
@@ -68,10 +73,11 @@ import Unique		( Unique, cCallableClassKey, cReturnableClassKey,
 			  enumFromToClassOpKey, enumFromThenToClassOpKey,
 			  thenMClassOpKey, zeroClassOpKey, returnMClassOpKey
 			)
-import Outputable	( interpp'SP )
+import Outputable	( speakNth, interpp'SP, Outputable(..) )
 import PprType		( GenType, GenTyVar )	-- Instances
 import Maybes		( maybeToBool )
 import Pretty
+import ListSetOps	( minusList )
 import Util
 \end{code}
 
@@ -283,9 +289,14 @@ tcExpr (HsSCC label expr)
 
 tcExpr (HsLet binds expr)
   = tcBindsAndThen
-	HsLet 			-- The combiner
+	combiner
 	binds 			-- Bindings to check
-	(tcExpr expr)		-- Typechecker for the expression
+	(tc_expr expr)	`thenTc` \ ((expr', ty), lie) ->
+    returnTc (expr', lie, ty)
+  where
+    tc_expr expr = tcExpr expr `thenTc` \ (expr', lie, ty) ->
+	   	   returnTc ((expr',ty), lie)
+    combiner bind (expr, ty) = (HsLet bind expr, ty)
 
 tcExpr in_expr@(HsCase expr matches src_loc)
   = tcAddSrcLoc src_loc	$
@@ -344,49 +355,134 @@ tcExpr (RecordCon (HsVar con) rbinds)
 	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (maybeAppDataTyCon record_ty ) )
 
-    tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
-
 	-- Check that the record bindings match the constructor
-    tcLookupGlobalValue con			`thenNF_Tc` \ con_id ->
-    checkTc (checkRecordFields rbinds con_id)
-	    (badFieldsCon con rbinds)		`thenTc_`
+    tcLookupGlobalValue con				`thenNF_Tc` \ con_id ->
+    let
+	bad_fields = badFields rbinds con_id
+    in
+    checkTc (null bad_fields) (badFieldsCon con bad_fields)	`thenTc_`
+
+	-- Typecheck the record bindings
+	-- (Do this after checkRecordFields in case there's a field that
+	--  doesn't match the constructor.)
+    tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
 
     returnTc (RecordCon con_expr rbinds', con_lie `plusLIE` rbinds_lie, record_ty)
 
--- One small complication in RecordUpd is that we have to generate some 
--- dictionaries for the data type context, since we are going to
--- do some construction.
+
+-- The main complication with RecordUpd is that we need to explicitly
+-- handle the *non-updated* fields.  Consider:
 --
--- What dictionaries do we need?  For the moment we assume that all
--- data constructors have the same context, and grab it from the first
--- constructor.  If they have varying contexts then we'd have to 
--- union the ones that could participate in the update.
+--	data T a b = MkT1 { fa :: a, fb :: b }
+--		   | MkT2 { fa :: a, fc :: Int -> Int }
+--		   | MkT3 { fd :: a }
+--	
+--	upd :: T a b -> c -> T a c
+--	upd t x = t { fb = x}
+--
+-- The type signature on upd is correct (i.e. the result should not be (T a b))
+-- because upd should be equivalent to:
+--
+--	upd t x = case t of 
+--			MkT1 p q -> MkT1 p x
+--			MkT2 a b -> MkT2 p b
+--			MkT3 d   -> error ...
+--
+-- So we need to give a completely fresh type to the result record,
+-- and then constrain it by the fields that are *not* updated ("p" above).
+--
+-- Note that because MkT3 doesn't contain all the fields being updated,
+-- its RHS is simply an error, so it doesn't impose any type constraints
+--
+-- All this is done in STEP 4 below.
 
 tcExpr (RecordUpd record_expr rbinds)
-  = ASSERT( not (null rbinds) )
-    tcAddErrCtxt recordUpdCtxt			$
+  = tcAddErrCtxt recordUpdCtxt			$
 
-    tcExpr record_expr			`thenTc` \ (record_expr', record_lie, record_ty) ->
-    tcRecordBinds record_ty rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
-
-	-- Check that the field names are plausible
-    zonkTcType record_ty		`thenNF_Tc` \ record_ty' ->
-    let
-	(tycon, inst_tys, data_cons) = --trace "TcExpr.getAppDataTyCon" $
-				       getAppDataTyCon record_ty'
-	-- The record binds are non-empty (syntax); so at least one field
-	-- label will have been unified with record_ty by tcRecordBinds;
-	-- field labels must be of data type; hencd the getAppDataTyCon must succeed.
-	(tyvars, theta, _, _) = dataConSig (head data_cons)
+	-- STEP 1
+	-- Figure out the tycon and data cons from the first field name
+    ASSERT( not (null rbinds) )
+    let 
+	((first_field_name, _, _) : rest) = rbinds
     in
-    tcInstTheta (zipEqual "tcExpr:RecordUpd" tyvars inst_tys) theta `thenNF_Tc` \ theta' ->
-    newDicts RecordUpdOrigin theta'				    `thenNF_Tc` \ (con_lie, dicts) ->
-    checkTc (any (checkRecordFields rbinds) data_cons)
+    tcLookupGlobalValueMaybe first_field_name	`thenNF_Tc` \ maybe_sel_id ->
+    (case maybe_sel_id of
+	Just sel_id | isRecordSelector sel_id -> returnTc sel_id
+	other				      -> failTc (notSelector first_field_name)
+    )						`thenTc` \ sel_id ->
+    let
+	(_, tau)	      	  = splitForAllTy (idType sel_id)
+	Just (data_ty, _)     	  = getFunTy_maybe tau	-- Must succeed since sel_id is a selector
+	(tycon, _, data_cons) 	  = getAppDataTyCon data_ty
+	(con_tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
+    in
+    tcInstTyVars con_tyvars			`thenNF_Tc` \ (_, result_inst_tys, result_inst_env) ->
+
+	-- STEP 2
+	-- Check for bad fields
+    checkTc (any (null . badFields rbinds) data_cons)
 	    (badFieldsUpd rbinds)		`thenTc_`
 
-    returnTc (RecordUpdOut record_expr' dicts rbinds', 
+	-- STEP 3
+	-- Typecheck the update bindings.
+	-- (Do this after checking for bad fields in case there's a field that
+	--  doesn't match the constructor.)
+    let
+	result_record_ty = applyTyCon tycon result_inst_tys
+    in
+    tcRecordBinds result_record_ty rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
+
+	-- STEP 4
+	-- Use the un-updated fields to find a vector of booleans saying
+	-- which type arguments must be the same in updatee and result.
+	--
+	-- WARNING: this code assumes that all data_cons in a common tycon
+	-- have FieldLabels abstracted over the same tyvars.
+    let
+	upd_field_lbls      = [recordSelectorFieldLabel sel_id | (RealId sel_id, _, _) <- rbinds']
+	con_field_lbls_s    = map dataConFieldLabels data_cons
+
+		-- A constructor is only relevant to this process if
+		-- it contains all the fields that are being updated
+	relevant_field_lbls_s      = filter is_relevant con_field_lbls_s
+	is_relevant con_field_lbls = all (`elem` con_field_lbls) upd_field_lbls
+
+	non_upd_field_lbls  = concat relevant_field_lbls_s `minusList` upd_field_lbls
+	common_tyvars       = tyVarsOfTypes (map fieldLabelType non_upd_field_lbls)
+
+	mk_inst_ty (tyvar, result_inst_ty) 
+	  | tyvar `elementOfTyVarSet` common_tyvars = returnNF_Tc result_inst_ty	-- Same as result type
+	  | otherwise			            = newTyVarTy mkBoxedTypeKind	-- Fresh type
+    in
+    mapNF_Tc mk_inst_ty (zip con_tyvars result_inst_tys)	`thenNF_Tc` \ inst_tys ->
+
+	-- STEP 5
+	-- Typecheck the expression to be updated
+    tcExpr record_expr					`thenTc` \ (record_expr', record_lie, record_ty) ->
+    unifyTauTy (applyTyCon tycon inst_tys) record_ty	`thenTc_`
+    
+
+	-- STEP 6
+	-- Figure out the LIE we need.  We have to generate some 
+	-- dictionaries for the data type context, since we are going to
+	-- do some construction.
+	--
+	-- What dictionaries do we need?  For the moment we assume that all
+	-- data constructors have the same context, and grab it from the first
+	-- constructor.  If they have varying contexts then we'd have to 
+	-- union the ones that could participate in the update.
+    let
+	(tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
+	inst_env = zipEqual "tcExpr:RecordUpd" tyvars result_inst_tys
+    in
+    tcInstTheta inst_env theta			`thenNF_Tc` \ theta' ->
+    newDicts RecordUpdOrigin theta'		`thenNF_Tc` \ (con_lie, dicts) ->
+
+	-- Phew!
+    returnTc (RecordUpdOut record_expr' result_record_ty dicts rbinds', 
 	      con_lie `plusLIE` record_lie `plusLIE` rbinds_lie, 
-	      record_ty)
+	      result_record_ty)
+
 
 tcExpr (ArithSeqIn seq@(From expr))
   = tcExpr expr					`thenTc`    \ (expr', lie1, ty) ->
@@ -608,11 +704,7 @@ tcArg expected_arg_ty arg
 	returnTc (TyLam sig_tyvars (HsLet (mk_binds inst_binds) arg'), free_insts)
     )
   where
-
-    mk_binds [] = EmptyBinds
-    mk_binds ((inst,rhs):inst_binds)
-	= (SingleBind (NonRecBind (VarMonoBind inst rhs))) `ThenBinds`
-	  mk_binds inst_binds
+    mk_binds inst_binds = MonoBind inst_binds [] nonRecursive
 \end{code}
 
 %************************************************************************
@@ -650,17 +742,17 @@ tcId name
 	instantiate_it2 tc_id_occ tyvars rho
 
     instantiate_it2 tc_id_occ tyvars rho
-      | null theta	-- Is it overloaded?
-      = returnNF_Tc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
-
-      | otherwise	-- Yes, it's overloaded
-      = newMethodWithGivenTy (OccurrenceOf tc_id_occ)
+      = tcSplitRhoTy rho				`thenNF_Tc` \ (theta, tau) ->
+	if null theta then 	-- Is it overloaded?
+		returnNF_Tc (mkHsTyApp (HsVar tc_id_occ) arg_tys, emptyLIE, tau)
+	else
+		-- Yes, it's overloaded
+	newMethodWithGivenTy (OccurrenceOf tc_id_occ)
 			     tc_id_occ arg_tys rho	`thenNF_Tc` \ (lie1, meth_id) ->
 	instantiate_it meth_id tau			`thenNF_Tc` \ (expr, lie2, final_tau) ->
 	returnNF_Tc (expr, lie1 `plusLIE` lie2, final_tau)
 
       where
-        (theta,  tau) = splitRhoTy   rho
 	arg_tys	      = mkTyVarTys tyvars
 \end{code}
 
@@ -674,11 +766,30 @@ tcId name
 tcDoStmts do_or_lc stmts src_loc
   =	-- get the Monad and MonadZero classes
 	-- create type consisting of a fresh monad tyvar
+    ASSERT( not (null stmts) )
     tcAddSrcLoc src_loc	$
     newTyVarTy (mkArrowKind mkBoxedTypeKind mkBoxedTypeKind)	`thenNF_Tc` \ m ->
 
+    let
+      tc_stmts []	    = returnTc (([], error "tc_stmts"), emptyLIE)
+      tc_stmts (stmt:stmts) = tcStmt tcExpr do_or_lc (mkAppTy m) combine_stmts stmt $
+			      tc_stmts stmts
+
+      combine_stmts stmt@(ReturnStmt _) (Just ty) ([], _) = ([stmt], ty)
+      combine_stmts stmt@(ExprStmt e _) (Just ty) ([], _) = ([stmt], ty)
+      combine_stmts stmt 		_ 	  ([], _) = panic "Bad last stmt tcDoStmts"
+      combine_stmts stmt		_     (stmts, ty) = (stmt:stmts, ty)
+    in
+    tc_stmts stmts	`thenTc` \ ((stmts', result_ty), final_lie) ->
 
 	-- Build the then and zero methods in case we need them
+	-- It's important that "then" and "return" appear just once in the final LIE,
+	-- not only for typechecker efficiency, but also because otherwise during
+	-- simplification we end up with silly stuff like
+	--	then = case d of (t,r) -> t
+	--	then = then
+	-- where the second "then" sees that it already exists in the "available" stuff.
+	--
     tcLookupGlobalValueByKey returnMClassOpKey	`thenNF_Tc` \ return_sel_id ->
     tcLookupGlobalValueByKey thenMClassOpKey	`thenNF_Tc` \ then_sel_id ->
     tcLookupGlobalValueByKey zeroClassOpKey	`thenNF_Tc` \ zero_sel_id ->
@@ -688,86 +799,95 @@ tcDoStmts do_or_lc stmts src_loc
 	      (RealId then_sel_id) [m]		`thenNF_Tc` \ (then_lie, then_id) ->
     newMethod DoOrigin
 	      (RealId zero_sel_id) [m]		`thenNF_Tc` \ (zero_lie, zero_id) ->
-
     let
-      -- go :: [RenamedStmt] -> TcM s ([TcStmt s], LIE s, TcType s)
+      monad_lie = then_lie `plusLIE` return_lie `plusLIE` perhaps_zero_lie
+      perhaps_zero_lie | all failure_free stmts' = emptyLIE
+		       | otherwise		 = zero_lie
 
-      go [stmt@(ReturnStmt exp)]	-- Must be last statement
-	= ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
-	  tcSetErrCtxt (stmtCtxt do_or_lc stmt) $
-	  tcExpr exp			 	`thenTc`    \ (exp', exp_lie, exp_ty) ->
-	  returnTc ([ReturnStmt exp'], return_lie `plusLIE` exp_lie, mkAppTy m exp_ty)
-
-      go (stmt@(GuardStmt exp src_loc) : stmts)
-	= ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
-	  tcAddSrcLoc src_loc 		(
-	  tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
-		tcExpr exp	 		`thenTc`    \ (exp', exp_lie, exp_ty) ->
-		unifyTauTy boolTy exp_ty	`thenTc_`
-		returnTc (GuardStmt exp' src_loc, exp_lie)
-	  ))					`thenTc` \ (stmt', stmt_lie) ->
-	  go stmts			`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
-	  returnTc (stmt' : stmts',
-		    stmt_lie `plusLIE` stmts_lie `plusLIE` zero_lie,
-		    stmts_ty)
-	 
-      go (stmt@(ExprStmt exp src_loc) : stmts)
-	= ASSERT( case do_or_lc of { DoStmt -> True; ListComp -> False } )
-	  tcAddSrcLoc src_loc 		(
-	  tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
-		tcExpr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
-		-- Check that exp has type (m tau) for some tau (doesn't matter what)
-		newTyVarTy mkTypeKind			`thenNF_Tc` \ tau ->
-	        unifyTauTy (mkAppTy m tau) exp_ty	`thenTc_`
-		returnTc (ExprStmt exp' src_loc, exp_lie, exp_ty, exp_ty)
-	  ))					`thenTc` \ (stmt',  stmt_lie, stmt_ty, result_ty) -> 
-	  if null stmts then
-		-- This is the last statement
-		returnTc ([stmt'], stmt_lie, result_ty)
-	  else
-		-- More statments follow
-	  go stmts				`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
-	  returnTc (stmt' : stmts',
-		    stmt_lie `plusLIE` stmts_lie `plusLIE` then_lie,
-		    stmts_ty)
-
-      go (stmt@(BindStmt pat exp src_loc) : stmts)
-	= newMonoIds (collectPatBinders pat) mkBoxedTypeKind $ \ _ ->
-	  tcAddSrcLoc src_loc		(
-	  tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
-		tcPat pat		`thenTc`    \ (pat', pat_lie, pat_ty) ->  
-	    	tcExpr exp		`thenTc`    \ (exp', exp_lie, exp_ty) ->
-		unifyTauTy (mkAppTy m pat_ty) exp_ty	`thenTc_`
-
-		-- NB: the environment has been extended with the new binders
-		-- which the rhs can't "see", but the renamer should have made
-		-- sure that everything is distinct by now, so there's no problem.
-		-- Putting the tcExpr before the newMonoIds messes up the nesting
-		-- of error contexts, so I didn't  bother
-
-		returnTc (BindStmt pat' exp' src_loc, pat', pat_lie `plusLIE` exp_lie)
-	  ))				`thenTc` \ (stmt', pat', stmt_lie) ->
-
-	  go stmts			`thenTc` \ (stmts', stmts_lie, stmts_ty) ->
-
-	  returnTc (stmt' : stmts',
-		    stmt_lie `plusLIE` stmts_lie `plusLIE` then_lie `plusLIE` 
-			(if failureFreePat pat' then emptyLIE else zero_lie),
-		    stmts_ty)
-
-      go (LetStmt binds : stmts)
-	   = tcBindsAndThen		-- No error context, but a binding group is
-		combine			-- rather a large thing for an error context anyway
-		binds
-		(go stmts)
-	   where
-	     combine binds' stmts' = LetStmt binds' : stmts'
+      failure_free (BindStmt pat _ _) = failureFreePat pat
+      failure_free (GuardStmt _ _)    = False
+      failure_free other_stmt	      = True
     in
-
-    go stmts		`thenTc` \ (stmts', final_lie, result_ty) ->
     returnTc (HsDoOut do_or_lc stmts' return_id then_id zero_id result_ty src_loc,
-	      final_lie,
+	      final_lie `plusLIE` monad_lie,
 	      result_ty)
+\end{code}
+
+\begin{code}
+tcStmt :: (RenamedHsExpr -> TcM s (TcExpr s, LIE s, TcType s))	-- This is tcExpr
+				-- The sole, disgusting, reason for this parameter
+				-- is to get the effect of polymorphic recursion
+				-- ToDo: rm when booting with Haskell 1.3
+       -> DoOrListComp
+       -> (TcType s -> TcType s)		-- Relationship type of pat and rhs in pat <- rhs
+       -> (TcStmt s -> Maybe (TcType s) -> thing -> thing)
+       -> RenamedStmt
+       -> TcM s (thing, LIE s)
+       -> TcM s (thing, LIE s)
+
+tcStmt tc_expr do_or_lc m combine stmt@(ReturnStmt exp) do_next
+  = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+    tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
+	tc_expr exp			 `thenTc`    \ (exp', exp_lie, exp_ty) ->
+	returnTc (ReturnStmt exp', exp_lie, m exp_ty)
+    )					`thenTc` \ (stmt', stmt_lie, stmt_ty) ->
+    do_next				`thenTc` \ (thing', thing_lie) ->
+    returnTc (combine stmt' (Just stmt_ty) thing',
+  	      stmt_lie `plusLIE` thing_lie)
+
+tcStmt tc_expr do_or_lc m combine stmt@(GuardStmt exp src_loc) do_next
+  = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+    tcAddSrcLoc src_loc 		(
+    tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
+  	tc_expr exp	 		`thenTc`    \ (exp', exp_lie, exp_ty) ->
+  	unifyTauTy boolTy exp_ty	`thenTc_`
+  	returnTc (GuardStmt exp' src_loc, exp_lie)
+    ))					`thenTc` \ (stmt', stmt_lie) ->
+    do_next				`thenTc` \ (thing', thing_lie) ->
+    returnTc (combine stmt' Nothing thing',
+  	      stmt_lie `plusLIE` thing_lie)
+
+tcStmt tc_expr do_or_lc m combine stmt@(ExprStmt exp src_loc) do_next
+  = ASSERT( case do_or_lc of { DoStmt -> True; ListComp -> False } )
+    tcAddSrcLoc src_loc 		(
+    tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
+  	tc_expr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
+  	-- Check that exp has type (m tau) for some tau (doesn't matter what)
+  	newTyVarTy mkTypeKind		`thenNF_Tc` \ tau ->
+        unifyTauTy (m tau) exp_ty	`thenTc_`
+  	returnTc (ExprStmt exp' src_loc, exp_lie, exp_ty)
+    ))					`thenTc` \ (stmt',  stmt_lie, stmt_ty) ->
+    do_next				`thenTc` \ (thing', thing_lie) ->
+    returnTc (combine stmt' (Just stmt_ty) thing',
+  	      stmt_lie `plusLIE` thing_lie)
+
+tcStmt tc_expr do_or_lc m combine stmt@(BindStmt pat exp src_loc) do_next
+  = newMonoIds (collectPatBinders pat) mkBoxedTypeKind $ \ _ ->
+    tcAddSrcLoc src_loc		(
+    tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
+  	tcPat pat			`thenTc`    \ (pat', pat_lie, pat_ty) ->  
+      	tc_expr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
+  	unifyTauTy (m pat_ty) exp_ty	`thenTc_`
+
+  	-- NB: the environment has been extended with the new binders
+  	-- which the rhs can't "see", but the renamer should have made
+  	-- sure that everything is distinct by now, so there's no problem.
+  	-- Putting the tcExpr before the newMonoIds messes up the nesting
+  	-- of error contexts, so I didn't  bother
+
+  	returnTc (BindStmt pat' exp' src_loc, pat_lie `plusLIE` exp_lie)
+    ))					`thenTc` \ (stmt', stmt_lie) ->
+    do_next				`thenTc` \ (thing', thing_lie) ->
+    returnTc (combine stmt' Nothing thing',
+  	      stmt_lie `plusLIE` thing_lie)
+
+tcStmt tc_expr do_or_lc m combine (LetStmt binds) do_next
+     = tcBindsAndThen		-- No error context, but a binding group is
+  	combine'		-- rather a large thing for an error context anyway
+  	binds
+  	do_next
+     where
+      	combine' binds' thing' = combine (LetStmt binds') Nothing thing'
 \end{code}
 
 %************************************************************************
@@ -810,6 +930,11 @@ tcRecordBinds expected_record_ty rbinds
   where
     do_bind (field_label, rhs, pun_flag)
       = tcLookupGlobalValue field_label	`thenNF_Tc` \ sel_id ->
+	ASSERT( isRecordSelector sel_id )
+		-- This lookup and assertion will surely succeed, because
+		-- we check that the fields are indeed record selectors
+		-- before calling tcRecordBinds
+
 	tcInstId sel_id			`thenNF_Tc` \ (_, _, tau) ->
 
 		-- Record selectors all have type
@@ -823,17 +948,12 @@ tcRecordBinds expected_record_ty rbinds
 	tcArg field_ty rhs				`thenTc` \ (rhs', lie) ->
 	returnTc ((RealId sel_id, rhs', pun_flag), lie)
 
-checkRecordFields :: RenamedRecordBinds -> Id -> Bool	-- True iff all the fields in
-							-- RecordBinds are field of the
-							-- specified constructor
-checkRecordFields rbinds data_con
-  = all ok rbinds
-  where 
-    data_con_fields = dataConFieldLabels data_con
-
-    ok (field_name, _, _) = any (match (getName field_name)) data_con_fields
-
-    match field_name field_label = field_name == fieldLabelName field_label
+badFields rbinds data_con
+  = [field_name | (field_name, _, _) <- rbinds,
+		  not (field_name `elem` field_names)
+    ]
+  where
+    field_names = map fieldLabelName (dataConFieldLabels data_con)
 \end{code}
 
 %************************************************************************
@@ -860,77 +980,78 @@ Errors and contexts
 
 Mini-utils:
 \begin{code}
-pp_nest_hang :: String -> Pretty -> Pretty
-pp_nest_hang label stuff = ppNest 2 (ppHang (ppStr label) 4 stuff)
+pp_nest_hang :: String -> Doc -> Doc
+pp_nest_hang label stuff = nest 2 (hang (text label) 4 stuff)
 \end{code}
 
 Boring and alphabetical:
 \begin{code}
 arithSeqCtxt expr sty
-  = ppHang (ppPStr SLIT("In an arithmetic sequence:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In an arithmetic sequence:")) 4 (ppr sty expr)
 
 branchCtxt b1 b2 sty
-  = ppSep [ppPStr SLIT("In the branches of a conditional:"),
+  = sep [ptext SLIT("In the branches of a conditional:"),
 	   pp_nest_hang "`then' branch:" (ppr sty b1),
 	   pp_nest_hang "`else' branch:" (ppr sty b2)]
 
 caseCtxt expr sty
-  = ppHang (ppPStr SLIT("In a case expression:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In a case expression:")) 4 (ppr sty expr)
 
 exprSigCtxt expr sty
-  = ppHang (ppPStr SLIT("In an expression with a type signature:"))
+  = hang (ptext SLIT("In an expression with a type signature:"))
 	 4 (ppr sty expr)
 
 listCtxt expr sty
-  = ppHang (ppPStr SLIT("In a list expression:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In a list expression:")) 4 (ppr sty expr)
 
 predCtxt expr sty
-  = ppHang (ppPStr SLIT("In a predicate expression:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In a predicate expression:")) 4 (ppr sty expr)
 
 sectionRAppCtxt expr sty
-  = ppHang (ppPStr SLIT("In a right section:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In a right section:")) 4 (ppr sty expr)
 
 sectionLAppCtxt expr sty
-  = ppHang (ppPStr SLIT("In a left section:")) 4 (ppr sty expr)
+  = hang (ptext SLIT("In a left section:")) 4 (ppr sty expr)
 
 funAppCtxt fun arg_no arg sty
-  = ppHang (ppCat [ ppPStr SLIT("In the"), speakNth arg_no, ppPStr SLIT("argument of"), 
-		    ppr sty fun `ppBeside` ppStr ", namely"])
+  = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
+		    ppr sty fun <> text ", namely"])
 	 4 (pprParendExpr sty arg)
 
 stmtCtxt ListComp stmt sty
-  = ppHang (ppPStr SLIT("In a list-comprehension qualifer:")) 
+  = hang (ptext SLIT("In a list-comprehension qualifer:")) 
          4 (ppr sty stmt)
 
 stmtCtxt DoStmt stmt sty
-  = ppHang (ppPStr SLIT("In a do statement:")) 
+  = hang (ptext SLIT("In a do statement:")) 
          4 (ppr sty stmt)
 
 tooManyArgsCtxt f sty
-  = ppHang (ppPStr SLIT("Too many arguments in an application of the function"))
+  = hang (ptext SLIT("Too many arguments in an application of the function"))
 	 4 (ppr sty f)
 
 lurkingRank2Err fun fun_ty sty
-  = ppHang (ppCat [ppPStr SLIT("Illegal use of"), ppr sty fun])
-	 4 (ppAboves [ppStr "It is applied to too few arguments,", 
-		      ppPStr SLIT("so that the result type has for-alls in it")])
+  = hang (hsep [ptext SLIT("Illegal use of"), ppr sty fun])
+	 4 (vcat [text "It is applied to too few arguments,", 
+		      ptext SLIT("so that the result type has for-alls in it")])
 
 rank2ArgCtxt arg expected_arg_ty sty
-  = ppHang (ppPStr SLIT("In a polymorphic function argument:"))
-	 4 (ppSep [ppBeside (ppr sty arg) (ppPStr SLIT(" ::")),
+  = hang (ptext SLIT("In a polymorphic function argument:"))
+	 4 (sep [(<>) (ppr sty arg) (ptext SLIT(" ::")),
 		   ppr sty expected_arg_ty])
 
 badFieldsUpd rbinds sty
-  = ppHang (ppPStr SLIT("No constructor has all these fields:"))
+  = hang (ptext SLIT("No constructor has all these fields:"))
 	 4 (interpp'SP sty fields)
   where
     fields = [field | (field, _, _) <- rbinds]
 
-recordUpdCtxt sty = ppPStr SLIT("In a record update construct")
+recordUpdCtxt sty = ptext SLIT("In a record update construct")
 
-badFieldsCon con rbinds sty
-  = ppHang (ppBesides [ppPStr SLIT("Inconsistent constructor:"), ppr sty con])
-	 4 (ppBesides [ppPStr SLIT("and fields:"), interpp'SP sty fields])
-  where
-    fields = [field | (field, _, _) <- rbinds]
+badFieldsCon con fields sty
+  = hsep [ptext SLIT("Constructor"), 		ppr sty con,
+	   ptext SLIT("does not have field(s)"), interpp'SP sty fields]
+
+notSelector field sty
+  = hsep [ppr sty field, ptext SLIT("is not a record selector")]
 \end{code}
