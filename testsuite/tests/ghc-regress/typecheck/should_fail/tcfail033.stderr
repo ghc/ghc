@@ -4,4 +4,4 @@ tcfail033.hs:4:
 	Expected type: (t, t1)
 	Inferred type: t
     In the result of a list comprehension: x
-    In a right-hand side of function `buglet': [x | (x, y) <- buglet]
+    In the definition of `buglet': buglet = [x | (x, y) <- buglet]

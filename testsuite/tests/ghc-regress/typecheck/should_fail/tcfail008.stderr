@@ -6,5 +6,4 @@ tcfail008.hs:3:
       o :: [a] (bound at tcfail008.hs:3)
     Probable fix: give these definition(s) an explicit type signature
     In the second argument of `(:)', namely `2'
-    In a right-hand side of function `o': 1 : 2
     In the definition of `o': o = 1 : 2

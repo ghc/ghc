@@ -1,6 +1,5 @@
 
 tcfail029.hs:6:
     No instance for (Ord Foo)
-    arising from use of `>' at tcfail029.hs:6
-    In a right-hand side of function `f': x > Bar
+      arising from use of `>' at tcfail029.hs:6
     In the definition of `f': f x = x > Bar

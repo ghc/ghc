@@ -2,9 +2,13 @@
 tcfail006.hs:5:
     No instance for (Num Bool)
       arising from the literal `1' at tcfail006.hs:5
-    In the body of a case alternative: (1, True)
     In a case alternative: False -> (1, True)
     In the case expression:
 	case (if True then True else False) of
 	  True -> (True, 1)
 	  False -> (1, True)
+    In a pattern binding:
+	(j, k)
+	    = case (if True then True else False) of
+		True -> (True, 1)
+		False -> (1, True)

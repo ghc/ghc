@@ -4,4 +4,4 @@ tcfail090.hs:8:
     When matching types `ByteArray#' and `a'
 	Expected type: ByteArray#
 	Inferred type: a
-    In a right-hand side of function `die': undefined
+    In the definition of `die': die _ = undefined

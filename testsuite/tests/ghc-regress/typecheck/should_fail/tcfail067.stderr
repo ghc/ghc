@@ -44,9 +44,9 @@ tcfail067.hs:61:
       arising from use of `numSubRangeNegate' at tcfail067.hs:61
     Probable fix:
 	Add (Ord a) to the class or instance method `negate'
-    In a right-hand side of function `negate': numSubRangeNegate
     In the definition of `negate': negate = numSubRangeNegate
     In the definition for method `negate'
+    In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:65:
     Could not deduce (Ord a)
@@ -57,20 +57,17 @@ tcfail067.hs:65:
       arising from use of `SubRange' at tcfail067.hs:65
     Probable fix:
 	Add (Ord a) to the class or instance method `fromInteger'
-    In a right-hand side of function `fromInteger':
-	SubRange (fromInteger a, fromInteger a) (fromInteger a)
     In the definition of `fromInteger':
 	fromInteger a = SubRange (fromInteger a, fromInteger a)
 				 (fromInteger a)
     In the definition for method `fromInteger'
+    In the instance declaration for `Num (SubRange a)'
 
 tcfail067.hs:74:
     Could not deduce (Ord a) from the context (Num a)
       arising from use of `SubRange' at tcfail067.hs:74
     Probable fix:
 	Add (Ord a) to the type signature(s) for `numSubRangeBinOp'
-    In a right-hand side of function `numSubRangeBinOp':
-	SubRange (result, result) result
     In the definition of `numSubRangeBinOp':
 	numSubRangeBinOp op a b
 			   = SubRange (result, result) result

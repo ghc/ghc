@@ -4,4 +4,4 @@ tcfail014.hs:5:
 	Expected type: t
 	Inferred type: t -> t1
     In the first argument of `z', namely `z'
-    In a right-hand side of function `h': z z
+    In the definition of `h': h z = z z

@@ -5,5 +5,4 @@ tcfail093.hs:14:
     Possible cause: the monomorphism restriction applied to the following:
       dup :: () -> Int -> h (bound at tcfail093.hs:14)
     Probable fix: give these definition(s) an explicit type signature
-    In a right-hand side of function `dup': call primDup
     In the definition of `dup': dup () = call primDup

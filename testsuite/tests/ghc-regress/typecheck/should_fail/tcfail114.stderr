@@ -2,5 +2,4 @@
 tcfail114.hs:11:
     `foo' is not a record selector
     In the record update: undefined {foo = ()}
-    In a right-hand side of function `test': undefined {foo = ()}
     In the definition of `test': test = undefined {foo = ()}

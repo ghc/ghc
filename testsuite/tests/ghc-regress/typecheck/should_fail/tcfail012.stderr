@@ -3,5 +3,4 @@ tcfail012.hs:3:
     Couldn't match `Bool' against `[a]'
 	Expected type: Bool
 	Inferred type: [a]
-    In the right-hand side of a pattern binding: []
     In a pattern binding: True = []

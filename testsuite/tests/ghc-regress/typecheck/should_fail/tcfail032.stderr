@@ -6,6 +6,4 @@ tcfail032.hs:14:
 	  x :: a -> Int (bound at tcfail032.hs:14)
     When checking the type signature of the expression:
 	  x :: forall a. (Eq a) => a -> Int
-    In a right-hand side of function `f':
-	(x :: forall a. (Eq a) => a -> Int)
     In the definition of `f': f x = (x :: forall a. (Eq a) => a -> Int)

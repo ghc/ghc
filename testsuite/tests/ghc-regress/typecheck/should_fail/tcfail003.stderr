@@ -3,5 +3,4 @@ tcfail003.hs:3:
     No instance for (Num Char)
       arising from the literal `1' at tcfail003.hs:3
     In the list element: 1
-    In the right-hand side of a pattern binding: [1, 'a']
     In a pattern binding: (d : e) = [1, 'a']

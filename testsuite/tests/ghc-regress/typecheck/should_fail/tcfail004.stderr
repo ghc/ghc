@@ -3,5 +3,4 @@ tcfail004.hs:3:
     Couldn't match `(t, t1)' against `(t2, t3, t4)'
 	Expected type: (t, t1)
 	Inferred type: (t2, t3, t4)
-    In the right-hand side of a pattern binding: (1, 2, 3)
     In a pattern binding: (f, g) = (1, 2, 3)

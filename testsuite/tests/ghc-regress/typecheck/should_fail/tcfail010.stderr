@@ -5,6 +5,5 @@ tcfail010.hs:3:
     Possible cause: the monomorphism restriction applied to the following:
       q :: [a] -> [a] (bound at tcfail010.hs:3)
     Probable fix: give these definition(s) an explicit type signature
-    In the body of a lambda: z + 2
     In a lambda abstraction: \ (y : z) -> z + 2
-    In a right-hand side of function `q': \ (y : z) -> z + 2
+    In the definition of `q': q = \ (y : z) -> z + 2

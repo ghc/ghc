@@ -5,5 +5,4 @@ tcfail018.hs:5:
     Possible cause: the monomorphism restriction applied to the following:
       a :: a (bound at tcfail018.hs:5)
     Probable fix: give these definition(s) an explicit type signature
-    In the right-hand side of a pattern binding: 1
     In a pattern binding: (a : []) = 1
