@@ -61,6 +61,15 @@ We use ANSI C with some extensions.  In particular, we use:
 <li>#elsif, #error, #warning, ## and other cpp features
 </ul>
 
+<li> Our POSIX policy: try to write code that only uses POSIX (IEEE
+Std 1003.1) interfaces and APIs.  When you include <code>Rts.h<code>,
+<code>POSIX_SOURCE</code> is automatically defined for you before any
+system headers are slurped in, unless you define
+<code>NON_POSIX_SOURCE</code> prior to including <code>Rts.h</code>.
+A good C library will use the <code>POSIX_SOURCE</code> define to
+eliminate non-posix types and function prototypes, so the compiler
+should complain if you venture outside the POSIX spec.</li>
+
 <li>
 We use the following gcc extensions (see gcc documentation):
 <ul>
@@ -508,7 +517,6 @@ within Hugs.  Add this to your .emacs file.
     (c-set-offset 'statement-case-open  '+)
     )
 </pre>
-
 
 </ul>
 
