@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.2 2002/07/24 09:42:18 simonmar Exp $
+-- $Id: Html.hs,v 1.3 2004/03/25 15:17:24 simonmar Exp $
 --
 -- An Html combinator library
 --
@@ -214,6 +214,7 @@ blockquote          :: Html -> Html
 body                :: Html -> Html
 bold                :: Html -> Html
 br                  ::         Html
+button		    :: Html -> Html
 caption             :: Html -> Html
 center              :: Html -> Html
 cite                :: Html -> Html
@@ -249,6 +250,7 @@ paragraph           :: Html -> Html
 param               ::         Html
 pre                 :: Html -> Html
 sample              :: Html -> Html
+script		    :: Html -> Html
 select              :: Html -> Html
 small               :: Html -> Html
 strong              :: Html -> Html
@@ -283,6 +285,7 @@ blockquote          =  tag "BLOCKQUOTE"
 body                =  tag "BODY"
 bold                =  tag "B"
 br                  = itag "BR"
+button		    =  tag "BUTTON"
 caption             =  tag "CAPTION"
 center              =  tag "CENTER"
 cite                =  tag "CITE"
@@ -318,6 +321,7 @@ paragraph           =  tag "P"
 param               = itag "PARAM"
 pre                 =  tag "PRE"
 sample              =  tag "SAMP"
+script		    =  tag "SCRIPT"
 select              =  tag "SELECT"
 small               =  tag "SMALL"
 strong              =  tag "STRONG"
@@ -391,6 +395,7 @@ nohref              ::           HtmlAttr
 noresize            ::           HtmlAttr
 noshade             ::           HtmlAttr
 nowrap              ::           HtmlAttr
+onclick		    :: String -> HtmlAttr
 rel                 :: String -> HtmlAttr
 rev                 :: String -> HtmlAttr
 rows                :: String -> HtmlAttr
@@ -460,6 +465,7 @@ nohref              = emptyAttr "NOHREF"
 noresize            = emptyAttr "NORESIZE"
 noshade             = emptyAttr "NOSHADE"
 nowrap              = emptyAttr "NOWRAP"
+onclick             =   strAttr "ONCLICK"
 rel                 =   strAttr "REL"
 rev                 =   strAttr "REV"
 rows                =   strAttr "ROWS"

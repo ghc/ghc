@@ -35,6 +35,8 @@ TD.s15 {  height: 15px; }
 
 SPAN.keyword { text-decoration: underline; }
 
+BUTTON.coll { width : 2em; }
+
 /* --------- Documentation elements ---------- */
 
 TD.children {

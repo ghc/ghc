@@ -39,8 +39,9 @@ foo = 42
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir
 
-cssFile, iconFile :: String
+cssFile, jsFile, iconFile :: String
 cssFile  = "haddock.css"
+jsFile   = "haddock.js"
 iconFile = "haskell_icon.gif"
 
 -- -----------------------------------------------------------------------------
@@ -88,13 +89,13 @@ copyHtmlBits odir libdir maybe_css = do
 			Just f  -> f
 	css_destination = odir ++ pathSeparator:cssFile
 
-	icon_file        = libdir ++ pathSeparator:iconFile
-	icon_destination = odir   ++ pathSeparator:iconFile
+	copyFile f = do
+	   s <- readFile (libdir ++ pathSeparator:f)
+	   writeFile (odir ++ pathSeparator:f) s
   
   css_contents <- readFile css_file
   writeFile css_destination css_contents
-  icon_contents <- readFile icon_file
-  writeFile icon_destination icon_contents
+  mapM_ copyFile [ iconFile, jsFile ]
 
 
 contentsHtmlFile, indexHtmlFile :: String
@@ -369,7 +370,8 @@ ppHtmlModule odir doctitle source_url
   let html = 
 	header (thetitle (toHtml mdl) +++
 		thelink ! [href cssFile,
-		  rel "stylesheet", thetype "text/css"]) +++
+		  rel "stylesheet", thetype "text/css"] +++
+		(script ! [src jsFile] $ noHtml)) +++
         body << vanillaTable << (
 	    pageHeader mdl iface doctitle source_url 
 		maybe_contents_url maybe_index_url </> s15 </>
@@ -579,13 +581,18 @@ ppHsDataDecl summary instances is_newty
 			 aboves (map ppSideBySideConstr cons)
 			)
 
+	inst_id = "i:" ++ hsNameStr nm
+
 	instances_bit
 	   | null instances = Html.emptyTable
 	   | otherwise
-	   =  inst_hdr </>
-		 tda [theclass "body"] << spacedTable1 << (
-			aboves (map (declBox.ppInstHead) instances)
-		  )
+	   =  inst_hdr inst_id </>
+		 tda [theclass "body"] << 
+		    collapsed inst_id (
+			spacedTable1 << (
+			   aboves (map (declBox.ppInstHead) instances)
+		        )
+ 		   )
 ppHsDataDecl _ _ _ _ d =
     error $ "HaddockHtml.ppHsDataDecl: unexpected decl " ++ show d
 
@@ -753,11 +760,16 @@ ppHsClassDecl summary instances orig_c
 			             ]
 			)
 
+	inst_id = "i:" ++ hsNameStr nm
 	instances_bit
-	   =  s8 </> inst_hdr </>
-		 tda [theclass "body"] << spacedTable1 << (
+	   | null instances = Html.emptyTable
+	   | otherwise 
+	   =  s8 </> inst_hdr inst_id </>
+		 tda [theclass "body"] << 
+		   collapsed inst_id (
+		      spacedTable1 << (
 			aboves (map (declBox.ppInstHead) instances)
-		  )
+		   ))
 
 ppHsClassDecl _ _ _ d =
     error $ "HaddockHtml.ppHsClassDecl: unexpected decl: " ++ show d
@@ -1074,10 +1086,13 @@ spacedTable1, spacedTable5 :: Html -> Html
 spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
 spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 
-constr_hdr, meth_hdr, inst_hdr :: HtmlTable
-constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
-meth_hdr   = tda [ theclass "section4" ] << toHtml "Methods"
-inst_hdr   = tda [ theclass "section4" ] << toHtml "Instances"
+constr_hdr, meth_hdr :: HtmlTable
+constr_hdr  = tda [ theclass "section4" ] << toHtml "Constructors"
+meth_hdr    = tda [ theclass "section4" ] << toHtml "Methods"
+
+inst_hdr :: String -> HtmlTable
+inst_hdr id = 
+  tda [ theclass "section4" ] << (collapsebutton id +++ toHtml " Instances")
 
 dcolon, arrow, darrow :: Html
 dcolon = toHtml "::"
@@ -1098,3 +1113,15 @@ linkedAnchor ref frag = anchor ! [href hr]
 
 escapeStr :: String -> String
 escapeStr = flip escapeString unreserved
+
+--
+-- A section of HTML which is collapsible via a +/- button.
+--
+collapsebutton :: String -> Html
+collapsebutton id = 
+  button ! [ theclass "coll", onclick ("toggle(this,'" ++ id ++ "')") ] << 
+    toHtml "+"
+
+collapsed :: String -> Html -> Html
+collapsed id html =
+  thediv ! [identifier id, thestyle "display:none;"] << html
