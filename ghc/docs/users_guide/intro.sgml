@@ -79,8 +79,9 @@
       <varlistentry>
 	<term>glasgow-haskell-users:</term>
 	<listitem>
-	  <para>This list is for GHC users to chat among
-	  themselves.</para>
+	  <para>This list is for GHC users to chat among themselves.
+	  If you have a specific question about GHC, please check the
+	  FAQ first (<xref linkend="faq">).</para>
 
 	  <variablelist>
 	    <varlistentry>
@@ -240,15 +241,22 @@
     </itemizedlist>
 
     <sect2>
-      <title>How do I tell if my bug has already been
-      reported?</title>
-      
-      <para>Try searching the mailing list archives.  The archives
-      don't have a built-in search facility, but we find that <ulink
+      <title>How do I tell if I should report my bug?</title>
+
+      <para>Take a look at the FAQ (<xref linkend="faq">) and <xref
+      linkend="wrong">, which will give you some guidance as to
+      whether the behaviour you're seeing is really a bug or
+      not.</para>
+
+      <para>If it is a bug, then it might have been reported before:
+      try searching the mailing list archives.  The archives don't
+      have a built-in search facility, but we find that <ulink
       url="http://www.google.com/">Google</ulink>'s site search works
       pretty well: enter
       <quote><literal>site:www.haskell.org</literal></quote> followed
       by your search term into Google.</para>
+
+      <para>If in doubt, just report it.</para>
     </sect2>
 
     <sect2>
