@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.46 2004/11/09 16:59:31 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.47 2005/01/11 15:22:04 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -25,6 +25,7 @@ module DriverUtil (
 import Util
 import Panic
 import Config		( cLeadingUnderscore )
+import Ctype
 
 import EXCEPTION	( Exception(..), finally, throwDyn, catchDyn, throw )
 import qualified EXCEPTION as Exception
@@ -66,6 +67,7 @@ getOptionsFromSource file
 matchOptions s
   | Just s1 <- maybePrefixMatch "{-#" s, -- -}
     Just s2 <- maybePrefixMatch "OPTIONS" (remove_spaces s1),
+    not (is_ident (head s2)),
     Just s3 <- maybePrefixMatch "}-#" (reverse s2)
   = Just (reverse s3)
   | otherwise
