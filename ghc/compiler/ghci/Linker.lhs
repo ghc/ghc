@@ -778,9 +778,13 @@ linkPackage dflags pkg
             -- dlopen-ing A with RTLD_NOW (see addDLL in Linker.c) will fail
             -- when B has not been loaded before. In a nutshell: Reverse the
             -- order of DLLs for dynamic linking.
+	    -- This fixes a problem with the HOpenGL package (see "Compiling
+	    -- HOpenGL under recent versions of GHC" on the HOpenGL list).
 	    mapM_ (load_dyn dirs) (reverse dlls)
 	
 	-- After loading all the DLLs, we can load the static objects.
+	-- Ordering isn't important here, because we do one final link
+	-- step to resolve everything.
 	mapM_ loadObj objs
 
         maybePutStr dflags "linking ... "
