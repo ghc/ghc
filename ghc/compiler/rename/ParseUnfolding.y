@@ -347,6 +347,7 @@ tv_names	:: { [RdrName] }
 
 tc_name		:: { RdrName }
 tc_name		:  QCONID		{ lexTcQual $1 }
+		|  QCONSYM		{ lexTcQual $1 }
 		|  CONID		{ Unqual (TCOcc $1) }
 		|  CONSYM		{ Unqual (TCOcc $1) }
 		|  OPAREN RARROW CPAREN	{ Unqual (TCOcc SLIT("->")) }
