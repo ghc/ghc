@@ -15,7 +15,7 @@ module Outputable (
 
 	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
 	getPprStyle, withPprStyle, withPprStyleDoc, pprDeeper,
-	codeStyle, userStyle, debugStyle, asmStyle,
+	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, unqualStyle, 
 	mkErrStyle, defaultErrStyle,
 
@@ -76,14 +76,21 @@ import Char             ( ord )
 
 \begin{code}
 data PprStyle
-  = PprUser PrintUnqualified Depth	-- Pretty-print in a way that will
-					-- make sense to the ordinary user;
-					-- must be very close to Haskell
-					-- syntax, etc.
+  = PprUser PrintUnqualified Depth
+		-- Pretty-print in a way that will make sense to the
+		-- ordinary user; must be very close to Haskell
+		-- syntax, etc.
+		-- Assumes printing tidied code: non-system names are
+		-- printed without uniques.
 
-  | PprCode CodeStyle		-- Print code; either C or assembler
+  | PprCode CodeStyle
+		-- Print code; either C or assembler
 
-  | PprDebug			-- Standard debugging output
+  | PprDump	-- For -ddump-foo; less verbose than PprDebug.
+		-- Does not assume tidied code: non-external names
+		-- are printed with uniques.
+
+  | PprDebug	-- Full debugging output
 
 data CodeStyle = CStyle		-- The format of labels differs for C and assembler
 	       | AsmStyle
@@ -101,6 +108,9 @@ alwaysQualify m n = False
 neverQualify  m n = True
 
 defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
+
+defaultDumpStyle |  opt_PprStyle_Debug = PprDebug
+		 |  otherwise          = PprDump
 
 mkErrStyle :: PrintUnqualified -> PprStyle
 -- Style for printing error messages
@@ -163,6 +173,10 @@ asmStyle :: PprStyle -> Bool
 asmStyle (PprCode AsmStyle)  = True
 asmStyle other               = False
 
+dumpStyle :: PprStyle -> Bool
+dumpStyle PprDump = True
+dumpStyle other   = False
+
 debugStyle :: PprStyle -> Bool
 debugStyle PprDebug	  = True
 debugStyle other	  = False
@@ -191,7 +205,7 @@ printErrs doc = do Pretty.printDoc PageMode stderr doc
 
 printDump :: SDoc -> IO ()
 printDump doc = do
-   Pretty.printDoc PageMode stdout (better_doc defaultUserStyle)
+   Pretty.printDoc PageMode stdout (better_doc defaultDumpStyle)
    hFlush stdout
  where
    better_doc = doc $$ text ""

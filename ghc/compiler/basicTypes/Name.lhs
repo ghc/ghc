@@ -329,6 +329,9 @@ pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = ppr_occ_name occ <> braces (hsep [text (briefOccNameFlavour occ), 
 				 		       pprUnique uniq])
+  | dumpStyle sty  = ppr_occ_name occ <> char '_' <> pprUnique uniq
+			-- For debug dumps, we're not necessarily dumping
+			-- tidied code, so we need to print the uniques.
   | otherwise      = ppr_occ_name occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
