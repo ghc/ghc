@@ -9,8 +9,6 @@
 
 #ifdef PROFILING
 
-#include <stdlib.h>
-
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "Stats.h"
@@ -19,6 +17,7 @@
 #include "Arena.h"
 #include "Profiling.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #define HASH_TABLE_SIZE 255
