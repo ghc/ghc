@@ -961,21 +961,26 @@ install:: $(INSTALL_INCLUDES)
 	done
 endif
 
-ifneq "$(INSTALL_DOCS)$(INSTALL_SGML_DOC)" ""
-install-docs:: $(INSTALL_DOCS) $(foreach j,$(SGMLDocWays),$(INSTALL_SGML_DOC).$j)
-	@$(INSTALL_DIR) $(datadir)
+ifneq "$(INSTALL_DOCS)" ""
+install-docs:: $(INSTALL_DOCS)
+	@$(INSTALL_DIR) $(datadir)	
 	for i in $(INSTALL_DOCS); do \
 		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
 	done
-	ifneq "$(SGMLDocWays)" "" \
-		for i in $(SGMLDocWays); do \
-			if [ $$j = "html" ]; then \
-				$(CP) -r $(INSTALL_SGML_DOC) $(datadir); \
-			else \
-				$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$j $(datadir); \
-			fi \
-		done \
-	fi
+endif
+
+ifneq "$(INSTALL_SGML_DOC)" ""
+ifneq "$(SGMLDocWays)" ""
+install-docs:: $(foreach i,$(SGMLDocWays),$(INSTALL_SGML_DOC).$i)
+	@$(INSTALL_DIR) $(datadir)	
+	for i in $(SGMLDocWays); do \
+		if [ $$j = "html" ]; then \
+			$(CP) -r $(INSTALL_SGML_DOC) $(datadir); \
+		else \
+			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$j $(datadir); \
+		fi \
+	done
+endif
 endif
 
 #
