@@ -22,7 +22,7 @@ module Test (
 	-- Subsection headings are introduced with '-- **' and so on.
 	-- ** Data types
 	T(..), T2, T3(..), T4(..), T5(..),
-	N1(..), N2(..), N3(..), N4, N5(..),
+	N1(..), N2(..), N3(..), N4, N5(..), N6(..), N7(..),
 
 	-- ** Records
 	R(..),
@@ -64,7 +64,7 @@ module Test (
 	Ex(..),
 
 	-- * Type signatures with argument docs
-	k, l, m,
+	k, l, m, n, o,
    ) where
 
 
@@ -106,6 +106,16 @@ newtype N4 a b = N4 a
 newtype N5 a b = N5 {n5 :: a b -- ^ no docs on the datatype or the constructor
 		    }
 
+newtype N6 a b = N6 {n6 :: a b
+		    }
+		 -- ^ docs on the constructor only
+
+-- | docs on the newtype and the constructor
+newtype N7 a b = N7 {n7 :: a b
+		    }
+		-- ^ The 'N7' constructor
+		 
+
 class (D a) => C a  where
    -- |this is a description of the 'a' method
    a :: Int
@@ -131,11 +141,16 @@ class F a where
 -- | This is the documentation for the 'R' record, which has four fields,
 -- 'p', 'q', 'r', and 's'.
 data R = 
+  -- | This is the 'C1' record constructor, with the following fields:
   C1 { p :: Int -- ^ This comment applies to the 'p' field
      , q :: forall a . a->a  -- ^ This comment applies to the 'q' field
      , -- | This comment applies to both 'r' and 's'
        r,s :: Int
      }
+  | C2 { t :: T1 -> T2 -> T3 -> T4 -> T5,
+       u,v :: Int
+     }
+  -- ^ This is the 'C2' record constructor, also with some fields:
 
 -- These section headers are only used when there is no export list to
 -- give the structure of the documentation:
@@ -226,3 +241,13 @@ l :: (Int, Int, Float) -- ^ takes a triple
 m :: R
   -> N1		-- ^ one of the arguments
   -> IO Int	-- ^ and the return value
+
+-- | This function has some arg docs but not a return value doc
+n :: R		-- ^ one of the arguments, an 'R'
+  -> N1		-- ^ one of the arguments
+  -> IO Int
+
+-- | A foreign import with argument docs
+foreign import ccall unsafe 
+ o :: Float  -- ^ The input float
+   -> IO Float  -- ^ The output float
