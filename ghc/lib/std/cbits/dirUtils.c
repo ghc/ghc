@@ -76,13 +76,14 @@ HsInt prel_end_of_dir()
 HsInt
 prel_readdir(HsAddr dirPtr, HsAddr pDirEnt)
 {
+  struct dirent **pDirE = (struct dirent**)pDirEnt;
 #if HAVE_READDIR_R
   struct dirent* p;
   struct dirent* r;
   int res;
   static unsigned int nm_max = -1;
   
-  if ((struct dirent**)pDirEnt == NULL) {
+  if (pDirE == NULL) {
     return -1;
   }
   if (nm_max == -1) {
@@ -95,14 +96,13 @@ prel_readdir(HsAddr dirPtr, HsAddr pDirEnt)
 #endif
   }
   p = (struct dirent*)malloc(sizeof(struct dirent) + nm_max);
-  res = readdir_r((DIR*)dirPtr, p, (struct dirent**)pDirEnt);
+  res = readdir_r((DIR*)dirPtr, p, pDirE);
   if (res != 0) {
-    *pDirEnt = NULL;
+    *pDirE = NULL;
     free(p);
   }
   return res;
 #else
-  struct dirent **pDirE = (struct dirent**)pDirEnt;
 
   if (pDirE == NULL) {
     return -1;
