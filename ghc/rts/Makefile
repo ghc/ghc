@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.62 2002/02/04 12:23:02 simonmar Exp $
+# $Id: Makefile,v 1.63 2002/02/04 13:59:48 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -45,7 +45,7 @@ EXCLUDED_SRCS += parallel/SysMan.c
 
 # The build system doesn't give us these
 HC_SRCS = $(filter %.hc, $(SRCS))
-HC_OBJS = $(patsubst %.hc,%.$(way)_o, $(HC_SRCS))
+HC_OBJS = $(patsubst %.hc,%.$(way_)o, $(HC_SRCS))
 
 # Override the default $(LIBOBJS) (the default provides for building Haskell libs)
 LIBOBJS = $(C_OBJS) $(HC_OBJS)
