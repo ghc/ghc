@@ -837,11 +837,17 @@ recvFrom	:: Hostname -> PortID -> IO String
 socketPort	:: Socket -> IO PortID
 
 data PortID	-- PortID is a non-abstract type
-  = Service String	-- Service Name eg "ftp"
-  | PortNumber Int	-- User defined Port Number
-  | UnixSocket String	-- Unix family socket in file system
+  = Service String	  -- Service Name eg "ftp"
+  | PortNumber PortNumber -- User defined Port Number
+  | UnixSocket String	  -- Unix family socket in file system
 
 type Hostname = String
+
+ -- 16-bit value (stored in network byte order).
+data PortNumber
+ -- instance of: Eq, Num, Show.
+
+mkPortNumber :: Int -> PortNumber
 </verb></tscreen>
 
 Various examples of networking Haskell code are provided in
