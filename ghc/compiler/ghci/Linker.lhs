@@ -6,6 +6,7 @@
 \begin{code}
 {-# OPTIONS -#include "Linker.h" #-}
 module Linker ( 
+   initLinker,	 -- :: IO ()
    loadObj,      -- :: String -> IO ()
    unloadObj,    -- :: String -> IO ()
    lookupSymbol, -- :: String -> IO (Maybe (Ptr a))
@@ -59,4 +60,7 @@ foreign import "unloadObj" unsafe
 
 foreign import "resolveObjs" unsafe
    c_resolveObjs :: IO Int
+
+foreign import "initLinker" unsafe
+   initLinker :: IO ()
 \end{code}

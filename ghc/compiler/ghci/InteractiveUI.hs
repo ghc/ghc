@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.41 2001/02/11 14:33:27 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.42 2001/02/12 11:38:49 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -111,6 +111,7 @@ interactiveUI cmstate mod = do
 
    -- link in the available packages
    pkgs <- getPackageInfo
+   initLinker
    linkPackages (reverse pkgs)
 
    (cmstate, ok, mods) <-
