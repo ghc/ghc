@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.107 2002/07/23 10:08:58 simonmar Exp $
+dnl $Id: aclocal.m4,v 1.108 2002/12/04 23:41:15 dons Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -443,15 +443,19 @@ AC_DEFUN(FPTOOLS_CHECK_PERL_VERSION,
 if grep "version 5" conftest.out >/dev/null 2>&1; then
    :
 else
-  if grep "v5.6" conftest.out >/dev/null 2>&1; then
-     :
-  else
-     if grep "version 6" conftest.out >/dev/null 2>&1; then
-	:
-     else
-       echo "Your version of perl probably won't work."
-     fi
-  fi
+   if grep "v5.6" conftest.out >/dev/null 2>&1; then
+      :
+   else
+      if grep "v5.8" conftest.out >/dev/null 2>&1; then
+         :
+      else
+         if grep "version 6" conftest.out >/dev/null 2>&1; then
+            :
+         else
+            echo "Your version of perl probably won't work."
+         fi  
+      fi
+   fi
 fi
 rm -fr conftest*
 ])
