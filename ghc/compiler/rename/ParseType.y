@@ -26,7 +26,7 @@ import Name		( OccName(..), isTCOcc, Provenance )
 import SrcLoc		( mkIfaceSrcLoc )
 import Util		( panic{-, pprPanic ToDo:rm-} )
 import Pretty		( Doc )
-import PprStyle         -- PprDebug for panic
+import Outputable	( PprStyle(..) )
 import Maybes           ( MaybeErr(..) )
 
 ------------------------------------------------------------------
