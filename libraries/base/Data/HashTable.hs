@@ -101,7 +101,7 @@ data HashTable key val
 --
 -- This implementation of hash tables uses the low-order /n/ bits of the hash
 -- value for a key, where /n/ varies as the hash table grows.  A good hash
--- function therefore will give a good distribution regardless of /n/.
+-- function therefore will give an even distribution regardless of /n/.
 --
 -- If your keyspace is integrals such that the low-order bits between
 -- keys are highly variable, then you could get away with using 'id'
@@ -117,7 +117,7 @@ data HashTable key val
 hashInt :: Int -> Int32
 hashInt = (`rem` prime) . fromIntegral
 
--- | A sample hash fucntion for 'String's.  The implementation is:
+-- | A sample hash function for 'String's.  The implementation is:
 --
 -- >    hashString = fromIntegral . foldr f 0
 -- >      where f c m = ord c + (m * 128) `rem` 1500007
