@@ -1,7 +1,7 @@
 #ifndef HSPINCL_H
 #define HSPINCL_H
 
-#include "../../includes/config.h"
+#include "config.h"
 
 #if __STDC__
 #define PROTO(x)	x
