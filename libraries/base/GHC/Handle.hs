@@ -131,8 +131,11 @@ withHandle' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   (h',v)  <- catch (act h_) 
-		(\ ex -> putMVar m h_ >> ioError (augmentIOError ex fun h h_))
+   (h',v)  <- catchException (act h_) 
+		(\ err -> putMVar m h_ >>
+		          case err of
+		              IOException ex -> ioError (augmentIOError ex fun h h_)
+		              _ -> throw err)
    checkBufferInvariants h'
    putMVar m h'
    return v
@@ -146,8 +149,11 @@ withHandle_' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   v  <- catch (act h_) 
-	    (\ ex -> putMVar m h_ >> ioError (augmentIOError ex fun h h_))
+   v  <- catchException (act h_) 
+		(\ err -> putMVar m h_ >>
+		          case err of
+		              IOException ex -> ioError (augmentIOError ex fun h h_)
+		              _ -> throw err)
    checkBufferInvariants h_
    putMVar m h_
    return v
@@ -162,8 +168,11 @@ withHandle__' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   h'  <- catch (act h_)
-	    (\ ex -> putMVar m h_ >> ioError (augmentIOError ex fun h h_))
+   h'  <- catchException (act h_)
+		(\ err -> putMVar m h_ >>
+		          case err of
+		              IOException ex -> ioError (augmentIOError ex fun h h_)
+		              _ -> throw err)
    checkBufferInvariants h'
    putMVar m h'
    return ()
