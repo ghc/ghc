@@ -22,7 +22,7 @@ import Id		( mkIdEnv, lookupIdEnv, SYN_IE(IdEnv),
 import Maybes		( catMaybes )
 import OccurAnal	( occurAnalyseBinds )
 import Pretty		( Doc, vcat, hcat, int, char, text, ptext, empty )
-import PprStyle         ( PprStyle(..) )   -- added SOF
+import Outputable       ( PprStyle(..) )   -- added SOF
 import PprCore          ( pprCoreBinding ) -- added SOF
 import SimplEnv
 import SimplMonad
