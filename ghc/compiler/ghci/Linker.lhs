@@ -57,8 +57,8 @@ resolveObjs = do
 	then panic "resolveObjs: failed"
 	else return ()
 
-addDLL str = do
-   maybe_errmsg <- c_addDLL (packString str)
+addDLL path lib = do
+   maybe_errmsg <- c_addDLL (packString path) (packString lib)
    return maybe_errmsg
 
 type PackedString = ByteArray Int
@@ -79,6 +79,6 @@ foreign import "initLinker" unsafe
    initLinker :: IO ()
 
 foreign import "addDLL" unsafe 
-   c_addDLL :: PackedString -> IO (Ptr CChar)
+   c_addDLL :: PackedString -> PackedString -> IO (Ptr CChar)
 
 \end{code}

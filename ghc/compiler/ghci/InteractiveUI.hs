@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.70 2001/05/28 12:56:35 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.71 2001/06/06 14:02:50 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -652,7 +652,11 @@ ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 --        e.g.    On unix     "qt"  denotes "libqt.so"
 --                On WinDoze  "burble"  denotes "burble.DLL"
 --        addDLL is platform-specific and adds the lib/.so/.DLL
---        prefixes plaform-dependently; we don't do that here.
+--        suffixes platform-dependently; we don't do that here.
+-- 
+-- For dynamic objects only, try to find the object file in all the 
+-- directories specified in v_Library_Paths before giving up.
+
 type LibrarySpec
    = Either FilePath String
 
@@ -662,30 +666,48 @@ showLS (Right nm) = "(dynamic) " ++ nm
 linkPackages :: [LibrarySpec] -> [PackageConfig] -> IO ()
 linkPackages cmdline_lib_specs pkgs
    = do sequence_ [ linkPackage (name p `elem` loaded) p | p <- reverse pkgs ]
-        mapM_ preloadLib cmdline_lib_specs
+        lib_paths <- readIORef v_Library_paths
+        mapM_ (preloadLib lib_paths) cmdline_lib_specs
      where
 	-- packages that are already linked into GHCi
 	loaded = [ "concurrent", "posix", "text", "util" ]
 
-        preloadLib lib_spec
+        preloadLib :: [String] -> LibrarySpec -> IO ()
+        preloadLib lib_paths lib_spec
            = do putStr ("Loading object " ++ showLS lib_spec ++ " ... ")
                 case lib_spec of
                    Left static_ish
-                      -> do b <- doesFileExist static_ish
-                            if    not b
-                             then do putStr "not found.\n"
-                                     croak
-                             else do loadObj static_ish
-                                     putStr "done.\n"
+                      -> do b <- preload_static lib_paths static_ish
+                            putStrLn (if b then "done" else "not found")
                    Right dll_unadorned
-                      -> do maybe_errmsg <- addDLL dll_unadorned
-                            if    maybe_errmsg == nullPtr
-                             then putStr "done.\n"
-                             else do str <- peekCString maybe_errmsg
-                                     putStr ("failed (" ++ str ++ ")\n")
-                                     croak
+                      -> do b <- preload_dynamic lib_paths dll_unadorned
+                            when (not b) (cantFind lib_paths lib_spec)
+                            putStrLn "done"
 
-        croak = throwDyn (CmdLineError "user specified .o/.so/.DLL could not be loaded.")
+        cantFind :: [String] -> LibrarySpec -> IO ()
+        cantFind paths spec
+           = do putStr ("failed.\nCan't find " ++ showLS spec
+                        ++ " in directories:\n"
+                        ++ unlines (map ("   "++) paths) )
+                give_up
+
+        -- not interested in the paths in the static case.
+        preload_static paths name
+           = do b <- doesFileExist name
+                if not b then return False
+                         else loadObj name >> return True
+
+        preload_dynamic [] name
+           = return False
+        preload_dynamic (path:paths) rootname
+           = do maybe_errmsg <- addDLL path rootname
+                if    maybe_errmsg /= nullPtr
+                 then preload_dynamic paths rootname
+                 else return True
+
+        give_up 
+           = (throwDyn . CmdLineError)
+                "user specified .o/.so/.DLL could not be loaded."
 
 
 linkPackage :: Bool -> PackageConfig -> IO ()
@@ -719,7 +741,7 @@ loadClassified :: LibrarySpec -> IO ()
 loadClassified (Left obj_absolute_filename)
    = do loadObj obj_absolute_filename
 loadClassified (Right dll_unadorned)
-   = do maybe_errmsg <- addDLL dll_unadorned
+   = do maybe_errmsg <- addDLL "" dll_unadorned -- doesn't seem right to me
         if    maybe_errmsg == nullPtr
          then return ()
          else do str <- peekCString maybe_errmsg
