@@ -40,6 +40,7 @@ Haskell side.
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "RtsFlags.h"
+#include <stdlib.h>
 
 /* Heavily arch-specific, I'm afraid.. */
 

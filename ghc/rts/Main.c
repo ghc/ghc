@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Main.c,v 1.34 2002/02/13 08:48:06 sof Exp $
+ * $Id: Main.c,v 1.35 2002/07/18 06:05:30 sof Exp $
  *
  * (c) The GHC Team 1998-2000
  *
@@ -16,6 +16,7 @@
 #include "RtsFlags.h"
 #include "RtsUtils.h"
 #include "Prelude.h"
+#include <stdlib.h>
 
 #ifdef DEBUG
 # include "Printer.h"   /* for printing        */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.76 2002/04/19 10:22:58 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.77 2002/07/18 06:05:30 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -23,8 +23,8 @@
 # include "StgRun.h"	/* for StgReturn and register saving */
 #endif
 
-#ifdef HAVE_STDIO_H
-#include <stdio.h>
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
 #endif
 
 /* ToDo: make the printing of panics more win32-friendly, i.e.,

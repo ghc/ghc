@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.99 2002/07/17 08:26:44 simonmar Exp $
+ * $Id: Linker.c,v 1.100 2002/07/18 06:05:29 sof Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -62,6 +62,7 @@
 #elif defined(cygwin32_TARGET_OS) || defined (mingw32_TARGET_OS)
 #  define OBJFORMAT_PEi386
 #  include <windows.h>
+#  include <math.h>
 #elif defined(darwin_TARGET_OS)
 #  define OBJFORMAT_MACHO
 #  include <mach-o/loader.h>
