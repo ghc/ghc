@@ -540,7 +540,10 @@ Download the latest GHC distribution (ghc-4.08 InstallShield installer, 19M)
 from <ULink
 URL="http://www.haskell.org/ghc/download.html">haskell.org</ULink>
 It is packaged up using an installer that should be familiar-looking to
-Windows users.
+Windows users. The 4.08 InstallShield package comes with some Cygwin
+binaries, which unfortunately won't work with another Cygwin installation on
+the same machine, unless it uses exactly the same version of the Cygwin DLL
+(1.3.1 in this InstallShield).
 </Para>
 
 <Para>
