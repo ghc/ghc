@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.39 2000/12/05 16:59:03 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.40 2000/12/07 16:39:40 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -470,7 +470,11 @@ run_phase Hsc basename suff input_fn output_fn
 
 	    HscFail pcs -> throwDyn (PhaseFailed "hsc" (ExitFailure 1));
 
-            HscNoRecomp pcs details iface -> return False;
+            HscNoRecomp pcs details iface -> 
+	        do {
+		  runSomething "Touching object file" ("touch " ++ o_file);
+		  return False;
+		};
 
 	    HscRecomp pcs details iface maybe_stub_h maybe_stub_c 
 		      _maybe_interpreted_code -> do
