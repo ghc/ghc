@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 2002/02/12 10:52:47 simonmar Exp $
+# $Id: Makefile,v 1.15 2002/02/12 15:17:34 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -42,8 +42,13 @@ PACKAGE = base
 SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
 SRC_HSC2HS_OPTS += -Iinclude
 
+# -----------------------------------------------------------------------------
+# Per-module flags
+
 # ESSENTIAL, for getting reasonable performance from the I/O library:
-GHC/IOBase_HC_OPTS   = -funbox-strict-fields 
+GHC/IOBase_HC_OPTS   		= -funbox-strict-fields 
+
+Data/Array/Storable_HC_OPTS 	= -funbox-strict-fields
 
 # -----------------------------------------------------------------------------
 # PrimOpWrappers

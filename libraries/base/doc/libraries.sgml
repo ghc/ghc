@@ -1017,7 +1017,7 @@ import Text.HTML.Internals -- The non-abstract library
 -- Stability   :  experimental | provisional | stable
 -- Portability :  portable | non-portable (<replaceable>reason(s)</replaceable>)
 --
--- $Id: libraries.sgml,v 1.6 2001/12/21 15:07:26 simonmar Exp $
+-- $Id: libraries.sgml,v 1.7 2002/02/12 15:17:34 simonmar Exp $
 --
 -- <replaceable>Description</replaceable>
 -----------------------------------------------------------------------------
@@ -1027,7 +1027,7 @@ import Text.HTML.Internals -- The non-abstract library
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>$Id: libraries.sgml,v 1.6 2001/12/21 15:07:26 simonmar Exp $</literal></term>
+	  <term><literal>$Id: libraries.sgml,v 1.7 2002/02/12 15:17:34 simonmar Exp $</literal></term>
 	  <listitem>
 	    <para>is optional, but usually included if the module is
 	    under CVS or RCS control.</para>
@@ -1414,17 +1414,15 @@ e.g. <literal>fromInteger</literal>.</para>
 
     IO -> System.IO
        added 
-        hPutBuf :: Handle -> Ptr a -> Int -> IO ()
-        hGetBuf :: Handle -> Ptr a -> Int -> IO Int
-        fixIO   :: (a -> IO a) -> IO a
+        hPutBuf  :: Handle -> Ptr a -> Int -> IO ()
+        hGetBuf  :: Handle -> Ptr a -> Int -> IO Int
+        fixIO    :: (a -> IO a) -> IO a
+	hSetEcho :: Handle -> Bool -> IO ()
+        hGetEcho :: Handle -> IO Bool
+        hIsTerminalDevice :: Handle -> IO Bool
 
     List -> Data.List
        exports [](..)
-
-    Numeric -> Numeric
-       added showHex, showOct, showBin & showIntAtBase from NumExts,
-       (not exported yet - these aren't H98)
-       but left out floatToDouble & doubleToFloat (realToFrac is more general).
 
     System    -> System.Exit, System.Environment, System.Cmd
        split into three modules
@@ -1438,6 +1436,7 @@ e.g. <literal>fromInteger</literal>.</para>
     Locale    -> System.Locale
     Maybe     -> Data.Maybe
     Monad     -> Data.Monad
+    Numeric   -> Numeric
     Random    -> System.Random
     Ratio     -> Data.Ratio
     Time      -> System.Time
