@@ -587,6 +587,7 @@ decode_escape (c : rest)
     go n other = pprPanic "decode_escape" (ppr n <+> text (c:rest))
 
 decode_escape (c : rest) = pprTrace "decode_escape" (char c) (decode rest)
+decode_escape []	 = pprTrace "decode_escape" (text "empty") ""
 \end{code}
 
 
