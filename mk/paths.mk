@@ -70,13 +70,12 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #		Standard variable names
 #
 #################################################################################
-
-#
-# The fptools mk setup defines a set of standard names which are used by the standard
-# targets provided by mk. One example of this is the use of standard names
-# for specifying what files to compile, their intermediate/object code, and
-# the name of the final executable. Based on the settings of these variables, the
-# standard targets will generate/expand rules that automatically compile and
+# The fptools mk setup defines a set of standard names which are used
+# by the standard targets provided by mk. One example of this is the
+# use of standard names for specifying what files to compile, their
+# intermediate/object code, and the name of the final
+# executable. Based on the settings of these variables, the standard
+# targets will generate/expand rules that automatically compile and
 # link your program.
 #
 # The general rules:
@@ -86,21 +85,21 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #   OBJS - object files (possibly prefixed).
 #
 #   PROG - name of final executable
-
-# We attempt to automatically devine the list of sources $(SRCS) to
-# compile by looking in the current directory.  This is complicated by
-# the fact that a .hsc file gives rise to a .hs file (which needs to
-# be automatically included in $(SRCS)), but the .hs file might
-# already be present in the current directory and we don't want to
-# compile it twice.
-
-# So we figure out the sources in three stages: first figure out
-# what's in the current directory (this is $(PRE_SRCS)).  Then figure
-# out all the "derived" sources (eg. A.hsc generates A.hs and
-# A_hsc.c), and finally put all these together and remove duplicates
-# (GNU make's handy sort function does the duplicate removing).
 #
-# BOOT_SRCS: list of machine generated Haskell modules.
+# We attempt to automatically devine the list of sources $(SRCS) to
+# compile by looking in the current directory (and possibly other
+# directories which may be specified by setting the $(ALL_DIRS)
+# variable).  This is complicated by the fact that some files are
+# derived from other files: eg. .hsc files give rise to -hsc.c and
+# -hsc.h files, .ly files give rise to .hs files, and .hs files give
+# rise to .hc files sometimes.
+
+# So we figure out the sources in three stages: first figure out what
+# sources we can find (this is $(ALL_SRCS)).  Then figure out all the
+# "derived" sources (eg. A.hsc generates A.hs and A_hsc.c), and
+# finally put all these together and remove duplicates (GNU make's
+# handy sort function does the duplicate removing).
+
 # HS_SRCS:   list of Haskell modules you want to compile.
 #             (also use by depend rule).
 # HS_OBJS:   list of corresponding object files
@@ -109,8 +108,6 @@ INSTALL_DIR     = $(FPTOOLS_TOP)/glafp-utils/mkdirhier/mkdirhier
 #             (caveat: assuming no funny use of -hisuf and that
 #               file name and module name match)
 
-# NB. use := rather than = here, otherwise the wildcard will get re-computed
-# every time PRE_SRCS is expanded (this happens a lot).
 ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.hs,   . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.lhs,  . $(ALL_DIRS)) \
@@ -124,9 +121,13 @@ ALL_SRCS    = $(wildcard $(patsubst ./%, %,  \
 		   $(patsubst %,%/*.lit,  . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.verb, . $(ALL_DIRS)) \
 		   $(patsubst %,%/*.hsc,  . $(ALL_DIRS)) \
-	       ))
+	       )) $(EXTRA_SRCS)
 
-# ALL_SRCS is computed once and for all into PRE_SRCS at the top of target.mk.
+# ALL_SRCS is computed once and for all into PRE_SRCS at the top of
+# target.mk.  Otherwise, we end up re-computing ALL_SRCS every time it
+# is expanded (it is used in several variables below, and these
+# variables are used in several others, etc.), which can really slow
+# down make.
 
 PRE_HS_SRCS  = $(filter %.hs,  $(PRE_SRCS))
 PRE_LHS_SRCS = $(filter %.lhs, $(PRE_SRCS))
@@ -136,14 +137,20 @@ HAPPY_Y_SRCS  = $(filter %.y,   $(PRE_SRCS))
 HAPPY_LY_SRCS = $(filter %.ly,   $(PRE_SRCS))
 HAPPY_SRCS    = $(HAPPY_Y_SRCS) $(HAPPY_LY_SRCS)
 
-DERIVED_SRCS = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
-	       $(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
-	       $(patsubst %.hsc, %_hsc.h, $(HSC_SRCS)) \
-	       $(patsubst %.hsc, %.hc, $(HSC_SRCS)) \
-	       $(patsubst %.y,   %.hs, $(HAPPY_Y_SRCS)) \
-	       $(patsubst %.ly,  %.hs, $(HAPPY_LY_SRCS)) \
-	       $(patsubst %.hs,  %.hc, $(PRE_HS_SRCS)) \
-	       $(patsubst %.lhs, %.hc, $(PRE_LHS_SRCS))
+DERIVED_HSC_SRCS      = $(patsubst %.hsc, %.hs, $(HSC_SRCS)) \
+			$(patsubst %.hsc, %_hsc.c, $(HSC_SRCS)) \
+			$(patsubst %.hsc, %_hsc.h, $(HSC_SRCS)) \
+			$(patsubst %.hsc, %.hc, $(HSC_SRCS))
+
+DERIVED_HAPPY_SRCS    = $(patsubst %.y,   %.hs, $(HAPPY_Y_SRCS)) \
+			$(patsubst %.ly,  %.hs, $(HAPPY_LY_SRCS))
+
+DERIVED_HC_SRCS       = $(patsubst %.hs,  %.hc, $(PRE_HS_SRCS)) \
+			$(patsubst %.lhs, %.hc, $(PRE_LHS_SRCS))
+
+DERIVED_SRCS	      = $(DERIVED_HSC_SRCS) \
+			$(DERIVED_HAPPY_SRCS) \
+			$(DERIVED_HC_SRCS)
 
 # EXCLUDED_SRCS can be set in the Makefile, otherwise it defaults to empty.
 EXCLUDED_HSC_SRCS      = $(filter %.hsc, $(EXCLUDED_SRCS))
@@ -179,10 +186,10 @@ C_OBJS      = $(addsuffix .$(way_)o,$(basename $(C_SRCS)))
 
 # SCRIPT_SRCS:  list of raw script files (in literate form)
 # SCRIPT_OBJS:  de-litted scripts
-SCRIPT_SRCS=$(filter %.lprl,$(SRCS))
-SCRIPT_OBJS=$(addsuffix .prl,$(basename $(SCRIPT_SRCS)))
+SCRIPT_SRCS = $(filter %.lprl,$(SRCS))
+SCRIPT_OBJS = $(addsuffix .prl,$(basename $(SCRIPT_SRCS)))
 
-OBJS=$(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
+OBJS        = $(HS_OBJS) $(C_OBJS) $(SCRIPT_OBJS)
 
 #
 # Note that as long as you use the standard variables for setting
@@ -235,17 +242,16 @@ TAGS_C_SRCS=$(C_SRCS)
 MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) $(HS_IFACES) a.out \
-		      $(CLEAN_DERIVED_SRCS)
+		      $(DERIVED_HSC_SRCS)
 
 # Don't clean the .hc files if we're bootstrapping
-ifeq "$(BootingFromHc)" "YES"
-CLEAN_DERIVED_SRCS = $(filter-out %.hc, $(DERIVED_SRCS))
-else
-CLEAN_DERIVED_SRCS = $(DERIVED_SRCS)
+ifneq "$(BootingFromHc)" "YES"
+CLEAN_FILES += $(DERIVED_HC_SRCS)
 endif
 
-DIST_CLEAN_FILES += .depend
-MAINTAINER_CLEAN_FILES += $(BOOT_SRCS)
+DIST_CLEAN_FILES 	+= .depend *.hp *.prof
+
+MAINTAINER_CLEAN_FILES 	+= $(BOOT_SRCS) $(DERIVED_HAPPY_SRCS)
 
 #
 # `Standard' set of files to clean out.
