@@ -61,15 +61,11 @@ occurAnalyseBinds
 
 occurAnalyseBinds binds simplifier_sw_chkr
   | opt_D_dump_occur_anal = pprTrace "OccurAnal:"
-				     (pprGenericBindings new_binds)
-				     new_binds
-  | otherwise		  = new_binds
+				     (pprGenericBindings binds')
+				     binds'
+  | otherwise		  = binds'
   where
-    new_binds	= concat binds'
-{- OLD VERSION:
     (_, _, binds') = occAnalTop initial_env binds
--}
-    (_, binds') = occAnalTop initial_env binds
 
     initial_env = OccEnv (simplifier_sw_chkr IgnoreINLINEPragma)
 			 (\id in_scope -> isLocallyDefined id)	-- Anything local is interesting
@@ -154,14 +150,21 @@ unfolding for something.
 
 
 \begin{code}
-{- OLD VERSION:
 occAnalTop :: OccEnv 			-- What's in scope
 	   -> [CoreBinding]
 	   -> (IdEnv BinderInfo, 	-- Occurrence info
-	       IdEnv Id,	        -- Indirection elimination info
-	       [[SimplifiableCoreBinding]]
+	       IdEnv Id,		-- Indirection elimination info
+	       [SimplifiableCoreBinding]
 	      )
+
 occAnalTop env [] = (emptyDetails, nullIdEnv, [])
+
+-- Special case for eliminating indirections
+--   Note: it's a shortcoming that this only works for
+--	   non-recursive bindings.  Elminating indirections
+--	   makes perfect sense for recursive bindings too, but
+--	   it's more complicated to implement, so I haven't done so
+
 occAnalTop env (NonRec exported_id (Var local_id) : binds)
   | isExported exported_id &&		-- Only if this is exported
 
@@ -176,7 +179,6 @@ occAnalTop env (NonRec exported_id (Var local_id) : binds)
 					-- 	something like a constructor, whose 
 					--	definition is implicitly exported and 
 					-- 	which must not vanish.
-    
 		-- To illustrate the preceding check consider
 		--	data T = MkT Int
 		--	mkT = MkT
@@ -190,21 +192,21 @@ occAnalTop env (NonRec exported_id (Var local_id) : binds)
 		-- the MkT constructor.
 		-- Slightly gruesome, this.
 
+
     not (maybeToBool (lookupIdEnv ind_env local_id))
 					-- Only if not already substituted for
-
-
+    
   = 	-- Aha!  An indirection; let's eliminate it!
---    pprTrace "occAnalTop" (ppr exported_id <+> ppr local_id) 
     (scope_usage, ind_env', binds')
   where
     (scope_usage, ind_env, binds') = occAnalTop env binds
     ind_env' = addOneToIdEnv ind_env local_id exported_id
+
 -- The normal case
 occAnalTop env (bind : binds)
-  = (final_usage, ind_env, (new_binds : binds'))
+  = (final_usage, ind_env, new_binds ++ binds')
   where
-    new_env		           = env `addNewCands` (bindersOf bind)
+    new_env			   = env `addNewCands` (bindersOf bind)
     (scope_usage, ind_env, binds') = occAnalTop new_env binds
     (final_usage, new_binds)       = occAnalBind env (zap_bind bind) scope_usage
 
@@ -221,79 +223,6 @@ occAnalTop env (bind : binds)
 			    Nothing          -> [pair]
 			    Just exported_id -> [(bndr, Var exported_id),
 					         (exported_id, rhs)]
-
--}
--- NEW VERSION:
-occAnalTop :: OccEnv 			-- What's in scope
-	   -> [CoreBinding]
-	   -> (IdEnv BinderInfo, 	-- Occurrence info
-	       [[SimplifiableCoreBinding]]
-	      )
-occAnalTop env binds = occAnalTop' env ind_env binds
- where
-  ind_env = go nullIdEnv binds
-  
-  go ind_env [] = ind_env
-  go ind_env (NonRec exported_id (Var local_id) : binds)
-   | isExported exported_id &&		-- Only if this is exported
-
-     isLocallyDefined local_id &&	-- Only if this one is defined in this
-					-- 	module, so that we *can* change its
-				  	-- 	binding to be the exported thing!
-
-     not (isExported local_id) &&	-- Only if this one is not itself exported,
-					--	since the transformation will nuke it
-
-     not (omitIfaceSigForId local_id)
-   = go ind_env' binds
-    where
-      -- the last addition for 'local_id' wins.
-     ind_env' = addOneToIdEnv ind_env local_id exported_id
-
-  go ind_env (_:xs) = go ind_env xs
-
-occAnalTop' :: OccEnv 			-- What's in scope
-	    -> IdEnv Id		        -- Indirection elimination info
-	    -> [CoreBinding]
-	    -> (IdEnv BinderInfo, 	-- Occurrence info
-	       [[SimplifiableCoreBinding]]
-	      )
-occAnalTop' env ind_env [] = (emptyDetails, [])
-
--- Special case for eliminating indirections
---   Note: it's a shortcoming that this only works for
---	   non-recursive bindings.  Elminating indirections
---	   makes perfect sense for recursive bindings too, but
---	   it's more complicated to implement, so I haven't done so
-
-occAnalTop' env ind_env (NonRec exported_id (Var local_id) : binds)
-  | maybeToBool (lookupIdEnv ind_env local_id)
-  = occAnalTop' env ind_env' binds
-  where
-    ind_env' = delOneFromIdEnv ind_env local_id
-  
--- The normal case
-occAnalTop' env ind_env (bind : binds)
-  = (final_usage, (new_binds : binds'))
-  where
-    new_env		     = env `addNewCands` (bindersOf bind)
-    (scope_usage, binds')    = occAnalTop' new_env ind_env binds
-    (final_usage, new_binds) = occAnalBind env (zap_bind bind) scope_usage
-
-	-- Deal with any indirections
-    zap_bind (NonRec bndr rhs) 
-	| bndr `elemIdEnv` ind_env 			= Rec (zap (bndr,rhs))
-		-- The Rec isn't strictly necessary, but it's convenient
-    zap_bind (Rec pairs)
-	| or [id `elemIdEnv` ind_env | (id,_) <- pairs] = Rec (concat (map zap pairs))
-
-    zap_bind bind = bind
-
-    zap pair@(bndr,rhs) = case lookupIdEnv ind_env bndr of
-			    Nothing          -> [pair]
-			    Just exported_id -> [(bndr, Var exported_id),
-					         (exported_id, rhs)]
-
 \end{code}
 
 
