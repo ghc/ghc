@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Float.lhs,v 1.4 2002/02/05 17:32:26 simonmar Exp $
+% $Id: Float.lhs,v 1.5 2002/02/27 14:33:09 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -768,18 +768,6 @@ minusFloat  (F# x) (F# y) = F# (minusFloat# x y)
 timesFloat  (F# x) (F# y) = F# (timesFloat# x y)
 divideFloat (F# x) (F# y) = F# (divideFloat# x y)
 
-{-# RULES
-"plusFloat x 0.0"   forall x#. plusFloat#  x#   0.0# = x#
-"plusFloat 0.0 x"   forall x#. plusFloat#  0.0# x#   = x#
-"minusFloat x 0.0"  forall x#. minusFloat# x#   0.0# = x#
-"minusFloat x x"    forall x#. minusFloat# x#   x#   = 0.0#
-"timesFloat x 0.0"  forall x#. timesFloat# x#   0.0# = 0.0#
-"timesFloat0.0 x"   forall x#. timesFloat# 0.0# x#   = 0.0#
-"timesFloat x 1.0"  forall x#. timesFloat# x#   1.0# = x#
-"timesFloat 1.0 x"  forall x#. timesFloat# 1.0# x#   = x#
-"divideFloat x 1.0" forall x#. divideFloat# x#  1.0# = x#
-  #-}
-
 negateFloat :: Float -> Float
 negateFloat (F# x)        = F# (negateFloat# x)
 
@@ -825,18 +813,6 @@ plusDouble   (D# x) (D# y) = D# (x +## y)
 minusDouble  (D# x) (D# y) = D# (x -## y)
 timesDouble  (D# x) (D# y) = D# (x *## y)
 divideDouble (D# x) (D# y) = D# (x /## y)
-
-{-# RULES
-"plusDouble x 0.0"   forall x#. (+##) x#    0.0## = x#
-"plusDouble 0.0 x"   forall x#. (+##) 0.0## x#    = x#
-"minusDouble x 0.0"  forall x#. (-##) x#    0.0## = x#
-"minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
-"timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
-"timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
-"timesDouble x 1.0"  forall x#. (*##) x#    1.0## = x#
-"timesDouble 1.0 x"  forall x#. (*##) 1.0## x#    = x#
-"divideDouble x 1.0" forall x#. (/##) x#    1.0## = x#
-  #-}
 
 negateDouble :: Double -> Double
 negateDouble (D# x)        = D# (negateDouble# x)

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.6 2002/02/12 09:39:19 simonmar Exp $
+% $Id: Base.lhs,v 1.7 2002/02/27 14:33:09 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2002
 %
@@ -85,7 +85,7 @@ module GHC.Base
   ) 
 	where
 
-import {-# SOURCE #-} GHC.Prim
+import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 
 infixr 9  .
@@ -690,6 +690,30 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "x# /=# x#" forall x#. x# /=# x# = False
 "x# <# x#"  forall x#. x# <#  x# = False
 "x# <=# x#" forall x#. x# <=# x# = True
+  #-}
+
+{-# RULES
+"plusFloat x 0.0"   forall x#. plusFloat#  x#   0.0# = x#
+"plusFloat 0.0 x"   forall x#. plusFloat#  0.0# x#   = x#
+"minusFloat x 0.0"  forall x#. minusFloat# x#   0.0# = x#
+"minusFloat x x"    forall x#. minusFloat# x#   x#   = 0.0#
+"timesFloat x 0.0"  forall x#. timesFloat# x#   0.0# = 0.0#
+"timesFloat0.0 x"   forall x#. timesFloat# 0.0# x#   = 0.0#
+"timesFloat x 1.0"  forall x#. timesFloat# x#   1.0# = x#
+"timesFloat 1.0 x"  forall x#. timesFloat# 1.0# x#   = x#
+"divideFloat x 1.0" forall x#. divideFloat# x#  1.0# = x#
+  #-}
+
+{-# RULES
+"plusDouble x 0.0"   forall x#. (+##) x#    0.0## = x#
+"plusDouble 0.0 x"   forall x#. (+##) 0.0## x#    = x#
+"minusDouble x 0.0"  forall x#. (-##) x#    0.0## = x#
+"minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
+"timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
+"timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
+"timesDouble x 1.0"  forall x#. (*##) x#    1.0## = x#
+"timesDouble 1.0 x"  forall x#. (*##) 1.0## x#    = x#
+"divideDouble x 1.0" forall x#. (/##) x#    1.0## = x#
   #-}
 
 -- Wrappers for the shift operations.  The uncheckedShift# family are
