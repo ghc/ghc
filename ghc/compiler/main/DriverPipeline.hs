@@ -1156,10 +1156,10 @@ staticLink o_files dep_packages = do
     let framework_path_opts = map ("-F"++) framework_paths
 
     pkg_frameworks <- getPackageFrameworks dep_packages
-    let pkg_framework_opts = map ("-framework " ++) pkg_frameworks
+    let pkg_framework_opts = concat [ ["-framework", fw] | fw <- pkg_frameworks ]
 
     frameworks <- readIORef v_Cmdline_frameworks
-    let framework_opts = map ("-framework "++) (reverse frameworks)
+    let framework_opts = concat [ ["-framework", fw] | fw <- reverse frameworks ]
 	 -- reverse because they're added in reverse order from the cmd line
 #endif
 
