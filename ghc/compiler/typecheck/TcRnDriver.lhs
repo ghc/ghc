@@ -709,12 +709,16 @@ monad; it augments it and returns the new TcGblEnv.
 tcRnGroup :: HsGroup RdrName -> TcM ((TcGblEnv, TcLclEnv), FreeVars)
 	-- Returns the variables free in the decls, for unused-binding reporting
 tcRnGroup decls
- = do {		-- Rename the declarations
+ = do {	showLIE (text "start of tcRnGroup" ++ ppr decls) ;
+
+		-- Rename the declarations
 	(tcg_env, rn_decls, src_fvs) <- rnTopSrcDecls decls ;
 	setGblEnv tcg_env $ do {
 
 		-- Typecheck the declarations
 	tc_envs <- tcTopSrcDecls rn_decls ;
+
+	showLIE (text "end of tcRnGroup" ++ ppr decls) 
 	return (tc_envs, src_fvs)
   }}
 
@@ -797,7 +801,7 @@ tcTopSrcDecls
 	(cls_dm_binds, dm_ids) <- tcClassDecls2 tycl_decls ;
 	tcExtendGlobalValEnv dm_ids	$ do {
 	inst_binds <- tcInstDecls2 inst_infos ;
-	showLIE "after instDecls2" ;
+	showLIE (text "after instDecls2") ;
 
 		-- Foreign exports
 		-- They need to be zonked, so we return them

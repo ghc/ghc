@@ -504,11 +504,11 @@ tidyMoreInsts env insts
 tidyInsts :: [Inst] -> (TidyEnv, [Inst])
 tidyInsts insts = tidyMoreInsts emptyTidyEnv insts
 
-showLIE :: String -> TcM ()	-- Debugging
+showLIE :: SDoc -> TcM ()	-- Debugging
 showLIE str
   = do { lie_var <- getLIEVar ;
 	 lie <- readMutVar lie_var ;
-	 traceTc (text str <+> pprInstsInFull (lieToList lie)) }
+	 traceTc (str <+> pprInstsInFull (lieToList lie)) }
 \end{code}
 
 
