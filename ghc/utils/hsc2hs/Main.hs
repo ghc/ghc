@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.18 2001/02/13 15:09:02 rrt Exp $
+-- $Id: Main.hs,v 1.19 2001/02/13 15:53:10 qrczak Exp $
 --
 -- (originally "GlueHsc.hs" by Marcin 'Qrczak' Kowalczyk)
 --
@@ -13,7 +13,7 @@
 
 import GetOpt
 import System        (getProgName, getArgs, ExitCode(..), exitWith, exitFailure)
-import KludgedSystem (system)
+import KludgedSystem (system, defaultCompiler)
 import Directory     (removeFile)
 import Parsec
 import ParsecError
@@ -213,11 +213,7 @@ output flags name toks = let
         [c] -> return c
         _   -> onlyOne "compiler"
     linker <- case [l | Linker l <- flags] of
-#ifndef mingw32_TARGET_OS
-        []  -> return "gcc"
-#else
-        []  -> return "gcc -mno-cygwin"
-#endif
+        []  -> return defaultCompiler
         [l] -> return l
         _   -> onlyOne "linker"
         
