@@ -351,3 +351,6 @@ SRC_DIST_NAME=$(ProjectNameShort)-$(ProjectVersion)
 
 DLL_PEN = $(FPTOOLS_TOP)/dll
 
+#------------------------------------------------------------------
+
+FPTOOLS_CSS = $(FPTOOLS_TOP)/mk/fptools.css

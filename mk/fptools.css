@@ -1,0 +1,29 @@
+div.article div.book {
+  font-family: sans-serif;
+  color: black;
+  background: white
+}
+
+h1, h2, h3 { color: #005A9C }
+
+h1 { font:            170% sans-serif }
+h2 { font:            140% sans-serif }
+h3 { font:            120% sans-serif }
+h4 { font: bold       100% sans-serif }
+h5 { font: italic     100% sans-serif }
+h6 { font: small-caps 100% sans-serif }
+
+pre {
+  font-family: monospace;
+  border-width: 1px;
+  border-style: solid;
+  padding: 0.3em
+}
+
+pre.screen         { color: green  }
+pre.programlisting { color: maroon }
+
+a:link    { color:      #0000C8 }
+a:hover   { background: #FFFFA8 }
+a:active  { color:      #D00000 }
+a:visited { color:      #680098 }

@@ -185,6 +185,12 @@ IncludeExampleDirsInBuild=NO
 #
 SGMLDocWays=
 
+#
+# Which ways should DocBook XML documents be built?
+# options are: dvi ps pdf html
+#
+XMLDocWays=
+
 ################################################################################
 #
 #		GHC project
@@ -900,6 +906,18 @@ SRC_SGML2RTF_OPTS       = -d $(SGMLSTYLESHEET)
 SRC_SGML2PDF_OPTS       = -d $(SGMLSTYLESHEET)
 
 DOCBOOK_CATALOG		= @Catalog@
+
+#-----------------------------------------------------------------------------
+# DocBook XML stuff
+
+XSLTPROC		= @XsltprocCmd@
+XMLLINT			= @XmllintCmd@
+FOP			= @FopCmd@
+XMLTEX			= @XmltexCmd@
+PDFXMLTEX		= @PdfxmltexCmd@
+DVIPS			= @DvipsCmd@
+
+DIR_DOCBOOK_XSL		= @DIR_DOCBOOK_XSL@
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software

@@ -802,6 +802,35 @@ install-docs:: $(INSTALL_DOCS)
 		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
 	done
 endif
+ifneq "$(XMLDocWays)" ""
+install-docs:: $(INSTALL_DOCS)
+	@$(INSTALL_DIR) $(datadir)	
+	for i in $(INSTALL_DOCS); do \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
+	done
+endif
+endif
+
+# The following could be an entry for an Obfuscated Makefile Contest...
+ifneq "$(INSTALL_XML_DOC)" ""
+ifneq "$(XMLDocWays)" ""
+install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(subst .no-chunks-html,-no-chunks.html,.$(i)))
+	@$(INSTALL_DIR) $(datadir)	
+	@for i in $(XMLDocWays); do \
+		if [ $$i = "html" ]; then \
+			$(INSTALL_DIR) $(datadir)/html; \
+			echo $(CP) -r $(INSTALL_XML_DOC) $(datadir)/html; \
+			$(CP) -r $(INSTALL_XML_DOC) $(datadir)/html; \
+		else \
+			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.no-chunks-html/-no-chunks.html/` $(datadir); \
+			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.no-chunks-html/-no-chunks.html/` $(datadir); \
+		fi; \
+		if [ $$i = "no-chunks-html" ]; then \
+			echo $(CP) $(FPTOOLS_CSS) $(datadir); \
+			$(CP) $(FPTOOLS_CSS) $(datadir); \
+		fi \
+	done
+endif
 endif
 
 ifneq "$(INSTALL_SGML_DOC)" ""
@@ -946,6 +975,50 @@ extraclean ::
 	$(RM) -rf DBTOHTML_OUTPUT_*
 	$(RM) -rf *.junk/
 	$(RM) -rf $(SGML_DOC)
+endif
+
+################################################################################
+#
+#			DocBook XML Documentation
+#
+################################################################################
+
+.PHONY: html no-chunks-html fo dvi ps pdf
+
+ifneq "$(XML_DOC)" ""
+
+all :: $(XMLDocWays)
+
+# multi-file XML document: main document name is specified in $(XML_DOC),
+# sub-documents (.xml files) listed in $(XML_SRCS).
+
+ifeq "$(XML_SRCS)" ""
+XML_SRCS = $(wildcard *.xml)
+endif
+
+XML_HTML           = $(addsuffix .html,$(XML_DOC))
+XML_NO_CHUNKS_HTML = $(addsuffix -no-chunks.html,$(XML_DOC))
+XML_FO             = $(addsuffix .fo,$(XML_DOC))
+XML_DVI            = $(addsuffix .dvi,$(XML_DOC))
+XML_PS             = $(addsuffix .ps,$(XML_DOC))
+XML_PDF            = $(addsuffix .pdf,$(XML_DOC))
+
+$(XML_HTML) $(XML_NO_CHUNKS_HTML) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF) :: $(XML_SRCS)
+
+html           :: $(XML_HTML)
+no-chunks-html :: $(XML_NO_CHUNKS_HTML)
+fo             :: $(XML_FO)
+dvi            :: $(XML_DVI)
+ps             :: $(XML_PS)
+pdf            :: $(XML_PDF)
+
+CLEAN_FILES += $(XML_HTML) $(XML_NO_CHUNKS_HTML) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF)
+
+extraclean ::
+	$(RM) -rf $(XML_DOC).out $(XML_DOC)
+
+validate ::
+	$(XMLLINT) --valid --noout $(XMLLINT_OPTS) $(XML_DOC).xml
 endif
 
 ##############################################################################

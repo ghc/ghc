@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.34 2003/08/18 15:45:09 panne Exp $
+# 	$Id: opts.mk,v 1.35 2004/08/15 20:28:06 panne Exp $
 #
 #################################################################################
 
@@ -104,6 +104,8 @@ SGML2PS_OPTS       = $(SRC_SGML2PS_OPTS) $(WAY$(_way)_SGML2PS_OPTS) $(EXTRA_SGML
 SGML2PDF_OPTS      = $(SRC_SGML2PDF_OPTS) $(WAY$(_way)_SGML2PDF_OPTS) $(EXTRA_SGML2PDF_OPTS)
 SGML2RTF_OPTS      = $(SRC_SGML2RTF_OPTS) $(WAY$(_way)_SGML2RTF_OPTS) $(EXTRA_SGML2RTF_OPTS)
 SGML2HTML_OPTS     = $(SRC_SGML2HTML_OPTS) $(WAY$(_way)_SGML2HTML_OPTS) $(EXTRA_SGML2HTML_OPTS)
+XSLTPROC_OPTS      = $(WAY$(_way)_XSLTPROC_OPTS) $(EXTRA_XSLTPROC_OPTS)
+FOP_OPTS           = $(WAY$(_way)_FOP_OPTS) $(EXTRA_FOP_OPTS)
 UNLIT_OPTS         = $(SRC_UNLIT_OPTS) $(WAY$(_way)_UNLIT_OPTS) $(EXTRA_UNLIT_OPTS)
 ZIP_OPTS           = $(SRC_ZIP_OPTS) $(EXTRA_ZIP_OPTS)
 

@@ -854,6 +854,11 @@ dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
+dnl ** check for DocBook toolchain
+FP_CHECK_DOCBOOK_DTD
+FP_DIR_DOCBOOK_XSL([/usr/share/xml/docbook/stylesheet/nwalsh/current /usr/share/sgml/docbook/docbook-xsl-stylesheets* /opt/kde?/share/apps/ksgmltools2/docbook/xsl /usr/share/docbook-xsl /usr/share/sgml/docbkxsl])
+FP_PROG_FO_PROCESSOR
+
 dnl ** check for jade/openjade & determine a working catalog
 AC_PATH_PROGS(JadeCmd,openjade jade,jade)
 FPTOOLS_DOCBOOK_CATALOG(Catalog, $JadeCmd, docs/fptools-both.dsl, 

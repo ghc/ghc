@@ -287,14 +287,14 @@ ifneq "$(DOCBOOK_CATALOG)" ""
 	@for i in $(BIN_DIST_DIRS); do 		 	 	\
 	  if test -d "$$i"; then 			 	\
 	    $(MAKE) -C $$i $(MFLAGS) $(BINDIST_DOC_WAYS); 	\
-	    echo $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="$(BINDIST_DOC_WAYS)" \
+	    echo $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="$(BINDIST_DOC_WAYS)" XMLDocWays="$(BINDIST_DOC_WAYS)" \
 		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
 		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \
 		libdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
 		libexecdir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM) \
 		datadir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/share; \
-	    $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="$(BINDIST_DOC_WAYS)" \
+	    $(MAKE) -C $$i $(MFLAGS) install-docs SGMLDocWays="$(BINDIST_DOC_WAYS)" XMLDocWays="$(BINDIST_DOC_WAYS)" \
 		prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) 	\
 		exec_prefix=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME) \
 		bindir=$(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM) \

@@ -240,13 +240,63 @@ endif
 	$(TIME) $(RUNTEST) $(HC) $(RUNTEST_OPTS) $<
 
 #-----------------------------------------------------------------------------
+# DocBook XML suffix rules
+#
+
+%-no-chunks.html : %.xml
+	$(XSLTPROC) --output $@ \
+	            --stringparam html.stylesheet fptools.css \
+	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/docbook.xsl $<
+	cp $(FPTOOLS_CSS) .
+
+%.html : %.xml
+	@$(RM) -rf $@ $(basename $@)
+	$(XSLTPROC) --stringparam base.dir $(basename $@)/ \
+	            --stringparam use.id.as.filename 1 \
+	            --stringparam root.filename '' \
+	            --stringparam html.stylesheet fptools.css \
+	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/chunk.xsl $<
+	cp $(FPTOOLS_CSS) $(basename $@)
+	touch $@
+
+%.fo : %.xml
+	$(XSLTPROC) --output $@ \
+	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/fo/docbook.xsl $<
+
+ifeq "$(FOP)" ""
+ifneq "$(PDFXMLTEX)" ""
+%.pdf : %.fo
+	$(PDFXMLTEX) $<
+	if grep "LaTeX Warning: Label(s) may have changed.Rerun to get cross-references right." $(basename $@).log > /dev/null ; then \
+	  $(PDFXMLTEX) $< ; \
+	  $(PDFXMLTEX) $< ; \
+	fi
+endif
+else
+%.ps : %.fo
+	$(FOP) $(FOP_OPTS) -fo $< -ps $@
+
+%.pdf : %.fo
+	$(FOP) $(FOP_OPTS) -fo $< -pdf $@
+endif
+
+ifneq "$(XMLTEX)" ""
+%.dvi : %.fo
+	$(XMLTEX) $<
+	if grep "LaTeX Warning: Label(s) may have changed.Rerun to get cross-references right." $(basename $@).log > /dev/null ; then \
+	  $(XMLTEX) $< ; \
+	  $(XMLTEX) $< ; \
+	fi
+endif
+
+#-----------------------------------------------------------------------------
 # Doc processing suffix rules
 #
 # ToDo: make these more robust
 #
 %.ps : %.dvi
 	@$(RM) $@
-	dvips $< -o $@
+	$(DVIPS) $< -o $@
 
 %.tex : %.tib
 	@$(RM) $*.tex $*.verb-t.tex
