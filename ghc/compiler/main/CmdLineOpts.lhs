@@ -65,7 +65,8 @@ module CmdLineOpts (
 	opt_Flatten,
 
 	-- optimisation opts
-	opt_NoMethodSharing,
+	opt_NoMethodSharing, 
+	opt_NoStateHack,
 	opt_LiberateCaseThreshold,
 	opt_CprOff,
 	opt_RulesOff,
@@ -767,6 +768,7 @@ opt_SMP				= lookUp  FSLIT("-fsmp")
 opt_Flatten			= lookUp  FSLIT("-fflatten")
 
 -- optimisation opts
+opt_NoStateHack			= lookUp  FSLIT("-fno-state-hack")
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
 opt_RulesOff			= lookUp  FSLIT("-frules-off")

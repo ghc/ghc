@@ -20,7 +20,7 @@ module OccurAnal (
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
-import Id		( isDataConWorkId, isOneShotLambda, setOneShotLambda, 
+import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
 			  idOccInfo, setIdOccInfo,
 			  isExportedId, modifyIdInfo, idInfo, idArity,
 			  idSpecialisation, isLocalId,
@@ -859,7 +859,7 @@ oneShotGroup (OccEnv cands encl ctxt) bndrs
   = case go ctxt bndrs [] of
 	(new_ctxt, new_bndrs) -> (all is_one_shot new_bndrs, OccEnv cands encl new_ctxt, new_bndrs)
   where
-    is_one_shot b = isId b && isOneShotLambda b
+    is_one_shot b = isId b && isOneShotBndr b
 
     go ctxt [] rev_bndrs = (ctxt, reverse rev_bndrs)
 

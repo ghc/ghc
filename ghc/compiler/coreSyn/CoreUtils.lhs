@@ -51,7 +51,7 @@ import DataCon		( DataCon, dataConRepArity, dataConArgTys,
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
-			  isOneShotLambda, isDataConWorkId_maybe, mkSysLocal,
+			  isOneShotBndr, isDataConWorkId_maybe, mkSysLocal,
 			  isDataConWorkId, isBottomingId
 			)
 import IdInfo		( GlobalIdDetails(..), megaSeqIdInfo )
@@ -71,7 +71,6 @@ import Unique		( Unique )
 import Outputable
 import TysPrim		( alphaTy )	-- Debugging only
 import Util             ( equalLength, lengthAtLeast )
-import TysPrim		( statePrimTyCon )
 \end{code}
 
 
@@ -715,7 +714,7 @@ IO state transformers, where we often get
 and the \s is a real-world state token abstraction.  Such abstractions
 are almost invariably 1-shot, so we want to pull the \s out, past the
 let x=E, even if E is expensive.  So we treat state-token lambdas as 
-one-shot even if they aren't really.  The hack is in Id.isOneShotLambda.
+one-shot even if they aren't really.  The hack is in Id.isOneShotBndr.
 
 3.  Dealing with bottom
 
@@ -782,7 +781,7 @@ arityType (Var v)
 			-- use the idinfo here
 
 	-- Lambdas; increase arity
-arityType (Lam x e) | isId x    = AFun (isOneShotLambda x || isStateHack x) (arityType e)
+arityType (Lam x e) | isId x    = AFun (isOneShotBndr x) (arityType e)
 		    | otherwise	= arityType e
 
 	-- Applications; decrease arity
@@ -809,28 +808,6 @@ arityType (Let b e) = case arityType e of
 					     | otherwise		      -> ATop
 
 arityType other = ATop
-
-isStateHack id = case splitTyConApp_maybe (idType id) of
-                     Just (tycon,_) | tycon == statePrimTyCon -> True
-                     other                                    -> False
-
-	-- The last clause is a gross hack.  It claims that 
-	-- every function over realWorldStatePrimTy is a one-shot
-	-- function.  This is pretty true in practice, and makes a big
-	-- difference.  For example, consider
-	--	a `thenST` \ r -> ...E...
-	-- The early full laziness pass, if it doesn't know that r is one-shot
-	-- will pull out E (let's say it doesn't mention r) to give
-	--	let lvl = E in a `thenST` \ r -> ...lvl...
-	-- When `thenST` gets inlined, we end up with
-	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
-	-- and we don't re-inline E.
-	--
-	-- It would be better to spot that r was one-shot to start with, but
-	-- I don't want to rely on that.
-	--
-	-- Another good example is in fill_in in PrelPack.lhs.  We should be able to
-	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
 
 {- NOT NEEDED ANY MORE: etaExpand is cleverer
 ok_note InlineMe = False

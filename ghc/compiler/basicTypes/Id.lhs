@@ -38,7 +38,7 @@ module Id (
 
 
 	-- One shot lambda stuff
-	isOneShotLambda, setOneShotLambda, clearOneShotLambda,
+	isOneShotBndr, isOneShotLambda, setOneShotLambda, clearOneShotLambda,
 
 	-- IdInfo stuff
 	setIdUnfolding,
@@ -89,8 +89,8 @@ import Var		( Id, DictId,
 			  globalIdDetails
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId, mkExportedLocalId )
-import Type		( Type, typePrimRep, addFreeTyVars, seqType)
-
+import Type		( Type, typePrimRep, addFreeTyVars, seqType, splitTyConApp_maybe )
+import TysPrim		( statePrimTyCon )
 import IdInfo 
 
 #ifdef OLD_STRICTNESS
@@ -110,6 +110,7 @@ import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
 import Outputable
 import Unique		( Unique, mkBuiltinUnique )
+import CmdLineOpts	( opt_NoStateHack )
 
 -- infixl so you can say (id `set` a `set` b)
 infixl 	1 `setIdUnfolding`,
@@ -455,6 +456,38 @@ modifyInlinePragma id fn = modifyIdInfo (\info -> info `setInlinePragInfo` (fn (
 idLBVarInfo :: Id -> LBVarInfo
 idLBVarInfo id = lbvarInfo (idInfo id)
 
+isOneShotBndr :: Id -> Bool
+-- This one is the "business end", called externally.
+-- Its main purpose is to encapsulate the Horrible State Hack
+isOneShotBndr id = isOneShotLambda id || (isStateHack id)
+
+isStateHack id 
+  | opt_NoStateHack 
+  = False
+  | otherwise
+  = case splitTyConApp_maybe (idType id) of
+	Just (tycon,_) | tycon == statePrimTyCon -> True
+        other                                    -> False
+	-- This is a gross hack.  It claims that 
+	-- every function over realWorldStatePrimTy is a one-shot
+	-- function.  This is pretty true in practice, and makes a big
+	-- difference.  For example, consider
+	--	a `thenST` \ r -> ...E...
+	-- The early full laziness pass, if it doesn't know that r is one-shot
+	-- will pull out E (let's say it doesn't mention r) to give
+	--	let lvl = E in a `thenST` \ r -> ...lvl...
+	-- When `thenST` gets inlined, we end up with
+	--	let lvl = E in \s -> case a s of (r, s') -> ...lvl...
+	-- and we don't re-inline E.
+	--
+	-- It would be better to spot that r was one-shot to start with, but
+	-- I don't want to rely on that.
+	--
+	-- Another good example is in fill_in in PrelPack.lhs.  We should be able to
+	-- spot that fill_in has arity 2 (and when Keith is done, we will) but we can't yet.
+
+
+-- The OneShotLambda functions simply fiddle with the IdInfo flag
 isOneShotLambda :: Id -> Bool
 isOneShotLambda id = case idLBVarInfo id of
                        IsOneShotLambda  -> True

@@ -21,7 +21,7 @@ import CoreSyn
 import CoreUtils	( exprIsValue, exprIsDupable )
 import CoreLint		( showPass, endPass )
 import CoreFVs		( CoreExprWithFVs, freeVars, freeVarsOf )
-import Id		( isOneShotLambda )
+import Id		( isOneShotBndr )
 import Var		( Id, idType )
 import Type		( isUnLiftedType )
 import VarSet
@@ -357,7 +357,7 @@ noFloatIntoRhs (AnnLam b _)   	    = not (is_one_shot b)
 
 noFloatIntoRhs rhs = exprIsValue (deAnnotate' rhs)	-- We'd just float right back out again...
 
-is_one_shot b = isId b && isOneShotLambda b
+is_one_shot b = isId b && isOneShotBndr b
 \end{code}
 
 
