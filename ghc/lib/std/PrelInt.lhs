@@ -4,6 +4,8 @@
 \section[Int]{Module @PrelInt@}
 
 \begin{code}
+{-# OPTIONS -monly-3-regs #-}
+
 module PrelInt 
    ( 
 	Int8(..), Int16(..), Int32(..), Int64(..)
