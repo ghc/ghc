@@ -182,7 +182,7 @@ unsafePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
 When passed a value of type @IO a@, the 'IO' will only be performed
 when the value of the @a@ is demanded.  This is used to implement lazy
-file reading, see 'IO.hGetContents'.
+file reading, see 'System.IO.hGetContents'.
 -}
 {-# NOINLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
