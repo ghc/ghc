@@ -100,4 +100,4 @@ test('conc047', compose(only_compiler_types(['ghc']),
 test('conc048', compose(only_compiler_types(['ghc']), 
                         omit_ways(['threaded','ghci'])), compile_and_run, [''])
 
-
+test('conc049', only_compiler_types(['ghc']), compile_and_run, ['-package stm'])
