@@ -6,3 +6,13 @@
 
 * added the -Wnot, -W, and -Wall options.  Set up a default set of warnings,
   namely -fwarn-{overlapped,incomplete}-patterns.
+
+* Added -fwarn-duplicate-exports warning to check for duplicates in
+  export lists. Included in default warning set.
+
+* Renamed SampleVar.{write,read}Sample to SampleVar.{write,read}SampleVar
+
+* new mkdependHS options: -W disables warnings of duplicate interface
+  files found along the import path. --include-prelude *will* generate
+  dependencies on Prelude + any prelude/syslib .hi files used.
+
