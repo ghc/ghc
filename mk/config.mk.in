@@ -220,7 +220,7 @@ GhcLibHcOpts=-O
 # Win32 only: Enable the RTS and libraries to be built as DLLs
 # Don't split object files for libs if we're building DLLs
 EnableWin32DLLs=@EnableWin32DLLs@
-ifeq "($EnableWin32DLLs)" "YES"
+ifeq "$(EnableWin32DLLs)" "YES"
 SplitObjs=NO
 else
 SplitObjs=YES
