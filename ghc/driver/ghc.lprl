@@ -2434,11 +2434,11 @@ sub add_syslib {
     local($syslib) = @_;
     
     unshift(@SysImport_dir,
-	    ${INSTALLING} ? "$InstLibDir/imports/$syslib"
+	    $INSTALLING ? "$InstLibDirGhc/imports/$syslib"
 		          : "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib");
 
     push(@SysLibrary_dir,
-	 ${INSTALLING} ? ("$InstLibDir")
+	 $INSTALLING ? ("$InstLibDirGhc")
                        : ("$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib",
 			  "$TopPwd/$CURRENT_DIR/$GHC_LIB_DIR/$syslib/cbits"));
 
