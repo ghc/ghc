@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.27 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.28 2001/11/27 15:30:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -548,6 +548,12 @@ dumpCensus( Census *census )
 	case HEAP_BY_RETAINER:
 	{
 	    RetainerSet *rs = (RetainerSet *)ctr->identity;
+
+	    // it might be the distinguished retainer set rs_MANY:
+	    if (rs == &rs_MANY) {
+		fprintf(hp_file, "MANY");
+		break;
+	    }
 
 	    // Mark this retainer set by negating its id, because it
 	    // has appeared in at least one census.  We print the
