@@ -688,6 +688,14 @@ runPhase cc_phase basename suff input_fn get_output_fn maybe_loc
         pkg_include_dirs <- getPackageIncludePath pkgs
         let include_paths = foldr (\ x xs -> "-I" : x : xs) []
 			      (cmdline_include_paths ++ pkg_include_dirs)
+			    ++ ["-I-"]
+		-- We add the flag -I- after all the include paths.
+		-- According to the gcc docs, this causes all -I paths
+		-- up to this point apply only to #include "..."
+		-- style includes.  This prevents accidentally
+		-- shadowing a system include (eg. #include <stdio.h>)
+		-- by putting a file of the same name in the current
+		-- directory, for example.
 
 	mangle <- readIORef v_Do_asm_mangling
 	(md_c_flags, md_regd_c_flags) <- machdepCCOpts
