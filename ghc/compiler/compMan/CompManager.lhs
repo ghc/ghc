@@ -319,8 +319,11 @@ cmRunStmt cmstate@CmState{ hpt=hpt, pcs=pcs, ic=icontext }
 
 		case either_hvals of
 		    Left e -> do
-		        return ( cmstate{ pcs=new_pcs, ic=new_ic }, 
-		  	  	 CmRunException e )
+			-- on error, keep the *old* interactive context,
+			-- so that 'it' is not bound to something
+			-- that doesn't exist.
+		        return ( cmstate{ pcs=new_pcs }, CmRunException e )
+
 		    Right hvals -> do
 			-- Get the newly bound things, and bind them.  
 			-- Don't need to delete any shadowed bindings;
