@@ -6,7 +6,7 @@
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (needs POSIX regexps)
+-- Portability :  portable
 --
 -- Interface to the POSIX regular expression library.
 --
