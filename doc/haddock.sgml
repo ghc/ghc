@@ -52,9 +52,10 @@
 	<para>Documentation annotations in the source code should be
 	easy on the eye when editing the source code itself, so as not
 	to obsure the code and to make reading and writing
-	documentation annotations easy.  Haddock therefore uses
-	lightweight markup in its annotations, taking several ideas
-	from <ulink
+	documentation annotations easy.  The easier it is to write
+	documentation, the more likely the programmer is to do it.
+	Haddock therefore uses lightweight markup in its annotations,
+	taking several ideas from <ulink
 	url="http://www.cse.unsw.edu.au/~chak/haskell/idoc/">IDoc</ulink>.
 	In fact, Haddock can understand IDoc-annotated source
 	code.</para>
@@ -72,10 +73,11 @@
 	modules.</para>
 
 	<para>Haddock therefore understands the Haskell module system
-	and can generate documentation which hides the internal module
-	structure of the interface.  A documentation annotation can
-	still be placed next to the implementation, and it will be
-	propagated to the external module in the generated
+	and can generate documentation which hides not only
+	non-exported entities from the interface, but also the
+	internal module structure of the interface.  A documentation
+	annotation can still be placed next to the implementation, and
+	it will be propagated to the external module in the generated
 	documentation.</para>
       </listitem>
       <listitem>
@@ -161,12 +163,340 @@
 
   <chapter id="invoking">
     <title>Invoking Haddock</title>
-    <para></para>
+    <para>Haddock is invoked from the command line, like so:</para>
+
+    <cmdsynopsis>
+      <command>haddock</command>
+      <arg rep=repeat><replaceable>option</replaceable></arg>
+      <arg rep=repeat choice=plain><replaceable>file</replaceable></arg>
+    </cmdsynopsis>
+
+    <para>Where each <replaceable>file</replaceable> is a filename
+    containing a Haskell source module.  All the modules specified on
+    the command line will be processed together.  When one module
+    refers to an entity in another module being processed, the
+    documentation will link directly to that entity.</para>
+
+    <para>Entities that cannot be found, for example because they are
+    in a module that isn't being processed as part of the current
+    batch, simply won't be hyperlinked in the generated
+    documentation.  Haddock will emit warnings listing all the
+    indentifiers it couldn't resolve.</para>
+
+    <para>The modules should <emphasis>not</emphasis> be mutually
+    recursive, as Haddock don't like swimming in circles.</para> 
+
+    <para>The following options are available:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-d</option></term>
+	<term><option>--docbook</option></term>
+	<indexterm><primary><option>-d</option></primary></indexterm>
+	<indexterm><primary><option>--docbook</option></primary></indexterm>
+	<listitem>
+	  <para>Output documentation in SGML DocBook format.  NOTE: at
+	  time of writing this is only partially implemented and
+	  doens't work.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-h</option></term>
+	<term><option>--html</option></term>
+	<indexterm><primary><option>-h</option></primary></indexterm>
+	<indexterm><primary><option>--html</option></primary></indexterm>
+	<listitem>
+	  <para>Generate documentation in HTML format.  Several files
+	  will be generated into the current directory (or the
+	  specified directory if the <option>-o</option> option is
+	  given), including the following:</para>
+	  <variablelist>
+	    <varlistentry>
+	      <term><filename>index.html</filename></term>
+	      <listitem>
+		<para>The top level page of the documentation: lists
+		the modules available, using indentation to represent
+		the hierarchy if the modules are hierarchical.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><filename>haddock.css</filename></term>
+	      <listitem>
+		<para>The stylesheet used by the generated HTML.  Feel
+		free to modify this to change the colors or
+		layout, or even specify your own stylesheet using the
+		<option>--css</option> option.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><filename><replaceable>module</replaceable>.html</filename></term>
+	      <listitem>
+		<para>An HTML page for each
+		<replaceable>module</replaceable>.</para>
+	      </listitem>
+	    </varlistentry>
+	    <varlistentry>
+	      <term><filename>doc-index.html</filename></term>
+	      <term><filename>doc-index-XX.html</filename></term>
+	      <listitem>
+		<para>The index, split into two
+		(functions/constructors and types/classes, as per
+		Haskell namespaces) and further split
+		alphabetically.</para>
+	      </listitem>
+	    </varlistentry>
+	  </variablelist>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-o</option> <replaceable>dir</replaceable></term>
+	<term><option>--odir</option>=<replaceable>dir</replaceable></term>
+	<indexterm><primary><option>-o</option></primary></indexterm>
+	<indexterm><primary><option>--odir</option></primary></indexterm>
+	<listitem>
+	  <para>Generate files into <replaceable>dir</replaceable>
+	  instead of the current directory.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-s</option> <replaceable>URL</replaceable></term>
+	<term><option>--source</option>=<replaceable>URL</replaceable></term>
+	<indexterm><primary><option>-s</option></primary></indexterm>
+	<indexterm><primary><option>--source</option></primary></indexterm>
+	<listitem>
+	  <para>Include links to the source files in the generated
+	  documentation, where <replaceable>URL</replaceable> is the
+	  base URL where the source files can be found.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-t</option> <replaceable>title</replaceable></term>
+	<term><option>--title</option>=<replaceable>title</replaceable></term>
+	<indexterm><primary><option>-t</option></primary></indexterm>
+	<indexterm><primary><option>--title</option></primary></indexterm>
+	<listitem>
+	  <para>Use <replaceable>title</replaceable> as the page
+	  heading for each page in the documentation.This will
+	  normally be the name of the library being documented.</para>
+
+	  <para>The title should be a plain string (no markup
+	  please!).</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-v</option></term>
+	<term><option>--verbose</option></term>
+	<indexterm><primary><option>-v</option></primary></indexterm>
+	<indexterm><primary><option>--verbose</option></primary></indexterm>
+	<listitem>
+	  <para>Reserved for future expansion.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>--css</option>=<replaceable>filename</replaceable></term>
+	<indexterm><primary><option>--css</option></primary></indexterm>
+	<listitem>
+	  <para>Specify a stylesheet to use instead of the default one
+	  that comes with Haddock.  It should specify certain classes:
+	  see the default stylesheet for details.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
   </chapter>
   
   <chapter id="markup">
     <title>Documentation and Markup</title>
-    <para></para>
-  </chapter>
 
+    <para>Haddock understands special documentation annotations in the
+    Haskell source file and propagates these into the generated
+    documentation.  The annotations are purely optional: if there are
+    no annotations, Haddock will just generate documentation that
+    contains the type signatures, data type declarations, and class
+    declarations exported by each of the modules being
+    processed.</para>
+
+    <section>
+      <title>Documenting a top-level declaration</title>
+
+      <para>The simplest example of a documentation annotation is for
+      documenting any top-level declaration (function type signature,
+      type declaration, or class declaration).  For example, if the
+      source file contains the following type signature:</para>
+
+<programlisting>
+square :: Int -> Int
+square x = x * x
+</programlisting>
+
+    <para>Then we can document it like this:</para>
+
+<programlisting>
+-- |The 'sqaure' function squares an integer.
+square :: Int -> Int
+square x = x * x
+</programlisting>
+
+      <para>The <quote><literal>-- |</literal></quote> syntax begins a
+      documentation annotation, which applies to the
+      <emphasis>following</emphasis> declaration in the source file.
+      Note that the annotation is just a comment in Haskell &mdash; it
+      will be ignored by the Haskell compiler.</para>
+
+      <para>The declaration following a documentation annotation
+      should be one of the following:</para>
+      <itemizedlist>
+	<listitem>
+	  <para>A type signature for a top-level function,</para>
+	</listitem>
+	<listitem>
+	  <para>A <literal>data</literal> declaration,</para>
+	</listitem>
+	<listitem>
+	  <para>A <literal>newtype</literal> declaration,</para>
+	</listitem>
+	<listitem>
+	  <para>A <literal>type</literal> declaration, or</para>
+	</listitem>
+	<listitem>
+	  <para>A <literal>class</literal> declaration.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>If the annotation is followed by a different kind of
+      declaration, it will probably be ignored by Haddock.</para>
+
+      <para>Some people like to write their documentation
+      <emphasis>after</emphasis> the declaration; this is possible in
+      Haddock too:</para>
+     
+<programlisting>
+square :: Int -> Int
+-- ^The 'sqaure' function squares an integer.
+square x = x * x
+</programlisting>
+
+      <para>Note that Haddock doesn't contain a Haskell type system
+      &mdash; if you don't write the type signature for a function,
+      then Haddock can't tell what its type is and it won't be
+      included in the documentation.</para>
+      
+      <section>
+	<title>Controlling the documentation structure</title>
+	
+	<para>Haddock produces interface documentation that lists only
+        the entities actually exported by the module.  The
+        documentation for a module will include
+        <emphasis>all</emphasis> entities exported by that module,
+        even if they were re-exported by another module.  The only
+        exception is when Haddock can't see the declaration for the
+        re-exported entity, perhaps because it isn't part of the batch
+        of modules currently being processed.</para>
+
+	<para>However, to Haddock the export list has even more
+	significance than just specifying the entities to be included
+	in the documentation.  It also specifies the
+	<emphasis>order</emphasis> that entities will be listed in the
+	generated documentation.  This leaves the programmer free to
+	implement functions in any order he/she pleases, and indeed in
+	any <emphasis>module</emphasis> he/she pleases, but still
+	specify the order that the functions should be documented in
+	the export list.  Indeed, many programmers already do this:
+	the export list is often used as a kind of ad-hoc interface
+	documentation, with headings, groups of functions, type
+	signatures and declarations in comments.</para>
+
+	<para>You can insert headings and sub-headings in the
+	documentation by including annotations at the appropriate
+	point in the export list.  For example:</para>
+
+<programlisting>
+module Foo (
+  -- * Classes
+  C(..),
+  -- * Types
+  -- ** A data type
+  T,
+  -- ** A record
+  R,
+  -- * Some functions
+  f, g
+  ) where
+</programlisting>
+
+	<para>Headings are introduced with the syntax
+
+ 	<quote><literal>-- *</literal></quote>, 
+        <quote><literal>-- **</literal></quote> 
+
+        and so on, where the number of <literal>*</literal>s indicates
+        the level of the heading (section, sub-section,
+        sub-sub-section, etc.).</para>
+
+	<para>If you use section headings, then Haddock will generate
+	a table of contents at the top of the module documentation for
+	you.</para>
+
+	<section>
+	  <title>Re-exporting an entire module</title>
+
+	  <para>Haskell allows you to re-export the entire contents of
+	  a module (or at least, everything currently in scope that
+	  was imported from a given module) by listing it in the
+	  export list:</para>
+
+<programlisting>
+module Foo (
+  module Bar,
+  module Baz
+ ) where	  
+</programlisting>
+
+	  <para>What will the Haddock-generated documentation for this
+	  module look like?  Well, Haddock simply behaves as if the
+	  export list for modules <literal>Bar</literal> and
+	  <literal>Baz</literal> had been expanded in-place in the
+	  export list for <literal>Foo</literal>, including all of
+	  their structure (section headings etc.).</para>
+	</section>
+
+	<section>
+	  <title>More about re-exported entities</title> 
+	  
+	  <para>How hyperlinks are re-targetted when an entity is
+	  re-exported.</para>
+
+	</section>
+      </section>
+
+    </section>
+
+    <section>
+      <title>The module description</title>
+      <para></para>
+    </section>
+    
+    <section>
+      <title>Named chunks of documentation</title>
+      <para></para>
+    </section>
+    
+    <section>
+      <title>Markup</title>
+      <para>
+	links to identifiers
+	links to modules
+	itemized lists
+	enumerated lists
+	emphasis
+	code blocks
+	URLs</para>
+    </section>
+  </chapter>
 </book>
