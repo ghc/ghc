@@ -27,7 +27,7 @@ import RnMonad
 import RnEnv
 import RnHiFiles	( lookupFixityRn )
 import CmdLineOpts	( DynFlag(..), opt_IgnoreAsserts )
-import Literal		( inIntRange )
+import Literal		( inIntRange, inCharRange )
 import BasicTypes	( Fixity(..), FixityDirection(..), defaultFixity, negateFixity )
 import PrelNames	( hasKey, assertIdKey, minusName, negateName, fromIntegerName,
 			  eqClass_RDR, foldr_RDR, build_RDR, eqString_RDR,
@@ -799,7 +799,10 @@ that the types and classes they involve
 are made available.
 
 \begin{code}
-litFVs (HsChar c)             = returnRn (unitFV charTyCon_name)
+litFVs (HsChar c)
+   = checkRn (inCharRange c) (bogusCharError c) `thenRn_`
+     returnRn (unitFV charTyCon_name)
+
 litFVs (HsCharPrim c)         = returnRn (unitFV (getName charPrimTyCon))
 litFVs (HsString s)           = returnRn (mkFVs [listTyCon_name, charTyCon_name])
 litFVs (HsStringPrim s)       = returnRn (unitFV (getName addrPrimTyCon))
@@ -916,4 +919,7 @@ patSynErr e
 doStmtListErr e
   = sep [ptext SLIT("`do' statements must end in expression:"),
 	 nest 4 (ppr e)]
+
+bogusCharError c
+  = ptext SLIT("character literal out of range: '\\") <> int c <> char '\''
 \end{code}

@@ -12,7 +12,7 @@ module Literal
 	, literalType, literalPrimRep
 	, hashLiteral
 
-	, inIntRange, inWordRange, tARGET_MAX_INT
+	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
 
 	, word2IntLit, int2WordLit, char2IntLit, int2CharLit
 	, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
@@ -61,6 +61,9 @@ tARGET_MIN_INT = -2147483648
 tARGET_MAX_INT =  2147483647
 #endif
 tARGET_MAX_WORD = (tARGET_MAX_INT * 2) + 1
+
+tARGET_MAX_CHAR :: Int
+tARGET_MAX_CHAR = 0x10ffff
 \end{code}
  
 
@@ -145,6 +148,9 @@ mkMachWord64 x = MachWord64 x	-- Ditto?
 inIntRange, inWordRange :: Integer -> Bool
 inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT
 inWordRange x = x >= 0		    && x <= tARGET_MAX_WORD
+
+inCharRange :: Int -> Bool
+inCharRange c =  c >= 0 && c <= tARGET_MAX_CHAR
 \end{code}
 
 	Coercions

@@ -49,12 +49,14 @@ module Outputable (
 
 import {-# SOURCE #-} 	Name( Name )
 
-import IO		( Handle, hPutChar, hPutStr, stderr, stdout )
 import CmdLineOpts	( opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )
 import Panic
+
+import Word		( Word32 )
+import IO		( Handle, hPutChar, hPutStr, stderr, stdout )
 import Char             ( chr, ord, isDigit )
 \end{code}
 
@@ -360,7 +362,7 @@ showCharLit c rest
     | c == ord '\r' = "\\r" ++ rest
     | c == ord '\t' = "\\t" ++ rest
     | c == ord '\v' = "\\v" ++ rest
-    | otherwise     = ('\\':) $ shows c $ case rest of
+    | otherwise     = ('\\':) $ shows (fromIntegral c :: Word32) $ case rest of
         d:_ | isDigit d -> "\\&" ++ rest
         _               -> rest
 
@@ -369,7 +371,8 @@ showCharLit c rest
 -- of Char and String.
 
 pprHsChar :: Int -> SDoc
-pprHsChar c = text (show (chr c))
+pprHsChar c | not (inCharRange c) = char '\\' <> show (fromIntegral c :: Word32)
+            | otherwise = text (show (chr c))
 
 pprHsString :: FastString -> SDoc
 pprHsString fs = text (show (unpackFS fs))
