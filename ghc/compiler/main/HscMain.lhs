@@ -197,7 +197,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -- RENAME
  	    -------------------
 	; (pcs_rn, maybe_rn_result) 
-      	     <- renameModule dflags hit hst pcs_ch this_mod rdr_module
+      	     <- _scc_ "Rename" 
+		 renameModule dflags hit hst pcs_ch this_mod rdr_module
       	; case maybe_rn_result of {
       	     Nothing -> return (HscFail pcs_rn);
       	     Just (print_unqualified, (is_exported, new_iface, rn_hs_decls)) -> do {
@@ -205,7 +206,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -------------------
  	    -- TYPECHECK
  	    -------------------
-	; maybe_tc_result <- typecheckModule dflags pcs_rn hst new_iface 
+	; maybe_tc_result 
+	    <- _scc_ "TypeCheck" typecheckModule dflags pcs_rn hst new_iface 
 					     print_unqualified rn_hs_decls
 	; case maybe_tc_result of {
       	     Nothing -> return (HscFail pcs_rn);
@@ -217,7 +219,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -- DESUGAR
  	    -------------------
 	; (ds_binds, ds_rules, foreign_stuff) 
-             <- deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
+             <- _scc_ "DeSugar" 
+		deSugar dflags pcs_tc hst this_mod print_unqualified tc_result
 
  	    -------------------
  	    -- SIMPLIFY, TIDY-CORE
@@ -230,7 +233,8 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
  	    -- BUILD THE NEW ModDetails AND ModIface
  	    -------------------
 	; let new_details = mkModDetails env_tc tidy_binds orphan_rules
-	; final_iface <- mkFinalIface ghci_mode dflags location 
+	; final_iface <- _scc_ "MkFinalIface" 
+			  mkFinalIface ghci_mode dflags location 
                                       maybe_checked_iface new_iface new_details
 
  	    -------------------
@@ -273,7 +277,7 @@ mkFinalIface ghci_mode dflags location maybe_old_iface new_iface new_details
 myParseModule dflags src_filename
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
-      -- _scc_     "Parser"
+      _scc_  "Parser" do
 
       buf <- hGetStringBuffer True{-expand tabs-} src_filename
 
@@ -327,18 +331,19 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names
  = do
       --------------------------  Convert to STG -------------------------------
       (stg_binds, cost_centre_info) 
-		<- myCoreToStg dflags this_mod tidy_binds env_tc
+		<- _scc_ "CoreToStg"
+		    myCoreToStg dflags this_mod tidy_binds env_tc
 
-      --------------------------  Code generation -------------------------------
-      -- _scc_     "CodeGen"
-      abstractC <- codeGen dflags this_mod imported_modules
+      --------------------------  Code generation ------------------------------
+      abstractC <- _scc_ "CodeGen"
+		    codeGen dflags this_mod imported_modules
                            cost_centre_info fe_binders
                            local_tycons stg_binds
 
       --------------------------  Code output -------------------------------
-      -- _scc_     "CodeOutput"
       (maybe_stub_h_name, maybe_stub_c_name)
-         <- codeOutput dflags this_mod local_tycons
+         <- _scc_ "CodeOutput"
+	     codeOutput dflags this_mod local_tycons
                        tidy_binds stg_binds
                        c_code h_code abstractC
 
@@ -370,11 +375,11 @@ myCoreToStg dflags this_mod tidy_binds env_tc
 
       --let bcos = byteCodeGen dflags tidy_binds local_tycons local_classes
 
-      -- _scc_     "Core2Stg"
-      stg_binds <- coreToStg dflags this_mod tidy_binds
+      
+      stg_binds <- _scc_ "Core2Stg" coreToStg dflags this_mod tidy_binds
 
-      -- _scc_     "Stg2Stg"
-      (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod stg_binds
+      (stg_binds2, cost_centre_info)
+	   <- _scc_ "Core2Stg" stg2stg dflags this_mod stg_binds
 
       return (stg_binds2, cost_centre_info)
    where
@@ -462,7 +467,7 @@ hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
 hscParseExpr dflags str
  = do --------------------------  Parser  ----------------
       showPass dflags "Parser"
-      -- _scc_     "Parser"
+      _scc_ "Parser" do
 
       buf <- stringToStringBuffer str
 
