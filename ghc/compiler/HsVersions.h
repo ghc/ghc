@@ -70,7 +70,7 @@ name = Util.global (value) :: IORef (ty); \
 #define ASSERT(e)      if False then error "ASSERT"  else
 #define ASSERT2(e,msg) if False then error "ASSERT2" else
 #define ASSERTM(e)
-#define ASSERTM2(e)
+#define ASSERTM2(e,msg)
 #define WARN(e,msg)    if False then error "WARN"    else
 #endif
 
