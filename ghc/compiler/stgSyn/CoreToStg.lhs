@@ -31,6 +31,7 @@ import VarEnv
 import Const		( Con(..), isWHNFCon, Literal(..) )
 import PrimOp		( PrimOp(..) )
 import Type		( isUnLiftedType, isUnboxedTupleType, Type )
+import TysPrim		( intPrimTy )
 import Unique		( Unique, Uniquable(..) )
 import UniqSupply	-- all of it, really
 import Outputable
@@ -72,6 +73,10 @@ invariant any longer.)
 
 \begin{code}
 type StgEnv = IdEnv Id
+
+data StgFloatBind
+   = LetBind Id StgExpr
+   | CaseBind Id StgExpr
 \end{code}
 
 No free/live variable information is pinned on in this pass; it's added
@@ -229,8 +234,7 @@ isDynName nm =
 %************************************************************************
 
 \begin{code}
-coreArgsToStg :: StgEnv -> [CoreArg]
-	      -> UniqSM ([(Id,StgExpr)], [StgArg])
+coreArgsToStg :: StgEnv -> [CoreArg] -> UniqSM ([StgFloatBind], [StgArg])
 
 coreArgsToStg env []
   = returnUs ([], [])
@@ -245,7 +249,7 @@ coreArgsToStg env (a:as)
 
 -- This is where we arrange that a non-trivial argument is let-bound
 
-coreArgToStg :: StgEnv -> CoreArg -> UniqSM ([(Id,StgExpr)], StgArg)
+coreArgToStg :: StgEnv -> CoreArg -> UniqSM ([StgFloatBind], StgArg)
 
 coreArgToStg env arg
   = coreExprToStgFloat env arg	`thenUs` \ (binds, arg') ->
@@ -254,7 +258,7 @@ coreArgToStg env arg
 	([], StgApp v [])		      -> returnUs ([], StgVarArg v)
 
 	-- A non-trivial argument: we must let (or case-bind)
-	-- We don't do the case part here... we leave that to mkStgLets
+	-- We don't do the case part here... we leave that to mkStgBinds
 
 	-- Further complication: if we're converting this binding into
 	-- a case,  then try to avoid generating any case-of-case
@@ -262,8 +266,8 @@ coreArgToStg env arg
 	(_, other) ->
 		 newStgVar ty	`thenUs` \ v ->
 		 if isUnLiftedType ty
-		   then returnUs (binds ++ [(v,arg')], StgVarArg v)
-		   else returnUs ([(v, mkStgLets binds arg')], StgVarArg v)
+		   then returnUs (binds ++ [CaseBind v arg'], StgVarArg v)
+		   else returnUs ([LetBind v (mkStgBinds binds arg')], StgVarArg v)
 	  where 
 		ty = coreExprType arg
 
@@ -369,7 +373,7 @@ The rest are handled by coreExprStgFloat.
 \begin{code}
 coreExprToStg env expr
   = coreExprToStgFloat env expr  `thenUs` \ (binds,stg_expr) ->
-    returnUs (mkStgLets binds stg_expr)
+    returnUs (mkStgBinds binds stg_expr)
 \end{code}
 
 %************************************************************************
@@ -432,6 +436,16 @@ coreExprToStgFloat env expr@(Con (PrimOp (CCallOp (Right _) a b c)) args)
     coreArgsToStg env args      `thenUs` \ (binds, stg_atoms) ->
     let con' = PrimOp (CCallOp (Right u) a b c) in
     returnUs (binds, StgCon con' stg_atoms (coreExprType expr))
+
+-- for dataToTag#, we need to make sure the argument is evaluated first.
+coreExprToStgFloat env expr@(Con op@(PrimOp DataToTagOp) [Type ty, a])
+  = newStgVar ty		`thenUs` \ v ->
+    coreArgToStg env a		`thenUs` \ (binds, arg) ->
+    let e = case arg of
+		StgVarArg v -> StgApp v []
+		StgConArg c -> StgCon c [] (coreExprType a)
+    in
+    returnUs (binds ++ [CaseBind v e], StgCon op [StgVarArg v] (coreExprType expr))
 
 coreExprToStgFloat env expr@(Con con args)
   = coreArgsToStg env args	`thenUs` \ (binds, stg_atoms) ->
@@ -541,12 +555,20 @@ newLocalIds env (b:bs)
 
 
 \begin{code}
-mkStgLets :: [(Id,StgExpr)] -> StgExpr -> StgExpr
-mkStgLets binds body = foldr mkStgLet body binds
+mkStgBinds :: [StgFloatBind] -> StgExpr -> StgExpr
+mkStgBinds binds body = foldr mkStgBind body binds
 
-mkStgLet (bndr, rhs) body
+mkStgBind (CaseBind bndr rhs) body
+  | isUnLiftedType bndr_ty
+  = mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
+  | otherwise
+  = mkStgCase rhs bndr (StgAlgAlts bndr_ty [] (StgBindDefault body))
+  where
+    bndr_ty = idType bndr
+
+mkStgBind (LetBind bndr rhs) body
   | isUnboxedTupleType bndr_ty
-  = panic "mkStgLets: unboxed tuple"
+  = panic "mkStgBinds: unboxed tuple"
   | isUnLiftedType bndr_ty
   = mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
 

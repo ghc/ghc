@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.25 1999/03/22 16:57:10 simonm Exp $
+% $Id: CgCase.lhs,v 1.26 1999/04/23 13:53:28 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -27,12 +27,12 @@ import AbsCUtils	( mkAbstractCs, mkAbsCStmts, mkAlgAltsCSwitch,
 			)
 import CoreSyn		( isDeadBinder )
 import CgUpdate		( reserveSeqFrame )
-import CgBindery	( getVolatileRegs, getArgAmodes,
+import CgBindery	( getVolatileRegs, getArgAmodes, getArgAmode,
 			  bindNewToReg, bindNewToTemp,
 			  bindNewPrimToAmode,
 			  rebindToStack, getCAddrMode,
 			  getCAddrModeAndInfo, getCAddrModeIfVolatile,
-			  buildContLivenessMask, nukeDeadBindings
+			  buildContLivenessMask, nukeDeadBindings,
 			)
 import CgCon		( bindConArgs, bindUnboxedTupleComponents )
 import CgHeapery	( altHeapCheck, yield )
@@ -62,8 +62,9 @@ import PrimRep		( getPrimRepSize, retPrimRepSize, PrimRep(..)
 import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  isNewTyCon, isAlgTyCon, isFunTyCon, isPrimTyCon,
 			  tyConDataCons, tyConFamilySize )
-import Type		( Type, typePrimRep, splitAlgTyConApp, splitTyConApp_maybe,
-			  splitFunTys, applyTys )
+import Type		( Type, typePrimRep, splitAlgTyConApp, 
+			  splitTyConApp_maybe,
+			   splitFunTys, applyTys )
 import Unique           ( Unique, Uniquable(..) )
 import Maybes		( maybeToBool )
 import Outputable
@@ -116,14 +117,6 @@ Against:
 
 	This never hurts us if there is only one alternative.
 
-
-*** NOT YET DONE ***  The difficulty is that \tr{!B!}, \tr{!C!} need
-to take account of what is live, and that includes all live volatile
-variables, even if they also have stable analogues.  Furthermore, the
-stack pointers must be lined up properly so that GC sees tidy stacks.
-If these things are done, then the heap checks can be done at \tr{!B!} and
-\tr{!C!} without a full save-volatile-vars sequence.
-
 \begin{code}
 cgCase	:: StgExpr
 	-> StgLiveVars
@@ -137,7 +130,26 @@ cgCase	:: StgExpr
 Several special cases for inline primitive operations.
 
 \begin{code}
-cgCase (StgCon (PrimOp op) args res_ty) live_in_whole_case live_in_alts bndr srt alts
+cgCase (StgCon (PrimOp TagToEnumOp) [arg] res_ty)
+         live_in_whole_case live_in_alts bndr srt alts
+  | isEnumerationTyCon tycon
+  = getArgAmode arg `thenFC` \amode ->
+    let
+	[res] = getPrimAppResultAmodes (getUnique bndr) alts
+    in
+    absC (CAssign res (CTableEntry 
+		     	(CLbl (mkClosureTblLabel tycon) PtrRep)
+		      	amode PtrRep)) `thenC`
+
+	-- Scrutinise the result
+    cgInlineAlts bndr alts
+
+  | otherwise = panic "cgCase: tagToEnum# of non-enumerated type"
+   where
+	(Just (tycon,_)) = splitTyConApp_maybe res_ty
+
+cgCase (StgCon (PrimOp op) args res_ty) 
+	live_in_whole_case live_in_alts bndr srt alts
   | not (primOpOutOfLine op)
   =
 	-- Get amodes for the arguments and results
@@ -338,22 +350,22 @@ getPrimAppResultAmodes
 	-> [CAddrMode]
 \end{code}
 
-\begin{code}
--- If there's an StgBindDefault which does use the bound
--- variable, then we can only handle it if the type involved is
--- an enumeration type.   That's important in the case
--- of comparisions:
---
---	case x ># y of
---	  r -> f r
---
--- The only reason for the restriction to *enumeration* types is our
--- inability to invent suitable temporaries to hold the results;
--- Elaborating the CTemp addr mode to have a second uniq field
--- (which would simply count from 1) would solve the problem.
--- Anyway, cgInlineAlts is now capable of handling all cases;
--- it's only this function which is being wimpish.
+If there's an StgBindDefault which does use the bound
+variable, then we can only handle it if the type involved is
+an enumeration type.   That's important in the case
+of comparisions:
 
+	case x ># y of
+	  r -> f r
+
+The only reason for the restriction to *enumeration* types is our
+inability to invent suitable temporaries to hold the results;
+Elaborating the CTemp addr mode to have a second uniq field
+(which would simply count from 1) would solve the problem.
+Anyway, cgInlineAlts is now capable of handling all cases;
+it's only this function which is being wimpish.
+
+\begin{code}
 getPrimAppResultAmodes uniq (StgAlgAlts ty alts 
 				(StgBindDefault rhs))
   | isEnumerationTyCon spec_tycon = [tag_amode]

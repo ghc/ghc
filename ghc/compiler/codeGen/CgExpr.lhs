@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.22 1999/03/25 13:13:51 simonm Exp $
+% $Id: CgExpr.lhs,v 1.23 1999/04/23 13:53:29 simonm Exp $
 %
 %********************************************************
 %*							*
@@ -22,7 +22,7 @@ import AbsCUtils	( mkAbstractCs )
 import CLabel		( mkClosureTblLabel )
 
 import SMRep		( fixedHdrSize )
-import CgBindery	( getArgAmodes, CgIdInfo, nukeDeadBindings )
+import CgBindery	( getArgAmodes, getArgAmode, CgIdInfo, nukeDeadBindings)
 import CgCase		( cgCase, saveVolatileVarsAndRegs, 
 			  restoreCurrentCostCentre, freeCostCentreSlot,
 			  splitTyConAppThroughNewTypes )
@@ -48,7 +48,7 @@ import PrimOp		( primOpOutOfLine,
 import PrimRep		( getPrimRepSize, PrimRep(..), isFollowableRep )
 import TyCon		( maybeTyConSingleCon,
 			  isUnboxedTupleTyCon, isEnumerationTyCon )
-import Type		( Type, typePrimRep )
+import Type		( Type, typePrimRep, splitTyConApp_maybe )
 import Maybes		( assocMaybe, maybeToBool )
 import Unique		( mkBuiltinUnique )
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
@@ -116,11 +116,29 @@ NOTE about _ccall_GC_:
 A _ccall_GC_ is treated as an out-of-line primop for the case
 expression code, because we want a proper stack frame on the stack
 when we perform it.  When we get here, however, we need to actually
-perform the call, so we treat it an an inline primop.
+perform the call, so we treat it as an inline primop.
 
 \begin{code}
 cgExpr (StgCon (PrimOp op@(CCallOp _ _ may_gc@True _)) args res_ty)
   = primRetUnboxedTuple op args res_ty
+
+-- tagToEnum# is special: we need to pull the constructor out of the table,
+-- and perform an appropriate return.
+
+cgExpr (StgCon (PrimOp TagToEnumOp) [arg] res_ty) 
+  | isEnumerationTyCon tycon =
+	getArgAmode arg `thenFC` \amode ->
+	performReturn (CAssign (CReg node) 
+			(CTableEntry 
+		          (CLbl (mkClosureTblLabel tycon) PtrRep)
+		          amode PtrRep))
+		  (\ sequel -> mkDynamicAlgReturnCode tycon amode sequel)
+
+  | otherwise = panic "cgExpr: tagToEnum# of non-enumerated type"
+
+   where
+	(Just (tycon,_)) = splitTyConApp_maybe res_ty
+
 
 cgExpr x@(StgCon (PrimOp op) args res_ty)
   | primOpOutOfLine op = tailCallPrimOp op args
@@ -143,7 +161,6 @@ cgExpr x@(StgCon (PrimOp op) args res_ty)
 
 	ReturnsAlg tycon
 	    | isUnboxedTupleTyCon tycon -> primRetUnboxedTuple op args res_ty
-
 
 	    | isEnumerationTyCon  tycon ->
 	     	performReturn

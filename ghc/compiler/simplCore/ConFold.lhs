@@ -18,6 +18,9 @@ import Const		( mkMachInt, mkMachWord, Literal(..), Con(..) )
 import PrimOp		( PrimOp(..) )
 import SimplMonad
 import TysWiredIn	( trueDataCon, falseDataCon )
+import TyCon		( tyConDataCons, isEnumerationTyCon )
+import DataCon		( dataConTag, fIRST_TAG )
+import Type		( splitTyConApp_maybe )
 
 import Char		( ord, chr )
 import Outputable
@@ -91,6 +94,19 @@ tryPrimOp SeqOp [Type ty, Con (Literal lit) _]
 tryPrimOp SeqOp args@[Type ty, Var var]
   | isEvaluated (getIdUnfolding var) = Just (Con (Literal (mkMachInt 1)) []))	-- var is eval'd
   | otherwise			     = Nothing 					-- var not eval'd
+\end{code}
+
+\begin{code}
+tryPrimOp TagToEnumOp [Type ty, Con (Literal (MachInt i _)) _]
+  | isEnumerationTyCon tycon = Just (Con (DataCon dc) [])
+  | otherwise = panic "tryPrimOp: tagToEnum# on non-enumeration type"
+    where tag = fromInteger i
+	  constrs = tyConDataCons tycon
+	  (dc:_) = [ dc | dc <- constrs, tag == dataConTag dc ]
+	  (Just (tycon,_)) = splitTyConApp_maybe ty
+
+tryPrimOp DataToTagOp [Type ty, Con (DataCon dc) _]
+  = Just (Con (Literal (mkMachInt (toInteger (dataConTag dc - fIRST_TAG)))) [])
 \end{code}
 
 \begin{code}

@@ -172,17 +172,21 @@ data PrimOp
     | CatchOp
     | RaiseOp
 
+    -- foreign objects
     | MakeForeignObjOp
     | WriteForeignObjOp
 
+    -- weak pointers
     | MkWeakOp
     | DeRefWeakOp
     | FinalizeWeakOp
 
+    -- stable names
     | MakeStableNameOp
     | EqStableNameOp
     | StableNameToIntOp
 
+    -- stable pointers
     | MakeStablePtrOp
     | DeRefStablePtrOp
     | EqStablePtrOp
@@ -280,6 +284,7 @@ about using it this way?? ADR)
     | WaitReadOp
     | WaitWriteOp
 
+    -- more parallel stuff
     | ParGlobalOp	-- named global par
     | ParLocalOp	-- named local par
     | ParAtOp		-- specifies destination of local par
@@ -288,6 +293,10 @@ about using it this way?? ADR)
     | ParAtForNowOp	-- specifies initial destination of global par
     | CopyableOp	-- marks copyable code
     | NoFollowOp	-- marks non-followup expression
+
+    -- tag-related
+    | DataToTagOp
+    | TagToEnumOp
 \end{code}
 
 Used for the Ord instance
@@ -546,6 +555,8 @@ tagOf_PrimOp WriteMutVarOp		      = ILIT(239)
 tagOf_PrimOp SameMutVarOp		      = ILIT(240)
 tagOf_PrimOp CatchOp			      = ILIT(241)
 tagOf_PrimOp RaiseOp			      = ILIT(242)
+tagOf_PrimOp DataToTagOp		      = ILIT(243)
+tagOf_PrimOp TagToEnumOp		      = ILIT(244)
 
 tagOf_PrimOp op = pprPanic# "tagOf_PrimOp: pattern-match" (ppr op)
 --panic# "tagOf_PrimOp: pattern-match"
@@ -810,7 +821,9 @@ allThePrimOps
 	MyThreadIdOp,
 	DelayOp,
 	WaitReadOp,
-	WaitWriteOp
+	WaitWriteOp,
+	DataToTagOp,
+	TagToEnumOp
     ]
 \end{code}
 
@@ -908,6 +921,8 @@ primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
 primOpStrictness MkWeakOp	  = ([wwLazy, wwLazy, wwLazy, wwPrim], False)
 primOpStrictness MakeStableNameOp = ([wwLazy, wwPrim], False)
 primOpStrictness MakeStablePtrOp  = ([wwLazy, wwPrim], False)
+
+primOpStrictness DataToTagOp      = ([wwLazy], False)
 
 	-- The rest all have primitive-typed arguments
 primOpStrictness other		  = (repeat wwPrim, False)
@@ -1837,10 +1852,39 @@ primOpInfo (CCallOp _ _ _ _ arg_tys result_ty)
   where
     (result_tycon, tys_applied, _) = splitAlgTyConApp result_ty
 -}
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[PrimOp-tag]{PrimOpInfo for @dataToTag#@ and @tagToEnum#@}
+%*									*
+%************************************************************************
+
+These primops are pretty wierd.
+
+	dataToTag# :: a -> Int    (arg must be an evaluated data type)
+	tagToEnum# :: Int -> a    (result type must be an enumerated type)
+
+The constraints aren't currently checked by the front end, but the
+code generator will fall over if they aren't satisfied.
+
+\begin{code}
+primOpInfo DataToTagOp
+  = mkGenPrimOp SLIT("dataToTag#") [alphaTyVar] [alphaTy] intPrimTy
+
+primOpInfo TagToEnumOp
+  = mkGenPrimOp SLIT("tagToEnum#") [alphaTyVar] [intPrimTy] alphaTy
+
 #ifdef DEBUG
 primOpInfo op = panic ("primOpInfo:"++ show (I# (tagOf_PrimOp op)))
 #endif
 \end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[PrimOp-ool]{Which PrimOps are out-of-line}
+%*									*
+%************************************************************************
 
 Some PrimOps need to be called out-of-line because they either need to
 perform a heap check or they block.
@@ -2066,12 +2110,11 @@ data PrimOpResultInfo
 -- be out of line, or the code generator won't work.
 
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
-
 getPrimOpResultInfo op
   = case (primOpInfo op) of
       Dyadic  _ ty		 -> ReturnsPrim (typePrimRep ty)
       Monadic _ ty		 -> ReturnsPrim (typePrimRep ty)
-      Compare _ ty		 -> ReturnsAlg  boolTyCon
+      Compare _ ty		 -> ReturnsAlg boolTyCon
       GenPrimOp _ _ _ ty	 -> 
 	let rep = typePrimRep ty in
 	case rep of
@@ -2081,7 +2124,6 @@ getPrimOpResultInfo op
 	   other -> ReturnsPrim other
 
 isCompareOp :: PrimOp -> Bool
-
 isCompareOp op
   = case primOpInfo op of
       Compare _ _ -> True

@@ -20,7 +20,7 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			)
 import CostCentre	( dontCareCCS )
 import FiniteMap	( fmToList, FiniteMap )
-import DataCon		( DataCon, dataConTag, dataConName, dataConRawArgTys )
+import DataCon		( DataCon, dataConName, dataConRawArgTys )
 import Const		( Con(..) )
 import Name		( getOccString )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
@@ -141,8 +141,6 @@ genConInfo comp_info tycon data_con
 			CClosureInfoAndCode closure_info body Nothing con_descr
 
     static_code  = CClosureInfoAndCode static_ci body Nothing con_descr
-
-    tag	    	 = dataConTag data_con
 
     cost_centre  = mkCCostCentreStack dontCareCCS -- not worried about static data costs
 

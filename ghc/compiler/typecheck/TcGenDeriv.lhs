@@ -49,7 +49,7 @@ import PrimOp		( PrimOp(..) )
 import PrelInfo		-- Lots of RdrNames
 import SrcLoc		( mkGeneratedSrcLoc, SrcLoc )
 import TyCon		( TyCon, isNewTyCon, tyConDataCons, isEnumerationTyCon,
-			  maybeTyConSingleCon
+			  maybeTyConSingleCon, tyConFamilySize
 			)
 import Type		( isUnLiftedType, isUnboxedType, Type )
 import TysPrim		( charPrimTy, intPrimTy, wordPrimTy, addrPrimTy,
@@ -59,6 +59,7 @@ import Util		( mapAccumL, zipEqual, zipWithEqual,
 			  zipWith3Equal, nOfThem )
 import Panic		( panic, assertPanic )
 import Maybes		( maybeToBool, assocMaybe )
+import Constants
 import List		( partition, intersperse )
 \end{code}
 
@@ -1063,15 +1064,24 @@ gen_tag_n_con_monobind
     -> RdrNameMonoBinds
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
-  = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon))
-  where
-    mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
+  | lots_of_constructors
+  = mk_FunMonoBind (getSrcLoc tycon) rdr_name 
+	[([VarPatIn a_RDR], HsApp dataToTag_Expr a_Expr)]
 
+  | otherwise
+  = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon))
+
+  where
+    lots_of_constructors = tyConFamilySize tycon > mAX_FAMILY_SIZE_FOR_VEC_RETURNS
+
+    mk_stuff :: DataCon -> ([RdrNamePat], RdrNameHsExpr)
     mk_stuff var
       = ([pat], HsLit (HsIntPrim (toInteger ((dataConTag var) - fIRST_TAG))))
       where
 	pat    = ConPatIn var_RDR (nOfThem (argFieldCount var) WildPatIn)
 	var_RDR = qual_orig_name var
+
+
 
 gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
   = mk_FunMonoBind (getSrcLoc tycon) rdr_name (map mk_stuff (tyConDataCons tycon) ++ 
@@ -1351,6 +1361,7 @@ gtTag_Expr	= HsVar gtTag_RDR
 false_Expr	= HsVar false_RDR
 true_Expr	= HsVar true_RDR
 
+dataToTag_Expr  = HsVar dataToTagH_RDR
 con2tag_Expr tycon = HsVar (con2tag_RDR tycon)
 
 a_Pat		= VarPatIn a_RDR
@@ -1358,7 +1369,7 @@ b_Pat		= VarPatIn b_RDR
 c_Pat		= VarPatIn c_RDR
 d_Pat		= VarPatIn d_RDR
 
-con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
+tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
 
 con2tag_RDR tycon = varUnqual (_PK_ ("con2tag_" ++ occNameString (getOccName tycon) ++ "#"))
 tag2con_RDR tycon = varUnqual (_PK_ ("tag2con_" ++ occNameString (getOccName tycon) ++ "#"))
