@@ -947,7 +947,6 @@ getRegister (StDouble d)
 getRegister (StPrim primop [x]) -- unary PrimOps
   = case primop of
       IntNegOp -> trivialUCode (SUB False False g0) x
-      IntAbsOp -> absIntCode x
       NotOp    -> trivialUCode (XNOR False g0) x
 
       FloatNegOp  -> trivialUFCode FloatRep (FNEG F) x
@@ -3274,69 +3273,3 @@ chrCode x
 
 #endif {- sparc_TARGET_ARCH -}
 \end{code}
-
-%************************************************************************
-%*									*
-\subsubsection{Absolute value on integers}
-%*									*
-%************************************************************************
-
-Absolute value on integers, mostly for gmp size check macros.  Again,
-the argument cannot be an StInt, because genericOpt already folded
-constants.
-
-If applicable, do not fill the delay slots here; you will confuse the
-register allocator.
-
-\begin{code}
-absIntCode :: StixTree -> UniqSM Register
-
-#if alpha_TARGET_ARCH
-absIntCode = panic "MachCode.absIntCode: not on Alphas"
-#endif {- alpha_TARGET_ARCH -}
-
--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if i386_TARGET_ARCH
-
-absIntCode x
-  = getRegister x		`thenUs` \ register ->
-    --getNewRegNCG IntRep	`thenUs` \ reg ->
-    getUniqLabelNCG		`thenUs` \ lbl ->
-    let
-    	code__2 dst = let code = registerCode register dst
-    	                  src  = registerName register dst
-		      in code . if isFixed register && dst /= src
-				then mkSeqInstrs [MOV L (OpReg src) (OpReg dst),
-						  TEST L (OpReg dst) (OpReg dst),
-						  JXX GE lbl,
-						  NEGI L (OpReg dst),
-						  LABEL lbl]
-				else mkSeqInstrs [TEST L (OpReg src) (OpReg src),
-						  JXX GE lbl,
-						  NEGI L (OpReg src),
-						  LABEL lbl]
-    in
-    returnUs (Any IntRep code__2)
-
-#endif {- i386_TARGET_ARCH -}
--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if sparc_TARGET_ARCH
-
-absIntCode x
-  = getRegister x		`thenUs` \ register ->
-    getNewRegNCG IntRep		`thenUs` \ reg ->
-    getUniqLabelNCG		`thenUs` \ lbl ->
-    let
-    	code = registerCode register reg
-    	src  = registerName register reg
-    	code__2 dst = code . mkSeqInstrs [
-	    SUB False True g0 (RIReg src) dst,
-	    BI GE False (ImmCLbl lbl), NOP,
-	    OR False g0 (RIReg src) dst,
-	    LABEL lbl]
-    in
-    returnUs (Any IntRep code__2)
-
-#endif {- sparc_TARGET_ARCH -}
-\end{code}
-
