@@ -62,9 +62,6 @@ instance OutputableBndr id => Outputable (HsBindGroup id) where
   ppr (HsIPBinds ipbinds)
      = vcat (map ppr ipbinds)
 
-mkHsBindGroup :: RecFlag -> Bag (LHsBind id) -> HsBindGroup id
-mkHsBindGroup is_rec mbinds = HsBindGroup mbinds [] is_rec
-
 -- -----------------------------------------------------------------------------
 -- Implicit parameter bindings
 

@@ -33,6 +33,7 @@ import CmdLineOpts	( opt_SccProfilingOn )
 import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  NewOrData(..), Activation(..) )
+import OrdList
 import Bag		( emptyBag )
 import Panic
 
@@ -419,21 +420,21 @@ ops   	:: { Located [Located RdrName] }
 -----------------------------------------------------------------------------
 -- Top-Level Declarations
 
-topdecls :: { [RdrBinding] }	-- Reversed
-	: topdecls ';' topdecl		{ $3 : $1 }
+topdecls :: { OrdList (LHsDecl RdrName) }	-- Reversed
+	: topdecls ';' topdecl		{ $1 `appOL` $3 }
 	| topdecls ';'			{ $1 }
-	| topdecl			{ [$1] }
+	| topdecl			{ $1 }
 
-topdecl :: { RdrBinding }
-  	: tycl_decl			{ RdrHsDecl (L1 (TyClD (unLoc $1))) }
+topdecl :: { OrdList (LHsDecl RdrName) }
+  	: tycl_decl			{ unitOL (L1 (TyClD (unLoc $1))) }
 	| 'instance' inst_type where
 		{ let (binds,sigs) = cvBindsAndSigs (unLoc $3)
-		  in RdrHsDecl (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs))) }
-	| 'default' '(' comma_types0 ')'	{ RdrHsDecl (LL $ DefD (DefaultDecl $3)) }
-	| 'foreign' fdecl			{ RdrHsDecl (LL (unLoc $2)) }
-	| '{-# DEPRECATED' deprecations '#-}'	{ RdrBindings (reverse $2) }
-	| '{-# RULES' rules '#-}'		{ RdrBindings (reverse $2) }
-	| '$(' exp ')'				{ RdrHsDecl (LL $ SpliceD (SpliceDecl $2)) }
+		  in unitOL (L (comb3 $1 $2 $3) (InstD (InstDecl $2 binds sigs))) }
+	| 'default' '(' comma_types0 ')'	{ unitOL (LL $ DefD (DefaultDecl $3)) }
+	| 'foreign' fdecl			{ unitOL (LL (unLoc $2)) }
+	| '{-# DEPRECATED' deprecations '#-}'	{ $2 }
+	| '{-# RULES' rules '#-}'		{ $2 }
+	| '$(' exp ')'				{ unitOL (LL $ SpliceD (SpliceDecl $2)) }
       	| decl					{ unLoc $1 }
 
 tycl_decl :: { LTyClDecl RdrName }
@@ -478,21 +479,21 @@ tycl_hdr :: { Located (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrNam
 -----------------------------------------------------------------------------
 -- Nested declarations
 
-decls 	:: { Located [RdrBinding] }	-- Reversed
-	: decls ';' decl		{ LL (unLoc $3 : unLoc $1) }
+decls 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
+	: decls ';' decl		{ LL (unLoc $1 `appOL` unLoc $3) }
 	| decls ';'			{ LL (unLoc $1) }
-	| decl				{ L1 [unLoc $1] }
-	| {- empty -}			{ noLoc [] }
+	| decl				{ L1 (unLoc $1) }
+	| {- empty -}			{ noLoc nilOL }
 
 
-decllist :: { Located [RdrBinding] }	-- Reversed
+decllist :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 	: '{'            decls '}'	{ LL (unLoc $2) }
 	|     vocurly    decls close	{ $2 }
 
-where 	:: { Located [RdrBinding] }	-- Reversed
+where 	:: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 				-- No implicit parameters
 	: 'where' decllist		{ LL (unLoc $2) }
-	| {- empty -}			{ noLoc [] }
+	| {- empty -}			{ noLoc nilOL }
 
 binds 	::  { Located [HsBindGroup RdrName] } 	-- May have implicit parameters
 	: decllist			{ L1 [cvBindGroup (unLoc $1)] }
@@ -507,15 +508,15 @@ wherebinds :: { Located [HsBindGroup RdrName] }	-- May have implicit parameters
 -----------------------------------------------------------------------------
 -- Transformation Rules
 
-rules	:: { [RdrBinding] }	-- Reversed
-	:  rules ';' rule			{ $3 : $1 }
+rules	:: { OrdList (LHsDecl RdrName) }	-- Reversed
+	:  rules ';' rule			{ $1 `snocOL` $3 }
         |  rules ';'				{ $1 }
-        |  rule					{ [$1] }
-	|  {- empty -}				{ [] }
+        |  rule					{ unitOL $1 }
+	|  {- empty -}				{ nilOL }
 
-rule  	:: { RdrBinding }
+rule  	:: { LHsDecl RdrName }
 	: STRING activation rule_forall infixexp '=' exp
-	     { RdrHsDecl (LL $ RuleD (HsRule (getSTRING $1) $2 $3 $4 $6)) }
+	     { LL $ RuleD (HsRule (getSTRING $1) $2 $3 $4 $6) }
 
 activation :: { Activation }           -- Omitted means AlwaysActive
         : {- empty -}                           { AlwaysActive }
@@ -544,16 +545,17 @@ rule_var :: { RuleBndr RdrName }
 -----------------------------------------------------------------------------
 -- Deprecations (c.f. rules)
 
-deprecations :: { [RdrBinding] }	-- Reversed
-	: deprecations ';' deprecation		{ $3 : $1 }
+deprecations :: { OrdList (LHsDecl RdrName) }	-- Reversed
+	: deprecations ';' deprecation		{ $1 `appOL` $3 }
 	| deprecations ';' 			{ $1 }
-	| deprecation				{ [$1] }
-	| {- empty -}				{ [] }
+	| deprecation				{ $1 }
+	| {- empty -}				{ nilOL }
 
 -- SUP: TEMPORARY HACK, not checking for `module Foo'
-deprecation :: { RdrBinding }
+deprecation :: { OrdList (LHsDecl RdrName) }
 	: depreclist STRING
-		{ RdrBindings [ RdrHsDecl (LL $ DeprecD (Deprecation n (getSTRING $2))) | n <- unLoc $1 ] }
+		{ toOL [ LL $ DeprecD (Deprecation n (getSTRING $2)) 
+		       | n <- unLoc $1 ] }
 
 
 -----------------------------------------------------------------------------
@@ -919,10 +921,10 @@ deriving :: { Located (Maybe (LHsContext RdrName)) }
   We can't tell whether to reduce var to qvar until after we've read the signatures.
 -}
 
-decl 	:: { Located RdrBinding }
+decl 	:: { Located (OrdList (LHsDecl RdrName)) }
 	: sigdecl			{ $1 }
 	| infixexp opt_sig rhs		{% do { r <- checkValDef $1 $2 (unLoc $3);
-						return (LL $ RdrValBinding (LL r)) } }
+						return (LL $ unitOL (LL $ ValD r)) } }
 
 rhs	:: { Located (GRHSs RdrName) }
 	: '=' exp wherebinds	{ L (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) placeHolderType }
@@ -936,23 +938,24 @@ gdrh :: { LGRHS RdrName }
 	: '|' quals '=' exp  	{ LL $ GRHS (reverse (L (getLoc $4) (ResultStmt $4) : 
 							unLoc $2)) }
 
-sigdecl :: { Located RdrBinding }
+sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	: infixexp '::' sigtype
 				{% do s <- checkValSig $1 $3; 
-				      return (LL $ RdrHsDecl (LL $ SigD s)) }
+				      return (LL $ unitOL (LL $ SigD s)) }
 		-- See the above notes for why we need infixexp here
 	| var ',' sig_vars '::' sigtype	
-				{ LL $ mkSigDecls [ LL $ Sig n $5 | n <- $1 : unLoc $3 ] }
-	| infix prec ops	{ LL $ mkSigDecls [ LL $ FixSig (FixitySig n (Fixity $2 (unLoc $1)))
+				{ LL $ toOL [ LL $ SigD (Sig n $5) | n <- $1 : unLoc $3 ] }
+	| infix prec ops	{ LL $ toOL [ LL $ SigD (FixSig (FixitySig n (Fixity $2 (unLoc $1))))
 					     | n <- unLoc $3 ] }
 	| '{-# INLINE'   activation qvar '#-}'	      
-				{ LL $ RdrHsDecl (LL $ SigD (InlineSig True  $3 $2)) }
+				{ LL $ unitOL (LL $ SigD (InlineSig True  $3 $2)) }
 	| '{-# NOINLINE' inverse_activation qvar '#-}' 
-				{ LL $ RdrHsDecl (LL $ SigD (InlineSig False $3 $2)) }
+				{ LL $ unitOL (LL $ SigD (InlineSig False $3 $2)) }
 	| '{-# SPECIALISE' qvar '::' sigtypes '#-}'
-			 	{ LL $ mkSigDecls  [ LL $ SpecSig $2 t | t <- $4] }
+			 	{ LL $ toOL [ LL $ SigD (SpecSig $2 t)
+					    | t <- $4] }
 	| '{-# SPECIALISE' 'instance' inst_type '#-}'
-				{ LL $ RdrHsDecl (LL $ SigD (SpecInstSig $3)) }
+				{ LL $ unitOL (LL $ SigD (SpecInstSig $3)) }
 
 -----------------------------------------------------------------------------
 -- Expressions

@@ -53,7 +53,7 @@ import Module	  ( Module, mkBasePkgModule, mkHomeModule, mkModuleName )
 import OccName	  ( dataName, tcName, clsName, varName, mkOccFS
 		  )
 		  
-import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc )
+import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
 		    mkPreludeTyConUnique, mkPreludeClassUnique,
@@ -63,8 +63,6 @@ import BasicTypes ( Boxity(..), Arity )
 import Name	  ( Name, mkInternalName, mkExternalName, nameUnique, nameModule )
 import SrcLoc     ( noSrcLoc )
 import FastString
-
-
 \end{code}
 
 
@@ -345,6 +343,10 @@ mkTupleModule Unboxed _ = gHC_PRIM
 %************************************************************************
 
 \begin{code}
+main_RDR_Unqual 	= mkUnqual varName FSLIT("main")
+	-- We definitely don't want an Orig RdrName, because
+	-- main might, in principle, be imported into module Main
+
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
 ne_RDR 			= varQual_RDR  pREL_BASE_Name FSLIT("/=")

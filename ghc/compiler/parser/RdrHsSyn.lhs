@@ -1,23 +1,16 @@
 %
-% (c) The AQUA Project, Glasgow University, 1996-1998
-%
-\section[RdrHsSyn]{Specialisations of the @HsSyn@ syntax for the reader}
+% (c) The University of Glasgow, 1996-2003
 
-(Well, really, for specialisations involving @RdrName@s, even if
-they are used somewhat later on in the compiler...)
+Functions over HsSyn specialised to RdrName.
 
 \begin{code}
 module RdrHsSyn (
-	RdrBinding(..),
-
-	main_RDR_Unqual,
-
 	extractHsTyRdrTyVars, 
 	extractHsRhoRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl, 
 	mkHsNegApp, mkHsIntegral, mkHsFractional,
-	mkHsDo, mkHsSplice, mkSigDecls,
+	mkHsDo, mkHsSplice,
         mkTyData, mkPrefixCon, mkRecCon,
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
 	mkBootIface,
@@ -76,6 +69,7 @@ import Module		( ModuleName )
 import SrcLoc
 import CStrings		( CLabelString )
 import CmdLineOpts	( opt_InPackage )
+import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
 import Outputable
 import FastString
@@ -84,19 +78,6 @@ import Panic
 import List		( isSuffixOf, nubBy )
 \end{code}
 
- 
-%************************************************************************
-%*									*
-\subsection{Type synonyms}
-%*									*
-%************************************************************************
-
-\begin{code}
-main_RDR_Unqual :: RdrName
-main_RDR_Unqual = mkUnqual varName FSLIT("main")
-	-- We definitely don't want an Orig RdrName, because
-	-- main might, in principle, be imported into module Main
-\end{code}
 
 %************************************************************************
 %*									*
@@ -104,7 +85,7 @@ main_RDR_Unqual = mkUnqual varName FSLIT("main")
 %*                                                                    *
 %************************************************************************
 
-@extractHsTyRdrNames@ finds the free variables of a HsType
+extractHsTyRdrNames finds the free variables of a HsType
 It's used when making the for-alls explicit.
 
 \begin{code}
@@ -344,25 +325,6 @@ hsIfaceFDs fds = [ (map rdrNameOcc xs, map rdrNameOcc ys)
 		 | (xs,ys) <- fds ]
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection[rdrBinding]{Bindings straight out of the parser}
-%*									*
-%************************************************************************
-
-\begin{code}
-data RdrBinding
-  =   -- Value bindings havn't been united with their
-      -- signatures yet
-    RdrBindings [RdrBinding]	-- Convenience for parsing
-
-  | RdrValBinding     (LHsBind RdrName)
-
-      -- The remainder all fit into the main HsDecl form
-  | RdrHsDecl         (LHsDecl RdrName)
-\end{code}
-
 %************************************************************************
 %*									*
 \subsection[cvBinds-etc]{Converting to @HsBinds@, etc.}
@@ -375,44 +337,39 @@ analyser.
 
 
 \begin{code}
-cvTopDecls :: [RdrBinding] -> [LHsDecl RdrName]
--- Incoming bindings are in reverse order; result is in ordinary order
--- (a) flatten RdrBindings
--- (b) Group together bindings for a single function
-cvTopDecls decls
-  = go [] decls
+-- | Groups together bindings for a single function
+cvTopDecls :: OrdList (LHsDecl RdrName) -> [LHsDecl RdrName]
+cvTopDecls decls = go (fromOL decls)
   where
-    go :: [LHsDecl RdrName] -> [RdrBinding] -> [LHsDecl RdrName]
-    go acc [] 			   = acc
-    go acc (RdrBindings ds1 : ds2) = go (go acc ds1)    ds2
-    go acc (RdrHsDecl d : ds)      = go (d       : acc) ds
-    go acc (RdrValBinding b : ds)  = go (L l (ValD b') : acc) ds'
-				   where
-				     (L l b', ds') = getMonoBind b ds
+    go :: [LHsDecl RdrName] -> [LHsDecl RdrName]
+    go [] 		    = []
+    go (L l (ValD b) : ds)  = L l' (ValD b') : go ds'
+			    where (L l' b', ds') = getMonoBind (L l b) ds
+    go (d : ds)   	    = d : go ds
 
-cvBindGroup :: [RdrBinding] -> HsBindGroup RdrName
+cvBindGroup :: OrdList (LHsDecl RdrName) -> HsBindGroup RdrName
 cvBindGroup binding
   = case (cvBindsAndSigs binding) of { (mbs, sigs) ->
     HsBindGroup mbs sigs Recursive -- just one big group for now
     }
 
-cvBindsAndSigs :: [RdrBinding] -> (Bag (LHsBind RdrName), [LSig RdrName])
--- Input bindings are in *reverse* order, 
--- and contain just value bindings and signatures
-cvBindsAndSigs  fb
-  = go (emptyBag, []) fb
+cvBindsAndSigs :: OrdList (LHsDecl RdrName)
+  -> (Bag (LHsBind RdrName), [LSig RdrName])
+-- Input decls contain just value bindings and signatures
+cvBindsAndSigs  fb = go (fromOL fb)
   where
-    go acc	[] 		          = acc
-    go acc 	(RdrBindings ds1 : ds2)   = go (go acc ds1) ds2
-    go (bs, ss) (RdrHsDecl (L l (SigD s)) : ds) = go (bs, L l s : ss) ds
-    go (bs, ss) (RdrValBinding b : ds)    = go (b' `consBag` bs, ss) ds'
-					  where
-					    (b',ds') = getMonoBind b ds
+    go [] 		   = (emptyBag, [])
+    go (L l (SigD s) : ds) = (bs, L l s : ss)
+			    where (bs,ss) = go ds
+    go (L l (ValD b) : ds) = (b' `consBag` bs, ss)
+			    where (b',ds') = getMonoBind (L l b) ds
+				  (bs,ss)  = go ds'
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups
 
-getMonoBind :: LHsBind RdrName -> [RdrBinding] -> (LHsBind RdrName, [RdrBinding])
+getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
+  -> (LHsBind RdrName, [LHsDecl RdrName])
 -- Suppose 	(b',ds') = getMonoBind b ds
 -- 	ds is a *reversed* list of parsed bindings
 --	b is a MonoBinds that has just been read off the front
@@ -427,7 +384,7 @@ getMonoBind (L loc (FunBind lf@(L _ f) inf mtchs)) binds
   | has_args mtchs
   = go mtchs loc binds
   where
-    go mtchs1 loc1 (RdrValBinding (L loc2 (FunBind f2 inf2 mtchs2)) : binds)
+    go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 mtchs2)) : binds)
 	| f == unLoc f2 = go (mtchs2 ++ mtchs1) loc binds
 	-- Remember binds is reversed, so glue mtchs2 on the front
 	-- and use loc2 as the final location
@@ -795,10 +752,6 @@ checkValSig
 checkValSig (L l (HsVar v)) ty | isUnqual v = return (Sig (L l v) ty)
 checkValSig (L l other)     ty
   = parseError l "Type signature given for an expression"
-
-mkSigDecls :: [LSig RdrName] -> RdrBinding
-mkSigDecls sigs = RdrBindings [RdrHsDecl (L l (SigD sig)) | L l sig <- sigs]
-
 
 -- A variable binding is parsed as a FunBind.
 

@@ -1,9 +1,16 @@
 %
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
+% (c) The University of Glasgow, 1992-2003
 %
 
-	Collects a variety of helper functions that
-		construct or analyse HsSyn
+Here we collect a variety of helper functions that construct or
+analyse HsSyn.  All these functions deal with generic HsSyn; functions
+which deal with the intantiated versions are located elsewhere:
+
+   Parameterised by	Module
+   ----------------     -------------
+   RdrName		parser/RdrHsSyn
+   Name			rename/RnHsSyn
+   Id			typecheck/TcHsSyn	
 
 \begin{code}
 module HsUtils where
@@ -33,10 +40,13 @@ import Bag
 
 %************************************************************************
 %*									*
-	Some useful helpers for constructing expressions
+	Some useful helpers for constructing syntax
 %*									*
 %************************************************************************
 
+These functions attempt to construct a not-completely-useless SrcSpan
+from their components, compared with the nl* functions below which
+just attach noSrcSpan to everything.
 
 \begin{code}
 mkHsPar :: LHsExpr id -> LHsExpr id
@@ -119,11 +129,9 @@ mkHsString s = HsString (mkFastString s)
 
 %************************************************************************
 %*									*
-	These ones do not pin on useful locations
-	Used mainly for generated code
+	Constructing syntax with no location info
 %*									*
 %************************************************************************
-
 
 \begin{code}
 nlHsVar :: id -> LHsExpr id
@@ -239,3 +247,96 @@ mkMatch pats expr binds
 		L l _	       -> L l (ParPat p)
 \end{code}
 
+
+%************************************************************************
+%*									*
+	Collecting binders from HsBindGroups and HsBinds
+%*									*
+%************************************************************************
+
+Get all the binders in some HsBindGroups, IN THE ORDER OF APPEARANCE. eg.
+
+...
+where
+  (x, y) = ...
+  f i j  = ...
+  [a, b] = ...
+
+it should return [x, y, f, a, b] (remember, order important).
+
+\begin{code}
+collectGroupBinders :: [HsBindGroup name] -> [Located name]
+collectGroupBinders groups = foldr collect_group [] groups
+	where
+	  collect_group (HsBindGroup bag sigs is_rec) acc
+	 	= foldrBag (collectAcc . unLoc) acc bag
+	  collect_group (HsIPBinds _) acc = acc
+
+
+collectAcc :: HsBind name -> [Located name] -> [Located name]
+collectAcc (PatBind pat _) acc = collectLocatedPatBinders pat ++ acc
+collectAcc (FunBind f _ _) acc = f : acc
+collectAcc (VarBind f _) acc  = noLoc f : acc
+collectAcc (AbsBinds _ _ dbinds _ binds) acc
+  = [noLoc dp | (_,dp,_) <- dbinds] ++ acc
+	-- ++ foldr collectAcc acc binds
+	-- I don't think we want the binders from the nested binds
+	-- The only time we collect binders from a typechecked 
+	-- binding (hence see AbsBinds) is in zonking in TcHsSyn
+
+collectHsBindBinders :: Bag (LHsBind name) -> [name]
+collectHsBindBinders binds = map unLoc (collectHsBindLocatedBinders binds)
+
+collectHsBindLocatedBinders :: Bag (LHsBind name) -> [Located name]
+collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
+\end{code}
+
+
+%************************************************************************
+%*									*
+	Getting pattern signatures out of bindings
+%*									*
+%************************************************************************
+
+Get all the pattern type signatures out of a bunch of bindings
+
+\begin{code}
+collectSigTysFromHsBinds :: [LHsBind name] -> [LHsType name]
+collectSigTysFromHsBinds binds = concat (map collectSigTysFromHsBind binds)
+
+collectSigTysFromHsBind :: LHsBind name -> [LHsType name]
+collectSigTysFromHsBind bind
+  = go (unLoc bind)
+  where
+    go (PatBind pat _)  = collectSigTysFromPat pat
+    go (FunBind f _ ms) = go_matches (map unLoc ms)
+
+	-- A binding like    x :: a = f y
+	-- is parsed as FunMonoBind, but for this purpose we 	
+	-- want to treat it as a pattern binding
+    go_matches []				 = []
+    go_matches (Match [] (Just sig) _ : matches) = sig : go_matches matches
+    go_matches (match		      : matches) = go_matches matches
+\end{code}
+
+%************************************************************************
+%*									*
+	Getting binders from statements
+%*									*
+%************************************************************************
+
+\begin{code}
+collectStmtsBinders :: [LStmt id] -> [Located id]
+collectStmtsBinders = concatMap collectLStmtBinders
+
+collectLStmtBinders = collectStmtBinders . unLoc
+
+collectStmtBinders :: Stmt id -> [Located id]
+  -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
+collectStmtBinders (BindStmt pat _)   = collectLocatedPatBinders pat
+collectStmtBinders (LetStmt binds)    = collectGroupBinders binds
+collectStmtBinders (ExprStmt _ _)     = []
+collectStmtBinders (ResultStmt _)     = []
+collectStmtBinders (RecStmt ss _ _ _) = collectStmtsBinders ss
+collectStmtBinders other              = panic "collectStmtBinders"
+\end{code}

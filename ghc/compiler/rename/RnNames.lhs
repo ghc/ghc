@@ -16,14 +16,14 @@ import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
 			  ForeignDecl(..), HsGroup(..),
 			  collectGroupBinders, tyClDeclNames 
 			)
-import RdrHsSyn		( main_RDR_Unqual )
 import RnEnv
 import IfaceEnv		( lookupOrig, newGlobalBinder )
 import LoadIface	( loadSrcInterface )
 import TcRnMonad
 
 import FiniteMap
-import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName, isUnboundName )
+import PrelNames	( pRELUDE_Name, isBuiltInSyntaxName, isUnboundName,
+			  main_RDR_Unqual )
 import Module		( Module, ModuleName, moduleName, mkPackageModule,
 			  moduleNameUserString, isHomeModule,
 			  unitModuleEnvByName, unitModuleEnv, 
@@ -46,7 +46,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  isLocalGRE, pprNameProvenance )
 import Outputable
 import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes )
-import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan, srcSpanStart,
+import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc )
 import ListSetOps	( removeDups )
 import Util		( sortLt, notNull )

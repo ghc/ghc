@@ -22,9 +22,10 @@ import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 import CmdLineOpts	( DynFlag(..), opt_PprStyle_Debug, dopt )
 import DriverState	( v_MainModIs, v_MainFunIs )
 import HsSyn
-import RdrHsSyn		( findSplice, main_RDR_Unqual )
+import RdrHsSyn		( findSplice )
 
-import PrelNames	( runIOName, rootMainName, mAIN_Name )
+import PrelNames	( runIOName, rootMainName, mAIN_Name,
+			  main_RDR_Unqual )
 import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv, 
 			  plusGlobalRdrEnv )
 import TcHsSyn		( zonkTopDecls )
@@ -56,7 +57,7 @@ import OccName		( mkVarOcc )
 import Name		( Name, isExternalName, getSrcLoc, getOccName )
 import NameSet
 import TyCon		( tyConHasGenerics )
-import SrcLoc		( srcLocSpan, Located(..), noLoc, unLoc )
+import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..),
 			  GhciMode(..), noDependencies,
@@ -93,7 +94,7 @@ import Id		( Id, isImplicitId )
 import MkId		( unsafeCoerceId )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
-import SrcLoc		( interactiveSrcLoc )
+import SrcLoc		( interactiveSrcLoc, unLoc )
 import Var		( setGlobalIdDetails )
 import Name		( nameOccName, nameModuleName )
 import NameEnv		( delListFromNameEnv )
@@ -104,12 +105,13 @@ import HscTypes		( InteractiveContext(..),
 			  TyThing(..), availNames, icPrintUnqual,
 			  ModIface(..), ModDetails(..) )
 import BasicTypes	( RecFlag(..), Fixity )
+import Bag		( unitBag )
 import Panic		( ghcError, GhcException(..) )
 #endif
 
 import FastString	( mkFastString )
 import Util		( sortLt )
-import Bag		( unionBags, snocBag, unitBag )
+import Bag		( unionBags, snocBag )
 
 import Maybe		( isJust )
 \end{code}
