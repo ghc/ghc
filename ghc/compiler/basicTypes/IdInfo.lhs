@@ -131,7 +131,7 @@ data IdInfo
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
         workerInfo      :: WorkerInfo,          -- Pointer to Worker Function
 	unfoldingInfo	:: Unfolding,		-- Its unfolding
-	cafInfo		:: CafInfo,
+	cafInfo		:: CafInfo,		-- whether it refers (indirectly) to any CAFs
 	cprInfo 	:: CprInfo,             -- Function always constructs a product result
         lbvarInfo	:: LBVarInfo,		-- Info about a lambda-bound variable
 	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
@@ -223,7 +223,7 @@ mkIdInfo flv = IdInfo {
 		    workerInfo		= NoWorker,
 		    strictnessInfo	= NoStrictnessInfo,
 		    unfoldingInfo	= noUnfolding,
-		    cafInfo		= MayHaveCafRefs,
+		    cafInfo		= NoCafRefs,
 		    cprInfo		= NoCPRInfo,
 		    lbvarInfo		= NoLBVarInfo,
 		    inlinePragInfo 	= NoInlinePragInfo,
