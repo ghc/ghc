@@ -10,11 +10,14 @@
 
 StgInt
 closeFile(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     int rc;
 
-    unlockFile(fileno((FILE *) fp));
+    if (unlockFile(fileno((FILE *) fp))) {
+       /* If it has been unlocked, don't bother fclose()ing */
+       return 0;
+    }
 
     while ((rc = fclose((FILE *) fp)) != 0) {
 	if (errno != EINTR) {

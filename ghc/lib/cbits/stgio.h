@@ -1,14 +1,14 @@
 #ifndef STGIO_H
 #define STGIO_H
 
-/* Decls for routines in ghc/runtime/io/ only used there.
+/* Decls for routines in ghc/lib/cbits/ only used there.
  * This file is used when compiling the Haskell library
  * that _ccalls_ those routines; and when compiling those
  * routines (to check consistency).
  */
 
 /* closeFile.lc */
-StgInt closeFile PROTO((StgAddr));
+StgInt closeFile PROTO((StgForeignObj));
 
 /* createDirectory.lc */
 StgInt createDirectory PROTO((StgByteArray));
@@ -30,29 +30,28 @@ void	stdErrno(STG_NO_ARGS);
 int	execvpe PROTO((char *, char **, char **));
 
 /* fileEOF.lc */
-StgInt	fileEOF PROTO((StgAddr));
-
+StgInt	fileEOF PROTO((StgForeignObj));
 /* fileGetc.lc */
-StgInt	fileGetc PROTO((StgAddr));
+StgInt	fileGetc PROTO((StgForeignObj));
 
 /* fileLookAhead.lc */
-StgInt	fileLookAhead PROTO((StgAddr));
+StgInt	fileLookAhead PROTO((StgForeignObj));
 
 /* filePosn.lc */
-StgInt	getFilePosn PROTO((StgAddr));
-StgInt	setFilePosn PROTO((StgAddr, StgInt));
+StgInt	getFilePosn PROTO((StgForeignObj));
+StgInt	setFilePosn PROTO((StgForeignObj, StgInt));
 
 /* filePutc.lc */
-StgInt	filePutc    PROTO((StgAddr, StgInt));
+StgInt	filePutc    PROTO((StgForeignObj, StgInt));
 
 /* fileSize.lc */
-StgInt	fileSize    PROTO((StgAddr, StgByteArray));
+StgInt	fileSize    PROTO((StgForeignObj, StgByteArray));
 
 /* flushFile.lc */
-StgInt	flushFile   PROTO((StgAddr));
+StgInt	flushFile   PROTO((StgForeignObj));
 
 /* getBufferMode.lc */
-StgInt	getBufferMode PROTO((StgAddr));
+StgInt	getBufferMode PROTO((StgForeignObj));
 
 /* getClockTime.lc */
 StgInt	getClockTime PROTO((StgByteArray, StgByteArray));
@@ -68,19 +67,23 @@ StgAddr getDirectoryContents PROTO((StgByteArray));
 
 /* getLock.lc */
 int     lockFile    PROTO((int, int));
-void    unlockFile  PROTO((int));
-StgInt	getLock	    PROTO((StgAddr, StgInt));
+int     unlockFile  PROTO((int));
+StgInt	getLock	    PROTO((StgForeignObj, StgInt));
 
 /* inputReady.lc */
-StgInt	inputReady  PROTO((StgAddr));
+StgInt	inputReady  PROTO((StgForeignObj));
 
 /* openFile.lc */
 StgAddr openFile PROTO((StgByteArray, StgByteArray));
 
+/* freeFile.lc */
+void freeStdChannel PROTO((StgForeignObj));
+void freeFile PROTO((StgForeignObj));
+
 /* readFile.lc */
-StgInt	readBlock PROTO((StgAddr, StgAddr, StgInt));
-StgInt	readLine PROTO((StgAddr, StgAddr, StgInt));
-StgInt	readChar PROTO((StgAddr));
+StgInt	readBlock PROTO((StgAddr, StgForeignObj, StgInt));
+StgInt	readLine PROTO((StgAddr,  StgForeignObj, StgInt));
+StgInt	readChar PROTO((StgForeignObj));
 
 /* removeDirectory.lc */
 StgInt removeDirectory PROTO((StgByteArray));
@@ -95,11 +98,11 @@ StgInt renameDirectory PROTO((StgByteArray, StgByteArray));
 StgInt renameFile PROTO((StgByteArray, StgByteArray));
 
 /* seekFile.lc */
-StgInt	seekFile  PROTO((StgAddr, StgInt, StgInt, StgByteArray));
-StgInt	seekFileP PROTO((StgAddr));
+StgInt	seekFile  PROTO((StgForeignObj, StgInt, StgInt, StgByteArray));
+StgInt	seekFileP PROTO((StgForeignObj));
 
 /* setBuffering.lc */
-StgInt	setBuffering PROTO((StgAddr, StgInt));
+StgInt	setBuffering PROTO((StgForeignObj, StgInt));
 
 /* setCurrentDirectory.lc */
 StgInt setCurrentDirectory PROTO((StgByteArray));
@@ -120,6 +123,6 @@ StgAddr toUTCTime PROTO((StgInt, StgByteArray, StgByteArray));
 StgAddr toClockSec PROTO((StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray));
 
 /* writeFile.lc */
-StgInt	writeFile PROTO((StgAddr, StgAddr, StgInt));
+StgInt	writeFile PROTO((StgAddr, StgForeignObj, StgInt));
 
 #endif /* ! STGIO_H */

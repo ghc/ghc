@@ -1,37 +1,30 @@
-# $Id: Makefile,v 1.2 1996/11/21 16:47:46 simonm Exp $
+# $Id: Makefile,v 1.3 1997/03/14 05:17:06 sof Exp $
 
-TOP = ../../..
-UnlitSuffixRules = YES
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ../..
+include $(TOP)/mk/boilerplate.mk
+WAYS=
 
-ARCHIVE=libHS_cbits.a
-DESTDIR=$(INSTLIBDIR_GHC)
+LIBRARY=libHS_cbits.a
+INSTALL_LIBS+=$(LIBRARY)
 
-SRCS=\
-closeFile.lc		createDirectory.lc		\
-errno.lc		fileEOF.lc			\
-fileGetc.lc		fileLookAhead.lc		\
-filePosn.lc		filePutc.lc			\
-fileSize.lc		flushFile.lc			\
-getBufferMode.lc	getCurrentDirectory.lc		\
-getDirectoryContents.lc getLock.lc			\
-inputReady.lc		openFile.lc			\
-readFile.lc		removeDirectory.lc		\
-removeFile.lc		renameDirectory.lc		\
-renameFile.lc		seekFile.lc			\
-setBuffering.lc		setCurrentDirectory.lc		\
-system.lc		writeFile.lc
+SRCS= $(wildcard *.lc)
 
-LIBOBJS = $(patsubst %.lc, %.o, $(SRCS))
+C_SRCS  = $(SRCS:.lc=.c)
+C_OBJS  = $(C_SRCS:.c=.o)
+LIBOBJS = $(C_OBJS)
+SRC_CC_OPTS = -I$(GHC_INCLUDE_DIR)
 
-%.o : %.c
-	@$(RM) $@
-	$(GHC) $(GHCFLAGS) -c $< -o $@
+#
+# Compile the files using the Haskell compiler (ghc really).
+# 
+CC=$(HC)
 
-clean ::
-	$(RM) $(SRCS:.lc=.c)
+#
+# Remove the intermediate .c files
+# (the .o's will be removed automatically by default mk setup)
+#
+CLEAN_FILES += $(C_SRCS)
 
-C_DEP_SRCS = $(SRCS) 
-MKDEPENDC_OPTS = -I$(GHC_INCLUDES)
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
-include $(TOP)/mk/lib.mk
+include $(TOP)/mk/target.mk

@@ -11,7 +11,7 @@
 StgInt
 writeFile(buf, fp, bytes)
 StgAddr buf;
-StgAddr fp;
+StgForeignObj fp;
 StgInt bytes;
 {
     int count;

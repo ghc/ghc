@@ -85,18 +85,18 @@ int exclusive;
     return 0;
 }
 
-void
+int
 unlockFile(fd)
 int fd;
 {
-    int i;
+    int i, rc;
 
     for (i = 0; i < readLocks; i++)
 	if (readLock[i].fd == fd) {
 	    while (++i < readLocks)
 		readLock[i - 1] = readLock[i];
 	    readLocks--;
-	    return;
+	    return 0;
 	}
 
     for (i = 0; i < writeLocks; i++)
@@ -104,13 +104,15 @@ int fd;
 	    while (++i < writeLocks)
 		writeLock[i - 1] = writeLock[i];
 	    writeLocks--;
-	    return;
+	    return 0;
 	}
+     /* Signal that we did not find an entry */
+    return 1;
 }
 
 StgInt
 getLock(fp, exclusive)
-StgAddr fp;
+StgForeignObj fp;
 StgInt exclusive;
 {
     if (lockFile(fileno((FILE *) fp), exclusive) < 0) {

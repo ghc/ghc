@@ -11,7 +11,7 @@
 
 StgInt
 fileGetc(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     int c;
 

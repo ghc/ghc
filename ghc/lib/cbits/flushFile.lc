@@ -10,7 +10,7 @@
 
 StgInt
 flushFile(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     int rc;
 

@@ -10,7 +10,7 @@
 
 StgInt
 fileLookAhead(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     int c;
 

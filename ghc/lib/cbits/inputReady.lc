@@ -22,7 +22,7 @@
 
 StgInt
 inputReady(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     int flags;
     int c;

@@ -18,7 +18,7 @@
 
 StgInt
 seekFile(fp, whence, size, d)
-StgAddr fp;
+StgForeignObj fp;
 StgInt whence;
 StgInt size;
 StgByteArray d;
@@ -106,7 +106,7 @@ StgByteArray d;
 
 StgInt
 seekFileP(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     struct stat sb;
 

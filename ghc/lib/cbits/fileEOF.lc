@@ -10,7 +10,7 @@
 
 StgInt
 fileEOF(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     if (fileLookAhead(fp) != EOF)
 	return 0;

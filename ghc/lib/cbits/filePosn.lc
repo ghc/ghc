@@ -10,7 +10,7 @@
 
 StgInt
 getFilePosn(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     StgInt posn;
 
@@ -29,7 +29,7 @@ StgAddr fp;
 
 StgInt
 setFilePosn(fp, posn)
-StgAddr fp;
+StgForeignObj fp;
 StgInt posn;
 {
     while (fseek((FILE *) fp, posn, SEEK_SET) != 0) {

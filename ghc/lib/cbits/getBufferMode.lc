@@ -28,7 +28,7 @@
 
 StgInt
 getBufferMode(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     struct stat sb;
 

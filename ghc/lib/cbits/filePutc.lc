@@ -11,7 +11,7 @@
 
 StgInt
 filePutc(fp, c)
-StgAddr fp;
+StgForeignObj fp;
 StgInt c;
 {
     int rc;

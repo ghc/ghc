@@ -13,7 +13,7 @@
 StgInt
 readBlock(buf, fp, size)
 StgAddr buf;
-StgAddr fp;
+StgForeignObj fp;
 StgInt size;
 {
     int count;
@@ -43,7 +43,7 @@ StgInt size;
 StgInt
 readLine(buf, fp, size)
 StgAddr buf;
-StgAddr fp;
+StgForeignObj fp;
 StgInt size;
 {
     if (feof((FILE *) fp)) {
@@ -70,7 +70,7 @@ StgInt size;
 
 StgInt
 readChar(fp)
-StgAddr fp;
+StgForeignObj fp;
 {
     int c;
 

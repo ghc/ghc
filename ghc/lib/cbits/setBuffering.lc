@@ -30,7 +30,7 @@
 
 StgInt
 setBuffering(fp, size)
-StgAddr fp;
+StgForeignObj fp;
 StgInt size;
 {
     int flags;
