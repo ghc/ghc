@@ -364,9 +364,18 @@ def run_command_ignore_output( name, way, cmd ):
 # GHCi tests
 
 def ghci_script( name, way, script ):
-    cmd = "'" + config.compiler + "'" + \
+    # filter out -no-recomp from compiler_always_flags, becuase we're
+    # actually testing the recompilation behaviour in the GHCi tests.
+    flags = filter(lambda f: f != '-no-recomp', config.compiler_always_flags)
+
+    # We pass HC and HC_OPTS as environment variables, so that the
+    # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
+    cmd = "HC='" + config.compiler + "' " + \
+          "HC_OPTS='" + join(flags,' ') + "' " + \
+          "'" + config.compiler + "'" + \
           ' --interactive -v0 ' + \
-          join(config.compiler_always_flags,' ')
+          join(flags,' ')
+
     testopts.stdin = script
     return simple_run( name, cmd, '', 0 )
 
