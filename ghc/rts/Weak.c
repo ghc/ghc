@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.23 2002/04/26 22:31:31 sof Exp $
+ * $Id: Weak.c,v 1.24 2002/06/13 11:41:15 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -69,11 +69,23 @@ scheduleFinalizers(StgWeak *list)
     StgMutArrPtrs *arr;
     nat n;
 
-    /* count number of finalizers first... */
+    // count number of finalizers, and kill all the weak pointers first...
     for (n = 0, w = list; w; w = w->link) { 
 	if (w->header.info != &stg_DEAD_WEAK_info &&
-	    w->finalizer != &stg_NO_FINALIZER_closure)
+	    w->finalizer != &stg_NO_FINALIZER_closure) {
 	    n++;
+	}
+
+#ifdef PROFILING
+        // A weak pointer is inherently used, so we do not need to call
+        // LDV_recordDead().
+	//
+        // Furthermore, when PROFILING is turned on, dead weak
+        // pointers are exactly as large as weak pointers, so there is
+        // no need to fill the slop, either.  See stg_DEAD_WEAK_info
+        // in StgMiscClosures.hc.
+#endif
+	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 	
     if (n == 0) return;
@@ -90,17 +102,6 @@ scheduleFinalizers(StgWeak *list)
 	    arr->payload[n] = w->finalizer;
 	    n++;
 	}
-
-#ifdef PROFILING
-        // A weak pointer is inherently used, so we do not need to call
-        // LDV_recordDead().
-	//
-        // Furthermore, when PROFILING is turned on, dead weak
-        // pointers are exactly as large as weak pointers, so there is
-        // no need to fill the slop, either.  See stg_DEAD_WEAK_info
-        // in StgMiscClosures.hc.
-#endif
-	SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }
 
     t = createIOThread(RtsFlags.GcFlags.initialStkSize, 
