@@ -22,6 +22,7 @@ module IOExts
         , newIORef
         , readIORef
         , writeIORef
+	, updateIORef
 
 	, mkWeakIORef
 
@@ -106,9 +107,9 @@ unsafePtrEq a b =
 \end{code}
 
 \begin{code}
-newIORef   :: a -> IO (IORef a)
-readIORef  :: IORef a -> IO a
-writeIORef :: IORef a -> a -> IO ()
+newIORef    :: a -> IO (IORef a)
+readIORef   :: IORef a -> IO a
+writeIORef  :: IORef a -> a -> IO ()
 
 #ifdef __HUGS__
 type IORef a = STRef RealWorld a
@@ -123,6 +124,13 @@ newIORef v = stToIO (newVar v) >>= \ var -> return (IORef var)
 readIORef  (IORef var) = stToIO (readVar var)
 writeIORef (IORef var) v = stToIO (writeVar var v)
 #endif
+
+updateIORef :: IORef a -> (a -> a) -> IO ()
+updateIORef ref f = do
+  x <- readIORef ref
+  let x' = f x
+  writeIORef ref x'
+  -- or should we return new value ? (or old?)
 
 mkWeakIORef :: IORef a -> IO () -> IO (Weak (IORef a))
 mkWeakIORef r@(IORef (MutableVar r#)) f = IO $ \s ->
