@@ -19,7 +19,9 @@ module Data.Array.IO (
 
    -- * @IO@ arrays with unboxed elements
    IOUArray,		-- instance of: Eq, Typeable
+#ifdef __GLASGOW_HASKELL__
    castIOUArray,	-- :: IOUArray i a -> IO (IOUArray i b)
+#endif
 
    -- * Overloaded mutable array interface
    module Data.Array.MArray,
