@@ -240,15 +240,16 @@ MOSTLY_CLEAN_FILES += \
 #  DOC_DVI   = list of DVI files to generate.
 #  DOC_HTML  = list of HTML files to generate
 #  DOC_TEXI  = list of TexInfo files to generate
+#  DOC_INFO  = list of Emacs Info files to generate
 #  DOC_TEXT  = list of simple text files to generate
 # 
 DOC_SRCS=$(wildcard    *.tex *.lit)
 DOC_DVI =$(addsuffix  .dvi,$(basename $(DOC_SRCS)))
 DOC_PS  =$(addsuffix   .ps,$(basename $(DOC_SRCS)))
 DOC_TEXI=$(addsuffix .texi,$(basename $(DOC_SRCS)))
+DOC_INFO=$(addsuffix .info,$(basename $(DOC_SRCS)))
 DOC_HTML=$(addsuffix .html,$(basename $(DOC_SRCS)))
 DOC_TEXT=$(addsuffix .txt,$(basename $(DOC_SRCS)))
-
 CLEAN_FILES += $(DOC_TEXT) $(DOC_HTML) $(DOC_TEXI) $(DOC_PS) $(DOC_DVI)
 
 #------------------------------------------------------------------
