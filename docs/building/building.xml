@@ -4317,6 +4317,24 @@ Cygwin programs have a more complicated mount table, and map the lettered drives
 </para>
 </sect3>
 
+<sect3><title>Crippled <command>ld</command></title>
+
+<para>
+It turns out that on both Cygwin and MSYS, the <command>ld</command> has a
+limit of 32kbytes on its command line.  Especially when using split object
+files, the make system can emit calls to <command>ld</command> with thousands
+of files on it.  Then you may see something like this:
+<programlisting>
+(cd Graphics/Rendering/OpenGL/GL/QueryUtils_split &amp;&amp; /mingw/bin/ld -r -x -o ../QueryUtils.o *.o)
+/bin/sh: /mingw/bin/ld: Invalid argument
+</programlisting>
+The solution is either to switch off object file splitting (set
+<option>SplitObjs</option> to <literal>NO</literal> in your
+<filename>build.mk</filename>),
+or to make the module smaller.
+</para>
+</sect3>
+
 <sect3><title>Host System vs Target System</title>
 
 <para>
