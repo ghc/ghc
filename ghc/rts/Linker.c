@@ -515,6 +515,7 @@ typedef struct _RtsSymbolVal {
       SymX(stg_INTLIKE_closure)			\
       SymX(stg_MUT_ARR_PTRS_FROZEN_info)	\
       SymX(stg_WEAK_info)                       \
+      SymX(stg_ap_0_info)			\
       SymX(stg_ap_v_info)			\
       SymX(stg_ap_f_info)			\
       SymX(stg_ap_d_info)			\
@@ -641,6 +642,7 @@ RTS_LIBGCC_SYMBOLS
 
 static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
+      RTS_RET_SYMBOLS
       RTS_LONG_LONG_SYMS
       RTS_POSIX_ONLY_SYMBOLS
       RTS_MINGW_ONLY_SYMBOLS
