@@ -1,8 +1,0 @@
-module Rn017 where
-
-data Wibble 
-data Wobble
-
-a :: GHC.Base.Int -> GHC.Base.Int
-b :: GHC.Base.Int -> GHC.Base.Int
-c :: GHC.Base.Int -> GHC.Base.Int
