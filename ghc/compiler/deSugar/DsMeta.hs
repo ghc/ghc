@@ -13,7 +13,7 @@
 
 module DsMeta( dsBracket, dsReify,
 	       templateHaskellNames, qTyConName, 
-	       liftName, exprTyConName, declTyConName,
+	       liftName, exprTyConName, declTyConName, typeTyConName,
 	       decTyConName, typTyConName ) where
 
 #include "HsVersions.h"
@@ -90,9 +90,9 @@ dsBracket brack splices
 
 -----------------------------------------------------------------------------
 dsReify :: HsReify Id -> DsM CoreExpr
--- Returns a CoreExpr of type 	reifyType --> M.Typ
---				reifyDecl --> M.Dec
---				reifyFixty --> M.Fix
+-- Returns a CoreExpr of type 	reifyType --> M.Type
+--				reifyDecl --> M.Decl
+--				reifyFixty --> Q M.Fix
 dsReify (ReifyOut ReifyType name)
   = do { thing <- dsLookupGlobal name ;
 		-- By deferring the lookup until now (rather than doing it
@@ -136,6 +136,14 @@ repTopDs group
  = do { let { bndrs = groupBinders group } ;
 	ss    <- mkGenSyms bndrs ;
 
+	-- Bind all the names mainly to avoid repeated use of explicit strings.
+	-- Thus	we get
+	--	do { t :: String <- genSym "T" ;
+	--	     return (Data t [] ...more t's... }
+	-- The other important reason is that the output must mention
+	-- only "T", not "Foo.T" where Foo is the current module
+
+	
 	decls <- addBinds ss (do {
 			val_ds <- rep_binds (hs_valds group) ;
 			tycl_ds <- mapM repTyClD (hs_tyclds group) ;
@@ -156,12 +164,36 @@ groupBinders (HsGroup { hs_valds = val_decls, hs_tyclds = tycl_decls,
     [n | ForeignImport n _ _ _ _ <- foreign_decls]
 
 
+{- 	Note [Binders and occurrences]
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we desugar [d| data T = MkT |]
+we want to get
+	Data "T" [] [Con "MkT" []] []
+and *not*
+	Data "Foo:T" [] [Con "Foo:MkT" []] []
+That is, the new data decl should fit into whatever new module it is
+asked to fit in.   We do *not* clone, though; no need for this:
+	Data "T79" ....
+
+But if we see this:
+	data T = MkT 
+	foo = reifyDecl T
+
+then we must desugar to
+	foo = Data "Foo:T" [] [Con "Foo:MkT" []] []
+
+So in repTopDs we bring the binders into scope with mkGenSyms and addBinds,
+but in dsReify we do not.  And we use lookupOcc, rather than lookupBinder
+in repTyClD and repC.
+
+-}
+
 repTyClD :: TyClDecl Name -> DsM (Maybe (Core M.Decl))
 
 repTyClD (TyData { tcdND = DataType, tcdCtxt = [], 
 		   tcdName = tc, tcdTyVars = tvs, 
 		   tcdCons = DataCons cons, tcdDerivs = mb_derivs }) 
- = do { tc1  <- lookupBinder tc ;
+ = do { tc1  <- lookupOcc tc ;		-- See note [Binders and occurrences] 
 	tvs1  <- repTvs tvs ;
 	cons1 <- mapM repC cons ;
 	cons2 <- coreList consTyConName cons1 ;
@@ -173,7 +205,7 @@ repTyClD (ClassDecl { tcdCtxt = cxt, tcdName = cls,
 		      tcdTyVars = tvs, tcdFDs = [], 
 		      tcdSigs = sigs, tcdMeths = Just binds
 	})
- = do { cls1 <- lookupBinder cls ;
+ = do { cls1 <- lookupOcc cls ;		-- See note [Binders and occurrences] 
 	tvs1 <- repTvs tvs ;
 	cxt1 <- repCtxt cxt ;
 	sigs1  <- rep_sigs sigs ;
@@ -206,7 +238,7 @@ repInstD (InstDecl ty binds _ _ loc)
 
 repC :: ConDecl Name -> DsM (Core M.Cons)
 repC (ConDecl con [] [] details loc)
-  = do { con1     <- lookupBinder con ;
+  = do { con1     <- lookupOcc con ;		-- See note [Binders and occurrences] 
 	 arg_tys  <- mapM (repBangTy con) (hsConArgs details) ;
 	 arg_tys1 <- coreList typeTyConName arg_tys ;
 	 repConstr con1 arg_tys1 }
@@ -640,19 +672,39 @@ type GenSymBind = (Name, Id)	-- Gensym the string and bind it to the Id
 addBinds :: [GenSymBind] -> DsM a -> DsM a
 addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,Bound id) | (n,id) <- bs]) m
 
-lookupBinder :: Name -> DsM (Core String)
-lookupBinder n 
-  = do { mb_val <- dsLookupMetaEnv n;
-	 case mb_val of
-	    Just (Bound id) -> return (MkC (Var id))
-	    other	    -> pprPanic "Failed binder lookup:" (ppr n) }
-
 mkGenSym :: Name -> DsM GenSymBind
 mkGenSym nm = do { id <- newUniqueId nm stringTy; return (nm,id) }
 
 mkGenSyms :: [Name] -> DsM [GenSymBind]
 mkGenSyms ns = mapM mkGenSym ns
 	     
+lookupBinder :: Name -> DsM (Core String)
+lookupBinder n 
+  = do { mb_val <- dsLookupMetaEnv n;
+	 case mb_val of
+	    Just (Bound x) -> return (coreVar x)
+	    other	   -> pprPanic "Failed binder lookup:" (ppr n) }
+
+lookupOcc :: Name -> DsM (Core String)
+-- Lookup an occurrence; it can't be a splice.
+-- Use the in-scope bindings if they exist
+lookupOcc n
+  = do {  mb_val <- dsLookupMetaEnv n ;
+          case mb_val of
+		Nothing         -> globalVar n
+		Just (Bound x)  -> return (coreVar x)
+		Just (Splice _) -> pprPanic "repE:lookupOcc" (ppr n) 
+    }
+
+globalVar :: Name -> DsM (Core String)
+globalVar n = coreStringLit (name_mod ++ ":" ++ name_occ)
+ 	    where
+	      name_mod = moduleUserString (nameModule n)
+	      name_occ = occNameUserString (nameOccName n)
+
+localVar :: Name -> DsM (Core String)
+localVar n = coreStringLit (occNameUserString (nameOccName n))
+
 lookupType :: Name 	-- Name of type constructor (e.g. M.Expr)
 	   -> DsM Type	-- The type
 lookupType tc_name = do { tc <- dsLookupTyCon tc_name ;
@@ -948,26 +1000,6 @@ nonEmptyCoreList xs@(MkC x:_) = MkC (mkListExpr (exprType x) (map unC xs))
 
 corePair :: (Core a, Core b) -> Core (a,b)
 corePair (MkC x, MkC y) = MkC (mkCoreTup [x,y])
-
-lookupOcc :: Name -> DsM (Core String)
--- Lookup an occurrence; it can't be a splice.
--- Use the in-scope bindings if they exist
-lookupOcc n
-  = do {  mb_val <- dsLookupMetaEnv n ;
-          case mb_val of
-		Nothing        -> globalVar n
-		Just (Bound x) -> return (coreVar x)
-		other	       -> pprPanic "repE:lookupOcc" (ppr n) 
-    }
-
-globalVar :: Name -> DsM (Core String)
-globalVar n = coreStringLit (name_mod ++ ":" ++ name_occ)
- 	    where
-	      name_mod = moduleUserString (nameModule n)
-	      name_occ = occNameUserString (nameOccName n)
-
-localVar :: Name -> DsM (Core String)
-localVar n = coreStringLit (occNameUserString (nameOccName n))
 
 coreStringLit :: String -> DsM (Core String)
 coreStringLit s = do { z <- mkStringLit s; return(MkC z) }
