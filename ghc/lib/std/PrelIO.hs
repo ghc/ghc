@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hs,v 1.1 2001/11/07 18:25:35 sof Exp $
+-- $Id: PrelIO.hs,v 1.2 2001/11/08 17:02:41 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -138,7 +138,7 @@ hWaitForInput h msecs = do
 	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs))
   return (r /= 0)
 
-foreign import "inputReady" 
+foreign import "inputReady" unsafe
   inputReady :: CInt -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
