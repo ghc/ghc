@@ -828,7 +828,7 @@ reportUnusedNames gbl_env
 
     -- unused_imp_mods are the directly-imported modules 
     -- that are not mentioned in minimal_imports1
-    -- [Note: not 'minimal_imports', because that includes direcly-imported
+    -- [Note: not 'minimal_imports', because that includes directly-imported
     --	      modules even if we use nothing from them; see notes above]
     unused_imp_mods = [m | m <- direct_import_mods,
     		       isNothing (lookupFM minimal_imports1 m),
