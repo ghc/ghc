@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.46 2003/05/21 13:22:46 stolz Exp $
+ * $Id: MBlock.c,v 1.47 2003/06/26 20:49:32 panne Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -20,6 +20,9 @@
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
+#ifdef HAVE_STRING_H
+#include <string.h>
 #endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
