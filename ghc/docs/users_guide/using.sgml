@@ -1885,7 +1885,7 @@ statements or clauses.
 &runtime;
 
 <sect1 id="ext-core">
-  <title>Generating External Core Files</title>
+  <title>Generating and compiling External Core Files</title>
 
   <indexterm><primary>intermediate code generation</primary></indexterm>
 
@@ -1919,6 +1919,10 @@ statements or clauses.
 
     </variablelist>
 
+<para>GHC can also read in External Core files as source; just give the <literal>.hcr</literal> file on
+the command line, instead of the <literal>.hs</literal> or <literal>.lhs</literal> Haskell source.
+A current infelicity is that you need to give teh <literal>-fglasgow-exts</literal> flag too, because
+ordinary Haskell 98, when translated to External Core, uses things like rank-2 types.</para>
 </sect1>
 
 &debug;
