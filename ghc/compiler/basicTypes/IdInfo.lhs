@@ -49,7 +49,10 @@ module IdInfo (
 	CafInfo(..), cafInfo, setCafInfo, ppCafInfo,
 
         -- Constructed Product Result Info
-        CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo
+        CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
+
+        -- Lambda-bound variable info
+        LBVarInfo(..), lbvarInfo, setLBVarInfo, noLBVarInfo,
     ) where
 
 #include "HsVersions.h"
@@ -61,6 +64,7 @@ import {-# SOURCE #-} CoreSyn	 ( CoreExpr )
 import Var              ( Id )
 import SpecEnv	        ( SpecEnv, emptySpecEnv )
 import Demand		( Demand,  isLazy, wwLazy, pprDemands )
+import Type             ( UsageAnn )
 import Outputable	
 
 import Maybe            ( isJust )
@@ -77,7 +81,8 @@ the properties attached to the other.
 
 The @IdInfo@ gives information about the value, or definition, of the
 @Id@.  It does {\em not} contain information about the @Id@'s usage
-(except for @DemandInfo@? ToDo).
+(except for @DemandInfo@? ToDo). (@lbvarInfo@ is also a marginal
+case.  KSW 1999-04).
 
 \begin{code}
 data IdInfo
@@ -91,6 +96,7 @@ data IdInfo
 	updateInfo :: UpdateInfo,		-- Which args should be updated
 	cafInfo :: CafInfo,
 	cprInfo :: CprInfo,                     -- Function always constructs a product result
+        lbvarInfo :: LBVarInfo,			-- Info about a lambda-bound variable
 	inlinePragInfo :: !InlinePragInfo	-- Inline pragmas
     }
 \end{code}
@@ -108,6 +114,7 @@ setInlinePragInfo pr info = info { inlinePragInfo = pr }
 setUnfoldingInfo  uf info = info { unfoldingInfo = uf }
 setCafInfo        cf info = info { cafInfo = cf }
 setCprInfo        cp info = info { cprInfo = cp }
+setLBVarInfo      lb info = info { lbvarInfo = lb }
 \end{code}
 
 
@@ -122,6 +129,7 @@ noIdInfo = IdInfo {
 		updateInfo	= NoUpdateInfo,
 		cafInfo		= MayHaveCafRefs,
 		cprInfo		= NoCPRInfo,
+                lbvarInfo       = NoLBVarInfo,
 		inlinePragInfo  = NoInlinePragInfo
 	   }
 \end{code}
@@ -488,4 +496,43 @@ instance Show CprInfo where
 \end{code}
 
 
+%************************************************************************
+%*									*
+\subsection[lbvar-IdInfo]{Lambda-bound var info about an @Id@}
+%*									*
+%************************************************************************
 
+If the @Id@ is a lambda-bound variable then it may have lambda-bound
+var info.  The usage analysis (UsageSP) detects whether the lambda
+binding this var is a ``one-shot'' lambda; that is, whether it is
+applied at most once.
+
+This information may be useful in optimisation, as computations may
+safely be floated inside such a lambda without risk of duplicating
+work.
+
+\begin{code}
+data LBVarInfo
+  = NoLBVarInfo
+
+  | IsOneShotLambda			-- the lambda that binds this Id is applied
+					--   at most once
+				-- HACK ALERT! placing this info here is a short-term hack,
+				--   but it minimises changes to the rest of the compiler.
+				--   Hack agreed by SLPJ/KSW 1999-04.
+\end{code}
+
+\begin{code}
+
+noLBVarInfo = NoLBVarInfo
+
+-- not safe to print or parse LBVarInfo because it is not really a
+-- property of the definition, but a property of the context.
+ppLBVarInfo _ = empty
+
+instance Outputable LBVarInfo where
+    ppr = ppLBVarInfo
+
+instance Show LBVarInfo where
+    showsPrec p c = showsPrecSDoc p (ppr c)
+\end{code}
