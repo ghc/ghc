@@ -18,6 +18,7 @@
 TOP = ..
 
 # Use GHC for compiling C bits (NB. must be before boilerplate include)
+# NB. this requires BootingFromHc to be set on the make command line!
 #
 ifneq "$(BootingFromHc)" "YES"
 UseGhcForCc = YES
@@ -521,16 +522,45 @@ endif
 # ----------------------------------------------------------------------------
 # profiling.
 
-# rename/Rename_HC_OPTS += -auto-all
-# rename/RnEnv_HC_OPTS += -auto-all
-# rename/RnHiFiles_HC_OPTS += -auto-all
-# rename/RnIfaces_HC_OPTS += -auto-all
-# rename/RnSource_HC_OPTS += -auto-all
-# rename/RnBinds_HC_OPTS += -auto-all
-# rename/RnExpr_HC_OPTS += -auto-all
-# rename/RnHsSyn_HC_OPTS += -auto-all
-# rename/RnNames_HC_OPTS += -auto-all
-# rename/RnTypes_HC_OPTS += -auto-all
+rename/RnBinds_HC_OPTS += -auto-all
+rename/RnEnv_HC_OPTS += -auto-all
+rename/RnExpr_HC_OPTS += -auto-all
+rename/RnHiFiles_HC_OPTS += -auto-all
+rename/RnHsSyn_HC_OPTS += -auto-all
+rename/Rename_HC_OPTS += -auto-all
+rename/RnIfaces_HC_OPTS += -auto-all
+rename/RnNames_HC_OPTS += -auto-all
+rename/RnSource_HC_OPTS += -auto-all
+rename/RnTypes_HC_OPTS += -auto-all
+
+typecheck/Inst_HC_OPTS += -auto-all
+typecheck/TcBinds_HC_OPTS += -auto-all
+typecheck/TcClassDcl_HC_OPTS += -auto-all
+typecheck/TcDefaults_HC_OPTS += -auto-all
+typecheck/TcDeriv_HC_OPTS += -auto-all
+typecheck/TcEnv_HC_OPTS += -auto-all
+typecheck/TcExpr_HC_OPTS += -auto-all
+typecheck/TcForeign_HC_OPTS += -auto-all
+typecheck/TcGenDeriv_HC_OPTS += -auto-all
+typecheck/TcHsSyn_HC_OPTS += -auto-all
+typecheck/TcIfaceSig_HC_OPTS += -auto-all
+typecheck/TcInstDcls_HC_OPTS += -auto-all
+typecheck/TcMatches_HC_OPTS += -auto-all
+typecheck/TcMonoType_HC_OPTS += -auto-all
+typecheck/TcMType_HC_OPTS += -auto-all
+typecheck/TcPat_HC_OPTS += -auto-all
+typecheck/TcRnDriver_HC_OPTS += -auto-all
+#typecheck/TcRnMonad_HC_OPTS += -auto-all
+#typecheck/TcRnTypes_HC_OPTS += -auto-all
+typecheck/TcRules_HC_OPTS += -auto-all
+typecheck/TcSimplify_HC_OPTS += -auto-all
+typecheck/TcSplice_HC_OPTS += -auto-all
+typecheck/TcTyClsDecls_HC_OPTS += -auto-all
+typecheck/TcTyDecls_HC_OPTS += -auto-all
+typecheck/TcType_HC_OPTS += -auto-all
+typecheck/TcUnify_HC_OPTS += -auto-all
+
+absCSyn/PprAbsC_HC_OPTS += -auto-all
 
 #-----------------------------------------------------------------------------
 # 		clean
