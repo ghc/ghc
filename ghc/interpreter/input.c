@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/29 18:59:27 $
+ * $Revision: 1.15 $
+ * $Date: 1999/12/01 11:50:34 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -33,7 +33,7 @@
 #undef IN
 #endif
 
-#if HAVE_LIBREADLINE && HAVE_READLINE_READLINE_H
+#if HAVE_LIBREADLINE && HAVE_READLINE_READLINE_H && HAVE_READLINE_HISTORY_H
 #define USE_READLINE 1
 #else
 #define USE_READLINE 0
