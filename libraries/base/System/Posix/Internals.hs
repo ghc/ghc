@@ -341,7 +341,7 @@ foreign import ccall unsafe "HsBase.h dup"
 foreign import ccall unsafe "HsBase.h dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
 
-foreign import ccall unsafe "HsBase.h fstat"
+foreign import ccall unsafe "HsBase.h __hscore_fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
 foreign import ccall unsafe "HsBase.h getcwd"
