@@ -17,7 +17,7 @@ import Interpreter
 import CmStaticInfo	( PackageConfigInfo )
 import Module		( ModuleName, PackageName )
 import Outputable	( SDoc )
-import Digraph		( SCC(..), flattenSCC )
+import Digraph		( SCC(..), flattenSCC, flattenSCCs )
 import Outputable
 import Panic		( panic )
 
@@ -70,6 +70,10 @@ isObject (DotA _) = True
 isObject (DotDLL _) = True
 isObject _ = False
 
+nameOfObject (DotO fn)   = fn
+nameOfObject (DotA fn)   = fn
+nameOfObject (DotDLL fn) = fn
+
 isInterpretable (Trees _ _) = True
 isInterpretable _ = False
 
@@ -91,18 +95,39 @@ emptyPLS = return (PersistentLinkerState {})
 \end{code}
 
 \begin{code}
-link :: PackageConfigInfo 
+-- The first arg is supposed to be DriverPipeline.doLink.
+-- Passed in here to avoid a hard-to-avoid circular dependency
+-- between CmLink and DriverPipeline.  Same deal as with
+-- CmSummarise.summarise.
+link :: ([String] -> IO ()) 
+     -> Bool			-- was the upsweep completely successful?
+     -> PackageConfigInfo 
      -> [SCC Linkable] 
      -> PersistentLinkerState 
      -> IO LinkResult
 
 #ifndef GHCI_NOTYET
 --link = panic "CmLink.link: not implemented"
-link pci groups pls1
+
+-- For the moment, in the batch linker, we don't bother to
+-- tell doLink which packages to link -- it just tries all that
+-- are available.
+link doLink upsweep_complete_success pci groups pls1
+   | upsweep_complete_success
    = do putStrLn "Hello from the Linker!"
         putStrLn (showSDoc (vcat (map ppLinkableSCC groups)))
-        putStrLn "Bye-bye from the Linker!"
+        let o_files = concatMap getOfiles (flattenSCCs groups)
+        doLink o_files
+        putStrLn "Bye-bye from the Linker!"        
         return (LinkOK pls1)
+   | otherwise
+   = do putStrLn "LINKER: upsweep (partially?) failed; not doing batch linking"
+        return (LinkOK pls1)
+   where
+      getOfiles (LP _)    = []
+      getOfiles (LM _ us) = map nameOfObject (filter isObject us)
+
+   
 
 ppLinkableSCC :: SCC Linkable -> SDoc
 ppLinkableSCC = ppr . flattenSCC

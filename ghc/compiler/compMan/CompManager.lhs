@@ -30,7 +30,7 @@ import CmSummarise	( summarise, ModSummary(..),
 import Module		( ModuleName, moduleName, packageOfModule, 
 			  isModuleInThisPackage, PackageName )
 import CmStaticInfo	( Package(..), PackageConfigInfo )
-import DriverPipeline 	( compile, preprocess, CompResult(..) )
+import DriverPipeline 	( compile, preprocess, doLink, CompResult(..) )
 import HscTypes		( HomeSymbolTable, HomeIfaceTable, 
 			  PersistentCompilerState )
 import HscMain		( initPersistentCompilerState )
@@ -167,7 +167,8 @@ cmLoadModule cmstate1 modname
         if upsweepOK
 
          then 
-           do let mods_to_relink = upwards_closure mg2 
+           do putStrLn "UPSWEEP COMPLETELY SUCCESSFUL"
+              let mods_to_relink = upwards_closure mg2 
                                       (map modname_of_linkable newLis)
               pkg_linkables <- find_pkg_linkables_for pcii
                                                       mg2 mods_to_relink
@@ -176,7 +177,7 @@ cmLoadModule cmstate1 modname
               let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
               let all_to_relink  = map AcyclicSCC pkg_linkables 
                                    ++ sccs_to_relink
-              linkresult <- link pcii all_to_relink pls1
+              linkresult <- link doLink True pcii all_to_relink pls1
               case linkresult of
                  LinkErrs _ _
                     -> panic "cmLoadModule: link failed (1)"
@@ -188,14 +189,15 @@ cmLoadModule cmstate1 modname
                           return (cmstate3, Just modname)
 
          else 
-           do let mods_to_relink = downwards_closure mg2 
+           do putStrLn "UPSWEEP PARTIALLY SUCCESSFUL"
+              let mods_to_relink = downwards_closure mg2 
                                       (map name_of_summary (flattenSCCs sccOKs))
               pkg_linkables <- find_pkg_linkables_for pcii
                                                       mg2 mods_to_relink
               let sccs_to_relink = group_uis ui3 mg2 mods_to_relink
               let all_to_relink  = map AcyclicSCC pkg_linkables 
                                    ++ sccs_to_relink
-              linkresult <- link pcii all_to_relink pls1
+              linkresult <- link doLink False pcii all_to_relink pls1
               let (hst4, hit4, ui4) 
                      = removeFromTopLevelEnvs mods_to_relink (hst3,hit3,ui3)
               case linkresult of

@@ -72,7 +72,8 @@ type Fingerprint = Int
 
 -- The first arg is supposed to be DriverPipeline.preprocess.
 -- Passed in here to avoid a hard-to-avoid circular dependency
--- between CmSummarise and DriverPipeline.
+-- between CmSummarise and DriverPipeline.  Same deal as with
+-- CmLink.link.
 summarise :: (FilePath -> IO FilePath)
           -> Module -> ModuleLocation -> IO ModSummary
 summarise preprocess mod location
