@@ -310,6 +310,10 @@ instance Eq (STArray s i e) where
 arrEleBottom :: a
 arrEleBottom = error "(Array.!): undefined array element"
 
+-- | Note: GHC's implementation of @array@ differs slightly from the Haskell 98
+-- report.  If the same index appears twice, GHC's implementation takes the 
+-- value from last (index,value) pair in the list, rather than yielding bottom
+-- for that array slot.  
 {-# INLINE array #-}
 array :: Ix i => (i,i) -> [(i, e)] -> Array i e
 array (l,u) ies = unsafeArray (l,u) [(index (l,u) i, e) | (i, e) <- ies]
