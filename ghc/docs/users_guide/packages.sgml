@@ -50,7 +50,7 @@
       automatically get <literal>-package lang</literal> too.</para>
     </sect2>
 
-    <sect2>
+    <sect2 id="using-local-packages">
       <title>Maintaining a local set of packages</title>
       
       <para>When GHC starts up, it automatically reads the default set

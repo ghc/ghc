@@ -525,7 +525,7 @@ Wed Mar 14 12:23:13 GMT 2001
     </sect2>
   </sect1>
 
-  <sect1>
+  <sect1 id="ghci-invokation">
     <title>Invoking GHCi</title>
     <indexterm><primary>invoking</primary><secondary>GHCi</secondary></indexterm>
     <indexterm><primary><option>--interactive</option></primary></indexterm>

@@ -49,18 +49,19 @@
         <para>New option <option>-package-conf
         <replaceable>file</replaceable></option>.  This makes GHC read
         additional package descriptions from
-        <replaceable>file</replaceable>.</para>
+        <replaceable>file</replaceable>.  See <xref
+        linkend="using-local-packages">.</para>
       </listitem>
 
       <listitem>
 	<para><option>+RTS
-	-i<replaceable>seconds</replaceable></option> flag reinstated
-	for heap profiling.</para>
+          -i<replaceable>seconds</replaceable></option> flag reinstated for heap
+          profiling.  See <xref linkend="prof-rts-options">.</para>
       </listitem>
 
       <listitem>
 	<para><option>-funbox-strict-fields</option> now works
-	correctly.</para>
+	correctly.  See <xref linkend="options-f">.</para>
       </listitem>
 
       <listitem>
@@ -70,7 +71,18 @@
 
       <listitem>
 	<para>
-        Data declarations with no constructors are allowed.</para>
+        Data declarations with no constructors are allowed.  This
+        facilitates types whose only value is bottom, and which have
+        no representation.</para>
+      </listitem>
+
+      <listitem>
+	<para>
+        You can disconnect numeric syntax from the Prelude syntax.
+        Doing this means you can define your own arithmetic.  The
+        relevant flag is <option>-fno-implicit-prelude</option>.  See
+        <xref linkend="options-language">.
+        </para>
       </listitem>
 
     </itemizedlist>
@@ -92,12 +104,14 @@
 
       <listitem>
 	<para>New interpreter command <literal>:add</literal>, to add
-	modules to the current bunch.</para>
+	modules to the current bunch.  See
+        <xref linkend="ghci-commands">.</para>
       </listitem>
 
       <listitem>
 	<para>New interpreter command <literal>:info</literal>, to provide
-	information on values, types and classes, a la Hugs.</para>
+	information on values, types and classes, a la Hugs.  See
+        <xref linkend="ghci-commands">.</para>
       </listitem>
 
       <listitem>
@@ -105,12 +119,14 @@
 	multiple modules for the <literal>:add</literal> and
 	<literal>:load</literal> commands.  From the command line, you
 	may specify multiple modules when starting GHCi and when
-	compiling in <option>--make</option> mode.</para>
+	compiling in <option>--make</option> mode.  See
+        <xref linkend="ghci-commands">.</para>
       </listitem>
 
       <listitem>
 	<para>New flags <option>-ignore-dot-ghci</option> and
-	<option>-read-dot-ghci</option>.</para>
+	<option>-read-dot-ghci</option>.  See
+        <xref linkend="ghci-dot-files">.</para>
       </listitem>
 
       <listitem>
@@ -119,7 +135,7 @@
 	<option>-L<replaceable>library-path</replaceable></option> and
 	<option>-l<replaceable>library-name</replaceable></option> to
 	specify libraries to be loaded into the interactive
-	session.</para>
+	session.  See <xref linkend="ghci-invokation">.</para>
       </listitem>
 
     </itemizedlist>
@@ -224,19 +240,26 @@
       <!-- don't forget: 31-bit support -->
 
       <listitem>
-	<para>Support for hierarchical module names.</para>
+	<para>Partial support for hierarchical module names.</para>
       </listitem>
 
       <listitem>
-         <para>.NET code generator.</para>
+         <para>Mucho hacking on the .NET code generator, including
+         some FFI extensions for .NET interop.  It's still
+         severely b0rk3d, so won't do anything useful.  Yet.</para>
       </listitem>
 
       <listitem>
-         <para>Emission of external Core format.</para>
-      </listitem>
-
-      <listitem>
-         <para>Experimental FFI extensions.</para>
+         <para>Emission of external Core format.  The goal is for
+         other tools to be able to grab the Core resulting from GHC's
+         front end manglings and optimisations.  Core format is
+         formally defined by the document <replaceable>An External
+         Representation of the GHC Core Language</replaceable> in the
+         GHC repository.  We also have sample
+         tools for reading, writing and typechecking external Core.
+         Ultimately we plan that Core files can also be read by
+         GHC.  The relevant flag is <option>-fext-core</option>.
+         </para>
       </listitem>
 
       <listitem>
@@ -246,7 +269,9 @@
 	memory gets tight by setting the maximum heap size (see <xref
 	linkend="rts-options-gc">).  Compaction works together with
 	the existing generational scheme: it is only used on the
-	oldest generation.</para>
+	oldest generation.  Despite the "experimental"
+	classification, we've jumped up and down quite significantly
+	on this code, and it seems stable.</para>
       </listitem>
     </itemizedlist>
   </sect2>
@@ -271,11 +296,6 @@
       <listitem>
 	<para>The compiler has a new strictness-and-absence analyser,
         which is alleged to help it generate better code.</para>
-      </listitem>
-
-      <listitem>
-	<para>Improved temporary (<literal>alloca</literal>-style)
-	memory support in the RTS: pinned objects.</para>
       </listitem>
 
     </itemizedlist>
