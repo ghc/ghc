@@ -777,7 +777,8 @@ Download a GHC distribution:
 <VariableList>
 
 <VarListEntry>
-<Term>ghc-4.045&mdash;InstallShield installer, 10M: <ULink URL="http://www.dcs.gla.ac.uk/~sof/ghc-4.045-win32-IS.zip">http</ULink> or <ULink URL="ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/4.04/ghc-4.045-win32-IS.zip">ftp</ULink>
+<Term>ghc-4.08&mdash;InstallShield installer, 20M: <ULink
+URL="http://www.haskell.org/ghc/dist/ghc-4-08.exe">http</ULink>
 </Term>
 
 <ListItem>
@@ -799,7 +800,8 @@ When the installer has completed its job, you may delete the
 
 <Para>
 When the installer has completed, make sure you add the location of the
-ghc <Filename>bin/</Filename> directory to your path (i.e. <Filename>/path/to/wherever/ghc-4.05/bin </Filename>).
+ghc <Filename>bin/</Filename> directory to your path (i.e.
+<Filename>/path/to/wherever/ghc-4.08/bin </Filename>).
 You need to do this in order to bring the various GHC DLLs into scope;
 if not, then you need to copy the DLLs into a directory that is (the
 system directory, for example).
@@ -814,30 +816,6 @@ ghc <Filename>bin/</Filename> into your <Filename>/bin</Filename> directory befo
 
 </VarListEntry>
 
-<VarListEntry>
-<Term>
-ghc-4.045 - gzip'ed tarfile, 7.5M: <ULink URL="http://www.dcs.gla.ac.uk/~sof/ghc-4.045-win32.tar.gz">
-http</ULink> or <ULink URL="ftp://ftp.dcs.gla.ac.uk/pub/haskell/glasgow/4.04/ghc-4.045-win32.tar.gz">ftp</ULink>
-</Term>
-
-<ListItem>
-<Para>
-A `normal' GHC binary distribution packaged up as a compressed tar file.
-If you're already accustomed to installing and using GHC distributions
-on other platforms, the setup should be familiar to you, I
-hope. Unpack and read the INSTALL file contained in the
-distribution for instructions on how to set it up.
-</Para>
-
-<Para>
-Notice that the top directory of the distribution contains
-(rather clumsily) a perl binary (version 5.005_02). If you
-haven't already got a working perl, install this somewhere
-along your path too.
-</Para>
-</ListItem>
-
-</VarListEntry>
 </VariableList>
 
 <Para>
@@ -854,7 +832,7 @@ bash$ cat main.hs
 module Main(main) where
 
 main = putStrLn "Hello, world!"
-bash$ /path/to/the/ghc/bin/directory/ghc-4.05 -o main main.hs
+bash$ /path/to/the/ghc/bin/directory/ghc-4.08 -o main main.hs
 ..
 bash$ ./main
 Hello, world!
