@@ -46,6 +46,10 @@ module IOExts
 	, hGetEcho
 	, hIsTerminalDevice
 	, hConnectTo
+	, withHandleFor
+	, withStdout
+	, withStdin
+	, withStderr
 #endif
         , trace
 #ifdef __HUGS__
@@ -68,6 +72,7 @@ import ST
 #else
 import PrelBase
 import PrelIOBase
+import IO
 import PrelHandle ( openFileEx, IOModeEx(..),
 		    hSetEcho, hGetEcho, getHandleFd
 		  )
@@ -209,3 +214,53 @@ foreign import ccall "freeHaskellFunctionPtr"
 
 \end{code}
 
+(Experimental) 
+
+Support for redirecting I/O on a handle to another for the
+duration of an IO action. To re-route a handle, it is first
+flushed, followed by replacing its innards (i.e., FILE_OBJECT)
+with that of the other. This happens before and after the
+action is executed.
+
+If the action raises an exception, the handle is replaced back
+to its old contents, but without flushing it first - as this
+may provoke exceptions. Notice that the action may perform
+I/O on either Handle, with the result that the I/O is interleaved.
+(Why you would want to do this, is a completely different matter.)
+
+ToDo: probably want to restrict what kind of handles can be
+replaced with another - i.e., don't want to be able to replace
+a writeable handle with a readable one.
+
+\begin{code}
+withHandleFor :: Handle
+	      -> Handle
+	      -> IO a
+	      -> IO a
+withHandleFor h1 h2 act = do
+   h1_fo <- getFO h1
+   plugIn h1_fo
+ where
+  plugIn h1_fo = do
+    hFlush h2
+    h2_fo <- withHandle h2 $ \ h2_ -> return (h2_{haFO__=h1_fo}, haFO__ h2_)
+    catch (act >>= \ x -> hFlush h2 >> setFO h2 h2_fo >> return x)
+    	  (\ err -> setFO h2 h2_fo >> ioError err)
+
+  setFO h fo = 
+    withHandle h $ \ h_ -> return (h_{haFO__=fo}, ())
+
+  getFO h = 
+    wantRWHandle "withHandleFor" h $ \ h_ ->
+    return (haFO__ h_)
+        
+\end{code}
+
+Derived @withHandleFor@ combinators and, at the moment, these
+are exported from @IOExts@ and not @withHandleFor@ itself.
+
+\begin{code}
+withStdin  h a = withHandleFor h stdin  a
+withStdout h a = withHandleFor h stdout a
+withStderr h a = withHandleFor h stderr a
+\end{code}
