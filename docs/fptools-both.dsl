@@ -58,7 +58,7 @@ Options added:
   ;; General measure of document text size
   ;; "presbyopic"
   ;; "large-type"
-  "presbyopic")
+  "normal")
 
 (define %generate-part-toc% #t)
 
