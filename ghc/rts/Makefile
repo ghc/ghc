@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.35 2000/08/25 10:06:37 qrczak Exp $
+# $Id: Makefile,v 1.36 2000/09/04 14:39:10 simonmar Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -50,7 +50,7 @@ WARNING_OPTS += -optc-Wmissing-prototypes
 WARNING_OPTS += -optc-Wmissing-declarations
 WARNING_OPTS += -optc-Winline
 WARNING_OPTS += -optc-Waggregate-return
-WARNING_OPTS += -optc-Wpointer-arith
+#WARNING_OPTS += -optc-Wpointer-arith
 WARNING_OPTS += -optc-Wbad-function-cast
 #WARNING_OPTS += -optc-Wcast-align
 #WARNING_OPTS += -optc-Wnested-externs
