@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: PrelIOBase.lhs,v 1.36 2001/02/27 13:38:15 simonmar Exp $
+% $Id: PrelIOBase.lhs,v 1.37 2001/02/27 13:38:58 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2000
 %
@@ -93,7 +93,10 @@ instance  Monad IO  where
     return x	= returnIO x
 
     m >>= k     = bindIO m k
-    fail s	= ioError (userError s)
+    fail s	= failIO s
+
+failIO :: String -> IO a
+failIO s = ioError (userError s)
 
 liftIO :: IO a -> State# RealWorld -> STret RealWorld a
 liftIO (IO m) = \s -> case m s of (# s', r #) -> STret s' r
