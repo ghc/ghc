@@ -64,7 +64,13 @@ package_details installing
         import_dirs    = [],
         source_dirs    = [],
         library_dirs   = if installing
-                            then [ "$libdir" ]
+                            then 
+#ifdef mingw32_TARGET_OS
+				-- force the dist-provided gcc-lib/ into scope.
+			    	 [ "$libdir", "$libdir/gcc-lib" ]
+#else
+			    	 [ "$libdir" ]
+#endif
                             else [ ghc_src_dir cGHC_RUNTIME_DIR ],
         hs_libraries      = [ "HSrts" ],
 	extra_libraries   =
