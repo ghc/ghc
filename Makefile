@@ -308,6 +308,18 @@ CLEAN_FILES += hc-files-to-go *-hc.tar.gz
 
 DIST_CLEAN_FILES += config.cache config.status
 
+#
+# If you've ended up using an in-place version of Happy,
+# make sure it gets built early on.
+#
+ifeq "$(HAPPY)" "$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace"
+all :: $(FPTOOLS_TOP_ABS)/happy/src/happy-inplace
+
+$(FPTOOLS_TOP_ABS)/happy/src/happy-inplace :
+	cd ghc/includes && make boot
+	cd happy && make boot all
+endif
+
 all ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
