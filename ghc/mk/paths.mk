@@ -65,21 +65,9 @@ GHC_SYSMAN_DIR 		= $(GHC_RUNTIME_DIR)/gum
 #-----------------------------------------------------------------------------
 # Stuff for the C-compiling phase in particular...
 
-# NON-OPTIMISING C COMPILATION: =================================
-
-ifeq ($(HaveGcc), YES)
-GHC_DEBUG_HILEV_ASM 		= $(WhatGccIsCalled)
-else
-GHC_DEBUG_HILEV_ASM 		= $(CC)
-endif
-
-# OPTIMISING C COMPILATION (regs, etc): ==========================
-
 ifeq ($(HaveGcc), YES)
 GHC_OPT_HILEV_ASM 		= $(WhatGccIsCalled)
-GHC_GCC_IS_AVAILABLE 		= 1
 else
 GHC_OPT_HILEV_ASM 		= $(CC)
-GHC_GCC_IS_AVAILABLE 		= 0
 endif
 
