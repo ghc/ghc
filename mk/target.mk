@@ -703,29 +703,13 @@ dist-post::
 	( cd $(SRC_DIST_DIR) ; cd .. ; find $(SRC_DIST_NAME) -type d -exec sh -c 'test x`ls $$0 | wc -l | sed -e "s/ //g"` = x0' {} \; -print -exec rm -rf {} \; -prune )
 	( cd $(SRC_DIST_DIR) ; cd .. ; chmod -R a+rw $(SRC_DIST_NAME) ) 
 
+# Automatic generation of a MANIFEST file for a source distribution
+# tree that is ready to go.
+dist-manifest ::
+	cd $(SRC_DIST_DIR); find . \( -type l -o -type f \) -exec ls -lLG {} \; | sed -e 's/\.\///' > /tmp/MANIFEST ; mv /tmp/MANIFEST MANIFEST
+
 dist-package::
 	cd $(SRC_DIST_DIR); cd ..; $(TAR) chzf $(SRC_DIST_NAME).tar.gz $(SRC_DIST_NAME)
-
-#
-
-
-# The default dist rule:
-#
-# copy/link the contents of $(SRC_DIST_FILES) into the
-# shadow distribution tree. SRC_DIST_FILES contain the
-# build-generated files that you want to include in
-# a source distribution.
-#
-#
-ifneq "$(SRC_DIST_FILES)" ""
-dist::
-	@for i in $(SRC_DIST_FILES); do 		 \
-	  if (test -f "$$i"); then 			 \
-	    echo $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ; \
-	    $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ;	 \
-	  fi;						 \
-	done;
-endif
 
 #
 # binary-dist creates a binary bundle, set BIN_DIST_NAME
@@ -1053,6 +1037,30 @@ dist ::
 	done
 endif
 endif
+
+# The default dist rule:
+#
+# copy/link the contents of $(SRC_DIST_FILES) into the
+# shadow distribution tree. SRC_DIST_FILES contain the
+# build-generated files that you want to include in
+# a source distribution.
+#
+#
+ifneq "$(SRC_DIST_FILES)" ""
+dist::
+	@for i in $(SRC_DIST_FILES); do 		 \
+	  if ( echo "$$i" | grep "~" >/dev/null 2>&1 ); then	 \
+	    echo $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
+	    $(LN_S) `pwd`/`echo $$i | sed -e "s/^\([^~]*\)~.*/\1/g"` $(SRC_DIST_DIR)/`echo $$i | sed -e "s/.*~\(.*\)/\1/g"` ; \
+	  else \
+	    if (test -f "$$i"); then 			   \
+	      echo $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ; \
+	      $(LN_S) `pwd`/$$i $(SRC_DIST_DIR)/$$i ;	   \
+	     fi;					   \
+	  fi; \
+	done;
+endif
+
 
 #
 # Selectively building subdirectories.
