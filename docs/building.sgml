@@ -2972,27 +2972,10 @@ configure: error: ./configure failed for ghc
 <Para>
 You need <Filename>ghc</Filename> to be in your <Constant>PATH</Constant> before you run
 <Command>configure</Command>.  The default GHC InstallShield creates only
-<Filename>ghc-4.05</Filename>, so you may need to duplicate this file as <Filename>ghc</Filename>
+<Filename>ghc-4.08</Filename>, so you may need to duplicate this file as <Filename>ghc</Filename>
 in the same directory, in order that <Command>configure</Command> will see it (or
-just rename <Filename>ghc-4.05</Filename> to <Filename>ghc</Filename>.
+just rename <Filename>ghc-4.08</Filename> to <Filename>ghc</Filename>.
 And make sure that the directory is in your path.
-</Para>
-</ListItem>
-
-<ListItem>
-<Para>
-Compile <Command>happy</Command> and <Command>ghc</Command> 
-with <Option>-static</Option>.  To do this, set
-</Para>
-
-<ProgramListing>
-GhcHcOpts=-static
-HappyHcOpts=-static
-</ProgramListing>
-
-<Para>
-in your <Filename>build.mk</Filename> file.
-[Actually, I successfully compiled Happy without <Option>-static</Option> on Win2k, but not GHC.]
 </Para>
 </ListItem>
 
