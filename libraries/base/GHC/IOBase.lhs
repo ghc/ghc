@@ -17,6 +17,8 @@
 module GHC.IOBase where
 
 import GHC.ST
+import GHC.Arr	-- to derive Ix class
+import GHC.Enum -- to derive Enum class
 import GHC.STRef
 import GHC.Base
 import GHC.Num	-- To get fromInteger etc, needed because of -fno-implicit-prelude
@@ -772,4 +774,10 @@ instance Show IOException where
       (case fn of
 	 Nothing -> id
 	 Just name -> showString "\nFile: " . showString name)
+
+-- -----------------------------------------------------------------------------
+-- IOMode type
+
+data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
+                    deriving (Eq, Ord, Ix, Enum, Read, Show)
 \end{code}

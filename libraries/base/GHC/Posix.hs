@@ -140,6 +140,24 @@ foreign import stdcall unsafe "closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
 
+fdGetMode :: Int -> IO IOMode
+fdGetMode fd = do
+    flags <- throwErrnoIfMinus1Retry "fdGetMode" 
+		(c_fcntl_read (fromIntegral fd) const_f_getfl)
+    
+    let
+       wH  = (flags .&. o_WRONLY) /= 0
+       aH  = (flags .&. o_APPEND) /= 0
+       rwH = (flags .&. o_RDWR) /= 0
+
+       mode
+	 | wH && aH  = AppendMode
+	 | wH        = WriteMode
+	 | rwH       = ReadWriteMode
+	 | otherwise = ReadMode
+	  
+    return mode
+
 -- ---------------------------------------------------------------------------
 -- Terminal-related stuff
 

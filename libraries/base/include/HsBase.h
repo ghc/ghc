@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.10 2002/07/17 09:22:20 simonmar Exp $
+ * $Id: HsBase.h,v 1.11 2002/08/29 11:49:11 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -110,6 +110,9 @@ int *ghcErrno(void);
 
 /* in system.c */
 HsInt systemCmd(HsAddr cmd);
+
+/* in rawSystem.c */
+HsInt rawSystemCmd(HsAddr cmd);
 
 /* in inputReady.c */
 int inputReady(int fd, int msecs, int isSock);
@@ -584,3 +587,4 @@ __hscore_f_setfl( void )
 
 #endif
 
+INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }

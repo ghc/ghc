@@ -29,7 +29,7 @@ module GHC.Handle (
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
-  IOMode(..), IOModeEx(..), openFile, openFileEx, openFd,
+  IOMode(..), IOModeEx(..), openFile, openFileEx, openFd, fdToHandle,
   hFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, 
 
@@ -555,9 +555,6 @@ Two files are the same if they have the same absolute name.  An
 implementation is free to impose stricter conditions.
 -}
 
-data IOMode      =  ReadMode | WriteMode | AppendMode | ReadWriteMode
-                    deriving (Eq, Ord, Ix, Enum, Read, Show)
-
 data IOModeEx 
  = BinaryMode IOMode
  | TextMode   IOMode
@@ -673,6 +670,12 @@ openFd fd mb_fd_type filepath mode binary truncate = do
 
 	   mkFileHandle fd is_stream filepath ha_type binary
 
+
+fdToHandle :: FD -> IO Handle
+fdToHandle fd = do
+   mode <- fdGetMode fd
+   let fd_str = "<file descriptor: " ++ show fd ++ ">"
+   openFd fd Nothing fd_str mode True{-bin mode-} False{-no truncate-}
 
 foreign import ccall unsafe "lockFile"
   lockFile :: CInt -> CInt -> CInt -> IO CInt
