@@ -64,6 +64,10 @@ module System.Directory
 
 #ifdef __NHC__
 import Directory
+import System (getEnv)
+import System.FilePath
+import NHC.FFI
+import IO (try)
 #endif /* __NHC__ */
 
 #ifdef __HUGS__
@@ -441,6 +445,8 @@ renameFile opath npath =
       withCString npath $ \s2 ->
          throwErrnoIfMinus1Retry_ "renameFile" (c_rename s1 s2)
 
+#endif /* __GLASGOW_HASKELL__ */
+
 {- |@'copyFile' old new@ copies the existing file from /old/ to /new/.
 If the /new/ file already exists, it is atomically replaced by the /old/ file.
 Neither path may refer to an existing directory.
@@ -470,6 +476,7 @@ copyFile fromFPath toFPath =
 				copyContents hFrom hTo buffer
 #endif
 
+#ifdef __GLASGOW_HASKELL__
 -- | Given path referring to a file or directory, returns a
 -- canonicalized path, with the intent that two paths referring
 -- to the same file\/directory will map to the same canonicalized
@@ -502,6 +509,11 @@ foreign import ccall unsafe "realpath"
                               -> CString
                               -> IO CString
 #endif
+#else /* !__GLASGOW_HASKELL__ */
+-- dummy implementation
+canonicalizePath :: FilePath -> IO FilePath
+canonicalizePath fpath = return fpath
+#endif /* !__GLASGOW_HASKELL__ */
 
 -- | Given an executable file name, searches for such file
 -- in the directories listed in system PATH. The returned value 
@@ -527,7 +539,7 @@ findExecutable binary = do
 	if b then return (Just path)
              else search ds
 
-
+#ifdef __GLASGOW_HASKELL__
 {- |@'getDirectoryContents' dir@ returns a list of /all/ entries
 in /dir/. 
 
