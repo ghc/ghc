@@ -14,7 +14,7 @@ import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  HsExpr(..), HsLit(..), HsType(..), HsPred(..), 
 			  mkSimpleMatch, andMonoBinds, andMonoBindList, 
 			  isClassOpSig, isPragSig,
-			  getClassDeclSysNames, 
+			  getClassDeclSysNames, placeHolderType
 			)
 import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
 import RnHsSyn		( RenamedTyClDecl, 
@@ -517,7 +517,7 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
 	Just user_bind -> returnTc user_bind 
 	Nothing	       -> mkDefMethRhs is_inst_decl clas inst_tys sel_id loc dm_info	`thenTc` \ rhs ->
 			  returnTc (FunMonoBind meth_name False	-- Not infix decl
-				                [mkSimpleMatch [] rhs Nothing loc] loc)
+				                [mkSimpleMatch [] rhs placeHolderType loc] loc)
     )								`thenTc` \ meth_bind ->
      -- Check the bindings; first add inst_tyvars to the envt
      -- so that we don't quantify over them in nested places

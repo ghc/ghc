@@ -5,7 +5,7 @@ module Generics ( mkTyConGenInfo, mkGenericRhs,
 
 
 import RnHsSyn		( RenamedHsExpr )
-import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch )
+import HsSyn		( HsExpr(..), InPat(..), mkSimpleMatch, placeHolderType )
 
 import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			  mkTyVarTys, mkForAllTys, mkTyConApp, 
@@ -528,7 +528,7 @@ genericNames :: [Name]
 genericNames = [mkSysLocalName (mkBuiltinUnique i) (_PK_ ('g' : show i)) | i <- [1..]]
 (g1:g2:g3:_) = genericNames
 
-mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body Nothing builtinSrcLoc))
+mk_hs_lam pats body = HsPar (HsLam (mkSimpleMatch pats body placeHolderType builtinSrcLoc))
 
 idEP :: EP RenamedHsExpr
 idEP = EP idexpr idexpr

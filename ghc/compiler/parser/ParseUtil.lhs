@@ -6,7 +6,6 @@
 \begin{code}
 module ParseUtil (
 	  parseError		-- String -> Pa
-	, cbot			-- a
 	, mkVanillaCon, mkRecCon,
 
 	, mkRecConstrOrUpdate	-- HsExp -> [HsFieldUpdate] -> P HsExp
@@ -52,7 +51,6 @@ parseError s =
   getSrcLocP `thenP` \ loc ->
   failMsgP (hcat [ppr loc, text ": ", text s])
 
-cbot = panic "CCall:result_ty"
 
 -----------------------------------------------------------------------------
 -- mkVanillaCon
@@ -156,11 +154,11 @@ checkSimple t _ = parseError "Illegal left hand side in data/newtype declaration
 -- checkDo (a) checks that the last thing is an ExprStmt
 --	   (b) transforms it to a ResultStmt
 
-checkDo []	       = parseError "Empty 'do' construct"
-checkDo [ExprStmt e l] = returnP [ResultStmt e l]
-checkDo [s] 	       = parseError "The last statement in a 'do' construct must be an expression"
-checkDo (s:ss)	       = checkDo ss	`thenP` \ ss' ->
-			 returnP (s:ss')
+checkDo []	         = parseError "Empty 'do' construct"
+checkDo [ExprStmt e _ l] = returnP [ResultStmt e l]
+checkDo [s] 	         = parseError "The last statement in a 'do' construct must be an expression"
+checkDo (s:ss)	         = checkDo ss	`thenP` \ ss' ->
+			   returnP (s:ss')
 
 ---------------------------------------------------------------------------
 -- Checking Patterns.
@@ -209,7 +207,7 @@ checkPat e [] = case e of
 			   	 _ -> patFail
 
 	HsPar e		   -> checkPat e [] `thenP` (returnP . ParPatIn)
-	ExplicitList es	   -> mapP (\e -> checkPat e []) es `thenP` \ps ->
+	ExplicitList _ es  -> mapP (\e -> checkPat e []) es `thenP` \ps ->
 			      returnP (ListPatIn ps)
 
 	ExplicitTuple es b -> mapP (\e -> checkPat e []) es `thenP` \ps ->

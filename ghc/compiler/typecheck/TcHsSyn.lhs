@@ -26,6 +26,8 @@ module TcHsSyn (
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
 
+	collectTypedPatBinders, outPatType,
+
 	-- re-exported from TcEnv
 	TcId, 
 
@@ -44,9 +46,11 @@ import DataCon	( dataConWrapId )
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, TcEnv, TcId )
 
 import TcMonad
-import TcMType	( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
-import CoreSyn  ( Expr )
-import BasicTypes ( RecFlag(..) )
+import Type	  ( Type )
+import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
+import TysWiredIn ( mkListTy, mkTupleTy, unitTy )
+import CoreSyn    ( Expr )
+import BasicTypes ( RecFlag(..), Boxity(..) )
 import Bag
 import Outputable
 import HscTypes	( TyThing(..) )
@@ -116,6 +120,60 @@ mkHsLet mbinds	       expr = HsLet (MonoBind mbinds [] Recursive) expr
 
 mkHsConApp data_con tys args = foldl HsApp (HsVar (dataConWrapId data_con) `mkHsTyApp` tys) args
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[mkFailurePair]{Code for pattern-matching and other failures}
+%*									*
+%************************************************************************
+
+Note: If @outPatType@ doesn't bear a strong resemblance to @exprType@,
+then something is wrong.
+\begin{code}
+outPatType :: TypecheckedPat -> Type
+
+outPatType (WildPat ty)		= ty
+outPatType (VarPat var)		= idType var
+outPatType (LazyPat pat)	= outPatType pat
+outPatType (AsPat var pat)	= idType var
+outPatType (ConPat _ ty _ _ _)	= ty
+outPatType (ListPat ty _)	= mkListTy ty
+outPatType (TuplePat pats box)	= mkTupleTy box (length pats) (map outPatType pats)
+outPatType (RecPat _ ty _ _ _)  = ty
+outPatType (LitPat lit ty)	= ty
+outPatType (NPat lit ty _)	= ty
+outPatType (NPlusKPat _ _ ty _ _) = ty
+outPatType (DictPat ds ms)      = case (length ds_ms) of
+				    0 -> unitTy
+				    1 -> idType (head ds_ms)
+				    n -> mkTupleTy Boxed n (map idType ds_ms)
+				   where
+				    ds_ms = ds ++ ms
+\end{code}
+
+
+Nota bene: @DsBinds@ relies on the fact that at least for simple
+tuple patterns @collectTypedPatBinders@ returns the binders in
+the same order as they appear in the tuple.
+
+@collectTypedBinders@ and @collectedTypedPatBinders@ are the exportees.
+
+\begin{code}
+collectTypedPatBinders :: TypecheckedPat -> [Id]
+collectTypedPatBinders (VarPat var)	       = [var]
+collectTypedPatBinders (LazyPat pat)	       = collectTypedPatBinders pat
+collectTypedPatBinders (AsPat a pat)	       = a : collectTypedPatBinders pat
+collectTypedPatBinders (ConPat _ _ _ _ pats)   = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (ListPat t pats)        = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (TuplePat pats _)       = concat (map collectTypedPatBinders pats)
+collectTypedPatBinders (RecPat _ _ _ _ fields) = concat (map (\ (f,pat,_) -> collectTypedPatBinders pat)
+							  fields)
+collectTypedPatBinders (DictPat ds ms)	       = ds ++ ms
+collectTypedPatBinders (NPlusKPat var _ _ _ _) = [var]
+collectTypedPatBinders any_other_pat	       = [ {-no binders-} ]
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -295,7 +353,7 @@ zonkMatch (Match _ pats _ grhss)
 zonkGRHSs :: TcGRHSs
 	  -> NF_TcM TypecheckedGRHSs
 
-zonkGRHSs (GRHSs grhss binds (Just ty))
+zonkGRHSs (GRHSs grhss binds ty)
   = zonkBinds binds   		`thenNF_Tc` \ (new_binds, new_env) ->
     tcSetEnv new_env $
     let
@@ -305,7 +363,7 @@ zonkGRHSs (GRHSs grhss binds (Just ty))
     in
     mapNF_Tc zonk_grhs grhss 	`thenNF_Tc` \ new_grhss ->
     zonkTcTypeToType ty 	`thenNF_Tc` \ new_ty ->
-    returnNF_Tc (GRHSs new_grhss new_binds (Just new_ty))
+    returnNF_Tc (GRHSs new_grhss new_binds new_ty)
 \end{code}
 
 %************************************************************************
@@ -406,12 +464,10 @@ zonkExpr (HsDoOut do_or_lc stmts return_id then_id zero_id ty src_loc)
     returnNF_Tc (HsDoOut do_or_lc new_stmts new_return_id new_then_id new_zero_id
 			 new_ty src_loc)
 
-zonkExpr (ExplicitList _) = panic "zonkExpr:ExplicitList"
-
-zonkExpr (ExplicitListOut ty exprs)
+zonkExpr (ExplicitList ty exprs)
   = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty ->
     mapNF_Tc zonkExpr exprs	`thenNF_Tc` \ new_exprs ->
-    returnNF_Tc (ExplicitListOut new_ty new_exprs)
+    returnNF_Tc (ExplicitList new_ty new_exprs)
 
 zonkExpr (ExplicitTuple exprs boxed)
   = mapNF_Tc zonkExpr exprs  	`thenNF_Tc` \ new_exprs ->
@@ -424,12 +480,13 @@ zonkExpr (RecordConOut data_con con_expr rbinds)
 
 zonkExpr (RecordUpd _ _) = panic "zonkExpr:RecordUpd"
 
-zonkExpr (RecordUpdOut expr ty dicts rbinds)
+zonkExpr (RecordUpdOut expr in_ty out_ty dicts rbinds)
   = zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
+    zonkTcTypeToType in_ty	`thenNF_Tc` \ new_in_ty ->
+    zonkTcTypeToType out_ty	`thenNF_Tc` \ new_out_ty ->
     mapNF_Tc zonkIdOcc dicts	`thenNF_Tc` \ new_dicts ->
     zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordUpdOut new_expr new_ty new_dicts new_rbinds)
+    returnNF_Tc (RecordUpdOut new_expr new_in_ty new_out_ty new_dicts new_rbinds)
 
 zonkExpr (ExprWithTySig _ _) = panic "zonkExpr:ExprWithTySig"
 zonkExpr (ArithSeqIn _)      = panic "zonkExpr:ArithSeqIn"
@@ -516,10 +573,11 @@ zonkStmts (ResultStmt expr locn : stmts)
     zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
     returnNF_Tc (ResultStmt new_expr locn : new_stmts)
 
-zonkStmts (ExprStmt expr locn : stmts)
+zonkStmts (ExprStmt expr ty locn : stmts)
   = zonkExpr expr	`thenNF_Tc` \ new_expr ->
+    zonkTcTypeToType ty	`thenNF_Tc` \ new_ty ->
     zonkStmts stmts	`thenNF_Tc` \ new_stmts ->
-    returnNF_Tc (ExprStmt new_expr locn : new_stmts)
+    returnNF_Tc (ExprStmt new_expr new_ty locn : new_stmts)
 
 zonkStmts (LetStmt binds : stmts)
   = zonkBinds binds		`thenNF_Tc` \ (new_binds, new_env) ->

@@ -359,10 +359,10 @@ tcMonoExpr expr@(HsDo do_or_lc stmts src_loc) res_ty
 \end{code}
 
 \begin{code}
-tcMonoExpr in_expr@(ExplicitList exprs) res_ty	-- Non-empty list
+tcMonoExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
   = unifyListTy res_ty                        `thenTc` \ elt_ty ->  
     mapAndUnzipTc (tc_elt elt_ty) exprs	      `thenTc` \ (exprs', lies) ->
-    returnTc (ExplicitListOut elt_ty exprs', plusLIEs lies)
+    returnTc (ExplicitList elt_ty exprs', plusLIEs lies)
   where
     tc_elt elt_ty expr
       = tcAddErrCtxt (listCtxt expr) $
@@ -536,7 +536,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
     newDicts RecordUpdOrigin theta'	`thenNF_Tc` \ dicts ->
 
 	-- Phew!
-    returnTc (RecordUpdOut record_expr' result_record_ty (map instToId dicts) rbinds', 
+    returnTc (RecordUpdOut record_expr' record_ty result_record_ty (map instToId dicts) rbinds', 
 	      mkLIE dicts `plusLIE` record_lie `plusLIE` rbinds_lie)
 
 tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
@@ -776,7 +776,7 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 
        _	-> newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenNF_Tc` \ m_ty ->
 		   newTyVarTy liftedTypeKind 					`thenNF_Tc` \ elt_ty ->
-		   unifyTauTy res_ty (mkAppTy m_ty elt_ty)				`thenTc_`
+		   unifyTauTy res_ty (mkAppTy m_ty elt_ty)			`thenTc_`
 		   returnNF_Tc (m_ty, (mkAppTy m_ty, elt_ty))
     )							`thenNF_Tc` \ (tc_ty, m_ty) ->
 

@@ -12,8 +12,7 @@ import {-# SOURCE #-} DsExpr ( dsExpr, dsLet )
 
 import BasicTypes	( Boxity(..) )
 import HsSyn		( OutPat(..), HsExpr(..), Stmt(..), HsMatchContext(..), HsDoContext(..) )
-import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr )
-import DsHsSyn		( outPatType )
+import TcHsSyn		( TypecheckedStmt, TypecheckedPat, TypecheckedHsExpr, outPatType )
 import CoreSyn
 
 import DsMonad		-- the monadery used in the desugarer
@@ -23,7 +22,7 @@ import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( exprType, mkIfThenElse )
 import Id		( idType )
 import Var              ( Id )
-import TcType		( mkTyVarTy, mkFunTys, mkFunTy, Type )
+import Type		( mkTyVarTy, mkFunTys, mkFunTy, Type )
 import TysPrim		( alphaTyVar )
 import TysWiredIn	( nilDataCon, consDataCon, unitDataConId, mkListTy, mkTupleTy )
 import Match		( matchSimply )
@@ -158,7 +157,7 @@ deListComp [ResultStmt expr locn] list	-- Figure 7.4, SLPJ, p 135, rule C above
     returnDs (mkConsExpr (exprType core_expr) core_expr list)
 
 	-- Non-last: must be a guard
-deListComp (ExprStmt guard locn : quals) list	-- rule B above
+deListComp (ExprStmt guard ty locn : quals) list	-- rule B above
   = dsExpr guard       		`thenDs` \ core_guard ->
     deListComp quals list	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest list)
@@ -280,7 +279,7 @@ dfListComp c_id n_id [ResultStmt expr locn]
     returnDs (mkApps (Var c_id) [core_expr, Var n_id])
 
 	-- Non-last: must be a guard
-dfListComp c_id n_id (ExprStmt guard locn  : quals)
+dfListComp c_id n_id (ExprStmt guard ty locn  : quals)
   = dsExpr guard               			`thenDs` \ core_guard ->
     dfListComp c_id n_id quals	`thenDs` \ core_rest ->
     returnDs (mkIfThenElse core_guard core_rest (Var n_id))

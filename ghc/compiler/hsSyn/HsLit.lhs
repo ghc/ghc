@@ -8,7 +8,8 @@ module HsLit where
 
 #include "HsVersions.h"
 
-import Type	( Type )	
+import Type	( Type )
+import HsTypes	( PostTcType )
 import Outputable
 import Ratio	( Rational )
 \end{code}
@@ -34,9 +35,9 @@ data HsLit
   | HsRat	    Rational Type	-- Genuinely a rational; arises only from TRANSLATION
   | HsFloatPrim	    Rational		-- Unboxed Float
   | HsDoublePrim    Rational		-- Unboxed Double
-  | HsLitLit	    FAST_STRING Type	-- to pass ``literal literals'' through to C
-					-- also: "overloaded" type; but
-					-- must resolve to boxed-primitive!
+  | HsLitLit	    FAST_STRING PostTcType	-- to pass ``literal literals'' through to C
+						-- also: "overloaded" type; but
+						-- must resolve to boxed-primitive!
 	-- The Type in HsLitLit is needed when desuaring;
 	-- before the typechecker it's just an error value
 

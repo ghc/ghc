@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.69 2001/06/27 11:15:34 simonmar Exp $
+$Id: Parser.y,v 1.70 2001/07/12 16:21:23 simonpj Exp $
 
 Haskell grammar.
 
@@ -693,9 +693,8 @@ valdef :: { RdrBinding }
 
 
 rhs	:: { RdrNameGRHSs }
-	: '=' srcloc exp wherebinds	{ (GRHSs (unguardedRHS $3 $2) 
-								$4 Nothing)}
-	| gdrhs	wherebinds		{ GRHSs (reverse $1) $2 Nothing }
+	: '=' srcloc exp wherebinds	{ (GRHSs (unguardedRHS $3 $2) $4 placeHolderType)}
+	| gdrhs	wherebinds		{ GRHSs (reverse $1) $2 placeHolderType }
 
 gdrhs :: { [RdrNameGRHS] }
 	: gdrhs gdrh			{ $2 : $1 }
@@ -722,7 +721,7 @@ exp10 :: { RdrNameHsExpr }
 			{% checkPatterns $2 ($3 : reverse $4) `thenP` \ ps -> 
 			   returnP (HsLam (Match [] ps $5 
 					    (GRHSs (unguardedRHS $8 $7) 
-						   EmptyBinds Nothing))) }
+						   EmptyBinds placeHolderType))) }
   	| 'let' declbinds 'in' exp		{ HsLet $2 $4 }
 	| 'if' srcloc exp 'then' exp 'else' exp { HsIf $3 $5 $7 $2 }
    	| 'case' srcloc exp 'of' altslist	{ HsCase $3 $5 $2 }
@@ -730,10 +729,10 @@ exp10 :: { RdrNameHsExpr }
   	| srcloc 'do' stmtlist			{% checkDo $3  `thenP` \ stmts ->
 						   returnP (HsDo DoExpr stmts $1) }
 
-	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False cbot }
-	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 PlaySafe  False cbot }
-	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 PlayRisky True  cbot }
-	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 PlaySafe  True  cbot }
+	| '_ccall_'    ccallid aexps0		{ HsCCall $2 $3 PlayRisky False placeHolderType }
+	| '_ccall_GC_' ccallid aexps0		{ HsCCall $2 $3 PlaySafe  False placeHolderType }
+	| '_casm_'     CLITLIT aexps0		{ HsCCall $2 $3 PlayRisky True  placeHolderType }
+	| '_casm_GC_'  CLITLIT aexps0		{ HsCCall $2 $3 PlaySafe  True  placeHolderType }
 
         | scc_annot exp		    		{ if opt_SccProfilingOn
 							then HsSCC $1 $2
@@ -798,8 +797,8 @@ texps :: { [RdrNameHsExpr] }
 -- avoiding another shift/reduce-conflict.
 
 list :: { RdrNameHsExpr }
-	: exp				{ ExplicitList [$1] }
-	| lexps 			{ ExplicitList (reverse $1) }
+	: exp				{ ExplicitList placeHolderType [$1] }
+	| lexps 			{ ExplicitList placeHolderType (reverse $1) }
 	| exp '..'			{ ArithSeqIn (From $1) }
 	| exp ',' exp '..' 		{ ArithSeqIn (FromThen $1 $3) }
 	| exp '..' exp	 		{ ArithSeqIn (FromTo $1 $3) }
@@ -848,7 +847,7 @@ alt 	:: { RdrNameMatch }
 	: srcloc infixexp opt_sig ralt wherebinds
 					{% (checkPattern $1 $2 `thenP` \p ->
 				   	   returnP (Match [] [p] $3
-					             (GRHSs $4 $5 Nothing))  )}
+					             (GRHSs $4 $5 placeHolderType))  )}
 
 ralt :: { [RdrNameGRHS] }
 	: '->' srcloc exp		{ [GRHS [ResultStmt $3 $2] $2] }
@@ -891,7 +890,7 @@ maybe_stmt :: { Maybe RdrNameStmt }
 stmt  :: { RdrNameStmt }
 	: srcloc infixexp '<-' exp	{% checkPattern $1 $2 `thenP` \p ->
 					   returnP (BindStmt p $4 $1) }
-	| srcloc exp			{ ExprStmt $2 $1 }
+	| srcloc exp			{ ExprStmt $2 placeHolderType $1 }
   	| srcloc 'let' declbinds	{ LetStmt $3 }
 
 -----------------------------------------------------------------------------
@@ -1095,7 +1094,7 @@ literal :: { HsLit }
 	| PRIMSTRING		{ HsStringPrim $1 }
 	| PRIMFLOAT		{ HsFloatPrim  $1 }
 	| PRIMDOUBLE		{ HsDoublePrim $1 }
-	| CLITLIT		{ HsLitLit     $1 (error "Parser.y: CLITLIT") }
+	| CLITLIT		{ HsLitLit     $1 placeHolderType }
 
 srcloc :: { SrcLoc }	:	{% getSrcLocP }
  

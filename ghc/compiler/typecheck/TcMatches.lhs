@@ -180,7 +180,7 @@ tcGRHSs ctxt (GRHSs grhss binds _) expected_ty
   where
     tc_grhss grhss
 	= mapAndUnzipTc tc_grhs grhss	    `thenTc` \ (grhss', lies) ->
-	  returnTc (GRHSs grhss' EmptyBinds (Just expected_ty), plusLIEs lies)
+	  returnTc (GRHSs grhss' EmptyBinds expected_ty, plusLIEs lies)
 
     tc_grhs (GRHS guarded locn)
 	= tcAddSrcLoc locn					$
@@ -394,19 +394,20 @@ tcStmtAndThen combine do_or_lc m_ty (ParStmtOut bndr_stmts_s) thing_inside
     combine_par stmt (stmts, thing) = (stmt:stmts, thing)
 
 	-- ExprStmt
-tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp locn) thing_inside
+tcStmtAndThen combine do_or_lc m_ty@(m, res_elt_ty) stmt@(ExprStmt exp _ locn) thing_inside
   = tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
 	if isDoExpr do_or_lc then
 		newTyVarTy openTypeKind 	`thenNF_Tc` \ any_ty ->
-		tcExpr exp (m any_ty)	
+		tcExpr exp (m any_ty)		`thenNF_Tc` \ (exp', lie) ->
+		returnTc (ExprStmt exp' any_ty locn, lie)
 	else
-		tcExpr exp boolTy
-    )						`thenTc` \ (exp', stmt_lie) ->
+		tcExpr exp boolTy		`thenNF_Tc` \ (exp', lie) ->
+		returnTc (ExprStmt exp' boolTy locn, lie)
+    )						`thenTc` \ (stmt', stmt_lie) ->
 
     thing_inside 				`thenTc` \ (thing, stmts_lie) ->
 
-    returnTc (combine (ExprStmt exp' locn) thing,
-	      stmt_lie `plusLIE` stmts_lie)
+    returnTc (combine stmt' thing, stmt_lie `plusLIE` stmts_lie)
 
 
 	-- Result statements

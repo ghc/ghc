@@ -29,7 +29,7 @@ module TcGenDeriv (
 import HsSyn		( InPat(..), HsExpr(..), MonoBinds(..),
 			  Match(..), GRHSs(..), Stmt(..), HsLit(..),
 			  HsBinds(..), HsType(..), HsDoContext(..),
-			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList
+			  unguardedRHS, mkSimpleMatch, mkMonoBind, andMonoBindList, placeHolderType
 			)
 import RdrHsSyn		( mkHsOpApp, RdrNameMonoBinds, RdrNameHsExpr, RdrNamePat )
 import RdrName		( RdrName, mkUnqual )
@@ -666,7 +666,7 @@ gen_Ix_binds tycon
 	   in
 	   HsCase
 	     (genOpApp (HsVar dh_RDR) minusH_RDR (HsVar ah_RDR))
-	     [mkSimpleMatch [VarPatIn c_RDR] rhs Nothing tycon_loc]
+	     [mkSimpleMatch [VarPatIn c_RDR] rhs placeHolderType tycon_loc]
 	     tycon_loc
 	   ))
 	) {-else-} (
@@ -1182,7 +1182,7 @@ mk_FunMonoBind loc fun pats_and_exprs
 
 mk_match loc pats expr binds
   = Match [] (map paren pats) Nothing 
-	  (GRHSs (unguardedRHS expr loc) binds Nothing)
+	  (GRHSs (unguardedRHS expr loc) binds placeHolderType)
   where
     paren p@(VarPatIn _) = p
     paren other_p	 = ParPatIn other_p
@@ -1216,9 +1216,9 @@ cmp_eq_Expr a b = HsApp (HsApp (HsVar cmp_eq_RDR) a) b
 
 compare_gen_Case fun lt eq gt a b
   = HsCase (HsPar (HsApp (HsApp (HsVar fun) a) b)) {-of-}
-      [mkSimpleMatch [ConPatIn ltTag_RDR []] lt Nothing generatedSrcLoc,
-       mkSimpleMatch [ConPatIn eqTag_RDR []] eq Nothing generatedSrcLoc,
-       mkSimpleMatch [ConPatIn gtTag_RDR []] gt Nothing generatedSrcLoc]
+      [mkSimpleMatch [ConPatIn ltTag_RDR []] lt placeHolderType generatedSrcLoc,
+       mkSimpleMatch [ConPatIn eqTag_RDR []] eq placeHolderType generatedSrcLoc,
+       mkSimpleMatch [ConPatIn gtTag_RDR []] gt placeHolderType generatedSrcLoc]
       generatedSrcLoc
 
 careful_compare_Case ty lt eq gt a b
@@ -1282,7 +1282,7 @@ untag_Expr :: TyCon -> [(RdrName, RdrName)] -> RdrNameHsExpr -> RdrNameHsExpr
 untag_Expr tycon [] expr = expr
 untag_Expr tycon ((untag_this, put_tag_here) : more) expr
   = HsCase (HsPar (HsApp (con2tag_Expr tycon) (HsVar untag_this))) {-of-}
-      [mkSimpleMatch [VarPatIn put_tag_here] (untag_Expr tycon more expr) Nothing generatedSrcLoc]
+      [mkSimpleMatch [VarPatIn put_tag_here] (untag_Expr tycon more expr) placeHolderType generatedSrcLoc]
       generatedSrcLoc
 
 cmp_tags_Expr :: RdrName 		-- Comparison op

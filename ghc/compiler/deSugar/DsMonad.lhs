@@ -33,7 +33,7 @@ import Module		( Module )
 import Var		( TyVar, setTyVarUnique )
 import Outputable
 import SrcLoc		( noSrcLoc, SrcLoc )
-import TcType           ( Type )
+import Type             ( Type )
 import UniqSupply	( initUs_, splitUniqSupply, uniqFromSupply, uniqsFromSupply,
 			  UniqSM, UniqSupply )
 import Unique		( Unique )

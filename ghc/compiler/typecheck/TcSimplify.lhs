@@ -347,7 +347,7 @@ OK, so it it legal to give an explicit, user type signature to f, thus:
 	f x = (x::Int) + ?y
 
 At first sight this seems reasonable, but it has the nasty property
-that adding a type signature changes the dynamic semantics.=20
+that adding a type signature changes the dynamic semantics.
 Consider this:
 
 	(let f x = (x::Int) + ?y
@@ -355,7 +355,7 @@ Consider this:
 
 		returns (3+6, 3+5)
 vs
-	(let f :: Int -> Int=20
+	(let f :: Int -> Int
 	     f x = x + ?y
 	 in (f 3, f 3 with ?y=5))  with ?y = 6
 
@@ -374,11 +374,11 @@ There's a nasty corner case when the monomorphism restriction bites:
 
 	z = (x::Int) + ?y
 
-The argument above suggests that we *must* generalise=20
-over the ?y parameter, to get=20
+The argument above suggests that we *must* generalise
+over the ?y parameter, to get
 	z :: (?y::Int) => Int,
 but the monomorphism restriction says that we *must not*, giving
-	z :: Int. =20
+	z :: Int. 
 Why does the momomorphism restriction say this?  Because if you have
 
 	let z = x + ?y in z+z
@@ -446,11 +446,11 @@ if we say that we get the value of ?y from the definition site of 'z',
 then inlining 'z' might change the semantics of the program.
 
 Choice (C) really says "the monomorphism restriction doesn't apply
-to implicit parameters".  Which is fine, but remember that every=20
+to implicit parameters".  Which is fine, but remember that every
 innocent binding 'x = ...' that mentions an implicit parameter in
 the RHS becomes a *function* of that parameter, called at each
 use of 'x'.  Now, the chances are that there are no intervening 'with'
-clauses that bind ?y, so a decent compiler should common up all=20
+clauses that bind ?y, so a decent compiler should common up all
 those function calls.  So I think I strongly favour (C).  Indeed,
 one could make a similar argument for abolishing the monomorphism
 restriction altogether.

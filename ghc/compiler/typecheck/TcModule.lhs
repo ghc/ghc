@@ -14,7 +14,7 @@ module TcModule (
 import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), InPat(..), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
-			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch
+			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch, placeHolderType
 			)
 import PrelNames	( SyntaxMap, mAIN_Name, mainName, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, 
@@ -158,18 +158,18 @@ Here is the grand plan, implemented in tcUserStmt
 \begin{code}
 tcUserStmt :: [Name] -> RenamedStmt -> TcM (TypecheckedHsExpr, [Id])
 
-tcUserStmt names (ExprStmt expr loc)
+tcUserStmt names (ExprStmt expr _ loc)
   = ASSERT( null names )
     tcGetUnique 		`thenNF_Tc` \ uniq ->
     let 
 	fresh_it = itName uniq
         the_bind = FunMonoBind fresh_it False 
-			[ mkSimpleMatch [] expr Nothing loc ] loc
+			[ mkSimpleMatch [] expr placeHolderType loc ] loc
     in
     tryTc_ (traceTc (text "tcs 1b") `thenNF_Tc_`
 		tc_stmts [fresh_it] [
 		    LetStmt (MonoBind the_bind [] NonRecursive),
-		    ExprStmt (HsApp (HsVar printName) (HsVar fresh_it)) loc])
+		    ExprStmt (HsApp (HsVar printName) (HsVar fresh_it)) placeHolderType loc])
 	   (    traceTc (text "tcs 1a") `thenNF_Tc_`
 		tc_stmts [fresh_it] [BindStmt (VarPatIn fresh_it) expr loc])
 
@@ -189,7 +189,7 @@ tc_stmts names stmts
 		-- mk_return builds the expression
 		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
 	mk_return ids = HsApp (TyApp (HsVar return_id) [mkListTy unitTy]) 
-			      (ExplicitListOut unitTy (map mk_item ids))
+			      (ExplicitList unitTy (map mk_item ids))
 
 	mk_item id = HsApp (TyApp (HsVar unsafeCoerceId) [idType id, unitTy])
 		  	   (HsVar id)

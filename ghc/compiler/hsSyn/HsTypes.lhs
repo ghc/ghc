@@ -11,7 +11,10 @@ module HsTypes (
         , hsUsOnce, hsUsMany
 
 	, mkHsForAllTy, mkHsDictTy, mkHsIParamTy
-	, hsTyVarName, hsTyVarNames, replaceTyVarName
+	, hsTyVarName, hsTyVarNames, replaceTyVarName,
+	
+	-- Type place holder
+	PostTcType, placeHolderType,
 
 	-- Printing
 	, pprParendHsType, pprHsForAll, pprHsContext, pprHsTyVarBndr
@@ -44,8 +47,31 @@ import PrelNames	( mkTupConRdrName, listTyConKey, usOnceTyConKey, usManyTyConKey
 			)
 import FiniteMap
 import Outputable
-
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Annotating the syntax}
+%*									*
+%************************************************************************
+
+\begin{code}
+type PostTcType = Type		-- Used for slots in the abstract syntax
+				-- where we want to keep slot for a type
+				-- to be added by the type checker...but
+				-- before typechecking it's just bogus
+
+placeHolderType :: PostTcType	-- Used before typechecking
+placeHolderType  = panic "Evaluated the place holder for a PostTcType"
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Data types}
+%*									*
+%************************************************************************
 
 This is the syntax for types as seen in type signatures.
 

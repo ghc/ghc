@@ -492,8 +492,8 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
       	     Nothing -> return (pcs0, Nothing)
       	     Just parsed_stmt -> do {
 
-	   let { notExprStmt (ExprStmt _ _) = False;
-	         notExprStmt _              = True 
+	   let { notExprStmt (ExprStmt _ _ _) = False;
+	         notExprStmt _                = True 
 	       };
 
 	   if (just_expr && notExprStmt parsed_stmt)
@@ -513,7 +513,7 @@ hscStmt dflags hst hit pcs0 icontext stmt just_expr
 		-- Typecheck it
 	  maybe_tc_return <- 
 	    if just_expr 
-		then case rn_stmt of { (syn, ExprStmt e _, decls) -> 
+		then case rn_stmt of { (syn, ExprStmt e _ _, decls) -> 
 		     typecheckExpr dflags pcs1 hst type_env
 			   print_unqual iNTERACTIVE (syn,e,decls) }
 		else typecheckStmt dflags pcs1 hst type_env

@@ -14,7 +14,7 @@ import {-# SOURCE #-} Match   ( matchSinglePat )
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), HsMatchContext(..) )
 import TcHsSyn		( TypecheckedGRHSs, TypecheckedPat, TypecheckedStmt, TypecheckedMatchContext )
 import CoreSyn		( CoreExpr )
-import TcType		( Type )
+import Type		( Type )
 
 import DsMonad
 import DsUtils
@@ -49,7 +49,7 @@ dsGRHSs :: TypecheckedMatchContext -> [TypecheckedPat]	-- These are to build a M
 	-> TypecheckedGRHSs				-- Guarded RHSs
 	-> DsM (Type, MatchResult)
 
-dsGRHSs kind pats (GRHSs grhss binds (Just ty))
+dsGRHSs kind pats (GRHSs grhss binds ty)
   = mapDs (dsGRHS kind pats) grhss		`thenDs` \ match_results ->
     let 
 	match_result1 = foldr1 combineMatchResults match_results
@@ -83,12 +83,12 @@ matchGuard [ResultStmt expr locn] ctx
 
 	-- ExprStmts must be guards
 	-- Turn an "otherwise" guard is a no-op
-matchGuard (ExprStmt (HsVar v) _ : stmts) ctx
+matchGuard (ExprStmt (HsVar v) _ _ : stmts) ctx
   |  v `hasKey` otherwiseIdKey
   || v `hasKey` trueDataConKey
   = matchGuard stmts ctx
 
-matchGuard (ExprStmt expr locn : stmts) ctx
+matchGuard (ExprStmt expr _ locn : stmts) ctx
   = matchGuard stmts ctx 		`thenDs` \ match_result ->
     putSrcLocDs locn (dsExpr expr)	`thenDs` \ pred_expr ->
     returnDs (mkGuardedMatchResult pred_expr match_result)

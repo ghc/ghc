@@ -11,9 +11,8 @@ module Check ( check , ExhaustivePat ) where
 
 
 import HsSyn		
-import TcHsSyn		( TypecheckedPat )
+import TcHsSyn		( TypecheckedPat, outPatType )
 import TcType		( tcTyConAppTyCon, tcTyConAppArgs )
-import DsHsSyn		( outPatType ) 
 import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, 
 			  CanItFail(..),  tidyLitPat, tidyNPat, 
  			)

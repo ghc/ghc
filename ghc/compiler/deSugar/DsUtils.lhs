@@ -33,8 +33,7 @@ module DsUtils (
 import {-# SOURCE #-} Match ( matchSimply )
 
 import HsSyn
-import TcHsSyn		( TypecheckedPat )
-import DsHsSyn		( outPatType, collectTypedPatBinders )
+import TcHsSyn		( TypecheckedPat, outPatType, collectTypedPatBinders )
 import CoreSyn
 
 import DsMonad
@@ -46,8 +45,8 @@ import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons, isRecursiveTyCon )
 import DataCon		( DataCon, dataConStrictMarks, dataConId )
-import TcType		( mkFunTy, isUnLiftedType, Type )
-import TcType		( tcSplitTyConApp, isIntTy, isFloatTy, isDoubleTy )
+import Type		( mkFunTy, isUnLiftedType, Type )
+import TcType		( tcTyConAppTyCon, isIntTy, isFloatTy, isDoubleTy )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon,
@@ -269,8 +268,8 @@ mkCoAlgCaseMatchResult var match_alts
   = MatchResult fail_flag mk_case
   where
 	-- Common stuff
-    scrut_ty    = idType var
-    (tycon, _)  = tcSplitTyConApp scrut_ty		-- Newtypes must be opaque here
+    scrut_ty = idType var
+    tycon    = tcTyConAppTyCon scrut_ty		-- Newtypes must be opaque here
 
 	-- Stuff for newtype
     (_, arg_ids, match_result) = head match_alts
@@ -618,6 +617,5 @@ mkFailurePair expr
   where
     ty = exprType expr
 \end{code}
-
 
 

@@ -25,12 +25,12 @@ import Maybes		( maybeToBool )
 import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..), Safety, CCallConv(..) )
 import DataCon		( splitProductType_maybe, dataConSourceArity, dataConWrapId )
 import ForeignCall	( ForeignCall, CCallTarget(..) )
-import TcType		( isUnLiftedType, mkFunTys,
-			  tcSplitTyConApp_maybe, tyVarsOfType, mkForAllTys, isPrimitiveType,
-			  isUnLiftedType, mkFunTy, mkTyConApp, 
-			  tcEqType, isBoolTy, isUnitTy,
-			  Type
+
+import TcType		( Type, isUnLiftedType, mkFunTys, mkFunTy,
+			  tyVarsOfType, mkForAllTys, mkTyConApp, 
+			  isBoolTy, isUnitTy, isPrimitiveType
 			)
+import Type		( splitTyConApp_maybe, repType, eqType )	-- Sees the representation type
 import PrimOp		( PrimOp(TouchOp) )
 import TysPrim		( realWorldStatePrimTy,
 			  byteArrayPrimTyCon, mutableByteArrayPrimTyCon,
@@ -152,6 +152,7 @@ unboxArg arg
                              prim_arg 
 			     [(DEFAULT,[],body)])
 
+  -- Newtypes 
   -- Data types with a single constructor, which has a single, primitive-typed arg
   -- This deals with Int, Float etc
   | is_product_type && data_con_arity == 1 
@@ -179,7 +180,9 @@ unboxArg arg
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
-    arg_ty  					= exprType arg
+    arg_ty  					= repType (exprType arg)
+	-- The repType looks through any newtype or 
+	-- implicit-parameter wrappings on the argument.  
     maybe_product_type 			   	= splitProductType_maybe arg_ty
     is_product_type			   	= maybeToBool maybe_product_type
     Just (_, _, data_con, data_con_arg_tys)	= maybe_product_type
@@ -187,7 +190,7 @@ unboxArg arg
     (data_con_arg_ty1 : _)			= data_con_arg_tys
 
     (_ : _ : data_con_arg_ty3 : _) = data_con_arg_tys
-    maybe_arg3_tycon    	   = tcSplitTyConApp_maybe data_con_arg_ty3
+    maybe_arg3_tycon    	   = splitTyConApp_maybe data_con_arg_ty3
     Just (arg3_tycon,_)		   = maybe_arg3_tycon
 \end{code}
 
@@ -212,7 +215,7 @@ boxResult :: [Id] -> Type -> DsM (Type, CoreExpr -> CoreExpr)
 -- the call.  The arg_ids passed in are the Ids passed to the actual ccall.
 
 boxResult arg_ids result_ty
-  = case tcSplitTyConApp_maybe result_ty of
+  = case splitTyConApp_maybe result_ty of
 
 	-- The result is IO t, so wrap the result in an IO constructor
 	Just (io_tycon, [io_res_ty]) | io_tycon `hasKey` ioTyConKey
@@ -282,7 +285,7 @@ touchzh = mkPrimOpId TouchOp
 
 mkTouches []     s cont = returnDs (cont s)
 mkTouches (v:vs) s cont
-  | not (idType v `tcEqType` foreignObjPrimTy) = mkTouches vs s cont
+  | not (idType v `eqType` foreignObjPrimTy) = mkTouches vs s cont
   | otherwise = newSysLocalDs realWorldStatePrimTy `thenDs` \s' -> 
 		mkTouches vs s' cont `thenDs` \ rest ->
 	        returnDs (Case (mkApps (Var touchzh) [Type foreignObjPrimTy, 
@@ -294,20 +297,22 @@ resultWrapper :: Type
 		  CoreExpr -> CoreExpr)	-- Wrapper for the result 
 resultWrapper result_ty
   -- Base case 1: primitive types
-  | isPrimitiveType result_ty
+  | isPrimitiveType result_ty_rep
   = (Just result_ty, \e -> e)
 
-  -- Base case 1: the unit type ()
-  | isUnitTy result_ty
+  -- Base case 2: the unit type ()
+  | isUnitTy result_ty_rep
   = (Nothing, \e -> Var unitDataConId)
 
-  | isBoolTy result_ty
+  -- Base case 3: the boolean type ()
+  | isBoolTy result_ty_rep
   = (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
 	                          [(DEFAULT             ,[],Var trueDataConId ),
 				   (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 
   -- Data types with a single constructor, which has a single arg
-  | is_product_type && data_con_arity == 1
+  | Just (_, tycon_arg_tys, data_con, data_con_arg_tys) <- splitProductType_maybe result_ty_rep,
+    dataConSourceArity data_con == 1
   = let
         (maybe_ty, wrapper)    = resultWrapper unwrapped_res_ty
 	(unwrapped_res_ty : _) = data_con_arg_tys
@@ -318,8 +323,5 @@ resultWrapper result_ty
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
   where
-    maybe_product_type 					= splitProductType_maybe result_ty
-    is_product_type					= maybeToBool maybe_product_type
-    Just (_, tycon_arg_tys, data_con, data_con_arg_tys) = maybe_product_type
-    data_con_arity					= dataConSourceArity data_con
+    result_ty_rep = repType result_ty
 \end{code}

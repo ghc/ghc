@@ -226,11 +226,10 @@ bindPatSigTyVars tys thing_inside
 \begin{code}
 rnGRHSs :: RdrNameGRHSs -> RnMS (RenamedGRHSs, FreeVars)
 
-rnGRHSs (GRHSs grhss binds maybe_ty)
-  = ASSERT( not (maybeToBool maybe_ty) )
-    rnBinds binds		$ \ binds' ->
+rnGRHSs (GRHSs grhss binds _)
+  = rnBinds binds		$ \ binds' ->
     mapFvRn rnGRHS grhss	`thenRn` \ (grhss', fvGRHSs) ->
-    returnRn (GRHSs grhss' binds' Nothing, fvGRHSs)
+    returnRn (GRHSs grhss' binds' placeHolderType, fvGRHSs)
 
 rnGRHS (GRHS guarded locn)
   = doptRn Opt_GlasgowExts		`thenRn` \ opt_GlasgowExts ->
@@ -247,9 +246,9 @@ rnGRHS (GRHS guarded locn)
 	-- Standard Haskell 1.4 guards are just a single boolean
 	-- expression, rather than a list of qualifiers as in the
 	-- Glasgow extension
-    is_standard_guard [ResultStmt _ _]               = True
-    is_standard_guard [ExprStmt _ _, ResultStmt _ _] = True
-    is_standard_guard other	      		     = False
+    is_standard_guard [ResultStmt _ _]                 = True
+    is_standard_guard [ExprStmt _ _ _, ResultStmt _ _] = True
+    is_standard_guard other	      		       = False
 \end{code}
 
 %************************************************************************
@@ -355,13 +354,13 @@ rnExpr section@(SectionR op expr)
     checkSectionPrec "right" section op' expr'	`thenRn_`
     returnRn (SectionR op' expr', fvs_op `plusFV` fvs_expr)
 
-rnExpr (HsCCall fun args may_gc is_casm fake_result_ty)
+rnExpr (HsCCall fun args may_gc is_casm _)
 	-- Check out the comment on RnIfaces.getNonWiredDataDecl about ccalls
   = lookupOrigNames [cCallableClass_RDR, 
 			  cReturnableClass_RDR, 
 			  ioDataCon_RDR]	`thenRn` \ implicit_fvs ->
     rnExprs args				`thenRn` \ (args', fvs_args) ->
-    returnRn (HsCCall fun args' may_gc is_casm fake_result_ty, 
+    returnRn (HsCCall fun args' may_gc is_casm placeHolderType, 
 	      fvs_args `plusFV` implicit_fvs)
 
 rnExpr (HsSCC lbl expr)
@@ -401,9 +400,9 @@ rnExpr e@(HsDo do_or_lc stmts src_loc)
 	-- Oh well.
 
 
-rnExpr (ExplicitList exps)
+rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenRn` \ (exps', fvs) ->
-    returnRn  (ExplicitList exps', fvs `addOneFV` listTyCon_name)
+    returnRn  (ExplicitList placeHolderType exps', fvs `addOneFV` listTyCon_name)
 
 rnExpr (ExplicitTuple exps boxity)
   = rnExprs exps	 			`thenRn` \ (exps', fvs) ->
@@ -596,10 +595,10 @@ rnStmt (BindStmt pat expr src_loc) thing_inside
   where
     doc = text "In a pattern in 'do' binding" 
 
-rnStmt (ExprStmt expr src_loc) thing_inside
+rnStmt (ExprStmt expr _ src_loc) thing_inside
   = pushSrcLocRn src_loc $
-    rnExpr expr 				`thenRn` \ (expr', fv_expr) ->
-    thing_inside (ExprStmt expr' src_loc)	`thenRn` \ (result, fvs) ->
+    rnExpr expr 						`thenRn` \ (expr', fv_expr) ->
+    thing_inside (ExprStmt expr' placeHolderType src_loc)	`thenRn` \ (result, fvs) ->
     returnRn (result, fv_expr `plusFV` fvs)
 
 rnStmt (ResultStmt expr src_loc) thing_inside
@@ -877,7 +876,7 @@ mkAssertExpr =
      vname = mkSysLocalName uniq SLIT("v")
      expr  = HsLam ignorePredMatch
      loc   = nameSrcLoc vname
-     ignorePredMatch = mkSimpleMatch [WildPatIn, VarPatIn vname] (HsVar vname) Nothing loc
+     ignorePredMatch = mkSimpleMatch [WildPatIn, VarPatIn vname] (HsVar vname) placeHolderType loc
     in
     returnRn (expr, unitFV name)
   else

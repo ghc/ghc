@@ -15,9 +15,16 @@ import HsSyn		( failureFreePat,
 			  Match(..), HsBinds(..), MonoBinds(..), 
 			  mkSimpleMatch 
 			)
-import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt )
+import TcHsSyn		( TypecheckedHsExpr, TypecheckedHsBinds, TypecheckedStmt, outPatType )
+
+-- NB: The desugarer, which straddles the source and Core worlds, sometimes
+--     needs to see source types (newtypes etc), and sometimes not
+--     So WATCH OUT; check each use of split*Ty functions.
+-- Sigh.  This is a pain.
+
 import TcType		( tcSplitAppTy, tcSplitFunTys, tcSplitTyConApp_maybe, tcTyConAppArgs,
 			  isIntegerTy, tcSplitTyConApp, isUnLiftedType, Type )
+import Type		( splitFunTys )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
@@ -161,7 +168,9 @@ dsExpr (SectionL expr op)
   = dsExpr op						`thenDs` \ core_op ->
     -- for the type of y, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = tcSplitFunTys (exprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
+	-- Must look through an implicit-parameter type; 
+	-- newtype impossible; hence Type.splitFunTys
     in
     dsExpr expr				`thenDs` \ x_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
@@ -175,7 +184,8 @@ dsExpr (SectionR op expr)
   = dsExpr op			`thenDs` \ core_op ->
     -- for the type of x, we need the type of op's 2nd argument
     let
-	(x_ty:y_ty:_, _) = tcSplitFunTys (exprType core_op)
+	(x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
+	-- See comment with SectionL
     in
     dsExpr expr				`thenDs` \ y_core ->
     newSysLocalDs x_ty			`thenDs` \ x_id ->
@@ -276,7 +286,7 @@ dsExpr (TyApp expr tys)
 \underline{\bf Various data construction things}
 %              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-dsExpr (ExplicitListOut ty xs)
+dsExpr (ExplicitList ty xs)
   = go xs
   where
     go []     = returnDs (mkNilExpr ty)
@@ -340,6 +350,8 @@ dsExpr (RecordConOut data_con con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
 	(arg_tys, _) = tcSplitFunTys (exprType con_expr')
+	-- A newtype in the corner should be opaque; 
+	-- hence TcType.tcSplitFunTys
 
 	mk_arg (arg_ty, lbl)
 	  = case [rhs | (sel_id,rhs,_) <- rbinds,
@@ -382,10 +394,10 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
-dsExpr (RecordUpdOut record_expr record_out_ty dicts [])
+dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty dicts [])
   = dsExpr record_expr
 
-dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
+dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty dicts rbinds)
   = getSrcLocDs			`thenDs` \ src_loc ->
     dsExpr record_expr	 	`thenDs` \ record_expr' ->
 
@@ -393,9 +405,8 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	-- necessary so that we don't lose sharing
 
     let
-	record_in_ty = exprType record_expr'
-	in_inst_tys  = tcTyConAppArgs record_in_ty
-	out_inst_tys = tcTyConAppArgs record_out_ty
+	in_inst_tys  = tcTyConAppArgs record_in_ty	-- Newtype opaque
+	out_inst_tys = tcTyConAppArgs record_out_ty	-- Newtype opaque
 
 	mk_val_arg field old_arg_id 
 	  = case [rhs | (sel_id, rhs, _) <- rbinds, 
@@ -416,7 +427,7 @@ dsExpr (RecordUpdOut record_expr record_out_ty dicts rbinds)
 	    in
 	    returnDs (mkSimpleMatch [ConPat con record_in_ty [] [] (map VarPat arg_ids)]
 				    rhs
-				    (Just record_out_ty)
+				    record_out_ty
 				    src_loc)
     in
 	-- Record stuff doesn't work for existentials
@@ -474,7 +485,6 @@ dsExpr (DictApp expr dicts)	-- becomes a curried application
 #ifdef DEBUG
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (HsDo _ _ _)	    = panic "dsExpr:HsDo"
-dsExpr (ExplicitList _)	    = panic "dsExpr:ExplicitList"
 dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
 dsExpr (ArithSeqIn _)	    = panic "dsExpr:ArithSeqIn"
 #endif
@@ -511,13 +521,10 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  | otherwise = do_expr expr locn	`thenDs` \ expr2 ->
 			returnDs (mkApps (Var return_id) [Type b_ty, expr2])
 
-	go (ExprStmt expr locn : stmts)
+	go (ExprStmt expr a_ty locn : stmts)
 	  | is_do	-- Do expression
 	  = do_expr expr locn		`thenDs` \ expr2 ->
 	    go stmts     		`thenDs` \ rest  ->
-	    let
-		(_, a_ty) = tcSplitAppTy (exprType expr2)  -- Must be of form (m a)
-	    in
 	    newSysLocalDs a_ty		`thenDs` \ ignored_result_id ->
 	    returnDs (mkApps (Var then_id) [Type a_ty, Type b_ty, expr2, 
 					    Lam ignored_result_id rest])
@@ -540,19 +547,19 @@ dsDo do_or_lc stmts return_id then_id fail_id result_ty
 	  = putSrcLocDs locn $
 	    dsExpr expr 	   `thenDs` \ expr2 ->
 	    let
-		(_, a_ty)  = tcSplitAppTy (exprType expr2) -- Must be of form (m a)
+		a_ty       = outPatType pat
 		fail_expr  = HsApp (TyApp (HsVar fail_id) [b_ty])
                                    (HsLit (HsString (_PK_ msg)))
 	        msg = "Pattern match failure in do expression, " ++ showSDoc (ppr locn)
 		main_match = mkSimpleMatch [pat] 
 					   (HsDoOut do_or_lc stmts return_id then_id
                                                     fail_id result_ty locn)
-					   (Just result_ty) locn
+					   result_ty locn
 		the_matches
 		  | failureFreePat pat = [main_match]
 		  | otherwise	       =
 		      [ main_match
-		      , mkSimpleMatch [WildPat a_ty] fail_expr (Just result_ty) locn
+		      , mkSimpleMatch [WildPat a_ty] fail_expr result_ty locn
 		      ]
 	    in
 	    matchWrapper (DoCtxt do_or_lc) the_matches	`thenDs` \ (binders, matching_code) ->

@@ -10,6 +10,7 @@ module HsExpr where
 
 -- friends:
 import HsBinds		( HsBinds(..), nullBinds )
+import HsTypes		( PostTcType )
 import HsLit		( HsLit, HsOverLit )
 import BasicTypes	( Fixity(..) )
 import HsTypes		( HsType )
@@ -95,9 +96,7 @@ data HsExpr id pat
 		SrcLoc
 
   | ExplicitList		-- syntactic list
-		[HsExpr id pat]
-  | ExplicitListOut		-- TRANSLATION
-		Type	-- Gives type of components of list
+		PostTcType	-- Gives type of components of list
 		[HsExpr id pat]
 
   | ExplicitTuple		-- tuple
@@ -122,8 +121,9 @@ data HsExpr id pat
 		(HsRecordBinds id pat)
 
   | RecordUpdOut (HsExpr id pat)	-- TRANSLATION
+		 Type			-- Type of *input* record
 		 Type			-- Type of *result* record (may differ from
-						-- type of input record)
+					-- 	type of input record)
 		 [id]			-- Dicts needed for construction
 		 (HsRecordBinds id pat)
 
@@ -146,7 +146,7 @@ data HsExpr id pat
 				-- NOTE: this CCall is the *boxed*
 				-- version; the desugarer will convert
 				-- it into the unboxed "ccall#".
-		Type	-- The result type; will be *bottom*
+		PostTcType	-- The result type; will be *bottom*
 				-- until the typechecker gets ahold of it
 
   | HsSCC	FAST_STRING	-- "set cost centre" (_scc_) annotation
@@ -300,9 +300,7 @@ ppr_expr (HsWith expr binds)
 ppr_expr (HsDo do_or_list_comp stmts _)            = pprDo do_or_list_comp stmts
 ppr_expr (HsDoOut do_or_list_comp stmts _ _ _ _ _) = pprDo do_or_list_comp stmts
 
-ppr_expr (ExplicitList exprs)
-  = brackets (fsep (punctuate comma (map ppr_expr exprs)))
-ppr_expr (ExplicitListOut ty exprs)
+ppr_expr (ExplicitList _ exprs)
   = brackets (fsep (punctuate comma (map ppr_expr exprs)))
 
 ppr_expr (ExplicitTuple exprs boxity)
@@ -315,7 +313,7 @@ ppr_expr (RecordConOut data_con con rbinds)
 
 ppr_expr (RecordUpd aexp rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
-ppr_expr (RecordUpdOut aexp _ _ rbinds)
+ppr_expr (RecordUpdOut aexp _ _ _ rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)
@@ -381,8 +379,7 @@ pprParendExpr expr
 
       HsVar _		    -> pp_as_was
       HsIPVar _		    -> pp_as_was
-      ExplicitList _	    -> pp_as_was
-      ExplicitListOut _ _   -> pp_as_was
+      ExplicitList _ _      -> pp_as_was
       ExplicitTuple _ _	    -> pp_as_was
       HsPar _		    -> pp_as_was
 
@@ -449,7 +446,7 @@ data Match id pat
 data GRHSs id pat	
   = GRHSs [GRHS id pat]		-- Guarded RHSs
 	  (HsBinds id pat)	-- The where clause
-	  (Maybe Type)		-- Just rhs_ty after type checking
+	  PostTcType		-- Type of RHS (after type checking)
 
 data GRHS id pat
   = GRHS  [Stmt id pat]		-- The RHS is the final ResultStmt
@@ -457,9 +454,9 @@ data GRHS id pat
 				-- it printed 'wrong' in error messages 
 	  SrcLoc
 
-mkSimpleMatch :: [pat] -> HsExpr id pat -> Maybe Type -> SrcLoc -> Match id pat
-mkSimpleMatch pats rhs maybe_rhs_ty locn
-  = Match [] pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds maybe_rhs_ty)
+mkSimpleMatch :: [pat] -> HsExpr id pat -> Type -> SrcLoc -> Match id pat
+mkSimpleMatch pats rhs rhs_ty locn
+  = Match [] pats Nothing (GRHSs (unguardedRHS rhs locn) EmptyBinds rhs_ty)
 
 unguardedRHS :: HsExpr id pat -> SrcLoc -> [GRHS id pat]
 unguardedRHS rhs loc = [GRHS [ResultStmt rhs loc] loc]
@@ -508,7 +505,7 @@ pprMatch ctxt (Match _ pats maybe_ty grhss)
 
 pprGRHSs :: (Outputable id, Outputable pat)
 	 => HsMatchContext id -> GRHSs id pat -> SDoc
-pprGRHSs ctxt (GRHSs grhss binds maybe_ty)
+pprGRHSs ctxt (GRHSs grhss binds ty)
   = vcat (map (pprGRHS ctxt) grhss)
     $$
     (if nullBinds binds then empty
@@ -542,11 +539,12 @@ pp_rhs ctxt rhs = ptext (matchSeparator ctxt) <+> pprDeeper (ppr rhs)
 data Stmt id pat
   = BindStmt	pat (HsExpr id pat) SrcLoc
   | LetStmt	(HsBinds id pat)
-  | ResultStmt	(HsExpr id pat)	SrcLoc	-- See notes that follow
-  | ExprStmt	(HsExpr id pat)	SrcLoc	-- See notes that follow
-  | ParStmt	[[Stmt id pat]]		-- List comp only: parallel set of quals
-  | ParStmtOut	[([id], [Stmt id pat])]	-- PLC after renaming; the ids are the binders
-					-- bound by the stmts
+  | ResultStmt	(HsExpr id pat)	SrcLoc			-- See notes that follow
+  | ExprStmt	(HsExpr id pat)	PostTcType SrcLoc	-- See notes that follow
+	-- The type is the *element type* of the expression
+  | ParStmt	[[Stmt id pat]]				-- List comp only: parallel set of quals
+  | ParStmtOut	[([id], [Stmt id pat])]			-- PLC after renaming; the ids are the binders
+							-- bound by the stmts
 \end{code}
 
 ExprStmts and ResultStmts are a bit tricky, because what they mean
@@ -554,7 +552,7 @@ depends on the context.  Consider the following contexts:
 
 	A do expression of type (m res_ty)
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	* ExprStmt E:   do { ....; E; ... }
+	* ExprStmt E any_ty:   do { ....; E; ... }
 		E :: m any_ty
 	  Translation: E >> ...
 	
@@ -564,7 +562,7 @@ depends on the context.  Consider the following contexts:
 	
 	A list comprehensions of type [elt_ty]
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	* ExprStmt E:   [ .. | .... E ]
+	* ExprStmt E Bool:   [ .. | .... E ]
 			[ .. | ..., E, ... ]
 			[ .. | .... | ..., E | ... ]
 		E :: Bool
@@ -576,7 +574,7 @@ depends on the context.  Consider the following contexts:
 	
 	A guard list, guarding a RHS of type rhs_ty
 	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	* ExprStmt E:   f x | ..., E, ... = ...rhs...
+	* ExprStmt E Bool:   f x | ..., E, ... = ...rhs...
 		E :: Bool
 	  Translation: if E then fail else ...
 	
@@ -598,7 +596,7 @@ instance (Outputable id, Outputable pat) =>
 
 pprStmt (BindStmt pat expr _) = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
 pprStmt (LetStmt binds)       = hsep [ptext SLIT("let"), pprBinds binds]
-pprStmt (ExprStmt expr _)     = ppr expr
+pprStmt (ExprStmt expr _ _)   = ppr expr
 pprStmt (ResultStmt expr _)   = ppr expr
 pprStmt (ParStmt stmtss)
  = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
