@@ -7,6 +7,7 @@ import HaddockModuleTree
 import HaddockUtil
 import HaddockTypes
 
+contentsHHFile, indexHHFile :: String
 contentsHHFile = "index.hhc"
 indexHHFile = "index.hhk"
 
@@ -36,6 +37,7 @@ ppHHContents odir mods = do
 	fn :: [String] -> [ModuleTree] -> Doc
 	fn ss [x]    = ppNode ss x
 	fn ss (x:xs) = ppNode ss x $$ fn ss xs
+        fn _  []     = error "HaddockHH.ppHHContents.fn: no module trees given"
 
 	ppNode :: [String] -> ModuleTree -> Doc
 	ppNode ss (Node s leaf []) =
@@ -50,11 +52,11 @@ ppHHContents odir mods = do
 		text "<LI>" <> nest 4
 			(text "<OBJECT type=\"text/sitemap\">" $$
 			 text "<PARAM name=\"Name\" value=\"" <> text s <> text "\">" $$
-			 (if isleaf then text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile "" mod) <> text "\">" else empty) $$
+			 (if isleaf then text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile "" mdl) <> text "\">" else empty) $$
 			 text "</OBJECT>") $+$
 		text "</LI>"
 		where 
-			mod = foldr (++) "" (s' : map ('.':) ss')
+			mdl = foldr (++) "" (s' : map ('.':) ss')
 			(s':ss') = reverse (s:ss)
 			-- reconstruct the module name
 		
@@ -80,15 +82,15 @@ ppHHIndex odir ifaces = do
 	iface_indices = map getIfaceIndex ifaces
 	full_index = foldr1 plusFM iface_indices
 
-	getIfaceIndex (mod,iface) = listToFM
-	    [ (name, mod) | (name, Qual mod' _) <- fmToList (iface_env iface), mod == mod']
+	getIfaceIndex (mdl,iface) = listToFM
+	    [ (name, mdl) | (name, Qual mdl' _) <- fmToList (iface_env iface), mdl == mdl']
 	
 	ppList [] = empty
-	ppList ((name,Module mod):mods)  =
+	ppList ((name,Module mdl):mdls)  =
 		text "<LI>" <> nest 4
 				(text "<OBJECT type=\"text/sitemap\">" $$
 				 text "<PARAM name=\"Name\" value=\"" <> text (show name) <> text "\">" $$
-				 text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile "" mod) <> char '#' <> text (show name) <> text "\">" $$
+				 text "<PARAM name=\"Local\" value=\"" <> text (moduleHtmlFile "" mdl) <> char '#' <> text (show name) <> text "\">" $$
 				 text "</OBJECT>") $+$
 		text "</LI>" $$
-		ppList mods
+		ppList mdls

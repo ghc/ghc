@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsLexer.lhs,v 1.11 2002/05/17 10:51:57 simonmar Exp $
+-- $Id: HsLexer.lhs,v 1.12 2002/07/24 09:42:18 simonmar Exp $
 --
 -- (c) The GHC Team, 1997-2000
 --
@@ -180,11 +180,13 @@ reserved_ids = [
  ( "stdcall",   KW_StdCall )
  ]
 
+isIdent, isSymbol, isWhite :: Char -> Bool
 isIdent  c = isAlpha c || isDigit c || c == '\'' || c == '_'
 isSymbol c = elem c ":!#$%&*+./<=>?@\\^|-~"
 isWhite  c = elem c " \n\r\t\v\f"
 
-tAB_LENGTH = 8 :: Int
+tAB_LENGTH :: Int
+tAB_LENGTH = 8
 
 -- The source location, (y,x), is the coordinates of the previous token.
 -- col is the current column in the source file.  If col is 0, we are
@@ -197,23 +199,23 @@ tAB_LENGTH = 8 :: Int
 
 
 lexer :: (Token -> P a) -> P a
-lexer cont input (SrcLoc _ x) y col =
+lexer cont input (SrcLoc _ x0) y0 col =
         if col == 0
-           then tab y x True  input
-           else tab y col False input -- throw away old x
+           then tab y0 x0  True  input
+           else tab y0 col False input -- throw away old x
   where
    	-- move past whitespace and comments
-        tab y x bol [] = 
+        tab y x _ [] = 
         	cont EOF [] (SrcLoc y x) col y
         tab y x bol ('\t':s) =
         	tab y (nextTab x) bol s
-        tab y x bol ('\n':s) =
+        tab y _ _  ('\n':s) =
                 newLine cont s y
 
 	-- single-line comments
         tab y x bol s@('-':'-':' ':c:_) | doc c = 
 	 	is_a_token bol s y x
-        tab y x bol ('-':'-':s) =
+        tab y _ _ ('-':'-':s) =
         	newLine cont (drop 1 (dropWhile (/= '\n') s)) y
 
 	-- multi-line nested comments
@@ -231,7 +233,7 @@ lexer cont input (SrcLoc _ x) y col =
 	   | bol       = lexBOL   cont s (SrcLoc y x) y x
 	   | otherwise = lexToken cont s (SrcLoc y x) y x
 
-	newLine cont s y =  tab (y+1) 1 True s
+	newLine _ s y =  tab (y+1) 1 True s
 
 	doc '|' = True
 	doc '/' = True
@@ -241,6 +243,7 @@ lexer cont input (SrcLoc _ x) y col =
 	doc '#' = True
 	doc _ = False
 
+nextTab :: Int -> Int
 nextTab x = x + (tAB_LENGTH - (x-1) `mod` tAB_LENGTH)
 
 -- When we are lexing the first token of a line, check whether we need to
@@ -275,10 +278,13 @@ lexBOL cont s loc y x context =
         			    Layout n -> x == n
 
 lexToken :: (Token -> P a) -> P a
-lexToken cont [] loc y x = error "Internal error: empty input in lexToken"
-lexToken cont s loc y x =
+--lexToken _    [] loc _ _ =
+--    error $ "Internal error: empty input in lexToken at " ++ show loc
+lexToken cont s0 loc y x =
    -- trace ("lexer: y="++show y++" x="++show x++"\n") $ 
-   case s of
+   case s0 of
+        []            -> error $ "Internal error: empty input in lexToken at "
+                                 ++ show loc
 	-- First the doc comments
 	'-':'-':' ':s -> do_doc s False
 	'{':'-':' ':s -> do_doc s True
@@ -294,11 +300,11 @@ lexToken cont s loc y x =
         '[':s     -> forward 1 LeftSquare s
         ']':s     -> forward 1 RightSquare s
         '`':s     -> forward 1 BackQuote s
-        '{':s     -> \ctxt -> forward 1 LeftCurly s (NoLayout : ctxt)
-        '}':s     -> \ctxt -> case ctxt of
-                              (_:ctxt) -> forward 1 RightCurly s ctxt
+        '{':s     -> \ctxt  -> forward 1 LeftCurly s (NoLayout : ctxt)
+        '}':s     -> \ctxt0 -> case ctxt0 of
+                               (_:ctxt) -> forward 1 RightCurly s ctxt
 						-- pop context on '}'
-                              []       -> error "Internal error: empty context in lexToken"
+                               []       -> error "Internal error: empty context in lexToken"
 
         '\'':s -> lexChar cont s loc y (x+1)
         '\"':s{-"-} -> lexString cont s loc y (x+1)
@@ -317,12 +323,12 @@ lexToken cont s loc y x =
         c:s | isLower c || c == '_' ->
         	let 
         	    (idtail, rest) = slurpIdent s
-        	    id = c:idtail
+        	    id0 = c:idtail
         	    l_id = 1 + length idtail
         	in
-        	case lookup id reserved_ids of
+        	case lookup id0 reserved_ids of
         		Just keyword -> forward l_id keyword rest
-        		Nothing -> forward l_id (VarId id) rest
+        		Nothing      -> forward l_id (VarId id0) rest
 
           | isUpper c -> lexCon "" cont (c:s) loc y x
           | isSymbol c ->
@@ -343,7 +349,7 @@ lexToken cont s loc y x =
         	parseError ("illegal character \'" ++ show c ++ "\'\n") 
         		  s loc y x
 
-  where forward n t s = cont t s loc y (x+n)
+  where forward n t str = cont t str loc y (x+n)
 
 	-- this is all terribly ugly, sorry :(
 	do_doc ('|':s) nested  = multi nested DocCommentNext  cont s loc y x
@@ -352,24 +358,32 @@ lexToken cont s loc y x =
 	do_doc ('$':s) nested  = multi nested DocCommentNamed cont s loc y x
 	do_doc ('#':s) nested  = multi nested DocOptions      cont s loc y x
 	do_doc ('*':s) nested  = section 1 s
-	  where section n ('*':s) = section (n+1) s
-		section n s 
-		  | nested = nestedDocComment (DocSection n) cont s loc y x
-		  | otherwise = oneLineDocComment (DocSection n) cont s loc y x
-	do_doc _ _ = error "Internal error: HsLexer.do_doc"
+	  where section n ('*':s1) = section (n+1) s1
+		section n s1 
+		 | nested    = nestedDocComment  (DocSection n) cont s1 loc y x
+		 | otherwise = oneLineDocComment (DocSection n) cont s1 loc y x
+	do_doc _       _ = error "Internal error: HsLexer.do_doc"
+        
 
+multi :: Num a => Bool -> ([Char] -> b)
+      -> (b -> [Char] -> c -> a -> Int -> d)
+      -> [Char] -> c -> a -> Int -> d
 multi True  = nestedDocComment
 multi False = multiLineDocComment
 
+afterNum :: Num a => (Token -> [Char] -> b -> c -> a -> d)
+	 -> Integer -> [Char] -> b -> c -> a -> d
 afterNum cont i ('#':s) loc y x = cont (PrimInt i) s loc y (x+1)
 afterNum cont i s loc y x = cont (IntTok i) s loc y x
 
-lexNum cont c s loc y x = 
-  let (num, after_num) = span isDigit (c:s)
+lexNum :: (Token -> [Char] -> a -> b -> Int -> c)
+       -> Char -> [Char] -> a -> b -> Int -> c
+lexNum cont c0 s0 loc y x = 
+  let (num, after_num) = span isDigit (c0:s0)
   in
   case after_num of
-    '.':c:s | isDigit c ->
-	let (frac,after_frac) = span isDigit s
+    '.':c1:s1 | isDigit c1 ->
+	let (frac,after_frac) = span isDigit s1
 	in
 	let float = num ++ '.':frac
 	    (f, after_exp)
@@ -378,17 +392,17 @@ lexNum cont c s loc y x =
 		    'e':s -> do_exponent s
 		    _     -> (float, after_frac)
 
-	    do_exponent s =
-		 case s of
+	    do_exponent s2 =
+		 case s2 of
 		  '-':c:s | isDigit c -> 
-			let (exp,rest) = span isDigit (c:s) in
-			(float ++ 'e':'-':exp, rest)
+			let (exp0,rest) = span isDigit (c:s) in
+			(float ++ 'e':'-':exp0, rest)
 		  '+':c:s | isDigit c -> 
-			let (exp,rest) = span isDigit (c:s) in
-			(float ++ 'e':'+':exp, rest)
+			let (exp0,rest) = span isDigit (c:s) in
+			(float ++ 'e':'+':exp0, rest)
 		  c:s | isDigit c -> 
-			let (exp,rest) = span isDigit (c:s) in
-			(float ++ 'e':exp, rest)
+			let (exp0,rest) = span isDigit (c:s) in
+			(float ++ 'e':exp0, rest)
 		  _ -> (float, after_frac)
 
 	    x' = x + length f
@@ -402,6 +416,7 @@ lexNum cont c s loc y x =
 
 		
 -- GHC extension: allow trailing '#'s in an identifier. 
+slurpIdent :: String -> (String, String)
 slurpIdent s = slurp' s []
  where
   slurp' [] i = (reverse i, [])
@@ -410,16 +425,18 @@ slurpIdent s = slurp' s []
     | c == '#'  = slurphashes cs (c:i)
   slurp' cs i = (reverse i, cs)
 
+slurphashes :: String -> String -> (String, String)
 slurphashes [] i = (reverse i, [])
 slurphashes ('#':cs) i = slurphashes cs ('#':i)
 slurphashes s i = (reverse i, s)
 
-
-lexCon qual cont s loc y x =
+lexCon :: [Char] -> (Token -> String -> a -> b -> Int -> c)
+       -> String -> a -> b -> Int -> c
+lexCon qual cont s0 loc y x =
   let
     forward n t s = cont t s loc y (x+n)
 
-    (con, rest) = slurpIdent s
+    (con, rest) = slurpIdent s0
     l_con = length con
 
     just_a_conid 
@@ -434,13 +451,13 @@ lexCon qual cont s loc y x =
      | isLower c1 ->	-- qualified varid?
 	let
 	    (idtail, rest1) = slurpIdent s1
-	    id = c1:idtail
+	    id0 = c1:idtail
 	    l_id = 1 + length idtail
 	in
-	case lookup id reserved_ids of
+	case lookup id0 reserved_ids of
 	   -- cannot qualify a reserved word
-	   Just keyword -> just_a_conid
-	   Nothing -> forward (l_con+1+l_id) (QVarId (qual',id)) rest1
+	   Just _  -> just_a_conid
+	   Nothing -> forward (l_con+1+l_id) (QVarId (qual', id0)) rest1
 
      | isUpper c1 ->	-- qualified conid?
 	lexCon qual' cont (c1:s1) loc y (x+l_con+1)
@@ -463,41 +480,41 @@ lexCon qual cont s loc y x =
 
 
 lexChar :: (Token -> P a) -> P a
-lexChar cont s loc y x = case s of
-                    '\\':s -> (escapeChar s `thenP` \(e,s,i) _ _ _ _ ->
-                               charEnd e s loc y (x+i)) s loc y x
-                    c:s    -> charEnd c s loc y (x+1)
-                    []     -> error "Internal error: lexChar"
+lexChar cont s0 loc0 y x = case s0 of
+                    '\\':s1 -> (escapeChar s1 `thenP` \(e,s,i) _ _ _ _ ->
+                               charEnd e s loc0 y (x+i)) s1 loc0 y x
+                    c:s     -> charEnd c s loc0 y (x+1)
+                    []      -> error "Internal error: lexChar"
 
-  where charEnd c ('\'':'#':s) = \loc y x -> cont (PrimChar c) s loc y (x+2)
-	charEnd c ('\'':s) = \loc y x -> cont (Character c) s loc y (x+1)
-        charEnd c s = parseError "Improperly terminated character constant" s
+  where charEnd c ('\'':'#':s) = \loc y0 x0 -> cont (PrimChar c) s loc y0 (x0+2)
+	charEnd c ('\'':s) = \loc y0 x0 -> cont (Character c) s loc y0 (x0+1)
+        charEnd _ s = parseError "Improperly terminated character constant" s
 
 lexString :: (Token -> P a) -> P a
-lexString cont s loc y x = loop "" s x y
+lexString cont s0 loc y0 x0 = loop "" s0 x0 y0
   where
-     loop e s x y = case s of
+     loop e s1 x y = case s1 of
             '\\':'&':s  -> loop e s (x+2) y
             '\\':c:s | isSpace c -> stringGap e s (x+2) y
-        	     | otherwise -> (escapeChar (c:s) `thenP` \(e',s,i) _ _ _ _ ->
-        		             loop (e':e) s (x+i) y) s loc y x
+        	     | otherwise -> (escapeChar (c:s) `thenP` \(e',s2,i) _ _ _ _ ->
+        		             loop (e':e) s2 (x+i) y) s loc y x
             '\"':'#':s  -> cont (PrimString (reverse e)) s loc y (x+2)
             '\"':s{-"-} -> cont (StringTok (reverse e)) s loc y (x+1)
             c:s		-> loop (c:e) s (x+1) y
-            []          -> parseError "Improperly terminated string" s loc y x
+            []          -> parseError "Improperly terminated string" s1 loc y x
 
-     stringGap e s x y = case s of
+     stringGap e s1 x y = case s1 of
         	'\n':s -> stringGap e s 1 (y+1)
         	'\\':s -> loop e s (x+1) y
-        	c:s' | isSpace c -> stringGap e s' (x+1) y
-        	     | otherwise -> 
-        	       parseError "Illegal character in string gap" s loc y x
+        	c:s | isSpace c -> stringGap e s (x+1) y
+        	    | otherwise -> 
+        	       parseError "Illegal character in string gap" s1 loc y x
                 []     -> error "Internal error: stringGap"
 
 -- ToDo: \o, \x, \<octal> things.
 
 escapeChar :: String -> P (Char,String,Int)
-escapeChar s = case s of
+escapeChar s0 = case s0 of
 
   'x':c:s | isHexDigit c -> 
 	let (num,rest) = span isHexDigit (c:s) in
@@ -525,7 +542,7 @@ escapeChar s = case s of
 
 -- Production ascii from section B.2
 
-  '^':x@(c:s)   -> cntrl x
+  '^':x@(_:_)   -> cntrl x
   'N':'U':'L':s -> returnP ('\NUL',s,4)
   'S':'O':'H':s -> returnP ('\SOH',s,4)
   'S':'T':'X':s -> returnP ('\STX',s,4)
@@ -575,37 +592,49 @@ cntrl :: String -> P (Char,String,Int)
 cntrl (c:s) | c >= '@' && c <= '_' = returnP (chr (ord c - ord '@'), s,2)
 cntrl _                            = parseError "Illegal control character"
 
-nestedComment cont y x bol s =
-   case s of
+nestedComment :: Num a => (a -> Int -> Bool -> [Char] -> b)
+	      -> a -> Int -> Bool -> [Char] -> b
+nestedComment cont y x bol s0 =
+   case s0 of
       '-':'}':s -> cont y (x+2) bol s
       '{':'-':s -> nestedComment (nestedComment cont) y (x+2) bol s
       '\t':s    -> nestedComment cont y (nextTab x) bol s
       '\n':s    -> nestedComment cont (y+1) 1 True s
-      c:s       -> nestedComment cont y (x+1) bol s
+      _:s       -> nestedComment cont y (x+1) bol s
       []        -> error "Internal error: nestedComment"
 
-
-nestedDocComment f cont s loc y x = go f cont "" y x s
+nestedDocComment :: Num a => ([Char] -> b)
+		 -> (b -> [Char] -> c -> a -> Int -> d)
+                 -> [Char] -> c -> a -> Int -> d
+nestedDocComment f0 cont0 s0 loc y0 x0 = go f0 cont0 "" y0 x0 s0
  where
-  go f cont acc y x s = 
-   case s of
-      '-':'}':s -> cont (f (reverse acc)) s loc y (x+2)
-      '{':'-':s -> nestedComment (\y x bol s -> go f cont acc y x s) 
-			y (x+2) False s
-      '\t':s    -> go f cont ('\t':acc) y (nextTab x) s
-      '\n':s    -> go f cont ('\n':acc) (y+1) 1 s
-      c:s       -> go f cont (c:acc) y (x+1) s
+  go f cont acc y1 x1 s1 = 
+   case s1 of
+      '-':'}':s -> cont (f (reverse acc)) s loc y1 (x1+2)
+      '{':'-':s -> nestedComment (\y x _ s2 -> go f cont acc y x s2) 
+			y1 (x1+2) False s
+      '\t':s    -> go f cont ('\t':acc) y1 (nextTab x1) s
+      '\n':s    -> go f cont ('\n':acc) (y1+1) 1 s
+      c:s       -> go f cont (c:acc) y1 (x1+1) s
       []        -> error "Internal error: nestedComment"
 
+oneLineDocComment :: ([Char] -> a)
+		  -> (a -> [Char] -> b -> c -> d -> e)
+		  -> [Char] -> b -> c -> d -> e
 oneLineDocComment f cont s loc y x
   = cont (f line) rest loc y x -- continue with the newline char
   where (line, rest) = break (== '\n') s
 
+multiLineDocComment :: Num a => ([Char] -> b)
+		    -> (b -> [Char] -> c -> a -> d -> e)
+		    -> [Char] -> c -> a -> d -> e
 multiLineDocComment f cont s loc y x 
   = cont (f comment) s' loc y' x -- continue with the newline char
   where (s', comment, y') = slurpExtraCommentLines s [] y
     
-slurpExtraCommentLines s lines y
+slurpExtraCommentLines :: Num a => [Char] -> [[Char]] -> a 
+                       -> ([Char], [Char], a)
+slurpExtraCommentLines s0 lines0 y
   = case rest of
 	'\n':nextline -> 
 		case dropWhile nonNewlineSpace nextline of 
@@ -614,12 +643,13 @@ slurpExtraCommentLines s lines y
 		  -- want them in the doc.
 		  '-':'-':c:s | c /= '-'
 			 -> slurpExtraCommentLines (c:s)
-				((line++"\n"):lines) (y+1)
+				((line++"\n"):lines0) (y+1)
 		  _ -> (rest, finished, y)
-	other -> (rest, finished, y)
+	_ -> (rest, finished, y)
   where
-	(line, rest) = break (== '\n') s
-	finished = concat (reverse (line:lines))
+	(line, rest) = break (== '\n') s0
+	finished = concat (reverse (line:lines0))
 
+nonNewlineSpace :: Char -> Bool
 nonNewlineSpace c = isSpace c && c /= '\n'
 \end{code}

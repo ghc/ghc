@@ -64,7 +64,6 @@ import Char
 import Monad
 import Exception
 import GlaExts hiding (ByteArray, newByteArray, freezeByteArray)
-import Array
 import IO
 #if __GLASGOW_HASKELL__ < 503
 import PrelIOBase	--	( IOError(..), IOErrorType(..) )
@@ -77,11 +76,19 @@ import GHC.IOBase ( IO(..) )
 #endif
 
 type BinArray = MutableByteArray RealWorld Int
+newArray_ :: Ix ix => (ix, ix) -> IO (MutableByteArray RealWorld ix)
 newArray_ bounds     = stToIO (newCharArray bounds)
+
+unsafeWrite :: Ix ix => MutableByteArray RealWorld ix -> ix -> Word8 -> IO ()
 unsafeWrite arr ix e = stToIO (writeWord8Array arr ix e)
+
+unsafeRead :: Ix ix => MutableByteArray RealWorld ix -> ix -> IO Word8
 unsafeRead  arr ix   = stToIO (readWord8Array arr ix)
 
+hPutArray :: Handle -> MutableByteArray RealWorld a -> Int -> IO ()
 hPutArray h arr sz   = hPutBufBA h arr sz
+
+hGetArray :: Handle -> MutableByteArray RealWorld a -> Int -> IO Int
 hGetArray h sz       = hGetBufBA h sz
 
 #if __GLASGOW_HASKELL__ < 503
@@ -160,14 +167,15 @@ openBinMem size
  | size <= 0 = error "Data.Binary.openBinMem: size must be >= 0"
  | otherwise = do
    arr <- newArray_ (0,size-1)
-   arr_r <- newIORef arr
+   arr_r0 <- newIORef arr
    ix_r <- newFastMutInt
    writeFastMutInt ix_r 0
-   sz_r <- newFastMutInt
-   writeFastMutInt sz_r size
-   return (BinMem undefined ix_r sz_r arr_r)
+   sz_r0 <- newFastMutInt
+   writeFastMutInt sz_r0 size
+   return (BinMem undefined ix_r sz_r0 arr_r0)
 
-noBinHandleUserData = error "Binary.BinHandle: no user data"
+--noBinHandleUserData :: a
+--noBinHandleUserData = error "Binary.BinHandle: no user data"
 
 --getUserData :: BinHandle -> BinHandleState
 --getUserData bh = state bh
@@ -180,24 +188,24 @@ seekBin :: BinHandle -> Bin a -> IO ()
 seekBin (BinIO _ ix_r h) (BinPtr p) = do 
   writeFastMutInt ix_r p
   hSeek h AbsoluteSeek (fromIntegral p)
-seekBin h@(BinMem _ ix_r sz_r a) (BinPtr p) = do
-  sz <- readFastMutInt sz_r
+seekBin h@(BinMem _ ix_r sz_r0 _) (BinPtr p) = do
+  sz <- readFastMutInt sz_r0
   if (p >= sz)
 	then do expandBin h p; writeFastMutInt ix_r p
 	else writeFastMutInt ix_r p
 
 isEOFBin :: BinHandle -> IO Bool
-isEOFBin (BinMem _ ix_r sz_r a) = do
+isEOFBin (BinMem _ ix_r sz_r0 _) = do
   ix <- readFastMutInt ix_r
-  sz <- readFastMutInt sz_r
+  sz <- readFastMutInt sz_r0
   return (ix >= sz)
-isEOFBin (BinIO _ ix_r h) = hIsEOF h
+isEOFBin (BinIO _ _ h) = hIsEOF h
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinIO _ _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
-writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
+writeBinMem (BinMem _ ix_r _ arr_r0) fn = do
   h <- openFileEx fn (BinaryMode WriteMode)
-  arr <- readIORef arr_r
+  arr <- readIORef arr_r0
   ix  <- readFastMutInt ix_r
   hPutArray h arr ix
   hClose h
@@ -212,24 +220,24 @@ readBinMem filename = do
   when (count /= filesize)
 	(error ("Binary.readBinMem: only read " ++ show count ++ " bytes"))
   hClose h
-  arr_r <- newIORef arr
+  arr_r0 <- newIORef arr
   ix_r <- newFastMutInt
   writeFastMutInt ix_r 0
-  sz_r <- newFastMutInt
-  writeFastMutInt sz_r filesize
-  return (BinMem undefined {-initReadState-} ix_r sz_r arr_r)
+  sz_r0 <- newFastMutInt
+  writeFastMutInt sz_r0 filesize
+  return (BinMem undefined {-initReadState-} ix_r sz_r0 arr_r0)
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem _ ix_r sz_r arr_r) off = do
-   sz <- readFastMutInt sz_r
+expandBin (BinMem _ _ sz_r0 arr_r0) off = do
+   sz <- readFastMutInt sz_r0
    let sz' = head (dropWhile (<= off) (iterate (* 2) sz))
-   arr <- readIORef arr_r
+   arr <- readIORef arr_r0
    arr' <- newArray_ (0,sz'-1)
    sequence_ [ unsafeRead arr i >>= unsafeWrite arr' i
  	     | i <- [ 0 .. sz-1 ] ]
-   writeFastMutInt sz_r sz'
-   writeIORef arr_r arr'
+   writeFastMutInt sz_r0 sz'
+   writeIORef arr_r0 arr'
    hPutStrLn stderr ("expanding to size: " ++ show sz')
    return ()
 expandBin (BinIO _ _ _) _ = return ()
@@ -239,14 +247,14 @@ expandBin (BinIO _ _ _) _ = return ()
 -- Low-level reading/writing of bytes
 
 putWord8 :: BinHandle -> Word8 -> IO ()
-putWord8 h@(BinMem _ ix_r sz_r arr_r) w = do
+putWord8 h@(BinMem _ ix_r sz_r0 arr_r0) w = do
     ix <- readFastMutInt ix_r
-    sz <- readFastMutInt sz_r
+    sz <- readFastMutInt sz_r0
 	-- double the size of the array if it overflows
     if (ix >= sz) 
 	then do expandBin h ix
 		putWord8 h w
-	else do arr <- readIORef arr_r
+	else do arr <- readIORef arr_r0
 		unsafeWrite arr ix w
     		writeFastMutInt ix_r (ix+1)
     		return ()
@@ -257,12 +265,12 @@ putWord8 (BinIO _ ix_r h) w = do
     return ()
 
 getWord8 :: BinHandle -> IO Word8
-getWord8 (BinMem _ ix_r sz_r arr_r) = do
+getWord8 (BinMem _ ix_r sz_r0 arr_r0) = do
     ix <- readFastMutInt ix_r
-    sz <- readFastMutInt sz_r
+    sz <- readFastMutInt sz_r0
     when (ix >= sz)  $
 	throw (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
-    arr <- readIORef arr_r
+    arr <- readIORef arr_r0
     w <- unsafeRead arr ix
     writeFastMutInt ix_r (ix+1)
     return w
@@ -363,8 +371,8 @@ instance Binary Int64 where
 -- Instances for standard types
 
 instance Binary () where
-    put_ bh () = return ()
-    get  _     = return ()
+    put_ _ () = return ()
+    get  _    = return ()
 --    getF bh p  = case getBitsF bh 0 p of (_,b) -> ((),b)
 
 instance Binary Bool where
@@ -494,22 +502,23 @@ data ByteArray = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
 
 newByteArray :: Int# -> IO MBA
-newByteArray sz = IO $ \s ->
-  case newByteArray# sz s of { (# s, arr #) ->
+newByteArray sz = IO $ \s0 ->
+  case newByteArray# sz s0 of { (# s, arr #) ->
   (# s, MBA arr #) }
 
 freezeByteArray :: MutableByteArray# RealWorld -> IO ByteArray
-freezeByteArray arr = IO $ \s ->
-  case unsafeFreezeByteArray# arr s of { (# s, arr #) ->
+freezeByteArray arr0 = IO $ \s0 ->
+  case unsafeFreezeByteArray# arr0 s0 of { (# s, arr #) ->
   (# s, BA arr #) }
 
 writeByteArray :: MutableByteArray# RealWorld -> Int# -> Word8 -> IO ()
 
-writeByteArray arr i w8 = IO $ \s ->
-  case word8ToWord w8 of { W# w# -> 
-  case writeCharArray# arr i (chr# (word2Int# w#)) s  of { s ->
+writeByteArray arr i w8 = IO $ \s0 ->
+  case fromIntegral w8 of { W# w# -> 
+  case writeCharArray# arr i (chr# (word2Int# w#)) s0  of { s ->
   (# s , () #) }}
 
+indexByteArray :: ByteArray# -> Int# -> Word8
 indexByteArray a# n# = fromIntegral (I# (ord# (indexCharArray# a# n#)))
 
 instance (Integral a, Binary a) => Binary (Ratio a) where
@@ -530,6 +539,7 @@ putString bh str = put_ bh word8s
   word8s :: [Word8]
   word8s = map (fromIntegral.ord) str
 
+getString :: BinHandle -> IO String
 getString bh = do
   word8s <- get bh
   return (map (chr.fromIntegral) (word8s :: [Word8]))

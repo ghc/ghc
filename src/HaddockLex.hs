@@ -25,6 +25,7 @@ data Token
   | TokBirdTrack
   deriving Show
 
+isSpecial, isSingleQuote, isIdent :: Char -> Bool
 isSpecial c     = c `elem` ['\"', '@', '/']
 isSingleQuote c = c `elem` ['\'', '`']
 isIdent c       = isAlphaNum c || c `elem` "_.!#$%&*+/<=>?@\\^|-~"
@@ -43,14 +44,16 @@ tokenise str = case str of
 	| isSpecial c     -> TokSpecial c : tokenise1 cs
   _other  -> tokenise_string "" str
 
-tokenise_newline cs =
- case dropWhile nonNewlineSpace cs of
+tokenise_newline :: String -> [Token]
+tokenise_newline cs0 =
+ case dropWhile nonNewlineSpace cs0 of
    '\n':cs -> TokPara : tokenise_para cs -- paragraph break
    '>':cs  -> TokBirdTrack : tokenise_birdtrack cs -- bird track
-   _other  -> tokenise_string "" cs
+   _       -> tokenise_string "" cs0
 
-tokenise_para cs =
-  case dropWhile nonNewlineSpace cs of   
+tokenise_para :: String -> [Token]
+tokenise_para cs0 =
+  case dropWhile nonNewlineSpace cs0 of   
 	-- bullet:  '*'
    '*':cs  -> TokBullet  : tokenise cs
 	-- bullet: '-'
@@ -63,8 +66,9 @@ tokenise_para cs =
 	-- enumerated item: '(1)'
    '(':cs | (ds,')':cs') <- span isDigit cs, not (null ds)
 		-> TokNumber : tokenise cs'
-   other -> tokenise cs
+   _ -> tokenise cs0
 
+nonNewlineSpace :: Char -> Bool
 nonNewlineSpace c = isSpace c && c /= '\n'
 
 -- ----------------------------------------------------------------------------
@@ -75,20 +79,23 @@ tokenise1 :: String -> [Token]
 tokenise1 str = tokenise_string "" str
 
 -- found a single quote, check whether we have an identifier...
-tokenise_identifier q cs =
-  let (ident,rest) = break (not.isIdent) cs in
+tokenise_identifier :: Char -> String -> [Token]
+tokenise_identifier q cs0 =
+  let (ident,rest) = break (not.isIdent) cs0 in
   case (rest, strToHsQNames ident) of
     (c:cs, Just names) | isSingleQuote c -> TokIdent names : tokenise1 cs
-    _other -> tokenise_string [q] cs
+    _ -> tokenise_string [q] cs0
 
+tokenise_url :: String -> [Token]
 tokenise_url cs =
-  let (url,rest) = break (=='>') cs in
-  TokURL url : case rest of
+  let (url,rest0) = break (=='>') cs in
+  TokURL url : case rest0 of
 		 '>':rest -> tokenise1 rest
-		 _ -> tokenise1 rest
+		 _ -> tokenise1 rest0
 
-tokenise_string str cs = 
-  case cs of
+tokenise_string :: String -> String -> [Token]
+tokenise_string str cs0 = 
+  case cs0 of
     []        -> tokString str []
     '\\':c:cs -> tokenise_string (c:str) cs
     '\n':cs   -> tokenise_string_newline str cs
@@ -97,19 +104,22 @@ tokenise_string str cs =
 	 | isSingleQuote c -> tokString str (tokenise_identifier c cs)
          | otherwise 	   -> tokenise_string (c:str) cs
 
-tokenise_string_newline str cs =
-  case dropWhile nonNewlineSpace cs  of
+tokenise_string_newline :: String -> String -> [Token]
+tokenise_string_newline str cs0 =
+  case dropWhile nonNewlineSpace cs0  of
    '\n':cs -> tokString str (TokPara : tokenise_para cs)
 		-- paragraph break: throw away all whitespace
    '>':cs  -> tokString ('\n':str) (TokBirdTrack : tokenise_birdtrack cs)
 		-- keep the \n, but throw away any space before the '>'
-   _other  -> tokenise_string ('\n':str) cs
+   _       -> tokenise_string ('\n':str) cs0
 		-- don't throw away whitespace at all
 
+tokString :: String -> [Token] -> [Token]
 tokString [] rest = rest
 tokString cs rest = TokString (reverse cs) : rest
 
 -- A bird-tracked line is verbatim, no markup characters are interpreted
+tokenise_birdtrack :: String -> [Token]
 tokenise_birdtrack cs = 
   let (line, rest) = break (=='\n') cs in
   TokString line : tokenise1 rest
@@ -118,27 +128,27 @@ tokenise_birdtrack cs =
 -- Lex a string as a Haskell identifier
 
 strToHsQNames :: String -> Maybe [HsQName]
-strToHsQNames str
- = case lexer (\t -> returnP t) str (SrcLoc 1 1) 1 1 [] of
+strToHsQNames str0
+ = case lexer (\t -> returnP t) str0 (SrcLoc 1 1) 1 1 [] of
 	Ok _ (VarId str)
 	   -> Just [ UnQual (HsVarName (HsIdent str)) ]
-        Ok _ (QVarId (mod,str))
- 	   -> Just [ Qual (Module mod) (HsVarName (HsIdent str)) ]
+        Ok _ (QVarId (mod0,str))
+ 	   -> Just [ Qual (Module mod0) (HsVarName (HsIdent str)) ]
 	Ok _ (ConId str)
 	   -> Just [ UnQual (HsTyClsName (HsIdent str)),
 		     UnQual (HsVarName (HsIdent str)) ]
-        Ok _ (QConId (mod,str))
-	   -> Just [ Qual (Module mod) (HsTyClsName (HsIdent str)),
-		     Qual (Module mod) (HsVarName (HsIdent str)) ]
+        Ok _ (QConId (mod0,str))
+	   -> Just [ Qual (Module mod0) (HsTyClsName (HsIdent str)),
+		     Qual (Module mod0) (HsVarName (HsIdent str)) ]
         Ok _ (VarSym str)
 	   -> Just [ UnQual (HsVarName (HsSymbol str)) ]
         Ok _ (ConSym str)
 	   -> Just [ UnQual (HsTyClsName (HsSymbol str)),
 		     UnQual (HsVarName (HsSymbol str)) ]
-        Ok _ (QVarSym (mod,str))
-	   -> Just [ Qual (Module mod) (HsVarName (HsSymbol str)) ]
-        Ok _ (QConSym (mod,str))
-	   -> Just [ Qual (Module mod) (HsTyClsName (HsSymbol str)),
-		     Qual (Module mod) (HsVarName (HsSymbol str)) ]
-	other
+        Ok _ (QVarSym (mod0,str))
+	   -> Just [ Qual (Module mod0) (HsVarName (HsSymbol str)) ]
+        Ok _ (QConSym (mod0,str))
+	   -> Just [ Qual (Module mod0) (HsTyClsName (HsSymbol str)),
+		     Qual (Module mod0) (HsVarName (HsSymbol str)) ]
+	_other
 	   -> Nothing

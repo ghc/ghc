@@ -34,13 +34,17 @@ instance Monad (GenRnM n) where
   (>>=) = thenRn
   return = returnRn   
 
-returnRn a   = RnM (\lkp -> (a,[]))
+returnRn :: a -> GenRnM n a
+returnRn a   = RnM (\_ -> (a,[]))
+thenRn :: GenRnM n a -> (a -> GenRnM n b) -> GenRnM n b
 m `thenRn` k = RnM (\lkp -> case unRn m lkp of 
 				(a,out1) -> case unRn (k a) lkp of
 						(b,out2) -> (b,out1++out2))
 
+getLookupRn :: RnM (HsQName -> Maybe HsQName)
 getLookupRn = RnM (\lkp -> (lkp,[]))
-outRn name = RnM (\lkp -> ((),[name]))
+outRn :: HsQName -> RnM ()
+outRn name = RnM (\_ -> ((),[name]))
 
 lookupRn :: (HsQName -> a) -> HsQName -> RnM a
 lookupRn and_then name = do
@@ -68,11 +72,11 @@ renameExportList spec = mapM renameExport spec
 	cs' <- mapM (lookupRn id) cs
 	lookupRn (\x' -> HsEThingWith x' cs') x
     renameExport (HsEModuleContents m) = return (HsEModuleContents m)
-    renameExport (HsEGroup lev doc) = do
-	doc <- renameDoc doc
+    renameExport (HsEGroup lev doc0) = do
+	doc <- renameDoc doc0
 	return (HsEGroup lev doc)
-    renameExport (HsEDoc doc) = do
-	doc <- renameDoc doc
+    renameExport (HsEDoc doc0) = do
+	doc <- renameDoc doc0
 	return (HsEDoc doc)
     renameExport (HsEDocNamed str) = return (HsEDocNamed str)
 
@@ -80,84 +84,89 @@ renameExportList spec = mapM renameExport spec
 renameDecl :: HsDecl -> RnM HsDecl
 renameDecl decl
   = case decl of
-	HsTypeDecl loc t args ty doc -> do
-	    ty <- renameType ty
-	    doc <- renameMaybeDoc doc
+	HsTypeDecl loc t args ty0 doc0 -> do
+	    ty <- renameType ty0
+	    doc <- renameMaybeDoc doc0
 	    return (HsTypeDecl loc t args ty doc)
-	HsDataDecl loc ctx t args cons drv doc -> do
-	    cons <- mapM renameConDecl cons
-	    doc <- renameMaybeDoc doc
+	HsDataDecl loc ctx t args cons0 drv doc0 -> do
+	    cons <- mapM renameConDecl cons0
+	    doc <- renameMaybeDoc doc0
 	    return (HsDataDecl loc ctx t args cons drv doc)
-        HsNewTypeDecl loc ctx t args con drv doc -> do
-	    con <- renameConDecl con
-	    doc <- renameMaybeDoc doc
+        HsNewTypeDecl loc ctx t args con0 drv doc0 -> do
+	    con <- renameConDecl con0
+	    doc <- renameMaybeDoc doc0
 	    return (HsNewTypeDecl loc ctx t args con drv doc)
-        HsClassDecl loc ctxt nm tvs fds decls doc -> do
-	    ctxt <- mapM renamePred ctxt
-	    decls <- mapM renameDecl decls
-	    doc <- renameMaybeDoc doc
+        HsClassDecl loc ctxt0 nm tvs fds decls0 doc0 -> do
+	    ctxt <- mapM renamePred ctxt0
+	    decls <- mapM renameDecl decls0
+	    doc <- renameMaybeDoc doc0
 	    return (HsClassDecl loc ctxt nm tvs fds decls doc)
-	HsTypeSig loc fs qt doc -> do
-	    qt <- renameType qt
-	    doc <- renameMaybeDoc doc
+	HsTypeSig loc fs qt0 doc0 -> do
+	    qt <- renameType qt0
+	    doc <- renameMaybeDoc doc0
 	    return (HsTypeSig loc fs qt doc)
-	HsForeignImport loc cc safe ent n ty doc -> do
-	    ty <- renameType ty
-	    doc <- renameMaybeDoc doc
+	HsForeignImport loc cc safe ent n ty0 doc0 -> do
+	    ty <- renameType ty0
+	    doc <- renameMaybeDoc doc0
 	    return (HsForeignImport loc cc safe ent n ty doc)
-	HsInstDecl loc ctxt asst decls -> do
-	    ctxt <- mapM renamePred ctxt
-	    asst <- renamePred asst
+	HsInstDecl loc ctxt0 asst0 decls -> do
+	    ctxt <- mapM renamePred ctxt0
+	    asst <- renamePred asst0
 	    return (HsInstDecl loc ctxt asst decls)
-	HsDocCommentNamed loc name doc -> do
-	    doc <- renameDoc doc
+	HsDocCommentNamed loc name doc0 -> do
+	    doc <- renameDoc doc0
 	    return (HsDocCommentNamed loc name doc)
 	_ -> 
 	    return decl
 
-renameConDecl (HsConDecl loc nm tvs ctxt tys doc) = do
-  tys <- mapM renameBangTy tys
-  doc <- renameMaybeDoc doc
+renameConDecl :: HsConDecl -> RnM HsConDecl
+renameConDecl (HsConDecl loc nm tvs ctxt tys0 doc0) = do
+  tys <- mapM renameBangTy tys0
+  doc <- renameMaybeDoc doc0
   return (HsConDecl loc nm tvs ctxt tys doc)
-renameConDecl (HsRecDecl loc nm tvs ctxt fields doc) = do
-  fields <- mapM renameField fields
-  doc <- renameMaybeDoc doc
+renameConDecl (HsRecDecl loc nm tvs ctxt fields0 doc0) = do
+  fields <- mapM renameField fields0
+  doc <- renameMaybeDoc doc0
   return (HsRecDecl loc nm tvs ctxt fields doc)
 
-renameField (HsFieldDecl ns ty doc) = do 
-  ty <- renameBangTy ty
-  doc <- renameMaybeDoc doc
+renameField :: HsFieldDecl -> RnM HsFieldDecl
+renameField (HsFieldDecl ns ty0 doc0) = do 
+  ty <- renameBangTy ty0
+  doc <- renameMaybeDoc doc0
   return (HsFieldDecl ns ty doc)
 
+renameBangTy :: HsBangType -> RnM HsBangType
 renameBangTy (HsBangedTy ty)   = HsBangedTy   `liftM` renameType ty
 renameBangTy (HsUnBangedTy ty) = HsUnBangedTy `liftM` renameType ty
 
-renamePred (c,tys) = do
-  tys <- mapM renameType tys
+renamePred :: (HsQName,[HsType]) -> RnM (HsQName,[HsType])
+renamePred (c,tys0) = do
+  tys <- mapM renameType tys0
   lookupRn (\c' -> (c',tys)) c
 
-renameType (HsForAllType tvs ctx ty) = do
-  ctx <- mapM renamePred ctx
-  ty <- renameType ty
+renameType :: HsType -> RnM HsType
+renameType (HsForAllType tvs ctx0 ty0) = do
+  ctx <- mapM renamePred ctx0
+  ty <- renameType ty0
   return (HsForAllType tvs ctx ty)
-renameType (HsTyFun arg res) = do
-  arg <- renameType arg
-  res <- renameType res
+renameType (HsTyFun arg0 res0) = do
+  arg <- renameType arg0
+  res <- renameType res0
   return (HsTyFun arg res)
-renameType (HsTyTuple b tys) = do
-  tys <- mapM renameType tys
+renameType (HsTyTuple b tys0) = do
+  tys <- mapM renameType tys0
   return (HsTyTuple b tys)
-renameType (HsTyApp ty arg) = do
-  ty <- renameType ty
-  arg <- renameType arg
+renameType (HsTyApp ty0 arg0) = do
+  ty <- renameType ty0
+  arg <- renameType arg0
   return (HsTyApp ty arg)
 renameType (HsTyVar nm) =
   return (HsTyVar nm)
 renameType (HsTyCon nm) =
   lookupRn HsTyCon nm
-renameType (HsTyDoc ty doc) = do
-  ty <- renameType ty
-  doc <- renameDoc doc
+renameType (HsTyDoc ty0 doc0) = do
+  ty <- renameType ty0
+  doc <- renameDoc doc0
   return (HsTyDoc ty doc)
 
 -- -----------------------------------------------------------------------------
@@ -181,8 +190,10 @@ markupRename = Markup {
   markupURL	      = return . DocURL
   }
 
+renameDoc :: Doc -> RnM Doc
 renameDoc = markup markupRename
 
+renameMaybeDoc :: Maybe Doc -> RnM (Maybe Doc)
 renameMaybeDoc Nothing = return Nothing
 renameMaybeDoc (Just doc) = Just `liftM` renameDoc doc
 
@@ -206,21 +217,22 @@ lookupForDoc qns = do
 		-- string representation.
 		return (DocString (show (head qns)))
  where
-   isQualified (Qual m i) = True
+   isQualified (Qual _ _) = True
    isQualified _ = False
    
 -- -----------------------------------------------------------------------------
 
+renameExportItems :: [ExportItem] -> RnM [ExportItem]
 renameExportItems items = mapM rn items
   where
-	rn (ExportModule mod)
-	   = return (ExportModule mod)
- 	rn (ExportGroup lev id doc) 
-	   = do doc <- renameDoc doc
-	        return (ExportGroup lev id doc)
-	rn (ExportDecl x decl) -- x is an original name, don't rename it
-	   = do decl <- renameDecl decl
+	rn (ExportModule mod0)
+	   = return (ExportModule mod0)
+ 	rn (ExportGroup lev id0 doc0) 
+	   = do doc <- renameDoc doc0
+	        return (ExportGroup lev id0 doc)
+	rn (ExportDecl x decl0) -- x is an original name, don't rename it
+	   = do decl <- renameDecl decl0
 		return (ExportDecl x decl)
-	rn (ExportDoc doc)
-	   = do doc <- renameDoc doc
+	rn (ExportDoc doc0)
+	   = do doc <- renameDoc doc0
 		return (ExportDoc doc)

@@ -15,11 +15,12 @@ addToTrees (s1:ss) (t@(Node s2 leaf subs) : ts)
   | s1 == s2  = Node s2 (leaf || null ss) (addToTrees ss subs) : ts
   | otherwise = mkSubTree (s1:ss) ++ t : ts
 
+mkSubTree :: [String] -> [ModuleTree]
 mkSubTree [] = []
 mkSubTree (s:ss) = [Node s (null ss) (mkSubTree ss)]
 
 splitModule :: Module -> [String]
-splitModule (Module mod) = split mod
-  where split mod = case break (== '.') mod of
+splitModule (Module mdl) = split mdl
+  where split mdl0 = case break (== '.') mdl0 of
      			(s1, '.':s2) -> s1 : split s2
-     			(s1, _) -> [s1]
+     			(s1, _)      -> [s1]

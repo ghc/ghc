@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: BlockTable.hs,v 1.1 2002/04/08 16:41:37 simonmar Exp $
+-- $Id: BlockTable.hs,v 1.2 2002/07/24 09:42:18 simonmar Exp $
 --
 -- An Html combinator library
 --
@@ -102,7 +102,7 @@ infixr 3 `above`
 -- to show boxes aka the above ascii renditions.
 
 instance (Show a) => Show (BlockTable a) where
-      showsPrec p = showsTable
+      showsPrec _ = showsTable
 
 type TableI a = [[(a,(Int,Int))]] -> [[(a,(Int,Int))]]
 
@@ -115,7 +115,7 @@ single :: a -> BlockTable a
 single a = Table (\ x y r -> [(a,(x+1,y+1))] : r) 1 1
 
 empty :: BlockTable a
-empty = Table (\ x y r -> r) 0 0
+empty = Table (\ _ _ r -> r) 0 0
 
 
 -- You can compose tables, horizonally and vertically
@@ -134,12 +134,12 @@ t1 `beside` t2 = combine t1 t2 (\ lst1 lst2 r ->
       -- but is always true for these combinators.
       -- I should assert this!
       -- I should even prove this.
-      beside (x:xs) (y:ys) = (x ++ y) : beside xs ys
-      beside (x:xs) []     = x        : xs ++ r
-      beside []     (y:ys) = y        : ys ++ r
-      beside []     []     =                  r
+      beside' (x:xs) (y:ys) = (x ++ y) : beside' xs ys
+      beside' (x:xs) []     = x        : xs ++ r
+      beside' []     (y:ys) = y        : ys ++ r
+      beside' []     []     =                  r
     in
-      beside (lst1 []) (lst2 []))
+      beside' (lst1 []) (lst2 []))
 
 -- trans flips (transposes) over the x and y axis of
 -- the table. It is only used internally, and typically

@@ -45,14 +45,15 @@ import PackedString
 
 -----------------------------------------------------------------------------
 -- Top-level stuff
-
+main :: IO ()
 main = do
-  args <- getArgs
-  case getOpt Permute options args of
+  cmdline <- getArgs
+  case getOpt Permute options cmdline of
     (flags, args, []    ) -> run flags args
     (_,     _,    errors) -> do sequence_ (map putStr errors)
 				putStr usage
 
+usage :: String
 usage = usageInfo "usage: haddock [OPTION] file...\n" options
 
 data Flag
@@ -72,6 +73,7 @@ data Flag
   | Flag_Verbose
   deriving (Eq)
 
+options :: [OptDescr Flag]
 options =
   [ 
     Option ['d']  ["docbook"]  (NoArg Flag_DocBook)
@@ -107,14 +109,15 @@ options =
 saved_flags :: IORef [Flag]
 saved_flags = unsafePerformIO (newIORef (error "no flags yet"))
 
+run :: [Flag] -> [FilePath] -> IO ()
 run flags files = do
   let title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
-		(t:ts) -> t
+		(t:_) -> t
 
       source_url = case [str | Flag_SourceURL str <- flags] of
 			[] -> Nothing
-			(t:ts) -> Just t
+			(t:_) -> Just t
 
   when (Flag_Verbose `elem` flags) $
      hPutStrLn stderr 
@@ -161,19 +164,19 @@ run flags files = do
   -- modules to interfaces.
   let 
 	loop ifaces [] = return ifaces
-	loop ifaces ((hsmod,file):mods)  = do 
-	   let ((mod,iface),msgs) = runWriter $
+	loop ifaces ((hsmod,file):mdls)  = do 
+	   let ((mdl,iface),msgs) = runWriter $
 		   mkInterface no_implicit_prelude ifaces file hsmod
-	       new_ifaces = addToFM ifaces mod iface
+	       new_ifaces = addToFM ifaces mdl iface
 	   mapM (hPutStrLn stderr) msgs
-	   loop new_ifaces mods
+	   loop new_ifaces mdls
 
   module_map <- loop (listToFM read_ifaces) sorted_mod_files
   let mod_ifaces = fmToList module_map
 
-      these_mod_ifaces = [ (mod, iface) 
-			 | (mod, iface) <- mod_ifaces,
-			   mod `notElem` external_mods ]
+      these_mod_ifaces = [ (mdl, iface) 
+			 | (mdl, iface) <- mod_ifaces,
+			   mdl `notElem` external_mods ]
 
 --  when (Flag_DocBook `elem` flags) $
 --    putStr (ppDocBook odir mod_ifaces)
@@ -181,9 +184,9 @@ run flags files = do
   let inst_maps = collectInstances these_mod_ifaces
 
   when (Flag_Debug `elem` flags) $ do
-    mapM_ putStrLn (map show [ (mod, fmToList (iface_env i), 
+    mapM_ putStrLn (map show [ (mdl, fmToList (iface_env i), 
 				     fmToList (iface_sub i))
-			     | (mod, i) <-  these_mod_ifaces ])
+			     | (mdl, i) <-  these_mod_ifaces ])
 
   when (Flag_Html `elem` flags) $
     ppHtml title source_url these_mod_ifaces odir css_file 
@@ -198,13 +201,13 @@ run flags files = do
 	writeBinMem bh fn
       where
 	prepared_ifaces = 
-	  [ (mod, fmToList (iface_env iface), fmToList (iface_sub iface))
-	  | (mod, iface) <- these_mod_ifaces ]
+	  [ (mdl, fmToList (iface_env iface), fmToList (iface_sub iface))
+	  | (mdl, iface) <- these_mod_ifaces ]
 
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
   case break (==',') s of
-	(path,',':file) -> (path,file)
+	(fpath,',':file) -> (fpath,file)
 	(_, file)       -> ("", file)
 
 readIface :: FilePath -> IO [(Module,Interface)]
@@ -213,8 +216,8 @@ readIface filename = do
   stuff <- get bh
   return (map to_interface stuff)
  where 
-   to_interface (mod, env, sub) = 
-	  (mod, Interface { 
+   to_interface (mdl, env, sub) = 
+	  (mdl, Interface { 
 		   iface_filename     = "",
 		   iface_env          = listToFM env,
 		   iface_sub	      = listToFM sub,
@@ -233,19 +236,19 @@ updateHTMLXRefs :: [FilePath] -> [[(Module,Interface)]] -> IO ()
 updateHTMLXRefs paths ifaces_s =
   writeIORef html_xrefs_ref (listToFM mapping)
  where
-  mapping = [ (mod,path) 
-	    | (path, ifaces) <- zip paths ifaces_s,
-	      (mod, _iface) <- ifaces
+  mapping = [ (mdl,fpath) 
+	    | (fpath, ifaces) <- zip paths ifaces_s,
+	      (mdl, _iface) <- ifaces
 	    ]
 
-
+parse_file :: FilePath -> IO HsModule
 parse_file file = do
   bracket 
     (openFile file ReadMode)
     (\h -> hClose h)
     (\h -> do stuff <- hGetContents h 
 	      case parse stuff (SrcLoc 1 1) 1 0 [] of
-	        Ok state e -> return e
+	        Ok _ e -> return e
 	        Failed err -> do hPutStrLn stderr (file ++ ':':err)
 				 exitWith (ExitFailure 1)
     )
@@ -273,10 +276,10 @@ mkInterface
 	      )
 
 mkInterface no_implicit_prelude mod_map filename 
-	(HsModule mod exps imps decls maybe_opts maybe_info maybe_doc) = do  
+	(HsModule mdl exps imps decls maybe_opts maybe_info maybe_doc) = do  
 
   -- Process the options, if available
-  options <- case maybe_opts of
+  opts <- case maybe_opts of
 		Just opt_str -> processOptions opt_str
 		Nothing      -> return []
 
@@ -293,7 +296,7 @@ mkInterface no_implicit_prelude mod_map filename
      -- now find the defined names
      locally_defined_names = collectNames annotated_decls
 
-     qual_local_names   = map (Qual mod) locally_defined_names
+     qual_local_names   = map (Qual mdl) locally_defined_names
      unqual_local_names = map UnQual     locally_defined_names
 
      local_orig_env = listToFM (zip unqual_local_names qual_local_names ++
@@ -305,7 +308,7 @@ mkInterface no_implicit_prelude mod_map filename
 	| otherwise = HsImportDecl loc prelude_mod False Nothing Nothing : imps
 	where 
 		loc = SrcLoc 0 0
-	 	is_prel_import (HsImportDecl _ mod _ _ _ ) = mod == prelude_mod
+	 	is_prel_import (HsImportDecl _ mdl0 _ _ _ ) = mdl0 == prelude_mod
 
      -- build the orig_env, which maps names to *original* names (so we can
      -- find the original declarations & docs for things).
@@ -320,14 +323,14 @@ mkInterface no_implicit_prelude mod_map filename
 
      -- gather up a list of entities that are exported (original names)
      (exported_names, exported_visible_names)
-	 = exportedNames mod mod_map
+	 = exportedNames mdl mod_map
 			locally_defined_names orig_env sub_map
-			orig_exports options
+			orig_exports opts
 
      -- build the import env, which maps original names to import names
      local_import_env = listToFM (zip qual_local_names qual_local_names)
      import_env = local_import_env `plusFM`
-		   buildImportEnv mod_map mod exported_visible_names 
+		   buildImportEnv mod_map mdl exported_visible_names 
 			implicit_imps
 
   -- trace (show (fmToList orig_env)) $ do
@@ -341,14 +344,14 @@ mkInterface no_implicit_prelude mod_map filename
      instances = [ d | d@HsInstDecl{} <- final_decls ]
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list <- mkExportItems mod_map mod orig_env decl_map sub_map
-			 		final_decls options orig_exports
+  orig_export_list <- mkExportItems mod_map mdl orig_env decl_map sub_map
+			 		final_decls opts orig_exports
 
   let
      -- prune the export list to just those declarations that have
      -- documentation, if the 'prune' option is on.
      pruned_export_list
-	| OptPrune `elem` options = pruneExportItems orig_export_list
+	| OptPrune `elem` opts = pruneExportItems orig_export_list
 	| otherwise = orig_export_list
 
      -- rename names in the exported declarations to point to things that
@@ -372,12 +375,12 @@ mkInterface no_implicit_prelude mod_map filename
       name_strings = nub (map show missing_names)
 
   when (not (null name_strings)) $
-	  tell ["Warning: " ++ show mod ++ 
+	  tell ["Warning: " ++ show mdl ++ 
 		": the following names could not be resolved:\n\ 
 		\   " ++ concat (map (' ':) name_strings)
 		]
 
-  return (mod, Interface { 
+  return (mdl, Interface { 
 		   iface_filename     = filename,
 		   iface_env          = name_env,
 		   iface_exports      = renamed_export_list,
@@ -387,7 +390,7 @@ mkInterface no_implicit_prelude mod_map filename
 		   iface_decls        = decl_map,
 		   iface_info	      = maybe_info,
 		   iface_doc          = final_module_doc,
-		   iface_options      = options
+		   iface_options      = opts
 		}
       	  )
 
@@ -408,10 +411,10 @@ mkExportItems
 	-> ErrMsgM [ExportItem]
 
 mkExportItems mod_map this_mod orig_env decl_map sub_map decls
-	 options maybe_exps
-  | Nothing <- maybe_exps	    = everything_local_exported
-  | OptIgnoreExports `elem` options = everything_local_exported
-  | Just specs <- maybe_exps = do 
+	 opts maybe_exps
+  | Nothing <- maybe_exps	 = everything_local_exported
+  | OptIgnoreExports `elem` opts = everything_local_exported
+  | Just specs <- maybe_exps     = do 
 	exps <- mapM lookupExport specs
         return (concat exps)
   where
@@ -434,10 +437,10 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
     in_scope = eltsFM orig_env
 
     declWith :: HsQName -> Maybe [HsQName] -> ErrMsgM [ ExportItem ]
-    declWith (UnQual x)     mb_subs = return []
-    declWith t@(Qual mod x) mb_subs
+    declWith (UnQual _)     _ = return []
+    declWith t@(Qual mdl x) mb_subs
 	| Just decl <- findDecl t
-	= return [ ExportDecl t (restrictTo subs (extractDecl x mod decl)) ]
+	= return [ ExportDecl t (restrictTo subs (extractDecl x mdl decl)) ]
 	| otherwise
 	= return []
 	where 
@@ -449,9 +452,9 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 	      in_scope_subs = map nameOfQName in_scope_subs_qnames
 	      in_scope_subs_qnames = filter (`elem` in_scope) all_subs_qnames
 
-	      all_subs_qnames = map (Qual mod) all_subs
+	      all_subs_qnames = map (Qual mdl) all_subs
 
-	      all_subs | mod == this_mod = lookupWithDefaultFM sub_map [] x
+	      all_subs | mdl == this_mod = lookupWithDefaultFM sub_map [] x
 		       | otherwise       = all_subs_of_qname mod_map t
 
     fullContentsOf m
@@ -466,7 +469,7 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 			   return []
 
     findDecl :: HsQName -> Maybe HsDecl
-    findDecl (UnQual n)
+    findDecl (UnQual _)
 	= Nothing	-- must be a name we couldn't resolve
     findDecl (Qual m n)
 	| m == this_mod  = lookupFM decl_map n
@@ -475,12 +478,14 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 		Just iface -> lookupFM (iface_decls iface) n
 		Nothing -> Nothing
 
-fullContentsOfThisModule mod decls = 
+fullContentsOfThisModule :: Module -> [HsDecl] -> [ExportItem]
+fullContentsOfThisModule mdl decls = 
   map mkExportItem (filter keepDecl decls)
-  where mkExportItem (HsDocGroup loc lev doc) = ExportGroup lev "" doc
-	mkExportItem decl = ExportDecl (Qual mod x) decl
+  where mkExportItem (HsDocGroup _ lev doc) = ExportGroup lev "" doc
+	mkExportItem decl = ExportDecl (Qual mdl x) decl
 	     where Just x = declMainBinder decl
 
+keepDecl :: HsDecl -> Bool
 keepDecl HsTypeSig{}       = True
 keepDecl HsTypeDecl{}      = True
 keepDecl HsNewTypeDecl{}   = True
@@ -496,51 +501,57 @@ keepDecl _ = False
 -- together a type signature for it...)
 
 extractDecl :: HsName -> Module -> HsDecl -> HsDecl
-extractDecl name mod decl
+extractDecl name mdl decl
   | Just n <- declMainBinder decl, n == name  =  decl
   | otherwise  =  
 	case decl of
-	    HsClassDecl loc ctxt n tvs fds decls mb_doc ->
+	    HsClassDecl _ _ n tvs _ decls _ ->
 		case [ d | d@HsTypeSig{} <- decls, 
 			   declMainBinder d == Just name ] of
-		  [decl] -> extractClassDecl n mod tvs decl
+		  [d0] -> extractClassDecl n mdl tvs d0
 		  _ -> error "internal: extractDecl"
 
-	    HsDataDecl loc ctxt t tvs cons drvs mb_doc ->
-		extractRecSel name mod t tvs cons
+	    HsDataDecl _ _ t tvs cons _ _ ->
+		extractRecSel name mdl t tvs cons
 
-	    HsNewTypeDecl loc ctxt t tvs con drvs mb_doc ->
-		extractRecSel name mod t tvs [con]
+	    HsNewTypeDecl _ _ t tvs con _ _ ->
+		extractRecSel name mdl t tvs [con]
 
 	    _ -> error ("extractDecl: "  ++ show decl)
 
-
-extractClassDecl c mod tvs (HsTypeSig loc [n] ty doc)
+extractClassDecl :: HsName -> Module -> [HsName] -> HsDecl -> HsDecl
+extractClassDecl c mdl tvs0 (HsTypeSig loc [n] ty doc)
  = case ty of
  	HsForAllType tvs ctxt' ty' -> 
 	  HsTypeSig loc [n] (HsForAllType tvs (ctxt ++ ctxt') ty') doc
-	ty -> 
+	_ -> 
 	  HsTypeSig loc [n] (HsForAllType Nothing ctxt ty) doc
  where
-  ctxt = [(Qual mod c, map HsTyVar tvs)]
+  ctxt = [(Qual mdl c, map HsTyVar tvs0)]
+extractClassDecl _ _ _ d =
+     error $ "Main.extractClassDecl: unexpected decl: " ++ show d
 
-extractRecSel nm mod t tvs [] = error "extractRecSel: selector not found"
-extractRecSel nm mod t tvs (HsRecDecl loc c _tvs ctxt fields _mb_doc : rest)
+extractRecSel :: HsName -> Module -> HsName -> [HsName] -> [HsConDecl]
+              -> HsDecl
+extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
+extractRecSel _ _ _ _ (d@(HsConDecl{}):_) =
+    error $ "Main.extractRecSel: unexpected (con)decl" ++ show d
+extractRecSel nm mdl t tvs (HsRecDecl loc _ _tvs _ fields _mb_doc : rest)
   | (HsFieldDecl ns ty mb_doc : _) <- matching_fields
 	= HsTypeSig loc [nm] (HsTyFun data_ty (unbang ty)) mb_doc
-  | otherwise = extractRecSel nm mod t tvs rest
+  | otherwise = extractRecSel nm mdl t tvs rest
   where
 	matching_fields = [ f | f@(HsFieldDecl ns ty mb_doc) <- fields,
 			        nm `elem` ns ]
 
-	data_ty = foldl HsTyApp (HsTyCon (Qual mod t)) (map HsTyVar tvs)
+	data_ty = foldl HsTyApp (HsTyCon (Qual mdl t)) (map HsTyVar tvs)
 
 -- -----------------------------------------------------------------------------
 -- Pruning
 
 pruneExportItems :: [ExportItem] -> [ExportItem]
 pruneExportItems items = filter has_doc items
-  where has_doc (ExportDecl x d) = isJust (declDoc d)
+  where has_doc (ExportDecl _ d) = isJust (declDoc d)
 	has_doc _ = True
 
 -- -----------------------------------------------------------------------------
@@ -562,14 +573,14 @@ exportedNames :: Module -> ModuleMap -> [HsName]
 	-> [DocOption]
 	-> ([HsQName], [HsQName])
 
-exportedNames mod mod_map local_names orig_env sub_map maybe_exps options
+exportedNames mdl mod_map local_names orig_env sub_map maybe_exps opts
   | Nothing <- maybe_exps 	    = all_local_names_pr
-  | OptIgnoreExports `elem` options = all_local_names_pr
+  | OptIgnoreExports `elem` opts = all_local_names_pr
   | Just expspecs <- maybe_exps     = 
 	(concat (map extract expspecs), 
 	 concat (map extract_vis expspecs))
  where
-  all_local_names = map (Qual mod) local_names
+  all_local_names = map (Qual mdl) local_names
   all_local_names_pr = (all_local_names,all_local_names)
 
   in_scope = eltsFM orig_env
@@ -581,12 +592,12 @@ exportedNames mod mod_map local_names orig_env sub_map maybe_exps options
     HsEThingAll t@(Qual m x) ->
 	 t : filter (`elem` in_scope) (map (Qual m) all_subs)
 	 where
-	      all_subs | m == mod  = lookupWithDefaultFM sub_map [] x
+	      all_subs | m == mdl  = lookupWithDefaultFM sub_map [] x
 		       | otherwise = all_subs_of_qname mod_map t
 
     HsEThingWith t cs -> t : cs
     HsEModuleContents m
-	| m == mod  -> map (Qual mod) local_names
+	| m == mdl  -> map (Qual mdl) local_names
 	| otherwise ->
 	  case lookupFM mod_map m of
 	    Just iface -> filter (`elem` in_scope) (eltsFM (iface_env iface))
@@ -599,7 +610,7 @@ exportedNames mod mod_map local_names orig_env sub_map maybe_exps options
   extract_vis e = 
    case e of
     HsEModuleContents m
-	| m == mod  -> map (Qual mod) local_names
+	| m == mdl  -> map (Qual mdl) local_names
 	| otherwise ->
 	  case lookupFM mod_map m of
 	    Just iface
@@ -615,22 +626,24 @@ exportedNames mod mod_map local_names orig_env sub_map maybe_exps options
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
 all_subs_of_qname :: ModuleMap -> HsQName -> [HsName]
-all_subs_of_qname mod_map (Qual mod nm) =
-  case lookupFM mod_map mod of
+all_subs_of_qname mod_map (Qual mdl nm) =
+  case lookupFM mod_map mdl of
 	Just iface -> lookupWithDefaultFM (iface_sub iface) [] nm
-	Nothing -> []
+	Nothing    -> []
+all_subs_of_qname _ n@(UnQual _) =
+    error $ "Main.all_subs_of_qname: unexpected unqual'd name:" ++ show n
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 -- Building name environments
 
 buildOrigEnv :: ModuleMap -> [HsImportDecl] -> FiniteMap HsQName HsQName
 buildOrigEnv mod_map imp_decls
   = foldr plusFM emptyFM (map build imp_decls)
   where
-  build (HsImportDecl _ mod qual maybe_as spec)
-    = case lookupFM mod_map mod of
+  build (HsImportDecl _ mdl qual maybe_as spec)
+    = case lookupFM mod_map mdl of
        Nothing -> 
-	  trace ("Warning: module not found: " ++ show mod) $ emptyFM
+	  trace ("Warning: module not found: " ++ show mdl) $ emptyFM
        Just iface -> 
 	  case spec of
 		-- no import specs
@@ -652,7 +665,7 @@ buildOrigEnv mod_map imp_decls
 
         qual_module
 	  | Just m <- maybe_as = m
-	  | otherwise          = mod
+	  | otherwise          = mdl
 
 	env = iface_env iface
 
@@ -675,7 +688,7 @@ buildOrigEnv mod_map imp_decls
 	one_name :: HsName -> [(HsQName,HsQName)]
 	one_name nm = 
 	   case lookupFM env nm of
-		Nothing ->  trace ("Warning: " ++ show mod
+		Nothing ->  trace ("Warning: " ++ show mdl
 				    ++ " does not export " ++ show nm) []
 		Just qnm -> orig_map (nm,qnm)
 
@@ -685,14 +698,14 @@ buildImportEnv :: ModuleMap -> Module -> [HsQName] -> [HsImportDecl]
 buildImportEnv mod_map this_mod exported_names imp_decls
   = foldr plusFM emptyFM (map build imp_decls)
   where
-  build (HsImportDecl _ mod qual maybe_as _)
-    = case lookupFM mod_map mod of
+  build (HsImportDecl _ mdl _ _ _)
+    = case lookupFM mod_map mdl of
        Nothing    -> emptyFM
        Just iface -> listToFM (map import_map (fmToList (iface_env iface)))
     where
 	import_map (nm,qnm) = (qnm, maps_to)
  	  where maps_to | qnm `elem` exported_names = Qual this_mod nm
-		        | otherwise = Qual mod nm
+		        | otherwise = Qual mdl nm
 
 -- -----------------------------------------------------------------------------
 -- Expand multiple type signatures
@@ -709,26 +722,29 @@ expandDecl d = [ d ]
 collectDoc :: [HsDecl] -> [HsDecl]
 collectDoc decls = collect Nothing DocEmpty decls
 
+collect :: Maybe HsDecl -> GenDoc [HsQName] -> [HsDecl] -> [HsDecl]
 collect d doc_so_far [] = 
    case d of
 	Nothing -> []
-	Just d  -> finishedDoc d doc_so_far []
+	Just d0  -> finishedDoc d0 doc_so_far []
 
 collect d doc_so_far (decl:ds) = 
    case decl of
-      HsDocCommentNext loc str -> 
+      HsDocCommentNext _ str -> 
 	case d of
 	   Nothing -> collect d (docAppend doc_so_far str) ds
-	   Just d  -> finishedDoc d doc_so_far (collect Nothing str ds)
+	   Just d0 -> finishedDoc d0 doc_so_far (collect Nothing str ds)
 
-      HsDocCommentPrev loc str -> collect d (docAppend doc_so_far str) ds
+      HsDocCommentPrev _ str -> collect d (docAppend doc_so_far str) ds
 
       _other -> 
 	let decl' = collectInDecl decl in
 	case d of
 	    Nothing -> collect (Just decl') doc_so_far ds
-	    Just d  -> finishedDoc d doc_so_far (collect (Just decl') DocEmpty ds)
+	    Just d0 -> finishedDoc d0 doc_so_far
+                           (collect (Just decl') DocEmpty ds)
 
+finishedDoc :: HsDecl -> GenDoc [HsQName] -> [HsDecl] -> [HsDecl]
 finishedDoc d DocEmpty rest = d : rest
 finishedDoc d doc rest = d' : rest
  where d' = 
@@ -747,6 +763,7 @@ finishedDoc d doc rest = d' : rest
 		HsForeignImport loc cc sf str n ty (Just doc)
 	  _other -> d
 
+collectInDecl :: HsDecl -> HsDecl
 collectInDecl (HsClassDecl loc ctxt n tvs fds meths doc)
   = HsClassDecl loc ctxt n tvs fds (collect Nothing DocEmpty meths) doc
 collectInDecl decl
@@ -760,7 +777,7 @@ findNamedDoc name decls = search decls
 	where search [] = do
 		tell ["Cannot find documentation for: $" ++ name]
 		return Nothing
-	      search (HsDocCommentNamed loc name' doc : rest) 
+	      search (HsDocCommentNamed _ name' doc : rest) 
 			| name == name' = return (Just doc)
 		   	| otherwise = search rest
 	      search (_other_decl : rest) = search rest
@@ -789,18 +806,18 @@ parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
 -- Topologically sort the modules
 
 sortModules :: [(HsModule,FilePath)] -> IO [(HsModule,FilePath)]
-sortModules mods = mapM for_each_scc sccs
+sortModules mdls = mapM for_each_scc sccs
   where
 	sccs = stronglyConnComp edges
 
 	edges :: [((HsModule,FilePath), Module, [Module])]
-	edges = [ ((hsmod,file), mod, get_imps impdecls)
-		| (hsmod@(HsModule mod _ impdecls _ _ _ _), file) <- mods
+	edges = [ ((hsmod,file), mdl, get_imps impdecls)
+		| (hsmod@(HsModule mdl _ impdecls _ _ _ _), file) <- mdls
 		]
 
         get_imps impdecls  = [ imp | HsImportDecl _ imp _ _ _ <- impdecls  ]
 
-	get_mods hsmodules = [ mod | HsModule mod _ _ _ _ _ _ <- hsmodules ]
+	get_mods hsmodules = [ mdl | HsModule mdl _ _ _ _ _ _ <- hsmodules ]
 
 	for_each_scc (AcyclicSCC hsmodule) = return hsmodule
 	for_each_scc (CyclicSCC  hsmodules) = 

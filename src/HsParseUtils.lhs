@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsParseUtils.lhs,v 1.4 2002/06/03 13:05:58 simonmar Exp $
+-- $Id: HsParseUtils.lhs,v 1.5 2002/07/24 09:42:18 simonmar Exp $
 --
 -- (c) The GHC Team 1997-2000
 --
@@ -45,13 +45,13 @@ parseError s = \r (SrcLoc y x) ->
     failP (show y ++ ":" ++ show x ++ ": " ++ s) r (SrcLoc y x)
 
 splitTyConApp :: HsType -> P (HsName,[HsType])
-splitTyConApp t = split t []
+splitTyConApp t0 = split t0 []
  where
 	split :: HsType -> [HsType] -> P (HsName,[HsType])
 	split (HsTyApp t u) ts = split t (u:ts)
 	split (HsTyCon (UnQual t)) ts = returnP (t,ts)
 		-- to cope with data [] = [] | a:[a]
-	split (HsTyCon (Qual m t)) ts = returnP (t,ts)
+	split (HsTyCon (Qual _ t)) ts = returnP (t,ts)
 	split _ _ = parseError "Illegal data/newtype declaration"
 
 -----------------------------------------------------------------------------
@@ -100,7 +100,7 @@ checkClassHeader ty =
 checkSimple :: String -> HsType -> [HsName] -> P ((HsName,[HsName]))
 checkSimple kw (HsTyApp l (HsTyVar a)) xs = checkSimple kw l (a:xs)
 checkSimple _kw (HsTyCon (UnQual t))   xs = returnP (t,xs)
-checkSimple kw (HsTyCon (Qual m t))    xs
+checkSimple _ (HsTyCon (Qual m t))    xs
   | m == prelude_mod = returnP (t,xs)	-- for "special" declarations
 checkSimple kw _ _ = failP ("Illegal " ++ kw ++ " declaration")
 
@@ -118,29 +118,29 @@ checkPatterns es = mapP checkPattern es
 
 checkPat :: HsExp -> [HsPat] -> P HsPat
 checkPat (HsCon c) args = returnP (HsPApp c args)
-checkPat (HsApp f x) args = checkPat x [] `thenP` \x -> checkPat f (x:args)
-checkPat e [] = case e of
-	HsVar (UnQual x)   -> returnP (HsPVar x)
-	HsLit l            -> returnP (HsPLit l)
-	HsInfixApp l op r  -> checkPat l [] `thenP` \l ->
-			      checkPat r [] `thenP` \r ->
-			      case op of
-				 HsCon c -> returnP (HsPInfixApp l c r)
-				 _ -> patFail
-	HsTuple b es       -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (HsPTuple b ps)
-	HsList es	   -> mapP (\e -> checkPat e []) es `thenP` \ps ->
-			      returnP (HsPList ps)
-	HsParen e	   -> checkPat e [] `thenP` (returnP . HsPParen)
-	HsAsPat n e	   -> checkPat e [] `thenP` (returnP . HsPAsPat n)
-	HsWildCard	   -> returnP HsPWildCard
-	HsIrrPat e	   -> checkPat e [] `thenP` (returnP . HsPIrrPat)
-	HsRecConstr c fs   -> mapP checkPatField fs `thenP` \fs ->
-			      returnP (HsPRec c fs)
-	HsNegApp (HsLit l) -> returnP (HsPNeg (HsPLit l))
-	HsExpTypeSig l e ty -> checkPat e [] `thenP` \e -> 
-			       returnP (HsPTypeSig e ty)
-	_ -> patFail
+checkPat (HsApp f x0) args = checkPat x0 [] `thenP` \x -> checkPat f (x:args)
+checkPat e0 [] = case e0 of
+	HsVar (UnQual x)     -> returnP (HsPVar x)
+	HsLit l              -> returnP (HsPLit l)
+	HsInfixApp l0 op r0  -> checkPat l0 [] `thenP` \l ->
+			        checkPat r0 [] `thenP` \r ->
+			        case op of
+				     HsCon c -> returnP (HsPInfixApp l c r)
+				     _       -> patFail
+	HsTuple b es         -> mapP (\e -> checkPat e []) es `thenP` \ps ->
+			        returnP (HsPTuple b ps)
+	HsList es	     -> mapP (\e -> checkPat e []) es `thenP` \ps ->
+			        returnP (HsPList ps)
+	HsParen e	     -> checkPat e [] `thenP` (returnP . HsPParen)
+	HsAsPat n e	     -> checkPat e [] `thenP` (returnP . HsPAsPat n)
+	HsWildCard	     -> returnP HsPWildCard
+	HsIrrPat e	     -> checkPat e [] `thenP` (returnP . HsPIrrPat)
+	HsRecConstr c fs0    -> mapP checkPatField fs0 `thenP` \fs ->
+			        returnP (HsPRec c fs)
+	HsNegApp (HsLit l)   -> returnP (HsPNeg (HsPLit l))
+	HsExpTypeSig _ e1 ty -> checkPat e1 [] `thenP` \e -> 
+			        returnP (HsPTypeSig e ty)
+	_                    -> patFail
 
 checkPat _ _ = patFail
 
@@ -148,24 +148,25 @@ checkPatField :: HsFieldUpdate -> P HsPatField
 checkPatField (HsFieldUpdate n e) = 
    checkPat e [] `thenP` \p ->returnP (HsPFieldPat n p)
 
+patFail :: P a
 patFail = parseError "Parse error in pattern"
 
 -----------------------------------------------------------------------------
 -- Check Expression Syntax
 
 checkExpr :: HsExp -> P HsExp
-checkExpr e = case e of
-	HsVar _			  -> returnP e
-	HsCon _			  -> returnP e
-	HsLit _			  -> returnP e
+checkExpr e0 = case e0 of
+	HsVar _			  -> returnP e0
+	HsCon _			  -> returnP e0
+	HsLit _			  -> returnP e0
 	HsInfixApp e1 e2 e3	  -> check3Exprs e1 e2 e3 HsInfixApp
 	HsApp e1 e2		  -> check2Exprs e1 e2 HsApp
 	HsNegApp e		  -> check1Expr e HsNegApp
 	HsLambda ps e		  -> check1Expr e (HsLambda ps)
 	HsLet bs e		  -> check1Expr e (HsLet bs)
 	HsIf e1 e2 e3		  -> check3Exprs e1 e2 e3 HsIf
-	HsCase e alts		  -> mapP checkAlt alts `thenP` \alts ->
-				     checkExpr e `thenP` \e ->
+	HsCase e1 alts0		  -> mapP checkAlt alts0 `thenP` \alts ->
+				     checkExpr e1 `thenP` \e ->
 				     returnP (HsCase e alts)
 	HsDo stmts		  -> mapP checkStmt stmts `thenP` (returnP . HsDo)
 	HsTuple b es		  -> checkManyExprs es (HsTuple b)
@@ -173,19 +174,19 @@ checkExpr e = case e of
 	HsParen e		  -> check1Expr e HsParen
 	HsLeftSection e1 e2	  -> check2Exprs e1 e2 HsLeftSection
 	HsRightSection e1 e2      -> check2Exprs e1 e2 HsRightSection
-	HsRecConstr c fields	  -> mapP checkField fields `thenP` \fields ->
+	HsRecConstr c fields0	  -> mapP checkField fields0 `thenP` \fields ->
 				     returnP (HsRecConstr c fields)
-	HsRecUpdate e fields	  -> mapP checkField fields `thenP` \fields ->
-				     checkExpr e `thenP` \e ->
+	HsRecUpdate e1 fields0	  -> mapP checkField fields0 `thenP` \fields ->
+				     checkExpr e1 `thenP` \e ->
 				     returnP (HsRecUpdate e fields)
 	HsEnumFrom e		  -> check1Expr e HsEnumFrom
 	HsEnumFromTo e1 e2	  -> check2Exprs e1 e2 HsEnumFromTo
 	HsEnumFromThen e1 e2      -> check2Exprs e1 e2 HsEnumFromThen
 	HsEnumFromThenTo e1 e2 e3 -> check3Exprs e1 e2 e3 HsEnumFromThenTo
-	HsListComp e stmts        -> mapP checkStmt stmts `thenP` \stmts ->
-				     checkExpr e `thenP` \e ->
+	HsListComp e1 stmts0      -> mapP checkStmt stmts0 `thenP` \stmts ->
+				     checkExpr e1 `thenP` \e ->
 				     returnP (HsListComp e stmts)
-	HsExpTypeSig loc e ty     -> checkExpr e `thenP` \e ->
+	HsExpTypeSig loc e1 ty    -> checkExpr e1 `thenP` \e ->
 				     returnP (HsExpTypeSig loc e ty)
 	_                         -> parseError "parse error in expression"
 
@@ -195,52 +196,59 @@ check1Expr e f = checkExpr e `thenP` (returnP . f)
 
 check2Exprs :: HsExp -> HsExp -> (HsExp -> HsExp -> a) -> P a
 check2Exprs e1 e2 f = 
-	checkExpr e1 `thenP` \e1 ->
-	checkExpr e2 `thenP` \e2 ->
-	returnP (f e1 e2)
+	checkExpr e1 `thenP` \e1' ->
+	checkExpr e2 `thenP` \e2' ->
+	returnP (f e1' e2')
 
 check3Exprs :: HsExp -> HsExp -> HsExp -> (HsExp -> HsExp -> HsExp -> a) -> P a
 check3Exprs e1 e2 e3 f = 
-	checkExpr e1 `thenP` \e1 ->
-	checkExpr e2 `thenP` \e2 ->
-	checkExpr e3 `thenP` \e3 ->
-	returnP (f e1 e2 e3)
+	checkExpr e1 `thenP` \e1' ->
+	checkExpr e2 `thenP` \e2' ->
+	checkExpr e3 `thenP` \e3' ->
+	returnP (f e1' e2' e3')
 
-checkManyExprs es f =
-	mapP checkExpr es `thenP` \es ->
+checkManyExprs :: [HsExp] -> ([HsExp] -> HsExp) -> P HsExp
+checkManyExprs es0 f =
+	mapP checkExpr es0 `thenP` \es ->
 	returnP (f es) 
 
-checkAlt (HsAlt loc p galts bs) 
-	= checkGAlts galts `thenP` \galts -> returnP (HsAlt loc p galts bs)
+checkAlt :: HsAlt -> P HsAlt
+checkAlt (HsAlt loc p galts0 bs) 
+	= checkGAlts galts0 `thenP` \galts -> returnP (HsAlt loc p galts bs)
 
+checkGAlts :: HsGuardedAlts -> P HsGuardedAlts
 checkGAlts (HsUnGuardedAlt e) = check1Expr e HsUnGuardedAlt
 checkGAlts (HsGuardedAlts galts) 
     	= mapP checkGAlt galts `thenP` (returnP . HsGuardedAlts)
 
-checkGAlt (HsGuardedAlt loc stmts e) = 
-  mapP checkStmt stmts 	`thenP` \stmts ->
-  checkExpr e 		`thenP` \e ->
+checkGAlt :: HsGuardedAlt -> P HsGuardedAlt
+checkGAlt (HsGuardedAlt loc stmts0 e0) = 
+  mapP checkStmt stmts0	`thenP` \stmts ->
+  checkExpr e0 		`thenP` \e ->
   returnP (HsGuardedAlt loc stmts e)
 
+checkStmt :: HsStmt -> P HsStmt
 checkStmt (HsGenerator p e) = check1Expr e (HsGenerator p)
 checkStmt (HsQualifier e)   = check1Expr e HsQualifier
-checkStmt s@(HsLetStmt bs)  = returnP s
+checkStmt s@(HsLetStmt _)   = returnP s
 
+checkField :: HsFieldUpdate -> P HsFieldUpdate
 checkField (HsFieldUpdate n e) = check1Expr e (HsFieldUpdate n)
 
 -----------------------------------------------------------------------------
 -- Check Equation Syntax
 
 checkValDef :: (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-checkValDef (srcloc, lhs, rhs, whereBinds) =
-    case isFunLhs lhs [] of
+checkValDef (srcloc, lhs0, rhs, whereBinds) =
+    case isFunLhs lhs0 [] of
  	 Just (f,es) -> checkPatterns es `thenP` \ps ->
 	          	returnP (HsFunBind [HsMatch srcloc f ps rhs whereBinds])
-         Nothing     -> checkPattern lhs `thenP` \lhs ->
+         Nothing     -> checkPattern lhs0 `thenP` \lhs ->
 		  	returnP (HsPatBind srcloc lhs rhs whereBinds)
 
 -- A variable binding is parsed as an HsPatBind.
 
+isFunLhs :: HsExp -> [HsExp] -> Maybe (HsQName, [HsExp])
 isFunLhs (HsInfixApp l (HsVar op) r) es = Just (op, l:r:es)
 isFunLhs (HsApp (HsVar f) e) es = Just (f,e:es)
 isFunLhs (HsApp (HsParen f) e) es = isFunLhs f (e:es)
@@ -278,8 +286,10 @@ readInteger ('0':'x':ds) = readInteger2 16 isHexDigit ds
 readInteger          ds  = readInteger2 10 isDigit    ds
 
 readInteger2 :: Integer -> (Char -> Bool) -> String -> Integer
-readInteger2 radix isDig ds 
-  = foldl1 (\n d -> n * radix + d) (map (fromIntegral . digitToInt) ds)
+readInteger2 radix isDig ds
+    | and $ map isDig ds
+        = foldl1 (\n d -> n * radix + d) (map (fromIntegral . digitToInt) ds)
+    | otherwise = error $ "readInteger2:expected all digits, got " ++ show ds
 
 -- Hack...
 
@@ -290,7 +300,7 @@ readRational xs = (readInteger (i++m))%1 * 10^^(case e of {[] -> 0;  ('+':e2) ->
         e      = dropWhile (=='e') r2
 
 mkRecConstrOrUpdate :: HsExp -> [HsFieldUpdate] -> P HsExp
-mkRecConstrOrUpdate (HsCon c) fs       = returnP (HsRecConstr c fs)
-mkRecConstrOrUpdate exp       fs@(_:_) = returnP (HsRecUpdate exp fs)
-mkRecConstrOrUpdate _         _        = parseError "Empty record update"
+mkRecConstrOrUpdate (HsCon c) fs        = returnP (HsRecConstr c fs)
+mkRecConstrOrUpdate exp0       fs@(_:_) = returnP (HsRecUpdate exp0 fs)
+mkRecConstrOrUpdate _         _         = parseError "Empty record update"
 \end{code}

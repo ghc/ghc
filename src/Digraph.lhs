@@ -61,6 +61,7 @@ data SCC vertex = AcyclicSCC vertex
 flattenSCCs :: [SCC a] -> [a]
 flattenSCCs = concatMap flattenSCC
 
+flattenSCC :: SCC vertex -> [vertex]
 flattenSCC (AcyclicSCC v) = [v]
 flattenSCC (CyclicSCC vs) = vs
 \end{code}
@@ -73,8 +74,8 @@ stronglyConnComp
 					-- a vertex key, they are ignored
 	-> [SCC node]
 
-stronglyConnComp edges
-  = map get_node (stronglyConnCompR edges)
+stronglyConnComp edges0
+  = map get_node (stronglyConnCompR edges0)
   where
     get_node (AcyclicSCC (n, _, _)) = AcyclicSCC n
     get_node (CyclicSCC triples)     = CyclicSCC [n | (n,_,_) <- triples]
@@ -89,10 +90,10 @@ stronglyConnCompR
 	-> [SCC (node, key, [key])]
 
 stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEdges -- SOF
-stronglyConnCompR edges
+stronglyConnCompR edges0
   = map decode forest
   where
-    (graph, vertex_fn) = graphFromEdges edges
+    (graph, vertex_fn) = graphFromEdges edges0
     forest	       = scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
 		       | otherwise	   = AcyclicSCC (vertex_fn v)
@@ -128,7 +129,7 @@ mapT    :: (Vertex -> a -> b) -> Table a -> Table b
 mapT f t = array (bounds t) [ (,) v (f v (t!v)) | v <- indices t ]
 
 buildG :: Bounds -> [Edge] -> Graph
-buildG bounds edges = accumArray (flip (:)) [] bounds edges
+buildG bounds0 edges0 = accumArray (flip (:)) [] bounds0 edges0
 
 transposeG  :: Graph -> Graph
 transposeG g = buildG (bounds g) (reverseE g)
@@ -138,7 +139,7 @@ reverseE g   = [ (w, v) | (v, w) <- edges g ]
 
 outdegree :: Graph -> Table Int
 outdegree  = mapT numEdges
-             where numEdges v ws = length ws
+             where numEdges _ ws = length ws
 
 indegree :: Graph -> Table Int
 indegree  = outdegree . transposeG
@@ -150,30 +151,30 @@ graphFromEdges
 	:: Ord key
 	=> [(node, key, [key])]
 	-> (Graph, Vertex -> (node, key, [key]))
-graphFromEdges edges
+graphFromEdges edges0
   = (graph, \v -> vertex_map ! v)
   where
-    max_v      	    = length edges - 1
-    bounds          = (0,max_v) :: (Vertex, Vertex)
-    sorted_edges    = sortBy lt edges
+    max_v      	    = length edges0 - 1
+    bounds0          = (0,max_v) :: (Vertex, Vertex)
+    sorted_edges    = sortBy lt edges0
     edges1	    = zipWith (,) [0..] sorted_edges
 
-    graph	    = array bounds [(,) v (mapMaybe key_vertex ks) | (,) v (_,    _, ks) <- edges1]
-    key_map	    = array bounds [(,) v k			   | (,) v (_,    k, _ ) <- edges1]
-    vertex_map	    = array bounds edges1
+    graph	    = array bounds0 [(,) v (mapMaybe key_vertex ks) | (,) v (_,    _, ks) <- edges1]
+    key_map	    = array bounds0 [(,) v k			   | (,) v (_,    k, _ ) <- edges1]
+    vertex_map	    = array bounds0 edges1
 
     (_,k1,_) `lt` (_,k2,_) = k1 `compare` k2
 
     -- key_vertex :: key -> Maybe Vertex
     -- 	returns Nothing for non-interesting vertices
-    key_vertex k   = find 0 max_v 
+    key_vertex k   = findVertex 0 max_v 
 		   where
-		     find a b | a > b 
+		     findVertex a b | a > b 
 			      = Nothing
-		     find a b = case compare k (key_map ! mid) of
-				   LT -> find a (mid-1)
+		     findVertex a b = case compare k (key_map ! mid) of
+				   LT -> findVertex a (mid-1)
 				   EQ -> Just mid
-				   GT -> find (mid+1) b
+				   GT -> findVertex (mid+1) b
 			      where
 			 	mid = (a + b) `div` 2
 \end{code}
@@ -194,7 +195,7 @@ mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
 
 \begin{code}
 instance Show a => Show (Tree a) where
-  showsPrec p t s = showTree t ++ s
+  showsPrec _ t s = showTree t ++ s
 
 showTree :: Show a => Tree a -> String
 showTree  = drawTree . mapTree show
@@ -205,7 +206,8 @@ showForest  = unlines . map showTree
 drawTree        :: Tree String -> String
 drawTree         = unlines . draw
 
-draw (Node x ts) = grp this (space (length this)) (stLoop ts)
+draw :: Tree String -> [String]
+draw (Node x ts0) = grp this (space (length this)) (stLoop ts0)
  where this          = s1 ++ x ++ " "
 
        space n       = replicate n ' '
@@ -214,10 +216,11 @@ draw (Node x ts) = grp this (space (length this)) (stLoop ts)
        stLoop [t]    = grp s2 "  " (draw t)
        stLoop (t:ts) = grp s3 s4 (draw t) ++ [s4] ++ rsLoop ts
 
+       rsLoop []     = error "rsLoop:Unexpected empty list."
        rsLoop [t]    = grp s5 "  " (draw t)
        rsLoop (t:ts) = grp s6 s4 (draw t) ++ [s4] ++ rsLoop ts
 
-       grp fst rst   = zipWith (++) (fst:repeat rst)
+       grp fst0 rst   = zipWith (++) (fst0:repeat rst)
 
        [s1,s2,s3,s4,s5,s6] = ["- ", "--", "-+", " |", " `", " +"]
 \end{code}
@@ -257,7 +260,7 @@ prune bnds ts = runST (mkEmpty bnds  >>= \m ->
                        chop m ts)
 
 chop         :: Set s -> Forest Vertex -> ST s (Forest Vertex)
-chop m []     = return []
+chop _ []     = return []
 chop m (Node v ts : us)
               = contains m v >>= \visited ->
                 if visited then
@@ -281,7 +284,7 @@ chop m (Node v ts : us)
 ------------------------------------------------------------
 
 \begin{code}
---preorder            :: Tree a -> [a]
+preorder            :: Tree a -> [a]
 preorder (Node a ts) = a : preorderF ts
 
 preorderF           :: Forest a -> [a]
@@ -300,7 +303,7 @@ preArr bnds      = tabulate bnds . preorderF
 ------------------------------------------------------------
 
 \begin{code}
---postorder :: Tree a -> [a]
+postorder :: Tree a -> [a]
 postorder (Node a ts) = postorderF ts ++ [a]
 
 postorderF   :: Forest a -> [a]
@@ -384,7 +387,7 @@ do_label g dnum (Node v ts) = Node (v,dnum!v,lv) us
                      ++ [lu | Node (u,du,lu) xs <- us])
 
 bicomps :: Tree (Vertex,Int,Int) -> Forest [Vertex]
-bicomps (Node (v,dv,lv) ts)
+bicomps (Node (v,_,_) ts)
       = [ Node (v:vs) us | (l,Node vs us) <- map collect ts]
 
 collect :: Tree (Vertex,Int,Int) -> (Int, Tree [Vertex])

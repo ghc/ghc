@@ -39,48 +39,53 @@ import Monad
 -- -----------------------------------------------------------------------------
 -- Some Utilities
 
+nameOfQName :: HsQName -> HsName
 nameOfQName (Qual _ n) = n
 nameOfQName (UnQual n) = n
 
 collectNames :: [HsDecl] -> [HsName]
 collectNames ds = concat (map declBinders ds)
 
+unbang :: HsBangType -> HsType
 unbang (HsUnBangedTy ty) = ty
 unbang (HsBangedTy   ty) = ty
 
+declBinders :: HsDecl -> [HsName]
 declBinders d = maybeToList (declMainBinder d) ++ declSubBinders d
 
 declMainBinder :: HsDecl -> Maybe HsName
 declMainBinder d = 
    case d of
      HsTypeDecl _ n _ _ _          -> Just n
-     HsDataDecl _ _ n _ cons _ _   -> Just n
+     HsDataDecl _ _ n _ _ _ _      -> Just n
      HsNewTypeDecl _ _ n _ _ _  _  -> Just n
-     HsClassDecl _ _ n _ _ decls _ -> Just n
+     HsClassDecl _ _ n _ _ _ _     -> Just n
      HsTypeSig _ [n] _ _           -> Just n
-     HsTypeSig _ ns _ _            -> error "declMainBinder"
+     HsTypeSig _ _ _ _             -> error "declMainBinder"
      HsForeignImport _ _ _ _ n _ _ -> Just n
      _                             -> Nothing
 
 declSubBinders :: HsDecl -> [HsName]
 declSubBinders d =
    case d of
-     HsTypeDecl _ n _ _ _          -> []
-     HsDataDecl _ _ n _ cons _ _   -> concat (map conDeclBinders cons)
-     HsNewTypeDecl _ _ n _ con _ _ -> conDeclBinders con
-     HsClassDecl _ _ n _ _ decls _ -> collectNames decls
-     HsTypeSig _ ns _ _            -> []
-     HsForeignImport _ _ _ _ n _ _ -> []
+     HsTypeDecl _ _ _ _ _          -> []
+     HsDataDecl _ _ _ _ cons _ _   -> concat (map conDeclBinders cons)
+     HsNewTypeDecl _ _ _ _ con _ _ -> conDeclBinders con
+     HsClassDecl _ _ _ _ _ decls _ -> collectNames decls
+     HsTypeSig _ _ _ _             -> []
+     HsForeignImport _ _ _ _ _ _ _ -> []
      _                             -> []
 
+conDeclBinders :: HsConDecl -> [HsName]
 conDeclBinders (HsConDecl _ n _ _ _ _) = [n]
 conDeclBinders (HsRecDecl _ n _ _ fields _) = 
   n : concat (map fieldDeclBinders fields)
 
+fieldDeclBinders :: HsFieldDecl -> [HsName]
 fieldDeclBinders (HsFieldDecl ns _ _) = ns
 
 splitTyConApp :: HsType -> (HsQName, [HsType])
-splitTyConApp t = split t []
+splitTyConApp t0 = split t0 []
  where
 	split :: HsType -> [HsType] -> (HsQName,[HsType])
 	split (HsTyApp t u) ts = split t (u:ts)
@@ -93,25 +98,29 @@ freeTyCons ty = go ty []
 	go (HsTyApp t u) r = go t (go u r)
 	go (HsTyCon c) r = c : r
 	go (HsTyFun f a) r = go f (go a r)
-	go (HsTyTuple b ts) r = foldr go r ts
-	go (HsTyVar v) r = r
+	go (HsTyTuple _ ts) r = foldr go r ts
+	go (HsTyVar _) r = r
 	go (HsTyDoc t _) r = go t r
 
 -- -----------------------------------------------------------------------------
 -- Adding documentation to record fields (used in parsing).
 
+addFieldDoc :: HsFieldDecl -> Maybe Doc -> HsFieldDecl
 addFieldDoc (HsFieldDecl ns ty doc1) doc2 = 
    HsFieldDecl ns ty (doc1 `mplus` doc2)
 
-addFieldDocs [] doc = []
+addFieldDocs :: [HsFieldDecl] -> Maybe Doc -> [HsFieldDecl]
+addFieldDocs [] _ = []
 addFieldDocs (x:xs) doc = addFieldDoc x doc : xs
 
+addConDoc :: HsConDecl -> Maybe Doc -> HsConDecl
 addConDoc (HsConDecl pos nm tvs ctxt typeList doc1) doc2 = 
    HsConDecl pos nm tvs ctxt typeList (doc1 `mplus` doc2)
 addConDoc (HsRecDecl pos nm tvs ctxt fields doc1) doc2=
    HsRecDecl pos nm tvs ctxt fields (doc1 `mplus` doc2)
 
-addConDocs [] doc = []
+addConDocs :: [HsConDecl] -> Maybe Doc -> [HsConDecl]
+addConDocs [] _ = []
 addConDocs (x:xs) doc = addConDoc x doc : xs
 
 -- ---------------------------------------------------------------------------
@@ -141,6 +150,7 @@ restrictDecls names decls = filter keep decls
 -- -----------------------------------------------------------------------------
 -- Extract documentation from a declaration
 
+declDoc :: HsDecl -> Maybe Doc
 declDoc (HsTypeDecl _ _ _ _ d)          = d
 declDoc (HsDataDecl _ _ _ _ _ _ d)      = d
 declDoc (HsNewTypeDecl _ _ _ _ _ _ d)   = d
@@ -155,13 +165,14 @@ declDoc _ = Nothing
 parseModuleHeader :: String -> (String, Maybe ModuleInfo)
 parseModuleHeader str =
   case matchRegexAll moduleHeaderRE str of
-	Just (before, match, after, _, (_:_:_:s1:s2:s3:_)) -> 
+	Just (_, _, after, _, (_:_:_:s1:s2:s3:_)) -> 
 	   (after, Just (ModuleInfo { 
 				 portability = s3,
 				 stability   = s2,
 				 maintainer  = s1 }))
 	_other -> (str, Nothing)
 
+moduleHeaderRE :: Regex
 moduleHeaderRE = mkRegexWithOpts
 			 "^([ \t\n]*Module[ \t]*:.*\n)?\ 
 			  \([ \t\n]*Copyright[ \t]*:.*\n)?\ 
@@ -208,11 +219,11 @@ splitFilename3 str
      in  (real_dir, name, ext)
 
 split_longest_prefix :: String -> (Char -> Bool) -> (String,String)
-split_longest_prefix s pred
-  = case pre of
+split_longest_prefix s pred0
+  = case pre0 of
 	[]      -> ([], reverse suf)
 	(_:pre) -> (reverse pre, reverse suf)
-  where (suf,pre) = break pred (reverse s)
+  where (suf,pre0) = break pred0 (reverse s)
 
 pathSeparator :: Char
 #ifdef __WIN32__
@@ -230,8 +241,8 @@ isPathSeparator ch =
 #endif
 
 moduleHtmlFile :: FilePath -> String -> FilePath
-moduleHtmlFile "" mod  = mod ++ ".html" -- ToDo: Z-encode filename?
-moduleHtmlFile dir mod = dir ++ pathSeparator : mod ++ ".html"
+moduleHtmlFile "" mod0  = mod0 ++ ".html" -- ToDo: Z-encode filename?
+moduleHtmlFile dir mod0 = dir ++ pathSeparator : mod0 ++ ".html"
 
 -----------------------------------------------------------------------------
 -- misc.
@@ -242,11 +253,12 @@ die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 dieMsg :: String -> IO a
 dieMsg s = getProgName >>= \prog -> die (prog ++ ": " ++ s)
 
-mapSnd f [] = []
+mapSnd :: (b -> c) -> [(a,b)] -> [(a,c)]
+mapSnd _ [] = []
 mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
 
 mapMaybeM :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
-mapMaybeM f Nothing = return Nothing
+mapMaybeM _ Nothing = return Nothing
 mapMaybeM f (Just a) = f a >>= return . Just
 
 -----------------------------------------------------------------------------

@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- $Id: Html.hs,v 1.1 2002/04/08 16:41:38 simonmar Exp $
+-- $Id: Html.hs,v 1.2 2002/07/24 09:42:18 simonmar Exp $
 --
 -- An Html combinator library
 --
@@ -74,7 +74,7 @@ instance HTML Char where
       toHtmlFromList str = Html [HtmlString (stringToHtmlString str)]
 
 instance (HTML a) => HTML [a] where
-      toHtml xs = toHtmlFromList xs
+    toHtml xs = toHtmlFromList xs
 
 class ADDATTRS a where
       (!) :: a -> [HtmlAttr] -> a
@@ -85,9 +85,15 @@ instance (ADDATTRS b) => ADDATTRS (a -> b) where
 instance ADDATTRS Html where
       (Html htmls) ! attr = Html (map addAttrs htmls)
         where
-              addAttrs (html@(HtmlTag { markupAttrs = markupAttrs }) )
-                              = html { markupAttrs = markupAttrs ++ attr }
-              addAttrs html = html
+              addAttrs html =
+                  case html of
+                       HtmlTag { markupAttrs   = markupAttrs0
+                               , markupTag     = markupTag0
+                               , markupContent = markupContent0 } ->
+                               HtmlTag { markupAttrs   = markupAttrs0 ++ attr
+                                       , markupTag     = markupTag0
+                                       , markupContent = markupContent0 }
+                       _                                         -> html
 
 
 (<<)            :: (HTML a) => (Html -> b) -> a        -> b
@@ -104,15 +110,16 @@ noHtml :: Html
 noHtml = Html []
 
 
+isNoHtml :: Html -> Bool
 isNoHtml (Html xs) = null xs
 
 
 tag  :: String -> Html -> Html
-tag str       htmls = Html [
-      HtmlTag {
-              markupTag = str,
-              markupAttrs = [],
-              markupContent = htmls }]
+tag str htmls =
+    Html [ HtmlTag { markupTag = str,
+                     markupAttrs = [],
+                     markupContent = htmls }
+         ]
 
 itag :: String -> Html
 itag str = tag str noHtml
@@ -694,9 +701,10 @@ p             = paragraph
 -- ---------------------------------------------------------------------------
 -- Html tables
 
+cell :: Html -> HtmlTable
 cell h = let
               cellFn x y = h ! (add x colspan $ add y rowspan $ [])
-              add 1 fn rest = rest
+              add 1 _  rest = rest
               add n fn rest = fn n : rest
               r = BT.single cellFn
          in 
@@ -720,22 +728,30 @@ td = cell . thetd
 tda :: [HtmlAttr] -> Html -> HtmlTable
 tda as = cell . (thetd ! as)
 
+above, beside :: HtmlTable -> HtmlTable -> HtmlTable
 above  a b = combine BT.above a b
 beside a b = combine BT.beside a b
 
 infixr 3 </>  -- combining table cells 
 infixr 4 <->  -- combining table cells
+(</>), (<->) :: HtmlTable -> HtmlTable -> HtmlTable
 (</>) = above
 (<->) = beside
 
+emptyTable :: HtmlTable
 emptyTable = HtmlTable BT.empty
 
+aboves, besides :: [HtmlTable] -> HtmlTable
 aboves  = foldr above  emptyTable
 besides = foldr beside emptyTable
 
 mkHtmlTable :: BT.BlockTable (Int -> Int -> Html) -> HtmlTable
 mkHtmlTable r = HtmlTable r
 
+combine :: (BT.BlockTable (Int -> Int -> Html)
+	    -> BT.BlockTable (Int -> Int -> Html)
+	    -> BT.BlockTable (Int -> Int -> Html))
+	-> HtmlTable -> HtmlTable -> HtmlTable
 combine fn (HtmlTable a) (HtmlTable b) = mkHtmlTable (a `fn` b)
 
 -- renderTable takes the HtmlTable, and renders it back into
@@ -767,6 +783,7 @@ instance Show HtmlTable where
 -- gets padded. If you want more power, then
 -- use the system above, or build tables explicitly.
 
+simpleTable :: HTML a => [HtmlAttr] -> [HtmlAttr] -> [[a]] -> Html
 simpleTable attr cellAttr lst
       = table ! attr 
           <<  (aboves 
@@ -797,7 +814,7 @@ treeHtml colors h = table ! [
       treeHtmls c ts = aboves (zipWith treeHtml' c ts)
 
       treeHtml' :: [String] -> HtmlTree -> HtmlTable
-      treeHtml' (c:_) (HtmlLeaf leaf) = cell
+      treeHtml' (_:_) (HtmlLeaf leaf) = cell
                                          (thetd ! [width "100%"] 
                                             << bold  
                                                << leaf)
@@ -825,6 +842,7 @@ instance HTML HtmlTree where
       toHtml x = treeHtml treeColors x
 
 -- type "length treeColors" to see how many colors are here.
+treeColors :: [String]
 treeColors = ["#88ccff","#ffffaa","#ffaaff","#ccffff"] ++ treeColors
 
 
@@ -851,19 +869,19 @@ debugHtml obj = table ! [border 0] << (
       debug (HtmlString str) = HtmlLeaf (spaceHtml +++
                                               linesToHtml (lines str))
       debug (HtmlTag {
-              markupTag = markupTag,
-              markupContent = markupContent,
-              markupAttrs  = markupAttrs
+              markupTag = markupTag0,
+              markupContent = markupContent0,
+              markupAttrs  = markupAttrs0
               }) =
-              case markupContent of
+              case markupContent0 of
                 Html [] -> HtmlNode hd [] noHtml
                 Html xs -> HtmlNode hd (map debug xs) tl
         where
-              args = if null markupAttrs
+              args = if null markupAttrs0
                      then ""
-                     else "  " ++ unwords (map show markupAttrs) 
-              hd = font ! [size "1"] << ("<" ++ markupTag ++ args ++ ">")
-              tl = font ! [size "1"] << ("</" ++ markupTag ++ ">")
+                     else "  " ++ unwords (map show markupAttrs0) 
+              hd = font ! [size "1"] << ("<" ++ markupTag0 ++ args ++ ">")
+              tl = font ! [size "1"] << ("</" ++ markupTag0 ++ ">")
 
 -- ---------------------------------------------------------------------------
 -- Hotlink datatype
@@ -902,7 +920,7 @@ defList items
 
 
 widget :: String -> String -> [HtmlAttr] -> Html
-widget w n markupAttrs = input ! ([thetype w,name n] ++ markupAttrs)
+widget w n markupAttrs0 = input ! ([thetype w,name n] ++ markupAttrs0)
 
 checkbox :: String -> String -> Html
 hidden   :: String -> String -> Html
@@ -944,6 +962,7 @@ renderHtml theHtml =
          foldr (.) id (map (renderHtml' 0)
                            (getHtmlElements (tag "HTML" << theHtml))) "\n"
 
+renderMessage :: String
 renderMessage =
       "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\" \"http://www.w3.org/TR/html4/loose.dtd\">\n" ++
       "<!--Rendered using the Haskell Html Library v0.2-->\n"
@@ -964,38 +983,40 @@ prettyHtml theHtml =
 renderHtml' :: Int -> HtmlElement -> ShowS
 renderHtml' _ (HtmlString str) = (++) str
 renderHtml' n (HtmlTag
-              { markupTag = name,
+              { markupTag = name0,
                 markupContent = html,
-                markupAttrs = markupAttrs })
-      = if isNoHtml html && elem name validHtmlITags
-        then renderTag True name markupAttrs n
-        else (renderTag True name markupAttrs n
+                markupAttrs = markupAttrs0 })
+      = if isNoHtml html && elem name0 validHtmlITags
+        then renderTag True name0 markupAttrs0 n
+        else (renderTag True name0 markupAttrs0 n
              . foldr (.) id (map (renderHtml' (n+2)) (getHtmlElements html))
-             . renderTag False name [] n)
+             . renderTag False name0 [] n)
 
 prettyHtml' :: HtmlElement -> [String]
 prettyHtml' (HtmlString str) = [str]
 prettyHtml' (HtmlTag
-              { markupTag = name,
+              { markupTag = name0,
                 markupContent = html,
-                markupAttrs = markupAttrs })
-      = if isNoHtml html && elem name validHtmlITags
+                markupAttrs = markupAttrs0 })
+      = if isNoHtml html && elem name0 validHtmlITags
         then 
-         [rmNL (renderTag True name markupAttrs 0 "")]
+         [rmNL (renderTag True name0 markupAttrs0 0 "")]
         else
-         [rmNL (renderTag True name markupAttrs 0 "")] ++ 
+         [rmNL (renderTag True name0 markupAttrs0 0 "")] ++ 
           shift (concat (map prettyHtml' (getHtmlElements html))) ++
-         [rmNL (renderTag False name [] 0 "")]
+         [rmNL (renderTag False name0 [] 0 "")]
   where
       shift = map (\x -> "   " ++ x)
+
+rmNL :: [Char] -> [Char]
 rmNL = filter (/= '\n')
 
 -- This prints the Tags The lack of spaces in intentunal, because Html is
 -- actually space dependant.
 
 renderTag :: Bool -> String -> [HtmlAttr] -> Int -> ShowS
-renderTag x name markupAttrs n r
-      = open ++ name ++ rest markupAttrs ++ ">" ++ r
+renderTag x name0 markupAttrs0 n r
+      = open ++ name0 ++ rest markupAttrs0 ++ ">" ++ r
   where
       open = if x then "<" else "</"
       
@@ -1006,6 +1027,6 @@ renderTag x name markupAttrs n r
       rest attr = " " ++ unwords (map showPair attr) ++ nl
 
       showPair :: HtmlAttr -> String
-      showPair (HtmlAttr tag val)
-              = tag ++ " = \"" ++ val  ++ "\""
+      showPair (HtmlAttr tag0 val)
+              = tag0 ++ " = \"" ++ val  ++ "\""
 

@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2002
 --
 
-module HaddockHtml (ppHtml) where
+module HaddockHtml ( ppHtml ) where
 
 import Prelude hiding (div)
 import HaddockVersion
@@ -21,16 +21,13 @@ import List 	( sortBy )
 import Char	( toUpper, toLower )
 import Monad	( when )
 
-#ifdef __GLASGOW_HASKELL__
-import IOExts
-#endif
-
 import Html
 import qualified Html
 
 -- -----------------------------------------------------------------------------
 -- Files we need to copy from our $libdir
 
+cssFile, iconFile :: String
 cssFile  = "haddock.css"
 iconFile = "haskell_icon.gif"
 
@@ -52,8 +49,7 @@ ppHtml	:: String
 	-> Bool				-- do MS Help stuff
 	-> IO ()
 
-ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue
- do_ms_help =  do
+ppHtml doctitle source_url ifaces odir maybe_css libdir inst_maps prologue do_ms_help =  do
   let 
 	css_file = case maybe_css of
 			Nothing -> libdir ++ pathSeparator:cssFile
@@ -64,28 +60,31 @@ ppHtml title source_url ifaces odir maybe_css libdir inst_maps prologue
 	icon_destination = odir   ++ pathSeparator:iconFile
 
 	visible_ifaces = filter visible ifaces
-	visible (m,i) = OptHide `notElem` iface_options i
+	visible (_, i) = OptHide `notElem` iface_options i
 
   css_contents <- readFile css_file
   writeFile css_destination css_contents
   icon_contents <- readFile icon_file
   writeFile icon_destination icon_contents
 
-  ppHtmlContents odir title source_url (map fst visible_ifaces) prologue
-  ppHtmlIndex odir title visible_ifaces
+  ppHtmlContents odir doctitle source_url (map fst visible_ifaces) prologue
+  ppHtmlIndex odir doctitle visible_ifaces
 
   -- Generate index and contents page for MS help if requested
   when do_ms_help $ do
     ppHHContents odir (map fst visible_ifaces)
     ppHHIndex odir visible_ifaces
 
-  mapM_ (ppHtmlModule odir title source_url inst_maps) visible_ifaces
+  mapM_ (ppHtmlModule odir doctitle source_url inst_maps) visible_ifaces
 
-
+contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
 indexHtmlFile    = "doc-index.html"
+
+subIndexHtmlFile :: Char -> Char -> String
 subIndexHtmlFile k a = "doc-index-" ++ k:a:".html"
 
+footer :: HtmlTable
 footer = 
   tda [theclass "botbar"] << 
 	( toHtml "Produced by" <+> 
@@ -94,7 +93,8 @@ footer =
 	)
    
 
-src_button source_url mod file
+src_button :: Maybe String -> String -> String -> HtmlTable
+src_button source_url _ file
   | Just u <- source_url = 
 	let src_url = if (last u == '/') then u ++ file else u ++ '/':file
 	in
@@ -102,50 +102,55 @@ src_button source_url mod file
   | otherwise =
 	Html.emptyTable
   
-
-parent_button mod = 
-  case span (/= '.') (reverse mod) of
-   (m, '.':rest) -> 
+parent_button :: String -> HtmlTable
+parent_button mdl = 
+  case span (/= '.') (reverse mdl) of
+   (_, '.':rest) -> 
        topButBox (
   	 anchor ! [href (moduleHtmlFile "" (reverse rest))] << toHtml "Parent")
    _ -> 
 	Html.emptyTable
 
+contentsButton :: HtmlTable
 contentsButton = topButBox (anchor ! [href contentsHtmlFile] << 
 				toHtml "Contents")
 
+indexButton :: HtmlTable
 indexButton = topButBox (anchor ! [href indexHtmlFile] << toHtml "Index")
 
-simpleHeader title = 
+simpleHeader :: String -> HtmlTable
+simpleHeader doctitle = 
   (tda [theclass "topbar"] << 
      vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " " ]
        ) <->
-       (tda [theclass "title"] << toHtml title) <->
+       (tda [theclass "title"] << toHtml doctitle) <->
 	contentsButton <-> indexButton
    ))
 
-pageHeader mod iface title source_url =
+pageHeader :: String -> Interface -> String -> Maybe String -> HtmlTable
+pageHeader mdl iface doctitle source_url =
   (tda [theclass "topbar"] << 
     vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
-       (tda [theclass "title"] << toHtml title) <->
-	src_button source_url mod (iface_filename iface) <->
-	parent_button mod <->
+       (tda [theclass "title"] << toHtml doctitle) <->
+	src_button source_url mdl (iface_filename iface) <->
+	parent_button mdl <->
 	contentsButton <->
 	indexButton
     )
    ) </>
    tda [theclass "modulebar"] <<
 	(vanillaTable << (
-	  (td << font ! [size "6"] << toHtml mod) <->
+	  (td << font ! [size "6"] << toHtml mdl) <->
 	  moduleInfo iface
 	)
     )
 
+moduleInfo :: Interface -> HtmlTable
 moduleInfo iface = 
   case iface_info iface of
     Nothing   -> Html.emptyTable
@@ -164,16 +169,16 @@ moduleInfo iface =
 
 ppHtmlContents :: FilePath -> String -> Maybe String -> [Module] -> Maybe Doc
    -> IO ()
-ppHtmlContents odir title source_url mods prologue = do
-  let tree = mkModuleTree mods  
+ppHtmlContents odir doctitle _ mdls prologue = do
+  let tree = mkModuleTree mdls  
       html = 
-	header (thetitle (toHtml title) +++
+	header (thetitle (toHtml doctitle) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-   	    simpleHeader title </>
+   	    simpleHeader doctitle </>
 	    ppPrologue prologue </>
-	    ppModuleTree title tree </>
+	    ppModuleTree doctitle tree </>
 	    s15 </>
 	    footer
 	  )
@@ -186,7 +191,7 @@ ppPrologue (Just doc) =
   docBox (docToHtml doc)
 
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
-ppModuleTree title ts = 
+ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
   td <<  table ! [cellpadding 0, cellspacing 2] << aboves (map (mkNode []) ts)
 
@@ -199,9 +204,10 @@ mkNode ss (Node s leaf ts) =
   (tda [theclass "children"] << 
      vanillaTable (toHtml (aboves (map (mkNode (s:ss)) ts))))
 
-mkLeaf s ss False = toHtml s
-mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mod)] << toHtml s
-  where mod = foldr (++) "" (s' : map ('.':) ss')
+mkLeaf :: String -> [String] -> Bool -> Html
+mkLeaf s _ False = toHtml s
+mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mdl)] << toHtml s
+  where mdl = foldr (++) "" (s' : map ('.':) ss')
 	(s':ss') = reverse (s:ss)
 	 -- reconstruct the module name
 
@@ -209,13 +215,13 @@ mkLeaf s ss True  = anchor ! [href (moduleHtmlFile "" mod)] << toHtml s
 -- Generate the index
 
 ppHtmlIndex :: FilePath -> String -> [(Module,Interface)] -> IO ()
-ppHtmlIndex odir title ifaces = do
+ppHtmlIndex odir doctitle ifaces = do
   let html = 
-	header (thetitle (toHtml (title ++ " (Index)")) +++
+	header (thetitle (toHtml (doctitle ++ " (Index)")) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-	    simpleHeader title </>
+	    simpleHeader doctitle </>
 	    tda [theclass "section1"] << toHtml "Type/Class Index" </>
 	    index_html tycls_index 't' </>
 	    tda [theclass "section1"] << toHtml "Function/Constructor Index" </>
@@ -246,11 +252,11 @@ ppHtmlIndex odir title ifaces = do
     = writeFile (odir ++ pathSeparator:subIndexHtmlFile kind c)
 	(renderHtml html)
     where 
-      html = header (thetitle (toHtml (title ++ " (" ++ descr ++ "Index)")) +++
+      html = header (thetitle (toHtml (doctitle ++ " (" ++ descr ++ "Index)")) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
              body << vanillaTable << (
-	        simpleHeader title </>
+	        simpleHeader doctitle </>
 	        tda [theclass "section1"] << 
 	      	toHtml (descr ++ " Index (" ++ c:")") </>
 	        td << table ! [cellpadding 0, cellspacing 5] <<
@@ -272,24 +278,25 @@ ppHtmlIndex odir title ifaces = do
   iface_indices f = map (getIfaceIndex f) ifaces
   full_index f = foldr (plusFM_C (++)) emptyFM (iface_indices f)
 
-  getIfaceIndex f (mod,iface) = listToFM
-    [ (name, [(mod, mod == mod')]) 
-    | (name, Qual mod' _) <- fmToList (iface_env iface),
-      f name ]
+  getIfaceIndex f (mdl,iface) = listToFM
+    [ (nm, [(mdl, mdl == mdl')]) 
+    | (nm, Qual mdl' _) <- fmToList (iface_env iface), f nm ]
 
   indexElt :: (HsName, [(Module,Bool)]) -> HtmlTable
   indexElt (nm, entries) = 
      td << ppHsName nm
      <-> td << (hsep [ if defining then
-			 bold << anchor ! [href (linkId (Module mod) nm)]
-			   << toHtml mod
+			 bold << anchor ! [href (linkId (Module mdl) nm)]
+			   << toHtml mdl
 		       else
-			 anchor ! [href (linkId (Module mod) nm)] << toHtml mod
-	             | (Module mod, defining) <- entries ])
+			 anchor ! [href (linkId (Module mdl) nm)] << toHtml mdl
+	             | (Module mdl, defining) <- entries ])
 
-nameBeginsWith (HsTyClsName id) c = idBeginsWith id c
-nameBeginsWith (HsVarName   id) c = idBeginsWith id c
+nameBeginsWith :: HsName -> Char -> Bool
+nameBeginsWith (HsTyClsName id0) c = idBeginsWith id0 c
+nameBeginsWith (HsVarName   id0) c = idBeginsWith id0 c
 
+idBeginsWith :: HsIdentifier -> Char -> Bool
 idBeginsWith (HsIdent   s) c = head s `elem` [toLower c, toUpper c]
 idBeginsWith (HsSymbol  s) c = head s `elem` [toLower c, toUpper c]
 idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
@@ -299,21 +306,21 @@ idBeginsWith (HsSpecial s) c = head s `elem` [toLower c, toUpper c]
 
 ppHtmlModule :: FilePath -> String -> Maybe String -> InstMaps
 	-> (Module,Interface) -> IO ()
-ppHtmlModule odir title source_url inst_maps (Module mod,iface) = do
+ppHtmlModule odir doctitle source_url inst_maps (Module mdl,iface) = do
   let html = 
-	header (thetitle (toHtml mod) +++
+	header (thetitle (toHtml mdl) +++
 		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-	    pageHeader mod iface title source_url </> s15 </>
-	    ifaceToHtml mod iface inst_maps </> s15 </>
+	    pageHeader mdl iface doctitle source_url </> s15 </>
+	    ifaceToHtml mdl iface inst_maps </> s15 </>
 	    footer
          )
-  writeFile (moduleHtmlFile odir mod) (renderHtml html)
+  writeFile (moduleHtmlFile odir mdl) (renderHtml html)
 
 ifaceToHtml :: String -> Interface -> InstMaps -> HtmlTable
-ifaceToHtml mod iface inst_maps
-  = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: body)
+ifaceToHtml _ iface inst_maps
+  = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
   where 
 	exports = numberSectionHeadings (iface_exports iface)
 
@@ -353,7 +360,7 @@ ifaceToHtml mod iface inst_maps
 		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 	     | otherwise  = Html.emptyTable
 
-	body = map (processExport False inst_maps) exports
+	bdy = map (processExport False inst_maps) exports
 
 ppModuleContents :: [ExportItem] -> HtmlTable
 ppModuleContents exports
@@ -364,15 +371,15 @@ ppModuleContents exports
   (sections, _leftovers{-should be []-}) = process 0 exports
 
   process :: Int -> [ExportItem] -> ([Html],[ExportItem])
-  process n [] = ([], [])
-  process n items@(ExportGroup lev id doc : rest) 
+  process _ [] = ([], [])
+  process n items@(ExportGroup lev id0 doc : rest) 
     | lev <= n  = ( [], items )
-    | otherwise = ( html:sections, rest2 )
+    | otherwise = ( html:secs, rest2 )
     where
-	html = (dterm << anchor ! [href ('#':id)] << docToHtml doc)
-		 +++ mk_subsections subsections
-	(subsections, rest1) = process lev rest
-	(sections,    rest2) = process n   rest1
+	html = (dterm << anchor ! [href ('#':id0)] << docToHtml doc)
+		 +++ mk_subsections ssecs
+	(ssecs, rest1) = process lev rest
+	(secs,  rest2) = process n   rest1
   process n (_ : rest) = process n rest
 
   mk_subsections [] = noHtml
@@ -382,26 +389,29 @@ ppModuleContents exports
 -- them from the contents:
 numberSectionHeadings :: [ExportItem] -> [ExportItem]
 numberSectionHeadings exports = go 1 exports
-  where go n [] = []
+  where go :: Int -> [ExportItem] -> [ExportItem]
+        go _ [] = []
 	go n (ExportGroup lev _ doc : es) 
 	  = ExportGroup lev (show n) doc : go (n+1) es
 	go n (other:es)
 	  = other : go n es
 
 processExport :: Bool -> InstMaps -> ExportItem -> HtmlTable
-processExport summary inst_maps (ExportGroup lev id doc)
-  = ppDocGroup lev (anchor ! [name id] << docToHtml doc)
+processExport _ _ (ExportGroup lev id0 doc)
+  = ppDocGroup lev (anchor ! [name id0] << docToHtml doc)
 processExport summary inst_maps (ExportDecl x decl)
   = doDecl summary inst_maps x decl
-processExport summary inst_maps (ExportDoc doc)
+processExport _       _ (ExportDoc doc)
   = docBox (docToHtml doc)
-processExport summary inst_maps (ExportModule (Module mod))
-  = declBox (toHtml "module" <+> ppHsModule mod)
+processExport _       _ (ExportModule (Module mdl))
+  = declBox (toHtml "module" <+> ppHsModule mdl)
 
+forSummary :: ExportItem -> Bool
 forSummary (ExportGroup _ _ _) = False
-forSummary (ExportDoc _) = False
-forSummary _ = True
+forSummary (ExportDoc _)       = False
+forSummary _                   = True
 
+ppDocGroup :: Int -> Html -> HtmlTable
 ppDocGroup lev doc
   | lev == 1  = tda [ theclass "section1" ] << doc
   | lev == 2  = tda [ theclass "section2" ] << doc
@@ -412,13 +422,13 @@ ppDocGroup lev doc
 -- Converting declarations to HTML
 
 declWithDoc :: Bool -> Maybe Doc -> Html -> HtmlTable
-declWithDoc True  doc        html_decl = declBox html_decl
+declWithDoc True  _          html_decl = declBox html_decl
 declWithDoc False Nothing    html_decl = declBox html_decl
 declWithDoc False (Just doc) html_decl = 
 		declBox html_decl </> docBox (docToHtml doc)
 
 doDecl :: Bool -> InstMaps -> HsQName -> HsDecl -> HtmlTable
-doDecl summary inst_maps x decl = do_decl decl
+doDecl summary inst_maps x d = do_decl d
   where
      do_decl (HsTypeSig _ [nm] ty doc) 
 	= ppFunSig summary nm ty doc
@@ -436,19 +446,20 @@ doDecl summary inst_maps x decl = do_decl decl
 		(HsDataDecl loc ctx nm args [con] drv doc)
 	  -- print it as a single-constructor datatype
 
-     do_decl decl@(HsDataDecl loc ctx nm args cons drv doc)
-	= ppHsDataDecl summary inst_maps False{-not newtype-} x decl
+     do_decl d0@(HsDataDecl{})
+	= ppHsDataDecl summary inst_maps False{-not newtype-} x d0
 
-     do_decl decl@(HsClassDecl{})
-	= ppHsClassDecl summary inst_maps x decl
+     do_decl d0@(HsClassDecl{})
+	= ppHsClassDecl summary inst_maps x d0
 
-     do_decl (HsDocGroup loc lev str)
+     do_decl (HsDocGroup _ lev str)
 	= if summary then Html.emptyTable 
 		     else ppDocGroup lev (docToHtml str)
 
-     do_decl _ = error ("do_decl: " ++ show decl)
+     do_decl _ = error ("do_decl: " ++ show d)
 
 
+ppTypeSig :: Bool -> HsName -> HsType -> Html
 ppTypeSig summary nm ty = ppHsBinder summary nm <+> toHtml "::" <+> ppHsType ty
 
 -- -----------------------------------------------------------------------------
@@ -456,11 +467,11 @@ ppTypeSig summary nm ty = ppHsBinder summary nm <+> toHtml "::" <+> ppHsType ty
 
 ppShortDataDecl :: Bool -> Bool -> HsDecl -> Html
 ppShortDataDecl summary is_newty 
-	(HsDataDecl loc ctx nm args [con] drv _doc) =
+	(HsDataDecl _ _ nm args [con] _ _doc) =
    ppHsDataHeader summary is_newty nm args      
      <+> equals <+> ppShortConstr summary con
 ppShortDataDecl summary is_newty
-	(HsDataDecl loc ctx nm args cons drv _doc) = 
+	(HsDataDecl _ _ nm args cons _ _doc) = 
    vanillaTable << (
 	declBox (ppHsDataHeader summary is_newty nm args) </>
 	tda [theclass "body"] << vanillaTable << (
@@ -468,22 +479,25 @@ ppShortDataDecl summary is_newty
         )
    )
   where do_constr c con = declBox (toHtml [c] <+> ppShortConstr summary con)
+ppShortDataDecl _ _ d =
+    error $ "HaddockHtml.ppShortDataDecl: unexpected decl " ++ show d
 
 -- The rest of the cases:
-
+ppHsDataDecl :: Ord key => Bool	-> (a, FiniteMap key [InstHead])
+	     -> Bool -> key -> HsDecl -> HtmlTable
 ppHsDataDecl summary (_, ty_inst_map) is_newty 
-     x decl@(HsDataDecl loc ctx nm args cons drv doc)
+     x decl@(HsDataDecl _ _ nm args cons _ doc)
   | summary = declWithDoc summary doc (ppShortDataDecl summary is_newty decl)
 
   | otherwise
-        = header </> 
+        = dataheader </> 
 	    tda [theclass "body"] << vanillaTable << (
 		datadoc </> 
 		constr_bit </>
 		instances_bit
             )
   where
-	header = declBox (ppHsDataHeader False is_newty nm args)
+	dataheader = declBox (ppHsDataHeader False is_newty nm args)
 
 	constr_table
 	 	| any isRecDecl cons  = spacedTable5
@@ -511,19 +525,23 @@ ppHsDataDecl summary (_, ty_inst_map) is_newty
 		 tda [theclass "body"] << spacedTable1 << (
 			aboves (map (declBox.ppInstHead) is)
 		  )
+ppHsDataDecl _ _ _ _ d =
+    error $ "HaddockHtml.ppHsDataDecl: unexpected decl " ++ show d
 
-isRecDecl (HsRecDecl pos nm tvs ctxt fields maybe_doc) = True
-isRecDecl _ = False
+isRecDecl :: HsConDecl -> Bool
+isRecDecl (HsRecDecl{}) = True
+isRecDecl _             = False
 
 ppShortConstr :: Bool -> HsConDecl -> Html
-ppShortConstr summary (HsConDecl pos nm tvs ctxt typeList _maybe_doc) = 
+ppShortConstr summary (HsConDecl _ nm tvs ctxt typeList _maybe_doc) = 
    ppHsConstrHdr tvs ctxt +++
 	hsep (ppHsBinder summary nm : map ppHsBangType typeList)
-ppShortConstr summary (HsRecDecl pos nm tvs ctxt fields maybe_doc) =
+ppShortConstr summary (HsRecDecl _ nm tvs ctxt fields _) =
    ppHsConstrHdr tvs ctxt +++
    ppHsBinder summary nm <+>
    braces (vanillaTable << aboves (map (ppShortField summary) fields))
 
+ppHsConstrHdr :: [HsName] -> HsContext -> Html
 ppHsConstrHdr tvs ctxt
  = (if null tvs then noHtml else keyword "forall" <+> 
 				 hsep (map ppHsName tvs) <+> 
@@ -531,31 +549,35 @@ ppHsConstrHdr tvs ctxt
    +++
    (if null ctxt then noHtml else ppHsContext ctxt <+> toHtml "=> ")
 
-ppSideBySideConstr (HsConDecl pos nm tvs ctxt typeList doc) =
+ppSideBySideConstr :: HsConDecl -> HtmlTable
+ppSideBySideConstr (HsConDecl _ nm tvs ctxt typeList doc) =
   declBox (hsep ((ppHsConstrHdr tvs ctxt +++ 
 		ppHsBinder False nm) : map ppHsBangType typeList)) <->
   maybeRDocBox doc
-ppSideBySideConstr (HsRecDecl pos nm tvs ctxt fields doc) =
+ppSideBySideConstr (HsRecDecl _ nm tvs ctxt fields doc) =
   declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm) <->
   maybeRDocBox doc </>
   (tda [theclass "body"] << spacedTable1 <<
      aboves (map ppSideBySideField fields))
 
+ppSideBySideField :: HsFieldDecl -> HtmlTable
 ppSideBySideField (HsFieldDecl ns ty doc) =
   declBox (hsep (punctuate comma (map (ppHsBinder False) ns))
 	   <+> toHtml "::" <+> ppHsBangType ty) <->
   maybeRDocBox doc
 
-ppHsFullConstr (HsConDecl pos nm tvs ctxt typeList doc) = 
+{-
+ppHsFullConstr :: HsConDecl -> Html
+ppHsFullConstr (HsConDecl _ nm tvs ctxt typeList doc) = 
      declWithDoc False doc (
 	hsep ((ppHsConstrHdr tvs ctxt +++ 
 		ppHsBinder False nm) : map ppHsBangType typeList)
       )
-ppHsFullConstr (HsRecDecl pos nm tvs ctxt fields doc) =
+ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
    td << vanillaTable << (
      case doc of
-       Nothing  -> aboves [hdr, fields_html]
-       Just doc -> aboves [hdr, constr_doc, fields_html]
+       Nothing -> aboves [hdr, fields_html]
+       Just _  -> aboves [hdr, constr_doc, fields_html]
    )
 
   where hdr = declBox (ppHsConstrHdr tvs ctxt +++ ppHsBinder False nm)
@@ -569,22 +591,28 @@ ppHsFullConstr (HsRecDecl pos nm tvs ctxt fields doc) =
 	      table ! [width "100%", cellpadding 0, cellspacing 8] << (
 		   aboves (map ppFullField (concat (map expandField fields)))
 		)
+-}
 
-
+ppShortField :: Bool -> HsFieldDecl -> HtmlTable
 ppShortField summary (HsFieldDecl ns ty _doc) 
   = tda [theclass "recfield"] << (
 	  hsep (punctuate comma (map (ppHsBinder summary) ns))
 	    <+> toHtml "::" <+> ppHsBangType ty
    )
 
+{-
+ppFullField :: HsFieldDecl -> Html
 ppFullField (HsFieldDecl [n] ty doc) 
   = declWithDoc False doc (
 	ppHsBinder False n <+> toHtml "::" <+> ppHsBangType ty
     )
 ppFullField _ = error "ppFullField"
 
+expandField :: HsFieldDecl -> [HsFieldDecl]
 expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
+-}
 
+ppHsDataHeader :: Bool -> Bool -> HsName -> [HsName] -> Html
 ppHsDataHeader summary is_newty nm args = 
   (if is_newty then keyword "newtype" else keyword "data") <+> 
 	ppHsBinder summary nm <+> hsep (map ppHsName args)
@@ -596,6 +624,7 @@ ppHsBangType (HsUnBangedTy ty) = ppHsAType ty
 -- -----------------------------------------------------------------------------
 -- Class declarations
 
+ppClassHdr :: Bool -> HsContext -> HsName -> [HsName] -> [HsFunDep] -> Html
 ppClassHdr summ [] n tvs fds = 
   keyword "class"
 	<+> ppHsBinder summ n <+> hsep (map ppHsName tvs)
@@ -605,6 +634,7 @@ ppClassHdr summ ctxt n tvs fds =
 	<+> ppHsBinder summ n <+> hsep (map ppHsName tvs)
 	<+> ppFds fds
 
+ppFds :: [HsFunDep] -> Html
 ppFds fds =
   if null fds then noHtml else 
 	char '|' <+> hsep (punctuate comma (map fundep fds))
@@ -612,8 +642,9 @@ ppFds fds =
 	fundep (vars1,vars2) = hsep (map ppHsName vars1) <+> toHtml "->" <+>
 			       hsep (map ppHsName vars2)
 
-ppShortClassDecl summary inst_maps 
-	decl@(HsClassDecl loc ctxt nm tvs fds decls doc) = 
+ppShortClassDecl :: Bool -> a -> HsDecl -> HtmlTable
+ppShortClassDecl summary _
+	(HsClassDecl _ ctxt nm tvs fds decls _) = 
   if null decls
     then declBox hdr
     else declBox (hdr <+> keyword "where")
@@ -627,19 +658,23 @@ ppShortClassDecl summary inst_maps
          
    where
 	hdr = ppClassHdr summary ctxt nm tvs fds
+ppShortClassDecl _ _ d =
+    error $ "HaddockHtml.ppShortClassDecl: unexpected decl: " ++ show d
 
+ppHsClassDecl :: Ord key => Bool -> (FiniteMap key [InstHead], t_a4nrR)
+	      -> key -> HsDecl -> HtmlTable
 ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c 
-	decl@(HsClassDecl loc ctxt nm tvs fds decls doc)
+	decl@(HsClassDecl _ ctxt nm tvs fds decls doc)
   | summary = ppShortClassDecl summary inst_maps decl
 
   | otherwise
-        = header </>
+        = classheader </>
 		tda [theclass "body"] << vanillaTable << (
 		   classdoc </> methods_bit </> instances_bit
 		)
 
    where 
-	header
+	classheader
 	   | null decls = declBox hdr
 	   | otherwise  = declBox (hdr <+> keyword "where")
 
@@ -654,8 +689,8 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 	   | otherwise  = 
 		s8 </> meth_hdr </>
 		tda [theclass "body"] << vanillaTable << (
-	       		abovesSep s8 [ ppFunSig summary n ty doc 
-			             | HsTypeSig _ [n] ty doc <- decls
+	       		abovesSep s8 [ ppFunSig summary n ty doc0
+			             | HsTypeSig _ [n] ty doc0 <- decls
 			             ]
 			)
 
@@ -670,6 +705,8 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 		  )
 
 	instances = lookupFM cls_inst_map orig_c
+ppHsClassDecl _ _ _ d =
+    error $ "HaddockHtml.ppHsClassDecl: unexpected decl: " ++ show d
 
 
 ppInstHead	       :: InstHead -> Html
@@ -679,14 +716,15 @@ ppInstHead (ctxt,asst) =  ppHsContext ctxt <+> darrow <+> ppHsAsst asst
 -- ----------------------------------------------------------------------------
 -- Type signatures
 
-ppFunSig summary nm ty doc
-  | summary || no_arg_docs ty = 
-      declWithDoc summary doc (ppTypeSig summary nm ty)
+ppFunSig :: Bool -> HsName -> HsType -> Maybe Doc -> HtmlTable
+ppFunSig summary nm ty0 doc
+  | summary || no_arg_docs ty0 = 
+      declWithDoc summary doc (ppTypeSig summary nm ty0)
 
   | otherwise   = 
 	declBox (ppHsBinder False nm) </>
 	(tda [theclass "body"] << vanillaTable <<  (
-	   do_args dcolon ty </>
+	   do_args dcolon ty0 </>
 	   (if (isJust doc) 
 		then ndocBox (docToHtml (fromJust doc))
 		else Html.emptyTable)
@@ -710,18 +748,18 @@ ppFunSig summary nm ty doc
 	  = (declBox (leader <+> ppHsContext ctxt)
 		<-> rdocBox noHtml) </> 
 	    do_args darrow ty
-	do_args leader (HsTyFun (HsTyDoc ty doc) r)
-	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc)) </>
-	    do_args arrow r
+	do_args leader (HsTyFun (HsTyDoc ty doc0) r)
+	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
+            </> do_args arrow r
 	do_args leader (HsTyFun ty r)
 	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox noHtml) </>
 	    do_args arrow r
-	do_args leader (HsTyDoc ty doc)
-	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc))
+	do_args leader (HsTyDoc ty doc0)
+	  = (declBox (leader <+> ppHsBType ty) <-> rdocBox (docToHtml doc0))
 	do_args leader ty
 	  = declBox (leader <+> ppHsBType ty) <-> rdocBox (noHtml)
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 -- Types and contexts
 
 ppHsAsst	    :: (HsQName,[HsType]) -> Html
@@ -731,6 +769,7 @@ ppHsContext	    :: HsContext -> Html
 ppHsContext []      =  empty
 ppHsContext context =  parenList (map ppHsAsst context)
 
+ppHsForAll :: Maybe [HsName] -> HsContext -> Html
 ppHsForAll Nothing context = 
   hsep [ ppHsContext context, darrow ]
 ppHsForAll (Just tvs) [] = 
@@ -745,7 +784,8 @@ ppHsType (HsForAllType maybe_tvs context htype) =
 ppHsType (HsTyFun a b) = hsep [ppHsBType a, toHtml "->", ppHsType b]
 ppHsType t = ppHsBType t
 
-ppHsBType (HsTyDoc ty doc) = ppHsBType ty
+ppHsBType :: HsType -> Html
+ppHsBType (HsTyDoc ty _) = ppHsBType ty
 ppHsBType (HsTyApp (HsTyCon (Qual _ (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
 ppHsBType (HsTyApp a b) = ppHsBType a <+> ppHsAType b
@@ -754,15 +794,15 @@ ppHsBType t = ppHsAType t
 ppHsAType :: HsType -> Html
 ppHsAType (HsTyTuple True l)  = parenList . map ppHsType $ l
 ppHsAType (HsTyTuple False l) = ubxParenList . map ppHsType $ l
-ppHsAType (HsTyVar name) = ppHsName name
-ppHsAType (HsTyCon name)
-  | name == fun_tycon_qname = parens $ ppHsQName name
-  | otherwise               = ppHsQName name
+ppHsAType (HsTyVar nm) = ppHsName nm
+ppHsAType (HsTyCon nm)
+  | nm == fun_tycon_qname = parens $ ppHsQName nm
+  | otherwise               = ppHsQName nm
 ppHsAType (HsTyApp (HsTyCon (Qual _ (HsTyClsName (HsSpecial "[]")))) b )
   = brackets $ ppHsType b
 ppHsAType t = parens $ ppHsType t
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 -- Names
 
 linkTarget :: HsName -> Html
@@ -770,21 +810,22 @@ linkTarget nm = anchor ! [name (hsNameStr nm)] << toHtml ""
 
 ppHsQName :: HsQName -> Html
 ppHsQName (UnQual str) = ppHsName str
-ppHsQName n@(Qual mod str)
+ppHsQName n@(Qual mdl str)
   | n == unit_con_name	= ppHsName str
   | isSpecial str	= ppHsName str
-  | otherwise		= anchor ! [href (linkId mod str)] << ppHsName str
+  | otherwise		= anchor ! [href (linkId mdl str)] << ppHsName str
 
-isSpecial (HsTyClsName id) | HsSpecial _ <- id = True
-isSpecial (HsVarName id) | HsSpecial _ <- id = True
-isSpecial _ = False
+isSpecial :: HsName -> Bool
+isSpecial (HsTyClsName id0) | HsSpecial _ <- id0 = True
+isSpecial (HsVarName id0)   | HsSpecial _ <- id0 = True
+isSpecial _                                      = False
 
 ppHsName :: HsName -> Html
 ppHsName nm = toHtml (hsNameStr nm)
 
 hsNameStr :: HsName -> String
-hsNameStr (HsTyClsName id) = ppHsIdentifier id
-hsNameStr (HsVarName id)   = ppHsIdentifier id
+hsNameStr (HsTyClsName id0) = ppHsIdentifier id0
+hsNameStr (HsVarName id0)   = ppHsIdentifier id0
 
 ppHsIdentifier :: HsIdentifier -> String
 ppHsIdentifier (HsIdent str)   =  str
@@ -795,8 +836,9 @@ ppHsBinder :: Bool -> HsName -> Html
 ppHsBinder True nm = anchor ! [href ('#':hsNameStr nm)] << ppHsBinder' nm
 ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
 
-ppHsBinder' (HsTyClsName id) = ppHsBindIdent id
-ppHsBinder' (HsVarName id)   = ppHsBindIdent id
+ppHsBinder' :: HsName -> Html
+ppHsBinder' (HsTyClsName id0) = ppHsBindIdent id0
+ppHsBinder' (HsVarName id0)   = ppHsBindIdent id0
 
 ppHsBindIdent :: HsIdentifier -> Html
 ppHsBindIdent (HsIdent str)   =  toHtml str
@@ -804,20 +846,20 @@ ppHsBindIdent (HsSymbol str)  =  parens (toHtml str)
 ppHsBindIdent (HsSpecial str) =  toHtml str
 
 linkId :: Module -> HsName -> String
-linkId (Module mod) str = moduleHtmlFile fp mod ++ '#': hsNameStr str
-  where fp = case lookupFM html_xrefs (Module mod) of
-		Just fp -> fp 
-		Nothing -> ""
+linkId (Module mdl) str = moduleHtmlFile fp mdl ++ '#': hsNameStr str
+  where fp = case lookupFM html_xrefs (Module mdl) of
+		Just fp0 -> fp0 
+		Nothing  -> ""
 
 ppHsModule :: String -> Html
-ppHsModule mod = anchor ! [href (moduleHtmlFile fp mod)] << toHtml mod
-  where fp = case lookupFM html_xrefs (Module mod) of
-		Just fp -> fp 
-		Nothing -> ""
+ppHsModule mdl = anchor ! [href (moduleHtmlFile fp mdl)] << toHtml mdl
+  where fp = case lookupFM html_xrefs (Module mdl) of
+		Just fp0 -> fp0 
+		Nothing  -> ""
 
 -- -----------------------------------------------------------------------------
 -- * Doc Markup
-
+htmlMarkup :: DocMarkup [HsQName] Html
 htmlMarkup = Markup {
   markupParagraph     = paragraph,
   markupEmpty	      = toHtml "",
@@ -835,9 +877,10 @@ htmlMarkup = Markup {
 
 -- If the doc is a single paragraph, don't surround it with <P> (this causes
 -- ugly extra whitespace with some browsers).
-docToHtml (DocParagraph p) = docToHtml p
-docToHtml (DocCodeBlock p) = docToHtml (DocMonospaced p)
-docToHtml doc = markup htmlMarkup doc
+docToHtml :: Doc -> Html
+docToHtml (DocParagraph d) = docToHtml d
+docToHtml (DocCodeBlock d) = docToHtml (DocMonospaced d)
+docToHtml doc              = markup htmlMarkup doc
 
 -- -----------------------------------------------------------------------------
 -- * Misc
@@ -847,33 +890,40 @@ hsep [] = noHtml
 hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
 
 infixr 8 <+>
+(<+>) :: Html -> Html -> Html
 a <+> b = Html (getHtmlElements (toHtml a) ++ HtmlString " ": getHtmlElements (toHtml b))
 
+keyword :: String -> Html
 keyword s = thespan ! [theclass "keyword"] << toHtml s
 
+equals, comma :: Html
 equals = char '='
 comma  = char ','
 
+char :: Char -> Html
 char c = toHtml [c]
+
+empty :: Html
 empty  = noHtml
 
-parens p        = char '(' +++ p +++ char ')'
-brackets p      = char '[' +++ p +++ char ']'
-braces p        = char '{' +++ p +++ char '}'
+parens, brackets, braces :: Html -> Html
+parens h        = char '(' +++ h +++ char ')'
+brackets h      = char '[' +++ h +++ char ']'
+braces h        = char '{' +++ h +++ char '}'
 
 punctuate :: Html -> [Html] -> [Html]
-punctuate p []     = []
-punctuate p (d:ds) = go d ds
+punctuate _ []     = []
+punctuate h (d0:ds) = go d0 ds
                    where
                      go d [] = [d]
-                     go d (e:es) = (d +++ p) : go e es
+                     go d (e:es) = (d +++ h) : go e es
 
 abovesSep :: HtmlTable -> [HtmlTable] -> HtmlTable
-abovesSep p []     = Html.emptyTable
-abovesSep p (d:ds) = go d ds
+abovesSep _ []      = Html.emptyTable
+abovesSep h (d0:ds) = go d0 ds
                    where
                      go d [] = d
-                     go d (e:es) = d </> p </> go e es
+                     go d (e:es) = d </> h </> go e es
 
 parenList :: [Html] -> Html
 parenList = parens . hsep . punctuate comma
@@ -881,9 +931,13 @@ parenList = parens . hsep . punctuate comma
 ubxParenList :: [Html] -> Html
 ubxParenList = ubxparens . hsep . punctuate comma
 
-ubxparens p = toHtml "(#" +++ p +++ toHtml "#)"
+ubxparens :: Html -> Html
+ubxparens h = toHtml "(#" +++ h +++ toHtml "#)"
 
+{-
+text :: Html
 text   = strAttr "TEXT"
+-}
 
 -- a box for displaying code
 declBox :: Html -> HtmlTable
@@ -907,20 +961,25 @@ maybeRDocBox Nothing = rdocBox (noHtml)
 maybeRDocBox (Just doc) = rdocBox (docToHtml doc)
 
 -- a box for the buttons at the top of the page
+topButBox :: Html -> HtmlTable
 topButBox html = tda [theclass "topbut"] << html
 
 -- a vanilla table has width 100%, no border, no padding, no spacing
 -- a narrow table is the same but without width 100%.
+vanillaTable, narrowTable :: Html -> Html
 vanillaTable = table ! [theclass "vanilla", cellspacing 0, cellpadding 0]
 narrowTable  = table ! [theclass "narrow",  cellspacing 0, cellpadding 0]
 
+spacedTable1, spacedTable5 :: Html -> Html
 spacedTable1 = table ! [theclass "vanilla",  cellspacing 1, cellpadding 0]
 spacedTable5 = table ! [theclass "vanilla",  cellspacing 5, cellpadding 0]
 
+constr_hdr, meth_hdr, inst_hdr :: HtmlTable
 constr_hdr = tda [ theclass "section4" ] << toHtml "Constructors"
 meth_hdr   = tda [ theclass "section4" ] << toHtml "Methods"
 inst_hdr   = tda [ theclass "section4" ] << toHtml "Instances"
 
+dcolon, arrow, darrow :: Html
 dcolon = toHtml "::"
 arrow  = toHtml "->"
 darrow = toHtml "=>"

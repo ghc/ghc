@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: HsParseMonad.lhs,v 1.1 2002/04/04 16:23:43 simonmar Exp $
+-- $Id: HsParseMonad.lhs,v 1.2 2002/07/24 09:42:18 simonmar Exp $
 --
 -- (c) The GHC Team 1997-2000
 --
@@ -31,38 +31,40 @@ type P a
      -> ParseResult a
 
 thenP :: P a -> (a -> P b) -> P b
-m `thenP` k = \i l n c s -> 
-	case m i l n c s of 
+m `thenP` k = \i l n c s0 -> 
+	case m i l n c s0 of 
 	    Failed s -> Failed s
 	    Ok s' a -> case k a of k' -> k' i l n c s'
 
+thenP_ :: P a -> P b -> P b
 m `thenP_` k = m `thenP` \_ -> k
 
 mapP :: (a -> P b) -> [a] -> P [b]
-mapP f [] = returnP []
+mapP _ [] = returnP []
 mapP f (a:as) = 
      f a `thenP` \b ->
      mapP f as `thenP` \bs ->
      returnP (b:bs)
 
-returnP a = \i l n c s -> Ok s a
+returnP :: a -> P a
+returnP a = \_ _ _ _ s -> Ok s a
 
 failP :: String -> P a
-failP err = \i l n c s -> Failed err
+failP err = \_ _ _ _ _ -> Failed err
 
 getSrcLoc :: P SrcLoc
-getSrcLoc = \i l n c s -> Ok s l
+getSrcLoc = \_ l _ _ s -> Ok s l
 
 getContext :: P [LexContext]
-getContext = \i l n c s -> Ok s s
+getContext = \_ _ _ _ s -> Ok s s
 
 pushContext :: LexContext -> P ()
 pushContext ctxt = 
 --trace ("pushing lexical scope: " ++ show ctxt ++"\n") $
-	\i l n c s -> Ok (ctxt:s) ()
+	\_ _ _ _ s -> Ok (ctxt:s) ()
 
 popContext :: P ()
-popContext = \i l n c stk ->
+popContext = \_ _ _ _ stk ->
       case stk of
    	(_:s) -> --trace ("popping lexical scope, context now "++show s ++ "\n") $ 
             Ok s ()

@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.12 2002/07/19 09:59:02 simonmar Exp $
+% $Id: HsSyn.lhs,v 1.13 2002/07/24 09:42:18 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -44,7 +44,7 @@ newtype Module = Module String
   deriving (Eq,Ord)
 
 instance Show Module where
-   showsPrec p (Module m) = showString m
+   showsPrec _ (Module m) = showString m
 
 data HsQName
 	= Qual Module HsName
@@ -299,28 +299,40 @@ data HsGuardedAlt
 -- Smart constructors
 
 -- pinched from GHC
+mkHsForAllType :: Maybe [HsName] -> [HsAsst] -> HsType -> HsType
 mkHsForAllType (Just []) [] ty = ty	-- Explicit for-all with no tyvars
 mkHsForAllType mtvs1     [] (HsForAllType mtvs2 ctxt ty)
  = mkHsForAllType (mtvs1 `plus` mtvs2) ctxt ty
  where
-    mtvs1       `plus` Nothing     = mtvs1
-    Nothing     `plus` mtvs2       = mtvs2 
+    mtvs        `plus` Nothing     = mtvs
+    Nothing     `plus` mtvs        = mtvs
     (Just tvs1) `plus` (Just tvs2) = Just (tvs1 ++ tvs2)
 mkHsForAllType tvs ctxt ty = HsForAllType tvs ctxt ty
 
 -----------------------------------------------------------------------------
 -- Builtin names.
 
+prelude_mod, main_mod :: Module
 prelude_mod	      = Module "Prelude"
 main_mod	      = Module "Main"
 
+unit_ident, nil_ident :: HsIdentifier
 unit_ident	      = HsSpecial "()"
-tuple_ident i	      = HsSpecial ("("++replicate i ','++")")
 nil_ident	      = HsSpecial "[]"
 
+tuple_ident :: Int -> HsIdentifier
+tuple_ident i	      = HsSpecial ("("++replicate i ','++")")
+
+unit_con_name, nil_con_name :: HsQName
 unit_con_name	      = Qual prelude_mod (HsVarName unit_ident)
-tuple_con_name i      = Qual prelude_mod (HsVarName (tuple_ident i))
 nil_con_name	      = Qual prelude_mod (HsVarName nil_ident)
+
+tuple_con_name :: Int -> HsQName
+tuple_con_name i      = Qual prelude_mod (HsVarName (tuple_ident i))
+
+as_name, qualified_name, hiding_name, unsafe_name, safe_name
+       , forall_name, threadsafe_name, export_name, ccall_name, stdcall_name
+       , dotnet_name, minus_name, pling_name, dot_name :: HsName
 
 as_name	              = HsVarName (HsIdent "as")
 qualified_name        = HsVarName (HsIdent "qualified")
@@ -337,19 +349,31 @@ minus_name	      = HsVarName (HsSymbol "-")
 pling_name	      = HsVarName (HsSymbol "!")
 dot_name	      = HsVarName (HsSymbol ".")
 
+unit_tycon_name, fun_tycon_name, list_tycon_name :: HsName
+
 unit_tycon_name       = HsTyClsName unit_ident
 fun_tycon_name        = HsTyClsName (HsSpecial "->")
 list_tycon_name       = HsTyClsName (HsSpecial "[]")
+
+tuple_tycon_name :: Int -> HsName
 tuple_tycon_name i    = HsTyClsName (tuple_ident i)
+
+unit_tycon_qname, fun_tycon_qname, list_tycon_qname :: HsQName
 
 unit_tycon_qname      = Qual prelude_mod unit_tycon_name   
 fun_tycon_qname       = Qual prelude_mod fun_tycon_name    
 list_tycon_qname      = Qual prelude_mod list_tycon_name   
+
+tuple_tycon_qname :: Int -> HsQName
 tuple_tycon_qname i   = Qual prelude_mod (tuple_tycon_name i)
+
+unit_tycon, fun_tycon, list_tycon :: HsType
 
 unit_tycon	      = HsTyCon unit_tycon_qname
 fun_tycon	      = HsTyCon fun_tycon_qname
 list_tycon	      = HsTyCon list_tycon_qname
+
+tuple_tycon :: Int -> HsType
 tuple_tycon i	      = HsTyCon (tuple_tycon_qname i)
 
 -- -----------------------------------------------------------------------------
@@ -397,7 +421,7 @@ markup m (DocAppend d1 d2)	= markupAppend m (markup m d1) (markup m d2)
 markup m (DocString s)		= markupString m s
 markup m (DocParagraph d)	= markupParagraph m (markup m d)
 markup m (DocIdentifier i)	= markupIdentifier m i
-markup m (DocModule mod)	= markupModule m mod
+markup m (DocModule mod0)	= markupModule m mod0
 markup m (DocEmphasis d)	= markupEmphasis m (markup m d)
 markup m (DocMonospaced d)	= markupMonospaced m (markup m d)
 markup m (DocUnorderedList ds)	= markupUnorderedList m (map (markup m) ds)
@@ -408,6 +432,7 @@ markup m (DocURL url)		= markupURL m url
 -- | Since marking up is just a matter of mapping 'Doc' into some
 -- other type, we can \'rename\' documentation by marking up 'Doc' into
 -- the same thing, modifying only the identifiers embedded in it.
+mapIdent :: (a -> GenDoc b) -> DocMarkup a (GenDoc b)
 mapIdent f = Markup {
   markupEmpty         = DocEmpty,
   markupString        = DocString,
@@ -427,6 +452,7 @@ mapIdent f = Markup {
 -- ** Smart constructors
 
 -- used to make parsing easier; we group the list items later
+docAppend :: Doc -> Doc -> Doc
 docAppend (DocUnorderedList ds1) (DocUnorderedList ds2) 
   = DocUnorderedList (ds1++ds2)
 docAppend (DocUnorderedList ds1) (DocAppend (DocUnorderedList ds2) d)
@@ -442,6 +468,7 @@ docAppend d1 d2
 
 -- again to make parsing easier - we spot a paragraph whose only item
 -- is a DocMonospaced and make it into a DocCodeBlock
+docParagraph :: Doc -> Doc
 docParagraph (DocMonospaced p)
   = DocCodeBlock p
 docParagraph (DocAppend (DocString s1) (DocMonospaced p))
