@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsExternal.h,v 1.3 2004/08/21 12:47:17 panne Exp $
+ * $Id: RtsExternal.h,v 1.4 2004/09/09 11:38:09 stolz Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -34,6 +34,7 @@ extern I_ resetGenSymZh(void);
 extern int cmp_thread(StgPtr tso1, StgPtr tso2);
 extern int rts_getThreadId(StgPtr tso);
 extern int forkOS_createThread ( HsStablePtr entry );
+extern StgInt forkProcess(HsStablePtr *entry);
 
 /* grimy low-level support functions defined in StgPrimFloat.c */
 extern StgDouble __encodeDouble (I_ size, StgByteArray arr, I_ e);

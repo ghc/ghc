@@ -158,7 +158,6 @@ extern nat         RTS_VAR(rts_n_waiting_tasks);
 
 StgBool rtsSupportsBoundThreads(void);
 StgBool isThreadBound(StgTSO *tso);
-StgInt forkProcess(HsStablePtr *entry);
 
 extern SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
 
