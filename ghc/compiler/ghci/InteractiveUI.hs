@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.78 2001/06/27 11:17:47 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.79 2001/06/27 14:26:36 sewardj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -678,8 +678,15 @@ linkPackages cmdline_lib_specs pkgs
         lib_paths <- readIORef v_Library_paths
         mapM_ (preloadLib lib_paths) cmdline_lib_specs
      where
-	-- packages that are already linked into GHCi
-	loaded = [ "gmp", "rts", "std", "concurrent", "posix", "text", "util" ]
+	-- Packages that are already linked into GHCi.  For mingw32, we only
+	-- skip gmp and rts, since std and after need to load the msvcrt.dll
+	-- library which std depends on.
+	loaded 
+#          ifndef mingw32_TARGET_OS
+           = [ "gmp", "rts", "std", "concurrent", "posix", "text", "util" ]
+#          else
+           = [ "gmp", "rts" ]
+#          endif
 
         preloadLib :: [String] -> LibrarySpec -> IO ()
         preloadLib lib_paths lib_spec
