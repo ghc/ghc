@@ -563,12 +563,15 @@ checkNewInst dflags ies dfun
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
-	; mappM_ (dupInstErr dfun) dup_dfuns }
+	; case dup_dfuns of
+	    dup_dfun : _ -> dupInstErr dfun dup_dfun
+	    []           -> return ()
+	}
   where
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
     (matches, _) = lookupInstEnv dflags ies cls tys
-    dup_dfuns = [dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			isJust (matchTys (mkVarSet tvs) tys dup_tys)]
+    dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
+			    isJust (matchTys (mkVarSet tvs) tys dup_tys)]
 	-- Find memebers of the match list which 
 	-- dfun itself matches. If the match is 2-way, it's a duplicate
 
