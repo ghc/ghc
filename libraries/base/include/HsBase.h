@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.1 2002/02/07 11:13:30 simonmar Exp $
+ * $Id: HsBase.h,v 1.2 2002/02/13 10:17:29 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -70,6 +70,9 @@
 #endif
 #ifdef HAVE_WINSOCK_H
 #include <winsock.h>
+#endif
+#ifdef HAVE_LIMITS_H
+#include <limits.h>
 #endif
 
 #if !defined(mingw32_TARGET_OS) && !defined(irix_TARGET_OS)
