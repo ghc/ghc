@@ -14,18 +14,15 @@ import CoreSyn
 
 import DsCCall		( dsCCall, mkCCall, boxResult, unboxArg )
 import DsMonad
-import DsUtils
 
 import HsSyn		( ExtName(..), ForeignDecl(..), isDynamicExtName, ForKind(..) )
 import HsDecls		( extNameStatic )
 import CallConv
 import TcHsSyn		( TypecheckedForeignDecl )
 import CoreUtils	( exprType, mkInlineMe )
-import DataCon		( DataCon, dataConWrapId )
-import Id		( Id, idType, idName, mkWildId, mkVanillaId, mkSysLocal,
+import Id		( Id, idType, idName, mkVanillaId, mkSysLocal,
 			  setInlinePragma )
 import IdInfo		( neverInlinePrag )
-import MkId		( mkWorkerId )
 import Literal		( Literal(..) )
 import Module		( Module, moduleUserString )
 import Name		( mkGlobalName, nameModule, nameOccName, getOccString, 
@@ -37,10 +34,8 @@ import Type		( unUsgTy, repType,
 			  Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkTyVarTy, mkFunTy, splitAppTy, applyTy, funResultTy
 			)
-import PprType		( {- instance Outputable Type -} )
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..), dynamicTarget )
-import Var		( TyVar )
-import TysPrim		( realWorldStatePrimTy, addrPrimTy )
+import PrimOp		( PrimOp(..), CCall(..), 
+			  CCallTarget(..), dynamicTarget )
 import TysWiredIn	( unitTy, addrTy, stablePtrTyCon,
 			  addrDataCon
 			)
@@ -48,7 +43,6 @@ import Unique		( Uniquable(..), hasKey,
 			  ioTyConKey, deRefStablePtrIdKey, returnIOIdKey, 
 			  bindIOIdKey, makeStablePtrIdKey
 		)
-import Maybes		( maybeToBool )
 import Outputable
 \end{code}
 
@@ -170,9 +164,8 @@ Foreign labels
 dsFLabel :: Id -> ExtName -> DsM CoreBind
 dsFLabel nm ext_name = returnDs (NonRec nm fo_rhs)
   where
-   fo_rhs = mkConApp addrDataCon [mkLit (MachLitLit addr addrPrimTy)]
+   fo_rhs = mkConApp addrDataCon [mkLit (MachLabel enm)]
    enm    = extNameStatic ext_name
-   addr   = SLIT("(&") _APPEND_ enm _APPEND_ SLIT(")")
 \end{code}
 
 The function that does most of the work for `@foreign export@' declarations.
@@ -358,7 +351,7 @@ dsFExportDynamic i ty mod_name ext_name cconv =
        -}
       adj_args      = [ mkIntLitInt (callConvToInt cconv)
 		      , Var stbl_value
-		      , mkLit (MachLitLit (_PK_ fe_nm) addrPrimTy)
+		      , mkLit (MachLabel (_PK_ fe_nm))
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
