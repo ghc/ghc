@@ -340,12 +340,6 @@ parsePackageInfo str defines force =
     ParseOk ok -> return ok
     ParseFailed err -> die (showError err)
 
--- Used for converting versionless package names to new
--- PackageIdentifiers.  "Version [] []" is special: it means "no
--- version" or "any version"
-pkgNameToId :: String -> PackageIdentifier
-pkgNameToId name = PackageIdentifier name (Version [] [])
-
 -- -----------------------------------------------------------------------------
 -- Exposing, Hiding, Unregistering are all similar
 
@@ -799,12 +793,19 @@ oldRunit clis = do
     [ OF_ListLocal ] -> listPackages db_stack
     [ OF_Add upd ]   -> registerPackage input_file defines db_stack
 				auto_ghci_libs upd force
-    [ OF_Remove p ]  -> unregisterPackage (pkgNameToId p) db_stack
-    [ OF_Show p ]
-	| null fields -> describePackage db_stack (pkgNameToId p)
-	| otherwise   -> mapM_ (describeField db_stack (pkgNameToId p)) fields
-    _            -> do prog <- getProgramName
-		       die (usageInfo (usageHeader prog) flags)
+    [ OF_Remove pkgid_str ]  -> do
+	pkgid <- readPkgId pkgid_str
+	unregisterPackage pkgid db_stack
+    [ OF_Show pkgid_str ]
+	| null fields -> do
+		pkgid <- readPkgId pkgid_str
+		describePackage db_stack pkgid
+	| otherwise   -> do
+		pkgid <- readPkgId pkgid_str
+		mapM_ (describeField db_stack pkgid) fields
+    _ -> do 
+	prog <- getProgramName
+	die (usageInfo (usageHeader prog) flags)
 
 my_head s [] = error s
 my_head s (x:xs) = x
