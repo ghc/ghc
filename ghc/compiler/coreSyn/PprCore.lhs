@@ -21,9 +21,6 @@ import CostCentre	( pprCostCentreCore )
 import Var		( Var )
 import Id		( Id, idType, isDataConWorkId_maybe, idLBVarInfo, idArity,
 			  idInfo, idInlinePragma, idOccInfo,
-#ifdef OLD_STRICTNESS
-			  idDemandInfo, 
-#endif
 			  globalIdDetails, isGlobalId, isExportedId, 
 			  isSpecPragmaId, idNewDemandInfo
 			)
@@ -33,11 +30,13 @@ import IdInfo		( IdInfo, megaSeqIdInfo,
 			  specInfo, pprNewStrictness,
 			  workerInfo, ppWorkerInfo,
 			  newStrictnessInfo, cafInfo, ppCafInfo,
-#ifdef OLD_STRICTNESS
-			  cprInfo, ppCprInfo, 
-			  strictnessInfo, ppStrictnessInfo, 
-#endif
 			)
+
+#ifdef OLD_STRICTNESS
+import Id		( idDemandInfo )
+import IdInfo		( cprInfo, ppCprInfo, strictnessInfo, ppStrictnessInfo ) 
+#endif
+
 import DataCon		( dataConTyCon )
 import TyCon		( tupleTyConBoxity, isTupleTyCon )
 import Type		( pprParendType, pprType, pprParendKind )
@@ -155,7 +154,7 @@ ppr_expr add_par expr@(App fun arg)
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = add_par $
-    sep [sep [ptext SLIT("case") <+> parens (ppr ty) <+> pprCoreExpr expr,
+    sep [sep [ptext SLIT("case") <+> pprParendType ty <+> pprCoreExpr expr,
 	      hsep [ptext SLIT("of"),
 		    ppr_bndr var, 
 		    char '{',
@@ -169,7 +168,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
 
 ppr_expr add_par (Case expr var ty alts)
   = add_par $
-    sep [sep [ptext SLIT("case") <+> parens (ppr ty) <+> pprCoreExpr expr,
+    sep [sep [ptext SLIT("case") <+> pprParendType ty <+> pprCoreExpr expr,
 	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
 	 nest 2 (sep (punctuate semi (map pprCoreAlt alts))),
 	 char '}'
