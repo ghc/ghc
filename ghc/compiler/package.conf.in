@@ -28,6 +28,7 @@ Package {
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/ndpFlatten",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cbits",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/iface",
+			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/cmm",
 			   FPTOOLS_TOP_ABS"/ghc/compiler/stage1/nativeGen" ],
 #endif
         source_dirs    = [],
