@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.37 2001/03/28 11:01:19 simonmar Exp $
+-- $Id: DriverState.hs,v 1.38 2001/05/09 09:38:18 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -92,9 +92,12 @@ defaultHscLang
   | otherwise					=  HscC
 
 GLOBAL_VAR(v_Output_dir,  Nothing, Maybe String)
-GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
 GLOBAL_VAR(v_Output_file, Nothing, Maybe String)
 GLOBAL_VAR(v_Output_hi,   Nothing, Maybe String)
+
+GLOBAL_VAR(v_Object_suf,  Nothing, Maybe String)
+GLOBAL_VAR(v_HC_suf,  	  Nothing, Maybe String)
+GLOBAL_VAR(v_Hi_suf,      "hi",	   String)
 
 GLOBAL_VAR(v_Ld_inputs,	[],      [String])
 
@@ -111,12 +114,6 @@ osuf_ify f = do
   case osuf_opt of
 	Nothing -> return f
 	Just s  -> return (newsuf s f)
-
------------------------------------------------------------------------------
--- Hi Files
-
-GLOBAL_VAR(v_Hi_on_stdout, 	False,	Bool)
-GLOBAL_VAR(v_Hi_suf,          	"hi",	String)
 
 -----------------------------------------------------------------------------
 -- Compiler optimisation options

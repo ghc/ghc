@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.67 2001/05/08 11:07:30 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.68 2001/05/09 09:38:18 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -152,6 +152,7 @@ genPipeline todo stop_flag persistent_output lang filename
    writeIORef v_Object_suf (Just "ilx")
 #endif
    osuf       <- readIORef v_Object_suf
+   hcsuf      <- readIORef v_HC_suf
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
@@ -209,10 +210,10 @@ genPipeline todo stop_flag persistent_output lang filename
 	else do
 
    let
-   ----------- -----  ----   ---   --   --  -  -  -
-      myPhaseInputExt Ln = case osuf of Nothing -> phaseInputExt Ln
-					Just s  -> s
-      myPhaseInputExt other = phaseInputExt other
+	-- .o and .hc suffixes can be overriden by command-line options:
+      myPhaseInputExt Ln  | Just s <- osuf  = s
+      myPhaseInputExt HCc | Just s <- hcsuf = s
+      myPhaseInputExt other                 = phaseInputExt other
 
       annotatePipeline
 	 :: [Phase]		-- raw pipeline

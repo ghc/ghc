@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.52 2001/03/29 18:40:09 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.53 2001/05/09 09:38:18 simonmar Exp $
 --
 -- Driver flags
 --
@@ -206,11 +206,10 @@ static_flags =
   ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
   ,  ( "o"		, SepArg (writeIORef v_Output_file . Just) )
   ,  ( "osuf"		, HasArg (writeIORef v_Object_suf  . Just) )
+  ,  ( "hcsuf"		, HasArg (writeIORef v_HC_suf      . Just) )
   ,  ( "hisuf"		, HasArg (writeIORef v_Hi_suf) )
   ,  ( "tmpdir"		, HasArg (writeIORef v_TmpDir . (++ "/")) )
-  ,  ( "ohi"		, HasArg (\s -> case s of 
-					  "-" -> writeIORef v_Hi_on_stdout True
-					  _   -> writeIORef v_Output_hi (Just s)) )
+  ,  ( "ohi"		, HasArg (writeIORef v_Output_hi   . Just) )
 	-- -odump?
 
   ,  ( "keep-hc-file"   , AnySuffix (\_ -> writeIORef v_Keep_hc_files True) )
