@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.29 2003/09/21 22:20:51 wolfgang Exp $
+-- $Id: primops.txt.pp,v 1.30 2003/10/01 10:57:39 wolfgang Exp $
 --
 -- Primitive Operations
 --
@@ -1462,12 +1462,6 @@ primop  ForkOp "fork#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
    usage            = { mangle ForkOp [mkO, mkP] mkR }
-   has_side_effects = True
-   out_of_line      = True
-
-primop ForkProcessOp "forkProcess#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, Int#  #)
-   with
    has_side_effects = True
    out_of_line      = True
 

@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.176 2003/10/01 10:49:08 wolfgang Exp $
+ * $Id: Schedule.c,v 1.177 2003/10/01 10:57:42 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1645,108 +1645,62 @@ deleteThreadImmediately(StgTSO *tso);
 #endif
 
 StgInt
-forkProcess(StgTSO* tso)
+forkProcess(HsStablePtr *entry)
 {
 #ifndef mingw32_TARGET_OS
   pid_t pid;
   StgTSO* t,*next;
+  StgMainThread *m;
+  SchedulerStatus rc;
 
   IF_DEBUG(scheduler,sched_belch("forking!"));
-  ACQUIRE_LOCK(&sched_mutex);
+  rts_lock(); // This not only acquires sched_mutex, it also
+              // makes sure that no other threads are running
 
   pid = fork();
+
   if (pid) { /* parent */
 
   /* just return the pid */
+    rts_unlock();
+    return pid;
     
   } else { /* child */
-#ifdef THREADED_RTS
-    /* wipe all other threads */
+    
+    
+      // delete all threads
     run_queue_hd = run_queue_tl = END_TSO_QUEUE;
-    tso->link = END_TSO_QUEUE;
     
     for (t = all_threads; t != END_TSO_QUEUE; t = next) {
       next = t->link;
-      
-      /* Don't kill the current thread.. */
-      if (t->id == tso->id) {
-	continue;
-      }
-      
-      if (isThreadBound(t)) {
-	// If the thread is bound, the OS thread that the thread is bound to
-	// no longer exists after the fork() system call.
-	// The bound Haskell thread is therefore unable to run at all;
-	// we must not give it a chance to survive by catching the
-	// ThreadKilled exception. So we kill it "brutally" rather than
-	// using deleteThread.
-	deleteThreadImmediately(t);
-      } else {
-	deleteThread(t);
-      }
-    }
-    
-    if (isThreadBound(tso)) {
-    } else {
-      // If the current is not bound, then we should make it so.
-      // The OS thread left over by fork() is special in that the process
-      // will terminate as soon as the thread terminates; 
-      // we'd expect forkProcess to behave similarily.
-      // FIXME - we don't do this.
-    }
-#else
-  StgMainThread *m;
-  rtsBool doKill;
-  /* wipe all other threads */
-  run_queue_hd = run_queue_tl = END_TSO_QUEUE;
-  tso->link = END_TSO_QUEUE;
 
-  /* When clearing out the threads, we need to ensure
-     that a 'main thread' is left behind; if there isn't,
-     the Scheduler will shutdown next time it is entered.
-     
-     ==> we don't kill a thread that's on the main_threads
-         list (nor the current thread.)
-    
-     [ Attempts at implementing the more ambitious scheme of
-       killing the main_threads also, and then adding the
-       current thread onto the main_threads list if it wasn't
-       there already, failed -- waitThread() (for one) wasn't
-       up to it. If it proves to be desirable to also kill
-       the main threads, then this scheme will have to be
-       revisited (and fully debugged!)
-       
-       -- sof 7/2002
-     ]
-  */
-  /* DO NOT TOUCH THE QUEUES directly because most of the code around
-     us is picky about finding the thread still in its queue when
-     handling the deleteThread() */
-
-  for (t = all_threads; t != END_TSO_QUEUE; t = next) {
-    next = t->link;
-    
-    /* Don't kill the current thread.. */
-    if (t->id == tso->id) continue;
-    doKill=rtsTrue;
-    /* ..or a main thread */
-    for (m = main_threads; m != NULL; m = m->link) {
-	if (m->tso->id == t->id) {
-	  doKill=rtsFalse;
-	  break;
-	}
+        // don't allow threads to catch the ThreadKilled exception
+      deleteThreadImmediately(t);
     }
-    if (doKill) {
-      deleteThread(t);
-    }
-  }
+    
+      // wipe the main thread list
+    while((m = main_threads) != NULL) {
+      main_threads = m->link;
+#ifdef THREADED_RTS
+      closeCondition(&m->bound_thread_cond);
 #endif
+      stgFree(m);
+    }
+    
+    resetTaskManagerAfterFork();      // tell startTask() and friends that
+    startingWorkerThread = rtsFalse;  // we have no worker threads any more
+    resetWorkerWakeupPipeAfterFork();
+    
+    rc = rts_evalStableIO(entry, NULL);  // run the action
+    rts_checkSchedStatus("forkProcess",rc);
+    
+    rts_unlock();
+    
+    hs_exit();                      // clean up and exit
+    stg_exit(0);
   }
-  RELEASE_LOCK(&sched_mutex);
-  return pid;
 #else /* mingw32 */
-  barf("forkProcess#: primop not implemented for mingw32, sorry! (%u)\n", tso->id);
-  /* pointlessly printing out the TSOs 'id' to avoid CC unused warning. */
+  barf("forkProcess#: primop not implemented for mingw32, sorry!\n");
   return -1;
 #endif /* mingw32 */
 }

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.113 2003/09/21 22:20:55 wolfgang Exp $
+ * $Id: PrimOps.hc,v 1.114 2003/10/01 10:57:41 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1050,20 +1050,6 @@ FN_(forkzh_fast)
   context_switch = 1;
   
   RET_P(R1.t);
-  FE_
-}
-
-FN_(forkProcesszh_fast)
-{
-  pid_t pid;
-
-  FB_
-  /* args: none */
-  /* result: Pid */
-
-  R1.i = RET_STGCALL1(StgInt, forkProcess, CurrentTSO);
-
-  RET_N(R1.i);
   FE_
 }
 

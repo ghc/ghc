@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.40 2003/10/01 10:49:09 wolfgang Exp $
+ * $Id: Schedule.h,v 1.41 2003/10/01 10:57:43 wolfgang Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -90,6 +90,14 @@ rtsBool wakeUpSleepingThreads(nat);  /* In Select.c */
  */
 void wakeBlockedWorkerThread(void); /* In Select.c */
 
+/* resetWorkerWakeupPipeAfterFork()
+ *
+ * Notify Select.c that a fork() has occured
+ *
+ * Called from STG :  NO
+ * Locks assumed   :  don't care, but must be called right after fork()
+ */
+void resetWorkerWakeupPipeAfterFork(void); /* In Select.c */
 
 /* GetRoots(evac_fn f)
  *
@@ -151,7 +159,7 @@ extern nat         rts_n_waiting_tasks;
 
 StgBool rtsSupportsBoundThreads(void);
 StgBool isThreadBound(StgTSO *tso);
-StgInt forkProcess(StgTSO *tso);
+StgInt forkProcess(HsStablePtr *entry);
 
 extern SchedulerStatus rts_mainLazyIO(HaskellObj p, /*out*/HaskellObj *ret);
 

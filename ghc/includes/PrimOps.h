@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.105 2003/09/24 11:06:51 simonmar Exp $
+ * $Id: PrimOps.h,v 1.106 2003/10/01 10:57:41 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -273,7 +273,6 @@ EXTFUN_RTS(deRefStablePtrzh_fast);
    -------------------------------------------------------------------------- */
 
 EXTFUN_RTS(forkzh_fast);
-EXTFUN_RTS(forkProcesszh_fast);
 EXTFUN_RTS(yieldzh_fast);
 EXTFUN_RTS(killThreadzh_fast);
 EXTFUN_RTS(seqzh_fast);
