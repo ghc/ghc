@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.130 2002/07/26 03:06:58 sof Exp $
+-- $Id: InteractiveUI.hs,v 1.131 2002/08/05 09:18:27 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -164,7 +164,10 @@ interactiveUI cmstate paths cmdline_libs = do
    (cmstate, maybe_hval) 
 	<- cmCompileExpr cmstate dflags "IO.hSetBuffering IO.stdout IO.NoBuffering Prelude.>> IO.hSetBuffering IO.stderr IO.NoBuffering"
    case maybe_hval of
-	Just hval -> unsafeCoerce# hval :: IO ()
+	Just hval -> do
+		let action = unsafeCoerce# hval :: IO ()
+		action -- do it now
+		writeIORef turn_off_buffering action -- and save it for later
 	_ -> panic "interactiveUI:buffering"
 
    (cmstate, maybe_hval)
@@ -938,6 +941,7 @@ data GHCiOption
 
 GLOBAL_VAR(flush_stdout, error "no flush_stdout", IO ())
 GLOBAL_VAR(flush_stderr, error "no flush_stdout", IO ())
+GLOBAL_VAR(turn_off_buffering, error "no flush_stdout", IO ())
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> IO a }
 
@@ -1248,4 +1252,12 @@ maybePutStrLn dflags s | verbosity dflags > 0 = putStrLn s
 -----------------------------------------------------------------------------
 -- reverting CAFs
 	
-foreign import revertCAFs :: IO ()	-- make it "safe", just in case
+revertCAFs :: IO ()
+revertCAFs = do
+  rts_revertCAFs
+  Monad.join (readIORef turn_off_buffering)
+	-- have to do this again, because we just reverted
+	-- stdout, stderr & stdin to their defaults.
+
+foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()  
+	-- make it "safe", just in case
