@@ -127,7 +127,7 @@ stg2stg stg_todos module_name us binds
     end_pass us2 what ccs binds2
       = -- report verbosely, if required
 	(if do_verbose_stg2stg then
-	    hPutStr stderr (show
+	    hPutStr stderr (showSDoc
 	      (text ("*** "++what++":") $$ vcat (map ppr binds2)
 	    ))
 	 else return ()) >>
