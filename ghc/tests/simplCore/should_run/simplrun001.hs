@@ -1,5 +1,3 @@
-{-# OPTIONS -O #-}
-
 -- !!! Test filter fusion
 
 -- In GHC 4.06, the filterFB rule was back to front, which

@@ -22,10 +22,10 @@ import TcExpr		( tcExpr )
 import TcEnv		( tcExtendLocalValEnv, tcExtendTyVarEnv, isLocalThing )
 import Rules		( extendRuleBase )
 import Inst		( LIE, plusLIEs, instToId )
-import Id		( idName, mkVanillaId )
+import Id		( idName, idType, mkVanillaId )
 import Module		( Module )
 import VarSet
-import Type		( tyVarsOfType, openTypeKind )
+import Type		( tyVarsOfTypes, openTypeKind )
 import List		( partition )
 import Outputable
 \end{code}
@@ -106,16 +106,29 @@ tcSourceRule (HsRule name sig_tvs vars lhs rhs src_loc)
 	--	b) We'd like to make available the dictionaries bound 
 	--	   on the LHS in the RHS, so quantifying over them is good
 	--	   See the 'lhs_dicts' in tcSimplifyAndCheck for the RHS
+
+	-- We initially quantify over any tyvars free in *either* the rule
+	-- *or* the bound variables.  The latter is important.  Consider
+	--	ss (x,(y,z)) = (x,z)
+	--	RULE:  forall v. fst (ss v) = fst v
+	-- The type of the rhs of the rule is just a, but v::(a,(b,c))
+	--
+	-- It's still conceivable that there may be type variables mentioned
+	-- in the LHS, but not in the type of the lhs, nor in the binders.
+	-- They'll get zapped to (), but that's over-constraining really.
+	-- Let's see if we get a problem.
+	forall_tvs = varSetElems (tyVarsOfTypes (rule_ty : map idType tpl_ids))
     in
 
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
+	--
+	-- 
     tcSimplifyInferCheck (text "tcRule")
-			 (varSetElems (tyVarsOfType rule_ty))
-			 lhs_dicts rhs_lie	`thenTc` \ (forall_tvs', lie', rhs_binds) ->
+			 forall_tvs
+			 lhs_dicts rhs_lie	`thenTc` \ (forall_tvs1, lie', rhs_binds) ->
 
-    mapTc zonkTcTyVarToTyVar forall_tvs'		`thenTc` \ tvs ->
-    returnTc (lie', HsRule	name tvs
+    returnTc (lie', HsRule	name forall_tvs1
 				(map RuleBndr tpl_ids)	-- yuk
 				(mkHsLet lhs_binds lhs')
 				(mkHsLet rhs_binds rhs')
