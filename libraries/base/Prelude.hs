@@ -153,6 +153,8 @@ import Data.Either
 import Data.Maybe
 import Data.Bool
 import Data.Tuple
+import Data.Eq
+import Data.Ord
 #endif
 
 #ifdef __GLASGOW_HASKELL__
@@ -171,9 +173,6 @@ import GHC.Err   ( error, undefined )
 #ifdef __HUGS__
 import Hugs.Prelude
 #endif
-
-import Data.Eq
-import Data.Ord
 
 #ifndef __HUGS__
 infixr 0 $!
