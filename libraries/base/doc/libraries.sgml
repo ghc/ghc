@@ -10,17 +10,18 @@
   <sect1 id="introduction">
     <title>Introduction</title>
 
-    <para>This document consistutes part of a proposal for an
-    extension to the <ulink
-    url="http://www.haskell.org/onlinereport/">Haskell 98</ulink>
-    language.  The full proposal has several parts: </para>
+    <para>This document consistutes a proposal for an extension to the
+    <ulink url="http://www.haskell.org/onlinereport/">Haskell
+    98</ulink> language.  The proposal has several parts: </para>
 
     <itemizedlist>
       <listitem>
 	<para>A modest language extension to Haskell 98 that adds the
         character <quote>.</quote> to the lexical syntax for a module
         name, allowing a hierarchical module namespace where a module
-        name is a sequence of components separated by periods.</para>
+        name is a sequence of components separated by periods.  The
+        extension is described in <xref
+        linkend="language-extension">.</para>
       </listitem>
       <listitem>
 	<para>An allocation of the new module namespace to existing
@@ -112,6 +113,148 @@
     </itemizedlist>
   </sect1>
 
+  <sect1 id="language-extension">
+    <title>The language extension</title>
+
+    <para>The key concept here is to map the module namespace into a
+    hierarchical directory-like structure. We propose using the dot as
+    a separator, analogous to Java's usage for namespaces.</para>
+
+    <para>For most compilers and interpreters, this extended module
+    namespace maps directly to a directory/file structure in which the
+    modules are stored. Storing unrelated modules in separate
+    directories (and related modules in the same directory) is a
+    useful and common practice when engineering large systems.</para>
+
+    <para>(But note that, just as Haskell'98 does not insist that
+    modules live in files of the same name, this proposal does not
+    insist on it either. However, we expect most tools to use the
+    close correspondance to their advantage.)</para>
+
+    <para>There are several issues arising from this proposal
+    proposal here. </para>
+
+    <para>This is a surface change to the module naming convention. It
+    does not introduce nested definition of modules.  The syntax we
+    propose (a dot separator) is familiar from other languages such as
+    Java, but could in principle be something else, for instance a
+    prime <literal>'</literal>, underscore <literal>_</literal> or
+    centred dot <literal>&cdot;</literal> or something different
+    again.  Of the choices of separator, dot requires a change to the
+    Haskell'98 lexical syntax, allowing</para>
+
+<programlisting>
+   modid   -> qconid 
+   qconid  -> [modid .] conid  
+</programlisting>
+
+    <para>where currently the syntax is</para>
+
+<programlisting>
+   modid ->  conid 
+   qconid  -> [modid .] conid  
+</programlisting>
+
+    <para>Note that the new syntax is recursive, a
+    <literal>modid</literal> may contain multiple components separated
+    by dots, where the final component is a <literal>conid</literal>.</para>
+
+    <para>A consequence of using the dot as the module namespace
+    separator is that it steals one extremely rare construction from
+    Haskell'98:</para>
+
+<programlisting>
+   A.B.C.D 
+</programlisting>
+
+    <para>in Haskell'98 means the composition of constructor D from
+    module C, with constructor B from module A:</para>
+
+<programlisting>
+   (.)  A.B  C.D 
+</programlisting>
+
+    <para>No-one so far thinks this is any great loss, and if you
+    really want to say the latter, you still can by simply inserting
+    spaces:</para>
+
+<programlisting>
+   A.B . C.D 
+</programlisting>
+
+    <sect2>
+      <title>A possible extension</title>
+
+      <para>The use of qualified imports has become more verbose: for
+      instance</para>
+
+<programlisting>
+   import qualified XmlParse
+                      ... XmlParse.element f ...  
+</programlisting>
+
+      <para>becomes</para>
+
+<programlisting>
+   import qualified Text.Xml.Parse
+                      ... Text.Xml.Parse.element f ...  
+</programlisting>
+
+      <para>It is usually more convenient to make use of Haskell's
+      <literal>as</literal> keyword to shorten qualified identifiers:</para>
+
+<programlisting>
+   import qualified Text.Xml.Parse as Parse
+                      ... Parse.element f ...  
+</programlisting>
+
+      <para>A possible extension to the proposal is to make this use
+      of <literal>as</literal> implicit, unless overridden by the
+      programmer with her own <literal>as</literal> clause. The
+      implicit <literal>as</literal> clause always uses the final
+      subdivision of the module name. So for instance, either the
+      fully-qualified or abbreviated-qualified names</para>
+
+<programlisting>
+   Text.Xml.Parse.element
+            Parse.element 
+</programlisting>
+
+      <para>would be accepted and have the same referent, but a
+      partial qualification like</para>
+
+<programlisting>
+   Xml.Parse.element 
+</programlisting>
+
+      <para>would not be accepted.</para>
+    </sect2>
+
+    <sect2>
+      <title>Renaming subtrees</title>
+
+      <para>Various proposals have been made to allow you to rename a
+      whole subtree.  This may occasionally be convenient: for example
+      suppose there are several libraries under
+      <literal>Org.Com.Microsoft</literal> that I need to import, it
+      would be easier to rename this subtree to just
+      <literal>Microsoft</literal> for use in future import
+      declarations.  For example:</para>
+
+<programlisting>
+   import Org.Com.Microsoft.* as Microsoft.*
+   import Microsoft.Foo
+   import Microsoft.Bar
+   ...
+</programlisting>
+
+      <para>The exact syntax of the renaming declaration is up for
+      debate (as is whether we need it at all), please send
+      suggestions to <email>libraries@haskell.org</email>.</para>
+    </sect2>
+
+  </sect1>
+
   <sect1 id="layout">
     <title>The hierarchy layout</title>
 
@@ -151,9 +294,10 @@
           organisations.  Any organisation with a DNS domain name owns
           a unique space in the hierarchy formed by reversing the
           components of the domain, capitalising the first character
-          of each component, and prepending
-          <literal>Org.</literal>.  <emphasis>ToDo: I don't like this
-          very much, any better ideas?</emphasis></para>
+          of each component, and prepending <literal>Org.</literal>.
+          <emphasis>ToDo: the Org name isn't great, especially when
+          the domain name also ends with Org (eg. Org.Org.Haskell?).
+          Contrib has also been suggested.</emphasis></para>
 	</listitem>
       </varlistentry>
 
@@ -198,12 +342,91 @@
 
     <sect2 id="hierarchy-design-guidelines">
       <title>Hierarchy design guidelines</title>
-      <para></para>
+      <para>Apart from the User, Local and Organisation top-level
+      categories, the rest of the hierarchy is organised with a single
+      principle in mind:</para>
+
+      <blockquote>
+	<para>Modules are grouped by
+        <emphasis>functionality</emphasis>, since this is the single
+        property that is most helpful for a user of the library - we
+        want users to be able to find out where to obtain
+        functionality easily, and to easily find all the modules that
+        provide relevant functionality.</para>
+
+        <para>So, if two modules provide similar functionality, or
+        alternative interfaces to the same functionality, then they
+        should be children of the same node in the hierarchy.  Modules
+        are never grouped by standards compliance, portability,
+        stability, or any other property.</para>
+      </blockquote>
     </sect2>
-    
+
     <sect2 id="module-naming-convention">
       <title>Module Naming Conventions</title>
-      <para></para>
+      
+      <itemizedlist>
+	<listitem>
+	  <para>A module defining a data type or type class
+          <replaceable>X</replaceable> has the itself the name
+          <replaceable>X</replaceable>, e.g.
+          <literal>StablePtr</literal>.</para>
+	</listitem>
+	
+	<listitem>
+	  <para>A module which re-exports the modules in a subtree of
+	  the hierarchy has the same name as the root of that subtree,
+	  eg. <literal>Foreign</literal> re-exports
+	  <literal>Foreign.Ptr</literal>,
+	  <literal>Foreign.Marshal.Utils</literal> etc.</para>
+	</listitem>
+	
+	<listitem>
+	  <para>If a subtree of the hierarchy contains several modules
+	  which provide similar functionality (eg. there are several
+	  pretty-printing libraries under
+	  <literal>Text.PrettyPrinter</literal>), then the module at
+	  the root of the subtree generally re-exports just
+	  <emphasis>one</emphasis> of the modules in the subtree
+	  (possibly the most popular or commonly-used
+	  alternative).</para>
+	</listitem>
+
+	<listitem>
+	  <para>In Haskell you sometimes publish
+          <emphasis>two</emphasis> interfaces to your libraries; one
+          for users, and one for library writers or advanced users who
+          might want to extend things.  Typically the advanced users
+          need to be able to see past certain abstractions.</para>
+
+	  <para>The current proposal is for a module named
+	  <literal>M</literal>, the <quote>advanced</quote> version
+	  would be named <literal>M.Internals</literal>. eg.</para>
+
+<programlisting>
+import Text.Html           -- The library
+import Text.Html.Internals -- The non-abstract library (for building other libs)
+</programlisting>
+	</listitem>
+
+	<listitem>
+	  <para>Acronyms are fully capitalised in a module name.
+	  eg. <literal>HTML</literal>, <literal>URI</literal>,
+	  <literal>CGI</literal>, etc.  Exceptions may be made for
+	  acronyms which have an existing well-established alternative
+	  capitalisation, or acronyms which are also valid words, and
+	  are more often used as such.</para>
+	</listitem>
+
+	<listitem>
+	  <para>A module name should be made plural only if the module
+	  actually defines multiple entities of a particular kind:
+	  eg. <literal>Foreign.C.Types</literal>.  Most module names
+	  which define a type or class will follow the name of the
+	  type or class, so whether to pluralize is not an
+	  issue.</para>
+	</listitem>
+      </itemizedlist>
     </sect2>
 
     <sect2 id="hierarchy">
@@ -356,9 +579,9 @@
 	</varlistentry>
 
 	<varlistentry>
-	  <term><literal>NHC</literal></term>
+	  <term><literal>Nhc</literal></term>
 	  <listitem>
-	    <para>Libraries specific to the NHC compiler.</para>
+	    <para>Libraries specific to the Nhc compiler.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -501,9 +724,9 @@
 	<term><firstterm>Portable</firstterm></term>
 	<listitem>
 	  <para>A portable library may use only Haskell 98 features
-	  plus approved extensions (see <xref linkend="portability">),
-	  and may not use any platform-specific features.  It may make
-	  use of other portable libraries only.</para>
+	  plus approved extensions, and may not use any
+	  platform-specific features.  It may make use of other
+	  portable libraries only.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -540,8 +763,95 @@
       </varlistentry>
     </variablelist>
 
+    <sect2>
+      <title>Approved Extensions</title>
+      
+      <para>Very few of the core libraries can be implemented using
+      pure Haskell 98.  For this reason, we decided to raise the
+      baseline for portable libraries to include a few common
+      extensions; the following langauge extensions can be
+      <emphasis>assumed</emphasis> to be present when writing
+      libraries:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>The <ulink
+	  url="http://haskell.org/ghc/docs/latest/set/ffi.html">Foreign
+	  Function Interface</ulink>.</para>
+	</listitem>
+	<listitem>
+	  <para>Mutable variables
+	  (<literal>Data.IORef</literal>).</para>
+	</listitem>
+	<listitem>
+	  <para>Unsafe IO monad operations
+	  (<literal>System.IO.Unsafe</literal>).</para>
+	</listitem>
+	<listitem>
+	  <para>Packed strings
+	  (<literal>Data.PackedString</literal>).</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>Extensions which we'd like to be standard, but aren't
+      currently implemented by one or more of the our target
+      compilers:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Bit operations (<literal>Data.Bits</literal>).</para>
+	</listitem>
+	<listitem>
+	  <para>Exceptions (synchronous only), defined by the
+	  <literal>Control.Exception</literal> interface.</para>
+	</listitem>
+	<listitem>
+	  <para>The ST monad, defined by
+	  <literal>Control.Monad.ST</literal>, and the associated
+	  <literal>Data.Array.ST</literal> and
+	  <literal>Data.STRef</literal> libraries.  ST requires a
+	  small typechecker extension for the <literal>runST</literal>
+	  function.</para>
+	</listitem>
+	<listitem>
+	  <para>Concurrent Haskell (pre-emptive multitasking
+	  optional).  Hugs implements this, but Nhc currently does
+	  not.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>The following extensions are not likely to become part of
+      the baseline, but are nevertheless used by one or more libraries
+      in the core set:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>Multi-parameter type classes.</para>
+	</listitem>
+	<listitem>
+	  <para>Local unversal and existential quantification.</para>
+	</listitem>
+	<listitem>
+	  <para>Concurrent Haskell with pre-emptive multitasking.</para>
+	</listitem>
+	<listitem>
+	  <para>Asynchronous exceptions.</para>
+	</listitem>
+	<listitem>
+	  <para>Stable Names.</para>
+	</listitem>
+	<listitem>
+	  <para>Weak Pointers.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>Other extensions are supported by a single compiler only,
+      and can be accessed by libraries under the top level hierarchy
+      for that compiler,
+      eg. <literal>GHC.UnboxedTypes</literal>.</para>
+    </sect2>
   </sect1>
-    
+
   <sect1 id="maintainership">
     <title>Library Maintainers</title>
 
@@ -612,7 +922,7 @@
 	</listitem>
 	<listitem>
 	  <para>Malcolm Wallace
-	  <email>Malcolm.Wallace@cs.york.ac.uk</email> (NHC representative)</para>
+	  <email>Malcolm.Wallace@cs.york.ac.uk</email> (Nhc representative)</para>
 	</listitem>
 	<listitem>
 	  <para>Andy Gill
@@ -677,7 +987,7 @@
 -- Stability   :  experimental | provisional | stable
 -- Portability :  portable | non-portable (<replaceable>reason(s)</replaceable>)
 --
--- $Id: libraries.sgml,v 1.3 2001/07/03 09:21:46 simonmar Exp $
+-- $Id: libraries.sgml,v 1.4 2001/07/05 13:52:49 simonmar Exp $
 --
 -- <replaceable>Description</replaceable>
 -----------------------------------------------------------------------------
@@ -687,7 +997,7 @@
 
       <variablelist>
 	<varlistentry>
-	  <term><literal>$Id: libraries.sgml,v 1.3 2001/07/03 09:21:46 simonmar Exp $</literal></term>
+	  <term><literal>$Id: libraries.sgml,v 1.4 2001/07/05 13:52:49 simonmar Exp $</literal></term>
 	  <listitem>
 	    <para>is optional, but usually included if the module is
 	    under CVS or RCS control.</para>
@@ -765,74 +1075,6 @@
       i.e. functions having a type <Literal>... -&#62; m a</Literal>
       for some Monad <Literal>m</Literal> are called
       <emphasis>actions</emphasis>.</para>
-
-      <sect3 id="sec-library-module-names">
-	<title>Module names</title>
-	<itemizedlist>
-	  <listitem>
-	    <para>A module defining a data type or type class
-            <replaceable>X</replaceable> has the itself the name
-            <replaceable>X</replaceable>, e.g.
-            <literal>StablePtr</literal>.</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>A module which re-exports the modules in a subtree
-	    of the hierarchy has the same name as the root of that
-	    subtree, eg. <literal>Foreign</literal> re-exports
-	    <literal>Foreign.Ptr</literal>,
-	    <literal>Foreign.Marshal.Utils</literal> etc.</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>If a subtree of the hierarchy contains several
-	    modules which provide similar functionality (eg. there are
-	    several pretty-printing libraries under
-	    <literal>Text.PrettyPrinter</literal>), then the module at
-	    the root of the subtree generally re-exports just
-	    <emphasis>one</emphasis> of the modules in the subtree
-	    (possibly the most popular or commonly-used
-	    alternative).</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>In Haskell you sometimes publish
-            <emphasis>two</emphasis> interfaces to your libraries; one
-            for users, and one for library writers or advanced users
-            who might want to extend things.  Typically the advanced
-            users need to be able to see past certain
-            abstractions.</para>
-
-	    <para>The current proposal is for a module named
-	    <literal>M</literal>, the <quote>advanced</quote> version
-	    would be named <literal>M.Internals</literal>. eg.</para>
-
-<programlisting>
-import Text.Html           -- The library
-import Text.Html.Internals -- The non-abstract library (for building other libs)
-</programlisting>
-	  </listitem>
-
-	  <listitem>
-	    <para>Acronyms are fully capitalised in a module name.
-	    eg. <literal>HTML</literal>, <literal>URI</literal>,
-	    <literal>CGI</literal>, etc.  Exceptions may be made for
-	    acronyms which have an existing well-established
-	    alternative capitalisation, or acronyms which are also
-	    valid words, and are more often used as such.</para>
-	  </listitem>
-
-	  <listitem>
-	    <para>A module name should be made plural only if the
-	    module actually defines multiple entities of a particular
-	    kind: eg. <literal>Foreign.C.Types</literal>.  Most module
-	    names which define a type or class will follow the name of
-	    the type or class, so whether to pluralize is not an
-	    issue.</para>
-	  </listitem>
-
-	</itemizedlist>
-      </sect3>
 
       <sect3 id="sec-library-constructor-names">
 	<title>Constructor names</title>
@@ -1149,8 +1391,9 @@ e.g. <literal>fromInteger</literal>.</para>
     List -> Data.List
        exports [](..)
 
-    Numeric -> ????
-       not placed in hierarchy yet
+    Numeric -> Numeric
+       added showHex, showOct, showBin & showIntAtBase from NumExts,
+       but left out floatToDouble & doubleToFloat (realToFrac is more general).
 
     System    -> System.Exit, System.Environment, System.Cmd
        split into three modules
@@ -1170,5 +1413,3 @@ e.g. <literal>fromInteger</literal>.</para>
   </sect1>
 
 </article>
-
-
