@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.20 $
- * $Date: 1999/12/16 16:34:46 $
+ * $Revision: 1.21 $
+ * $Date: 2000/01/07 17:49:29 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2795,7 +2795,20 @@ Int what; {
 		       mark(typeProgIO);
                        break;
 
-        case POSTPREL: break;
+        case POSTPREL:
+
+           if (combined) {
+               setCurrModule(modulePrelude);
+               dummyVar     = inventVar();
+               typeUnit     = mkTuple(0);
+               arrow        = fn(aVar,bVar);
+               listof       = ap(typeList,aVar);
+               boundPair    = ap(ap(mkTuple(2),aVar),aVar);
+               nameUnit     = findQualNameWithoutConsultingExportList
+                                 (mkQVar(findText("PrelBase"),
+                                         findText("()")));
+           }
+           break;
 
         case PREPREL : 
            typeChecker(RESET);
@@ -2834,8 +2847,11 @@ Int what; {
 
                starToStar   = simpleKind(1);
 
-               typeUnit     = addPrimTycon(findText("()"),
-                                           STAR,0,DATATYPE,NIL);
+               typeUnit     = //addPrimTycon(findText("()"),
+                              //             STAR,0,DATATYPE,NIL);
+                              findTycon(findText("()"));
+                              assert(nonNull(typeUnit));
+
                typeArrow    = addPrimTycon(findText("(->)"),
                                            simpleKind(2),2,
                                            DATATYPE,NIL);

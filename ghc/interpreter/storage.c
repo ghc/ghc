@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.32 $
- * $Date: 2000/01/07 16:56:47 $
+ * $Revision: 1.33 $
+ * $Date: 2000/01/07 17:49:29 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -803,10 +803,11 @@ Name addWiredInBoxingTycon
 
 Tycon addTupleTycon ( Int n )
 {
-   Int   i;
-   Kind  k;
-   Tycon t;
+   Int    i;
+   Kind   k;
+   Tycon  t;
    Module m;
+   Name   nm;
 
    for (i = TYCMIN; i < tyconHw; i++)
       if (tycon(i).tuple == n) return i;
@@ -822,6 +823,13 @@ Tycon addTupleTycon ( Int n )
    tycon(t).kind  = k;
    tycon(t).tuple = n;
    tycon(t).what  = DATATYPE;
+
+   if (n == 0) {
+      /* maybe we want to do this for all n ? */
+      nm = newName(ghcTupleText_n(n), t);
+      name(nm).type = t;   /* ummm ... for n > 0 */
+   }
+
    return t;
 }
 
