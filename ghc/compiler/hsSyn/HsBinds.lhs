@@ -262,6 +262,14 @@ isFixitySig _	       = False
 isClassOpSig :: Sig name -> Bool
 isClassOpSig (ClassOpSig _ _ _ _) = True
 isClassOpSig _			  = False
+
+isPragSig :: Sig name -> Bool
+	-- Identifies pragmas 
+isPragSig (SpecSig _ _ _)   = True
+isPragSig (InlineSig   _ _) = True
+isPragSig (NoInlineSig _ _) = True
+isPragSig (SpecInstSig _ _) = True
+isPragSig other		    = False
 \end{code}
 
 \begin{code}
