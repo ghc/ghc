@@ -210,7 +210,7 @@ shortMeOut ind_env exported_id local_id
        not (local_id `elemVarEnv` ind_env)	-- Only if not already substituted for
     then
 	if shortableIdInfo (idInfo exported_id) 	-- Only if its IdInfo is 'shortable'
-							-- (see the defn of IdInfo.shortableIdInfo
+							-- (see the defn of IdInfo.shortableIdInfo)
 	then True
 	else pprTrace "shortMeOut:" (ppr exported_id) False
     else
