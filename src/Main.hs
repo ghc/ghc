@@ -422,8 +422,9 @@ mkInterface no_implicit_prelude verbose mod_map filename package
 		 [ d | decl <- orig_decls, d <- derivedInstances mdl decl]
 
   -- make the "export items", which will be converted into docs later
-  orig_export_list <- mkExportItems mod_map mdl orig_env decl_map sub_map
+  orig_export_list <- mkExportItems mod_map mdl exported_names decl_map sub_map
 			 		final_decls opts orig_exports
+					
 
   let
      -- prune the export list to just those declarations that have
@@ -562,7 +563,7 @@ unknownConstraint = UnQual (HsTyClsName (HsIdent "???"))
 mkExportItems
 	:: ModuleMap
 	-> Module			-- this module
-	-> FiniteMap HsQName HsQName	-- the orig env
+	-> [HsQName]			-- exported names (orig)
 	-> FiniteMap HsName HsDecl	-- maps local names to declarations
 	-> FiniteMap HsName [HsName]	-- sub-map for this module
 	-> [HsDecl]			-- decls in the current module
@@ -570,7 +571,7 @@ mkExportItems
 	-> Maybe [HsExportSpec]
 	-> ErrMsgM [ExportItem]
 
-mkExportItems mod_map this_mod orig_env decl_map sub_map decls
+mkExportItems mod_map this_mod exported_names decl_map sub_map decls
 	 opts maybe_exps
   | Nothing <- maybe_exps	 = everything_local_exported
   | OptIgnoreExports `elem` opts = everything_local_exported
@@ -581,10 +582,10 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
     everything_local_exported =  -- everything exported
 	return (fullContentsOfThisModule this_mod decls)
 
-    lookupExport (HsEVar x)            = declWith x (Just [])
-    lookupExport (HsEAbs t)            = declWith t (Just [])
-    lookupExport (HsEThingAll t)       = declWith t Nothing
-    lookupExport (HsEThingWith t cs)   = declWith t (Just cs)
+    lookupExport (HsEVar x)            = declWith x
+    lookupExport (HsEAbs t)            = declWith t
+    lookupExport (HsEThingAll t)       = declWith t
+    lookupExport (HsEThingWith t cs)   = declWith t
     lookupExport (HsEModuleContents m) = fullContentsOf m
     lookupExport (HsEGroup lev doc)    = return [ ExportGroup lev "" doc ]
     lookupExport (HsEDoc doc)          = return [ ExportDoc doc ]
@@ -594,11 +595,9 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 		Nothing -> return []
 		Just found -> return [ ExportDoc found ]
 	
-    in_scope = eltsFM orig_env
-
-    declWith :: HsQName -> Maybe [HsQName] -> ErrMsgM [ ExportItem ]
-    declWith (UnQual _)     _ = return []
-    declWith t@(Qual mdl x) mb_subs
+    declWith :: HsQName -> ErrMsgM [ ExportItem ]
+    declWith (UnQual _) = return []
+    declWith t@(Qual mdl x)
 	| Just decl <- findDecl t
 	= return [ ExportDecl t (restrictTo subs (extractDecl x mdl decl)) [] ]
 	| otherwise
@@ -608,13 +607,8 @@ mkExportItems mod_map this_mod orig_env decl_map sub_map decls
 	-- orig name into the import name, so we get a proper link to
 	-- the doc for this entity.
 	where 
-	      subs = 
-		case mb_subs of
-		  Nothing -> in_scope_subs
-	      	  Just xs -> filter (`elem` map nameOfQName xs) in_scope_subs
-
-	      in_scope_subs = map nameOfQName in_scope_subs_qnames
-	      in_scope_subs_qnames = filter (`elem` in_scope) all_subs_qnames
+	      subs = map nameOfQName subs_qnames
+	      subs_qnames = filter (`elem` exported_names) all_subs_qnames
 
 	      all_subs_qnames = map (Qual mdl) all_subs
 
