@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.48 2001/01/19 15:26:37 simonmar Exp $
+-- $Id: Main.hs,v 1.49 2001/01/21 16:37:06 sewardj Exp $
 --
 -- GHC Driver program
 --
@@ -311,7 +311,7 @@ beginMake mods
 
 beginInteractive :: [String] -> IO ()
 #ifndef GHCI
-beginInteractive = throwDyn (OtherError "not build for interactive use")
+beginInteractive = throwDyn (OtherError "not built for interactive use")
 #else
 beginInteractive mods
   = do state <- cmInit Interactive
