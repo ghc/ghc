@@ -24,14 +24,15 @@ module IdInfo (
 	arityInfo, setArityInfo, ppArityInfo, 
 
 	-- New demand and strictness info
- 	newStrictnessInfo, setNewStrictnessInfo, mkNewStrictnessInfo,
+ 	newStrictnessInfo, setNewStrictnessInfo, 
   	newDemandInfo, setNewDemandInfo, newDemand, oldDemand,
 
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
 	mkStrictnessInfo, noStrictnessInfo,
 	ppStrictnessInfo,isBottomingStrictness, 
-	strictnessInfo, setStrictnessInfo, 	
+	strictnessInfo, setStrictnessInfo, setAllStrictnessInfo,
+	oldStrictnessFromNew, newStrictnessFromOld, cprInfoFromNewStrictness,
 
         -- Usage generalisation
         TyGenInfo(..),
@@ -96,9 +97,10 @@ import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
 import Demand		hiding( Demand )
 import qualified Demand
-import NewDemand	( Demand(..), Keepity(..), DmdResult(..),
-			  lazyDmd, topDmd, dmdTypeDepth, isStrictDmd,
-			  StrictSig, mkStrictSig, mkTopDmdType
+import NewDemand	( Demand(..), DmdResult(..), Demands(..),
+			  lazyDmd, topDmd, dmdTypeDepth, isStrictDmd, isBotRes, 
+			  splitStrictSig, strictSigResInfo,
+			  StrictSig, mkStrictSig, mkTopDmdType, evalDmd, lazyDmd
 			)
 import Outputable	
 import Util		( seqList, listLengthCmp )
@@ -118,6 +120,7 @@ infixl 	1 `setDemandInfo`,
 	  `setCgInfo`,
 	  `setCafInfo`,
 	  `setNewStrictnessInfo`,
+	  `setAllStrictnessInfo`,
 	  `setNewDemandInfo`
 	-- infixl so you can say (id `set` a `set` b)
 \end{code}
@@ -131,22 +134,43 @@ infixl 	1 `setDemandInfo`,
 To be removed later
 
 \begin{code}
-mkNewStrictnessInfo :: Id -> Arity -> Demand.StrictnessInfo -> CprInfo -> StrictSig
-mkNewStrictnessInfo id arity (Demand.StrictnessInfo ds res) cpr
+setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
+-- Set old and new strictness info
+setAllStrictnessInfo info Nothing
+  = info { newStrictnessInfo = Nothing, 
+	   strictnessInfo = NoStrictnessInfo, 
+	   cprInfo = NoCPRInfo }
+setAllStrictnessInfo info (Just sig)
+  = info { newStrictnessInfo = Just sig, 
+	   strictnessInfo = oldStrictnessFromNew sig, 
+	   cprInfo = cprInfoFromNewStrictness sig }
+
+oldStrictnessFromNew :: StrictSig -> Demand.StrictnessInfo
+oldStrictnessFromNew sig = mkStrictnessInfo (map oldDemand dmds, isBotRes res_info)
+			 where
+			   (dmds, res_info) = splitStrictSig sig
+
+cprInfoFromNewStrictness :: StrictSig -> CprInfo
+cprInfoFromNewStrictness sig = case strictSigResInfo sig of
+				  RetCPR -> ReturnsCPR
+				  other  -> NoCPRInfo
+
+newStrictnessFromOld :: Name -> Arity -> Demand.StrictnessInfo -> CprInfo -> StrictSig
+newStrictnessFromOld name arity (Demand.StrictnessInfo ds res) cpr
   | listLengthCmp ds arity /= GT -- length ds <= arity
 	-- Sometimes the old strictness analyser has more
 	-- demands than the arity justifies
-  = mk_strict_sig id arity $
+  = mk_strict_sig name arity $
     mkTopDmdType (map newDemand ds) (newRes res cpr)
 
-mkNewStrictnessInfo id arity other cpr
+newStrictnessFromOld name arity other cpr
   =	-- Either no strictness info, or arity is too small
 	-- In either case we can't say anything useful
-    mk_strict_sig id arity $
+    mk_strict_sig name arity $
     mkTopDmdType (replicate arity lazyDmd) (newRes False cpr)
 
-mk_strict_sig id arity dmd_ty
-  = WARN( arity /= dmdTypeDepth dmd_ty, ppr id <+> (ppr arity $$ ppr dmd_ty) )
+mk_strict_sig name arity dmd_ty
+  = WARN( arity /= dmdTypeDepth dmd_ty, ppr name <+> (ppr arity $$ ppr dmd_ty) )
     mkStrictSig dmd_ty
 
 newRes True  _ 	        = BotRes
@@ -155,20 +179,23 @@ newRes False NoCPRInfo  = TopRes
 
 newDemand :: Demand.Demand -> NewDemand.Demand
 newDemand (WwLazy True)      = Abs
-newDemand (WwLazy False)     = Lazy
-newDemand WwStrict	     = Eval
-newDemand (WwUnpack unpk ds) = Seq Drop (map newDemand ds)
-newDemand WwPrim	     = Lazy
-newDemand WwEnum	     = Eval
+newDemand (WwLazy False)     = lazyDmd
+newDemand WwStrict	     = evalDmd
+newDemand (WwUnpack unpk ds) = Eval (Prod (map newDemand ds))
+newDemand WwPrim	     = lazyDmd
+newDemand WwEnum	     = evalDmd
 
 oldDemand :: NewDemand.Demand -> Demand.Demand
-oldDemand Abs	     = WwLazy True
-oldDemand Lazy	     = WwLazy False
-oldDemand Bot	     = WwStrict
-oldDemand Err	     = WwStrict
-oldDemand Eval	     = WwStrict
-oldDemand (Seq _ ds) = WwUnpack True (map oldDemand ds)
-oldDemand (Call _)   = WwStrict
+oldDemand Abs	     	   = WwLazy True
+oldDemand Top	     	   = WwLazy False
+oldDemand Bot	     	   = WwStrict
+oldDemand (Box Bot)	   = WwStrict
+oldDemand (Box Abs)	   = WwLazy False
+oldDemand (Box (Eval _))   = WwStrict	-- Pass box only
+oldDemand (Defer d)        = WwLazy False
+oldDemand (Eval (Prod ds)) = WwUnpack True (map oldDemand ds)
+oldDemand (Eval (Poly _))  = WwStrict
+oldDemand (Call _)         = WwStrict
 \end{code}
 
 
@@ -300,7 +327,7 @@ setUnfoldingInfo  info uf
 	--	let x = (a,b) in h a b x
 	-- and now x is not demanded (I'm assuming h is lazy)
 	-- This really happens.  The solution here is a bit ad hoc...
-  = info { unfoldingInfo = uf, newDemandInfo = Lazy }
+  = info { unfoldingInfo = uf, newDemandInfo = Top }
 
   | otherwise
 	-- We do *not* seq on the unfolding info, For some reason, doing so 
@@ -717,7 +744,7 @@ zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
   = Nothing
   | otherwise
   = Just (info {occInfo = safe_occ,
-		newDemandInfo = Lazy})
+		newDemandInfo = Top})
   where
 	-- The "unsafe" occ info is the ones that say I'm not in a lambda
 	-- because that might not be true for an unsaturated lambda
@@ -734,7 +761,7 @@ zapLamInfo info@(IdInfo {occInfo = occ, newDemandInfo = demand})
 zapDemandInfo :: IdInfo -> Maybe IdInfo
 zapDemandInfo info@(IdInfo {newDemandInfo = demand})
   | not (isStrictDmd demand) = Nothing
-  | otherwise		     = Just (info {newDemandInfo = Lazy})
+  | otherwise		     = Just (info {newDemandInfo = Top})
 \end{code}
 
 

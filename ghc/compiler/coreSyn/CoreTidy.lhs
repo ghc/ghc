@@ -500,7 +500,7 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info arity cg_info
     basic_info = vanillaIdInfo 
 			`setCgInfo` 	       cg_info
 			`setArityInfo`	       arity
-			`setNewStrictnessInfo` newStrictnessInfo idinfo
+			`setAllStrictnessInfo` newStrictnessInfo idinfo
 
 -- This is where we set names to local/global based on whether they really are 
 -- externally visible (see comment at the top of this module).  If the name
@@ -663,7 +663,7 @@ tidyLetBndr env (id,rhs)
     idinfo   = idInfo id
     new_info = vanillaIdInfo 
 		`setArityInfo`		exprArity rhs
-		`setNewStrictnessInfo`	newStrictnessInfo idinfo
+		`setAllStrictnessInfo`	newStrictnessInfo idinfo
 		`setNewDemandInfo`	newDemandInfo idinfo
 
     -- Override the env we get back from tidyId with the new IdInfo

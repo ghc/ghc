@@ -5,13 +5,16 @@
 
 \begin{code}
 module NewDemand(
-	Demand(..), Keepity(..), 
-	mkSeq, topDmd, lazyDmd, seqDmd, evalDmd, isStrictDmd, 
+	Demand(..), 
+	topDmd, lazyDmd, seqDmd, evalDmd, errDmd, isStrictDmd, 
+	isTop, isAbsent,
 
 	DmdType(..), topDmdType, botDmdType, mkDmdType, mkTopDmdType, 
 		dmdTypeDepth, dmdTypeRes,
 	DmdEnv, emptyDmdEnv,
-	DmdResult(..), isBotRes, returnsCPR,
+	DmdResult(..), isBotRes, returnsCPR, resTypeArgDmd,
+	
+	Demands(..), mapDmds, zipWithDmds, allTop,
 
 	StrictSig(..), mkStrictSig, topSig, botSig, isTopSig,
 	splitStrictSig, strictSigResInfo,
@@ -23,8 +26,93 @@ module NewDemand(
 import BasicTypes	( Arity )
 import VarEnv		( VarEnv, emptyVarEnv, isEmptyVarEnv )
 import UniqFM		( ufmToList )
-import Util             ( listLengthCmp )
+import Util             ( listLengthCmp, zipWithEqual )
 import Outputable
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Demands}
+%*									*
+%************************************************************************
+
+\begin{code}
+data Demand
+  = Top			-- T; used for unlifted types too, so that
+			--	A `lub` T = T
+  | Abs			-- A
+
+  | Call Demand		-- C(d)
+
+  | Eval Demands	-- U(ds)
+
+  | Defer Demands	-- D(ds)
+
+  | Box Demand		-- B(d)
+
+  | Bot			-- B
+  deriving( Eq )
+	-- Equality needed for fixpoints in DmdAnal
+
+data Demands = Poly Demand	-- Polymorphic case
+	     | Prod [Demand]	-- Product case
+	     deriving( Eq )
+
+allTop (Poly d)  = isTop d
+allTop (Prod ds) = all isTop ds
+
+isTop Top = True
+isTop d   = False 
+
+isAbsent Abs = True
+isAbsent d   = False 
+
+mapDmds :: (Demand -> Demand) -> Demands -> Demands
+mapDmds f (Poly d)  = Poly (f d)
+mapDmds f (Prod ds) = Prod (map f ds)
+
+zipWithDmds :: (Demand -> Demand -> Demand)
+	    -> Demands -> Demands -> Demands
+zipWithDmds f (Poly d1)  (Poly d2)  = Poly (d1 `f` d2)
+zipWithDmds f (Prod ds1) (Poly d2)  = Prod [d1 `f` d2 | d1 <- ds1]
+zipWithDmds f (Poly d1)  (Prod ds2) = Prod [d1 `f` d2 | d2 <- ds2]
+zipWithDmds f (Prod ds1) (Prod ds2) = Prod (zipWithEqual "zipWithDmds" f ds1 ds2)
+
+topDmd, lazyDmd, seqDmd :: Demand
+topDmd  = Top			-- The most uninformative demand
+lazyDmd = Box Abs
+seqDmd  = Eval (Poly Abs)	-- Polymorphic seq demand
+evalDmd = Box seqDmd		-- Evaluate and return
+errDmd  = Box Bot		-- This used to be called X
+
+isStrictDmd :: Demand -> Bool
+isStrictDmd Bot      = True
+isStrictDmd (Eval _) = True
+isStrictDmd (Call _) = True
+isStrictDmd (Box d)  = isStrictDmd d
+isStrictDmd other    = False
+
+instance Outputable Demand where
+    ppr Top  = char 'T'
+    ppr Abs  = char 'A'
+    ppr Bot  = char 'B'
+
+    ppr (Defer ds)      = char 'D' <> ppr ds
+    ppr (Eval ds)       = char 'U' <> ppr ds
+				      
+    ppr (Box (Eval ds)) = char 'S' <> ppr ds
+    ppr (Box Abs)	= char 'L'
+    ppr (Box Bot)	= char 'X'
+
+    ppr (Call d)	= char 'C' <> parens (ppr d)
+
+
+instance Outputable Demands where
+    ppr (Poly Abs) = empty
+    ppr (Poly d)   = parens (ppr d <> char '*')
+    ppr (Prod ds) | all isAbsent ds = empty
+		  | otherwise       = parens (hcat (map ppr ds))
 \end{code}
 
 
@@ -48,7 +136,7 @@ data DmdType = DmdType
 
 	-- 		ANOTHER IMPORTANT INVARIANT
 	-- The Demands in the argument list are never
-	--	Bot, Err, Seq Defer ds
+	--	Bot, Defer d
 	-- Handwavey reason: these don't correspond to calling conventions
 	-- See DmdAnal.funArgDemand for details
 
@@ -95,6 +183,15 @@ isTopDmdType other		     = False
 isBotRes :: DmdResult -> Bool
 isBotRes BotRes = True
 isBotRes other  = False
+
+resTypeArgDmd :: DmdResult -> Demand
+-- TopRes and BotRes are polymorphic, so that
+--	BotRes = Bot -> BotRes
+--	TopRes = Top -> TopRes
+-- This function makes that concrete
+resTypeArgDmd TopRes = Top
+resTypeArgDmd BotRes = Bot
+resTypeArgDmd RetCPR = panic "resTypeArgDmd: RetCPR"
 
 returnsCPR :: DmdResult -> Bool
 returnsCPR RetCPR = True
@@ -182,73 +279,4 @@ pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
   = hcat (map ppr dmds) <> ppr res
 \end{code}
     
-
-%************************************************************************
-%*									*
-\subsection{Demands}
-%*									*
-%************************************************************************
-
-\begin{code}
-data Demand
-  = Lazy		-- L; used for unlifted types too, so that
-			--	A `lub` L = L
-  | Abs			-- A
-
-  | Call Demand		-- C(d)
-  | Eval 		-- V
-  | Seq Keepity		-- S/U/D(ds)
-	[Demand]	-- 	S(ds) = L `both` U(ds)
-			-- 	D(ds) = A `lub`  U(ds)
-			-- *** Invariant: these demands are never Bot or Abs
-			-- *** Invariant: if all demands are Abs, get []
-
-  | Err			-- X
-  | Bot			-- B
-  deriving( Eq )
-	-- Equality needed for fixpoints in DmdAnal
-
-data Keepity = Keep 	-- Strict and I need the box
-	     | Drop	-- Strict, but I don't need the box
-	     | Defer	-- Lazy, if you *do* evaluate, I need
-			--	 the components but not the box
-	     deriving( Eq )
-
-mkSeq :: Keepity -> [Demand] -> Demand
-mkSeq k ds | all is_absent ds = Seq k []
-	   | otherwise	      = Seq k ds
-	   where
- 	     is_absent Abs = True
-	     is_absent d   = False
-
-topDmd, lazyDmd, seqDmd :: Demand
-topDmd  = Lazy		-- The most uninformative demand
-lazyDmd = Lazy
-seqDmd  = Seq Keep []	-- Polymorphic seq demand
-evalDmd = Eval
-
-isStrictDmd :: Demand -> Bool
-isStrictDmd Bot       	 = True
-isStrictDmd Err	      	 = True    	   
-isStrictDmd (Seq Drop _) = True	-- But not Defer!
-isStrictDmd (Seq Keep _) = True
-isStrictDmd Eval      	 = True
-isStrictDmd (Call _)  	 = True
-isStrictDmd other     	 = False
-
-instance Outputable Demand where
-    ppr Lazy 	   = char 'L'
-    ppr Abs	   = char 'A'
-    ppr Eval       = char 'V'
-    ppr Err        = char 'X'
-    ppr Bot        = char 'B'
-    ppr (Call d)   = char 'C' <> parens (ppr d)
-    ppr (Seq k []) = ppr k
-    ppr (Seq k ds) = ppr k <> parens (hcat (map ppr ds))
-
-instance Outputable Keepity where
-  ppr Keep  = char 'S'
-  ppr Drop  = char 'U'
-  ppr Defer = char 'D'
-\end{code}
 

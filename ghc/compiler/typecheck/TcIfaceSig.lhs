@@ -104,7 +104,7 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
 	  returnTc info2
 
     tcPrag info (HsStrictness strict_info)
-	= returnTc (info `setNewStrictnessInfo` Just strict_info)
+	= returnTc (info `setAllStrictnessInfo` Just strict_info)
 
     tcPrag info (HsWorker nm arity)
 	= tcWorkerInfo unf_env ty info nm arity

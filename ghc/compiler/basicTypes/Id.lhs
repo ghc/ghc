@@ -55,7 +55,7 @@ module Id (
 
 	idArity, 
 	idDemandInfo, idNewDemandInfo,
-	idStrictness, idNewStrictness, idNewStrictness_maybe, getNewStrictness,
+	idStrictness, idNewStrictness, idNewStrictness_maybe, 
         idTyGenInfo,
 	idWorkerInfo,
 	idUnfolding,
@@ -318,11 +318,7 @@ setIdArity id arity = modifyIdInfo (`setArityInfo` arity) id
 	---------------------------------
 	-- STRICTNESS 
 idStrictness :: Id -> StrictnessInfo
-idStrictness id = case strictnessInfo (idInfo id) of
-			NoStrictnessInfo -> case idNewStrictness_maybe id of
-						Just sig -> oldStrictnessFromNew sig
-						Nothing  -> NoStrictnessInfo
-			strictness -> strictness
+idStrictness id = strictnessInfo (idInfo id)
 
 setIdStrictness :: Id -> StrictnessInfo -> Id
 setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) id
@@ -336,20 +332,6 @@ idNewStrictness :: Id -> StrictSig
 
 idNewStrictness_maybe id = newStrictnessInfo (idInfo id)
 idNewStrictness       id = idNewStrictness_maybe id `orElse` topSig
-
-getNewStrictness :: Id -> StrictSig
--- First tries the "new-strictness" field, and then
--- reverts to the old one. This is just until we have
--- cross-module info for new strictness
-getNewStrictness id = idNewStrictness_maybe id `orElse` newStrictnessFromOld id
-		      
-newStrictnessFromOld :: Id -> StrictSig
-newStrictnessFromOld id = mkNewStrictnessInfo id (idArity id) (idStrictness id) (idCprInfo id)
-
-oldStrictnessFromNew :: StrictSig -> StrictnessInfo
-oldStrictnessFromNew sig = mkStrictnessInfo (map oldDemand dmds, isBotRes res_info)
-			 where
-			   (dmds, res_info) = splitStrictSig sig
 
 setIdNewStrictness :: Id -> StrictSig -> Id
 setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
@@ -431,11 +413,7 @@ idCafInfo id = cgCafInfo (idCgInfo id)
 	---------------------------------
 	-- CPR INFO
 idCprInfo :: Id -> CprInfo
-idCprInfo id = case cprInfo (idInfo id) of
-		 NoCPRInfo -> case strictSigResInfo (idNewStrictness id) of
-				RetCPR -> ReturnsCPR
-				other  -> NoCPRInfo
-		 ReturnsCPR -> ReturnsCPR
+idCprInfo id = cprInfo (idInfo id)
 
 setIdCprInfo :: Id -> CprInfo -> Id
 setIdCprInfo id cpr_info = modifyIdInfo (`setCprInfo` cpr_info) id

@@ -16,7 +16,7 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
 			)
 import IdInfo		( vanillaIdInfo )
 import DataCon		( splitProductType_maybe, splitProductType )
-import NewDemand	( Demand(..), Keepity(..), DmdResult(..) ) 
+import NewDemand	( Demand(..), DmdResult(..), Demands(..) ) 
 import DmdAnal		( both )
 import MkId		( realWorldPrimId, voidArgId, eRROR_CSTRING_ID )
 import TysPrim		( realWorldStatePrimTy )
@@ -315,6 +315,12 @@ mkWWstr (arg : args)
 
 
 ----------------------
+-- mkWWstr_one wrap_arg = (work_args, wrap_fn, work_fn)
+--   *  wrap_fn assumes wrap_arg is in scope,
+--	  brings into scope work_args (via cases)
+--   * work_fn assumes work_args are in scope, a
+--	  brings into scope wrap_arg (via lets)
+
 mkWWstr_one arg
   | isTyVar arg
   = returnUs ([arg],  nop_fn, nop_fn)
@@ -328,8 +334,25 @@ mkWWstr_one arg
       Abs | not (isUnLiftedType (idType arg)) ->
 	returnUs ([], nop_fn, mk_absent_let arg) 
 
-	-- Seq and keep
-      Seq _ []
+	-- Unpack case
+      Eval (Prod cs)
+	| Just (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) 
+		<- splitProductType_maybe (idType arg)
+	-> getUniquesUs 		`thenUs` \ uniqs ->
+	   let
+	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
+	     unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
+	     unbox_fn       = mk_unpk_case arg unpk_args data_con arg_tycon
+	     rebox_fn	    = Let (NonRec arg con_app) 
+	     con_app	    = mkConApp data_con (map Type tycon_arg_tys ++ map Var unpk_args)
+	   in
+	   mkWWstr unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
+	   returnUs (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn)
+	  		   -- Don't pass the arg, rebox instead
+
+	-- `seq` demand; evaluate in wrapper in the hope
+	-- of dropping seqs in the worker
+      Eval (Poly Abs)
 	-> let
 		arg_w_unf = arg `setIdUnfolding` mkOtherCon []
 		-- Tell the worker arg that it's sure to be evaluated
@@ -346,50 +369,9 @@ mkWWstr_one arg
 		--	fw y = let x{Evald} = error "oops" in (x `seq` y)
 		-- If we don't pin on the "Evald" flag, the seq doesn't disappear, and
 		-- we end up evaluating the absent thunk.
-		-- But the Evald flag is pretty wierd, and I worry that it might disappear
+		-- But the Evald flag is pretty weird, and I worry that it might disappear
 		-- during simplification, so for now I've just nuked this whole case
 			
-	-- Unpack case
-      Seq keep cs 
-	| Just (arg_tycon, tycon_arg_tys, data_con, inst_con_arg_tys) 
-		<- splitProductType_maybe (idType arg)
-	-> getUniquesUs 		`thenUs` \ uniqs ->
-	   let
-	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
-	     unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs'
-	     unbox_fn       = mk_unpk_case arg unpk_args data_con arg_tycon
-	     rebox_fn	    = Let (NonRec arg con_app) 
-	     con_app	    = mkConApp data_con (map Type tycon_arg_tys ++ map Var unpk_args)
-
-	     cs' = case keep of
-			Keep -> map (DmdAnal.both Lazy) cs	-- Careful! Now we don't pass
-								-- the box, we must pass all the
-								-- components.   In effect
-								-- 	S(LA) -->  U(LL)
-			Drop -> cs
-			Defer -> pprTrace "wwlib" (ppr arg) cs
-	   in
-	   mkWWstr unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-
---	   case keep of
---	     Keep -> returnUs (arg : worker_args, unbox_fn . wrap_fn, work_fn)
---	  		   -- Pass the arg, no need to rebox
---	     Drop -> returnUs (worker_args,       unbox_fn . wrap_fn, work_fn . rebox_fn)
---	  		   -- Don't pass the arg, rebox instead
--- I used to be clever here, but consider
---	f n []     = n
---	f n (x:xs) = f (n+x) xs
--- Here n gets (Seq Keep [L]), but it's BAD BAD BAD to pass both n and n#
--- Needs more thought, but the simple thing to do is to accept the reboxing
--- stuff if there are any non-absent arguments (and that case is dealt with above):
-
-	   returnUs (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn)
-	  		   -- Don't pass the arg, rebox instead
-
-	| otherwise -> 
-	   WARN( True, ppr arg )
-	   returnUs ([arg], nop_fn, nop_fn)
-
 	-- Other cases
       other_demand -> returnUs ([arg], nop_fn, nop_fn)
 

@@ -39,8 +39,8 @@ import List             ( isSuffixOf )
 import PrelNames	( mkTupNameStr )
 import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import ForeignCall	( Safety(..) )
-import NewDemand	( StrictSig(..), Demand(..), Keepity(..), 
-			  DmdResult(..), mkTopDmdType )
+import NewDemand	( StrictSig(..), Demand(..), Demands(..),
+			  DmdResult(..), mkTopDmdType, evalDmd, lazyDmd )
 import UniqFM           ( listToUFM, lookupUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
@@ -838,30 +838,37 @@ lex_demand cont buf =
  where
   read_em acc buf = 
    case currentChar# buf of
-    'L'# -> read_em (Lazy : acc) (stepOn buf)
-    'A'# -> read_em (Abs : acc) (stepOn buf)
-    'V'# -> read_em (Eval : acc) (stepOn buf)
-    'X'# -> read_em (Err : acc) (stepOn buf)
-    'B'# -> read_em (Bot : acc) (stepOn buf)
-    ')'# -> (reverse acc, stepOn buf)
-    'C'# -> do_call acc (stepOnBy# buf 2#)
-    'D'# -> do_unpack1 Defer acc (stepOnBy# buf 1#)
-    'U'# -> do_unpack1 Drop acc (stepOnBy# buf 1#)
-    'S'# -> do_unpack1 Keep acc (stepOnBy# buf 1#)
+    'T'# -> read_em (Top     : acc) (stepOn buf)
+    'L'# -> read_em (lazyDmd : acc) (stepOn buf)
+    'A'# -> read_em (Abs     : acc) (stepOn buf)
+    'V'# -> read_em (evalDmd : acc) (stepOn buf)	-- Temporary, until
+							-- we've recompiled prelude etc
+    'C'# -> do_unary Call  acc (stepOnBy# buf 2#)	-- Skip 'C('
+
+    'U'# -> do_seq1 Eval	 acc (stepOnBy# buf 1#)
+    'D'# -> do_seq1 Defer	 acc (stepOnBy# buf 1#)
+    'S'# -> do_seq1 (Box . Eval) acc (stepOnBy# buf 1#)
+
     _    -> (reverse acc, buf)
 
-  do_unpack1 keepity acc buf
+  do_seq1 fn acc buf
     = case currentChar# buf of
-	'('# -> do_unpack2 keepity acc (stepOnBy# buf 1#)
-	_    -> read_em (Seq keepity [] : acc) buf
+	'('# -> do_seq2 fn acc (stepOnBy# buf 1#)
+	_    -> read_em (fn (Poly Abs) : acc) buf
 
-  do_unpack2 keepity acc buf
+  do_seq2 fn acc buf
+    = case read_em [] buf of { (dmds, buf) -> 
+      case currentChar# buf of
+	')'# -> read_em (fn (Prod dmds) : acc)
+			(stepOn buf) 
+	'*'# -> ASSERT( length dmds == 1 )
+		read_em (fn (Poly (head dmds)) : acc)
+			(stepOnBy# buf 2#)	-- Skip '*)'
+      }
+	
+  do_unary fn acc buf
     = case read_em [] buf of
-        (stuff, rest) -> read_em (Seq keepity stuff : acc) rest
-
-  do_call acc buf
-    = case read_em [] buf of
-        ([dmd], rest) -> read_em (Call dmd : acc) rest
+        ([dmd], rest) -> read_em (fn dmd : acc) (stepOn rest)	-- Skip ')'
 
 ------------------
 lex_scc cont buf =

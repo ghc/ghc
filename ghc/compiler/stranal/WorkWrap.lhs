@@ -20,8 +20,8 @@ import Type		( Type )
 import IdInfo		( WorkerInfo(..), arityInfo,
 			  newDemandInfo, newStrictnessInfo, unfoldingInfo, inlinePragInfo
 			)
-import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), Keepity(..),
-			  mkTopDmdType, isBotRes, returnsCPR, topSig
+import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
+			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import BasicTypes	( RecFlag(..), isNonRec, Activation(..) )
@@ -343,9 +343,9 @@ worthSplittingFun ds res
 	-- [We don't do reboxing now, but in general it's better to pass 
 	--  an unboxed thing to f, and have it reboxed in the error cases....]
   where
-    worth_it Abs	= True	-- Absent arg
-    worth_it (Seq _ ds) = True	-- Arg to evaluate
-    worth_it other	= False
+    worth_it Abs	      = True	-- Absent arg
+    worth_it (Eval (Prod ds)) = True	-- Product arg to evaluate
+    worth_it other	      = False
 
 worthSplittingThunk :: Demand		-- Demand on the thunk
 		    -> DmdResult	-- CPR info for the thunk
@@ -354,12 +354,8 @@ worthSplittingThunk dmd res
   = worth_it dmd || returnsCPR res
   where
 	-- Split if the thing is unpacked
-    worth_it (Seq Defer ds) = False
-    worth_it (Seq _     ds) = any not_abs ds
-    worth_it other	    = False
-
-    not_abs Abs   = False
-    not_abs other = True
+    worth_it (Eval (Prod ds)) = not (all isAbsent ds)
+    worth_it other	      = False
 \end{code}
 
 

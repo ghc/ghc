@@ -72,12 +72,13 @@ import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  setUnfoldingInfo, 
 			  setArityInfo, setSpecInfo,  setCgInfo, setCafInfo,
-			  mkNewStrictnessInfo, setNewStrictnessInfo,
+			  newStrictnessFromOld, setAllStrictnessInfo,
 			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
 			  CgInfo 
 			)
 import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
-			  mkTopDmdType, topDmd, evalDmd, Demand(..), Keepity(..) )
+			  mkTopDmdType, topDmd, evalDmd, lazyDmd, 
+			  Demand(..), Demands(..) )
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
 			)
@@ -147,7 +148,7 @@ mkDataConId work_name data_con
   where
     info = noCafNoTyGenIdInfo
 	   `setArityInfo`		arity
-	   `setNewStrictnessInfo`	Just strict_sig
+	   `setAllStrictnessInfo`	Just strict_sig
 
     arity      = dataConRepArity data_con
 
@@ -238,15 +239,15 @@ mkDataConWrapId data_con
 	   `setArityInfo`	arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
-	   `setNewStrictnessInfo` 	Just wrap_sig
+	   `setAllStrictnessInfo` 	Just wrap_sig
 
     wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
 
     wrap_sig = mkStrictSig (mkTopDmdType arg_dmds res_info)
     res_info = strictSigResInfo (idNewStrictness work_id)
     arg_dmds = [Abs | d <- dict_args] ++ map mk_dmd strict_marks
-    mk_dmd str | isMarkedStrict str = Eval
-	       | otherwise	    = Lazy
+    mk_dmd str | isMarkedStrict str = evalDmd
+	       | otherwise	    = lazyDmd
 	-- The Cpr info can be important inside INLINE rhss, where the
 	-- wrapper constructor isn't inlined.
 	-- And the argument strictness can be important too; we
@@ -444,7 +445,7 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	   `setCafInfo`		  caf_info
 	   `setArityInfo`	  arity
 	   `setUnfoldingInfo`     mkTopUnfolding rhs_w_str
-	   `setNewStrictnessInfo` Just strict_sig
+	   `setAllStrictnessInfo` Just strict_sig
 
 	-- Allocate Ids.  We do it a funny way round because field_dict_tys is
 	-- almost always empty.  Also note that we use length_tycon_theta
@@ -588,7 +589,7 @@ mkDictSelId name clas
     info      = noCafNoTyGenIdInfo
 		`setArityInfo`	    	1
 		`setUnfoldingInfo`  	mkTopUnfolding rhs
-		`setNewStrictnessInfo`	Just strict_sig
+		`setAllStrictnessInfo`	Just strict_sig
 
 	-- We no longer use 'must-inline' on record selectors.  They'll
 	-- inline like crazy if they scrutinise a constructor
@@ -598,9 +599,9 @@ mkDictSelId name clas
 	-- It's worth giving one, so that absence info etc is generated
 	-- even if the selector isn't inlined
     strict_sig = mkStrictSig (mkTopDmdType [arg_dmd] TopRes)
-    arg_dmd | isNewTyCon tycon = Eval
-	    | otherwise	       = Seq Drop [ if the_arg_id == id then Eval else Abs
-					  | id <- arg_ids ]
+    arg_dmd | isNewTyCon tycon = evalDmd
+	    | otherwise	       = Eval (Prod [ if the_arg_id == id then evalDmd else Abs
+					    | id <- arg_ids ])
 
     tyvars  = classTyVars clas
 
@@ -648,7 +649,7 @@ mkPrimOpId prim_op
     info = noCafNoTyGenIdInfo
 	   `setSpecInfo`	rules
 	   `setArityInfo` 	arity
-	   `setNewStrictnessInfo`	Just (mkNewStrictnessInfo id arity strict_info NoCPRInfo)
+	   `setAllStrictnessInfo`	Just (newStrictnessFromOld name arity strict_info NoCPRInfo)
 	-- Until we modify the primop generation code
 
     rules = foldl (addRule id) emptyCoreRules (primOpRules prim_op)
@@ -678,7 +679,7 @@ mkFCallId uniq fcall ty
 
     info = noCafNoTyGenIdInfo
 	   `setArityInfo` 		arity
-	   `setNewStrictnessInfo`	Just strict_sig
+	   `setAllStrictnessInfo`	Just strict_sig
 
     (_, tau) 	 = tcSplitForAllTys ty
     (arg_tys, _) = tcSplitFunTys tau
@@ -939,7 +940,7 @@ pc_bottoming_Id key mod name ty
  = pcMiscPrelId key mod name ty bottoming_info
  where
     strict_sig	   = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
-    bottoming_info = noCafNoTyGenIdInfo `setNewStrictnessInfo` Just strict_sig
+    bottoming_info = noCafNoTyGenIdInfo `setAllStrictnessInfo` Just strict_sig
 	-- these "bottom" out, no matter what their arguments
 
 generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy

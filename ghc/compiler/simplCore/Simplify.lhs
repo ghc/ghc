@@ -897,7 +897,8 @@ completeCall env var occ_info cont
 		   pprTrace "Rule fired" (vcat [
 			text "Rule:" <+> ptext rule_name,
 			text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
-			text "After: " <+> pprCoreExpr rule_rhs])
+			text "After: " <+> pprCoreExpr rule_rhs,
+			text "Cont:  " <+> ppr call_cont])
 		 else
 			id)		$
 		simplExprF env rule_rhs call_cont ;
