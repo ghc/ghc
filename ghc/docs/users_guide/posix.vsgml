@@ -1089,7 +1089,7 @@ Various other causes.
 </descrip>
 
 <sect2>Posix Input and Output Primitives
-<label id="Inut Output">
+<label id="Input/Output">
 <p>
 <nidx>Posix, input/output</nidx>
 
@@ -1098,7 +1098,7 @@ createPipe :: IO (Fd, Fd)
 </verb></tscreen>
 
 @createPipe@ calls @pipe@ to create a pipe and returns a pair of
-@Fd@s, the first for writing and the second for reading.
+@Fd@s, the first for reading and the second for writing.
 
 <tscreen><verb>
 dup :: Fd -> IO Fd
