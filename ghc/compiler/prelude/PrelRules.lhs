@@ -381,7 +381,7 @@ For dataToTag#, we can reduce if either
 	(b) the argument is a variable whose unfolding is a known constructor
 
 \begin{code}
-dataToTagRule [ty1, Var tag_to_enum `App` ty2 `App` tag]
+dataToTagRule [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
   | Just TagToEnumOp <- isPrimOpId_maybe tag_to_enum
   , ty1 `coreEqType` ty2
   = Just tag	-- dataToTag (tagToEnum x)   ==>   x
