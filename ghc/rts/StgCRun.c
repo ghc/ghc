@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.39 2003/06/09 13:17:41 matthewc Exp $
+ * $Id: StgCRun.c,v 1.40 2003/08/29 16:13:48 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2003
  *
  * STG-to-C glue.
  *
@@ -163,6 +163,71 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 }
 
 #endif
+
+/* ----------------------------------------------------------------------------
+   x86-64 is almost the same as plain x86.
+
+   I've done it using entirely inline assembler, because I couldn't
+   get gcc to generate the correct subtraction from %rsp by using
+   the local array variable trick.  It didn't seem to reserve
+   enough space.  Oh well, it's not much harder this way.
+
+   ------------------------------------------------------------------------- */
+
+#ifdef x86_64_TARGET_ARCH
+
+extern StgThreadReturnCode StgRun(StgFunPtr f, StgRegTable *basereg);
+
+static void StgRunIsImplementedInAssembler(void)
+{
+    __asm__ volatile (
+	/*
+	 * save callee-saves registers on behalf of the STG code.
+	 */
+	".globl StgRun\n"
+	"StgRun:\n\t"
+	"subq %0, %%rsp\n\t"
+	"movq %%rsp, %%rax\n\t"
+	"addq %0-48, %%rax\n\t"
+        "movq %%rbx,0(%%rax)\n\t"
+        "movq %%rbp,8(%%rax)\n\t"
+        "movq %%r12,16(%%rax)\n\t"
+        "movq %%r13,24(%%rax)\n\t"
+        "movq %%r14,32(%%rax)\n\t"
+        "movq %%r15,40(%%rax)\n\t"
+	/*
+	 * Set BaseReg
+	 */
+	"movq %%rsi,%%rbx\n\t"
+	/*
+	 * grab the function argument from the stack, and jump to it.
+	 */
+        "movq %%rdi,%%rax\n\t"
+        "jmp *%%rax\n\t"
+
+	".global " STG_RETURN "\n"
+       	STG_RETURN ":\n\t"
+
+	"movq %%r13, %%rax\n\t"   /* Return value in R1  */
+
+	/*
+	 * restore callee-saves registers.  (Don't stomp on %%rax!)
+	 */
+	"movq %%rsp, %%rdx\n\t"
+	"addq %0-48, %%rdx\n\t"
+        "movq 0(%%rdx),%%rbx\n\t"	/* restore the registers saved above */
+        "movq 8(%%rdx),%%rbp\n\t"
+        "movq 16(%%rdx),%%r12\n\t"
+        "movq 24(%%rdx),%%r13\n\t"
+        "movq 32(%%rdx),%%r14\n\t"
+        "movq 40(%%rdx),%%r15\n\t"
+	"addq %0, %%rsp\n\t"
+	"retq"
+
+	: : "i"(RESERVED_C_STACK_BYTES+48 /*stack frame size*/));
+}
+
+#endif /* x86-64 */
 
 /* -----------------------------------------------------------------------------
    Sparc architecture
