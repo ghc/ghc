@@ -63,6 +63,7 @@ Prelude>
    :show bindings             show the current bindings made at the prompt
 
    :type &lt;expr&gt;               show the type of &lt;expr&gt;
+   :kind &lt;type&gt;               show the kind of &lt;type&gt;
    :undef &lt;cmd&gt;               undefine user-defined command :&lt;cmd&gt;
    :unset &lt;option&gt; ...        unset options
    :quit                      exit GHCi
@@ -1055,6 +1056,17 @@ Prelude> :def make (\_ -> return ":! ghc &ndash;&ndash;make Main")
 	  forall quantifiers for polymorphic types.  The monomorphism
 	  restriction is <emphasis>not</emphasis> applied to the
 	  expression during type inference.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>:kind</literal> <replaceable>type</replaceable></term>
+	<indexterm><primary><literal>:kind</literal></primary></indexterm>
+	<listitem>
+	  <para>Infers and prints the kind of
+	  <replaceable>type</replaceable>. The latter can be an arbitrary
+	    type expression, including a partial application of a type constructor,
+	    such as <literal>Either Int</literal>.</para>
 	</listitem>
       </varlistentry>
 

@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.164 2004/04/05 10:50:26 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.165 2004/04/05 11:14:30 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -134,6 +134,7 @@ helpText = "\
 \   :show bindings	       show the current bindings made at the prompt\n\ 
 \\n\ 
 \   :type <expr>	       show the type of <expr>\n\ 
+\   :kind <type>	       show the kind of <type>\n\ 
 \   :undef <cmd> 	       undefine user-defined command :<cmd>\n\ 
 \   :unset <option> ...	       unset options\n\ 
 \   :quit		       exit GHCi\n\ 
