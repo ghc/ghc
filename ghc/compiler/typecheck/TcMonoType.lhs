@@ -13,8 +13,7 @@ module TcMonoType ( tcHsSigType, tcHsType, tcIfaceType, tcHsTheta,
 		    kcHsLiftedSigType, kcHsContext,
 		    tcAddScopedTyVars, tcHsTyVars, mkImmutTyVars,
 
-		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig,
-		    checkSigTyVars, sigCtxt, sigPatCtxt
+		    TcSigInfo(..), tcTySig, mkTcSig, maybeSig
 	          ) where
 
 #include "HsVersions.h"
@@ -26,44 +25,36 @@ import TcHsSyn		( TcId )
 
 import TcMonad
 import TcEnv		( tcExtendTyVarEnv, tcLookup, tcLookupGlobal,
-			  tcGetGlobalTyVars, tcLEnvElts, tcInLocalScope,
+			  tcInLocalScope,
 		 	  TyThing(..), TcTyThing(..), tcExtendKindEnv
 			)
-import TcMType		( newKindVar, tcInstSigTyVars, 
-			  zonkKindEnv, zonkTcType, zonkTcTyVars, zonkTcTyVar,
-			  unifyKind, unifyOpenTypeKind,
+import TcMType		( newKindVar, tcInstSigTyVars, zonkKindEnv, 
 			  checkValidType, UserTypeCtxt(..), pprUserTypeCtxt
 			)
+import TcUnify		( unifyKind, unifyOpenTypeKind )
 import TcType		( Type, Kind, SourceType(..), ThetaType, TyVarDetails(..),
-			  TcTyVar, TcTyVarSet, TcKind, TcThetaType, TcTauType,
+			  TcTyVar, TcKind, TcThetaType, TcTauType,
 			  mkTyVarTy, mkTyVarTys, mkFunTy, mkSynTy,
 			  tcSplitForAllTys, tcSplitRhoTy, 
-		 	  hoistForAllTys, allDistinctTyVars, zipFunTys, 
-			  mkSigmaTy, mkPredTy, mkTyConApp, mkAppTys, mkRhoTy,
+		 	  hoistForAllTys, zipFunTys, 
+			  mkSigmaTy, mkPredTy, mkTyConApp, mkAppTys, 
 			  liftedTypeKind, unliftedTypeKind, mkArrowKind,
-			  mkArrowKinds, tcGetTyVar_maybe, tcGetTyVar, tcSplitFunTy_maybe,
-		  	  tidyOpenType, tidyOpenTypes, tidyOpenTyVar, tidyOpenTyVars,
-			  tyVarsOfType, mkForAllTys
+			  mkArrowKinds, tcSplitFunTy_maybe
 			)
-import qualified Type	( getTyVar_maybe )
 
 import Inst		( Inst, InstOrigin(..), newMethodWithGivenTy, instToId )
-import PprType		( pprType )
 import Subst		( mkTopTyVarSubst, substTy )
-import CoreFVs		( idFreeTyVars )
 import Id		( mkLocalId, idName, idType )
-import Var		( Var, TyVar, mkTyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
-import VarEnv
-import VarSet
+import Var		( TyVar, mkTyVar, tyVarKind )
 import ErrUtils		( Message )
 import TyCon		( TyCon, isSynTyCon, tyConKind )
 import Class		( classTyCon )
-import Name		( Name, getSrcLoc )
+import Name		( Name )
 import NameSet
 import TysWiredIn	( mkListTy, mkTupleTy, genUnitTyCon )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc )
-import Util		( isSingleton, lengthIs )
+import Util		( lengthIs )
 import Outputable
 
 \end{code}
@@ -606,265 +597,6 @@ mkTcSig poly_id src_loc
     name = idName poly_id
 \end{code}
 
-
-
-%************************************************************************
-%*									*
-\subsection{Checking signature type variables}
-%*									*
-%************************************************************************
-
-@checkSigTyVars@ is used after the type in a type signature has been unified with
-the actual type found.  It then checks that the type variables of the type signature
-are
-	(a) Still all type variables
-		eg matching signature [a] against inferred type [(p,q)]
-		[then a will be unified to a non-type variable]
-
-	(b) Still all distinct
-		eg matching signature [(a,b)] against inferred type [(p,p)]
-		[then a and b will be unified together]
-
-	(c) Not mentioned in the environment
-		eg the signature for f in this:
-
-			g x = ... where
-					f :: a->[a]
-					f y = [x,y]
-
-		Here, f is forced to be monorphic by the free occurence of x.
-
-	(d) Not (unified with another type variable that is) in scope.
-		eg f x :: (r->r) = (\y->y) :: forall a. a->r
-	    when checking the expression type signature, we find that
-	    even though there is nothing in scope whose type mentions r,
-	    nevertheless the type signature for the expression isn't right.
-
-	    Another example is in a class or instance declaration:
-		class C a where
-		   op :: forall b. a -> b
-		   op x = x
-	    Here, b gets unified with a
-
-Before doing this, the substitution is applied to the signature type variable.
-
-We used to have the notion of a "DontBind" type variable, which would
-only be bound to itself or nothing.  Then points (a) and (b) were 
-self-checking.  But it gave rise to bogus consequential error messages.
-For example:
-
-   f = (*)	-- Monomorphic
-
-   g :: Num a => a -> a
-   g x = f x x
-
-Here, we get a complaint when checking the type signature for g,
-that g isn't polymorphic enough; but then we get another one when
-dealing with the (Num x) context arising from f's definition;
-we try to unify x with Int (to default it), but find that x has already
-been unified with the DontBind variable "a" from g's signature.
-This is really a problem with side-effecting unification; we'd like to
-undo g's effects when its type signature fails, but unification is done
-by side effect, so we can't (easily).
-
-So we revert to ordinary type variables for signatures, and try to
-give a helpful message in checkSigTyVars.
-
-\begin{code}
-checkSigTyVars :: [TcTyVar]		-- Universally-quantified type variables in the signature
-	       -> TcTyVarSet		-- Tyvars that are free in the type signature
-					--	Not necessarily zonked
-					-- 	These should *already* be in the free-in-env set, 
-					-- 	and are used here only to improve the error message
-	       -> TcM [TcTyVar]		-- Zonked signature type variables
-
-checkSigTyVars [] free = returnTc []
-checkSigTyVars sig_tyvars free_tyvars
-  = zonkTcTyVars sig_tyvars		`thenNF_Tc` \ sig_tys ->
-    tcGetGlobalTyVars			`thenNF_Tc` \ globals ->
-
-    checkTcM (allDistinctTyVars sig_tys globals)
-	     (complain sig_tys globals)	`thenTc_`
-
-    returnTc (map (tcGetTyVar "checkSigTyVars") sig_tys)
-
-  where
-    complain sig_tys globals
-      = -- "check" checks each sig tyvar in turn
-        foldlNF_Tc check
-		   (env2, emptyVarEnv, [])
-		   (tidy_tvs `zip` tidy_tys)	`thenNF_Tc` \ (env3, _, msgs) ->
-
-        failWithTcM (env3, main_msg $$ vcat msgs)
-      where
-	(env1, tidy_tvs) = tidyOpenTyVars emptyTidyEnv sig_tyvars
-	(env2, tidy_tys) = tidyOpenTypes  env1	       sig_tys
-
-	main_msg = ptext SLIT("Inferred type is less polymorphic than expected")
-
-	check (tidy_env, acc, msgs) (sig_tyvar,ty)
-		-- sig_tyvar is from the signature;
-		-- ty is what you get if you zonk sig_tyvar and then tidy it
-		--
-		-- acc maps a zonked type variable back to a signature type variable
-	  = case tcGetTyVar_maybe ty of {
-	      Nothing ->			-- Error (a)!
-			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar (quotes (ppr ty)) : msgs) ;
-
-	      Just tv ->
-
-	    case lookupVarEnv acc tv of {
-		Just sig_tyvar' -> 	-- Error (b)!
-			returnNF_Tc (tidy_env, acc, unify_msg sig_tyvar thing : msgs)
-		    where
-			thing = ptext SLIT("another quantified type variable") <+> quotes (ppr sig_tyvar')
-
-	      ; Nothing ->
-
-	    if tv `elemVarSet` globals	-- Error (c) or (d)! Type variable escapes
-					-- The least comprehensible, so put it last
-			-- Game plan: 
-			--    a) get the local TcIds and TyVars from the environment,
-			-- 	 and pass them to find_globals (they might have tv free)
-			--    b) similarly, find any free_tyvars that mention tv
-	    then   tcGetEnv 							`thenNF_Tc` \ ve ->
-        	   find_globals tv tidy_env  (tcLEnvElts ve)			`thenNF_Tc` \ (tidy_env1, globs) ->
-        	   find_frees   tv tidy_env1 [] (varSetElems free_tyvars)	`thenNF_Tc` \ (tidy_env2, frees) ->
-		   returnNF_Tc (tidy_env2, acc, escape_msg sig_tyvar tv globs frees : msgs)
-
-	    else 	-- All OK
-	    returnNF_Tc (tidy_env, extendVarEnv acc tv sig_tyvar, msgs)
-	    }}
-
------------------------
--- find_globals looks at the value environment and finds values
--- whose types mention the offending type variable.  It has to be 
--- careful to zonk the Id's type first, so it has to be in the monad.
--- We must be careful to pass it a zonked type variable, too.
-
-find_globals :: Var 
-             -> TidyEnv 
-             -> [TcTyThing] 
-             -> NF_TcM (TidyEnv, [SDoc])
-
-find_globals tv tidy_env things
-  = go tidy_env [] things
-  where
-    go tidy_env acc [] = returnNF_Tc (tidy_env, acc)
-    go tidy_env acc (thing : things)
-      = find_thing ignore_it tidy_env thing 	`thenNF_Tc` \ (tidy_env1, maybe_doc) ->
-	case maybe_doc of
-	  Just d  -> go tidy_env1 (d:acc) things
-	  Nothing -> go tidy_env1 acc     things
-
-    ignore_it ty = not (tv `elemVarSet` tyVarsOfType ty)
-
------------------------
-find_thing ignore_it tidy_env (ATcId id)
-  = zonkTcType  (idType id)	`thenNF_Tc` \ id_ty ->
-    if ignore_it id_ty then
-	returnNF_Tc (tidy_env, Nothing)
-    else let
-	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
-	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
-		   nest 2 (parens (ptext SLIT("bound at") <+>
-			 	   ppr (getSrcLoc id)))]
-    in
-    returnNF_Tc (tidy_env', Just msg)
-
-find_thing ignore_it tidy_env (ATyVar tv)
-  = zonkTcTyVar tv		`thenNF_Tc` \ tv_ty ->
-    if ignore_it tv_ty then
-	returnNF_Tc (tidy_env, Nothing)
-    else let
-	(tidy_env1, tv1)     = tidyOpenTyVar tidy_env  tv
-	(tidy_env2, tidy_ty) = tidyOpenType  tidy_env1 tv_ty
-	msg = sep [ptext SLIT("Type variable") <+> quotes (ppr tv1) <+> eq_stuff, nest 2 bound_at]
-
-	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, tv == tv' = empty
-		 | otherwise	  				    = equals <+> ppr tv_ty
-		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	
-	bound_at | isMutTyVar tv = mut_info	-- The expected case
-		 | otherwise     = empty
-	
-	mut_info = sep [ptext SLIT("is bound by the") <+> ppr (mutTyVarDetails tv),
-	     	        ptext SLIT("at") <+> ppr (getSrcLoc tv)]
-    in
-    returnNF_Tc (tidy_env2, Just msg)
-
------------------------
-find_frees tv tidy_env acc []
-  = returnNF_Tc (tidy_env, acc)
-find_frees tv tidy_env acc (ftv:ftvs)
-  = zonkTcTyVar ftv	`thenNF_Tc` \ ty ->
-    if tv `elemVarSet` tyVarsOfType ty then
-	let
-	    (tidy_env', ftv') = tidyOpenTyVar tidy_env ftv
-	in
-	find_frees tv tidy_env' (ftv':acc) ftvs
-    else
-	find_frees tv tidy_env  acc        ftvs
-
-
-escape_msg sig_tv tv globs frees
-  = mk_msg sig_tv <+> ptext SLIT("escapes") $$
-    if not (null globs) then
-	vcat [pp_it <+> ptext SLIT("is mentioned in the environment:"), 
-	      nest 2 (vcat globs)]
-     else if not (null frees) then
-	vcat [ptext SLIT("It is reachable from the type variable(s)") <+> pprQuotedList frees,
-	      nest 2 (ptext SLIT("which") <+> is_are <+> ptext SLIT("free in the signature"))
-	]
-     else
-	empty	-- Sigh.  It's really hard to give a good error message
-		-- all the time.   One bad case is an existential pattern match
-  where
-    is_are | isSingleton frees = ptext SLIT("is")
-	   | otherwise         = ptext SLIT("are")
-    pp_it | sig_tv /= tv = ptext SLIT("It unifies with") <+> quotes (ppr tv) <> comma <+> ptext SLIT("which")
-	  | otherwise    = ptext SLIT("It")
-
-    vcat_first :: Int -> [SDoc] -> SDoc
-    vcat_first n []     = empty
-    vcat_first 0 (x:xs) = text "...others omitted..."
-    vcat_first n (x:xs) = x $$ vcat_first (n-1) xs
-
-
-unify_msg tv thing = mk_msg tv <+> ptext SLIT("is unified with") <+> thing
-mk_msg tv          = ptext SLIT("Quantified type variable") <+> quotes (ppr tv)
-\end{code}
-
-These two context are used with checkSigTyVars
-    
-\begin{code}
-sigCtxt :: Message -> [TcTyVar] -> TcThetaType -> TcTauType
-	-> TidyEnv -> NF_TcM (TidyEnv, Message)
-sigCtxt when sig_tyvars sig_theta sig_tau tidy_env
-  = zonkTcType sig_tau		`thenNF_Tc` \ actual_tau ->
-    let
-	(env1, tidy_sig_tyvars)  = tidyOpenTyVars tidy_env sig_tyvars
-	(env2, tidy_sig_rho)	 = tidyOpenType env1 (mkRhoTy sig_theta sig_tau)
-	(env3, tidy_actual_tau)  = tidyOpenType env2 actual_tau
-	msg = vcat [ptext SLIT("Signature type:    ") <+> pprType (mkForAllTys tidy_sig_tyvars tidy_sig_rho),
-		    ptext SLIT("Type to generalise:") <+> pprType tidy_actual_tau,
-		    when
-		   ]
-    in
-    returnNF_Tc (env3, msg)
-
-sigPatCtxt bound_tvs bound_ids tidy_env
-  = returnNF_Tc (env1,
-		 sep [ptext SLIT("When checking a pattern that binds"),
-		      nest 4 (vcat (zipWith ppr_id show_ids tidy_tys))])
-  where
-    show_ids = filter is_interesting bound_ids
-    is_interesting id = any (`elemVarSet` idFreeTyVars id) bound_tvs
-
-    (env1, tidy_tys) = tidyOpenTypes tidy_env (map idType show_ids)
-    ppr_id id ty     = ppr id <+> dcolon <+> ppr ty
-	-- Don't zonk the types so we get the separate, un-unified versions
-\end{code}
 
 
 %************************************************************************

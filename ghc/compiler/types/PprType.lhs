@@ -18,9 +18,10 @@ module PprType(
 
 -- friends:
 -- (PprType can see all the representations it's trying to print)
-import TypeRep		( Type(..), TyNote(..), Kind, liftedTypeKind ) -- friend
+import TypeRep		( Type(..), TyNote(..), IPName(..), 
+			  Kind, liftedTypeKind ) -- friend
 import Type		( SourceType(..), isUTyVar, eqKind )
-import TcType		( ThetaType, PredType, 
+import TcType		( ThetaType, PredType, ipNameName,
 			  tcSplitSigmaTy, isPredTy, isDictTy,
 			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe
 			) 
@@ -67,8 +68,7 @@ pprPred = pprSourceType
 
 pprSourceType :: SourceType -> SDoc
 pprSourceType (ClassP clas tys) = pprClassPred clas tys
-pprSourceType (IParam n ty)     = hsep [ptext SLIT("?") <> ppr n,
-				  ptext SLIT("::"), ppr ty]
+pprSourceType (IParam n ty)     = hsep [ppr n, dcolon, ppr ty]
 pprSourceType (NType tc tys)    = ppr tc <+> hsep (map pprParendType tys)
 
 pprClassPred :: Class -> [Type] -> SDoc
@@ -80,8 +80,12 @@ pprTheta theta = parens (hsep (punctuate comma (map pprPred theta)))
 instance Outputable Type where
     ppr ty = pprType ty
 
-instance Outputable PredType where
+instance Outputable SourceType where
     ppr = pprPred
+
+instance Outputable name => Outputable (IPName name) where
+    ppr (Dupable n)   = char '?' <> ppr n -- Ordinary implicit parameters
+    ppr (MustSplit n) = char '%' <> ppr n -- Splittable implicit parameters
 \end{code}
 
 
@@ -262,7 +266,7 @@ getTyDescription ty
 
 getSourceTyDescription (ClassP cl tys) = getOccString cl
 getSourceTyDescription (NType  tc tys) = getOccString tc
-getSourceTyDescription (IParam id ty)  = getOccString id
+getSourceTyDescription (IParam ip ty)  = getOccString (ipNameName ip)
 \end{code}
 
 

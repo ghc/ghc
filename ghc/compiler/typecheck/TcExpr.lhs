@@ -4,7 +4,7 @@
 \section[TcExpr]{Typecheck an expression}
 
 \begin{code}
-module TcExpr ( tcApp, tcExpr, tcMonoExpr, tcPolyExpr, tcId ) where
+module TcExpr ( tcExpr, tcMonoExpr, tcId ) where
 
 #include "HsVersions.h"
 
@@ -12,9 +12,12 @@ import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..),
 			  HsMatchContext(..), HsDoContext(..), mkMonoBind
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, mkHsLet )
+import TcHsSyn		( TcExpr, TcRecordBinds, simpleHsLitTy  )
 
 import TcMonad
+import TcUnify		( tcSub, tcGen, (<$>),
+			  unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy
+			)
 import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
@@ -24,21 +27,18 @@ import Inst		( InstOrigin(..),
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
-			  tcLookupTyCon, tcLookupDataCon, tcLookupId,
-			  tcExtendGlobalTyVars
+			  tcLookupTyCon, tcLookupDataCon, tcLookupId
 			)
 import TcMatches	( tcMatchesCase, tcMatchLambda, tcStmts )
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..), checkSigTyVars, sigCtxt )
-import TcPat		( badFieldCon, simpleHsLitTy )
-import TcSimplify	( tcSimplifyCheck, tcSimplifyIPs )
-import TcMType		( tcInstTyVars, tcInstType, 
-			  newTyVarTy, newTyVarTys, zonkTcType,
-			  unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy
-			)
-import TcType		( TcType, TcTauType, tcSplitFunTys, tcSplitTyConApp,
-			  isQualifiedTy, mkFunTy, mkAppTy, mkTyConTy,
+import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
+import TcPat		( badFieldCon )
+import TcSimplify	( tcSimplifyIPs )
+import TcMType		( tcInstTyVars, newTyVarTy, newTyVarTys, zonkTcType )
+import TcType		( TcType, TcSigmaType, TcPhiType,
+			  tcSplitFunTys, tcSplitTyConApp,
+			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
-			  isTauTy, tyVarsOfType, tyVarsOfTypes, 
+			  tyVarsOfTypes, 
 			  liftedTypeKind, openTypeKind, mkArrowKind,
 			  tcSplitSigmaTy, tcTyConAppTyCon,
 			  tidyOpenType
@@ -74,82 +74,19 @@ import HscTypes		( TyThing(..) )
 %************************************************************************
 
 \begin{code}
-tcExpr :: RenamedHsExpr			-- Expession to type check
-	-> TcType 			-- Expected type (could be a polytpye)
-	-> TcM (TcExpr, LIE)
+tcExpr :: RenamedHsExpr		-- Expession to type check
+	-> TcSigmaType 		-- Expected type (could be a polytpye)
+	-> TcM (TcExpr, LIE)	-- Generalised expr with expected type, and LIE
 
-tcExpr expr ty | isQualifiedTy ty = -- Polymorphic case
-				    tcPolyExpr expr ty 	`thenTc` \ (expr', lie, _, _, _) ->
-				    returnTc (expr', lie)
+tcExpr expr expected_ty 
+  | not (isSigmaTy expected_ty)  -- Monomorphic case
+  = tcMonoExpr expr expected_ty
 
-	       | otherwise        = -- Monomorphic case
-				    tcMonoExpr expr ty
+  | otherwise
+  = tcGen expected_ty (tcMonoExpr expr)		`thenTc` \ (gen_fn, expr', lie) ->
+    returnTc (gen_fn <$> expr', lie)
 \end{code}
 
-
-%************************************************************************
-%*									*
-\subsection{@tcPolyExpr@ typchecks an application}
-%*									*
-%************************************************************************
-
-\begin{code}
--- tcPolyExpr is like tcMonoExpr, except that the expected type
--- can be a polymorphic one.
-tcPolyExpr :: RenamedHsExpr
-	   -> TcType				-- Expected type
-	   -> TcM (TcExpr, LIE,		-- Generalised expr with expected type, and LIE
-		     TcExpr, TcTauType, LIE)	-- Same thing, but instantiated; tau-type returned
-
-tcPolyExpr arg expected_arg_ty
-  = 	-- Ha!  The argument type of the function is a for-all type,
-	-- An example of rank-2 polymorphism.
-
-	-- To ensure that the forall'd type variables don't get unified with each
-	-- other or any other types, we make fresh copy of the alleged type
-    tcInstType expected_arg_ty 		`thenNF_Tc` \ (sig_tyvars, sig_theta, sig_tau) ->
-    let
-	free_tvs = tyVarsOfType expected_arg_ty
-    in
-	-- Type-check the arg and unify with expected type
-    tcMonoExpr arg sig_tau				`thenTc` \ (arg', lie_arg) ->
-
-	-- Check that the sig_tyvars havn't been constrained
-	-- The interesting bit here is that we must include the free variables
-	-- of the expected arg ty.  Here's an example:
-	--	 runST (newVar True)
-	-- Here, if we don't make a check, we'll get a type (ST s (MutVar s Bool))
-	-- for (newVar True), with s fresh.  Then we unify with the runST's arg type
-	-- forall s'. ST s' a. That unifies s' with s, and a with MutVar s Bool.
-	-- So now s' isn't unconstrained because it's linked to a.
-	-- Conclusion: include the free vars of the expected arg type in the
-	-- list of "free vars" for the signature check.
-
-    tcExtendGlobalTyVars free_tvs				  $
-    tcAddErrCtxtM (sigCtxt sig_msg sig_tyvars sig_theta sig_tau)  $
-
-    newDicts SignatureOrigin sig_theta		`thenNF_Tc` \ sig_dicts ->
-    tcSimplifyCheck 
-	(text "the type signature of an expression")
-	sig_tyvars
-	sig_dicts lie_arg			`thenTc` \ (free_insts, inst_binds) ->
-
-    checkSigTyVars sig_tyvars free_tvs		`thenTc` \ zonked_sig_tyvars ->
-
-    let
-	    -- This HsLet binds any Insts which came out of the simplification.
-	    -- It's a bit out of place here, but using AbsBind involves inventing
-	    -- a couple of new names which seems worse.
-	generalised_arg = TyLam zonked_sig_tyvars $
-			  DictLam (map instToId sig_dicts) $
-			  mkHsLet inst_binds $ 
-			  arg' 
-    in
-    returnTc ( generalised_arg, free_insts,
-	       arg', sig_tau, lie_arg )
-  where
-    sig_msg = ptext SLIT("When checking an expression type signature")
-\end{code}
 
 %************************************************************************
 %*									*
@@ -159,27 +96,43 @@ tcPolyExpr arg expected_arg_ty
 
 \begin{code}
 tcMonoExpr :: RenamedHsExpr		-- Expession to type check
-	   -> TcTauType 		-- Expected type (could be a type variable)
+	   -> TcPhiType 		-- Expected type (could be a type variable)
+					-- Definitely no foralls at the top
+					-- Can be a 'hole'.
 	   -> TcM (TcExpr, LIE)
 
 tcMonoExpr (HsVar name) res_ty
-  = tcId name			`thenNF_Tc` \ (expr', lie, id_ty) ->
-    unifyTauTy res_ty id_ty 	`thenTc_`
+  = tcId name			`thenNF_Tc` \ (expr', lie1, id_ty) ->
+    tcSub res_ty id_ty 		`thenTc` \ (co_fn, lie2) ->
+    returnTc (co_fn <$> expr', lie1 `plusLIE` lie2)
 
-    -- Check that the result type doesn't have any nested for-alls.
-    -- For example, a "build" on its own is no good; it must be
-    -- applied to something.
-    checkTc (isTauTy id_ty)
-	    (lurkingRank2Err name id_ty) `thenTc_`
-
-    returnTc (expr', lie)
+tcMonoExpr (HsIPVar ip) res_ty
+  = 	-- Implicit parameters must have a *tau-type* not a 
+	-- type scheme.  We enforce this by creating a fresh
+	-- type variable as its type.  (Because res_ty may not
+	-- be a tau-type.)
+    newTyVarTy openTypeKind		`thenNF_Tc` \ ip_ty ->
+    newIPDict (IPOcc ip) ip ip_ty 	`thenNF_Tc` \ (ip', inst) ->
+    tcSub res_ty ip_ty			`thenTc` \ (co_fn, lie) ->
+    returnNF_Tc (co_fn <$> HsIPVar ip', lie `plusLIE` unitLIE inst)
 \end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Expressions type signatures}
+%*									*
+%************************************************************************
 
 \begin{code}
-tcMonoExpr (HsIPVar name) res_ty
-  = newIPDict (IPOcc name) name res_ty		`thenNF_Tc` \ ip ->
-    returnNF_Tc (HsIPVar (instToId ip), unitLIE ip)
+tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
+ = tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
+   tcAddErrCtxt (exprSigCtxt in_expr)	$
+   tcExpr expr sig_tc_ty		`thenTc` \ (expr', lie1) ->
+   tcSub res_ty sig_tc_ty		`thenTc` \ (co_fn, lie2) ->
+   returnTc (co_fn <$> expr', lie1 `plusLIE` lie2)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -199,17 +152,8 @@ tcMonoExpr (HsLam match) res_ty
   = tcMatchLambda match res_ty 		`thenTc` \ (match',lie) ->
     returnTc (HsLam match', lie)
 
-tcMonoExpr (HsApp e1 e2) res_ty = accum e1 [e2]
-  where
-    accum (HsApp e1 e2) args = accum e1 (e2:args)
-    accum fun args
-      = tcApp fun args res_ty 	`thenTc` \ (fun', args', lie) ->
-	returnTc (foldl HsApp fun' args', lie)
-
--- equivalent to (op e1) e2:
-tcMonoExpr (OpApp arg1 op fix arg2) res_ty
-  = tcApp op [arg1,arg2] res_ty	`thenTc` \ (op', [arg1', arg2'], lie) ->
-    returnTc (OpApp arg1' op' fix arg2', lie)
+tcMonoExpr (HsApp e1 e2) res_ty 
+  = tcApp e1 [e2] res_ty
 \end{code}
 
 Note that the operators in sections are expected to be binary, and
@@ -223,30 +167,36 @@ a type error will occur if they aren't.
 -- or just
 -- 	op e
 
-tcMonoExpr in_expr@(SectionL arg op) res_ty
-  = tcApp op [arg] res_ty 		`thenTc` \ (op', [arg'], lie) ->
-
-	-- Check that res_ty is a function type
-	-- Without this check we barf in the desugarer on
-	-- 	f op = (3 `op`)
-	-- because it tries to desugar to
-	--	f op = \r -> 3 op r
-	-- so (3 `op`) had better be a function!
-    tcAddErrCtxt (sectionLAppCtxt in_expr) $
-    unifyFunTy res_ty			`thenTc_`
-
-    returnTc (SectionL arg' op', lie)
+tcMonoExpr in_expr@(SectionL arg1 op) res_ty
+  = tcExpr_id op				`thenTc` \ (op', lie1, op_ty) ->
+    split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcArg op (arg1, arg1_ty, 1)			`thenTc` \ (arg1',lie2) ->
+    tcAddErrCtxt (exprCtxt in_expr)		$
+    tcSub res_ty (mkFunTy arg2_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
+    returnTc (co_fn <$> SectionL arg1' op', lie1 `plusLIE` lie2 `plusLIE` lie3)
 
 -- Right sections, equivalent to \ x -> x op expr, or
 --	\ x -> op x expr
 
-tcMonoExpr in_expr@(SectionR op expr) res_ty
-  = tcExpr_id op		`thenTc`    \ (op', lie1, op_ty) ->
-    tcAddErrCtxt (sectionRAppCtxt in_expr) $
-    split_fun_ty op_ty 2 {- two args -}			`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
-    tcMonoExpr expr arg2_ty				`thenTc` \ (expr',lie2) ->
-    unifyTauTy res_ty (mkFunTy arg1_ty op_res_ty)	`thenTc_`
-    returnTc (SectionR op' expr', lie1 `plusLIE` lie2)
+tcMonoExpr in_expr@(SectionR op arg2) res_ty
+  = tcExpr_id op				`thenTc` \ (op', lie1, op_ty) ->
+    split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcArg op (arg2, arg2_ty, 2)			`thenTc` \ (arg2',lie2) ->
+    tcAddErrCtxt (exprCtxt in_expr)		$
+    tcSub res_ty (mkFunTy arg1_ty op_res_ty)	`thenTc` \ (co_fn, lie3) ->
+    returnTc (co_fn <$> SectionR op' arg2', lie1 `plusLIE` lie2 `plusLIE` lie3)
+
+-- equivalent to (op e1) e2:
+
+tcMonoExpr in_expr@(OpApp arg1 op fix arg2) res_ty
+  = tcExpr_id op				`thenTc` \ (op', lie1, op_ty) ->
+    split_fun_ty op_ty 2 {- two args -}		`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcArg op (arg1, arg1_ty, 1)			`thenTc` \ (arg1',lie2a) ->
+    tcArg op (arg2, arg2_ty, 2)			`thenTc` \ (arg2',lie2b) ->
+    tcAddErrCtxt (exprCtxt in_expr)		$
+    tcSub res_ty op_res_ty			`thenTc` \ (co_fn, lie3) ->
+    returnTc (OpApp arg1' op' fix arg2', 
+	      lie1 `plusLIE` lie2a `plusLIE` lie2b `plusLIE` lie3)
 \end{code}
 
 The interesting thing about @ccall@ is that it is just a template
@@ -595,60 +545,29 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
 
 %************************************************************************
 %*									*
-\subsection{Expressions type signatures}
+\subsection{Implicit Parameter bindings}
 %*									*
 %************************************************************************
 
 \begin{code}
-tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
- = tcHsSigType ExprSigCtxt poly_ty	`thenTc` \ sig_tc_ty ->
-
-   tcAddErrCtxt (exprSigCtxt in_expr)	$
-   if not (isQualifiedTy sig_tc_ty) then
-	-- Easy case
-	unifyTauTy sig_tc_ty res_ty	`thenTc_`
-	tcMonoExpr expr sig_tc_ty
-
-   else	-- Signature is polymorphic
-	tcPolyExpr expr sig_tc_ty		`thenTc` \ (_, _, expr, expr_ty, lie) ->
-
-	    -- Now match the signature type with res_ty.
-	    -- We must not do this earlier, because res_ty might well
-	    -- mention variables free in the environment, and we'd get
-	    -- bogus complaints about not being able to for-all the
-	    -- sig_tyvars
-	unifyTauTy res_ty expr_ty			`thenTc_`
-
-	    -- If everything is ok, return the stuff unchanged, except for
-	    -- the effect of any substutions etc.  We simply discard the
-	    -- result of the tcSimplifyCheck (inside tcPolyExpr), except for any default
-	    -- resolution it may have done, which is recorded in the
-	    -- substitution.
-	returnTc (expr, lie)
-\end{code}
-
-Implicit Parameter bindings.
-
-\begin{code}
 tcMonoExpr (HsWith expr binds) res_ty
   = tcMonoExpr expr res_ty			`thenTc` \ (expr', expr_lie) ->
-    mapAndUnzipTc tcIPBind binds		`thenTc` \ (pairs, bind_lies) ->
+    mapAndUnzip3Tc tcIPBind binds		`thenTc` \ (avail_ips, binds', bind_lies) ->
 
 	-- If the binding binds ?x = E, we  must now 
 	-- discharge any ?x constraints in expr_lie
-    tcSimplifyIPs (map fst pairs) expr_lie	`thenTc` \ (expr_lie', dict_binds) ->
+    tcSimplifyIPs avail_ips expr_lie		`thenTc` \ (expr_lie', dict_binds) ->
     let
-	binds' = [(instToId ip, rhs) | (ip,rhs) <- pairs]
 	expr'' = HsLet (mkMonoBind dict_binds [] Recursive) expr'
     in
     returnTc (HsWith expr'' binds', expr_lie' `plusLIE` plusLIEs bind_lies)
 
-tcIPBind (name, expr)
+tcIPBind (ip, expr)
   = newTyVarTy openTypeKind		`thenTc` \ ty ->
     tcGetSrcLoc				`thenTc` \ loc ->
-    newIPDict (IPBind name) name ty	`thenNF_Tc` \ ip ->
+    newIPDict (IPBind ip) ip ty		`thenNF_Tc` \ (ip', ip_inst) ->
     tcMonoExpr expr ty			`thenTc` \ (expr', lie) ->
-    returnTc ((ip, expr'), lie)
+    returnTc (ip_inst, (ip', expr'), lie)
 \end{code}
 
 %************************************************************************
@@ -661,8 +580,10 @@ tcIPBind (name, expr)
 
 tcApp :: RenamedHsExpr -> [RenamedHsExpr]   	-- Function and args
       -> TcType			    		-- Expected result type of application
-      -> TcM (TcExpr, [TcExpr],	    	-- Translated fun and args
-		LIE)
+      -> TcM (TcExpr, LIE)		    	-- Translated fun and args
+
+tcApp (HsApp e1 e2) args res_ty 
+  = tcApp e1 (e2:args) res_ty		-- Accumulate the arguments
 
 tcApp fun args res_ty
   = 	-- First type-check the function
@@ -673,21 +594,17 @@ tcApp fun args res_ty
     )						`thenTc` \ (expected_arg_tys, actual_result_ty) ->
 
 	-- Unify with expected result before type-checking the args
+	-- so that the info from res_ty percolates to expected_arg_tys
 	-- This is when we might detect a too-few args situation
-    tcAddErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty) (
-       unifyTauTy res_ty actual_result_ty
-    )							`thenTc_`
+    tcAddErrCtxtM (checkArgsCtxt fun args res_ty actual_result_ty)
+		  (tcSub res_ty actual_result_ty)	`thenTc` \ (co_fn, lie_res) ->
 
 	-- Now typecheck the args
     mapAndUnzipTc (tcArg fun)
 	  (zip3 args expected_arg_tys [1..])	`thenTc` \ (args', lie_args_s) ->
 
-    -- Check that the result type doesn't have any nested for-alls.
-    -- For example, a "build" on its own is no good; it must be applied to something.
-    checkTc (isTauTy actual_result_ty)
-	    (lurkingRank2Err fun actual_result_ty)	`thenTc_`
-
-    returnTc (fun', args', lie_fun `plusLIE` plusLIEs lie_args_s)
+    returnTc (co_fn <$> foldl HsApp fun' args', 
+	      lie_res `plusLIE` lie_fun `plusLIE` plusLIEs lie_args_s)
 
 
 -- If an error happens we try to figure out whether the
@@ -713,9 +630,9 @@ checkArgsCtxt fun args expected_res_ty actual_res_ty tidy_env
 
 
 split_fun_ty :: TcType		-- The type of the function
-	     -> Int			-- Number of arguments
+	     -> Int		-- Number of arguments
 	     -> TcM ([TcType],	-- Function argument types
-		       TcType)	-- Function result types
+		     TcType)	-- Function result types
 
 split_fun_ty fun_ty 0 
   = returnTc ([], fun_ty)
@@ -728,9 +645,9 @@ split_fun_ty fun_ty n
 \end{code}
 
 \begin{code}
-tcArg :: RenamedHsExpr			-- The function (for error messages)
-      -> (RenamedHsExpr, TcType, Int)	-- Actual argument and expected arg type
-      -> TcM (TcExpr, LIE)	-- Resulting argument and LIE
+tcArg :: RenamedHsExpr				-- The function (for error messages)
+      -> (RenamedHsExpr, TcSigmaType, Int)	-- Actual argument and expected arg type
+      -> TcM (TcExpr, LIE)			-- Resulting argument and LIE
 
 tcArg the_fun (arg, expected_arg_ty, arg_no)
   = tcAddErrCtxt (funAppCtxt the_fun arg arg_no) $
@@ -864,7 +781,7 @@ tcRecordBinds tycon ty_args rbinds
 		-- The caller of tcRecordBinds has already checked
 		-- that all the fields come from the same type
 
-	tcPolyExpr rhs field_ty 	`thenTc` \ (rhs', lie, _, _, _) ->
+	tcExpr rhs field_ty 			`thenTc` \ (rhs', lie) ->
 
 	returnTc ((sel_id, rhs', pun_flag), lie)
 
@@ -971,11 +888,8 @@ listCtxt expr
 predCtxt expr
   = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)
 
-sectionRAppCtxt expr
-  = hang (ptext SLIT("In the right section:")) 4 (ppr expr)
-
-sectionLAppCtxt expr
-  = hang (ptext SLIT("In the left section:")) 4 (ppr expr)
+exprCtxt expr
+  = hang (ptext SLIT("In the expression:")) 4 (ppr expr)
 
 funAppCtxt fun arg arg_no
   = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 

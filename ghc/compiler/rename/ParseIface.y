@@ -43,6 +43,7 @@ import BasicTypes	( Fixity(..), FixityDirection(..), StrictnessMark(..),
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
+import TypeRep          ( IPName(..) )
 import ForeignCall	( ForeignCall(..), CCallConv(..), CCallSpec(..), CCallTarget(..) )
 import Lex		
 
@@ -182,7 +183,8 @@ import FastString	( tailFS )
  QVARSYM 	{ ITqvarsym  $$ }
  QCONSYM 	{ ITqconsym  $$ }
 
- IPVARID   	{ ITipvarid  $$ }		-- GHC extension
+ IPDUPVARID   	{ ITdupipvarid   $$ }		-- GHC extension
+ IPSPLITVARID  	{ ITsplitipvarid $$ }		-- GHC extension
 
  PRAGMA		{ ITpragma   $$ }
 
@@ -626,8 +628,9 @@ qvar_name	:: { RdrName }
 qvar_name	:  var_name		{ $1 }
 		|  QVARID	      	{ mkIfaceOrig varName $1 }
 
-ipvar_name	:: { RdrName }
-		:  IPVARID		{ mkRdrUnqual (mkSysOccFS varName (tailFS $1)) }
+ipvar_name	:: { IPName RdrName }
+	        : IPDUPVARID		{ Dupable   (mkRdrUnqual (mkSysOccFS varName $1)) }
+	        | IPSPLITVARID		{ MustSplit (mkRdrUnqual (mkSysOccFS varName $1)) }
 
 qvar_names1	:: { [RdrName] }
 qvar_names1	: qvar_name		{ [$1] }

@@ -449,15 +449,13 @@ mkSelectorBinds pat val_expr
 
 
   | otherwise
-  = mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (showSDoc (ppr pat))
-    `thenDs` \ error_expr ->
-    matchSimply val_expr PatBindRhs pat local_tuple error_expr
-    `thenDs` \ tuple_expr ->
-    newSysLocalDs tuple_ty
-    `thenDs` \ tuple_var ->
+  = mkErrorAppDs iRREFUT_PAT_ERROR_ID 
+		 tuple_ty (showSDoc (ppr pat))			`thenDs` \ error_expr ->
+    matchSimply val_expr PatBindRhs pat local_tuple error_expr	`thenDs` \ tuple_expr ->
+    newSysLocalDs tuple_ty					`thenDs` \ tuple_var ->
     let
-	mk_tup_bind binder =
-	  (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
+	mk_tup_bind binder
+	  = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
     in
     returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where

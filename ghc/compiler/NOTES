@@ -1,3 +1,17 @@
+* Can a scoped type variable denote a type scheme?
+
+* Relation between separate type sigs and pattern type sigs
+f :: forall a. a->a
+f :: b->b = e   -- No: monomorphic
+
+f :: forall a. a->a
+f :: forall a. a->a  -- OK
+
+f :: forall a. [a] -> [a]
+f :: forall b. b->b = e  ???
+
+
+-------------------------------
 NB: all floats are let-binds, but some non-rec lets
     may be unlifted (with RHS ok-for-speculation)
 

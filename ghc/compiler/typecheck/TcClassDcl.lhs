@@ -25,16 +25,17 @@ import TcHsSyn		( TcMonoBinds )
 
 import Inst		( Inst, InstOrigin(..), LIE, emptyLIE, plusLIE, plusLIEs, 
 			  instToId, newDicts, newMethod )
-import TcEnv		( RecTcEnv, TyThingDetails(..), tcAddImportedIdInfo,
+import TcEnv		( RecTcEnv, TyThingDetails(..), 
 			  tcLookupClass, tcExtendTyVarEnvForMeths, tcExtendGlobalTyVars,
 			  tcExtendLocalValEnv, tcExtendTyVarEnv
 			)
 import TcBinds		( tcBindWithSigs, tcSpecSigs )
-import TcMonoType	( tcHsType, tcHsTheta, checkSigTyVars, sigCtxt, mkTcSig )
+import TcMonoType	( tcHsType, tcHsTheta, mkTcSig )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
+import TcUnify		( checkSigTyVars, sigCtxt )
 import TcMType		( tcInstSigTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
 import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
-			  mkSigmaTy, mkTyVarTys, mkPredTys, mkClassPred, 
+			  mkTyVarTys, mkPredTys, mkClassPred, 
 			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitSigmaTy
 			)
 import TcMonad
@@ -495,7 +496,6 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
     let
 	meth_id	   = instToId meth
 	meth_name  = idName meth_id
-	sig_msg    = ptext SLIT("When checking the expected type for class method") <+> ppr sel_id
 	meth_prags = find_prags (idName sel_id) meth_name prags
     in
     mkTcSig meth_id loc			`thenNF_Tc` \ sig_info -> 
@@ -532,7 +532,9 @@ tcMethodBind clas origin inst_tyvars inst_tys inst_theta
      -- We do this for each method independently to localise error messages
      -- ...and this is why the call to tcExtendGlobalTyVars must be here
      --    rather than in the caller
-     tcAddErrCtxtM (sigCtxt sig_msg inst_tyvars inst_theta (idType meth_id))	$
+     tcAddErrCtxt (ptext SLIT("When checking the type of class method") 
+		   <+> quotes (ppr sel_id))					$
+     tcAddErrCtxtM (sigCtxt inst_tyvars inst_theta (idType meth_id))	$
      checkSigTyVars inst_tyvars emptyVarSet					`thenTc_` 
 
      returnTc (binds `AndMonoBinds` prag_binds1 `AndMonoBinds` prag_binds2, 

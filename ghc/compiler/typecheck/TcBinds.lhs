@@ -25,18 +25,16 @@ import TcMonad
 import Inst		( LIE, emptyLIE, mkLIE, plusLIE, InstOrigin(..),
 			  newDicts, instToId
 			)
-import TcEnv		( tcExtendLocalValEnv,
-			  newSpecPragmaId, newLocalId
-			)
+import TcEnv		( tcExtendLocalValEnv, newLocalName )
+import TcUnify		( unifyTauTyLists, checkSigTyVars, sigCtxt )
 import TcSimplify	( tcSimplifyInfer, tcSimplifyInferCheck, tcSimplifyRestricted, tcSimplifyToDicts )
-import TcMonoType	( tcHsSigType, UserTypeCtxt(..), checkSigTyVars,
-			  TcSigInfo(..), tcTySig, maybeSig, sigCtxt, tcAddScopedTyVars
+import TcMonoType	( tcHsSigType, UserTypeCtxt(..), 
+			  TcSigInfo(..), tcTySig, maybeSig, tcAddScopedTyVars
 			)
-import TcPat		( tcPat )
+import TcPat		( tcPat, tcSubPat, tcMonoPatBndr )
 import TcSimplify	( bindInstsOfLocalFuns )
-import TcMType		( newTyVarTy, newTyVar, 
-			  zonkTcTyVarToTyVar, 
-			  unifyTauTy, unifyTauTyLists
+import TcMType		( newTyVar, newTyVarTy, newHoleTyVarTy,
+			  zonkTcTyVarToTyVar
 			)
 import TcType		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType, 
 			  mkPredTy, mkForAllTy, isUnLiftedType, 
@@ -44,9 +42,9 @@ import TcType		( mkTyVarTy, mkForAllTys, mkFunTys, tyVarsOfType,
 			)
 
 import CoreFVs		( idFreeTyVars )
-import Id		( mkLocalId, setInlinePragma )
+import Id		( mkLocalId, mkSpecPragmaId, setInlinePragma )
 import Var		( idType, idName )
-import Name		( Name, getOccName, getSrcLoc )
+import Name		( Name, getSrcLoc )
 import NameSet
 import Var		( tyVarKind )
 import VarSet
@@ -283,8 +281,8 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
 
 	    new_poly_id = mkLocalId binder_name poly_ty
 	    poly_ty = mkForAllTys real_tyvars_to_gen
-			$ mkFunTys dict_tys 
-			$ idType zonked_mono_id
+		    $ mkFunTys dict_tys 
+		    $ idType zonked_mono_id
 		-- It's important to build a fully-zonked poly_ty, because
 		-- we'll slurp out its free type variables when extending the
 		-- local environment (tcExtendLocalValEnv); if it's not zonked
@@ -489,11 +487,11 @@ checkSigsCtxts sigs@(TySigInfo _ id1 sig_tvs theta1 _ _ _ src_loc : other_sigs)
 checkSigsTyVars sigs = mapTc_ check_one sigs
   where
     check_one (TySigInfo _ id sig_tyvars sig_theta sig_tau _ _ src_loc)
-      = tcAddSrcLoc src_loc							$
-	tcAddErrCtxtM (sigCtxt (sig_msg id) sig_tyvars sig_theta sig_tau)	$
+      = tcAddSrcLoc src_loc						$
+	tcAddErrCtxt (ptext SLIT("When checking the type signature for") 
+		      <+> quotes (ppr id))				$
+	tcAddErrCtxtM (sigCtxt sig_tyvars sig_theta sig_tau)		$
 	checkSigTyVars sig_tyvars (idFreeTyVars id)
-
-    sig_msg id = ptext SLIT("When checking the type signature for") <+> quotes (ppr id)
 \end{code}
 
 @getTyVarsToGen@ decides what type variables to generalise over.
@@ -609,23 +607,6 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
     returnTc (mbinds', lie_req_pat `plusLIE` lie_req_rhss, names, mono_ids)
   where
 
-	-- This function is used when dealing with a LHS binder; 
-	-- we make a monomorphic version of the Id.  
-	-- We check for a type signature; if there is one, we use the mono_id
-	-- from the signature.  This is how we make sure the tau part of the
-	-- signature actually maatches the type of the LHS; then tc_mb_pats
-	-- ensures the LHS and RHS have the same type
-	
-    tc_pat_bndr name pat_ty
-	= case maybeSig tc_ty_sigs name of
-	    Nothing
-		-> newLocalId (getOccName name) pat_ty (getSrcLoc name)
-
-	    Just (TySigInfo _ _ _ _ _ mono_id _ _)
-		-> tcAddSrcLoc (getSrcLoc name)		$
-		   unifyTauTy (idType mono_id) pat_ty 	`thenTc_`
-		   returnTc mono_id
-
     mk_bind (name, mono_id) = case maybeSig tc_ty_sigs name of
 				Nothing 				  -> (name, mono_id)
 				Just (TySigInfo name poly_id _ _ _ _ _ _) -> (name, poly_id)
@@ -648,9 +629,18 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 		  lie_avail1 `plusLIE` lie_avail2)
 
     tc_mb_pats (FunMonoBind name inf matches locn)
-      = newTyVarTy kind 		`thenNF_Tc` \ bndr_ty -> 
-	tc_pat_bndr name bndr_ty	`thenTc` \ bndr_id ->
+      = (case maybeSig tc_ty_sigs name of
+	    Just (TySigInfo _ _ _ _ _ mono_id _ _) 
+		    -> returnNF_Tc mono_id
+	    Nothing -> newLocalName name	`thenNF_Tc` \ bndr_name ->
+		       newTyVarTy openTypeKind	`thenNF_Tc` \ bndr_ty -> 
+			-- NB: not a 'hole' tyvar; since there is no type 
+			-- signature, we revert to ordinary H-M typechecking
+			-- which means the variable gets an inferred tau-type
+		       returnNF_Tc (mkLocalId bndr_name bndr_ty)
+	)					`thenNF_Tc` \ bndr_id ->
 	let
+	   bndr_ty	   = idType bndr_id
 	   complete_it xve = tcAddSrcLoc locn				$
 			     tcMatchesFun xve name bndr_ty  matches	`thenTc` \ (matches', lie) ->
 			     returnTc (FunMonoBind bndr_id inf matches' locn, lie)
@@ -659,19 +649,16 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 
     tc_mb_pats bind@(PatMonoBind pat grhss locn)
       = tcAddSrcLoc locn	 	$
-	newTyVarTy kind 		`thenNF_Tc` \ pat_ty -> 
+	newHoleTyVarTy 			`thenNF_Tc` \ pat_ty -> 
 
 		-- 	Now typecheck the pattern
-		-- We don't support binding fresh (not-already-in-scope) scoped 
+		-- We do now support binding fresh (not-already-in-scope) scoped 
 		-- type variables in the pattern of a pattern binding.  
-		-- For example, this is illegal:
+		-- For example, this is now legal:
 		--	(x::a, y::b) = e
-		-- whereas this is ok
-		--	(x::Int, y::Bool) = e
-		--
-		-- We don't check explicitly for this problem.  Instead, we simply
-		-- type check the pattern with tcPat.  If the pattern mentions any
-		-- fresh tyvars we simply get an out-of-scope type variable error
+		-- The type variables are brought into scope in tc_binds_and_then,
+		-- so we don't have to do anything here.
+
 	tcPat tc_pat_bndr pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
 	let
 	   complete_it xve = tcAddSrcLoc locn		 		$
@@ -682,11 +669,24 @@ tcMonoBinds mbinds tc_ty_sigs is_rec
 	in
 	returnTc (complete_it, lie_req, tvs, ids, lie_avail)
 
-	-- Figure out the appropriate kind for the pattern,
-	-- and generate a suitable type variable 
-    kind = case is_rec of
-		Recursive    -> liftedTypeKind	-- Recursive, so no unlifted types
-		NonRecursive -> openTypeKind 	-- Non-recursive, so we permit unlifted types
+	-- tc_pat_bndr is used when dealing with a LHS binder in a pattern.
+	-- If there was a type sig for that Id, we want to make it much
+	-- as if that type signature had been on the binder as a SigPatIn.
+	-- We check for a type signature; if there is one, we use the mono_id
+	-- from the signature.  This is how we make sure the tau part of the
+	-- signature actually matches the type of the LHS; then tc_mb_pats
+	-- ensures the LHS and RHS have the same type
+	
+    tc_pat_bndr name pat_ty
+	= case maybeSig tc_ty_sigs name of
+	    Nothing
+		-> newLocalName name	`thenNF_Tc` \ bndr_name ->
+		   tcMonoPatBndr bndr_name pat_ty
+
+	    Just (TySigInfo _ _ _ _ _ mono_id _ _)
+		-> tcAddSrcLoc (getSrcLoc name)		$
+		   tcSubPat pat_ty (idType mono_id)	`thenTc` \ (co_fn, lie) ->
+		   returnTc (co_fn, lie, mono_id)
 \end{code}
 
 
@@ -751,11 +751,15 @@ tcSpecSigs (SpecSig name poly_ty src_loc : sigs)
     	-- Just specialise "f" by building a SpecPragmaId binding
 	-- It is the thing that makes sure we don't prematurely 
 	-- dead-code-eliminate the binding we are really interested in.
-    newSpecPragmaId name sig_ty		`thenNF_Tc` \ spec_id ->
+    newLocalName name			`thenNF_Tc` \ spec_name ->
+    let
+	spec_bind = VarMonoBind (mkSpecPragmaId spec_name sig_ty)
+		   		(mkHsLet spec_binds spec_expr)
+    in
 
 	-- Do the rest and combine
     tcSpecSigs sigs			`thenTc` \ (binds_rest, lie_rest) ->
-    returnTc (binds_rest `andMonoBinds` VarMonoBind spec_id (mkHsLet spec_binds spec_expr),
+    returnTc (binds_rest `andMonoBinds` spec_bind,
 	      lie_rest   `plusLIE`      mkLIE spec_dicts)
 
 tcSpecSigs (other_sig : sigs) = tcSpecSigs sigs

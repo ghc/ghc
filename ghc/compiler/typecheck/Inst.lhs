@@ -54,7 +54,8 @@ import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  isClassPred, isTyVarClassPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
 		  tidyType, tidyTypes, tidyFreeTyVars,
-		  tcCmpType, tcCmpTypes, tcCmpPred
+		  tcCmpType, tcCmpTypes, tcCmpPred,
+		  IPName, mapIPName, ipNameName
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
@@ -219,11 +220,12 @@ predsOfInst (LitInst _ _ _ _)	     = []
 ipNamesOfInsts :: [Inst] -> [Name]
 ipNamesOfInst  :: Inst   -> [Name]
 -- Get the implicit parameters mentioned by these Insts
+-- NB: ?x and %x get different Names
 
 ipNamesOfInsts insts = [n | inst <- insts, n <- ipNamesOfInst inst]
 
-ipNamesOfInst (Dict _ (IParam n _) _)  = [n]
-ipNamesOfInst (Method _ _ _ theta _ _) = [n | IParam n _ <- theta]
+ipNamesOfInst (Dict _ (IParam n _) _)  = [ipNameName n]
+ipNamesOfInst (Method _ _ _ theta _ _) = [ipNameName n | IParam n _ <- theta]
 ipNamesOfInst other		       = []
 
 tyVarsOfInst :: Inst -> TcTyVarSet
@@ -273,7 +275,6 @@ must be witnessed by an actual binding; the second tells whether an
 \begin{code}
 instBindingRequired :: Inst -> Bool
 instBindingRequired (Dict _ (ClassP clas _) _) = not (isNoDictClass clas)
-instBindingRequired (Dict _ (IParam _ _) _)    = False
 instBindingRequired other		       = True
 
 instCanBeGeneralised :: Inst -> Bool
@@ -310,12 +311,20 @@ newDictsAtLoc inst_loc@(_,loc,_) theta
   where
     mk_dict uniq pred = Dict (mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)) pred inst_loc
 
--- For implicit parameters, since there is only one in scope
--- at any time, we use the name of the implicit parameter itself
-newIPDict orig name ty
-  = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc ->
-    returnNF_Tc (Dict (mkLocalId name (mkPredTy pred)) pred inst_loc)
-  where pred = IParam name ty
+-- For vanilla implicit parameters, there is only one in scope
+-- at any time, so we used to use the name of the implicit parameter itself
+-- But with splittable implicit parameters there may be many in 
+-- scope, so we make up a new name.
+newIPDict :: InstOrigin -> IPName Name -> Type 
+	  -> NF_TcM (IPName Id, Inst)
+newIPDict orig ip_name ty
+  = tcGetInstLoc orig			`thenNF_Tc` \ inst_loc@(_,loc,_) ->
+    tcGetUnique				`thenNF_Tc` \ uniq ->
+    let
+	pred = IParam ip_name ty
+	id   = mkLocalId (mkPredName uniq loc pred) (mkPredTy pred)
+    in
+    returnNF_Tc (mapIPName (\n -> id) ip_name, Dict id pred inst_loc)
 \end{code}
 
 

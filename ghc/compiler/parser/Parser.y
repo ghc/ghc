@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.76 2001/10/31 15:22:54 simonpj Exp $
+$Id: Parser.y,v 1.77 2001/11/26 09:20:26 simonpj Exp $
 
 Haskell grammar.
 
@@ -13,6 +13,7 @@ module Parser ( parseModule, parseStmt, parseIdentifier ) where
 
 import HsSyn
 import HsTypes		( mkHsTupCon )
+import TypeRep          ( IPName(..) )
 
 import RdrHsSyn
 import Lex
@@ -189,7 +190,8 @@ Conflicts: 14 shift/reduce
  QVARSYM 	{ ITqvarsym  $$ }
  QCONSYM 	{ ITqconsym  $$ }
 
- IPVARID   	{ ITipvarid  $$ }		-- GHC extension
+ IPDUPVARID   	{ ITdupipvarid   $$ }		-- GHC extension
+ IPSPLITVARID  	{ ITsplitipvarid $$ }		-- GHC extension
 
  CHAR		{ ITchar     $$ }
  STRING		{ ITstring   $$ }
@@ -914,17 +916,17 @@ fbind	:: { (RdrName, RdrNameHsExpr, Bool) }
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings
 
-dbinding :: { [(RdrName, RdrNameHsExpr)] }
+dbinding :: { [(IPName RdrName, RdrNameHsExpr)] }
 	: '{' dbinds '}'		{ $2 }
 	| layout_on dbinds close	{ $2 }
 
-dbinds 	:: { [(RdrName, RdrNameHsExpr)] }
+dbinds 	:: { [(IPName RdrName, RdrNameHsExpr)] }
 	: dbinds ';' dbind		{ $3 : $1 }
 	| dbinds ';'			{ $1 }
 	| dbind				{ [$1] }
 	| {- empty -}			{ [] }
 
-dbind	:: { (RdrName, RdrNameHsExpr) }
+dbind	:: { (IPName RdrName, RdrNameHsExpr) }
 dbind	: ipvar '=' exp			{ ($1, $3) }
 
 -----------------------------------------------------------------------------
@@ -969,8 +971,9 @@ qvar 	:: { RdrName }
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.
 
-ipvar	:: { RdrName }
-	: IPVARID		{ (mkUnqual varName (tailFS $1)) }
+ipvar	:: { IPName RdrName }
+	: IPDUPVARID		{ Dupable   (mkUnqual varName $1) }
+	| IPSPLITVARID		{ MustSplit (mkUnqual varName $1) }
 
 qcon	:: { RdrName }
 	: qconid		{ $1 }

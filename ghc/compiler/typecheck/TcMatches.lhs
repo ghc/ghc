@@ -21,14 +21,15 @@ import RnHsSyn		( RenamedMatch, RenamedGRHSs, RenamedStmt, RenamedPat, RenamedMa
 import TcHsSyn		( TcMatch, TcGRHSs, TcStmt, TcDictBinds, TypecheckedPat )
 
 import TcMonad
-import TcMonoType	( tcAddScopedTyVars, checkSigTyVars, tcHsSigType, UserTypeCtxt(..), sigPatCtxt )
+import TcMonoType	( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
 import Inst		( LIE, isEmptyLIE, plusLIE, emptyLIE, plusLIEs, lieToList )
 import TcEnv		( TcId, tcLookupLocalIds, tcExtendLocalValEnv, tcExtendGlobalTyVars )
 import TcPat		( tcPat, tcMonoPatBndr, polyPatSig )
-import TcMType		( newTyVarTy, unifyFunTy, unifyTauTy )
+import TcMType		( newTyVarTy )
 import TcType		( TcType, TcTyVar, tyVarsOfType, isTauTy,  
 			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind  )
 import TcBinds		( tcBindsAndThen )
+import TcUnify		( subFunTy, unifyTauTy, checkSigTyVars, sigPatCtxt )
 import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
 import Name		( Name )
 import TysWiredIn	( boolTy )
@@ -77,7 +78,7 @@ tcMatchesFun xve fun_name expected_ty matches@(first_match:_)
 	-- because inconsistency between branches
 	-- may show up as something wrong with the (non-existent) type signature
 
-	-- No need to zonk expected_ty, because unifyFunTy does that on the fly
+	-- No need to zonk expected_ty, because subFunTy does that on the fly
     tcMatches xve (FunRhs fun_name) matches expected_ty
 \end{code}
 
@@ -280,7 +281,10 @@ tc_match_pats [] expected_ty
   = returnTc (expected_ty, [], emptyLIE, emptyBag, emptyBag, emptyLIE)
 
 tc_match_pats (pat:pats) expected_ty
-  = unifyFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
+  = subFunTy expected_ty		`thenTc` \ (arg_ty, rest_ty) ->
+	-- This is the unique place we call subFunTy
+	-- The point is that if expected_y is a "hole", we want 
+	-- to make arg_ty and rest_ty as "holes" too.
     tcPat tcMonoPatBndr pat arg_ty	`thenTc` \ (pat', lie_req, pat_tvs, pat_ids, lie_avail) ->
     tc_match_pats pats rest_ty		`thenTc` \ (rhs_ty, pats', lie_reqs, pats_tvs, pats_ids, lie_avails) ->
     returnTc (	rhs_ty, 

@@ -28,7 +28,7 @@ then
 then
 	TysWiredIn (DataCon.mkDataCon, loop MkId.mkDataConId, loop Generics.mkGenInfo)
 then
-	TcType( lots of TywWiredIn stuff)
+	TcType( lots of TysWiredIn stuff)
 then
 	PprType( lots of TcType stuff )
 then

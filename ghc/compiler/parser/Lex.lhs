@@ -210,7 +210,8 @@ data Token
   | ITqvarsym (FAST_STRING,FAST_STRING)
   | ITqconsym (FAST_STRING,FAST_STRING)
 
-  | ITipvarid FAST_STRING	-- GHC extension: implicit param: ?x
+  | ITdupipvarid   FAST_STRING	-- GHC extension: implicit param: ?x
+  | ITsplitipvarid FAST_STRING	-- GHC extension: implicit param: %x
 
   | ITpragma StringBuffer
 
@@ -653,7 +654,9 @@ lexToken cont glaexts buf =
 	       cont (ITunknown "\NUL") (stepOn buf)
 
     '?'# | flag glaexts && is_lower (lookAhead# buf 1#) ->
-	    lex_ip cont (incLexeme buf)
+	    lex_ip ITdupipvarid cont (incLexeme buf)
+    '%'# | flag glaexts && is_lower (lookAhead# buf 1#) ->
+	    lex_ip ITsplitipvarid cont (incLexeme buf)
     c | is_digit  c -> lex_num cont glaexts 0 buf
       | is_symbol c -> lex_sym cont buf
       | is_upper  c -> lex_con cont glaexts buf
@@ -936,10 +939,10 @@ lex_cstring cont buf =
 -----------------------------------------------------------------------------
 -- identifiers, symbols etc.
 
-lex_ip cont buf =
+lex_ip ip_constr cont buf =
  case expandWhile# is_ident buf of
-   buf' -> cont (ITipvarid lexeme) buf'
-	   where lexeme = lexemeToFastString buf'
+   buf' -> cont (ip_constr (tailFS lexeme)) buf'
+	where lexeme = lexemeToFastString buf'
 
 lex_id cont glaexts buf =
  let buf1 = expandWhile# is_ident buf in

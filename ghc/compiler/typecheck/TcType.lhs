@@ -17,12 +17,13 @@ is the principal client.
 module TcType (
   --------------------------------
   -- Types 
-  TcType, TcTauType, TcPredType, TcThetaType, TcRhoType,
-  TcTyVar, TcTyVarSet, TcKind,
+  TcType, TcSigmaType, TcPhiType, TcTauType, TcPredType, TcThetaType, 
+  TcTyVar, TcTyVarSet, TcKind, 
 
   --------------------------------
   -- TyVarDetails
-  TyVarDetails(..), isUserTyVar, isSkolemTyVar,
+  TyVarDetails(..), isUserTyVar, isSkolemTyVar, isHoleTyVar, 
+  tyVarBindingInfo,
 
   --------------------------------
   -- Builders
@@ -41,7 +42,7 @@ module TcType (
   -- Predicates. 
   -- Again, newtypes are opaque
   tcEqType, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred,
-  isQualifiedTy, isOverloadedTy, 
+  isSigmaTy, isOverloadedTy, 
   isDoubleTy, isFloatTy, isIntTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy, isForeignPtrTy, 
   isTauTy, tcIsTyVarTy, tcIsForAllTy,
@@ -58,7 +59,7 @@ module TcType (
   isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
   mkDictTy, tcSplitPredTy_maybe, predTyUnique,
   isDictTy, tcSplitDFunTy, predTyUnique, 
-  mkClassPred, inheritablePred, isIPPred, mkPredName,
+  mkClassPred, inheritablePred, isIPPred, mkPredName, 
 
   ---------------------------------
   -- Foreign import and export
@@ -82,6 +83,8 @@ module TcType (
   unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds, 
   superBoxity, liftedBoxity, hasMoreBoxityInfo, defaultKind, superKind,
   isTypeKind,
+
+  IPName, ipNameName, mapIPName,
 
   Type, SourceType(..), PredType, ThetaType, 
   mkForAllTy, mkForAllTys, 
@@ -111,7 +114,7 @@ import Type		( mkUTyM, unUTy )	-- Used locally
 
 import Type		(	-- Re-exports
 			  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-			  Kind, Type, TauType, SourceType(..), PredType, ThetaType, 
+			  IPName, Kind, Type, SourceType(..), PredType, ThetaType, 
 			  unliftedTypeKind, liftedTypeKind, openTypeKind, mkArrowKind, mkArrowKinds,
 			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
@@ -121,18 +124,19 @@ import Type		(	-- Re-exports
 			  splitNewType_maybe, splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVarBndr, tidyOpenTyVar, tidyOpenTyVars, eqKind, eqUsage,
-			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
+			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind,
+			  ipNameName, mapIPName
 			)
 import TyCon		( TyCon, isUnLiftedTyCon )
 import Class		( classHasFDs, Class )
-import Var		( TyVar, tyVarKind )
+import Var		( TyVar, tyVarKind, isMutTyVar, mutTyVarDetails )
 import ForeignCall	( Safety, playSafe )
 import VarEnv
 import VarSet
 
 -- others:
 import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
-import Name		( Name, NamedThing(..), mkLocalName )
+import Name		( Name, NamedThing(..), mkLocalName, getSrcLoc )
 import OccName		( OccName, mkDictOcc )
 import NameSet
 import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
@@ -151,6 +155,40 @@ import Outputable
 %*									*
 %************************************************************************
 
+The type checker divides the generic Type world into the 
+following more structured beasts:
+
+sigma ::= forall tyvars. theta => phi
+	-- A sigma type is a qualified type
+	--
+	-- Note that even if 'tyvars' is empty, theta
+	-- may not be: e.g.   (?x::Int) => Int
+
+	-- Note that 'sigma' is in prenex form:
+	-- all the foralls are at the front.
+	-- A 'phi' type has no foralls to the right of
+	-- an arrow
+
+phi ::= sigma -> phi
+     |  tau
+
+-- A 'tau' type has no quantification anywhere
+-- Note that the args of a type constructor must be taus
+tau ::= tyvar
+     |  tycon tau_1 .. tau_n
+     |  tau_1 tau_2
+     |  tau_1 -> tau_2
+
+-- In all cases, a (saturated) type synonym application is legal,
+-- provided it expands to the required form.
+
+
+\begin{code}
+type SigmaType = Type
+type PhiType   = Type
+type TauType   = Type
+\end{code}
+
 \begin{code}
 type TcTyVar    = TyVar		-- Might be a mutable tyvar
 type TcTyVarSet = TyVarSet
@@ -163,8 +201,9 @@ type TcType = Type 		-- A TcType can have mutable type variables
 
 type TcPredType     = PredType
 type TcThetaType    = ThetaType
-type TcRhoType      = Type
-type TcTauType      = TauType
+type TcSigmaType    = TcType
+type TcPhiType      = TcType
+type TcTauType      = TcType
 type TcKind         = TcType
 \end{code}
 
@@ -182,7 +221,12 @@ why Var.lhs shouldn't actually have the definition, but it "belongs" here.
 
 \begin{code}
 data TyVarDetails
-  = SigTv	-- Introduced when instantiating a type signature,
+  = HoleTv	-- Used *only* by the type checker when passing in a type
+		-- variable that should be side-effected to the result type.
+		-- Always has kind openTypeKind.
+		-- Never appears in types
+
+  | SigTv	-- Introduced when instantiating a type signature,
 		-- prior to checking that the defn of a fn does 
 		-- have the expected type.  Should not be instantiated.
 		--
@@ -202,20 +246,38 @@ data TyVarDetails
 
    | VanillaTv	-- Everything else
 
-isUserTyVar :: TyVarDetails -> Bool	-- Avoid unifying these if possible
-isUserTyVar VanillaTv = False
-isUserTyVar other     = True
+isUserTyVar :: TcTyVar -> Bool	-- Avoid unifying these if possible
+isUserTyVar tv = case mutTyVarDetails tv of
+		   VanillaTv -> False
+		   other     -> True
 
-isSkolemTyVar :: TyVarDetails -> Bool
-isSkolemTyVar SigTv = True
-isSkolemTyVar other = False
+isSkolemTyVar :: TcTyVar -> Bool
+isSkolemTyVar tv = case mutTyVarDetails tv of
+		      SigTv -> True
+		      oteher -> False
 
-instance Outputable TyVarDetails where
-  ppr SigTv	= ptext SLIT("type signature")
-  ppr ClsTv     = ptext SLIT("class declaration")
-  ppr InstTv    = ptext SLIT("instance declaration")
-  ppr PatSigTv  = ptext SLIT("pattern type signature")
-  ppr VanillaTv = ptext SLIT("???")
+isHoleTyVar :: TcTyVar -> Bool
+-- NB:  the hole might be filled in by now, and this
+--	function does not check for that
+isHoleTyVar tv = ASSERT( isMutTyVar tv )
+		 case mutTyVarDetails tv of
+			HoleTv -> True
+			other  -> False
+
+tyVarBindingInfo :: TyVar -> SDoc	-- Used in checkSigTyVars
+tyVarBindingInfo tv
+  | isMutTyVar tv
+  = sep [ptext SLIT("is bound by the") <+> details (mutTyVarDetails tv),
+	 ptext SLIT("at") <+> ppr (getSrcLoc tv)]
+  | otherwise
+  = empty
+  where
+    details SigTv     = ptext SLIT("type signature")
+    details ClsTv     = ptext SLIT("class declaration")
+    details InstTv    = ptext SLIT("instance declaration")
+    details PatSigTv  = ptext SLIT("pattern type signature")
+    details HoleTv    = ptext SLIT("//hole//")		-- Should not happen
+    details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
 \end{code}
 
 
@@ -419,7 +481,7 @@ tcSplitDFunTy ty
 isPred :: SourceType -> Bool
 isPred (ClassP _ _) = True
 isPred (IParam _ _) = True
-isPred (NType _ __) = False
+isPred (NType _ _)  = False
 
 isPredTy :: Type -> Bool
 isPredTy (NoteTy _ ty)  = isPredTy ty
@@ -435,7 +497,7 @@ tcSplitPredTy_maybe (SourceTy p) | isPred p = Just p
 tcSplitPredTy_maybe other	      	    = Nothing
 	
 predTyUnique :: PredType -> Unique
-predTyUnique (IParam n _)      = getUnique n
+predTyUnique (IParam n _)      = getUnique (ipNameName n)
 predTyUnique (ClassP clas tys) = getUnique clas
 
 predHasFDs :: PredType -> Bool
@@ -446,7 +508,7 @@ predHasFDs (ClassP cls _) = classHasFDs cls
 
 mkPredName :: Unique -> SrcLoc -> SourceType -> Name
 mkPredName uniq loc (ClassP cls tys) = mkLocalName uniq (mkDictOcc (getOccName cls)) loc
-mkPredName uniq loc (IParam name ty) = name
+mkPredName uniq loc (IParam ip ty)   = mkLocalName uniq (getOccName (ipNameName ip)) loc
 \end{code}
 
 
@@ -573,7 +635,7 @@ cmpTy env _ _ = LT
 
 \begin{code}
 cmpSourceTy :: TyVarEnv TyVar -> SourceType -> SourceType -> Ordering
-cmpSourceTy env (IParam n1 ty1)   (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmpTy env ty1 ty2)
+cmpSourceTy env (IParam n1 ty1) (IParam n2 ty2) = (n1 `compare` n2) `thenCmp` (cmpTy env ty1 ty2)
 	-- Compare types as well as names for implicit parameters
 	-- This comparison is used exclusively (I think) for the
 	-- finite map built in TcSimplify
@@ -602,17 +664,17 @@ instance Ord SourceType where { compare = tcCmpPred }
 %*									*
 %************************************************************************
 
-isQualifiedTy returns true of any qualified type.  It doesn't *necessarily* have 
+isSigmaTy returns true of any qualified type.  It doesn't *necessarily* have 
 any foralls.  E.g.
 	f :: (?x::Int) => Int -> Int
 
 \begin{code}
-isQualifiedTy :: Type -> Bool
-isQualifiedTy (ForAllTy tyvar ty) = True
-isQualifiedTy (FunTy a b)	  = isPredTy a
-isQualifiedTy (NoteTy n ty)	  = isQualifiedTy ty
-isQualifiedTy (UsageTy _ ty)	  = isQualifiedTy ty
-isQualifiedTy _			  = False
+isSigmaTy :: Type -> Bool
+isSigmaTy (ForAllTy tyvar ty) = True
+isSigmaTy (FunTy a b)	      = isPredTy a
+isSigmaTy (NoteTy n ty)	      = isSigmaTy ty
+isSigmaTy (UsageTy _ ty)      = isSigmaTy ty
+isSigmaTy _		      = False
 
 isOverloadedTy :: Type -> Bool
 isOverloadedTy (ForAllTy tyvar ty) = isOverloadedTy ty
@@ -677,9 +739,9 @@ deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
 deNoteType (UsageTy u ty)	= UsageTy u (deNoteType ty)
 
 deNoteSourceType :: SourceType -> SourceType
-deNoteSourceType (ClassP c tys) = ClassP c (map deNoteType tys)
-deNoteSourceType (IParam n ty)  = IParam n (deNoteType ty)
-deNoteSourceType (NType tc tys) = NType tc (map deNoteType tys)
+deNoteSourceType (ClassP c tys)   = ClassP c (map deNoteType tys)
+deNoteSourceType (IParam n ty)    = IParam n (deNoteType ty)
+deNoteSourceType (NType tc tys)   = NType tc (map deNoteType tys)
 \end{code}
 
 Find the free names of a type, including the type constructors and classes it mentions

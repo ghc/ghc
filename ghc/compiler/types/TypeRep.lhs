@@ -5,9 +5,10 @@
 
 \begin{code}
 module TypeRep (
-	Type(..), TyNote(..), SourceType(..), 		-- Representation visible to friends
+	Type(..), TyNote(..), 		-- Representation visible 
+	SourceType(..), IPName(..),	-- to friends
 	
- 	Kind, TauType, PredType, ThetaType,		-- Synonyms
+ 	Kind, PredType, ThetaType,		-- Synonyms
 	TyVarSubst,
 
 	superKind, superBoxity,				-- KX and BX respectively
@@ -135,7 +136,6 @@ newtype application as a SourceType; instead as a TyConApp.
 \begin{code}
 type SuperKind = Type
 type Kind      = Type
-type TauType   = Type
 
 type TyVarSubst = TyVarEnv Type
 
@@ -207,11 +207,19 @@ Here the "Eq a" and "?x :: Int -> Int" and "r\l" are all called *predicates*
 Predicates are represented inside GHC by PredType:
 
 \begin{code}
-data SourceType  = ClassP Class [Type]		-- Class predicate
-	         | IParam Name  Type		-- Implicit parameter
-		 | NType TyCon [Type]		-- A *saturated*, *non-recursive* newtype application
-						-- [See notes at top about newtypes]
+data SourceType 
+  = ClassP Class [Type]		-- Class predicate
+  | IParam (IPName Name) Type	-- Implicit parameter
+  | NType TyCon [Type]		-- A *saturated*, *non-recursive* newtype application
+				-- [See notes at top about newtypes]
 
+data IPName name
+  = Dupable   name	-- ?x: you can freely duplicate this implicit parameter
+  | MustSplit name	-- %x: you must use the splitting function to duplicate it
+  deriving( Eq, Ord )	-- Ord is used in the IP name cache finite map
+			--	(used in HscTypes.OrigIParamCache)
+	-- I sometimes thisnk this type should be in BasicTypes
+		
 type PredType  = SourceType	-- A subtype for predicates
 type ThetaType = [PredType]
 \end{code}
@@ -269,8 +277,8 @@ in two situations:
     type variable, one that may very well later be unified with a type.
     For example, suppose f::a, and we see an application (f x).  Then a
     must be a function type, so we unify a with (b->c).  But what kind
-    are b and c?  They can be lifted or unlifted types, so we give them 
-    kind '?'.
+    are b and c?  They can be lifted or unlifted types, or indeed type schemes,
+    so we give them kind '?'.
 
     When the type checker generalises over a bunch of type variables, it
     makes any that still have kind '?' into kind '*'.  So kind '?' is never

@@ -25,6 +25,7 @@ import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
 			  Deprecations(..), lookupDeprec,
 			  extendLocalRdrEnv
 			)
+import Type		( mapIPName )
 import RnMonad
 import Name		( Name, 
 			  getSrcLoc, nameIsLocalOrFrom,
@@ -161,21 +162,24 @@ newGlobalName mod_name occ
 		     name       = mkGlobalName uniq mod occ noSrcLoc
 		     new_cache  = addToFM cache key name
 
-newIPName rdr_name
+newIPName rdr_name_ip
   = getNameSupplyRn		`thenRn` \ name_supply ->
     let
 	ipcache = nsIPs name_supply
     in
     case lookupFM ipcache key of
-	Just name -> returnRn name
-	Nothing   -> setNameSupplyRn (name_supply {nsUniqs = us', nsIPs = new_ipcache})	`thenRn_`
-		     returnRn name
+	Just name_ip -> returnRn name_ip
+	Nothing      -> setNameSupplyRn new_ns 	`thenRn_`
+		        returnRn name_ip
 		  where
 		     (us', us1)  = splitUniqSupply (nsUniqs name_supply)
 		     uniq   	 = uniqFromSupply us1
-		     name        = mkIPName uniq key
-		     new_ipcache = addToFM ipcache key name
-    where key = (rdrNameOcc rdr_name)
+		     name_ip	 = mapIPName mk_name rdr_name_ip
+		     mk_name rdr_name = mkIPName uniq (rdrNameOcc rdr_name)
+		     new_ipcache = addToFM ipcache key name_ip
+		     new_ns	 = name_supply {nsUniqs = us', nsIPs = new_ipcache}
+    where 
+	key = rdr_name_ip	-- Ensures that ?x and %x get distinct Names
 \end{code}
 
 %*********************************************************

@@ -52,7 +52,8 @@ module HscTypes (
 
 #include "HsVersions.h"
 
-import RdrName		( RdrNameEnv, addListToRdrEnv, emptyRdrEnv, mkRdrUnqual, rdrEnvToList )
+import RdrName		( RdrName, RdrNameEnv, addListToRdrEnv, emptyRdrEnv, 
+			  mkRdrUnqual, rdrEnvToList )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameSrcLoc )
 import NameEnv
 import OccName		( OccName )
@@ -63,6 +64,7 @@ import InstEnv		( InstEnv, ClsInstEnv, DFunId )
 import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import Id		( Id )
+import Type		( IPName )
 import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataConsIfAvailable )
 import DataCon		( dataConId, dataConWrapId )
@@ -585,7 +587,7 @@ data NameSupply
    }
 
 type OrigNameCache   = FiniteMap (ModuleName,OccName) Name
-type OrigIParamCache = FiniteMap OccName Name
+type OrigIParamCache = FiniteMap (IPName RdrName) (IPName Name)
 \end{code}
 
 @ImportedModuleInfo@ contains info ONLY about modules that have not yet 

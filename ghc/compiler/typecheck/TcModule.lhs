@@ -15,7 +15,7 @@ module TcModule (
 import CmdLineOpts	( DynFlag(..), DynFlags, dopt )
 import HsSyn		( HsBinds(..), MonoBinds(..), HsDecl(..), HsExpr(..),
 			  Stmt(..), InPat(..), HsMatchContext(..), HsDoContext(..), RuleDecl(..),
-			  isIfaceRuleDecl, nullBinds, andMonoBindList, mkSimpleMatch, placeHolderType
+			  isIfaceRuleDecl, nullBinds, mkSimpleMatch, placeHolderType
 			)
 import PrelNames	( mAIN_Name, mainName, ioTyConName, printName,
 			  returnIOName, bindIOName, failIOName, 
@@ -33,7 +33,7 @@ import TcHsSyn		( TypecheckedMonoBinds, TypecheckedHsExpr,
 import MkIface		( pprModDetails )
 import TcExpr 		( tcMonoExpr )
 import TcMonad
-import TcMType		( unifyTauTy, newTyVarTy, zonkTcType, tcInstType )
+import TcMType		( newTyVarTy, zonkTcType, tcInstType )
 import TcType		( Type, liftedTypeKind, openTypeKind,
 			  tyVarsOfType, tidyType, tcFunResultTy,
 			  mkForAllTys, mkFunTys, mkTyConApp, tcSplitForAllTys
@@ -52,9 +52,10 @@ import TcRules		( tcIfaceRules, tcSourceRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcIfaceSig	( tcInterfaceSigs )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
+import TcUnify		( unifyTauTy )
 import TcSimplify	( tcSimplifyTop, tcSimplifyInfer )
 import TcTyClsDecls	( tcTyAndClassDecls )
-import CoreUnfold	( unfoldingTemplate, hasUnfolding )
+import CoreUnfold	( unfoldingTemplate )
 import TysWiredIn	( mkListTy, unitTy )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, 
 			  dumpIfSet_dyn, dumpIfSet_dyn_or, showPass )
@@ -71,7 +72,6 @@ import HscTypes		( PersistentCompilerState(..), HomeSymbolTable,
 			  PackageTypeEnv, ModIface(..),
 			  ModDetails(..), DFunId,
 			  TypeEnv, extendTypeEnvList, typeEnvTyCons, typeEnvElts,
-		          TyThing(..), 
 			  mkTypeEnv
 			)
 \end{code}

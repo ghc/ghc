@@ -25,7 +25,7 @@ module DataCon (
 import {-# SOURCE #-} Subst( substTyWith )
 import {-# SOURCE #-} PprType( pprType )
 
-import Type		( Type, TauType, ThetaType, 
+import Type		( Type, ThetaType, 
 			  mkForAllTys, mkFunTys, mkTyConApp,
 			  mkTyVarTys, splitTyConApp_maybe, repType, 
 			  mkPredTys, isStrictType
@@ -208,7 +208,7 @@ mkDataCon :: Name
 	  -> [StrictnessMark] -> [FieldLabel]
 	  -> [TyVar] -> ThetaType
 	  -> [TyVar] -> ThetaType
-	  -> [TauType] -> TyCon
+	  -> [Type] -> TyCon
 	  -> Id -> Id
 	  -> DataCon
   -- Can get the tag from the TyCon
@@ -303,7 +303,7 @@ dataConRepStrictness dc = dcRepStrictness dc
 
 dataConSig :: DataCon -> ([TyVar], ThetaType,
 			  [TyVar], ThetaType,
-			  [TauType], TyCon)
+			  [Type], TyCon)
 
 dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,
 		     dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
@@ -345,7 +345,7 @@ after any flattening has been done.
 dataConOrigArgTys :: DataCon -> [Type]
 dataConOrigArgTys dc = dcOrigArgTys dc
 
-dataConRepArgTys :: DataCon -> [TauType]
+dataConRepArgTys :: DataCon -> [Type]
 dataConRepArgTys dc = dcRepArgTys dc
 \end{code}
 

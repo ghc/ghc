@@ -4,36 +4,39 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat, tcMonoPatBndr, simpleHsLitTy, badFieldCon, polyPatSig ) where
+module TcPat ( tcPat, tcMonoPatBndr, tcSubPat,
+	       badFieldCon, polyPatSig
+  ) where
 
 #include "HsVersions.h"
 
 import HsSyn		( InPat(..), OutPat(..), HsLit(..), HsOverLit(..), HsExpr(..) )
 import RnHsSyn		( RenamedPat )
-import TcHsSyn		( TcPat, TcId )
+import TcHsSyn		( TcPat, TcId, simpleHsLitTy )
 
 import TcMonad
 import Inst		( InstOrigin(..),
-			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId,
+			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId, isEmptyLIE,
 			  newMethod, newOverloadedLit, newDicts
 			)
-import Id		( mkLocalId )
+import Id		( mkLocalId, mkSysLocal )
 import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupId )
-import TcMType 		( tcInstTyVars, newTyVarTy, unifyTauTy, unifyListTy, unifyTupleTy )
-import TcType		( TcType, TcTyVar, isTauTy, mkTyConApp, mkClassPred, liftedTypeKind )
+import TcMType 		( tcInstTyVars, newTyVarTy, getTcTyVar, putTcTyVar )
+import TcType		( TcType, TcTyVar, TcSigmaType,
+			  mkTyConApp, mkClassPred, liftedTypeKind, tcGetTyVar_maybe,
+			  isHoleTyVar, openTypeKind )
+import TcUnify		( tcSub, unifyTauTy, unifyListTy, unifyTupleTy, 
+			  mkCoercion, idCoercion, isIdCoercion, (<$>), PatCoFn )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
+import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
 import DataCon		( dataConSig, dataConFieldLabels, 
 			  dataConSourceArity
 			)
 import Subst		( substTy, substTheta )
-import TysPrim		( charPrimTy, intPrimTy, floatPrimTy,
-			  doublePrimTy, addrPrimTy
-			)
-import TysWiredIn	( charTy, stringTy, intTy, integerTy )
 import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
@@ -48,10 +51,41 @@ import Outputable
 %************************************************************************
 
 \begin{code}
--- This is the right function to pass to tcPat when 
--- we're looking at a lambda-bound pattern, 
--- so there's no polymorphic guy to worry about
-tcMonoPatBndr binder_name pat_ty = returnTc (mkLocalId binder_name pat_ty)
+type BinderChecker = Name -> TcSigmaType -> TcM (PatCoFn, LIE, TcId)
+			-- How to construct a suitable (monomorphic)
+			-- Id for variables found in the pattern
+			-- The TcSigmaType is the expected type 
+			-- from the pattern context
+
+-- The Id may have a sigma type (e.g. f (x::forall a. a->a))
+-- so we want to *create* it during pattern type checking.
+-- We don't want to make Ids first with a type-variable type
+-- and then unify... becuase we can't unify a sigma type with a type variable.
+
+tcMonoPatBndr :: BinderChecker
+  -- This is the right function to pass to tcPat when 
+  -- we're looking at a lambda-bound pattern, 
+  -- so there's no polymorphic guy to worry about
+
+tcMonoPatBndr binder_name pat_ty 
+  | Just tv <- tcGetTyVar_maybe pat_ty,
+    isHoleTyVar tv
+	-- If there are *no constraints* on the pattern type, we
+	-- revert to good old H-M typechecking, making
+	-- the type of the binder into an *ordinary* 
+	-- type variable.  We find out if there are no constraints
+	-- by seeing if we are given an "open hole" as our info.
+	-- What we are trying to avoid here is giving a binder
+	-- a type that is a 'hole'.  The only place holes should
+	-- appear is as an argument to tcPat and tcExpr/tcMonoExpr.
+  = getTcTyVar tv	`thenNF_Tc` \ maybe_ty ->
+    case maybe_ty of
+	Just ty -> tcMonoPatBndr binder_name ty
+	Nothing -> newTyVarTy openTypeKind	`thenNF_Tc` \ ty ->
+		   putTcTyVar tv ty		`thenNF_Tc_`
+		   returnTc (idCoercion, emptyLIE, mkLocalId binder_name ty)
+  | otherwise
+  = returnTc (idCoercion, emptyLIE, mkLocalId binder_name pat_ty)
 \end{code}
 
 
@@ -62,16 +96,12 @@ tcMonoPatBndr binder_name pat_ty = returnTc (mkLocalId binder_name pat_ty)
 %************************************************************************
 
 \begin{code}
-tcPat :: (Name -> TcType -> TcM TcId)	-- How to construct a suitable (monomorphic)
-					-- Id for variables found in the pattern
-			         	-- The TcType is the expected type, see note below
+tcPat :: BinderChecker
       -> RenamedPat
 
-      -> TcType		-- Expected type derived from the context
+      -> TcSigmaType	-- Expected type derived from the context
 			--	In the case of a function with a rank-2 signature,
 			--	this type might be a forall type.
-			--	INVARIANT: if it is, the foralls will always be visible,
-			--	not hidden inside a mutable type variable
 
       -> TcM (TcPat, 
 		LIE,			-- Required by n+k and literal pats
@@ -99,18 +129,18 @@ tcPat tc_bndr pat@(TypePatIn ty) pat_ty
   = failWithTc (badTypePat pat)
 
 tcPat tc_bndr (VarPatIn name) pat_ty
-  = tc_bndr name pat_ty		`thenTc` \ bndr_id ->
-    returnTc (VarPat bndr_id, emptyLIE, emptyBag, unitBag (name, bndr_id), emptyLIE)
+  = tc_bndr name pat_ty				`thenTc` \ (co_fn, lie_req, bndr_id) ->
+    returnTc (co_fn <$> VarPat bndr_id, lie_req,
+	      emptyBag, unitBag (name, bndr_id), emptyLIE)
 
 tcPat tc_bndr (LazyPatIn pat) pat_ty
   = tcPat tc_bndr pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
     returnTc (LazyPat pat', lie_req, tvs, ids, lie_avail)
 
 tcPat tc_bndr pat_in@(AsPatIn name pat) pat_ty
-  = tc_bndr name pat_ty			`thenTc` \ bndr_id ->
-    tcPat tc_bndr pat pat_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
-    tcAddErrCtxt (patCtxt pat_in) 	$
-    returnTc (AsPat bndr_id pat', lie_req, 
+  = tc_bndr name pat_ty			`thenTc` \ (co_fn, lie_req1, bndr_id) ->
+    tcPat tc_bndr pat pat_ty		`thenTc` \ (pat', lie_req2, tvs, ids, lie_avail) ->
+    returnTc (co_fn <$> (AsPat bndr_id pat'), lie_req1 `plusLIE` lie_req1, 
 	      tvs, (name, bndr_id) `consBag` ids, lie_avail)
 
 tcPat tc_bndr WildPatIn pat_ty
@@ -120,15 +150,12 @@ tcPat tc_bndr (ParPatIn parend_pat) pat_ty
   = tcPat tc_bndr parend_pat pat_ty
 
 tcPat tc_bndr (SigPatIn pat sig) pat_ty
-  = tcHsSigType PatSigCtxt sig				`thenTc` \ sig_ty ->
-
-	-- Check that the signature isn't a polymorphic one, which
-	-- we don't permit (at present, anyway)
-    checkTc (isTauTy sig_ty) (polyPatSig sig_ty)	`thenTc_`
-
-    unifyTauTy pat_ty sig_ty	`thenTc_`
-    tcPat tc_bndr pat sig_ty
+  = tcHsSigType PatSigCtxt sig		`thenTc` \ sig_ty ->
+    tcSubPat sig_ty pat_ty		`thenTc` \ (co_fn, lie_sig) ->
+    tcPat tc_bndr pat sig_ty		`thenTc` \ (pat', lie_req, tvs, ids, lie_avail) ->
+    returnTc (co_fn <$> pat', lie_req `plusLIE` lie_sig, tvs, ids, lie_avail)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -166,6 +193,7 @@ tcPat tc_bndr pat_in@(TuplePatIn pats boxity) pat_ty
   where
     arity = length pats
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -296,18 +324,18 @@ tcPat tc_bndr pat@(NPatIn over_lit) pat_ty
 
 \begin{code}
 tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
-  = tc_bndr name pat_ty				`thenTc` \ bndr_id ->
+  = tc_bndr name pat_ty				`thenTc` \ (co_fn, lie1, bndr_id) ->
 	-- The '-' part is re-mappable syntax
     tcLookupId minus_name			`thenNF_Tc` \ minus_sel_id ->
     tcLookupGlobalId geName			`thenNF_Tc` \ ge_sel_id ->
-    newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie1) ->
+    newOverloadedLit origin lit pat_ty		`thenNF_Tc` \ (over_lit_expr, lie2) ->
     newMethod origin ge_sel_id    [pat_ty]	`thenNF_Tc` \ ge ->
     newMethod origin minus_sel_id [pat_ty]	`thenNF_Tc` \ minus ->
 
     returnTc (NPlusKPat bndr_id i pat_ty
 			(SectionR (HsVar (instToId ge)) over_lit_expr)
 			(SectionR (HsVar (instToId minus)) over_lit_expr),
-	      lie1 `plusLIE` mkLIE [ge,minus],
+	      lie1 `plusLIE` lie2 `plusLIE` mkLIE [ge,minus],
 	      emptyBag, unitBag (name, bndr_id), emptyLIE)
   where
     origin = PatOrigin pat
@@ -322,7 +350,7 @@ tcPat tc_bndr pat@(NPlusKPatIn name lit@(HsIntegral i _) minus_name) pat_ty
 Helper functions
 
 \begin{code}
-tcPats :: (Name -> TcType -> TcM TcId)	-- How to deal with variables
+tcPats :: BinderChecker				-- How to deal with variables
        -> [RenamedPat] -> [TcType]		-- Excess 'expected types' discarded
        -> TcM ([TcPat], 
 		 LIE,				-- Required by n+k and literal pats
@@ -340,21 +368,6 @@ tcPats tc_bndr (ty:tys) (pat:pats)
 	      tvs1 `unionBags` tvs2, ids1 `unionBags` ids2, 
 	      lie_avail1 `plusLIE` lie_avail2)
 \end{code}
-
-------------------------------------------------------
-\begin{code}
-simpleHsLitTy :: HsLit -> TcType
-simpleHsLitTy (HsCharPrim c)   = charPrimTy
-simpleHsLitTy (HsStringPrim s) = addrPrimTy
-simpleHsLitTy (HsInt i)	       = intTy
-simpleHsLitTy (HsInteger i)    = integerTy
-simpleHsLitTy (HsIntPrim i)    = intPrimTy
-simpleHsLitTy (HsFloatPrim f)  = floatPrimTy
-simpleHsLitTy (HsDoublePrim d) = doublePrimTy
-simpleHsLitTy (HsChar c)       = charTy
-simpleHsLitTy (HsString str)   = stringTy
-\end{code}
-
 
 ------------------------------------------------------
 \begin{code}
@@ -410,6 +423,48 @@ tcConPat tc_bndr pat con_name arg_pats pat_ty
 	      listToBag ex_tvs' `unionBags` tvs,
 	      ids,
 	      lie_avail1 `plusLIE` lie_avail2)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Subsumption}
+%*									*
+%************************************************************************
+
+Example:  
+	f :: (forall a. a->a) -> Int -> Int
+	f (g::Int->Int) y = g y
+This is ok: the type signature allows fewer callers than
+the (more general) signature f :: (Int->Int) -> Int -> Int
+I.e.    (forall a. a->a) <= Int -> Int
+We end up translating this to:
+	f = \g' :: (forall a. a->a).  let g = g' Int in g' y
+
+tcSubPat does the work
+ 	sig_ty is the signature on the pattern itself 
+		(Int->Int in the example)
+	expected_ty is the type passed inwards from the context
+		(forall a. a->a in the example)
+
+\begin{code}
+tcSubPat :: TcSigmaType -> TcSigmaType -> TcM (PatCoFn, LIE)
+
+tcSubPat sig_ty exp_ty
+ = tcSub exp_ty sig_ty			`thenTc` \ (co_fn, lie) ->
+	-- co_fn is a coercion on *expressions*, and we
+	-- need to make a coercion on *patterns*
+   if isIdCoercion co_fn then
+	ASSERT( isEmptyLIE lie )
+	returnNF_Tc (idCoercion, emptyLIE)
+   else
+   tcGetUnique				`thenNF_Tc` \ uniq ->
+   let
+	arg_id  = mkSysLocal SLIT("sub") uniq exp_ty
+	the_fn  = DictLam [arg_id] (co_fn <$> HsVar arg_id)
+	pat_co_fn p = SigPat p exp_ty the_fn
+   in
+   returnNF_Tc (mkCoercion pat_co_fn, lie)
 \end{code}
 
 

@@ -45,6 +45,7 @@ import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
 import DataCon		( isExistentialDataCon )
 import Literal		( Literal(..) )
+import Type		( ipNameName )
 import TyCon		( tyConDataCons )
 import TysWiredIn	( tupleCon, listTyCon, charDataCon, intDataCon )
 import BasicTypes	( RecFlag(..), Boxity(..) )
@@ -143,9 +144,9 @@ dsLet (MonoBind binds sigs is_rec) body
 \begin{code}
 dsExpr :: TypecheckedHsExpr -> DsM CoreExpr
 
-dsExpr (HsVar var)	 = returnDs (Var var)
-dsExpr (HsIPVar var)     = returnDs (Var var)
-dsExpr (HsLit lit)       = dsLit lit
+dsExpr (HsVar var)  = returnDs (Var var)
+dsExpr (HsIPVar ip) = returnDs (Var (ipNameName ip))
+dsExpr (HsLit lit)  = dsLit lit
 -- HsOverLit has been gotten rid of by the type checker
 
 dsExpr expr@(HsLam a_Match)
@@ -258,7 +259,7 @@ dsExpr (HsWith expr binds)
     where
       dsIPBind body (n, e)
         = dsExpr e	`thenDs` \ e' ->
-	  returnDs (Let (NonRec n e') body)
+	  returnDs (Let (NonRec (ipNameName n) e') body)
 
 dsExpr (HsDoOut do_or_lc stmts return_id then_id fail_id result_ty src_loc)
   | maybeToBool maybe_list_comp

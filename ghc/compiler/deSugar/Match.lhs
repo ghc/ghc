@@ -8,6 +8,7 @@ module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) w
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} DsExpr( dsExpr )
 import CmdLineOpts	( DynFlag(..), dopt )
 import HsSyn		
 import TcHsSyn		( TypecheckedPat, TypecheckedMatch, TypecheckedMatchContext, outPatType )
@@ -238,20 +239,12 @@ And gluing the ``success expressions'' together isn't quite so pretty.
 
 \begin{code}
 match [] eqns_info
-  = complete_matches eqns_info
+  = returnDs (foldr1 combineMatchResults match_results)
   where
-    complete_matches [eqn] 
-	= complete_match eqn
- 
-    complete_matches (eqn:eqns)
-	= complete_match eqn		`thenDs` \ match_result1 ->
-	  complete_matches eqns 	`thenDs` \ match_result2 ->
-	  returnDs (combineMatchResults match_result1 match_result2)
-
-    complete_match (EqnInfo _ _ pats match_result)
-	= ASSERT( null pats )
-	  returnDs match_result
+    match_results = [ ASSERT( null pats) mr
+		    | EqnInfo _ _ pats mr <- eqns_info ]
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -381,6 +374,16 @@ tidy1 v (AsPat var pat) match_result
   where
     match_result' | v == var  = match_result
 		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
+
+tidy1 v (SigPat pat ty fn) match_result
+  = selectMatchVar pat		`thenDs` \ v' ->
+    tidy1 v' pat match_result	`thenDs` \ (WildPat _, match_result') ->
+	-- The ice is a little thin here
+	-- We only expect a SigPat (with a non-trivial coercion) wrapping
+	-- a variable pattern. If it was a constructor or literal pattern
+	-- there would be no interesting polymorphism, and hence no coercion.
+    dsExpr (HsApp fn (HsVar v))	`thenDs` \ e ->
+    returnDs (WildPat ty, adjustMatchResult (bindNonRec v' e) match_result')
 
 tidy1 v (WildPat ty) match_result
   = returnDs (WildPat ty, match_result)
@@ -573,7 +576,7 @@ matchUnmixedEqns all_vars@(var:vars) eqns_info
 
   where
     first_pat		= head column_1_pats
-    column_1_pats 	= [pat                       | EqnInfo _ _ (pat:_)  _            <- eqns_info]
+    column_1_pats 	= [pat		                   | EqnInfo _ _   (pat:_)  _            <- eqns_info]
     remaining_eqns_info = [EqnInfo n ctx pats match_result | EqnInfo n ctx (_:pats) match_result <- eqns_info]
 \end{code}
 

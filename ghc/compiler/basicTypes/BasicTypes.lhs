@@ -144,6 +144,7 @@ data NewOrData
   deriving( Eq )	-- Needed because Demand derives Eq
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection[Top-level/local]{Top-level/not-top level flag}

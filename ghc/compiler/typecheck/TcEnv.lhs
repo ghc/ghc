@@ -30,8 +30,7 @@ module TcEnv(
 	RecTcEnv, tcAddImportedIdInfo, tcLookupRecId, tcLookupRecId_maybe, 
 
 	-- New Ids
-	newLocalId, newSpecPragmaId,
-	newDFunName,
+	newLocalName, newDFunName,
 
 	-- Misc
 	isLocalThing, tcSetEnv
@@ -42,20 +41,19 @@ module TcEnv(
 import RnHsSyn		( RenamedMonoBinds, RenamedSig )
 import TcMonad
 import TcMType		( zonkTcTyVarsAndFV )
-import TcType		( Type, ThetaType, TcType, TcKind, TcTyVar, TcTyVarSet, 
+import TcType		( Type, ThetaType, TcKind, TcTyVar, TcTyVarSet, 
 			  tyVarsOfTypes, tcSplitDFunTy,
 			  getDFunTyKey, tcTyConAppTyCon
 			)
-import Id		( idName, mkSpecPragmaId, mkUserLocal, isDataConWrapId_maybe )
+import Id		( idName, isDataConWrapId_maybe )
 import IdInfo		( vanillaIdInfo )
 import Var		( TyVar, Id, idType, lazySetIdInfo, idInfo )
 import VarSet
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import Class		( Class, ClassOpItem )
-import Name		( Name, OccName, NamedThing(..), 
-			  nameOccName, getSrcLoc, mkLocalName, isLocalName,
-			  nameIsLocalOrFrom
+import Name		( Name, NamedThing(..), 
+			  getSrcLoc, mkLocalName, isLocalName, nameIsLocalOrFrom
 			)
 import NameEnv		( NameEnv, lookupNameEnv, nameEnvElts, elemNameEnv,
 			  extendNameEnvList, emptyNameEnv, plusNameEnv )
@@ -240,15 +238,10 @@ tcLookupRecId env name = case lookup_global env name of
 Constructing new Ids
 
 \begin{code}
-newLocalId :: OccName -> TcType -> SrcLoc -> NF_TcM TcId
-newLocalId name ty loc
+newLocalName :: Name -> NF_TcM Name
+newLocalName name	-- Make a clone
   = tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkUserLocal name uniq ty loc)
-
-newSpecPragmaId :: Name -> TcType -> NF_TcM TcId
-newSpecPragmaId name ty 
-  = tcGetUnique		`thenNF_Tc` \ uniq ->
-    returnNF_Tc (mkSpecPragmaId (nameOccName name) uniq ty (getSrcLoc name))
+    returnNF_Tc (mkLocalName uniq (getOccName name) (getSrcLoc name))
 \end{code}
 
 Make a name for the dict fun for an instance decl.

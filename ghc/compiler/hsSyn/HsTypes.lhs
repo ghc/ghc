@@ -30,7 +30,7 @@ module HsTypes (
 #include "HsVersions.h"
 
 import Class		( FunDep )
-import TcType		( Type, Kind, ThetaType, SourceType(..), 
+import TcType		( Type, Kind, ThetaType, SourceType(..), IPName,
 			  tcSplitSigmaTy, liftedTypeKind, eqKind, tcEqType
 			)
 import TypeRep		( Type(..), TyNote(..) )	-- toHsType sees the representation
@@ -80,7 +80,7 @@ This is the syntax for types as seen in type signatures.
 type HsContext name = [HsPred name]
 
 data HsPred name = HsClassP name [HsType name]
-		 | HsIParam name (HsType name)
+		 | HsIParam (IPName name) (HsType name)
 
 data HsType name
   = HsForAllTy	(Maybe [HsTyVarBndr name])	-- Nothing for implicitly quantified signatures
@@ -191,7 +191,7 @@ instance (Outputable name) => Outputable (HsTyVarBndr name) where
 
 instance Outputable name => Outputable (HsPred name) where
     ppr (HsClassP clas tys) = ppr clas <+> hsep (map pprParendHsType tys)
-    ppr (HsIParam n ty)    = hsep [char '?' <> ppr n, text "::", ppr ty]
+    ppr (HsIParam n ty)    = hsep [ppr n, dcolon, ppr ty]
 
 pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
 pprHsTyVarBndr name kind | kind `eqKind` liftedTypeKind = ppr name
@@ -353,7 +353,7 @@ toHsType (UsageTy u ty) = HsUsageTy (toHsType u) (toHsType ty)
 
 
 toHsPred (ClassP cls tys) = HsClassP (getName cls) (map toHsType tys)
-toHsPred (IParam n ty)	  = HsIParam (getName n)  (toHsType ty)
+toHsPred (IParam n ty)    = HsIParam n		   (toHsType ty)
 
 toHsContext :: ThetaType -> HsContext Name
 toHsContext theta = map toHsPred theta

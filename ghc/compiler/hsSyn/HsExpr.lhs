@@ -21,7 +21,7 @@ import Name		( Name )
 import ForeignCall	( Safety )
 import Outputable	
 import PprType		( pprParendType )
-import Type		( Type )
+import Type		( Type, IPName  )
 import Var		( TyVar )
 import DataCon		( DataCon )
 import CStrings		( CLabelString, pprCLabelString )
@@ -38,7 +38,7 @@ import SrcLoc		( SrcLoc )
 \begin{code}
 data HsExpr id pat
   = HsVar	id		-- variable
-  | HsIPVar	id		-- implicit parameter
+  | HsIPVar	(IPName id)	-- implicit parameter
   | HsOverLit	HsOverLit	-- Overloaded literals; eliminated by type checker
   | HsLit	HsLit		-- Simple (non-overloaded) literals
 
@@ -83,7 +83,7 @@ data HsExpr id pat
 		(HsExpr  id pat)
 
   | HsWith	(HsExpr id pat)	-- implicit parameter binding
-  		[(id, HsExpr id pat)]
+  		[(IPName id, HsExpr id pat)]
 
   | HsDo	HsDoContext
 		[Stmt id pat]	-- "do":one or more stmts
@@ -218,7 +218,7 @@ ppr_expr (HsVar v)
   | isOperator v = parens (ppr v)
   | otherwise    = ppr v
 
-ppr_expr (HsIPVar v)     = char '?' <> ppr v
+ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
 
@@ -413,10 +413,10 @@ pp_rbinds thing rbinds
 
 \begin{code}
 pp_ipbinds :: (Outputable id, Outputable pat)
-	   => [(id, HsExpr id pat)] -> SDoc
+	   => [(IPName id, HsExpr id pat)] -> SDoc
 pp_ipbinds pairs = hsep (punctuate semi (map pp_item pairs))
 		 where
-		   pp_item (id,rhs) = char '?' <> ppr id <+> equals <+> ppr_expr rhs
+		   pp_item (id,rhs) = ppr id <+> equals <+> ppr_expr rhs
 \end{code}
 
 

@@ -42,7 +42,8 @@ import TcEnv		( TcEnv, tcExtendGlobalValEnv,
 			)
 import InstEnv		( InstEnv, extendInstEnv )
 import PprType		( pprClassPred )
-import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType, checkSigTyVars )
+import TcMonoType	( tcHsTyVars, kcHsSigType, tcHsType, tcHsSigType )
+import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck )
 import HscTypes		( HomeSymbolTable, DFunId,
 			  ModDetails(..), PackageInstEnv, PersistentRenamerState
@@ -50,7 +51,7 @@ import HscTypes		( HomeSymbolTable, DFunId,
 
 import Subst		( substTy, substTheta )
 import DataCon		( classDataCon )
-import Class		( Class, DefMeth(..), classBigSig )
+import Class		( Class, classBigSig )
 import Var		( idName, idType )
 import VarSet		( emptyVarSet )
 import Id		( setIdLocalExported )

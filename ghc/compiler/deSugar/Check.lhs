@@ -564,8 +564,9 @@ simplify_pat :: TypecheckedPat -> TypecheckedPat
 simplify_pat pat@(WildPat gt) = pat
 simplify_pat (VarPat id)      = WildPat (idType id) 
 
-simplify_pat (LazyPat p)    = simplify_pat p
-simplify_pat (AsPat id p)   = simplify_pat p
+simplify_pat (LazyPat p)      = simplify_pat p
+simplify_pat (AsPat id p)     = simplify_pat p
+simplify_pat (SigPat p ty fn) = simplify_pat p	-- I'm not sure this is right
 
 simplify_pat (ConPat id ty tvs dicts ps) = ConPat id ty tvs dicts (map simplify_pat ps)
 
@@ -635,5 +636,4 @@ simplify_pat (DictPat dicts methods) =
     where
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)
-
 \end{code}

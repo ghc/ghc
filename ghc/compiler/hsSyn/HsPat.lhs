@@ -9,8 +9,8 @@ module HsPat (
 	OutPat(..),
 
 	irrefutablePat, irrefutablePats,
-	failureFreePat, isWildPat,
-	patsAreAllCons, isConPat,
+	failureFreePat, isWildPat, 
+	patsAreAllCons, isConPat, 
 	patsAreAllLits,	isLitPat,
 	collectPatBinders, collectPatsBinders,
 	collectSigTysFromPat, collectSigTysFromPats
@@ -86,6 +86,12 @@ data OutPat id
   | LazyPat	    (OutPat id)	-- lazy pattern
   | AsPat	    id		-- as pattern
 		    (OutPat id)
+
+  | SigPat	    (OutPat id)	-- Pattern p
+		    Type	-- Type, t, of the whole pattern
+		    (HsExpr id (OutPat id))
+				-- Coercion function,
+				-- of type t -> typeof(p)
 
   | ListPat		 	-- Syntactic list
 		    Type	-- The type of the elements
@@ -186,6 +192,8 @@ pprOutPat (VarPat var)	= ppr var
 pprOutPat (LazyPat pat)	= hcat [char '~', ppr pat]
 pprOutPat (AsPat name pat)
   = parens (hcat [ppr name, char '@', ppr pat])
+
+pprOutPat (SigPat pat ty _)   = ppr pat <+> dcolon <+> ppr ty
 
 pprOutPat (ConPat name ty [] [] [])
   = ppr name

@@ -44,7 +44,7 @@ import {-# SOURCE #-} TcEnv  ( TcEnv )
 
 import HsLit		( HsOverLit )
 import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
-import TcType		( Type, Kind, TyVarDetails )
+import TcType		( Type, Kind, TyVarDetails, IPName )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
@@ -644,8 +644,8 @@ type InstLoc = (InstOrigin, SrcLoc, ErrCtxt)
 data InstOrigin
   = OccurrenceOf Id		-- Occurrence of an overloaded identifier
 
-  | IPOcc Name			-- Occurrence of an implicit parameter
-  | IPBind Name			-- Binding site of an implicit parameter
+  | IPOcc (IPName Name)		-- Occurrence of an implicit parameter
+  | IPBind (IPName Name)	-- Binding site of an implicit parameter
 
   | RecordUpdOrigin
 

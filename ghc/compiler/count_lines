@@ -8,7 +8,7 @@
 foreach $f ( @ARGV ) {
 
     if ( $f =~ /\.lhs$/ ) {
-	open(INF, "/home/simonpj/builds/slpj/ghc/utils/unlit/unlit $f - |") || die "Couldn't unlit $f!\n";
+	open(INF, "c:/fptools-HEAD/ghc/utils/unlit/unlit $f - |") || die "Couldn't unlit $f!\n";
     } else {
 	open(INF, "< $f") || die "Couldn't open $f!\n";
     }

@@ -17,6 +17,8 @@ module TcSimplify (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} TcUnify( unifyTauTy )
+
 import HsSyn		( MonoBinds(..), HsExpr(..), andMonoBinds, andMonoBindList )
 import TcHsSyn		( TcExpr, TcId,
 			  TcMonoBinds, TcDictBinds
@@ -38,8 +40,7 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			)
 import TcEnv		( tcGetGlobalTyVars, tcGetInstEnv )
 import InstEnv		( lookupInstEnv, classInstEnv, InstLookupResult(..) )
-
-import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, unifyTauTy )
+import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars )
 import TcType		( TcTyVar, TcTyVarSet, ThetaType, PredType, 
 			  mkClassPred, isOverloadedTy,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred,
@@ -1087,6 +1088,7 @@ bindsAndIrreds avails wanteds
 			    where
 				-- For implicit parameters, all occurrences share the same
 				-- Id, so there is no need for synonym bindings
+				-- ** BUT THIS TEST IS NEEDED FOR DICTS TOO ** (not sure why)
 			       new_binds | new_id == id = binds
 					 | otherwise	= addBind binds new_id (HsVar id)
 			       new_id   = instToId w

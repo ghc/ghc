@@ -6,8 +6,8 @@
 \begin{code}
 module Type (
         -- re-exports from TypeRep:
-	Type, PredType, TauType, ThetaType,
-	Kind, TyVarSubst,
+	Type, PredType, ThetaType,
+	Kind, TyVarSubst, IPName,
 
 	superKind, superBoxity,				-- KX and BX respectively
 	liftedBoxity, unliftedBoxity, 			-- :: BX
@@ -50,6 +50,7 @@ module Type (
 
 	-- Source types
 	SourceType(..), sourceTypeRep, mkPredTy, mkPredTys,
+	ipNameName, mapIPName,
 
 	-- Newtypes
 	splitNewType_maybe,
@@ -630,7 +631,7 @@ mkPredTys preds = map SourceTy preds
 sourceTypeRep :: SourceType -> Type
 -- Convert a predicate to its "representation type";
 -- the type of evidence for that predicate, which is actually passed at runtime
-sourceTypeRep (IParam n ty)     = ty
+sourceTypeRep (IParam _ ty)     = ty
 sourceTypeRep (ClassP clas tys) = mkTyConApp (classTyCon clas) tys
 	-- Note the mkTyConApp; the classTyCon might be a newtype!
 sourceTypeRep (NType  tc tys)   = newTypeRep tc tys
@@ -659,6 +660,16 @@ splitNewType_maybe ty
 -- A local helper function (not exported)
 newTypeRep new_tycon tys = case newTyConRep new_tycon of
 			     (tvs, rep_ty) -> substTyWith tvs tys rep_ty
+\end{code}
+
+\begin{code}
+ipNameName :: IPName name -> name
+ipNameName (Dupable n)   = n
+ipNameName (MustSplit n) = n
+
+mapIPName :: (a->b) -> IPName a -> IPName b
+mapIPName f (Dupable n)   = Dupable (f n)
+mapIPName f (MustSplit n) = MustSplit (f n)
 \end{code}
 
 
@@ -721,9 +732,9 @@ tyVarsOfPred :: PredType -> TyVarSet
 tyVarsOfPred = tyVarsOfSourceType	-- Just a subtype
 
 tyVarsOfSourceType :: SourceType -> TyVarSet
-tyVarsOfSourceType (IParam n ty)     = tyVarsOfType ty
-tyVarsOfSourceType (ClassP clas tys) = tyVarsOfTypes tys
-tyVarsOfSourceType (NType tc tys)    = tyVarsOfTypes tys
+tyVarsOfSourceType (IParam _ ty)  = tyVarsOfType ty
+tyVarsOfSourceType (ClassP _ tys) = tyVarsOfTypes tys
+tyVarsOfSourceType (NType _ tys)  = tyVarsOfTypes tys
 
 tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = foldr (unionVarSet . tyVarsOfSourceType) emptyVarSet

@@ -25,10 +25,10 @@ import HsSyn		( HsDecl(..), ForeignDecl(..), HsExpr(..),
 import RnHsSyn		( RenamedHsDecl, RenamedForeignDecl )
 
 import TcMonad
-import TcEnv		( newLocalId )
+import TcEnv		( newLocalName )
 import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 import TcHsSyn		( TcMonoBinds, TypecheckedForeignDecl, TcForeignExportDecl )
-import TcExpr		( tcPolyExpr )			
+import TcExpr		( tcExpr )			
 import Inst		( emptyLIE, LIE, plusLIE )
 
 import ErrUtils		( Message )
@@ -199,7 +199,7 @@ tcFExport fo@(ForeignExport nm hs_ty spec src_loc) =
    tcAddErrCtxt (foreignDeclCtxt fo)	$
 
    tcHsSigType (ForSigCtxt nm) hs_ty	`thenTc` \ sig_ty ->
-   tcPolyExpr (HsVar nm) sig_ty		`thenTc` \ (rhs, lie, _, _, _) ->
+   tcExpr (HsVar nm) sig_ty		`thenTc` \ (rhs, lie) ->
 
    tcCheckFEType sig_ty spec		`thenTc_`
 
@@ -207,9 +207,10 @@ tcFExport fo@(ForeignExport nm hs_ty spec src_loc) =
 	  -- than its declared/inferred type. Hence the need
 	  -- to create a local binding which will call the exported function
 	  -- at a particular type (and, maybe, overloading).
-   newLocalId (nameOccName nm) sig_ty src_loc	`thenNF_Tc` \ id ->
+   newLocalName nm			`thenNF_Tc` \ id_name ->
    let
-	bind  = VarMonoBind id rhs
+	id   = mkLocalId id_name sig_ty
+	bind = VarMonoBind id rhs
    in
    returnTc (lie, bind, ForeignExport id undefined spec src_loc)
 \end{code}

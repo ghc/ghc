@@ -136,10 +136,8 @@ where it can easily be found.
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdWithInfo name ty info = Var.mkLocalId name (addFreeTyVars ty) info
 
-mkSpecPragmaId :: OccName -> Unique -> Type -> SrcLoc -> Id
-mkSpecPragmaId occ uniq ty loc = Var.mkSpecPragmaId (mkLocalName uniq occ loc)
-						    (addFreeTyVars ty)
-						    vanillaIdInfo
+mkSpecPragmaId :: Name -> Type -> Id
+mkSpecPragmaId name ty = Var.mkSpecPragmaId name (addFreeTyVars ty) vanillaIdInfo
 
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId details name ty info = Var.mkGlobalId details name (addFreeTyVars ty) info

@@ -25,8 +25,9 @@ module TcHsSyn (
 
 	mkHsTyApp, mkHsDictApp, mkHsConApp,
 	mkHsTyLam, mkHsDictLam, mkHsLet,
+	simpleHsLitTy,
 
-	collectTypedPatBinders, outPatType,
+	collectTypedPatBinders, outPatType, 
 
 	-- re-exported from TcEnv
 	TcId, 
@@ -46,9 +47,15 @@ import DataCon	( dataConWrapId )
 import TcEnv	( tcLookupGlobal_maybe, tcExtendGlobalValEnv, TcEnv, TcId )
 
 import TcMonad
-import Type	  ( Type )
+import TypeRep    ( IPName(..) )	-- For zonking
+import Type	  ( Type, ipNameName )
+import TcType	  ( TcType )
 import TcMType	  ( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars )
-import TysWiredIn ( mkListTy, mkTupleTy, unitTy )
+import TysPrim	  ( charPrimTy, intPrimTy, floatPrimTy,
+		    doublePrimTy, addrPrimTy
+		  )
+import TysWiredIn ( charTy, stringTy, intTy, integerTy,
+		    mkListTy, mkTupleTy, unitTy )
 import CoreSyn    ( Expr )
 import Var	  ( isId )
 import BasicTypes ( RecFlag(..), Boxity(..) )
@@ -123,6 +130,21 @@ mkHsConApp data_con tys args = foldl HsApp (HsVar (dataConWrapId data_con) `mkHs
 \end{code}
 
 
+------------------------------------------------------
+\begin{code}
+simpleHsLitTy :: HsLit -> TcType
+simpleHsLitTy (HsCharPrim c)   = charPrimTy
+simpleHsLitTy (HsStringPrim s) = addrPrimTy
+simpleHsLitTy (HsInt i)	       = intTy
+simpleHsLitTy (HsInteger i)    = integerTy
+simpleHsLitTy (HsIntPrim i)    = intPrimTy
+simpleHsLitTy (HsFloatPrim f)  = floatPrimTy
+simpleHsLitTy (HsDoublePrim d) = doublePrimTy
+simpleHsLitTy (HsChar c)       = charTy
+simpleHsLitTy (HsString str)   = stringTy
+\end{code}
+
+
 %************************************************************************
 %*									*
 \subsection[mkFailurePair]{Code for pattern-matching and other failures}
@@ -142,6 +164,7 @@ outPatType (ConPat _ ty _ _ _)	= ty
 outPatType (ListPat ty _)	= mkListTy ty
 outPatType (TuplePat pats box)	= mkTupleTy box (length pats) (map outPatType pats)
 outPatType (RecPat _ ty _ _ _)  = ty
+outPatType (SigPat _ ty _)	= ty
 outPatType (LitPat lit ty)	= ty
 outPatType (NPat lit ty _)	= ty
 outPatType (NPlusKPat _ _ ty _ _) = ty
@@ -165,6 +188,7 @@ collectTypedPatBinders :: TypecheckedPat -> [Id]
 collectTypedPatBinders (VarPat var)	       = [var]
 collectTypedPatBinders (LazyPat pat)	       = collectTypedPatBinders pat
 collectTypedPatBinders (AsPat a pat)	       = a : collectTypedPatBinders pat
+collectTypedPatBinders (SigPat pat _ _)	       = collectTypedPatBinders pat
 collectTypedPatBinders (ConPat _ _ _ _ pats)   = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (ListPat t pats)        = concat (map collectTypedPatBinders pats)
 collectTypedPatBinders (TuplePat pats _)       = concat (map collectTypedPatBinders pats)
@@ -381,7 +405,7 @@ zonkExpr (HsVar id)
     returnNF_Tc (HsVar id')
 
 zonkExpr (HsIPVar id)
-  = zonkIdOcc id	`thenNF_Tc` \ id' ->
+  = mapIPNameTc zonkIdOcc id	`thenNF_Tc` \ id' ->
     returnNF_Tc (HsIPVar id')
 
 zonkExpr (HsLit (HsRat f ty))
@@ -444,15 +468,15 @@ zonkExpr (HsLet binds expr)
 
 zonkExpr (HsWith expr binds)
   = zonkIPBinds binds				`thenNF_Tc` \ new_binds ->
-    tcExtendGlobalValEnv (map fst new_binds)	$
+    tcExtendGlobalValEnv (map (ipNameName . fst) new_binds)	$
     zonkExpr expr				`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsWith new_expr new_binds)
     where
 	zonkIPBinds = mapNF_Tc zonkIPBind
-	zonkIPBind (n, e) =
-	    zonkIdBndr n	`thenNF_Tc` \ n' ->
-	    zonkExpr e		`thenNF_Tc` \ e' ->
-	    returnNF_Tc (n', e')
+	zonkIPBind (n, e)
+	    = mapIPNameTc zonkIdBndr n	`thenNF_Tc` \ n' ->
+	      zonkExpr e		`thenNF_Tc` \ e' ->
+	      returnNF_Tc (n', e')
 
 zonkExpr (HsDo _ _ _) = panic "zonkExpr:HsDo"
 
@@ -605,7 +629,13 @@ zonkRbinds rbinds
       = zonkExpr expr		`thenNF_Tc` \ new_expr ->
 	zonkIdOcc field		`thenNF_Tc` \ new_field ->
 	returnNF_Tc (new_field, new_expr, pun)
+
+-------------------------------------------------------------------------
+mapIPNameTc :: (a -> NF_TcM b) -> IPName a -> NF_TcM (IPName b)
+mapIPNameTc f (Dupable   n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (Dupable r)
+mapIPNameTc f (MustSplit n) = f n  `thenNF_Tc` \ r -> returnNF_Tc (MustSplit r)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -667,6 +697,12 @@ zonkPat (RecPat n ty tvs dicts rpats)
 zonkPat (LitPat lit ty)
   = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
     returnNF_Tc (LitPat lit new_ty, emptyBag)
+
+zonkPat (SigPat pat ty expr)
+  = zonkPat pat			`thenNF_Tc` \ (new_pat, ids) ->
+    zonkTcTypeToType ty		`thenNF_Tc` \ new_ty  ->
+    zonkExpr expr		`thenNF_Tc` \ new_expr ->
+    returnNF_Tc (SigPat new_pat new_ty new_expr, ids)
 
 zonkPat (NPat lit ty expr)
   = zonkTcTypeToType ty		`thenNF_Tc` \ new_ty   ->

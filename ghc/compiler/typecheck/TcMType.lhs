@@ -7,14 +7,15 @@ This module contains monadic operations over types that contain mutable type var
 
 \begin{code}
 module TcMType (
-  TcTyVar, TcKind, TcType, TcTauType, TcThetaType, TcRhoType, TcTyVarSet,
+  TcTyVar, TcKind, TcType, TcTauType, TcThetaType, TcTyVarSet,
 
   --------------------------------
   -- Creating new mutable type variables
-  newTyVar,
+  newTyVar, newHoleTyVarTy,
   newTyVarTy,		-- Kind -> NF_TcM TcType
   newTyVarTys,		-- Int -> Kind -> NF_TcM [TcType]
   newKindVar, newKindVars, newBoxityVar,
+  putTcTyVar, getTcTyVar,
 
   --------------------------------
   -- Instantiation
@@ -29,12 +30,6 @@ module TcMType (
   checkValidInstHead, instTypeErr,
 
   --------------------------------
-  -- Unification
-  unifyTauTy, unifyTauTyList, unifyTauTyLists, 
-  unifyFunTy, unifyListTy, unifyTupleTy,
-  unifyKind, unifyKinds, unifyOpenTypeKind,
-
-  --------------------------------
   -- Zonking
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkTcSigTyVars,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
@@ -47,23 +42,22 @@ module TcMType (
 
 -- friends:
 import TypeRep		( Type(..), SourceType(..), TyNote(..),	 -- Friend; can see representation
-			  Kind, TauType, ThetaType, 
-			  openKindCon, typeCon
+			  Kind, ThetaType
 			) 
-import TcType		( TcType, TcRhoType, TcThetaType, TcTauType, TcPredType,
+import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TyVarDetails(..),
 			  tcEqType, tcCmpPred,
 			  tcSplitRhoTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
-			  tcSplitTyConApp_maybe, tcSplitFunTy_maybe, tcSplitForAllTys,
+			  tcSplitTyConApp_maybe, tcSplitForAllTys,
 			  tcGetTyVar, tcIsTyVarTy, tcSplitSigmaTy, 
-			  isUnLiftedType, isIPPred, isUserTyVar, isSkolemTyVar,
+			  isUnLiftedType, isIPPred, 
 
-			  mkAppTy, mkTyVarTy, mkTyVarTys, mkFunTy, mkTyConApp,
+			  mkAppTy, mkTyVarTy, mkTyVarTys, 
 			  tyVarsOfPred, getClassPredTys_maybe,
 
-			  liftedTypeKind, unliftedTypeKind, openTypeKind, defaultKind, superKind,
-			  superBoxity, liftedBoxity, hasMoreBoxityInfo, typeKind,
-			  tyVarsOfType, tyVarsOfTypes, tidyOpenType, tidyOpenTypes, tidyOpenTyVar,
+			  liftedTypeKind, openTypeKind, defaultKind, superKind,
+			  superBoxity, liftedBoxity, typeKind,
+			  tyVarsOfType, tyVarsOfTypes, 
 			  eqKind, isTypeKind,
 
 			  isFFIArgumentTy, isFFIImportResultTy
@@ -71,23 +65,21 @@ import TcType		( TcType, TcRhoType, TcThetaType, TcTauType, TcPredType,
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( classArity, className )
 import TyCon		( TyCon, mkPrimTyCon, isSynTyCon, isUnboxedTupleTyCon, 
-			  isTupleTyCon, tyConArity, tupleTyConBoxity, tyConName )
+			  tyConArity, tyConName )
 import PrimRep		( PrimRep(VoidRep) )
-import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
-			  isMutTyVar, mutTyVarDetails )
+import Var		( TyVar, tyVarKind, tyVarName, isTyVar, mkTyVar, isMutTyVar )
 
 -- others:
 import TcMonad          -- TcType, amongst others
-import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy )
+import TysWiredIn	( voidTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )
 import PprType		( pprPred, pprSourceType, pprTheta, pprClassPred )
 import Name		( Name, NamedThing(..), setNameUnique, mkSysLocalName,
-			  mkLocalName, mkDerivedTyConOcc, isSystemName
+			  mkLocalName, mkDerivedTyConOcc
 			)
 import VarSet
-import BasicTypes	( Boxity, Arity, isBoxed )
 import CmdLineOpts	( dopt, DynFlag(..) )
 import Unique		( Uniquable(..) )
 import SrcLoc		( noSrcLoc )
@@ -113,6 +105,11 @@ newTyVarTy  :: Kind -> NF_TcM TcType
 newTyVarTy kind
   = newTyVar kind	`thenNF_Tc` \ tc_tyvar ->
     returnNF_Tc (TyVarTy tc_tyvar)
+
+newHoleTyVarTy :: NF_TcM TcType
+  = tcGetUnique 	`thenNF_Tc` \ uniq ->
+    tcNewMutTyVar (mkSysLocalName uniq SLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
+    returnNF_Tc (TyVarTy tv)
 
 newTyVarTys :: Int -> Kind -> NF_TcM [TcType]
 newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
@@ -352,11 +349,11 @@ zonkTcThetaType :: TcThetaType -> NF_TcM TcThetaType
 zonkTcThetaType theta = mapNF_Tc zonkTcPredType theta
 
 zonkTcPredType :: TcPredType -> NF_TcM TcPredType
-zonkTcPredType (ClassP c ts) =
-    zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
+zonkTcPredType (ClassP c ts)
+  = zonkTcTypes ts	`thenNF_Tc` \ new_ts ->
     returnNF_Tc (ClassP c new_ts)
-zonkTcPredType (IParam n t) =
-    zonkTcType t	`thenNF_Tc` \ new_t ->
+zonkTcPredType (IParam n t)
+  = zonkTcType t	`thenNF_Tc` \ new_t ->
     returnNF_Tc (IParam n new_t)
 \end{code}
 
@@ -494,8 +491,8 @@ zonkType unbound_var_fn ty
 			     returnNF_Tc (ClassP c tys')
     go_pred (NType tc tys) = mapNF_Tc go tys	`thenNF_Tc` \ tys' ->
 			     returnNF_Tc (NType tc tys')
-    go_pred (IParam n ty) = go ty		`thenNF_Tc` \ ty' ->
-			    returnNF_Tc (IParam n ty')
+    go_pred (IParam n ty)  = go ty		`thenNF_Tc` \ ty' ->
+			     returnNF_Tc (IParam n ty')
 
 zonkTyVar :: (TcTyVar -> NF_TcM Type)		-- What to do for an unbound mutable variable
 	  -> TcTyVar -> NF_TcM TcType
@@ -592,19 +589,19 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 checkValidType ctxt ty
   = doptsTc Opt_GlasgowExts	`thenNF_Tc` \ gla_exts ->
     let 
-	rank = case ctxt of
-		 GenPatCtxt		  -> 0
-		 PatSigCtxt		  -> 0
-		 ResSigCtxt		  -> 0
-		 ExprSigCtxt 	          -> 1
-		 FunSigCtxt _ | gla_exts  -> 2
-			      | otherwise -> 1
-		 ConArgCtxt _ | gla_exts  -> 2	-- We are given the type of the entire
-			      | otherwise -> 1	-- constructor; hence rank 1 is ok
-		 TySynCtxt _  | gla_exts  -> 1
-			      | otherwise -> 0
-		 ForSigCtxt _		  -> 1
-		 RuleSigCtxt _		  -> 1
+	rank | gla_exts = Arbitrary
+	     | otherwise
+	     = case ctxt of	-- Haskell 98
+		 GenPatCtxt	-> Rank 0
+		 PatSigCtxt	-> Rank 0
+		 ResSigCtxt	-> Rank 0
+		 TySynCtxt _    -> Rank 0
+		 ExprSigCtxt 	-> Rank 1
+		 FunSigCtxt _   -> Rank 1
+		 ConArgCtxt _   -> Rank 1	-- We are given the type of the entire
+						-- constructor, hence rank 1
+		 ForSigCtxt _	-> Rank 1
+		 RuleSigCtxt _	-> Rank 1
 
 	actual_kind = typeKind ty
 
@@ -645,17 +642,22 @@ ppr_ty ty | null forall_tvs && not (null theta) = pprTheta theta <+> ptext SLIT(
 
 
 \begin{code}
-type Rank = Int
+data Rank = Rank Int | Arbitrary
+
+decRank :: Rank -> Rank
+decRank Arbitrary = Arbitrary
+decRank (Rank n)  = Rank (n-1)
+
 check_poly_type :: Rank -> Type -> TcM ()
+check_poly_type (Rank 0) ty 
+  = check_tau_type (Rank 0) False ty
+
 check_poly_type rank ty 
-  | rank == 0 
-  = check_tau_type 0 False ty
-  | otherwise	-- rank > 0
   = let
 	(tvs, theta, tau) = tcSplitSigmaTy ty
     in
-    check_valid_theta SigmaCtxt theta	`thenTc_`
-    check_tau_type (rank-1) False tau	`thenTc_`
+    check_valid_theta SigmaCtxt theta		`thenTc_`
+    check_tau_type (decRank rank) False tau	`thenTc_`
     checkAmbiguity tvs theta tau
 
 ----------------------------------------
@@ -680,7 +682,7 @@ check_arg_type :: Type -> TcM ()
 -- Question: what about nested unboxed tuples?
 -- 	     Currently rejected.
 check_arg_type ty 
-  = check_tau_type 0 False ty	`thenTc_` 
+  = check_tau_type (Rank 0) False ty	`thenTc_` 
     checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty)
 
 ----------------------------------------
@@ -711,7 +713,7 @@ check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
     
   | isUnboxedTupleTyCon tc
   = checkTc ubx_tup_ok ubx_tup_msg	`thenTc_`
-    mapTc_ (check_tau_type 0 True) tys		-- Args are allowed to be unlifted, or
+    mapTc_ (check_tau_type (Rank 0) True) tys	-- Args are allowed to be unlifted, or
 						-- more unboxed tuples, so can't use check_arg_ty
 
   | otherwise
@@ -731,7 +733,7 @@ check_tau_type rank ubx_tup_ok ty@(TyConApp tc tys)
 
 ----------------------------------------
 check_note (FTVNote _)  = returnTc ()
-check_note (SynNote ty) = check_tau_type 0 False ty
+check_note (SynNote ty) = check_tau_type (Rank 0) False ty
 \end{code}
 
 Check for ambiguity
@@ -771,7 +773,7 @@ don't need to check for ambiguity either, because the test can't fail
 (see is_ambig).
 
 \begin{code}
-checkAmbiguity :: [TyVar] -> ThetaType -> TauType -> TcM ()
+checkAmbiguity :: [TyVar] -> ThetaType -> Type -> TcM ()
 checkAmbiguity forall_tyvars theta tau
   = mapTc_ check_pred theta	`thenTc_`
     returnTc ()
@@ -868,7 +870,7 @@ check_source_ty dflags ctxt pred@(ClassP cls tys)
 			InstThetaCtxt -> dopt Opt_AllowUndecidableInstances dflags
 			other	      -> dopt Opt_GlasgowExts               dflags
 
-check_source_ty dflags SigmaCtxt (IParam name ty) = check_arg_type ty
+check_source_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 	-- Implicit parameters only allows in type
 	-- signatures; not in instance decls, superclasses etc
 	-- The reason for not allowing implicit params in instances is a bit subtle
@@ -992,498 +994,3 @@ nonBoxedPrimCCallErr clas inst_ty
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection{Kind unification}
-%*									*
-%************************************************************************
-
-\begin{code}
-unifyKind :: TcKind		    -- Expected
-	  -> TcKind		    -- Actual
-	  -> TcM ()
-unifyKind k1 k2 
-  = tcAddErrCtxtM (unifyCtxt "kind" k1 k2) $
-    uTys k1 k1 k2 k2
-
-unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
-unifyKinds []       []       = returnTc ()
-unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenTc_`
-			       unifyKinds ks1 ks2
-unifyKinds _ _ = panic "unifyKinds: length mis-match"
-\end{code}
-
-\begin{code}
-unifyOpenTypeKind :: TcKind -> TcM ()	
--- Ensures that the argument kind is of the form (Type bx)
--- for some boxity bx
-
-unifyOpenTypeKind ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyOpenTypeKind ty'
-	other	 -> unify_open_kind_help ty
-
-unifyOpenTypeKind ty
-  | isTypeKind ty = returnTc ()
-  | otherwise     = unify_open_kind_help ty
-
-unify_open_kind_help ty	-- Revert to ordinary unification
-  = newBoxityVar 	`thenNF_Tc` \ boxity ->
-    unifyKind ty (mkTyConApp typeCon [boxity])
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Unify-exported]{Exported unification functions}
-%*									*
-%************************************************************************
-
-The exported functions are all defined as versions of some
-non-exported generic functions.
-
-Unify two @TauType@s.  Dead straightforward.
-
-\begin{code}
-unifyTauTy :: TcTauType -> TcTauType -> TcM ()
-unifyTauTy ty1 ty2 	-- ty1 expected, ty2 inferred
-  = tcAddErrCtxtM (unifyCtxt "type" ty1 ty2) $
-    uTys ty1 ty1 ty2 ty2
-\end{code}
-
-@unifyTauTyList@ unifies corresponding elements of two lists of
-@TauType@s.  It uses @uTys@ to do the real work.  The lists should be
-of equal length.  We charge down the list explicitly so that we can
-complain if their lengths differ.
-
-\begin{code}
-unifyTauTyLists :: [TcTauType] -> [TcTauType] ->  TcM ()
-unifyTauTyLists [] 	     []	        = returnTc ()
-unifyTauTyLists (ty1:tys1) (ty2:tys2) = uTys ty1 ty1 ty2 ty2   `thenTc_`
-					unifyTauTyLists tys1 tys2
-unifyTauTyLists ty1s ty2s = panic "Unify.unifyTauTyLists: mismatched type lists!"
-\end{code}
-
-@unifyTauTyList@ takes a single list of @TauType@s and unifies them
-all together.  It is used, for example, when typechecking explicit
-lists, when all the elts should be of the same type.
-
-\begin{code}
-unifyTauTyList :: [TcTauType] -> TcM ()
-unifyTauTyList []		 = returnTc ()
-unifyTauTyList [ty]		 = returnTc ()
-unifyTauTyList (ty1:tys@(ty2:_)) = unifyTauTy ty1 ty2	`thenTc_`
-				   unifyTauTyList tys
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection[Unify-uTys]{@uTys@: getting down to business}
-%*									*
-%************************************************************************
-
-@uTys@ is the heart of the unifier.  Each arg happens twice, because
-we want to report errors in terms of synomyms if poss.  The first of
-the pair is used in error messages only; it is always the same as the
-second, except that if the first is a synonym then the second may be a
-de-synonym'd version.  This way we get better error messages.
-
-We call the first one \tr{ps_ty1}, \tr{ps_ty2} for ``possible synomym''.
-
-\begin{code}
-uTys :: TcTauType -> TcTauType	-- Error reporting ty1 and real ty1
-				-- ty1 is the *expected* type
-
-     -> TcTauType -> TcTauType	-- Error reporting ty2 and real ty2
-				-- ty2 is the *actual* type
-     -> TcM ()
-
-	-- Always expand synonyms (see notes at end)
-        -- (this also throws away FTVs)
-uTys ps_ty1 (NoteTy n1 ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
-uTys ps_ty1 ty1 ps_ty2 (NoteTy n2 ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
-
-	-- Ignore usage annotations inside typechecker
-uTys ps_ty1 (UsageTy _ ty1) ps_ty2 ty2 = uTys ps_ty1 ty1 ps_ty2 ty2
-uTys ps_ty1 ty1 ps_ty2 (UsageTy _ ty2) = uTys ps_ty1 ty1 ps_ty2 ty2
-
-	-- Variables; go for uVar
-uTys ps_ty1 (TyVarTy tyvar1) ps_ty2 ty2 = uVar False tyvar1 ps_ty2 ty2
-uTys ps_ty1 ty1 ps_ty2 (TyVarTy tyvar2) = uVar True  tyvar2 ps_ty1 ty1
-					-- "True" means args swapped
-
-	-- Predicates
-uTys _ (SourceTy (IParam n1 t1)) _ (SourceTy (IParam n2 t2))
-  | n1 == n2 = uTys t1 t1 t2 t2
-uTys _ (SourceTy (ClassP c1 tys1)) _ (SourceTy (ClassP c2 tys2))
-  | c1 == c2 = unifyTauTyLists tys1 tys2
-uTys _ (SourceTy (NType tc1 tys1)) _ (SourceTy (NType tc2 tys2))
-  | tc1 == tc2 = unifyTauTyLists tys1 tys2
-
-	-- Functions; just check the two parts
-uTys _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
-  = uTys fun1 fun1 fun2 fun2	`thenTc_`    uTys arg1 arg1 arg2 arg2
-
-	-- Type constructors must match
-uTys ps_ty1 (TyConApp con1 tys1) ps_ty2 (TyConApp con2 tys2)
-  | con1 == con2 && equalLength tys1 tys2
-  = unifyTauTyLists tys1 tys2
-
-  | con1 == openKindCon
-	-- When we are doing kind checking, we might match a kind '?' 
-	-- against a kind '*' or '#'.  Notably, CCallable :: ? -> *, and
-	-- (CCallable Int) and (CCallable Int#) are both OK
-  = unifyOpenTypeKind ps_ty2
-
-	-- Applications need a bit of care!
-	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
-	-- NB: we've already dealt with type variables and Notes,
-	-- so if one type is an App the other one jolly well better be too
-uTys ps_ty1 (AppTy s1 t1) ps_ty2 ty2
-  = case tcSplitAppTy_maybe ty2 of
-	Just (s2,t2) -> uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
-	Nothing      -> unifyMisMatch ps_ty1 ps_ty2
-
-	-- Now the same, but the other way round
-	-- Don't swap the types, because the error messages get worse
-uTys ps_ty1 ty1 ps_ty2 (AppTy s2 t2)
-  = case tcSplitAppTy_maybe ty1 of
-	Just (s1,t1) -> uTys s1 s1 s2 s2	`thenTc_`    uTys t1 t1 t2 t2
-	Nothing      -> unifyMisMatch ps_ty1 ps_ty2
-
-	-- Not expecting for-alls in unification
-	-- ... but the error message from the unifyMisMatch more informative
-	-- than a panic message!
-
-	-- Anything else fails
-uTys ps_ty1 ty1 ps_ty2 ty2  = unifyMisMatch ps_ty1 ps_ty2
-\end{code}
-
-
-Notes on synonyms
-~~~~~~~~~~~~~~~~~
-If you are tempted to make a short cut on synonyms, as in this
-pseudocode...
-
-\begin{verbatim}
--- NO	uTys (SynTy con1 args1 ty1) (SynTy con2 args2 ty2)
--- NO     = if (con1 == con2) then
--- NO	-- Good news!  Same synonym constructors, so we can shortcut
--- NO	-- by unifying their arguments and ignoring their expansions.
--- NO	unifyTauTypeLists args1 args2
--- NO    else
--- NO	-- Never mind.  Just expand them and try again
--- NO	uTys ty1 ty2
-\end{verbatim}
-
-then THINK AGAIN.  Here is the whole story, as detected and reported
-by Chris Okasaki \tr{<Chris_Okasaki@loch.mess.cs.cmu.edu>}:
-\begin{quotation}
-Here's a test program that should detect the problem:
-
-\begin{verbatim}
-	type Bogus a = Int
-	x = (1 :: Bogus Char) :: Bogus Bool
-\end{verbatim}
-
-The problem with [the attempted shortcut code] is that
-\begin{verbatim}
-	con1 == con2
-\end{verbatim}
-is not a sufficient condition to be able to use the shortcut!
-You also need to know that the type synonym actually USES all
-its arguments.  For example, consider the following type synonym
-which does not use all its arguments.
-\begin{verbatim}
-	type Bogus a = Int
-\end{verbatim}
-
-If you ever tried unifying, say, \tr{Bogus Char} with \tr{Bogus Bool},
-the unifier would blithely try to unify \tr{Char} with \tr{Bool} and
-would fail, even though the expanded forms (both \tr{Int}) should
-match.
-
-Similarly, unifying \tr{Bogus Char} with \tr{Bogus t} would
-unnecessarily bind \tr{t} to \tr{Char}.
-
-... You could explicitly test for the problem synonyms and mark them
-somehow as needing expansion, perhaps also issuing a warning to the
-user.
-\end{quotation}
-
-
-%************************************************************************
-%*									*
-\subsection[Unify-uVar]{@uVar@: unifying with a type variable}
-%*									*
-%************************************************************************
-
-@uVar@ is called when at least one of the types being unified is a
-variable.  It does {\em not} assume that the variable is a fixed point
-of the substitution; rather, notice that @uVar@ (defined below) nips
-back into @uTys@ if it turns out that the variable is already bound.
-
-\begin{code}
-uVar :: Bool		-- False => tyvar is the "expected"
-			-- True  => ty    is the "expected" thing
-     -> TcTyVar
-     -> TcTauType -> TcTauType	-- printing and real versions
-     -> TcM ()
-
-uVar swapped tv1 ps_ty2 ty2
-  = getTcTyVar tv1	`thenNF_Tc` \ maybe_ty1 ->
-    case maybe_ty1 of
-	Just ty1 | swapped   -> uTys ps_ty2 ty2 ty1 ty1	-- Swap back
-		 | otherwise -> uTys ty1 ty1 ps_ty2 ty2	-- Same order
-	other       -> uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
-
-	-- Expand synonyms; ignore FTVs
-uUnboundVar swapped tv1 maybe_ty1 ps_ty2 (NoteTy n2 ty2)
-  = uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2
-
-
-	-- The both-type-variable case
-uUnboundVar swapped tv1 maybe_ty1 ps_ty2 ty2@(TyVarTy tv2)
-
-	-- Same type variable => no-op
-  | tv1 == tv2
-  = returnTc ()
-
-	-- Distinct type variables
-	-- ASSERT maybe_ty1 /= Just
-  | otherwise
-  = getTcTyVar tv2	`thenNF_Tc` \ maybe_ty2 ->
-    case maybe_ty2 of
-	Just ty2' -> uUnboundVar swapped tv1 maybe_ty1 ty2' ty2'
-
-	Nothing | update_tv2
-
-		-> WARN( not (k1 `hasMoreBoxityInfo` k2), (ppr tv1 <+> ppr k1) $$ (ppr tv2 <+> ppr k2) )
-		   putTcTyVar tv2 (TyVarTy tv1)		`thenNF_Tc_`
-		   returnTc ()
-		|  otherwise
-
-		-> WARN( not (k2 `hasMoreBoxityInfo` k1), (ppr tv2 <+> ppr k2) $$ (ppr tv1 <+> ppr k1) )
-                   (putTcTyVar tv1 ps_ty2		`thenNF_Tc_`
-	  	    returnTc ())
-  where
-    k1 = tyVarKind tv1
-    k2 = tyVarKind tv2
-    update_tv2 = (k2 `eqKind` openTypeKind) || (not (k1 `eqKind` openTypeKind) && nicer_to_update_tv2)
-			-- Try to get rid of open type variables as soon as poss
-
-    nicer_to_update_tv2 =  isUserTyVar (mutTyVarDetails tv1)
-				-- Don't unify a signature type variable if poss
-			|| isSystemName (varName tv2)
-				-- Try to update sys-y type variables in preference to sig-y ones
-
-	-- Second one isn't a type variable
-uUnboundVar swapped tv1 maybe_ty1 ps_ty2 non_var_ty2
-  = 	-- Check that the kinds match
-    checkKinds swapped tv1 non_var_ty2			`thenTc_`
-
-	-- Check that tv1 isn't a type-signature type variable
-    checkTcM (not (isSkolemTyVar (mutTyVarDetails tv1)))
-	     (failWithTcM (unifyWithSigErr tv1 ps_ty2))	`thenTc_`
-
-	-- Check that we aren't losing boxity info (shouldn't happen)
-    warnTc (not (typeKind non_var_ty2 `hasMoreBoxityInfo` tyVarKind tv1))
-	   ((ppr tv1 <+> ppr (tyVarKind tv1)) $$ 
-	     (ppr non_var_ty2 <+> ppr (typeKind non_var_ty2)))		`thenNF_Tc_` 
-
-	-- Occurs check
-	-- Basically we want to update     tv1 := ps_ty2
-	-- because ps_ty2 has type-synonym info, which improves later error messages
-	-- 
-	-- But consider 
-	--	type A a = ()
-	--
-	--	f :: (A a -> a -> ()) -> ()
-	--	f = \ _ -> ()
-	--
-	-- 	x :: ()
-	-- 	x = f (\ x p -> p x)
-	--
-	-- In the application (p x), we try to match "t" with "A t".  If we go
-	-- ahead and bind t to A t (= ps_ty2), we'll lead the type checker into 
-	-- an infinite loop later.
- 	-- But we should not reject the program, because A t = ().
-	-- Rather, we should bind t to () (= non_var_ty2).
-	-- 
-	-- That's why we have this two-state occurs-check
-    zonkTcType ps_ty2					`thenNF_Tc` \ ps_ty2' ->
-    if not (tv1 `elemVarSet` tyVarsOfType ps_ty2') then
-	putTcTyVar tv1 ps_ty2'				`thenNF_Tc_`
-	returnTc ()
-    else
-    zonkTcType non_var_ty2				`thenNF_Tc` \ non_var_ty2' ->
-    if not (tv1 `elemVarSet` tyVarsOfType non_var_ty2') then
-	-- This branch rarely succeeds, except in strange cases
-	-- like that in the example above
-	putTcTyVar tv1 non_var_ty2'			`thenNF_Tc_`
-	returnTc ()
-    else
-    failWithTcM (unifyOccurCheck tv1 ps_ty2')
-
-
-checkKinds swapped tv1 ty2
--- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
--- We need to check that we don't unify a lifted type variable with an
--- unlifted type: e.g.  (id 3#) is illegal
-  | tk1 `eqKind` liftedTypeKind && tk2 `eqKind` unliftedTypeKind
-  = tcAddErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
-    unifyMisMatch k1 k2
-  | otherwise
-  = returnTc ()
-  where
-    (k1,k2) | swapped   = (tk2,tk1)
-	    | otherwise = (tk1,tk2)
-    tk1 = tyVarKind tv1
-    tk2 = typeKind ty2
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Unify-fun]{@unifyFunTy@}
-%*									*
-%************************************************************************
-
-@unifyFunTy@ is used to avoid the fruitless creation of type variables.
-
-\begin{code}
-unifyFunTy :: TcType	 			-- Fail if ty isn't a function type
-	   -> TcM (TcType, TcType)	-- otherwise return arg and result types
-
-unifyFunTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyFunTy ty'
-	other	    -> unify_fun_ty_help ty
-
-unifyFunTy ty
-  = case tcSplitFunTy_maybe ty of
-	Just arg_and_res -> returnTc arg_and_res
-	Nothing 	 -> unify_fun_ty_help ty
-
-unify_fun_ty_help ty	-- Special cases failed, so revert to ordinary unification
-  = newTyVarTy openTypeKind	`thenNF_Tc` \ arg ->
-    newTyVarTy openTypeKind	`thenNF_Tc` \ res ->
-    unifyTauTy ty (mkFunTy arg res)	`thenTc_`
-    returnTc (arg,res)
-\end{code}
-
-\begin{code}
-unifyListTy :: TcType              -- expected list type
-	    -> TcM TcType      -- list element type
-
-unifyListTy ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyListTy ty'
-	other	 -> unify_list_ty_help ty
-
-unifyListTy ty
-  = case tcSplitTyConApp_maybe ty of
-	Just (tycon, [arg_ty]) | tycon == listTyCon -> returnTc arg_ty
-	other					    -> unify_list_ty_help ty
-
-unify_list_ty_help ty	-- Revert to ordinary unification
-  = newTyVarTy liftedTypeKind		`thenNF_Tc` \ elt_ty ->
-    unifyTauTy ty (mkListTy elt_ty)	`thenTc_`
-    returnTc elt_ty
-\end{code}
-
-\begin{code}
-unifyTupleTy :: Boxity -> Arity -> TcType -> TcM [TcType]
-unifyTupleTy boxity arity ty@(TyVarTy tyvar)
-  = getTcTyVar tyvar	`thenNF_Tc` \ maybe_ty ->
-    case maybe_ty of
-	Just ty' -> unifyTupleTy boxity arity ty'
-	other	 -> unify_tuple_ty_help boxity arity ty
-
-unifyTupleTy boxity arity ty
-  = case tcSplitTyConApp_maybe ty of
-	Just (tycon, arg_tys)
-		|  isTupleTyCon tycon 
-		&& tyConArity tycon == arity
-		&& tupleTyConBoxity tycon == boxity
-		-> returnTc arg_tys
-	other -> unify_tuple_ty_help boxity arity ty
-
-unify_tuple_ty_help boxity arity ty
-  = newTyVarTys arity kind				`thenNF_Tc` \ arg_tys ->
-    unifyTauTy ty (mkTupleTy boxity arity arg_tys)	`thenTc_`
-    returnTc arg_tys
-  where
-    kind | isBoxed boxity = liftedTypeKind
-	 | otherwise      = openTypeKind
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[Unify-context]{Errors and contexts}
-%*									*
-%************************************************************************
-
-Errors
-~~~~~~
-
-\begin{code}
-unifyCtxt s ty1 ty2 tidy_env	-- ty1 expected, ty2 inferred
-  = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
-    zonkTcType ty2	`thenNF_Tc` \ ty2' ->
-    returnNF_Tc (err ty1' ty2')
-  where
-    err ty1 ty2 = (env1, 
-		   nest 4 
-			(vcat [
-			   text "Expected" <+> text s <> colon <+> ppr tidy_ty1,
-			   text "Inferred" <+> text s <> colon <+> ppr tidy_ty2
-		        ]))
-		  where
-		    (env1, [tidy_ty1,tidy_ty2]) = tidyOpenTypes tidy_env [ty1,ty2]
-
-unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
-	-- tv1 is zonked already
-  = zonkTcType ty2	`thenNF_Tc` \ ty2' ->
-    returnNF_Tc (err ty2')
-  where
-    err ty2 = (env2, ptext SLIT("When matching types") <+> 
-		     sep [quotes pp_expected, ptext SLIT("and"), quotes pp_actual])
-	    where
-	      (pp_expected, pp_actual) | swapped   = (pp2, pp1)
-				       | otherwise = (pp1, pp2)
-	      (env1, tv1') = tidyOpenTyVar tidy_env tv1
-	      (env2, ty2') = tidyOpenType  env1 ty2
-	      pp1 = ppr tv1'
-	      pp2 = ppr ty2'
-
-unifyMisMatch ty1 ty2
-  = zonkTcType ty1	`thenNF_Tc` \ ty1' ->
-    zonkTcType ty2	`thenNF_Tc` \ ty2' ->
-    let
-    	(env, [tidy_ty1, tidy_ty2]) = tidyOpenTypes emptyTidyEnv [ty1',ty2']
-	msg = hang (ptext SLIT("Couldn't match"))
-		   4 (sep [quotes (ppr tidy_ty1), 
-			   ptext SLIT("against"), 
-			   quotes (ppr tidy_ty2)])
-    in
-    failWithTcM (env, msg)
-
-unifyWithSigErr tyvar ty
-  = (env2, hang (ptext SLIT("Cannot unify the type-signature variable") <+> quotes (ppr tidy_tyvar))
-	      4 (ptext SLIT("with the type") <+> quotes (ppr tidy_ty)))
-  where
-    (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
-    (env2, tidy_ty)    = tidyOpenType  env1         ty
-
-unifyOccurCheck tyvar ty
-  = (env2, hang (ptext SLIT("Occurs check: cannot construct the infinite type:"))
-	      4 (sep [ppr tidy_tyvar, char '=', ppr tidy_ty]))
-  where
-    (env1, tidy_tyvar) = tidyOpenTyVar emptyTidyEnv tyvar
-    (env2, tidy_ty)    = tidyOpenType  env1         ty
-\end{code}
