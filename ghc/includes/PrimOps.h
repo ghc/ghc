@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.30 1999/05/10 09:50:49 simonm Exp $
+ * $Id: PrimOps.h,v 1.31 1999/05/10 09:56:50 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -319,14 +319,10 @@ typedef union {
 	  (I_)word0;					\
 }
 
-#define integer2Wordzh(r, sa,da)				\
-{ MP_INT arg;							\
-								\
-  arg._mp_size	= (sa);						\
-  arg._mp_alloc	= ((StgArrWords *)da)->words;			\
-  arg._mp_d	= (unsigned long int *) (BYTE_ARR_CTS(da));	\
-								\
-  (r) = RET_PRIM_STGCALL1(I_,mpz_get_ui,&arg);			\
+#define integer2Wordzh(r, sa,da)			\
+{ StgWord word0 = ((StgWord *)BYTE_ARR_CTS(da))[0];	\
+  int size = sa;                                        \
+  (r) = ( size == 0 ) ? 0 : word0 ;                     \
 }
 
 #define cmpIntegerzh(r, s1,d1, s2,d2)				\
