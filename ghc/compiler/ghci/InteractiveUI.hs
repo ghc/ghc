@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.54 2001/03/12 14:06:46 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.55 2001/03/15 11:23:19 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -82,26 +82,27 @@ helpText = "\
 \ Commands available from the prompt:\n\ 
 \\  
 \   <stmt>		evaluate/run <stmt>\n\ 
-\   :add <filename>     add a module to the current set\n\ 
 \   :cd <dir>		change directory to <dir>\n\ 
+\   :def <cmd> <expr>   define a macro :<cmd>\n\ 
 \   :help, :?		display this list of commands\n\ 
 \   :load <filename>    load a module (and it dependents)\n\ 
 \   :module <mod>	set the context for expression evaluation to <mod>\n\ 
 \   :reload		reload the current module set\n\ 
 \   :set <option> ...	set options\n\ 
-\   :unset <option> ...	unset options\n\ 
 \   :type <expr>	show the type of <expr>\n\ 
+\   :unset <option> ...	unset options\n\ 
 \   :quit		exit GHCi\n\ 
 \   :!<command>		run the shell command <command>\n\ 
 \\ 
 \ Options for `:set' and `:unset':\n\ 
 \\ 
+\    +r			revert top-level expressions after each evaluation\n\ 
 \    +s                 print timing/memory stats after each evaluation\n\ 
 \    +t			print type after evaluation\n\ 
-\    +r			revert top-level expressions after each evaluation\n\ 
 \    -<flags>		most GHC command line flags can also be set here\n\ 
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
+ --ToDo   :add <filename>     add a module to the current set\n\ 
 
 interactiveUI :: CmState -> Maybe FilePath -> [LibrarySpec] -> IO ()
 interactiveUI cmstate mod cmdline_libs = do
@@ -237,7 +238,6 @@ runCommand c =
    doCommand c
 
 doCommand (':' : command) = specialCommand command
-doCommand ('-':'-':_) = return False	-- comments, useful in scripts
 doCommand stmt
    = do timeIt (do stuff <- runStmt stmt; finishEvalExpr stuff)
         return False
@@ -318,6 +318,9 @@ setContext str
        setGHCiState st{cmstate=new_cmstate}
 
 changeDirectory :: String -> GHCi ()
+changeDirectory ('~':d) = do
+   tilde <- io (getEnv "HOME")	-- will fail if HOME not defined
+   io (setCurrentDirectory (tilde ++ '/':d))
 changeDirectory d = io (setCurrentDirectory d)
 
 defineMacro :: String -> GHCi ()
