@@ -798,67 +798,96 @@ Prelude> :def make (\_ -> return ":! ghc --make Main")
     <para>The <literal>:set</literal> command sets two types of
     options: GHCi options, which begin with
     &lsquo;<literal>+</literal>&rdquo; and &ldquo;command-line&rdquo;
-    options, which begin with &lsquo;-&rsquo;.  Either type of option
-    may be set using <literal>:set</literal> and unset using
-    <literal>:unset</literal>.</para>
+    options, which begin with &lsquo;-&rsquo;.  </para>
 
-    <para>The available GHCi options are:</para>
+    <sect2>
+      <title>GHCi options</title>
+      <indexterm><primary>options</primary><secondary>GHCi</secondary>
+      </indexterm>
 
-    <variablelist>
-      <varlistentry>
-	<term><literal>+r</literal></term>
-	<indexterm><primary><literal>+r</literal></primary></indexterm>
-	<indexterm><primary>CAFs</primary><secondary>in GHCi</secondary></indexterm>
-	<indexterm><primary>Constant Applicative Form</primary><see>CAFs</see></indexterm>
-	<listitem>
-	  <para>Normally, any evaluation of top-level expressions
-	  (otherwise known as CAFs or Constant Applicative Forms) in
-	  loaded modules is retained between evaluations.  Turning on
-	  <literal>+r</literal> causes all evaluation of top-level
-	  expressions to be discarded after each evaluation (they are
-	  still retained <emphasis>during</emphasis> a single
-	  evaluation).</para>
+      <para>GHCi options may be set using <literal>:set</literal> and
+      unset using <literal>:unset</literal>.</para>
+
+      <para>The available GHCi options are:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term><literal>+r</literal></term>
+	  <indexterm><primary><literal>+r</literal></primary></indexterm>
+	  <indexterm><primary>CAFs</primary><secondary>in GHCi</secondary></indexterm>
+	  <indexterm><primary>Constant Applicative Form</primary><see>CAFs</see></indexterm>
+	  <listitem>
+	    <para>Normally, any evaluation of top-level expressions
+	    (otherwise known as CAFs or Constant Applicative Forms) in
+	    loaded modules is retained between evaluations.  Turning
+	    on <literal>+r</literal> causes all evaluation of
+	    top-level expressions to be discarded after each
+	    evaluation (they are still retained
+	    <emphasis>during</emphasis> a single evaluation).</para>
 	  
-	  <para>This option may help if the evaluated top-level
-	  expressions are consuming large amounts of space, or if you
-	  need repeatable performance measurements.</para>
-	</listitem>
-      </varlistentry>
+	    <para>This option may help if the evaluated top-level
+	    expressions are consuming large amounts of space, or if
+	    you need repeatable performance measurements.</para>
+	  </listitem>
+	</varlistentry>
 
-      <varlistentry>
-	<term><literal>+s</literal></term>
-	<indexterm><primary><literal>+s</literal></primary></indexterm>
-	<listitem>
-	  <para>Display some stats after evaluating each expression,
-	  including the elapsed time and number of bytes allocated.
-	  NOTE: the allocation figure is only accurate to the size of
-	  the storage manager's allocation area, because it is
-	  calculated at every GC.  Hence, you might see values of zero
-	  if no GC has occurred.</para>
-	</listitem>
-      </varlistentry>
+	<varlistentry>
+	  <term><literal>+s</literal></term>
+	  <indexterm><primary><literal>+s</literal></primary></indexterm>
+	  <listitem>
+	    <para>Display some stats after evaluating each expression,
+	    including the elapsed time and number of bytes allocated.
+	    NOTE: the allocation figure is only accurate to the size
+	    of the storage manager's allocation area, because it is
+	    calculated at every GC.  Hence, you might see values of
+	    zero if no GC has occurred.</para>
+	  </listitem>
+	</varlistentry>
 
-      <varlistentry>
-	<term><literal>+t</literal></term>
-	<indexterm><primary><literal>+t</literal></primary></indexterm>
-	<listitem>
-	  <para>Display the type of each variable bound after a
-	  statement is entered at the prompt.  If the statement is a
-	  single expression, then the only variable binding will be
-	  for the variable &lsquo;<literal>it</literal>&rsquo;.</para>
-	</listitem>
-      </varlistentry>
-    </variablelist>
+	<varlistentry>
+	  <term><literal>+t</literal></term>
+	  <indexterm><primary><literal>+t</literal></primary></indexterm>
+	  <listitem>
+	    <para>Display the type of each variable bound after a
+	    statement is entered at the prompt.  If the statement is a
+	    single expression, then the only variable binding will be
+	    for the variable
+	    &lsquo;<literal>it</literal>&rsquo;.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
 
-    <para>In addition, any normal GHC command-line option that is
-    designated as <firstterm>dynamic</firstterm> (see the table in
-    <xref linkend="flag-reference">), may be set using
-    <literal>:set</literal>.  Certain static options
-    (<option>-I</option>, <option>-i</option>, and <option>-l</option>
-    in particular) will also work, but may not take effect until the
-    next reload.</para>
-    <indexterm><primary>dynamic</primary><secondary>options</secondary></indexterm>
-    <indexterm><primary>static</primary><secondary>options</secondary></indexterm>
+    <sect2>
+      <title>Setting GHC command-line options in GHCi</title>
+
+      <para>Normal GHC command-line options may also be set using
+      <literal>:set</literal>.  For example, to turn on
+      <option>-fglasgow-exts</option>, you would say:</para>
+
+<screen>
+Prelude> :set -fglasgow-exts
+</screen>
+      
+      <para>Any GHC command-line option that is designated as
+      <firstterm>dynamic</firstterm> (see the table in <xref
+      linkend="flag-reference">), may be set using
+      <literal>:set</literal>.  To unset an option, you can set the
+      reverse option:</para>
+      <indexterm><primary>dynamic</primary><secondary>options</secondary></indexterm>
+
+<screen>
+Prelude> :set -fno-glasgow-exts
+</screen>
+
+      <para><xref linkend="flag-reference"> lists the reverse for each
+      option where applicable.</para>
+
+      <para>Certain static options (<option>-I</option>,
+      <option>-i</option>, and <option>-l</option> in particular) will
+      also work, but may not take effect until the next reload.</para>
+      <indexterm><primary>static</primary><secondary>options</secondary></indexterm>
+    </sect2>
   </sect1>
 
   <sect1>
