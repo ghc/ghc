@@ -4093,10 +4093,13 @@ Hello World!
 	<para>To support GHCi, you need to port the dynamic linker
 	(<filename>fptools/ghc/rts/Linker.c</filename>).  The linker
 	currently supports the ELF and PEi386 object file formats - if
-	your platform uses one of these then you probably don't have
-	to do anything except fiddle with the
-	<literal>#ifdef</literal>s at the top of
-	<filename>Linker.c</filename> to tell it about your OS.</para>
+	your platform uses one of these then things will be
+	significantly easier.  The majority of Unix platforms use the
+	ELF format these days.  Even so, there are some
+	machine-specific parts of the ELF linker: for example, the
+	code for resolving particular relocation types is
+	machine-specific, so some porting of this code to your
+	architecture will probaly be necessary.</para>
 	
 	<para>If your system uses a different object file format, then
 	you have to write a linker &mdash; good luck!</para>
