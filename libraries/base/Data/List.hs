@@ -42,6 +42,7 @@ module Data.List
    , foldl	       -- :: (a -> b -> a) -> a -> [b] -> a
    , foldl'	       -- :: (a -> b -> a) -> a -> [b] -> a
    , foldl1	       -- :: (a -> a -> a) -> [a] -> a
+   , foldl1'	       -- :: (a -> a -> a) -> [a] -> a
    , foldr             -- :: (a -> b -> b) -> b -> [a] -> b
    , foldr1            -- :: (a -> a -> a) -> [a] -> a
 
@@ -462,14 +463,17 @@ maximum                 :: (Ord a) => [a] -> a
 maximum []              =  errorEmptyList "maximum"
 maximum xs              =  foldl1 max xs
 
-{-# RULES "maximumInt" maximum = maximumInt #-}
+{-# RULES 
+  "maximumInt"     maximum = (strictMaximum :: [Int]     -> Int);
+  "maximumInteger" maximum = (strictMaximum :: [Integer] -> Integer)
+ #-}
 
 -- We can't make the overloaded version of maximum strict without
 -- changing its semantics (max might not be strict), but we can for
 -- the version specialised to 'Int'.
-maximumInt		:: [Int] -> Int
-maximumInt []           =  errorEmptyList "maximum"
-maximumInt xs           =  foldl1' max xs
+strictMaximum		:: (Ord a) => [a] -> a
+strictMaximum []        =  errorEmptyList "maximum"
+strictMaximum xs        =  foldl1' max xs
 
 -- | 'minimum' returns the minimum value from a list,
 -- which must be non-empty, finite, and of an ordered type.
@@ -479,11 +483,14 @@ minimum                 :: (Ord a) => [a] -> a
 minimum []              =  errorEmptyList "minimum"
 minimum xs              =  foldl1 min xs
 
-{-# RULES "minimumInt" minimum = minimumInt #-}
+{-# RULES
+  "minimumInt"     minimum = (strictMinimum :: [Int]     -> Int);
+  "minimumInteger" minimum = (strictMinimum :: [Integer] -> Integer)
+ #-}
 
-minimumInt		:: [Int] -> Int
-minimumInt []           =  errorEmptyList "minimum"
-minimumInt xs           =  foldl1' min xs
+strictMinimum		:: (Ord a) => [a] -> a
+strictMinimum []        =  errorEmptyList "minimum"
+strictMinimum xs        =  foldl1' min xs
 
 -- | The 'maximumBy' function takes a comparison function and a list
 -- and returns the greatest element of the list by the comparison function.
