@@ -23,7 +23,7 @@
       now provided in the user guide.</para>
 
       <para>The bulk of this guide applies to building on Unix
-      systems; see <xref linkend="winbuild"/> for Windows notes.</para>
+      systems; see <xref linkend="winbuild"> for Windows notes.</para>
     </abstract>
 
 </artheader>
@@ -82,7 +82,7 @@
           scratch.</para>
 
 	  <para>More information about our CVS repository can be found
-          in <xref linkend="sec-cvs"/>.</para>
+          in <xref linkend="sec-cvs">.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
@@ -111,8 +111,8 @@
       <title>Getting access to the CVS Repository</title>
 
       <para>You can access the repository in one of two ways:
-      read-only (<xref linkend="cvs-read-only"/>), or read-write (<xref
-      linkend="cvs-read-write"/>).</para>
+      read-only (<xref linkend="cvs-read-only">), or read-write (<xref
+      linkend="cvs-read-write">).</para>
 
       <sect3 id="cvs-read-only">
 	<title>Remote Read-only CVS Access</title>
@@ -150,7 +150,7 @@
 	  </listitem>
 
 	  <listitem>
-	    <para>Now go to <xref linkend="cvs-first"/>.</para>
+	    <para>Now go to <xref linkend="cvs-first">.</para>
 	  </listitem>
 	</orderedlist>
       </sect3>
@@ -234,7 +234,7 @@ Protocol 1</programlisting>
 
 
        <para>
-       <emphasis>Windows users: see the notes in <xref linkend="configure-ssh"/> about <command>ssh</command> wrinkles!</emphasis>
+       <emphasis>Windows users: see the notes in <xref linkend="configure-ssh"> about <command>ssh</command> wrinkles!</emphasis>
          </para>
 
 
@@ -413,7 +413,7 @@ $ cvs checkout ghc hslibs libraries</screen>
           you need at least the <literal>ghc</literal>,
           <literal>hslibs</literal> and <literal>libraries</literal>
           modules (for a full list of the projects available, see
-          <xref linkend="projects"/>).</para>
+          <xref linkend="projects">).</para>
 
 	  <para>Remember that if you do not have
           <literal>happy</literal> and/or <literal>Alex</literal>
@@ -864,21 +864,21 @@ $ cvs checkout nofib/spectral</screen>
 
       <listitem>
 	<para>Use an appropriate machine / operating system.  <xref
-	linkend="sec-port-info"/> lists the supported platforms; if
+	linkend="sec-port-info"> lists the supported platforms; if
 	yours isn't amongst these then you can try porting GHC (see
-	<xref linkend="sec-porting-ghc"/>).</para>
+	<xref linkend="sec-porting-ghc">).</para>
       </listitem>
 
       <listitem>
 	<para>Be sure that the &ldquo;pre-supposed&rdquo; utilities are
-        installed.  <xref linkend="sec-pre-supposed"/>
+        installed.  <xref linkend="sec-pre-supposed">
         elaborates.</para>
       </listitem>
 
       <listitem>
 	<para>If you have any problem when building or installing the
         Glasgow tools, please check the &ldquo;known pitfalls&rdquo; (<xref
-        linkend="sec-build-pitfalls"/>).  Also check the FAQ for the
+        linkend="sec-build-pitfalls">).  Also check the FAQ for the
         version you're building, which is part of the User's Guide and
         available on the <ulink url="http://www.haskell.org/ghc/" >GHC web
         site</ulink>.</para>
@@ -1201,7 +1201,7 @@ $ cvs checkout nofib/spectral</screen>
 	  <para>GHC is required to build many of the tools, including
 	  GHC itself.  If you need to port GHC to your platform
 	  because there isn't a binary distribution of GHC available,
-	  then see <xref linkend="sec-porting-ghc"/>.</para>
+	  then see <xref linkend="sec-porting-ghc">.</para>
 
 	  <para>Which version of GHC you need will depend on the
 	  packages you intend to build.  GHC itself will normally
@@ -1414,7 +1414,7 @@ $ cvs checkout nofib/spectral</screen>
 
       <para>More tools are required if you want to format the documentation
       that comes with GHC and other fptools projects.  See <xref
-      linkend="building-docs"/>.</para>
+      linkend="building-docs">.</para>
     </sect2>
   </sect1>
 
@@ -1536,7 +1536,7 @@ $ make install</screen>
       includes sources for the X11
       <command>lndir</command>&mdash;check out
       <filename>fptools/glafp-utils/lndir</filename>). See <xref
-      linkend="sec-storysofar"/> for a typical invocation.</para>
+      linkend="sec-storysofar"> for a typical invocation.</para>
 
       <para>The build tree does not need to be anywhere near the
       source tree in the file system.  Indeed, one advantage of
@@ -1545,7 +1545,7 @@ $ make install</screen>
       support people from backing up untold megabytes of
       easily-regenerated, and rapidly-changing, gubbins.  The golden
       rule is that (with a single exception&mdash;<xref
-      linkend="sec-build-config"/>) <emphasis>absolutely everything in
+      linkend="sec-build-config">) <emphasis>absolutely everything in
       the build tree is either a symbolic link to the source tree, or
       else is mechanically generated</emphasis>.  It should be
       perfectly OK for your build tree to vanish overnight; an hour or
@@ -1863,7 +1863,7 @@ $ make install</screen>
           <filename>myfptools</filename> (it does not have to be
           called <filename>fptools</filename>).  Make sure that you
           have the essential files (see <xref
-          linkend="sec-source-tree"/>).</para>
+          linkend="sec-source-tree">).</para>
 	</listitem>
 
 	<listitem>
@@ -2186,7 +2186,7 @@ $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4</programlisting>
 	    <para>is only available in the root directory
             <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>; it has
             been discussed in <xref
-            linkend="sec-build-config"/>.</para>
+            linkend="sec-build-config">.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -2369,7 +2369,7 @@ directive.
           As its name suggests, <filename>boilerplate.mk</filename>
           consists of a large quantity of standard
           <filename>Makefile</filename> code.  We discuss this
-          boilerplate in more detail in <xref linkend="sec-boiler"/>.
+          boilerplate in more detail in <xref linkend="sec-boiler">.
           <indexterm><primary>include, directive in
           Makefiles</primary></indexterm> <indexterm><primary>Makefile
           inclusion</primary></indexterm></para>
@@ -2420,7 +2420,7 @@ directive.
           (the executable binary to be built).  We will discuss in
           more detail what the &ldquo;standard variables&rdquo; are,
           and how they affect what happens, in <xref
-          linkend="sec-targets"/>.</para>
+          linkend="sec-targets">.</para>
 
 	  <para>The definition for <constant>SRCS</constant> uses the
           useful GNU <command>make</command> construct
@@ -2440,11 +2440,11 @@ directive.
           <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>.
           It contains the rules that tell <command>gmake</command> how
           to make the standard targets (<xref
-          linkend="sec-standard-targets"/>).  Why, you ask, can't this
+          linkend="sec-standard-targets">).  Why, you ask, can't this
           standard code be part of
           <filename>boilerplate.mk</filename>?  Good question.  We
           discuss the reason later, in <xref
-          linkend="sec-boiler-arch"/>.</para>
+          linkend="sec-boiler-arch">.</para>
 
           <para>You do not <emphasis>have</emphasis> to
           <literal>include</literal> the
@@ -2454,7 +2454,7 @@ directive.
           canned rules in <filename>target.mk</filename>; the price
           tag is that you have to understand what canned rules get
           enabled, and what they do (<xref
-          linkend="sec-targets"/>).</para>
+          linkend="sec-targets">).</para>
 	</listitem>
       </orderedlist>
 
@@ -2644,7 +2644,7 @@ directive.
 	<listitem>
 	  <para><filename>target.mk</filename> contains
           <command>make</command> rules for the standard targets
-          described in <xref linkend="sec-standard-targets"/>.  These
+          described in <xref linkend="sec-standard-targets">.  These
           rules are selectively included, depending on the setting of
           certain <command>make</command> variables.  These variables
           are usually set in the middle section of the
@@ -2717,7 +2717,7 @@ directive.
           </term>
 	  <listitem>
 	    <para>is the build configuration file we discussed at
-            length in <xref linkend="sec-build-config"/>.</para>
+            length in <xref linkend="sec-build-config">.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -2928,7 +2928,7 @@ directive.
             strings to pass to each program. For example, it defines
             <constant>HC&lowbar;OPTS</constant><indexterm><primary>HC&lowbar;OPTS</primary></indexterm>,
             the option strings to pass to the Haskell compiler.  See
-            <xref linkend="sec-suffix"/>.</para>
+            <xref linkend="sec-suffix">.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -2938,7 +2938,7 @@ directive.
           </term>
 	  <listitem>
 	    <para>defines standard pattern rules&mdash;see <xref
-	    linkend="sec-suffix"/>.</para>
+	    linkend="sec-suffix">.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -3022,7 +3022,7 @@ directive.
             <literal>mp</literal>.  The variable
             <constant>WAY&lowbar;CC&lowbar;OPTS</constant> holds
             options to pass to the C compiler when compiling the
-            standard way.  (<xref linkend="sec-ways"/> dicusses
+            standard way.  (<xref linkend="sec-ways"> dicusses
             multi-way compilation.)</para>
 	  </listitem>
 	</varlistentry>
@@ -3056,7 +3056,7 @@ directive.
 
       <para><filename>target.mk</filename> contains canned rules for
       all the standard targets described in <xref
-      linkend="sec-standard-targets"/>.  It is complicated by the fact
+      linkend="sec-standard-targets">.  It is complicated by the fact
       that you don't want all of these rules to be active in every
       <filename>Makefile</filename>.  Rather than have a plethora of
       tiny files which you can include selectively, there is a single
@@ -3182,7 +3182,7 @@ directive.
 
       <para>When <constant>SUBDIRS</constant> is defined,
       <filename>target.mk</filename> includes a rather neat rule for
-      the standard targets (<xref linkend="sec-standard-targets"/> that
+      the standard targets (<xref linkend="sec-standard-targets"> that
       simply invokes <command>make</command> recursively in each of
       the sub-directories.</para>
 
@@ -3272,7 +3272,7 @@ directive.
           want these targets built for.  The mechanism here is very
           much like the recursive invocation of
           <command>make</command> in sub-directories (<xref
-          linkend="sec-subdirs"/>).  It is up to you to set
+          linkend="sec-subdirs">).  It is up to you to set
           <constant>WAYS</constant> in your
           <filename>Makefile</filename>; this is how you control what
           ways will get built.</para>
@@ -3593,14 +3593,14 @@ $ make install</screen>
 	supported (or perhaps has been supported in the past, but
 	currently isn't).  This is the easiest type of porting job,
 	but it still requires some careful bootstrapping.  Proceed to
-	<xref linkend="sec-booting-from-hc"/>.</para>
+	<xref linkend="sec-booting-from-hc">.</para>
       </listitem>
       
       <listitem>
 	<para>Your system's hardware architecture isn't supported by
 	GHC.  This will be a more difficult port (though by comparison
 	perhaps not as difficult as porting gcc).  Proceed to <xref
-	linkend="unregisterised-porting"/>.</para>
+	linkend="unregisterised-porting">.</para>
       </listitem>
     </itemizedlist>
     
@@ -3626,7 +3626,7 @@ $ make install</screen>
       supplied on the GHC download page, otherwise you'll have to
       compile some up yourself, or start from
       <emphasis>unregisterised</emphasis> HC files - see <xref
-      linkend="unregisterised-porting"/>.</para>
+      linkend="unregisterised-porting">.</para>
 
       <para>The following steps should result in a working GHC build
       with full libraries:</para>
@@ -3880,7 +3880,7 @@ $ make hc-file-bundle Project=Ghc</screen>
 	    from the intermediate C files we generated above.  The
 	    process of bootstrapping from C files is automated by the
 	    script in <literal>distrib/hc-build</literal>, and is
-	    described in <xref linkend="sec-booting-from-hc"/>.</para>
+	    described in <xref linkend="sec-booting-from-hc">.</para>
 
 <screen>$ ./distrib/hc-build --enable-hc-boot-unregisterised</screen>
 
@@ -3943,7 +3943,7 @@ Hello World!</screen>
             </term>
 	    <listitem>
 	      <para>Macros that cooperate with the mangler (see <xref
-	      linkend="sec-mangler"/>) to make proper tail-calls
+	      linkend="sec-mangler">) to make proper tail-calls
 	      work.</para>
 	    </listitem>
 	  </varlistentry>
@@ -4160,7 +4160,7 @@ above.
 </itemizedlist>
 
 
-and try again: <command>gmake</command>.  (see <xref linkend="sec-suffix"/> for information about
+and try again: <command>gmake</command>.  (see <xref linkend="sec-suffix"> for information about
 <constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</constant>.)
 
 Alternatively, just cut to the chase:
@@ -4447,7 +4447,7 @@ installing and running GHC may be found in the user guide. In general,
 Win95/Win98 behave the same, and WinNT/Win2k behave the same.
 </para>
 <para>
-Make sure you read the preceding section on platforms (<xref linkend="platforms"/>)
+Make sure you read the preceding section on platforms (<xref linkend="platforms">)
 before reading section.
 You don't need Cygwin or MSYS to <emphasis>use</emphasis> GHC, 
 but you do need one or the other to <emphasis>build</emphasis> GHC.</para>
@@ -4640,7 +4640,7 @@ they don't recognise symlinks.
 </para></listitem>
 
 <listitem> <para>
-See the notes in <xref linkend="msys-install"/> about <command>find</command> and <command>bzip</command>,
+See the notes in <xref linkend="msys-install"> about <command>find</command> and <command>bzip</command>,
 which apply to Cygwin too.
 </para></listitem>
 </itemizedlist>
@@ -4757,7 +4757,7 @@ Make sure the installation directory is in your
 
 <listitem>
 <para>GHC uses the <emphasis>mingw</emphasis> C compiler to
-generate code, so you have to install that (see <xref linkend="cygwin-and-mingw"/>). 
+generate code, so you have to install that (see <xref linkend="cygwin-and-mingw">). 
 Just pick up a mingw bundle at
 <ulink url="http://www.mingw.org/">http://www.mingw.org/</ulink>.
 We install it in <filename>c:/mingw</filename>.
@@ -4784,7 +4784,7 @@ so you will need to add <filename>emacs/bin</filename> to your <literal>PATH</li
 
 <listitem>
 <para> Finally, check out a copy of GHC sources from
-the CVS repository, following the instructions above (<xref linkend="cvs-access"/>).
+the CVS repository, following the instructions above (<xref linkend="cvs-access">).
 </para>
 </listitem>
 </itemizedlist>
@@ -4794,7 +4794,7 @@ the CVS repository, following the instructions above (<xref linkend="cvs-access"
 <sect2><title>Building GHC</title>
 
 <para>OK!  
-Now go read the documentation above on building from source (<xref linkend="sec-building-from-source"/>); 
+Now go read the documentation above on building from source (<xref linkend="sec-building-from-source">); 
 the bullets below only tell
 you about Windows-specific wrinkles.</para>
 <itemizedlist>
@@ -4827,7 +4827,7 @@ Solution: delete <filename>configure</filename> first.
 
 <screen>./configure --host=i386-unknown-mingw32 --with-gcc=c:/mingw/bin/gcc</screen>
 This is the point at which you specify that you are building GHC-mingw
-(see <xref linkend="ghc-mingw"/>). </para>
+(see <xref linkend="ghc-mingw">). </para>
 
 <para> Both these options are important! It's possible to get into
 trouble using the wrong C compiler!</para>
@@ -4857,7 +4857,7 @@ Be warned!
 </para>
 
 <para>
-If you want to build GHC-cygwin (<xref linkend="ghc-cygwin"/>)
+If you want to build GHC-cygwin (<xref linkend="ghc-cygwin">)
 you'll have to do something more like:
 <screen>./configure --with-gcc=...the Cygwin gcc...</screen>
 </para>
@@ -4872,7 +4872,7 @@ can be really confusing.
 
 <listitem><para> You almost certainly want to set
 <programlisting>SplitObjs = NO</programlisting>
-in your <filename>build.mk</filename> configuration file (see <xref linkend="sec-build-config"/>).
+in your <filename>build.mk</filename> configuration file (see <xref linkend="sec-build-config">).
 This tells the build system not to split each library into a myriad of little object files, one
 for each function.  Doing so reduces binary sizes for statically-linked binaries, but on Windows
 it dramatically increases the time taken to build the libraries in the first place.
