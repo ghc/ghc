@@ -53,7 +53,7 @@ import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, isAlgTyCon,
 import Class		( Class, classBigSig )
 import SpecEnv		( specEnvToList )
 import FieldLabel	( fieldLabelName, fieldLabelType )
-import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType,
+import Type		( mkSigmaTy, splitSigmaTy, mkDictTy, tidyTopType, deNoteType,
 			  Type, ThetaType
 		        )
 
@@ -227,7 +227,16 @@ ifaceInstances if_hdl inst_infos
     -------			 
     pp_inst (InstInfo clas tvs tys theta dfun_id _ _ _)
       = let			 
-	    forall_ty     = mkSigmaTy tvs theta (mkDictTy clas tys)
+		-- The deNoteType is very important.   It removes all type
+		-- synonyms from the instance type in interface files.
+		-- That in turn makes sure that when reading in instance decls
+		-- from interface files that the 'gating' mechanism works properly.
+		-- Otherwise you could have
+		--	type Tibble = T Int
+		--	instance Foo Tibble where ...
+		-- and this instance decl wouldn't get imported into a module
+		-- that mentioned T but not Tibble.
+	    forall_ty     = mkSigmaTy tvs theta (deNoteType (mkDictTy clas tys))
 	    renumbered_ty = tidyTopType forall_ty
 	in			 
 	hcat [ptext SLIT("instance "), pprType renumbered_ty, 

@@ -195,10 +195,11 @@ simplifyPgm sw_chkr us binds
   	  (us1, us2) = splitUniqSupply us
 
 
-simplTopBinds []              = returnSmpl []
-simplTopBinds (bind1 : binds) = (simplBind bind1	$
-			         simplTopBinds binds)	`thenSmpl` \ (binds1', binds') ->
-				returnSmpl (binds1' ++ binds')
+simplTopBinds binds = go binds		`thenSmpl` \ (binds', _) ->
+		      returnSmpl binds'
+		    where
+		      go []              = returnSmpl ([], ())
+		      go (bind1 : binds) = simplBind bind1 (go binds)
 \end{code}
 
 

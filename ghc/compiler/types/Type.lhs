@@ -27,7 +27,7 @@ module Type (
 	splitAlgTyConApp_maybe, splitAlgTyConApp,
 	mkDictTy, splitDictTy_maybe, isDictTy,
 
-	mkSynTy, isSynTy,
+	mkSynTy, isSynTy, deNoteType,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy,
@@ -39,7 +39,7 @@ module Type (
 	mkSigmaTy, splitSigmaTy,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType,
+	isUnLiftedType, isUnboxedType, isUnboxedTupleType, isAlgType, isDataType,
 	typePrimRep,
 
 	-- Free variables
@@ -78,7 +78,7 @@ import Class	( classTyCon, Class )
 import TyCon	( TyCon, KindCon, 
 		  mkFunTyCon, mkKindCon, mkSuperKindCon,
 		  matchesTyCon, isUnboxedTupleTyCon, isUnLiftedTyCon,
-		  isFunTyCon, 
+		  isFunTyCon, isDataTyCon,
 		  isAlgTyCon, isSynTyCon, tyConArity,
 		  tyConKind, tyConDataCons, getSynTyConDefn, 
 		  tyConPrimRep, tyConClass_maybe
@@ -115,11 +115,15 @@ A type is
 			can be entered.
 			(NOTE: previously "pointed").			
 
-	*algebraic*	A type with one or more constructors.  An algebraic
-			type is one that can be deconstructed with a case
-			expression.  *NOT* the same as lifted types, 
-			because we also include unboxed tuples in this
-			classification.
+	*algebraic*	A type with one or more constructors, whether declared
+			with "data" or "newtype".   
+			An algebraic type is one that can be deconstructed
+			with a case expression.  
+
+			*NOT* the same as lifted types,  because we also 
+			include unboxed tuples in this classification.
+
+	*data*		A type declared with "data".  Also boxed tuples.
 
 	*primitive*	iff it is a built-in type that can't be expressed
 			in Haskell.
@@ -523,6 +527,15 @@ mkSynTy syn_tycon tys
 
 isSynTy (NoteTy (SynNote _) _) = True
 isSynTy other                  = False
+
+deNoteType :: Type -> Type
+	-- Sorry for the cute name
+deNoteType ty@(TyVarTy tyvar)	= ty
+deNoteType (TyConApp tycon tys) = TyConApp tycon (map deNoteType tys)
+deNoteType (NoteTy _ ty)	= deNoteType ty
+deNoteType (AppTy fun arg)	= AppTy (deNoteType fun) (deNoteType arg)
+deNoteType (FunTy fun arg)	= FunTy (deNoteType fun) (deNoteType arg)
+deNoteType (ForAllTy tv ty)	= ForAllTy tv (deNoteType ty)
 \end{code}
 
 Notes on type synonyms
@@ -899,9 +912,18 @@ isUnboxedTupleType ty = case splitTyConApp_maybe ty of
 			   Just (tc, ty_args) -> isUnboxedTupleTyCon tc
 			   other	      -> False
 
+-- Should only be applied to *types*; hence the assert
 isAlgType :: Type -> Bool
 isAlgType ty = case splitTyConApp_maybe ty of
-			Just (tc, ty_args) -> isAlgTyCon tc
+			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+					      isAlgTyCon tc
+			other		   -> False
+
+-- Should only be applied to *types*; hence the assert
+isDataType :: Type -> Bool
+isDataType ty = case splitTyConApp_maybe ty of
+			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+					      isDataTyCon tc
 			other		   -> False
 
 typePrimRep :: Type -> PrimRep

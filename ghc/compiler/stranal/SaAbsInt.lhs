@@ -18,6 +18,7 @@ module SaAbsInt (
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )
 import CoreSyn
 import CoreUnfold	( Unfolding(..) )
+import PrimOp		( primOpStrictness )
 import Id		( Id, idType, getIdStrictness, getIdUnfolding )
 import Const		( Con(..) )
 import DataCon		( dataConTyCon, dataConArgTys )
@@ -418,14 +419,19 @@ absEval anal (Con (Literal _) args) env
   = 	-- Literals terminate (strictness) and are not poison (absence)
     AbsTop
 
-absEval anal (Con (PrimOp _) args) env
-  = 	-- PrimOps evaluate all their arguments
-    if any (what_bot anal) [absEval anal arg env | arg <- args]
+absEval anal (Con (PrimOp op) args) env
+  = 	-- Not all PrimOps evaluate all their arguments
+    if or (zipWith (check_arg anal) 
+		   [absEval anal arg env | arg <- args]
+		   arg_demands)
     then AbsBot
-    else AbsTop
+    else case anal of
+	    StrAnal | result_bot -> AbsBot
+	    other		 -> AbsTop
   where
-    what_bot StrAnal = isBot	-- Primops are strict
-    what_bot AbsAnal = anyBot	-- Look for poison anywhere
+    (arg_demands, result_bot) = primOpStrictness op
+    check_arg StrAnal arg dmd = evalStrictness dmd arg
+    check_arg AbsAnal arg dmd = evalAbsence    dmd arg
 
 absEval anal (Con (DataCon con) args) env
   | isProductTyCon (dataConTyCon con)

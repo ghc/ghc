@@ -34,7 +34,7 @@ import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..),
 import Demand		( Demand, isStrict, wwLazy )
 import Const		( isWHNFCon, conOkForAlt )
 import ConFold		( tryPrimOp )
-import PrimOp		( PrimOp )
+import PrimOp		( PrimOp, primOpStrictness )
 import DataCon		( DataCon, dataConNumInstArgs, dataConStrictMarks, dataConSig, dataConArgTys )
 import Const		( Con(..) )
 import MagicUFs		( applyMagicUnfoldingFun )
@@ -53,7 +53,7 @@ import SpecEnv		( lookupSpecEnv, isEmptySpecEnv, substSpecEnv )
 import CostCentre	( isSubsumedCCS, currentCCS, isEmptyCC )
 import Type		( Type, mkTyVarTy, mkTyVarTys, isUnLiftedType, fullSubstTy, 
 			  mkFunTy, splitFunTys, splitTyConApp_maybe, splitFunTy_maybe,
-			  applyTy, applyTys, funResultTy
+			  applyTy, applyTys, funResultTy, isDictTy, isDataType
 			)
 import TyCon		( isDataTyCon, tyConDataCons, tyConClass_maybe, tyConArity, isDataTyCon )
 import TysPrim		( realWorldStatePrimTy )
@@ -141,16 +141,24 @@ simplExprB expr@(Con (PrimOp op) args) cont
     getInScope				`thenSmpl` \ in_scope ->
     getSubstEnv				`thenSmpl` \ se ->
     let
+	(val_arg_demands, _) = primOpStrictness op
+
 	-- Main game plan: loop through the arguments, simplifying
 	-- each of them with an ArgOf continuation.  Getting the right
 	-- cont_ty in the ArgOf continuation is a bit of a nuisance.
-        go []         args' = rebuild_primop (reverse args')
-        go (arg:args) args' = setSubstEnv se (simplExprB arg (mk_cont args args'))
+        go []         ds     args' = rebuild_primop (reverse args')
+        go (arg:args) ds     args' 
+	   | isTypeArg arg  	   = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
+				     go args ds (arg':args')
+        go (arg:args) (d:ds) args' 
+	   | not (isStrict d)      = setSubstEnv se (simplArg arg)	`thenSmpl` \ arg' ->
+				     go args ds (arg':args')
+	   | otherwise		   = setSubstEnv se (simplExprB arg (mk_cont args ds args'))
 
 	cont_ty = contResultType in_scope expr_ty cont
-	mk_cont args args' = ArgOf NoDup (\ arg' -> go args (arg':args')) cont_ty
+	mk_cont args ds args' = ArgOf NoDup (\ arg' -> go args ds (arg':args')) cont_ty
     in
-    go args []
+    go args val_arg_demands []
   where
 
     rebuild_primop args'
@@ -196,14 +204,13 @@ simplExprB (Note note e) cont
   = simplExpr e Stop	`thenSmpl` \ e' ->
     rebuild (mkNote note e') cont
 
--- Let to case, but only if the RHS isn't a WHNF
+-- A non-recursive let is dealt with by simplBeta
 simplExprB (Let (NonRec bndr rhs) body) cont
   = getSubstEnv		`thenSmpl` \ se ->
     simplBeta bndr rhs se body cont
 
-simplExprB (Let bind body) cont
-  = simplBind bind (simplExprB body cont)	`thenSmpl` \ (binds, stuff) ->
-    returnSmpl (addBinds binds stuff)
+simplExprB (Let (Rec pairs) body) cont
+  = simplRecBind pairs (simplExprB body cont)
 
 -- Type-beta reduction
 simplExprB expr@(Lam bndr body) cont@(ApplyTo _ (Type ty_arg) arg_se body_cont)
@@ -478,36 +485,36 @@ costCentreOk ccs_encl cc_rhs
 %************************************************************************
 
 \begin{code}
-simplBind :: CoreBind -> SimplM a -> SimplM ([CoreBind], a)
+simplBind :: InBind -> SimplM (OutStuff a) -> SimplM (OutStuff a)
 
 simplBind (NonRec bndr rhs) thing_inside
   = simplTopRhs bndr rhs	`thenSmpl` \ (binds, in_scope,  rhs', arity) ->
     setInScope in_scope							$
-    completeBindNonRec (bndr `setIdArity` arity) rhs' thing_inside	`thenSmpl` \ (maybe_bind, res) ->
-    let
-	binds' = case maybe_bind of
-			Just bind -> binds ++ [bind]
-			Nothing	  -> binds
-    in
-    returnSmpl (binds', res)
+    completeBindNonRec (bndr `setIdArity` arity) rhs' thing_inside	`thenSmpl` \ stuff ->
+    returnSmpl (addBinds binds stuff)
 
 simplBind (Rec pairs) thing_inside
+  = simplRecBind pairs thing_inside
+	-- The assymetry between the two cases is a bit unclean
+
+simplRecBind :: [(InId, InExpr)] -> SimplM (OutStuff a) -> SimplM (OutStuff a)
+simplRecBind pairs thing_inside
   = simplIds (map fst pairs) 		$ \ bndrs' -> 
 	-- NB: bndrs' don't have unfoldings or spec-envs
 	-- We add them as we go down, using simplPrags
 
-    go (pairs `zip` bndrs')		`thenSmpl` \ (pairs', thing') ->
-    returnSmpl ([Rec pairs'], thing')
+    go (pairs `zip` bndrs')		`thenSmpl` \ (pairs', stuff) ->
+    returnSmpl (addBind (Rec pairs') stuff)
   where
-    go [] = thing_inside 	`thenSmpl` \ res ->
-	    returnSmpl ([], res)
+    go [] = thing_inside 	`thenSmpl` \ stuff ->
+	    returnSmpl ([], stuff)
 
     go (((bndr, rhs), bndr') : pairs) 
 	= simplTopRhs bndr rhs 				`thenSmpl` \ (rhs_binds, in_scope, rhs', arity) ->
 	  setInScope in_scope				$
 	  completeBindRec bndr (bndr' `setIdArity` arity) 
-			  rhs' (go pairs)		`thenSmpl` \ (pairs', res) ->
-	  returnSmpl (flatten rhs_binds pairs', res)
+			  rhs' (go pairs)		`thenSmpl` \ (pairs', stuff) ->
+	  returnSmpl (flatten rhs_binds pairs', stuff)
 
     flatten (NonRec b r : binds) prs  = (b,r) : flatten binds prs
     flatten (Rec prs1   : binds) prs2 = prs1 ++ flatten binds prs2
@@ -569,11 +576,11 @@ simplRhs bndr bndr_se rhs
     mkRhsTyLam rhs		`thenSmpl` \ rhs' ->
 
 	-- Simplify the swizzled RHS
-    simplRhs2 bndr bndr_se rhs	`thenSmpl` \ stuff@(floats, in_scope, rhs', arity) ->
+    simplRhs2 bndr bndr_se rhs	`thenSmpl` \ (floats, (in_scope, rhs', arity)) ->
 
     if not (null floats) && exprIsWHNF rhs' then	-- Do the float
 	tick LetFloatFromLet	`thenSmpl_`
-	returnSmpl stuff
+	returnSmpl (floats, in_scope, rhs', arity)
     else			-- Don't do it
 	getInScope		`thenSmpl` \ in_scope ->
 	returnSmpl ([], in_scope, mkLetBinds floats rhs', arity)
@@ -588,10 +595,7 @@ from simplExpr for an applied lambda).  The binder needs to
 
 \begin{code}
 simplRhs2 bndr bndr_se (Let bind body)
-  = simplBind bind (
-	simplRhs2 bndr bndr_se body
-    )  				`thenSmpl` \ (binds1, (binds2, in_scope, rhs', arity)) ->
-    returnSmpl (binds1 ++ binds2, in_scope, rhs', arity)
+  = simplBind bind (simplRhs2 bndr bndr_se body)
 
 simplRhs2 bndr bndr_se rhs 
   | null ids	-- Prevent eta expansion for both thunks 
@@ -604,7 +608,7 @@ simplRhs2 bndr bndr_se rhs
 		-- Also if there isn't a lambda at the top we use
 		-- simplExprB so that we can do (more) let-floating
   = simplExprB rhs Stop		`thenSmpl` \ (binds, (in_scope, rhs')) ->
-    returnSmpl (binds, in_scope, rhs', unknownArity)
+    returnSmpl (binds, (in_scope, rhs', unknownArity))
 
   | otherwise	-- Consider eta expansion
   = getSwitchChecker		`thenSmpl` \ sw_chkr ->
@@ -620,17 +624,22 @@ simplRhs2 bndr bndr_se rhs
 						`thenSmpl` \ extra_arg_tys' ->
 	newIds extra_arg_tys'			$ \ extra_bndrs' ->
 	simplExpr body (mk_cont extra_bndrs') 	`thenSmpl` \ body' ->
-	returnSmpl ( [], in_scope, 
-		     mkLams tyvars'
-		   $ mkLams ids' 
- 		   $ mkLams extra_bndrs' body',
-		   atLeastArity (no_of_ids + no_of_extras))
+	let
+	    expanded_rhs = mkLams tyvars'
+			 $ mkLams ids' 
+ 			 $ mkLams extra_bndrs' body'
+	    expanded_arity = atLeastArity (no_of_ids + no_of_extras)	
+	in
+	returnSmpl ([], (in_scope, expanded_rhs, expanded_arity))
+
     else
 	simplExpr body Stop 			`thenSmpl` \ body' ->
-	returnSmpl ( [], in_scope, 
-		     mkLams tyvars'
-		   $ mkLams ids' body', 
-		   atLeastArity no_of_ids)
+	let
+	    unexpanded_rhs = mkLams tyvars'
+			   $ mkLams ids' body'
+	    unexpanded_arity = atLeastArity no_of_ids
+	in
+	returnSmpl ([], (in_scope, unexpanded_rhs, unexpanded_arity))
 
   where
     (tyvars, ids, body) = collectTyAndValBinders rhs
@@ -682,8 +691,8 @@ simplBeta bndr rhs rhs_se body cont
 #endif
 
 simplBeta bndr rhs rhs_se body cont
-  |  (isStrict (getIdDemandInfo bndr) || is_dict bndr)
-  && not (exprIsWHNF rhs)
+  |  isUnLiftedType bndr_ty
+  || (isStrict (getIdDemandInfo bndr) || is_dict bndr) && not (exprIsWHNF rhs)
   = tick Let2Case	`thenSmpl_`
     getSubstEnv 	`thenSmpl` \ body_se ->
     setSubstEnv rhs_se	$
@@ -700,53 +709,48 @@ simplBeta bndr rhs rhs_se body cont
     setSubstEnv rhs_se (simplRhs bndr bndr_se rhs)
 				`thenSmpl` \ (floats, in_scope, rhs', arity) ->
     setInScope in_scope				$
-    completeBindNonRecE (bndr `setIdArity` arity) rhs' (
+    completeBindNonRec (bndr `setIdArity` arity) rhs' (
 	    simplExprB body cont		
-    )						`thenSmpl` \ res ->
-    returnSmpl (addBinds floats res)
+    )						`thenSmpl` \ stuff ->
+    returnSmpl (addBinds floats stuff)
   where
 	-- Return true only for dictionary types where the dictionary
 	-- has more than one component (else we risk poking on the component
 	-- of a newtype dictionary)
-    is_dict bndr
-	| not opt_DictsStrict = False
-	| otherwise
-        = case splitTyConApp_maybe (idType bndr) of
-		Nothing          -> False
-		Just (tycon,tys) -> maybeToBool (tyConClass_maybe tycon) &&
-				    length tys == tyConArity tycon	&&
-				    isDataTyCon tycon
+    is_dict bndr = opt_DictsStrict && isDictTy bndr_ty && isDataType bndr_ty
+    bndr_ty      = idType bndr
 \end{code}
 
 
-The completeBindNonRec family 
+completeBindNonRec
 	- deals only with Ids, not TyVars
 	- take an already-simplified RHS
 	- always produce let bindings
 
-They do *not* attempt to do let-to-case.  Why?  Because
-they are used for top-level bindings, and in many situations where
-the "rhs" is known to be a WHNF (so let-to-case is inappropriate).
+It does *not* attempt to do let-to-case.  Why?  Because they are used for
+
+	- top-level bindings
+		(when let-to-case is impossible) 
+
+	- many situations where the "rhs" is known to be a WHNF
+		(so let-to-case is inappropriate).
 
 \begin{code}
-completeBindNonRec :: InId 	-- Binder
-	        -> OutExpr	-- Simplified RHS
-	   	-> SimplM a	-- Thing inside
-	   	-> SimplM (Maybe OutBind, a)
+completeBindNonRec :: InId 		-- Binder
+	        -> OutExpr		-- Simplified RHS
+	   	-> SimplM (OutStuff a)	-- Thing inside
+	   	-> SimplM (OutStuff a)
 completeBindNonRec bndr rhs thing_inside
   |  isDeadBinder bndr		-- This happens; for example, the case_bndr during case of
 				-- known constructor:  case (a,b) of x { (p,q) -> ... }
 				-- Here x isn't mentioned in the RHS, so we don't want to
 				-- create the (dead) let-binding  let x = (a,b) in ...
-  =  thing_inside			`thenSmpl` \ res ->
-     returnSmpl (Nothing,res)		
+  =  thing_inside
 
   |  postInlineUnconditionally bndr etad_rhs
   =  tick PostInlineUnconditionally	`thenSmpl_`
-     extendIdSubst bndr (Done etad_rhs)	(
-     thing_inside			`thenSmpl` \ res ->
-     returnSmpl (Nothing,res)
-     )
+     extendIdSubst bndr (Done etad_rhs)	
+     thing_inside
 
   |  otherwise			-- Note that we use etad_rhs here
 				-- This gives maximum chance for a remaining binding
@@ -754,19 +758,10 @@ completeBindNonRec bndr rhs thing_inside
   =  simplBinder bndr				$ \ bndr' ->
      simplPrags bndr bndr' etad_rhs		`thenSmpl` \ bndr'' ->
      modifyInScope bndr''			$ 
-     thing_inside				`thenSmpl` \ res ->
-     returnSmpl (Just (NonRec bndr' etad_rhs), res)
+     thing_inside				`thenSmpl` \ stuff ->
+     returnSmpl (addBind (NonRec bndr' etad_rhs) stuff)
   where
      etad_rhs = etaCoreExpr rhs
-
-completeBindNonRecE :: InId -> OutExpr
-		    -> SimplM (OutStuff a)
-		    -> SimplM (OutStuff a)
-completeBindNonRecE bndr rhs thing_inside
-  = completeBindNonRec bndr rhs thing_inside	`thenSmpl` \ (maybe_bind, stuff) ->
-    case maybe_bind of
-	Nothing   -> returnSmpl stuff
-	Just bind -> returnSmpl (addBind bind stuff)
 
 -- (simplPrags old_bndr new_bndr new_rhs) does two things
 --	(a) it attaches the new unfolding to new_bndr
@@ -1078,6 +1073,7 @@ do_rebuild expr@(Con con args) cont@(Select _ _ _ _ _)
 
 
 ---------------------------------------------------------
+
 --	Case of other value (e.g. a partial application or lambda)
 --	Turn it back into a let
 
@@ -1086,7 +1082,7 @@ do_rebuild expr (Select _ bndr ((DEFAULT, bs, rhs):alts) se cont)
   = ASSERT( null bs && null alts )
     tick Case2Let		`thenSmpl_`
     setSubstEnv se 		(
-    completeBindNonRecE bndr expr 	$
+    completeBindNonRec bndr expr 	$
     simplExprB rhs cont
     )
 
@@ -1116,10 +1112,88 @@ do_rebuild scrut (Select _ bndr alts se cont)
   where
     (rhs1:other_rhss)		 = [rhs | (_,_,rhs) <- alts]
     binders_unused (_, bndrs, _) = all isDeadBinder bndrs
+\end{code}
+
+Case elimination [see the code above]
+~~~~~~~~~~~~~~~~
+Start with a simple situation:
+
+	case x# of	===>   e[x#/y#]
+	  y# -> e
+
+(when x#, y# are of primitive type, of course).  We can't (in general)
+do this for algebraic cases, because we might turn bottom into
+non-bottom!
+
+Actually, we generalise this idea to look for a case where we're
+scrutinising a variable, and we know that only the default case can
+match.  For example:
+\begin{verbatim}
+	case x of
+	  0#    -> ...
+	  other -> ...(case x of
+			 0#    -> ...
+			 other -> ...) ...
+\end{code}
+Here the inner case can be eliminated.  This really only shows up in
+eliminating error-checking code.
+
+We also make sure that we deal with this very common case:
+
+ 	case e of 
+	  x -> ...x...
+
+Here we are using the case as a strict let; if x is used only once
+then we want to inline it.  We have to be careful that this doesn't 
+make the program terminate when it would have diverged before, so we
+check that 
+	- x is used strictly, or
+	- e is already evaluated (it may so if e is a variable)
+
+Lastly, we generalise the transformation to handle this:
+
+	case e of	===> r
+	   True  -> r
+	   False -> r
+
+We only do this for very cheaply compared r's (constructors, literals
+and variables).  If pedantic bottoms is on, we only do it when the
+scrutinee is a PrimOp which can't fail.
+
+We do it *here*, looking at un-simplified alternatives, because we
+have to check that r doesn't mention the variables bound by the
+pattern in each alternative, so the binder-info is rather useful.
+
+So the case-elimination algorithm is:
+
+	1. Eliminate alternatives which can't match
+
+	2. Check whether all the remaining alternatives
+		(a) do not mention in their rhs any of the variables bound in their pattern
+	   and  (b) have equal rhss
+
+	3. Check we can safely ditch the case:
+		   * PedanticBottoms is off,
+		or * the scrutinee is an already-evaluated variable
+		or * the scrutinee is a primop which is ok for speculation
+			-- ie we want to preserve divide-by-zero errors, and
+			-- calls to error itself!
+
+		or * [Prim cases] the scrutinee is a primitive variable
+
+		or * [Alg cases] the scrutinee is a variable and
+		     either * the rhs is the same variable
+			(eg case x of C a b -> x  ===>   x)
+		     or     * there is only one alternative, the default alternative,
+				and the binder is used strictly in its scope.
+				[NB this is helped by the "use default binder where
+				 possible" transformation; see below.]
 
 
+If so, then we can replace the case with one of the rhss.
 
 
+\begin{code}
 ---------------------------------------------------------
 --	Rebuiling a function with strictness info
 
@@ -1138,16 +1212,17 @@ rebuild_strict ds result_bot fun fun_ty (ApplyTo _ (Type ty_arg) se cont)
 			 (applyTy fun_ty ty_arg') cont
 
 rebuild_strict (d:ds) result_bot fun fun_ty (ApplyTo _ val_arg se cont)
-	| not (isStrict d)	-- Lazy value argument
-	= setSubstEnv se (simplArg val_arg)	`thenSmpl` \ val_arg' ->
-	  rebuild_strict ds result_bot (App fun val_arg') res_ty cont
-
-	| otherwise  		-- Strict value argument
+	| isStrict d || isUnLiftedType arg_ty	-- Strict value argument
 	= getInScope 				`thenSmpl` \ in_scope ->
 	  let
 		cont_ty = contResultType in_scope res_ty cont
 	  in
  	  setSubstEnv se (simplExprB val_arg (ArgOf NoDup cont_fn cont_ty))
+
+	| otherwise  				-- Lazy value argument
+	= setSubstEnv se (simplArg val_arg)	`thenSmpl` \ val_arg' ->
+	  cont_fn val_arg'
+
 	where
 	  Just (arg_ty, res_ty) = splitFunTy_maybe fun_ty
 	  cont_fn arg'          = rebuild_strict ds result_bot 
@@ -1226,7 +1301,7 @@ knownCon expr con args (Select _ bndr alts se cont)
     setSubstEnv se 		(
     case findAlt con alts of
 	(DEFAULT, bs, rhs)     -> ASSERT( null bs )
-				  completeBindNonRecE bndr expr $
+				  completeBindNonRec bndr expr $
 			          simplExprB rhs cont
 
 	(Literal lit, bs, rhs) -> ASSERT( null bs )
@@ -1237,7 +1312,7 @@ knownCon expr con args (Select _ bndr alts se cont)
 					-- case patterns.
 				  simplExprB rhs cont
 
-	(DataCon dc, bs, rhs)  -> completeBindNonRecE bndr expr 	$
+	(DataCon dc, bs, rhs)  -> completeBindNonRec bndr expr 		$
 				  extend bs real_args			$
 			          simplExprB rhs cont
 			       where
@@ -1394,83 +1469,6 @@ simplAlts zap_occ_info scrut_cons case_bndr'' alts cont'
 \end{code}
 
 
-Case elimination [see the code above]
-~~~~~~~~~~~~~~~~
-Start with a simple situation:
-
-	case x# of	===>   e[x#/y#]
-	  y# -> e
-
-(when x#, y# are of primitive type, of course).  We can't (in general)
-do this for algebraic cases, because we might turn bottom into
-non-bottom!
-
-Actually, we generalise this idea to look for a case where we're
-scrutinising a variable, and we know that only the default case can
-match.  For example:
-\begin{verbatim}
-	case x of
-	  0#    -> ...
-	  other -> ...(case x of
-			 0#    -> ...
-			 other -> ...) ...
-\end{code}
-Here the inner case can be eliminated.  This really only shows up in
-eliminating error-checking code.
-
-We also make sure that we deal with this very common case:
-
- 	case e of 
-	  x -> ...x...
-
-Here we are using the case as a strict let; if x is used only once
-then we want to inline it.  We have to be careful that this doesn't 
-make the program terminate when it would have diverged before, so we
-check that 
-	- x is used strictly, or
-	- e is already evaluated (it may so if e is a variable)
-
-Lastly, we generalise the transformation to handle this:
-
-	case e of	===> r
-	   True  -> r
-	   False -> r
-
-We only do this for very cheaply compared r's (constructors, literals
-and variables).  If pedantic bottoms is on, we only do it when the
-scrutinee is a PrimOp which can't fail.
-
-We do it *here*, looking at un-simplified alternatives, because we
-have to check that r doesn't mention the variables bound by the
-pattern in each alternative, so the binder-info is rather useful.
-
-So the case-elimination algorithm is:
-
-	1. Eliminate alternatives which can't match
-
-	2. Check whether all the remaining alternatives
-		(a) do not mention in their rhs any of the variables bound in their pattern
-	   and  (b) have equal rhss
-
-	3. Check we can safely ditch the case:
-		   * PedanticBottoms is off,
-		or * the scrutinee is an already-evaluated variable
-		or * the scrutinee is a primop which is ok for speculation
-			-- ie we want to preserve divide-by-zero errors, and
-			-- calls to error itself!
-
-		or * [Prim cases] the scrutinee is a primitive variable
-
-		or * [Alg cases] the scrutinee is a variable and
-		     either * the rhs is the same variable
-			(eg case x of C a b -> x  ===>   x)
-		     or     * there is only one alternative, the default alternative,
-				and the binder is used strictly in its scope.
-				[NB this is helped by the "use default binder where
-				 possible" transformation; see below.]
-
-
-If so, then we can replace the case with one of the rhss.
 
 
 %************************************************************************

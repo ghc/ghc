@@ -12,7 +12,7 @@ module PrimOp (
 
 	commutableOp,
 
-	primOpOutOfLine, primOpNeedsWrapper,
+	primOpOutOfLine, primOpNeedsWrapper, primOpStrictness,
 	primOpOkForSpeculation, primOpIsCheap,
 	primOpHasSideEffects,
 
@@ -27,6 +27,7 @@ import PrimRep		-- most of it
 import TysPrim
 import TysWiredIn
 
+import Demand		( Demand, wwLazy, wwPrim, wwStrict )
 import Var		( TyVar )
 import CallConv		( CallConv, pprCallConv )
 import PprType		( pprParendType )
@@ -837,6 +838,32 @@ integerDyadic2Results name = mkGenPrimOp name [] two_Integer_tys
 	 	      intPrimTy, intPrimTy, byteArrayPrimTy])
 
 integerCompare name = mkGenPrimOp name [] two_Integer_tys intPrimTy
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection{Strictness}
+%*									*
+%************************************************************************
+
+Not all primops are strict!
+
+\begin{code}
+primOpStrictness :: PrimOp -> ([Demand], Bool)
+	-- See IdInfo.StrictnessInfo for discussion of what the results
+	-- **NB** as a cheap hack, to avoid having to look up the PrimOp's arity,
+	-- the list of demands may be infinite!
+	-- Use only the ones you ned.
+
+primOpStrictness SeqOp            = ([wwLazy], False)
+primOpStrictness WriteArrayOp     = ([wwPrim, wwPrim, wwLazy, wwPrim], False)
+primOpStrictness WriteMutVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
+primOpStrictness PutMVarOp	  = ([wwPrim, wwLazy, wwPrim], False)
+primOpStrictness CatchOp	  = ([wwLazy, wwLazy], False)
+primOpStrictness RaiseOp	  = ([wwLazy], True)	-- NB: True => result is bottom
+primOpStrictness MkWeakOp	  = ([wwLazy, wwLazy, wwLazy, wwPrim], False)
+primOpStrictness MakeStablePtrOp  = ([wwLazy, wwPrim], False)
+primOpStrictness other		  = (repeat wwPrim, False)
 \end{code}
 
 %************************************************************************

@@ -159,7 +159,7 @@ stretchZipEqual :: (a -> b -> Maybe a) -> [a] -> [b] -> [a]
 stretchZipEqual f [] [] = []
 stretchZipEqual f (x:xs) (y:ys) = case f x y of
 				    Just x' -> x' : stretchZipEqual f xs ys
-				    Nothing -> x  :  stretchZipEqual f xs (y:ys)
+				    Nothing -> x  : stretchZipEqual f xs (y:ys)
 \end{code}
 
 

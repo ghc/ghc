@@ -460,7 +460,11 @@ initTidyOccEnv = foldl (\env (OccName _ fs _ _) -> addToFM env fs 1) emptyTidyOc
 tidyOccName :: TidyOccEnv -> OccName -> (TidyOccEnv, OccName)
 
 tidyOccName in_scope occ@(OccName occ_sp real _ _)
-  | not (real `elemFM` in_scope)
+  | not (real `elemFM` in_scope) &&
+    not (isLexCon real)			-- Hack alert!   Specialised versions of overloaded
+					-- constructors end up as ordinary Ids, but we don't
+					-- want them as ConIds in interface files.
+
   = (addToFM in_scope real 1, occ)	-- First occurrence
 
   | otherwise				-- Already occurs

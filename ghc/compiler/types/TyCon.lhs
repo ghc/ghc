@@ -248,11 +248,11 @@ isAlgTyCon (AlgTyCon {})   = True
 isAlgTyCon (TupleTyCon {}) = True
 isAlgTyCon other 	   = False
 
--- isDataTyCon returns False for @newtype@.
+-- isDataTyCon returns False for @newtype@ and for unboxed tuples
 isDataTyCon (AlgTyCon {algTyConFlavour = new_or_data})  = case new_or_data of
 								NewType -> False
 								other	-> True
-isDataTyCon (TupleTyCon {}) = True	-- is an unboxed tuple a datatype?
+isDataTyCon (TupleTyCon {tyConBoxed = True}) = True	
 isDataTyCon other = False
 
 isNewTyCon (AlgTyCon {algTyConFlavour = NewType}) = True 
