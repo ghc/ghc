@@ -19,13 +19,19 @@ module PprAbsC (
     ) where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(AbsCLoop)		-- break its dependence on ClosureInfo
+
 IMPORT_1_3(IO(Handle))
 IMPORT_1_3(Char(isDigit,isPrint))
 #if __GLASGOW_HASKELL__ == 201
 IMPORT_1_3(GHCbase(Addr(..)) ) -- to see innards
 #elif __GLASGOW_HASKELL__ >= 202
 import GlaExts (Addr(..))
+#endif
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(AbsCLoop)		-- break its dependence on ClosureInfo
+#else
+import {-# SOURCE #-} ClosureInfo
 #endif
 
 import AbsCSyn

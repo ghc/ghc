@@ -48,11 +48,21 @@ module CLabel (
     ) where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		( CtrlReturnConvention(..),
 			  ctrlReturnConvAlg
 			)
+#else
+import {-# SOURCE #-} CgRetConv
+#endif
+
+
 #if ! OMIT_NATIVE_CODEGEN
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl )
+#else
+import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
+#endif
 #endif
 
 import CStrings		( pp_cSEP )

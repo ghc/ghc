@@ -33,7 +33,11 @@ module HeapOffs (
 
 IMP_Ubiq(){-uitous-}
 #if ! OMIT_NATIVE_CODEGEN
+# if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords )
+# else
+import {-# SOURCE #-} MachMisc
+# endif
 #endif
 
 import Maybes		( catMaybes )
@@ -319,7 +323,7 @@ pprHeapOffsetPieces sty int_offs fxdhdr_offs varhdr_offs tothdr_offs
   where
     pp_hdrs hdr_pp [] = Nothing
     pp_hdrs hdr_pp [SMRI(rep, n)] | n _EQ_ ILIT(1) = Just ((<>) (text (show rep)) hdr_pp)
-    pp_hdrs hdr_pp hdrs = Just (parens (sep (punctuate (char '+')
+    pp_hdrs hdr_pp hdrs = Just (parens (hsep (punctuate (char '+')
 						(map (pp_hdr hdr_pp) hdrs))))
 
     pp_hdr :: Doc -> SMRep__Int -> Doc

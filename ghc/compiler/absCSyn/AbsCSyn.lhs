@@ -36,7 +36,14 @@ module AbsCSyn {- (
     )-} where
 
 IMP_Ubiq(){-uitous-}
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(AbsCLoop)
+#else
+import {-# SOURCE #-} MachMisc
+import {-# SOURCE #-} CLabel
+import {-# SOURCE #-} ClosureInfo
+import {-# SOURCE #-} CgRetConv
+#endif
 
 import Constants   	( mAX_Vanilla_REG, mAX_Float_REG,
 			  mAX_Double_REG, lIVENESS_R1, lIVENESS_R2,
