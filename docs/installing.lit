@@ -1720,6 +1720,22 @@ will reach out and bite you.  Yes, please complain; meanwhile,
 you can do \tr{make -n whatever.dvi} to see the intended commands,
 then try to muddle through, doing them by hand.
 
+%------------------------------------------------------------------------
+\item
+GHC's sources go through \tr{cpp}
+before being compiled, and \tr{cpp} varies a bit from one Unix to another.
+One particular gotcha is macro calls like this:
+\begin{verbatim}
+  SLIT("Hello, world")
+\end{verbatim}
+Some \tr{cpp}s treat the comma inside the string as separating two macro arguments,
+so you get
+\begin{verbatim}
+  :731: macro `SLIT' used with too many (2) args
+\end{verbatim}
+Alas, \tr{cpp} doesn't tell you the offending file!
+
+Workaround: don't put wierd things in string args to \tr{cpp} macros.
 \end{enumerate}
 
 
