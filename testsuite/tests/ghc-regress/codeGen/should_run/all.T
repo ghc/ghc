@@ -54,3 +54,6 @@ test "cg046" { vtr("", "", "") }
 test "cg047" { vtr("", "", "") }
 test "cg048" { vtr("", "", "") }
 test "cg049" { vtr( "-funbox-strict-fields", "", "") }
+
+-- NB: be sure to run cg050 *without* -O; that's what showed the bug
+test "cg050" { vtr( "", "", "") }
