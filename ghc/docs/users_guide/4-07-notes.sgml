@@ -105,7 +105,8 @@
     <itemizedlist>
       <listitem>
 	<para>The FFI has been revised and expanded; see <xref
-	linkend="sec-Foreign"> and <xref linkend="sec-CTypes">.</para>
+	linkend="sec-Foreign">, <xref linkend="sec-CTypes">, and <xref
+	linkend="sec-CTypesISO"> .</para>
       </listitem>
 
       <listitem>
@@ -117,30 +118,24 @@
       <listitem>
 	<para>The <literal>QuickCheck</literal> library for performing
 	functional testing has been added to the
-	<literal>util</literal> package.</para>
+	<literal>util</literal> package (<xref
+	linkend="sec-quickcheck">).</para>
       </listitem>
 
       <listitem>
 	<para>Two new experimental interfaces to arrays:
 	<literal>IArray</literal> for immutable arrays (<xref
 	linkend="sec-iarray">), and <literal>MArray</literal> for
-	mutable arrays (<xref linkend="sec-marray">).</para> 
-
-	<para>Comments on these interfaces are welcome; eventually
-	we'd like them to replace <literal>ByteArray</literal>,
-	<literal>STArray</literal> and
-	<literal>IOArray</literal>.</para>
+	mutable arrays (<xref linkend="sec-marray">). Comments on
+	these interfaces are welcome; eventually we'd like them to
+	replace <literal>ByteArray</literal>,
+	<literal>MutableArray</literal>, <literal>IOArray</literal>,
+	and <literal>STArray</literal>.</para>
       </listitem>
 
       <listitem>
 	<para>New function: <link
 	linkend="tryTakeMVar"><literal>tryTakeMVar</literal></link>.</para>
-      </listitem>
-
-      <listitem>
-	<para><literal>MutableArray</literal> has gone away, use
-	<literal>STArray</literal> (see <xref linkend="sec-ST">)
-	instead.</para>
       </listitem>
 
       <listitem>
