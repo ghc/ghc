@@ -363,7 +363,6 @@ tc_expr expr@(RecordCon con@(L loc con_name) rbinds) res_ty
  	-- Check for missing fields
     checkMissingFields data_con rbinds		`thenM_` 
 
-    getSrcSpanM					`thenM` \ loc ->
     returnM (RecordConOut data_con (L loc con_expr) rbinds')
 
 -- The main complication with RecordUpd is that we need to explicitly
