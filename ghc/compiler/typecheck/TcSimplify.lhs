@@ -408,7 +408,7 @@ inferLoop doc tau_tvs wanteds
 	try_me inst 	
 	  | isFree qtvs inst  = Free
 	  | isClassDict inst  = DontReduceUnlessConstant	-- Dicts
-	  | otherwise	      = ReduceMe AddToIrreds		-- Lits and Methods
+	  | otherwise	      = ReduceMe 			-- Lits and Methods
     in
 		-- Step 2
     reduceContext doc try_me [] wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
@@ -494,7 +494,7 @@ checkLoop doc qtvs givens wanteds
 	      -- When checking against a given signature we always reduce
 	      -- until we find a match against something given, or can't reduce
 	try_me inst | isFree qtvs' inst  = Free
-		    | otherwise          = ReduceMe AddToIrreds
+		    | otherwise          = ReduceMe 
     in
 		-- Step 2
     reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
@@ -573,7 +573,7 @@ inferCheckLoop doc tau_tvs givens wanteds
 	      -- When checking against a given signature we always reduce
 	      -- until we find a match against something given, or can't reduce
 	try_me inst | isFree qtvs inst  = Free
-		    | otherwise         = ReduceMe AddToIrreds
+		    | otherwise         = ReduceMe 
     in
 		-- Step 2
     reduceContext doc try_me givens' wanteds'    `thenTc` \ (no_improvement, frees, binds, irreds) ->
@@ -614,6 +614,24 @@ and we want to end up with
 But that means that we must simplify the Method for f to (f Int dNumInt)! 
 So tcSimplifyToDicts squeezes out all Methods.
 
+IMPORTANT NOTE:  we *don't* want to do superclass commoning up.  Consider
+
+	fromIntegral :: (Integral a, Num b) => a -> b
+	{-# RULES "foo"  fromIntegral = id :: Int -> Int #-}
+
+Here, a=b=Int, and Num Int is a superclass of Integral Int. But we *dont* 
+want to get
+
+	forall dIntegralInt.
+	fromIntegral Int Int dIntegralInt (scsel dIntegralInt) = id Int
+
+because the scsel will mess up matching.  Instead we want
+
+	forall dIntegralInt, dNumInt.
+	fromIntegral Int Int dIntegralInt dNumInt = id Int
+
+Hence "DontReduce NoSCs"
+
 \begin{code}
 tcSimplifyToDicts :: LIE -> TcM ([Inst], TcDictBinds)
 tcSimplifyToDicts wanted_lie
@@ -628,8 +646,8 @@ tcSimplifyToDicts wanted_lie
     wanteds = lieToList wanted_lie
 
 	-- Reduce methods and lits only; stop as soon as we get a dictionary
-    try_me inst	| isDict inst = DontReduce
-		| otherwise   = ReduceMe AddToIrreds
+    try_me inst	| isDict inst = DontReduce NoSCs
+		| otherwise   = ReduceMe
 \end{code}
 
 
@@ -663,7 +681,7 @@ tcSimplifyIPs ip_names wanted_lie
     here_ip ip = isDict ip && ip `instMentionsIPs` ip_set
 
 	-- Simplify any methods that mention the implicit parameter
-    try_me inst | inst `instMentionsIPs` ip_set = ReduceMe AddToIrreds
+    try_me inst | inst `instMentionsIPs` ip_set = ReduceMe
 		| otherwise		        = Free
 \end{code}
 
@@ -716,7 +734,7 @@ bindInstsOfLocalFuns init_lie local_ids
 						-- so it's worth building a set, so that 
 						-- lookup (in isMethodFor) is faster
 
-    try_me inst | isMethodFor overloaded_set inst = ReduceMe AddToIrreds
+    try_me inst | isMethodFor overloaded_set inst = ReduceMe
 		| otherwise		          = Free
 \end{code}
 
@@ -731,23 +749,22 @@ The main control over context reduction is here
 
 \begin{code}
 data WhatToDo 
- = ReduceMe		  -- Try to reduce this
-	NoInstanceAction  -- What to do if there's no such instance
+ = ReduceMe		-- Try to reduce this
+			-- If there's no instance, behave exactly like
+			-- DontReduce: add the inst to 
+			-- the irreductible ones, but don't 
+			-- produce an error message of any kind.
+			-- It might be quite legitimate such as (Eq a)!
 
- | DontReduce		  	-- Return as irreducible 
+ | DontReduce WantSCs		-- Return as irreducible 
 
  | DontReduceUnlessConstant	-- Return as irreducible unless it can
 				-- be reduced to a constant in one step
 
  | Free			  -- Return as free
 
-data NoInstanceAction
-  = Stop		-- Fail; no error message
-			-- (Only used when tautology checking.)
-
-  | AddToIrreds		-- Just add the inst to the irreductible ones; don't 
-			-- produce an error message of any kind.
-			-- It might be quite legitimate such as (Eq a)!
+data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
+				-- of a predicate when adding it to the avails
 \end{code}
 
 
@@ -817,15 +834,15 @@ bindsAndIrreds avails wanteds
 				-- For implicit parameters, all occurrences share the same
 				-- Id, so there is no need for synonym bindings
 			       new_binds | new_id == id = binds
-					 | otherwise	= binds `AndMonoBinds` new_bind
-			       new_bind = VarMonoBind new_id (HsVar id)
+					 | otherwise	= addBind binds new_id (HsVar id)
 			       new_id   = instToId w
 
-	  Just (Rhs rhs ws') -> go avails' (binds `AndMonoBinds` new_bind) irreds (ws' ++ ws)
+	  Just (Rhs rhs ws') -> go avails' (addBind binds id rhs) irreds (ws' ++ ws)
 			     where
 				id	 = instToId w
 				avails'  = addToFM avails w (BoundTo id)
-				new_bind = VarMonoBind id rhs
+
+addBind binds id rhs = binds `AndMonoBinds` VarMonoBind id rhs
 \end{code}
 
 
@@ -986,17 +1003,17 @@ reduce stack try_me wanted state
   | otherwise
   = case try_me wanted of {
 
-      DontReduce -> addIrred state wanted
+      DontReduce want_scs -> addIrred want_scs state wanted
 
     ; DontReduceUnlessConstant ->    -- It's irreducible (or at least should not be reduced)
   				     -- First, see if the inst can be reduced to a constant in one step
-	try_simple addIrred
+	try_simple (addIrred AddSCs)	-- Assume want superclasses
 
     ; Free ->	-- It's free so just chuck it upstairs
   		-- First, see if the inst can be reduced to a constant in one step
 	try_simple addFree
 
-    ; ReduceMe no_instance_action ->	-- It should be reduced
+    ; ReduceMe ->		-- It should be reduced
 	lookupInst wanted	      `thenNF_Tc` \ lookup_result ->
 	case lookup_result of
 	    GenInst wanteds' rhs -> reduceList stack try_me wanteds' state	`thenTc` \ state' -> 
@@ -1004,9 +1021,8 @@ reduce stack try_me wanted state
 	    SimpleInst rhs       -> addWanted state wanted rhs []
 
 	    NoInstance ->    -- No such instance! 
-		    case no_instance_action of
-			Stop        -> failTc		
-			AddToIrreds -> addIrred state wanted
+			     -- Add it and its superclasses
+		    	     addIrred AddSCs state wanted
 
     }
   where
@@ -1083,32 +1099,33 @@ addWanted state@(avails, frees) wanted rhs_expr wanteds
 	  | otherwise		       = ASSERT( null wanteds ) NoRhs
 
 addGiven :: RedState -> Inst -> NF_TcM RedState
-addGiven state given = add_avail state given (BoundTo (instToId given))
+addGiven state given = addAvailAndSCs state given (BoundTo (instToId given))
 
-addIrred :: RedState -> Inst -> NF_TcM RedState
-addIrred state irred = add_avail state irred Irred
+addIrred :: WantSCs -> RedState -> Inst -> NF_TcM RedState
+addIrred NoSCs  (avails,frees) irred = returnNF_Tc (addToFM avails irred Irred, frees)
+addIrred AddSCs state	       irred = addAvailAndSCs state irred Irred
 
-add_avail :: RedState -> Inst -> Avail -> NF_TcM RedState
-add_avail (avails, frees) wanted avail
-  = addAvail avails wanted avail	`thenNF_Tc` \ avails' ->
+addAvailAndSCs :: RedState -> Inst -> Avail -> NF_TcM RedState
+addAvailAndSCs (avails, frees) wanted avail
+  = add_avail_and_scs avails wanted avail	`thenNF_Tc` \ avails' ->
     returnNF_Tc (avails', frees)
 
 ---------------------
-addAvail :: Avails -> Inst -> Avail -> NF_TcM Avails
-addAvail avails wanted avail
-  = addSuperClasses (addToFM avails wanted avail) wanted
+add_avail_and_scs :: Avails -> Inst -> Avail -> NF_TcM Avails
+add_avail_and_scs avails wanted avail
+  = add_scs (addToFM avails wanted avail) wanted
 
-addSuperClasses :: Avails -> Inst -> NF_TcM Avails
+add_scs :: Avails -> Inst -> NF_TcM Avails
 	-- Add all the superclasses of the Inst to Avails
 	-- Invariant: the Inst is already in Avails.
 
-addSuperClasses avails dict
+add_scs avails dict
   | not (isClassDict dict)
   = returnNF_Tc avails
 
   | otherwise	-- It is a dictionary
   = newDictsFromOld dict sc_theta'	`thenNF_Tc` \ sc_dicts ->
-    foldlNF_Tc add_sc avails (zipEqual "addSuperClasses" sc_dicts sc_sels)
+    foldlNF_Tc add_sc avails (zipEqual "add_scs" sc_dicts sc_sels)
   where
     (clas, tys) = getDictClassTys dict
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
@@ -1117,7 +1134,7 @@ addSuperClasses avails dict
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
       = case lookupFM avails sc_dict of
 	  Just (BoundTo _) -> returnNF_Tc avails	-- See Note [SUPER] below
-	  other		   -> addAvail avails sc_dict avail
+	  other		   -> add_avail_and_scs avails sc_dict avail
       where
 	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
 	avail      = Rhs sc_sel_rhs [dict]
@@ -1214,7 +1231,7 @@ tcSimplifyTop wanted_lie
     returnTc (binds `andMonoBinds` andMonoBindList binds_ambig)
   where
     wanteds	= lieToList wanted_lie
-    try_me inst	= ReduceMe AddToIrreds
+    try_me inst	= ReduceMe
 
     d1 `cmp_by_tyvar` d2 = get_tv d1 `compare` get_tv d2
 
@@ -1292,7 +1309,7 @@ disambigGroup dicts
     returnTc EmptyMonoBinds
 
   where
-    try_me inst = ReduceMe AddToIrreds		-- This reduce should not fail
+    try_me inst = ReduceMe			-- This reduce should not fail
     tyvar       = get_tv (head dicts)		-- Should be non-empty
     classes     = map get_clas dicts
 \end{code}
