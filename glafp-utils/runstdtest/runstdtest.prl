@@ -174,6 +174,7 @@ if ( $SysSpecificTiming =~ /^ghc/ ) {
 if ($PreScript ne '') {
     local($to_do);
     $PreScriptLines = `cat $PreScript`;
+    $PreScriptLines =~ s/\r//g;
 } else {
     $PreScriptLines = '';
 }
@@ -181,6 +182,7 @@ if ($PreScript ne '') {
 if ($PostScript ne '') {
     local($to_do);
     $PostScriptLines = `cat $PostScript`;
+    $PostScriptLines =~ s/\r//g;
     $* = 1;
     $PostScriptLines =~ s#\$o1#$TmpPrefix/runtest$$.1#g;
     $PostScriptLines =~ s#\$o2#$TmpPrefix/runtest$$.2#g;
