@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.22 1999/06/09 14:28:38 simonmar Exp $
+% $Id: CgMonad.lhs,v 1.23 1999/10/13 16:39:16 simonmar Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -24,10 +24,11 @@ module CgMonad (
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
 	setSRTLabel, getSRTLabel,
+	setTickyCtrLabel, getTickyCtrLabel,
 
 	StackUsage, Slot(..), HeapUsage,
 
-	profCtrC,
+	profCtrC, profCtrAbsC,
 
 	costCentresC, moduleName,
 
@@ -47,7 +48,7 @@ import {-# SOURCE #-} CgUsages  ( getSpRelOffset )
 import AbsCSyn
 import AbsCUtils	( mkAbsCStmts )
 import CmdLineOpts	( opt_SccProfilingOn, opt_DoTickyProfiling )
-import CLabel           ( CLabel, mkUpdInfoLabel )
+import CLabel           ( CLabel, mkUpdInfoLabel, mkTopTickyCtrLabel )
 import Module		( Module )
 import DataCon		( ConTag )
 import Id		( Id )
@@ -79,6 +80,8 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
      CgBindings		-- [Id -> info] : static environment
 
      CLabel		-- label of the current SRT
+
+     CLabel		-- current destination for ticky counts
 
      EndOfBlockInfo	-- Info for stuff to do at end of basic block:
 
@@ -268,6 +271,7 @@ initC cg_info code
 			cg_info 
 			(error "initC: statics")
 			(error "initC: srt")
+			(mkTopTickyCtrLabel)
 			initEobInfo)
 	       initialStateC) of
       MkCgState abc _ _ -> abc
@@ -367,24 +371,24 @@ bindings and usage information is otherwise unchanged.
 forkClosureBody :: Code -> Code
 
 forkClosureBody code
-	(MkCgInfoDown cg_info statics srt _)
+	(MkCgInfoDown cg_info statics srt ticky _)
 	(MkCgState absC_in binds un_usage)
   = MkCgState (AbsCStmts absC_in absC_fork) binds un_usage
   where
     fork_state		    = code body_info_down initialStateC
     MkCgState absC_fork _ _ = fork_state
-    body_info_down = MkCgInfoDown cg_info statics srt initEobInfo
+    body_info_down = MkCgInfoDown cg_info statics srt ticky initEobInfo
 
 forkStatics :: FCode a -> FCode a
 
-forkStatics fcode (MkCgInfoDown cg_info _ srt _)
+forkStatics fcode (MkCgInfoDown cg_info _ srt ticky _)
 		  (MkCgState absC_in statics un_usage)
   = (result, MkCgState (AbsCStmts absC_in absC_fork) statics un_usage)
   where
   (result, state) = fcode rhs_info_down initialStateC
   MkCgState absC_fork _ _ = state	-- Don't merge these this line with the one
 					-- above or it becomes too strict!
-  rhs_info_down = MkCgInfoDown cg_info statics srt initEobInfo
+  rhs_info_down = MkCgInfoDown cg_info statics srt ticky initEobInfo
 
 forkAbsC :: Code -> FCode AbstractC
 forkAbsC code info_down (MkCgState absC1 bs usage)
@@ -453,10 +457,10 @@ forkEvalHelp :: EndOfBlockInfo  -- For the body
 		       a)	-- Result of the FCode
 
 forkEvalHelp body_eob_info env_code body_code
-	 info_down@(MkCgInfoDown cg_info statics srt _) state
+	 info_down@(MkCgInfoDown cg_info statics srt ticky _) state
   = ((v,value_returned), state `stateIncUsageEval` state_at_end_return)
   where
-    info_down_for_body = MkCgInfoDown cg_info statics srt body_eob_info
+    info_down_for_body = MkCgInfoDown cg_info statics srt ticky body_eob_info
 
     (MkCgState _ binds ((v,f,_,_), _)) = env_code info_down_for_body state
 	-- These v and f things are now set up as the body code expects them
@@ -518,6 +522,13 @@ profCtrC macro args _ state@(MkCgState absC binds usage)
     then state
     else MkCgState (mkAbsCStmts absC (CCallProfCtrMacro macro args)) binds usage
 
+profCtrAbsC :: FAST_STRING -> [CAddrMode] -> AbstractC
+
+profCtrAbsC macro args
+  = if not opt_DoTickyProfiling
+    then AbsCNop
+    else CCallProfCtrMacro macro args
+
 {- Try to avoid adding too many special compilation strategies here.
    It's better to modify the header files as necessary for particular
    targets, so that we can get away with as few variants of .hc files
@@ -544,27 +555,37 @@ getAbsC code info_down (MkCgState absC binds usage)
 \begin{code}
 
 moduleName :: FCode Module
-moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _ _) state
+moduleName (MkCgInfoDown (MkCompInfo mod_name) _ _ _ _) state
   = (mod_name, state)
 
 \end{code}
 
 \begin{code}
 setEndOfBlockInfo :: EndOfBlockInfo -> Code -> Code
-setEndOfBlockInfo eob_info code	(MkCgInfoDown c_info statics srt _) state
-  = code (MkCgInfoDown c_info statics srt eob_info) state
+setEndOfBlockInfo eob_info code	(MkCgInfoDown c_info statics srt ticky _) state
+  = code (MkCgInfoDown c_info statics srt ticky eob_info) state
 
 getEndOfBlockInfo :: FCode EndOfBlockInfo
-getEndOfBlockInfo (MkCgInfoDown c_info statics _ eob_info) state
+getEndOfBlockInfo (MkCgInfoDown c_info statics _ _ eob_info) state
   = (eob_info, state)
 \end{code}
 
 \begin{code}
 getSRTLabel :: FCode CLabel
-getSRTLabel (MkCgInfoDown _ _ srt _) state
+getSRTLabel (MkCgInfoDown _ _ srt _ _) state
   = (srt, state)
 
 setSRTLabel :: CLabel -> Code -> Code
-setSRTLabel srt code (MkCgInfoDown c_info statics _ eob_info) state
-  = code (MkCgInfoDown c_info statics srt eob_info) state
+setSRTLabel srt code (MkCgInfoDown c_info statics _ ticky eob_info) state
+  = code (MkCgInfoDown c_info statics srt ticky eob_info) state
+\end{code}
+
+\begin{code}
+getTickyCtrLabel :: FCode CLabel
+getTickyCtrLabel (MkCgInfoDown _ _ _ ticky _) state
+  = (ticky, state)
+
+setTickyCtrLabel :: CLabel -> Code -> Code
+setTickyCtrLabel ticky code (MkCgInfoDown c_info statics srt _ eob_info) state
+  = code (MkCgInfoDown c_info statics srt ticky eob_info) state
 \end{code}

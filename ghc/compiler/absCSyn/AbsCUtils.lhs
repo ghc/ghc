@@ -344,9 +344,14 @@ flatAbsC stmt@(CCheck macro amodes code)
   = flatAbsC code		`thenFlt` \ (code_here, code_tops) ->
     returnFlt (CCheck macro amodes code_here, code_tops)
 
+-- the TICKY_CTR macro always needs to be hoisted out to the top level. 
+-- This is a HACK.
+flatAbsC stmt@(CCallProfCtrMacro str amodes)
+  | str == SLIT("TICK_CTR") 	= returnFlt (AbsCNop, stmt)
+  | otherwise		 	= returnFlt (stmt, AbsCNop)
+
 -- Some statements need no flattening at all:
 flatAbsC stmt@(CMacroStmt macro amodes) 	= returnFlt (stmt, AbsCNop)
-flatAbsC stmt@(CCallProfCtrMacro str amodes) 	= returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CCallProfCCMacro str amodes) 	= returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CAssign dest source) 		= returnFlt (stmt, AbsCNop)
 flatAbsC stmt@(CJump target) 			= returnFlt (stmt, AbsCNop)

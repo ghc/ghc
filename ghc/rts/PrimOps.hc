@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.30 1999/09/15 13:45:18 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.31 1999/10/13 16:39:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -257,7 +257,7 @@ FN_(newMutVarzh_fast)
   /* Args: R1.p = initialisation value */
   FB_
 
-  HP_CHK_GEN(sizeofW(StgMutVar), R1_PTR, newMutVarzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgMutVar), R1_PTR, newMutVarzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,1, 0); /* hack, dependent on rep. */
   CCS_ALLOC(CCCS,sizeofW(StgMutVar));
 
@@ -283,7 +283,7 @@ FN_(makeForeignObjzh_fast)
   StgForeignObj *result;
   FB_
 
-  HP_CHK_GEN(sizeofW(StgForeignObj), NO_PTRS, makeForeignObjzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgForeignObj), NO_PTRS, makeForeignObjzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader),
 		  sizeofW(StgForeignObj)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgForeignObj)); /* ccs prof */
@@ -326,7 +326,7 @@ FN_(mkWeakzh_fast)
   StgWeak *w;
   FB_
 
-  HP_CHK_GEN(sizeofW(StgWeak), R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgWeak), R1_PTR|R2_PTR|R3_PTR, mkWeakzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader)+1,  // +1 is for the link field
 		  sizeofW(StgWeak)-sizeofW(StgHeader)-1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgWeak)); /* ccs prof */
@@ -395,7 +395,7 @@ FN_(int2Integerzh_fast)
    FB_
 
    val = R1.i;
-   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, int2Integerzh_fast,);
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, int2Integerzh_fast,);
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -432,7 +432,7 @@ FN_(word2Integerzh_fast)
    FB_
 
    val = R1.w;
-   HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, word2Integerzh_fast,)
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, word2Integerzh_fast,)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -505,7 +505,7 @@ FN_(int64ToIntegerzh_fast)
        /* minimum is one word */
        words_needed = 1;
    }
-   HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerzh_fast,)
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+words_needed, NO_PTRS, int64ToIntegerzh_fast,)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
@@ -556,7 +556,7 @@ FN_(word64ToIntegerzh_fast)
    } else {
       words_needed = 1;
    }
-   HP_CHK_GEN(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerzh_fast,)
+   HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+words_needed, NO_PTRS, word64ToIntegerzh_fast,)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
@@ -682,7 +682,7 @@ FN_(decodeFloatzh_fast)
   /* arguments: F1 = Float# */
   arg = F1;
 
-  HP_CHK_GEN(sizeofW(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgArrWords)+1, NO_PTRS, decodeFloatzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgArrWords),1,0);
   CCS_ALLOC(CCCS,sizeofW(StgArrWords)+1); /* ccs prof */
 
@@ -715,7 +715,7 @@ FN_(decodeDoublezh_fast)
   /* arguments: D1 = Double# */
   arg = D1;
 
-  HP_CHK_GEN(ARR_SIZE, NO_PTRS, decodeDoublezh_fast,);
+  HP_CHK_GEN_TICKY(ARR_SIZE, NO_PTRS, decodeDoublezh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgArrWords),DOUBLE_MANTISSA_SIZE,0);
   CCS_ALLOC(CCCS,ARR_SIZE); /* ccs prof */
 
@@ -807,7 +807,7 @@ FN_(newMVarzh_fast)
   FB_
   /* args: none */
 
-  HP_CHK_GEN(sizeofW(StgMVar), NO_PTRS, newMVarzh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgMVar), NO_PTRS, newMVarzh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgMutVar)-1, // consider head,tail,link as admin wds
 	 	  1, 0);
   CCS_ALLOC(CCCS,sizeofW(StgMVar)); /* ccs prof */
@@ -900,7 +900,7 @@ FN_(makeStableNamezh_fast)
   StgStableName *sn_obj;
   FB_
 
-  HP_CHK_GEN(sizeofW(StgStableName), R1_PTR, makeStableNamezh_fast,);
+  HP_CHK_GEN_TICKY(sizeofW(StgStableName), R1_PTR, makeStableNamezh_fast,);
   TICK_ALLOC_PRIM(sizeofW(StgHeader), 
 		  sizeofW(StgStableName)-sizeofW(StgHeader), 0);
   CCS_ALLOC(CCCS,sizeofW(StgStableName)); /* ccs prof */

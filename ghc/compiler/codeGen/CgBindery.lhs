@@ -193,7 +193,7 @@ modifyBindC name mangle_fn info_down (MkCgState absC binds usage)
   = MkCgState absC (modifyVarEnv mangle_fn binds name) usage
 
 lookupBindC :: Id -> FCode CgIdInfo
-lookupBindC name info_down@(MkCgInfoDown _ static_binds srt _)
+lookupBindC name info_down@(MkCgInfoDown _ static_binds srt ticky _)
 		 state@(MkCgState absC local_binds usage)
   = (val, state)
   where
@@ -208,7 +208,7 @@ lookupBindC name info_down@(MkCgInfoDown _ static_binds srt _)
 	  -> cgPanic (text "lookupBindC: no info for" <+> ppr name) info_down state
 
 cgPanic :: SDoc -> CgInfoDownwards -> CgState -> a
-cgPanic doc info_down@(MkCgInfoDown _ static_binds srt _)
+cgPanic doc info_down@(MkCgInfoDown _ static_binds srt ticky _)
 	    state@(MkCgState absC local_binds usage)
   = pprPanic "cgPanic"
 	     (vcat [doc,

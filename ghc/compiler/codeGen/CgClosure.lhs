@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.34 1999/07/14 14:40:28 simonpj Exp $
+% $Id: CgClosure.lhs,v 1.35 1999/10/13 16:39:15 simonmar Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -297,6 +297,7 @@ closureCodeBody binder_info closure_info cc all_args body
     -- get the current virtual Sp (it might not be zero, eg. if we're
     -- compiling a let-no-escape).
     getVirtSp `thenFC` \vSp ->
+
     let
     	-- Figure out what is needed and what isn't
 
@@ -371,13 +372,17 @@ closureCodeBody binder_info closure_info cc all_args body
 	-- fast_entry_code = forceHeapCheck [] True fast_entry_code'
 
 	fast_entry_code
-	  = profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
-		    CLbl (mkRednCountsLabel name) PtrRep,
-		    mkCString (_PK_ (showSDoc (ppr name))),
-		    mkIntCLit stg_arity,	-- total # of args
-		    mkIntCLit sp_stk_args,	-- # passed on stk
-		    mkCString (_PK_ (map (showTypeCategory . idType) all_args))
-		]			`thenC`
+	  = profCtrC SLIT("TICK_CTR") [ 
+		CLbl ticky_ctr_label DataPtrRep,
+		mkCString (_PK_ (showSDocDebug (ppr name))),
+		mkIntCLit stg_arity,	-- total # of args
+		mkIntCLit sp_stk_args,	-- # passed on stk
+		mkCString (_PK_ (map (showTypeCategory . idType) all_args))
+      	    ] `thenC`
+
+	    profCtrC SLIT("TICK_ENT_FUN_DIRECT") [
+		    CLbl ticky_ctr_label DataPtrRep
+	    ] `thenC`
 
 -- Nuked for now; see comment at end of file
 --		    CString (_PK_ (show_wrapper_name wrapper_maybe)),
@@ -399,24 +404,30 @@ closureCodeBody binder_info closure_info cc all_args body
 		-- Do the business
 	    funWrapper closure_info arg_regs stk_tags info_label (cgExpr body)
     in
+
+    setTickyCtrLabel ticky_ctr_label (
+
  	-- Make a labelled code-block for the slow and fast entry code
-    forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)
+      forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)
 				`thenFC` \ slow_abs_c ->
-    forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
-    moduleName			`thenFC` \ mod_name ->
+      forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
+      moduleName			`thenFC` \ mod_name ->
 
 	-- Now either construct the info table, or put the fast code in alone
 	-- (We never have slow code without an info table)
 	-- XXX probably need the info table and slow entry code in case of
 	-- a heap check failure.
-    absC (
-      if info_table_needed then
-	CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
+      absC (
+       if info_table_needed then
+	  CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
 			(cl_descr mod_name)
-      else
+       else
 	CCodeBlock fast_label fast_abs_c
+       )
     )
   where
+    ticky_ctr_label = mkRednCountsLabel name
+
     stg_arity = length all_args
     lf_info = closureLFInfo closure_info
 

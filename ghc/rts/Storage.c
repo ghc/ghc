@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.18 1999/09/15 13:45:20 simonmar Exp $
+ * $Id: Storage.c,v 1.19 1999/10/13 16:39:23 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -289,7 +289,7 @@ allocate(nat n)
   bdescr *bd;
   StgPtr p;
 
-  TICK_ALLOC_HEAP(n);
+  TICK_ALLOC_HEAP_NOCTR(n);
   CCS_ALLOC(CCCS,n);
 
   /* big allocation (>LARGE_OBJECT_THRESHOLD) */

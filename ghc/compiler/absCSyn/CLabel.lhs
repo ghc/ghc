@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.27 1999/05/13 17:30:52 simonm Exp $
+% $Id: CLabel.lhs,v 1.28 1999/10/13 16:39:10 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -36,6 +36,7 @@ module CLabel (
 
 	mkErrorStdEntryLabel,
 	mkUpdInfoLabel,
+	mkTopTickyCtrLabel,
         mkCAFBlackHoleInfoTableLabel,
         mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
@@ -166,6 +167,8 @@ data RtsLabelInfo
 
   | RtsPrimOp PrimOp
 
+  | RtsTopTickyCtr
+
   deriving (Eq, Ord)
 
 -- Label Type: for generating C declarations.
@@ -211,6 +214,7 @@ mkAsmTempLabel 			= AsmTempLabel
 
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
 mkUpdInfoLabel			= RtsLabel RtsUpdInfo
+mkTopTickyCtrLabel		= RtsLabel RtsTopTickyCtr
 mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("CAF_BLACKHOLE_info"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
                                     RtsLabel (RtsBlackHoleInfoTbl SLIT("SE_CAF_BLACKHOLE_info"))
@@ -404,6 +408,8 @@ pprCLbl (CaseLabel u CaseBitmap)
 pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
 
 pprCLbl (RtsLabel RtsUpdInfo) = ptext SLIT("Upd_frame_info")
+
+pprCLbl (RtsLabel RtsTopTickyCtr) = ptext SLIT("top_ct")
 
 pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ptext info
 

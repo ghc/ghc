@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.18 1999/06/24 13:04:19 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.19 1999/10/13 16:39:15 simonmar Exp $
 %
 \section[CgHeapery]{Heap management functions}
 
@@ -75,9 +75,11 @@ fastEntryChecks regs tags ret node_points code
      let stk_words = spHw - sp in
      initHeapUsage				 (\ hp_words  ->
 
+     getTickyCtrLabel `thenFC` \ ticky_ctr ->
+
      ( if all_pointers then -- heap checks are quite easy
 	  absC (checking_code stk_words hp_words tag_assts 
-		    free_reg (length regs))
+			free_reg (length regs) ticky_ctr)
 
        else -- they are complicated
 
@@ -101,7 +103,7 @@ fastEntryChecks regs tags ret node_points code
 	  absC (checking_code real_stk_words hp_words 
 	            (mkAbstractCs [tag_assts, stk_assts, more_tag_assts,
 				   adjust_sp])
-	            (CReg node) 0)
+	            (CReg node) 0 ticky_ctr)
 
       ) `thenC`
 
@@ -110,9 +112,17 @@ fastEntryChecks regs tags ret node_points code
 
   where
 	
-    checking_code stk hp assts ret regs
-	| node_points = do_checks_np stk hp assts (regs+1) -- ret not required
-        | otherwise   = do_checks    stk hp assts ret regs
+    checking_code stk hp assts ret regs ctr
+        = mkAbstractCs 
+	  [ real_check,
+            if hp == 0 then AbsCNop 
+	    else profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+		  [ mkIntCLit hp, CLbl ctr DataPtrRep ]
+	  ]
+
+        where real_check
+		  | node_points = do_checks_np stk hp assts (regs+1)
+        	  | otherwise   = do_checks    stk hp assts ret regs
 
     -- When node points to the closure for the function:
 
@@ -241,9 +251,15 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
     initHeapUsage (\ hHw -> do_heap_chk hHw tag_assts `thenC` code)
   where
     do_heap_chk words_required tag_assts
-      = absC (if words_required == 0
-		then  AbsCNop
-		else  checking_code tag_assts)  `thenC`
+      = getTickyCtrLabel `thenFC` \ ctr ->
+	absC ( if words_required == 0
+		  then  AbsCNop
+		  else  mkAbstractCs 
+			[ checking_code tag_assts,
+          	          profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
+			]
+	)  `thenC`
 	setRealHp words_required
 
       where
@@ -291,12 +307,19 @@ altHeapCheck is_fun regs tags fail_code (Just ret_addr) code
 
 altHeapCheck is_fun regs [] AbsCNop Nothing code
   = initHeapUsage (\ hHw -> do_heap_chk hHw `thenC` code)
+		      
   where
     do_heap_chk :: HeapOffset -> Code
     do_heap_chk words_required
-      = absC (if words_required == 0
-		then  AbsCNop
-		else  checking_code)  `thenC`
+      = getTickyCtrLabel `thenFC` \ ctr ->
+	absC ( if words_required == 0
+		 then  AbsCNop
+		 else  mkAbstractCs 
+		       [ checking_code,
+          	         profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
+			    [ mkIntCLit words_required, CLbl ctr DataPtrRep ]
+		       ]
+	)  `thenC`
 	setRealHp words_required
 
       where

@@ -37,7 +37,7 @@ module Outputable (
 	printSDoc, printErrs, printDump, 
 	printForC, printForAsm, printForIface,
 	pprCode, pprCols,
-	showSDoc, showsPrecSDoc, pprFSAsString,
+	showSDoc, showSDocDebug, showsPrecSDoc, pprFSAsString,
 
 
 	-- error handling
@@ -185,6 +185,9 @@ pprCode cs d = withPprStyle (PprCode cs) d
 -- showSDoc just blasts it out as a string
 showSDoc :: SDoc -> String
 showSDoc d = show (d (mkUserStyle AllTheWay))
+
+showSDocDebug :: SDoc -> String
+showSDocDebug d = show (d PprDebug)
 
 showsPrecSDoc :: Int -> SDoc -> ShowS
 showsPrecSDoc p d = showsPrec p (d (mkUserStyle AllTheWay))

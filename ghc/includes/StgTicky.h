@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: StgTicky.h,v 1.6 1999/09/14 12:16:39 simonmar Exp $
+ * $Id: StgTicky.h,v 1.7 1999/10/13 16:39:21 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -21,7 +21,18 @@
  * the allocations gives an indication of how many things we get per trip
  * to the well:
  */
-#define TICK_ALLOC_HEAP(n)	ALLOC_HEAP_ctr++; ALLOC_HEAP_tot += (n)
+#define TICK_ALLOC_HEAP(n, f_ct)		\
+  {						\
+    f_ct.allocs += (n);				\
+    ALLOC_HEAP_ctr++;				\
+    ALLOC_HEAP_tot += (n);			\
+  }
+
+#define TICK_ALLOC_HEAP_NOCTR(n)		\
+  {						\
+    ALLOC_HEAP_ctr++;				\
+    ALLOC_HEAP_tot += (n);			\
+  }
 
 /* We count things every time we allocate something in the dynamic heap.
  * For each, we count the number of words of (1) ``admin'' (header),
@@ -127,36 +138,39 @@
 #define TICK_ENT_THK()		ENT_THK_ctr++         /* thunk */
 #define TICK_ENT_FUN_STD()	ENT_FUN_STD_ctr++     /* std entry pt */
 
-struct ent_counter {
+typedef struct _StgEntCounter {
     unsigned	registeredp:16,	/* 0 == no, 1 == yes */
     		arity:16,	/* arity (static info) */
     		stk_args:16;	/* # of args off stack */
 				/* (rest of args are in registers) */
-    StgChar	*f_str;		/* name of the thing */
-    StgChar	*f_arg_kinds;	/* info about the args types */
+    StgChar	*str;		/* name of the thing */
+    StgChar	*arg_kinds;	/* info about the args types */
     I_		ctr;		/* the actual counter */
-    struct ent_counter *link;	/* link to chain them all together */
-};
+    I_          allocs;         /* number of allocations by this fun */
+    struct _StgEntCounter *link;/* link to chain them all together */
+} StgEntCounter;
 
-#define TICK_ENT_FUN_DIRECT(f_ct, f_str, f_arity, f_args, f_arg_kinds) \
+#define TICK_CTR(f_ct, str, arity, args, arg_kinds)	\
+   static StgEntCounter f_ct			\
+	= { 0, arity, args,			\
+	    str, arg_kinds, 			\
+	    0, 0, NULL };
+
+#define TICK_ENT_FUN_DIRECT(f_ct)				\
 	{							\
-	static struct ent_counter f_ct				\
-	  = { 0,						\
-	      (f_arity), (f_args), (f_str), (f_arg_kinds),	\
-	      0, NULL };					\
-	if ( ! f_ct.registeredp ) {				\
+	  if ( ! f_ct.registeredp ) {				\
 	    /* hook this one onto the front of the list */	\
 	    f_ct.link = ticky_entry_ctrs;			\
 	    ticky_entry_ctrs = & (f_ct);			\
-								\
 	    /* mark it as "registered" */			\
 	    f_ct.registeredp = 1;				\
-	}							\
-	f_ct.ctr += 1;						\
+	  }							\
+	  f_ct.ctr += 1;					\
 	}							\
 	ENT_FUN_DIRECT_ctr++ /* the old boring one */
 
-extern struct ent_counter *ticky_entry_ctrs;
+extern StgEntCounter top_ct;
+extern StgEntCounter *ticky_entry_ctrs;
 
 #define TICK_ENT_CON(n)		ENT_CON_ctr++	      /* enter constructor */
 #define TICK_ENT_IND(n)		ENT_IND_ctr++	      /* enter indirection */

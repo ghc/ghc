@@ -1205,8 +1205,12 @@ cCheckMacroText	HP_CHK_GEN		= SLIT("HP_CHK_GEN")
 pp_liveness :: Liveness -> SDoc
 pp_liveness lv = 
    case lv of
-	LvSmall mask -> int (intBS mask)
 	LvLarge lbl  -> char '&' <> pprCLabel lbl
+	LvSmall mask
+	   | bitmap_int == (minBound :: Int) -> int (bitmap_int+1) <> text "-1"
+	   | otherwise -> int bitmap_int
+         where
+	   bitmap_int = intBS mask
 \end{code}
 
 %************************************************************************

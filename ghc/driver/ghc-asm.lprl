@@ -478,6 +478,11 @@ sub mangle_asm {
 
 	    $srtchk{$1} = $i;
 
+	} elsif ( /^$TUS[@]?([A-Za-z0-9_]+)_ct$TPOSTLBL[@]?$/o ) {
+	    $chk[++$i]   = $_;
+	    $chkcat[$i]  = 'data';
+	    $chksymb[$i] = '';
+
 	} elsif ( /^$TUS[@]?ghc.*c_ID$TPOSTLBL/o ) {
 	    $chk[++$i]  = $_;
 	    $chkcat[$i] = 'consist';

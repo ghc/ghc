@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Ticky.c,v 1.9 1999/09/14 12:16:36 simonmar Exp $
+ * $Id: Ticky.c,v 1.10 1999/10/13 16:39:24 simonmar Exp $
  *
  * (c) The AQUA project, Glasgow University, 1992-1997
  * (c) The GHC Team, 1998-1999
@@ -538,31 +538,44 @@ PrintTickyInfo(void)
 
 /* Data structure used in ``registering'' one of these counters. */
 
-struct ent_counter *ticky_entry_ctrs = NULL; /* root of list of them */
+StgEntCounter *ticky_entry_ctrs = NULL; /* root of list of them */
 
 /* To print out all the registered-counter info: */
 
 static void
 printRegisteredCounterInfo (FILE *tf)
 {
-    struct ent_counter *p;
+    StgEntCounter *p;
 
     if ( ticky_entry_ctrs != NULL ) {
-    	fprintf(tf,"\n**************************************************\n");
+      fprintf(tf,"\n**************************************************\n\n");
     }
+    fprintf(tf, "%-30s %6s%6s    %-16s%-11s%-11s\n",
+	    "Function", "Arity", "Stack", "Kinds", "Entries",
+	    "Allocs");
+    fprintf(tf, "--------------------------------------------------------------------------------\n");
 
     for (p = ticky_entry_ctrs; p != NULL; p = p->link) {
-	fprintf(tf, "%-40s%u\t%u\t%-16s%ld",
-		p->f_str,
+	fprintf(tf, "%-30s%6u%6u     %-11s%11ld%11ld",
+		p->str,
 		p->arity,
 		p->stk_args,
-		p->f_arg_kinds,
-		p->ctr);
+		p->arg_kinds,
+		p->ctr,
+		p->allocs);
 
 	fprintf(tf, "\n");
 
     }
 }
+
+/* Catch-all top-level counter struct.  Allocations from CAFs will go
+ * here.
+ */
+StgEntCounter top_ct
+	= { 0, 0, 0,
+	    "TOP", "",
+	    0, 0, NULL };
 
 #endif /* TICKY_TICKY */
 

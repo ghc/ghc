@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgCase.lhs,v 1.34 1999/06/28 16:29:45 simonpj Exp $
+% $Id: CgCase.lhs,v 1.35 1999/10/13 16:39:14 simonmar Exp $
 %
 %********************************************************
 %*							*
@@ -63,7 +63,7 @@ import TyCon		( TyCon, isEnumerationTyCon, isUnboxedTupleTyCon,
 			  tyConDataCons, tyConFamilySize )
 import Type		( Type, typePrimRep, splitAlgTyConApp, 
 			  splitTyConApp_maybe, repType )
-import Unique           ( Unique, Uniquable(..), mkBuiltinUnique )
+import Unique           ( Unique, Uniquable(..), mkPseudoUnique1 )
 import Maybes		( maybeToBool )
 import Util
 import Outputable
@@ -144,6 +144,11 @@ which generates no code for the primop, unless x is used in the
 alternatives (in which case we lookup the tag in the relevant closure
 table to get the closure).
 
+Being a bit short of uniques for temporary variables here, we use
+mkPseudoUnique1 to generate a temporary for the tag.  We can't use
+mkBuiltinUnique, because that occasionally clashes with some
+temporaries generated for _ccall_GC, amongst others (see CgExpr.lhs).
+
 \begin{code}
 cgCase (StgCon (PrimOp op) args res_ty)
          live_in_whole_case live_in_alts bndr srt (StgAlgAlts ty alts deflt)
@@ -152,7 +157,7 @@ cgCase (StgCon (PrimOp op) args res_ty)
 
     let tag_amode = case op of 
 			TagToEnumOp -> only arg_amodes
-			_ -> CTemp (mkBuiltinUnique 1) IntRep
+			_ -> CTemp (mkPseudoUnique1{-see above-} 1) IntRep
 
 	closure = CVal (CIndex (CLbl (mkClosureTblLabel tycon) PtrRep) tag_amode PtrRep) PtrRep
     in
