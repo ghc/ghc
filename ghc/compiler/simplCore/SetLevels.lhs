@@ -55,7 +55,7 @@ module SetLevels (
 import CoreSyn
 
 import CmdLineOpts	( FloatOutSwitches(..) )
-import CoreUtils	( exprType, exprIsTrivial, exprIsBottom, mkPiTypes )
+import CoreUtils	( exprType, exprIsTrivial, exprIsCheap, mkPiTypes )
 import CoreFVs		-- all of it
 import Subst
 import Id		( Id, idType, mkSysLocal, isOneShotLambda, zapDemandIdInfo,
@@ -345,11 +345,8 @@ lvlMFE strict_ctxt ctxt_lvl env (_, AnnType ty)
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
   |  isUnLiftedType ty			-- Can't let-bind it
   || isInlineCtxt ctxt_lvl		-- Don't float out of an __inline__ context
+  || exprIsTrivial expr			-- Never float if it's trivial
   || not good_destination
-  || exprIsTrivial expr			-- Is trivial
-  || (strict_ctxt && exprIsBottom expr)	-- Strict context and is bottom
-					--  e.g. \x -> error "foo"
-					-- No gain from floating this
   = 	-- Don't float it out
     lvlExpr ctxt_lvl env ann_expr
 
@@ -364,25 +361,42 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
     dest_lvl = destLevel env fvs (isFunction ann_expr)
     abs_vars = abstractVars dest_lvl env fvs
 
-    good_destination =  dest_lvl `ltMajLvl` ctxt_lvl	-- Escapes a value lambda
-		     || (isTopLvl dest_lvl		-- Goes to the top
-			 && floatConsts env
-			 && not strict_ctxt)		--   or from a strict context	
 	-- A decision to float entails let-binding this thing, and we only do 
 	-- that if we'll escape a value lambda, or will go to the top level.
-	--
-	-- Beware:
-	--	concat = /\ a -> foldr ..a.. (++) []
-	-- was getting turned into
-	--	concat = /\ a -> lvl a
-	--	lvl    = /\ a -> foldr ..a.. (++) []
-	-- which is pretty stupid.  Hence the strict_ctxt test
-	--
-	-- We are keen to float something to the top level, even if it does not
-	-- escape a lambda, because then it needs no allocation.  But it's controlled
-	-- by a flag, because doing this too early loses opportunities for RULES
-	-- which (needless to say) are important in some nofib programs
-	-- (gcd is an example).
+    good_destination 
+	| dest_lvl `ltMajLvl` ctxt_lvl		-- Escapes a value lambda
+	= not (exprIsCheap expr) || isTopLvl dest_lvl
+	  -- Even if it escapes a value lambda, we only
+	  -- float if it's not cheap (unless it'll get all the
+	  -- way to the top).  I've seen cases where we
+	  -- float dozens of tiny free expressions, which cost
+	  -- more to allocate than to evaluate.
+	  -- NB: exprIsCheap is also true of bottom expressions, which
+	  --     is good; we don't want to share them
+	  --
+	  -- It's only Really Bad to float a cheap expression out of a
+	  -- strict context, because that builds a thunk that otherwise
+	  -- would never be built.  So another alternative would be to
+	  -- add 
+	  -- 	|| (strict_ctxt && not (exprIsBottom expr))
+	  -- to the condition above. We should really try this out.
+
+	| otherwise		-- Does not escape a value lambda
+	= isTopLvl dest_lvl 	-- Only float if we are going to the top level
+	&& floatConsts env	--   and the floatConsts flag is on
+	&& not strict_ctxt	-- Don't float from a strict context	
+	  -- We are keen to float something to the top level, even if it does not
+	  -- escape a lambda, because then it needs no allocation.  But it's controlled
+	  -- by a flag, because doing this too early loses opportunities for RULES
+	  -- which (needless to say) are important in some nofib programs
+	  -- (gcd is an example).
+	  --
+	  -- Beware:
+	  --	concat = /\ a -> foldr ..a.. (++) []
+	  -- was getting turned into
+	  --	concat = /\ a -> lvl a
+	  --	lvl    = /\ a -> foldr ..a.. (++) []
+	  -- which is pretty stupid.  Hence the strict_ctxt test
 \end{code}
 
 
