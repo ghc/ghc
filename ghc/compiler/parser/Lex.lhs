@@ -448,7 +448,11 @@ lexer cont buf s@(PState{
 
 		-- special GHC extension: we grok cpp-style #line pragmas
 	    '#'# | lexemeIndex buf ==# bol -> 	-- the '#' must be in column 0
-		line_prag next_line (stepOn buf) s'
+		case expandWhile# is_space (stepOn buf) of { buf1 ->
+		if is_digit (currentChar# buf1) 
+			then line_prag next_line buf1 s'
+			else is_a_token
+		}
 		where
 		next_line buf = lexer cont (stepOnUntilChar# buf '\n'#)
 
