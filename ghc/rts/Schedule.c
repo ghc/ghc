@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.119 2002/02/07 06:33:20 sof Exp $
+ * $Id: Schedule.c,v 1.120 2002/02/08 03:44:01 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1524,7 +1524,7 @@ suspendThread( StgRegTable *reg )
   tok = cap->r.rCurrentTSO->id;
 
   /* Hand back capability */
-  releaseCapability(&cap);
+  releaseCapability(cap);
   
 #if defined(RTS_SUPPORTS_THREADS) && !defined(SMP)
   /* Preparing to leave the RTS, so ensure there's a native thread/task

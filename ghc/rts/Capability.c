@@ -22,6 +22,9 @@
 #include "RtsUtils.h"
 #include "Capability.h"
 
+#if !defined(SMP)
+Capability MainCapability;     /* for non-SMP, we have one global capability */
+#endif
 
 static
 void
@@ -69,11 +72,11 @@ void grabCapability(Capability** cap)
 #endif
 }
 
-void releaseCapability(Capability** cap)
+void releaseCapability(Capability* cap)
 {
 #if defined(SMP)
-  (*cap)->link = free_capabilities;
-  free_capabilities = *cap;
+  cap->link = free_capabilities;
+  free_capabilities = cap;
   rts_n_free_capabilities++;
 #endif
   return;

@@ -25,12 +25,12 @@
 /* ToDo: assume that RtsFlags.h has been included at usage sites of Capability.h? */
 
 #if !defined(SMP)
-Capability MainCapability;
+extern Capability MainCapability;
 #endif
 
 extern void initCapabilities(void);
 extern void grabCapability(Capability** cap);
-extern void releaseCapability(Capability** cap);
+extern void releaseCapability(Capability* cap);
 
 #if defined(SMP)
 extern nat rts_n_free_capabilities;  /* total number of available capabilities */
