@@ -39,7 +39,7 @@ import Outputable
 data AnalysisKind
   = StrAnal 	-- We're doing strictness analysis
   | AbsAnal	-- We're doing absence analysis
-  deriving Text
+  deriving Show
 \end{code}
 
 @AbsVal@ is the data type of HNF abstract values.
