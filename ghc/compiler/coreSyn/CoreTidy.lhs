@@ -391,7 +391,7 @@ tidyTopBind mod ext_ids cg_info_env top_tidy_env (NonRec bndr rhs)
   where
     ((orig,occ,subst), bndr')
 	 = tidyTopBinder mod ext_ids cg_info_env 
-			 rec_tidy_env rhs' top_tidy_env bndr
+			 rec_tidy_env rhs rhs' top_tidy_env bndr
     rec_tidy_env = (occ,subst)
     rhs' = tidyExpr rec_tidy_env rhs
 
@@ -406,19 +406,20 @@ tidyTopBind mod ext_ids cg_info_env top_tidy_env (Rec prs)
 	where
 	((orig,occ,subst), bndr')
 	   = tidyTopBinder mod ext_ids cg_info_env
-		rec_tidy_env rhs' top_tidy_env bndr
+		rec_tidy_env rhs rhs' top_tidy_env bndr
 
         rhs' = tidyExpr rec_tidy_env rhs
 
 tidyTopBinder :: Module -> IdEnv Bool -> CgInfoEnv
-	      -> TidyEnv -> CoreExpr
-			-- The TidyEnv is used to tidy the IdInfo
-			-- The expr is the already-tided RHS
-			-- Both are knot-tied: don't look at them!
+	      -> TidyEnv 	-- The TidyEnv is used to tidy the IdInfo
+	      -> CoreExpr	-- RHS *before* tidying
+	      -> CoreExpr	-- RHS *after* tidying
+			-- The TidyEnv and the after-tidying RHS are
+			-- both are knot-tied: don't look at them!
 	      -> TopTidyEnv -> Id -> (TopTidyEnv, Id)
   -- NB: tidyTopBinder doesn't affect the unique supply
 
-tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
+tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs tidy_rhs
 	      env@(ns2, occ_env2, subst_env2) id
 	-- This function is the heart of Step 2
 	-- The rec_tidy_env is the one to use for the IdInfo
@@ -449,7 +450,7 @@ tidyTopBinder mod ext_ids cg_info_env rec_tidy_env rhs
     -- Remember that ext_ids maps an Id to a Bool: 
     --	True to show the unfolding, False to hide it
     show_unfold = maybe_external `orElse` False
-    unfold_info | show_unfold = mkTopUnfolding rhs
+    unfold_info | show_unfold = mkTopUnfolding tidy_rhs
 		| otherwise   = noUnfolding
 
     -- Usually the Id will have an accurate arity on it, because
