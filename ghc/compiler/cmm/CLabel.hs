@@ -87,7 +87,6 @@ module CLabel (
         dynamicLinkerLabelInfo,
         
         mkPicBaseLabel,
-        mkDeadStripPreventer,
 
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, externallyVisibleCLabel,
@@ -197,9 +196,6 @@ data CLabel
                                 -- assembler label '1'; it is pretty-printed
                                 -- as 1b, referring to the previous definition
                                 -- of 1: in the assembler source file.
-
-  | DeadStripPreventer CLabel
-    -- label before an info table to prevent excessive dead-stripping on darwin
 
   deriving (Eq, Ord)
 
@@ -405,9 +401,6 @@ dynamicLinkerLabelInfo _ = Nothing
         
 mkPicBaseLabel :: CLabel
 mkPicBaseLabel = PicBaseLabel
-
-mkDeadStripPreventer :: CLabel -> CLabel
-mkDeadStripPreventer lbl = DeadStripPreventer lbl
 
 -- -----------------------------------------------------------------------------
 -- Converting info labels to entry labels.
@@ -626,9 +619,6 @@ pprCLabel (DynamicLinkerLabel info lbl)
    
 pprCLabel PicBaseLabel
    = ptext SLIT("1b")
-   
-pprCLabel (DeadStripPreventer lbl)
-   = pprCLabel lbl <> ptext SLIT("_dsp")
 #endif
 
 pprCLabel lbl = 
