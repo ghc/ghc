@@ -14,5 +14,5 @@ AC_SUBST([ProjectVersionInt])
 AC_SUBST([release], [1])
 
 # Write the results...
-AC_CONFIG_FILES([ghc.spec VERSION docs/users_guide/ug-book.xml])
+AC_CONFIG_FILES([ghc.spec VERSION docs/users_guide/ug-book.xml mk/version.mk])
 AC_OUTPUT
