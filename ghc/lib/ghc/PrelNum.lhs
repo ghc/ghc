@@ -941,6 +941,13 @@ point type to obtain the same results.
 {-# GENERATE_SPECS showFloat a{Double#,Double} #-}
 showFloat:: (RealFloat a) => a -> ShowS
 showFloat x =
+    if isNaN x then showString "NaN"
+    else if isInfinite x then
+      ( if x < 0 then showString "-" else id) . showString "Infinite"
+    else if x < 0 || isNegativeZero x then showChar '-' . showFloat' (-x) else showFloat' x
+
+showFloat' :: (RealFloat a) => a -> ShowS
+showFloat' x =
     if x == 0 then showString ("0." ++ take (m-1) zeros)
 	      else if e >= m-1 || e < 0 then showSci else showFix
     where
