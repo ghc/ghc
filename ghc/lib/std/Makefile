@@ -29,7 +29,7 @@ ifneq "$(way)" "dll"
 PACKAGE = -package-name std
 else
 # Hack by SPJ to delay if-then-else until the pattern rule when we have $*
-PACKAGE = $(subst ~, ,$(word $(words dummy $(findstr $(notdir $*), PrelMain )), -package-name~std))
+PACKAGE = $(subst ~, ,$(word $(words dummy $(findstring $(notdir $*), PrelMain )), -package-name~std))
 endif
 LIBRARY = libHSstd$(_way).a
 
