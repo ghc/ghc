@@ -356,7 +356,7 @@ hscFileFrontEnd hsc_env msg_act location = do {
     }}
 
 -- Perform static/dynamic checks on the source code in a StringBuffer
--- This is a temporary solution: it'll read in interface files lazilly, whereas
+-- This is a temporary solution: it'll read in interface files lazily, whereas
 -- we probably want to use the compilation manager to load in all the modules
 -- in a project.
 hscBufferFrontEnd :: HscEnv -> StringBuffer -> MessageAction -> IO HscResult
