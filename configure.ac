@@ -245,13 +245,13 @@ m68k-*-openbsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
-m68k-apple-netbsd*)
-	HostPlatform=m68k-apple-netbsd
-	TargetPlatform=m68k-apple-netbsd
-	BuildPlatform=m68k-apple-netbsd
-        HostPlatform_CPP='m68k_apple_netbsd'
+m68k-*-netbsd*)
+	HostPlatform=m68k-unknown-netbsd
+	TargetPlatform=m68k-unknown-netbsd
+	BuildPlatform=m68k-unknown-netbsd
+        HostPlatform_CPP='m68k_unknown_netbsd'
         HostArch_CPP='m68k'
-        HostVendor_CPP='apple'
+        HostVendor_CPP='unknown'
         HostOS_CPP='netbsd'
         ;;
 m68k-sun-sunos4*)
