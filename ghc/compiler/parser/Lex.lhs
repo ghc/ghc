@@ -819,12 +819,11 @@ silly_escape_chars = [
 lex_demand cont buf = 
  case read_em [] buf of { (ls,buf') -> 
  case currentChar# buf' of
-   'X'# -> cont (ITstrict (StrictSig (mkTopDmdType ls BotRes))) (incLexeme buf')
-   'M'# -> cont (ITstrict (StrictSig (mkTopDmdType ls RetCPR))) (incLexeme buf')
+   'b'# -> cont (ITstrict (StrictSig (mkTopDmdType ls BotRes))) (incLexeme buf')
+   'm'# -> cont (ITstrict (StrictSig (mkTopDmdType ls RetCPR))) (incLexeme buf')
    _    -> cont (ITstrict (StrictSig (mkTopDmdType ls TopRes))) buf'
  }
  where
-   -- code snatched from Demand.lhs
   read_em acc buf = 
    case currentChar# buf of
     'L'# -> read_em (Lazy : acc) (stepOn buf)

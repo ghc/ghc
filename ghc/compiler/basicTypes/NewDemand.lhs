@@ -71,9 +71,10 @@ instance Outputable DmdType where
       pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
 
 instance Outputable DmdResult where
-  ppr TopRes = empty
-  ppr RetCPR = char 'M'
-  ppr BotRes = char 'X'
+  ppr TopRes = empty	  -- Keep these distinct from Demand letters
+  ppr RetCPR = char 'm'	  -- so that we can print strictness sigs as
+  ppr BotRes = char 'b'   --    dddr
+			  -- without ambiguity
 
 emptyDmdEnv = emptyVarEnv
 topDmdType = DmdType emptyDmdEnv [] TopRes
