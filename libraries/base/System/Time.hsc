@@ -96,16 +96,22 @@ module System.Time
 
      ) where
 
+#ifndef __HUGS__
 #include "HsBase.h"
+#endif
 
 import Prelude
 
 import Data.Ix
 import System.Locale
 import System.IO.Unsafe
-	
+
+#ifdef __HUGS__
+import Hugs.Time ( getClockTimePrim, toCalTimePrim, toClockTimePrim )
+#else
 import Foreign
 import Foreign.C
+#endif
 
 -- One way to partition and give name to chunks of a year and a week:
 
@@ -200,7 +206,12 @@ noTimeDiff = TimeDiff 0 0 0 0 0 0 0
 -- getClockTime returns the current time in its internal representation.
 
 getClockTime :: IO ClockTime
-#if HAVE_GETTIMEOFDAY
+#ifdef __HUGS__
+getClockTime = do
+  (sec,usec) <- getClockTimePrim
+  return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000000))
+
+#elif HAVE_GETTIMEOFDAY
 getClockTime = do
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
@@ -297,6 +308,7 @@ normalizeTimeDiff td =
         , tdSec   = diffSecs
         }
 
+#ifndef __HUGS__
 -- -----------------------------------------------------------------------------
 -- How do we deal with timezones on this architecture?
 
@@ -356,6 +368,7 @@ gmtoff x = do
   return (- (if dst then (fromIntegral tz - 3600) else tz))
 # endif /* ! HAVE_ALTZONE */
 #endif  /* ! HAVE_TM_ZONE */
+#endif /* ! __HUGS__ */
 
 -- -----------------------------------------------------------------------------
 -- toCalendarTime t converts t to a local time, modified by
@@ -366,19 +379,47 @@ gmtoff x = do
 
 
 toCalendarTime :: ClockTime -> IO CalendarTime
-#if HAVE_LOCALTIME_R
+#ifdef __HUGS__
+toCalendarTime =  toCalTime False
+#elif HAVE_LOCALTIME_R
 toCalendarTime =  clockToCalendarTime_reentrant (throwAwayReturnPointer localtime_r) False
 #else
 toCalendarTime =  clockToCalendarTime_static localtime False
 #endif
 
-toUTCTime      :: ClockTime -> CalendarTime
-#if HAVE_GMTIME_R
+toUTCTime :: ClockTime -> CalendarTime
+#ifdef __HUGS__
+toUTCTime      =  unsafePerformIO . toCalTime True
+#elif HAVE_GMTIME_R
 toUTCTime      =  unsafePerformIO . clockToCalendarTime_reentrant (throwAwayReturnPointer gmtime_r) True
 #else
 toUTCTime      =  unsafePerformIO . clockToCalendarTime_static gmtime True
 #endif
 
+#ifdef __HUGS__
+toCalTime :: Bool -> ClockTime -> IO CalendarTime
+toCalTime toUTC (TOD s psecs)
+  | (s > fromIntegral (maxBound :: Int)) || 
+    (s < fromIntegral (minBound :: Int))
+  = error ((if toUTC then "toUTCTime: " else "toCalendarTime: ") ++
+           "clock secs out of range")
+  | otherwise = do
+    (sec,min,hour,mday,mon,year,wday,yday,isdst,zone,off) <- 
+  		toCalTimePrim (if toUTC then 1 else 0) (fromIntegral s)
+    return (CalendarTime{ ctYear=1900+year
+  		        , ctMonth=toEnum mon
+		        , ctDay=mday
+		        , ctHour=hour
+		        , ctMin=min
+		        , ctSec=sec
+		        , ctPicosec=psecs
+		        , ctWDay=toEnum wday
+		        , ctYDay=yday
+		        , ctTZName=(if toUTC then "UTC" else zone)
+		        , ctTZ=(if toUTC then 0 else off)
+		        , ctIsDST=not toUTC && (isdst/=0)
+		        })
+#else /* ! __HUGS__ */
 throwAwayReturnPointer :: (Ptr CTime -> Ptr CTm -> IO (Ptr CTm))
                        -> (Ptr CTime -> Ptr CTm -> IO (       ))
 throwAwayReturnPointer fun x y = fun x y >> return ()
@@ -430,9 +471,18 @@ clockToCalendarTime_aux is_utc p_tm psec = do
 		(if is_utc then "UTC" else tzname)
 		(if is_utc then 0     else fromIntegral tz)
 		(if is_utc then False else isdst /= 0))
-
+#endif /* ! __HUGS__ */
 
 toClockTime :: CalendarTime -> ClockTime
+#ifdef __HUGS__
+toClockTime (CalendarTime yr mon mday hour min sec psec
+			  _wday _yday _tzname tz isdst) =
+  unsafePerformIO $ do
+    s <- toClockTimePrim (yr-1900) (fromEnum mon) mday
+  		         hour min sec
+		         tz (if isdst then 1 else 0)
+    return (TOD (fromIntegral s) psec)
+#else /* ! __HUGS__ */
 toClockTime (CalendarTime year mon mday hour min sec psec 
 			  _wday _yday _tzname tz isdst) =
 
@@ -474,6 +524,7 @@ toClockTime (CalendarTime year mon mday hour min sec psec
         gmtoff <- gmtoff p_tm
 	let res = fromIntegral t - tz + fromIntegral gmtoff
 	return (TOD (fromIntegral res) psec)
+#endif /* ! __HUGS__ */
 
 -- -----------------------------------------------------------------------------
 -- Converting time values to strings.
@@ -615,7 +666,7 @@ formatTimeDiff l fmt td@(TimeDiff year month day hour min sec _)
 
    addS v s = if abs v == 1 then fst s else snd s
 
-
+#ifndef __HUGS__
 -- -----------------------------------------------------------------------------
 -- Foreign time interface (POSIX)
 
@@ -647,3 +698,4 @@ foreign import ccall unsafe ftime :: Ptr CTimeB -> IO CInt
 foreign import ccall unsafe ftime :: Ptr CTimeB -> IO ()
 #endif
 #endif
+#endif /* ! __HUGS__ */

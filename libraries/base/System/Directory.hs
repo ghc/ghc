@@ -57,6 +57,8 @@ module System.Directory
 
 #ifdef __NHC__
 import Directory
+#elif defined(__HUGS__)
+import Hugs.Directory
 #else
 
 import Prelude
