@@ -32,6 +32,46 @@
 # 
 #
 
+##################################################################
+# 		FPtools standard targets
+#
+# depend:
+#
+#  The depend target has to cope with a set of files that may have
+#  different ways of computing their dependencies, i.e., a Haskell
+#  module's dependencies are computed differently from C files.
+#
+.PHONY: depend
+
+# Compiler produced files that are targets of the source's imports.
+MKDEPENDHS_OBJ_SUFFICES=o
+
+DEPEND_SRCS = $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
+
+ifneq "$(DEPEND_SRCS)" ""
+depend :: .depend
+
+# Build .depend, then recursively invoke $(MAKE) to carry on.  Because the
+# build system includes .depend (from boilerplate.mk), GNU make records .depend
+# as a Makefile and automatically tries to rebuild it if it is out-of-date.
+# this will happen before any other targets are processed.
+.depend : $(DEPEND_SRCS)
+	@echo "------------------------------------------------------------------------"
+	@echo "===fptools== Rebuilding dependencies..."
+	@echo "PWD = $(shell pwd)"
+	@echo "------------------------------------------------------------------------"
+	@$(RM) .depend
+	@touch .depend
+ifneq "$(MKDEPENDC_SRCS)" ""
+	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
+endif
+ifneq "$(MKDEPENDHS_SRCS)" ""
+	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS)
+endif
+
+else # no dependencies required
+depend ::
+endif
 
 ##################################################################
 #
@@ -116,48 +156,6 @@ ifneq "$(SUBDIRS)" ""
 $(SUBDIRS) ::
 	  $(MAKE) -C $@ $(MFLAGS)
 endif
-
-##################################################################
-# 		FPtools standard targets
-#
-# depend:
-#
-#  The depend target has to cope with a set of files that may have
-#  different ways of computing their dependencies, i.e., a Haskell
-#  module's dependencies are computed differently from C files.
-#
-# Note that we don't compute dependencies automatically, i.e., have the
-# .depend file be a target that is dependent on the Haskell+C sources,
-# and then have the `depend' target depend on `.depend'. The reason for
-# this is that when GNU make is processing the `include .depend' statement
-# it records .depend as being a Makefile. Before doing any other processing,
-# `make' will try to check to see if the Makefiles are up-to-date. And,
-# surprisingly enough, .depend has a rule for it, so if any of the source
-# files change, it will be invoked, *regardless* of what target you're making.
-#
-# So, for now, the dependencies has to be re-computed manually via `make depend'
-# whenever a module changes its set of imports. Doing what was outlined above
-# is only a small optimisation anyway, it would avoid the recomputation of
-# dependencies if the .depend file was newer than any of the source modules.
-#
-.PHONY: depend
-
-# Compiler produced files that are targets of the source's imports.
-MKDEPENDHS_OBJ_SUFFICES=o
-
-depend :: $(MKDEPENDHS_SRCS) $(MKDEPENDC_SRCS)
-	@$(RM) .depend
-	@touch .depend
-ifneq "$(DOC_SRCS)" ""
-	$(MKDEPENDLIT) -o .depend $(MKDEPENDLIT_OPTS) $(filter %.lit,$(DOC_SRCS))
-endif
-ifneq "$(MKDEPENDC_SRCS)" ""
-	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS) 
-endif
-ifneq "$(MKDEPENDHS_SRCS)" ""
-	$(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS)
-endif
-
 
 ##################################################################
 # 			boot
@@ -417,6 +415,7 @@ endif
 #
 
 ifneq "$(GHCI_LIBRARY)" ""
+ifeq "$(way)" ""
 ifeq "$(GhcWithInterpreter)" "YES"
 
 all :: $(GHCI_LIBRARY)
@@ -430,6 +429,7 @@ $(GHCI_LIBRARY) :: $(GHCI_LIBOBJS)
 
 INSTALL_LIBS += $(GHCI_LIBRARY)
 CLEAN_FILES += $(GHCI_LIBRARY)
+endif
 endif
 endif
 
