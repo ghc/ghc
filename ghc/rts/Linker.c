@@ -3372,7 +3372,12 @@ static int relocateSection(
 		    // Step 1: Figure out what the relocated value should be
 		    if(scat->r_type == GENERIC_RELOC_VANILLA)
 		    {
-		        word = scat->r_value + sect->offset + ((long) image);
+                        word = *wordPtr + (unsigned long) relocateAddress(
+                                                                oc,
+                                                                nSections,
+                                                                sections,
+                                                                scat->r_value)
+                                        - scat->r_value;
 		    }
 		    else if(scat->r_type == PPC_RELOC_SECTDIFF
 		        || scat->r_type == PPC_RELOC_LO16_SECTDIFF
