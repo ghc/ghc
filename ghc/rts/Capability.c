@@ -1,6 +1,5 @@
 /* ---------------------------------------------------------------------------
- *
- * (c) The GHC Team, 2002
+ * (c) The GHC Team, 2003
  *
  * Capabilities
  *
@@ -15,9 +14,11 @@
  * one global capability, namely MainCapability.
  * 
  * --------------------------------------------------------------------------*/
+
 #include "PosixSource.h"
 #include "Rts.h"
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 #include "OSThreads.h"
 #include "Capability.h"
 #include "Schedule.h"  /* to get at EMPTY_RUN_QUEUE() */
@@ -74,11 +75,17 @@ static Condition *passTarget = NULL;
 static rtsBool passingCapability = rtsFalse;
 #endif
 
-/* -----------------------------------------------------------------------------
+#ifdef SMP
+#define UNUSED_IF_NOT_SMP
+#else
+#define UNUSED_IF_NOT_SMP STG_UNUSED
+#endif
+
+/* ----------------------------------------------------------------------------
    Initialisation
-   -------------------------------------------------------------------------- */
-static
-void
+   ------------------------------------------------------------------------- */
+
+static void
 initCapability( Capability *cap )
 {
     cap->f.stgGCEnter1     = (F_)__stg_gc_enter_1;
@@ -89,17 +96,16 @@ initCapability( Capability *cap )
 static void initCapabilities_(nat n);
 #endif
 
-/* 
+/* ---------------------------------------------------------------------------
  * Function:  initCapabilities()
  *
  * Purpose:   set up the Capability handling. For the SMP build,
  *            we keep a table of them, the size of which is
  *            controlled by the user via the RTS flag RtsFlags.ParFlags.nNodes
  *
- * Pre-conditions: no locks assumed held.
- */
+ * ------------------------------------------------------------------------- */
 void
-initCapabilities()
+initCapabilities( void )
 {
 #if defined(RTS_SUPPORTS_THREADS)
   initCondition(&returning_worker_cond);
@@ -123,22 +129,15 @@ static Capability *returning_capabilities;
 	/* Capabilities being passed to returning worker threads */
 #endif
 
-/* -----------------------------------------------------------------------------
-   Acquiring capabilities
-   -------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------
+   grabCapability( Capability** )
 
-/*
- * Function:  grabCapability(Capability**)
- * 
- * Purpose:   the act of grabbing a capability is easy; just 
- *            remove one from the free capabilities list (which
- *            may just have one entry). In threaded builds, worker
- *            threads are prevented from doing so willy-nilly
- *            via the condition variables thread_ready_cond and
- *            returning_worker_cond.
- *
- */ 
-void grabCapability(Capability** cap)
+   (only externally visible when !RTS_SUPPORTS_THREADS.  In the
+   threaded RTS, clients must use waitFor*Capability()).
+   ------------------------------------------------------------------------- */
+
+void
+grabCapability( Capability** cap )
 {
 #if !defined(SMP)
   ASSERT(rts_n_free_capabilities == 1);
@@ -153,56 +152,63 @@ void grabCapability(Capability** cap)
   IF_DEBUG(scheduler, sched_belch("worker: got capability"));
 }
 
-/*
+/* ----------------------------------------------------------------------------
  * Function:  releaseCapability(Capability*)
  *
  * Purpose:   Letting go of a capability. Causes a
  *            'returning worker' thread or a 'waiting worker'
  *            to wake up, in that order.
- *
- */
-void releaseCapability(Capability* cap
-#if !defined(SMP)
-		       STG_UNUSED
-#endif
-)
-{	// Precondition: sched_mutex must be held
+ * ------------------------------------------------------------------------- */
+
+void
+releaseCapability( Capability* cap UNUSED_IF_NOT_SMP )
+{
+    // Precondition: sched_mutex is held.
 #if defined(RTS_SUPPORTS_THREADS)
 #ifndef SMP
-  ASSERT(rts_n_free_capabilities == 0);
+    ASSERT(rts_n_free_capabilities == 0);
 #endif
-  /* Check to see whether a worker thread can be given
-     the go-ahead to return the result of an external call..*/
-  if (rts_n_waiting_workers > 0) {
-    /* Decrement the counter here to avoid livelock where the
-     * thread that is yielding its capability will repeatedly
-     * signal returning_worker_cond.
-     */
+    // Check to see whether a worker thread can be given
+    // the go-ahead to return the result of an external call..
+    if (rts_n_waiting_workers > 0) {
+	// Decrement the counter here to avoid livelock where the
+	// thread that is yielding its capability will repeatedly
+	// signal returning_worker_cond.
+
 #if defined(SMP)
 	// SMP variant untested
-    cap->link = returning_capabilities;
-    returning_capabilities = cap;
-#else
+	cap->link = returning_capabilities;
+	returning_capabilities = cap;
 #endif
-    rts_n_waiting_workers--;
-    signalCondition(&returning_worker_cond);
-    IF_DEBUG(scheduler, sched_belch("worker: released capability to returning worker"));
-  } else /*if ( !EMPTY_RUN_QUEUE() )*/ {
+
+	rts_n_waiting_workers--;
+	signalCondition(&returning_worker_cond);
+	IF_DEBUG(scheduler, sched_belch("worker: released capability to returning worker"));
+    } else if (passingCapability) {
+	if (passTarget == NULL) {
+	    signalCondition(&thread_ready_cond);
+	    startSchedulerTaskIfNecessary();
+	} else {
+	    signalCondition(passTarget);
+	}
+	rts_n_free_capabilities = 1;
+	IF_DEBUG(scheduler, sched_belch("worker: released capability, passing it"));
+
+    } else {
 #if defined(SMP)
-    cap->link = free_capabilities;
-    free_capabilities = cap;
-    rts_n_free_capabilities++;
+	cap->link = free_capabilities;
+	free_capabilities = cap;
+	rts_n_free_capabilities++;
 #else
-    rts_n_free_capabilities = 1;
+	rts_n_free_capabilities = 1;
 #endif
-    /* Signal that a capability is available */
-    signalCondition(&thread_ready_cond);
-    startSchedulerTaskIfNecessary();  // if there is more work to be done,
-				      // we'll need a new thread
-    IF_DEBUG(scheduler, sched_belch("worker: released capability"));
-  }
+	// Signal that a capability is available
+	signalCondition(&thread_ready_cond);
+	startSchedulerTaskIfNecessary();
+	IF_DEBUG(scheduler, sched_belch("worker: released capability"));
+    }
 #endif
-  return;
+    return;
 }
 
 #if defined(RTS_SUPPORTS_THREADS)
@@ -211,8 +217,8 @@ void releaseCapability(Capability* cap
  * call, it needs to communicate the result back. This is done
  * as follows:
  *
- *  - in resumeThread(), the thread calls grabReturnCapability().
- *  - If no capabilities are readily available, grabReturnCapability()
+ *  - in resumeThread(), the thread calls waitForReturnCapability().
+ *  - If no capabilities are readily available, waitForReturnCapability()
  *    increments a counter rts_n_waiting_workers, and blocks
  *    waiting for the condition returning_worker_cond to become
  *    signalled.
@@ -225,8 +231,8 @@ void releaseCapability(Capability* cap
  *    to re-grab a capability and re-enter the Scheduler.
  */
 
-/*
- * Function: grabReturnCapability(Capability**)
+/* ----------------------------------------------------------------------------
+ * waitForReturnCapability( Mutext *pMutex, Capability** )
  *
  * Purpose:  when an OS thread returns from an external call,
  * it calls grabReturnCapability() (via Schedule.resumeThread())
@@ -234,73 +240,69 @@ void releaseCapability(Capability* cap
  * result of the external call back to the Haskell thread that
  * made it.
  *
- * Pre-condition:  pMutex is held.
- * Post-condition: pMutex is still held and a capability has
- *                 been assigned to the worker thread.
- */
+ * ------------------------------------------------------------------------- */
+
 void
-grabReturnCapability(Mutex* pMutex, Capability** pCap)
+waitForReturnCapability( Mutex* pMutex, Capability** pCap )
 {
-  IF_DEBUG(scheduler, 
-	   sched_belch("worker: returning; workers waiting: %d",
-		       rts_n_waiting_workers));
-  if ( noCapabilities() || passingCapability ) {
-    rts_n_waiting_workers++;
-    wakeBlockedWorkerThread();
-    context_switch = 1;	// make sure it's our turn soon
-    waitCondition(&returning_worker_cond, pMutex);
+    // Pre-condition: pMutex is held.
+
+    IF_DEBUG(scheduler, 
+	     sched_belch("worker: returning; workers waiting: %d",
+			 rts_n_waiting_workers));
+
+    if ( noCapabilities() || passingCapability ) {
+	rts_n_waiting_workers++;
+	wakeBlockedWorkerThread();
+	context_switch = 1;	// make sure it's our turn soon
+	waitCondition(&returning_worker_cond, pMutex);
 #if defined(SMP)
-    *pCap = returning_capabilities;
-    returning_capabilities = (*pCap)->link;
+	*pCap = returning_capabilities;
+	returning_capabilities = (*pCap)->link;
 #else
-    *pCap = &MainCapability;
-    ASSERT(rts_n_free_capabilities == 0);
-    handleSignalsInThisThread();
+	*pCap = &MainCapability;
+	ASSERT(rts_n_free_capabilities == 0);
+	handleSignalsInThisThread();
 #endif
-  } else {
-    grabCapability(pCap);
-  }
-  return;
+    } else {
+	grabCapability(pCap);
+    }
+
+    // Post-condition: pMutex is held, pCap points to a capability
+    // which is now held by the current thread.
+    return;
 }
 
 
-/* -----------------------------------------------------------------------------
-   Yielding/waiting for capabilities
-   -------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------
+ * yieldCapability( Mutex* pMutex, Capability** pCap )
+ * ------------------------------------------------------------------------- */
 
-/*
- * Function: yieldToReturningWorker(Mutex*,Capability*,Condition*)
- *
- * Purpose:  when, upon entry to the Scheduler, an OS worker thread
- *           spots that one or more threads are blocked waiting for
- *           permission to return back their result, it gives up
- *           its Capability.
- *           Immediately afterwards, it tries to reaquire the Capabilty
- *           using waitForWorkCapability.
- *
- *
- * Pre-condition:  pMutex is assumed held and the thread possesses
- *                 a Capability.
- * Post-condition: pMutex is held and the thread possesses
- *                 a Capability.
- */
 void
-yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
+yieldCapability( Capability** pCap )
 {
-  if ( rts_n_waiting_workers > 0 ) {
-    IF_DEBUG(scheduler, sched_belch("worker: giving up capability"));
-    releaseCapability(*pCap);
-        /* And wait for work */
-    waitForWorkCapability(pMutex, pCap, pThreadCond);
-    IF_DEBUG(scheduler,
-	     sched_belch("worker: got back capability (after yieldToReturningWorker)"));
-  }
-  return;
+    // Pre-condition:  pMutex is assumed held, the current thread
+    // holds the capability pointed to by pCap.
+
+    if ( rts_n_waiting_workers > 0 || passingCapability ) {
+	IF_DEBUG(scheduler, sched_belch("worker: giving up capability"));
+	releaseCapability(*pCap);
+	*pCap = NULL;
+    }
+
+    // Post-condition:  pMutex is assumed held, and either:
+    //
+    //  1. *pCap is NULL, in which case the current thread does not
+    //     hold a capability now, or
+    //  2. *pCap is not NULL, in which case the current thread still
+    //     holds the capability.
+    //
+    return;
 }
 
 
-/*
- * Function: waitForWorkCapability(Mutex*, Capability**, Condition*)
+/* ----------------------------------------------------------------------------
+ * waitForCapability( Mutex*, Capability**, Condition* )
  *
  * Purpose:  wait for a Capability to become available. In
  *           the process of doing so, updates the number
@@ -310,92 +312,69 @@ yieldToReturningWorker(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
  *           call is made.
  *           If pThreadCond is not NULL, a capability can be specifically
  *           passed to this thread using passCapability.
- *
- * Pre-condition: pMutex is held.
- * Post-condition: pMutex is held and *pCap is held by the current thread
- */
+ * ------------------------------------------------------------------------- */
  
 void 
-waitForWorkCapability(Mutex* pMutex, Capability** pCap, Condition* pThreadCond)
+waitForCapability( Mutex* pMutex, Capability** pCap, Condition* pThreadCond )
 {
-#ifdef SMP
-  #error SMP version not implemented
-#endif
-  while ( noCapabilities() || (passingCapability && passTarget != pThreadCond)) {
-    IF_DEBUG(scheduler,
-	     sched_belch("worker: wait for capability (cond: %p)",
-			 pThreadCond));
-    if(pThreadCond)
-    {
-      waitCondition(pThreadCond, pMutex);
-      IF_DEBUG(scheduler, sched_belch("worker: get passed capability"));
+    // Pre-condition: pMutex is held.
+
+    while ( noCapabilities() || 
+	    (passingCapability && passTarget != pThreadCond)) {
+	IF_DEBUG(scheduler,
+		 sched_belch("worker: wait for capability (cond: %p)",
+			     pThreadCond));
+
+	if (pThreadCond != NULL) {
+	    waitCondition(pThreadCond, pMutex);
+	    IF_DEBUG(scheduler, sched_belch("worker: get passed capability"));
+	} else {
+	    rts_n_waiting_tasks++;
+	    waitCondition(&thread_ready_cond, pMutex);
+	    rts_n_waiting_tasks--;
+	    IF_DEBUG(scheduler, sched_belch("worker: get normal capability"));
+	}
     }
-    else
-    {
-      rts_n_waiting_tasks++;
-      waitCondition(&thread_ready_cond, pMutex);
-      rts_n_waiting_tasks--;
-      IF_DEBUG(scheduler, sched_belch("worker: get normal capability"));
-    }
-  }
-  passingCapability = rtsFalse;
-  grabCapability(pCap);
-  return;
+    passingCapability = rtsFalse;
+    grabCapability(pCap);
+
+    // Post-condition: pMutex is held and *pCap is held by the current thread
+    return;
 }
 
-/*
- * Function: passCapability(Mutex*, Capability*, Condition*)
- *
- * Purpose:  Let go of the capability and make sure the thread associated
- *	     with the Condition pTargetThreadCond gets it next.
- *
- * Pre-condition: pMutex is held and cap is held by the current thread
- * Post-condition: pMutex is held; cap will be grabbed by the "target"
- *		   thread when pMutex is released.
- */
+/* ----------------------------------------------------------------------------
+   passCapability, passCapabilityToWorker
+   ------------------------------------------------------------------------- */
 
 void
-passCapability(Mutex* pMutex, Capability* cap, Condition *pTargetThreadCond)
+passCapability( Condition *pTargetThreadCond )
 {
-#ifdef SMP
-  #error SMP version not implemented
-#endif
-    ASSERT(rts_n_free_capabilities == 0);
-    rts_n_free_capabilities = 1;
-    signalCondition(pTargetThreadCond);
+    // Pre-condition: pMutex is held and cap is held by the current thread
+
     passTarget = pTargetThreadCond;
     passingCapability = rtsTrue;
     IF_DEBUG(scheduler, sched_belch("worker: passCapability"));
+
+    // Post-condition: pMutex is held; cap is still held, but will be
+    //                 passed to the target thread when next released.
 }
 
-/*
- * Function: passCapabilityToWorker(Mutex*, Capability*)
- *
- * Purpose:  Let go of the capability and make sure that a
- *	     "plain" worker thread (not a bound thread) gets it next.
- *
- * Pre-condition: pMutex is held and cap is held by the current thread
- * Post-condition: pMutex is held; cap will be grabbed by the "target"
- *		   thread when pMutex is released.
- */
-
 void
-passCapabilityToWorker(Mutex* pMutex, Capability* cap)
+passCapabilityToWorker( void )
 {
-#ifdef SMP
-  #error SMP version not implemented
-#endif
-    rts_n_free_capabilities = 1;
-    signalCondition(&thread_ready_cond);
-    startSchedulerTaskIfNecessary();
+    // Pre-condition: pMutex is held and cap is held by the current thread
+
     passTarget = NULL;
     passingCapability = rtsTrue;
     IF_DEBUG(scheduler, sched_belch("worker: passCapabilityToWorker"));
+
+    // Post-condition: pMutex is held; cap is still held, but will be
+    //                 passed to a worker thread when next released.
 }
 
-
-
 #endif /* RTS_SUPPORTS_THREADS */
+
+/* ------------------------------------------------------------------------- */
 
 #if defined(SMP)
 /*

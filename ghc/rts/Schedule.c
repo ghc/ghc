@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.182 2003/12/12 16:35:20 simonmar Exp $
+ * $Id: Schedule.c,v 1.183 2003/12/16 13:27:32 simonmar Exp $
  *
- * (c) The GHC Team, 1998-2000
+ * (c) The GHC Team, 1998-2003
  *
  * Scheduler
  *
@@ -10,36 +10,14 @@
  *
  * WAY  Name     CPP flag  What's it for
  * --------------------------------------
- * mp   GUM      PAR          Parallel execution on a distributed memory machine
+ * mp   GUM      PAR          Parallel execution on a distrib. memory machine
  * s    SMP      SMP          Parallel execution on a shared memory machine
  * mg   GranSim  GRAN         Simulation of parallel execution
  * md   GUM/GdH  DIST         Distributed execution (based on GUM)
  *
  * --------------------------------------------------------------------------*/
 
-//@node Main scheduling code, , ,
-//@section Main scheduling code
-
 /* 
- * Version with scheduler monitor support for SMPs (WAY=s):
-
-   This design provides a high-level API to create and schedule threads etc.
-   as documented in the SMP design document.
-
-   It uses a monitor design controlled by a single mutex to exercise control
-   over accesses to shared data structures, and builds on the Posix threads
-   library.
-
-   The majority of state is shared.  In order to keep essential per-task state,
-   there is a Capability structure, which contains all the information
-   needed to run a thread: its STG registers, a pointer to its TSO, a
-   nursery etc.  During STG execution, a pointer to the capability is
-   kept in a register (BaseReg).
-
-   In a non-SMP build, there is one global capability, namely MainRegTable.
-
-   SDM & KH, 10/99
-
  * Version with support for distributed memory parallelism aka GUM (WAY=mp):
 
    The main scheduling loop in GUM iterates until a finish message is received.
@@ -58,22 +36,6 @@
    threads in the runnable queue, GranSim is event driven, i.e. it iterates
    over the events in the global event queue.  -- HWL
 */
-
-//@menu
-//* Includes::			
-//* Variables and Data structures::  
-//* Main scheduling loop::	
-//* Suspend and Resume::	
-//* Run queue code::		
-//* Garbage Collextion Routines::  
-//* Blocking Queue Routines::	
-//* Exception Handling Routines::  
-//* Debugging Routines::	
-//* Index::			
-//@end menu
-
-//@node Includes, Variables and Data structures, Main scheduling code, Main scheduling code
-//@subsection Includes
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -142,9 +104,6 @@
 #define USED_WHEN_RTS_SUPPORTS_THREADS STG_UNUSED
 #endif
 
-//@node Variables and Data structures, Prototypes, Includes, Main scheduling code
-//@subsection Variables and Data structures
-
 /* Main thread queue.
  * Locks required: sched_mutex.
  */
@@ -202,17 +161,14 @@ static StgTSO *threadStackOverflow(StgTSO *tso);
 */
 
 /* flag set by signal handler to precipitate a context switch */
-//@cindex context_switch
 nat context_switch = 0;
 
 /* if this flag is set as well, give up execution */
-//@cindex interrupted
 rtsBool interrupted = rtsFalse;
 
 /* Next thread ID to allocate.
  * Locks required: thread_id_mutex
  */
-//@cindex next_thread_id
 static StgThreadID next_thread_id = 1;
 
 /*
@@ -274,12 +230,6 @@ Mutex     term_mutex        = INIT_MUTEX_VAR;
  */
 Mutex     thread_id_mutex   = INIT_MUTEX_VAR;
 
-
-# if defined(SMP)
-static Condition gc_pending_cond = INIT_COND_VAR;
-nat await_death;
-# endif
-
 #endif /* RTS_SUPPORTS_THREADS */
 
 #if defined(PAR)
@@ -303,11 +253,9 @@ StgTSO * createSparkThread(rtsSpark spark);
 StgTSO * activateSpark (rtsSpark spark);  
 #endif
 
-/*
- * The thread state for the main thread.
-// ToDo: check whether not needed any more
-StgTSO   *MainTSO;
- */
+/* ----------------------------------------------------------------------------
+ * Starting Tasks
+ * ------------------------------------------------------------------------- */
 
 #if defined(RTS_SUPPORTS_THREADS)
 static rtsBool startingWorkerThread = rtsFalse;
@@ -316,14 +264,9 @@ static void taskStart(void);
 static void
 taskStart(void)
 {
-  Capability *cap;
-  
   ACQUIRE_LOCK(&sched_mutex);
-  startingWorkerThread = rtsFalse;
-  waitForWorkCapability(&sched_mutex, &cap, NULL);
+  schedule(NULL,NULL);
   RELEASE_LOCK(&sched_mutex);
-  
-  schedule(NULL,cap);
 }
 
 void
@@ -343,9 +286,6 @@ startSchedulerTaskIfNecessary(void)
   }
 }
 #endif
-
-//@node Main scheduling loop, Suspend and Resume, Prototypes, Main scheduling code
-//@subsection Main scheduling loop
 
 /* ---------------------------------------------------------------------------
    Main scheduling loop.
@@ -382,7 +322,6 @@ startSchedulerTaskIfNecessary(void)
      This is not the ugliest code you could imagine, but it's bloody close.
 
    ------------------------------------------------------------------------ */
-//@cindex schedule
 static void
 schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
           Capability *initialCapability )
@@ -405,7 +344,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
   rtsBool was_interrupted = rtsFalse;
   StgTSOWhatNext prev_what_next;
   
-  ACQUIRE_LOCK(&sched_mutex);
+  // Pre-condition: sched_mutex is held.
  
 #if defined(RTS_SUPPORTS_THREADS)
   //
@@ -418,7 +357,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 		       mainThread, initialCapability);
       );
 #else
-  /* simply initialise it in the non-threaded case */
+  // simply initialise it in the non-threaded case
   grabCapability(&cap);
 #endif
 
@@ -459,23 +398,20 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
      IF_DEBUG(scheduler, printAllThreads());
 
 #if defined(RTS_SUPPORTS_THREADS)
-    //
-    // Check to see whether there are any worker threads
-    // waiting to deposit external call results. If so,
-    // yield our capability... if we have a capability, that is.
-    //
-    if (cap != NULL) {
-	yieldToReturningWorker(&sched_mutex, &cap,
-			       mainThread ? &mainThread->bound_thread_cond
-			                  : NULL);
-    }
+      // Yield the capability to higher-priority tasks if necessary.
+      //
+      if (cap != NULL) {
+	  yieldCapability(&cap);
+      }
 
-    // If we do not currently hold a capability, we wait for one
-    if (cap == NULL) {
-	waitForWorkCapability(&sched_mutex, &cap,
-			      mainThread ? &mainThread->bound_thread_cond
-			                 : NULL);
-    }
+      // If we do not currently hold a capability, we wait for one
+      //
+      if (cap == NULL) {
+	  waitForCapability(&sched_mutex, &cap,
+			    mainThread ? &mainThread->bound_thread_cond : NULL);
+      }
+
+      // We now have a capability...
 #endif
 
     //
@@ -545,7 +481,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	      removeThreadLabel((StgWord)m->tso->id);
 #endif
               releaseCapability(cap);
-              RELEASE_LOCK(&sched_mutex);
               return;
             }
             else
@@ -555,18 +490,12 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
                 // the scheduler loop in it's bound OS thread has to
                 // return, so let's pass our capability directly to
                 // that thread.
-		passCapability(&sched_mutex, cap, &m->bound_thread_cond);
-		cap = NULL;
+		passCapability(&m->bound_thread_cond);
             }
           }
 	}
     }
     
-    // If we gave our capability away, go to the top to get it back
-    if (cap == NULL) {
-	continue;	
-    }
-      
 #else /* not threaded */
 
 # if defined(PAR)
@@ -603,48 +532,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 #endif
 
 
-#if 0 /* defined(SMP) */
-    /* Top up the run queue from our spark pool.  We try to make the
-     * number of threads in the run queue equal to the number of
-     * free capabilities.
-     *
-     * Disable spark support in SMP for now, non-essential & requires
-     * a little bit of work to make it compile cleanly. -- sof 1/02.
-     */
-    {
-      nat n = getFreeCapabilities();
-      StgTSO *tso = run_queue_hd;
-
-      /* Count the run queue */
-      while (n > 0 && tso != END_TSO_QUEUE) {
-	tso = tso->link;
-	n--;
-      }
-
-      for (; n > 0; n--) {
-	StgClosure *spark;
-	spark = findSpark(rtsFalse);
-	if (spark == NULL) {
-	  break; /* no more sparks in the pool */
-	} else {
-	  /* I'd prefer this to be done in activateSpark -- HWL */
-	  /* tricky - it needs to hold the scheduler lock and
-	   * not try to re-acquire it -- SDM */
-	  createSparkThread(spark);	  
-	  IF_DEBUG(scheduler,
-		   sched_belch("==^^ turning spark of closure %p into a thread",
-			       (StgClosure *)spark));
-	}
-      }
-      /* We need to wake up the other tasks if we just created some
-       * work for them.
-       */
-      if (getFreeCapabilities() - n > 1) {
-   	  signalCondition( &thread_ready_cond );
-      }
-    }
-#endif // SMP
-
 #if defined(RTS_USER_SIGNALS)
     // check for signals each time around the scheduler
     if (signals_pending()) {
@@ -659,16 +546,12 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
      * can wait indefinitely for something to happen.
      */
     if ( !EMPTY_QUEUE(blocked_queue_hd) || !EMPTY_QUEUE(sleeping_queue) 
-#if defined(RTS_SUPPORTS_THREADS) && !defined(SMP)
+#if defined(RTS_SUPPORTS_THREADS)
 		|| EMPTY_RUN_QUEUE()
 #endif
         )
     {
-      awaitEvent( EMPTY_RUN_QUEUE()
-#if defined(SMP)
-	&& allFreeCapabilities()
-#endif
-	);
+      awaitEvent( EMPTY_RUN_QUEUE() );
     }
     /* we can be interrupted while waiting for I/O... */
     if (interrupted) continue;
@@ -685,20 +568,9 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
      * inform all the main threads.
      */
 #if !defined(PAR) && !defined(RTS_SUPPORTS_THREADS)
-    if (   EMPTY_THREAD_QUEUES()
-#if defined(RTS_SUPPORTS_THREADS)
-	&& EMPTY_QUEUE(suspended_ccalling_threads)
-#endif
-#ifdef SMP
-	&& allFreeCapabilities()
-#endif
-	)
+    if (   EMPTY_THREAD_QUEUES() )
     {
 	IF_DEBUG(scheduler, sched_belch("deadlocked, forcing major GC..."));
-#if defined(THREADED_RTS)
-	/* and SMP mode ..? */
-	releaseCapability(cap);
-#endif
 	// Garbage collection can release some new threads due to
 	// either (a) finalizers or (b) threads resurrected because
 	// they are about to be send BlockedOnDeadMVar.  Any threads
@@ -718,19 +590,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	 * for signals to arrive rather then bombing out with a
 	 * deadlock.
 	 */
-#if defined(RTS_SUPPORTS_THREADS)
-	if ( 0 ) { /* hmm..what to do? Simply stop waiting for
-		      a signal with no runnable threads (or I/O
-		      suspended ones) leads nowhere quick.
-		      For now, simply shut down when we reach this
-		      condition.
-		      
-		      ToDo: define precisely under what conditions
-		      the Scheduler should shut down in an MT setting.
-		   */
-#else
 	if ( anyUserHandlers() ) {
-#endif
 	    IF_DEBUG(scheduler, 
 		     sched_belch("still deadlocked, waiting for signals..."));
 
@@ -756,21 +616,6 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	 */
 	{
 	    StgMainThread *m;
-#if defined(RTS_SUPPORTS_THREADS)
-	    for (m = main_threads; m != NULL; m = m->link) {
-		switch (m->tso->why_blocked) {
-		case BlockedOnBlackHole:
-		    raiseAsync(m->tso, (StgClosure *)NonTermination_closure);
-		    break;
-		case BlockedOnException:
-		case BlockedOnMVar:
-		    raiseAsync(m->tso, (StgClosure *)Deadlock_closure);
-		    break;
-		default:
-		    barf("deadlock: main thread blocked in a strange way");
-		}
-	    }
-#else
 	    m = main_threads;
 	    switch (m->tso->why_blocked) {
 	    case BlockedOnBlackHole:
@@ -783,62 +628,20 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	    default:
 		barf("deadlock: main thread blocked in a strange way");
 	    }
-#endif
 	}
-
-#if defined(RTS_SUPPORTS_THREADS)
-	/* ToDo: revisit conditions (and mechanism) for shutting
-	   down a multi-threaded world  */
-	IF_DEBUG(scheduler, sched_belch("all done, i think...shutting down."));
-	RELEASE_LOCK(&sched_mutex);
-	shutdownHaskell();
-	return;
-#endif
     }
   not_deadlocked:
 
 #elif defined(RTS_SUPPORTS_THREADS)
-    /* ToDo: add deadlock detection in threaded RTS */
+    // ToDo: add deadlock detection in threaded RTS
 #elif defined(PAR)
-    /* ToDo: add deadlock detection in GUM (similar to SMP) -- HWL */
+    // ToDo: add deadlock detection in GUM (similar to SMP) -- HWL
 #endif
 
-#if defined(SMP)
-    /* If there's a GC pending, don't do anything until it has
-     * completed.
-     */
-    if (ready_to_gc) {
-      IF_DEBUG(scheduler,sched_belch("waiting for GC"));
-      waitCondition( &gc_pending_cond, &sched_mutex );
-    }
-#endif    
-
 #if defined(RTS_SUPPORTS_THREADS)
-#if defined(SMP)
-    /* block until we've got a thread on the run queue and a free
-     * capability.
-     *
-     */
-    if ( EMPTY_RUN_QUEUE() ) {
-      /* Give up our capability */
-      releaseCapability(cap);
-
-      /* If we're in the process of shutting down (& running the
-       * a batch of finalisers), don't wait around.
-       */
-      if ( shutting_down_scheduler ) {
-	RELEASE_LOCK(&sched_mutex);
-	return;
-      }
-      IF_DEBUG(scheduler, sched_belch("waiting for work"));
-      waitForWorkCapability(&sched_mutex, &cap, rtsTrue);
-      IF_DEBUG(scheduler, sched_belch("work now available"));
-    }
-#else
     if ( EMPTY_RUN_QUEUE() ) {
       continue; // nothing to do
     }
-#endif
 #endif
 
 #if defined(GRAN)
@@ -1147,8 +950,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	    sched_belch("### thread %d bound to another OS thread", t->id));
 	  // no, bound to a different Haskell thread: pass to that thread
 	  PUSH_ON_RUN_QUEUE(t);
-	  passCapability(&sched_mutex,cap,&m->bound_thread_cond);
-	  cap = NULL;
+	  passCapability(&m->bound_thread_cond);
 	  continue;
 	}
       }
@@ -1162,8 +964,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
 	  // no, the current native thread is bound to a different
 	  // Haskell thread, so pass it to any worker thread
 	  PUSH_ON_RUN_QUEUE(t);
-	  passCapabilityToWorker(&sched_mutex, cap);
-	  cap = NULL;
+	  passCapabilityToWorker();
 	  continue; 
 	}
       }
@@ -1550,11 +1351,7 @@ run_thread:
     }
 #endif
 
-    if (ready_to_gc 
-#ifdef SMP
-	&& allFreeCapabilities() 
-#endif
-	) {
+    if (ready_to_gc) {
       /* everybody back, start the GC.
        * Could do it in this thread, or signal a condition var
        * to do it in another thread.  Either way, we need to
@@ -1565,9 +1362,6 @@ run_thread:
 #endif
       GarbageCollect(GetRoots,rtsFalse);
       ready_to_gc = rtsFalse;
-#ifdef SMP
-      broadcastCondition(&gc_pending_cond);
-#endif
 #if defined(GRAN)
       /* add a ContinueThread event to continue execution of current thread */
       new_event(CurrentProc, CurrentProc, CurrentTime[CurrentProc],
@@ -1726,9 +1520,6 @@ deleteAllThreads ( void )
 /* startThread and  insertThread are now in GranSim.c -- HWL */
 
 
-//@node Suspend and Resume, Run queue code, Main scheduling loop, Main scheduling code
-//@subsection Suspend and Resume
-
 /* ---------------------------------------------------------------------------
  * Suspending & resuming Haskell threads.
  * 
@@ -1747,7 +1538,7 @@ deleteAllThreads ( void )
 StgInt
 suspendThread( StgRegTable *reg, 
 	       rtsBool concCall
-#if !defined(RTS_SUPPORTS_THREADS) && !defined(DEBUG)
+#if !defined(DEBUG)
 	       STG_UNUSED
 #endif
 	       )
@@ -1817,7 +1608,7 @@ resumeThread( StgInt tok,
 #if defined(RTS_SUPPORTS_THREADS)
   /* Wait for permission to re-enter the RTS with the result. */
   ACQUIRE_LOCK(&sched_mutex);
-  grabReturnCapability(&sched_mutex, &cap);
+  waitForReturnCapability(&sched_mutex, &cap);
 
   IF_DEBUG(scheduler, sched_belch("worker (token %d): re-entering RTS", tok));
 #else
@@ -1851,9 +1642,7 @@ resumeThread( StgInt tok,
   tso->why_blocked  = NotBlocked;
 
   cap->r.rCurrentTSO = tso;
-#if defined(RTS_SUPPORTS_THREADS)
   RELEASE_LOCK(&sched_mutex);
-#endif
   errno = saved_errno;
   return &cap->r;
 }
@@ -1922,7 +1711,6 @@ labelThread(StgPtr tso, char *label)
 
    currently pri (priority) is only used in a GRAN setup -- HWL
    ------------------------------------------------------------------------ */
-//@cindex createThread
 #if defined(GRAN)
 /*   currently pri (priority) is only used in a GRAN setup -- HWL */
 StgTSO *
@@ -2134,7 +1922,6 @@ createSparkThread(rtsSpark spark)
   ToDo: fix for SMP (needs to acquire SCHED_MUTEX!)
 */
 #if defined(PAR)
-//@cindex activateSpark
 StgTSO *
 activateSpark (rtsSpark spark) 
 {
@@ -2199,39 +1986,37 @@ void scheduleThread(StgTSO* tso)
 }
 
 SchedulerStatus
-scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *initialCapability)
-{	// Precondition: sched_mutex must be held
-  StgMainThread *m;
+scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret,
+		   Capability *initialCapability)
+{
+    // Precondition: sched_mutex must be held
+    StgMainThread *m;
 
-  m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
-  m->tso = tso;
-  m->ret = ret;
-  m->stat = NoStatus;
+    m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
+    m->tso = tso;
+    m->ret = ret;
+    m->stat = NoStatus;
 #if defined(RTS_SUPPORTS_THREADS)
-#if defined(THREADED_RTS)
-  initCondition(&m->bound_thread_cond);
-#else
-  initCondition(&m->wakeup);
-#endif
+    initCondition(&m->bound_thread_cond);
 #endif
 
-  /* Put the thread on the main-threads list prior to scheduling the TSO.
-     Failure to do so introduces a race condition in the MT case (as
-     identified by Wolfgang Thaller), whereby the new task/OS thread 
-     created by scheduleThread_() would complete prior to the thread
-     that spawned it managed to put 'itself' on the main-threads list.
-     The upshot of it all being that the worker thread wouldn't get to
-     signal the completion of the its work item for the main thread to
-     see (==> it got stuck waiting.)    -- sof 6/02.
-  */
-  IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)", tso->id));
-  
-  m->link = main_threads;
-  main_threads = m;
+    /* Put the thread on the main-threads list prior to scheduling the TSO.
+       Failure to do so introduces a race condition in the MT case (as
+       identified by Wolfgang Thaller), whereby the new task/OS thread 
+       created by scheduleThread_() would complete prior to the thread
+       that spawned it managed to put 'itself' on the main-threads list.
+       The upshot of it all being that the worker thread wouldn't get to
+       signal the completion of the its work item for the main thread to
+       see (==> it got stuck waiting.)    -- sof 6/02.
+    */
+    IF_DEBUG(scheduler, sched_belch("waiting for thread (%d)", tso->id));
+    
+    m->link = main_threads;
+    main_threads = m;
+    
+    scheduleThread_(tso);
 
-  scheduleThread_(tso);
-
-  return waitThread_(m, initialCapability);
+    return waitThread_(m, initialCapability);
 }
 
 /* ---------------------------------------------------------------------------
@@ -2242,18 +2027,6 @@ scheduleWaitThread(StgTSO* tso, /*[out]*/HaskellObj* ret, Capability *initialCap
  * next pass.
  *
  * ------------------------------------------------------------------------ */
-
-#ifdef SMP
-static void
-term_handler(int sig STG_UNUSED)
-{
-  stat_workerStop();
-  ACQUIRE_LOCK(&term_mutex);
-  await_death--;
-  RELEASE_LOCK(&term_mutex);
-  shutdownThread();
-}
-#endif
 
 void 
 initScheduler(void)
@@ -2298,26 +2071,8 @@ initScheduler(void)
   initCondition(&thread_ready_cond);
 #endif
   
-#if defined(SMP)
-  initCondition(&gc_pending_cond);
-#endif
-
 #if defined(RTS_SUPPORTS_THREADS)
   ACQUIRE_LOCK(&sched_mutex);
-#endif
-
-  /* Install the SIGHUP handler */
-#if defined(SMP)
-  {
-    struct sigaction action,oact;
-
-    action.sa_handler = term_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-    if (sigaction(SIGTERM, &action, &oact) != 0) {
-      barf("can't install TERM handler");
-    }
-  }
 #endif
 
   /* A capability holds the state a native thread needs in
@@ -2328,20 +2083,14 @@ initScheduler(void)
   
 #if defined(RTS_SUPPORTS_THREADS)
     /* start our haskell execution tasks */
-# if defined(SMP)
-    startTaskManager(RtsFlags.ParFlags.nNodes, taskStart);
-# else
     startTaskManager(0,taskStart);
-# endif
 #endif
 
 #if /* defined(SMP) ||*/ defined(PAR)
   initSparkPools();
 #endif
 
-#if defined(RTS_SUPPORTS_THREADS)
   RELEASE_LOCK(&sched_mutex);
-#endif
 
 }
 
@@ -2354,94 +2103,14 @@ exitScheduler( void )
   shutting_down_scheduler = rtsTrue;
 }
 
-/* -----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
    Managing the per-task allocation areas.
    
    Each capability comes with an allocation area.  These are
    fixed-length block lists into which allocation can be done.
 
    ToDo: no support for two-space collection at the moment???
-   -------------------------------------------------------------------------- */
-
-/* -----------------------------------------------------------------------------
- * waitThread is the external interface for running a new computation
- * and waiting for the result.
- *
- * In the non-SMP case, we create a new main thread, push it on the 
- * main-thread stack, and invoke the scheduler to run it.  The
- * scheduler will return when the top main thread on the stack has
- * completed or died, and fill in the necessary fields of the
- * main_thread structure.
- *
- * In the SMP case, we create a main thread as before, but we then
- * create a new condition variable and sleep on it.  When our new
- * main thread has completed, we'll be woken up and the status/result
- * will be in the main_thread struct.
- * -------------------------------------------------------------------------- */
-
-int 
-howManyThreadsAvail ( void )
-{
-   int i = 0;
-   StgTSO* q;
-   for (q = run_queue_hd; q != END_TSO_QUEUE; q = q->link)
-      i++;
-   for (q = blocked_queue_hd; q != END_TSO_QUEUE; q = q->link)
-      i++;
-   for (q = sleeping_queue; q != END_TSO_QUEUE; q = q->link)
-      i++;
-   return i;
-}
-
-void
-finishAllThreads ( void )
-{
-   do {
-      while (run_queue_hd != END_TSO_QUEUE) {
-         waitThread ( run_queue_hd, NULL, NULL );
-      }
-      while (blocked_queue_hd != END_TSO_QUEUE) {
-         waitThread ( blocked_queue_hd, NULL, NULL );
-      }
-      while (sleeping_queue != END_TSO_QUEUE) {
-         waitThread ( blocked_queue_hd, NULL, NULL );
-      }
-   } while 
-      (blocked_queue_hd != END_TSO_QUEUE || 
-       run_queue_hd     != END_TSO_QUEUE ||
-       sleeping_queue   != END_TSO_QUEUE);
-}
-
-SchedulerStatus
-waitThread(StgTSO *tso, /*out*/StgClosure **ret, Capability *initialCapability)
-{ 
-  StgMainThread *m;
-  SchedulerStatus stat;
-
-  m = stgMallocBytes(sizeof(StgMainThread), "waitThread");
-  m->tso = tso;
-  m->ret = ret;
-  m->stat = NoStatus;
-#if defined(RTS_SUPPORTS_THREADS)
-#if defined(THREADED_RTS)
-  initCondition(&m->bound_thread_cond);
-#else
-  initCondition(&m->wakeup);
-#endif
-#endif
-
-  /* see scheduleWaitThread() comment */
-  ACQUIRE_LOCK(&sched_mutex);
-  m->link = main_threads;
-  main_threads = m;
-
-  IF_DEBUG(scheduler, sched_belch("waiting for thread %d", tso->id));
-
-  stat = waitThread_(m,initialCapability);
-  
-  RELEASE_LOCK(&sched_mutex);
-  return stat;
-}
+   ------------------------------------------------------------------------- */
 
 static
 SchedulerStatus
@@ -2452,149 +2121,29 @@ waitThread_(StgMainThread* m, Capability *initialCapability)
   // Precondition: sched_mutex must be held.
   IF_DEBUG(scheduler, sched_belch("new main thread (%d)", m->tso->id));
 
-#if defined(RTS_SUPPORTS_THREADS) && !defined(THREADED_RTS)
-  {	// FIXME: does this still make sense?
-	// It's not for the threaded rts => SMP only
-    do {
-      waitCondition(&m->wakeup, &sched_mutex);
-    } while (m->stat == NoStatus);
-  }
-#elif defined(GRAN)
+#if defined(GRAN)
   /* GranSim specific init */
   CurrentTSO = m->tso;                // the TSO to run
   procStatus[MainProc] = Busy;        // status of main PE
   CurrentProc = MainProc;             // PE to run it on
-
-  RELEASE_LOCK(&sched_mutex);
   schedule(m,initialCapability);
 #else
-  RELEASE_LOCK(&sched_mutex);
   schedule(m,initialCapability);
-  ACQUIRE_LOCK(&sched_mutex);
   ASSERT(m->stat != NoStatus);
 #endif
 
   stat = m->stat;
 
 #if defined(RTS_SUPPORTS_THREADS)
-#if defined(THREADED_RTS)
   closeCondition(&m->bound_thread_cond);
-#else
-  closeCondition(&m->wakeup);
-#endif
 #endif
 
-  IF_DEBUG(scheduler, fprintf(stderr, "== sched: main thread (%d) finished\n", 
-			      m->tso->id));
+  IF_DEBUG(scheduler, sched_belch("main thread (%d) finished", m->tso->id));
   stgFree(m);
 
   // Postcondition: sched_mutex still held
   return stat;
 }
-
-//@node Run queue code, Garbage Collextion Routines, Suspend and Resume, Main scheduling code
-//@subsection Run queue code 
-
-#if 0
-/* 
-   NB: In GranSim we have many run queues; run_queue_hd is actually a macro
-       unfolding to run_queue_hds[CurrentProc], thus CurrentProc is an
-       implicit global variable that has to be correct when calling these
-       fcts -- HWL 
-*/
-
-/* Put the new thread on the head of the runnable queue.
- * The caller of createThread better push an appropriate closure
- * on this thread's stack before the scheduler is invoked.
- */
-static /* inline */ void
-add_to_run_queue(tso)
-StgTSO* tso; 
-{
-  ASSERT(tso!=run_queue_hd && tso!=run_queue_tl);
-  tso->link = run_queue_hd;
-  run_queue_hd = tso;
-  if (run_queue_tl == END_TSO_QUEUE) {
-    run_queue_tl = tso;
-  }
-}
-
-/* Put the new thread at the end of the runnable queue. */
-static /* inline */ void
-push_on_run_queue(tso)
-StgTSO* tso; 
-{
-  ASSERT(get_itbl((StgClosure *)tso)->type == TSO);
-  ASSERT(run_queue_hd!=NULL && run_queue_tl!=NULL);
-  ASSERT(tso!=run_queue_hd && tso!=run_queue_tl);
-  if (run_queue_hd == END_TSO_QUEUE) {
-    run_queue_hd = tso;
-  } else {
-    run_queue_tl->link = tso;
-  }
-  run_queue_tl = tso;
-}
-
-/* 
-   Should be inlined because it's used very often in schedule.  The tso
-   argument is actually only needed in GranSim, where we want to have the
-   possibility to schedule *any* TSO on the run queue, irrespective of the
-   actual ordering. Therefore, if tso is not the nil TSO then we traverse
-   the run queue and dequeue the tso, adjusting the links in the queue. 
-*/
-//@cindex take_off_run_queue
-static /* inline */ StgTSO*
-take_off_run_queue(StgTSO *tso) {
-  StgTSO *t, *prev;
-
-  /* 
-     qetlaHbogh Qu' ngaSbogh ghomDaQ {tso} yIteq!
-
-     if tso is specified, unlink that tso from the run_queue (doesn't have
-     to be at the beginning of the queue); GranSim only 
-  */
-  if (tso!=END_TSO_QUEUE) {
-    /* find tso in queue */
-    for (t=run_queue_hd, prev=END_TSO_QUEUE; 
-	 t!=END_TSO_QUEUE && t!=tso;
-	 prev=t, t=t->link) 
-      /* nothing */ ;
-    ASSERT(t==tso);
-    /* now actually dequeue the tso */
-    if (prev!=END_TSO_QUEUE) {
-      ASSERT(run_queue_hd!=t);
-      prev->link = t->link;
-    } else {
-      /* t is at beginning of thread queue */
-      ASSERT(run_queue_hd==t);
-      run_queue_hd = t->link;
-    }
-    /* t is at end of thread queue */
-    if (t->link==END_TSO_QUEUE) {
-      ASSERT(t==run_queue_tl);
-      run_queue_tl = prev;
-    } else {
-      ASSERT(run_queue_tl!=t);
-    }
-    t->link = END_TSO_QUEUE;
-  } else {
-    /* take tso from the beginning of the queue; std concurrent code */
-    t = run_queue_hd;
-    if (t != END_TSO_QUEUE) {
-      run_queue_hd = t->link;
-      t->link = END_TSO_QUEUE;
-      if (run_queue_hd == END_TSO_QUEUE) {
-	run_queue_tl = END_TSO_QUEUE;
-      }
-    }
-  }
-  return t;
-}
-
-#endif /* 0 */
-
-//@node Garbage Collextion Routines, Blocking Queue Routines, Run queue code, Main scheduling code
-//@subsection Garbage Collextion Routines
 
 /* ---------------------------------------------------------------------------
    Where are the roots that we know about?
@@ -2613,7 +2162,7 @@ take_off_run_queue(StgTSO *tso) {
 */
 
 void
-GetRoots(evac_fn evac)
+GetRoots( evac_fn evac )
 {
 #if defined(GRAN)
   {
@@ -2817,9 +2366,6 @@ threadStackOverflow(StgTSO *tso)
 
   return dest;
 }
-
-//@node Blocking Queue Routines, Exception Handling Routines, Garbage Collextion Routines, Main scheduling code
-//@subsection Blocking Queue Routines
 
 /* ---------------------------------------------------------------------------
    Wake up a queue that was blocked on some resource.
@@ -3122,9 +2668,6 @@ awakenBlockedQueue(StgTSO *tso)
   RELEASE_LOCK(&sched_mutex);
 }
 #endif
-
-//@node Exception Handling Routines, Debugging Routines, Blocking Queue Routines, Main scheduling code
-//@subsection Exception Handling Routines
 
 /* ---------------------------------------------------------------------------
    Interrupt execution
@@ -3756,14 +3299,11 @@ detectBlackHoles( void )
     }
 }
 
-//@node Debugging Routines, Index, Exception Handling Routines, Main scheduling code
-//@subsection Debugging Routines
-
-/* -----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
  * Debugging: why is a thread blocked
  * [Also provides useful information when debugging threaded programs
  *  at the Haskell source code level, so enable outside of DEBUG. --sof 7/02]
-   -------------------------------------------------------------------------- */
+   ------------------------------------------------------------------------- */
 
 static
 void
@@ -3873,7 +3413,6 @@ printAllThreads(void)
 /* 
    Print a whole blocking queue attached to node (debugging only).
 */
-//@cindex print_bq
 # if defined(PAR)
 void 
 print_bq (StgClosure *node)
@@ -4057,27 +3596,3 @@ sched_belch(char *s, ...)
 }
 
 #endif /* DEBUG */
-
-
-//@node Index,  , Debugging Routines, Main scheduling code
-//@subsection Index
-
-//@index
-//* StgMainThread::  @cindex\s-+StgMainThread
-//* awaken_blocked_queue::  @cindex\s-+awaken_blocked_queue
-//* blocked_queue_hd::  @cindex\s-+blocked_queue_hd
-//* blocked_queue_tl::  @cindex\s-+blocked_queue_tl
-//* context_switch::  @cindex\s-+context_switch
-//* createThread::  @cindex\s-+createThread
-//* gc_pending_cond::  @cindex\s-+gc_pending_cond
-//* initScheduler::  @cindex\s-+initScheduler
-//* interrupted::  @cindex\s-+interrupted
-//* next_thread_id::  @cindex\s-+next_thread_id
-//* print_bq::  @cindex\s-+print_bq
-//* run_queue_hd::  @cindex\s-+run_queue_hd
-//* run_queue_tl::  @cindex\s-+run_queue_tl
-//* sched_mutex::  @cindex\s-+sched_mutex
-//* schedule::  @cindex\s-+schedule
-//* take_off_run_queue::  @cindex\s-+take_off_run_queue
-//* term_mutex::  @cindex\s-+term_mutex
-//@end index
