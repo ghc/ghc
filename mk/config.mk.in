@@ -860,6 +860,7 @@ GHC_HAPPY_OPTS		= -agc
 #
 # Haddock
 # 
+HADDOCK			= @HaddockCmd@
 HADDOCK_INPLACE		= $(HADDOCK_PREFIX)/src/haddock-inplace
 
 #
