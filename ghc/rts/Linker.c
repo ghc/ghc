@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.84 2002/03/25 05:21:19 sof Exp $
+ * $Id: Linker.c,v 1.85 2002/03/29 20:46:50 krasimir Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -389,7 +389,7 @@ static RtsSymbolVal rtsSyms[] = {
  */
 static void ghciInsertStrHashTable ( char* obj_name,
                                      HashTable *table,
-                                     char* key, 
+                                     char* key,
                                      void *data
 				   )
 {
@@ -398,7 +398,7 @@ static void ghciInsertStrHashTable ( char* obj_name,
       insertStrHashTable(table, (StgWord)key, data);
       return;
    }
-   fprintf(stderr, 
+   fprintf(stderr,
       "\n\n"
       "GHCi runtime linker: fatal error: I found a duplicate definition for symbol\n"
       "   %s\n"
@@ -449,7 +449,7 @@ initLinker( void )
  * lookupSymbol() will subsequently see them by dlsym on the program's
  * dl-handle.  Returns NULL if success, otherwise ptr to an err msg.
  *
- * In the PEi386 case, open the DLLs and put handles to them in a 
+ * In the PEi386 case, open the DLLs and put handles to them in a
  * linked list.  When looking for a symbol, try all handles in the
  * list.
  */
@@ -462,7 +462,7 @@ typedef
       char*              name;
       struct _OpenedDLL* next;
       HINSTANCE instance;
-   } 
+   }
    OpenedDLL;
 
 /* A list thereof. */
@@ -517,11 +517,17 @@ addDLL ( __attribute((unused)) char* path, char* dll_name )
    buf = stgMallocBytes(strlen(dll_name) + 10, "addDLL");
    sprintf(buf, "%s.DLL", dll_name);
    instance = LoadLibrary(buf);
-   free(buf);
    if (instance == NULL) {
-     /* LoadLibrary failed; return a ptr to the error msg. */
-     return "addDLL: unknown error";
+	 sprintf(buf, "%s.DRV", dll_name);		// KAA: allow loading of drivers (like winspool.drv)
+	 instance = LoadLibrary(buf);
+	 if (instance == NULL) {
+		free(buf);
+
+	    /* LoadLibrary failed; return a ptr to the error msg. */
+	    return "addDLL: unknown error";
+   	 }
    }
+   free(buf);
 
    o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLL" );
    o_dll->name     = stgMallocBytes(1+strlen(dll_name), "addDLL");
@@ -538,7 +544,7 @@ addDLL ( __attribute((unused)) char* path, char* dll_name )
 
 /* -----------------------------------------------------------------------------
  * lookup a symbol in the hash table
- */  
+ */
 void *
 lookupSymbol( char *lbl )
 {
@@ -564,7 +570,7 @@ lookupSymbol( char *lbl )
               if (sym != NULL) {
 		/*fprintf(stderr, "found %s in %s\n", lbl+1,o_dll->name); fflush(stderr);*/
 		return sym;
-	      } 
+	      }
            }
            sym = GetProcAddress(o_dll->instance, lbl);
            if (sym != NULL) {
@@ -582,7 +588,7 @@ lookupSymbol( char *lbl )
     }
 }
 
-static 
+static
 __attribute((unused))
 void *
 lookupLocalSymbol( ObjectCode* oc, char *lbl )
@@ -624,7 +630,7 @@ void ghci_enquire ( char* addr )
             a = lookupStrHashTable(symhash, sym);
          if (a == NULL) {
             /* fprintf(stderr, "ghci_enquire: can't find %s\n", sym); */
-         } 
+         }
          else if (addr-DELTA <= a && a <= addr+DELTA) {
             fprintf(stderr, "%p + %3d  ==  `%s'\n", addr, a - addr, sym);
          }
@@ -651,7 +657,7 @@ loadObj( char *path )
 
    /* Check that we haven't already loaded this object.  Don't give up
       at this stage; ocGetNames_* will barf later. */
-   { 
+   {
        ObjectCode *o;
        int is_dup = 0;
        for (o = objects; o; o = o->next) {
@@ -659,7 +665,7 @@ loadObj( char *path )
              is_dup = 1;
        }
        if (is_dup) {
-	 fprintf(stderr, 
+	 fprintf(stderr,
             "\n\n"
             "GHCi runtime linker: warning: looks like you're trying to load the\n"
             "same object file twice:\n"
@@ -741,7 +747,7 @@ loadObj( char *path )
  *
  * Returns: 1 if ok, 0 on error.
  */
-HsInt 
+HsInt
 resolveObjs( void )
 {
     ObjectCode *oc;
@@ -781,7 +787,7 @@ unloadObj( char *path )
 	    /* Remove all the mappings for the symbols within this
 	     * object..
 	     */
-	    { 
+	    {
                 int i;
                 for (i = 0; i < oc->n_symbols; i++) {
                    if (oc->symbols[i] != NULL) {
@@ -821,7 +827,7 @@ unloadObj( char *path )
  */
 static void addProddableBlock ( ObjectCode* oc, void* start, int size )
 {
-   ProddableBlock* pb 
+   ProddableBlock* pb
       = stgMallocBytes(sizeof(ProddableBlock), "addProddableBlock");
    /* fprintf(stderr, "aPB %p %p %d\n", oc, start, size); */
    ASSERT(size > 0);
@@ -858,9 +864,9 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
    s->kind      = kind;
    s->next      = oc->sections;
    oc->sections = s;
-   /* 
-   fprintf(stderr, "addSection: %p-%p (size %d), kind %d\n", 
-                   start, ((char*)end)-1, end - start + 1, kind ); 
+   /*
+   fprintf(stderr, "addSection: %p-%p (size %d), kind %d\n",
+                   start, ((char*)end)-1, end - start + 1, kind );
    */
 }
 
@@ -870,13 +876,13 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
  * PEi386 specifics (Win32 targets)
  * ------------------------------------------------------------------------*/
 
-/* The information for this linker comes from 
-      Microsoft Portable Executable 
+/* The information for this linker comes from
+      Microsoft Portable Executable
       and Common Object File Format Specification
       revision 5.1 January 1998
    which SimonM says comes from the MS Developer Network CDs.
-   
-   It can be found there (on older CDs), but can also be found 
+
+   It can be found there (on older CDs), but can also be found
    online at:
 
       http://www.microsoft.com/hwdev/hardware/PECOFF.asp
@@ -885,17 +891,17 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
 
    Things move, so if that fails, try searching for it via
 
-      http://www.google.com/search?q=PE+COFF+specification     
+      http://www.google.com/search?q=PE+COFF+specification
 
-   The ultimate reference for the PE format is the Winnt.h 
+   The ultimate reference for the PE format is the Winnt.h
    header file that comes with the Platform SDKs; as always,
    implementations will drift wrt their documentation.
-   
+
    A good background article on the PE format is Matt Pietrek's
    March 1994 article in Microsoft System Journal (MSJ)
    (Vol.9, No. 3): "Peering Inside the PE: A Tour of the
    Win32 Portable Executable File Format." The info in there
-   has recently been updated in a two part article in 
+   has recently been updated in a two part article in
    MSDN magazine, issues Feb and March 2002,
    "Inside Windows: An In-Depth Look into the Win32 Portable
    Executable File Format"
@@ -903,7 +909,7 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
    John Levine's book "Linkers and Loaders" contains useful
    info on PE too.
 */
-      
+
 
 #if defined(OBJFORMAT_PEi386)
 
@@ -915,7 +921,7 @@ typedef unsigned int   UInt32;
 typedef          int   Int32;
 
 
-typedef 
+typedef
    struct {
       UInt16 Machine;
       UInt16 NumberOfSections;
@@ -930,7 +936,7 @@ typedef
 #define sizeof_COFF_header 20
 
 
-typedef 
+typedef
    struct {
       UChar  Name[8];
       UInt32 VirtualSize;
@@ -941,7 +947,7 @@ typedef
       UInt32 PointerToLinenumbers;
       UInt16 NumberOfRelocations;
       UInt16 NumberOfLineNumbers;
-      UInt32 Characteristics; 
+      UInt32 Characteristics;
    }
    COFF_section;
 
@@ -1002,7 +1008,7 @@ typedef
 
 /* We use myindex to calculate array addresses, rather than
    simply doing the normal subscript thing.  That's because
-   some of the above structs have sizes which are not 
+   some of the above structs have sizes which are not
    a whole number of words.  GCC rounds their sizes up to a
    whole number of words, which means that the address calcs
    arising from using normal C indexing or pointer arithmetic
@@ -1057,7 +1063,7 @@ cstring_from_COFF_symbol_name ( UChar* name, UChar* strtab )
 {
    UChar* newstr;
    /* If the string is longer than 8 bytes, look in the
-      string table for it -- this will be correctly zero terminated. 
+      string table for it -- this will be correctly zero terminated.
    */
    if (name[0]==0 && name[1]==0 && name[2]==0 && name[3]==0) {
       UInt32 strtab_offset = * (UInt32*)(name+4);
@@ -1083,23 +1089,23 @@ static COFF_section *
 findPEi386SectionCalled ( ObjectCode* oc,  char* name )
 {
    int i;
-   COFF_header* hdr 
+   COFF_header* hdr
       = (COFF_header*)(oc->image);
-   COFF_section* sectab 
+   COFF_section* sectab
       = (COFF_section*) (
-           ((UChar*)(oc->image)) 
+           ((UChar*)(oc->image))
            + sizeof_COFF_header + hdr->SizeOfOptionalHeader
         );
    for (i = 0; i < hdr->NumberOfSections; i++) {
       UChar* n1;
       UChar* n2;
-      COFF_section* section_i 
+      COFF_section* section_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
       n1 = (UChar*) &(section_i->Name);
       n2 = name;
-      if (n1[0]==n2[0] && n1[1]==n2[1] && n1[2]==n2[2] && 
-          n1[3]==n2[3] && n1[4]==n2[4] && n1[5]==n2[5] && 
+      if (n1[0]==n2[0] && n1[1]==n2[1] && n1[2]==n2[2] &&
+          n1[3]==n2[3] && n1[4]==n2[4] && n1[5]==n2[5] &&
           n1[6]==n2[6] && n1[7]==n2[7])
          return section_i;
    }
@@ -1114,7 +1120,7 @@ zapTrailingAtSign ( UChar* sym )
 #  define my_isdigit(c) ((c) >= '0' && (c) <= '9')
    int i, j;
    if (sym[0] == 0) return;
-   i = 0; 
+   i = 0;
    while (sym[i] != 0) i++;
    i--;
    j = i;
@@ -1136,12 +1142,12 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    /* fprintf(stderr, "\nLOADING %s\n", oc->fileName); */
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
-               ((UChar*)(oc->image)) 
+               ((UChar*)(oc->image))
                + sizeof_COFF_header + hdr->SizeOfOptionalHeader
             );
    symtab = (COFF_symbol*) (
                ((UChar*)(oc->image))
-               + hdr->PointerToSymbolTable 
+               + hdr->PointerToSymbolTable
             );
    strtab = ((UChar*)symtab)
             + hdr->NumberOfSymbols * sizeof_COFF_symbol;
@@ -1163,7 +1169,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    }
    if ( (hdr->Characteristics & MYIMAGE_FILE_BYTES_REVERSED_HI)
         /* || !(hdr->Characteristics & MYIMAGE_FILE_32BIT_MACHINE) */ ) {
-      belch("Invalid PEi386 word size or endiannness: %d", 
+      belch("Invalid PEi386 word size or endiannness: %d",
             (int)(hdr->Characteristics));
       return 0;
    }
@@ -1186,25 +1192,25 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    IF_DEBUG(linker, i=1);
    if (i == 0) return 1;
 
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "sectab offset = %d\n", ((UChar*)sectab) - ((UChar*)hdr) );
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "symtab offset = %d\n", ((UChar*)symtab) - ((UChar*)hdr) );
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "strtab offset = %d\n", ((UChar*)strtab) - ((UChar*)hdr) );
 
    fprintf ( stderr, "\n" );
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "Machine:           0x%x\n", (UInt32)(hdr->Machine) );
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "# sections:        %d\n",   (UInt32)(hdr->NumberOfSections) );
    fprintf ( stderr,
              "time/date:         0x%x\n", (UInt32)(hdr->TimeDateStamp) );
    fprintf ( stderr,
              "symtab offset:     %d\n",   (UInt32)(hdr->PointerToSymbolTable) );
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "# symbols:         %d\n",   (UInt32)(hdr->NumberOfSymbols) );
-   fprintf ( stderr, 
+   fprintf ( stderr,
              "sz of opt hdr:     %d\n",   (UInt32)(hdr->SizeOfOptionalHeader) );
    fprintf ( stderr,
              "characteristics:   0x%x\n", (UInt32)(hdr->Characteristics) );
@@ -1216,14 +1222,14 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       COFF_section* sectab_i
          = (COFF_section*)
            myindex ( sizeof_COFF_section, sectab, i );
-      fprintf ( stderr, 
+      fprintf ( stderr,
                 "\n"
                 "section %d\n"
                 "     name `",
-                i 
+                i
               );
       printName ( sectab_i->Name, strtab );
-      fprintf ( stderr, 
+      fprintf ( stderr,
                 "'\n"
                 "    vsize %d\n"
                 "    vaddr %d\n"
@@ -1243,11 +1249,11 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       reltab = (COFF_reloc*) (
                   ((UChar*)(oc->image)) + sectab_i->PointerToRelocations
                );
-	       
+
       if ( sectab_i->Characteristics & MYIMAGE_SCN_LNK_NRELOC_OVFL ) {
 	/* If the relocation field (a short) has overflowed, the
 	 * real count can be found in the first reloc entry.
-	 * 
+	 *
 	 * See Section 4.1 (last para) of the PE spec (rev6.0).
 	 */
         COFF_reloc* rel = (COFF_reloc*)
@@ -1263,9 +1269,9 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
          COFF_symbol* sym;
          COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, j );
-         fprintf ( stderr, 
+         fprintf ( stderr,
                    "        type 0x%-4x   vaddr 0x%-8x   name `",
-                   (UInt32)rel->Type, 
+                   (UInt32)rel->Type,
                    rel->VirtualAddress );
          sym = (COFF_symbol*)
                myindex ( sizeof_COFF_symbol, symtab, rel->SymbolTableIndex );
@@ -1280,8 +1286,8 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
    fprintf ( stderr, "string table has size 0x%x\n", * (UInt32*)strtab );
    fprintf ( stderr, "---START of string table---\n");
    for (i = 4; i < *(Int32*)strtab; i++) {
-      if (strtab[i] == 0) 
-         fprintf ( stderr, "\n"); else 
+      if (strtab[i] == 0)
+         fprintf ( stderr, "\n"); else
          fprintf( stderr, "%c", strtab[i] );
    }
    fprintf ( stderr, "--- END  of string table---\n");
@@ -1293,13 +1299,13 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
       if (i >= (Int32)(hdr->NumberOfSymbols)) break;
       symtab_i = (COFF_symbol*)
                  myindex ( sizeof_COFF_symbol, symtab, i );
-      fprintf ( stderr, 
+      fprintf ( stderr,
                 "symbol %d\n"
                 "     name `",
-                i 
+                i
               );
       printName ( symtab_i->Name, strtab );
-      fprintf ( stderr, 
+      fprintf ( stderr,
                 "'\n"
                 "    value 0x%x\n"
                 "   1+sec# %d\n"
@@ -1310,7 +1316,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
                 (Int32)(symtab_i->SectionNumber),
                 (UInt32)symtab_i->Type,
                 (UInt32)symtab_i->StorageClass,
-                (UInt32)symtab_i->NumberOfAuxSymbols 
+                (UInt32)symtab_i->NumberOfAuxSymbols
               );
       i += symtab_i->NumberOfAuxSymbols;
       i++;
@@ -1332,15 +1338,15 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    UChar* sname;
    void*  addr;
    int    i;
-   
+
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
-               ((UChar*)(oc->image)) 
+               ((UChar*)(oc->image))
                + sizeof_COFF_header + hdr->SizeOfOptionalHeader
             );
    symtab = (COFF_symbol*) (
                ((UChar*)(oc->image))
-               + hdr->PointerToSymbolTable 
+               + hdr->PointerToSymbolTable
             );
    strtab = ((UChar*)(oc->image))
             + hdr->PointerToSymbolTable
@@ -1358,7 +1364,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       /* This is a non-empty .bss section.  Allocate zeroed space for
          it, and set its PointerToRawData field such that oc->image +
          PointerToRawData == addr_of_zeroed_space.  */
-      zspace = stgCallocBytes(1, sectab_i->VirtualSize, 
+      zspace = stgCallocBytes(1, sectab_i->VirtualSize,
                               "ocGetNames_PEi386(anonymous bss)");
       sectab_i->PointerToRawData = ((UChar*)zspace) - ((UChar*)(oc->image));
       addProddableBlock(oc, zspace, sectab_i->VirtualSize);
@@ -1372,7 +1378,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       UChar* end;
       UInt32 sz;
 
-      SectionKind kind 
+      SectionKind kind
          = SECTIONKIND_OTHER;
       COFF_section* sectab_i
          = (COFF_section*)
@@ -1380,11 +1386,11 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       IF_DEBUG(linker, belch("section name = %s\n", sectab_i->Name ));
 
 #     if 0
-      /* I'm sure this is the Right Way to do it.  However, the 
+      /* I'm sure this is the Right Way to do it.  However, the
          alternative of testing the sectab_i->Name field seems to
          work ok with Cygwin.
       */
-      if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE || 
+      if (sectab_i->Characteristics & MYIMAGE_SCN_CNT_CODE ||
           sectab_i->Characteristics & MYIMAGE_SCN_CNT_INITIALIZED_DATA)
          kind = SECTIONKIND_CODE_OR_RODATA;
 #     endif
@@ -1425,7 +1431,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    oc->symbols   = stgMallocBytes(oc->n_symbols * sizeof(char*),
                                   "ocGetNames_PEi386(oc->symbols)");
    /* Call me paranoid; I don't care. */
-   for (i = 0; i < oc->n_symbols; i++) 
+   for (i = 0; i < oc->n_symbols; i++)
       oc->symbols[i] = NULL;
 
    i = 0;
@@ -1440,27 +1446,27 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (symtab_i->StorageClass == MYIMAGE_SYM_CLASS_EXTERNAL
           && symtab_i->SectionNumber != MYIMAGE_SYM_UNDEFINED) {
          /* This symbol is global and defined, viz, exported */
-         /* for MYIMAGE_SYMCLASS_EXTERNAL 
+         /* for MYIMAGE_SYMCLASS_EXTERNAL
                 && !MYIMAGE_SYM_UNDEFINED,
-            the address of the symbol is: 
+            the address of the symbol is:
                 address of relevant section + offset in section
          */
-         COFF_section* sectabent 
-            = (COFF_section*) myindex ( sizeof_COFF_section, 
+         COFF_section* sectabent
+            = (COFF_section*) myindex ( sizeof_COFF_section,
                                         sectab,
                                         symtab_i->SectionNumber-1 );
          addr = ((UChar*)(oc->image))
                 + (sectabent->PointerToRawData
                    + symtab_i->Value);
-      } 
+      }
       else
       if (symtab_i->SectionNumber == MYIMAGE_SYM_UNDEFINED
 	  && symtab_i->Value > 0) {
          /* This symbol isn't in any section at all, ie, global bss.
             Allocate zeroed space for it. */
-         addr = stgCallocBytes(1, symtab_i->Value, 
+         addr = stgCallocBytes(1, symtab_i->Value,
                                "ocGetNames_PEi386(non-anonymous bss)");
-         addSection(oc, SECTIONKIND_RWDATA, addr, 
+         addSection(oc, SECTIONKIND_RWDATA, addr,
                         ((UChar*)addr) + symtab_i->Value - 1);
          addProddableBlock(oc, addr, symtab_i->Value);
          /* fprintf(stderr, "BSS      section at 0x%x\n", addr); */
@@ -1476,13 +1482,13 @@ ocGetNames_PEi386 ( ObjectCode* oc )
          ghciInsertStrHashTable(oc->fileName, symhash, sname, addr);
       } else {
 #        if 0
-         fprintf ( stderr, 
+         fprintf ( stderr,
                    "IGNORING symbol %d\n"
                    "     name `",
-                   i 
+                   i
                  );
          printName ( symtab_i->Name, strtab );
-         fprintf ( stderr, 
+         fprintf ( stderr,
                    "'\n"
                    "    value 0x%x\n"
                    "   1+sec# %d\n"
@@ -1493,7 +1499,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
                    (Int32)(symtab_i->SectionNumber),
                    (UInt32)symtab_i->Type,
                    (UInt32)symtab_i->StorageClass,
-                   (UInt32)symtab_i->NumberOfAuxSymbols 
+                   (UInt32)symtab_i->NumberOfAuxSymbols
                  );
 #        endif
       }
@@ -1502,7 +1508,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       i++;
    }
 
-   return 1;   
+   return 1;
 }
 
 
@@ -1528,12 +1534,12 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
    hdr = (COFF_header*)(oc->image);
    sectab = (COFF_section*) (
-               ((UChar*)(oc->image)) 
+               ((UChar*)(oc->image))
                + sizeof_COFF_header + hdr->SizeOfOptionalHeader
             );
    symtab = (COFF_symbol*) (
                ((UChar*)(oc->image))
-               + hdr->PointerToSymbolTable 
+               + hdr->PointerToSymbolTable
             );
    strtab = ((UChar*)(oc->image))
             + hdr->PointerToSymbolTable
@@ -1573,14 +1579,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
       for (; j < noRelocs; j++) {
          COFF_symbol* sym;
-         COFF_reloc* reltab_j 
+         COFF_reloc* reltab_j
             = (COFF_reloc*)
               myindex ( sizeof_COFF_reloc, reltab, j );
 
          /* the location to patch */
          pP = (UInt32*)(
-                 ((UChar*)(oc->image)) 
-                 + (sectab_i->PointerToRawData 
+                 ((UChar*)(oc->image))
+                 + (sectab_i->PointerToRawData
                     + reltab_j->VirtualAddress
                     - sectab_i->VirtualAddress )
               );
@@ -1588,20 +1594,20 @@ ocResolve_PEi386 ( ObjectCode* oc )
          A = *pP;
          /* the symbol to connect to */
          sym = (COFF_symbol*)
-               myindex ( sizeof_COFF_symbol, 
+               myindex ( sizeof_COFF_symbol,
                          symtab, reltab_j->SymbolTableIndex );
          IF_DEBUG(linker,
-                  fprintf ( stderr, 
+                  fprintf ( stderr,
                             "reloc sec %2d num %3d:  type 0x%-4x   "
                             "vaddr 0x%-8x   name `",
                             i, j,
-                            (UInt32)reltab_j->Type, 
+                            (UInt32)reltab_j->Type,
                             reltab_j->VirtualAddress );
                             printName ( sym->Name, strtab );
                             fprintf ( stderr, "'\n" ));
 
          if (sym->StorageClass == MYIMAGE_SYM_CLASS_STATIC) {
-            COFF_section* section_sym 
+            COFF_section* section_sym
                = findPEi386SectionCalled ( oc, sym->Name );
             if (!section_sym) {
                belch("%s: can't find section `%s'", oc->fileName, sym->Name);
@@ -1627,8 +1633,8 @@ ocResolve_PEi386 ( ObjectCode* oc )
          }
          checkProddableBlock(oc, pP);
          switch (reltab_j->Type) {
-            case MYIMAGE_REL_I386_DIR32: 
-               *pP = A + S; 
+            case MYIMAGE_REL_I386_DIR32:
+               *pP = A + S;
                break;
             case MYIMAGE_REL_I386_REL32:
                /* Tricky.  We have to insert a displacement at
@@ -1645,15 +1651,15 @@ ocResolve_PEi386 ( ObjectCode* oc )
                ASSERT(A==0);
                *pP = S - ((UInt32)pP) - 4;
                break;
-            default: 
-               belch("%s: unhandled PEi386 relocation type %d", 
+            default:
+               belch("%s: unhandled PEi386 relocation type %d",
 		     oc->fileName, reltab_j->Type);
                return 0;
          }
 
       }
    }
-   
+
    IF_DEBUG(linker, belch("completed %s", oc->fileName));
    return 1;
 }
@@ -1755,13 +1761,13 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    switch (ehdr->e_machine) {
       case EM_386:   IF_DEBUG(linker,belch( "x86" )); break;
       case EM_SPARC: IF_DEBUG(linker,belch( "sparc" )); break;
-      default:       IF_DEBUG(linker,belch( "unknown" )); 
+      default:       IF_DEBUG(linker,belch( "unknown" ));
                      belch("%s: unknown architecture", oc->fileName);
                      return 0;
    }
 
    IF_DEBUG(linker,belch(
-             "\nSection header table: start %d, n_entries %d, ent_size %d", 
+             "\nSection header table: start %d, n_entries %d, ent_size %d",
              ehdr->e_shoff, ehdr->e_shnum, ehdr->e_shentsize  ));
 
    ASSERT (ehdr->e_shentsize == sizeof(Elf32_Shdr));
@@ -1772,7 +1778,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       belch("%s: no section header string table", oc->fileName);
       return 0;
    } else {
-      IF_DEBUG(linker,belch( "Section header string table is section %d", 
+      IF_DEBUG(linker,belch( "Section header string table is section %d",
                           ehdr->e_shstrndx));
       sh_strtab = ehdrC + shdr[ehdr->e_shstrndx].sh_offset;
    }
@@ -1783,7 +1789,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       IF_DEBUG(linker,fprintf(stderr, "size=%4d  ", (int)shdr[i].sh_size ));
       IF_DEBUG(linker,fprintf(stderr, "offs=%4d  ", (int)shdr[i].sh_offset ));
       IF_DEBUG(linker,fprintf(stderr, "  (%p .. %p)  ",
-               ehdrC + shdr[i].sh_offset, 
+               ehdrC + shdr[i].sh_offset,
 		      ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1));
 
       if (shdr[i].sh_type == SHT_REL) {
@@ -1813,14 +1819,14 @@ ocVerifyImage_ELF ( ObjectCode* oc )
          strtab = ehdrC + shdr[i].sh_offset;
          nstrtab++;
       }
-   }  
+   }
    if (nstrtab != 1) {
       belch("%s: no string tables, or too many", oc->fileName);
       return 0;
    }
 
    nsymtabs = 0;
-   IF_DEBUG(linker,belch( "\nSymbol tables" )); 
+   IF_DEBUG(linker,belch( "\nSymbol tables" ));
    for (i = 0; i < ehdr->e_shnum; i++) {
       if (shdr[i].sh_type != SHT_SYMTAB) continue;
       IF_DEBUG(linker,belch( "section %d is a symbol table", i ));
@@ -1837,7 +1843,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       }
       for (j = 0; j < nent; j++) {
          IF_DEBUG(linker,fprintf(stderr, "   %2d  ", j ));
-         IF_DEBUG(linker,fprintf(stderr, "  sec=%-5d  size=%-3d  val=%5p  ", 
+         IF_DEBUG(linker,fprintf(stderr, "  sec=%-5d  size=%-3d  val=%5p  ",
                              (int)stab[j].st_shndx,
                              (int)stab[j].st_size,
                              (char*)stab[j].st_value ));
@@ -1902,25 +1908,25 @@ ocGetNames_ELF ( ObjectCode* oc )
       SectionKind kind   = SECTIONKIND_OTHER;
       int         is_bss = FALSE;
 
-      if (hdr.sh_type == SHT_PROGBITS 
+      if (hdr.sh_type == SHT_PROGBITS
           && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_EXECINSTR)) {
          /* .text-style section */
          kind = SECTIONKIND_CODE_OR_RODATA;
       }
       else
-      if (hdr.sh_type == SHT_PROGBITS 
+      if (hdr.sh_type == SHT_PROGBITS
           && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_WRITE)) {
          /* .data-style section */
          kind = SECTIONKIND_RWDATA;
       }
       else
-      if (hdr.sh_type == SHT_PROGBITS 
+      if (hdr.sh_type == SHT_PROGBITS
           && (hdr.sh_flags & SHF_ALLOC) && !(hdr.sh_flags & SHF_WRITE)) {
          /* .rodata-style section */
          kind = SECTIONKIND_CODE_OR_RODATA;
       }
       else
-      if (hdr.sh_type == SHT_NOBITS 
+      if (hdr.sh_type == SHT_NOBITS
           && (hdr.sh_flags & SHF_ALLOC) && (hdr.sh_flags & SHF_WRITE)) {
          /* .bss-style section */
          kind = SECTIONKIND_RWDATA;
@@ -1929,13 +1935,13 @@ ocGetNames_ELF ( ObjectCode* oc )
 
       if (is_bss && shdr[i].sh_size > 0) {
          /* This is a non-empty .bss section.  Allocate zeroed space for
-            it, and set its .sh_offset field such that 
+            it, and set its .sh_offset field such that
             ehdrC + .sh_offset == addr_of_zeroed_space.  */
-         char* zspace = stgCallocBytes(1, shdr[i].sh_size, 
+         char* zspace = stgCallocBytes(1, shdr[i].sh_size,
                                        "ocGetNames_ELF(BSS)");
          shdr[i].sh_offset = ((char*)zspace) - ((char*)ehdrC);
-	 /*         
-         fprintf(stderr, "BSS section at 0x%x, size %d\n", 
+	 /*
+         fprintf(stderr, "BSS section at 0x%x, size %d\n",
                          zspace, shdr[i].sh_size);
 	 */
       }
@@ -1943,7 +1949,7 @@ ocGetNames_ELF ( ObjectCode* oc )
       /* fill in the section info */
       if (kind != SECTIONKIND_OTHER && shdr[i].sh_size > 0) {
          addProddableBlock(oc, ehdrC + shdr[i].sh_offset, shdr[i].sh_size);
-         addSection(oc, kind, ehdrC + shdr[i].sh_offset, 
+         addSection(oc, kind, ehdrC + shdr[i].sh_offset,
                         ehdrC + shdr[i].sh_offset + shdr[i].sh_size - 1);
       }
 
@@ -1954,7 +1960,7 @@ ocGetNames_ELF ( ObjectCode* oc )
       nent = shdr[i].sh_size / sizeof(Elf32_Sym);
 
       oc->n_symbols = nent;
-      oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*), 
+      oc->symbols = stgMallocBytes(oc->n_symbols * sizeof(char*),
                                    "ocGetNames_ELF(oc->symbols)");
 
       for (j = 0; j < nent; j++) {
@@ -1971,7 +1977,7 @@ ocGetNames_ELF ( ObjectCode* oc )
             isLocal = FALSE;
             ad = stgCallocBytes(1, stab[j].st_size, "ocGetNames_ELF(COMMON)");
 	    /*
-            fprintf(stderr, "COMMON symbol, size %d name %s\n", 
+            fprintf(stderr, "COMMON symbol, size %d name %s\n",
                             stab[j].st_size, nm);
 	    */
 	    /* Pointless to do addProddableBlock() for this area,
@@ -1989,14 +1995,14 @@ ocGetNames_ELF ( ObjectCode* oc )
 	      /* and it's a not a section or string table or anything silly */
               ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
                 ELF32_ST_TYPE(stab[j].st_info)==STT_OBJECT ||
-                ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE 
+                ELF32_ST_TYPE(stab[j].st_info)==STT_NOTYPE
               )
             ) {
 	    /* Section 0 is the undefined section, hence > and not >=. */
             ASSERT(secno > 0 && secno < ehdr->e_shnum);
-	    /*            
+	    /*
             if (shdr[secno].sh_type == SHT_NOBITS) {
-               fprintf(stderr, "   BSS symbol, size %d off %d name %s\n", 
+               fprintf(stderr, "   BSS symbol, size %d off %d name %s\n",
                                stab[j].st_size, stab[j].st_value, nm);
             }
             */
@@ -2023,13 +2029,13 @@ ocGetNames_ELF ( ObjectCode* oc )
             }
          } else {
             /* Skip. */
-            IF_DEBUG(linker,belch( "skipping `%s'", 
+            IF_DEBUG(linker,belch( "skipping `%s'",
                                    strtab + stab[j].st_name ));
             /*
-            fprintf(stderr, 
+            fprintf(stderr,
                     "skipping   bind = %d,  type = %d,  shndx = %d   `%s'\n",
-                    (int)ELF32_ST_BIND(stab[j].st_info), 
-                    (int)ELF32_ST_TYPE(stab[j].st_info), 
+                    (int)ELF32_ST_BIND(stab[j].st_info),
+                    (int)ELF32_ST_TYPE(stab[j].st_info),
                     (int)stab[j].st_shndx,
                     strtab + stab[j].st_name
                    );
@@ -2048,7 +2054,7 @@ ocGetNames_ELF ( ObjectCode* oc )
    relocations appear to be of this form. */
 static int
 do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
-                           Elf32_Shdr* shdr, int shnum, 
+                           Elf32_Shdr* shdr, int shnum,
                            Elf32_Sym*  stab, char* strtab )
 {
    int j;
@@ -2071,7 +2077,7 @@ do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
       Elf32_Addr  A  = *pP;
       Elf32_Addr  S;
 
-      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)", 
+      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p)",
                              j, (void*)offset, (void*)info ));
       if (!info) {
          IF_DEBUG(linker,belch( " ZERO" ));
@@ -2099,14 +2105,14 @@ do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
       }
       IF_DEBUG(linker,belch( "Reloc: P = %p   S = %p   A = %p",
-			     (void*)P, (void*)S, (void*)A )); 
+			     (void*)P, (void*)S, (void*)A ));
       checkProddableBlock ( oc, pP );
       switch (ELF32_R_TYPE(info)) {
 #        ifdef i386_TARGET_ARCH
          case R_386_32:   *pP = S + A;     break;
          case R_386_PC32: *pP = S + A - P; break;
 #        endif
-         default: 
+         default:
             belch("%s: unhandled ELF relocation(Rel) type %d\n",
 		  oc->fileName, ELF32_R_TYPE(info));
             return 0;
@@ -2121,7 +2127,7 @@ do_Elf32_Rel_relocations ( ObjectCode* oc, char* ehdrC,
    sparc-solaris relocations appear to be of this form. */
 static int
 do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
-                            Elf32_Shdr* shdr, int shnum, 
+                            Elf32_Shdr* shdr, int shnum,
                             Elf32_Sym*  stab, char* strtab )
 {
    int j;
@@ -2148,8 +2154,8 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       Elf32_Word  w1, w2;
 #     endif
 
-      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p %6p)   ", 
-                             j, (void*)offset, (void*)info, 
+      IF_DEBUG(linker,belch( "Rel entry %3d is raw(%6p %6p %6p)   ",
+                             j, (void*)offset, (void*)info,
                                 (void*)addend ));
       if (!info) {
          IF_DEBUG(linker,belch( " ZERO" ));
@@ -2173,7 +2179,7 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          if (!S) {
 	   belch("%s: unknown symbol `%s'", oc->fileName, symbol);
 	   return 0;
-	   /* 
+	   /*
 	   S = 0x11223344;
 	   fprintf ( stderr, "S %p A %p S+A %p S+A-P %p\n",S,A,S+A,S+A-P);
 	   */
@@ -2181,11 +2187,11 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          IF_DEBUG(linker,belch( "`%s' resolves to %p", symbol, (void*)S ));
       }
       IF_DEBUG(linker,fprintf ( stderr, "Reloc: P = %p   S = %p   A = %p\n",
-                                        (void*)P, (void*)S, (void*)A )); 
+                                        (void*)P, (void*)S, (void*)A ));
       checkProddableBlock ( oc, (void*)P );
       switch (ELF32_R_TYPE(info)) {
 #        if defined(sparc_TARGET_ARCH)
-         case R_SPARC_WDISP30: 
+         case R_SPARC_WDISP30:
             w1 = *pP & 0xC0000000;
             w2 = (Elf32_Word)((S + A - P) >> 2);
             ASSERT((w2 & 0xC0000000) == 0);
@@ -2207,14 +2213,14 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             *pP = w1;
             break;
          /* According to the Sun documentation:
-            R_SPARC_UA32 
+            R_SPARC_UA32
             This relocation type resembles R_SPARC_32, except it refers to an
             unaligned word. That is, the word to be relocated must be treated
             as four separate bytes with arbitrary alignment, not as a word
             aligned according to the architecture requirements.
 
             (JRS: which means that freeloading on the R_SPARC_32 case
-            is probably wrong, but hey ...)  
+            is probably wrong, but hey ...)
          */
          case R_SPARC_UA32:
          case R_SPARC_32:
@@ -2222,7 +2228,7 @@ do_Elf32_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             *pP = w2;
             break;
 #        endif
-         default: 
+         default:
             belch("%s: unhandled ELF relocation(RelA) type %d\n",
 		  oc->fileName, ELF32_R_TYPE(info));
             return 0;
@@ -2252,7 +2258,7 @@ ocResolve_ELF ( ObjectCode* oc )
 
    if (stab == NULL || strtab == NULL) {
       belch("%s: can't find string or symbol table", oc->fileName);
-      return 0; 
+      return 0;
    }
 
    /* Process the relocation sections. */
@@ -2266,13 +2272,13 @@ ocResolve_ELF ( ObjectCode* oc )
          continue;
 
       if (shdr[shnum].sh_type == SHT_REL ) {
-         ok = do_Elf32_Rel_relocations ( oc, ehdrC, shdr, 
+         ok = do_Elf32_Rel_relocations ( oc, ehdrC, shdr,
                                          shnum, stab, strtab );
          if (!ok) return ok;
       }
       else
       if (shdr[shnum].sh_type == SHT_RELA) {
-         ok = do_Elf32_Rela_relocations ( oc, ehdrC, shdr, 
+         ok = do_Elf32_Rela_relocations ( oc, ehdrC, shdr,
                                           shnum, stab, strtab );
          if (!ok) return ok;
       }
