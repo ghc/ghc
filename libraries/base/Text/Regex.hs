@@ -8,12 +8,13 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (only on platforms that provide a regex lib)
 --
--- Regular expression matching.
--- Uses the POSIX regular expression interface in Text.Regex.Posix for now.
+-- Regular expression matching.  Uses the POSIX regular expression
+-- interface in "Text.Regex.Posix".
 --
 -----------------------------------------------------------------------------
 
 module Text.Regex (
+    -- * Regular expressions
     Regex,
     mkRegex,
     mkRegexWithOpts,
@@ -25,12 +26,26 @@ import Prelude
 import qualified Text.Regex.Posix as RE
 import System.IO.Unsafe
 
+-- | A compiled regular expression
 type Regex = RE.Regex
 
+-- | Makes a regular expression with the default options (multi-line,
+-- case-sensitive).  The syntax of regular expressions is
+-- otherwise that of @egrep@ (i.e. POSIX \"extended\" regular
+-- expressions).
 mkRegex :: String -> Regex
 mkRegex s = unsafePerformIO (RE.regcomp s RE.regExtended)
 
-mkRegexWithOpts :: String -> Bool -> Bool -> Regex
+-- | Makes a regular expression, where the multi-line and
+-- case-sensitve options can be changed from the default settings.
+mkRegexWithOpts
+   :: String  -- ^ The regular expression to compile
+   -> Bool    -- ^ 'True' @<=>@ \'@^@\' and \'@$@\' match the beginning and 
+	      -- end of individual lines respectively, and \'.\' does /not/
+	      -- match the newline character.
+   -> Bool    -- ^ 'True' @<=>@ matching is case-sensitive
+   -> Regex   -- ^ Returns: the compiled regular expression
+
 mkRegexWithOpts s single_line case_sensitive
    = unsafePerformIO (RE.regcomp s (RE.regExtended + newline + igcase))
    where
@@ -40,17 +55,30 @@ mkRegexWithOpts s single_line case_sensitive
 	igcase  | case_sensitive = 0 
 		| otherwise 	 = RE.regIgnoreCase
 
-matchRegex :: Regex -> String -> Maybe [String]
+-- | Match a regular expression against a string
+matchRegex
+   :: Regex	-- ^ The regular expression
+   -> String	-- ^ The string to match against
+   -> Maybe [String]	-- ^ Returns: @'Just' strs@ if the match succeeded
+			-- (and @strs@ is the list of subexpression matches),
+			-- or 'Nothing' otherwise.
 matchRegex p str = 
   case (unsafePerformIO (RE.regexec p str)) of
 	Nothing -> Nothing
 	Just (before, match, after, sub_strs) -> Just sub_strs
 
-matchRegexAll :: Regex -> String ->
-        Maybe ( String,  -- \$`
-                String,  -- \$&
-                String,  -- \$'
-                [String] -- \$1..
-              )
+-- | Match a regular expression against a string, returning more information
+-- about the match.
+matchRegexAll
+   :: Regex	-- ^ The regular expression
+   -> String	-- ^ The string to match against
+   -> Maybe ( String, String, String, [String] )
+		-- ^ Returns: 'Nothing' if the match failed, or:
+		-- 
+		-- >  Just ( everything before match,
+		-- >         portion matched,
+		-- >         everything after the match,
+		-- >         subexpression matches )
+
 matchRegexAll p str = unsafePerformIO (RE.regexec p str)
 

@@ -1,23 +1,32 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Text.Regex.Posix
--- Copyright   :  (c) The University of Glasgow 2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
+-- Copyright   :  (c) The University of Glasgow 2002
+-- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
--- Portability :  non-portable (only on platforms that provide POSIX regexps)
+-- Portability :  non-portable (needs POSIX regexps)
 --
 -- Interface to the POSIX regular expression library.
--- ToDo: should have an interface using PackedStrings.
 --
 -----------------------------------------------------------------------------
 
+-- ToDo: should have an interface using PackedStrings.
+
 module Text.Regex.Posix (
+	-- * The @Regex@ type
 	Regex,	 	-- abstract
 
+	-- * Compiling a regular expression
 	regcomp, 	-- :: String -> Int -> IO Regex
 
+	-- ** Flags for regcomp
+	regExtended,	-- (flag to regcomp) use extended regex syntax
+	regIgnoreCase,	-- (flag to regcomp) ignore case when matching
+	regNewline,	-- (flag to regcomp) '.' doesn't match newline
+
+	-- * Matching a regular expression
 	regexec, 	-- :: Regex		     -- pattern
 	         	-- -> String		     -- string to match
 	         	-- -> IO (Maybe (String,     -- everything before match
@@ -25,9 +34,6 @@ module Text.Regex.Posix (
 	         	--		 String,     -- everything after match
 	         	-- 	 	 [String]))  -- subexpression matches
 
-	regExtended,	-- (flag to regcomp) use extended regex syntax
-	regIgnoreCase,	-- (flag to regcomp) ignore case when matching
-	regNewline	-- (flag to regcomp) '.' doesn't match newline
   ) where
 
 #include <sys/types.h>
@@ -38,12 +44,17 @@ import Prelude
 import Foreign
 import Foreign.C
 
+-- | A compiled regular expression
 newtype Regex = Regex (ForeignPtr CRegex)
 
 -- -----------------------------------------------------------------------------
 -- regcomp
 
-regcomp :: String -> Int -> IO Regex
+-- | Compiles a regular expression
+regcomp
+  :: String  	-- ^ The regular expression to compile
+  -> Int    	-- ^ Flags (summed together)
+  -> IO Regex  	-- ^ Returns: the compiled regular expression
 regcomp pattern flags = do
   regex_ptr <- mallocBytes (#const sizeof(regex_t))
   regex_fptr <- newForeignPtr regex_ptr (regfree regex_ptr)
@@ -62,12 +73,17 @@ regfree p_regex = do
 -- -----------------------------------------------------------------------------
 -- regexec
 
-regexec :: Regex			-- pattern
-	-> String			-- string to match
-	-> IO (Maybe (String,		-- everything before match
-		      String,		-- matched portion
-		      String,		-- everything after match
-		      [String])) 	-- subexpression matches
+-- | Matches a regular expression against a string
+regexec :: Regex			-- ^ Compiled regular expression
+	-> String			-- ^ String to match against
+	-> IO (Maybe (String, String, String, [String]))
+	 	-- ^ Returns: 'Nothing' if the regex did not match the
+		-- string, or:
+		--
+		--  > 'Just' (everything before match,
+		--  >       matched portion,
+		--  >       everything after match,
+		--  >       subexpression matches)
 
 regexec (Regex regex_fptr) str = do
   withCString str $ \cstr -> do
