@@ -60,7 +60,7 @@ import DataCon		( DataCon, dataConTag, dataConRepArgTys )
 import ClosureInfo	( mkVirtHeapOffsets )
 import Module		( ModuleName, moduleName )
 import RdrName
-import Name
+import Name		hiding (filterNameEnv)
 import Util
 import UniqFM
 import UniqSet
@@ -801,6 +801,10 @@ evalP (ConAppGen itbl args) de
 			let c' = setDoubleOffClosure c off d#
 			in c' `seq` loop c' (off +# 2#) as }
 
+evalP (PrimOpP IntEqOp [e1,e2]) de = unsafeCoerce# (evalI e1 de ==# evalI e2 de)
+
+evalP (PrimOpP primop _) de
+   = error ("evalP: unhandled primop: " ++ showSDoc (ppr primop))
 evalP other de
    = error ("evalP: unhandled case: " ++ showExprTag other)
 
@@ -856,6 +860,10 @@ evalI (CasePrimI bndr expr alts def) de
 
 evalI (PrimOpI IntAddOp [e1,e2]) de  = evalI e1 de +# evalI e2 de
 evalI (PrimOpI IntSubOp [e1,e2]) de  = evalI e1 de -# evalI e2 de
+evalI (PrimOpI DataToTagOp [e1]) de  = dataToTag# (evalP e1 de)
+
+evalI (PrimOpI primop _) de
+   = error ("evalI: unhandled primop: " ++ showSDoc (ppr primop))
 
 --evalI (NonRec (IBind v e) b) de
 --   = evalI b (augment de v (eval e de))
@@ -1273,9 +1281,9 @@ make_constr_itbls cons
                  entry_addr_w = fromIntegral (addrToInt entry_addr)
              in
                  do addr <- malloc
-                    putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
-                    putStrLn ("# ptrs  of itbl is " ++ show ptrs)
-                    putStrLn ("# nptrs of itbl is " ++ show nptrs)
+                    --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
+                    --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
+                    --putStrLn ("# nptrs of itbl is " ++ show nptrs)
                     poke addr itbl
                     return (getName dcon, addr `plusPtr` 8)
 
