@@ -946,7 +946,7 @@ ifneq "$(HS_OBJS)" ""
 ifneq "$(filter -split-objs,$(HC_OPTS))" ""
 clean ::
 	find $(patsubst %.$(way_)o,%,$(HS_OBJS)) -name '*.$(way_)o' -print | xargs $(RM) __rm_food
-	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS))
+	-rmdir $(patsubst %.$(way_)o,%,$(HS_OBJS)) > /dev/null 2>&1
 endif
 endif
 
