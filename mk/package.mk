@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.21 2003/01/14 13:17:43 simonmar Exp $
+# $Id: package.mk,v 1.22 2003/01/14 13:43:11 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -161,7 +161,7 @@ HTML_DOC = $(HTML_DIR)/index.html
 
 ifneq "$(HS_PPS)" ""
 
-CLEAN_FILES += $(HS_PPS) $(addsuffix .tmp, $(basename $(HS_PPS)))
+CLEAN_FILES += $(HS_PPS) $(addsuffix .tmp, $(HS_SRCS))
 
 ifeq "$(HADDOCK)" ""
 html ::
