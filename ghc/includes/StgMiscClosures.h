@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.35 2001/02/11 17:51:08 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.36 2001/02/12 04:55:33 chak Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -53,7 +53,6 @@ STGFUN(stg_MUT_CONS_entry);
 STGFUN(stg_END_MUT_LIST_entry);
 STGFUN(stg_dummy_ret_entry);
 
-#ifdef GHCI
 /* entry code for constructors created by the bytecode interpreter */
 STGFUN(stg_interp_constr_entry);
 STGFUN(stg_interp_constr1_entry);
@@ -77,7 +76,6 @@ extern DLL_IMPORT_RTS const vec_info_8 stg_ctoi_ret_D1_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_unbx_r1_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_f1_info;
 extern DLL_IMPORT_RTS const StgInfoTable stg_gc_d1_info;
-#endif
 
 #if defined(PAR) || defined(GRAN)
 /* this is the NIL ptr for a blocking queue */

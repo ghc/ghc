@@ -1,6 +1,6 @@
 
 /* -----------------------------------------------------------------------------
- * $Id: Interpreter.h,v 1.2 2000/12/19 16:48:35 sewardj Exp $
+ * $Id: Interpreter.h,v 1.3 2001/02/12 04:55:33 chak Exp $
  *
  * (c) The GHC Team, 1998-2000.
  *
@@ -8,13 +8,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef GHCI
-
 extern StgThreadReturnCode interpretBCO ( Capability* cap );
 
 typedef unsigned short UShort;
-
-#endif
 
 #if 0
 /* --------------------------------------------------------------------------
