@@ -24,6 +24,11 @@ TABLE.narrow {
   border-width: 0px;
 }
 
+TD.s8  {  height: 8px;  }
+TD.s15 {  height: 15px; }
+
+SPAN.keyword { text-decoration: underline; }
+
 /* --------- Documentation elements ---------- */
 
 TD.children {

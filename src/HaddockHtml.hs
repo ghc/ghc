@@ -700,11 +700,11 @@ ppFunSig summary nm ty doc
   | otherwise   = 
 	declBox (ppHsBinder False nm) </>
 	(tda [theclass "body"] << vanillaTable <<  (
+	   do_args True ty </>
 	   (if (isJust doc) 
 		then ndocBox (docToHtml (fromJust doc))
-		else Html.emptyTable)  </>
-	   do_args True ty
-	 ))
+		else Html.emptyTable)
+	))
   where
 	no_arg_docs (HsForAllType _ _ ty) = no_arg_docs ty
 	no_arg_docs (HsTyFun (HsTyDoc _ _) _) = False
@@ -804,7 +804,7 @@ ppHsIdentifier (HsSpecial str) =  str
 
 ppHsBinder :: Bool -> HsName -> Html
 ppHsBinder True nm = anchor ! [href ('#':hsNameStr nm)] << ppHsBinder' nm
-ppHsBinder False nm = linkTarget nm +++ ppHsBinder' nm
+ppHsBinder False nm = linkTarget nm +++ bold << ppHsBinder' nm
 
 ppHsBinder' (HsTyClsName id) = ppHsBindIdent id
 ppHsBinder' (HsVarName id)   = ppHsBindIdent id
@@ -853,7 +853,7 @@ hsep htmls = foldr1 (\a b -> a+++" "+++b) htmls
 infixr 8 <+>
 a <+> b = Html (getHtmlElements (toHtml a) ++ HtmlString " ": getHtmlElements (toHtml b))
 
-keyword s = bold << toHtml s
+keyword s = thespan ! [theclass "keyword"] << toHtml s
 
 equals = char '='
 comma  = char ','
