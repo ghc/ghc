@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 2000/01/31 15:12:07 simonmar Exp $
+# $Id: Makefile,v 1.11 2000/06/25 17:18:15 panne Exp $
 #
 
 TOP=.
@@ -14,16 +14,16 @@ include $(TOP)/mk/boilerplate.mk
 #
 
 #
-# Order is important! driver/ has to come before includes/ which
-# again has to come before the rest.
+# Order is important! It's e.g. necessary to descend into include/
+# before the rest to have a config.h, etc.
 #
 # If we're booting from .hc files, swap the order
 # we descend into compiler/ and lib/
 #
 ifeq "$(GhcWithHscBuiltViaC)" "NO"
-SUBDIRS = utils driver includes rts docs compiler lib
+SUBDIRS = includes utils driver rts docs compiler lib
 else
-SUBDIRS = utils driver includes rts docs lib compiler
+SUBDIRS = includes utils driver rts docs lib compiler
 endif
 
 # Easier to copy
