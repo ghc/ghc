@@ -146,35 +146,42 @@ The libraries section give more details on all these
 %************************************************************************
 
 Normally, the GHC runtime system begins things by called an internal
-function @mainIO :: IO ()@ which, in turn, fires up your @Main.main@.
-The standard definition of @mainIO@ looks like this:
+function 
 
 \begin{verbatim}
-mainIO = catch Main.main 
-	   (\err -> error ("I/O error: " ++ showsPrec 0 err "\n"))
+	mainIO :: IO ()
 \end{verbatim}
 
-\noindent that is, all it does is to run @Main.main@, catching any I/O
+\noindent which, in turn, fires up your @Main.main@.  The standard
+definition of @mainIO@ looks like this:
+
+\begin{verbatim}
+	mainIO = catch Main.main 
+		   (\err -> error ("I/O error: " ++ 
+					showsPrec 0 err "\n"))
+\end{verbatim}
+
+\noindent that is, all it does is run @Main.main@, catching any I/O
 errors that occur and displaying them on standard error before exiting
 the program.
 
-To subvert the above process, you need only provide a @mainIO :: IO
-()@ of your own (in a module named \tr{GHCmain}).
+To subvert the above process, you need only provide a @mainIO@ of your
+own (in a module named \tr{GHCmain}).
 
 Here's a little example, stolen from Alastair Reid:
 
 \begin{verbatim}
-module GHCmain ( mainIO ) where
-
-import GlaExts
-
-mainIO :: IO ()
-mainIO = do
-	 sleep 5
-	 _ccall_ printf "%d\n" (14::Int)
-
-sleep :: Int -> IO ()
-sleep t = _ccall_ sleep t
+	module GHCmain ( mainIO ) where
+	
+	import GlaExts
+	
+	mainIO :: IO ()
+	mainIO = do
+		 sleep 5
+		 _ccall_ printf "%d\n" (14::Int)
+	
+	sleep :: Int -> IO ()
+	sleep t = _ccall_ sleep t
 \end{verbatim}
 
 %************************************************************************
@@ -242,7 +249,7 @@ said about \tr{_ccall_} goes for \tr{_casm_} as well.
 %************************************************************************
 %*                                                                      *
 \subsubsection[glasgow-foreign-headers]{Using function headers}
-\index{C calls---function headers}
+\index{C calls, function headers}
 %*                                                                      *
 %************************************************************************
 
@@ -390,11 +397,14 @@ void StgPerformGarbageCollection()
 performGC :: IO ()
 \end{verbatim}
 
+More information is provided on the programmers' interface to
+@ForeignObj@ can be found in Section \ref{sec:foreign-obj}.
+
 %************************************************************************
 %*                                                                      *
 \subsubsection[glasgow-avoiding-monads]{Avoiding monads}
 \index{C calls to `pure C'}
-\index{unsafePerformIO (GlaExts)}
+\index{unsafePerformIO}
 %*                                                                      *
 %************************************************************************
 
@@ -478,17 +488,6 @@ useful in debugging code.)
 And some advice, too.
 
 \begin{itemize}
-\item
-\tr{_ccall_} is part of the \tr{IO} monad --- not the \tr{ST} monad.
-Use the functions
-\begin{verbatim}
-ioToST :: IO a -> ST RealWorld a
-stToIO :: ST RealWorld a -> IO a
-\end{verbatim}
-\index{ioToST function}
-\index{stToIO function}
-to coerce computations back and forth between the two monads.
-
 \item For modules that use \tr{_ccall_}s, etc., compile with
 \tr{-fvia-C}.\index{-fvia-C option} You don't have to, but you should.
 
@@ -511,13 +510,13 @@ If you do use \tr{floats}, check and re-check that the right thing is
 happening.  Perhaps compile with \tr{-keep-hc-file-too} and look at
 the intermediate C (\tr{.hc} file).
 
-\item
-The compiler uses two non-standard type-classes when
+\item The compiler uses two non-standard type-classes when
 type-checking the arguments and results of \tr{_ccall_}: the arguments
 (respectively result) of \tr{_ccall_} must be instances of the class
-\tr{CCallable} (respectively \tr{CReturnable}).  (Neither class
-defines any methods --- their only function is to keep the
-type-checker happy.)
+\tr{CCallable} (respectively \tr{CReturnable}).  Both classes may be
+imported from the module @CCall@, but this should only be necessary if
+you want to define a new instance.  (Neither class defines any methods
+--- their only function is to keep the type-checker happy.)
 
 The type checker must be able to figure out just which of the
 C-callable/returnable types is being used.  If it can't, you have to
