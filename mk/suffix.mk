@@ -243,21 +243,25 @@ endif
 # DocBook XML suffix rules
 #
 
-%-no-chunks.html : %.xml
+%.html : %.xml
 	$(XSLTPROC) --output $@ \
 	            --stringparam html.stylesheet fptools.css \
 	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/docbook.xsl $<
 	cp $(FPTOOLS_CSS) .
 
-%.html : %.xml
-	@$(RM) -rf $@ $(basename $@)
-	$(XSLTPROC) --stringparam base.dir $(basename $@)/ \
+%-html/index.html : %.xml
+	$(RM) -rf $(dir $@)
+	$(XSLTPROC) --stringparam base.dir $(dir $@) \
 	            --stringparam use.id.as.filename 1 \
-	            --stringparam root.filename '' \
 	            --stringparam html.stylesheet fptools.css \
 	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/chunk.xsl $<
-	cp $(FPTOOLS_CSS) $(basename $@)
-	touch $@
+	cp $(FPTOOLS_CSS) $(dir $@)
+
+%-htmlhelp/index.html : %.xml
+	$(RM) -rf $(dir $@)
+	$(XSLTPROC) --stringparam base.dir $(dir $@) \
+	            --stringparam manifest.in.base.dir 1 \
+	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/htmlhelp/htmlhelp.xsl $<
 
 %.fo : %.xml
 	$(XSLTPROC) --output $@ \

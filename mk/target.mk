@@ -814,18 +814,22 @@ endif
 # The following could be an entry for an Obfuscated Makefile Contest...
 ifneq "$(INSTALL_XML_DOC)" ""
 ifneq "$(XMLDocWays)" ""
-install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(subst .no-chunks-html,-no-chunks.html,.$(i)))
+install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.htmlhelp,%-htmlhelp/index.html,$(patsubst %.html,%-html/index.html,.$(i)))))
 	@$(INSTALL_DIR) $(datadir)	
 	@for i in $(XMLDocWays); do \
 		if [ $$i = "html" ]; then \
 			$(INSTALL_DIR) $(datadir)/html; \
-			echo $(CP) -r $(INSTALL_XML_DOC) $(datadir)/html; \
-			$(CP) -r $(INSTALL_XML_DOC) $(datadir)/html; \
+			echo "( cd $(INSTALL_XML_DOC)-html && $(CP) * $(datadir)/html )" ; \
+			( cd $(INSTALL_XML_DOC)-html && $(CP) * $(datadir)/html ) ; \
+		elif [ $$i = "htmlhelp" ]; then \
+			$(INSTALL_DIR) $(datadir)/htmlhelp; \
+			echo "( cd $(INSTALL_XML_DOC)-htmlhelp && $(CP) * $(datadir)/htmlhelp )" ; \
+			( cd $(INSTALL_XML_DOC)-htmlhelp && $(CP) * $(datadir)/htmlhelp ) ; \
 		else \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.no-chunks-html/-no-chunks.html/` $(datadir); \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.no-chunks-html/-no-chunks.html/` $(datadir); \
+			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir); \
+			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir); \
 		fi; \
-		if [ $$i = "no-chunks-html" ]; then \
+		if [ $$i = "html-no-chunks" ]; then \
 			echo $(CP) $(FPTOOLS_CSS) $(datadir); \
 			$(CP) $(FPTOOLS_CSS) $(datadir); \
 		fi \
@@ -983,7 +987,7 @@ endif
 #
 ################################################################################
 
-.PHONY: html no-chunks-html fo dvi ps pdf
+.PHONY: html html-no-chunks htmlhelp fo dvi ps pdf
 
 ifneq "$(XML_DOC)" ""
 
@@ -996,8 +1000,9 @@ ifeq "$(XML_SRCS)" ""
 XML_SRCS = $(wildcard *.xml)
 endif
 
-XML_HTML           = $(addsuffix .html,$(XML_DOC))
-XML_NO_CHUNKS_HTML = $(addsuffix -no-chunks.html,$(XML_DOC))
+XML_HTML           = $(addsuffix -html/index.html,$(basename $(XML_DOC)))
+XML_HTML_NO_CHUNKS = $(addsuffix .html,$(XML_DOC))
+XML_HTMLHELP       = $(addsuffix -htmlhelp/index.html,$(basename $(XML_DOC)))
 XML_FO             = $(addsuffix .fo,$(XML_DOC))
 XML_DVI            = $(addsuffix .dvi,$(XML_DOC))
 XML_PS             = $(addsuffix .ps,$(XML_DOC))
@@ -1006,16 +1011,17 @@ XML_PDF            = $(addsuffix .pdf,$(XML_DOC))
 $(XML_HTML) $(XML_NO_CHUNKS_HTML) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF) :: $(XML_SRCS)
 
 html           :: $(XML_HTML)
-no-chunks-html :: $(XML_NO_CHUNKS_HTML)
+html-no-chunks :: $(XML_HTML_NO_CHUNKS)
+htmlhelp       :: $(XML_HTMLHELP)
 fo             :: $(XML_FO)
 dvi            :: $(XML_DVI)
 ps             :: $(XML_PS)
 pdf            :: $(XML_PDF)
 
-CLEAN_FILES += $(XML_HTML) $(XML_NO_CHUNKS_HTML) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF)
+CLEAN_FILES += $(XML_HTML_NO_CHUNKS) $(XML_FO) $(XML_DVI) $(XML_PS) $(XML_PDF)
 
 extraclean ::
-	$(RM) -rf $(XML_DOC).out $(XML_DOC)
+	$(RM) -rf $(XML_DOC).out $(notdir $(FPTOOLS_CSS)) $(addsuffix -html,$(basename $(XML_DOC))) $(addsuffix -htmlhelp,$(basename $(XML_DOC)))
 
 validate ::
 	$(XMLLINT) --valid --noout $(XMLLINT_OPTS) $(XML_DOC).xml
