@@ -11,7 +11,7 @@ can be appended in linear time.
 module OrdList (
 	OrdList, 
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
-        fromOL, toOL
+        fromOL, toOL, foldOL
 ) where
 
 infixl 5  `appOL`
@@ -19,7 +19,8 @@ infixl 5  `snocOL`
 infixr 5  `consOL`
 
 data OrdList a
-  = Many (OrdList a) (OrdList a)
+  = Many [a]
+  | Two (OrdList a) (OrdList a)
   | One  a
   | None
 
@@ -34,28 +35,34 @@ concatOL :: [OrdList a] -> OrdList a
 
 nilOL        = None
 unitOL as    = One as
-snocOL as b  = Many as (One b)
-consOL a  bs = Many (One a) bs
-concatOL aas = foldr Many None aas
+snocOL as b  = Two as (One b)
+consOL a  bs = Two (One a) bs
+concatOL aas = foldr Two None aas
 
-isNilOL None         = True
-isNilOL (One _)      = False
-isNilOL (Many as bs) = isNilOL as && isNilOL bs
+isNilOL None        = True
+isNilOL (One _)     = False
+isNilOL (Two as bs) = isNilOL as && isNilOL bs
+isNilOL (Many xs)   = null xs
 
 appOL None bs   = bs
 appOL as   None = as
-appOL as   bs   = Many as bs
+appOL as   bs   = Two as bs
+
+foldOL :: (a->b->b) -> b -> OrdList a -> b
+foldOL k z None        = z
+foldOL k z (One x)     = k x z
+foldOL k z (Two b1 b2) = foldOL k (foldOL k z b2) b1
+foldOL k z (Many xs)   = foldr k z xs
 
 fromOL :: OrdList a -> [a]
 fromOL ol 
    = flat ol []
      where
-        flat None       rest = rest
-        flat (One x)    rest = x:rest
-        flat (Many a b) rest = flat a (flat b rest)
+        flat None      rest = rest
+        flat (One x)   rest = x:rest
+        flat (Two a b) rest = flat a (flat b rest)
+	flat (Many xs) rest = xs ++ rest
 
 toOL :: [a] -> OrdList a
-toOL []     = None
-toOL (x:xs) = Many (One x) (toOL xs)
-
+toOL xs = Many xs
 \end{code}
