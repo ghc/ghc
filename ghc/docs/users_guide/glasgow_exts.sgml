@@ -114,6 +114,20 @@ Details in <XRef LinkEnd="rewrite-rules">.
 </Para>
 </ListItem>
 </VarListEntry>
+
+<VarListEntry>
+<Term>Generic classes:</Term>
+<ListItem>
+<Para>
+Generic class declarations allow you to define a class
+whose methods say how to work over an arbitrary data type.
+Then it's really easy to make any new type into an instance of
+the class.  This generalises the rather ad-hoc "deriving" feature
+of Haskell 98.
+Details in <XRef LinkEnd="generic-classes">.
+</Para>
+</ListItem>
+</VarListEntry>
 </VariableList>
 </Para>
 
@@ -4218,6 +4232,177 @@ program even if fusion doesn't happen.  More rules in <Filename>PrelList.lhs</Fi
 
 </Sect2>
 
+</Sect1>
+
+<Sect1 id="generic-classes">
+<Title>Generic classes</Title>
+
+<Para>
+The ideas behind this extension are described in detail in "Derivable type classes",
+Ralf Hinze and Simon Peyton Jones, Haskell Workshop, Montreal Sept 2000, pp94-105.
+An example will give the idea:
+</Para>
+
+<ProgramListing>
+  class Bin a where
+    toBin   :: a -> [Int]
+    fromBin :: [Int] -> (a, [Int])
+  
+    toBin {| Unit |}    Unit	  = []
+    toBin {| a :+: b |} (Inl x)   = 0 : toBin x
+    toBin {| a :+: b |} (Inr y)   = 1 : toBin y
+    toBin {| a :*: b |} (x :*: y) = toBin x ++ toBin y
+  
+    fromBin {| Unit |}    bs      = (Unit, bs)
+    fromBin {| a :+: b |} (0:bs)  = (Inl x, bs')    where (x,bs') = fromBin bs
+    fromBin {| a :+: b |} (1:bs)  = (Inr y, bs')    where (y,bs') = fromBin bs
+    fromBin {| a :*: b |} bs	  = (x :*: y, bs'') where (x,bs' ) = fromBin bs
+							  (y,bs'') = fromBin bs'
+</ProgramListing>
+<Para>
+This class declaration explains how <Literal>toBin</Literal> and <Literal>fromBin</Literal>
+work for arbitrary data types.  They do so by giving cases for unit, product, and sum,
+which are defined thus:
+</Para>
+<ProgramListing>
+  data Unit    = Unit
+  data a :+: b = Inl a | Inr b
+  data a :*: b = a :*: b
+</ProgramListing>
+<Para>
+Now you can make a data type into an instance of Bin like this:
+<ProgramListing>
+  instance (Bin a, Bin b) => Bin (a,b)
+  instance Bin a => Bin [a]
+</ProgramListing>
+That is, just leave off the "where" clasuse.  Of course, you can put in the
+where clause and over-ride whichever methods you please.
+
+
+<Sect2> <Title> Changes wrt the paper </Title>
+<Para>
+Note that the type constructors <Literal>:+:</Literal> and <Literal>:*:</Literal> 
+can be written infix (indeed, you can now use
+any operator starting in a colon as an infix type constructor).  Also note that
+the type constructors are not exactly as in the paper (Unit instead of 1, etc).
+Finally, note that the syntax of the type patterns in the class declaration
+uses "<Literal>{|</Literal>" and "<Literal>{|</Literal>" brackets; curly braces
+alone would ambiguous when they appear on right hand sides (an extension we 
+anticipate wanting).
+</Para>
+</Sect2>
+
+<Sect2> <Title>Terminology and restrictions</Title>
+<Para>
+Terminology.  A "generic default method" in a class declaration
+is one that is defined using type patterns as above.
+A "polymorphic default method" is a default method defined as in Haskell 98.
+A "generic class declaration" is a class declaration with at least one
+generic default method.
+</Para>
+Restrictions:
+<ItemizedList>
+<ListItem> Alas, we do not yet implement the stuff about constructor names and 
+field labels.
+</ListItem>
+
+<ListItem> A generic class can have only one parameter; you can't have a generic
+multi-parameter class.
+</ListItem>
+
+<ListItem> A default method must be defined entirely using type patterns, or entirely
+without.  So this is illegal:
+<ProgramListing>
+  class Foo a where
+    op :: a -> (a, Bool)
+    op {| Unit |} Unit = (Unit, True)
+    op x               = (x,    False)
+</ProgramListing>
+However it is perfectly OK for some methods of a generic class to have 
+generic default methods and others to have polymorphic default methods.
+</ListItem>
+
+<ListItem> The type variable(s) in the type pattern for a generic method declaration
+scope over the right hand side.  So this is legal (note the use of the type variable
+"p" in a type signature on the right hand side:
+<ProgramListing>
+  class Foo a where
+    op :: a -> Bool
+    op {| p :*: q |} (x :*: y) = op (x :: p)
+    ...
+</ProgramListing>
+
+<ListItem> The type patterns in a generic default method must take one of the forms:
+<ProgramListing>
+       a :+: b
+       a :*: b
+       Unit
+</ProgramListing>
+where "a" and "b" are type variables.  Furthermore, all the type patterns for
+a single type constructor (<Literal>:*:</Literal>, say) must be identical; they
+must use the same type variables.  So this is illegal:
+<ProgramListing>
+  class Foo a where
+    op :: a -> Bool
+    op {| a :+: b |} (Inl x) = True
+    op {| p :+: q |} (Inr y) = False
+</ProgramListing>
+The type patterns must be identical, even in equations for different methods of the class.
+So this too is illegal:
+<ProgramListing>
+  class Foo a where
+    op1 :: a -> Bool
+    op {| a :*: b |} (Inl x) = True
+
+    op2 :: a -> Bool
+    op {| p :*: q |} (Inr y) = False
+</ProgramListing>
+(The reason for this restriction is that we gather all the equations for a particular type consructor
+into a single generic instance declaration.)
+</ListItem>
+
+<ListItem> A generic method declaration must give a case for each of the three type constructors.
+</ListItem>
+
+<ListItem> In an instance declaration for a generic class, the idea is that the compiler
+will fill in the methods for you, based on the generic templates.  However it can only
+do so if
+  <ItemizedList>
+  <ListItem> The instance type is simple (a type constructor applied to type variables, as in Haskell 98).
+	     </ListItem>
+  <ListItem> No constructor of the instance type has unboxed fields. </ListItem>
+  </ItemizedList>
+(Of course, these things can only arise if you are already using GHC extensions.)
+However, you can still give an instance declarations for types which break these rules,
+provided you give explicit code to override any generic default methods.
+
+</ListItem>
+
+</ItemizedList>
+<Para>
+The option <Option>-ddump-deriv</Option> dumps incomprehensible stuff giving details of 
+what the compiler does with generic declarations.
+</Para>
+
+</Sect2>
+
+<Sect2> <Title> Another example </Title>
+<Para>
+Just to finish with, here's another example I rather like:
+<ProgramListing>
+  class Tag a where
+    nCons :: a -> Int
+    nCons {| Unit |}    _ = 1
+    nCons {| a :*: b |} _ = 1
+    nCons {| a :+: b |} _ = nCons (bot::a) + nCons (bot::b)
+  
+    tag :: a -> Int
+    tag {| Unit |}    _       = 1
+    tag {| a :*: b |} _       = 1   
+    tag {| a :+: b |} (Inl x) = tag x
+    tag {| a :+: b |} (Inr y) = nCons (bot::a) + tag y
+</ProgramListing>
+</Sect2>
 </Sect1>
 
 <!-- Emacs stuff:
