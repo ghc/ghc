@@ -337,16 +337,17 @@ tcBindWithSigs top_lvl binder_names mbind tc_ty_sigs is_rec prag_info_fn
 	mk_export binder_name mono_id zonked_mono_id_ty
 	  = (tyvars, TcId (replaceIdInfo poly_id (prag_info_fn binder_name)), TcId mono_id)
 	  where
-	    (tyvars, poly_id) = case maybeSig tc_ty_sigs binder_name of
-				  Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) -> (sig_tyvars, sig_poly_id)
-				  Nothing ->			        (real_tyvars_to_gen_list, new_poly_id)
+	    (tyvars, poly_id) = 
+	        case maybeSig tc_ty_sigs binder_name of
+		  Just (TySigInfo _ sig_poly_id sig_tyvars _ _ _) -> (sig_tyvars, sig_poly_id)
+		  Nothing ->			        (real_tyvars_to_gen_list, new_poly_id)
 
 	    new_poly_id = mkUserId binder_name poly_ty
-	    poly_ty     = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys $ zonked_mono_id_ty
-				-- It's important to build a fully-zonked poly_ty, because
-				-- we'll slurp out its free type variables when extending the
-				-- local environment (tcExtendLocalValEnv); if it's not zonked
-				-- it appears to have free tyvars that aren't actually free at all.
+	    poly_ty     = mkForAllTys real_tyvars_to_gen_list $ mkFunTys dict_tys zonked_mono_id_ty
+			-- It's important to build a fully-zonked poly_ty, because
+			-- we'll slurp out its free type variables when extending the
+			-- local environment (tcExtendLocalValEnv); if it's not zonked
+			-- it appears to have free tyvars that aren't actually free at all.
     in
 
 	 -- BUILD RESULTS
