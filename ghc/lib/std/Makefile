@@ -56,6 +56,8 @@ PrelIO_HC_OPTS       += -fno-ignore-asserts
 # Special options
 PrelStorable_HC_OPTS = -monly-3-regs
 PrelCError_HC_OPTS   = +RTS -K4m -RTS
+PrelInt_HC_OPTS      = -monly-3-regs
+PrelWord_HC_OPTS     = -monly-3-regs
 
 #-----------------------------------------------------------------------------
 # 	Dependency generation
@@ -66,11 +68,9 @@ SRC_MKDEPENDHS_OPTS += -I$(GHC_INCLUDE_DIR)
 # 	Rules
 
 PrelPrimopWrappers.hs: ../../compiler/prelude/primops.txt
-	rm -f $@
-	../../utils/genprimopcode/genprimopcode --make-haskell-wrappers < $< > $@
-
-PrelGHC.$(way_)hi	: PrelGHC.hi-boot
-	cp $< $@
+	rm -f PrelPrimopWrappers.hs
+	../../utils/genprimopcode/genprimopcode  --make-haskell-wrappers \
+		< ../../compiler/prelude/primops.txt > PrelPrimopWrappers.hs
 
 boot :: PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
@@ -88,7 +88,7 @@ HS_SRCS := $(filter-out PrelMain.lhs, $(HS_SRCS))
 all :: PrelMain.dll_o
 endif
 
-CLEAN_FILES += PrelGHC.hi-boot PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
+CLEAN_FILES += PrelGHC.hi $(foreach way, $(WAYS), PrelGHC.$(way)_hi)
 
 
 #-----------------------------------------------------------------------------
@@ -147,64 +147,65 @@ INSTALL_DATAS += PrelGHC.$(way_)hi
 
 
 ilxstd:
-	$(MAKE) way=ilx-Onot-mono std.ilx-Onot.mono.dll std.ilx-Onot.mono.vlb
-	$(MAKE) way=ilx-O-mono  std.ilx-O.mono.dll std.ilx-O.mono.vlb
-	$(MAKE) way=ilx-Onot-generic std.ilx-Onot.generic.dll
-	$(MAKE) way=ilx-O-generic  std.ilx-O.generic.dll 
-	$(MAKE) way=ilx-Onot-mono-traced std.ilx-Onot.mono.dll std.ilx-Onot.mono-traced.vlb
-	$(MAKE) way=ilx-O-mono-traced  std.ilx-O.mono.dll std.ilx-O.mono-traced.vlb
-	$(MAKE) way=ilx-Onot-generic-traced std.ilx-Onot.generic-traced.dll
-	$(MAKE) way=ilx-O-generic-traced  std.ilx-O.generic-traced.dll 
-	$(MAKE) way=ilx-Onot-mono-verifiable std.ilx-Onot.mono-verifiable.dll std.ilx-Onot.mono-verifiable.vlb
-	$(MAKE) way=ilx-O-mono-verifiable  std.ilx-O.mono-verifiable.dll std.ilx-O.mono-verifiable.vlb
+	$(MAKE) way=i std.dll std.i_vlb
+#	$(MAKE) way=ilx-Onot-mono std.ilx-Onot.mono.dll std.ilx-Onot.mono.vlb
+#	$(MAKE) way=ilx-O-mono  std.ilx-O.mono.dll std.ilx-O.mono.vlb
+#	$(MAKE) way=ilx-Onot-generic std.ilx-Onot.generic.dll
+#	$(MAKE) way=ilx-O-generic  std.ilx-O.generic.dll
+#	$(MAKE) way=ilx-Onot-mono-traced std.ilx-Onot.mono.dll std.ilx-Onot.mono-traced.vlb
+#	$(MAKE) way=ilx-O-mono-traced  std.ilx-O.mono.dll std.ilx-O.mono-traced.vlb
+#	$(MAKE) way=ilx-Onot-generic-traced std.ilx-Onot.generic-traced.dll
+#	$(MAKE) way=ilx-O-generic-traced  std.ilx-O.generic-traced.dll
+#	$(MAKE) way=ilx-Onot-mono-verifiable std.ilx-Onot.mono-verifiable.dll std.ilx-Onot.mono-verifiable.vlb
+#	$(MAKE) way=ilx-O-mono-verifiable  std.ilx-O.mono-verifiable.dll std.ilx-O.mono-verifiable.vlb
 
 ilxcheck:
-	(cd //c/devel/fcom/src; make)
-	(cd ../../compiler; make)
-	$(MAKE) way=ilx-Onot-mono  std.ilx-Onot.mono.mvl 
-	$(MAKE) way=ilx-O-mono   std.ilx-O.mono.mvl 
-	$(MAKE) way=ilx-Onot-mono-verifiable  std.ilx-Onot.mono-verifiable.mvl 
-	$(MAKE) way=ilx-O-mono-verifiable   std.ilx-O.mono-verifiable.mvl 
-	$(MAKE) way=ilx-Onot-mono-verifiable  std.ilx-Onot.mono-verifiable.mvr 
-	$(MAKE) way=ilx-O-mono-verifiable   std.ilx-O.mono-verifiable.mvr 
+#	(cd //c/devel/fcom/src; make)
+#	(cd ../../compiler; make)
+	$(MAKE) way=ilx-Onot-mono std.ilx-Onot.mono.mvl
+	$(MAKE) way=ilx-O-mono std.ilx-O.mono.mvl
+	$(MAKE) way=ilx-Onot-mono-verifiable std.ilx-Onot.mono-verifiable.mvl 
+	$(MAKE) way=ilx-O-mono-verifiable std.ilx-O.mono-verifiable.mvl
+	$(MAKE) way=ilx-Onot-mono-verifiable std.ilx-Onot.mono-verifiable.mvr 
+	$(MAKE) way=ilx-O-mono-verifiable std.ilx-O.mono-verifiable.mvr
 
 
 ifeq "$(ILXized)" "YES"
 
-HS_ILX+=PrelGHC.$(hs2ilx_suffix)_o
-PrelGHC.$(hs2ilx_suffix)_o: PrelGHC.ilx.real
-	sed -e "s/'PrelBase.dll'/'PrelBase.$(hs2ilx_suffix).dll'/g" $< > $@.tmp
-	mv $@.tmp $@
+SRC_HC_OPTS += -optI--assembly-name -optIstd.$(way_)o -optI--module
 
-PrelGHC.$(hs2ilx_suffix)_hi	: PrelGHC.hi-boot
+HS_ILX+=PrelGHC.$(way_)o
+PrelGHC.$(way_)o: PrelGHC.ilx.real
+	sed -e "s/'PrelBase.dll'/'PrelBase.$(way_)o'/g" $< > $@.tmp
+	$(ILX2IL) --module --assembly-name std.$(way_)o -o $@.il $@.tmp
+	$(ILASM) /QUIET /DLL /OUT=$@ $@.il
+#	mv $@.tmp $@
+
+PrelGHC.$(way_)hi: PrelGHC.hi-boot
 	cp $< $@
 
-std.$(ilx_way).dll: $(HS_MODS)
-	echo "call devcorb2gen free" > tmp.bat
-	echo "al -out:$@ $(HS_MODS)" >> tmp.bat
-	cmd /c tmp.bat
+std.dll: $(HS_OBJS)
+	al -out:$@ $(HS_OBJS)
 
-std.$(ilx_way).mvl: $(HS_IL)
-	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb  $(HS_IL)) 2>&1) | tee $@
+std.$(way_)mvl: $(HS_IL)
+	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb $(HS_IL)) 2>&1) | tee $@
 
-std.$(ilx_way).vlb: std.$(ilx_way).dll
-	echo "call devcorb2gen fastchecked" > tmp.bat
-	echo "copy c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).dll ." >> tmp.bat
-	echo "copy c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).dll ." >> tmp.bat
-	echo "copy c:\\devel\\fcom\\src\\bin\\mkvlb.exe ." >> tmp.bat
-	echo ".\\mkvlb.exe -o $@.tmp std.$(ilx_way)" >> tmp.bat
+std.$(way_)vlb: std.dll
+#	echo "call devcorb2gen fastchecked" > tmp.bat
+	echo "copy c:\\devel\\fcom\\bin\\msilxlib.$(ILX_WAY).dll msilxlib.$(ILX_WAY).dll" > tmp.bat
+	echo "copy c:\\devel\\fcom\\bin\\mkvlb.exe ." >> tmp.bat
+	echo "copy c:\\devel\\fcom\\bin\\mkvlb.pdb ." >> tmp.bat
+	echo ".\\mkvlb.exe -V -o $@.tmp std" >> tmp.bat
 	cmd /c tmp.bat
 	mv $@.tmp $@
 
-MINI_IL=PrelBase.ilx-Onot.mono.il  Prelude.ilx-Onot.mono.il PrelGHC.ilx-Onot.mono.il PrelPrimopWrappers.ilx-Onot.mono.il PrelErr.ilx-Onot.mono.il  PrelIOBase.ilx-Onot.mono.il PrelTup.ilx-Onot.mono.il  PrelShow.ilx-Onot.mono.il   PrelList.ilx-Onot.mono.il  PrelPtr.ilx-Onot.mono.il  PrelMaybe.ilx-Onot.mono.il  PrelPack.ilx-Onot.mono.il PrelST.ilx-Onot.mono.il PrelByteArr.ilx-Onot.mono.il PrelArr.ilx-Onot.mono.il PrelNum.ilx-Onot.mono.il PrelEnum.ilx-Onot.mono.il PrelFloat.ilx-Onot.mono.il PrelReal.ilx-Onot.mono.il PrelConc.ilx-Onot.mono.il
+MINI_IL=PrelBase.ilx-Onot.mono.il Prelude.ilx-Onot.mono.il PrelGHC.ilx-Onot.mono.il PrelPrimopWrappers.ilx-Onot.mono.il PrelErr.ilx-Onot.mono.il PrelIOBase.ilx-Onot.mono.il PrelTup.ilx-Onot.mono.il PrelShow.ilx-Onot.mono.il PrelList.ilx-Onot.mono.il PrelPtr.ilx-Onot.mono.il PrelMaybe.ilx-Onot.mono.il PrelPack.ilx-Onot.mono.il PrelST.ilx-Onot.mono.il PrelByteArr.ilx-Onot.mono.il PrelArr.ilx-Onot.mono.il PrelNum.ilx-Onot.mono.il PrelEnum.ilx-Onot.mono.il PrelFloat.ilx-Onot.mono.il PrelReal.ilx-Onot.mono.il PrelConc.ilx-Onot.mono.il
 mini.mvl: $(MINI_IL)
 	((ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib$(ilx2il_suffix).vlb  $(MINI_IL)) 2>&1) | tee $@
 
 
 std.$(ilx_way).mvlx: $(HS_ILX)
 	ILVALID_HOME=c:\\devel\\fcom\\src\\ ILVALID_MSCORLIB=mscorlib.vlb $(ILVALID) c:\\devel\\fcom\\src\\bin\\msilxlib.vlbx  $(HS_ILX) | tee $@
-
-.PRECIOUS:  $(HS_MODS) $(HS_ILX) $(HS_IL)
 
 endif # ILXized
 
@@ -213,6 +214,3 @@ endif # ILXized
 
 
 include $(TOP)/mk/target.mk
-
-# PrelIO.hsc includes PrelHandle_hsc.h
-PrelIO.hsc : PrelHandle_hsc.h
