@@ -251,9 +251,9 @@ mkIface :: HscEnv
 	-> Maybe ModIface	-- The old interface, if we have it
 	-> ModGuts		-- The compiled, tidied module
 	-> IO ModIface		-- The new one, complete with decls and versions
--- mkFinalIface 
---	a) completes the interface
---	b) writes it out to a file if necessary
+-- mkIface 
+--	a) Builds the ModIface
+--	b) Writes it out to a file if necessary
 
 mkIface hsc_env location maybe_old_iface 
 	guts@ModGuts{ mg_module = this_mod,
@@ -774,8 +774,8 @@ mkIfaceExports exports
 	avail_fs = occNameFS (availName avail)	    
 	add_avail avail_fm _ = addToFM_C add_item avail_fm avail_fs avail
 
-	add_item (AvailTC p occs) _ = AvailTC p (insert occ occs)
-	add_item (Avail n)	   _ = pprPanic "MkIface.addAvail" (ppr n <+> ppr name)
+	add_item (AvailTC p occs) _ = AvailTC p (List.insert occ occs)
+	add_item (Avail n)	  _ = pprPanic "MkIface.addAvail" (ppr n <+> ppr name)
 \end{code}
 
 

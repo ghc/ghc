@@ -265,7 +265,7 @@ data DynFlag
    | Opt_AllowOverlappingInstances
    | Opt_AllowUndecidableInstances
    | Opt_AllowIncoherentInstances
-   | Opt_NoMonomorphismRestriction
+   | Opt_MonomorphismRestriction
    | Opt_GlasgowExts
    | Opt_FFI
    | Opt_PArr			       -- syntactic support for parallel arrays
@@ -273,7 +273,7 @@ data DynFlag
    | Opt_TH
    | Opt_ImplicitParams
    | Opt_Generics
-   | Opt_NoImplicitPrelude 
+   | Opt_ImplicitPrelude 
 
    -- optimisation opts
    | Opt_Strictness
@@ -391,6 +391,8 @@ defaultDynFlags = DynFlags {
   pkgState		= error "pkgState",
 
   flags = [ 
+	    Opt_ImplicitPrelude,
+	    Opt_MonomorphismRestriction,
 	    Opt_Generics,
 			-- Generating the helper-functions for
 			-- generics is now on by default

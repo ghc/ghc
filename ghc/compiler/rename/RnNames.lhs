@@ -75,9 +75,9 @@ rnImports imports
 		-- Do the non {- SOURCE -} ones first, so that we get a helpful
 		-- warning for {- SOURCE -} ones that are unnecessary
 	  this_mod <- getModule
-	; opt_no_prelude <- doptM Opt_NoImplicitPrelude
+	; implicit_prelude <- doptM Opt_ImplicitPrelude
 	; let
-	    all_imports	     = mk_prel_imports this_mod opt_no_prelude ++ imports
+	    all_imports	       = mk_prel_imports this_mod implicit_prelude ++ imports
 	    (source, ordinary) = partition is_source_import all_imports
 	    is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
 
@@ -101,10 +101,10 @@ rnImports imports
 	-- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
 	-- because the former doesn't even look at Prelude.hi for instance 
 	-- declarations, whereas the latter does.
-    mk_prel_imports this_mod no_prelude
+    mk_prel_imports this_mod implicit_prelude
 	|  this_mod == pRELUDE
 	|| explicit_prelude_import
-	|| no_prelude
+	|| not implicit_prelude
 	= []
 
 	| otherwise = [preludeImportDecl]
@@ -251,18 +251,29 @@ exportsToAvails :: [IfaceExport] -> TcRnIf gbl lcl NameSet
 exportsToAvails exports 
   = foldlM do_one emptyNameSet exports
   where
-    do_one acc (mod, exports)       = foldlM (do_avail mod) acc exports
-    do_avail mod acc (Avail n)      = do { n' <- lookupOrig mod n; 
-				   	 ; return (addOneToNameSet acc n') }
-    do_avail mod acc (AvailTC n ns) = do { n' <- lookupOrig mod n
-				         ; ns' <- mappM (lookup_sub n') ns
-				         ; return (addListToNameSet acc (n':ns')) }
+    do_one acc (mod, exports)  = foldlM (do_avail mod) acc exports
+    do_avail mod acc (Avail n) = do { n' <- lookupOrig mod n; 
+				    ; return (addOneToNameSet acc n') }
+    do_avail mod acc (AvailTC p_occ occs) 
+	= do { p_name <- lookupOrig mod p_occ
+	     ; ns <- mappM (lookup_sub p_name) occs
+	     ; return (addListToNameSet acc ns) }
+	-- Remember that 'occs' is all the exported things, including
+	-- the parent.  It's possible to export just class ops without
+	-- the class, via C( op ). If the class was exported too we'd
+	-- have C( C, op )
 	where
-	  lookup_sub parent occ = newGlobalBinder mod occ (Just parent) noSrcLoc
-		-- Hack alert! Notice the newGlobalBinder.  It ensures that the subordinate 
-		-- names record their parent; and that in turn ensures that the GlobalRdrEnv
-		-- has the correct parent for all the names in its range.
-		-- For imported things, we only suck in the binding site later, if ever.
+	   lookup_sub parent occ 
+		= newGlobalBinder mod occ mb_parent noSrcLoc
+		where
+		  mb_parent | occ == p_occ = Nothing
+			    | otherwise	   = Just parent
+
+	-- The use of newGlobalBinder here (rather than lookupOrig) 
+	-- ensures that the subordinate names record their parent; 
+	-- and that in turn ensures that the GlobalRdrEnv
+	-- has the correct parent for all the names in its range.
+	-- For imported things, we only suck in the binding site later, if ever.
 	-- Reason for all this:
 	--   Suppose module M exports type A.T, and constructor A.MkT
 	--   Then, we know that A.MkT is a subordinate name of A.T,
@@ -309,7 +320,7 @@ importsFromLocalDecls group
 	-- printer returns False.  It seems awkward to fix, unfortunately.
     mappM_ addDupDeclErr dups			`thenM_` 
 
-    doptM Opt_NoImplicitPrelude 		`thenM` \ implicit_prelude ->
+    doptM Opt_ImplicitPrelude 		`thenM` \ implicit_prelude ->
     let
 	prov     = LocalDef this_mod
 	gbl_env  = mkGlobalRdrEnv gres
@@ -335,8 +346,8 @@ importsFromLocalDecls group
 	    -- Sigh. It doesn't matter because it only affects the Data.Tuple really.
 	    -- The important thing is to trim down the exports.
  	filtered_names 
-	  | implicit_prelude = filter (not . isBuiltInSyntax) all_names
-	  | otherwise	     = all_names
+	  | implicit_prelude = all_names
+	  | otherwise	     = filter (not . isBuiltInSyntax) all_names
 
 	imports = emptyImportAvails {
 			imp_env = unitModuleEnv this_mod $

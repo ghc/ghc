@@ -11,7 +11,7 @@ module TcBinds ( tcBindsAndThen, tcTopBinds, tcMonoBinds, tcSpecSigs ) where
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcCheckSigma, tcCheckRho )
 
-import CmdLineOpts	( DynFlag(Opt_NoMonomorphismRestriction) )
+import CmdLineOpts	( DynFlag(Opt_MonomorphismRestriction) )
 import HsSyn		( HsExpr(..), HsBind(..), LHsBinds, Sig(..),
 			  LSig, Match(..), HsBindGroup(..), IPBind(..),
 			  LPat, GRHSs, MatchGroup(..), emptyLHsBinds, isEmptyLHsBinds,
@@ -720,8 +720,8 @@ find which tyvars are constrained.
 \begin{code}
 isUnRestrictedGroup :: LHsBinds Name -> [TcSigInfo] -> TcM Bool
 isUnRestrictedGroup binds sigs
-  = do	{ no_MR <- doptM Opt_NoMonomorphismRestriction
-	; return (no_MR || all_unrestricted) }
+  = do	{ mono_restriction <- doptM Opt_MonomorphismRestriction
+	; return (not mono_restriction || all_unrestricted) }
   where 
     all_unrestricted = all (unrestricted . unLoc) (bagToList binds)
     tysig_names      = map (idName . sig_id) sigs

@@ -437,11 +437,6 @@ dynamic_flags = [
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
 
-	-- "active negatives"
-  ,  ( "fno-implicit-prelude",  NoArg (setDynFlag Opt_NoImplicitPrelude) )
-  ,  ( "fno-monomorphism-restriction",	
-			NoArg (setDynFlag Opt_NoMonomorphismRestriction) )
-
 	-- the rest of the -f* and -fno-* flags
   ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )
   ,  ( "f",		PrefixPred (\f -> isFFlag f) (\f -> setDynFlag (getFFlag f)) )
@@ -470,6 +465,8 @@ fFlags = [
   ( "arrows",				Opt_Arrows ), -- arrow syntax
   ( "parr",				Opt_PArr ),
   ( "th",				Opt_TH ),
+  ( "implicit-prelude",  		Opt_ImplicitPrelude ),
+  ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
   ( "implicit-params",			Opt_ImplicitParams ),
   ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
   ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),

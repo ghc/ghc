@@ -46,7 +46,7 @@ import HsTypes		( replaceTyVarName )
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isInternalName,
-			  nameSrcLoc, nameOccName, nameModule, nameParent )
+			  nameSrcLoc, nameOccName, nameModule, nameParent, isExternalName )
 import NameSet
 import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
 import Module		( Module )
@@ -73,19 +73,16 @@ import FastString	( FastString )
 newTopSrcBinder :: Module -> Maybe Name -> Located RdrName -> RnM Name
 newTopSrcBinder this_mod mb_parent (L loc rdr_name)
   | Just name <- isExact_maybe rdr_name
-	-- This is here to catch 
+  =	-- This is here to catch 
 	--   (a) Exact-name binders created by Template Haskell
 	--   (b) The PrelBase defn of (say) [] and similar, for which
 	--	 the parser reads the special syntax and returns an Exact RdrName
-	--
-  	-- We are at a binding site for the name, so check first that it 
+   	-- We are at a binding site for the name, so check first that it 
 	-- the current module is the correct one; otherwise GHC can get
-	-- very confused indeed.  This test rejects code like
-	--	data T = (,) Int Int
-	-- unless we are in GHC.Tup
-  = do	checkErr (isInternalName name || this_mod == nameModule name)
-	         (badOrigBinding rdr_name)
-	returnM name
+	-- very confused indeed.
+    ASSERT2( isExternalName name,  ppr name )
+    ASSERT2( this_mod == nameModule name, ppr name )
+    returnM name
 
   | isOrig rdr_name
   = do	checkErr (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
@@ -493,8 +490,8 @@ checks the type of the user thing against the type of the standard thing.
 lookupSyntaxName :: Name 			-- The standard name
 	         -> RnM (Name, FreeVars)	-- Possibly a non-standard name
 lookupSyntaxName std_name
-  = doptM Opt_NoImplicitPrelude		`thenM` \ no_prelude -> 
-    if not no_prelude then normal_case
+  = doptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
+    if implicit_prelude then normal_case
     else
 	-- Get the similarly named thing from the local environment
     lookupOccRn (mkRdrUnqual (nameOccName std_name)) `thenM` \ usr_name ->
@@ -505,8 +502,8 @@ lookupSyntaxName std_name
 lookupSyntaxNames :: [Name]				-- Standard names
 		  -> RnM (ReboundNames Name, FreeVars)	-- See comments with HsExpr.ReboundNames
 lookupSyntaxNames std_names
-  = doptM Opt_NoImplicitPrelude		`thenM` \ no_prelude -> 
-    if not no_prelude then normal_case 
+  = doptM Opt_ImplicitPrelude		`thenM` \ implicit_prelude -> 
+    if implicit_prelude then normal_case 
     else
     	-- Get the similarly named thing from the local environment
     mappM (lookupOccRn . mkRdrUnqual . nameOccName) std_names 	`thenM` \ usr_names ->

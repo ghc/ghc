@@ -15,27 +15,24 @@ import Language.Haskell.TH.Syntax as TH
 
 import HsSyn as Hs
 import qualified Class (FunDep)
-import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, nameRdrName, getRdrName )
+import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig, getRdrName )
 import Module   ( Module, mkModule )
-import RdrHsSyn	( mkHsIntegral, mkHsFractional, mkClassDecl, mkTyData )
-import Name	( mkInternalName )
+import RdrHsSyn	( mkClassDecl, mkTyData )
 import qualified OccName
-import SrcLoc	( SrcLoc, generatedSrcLoc, noLoc, unLoc, Located(..),
-		  noSrcSpan, SrcSpan, srcLocSpan, noSrcLoc )
+import SrcLoc	( generatedSrcLoc, noLoc, unLoc, Located(..),
+		  SrcSpan, srcLocSpan )
 import Type	( Type )
-import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon, falseDataCon )
+import TysWiredIn ( unitTyCon, tupleTyCon, trueDataCon )
 import BasicTypes( Boxity(..), RecFlag(Recursive) )
 import ForeignCall ( Safety(..), CCallConv(..), CCallTarget(..),
                      CExportSpec(..)) 
-import HsDecls ( CImportSpec(..), ForeignImport(..), ForeignExport(..),
-                 ForeignDecl(..) )
-import FastString( FastString, mkFastString, nilFS )
-import Char 	( ord, isAscii, isAlphaNum, isAlpha )
+import Char 	( isAscii, isAlphaNum, isAlpha )
 import List	( partition )
-import Unique	( Unique, mkUniqueGrimily )
+import Unique	( mkUniqueGrimily )
 import ErrUtils (Message)
-import GLAEXTS	( Int#, Int(..) )
+import GLAEXTS	( Int(..) )
 import Bag	( emptyBag, consBag )
+import FastString
 import Outputable
 
 
@@ -371,7 +368,6 @@ cvtPanic herald thing
 -- some useful things
 
 truePat  = nlConPat (getRdrName trueDataCon)  []
-falsePat = nlConPat (getRdrName falseDataCon) []
 
 overloadedLit :: Lit -> Bool
 -- True for literals that Haskell treats as overloaded
@@ -406,17 +402,21 @@ tconName = thRdrName OccName.tcName
 
 thRdrName :: OccName.NameSpace -> TH.Name -> RdrName
 -- This turns a Name into a RdrName
--- The last case is slightly interesting.  It constructs a
--- unique name from the unique in the TH thingy, so that the renamer
--- won't mess about.  I hope.  (Another possiblity would be to generate 
--- "x_77" etc, but that could conceivably clash.)
 
-thRdrName ns (TH.Name occ (TH.NameG ns' mod))  = mkOrig (mk_mod mod) (mk_occ ns occ)
-thRdrName ns (TH.Name occ TH.NameS)            = mkDynName ns occ
-thRdrName ns (TH.Name occ (TH.NameU uniq))     = nameRdrName (mkInternalName (mk_uniq uniq) (mk_occ ns occ) noSrcLoc)
-
-mk_uniq :: Int# -> Unique
-mk_uniq u = mkUniqueGrimily (I# u)
+thRdrName ns (TH.Name occ (TH.NameG ns' mod)) = mkOrig (mk_mod mod) (mk_occ ns occ)
+thRdrName ns (TH.Name occ TH.NameS)           = mkDynName ns occ
+thRdrName ns (TH.Name occ (TH.NameU uniq))    
+  = mkRdrUnqual (OccName.mkOccName ns uniq_str)
+  where
+    uniq_str = TH.occString occ ++ '[' : shows (mkUniqueGrimily (I# uniq)) "]"
+	-- The idea here is to make a name that 
+	-- a) the user could not possibly write, and
+	-- b) cannot clash with another NameU
+	-- Previously I generated an Exact RdrName with mkInternalName.
+	-- This works fine for local binders, but does not work at all for
+	-- top-level binders, which must have External Names, since they are
+	-- rapidly baked into data constructors and the like.  Baling out
+	-- and generating an unqualified RdrName here is the simple solution
 
 -- The packing and unpacking is rather turgid :-(
 mk_occ :: OccName.NameSpace -> TH.OccName -> OccName.OccName

@@ -10,7 +10,7 @@ module IfaceEnv (
 	tcIfaceLclId,     tcIfaceTyVar, 
 
 	-- Name-cache stuff
-	allocateGlobalBinder, initNameCache
+	allocateGlobalBinder, initNameCache, 
    ) where
 
 #include "HsVersions.h"
@@ -23,10 +23,11 @@ import TyCon		( TyCon, tyConName )
 import DataCon		( dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
 import Name		( Name, nameUnique, nameModule, 
-			  nameOccName, nameSrcLoc,
+			  nameOccName, nameSrcLoc, 
 			  getOccName, nameParent_maybe,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
+
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM, pREL_TUP )

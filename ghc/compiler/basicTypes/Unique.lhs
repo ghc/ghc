@@ -18,7 +18,7 @@ Haskell).
 module Unique (
 	Unique, Uniquable(..), hasKey,
 
-	pprUnique,
+	pprUnique, 
 
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
@@ -202,7 +202,7 @@ We do sometimes make strings with @Uniques@ in them:
 pprUnique :: Unique -> SDoc
 pprUnique uniq
   = case unpkUnique uniq of
-      (tag, u) -> finish_ppr tag u (iToBase62 u)
+      (tag, u) -> finish_ppr tag u (text (iToBase62 u))
 
 #ifdef UNUSED
 pprUnique10 :: Unique -> SDoc
@@ -235,19 +235,18 @@ The ``62-its'' are \tr{[0-9a-zA-Z]}.  We don't handle negative Ints.
 Code stolen from Lennart.
 
 \begin{code}
-iToBase62 :: Int -> SDoc
-
-iToBase62 n@(I# n#)
-  = ASSERT(n >= 0)
-    if n# <# 62# then
-	case (indexCharOffAddr# chars62# n#) of { c ->
-	char (C# c) }
-    else
-	case (quotRem n 62)		of { (q, I# r#) ->
-	case (indexCharOffAddr# chars62# r#) of { c  ->
-	(<>) (iToBase62 q) (char (C# c)) }}
+iToBase62 :: Int -> String
+iToBase62 n@(I# n#) 
+  = ASSERT(n >= 0) go n# ""
   where
-     chars62# = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
+    go n# cs | n# <# 62# 
+	     = case (indexCharOffAddr# chars62# n#) of { c# -> C# c# : cs }
+	     | otherwise
+	     =	case (quotRem (I# n#) 62)	     of { (I# q#, I# r#) ->
+		case (indexCharOffAddr# chars62# r#) of { c#  ->
+		go q# (C# c# : cs) }}
+
+    chars62# = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
 \end{code}
 
 %************************************************************************
