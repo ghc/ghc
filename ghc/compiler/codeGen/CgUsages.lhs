@@ -39,47 +39,43 @@ heap usage.
 It is usually a prelude to performing a GC check, so everything must
 be in a tidy and consistent state.
 
-rje: Note the slightly suble fixed point behaviour needed here
 \begin{code}
 initHeapUsage :: (VirtualHeapOffset -> Code) -> Code
 
-initHeapUsage fcode = do 
-	(stk_usage, heap_usage) <- getUsage
-	setUsage (stk_usage, (0,0))
-	fixC (\heap_usage2 -> do
-		fcode (heapHWM heap_usage2)
-		(_, heap_usage2) <- getUsage
-		return heap_usage2)
-	(stk_usage2, heap_usage2) <- getUsage
-	setUsage (stk_usage2, heap_usage {-unchanged -})
+initHeapUsage fcode info_down (MkCgState absC binds (stk_usage, heap_usage))
+  = state3
+  where
+    state1 = MkCgState absC binds (stk_usage, (0, 0))
+    state2 = fcode (heapHWM heap_usage2) info_down state1
+    (MkCgState absC2 binds2 (stk_usage2, heap_usage2)) = state2
+    state3 = MkCgState  absC2
+			binds2
+			(stk_usage2, heap_usage {- unchanged -})
 \end{code}
 
 \begin{code}
 setVirtHp :: VirtualHeapOffset -> Code
-setVirtHp new_virtHp = do
-	(stk, (virtHp, realHp)) <- getUsage
-	setUsage (stk, (new_virtHp, realHp))
+setVirtHp new_virtHp info_down
+	  state@(MkCgState absC binds (stk, (virtHp, realHp)))
+  = MkCgState absC binds (stk, (new_virtHp, realHp))
 \end{code}
 
 \begin{code}
 getVirtAndRealHp :: FCode (VirtualHeapOffset, VirtualHeapOffset)
-getVirtAndRealHp = do 
-	(_, (virtHp, realHp)) <- getUsage
-	return (virtHp, realHp)
+getVirtAndRealHp info_down state@(MkCgState _ _ (_, (virtHp, realHp)))
+  = ((virtHp, realHp), state)
 \end{code}
 
 \begin{code}
 setRealHp ::  VirtualHeapOffset -> Code
-setRealHp realHp = do
-	(stk_usage, (vHp, _)) <- getUsage
-	setUsage (stk_usage, (vHp, realHp))
+setRealHp realHp info_down (MkCgState absC binds (stk_usage, (vHp, _)))
+  = MkCgState absC binds (stk_usage, (vHp, realHp))
 \end{code}
 
 \begin{code}
 getHpRelOffset :: VirtualHeapOffset -> FCode RegRelative
-getHpRelOffset virtual_offset = do
-	(_,(_,realHp)) <- getUsage
-	return $ hpRel realHp virtual_offset
+getHpRelOffset virtual_offset info_down state@(MkCgState _ _ (_,(_,realHp)))
+  = (hpRel realHp virtual_offset, state)
 \end{code}
 
 The heap high water mark is the larger of virtHp and hwHp.  The latter is
@@ -106,29 +102,27 @@ It is used to initialise things at the beginning of a closure body.
 setRealAndVirtualSp :: VirtualSpOffset 	-- New real Sp
 		     -> Code
 
-setRealAndVirtualSp sp = do
-	((vsp,f,realSp,hwsp), h_usage) <- getUsage
-	let new_usage = ((sp, f, sp, sp), h_usage)
-	setUsage new_usage
+setRealAndVirtualSp sp info_down (MkCgState absC binds
+					((vsp,f,realSp,hwsp), h_usage))
+  = MkCgState absC binds new_usage
+  where
+    new_usage = ((sp, f, sp, sp), h_usage)
 \end{code}
 
 \begin{code}
 getVirtSp :: FCode VirtualSpOffset
-getVirtSp = do 
-	((virtSp,_,_,_), _) <- getUsage
-	return virtSp
+getVirtSp info_down state@(MkCgState absC binds ((virtSp,_,_,_), _))
+  = (virtSp, state)
 
 getRealSp :: FCode VirtualSpOffset
-getRealSp = do
-	((_,_,realSp,_),_) <- getUsage
-	return realSp
+getRealSp info_down state@(MkCgState absC binds ((_,_,realSp,_),_)) 
+  = (realSp,state)
 \end{code}
 
 \begin{code}
 getSpRelOffset :: VirtualSpOffset -> FCode RegRelative
-getSpRelOffset virtual_offset = do
-	((_,_,realSp,_),_) <- getUsage
-  	return $ spRel realSp virtual_offset
+getSpRelOffset virtual_offset info_down state@(MkCgState _ _ ((_,_,realSp,_),_))
+  = (spRel realSp virtual_offset, state)
 \end{code}
 
 %************************************************************************
@@ -150,21 +144,25 @@ That's done by functions which allocate stack space.
 \begin{code}
 adjustSpAndHp :: VirtualSpOffset 	-- New offset for Arg stack ptr
 	      -> Code
-adjustSpAndHp newRealSp = do
-	(MkCgInfoDown _ _ _ ticky_ctr _) <- getInfoDown
-	(MkCgState absC binds
-		   ((vSp,fSp,realSp,hwSp),	
-		   (vHp, rHp))) <- getState
-	let move_sp = if (newRealSp == realSp) then AbsCNop
+adjustSpAndHp newRealSp (MkCgInfoDown _ _ _ ticky_ctr _)
+			(MkCgState absC binds
+				   ((vSp,fSp,realSp,hwSp),	
+				   (vHp, rHp)))
+  = MkCgState (mkAbstractCs [absC,move_sp,move_hp]) binds new_usage
+    where
+
+    move_sp = if (newRealSp == realSp) then AbsCNop
 	      else (CAssign (CReg Sp)
 			    (CAddr (spRel realSp newRealSp)))
-	let move_hp = 
-		if (rHp == vHp) then AbsCNop
-	 	else mkAbstractCs [
-		CAssign (CReg Hp) (CAddr (hpRel rHp vHp)),
+
+	-- Adjust the heap pointer backwards in case we over-allocated
+	-- Analogously, we also remove bytes from the ticky counter
+    move_hp = if (rHp == vHp) then AbsCNop
+	      else mkAbstractCs [
+			CAssign (CReg Hp) (CAddr (hpRel rHp vHp)),
 			profCtrAbsC SLIT("TICK_ALLOC_HEAP") 
-			[ mkIntCLit (vHp - rHp), CLbl ticky_ctr DataPtrRep ]
-		]
-	let new_usage = ((vSp, fSp, newRealSp, hwSp), (vHp,vHp))
-	setState $ MkCgState (mkAbstractCs [absC,move_sp,move_hp]) binds new_usage
+			    [ mkIntCLit (vHp - rHp), CLbl ticky_ctr DataPtrRep ]
+	      ]
+
+    new_usage = ((vSp, fSp, newRealSp, hwSp), (vHp,vHp))
 \end{code}
