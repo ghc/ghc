@@ -112,7 +112,7 @@ make -C ghc/docs ps html
 for j in docs ghc/docs; do
   dir=`pwd`
   cd $j
-  for i in ps dvi sgml vsgml verb idx; do
+  for i in ps dvi sgml verb idx; do
     find . -name '*.'$i -exec gzip -9 '{}' ';' -print
   done
   cd $dir
