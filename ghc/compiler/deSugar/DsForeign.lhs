@@ -146,7 +146,7 @@ dsFImport fn_id ty unsafe ext_name cconv
 	maybe_arg_ids | unsafe    = []
 		      | otherwise = work_arg_ids
     in
-    boxResult work_arg_ids io_res_ty   		`thenDs` \ (ccall_result_ty, res_wrapper) ->
+    boxResult maybe_arg_ids io_res_ty  		`thenDs` \ (ccall_result_ty, res_wrapper) ->
 
     getUniqueDs					`thenDs` \ ccall_uniq ->
     getUniqueDs					`thenDs` \ work_uniq ->
