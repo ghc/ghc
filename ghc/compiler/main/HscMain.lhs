@@ -7,7 +7,7 @@
 \begin{code}
 module HscMain ( HscResult(..), hscMain, 
 #ifdef GHCI
-		 hscStmt, hscThing,
+		 hscStmt, hscThing, hscModuleContents,
 #endif
 		 initPersistentCompilerState ) where
 
@@ -18,7 +18,7 @@ import Interpreter
 import ByteCodeGen	( byteCodeGen )
 import CoreTidy		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
-import Rename		( renameStmt, renameRdrName )
+import Rename		( renameStmt, renameRdrName, slurpIface )
 import RdrName          ( rdrNameOcc, setRdrNameOcc )
 import RdrHsSyn		( RdrNameStmt )
 import OccName          ( dataName, tcClsName, 
@@ -28,10 +28,13 @@ import Id		( Id, idName, setGlobalIdDetails )
 import IdInfo		( GlobalIdDetails(VanillaGlobal) )
 import Name		( isLocalName )
 import NameEnv		( lookupNameEnv )
+import RdrName		( rdrEnvElts )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import FastString       ( mkFastString )
 import Maybes		( catMaybes )
+
+import List		( nub )
 #endif
 
 import HsSyn
@@ -64,7 +67,7 @@ import CodeGen		( codeGen )
 import CodeOutput	( codeOutput )
 
 import Module		( ModuleName, moduleName, mkHomeModule, 
-			  moduleUserString )
+			  moduleUserString, lookupModuleEnv )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet_dyn, showPass, printError )
 import Util		( unJust )
@@ -672,6 +675,62 @@ myParseIdentifier dflags str
 
 	  POk _ rdr_name -> do { --should, but can't: freeStringBuffer buf;
 			         return (Just rdr_name) }
+#endif
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Find all the things defined in a module}
+%*									*
+%************************************************************************
+
+\begin{code}
+#ifdef GHCI
+hscModuleContents
+  :: DynFlags
+  -> HomeSymbolTable
+  -> HomeIfaceTable
+  -> PersistentCompilerState    -- IN: persistent compiler state
+  -> Module			-- module to inspect
+  -> Bool			-- grab just the exports, or the whole toplev
+  -> IO (PersistentCompilerState, Maybe [TyThing])
+
+hscModuleContents dflags hst hit pcs0 mod exports_only = do {
+
+  -- slurp the interface if necessary
+  (pcs1, print_unqual, maybe_rn_stuff) 
+	<- slurpIface dflags hit hst pcs0 mod;
+
+  case maybe_rn_stuff of {
+	Nothing -> return (pcs0, Nothing);
+	Just (names, rn_decls) -> do {
+
+  -- Typecheck the declarations
+  maybe_pcs <-
+     typecheckExtraDecls dflags pcs1 hst print_unqual iNTERACTIVE rn_decls;
+
+  case maybe_pcs of {
+	Nothing   -> return (pcs1, Nothing);
+	Just pcs2 -> 
+
+  let { all_names 
+	   | exports_only = names
+	   | otherwise =
+	     let { iface = fromJust (lookupModuleEnv hit mod);
+		   env   = fromJust (mi_globals iface);
+	           range = rdrEnvElts env;
+             } in
+	     -- grab all the things from the global env that are locally def'd
+	     nub [ n | elts <- range, GRE n LocalDef _ <- elts ];
+
+	pte = pcs_PTE pcs2;
+
+	ty_things = map (fromJust . lookupType hst pte) all_names;
+
+      } in
+
+  return (pcs2, Just ty_things)
+  }}}}
 #endif
 \end{code}
 

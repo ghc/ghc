@@ -48,11 +48,7 @@ import Name		( getName, nameModule, toRdrName, isGlobalName,
 import NameEnv
 import NameSet
 import OccName		( pprOccName )
-import TyCon		( TyCon, getSynTyConDefn, isSynTyCon, isNewTyCon, 
-			  isAlgTyCon, tyConGenIds, tyConTheta, tyConTyVars,
-			  tyConDataCons, tyConFamilySize, isPrimTyCon,
-			  isClassTyCon, isForeignTyCon, tyConArity
-			)
+import TyCon
 import Class		( classExtraBigSig, classTyCon, DefMeth(..) )
 import FieldLabel	( fieldLabelType )
 import TcType		( tcSplitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
@@ -215,7 +211,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 			    tcdFoType  = DNType,	-- The only case at present
 			    tcdLoc     = noSrcLoc }
 
-	    | isPrimTyCon tycon
+	    | isPrimTyCon tycon || isFunTyCon tycon
 		-- needed in GHCi for ':info Int#', for example
 	    = TyData {  tcdND     = DataType,
 			tcdCtxt   = [],

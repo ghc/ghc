@@ -28,6 +28,8 @@ module CompManager (
     cmInfoThing,   -- :: CmState -> DynFlags -> String
 		   --	-> IO (CmState, [(TyThing,Fixity)])
 
+    cmBrowseModule, -- :: CmState -> IO [TyThing]
+
     CmRunResult(..),
     cmRunStmt,	   -- :: CmState -> DynFlags -> String
 		   --	 -> IO (CmState, CmRunResult)
@@ -66,7 +68,8 @@ import DriverPhases
 import DriverUtil
 import Finder
 #ifdef GHCI
-import HscMain		( initPersistentCompilerState, hscThing )
+import HscMain		( initPersistentCompilerState, hscThing, 
+			  hscModuleContents )
 #else
 import HscMain		( initPersistentCompilerState )
 #endif
@@ -217,11 +220,11 @@ moduleNameToModule hit mn = do
   case lookupModuleEnvByName hit mn of
     Just iface -> return (mi_module iface)
     _not_a_home_module -> do
-	maybe_stuff <- findModule mn
-        case maybe_stuff of
-	  Nothing -> throwDyn (CmdLineError ("can't find module `"
-				    ++ moduleNameUserString mn ++ "'"))
-	  Just (m,_) -> return m
+	  maybe_stuff <- findModule mn
+	  case maybe_stuff of
+	    Nothing -> throwDyn (CmdLineError ("can't find module `"
+	  			    ++ moduleNameUserString mn ++ "'"))
+	    Just (m,_) -> return m
 
 cmGetContext :: CmState -> IO ([String],[String])
 cmGetContext CmState{ic=ic} = 
@@ -259,6 +262,24 @@ cmInfoThing cmstate dflags id
 	  = defaultFixity
 	where iface_table | isHomePackageName name = hit
 			  | otherwise              = pcs_PIT pcs
+#endif
+
+-- ---------------------------------------------------------------------------
+-- cmBrowseModule: get all the TyThings defined in a module
+
+#ifdef GHCI
+cmBrowseModule :: CmState -> DynFlags -> String -> Bool 
+	-> IO (CmState, [TyThing])
+cmBrowseModule cmstate dflags str exports_only = do
+  let mn = mkModuleName str
+  mod <- moduleNameToModule hit mn
+  (pcs1, maybe_ty_things) 
+	<- hscModuleContents dflags hst hit pcs mod exports_only
+  case maybe_ty_things of
+	Nothing -> return (cmstate{pcs=pcs1}, [])
+	Just ty_things -> return (cmstate{pcs=pcs1}, ty_things)
+  where
+     CmState{ hst=hst, hit=hit, pcs=pcs, pls=pls, ic=icontext } = cmstate
 #endif
 
 -----------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 \begin{code}
 module Rename ( 
 	renameModule, renameStmt, renameRdrName, mkGlobalContext,
-	closeIfaceDecls, checkOldIface 
+	closeIfaceDecls, checkOldIface, slurpIface
   ) where
 
 #include "HsVersions.h"
@@ -239,6 +239,31 @@ getModuleExports mod =
     prov_fn n = NonLocalDef ImplicitImport
     add env (mod,avails) = 
 	plusGlobalRdrEnv env (mkGlobalRdrEnv mod True prov_fn avails NoDeprecs)
+\end{code}
+
+%*********************************************************
+%*						 	 *
+\subsection{Slurp in a whole module eagerly}
+%*							 *
+%*********************************************************
+
+\begin{code}
+slurpIface
+	:: DynFlags -> HomeIfaceTable -> HomeSymbolTable
+	-> PersistentCompilerState -> Module
+	-> IO (PersistentCompilerState, PrintUnqualified, 
+	       Maybe ([Name], [RenamedHsDecl]))
+slurpIface dflags hit hst pcs mod = 
+  renameSource dflags hit hst pcs iNTERACTIVE $
+
+    let mod_name = moduleName mod
+    in
+    loadInterface contextDoc mod_name ImportByUser `thenRn` \ iface ->
+    let fvs = availsToNameSet [ avail | (mn,avails) <- mi_exports iface, 
+		  	        	avail <- avails ]
+    in
+    slurpImpDecls fvs	`thenRn` \ rn_imp_decls ->
+    returnRn (alwaysQualify, Just (nameSetToList fvs, rn_imp_decls))
 \end{code}
 
 %*********************************************************

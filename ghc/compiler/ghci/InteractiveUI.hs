@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" -#include "SchedAPI.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.109 2002/01/23 16:50:49 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.110 2002/01/24 16:55:36 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -19,6 +19,7 @@ import CmTypes		( Linkable, isObjectLinkable, ModSummary(..) )
 import CmLink		( findModuleLinkable_maybe )
 
 import HscTypes		( TyThing(..), showModMsg, InteractiveContext(..) )
+import HsSyn		( TyClDecl(..), ConDecl(..), Sig(..) )
 import MkIface		( ifaceTyThing )
 import DriverFlags
 import DriverState
@@ -27,7 +28,7 @@ import Linker
 import Finder		( flushPackageCache )
 import Util
 import Id		( isRecordSelector, recordSelectorFieldLabel, 
-			  isDataConWrapId, idName )
+			  isDataConWrapId, isDataConId, idName )
 import Class		( className )
 import TyCon		( tyConName, tyConClass_maybe, isPrimTyCon )
 import FieldLabel	( fieldLabelTyCon )
@@ -84,6 +85,7 @@ GLOBAL_VAR(commands, builtin_commands, [(String, String -> GHCi Bool)])
 builtin_commands :: [(String, String -> GHCi Bool)]
 builtin_commands = [
   ("add",	keepGoing addModule),
+  ("browse",    keepGoing browseCmd),
   ("cd",    	keepGoing changeDirectory),
   ("def",	keepGoing defineMacro),
   ("help",	keepGoing help),
@@ -110,6 +112,7 @@ helpText = "\
 \\
 \   <stmt>		   evaluate/run <stmt>\n\ 
 \   :add <filename> ...    add module(s) to the current target set\n\ 
+\   :browse [*]<module>	   display the names defined by <module>\n\ 
 \   :cd <dir>		   change directory to <dir>\n\ 
 \   :def <cmd> <expr>      define a command :<cmd>\n\ 
 \   :help, :?		   display this list of commands\n\ 
@@ -616,6 +619,70 @@ shellEscape :: String -> GHCi Bool
 shellEscape str = io (system str >> return False)
 
 -----------------------------------------------------------------------------
+-- Browing a module's contents
+
+browseCmd :: String -> GHCi ()
+browseCmd m = 
+  case words m of
+    ['*':m] | looksLikeModuleName m -> browseModule m True
+    [m]     | looksLikeModuleName m -> browseModule m False
+    _ -> throwDyn (CmdLineError "syntax:  :browse <module>")
+
+browseModule m exports_only = do
+  cms <- getCmState
+  dflags <- io getDynFlags
+
+  is_interpreted <- io (cmModuleIsInterpreted cms m)
+  when (not is_interpreted && not exports_only) $
+	throwDyn (CmdLineError ("module `" ++ m ++ "' is not interpreted"))
+
+  -- temporarily set the context to the module we're interested in,
+  -- just so we can get an appropriate PrintUnqualified
+  (as,bs) <- io (cmGetContext cms)
+  cms1 <- io (if exports_only then cmSetContext cms dflags [] [prel,m]
+			      else cmSetContext cms dflags [m] [])
+  cms2 <- io (cmSetContext cms1 dflags as bs)
+
+  (cms3, things) <- io (cmBrowseModule cms2 dflags m exports_only)
+
+  setCmState cms3
+
+  let unqual = cmGetPrintUnqual cms1 -- NOTE: cms1 with the new context
+
+      things' = filter wantToSee things
+
+      wantToSee (AnId id) = not (isDataConId id || isDataConWrapId id)
+      wantToSee _ = True
+
+      thing_names = map getName things
+
+      thingDecl thing@(AnId id)  = ifaceTyThing thing
+
+      thingDecl thing@(AClass c) =
+        let rn_decl = ifaceTyThing thing in
+	case rn_decl of
+	  ClassDecl { tcdSigs = cons } -> 
+		rn_decl{ tcdSigs = filter methodIsVisible cons }
+	  other -> other
+        where
+           methodIsVisible (ClassOpSig n _ _ _) = n `elem` thing_names
+
+      thingDecl thing@(ATyCon t) =
+        let rn_decl = ifaceTyThing thing in
+	case rn_decl of
+	  TyData { tcdCons = cons } -> 
+		rn_decl{ tcdCons = filter conIsVisible cons }
+	  other -> other
+        where
+	  conIsVisible (ConDecl n _ _ _ _ _) = n `elem` thing_names
+
+  io (putStrLn (showSDocForUser unqual (
+   	 vcat (map (ppr . thingDecl) things')))
+   )
+
+  where
+
+-----------------------------------------------------------------------------
 -- Setting the module context
 
 setContext str
@@ -627,9 +694,8 @@ setContext str
 			'-':stuff -> (removeFromContext, words stuff)
 			stuff     -> (newContext,        words stuff) 
 
-    sensible ('*':c:cs) = isUpper c && all isAlphaNumEx cs
-    sensible (c:cs)     = isUpper c && all isAlphaNumEx cs
-    isAlphaNumEx c = isAlphaNum c || c == '_'
+    sensible ('*':m) = looksLikeModuleName m
+    sensible m       = looksLikeModuleName m
 
 newContext mods = do
   cms <- getCmState
@@ -1067,6 +1133,14 @@ printTimes allocs psecs
 	putStrLn (showSDoc (
 		 parens (text (secs_str "") <+> text "secs" <> comma <+> 
 			 int allocs <+> text "bytes")))
+
+-----------------------------------------------------------------------------
+-- utils
+	
+looksLikeModuleName [] = False
+looksLikeModuleName (c:cs) = isUpper c && all isAlphaNumEx cs
+
+isAlphaNumEx c = isAlphaNum c || c == '_'
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
