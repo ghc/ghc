@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.6 1997/03/20 11:44:07 sof Exp $
+# $Id: Makefile,v 1.7 1997/05/27 05:58:46 sof Exp $
 
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -164,7 +164,9 @@ SRC_HC_OPTS += -I$(GHC_INCLUDE_DIR) $(GCap) $(GC2s) $(GC1s) -O -optc-DIN_GHC_RTS
 # Note: _have_ to drop the -optc prefix for the GC-type opts (e.g. -optc-DGCap), since
 # -o<foo> is interpreted by mkdependC as meaning use <foo> as suffix.
 #
-SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR) $(patsubst -optc%,%,$(GCap) $(GC2s) $(GC1s))
+# Include -D for all the different collectors to be sure we get at all deps.
+#
+SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR) -DGCap -DGC1s -DGC2s
 
 #-----------------------------------------------------------------------------
 # file-specific options 
