@@ -94,7 +94,7 @@ import PrelInfo		( maybeCharLikeTyCon, maybeIntLikeTyCon )
 import PrimRep		( getPrimRepSize, separateByPtrFollowness )
 import SMRep		-- all of it
 import TyCon		( TyCon{-instance NamedThing-} )
-import Type		( isPrimType, expandTy, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
+import Type		( isPrimType, splitForAllTy, splitFunTyExpandingDictsAndPeeking,
 			  mkFunTys, maybeAppSpecDataTyConExpandingDicts
 			)
 import Util		( isIn, mapAccumL, panic, pprPanic, assertPanic )
