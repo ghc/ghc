@@ -9,6 +9,11 @@
 module TcBinds ( tcBindsAndThen, tcPragmaSigs, checkSigTyVars, tcBindWithSigs, TcSigInfo(..) ) where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
+#else
+import {-# SOURCE #-} TcGRHSs ( tcGRHSsAndBinds )
+#endif
 
 import HsSyn		( HsBinds(..), Sig(..), MonoBinds(..), 
 			  Match, HsType, InPat(..), OutPat(..), HsExpr(..),
@@ -31,7 +36,6 @@ import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds,
 			  tcGetGlobalTyVars, tcExtendGlobalTyVars
 			)
 import SpecEnv		( SpecEnv )
-IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcMatches	( tcMatchesFun )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
 import TcMonoType	( tcHsType )
@@ -535,32 +539,40 @@ now (ToDo).
 checkSigMatch []
   = returnTc (error "checkSigMatch")
 
-checkSigMatch tc_ty_sigs
-  = 	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
+checkSigMatch tc_ty_sigs@( sig1@(TySigInfo _ id1 _ theta1 _ _) : all_sigs_but_first )
+  = 	-- CHECK THAT THE SIGNATURE TYVARS AND TAU_TYPES ARE OK
+	-- Doesn't affect substitution
+    mapTc check_one_sig tc_ty_sigs	`thenTc_`
+
+	-- CHECK THAT ALL THE SIGNATURE CONTEXTS ARE UNIFIABLE
 	-- The type signatures on a mutually-recursive group of definitions
 	-- must all have the same context (or none).
 	--
 	-- We unify them because, with polymorphic recursion, their types
 	-- might not otherwise be related.  This is a rather subtle issue.
 	-- ToDo: amplify
-    tcAddErrCtxt (sigContextsCtxt tc_ty_sigs) (
-	mapTc (unifyTauTyLists dict_tys1) dict_tys_s
-    )				 		`thenTc_`
-    
-  	-- CHECK THAT THE SIGNATURE TYVARS AND TAU_TYPES ARE OK
-	-- Doesn't affect substitution
-    mapTc check_one_sig tc_ty_sigs	`thenTc_`
+    mapTc check_one_cxt all_sigs_but_first		`thenTc_`
 
     returnTc theta1
   where
-    (theta1:thetas)          = [theta | TySigInfo _ _ _ theta _ _ <- tc_ty_sigs]
-    (dict_tys1 : dict_tys_s) = map mk_dict_tys (theta1 : thetas)
-    mk_dict_tys theta	     = [mkDictTy c t | (c,t) <- theta]
+    sig1_dict_tys	= mk_dict_tys theta1
+    n_sig1_dict_tys	= length sig1_dict_tys
+
+    check_one_cxt sig@(TySigInfo _ id _  theta _ src_loc)
+       = tcAddSrcLoc src_loc	$
+	 tcAddErrCtxt (sigContextsCtxt id1 id) $
+	 checkTc (length this_sig_dict_tys == n_sig1_dict_tys)
+				sigContextsErr 		`thenTc_`
+	 unifyTauTyLists sig1_dict_tys this_sig_dict_tys
+      where
+	 this_sig_dict_tys = mk_dict_tys theta
 
     check_one_sig (TySigInfo name id sig_tyvars _ sig_tau src_loc)
       = tcAddSrcLoc src_loc	$
 	tcAddErrCtxt (sigCtxt id) $
 	checkSigTyVars sig_tyvars sig_tau
+
+    mk_dict_tys theta = [mkDictTy c t | (c,t) <- theta]
 \end{code}
 
 
@@ -845,17 +857,12 @@ sigsCtxt ids sty
   = sep [ptext SLIT("When checking signature(s) for:"), interpp'SP sty ids]
 
 -----------------------------------------------
-sigContextsCtxt ty_sigs sty
-  = hang (ptext SLIT("When matching the contexts of the signatures of a recursive group"))
-	 4 (vcat (map ppr_tc_ty_sig ty_sigs))
-  where
-    ppr_tc_ty_sig (TySigInfo val _ tyvars theta tau_ty _)
-      = hang ((<>) (ppr sty val) (ptext SLIT(" :: ")))
-    	     4 (if null theta
-		then empty
-		else hcat [parens (hsep (punctuate comma (map (ppr_inst sty) theta))), 
-			   text " => ..."])
-    ppr_inst sty (clas, ty) = hsep [ppr sty clas, ppr sty ty]
+sigContextsErr sty
+  = ptext SLIT("Mismatched contexts")
+sigContextsCtxt s1 s2 sty
+  = hang (hsep [ptext SLIT("When matching the contexts of the signatures for"), 
+		ppr sty s1, ptext SLIT("and"), ppr sty s2])
+	 4 (ptext SLIT("(the signature contexts in a mutually recursive group should all be identical)"))
 
 -----------------------------------------------
 specGroundnessCtxt
