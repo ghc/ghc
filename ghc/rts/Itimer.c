@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.c,v 1.27 2001/11/26 12:58:17 simonpj Exp $
+ * $Id: Itimer.c,v 1.28 2001/11/27 01:51:23 sof Exp $
  *
  * (c) The GHC Team, 1995-1999
  *
@@ -61,6 +61,7 @@ int ticks_to_ctxt_switch = 0;
 static
 void
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
+
 CALLBACK
 handle_tick(UINT uID STG_UNUSED, UINT uMsg STG_UNUSED, DWORD dwUser STG_UNUSED,
 	    DWORD dw1 STG_UNUSED, DWORD d STG_UNUSED)
@@ -97,10 +98,12 @@ handle_tick(int unused STG_UNUSED)
 
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
 
-LPTIMECALLBACK vtalrm_cback;
+static LPTIMECALLBACK vtalrm_cback;
+static unsigned int vtalrm_id = 0;
+static unsigned int period = -1;
 
 int
-initialize_virtual_timer(nat ms)
+startVirtTimer(nat ms)
 {
   /* On Win32 setups that don't have support for
      setitimer(), we use the MultiMedia API's timer
@@ -109,56 +112,73 @@ initialize_virtual_timer(nat ms)
      The delivery of ticks isn't free; the performance hit should be checked.
   */
   unsigned int delay;
-  static unsigned int vtalrm_id = 0;
-  static unsigned int period = -1;
- 
-  /* A zero argument value means shutdown. */
-  if (ms != 0) {
-    TIMECAPS tc;
-    
-    if ( timeGetDevCaps(&tc, sizeof(TIMECAPS)) == TIMERR_NOERROR) {
-      period = tc.wPeriodMin;
-      delay = timeBeginPeriod(period);
-      if (delay == TIMERR_NOCANDO) { /* error of some sort. */
-	return -1;
-      }
-    } else {
+  TIMECAPS tc;
+  
+  vtalrm_cback = handle_tick;
+  
+  if ( timeGetDevCaps(&tc, sizeof(TIMECAPS)) == TIMERR_NOERROR) {
+    period = tc.wPeriodMin;
+    delay = timeBeginPeriod(period);
+    if (delay == TIMERR_NOCANDO) { /* error of some sort. */
       return -1;
     }
-    
-    vtalrm_id =
-      timeSetEvent(ms,      /* event every `delay' milliseconds. */
-		   1,       /* precision is within 1 ms */
-		   vtalrm_cback,
-		   TIME_CALLBACK_FUNCTION,     /* ordinary callback */
-		   TIME_PERIODIC);
   } else {
-    /* Shutdown the MM timer */
-    if ( vtalrm_id != 0 ) {
-      timeKillEvent(vtalrm_id);
-    }
-    if (period > 0) {
-      timeEndPeriod(period);
-    }
+    return -1;
   }
-
+    
 #ifdef PROFILING
   initProfTimer();
 #endif
 
+  vtalrm_id =
+    timeSetEvent(ms,      /* event every `delay' milliseconds. */
+		 1,       /* precision is within 1 ms */
+		 vtalrm_cback,
+		 TIME_CALLBACK_FUNCTION,     /* ordinary callback */
+		 TIME_PERIODIC);
+
+  return 0;
+}
+
+int
+stopVirtTimer()
+{
+    /* Shutdown the MM timer */
+  if ( vtalrm_id != 0 ) {
+    timeKillEvent(vtalrm_id);
+  }
+  if (period > 0) {
+    timeEndPeriod(period);
+  }
+  
   return 0;
 }
  
 #else
+static
+int
+install_vtalrm_handler(void)
+{
+    struct sigaction action;
+
+    action.sa_handler = handle_tick;
+
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = 0;
+
+    return sigaction(SIGVTALRM, &action, NULL);
+}
 
 int
-initialize_virtual_timer(nat ms)
+startVirtTimer(nat ms)
 {
 # ifndef HAVE_SETITIMER
   /*    fprintf(stderr, "No virtual timer on this system\n"); */
     return -1;
 # else
     struct itimerval it;
+
+    install_vtalrm_handler(void)
 
     timestamp = getourtimeofday();
 
@@ -173,12 +193,28 @@ initialize_virtual_timer(nat ms)
 # endif
 }
 
+int
+stopVirtTimer()
+{
+# ifndef HAVE_SETITIMER
+  /*    fprintf(stderr, "No virtual timer on this system\n"); */
+    return -1;
+# else
+    struct itimerval it;
+  
+    it.it_value.tv_sec = 0;
+    it.it_value.tv_usec = 0;
+    it.it_interval = it.it_value;
+    return (setitimer(ITIMER_VIRTUAL, &it, NULL));
+# endif
+}
+
 #endif /* !{mingw,cygwin32}_TARGET_OS */
 
 # if 0
 /* This is a potential POSIX version */
 int
-initialize_virtual_timer(nat ms)
+startVirtTimer(nat ms)
 {
     struct sigevent se;
     struct itimerspec it;
@@ -186,7 +222,9 @@ initialize_virtual_timer(nat ms)
 
     timestamp = getourtimeofday();
 
+#ifdef PROFILING
     initProfTimer();
+#endif
 
     se.sigev_notify = SIGEV_SIGNAL;
     se.sigev_signo = SIGVTALRM;
@@ -199,30 +237,32 @@ initialize_virtual_timer(nat ms)
     it.it_interval = it.it_value;
     return timer_settime(tid, TIMER_RELTIME, &it, NULL);
 }
+
+int
+stopVirtTimer()
+{
+    struct sigevent se;
+    struct itimerspec it;
+    timer_t tid;
+
+    timestamp = getourtimeofday();
+
+    se.sigev_notify = SIGEV_SIGNAL;
+    se.sigev_signo = SIGVTALRM;
+    se.sigev_value.sival_int = SIGVTALRM;
+    if (timer_create(CLOCK_VIRTUAL, &se, &tid)) {
+	barf("can't create virtual timer");
+    }
+    it.it_value.tv_sec = 0;
+    it.it_value.tv_nsec = 0;
+    it.it_interval = it.it_value;
+    return timer_settime(tid, TIMER_RELTIME, &it, NULL);
+}
+
 # endif
 
 #if defined(mingw32_TARGET_OS) || (defined(cygwin32_TARGET_OS) && !defined(HAVE_SETITIMER))
-int
-install_vtalrm_handler(void)
-{
-  vtalrm_cback = handle_tick;
-  return 0;
-}
-
 #else
-int
-install_vtalrm_handler(void)
-{
-    struct sigaction action;
-
-    action.sa_handler = handle_tick;
-
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-
-    return sigaction(SIGVTALRM, &action, NULL);
-}
-
 void
 block_vtalrm_signal(void)
 {

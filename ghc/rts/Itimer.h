@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Itimer.h,v 1.9 2001/11/22 14:25:12 simonmar Exp $
+ * $Id: Itimer.h,v 1.10 2001/11/27 01:51:23 sof Exp $
  *
  * (c) The GHC Team 1998-2001
  *
@@ -15,8 +15,8 @@
  */
 #define CS_MIN_MILLISECS TICK_MILLISECS       /* milliseconds per slice */
  
-int  initialize_virtual_timer  ( nat ms );
-int  install_vtalrm_handler    ( void );
+int  startVirtTimer( nat ms );
+int  stopVirtTimer ( void );
 void block_vtalrm_signal       ( void );
 void unblock_vtalrm_signal     ( void );
 unsigned int getourtimeofday   ( void );

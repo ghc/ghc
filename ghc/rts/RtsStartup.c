@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.57 2001/11/26 16:54:22 simonmar Exp $
+ * $Id: RtsStartup.c,v 1.58 2001/11/27 01:51:23 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -162,9 +162,8 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void))
     initProfiling2();
 #endif
 
-    /* start the ticker */
-    install_vtalrm_handler();
-    initialize_virtual_timer(TICK_MILLISECS);
+    /* start the virtual timer 'subsystem'. */
+    startVirtTimer(TICK_MILLISECS);
 
     /* start our haskell execution tasks */
 #ifdef SMP
@@ -292,7 +291,7 @@ shutdownHaskell(void)
   exitScheduler();
 
   /* stop the ticker */
-  initialize_virtual_timer(0);
+  stopVirtTimer();
   
   /* reset the standard file descriptors to blocking mode */
   resetNonBlockingFd(0);
