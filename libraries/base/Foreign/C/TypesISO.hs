@@ -14,6 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
+-- #hide
 module Foreign.C.TypesISO
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
