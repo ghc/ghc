@@ -18,7 +18,7 @@ and the classes
 \begin{code}
 {-# OPTIONS -fno-implicit-prelude #-}
 
-#include "../includes/ieee-flpt.h"
+#include "../../includes/ieee-flpt.h"
 
 module PrelFloat( module PrelFloat, Float#, Double# )  where
 
