@@ -1,3 +1,0 @@
--- bug: shouldn't be defaulting these expressions
-:type (+)
-:type enumFromTo
