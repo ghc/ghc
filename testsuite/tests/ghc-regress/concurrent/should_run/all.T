@@ -80,4 +80,7 @@ test('conc039', omit_ways(['ghci']), compile_and_run, [''])
 
 # Omit for GHCi, uses foreign export
 # Omit threaded RTS: Hangs forever
-test('conc040', compose(exit_code(1), omit_ways(['ghci','threaded'])), compile_and_run, [''])
+test('conc040', compose(only_compiler_types(['ghc']),
+			compose(exit_code(1),
+			omit_ways(['ghci','threaded']))),
+		compile_and_run, [''])
