@@ -6,11 +6,6 @@
 See also: the ``library'' for the ``back end'' (@SaBackLib@).
 
 \begin{code}
-#ifndef DEBUG
--- If DEBUG is off, omit all exports 
-module SaLib () where
-
-#else
 module SaLib (
 	AbsVal(..),
 	AnalysisKind(..),
@@ -20,7 +15,6 @@ module SaLib (
 	lookupAbsValEnv,
 	absValFromStrictness
     ) where
-#endif /* DEBUG */
 
 #include "HsVersions.h"
 
