@@ -1,6 +1,6 @@
 THISPKG	= base
 SEARCH	= -I$(TOPDIR)/targets/$(MACHINE)
-EXTRA_H_FLAGS = +RTS -K4M -RTS
+EXTRA_H_FLAGS = +RTS -K6M -RTS
 
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
