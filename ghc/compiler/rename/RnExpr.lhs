@@ -952,7 +952,8 @@ segsToStmts :: [Segment [LStmt Name]] -> ([LStmt Name], FreeVars)
 
 segsToStmts [] = ([], emptyFVs)
 segsToStmts ((defs, uses, fwds, ss) : segs)
-  = (new_stmt : later_stmts, later_uses `plusFV` uses)
+  = ASSERT( not (null ss) )
+    (new_stmt : later_stmts, later_uses `plusFV` uses)
   where
     (later_stmts, later_uses) = segsToStmts segs
     new_stmt | non_rec	 = head ss
