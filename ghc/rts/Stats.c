@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.17 1999/11/09 15:46:57 simonmar Exp $
+ * $Id: Stats.c,v 1.18 1999/11/11 13:17:36 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -327,6 +327,7 @@ stat_startExit(void)
   MutUserTime = usertime();
 #else
   MutUserTime = usertime() - GC_tot_time - InitUserTime;
+  if (MutUserTime < 0) { MutUserTime = 0; }
 #endif
 }
 
