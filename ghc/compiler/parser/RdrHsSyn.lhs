@@ -45,7 +45,6 @@ module RdrHsSyn (
 
 	extractHsTyRdrNames, 
 	extractHsTyRdrTyVars, extractHsTysRdrTyVars,
-	extractPatsTyVars, 
 	extractRuleBndrsTyVars,
 	extractHsCtxtRdrTyVars, extractGenericPatTyVars,
  
@@ -171,13 +170,6 @@ extract_ty (HsForAllTy (Just tvs) ctxt ty)
 				       extract_ctxt ctxt (extract_ty ty []))
 				    where
 				      locals = hsTyVarNames tvs
-
-
-extractPatsTyVars :: [RdrNamePat] -> [RdrName]
-extractPatsTyVars = filter isRdrTyVar . 
-		    nub . 
-		    extract_tys .
-		    collectSigTysFromPats
 
 extractGenericPatTyVars :: RdrNameMonoBinds -> [RdrName]
 -- Get the type variables out of the type patterns in a bunch of

@@ -13,7 +13,7 @@ module HsPat (
 	patsAreAllCons, isConPat,
 	patsAreAllLits,	isLitPat,
 	collectPatBinders, collectPatsBinders,
-	collectSigTysFromPats
+	collectSigTysFromPat, collectSigTysFromPats
     ) where
 
 #include "HsVersions.h"
@@ -333,6 +333,9 @@ collect (TypePatIn ty)           bndrs = bndrs
 \begin{code}
 collectSigTysFromPats :: [InPat name] -> [HsType name]
 collectSigTysFromPats pats = foldr collect_pat [] pats
+
+collectSigTysFromPat :: InPat name -> [HsType name]
+collectSigTysFromPat pat = collect_pat pat []
 
 collect_pat (SigPatIn pat ty)	   acc = collect_pat pat (ty:acc)
 collect_pat WildPatIn	      	   acc = acc

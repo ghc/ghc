@@ -146,8 +146,9 @@ rnPat (RecPatIn con rpats)
   = lookupOccRn con 	`thenRn` \ con' ->
     rnRpats rpats	`thenRn` \ (rpats', fvs) ->
     returnRn (RecPatIn con' rpats', fvs `addOneFV` con')
+
 rnPat (TypePatIn name) =
-    (rnHsTypeFVs (text "type pattern") name) `thenRn` \ (name', fvs) ->
+    rnHsTypeFVs (text "type pattern") name	`thenRn` \ (name', fvs) ->
     returnRn (TypePatIn name', fvs)
 \end{code}
 
@@ -163,25 +164,21 @@ rnMatch :: RdrNameMatch -> RnMS (RenamedMatch, FreeVars)
 rnMatch match@(Match _ pats maybe_rhs_sig grhss)
   = pushSrcLocRn (getMatchLoc match)	$
 
-	-- Find the universally quantified type variables
-	-- in the pattern type signatures
-    getLocalNameEnv			`thenRn` \ name_env ->
+	-- Bind pattern-bound type variables
     let
-	tyvars_in_sigs = rhs_sig_tyvars `unionLists` tyvars_in_pats
-	rhs_sig_tyvars = case maybe_rhs_sig of
+	rhs_sig_tys =  case maybe_rhs_sig of
 				Nothing -> []
-				Just ty -> extractHsTyRdrTyVars ty
-	tyvars_in_pats = extractPatsTyVars pats
-	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
-	doc_sig        = text "a pattern type-signature"
-	doc_pats       = text "a pattern match"
+				Just ty -> [ty]
+	pat_sig_tys = collectSigTysFromPats pats
+	doc_sig     = text "a result type-signature"
+ 	doc_pat     = text "a pattern match"
     in
-    bindNakedTyVarsFVRn doc_sig forall_tyvars	$ \ sig_tyvars ->
+    bindPatSigTyVars (rhs_sig_tys ++ pat_sig_tys)	$ \ sig_tyvars ->
 
 	-- Note that we do a single bindLocalsRn for all the
 	-- matches together, so that we spot the repeated variable in
 	--	f x x = 1
-    bindLocalsFVRn doc_pats (collectPatsBinders pats) $ \ new_binders ->
+    bindLocalsFVRn doc_pat (collectPatsBinders pats)	$ \ new_binders ->
 
     mapFvRn rnPat pats			`thenRn` \ (pats', pat_fvs) ->
     rnGRHSs grhss			`thenRn` \ (grhss', grhss_fvs) ->
@@ -203,6 +200,21 @@ rnMatch match@(Match _ pats maybe_rhs_sig grhss)
     
     returnRn (Match sig_tyvars pats' maybe_rhs_sig' grhss', all_fvs)
 	-- The bindLocals and bindTyVars will remove the bound FVs
+
+
+bindPatSigTyVars :: [RdrNameHsType]
+		 -> ([Name] -> RnMS (a, FreeVars))
+	  	 -> RnMS (a, FreeVars)
+  -- Find the type variables in the pattern type 
+  -- signatures that must be brought into scope
+bindPatSigTyVars tys thing_inside
+  = getLocalNameEnv			`thenRn` \ name_env ->
+    let
+	tyvars_in_sigs = extractHsTysRdrTyVars tys
+	forall_tyvars  = filter (not . (`elemFM` name_env)) tyvars_in_sigs
+	doc_sig        = text "a pattern type-signature"
+    in
+    bindNakedTyVarsFVRn doc_sig forall_tyvars thing_inside
 \end{code}
 
 %************************************************************************
@@ -575,14 +587,13 @@ rnStmt (ParStmt stmtss) thing_inside
 rnStmt (BindStmt pat expr src_loc) thing_inside
   = pushSrcLocRn src_loc $
     rnExpr expr					`thenRn` \ (expr', fv_expr) ->
-    bindLocalsFVRn doc binders			$ \ new_binders ->
+    bindPatSigTyVars (collectSigTysFromPat pat)	$ \ sig_tyvars ->
+    bindLocalsFVRn doc (collectPatBinders pat)	$ \ new_binders ->
     rnPat pat					`thenRn` \ (pat', fv_pat) ->
     thing_inside (BindStmt pat' expr' src_loc)	`thenRn` \ ((rest_binders, result), fvs) ->
-    -- ZZ is shadowing handled correctly?
     returnRn ((new_binders ++ rest_binders, result),
 	      fv_expr `plusFV` fvs `plusFV` fv_pat)
   where
-    binders = collectPatBinders pat
     doc = text "a pattern in do binding" 
 
 rnStmt (ExprStmt expr src_loc) thing_inside
