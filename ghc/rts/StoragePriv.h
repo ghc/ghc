@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.13 2000/12/04 12:31:22 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.14 2001/01/24 15:39:50 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -77,8 +77,8 @@ extern void checkSanity(nat N);
  * IS_CODE_PTR etc.). 
  * Defined in Linker.c.
  */
-int is_dynamically_loaded_code_or_rodata_ptr ( char* p );
-int is_dynamically_loaded_rwdata_ptr ( char* p );
-int is_not_dynamically_loaded_ptr ( char* p );
+int is_dynamically_loaded_code_or_rodata_ptr ( void* p );
+int is_dynamically_loaded_rwdata_ptr         ( void* p );
+int is_not_dynamically_loaded_ptr            ( void* p );
 
 #endif /* STORAGEPRIV_H */

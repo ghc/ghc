@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.11 2001/01/19 17:31:24 simonmar Exp $
+ * $Id: Linker.c,v 1.12 2001/01/24 15:39:50 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -13,6 +13,7 @@
 #include "Hash.h"
 #include "Linker.h"
 #include "RtsUtils.h"
+#include "StoragePriv.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -25,7 +26,7 @@
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
 #endif
-  
+
 #ifdef GHCI /* endif is right at end of file */
 
 /* A bucket in the symbol hash-table.  Primarily, maps symbol names to
@@ -1491,7 +1492,7 @@ lookupSection ( void* addr )
 }
 
 int
-is_dynamically_loaded_code_or_rodata_ptr ( char* p )
+is_dynamically_loaded_code_or_rodata_ptr ( void* p )
 {
    SectionKind sk = lookupSection(p);
    ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
@@ -1500,7 +1501,7 @@ is_dynamically_loaded_code_or_rodata_ptr ( char* p )
 
 
 int
-is_dynamically_loaded_rwdata_ptr ( char* p )
+is_dynamically_loaded_rwdata_ptr ( void* p )
 {
    SectionKind sk = lookupSection(p);
    ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
@@ -1509,7 +1510,7 @@ is_dynamically_loaded_rwdata_ptr ( char* p )
 
 
 int
-is_not_dynamically_loaded_ptr ( char* p )
+is_not_dynamically_loaded_ptr ( void* p )
 {
    SectionKind sk = lookupSection(p);
    ASSERT (sk != SECTIONKIND_NOINFOAVAIL);
