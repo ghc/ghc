@@ -1,0 +1,13 @@
+We should get errors for 
+   class Foo a where
+      op :: Eq a => a -> a
+and
+   instance Wob a => Wob Bool
+as well!
+
+rnfail014.hs:12:
+    Ambiguous constraint `Eq a'
+	At least one of the forall'd type variables mentioned by the constraint
+	must be reachable from the type after the =>
+    In the type: forall a. (Eq a) => Int -> Int
+    While checking the type signature for `f'
