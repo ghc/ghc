@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.26 2003/05/22 15:36:08 simonmar Exp $
+# $Id: package.mk,v 1.27 2003/05/23 10:00:04 simonmar Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -59,8 +59,12 @@ CLEAN_FILES += package.conf.installed package.conf.inplace
 
 else # $(STANDALONE_PACKAGE) == "YES"
 
+# Let the package configuration file refer to $(libdir) as
+# ${pkglibdir}.  Note we can't use ${libdir} because ghc-pkg already
+# redefines it to point to GHC's libdir (bug or feature?).
+#
 install :: package.conf.installed
-	$(GHC_PKG) --update-package <package.conf.installed
+	pkglibdir=$(libdir) $(GHC_PKG) --update-package <package.conf.installed
 
 endif # $(STANDALONE_PACKAGE)
 
