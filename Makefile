@@ -14,11 +14,12 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 # Totally evil hack to make the setting of SUBDIRS be dependent
 # on whether we do `make install' or not. Having a $(ifeq ... ) would
 # be preferable..
-CURRENT_TARGET = $@
+CURRENT_TARGET = $(MAKECMDGOALS)
 SUBDIRS = $(shell if (test x$(CURRENT_TARGET) = xinstall) ; then echo $(ProjectsToInstall); else echo $(ProjectsToBuild); fi)
-PROJECT_CONFIG_MK = $(shell if (test x$(CURRENT_TARGET) = xbinary-dist) ; then echo inlude $(Project)/mk/config.mk; else echo ''; fi)
 
-$(PROJECT_CONFIG_MK)
+ifeq (x$(CURRENT_TARGET),xbinary-dist)
+   include $(shell echo $(Project) | tr A-Z a-z)/mk/config.mk
+endif
 
 #
 # Files to include in fptools source distribution
