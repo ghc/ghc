@@ -29,6 +29,9 @@
   here: what we really want is just the documentation section but without
   the extra whitespace between decls.
 
+* We don't handle non-ASCII characters in doc comments.  (need to specify
+  the encoding in the generated HTML too?).
+
 -----------------------------------------------------------------------------
 -- features
 
