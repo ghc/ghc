@@ -15,7 +15,11 @@ test "hGetLine001" 	{ $stdin = "hGetLine001.hs"
 test "hGetPosn001" 	{ vtr("-cpp","","") }
 test "hIsEOF001" 	{ vtr("","","") }
 test "hIsEOF002" 	{ vtr("-cpp","","") }
-test "hReady001" 	{ vtr("-cpp","","") }
+
+-- hReady doesn't work at the end of a file in GHC
+test "hReady001" 	{ $expect = "fail"
+			  vtr("-cpp","","") }
+
 test "hSeek001" 	{ vtr("-cpp","","") }
 test "hSeek002" 	{ vtr("-cpp","","") }
 test "hSeek003" 	{ vtr("-cpp","","") }
