@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.8 1997/09/05 09:16:34 simonm Exp $
+# $Id: Makefile,v 1.9 1998/02/04 20:56:24 sof Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -16,7 +16,9 @@ SCRIPT_OBJS=stat2resid.prl
 #
 INSTALLING=0
 
+ifneq "$(BIN_DIST)" "1"
 SCRIPT_SUBST_VARS=TMPDIR
+endif
 
 INTERP=perl
 CLEAN_FILES += $(SCRIPT_PROG)
