@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: dynamic.c,v $
- * $Revision: 1.5 $
- * $Date: 1999/06/07 17:22:31 $
+ * $Revision: 1.6 $
+ * $Date: 1999/10/15 19:11:54 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -16,7 +16,41 @@
 #include "errors.h"
 #include "dynamic.h"
 
-#if HAVE_DLFCN_H /* eg LINUX, SOLARIS, ULTRIX */
+#if HAVE_WINDOWS_H && !defined(__MSDOS__)
+
+#include <windows.h>
+
+ObjectFile loadLibrary(fn)
+String fn; {
+    return LoadLibrary(fn);
+}
+
+void* lookupSymbol(file,symbol)
+ObjectFile file;
+String symbol; {
+    return GetProcAddress(file,symbol);
+}
+
+const char *dlerror(void)
+{
+   return "<unknown>";
+}
+
+void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
+String dll;
+String symbol; {
+    ObjectFile instance = LoadLibrary(dll);
+    if (NULL == instance) {
+        /* GetLastError allegedly provides more detail - in practice,
+	 * it tells you nothing more.
+         */
+        ERRMSG(0) "Error while importing DLL \"%s\"", dll
+        EEND;
+    }
+    return GetProcAddress(instance,symbol);
+}
+
+#elif HAVE_DLFCN_H /* eg LINUX, SOLARIS, ULTRIX */
 
 #include <stdio.h>
 #include <dlfcn.h>
@@ -63,40 +97,6 @@ String symbol; {
         EEND;
     }
     return (0 == shl_findsym(&instance,symbol,TYPE_PROCEDURE,&r)) ? r : 0;
-}
-
-#elif HAVE_WINDOWS_H && !defined(__MSDOS__)
-
-#include <windows.h>
-
-ObjectFile loadLibrary(fn)
-String fn; {
-    return LoadLibrary(fn);
-}
-
-void* lookupSymbol(file,symbol)
-ObjectFile file;
-String symbol; {
-    return GetProcAddress(file,symbol);
-}
-
-const char *dlerror(void)
-{
-   return "<unknown>";
-}
-
-void* getDLLSymbol(dll,symbol)  /* load dll and lookup symbol */
-String dll;
-String symbol; {
-    ObjectFile instance = LoadLibrary(dll);
-    if (NULL == instance) {
-        /* GetLastError allegedly provides more detail - in practice,
-	 * it tells you nothing more.
-         */
-        ERRMSG(0) "Error while importing DLL \"%s\"", dll
-        EEND;
-    }
-    return GetProcAddress(instance,symbol);
 }
 
 #else /* Dynamic loading not available */

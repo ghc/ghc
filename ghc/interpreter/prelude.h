@@ -8,8 +8,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: prelude.h,v $
- * $Revision: 1.3 $
- * $Date: 1999/02/03 17:08:36 $
+ * $Revision: 1.4 $
+ * $Date: 1999/10/15 19:11:55 $
  * ------------------------------------------------------------------------*/
 
 #include "config.h"
@@ -246,12 +246,12 @@ typedef void*           HpPtr;
 /* ToDo: this should probably go in dynamic.h - but then
  * storage.h has to include dynamic.h!
  */
-#if HAVE_DLFCN_H /* eg LINUX, SOLARIS, ULTRIX */
+#if HAVE_WINDOWS_H && !defined(__MSDOS__)
+typedef HINSTANCE ObjectFile;
+#elif HAVE_DLFCN_H /* eg LINUX, SOLARIS, ULTRIX */
 typedef void* ObjectFile; 
 #elif HAVE_DL_H /* eg HPUX */
 typedef shl_t ObjectFile;
-#elif HAVE_WINDOWS_H && !defined(__MSDOS__)
-typedef HINSTANCE ObjectFile;
 #else
 #warning GHC file loading not available on this machine
 #endif
