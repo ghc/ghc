@@ -84,14 +84,9 @@ The library is split into two layers:
 a random number generator. For example, the 'Float' instance of 'Random'
 allows one to generate random values of type 'Float'.
 
-[Comment found in this file when merging with Library Report:]
-
-The June 1988 (v31 \#6) issue of the Communications of the ACM has an
-article by Pierre L'Ecuyer called, /Efficient and Portable Combined
-Random Number Generators/.  Here is the Portable Combined Generator of
-L'Ecuyer for 32-bit computers.  It has a period of roughly 2.30584e18.
-
-Transliterator: Lennart Augustsson
+This implementation uses the Portable Combined Generator of L'Ecuyer
+["System.Random\#LEcuyer"] for 32-bit computers, transliterated by
+Lennart Augustsson.  It has a period of roughly 2.30584e18.
 
 -}
 
@@ -100,16 +95,17 @@ Transliterator: Lennart Augustsson
 
 class RandomGen g where
 
-   -- |The 'next' operation allows one to extract at least 30 bits (one 'Int''s
-   -- worth) from the generator, returning a new generator as well.  The
-   -- integer returned may be positive or negative.
+   -- |The 'next' operation returns an 'Int' that is uniformly distributed
+   -- in the range returned by 'genRange' (including both end points),
+   -- and a new generator.
    next     :: g -> (Int, g)
 
    -- |The 'split' operation allows one to obtain two distinct random number
    -- generators. This is very useful in functional programs (for example, when
    -- passing a random number generator down to recursive calls), but very
    -- little work has been done on statistically robust implementations of
-   -- 'split' ([1,4] are the only examples we know of).
+   -- 'split' (["System.Random\#Burton", "System.Random\#Hellekalek"]
+   -- are the only examples we know of).
    split    :: g -> (g, g)
 
    -- |The 'genRange' operation yields the range of values returned by
@@ -144,7 +140,7 @@ Until more is known about implementations of 'split', all we require is
 that 'split' deliver generators that are (a) not identical and
 (b) independently robust in the sense just given.
 
-The 'Show'\/'Read' instances of 'StdGen' provide a primitive way to save the
+The 'Show' and 'Read' instances of 'StdGen' provide a primitive way to save the
 state of a random number generator.
 It is required that @'read' ('show' g) == g@.
 
@@ -427,7 +423,7 @@ getStdRandom f = do
 
 {- $references
 
-1. FW Burton and RL Page, /Distributed random number generation/,
+1. FW #Burton# Burton and RL Page, /Distributed random number generation/,
 Journal of Functional Programming, 2(2):203-212, April 1992.
 
 2. SK #Park# Park, and KW Miller, /Random number generators -
@@ -436,9 +432,12 @@ good ones are hard to find/, Comm ACM 31(10), Oct 1988, pp1192-1201.
 3. DG #Carta# Carta, /Two fast implementations of the minimal standard
 random number generator/, Comm ACM, 33(1), Jan 1990, pp87-88.
 
-4. P Hellekalek, /Don\'t trust parallel Monte Carlo/,
+4. P #Hellekalek# Hellekalek, /Don\'t trust parallel Monte Carlo/,
 Department of Mathematics, University of Salzburg,
 <http://random.mat.sbg.ac.at/~peter/pads98.ps>, 1998.
+
+5. Pierre #LEcuyer# L'Ecuyer, /Efficient and portable combined random
+number generators/, Comm ACM, 31(6), Jun 1988, pp742-749.
 
 The Web site <http://random.mat.sbg.ac.at/> is a great source of information.
 
