@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Weak.c,v 1.21 2002/02/18 13:26:13 sof Exp $
+ * $Id: Weak.c,v 1.22 2002/04/19 10:23:43 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,7 +70,8 @@ scheduleFinalizers(StgWeak *list)
 
     /* count number of finalizers first... */
     for (n = 0, w = list; w; w = w->link) { 
-	if (w->finalizer != &stg_NO_FINALIZER_closure)
+	if (w->header.info != &stg_DEAD_WEAK_info &&
+	    w->finalizer != &stg_NO_FINALIZER_closure)
 	    n++;
     }
 	
@@ -83,7 +84,8 @@ scheduleFinalizers(StgWeak *list)
     arr->ptrs = n;
 
     for (n = 0, w = list; w; w = w->link) {
-	if (w->finalizer != &stg_NO_FINALIZER_closure) {
+	if (w->header.info != &stg_DEAD_WEAK_info &&
+	    w->finalizer != &stg_NO_FINALIZER_closure) {
 	    arr->payload[n] = w->finalizer;
 	    n++;
 	}
