@@ -11,7 +11,10 @@ test('cc002', normal, compile, [''])
 test('cc003', normal, compile, [''])
 test('cc004', normal, compile, [''])
 test('cc005', normal, compile, [''])
-test('cc006', normal, compile, [''])
+
+# Missing:
+# test('cc006', normal, compile, [''])
+
 test('cc007', normal, compile, [''])
 test('cc008', normal, compile, [''])
 test('cc009', normal, compile, [''])
