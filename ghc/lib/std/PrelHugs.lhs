@@ -17,7 +17,8 @@ module PrelHugs (
    hugsprimEqChar,
    fromDouble,
    hugsprimMkIO,
-   hugsprimCreateAdjThunk
+   hugsprimCreateAdjThunk,
+   hugsprimUnpackString
 )
 where
 import PrelGHC
@@ -25,7 +26,7 @@ import PrelBase
 import PrelNum
 import PrelReal(Integral)
 import Prelude(fromIntegral)
-import IO(putStr)
+import IO(putStr,hFlush,stdout,stderr)
 import PrelException(catch)
 import PrelIOBase(IO,unsafePerformIO)
 import PrelShow(show)
@@ -33,6 +34,7 @@ import PrelFloat(Double)
 import PrelReal(Fractional,fromRational,toRational)
 import PrelAddr(Addr)
 import PrelErr(error)
+import PrelPack(unpackCString)
 
 -- Stuff needed by Hugs for desugaring.  Do not mess with these!
 -- They need to correspond exactly to versions written in 
@@ -77,6 +79,10 @@ hugsprimPmSubtract x y   = x - y
 hugsprimPmLe            :: Integral a => a -> a -> Bool
 hugsprimPmLe x y         = x <= y
 
+hugsprimUnpackString :: Addr -> String
+hugsprimUnpackString a = unpackCString a
+
+
 -- used when Hugs invokes top level function
 {-
 hugsprimRunIO_toplevel :: IO a -> ()
@@ -102,8 +108,9 @@ hugsprimRunIO_toplevel m
 hugsprimRunIO_toplevel :: IO a -> ()
 hugsprimRunIO_toplevel m
    = unsafePerformIO (
-        catch (m >> return ())
+        catch (m >> hFlush stderr >> hFlush stdout)
               (\e -> putStr (show e ++ "\n"))
      )
+
 
 \end{code}

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.35 $
- * $Date: 2000/01/12 10:30:09 $
+ * $Revision: 1.36 $
+ * $Date: 2000/01/12 10:44:50 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -526,6 +526,7 @@ Int what; {
               = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZMZN_static_closure"));
            name(nameCons).stgVar 
               = mkCPtr(lookupOTabName(modulePrelBase, "PrelBase_ZC_closure"));
+           nameUnpackString = linkName("hugsprimUnpackString");
 #endif
 #endif
            break;
@@ -616,7 +617,7 @@ Int what; {
                /* implementTagToCon                     */
                pFun(namePMFail,         "primPmFail");
                pFun(nameError,          "error");
-               pFun(nameUnpackString,   "primUnpackString");
+               pFun(nameUnpackString,   "hugsprimUnpackString");
 
                /* hooks for handwritten bytecode */
                pFun(namePrimSeq,        "primSeq");

@@ -1548,14 +1548,17 @@ readFloat r    = [(fromRational ((n%1)*10^^(k-d)),t) | (n,d,s) <- readFix r,
 primCompAux      :: Ord a => a -> a -> Ordering -> Ordering
 primCompAux x y o = case compare x y of EQ -> o; LT -> LT; GT -> GT
 
+hugsprimEqChar       :: Char -> Char -> Bool
+hugsprimEqChar c1 c2  = primEqChar c1 c2
+
 hugsprimPmInt        :: Num a => Int -> a -> Bool
 hugsprimPmInt n x     = fromInt n == x
 
 hugsprimPmInteger    :: Num a => Integer -> a -> Bool
 hugsprimPmInteger n x = fromInteger n == x
 
-primPmDouble     :: Fractional a => Double -> a -> Bool
-primPmDouble n x  = fromDouble n == x
+hugsprimPmDouble     :: Fractional a => Double -> a -> Bool
+hugsprimPmDouble n x  = fromDouble n == x
 
 -- ToDo: make the message more informative.
 primPmFail       :: a
@@ -1590,8 +1593,8 @@ hugsprimPmLe x y         = x <= y
 -- 
 -- ToDo: change this (and Hugs code generator) to use ByteArrays
 
-primUnpackString :: Addr -> String
-primUnpackString a = unpack 0
+hugsprimUnpackString :: Addr -> String
+hugsprimUnpackString a = unpack 0
  where
   -- The following decoding is based on evalString in the old machine.c
   unpack i
