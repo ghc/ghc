@@ -1844,11 +1844,11 @@ We have to be careful here.  If we are *given* d1:Ord a,
 and want to deduce (d2:C [a]) where
 
 	class Ord a => C a where
-	instance Ord a => C [a] where ...
+	instance Ord [a] => C [a] where ...
 
-Then we'll use the instance decl to deduce C [a] and then add the
+Then we'll use the instance decl to deduce C [a] from Ord [a], and then add the
 superclasses of C [a] to avails.  But we must not overwrite the binding
-for d1:Ord a (which is given) with a superclass selection or we'll just
+for Ord [a] (which is obtained from Ord a) with a superclass selection or we'll just
 build a loop! 
 
 Here's another variant, immortalised in tcrun020
