@@ -275,13 +275,13 @@ expandHashTable
 	then return table
 	else do
   --
-  when (newindex == 0) $
+   when (newindex == 0) $
 	do segment <- newIOArray (0,sEGMENT_SIZE-1) []
 	   writeIOArray dir newsegment segment
 	   -- doesn't happen very often, so we might as well use a safe
 	   -- array index here.
   --
-  let table' =
+   let table' =
   	if (split+1) < max
      	    then table{ split = split+1,
 			bcount = bcount+1 }
@@ -292,7 +292,7 @@ expandHashTable
 			max_bucket = max * 2,
 			mask1 = mask2,
 			mask2 = mask2 `shiftL` 1 .|. 1 }
-  let
+   let
     split_bucket old new [] = do
 	segment <- myReadArray dir oldsegment
 	myWriteArray segment oldindex old
@@ -304,10 +304,10 @@ expandHashTable
 		then split_bucket old ((k,v):new) xs
 		else split_bucket ((k,v):old) new xs
   --
-  segment <- myReadArray dir oldsegment
-  bucket <- myReadArray segment oldindex
-  split_bucket [] [] bucket
-  return table'
+   segment <- myReadArray dir oldsegment
+   bucket <- myReadArray segment oldindex
+   split_bucket [] [] bucket
+   return table'
 
 -- -----------------------------------------------------------------------------
 -- Deleting a mapping from the hash table
