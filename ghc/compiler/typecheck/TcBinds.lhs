@@ -416,8 +416,7 @@ generalise_help doc tau_tvs lie_req sigs
 -----------------------
   | null sigs
   =	-- INFERENCE CASE: Unrestricted group, no type signatures
-    tcSimplifyInfer doc
-		    tau_tvs lie_req
+    tcSimplifyInfer doc tau_tvs lie_req
 
 -----------------------
   | otherwise
