@@ -8,7 +8,7 @@
 -- ---------------------------------------------------------------------------
 
 {
-module Parser ( parseModule, parseStmt, parseIdentifier, parseIface ) where
+module Parser ( parseModule, parseStmt, parseIdentifier, parseIface, parseType ) where
 
 #define INCLUDE #include 
 INCLUDE "HsVersions.h"
@@ -263,6 +263,7 @@ TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
 %name parseStmt   maybe_stmt
 %name parseIdentifier  identifier
 %name parseIface iface
+%name parseType ctype
 %tokentype { Located Token }
 %%
 
@@ -753,7 +754,7 @@ context :: { LHsContext RdrName }
 	: btype 			{% checkContext $1 }
 
 type :: { LHsType RdrName }
-	: ipvar '::' gentype		{ LL (HsPredTy (LL $ HsIParam (unLoc $1) $3)) }
+	: ipvar '::' gentype		{ LL (HsPredTy (HsIParam (unLoc $1) $3)) }
 	| gentype			{ $1 }
 
 gentype :: { LHsType RdrName }

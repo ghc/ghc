@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.163 2004/02/01 23:43:02 dons Exp $
+-- $Id: InteractiveUI.hs,v 1.164 2004/04/05 10:50:26 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -97,6 +97,7 @@ builtin_commands = [
   ("set",	keepGoing setCmd),
   ("show",	keepGoing showCmd),
   ("type",	keepGoing typeOfExpr),
+  ("kind",	keepGoing kindOfType),
   ("unset",	keepGoing unsetOptions),
   ("undef",     keepGoing undefineMacro),
   ("quit",	quit)
@@ -664,6 +665,14 @@ typeOfExpr :: String -> GHCi ()
 typeOfExpr str 
   = do cms <- getCmState
        maybe_tystr <- io (cmTypeOfExpr cms str)
+       case maybe_tystr of
+	  Nothing    -> return ()
+	  Just tystr -> io (putStrLn tystr)
+
+kindOfType :: String -> GHCi ()
+kindOfType str 
+  = do cms <- getCmState
+       maybe_tystr <- io (cmKindOfType cms str)
        case maybe_tystr of
 	  Nothing    -> return ()
 	  Just tystr -> io (putStrLn tystr)

@@ -6,7 +6,8 @@
 \begin{code}
 module TcRnDriver (
 #ifdef GHCI
-	mkExportEnv, getModuleContents, tcRnStmt, tcRnThing, tcRnExpr,
+	mkExportEnv, getModuleContents, tcRnStmt, 
+	tcRnThing, tcRnExpr, tcRnType,
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -63,7 +64,7 @@ import Outputable
 import HscTypes		( ModGuts(..), HscEnv(..),
 			  GhciMode(..), noDependencies,
 			  Deprecs( NoDeprecs ), plusDeprecs,
-			  ForeignStubs(NoStubs), TypeEnv, typeEnvTyCons, 
+			  ForeignStubs(NoStubs), TypeEnv, 
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons,
 			  emptyFixityEnv
 			)
@@ -76,12 +77,14 @@ import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
 			  lookupLocalRdrEnv, extendLocalRdrEnv )
 import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
+import TcHsType		( kcHsType )
 import TcExpr		( tcCheckRho )
 import TcMType		( zonkTcType )
 import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
 import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
+import RnTypes		( rnLHsType )
 import Inst		( tcStdSyntaxName )
 import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
@@ -95,6 +98,7 @@ import MkId		( unsafeCoerceId )
 import TysWiredIn	( mkListTy, unitTy )
 import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
+import Kind		( Kind )
 import Var		( globaliseId )
 import Name		( nameOccName, nameModuleName )
 import NameEnv		( delListFromNameEnv )
@@ -421,6 +425,27 @@ tcRnExpr hsc_env ictxt rdr_expr
     smpl_doc = ptext SLIT("main expression")
 \end{code}
 
+tcRnExpr just finds the kind of a type
+
+\begin{code}
+tcRnType :: HscEnv
+	 -> InteractiveContext
+	 -> LHsType RdrName
+	 -> IO (Maybe Kind)
+tcRnType hsc_env ictxt rdr_type
+  = initTcPrintErrors hsc_env iNTERACTIVE $ 
+    setInteractiveContext ictxt $ do {
+
+    rn_type <- rnLHsType doc rdr_type ;
+    failIfErrsM ;
+
+	-- Now kind-check the type
+    (ty', kind) <- kcHsType rn_type ;
+    return kind
+    }
+  where
+    doc = ptext SLIT("In GHCi input")
+\end{code}
 
 \begin{code}
 tcRnThing :: HscEnv

@@ -8,7 +8,7 @@
 module HscMain ( 
 	HscResult(..), hscMain, newHscEnv, hscBufferFrontEnd
 #ifdef GHCI
-	, hscStmt, hscTcExpr, hscThing, 
+	, hscStmt, hscTcExpr, hscKcType, hscThing, 
 	, compileExpr
 #endif
 	) where
@@ -16,7 +16,7 @@ module HscMain (
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LStmt, LHsExpr )
+import HsSyn		( Stmt(..), LStmt, LHsExpr, LHsType )
 import IfaceSyn		( IfaceDecl )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
@@ -24,14 +24,14 @@ import Linker		( HValue, linkExpr )
 import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
-import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnThing ) 
-import RdrName		( RdrName, GlobalRdrEnv )
+import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnThing, tcRnType ) 
+import RdrName		( RdrName )
 import Type		( Type )
 import PrelNames	( iNTERACTIVE )
 import StringBuffer	( stringToStringBuffer )
 import SrcLoc		( noSrcLoc, Located(..) )
+import Kind		( Kind )
 import Var		( Id )
-import Name		( Name )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
 import BasicTypes	( Fixity )
@@ -528,8 +528,9 @@ hscStmt		-- Compile a stmt all the way to an HValue, but don't run it
 hscStmt hsc_env icontext stmt
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) stmt
 	; case maybe_stmt of {
-      	     Nothing -> return Nothing ;
-      	     Just parsed_stmt -> do {
+      	     Nothing	  -> return Nothing ;	-- Parse error
+      	     Just Nothing -> return Nothing ;	-- Empty line
+      	     Just (Just parsed_stmt) -> do {	-- The real stuff
 
 		-- Rename and typecheck it
 	  maybe_tc_result
@@ -557,16 +558,45 @@ hscTcExpr	-- Typecheck an expression (but don't run it)
 hscTcExpr hsc_env icontext expr
   = do	{ maybe_stmt <- hscParseStmt (hsc_dflags hsc_env) expr
 	; case maybe_stmt of {
-	     Just (L _ (ExprStmt expr _))
+	     Nothing      -> return Nothing ;	-- Parse error
+	     Just (Just (L _ (ExprStmt expr _)))
 			-> tcRnExpr hsc_env icontext expr ;
 	     Just other -> do { hPutStrLn stderr ("not an expression: `" ++ expr ++ "'") ;
+			        return Nothing } ;
+      	     } }
+
+hscKcType	-- Find the kind of a type
+  :: HscEnv
+  -> InteractiveContext		-- Context for compiling
+  -> String			-- The type
+  -> IO (Maybe Kind)
+
+hscKcType hsc_env icontext str
+  = do	{ maybe_type <- hscParseType (hsc_dflags hsc_env) str
+	; case maybe_type of {
+	     Just ty	-> tcRnType hsc_env icontext ty ;
+	     Just other -> do { hPutStrLn stderr ("not an type: `" ++ str ++ "'") ;
 			        return Nothing } ;
       	     Nothing    -> return Nothing } }
 \end{code}
 
 \begin{code}
-hscParseStmt :: DynFlags -> String -> IO (Maybe (LStmt RdrName))
-hscParseStmt dflags str
+hscParseStmt :: DynFlags -> String -> IO (Maybe (Maybe (LStmt RdrName)))
+hscParseStmt = hscParseThing parseStmt
+
+hscParseType :: DynFlags -> String -> IO (Maybe (LHsType RdrName))
+hscParseType = hscParseThing parseType
+
+hscParseIdentifier :: DynFlags -> String -> IO (Maybe (Located RdrName))
+hscParseIdentifier = hscParseThing parseIdentifier
+
+hscParseThing :: Outputable thing
+	      => Lexer.P thing
+	      -> DynFlags -> String
+	      -> IO (Maybe thing)
+	-- Nothing => Parse error (message already printed)
+	-- Just x  => success
+hscParseThing parser dflags str
  = do showPass dflags "Parser"
       _scc_ "Parser"  do
 
@@ -574,20 +604,17 @@ hscParseStmt dflags str
 
       let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
 
-      case unP parseStmt (mkPState buf loc dflags) of {
+      case unP parser (mkPState buf loc dflags) of {
 
 	PFailed span err -> do { printError span err;
                                  return Nothing };
 
-	-- no stmt: the line consisted of just space or comments
-	POk _ Nothing -> return Nothing;
-
-	POk _ (Just rdr_stmt) -> do {
+	POk _ thing -> do {
 
       --ToDo: can't free the string buffer until we've finished this
       -- compilation sweep and all the identifiers have gone away.
-      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr rdr_stmt);
-      return (Just rdr_stmt)
+      dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing);
+      return (Just thing)
       }}
 #endif
 \end{code}
@@ -607,7 +634,7 @@ hscThing -- like hscStmt, but deals with a single identifier
   -> IO [(IfaceDecl, Fixity)]
 
 hscThing hsc_env ic str
-   = do maybe_rdr_name <- myParseIdentifier (hsc_dflags hsc_env) str
+   = do maybe_rdr_name <- hscParseIdentifier (hsc_dflags hsc_env) str
 	case maybe_rdr_name of {
 	  Nothing -> return [];
 	  Just (L _ rdr_name) -> do
@@ -618,17 +645,6 @@ hscThing hsc_env ic str
 	     Nothing     -> return [] ;
 	     Just things -> return things
  	}}
-
-myParseIdentifier dflags str
-  = do buf <- stringToStringBuffer str
- 
-       let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
-       case unP parseIdentifier (mkPState buf loc dflags) of
-
-	  PFailed span err -> do { printError span err;
-                                   return Nothing }
-
-	  POk _ rdr_name -> return (Just rdr_name)
 #endif
 \end{code}
 

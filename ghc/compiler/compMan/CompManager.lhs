@@ -37,6 +37,9 @@ module CompManager (
     cmTypeOfExpr,  -- :: CmState -> DynFlags -> String
 		   -- 	-> IO (CmState, Maybe String)
 
+    cmKindOfType,  -- :: CmState -> DynFlags -> String
+		   -- 	-> IO (CmState, Maybe String)
+
     cmTypeOfName,  -- :: CmState -> Name -> IO (Maybe String)
 
     HValue,
@@ -81,7 +84,7 @@ import Maybes		( expectJust, orElse, mapCatMaybes )
 import DATA_IOREF	( readIORef )
 
 #ifdef GHCI
-import HscMain		( hscThing, hscStmt, hscTcExpr )
+import HscMain		( hscThing, hscStmt, hscTcExpr, hscKcType )
 import TcRnDriver	( mkExportEnv, getModuleContents )
 import IfaceSyn		( IfaceDecl )
 import RdrName		( GlobalRdrEnv, plusGlobalRdrEnv )
@@ -322,6 +325,19 @@ cmTypeOfExpr cmstate expr
 		unqual  = icPrintUnqual (cm_ic cmstate)
 		tidy_ty = tidyType emptyTidyEnv ty
 
+
+-----------------------------------------------------------------------------
+-- cmKindOfType: returns a string representing the kind of a type
+
+cmKindOfType :: CmState -> String -> IO (Maybe String)
+cmKindOfType cmstate str
+   = do maybe_stuff <- hscKcType (cm_hsc cmstate) (cm_ic cmstate) str
+	case maybe_stuff of
+	   Nothing -> return Nothing
+	   Just kind -> return (Just str)
+ 	     where 
+		str     = showSDocForUser unqual (text str <+> dcolon <+> ppr kind)
+		unqual  = icPrintUnqual (cm_ic cmstate)
 
 -----------------------------------------------------------------------------
 -- cmTypeOfName: returns a string representing the type of a name.
