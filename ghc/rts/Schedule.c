@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.81 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: Schedule.c,v 1.82 2000/11/13 14:42:16 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -1247,6 +1247,7 @@ resumeThread( StgInt tok )
   if (tso == END_TSO_QUEUE) {
     barf("resumeThread: thread not found");
   }
+  tso->link = END_TSO_QUEUE;
 
 #ifdef SMP
   while (free_capabilities == NULL) {
