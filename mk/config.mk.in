@@ -524,7 +524,7 @@ HBC		= @HBC@
 NHC		= @NHC@
 
 HC	        = @WithHc@
-MKDEPENDHS	= $(HC)
+MKDEPENDHS	= $(GHC)
 
 # Sometimes we want to invoke ghc from the build tree in different
 # projects (eg. it's handy to have a nofib & a ghc build in the same
