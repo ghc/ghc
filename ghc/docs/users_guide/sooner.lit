@@ -362,24 +362,6 @@ If you want to see why candidate unfoldings are rejected, use the
 option.
 
 %----------------------------------------------------------------
-\item[Don't let GHC ignore pragmatic information:]
-
-Sort-of by definition, GHC is allowed to ignore pragmas in interfaces.
-Your program should still work, if not as well.
-
-Normally, GHC {\em will} ignore an unfolding pragma in an interface if
-it cannot figure out all the names mentioned in the unfolding.  (A
-very much hairier implementation could make sure This Never Happens,
-but life is too short to wage constant battle with Haskell's module
-system.)
-
-If you want to prevent such ignorings, give GHC a
-\tr{-fshow-pragma-name-errs}
-option.\index{-fshow-pragma-name-errs option}
-It will then treat any unresolved names in pragmas as {\em
-errors}, rather than inconveniences.
-
-%----------------------------------------------------------------
 \item[Explicit \tr{export} list:]
 If you do not have an explicit export list in a module, GHC must
 assume that everything in that module will be exported.  This has
