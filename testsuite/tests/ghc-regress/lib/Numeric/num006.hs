@@ -4,7 +4,6 @@ module Main(main) where
 
 import Numeric
 import Char
-import NumExts
 
 --showDec :: Integral a => a -> ShowS
 showDec = showInt
