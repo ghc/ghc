@@ -328,8 +328,8 @@ SRC_HC_OPTS += -package concurrent -package util
 endif
 endif
 
-SRC_CC_OPTS += -Iparser -I. -O
-SRC_HC_OPTS += -recomp $(GhcHcOpts)
+SRC_CC_OPTS += -Iparser -I. -I$(GHC_INCLUDE_DIR) -O
+SRC_HC_OPTS += -recomp $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
 SRC_HC_OPTS += -H16M
 
 ifeq "$(BootingFromHc)" "YES"
