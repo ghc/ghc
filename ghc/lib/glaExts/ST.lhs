@@ -10,6 +10,9 @@ module ST (
 
 	ST,
 
+	runST,				-- :: (All s => ST s a) -> a
+	fixST,				-- :: (a -> ST s a) -> ST s a
+
 	unsafeInterleaveST,
 
         -- ST is one, so you'll likely need some Monad bits
