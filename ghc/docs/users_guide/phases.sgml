@@ -702,6 +702,10 @@ strmod = "\
 	    (if the Haskell thread was created by
 	    <literal>forkIO</literal>).</para>
 
+	    <para>More details on the use of "bound threads" in the
+	    threaded runtime can be found in the <ulink
+	    url="../libraries/base/Control.Concurrent.html"><literal>Control.Concurrent</literal></ulink> module.</para>
+
 	    <para>The threaded RTS does <emphasis>not</emphasis>
 	    support using multiple CPUs to speed up execution of a
 	    multi-threaded Haskell program.  The GHC runtime platform
