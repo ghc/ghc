@@ -3755,7 +3755,7 @@ to arbitrary expressions.  For example, this is <Emphasis>not</Emphasis> OK:
 "wrong2"   forall f.      f True = True
 </ProgramListing>
 
-In <Literal>"wrong1"</Literal>, the LHS is not an application; in <Literal>"wrong1"</Literal>, the LHS has a pattern variable
+In <Literal>"wrong1"</Literal>, the LHS is not an application; in <Literal>"wrong2"</Literal>, the LHS has a pattern variable
 in the head.
 </Para>
 </ListItem>
