@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.185 2005/01/28 12:55:23 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.186 2005/01/28 17:44:56 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -15,8 +15,7 @@ module InteractiveUI (
 #include "HsVersions.h"
 
 import CompManager
-import HscTypes		( HomeModInfo(hm_linkable), HomePackageTable,
-			  isObjectLinkable, GhciMode(..) )
+import HscTypes		( GhciMode(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..), IfaceConDecl(..), 
 		   	  IfaceInst(..), pprIfaceDeclHead, pprParendIfaceType, pprIfaceForAllPart )
 import FunDeps		( pprFundeps )
@@ -29,7 +28,7 @@ import Name		( Name, NamedThing(..) )
 import OccName		( OccName, isSymOcc, occNameUserString )
 import BasicTypes	( StrictnessMark(..), defaultFixity, SuccessFlag(..) )
 import Outputable
-import CmdLineOpts	( DynFlag(..), DynFlags(..), dopt_unset )
+import CmdLineOpts	( DynFlags(..) )
 import Panic 		hiding ( showException )
 import Config
 import SrcLoc		( SrcLoc, isGoodSrcLoc )
@@ -51,7 +50,7 @@ import System.Console.Readline as Readline
 
 import Control.Exception as Exception
 import Data.Dynamic
-import Control.Concurrent
+-- import Control.Concurrent
 
 import Numeric
 import Data.List
@@ -497,9 +496,8 @@ info s  = do { let names = words s
 
 showThing :: GetInfoResult -> SDoc
 showThing  (wanted_str, (thing, fixity, src_loc, insts)) 
-    = vcat [ showDecl want_name thing, 
+    = vcat [ showWithLoc src_loc (showDecl want_name thing),
 	     show_fixity fixity,
-	     show_loc src_loc,
 	     vcat (map show_inst insts)]
   where
     want_name occ = wanted_str == occNameUserString occ
@@ -508,15 +506,19 @@ showThing  (wanted_str, (thing, fixity, src_loc, insts))
 	| fix == defaultFixity = empty
 	| otherwise            = ppr fix <+> text wanted_str
 
+    show_inst (iface_inst, loc)
+	= showWithLoc loc (ptext SLIT("instance") <+> ppr (ifInstHead iface_inst))
+
+showWithLoc :: SrcLoc -> SDoc -> SDoc
+showWithLoc loc doc 
+    = hang doc 2 (char '\t' <> show_loc loc)
+		-- The tab tries to make them line up a bit
+  where
     show_loc loc	-- The ppr function for SrcLocs is a bit wonky
 	| isGoodSrcLoc loc = comment <+> ptext SLIT("Defined at") <+> ppr loc
 	| otherwise	   = comment <+> ppr loc
     comment = ptext SLIT("--")
 
-    show_inst (iface_inst, loc)
-	= hang (ptext SLIT("instance") <+> ppr (ifInstHead iface_inst))
-	     2 (char '\t' <> show_loc loc)
-		-- The tab tries to make them line up a bit
 
 -- Now there is rather a lot of goop just to print declarations in a
 -- civilised way with "..." for the parts we are less interested in.

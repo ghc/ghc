@@ -9,7 +9,8 @@ module IfaceType (
 	IfaceType(..), IfaceKind, IfacePredType(..), IfaceTyCon(..),
 	IfaceContext, IfaceBndr(..), IfaceTvBndr, IfaceIdBndr,
 
-	IfaceExtName(..), mkIfaceExtName, ifaceTyConName, ifPrintUnqual,
+	IfaceExtName(..), mkIfaceExtName, isLocalIfaceExtName,
+	ifaceTyConName, interactiveExtNameFun,
 
 	-- Conversion from Type -> IfaceType
 	toIfaceType, toIfacePred, toIfaceContext, 
@@ -25,7 +26,7 @@ module IfaceType (
 #include "HsVersions.h"
 
 import Kind		( Kind(..) )
-import TypeRep		( Type(..), TyNote(..), PredType(..), Kind, ThetaType )
+import TypeRep		( Type(..), TyNote(..), PredType(..), ThetaType )
 import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
@@ -63,13 +64,21 @@ data IfaceExtName
 	-- LocalTopSub is written into iface files as LocalTop; the parent 
 	-- info is only used when computing version information in MkIface
 
+isLocalIfaceExtName :: IfaceExtName -> Bool
+isLocalIfaceExtName (LocalTop _)      = True
+isLocalIfaceExtName (LocalTopSub _ _) = True
+isLocalIfaceExtName other	      = False
+
 mkIfaceExtName name = ExtPkg (nameModule name) (nameOccName name)
 	-- Local helper for wired-in names
 
-ifPrintUnqual :: PrintUnqualified -> IfaceExtName -> Bool
-ifPrintUnqual print_unqual (ExtPkg  mod occ)   = print_unqual mod occ
-ifPrintUnqual print_unqual (HomePkg mod occ _) = print_unqual mod occ
-ifPrintUnqual print_unqual other	       = True
+interactiveExtNameFun :: PrintUnqualified -> Name-> IfaceExtName
+interactiveExtNameFun print_unqual name
+  | print_unqual mod occ = LocalTop occ
+  | otherwise		 = ExtPkg mod occ
+  where
+    mod = nameModule name
+    occ = nameOccName name
 \end{code}
 
 
@@ -189,12 +198,9 @@ instance Outputable IfaceExtName where
     ppr (LocalTopSub occ _)    = ppr occ	-- from an ordinary occurrence?
 
 pprExt :: Module -> OccName -> SDoc
-pprExt mod occ
-  = getPprStyle $ \ sty ->
-    if unqualStyle sty mod occ then
-	ppr occ
-    else 
-	ppr mod <> dot <> ppr occ
+-- No need to worry about printing unqualified becuase that was handled
+-- in the transiation to IfaceSyn 
+pprExt mod occ = ppr mod <> dot <> ppr occ
 
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr

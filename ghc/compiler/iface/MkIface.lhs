@@ -269,7 +269,8 @@ mkIface hsc_env location maybe_old_iface
 		      mg_rules = rules,
 		      mg_types = type_env }
   = do	{ eps <- hscEPS hsc_env
-	; let	{ ext_nm = mkExtNameFn hsc_env eps this_mod
+	; let	{ ext_nm_rhs = mkExtNameFn hsc_env eps this_mod
+		; ext_nm_lhs = mkLhsNameFn this_mod
 		; local_things = [thing | thing <- typeEnvElts type_env,
 					  not (isWiredInName (getName thing)) ]
 			-- Do not export anything about wired-in things
@@ -282,7 +283,7 @@ mkIface hsc_env location maybe_old_iface
 						 | thing <- local_things
 				 		 , not (mustExposeThing exports thing)]
 
-		; decls  = [ tyThingToIfaceDecl omit_prags abstract_tcs ext_nm thing 
+		; decls  = [ tyThingToIfaceDecl omit_prags abstract_tcs ext_nm_rhs thing 
 			   | thing <- local_things, wantDeclFor exports abstract_tcs thing ]
 			    	-- Don't put implicit Ids and class tycons in the interface file
 
@@ -291,8 +292,8 @@ mkIface hsc_env location maybe_old_iface
 		; iface_rules 
 		     | omit_prags = []
 		     | otherwise  = sortLe le_rule $
-				    map (coreRuleToIfaceRule this_mod ext_nm) rules
-		; iface_insts = sortLe le_inst (map dfunToIfaceInst insts)
+				    map (coreRuleToIfaceRule ext_nm_lhs ext_nm_rhs) rules
+		; iface_insts = sortLe le_inst (map (dfunToIfaceInst ext_nm_lhs) insts)
 
 	        ; intermediate_iface = ModIface { 
 			mi_module   = this_mod,
@@ -420,6 +421,20 @@ mkExtNameFn hsc_env eps this_mod
       where
         iface = lookupIfaceByModule hpt pit mod `orElse` 
 	        pprPanic "lookupVers2" (ppr mod <+> ppr occ)
+
+
+---------------------
+-- mkLhsNameFn ignores versioning info altogether
+-- It is used for the LHS of instance decls and rules, where we 
+-- there's no point in recording version info
+mkLhsNameFn :: Module -> Name -> IfaceExtName
+mkLhsNameFn this_mod name	
+  | mod == this_mod = LocalTop occ
+  | otherwise	    = ExtPkg mod occ
+  where
+    mod = nameModule name
+    occ	= nameOccName name
+
 
 -----------------------------
 -- Compute version numbers for local decls

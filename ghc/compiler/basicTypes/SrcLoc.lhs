@@ -161,7 +161,7 @@ instance Outputable SrcLoc where
 	   hcat [text "{-# LINE ", int src_line, space,
 		 char '\"', ftext src_path, text " #-}"]
 
-    ppr (ImportedLoc mod) = ptext SLIT("Imported from") <+> quotes (text mod)
+    ppr (ImportedLoc mod) = ptext SLIT("Imported from") <+> text mod
     ppr (UnhelpfulLoc s)  = ftext s
 \end{code}
 

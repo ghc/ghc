@@ -503,11 +503,11 @@ ifaceInstGates :: IfaceType -> (IfaceExtName, [IfaceTyCon])
 
 ifaceInstGates (IfaceForAllTy _ t) 		   = ifaceInstGates t
 ifaceInstGates (IfaceFunTy _ t)    		   = ifaceInstGates t
-ifaceInstGates (IfacePredTy (IfaceClassP cls tys)) = instHeadGates cls tys
+ifaceInstGates (IfacePredTy (IfaceClassP cls tys)) = (cls, instHeadTyconGates tys)
 ifaceInstGates other = pprPanic "ifaceInstGates" (ppr other)
 	-- The other cases should not happen
 
-instHeadGates cls tys = (cls, mapCatMaybes root_tycon tys)
+instHeadTyconGates tys = mapCatMaybes root_tycon tys
   where
     root_tycon (IfaceFunTy _ _)      = Just (IfaceTc funTyConExtName)
     root_tycon (IfaceTyConApp tc _)  = Just tc

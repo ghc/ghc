@@ -16,6 +16,7 @@ module TcRnDriver (
 
 #include "HsVersions.h"
 
+import IO
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
 #endif
@@ -105,7 +106,7 @@ import LoadIface	( loadSrcInterface, ifaceInstGates )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
 			  IfaceExtName(..), IfaceConDecls(..), IfaceInst(..),
 			  tyThingToIfaceDecl, dfunToIfaceInst )
-import IfaceType	( IfaceTyCon(..), ifPrintUnqual )
+import IfaceType	( IfaceTyCon(..), interactiveExtNameFun, isLocalIfaceExtName )
 import IfaceEnv		( lookupOrig )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId, setIdType, globalIdDetails )
@@ -117,7 +118,7 @@ import IdInfo		( GlobalIdDetails(..) )
 import SrcLoc		( interactiveSrcLoc, unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
-import Name		( nameOccName, nameModule )
+import Name		( nameOccName )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
 import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
@@ -1091,7 +1092,7 @@ getModuleContents hsc_env ictxt mod exports_only
  			  -- so it had better be a home module
       = do { hpt <- getHpt
  	   ; case lookupModuleEnv hpt mod of
- 	       Just mod_info -> return (map toIfaceDecl $
+ 	       Just mod_info -> return (map (toIfaceDecl ext_nm) $
 					filter wantToSee $
  				        typeEnvElts $
  				        md_types (hm_details mod_info))
@@ -1108,7 +1109,9 @@ getModuleContents hsc_env ictxt mod exports_only
    get_decl (mod, avail)
 	= do { main_name <- lookupOrig mod (availName avail) 
 	     ; thing     <- tcLookupGlobal main_name
-	     ; return (filter_decl (availNames avail) (toIfaceDecl thing)) }
+	     ; return (filter_decl (availNames avail) (toIfaceDecl ext_nm thing)) }
+
+   ext_nm = interactiveExtNameFun (icPrintUnqual ictxt)
 
 ---------------------
 filter_decl occs decl@(IfaceClass {ifSigs = sigs})
@@ -1186,8 +1189,8 @@ tcRnGetInfo hsc_env ictxt rdr_name
 	-- their parent declaration
     let { do_one name = do { thing  <- tcLookupGlobal name
 		           ; fixity <- lookupFixityRn name
-			   ; insts  <- lookupInsts print_unqual thing
-		           ; return (toIfaceDecl thing, fixity, 
+			   ; insts  <- lookupInsts ext_nm thing
+		           ; return (toIfaceDecl ext_nm thing, fixity, 
 				     getSrcLoc thing, insts) } } ;
 		-- For the SrcLoc, the 'thing' has better info than
 		-- the 'name' because getting the former forced the
@@ -1198,28 +1201,26 @@ tcRnGetInfo hsc_env ictxt rdr_name
     }
   where
     cmp (d1,_,_,_) (d2,_,_,_) = ifName d1 `compare` ifName d2
-
-    print_unqual :: PrintUnqualified
-    print_unqual = icPrintUnqual ictxt
+    ext_nm = interactiveExtNameFun (icPrintUnqual ictxt)
 
 
-lookupInsts :: PrintUnqualified -> TyThing -> TcM [(IfaceInst, SrcLoc)]
+lookupInsts :: (Name -> IfaceExtName) -> TyThing -> TcM [(IfaceInst, SrcLoc)]
 -- Filter the instances by the ones whose tycons (or clases resp) 
 -- are in scope unqualified.  Otherwise we list a whole lot too many!
-lookupInsts print_unqual (AClass cls)
+lookupInsts ext_nm (AClass cls)
   = do	{ loadImportedInsts cls []	-- [] means load all instances for cls
 	; inst_envs <- tcGetInstEnvs
 	; return [ (inst, getSrcLoc dfun)
 		 | (_,_,dfun) <- classInstances inst_envs cls
-		 , let inst = dfunToIfaceInst dfun
+		 , let inst = dfunToIfaceInst ext_nm dfun
 		       (_, tycons) = ifaceInstGates (ifInstHead inst)
 		 , all print_tycon_unqual tycons ] }
   where
-    print_tycon_unqual (IfaceTc ext_nm) = ifPrintUnqual print_unqual ext_nm
+    print_tycon_unqual (IfaceTc nm) = isLocalIfaceExtName nm
     print_tycon_unqual other		= True 	-- Int etc
    
 
-lookupInsts print_unqual (ATyCon tc)
+lookupInsts ext_nm (ATyCon tc)
   = do 	{ eps <- getEps	-- Load all instances for all classes that are
 			-- in the type environment (which are all the ones
 			-- we've seen in any interface file so far)
@@ -1229,24 +1230,22 @@ lookupInsts print_unqual (ATyCon tc)
 	; return [ (inst, getSrcLoc dfun)
 		 | (_, _, dfun) <- instEnvElts home_ie ++ instEnvElts pkg_ie
 		 , relevant dfun
-		 , let inst     = dfunToIfaceInst dfun
+		 , let inst     = dfunToIfaceInst ext_nm dfun
 		       (cls, _) = ifaceInstGates (ifInstHead inst)
-		 , ifPrintUnqual print_unqual cls ]  }
+		 , isLocalIfaceExtName cls ]  }
   where
     relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
     tc_name     = tyConName tc		  
 
-lookupInsts print_unqual other = return []
+lookupInsts ext_nm other = return []
 
 
-toIfaceDecl :: TyThing -> IfaceDecl
-toIfaceDecl thing
+toIfaceDecl :: (Name -> IfaceExtName) -> TyThing -> IfaceDecl
+toIfaceDecl ext_nm thing
   = tyThingToIfaceDecl True 		-- Discard IdInfo
 		       emptyNameSet	-- Show data cons
 		       ext_nm (munge thing)
   where
-    ext_nm n = ExtPkg (nameModule n) (nameOccName n)
-
 	-- munge transforms a thing to its "parent" thing
     munge (ADataCon dc) = ATyCon (dataConTyCon dc)
     munge (AnId id) = case globalIdDetails id of
@@ -1254,7 +1253,6 @@ toIfaceDecl thing
 			ClassOpId cls      -> AClass cls
 			other		   -> AnId id
     munge other_thing = other_thing
-
 #endif /* GHCI */
 \end{code}
 

@@ -23,7 +23,7 @@ module IfaceSyn (
 	visibleIfConDecls,
 
 	-- Converting things to IfaceSyn
-	tyThingToIfaceDecl, dfunToIfaceInst, coreRuleToIfaceRule,
+	tyThingToIfaceDecl, dfunToIfaceInst, coreRuleToIfaceRule, 
 
 	-- Equality
 	IfaceEq(..), (&&&), bool, eqListBy, eqMaybeBy,
@@ -57,12 +57,11 @@ import TyCon		( TyCon, ArgVrcs, AlgTyConRhs(..), isRecursiveTyCon, isForeignTyCo
 import DataCon		( dataConName, dataConSig, dataConFieldLabels, dataConStrictMarks,
 			  dataConTyCon, dataConIsInfix, isVanillaDataCon )
 import Class		( FunDep, DefMeth, classExtraBigSig, classTyCon )
-import OccName		( OccName, OccEnv, lookupOccEnv, emptyOccEnv, 
-			  lookupOccEnv, extendOccEnv, emptyOccEnv,
+import OccName		( OccName, OccEnv, emptyOccEnv, 
+			  lookupOccEnv, extendOccEnv, 
 			  OccSet, unionOccSets, unitOccSet )
-import Name		( Name, NamedThing(..), getOccName, nameOccName, nameModule, isExternalName )
+import Name		( Name, NamedThing(..), nameOccName, isExternalName )
 import NameSet		( NameSet, elemNameSet )
-import Module		( Module )
 import CostCentre	( CostCentre, pprCostCentreCore )
 import Literal		( Literal )
 import ForeignCall	( ForeignCall )
@@ -556,13 +555,12 @@ tyThingToIfaceDecl dis abstr ext (ADataCon dc)
 
 
 --------------------------
-dfunToIfaceInst :: DFunId -> IfaceInst
-dfunToIfaceInst dfun_id
+dfunToIfaceInst :: (Name -> IfaceExtName) -> DFunId -> IfaceInst
+dfunToIfaceInst ext_lhs dfun_id
   = IfaceInst { ifDFun     = nameOccName dfun_name, 
-		ifInstHead = toIfaceType (mkLhsNameFn mod) tidy_ty }
+		ifInstHead = toIfaceType ext_lhs tidy_ty }
   where
     dfun_name = idName dfun_id
-    mod = nameModule dfun_name
     (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun_id)
     head_ty = mkForAllTys tvs (mkPredTy (mkClassPred cls tys))
 	-- No need to record the instance context; 
@@ -621,17 +619,18 @@ toIfaceIdInfo ext id_info
 		  | otherwise	= Just (HsUnfold inline_prag (toIfaceExpr ext rhs))
 
 --------------------------
-coreRuleToIfaceRule :: Module -> (Name -> IfaceExtName) -> IdCoreRule -> IfaceRule
-coreRuleToIfaceRule mod ext (IdCoreRule id _ (BuiltinRule _ _))
+coreRuleToIfaceRule :: (Name -> IfaceExtName) 	-- For the LHS names
+		    -> (Name -> IfaceExtName) 	-- For the RHS names
+		    -> IdCoreRule -> IfaceRule
+coreRuleToIfaceRule ext_lhs ext_rhs (IdCoreRule id _ (BuiltinRule _ _))
   = pprTrace "toHsRule: builtin" (ppr id) (bogusIfaceRule (mkIfaceExtName (getName id)))
 
-coreRuleToIfaceRule mod ext (IdCoreRule id _ (Rule name act bndrs args rhs))
+coreRuleToIfaceRule ext_lhs ext_rhs (IdCoreRule id _ (Rule name act bndrs args rhs))
   = IfaceRule { ifRuleName  = name, ifActivation = act, 
-		ifRuleBndrs = map (toIfaceBndr ext) bndrs,
-		ifRuleHead  = ext (idName id), 
-		ifRuleArgs  = map (toIfaceExpr (mkLhsNameFn mod)) args,
-			-- Use LHS name-fn for the args
-		ifRuleRhs = toIfaceExpr ext rhs }
+		ifRuleBndrs = map (toIfaceBndr ext_lhs) bndrs,
+		ifRuleHead  = ext_lhs (idName id), 
+		ifRuleArgs  = map (toIfaceExpr ext_lhs) args,
+		ifRuleRhs = toIfaceExpr ext_rhs rhs }
 
 bogusIfaceRule :: IfaceExtName -> IfaceRule
 bogusIfaceRule id_name
@@ -700,18 +699,6 @@ toIfaceVar ext v
   | otherwise			    = IfaceLcl (nameOccName name)
   where
     name = idName v
-
----------------------
--- mkLhsNameFn ignores versioning info altogether
--- Used for the LHS of instance decls and rules, where we 
--- there's no point in recording version info
-mkLhsNameFn :: Module -> Name -> IfaceExtName
-mkLhsNameFn this_mod name	
-  | mod == this_mod = LocalTop occ
-  | otherwise	    = ExtPkg mod occ
-  where
-    mod = nameModule name
-    occ	= nameOccName name
 \end{code}
 
 

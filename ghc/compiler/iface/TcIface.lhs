@@ -22,7 +22,7 @@ import BuildTyCl	( buildSynTyCon, buildAlgTyCon, buildDataCon, buildClass,
 			  mkAbstractTyConRhs, mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
 import Type		( liftedTypeKind, splitTyConApp, 
-			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType, pprClassPred )
+			  mkTyVarTys, mkGenTyConApp, ThetaType, pprClassPred )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
@@ -577,9 +577,9 @@ tcIfaceRule (IfaceBuiltinRule fn_rdr core_rule)
 	; returnM (IdCoreRule fn (isOrphNm fn_rdr) core_rule) }
 
 isOrphNm :: IfaceExtName -> Bool
-isOrphNm (LocalTop _)      = False
-isOrphNm (LocalTopSub _ _) = False
-isOrphNm other		   = True
+-- An orphan name comes from somewhere other than this module,
+-- so it has a non-local name
+isOrphNm name = not (isLocalIfaceExtName name)
 \end{code}
 
 
