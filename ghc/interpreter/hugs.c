@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.34 $
- * $Date: 2000/01/10 16:27:03 $
+ * $Revision: 1.35 $
+ * $Date: 2000/01/11 14:21:43 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -320,6 +320,7 @@ String argv[]; {
    }
 
    addStackEntry("Prelude");
+   if (combined) addStackEntry("PrelHugs");
 
    for (i=1; i < argc; ++i) {            /* process command line arguments  */
         if (strcmp(argv[i], "--")==0) break;
@@ -1385,6 +1386,7 @@ static Void local evaluator() {        /* evaluate expr and print value    */
     checkExp();
     defaultDefns = evalDefaults;
     type         = typeCheckExp(TRUE);
+
     if (isPolyType(type)) {
         ks = polySigOf(type);
         bd = monotypeOf(type);
@@ -1418,9 +1420,9 @@ static Void local evaluator() {        /* evaluate expr and print value    */
             ERRTEXT   "\n"
             EEND;
         }
-        inputExpr = ap2(findName(findText("show")),d,inputExpr);
-        inputExpr = ap(findName(findText("putStr")), inputExpr);
-        inputExpr = ap(nameRunIO_toplevel, inputExpr);
+        inputExpr = ap2(nameShow,           d,inputExpr);
+        inputExpr = ap (namePutStr,         inputExpr);
+        inputExpr = ap (nameRunIO_toplevel, inputExpr);
 
         evalExp(); printf("\n");
         if (addType) {

@@ -1,7 +1,10 @@
 
 extern Cell conCons;
 
+extern Name nameShow;
+extern Name namePutStr;
 extern Name nameRunIO_toplevel;
+
 
 /* The following data constructors are used to box unboxed
  * arguments and are treated differently by the code generator.

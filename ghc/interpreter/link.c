@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.31 $
- * $Date: 2000/01/10 17:19:33 $
+ * $Revision: 1.32 $
+ * $Date: 2000/01/11 14:21:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -89,6 +89,8 @@ Name nameBind;             /* for translating monad comps     */
 Name nameZero;                          /* for monads with a zero          */
 
 Name nameId;
+Name nameShow;
+Name namePutStr;
 Name nameRunIO_toplevel;
 Name namePrint;
 
@@ -331,7 +333,8 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
         classFloating            = linkClass("Floating");
         classNum                 = linkClass("Num");
         classMonad               = linkClass("Monad");
-
+assert(nonNull(typeDouble));
+assert(nonNull(typeInteger));
         stdDefaults              = NIL;
         stdDefaults              = cons(typeDouble,stdDefaults);
 #       if DEFAULT_BIGNUM
@@ -378,6 +381,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
 	*/
         name(namePrimTakeMVar).type = primType(MONAD_Id, "rbc", "d");
 
+        if (combined) {
         for (i=2; i<=NUM_DTUPLES; i++) {/* Add derived instances of tuples */
             addTupInst(classEq,i);
             addTupInst(classOrd,i);
@@ -385,6 +389,7 @@ Void linkPreludeTC(void) {              /* Hook to tycons and classes in   */
             addTupInst(classShow,i);
             addTupInst(classRead,i);
             addTupInst(classBounded,i);
+        }
         }
     }
 }
@@ -424,8 +429,10 @@ Void linkPreludeCM(void) {              /* Hook to cfuns and mfuns in      */
         nameInRange      = linkName("inRange");
         nameMinus        = linkName("-");
         /* These come before calls to implementPrim */
+        if (combined) {
         for(i=0; i<NUM_TUPLES; ++i) {
             implementTuple(i);
+        }
         }
     }
 }
@@ -440,26 +447,30 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
 
         /* primops */
         nameMkIO           = linkName("hugsprimMkIO");
-        for (i=0; asmPrimOps[i].name; ++i) {
-            Text t = findText(asmPrimOps[i].name);
-            Name n = findName(t);
-            if (isNull(n)) {
-                n = newName(t,NIL);
-            }
-            name(n).line   = 0;
-            name(n).defn   = NIL;
-            name(n).type   = primType(asmPrimOps[i].monad,
-                                      asmPrimOps[i].args,
-                                      asmPrimOps[i].results);
-            name(n).arity  = strlen(asmPrimOps[i].args);
-            name(n).primop = &(asmPrimOps[i]);
-            implementPrim(n);
-        }
 
+        if (!combined) {
+           for (i=0; asmPrimOps[i].name; ++i) {
+               Text t = findText(asmPrimOps[i].name);
+               Name n = findName(t);
+               if (isNull(n)) {
+                   n = newName(t,NIL);
+               }
+               name(n).line   = 0;
+               name(n).defn   = NIL;
+               name(n).type   = primType(asmPrimOps[i].monad,
+                                         asmPrimOps[i].args,
+                                         asmPrimOps[i].results);
+               name(n).arity  = strlen(asmPrimOps[i].args);
+               name(n).primop = &(asmPrimOps[i]);
+               implementPrim(n);
+           }
+        }
         /* static(tidyInfix)                        */
         nameNegate         = linkName("negate");
         /* user interface                           */
         nameRunIO_toplevel = linkName("hugsprimRunIO_toplevel");
+        nameShow           = linkName("show");
+        namePutStr         = linkName("putStr");
         namePrint          = linkName("print");
         /* desugar                                  */
         nameOtherwise      = linkName("otherwise");
@@ -469,11 +480,11 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         namePmSub          = linkName("hugsprimPmSub");
 #       endif                          
         /* translator                               */
-        nameEqChar         = linkName("primEqChar");
+        nameEqChar         = linkName("hugsprimEqChar");
         nameCreateAdjThunk = linkName("hugsprimCreateAdjThunk");
         namePmInt          = linkName("hugsprimPmInt");
         namePmInteger      = linkName("hugsprimPmInteger");
-        namePmDouble       = linkName("primPmDouble");
+        namePmDouble       = linkName("hugsprimPmDouble");
  
         namePmFromInteger = linkName("hugsprimPmFromInteger");
         namePmSubtract    = linkName("hugsprimPmSubtract");
