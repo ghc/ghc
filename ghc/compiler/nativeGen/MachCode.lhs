@@ -49,6 +49,7 @@ import Stix		( pprStixStmt )
 
 -- DEBUGGING ONLY
 import IOExts		( trace )
+import Outputable	( assertPanic )
 
 infixr 3 `bind`
 \end{code}
