@@ -1,5 +1,6 @@
 getDirectoryContents001
 getDirectoryContents001.comp.stderr
+getDirectoryContents001.hi
 getDirectoryContents001.hs
 getDirectoryContents001.o
 getDirectoryContents001.run.stderr

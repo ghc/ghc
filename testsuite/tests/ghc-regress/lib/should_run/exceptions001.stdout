@@ -1,6 +1,6 @@
 user exception caught
 error call caught
 no method error
-./exceptions001.hs:39: Non-exhaustive patterns in function test1
-./exceptions001.hs:46: Non-exhaustive patterns in function test2
+exceptions001.hs:39: Non-exhaustive patterns in function test1
+exceptions001.hs:46: Non-exhaustive patterns in function test2
 43
