@@ -46,10 +46,10 @@ import Bag		( isEmptyBag )
 import ErrUtils		( Message, printErrorsAndWarnings, dumpIfSet )
 import Id		( Id, idType, idName )
 import Module           ( pprModuleName, mkThisModule )
-import OccName		( isSysOcc )
-import Name		( Name, nameUnique, nameOccName, isLocallyDefined, 
+import Name		( Name, nameUnique, nameOccName, isLocallyDefined, isGlobalName,
 			  toRdrName, nameEnvElts, NamedThing(..)
 			)
+import OccName		( isSysOcc )
 import TyCon		( TyCon, tyConKind, tyConClass_maybe )
 import Class		( Class, classSelIds, classTyCon )
 import PrelInfo		( mAIN_Name )
@@ -115,7 +115,9 @@ dump_sigs results	-- Print type signatures
     ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
 
     want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = isLocallyDefined n && not (isSysOcc (nameOccName n))
+	        | otherwise	     = isLocallyDefined n && 
+				       isGlobalName n && 
+				       not (isSysOcc (nameOccName n))
 				     where
 				       n = idName id
 
