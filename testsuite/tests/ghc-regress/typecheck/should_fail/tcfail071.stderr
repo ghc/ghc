@@ -9,9 +9,8 @@ tcfail071.hs:5:
 
 tcfail071.hs:10:
     Cannot unify the type-signature variable `e'
-	with the type `a -> b -> b'
+	with the type `t -> t1'
 	Expected type: a -> b -> b
 	Inferred type: e
-    Probable cause: `f' is applied to too many arguments in the call
-	(f c)
+    In the first argument of `f', namely `c'
     In the first argument of `foldr', namely `(f c)'
