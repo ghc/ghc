@@ -92,7 +92,6 @@ codeGen dflags mod_name imported_modules cost_centre_info fe_binders
 	}
   where
     data_tycons = filter isDataTyCon tycons
-
     cinfo       = MkCompInfo mod_name
 \end{code}
 
@@ -229,7 +228,7 @@ mkSRT lbl ids these
 				`thenFC` \ (id, _, _) -> returnFC id
 		(id':_) -> returnFC id'
 
--- if we're splitting the object, we need to globalise all the top-level names
+-- If we're splitting the object, we need to globalise all the top-level names
 -- (and then make sure we only use the globalised one in any C label we use
 -- which refers to this name).
 maybeGlobaliseId :: Id -> FCode Id

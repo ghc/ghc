@@ -23,7 +23,7 @@ import Var		( Id, Var )
 import Id		( idType, idInfo, idName, isExportedId, 
 			  idSpecialisation, idUnique, isDataConWrapId,
 			  mkVanillaGlobal, mkGlobalId, isLocalId, 
-			  hasNoBinding, mkUserLocal, isGlobalId, globalIdDetails,
+			  isDataConId, mkUserLocal, isGlobalId, globalIdDetails,
 			  idNewDemandInfo, setIdNewDemandInfo, 
 			  idNewStrictness_maybe, setIdNewStrictness
 			) 
@@ -224,9 +224,9 @@ mkFinalTypeEnv type_env final_ids
 	-- in interface files, because they are needed by importing modules when
 	-- using the compilation manager
 
-	-- We keep "hasNoBinding" Ids, notably constructor workers, 
+	-- We keep constructor workers, 
 	-- because they won't appear in the bindings from which final_ids are derived!
-    keep_it (AnId id) = hasNoBinding id	-- Remove all Ids except constructor workers
+    keep_it (AnId id) = isDataConId id	-- Remove all Ids except constructor workers
     keep_it other     = True		-- Keep all TyCons and Classes
 \end{code}
 

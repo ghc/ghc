@@ -501,11 +501,14 @@ coreToStgApp maybe_thunk_body f args
 	-- NB: f_arity is only consulted for LetBound things
 	f_arity = case how_bound of 
 			LetBound _ arity -> arity
+			ImportBound	 -> idArity f
+
+	saturated = f_arity <= n_val_args
 
 	fun_occ 
-	 | not_letrec_bound		        = noBinderInfo	-- Uninteresting variable
-	 | f_arity > 0 && f_arity <= n_val_args = stgSatOcc	-- Saturated or over-saturated function call
-	 | otherwise			        = stgUnsatOcc	-- Unsaturated function or thunk
+	 | not_letrec_bound	    = noBinderInfo	-- Uninteresting variable
+	 | f_arity > 0 && saturated = stgSatOcc	-- Saturated or over-saturated function call
+	 | otherwise		    = stgUnsatOcc	-- Unsaturated function or thunk
 
 	fun_escs
 	 | not_letrec_bound      = emptyVarSet	-- Only letrec-bound escapees are interesting
@@ -528,10 +531,12 @@ coreToStgApp maybe_thunk_body f args
 
 	res_ty = exprType (mkApps (Var f) args)
 	app = case globalIdDetails f of
-      		DataConId dc -> StgConApp dc				 args'
-	        PrimOpId op  -> StgOpApp  (StgPrimOp op)		 args' res_ty
-		FCallId call -> StgOpApp  (StgFCallOp call (idUnique f)) args' res_ty
-		_other       -> StgApp f args'
+      		DataConId dc | saturated -> StgConApp dc args'
+	        PrimOpId op  		 -> ASSERT( saturated )
+					    StgOpApp (StgPrimOp op) args' res_ty
+		FCallId call		 -> ASSERT( saturated )
+					    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+		_other      		 -> StgApp f args'
 
     in
     returnLne (
@@ -813,14 +818,8 @@ unitLiveCaf caf = (emptyVarSet, unitVarSet caf)
 addLiveVar :: LiveInfo -> Id -> LiveInfo
 addLiveVar (lvs, cafs) id = (lvs `extendVarSet` id, cafs)
 
-deleteLiveVar :: LiveInfo -> Id -> LiveInfo
-deleteLiveVar (lvs, cafs) id = (lvs `delVarSet` id, cafs)
-
 unionLiveInfo :: LiveInfo -> LiveInfo -> LiveInfo
 unionLiveInfo (lv1,caf1) (lv2,caf2) = (lv1 `unionVarSet` lv2, caf1 `unionVarSet` caf2)
-
-unionLiveInfos :: [LiveInfo] -> LiveInfo
-unionLiveInfos lvs = foldr unionLiveInfo emptyLiveInfo lvs
 
 mkSRT :: LiveInfo -> SRT
 mkSRT (_, cafs) = SRTEntries cafs
@@ -940,10 +939,13 @@ type FreeVarsInfo = VarEnv (Var, HowBound, StgBinderInfo)
 	-- we look up just once when we encounter the occurrence.
 	-- INVARIANT: Any ImportBound Ids are HaveCafRef Ids
 	--	      Imported Ids without CAF refs are simply
-	--	      not put in the FreeVarsInfo for an expression;
-	--	      see singletonFVInfo
+	--	      not put in the FreeVarsInfo for an expression.
+	--	      See singletonFVInfo and freeVarsToLiveVars
 	--
-	-- StgBinderInfo
+	-- StgBinderInfo records how it occurs; notably, we
+	-- are interested in whether it only occurs in saturated 
+	-- applications, because then we don't need to build a
+	-- curried version.
 	-- If f is mapped to noBinderInfo, that means
 	-- that f *is* mentioned (else it wouldn't be in the
 	-- IdEnv at all), but perhaps in an unsaturated applications.
