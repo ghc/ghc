@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.39 2002/09/30 10:27:49 simonmar Exp $
+# $Id: Makefile,v 1.40 2002/12/20 09:31:11 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
@@ -38,7 +38,7 @@ ALL_DIRS = \
 
 PACKAGE = base
 
-SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude
+SRC_HC_OPTS += -fglasgow-exts -cpp -Iinclude -\#include HsBase.h
 SRC_HSC2HS_OPTS += -Iinclude -I$(FPTOOLS_TOP)/ghc/includes
 
 # Make sure we can get hold of regex.h
