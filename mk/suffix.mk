@@ -146,6 +146,7 @@ endif
 #-----------------------------------------------------------------------------
 # C-related suffix rules
 
+# UseGhcForCc is only relevant when not booting from HC files.
 ifeq "$(UseGhcForCc) $(BootingFromHc)" "YES NO"
 
 $(odir_)%.$(way_)o : %.c
