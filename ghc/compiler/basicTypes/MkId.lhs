@@ -47,7 +47,6 @@ import Type		( Type, ClassContext, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
 			  splitFunTys, splitForAllTys, unUsgTy,
 			  mkUsgTy, UsageAnn(..)
 			)
-import PprType		( pprParendType )
 import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
@@ -89,12 +88,10 @@ import FieldLabel	( FieldLabel, FieldLabelTag, mkFieldLabel, fieldLabelName,
 			)
 import CoreSyn
 import Maybes
-import BasicTypes	( Arity )
 import Unique
 import Maybe            ( isJust )
 import Outputable
 import Util		( assoc )
-import List		( nub )
 \end{code}		
 
 

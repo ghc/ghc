@@ -463,10 +463,11 @@ The basic encoding scheme is this.
 alreadyEncoded :: String -> Bool
 alreadyEncoded s = all ok s
 		 where
-		   ok ' ' = True		-- This is a bit of a lie; if we really wanted spaces
-						-- in names we'd have to encode them.  But we do put
-						-- spaces in ccall "occurrences", and we don't want to
-						-- reject them here
+		   ok ' ' = True
+			-- This is a bit of a lie; if we really wanted spaces
+			-- in names we'd have to encode them.  But we do put
+			-- spaces in ccall "occurrences", and we don't want to
+			-- reject them here
 		   ok ch  = ISALPHANUM ch
 
 alreadyEncodedFS :: FAST_STRING -> Bool
