@@ -331,14 +331,16 @@ rnExpr (HsPar e)
   = rnExpr e 		`thenRn` \ (e', fvs_e) ->
     returnRn (HsPar e', fvs_e)
 
-rnExpr (SectionL expr op)
-  = rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
-    rnExpr op	 	`thenRn` \ (op', fvs_op) ->
+rnExpr section@(SectionL expr op)
+  = rnExpr expr	 				`thenRn` \ (expr', fvs_expr) ->
+    rnExpr op	 				`thenRn` \ (op', fvs_op) ->
+    checkSectionPrec "left" section op' expr'	`thenRn_`
     returnRn (SectionL expr' op', fvs_op `plusFV` fvs_expr)
 
-rnExpr (SectionR op expr)
-  = rnExpr op	 	`thenRn` \ (op',   fvs_op) ->
-    rnExpr expr	 	`thenRn` \ (expr', fvs_expr) ->
+rnExpr section@(SectionR op expr)
+  = rnExpr op	 				`thenRn` \ (op',   fvs_op) ->
+    rnExpr expr	 				`thenRn` \ (expr', fvs_expr) ->
+    checkSectionPrec "right" section op' expr'	`thenRn_`
     returnRn (SectionR op' expr', fvs_op `plusFV` fvs_expr)
 
 rnExpr (CCall fun args may_gc is_casm fake_result_ty)
@@ -581,7 +583,7 @@ mkOpAppRn :: RenamedHsExpr			-- Left operand; already rearranged
 -- (e11 `op1` e12) `op2` e2
 mkOpAppRn e1@(OpApp e11 op1 fix1 e12) op2 fix2 e2
   | nofix_error
-  = addErrRn (precParseErr (get op1,fix1) (get op2,fix2))	`thenRn_`
+  = addErrRn (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenRn_`
     returnRn (OpApp e1 op2 fix2 e2)
 
   | associate_right
@@ -594,7 +596,7 @@ mkOpAppRn e1@(OpApp e11 op1 fix1 e12) op2 fix2 e2
 --	(- neg_arg) `op` e2
 mkOpAppRn e1@(NegApp neg_arg neg_op) op2 fix2 e2
   | nofix_error
-  = addErrRn (precParseErr (get neg_op,negateFixity) (get op2,fix2))	`thenRn_`
+  = addErrRn (precParseErr (pp_prefix_minus,negateFixity) (ppr_op op2,fix2))	`thenRn_`
     returnRn (OpApp e1 op2 fix2 e2)
 
   | associate_right
@@ -607,7 +609,7 @@ mkOpAppRn e1@(NegApp neg_arg neg_op) op2 fix2 e2
 --	e1 `op` - neg_arg
 mkOpAppRn e1 op1 fix1 e2@(NegApp neg_arg neg_op)	-- NegApp can occur on the right
   | not associate_right					-- We *want* right association
-  = addErrRn (precParseErr (get op1, fix1) (get neg_op, negateFixity))	`thenRn_`
+  = addErrRn (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))	`thenRn_`
     returnRn (OpApp e1 op1 fix1 e2)
   where
     (nofix_err, associate_right) = compareFixity fix1 negateFixity
@@ -619,8 +621,6 @@ mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
 	     ppr e1 $$ text "---" $$ ppr op $$ text "---" $$ ppr fix $$ text "---" $$ ppr e2
     )
     returnRn (OpApp e1 op fix e2)
-
-get (HsVar n) = n
 
 -- Parser left-associates everything, but 
 -- derived instances may have correctly-associated things to
@@ -652,7 +652,7 @@ mkConOpPatRn :: RenamedPat -> Name -> Fixity -> RenamedPat
 mkConOpPatRn p1@(ConOpPatIn p11 op1 fix1 p12) 
 	     op2 fix2 p2
   | nofix_error
-  = addErrRn (precParseErr (op1,fix1) (op2,fix2))	`thenRn_`
+  = addErrRn (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenRn_`
     returnRn (ConOpPatIn p1 op2 fix2 p2)
 
   | associate_right
@@ -667,7 +667,7 @@ mkConOpPatRn p1@(NegPatIn neg_arg)
 	  fix2@(Fixity prec2 dir2)
 	  p2
   | prec2 > negatePrecedence 	-- Precedence of unary - is wired in
-  = addErrRn (precParseNegPatErr (op2,fix2))	`thenRn_`
+  = addErrRn (precParseNegPatErr (ppr_op op2,fix2))	`thenRn_`
     returnRn (ConOpPatIn p1 op2 fix2 p2)
 
 mkConOpPatRn p1 op fix p2 			-- Default case, no rearrangment
@@ -703,18 +703,33 @@ checkPrec op (ConOpPatIn _ op1 _ _) right
 		  (op1_dir == InfixR && op_dir == InfixR && right ||
 		   op1_dir == InfixL && op_dir == InfixL && not right))
 
-	info  = (op,op_fix)
-	info1 = (op1,op1_fix)
+	info  = (ppr_op op,  op_fix)
+	info1 = (ppr_op op1, op1_fix)
 	(infol, infor) = if right then (info, info1) else (info1, info)
     in
     checkRn inf_ok (precParseErr infol infor)
 
 checkPrec op (NegPatIn _) right
   = lookupFixity op	`thenRn` \ op_fix@(Fixity op_prec op_dir) ->
-    checkRn (op_prec <= negatePrecedence) (precParseNegPatErr (op,op_fix))
+    checkRn (op_prec <= negatePrecedence) (precParseNegPatErr (ppr_op op,op_fix))
 
 checkPrec op pat right
   = returnRn ()
+
+-- Check precedence of (arg op) or (op arg) respectively
+-- If arg is itself an operator application, its precedence should
+-- be higher than that of op
+checkSectionPrec left_or_right section op arg
+  = case arg of
+	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
+	NegApp _ op	 -> go_for_it pp_prefix_minus negateFixity
+	other		 -> returnRn ()
+  where
+    HsVar op_name = op
+    go_for_it pp_arg_op arg_fix@(Fixity arg_prec _)
+	= lookupFixity op_name	`thenRn` \ op_fix@(Fixity op_prec _) ->
+	  checkRn (op_prec < arg_prec)
+		  (sectionPrecErr (ppr_op op_name, op_fix) (pp_arg_op, arg_fix) section)
 \end{code}
 
 Consider
@@ -837,25 +852,35 @@ mkAssertExpr =
 %************************************************************************
 
 \begin{code}
+ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
+ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
+pp_prefix_minus = ptext SLIT("prefix `-'")
+
 dupFieldErr str (dup:rest)
   = hsep [ptext SLIT("duplicate field name"), 
           quotes (ppr dup),
 	  ptext SLIT("in record"), text str]
 
 negPatErr pat 
-  = sep [ptext SLIT("prefix `-' not applied to literal in pattern"), quotes (ppr pat)]
+  = sep [pp_prefix_minus <+> ptext SLIT("not applied to literal in pattern"), 
+	 quotes (ppr pat)]
 
 precParseNegPatErr op 
   = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [ptext SLIT("prefix `-' has lower precedence than"), 
-	       pp_op op, 
+      4 (hsep [pp_prefix_minus <+> ptext SLIT("has lower precedence than"), 
+	       ppr_opfix op, 
 	       ptext SLIT("in pattern")])
 
 precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [ptext SLIT("cannot mix"), pp_op op1, ptext SLIT("and"), 
-	       pp_op op2,
+      4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
+	       ppr_opfix op2,
 	       ptext SLIT("in the same infix expression")])
+
+sectionPrecErr op arg_op section
+ = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
+	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
+	 nest 4 (ptext SLIT("In the section:") <+> quotes (ppr section))]
 
 nonStdGuardErr guard
   = hang (ptext
@@ -865,8 +890,6 @@ nonStdGuardErr guard
 patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
 	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
-
-pp_op (op, fix) = hcat [quotes (ppr op), space, parens (ppr fix)]
 
 patSynErr e 
   = sep [ptext SLIT("Pattern syntax in expression context:"),
