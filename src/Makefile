@@ -22,15 +22,15 @@ HaddockVersion : ../mk/version.mk
 
 ifeq "$(INSTALLING)" "1"
 ifeq "$(BIN_DIST)"   "1"
-HADDOCKLIB=$$\"\"libdir/haddock
+HADDOCKLIB=$$\"\"datadir/haddock
 HADDOCKBIN=$$\"\"libexecdir/$(HS_PROG)
 else
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 # --mixed is only provided by newer versions of cygpath (1.2 doesn't have it, for instance.)
-#HADDOCKLIB=$(shell cygpath --mixed $(libdir))
-HADDOCKLIB=$(shell cygpath -w $(libdir) | sed -e 's%\\%/%g')
+#HADDOCKLIB=$(shell cygpath --mixed $(datadir))
+HADDOCKLIB=$(shell cygpath -w $(datadir) | sed -e 's%\\%/%g')
 else
-HADDOCKLIB=$(libdir)
+HADDOCKLIB=$(datadir)
 endif # mingw
 HADDOCKBIN=$(libexecdir)/$(HS_PROG)
 endif # BIN_DIST
