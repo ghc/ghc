@@ -1,0 +1,140 @@
+Typechecked:
+AbsBinds [] [] [(a.t439, Test.a{-r79-})]
+    {- nonrec -}
+    a.t439 :: IoWorld -> (CHeapPtr, IoWorld)
+    a.t439
+	= ccall  a [CHeapPtr] 
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [(b.t440, Test.b{-r80-})]
+    {- nonrec -}
+    b.t440 :: IoWorld -> (StablePtr, IoWorld)
+    b.t440
+	= ccall  b [StablePtr] 
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [(c.t441, Test.c{-r81-})]
+    {- nonrec -}
+    c.t441 :: CHeapPtr -> IoWorld -> (Int, IoWorld)
+    c.t441
+	x.r211 = ccall  c [Int, CHeapPtr] x.r211
+{- nonrec -}
+{- nonrec -}
+AbsBinds [] [] [(d.t442, Test.d{-r82-})]
+    {- nonrec -}
+    d.t442 :: StablePtr -> IoWorld -> (Int, IoWorld)
+    d.t442
+	x.r212 = ccall  d [Int, StablePtr] x.r212
+{- nonrec -}
+{- nonrec -}
+Desugared:
+Test.a{-r79-} :: IoWorld -> (CHeapPtr, IoWorld)
+_NI_
+Test.a{-r79-} =
+    \ ds.d0 ->
+	case
+	    (case
+		 (case ds.d0 of {
+		    IoWorld ds.d1# -> ds.d1#
+		  })
+	     of {
+	       a.d6# -> ( _CCALL_ a [] CHeapPtr# )! a.d6#
+	     })
+	of {
+	  CHPPrimAndIoWorld ds.d2#  ds.d3# ->
+	      let {
+		a.d4 :: CHeapPtr
+		_NI_
+		a.d4 = CHP#! ds.d2# } in
+	      let {
+		a.d5 :: IoWorld
+		_NI_
+		a.d5 = IoWorld! ds.d3#
+	      } in  Tup2! CHeapPtr IoWorld a.d4 a.d5
+	}
+Test.b{-r80-} :: IoWorld -> (StablePtr, IoWorld)
+_NI_
+Test.b{-r80-} =
+    \ ds.d7 ->
+	case
+	    (case
+		 (case ds.d7 of {
+		    IoWorld ds.d8# -> ds.d8#
+		  })
+	     of {
+	       a.d13# -> ( _CCALL_ b [] StablePtr# )! a.d13#
+	     })
+	of {
+	  SPPrimAndIoWorld ds.d9#  ds.d10# ->
+	      let {
+		a.d11 :: StablePtr
+		_NI_
+		a.d11 = StablePtr#! ds.d9# } in
+	      let {
+		a.d12 :: IoWorld
+		_NI_
+		a.d12 = IoWorld! ds.d10#
+	      } in  Tup2! StablePtr IoWorld a.d11 a.d12
+	}
+Test.c{-r81-} :: CHeapPtr -> IoWorld -> (Int, IoWorld)
+_NI_
+Test.c{-r81-} =
+    \ x.r211  ds.d14 ->
+	case
+	    (case
+		 (case ds.d14 of {
+		    IoWorld ds.d15# -> ds.d15#
+		  })
+	     of {
+	       a.d21# ->
+		   case
+		       (case x.r211 of {
+			  CHP# ds.d16# -> ds.d16#
+			})
+		   of {
+		     a.d22# -> ( _CCALL_ c [CHeapPtr#] Int# )! a.d21# a.d22#
+		   }
+	     })
+	of {
+	  IntPrimAndIoWorld ds.d17#  ds.d18# ->
+	      let {
+		a.d19 :: Int
+		_NI_
+		a.d19 = I#! ds.d17# } in
+	      let {
+		a.d20 :: IoWorld
+		_NI_
+		a.d20 = IoWorld! ds.d18#
+	      } in  Tup2! Int IoWorld a.d19 a.d20
+	}
+Test.d{-r82-} :: StablePtr -> IoWorld -> (Int, IoWorld)
+_NI_
+Test.d{-r82-} =
+    \ x.r212  ds.d23 ->
+	case
+	    (case
+		 (case ds.d23 of {
+		    IoWorld ds.d24# -> ds.d24#
+		  })
+	     of {
+	       a.d30# ->
+		   case
+		       (case x.r212 of {
+			  StablePtr# ds.d25# -> ds.d25#
+			})
+		   of {
+		     a.d31# -> ( _CCALL_ d [StablePtr#] Int# )! a.d30# a.d31#
+		   }
+	     })
+	of {
+	  IntPrimAndIoWorld ds.d26#  ds.d27# ->
+	      let {
+		a.d28 :: Int
+		_NI_
+		a.d28 = I#! ds.d26# } in
+	      let {
+		a.d29 :: IoWorld
+		_NI_
+		a.d29 = IoWorld! ds.d27#
+	      } in  Tup2! Int IoWorld a.d28 a.d29
+	}

@@ -1,3 +1,0 @@
-FLAGS=-noC -ddump-ds -fglasgow-exts
-
-RunStdTest(cvh-unbox1,$(GHC),$(FLAGS) Life2.lhs -o2 cvh-unbox1.stderr)

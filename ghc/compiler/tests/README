@@ -1,77 +1,42 @@
-Installing a new compiler test
-==============================
+-------------------------------------------------------------------------------
+			GHC COMPILER TESTS
+-------------------------------------------------------------------------------
 
-[If the test if for the driver, the parser, the runtime system, the
-std prelude, ... in short _not_ the compiler, it belongs elsewhere.]
+This directory contains tests for various bits of the internals of ghc.
+Note that tests for other parts of the ghc system (such as the driver,
+parser, runtime system, standard prelude) belong elsewhere.
 
-1.  Copy your Haskell program into an appropriately named file in the
-    appropriate directory, e.g., "typecheck/tc093.hs" for the 93rd
-    typechecker test.
+Each test takes the form of a single program (for example, reader001.hs)
+and a files which specify ghc's expected error output (reader001.stderr).
 
-2.  Edit the Jmakefile in that dir to add your test: almost certainly
-    just a line of the form...
+"make reader001.runtest" will compile reader001.hs using ghc and compare
+the resulting output with that specified in the file reader001.stderr.
 
-RunStdTest(tc093,$(TESTGHC), "-ddump-tc tc093.hs", 0, /dev/null, tc093.stderr)
-           ^^^^^
-name of test||||
-                 ^^^^^^^^^^
-driver to use----||||||||||      	     	 
-                             ^^^^^^^^^^^^^^^^^^^^
-driver command line----------||||||||||||||||||||
-                                                  ^^
-expected exit status (0=success, 1=failure)-------||
-                                                     ^^^^^^^^^
-file holding expected standard output----------------|||||||||
-								^^^^^^^^^^^^^
-file holding expected output on standard error------------------|||||||||||||
+"make runtests" run all tests.
 
-    The example above is typical.  The command-line stuff may vary,
-    but it's likely to be "dump pass <foo> output" (e.g., -ddump-tc)
-    and the input file name.  Dump output is on stderr, hence the
-    expected-output files.
+-------------------------------------------------------------------------------
+			ADDING A NEW TEST
+-------------------------------------------------------------------------------
 
-    The current best documentation of the flags to use is in
-    $(TOP)/driver/ghc (invoke w/ -help option).
+To add a new test copy your Haskell program into an appropriately named
+file in the appropriate directory (for example, "typecheck/tc093.hs" for
+the 93rd typechecker test).
 
-3.  Create the expected-output files.  I'm usually lazy and just
-    "touch" them (creating an empty file), then update them (section
-    below) after the test has "failed".
+Edit the Makefile in that directory to add your test.  Most directories
+have some flags which are set for every test (RUNSTDTEST_OPTS), but you can
+also set some extra per-file runtest flags (to control the output of ghc,
+for instance).  Just set ttc093_flags to the flags you want.
 
-4.  "make Makefile", to make a Makefile from the Jmakefile.
+For example,
 
-5.  "make runtest_<testname>" (e.g., make runtest_tc093) to run the
-    one test.
+  tc093_flags = -noC -ddump-tc -x1
 
-    IF "make" FALLS OVER, THEN IMMEDIATEDLY "mv Makefile.bak Makefile"!!
-    You probably had a typo in the Jmakefile; fix it and resume from
-    step 4.
+-noC tells not bother generating any C (not point in doing that, since we
+only want to test the typechecker).  -ddump-tc tells ghc to dump the
+typechcker state, while -x1 tells runtest that the expected exit code is 1,
+not 0 (the default).
 
-
-Running tests
-=============
-
-* You may run all tests by typing "make runtests" (or, if you expect
-  or don't mind errors, "make -k runtests").
-
-* You may run one test <foo> with "make runtest_<foo>".
-
-* You may run tests <foo> to <bar> with a simple script,
-  "dotests <foo> <bar>".  You may pass "make" arguments to it as well,
-  as in:
-    	dotests -k tc019 tc028
-
-
-Updating the "expected output" files
-====================================
-
-Sometimes, it will happen that the differences between expected and
-actual output of the tests will not mean failure but that the actual
-output is "more correct".
-
-If you save the output of "make runtests" (mainly from "diff"), you
-may automatically update the expected-output files by using
-
-    patch -p0 < saved-output
-
-(You should probably ^C out of the "patch" if it doesn't do exactly
-what you expect.)
+"touch" the file tc093.stderr.  "make tc093.runtest" will then build
+tc093.runtest and fail (because the expected output doesn't match the empty
+tc093.stderr).  However, it is then easy to update tc093.stderr with the
+stuff printed out during "make tc093.runtest".
