@@ -22,7 +22,6 @@ import PrimRep		( PrimRep(..), isFloatingRep )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE, uF_UPDATEE, bLOCK_SIZE )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
-			  mkTopClosureLabel, mkErrorIO_innardsLabel,
 			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
 import Outputable
 
