@@ -613,7 +613,8 @@ sub mangle_asm {
 		   || ! /^L\$\d+$/ ) ) {
 	    local($thing);
 	    chop($thing = $_);
-	    print STDERR "Warning: retaining unknown function `$_' in output from C compiler"
+	    $thing =~ s/:$//;
+	    print STDERR "Warning: retaining unknown function \`$thing' in output from C compiler\n"
 		unless # $KNOWN_FUNNY_THING{$thing}
 		       /^${T_US}stg_.*${T_POST_LBL}$/o          # RTS internals
 		    || /^${T_US}__stg_.*${T_POST_LBL}$/o        # more RTS internals
