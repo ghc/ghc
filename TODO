@@ -1,15 +1,28 @@
-* more compact rendering for datatypes, like
-	data T = -- comment for T
-	   A	 -- comment for A
-	 | B     -- comment for B
+* when exporting a class method on its own, don't list the whole class in
+  the export list (we should try to construct the type of the method, somehow).
 
-* instances: list relevant instances in the documentation for classes and
-  datatypes.
+* Allow linking to a section name?
+
+* Class names aren't rendered as proper binders
+
+* for a constructor, don't fill its entire cell with a grey background.
+
+* don't link to M.x if M.x is re-exported via a 'module N' from module M.
+
+* switch to longer rendering form for datatypes when necessary?
+
+* Pick the preferred export names as per the paper.
+
+* Top-level package docs
+
+* instances: need to construct instances for deriving clauses, somehow.
 
 * attributes for individual declarations, eg.
     -- #abstract
   or targetted to a specific decl:
     -- #T: abstract
+
+  #long, #short, #noinstances (on a type or class)
 
 * A module re-export should only reference the target module if the
   target module is imported without hiding any of its exports (otherwise
@@ -52,4 +65,7 @@
 
 * clean up the layout: don't use table cellspacing, use CSS instead
 
-* implicit parameter support in the parser.
+* Support for the rest of GHC extensions in the parser:
+  - implicit parameters
+  - scoped type variables (return types left to do).
+
