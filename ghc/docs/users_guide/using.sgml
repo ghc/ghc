@@ -4,63 +4,6 @@
   <indexterm><primary>GHC, using</primary></indexterm>
   <indexterm><primary>using GHC</primary></indexterm>
 
-  <para>GHC can work in one of three &ldquo;modes&rdquo;:</para>
-
-  <variablelist>
-    <varlistentry>
-      <term><cmdsynopsis><command>ghc</command>
-	  <arg choice=plain>&ndash;&ndash;interactive</arg>
-	</cmdsynopsis></term>
-      <indexterm><primary>interactive mode</primary>
-      </indexterm>
-      <indexterm><primary>ghci</primary>
-      </indexterm>
-      <listitem>
-	<para>Interactive mode, which is also available as
-	<command>ghci</command>.  Interactive mode is described in
-	more detail in <xref linkend="ghci">.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term><cmdsynopsis><command>ghc</command>
-	  <arg choice=plain>&ndash;&ndash;make</arg>
-	</cmdsynopsis></term>
-      <indexterm><primary>make mode</primary>
-      </indexterm>
-      <indexterm><primary><option>&ndash;&ndash;make</option></primary>
-      </indexterm>
-      <listitem>
-	<para>In this mode, GHC will build a multi-module Haskell
-	program automatically, figuring out dependencies for itself.
-	If you have a straightforward Haskell program, this is likely
-	to be much easier, and faster, than using
-	<command>make</command>.</para>
-      </listitem>
-    </varlistentry>
-
-    <varlistentry>
-      <term><cmdsynopsis>
-	  <command>ghc</command>
-	  <group>
-	    <arg>-E</arg>
-	    <arg>-C</arg>
-	    <arg>-S</arg>
-	    <arg>-c</arg>
-	  </group>
-	</cmdsynopsis></term>
-      <indexterm><primary><option>-E</option></primary></indexterm>
-      <indexterm><primary><option>-C</option></primary></indexterm>
-      <indexterm><primary><option>-S</option></primary></indexterm>
-      <indexterm><primary><option>-c</option></primary></indexterm>
-      <listitem>
-	<para>This is the traditional batch-compiler mode, in which
-	  GHC can compile source files one at a time, or link objects
-	  together into an executable.</para>
-      </listitem>
-    </varlistentry>
-  </variablelist>
-  
   <sect1>
     <title>Options overview</title>
     
@@ -244,6 +187,332 @@ module X where
 
   </sect1>
 
+  <sect1 id="modes">
+    <title>Modes of operation</title>
+
+    <para>GHC's behaviour is firstly controlled by a mode flag.  Only
+    one of these flags may be given, but it does not necessarily need
+    to be the first option on the command-line.  The available modes
+    are:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>&ndash;&ndash;interactive</arg>
+	  </cmdsynopsis></term>
+	<indexterm><primary>interactive mode</primary>
+	</indexterm>
+	<indexterm><primary>ghci</primary>
+	</indexterm>
+	<listitem>
+	  <para>Interactive mode, which is also available as
+	  <command>ghci</command>.  Interactive mode is described in
+	  more detail in <xref linkend="ghci">.</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>&ndash;&ndash;make</arg>
+	  </cmdsynopsis></term>
+	<indexterm><primary>make mode</primary>
+	</indexterm>
+	<indexterm><primary><option>&ndash;&ndash;make</option></primary>
+	</indexterm>
+	<listitem>
+	  <para>In this mode, GHC will build a multi-module Haskell
+	  program automatically, figuring out dependencies for itself.
+	  If you have a straightforward Haskell program, this is
+	  likely to be much easier, and faster, than using
+	  <command>make</command>.  Make mode is described in <xref
+	  linkend="make-mode">.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>&ndash;e</arg> <arg choice=plain><replaceable>expr</replaceable></arg>
+	</cmdsynopsis></term>
+	<indexterm><primary>eval mode</primary>
+	</indexterm>
+	<listitem>
+	  <para>Expression-evaluation mode.  This is very similar to
+	  interactive mode, except that there is a single expression
+	  to evaluate (<replaceable>expr</replaceable>) which is given
+	  on the command line.  See <xref linkend="eval-mode"> for
+	  more details.</para>
+	</listitem>
+      </varlistentry>
+      
+      <varlistentry>
+	<term><cmdsynopsis>
+	    <command>ghc</command>
+	    <group>
+	      <arg>-E</arg>
+	      <arg>-C</arg>
+	      <arg>-S</arg>
+	      <arg>-c</arg>
+	    </group>
+	  </cmdsynopsis></term>
+	<indexterm><primary><option>-E</option></primary></indexterm>
+	<indexterm><primary><option>-C</option></primary></indexterm>
+	<indexterm><primary><option>-S</option></primary></indexterm>
+	<indexterm><primary><option>-c</option></primary></indexterm>
+	<listitem>
+	  <para>This is the traditional batch-compiler mode, in which
+	  GHC can compile source files one at a time, or link objects
+	  together into an executable.  This mode also applies if
+	  there is no other mode flag specified on the command line,
+	  in which case it means that the specified files should be
+	  compiled and then linked to form a program. See <xref
+	  linkend="options-order">.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>&ndash;M</arg></cmdsynopsis></term>
+	<indexterm><primary>dependency-generation mode</primary>
+	</indexterm>
+	<listitem>
+	  <para>Dependency-generation mode.  In this mode, GHC can be
+	  used to generate dependency information suitable for use in
+	  a <literal>Makefile</literal>.  See <xref
+	  linkend="sec-makefile-dependencies">.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><cmdsynopsis><command>ghc</command>
+	    <arg choice=plain>&ndash;&ndash;mk-dll</arg></cmdsynopsis></term>
+	<indexterm><primary>dependency-generation mode</primary>
+	</indexterm>
+	<listitem>
+	  <para>DLL-creation mode (Windows only).  See <xref
+	  linkend="win32-dlls-create">.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <sect2 id="make-mode">
+      <title>Using <command>ghc</command> <option>&ndash;&ndash;make</option></title>
+      
+      <indexterm><primary><option>&ndash;&ndash;make</option></primary>
+      </indexterm>
+      <indexterm><primary>separate compilation</primary>
+      </indexterm>
+      
+      <para>When given the <option>&ndash;&ndash;make</option> option,
+      GHC will build a multi-module Haskell program by following
+      dependencies from a single root module (usually
+      <literal>Main</literal>).  For example, if your
+      <literal>Main</literal> module is in a file called
+      <filename>Main.hs</filename>, you could compile and link the
+      program like this:</para>
+
+<screen>
+ghc &ndash;&ndash;make Main.hs
+</screen>
+
+      <para>The command line may contain any number of source file
+      names or module names; GHC will figure out all the modules in
+      the program by following the imports from these initial modules.
+      It will then attempt to compile each module which is out of
+      date, and finally if there is a <literal>Main</literal> module,
+      the program will also be linked into an executable.</para>
+
+      <para>The main advantages to using <literal>ghc
+      &ndash;&ndash;make</literal> over traditional
+      <literal>Makefile</literal>s are:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para>GHC doesn't have to be restarted for each compilation,
+	  which means it can cache information between compilations.
+	  Compiling a muli-module program with <literal>ghc
+	  &ndash;&ndash;make</literal> can be up to twice as fast as
+	  running <literal>ghc</literal> individually on each source
+	  file.</para>
+	</listitem>
+	<listitem>
+	  <para>You don't have to write a
+	<literal>Makefile</literal>.</para>
+	</listitem>
+	<indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary>
+	</indexterm>
+	<listitem>
+	  <para>GHC re-calculates the dependencies each time it is
+	  invoked, so the dependencies never get out of sync with the
+	  source.</para>
+	</listitem>
+      </itemizedlist>
+      
+      <para>Any of the command-line options described in the rest of
+      this chapter can be used with
+      <option>&ndash;&ndash;make</option>, but note that any options
+      you give on the command line will apply to all the source files
+      compiled, so if you want any options to apply to a single source
+      file only, you'll need to use an <literal>OPTIONS</literal>
+      pragma (see <xref linkend="source-file-options">).</para>
+
+      <para>If the program needs to be linked with additional objects
+      (say, some auxilliary C code), then the object files can be
+      given on the command line and GHC will include them when linking
+      the executable.</para>
+      
+      <para>Note that GHC can only follow dependencies if it has the
+      source file available, so if your program includes a module for
+      which there is no source file, even if you have an object and an
+      interface file for the module, then GHC will complain.  The
+      exception to this rule is for package modules, which may or may
+      not have source files.</para>
+
+      <para>The source files for the program don't all need to be in
+      the same directory; the <option>-i</option> option can be used
+      to add directories to the search path (see <xref
+      linkend="search-path">).</para>
+    </sect2>
+  
+    <sect2 id="eval-mode">
+      <title>Expression evaluation mode</title>
+
+      <para>This mode is very similar to interactive mode, except that
+      there is a single expression to evaluate which is specified on
+      the command line as an argument to the <option>-e</option>
+      option:</para>
+
+<screen>
+ghc -e <replaceable>expr</replaceable>
+</screen>
+
+      <para>Haskell source files may be named on the command line, and
+      they will be loaded exactly as in interactive mode.  The
+      expression is evaluated in the context of the loaded
+      modules.</para>
+
+      <para>For example, to load and run a Haskell program containing
+      a module <literal>Main</literal>, we might say</para>
+
+<screen>
+ghc -e Main.main Main.hs
+</screen>
+      
+      <para>or we can just use this mode to evaluate expressions in
+      the context of the <literal>Prelude</literal>:</para>
+
+<screen>
+$ ghc -e "interact (unlines.map reverse.lines)"
+hello
+olleh
+</screen>
+    </sect2>
+
+    <sect2 id="options-order">
+      <title>Batch compiler mode</title>
+      
+      <para>In this mode, GHC will compile one or more source files
+      given on the command line.</para>
+      
+      <para>The first phase to run is determined by each input-file
+      suffix, and the last phase is determined by a flag.  If no
+      relevant flag is present, then go all the way through linking.
+      This table summarises:</para>
+      
+      <informaltable>
+	<tgroup cols="4">
+	  <colspec align="left">
+	  <colspec align="left">
+	  <colspec align="left">
+	  <colspec align="left">
+	  
+	  <thead>
+	    <row>
+	      <entry>Phase of the compilation system</entry>
+	      <entry>Suffix saying &ldquo;start here&rdquo;</entry>
+	      <entry>Flag saying &ldquo;stop after&rdquo;</entry>
+	      <entry>(suffix of) output file</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry>literate pre-processor</entry>
+	      <entry><literal>.lhs</literal></entry>
+	      <entry>-</entry>
+	      <entry><literal>.hs</literal></entry>
+	    </row>
+	    
+	    <row>
+	      <entry>C pre-processor (opt.) </entry>
+	      <entry><literal>.hs</literal> (with
+	      <option>-cpp</option>)</entry>
+	      <entry><option>-E</option></entry>
+	      <entry><literal>.hspp</literal></entry>
+	    </row>
+	    
+	    <row>
+	      <entry>Haskell compiler</entry>
+	      <entry><literal>.hs</literal></entry>
+	      <entry><option>-C</option>, <option>-S</option></entry>
+	      <entry><literal>.hc</literal>, <literal>.s</literal></entry>
+	    </row>
+	    
+	    <row>
+	      <entry>C compiler (opt.)</entry>
+	      <entry><literal>.hc</literal> or <literal>.c</literal></entry>
+	      <entry><option>-S</option></entry>
+	      <entry><literal>.s</literal></entry>
+	    </row>
+	    
+	    <row>
+	      <entry>assembler</entry>
+	      <entry><literal>.s</literal></entry>
+	      <entry><option>-c</option></entry>
+	      <entry><literal>.o</literal></entry>
+	    </row>
+	    
+	    <row>
+	      <entry>linker</entry>
+	      <entry><replaceable>other</replaceable></entry>
+	      <entry>-</entry>
+	      <entry><filename>a.out</filename></entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+      
+      <indexterm><primary><option>-C</option></primary></indexterm>
+      <indexterm><primary><option>-E</option></primary></indexterm>
+      <indexterm><primary><option>-S</option></primary></indexterm>
+      <indexterm><primary><option>-c</option></primary></indexterm>
+      
+      <para>Thus, a common invocation would be: </para>
+
+<screen>
+ghc -c Foo.hs</screen>
+      
+      <para>to compile the Haskell source file
+      <filename>Foo.hs</filename> to an object file
+      <filename>Foo.o</filename>.</para>
+
+      <para>Note: What the Haskell compiler proper produces depends on
+      whether a native-code generator<indexterm><primary>native-code
+      generator</primary></indexterm> is used (producing assembly
+      language) or not (producing C).  See <xref
+      linkend="options-codegen"> for more details.</para>
+
+      <para>Note: C pre-processing is optional, the
+      <option>-cpp</option><indexterm><primary><option>-cpp</option></primary></indexterm>
+      flag turns it on.  See <xref linkend="c-pre-processor"> for more
+      details.</para>
+      
+      <para>Note: The option <option>-E</option><IndexTerm><Primary>-E
+      option</Primary></IndexTerm> runs just the pre-processing passes
+      of the compiler, dumping the result in a file.  Note that this
+      differs from the previous behaviour of dumping the file to
+      standard output.</para>
+    </sect2>
+  </sect1>
+
   <sect1 id="options-help">
     <title>Help and verbosity options</title>
 
@@ -374,184 +643,6 @@ module X where
       </varlistentry>
 
     </variablelist>
-  </sect1>
-
-  <sect1 id="make-mode">
-    <title>Using <command>ghc</command> <option>&ndash;&ndash;make</option></title>
-
-    <indexterm><primary><option>&ndash;&ndash;make</option></primary>
-    </indexterm>
-    <indexterm><primary>separate compilation</primary>
-    </indexterm>
-    
-    <para>When given the <option>&ndash;&ndash;make</option> option, GHC will
-    build a multi-module Haskell program by following dependencies
-    from a single root module (usually <literal>Main</literal>).  For
-    example, if your <literal>Main</literal> module is in a file
-    called <filename>Main.hs</filename>, you could compile and link
-    the program like this:</para>
-
-<screen>
-ghc &ndash;&ndash;make Main.hs
-</screen>
-
-    <para>The command line may contain any number of source file names
-    or module names; GHC will figure out all the modules in the
-    program by following the imports from these initial modules.  It
-    will then attempt to compile each module which is out of date, and
-    finally if there is a <literal>Main</literal> module, the program
-    will also be linked into an executable.</para>
-
-    <para>The main advantages to using <literal>ghc &ndash;&ndash;make</literal>
-    over traditional <literal>Makefile</literal>s are:</para>
-
-    <itemizedlist>
-      <listitem>
-	<para>GHC doesn't have to be restarted for each compilation,
-	which means it can cache information between compilations.
-	Compiling a muli-module program with <literal>ghc
-	&ndash;&ndash;make</literal> can be up to twice as fast as running
-	<literal>ghc</literal> individually on each source
-	file.</para>
-      </listitem>
-      <listitem>
-	<para>You don't have to write a
-	<literal>Makefile</literal>.</para>
-      </listitem>
-      <indexterm><primary><literal>Makefile</literal>s</primary><secondary>avoiding</secondary>
-      </indexterm>
-      <listitem>
-	<para>GHC re-calculates the dependencies each time it is
-	invoked, so the dependencies never get out of sync with the
-	source.</para>
-      </listitem>
-    </itemizedlist>
-
-    <para>Any of the command-line options described in the rest of
-    this chapter can be used with <option>&ndash;&ndash;make</option>, but note
-    that any options you give on the command line will apply to all
-    the source files compiled, so if you want any options to apply to
-    a single source file only, you'll need to use an
-    <literal>OPTIONS</literal> pragma (see <xref
-    linkend="source-file-options">).</para>
-
-    <para>If the program needs to be linked with additional objects
-    (say, some auxilliary C code), then the object files can be
-    given on the command line and GHC will include them when linking
-    the executable.</para>
-
-    <para>Note that GHC can only follow dependencies if it has the
-    source file available, so if your program includes a module for
-    which there is no source file, even if you have an object and an
-    interface file for the module, then GHC will complain.  The
-    exception to this rule is for package modules, which may or may
-    not have source files.</para>
-
-    <para>The source files for the program don't all need to be in the
-    same directory; the <option>-i</option> option can be used to add
-    directories to the search path (see <xref
-    linkend="search-path">).</para>
-
-  </sect1>
-  
-  <Sect1 id="options-order">
-    <title>GHC without <option>&ndash;&ndash;make</option></title>
-
-    <para>Without <option>&ndash;&ndash;make</option>, GHC will compile one or
-    more source files given on the command line.</para>
-
-    <para>The first phase to run is determined by each input-file
-    suffix, and the last phase is determined by a flag.  If no
-    relevant flag is present, then go all the way through linking.
-    This table summarises:</para>
-
-    <informaltable>
-      <tgroup cols="4">
-	<colspec align="left">
-	<colspec align="left">
-	<colspec align="left">
-	<colspec align="left">
-
-	<thead>
-	  <row>
-	    <entry>Phase of the compilation system</entry>
-	    <entry>Suffix saying &ldquo;start here&rdquo;</entry>
-	    <entry>Flag saying &ldquo;stop after&rdquo;</entry>
-	    <entry>(suffix of) output file</entry>
-	  </row>
-	</thead>
-	<tbody>
-	  <row>
-	    <entry>literate pre-processor</entry>
-	    <entry><literal>.lhs</literal></entry>
-	    <entry>-</entry>
-	    <entry><literal>.hs</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry>C pre-processor (opt.)
-           </entry> 
-	    <entry><literal>.hs</literal> (with
-	    <option>-cpp</option>)</entry>
-	    <entry><option>-E</option></entry>
-	    <entry><literal>.hspp</literal></entry>
-	  </row>
-	  
-	  <row>
-	    <entry>Haskell compiler</entry>
-	    <entry><literal>.hs</literal></entry>
-	    <entry><option>-C</option>, <option>-S</option></entry>
-	    <entry><literal>.hc</literal>, <literal>.s</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry>C compiler (opt.)</entry>
-	    <entry><literal>.hc</literal> or <literal>.c</literal></entry>
-	    <entry><option>-S</option></entry>
-	    <entry><literal>.s</literal></entry>
-	  </row>
-
-	  <row>
-	    <entry>assembler</entry>
-	    <entry><literal>.s</literal></entry>
-	    <entry><option>-c</option></entry>
-	    <entry><literal>.o</literal></entry>
-	  </row>
-	  
-	  <row>
-	    <entry>linker</entry>
-	    <entry><replaceable>other</replaceable></entry>
-	    <entry>-</entry>
-	    <entry><filename>a.out</filename></entry>
-	  </row>
-	</tbody>
-      </tgroup>
-    </informaltable>
-
-    <indexterm><primary><option>-C</option></primary></indexterm>
-    <indexterm><primary><option>-E</option></primary></indexterm>
-    <indexterm><primary><option>-S</option></primary></indexterm>
-    <indexterm><primary><option>-c</option></primary></indexterm>
-
-    <para>Thus, a common invocation would be: <literal>ghc -c
-    Foo.hs</literal></para>
-
-    <para>Note: What the Haskell compiler proper produces depends on
-    whether a native-code generator<indexterm><primary>native-code
-    generator</primary></indexterm> is used (producing assembly
-    language) or not (producing C).  See <xref
-    linkend="options-codegen"> for more details.</para>
-
-    <para>Note: C pre-processing is optional, the
-    <option>-ccp</option><indexterm><primary><option>-cpp</option></primary>
-      </indexterm>flag turns it on.  See <xref
-    linkend="c-pre-processor"> for more details.</para>
-
-    <para>Note: The option <option>-E</option><IndexTerm><Primary>-E
-    option</Primary></IndexTerm> runs just the pre-processing passes
-    of the compiler, dumping the result in a file.  Note that this
-    differs from the previous behaviour of dumping the file to
-    standard output.</para>
   </sect1>
 
   &separate;
