@@ -17,8 +17,6 @@
 --	    Mark P Jones (<http://www.cse.ogi.edu/~mpj>)
 --		  Advanced School of Functional Programming, 1995.
 --
--- Oct. 1st, 2002: Added instances for Lazy ST, ST, and List monads
---           
 -----------------------------------------------------------------------------
 
 module Control.Monad.Fix (
@@ -29,8 +27,6 @@ module Control.Monad.Fix (
   ) where
 
 import Prelude
-import qualified Control.Monad.ST.Lazy as LazyST
-import qualified Control.Monad.ST as ST
 import System.IO
 
 fix :: (a -> a) -> a
@@ -39,7 +35,7 @@ fix f = let x = f x in x
 class (Monad m) => MonadFix m where
 	mfix :: (a -> m a) -> m a
 
--- Instances of MonadFix
+-- Instances of MonadFix for Prelude monads
 
 -- Maybe:
 instance MonadFix Maybe where
@@ -55,11 +51,3 @@ instance MonadFix [] where
 -- IO:
 instance MonadFix IO where
     mfix = fixIO 
-
--- Lazy State:
-instance MonadFix (LazyST.ST s) where
-    mfix = LazyST.fixST
-    
--- Strict State:
-instance MonadFix (ST.ST s) where
-    mfix = ST.fixST

@@ -36,6 +36,8 @@ module Control.Monad.ST.Lazy (
 
 import Prelude
 
+import Control.Monad.Fix
+
 #ifdef __GLASGOW_HASKELL__
 import qualified Control.Monad.ST as ST
 import qualified GHC.ST
@@ -85,6 +87,9 @@ fixST m = ST (\ s ->
 		in
 		   (r,s'))
 #endif
+
+instance MonadFix (ST s) where
+	mfix = fixST
 
 -- ---------------------------------------------------------------------------
 -- Strict <--> Lazy
