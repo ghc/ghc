@@ -147,6 +147,14 @@ tcMonoExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
    tcSubExp res_ty inst_sig_ty		`thenTc` \ (co_fn, lie3) ->
 
    returnTc (co_fn <$> inst_fn expr', lie1 `plusLIE` lie2 `plusLIE` lie3)
+
+tcMonoExpr (HsType ty) res_ty
+  = failWithTc (text "Can't handle type argument:" <+> ppr ty)
+	-- This is the syntax for type applications that I was planning
+	-- but there are difficulties (e.g. what order for type args)
+	-- so it's not enabled yet.
+	-- Can't eliminate it altogether from the parser, because the
+	-- same parser parses *patterns*.
 \end{code}
 
 
