@@ -80,6 +80,11 @@ option on all the Haskell modules that make up your application.
 </Title>
 
 <Para>
+<Strong>Making libraries into DLLs doesn't work on Windows at the
+moment (and is no longer supported); however, all the machinery is
+still there. If you're interested, contact the GHC team. Note that
+building an entire Haskell application as a DLL is still supported
+(it's just inter-DLL Haskell calls that don't work).</Strong>
 <IndexTerm><Primary>Creating a Win32 DLL</Primary></IndexTerm>
 <IndexTerm><Primary>--mk-dll</Primary></IndexTerm>
 Sealing up your Haskell library inside a DLL is straightforward;

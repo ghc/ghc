@@ -79,7 +79,10 @@
 	  single DLL on Windows is that the package system is used to
 	  tell the compiler when it should make an inter-DLL call
 	  rather than an intra-DLL call (inter-DLL calls require an
-	  extra indirection).</para>
+	  extra indirection). <Strong>Building packages as DLLs
+	  doesn't work at the moment; see <XRef
+	  LinkEnd="win32-dlls-create"> for the gory details.</Strong>
+	  </para>
 
 	  <para>Versions of the Haskell libraries for use with GHCi
 	  may also be included: GHCi cannot load <literal>.a</literal>
@@ -127,8 +130,8 @@ ld -r --whole-archive -o HSfoo.o libHSfoo.a
       bear in mind that we might add support for Unix shared libraries
       at some point in the future.</para>
 
-      <para>It is worth noting that on Windows, because each package
-      is built as a DLL, and a reference to a DLL costs an extra
+      <para>It is worth noting that on Windows, when each package
+      is built as a DLL, since a reference to a DLL costs an extra
       indirection, intra-package references are cheaper than
       inter-package references. Of course, this applies to the
       <filename>Main</filename> package as well.</para>
@@ -277,7 +280,8 @@ ld -r --whole-archive -o HSfoo.o libHSfoo.a
 	  <listitem>
 	    <para>A list of libraries containing Haskell code for this
 	    package, with the <literal>.a</literal> or
-	    <literal>.dll</literal> suffix omitted.  On Unix, the
+	    <literal>.dll</literal> suffix omitted.  When packages are
+	    built as libraries, the
 	    <literal>lib</literal> prefix is also omitted.</para>
 
 	    <para>For use with GHCi, each library should have an
