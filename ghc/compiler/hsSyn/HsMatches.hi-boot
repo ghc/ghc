@@ -1,0 +1,21 @@
+_interface_ HsMatches 1
+_exports_
+HsMatches Match GRHSsAndBinds pprMatch pprMatches pprGRHSsAndBinds ;
+_declarations_
+1 data Match a b c d ;
+1 data GRHSsAndBinds a b c d ;
+1 pprGRHSsAndBinds _:_ _forall_ [a b c d] {Name.NamedThing c, Outputable.Outputable c, 
+					   Outputable.Outputable d, PrelBase.Eq a, 
+					   Outputable.Outputable a, PrelBase.Eq b, Outputable.Outputable b}
+		   => Outputable.PprStyle -> PrelBase.Bool -> GRHSsAndBinds a b c d -> Pretty.Doc ;;
+
+1 pprMatch _:_ _forall_ [a b c d] {Name.NamedThing c, Outputable.Outputable c, 
+				   Outputable.Outputable d, PrelBase.Eq a, 
+				   Outputable.Outputable a, PrelBase.Eq b, Outputable.Outputable b} 
+		=> Outputable.PprStyle -> PrelBase.Bool -> Match a b c d -> Pretty.Doc ;;
+
+1 pprMatches _:_ _forall_ [a b c d] {Name.NamedThing c, Outputable.Outputable c,
+				    Outputable.Outputable d, PrelBase.Eq a,
+				    Outputable.Outputable a, PrelBase.Eq b, Outputable.Outputable b}
+		=> Outputable.PprStyle -> (PrelBase.Bool, Pretty.Doc) -> [Match a b c d] -> Pretty.Doc ;;
+
