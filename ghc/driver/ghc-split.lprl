@@ -200,7 +200,7 @@ sub process_asm_block_sparc {
     $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/g; # HACK HACK
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.align .\n(\.?LC\d+):\n(\t\.asci[iz].*\n)+)/ ) {
+    while ( $str =~ /(\t\.align .\n\.?(LC\d+):\n(\t\.asci[iz].*\n)+)/ ) {
 	local($label) = $2;
 	local($body)  = $1;
 
@@ -312,7 +312,7 @@ sub process_asm_block_iX86 {
     $str = "\.text\n\t.align 4\n" . $str;
 
     # remove/record any literal constants defined here
-    while ( ($str =~ /((\.?LC\d+):\n\t\.(ascii|string).*\n)/ )) {
+    while ( ($str =~ /(\.?(LC\d+):\n\t\.(ascii|string).*\n)/ )) {
 	local($label) = $2;
 	local($body)  = $1;
 
