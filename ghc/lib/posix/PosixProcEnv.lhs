@@ -4,6 +4,9 @@
 \section[PosixProcEnv]{Haskell 1.3 POSIX Process Environment}
 
 \begin{code}
+
+#include "config.h"
+
 module PosixProcEnv (
     ProcessTimes,
     SysVar(..),
