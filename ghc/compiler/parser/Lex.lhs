@@ -1000,6 +1000,7 @@ lex_id3 cont glaexts mod buf just_a_conid
      let
       lexeme  = lexemeToFastString buf'
       new_buf = mergeLexemes buf buf'
+      is_a_qvarid = cont (mk_qvar_token mod lexeme) new_buf
      in
      case _scc_ "Lex.haskellKeyword" lookupUFM haskellKeywordsFM lexeme of {
     	    Just kwd_token -> just_a_conid; -- avoid M.where etc.
@@ -1007,8 +1008,8 @@ lex_id3 cont glaexts mod buf just_a_conid
      if flag glaexts
        then case lookupUFM ghcExtensionKeywordsFM lexeme of {
     	    Just kwd_token -> just_a_conid;
-    	    Nothing        -> cont (mk_qvar_token mod lexeme) new_buf }
-       else just_a_conid
+    	    Nothing        -> is_a_qvarid }
+       else is_a_qvarid
      }}}
 
 
