@@ -38,20 +38,17 @@ import TysWiredIn
 import CStrings		( identToC )
 import Constants   	( mIN_MP_INT_SIZE, mP_STRUCT_SIZE )
 import HeapOffs		( addOff, intOff, totHdrSize, HeapOffset )
-import PprStyle		--( codeStyle, ifaceStyle )
+import Outputable	( PprStyle, Outputable(..), codeStyle, ifaceStyle )
 import PprType		( pprParendGenType, GenTyVar{-instance Outputable-} )
 import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
-import Type	{-	( getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts,
-			  mkForAllTys, mkFunTy, mkFunTys, applyTyCon, typePrimRep
-			) -}
+import Type		( mkForAllTys, mkFunTy, mkFunTys, applyTyCon, typePrimRep,
+			  getAppDataTyConExpandingDicts, SYN_IE(Type)
+			)
 import TyVar		--( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
 import Util		( panic#, assoc, panic{-ToDo:rm-} )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
 \end{code}
 
 %************************************************************************
@@ -1381,8 +1378,7 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 primOpInfo (CCallOp _ _ _ arg_tys result_ty)
   = AlgResult SLIT("ccall#") [] arg_tys result_tycon tys_applied
   where
-    (result_tycon, tys_applied, _) = --trace "PrimOp.getAppDataTyConExpandingDicts" $
-				     getAppDataTyConExpandingDicts result_ty
+    (result_tycon, tys_applied, _) = getAppDataTyConExpandingDicts result_ty
 
 #ifdef DEBUG
 primOpInfo op = panic ("primOpInfo:"++ show (I# (tagOf_PrimOp op)))

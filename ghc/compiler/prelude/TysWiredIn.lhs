@@ -83,7 +83,6 @@ module TysWiredIn (
 --import Pretty
 --import Util
 --import PprType
---import PprStyle
 --import Kind
 
 IMP_Ubiq()
@@ -100,8 +99,9 @@ import TysPrim
 import Kind		( mkBoxedTypeKind, mkArrowKind )
 import Name		--( mkWiredInTyConName, mkWiredInIdName, mkTupNameStr )
 import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
-			  NewOrData(..), TyCon, SYN_IE(Arity)
+			  TyCon, SYN_IE(Arity)
 			)
+import BasicTypes	( NewOrData(..) )
 import Type		( mkTyConTy, applyTyCon, mkSigmaTy, mkTyVarTys, 
 			  mkFunTy, mkFunTys, maybeAppTyCon,
 			  GenType(..), SYN_IE(ThetaType), SYN_IE(TauType) )

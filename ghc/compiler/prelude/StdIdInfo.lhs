@@ -21,6 +21,7 @@ module StdIdInfo (
 IMP_Ubiq()
 
 import Type
+import CmdLineOpts      ( opt_PprUserLength )
 import CoreSyn
 import Literal
 import CoreUnfold	( mkUnfolding, PragmaInfo(..) )
@@ -29,25 +30,22 @@ import Id		( GenId, mkTemplateLocals, idType,
 			  dataConStrictMarks, dataConFieldLabels, dataConArgTys,
 			  recordSelectorFieldLabel, dataConSig,
 			  StrictnessMark(..),
-			  isDataCon, isMethodSelId_maybe, isSuperDictSelId_maybe,
+			  isAlgCon, isMethodSelId_maybe, isSuperDictSelId_maybe,
 			  isRecordSelector, isPrimitiveId_maybe, 
 			  addIdUnfolding, addIdArity,
 			  SYN_IE(Id)
 			)
 import IdInfo		( ArityInfo, exactArity )
 import Class		( GenClass, GenClassOp, classSig, classOpLocalType )
-import TyCon		( isNewTyCon )
+import TyCon		( isNewTyCon, isDataTyCon, isAlgTyCon )
 import FieldLabel	( FieldLabel )
 import PrelVals		( pAT_ERROR_ID )
 import Maybes
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..), Outputable(..) )
 import Pretty
 import Util		( assertPanic, pprTrace, 
 			  assoc
 			)
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
 \end{code}		
 
 
@@ -86,7 +84,7 @@ addStandardIdInfo :: Id -> Id
 
 addStandardIdInfo con_id
 
-  | isDataCon con_id
+  | isAlgCon con_id
   = con_id `addIdUnfolding` unfolding
 	   `addIdArity` exactArity (length locals)
   where
@@ -145,7 +143,7 @@ We're going to build a record selector that looks like this:
 \begin{code}
 addStandardIdInfo sel_id
   | isRecordSelector sel_id
-  = ASSERT( null theta )
+  = ASSERT( null theta && isDataTyCon tycon )
     sel_id `addIdUnfolding` unfolding
 	   `addIdArity` exactArity 1 
 	-- ToDo: consider adding further IdInfo
@@ -175,7 +173,7 @@ addStandardIdInfo sel_id
 	    maybe_the_arg_id = assocMaybe (field_lbls `zip` arg_ids) field_lbl
 
 	error_expr = mkApp (Var pAT_ERROR_ID) [] [rhs_ty] [LitArg msg_lit]
- 	full_msg   = show (sep [text "No match in record selector", ppr PprForUser sel_id]) 
+ 	full_msg   = show (sep [text "No match in record selector", ppr (PprForUser opt_PprUserLength) sel_id]) 
 	msg_lit    = NoRepStr (_PK_ full_msg)
 \end{code}
 
