@@ -99,7 +99,9 @@ happening.
 <tag>@-ddump-<pass>@:</tag>
 <nidx>-ddump-&lt;pass&gt; options</nidx>
 Make a debugging dump after pass @<pass>@ (may be common enough to
-need a short form...).  Some of the most useful ones are:
+need a short form...).  You can get all of these at once (<em/lots/ of
+output) by using @-ddump-all@, or most of them with @-ddump-most@.
+Some of the most useful ones are:
 
 <descrip>
 <tag>@-ddump-rdr@:</tag> reader output (earliest stuff in the compiler)
