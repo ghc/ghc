@@ -20,16 +20,18 @@ module System.IO.Unsafe (
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase
+import GHC.IOBase (unsafePerformIO, unsafeInterleaveIO)
 #endif
 
 #ifdef __HUGS__
-import Hugs.IOExts
+import Hugs.IOExts (unsafePerformIO)
 #endif
 
 #ifdef __NHC__
 import NHC.Internal (unsafePerformIO)
+#endif
 
+#ifndef __GLASGOW_HASKELL__
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO f = let x = unsafePerformIO f in return x
+unsafeInterleaveIO f = return (unsafePerformIO f)
 #endif
