@@ -173,12 +173,24 @@ dmdAnal sigs dmd (Case scrut case_bndr [alt@(DataAlt dc,bndrs,rhs)])
     isProductTyCon tycon,
     not (isRecursiveTyCon tycon)
   = let
-	bndr_ids		= filter isId bndrs
-	(alt_ty, alt')		= dmdAnalAlt sigs dmd alt
-	(alt_ty1, case_bndr')   = annotateBndr alt_ty case_bndr
-	(_, bndrs', _)		= alt'
-        scrut_dmd 		= Seq Drop Now [idNewDemandInfo b | b <- bndrs', isId b]
-	(scrut_ty, scrut')      = dmdAnal sigs scrut_dmd scrut
+	bndr_ids		 = filter isId bndrs
+	(alt_ty, alt')		 = dmdAnalAlt sigs dmd alt
+	(alt_ty1, case_bndr')    = annotateBndr alt_ty case_bndr
+	(_, bndrs', _)		 = alt'
+
+	-- Figure out whether the case binder is used, and use
+	-- that to set the keepity of the demand.  This is utterly essential.
+	-- Consider	f x = case x of y { (a,b) -> k y a }
+	-- If we just take scrut_demand = U(L,A), then we won't pass x to the
+	-- worker, so the worker will rebuild 
+	--	x = (a, absent-error)
+	-- and that'll crash.
+	dead_case_bndr		 = isAbsentDmd (idNewDemandInfo case_bndr')
+	keepity | dead_case_bndr = Drop
+		| otherwise	 = Keep		
+
+        scrut_dmd 		 = Seq keepity Now [idNewDemandInfo b | b <- bndrs', isId b]
+	(scrut_ty, scrut')       = dmdAnal sigs scrut_dmd scrut
     in
     (alt_ty1 `bothType` scrut_ty, Case scrut' case_bndr' [alt'])
 

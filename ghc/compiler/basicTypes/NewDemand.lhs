@@ -6,7 +6,7 @@
 \begin{code}
 module NewDemand(
 	Demand(..), Keepity(..), Deferredness(..), 
-	topDmd, lazyDmd, seqDmd, evalDmd, isStrictDmd,
+	topDmd, lazyDmd, seqDmd, evalDmd, isStrictDmd, isAbsentDmd,
 
 	DmdType(..), topDmdType, mkDmdType, mkTopDmdType, 
 		dmdTypeDepth, dmdTypeRes,
@@ -211,6 +211,12 @@ isStrictDmd (Seq _ Now _) = True
 isStrictDmd Eval	  = True
 isStrictDmd (Call _)	  = True
 isStrictDmd other	  = False
+
+isAbsentDmd :: Demand -> Bool
+isAbsentDmd Bot	  = True
+isAbsentDmd Err	  = True
+isAbsentDmd Abs	  = True
+isAbsentDmd other = False
 
 instance Outputable Demand where
     ppr Lazy 	     = char 'L'
