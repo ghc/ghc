@@ -28,7 +28,7 @@ import GHC.IOBase
 import GHC.Exception
 import GHC.Prim (unsafeCoerce#)
 
--- | 'runIO' is wrapped around 'Main.main' by @TcModule@.  It is also wrapped
+-- | 'runIO' is wrapped around @Main.main@ by @TcModule@.  It is also wrapped
 -- around every @foreign export@ and @foreign import \"wrapper\"@ to mop up
 -- any uncaught exceptions.  Thus, the result of running
 -- 'System.Exit.exitWith' in a foreign-exported function is the same as
