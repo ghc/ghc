@@ -282,9 +282,12 @@ updateBinders rule_ids rule_rhs_fvs is_exported binds
     update_bndrs (Rec prs)    = Rec [(update_bndr b, r) | (b,r) <- prs]
 
     update_bndr bndr 
-	| isImplicitId bndr = bndr	-- Constructors, selectors; doesn't 
-					-- make sense to call setIdLocalExported
-					-- Also can't have rules
+	| isImplicitId bndr = bndr_with_rules
+		-- Constructors, selectors; doesn't 
+		-- make sense to call setIdLocalExported
+		-- They can have rules, though; e.g. 
+		-- 	class Foo a where { op :: a->a }
+		--	{-# RULES  op x = y #-}
 	| dont_discard bndr = setIdLocalExported bndr_with_rules
 	| otherwise	    = bndr_with_rules
 	where
