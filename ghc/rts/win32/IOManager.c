@@ -70,6 +70,11 @@ IOWorkerProc(PVOID param)
 	 */
 	rc = WaitForMultipleObjects( 2, hWaits, FALSE, INFINITE );
 
+	if (rc == WAIT_OBJECT_0) {
+	    // we received the exit event
+	    return 0;
+	}
+
 	EnterCriticalSection(&iom->manLock);
 	/* Signal that the thread is 'non-idle' and about to consume 
 	 * a work item.
@@ -78,10 +83,7 @@ IOWorkerProc(PVOID param)
 	iom->queueSize--;
 	LeaveCriticalSection(&iom->manLock);
     
-	if ( WAIT_OBJECT_0 == rc ) {
-	    /* shutdown */
-	    return 0;
-	} else if ( (WAIT_OBJECT_0 + 1) == rc ) {
+	if ( rc == (WAIT_OBJECT_0 + 1) ) {
 	    /* work item available, fetch it. */
 	    if (FetchWork(pq,(void**)&work)) {
 		if ( work->workKind & WORKER_READ ) {
