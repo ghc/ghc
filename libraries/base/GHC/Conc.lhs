@@ -216,7 +216,7 @@ takeMVar (MVar mvar#) = IO $ \ s# -> takeMVar# mvar# s#
 -- 'putMVar' will wait until it becomes empty.
 --
 -- If several threads are competing to fill the same 'MVar', one is
--- chosen to continue at random with the 'MVar' becomes empty.
+-- chosen to continue at random when the 'MVar' becomes empty.
 putMVar  :: MVar a -> a -> IO ()
 putMVar (MVar mvar#) x = IO $ \ s# ->
     case putMVar# mvar# x s# of
