@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.26 1999/10/04 16:13:18 simonmar Exp $
+ * $Id: Schedule.c,v 1.27 1999/10/19 15:41:18 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -376,19 +376,7 @@ SchedulerStatus schedule(StgTSO *main, StgClosure **ret_val)
       /* Put the thread back on the run queue, at the end.
        * t->link is already set to END_TSO_QUEUE.
        */
-      ASSERT(t->link == END_TSO_QUEUE);
-      if (run_queue_tl == END_TSO_QUEUE) {
-        run_queue_hd = run_queue_tl = t;
-      } else {
-        ASSERT(get_itbl(run_queue_tl)->type == TSO);
-	if (run_queue_hd == run_queue_tl) {
-	  run_queue_hd->link = t;
-	  run_queue_tl = t;
-	} else {
-	  run_queue_tl->link = t;
-	  run_queue_tl = t;
-	}
-      }
+      PUSH_ON_RUN_QUEUE(t);
       break;
 
     case ThreadBlocked:
