@@ -21,6 +21,9 @@ module System.Environment
       withArgs,
       withProgName,
 #endif
+#ifdef __GLASGOW_HASKELL__
+      getEnvironment,
+#endif
   ) where
 
 import Prelude
@@ -168,4 +171,26 @@ setArgs argv = do
 
 foreign import ccall unsafe "setProgArgv" 
   setArgsPrim  :: Int -> Ptr CString -> IO ()
+
+-- |'getEnvironment' retrieves the entire environment as a
+-- list of @(key,value)@ pairs.
+--
+-- If an environment entry does not contain an @\'=\'@ character,
+-- the @key@ is the whole entry and the @value@ is the empty string.
+
+getEnvironment :: IO [(String, String)]
+getEnvironment = do
+   pBlock <- getEnvBlock
+   if pBlock == nullPtr then return []
+    else do
+      stuff <- peekArray0 nullPtr pBlock >>= mapM peekCString
+      return (map divvy stuff)
+  where
+   divvy str = 
+      case break (=='=') str of
+        (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
+        (name,_:value) -> (name,value)
+
+foreign import ccall unsafe "__hscore_environ" 
+  getEnvBlock :: IO (Ptr CString)
 #endif  /* __GLASGOW_HASKELL__ */

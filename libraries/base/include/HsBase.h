@@ -737,5 +737,10 @@ INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
 INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 #endif
 
+/* ToDo: write a feature test that doesn't assume 'environ' to
+ *    be in scope at link-time. */
+extern char** environ;
+INLINE char **__hscore_environ() { return environ; }
+
 #endif /* __HSBASE_H__ */
 
