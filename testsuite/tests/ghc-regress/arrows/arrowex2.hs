@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -farrows #-}
 
 -- Homogeneous (or depth-preserving) functions over perfectly balanced trees.
 

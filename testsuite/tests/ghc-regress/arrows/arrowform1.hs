@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -farrows #-}
 
 module ShouldCompile where
 
