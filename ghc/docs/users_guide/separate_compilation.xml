@@ -719,12 +719,12 @@ When a hs-boot file <filename>A.hs-boot</filename>
    <command>ghc -M</command> will report an error if a cycle is found.
    </para></listitem>
 
-   <listitem><para> Every module that is 
-   <literal>{-# SOURCE #-}</literal>-imported in a program must also be ordinarily imported (or
-   else be one of the root modules).  To put it another way, if <literal>M.hs-boot</literal> is
-   reachable in the import graph, then <literal>M.hs</literal> must also be reachable.
-   The command <command>ghc --make</command> will report an error if this
-   condition is not satisfied.
+   <listitem><para> A module <literal>M</literal> that is 
+   <literal>{-# SOURCE #-}</literal>-imported in a program will usually also be
+   ordinarily imported elsewhere.  If not, <command>ghc --make</command>
+   automatically adds <literal>M</literal> to the set of moudles it tries to
+   compile and link, to ensure that <literal>M</literal>'s implementation is included in
+   the final program.
    </para></listitem>
 </itemizedlist>
 </para>
