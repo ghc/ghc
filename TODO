@@ -1,10 +1,6 @@
 -----------------------------------------------------------------------------
 -- bugs
 
-* Ralf Laemmel's isntance bug (email: "haddock 0.6 issue")
-
-* Pick the preferred export names as per the paper.
-
 * A module re-export should only reference the target module if the
   target module is imported without hiding any of its exports (otherwise
   we should inline just the exported bits).
@@ -41,6 +37,13 @@
 
 -----------------------------------------------------------------------------
 -- features
+
+* In theory there's no reason why we have to only link to modules which
+  are imported by the current module.  This is an artificial
+  restriction.  We might try doing a two-pass strategy: first find out
+  what everything exports, and then resolve all the links in the
+  documentation.  We could mark some modules as "definitive" destinations
+  for links to their entities, or even give a priority for each module.
 
 * nested itemized and enumerated lists.
 
@@ -91,6 +94,8 @@
 
 -----------------------------------------------------------------------------
 -- cosmetic
+
+* Allow more parts of the documentation to be squashed and expanded?
 
 * for a constructor, don't fill its entire cell with a grey background.
 
