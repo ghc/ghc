@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.54 2001/10/02 16:15:10 simonpj Exp $
+% $Id: PrelBase.lhs,v 1.55 2001/10/17 15:40:02 simonpj Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -275,7 +275,14 @@ augment g xs = g (:) xs
 "foldr/id"    	foldr (:) [] = \x->x
 "foldr/app"    	forall xs ys. foldr (:) ys xs = append xs ys
 
-"foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
+-- The foldr/cons rule looks nice, but it can give disastrously
+-- bloated code when commpiling
+--	array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
+-- i.e. when there are very very long literal lists
+-- So I've disabled it for now. We could have special cases
+-- for short lists, I suppose.
+-- "foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
+
 "foldr/nil"	forall k z.	 foldr k z []     = z 
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
