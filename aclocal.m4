@@ -244,7 +244,7 @@ AC_DEFUN(AC_HAVE_GCC,
     ac_cv_have_gcc='no'
 else
 changequote(, )dnl
-    cmd_string="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version \([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 20 \\\< \1 \\\* 10 + \2/g' `"
+    cmd_string="`$CC -v 2>&1 | grep 'version ' | sed -e 's/.*version [^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/expr 20 \\\< \1 \\\* 10 + \2/g' `"
 changequote([, ])dnl
     if test `eval $cmd_string 2>/dev/null` != "1"; then
 	echo ''
@@ -270,7 +270,7 @@ AC_DEFUN(AC_PROG_GNUCPP,
 	echo > conftest.c
 	gcc -v -E conftest.c >/dev/null 2>conftest.out
 	echo '/(\S+(\/|\\\\)cpp)/ && print "[$]1";' > conftest.pl
-	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out`"
+	ac_cv_gnu_cpp="`eval $PerlCmd -n conftest.pl conftest.out | tr '\\\' / `"
 	rm -fr conftest*
  else
 	# We need to be able to invoke CPP directly, preferably
