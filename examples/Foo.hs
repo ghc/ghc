@@ -38,6 +38,22 @@ module Foo (
 	-- $aux1
 
 	-- $aux2
+
+	-- $aux3
+
+	-- $aux4
+
+	-- | This is some inline documentation in the export list
+	--
+	-- > a code block using bird-tracks
+	-- > each line must begin with > (which isn\'t significant unless it
+	-- > is at the beginning of the line).
+
+	-- * A hidden module
+	module Hidden,
+
+	-- * A visible module
+	module Visible,
    ) where
 
 
@@ -144,5 +160,14 @@ h = 42
 -- $aux1 This is some documentation that is attached to a name ($aux1)
 -- rather than a source declaration.  The documentation may be
 -- referred to in the export list using its name.
+--
+-- [ code block in named doc ]
 
 -- $aux2 This is some documentation that is attached to a name ($aux2)
+
+-- $aux3
+-- [ code block on its own in named doc ]
+
+-- $aux4
+--
+-- [ code block on its own in named doc (after newline) ]
