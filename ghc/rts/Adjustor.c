@@ -193,9 +193,13 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
     machinery should then work in all cases.  (Or would it?  Perhaps
     it would trash parts of the caller's frame.  Dunno).  
 
-    SUP, 25 Apr 02: Alas, the "fully correct" solution above is only
-    half correct: "%sp has to be 16-byte aligned at all time", the
-    almighty ABI spec says...
+    SUP, 25 Apr 02: We are quite lucky to push a multiple of 8 bytes in
+    front of the existing arguments, because %sp must stay double-word
+    aligned at all times, see: http://www.sparc.org/standards/psABI3rd.pdf
+    Although we extend the *caller's* stack frame, this shouldn't cause
+    any problems for a C-like caller: alloca is implemented similarly, and
+    local variables should be accessed via %fp, not %sp. In a nutshell:
+    This should work. (Famous last words! :-)
   */
     if ((adjustor = stgMallocBytes(4*(8+1), "createAdjustor")) != NULL) {
 	unsigned long *const adj_code = (unsigned long *)adjustor;
