@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.108 2002/12/17 13:50:29 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.109 2003/01/08 13:03:25 simonmar Exp $
 --
 -- Driver flags
 --
@@ -579,7 +579,15 @@ machdepCCOpts
 	     return ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
 --                    , if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" 
 		      ],
-		      [ "-fno-defer-pop", "-fomit-frame-pointer",
+		      [ "-fno-defer-pop",
+#ifdef HAVE_GCC_MNO_OMIT_LFPTR
+			-- Some gccs are configured with
+			-- -momit-leaf-frame-pointer on by default, and it
+			-- apparently takes precedence over 
+			-- -fomit-frame-pointer, so we disable it first here.
+			"-mno-omit-leaf-frame-pointer",
+#endif
+			"-fomit-frame-pointer",
 			-- we want -fno-builtin, because when gcc inlines
 			-- built-in functions like memcpy() it tends to
 			-- run out of registers, requiring -monly-n-regs
