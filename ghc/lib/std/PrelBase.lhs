@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelBase.lhs,v 1.35 2000/08/07 23:37:23 qrczak Exp $
+% $Id: PrelBase.lhs,v 1.36 2000/08/29 17:42:17 qrczak Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -679,18 +679,19 @@ unpackCStringUtf8# addr
                                          (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#`  6#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 3#))) -# 0x3C82080#))
                                : unpack (nh +# 4#)
-      | ch `leChar#` '\xFB'# = C# (chr# ((ord# ch                                  `iShiftL#` 24#) +#
+      | ch `leChar#` '\xFB'# = C# (chr# ((ord# ch -# 0xF8#                         `iShiftL#` 24#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 18#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#` 12#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 3#)) `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 4#))) -# 0xFA082080#))
+                                         (ord# (indexCharOffAddr# addr (nh +# 4#))) -# 0x2082080#))
                                : unpack (nh +# 5#)
       | otherwise           = C# (chr# (((ord# ch -# 0xFC#)                        `iShiftL#` 30#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 1#)) `iShiftL#` 24#) +#
+                                        ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#)
+                                                                                   `iShiftL#` 24#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 2#)) `iShiftL#` 18#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 3#)) `iShiftL#` 12#) +#
                                          (ord# (indexCharOffAddr# addr (nh +# 4#)) `iShiftL#`  6#) +#
-                                         (ord# (indexCharOffAddr# addr (nh +# 5#))) -# 0x82082080#))
+                                         (ord# (indexCharOffAddr# addr (nh +# 5#))) -# 0x2082080#))
                                : unpack (nh +# 6#)
       where
 	ch = indexCharOffAddr# addr nh
