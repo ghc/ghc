@@ -9,9 +9,18 @@
 module PrelVals where
 
 IMP_Ubiq()
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(IdLoop)		( UnfoldingGuidance(..), mkUnfolding, nullSpecEnv, SpecEnv )
-import Id		( SYN_IE(Id), GenId, mkImported, mkTemplateLocals )
+#else
+import {-# SOURCE #-} CoreUnfold ( UnfoldingGuidance(..), mkUnfolding )
+import {-# SOURCE #-} SpecEnv    ( SpecEnv, nullSpecEnv )
+#endif
+
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
 IMPORT_DELOOPER(PrelLoop)
+#endif
+
+import Id		( SYN_IE(Id), GenId, mkImported, mkTemplateLocals )
 
 -- friends:
 import PrelMods

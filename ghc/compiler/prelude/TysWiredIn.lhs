@@ -86,10 +86,17 @@ module TysWiredIn (
 --import Kind
 
 IMP_Ubiq()
-IMPORT_DELOOPER(TyLoop)	--( mkDataCon, mkTupleCon, StrictnessMark(..) )
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
+IMPORT_DELOOPER(TyLoop)	( mkDataCon, mkTupleCon, StrictnessMark(..) )
 IMPORT_DELOOPER(IdLoop)	( SpecEnv, nullSpecEnv, 
 		          mkTupleCon, mkDataCon, 
 			  StrictnessMark(..) )
+#else
+import {-# SOURCE #-} Id ( Id, mkDataCon, mkTupleCon, StrictnessMark(..) )
+import {-# SOURCE #-} SpecEnv ( SpecEnv, nullSpecEnv )
+import {-# SOURCE #-} Type ( Type )
+import {-# SOURCE #-} TyVar ( TyVar )
+#endif
 
 -- friends:
 import PrelMods

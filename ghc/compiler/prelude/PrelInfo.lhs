@@ -34,12 +34,12 @@ module PrelInfo (
     ) where
 
 IMP_Ubiq()
+
 #if __GLASGOW_HASKELL__ >= 202
 import IdUtils ( primOpName )
 #else
 IMPORT_DELOOPER(PrelLoop) ( primOpName )
 #endif
--- IMPORT_DELOOPER(IdLoop)	  ( SpecEnv )
 
 -- friends:
 import PrelMods		-- Prelude module names
