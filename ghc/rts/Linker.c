@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.37 2001/04/14 22:29:16 qrczak Exp $
+ * $Id: Linker.c,v 1.38 2001/04/24 11:20:50 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -68,7 +68,14 @@ typedef struct _RtsSymbolVal {
 #define Maybe_ForeignObj
 #define Maybe_Stable_Names
 #endif
-         
+
+#if !defined (mingw32_TARGET_OS)
+#define RTS_POSIX_ONLY_SYMBOLS                  \         
+      SymX(stg_sig_install)			\
+      Sym(nocldstop)
+#else
+#define RTS_POSIX_ONLY_SYMBOLS
+#endif
 
 #define RTS_SYMBOLS				\
       SymX(MainRegTable)			\
@@ -204,8 +211,6 @@ typedef struct _RtsSymbolVal {
       SymX(defaultsHook)			\
       SymX(PreTraceHook)			\
       SymX(PostTraceHook)			\
-      SymX(stg_sig_install)			\
-      Sym(nocldstop)				\
       SymX(createAdjustor)			\
       SymX(rts_mkChar)				\
       SymX(rts_mkInt)				\
@@ -306,6 +311,7 @@ RTS_SYMBOLS
 static RtsSymbolVal rtsSyms[] = {
       RTS_SYMBOLS
       RTS_LONG_LONG_SYMS
+      RTS_POSIX_ONLY_SYMBOLS
       { 0, 0 } /* sentinel */
 };
 
