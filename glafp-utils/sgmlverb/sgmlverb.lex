@@ -20,6 +20,7 @@ miranda			([0-9]+(\-([0-9]+)?)?)?>
 #define PUSH		states[top++] =
 #define POP		BEGIN states[--top]
 #define yywrap() 	1
+#define YY_SKIP_YYWRAP
 %}
 %%
 			int states[256];
