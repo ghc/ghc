@@ -611,11 +611,14 @@ ppHsBangType (HsUnBangedTy ty) = ppHsAType ty
 -- -----------------------------------------------------------------------------
 -- Class declarations
 
-ppClassHdr [] n tvs fds = 
-  keyword "class" <+> ppHsAsst (UnQual n, map HsTyVar tvs) <+> ppFds fds
-ppClassHdr ctxt n tvs fds = 
-  keyword "class" <+> ppHsContext ctxt <+> darrow <+> 
-	ppHsAsst (UnQual n, map HsTyVar tvs) <+> ppFds fds
+ppClassHdr summ [] n tvs fds = 
+  keyword "class"
+	<+> ppHsBinder summ n <+> hsep (map ppHsName tvs)
+	<+> ppFds fds
+ppClassHdr summ ctxt n tvs fds = 
+  keyword "class" <+> ppHsContext ctxt <+> darrow
+	<+> ppHsBinder summ n <+> hsep (map ppHsName tvs)
+	<+> ppFds fds
 
 ppFds fds =
   if null fds then noHtml else 
@@ -639,8 +642,7 @@ ppShortClassDecl summary inst_maps
          
    where
 	Just c = declMainBinder decl
-	hdr | not summary = linkTarget c +++ ppClassHdr ctxt nm tvs fds
-	    | otherwise   = ppClassHdr ctxt nm tvs fds
+	hdr = ppClassHdr summary ctxt nm tvs fds
 
 ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c 
 	decl@(HsClassDecl loc ctxt nm tvs fds decls doc)
@@ -656,10 +658,10 @@ ppHsClassDecl summary inst_maps@(cls_inst_map, _) orig_c
 	Just c = declMainBinder decl
 
 	header
-	   | null decls = declBox (linkTarget c +++ ppClassHdr ctxt nm tvs fds)
-	   | otherwise  = declBox (linkTarget c +++ 
-				    ppClassHdr ctxt nm tvs fds <+> 
-				    keyword "where")
+	   | null decls = declBox hdr
+	   | otherwise  = declBox (hdr <+> keyword "where")
+
+	hdr = ppClassHdr summary ctxt nm tvs fds
 
 	classdoc
 	   | Just d <- doc = ndocBox (docToHtml d)
