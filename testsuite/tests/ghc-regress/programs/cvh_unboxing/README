@@ -1,0 +1,4 @@
+
+These files should typecheck and compile, but while they do
+typecheck, they don't assemble without warnings, and when executed,
+generate an illegal instruction.

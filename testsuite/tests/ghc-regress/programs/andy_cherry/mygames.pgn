@@ -1,0 +1,1323 @@
+% --------------
+%  Season 93/94
+% --------------
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.10.??"]
+[Round "1"]
+[White "Webb, George"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "C10"]
+
+1. Nf3 d5 2. d4 Nc6 3. Nc3 Nf6 (3... Bf5 {is more natural.}) 4. e4? (
+4. Bf4 {is better.}) 4... e6? (4... dxe4 5. d5 exf3 6. dxc6 Qxd1+ 7. 
+Nxd1 {and black is a clear pawn up.}) 5. e5 Ne4 {} 6. Nxe4? { Taking
+this knight looses a pawn} 6... dxe4 7. Nd2 Qxd4 8. Nc4 Qxd1+ 9. Kxd1 
+Bd7 (9... Bc5 10. f3 exf3 11. gxf3 O-O 12. Bd3 {White can get presure
+down the `g' file, but first needs to solve the problem of the Bishop on
+c5 guarding g8.}) 10. Bd2 (10. Be3 {is better.}) 10... Bb4 11. c3 Bc5 12. 
+Ke1 O-O-O (12... b5 13. Ne3 Bxe3 14. Bxe3 Nxe5 {wins a pawn, but black
+might have problems because of queenside weaknesses.}) 13. g3 (13. Bg5 
+Be7 14. Bxe7 Nxe7 15. Rd1 {and white is starting to contest the `d'
+file.}) 13... Rhf8 14. Bg2 f5? {black is throwing away a pawn.} 15. 
+exf6 gxf6 (15... Rxf6 {gives black more piece activity.}) 16. Bxe4 {
+taking the weak pawn, and attacking h7.} 16... e5? (16... Rh8 {is
+required to protect the weak h pawn.}) 17. Bxh7 {} 17... f5 (17... Bxf2+ 
+18. Kxf2 Be6 19. Nxe5 Rxd2+ 20. Ke1 Rxb2 {winning material, and striping
+whites king of protection.}) 18. b4 Be6 19. b5 (19. bxc5 Bxc4 {and white
+has the two bishops.}) 19... Bxc4 20. bxc6 bxc6 (20... Bxf2+ 21. Kxf2 
+Rxd2+ 22. Ke1 Re2+ 23. Kd1 bxc6 24. h4 Rd8+ {with a winning attack on
+whites exposed king.}) 21. Rb1? {Throws away a pawn needlessly.} 21... 
+Bxa2 (21... Bxf2+ 22. Kxf2 Rxd2+ 23. Ke1 Rxa2 {winning two pawns rather
+than one.}) 22. Rb2 Bd5 23. Rg1 e4 (23... a5 24. h4 a4 25. Bh6 Bf3 26. 
+Rd2 Rxd2 27. Bxd2 {is a better plan, with a dangerous passed `a' pawn.}) 
+24. Bh6? 24... Ba3 (24... Rf7 25. Bg5 Rxh7 26. Bxd8 Ba3 27. Rd2 Kxd8 {
+two bishops vs a rook, a difficult win for black.}) 25. Rb1 Rfe8? {
+another missed opertunity.} 26. Bxf5+ Be6 27. Bg6 Rh8 28. Be3 {} 
+28... Rd3?  (28... Rxh2 29. Bxe4 c5 30. Rb7 a5 {and black has a
+fighting chance}) 29. Bd4 (29. Bxe4 Rxc3 30. Bd4 Rc4 31. Bxh8 Rxe4+ {and
+black is lost.}) 29... Bd5?? 30. Bxh8 e3?? 31. f3? (31. Bxd3 
+exf2+ 32. Kxf2 Bc5+ 33. Bd4 {and white is two rooks up.}) 31... Rd2 32. 
+Bf6 Bb2 33. h4 (33. Bf5+ Kb7 34. c4 Bxc4 35. Rxb2+ Rxb2 36. Bxb2 {
+winning.}) 33... Kb7 34. Bg5 Bxf3 (34... Ba2 35. Bc2 Bxb1 36. Bxb1 Rh2 
+37. Bxe3 Bxc3+ {and black is just a bishop down in a pawn race.}) 35. 
+Bxe3 Re2+ 36. Kf1 Rxe3 37. Re1?? {giving black a chance to equalize.} 
+37... Re2?? {Returning the complement.} (37... Rxe1+ 38. Kxe1 Bxc3+ 
+39. Kf2 Bd4+ 40. Kxf3 Bxg1 {and White still has the edge with 2
+connected passed pawns, but black has real chances.}) 38. Rxe2 1-0
+
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.11.??"]
+[Round "2"]
+[White "Gill, Andy"]
+[Black "Dunne, Barry"]
+[Result "1-0"]
+[ECO "C65"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 (4. O-O {Ruy Lopez, Berlin Defence}) 
+4... Be7 (4... Bc5 {is better.}) 5. O-O (5. Bxc6 dxc6 6. Nxe5 Bd6 7. Nf3 
+O-O 8. O-O Be6 {and white is a pawn up, but black has a lead in
+development.}) 5... O-O $2 (5... d6 {is needed to protect e5.}) 6. Nc3 (6. 
+Bxc6 dxc6 7. Nxe5 Bd6 8. Nf3 Bg4 9. Be3 {and white is a clean pawn up.}) 
+6... b6 $2 7. a3 Bb7 8. b4 Nd4 {A bit ambitious.} 9. Nxe5 (9. Nxd4 exd4 
+10. Ne2 d5 11. e5 Nd7 {is whites best line.}) 9... Nxb5 (9... d5 10. Bb2 
+dxe4 11. dxe4 Nxe4 {with equal chances.}) 10. Nxb5 d5 11. Bb2 dxe4 12. 
+dxe4 (12. f3 {is a better approach.}) 12... Qxd1 13. Raxd1 Bd6 {} (13... 
+Bxe4 14. Nd7 Bxc2 15. Bxf6 gxf6 16. Rd2 {with a slight advantage for
+white.}) 14. Nf3 (14. Nxd6 cxd6 15. Rxd6 Bxe4 16. c4 Rfd8 17. c5 bxc5 
+18. bxc5 {winning for white.}) 14... Bxe4 (14... Nxe4 {is better.}) 15. 
+Nxd6 cxd6 16. Bxf6 gxf6 17. Rxd6 Bxc2 (17... Bxf3 18. gxf3 Rac8 19. Rc1 
+Rc3 20. Rd3 Rxd3 21. cxd3 {and whites passed pawn is a long way from
+queening.}) 18. Rxf6 (18. Nd4 Ba4 19. Rxf6 Rfd8 20. Rf4 Rd7 21. Re4 {a
+pawn up, but with chances for black, because of the powerful Bishop.}) 
+18... Rfd8 19. Ne5 Kg7 (19... Bg6 {is better, defending the weak pawn.}) 
+20. Rxf7+ Kg8 21. Rc7 (21. f4 a6 22. g3 Rd2 23. Rb7 b5 {and white should
+win.}) 21... Re8 (21... Rdc8 22. Rb7 Be4 23. Rd7 Rc2 24. Rfd1 {with
+connected rooks for white.}) 22. Re1 (22. f4 {is better for protecting the
+knight.}) 22... Rac8 {should have moved the `e' Rook.} 23. Rxa7 Bf5 (
+23... Ra8 $5 {planning to attack the weak `a' pawn.}) 24. f4 Bg4 (24... 
+Rc2 {penatraiting the 7th.}) 25. Kf2 Rc2+ 26. Kg3 Re2 27. Rxe2 Bxe2 28. 
+Nc6 $2 {where is that knight going ?} 28... Re3+ 29. Kf2 Re4 {} 30. f5 (
+30. Ne7+ Kf8 31. Nd5 Bd3 32. Nxb6 Re7 {totally winning for white}) 
+30... Bg4 31. Ne7+ (31. Kg3 h6 32. f6 Be6 33. Re7 {looking very good for
+white.}) 31... Kf8 32. f6 Rf4+ 33. Kg3 Re4 34. h3 (34. Nd5 Be6 35. Nxb6 
+Rg4+ 36. Kf3 Rg6 37. Rxh7 Rxf6+ 38. Ke4 {and with 4 connected passed
+white will win.}) 34... Bh5 35. Nd5 b5 36. Rxh7 Bg6 37. Rh4 (37. Rh8+ Kf7 
+38. Rb8 Bf5 39. Rxb5 Be6 40. Rb7+ Kg6 41. Rg7+ {just look at whites
+advantage.}) 37... Rxh4 38. Kxh4 Be4 39. Nc3 (39. Ne3 Kf7 40. Kg5 Bc6 
+41. g4 Be4 42. h4 Bd3 43. h5 {winning.}) 39... Bc6 (39... Bxg2 40. Nxb5 
+Kf7 41. Kg5 Bxh3 42. Nd6+ Kg8 43. a4 Kh7) 40. g4 Kf7 41. g5 (41. Kg5 Kg8 
+42. h4 Bd7 43. h5 Kf7 44. Ne4 Kg8 45. Nd6) 41... Kg6 42. Kg4? 42... 
+Bd7+ 43. Kf4 Bxh3 44. Nxb5 Bd7 (44... Kf7 45. Nd6+ Ke6 46. f7 Ke7 47. g6 
+Kf8 48. a4 Kg7) 45. a4 Bc6 46. Nc3 Bd7 47. b5 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.11.??"]
+[Round "3"]
+[White "Gill, Andy"]
+[Black "Brown, Rab"]
+[Result "0-1"]
+[ECO "C65"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Bc5 4. O-O Nf6 5. Nc3 d6 6. a3 Ng4? 7. 
+Qe1 (7. h3) 7... O-O {} 8. Bxc6 bxc6 9. b4 Ba6 10. bxc5 Bxf1 11. Kxf1 (
+11. Qxf1 Qd7 12. Bb2 dxc5 13. d3 Rfb8 14. Rb1 {clearly winning for
+white.}) 11... Qf6 {} (11... Rb8 12. Qe2 Qd7 13. Qa6 Ra8 14. h3 Nf6 15. 
+d4 exd4 {is a better plan.}) 12. d3 Qg6 13. Rb1 (13. h3 Nh6) 13... Qh5 
+14. Rb7 (14. h3 Nf6 15. Rb7 Rfc8 16. Bg5 Qg6 17. Qe3 Ne8 {and white has a
+commanding lead.}) 14... Nxh2+ 15. Nxh2 Qxh2 16. Rxc7 Qh1+ 17. Ke2 Qxg2 
+18. Rxc6 (18. cxd6 Rfc8 19. Rxc8+ Rxc8 20. Be3 Rd8 21. Bc5 h5) 18... dxc5 (
+18... Qg4+ 19. f3 Qg2+ 20. Qf2 Qxf2+ 21. Kxf2 Rfc8 22. Nd5 Rxc6 23. 
+Ne7+) 19. Rxc5 f5 20. Be3 Qg4+ 21. f3 Qg2+ 22. Qf2 Qh1 23. Rxe5 Qa1 {} 
+24. Bc5? (24. Qe1 Qb2 25. Qd2 Qxa3 26. Bc5 Qa5 27. exf5 {white has the
+advantage.}) 24... Qxc3 25. Rxf5 (25. Bxf8 Qxc2+ 26. Kf1 Qxd3+ 27. Qe2 
+Qb1+ 28. Qe1 Qxe1+ 29. Kxe1 {now black has only a slight advantage.}) 
+25... Qxc2+ (25... Rxf5 26. exf5 Qxc2+ 27. Kf1 Qxd3+ 28. Kg2 Rd8 29. f4 {
+and black has a clear lead.}) 26. Ke3 Qxf2+ 27. Kxf2 Rxf5 28. exf5 Rc8 
+29. d4 a6 30. a4 Kf7 31. Ke3 (31. Kg3 Kf6 32. Kf4 g5+ 33. fxg6 hxg6 34. 
+a5 g5+ 35. Kg4) 31... h5 (31... Kf6 32. Kf4 Rd8 33. a5 Rd5 34. Ke4 Rxf5) 
+32. Kf4 h4 33. Kg4 Rh8 34. d5 h3 35. Bd6 g6 (35... h2 36. Bxh2 Rxh2 37. 
+Kf4 Rh4+ 38. Ke5 Rxa4 39. d6 Rc4 {totaly won for black.}) 36. fxg6+ Kxg6 
+37. Bh2 Kf6 {} 38. f4 (38. a5 Ke7 39. Kf5 Rh5+ 40. Ke4 Rh4+ 41. f4 Kd6 
+42. Kd4 {holding the position.}) 38... Ke7 39. f5 a5 (39... Kf6 {is
+needed.}) 40. d6+ Kd7 (40... Kf6 {is still needed.}) 41. Kg5 Rb8 (41... Ke8) 
+42. f6 Rb2 (42... Ke6 43. Kg4 Rb4+ 44. Kxh3 Rxa4 45. d7 Kxd7 46. Be5 {
+but black should still win.}) 43. Kg6 (43. f7 Rg2+ 44. Kh6 Rf2 45. Kg7 
+Rg2+ 46. Kh7 Rf2 47. Kg7 {white has equalised!}) 43... Rf2 0-1
+
+[Site "Dunfermline C vs Stirling B"]
+[Date "1993.11.??"]
+[Round "4"]
+[White "Gill, Andy"]
+[Black "Kennedy, Ian"]
+[Result "0-1"]
+[ECO "C60"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Bd6 4. O-O a6 5. Ba4 b5 6. Bb3 Bb7 7. d3 Nf6 (
+7... Na5 8. Nbd2 f6 9. a4 Nxb3 10. Nxb3 Bb4 11. axb5 axb5 {with
+equality.}) 8. Nc3 (8. a4 b4 9. Nbd2 Bc5 10. Nc4 d6 {<saw>}) 8... O-O (
+8... Na5 9. Bd2 Nxb3 10. axb3 O-O 11. Bg5 Rb8 {=}) 9. Be3 Na5 {} (9... 
+Be7 10. a3 Ng4 11. Bd2 {<saw>}) 10. Bd5?! {where is that bishop going.} 
+10... b4 (10... c6 11. Bb3 Bc7 12. Bg5 Nxb3 13. Bxf6 Qxf6 14. axb3 {
+<sab>}) 11. Bxb7 Nxb7 12. Nd5 (12. Ne2 Ng4 13. Bd2 f5 14. exf5 Rxf5 15. 
+Ng3 Rf6 {<saw>}) 12... c6 (12... Nxd5 13. exd5 f6 14. c3 bxc3 15. bxc3 
+Be7 16. d4 d6 {<sab>}) 13. Nxf6+ (13. Bb6 Qc8 14. Nxf6+ gxf6 15. d4 Bc7 
+16. Bxc7 Qxc7 {<saw> and the black king is exposed.}) 13... Qxf6 14. Bb6 {
+?! strange move.} (14. Qd2 Be7 15. c3 a5 16. a3 bxa3 17. bxa3 {<saw> with
+the plan ofs owning the `b' file.}) 14... Bc5 (14... Be7) 15. Bc7 (15. Nxe5 {
+but black can easly win back the pawn.}) 15... Rac8? (15... d6 16. d4 
+exd4 17. e5 Qe7 18. exd6 Nxd6 19. Bxd6 Qxd6 {<ab>}) 16. Bxe5 Qg6 17. d4 (
+17. Bg3 Rfe8 18. Ne5 Qf6 19. Nxd7 Qxb2 20. Re1 {<aw> white should now
+try use his center pawns to push home his advantage.}) 17... Bd6 18. 
+Bxd6 {this is to early, leaving myself underdeveloped.} (18. Re1 f6 19. 
+Bxd6 Nxd6 20. Qd3 {<aw>}) 18... Nxd6 19. Ne5 (19. e5 Nc4 20. b3 Na3 21. 
+Rc1 d6 22. Re1 {<aw>}) 19... Qxe4 20. Nxd7 Rfe8 21. Nc5 Qg6? (21... 
+Qe2 22. Re1 Qc4 23. Qd2 Rcd8 24. Rad1 a5 {<aw> white is a clear pawn up.}) 
+22. Nxa6 Nf5 23. Nxb4 { white should now win the endgame quite
+comfortably.} 23... Nh4 (23... Rcd8 24. c3 c5 25. Nc2 cxd4 26. Nxd4 Qf6 
+27. Qf3 Nxd4 {<aw> though still two clear pawns up.}) 24. g3 {forced.} 
+24... c5 25. dxc5 Rxc5 (25... Qe4 26. gxh4 Qxb4 27. a4 Qxh4 28. Qd5 Re2 {
+<aw>, but whites king is dangerously exposed, and the `a' rook is not
+(yet) part of the game.}) 26. a4 {crap plan! Its just too slow.} (26. Nd3 
+Rf5 27. f4 Rd5 28. a4 Qb6+ 29. Rf2 Nf5 {<waw> black will never stop 3
+connected passed pawns!}) 26... f5 27. Nd5 Rd8?? (27... Qd6 28. Nf4 
+Qxd1 29. Rfxd1 Nf3+ 30. Kg2 Ne5 {<waw>}) 28. Ne7+! 28... Kf7 29. Qxd8 
+Qg5 {} (29... Nf3+ 30. Kg2 {is an idea.}) 30. a5 {this plan is still to
+slow.} (30. Qg8+ Kxe7 31. Rfe1+ Kd6 32. Qf8+ Kc6 33. Qc8+ Kb6 34. Re6+ 
+Rc6 35. Qxc6+ Ka7 36. Qb6+ Ka8 37. Re8+ Qd8 38. Rxd8#) 30... f4 {} 31. 
+f3?? (31. Nc6 Nf3+ 32. Kg2 fxg3 33. Qd7+ Kf8 34. Qc8+ Kf7 35. fxg3 {
+<waw> but there are still some hairy tactics.}) 31... fxg3 32. hxg3?? (
+32. Qg8+ Kxe7 33. Rfe1+ Re5 34. Rxe5+ Qxe5 35. h3 Nxf3+ 36. Kg2 {and
+white can still win!}) 32... Qxg3+ 33. Kh1 Qg2# {painfull!} 0-1
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.11.??"]
+[Round "5"]
+[White "Gill, Andy"]
+[Black "Langham, Neil"]
+[Result "1-0"]
+[ECO "C41"]
+
+1. e4 e5 2. Nf3 d6 3. Nc3 Nf6 4. Bc4 h6 ( 4... Bg4 5. d3 Nc6 6. h3 Bh5 7. O-O
+Bxf3 8. Qxf3 { = } ) 5. O-O Bd7 6. d3 Nc6 7. Bd2 ( 7. Be3 Be7 8. Nd5 O-O 9. h3
+Nxd5 10. Bxd5 Bf6 ) 7... Na5 {  } 8. b4 ( 8. Bd5 Bg4 9. a3 c6 10. Ba2 d5
+11. Be3 dxe4 12. Nxe4 { but black is having the freer game } ) 8... Nxc4
+9. dxc4 Be6 ( 9... Be7 10. Qe2 O-O 11. Rfd1 Be6 12. c5 c6 13. cxd6 Qxd6 { <sab>
+} ) 10. Nd5 $2 Nxe4 11. Qe2 ( 11. Re1 Nxd2 12. Qxd2 c6 13. Ne3 Be7 14. Rad1 O-O
+{ <ab>, with white a pawn and position down. } ) 11... Nxd2 12. Nxd2 ( 12. Qxd2
+{ is better. } ) 12... Qg5 $4 {  } ( 12... g6 13. Ne3 f5 14. c5 dxc5 15. bxc5
+c6 { <ab>, ready for a pawn charge on white's king. } ) 13. Nxc7+ Ke7 (
+13... Kd7 { is better, stoping the future escape of the white knight. } )
+14. Nxa8 Bh3 { going for the cheapo. } 15. f4 $1 Qg6 16. Nc7 ( 16. fxe5 Kd8
+17. Qe4 Be6 18. Qxg6 fxg6 { is the best line Fritz2 found. } ) 16... Kd7
+17. Nd5 Bg4 18. Qf2 f6 ( 18... Qxc2 19. Ne3 Qg6 20. fxe5 Be6 21. Nf3 { rather
+cheeky, but still a rook down. } ) 19. Ne3 Ke6 $2 {  } 20. f5+ Bxf5 21. Qxf5+
+( 21. Nxf5 Qg5 22. h4 Qg4 { actually wins more material, but with this level of
+inequality, you want to swap of queens. } ) 21... Qxf5 22. Nxf5 g6 23. Ng3 { At
+this point the score sheet goes wrong, but the game was won by now anyway! }
+1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.11.??"]
+[Round "6"]
+[White "Gill, Andy"]
+[Black "Duncan, Dennis"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 d6 3. Bc4 Bg4 4. O-O Nf6 5. Nc3 ( 5. d3 Nc6 6. Be3 d5 7. exd5
+Nxd5 8. Nbd2 Nxe3 9. fxe3 { = } ) 5... c6 ( 5... Nc6 6. Bb5 Qd7 7. h3 Bxf3
+8. Qxf3 O-O-O { = } ) 6. Bb3 d5 7. d3 ( 7. exd5 cxd5 8. Re1 e4 9. d3 Bxf3 { = }
+) 7... b5 ( 7... dxe4 8. dxe4 Qxd1 9. Rxd1 Bxf3 { <sab> } ) 8. h3 {  } (
+8. exd5 b4 9. Ne4 cxd5 10. Nxf6+ gxf6 11. d4 exd4 12. Qxd4 { <aw> } ) 8... Bc8
+( 8... Bxf3 9. Qxf3 d4 10. Ne2 Nbd7 11. Bg5 Be7 { <saw> } ) 9. Nxe5 ( 9. exd5
+Nxd5 10. Nxe5 Be6 11. Nxd5 { <aw> } ) 9... Qc7 ( 9... Bd6 10. Nf3 dxe4 11. Nxe4
+Nxe4 12. Re1 Bxh3 13. Rxe4+ Be6 { <aw> } ) 10. Nf3 Nh5 ( 10... Be6 11. Nd4 dxe4
+12. Bxe6 { <aw> } ) 11. exd5 c5 12. Nxb5 ( 12. Re1+ $1 Be7 13. Nxb5 Qb6 14. d6
+Qxb5 15. Rxe7+ Kd8 16. Bxf7 { <waw> } ) 12... Qb6 ( 12... Qb7 13. Re1+ Kd8
+14. Ne5 Nf6 15. Bg5 Bf5 16. Bxf6+ gxf6 { <waw> } ) 13. Ba4 ( 13. Re1+ Kd8
+14. Ne5 Qxb5 15. Nxf7+ Kc7 16. Nxh8 Nf6 17. Bf4+ { <waw> } ) 13... Bd7 14. Qe2+
+Be7 {  } 15. d4 ( 15. d6 O-O 16. dxe7 Re8 17. d4 cxd4 18. Nfxd4 { <waw> } )
+15... Bxb5 16. Bxb5+ Nd7 ( 16... Kf8 17. Re1 Qd6 18. Nh4 Qf6 19. Qxh5 { <waw> }
+) 17. Bxd7+ Kxd7 18. Ne5+ Ke8 19. dxc5 ( 19. Nc6 Qc7 20. Re1 cxd4 21. c4 Nf6 {
+<waw> } ) 19... Qxc5 20. Rd1 ( 20. d6 Qxd6 21. Qf3 Rc8 22. Nxf7 Qf6 23. Qxf6
+Nxf6 24. Nxh8 { <waw> } ) 20... Ng3 21. Qe3 ( 21. Qg4 Qxc2 22. Rd2 Qf5 23. Qxg3
+Bf6 { <waw> } ) 21... Nf5 22. Qxc5 ( 22. Qf3 Nd6 23. c4 Bf6 24. Re1 Bxe5
+25. Rxe5+ Kf8 { <waw> } ) 22... Bxc5 {  } 23. Be3 $2 ( 23. Re1 Ne7 24. c4 f6
+25. Nd3 Bd4 { <waw> } ) 23... Nxe3 ( 23... Bxe3 24. fxe3 Nxe3 25. Rd2 Rc8
+26. Re2 Nxd5 27. Ng6+ Kd7 { Blacks best line } ) 24. fxe3 Bxe3+ 25. Kf1 Bf4
+26. Re1 ( 26. Nd3 Bd6 27. c4 Rc8 28. b3 { <waw> } ) 26... f6 {  } 27. Ng6+ Kf7
+28. Nxf4 Rhe8 29. Rxe8 ( 29. c4 Rac8 30. b3 h6 31. Kf2 Rxe1 32. Rxe1 Rc5 {
+<waw> } ) 29... Rxe8 30. d6 ( 30. Kf2 Re5 31. Rd1 g5 32. Ne2 { <waw> } )
+30... Rd8 31. Rd1 g6 32. Nd5 ( 32. c4 g5 33. Ne2 Ke6 34. Nd4+ Kd7 35. c5 h6 {
+<waw>,5.25 } ) 32... Rxd6 33. c4 ( 33. Ke2 Ke6 34. c4 Rc6 35. Kd3 f5 36. b3 {
+<waw>,4.53 } ) 33... f5 34. Ke1 ( 34. b3 { <waw>,4.22 } ) 34... Ra6 35. a3 f4
+$4 { Simply throws away a pawn. } 36. c5 {  why not take the pawn? } (
+36. Nxf4 h6 37. g3 g5 38. Nd5 Re6+ 39. Kd2 Re4 { <waw>,5.06 looks good to me. }
+) 36... Ke6 $2 37. Nc7+ { Black resigns } 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.11.??"]
+[Round "7"]
+[White "Gill, Andy"]
+[Black "Rintoul, Adam"]
+[Result "1-0"]
+[ECO "C70"]
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 b5 5. Bb3 Nf6 6. d3 Bc5 ( 6... Bb7 7. O-O
+d5 8. exd5 Nxd5 9. Bg5 Be7 10. Bxe7 Ndxe7 { = } ) 7. Be3 $2 {  } ( 7. Nc3 )
+7... Bxe3 8. fxe3 O-O 9. O-O d6 10. Nbd2 ( 10. a3 Bb7 11. Nc3 Rb8 12. Nd5 a5 {
+<sab>,0.13 } ) 10... Bg4 11. d4 $2 ( 11. a4 Rb8 12. axb5 axb5 13. h3 Bh5
+14. Qe2 Nd7 { <sab>,-0.22 } ) 11... Bxf3 ( 11... exd4 12. Qe1 dxe3 13. Qxe3 Na5
+14. Nd4 c6 15. c3 Nxb3 { <ab> a pawn up. } ) 12. Nxf3 Nxe4 $4 {  } ( 12... Qe8
+13. d5 Na5 14. Qd3 Nxb3 15. axb3 c6 16. Rad1 { <ab> } ) 13. Bd5 Qd7 ( 13... Ng5
+14. Bxc6 Nxf3+ 15. Bxf3 Rb8 16. dxe5 dxe5 17. a3 { <waw> } ) 14. Bxe4 f5
+15. Bd5+ Kh8 16. Ng5 exd4 17. Qh5 {  } ( 17. Nxh7 Rfb8 18. Ng5 g6 19. Qf3 Ne5
+20. Qh3+ Kg7 21. Bxa8 { <waw>,4.44 } ) 17... h6 $2 ( 17... g6 18. Bxc6 gxh5
+19. Bxd7 dxe3 20. Rxf5 Rxf5 21. Bxf5 { <waw>,4.90 } ) 18. exd4 ( 18. Qg6 Qe8
+19. Qh7# ) 18... Rae8 ( 18... Rf6 19. Rae1 Raf8 20. Ne6 Re8 21. Qf3 {
+<waw>,2.66 } ) 19. Rae1 Rxe1 20. Rxe1 Nd8 21. Qg6 { I finally find the two move
+mate! } 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.11.??"]
+[Round "8"]
+[White "Robertson, Ian"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "C30"]
+[WhiteElo "2150"]
+
+1. e4 e5 2. f4 d6 3. Nf3 Nc6 (3... exf4 {Just take the pawn, and then
+follow the main line KG.}) 4. Bb5 Bd7 5. O-O Nf6 6. Nc3 Be7 (6... a6 7. 
+Ba4 exf4 8. d3 b5 9. Bb3 b4 {Who knows?}) 7. d3 { At this point white is
+winning.} 7... O-O 8. Kh1 {! A clever waiting move, to avoid temp
+gaining checks.} (8. Ne2) 8... Nd4 {? losses a pawn} 9. Bxd7 Qxd7 (9... 
+Nxf3 10. Bh3 Nd4 11. Be3 c5 12. fxe5 dxe5 {<saw>}) 10. fxe5 Nxf3 {?? 
+Losses the piece.} 11. exf6 Bxf6 12. Qxf3 b5 {? what is this for?} (
+12... Rae8 {Planning taking control over the very white center.}) 13. 
+Nd5 {} 13... Qd8 {?? Losses another pawn, as well as weakening the
+kingside, and allowing exchange of queens.} (13... Bd8) 14. Nxf6+ Qxf6 
+15. Qxf6 gxf6 16. Rxf6 Kg7 17. Bg5 {Black is just out of good moves.} 
+17... Rae8 {? Blocking in the f rook, allowing the skew.} 18. Raf1 d5 {
+? again lack of vision} 19. Bh6+ Kg8 20. exd5 Rd8 21. Bxf8 Rxf8 22. Rc6 {
+Planning an invasion of the 7th. Textbook play.} 22... Rd8 { Planing to
+remove the dangerous white pawn, but missing the connected rooks that
+arrive on the 7th.} 23. Rxc7 Rxd5 24. Rfxf7 Rd8 {Silly, blocking the
+kings escape, athough its over anyway. I should have tried for at least
+one cheapo.} (24... Re5) 25. Rxh7 Rf8 {?? Again just missing the action.} 
+26. Rcg7# 1-0
+
+[Site "Dunfermline Club Knockout"]
+[Date "1993.12.??"]
+[Round "9"]
+[White "Gill, Andy"]
+[Black "Colquhoun, Bob"]
+[Result "1-0"]
+[ECO "B10"]
+
+1. e4 c6 2. Nf3 d5 3. exd5 cxd5 4. c4 ( 4. d4 { Score: 0.06 } ) 4... Nf6 (
+4... d4 5. b3 Nc6 6. Bb2 Nf6 7. Na3 e5 { Score: -0.03 } ) 5. cxd5 ( 5. d4 e6
+6. cxd5 Nxd5 7. Nbd2 Bd6 8. Bc4 { Score: 0.13 } ) 5... Nxd5 6. Bc4 e6 (
+6... Nb6 7. Bb3 Nc6 8. d4 Bf5 9. Bg5 Be4 { Score: 0.00 } ) 7. O-O Nc6 8. d4 a6
+( 8... Bb4 9. Bd2 Bxd2 10. Nbxd2 Nf4 11. Nb3 O-O { Score: -0.16 } ) 9. Re1 (
+9. Nc3 { Score: -0.09 } ) 9... b5 ( 9... Be7 10. Nc3 O-O 11. Qd3 Qd7 12. Nxd5 {
+Score: -0.03 } ) 10. Bxd5 Qxd5 11. Nc3 Qf5 ( 11... Qd8 12. d5 Ne7 13. d6 Nf5
+14. Qd5 Bd7 { Score: 0.41 } ) 12. d5 Nd8 ( 12... Nb4 13. d6 Nd3 14. Re4 Nxc1
+15. Rxc1 Rb8 { Score: 0.34 } ) 13. dxe6 ( 13. d6 Nb7 14. Ne4 Nc5 15. Nd4 {
+Score: 0.34 } ) 13... Bxe6 14. Qd5 ( 14. Nd5 Rc8 15. Nd4 Qg6 16. Bf4 Bc5
+17. Nc7 Kf8 18. Nxa6 { Score: 0.75 } ) 14... Qxd5 15. Nxd5 Bd6 16. Bg5 (
+16. Nd4 Rb8 17. Bf4 Bxf4 18. Nxf4 Rb6 19. Ndxe6 Nxe6 20. Nxe6 { Score: 0.00 } )
+16... O-O ( 16... h6 17. Bd2 O-O 18. Bf4 { Score: -0.25 } ) 17. Rad1 Nc6 (
+17... Nb7 18. Be7 Bxe7 { Score: 0.00 } ) 18. Nd4 ( 18. Nb6 Bb4 19. Rxe6 fxe6
+20. Nxa8 Rxa8 { Score: 0.16 } ) 18... Bxd5 ( 18... Nxd4 19. Rxd4 h6 20. Ne7 Kh7
+21. Rxd6 hxg5 22. Nd5 { Score: -0.25 } ) 19. Nxc6 Bxh2+ ( 19... Rfe8 20. Rxe8
+Rxe8 21. h3 Re6 22. Nd4 Re4 { Score: -0.13 } ) 20. Kxh2 Bxc6 21. Rd6 Rfe8 (
+21... Rac8 { Score: -0.44 } ) 22. Rxe8+ ( 22. Rc1 Be4 23. Rc7 h6 24. Be3 Kf8 {
+Score: -0.41 } ) 22... Bxe8 23. a3 ( 23. Be3 h6 24. b3 Kh7 25. a3 g6 26. Bd4 {
+Score: -0.78 } ) 23... a5 ( 23... h6 24. Be3 Kh7 25. b3 f6 26. Bd4 Bf7 27. b4 {
+Score: -0.88 } ) 24. Kg3 ( 24. b3 h6 25. Rd8 Rxd8 26. Bxd8 a4 27. bxa4 bxa4 {
+Score: -0.81 } ) 24... a4 ( 24... h6 { Score: -0.91 } ) 25. Bc1 ( 25. Kh4 h6
+26. Be3 Kh7 27. Bd4 Rc8 28. g3 Bc6 { Score: -1.03 } ) 25... Rc8 ( 25... h6
+26. Be3 Kh7 27. Kh4 Rc8 28. Bd4 Bc6 29. f3 { Score: -1.09 } ) 26. Bd2 ( 26. Be3
+h6 27. Kh4 Kh7 28. Bd4 Bc6 29. f3 { Score: -1.13 } ) 26... Rc4 ( 26... Bc6
+27. Be3 h6 28. f3 Kh7 { Score: -1.16 } ) 27. Rd8 Re4 28. Bb4 ( 28. f4 { Score:
+-0.88 } ) 28... f6 ( 28... h6 29. Kf3 Re6 30. Kg4 Kh7 31. f4 Re4 32. g3 {
+Score: -1.13 } ) 29. f4 ( 29. Kf3 Re6 30. Kg4 Kf7 31. Kh4 Re2 32. Rd2 { Score:
+-0.91 } ) 29... Kf7 30. Kf3 ( 30. Rc8 Kg6 31. Kf3 { Score: -1.16 } ) 30... Bc6
+31. Rc8 ( 31. Kg3 Re2 32. Rd2 Rxd2 33. Bxd2 Ke6 34. Be3 { Score: -1.25 } )
+31... Rxb4+ 32. Rxc6 Rxb2 33. g4 ( 33. Rb6 { Score: -2.06 } ) 33... Rb3+
+34. Ke4 Rxa3 35. Rc7+ ( 35. f5 h6 36. Rc7 Kg8 37. Rb7 Rb3 38. Rd7 Rb4 39. Kf3 {
+Score: -3.28 } ) 35... Kg6 36. Rb7 ( 36. f5 Kh6 37. Rc2 Rb3 38. g5 Kh5 39. gxf6
+gxf6 40. Rh2 { Score: -3.34 } ) 36... Rb3 37. f5+ ( 37. Kd4 { Score: -3.44 } )
+37... Kh6 38. g5+ ( 38. Kd4 a3 39. Ra7 b4 40. Kc4 Rb2 41. Rb7 Rc2 { Score:
+-3.59 } ) 38... fxg5 39. Rb6+ Kh5 40. Rb7 Rb4+ ( 40... Kg4 41. Rxg7 Rb4 42. Ke5
+Rf4 43. f6 h5 44. Ra7 h4 { Score: -4.09 } ) 41. Ke5 Rf4 ( 41... Kg4 42. Rxg7
+Rf4 43. f6 h5 44. Ra7 Rf5 45. Ke6 h4 { Score: -4.22 } ) 42. Rxb5 Kg4 43. Ke6
+Rxf5 ( 43... h5 44. Re5 h4 45. Re1 a3 46. Ra1 Rf3 47. Rg1 Kh5 { Score: -3.94 }
+) 44. Rxf5 1-0
+
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.12.??"]
+[Round "10"]
+[White "Gill, Andy"]
+[Black "Petrie, George"]
+[Result "0-1"]
+
+1. e4 c5 2. Nf3 Nc6 3. Bc4 d6 ( 3... e6 4. Nc3 Nge7 5. d3 d5 6. Bb3 d4 7. Ne2
+e5 { Score: 0.09 } ) 4. O-O ( 4. c3 { Score: 0.03 } ) 4... e6 ( 4... g6 5. d4
+cxd4 6. Nxd4 Bg7 7. Be3 Nxd4 8. Bxd4 Nf6 { Score: -0.16 } ) 5. d3 ( 5. Bb5 Nf6
+6. d3 Bd7 7. Nc3 Be7 8. Bg5 O-O { Score: 0.00 } ) 5... Be7 ( 5... d5 6. Bb5 Nf6
+7. Ne5 Bd7 8. Nxd7 Qxd7 9. Bg5 { Score: 0.03 } ) 6. Nc3 Bd7 ( 6... Bf6 { Score:
+0.00 } ) 7. Bf4 ( 7. Re1 Nf6 8. Be3 O-O 9. a3 Rc8 10. Bf4 Nd4 11. Nxd4 { Score:
+0.06 } ) 7... a6 ( 7... Na5 8. Nd2 Nxc4 9. Nxc4 e5 10. Bg3 Be6 11. Ne3 { Score:
+-0.06 } ) 8. d4 ( 8. a3 Nf6 9. Re1 O-O 10. Be3 e5 11. Nd5 Be6 12. Nxe7 { Score:
+0.06 } ) 8... cxd4 9. Ne2 e5 ( 9... Na5 { Score: -0.94 } ) 10. Bg3 Nf6 11. Bd5
+( 11. c3 Nxe4 12. cxd4 O-O 13. Bd5 Nxg3 { Score: -0.97 } ) 11... O-O (
+11... Nb4 12. c3 Nbxd5 13. exd5 d3 14. Nc1 e4 15. Nd2 { Score: -1.16 } ) 12. c4
+( 12. c3 dxc3 13. Nxc3 b6 14. a3 Qc7 15. b3 Be6 16. Bxe6 { Score: -0.63 } )
+12... Qb6 ( 12... Bg4 13. Qb3 Qc7 14. Rac1 Rac8 15. Qd3 b6 { Score: -1.13 } )
+13. Qd2 ( 13. b3 Bg4 14. Nc1 Rac8 15. Nd3 Nh5 16. a3 Nxg3 17. fxg3 { Score:
+-1.22 } ) 13... Rac8 ( 13... Nb4 14. b3 Bg4 15. Rfd1 Nbxd5 { Score: -1.22 } )
+14. Bh4 ( 14. Rac1 { Score: -1.25 } ) 14... Nb4 ( 14... Bg4 15. Bg3 Nb4 16. b3
+Nbxd5 17. exd5 Bxf3 18. gxf3 { Score: -1.53 } ) 15. Nexd4 ( 15. Bxf6 Bxf6
+16. h3 Nxd5 17. cxd5 { Score: -1.44 } ) 15... Nbxd5 ( 15... exd4 16. b3 Bg4
+17. Qf4 Nd3 { Score: -3.34 } ) 16. Bxf6 ( 16. exd5 exd4 17. Rfe1 Bd8 18. b3 Ng4
+19. Bxd8 Rfxd8 20. Nxd4 { Score: -1.94 } ) 16... Nxf6 17. Ne2 ( 17. Nf5 Bxf5
+18. exf5 Rxc4 19. b3 Ne4 20. Qd5 Rb4 { Score: -4.75 } ) 17... Rxc4 18. b3 (
+18. Nc3 Rb4 19. b3 Nxe4 20. Nxe4 Rxe4 21. Rfd1 { Score: -5.13 } ) 18... Rxe4
+19. Nc3 ( 19. Ng3 Rb4 20. Rfe1 Bg4 21. Qd3 Rf4 22. Qe3 Qxe3 23. fxe3 { Score:
+-5.38 } ) 19... Rg4 ( 19... Rf4 20. Qe3 Qc7 { Score: -5.34 } ) 20. Qd1 (
+20. Rae1 { Score: -5.41 } ) 20... Bc6 21. Na4 ( 21. Rc1 Rf4 22. Re1 Bxf3
+23. gxf3 Re8 24. a3 { Score: -5.66 } ) 21... Qb4 ( 21... Bxa4 22. bxa4 Qa5
+23. Qb3 Rb4 24. Qc2 Rxa4 25. Rfc1 { Score: -5.94 } ) 22. Rc1 ( 22. h3 Rf4
+23. Nb2 Bxf3 24. gxf3 Rd4 25. Nd3 Qc3 { Score: -5.81 } ) 22... Rxg2+ 23. Kxg2
+Qg4+ 24. Kh1 Bxf3+ 25. Qxf3 Qxf3+ 26. Kg1 Nh5 ( 26... Nd5 27. Rc4 b5 28. Rfc1
+bxc4 29. Rxc4 Bf6 { Score: -14.53 } ) 27. Rc3 Qd5 ( 27... Qg4 28. Kh1 b5
+29. Rg1 Qd4 30. Rh3 Nf4 31. Rhg3 bxa4 { Score: -12.00 } ) 28. Nb6 ( 28. h3 Nf4
+29. Rg3 Ne2 30. Kh2 Nxg3 31. Kxg3 Qd3 32. Kg2 { Score: -11.94 } ) 28... Qd4
+29. Rfc1 ( 29. Na4 b5 30. h3 Nf4 31. Kh2 bxa4 32. Rc7 Re8 { Score: -12.97 } )
+29... Qxb6 30. Rc8 ( 30. R1c2 d5 31. h3 Qg6 32. Kh2 Nf4 33. f3 b6 { Score:
+-13.97 } ) 30... Nf4 31. R1c7 ( 31. R8c3 Ne2 32. Kf1 Nxc1 33. Rxc1 d5 34. h3
+Bc5 35. f3 { Score: -15.63 } ) 31... Bh4 ( 31... Nh3 32. Kh1 Qxf2 33. Rc4 d5
+34. Rc3 Qg1 { Score: -#4 } ) 32. Rc2 ( 32. Rxf8 Kxf8 33. Rc8 Ke7 34. Rc2 Qd4
+35. h3 Bxf2 36. Kh2 { Score: -18.41 } ) 32... Nd3 ( 32... Bxf2 33. Kf1 Qe3
+34. Rxf8 Kxf8 35. Rc8 Ke7 36. Rc7 Kd8 { Score: -19.53 } ) 33. Rxf8+ ( 33. Kf1
+Bxf2 34. Rxf8 Kxf8 35. Rc8 Ke7 36. Rg8 Bg3 37. Ke2 { Score: -14.78 } )
+33... Kxf8 0-1
+
+[Site "Dunfermline Club Championship"]
+[Date "1993.12.??"]
+[Round "11"]
+[White "Gill, Andy"]
+[Black "Horne, Peter"]
+[Result "0-1"]
+
+1. e4 e6 2. Nf3 Nc6 3. Bb5 a6 ( 3... d5 4. d3 dxe4 5. Bxc6 bxc6 6. dxe4 Qxd1
+7. Kxd1 { Score: 0.19 } ) 4. Ba4 ( 4. Bxc6 dxc6 5. O-O Nf6 6. Re1 Be7 7. d4 c5
+8. e5 { Score: 0.22 } ) 4... b5 5. Bb3 Bb7 ( 5... Na5 6. d3 Nxb3 7. axb3 Bb7
+8. O-O Bc5 9. Nc3 { Score: -0.13 } ) 6. d4 ( 6. c3 Nf6 7. d3 Be7 8. Be3 O-O
+9. Nbd2 d5 { Score: -0.09 } ) 6... Na5 7. Nbd2 ( 7. e5 Nxb3 8. axb3 c5 9. Bg5
+f6 10. Be3 cxd4 11. Bxd4 { Score: -0.38 } ) 7... Nf6 ( 7... Nxb3 8. axb3 c5
+9. O-O d5 10. exd5 Bxd5 { Score: -0.41 } ) 8. e5 Nd5 ( 8... Nxb3 9. Nxb3 Ne4
+10. O-O Be7 11. c3 O-O 12. Be3 d5 { Score: -0.19 } ) 9. O-O d6 ( 9... Nf4 {
+Score: -0.09 } ) 10. a4 ( 10. Bxd5 Bxd5 11. a4 dxe5 12. axb5 c5 13. bxa6 exd4 {
+Score: 0.09 } ) 10... b4 ( 10... dxe5 11. Bxd5 Qxd5 12. dxe5 c5 13. axb5 axb5
+14. b3 { Score: 0.06 } ) 11. Nc4 ( 11. Bxd5 Bxd5 12. c3 dxe5 13. Nxe5 Bd6
+14. cxb4 Bxb4 15. Ndf3 { Score: 0.03 } ) 11... Nxb3 12. cxb3 a5 ( 12... Rb8
+13. Qc2 Be7 14. Na5 c5 15. exd6 Qxd6 16. Nxb7 Rxb7 { Score: -0.34 } ) 13. Qe2 (
+13. Bg5 Be7 14. Bxe7 Qxe7 15. Re1 dxe5 { Score: -0.56 } ) 13... f6 ( 13... Be7
+14. Rd1 O-O 15. Be3 dxe5 16. dxe5 { Score: -0.63 } ) 14. exd6 ( 14. exf6 Bc8
+15. f7 Kxf7 16. Ng5 Ke7 17. Ne4 Qd7 18. Bg5 { Score: 0.47 } ) 14... cxd6 (
+14... Bxd6 15. Qxe6 Be7 16. Bd2 Ra6 17. Qf5 c5 18. dxc5 Bxc5 { Score: 0.03 } )
+15. Qxe6+ Qe7 ( 15... Be7 16. Re1 Ra6 17. Nh4 Nc7 18. Qxe7 Qxe7 19. Rxe7 Kxe7 {
+Score: 0.72 } ) 16. Qh3 ( 16. Nxd6 Kd8 17. Qxe7 Bxe7 18. Nxb7 Kc8 19. Nc5 Re8
+20. Re1 { Score: 4.66 } ) 16... Qf7 ( 16... Qc7 17. Re1 Be7 18. Qe6 Ra6 19. Bd2
+Qc8 20. Qxc8 Bxc8 { Score: 0.97 } ) 17. Re1+ Kd8 18. Bd2 Qg6 ( 18... g6 {
+Score: 0.97 } ) 19. Re2 ( 19. Rac1 Ra6 20. Ne3 Nxe3 21. Bxe3 d5 22. Bf4 Bd6 {
+Score: 0.88 } ) 19... Be7 ( 19... Ra6 20. Rae1 Be7 21. Qe6 Re8 22. Ne3 Nxe3
+23. Bxe3 Bxf3 { Score: 0.88 } ) 20. Rae1 ( 20. Nh4 Qh5 21. Rae1 Bc8 22. Qg3 Qg4
+23. Bf4 Nxf4 24. Qxg4 { Score: 1.06 } ) 20... Re8 ( 20... Bc8 21. Qh4 Bb7
+22. Bf4 Ba6 23. Qg3 { Score: 0.91 } ) 21. Nh4 ( 21. Nxd6 Bc8 22. Nh4 Qh5
+23. Qg3 Rg8 24. Nf3 Bg4 { Score: 2.06 } ) 21... Qh5 22. Nf5 ( 22. Nxd6 Ba6
+23. Re6 Bc8 24. g4 Bxe6 25. Rxe6 Nf4 26. Bxf4 { Score: 3.06 } ) 22... Qxh3
+23. gxh3 g6 ( 23... Bc6 24. Nxg7 Rg8 25. Bh6 Bd7 26. Nb6 { Score: 1.53 } )
+24. Ncxd6 ( 24. Nfxd6 Bc6 25. Nxe8 Kxe8 26. Re6 Bd7 27. Nd6 Kd8 28. Nf7 {
+Score: 3.41 } ) 24... gxf5 25. Nxe8 ( 25. Nxb7 Kd7 26. Nc5 Bxc5 27. dxc5 Rxe2 {
+Score: 1.66 } ) 25... Kxe8 26. Bh6 ( 26. f3 Kd7 27. Kf2 Rg8 28. Rd1 Bd6 29. Kf1
+Bc6 { Score: -0.16 } ) 26... Kf7 ( 26... Kd7 27. f3 Rg8 28. Kf2 Bd6 29. Rg1 Rg6
+30. Rxg6 hxg6 { Score: -0.47 } ) 27. Bf4 ( 27. f3 Rg8 28. Kf2 Bd6 29. Rg1 Rg6
+30. Rxg6 hxg6 31. Ke1 { Score: -0.41 } ) 27... Rg8+ 28. Kf1 Ba6 29. Bd2 Bd6
+30. f3 ( 30. Rc1 Bxh2 31. f3 Bg1 32. Rc4 Bxc4 33. bxc4 Bxd4 34. Rg2 { Score:
+-3.00 } ) 30... Bxh2 31. Kf2 ( 31. Rc1 Bg1 32. Rc4 Bxc4 33. bxc4 Bxd4 34. Re1
+Ne7 { Score: -3.13 } ) 31... Bg3+ 32. Kf1 Bxe1 33. Bxe1 ( 33. Kxe1 Rg1 34. Kf2
+Rb1 35. Re1 Rxb2 36. Rd1 Nc3 37. Ke1 { Score: -4.84 } ) 33... Ne3+ ( 33... Re8
+34. Bg3 Rxe2 35. Kg1 Rxb2 36. Bd6 Rxb3 { Score: -8.31 } ) 34. Kf2 f4 (
+34... Nd1 35. Kf1 Re8 36. Kg1 Bxe2 37. f4 Rd8 38. Kg2 Rxd4 { Score: -7.81 } )
+35. Rxe3 fxe3+ 36. Kxe3 Re8+ 37. Kd2 Re2+ 38. Kd1 Rxb2 39. d5 ( 39. f4 Rxb3
+40. h4 Rd3 41. Kc1 Rxd4 42. Bg3 Rd3 43. Bf2 { Score: -6.09 } ) 39... Rxb3 0-1
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.01.??"]
+[Round "12"]
+[White "Gill, Andy"]
+[Black "Easton, Brian"]
+[Result "1-0"]
+
+1. e4 Nf6 2. Nc3 e6 3. d4 d5 4. e5 Ne4 5. Nxe4 dxe4 6. Bc4 Nc6 7. Be3 
+Bb4+ 8. c3 Be7 9. Ne2 Bg5 10. Qd2 Na5 11. Bxg5 Nxc4 12. Qf4 Qd5 13. b3 
+Nb2 14. O-O b6 15. Ng3 Ba6 16. c4 Nd3 17. Qxe4 Qxe4 18. Nxe4 Bb7 19. f3 
+O-O 20. Nf2 f6 21. exf6 gxf6 22. Bh6 Rf7 23. Nxd3 Rd8 24. Nf4 Re7 25. 
+Rfe1 Kf7 26. Rad1 e5 27. dxe5 Rxd1 28. Rxd1 fxe5 29. Nd5 Rd7 30. f4 e4 
+31. f5 c6 32. Nc3 c5 33. Rxd7+ Kf6 34. Rxb7 Kxf5 35. Rxh7 Kg6 36. Rh8
+1-0
+
+[Site "Wester-Hailes Congress"]
+[Date "1994.01.??"]
+[Round "13"]
+[White "Plant, George"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. d4 b5 6. Bb3 d6 7. Ng5 Qd7 
+8. Bxf7+ Kd8 9. d5 Nb4 10. c3 Nxe4 11. Be6 Qe8 12. cxb4 Nxg5 13. Bxg5+ 
+Be7 14. Bxe7+ Qxe7 15. Bxc8 Rxc8 16. O-O c6 17. dxc6 Rxc6 18. Re1 h5 
+19. Nc3 Rc4 20. a3 g5 21. Nd5 Qg7 22. Ne3 Rc7 23. Nf5 Qf6 24. Qxd6+ 
+Qxd6 25. Nxd6 Re7 26. Rxe5 Rxe5 27. Nf7+ Ke7 28. Nxe5 Rc8 29. Nd3 Kd6 
+30. Kf1 h4 31. h3 Kd5 32. Ne1 Ke4 33. Nf3 Kf4 34. Nd4 Re8 35. Re1 Rxe1+ 
+36. Kxe1 Ke5 37. Nc2 Ke4 38. Ke2 Kf4 39. Kd3 Ke5 40. Ne3 Kf4 41. Nd5+ 
+Kf5 42. Nc7 1-0
+
+[Site "Wester-Hailes Congress"]
+[Date "1994.01.??"]
+[Round "14"]
+[White "Gill, Andy"]
+[Black "McIntee, C."]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 Nc6 3. Be2 Nf6 4. Nc3 e6 5. O-O d5 6. exd5 Nxd5 7. Nxd5 
+Qxd5 8. c4 Qd8 9. Re1 h5 10. b3 f6 11. Bb2 h4 12. h3 Qc7 13. d4 Qf4 
+14. d5 exd5 15. cxd5 Nd8 16. Bb5+ Kf7 17. Qc1 Qd6 18. Qe3 Be7 19. Qe4 
+g5 20. Bd3 Ke8 21. Qg6+ Kd7 22. Bb5+ Kc7 23. Ne5 Qxd5 24. Rad1 Qg8 25. 
+Bc4 Ne6 26. Qxg8 Rxg8 27. Bxe6 Bxe6 28. Nf3 Rad8 29. Rxd8 Rxd8 30. Rxe6 
+Rd1+ 31. Kh2 Bd6+ 32. g3 f5 33. Be5 hxg3+ 34. fxg3 Bxe5 35. Rxe5 Ra1 
+36. Rxc5+ Kb6 37. Rc2 g4 38. hxg4 fxg4 39. Ne5 Kb5 40. Nxg4 a5 41. Ne3 
+Re1 42. Nc4 Re6 43. g4 Rh6+ 44. Kg3 Rg6 45. Rg2 a4 46. Ne5 Rg5 47. 
+bxa4+ Kxa4 48. Kf4 Rg7 49. g5 b5 50. g6 b4 51. Kf5 Ka3 52. Kf6 Rg8 53. 
+g7 1-0
+
+[Site "Wester-Hailes Congress"]
+[Date "1994.01.??"]
+[Round "15"]
+[White "Robertson, F."]
+[Black "Gill, Andy"]
+[Result "1-0"]
+
+1. d4 d5 2. Nf3 e6 3. Bf4 Be7 4. e3 Nf6 5. Bd3 b6 6. O-O O-O 7. Re1 Bb7 
+8. Nbd2 c5 9. c3 Nc6 10. Ne5 Rc8 11. Ndf3 c4 12. Bc2 b5 13. b3 Qa5 14. 
+b4 Qd8 15. a4 a6 16. axb5 axb5 17. Nxc6 Bxc6 18. Ne5 Bb7 19. Ra5 Qe8 
+20. Ra7 Ba8 21. Ng4 Bc6 22. Be5 Qd8 23. Qf3 Ra8 24. Rxa8 Bxa8 25. Nxf6+ 
+Bxf6 26. e4 Bxe5 27. dxe5 dxe4 28. Bxe4 Bxe4 29. Qxe4 Qd3 30. Qxd3 cxd3 
+31. Rd1 Rd8 32. f4 f5 33. Kf2 Kf8 34. Ke3 Ke7 35. Rxd3 Rxd3+ 36. Kxd3 
+Kd7 37. h3 g6 38. Kd4 Kc6 39. g3 Kb6 40. g4 Kc6 41. c4 Kb6 42. c5+ Kc6 
+43. Ke3 Kc7 44. Ke2 Kc6 45. Kf3 Kd5 46. gxf5 gxf5 47. h4 Kc4 1-0
+
+[Site "Wester-Hailes Congress"]
+[Date "1994.01.??"]
+[Round "16"]
+[White "Gill, Andy"]
+[Black "McKerrow, A."]
+[Result "0-1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Nc3 b5 7. Bb3 
+O-O 8. a3 d6 9. Re1 Rb8 10. d3 Bg4 11. h3 Bh5 12. Nd5 Nxd5 13. exd5 Nd4 
+14. g4 Nxf3+ 15. Qxf3 Bg6 16. a4 b4 17. a5 Qc8 18. Ba4 f5 19. gxf5 Rxf5 
+20. Qg4 Bh5 21. Qc4 Rf6 22. Bg5 Rg6 23. f4 h6 24. Rxe5 dxe5 25. d6+ Qe6 
+26. Qxe6+ Rxe6 27. Bb3 hxg5 28. dxe7 Bf7 29. fxg5 Rg6 30. Rf1 Bxb3 31. 
+cxb3 Rxg5+ 32. Kh2 Re8 33. h4 Rg4 34. Kh3 Rf4 35. Rxf4 exf4 36. Kg4 
+Rxe7 37. Kxf4 Rd7 38. Ke4 Rd6 0-1
+
+[Site "Wester-Hailes Congress"]
+[Date "1994.01.??"]
+[Round "17"]
+[White "McCluskey, S."]
+[Black "Gill, Andy"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Bxc6 dxc6 5. d3 Bd6 6. O-O Bg4 7. h3 
+Bh5 8. Be3 Qe7 9. Nc3 Nf6 10. Re1 O-O-O 11. Nb1 Bb4 12. c3 Ba5 13. b4 
+Bb6 14. a3 Nxe4 15. Bxb6 Bxf3 16. Qxf3 Ng5 17. Qe3 cxb6 18. d4 Rhe8 
+19. h4 Ne6 20. g3 exd4 21. cxd4 Rxd4 22. Nc3 c5 23. Rac1 Red8 24. bxc5 
+bxc5 25. Ne4 R8d7 26. Nxc5 Rc7 27. Nxe6 Qxe6 28. Qxd4 Rxc1 29. Rxc1+ 
+Kb8 30. Qxg7 1-0
+
+[Site "Dunferline Club Knockout"]
+[Date "1994.01.??"]
+[Round "18"]
+[White "Gill, Andy"]
+[Black "Brown, Rab"]
+[Result "1-0"]
+
+1. e4 e5 2. Nf3 d6 3. d4 Nc6 4. dxe5 Nxe5 5. Nxe5 dxe5 6. Qxd8+ Kxd8 
+7. Bc4 Bb4+ 8. Nc3 Bxc3+ 9. bxc3 Be6 10. Bxe6 fxe6 11. O-O Nf6 12. Bb2 
+Nxe4 13. c4 Nd2 14. Rfd1 Ke7 15. Rxd2 c5 16. Bxe5 Rhg8 17. Rad1 g5 18. 
+Rd7+ Ke8 19. Rxb7 g4 20. Rxh7 Rd8 21. Rxd8+ Kxd8 22. Rh8 Rxh8 23. Bxh8 
+Kd7 24. f3 gxf3 25. gxf3 Ke7 26. Be5 Kd7 27. Kg2 Ke7 28. Kg3 Kf7 29. 
+Bd6 Kf6 30. Bxc5 a5 31. Kf4 e5+ 32. Ke4 Ke6 33. f4 a4 34. fxe5 a3 35. 
+Bxa3 Kd7 36. Kd5 Ke8 37. Ke6 Kd8 38. Kf7 Kd7 39. e6+ Kc6 40. e7 Kc7 
+41. e8=Q Kb7 42. Qe6 Kc7 43. Qd6+ Kb7 44. Ke7 Ka7 45. Qb4 Ka8 46. Kd7 
+Ka7 47. Kc7 Ka6 48. Qb6# 1-0
+
+[Site "Dunfermline C vs Grangemouth B"]
+[Date "1994.01.??"]
+[Round "19"]
+[White "Gill, Andy"]
+[Black "Patterson, Dick"]
+[Result "0-1"]
+
+1. e4 c5 2. Nf3 Nc6 3. Be2 e6 4. b3 a6 5. O-O b5 6. Bb2 Nf6 7. e5 Nd5 
+8. d4 Bb7 9. c4 Nf4 10. cxb5 Nxe2+ 11. Qxe2 axb5 12. Re1 cxd4 13. Nxd4 
+Nxd4 14. Bxd4 Qg5 15. g3 Rc8 16. f4 Qg6 17. Qxb5 Bc6 18. Qe2 Be7 19. a4 
+O-O 20. a5 f6 21. exf6 Bxf6 22. Bxf6 Rxf6 23. b4 Rxf4 24. Qd2 Rf3 25. 
+Rf1 Rxf1+ 26. Kxf1 Qf5+ 27. Qf4 Qd3+ 28. Ke1 Rf8 29. Qxf8+ Kxf8 30. a6 
+Qd4 31. Ke2 Qxa1 32. Nd2 Qxa6+ 33. Ke3 Qa3+ 0-1
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.01.??"]
+[Round "20"]
+[White "Mitchell, Ian"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[WhiteElo "1660"]
+
+1. e4 e5 2. f4 exf4 3. Nf3 Nc6 4. d4 Nf6 5. Bd3 d5 6. e5 Ne4 7. O-O g5 
+8. c3 Qe7 9. Nfd2 Bf5 10. Qe2 Nxd2 11. Nxd2 Bxd3 12. Qxd3 O-O-O 13. a4 
+Rg8 14. a5 a6 15. b4 h6 16. b5 Nb8 17. Nb3 axb5 18. Qxb5 Qd7 19. Qd3 f6 
+20. exf6 Bd6 21. Bd2 Qg4 22. a6 Nxa6 23. Rxa6 bxa6 24. Qxa6+ Kd7 25. 
+Qb5+ Ke6 26. c4 f3 27. Rxf3 Rb8 28. Qxd5+ Kd7 29. Nc5+ Kd8 30. Qxg8+
+1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.02.??"]
+[Round "21"]
+[White "Gill, Andy"]
+[Black "Burtwistle, Paul"]
+[Result "0-1"]
+
+1. e4 c5 2. Nf3 e6 3. Be2 Nc6 4. O-O Nf6 5. Nc3 d5 6. e5 Nd7 7. Re1 
+Ndxe5 8. Nxe5 Nxe5 9. Bb5+ Nc6 10. d4 a6 11. Bxc6+ bxc6 12. Be3 cxd4 
+13. Bxd4 c5 14. Be5 Bb7 15. Qd2 f6 16. Bc7 Qxc7 17. Rxe6+ Kf7 18. Rae1 
+d4 19. Nd1 Bd6 20. f4 Rhe8 21. f5 Bd5 22. Rxe8 Rxe8 23. c3 Rxe1+ 24. 
+Qxe1 Bxh2+ 25. Kh1 Be5 26. cxd4 cxd4 27. Qe2 Qc4 28. Qh5+ Kf8 29. Kg1 
+Qc2 0-1
+
+[Site "Dunfermline Club Knockout"]
+[Date "1994.02.??"]
+[Round "22"]
+[White "Gill, Andy"]
+[Black "O'Neill, Jim"]
+[Result "0-1"]
+[BlackElo "1875"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Bd3 a6 6. O-O e5 7. Nf3 
+Bg4 8. Nc3 Nbd7 9. Re1 Rc8 10. Be3 b5 11. Nd5 Nxd5 12. exd5 Nf6 13. Bg5 
+Be7 14. Bxf6 Bxf6 15. Be4 O-O 16. c3 Bh4 17. Qc2 f5 18. Nxh4 Qxh4 19. 
+g3 Qh5 20. Bg2 Rf6 21. f3 Bxf3 22. Bxf3 Qxf3 23. Rad1 f4 24. gxf4 Rg6+
+0-1
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.02.??"]
+[Round "23"]
+[White "Gill, Andy"]
+[Black "Bell, Bill"]
+[Result "1-0"]
+
+1. e4 e6 2. d4 d5 3. Nf3 dxe4 4. Nfd2 Qxd4 5. c3 Qd5 6. Be2 e3 7. Nf3 
+Qxd1+ 8. Bxd1 exf2+ 9. Kxf2 Nc6 10. Be3 Bd7 11. Re1 h6 12. Nbd2 O-O-O 
+13. Ba4 Kb8 14. Rad1 Bd6 15. b4 a6 16. Nc4 Be7 17. Nfe5 Be8 18. Rxd8+ 
+Bxd8 19. Bxc6 Bxc6 20. Nxf7 Rh7 21. Nxd8 Bd5 22. Nd2 g5 23. Rd1 Kc8 
+24. Nb3 Rd7 25. Nxb7 Bxb7 26. Rxd7 Kxd7 27. Nc5+ Kc6 28. Nxe6 Nf6 29. 
+Nd8+ Kd7 30. Nxb7 Ne4+ 31. Kf3 Nxc3 32. Nc5+ Kc6 33. Nxa6 Nxa2 34. Bd2 
+Kb6 35. Nc5 Kc6 36. Nd3 Kb5 37. Ke4 Kc4 38. g3 Kb3 39. h4 gxh4 40. gxh4 
+Nc3+ 41. Bxc3 Kxc3 42. h5 Kc4 43. Ne5+ Kxb4 44. Kd5 c5 45. Nd3+ Kb5 
+46. Nxc5 Kb6 47. Ne6 Kb7 48. Nf8 Kc7 49. Ke6 Kd8 50. Kf7 Kc8 51. Kg6 
+Kd8 52. Kxh6 Ke8 53. Kg7 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.02.??"]
+[Round "24"]
+[White "MacArthur, John"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[WhiteElo "1725"]
+
+1. d4 e6 2. Nf3 Nf6 3. c4 d5 4. Nc3 Nc6 5. e3 Be7 6. Be2 O-O 7. O-O Qd6 
+8. c5 Qd7 9. Ne5 Nxe5 10. dxe5 Ne4 11. Nxe4 dxe4 12. Qc2 Qc6 13. b4 Rd8 
+14. Bb2 a5 15. a3 axb4 16. axb4 Rxa1 17. Rxa1 b6 18. Bd4 bxc5 19. bxc5 
+Bb7 20. Ra5 Ra8 21. Bb5 Qd5 22. Qa4 Rxa5 23. Qxa5 Bxc5 24. Qxc7 Bf8 
+25. Be8 h6 26. Qxf7+ Kh7 27. Qxf8 Bc6 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.02.??"]
+[Round "25"]
+[White "Sneddon, Ian"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[WhiteElo "1685"]
+
+1. c4 e5 2. Nc3 Nf6 3. Nf3 Nc6 4. g3 d5 5. cxd5 Nxd5 6. Bg2 Be6 7. O-O 
+Bb4 8. Ne4 Qd7 9. d4 exd4 10. Nxd4 O-O-O 11. Nxe6 Qxe6 12. Qc2 h6 13. 
+Rd1 f5 14. Nc5 Bxc5 15. Qxc5 Nde7 16. Be3 Rxd1+ 17. Rxd1 Rd8 18. Rxd8+ 
+Kxd8 19. b3 a6 20. Qc3 Qe5 21. Qxe5 Nxe5 22. Bxb7 N7c6 23. Bf4 Na5 24. 
+Bxe5 Nxb7 25. Bxg7 h5 26. Kg2 Nd6 27. f3 Ne8 28. Be5 c6 29. Kh3 Ke7 
+30. Kh4 Nf6 31. Bxf6+ Kxf6 32. Kxh5 c5 33. g4 f4 34. g5+ Kg7 35. Kg4
+1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.03.??"]
+[Round "26"]
+[White "Gill, Andy"]
+[Black "Connally, Paul"]
+[Result "0-1"]
+[ECO "B70"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 g6 5. Nc3 Nf6 6. Bd3 Bg7 7. O-O 
+O-O 8. f4 Nc6 9. Nxc6 bxc6 10. Kh1 Rb8 11. Qe1 Ng4 12. h3 Nf6 13. b3 e5 
+14. fxe5 Nh5 15. Bb2 dxe5 16. Rf3 a5 17. g4 Nf4 18. Rd1 Qg5 19. Bc1 
+Bxg4 20. Bxf4 Bxf3+ 0-1
+
+[Site "Glenrothes Congress"]
+[Date "1994.03.??"]
+[Round "27"]
+[White "Hunt, Tom"]
+[Black "Gill, Andy"]
+[Result "1/2-1/2"]
+
+1. Nf3 Nc6 2. g3 e5 3. Nc3 d5 4. d3 Be6 5. Bg2 Qd7 6. Ng5 d4 7. Nce4 
+Bf5 8. a3 Be7 9. O-O Bxg5 10. Nxg5 f6 11. Ne4 Bh3 12. Nc5 Qc8 13. Bxh3 
+Qxh3 14. Nxb7 Rb8 15. Nc5 h5 16. e4 g5 17. Qf3 g4 18. Qf5 Kf7 19. Bg5 
+Nce7 20. Qe6+ Kg6 21. f4 exf4 22. Rxf4 Kxg5 23. Raf1 h4 24. Qf7 hxg3 
+25. Ne6+ Kh4 26. hxg3+ Qxg3+ 1/2-1/2
+
+[Site "Glenrothes Congress"]
+[Date "1994.03.??"]
+[Round "28"]
+[White "Gill, Andy"]
+[Black "Husband, Dan"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 Nc6 3. d4 Nxd4 4. Nxd4 cxd4 5. Qxd4 e6 6. Nc3 Qb6 7. 
+Qxb6 axb6 8. Bb5 Bc5 9. O-O Nf6 10. Be3 O-O 11. Rfe1 d6 12. a4 Bd7 13. 
+Bg5 Bc6 14. Bxf6 gxf6 15. Rad1 Kh8 16. Rd3 Rad8 17. Rh3 Rg8 18. Bd3 Rg7 
+19. Nb5 Bxb5 20. axb5 Rdg8 21. Rg3 Rxg3 22. hxg3 h6 23. Kf1 Kg7 24. c3 
+d5 25. exd5 exd5 26. Ra1 d4 27. Ra7 dxc3 28. bxc3 Rd8 29. Be4 Rd1+ 30. 
+Ke2 Rc1 31. Rxb7 Rxc3 32. Kf1 Rb3 33. Rxf7+ Kh8 34. Rxf6 Rxb5 35. Rxh6+ 
+Kg7 36. Rg6+ Kh7 37. Rxb6+ 1-0
+
+[Site "Glenrothes Congress"]
+[Date "1994.03.??"]
+[Round "29"]
+[White "Chance, Keith"]
+[Black "Gill, Andy"]
+[Result "1/2-1/2"]
+
+1. Nf3 Nc6 2. e4 e5 3. d4 exd4 4. Nxd4 d6 5. Nxc6 bxc6 6. Bd3 Bb7 7. 
+O-O Nf6 8. Re1 Be7 9. e5 dxe5 10. Rxe5 O-O 11. h3 Re8 12. Re1 Qd7 13. 
+Bg5 Rad8 14. Bxf6 Bxf6 15. Rxe8+ Qxe8 16. Nc3 Ba6 17. Qe1 Qxe1+ 18. 
+Rxe1 Bxd3 19. cxd3 g6 20. Rd1 Rb8 21. Ne4 Bxb2 22. Rb1 a5 23. Nc3 Rb4 
+24. Nd1 Ba3 25. Rxb4 Bxb4 26. Kf1 f5 27. Nb2 Kf7 28. Nc4 Ke6 29. Ke2 
+Kd5 30. a3 Bc5 31. Nxa5 Bxa3 32. Nc4 Bc5 33. f3 h5 34. g4 hxg4 35. hxg4 
+fxg4 36. fxg4 Ke6 37. Kf3 Bd6 38. Ke4 g5 39. Na5 c5 40. Nc4 Bf4 41. Na5 
+Bd2 42. Nc4 Bb4 43. Ne5 Bd2 44. Nf3 Bc1 45. Ne5 Bf4 46. Ng6 Bg3 47. 
+Nf8+ Kd6 48. Nh7 Bf4 49. Kf5 Kd5 50. Nxg5 Bxg5 51. Kxg5 Kd4 52. Kf5 
+Kxd3 53. g5 c4 54. g6 c3 55. g7 c2 56. g8=Q c1=Q 57. Qd5+ Ke2 58. Qg2+ 
+Kd1 59. Qg1+ 1/2-1/2
+
+[Site "Glenrothes Congress"]
+[Date "1994.03.??"]
+[Round "30"]
+[White "Gill, Andy"]
+[Black "King, Jim"]
+[Result "1/2-1/2"]
+
+1. e4 c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 d6 5. Bb5 Qc7 6. O-O a6 7. Ba4 
+b5 8. Bb3 Nf6 9. Re1 e6 10. Bg5 Be7 11. c3 O-O 12. Nd2 Bb7 13. Qe2 Rfe8 
+14. Rac1 d5 15. Bc2 Rac8 16. e5 Nd7 17. Bxe7 Rxe7 18. N2f3 h6 19. Qd3 
+g6 20. Qe3 Kg7 21. Nh4 Ncxe5 22. b3 Qxc3 23. Qxc3 Rxc3 24. Bb1 b4 25. 
+Rxc3 bxc3 26. Rc1 g5 27. Nhf3 Nxf3+ 28. Nxf3 g4 29. Nd4 e5 30. Nf5+ Kf6 
+31. Nxe7 Kxe7 32. Rxc3 Kd6 33. h3 Nf6 34. hxg4 Nxg4 35. Bf5 Nf6 36. Bc8 
+d4 37. Rc4 Bd5 38. Rc2 a5 39. f3 Nh5 40. Ba6 Nf4 41. Rd2 f6 42. Bd3 Bc6 
+43. Kf2 h5 44. g3 Ne6 45. a4 Be8 46. Bb5 Bg6 1/2-1/2
+
+[Site "Glenrothes Congress"]
+[Date "1994.03.??"]
+[Round "31"]
+[White "Gourley, R."]
+[Black "Gill, Andy"]
+[Result "1-0"]
+
+1. Nf3 Nc6 2. d4 e6 3. c4 d5 4. Nc3 Bb4 5. e3 Nf6 6. Bd2 O-O 7. Ne5 
+Nxe5 8. dxe5 Ne4 9. Nxe4 dxe4 10. Bxb4 c5 11. Bxc5 Qa5+ 12. b4 Rd8 13. 
+bxa5 Rxd1+ 14. Rxd1 h6 15. Rd8+ Kh7 16. Be7 b6 17. axb6 axb6 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.03.??"]
+[Round "32"]
+[White "Gill, Andy"]
+[Black "Glynis, Grant"]
+[Result "1-0"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bc4 Nc6 7. Nxc6 
+bxc6 8. Be3 e6 9. O-O Be7 10. Bb3 O-O 11. Qe2 Bb7 12. Rad1 Qc7 13. f4 
+e5 14. Kh1 Rfd8 15. Qf3 Qc8 16. fxe5 dxe5 17. Qg3 Rxd1 18. Nxd1 Qg4 
+19. Qxe5 Qxe4 20. Qxe4 Nxe4 21. Rxf7 Nd6 22. Rxe7+ Kh8 23. Re5 Rf8 24. 
+Kg1 h6 25. Bc5 Rf6 26. c3 a5 27. g3 Ba6 28. Bc2 g5 29. Bd4 Kg8 30. Rxa5 
+Rf1+ 31. Kg2 Rf8 32. Rxa6 Nc4 33. Rxc6 Na5 34. Rxh6 Rf7 35. Rh8# 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.03.??"]
+[Round "33"]
+[White "Welshman, Alistair"]
+[Black "Gill, Andy"]
+[Result "0-1"]
+[ECO "B20"]
+
+1. e4 c5 2. Bc4 d6 3. Nc3 Nf6 4. Nf3 e6 5. O-O Be7 6. d3 O-O 7. Bg5 Nc6 
+8. Bxf6 Bxf6 9. Bb5 Bd7 10. Bxc6 Bxc6 11. Qe2 Re8 12. Rae1 Bxc3 13. 
+bxc3 Qa5 14. e5 d5 15. d4 Bb5 16. Qe3 Bxf1 17. Rxf1 cxd4 18. Qxd4 Rac8 
+19. Qb4 Qxb4 20. cxb4 Rxc2 21. Ra1 Rec8 22. Kf1 Rc1+ 23. Rxc1 Rxc1+ 
+24. Ke2 Rc2+ 25. Nd2 Rxa2 26. g4 Rb2 0-1
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.03.??"]
+[Round "34"]
+[White "Taylor, Robin"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "C02"]
+[WhiteElo "1610"]
+
+1. d4 e6 2. e4 d5 3. e5 c5 4. c3 Nc6 5. Nf3 Bd7 6. Bf4 cxd4 7. cxd4 
+Bb4+ 8. Bd2 Bxd2+ 9. Qxd2 Nge7 10. Nc3 a6 11. a3 Qc7 12. Bd3 O-O-O 13. 
+O-O Rdf8 14. b4 f6 15. b5 Nxd4 16. Nxd4 Qxe5 17. bxa6 Qxd4 18. axb7+ 
+Kb8 19. Ne2 Qa7 20. Qb4 Nf5 21. Bxf5 exf5 22. Qd6+ Kxb7 23. Rab1+ Kc8 
+24. Rfc1+ Kd8 25. Rb8+ Qxb8 26. Qxb8+ Ke7 27. Qb4+ Kf7 28. f4 Rc8 29. 
+Rxc8 Rxc8 30. Qd6 Be6 31. Nd4 Rc1+ 32. Kf2 Rd1 33. Qxe6+ Kf8 34. Nxf5 
+Rd2+ 35. Ke3 1-0
+
+[Site "Dunfermline C vs Stirling A"]
+[Date "1994.03.??"]
+[Round "35"]
+[White "Smith, Steve"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "B92"]
+[WhiteElo "1745"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Be2 e5 7. Nb3 
+Be7 8. O-O O-O 9. a4 Be6 10. f4 Bxb3 11. cxb3 Nc6 12. Be3 Qd7 13. Bc4 
+Rad8 14. f5 Kh8 15. Qf3 Nb4 16. Rfd1 Nc2 17. Rac1 Nxe3 18. Qxe3 Qc6 
+19. Nd5 Nxd5 20. Bxd5 Qd7 21. Qb6 Rb8 22. Rc7 Bd8 23. Rxd7 Bxb6+ 24. 
+Kf1 f6 25. Bxb7 Bd4 26. Rc1 Bxb2 27. Rcc7 Rg8 28. Bxa6 h5 29. Bc4 Rgc8 
+30. Rxg7 Rxc7 31. Rxc7 Bd4 32. Rf7 Rg8 33. Rxf6 Rg4 34. Bd5 Rf4+ 35. 
+Ke1 Bc3+ 36. Ke2 Bd4 37. Rh6+ Kg7 38. Rxh5 Rf2+ 39. Kd3 Rxg2 40. Kc4 
+Bg1 41. h4 Rc2+ 42. Kd3 Rg2 43. Rg5+ Rxg5 44. hxg5 Bb6 45. Kc4 Bd8 46. 
+f6+ Kg6 47. f7 Be7 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.04.??"]
+[Round "36"]
+[White "Gill, Andy"]
+[Black "Bill, Phillips"]
+[Result "0-1"]
+[ECO "C10"]
+
+1. e4 e6 2. d4 d5 3. Nc3 c5 4. e5 Nc6 5. Nf3 Qb6 6. Bb5 Bd7 7. Bxc6 
+Bxc6 8. O-O Ne7 9. dxc5 Qxc5 10. Be3 Qa5 11. Qd3 Nf5 12. Nd4 Nxe3 13. 
+Nxc6 bxc6 14. Qxe3 Bc5 15. Qd3 O-O 16. a3 Qc7 17. b4 Bb6 18. Rfe1 a6 
+19. Na4 Rfb8 20. Nxb6 Rxb6 21. c4 dxc4 22. Qxc4 Rb5 23. Qe4 Rd5 24. 
+Rad1 Rad8 25. Rxd5 cxd5 26. Qd4 Rc8 27. f4 g6 28. Re3 h5 29. Kf2 Qc2+ 
+30. Kf3 Rc4 31. Qd3 Qc1 32. Qe2 d4 33. Rd3 Rc3 34. Ke4 Rxa3 35. Rxa3 
+Qxa3 36. Qc4 Qe3# 0-1
+
+[Site "Edinburgh Congress"]
+[Date "1994.04.??"]
+[Round "37"]
+[White "Gill, Andy"]
+[Black "Watt, Andrew"]
+[Result "0-1"]
+[ECO "C97"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 
+8. c3 O-O 9. h3 Na5 10. Bc2 c5 11. d4 Qc7 12. b4 cxb4 13. cxb4 Nc4 14. 
+Nbd2 Bb7 15. Nxc4 Qxc4 16. dxe5 dxe5 17. a3 Rac8 18. Bd3 Qc3 19. Bg5 
+Rfd8 20. Re3 Bxe4 21. Rc1 Qxc1 22. Qxc1 Rxc1+ 23. Re1 Rxe1+ 24. Nxe1 
+Bxd3 25. Nf3 Be4 26. Nxe5 Rd1+ 27. Kh2 Bd6 28. f4 h6 29. Bh4 g5 30. Bg3 
+Bxe5 31. fxe5 Nh5 32. e6 Nxg3 33. e7 Nf1+ 34. Kg1 Bc6 35. Kf2 f6 36. 
+Ke2 Ra1 37. Kd3 Kf7 0-1
+
+[Site "Edinburgh Congress"]
+[Date "1994.04.??"]
+[Round "38"]
+[White "Milne, Jake"]
+[Black "Gill, Andy"]
+[Result "0-1"]
+[ECO "B50"]
+
+1. e4 c5 2. Nf3 d6 3. Bc4 e6 4. d3 Nf6 5. a3 Nc6 6. Nc3 Be7 7. O-O O-O 
+8. Be3 b6 9. h3 Bb7 10. Ne2 d5 11. exd5 exd5 12. Ba2 Re8 13. c3 Qc7 
+14. Bf4 Bd6 15. Bxd6 Qxd6 16. d4 cxd4 17. Nexd4 Nxd4 18. Nxd4 Rad8 19. 
+Qd2 Ba6 20. Qg5 Re5 21. Nf5 Rxf5 22. Qxf5 Bxf1 23. Rxf1 g6 24. Qf3 Kg7 
+25. Rd1 Qe5 26. g3 a5 27. Kg2 h5 28. h4 Rd6 29. Bb1 d4 30. Qd3 Qd5+ 
+31. Qf3 Qb3 32. Qe2 Qd5+ 33. f3 Qe6 34. Qxe6 Rxe6 35. Be4 dxc3 36. bxc3 
+Nxe4 37. fxe4 Rxe4 38. Rd6 Re2+ 39. Kf3 Rb2 40. Rd3 a4 41. Ke4 f5+ 42. 
+Kd5 Re2 43. c4 Re8 44. Kc6 Rc8+ 45. Kxb6 Rxc4 46. Kb5 Rg4 47. Rd7+ Kf6 
+48. Ra7 f4 49. gxf4 Rxf4 50. Rxa4 Rxa4 51. Kxa4 g5 52. hxg5+ Kxg5 53. 
+Kb5 h4 54. a4 h3 55. a5 h2 56. a6 h1=Q 57. Kb6 Qb1+ 58. Ka7 Kf5 59. Ka8 
+Qe4+ 60. Kb8 Qe8+ 61. Kb7 Qd7+ 62. Kb6 Qd8+ 63. Kb7 Qd5+ 64. Kb6 Qa8 
+65. Ka5 Ke5 66. Kb6 Kd5 67. Ka5 Kc5 68. Ka4 Qxa6+ 69. Kb3 Qc4+ 70. Ka3 
+Qb5 71. Ka2 Kc4 72. Ka1 Kc3 0-1
+
+[Site "Edinburgh Congress"]
+[Date "1994.04.??"]
+[Round "39"]
+[White "Gill, Andy"]
+[Black "Bourke, John"]
+[Result "0-1"]
+[ECO "C54"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Nf6 5. d4 exd4 6. cxd4 Bb4+ 7. Bd2 
+Nxe4 8. Bxb4 Nxb4 9. Bxf7+ Kxf7 10. Qb3+ d5 11. Qxb4 Re8 12. O-O Kg8 
+13. Nc3 b6 14. Rfe1 Bf5 15. Qb3 c6 16. Rac1 Qd6 17. Re3 Nxc3 18. Qxc3 
+Rxe3 19. Qxe3 Rc8 20. Re1 h6 21. Qe7 Qxe7 22. Rxe7 a5 23. Rb7 b5 24. 
+Ne5 c5 25. Rxb5 cxd4 26. f4 Be4 27. Rxa5 Rc1+ 28. Kf2 Rc2+ 29. Kg3 
+Rxg2+ 30. Kh3 Rxb2 31. Ra3 Rd2 32. Kg3 Rg2+ 33. Kh3 Rd2 34. Kg3 d3 35. 
+Nf3 Rb2 36. h4 d2 37. Nxd2 Rxd2 38. Kg4 Rd3 39. Rxd3 Bxd3 40. Kf3 Bc4 
+41. a4 Kf7 42. Ke3 Ke6 43. Kd4 Kf5 44. a5 Kxf4 45. a6 Bxa6 46. Kxd5 Kg4 
+47. Ke6 Kxh4 48. Kf7 g5 0-1
+
+[Site "Edinburgh Congress"]
+[Date "1994.04.??"]
+[Round "40"]
+[White "Gill, Andy"]
+[Black "King, David"]
+[Result "1-0"]
+[ECO "C70"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 b5 5. Bb3 Bc5 6. O-O Nge7 7. c3 d6 
+8. d4 exd4 9. cxd4 Ba7 10. Be3 Na5 11. Bc2 O-O 12. Nbd2 f5 13. Bg5 Qe8 
+14. Re1 h6 15. Bxe7 Qxe7 16. exf5 Qf6 17. Be4 Bb7 18. Bxb7 Nxb7 19. 
+Qb3+ Kh8 20. Qd5 Rab8 21. Rac1 Bb6 22. g4 Nd8 23. Ne4 Qf7 24. Qxf7 Rxf7 
+25. h3 {At this point the score sheet goes wrong. Black eventually
+looses on time!} 1-0
+
+[Site "Edinburgh Congress"]
+[Date "1994.04.??"]
+[Round "41"]
+[White "Tait, C."]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "D20"]
+
+1. d4 d5 2. c4 dxc4 3. e4 c6 4. Bxc4 e6 ( 4... Nf6 5. Nc3 e5 6. Be3 exd4
+7. Bxd4 Bd6 8. f3 { Score: 0.22 } ) 5. Nf3 Bb4+ ( 5... Nf6 6. Qe2 Bb4 7. Bd2
+Qb6 8. Nc3 O-O 9. O-O Nbd7 { Score: 0.25 } ) 6. Bd2 Bxd2+ 7. Qxd2 ( 7. Nbxd2
+Nf6 8. O-O O-O 9. Rc1 Nbd7 10. Qe2 c5 11. Bd3 { Score: 0.41 } ) 7... Nf6 8. Nc3
+O-O ( 8... Nbd7 9. O-O O-O 10. Rad1 Qe7 11. Rfe1 e5 { Score: 0.38 } ) 9. O-O b6
+10. e5 ( 10. Rac1 Bb7 11. Rfd1 c5 12. dxc5 Qxd2 13. Rxd2 bxc5 { Score: 0.28 } )
+10... Nfd7 ( 10... Nd5 11. Rfd1 Ba6 12. Bxa6 Nxa6 13. Rac1 Nac7 14. Nxd5 cxd5 {
+Score: 0.28 } ) 11. Rfd1 Ba6 ( 11... Bb7 12. Ne4 c5 13. d5 b5 14. Bxb5 Bxd5
+15. Qe3 Qe7 { Score: 0.34 } ) 12. Bb3 ( 12. Bxa6 Nxa6 13. Rac1 Qe7 14. Ne4 c5
+15. Qe2 Nb4 16. dxc5 { Score: 0.34 } ) 12... Re8 ( 12... h6 13. Rac1 Qe7
+14. Ne4 Rd8 15. Nd6 Nf6 16. Qe3 { Score: 0.31 } ) 13. Ne4 c5 ( 13... h6 14. Nd6
+Re7 15. Rac1 c5 16. Bc2 Nc6 17. Be4 Qc7 { Score: 0.44 } ) 14. Nd6 ( 14. dxc5
+Bb7 15. Qe3 Re7 16. Nd6 Bc6 17. Ne4 bxc5 18. Nxc5 { Score: 1.25 } ) 14... Rf8 (
+14... Re7 15. Nxf7 Rxf7 16. Bxe6 cxd4 17. Bd5 Nc6 18. Bxc6 { Score: 0.44 } )
+15. d5 b5 ( 15... Qe7 16. Nxf7 c4 17. dxe6 Nxe5 18. N3xe5 cxb3 19. Qd5 { Score:
+1.06 } ) 16. dxe6 fxe6 ( 16... c4 17. Nxf7 Qb6 18. exd7 Nxd7 19. Qxd7 Rxf7
+20. Qd5 { Score: 3.75 } ) 17. Bxe6+ Kh8 18. Nf7+ ( 18. Qd5 Qe7 19. Nf7 Rxf7
+20. Bxf7 h6 { Score: 4.56 } ) 18... Rxf7 19. Bxf7 Nc6 ( 19... Bb7 20. Ng5 h6
+21. Bd5 { Score: 3.03 } ) 20. e6 ( 20. Qxd7 Nd4 21. Qg4 Qe7 22. Nxd4 Qxf7
+23. e6 Qf6 { Score: 5.84 } ) 20... Qe7 ( 20... Nf6 21. Rac1 c4 22. b3 Qxd2
+23. Rxd2 Rd8 24. Rxd8 Nxd8 { Score: 3.06 } ) 21. Qxd7 Bc8 ( 21... Bb7 22. Qxe7
+Nxe7 23. Rd7 Bxf3 24. gxf3 Nc6 25. e7 Nxe7 { Score: 7.41 } ) 22. Qxc6 (
+22. Qxe7 Bxe6 23. Qxe6 Nd4 24. Nxd4 cxd4 25. Rxd4 a6 { Score: 17.72 } )
+22... Rb8 ( 22... Bb7 23. Qd7 Qxd7 24. exd7 Rd8 25. Re1 g6 26. Re8 Kg7 { Score:
+10.66 } ) 23. Qe8+ ( 23. Qxc5 Bxe6 24. Qxe7 Bxf7 25. Qxa7 Rf8 26. Qxf7 Rc8 {
+Score: 18.22 } ) 23... Qxe8 24. Bxe8 Bb7 ( 24... Bxe6 25. Bd7 Bg8 26. Ne5 g6
+27. Rac1 c4 28. a4 bxa4 { Score: 7.88 } ) 25. Bf7 ( 25. Bxb5 Bxf3 26. gxf3 Kg8
+27. e7 Kf7 28. Rd8 Kxe7 29. Rxb8 { Score: 12.03 } ) 25... Bc6 ( 25... g5 26. e7
+Kg7 27. Rd8 Bc6 28. Rxb8 Kxf7 29. Ne5 Kxe7 { Score: 12.03 } ) 26. Rd2 ( 26. Ne5
+Bxg2 27. e7 g6 28. Kxg2 { Score: 15.75 } ) 1-0
+
+[Site "Dunfermline C vs Alloa"]
+[Date "1994.04.??"]
+[Round "42"]
+[White "Comrie, J."]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "B50"]
+
+1. e4 c5 2. Nf3 d6 3. Bc4 e6 4. Nc3 Be7 5. d4 cxd4 6. Qxd4 Nf6 7. e5 
+dxe5 8. Qxd8+ Bxd8 9. Nxe5 O-O 10. O-O Nbd7 11. Nxd7 Bxd7 12. Be3 a6 
+13. a4 Ba5 14. Ne2 Bc6 15. Nd4 Nd5 16. Nxc6 bxc6 17. Bxd5 cxd5 18. c3 
+Rab8 19. b4 Bc7 20. Rfd1 Rfd8 21. Rac1 Bb6 22. Kf1 Bxe3 23. fxe3 f5 
+24. Rc2 g5 25. Kf2 Kf7 26. Kf3 Rdc8 27. g4 Rxb4 28. gxf5 Kf6 29. fxe6 
+Kxe6 30. Rd4 Rxd4 31. exd4 Rf8+ 32. Kg4 h6 33. Re2+ Kd6 34. Rb2 Rc8 
+35. Kh5 Rxc3 36. Rb6+ Rc6 37. Rxc6+ Kxc6 38. Kxh6 g4 39. Kg5 Kd6 40. 
+Kxg4 Ke6 41. Kg5 Ke7 42. h4 Kf7 43. h5 Kg7 44. Kf5 1-0
+
+[Site "Dunfermline Club Championship"]
+[Date "1994.04.??"]
+[Round "43"]
+[White "Gill, Andy"]
+[Black "Hunter, Scott"]
+[Result "1-0"]
+[ECO "C65"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. d3 Bc5 5. O-O O-O 6. Re1 d5 7. Be3 
+Bxe3 8. exd5 Qxd5 9. Bxc6 Qxc6 10. Rxe3 e4 11. dxe4 Nxe4 12. Nc3 Nxc3 
+13. Rxc3 Qd6 14. Qxd6 cxd6 15. Rd1 Re8 16. Rxd6 g5 17. g4 Bxg4 18. Nxg5 
+Re1+ 19. Kg2 Rae8 20. Rg3 f5 21. h3 Be2 22. Nf3+ Kf7 23. Nxe1 f4 24. 
+Rf3 Bxf3+ 25. Nxf3 Re2 26. Rd7+ Kf8 27. Rxb7 Rxc2 28. Rxa7 Rxb2 29. Ra4 
+Kf7 30. Rxf4+ Kg6 31. a4 h5 32. h4 Ra2 33. Kg3 Ra3 34. Rc4 Rd3 35. Kf4 
+Rd5 36. Ne5+ Kf6 37. Re4 Ra5 38. Nd7+ Kg6 39. f3 Rf5+ 40. Ke3 1-0
+
+[Site "Under 1500 Final"]
+[Date "1994.05.??"]
+[Round "44"]
+[White "Hepburn, James"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "B20"]
+
+1. e4 c5 2. Bc4 d6 3. d3 e6 4. Nc3 Nf6 5. Nf3 a6 6. Bd2 Nc6 7. O-O Be7 
+8. Re1 O-O 9. a3 e5 10. h3 b5 11. Bb3 Bb7 12. Nd5 Nxd5 13. Bxd5 Qd7 
+14. c3 Na5 15. b4 Bxd5 16. exd5 Nb7 17. Re4 f5 18. Re2 cxb4 19. axb4 
+Bf6 20. Qb3 a5 21. Rae1 axb4 22. cxb4 Rfe8 23. Bg5 Bxg5 24. Nxg5 Nd8 
+25. f4 Nf7 26. Nxf7 Qxf7 27. fxe5 dxe5 28. Rxe5 Rxe5 29. Rxe5 Ra1+ 30. 
+Kh2 g5 31. d4 Kg7 32. Qd3 Qd7 33. Rxf5 Qd6+ 34. Re5 Qxb4 35. Rxg5+ Kf7 
+36. Qxh7+ Kf6 37. Qh6+ Ke7 38. Rg7+ Kd8 39. Qh8+ 1-0
+
+
+[Site "East of Scotland Championship"]
+[Date "1994.05.??"]
+[Round "45"]
+[White "Heron, D."]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "D02"]
+[WhiteElo "1790"]
+
+1. Nf3 Nc6 2. d4 d5 3. Bf4 Bf5 4. e3 a6 5. c4 e6 6. Nc3 Nf6 7. a3 Qd7 
+8. b4 Bd6 9. Bxd6 Qxd6 10. Be2 O-O 11. O-O Ne4 12. Nxe4 Bxe4 13. Nd2 
+Bg6 14. Qb3 Ne7 15. c5 Qd7 16. a4 c6 17. b5 Nf5 18. Ra3 Rfe8 19. Qb2 
+Kh8 20. Rb3 Nh6 21. bxc6 bxc6 22. Rb7 Qc8 23. Nf3 Rb8 24. Bxa6 Rxb7 
+25. Qxb7 Qxb7 26. Bxb7 f6 27. Bxc6 Rb8 28. Bb5 Bc2 29. Rc1 Be4 30. Nd2 
+Bg6 31. Nb1 Ng8 32. Nc3 Ne7 33. a5 Nc8 34. Bd7 Bf5 35. Nxd5 exd5 36. 
+Bxf5 Ne7 37. Bd3 Nc6 38. Rb1 Rxb1+ 39. Bxb1 Nxa5 40. Ba2 1-0
+
+[Site "East of Scotland Chalengers"]
+[Date "1994.05.??"]
+[Round "46"]
+[White "Gill, Andy"]
+[Black "Falconer, W."]
+[Result "1/2-1/2"]
+[ECO "A15"]
+
+1. c4 Nf6 2. d3 e6 3. Nf3 d5 4. cxd5 Nxd5 5. a3 Bd6 6. e3 Nc6 7. Nbd2 
+O-O 8. Nc4 Bd7 9. Be2 b5 10. Nxd6 cxd6 11. O-O Rc8 12. Bd2 Qb6 13. Qb3 
+Ne5 14. Rac1 a6 15. Rc2 Rxc2 16. Qxc2 Rc8 17. Qb1 Nxf3+ 18. Bxf3 Bc6 
+19. Rc1 Qd8 20. Bxd5 Bxd5 21. Ba5 Qd7 22. Rxc8+ Qxc8 23. Bb4 Qc6 24. f3 
+Bb3 25. Qe1 Qc2 26. Qc3 Qxc3 27. Bxc3 d5 28. Kf2 f6 29. d4 1/2-1/2
+
+
+
+[Site "East of Scotland Chalengers"]
+[Date "1994.05.??"]
+[Round "47"]
+[White "Gill, Andy"]
+[Black "Pearson, Walter"]
+[Result "0-1"]
+[ECO "A20"]
+[BlackElo "1650"]
+
+1. c4 e5 2. d3 Ne7 3. Nf3 d6 4. e3 g6 5. Be2 Bg7 6. O-O O-O 7. Nbd2 Nd7 
+8. Nb3 b6 9. d4 exd4 10. Nfxd4 Bb7 0-1
+
+[Site "East of Scotland Chalengers"]
+[Date "1994.05.??"]
+[Round "48"]
+[White "Heatlie, Douglas"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "D61"]
+[WhiteElo "1650"]
+
+1. d4 e6 2. c4 d5 3. Nc3 Nf6 4. Bg5 Be7 5. e3 Nbd7 6. Qc2 O-O 7. Nf3 
+Re8 8. h4 Nb6 9. b3 dxc4 10. bxc4 Bd7 11. Bd3 g6 12. Bxf6 Bxf6 13. h5 
+Bxd4 14. exd4 Qf6 15. hxg6 fxg6 16. Ne4 Qg7 17. Nc5 Bc6 18. Ne5 Nd5 
+19. cxd5 exd5 20. O-O-O Rxe5 21. dxe5 Qxe5 22. g3 Qg5+ 23. Qd2 Qe5 24. 
+Nb3 Ba4 25. Qh6 Qc3+ 26. Bc2 Bxb3 27. Qxh7+ Kf8 28. Qh8+ 1-0
+
+[Site "Scottish Chess Minor"]
+[Date "1994.07.??"]
+[Round "49"]
+[White "Mill, Graham"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "B50"]
+
+1. e4 c5 2. Nf3 d6 3. Bc4 { This is an unusual way of opening, but is common at
+the Minor level. } 3... e6 4. Nc3 Nf6 5. d3 ( 5. O-O ) 5... Nc6 ( 5... d5
+6. Bb3 dxe4 7. Nxe4 Nxe4 8. dxe4 Qxd1+ 9. Kxd1 { = } ) 6. Bf4 ( 6. O-O Be7 )
+6... a6 7. O-O Be7 ( 7... Na5 8. Bb3 Nxb3 9. axb3 Be7 10. Re1 O-O 11. Qd2 {
+<sab> } ) 8. Re1 O-O {  I often find this sort of position when playing the
+sicilian, where white has the e file, pushes his pawn, and gains a winning
+advantage. } 9. e5 dxe5 10. Nxe5 Bd7 ( 10... Nxe5 ) 11. Ne4 ( 11. Bb3 { <saw> }
+) 11... Nxe5 12. Bxe5 Bc6 {  } ( 12... Nxe4 13. dxe4 b5 14. Bb3 Bc6 15. Qh5
+Re8 { = } ) 13. Bxf6 ( 13. Qf3 Nxe4 14. dxe4 b6 15. Rad1 Qe8 { <saw> } )
+13... Bxe4 $4 ( 13... Bxf6 14. Nxf6+ Qxf6 15. c3 b6 16. Qe2 { <sab> } )
+14. Bxe7 Qxe7 15. Rxe4 Rac8 16. f4 ( 16. a4 Qf6 17. c3 Rfd8 18. Qe2 h6 19. Re1
+{ <waw> } ) 16... b5 17. Bb3 Rc6 ( 17... a5 { and I might be able to stir up a
+queenside pawn charge. } ) 18. c4 ( 18. a4 { striking at the ambushing pawns. }
+) 18... Rd8 ( 18... Rd6 19. cxb5 axb5 20. a4 c4 ) 19. Qe2 ( 19. cxb5 axb5
+20. a4 bxa4 21. Raxa4 Rcd6 22. d4 cxd4 23. Rexd4 ) 19... Rd4 ( 19... b4 )
+20. Rxd4 ( 20. cxb5 axb5 21. a4 bxa4 22. Rxa4 Rd8 23. d4 cxd4 24. Rexd4 { All
+variations just win for white. } ) 20... cxd4 21. Re1 ( 21. cxb5 ) 21... Rc5
+22. Qe4 ( 22. Qf2 bxc4 23. Bxc4 Qd6 { Blacks score is rapidly going down. } )
+22... Rh5 ( 22... Qd7 23. Qa8+ Qc8 24. Qxc8+ Rxc8 25. g3 bxc4 26. dxc4 { a
+passed pawn for white! Blacks passed pawn will not live long. } ) 23. g4 (
+23. f5 Rh6 24. cxb5 axb5 { Totally won for white. } ) 23... Rh4 24. Qa8+ Qf8
+25. Qxf8+ Kxf8 {  } 26. h3 $2 ( 26. Bd1 Rh3 27. Be2 Ke7 28. Kg2 Re3 29. h3 Kd6
+{ Just a piece up. } ) 26... Rxh3 27. Bc2 Rg3+ 28. Kf2 Rxg4 29. Kf3 h5 (
+29... Rh4 30. Kg3 Rh6 31. Re4 Rg6+ 32. Kh3 Rh6+ 33. Kg2 { And black has drawing
+chances. } ) 30. Re4 ( 30. Re5 g6 31. Re4 Rh4 32. Rxd4 g5 { Black is only a
+pawn or so down. } ) 30... Ke7 31. Rxd4 ( 31. cxb5 axb5 32. Re5 g6 33. Rxb5 Kd6
+34. Ke4 ) 31... e5 ( 31... g5 32. cxb5 axb5 33. a4 e5 34. Re4 Rxf4+ 35. Rxf4
+exf4 { Blacks is a `pawn` down, with 3 connected passed pawns. Not so bad, but
+still winning for white. } ) 32. Re4 Rxf4+ 33. Rxf4 exf4 34. Kxf4 Kf6 35. c5
+Ke7 36. b4 f6 37. d4 g5+ 38. Kg3 h4+ 39. Kg4 Ke6 40. c6 Kd6 41. d5 Kc7 42. Be4
+Kd6 43. Bg2 Kc7 44. Bh3 Kd6 45. Kf5 Kc7 46. Kxf6 Kb6 47. Kxg5 { I finally
+resigned here. } 1-0
+
+[Site "Scottish Chess Minor"]
+[Date "1994.07.??"]
+[Round "50"]
+[White "Gill, Andy"]
+[Black "McMonigle, A."]
+[Result "1-0"]
+[ECO "C67"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Nxe4 {  } 5. Re1 ( 5. d4 Be7 6. dxe5 O-O
+7. Be3 a6 { and white has the edge. } ) 5... d5 ( 5... Nd6 6. Bxc6 dxc6 7. Nxe5
+Be6 8. Nc3 Be7 9. Kh1 { <saw> } ) 6. Nxe5 ( 6. d3 { is a killer move. } )
+6... Qf6 7. Nf3 ( 7. Nxc6 bxc6 8. Qf3 Qg6 9. Bd3 Bf5 10. Bxe4 { <saw> } )
+7... Be7 8. d3 $1 Nd6 {  } ( 8... Nxf2 9. Kxf2 Bg4 10. Nbd2 O-O 11. Bxc6 bxc6
+{ <aw> } ) 9. Bxc6+ ( 9. Bg5 Qxb2 10. Bxc6+ bxc6 11. Rxe7+ Kf8 12. Nbd2 h6 {
+White is a couple of pawns up, but the tactices are hairy! } ) 9... bxc6 10. c3
+O-O {  } ( 10... h6 11. Be3 Nf5 12. Bf4 Rb8 13. Be5 Qg6 { <saw> } ) 11. Bg5
+Qg6 ( 11... Qxf3 12. Qxf3 Bxg5 13. b3 Bb7 14. Qg3 Bf6 { Is blacks best line. }
+) 12. Bxe7 Re8 13. Bxd6 Rxe1+ 14. Qxe1 Qxd6 15. Qe8+ Qf8 16. Qxf8+ ( 16. Qxc6
+Rb8 17. Qxc7 Rxb2 18. Qxa7 Bf5 19. Qd4 Qb8 20. Nfd2 { <waw> The proper
+continuation, and well winning for white. } ) 16... Kxf8 17. Ne5 ( 17. h3 {
+Still a <waw> } ) 17... Bf5 ( 17... c5 18. h3 f6 19. Nf3 { and white moving the
+knight was a waste of two tempi. } 19... Rb8 20. b3 Bf5 { <waw> } ) 18. d4 (
+18. Nd2 Re8 19. Ndf3 c5 20. g4 f6 21. Kg2 fxe5 22. gxf5 { <waw> } ) 18... Re8
+19. Nd2 Re6 {  } 20. Re1 ( 20. g4 Bxg4 21. Nxg4 Rg6 22. h3 h5 23. f3 hxg4
+24. hxg4 { <waw> what a cou. } ) 20... f6 21. Nd7+ Ke7 22. Rxe6+ Bxe6 23. Nc5
+Bf5 24. f3 ( 24. h3 h6 25. Kh2 Kd6 26. Nb7+ Ke7 27. g4 Bd3 { <waw> } )
+24... Bc8 25. g4 ( 25. Kf2 Kd6 26. f4 g6 27. Kf3 h6 28. g3 f5 ) 25... Kf7
+26. Kg2 ( 26. Kf2 Ke7 27. Ke3 Kd6 28. Kd3 h6 29. c4 dxc4+ 30. Nxc4+ { <waw>
+with a plan } ) 26... f5 27. Kg3 Kg6 28. Nd3 ( 28. gxf5+ Bxf5 29. Na6 Kf6
+30. h3 h6 31. Nxc7 { Attacking the weak backwards pawn. } ) 28... fxg4 {  } (
+28... Kf6 29. gxf5 Kxf5 30. Ne5 Bb7 { Score: 3.19 } ) 29. Ne5+ Kf6 30. Nxc6 a6
+31. fxg4 g5 32. h4 ( 32. Nb3 Bb7 33. Nb8 h6 34. Nc5 Bc8 35. b4 Kg6 36. Nbxa6 {
+Successfully ganing up on the `a` pawn. } ) 32... gxh4+ 33. Kxh4 Bd7 34. g5+ (
+34. Nb4 c6 35. Nxa6 h6 36. Kh5 Kg7 { Totally won. } ) 34... Kg7 35. Ne5 (
+35. Nb4 c6 36. Nxa6 h6 37. Nc5 Bf5 38. a4 Kg6 39. gxh6 { And either the 'a' or
+'b' pawn will queen. } ) 35... Be8 36. Nb3 Bg6 { At this point black resigned.
+} 1-0
+
+[Site "Scottish Chess Minor"]
+[Date "1994.07.??"]
+[Round "51"]
+[White "Swanson, Brian"]
+[Black "Gill, Andy"]
+[Result "1-0"]
+[ECO "B86"]
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 6. Bc4 e6 ( 6... e5 7. Nf3
+Qc7 8. Bd5 Bg4 9. O-O Nxd5 10. Nxd5 { Is another line of the Sicilian. } )
+7. Bg5 ( 7. O-O Qc7 8. Qd3 e5 9. Nf3 Bg4 10. Bg5 { <saw>,0.25 } ) 7... Be7
+8. f4 b5 {  } ( 8... d5 9. Bxf6 Bxf6 10. exd5 Qc7 11. Be2 Qxf4 { <ab> } )
+9. Bd3 $2 ( 9. Bb3 h6 10. Bxf6 Bxf6 11. O-O Bxd4+ 12. Qxd4 { <sab> } ) 9... Bb7
+10. b4 ( 10. Qf3 Qb6 11. Nde2 d5 { = } ) 10... Nc6 11. Nf3 $2 ( 11. Nxc6 Bxc6
+12. O-O d5 13. exd5 Nxd5 14. Bxe7 Qxe7 { <sab> } ) 11... Nxb4 12. Qe2 O-O
+13. O-O ( 13. a3 Qc7 14. Qd2 { <ab>,by a pawn or so. } ) 13... Rc8 ( 13... Qc7
+14. Qd2 d5 15. Bxf6 Bxf6 { <ab> } ) 14. Nd1 d5 15. exd5 ( 15. e5 Ne4 16. Bxe7
+Qxe7 17. Bxe4 dxe4 18. Nd4 ) 15... Bxd5 16. Ne3 {  } 16... Bc5 ( 16... Bxa2
+17. Rad1 Nxd3 18. cxd3 Nd5 { <wab>,2+ pawns up, but getting a bit tactical. } )
+17. Kh1 Bxe3 18. Qxe3 Nxc2 19. Bxc2 Rxc2 20. a4 Ra2 ( 20... h6 { <wab>, just
+winning. } ) 21. Rxa2 Bxa2 22. axb5 ( 22. Ra1 Bd5 23. axb5 axb5 24. Rb1 Ng4 {
+<wab>, to or so pawns up. } ) 22... Bc4 ( 22... axb5 23. Ra1 Bd5 24. Ra7 h6 {
+<ab>, even with the rook on blacks 2nd. This rook should be able to get to 'b'
+pawn, though. } ) 23. Rc1 Bxb5 24. Ne5 {  } 24... Nd5 $2 { A bit wild. } (
+24... h6 25. Bxf6 Qxf6 26. Rc7 a5 27. Qc5 Be2 28. Qxa5 Qxf4 { <wab>, almost
+three pawns up, and threating the forced queen exchage on f1. } ) 25. Qg3 {
+Alarms bells !!!, the bishop is going to h6. Remember. } 25... f6 { I though I
+was going to win a piece for a pawn. } 26. Bh6 g6 $4 ( 26... Qe7 27. Nc6 Qc7
+28. Rc2 Ba4 29. Rc4 Nb6 { Black still leads (two pawns up), but the tactics are
+hairy. } ) 27. Bxf8 $2 ( 27. Nxg6 Kf7 28. Nxf8 Ke8 29. Nxe6 Qd7 30. Re1 {
+<waw>,5.47 } ) 27... fxe5 ( 27... Kxf8 28. Qh4 a5 29. g3 a4 { <sab>, but
+critically depending on the weak a pawn. } ) 28. Bh6 exf4 29. Qe1 {  } (
+29. Bxf4 Nxf4 30. Qxf4 a5 31. h3 g5 32. Qe5 { <aw> } ) 29... g5 $4 { My major
+blunder. } ( 29... Kf7 30. g3 f3 31. Qf2 Qf6 { <ab>, but tricky. } ) 30. Qxe6+
+Kh8 31. Rc8 { Mate is in a couple of moves. } 1-0
+
+[Site "Scottish Chess Minor"]
+[Date "1994.07.??"]
+[Round "52"]
+[White "Gill, Andy"]
+[Black "Thomson, Brian"]
+[Result "1-0"]
+[ECO "B54"]
+
+1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nc6 5. Bb5 Bd7 6. Nc3 ( 6. Nxc6 { Score:
+0.06 } ) 6... Nf6 ( 6... Nxd4 7. Qxd4 Bxb5 8. Nxb5 Qa5 9. Nc3 e5 10. Qd5 Qc7 {
+Score: -0.03 } ) 7. Bg5 h6 ( 7... Nxd4 8. Bxd7 Nxd7 9. Qxd4 e5 10. Qd2 Be7
+11. Be3 { Score: -0.03 } ) 8. Bh4 ( 8. Bxf6 exf6 9. f4 Nxd4 10. Bxd7 Qxd7
+11. Qxd4 Be7 { Score: 0.16 } ) 8... Qb6 ( 8... g5 9. Bg3 Nxd4 10. Qxd4 Bg7
+11. O-O O-O { Score: -0.22 } ) 9. Nxc6 ( 9. Bxf6 gxf6 10. Bxc6 bxc6 11. Na4 Qa5
+12. c3 Bg7 { Score: 0.06 } ) 9... bxc6 10. Bxf6 ( 10. Bd3 Qxb2 11. Bxf6 exf6
+12. Na4 Qd4 13. c3 { Score: -1.03 } ) 10... exf6 11. Ba4 ( 11. Bd3 Qxb2 12. Na4
+Qa3 13. c3 Be6 14. Qc2 O-O-O { Score: -1.31 } ) 11... Qc7 ( 11... Qxb2 12. Kd2
+Qb6 13. Qf3 Be6 14. e5 Qd4 { Score: -1.44 } ) 12. O-O Be7 13. Re1 ( 13. Rb1 O-O
+14. Qd3 Be6 15. f4 f5 { Score: -0.09 } ) 13... O-O 14. Qd4 ( 14. Bb3 { Score:
+-0.09 } ) 14... Be6 ( 14... Rab8 15. b3 Be6 16. Rad1 Rb6 17. f4 Re8 { Score:
+-0.16 } ) 15. Nd1 ( 15. f4 Rab8 16. Bb3 f5 17. e5 Bxb3 18. axb3 { Score: -0.16
+} ) 15... Qa5 ( 15... Rab8 16. Qc3 Rb6 17. Ne3 Qb7 18. f4 { Score: -0.09 } )
+16. Nc3 Qc7 ( 16... Rab8 17. b3 Qc7 18. Rad1 Rfe8 19. f4 Rb6 { Score: -0.13 } )
+17. Ne2 ( 17. Nd1 { Score: 0.00 } ) 17... Rab8 ( 17... Rfb8 18. Nf4 Rb6
+19. Nxe6 fxe6 20. Bb3 d5 21. exd5 cxd5 { Score: -0.06 } ) 18. b3 ( 18. Nf4 {
+Score: -0.13 } ) 18... a5 ( 18... f5 19. Rad1 fxe4 20. Qxe4 Bd5 21. Qd4 {
+Score: -0.41 } ) 19. Nf4 ( 19. Qc3 c5 20. Nd4 Rb7 21. Nc6 Ra8 22. Rad1 { Score:
+0.06 } ) 19... Bd7 ( 19... Rfc8 20. c4 Rd8 21. f3 Rd7 { Score: 0.00 } ) 20. Qd2
+( 20. Qc3 Rb7 21. a3 Re8 22. Nd3 Reb8 23. f4 { Score: -0.09 } ) 20... g5 (
+20... Rfe8 { Score: -0.09 } ) 21. Nh5 ( 21. Ne2 Rb7 22. Nd4 Re8 23. Qc3 c5
+24. Bxd7 Qxd7 { Score: 0.13 } ) 21... Qb6 ( 21... Bg4 22. Ng3 Rfe8 23. c4 Bf8
+24. f3 Be6 { Score: 0.13 } ) 22. Qc3 Qd8 23. Rad1 ( 23. a3 Rc8 24. Ng3 Re8
+25. Rad1 Bg4 26. Bxc6 Bxd1 27. Rxd1 { Score: 0.31 } ) 23... Bg4 24. Ng3 Bxd1
+25. Rxd1 c5 26. Nh5 ( 26. Nf5 h5 27. a3 Rb7 28. Qd3 Rb6 29. Qd2 { Score: -0.06
+} ) 26... Kh8 ( 26... Rb4 27. Ng3 Qa8 28. a3 Rb6 { Score: -0.75 } ) 27. Rd3 (
+27. Ng3 Rg8 28. Nf5 Bf8 29. Qd2 Qc7 { Score: -0.34 } ) 27... Rg8 ( 27... Rb4
+28. Ng3 c4 29. Rd5 cxb3 30. cxb3 Qb6 31. Bc6 { Score: -0.88 } ) 28. Rf3 (
+28. Ng3 Rg6 29. Nf5 Rb4 30. Bc6 Qc7 31. a3 Rb6 { Score: -0.81 } ) 28... Rg6 (
+28... d5 29. exd5 Qxd5 30. Re3 Qd1 31. Re1 Qd8 32. Ng3 { Score: -1.00 } )
+29. Bc6 ( 29. Rd3 Rb4 30. f3 c4 31. Re3 cxb3 32. cxb3 { Score: -0.97 } )
+29... Kg8 30. Bd5 ( 30. Ng3 Qc7 31. Nf5 Bf8 32. Bd5 Bg7 33. Rd3 Bh8 { Score:
+-1.00 } ) 30... a4 31. Qc4 Qe8 32. Qd3 ( 32. Qc3 axb3 33. cxb3 Qd8 34. a4 Rb6
+35. Rd3 { Score: -0.78 } ) 32... Rb4 ( 32... Qb5 33. Ng3 axb3 34. Nf5 Bf8 {
+Score: -0.97 } ) 33. e5 ( 33. c3 Rb6 34. e5 Kf8 35. Nxf6 { Score: -0.25 } )
+33... dxe5 ( 33... Kh8 34. c3 Rh4 35. exf6 Bd8 36. Re3 Qd7 { Score: -0.22 } )
+34. Qxg6+ 1-0
+
+[Site "Scottish Chess Minor"]
+[Date "1994.07.??"]
+[Round "53"]
+[White "Navmann, M."]
+[Black "Gill, Andy"]
+[Result "1/2-1/2"]
+[ECO "B50"]
+
+1. e4 c5 2. Nf3 d6 3. Bc4 e6 ( 3... Nc6 { Score: 0.00 } ) 4. Nc3 a6 ( 4... Nf6
+5. d3 d5 6. Bb3 dxe4 7. Nxe4 Nxe4 8. dxe4 Qxd1 { Score: 0.00 } ) 5. a4 ( 5. d3
+Nc6 6. Bf4 Na5 7. e5 d5 8. Bg5 Ne7 { Score: 0.09 } ) 5... Nf6 6. d3 ( 6. d4 {
+Score: 0.06 } ) 6... Be7 ( 6... d5 7. Ba2 dxe4 8. Nxe4 Nxe4 9. dxe4 Qxd1
+10. Kxd1 { Score: 0.09 } ) 7. b3 ( 7. Bg5 h6 8. Bh4 d5 9. exd5 Nxd5 10. Nxd5
+exd5 { Score: 0.16 } ) 7... O-O ( 7... d5 8. exd5 exd5 9. Nxd5 Nxd5 10. O-O O-O
+{ Score: -1.59 } ) 8. d4 ( 8. Qe2 Nc6 9. O-O d5 10. exd5 exd5 { Score: 0.06 } )
+8... cxd4 ( 8... d5 9. exd5 exd5 10. Bd3 b6 11. O-O Nc6 { Score: -0.09 } )
+9. Nxd4 ( 9. Qxd4 { Score: -0.09 } ) 9... d5 ( 9... Qa5 10. Qd2 b5 11. Bd3 e5
+12. Nf3 Bg4 { Score: -0.16 } ) 10. exd5 exd5 11. Bd3 Re8 ( 11... Nc6 12. Nce2
+Nxd4 13. Nxd4 Bb4 14. Bd2 Qa5 15. Ne2 Bxd2 { Score: -0.22 } ) 12. O-O Bb4 (
+12... Nc6 13. Nce2 Bg4 14. f3 Bc5 15. c3 { Score: -0.03 } ) 13. Bd2 ( 13. Nce2
+Nc6 14. Bb2 Bg4 15. f3 Nxd4 16. Nxd4 { Score: 0.00 } ) 13... Qa5 ( 13... b6 {
+Score: -0.09 } ) 14. Nb1 Kh8 ( 14... Nc6 15. Bxb4 Nxb4 16. Re1 Bg4 17. Be2 Rad8
+{ Score: -0.09 } ) 15. Bxb4 Qxb4 16. c3 Qe7 ( 16... Qc5 17. Re1 Rxe1 18. Qxe1
+Nc6 19. Nf5 b6 { Score: 0.09 } ) 17. Nd2 ( 17. Ra2 Qc7 18. Re2 Rxe2 19. Qxe2
+Nc6 20. Rd1 Nxd4 21. cxd4 { Score: 0.09 } ) 17... Bg4 ( 17... Qc5 18. Qc2 Nc6
+19. N2f3 Nxd4 20. Nxd4 Ne4 { Score: 0.00 } ) 18. Qc1 ( 18. N2f3 Qc7 19. Qd2 Nc6
+20. Rfe1 Rad8 21. Rxe8 Rxe8 { Score: 0.00 } ) 18... Nc6 19. Nxc6 ( 19. Re1 Ne5
+20. Qc2 Qc7 21. c4 Nxd3 22. Qxd3 { Score: 0.03 } ) 19... bxc6 20. Re1 Qd7 (
+20... Qb7 21. Qc2 Rad8 22. h3 Bh5 23. c4 Rxe1 24. Rxe1 { Score: 0.03 } )
+21. Rxe8+ Qxe8 22. Qe1 ( 22. Qc2 c5 23. h3 Bh5 24. b4 c4 25. Bf5 { Score: 0.03
+} ) 22... a5 ( 22... Qd7 { Score: 0.09 } ) 23. h3 Bd7 ( 23... Bh5 24. g4 Bg6
+25. Bxg6 hxg6 26. Rd1 Rd8 27. Qxe8 Nxe8 { Score: 0.19 } ) 24. Nf3 ( 24. Rd1 Rb8
+25. c4 h6 26. Qxe8 Rxe8 27. cxd5 cxd5 { Score: 0.16 } ) 24... Qxe1+ ( 24... Rb8
+25. Bc2 c5 26. c4 Qxe1 27. Rxe1 d4 { Score: 0.16 } ) 25. Rxe1 Re8 ( 25... Rb8
+26. Bc2 g6 27. Re7 Kg7 28. Ne5 Be8 { Score: 0.44 } ) 26. Rxe8+ ( 26. Ne5 {
+Score: 0.53 } ) 26... Bxe8 27. c4 ( 27. g3 { Score: 0.28 } ) 27... h6 (
+27... g6 28. g3 Kg7 29. Kg2 h6 30. Ne5 d4 31. f4 c5 { Score: 0.13 } ) 28. Kf1 (
+28. g3 g6 29. Ne5 Kg7 30. Kg2 d4 31. Kf3 c5 { Score: 0.25 } ) 28... g6 29. Ke2
+( 29. cxd5 { Score: 0.31 } ) 29... Kg7 30. Ke3 ( 30. Ne5 { Score: 0.31 } )
+30... Nd7 ( 30... c5 31. Ne5 d4 32. Kd2 Bd7 33. Nxd7 Nxd7 34. Be4 Ne5 { Score:
+0.09 } ) 31. Kd4 ( 31. cxd5 cxd5 32. Kd4 Nf6 33. Ne5 Kf8 34. g3 Kg7 35. f4 {
+Score: 0.59 } ) 31... dxc4 32. Bxc4 ( 32. Kxc4 f5 33. Kc3 Bf7 34. g3 Nc5
+35. Bc2 Bd5 { Score: 0.16 } ) 32... Kf6 ( 32... f5 33. Ke3 Bf7 34. Bxf7 Kxf7
+35. Kf4 Ke6 36. Nd4 Kd5 { Score: -0.03 } ) 33. Bd3 ( 33. Nd2 Nb6 34. Ne4 Ke7
+35. Bd3 f5 36. Nc5 Bf7 { Score: 0.22 } ) 33... Ke6 34. Kc4 ( 34. Ke3 Nb6
+35. Nd4 Kd6 36. Kf3 Ke5 37. Ne2 f5 { Score: 0.09 } ) 34... f6 ( 34... f5 35. g4
+fxg4 36. hxg4 Ne5 37. Nxe5 Kxe5 38. Kc3 { Score: -0.13 } ) 1/2-1/2
+
+[Site "Grangemouth Congress"]
+[Date "1994.09.??"]
+[Round "54"]
+[White "Gill, Andy"]
+[Black "McKay, Stewart"]
+[Result "1-0"]
+[ECO "B01"]
+1. e4 d5 2. exd5 Nf6 3. Bb5+ Bd7 4. Bxd7+ Qxd7 5. Nf3 Nxd5
+6. O-O Nc6 7. Re1 e6 8. d3 g6 9. Bg5 Bg7 10. c3 Nf6 11. d4 h6 12. Bxf6 Bxf6
+13. d5 Rd8 14. Qd2 Qxd5 15. Qf4 Bg7 16. Qxc7 O-O 17. Qf4 g5 18. Qd2 Qf5 19. Qe3
+Rd3 20. Qe4 Qxe4 21. Rxe4 Rd1+ 22. Re1 Rfd8 23. h3 Ne5 24. Na3 Nxf3+ 25. gxf3
+R1d3 26. Kg2 a6 27. Rac1 b5 28. Re2 Bf8 29. Nc2 Bc5 30. Ne1 Rd2 31. Rxd2 Rxd2
+32. Rc2 Rd1 33. Kf1 Be7 34. a3 Bf6 35. Ke2 Rd5 36. Nd3 Rd8 37. Kd2 Rc8 38. Ke3
+Bg7 39. f4 Bf6 40. Ne5 Rc5 41. Nd7 gxf4+ 42. Kxf4 Bg5+ 43. Ke4 f5+ 44. Kf3 Rd5
+45. Nb8 Rd6 46. c4 bxc4 47. Rxc4 Rb6 48. Rb4 Rd6 49. Ra4 Rb6 50. Nxa6 Rxb2
+51. Nc7 Rb3+ 52. Kg2 Be7 53. Nxe6 Rxa3 54. Rxa3 Bxa3 55. Kg3 Kf7 56. Nd4 Kg6
+57. Kf4 Kh5 58. Nxf5 { And White won by queening the f pawn. } 1-0
+
+[Site "Grangemouth Minor Congress"]
+[Date "1994.09.??"]
+[Round "55"]
+[White "Shaughan, Harward"]
+[Black "Gill, Andy"]
+[Result "0-1"]
+[ECO "D02"]
+1. d4 e6 2. Bf4 d5 3. Nf3 Nf6 4. Nbd2 c5 5. e3 a6 6. c4 Nc6 7. Ne5 cxd4 8. Nxc6
+bxc6 9. exd4 Qb6 10. cxd5 cxd5 11. Qc2 Bd7 12. Be3 Bb4 13. a3 Bxd2+ 14. Qxd2
+O-O 15. Bd3 Rfc8 16. O-O Bb5 17. b3 Rc6 18. f3 Rac8 19. Rfc1 Bxd3 20. Rxc6 Rxc6
+21. Qxd3 Qc7 22. Bd2 h6 23. Rb1 Nh5 24. b4 Nf4 25. Bxf4 Qxf4 26. b5 Rc1+
+27. Rxc1 Qxc1+ 28. Kf2 Qb2+ 29. Kg3 Qxb5 30. Qxb5 axb5 31. Kf2 Kf8 32. Ke3 Ke7
+33. Kd3 Kd6 34. f4 f6 35. h4 e5 36. dxe5+ fxe5 37. f5 e4+ 38. Kd4 Ke7 39. g4
+Kf6 40. Ke3 g6 41. g5+ hxg5 42. hxg5+ Kxf5 0-1
+
+[Site "Grangemouth Minor Congress"]
+[Date "1994.09.??"]
+[Round "56"]
+[White "Gill, Andy"]
+[Black "Ridland, Lindsay"]
+[Result "1-0"]
+[ECO "C65"]
+1. e4 e5 2. Nf3 Nc6 3. Bb5 Nf6 4. O-O Bc5 5. Re1 a6 (5... Ng4 6. Re2 O-O 
+7. d3 Nd4 8. Nxd4 Bxd4 9. Nd2 {<saw>,0.13 but a bit messy for white.}) 
+6. Ba4 (6. Bxc6 dxc6 7. h3 Qe7 8. d3 O-O 9. Bg5 h6 10. Bh4 {=, taking the
+exchange way out.}) 6... b5 7. Bb3 d6 { We have now reached a main line
+of the Ruy Lopez.} 8. c3 (8. a4 Ng4 9. Re2 Bb7 10. axb5 axb5 {=, and very
+like Game 7 of the Short-Kasparov WC, where Kasparov as white scored a
+decisive victory.}) 8... Bg4 9. d3 h6 10. Be3 O-O (10... Bxe3 11. Rxe3 
+O-O 12. a4 b4 13. h3 Bh5 14. Nbd2 Rb8 {=}) 11. Bxc5 dxc5 12. Bc2 Qd7 
+13. Nbd2 (13. h3 Bh5 14. Nbd2 Rfd8 15. Nb3 Qd6 16. Qe2 Rab8 17. Red1 {
+Fritz is deperate to put h3, but I dont see why.}) 13... Nh5 {} (13... 
+Rad8 {is an idea.}) 14. Nb3 (14. h3 {<saw>,0.33 I now agree with this,
+because the knight block the h5 retreat square.}) 14... Nf4 {?} (14... 
+Qd6 15. h3 Be6 16. Ng5 Bxb3 17. axb3 Nf4 18. Nf3 {<sab>}) 15. Nxc5 Qc8 (
+15... Qe7 16. Nb3 Rfd8 17. h3 Be6 18. d4 Qf6 19. Rc1 exd4 {=}) 16. Re3 (
+16. b4 {White is just a pawn up.}) 16... Rd8 17. Qd2 Rd6 (17... Bxf3 {!} 
+18. Rxf3 Qg4 19. Rxf4 exf4 20. h3 Qh4 21. d4 {and black has equalised!}) 
+18. Bd1 {} 18... Nxg2 {?? Throws away a piece for a very temp.
+inititive.} (18... Rb8 19. d4 exd4 20. cxd4 Ne6 21. Nxe6 Qxe6 {and white
+is starting to push home his advantage.}) 19. Kxg2 Bh3+ 20. Kh1 Qg4 (
+20... Rg6 {is another idea, but the whole plan is conceptually flawed.}) 
+21. Ne1 Qg5 22. Qe2 Be6 23. Rg3 Qf6 24. Nxe6 {} (24. Nf3 Ne7 25. Nxe6 
+Qxe6 26. Bb3 Qf6 27. Rag1 {<waw>}) 24... Rxe6 (24... Qxe6 25. Bb3 Qe7 
+26. Bd5 Rad8 27. Nf3 R8d7 28. Rd1) 25. Qf3 {Crude plan of exchanging
+queens to avoid `acidents`.} (25. Bb3) 25... Qe7 26. Bb3 Rf6 27. Qe3 (27. 
+Qg2) 27... Rd8 28. Nc2 Kh7 29. Rag1 g6 30. Rf3 {} 30... Rxf3 (30... Rfd6 {
+??} 31. Rxf7+ {Trying to avoid the exchance, but black loses his Queen!
+Black actually moved his rook to d6, but before letting it go, spotted
+the danger, and then took the exchange. Shame...}) 31. Qxf3 Rd7 32. Ne3 
+h5 {?} 33. Nd5 {! At least winning the exchange. Black resigned here.}
+1-0
+
