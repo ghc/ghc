@@ -1,22 +1,17 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
 interface Core2Def where
 import BinderInfo(BinderInfo)
 import CmdLineOpts(GlobalSwitch, SwitchResult)
 import CoreSyn(CoreBinding, CoreExpr)
 import DefSyn(DefBindee, DefProgram(..))
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import PlainCore(PlainCoreProgram(..))
-import UniType(UniType)
 import UniqFM(UniqFM)
-import Unique(Unique)
-data CoreBinding a b 	{-# GHC_PRAGMA CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)] #-}
-data DefBindee 	{-# GHC_PRAGMA DefArgExpr (CoreExpr Id DefBindee) | DefArgVar Id | Label (CoreExpr Id DefBindee) (CoreExpr Id DefBindee) #-}
+data CoreBinding a b 
+data DefBindee 
 type DefProgram = [CoreBinding Id DefBindee]
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type PlainCoreProgram = [CoreBinding Id Id]
 c2d :: UniqFM (CoreExpr Id DefBindee) -> CoreExpr (Id, BinderInfo) Id -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 core2def :: (GlobalSwitch -> SwitchResult) -> [CoreBinding Id Id] -> [CoreBinding Id DefBindee]
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SL" _N_ _N_ #-}
 

@@ -294,7 +294,6 @@ getReg (StPrim primop args) =
     	IntSubOp -> trivialCode (SUB Q False) args
     	IntMulOp -> trivialCode (MUL Q False) args
     	IntQuotOp -> trivialCode (DIV Q False) args
-    	IntDivOp -> call SLIT("stg_div") IntKind
     	IntRemOp -> trivialCode (REM Q False) args
     	IntNegOp -> trivialUCode (NEG Q False) args
     	IntAbsOp -> trivialUCode (ABS Q) args

@@ -29,15 +29,13 @@ allocGALA(STG_NO_ARGS)
 
     if ((gl = freeGALAList) != NULL) {
 	freeGALAList = gl->next;
-    } else if ((gl = (GALA *) malloc(GCHUNK * sizeof(GALA))) != NULL) {
+    } else {
+	gl = (GALA *) stgMallocBytes(GCHUNK * sizeof(GALA), "allocGALA");
+
 	freeGALAList = gl + 1;
 	for (p = freeGALAList; p < gl + GCHUNK - 1; p++)
 	    p->next = p + 1;
 	p->next = NULL;
-    } else {
-	fflush(stdout);
-	fprintf(stderr, "VM exhausted\n");
-	EXIT(EXIT_FAILURE);
     }
     return gl;
 }
@@ -55,8 +53,7 @@ HashTable *taskIDtoPEtable = NULL;
 static int nextPE = 0;
 
 W_
-taskIDtoPE(gtid)
-GLOBAL_TASK_ID gtid;
+taskIDtoPE(GLOBAL_TASK_ID gtid)
 {
     return (W_) lookupHashTable(taskIDtoPEtable, gtid);
 }
@@ -92,7 +89,7 @@ P_ addr;
     GALA *gala;
 
     /* We never look for GA's on indirections */
-    ASSERT(INFO_PTR(addr) != (W_) Ind_info);
+    ASSERT(INFO_PTR(addr) != (W_) Ind_info_TO_USE);
     if ((gala = lookupHashTable(LAtoGALAtable, (W_) addr)) == NULL)
 	return NULL;
     else
@@ -119,7 +116,7 @@ P_
 GALAlookup(ga)
 globalAddr *ga;
 {
-    W_ pga = PACK_GA(taskIDtoPE(ga->loc.gc.gtid), ga->loc.gc.slot);
+    W_ pga = PackGA(taskIDtoPE(ga->loc.gc.gtid), ga->loc.gc.slot);
     GALA *gala;
     P_ la;
 
@@ -128,11 +125,12 @@ globalAddr *ga;
     else {
 	la = gala->la; 
 	/* 
-         * Bypass any indirections when returning a local closure to the caller.
-         * Note that we do not short-circuit the entry in the GALA tables right
-         * now, because we would have to do a hash table delete and insert in
-         * the LAtoGALAtable to keep that table up-to-date for preferred GALA pairs.
-         * That's probably a bit expensive.
+	 * Bypass any indirections when returning a local closure to
+	 * the caller.  Note that we do not short-circuit the entry in
+	 * the GALA tables right now, because we would have to do a
+	 * hash table delete and insert in the LAtoGALAtable to keep
+	 * that table up-to-date for preferred GALA pairs.  That's
+	 * probably a bit expensive.
          */
         while (IS_INDIRECTION(INFO_PTR(la)))
 	    la = (P_) IND_CLOSURE_PTR(la);
@@ -165,8 +163,7 @@ Allocate an indirection slot for the closure currently at address @addr@.
 \begin{code}
 
 static GALA *
-allocIndirection(addr)
-P_ addr;
+allocIndirection(P_ addr)
 {
     GALA *gala;
 
@@ -199,7 +196,7 @@ rtsBool preferred;
 {
     GALA *oldGALA = lookupHashTable(LAtoGALAtable, (W_) addr);
     GALA *newGALA = allocIndirection(addr);
-    W_ pga = PACK_GA(thisPE, newGALA->ga.loc.gc.slot);
+    W_ pga = PackGA(thisPE, newGALA->ga.loc.gc.slot);
 
     ASSERT(GALAlookup(&(newGALA->ga)) == NULL);
 
@@ -241,7 +238,7 @@ rtsBool preferred;
 {
     GALA *oldGALA = lookupHashTable(LAtoGALAtable, (W_) addr);
     GALA *newGALA = allocGALA();
-    W_ pga = PACK_GA(taskIDtoPE(ga->loc.gc.gtid), ga->loc.gc.slot);
+    W_ pga = PackGA(taskIDtoPE(ga->loc.gc.gtid), ga->loc.gc.slot);
 
     ASSERT(ga->loc.gc.gtid != mytid);
     ASSERT(ga->weight > 0);
@@ -303,7 +300,7 @@ globalAddr *
 addWeight(ga)
 globalAddr *ga;
 {
-    W_ pga = PACK_GA(taskIDtoPE(ga->loc.gc.gtid), ga->loc.gc.slot);
+    W_ pga = PackGA(taskIDtoPE(ga->loc.gc.gtid), ga->loc.gc.slot);
     GALA *gala = (GALA *) lookupHashTable(pGAtoGALAtable, pga);
 
 #ifdef DEBUG_WEIGHT
@@ -356,6 +353,36 @@ RebuildLAGAtable(STG_NO_ARGS)
 	if (gala->preferred)
 	    insertHashTable(LAtoGALAtable, (W_) gala->la, (void *) gala);
     }
+}
+\end{code}
+
+\begin{code}
+W_
+PackGA (pe, slot)
+  W_ pe;
+  int slot;
+{
+    int pe_shift = (BITS_IN(W_)*3)/4;
+    int pe_bits  = BITS_IN(W_) - pe_shift;
+
+    if ( pe_bits < 8 || slot >= (1L << pe_shift) ) { /* big trouble */
+	fflush(stdout);
+	fprintf(stderr, "PackGA: slot# too big (%d) or not enough pe_bits (%d)\n",slot,pe_bits);
+	EXIT(EXIT_FAILURE);
+    }
+
+    return((((W_)(pe)) << pe_shift) | ((W_)(slot)));
+	
+    /* the idea is to use 3/4 of the bits (e.g., 24) for indirection-
+       table "slot", and 1/4 for the pe# (e.g., 8).
+       
+       We check for too many bits in "slot", and double-check (at
+       compile-time?) that we have enough bits for "pe".  We *don't*
+       check for too many bits in "pe", because SysMan enforces a
+       MAX_PEs limit at the very very beginning.
+
+       Phil & Will 95/08
+    */
 }
 
 #endif /* PAR -- whole file */

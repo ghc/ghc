@@ -455,7 +455,14 @@ Let expressions
 
 \begin{code}	
 simplExpr env (CoLet bind body) args
-  = simplBind env bind (\env -> simplExpr env body args) (computeResultType env body args)
+  | not (switchIsSet env SimplNoLetFromApp)		-- The common case
+  = simplBind env bind (\env -> simplExpr env body args) 
+		       (computeResultType env body args)
+
+  | otherwise		-- No float from application
+  = simplBind env bind (\env -> simplExpr env body []) 
+		       (computeResultType env body [])	`thenSmpl` \ let_expr' ->
+    returnSmpl (applyToArgs let_expr' args)
 \end{code}
 
 Case expressions 
@@ -779,7 +786,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
 	  its body (obviously).
 	-}
 
-  | will_be_demanded ||
+  | (will_be_demanded && not no_float) ||
     always_float_let_from_let || 
     floatExposesHNF float_lets float_primops ok_to_dup rhs
   = try_float env rhs body_c
@@ -796,6 +803,7 @@ simplBind env (CoNonRec binder@(id,occ_info) rhs) body_c body_ty
     ok_to_dup	     	      = switchIsSet env SimplOkToDupCode
     always_float_let_from_let = switchIsSet env SimplAlwaysFloatLetsFromLets
     try_let_to_case           = switchIsSet env SimplLetToCase
+    no_float		      = switchIsSet env SimplNoLetFromStrictLet
 
     -------------------------------------------
     done_float env rhs body_c

@@ -2,8 +2,7 @@
 interface E where
 import CE(CE(..))
 import Class(Class)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Maybes(Labda)
 import Name(Name)
 import NameTypes(FullName, ShortName)
@@ -11,55 +10,35 @@ import PreludePS(_PackedString)
 import TCE(TCE(..))
 import TyCon(TyCon)
 import TyVar(TyVar)
-import UniType(UniType)
 import UniqFM(UniqFM)
 import Unique(Unique)
 type CE = UniqFM Class
-data E 	{-# GHC_PRAGMA MkE (UniqFM TyCon) (UniqFM Id) (UniqFM Id) (UniqFM Class) #-}
+data E 
 type GVE = [(Name, Id)]
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type LVE = [(Name, Id)]
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data Labda a 
+data Name 
 type TCE = UniqFM TyCon
-data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data TyVar 
+data UniqFM a 
 getE_CE :: E -> UniqFM Class
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UniqFM Class) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: E) -> case u0 of { _ALG_ _ORIG_ E MkE (u1 :: UniqFM TyCon) (u2 :: UniqFM Id) (u3 :: UniqFM Id) (u4 :: UniqFM Class) -> u4; _NO_DEFLT_ } _N_ #-}
 getE_GlobalVals :: E -> [Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASLA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getE_TCE :: E -> UniqFM TyCon
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(SAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: UniqFM TyCon) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: E) -> case u0 of { _ALG_ _ORIG_ E MkE (u1 :: UniqFM TyCon) (u2 :: UniqFM Id) (u3 :: UniqFM Id) (u4 :: UniqFM Class) -> u1; _NO_DEFLT_ } _N_ #-}
 growE_LVE :: E -> [(Name, Id)] -> E
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(LLLL)L" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 lookupE_Binder :: E -> Name -> Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AASA)S" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 lookupE_ClassOpByKey :: E -> Unique -> _PackedString -> Id
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAS)LL" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 lookupE_Value :: E -> Name -> Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(ALLA)S" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 lookupE_ValueQuietly :: E -> Name -> Labda Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(ALLA)S" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkE :: UniqFM TyCon -> UniqFM Class -> E
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 nullE :: E
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 nullGVE :: [(Name, Id)]
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _NIL_ [(Name, Id)] [] _N_ #-}
 nullLVE :: [(Name, Id)]
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _NIL_ [(Name, Id)] [] _N_ #-}
 plusE_CE :: E -> UniqFM Class -> E
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LLLL)L" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 plusE_GVE :: E -> [(Name, Id)] -> E
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(LLLL)L" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 plusE_TCE :: E -> UniqFM TyCon -> E
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LLLL)L" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 plusGVE :: [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeList (++) _N_ #-}
 plusLVE :: [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PreludeList (++) _N_ #-}
 tvOfE :: E -> [TyVar]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AASA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 unitGVE :: Name -> Id -> [(Name, Id)]
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

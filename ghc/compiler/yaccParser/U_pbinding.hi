@@ -6,5 +6,4 @@ import U_list(U_list)
 import U_treeHACK(U_tree)
 data U_pbinding   = U_pgrhs U_tree U_list U_binding _PackedString Int
 rdU_pbinding :: _Addr -> _PackedString -> _State _RealWorld -> (U_pbinding, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

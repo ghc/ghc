@@ -10,14 +10,12 @@ import HsLit(Literal)
 import HsMatches(Match)
 import HsPat(InPat, TypecheckedPat)
 import HsTypes(PolyType)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo, SpecEnv, SpecInfo)
+import Id(Id)
+import IdInfo(SpecEnv, SpecInfo)
 import Inst(Inst, InstOrigin, OverloadedLit)
 import Maybes(Labda, MaybeErr)
 import Name(Name)
-import NameTypes(FullName, ShortName)
 import PreludePS(_PackedString)
-import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import SplitUniq(SplitUniqSupply)
 import SrcLoc(SrcLoc)
@@ -25,35 +23,30 @@ import TyCon(TyCon)
 import TyVar(TyVar, TyVarTemplate)
 import UniType(UniType)
 import Unique(Unique)
-data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
+data Class 
 type ClassInstEnv = [(UniType, InstTemplate)]
-data ClassOp 	{-# GHC_PRAGMA MkClassOp _PackedString Int UniType #-}
-data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
-data Expr a b 	{-# GHC_PRAGMA Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
-data InstOrigin 	{-# GHC_PRAGMA OccurrenceOf Id SrcLoc | InstanceDeclOrigin SrcLoc | LiteralOrigin Literal SrcLoc | ArithSeqOrigin (ArithSeqInfo Name (InPat Name)) SrcLoc | SignatureOrigin | ClassDeclOrigin SrcLoc | DerivingOrigin (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) Class Bool TyCon SrcLoc | InstanceSpecOrigin (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) Class UniType SrcLoc | DefaultDeclOrigin SrcLoc | ValSpecOrigin Name SrcLoc | CCallOrigin SrcLoc [Char] (Labda (Expr Name (InPat Name))) | LitLitOrigin SrcLoc [Char] | UnknownOrigin #-}
-data InstTemplate 	{-# GHC_PRAGMA MkInstTemplate Id [UniType] [InstTy] #-}
-data InstTy 	{-# GHC_PRAGMA DictTy Class UniType | MethodTy Id [UniType] #-}
+data ClassOp 
+data CoreExpr a b 
+data Expr a b 
+data Id 
+data Inst 
+data InstOrigin 
+data InstTemplate 
+data InstTy 
 type InstanceMapper = Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Labda a 
 type MatchEnv a b = [(a, b)]
-data MaybeErr a b 	{-# GHC_PRAGMA Succeeded a | Failed b #-}
+data MaybeErr a b 
 type MethodInstInfo = (Id, [UniType], InstTemplate)
-data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
-data SpecInfo 	{-# GHC_PRAGMA SpecInfo [Labda UniType] Int Id #-}
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data TyVarTemplate 	{-# GHC_PRAGMA SysTyVarTemplate Unique _PackedString | UserTyVarTemplate Unique ShortName #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data TypecheckedPat 
+data SpecInfo 
+data SplitUniqSupply 
+data TyCon 
+data TyVarTemplate 
+data UniType 
 addClassInst :: Class -> [(UniType, InstTemplate)] -> UniType -> Id -> [TyVarTemplate] -> [(Class, UniType)] -> SrcLoc -> MaybeErr [(UniType, InstTemplate)] (Class, (UniType, SrcLoc), (UniType, SrcLoc))
-	{-# GHC_PRAGMA _A_ 7 _U_ 2222112 _N_ _S_ "LSLLLLL" _N_ _N_ #-}
 lookupClassInstAtSimpleType :: Class -> UniType -> Labda Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(AAAAAAAASA)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 lookupInst :: SplitUniqSupply -> Inst -> Labda (Expr Id TypecheckedPat, [Inst])
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 lookupNoBindInst :: SplitUniqSupply -> Inst -> Labda [Inst]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
 nullMEnv :: [(a, b)]
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 2 0 X 1 _/\_ u0 u1 -> _!_ _NIL_ [(u0, u1)] [] _N_ #-}
 

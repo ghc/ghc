@@ -5,24 +5,21 @@ import BasicLit(BasicLit)
 import CLabelInfo(CLabel)
 import CharSeq(CSeq)
 import ClosureInfo(ClosureInfo)
-import CmdLineOpts(GlobalSwitch, SwitchResult)
 import CostCentre(CostCentre)
 import HeapOffs(HeapOffset)
 import MachDesc(RegLoc, Target)
 import Maybes(Labda)
 import PreludePS(_PackedString)
 import PreludeRatio(Ratio(..))
-import Pretty(PprStyle)
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import SMRep(SMRep)
 import SplitUniq(SUniqSM(..), SplitUniqSupply)
 import Stix(CodeSegment, StixReg, StixTree)
-data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
-data Target 	{-# GHC_PRAGMA Target (GlobalSwitch -> SwitchResult) Int (SMRep -> Int) (MagicId -> RegLoc) (StixTree -> StixTree) (PrimKind -> Int) ([MagicId] -> [StixTree]) ([MagicId] -> [StixTree]) (HeapOffset -> Int) (CAddrMode -> StixTree) (CAddrMode -> StixTree) Int Int StixTree StixTree ([CAddrMode] -> PrimOp -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]) (CStmtMacro -> [CAddrMode] -> SplitUniqSupply -> [StixTree] -> [StixTree]) (StixTree -> StixTree -> StixTree -> SplitUniqSupply -> [StixTree] -> [StixTree]) (PprStyle -> [[StixTree]] -> SplitUniqSupply -> CSeq) Bool ([Char] -> [Char]) #-}
+data AbstractC 
+data Target 
 type SUniqSM a = SplitUniqSupply -> a
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data StixTree 	{-# GHC_PRAGMA StSegment CodeSegment | StInt Integer | StDouble (Ratio Integer) | StString _PackedString | StLitLbl CSeq | StLitLit _PackedString | StCLbl CLabel | StReg StixReg | StIndex PrimKind StixTree StixTree | StInd PrimKind StixTree | StAssign PrimKind StixTree StixTree | StLabel CLabel | StFunBegin CLabel | StFunEnd CLabel | StJump StixTree | StFallThrough CLabel | StCondJump CLabel StixTree | StData PrimKind [StixTree] | StPrim PrimOp [StixTree] | StCall _PackedString PrimKind [StixTree] | StComment _PackedString #-}
+data SplitUniqSupply 
+data StixTree 
 genCodeAbstractC :: Target -> AbstractC -> SplitUniqSupply -> [[StixTree]]
-	{-# GHC_PRAGMA _A_ 2 _U_ 221 _N_ _N_ _N_ _N_ #-}
 

@@ -25,7 +25,11 @@ EXTDATA_RO(vtbl_StdUpdFrame);
 
 /* Keep -Wmissing-prototypes from complaining */
 void SaveAllStgRegs(STG_NO_ARGS);
+#if i386_TARGET_ARCH
+void SaveAllStgContext(void * /*return address*/);
+#else
 void SaveAllStgContext(STG_NO_ARGS);
+#endif
 void SaveStgStackRegs(STG_NO_ARGS);
 void RestoreAllStgRegs(STG_NO_ARGS);
 void RestoreStackStgRegs(STG_NO_ARGS);
@@ -33,6 +37,15 @@ void RestoreStackStgRegs(STG_NO_ARGS);
 extern STG_INLINE 
 void SaveAllStgRegs(STG_NO_ARGS)
 {
+#ifdef REG_Base
+# ifdef CONCURRENT
+    /* I do not think so: CurrentRegTable will not have changed
+       between entry to and exit from "Haskell land" (WDP 95/12)
+    */
+    /* CurrentRegTable = BaseReg; */
+# endif
+#endif
+
 #ifdef REG_R1
     SAVE_R1 = R1;	
 #endif
@@ -115,22 +128,27 @@ void SaveAllStgRegs(STG_NO_ARGS)
 
     SAVE_Hp    = Hp;	/* always! */
     SAVE_HpLim = HpLim; /* ditto! */
-
-#if defined(DO_INSTR_COUNTING)
-#ifdef REG_Activity
-    SAVE_Activity = ActivityReg;
-#endif
-#endif
 }
 
 extern STG_INLINE
-void SaveAllStgContext(STG_NO_ARGS)
+void
+#if i386_TARGET_ARCH
+SaveAllStgContext(void * ret_addr)
+#else
+SaveAllStgContext(STG_NO_ARGS)
+#endif
 {
     SaveAllStgRegs(); 
 #ifdef CONCURRENT
+# ifdef PAR
     TSO_CCC(CurrentTSO) = CCC;
     CCC = (CostCentre)STATIC_CC_REF(CC_MAIN);
+# endif
+# if i386_TARGET_ARCH
+    SET_RETADDR(TSO_PC2(CurrentTSO), ret_addr)
+# else
     SET_RETADDR(TSO_PC2(CurrentTSO))
+# endif
 #endif
 }
 
@@ -159,7 +177,11 @@ RestoreAllStgRegs (STG_NO_ARGS)
 {
 #ifdef REG_Base
     /* Re-initialise the register table pointer */
+# ifdef CONCURRENT
+    BaseReg = CurrentRegTable;
+# else 
     BaseReg = &MainRegTable;
+# endif
 #endif
 
 #ifdef REG_R1
@@ -257,11 +279,7 @@ RestoreAllStgRegs (STG_NO_ARGS)
     StkStubReg = STK_STUB_closure;
 #endif
 
-#if defined(DO_INSTR_COUNTING) && defined(REG_Activity)
-    ActivityReg = SAVE_Activity;
-#endif
-
-#ifdef CONCURRENT
+#ifdef PAR
     CCC = TSO_CCC(CurrentTSO);
 #endif
 }

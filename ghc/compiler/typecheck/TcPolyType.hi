@@ -13,5 +13,4 @@ import TyCon(TyCon)
 import UniType(UniType)
 import UniqFM(UniqFM)
 tcPolyType :: UniqFM Class -> UniqFM TyCon -> UniqFM UniType -> PolyType Name -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult UniType
-	{-# GHC_PRAGMA _A_ 4 _U_ 22212222 _N_ _S_ "LLLS" _N_ _N_ #-}
 

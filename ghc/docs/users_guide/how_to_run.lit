@@ -1070,6 +1070,104 @@ Enables some debugging code related to the garbage-collector.
 %-ddump-asm-globals-info
 
 %----------------------------------------------------------------------
+\subsubsection{How to read Core syntax (from some \tr{-ddump-*} flags)}
+\index{reading Core syntax}
+\index{Core syntax, how to read}
+
+Let's do this by commenting an example.  It's from doing
+\tr{-ddump-ds} on this code:
+\begin{verbatim}
+skip2 m = m : skip2 (m+2)
+\end{verbatim}
+
+Before we jump in, a word about names of things.  Within GHC,
+variables, type constructors, etc., are identified by their
+``Uniques.''  These are of the form `letter' plus `number' (both
+loosely interpreted).  The `letter' gives some idea of where the
+Unique came from; e.g., \tr{_} means ``built-in type variable'';
+\tr{t} means ``from the typechecker''; \tr{s} means ``from the
+simplifier''; and so on.  The `number' is printed fairly compactly in
+a `base-62' format, which everyone hates except me (WDP).
+
+Remember, everything has a ``Unique'' and it is usually printed out
+when debugging, in some form or another.  So here we go...
+
+\begin{verbatim}
+Desugared:
+Main.skip2{-r1L6-} :: _forall_ a$_4 =>{{Num a$_4}} -> a$_4 -> [a$_4]
+
+--# `r1L6' is the Unique for Main.skip2;
+--# `_4' is the Unique for the type-variable (template) `a'
+--# `{{Num a$_4}}' is a dictionary argument
+
+_NI_
+
+--# `_NI_' means "no (pragmatic) information" yet; it will later
+--# evolve into the GHC_PRAGMA info that goes into interface files.
+
+Main.skip2{-r1L6-} =
+    /\ _4 -> \ d.Num.t4Gt ->
+	let {
+	  {- CoRec -}
+	  +.t4Hg :: _4 -> _4 -> _4
+	  _NI_
+	  +.t4Hg = (+{-r3JH-} _4) d.Num.t4Gt
+
+	  fromInt.t4GS :: Int{-2i-} -> _4
+	  _NI_
+	  fromInt.t4GS = (fromInt{-r3JX-} _4) d.Num.t4Gt
+
+--# The `+' class method (Unique: r3JH) selects the addition code
+--# from a `Num' dictionary (now an explicit lamba'd argument).
+--# Because Core is 2nd-order lambda-calculus, type applications
+--# and lambdas (/\) are explicit.  So `+' is first applied to a
+--# type (`_4'), then to a dictionary, yielding the actual addition
+--# function that we will use subsequently...
+
+--# We play the exact same game with the (non-standard) class method
+--# `fromInt'.  Unsurprisingly, the type `Int' is wired into the
+--# compiler.
+
+	  lit.t4Hb :: _4
+	  _NI_
+	  lit.t4Hb =
+	      let {
+		ds.d4Qz :: Int{-2i-}
+		_NI_
+		ds.d4Qz = I#! 2#
+	      } in  fromInt.t4GS ds.d4Qz
+
+--# `I# 2#' is just the literal Int `2'; it reflects the fact that
+--# GHC defines `data Int = I# Int#', where Int# is the primitive
+--# unboxed type.  (see relevant info about unboxed types elsewhere...)
+
+--# The `!' after `I#' indicates that this is a *saturated*
+--# application of the `I#' data constructor (i.e., not partially
+--# applied).
+
+	  skip2.t3Ja :: _4 -> [_4]
+	  _NI_
+	  skip2.t3Ja =
+	      \ m.r1H4 ->
+		  let { ds.d4QQ :: [_4]
+			_NI_
+			ds.d4QQ =
+		    let {
+		      ds.d4QY :: _4
+		      _NI_
+		      ds.d4QY = +.t4Hg m.r1H4 lit.t4Hb
+		    } in  skip2.t3Ja ds.d4QY
+		  } in
+		  :! _4 m.r1H4 ds.d4QQ
+
+	  {- end CoRec -}
+	} in  skip2.t3Ja
+\end{verbatim}
+
+(``It's just a simple functional language'' is an unregisterised
+trademark of Peyton Jones Enterprises, plc.)
+
+%----------------------------------------------------------------------
 \subsubsection[arity-checking]{Options to insert arity-checking code}
 \index{arity checking}
 

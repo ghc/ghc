@@ -438,6 +438,14 @@ codeGen/CgUpdate.lhs
 #define NATIVEGEN_SRCS_LHS /*none*/
 #else
 #define __omit_ncg_maybe /*none*/
+#if i386_TARGET_ARCH
+#define __machdep_nativegen_lhs \
+nativeGen/I386Desc.lhs \
+nativeGen/I386Code.lhs \
+nativeGen/I386Gen.lhs
+#define __ghci_machdep_nativegen_lhs \
+nativeGen/I386Code.lhs
+#endif
 #if sparc_TARGET_ARCH
 #define __machdep_nativegen_lhs \
 nativeGen/SparcDesc.lhs \
@@ -445,7 +453,8 @@ nativeGen/SparcCode.lhs \
 nativeGen/SparcGen.lhs
 #define __ghci_machdep_nativegen_lhs \
 nativeGen/SparcCode.lhs
-#else
+#endif
+#if alpha_TARGET_ARCH
 #define __machdep_nativegen_lhs \
 nativeGen/AlphaDesc.lhs \
 nativeGen/AlphaCode.lhs \
@@ -833,7 +842,7 @@ compile_rec(envs/TyVarEnv,lhs,)
 
 compile(main/CmdLineOpts,lhs,-K2m)
 compile_rec(main/Errors,lhs,)
-compile_rec(main/ErrsTc,lhs,-H20m)
+compile_rec(main/ErrsTc,lhs,-H20m if_ghc26(-monly-4-regs))
 compile_rec(main/ErrsRn,lhs,)
 compile_rec(main/ErrUtils,lhs,)
 compile(main/Main,lhs,-H16m if_ghc(-fvia-C -fno-update-analysis)) /* ToDo: update */
@@ -850,22 +859,28 @@ compile(nativeGen/StixInfo,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/StixInteger,lhs,-H20m)
 compile(nativeGen/StixMacro,lhs,-I$(NATIVEGEN_DIR))
 compile(nativeGen/StixPrim,lhs,-H16m)
-#if sparc_TARGET_ARCH
+# if i386_TARGET_ARCH
+compile_rec(nativeGen/I386Desc,lhs,)
+compile(nativeGen/I386Code,lhs,-H20m -I$(NATIVEGEN_DIR) if_ghc(-monly-4-regs))
+compile(nativeGen/I386Gen,lhs,-H20m)
+# endif
+# if sparc_TARGET_ARCH
 compile_rec(nativeGen/SparcDesc,lhs,)
 compile(nativeGen/SparcCode,lhs,-H20m -I$(NATIVEGEN_DIR))
 compile(nativeGen/SparcGen,lhs,-H20m)
-#else
+# endif
+# if alpha_TARGET_ARCH
 compile_rec(nativeGen/AlphaDesc,lhs,)
 compile(nativeGen/AlphaCode,lhs,-H24m -K2m -I$(NATIVEGEN_DIR))
-compile(nativeGen/AlphaGen,lhs,-H24m)
-#endif
+compile(nativeGen/AlphaGen,lhs,-H24m -K2m)
+# endif
 #endif
 
 compile_rec(prelude/AbsPrel,lhs,-H16m -K2m if_ghc(-fno-omit-reexported-instances -fno-update-analysis))
 compile_rec(prelude/PrelFuns,lhs,)
 compile(prelude/PrelVals,lhs,)
 compile_rec(prelude/PrimKind,lhs,-I$(COMPINFO_DIR))
-compile_rec(prelude/PrimOps,lhs,-H16m -K2m)
+compile_rec(prelude/PrimOps,lhs,-H16m -K3m)
 compile(prelude/TysPrim,lhs,)
 compile(prelude/TysWiredIn,lhs,)
 
@@ -1349,7 +1364,3 @@ count_lines ::
 /* accumulate similar info about the sizes of object files */
 count_bytes ::
 	./count_bytes $(ALLSRCS_LHS) $(ALLSRCS_HS)
-
-/* run the "resolve_ifaces" script (assuming you know what you are doing) */
-resolve_ifaces ::
-	./resolve_ifaces $(ALLINTS)

@@ -3,5 +3,4 @@ interface StgFuns where
 import Id(Id)
 import StgSyn(StgRhs)
 mapStgBindeesRhs :: (Id -> Id) -> StgRhs Id Id -> StgRhs Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 

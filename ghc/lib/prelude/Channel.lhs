@@ -8,15 +8,21 @@ Standard, unbounded channel abstraction.
 \begin{code}
 module Channel
        (
-	{- abstract -}
+	 {- abstract type defined -}
         Chan,
 
-	newChan,	-- :: IO (Chan a)
-	putChan,	-- :: Chan a -> a -> IO ()
-	getChan,	-- :: Chan a -> IO a
-	dupChan,	-- :: Chan a -> IO (Chan a)
-	unGetChan,	-- :: Chan a -> a -> IO ()
-	getChanContents -- :: Chan a -> IO [a]
+	 {- creator -}
+	newChan,	 -- :: IO (Chan a)
+
+	 {- operators -}
+	putChan,	 -- :: Chan a -> a -> IO ()
+	getChan,	 -- :: Chan a -> IO a
+	dupChan,	 -- :: Chan a -> IO (Chan a)
+	unGetChan,	 -- :: Chan a -> a -> IO ()
+
+	 {- stream interface -}
+	getChanContents, -- :: Chan a -> IO [a]
+	putList2Chan	 -- :: Chan a -> [a] -> IO ()
 
        ) where
 
@@ -107,14 +113,18 @@ unGetChan (Chan read write) val
 
 \end{code}
 
+Operators for interfacing with functional streams.
+
 \begin{code}
 
 getChanContents :: Chan a -> IO [a]
-getChanContents ch
- = unsafeInterleavePrimIO (
-      getChan ch)         `thenPrimIO` \ ~(Right x) ->
-   unsafeInterleavePrimIO (
-      getChanContents ch) `thenPrimIO` \ ~(Right xs) ->
-   return (x:xs)
+getChanContents ch =
+ unsafeInterleavePrimIO (
+  getChan ch 				       `thenPrimIO` \ ~(Right x) ->
+  unsafeInterleavePrimIO (getChanContents ch)  `thenPrimIO` \ ~(Right xs) ->
+  returnPrimIO  (Right (x:xs)))
+
+putList2Chan :: Chan a -> [a] -> IO ()
+putList2Chan ch ls = sequence (map (putChan ch) ls)
 
 \end{code}

@@ -158,7 +158,7 @@ allocBStack size info_down (MkCgState absC binds
     find_block :: [VirtualSpBOffset] -> Maybe VirtualSpBOffset
     find_block [] = Nothing
     find_block (slot:slots)
-      | take size (slot:slots) == take size (repeat slot)
+      | take size (slot:slots) == [slot..slot+size-1]
       = Just slot
       | otherwise
       = find_block slots

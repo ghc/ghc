@@ -190,30 +190,27 @@ cgCase (StgPrimApp op args _) live_in_whole_case live_in_alts uniq alts
 	-- Perform the operation
     getVolatileRegs live_in_alts		        `thenFC` \ vol_regs ->
 
-    profCtrC SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_PRIM") IntKind]  `thenC`
-
     absC (COpStmt result_amodes op
 		 arg_amodes -- note: no liveness arg
 		 liveness_mask vol_regs) 		`thenC`
-
-    profCtrC SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_PRIM_STOP") IntKind]  `thenC`
 
 	-- Scrutinise the result
     cgInlineAlts NoGC uniq alts
 
   | otherwise	-- *Can* trigger GC
-  = getPrimOpArgAmodes op args		`thenFC` \ arg_amodes ->
+  = getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
+--NO:  getIntSwitchChkrC	`thenFC` \ isw_chkr   ->
 
    	-- Get amodes for the arguments and results, and assign to regs
 	-- (Can-trigger-gc primops guarantee to have their (nonRobust)
 	--  args in regs)
     let
-	op_result_regs = assignPrimOpResultRegs op
+	op_result_regs = assignPrimOpResultRegs {-NO:isw_chkr-} op
 
     	op_result_amodes = map CReg op_result_regs
 
 	(op_arg_amodes, liveness_mask, arg_assts) 
-	  = makePrimOpArgsRobust op arg_amodes
+	  = makePrimOpArgsRobust {-NO:isw_chkr-} op arg_amodes
 
 	liveness_arg  = mkIntCLit liveness_mask
     in
@@ -245,16 +242,12 @@ cgCase (StgPrimApp op args _) live_in_whole_case live_in_alts uniq alts
 	
 	-- do_op_and_continue will be passed an amode for the continuation
 	do_op_and_continue sequel
-          = profCtrC SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_PRIM") IntKind]  `thenC`
-
-	    absC (COpStmt op_result_amodes
+          = absC (COpStmt op_result_amodes
 			  op
 			  (pin_liveness op liveness_arg op_arg_amodes)
 			  liveness_mask
 			  [{-no vol_regs-}])
     	    	    	    	    	`thenC`
-
-	    profCtrC SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_PRIM_STOP") IntKind]  `thenC`
 
             sequelToAmode sequel        `thenFC` \ dest_amode ->
             absC (CReturn dest_amode DirectReturn)
@@ -438,6 +431,7 @@ cgEvalAlts :: Maybe VirtualSpBOffset	-- Offset of cost-centre to be restored, if
 cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
   = 	-- Generate the instruction to restore cost centre, if any
     restoreCurrentCostCentre cc_slot 	`thenFC` \ cc_restore ->
+    getIntSwitchChkrC			`thenFC` \ isw_chkr ->
 
 	-- Generate sequel info for use downstream
 	-- At the moment, we only do it if the type is vector-returnable.
@@ -460,7 +454,7 @@ cgEvalAlts cc_slot uniq (StgAlgAlts ty alts deflt)
     	  = if not use_labelled_alts then
 		Nothing -- no semi-tagging info
 	    else
-		cgSemiTaggedAlts uniq alts deflt -- Just <something>
+		cgSemiTaggedAlts isw_chkr uniq alts deflt -- Just <something>
     in
     cgAlgAlts GCMayHappen uniq cc_restore use_labelled_alts ty alts deflt
 					`thenFC` \ (tagged_alt_absCs, deflt_absC) ->
@@ -587,14 +581,17 @@ It's all pretty turgid anyway.
 \begin{code}
 cgAlgAlts gc_flag uniq restore_cc semi_tagging
 	ty alts deflt@(StgBindDefault binder True{-used-} _)
-  = forkAlts (map (cgAlgAlt gc_flag uniq restore_cc semi_tagging) alts)
+  = getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+    let
+	extra_branches :: [FCode (ConTag, AbstractC)]
+	extra_branches = catMaybes (map (mk_extra_branch isw_chkr) default_cons)
+
+	must_label_default = semi_tagging || not (null extra_branches)
+    in
+    forkAlts (map (cgAlgAlt gc_flag uniq restore_cc semi_tagging) alts)
 	     extra_branches
 	     (cgAlgDefault  gc_flag uniq restore_cc must_label_default deflt)
   where
-    extra_branches :: [FCode (ConTag, AbstractC)]
-    extra_branches = catMaybes (map mk_extra_branch default_cons)
-
-    must_label_default = semi_tagging || not (null extra_branches)
 
     default_join_lbl = mkDefaultLabel uniq
     jump_instruction = CJump (CLbl default_join_lbl CodePtrKind)
@@ -620,11 +617,11 @@ cgAlgAlts gc_flag uniq restore_cc semi_tagging
     -- nothing to do. Otherwise, we have a special case for a nullary constructor,
     -- but in the general case we do an allocation and heap-check.
 
-    mk_extra_branch :: DataCon -> (Maybe (FCode (ConTag, AbstractC)))
+    mk_extra_branch :: IntSwitchChecker -> DataCon -> (Maybe (FCode (ConTag, AbstractC)))
 
-    mk_extra_branch con
+    mk_extra_branch isw_chkr con
       = ASSERT(isDataCon con)
-	case dataReturnConvAlg con of
+	case dataReturnConvAlg isw_chkr con of
 	  ReturnInHeap	  -> Nothing
 	  ReturnInRegs rs -> Just (getAbsC (alloc_code rs) `thenFC` \ abs_c ->
 				   returnFC (tag, abs_c)
@@ -728,9 +725,10 @@ cgAlgAlt gc_flag uniq restore_cc must_label_branch (con, args, use_mask, rhs)
 cgAlgAltRhs :: GCFlag -> Id -> [Id] -> [Bool] -> PlainStgExpr -> Code
 
 cgAlgAltRhs gc_flag con args use_mask rhs
-  = let
+  = getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+    let
       (live_regs, node_reqd)
-	= case (dataReturnConvAlg con) of
+	= case (dataReturnConvAlg isw_chkr con) of
 	    ReturnInHeap      -> ([],						  True)
 	    ReturnInRegs regs -> ([reg | (reg,True) <- regs `zipEqual` use_mask], False)
 				-- Pick the live registers using the use_mask
@@ -758,13 +756,14 @@ Turgid-but-non-monadic code to conjure up the required info from
 algebraic case alternatives for semi-tagging.
 
 \begin{code}
-cgSemiTaggedAlts :: Unique
+cgSemiTaggedAlts :: IntSwitchChecker
+		 -> Unique
 		 -> [(Id, [Id], [Bool], PlainStgExpr)]
 		 -> StgCaseDefault Id Id
 		 -> SemiTaggingStuff
 
-cgSemiTaggedAlts uniq alts deflt
-  = Just (map st_alt alts, st_deflt deflt)
+cgSemiTaggedAlts isw_chkr uniq alts deflt
+  = Just (map (st_alt isw_chkr) alts, st_deflt deflt)
   where
     st_deflt StgNoDefault = Nothing
 
@@ -774,13 +773,14 @@ cgSemiTaggedAlts uniq alts deflt
 	       mkDefaultLabel uniq)
 	     )
 
-    st_alt (con, args, use_mask, _)
-      = case (dataReturnConvAlg con) of
+    st_alt isw_chkr (con, args, use_mask, _)
+      = case (dataReturnConvAlg isw_chkr con) of
 
 	  ReturnInHeap ->
 	    -- Ha!  Nothing to do; Node already points to the thing
 	    (con_tag,
-	     (CCallProfCtrMacro SLIT("RET_SEMI_IN_HEAP") [], -- ToDo: monadise?
+	     (CCallProfCtrMacro SLIT("RET_SEMI_IN_HEAP") -- ToDo: monadise?
+			[mkIntCLit (length args)], -- how big the thing in the heap is
 	     join_label)
 	    )
 
@@ -799,7 +799,9 @@ cgSemiTaggedAlts uniq alts deflt
 	    in
 	    (con_tag,
 	     (mkAbstractCs [
-		CCallProfCtrMacro SLIT("RET_SEMI_IN_REGS") [], -- ToDo: macroise?
+		CCallProfCtrMacro SLIT("RET_SEMI_IN_REGS")  -- ToDo: macroise?
+			[mkIntCLit (length regs_w_offsets),
+			 mkIntCLit (length used_regs_w_offsets)],
 		CSimultaneous (mkAbstractCs (map move_to_reg used_regs_w_offsets))],
 	      join_label))
       where
@@ -809,7 +811,6 @@ cgSemiTaggedAlts uniq alts deflt
     move_to_reg :: (MagicId, VirtualHeapOffset {-from Node-}) -> AbstractC
     move_to_reg (reg, offset)
       = CAssign (CReg reg) (CVal (NodeRel offset) (kindFromMagicId reg))
-
 \end{code}
 
 %************************************************************************

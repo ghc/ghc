@@ -12,6 +12,7 @@ module SaLib (
 	AbsVal(..),
 	AnalysisKind(..),
 	AbsValEnv{-abstract-}, StrictEnv(..), AbsenceEnv(..),
+	StrAnalFlags(..), getStrAnalFlags,
 	nullAbsValEnv, addOneToAbsValEnv, growAbsValEnvList,
 	lookupAbsValEnv,
 	absValFromStrictness,
@@ -94,19 +95,24 @@ pessimistic value---see @absEval@ of a @CoVar@.
 
 \begin{code}
 data AbsValEnv = AbsValEnv StrAnalFlags (IdEnv AbsVal)
-type StrAnalFlags = Bool	-- True <=> make everything strict
+
+type StrAnalFlags
+  = (Bool,	-- True <=> AllStrict flag is set
+     Bool)	-- True <=> NumbersStrict flag is set
 
 type StrictEnv  = AbsValEnv	-- Environment for strictness analysis
 type AbsenceEnv = AbsValEnv	-- Environment for absence analysis
 
-nullAbsValEnv x = AbsValEnv x nullIdEnv
+nullAbsValEnv flags -- this is the one and only way to create AbsValEnvs
+  = AbsValEnv flags nullIdEnv
+
 addOneToAbsValEnv (AbsValEnv x idenv) y z = AbsValEnv x (addOneToIdEnv idenv y z)
 growAbsValEnvList (AbsValEnv x idenv) ys  = AbsValEnv x (growIdEnvList idenv ys)
 
-lookupAbsValEnv (AbsValEnv do_all_strict idenv) y
-  = if do_all_strict
-    then Just AbsBot
-    else lookupIdEnv idenv y
+lookupAbsValEnv (AbsValEnv _ idenv) y
+  = lookupIdEnv idenv y
+
+getStrAnalFlags (AbsValEnv flags _) = flags
 \end{code}
 
 \begin{code}

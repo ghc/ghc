@@ -40,7 +40,7 @@ access(const char *fileName, const char *mode)
 {
     FILE *fp = fopen(fileName, mode);
     if (fp != NULL) {
-	(VOID) fclose(fp);
+	(void) fclose(fp);
 	return 0;
     }
     return 1;
@@ -51,7 +51,7 @@ access(const char *fileName, const char *mode)
 list	imports_dirlist, sys_imports_dirlist; /* The imports lists */
 extern  char HiSuffix[];
 extern  char PreludeHiSuffix[];
-extern BOOLEAN ExplicitHiSuffixGiven;
+/* OLD 95/08: extern BOOLEAN ExplicitHiSuffixGiven; */
 
 #define MAX_MATCH 16
 
@@ -59,11 +59,8 @@ extern BOOLEAN ExplicitHiSuffixGiven;
   This finds a module along the imports directory list.
 */
 
-VOID
-find_module_on_imports_dirlist(module_name, is_sys_import, returned_filename)
-  char *module_name;
-  BOOLEAN is_sys_import;
-  char *returned_filename;
+void
+find_module_on_imports_dirlist(char *module_name, BOOLEAN is_sys_import, char *returned_filename)
 {
     char try[FILENAME_SIZE];
 
@@ -77,7 +74,9 @@ find_module_on_imports_dirlist(module_name, is_sys_import, returned_filename)
     BOOLEAN tried_source_dir = FALSE;
 
     char *try_end;
-    char *suffix_to_use = (is_sys_import) ? PreludeHiSuffix : HiSuffix;
+    char *suffix_to_use    = (is_sys_import) ? PreludeHiSuffix : HiSuffix;
+    char *suffix_to_report = suffix_to_use; /* save this for reporting, because we
+						might change suffix_to_use later */
     int modname_len = strlen(module_name);
 
     /* 
@@ -197,13 +196,13 @@ find_module_on_imports_dirlist(module_name, is_sys_import, returned_filename)
     switch ( no_of_matches ) {
     default:
 	  fprintf(stderr,"Warning: found %d %s files for module \"%s\"\n",
-			no_of_matches, suffix_to_use, module_name);
+			no_of_matches, suffix_to_report, module_name);
     	  break;
     case 0:
     	  {
 	    char disaster_msg[MODNAME_SIZE+1000];
 	    sprintf(disaster_msg,"can't find interface (%s) file for module \"%s\"%s",
-			suffix_to_use, module_name,
+			suffix_to_report, module_name,
 			(strncmp(module_name, "PreludeGlaIO", 12) == 0)
 			? "\n(The PreludeGlaIO interface no longer exists);"
 			:(

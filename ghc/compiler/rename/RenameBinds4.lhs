@@ -275,7 +275,8 @@ rnMonoBinds4 mbinds siglist
     case (inline_sigs_in_recursive_binds final_binds) of
       Nothing -> happy_answer
       Just names_n_locns ->
-	addErrRn4 (inlineInRecursiveBindsErr names_n_locns) `thenRn4_`
+-- SLPJ: sometimes want recursive INLINE for worker wrapper style stuff
+-- 	addErrRn4 (inlineInRecursiveBindsErr names_n_locns) `thenRn4_`
 	{-not so-}happy_answer
   where
     f :: (a,b, FreeVars, c,d) -> FreeVars -> FreeVars

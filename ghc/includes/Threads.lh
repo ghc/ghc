@@ -27,8 +27,6 @@
 
 #else
 
-#define	DEFAULT_MAX_THREADS    	    	(32)
-
 extern I_ do_gr_sim;	    	    	    	/* Are we simulating granularity? */
 extern FILE *gr_file;
 
@@ -41,16 +39,10 @@ extern FILE *qp_file;
 #define DO_QP_PROF do_qp_prof
 #endif
 
-extern I_ MaxThreads;
-
 extern I_ context_switch;	    	    	/* Flag set by signal handler */
-extern I_ contextSwitchTime;
-#if defined(USE_COST_CENTRES) || defined(GUM)
-extern I_ contextSwitchTicks;
-#endif
 
-#define CS_MAX_FREQUENCY	100		  	/* context switches per second */
-#define CS_MIN_MILLISECS	(1000/CS_MAX_FREQUENCY)	/* milliseconds per slice */
+#define CS_MAX_FREQUENCY 100		  	/* context switches per second */
+#define CS_MIN_MILLISECS (1000/CS_MAX_FREQUENCY)/* milliseconds per slice */
 
 #ifdef __STG_GCC_REGS__
 #define OR_CONTEXT_SWITCH || context_switch
@@ -72,9 +64,7 @@ extern I_ SparkLimit[SPARK_POOLS];
 extern P_ RunnableThreadsHd, RunnableThreadsTl;
 extern P_ WaitingThreadsHd, WaitingThreadsTl;
 
-#define DEFAULT_MAX_LOCAL_SPARKS 100
-
-extern I_ MaxLocalSparks;
+extern I_ sparksIgnored;
 
 IF_RTS(extern void AwaitEvent(I_);)
 
@@ -181,8 +171,6 @@ extern I_ PrintFetchMisses, fetch_misses;
 extern I_ nUPDs, nUPDs_old, nUPDs_new, nUPDs_BQ, nPAPs, BQ_lens;
 #endif
 
-extern I_ do_gr_binary;
-extern I_ do_gr_profile;
 extern I_ no_gr_profile;
 extern I_ do_sp_profile;
 
@@ -193,7 +181,7 @@ extern void GranSimUnAllocate              PROTO((I_, P_, W_));
 extern I_   GranSimFetch                   PROTO((P_));
 extern void GranSimExec                    PROTO((W_,W_,W_,W_,W_));
 extern void GranSimSpark                   PROTO((W_,P_));
-extern void GranSimBlock                   PROTO(());
+extern void GranSimBlock                   (STG_NO_ARGS);
 extern void PerformReschedule              PROTO((W_, W_));
 
 #if 0   /* 'ngo Dochmey */
@@ -336,7 +324,7 @@ table for those values).
 \begin{code}
 #define TSO_INFO_WORDS 10
 
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
 #define TSO_REDN_WORDS 2
 #else
 #define TSO_REDN_WORDS 0
@@ -375,7 +363,7 @@ table for those values).
 #define TSO_SWITCH_LOCN	    	(TSO_INFO_START + 9)
 
 #define TSO_REDN_START		(TSO_INFO_START + TSO_INFO_WORDS)
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
 #define TSO_AHWM_LOCN		(TSO_REDN_START + 0)
 #define TSO_BHWM_LOCN		(TSO_REDN_START + 1)
 #endif
@@ -454,7 +442,7 @@ The types of threads (TSO_TYPE):
 The total space required to start a new thread (See NewThread in
 Threads.lc):
 \begin{code}
-#define THREAD_SPACE_REQUIRED (TSO_HS + TSO_CTS_SIZE + STKO_HS + StkOChunkSize)
+#define THREAD_SPACE_REQUIRED (TSO_HS + TSO_CTS_SIZE + STKO_HS + RTSflags.ConcFlags.stkChunkSize)
 \end{code}
 
 Here are the various queues for GrAnSim-type events.
@@ -472,14 +460,14 @@ Here are the various queues for GrAnSim-type events.
 %************************************************************************
 
 \begin{code}
-#ifdef GUM
+#ifdef PAR
 
 P_ FindLocalSpark PROTO((rtsBool forexport));
 
 void DisposeSpark PROTO((P_ spark));
 rtsBool Spark PROTO((P_ closure, rtsBool required));
 
-#endif /*GUM*/
+#endif /*PAR*/
 
 #ifdef GRAN   /* For GrAnSim sparks are currently mallocated -- HWL */
 
@@ -559,18 +547,14 @@ From a storage-manager point of view, these are {\em very special}
 objects.
 
 \begin{code}
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
 #define STKO_VHS	(GC_MUT_RESERVED_WORDS + 9)
 #else
 #define STKO_VHS	(GC_MUT_RESERVED_WORDS + 7)
 #endif
 #define STKO_HS		(FIXED_HS + STKO_VHS)
 
-#define DEFAULT_STKO_CHUNK_SIZE	1024
-
 #define MIN_STKO_CHUNK_SIZE 16	/* Rather arbitrary */
-
-extern I_ StkOChunkSize;
 
 #define STKO_CLOSURE_SIZE(closure)	STKO_SIZE(closure)
 
@@ -594,7 +578,7 @@ extern I_ StkOChunkSize;
          to debug things.
  */
 
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
 #define STKO_ADEP_LOCN      (STKO_HS - 9)
 #define STKO_BDEP_LOCN      (STKO_HS - 8)
 #endif
@@ -762,7 +746,7 @@ The special info table used for stack objects (STKOs).
 	INCLUDE_TYPE_INFO(STKO_STATIC)				\
 	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)		\
 	INCLUDE_PAR_INFO					\
-	INCLUDE_COPYING_INFO(_Evacuate_Static,_Scavenge_Static) \
+	INCLUDE_COPYING_INFO(_Evacuate_Static,_Dummy_Static_entry) \
 	INCLUDE_COMPACTING_INFO(_Dummy_Static_entry,_PRStart_Static, \
 				_Dummy_Static_entry,_PRIn_Error)    \
     }

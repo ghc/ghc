@@ -2,7 +2,7 @@ module PreludeBuiltin where
 
 import Prel		( (&&) )
 import Cls
-import Core		( _readList, _showList )
+import Core
 import IChar
 import IInt
 import List		( (++) )

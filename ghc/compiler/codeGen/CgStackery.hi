@@ -14,22 +14,15 @@ import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import UniqFM(UniqFM)
 import Unique(Unique)
-data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
-data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
-data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
-data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
+data AbstractC 
+data CAddrMode 
+data CgState 
+data PrimKind 
 adjustRealSps :: Int -> Int -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 4 _U_ 2201 _N_ _S_ "LLAU(LLU(U(LLLL)U(LLLL)L))" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 allocAStack :: CgInfoDownwards -> CgState -> (Int, CgState)
-	{-# GHC_PRAGMA _A_ 2 _U_ 01 _N_ _S_ "AU(LLU(U(LLLL)LL))" {_A_ 5 _U_ 22122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 allocBStack :: Int -> CgInfoDownwards -> CgState -> (Int, CgState)
-	{-# GHC_PRAGMA _A_ 3 _U_ 201 _N_ _S_ "LAU(LLU(LU(LLLL)L))" {_A_ 4 _U_ 2221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 allocUpdateFrame :: Int -> CAddrMode -> ((Int, Int, Int) -> CgInfoDownwards -> CgState -> CgState) -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 5 _U_ 12111 _N_ _S_ "LLSU(LLU(LLS))U(LLU(LU(LLLL)L))" _N_ _N_ #-}
 getFinalStackHW :: (Int -> Int -> CgInfoDownwards -> CgState -> CgState) -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "SLU(LLL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkStkAmodes :: Int -> Int -> [CAddrMode] -> CgInfoDownwards -> CgState -> ((Int, Int, AbstractC), CgState)
-	{-# GHC_PRAGMA _A_ 5 _U_ 22201 _N_ _S_ "LLLAU(LLL)" {_A_ 4 _U_ 2221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkVirtStkOffsets :: Int -> Int -> (a -> PrimKind) -> [a] -> (Int, Int, [(a, Int)], [(a, Int)])
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 

@@ -19,5 +19,4 @@ type SrcFile = _PackedString
 type SrcFun = _PackedString
 type SrcLine = Int
 readInteger :: [Char] -> Integer
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 

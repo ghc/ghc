@@ -4,5 +4,4 @@ import Id(Id)
 import SplitUniq(SplitUniqSupply)
 import StgSyn(StgBinding)
 satStgRhs :: [StgBinding Id Id] -> SplitUniqSupply -> [StgBinding Id Id]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "S" _N_ _N_ #-}
 

@@ -77,12 +77,7 @@ STGFUN(startPerformIO)
        used to load the STG registers.
     */
 
-#if defined (DO_SPAT_PROFILING)
-    SET_ACTIVITY(ACT_REDN); /* init: do this first, so we count the restore insns */
-#endif
-
-    /* Load up the real registers from the *_SAVE locns.
-    */
+    /* Load up the real registers from the *_SAVE locns. */
     RestoreAllStgRegs();    	/* inline! */
 
     /* ------- STG registers are now valid! -------------------------*/
@@ -148,10 +143,6 @@ STGFUN(startEnterInt)
 {
     FUNBEGIN;
 
-#if defined (DO_SPAT_PROFILING)
-    SET_ACTIVITY(ACT_REDN); /* init: do this first so we count restore insns */
-#endif
-
     /* Load up the real registers from the *_SAVE locns. */
 #if defined(__STG_GCC_REGS__)
     RestoreAllStgRegs();    	/* inline! */
@@ -210,10 +201,6 @@ const W_ vtbl_stopEnterFloat[] = {
 STGFUN(startEnterFloat)
 {
     FUNBEGIN;
-
-#if defined (DO_SPAT_PROFILING)
-    SET_ACTIVITY(ACT_REDN); /* init: do this first so we count restore insns */
-#endif
 
     /* Load up the real registers from the *_SAVE locns. */
 #if defined(__STG_GCC_REGS__)

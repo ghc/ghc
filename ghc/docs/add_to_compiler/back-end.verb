@@ -30,12 +30,12 @@ non-strict functional language'' \cite{peyton-jones91b}.
 
 The reader interested in the final code-generation parts of the
 compiler, from Core syntax to STG syntax\srcloc{stgSyn/CoreToStg.lhs}
-to Abstract~C,\srcloc{codeGen/} should consult Peyton Jones's recent
+to Abstract~C\srcloc{codeGen/}, should consult Peyton Jones's recent
 paper, ``Implementing lazy functional languages on stock hardware: the
 Spineless Tagless G-machine'' \cite{peyton-jones92a}.
 
 Further note: We have found that the STG
 syntax\srcloc{stgSyn/StgSyn.lhs} is the better medium for a few
-transformations.\srcloc{stgSyn/SimplStg.lhs} This is fine---STG syntax
+transformations\srcloc{stgSyn/SimplStg.lhs}. This is fine---STG syntax
 is a just-as-manipulable functional language as Core syntax, even if
 it's a bit messier.

@@ -20,10 +20,10 @@ This is misleading in that what
 goes into the typechecker is quite different from what comes out.
 
 Let's first consider this fragment of the abstract-syntax
-definition,\srcloc{abstractSyn/HsExpr.lhs} for Haskell explicit-list
+definition\srcloc{abstractSyn/HsExpr.lhs}, for Haskell explicit-list
 expressions (Haskell report, section~3.5
 \cite{hudak91a}):\nopagebreak[4]
-\begin{tightcode}
+\begin{mytightcode}
 data Expr var pat =
   ...
   | ExplicitList	[Expr var pat]
@@ -32,8 +32,7 @@ data Expr var pat =
 
 type ProtoNameExpr	= Expr ProtoName ProtoNamePat
 type RenamedExpr        = Expr Name RenamedPat
-type TypecheckedExpr	= Expr Id TypecheckedPat
-\end{tightcode}
+type TypecheckedExpr	= Expr Id TypecheckedPat\end{mytightcode}
 an @ExplicitList@ appears only in typechecker input; an @ExplicitListOut@
 is the corresponding construct that appears
 only in the output, with the inferred type information attached.
@@ -64,7 +63,7 @@ try @ghc -noC -ddump-tc Foo.hs@, to see what comes out of the typechecker.
 \subsubsection{Basic datatypes in the compiler}
 
 None of the internal datatypes in the example just given are
-particularly interesting except @Ids@.\srcloc{basicTypes/Id.lhs} A
+particularly interesting except @Ids@\srcloc{basicTypes/Id.lhs}. A
 program variable, which enters the typechecker as a string, emerges as
 an @Id@.
 
@@ -77,19 +76,18 @@ Let us take a cursory look at @Ids@, as a representative example of
 these basic data types.  (Don't be too scared---@Ids@ are the hairiest
 entities in the whole compiler!)
 Here we go:
-\begin{tightcode}\codeallowbreaks{}
-data Id
+\begin{mytightcode}
+\codeallowbreaks{}data Id
   = Id Unique	   {\dcd\rm-- key for fast comparison}
        UniType	   {\dcd\rm-- Id's type; used all the time;}
        IdInfo	   {\dcd\rm-- non-essential info about this Id;}
        PragmaInfo  {\dcd\rm-- user-specified pragmas about this Id;}
-       IdDetails   {\dcd\rm-- stuff about individual kinds of Ids.}
-\end{tightcode}
+       IdDetails   {\dcd\rm-- stuff about individual kinds of Ids.}\end{mytightcode}
 
 So, every @Id@ comes with:
 \begin{enumerate}
 \item
-A @Unique@,\srcloc{basicTypes/Unique.lhs} essentially a unique
+A @Unique@\srcloc{basicTypes/Unique.lhs}, essentially a unique
 @Int@, for fast comparison;
 \item
 A @UniType@ (more on them below... section~\ref{sec:UniType}) giving the variable's
@@ -109,8 +107,8 @@ would be: that @Id@'s unfolding; or its arity.
 \end{enumerate}
 
 Then the fun begins with @IdDetails@...
-\begin{tightcode}\codeallowbreaks{}
-data IdDetails
+\begin{mytightcode}
+\codeallowbreaks{}data IdDetails
 
   {\dcd\rm---------------- Local values}
 
@@ -138,8 +136,7 @@ data IdDetails
 
   | TupleCon Int			 {\dcd\rm-- its arity}
 
-  {\dcd\rm-- There are quite a few more flavours of {\tt IdDetails}...}
-\end{tightcode}
+  {\dcd\rm-- There are quite a few more flavours of {\tt IdDetails}...}\end{mytightcode}
 
 % A @ShortName@,\srcloc{basicTypes/NameTypes.lhs} which includes a name string
 % and a source-line location for the name's binding occurrence;
@@ -171,10 +168,10 @@ construct it just from the arity.
 \subsubsection{@UniTypes@, representing types in the compiler}
 \label{sec:UniType}
 
-Let us look further at @UniTypes@.\srcloc{uniType/} Their definition
+Let us look further at @UniTypes@\srcloc{uniType/}. Their definition
 is:
-\begin{tightcode}\codeallowbreaks{}
-data UniType
+\begin{mytightcode}
+\codeallowbreaks{}data UniType
   = UniTyVar    TyVar
 
   | UniFun      UniType		{\dcd\rm-- function type}
@@ -194,8 +191,7 @@ data UniType
   | UniTyVarTemplate TyVarTemplate
 
   | UniForall   TyVarTemplate
-		UniType
-\end{tightcode}
+		UniType\end{mytightcode}
 When the typechecker processes a source module, it adds @UniType@
 information to all the basic entities (e.g., @Ids@), among other
 places (see Section~\ref{sec:second-order} for more details).  These
@@ -205,13 +201,12 @@ The following example shows several things about @UniTypes@.
 If a programmer wrote @(Eq a) => a -> [a]@, it would be represented
 as:\footnote{The internal structures of @Ids@,
 @Classes@, @TyVars@, and @TyCons@ are glossed over here...}
-\begin{tightcode}\codeallowbreaks{}
-UniForall {\dcd$\alpha$}
+\begin{mytightcode}
+\codeallowbreaks{}UniForall {\dcd$\alpha$}
       (UniFun (UniDict {\dcd\em Eq} (UniTyVar {\dcd$\alpha$}))
               (UniFun (UniTyVarTemplate {\dcd$\alpha$})
                       (UniData {\dcd\em listTyCon}
-			       [UniTyVarTemplate {\dcd$\alpha$}])))
-\end{tightcode}
+			       [UniTyVarTemplate {\dcd$\alpha$}])))\end{mytightcode}
 From this example we see:
 \begin{itemize}
 \item
@@ -241,8 +236,8 @@ synonyms (@UniSyns@) keep both the unexpanded and expanded forms handy.
 about @Ids@ is now hidden in the
 @IdInfo@\srcloc{basicTypes/IdInfo.lhs} datatype.  It looks something
 like:
-\begin{tightcode}\codeallowbreaks{}
-data IdInfo
+\begin{mytightcode}
+\codeallowbreaks{}data IdInfo
   = NoIdInfo		 {\dcd\rm-- OK, we know nothing...}
 
   | MkIdInfo
@@ -259,8 +254,7 @@ data IdInfo
 			 {\dcd\rm-- (used to match up workers/wrappers)}
       UnfoldingInfo	 {\dcd\rm-- its unfolding}
       UpdateInfo	 {\dcd\rm-- which args should be updated}
-      SrcLocation	 {\dcd\rm-- source location of definition}
-\end{tightcode}
+      SrcLocation	 {\dcd\rm-- source location of definition}\end{mytightcode}
 As you can see, we may accumulate a lot of information about an Id!
 (The types for all the sub-bits are given in the same place...)
 
@@ -286,15 +280,14 @@ Much of the abstract-syntax datatypes are given
 over to output-only translation machinery.  Here are a few more
 fragments of the @Expr@ type, all of which appear only in typechecker
 output:
-\begin{tightcode}
+\begin{mytightcode}
 data Expr var pat =
   ...
   | DictLam    [DictVar]       (Expr var pat)
   | DictApp    (Expr var pat)  [DictVar]
   | Dictionary [DictVar]       [Id]
   | SingleDict DictVar
-  ...
-\end{tightcode}
+  ...\end{mytightcode}
 You needn't worry about this stuff:
 After the desugarer gets through with such constructs, there's nothing
 left but @Ids@, tuples, tupling functions, etc.,---that is, ``plain

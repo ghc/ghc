@@ -125,77 +125,82 @@ RegisterTable ScavRegTable;
 
 /*** DEBUGGING MACROS ***/
 
-#if defined(_GC_DEBUG)
+#if defined(DEBUG)
 
 #define DEBUG_SCAV(s,p) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), s, p)
 
 #define DEBUG_SCAV_GEN(s,p) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, Gen info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), s, p)
 
 #define DEBUG_SCAV_DYN   \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, Dyn info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), DYN_CLOSURE_SIZE(Scav), DYN_CLOSURE_NoPTRS(Scav))
 
 #define DEBUG_SCAV_TUPLE \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, Tuple info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), TUPLE_CLOSURE_SIZE(Scav), TUPLE_CLOSURE_NoPTRS(Scav))
 
 #define DEBUG_SCAV_MUTUPLE \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, MuTuple info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), MUTUPLE_CLOSURE_SIZE(Scav), MUTUPLE_CLOSURE_NoPTRS(Scav))
 
 #define DEBUG_SCAV_DATA  \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, Data info 0x%lx, size %ld\n", \
 		Scav, INFO_PTR(Scav), DATA_CLOSURE_SIZE(Scav))
 
 #define DEBUG_SCAV_BH(s)  \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, BH info 0x%lx, size %ld\n", \
 		Scav, INFO_PTR(Scav), s)
 
 #define DEBUG_SCAV_IND \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, IND info 0x%lx, size %ld\n", \
 		Scav, INFO_PTR(Scav), IND_CLOSURE_SIZE(Scav))
 
 #define DEBUG_SCAV_PERM_IND \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: 0x%lx, PI info 0x%lx, size %ld\n", \
 		Scav, INFO_PTR(Scav), IND_CLOSURE_SIZE(Scav))
 
 #define DEBUG_SCAV_OLDROOT(s) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Scav: OLDROOT 0x%lx, info 0x%lx, size %ld\n", \
 		Scav, INFO_PTR(Scav), s)
 
 #ifdef CONCURRENT
 #define DEBUG_SCAV_BQ \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Scav: 0x%lx, BQ info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), BQ_CLOSURE_SIZE(Scav), BQ_CLOSURE_NoPTRS(Scav))
 
 #define DEBUG_SCAV_TSO  \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Scav TSO: 0x%lx\n", \
 		Scav)
 
 #define DEBUG_SCAV_STKO  \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Scav StkO: 0x%lx\n", \
 		Scav)
 
 # ifdef PAR
+#  define DEBUG_SCAV_RBH(s,p) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
+        fprintf(stderr, "Scav RBH: 0x%lx, info 0x%lx, size %ld, ptrs %ld\n", \
+		Scav, INFO_PTR(Scav), s, p)
+
 #  define DEBUG_SCAV_BF \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Scav: 0x%lx, BF info 0x%lx, size %ld, ptrs %ld\n", \
 		Scav, INFO_PTR(Scav), BF_CLOSURE_SIZE(dummy), 0)
 # endif
@@ -219,6 +224,7 @@ RegisterTable ScavRegTable;
 # define DEBUG_SCAV_TSO
 # define DEBUG_SCAV_STKO
 # ifdef PAR
+#  define DEBUG_SCAV_RBH(s,p)
 #  define DEBUG_SCAV_BF
 # endif
 #endif
@@ -226,10 +232,20 @@ RegisterTable ScavRegTable;
 #endif
 
 #define PROFILE_CLOSURE(closure,size) \
-    HEAP_PROFILE_CLOSURE(closure,size); \
-    LIFE_PROFILE_CLOSURE(closure,size)
+    HEAP_PROFILE_CLOSURE(closure,size)
 
 /*** SPECIALISED CODE ***/
+
+#ifdef TICKY_TICKY
+void
+_Scavenge_0_0(STG_NO_ARGS)
+{
+    DEBUG_SCAV(0,0);
+    PROFILE_CLOSURE(Scav,0);
+    NEXT_Scav(0); /* because "size" is defined to be 0 (size SPEC_VHS == 0) */
+    return;
+}
+#endif
 
 void
 _Scavenge_1_0(STG_NO_ARGS)
@@ -237,6 +253,15 @@ _Scavenge_1_0(STG_NO_ARGS)
     DEBUG_SCAV(1,0);
     PROFILE_CLOSURE(Scav,1);
     NEXT_Scav(1); /* because "size" is defined to be 1 (size SPEC_VHS == 0) */
+    return;
+}
+void
+_Scavenge_1_1(STG_NO_ARGS)
+{
+    DEBUG_SCAV(1,1);
+    PROFILE_CLOSURE(Scav,1);
+    SPEC_DO_EVACUATE(1);
+    NEXT_Scav(1);
     return;
 }
 void
@@ -248,31 +273,6 @@ _Scavenge_2_0(STG_NO_ARGS)
     return;
 }
 void
-_Scavenge_3_0(STG_NO_ARGS)
-{
-    DEBUG_SCAV(3,0);
-    PROFILE_CLOSURE(Scav,3);
-    NEXT_Scav(3);
-    return;
-}
-void
-_Scavenge_4_0(STG_NO_ARGS)
-{
-    DEBUG_SCAV(4,0);
-    PROFILE_CLOSURE(Scav,4);
-    NEXT_Scav(4);
-    return;
-}
-void
-_Scavenge_5_0(STG_NO_ARGS)
-{
-    DEBUG_SCAV(5,0);
-    PROFILE_CLOSURE(Scav,5);
-    NEXT_Scav(5);
-    return;
-}
-
-void
 _Scavenge_2_1(STG_NO_ARGS)
 {
     DEBUG_SCAV(2,1);
@@ -281,7 +281,24 @@ _Scavenge_2_1(STG_NO_ARGS)
     NEXT_Scav(2);
     return;
 }
-
+void
+_Scavenge_2_2(STG_NO_ARGS)
+{
+    DEBUG_SCAV(2,2);
+    PROFILE_CLOSURE(Scav,2);
+    SPEC_DO_EVACUATE(1);
+    SPEC_DO_EVACUATE(2);
+    NEXT_Scav(2);
+    return;
+}
+void
+_Scavenge_3_0(STG_NO_ARGS)
+{
+    DEBUG_SCAV(3,0);
+    PROFILE_CLOSURE(Scav,3);
+    NEXT_Scav(3);
+    return;
+}
 void
 _Scavenge_3_1(STG_NO_ARGS)
 {
@@ -301,26 +318,6 @@ _Scavenge_3_2(STG_NO_ARGS)
     NEXT_Scav(3);
     return;
 }
-
-void
-_Scavenge_1_1(STG_NO_ARGS)
-{
-    DEBUG_SCAV(1,1);
-    PROFILE_CLOSURE(Scav,1);
-    SPEC_DO_EVACUATE(1);
-    NEXT_Scav(1);
-    return;
-}
-void
-_Scavenge_2_2(STG_NO_ARGS)
-{
-    DEBUG_SCAV(2,2);
-    PROFILE_CLOSURE(Scav,2);
-    SPEC_DO_EVACUATE(1);
-    SPEC_DO_EVACUATE(2);
-    NEXT_Scav(2);
-    return;
-}
 void
 _Scavenge_3_3(STG_NO_ARGS)
 {
@@ -333,6 +330,14 @@ _Scavenge_3_3(STG_NO_ARGS)
     return;
 }
 void
+_Scavenge_4_0(STG_NO_ARGS)
+{
+    DEBUG_SCAV(4,0);
+    PROFILE_CLOSURE(Scav,4);
+    NEXT_Scav(4);
+    return;
+}
+void
 _Scavenge_4_4(STG_NO_ARGS)
 {
     DEBUG_SCAV(4,4);
@@ -342,6 +347,14 @@ _Scavenge_4_4(STG_NO_ARGS)
     SPEC_DO_EVACUATE(3);
     SPEC_DO_EVACUATE(4);
     NEXT_Scav(4);
+    return;
+}
+void
+_Scavenge_5_0(STG_NO_ARGS)
+{
+    DEBUG_SCAV(5,0);
+    PROFILE_CLOSURE(Scav,5);
+    NEXT_Scav(5);
     return;
 }
 void
@@ -491,31 +504,33 @@ closures.
 void					\
 CAT3(_Scavenge_RBH_,n,_1)(STG_NO_ARGS)	\
 {					\
+    I_ size = n + SPEC_RBH_VHS;		\
     P_ save_Scav;			\
-    DEBUG_SCAV(n,1);			\
+    DEBUG_SCAV_RBH(size,1);		\
     save_Scav = Scav;			\
     Scav = OldGen + 1;			\
     DO_EVACUATE(save_Scav, SPEC_RBH_BQ_LOCN);	\
     Scav = save_Scav;			\
-    PROFILE_CLOSURE(Scav,n);		\
-    NEXT_Scav(n); /* ToDo: dodgy size WDP 95/07 */			\
+    PROFILE_CLOSURE(Scav,size);		\
+    NEXT_Scav(size); 			\
 }
 
 #  define SCAVENGE_SPEC_RBH_N_N(n)	\
 void					\
 CAT4(_Scavenge_RBH_,n,_,n)(STG_NO_ARGS) \
 {					\
+    I_ size = n + SPEC_RBH_VHS;		\
     int i;				\
     P_ save_Scav;			\
-    DEBUG_SCAV(n,n-1);			\
+    DEBUG_SCAV_RBH(size,size-1);	\
     save_Scav = Scav;			\
     Scav = OldGen + 1;			\
     for(i = 0; i < n - 1; i++) {	\
         DO_EVACUATE(save_Scav, SPEC_RBH_BQ_LOCN + i);	\
     }					\
     Scav = save_Scav;			\
-    PROFILE_CLOSURE(Scav,n);		\
-    NEXT_Scav(n);			\
+    PROFILE_CLOSURE(Scav,size);		\
+    NEXT_Scav(size);			\
 }
 
 # else
@@ -524,23 +539,25 @@ CAT4(_Scavenge_RBH_,n,_,n)(STG_NO_ARGS) \
 void					\
 CAT3(_Scavenge_RBH_,n,_1)(STG_NO_ARGS)	\
 {					\
-    DEBUG_SCAV(n,1);			\
+    I_ size = n + SPEC_RBH_VHS;		\
+    DEBUG_SCAV_RBH(size,1);		\
     DO_EVACUATE(Scav, SPEC_RBH_BQ_LOCN);\
-    PROFILE_CLOSURE(Scav,n);		\
-    NEXT_Scav(n);			\
+    PROFILE_CLOSURE(Scav,size);		\
+    NEXT_Scav(size);			\
 }
 
 #  define SCAVENGE_SPEC_RBH_N_N(n)	\
 void					\
 CAT4(_Scavenge_RBH_,n,_,n)(STG_NO_ARGS) \
 {					\
+    I_ size = n + SPEC_RBH_VHS;		\
     int i;				\
-    DEBUG_SCAV(n,n-1);			\
+    DEBUG_SCAV_RBH(size,size-1);	\
     for(i = 0; i < n - 1; i++) {	\
         DO_EVACUATE(Scav, SPEC_RBH_BQ_LOCN + i);    \
     }					\
-    PROFILE_CLOSURE(Scav,n);	    	\
-    NEXT_Scav(n);			\
+    PROFILE_CLOSURE(Scav,size);	    	\
+    NEXT_Scav(size);			\
 }
 
 # endif
@@ -580,9 +597,10 @@ SCAVENGE_SPEC_RBH_N_N(12)
 void
 _Scavenge_MallocPtr(STG_NO_ARGS)
 {
-    DEBUG_SCAV(MallocPtr_SIZE,0);
-    PROFILE_CLOSURE(Scav,MallocPtr_SIZE);
-    NEXT_Scav(MallocPtr_SIZE);
+    I_ size = MallocPtr_SIZE;
+    DEBUG_SCAV(size,0);
+    PROFILE_CLOSURE(Scav,size);
+    NEXT_Scav(size);
     return;
 }
 #endif /* !PAR */
@@ -766,44 +784,51 @@ _Scavenge_MuTuple(STG_NO_ARGS)
 void
 _Scavenge_BH_U(STG_NO_ARGS)
 {
-    DEBUG_SCAV_BH(BH_U_SIZE);
-    PROFILE_CLOSURE(Scav,BH_U_SIZE);
-    NEXT_Scav(BH_U_SIZE);
+    I_ size = BH_U_SIZE;
+    DEBUG_SCAV_BH(size);
+    PROFILE_CLOSURE(Scav,size);
+    NEXT_Scav(size);
     return;   
 }
 
 void
 _Scavenge_BH_N(STG_NO_ARGS)
 {
-    DEBUG_SCAV_BH(BH_N_SIZE);
-    PROFILE_CLOSURE(Scav,BH_N_SIZE);
-    NEXT_Scav(BH_N_SIZE);
+    I_ size = BH_N_SIZE;
+    DEBUG_SCAV_BH(size);
+    PROFILE_CLOSURE(Scav,size);
+    NEXT_Scav(size);
     return;   
 }
 
-/* This is needed for scavenging the indirections on the OldMutables list */
-
+/* This is needed for scavenging indirections that "hang around";
+    e.g., because they are on the OldMutables list, or
+    because we have "turned off" shorting-out of indirections
+    (in SMevac.lc).
+*/
 void
 _Scavenge_Ind(STG_NO_ARGS)
 {
+    I_ size = IND_CLOSURE_SIZE(dummy);
     DEBUG_SCAV_IND;
-    PROFILE_CLOSURE(Scav,IND_CLOSURE_SIZE(dummy));
+    PROFILE_CLOSURE(Scav,size);
     DO_EVACUATE(Scav, IND_HS);
-    NEXT_Scav(IND_CLOSURE_SIZE(dummy));
+    NEXT_Scav(size);
     return;
 }
 
 void
 _Scavenge_Caf(STG_NO_ARGS)
 {
+    I_ size = IND_CLOSURE_SIZE(dummy);
     DEBUG_SCAV_IND;
-    PROFILE_CLOSURE(Scav,IND_CLOSURE_SIZE(dummy));
+    PROFILE_CLOSURE(Scav,size);
     DO_EVACUATE(Scav, IND_HS);
-    NEXT_Scav(IND_CLOSURE_SIZE(dummy));
+    NEXT_Scav(size);
     return;
 }
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING) || defined(TICKY_TICKY)
 
 /* Special permanent indirection for lexical scoping.
    As for _Scavenge_Ind but no PROFILE_CLOSURE.
@@ -812,19 +837,21 @@ _Scavenge_Caf(STG_NO_ARGS)
 void
 _Scavenge_PI(STG_NO_ARGS)
 {
+    I_ size = IND_CLOSURE_SIZE(dummy);
     DEBUG_SCAV_PERM_IND;
-    /* PROFILE_CLOSURE(Scav,IND_CLOSURE_SIZE(dummy)); */
+    /* PROFILE_CLOSURE(Scav,size); */
     DO_EVACUATE(Scav, IND_HS);
-    NEXT_Scav(IND_CLOSURE_SIZE(dummy));
+    NEXT_Scav(size);
     return;
 }
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING or TICKY */
 
 #ifdef CONCURRENT
 
 void
 _Scavenge_BQ(STG_NO_ARGS)
 {
+    I_ size = BQ_CLOSURE_SIZE(dummy);
 #if defined(GCgn)
     P_ save_Scav;
 #endif
@@ -843,14 +870,15 @@ _Scavenge_BQ(STG_NO_ARGS)
     DO_EVACUATE(Scav, BQ_HS);
 #endif /* GCgn */
 
-    PROFILE_CLOSURE(Scav,BQ_CLOSURE_SIZE(dummy));
-    NEXT_Scav(BQ_CLOSURE_SIZE(dummy));
+    PROFILE_CLOSURE(Scav,size);
+    NEXT_Scav(size);
     return;   
 }
 
 void
 _Scavenge_TSO(STG_NO_ARGS)
 {
+    I_ size = TSO_VHS + TSO_CTS_SIZE;
 #if defined(GCgn)
     P_ save_Scav;
 #endif
@@ -861,38 +889,74 @@ _Scavenge_TSO(STG_NO_ARGS)
     DEBUG_SCAV_TSO;
 
 #if defined(GCgn)
-    /* No old generation roots should be created for mutable */
-    /* pointer fields as they will be explicitly collected   */ 
-    /* Ensure this by pointing Scav at the new generation    */ 
-    save_Scav = Scav;
-    Scav = OldGen + 1;
-
-    DO_EVACUATE(save_Scav, TSO_LINK_LOCN);
-    DO_EVACUATE(save_Scav, ((P_) &r->rStkO) - save_Scav);
-    for(i = 0; liveness != 0; liveness >>= 1, i++) {
-    	if (liveness & 1) {
-    	    DO_EVACUATE(save_Scav, ((P_) &r->rR[i].p) - save_Scav)
-    	}
-    }
-    Scav = save_Scav;
+    /* old and probably wrong -- deleted (WDP 95/12) */
 #else
     DO_EVACUATE(Scav, TSO_LINK_LOCN);
+
     DO_EVACUATE(Scav, ((P_) &r->rStkO) - Scav);
-    for(i = 0; liveness != 0; liveness >>= 1, i++) {
+
+    for (i = 0; liveness != 0; liveness >>= 1, i++) {
     	if (liveness & 1) {
     	    DO_EVACUATE(Scav, ((P_) &r->rR[i].p) - Scav)
-    	}
+	}
     }
 #endif
 
-    PROFILE_CLOSURE(Scav, TSO_VHS + TSO_CTS_SIZE)
-    NEXT_Scav(TSO_VHS + TSO_CTS_SIZE);
+    PROFILE_CLOSURE(Scav, size);
+    NEXT_Scav(size);
     return;
+}
+
+int /* ToDo: move? */
+sanityChk_StkO(P_ stko)
+{
+    I_ size = STKO_CLOSURE_SIZE(stko);
+    I_ cts_size = STKO_CLOSURE_CTS_SIZE(stko);
+    I_ count;
+    I_ sub = STKO_SuB_OFFSET(stko); 	/* Offset of first update frame in B stack */
+    I_ prev_sub;
+    P_ begin_stko  = STKO_CLOSURE_ADDR(stko, 0);
+    P_ beyond_stko = STKO_CLOSURE_ADDR(stko, cts_size+1);
+
+    /*fprintf(stderr, "stko=%lx; SpA offset=%ld; first SuB=%ld, size=%ld; next=%lx\n",stko,STKO_SpA_OFFSET(stko),sub,STKO_CLOSURE_CTS_SIZE(stko),STKO_LINK(stko));*/
+
+    /* Evacuate the locations in the A stack */
+    for (count = STKO_SpA_OFFSET(stko); count <= cts_size; count++) {
+	ASSERT(count >= 0);
+    }
+
+    while(sub > 0) {
+    	P_ subptr;
+    	P_ suaptr;
+    	P_ updptr;
+    	P_ retptr;
+
+	ASSERT(sub >= 1);
+	ASSERT(sub <= cts_size);
+
+	retptr = GRAB_RET(STKO_CLOSURE_ADDR(stko,sub));
+    	subptr = GRAB_SuB(STKO_CLOSURE_ADDR(stko,sub));
+    	suaptr = GRAB_SuA(STKO_CLOSURE_ADDR(stko,sub));
+	updptr = GRAB_UPDATEE(STKO_CLOSURE_ADDR(stko,sub));
+
+	ASSERT(subptr >= begin_stko);
+	ASSERT(subptr <  beyond_stko);
+
+	ASSERT(suaptr >= begin_stko);
+	ASSERT(suaptr <=  beyond_stko);
+
+	/* ToDo: would be nice to chk that retptr is in text space */
+
+	sub = STKO_CLOSURE_OFFSET(stko, subptr);
+    }
+
+    return 1;
 }
 
 void
 _Scavenge_StkO(STG_NO_ARGS)
 {
+    I_ size = STKO_CLOSURE_SIZE(Scav);
 #if defined(GCgn)
     P_ save_Scav;
 #endif
@@ -902,31 +966,10 @@ _Scavenge_StkO(STG_NO_ARGS)
     DEBUG_SCAV_STKO;
 
 #if defined(GCgn)
-    /* No old generation roots should be created for mutable */
-    /* pointer fields as they will be explicitly collected   */ 
-    /* Ensure this by pointing Scav at the new generation    */ 
-    save_Scav = Scav;
-    Scav = OldGen + 1;
-
-    /* Evacuate the link */
-    DO_EVACUATE(save_Scav, STKO_LINK_LOCN);
-
-    /* Evacuate the locations in the A stack */
-    for (count = STKO_SpA_OFFSET(save_Scav); 
-      count <= STKO_CLOSURE_CTS_SIZE(save_Scav); count++) {
-	STKO_DO_EVACUATE(count);
-    }
-
-    /* Now evacuate the updatees in the update stack */
-    while(sub > 0) {
-    	P_ subptr;
-
-    	STKO_DO_EVACUATE(sub + BREL(UF_UPDATEE));
-    	subptr = GRAB_SuB(STKO_CLOSURE_ADDR(save_Scav,sub));
-	sub = STKO_CLOSURE_OFFSET(save_Scav, subptr);
-    }
-    Scav = save_Scav;
+    /* deleted; probably wrong */
 #else
+    ASSERT(sanityChk_StkO(Scav));
+
     /* Evacuate the link */
     DO_EVACUATE(Scav, STKO_LINK_LOCN);
 
@@ -941,11 +984,13 @@ _Scavenge_StkO(STG_NO_ARGS)
 
     	STKO_DO_EVACUATE(sub + BREL(UF_UPDATEE));
     	subptr = GRAB_SuB(STKO_CLOSURE_ADDR(Scav,sub));
+
 	sub = STKO_CLOSURE_OFFSET(Scav, subptr);
     }
+
 #endif
-    PROFILE_CLOSURE(Scav, STKO_CLOSURE_SIZE(Scav))
-    NEXT_Scav(STKO_CLOSURE_SIZE(Scav));
+    PROFILE_CLOSURE(Scav, size);
+    NEXT_Scav(size);
     return;
 }
 
@@ -954,15 +999,17 @@ _Scavenge_StkO(STG_NO_ARGS)
 void
 _Scavenge_FetchMe(STG_NO_ARGS)
 {
-    DEBUG_SCAV(2,0);
-    PROFILE_CLOSURE(Scav,2);
-    NEXT_Scav(2);
+    I_ size = FETCHME_CLOSURE_SIZE(dummy);
+    DEBUG_SCAV(size,0);
+    PROFILE_CLOSURE(Scav,size);
+    NEXT_Scav(size);
     return;
 }
 
 void
 _Scavenge_BF(STG_NO_ARGS)
 {
+    I_ size = BF_CLOSURE_SIZE(dummy);
 #if defined(GCgn)
     P_ save_Scav;
 #endif
@@ -984,8 +1031,8 @@ _Scavenge_BF(STG_NO_ARGS)
     DO_EVACUATE(Scav, BF_NODE_LOCN);
 #endif
 
-    PROFILE_CLOSURE(Scav, BF_CLOSURE_SIZE(dummy))
-    NEXT_Scav(BF_CLOSURE_SIZE(dummy));
+    PROFILE_CLOSURE(Scav, size);
+    NEXT_Scav(size);
     return;
 }
 
@@ -1001,8 +1048,9 @@ _Scavenge_BF(STG_NO_ARGS)
 void
 _Scavenge_OldRoot(STG_NO_ARGS)
 {
-    DEBUG_SCAV_OLDROOT(MIN_UPD_SIZE); /* dodgy size (WDP 95/07) */
-    NEXT_Scav(MIN_UPD_SIZE);
+    I_ size = ?????
+    DEBUG_SCAV_OLDROOT(size);
+    NEXT_Scav(size);
     return;
 }
 

@@ -2,168 +2,105 @@
 interface ClosureInfo where
 import AbsCSyn(AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId, RegRelative, ReturnInfo)
 import BasicLit(BasicLit)
-import CLabelInfo(CLabel, mkClosureLabel)
-import CgBindery(CgIdInfo, StableLoc, VolatileLoc)
+import CLabelInfo(CLabel)
+import CgBindery(CgIdInfo)
 import CgMonad(CgInfoDownwards, CgState, CompilationInfo, EndOfBlockInfo, FCode(..), StubFlag)
-import Class(Class)
 import CmdLineOpts(GlobalSwitch)
 import CostCentre(CostCentre)
 import HeapOffs(HeapOffset)
-import Id(DataCon(..), Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(DataCon(..), Id)
 import Maybes(Labda)
-import NameTypes(FullName)
 import PreludePS(_PackedString)
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import SMRep(SMRep, SMSpecRepKind, SMUpdateKind, getSMInfoStr, getSMInitHdrStr, getSMUpdInplaceHdrStr, ltSMRepHdr)
 import StgSyn(PlainStgAtom(..), PlainStgExpr(..), PlainStgLiveVars(..), StgAtom, StgBinderInfo, StgBinding, StgCaseAlternatives, StgExpr, UpdateFlag(..))
 import TyCon(TyCon)
-import TyVar(TyVarTemplate)
-import UniTyFuns(getUniDataSpecTyCon_maybe)
 import UniType(UniType)
 import UniqFM(UniqFM)
 import UniqSet(UniqSet(..))
 import Unique(Unique)
-data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
-data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
-data MagicId 	{-# GHC_PRAGMA BaseReg | StkOReg | VanillaReg PrimKind Int# | FloatReg Int# | DoubleReg Int# | TagReg | RetReg | SpA | SuA | SpB | SuB | Hp | HpLim | LivenessReg | ActivityReg | StdUpdRetVecReg | StkStubReg | CurCostCentre | VoidReg #-}
+data AbstractC 
+data CAddrMode 
+data MagicId 
 data CLabel 
-data CgIdInfo 	{-# GHC_PRAGMA MkCgIdInfo Id VolatileLoc StableLoc LambdaFormInfo #-}
-data CgInfoDownwards 	{-# GHC_PRAGMA MkCgInfoDown CompilationInfo (UniqFM CgIdInfo) EndOfBlockInfo #-}
-data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
-data ClosureInfo 	{-# GHC_PRAGMA MkClosureInfo Id LambdaFormInfo SMRep #-}
-data CompilationInfo 	{-# GHC_PRAGMA MkCompInfo (GlobalSwitch -> Bool) _PackedString #-}
+data CgIdInfo 
+data CgInfoDownwards 
+data CgState 
+data ClosureInfo 
+data CompilationInfo 
 data EntryConvention   = ViaNode | StdEntry CLabel (Labda CLabel) | DirectEntry CLabel Int [MagicId]
 type FCode a = CgInfoDownwards -> CgState -> (a, CgState)
 data HeapOffset 
 type DataCon = Id
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data LambdaFormInfo 	{-# GHC_PRAGMA LFReEntrant Bool Int Bool | LFCon Id Bool | LFTuple Id Bool | LFThunk Bool Bool Bool StandardFormInfo | LFArgument | LFImported | LFLetNoEscape Int (UniqFM Id) | LFBlackHole | LFIndirection #-}
-data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
-data SMRep 	{-# GHC_PRAGMA StaticRep Int Int | SpecialisedRep SMSpecRepKind Int Int SMUpdateKind | GenericRep Int Int SMUpdateKind | BigTupleRep Int | DataRep Int | DynamicRep | BlackHoleRep | PhantomRep | MuTupleRep Int #-}
+data Id 
+data Labda a 
+data LambdaFormInfo 
+data PrimKind 
+data SMRep 
 type PlainStgAtom = StgAtom Id
 type PlainStgExpr = StgExpr Id Id
 type PlainStgLiveVars = UniqFM Id
-data StandardFormInfo 	{-# GHC_PRAGMA NonStandardThunk | SelectorThunk Id Id Int | VapThunk Id [StgAtom Id] Bool #-}
-data StgAtom a 	{-# GHC_PRAGMA StgVarAtom a | StgLitAtom BasicLit #-}
-data StgBinderInfo 	{-# GHC_PRAGMA NoStgBinderInfo | StgBinderInfo Bool Bool Bool Bool Bool #-}
-data StgExpr a b 	{-# GHC_PRAGMA StgApp (StgAtom b) [StgAtom b] (UniqFM b) | StgConApp Id [StgAtom b] (UniqFM b) | StgPrimApp PrimOp [StgAtom b] (UniqFM b) | StgCase (StgExpr a b) (UniqFM b) (UniqFM b) Unique (StgCaseAlternatives a b) | StgLet (StgBinding a b) (StgExpr a b) | StgLetNoEscape (UniqFM b) (UniqFM b) (StgBinding a b) (StgExpr a b) | StgSCC UniType CostCentre (StgExpr a b) #-}
+data StandardFormInfo 
+data StgAtom a 
+data StgBinderInfo 
+data StgExpr a b 
 data UpdateFlag   = ReEntrant | Updatable | SingleEntry
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data TyCon 
+data UniqFM a 
 type UniqSet a = UniqFM a
 allocProfilingMsg :: ClosureInfo -> _PackedString
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 blackHoleClosureInfo :: ClosureInfo -> ClosureInfo
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LAA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 blackHoleOnEntry :: Bool -> ClosureInfo -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LU(ALS)" {_A_ 3 _U_ 111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureGoodStuffSize :: ClosureInfo -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureHdrSize :: ClosureInfo -> HeapOffset
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ HeapOffs totHdrSize _N_} _F_ _IF_ARGS_ 0 1 C 3 \ (u0 :: ClosureInfo) -> case u0 of { _ALG_ _ORIG_ ClosureInfo MkClosureInfo (u1 :: Id) (u2 :: LambdaFormInfo) (u3 :: SMRep) -> _APP_  _ORIG_ HeapOffs totHdrSize [ u3 ]; _NO_DEFLT_ } _N_ #-}
 closureId :: ClosureInfo -> Id
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(LLLL)AA)" {_A_ 4 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 4 XXXX 5 \ (u0 :: Unique) (u1 :: UniType) (u2 :: IdInfo) (u3 :: IdDetails) -> _!_ _ORIG_ Id Id [] [u0, u1, u2, u3] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ClosureInfo) -> case u0 of { _ALG_ _ORIG_ ClosureInfo MkClosureInfo (u1 :: Id) (u2 :: LambdaFormInfo) (u3 :: SMRep) -> u1; _NO_DEFLT_ } _N_ #-}
 closureKind :: ClosureInfo -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureLFInfo :: ClosureInfo -> LambdaFormInfo
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: LambdaFormInfo) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ClosureInfo) -> case u0 of { _ALG_ _ORIG_ ClosureInfo MkClosureInfo (u1 :: Id) (u2 :: LambdaFormInfo) (u3 :: SMRep) -> u2; _NO_DEFLT_ } _N_ #-}
 closureLabelFromCI :: ClosureInfo -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LAA)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ CLabelInfo mkClosureLabel _N_} _F_ _IF_ARGS_ 0 1 C 3 \ (u0 :: ClosureInfo) -> case u0 of { _ALG_ _ORIG_ ClosureInfo MkClosureInfo (u1 :: Id) (u2 :: LambdaFormInfo) (u3 :: SMRep) -> _APP_  _ORIG_ CLabelInfo mkClosureLabel [ u1 ]; _NO_DEFLT_ } _N_ #-}
 closureNonHdrSize :: ClosureInfo -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ALS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closurePtrsSize :: ClosureInfo -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureReturnsUnboxedType :: ClosureInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LSA)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureSMRep :: ClosureInfo -> SMRep
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SMRep) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ClosureInfo) -> case u0 of { _ALG_ _ORIG_ ClosureInfo MkClosureInfo (u1 :: Id) (u2 :: LambdaFormInfo) (u3 :: SMRep) -> u3; _NO_DEFLT_ } _N_ #-}
 closureSemiTag :: ClosureInfo -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureSingleEntry :: ClosureInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureSize :: ClosureInfo -> HeapOffset
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ALS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureSizeWithoutFixedHdr :: ClosureInfo -> HeapOffset
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ALS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureType :: ClosureInfo -> Labda (TyCon, [UniType], [Id])
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LSA)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureTypeDescr :: ClosureInfo -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(ALAS)AA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 closureUpdReqd :: ClosureInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 12 \ (u0 :: LambdaFormInfo) -> case u0 of { _ALG_ _ORIG_ ClosureInfo LFThunk (u1 :: Bool) (u2 :: Bool) (u3 :: Bool) (u4 :: StandardFormInfo) -> u3; _ORIG_ ClosureInfo LFBlackHole  -> _!_ True [] []; (u5 :: LambdaFormInfo) -> _!_ False [] [] } _N_} _N_ _N_ #-}
-dataConLiveness :: ClosureInfo -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LAS)" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+dataConLiveness :: ((Int -> GlobalSwitch) -> Labda Int) -> ClosureInfo -> Int
 entryLabelFromCI :: ClosureInfo -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LSL)" {_A_ 3 _U_ 211 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 fastLabelFromCI :: ClosureInfo -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LAA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 fitsMinUpdSize :: ClosureInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ALS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 funInfoTableRequired :: Id -> StgBinderInfo -> LambdaFormInfo -> Bool
-	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LSL" _N_ _N_ #-}
 getEntryConvention :: Id -> LambdaFormInfo -> [PrimKind] -> CgInfoDownwards -> CgState -> (EntryConvention, CgState)
-	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _N_ _N_ _N_ #-}
-mkClosureLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 getSMInfoStr :: SMRep -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 getSMInitHdrStr :: SMRep -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 getSMUpdInplaceHdrStr :: SMRep -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 getStandardFormThunkInfo :: LambdaFormInfo -> Labda [StgAtom Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
-getUniDataSpecTyCon_maybe :: UniType -> Labda (TyCon, [UniType], [Id])
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 infoTableLabelFromCI :: ClosureInfo -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LSL)" {_A_ 3 _U_ 212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 isConstantRep :: SMRep -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isPhantomRep :: SMRep -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 11 \ (u0 :: SMRep) -> case u0 of { _ALG_ _ORIG_ SMRep PhantomRep  -> _!_ True [] []; (u1 :: SMRep) -> _!_ False [] [] } _N_ #-}
 isSpecRep :: SMRep -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 11 \ (u0 :: SMRep) -> case u0 of { _ALG_ _ORIG_ SMRep SpecialisedRep (u1 :: SMSpecRepKind) (u2 :: Int) (u3 :: Int) (u4 :: SMUpdateKind) -> _!_ True [] []; (u5 :: SMRep) -> _!_ False [] [] } _N_ #-}
 isStaticClosure :: ClosureInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 11 \ (u0 :: SMRep) -> case u0 of { _ALG_ _ORIG_ SMRep StaticRep (u1 :: Int) (u2 :: Int) -> _!_ True [] []; (u3 :: SMRep) -> _!_ False [] [] } _N_} _N_ _N_ #-}
 layOutDynClosure :: Id -> (a -> PrimKind) -> [a] -> LambdaFormInfo -> (ClosureInfo, [(a, HeapOffset)])
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 layOutDynCon :: Id -> (a -> PrimKind) -> [a] -> (ClosureInfo, [(a, HeapOffset)])
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 layOutPhantomClosure :: Id -> LambdaFormInfo -> ClosureInfo
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 layOutStaticClosure :: Id -> (a -> PrimKind) -> [a] -> LambdaFormInfo -> (ClosureInfo, [(a, HeapOffset)])
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 layOutStaticNoFVClosure :: Id -> LambdaFormInfo -> ClosureInfo
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 ltSMRepHdr :: SMRep -> SMRep -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
 maybeSelectorInfo :: ClosureInfo -> Labda (Id, Int)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ASA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkClosureLFInfo :: Bool -> [Id] -> UpdateFlag -> [Id] -> StgExpr Id Id -> LambdaFormInfo
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222 _N_ _S_ "LLLSL" _N_ _N_ #-}
 mkConLFInfo :: Id -> LambdaFormInfo
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LLLS)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkLFArgument :: LambdaFormInfo
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ ClosureInfo LFArgument [] [] _N_ #-}
 mkLFImported :: Id -> LambdaFormInfo
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAU(SAAAAAAAAA)A)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkLFLetNoEscape :: Int -> UniqFM Id -> LambdaFormInfo
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Int) (u1 :: UniqFM Id) -> _!_ _ORIG_ ClosureInfo LFLetNoEscape [] [u0, u1] _N_ #-}
 mkVirtHeapOffsets :: SMRep -> (a -> PrimKind) -> [a] -> (Int, Int, [(a, HeapOffset)])
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 noUpdVapRequired :: StgBinderInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: StgBinderInfo) -> case u0 of { _ALG_ _ORIG_ StgSyn NoStgBinderInfo  -> _!_ False [] []; _ORIG_ StgSyn StgBinderInfo (u1 :: Bool) (u2 :: Bool) (u3 :: Bool) (u4 :: Bool) (u5 :: Bool) -> u4; _NO_DEFLT_ } _N_ #-}
 nodeMustPointToIt :: LambdaFormInfo -> CgInfoDownwards -> CgState -> (Bool, CgState)
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ #-}
 slopSize :: ClosureInfo -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(ALS)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 slowFunEntryCodeRequired :: Id -> StgBinderInfo -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
 staticClosureRequired :: Id -> StgBinderInfo -> LambdaFormInfo -> Bool
-	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LSL" _N_ _N_ #-}
 stdVapRequired :: StgBinderInfo -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: StgBinderInfo) -> case u0 of { _ALG_ _ORIG_ StgSyn NoStgBinderInfo  -> _!_ False [] []; _ORIG_ StgSyn StgBinderInfo (u1 :: Bool) (u2 :: Bool) (u3 :: Bool) (u4 :: Bool) (u5 :: Bool) -> u3; _NO_DEFLT_ } _N_ #-}
 

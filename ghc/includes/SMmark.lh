@@ -45,7 +45,7 @@ extern F_ _PRStart_Tuple(STG_NO_ARGS);
 extern F_ _PRStart_Data(STG_NO_ARGS);
 extern F_ _PRStart_MuTuple(STG_NO_ARGS);
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING) || defined(TICKY_TICKY)
 extern F_ _PRStart_PI(STG_NO_ARGS);
 #endif
 
@@ -139,7 +139,7 @@ extern F_ _PRIn_I_MallocPtr(STG_NO_ARGS);
 
 extern F_ _PRIn_Error(STG_NO_ARGS);
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING) || defined(TICKY_TICKY)
 extern F_ _PRIn_PI(STG_NO_ARGS);
 #endif
 

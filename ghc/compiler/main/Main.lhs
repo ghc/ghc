@@ -183,9 +183,9 @@ doIt (switch_lookup_fn, core_cmds, podize_cmds, pcore_cmds, stg_cmds) input_pgm
     -- of the Glorious Glasgow Haskell compiler!
     -- **********************************************
 #ifndef DPH
-    doDump Verbose "Glasgow Haskell Compiler, version 0.26" "" `thenMn_`
+    doDump Verbose "Glasgow Haskell Compiler, version 0.27" "" `thenMn_`
 #else
-    doDump Verbose "Data Parallel Haskell Compiler, version 0.06 (Glasgow 0.26)" ""
+    doDump Verbose "Data Parallel Haskell Compiler, version 0.06 (Glasgow 0.27)" ""
 	`thenMn_`
 #endif {- Data Parallel Haskell -}
 

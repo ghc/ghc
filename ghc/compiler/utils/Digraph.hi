@@ -1,11 +1,8 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface Digraph where
 import Maybes(MaybeErr)
-data MaybeErr a b 	{-# GHC_PRAGMA Succeeded a | Failed b #-}
+data MaybeErr a b 
 dfs :: (a -> a -> Bool) -> (a -> [a]) -> ([a], [a]) -> [a] -> ([a], [a])
-	{-# GHC_PRAGMA _A_ 4 _U_ 2211 _N_ _S_ "LLU(LL)S" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 stronglyConnComp :: (a -> a -> Bool) -> [(a, a)] -> [a] -> [[a]]
-	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
 topologicalSort :: (a -> a -> Bool) -> [(a, a)] -> [a] -> MaybeErr [a] [[a]]
-	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _S_ "LLS" _N_ _N_ #-}
 

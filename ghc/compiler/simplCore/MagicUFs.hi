@@ -1,41 +1,33 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface MagicUFs where
 import BasicLit(BasicLit)
-import Class(Class)
-import CmdLineOpts(SimplifierSwitch, SwitchResult)
 import CoreSyn(CoreArg, CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
 import CostCentre(CostCentre)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Maybes(Labda)
 import PlainCore(PlainCoreArg(..), PlainCoreAtom(..), PlainCoreExpr(..))
 import PreludePS(_PackedString)
 import PrimOps(PrimOp)
-import SimplEnv(EnclosingCcDetails, IdVal, SimplEnv, UnfoldEnv)
+import SimplEnv(SimplEnv)
 import SimplMonad(SimplCount, SmplM(..), TickType)
 import SplitUniq(SplitUniqSupply)
-import TyCon(TyCon)
-import TyVar(TyVar, TyVarTemplate)
+import TyVar(TyVar)
 import UniType(UniType)
-import UniqFM(UniqFM)
-import Unique(Unique)
-data CoreArg a 	{-# GHC_PRAGMA TypeArg UniType | ValArg (CoreAtom a) #-}
-data CoreAtom a 	{-# GHC_PRAGMA CoVarAtom a | CoLitAtom BasicLit #-}
-data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data MagicUnfoldingFun 	{-# GHC_PRAGMA MUF (SimplEnv -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (Labda (CoreExpr Id Id), SimplCount)) #-}
+data CoreArg a 
+data CoreAtom a 
+data CoreExpr a b 
+data Id 
+data Labda a 
+data MagicUnfoldingFun 
 type PlainCoreArg = CoreArg Id
 type PlainCoreAtom = CoreAtom Id
 type PlainCoreExpr = CoreExpr Id Id
-data SimplEnv 	{-# GHC_PRAGMA SimplEnv (SimplifierSwitch -> SwitchResult) EnclosingCcDetails (UniqFM UniType) (UniqFM IdVal) UnfoldEnv #-}
-data SimplCount 	{-# GHC_PRAGMA SimplCount Int# [(TickType, Int)] #-}
+data SimplEnv 
+data SimplCount 
 type SmplM a = SplitUniqSupply -> SimplCount -> (a, SimplCount)
-data TickType 	{-# GHC_PRAGMA UnfoldingDone | FoldrBuild | MagicUnfold | ConReused | CaseFloatFromLet | CaseOfCase | LetFloatFromLet | LetFloatFromCase | KnownBranch | Let2Case | CaseMerge | CaseElim | CaseIdentity | AtomicRhs | EtaExpansion | CaseOfError | FoldrConsNil | Foldr_Nil | FoldrFoldr | Foldr_List | FoldrCons | FoldrInline | TyBetaReduction | BetaReduction #-}
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data TickType 
+data SplitUniqSupply 
+data UniType 
 applyMagicUnfoldingFun :: MagicUnfoldingFun -> SimplEnv -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (Labda (CoreExpr Id Id), SimplCount)
-	{-# GHC_PRAGMA _A_ 3 _U_ 12222 _N_ _S_ "U(S)LL" {_A_ 3 _U_ 12222 _N_ _N_ _F_ _IF_ARGS_ 0 3 XXX 3 \ (u0 :: SimplEnv -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (Labda (CoreExpr Id Id), SimplCount)) (u1 :: SimplEnv) (u2 :: [CoreArg Id]) -> _APP_  u0 [ u1, u2 ] _N_} _F_ _IF_ARGS_ 0 3 CXX 4 \ (u0 :: MagicUnfoldingFun) (u1 :: SimplEnv) (u2 :: [CoreArg Id]) -> case u0 of { _ALG_ _ORIG_ MagicUFs MUF (u3 :: SimplEnv -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (Labda (CoreExpr Id Id), SimplCount)) -> _APP_  u3 [ u1, u2 ]; _NO_DEFLT_ } _N_ #-}
 mkMagicUnfoldingFun :: _PackedString -> MagicUnfoldingFun
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 

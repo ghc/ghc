@@ -216,6 +216,9 @@ stored in a mixed type location.)
 			-- ClosureInfo, because the latter refers to the *right* hand
 			-- side of a defn, whereas the "description" refers to *left*
 			-- hand side
+	Int		-- Liveness info; this is here because it is
+			-- easy to produce w/in the CgMonad; hard
+			-- thereafter.  (WDP 95/11)
 
   | CRetVector			-- Return vector with "holes"
 	  			-- (Nothings) for the default
@@ -542,7 +545,7 @@ data MagicId
   | LivenessReg	-- (parallel only) used when we need to record explicitly
 		-- what registers are live
 
-  | ActivityReg	    	-- mentioned only in nativeGen
+  | ActivityReg	    	-- mentioned only in nativeGen (UNUSED)
   | StdUpdRetVecReg 	-- mentioned only in nativeGen
   | StkStubReg	    	-- register holding STK_STUB_closure (for stubbing dead stack slots)
 
@@ -589,7 +592,7 @@ tagOf_MagicId SuB		= ILIT(7)
 tagOf_MagicId Hp		= ILIT(8)
 tagOf_MagicId HpLim		= ILIT(9)
 tagOf_MagicId LivenessReg	= ILIT(10)
-tagOf_MagicId ActivityReg	= ILIT(11)
+--tagOf_MagicId ActivityReg	= ILIT(11) -- UNUSED
 tagOf_MagicId StdUpdRetVecReg	= ILIT(12)
 tagOf_MagicId StkStubReg	= ILIT(13)
 tagOf_MagicId CurCostCentre	= ILIT(14)

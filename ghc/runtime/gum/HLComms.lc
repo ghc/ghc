@@ -24,6 +24,15 @@
 sends it.  
 
 \begin{code}
+static W_ *gumPackBuffer;
+
+void 
+InitMoreBuffers(STG_NO_ARGS)
+{
+    gumPackBuffer
+      = (W_ *) stgMallocWords(RTSflags.ParFlags.packBufferSize, "initMoreBuffers");
+}
+
 void
 sendFetch(rga, lga, load)
 globalAddr *rga, *lga;
@@ -52,9 +61,7 @@ int load;
 \begin{code}
 
 static void
-unpackFetch(lga, rga, load)
-globalAddr *lga, *rga;
-int *load;
+unpackFetch(globalAddr *lga, globalAddr *rga, int *load)
 {
     long buf[6];
 
@@ -105,9 +112,7 @@ P_ data;
 
 \begin{code}
 static void
-blockFetch(bf, bh)
-P_ bf;
-P_ bh;
+blockFetch(P_ bf, P_ bh)
 {
     switch (INFO_TYPE(INFO_PTR(bh))) {
     case INFO_BH_TYPE:
@@ -117,8 +122,8 @@ P_ bh;
 
 #ifdef GC_MUT_REQUIRED
 	/*
-	 * If we modify a black hole in the old generation, we have to make sure it
-	 * goes on the mutables list
+	 * If we modify a black hole in the old generation, we have to
+	 * make sure it goes on the mutables list
 	 */
 
 	if (bh <= StorageMgrInfo.OldLim) {
@@ -171,10 +176,10 @@ processFetches()
 	next = BF_LINK(bf);
 
 	/*
-	 * Find the target at the end of the indirection chain, and process it in
-	 * much the same fashion as the original target of the fetch.  Though we
-	 * hope to find graph here, we could find a black hole (of any flavor) or
-	 * even a FetchMe.
+	 * Find the target at the end of the indirection chain, and
+	 * process it in much the same fashion as the original target
+	 * of the fetch.  Though we hope to find graph here, we could
+	 * find a black hole (of any flavor) or even a FetchMe.
 	 */
 	closure = BF_NODE(bf);
 	while (IS_INDIRECTION(INFO_PTR(closure)))
@@ -223,10 +228,7 @@ processFetches()
 \begin{code}
 
 static void
-unpackResume(lga, nelem, data)
-globalAddr *lga;
-int *nelem;
-StgWord *data;
+unpackResume(globalAddr *lga, int *nelem, W_ *data)
 {
     long buf[3];
 
@@ -250,11 +252,12 @@ GLOBAL_TASK_ID task;
 int ngas;
 globalAddr *gagamap;
 {
-    long buffer[PACK_BUFFER_SIZE - PACK_HDR_SIZE];
+    static long *buffer;
     long *p;
     int i;
-
     CostCentre Save_CCC = CCC;
+
+    buffer = (long *) gumPackBuffer;
 
     CCC = (CostCentre)STATIC_CC_REF(CC_MSG);
     CCC->scc_count++;
@@ -286,9 +289,7 @@ Global addresses
 \begin{code}
 
 static void
-unpackAck(ngas, gagamap)
-int *ngas;
-globalAddr *gagamap;
+unpackAck(int *ngas, globalAddr *gagamap)
 {
     long GAarraysize;
     long buf[6];
@@ -345,9 +346,7 @@ fish. The history + hunger are not currently used.
 \begin{code}
 
 static void
-unpackFish(origPE, age, history, hunger)
-GLOBAL_TASK_ID *origPE;
-int *age, *history, *hunger;
+unpackFish(GLOBAL_TASK_ID *origPE, int *age, int *history, int *hunger)
 {
     long buf[4];
 
@@ -391,9 +390,7 @@ a data block.
 \begin{code}
 
 static void
-unpackFree(nelem, data)
-int *nelem;
-W_ *data;
+unpackFree(int *nelem, W_ *data)
 {
     long buf[1];
 
@@ -440,9 +437,7 @@ block (data).
 \begin{code}
 
 static void
-unpackSchedule(nelem, data)
-int *nelem;
-W_ *data;
+unpackSchedule(int *nelem, W_ *data)
 {
     long buf[1];
 
@@ -469,7 +464,6 @@ processFish(STG_NO_ARGS)
 
     unpackFish(&origPE, &age, &history, &hunger);
 
-    /* Ignore our own fish if we're busy; otherwise send it out after a delay */
     if (origPE == mytid) {
         fishing = rtsFalse;
     } else {
@@ -584,10 +578,11 @@ static void
 processFree(STG_NO_ARGS)
 {
     int nelem;
-    W_ freeBuffer[PACK_BUFFER_SIZE];
+    static W_ *freeBuffer;
     int i;
     globalAddr ga;
 
+    freeBuffer = gumPackBuffer;
     unpackFree(&nelem, freeBuffer);
 #ifdef FREE_DEBUG
     fprintf(stderr, "Rcvd Free (%d GAs)\n", nelem / 2);
@@ -614,16 +609,17 @@ which contains any newly allocated GAs.
 \begin{code}
 
 static void
-processResume(sender)
-GLOBAL_TASK_ID sender;
+processResume(GLOBAL_TASK_ID sender)
 {
     int nelem;
-    W_ packBuffer[PACK_BUFFER_SIZE], nGAs;
+    W_ nGAs;
+    static W_ *packBuffer;
     P_ newGraph;
     P_ old;
     globalAddr lga;
     globalAddr *gagamap;
 
+    packBuffer = gumPackBuffer;
     unpackResume(&lga, &nelem, packBuffer);
 
 #ifdef RESUME_DEBUG
@@ -634,8 +630,8 @@ GLOBAL_TASK_ID sender;
 
     /* 
      * We always unpack the incoming graph, even if we've received the
-     * requested node in some other data packet (and already awakened the
-     * blocking queue).
+     * requested node in some other data packet (and already awakened
+     * the blocking queue).
      */
     if (SAVE_Hp + packBuffer[0] >= SAVE_HpLim) {
 	ReallyPerformThreadGC(packBuffer[0], rtsFalse);
@@ -649,7 +645,7 @@ GLOBAL_TASK_ID sender;
 
     old = GALAlookup(&lga);
 
-    if (do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
 	P_ tso = NULL;
 
 	if (INFO_TYPE(INFO_PTR(old)) == INFO_FMBQ_TYPE) {
@@ -665,8 +661,8 @@ GLOBAL_TASK_ID sender;
     ASSERT(newGraph != NULL);
 
     /* 
-     * Sometimes, unpacking will common up the resumee with the incoming graph,
-     * but if it hasn't, we'd better do so now.
+     * Sometimes, unpacking will common up the resumee with the
+     * incoming graph, but if it hasn't, we'd better do so now.
      */
    
     if (INFO_TYPE(INFO_PTR(old)) == INFO_FMBQ_TYPE)
@@ -687,16 +683,17 @@ which contains any newly allocated GAs.
 
 \begin{code}
 static void
-processSchedule(sender)
-GLOBAL_TASK_ID sender;
+processSchedule(GLOBAL_TASK_ID sender)
 {
     int nelem;
     int space_required;
     rtsBool success;
-    W_ packBuffer[PACK_BUFFER_SIZE], nGAs;
+    static W_ *packBuffer;
+    W_ nGAs;
     P_ newGraph;
     globalAddr *gagamap;
 
+    packBuffer = gumPackBuffer;		/* HWL */
     unpackSchedule(&nelem, packBuffer);
 
 #ifdef SCHEDULE_DEBUG
@@ -705,9 +702,9 @@ GLOBAL_TASK_ID sender;
 #endif
 
     /*
-     * For now, the graph is a closure to be sparked as an advisory spark, but in
-     * future it may be a complete spark with required/advisory status, priority
-     * etc.
+     * For now, the graph is a closure to be sparked as an advisory
+     * spark, but in future it may be a complete spark with
+     * required/advisory status, priority etc.
      */
 
     space_required = packBuffer[0];
@@ -752,8 +749,9 @@ processAck(STG_NO_ARGS)
 #endif
 
     /*
-     * For each (oldGA, newGA) pair, set the GA of the corresponding thunk to the
-     * newGA, convert the thunk to a FetchMe, and return the weight from the oldGA.
+     * For each (oldGA, newGA) pair, set the GA of the corresponding
+     * thunk to the newGA, convert the thunk to a FetchMe, and return
+     * the weight from the oldGA.
      */
     for (gaga = gagamap; gaga < gagamap + nGAs * 2; gaga += 2) {
 	P_ old = GALAlookup(gaga);
@@ -766,14 +764,15 @@ processAck(STG_NO_ARGS)
 	    convertToFetchMe(old, ga);
 	} else {
 	    /* 
-             * Oops...we've got this one already; update the RBH to point to
-             * the object we already know about, whatever it happens to be.
+             * Oops...we've got this one already; update the RBH to
+             * point to the object we already know about, whatever it
+             * happens to be.
              */
 	    CommonUp(old, new);
 
 	    /* 
-             * Increase the weight of the object by the amount just received 
-             * in the second part of the ACK pair.
+             * Increase the weight of the object by the amount just
+             * received in the second part of the ACK pair.
              */
 	    (void) addWeight(gaga + 1);
 	}
@@ -805,7 +804,7 @@ processMessages(STG_NO_ARGS)
     CCC = (CostCentre)STATIC_CC_REF(CC_MSG);
     
     do {
-        if (cc_profiling) {
+        if (RTSflags.CcFlags.doCostCentres) {
 	    CCC = (CostCentre)STATIC_CC_REF(CC_IDLE);
 	    CCC->scc_count++;
 
@@ -956,9 +955,10 @@ PACKET packet;
 	}
 	break;
 
-      /* Anything we're not prepared to deal with.  Note that ALL opcodes are discarded
-	 during termination -- this helps prevent bizarre race conditions.
-      */
+      /* Anything we're not prepared to deal with.  Note that ALL
+       * opcodes are discarded during termination -- this helps
+       * prevent bizarre race conditions.
+       */
       default:
 	if (!GlobalStopPending) 
 	  {
@@ -1087,19 +1087,14 @@ prepareFreeMsgBuffers(STG_NO_ARGS)
     /* Allocate the freeMsg buffers just once and then hang onto them. */
 
     if (freeMsgIndex == NULL) {
-	freeMsgIndex = (int *) malloc(nPEs * sizeof(int));
-	freeMsgBuffer = (PP_) malloc(nPEs * sizeof(long *));
-	if (freeMsgIndex == NULL || freeMsgBuffer == NULL) {
-	    fflush(stdout);
-	    fprintf(stderr, "VM exhausted\n");
-	    EXIT(EXIT_FAILURE);
-	}
+
+	freeMsgIndex = (int *) stgMallocBytes(nPEs * sizeof(int), "prepareFreeMsgBuffers (Index)");
+	freeMsgBuffer = (PP_)  stgMallocBytes(nPEs * sizeof(long *), "prepareFreeMsgBuffers (Buffer)");
+
 	for(i = 0; i < nPEs; i++) {
-	    if(i != thisPE &&
-	      (freeMsgBuffer[i] = (P_) malloc(PACK_BUFFER_SIZE * sizeof(W_))) == NULL) {
-		fflush(stdout);
-		fprintf(stderr, "VM exhausted\n");
-		EXIT(EXIT_FAILURE);
+	    if (i != thisPE) {
+	      freeMsgBuffer[i] = (P_) stgMallocWords(RTSflags.ParFlags.packBufferSize,
+					"prepareFreeMsgBuffers (Buffer #i)");
 	    }
 	}
     }
@@ -1118,7 +1113,7 @@ globalAddr *ga;
 
     ASSERT(GALAlookup(ga) == NULL);
 
-    if ((i = freeMsgIndex[pe]) + 2 >= PACK_BUFFER_SIZE) {
+    if ((i = freeMsgIndex[pe]) + 2 >= RTSflags.ParFlags.packBufferSize) {
 #ifdef FREE_DEBUG
 	fprintf(stderr, "Filled a free message buffer\n");	
 #endif

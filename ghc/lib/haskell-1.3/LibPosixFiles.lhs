@@ -247,7 +247,8 @@ openChannel name how maybe_mode append excl noctty nonblock trunc =
     creat# = case creat of { W# x -> x }
 
     flags = W# (creat# `or#` append# `or#` excl# `or#` 
-                noctty# `or#` nonblock# `or#` trunc#)
+                noctty# `or#` nonblock# `or#` trunc# `or#` how#)
+    how#      = case (case how of { ReadOnly -> ``O_RDONLY'';WriteOnly -> ``O_WRONLY'';ReadWrite -> ``O_RDWR''}) of { W# x -> x }
     append#   = case (if append   then ``O_APPEND''   else ``0'') of { W# x -> x }
     excl#     = case (if excl     then ``O_EXCL''     else ``0'') of { W# x -> x }
     noctty#   = case (if noctty   then ``O_NOCTTY''   else ``0'') of { W# x -> x }

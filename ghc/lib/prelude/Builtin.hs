@@ -3,7 +3,8 @@ module PreludeBuiltin (
 	_trace,
 	absent#,
 	error,
-	patError#
+	patError#,
+	parError#
     ) where
 
 import Cls
@@ -65,6 +66,8 @@ error__ msg_hdr s
     sTDERR = (``stderr'' :: _FILE)
 
 absent# = error "Oops! The program has entered an `absent' argument!\n"
+
+parError# = error "Oops! Entered parError# (a GHC bug -- please report it!)\n"
 
 ---------------------------------------------------------------
 _runST m = case m (S# realWorld#) of

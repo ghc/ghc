@@ -715,6 +715,18 @@ pprX sty (Branch key elt sz fm_l fm_r)
 	      ppr sty key, ppSP, ppInt (IF_GHC(I# sz, sz)), ppSP,
 	      pprX sty fm_r, ppRparen]
 #endif
+
+#if !defined(COMPILING_GHC)
+instance (Eq key, Eq elt) => Eq (FiniteMap key elt) where
+  fm_1 == fm_2 = (sizeFM   fm_1 == sizeFM   fm_2) &&   -- quick test
+                 (fmToList fm_1 == fmToList fm_2)
+
+{- NO: not clear what The Right Thing to do is:
+instance (Ord key, Ord elt) => Ord (FiniteMap key elt) where
+  fm_1 <= fm_2 = (sizeFM   fm_1 <= sizeFM   fm_2) &&   -- quick test
+                 (fmToList fm_1 <= fmToList fm_2)
+-}
+#endif
 \end{code}
 
 %************************************************************************

@@ -1,5 +1,4 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface LiftMonad where
 bogusLiftMonadThing :: Bool
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_ #-}
 

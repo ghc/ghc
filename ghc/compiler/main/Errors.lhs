@@ -53,6 +53,7 @@ module Errors (
 	instTypeErr,
 --	methodInstErr, UNUSED
 	methodBindErr,
+	lurkingRank2Err,
 	methodTypeLacksTyVarErr,
 --	missingClassOpErr, UNUSED
 	naughtyCCallContextErr,
@@ -70,6 +71,7 @@ module Errors (
 	specInstUnspecInstNotFoundErr,
 	topLevelUnboxedDeclErr,
 	tyConArityErr,
+	underAppliedTyErr,
 	unifyErr,
 	varyingArgsErr,
 #ifdef DPH

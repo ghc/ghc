@@ -15,7 +15,7 @@
 /*  Imported Values */
 extern list Lnil;
 
-VOID is_context_format PROTO((ttype)); /* forward */
+static void is_context_format PROTO((ttype)); /* forward */
 
 /* 
     partain: see also the comment by "decl" in hsparser.y.
@@ -102,7 +102,7 @@ type2context(t)
 /* is_context_format is the same as "type2context" except that it just performs checking */
 /* ttype is either "tycon" [class] or "tycon (named)tvar" [class var] */
 
-VOID
+static void
 is_context_format(t)
   ttype t;
 {

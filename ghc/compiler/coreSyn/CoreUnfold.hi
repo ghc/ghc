@@ -7,9 +7,6 @@ import Pretty(PrettyRep)
 import SimplEnv(UnfoldingGuidance)
 import TyCon(TyCon)
 calcUnfoldingGuidance :: Bool -> Int -> CoreExpr Id Id -> UnfoldingGuidance
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LLS" _N_ _N_ #-}
 mentionedInUnfolding :: (a -> Id) -> CoreExpr a Id -> ([Id], [TyCon], [Class], Bool)
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 pprCoreUnfolding :: CoreExpr Id Id -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 1 _U_ 222 _N_ _S_ "S" _N_ _N_ #-}
 

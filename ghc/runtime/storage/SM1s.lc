@@ -29,22 +29,24 @@ P_ heap_space = 0;		/* Address of first word of slab
 
 P_ hp_start;	        /* Value of Hp when reduction was resumed */
 
-I_
-initHeap( sm )
-    smInfo *sm;    
+rtsBool
+initHeap( smInfo *sm )
 {
     if (heap_space == 0) { /* allocates if it doesn't already exist */
 
 	/* Allocate the roots space */
-	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+	sm->roots = (P_ *) stgMallocWords(SM_MAXROOTS, "initHeap (roots)");
 
 	/* Allocate the heap */
-	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+	heap_space = (P_) stgMallocWords(RTSflags.GcFlags.heapSize + EXTRA_HEAP_WORDS,
+					 "initHeap (heap)");
 
-	compactingInfo.bit_words = (SM_word_heap_size + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
-	compactingInfo.bits      = (BitWord *)(heap_space + SM_word_heap_size) - compactingInfo.bit_words;
+	compactingInfo.bit_words
+	  = (RTSflags.GcFlags.heapSize + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
+	compactingInfo.bits
+	  = (BitWord *)(heap_space + RTSflags.GcFlags.heapSize) - compactingInfo.bit_words;
 
-	compactingInfo.heap_words =  SM_word_heap_size - compactingInfo.bit_words;
+	compactingInfo.heap_words = RTSflags.GcFlags.heapSize - compactingInfo.bit_words;
 	compactingInfo.base = HEAP_FRAME_BASE(heap_space, compactingInfo.heap_words);
 	compactingInfo.lim  = HEAP_FRAME_LIMIT(heap_space, compactingInfo.heap_words);
 
@@ -53,16 +55,17 @@ initHeap( sm )
 
     sm->hp = hp_start = compactingInfo.base - 1;
 
-    if (SM_alloc_size) {
-	sm->hplim = sm->hp + SM_alloc_size;
-	SM_alloc_min = 0; /* No min; alloc size specified */
+    if (! RTSflags.GcFlags.allocAreaSizeGiven) {
+	sm->hplim = compactingInfo.lim;
+    } else {
+	sm->hplim = sm->hp + RTSflags.GcFlags.allocAreaSize;
+
+	RTSflags.GcFlags.minAllocAreaSize = 0; /* specified size takes precedence */
 
 	if (sm->hplim > compactingInfo.lim) {
 	    fprintf(stderr, "Not enough heap for requested alloc size\n");
-	    return -1;
+	    return rtsFalse;
 	}
-    } else {
-	sm->hplim = compactingInfo.lim;
     }
 
     sm->CAFlist = NULL;
@@ -71,7 +74,7 @@ initHeap( sm )
     initExtensions( sm );
 #endif /* !PAR */
 
-    if (SM_trace) {
+    if (RTSflags.GcFlags.trace) {
 	fprintf(stderr, "COMPACTING Heap: Base 0x%lx, Lim 0x%lx, Bits 0x%lx, bit words 0x%lx\n",
 		(W_) compactingInfo.base, (W_) compactingInfo.lim,
 		(W_) compactingInfo.bits, (W_) compactingInfo.bit_words);
@@ -81,7 +84,7 @@ initHeap( sm )
 		(W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
     }
 
-    return 0;
+    return rtsTrue; /* OK */
 }
 
 I_
@@ -96,8 +99,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     SAVE_REGS(&ScanRegDump); /* Save registers */
 
-    if (SM_trace)
-      {
+    if (RTSflags.GcFlags.trace) {
         fflush(stdout);     /* Flush stdout at start of GC */
 	fprintf(stderr, "COMPACTING Start: base 0x%lx, lim 0x%lx\n                 hp 0x%lx, hplim 0x%lx, req %lu\n",
 		(W_) compactingInfo.base, (W_) compactingInfo.lim,
@@ -156,23 +158,23 @@ collectHeap(reqsize, sm, do_full_collection)
     resident = sm->hp - (compactingInfo.base - 1);
     DO_MAX_RESIDENCY(resident); /* stats only */
 
-    if (SM_alloc_size) {
-	sm->hplim = sm->hp + SM_alloc_size;
+    if (! RTSflags.GcFlags.allocAreaSizeGiven) {
+	sm->hplim = compactingInfo.lim;
+	free_space = sm->hplim - sm->hp;
+    } else {
+	sm->hplim = sm->hp + RTSflags.GcFlags.allocAreaSize;
 	if (sm->hplim > compactingInfo.lim) {
 	    free_space = 0;
 	} else {
-	    free_space = SM_alloc_size;
+	    free_space = RTSflags.GcFlags.allocAreaSize;
 	}
-    } else {
-	sm->hplim = compactingInfo.lim;
-	free_space = sm->hplim - sm->hp;
     }
 
     hp_start = sm->hp;
 
     stat_endGC(alloc, compactingInfo.heap_words, resident, "");
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "COMPACTING Done: base 0x%lx, lim 0x%lx\n                    hp 0x%lx, hplim 0x%lx, free %lu\n",
 		(W_) compactingInfo.base, (W_) compactingInfo.lim,
 		(W_) sm->hp, (W_) sm->hplim, (W_) (free_space * sizeof(W_)));
@@ -185,7 +187,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     RESTORE_REGS(&ScanRegDump);     /* Restore Registers */
 
-    if ((SM_alloc_min > free_space) || (reqsize > free_space))
+    if (free_space < RTSflags.GcFlags.minAllocAreaSize || free_space < reqsize)
 	return GC_HARD_LIMIT_EXCEEDED;	/* Heap exhausted */
     else 
 	return GC_SUCCESS;		/* Heap OK */

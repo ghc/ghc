@@ -27,9 +27,7 @@
 /* For cleanup of partial answer on error */
 
 static void
-freeEntries(entries, count)
-  char **entries;
-  int count;
+freeEntries(char **entries, int count)
 {
     int i;
 

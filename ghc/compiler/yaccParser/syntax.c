@@ -37,8 +37,12 @@ extern BOOLEAN hashIds, etags;
 
 /* Forward Declarations */
 
-char *ineg    PROTO((char *));
-tree unparen  PROTO((tree));
+char *ineg		    PROTO((char *));
+static tree unparen	    PROTO((tree));
+static void is_conapp_patt  PROTO((int, tree, tree));
+static void rearrangeprec   PROTO((tree, tree));
+static void error_if_expr_wanted PROTO((int, char *));
+static void error_if_patt_wanted PROTO((int, char *));
 
 tree  fns[MAX_CONTEXTS] = { NULL };
 short samefn[MAX_CONTEXTS] = { 0 };
@@ -46,6 +50,8 @@ tree  prevpatt[MAX_CONTEXTS] = { NULL };
 
 BOOLEAN inpat = FALSE;
 
+static BOOLEAN	 checkorder2 PROTO((binding, BOOLEAN));
+static BOOLEAN	 checksig PROTO((BOOLEAN, binding));
 
 /*
   check infix value in range 0..9
@@ -74,12 +80,14 @@ checkfixity(vals)
   Check Previous Pattern usage
 */
 
+/* UNUSED:
 void
 checkprevpatt()
 {
   if (PREVPATT == NULL)
     hsperror("\"'\" used before a function definition");
 }
+*/
 
 void
 checksamefn(fn)
@@ -99,6 +107,8 @@ checksamefn(fn)
   Check that a list of types is a list of contexts
 */
 
+#if 0
+/* UNUSED */
 void
 checkcontext(context)
   list context;
@@ -122,6 +132,7 @@ checkcontext(context)
       context = ltl(context);
     }
 }
+#endif /* 0 */
 
 void
 checkinpat()
@@ -130,15 +141,21 @@ checkinpat()
     hsperror("syntax error");
 }
 
+/* ------------------------------------------------------------------------
+*/
+
 void
-checkpatt(e)
-  tree e;
+patternOrExpr(int wanted, tree e)
+  /* see utils.h for what args are */
 {
   switch(ttree(e))
     {
-      case ident:
+      case ident: /* a pattern or expr */
+	break;
+
       case wildp:
-        break;
+	error_if_expr_wanted(wanted, "wildcard in expression");
+	break;
 
       case lit:
 	switch (tliteral(glit(e))) {
@@ -148,24 +165,31 @@ checkpatt(e)
 	  case doubleprim:
 	  case floatprim:
 	  case string:
+	  case stringprim:
 	  case charr:
 	  case charprim:
-	  case stringprim:
-	    break;
-	  default:
-	    hsperror("not a valid literal pattern");
+	    break; /* pattern or expr */
+
+	  case clitlit:
+	    error_if_patt_wanted(wanted, "``literal-literal'' in pattern");
+
+	  default: /* the others only occur in pragmas */
+	    hsperror("not a valid literal pattern or expression");
 	}
 	break;
 
       case negate:
-	if (ttree(gnexp(e)) != lit) {
-	    hsperror("syntax error: \"-\" applied to a non-literal");
-	} else {
-	    literal l = glit(gnexp(e));
+	{ tree sub = gnexp(e);
+	  if (ttree(sub) != lit) {
+	      error_if_patt_wanted(wanted, "\"-\" applied to a non-literal");
+	  } else {
+	      literal l = glit(sub);
 
-	    if (tliteral(l) != integer && tliteral(l) != floatr) {
-	      hsperror("syntax error: \"-\" applied to a non-number");
-	    }
+	      if (tliteral(l) != integer && tliteral(l) != floatr) {
+		error_if_patt_wanted(wanted, "\"-\" applied to a non-number");
+	      }
+	  }
+	  patternOrExpr(wanted, sub);
 	}
 	break;
 
@@ -174,109 +198,177 @@ checkpatt(e)
 	  tree f = gfun(e);
 	  tree a = garg(e);
 
-	  checkconap(f, a);
+	  is_conapp_patt(wanted, f, a); /* does nothing unless wanted == LEGIT_PATT */
+	  patternOrExpr(wanted, f);
+	  patternOrExpr(wanted, a);
 	}
 	break;
 
       case as:
-	checkpatt(gase(e));
+	error_if_expr_wanted(wanted, "`as'-pattern instead of an expression");
+	patternOrExpr(wanted, gase(e));
 	break;
 
       case lazyp:
-	checkpatt(glazyp(e));
+	error_if_expr_wanted(wanted, "irrefutable pattern instead of an expression");
+	patternOrExpr(wanted, glazyp(e));
 	break;
 
       case plusp:
-	checkpatt(gplusp(e));
+	patternOrExpr(wanted, gplusp(e));
 	break;
 
       case tinfixop:
 	{
-	  tree f = ginfun((struct Sap *)e),
+	  tree f  = ginfun((struct Sap *)e),
 	       a1 = ginarg1((struct Sap *)e),
 	       a2 = ginarg2((struct Sap *)e);
 
 	  struct Splusp *e_plus;
 
-	  checkpatt(a1);
+	  patternOrExpr(wanted, a1);
+	  patternOrExpr(wanted, a2);
 
-	  if (ttree(f) == ident && strcmp(id_to_string(gident(f)),"+")==0)
-	    {
-	      if(ttree(a2) != lit || tliteral((literal) ttree(a2)) != integer)
-		hsperror("syntax error: non-integer in (n+k) pattern");
+	  if (wanted == LEGIT_PATT) {
+	     if (ttree(f) == ident && strcmp(id_to_string(gident(f)),"+")==0) {
 
-	      if(ttree(a1) == wildp || (ttree(a1) == ident && !isconstr(gident(a1))))
-		{
-		  e->tag = plusp;
-		  e_plus = (struct Splusp *) e;
-		  *Rgplusp(e_plus) = a1;
-		  *Rgplusi(e_plus) = glit(a2);
-		}
-	      else
-		hsperror("syntax error: non-variable in (n+k) pattern");
-	    }
-	  else
-	    {
-	      if(ttree(f) == ident && !isconstr(gident(f)))
-		hsperror("syntax error: variable application in pattern");
-	      checkpatt(a2);
-	    }
+		 if(ttree(a2) != lit || tliteral((literal) ttree(a2)) != integer)
+		   hsperror("non-integer in (n+k) pattern");
+
+		 if(ttree(a1) == wildp || (ttree(a1) == ident && !isconstr(gident(a1))))
+		   {
+		     e->tag = plusp;
+		     e_plus = (struct Splusp *) e;
+		     *Rgplusp(e_plus) = a1;
+		     *Rgplusi(e_plus) = glit(a2);
+		   }
+		 else
+		   hsperror("non-variable in (n+k) pattern");
+
+	     } else {
+		 if(ttree(f) == ident && !isconstr(gident(f)))
+		   hsperror("variable application in pattern");
+	     }
+	  }
 	}
 	break;
 
       case tuple:
 	{
-	  list tup = gtuplelist(e);
-	  while (tlist(tup) == lcons)
-	    {
-	      checkpatt(lhd(tup));
-	      tup = ltl(tup);
-	    }
+	  list tup;
+	  for (tup = gtuplelist(e); tlist(tup) == lcons; tup = ltl(tup)) {
+	      patternOrExpr(wanted, lhd(tup));
+	  }
 	}
 	break;
 
-      case par:
-	checkpatt(gpare(e));
+      case par: /* parenthesised */
+	patternOrExpr(wanted, gpare(e));
 	break;
 
       case llist:
 	{
-	  list l = gllist(e);
-	  while (tlist(l) == lcons)
-	    {
-	      checkpatt(lhd(l));
-	      l = ltl(l);
-	    }
+	  list l;
+	  for (l = gllist(e); tlist(l) == lcons; l = ltl(l)) {
+	      patternOrExpr(wanted, lhd(l));
+	  }
 	}
 	break;
 
 #ifdef DPH
       case proc:
         {
-          list pids = gprocid(e);
-	  while (tlist(pids) == lcons)
-	    {
-	      checkpatt(lhd(pids));
-	      pids = ltl(pids);
-	    }
-	  checkpatt(gprocdata(e));
+          list pids;
+	  for (pids = gprocid(e); tlist(pids) == lcons; pids = ltl(pids)) {
+	      patternOrExpr(wanted, lhd(pids));
+	  }
+	  patternOrExpr(wanted, gprocdata(e));
 	}
 	break;
 #endif /* DPH */
 
+      case lambda:
+      case let:
+      case casee:
+      case ife:
+      case restr:
+      case comprh:
+      case lsection:
+      case rsection:
+      case eenum:
+      case ccall:
+      case scc:
+	error_if_patt_wanted(wanted, "unexpected construct in a pattern");
+	break;
+
       default:
-	hsperror("not a pattern");
+	hsperror("not a pattern or expression");
       }
 }
 
+static void
+is_conapp_patt(int wanted, tree f, tree a)
+{
+  if (wanted == LEGIT_EXPR)
+     return; /* that was easy */
 
-BOOLEAN /* return TRUE if LHS is a pattern; FALSE if a function */
-is_patt_or_fun(e, outer_level)
-  tree e;
-  BOOLEAN outer_level;
-	/* only needed because x+y is a *function* at
-	   the "outer level", but an n+k *pattern* at
-	   any "inner" level.  Sigh. */
+  switch(ttree(f))
+    {
+      case ident:
+        if (isconstr(gident(f)))
+	  {
+	    patternOrExpr(wanted, a);
+	    return;
+	  }
+	{
+	  char errbuf[ERR_BUF_SIZE];
+	  sprintf(errbuf,"not a constructor application -- %s",gident(f));
+	  hsperror(errbuf);
+	}
+
+      case ap:
+	is_conapp_patt(wanted, gfun(f), garg(f));
+	patternOrExpr(wanted, a);
+	return;
+
+      case par:
+	is_conapp_patt(wanted, gpare(f), a);
+	break;
+
+      case tuple:
+	{
+	   char errbuf[ERR_BUF_SIZE];
+	   sprintf(errbuf,"tuple pattern `applied' to arguments (missing comma?)");
+	   hsperror(errbuf);
+	}
+	break;
+
+      default:
+	hsperror("not a constructor application");
+      }
+}
+
+static void
+error_if_expr_wanted(int wanted, char *msg)
+{
+    if (wanted == LEGIT_EXPR)
+	hsperror(msg);
+}
+
+static void
+error_if_patt_wanted(int wanted, char *msg)
+{
+    if (wanted == LEGIT_PATT)
+	hsperror(msg);
+}
+
+/* ---------------------------------------------------------------------- */
+
+static BOOLEAN /* return TRUE if LHS is a pattern; FALSE if a function */
+is_patt_or_fun(tree e, BOOLEAN outer_level)
+    /* "outer_level" only needed because x+y is a *function* at
+       the "outer level", but an n+k *pattern* at
+       any "inner" level.  Sigh. */
 {
   switch(ttree(e))
     {
@@ -308,7 +400,7 @@ is_patt_or_fun(e, outer_level)
 #ifdef DPH
       case proc:
 #endif
-	checkpatt(e);
+	patternOrExpr(LEGIT_PATT, e);
 	return TRUE;
 
       case ident:
@@ -327,7 +419,7 @@ is_patt_or_fun(e, outer_level)
 	  tree fn = function(e);
 
 /*fprintf(stderr,"ap:f=%d %s (%d),a=%d %s\n",ttree(gfun(e)),(ttree(gfun(e)) == ident) ? (gident(gfun(e))) : "",ttree(fn),ttree(garg(e)),(ttree(garg(e)) == ident) ? (gident(garg(e))) : "");*/
-	  checkpatt(a);
+	  patternOrExpr(LEGIT_PATT, a);
 
 	  if(ttree(fn) == ident)
 	    return(isconstr(gident(fn)));
@@ -348,8 +440,8 @@ is_patt_or_fun(e, outer_level)
 	  struct Splusp *e_plus;
 
 	  /* Even function definitions must have pattern arguments */
-	  checkpatt(a1);
-	  checkpatt(a2);
+	  patternOrExpr(LEGIT_PATT, a1);
+	  patternOrExpr(LEGIT_PATT, a2);
 
 	  if (ttree(f) == ident)
 	    {
@@ -404,7 +496,7 @@ function(e)
   switch (ttree(e))
     {
       case ap:
-        checkpatt(garg(e));
+        patternOrExpr(LEGIT_PATT, garg(e));
         return(function(gfun(e)));
 
       case par:
@@ -416,7 +508,7 @@ function(e)
 }
 
 
-tree
+static tree
 unparen(e)
   tree e;
 {
@@ -424,46 +516,6 @@ unparen(e)
       e = gpare(e);
 
   return(e);
-}
-
-void
-checkconap(f, a)
-  tree f, a;
-{
-  switch(ttree(f))
-    {
-      case ident:
-        if (isconstr(gident(f)))
-	  {
-	    checkpatt(a);
-	    return;
-	  }
-	{
-	  char errbuf[ERR_BUF_SIZE];
-	  sprintf(errbuf,"syntax error: not a constructor application -- %s",gident(f));
-	  hsperror(errbuf);
-	}
-
-      case ap:
-	checkconap(gfun(f), garg(f));
-	checkpatt(a);
-	return;
-
-      case par:
-	checkconap(gpare(f), a);
-	break;
-
-      case tuple:
-	{
-	   char errbuf[ERR_BUF_SIZE];
-	   sprintf(errbuf,"syntax error: tuple pattern `applied' to arguments (missing comma?)");
-	   hsperror(errbuf);
-	}
-	break;
-
-      default:
-	hsperror("syntax error: not a constructor application");
-      }
 }
 
 
@@ -501,22 +553,21 @@ binding rule;
 */
 
 void
-precparse(t)
-  tree t;
+precparse(tree t)
 {
 #if 0
-#ifdef HSP_DEBUG
+# ifdef HSP_DEBUG
   fprintf(stderr,"precparse %x\n",ttree(t));
-#endif
+# endif
 #endif
   if(ttree(t) == tinfixop)
     {
       tree left =  ginarg1((struct Sap *)t);
 
 #if 0
-#ifdef HSP_DEBUG
+# ifdef HSP_DEBUG
       fprintf(stderr,"precparse:t=");ptree(t);printf("\nleft=");ptree(left);printf("\n");
-#endif
+# endif
 #endif
 
       if(ttree(left) == negate)
@@ -542,10 +593,10 @@ precparse(t)
 	               *ttabpos    = infixlookup(tid);
 
 #if 0
-#ifdef HSP_DEBUG
+# ifdef HSP_DEBUG
 	  fprintf(stderr,"precparse: lid=%s; tid=%s,ltab=%d,ttab=%d\n",
 		  id_to_string(lid),id_to_string(tid),pprecedence(lefttabpos),pprecedence(ttabpos));
-#endif
+# endif
 #endif
 
 	  if (pprecedence(lefttabpos) < pprecedence(ttabpos))
@@ -577,9 +628,8 @@ precparse(t)
   The recursive call to precparse ensures this filters down as necessary.
 */
 
-void
-rearrangeprec(t1,t2)
-  tree t1, t2;
+static void
+rearrangeprec(tree t1, tree t2)
 {
   tree arg3 = ginarg2((struct Sap *)t2);
   id id1 = gident(ginfun((struct Sap *)t1)),
@@ -633,6 +683,8 @@ ineg(i)
   return(p);
 }
 
+#if 0
+/* UNUSED: at the moment */
 void
 checkmodname(import,interface)
   id import, interface;
@@ -644,6 +696,7 @@ checkmodname(import,interface)
       hsperror(errbuf);
     }
 }
+#endif /* 0 */
 
 /*
   Check the ordering of declarations in a cbody.
@@ -661,7 +714,7 @@ checkorder(decls)
   checkorder2(decls,TRUE);
 }
 
-BOOLEAN
+static BOOLEAN
 checkorder2(decls,sigs)
   binding decls;
   BOOLEAN sigs;
@@ -681,7 +734,7 @@ checkorder2(decls,sigs)
 }
 
 
-BOOLEAN
+static BOOLEAN
 checksig(sig,decl)
   BOOLEAN sig;
   binding decl;

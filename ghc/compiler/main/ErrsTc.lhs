@@ -27,6 +27,7 @@ module ErrsTc (
 	dupInstErr,
 	genCantGenErr,
 	instTypeErr,
+	lurkingRank2Err,
 	methodTypeLacksTyVarErr,
 	naughtyCCallContextErr,
 	noInstanceErr,
@@ -43,6 +44,7 @@ module ErrsTc (
 	topLevelUnboxedDeclErr,
 	tyConArityErr,
 	typeCycleErr,
+	underAppliedTyErr,
 	unifyErr,
 	varyingArgsErr
     ) where
@@ -265,6 +267,17 @@ instTypeErr ty locn
     )
 
 ----------------------------------------------------------------
+lurkingRank2Err :: Name -> UniType -> SrcLoc -> Error
+lurkingRank2Err name ty locn
+  = addErrLoc locn "Illegal use of a non-Hindley-Milner variable" ( \ sty ->
+    ppAboves [
+      ppBesides [ppStr "The variable is `", ppr sty name, ppStr "'."],
+      ppStr "Its type does not have all its for-alls at the top",
+      ppBesides [ppStr "(the type is `", ppr sty ty, ppStr "'),"],
+      ppStr "nor is it a full application of a rank-2-typed variable.",
+      ppStr "(Most common cause: `_runST' or `_build' not applied to an argument.)"])
+
+----------------------------------------------------------------
 {- UNUSED:
 methodInstErr :: (ClassOp, (UniType, SrcLoc), (UniType, SrcLoc)) -> Error
 methodInstErr (class_op, info1, info2) sty
@@ -376,6 +389,15 @@ unexpectedPreludeThingErr category thing locn
 
 ----------------------------------------------------------------
 specGroundnessErr :: UnifyErrContext -> [UniType] -> Error
+
+specGroundnessErr (ValSpecSigCtxt name spec_ty locn) arg_tys
+  = addShortErrLocLine locn ( \ sty ->
+    ppHang (
+    	ppSep [ppStr "In the SPECIALIZE pragma for `", ppr sty name,
+	       ppStr "'... not all type variables were specialised",
+	       ppStr "to type variables or ground types (nothing in between, please!):"])
+      4 (ppAboves (map (ppr sty) arg_tys))
+    )
 
 specGroundnessErr (ValSpecSpecIdCtxt name spec_ty spec locn) arg_tys
   = addShortErrLocLine locn ( \ sty ->
@@ -494,6 +516,15 @@ arityError kind name n m locn =
 	n_arguments | n == 0 = ppStr "no arguments"
 		    | n == 1 = ppStr "1 argument"
 		    | True   = ppCat [ppInt n, ppStr "arguments"]
+
+----------------------------------------------------------------
+underAppliedTyErr :: UniType -> SrcLoc -> Error
+underAppliedTyErr ty locn
+  = addErrLoc locn "A for-all type has been applied to too few arguments" ( \ sty ->
+    ppAboves [
+      ppBesides [ppStr "The type is `", ppr sty ty, ppStr "';"],
+      ppStr "This might be because of a GHC bug; feel free to report",
+      ppStr "it to glasgow-haskell-bugs@dcs.glasgow.ac.uk."])
 
 ----------------------------------------------------------------
 unifyErr :: UnifyErrInfo -> UnifyErrContext -> SrcLoc -> Error
@@ -930,6 +961,12 @@ speakNth 3 = ppStr "third"
 speakNth 4 = ppStr "fourth"
 speakNth 5 = ppStr "fifth"
 speakNth 6 = ppStr "sixth"
-speakNth n = ppBesides [ ppInt n, ppStr "th" ]		-- Wrong for eg "31th"
-							-- but who cares?
+speakNth n = ppBesides [ ppInt n, ppStr st_nd_rd_th ]
+  where
+    st_nd_rd_th | n_rem_10 == 1 = "st"
+		| n_rem_10 == 2 = "nd"
+		| n_rem_10 == 3 = "rd"
+		| otherwise     = "th"
+
+    n_rem_10 = n `rem` 10
 \end{code}

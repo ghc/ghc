@@ -53,44 +53,41 @@ As we saw with the ``abstract syntax'' (in
 Section~\ref{sec:AbsSyntax}), the Core syntax is also {\em
 parameterised}, this time with respect to binders and bound-variables
 (or ``bindees'').  The definition of a Core expression
-begins:\srcloc{coreSyn/CoreSyn.lhs}
-\begin{tightcode}
+begins\srcloc{coreSyn/CoreSyn.lhs}:
+\begin{mytightcode}
 data CoreExpr binder bindee
      = CoVar	    bindee
      | CoLit	    CoreLiteral
      ...
 type PlainCoreBinder = Id
 type PlainCoreBindee = Id
-type PlainCoreExpr = CoreExpr PlainCoreBinder PlainCoreBindee
-\end{tightcode}
+type PlainCoreExpr = CoreExpr PlainCoreBinder PlainCoreBindee\end{mytightcode}
 Most back-end passes use the parameterisation shown above, namely
-@PlainCoreExprs@,\srcloc{coreSyn/PlainCore.lhs} parameterised on @Id@
+@PlainCoreExprs@\srcloc{coreSyn/PlainCore.lhs}, parameterised on @Id@
 for both binders and bindees.
 
 An example of a pass that uses a different parameterisation is
-occurrence analysis,\srcloc{simplCore/OccurAnal.lhs} which gathers
+occurrence analysis\srcloc{simplCore/OccurAnal.lhs}, which gathers
 up info about the {\em occurrences} of bound variables.  It uses:
-\begin{tightcode}
+\begin{mytightcode}
 data BinderInfo	    {\dcd\rm-- various things to record about binders...}
 type TaggedBinder   tag = (Id, tag)
 type TaggedCoreExpr tag = CoreExpr (TaggedBinder tag) Id
 
-substAnalyseExpr :: PlainCoreExpr -> TaggedCoreExpr BinderInfo
-\end{tightcode}
+substAnalyseExpr :: PlainCoreExpr -> TaggedCoreExpr BinderInfo\end{mytightcode}
 The pass's expression-mangling function then has the unsurprising type
 shown above.
 
 Core syntax has a ``twin'' datatype that is also sometimes useful:
-{\em annotated} Core syntax.\srcloc{coreSyn/AnnCoreSyn.lhs} This is a
+{\em annotated} Core syntax\srcloc{coreSyn/AnnCoreSyn.lhs}. This is a
 datatype identical in form to Core syntax, but such that every
 ``node'' of a Core expression can be annotated with some information
 of your choice.  As an example, the type of a pass that attaches a
 @Set@ of free variables to every subexpression in a Core expression
-might be:\srcloc{coreSyn/FreeVars.lhs}
-\begin{tightcode}
+might be\srcloc{coreSyn/FreeVars.lhs}:
+\begin{mytightcode}
 freeVars :: PlainCoreExpr -> AnnCoreExpr Id Id (Set Id)
-	{\dcd\rm-- parameterised on binders, bindees, and annotation}
-\end{tightcode}
+	{\dcd\rm-- parameterised on binders, bindees, and annotation}\end{mytightcode}
 
 \subsection{Unboxing and other Core syntax details}
 \label{sec:unboxing}

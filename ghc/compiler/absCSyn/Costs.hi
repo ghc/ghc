@@ -4,29 +4,9 @@ import AbsCSyn(AbstractC, CAddrMode)
 data CostRes   = Cost (Int, Int, Int, Int, Int)
 data Side   = Lhs | Rhs
 addrModeCosts :: CAddrMode -> Side -> CostRes
-	{-# GHC_PRAGMA _A_ 2 _U_ 00 _N_ _S_ "AA" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: CAddrMode) (u1 :: Side) -> _ORIG_ Costs nullCosts _N_ #-}
 costs :: AbstractC -> CostRes
-	{-# GHC_PRAGMA _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: AbstractC) -> _ORIG_ Costs nullCosts _N_ #-}
 nullCosts :: CostRes
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 instance Eq CostRes
-	{-# GHC_PRAGMA _M_ Costs {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(CostRes -> CostRes -> Bool), (CostRes -> CostRes -> Bool)] [_CONSTM_ Eq (==) (CostRes), _CONSTM_ Eq (/=) (CostRes)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: CostRes) (u1 :: CostRes) -> _APP_  _TYAPP_  patError# { (CostRes -> CostRes -> Bool) } [ _NOREP_S_ "%DPreludeCore.Eq.(==)\"", u0, u1 ] _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance Num CostRes
-	{-# GHC_PRAGMA _M_ Costs {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [{{Eq CostRes}}, {{Text CostRes}}, (CostRes -> CostRes -> CostRes), (CostRes -> CostRes -> CostRes), (CostRes -> CostRes -> CostRes), (CostRes -> CostRes), (CostRes -> CostRes), (CostRes -> CostRes), (Integer -> CostRes), (Int -> CostRes)] [_DFUN_ Eq (CostRes), _DFUN_ Text (CostRes), _CONSTM_ Num (+) (CostRes), _CONSTM_ Num (-) (CostRes), _CONSTM_ Num (*) (CostRes), _CONSTM_ Num negate (CostRes), _CONSTM_ Num abs (CostRes), _CONSTM_ Num signum (CostRes), _CONSTM_ Num fromInteger (CostRes), _CONSTM_ Num fromInt (CostRes)] _N_
-	 (+) = _A_ 2 _U_ 00 _N_ _S_ "AA" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: CostRes) (u1 :: CostRes) -> _ORIG_ Costs nullCosts _N_,
-	 (-) = _A_ 2 _U_ 00 _N_ _S_ "AA" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _F_ _IF_ARGS_ 0 2 XX 1 \ (u0 :: CostRes) (u1 :: CostRes) -> _ORIG_ Costs nullCosts _N_,
-	 (*) = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: CostRes) (u1 :: CostRes) -> _APP_  _TYAPP_  patError# { (CostRes -> CostRes -> CostRes) } [ _NOREP_S_ "%DPreludeCore.Num.(*)\"", u0, u1 ] _N_,
-	 negate = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: CostRes) -> _APP_  _TYAPP_  patError# { (CostRes -> CostRes) } [ _NOREP_S_ "%DPreludeCore.Num.negate\"", u0 ] _N_,
-	 abs = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: CostRes) -> _APP_  _TYAPP_  patError# { (CostRes -> CostRes) } [ _NOREP_S_ "%DPreludeCore.Num.abs\"", u0 ] _N_,
-	 signum = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: CostRes) -> _APP_  _TYAPP_  patError# { (CostRes -> CostRes) } [ _NOREP_S_ "%DPreludeCore.Num.signum\"", u0 ] _N_,
-	 fromInteger = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: Integer) -> _APP_  _TYAPP_  patError# { (Integer -> CostRes) } [ _NOREP_S_ "%DPreludeCore.Num.fromInteger\"", u0 ] _N_,
-	 fromInt = _A_ 1 _U_ 1 _N_ _S_ _!_ _N_ _N_ #-}
 instance Text CostRes
-	{-# GHC_PRAGMA _M_ Costs {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(CostRes, [Char])]), (Int -> CostRes -> [Char] -> [Char]), ([Char] -> [([CostRes], [Char])]), ([CostRes] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (CostRes), _CONSTM_ Text showsPrec (CostRes), _CONSTM_ Text readList (CostRes), _CONSTM_ Text showList (CostRes)] _N_
-	 readsPrec = _A_ 2 _U_ 22 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 2 XX 4 \ (u0 :: Int) (u1 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> [Char] -> [(CostRes, [Char])]) } [ _NOREP_S_ "%DPreludeCore.Text.readsPrec\"", u0, u1 ] _N_,
-	 showsPrec = _A_ 3 _U_ 222 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 3 XXX 5 \ (u0 :: Int) (u1 :: CostRes) (u2 :: [Char]) -> _APP_  _TYAPP_  patError# { (Int -> CostRes -> [Char] -> [Char]) } [ _NOREP_S_ "%DPreludeCore.Text.showsPrec\"", u0, u1, u2 ] _N_,
-	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
-	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}
 

@@ -34,9 +34,10 @@ import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits, TCE(..), UniqFM )
 import ClosureInfo	( LambdaFormInfo, mkClosureLFInfo )
-import CmdLineOpts	( GlobalSwitch(..), switchIsOn, stringSwitchSet, SwitchResult )
+import CmdLineOpts
 import FiniteMap	( FiniteMap )
 import Maybes		( Maybe(..) )
+import Pretty		-- debugging only
 import PrimKind		( getKindSize )
 import Util
 \end{code}
@@ -56,15 +57,36 @@ codeGen :: FAST_STRING		-- module name
 
 codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons tycon_specs stg_pgm
   = let
-	switch_is_on	  = switchIsOn sw_lookup_fn
+	switch_is_on	  = switchIsOn   sw_lookup_fn
+	int_switch_set	  = intSwitchSet sw_lookup_fn
 	doing_profiling   = switch_is_on SccProfilingOn
 	compiling_prelude = switch_is_on CompilingPrelude
 	splitting         = switch_is_on (EnsureSplittableC (panic "codeGen:esc"))
+
+	cinfo = MkCompInfo switch_is_on int_switch_set mod_name
     in
+
+{- OLD:
+    pprTrace "codeGen:" (ppCat [
+    (case (switch_is_on StgDoLetNoEscapes) of
+	False -> ppStr "False?"
+	True  -> ppStr "True?"
+    ),
+    (case (int_switch_set ReturnInRegsThreshold) of
+	Nothing -> ppStr "Nothing!"
+	Just  n -> ppCat [ppStr "Just", ppInt n]
+    ),
+    (case (int_switch_set UnfoldingUseThreshold) of
+	Nothing -> ppStr "Nothing!"
+	Just  n -> ppCat [ppStr "Just", ppInt n]
+    ),
+    (case (int_switch_set UnfoldingCreationThreshold) of
+	Nothing -> ppStr "Nothing!"
+	Just  n -> ppCat [ppStr "Just", ppInt n]
+    )
+    ]) $
+-}
     if not doing_profiling then
-	let
-	    cinfo = MkCompInfo switch_is_on mod_name
-	in
 	mkAbstractCs [
 	    genStaticConBits cinfo gen_tycons tycon_specs,
 	    initC cinfo (cgTopBindings splitting stg_pgm) ]
@@ -80,9 +102,7 @@ codeGen mod_name (local_CCs, extern_CCs) import_names sw_lookup_fn gen_tycons ty
 	 -- into the code-generator, as are the imported-modules' names.)
 	 --
 	 -- Note: we don't register/etc if compiling Prelude bits.
-	let
-	    cinfo = MkCompInfo switch_is_on mod_name
-	in
+
 	mkAbstractCs [
 		if compiling_prelude
 		then AbsCNop

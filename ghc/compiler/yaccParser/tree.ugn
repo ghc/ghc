@@ -61,7 +61,12 @@ type tree;
 	qual	: < gqpat	: tree;
 		    gqexp	: tree;	>;
 	guard	: < ggexp	: tree; >;
-	def	: < ggdef	: tree; >;
+	def	: < ggdef	: tree; >; /* unused, I believe WDP 95/08 */
+/* "tinfixop" is an odd bird:
+    we clobber its tag into another "tree", thus marking
+    that tree as infixery.  We do not create tinfixops 
+    per se. (WDP 95/08)
+*/
 	tinfixop: < gdummy	: infixTree; >;
 	lsection: < glsexp	: tree; 
 		    glsop	: unkId; >;

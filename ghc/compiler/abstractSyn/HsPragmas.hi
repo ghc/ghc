@@ -31,11 +31,7 @@ type RenamedImpStrictness = ImpStrictness Name
 type RenamedInstancePragmas = InstancePragmas Name
 data TypePragmas   = NoTypePragmas | AbstractTySynonym
 instance Outputable a => Outputable (ClassOpPragmas a)
-	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (ClassPragmas a)
-	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (GenPragmas a)
-	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (InstancePragmas a)
-	{-# GHC_PRAGMA _M_ HsPragmas {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 

@@ -16,5 +16,4 @@ import TyCon(TyCon)
 import UniType(UniType)
 import UniqFM(UniqFM)
 tcTyDecls :: E -> (Name -> Bool) -> (Name -> [DataTypeSig Name]) -> [TyDecl Name] -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult (UniqFM TyCon, [(Name, Id)], FiniteMap TyCon [[Labda UniType]])
-	{-# GHC_PRAGMA _A_ 4 _U_ 22212222 _N_ _S_ "LLLS" _N_ _N_ #-}
 

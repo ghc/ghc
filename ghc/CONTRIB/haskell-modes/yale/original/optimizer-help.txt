@@ -1,0 +1,6 @@
+Optimizer switches
+      inline         Aggressively inline functions
+      constant       Hoist constant expressions to top-level
+      foldr          Perform foldr/build deforestation
+      lisp           Tell the Lisp compiler to work hard to produce best code
+      delays         Try to make delays out-of-line for more compact code

@@ -35,15 +35,26 @@ closure address.
 mkIntCLit_0 = mkIntCLit 0 -- out here to avoid CAF (sigh)
 mkIntCLit_3 = mkIntCLit 3
 
+-- hacking with Uncle Will:
+#define target_STRICT target@(Target _ _ _ _ _ _ _ _)
+
 genMacroCode 
     :: Target 
     -> CStmtMacro   	    -- statement macro
     -> [CAddrMode]  	    -- args
     -> SUniqSM StixTreeList
 
-genMacroCode target ARGS_CHK_A_LOAD_NODE args = 
+genMacroCode target_STRICT macro args
+ = genmacro macro args
+ where
+  a2stix  = amodeToStix target
+  stg_reg = stgReg target
+
+  -- real thing: here we go -----------------------
+
+  genmacro ARGS_CHK_A_LOAD_NODE args = 
     getUniqLabelNCG					`thenSUs` \ ulbl ->
-    let [words, lbl] = map (amodeToStix target) args
+    let [words, lbl] = map a2stix args
     	temp = StIndex PtrKind stgSpA words
 	test = StPrim AddrGeOp [stgSuA, temp]
 	cjmp = StCondJump ulbl test
@@ -52,9 +63,9 @@ genMacroCode target ARGS_CHK_A_LOAD_NODE args =
     in
 	returnSUs (\xs -> cjmp : assign : updatePAP : join : xs)
 
-genMacroCode target ARGS_CHK_A [words] = 
+  genmacro ARGS_CHK_A [words] = 
     getUniqLabelNCG					`thenSUs` \ ulbl ->
-    let temp = StIndex PtrKind stgSpA (amodeToStix target words)
+    let temp = StIndex PtrKind stgSpA (a2stix words)
 	test = StPrim AddrGeOp [stgSuA, temp]
 	cjmp = StCondJump ulbl test
 	join = StLabel ulbl
@@ -71,9 +82,9 @@ directions are swapped relative to the A stack.
 
 \begin{code}
 
-genMacroCode target ARGS_CHK_B_LOAD_NODE args = 
+  genmacro ARGS_CHK_B_LOAD_NODE args = 
     getUniqLabelNCG					`thenSUs` \ ulbl ->
-    let [words, lbl] = map (amodeToStix target) args
+    let [words, lbl] = map a2stix args
     	temp = StIndex PtrKind stgSuB (StPrim IntNegOp [words])
 	test = StPrim AddrGeOp [stgSpB, temp]
 	cjmp = StCondJump ulbl test
@@ -82,9 +93,9 @@ genMacroCode target ARGS_CHK_B_LOAD_NODE args =
     in
 	returnSUs (\xs -> cjmp : assign : updatePAP : join : xs)
 
-genMacroCode target ARGS_CHK_B [words] = 
+  genmacro ARGS_CHK_B [words] = 
     getUniqLabelNCG					`thenSUs` \ ulbl ->
-    let	temp = StIndex PtrKind stgSuB (StPrim IntNegOp [amodeToStix target words])
+    let	temp = StIndex PtrKind stgSuB (StPrim IntNegOp [a2stix words])
 	test = StPrim AddrGeOp [stgSpB, temp]
 	cjmp = StCondJump ulbl test
 	join = StLabel ulbl
@@ -103,10 +114,10 @@ primOps, this is just a wrapper.
 
 \begin{code}
 
-genMacroCode target HEAP_CHK args =
-    let [liveness,words,reenter] = map (amodeToStix target) args
+  genmacro HEAP_CHK args =
+    let [liveness,words,reenter] = map a2stix args
     in
-	doHeapCheck target liveness words reenter
+	doHeapCheck {-UNUSED NOW:target-} liveness words reenter
 
 \end{code}
 
@@ -118,11 +129,11 @@ so we don't have to @callWrapper@ it.
 
 \begin{code}
 
-genMacroCode target STK_CHK [liveness, aWords, bWords, spa, spb, prim, reenter] = 
+  genmacro STK_CHK [liveness, aWords, bWords, spa, spb, prim, reenter] = 
 {- Need to check to see if we are compiling with stack checks
     getUniqLabelNCG					`thenSUs` \ ulbl ->
     let words = StPrim IntNegOp 
-    	    [StPrim IntAddOp [amodeToStix target aWords, amodeToStix target bWords]]
+    	    [StPrim IntAddOp [a2stix aWords, a2stix bWords]]
 	temp = StIndex PtrKind stgSpA words
 	test = StPrim AddrGtOp [temp, stgSpB]
 	cjmp = StCondJump ulbl test
@@ -139,8 +150,8 @@ and putting the new CAF on a linked list for the storage manager.
 
 \begin{code}
 
-genMacroCode target UPD_CAF args =
-    let [cafptr,bhptr] = map (amodeToStix target) args
+  genmacro UPD_CAF args =
+    let [cafptr,bhptr] = map a2stix args
     	w0 = StInd PtrKind cafptr
 	w1 = StInd PtrKind (StIndex PtrKind cafptr (StInt 1))
 	w2 = StInd PtrKind (StIndex PtrKind cafptr (StInt 2))
@@ -159,9 +170,9 @@ if we update an old generation object.
 
 \begin{code}
 
-genMacroCode target UPD_IND args = 
+  genmacro UPD_IND args = 
     getUniqLabelNCG					`thenSUs` \ ulbl ->
-    let [updptr, heapptr] = map (amodeToStix target) args
+    let [updptr, heapptr] = map a2stix args
     	test = StPrim AddrGtOp [updptr, smOldLim]
     	cjmp = StCondJump ulbl test
     	updRoots = StAssign PtrKind smOldMutables updptr
@@ -180,7 +191,7 @@ genMacroCode target UPD_IND args =
 
 \begin{code}
 
-genMacroCode target UPD_INPLACE_NOPTRS args = returnSUs id
+  genmacro UPD_INPLACE_NOPTRS args = returnSUs id
 
 \end{code}
 
@@ -190,7 +201,7 @@ if we update an old generation object.
 
 \begin{code}
 
-genMacroCode target UPD_INPLACE_PTRS [liveness] =
+  genmacro UPD_INPLACE_PTRS [liveness] =
     getUniqLabelNCG					`thenSUs` \ ulbl ->
     let cjmp = StCondJump ulbl testOldLim
         testOldLim = StPrim AddrGtOp [stgNode, smOldLim]
@@ -204,7 +215,7 @@ genMacroCode target UPD_INPLACE_PTRS [liveness] =
     	updOldMutables = StAssign PtrKind smOldMutables stgNode
     	updUpdReg = StAssign PtrKind stgNode hpBack2
     in
-	genMacroCode target HEAP_CHK [liveness, mkIntCLit_3, mkIntCLit_0]
+	genmacro HEAP_CHK [liveness, mkIntCLit_3, mkIntCLit_0]
 							`thenSUs` \ heap_chk ->
 	returnSUs (\xs -> (cjmp : 
     	    	    	    heap_chk (updUpd0 : updUpd1 : updUpd2 : 
@@ -218,11 +229,11 @@ to handle @UPD_BH_SINGLE_ENTRY@ in all cases.
 
 \begin{code}
 
-genMacroCode target UPD_BH_UPDATABLE args = returnSUs id
+  genmacro UPD_BH_UPDATABLE args = returnSUs id
 
-genMacroCode target UPD_BH_SINGLE_ENTRY [arg] =
+  genmacro UPD_BH_SINGLE_ENTRY [arg] =
     let
-    	update = StAssign PtrKind (StInd PtrKind (amodeToStix target arg)) bh_info
+    	update = StAssign PtrKind (StInd PtrKind (a2stix arg)) bh_info
     in
         returnSUs (\xs -> update : xs)
 
@@ -233,8 +244,8 @@ registers to the current Sp[AB] locations.
 
 \begin{code}
 
-genMacroCode target PUSH_STD_UPD_FRAME args =
-    let [bhptr, aWords, bWords] = map (amodeToStix target) args
+  genmacro PUSH_STD_UPD_FRAME args =
+    let [bhptr, aWords, bWords] = map a2stix args
     	frame n = StInd PtrKind 
 	    (StIndex PtrKind stgSpB (StPrim IntAddOp 
     	    	[bWords, StInt (toInteger (sTD_UF_SIZE - n))]))
@@ -258,7 +269,7 @@ Pop a standard update frame.
 
 \begin{code}
 
-genMacroCode target POP_STD_UPD_FRAME args =
+  genmacro POP_STD_UPD_FRAME args =
     let frame n = StInd PtrKind (StIndex PtrKind stgSpB (StInt (toInteger (-n))))
 
 	grabRet = StAssign PtrKind stgRetReg (frame uF_RET)
@@ -276,7 +287,7 @@ genMacroCode target POP_STD_UPD_FRAME args =
 
 \begin{code}
 {- UNUSED:
-genMacroCode target PUSH_CON_UPD_FRAME args = 
+  genmacro PUSH_CON_UPD_FRAME args = 
     panic "genMacroCode:PUSH_CON_UPD_FRAME"
 -}
 \end{code}
@@ -285,8 +296,8 @@ The @SET_ARITY@ and @CHK_ARITY@ macros are disabled for ``normal'' compilation.
 
 \begin{code}
 
-genMacroCode target SET_ARITY args = returnSUs id
-genMacroCode target CHK_ARITY args = returnSUs id
+  genmacro SET_ARITY args = returnSUs id
+  genmacro CHK_ARITY args = returnSUs id
 
 \end{code}
 
@@ -294,10 +305,10 @@ This one only applies if we have a machine register devoted to TagReg.
 
 \begin{code}
 
-genMacroCode target SET_TAG [tag] = 
-    let set_tag = StAssign IntKind stgTagReg (amodeToStix target tag)
+  genmacro SET_TAG [tag] = 
+    let set_tag = StAssign IntKind stgTagReg (a2stix tag)
     in
-        case stgReg target TagReg of
+        case stg_reg TagReg of
             Always _ -> returnSUs id
             Save _ -> returnSUs (\xs -> set_tag : xs)
 
@@ -309,13 +320,13 @@ of StixOp.
 \begin{code}
 
 doHeapCheck 
-    :: Target 
-    -> StixTree  	-- liveness
+    :: {- unused now: Target 
+    -> -}StixTree  	-- liveness
     -> StixTree  	-- words needed
     -> StixTree  	-- always reenter node? (boolean)
     -> SUniqSM StixTreeList
 
-doHeapCheck target liveness words reenter =
+doHeapCheck {-target:unused now-} liveness words reenter =
     getUniqLabelNCG					`thenSUs` \ ulbl ->
     let newHp = StIndex PtrKind stgHp words
 	assign = StAssign PtrKind stgHp newHp

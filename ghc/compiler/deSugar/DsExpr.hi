@@ -12,5 +12,4 @@ import SplitUniq(SplitUniqSupply)
 import SrcLoc(SrcLoc)
 import UniqFM(UniqFM)
 dsExpr :: Expr Id TypecheckedPat -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 1 _U_ 2222222 _N_ _S_ "S" _N_ _N_ #-}
 

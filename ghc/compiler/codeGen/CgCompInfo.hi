@@ -2,93 +2,49 @@
 interface CgCompInfo where
 import AbsCSyn(RegRelative)
 import HeapOffs(HeapOffset)
-data RegRelative 	{-# GHC_PRAGMA HpRel HeapOffset HeapOffset | SpARel Int Int | SpBRel Int Int | NodeRel HeapOffset #-}
+data RegRelative 
 cON_UF_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [2#] _N_ #-}
 iND_TAG :: Integer
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 lIVENESS_R1 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [1#] _N_ #-}
 lIVENESS_R2 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [2#] _N_ #-}
 lIVENESS_R3 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [4#] _N_ #-}
 lIVENESS_R4 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [8#] _N_ #-}
 lIVENESS_R5 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [16#] _N_ #-}
 lIVENESS_R6 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [32#] _N_ #-}
 lIVENESS_R7 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [64#] _N_ #-}
 lIVENESS_R8 :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [128#] _N_ #-}
 mAX_Double_REG :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [2#] _N_ #-}
 mAX_FAMILY_SIZE_FOR_VEC_RETURNS :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [8#] _N_ #-}
 mAX_Float_REG :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [4#] _N_ #-}
 mAX_INTLIKE :: Integer
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _#_ int2Integer# [] [16#] _N_ #-}
 mAX_SPEC_ALL_NONPTRS :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [5#] _N_ #-}
 mAX_SPEC_ALL_PTRS :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [12#] _N_ #-}
 mAX_SPEC_MIXED_FIELDS :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [3#] _N_ #-}
 mAX_SPEC_SELECTEE_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [12#] _N_ #-}
 mAX_Vanilla_REG :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [8#] _N_ #-}
 mIN_BIG_TUPLE_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [16#] _N_ #-}
 mIN_INTLIKE :: Integer
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 mIN_MP_INT_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [16#] _N_ #-}
 mIN_SIZE_NonUpdHeapObject :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [1#] _N_ #-}
 mIN_SIZE_NonUpdStaticHeapObject :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_ #-}
 mIN_UPD_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [2#] _N_ #-}
 mP_STRUCT_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [3#] _N_ #-}
 oTHER_TAG :: Integer
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 sCC_CON_UF_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [3#] _N_ #-}
 sCC_STD_UF_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [5#] _N_ #-}
 sTD_UF_SIZE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [4#] _N_ #-}
 spARelToInt :: RegRelative -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 spBRelToInt :: RegRelative -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 uF_COST_CENTRE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [4#] _N_ #-}
 uF_RET :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [0#] _N_ #-}
 uF_SUA :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [2#] _N_ #-}
 uF_SUB :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [1#] _N_ #-}
 uF_UPDATEE :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [3#] _N_ #-}
 uNFOLDING_CHEAP_OP_COST :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [1#] _N_ #-}
 uNFOLDING_CON_DISCOUNT_WEIGHT :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [1#] _N_ #-}
 uNFOLDING_CREATION_THRESHOLD :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [30#] _N_ #-}
 uNFOLDING_DEAR_OP_COST :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [4#] _N_ #-}
 uNFOLDING_NOREP_LIT_COST :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [4#] _N_ #-}
 uNFOLDING_OVERRIDE_THRESHOLD :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [8#] _N_ #-}
 uNFOLDING_USE_THRESHOLD :: Int
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ I# [] [3#] _N_ #-}
 

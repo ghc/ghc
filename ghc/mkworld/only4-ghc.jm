@@ -6,7 +6,7 @@
 #endif
 /* ProjectVersion is something printable */
 #ifndef ProjectVersion
-#define ProjectVersion  0.26
+#define ProjectVersion  0.27
 #endif
 /* A patchlevel change is something *very minor* */
 #ifndef ProjectPatchLevel
@@ -14,7 +14,7 @@
 #endif
 /* GhcBuildeeVersion is something CPP-testable (ProjectVersion * 100) */
 #ifndef GhcBuildeeVersion
-#define GhcBuildeeVersion  26
+#define GhcBuildeeVersion  27
 #endif
 # line 29 "only4-ghc.ljm"
 /* state of the source world */

@@ -26,20 +26,15 @@ module Socket (
     Socket
 ) where
 
-
 import BSD
 import SocketPrim renaming (accept to socketPrim_accept
 			, socketPort to socketPort_prim
 			)
-
-	    
-
 \end{code} 
-
 
 %***************************************************************************
 %*                                                                         *
-\subsection[Socket-Setup]{High Level "Setup" functions}
+\subsection[Socket-Setup]{High Level ``Setup'' functions}
 %*                                                                         *
 %***************************************************************************
 
@@ -62,26 +57,25 @@ data PortID =
 type Hostname = String
 -- Maybe consider this alternative.
 -- data Hostname = Name String | IP Int Int Int Int
-
-
 \end{code}
    
 If more control over the socket type is required then $socketPrim$
 should be used instead.
 
-
-
 \begin{code}
 connectTo :: Hostname ->		-- Hostname
 	     PortID ->			-- Port Identifier
 	     IO Handle			-- Connected Socket
+
 connectTo hostname (Service serv) =
     getProtocolNumber "tcp"			>>= \ proto ->
     socket AF_INET Stream proto			>>= \ sock ->
     getServicePortNumber serv 			>>= \ port ->
     getHostByName hostname	>>= \ (HostEntry _ _ _ haddrs) ->
     connect sock (SockAddrInet port (head haddrs))	>>
-    socketToHandle sock
+    socketToHandle sock		>>= \ h ->
+    hSetBuffering h NoBuffering >>
+    return h
 connectTo hostname (PortNumber port) =
     getProtocolNumber "tcp"			>>= \ proto ->
     socket AF_INET Stream proto			>>= \ sock ->
@@ -94,13 +88,13 @@ connectTo _ (UnixSocket path) =
     socketToHandle sock
 \end{code}
 
-
 The dual to the $connectTo$ call. This creates the server side
 socket which has been bound to the specified port.
 
 \begin{code}
 listenOn ::  PortID ->			-- Port Identifier
 	     IO Socket			-- Connected Socket
+
 listenOn (Service serv) =
     getProtocolNumber "tcp"			>>= \ proto ->
     socket AF_INET Stream proto			>>= \ sock ->
@@ -124,6 +118,7 @@ listeOn (UnixSocket path) =
 accept :: Socket ->		-- Listening Socket
 	  IO (Handle, 		-- StdIO Handle for read/write
 	      HostName)		-- HostName of Peer socket
+
 accept sock =
     socketPrim_accept sock	    >>= \ (sock', (SockAddrInet _ haddr)) ->
     getHostByAddr AF_INET haddr	    >>= \ (HostEntry peer _ _ _) ->
@@ -142,17 +137,16 @@ sendTo :: Hostname ->			-- Hostname
 	  PortID->			-- Port Number
 	  String ->			-- Message to send
 	  IO ()
+
 sendTo h p msg = 
     connectTo h p			>>= \ s ->
     hPutStr s msg			>>
     hClose s
 
-
-
-
 recvFrom :: Hostname ->			-- Hostname
 	    PortID->			-- Port Number
 	    IO String			-- Received Data
+
 recvFrom host port =
     listenOn port			>>= \ s ->
     let 
@@ -170,13 +164,13 @@ recvFrom host port =
 	waiting				>>= \ message ->
 	sClose s			>>
 	return message
-
 \end{code}
 
 
 
 \begin{code}
 socketPort :: Socket -> IO PortID
+
 socketPort s =
     getSocketName s			>>= \ sockaddr ->
     return (case sockaddr of
@@ -185,5 +179,4 @@ socketPort s =
 		SockAddrUnix path	->
 		    (UnixSocket path)
 	    )
-
 \end{code}

@@ -2,13 +2,10 @@
 interface CoreSyn where
 import BasicLit(BasicLit)
 import CharSeq(CSeq)
-import Class(Class)
 import CmdLineOpts(GlobalSwitch)
-import CostCentre(CcKind, CostCentre, IsCafCC, IsDupdCC)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import CostCentre(CostCentre)
+import Id(Id)
 import Maybes(Labda)
-import NameTypes(FullName, ShortName)
 import Outputable(Outputable)
 import PreludePS(_PackedString)
 import PreludeRatio(Ratio(..))
@@ -16,48 +13,34 @@ import Pretty(Delay, PprStyle, PrettyRep)
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import TyCon(TyCon)
-import TyVar(TyVar, TyVarTemplate)
+import TyVar(TyVar)
 import UniType(UniType)
-import Unique(Unique)
-data BasicLit 	{-# GHC_PRAGMA MachChar Char | MachStr _PackedString | MachAddr Integer | MachInt Integer Bool | MachFloat (Ratio Integer) | MachDouble (Ratio Integer) | MachLitLit _PackedString PrimKind | NoRepStr _PackedString | NoRepInteger Integer | NoRepRational (Ratio Integer) #-}
+data BasicLit 
 data CoreArg a   = TypeArg UniType | ValArg (CoreAtom a)
 data CoreAtom a   = CoVarAtom a | CoLitAtom BasicLit
 data CoreBinding a b   = CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)]
 data CoreCaseAlternatives a b   = CoAlgAlts [(Id, [a], CoreExpr a b)] (CoreCaseDefault a b) | CoPrimAlts [(BasicLit, CoreExpr a b)] (CoreCaseDefault a b)
 data CoreCaseDefault a b   = CoNoDefault | CoBindDefault a (CoreExpr a b)
 data CoreExpr a b   = CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b)
-data CostCentre 	{-# GHC_PRAGMA NoCostCentre | NormalCC CcKind _PackedString _PackedString IsDupdCC IsCafCC | CurrentCC | SubsumedCosts | AllCafsCC _PackedString _PackedString | AllDictsCC _PackedString _PackedString IsDupdCC | OverheadCC | PreludeCafsCC | PreludeDictsCC IsDupdCC | DontCareCC #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
-data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
-data PrimOp
-	{-# GHC_PRAGMA CharGtOp | CharGeOp | CharEqOp | CharNeOp | CharLtOp | CharLeOp | IntGtOp | IntGeOp | IntEqOp | IntNeOp | IntLtOp | IntLeOp | WordGtOp | WordGeOp | WordEqOp | WordNeOp | WordLtOp | WordLeOp | AddrGtOp | AddrGeOp | AddrEqOp | AddrNeOp | AddrLtOp | AddrLeOp | FloatGtOp | FloatGeOp | FloatEqOp | FloatNeOp | FloatLtOp | FloatLeOp | DoubleGtOp | DoubleGeOp | DoubleEqOp | DoubleNeOp | DoubleLtOp | DoubleLeOp | OrdOp | ChrOp | IntAddOp | IntSubOp | IntMulOp | IntQuotOp | IntDivOp | IntRemOp | IntNegOp | IntAbsOp | AndOp | OrOp | NotOp | SllOp | SraOp | SrlOp | ISllOp | ISraOp | ISrlOp | Int2WordOp | Word2IntOp | Int2AddrOp | Addr2IntOp | FloatAddOp | FloatSubOp | FloatMulOp | FloatDivOp | FloatNegOp | Float2IntOp | Int2FloatOp | FloatExpOp | FloatLogOp | FloatSqrtOp | FloatSinOp | FloatCosOp | FloatTanOp | FloatAsinOp | FloatAcosOp | FloatAtanOp | FloatSinhOp | FloatCoshOp | FloatTanhOp | FloatPowerOp | DoubleAddOp | DoubleSubOp | DoubleMulOp | DoubleDivOp | DoubleNegOp | Double2IntOp | Int2DoubleOp | Double2FloatOp | Float2DoubleOp | DoubleExpOp | DoubleLogOp | DoubleSqrtOp | DoubleSinOp | DoubleCosOp | DoubleTanOp | DoubleAsinOp | DoubleAcosOp | DoubleAtanOp | DoubleSinhOp | DoubleCoshOp | DoubleTanhOp | DoublePowerOp | IntegerAddOp | IntegerSubOp | IntegerMulOp | IntegerQuotRemOp | IntegerDivModOp | IntegerNegOp | IntegerCmpOp | Integer2IntOp | Int2IntegerOp | Word2IntegerOp | Addr2IntegerOp | FloatEncodeOp | FloatDecodeOp | DoubleEncodeOp | DoubleDecodeOp | NewArrayOp | NewByteArrayOp PrimKind | SameMutableArrayOp | SameMutableByteArrayOp | ReadArrayOp | WriteArrayOp | IndexArrayOp | ReadByteArrayOp PrimKind | WriteByteArrayOp PrimKind | IndexByteArrayOp PrimKind | IndexOffAddrOp PrimKind | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp | NewSynchVarOp | TakeMVarOp | PutMVarOp | ReadIVarOp | WriteIVarOp | MakeStablePtrOp | DeRefStablePtrOp | CCallOp _PackedString Bool Bool [UniType] UniType | ErrorIOPrimOp | ReallyUnsafePtrEqualityOp | SeqOp | ParOp | ForkOp | DelayOp | WaitOp #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data CostCentre 
+data Id 
+data Labda a 
+data PprStyle 
+data PrettyRep 
+data PrimOp 
+data TyCon 
+data TyVar 
+data UniType 
 applyToArgs :: CoreExpr a b -> [CoreArg b] -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 collectArgs :: CoreExpr a b -> (CoreExpr a b, [CoreArg b])
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 decomposeArgs :: [CoreArg a] -> ([UniType], [CoreAtom a], [CoreArg a])
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 mkCoTyApp :: CoreExpr a b -> UniType -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 2 2 XX 3 _/\_ u0 u1 -> \ (u2 :: CoreExpr u0 u1) (u3 :: UniType) -> _!_ _ORIG_ CoreSyn CoTyApp [u0, u1] [u2, u3] _N_ #-}
 pprCoreBinding :: PprStyle -> (PprStyle -> a -> Int -> Bool -> PrettyRep) -> (PprStyle -> a -> Int -> Bool -> PrettyRep) -> (PprStyle -> b -> Int -> Bool -> PrettyRep) -> CoreBinding a b -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 5 _U_ 2222122 _N_ _S_ "LLLLS" _N_ _N_ #-}
 pprCoreExpr :: PprStyle -> (PprStyle -> a -> Int -> Bool -> PrettyRep) -> (PprStyle -> a -> Int -> Bool -> PrettyRep) -> (PprStyle -> b -> Int -> Bool -> PrettyRep) -> CoreExpr a b -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 5 _U_ 2222222 _N_ _S_ "LLLLS" _N_ _N_ #-}
 instance Outputable a => Outputable (CoreArg a)
-	{-# GHC_PRAGMA _M_ CoreSyn {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (CoreAtom a)
-	{-# GHC_PRAGMA _M_ CoreSyn {-dfun-} _A_ 3 _U_ 2 _N_ _S_ "LLS" _N_ _N_ #-}
 instance (Outputable a, Outputable b) => Outputable (CoreBinding a b)
-	{-# GHC_PRAGMA _M_ CoreSyn {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _F_ _IF_ARGS_ 2 4 XXXX 6 _/\_ u0 u1 -> \ (u2 :: {{Outputable u0}}) (u3 :: {{Outputable u1}}) (u4 :: PprStyle) (u5 :: CoreBinding u0 u1) -> _APP_  _TYAPP_  _TYAPP_  _ORIG_ CoreSyn pprCoreBinding { u0 } { u1 } [ u4, u2, u2, u3, u5 ] _N_ #-}
 instance (Outputable a, Outputable b) => Outputable (CoreCaseAlternatives a b)
-	{-# GHC_PRAGMA _M_ CoreSyn {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _N_ _N_ #-}
 instance (Outputable a, Outputable b) => Outputable (CoreCaseDefault a b)
-	{-# GHC_PRAGMA _M_ CoreSyn {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _N_ _N_ #-}
 instance (Outputable a, Outputable b) => Outputable (CoreExpr a b)
-	{-# GHC_PRAGMA _M_ CoreSyn {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _F_ _IF_ARGS_ 2 4 XXXX 6 _/\_ u0 u1 -> \ (u2 :: {{Outputable u0}}) (u3 :: {{Outputable u1}}) (u4 :: PprStyle) (u5 :: CoreExpr u0 u1) -> _APP_  _TYAPP_  _TYAPP_  _ORIG_ CoreSyn pprCoreExpr { u0 } { u1 } [ u4, u2, u2, u3, u5 ] _N_ #-}
 

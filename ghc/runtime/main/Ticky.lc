@@ -1,0 +1,871 @@
+%
+% (c) The GRASP Project, Glasgow University, 1992-1993
+%
+%************************************************************************
+%*									*
+\section[Ticky.lc]{Stuff for ``ticky-ticky'' profiling}
+%*									*
+%************************************************************************
+
+Goes with \tr{imports/Ticky.lh}; more documentation there.
+
+%************************************************************************
+%*									*
+\subsection[Ticky-counters]{Declare all the counters}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define NULL_REG_MAP	/* Not threaded */
+
+#include "../storage/SMinternal.h" /* Bad boy, Will (ToDo) */
+
+#if defined(TICKY_TICKY)
+
+I_ ALLOC_HEAP_ctr = 0;
+I_ ALLOC_HEAP_tot = 0;
+
+PP_ max_SpA; /* set in re_enterable_part_of_main */
+P_  max_SpB;
+
+/* not used at all
+I_ A_STK_REUSE_ctr = 0;
+I_ B_STK_REUSE_ctr = 0;
+*/
+I_ A_STK_STUB_ctr = 0;
+
+I_ ALLOC_FUN_ctr = 0;
+I_ ALLOC_FUN_adm = 0;
+I_ ALLOC_FUN_gds = 0;
+I_ ALLOC_FUN_slp = 0;
+I_ ALLOC_FUN_hst[5] = {0,0,0,0,0};
+I_ ALLOC_THK_ctr = 0;
+I_ ALLOC_THK_adm = 0;
+I_ ALLOC_THK_gds = 0;
+I_ ALLOC_THK_slp = 0;
+I_ ALLOC_THK_hst[5] = {0,0,0,0,0};
+I_ ALLOC_CON_ctr = 0;
+I_ ALLOC_CON_adm = 0;
+I_ ALLOC_CON_gds = 0;
+I_ ALLOC_CON_slp = 0;
+I_ ALLOC_CON_hst[5] = {0,0,0,0,0};
+I_ ALLOC_TUP_ctr = 0;
+I_ ALLOC_TUP_adm = 0;
+I_ ALLOC_TUP_gds = 0;
+I_ ALLOC_TUP_slp = 0;
+I_ ALLOC_TUP_hst[5] = {0,0,0,0,0};
+I_ ALLOC_BH_ctr = 0;
+I_ ALLOC_BH_adm = 0;
+I_ ALLOC_BH_gds = 0;
+I_ ALLOC_BH_slp = 0;
+I_ ALLOC_BH_hst[5] = {0,0,0,0,0};
+I_ ALLOC_PRIM_ctr = 0;
+I_ ALLOC_PRIM_adm = 0;
+I_ ALLOC_PRIM_gds = 0;
+I_ ALLOC_PRIM_slp = 0;
+I_ ALLOC_PRIM_hst[5] = {0,0,0,0,0};
+I_ ALLOC_UPD_PAP_ctr = 0;
+I_ ALLOC_UPD_PAP_adm = 0;
+I_ ALLOC_UPD_PAP_gds = 0;
+I_ ALLOC_UPD_PAP_slp = 0;
+I_ ALLOC_UPD_PAP_hst[5] = {0,0,0,0,0};
+
+#ifdef CONCURRENT
+I_ ALLOC_STK_ctr = 0;
+I_ ALLOC_STK_adm = 0;
+I_ ALLOC_STK_gds = 0;
+I_ ALLOC_STK_slp = 0;
+I_ ALLOC_STK_hst[5] = {0,0,0,0,0};
+I_ ALLOC_TSO_ctr = 0;
+I_ ALLOC_TSO_adm = 0;
+I_ ALLOC_TSO_gds = 0;
+I_ ALLOC_TSO_slp = 0;
+I_ ALLOC_TSO_hst[5] = {0,0,0,0,0};
+
+# ifdef PAR
+I_ ALLOC_FMBQ_ctr = 0;
+I_ ALLOC_FMBQ_adm = 0;
+I_ ALLOC_FMBQ_gds = 0;
+I_ ALLOC_FMBQ_slp = 0;
+I_ ALLOC_FMBQ_hst[5] = {0,0,0,0,0};
+I_ ALLOC_FME_ctr = 0;
+I_ ALLOC_FME_adm = 0;
+I_ ALLOC_FME_gds = 0;
+I_ ALLOC_FME_slp = 0;
+I_ ALLOC_FME_hst[5] = {0,0,0,0,0};
+I_ ALLOC_BF_ctr = 0;
+I_ ALLOC_BF_adm = 0;
+I_ ALLOC_BF_gds = 0;
+I_ ALLOC_BF_slp = 0;
+I_ ALLOC_BF_hst[5] = {0,0,0,0,0};
+# endif
+#endif
+
+I_ ENT_VIA_NODE_ctr = 0;
+I_ ENT_CON_ctr = 0;
+I_ ENT_FUN_STD_ctr = 0;
+I_ ENT_FUN_DIRECT_ctr = 0;
+I_ ENT_IND_ctr = 0;
+I_ ENT_PAP_ctr = 0;
+I_ ENT_THK_ctr = 0;
+
+I_ RET_NEW_IN_HEAP_ctr = 0;
+I_ RET_NEW_IN_REGS_ctr = 0;
+I_ RET_OLD_IN_HEAP_ctr = 0;
+I_ RET_OLD_IN_REGS_ctr = 0;
+I_ RET_SEMI_BY_DEFAULT_ctr = 0;
+I_ RET_SEMI_IN_HEAP_ctr = 0;
+I_ RET_SEMI_IN_REGS_ctr = 0;
+I_ RET_SEMI_FAILED_IND_ctr = 0;
+I_ RET_SEMI_FAILED_UNEVAL_ctr = 0;
+I_ VEC_RETURN_ctr = 0;
+
+I_ RET_NEW_IN_HEAP_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ RET_NEW_IN_REGS_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ RET_OLD_IN_HEAP_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ RET_OLD_IN_REGS_hst[9] = {0,0,0,0,0,0,0,0,0};
+/* no such thing: I_ RET_SEMI_BY_DEFAULT_hst[9] = {0,0,0,0,0,0,0,0,0}; */
+I_ RET_SEMI_IN_HEAP_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ RET_SEMI_IN_REGS_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ RET_VEC_RETURN_hst[9] = {0,0,0,0,0,0,0,0,0};
+
+I_ RET_SEMI_loads_avoided = 0;
+
+I_ ReturnInRegsNodeValid = 0; /* i.e., False */
+
+I_ UPDF_OMITTED_ctr = 0;
+I_ UPDF_STD_PUSHED_ctr = 0;
+I_ UPDF_CON_PUSHED_ctr = 0;
+I_ UPDF_HOLE_PUSHED_ctr = 0;
+
+I_ UPDF_RCC_PUSHED_ctr = 0;
+I_ UPDF_RCC_OMITTED_ctr = 0;
+
+I_ UPD_EXISTING_ctr = 0;
+I_ UPD_SQUEEZED_ctr = 0;
+I_ UPD_CON_W_NODE_ctr = 0;
+I_ UPD_CON_IN_PLACE_ctr = 0;
+I_ UPD_CON_IN_NEW_ctr = 0;
+I_ UPD_PAP_IN_PLACE_ctr = 0;
+I_ UPD_PAP_IN_NEW_ctr = 0;
+
+I_ UPD_CON_IN_PLACE_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ UPD_CON_IN_NEW_hst[9] = {0,0,0,0,0,0,0,0,0};
+I_ UPD_PAP_IN_NEW_hst[9] = {0,0,0,0,0,0,0,0,0};
+
+I_ UPD_ENTERED_hst[9] = {0,0,0,0,0,0,0,0,0};
+
+I_ UPD_NEW_IND_ctr = 0;
+I_ UPD_NEW_IN_PLACE_PTRS_ctr = 0;
+I_ UPD_NEW_IN_PLACE_NOPTRS_ctr = 0;
+I_ UPD_OLD_IND_ctr = 0;
+I_ UPD_OLD_IN_PLACE_PTRS_ctr = 0;
+I_ UPD_OLD_IN_PLACE_NOPTRS_ctr = 0;
+
+I_ UPD_IN_PLACE_COPY_ctr = 0;
+
+I_ GC_SEL_ABANDONED_ctr = 0;
+I_ GC_SEL_MINOR_ctr = 0;
+I_ GC_SEL_MAJOR_ctr = 0;
+
+I_ GC_SHORT_IND_ctr = 0;
+I_ GC_SHORT_CAF_ctr = 0;
+I_ GC_COMMON_CHARLIKE_ctr = 0;
+I_ GC_COMMON_INTLIKE_ctr = 0;
+I_ GC_COMMON_INTLIKE_FAIL_ctr = 0;
+I_ GC_COMMON_CONST_ctr = 0;
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Ticky-print]{Print out all the counters}
+%*									*
+%************************************************************************
+
+\begin{code}
+static void printRegisteredCounterInfo (FILE *); /* fwd decl */
+
+#define INTAVG(a,b) ((b == 0) ? 0.0 : ((StgDouble) (a) / (StgDouble) (b)))
+#define PC(a)	    (100.0 * a)
+
+#define AVG(thing) \
+	StgDouble CAT2(avg,thing)  = INTAVG(CAT2(tot,thing),CAT2(ctr,thing))
+
+void
+PrintTickyInfo()
+{
+  I_ i;
+  I_ tot_allocs = /* total number of things allocated */
+	ALLOC_FUN_ctr + ALLOC_THK_ctr + ALLOC_CON_ctr + ALLOC_TUP_ctr +
+#ifdef CONCURRENT
+    	ALLOC_STK_ctr + ALLOC_TSO_ctr +
+# ifdef PAR
+	ALLOC_FMBQ_ctr + ALLOC_FME_ctr + ALLOC_BF_ctr +
+# endif
+#endif
+	ALLOC_BH_ctr  + ALLOC_UPD_PAP_ctr + ALLOC_PRIM_ctr;
+  I_ tot_adm_wds = /* total number of admin words allocated */
+	ALLOC_FUN_adm + ALLOC_THK_adm + ALLOC_CON_adm + ALLOC_TUP_adm +
+#ifdef CONCURRENT
+    	ALLOC_STK_adm + ALLOC_TSO_adm +
+# ifdef PAR
+	ALLOC_FMBQ_adm + ALLOC_FME_adm + ALLOC_BF_adm +
+# endif
+#endif
+	ALLOC_BH_adm  + ALLOC_UPD_PAP_adm + ALLOC_PRIM_adm;
+  I_ tot_gds_wds = /* total number of words of ``good stuff'' allocated */
+	ALLOC_FUN_gds + ALLOC_THK_gds + ALLOC_CON_gds + ALLOC_TUP_gds +
+#ifdef CONCURRENT
+    	ALLOC_STK_gds + ALLOC_TSO_gds +
+# ifdef PAR
+	ALLOC_FMBQ_gds + ALLOC_FME_gds + ALLOC_BF_gds +
+# endif
+#endif
+	ALLOC_BH_gds  + ALLOC_UPD_PAP_gds + ALLOC_PRIM_gds;
+  I_ tot_slp_wds = /* total number of ``slop'' words allocated */
+	ALLOC_FUN_slp + ALLOC_THK_slp + ALLOC_CON_slp + ALLOC_TUP_slp +
+#ifdef CONCURRENT
+    	ALLOC_STK_slp + ALLOC_TSO_slp +
+# ifdef PAR
+	ALLOC_FMBQ_slp + ALLOC_FME_slp + ALLOC_BF_slp +
+# endif
+#endif
+	ALLOC_BH_slp  + ALLOC_UPD_PAP_slp + ALLOC_PRIM_slp;
+  I_ tot_wds = /* total words */
+	tot_adm_wds + tot_gds_wds + tot_slp_wds;
+
+  I_ tot_enters =
+	ENT_CON_ctr + ENT_FUN_DIRECT_ctr +
+	ENT_IND_ctr + ENT_PAP_ctr + ENT_THK_ctr;
+  I_ jump_direct_enters =
+	tot_enters - ENT_VIA_NODE_ctr;
+  I_ bypass_enters =
+	ENT_FUN_DIRECT_ctr -
+	(ENT_FUN_STD_ctr - UPD_PAP_IN_PLACE_ctr - UPD_PAP_IN_NEW_ctr);
+
+  I_ tot_returns_in_regs =
+	RET_NEW_IN_REGS_ctr + RET_OLD_IN_REGS_ctr + RET_SEMI_IN_REGS_ctr;
+  I_ tot_returns_in_heap =
+	RET_NEW_IN_HEAP_ctr + RET_OLD_IN_HEAP_ctr + RET_SEMI_IN_HEAP_ctr + RET_SEMI_BY_DEFAULT_ctr/*???*/;
+  I_ tot_returns_of_new =
+	RET_NEW_IN_REGS_ctr + RET_NEW_IN_HEAP_ctr;
+  I_ tot_returns_of_old = /* NB: NOT USED ???!  94/05 WDP */
+	RET_OLD_IN_REGS_ctr + RET_OLD_IN_HEAP_ctr +
+	RET_SEMI_BY_DEFAULT_ctr + RET_SEMI_IN_HEAP_ctr + RET_SEMI_IN_REGS_ctr /*???*/;
+
+  I_ tot_returns =
+	tot_returns_in_regs + tot_returns_in_heap;
+
+  I_ tot_upd_frames =
+	UPDF_STD_PUSHED_ctr + UPDF_CON_PUSHED_ctr;      /*DBH*/
+
+  I_ con_updates =
+	UPD_CON_W_NODE_ctr + UPD_CON_IN_PLACE_ctr + UPD_CON_IN_NEW_ctr;
+  I_ pap_updates =
+	UPD_PAP_IN_PLACE_ctr + UPD_PAP_IN_NEW_ctr;
+  I_ tot_updates =
+	UPD_EXISTING_ctr + UPD_SQUEEZED_ctr + con_updates + pap_updates;
+  I_ tot_in_place_updates =
+	UPD_CON_IN_PLACE_ctr + UPD_PAP_IN_PLACE_ctr;
+
+  I_ tot_new_updates = 
+        UPD_NEW_IN_PLACE_NOPTRS_ctr + UPD_NEW_IN_PLACE_PTRS_ctr + UPD_NEW_IND_ctr;
+  I_ tot_old_updates =
+        UPD_OLD_IN_PLACE_NOPTRS_ctr + UPD_OLD_IN_PLACE_PTRS_ctr + UPD_OLD_IND_ctr;
+  I_ tot_gengc_updates =
+        tot_new_updates + tot_old_updates;
+
+  FILE *tf = RTSflags.TickyFlags.tickyFile;
+
+  fprintf(tf,"\n\nALLOCATIONS: %ld (%ld words total: %ld admin, %ld goods, %ld slop)\n",
+	tot_allocs, tot_wds, tot_adm_wds, tot_gds_wds, tot_slp_wds);
+  fprintf(tf,"\t\t\t\ttotal words:\t    2     3     4     5    6+\n");
+
+#define ALLOC_HISTO_MAGIC(categ) \
+	(PC(INTAVG(CAT3(ALLOC_,categ,_hst)[0], CAT3(ALLOC_,categ,_ctr)))), \
+	(PC(INTAVG(CAT3(ALLOC_,categ,_hst)[1], CAT3(ALLOC_,categ,_ctr)))), \
+	(PC(INTAVG(CAT3(ALLOC_,categ,_hst)[2], CAT3(ALLOC_,categ,_ctr)))), \
+	(PC(INTAVG(CAT3(ALLOC_,categ,_hst)[3], CAT3(ALLOC_,categ,_ctr)))), \
+	(PC(INTAVG(CAT3(ALLOC_,categ,_hst)[4], CAT3(ALLOC_,categ,_ctr))))
+
+  fprintf(tf,"%7ld (%5.1f%%) function values",
+	ALLOC_FUN_ctr,
+	PC(INTAVG(ALLOC_FUN_ctr, tot_allocs)));
+  if (ALLOC_FUN_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FUN));
+
+  fprintf(tf,"\n%7ld (%5.1f%%) thunks",
+	ALLOC_THK_ctr,
+	PC(INTAVG(ALLOC_THK_ctr, tot_allocs)));
+  if (ALLOC_THK_ctr != 0)
+      fprintf(tf,"\t\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(THK));
+
+  fprintf(tf,"\n%7ld (%5.1f%%) data values",
+	ALLOC_CON_ctr,
+	PC(INTAVG(ALLOC_CON_ctr, tot_allocs)));
+  if (ALLOC_CON_ctr != 0)
+      fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(CON));
+
+  fprintf(tf,"\n%7ld (%5.1f%%) big tuples",
+	ALLOC_TUP_ctr,
+	PC(INTAVG(ALLOC_TUP_ctr, tot_allocs)));
+  if (ALLOC_TUP_ctr != 0)
+      fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(TUP));
+
+  fprintf(tf,"\n%7ld (%5.1f%%) black holes",
+	ALLOC_BH_ctr,
+	PC(INTAVG(ALLOC_BH_ctr, tot_allocs)));
+  if (ALLOC_BH_ctr != 0)
+      fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(BH));
+
+  fprintf(tf,"\n%7ld (%5.1f%%) prim things",
+	ALLOC_PRIM_ctr,
+	PC(INTAVG(ALLOC_PRIM_ctr, tot_allocs)));
+  if (ALLOC_PRIM_ctr != 0)
+      fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(PRIM));
+
+  fprintf(tf,"\n%7ld (%5.1f%%) partial applications",
+	ALLOC_UPD_PAP_ctr,
+	PC(INTAVG(ALLOC_UPD_PAP_ctr, tot_allocs)));
+  if (ALLOC_UPD_PAP_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(UPD_PAP));
+
+#ifdef CONCURRENT
+  fprintf(tf,"\n%7ld (%5.1f%%) stack objects",
+	ALLOC_STK_ctr,
+	PC(INTAVG(ALLOC_STK_ctr, tot_allocs)));
+  if (ALLOC_STK_ctr != 0)
+      fprintf(tf,"\t\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(STK));
+  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
+	ALLOC_TSO_ctr,
+	PC(INTAVG(ALLOC_TSO_ctr, tot_allocs)));
+  if (ALLOC_TSO_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(TSO));
+# ifdef PAR
+  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
+	ALLOC_FMBQ_ctr,
+	PC(INTAVG(ALLOC_FMBQ_ctr, tot_allocs)));
+  if (ALLOC_FMBQ_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FMBQ));
+  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
+	ALLOC_FME_ctr,
+	PC(INTAVG(ALLOC_FME_ctr, tot_allocs)));
+  if (ALLOC_FME_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(FME));
+  fprintf(tf,"\n%7ld (%5.1f%%) thread state objects",
+	ALLOC_BF_ctr,
+	PC(INTAVG(ALLOC_BF_ctr, tot_allocs)));
+  if (ALLOC_BF_ctr != 0)
+      fprintf(tf,"\t\t%5.1f %5.1f %5.1f %5.1f %5.1f", ALLOC_HISTO_MAGIC(BF));
+# endif
+#endif
+  fprintf(tf,"\n");
+
+  fprintf(tf,"\nTotal storage-manager allocations: %ld (%ld words)\n\t[%ld words lost to speculative heap-checks]\n", ALLOC_HEAP_ctr, ALLOC_HEAP_tot, ALLOC_HEAP_tot - tot_wds);
+
+  fprintf(tf,"\nSTACK USAGE:\n"); /* NB: some bits are direction sensitive */
+  fprintf(tf,"\tA stack slots stubbed: %ld\n", A_STK_STUB_ctr);
+/* not used at all
+  fprintf(tf,"\tA stack slots re-used: %ld\n", A_STK_REUSE_ctr);
+  fprintf(tf,"\tB stack slots re-used: %ld\n", B_STK_REUSE_ctr);
+*/
+#ifndef CONCURRENT
+  fprintf(tf,"\tA stack max. depth: %ld words\n",
+		(I_) (stackInfo.botA - max_SpA));
+  fprintf(tf,"\tB stack max. depth: %ld words\n",
+		(I_) (max_SpB - stackInfo.botB));	/* And cheating, too (ToDo) */
+#endif
+
+  fprintf(tf,"\nENTERS: %ld  of which %ld (%.1f%%) direct to the entry code\n\t\t  [the rest indirected via Node's info ptr]\n",
+	tot_enters,
+	jump_direct_enters,
+	PC(INTAVG(jump_direct_enters,tot_enters)));
+  fprintf(tf,"%7ld (%5.1f%%) thunks\n",
+	ENT_THK_ctr,
+	PC(INTAVG(ENT_THK_ctr,tot_enters)));
+  fprintf(tf,"%7ld (%5.1f%%) data values\n",
+	ENT_CON_ctr,
+	PC(INTAVG(ENT_CON_ctr,tot_enters)));
+  fprintf(tf,"%7ld (%5.1f%%) function values\n\t\t  [of which %ld (%.1f%%) bypassed arg-satisfaction chk]\n",
+	ENT_FUN_DIRECT_ctr,
+	PC(INTAVG(ENT_FUN_DIRECT_ctr,tot_enters)),
+	bypass_enters,
+	PC(INTAVG(bypass_enters,ENT_FUN_DIRECT_ctr)));
+  fprintf(tf,"%7ld (%5.1f%%) partial applications\n",
+	ENT_PAP_ctr,
+	PC(INTAVG(ENT_PAP_ctr,tot_enters)));
+  fprintf(tf,"%7ld (%5.1f%%) indirections\n",
+	ENT_IND_ctr,
+	PC(INTAVG(ENT_IND_ctr,tot_enters)));
+
+  fprintf(tf,"\nRETURNS: %ld\n", tot_returns);
+  fprintf(tf,"%7ld (%5.1f%%) in registers [the rest in the heap]\n",
+	tot_returns_in_regs,
+	PC(INTAVG(tot_returns_in_regs,tot_returns)));
+  fprintf(tf,"%7ld (%5.1f%%) from entering a new constructor\n\t\t  [the rest from entering an existing constructor]\n",
+	tot_returns_of_new,
+	PC(INTAVG(tot_returns_of_new,tot_returns)));
+  fprintf(tf,"%7ld (%5.1f%%) vectored [the rest unvectored]\n",
+	VEC_RETURN_ctr,
+	PC(INTAVG(VEC_RETURN_ctr,tot_returns)));
+
+/*
+  fprintf(tf, "RET_xxx: %7ld: ", RET_xxx_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
+				PC(INTAVG(RET_xxx_hst[i],RET_xxx_ctr))); }
+  fprintf(tf, "\n");
+*/
+  fprintf(tf, "\nRET_OLD_IN_REGS: %7ld: ", RET_OLD_IN_REGS_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
+				PC(INTAVG(RET_OLD_IN_REGS_hst[i],RET_OLD_IN_REGS_ctr))); }
+  fprintf(tf, "\n");
+  fprintf(tf, "RET_NEW_IN_REGS: %7ld: ", RET_NEW_IN_REGS_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
+			    PC(INTAVG(RET_NEW_IN_REGS_hst[i],RET_NEW_IN_REGS_ctr))); }
+  fprintf(tf, "\n");
+  fprintf(tf, "RET_OLD_IN_HEAP: %7ld: ", RET_OLD_IN_HEAP_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
+				PC(INTAVG(RET_OLD_IN_HEAP_hst[i],RET_OLD_IN_HEAP_ctr))); }
+  fprintf(tf, "\n");
+  fprintf(tf, "RET_NEW_IN_HEAP: %7ld: ", RET_NEW_IN_HEAP_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
+				PC(INTAVG(RET_NEW_IN_HEAP_hst[i],RET_NEW_IN_HEAP_ctr))); }
+  fprintf(tf, "\n");
+  fprintf(tf, "\nRET_VEC_RETURN : %7ld: ", VEC_RETURN_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%5.1f%%",
+				PC(INTAVG(RET_VEC_RETURN_hst[i],VEC_RETURN_ctr))); }
+  fprintf(tf, "\n");
+
+  fprintf(tf,"\nUPDATE FRAMES: %ld (%ld omitted from thunks)\n",
+	tot_upd_frames,
+	UPDF_OMITTED_ctr);
+  fprintf(tf,"%7ld (%5.1f%%) standard frames\n",
+	UPDF_STD_PUSHED_ctr,
+	PC(INTAVG(UPDF_STD_PUSHED_ctr,tot_upd_frames)));
+  fprintf(tf,"%7ld (%5.1f%%) constructor frames\n",
+	UPDF_CON_PUSHED_ctr,
+	PC(INTAVG(UPDF_CON_PUSHED_ctr,tot_upd_frames)));
+  fprintf(tf,"\t\t  [of which %ld (%.1f%%) were for black-holes]\n",
+	UPDF_HOLE_PUSHED_ctr,
+	PC(INTAVG(UPDF_HOLE_PUSHED_ctr,UPDF_CON_PUSHED_ctr)));  /*DBH*/
+
+  if (UPDF_RCC_PUSHED_ctr != 0)
+     fprintf(tf,"%7ld restore cost centre frames (%ld omitted)\n",
+	UPDF_RCC_PUSHED_ctr,
+	UPDF_RCC_OMITTED_ctr);
+
+  fprintf(tf,"\nUPDATES: %ld\n", tot_updates);
+  fprintf(tf,"%7ld (%5.1f%%) data values\n\t\t  [%ld in place, %ld allocated new space, %ld with Node]\n",
+	con_updates,
+	PC(INTAVG(con_updates,tot_updates)),
+	UPD_CON_IN_PLACE_ctr, UPD_CON_IN_NEW_ctr, UPD_CON_W_NODE_ctr);
+  fprintf(tf,"%7ld (%5.1f%%) partial applications\n\t\t  [%ld in place, %ld allocated new space]\n",
+	pap_updates,
+	PC(INTAVG(pap_updates,tot_updates)),
+	UPD_PAP_IN_PLACE_ctr, UPD_PAP_IN_NEW_ctr);
+  fprintf(tf,"%7ld (%5.1f%%) updates to existing heap objects (%ld by squeezing)\n",
+	UPD_EXISTING_ctr + UPD_SQUEEZED_ctr,
+	PC(INTAVG(UPD_EXISTING_ctr + UPD_SQUEEZED_ctr, tot_updates)),
+	UPD_SQUEEZED_ctr);
+  fprintf(tf,"%7ld (%5.1f%%) in-place updates copied\n",
+	UPD_IN_PLACE_COPY_ctr,
+	PC(INTAVG(UPD_IN_PLACE_COPY_ctr,tot_in_place_updates)));
+#if 0
+  if (UPD_ENTERED_ctr != 0) {
+      fprintf(tf,"%7ld (%5.1f%%) subsequently entered\n",
+	      UPD_ENTERED_ctr,
+	      PC(INTAVG(UPD_ENTERED_ctr,tot_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) subsequently entered more than once\n",
+	      UPD_ENTERED_AGAIN_ctr,
+	      PC(INTAVG(UPD_ENTERED_AGAIN_ctr,tot_updates)));
+  }
+#endif
+/*
+  fprintf(tf, "UPD_xxx: %7ld: ", UPD_xxx_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_xxx_hst[i]); }
+  fprintf(tf, "\n");
+*/
+  fprintf(tf, "UPD_CON_IN_PLACE: %7ld: ", UPD_CON_IN_PLACE_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_PLACE_hst[i]); }
+  fprintf(tf, "\n");
+  fprintf(tf, "UPD_CON_IN_NEW:   %7ld: ", UPD_CON_IN_NEW_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_CON_IN_NEW_hst[i]); }
+  fprintf(tf, "\n");
+  fprintf(tf, "UPD_PAP_IN_NEW:   %7ld: ", UPD_PAP_IN_NEW_ctr);
+  for (i = 0; i < 9; i++) { fprintf(tf, "%7ld", UPD_PAP_IN_NEW_hst[i]); }
+  fprintf(tf, "\n");
+
+  if (tot_gengc_updates != 0) {
+      fprintf(tf,"\nNEW GEN UPDATES: %ld (%5.1f%%)\n",
+	      tot_new_updates,
+	      PC(INTAVG(tot_new_updates,tot_gengc_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) indirections\n",
+	      UPD_NEW_IND_ctr,
+	      PC(INTAVG(UPD_NEW_IND_ctr,tot_gengc_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) inplace with ptrs\n",
+	      UPD_NEW_IN_PLACE_PTRS_ctr,
+	      PC(INTAVG(UPD_NEW_IN_PLACE_PTRS_ctr,tot_gengc_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) inplace without ptrs\n",
+	      UPD_NEW_IN_PLACE_NOPTRS_ctr,
+	      PC(INTAVG(UPD_NEW_IN_PLACE_NOPTRS_ctr,tot_gengc_updates)));
+      fprintf(tf,"\nOLD GEN UPDATES: %ld (%5.1f%%)\n",
+	      tot_old_updates,
+	      PC(INTAVG(tot_old_updates,tot_gengc_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) indirections\n",
+	      UPD_OLD_IND_ctr,
+	      PC(INTAVG(UPD_OLD_IND_ctr,tot_gengc_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) inplace with ptrs\n",
+	      UPD_OLD_IN_PLACE_PTRS_ctr,
+	      PC(INTAVG(UPD_OLD_IN_PLACE_PTRS_ctr,tot_gengc_updates)));
+      fprintf(tf,"%7ld (%5.1f%%) inplace without ptrs\n",
+	      UPD_OLD_IN_PLACE_NOPTRS_ctr,
+	      PC(INTAVG(UPD_OLD_IN_PLACE_NOPTRS_ctr,tot_gengc_updates)));
+  }
+
+  printRegisteredCounterInfo(tf);
+
+  fprintf(tf,"\n**************************************************\n");
+
+  /* here, we print out all the raw numbers; these are really
+    more useful when we want to snag them for subsequent
+    rdb-etc processing. WDP 95/11
+  */
+
+#define PR_CTR(ctr) \
+  do { fprintf(tf,"%7ld " #ctr "\n", ctr); } while(0)
+#define PR_HST(hst,i) \
+  do { fprintf(tf,"%7ld " #hst "_" #i "\n", hst[i]); } while(0)
+
+  PR_CTR(ALLOC_HEAP_ctr);
+  PR_CTR(ALLOC_HEAP_tot);
+
+#ifndef CONCURRENT
+  fprintf(tf,"%7ld HWM_SpA\n", (I_) (stackInfo.botA - max_SpA));
+  fprintf(tf,"%7ld HWM_SpB\n", (I_) (max_SpB - stackInfo.botB));
+#endif
+
+  PR_CTR(A_STK_STUB_ctr);
+
+  PR_CTR(ALLOC_FUN_ctr);
+  PR_CTR(ALLOC_FUN_adm);
+  PR_CTR(ALLOC_FUN_gds);
+  PR_CTR(ALLOC_FUN_slp);
+  PR_HST(ALLOC_FUN_hst,0);
+  PR_HST(ALLOC_FUN_hst,1);
+  PR_HST(ALLOC_FUN_hst,2);
+  PR_HST(ALLOC_FUN_hst,3);
+  PR_HST(ALLOC_FUN_hst,4);
+  PR_CTR(ALLOC_THK_ctr);
+  PR_CTR(ALLOC_THK_adm);
+  PR_CTR(ALLOC_THK_gds);
+  PR_CTR(ALLOC_THK_slp);
+  PR_HST(ALLOC_THK_hst,0);
+  PR_HST(ALLOC_THK_hst,1);
+  PR_HST(ALLOC_THK_hst,2);
+  PR_HST(ALLOC_THK_hst,3);
+  PR_HST(ALLOC_THK_hst,4);
+  PR_CTR(ALLOC_CON_ctr);
+  PR_CTR(ALLOC_CON_adm);
+  PR_CTR(ALLOC_CON_gds);
+  PR_CTR(ALLOC_CON_slp);
+  PR_HST(ALLOC_CON_hst,0);
+  PR_HST(ALLOC_CON_hst,1);
+  PR_HST(ALLOC_CON_hst,2);
+  PR_HST(ALLOC_CON_hst,3);
+  PR_HST(ALLOC_CON_hst,4);
+  PR_CTR(ALLOC_TUP_ctr);
+  PR_CTR(ALLOC_TUP_adm);
+  PR_CTR(ALLOC_TUP_gds);
+  PR_CTR(ALLOC_TUP_slp);
+  PR_HST(ALLOC_TUP_hst,0);
+  PR_HST(ALLOC_TUP_hst,1);
+  PR_HST(ALLOC_TUP_hst,2);
+  PR_HST(ALLOC_TUP_hst,3);
+  PR_HST(ALLOC_TUP_hst,4);
+  PR_CTR(ALLOC_BH_ctr);
+  PR_CTR(ALLOC_BH_adm);
+  PR_CTR(ALLOC_BH_gds);
+  PR_CTR(ALLOC_BH_slp);
+  PR_HST(ALLOC_BH_hst,0);
+  PR_HST(ALLOC_BH_hst,1);
+  PR_HST(ALLOC_BH_hst,2);
+  PR_HST(ALLOC_BH_hst,3);
+  PR_HST(ALLOC_BH_hst,4);
+  PR_CTR(ALLOC_PRIM_ctr);
+  PR_CTR(ALLOC_PRIM_adm);
+  PR_CTR(ALLOC_PRIM_gds);
+  PR_CTR(ALLOC_PRIM_slp);
+  PR_HST(ALLOC_PRIM_hst,0);
+  PR_HST(ALLOC_PRIM_hst,1);
+  PR_HST(ALLOC_PRIM_hst,2);
+  PR_HST(ALLOC_PRIM_hst,3);
+  PR_HST(ALLOC_PRIM_hst,4);
+  PR_CTR(ALLOC_UPD_PAP_ctr);
+  PR_CTR(ALLOC_UPD_PAP_adm);
+  PR_CTR(ALLOC_UPD_PAP_gds);
+  PR_CTR(ALLOC_UPD_PAP_slp);
+  PR_HST(ALLOC_UPD_PAP_hst,0);
+  PR_HST(ALLOC_UPD_PAP_hst,1);
+  PR_HST(ALLOC_UPD_PAP_hst,2);
+  PR_HST(ALLOC_UPD_PAP_hst,3);
+  PR_HST(ALLOC_UPD_PAP_hst,4);
+
+#ifdef CONCURRENT
+  PR_CTR(ALLOC_STK_ctr);
+  PR_CTR(ALLOC_STK_adm);
+  PR_CTR(ALLOC_STK_gds);
+  PR_CTR(ALLOC_STK_slp);
+  PR_HST(ALLOC_STK_hst,0);
+  PR_HST(ALLOC_STK_hst,1);
+  PR_HST(ALLOC_STK_hst,2);
+  PR_HST(ALLOC_STK_hst,3);
+  PR_HST(ALLOC_STK_hst,4);
+  PR_CTR(ALLOC_TSO_ctr);
+  PR_CTR(ALLOC_TSO_adm);
+  PR_CTR(ALLOC_TSO_gds);
+  PR_CTR(ALLOC_TSO_slp);
+  PR_HST(ALLOC_TSO_hst,0);
+  PR_HST(ALLOC_TSO_hst,1);
+  PR_HST(ALLOC_TSO_hst,2);
+  PR_HST(ALLOC_TSO_hst,3);
+  PR_HST(ALLOC_TSO_hst,4);
+
+# ifdef PAR
+  PR_CTR(ALLOC_FMBQ_ctr);
+  PR_CTR(ALLOC_FMBQ_adm);
+  PR_CTR(ALLOC_FMBQ_gds);
+  PR_CTR(ALLOC_FMBQ_slp);
+  PR_HST(ALLOC_FMBQ_hst,0);
+  PR_HST(ALLOC_FMBQ_hst,1);
+  PR_HST(ALLOC_FMBQ_hst,2);
+  PR_HST(ALLOC_FMBQ_hst,3);
+  PR_HST(ALLOC_FMBQ_hst,4);
+  PR_CTR(ALLOC_FME_ctr);
+  PR_CTR(ALLOC_FME_adm);
+  PR_CTR(ALLOC_FME_gds);
+  PR_CTR(ALLOC_FME_slp);
+  PR_HST(ALLOC_FME_hst,0);
+  PR_HST(ALLOC_FME_hst,1);
+  PR_HST(ALLOC_FME_hst,2);
+  PR_HST(ALLOC_FME_hst,3);
+  PR_HST(ALLOC_FME_hst,4);
+  PR_CTR(ALLOC_BF_ctr);
+  PR_CTR(ALLOC_BF_adm);
+  PR_CTR(ALLOC_BF_gds);
+  PR_CTR(ALLOC_BF_slp);
+  PR_HST(ALLOC_BF_hst,0);
+  PR_HST(ALLOC_BF_hst,1);
+  PR_HST(ALLOC_BF_hst,2);
+  PR_HST(ALLOC_BF_hst,3);
+  PR_HST(ALLOC_BF_hst,4);
+# endif
+#endif
+
+  PR_CTR(ENT_VIA_NODE_ctr);
+  PR_CTR(ENT_CON_ctr);
+  PR_CTR(ENT_FUN_STD_ctr);
+  PR_CTR(ENT_FUN_DIRECT_ctr);
+  PR_CTR(ENT_IND_ctr);
+  PR_CTR(ENT_PAP_ctr);
+  PR_CTR(ENT_THK_ctr);
+
+  PR_CTR(RET_NEW_IN_HEAP_ctr);
+  PR_CTR(RET_NEW_IN_REGS_ctr);
+  PR_CTR(RET_OLD_IN_HEAP_ctr);
+  PR_CTR(RET_OLD_IN_REGS_ctr);
+  PR_CTR(RET_SEMI_BY_DEFAULT_ctr);
+  PR_CTR(RET_SEMI_IN_HEAP_ctr);
+  PR_CTR(RET_SEMI_IN_REGS_ctr);
+  PR_CTR(RET_SEMI_FAILED_IND_ctr);
+  PR_CTR(RET_SEMI_FAILED_UNEVAL_ctr);
+  PR_CTR(VEC_RETURN_ctr);
+
+  PR_HST(RET_NEW_IN_HEAP_hst,0);
+  PR_HST(RET_NEW_IN_HEAP_hst,1);
+  PR_HST(RET_NEW_IN_HEAP_hst,2);
+  PR_HST(RET_NEW_IN_HEAP_hst,3);
+  PR_HST(RET_NEW_IN_HEAP_hst,4);
+  PR_HST(RET_NEW_IN_HEAP_hst,5);
+  PR_HST(RET_NEW_IN_HEAP_hst,6);
+  PR_HST(RET_NEW_IN_HEAP_hst,7);
+  PR_HST(RET_NEW_IN_HEAP_hst,8);
+  PR_HST(RET_NEW_IN_REGS_hst,0);
+  PR_HST(RET_NEW_IN_REGS_hst,1);
+  PR_HST(RET_NEW_IN_REGS_hst,2);
+  PR_HST(RET_NEW_IN_REGS_hst,3);
+  PR_HST(RET_NEW_IN_REGS_hst,4);
+  PR_HST(RET_NEW_IN_REGS_hst,5);
+  PR_HST(RET_NEW_IN_REGS_hst,6);
+  PR_HST(RET_NEW_IN_REGS_hst,7);
+  PR_HST(RET_NEW_IN_REGS_hst,8);
+  PR_HST(RET_OLD_IN_HEAP_hst,0);
+  PR_HST(RET_OLD_IN_HEAP_hst,1);
+  PR_HST(RET_OLD_IN_HEAP_hst,2);
+  PR_HST(RET_OLD_IN_HEAP_hst,3);
+  PR_HST(RET_OLD_IN_HEAP_hst,4);
+  PR_HST(RET_OLD_IN_HEAP_hst,5);
+  PR_HST(RET_OLD_IN_HEAP_hst,6);
+  PR_HST(RET_OLD_IN_HEAP_hst,7);
+  PR_HST(RET_OLD_IN_HEAP_hst,8);
+  PR_HST(RET_OLD_IN_REGS_hst,0);
+  PR_HST(RET_OLD_IN_REGS_hst,1);
+  PR_HST(RET_OLD_IN_REGS_hst,2);
+  PR_HST(RET_OLD_IN_REGS_hst,3);
+  PR_HST(RET_OLD_IN_REGS_hst,4);
+  PR_HST(RET_OLD_IN_REGS_hst,5);
+  PR_HST(RET_OLD_IN_REGS_hst,6);
+  PR_HST(RET_OLD_IN_REGS_hst,7);
+  PR_HST(RET_OLD_IN_REGS_hst,8);
+  PR_HST(RET_SEMI_IN_HEAP_hst,0);
+  PR_HST(RET_SEMI_IN_HEAP_hst,1);
+  PR_HST(RET_SEMI_IN_HEAP_hst,2);
+  PR_HST(RET_SEMI_IN_HEAP_hst,3);
+  PR_HST(RET_SEMI_IN_HEAP_hst,4);
+  PR_HST(RET_SEMI_IN_HEAP_hst,5);
+  PR_HST(RET_SEMI_IN_HEAP_hst,6);
+  PR_HST(RET_SEMI_IN_HEAP_hst,7);
+  PR_HST(RET_SEMI_IN_HEAP_hst,8);
+  PR_HST(RET_SEMI_IN_REGS_hst,0);
+  PR_HST(RET_SEMI_IN_REGS_hst,1);
+  PR_HST(RET_SEMI_IN_REGS_hst,2);
+  PR_HST(RET_SEMI_IN_REGS_hst,3);
+  PR_HST(RET_SEMI_IN_REGS_hst,4);
+  PR_HST(RET_SEMI_IN_REGS_hst,5);
+  PR_HST(RET_SEMI_IN_REGS_hst,6);
+  PR_HST(RET_SEMI_IN_REGS_hst,7);
+  PR_HST(RET_SEMI_IN_REGS_hst,8);
+  PR_HST(RET_VEC_RETURN_hst,0);
+  PR_HST(RET_VEC_RETURN_hst,1);
+  PR_HST(RET_VEC_RETURN_hst,2);
+  PR_HST(RET_VEC_RETURN_hst,3);
+  PR_HST(RET_VEC_RETURN_hst,4);
+  PR_HST(RET_VEC_RETURN_hst,5);
+  PR_HST(RET_VEC_RETURN_hst,6);
+  PR_HST(RET_VEC_RETURN_hst,7);
+  PR_HST(RET_VEC_RETURN_hst,8);
+
+  PR_CTR(RET_SEMI_loads_avoided);
+
+  PR_CTR(UPDF_OMITTED_ctr);
+  PR_CTR(UPDF_STD_PUSHED_ctr);
+  PR_CTR(UPDF_CON_PUSHED_ctr);
+  PR_CTR(UPDF_HOLE_PUSHED_ctr);
+
+  PR_CTR(UPDF_RCC_PUSHED_ctr);
+  PR_CTR(UPDF_RCC_OMITTED_ctr);
+
+  PR_CTR(UPD_EXISTING_ctr);
+  PR_CTR(UPD_SQUEEZED_ctr);
+  PR_CTR(UPD_CON_W_NODE_ctr);
+  PR_CTR(UPD_CON_IN_PLACE_ctr);
+  PR_CTR(UPD_CON_IN_NEW_ctr);
+  PR_CTR(UPD_PAP_IN_PLACE_ctr);
+  PR_CTR(UPD_PAP_IN_NEW_ctr);
+
+  PR_HST(UPD_CON_IN_PLACE_hst,0);
+  PR_HST(UPD_CON_IN_PLACE_hst,1);
+  PR_HST(UPD_CON_IN_PLACE_hst,2);
+  PR_HST(UPD_CON_IN_PLACE_hst,3);
+  PR_HST(UPD_CON_IN_PLACE_hst,4);
+  PR_HST(UPD_CON_IN_PLACE_hst,5);
+  PR_HST(UPD_CON_IN_PLACE_hst,6);
+  PR_HST(UPD_CON_IN_PLACE_hst,7);
+  PR_HST(UPD_CON_IN_PLACE_hst,8);
+  PR_HST(UPD_CON_IN_NEW_hst,0);
+  PR_HST(UPD_CON_IN_NEW_hst,1);
+  PR_HST(UPD_CON_IN_NEW_hst,2);
+  PR_HST(UPD_CON_IN_NEW_hst,3);
+  PR_HST(UPD_CON_IN_NEW_hst,4);
+  PR_HST(UPD_CON_IN_NEW_hst,5);
+  PR_HST(UPD_CON_IN_NEW_hst,6);
+  PR_HST(UPD_CON_IN_NEW_hst,7);
+  PR_HST(UPD_CON_IN_NEW_hst,8);
+  PR_HST(UPD_PAP_IN_NEW_hst,0);
+  PR_HST(UPD_PAP_IN_NEW_hst,1);
+  PR_HST(UPD_PAP_IN_NEW_hst,2);
+  PR_HST(UPD_PAP_IN_NEW_hst,3);
+  PR_HST(UPD_PAP_IN_NEW_hst,4);
+  PR_HST(UPD_PAP_IN_NEW_hst,5);
+  PR_HST(UPD_PAP_IN_NEW_hst,6);
+  PR_HST(UPD_PAP_IN_NEW_hst,7);
+  PR_HST(UPD_PAP_IN_NEW_hst,8);
+
+  PR_HST(UPD_ENTERED_hst,0);
+  PR_HST(UPD_ENTERED_hst,1);
+  PR_HST(UPD_ENTERED_hst,2);
+  PR_HST(UPD_ENTERED_hst,3);
+  PR_HST(UPD_ENTERED_hst,4);
+  PR_HST(UPD_ENTERED_hst,5);
+  PR_HST(UPD_ENTERED_hst,6);
+  PR_HST(UPD_ENTERED_hst,7);
+  PR_HST(UPD_ENTERED_hst,8);
+
+  PR_CTR(UPD_NEW_IND_ctr);
+  PR_CTR(UPD_NEW_IN_PLACE_PTRS_ctr);
+  PR_CTR(UPD_NEW_IN_PLACE_NOPTRS_ctr);
+  PR_CTR(UPD_OLD_IND_ctr);
+  PR_CTR(UPD_OLD_IN_PLACE_PTRS_ctr);
+  PR_CTR(UPD_OLD_IN_PLACE_NOPTRS_ctr);
+
+  PR_CTR(UPD_IN_PLACE_COPY_ctr);
+
+  PR_CTR(GC_SEL_ABANDONED_ctr);
+  PR_CTR(GC_SEL_MINOR_ctr);
+  PR_CTR(GC_SEL_MAJOR_ctr);
+  PR_CTR(GC_SHORT_IND_ctr);
+  PR_CTR(GC_SHORT_CAF_ctr);
+  PR_CTR(GC_COMMON_CHARLIKE_ctr);
+  PR_CTR(GC_COMMON_INTLIKE_ctr);
+  PR_CTR(GC_COMMON_INTLIKE_FAIL_ctr);
+  PR_CTR(GC_COMMON_CONST_ctr);
+}
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[Ticky-ent-counters]{Handle named entry counters}
+%*									*
+%************************************************************************
+
+Data structure used in ``registering'' one of these counters.
+\begin{code}
+struct ent_counter *ListOfEntryCtrs = NULL; /* root of list of them */
+\end{code}
+
+To print out all the registered-counter info:
+\begin{code}
+static void
+printRegisteredCounterInfo (FILE *tf)
+{
+    struct ent_counter *p;
+
+    if ( ListOfEntryCtrs != NULL ) {
+    	fprintf(tf,"\n**************************************************\n");
+    }
+
+    for (p = ListOfEntryCtrs; p != NULL; p = p->link) {
+	/* common stuff first; then the wrapper info if avail */
+	fprintf(tf, "%-40s%u\t%u\t%u\t%-16s%ld",
+		p->f_str,
+		p->arity,
+		p->Astk_args,
+		p->Bstk_args,
+		p->f_arg_kinds,
+		p->ctr);
+
+	if ( p->wrap_str == NULL ) {
+	    fprintf(tf, "\n");
+
+	} else {
+	    fprintf(tf, "\t%s\t%s\n",
+		p->wrap_str,
+		p->wrap_arg_kinds);
+	}
+    }
+}
+\end{code}
+
+That's all, folks.
+\begin{code}
+#endif /* TICKY_TICKY */
+\end{code}

@@ -5,5 +5,4 @@ import CoreSyn(CoreBinding)
 import Id(Id)
 import SplitUniq(SplitUniqSupply)
 workersAndWrappers :: [CoreBinding Id Id] -> SplitUniqSupply -> (GlobalSwitch -> Bool) -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 112 _N_ _N_ _N_ _N_ #-}
 

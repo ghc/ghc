@@ -384,7 +384,7 @@ maybeSingleConstructorTyCon (TupleTyCon arity)	         = Just (mkTupleCon arity
 maybeSingleConstructorTyCon (DataTyCon _ _ _ _ [c] _ _)  = Just c
 maybeSingleConstructorTyCon (DataTyCon _ _ _ _ _   _ _)  = Nothing
 maybeSingleConstructorTyCon (PrimTyCon _ _ _ _)	         = Nothing
-maybeSingleConstructorTyCon (SpecTyCon tc tys)           = panic "maybeSingleConstructorTyCon:SpecTyCon"
+maybeSingleConstructorTyCon tycon@(SpecTyCon tc tys)     = pprPanic "maybeSingleConstructorTyCon:SpecTyCon:" (ppr PprDebug tycon)
 							   -- requires DataCons of TyCon
 \end{code}
 

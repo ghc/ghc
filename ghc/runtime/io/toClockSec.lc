@@ -10,7 +10,7 @@
 #include "timezone.h"
 
 StgAddr 
-toClockSec(year, mon, mday, hour, min, sec, tz)
+toClockSec(year, mon, mday, hour, min, sec, tz, res)
 StgInt year;
 StgInt mon;
 StgInt mday;
@@ -18,9 +18,10 @@ StgInt hour;
 StgInt min;
 StgInt sec;
 StgInt tz;
+StgByteArray res;
 {
     struct tm tm;
-    static time_t t;
+    time_t t;
 
     tm.tm_year = year - 1900;
     tm.tm_mon = mon;
@@ -41,8 +42,9 @@ StgInt tz;
 #endif
     if (t == (time_t) -1)
 	return NULL;
-    else
-	return &t;
+
+    *(time_t *)res = t;
+    return res;
 }
 
 \end{code}

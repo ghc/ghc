@@ -169,8 +169,8 @@ mkStaticAlgReturnCode :: Id		-- The constructor
 mkStaticAlgReturnCode con maybe_info_lbl sequel
   =	-- Generate profiling code if necessary
     (case return_convention of
-	VectoredReturn _ -> profCtrC SLIT("VEC_RETURN") []
-	other		 -> nopC
+	VectoredReturn sz -> profCtrC SLIT("VEC_RETURN") [mkIntCLit sz]
+	other		  -> nopC
     )					`thenC`
 
 	-- Set tag if necessary
@@ -194,7 +194,8 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
 
 				-- Set the info pointer, and jump
 			set_info_ptr		`thenC`
-			absC (CJump (CLbl update_label CodePtrKind))
+			getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+    			absC (CJump (CLbl (update_label isw_chkr) CodePtrKind))
 
 	CaseAlts _ (Just (alts, _)) ->	-- Ho! We know the constructor so
 					-- we can go right to the alternative
@@ -224,9 +225,10 @@ mkStaticAlgReturnCode con maybe_info_lbl sequel
     zero_indexed_tag  = tag - fIRST_TAG	      -- Adjust tag to be zero-indexed
 					      -- cf AbsCFuns.mkAlgAltsCSwitch
 
-    update_label      = case dataReturnConvAlg con of
-			    ReturnInHeap   -> mkStdUpdCodePtrVecLabel tycon tag
-			    ReturnInRegs _ -> mkConUpdCodePtrVecLabel tycon tag
+    update_label isw_chkr
+      = case (dataReturnConvAlg isw_chkr con) of
+	  ReturnInHeap   -> mkStdUpdCodePtrVecLabel tycon tag
+	  ReturnInRegs _ -> mkConUpdCodePtrVecLabel tycon tag
 
     return_info = case return_convention of
 			UnvectoredReturn _ -> DirectReturn
@@ -241,9 +243,9 @@ mkDynamicAlgReturnCode :: TyCon -> CAddrMode -> Sequel -> Code
 
 mkDynamicAlgReturnCode tycon dyn_tag sequel
   = case ctrlReturnConvAlg tycon of
-	VectoredReturn _ ->	
+	VectoredReturn sz ->
 
-		profCtrC SLIT("VEC_RETURN") []	`thenC`
+		profCtrC SLIT("VEC_RETURN") [mkIntCLit sz] `thenC`
 		sequelToAmode sequel		`thenFC` \ ret_addr ->	
 		absC (CReturn ret_addr (DynamicVectoredReturn dyn_tag))
 
@@ -321,9 +323,7 @@ tailCallBusiness :: Id -> CAddrMode	-- Function and its amode
 		 -> Code
 
 tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
-  = profCtrC SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_TAILCALL") IntKind]  `thenC`
-
-    isSwitchSetC EmitArityChecks		`thenFC` \ do_arity_chks ->
+  = isSwitchSetC EmitArityChecks		`thenFC` \ do_arity_chks ->
 
     nodeMustPointToIt lf_info			`thenFC` \ node_points ->
     getEntryConvention fun lf_info
@@ -446,8 +446,6 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 		-- Here, lit.3 is built as a re-entrant thing, which you must enter.
 		-- (OK, the simplifier should have eliminated this, but it's
 		--  easy to deal with the case anyway.)
-
-
 		let
 		    join_details_to_code (load_regs_and_profiling_code, join_lbl)
 			= load_regs_and_profiling_code		`mkAbsCStmts`
@@ -458,14 +456,13 @@ tailCallBusiness fun fun_amode lf_info arg_amodes live_vars pending_assts
 				       | (tag, join_details) <- st_alts
 				       ]
 
-			-- This alternative is for the unevaluated case; oTHER_TAG is -1
-		    un_evald_alt = (mkMachInt oTHER_TAG, enter_jump)
-
-		    enter_jump = CJump (CMacroExpr CodePtrKind ENTRY_CODE [CReg infoptr])
+		    enter_jump
 		      -- Enter Node (we know infoptr will have the info ptr in it)!
-
+		      = mkAbstractCs [
+			CCallProfCtrMacro SLIT("RET_SEMI_FAILED")
+					[CMacroExpr IntKind INFO_TAG [CReg infoptr]],
+			CJump (CMacroExpr CodePtrKind ENTRY_CODE [CReg infoptr]) ]
 		in
-
 			-- Final switch
 		absC (mkAbstractCs [
 			    CAssign (CReg infoptr)

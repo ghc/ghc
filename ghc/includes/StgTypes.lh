@@ -237,7 +237,7 @@ Also include the RTS types for the runtime system modules.
 
 \begin{code}
 
-#include "rtsTypes.h"
+#include "RtsTypes.h"
 
 #endif /* ! STGTYPES_H */
 \end{code}

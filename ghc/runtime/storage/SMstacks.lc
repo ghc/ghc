@@ -16,42 +16,47 @@ EXTDATA_RO(StkO_static_info);
 P_ MainStkO;
 #endif
 
-I_
-initStacks(sm)
-smInfo *sm;
+rtsBool
+initStacks(smInfo *sm)
 {
     /*
      * Allocate them if they don't exist. One space does for both stacks, since they
      * grow towards each other
      */
     if (stks_space == 0) {
-#ifdef CONCURRENT
-	MainStkO = (P_) xmalloc((STKO_HS + SM_word_stk_size) * sizeof(W_));
+#ifndef CONCURRENT
+	stks_space = (P_) stgMallocWords(RTSflags.GcFlags.stksSize, "initStacks");
+#else
+	MainStkO = (P_) stgMallocWords(STKO_HS + RTSflags.GcFlags.stksSize, "initStacks");
 	stks_space = MainStkO + STKO_HS;
         SET_STKO_HDR(MainStkO, StkO_static_info, CC_SUBSUMED);
-        STKO_SIZE(MainStkO) = SM_word_stk_size + STKO_VHS;
+        STKO_SIZE(MainStkO) = RTSflags.GcFlags.stksSize + STKO_VHS;
+        STKO_SpB(MainStkO) = STKO_SuB(MainStkO) = STKO_BSTK_BOT(MainStkO) + BREL(1);
+        STKO_SpA(MainStkO) = STKO_SuA(MainStkO) = STKO_ASTK_BOT(MainStkO) + AREL(1);
         STKO_LINK(MainStkO) = Nil_closure;
     	STKO_RETURN(MainStkO) = NULL;
-#else
-	stks_space = (P_) xmalloc(SM_word_stk_size * sizeof(W_));
+
+	ASSERT(sanityChk_StkO(MainStkO));
 #endif
     }
+
 # if STACK_CHECK_BY_PAGE_FAULT
-    unmapMiddleStackPage((char *) stks_space, SM_word_stk_size * sizeof(W_));
+    unmapMiddleStackPage((char *) stks_space, RTSflags.GcFlags.stksSize * sizeof(W_));
 # endif
 
     /* Initialise Stack Info and pointers */
-    stackInfo.botA = STK_A_FRAME_BASE(stks_space, SM_word_stk_size);
-    stackInfo.botB = STK_B_FRAME_BASE(stks_space, SM_word_stk_size);
+    stackInfo.botA = STK_A_FRAME_BASE(stks_space, RTSflags.GcFlags.stksSize);
+    stackInfo.botB = STK_B_FRAME_BASE(stks_space, RTSflags.GcFlags.stksSize);
 
     MAIN_SuA = MAIN_SpA = stackInfo.botA + AREL(1);
     MAIN_SuB = MAIN_SpB = stackInfo.botB + BREL(1);
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "STACK init: botA, spa: 0x%lx, 0x%lx\n            botB, spb: 0x%lx, 0x%lx\n",
 	  (W_) stackInfo.botA, (W_) MAIN_SpA, (W_) stackInfo.botB, (W_) MAIN_SpB);
 
-    return 0;
+    return rtsTrue;
 }
+
 #endif /* not parallel */
 \end{code}

@@ -18,7 +18,7 @@
 
 /* fwd decls, necessary and otherwise */
 static void ptree   PROTO( (tree) );
-static void plist   PROTO( (void (*)(), list) );
+static void plist   PROTO( (void (*)(/*NOT WORTH IT: void * */), list) );
 static void pid	    PROTO( (id) );
 static void pstr    PROTO( (char *) );
 static void pbool   PROTO( (BOOLEAN) );
@@ -68,8 +68,7 @@ tree t;
    char/string lexer comments.  (WDP 94/11)
 */
 static void
-print_string(str)
-  hstring str;
+print_string(hstring str)
 {
     char *gs;
     char c;
@@ -95,13 +94,12 @@ print_string(str)
 }
 
 static int
-get_character(str)
-  hstring str;
+get_character(hstring str)
 {
     int c = (int)((str->bytes)[0]);
 
     if (str->len != 1) { /* ToDo: assert */
-	fprintf(stderr, "get_character: length != 1? (%d: %s)\n", str->len, str->bytes);
+	fprintf(stderr, "get_character: length != 1? (%ld: %s)\n", str->len, str->bytes);
     }
 
     if (c < 0) {
@@ -112,8 +110,7 @@ get_character(str)
 }
 
 static void
-pliteral(t)
-   literal t;
+pliteral(literal t)
 {
     switch(tliteral(t)) {
       case integer:
@@ -188,7 +185,7 @@ again:
       case par:		t = gpare(t); goto again;
       case hmodule:
 		      PUTTAG('M');
-		      printf("#%u\t",ghmodline(t));
+		      printf("#%lu\t",ghmodline(t));
 		      pid(ghname(t));
 		      pstr(input_filename);
 		      prbind(ghmodlist(t));
@@ -229,7 +226,7 @@ again:
 
       case lambda: 
 		      PUTTAG('l');
-		      printf("#%u\t",glamline(t));
+		      printf("#%lu\t",glamline(t));
 		      plist(ptree,glampats(t));
 		      ptree(glamexpr(t));
 		      break;
@@ -357,7 +354,7 @@ again:
 
 static void
 plist(fun, l)
-  void (*fun)();
+  void (*fun)(/* NOT WORTH IT: void * */);
   list l;
 {
 	if (tlist(l) == lcons) {
@@ -374,7 +371,7 @@ pid(i)
   id i;
 {
   if(hashIds)
-	printf("!%u\t", hash_index(i));
+	printf("!%lu\t", hash_index(i));
   else
 	printf("#%s\t", id_to_string(i));
 }
@@ -393,7 +390,7 @@ prbind(b)
 	switch(tbinding(b)) {
 	case tbind: 
 			  PUTTAG('t');
-			  printf("#%u\t",gtline(b));
+			  printf("#%lu\t",gtline(b));
 			  plist(pttype, gtbindc(b));
 			  plist(pid, gtbindd(b));
 			  pttype(gtbindid(b));
@@ -402,19 +399,19 @@ prbind(b)
 			  break;
 	case nbind	: 
 			  PUTTAG('n');
-			  printf("#%u\t",gnline(b));
+			  printf("#%lu\t",gnline(b));
 			  pttype(gnbindid(b));
 			  pttype(gnbindas(b));
 			  ppragma(gnpragma(b));
 			  break;
 	case pbind	: 
 			  PUTTAG('p');
-			  printf("#%u\t",gpline(b));
+			  printf("#%lu\t",gpline(b));
 			  plist(ppbinding, gpbindl(b));
 			  break;
 	case fbind	: 
 			  PUTTAG('f');
-			  printf("#%u\t",gfline(b));
+			  printf("#%lu\t",gfline(b));
 			  plist(ppbinding, gfbindl(b));
 			  break;
 	case abind	: 
@@ -424,7 +421,7 @@ prbind(b)
 			  break;
 	case cbind	:
 			  PUTTAG('$');
-			  printf("#%u\t",gcline(b));
+			  printf("#%lu\t",gcline(b));
 			  plist(pttype,gcbindc(b));
 			  pttype(gcbindid(b));
 			  prbind(gcbindw(b));
@@ -432,7 +429,7 @@ prbind(b)
 			  break;
 	case ibind	:
 			  PUTTAG('%');
-			  printf("#%u\t",giline(b));
+			  printf("#%lu\t",giline(b));
 			  plist(pttype,gibindc(b));
 			  pid(gibindid(b));
 			  pttype(gibindi(b));
@@ -441,14 +438,14 @@ prbind(b)
 			  break;
 	case dbind	:
 			  PUTTAG('D');
-			  printf("#%u\t",gdline(b));
+			  printf("#%lu\t",gdline(b));
 			  plist(pttype,gdbindts(b));
 			  break;
 
 	/* signature(-like) things, including user pragmas */
 	case sbind	:
 			  PUTTAGSTR("St");
-			  printf("#%u\t",gsline(b));
+			  printf("#%lu\t",gsline(b));
 			  plist(pid,gsbindids(b));
 			  pttype(gsbindid(b));
 			  ppragma(gspragma(b));
@@ -456,41 +453,41 @@ prbind(b)
 
 	case vspec_uprag:
 			  PUTTAGSTR("Ss");
-			  printf("#%u\t",gvspec_line(b));
+			  printf("#%lu\t",gvspec_line(b));
 			  pid(gvspec_id(b));
 			  plist(pttype,gvspec_tys(b));
 			  break;
 	case ispec_uprag:
 			  PUTTAGSTR("SS");
-			  printf("#%u\t",gispec_line(b));
+			  printf("#%lu\t",gispec_line(b));
 			  pid(gispec_clas(b));
 			  pttype(gispec_ty(b));
 			  break;
 	case inline_uprag:
 			  PUTTAGSTR("Si");
-			  printf("#%u\t",ginline_line(b));
+			  printf("#%lu\t",ginline_line(b));
 			  pid(ginline_id(b));
 			  plist(pid,ginline_howto(b));
 			  break;
 	case deforest_uprag:
 			  PUTTAGSTR("Sd");
-			  printf("#%u\t",gdeforest_line(b));
+			  printf("#%lu\t",gdeforest_line(b));
 			  pid(gdeforest_id(b));
 			  break;
 	case magicuf_uprag:
 			  PUTTAGSTR("Su");
-			  printf("#%u\t",gmagicuf_line(b));
+			  printf("#%lu\t",gmagicuf_line(b));
 			  pid(gmagicuf_id(b));
 			  pid(gmagicuf_str(b));
 			  break;
 	case abstract_uprag:
 			  PUTTAGSTR("Sa");
-			  printf("#%u\t",gabstract_line(b));
+			  printf("#%lu\t",gabstract_line(b));
 			  pid(gabstract_id(b));
 			  break;
 	case dspec_uprag:
 			  PUTTAGSTR("Sd");
-			  printf("#%u\t",gdspec_line(b));
+			  printf("#%lu\t",gdspec_line(b));
 			  pid(gdspec_id(b));
 			  plist(pttype,gdspec_tys(b));
 			  break;
@@ -499,14 +496,14 @@ prbind(b)
 
 	case mbind:	  
 			  PUTTAG('7');
-			  printf("#%u\t",gmline(b));
+			  printf("#%lu\t",gmline(b));
 			  pid(gmbindmodn(b));
 			  plist(pentid,gmbindimp(b));
 			  plist(prename,gmbindren(b));
 			  break;
 	case import:	  
 			  PUTTAG('e');
-			  printf("#%u\t",giebindline(b));
+			  printf("#%lu\t",giebindline(b));
 			  pstr(giebindfile(b));
 			  pid(giebindmod(b));
 			  plist(pentid,giebindexp(b));
@@ -515,7 +512,7 @@ prbind(b)
 			  break;
 	case hiding:	  
 			  PUTTAG('h');
-			  printf("#%u\t",gihbindline(b));
+			  printf("#%lu\t",gihbindline(b));
 			  pstr(gihbindfile(b));
 			  pid(gihbindmod(b));
 			  plist(pentid,gihbindexp(b));
@@ -597,7 +594,7 @@ patype(a)
 	switch (tatype(a)) {
 	case atc	: 
 			  PUTTAG('1');
-			  printf("#%u\t",gatcline(a));
+			  printf("#%lu\t",gatcline(a));
 			  pid(gatcid(a));
 			  plist(pttype, gatctypel(a));
 			  break;
@@ -659,7 +656,7 @@ pfixes()
 			PUTTAG('L');
 			pstr(fixop(i));
 			pstr(fixtype(i));
-			printf("#%u\t",precedence(i));
+			printf("#%lu\t",precedence(i));
 		}
 	}
 	PUTTAG('N');
@@ -672,7 +669,7 @@ ppbinding(p)
 {
 	switch(tpbinding(p)) {
 	case pgrhs	: PUTTAG('W');
-  			  printf("#%u\t",ggline(p));
+  			  printf("#%lu\t",ggline(p));
 	  		  pid(ggfuncname(p));
 			  ptree(ggpat(p));
 			  plist(pgrhses,ggdexprs(p));

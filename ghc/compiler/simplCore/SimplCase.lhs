@@ -54,7 +54,8 @@ simplCase :: SimplEnv
 	  -> SmplM OutExpr
 
 simplCase env (CoLet bind body) alts rhs_c result_ty
-  = 	-- Float the let outside the case scrutinee
+  | not (switchIsSet env SimplNoLetFromCase)
+  = 	-- Float the let outside the case scrutinee (if not disabled by flag)
     tick LetFloatFromCase		`thenSmpl_`
     simplBind env bind (\env -> simplCase env body alts rhs_c result_ty) result_ty
 \end{code}

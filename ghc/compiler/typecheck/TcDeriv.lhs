@@ -588,7 +588,7 @@ gen_inst_info modname fixities deriver_name_funs
     if not (isEmptyBag errs) then
 	pprPanic "gen_inst_info:renamer errs!\n" (ppAbove (pprBagOfErrors PprDebug errs) (ppr PprDebug proto_mbinds))
     else
-    --pprTrace "derived binds:" (ppr PprDebug proto_mbinds) (
+--  pprTrace "derived binds:" (ppr PprDebug proto_mbinds) $
 
 	-- All done
     let 
@@ -599,7 +599,6 @@ gen_inst_info modname fixities deriver_name_funs
 		       -- and here comes the main point...
 		       (if from_here then mbinds else EmptyMonoBinds)
 		       from_here modname locn [])
-    --)
   where
     clas_key = getClassKey clas
     clas_Name

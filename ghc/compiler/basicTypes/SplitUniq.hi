@@ -1,31 +1,18 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface SplitUniq where
-import Unique(Unique, mkUniqueGrimily)
+import Unique(Unique)
 type SUniqSM a = SplitUniqSupply -> a
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data SplitUniqSupply 
+data Unique 
 getSUnique :: SplitUniqSupply -> Unique
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(P)AA)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int#) -> _!_ _ORIG_ Unique MkUnique [] [u0] _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: SplitUniqSupply) -> case u0 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u1 :: Int) (u2 :: SplitUniqSupply) (u3 :: SplitUniqSupply) -> case u1 of { _ALG_ I# (u4 :: Int#) -> _!_ _ORIG_ Unique MkUnique [] [u4]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 getSUniqueAndDepleted :: SplitUniqSupply -> (Unique, SplitUniqSupply)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(U(P)LA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getSUniques :: Int -> SplitUniqSupply -> [Unique]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(P)L" {_A_ 2 _U_ 21 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getSUniquesAndDepleted :: Int -> SplitUniqSupply -> ([Unique], SplitUniqSupply)
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 initSUs :: SplitUniqSupply -> (SplitUniqSupply -> a) -> (SplitUniqSupply, a)
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(ALL)L" {_A_ 3 _U_ 221 _N_ _N_ _F_ _IF_ARGS_ 1 3 XXX 6 _/\_ u0 -> \ (u1 :: SplitUniqSupply) (u2 :: SplitUniqSupply) (u3 :: SplitUniqSupply -> u0) -> let {(u4 :: u0) = _APP_  u3 [ u1 ]} in _!_ _TUP_2 [SplitUniqSupply, u0] [u2, u4] _N_} _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: SplitUniqSupply) (u2 :: SplitUniqSupply -> u0) -> case u1 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u3 :: Int) (u4 :: SplitUniqSupply) (u5 :: SplitUniqSupply) -> let {(u6 :: u0) = _APP_  u2 [ u4 ]} in _!_ _TUP_2 [SplitUniqSupply, u0] [u5, u6]; _NO_DEFLT_ } _N_ #-}
 mapAndUnzipSUs :: (a -> SplitUniqSupply -> (b, c)) -> [a] -> SplitUniqSupply -> ([b], [c])
-	{-# GHC_PRAGMA _A_ 2 _U_ 212 _N_ _S_ "LS" _N_ _N_ #-}
 mapSUs :: (a -> SplitUniqSupply -> b) -> [a] -> SplitUniqSupply -> [b]
-	{-# GHC_PRAGMA _A_ 2 _U_ 212 _N_ _S_ "LS" _N_ _N_ #-}
 mkSplitUniqSupply :: Char -> _State _RealWorld -> (SplitUniqSupply, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
-mkUniqueGrimily :: Int# -> Unique
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "P" _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int#) -> _!_ _ORIG_ Unique MkUnique [] [u0] _N_ #-}
 returnSUs :: a -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 2 _U_ 10 _N_ _S_ "SL" _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: u0) (u2 :: SplitUniqSupply) -> u1 _N_ #-}
 splitUniqSupply :: SplitUniqSupply -> (SplitUniqSupply, SplitUniqSupply)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _ALWAYS_ \ (u0 :: SplitUniqSupply) -> case u0 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u1 :: Int) (u2 :: SplitUniqSupply) (u3 :: SplitUniqSupply) -> _!_ _TUP_2 [SplitUniqSupply, SplitUniqSupply] [u2, u3]; _NO_DEFLT_ } _N_ #-}
 thenSUs :: (SplitUniqSupply -> a) -> (a -> SplitUniqSupply -> b) -> SplitUniqSupply -> b
-	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LSS" _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: SplitUniqSupply -> u0) (u3 :: u0 -> SplitUniqSupply -> u1) (u4 :: SplitUniqSupply) -> case _APP_  _ORIG_ SplitUniq splitUniqSupply [ u4 ] of { _ALG_ _TUP_2 (u5 :: SplitUniqSupply) (u6 :: SplitUniqSupply) -> let {(u7 :: u0) = _APP_  u2 [ u5 ]} in _APP_  u3 [ u7, u6 ]; _NO_DEFLT_ } _N_ #-}
 

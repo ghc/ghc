@@ -508,6 +508,13 @@ doIfaceImport1 orig_to_pn local_to_pn acc (IEThingAbs orig_name)
 doIfaceImport1 orig_to_pn local_to_pn acc (IEThingAll orig_name)
   = int_import1_help orig_to_pn local_to_pn acc orig_name
 
+-- the next ones will go away with 1.3:
+doIfaceImport1 orig_to_pn local_to_pn acc (IEConWithCons orig_name _)
+  = int_import1_help orig_to_pn local_to_pn acc orig_name
+
+doIfaceImport1 orig_to_pn local_to_pn acc (IEClsWithOps orig_name _)
+  = int_import1_help orig_to_pn local_to_pn acc orig_name
+
 doIfaceImport1 orig_to_pn local_to_pn (v_bag, tc_bag) other
   = panic "Rename1: strange import decl"
 

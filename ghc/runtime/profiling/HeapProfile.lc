@@ -1,4 +1,4 @@
-Only have cost centres etc if @USE_COST_CENTRES@ defined
+Only have cost centres etc if @PROFILING@ defined
 
 \begin{code}
 /* 
@@ -13,9 +13,9 @@ Only have cost centres etc if @USE_COST_CENTRES@ defined
  */
 
 #define NULL_REG_MAP
-#include "../storage/SMinternal.h"  /* for xmalloc */
+#include "../storage/SMinternal.h" /* for ???? */
 
-#if defined (USE_COST_CENTRES)
+#if defined (PROFILING)
 \end{code}
 
 %************************************************************************
@@ -50,13 +50,9 @@ etc words are disregarded. The profiling itself is considered an
 idealised process which should not affect the statistics gathered.
 
 \begin{code}
-
 #define MAX_SELECT 10
 
-I_ heap_profiling_req
-    = HEAP_NO_PROFILING; /* type of heap profiling */
-
-static char heap_profiling_char[]           /* indexed by heap_profiling_req */
+static char heap_profiling_char[] /* indexed by RTSflags.ProfFlags.doHeapProfile */
     = {'?', CCchar, MODchar, GRPchar, DESCRchar, TYPEchar, TIMEchar};
 
 static I_  cc_select = 0;                  /* are we selecting on Cost Centre */
@@ -79,10 +75,7 @@ static I_   kind_select_no = 0;
 static I_   kind_selected[]    = {0, 0, 0, 0, 0, 0};
 static char *kind_select_strs[] = {"","CON","FN","PAP","THK","BH",0};
 
-static I_   age_select = 0;       /* select ages greater than this */
-                                  /* 0 indicates survived to the end of alloced interval */
-
-I_ *resid = 0;                    /* residencies indexed by hashed feature */
+I_ *resid = 0;	/* residencies indexed by hashed feature */
 
 /* For production times we have a resid table of time_intervals */
 /* And a seperate resid counter stuff produced earlier & later  */
@@ -96,7 +89,8 @@ hash_t time_intervals = 18;   /* No of time_intervals, also earlier & later */
 
 static hash_t earlier_intervals;     /* No of earlier intervals grouped together + 1*/
 
-hash_t dummy_index_time()
+hash_t
+dummy_index_time(STG_NO_ARGS)
 {
     return time_intervals;
 }
@@ -114,27 +108,22 @@ hash_t (* init_index_fns[])() = {
 static char heap_filename[STATS_FILENAME_MAXLEN]; /* heap log file name = <program>.hp */
 static FILE *heap_file = NULL;
 
-extern I_ SM_force_gc; /* Set here if we force 2-space GC */
-
 I_
-heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
+heap_profile_init(cc_select_str, mod_select_str, grp_select_str,
 		  descr_select_str, type_select_str, kind_select_str,
-		  select_age, argv) 
-    I_ prof;
+		  argv) 
     char *cc_select_str;
     char *mod_select_str;
     char *grp_select_str;
     char *descr_select_str;
     char *type_select_str;
     char *kind_select_str;
-    I_  select_age;
     char *argv[];
 {
     hash_t count, max, first;
+    W_ heap_prof_style;
 
-    heap_profiling_req = prof;
-
-    if (heap_profiling_req == HEAP_NO_PROFILING)
+    if (! RTSflags.ProfFlags.doHeapProfile)
 	return 0;
 
     /* for now, if using a generational collector and trying
@@ -142,15 +131,10 @@ heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
 	WDP 94/07
     */
 #if defined(GCap) || defined(GCgn)
-    SM_force_gc = USE_2s;
+    RTSflags.GcFlags.force2s = rtsTrue;
 #endif
 
-#if ! defined(HEAP_PROF_WITH_AGE)
-    if (heap_profiling_req == HEAP_BY_TIME || select_age) {
-	fprintf(stderr, "heap_profile_init: Heap Profiling not built with AGE field in closures\n");
-	return 1;
-    }
-#endif /* ! HEAP_PROF_WITH_AGE */
+    heap_prof_style = RTSflags.ProfFlags.doHeapProfile;
 
     /* process select strings -- will break them into bits */
     
@@ -276,8 +260,6 @@ heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
 	}
 	clcat_select |= kind_select_no > 0;
     }
-    age_select = select_age;
-
     
     /* open heap profiling log file */
     
@@ -290,8 +272,8 @@ heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
     /* write start of log file */
     
     fprintf(heap_file, "JOB \"%s", argv[0]);
-    fprintf(heap_file, " +RTS -h%c", heap_profiling_char[heap_profiling_req]);
-    if (heap_profiling_req == HEAP_BY_TIME) {
+    fprintf(heap_file, " +RTS -h%c", heap_profiling_char[heap_prof_style]);
+    if (heap_prof_style == HEAP_BY_TIME) {
 	fprintf(heap_file, "%ld", time_intervals);
 	if (earlier_ticks) {
 	    fprintf(heap_file, ",%3.1f",
@@ -342,9 +324,7 @@ heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
 	    }
 	fprintf(heap_file, "}");
     }
-    if (select_age) {
-	fprintf(heap_file, " -a%ld", age_select);
-    }
+
     fprintf(heap_file, " -i%4.2f -RTS", interval_ticks/(StgFloat)TICK_FREQUENCY);
     for(count = 1; argv[count]; count++)
 	fprintf(heap_file, " %s", argv[count]);
@@ -362,9 +342,11 @@ heap_profile_init(prof, cc_select_str, mod_select_str, grp_select_str,
     /* initialise required heap profiling data structures & hashing */
     
     earlier_intervals = (earlier_ticks / interval_ticks) + 1;
-    max = (* init_index_fns[heap_profiling_req])();
-    resid = (I_ *) xmalloc(max * sizeof(I_));
-    for (count = 0; count < max; count++) resid[count] = 0;
+    max = (* init_index_fns[heap_prof_style])();
+    resid = (I_ *) stgMallocBytes(max * sizeof(I_), "heap_profile_init");
+
+    for (count = 0; count < max; count++)
+	resid[count] = 0;
     
     return 0;
 }
@@ -385,7 +367,7 @@ Age selection is done for every closure -- not memoised.
 
 \begin{code}
 void
-set_selected_ccs()            /* set selection before we profile heap */
+set_selected_ccs(STG_NO_ARGS)	/* set selection before we profile heap */
 {
     I_ x;
     CostCentre cc;
@@ -408,8 +390,7 @@ set_selected_ccs()            /* set selection before we profile heap */
 
 
 I_
-selected_clcat(clcat)
-    ClCategory clcat;
+selected_clcat(ClCategory clcat)
 {
     I_ x;
 
@@ -438,20 +419,16 @@ resident space counter by the size of the closure (less any profiling
 words).
 
 \begin{code}
-#define NON_PROF_HS (FIXED_HS - PROF_FIXED_HDR - AGE_FIXED_HDR)
+#define NON_PROF_HS (FIXED_HS - PROF_FIXED_HDR - TICKY_FIXED_HDR)
 
 void
-profile_closure_none(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_none(P_ closure, I_ size)
 {
     return;
 }
 
 void
-profile_closure_cc(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_cc(P_ closure, I_ size)
 {
     CostCentre cc = (CostCentre) CC_HDR(closure);
     resid[index_cc(cc)] += size + NON_PROF_HS;
@@ -459,9 +436,7 @@ profile_closure_cc(closure,size)
 }
 
 void
-profile_closure_cc_select(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_cc_select(P_ closure, I_ size)
 {
     CostCentre cc; ClCategory clcat;
 
@@ -470,32 +445,15 @@ profile_closure_cc_select(closure,size)
 	return;                           /* all selected if ! cc_select         */
 
     clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
-    if (clcat_select && ! selected_clcat(clcat))    /* selection memoised during profile */
+    if (clcat_select && ! selected_clcat(clcat)) /* selection memoised during profile */
 	return;
-
-#if defined(HEAP_PROF_WITH_AGE)
-    if (age_select) {
-	I_ age, ts = AGE_HDR(closure);
-
-	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	    AGE_HDR(closure) = (W_)current_interval;
-	    age = - age_select;
-	}
-	else {
-	    age = current_interval - ts - age_select;
-	}
-	if (age < 0) return;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
 
     resid[index_cc(cc)] += size + NON_PROF_HS;
     return;
 }
 
 void
-profile_closure_mod(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_mod(P_ closure, I_ size)
 {
     CostCentre cc = (CostCentre) CC_HDR(closure);
     resid[index_mod(cc)] += size + NON_PROF_HS;
@@ -503,9 +461,7 @@ profile_closure_mod(closure,size)
 }
 
 void
-profile_closure_mod_select(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_mod_select(P_ closure, I_ size)
 {
     CostCentre cc; ClCategory clcat;
 
@@ -514,41 +470,23 @@ profile_closure_mod_select(closure,size)
 	return;
 
     clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
-    if (clcat_select && ! selected_clcat(clcat))    /* selection memoised during profile */
+    if (clcat_select && ! selected_clcat(clcat)) /* selection memoised during profile */
 	return;
-
-#if defined(HEAP_PROF_WITH_AGE)
-    if (age_select) {
-	I_ age, ts = AGE_HDR(closure);
-
-	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	    AGE_HDR(closure) = (W_)current_interval;
-	    age = - age_select;
-	}
-	else {
-	    age = current_interval - ts - age_select;
-	}
-	if (age < 0) return;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
 
     resid[index_mod(cc)] += size + NON_PROF_HS;
     return;
 }
 
 void
-profile_closure_grp(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_grp(P_ closure, I_ size)
 {
     CostCentre cc = (CostCentre) CC_HDR(closure);
     resid[index_grp(cc)] += size + NON_PROF_HS;
     return;
 }
+
 void
-profile_closure_grp_select(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_grp_select(P_ closure, I_ size)
 {
     CostCentre cc; ClCategory clcat;
 
@@ -557,32 +495,15 @@ profile_closure_grp_select(closure,size)
 	return;
 
     clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
-    if (clcat_select && ! selected_clcat(clcat))    /* selection memoised during profile */
+    if (clcat_select && ! selected_clcat(clcat)) /* selection memoised during profile */
 	return;
-
-#if defined(HEAP_PROF_WITH_AGE)
-    if (age_select) {
-	I_ age, ts = AGE_HDR(closure);
-
-	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	    AGE_HDR(closure) = (W_)current_interval;
-	    age = - age_select;
-	}
-	else {
-	    age = current_interval - ts - age_select;
-	}
-	if (age < 0) return;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
 
     resid[index_grp(cc)] += size + NON_PROF_HS;
     return;
 }
 
 void
-profile_closure_descr(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_descr(P_ closure, I_ size)
 {
     ClCategory clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
     resid[index_descr(clcat)] += size + NON_PROF_HS;
@@ -590,9 +511,32 @@ profile_closure_descr(closure,size)
 }
 
 void
-profile_closure_descr_select(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_descr_select(P_ closure, I_ size)
+{
+    CostCentre cc; ClCategory clcat;
+
+    cc = (CostCentre) CC_HDR(closure);
+    if (! cc->selected)                     /* selection determined before profile */
+	return;                             /* all selected if ! cc_select         */
+
+    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    if (clcat_select && ! selected_clcat(clcat)) /* selection memoised during profile */
+	return;
+
+    resid[index_descr(clcat)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_type(P_ closure, I_ size)
+{
+    ClCategory clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
+    resid[index_type(clcat)] += size + NON_PROF_HS;
+    return;
+}
+
+void
+profile_closure_type_select(P_ closure, I_ size)
 {
     CostCentre cc; ClCategory clcat;
 
@@ -604,139 +548,19 @@ profile_closure_descr_select(closure,size)
     if (clcat_select && ! selected_clcat(clcat))  /* selection memoised during profile */
 	return;
 
-#if defined(HEAP_PROF_WITH_AGE)
-    if (age_select) {
-	I_ age, ts = AGE_HDR(closure);
-
-	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	    AGE_HDR(closure) = (W_)current_interval;
-	    age = - age_select;
-	}
-	else {
-	    age = current_interval - ts - age_select;
-	}
-	if (age < 0) return;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
-
-    resid[index_descr(clcat)] += size + NON_PROF_HS;
-    return;
-}
-
-void
-profile_closure_type(closure,size)
-  P_ closure;
-  I_ size;
-{
-    ClCategory clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
     resid[index_type(clcat)] += size + NON_PROF_HS;
     return;
 }
 
 void
-profile_closure_type_select(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_time(P_ closure, I_ size)
 {
-    CostCentre cc; ClCategory clcat;
-
-    cc = (CostCentre) CC_HDR(closure);
-    if (! cc->selected)                     /* selection determined before profile */
-	return;                             /* all selected if ! cc_select         */
-
-    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
-    if (clcat_select && ! selected_clcat(clcat))  /* selection memoised during profile */
-	return;
-
-#if defined(HEAP_PROF_WITH_AGE)
-    if (age_select) {
-	I_ age, ts = AGE_HDR(closure);
-
-	if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	    AGE_HDR(closure) = (W_)current_interval;
-	    age = - age_select;
-	}
-	else {
-	    age = current_interval - ts - age_select;
-	}
-	if (age < 0) return;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
-
-    resid[index_type(clcat)] += size + NON_PROF_HS;
     return;
 }
 
 void
-profile_closure_time(closure,size)
-  P_ closure;
-  I_ size;
+profile_closure_time_select(P_ closure, I_ size)
 {
-#if defined(HEAP_PROF_WITH_AGE)
-    I_ ts = AGE_HDR(closure);
-
-    if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	AGE_HDR(closure) = (W_)current_interval;
-	ts = current_interval;
-    }
-
-    ts -= earlier_intervals;
-
-    if (ts < 0) {
-	resid_earlier +=  size + NON_PROF_HS;
-    }
-    else if (ts < time_intervals) {
-	resid[ts] +=  size + NON_PROF_HS;
-    }
-    else {
-	resid_later +=  size + NON_PROF_HS;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
-
-    return;
-}
-
-void
-profile_closure_time_select(closure,size)
-  P_ closure;
-  I_ size;
-{
-#if defined(HEAP_PROF_WITH_AGE)
-    CostCentre cc; ClCategory clcat; I_ age, ts;
-
-    cc = (CostCentre) CC_HDR(closure);
-    if (! cc->selected)                     /* selection determined before profile */
-	return;                             /* all selected if ! cc_select         */
-
-    clcat = (ClCategory) INFO_CAT(INFO_PTR(closure));
-    if (clcat_select && ! selected_clcat(clcat))  /* selection memoised during profile */
-	return;
-
-    ts = AGE_HDR(closure);
-    if (ts == 0) { /* Set to 0 when alloced -- now set to current interval */
-	AGE_HDR(closure) = (W_)current_interval;
-	ts = current_interval;
-	age = - age_select;
-    }
-    else {
-	age = current_interval - ts - age_select;
-    }
-    if (age < 0)
-	return;
-
-    ts -= earlier_intervals;
-
-    if (ts < 0) {
-	resid_earlier +=  size + NON_PROF_HS;
-    }
-    else if (ts < time_intervals) {
-	resid[ts] +=  size + NON_PROF_HS;
-    }
-    else {
-	resid_later +=  size + NON_PROF_HS;
-    }
-#endif /* HEAP_PROF_WITH_AGE */
-
     return;
 }
 \end{code}
@@ -776,37 +600,45 @@ void (* profiling_fns[]) PROTO((P_,I_)) = {
 void
 heap_profile_setup(STG_NO_ARGS)      /* called at start of heap profile */
 {
-    if (heap_profiling_req == HEAP_NO_PROFILING)
+    W_ heap_prof_style;
+
+    if (! RTSflags.ProfFlags.doHeapProfile)
 	return;
 
-    if (cc_select || clcat_select || age_select) {
+    heap_prof_style = RTSflags.ProfFlags.doHeapProfile;
+
+    if (cc_select || clcat_select) {
 	set_selected_ccs();               /* memoise cc selection */
-	heap_profile_fn = profiling_fns_select[heap_profiling_req];
+	heap_profile_fn = profiling_fns_select[heap_prof_style];
     } else {
-	heap_profile_fn = profiling_fns[heap_profiling_req];
+	heap_profile_fn = profiling_fns[heap_prof_style];
     }
 }
 
 void
 heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
 {
-    CostCentre cc; ClCategory clcat; hash_t ind, max;
+    CostCentre cc;
+    ClCategory clcat;
+    hash_t ind, max;
     StgFloat seconds;
+    W_ heap_prof_style;
 
-    if (heap_profiling_req == HEAP_NO_PROFILING)
+    if (! RTSflags.ProfFlags.doHeapProfile)
 	return;
 
+    heap_prof_style = RTSflags.ProfFlags.doHeapProfile;
     heap_profile_fn = profile_closure_none;
 
     seconds = (previous_ticks + current_ticks) / (StgFloat)TICK_FREQUENCY;
     fprintf(heap_file, "BEGIN_SAMPLE %0.2f\n", seconds);
 
-    max = (* init_index_fns[heap_profiling_req])();
+    max = (* init_index_fns[heap_prof_style])();
 
-    switch (heap_profiling_req) {
+    switch (heap_prof_style) {
       case HEAP_BY_CC:
 	for (ind = 0; ind < max; ind++) {
-	    if ((cc = index_cc_table[ind]) != 0) {
+	    if ((cc = index_cc_table[ind]) != 0 && ! cc_to_ignore(cc)) {
 		fprintf(heap_file, "  %0.11s:%0.16s %ld\n", cc->module, cc->label, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
@@ -815,7 +647,7 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
 
       case HEAP_BY_MOD:
 	for (ind = 0; ind < max; ind++) {
-	    if ((cc = index_mod_table[ind]) != 0) {
+	    if ((cc = index_mod_table[ind]) != 0 && ! cc_to_ignore(cc)) {
 		fprintf(heap_file, "  %0.11s %ld\n", cc->module, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
@@ -824,7 +656,7 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
 
       case HEAP_BY_GRP:
 	for (ind = 0; ind < max; ind++) {
-	    if ((cc = index_grp_table[ind]) != 0) {
+	    if ((cc = index_grp_table[ind]) != 0 && ! cc_to_ignore(cc)) {
 		fprintf(heap_file, "  %0.11s %ld\n", cc->group, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
@@ -833,7 +665,7 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
 
       case HEAP_BY_DESCR:
 	for (ind = 0; ind < max; ind++) {
-	    if ((clcat = index_descr_table[ind]) != 0) {
+	    if ((clcat = index_descr_table[ind]) != 0 && ! cc_to_ignore(cc)) {
 		fprintf(heap_file, "  %0.28s %ld\n", clcat->descr, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
@@ -842,42 +674,12 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
 
       case HEAP_BY_TYPE:
 	for (ind = 0; ind < max; ind++) {
-	    if ((clcat = index_type_table[ind]) != 0) {
+	    if ((clcat = index_type_table[ind]) != 0 && ! cc_to_ignore(cc)) {
 		fprintf(heap_file, "  %0.28s %ld\n", clcat->type, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
 	}
 	break;
-
-#if defined(HEAP_PROF_WITH_AGE)
-      case HEAP_BY_TIME:
-	{ I_ resid_tot = 0;
-	  if (resid_earlier) {
-	      resid_tot += resid_earlier;
-	      fprintf(heap_file, "  before_%4.2fs %ld\n",
-		      (earlier_intervals-1)*interval_ticks/(StgFloat)TICK_FREQUENCY,
-		      resid_earlier * sizeof(StgWord));
-	      resid_earlier = 0;
-	  }
-	  for (ind = 0; ind < max; ind++) {
-	      if (resid[ind]) {
-		  resid_tot +=  resid[ind];
-		  fprintf(heap_file, "  before_%4.2fs %ld\n",
-			  (ind+earlier_intervals)*interval_ticks/(StgFloat)TICK_FREQUENCY,
-			  resid[ind] * sizeof(StgWord));
-		  resid[ind] = 0;
-	      }
-	  }
-	  if (resid_later) {
-	      resid_tot += resid_later;
-	      fprintf(heap_file, "  later %ld\n", resid_later * sizeof(StgWord));
-	      resid_later = 0;
-	  }
-
-	  if (resid_max < resid_tot) resid_max = resid_tot;
-	  break;
-        }
-#endif /* HEAP_PROF_WITH_AGE */
     }
 
     fprintf(heap_file, "END_SAMPLE %0.2f\n", seconds);
@@ -889,7 +691,7 @@ heap_profile_finish(STG_NO_ARGS)     /* called at end of execution */
 {
     StgFloat seconds;
 
-    if (heap_profiling_req == HEAP_NO_PROFILING)
+    if (! RTSflags.ProfFlags.doHeapProfile)
 	return;
 
     seconds = (previous_ticks + current_ticks) / (StgFloat)TICK_FREQUENCY;
@@ -902,5 +704,5 @@ heap_profile_finish(STG_NO_ARGS)     /* called at end of execution */
 \end{code}
 
 \begin{code}
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 \end{code}

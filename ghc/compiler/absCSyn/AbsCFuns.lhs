@@ -190,7 +190,7 @@ kindFromMagicId SuB		    = PtrKind
 kindFromMagicId Hp		    = PtrKind
 kindFromMagicId HpLim		    = PtrKind
 kindFromMagicId LivenessReg	    = IntKind
-kindFromMagicId ActivityReg	    = IntKind
+--kindFromMagicId ActivityReg	    = IntKind -- UNUSED
 kindFromMagicId StdUpdRetVecReg	    = PtrKind
 kindFromMagicId StkStubReg	    = PtrKind
 kindFromMagicId CurCostCentre	    = CostCentreKind
@@ -411,12 +411,12 @@ flatAbsC (AbsCStmts s1 s2)
     returnFlt (mkAbsCStmts inline_s1 inline_s2,
 	       mkAbsCStmts top_s1    top_s2)
 
-flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast upd descr)
+flatAbsC (CClosureInfoAndCode cl_info slow maybe_fast upd descr liveness)
   = flatAbsC slow		`thenFlt` \ (slow_heres, slow_tops) ->
     flat_maybe maybe_fast	`thenFlt` \ (fast_heres, fast_tops) ->
     flatAmode upd               `thenFlt` \ (upd_lbl,    upd_tops) ->
     returnFlt (AbsCNop, mkAbstractCs [slow_tops, fast_tops, upd_tops,
-       CClosureInfoAndCode cl_info slow_heres fast_heres upd_lbl descr]
+       CClosureInfoAndCode cl_info slow_heres fast_heres upd_lbl descr liveness]
     )
   where
     flat_maybe :: Maybe AbstractC -> FlatM (Maybe AbstractC, AbstractC)

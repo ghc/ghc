@@ -33,9 +33,8 @@ System-wide constants need to be included:
 
 EXTDATA(Nil_closure);
 
-#if defined(DO_REDN_COUNTING)
-extern void PrintRednCountInfo(STG_NO_ARGS);
-extern I_   showRednCountStats;
+#if defined(TICKY_TICKY)
+void PrintTickyInfo(STG_NO_ARGS);
 #endif
 \end{code}
 
@@ -51,7 +50,6 @@ STGFUN(Ind_entry)
 {
     FB_
     ENT_IND(Node);	/* Ticky-ticky profiling info */
-    SET_ACTIVITY(ACT_INDIRECT); /* SPAT profiling */
 
     Node = (P_) IND_CLOSURE_PTR((P_) Node);
     ENT_VIA_NODE();
@@ -61,7 +59,6 @@ STGFUN(Ind_entry)
 }
 
 IND_ITBL(Ind_info,Ind_entry,const,EF_);
-
 \end{code}
 
 We also need a special @CAF@ indirection info table which is used to
@@ -71,7 +68,6 @@ STGFUN(Caf_entry)	/* same as Ind_entry */
 {
     FB_
     ENT_IND(Node);
-    SET_ACTIVITY(ACT_INDIRECT); /* SPAT profiling */
 
     Node = (P_) IND_CLOSURE_PTR((P_) Node);
     ENT_VIA_NODE();
@@ -102,8 +98,8 @@ EXTFUN(EnterNodeCode);
 EXTFUN(StackUnderflowEnterNode);
 EXTDATA_RO(BQ_info);
 #else
-extern StgStablePtr errorHandler;
-extern void raiseError PROTO((StgStablePtr));
+void raiseError PROTO((StgStablePtr));
+extern StgStablePtr errorHandler; /* NB: prone to magic-value-ery (WDP 95/12) */
 #endif
 
 STGFUN(BH_UPD_entry)
@@ -113,16 +109,16 @@ STGFUN(BH_UPD_entry)
     (void) STGCALL1(int,(void *, FILE *),fflush,stdout);
     (void) STGCALL2(int,(),fprintf,stderr,"Entered a `black hole': the program has a cyclic data dependency.\n");
 
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
     {
 	CostCentre cc = (CostCentre) CC_HDR(Node);
 	(void) STGCALL5(int,(),fprintf,stderr,"Cost Centre: %s  Module: %s  Group %s\n",cc->label, cc->module, cc->group);
     }
 # endif    
 
-# if defined(DO_REDN_COUNTING)
-    if (showRednCountStats) {
-	(void) STGCALL0(void,(),PrintRednCountInfo);
+# if defined(TICKY_TICKY)
+    if (RTSflags.TickyFlags.showTickyStats) {
+	(void) STGCALL0(void,(),PrintTickyInfo);
     }
 # endif
 
@@ -166,7 +162,7 @@ STGFUN(BH_UPD_entry)
     }
 
 # ifdef PAR
-    if(do_gr_profile) {
+    if(RTSflags.ParFlags.granSimStats) {
 	TIME now = CURRENT_TIME;
         TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
         TSO_BLOCKCOUNT(CurrentTSO)++;
@@ -184,6 +180,7 @@ STGFUN(BH_UPD_entry)
 # endif
 
     FE_
+
 #endif /* threads */
 }
 
@@ -197,16 +194,16 @@ STGFUN(BH_SINGLE_entry)
     (void) STGCALL2(int,(),fprintf,stderr,"either the compiler made a mistake on single-entryness,\n");
     (void) STGCALL2(int,(),fprintf,stderr,"or the program has a cyclic data dependency.\n");
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     {
 	CostCentre cc = (CostCentre) CC_HDR(Node);
 	(void) STGCALL5(int,(),fprintf,stderr, "Cost Centre: %s  Module: %s  Group %s\n",cc->label, cc->module, cc->group);
     }
 #endif    
 
-# if defined(DO_REDN_COUNTING)
-    if (showRednCountStats) {
-	(void) STGCALL0(void,(),PrintRednCountInfo);
+# if defined(TICKY_TICKY)
+    if (RTSflags.TickyFlags.showTickyStats) {
+	(void) STGCALL0(void,(),PrintTickyInfo);
     }
 # endif
 
@@ -303,27 +300,27 @@ vtbl_StdUpdFrame[] = {
 %*									*
 %************************************************************************
 
-Here is the standard update code for objects that are returned in the heap
-(or those which are initially returned in registers, but have already been
-allocated in the heap earlier in the update chain.)  In either case, Node
-points to the heap object.  The update code grabs the address of the updatee
-out of the partial update frame (the return address has already been popped),
-makes the updatee an indirection to Node, and returns according to the convention
-for the constructor.
+Here is the standard update code for objects that are returned in the
+heap (or those which are initially returned in registers, but have
+already been allocated in the heap earlier in the update chain).  In
+either case, @Node@ points to the heap object.  The update code grabs
+the address of the updatee out of the partial update frame (the return
+address has already been popped), makes the updatee an indirection to
+@Node@, and returns according to the convention for the constructor.
 
 \begin{code}
-#define IND_UPD_TEMPLATE(label, retvector) 				    	\
-  STGFUN(label) 								\
-  { 										\
-    FB_	    	    	    	    	    	    	    	    	    	\
-    UPD_EXISTING();			/* Ticky-ticky profiling info */ 	\
-    /* Update thing off stk with an indirection to Node */			\
-    UPD_IND(GRAB_UPDATEE(SpB), Node);                                    	\
-    /* Pop the standard update frame */                                         \
-    POP_STD_UPD_FRAME()	    	    	    	    	    	    	    	\
-										\
-    JMP_(retvector);								\
-    FE_ 	    	    	    	    	    	    	    	    	\
+#define IND_UPD_TEMPLATE(label, retvector)			\
+  STGFUN(label) 						\
+  { 								\
+    FB_	    	    	    	    	    	    	    	\
+    UPD_EXISTING();	/* Ticky-ticky profiling info */ 	\
+    /* Update thing off stk with an indirection to Node */	\
+    UPD_IND(GRAB_UPDATEE(SpB), Node);                           \
+    /* Pop the standard update frame */                         \
+    POP_STD_UPD_FRAME()	    	    	    	    	    	\
+								\
+    JMP_(retvector);						\
+    FE_ 	    	    	    	    	    	    	\
   }
 
 IND_UPD_TEMPLATE(IndUpdRetDir, DIRECT(((P_)RetReg)))
@@ -335,7 +332,6 @@ IND_UPD_TEMPLATE(IndUpdRetV4, ((P_)RetReg)[RVREL(4)])
 IND_UPD_TEMPLATE(IndUpdRetV5, ((P_)RetReg)[RVREL(5)])
 IND_UPD_TEMPLATE(IndUpdRetV6, ((P_)RetReg)[RVREL(6)])
 IND_UPD_TEMPLATE(IndUpdRetV7, ((P_)RetReg)[RVREL(7)])
-
 \end{code}
 
 %************************************************************************
@@ -385,8 +381,12 @@ the cost centre when entered. The heap profiler ignores the space
 occupied by it as it would not reside in the heap during normal
 execution.
 
+In ticky-land: If we are trying to collect update-entry counts
+(controlled by an RTS flag), then we must use permanent indirections
+(the shorting-out of regular indirections loses the counts).
+
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING) || defined(TICKY_TICKY)
 
 STGFUN(Perm_Ind_entry)
 {
@@ -394,15 +394,17 @@ STGFUN(Perm_Ind_entry)
 
     /* Don't add INDs to granularity cost */
 
-    ENT_IND(Node);	/* Ticky-ticky profiling info */
+    /* Dont: ENT_IND(Node); for ticky-ticky; this ind is here only to help ticky */
 
     /* Enter PAP cost centre -- lexical scoping only */
     ENTER_CC_PAP_CL(Node);
 
     Node = (P_) IND_CLOSURE_PTR((P_) Node);
-    ENT_VIA_NODE();	/* Ticky-ticky profiling info */
+
+    /* Dont: ENT_VIA_NODE(); for ticky-ticky; as above */
 
     InfoPtr=(D_)(INFO_PTR(Node));
+
 # if defined(GRAN)
     GRAN_EXEC(1,1,2,0,0);
 # endif
@@ -412,7 +414,7 @@ STGFUN(Perm_Ind_entry)
 
 PERM_IND_ITBL(Perm_Ind_info,Perm_Ind_entry,const,EF_);
 
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING or TICKY */
 \end{code}
 
 %************************************************************************
@@ -443,7 +445,6 @@ stack chunk.
 \end{itemize}
 
 \begin{code}
-
 STGFUN(UpdatePAP)
 {
     /* 
@@ -455,7 +456,7 @@ STGFUN(UpdatePAP)
 #define NPtrWords   	(R3.i)
 #define NArgWords   	(R4.i)
 #define PapSize		(R5.i)
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 # define CC_pap	((CostCentre)(R7.p))
 #endif
 
@@ -472,8 +473,6 @@ STGFUN(UpdatePAP)
       ++nPAPs;
 #endif
 
-    SET_ACTIVITY(ACT_UPDATE_PAP);   /* SPAT profiling */
-
     NPtrWords    = AREL(SuA - SpA);
     NNonPtrWords = BREL(SuB - SpB);
 
@@ -482,7 +481,7 @@ STGFUN(UpdatePAP)
 
     NArgWords = NPtrWords + NNonPtrWords + 1;	/* +1 for Node */
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
       /* set "CC_pap" to go in the updatee (see Sansom thesis, p 183) */
 
     CC_pap /*really cc_enter*/ = (CostCentre) CC_HDR(Node);
@@ -516,8 +515,6 @@ STGFUN(UpdatePAP)
 	/* Allocate PapClosure -- Only Node (R1) is live */
 	HEAP_CHK(LIVENESS_R1, PapSize, 0);
 
-	SET_ACTIVITY(ACT_UPDATE_PAP);   /* back to it (for SPAT profiling) */
-    
 	PapClosure = Hp + 1 - PapSize;	/* The new PapClosure */
 
 	SET_DYN_HDR(PapClosure, PAP_info, CC_pap, NArgWords + DYN_VHS, NPtrWords + 1);
@@ -526,13 +523,14 @@ STGFUN(UpdatePAP)
 
 	p = Hp;
         for (i = NNonPtrWords - 1; i >= 0; i--) *p-- = (W_) SpB[BREL(i)];
-        for (i = NPtrWords - 1; i >= 0; i--)    *p-- = (W_) SpA[AREL(i)];
+        for (i = NPtrWords    - 1; i >= 0; i--) *p-- = (W_) SpA[AREL(i)];
 	*p = (W_) Node;
 	}
 
     /* 
-     * Finished constructing PAP closure; now update the updatee. 
-     * But wait!  What if there is no updatee?  Then we fall off the stack.
+     * Finished constructing PAP closure; now update the updatee.  But
+     * wait!  What if there is no updatee?  Then we fall off the
+     * stack.
      */
 
 #ifdef CONCURRENT
@@ -558,12 +556,12 @@ STGFUN(UpdatePAP)
     UPD_IND(Updatee, PapClosure);   /* Indirect Updatee to PapClosure */
 
     if (NArgWords != 1) {
-	UPD_PAP_IN_NEW();
+	UPD_PAP_IN_NEW(NArgWords);
 
     } else {
 	UPD_PAP_IN_PLACE();	
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 	/* 
          * Lexical scoping requires a *permanent* indirection, and we
          * also have to set the cost centre for the indirection.
@@ -571,10 +569,10 @@ STGFUN(UpdatePAP)
 	INFO_PTR(Updatee) = (W_) Perm_Ind_info;
 	SET_CC_HDR(Updatee, CC_pap);
 
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
     }
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     /* 
      * Restore the Cost Centre too (if required); again see Sansom thesis p 183.
      * Take the CC out of the update frame if a CAF/DICT.
@@ -582,7 +580,7 @@ STGFUN(UpdatePAP)
 
     CCC = (IS_CAF_OR_DICT_CC(CC_pap)) ? GRAB_COST_CENTRE(SuB) : CC_pap;
 
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 
     /* Restore SuA, SuB, RetReg */
     RetReg = GRAB_RET(SuB);
@@ -615,7 +613,7 @@ STGFUN(UpdatePAP)
 #undef NPtrWords
 #undef NArgWords
 #undef PapSize
-#ifdef USE_COST_CENTRES
+#ifdef PROFILING
 # undef CC_pap
 #endif
 }
@@ -631,19 +629,17 @@ STGFUN(PAP_entry)
     /* Use STG registers for these locals which must survive the STK_CHK */
 #define NPtrWords   	(R2.i)
 #define NNonPtrWords	(R3.i)
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 # define CC_pap	((CostCentre)(R7.p))
 #endif
 
-    /* These locals don't have to survive a HEAP_CHK */
+    /* These locals don't have to survive the STK_CHK */
     P_ Updatee;
     P_ p;
     I_ i;
     I_ aWords, bWords;
 
     FB_
-
-    SET_ACTIVITY(ACT_UPDATE_PAP);   /* SPAT profiling */
 
     while (AREL(SuA - SpA) == 0 && BREL(SuB - SpB) == 0) {
 #ifdef CONCURRENT
@@ -660,16 +656,17 @@ STGFUN(PAP_entry)
         Updatee = GRAB_UPDATEE(SuB);
 	UPD_IND(Updatee, Node);
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
         /* 
-         * Restore the Cost Centre too (if required); again see Sansom thesis p 183.
-         * Take the CC out of the update frame if a CAF/DICT.
-     */
+         * Restore the Cost Centre too (if required); again see Sansom
+         * thesis p 183.  Take the CC out of the update frame if a
+         * CAF/DICT.
+         */
 
         CC_pap = (CostCentre) CC_HDR(Node);
         CCC = (IS_CAF_OR_DICT_CC(CC_pap)) ? GRAB_COST_CENTRE(SuB) : CC_pap;
 
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 
         RetReg = GRAB_RET(SuB);
         SuA = GRAB_SuA(SuB);
@@ -718,7 +715,7 @@ STGFUN(PAP_entry)
 
 #undef NPtrWords
 #undef NNonPtrWords
-#ifdef USE_COST_CENTRES
+#ifdef PROFILING
 # undef CC_pap
 #endif
 }

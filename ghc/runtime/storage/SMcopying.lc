@@ -53,8 +53,7 @@ do {                                        \
 
 \begin{code}
 void
-SetCAFInfoTables( CAFlist )
-  P_ CAFlist;
+SetCAFInfoTables(P_ CAFlist)
 {
   P_ CAFptr;
 
@@ -70,9 +69,7 @@ SetCAFInfoTables( CAFlist )
 
 \begin{code}
 void
-EvacuateRoots( roots, rootno )
-  P_ roots[];
-  I_ rootno;
+EvacuateRoots(P_ roots[], I_ rootno)
 {
   I_ root;
 
@@ -109,9 +106,7 @@ don't have a single main stack.
 \begin{code}
 #ifndef PAR
 void
-EvacuateAStack( stackA, botA )
-  PP_ stackA;
-  PP_ botA; /* botA points to bottom-most word */
+EvacuateAStack(PP_ stackA, PP_ botA /* botA points to bottom-most word */)
 {
   PP_ stackptr;
   
@@ -165,17 +160,15 @@ EvacuateBStack( stackB, botB, roots )
 #endif /* not PAR */
 \end{code}
 
-When we do a copying collection, we want to evacuate all of the local entries
-in the GALA table for which there are outstanding remote pointers (i.e. for
-which the weight is not MAX_GA_WEIGHT.)
+When we do a copying collection, we want to evacuate all of the local
+entries in the GALA table for which there are outstanding remote
+pointers (i.e. for which the weight is not MAX_GA_WEIGHT.)
 
 \begin{code}
-
 #ifdef PAR
 
 void
-EvacuateLocalGAs(full)
-rtsBool full;
+EvacuateLocalGAs(rtsBool full)
 {
     GALA *gala;
     GALA *next;
@@ -196,7 +189,7 @@ rtsBool full;
 	    prev = gala;
 	} else {
 	    /* Since we have all of the weight, this GA is no longer needed */
-	    W_ pga = PACK_GA(thisPE, gala->ga.loc.gc.slot);
+	    W_ pga = PackGA(thisPE, gala->ga.loc.gc.slot);
 
 #ifdef FREE_DEBUG
 	    fprintf(stderr, "Freeing slot %d\n", gala->ga.loc.gc.slot);
@@ -222,8 +215,7 @@ rtsBool full;
 EXTDATA_RO(Forward_Ref_info);
 
 void
-RebuildGAtables(full)
-rtsBool full;
+RebuildGAtables(rtsBool full)
 {
     GALA *gala;
     GALA *next;
@@ -259,8 +251,7 @@ rtsBool full;
 #endif
 	    if (INFO_PTR(closure) != (W_) Forward_Ref_info) {
 		int pe = taskIDtoPE(gala->ga.loc.gc.gtid);
-		W_ pga = PACK_GA(pe, gala->ga.loc.gc.slot);
-		int i;
+		W_ pga = PackGA(pe, gala->ga.loc.gc.slot);
 
 		(void) removeHashTable(pGAtoGALAtable, pga, (void *) gala);
 		freeRemoteGA(pe, &(gala->ga));
@@ -299,7 +290,7 @@ rtsBool full;
 
 \begin{code}
 void
-Scavenge()
+Scavenge(void)
 {
   DEBUG_SCAN("Scavenging Start", Scav, "ToHp", ToHp);
   while (Scav <= ToHp) (SCAV_CODE(INFO_PTR(Scav)))();
@@ -343,15 +334,12 @@ EvacAndScavengeCAFs( CAFlist, extra_words, roots )
        CAFptr != NULL;
        CAFptr = (P_) IND_CLOSURE_LINK(CAFptr)) {
 
-    EVACUATE_CLOSURE(CAFptr); /* evac & upd OR return */
-    caf_roots++;
+      EVACUATE_CLOSURE(CAFptr); /* evac & upd OR return */
+      caf_roots++;
 
-    DEBUG_SCAN("Scavenging CAF", Scav, "ToHp", ToHp);
-    while (Scav <= ToHp) (SCAV_CODE(INFO_PTR(Scav)))();
-    DEBUG_SCAN("Scavenging End", Scav, "ToHp", ToHp);
-
-    /* this_extra_caf_words = ToHp - this_caf_start; */
-    /* ToDo: Report individual CAF space */
+      DEBUG_SCAN("Scavenging CAF", Scav, "ToHp", ToHp);
+      while (Scav <= ToHp) (SCAV_CODE(INFO_PTR(Scav)))();
+      DEBUG_SCAN("Scavenging End", Scav, "ToHp", ToHp);
   }
   *extra_words = ToHp - caf_start;
   *roots = caf_roots;

@@ -24,6 +24,7 @@ module LibTime (
 import PreludeIOError
 import PreludeGlaST
 import PS
+import LibPosixUtil (allocWords, allocChars)
 
 \end{code}
 
@@ -47,7 +48,8 @@ we use the C library routines based on 32 bit integers.
 instance Text ClockTime where
     showsPrec p (TOD sec@(J# a# s# d#) nsec) = 
         showString (unsafePerformPrimIO (
-	    _ccall_ showTime (I# s#) (_ByteArray (error "ClockTime.show") d#)
+	    allocChars 32	`thenPrimIO` \ buf ->
+	    _ccall_ showTime (I# s#) (_ByteArray (error "ClockTime.show") d#) buf
 						    `thenPrimIO` \ str ->
             _ccall_ strlen str			    `thenPrimIO` \ len ->
             _packCBytesST len str		    `thenStrictlyST` \ ps ->
@@ -155,7 +157,10 @@ ignored.
 \begin{code}
 toCalendarTime :: ClockTime -> CalendarTime
 toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
-    _ccall_ toLocalTime (I# s#) (_ByteArray (error "toCalendarTime") d#)
+    allocWords (``sizeof(struct tm)''::Int) `thenPrimIO` \ res ->
+    allocChars 32			    `thenPrimIO` \ zoneNm ->
+    _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm	  `thenPrimIO` \ () ->
+    _ccall_ toLocalTime (I# s#) (_ByteArray (error "toCalendarTime") d#) res
 						    `thenPrimIO` \ tm ->
     if tm == (``NULL''::_Addr) then
 	error "toCalendarTime{LibTime}: out of range"
@@ -178,8 +183,8 @@ toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
 						    `thenPrimIO` \ yday ->
 	_casm_ ``%r = ((struct tm *)%0)->tm_isdst;'' tm
 						    `thenPrimIO` \ isdst ->
-	_ccall_ ZONE tm				    `thenPrimIO` \ zone ->
-	_ccall_ GMTOFF tm			    `thenPrimIO` \ tz ->
+	_ccall_ ZONE tm 			    `thenPrimIO` \ zone ->
+	_ccall_ GMTOFF tm 			    `thenPrimIO` \ tz ->
         _ccall_ strlen zone			    `thenPrimIO` \ len ->
         _packCBytesST len zone			    `thenStrictlyST` \ tzname ->
         returnPrimIO (CalendarTime (1900+year) mon mday hour min sec psec 
@@ -188,7 +193,10 @@ toCalendarTime (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
 
 toUTCTime :: ClockTime -> CalendarTime
 toUTCTime  (TOD sec@(J# a# s# d#) psec) = unsafePerformPrimIO (
-        _ccall_ toUTCTime (I# s#) (_ByteArray (error "toCalendarTime") d#)
+	allocWords (``sizeof(struct tm)''::Int) 		    `thenPrimIO` \ res ->
+        allocChars 32			    			    `thenPrimIO` \ zoneNm ->
+        _casm_ ``SETZONE((struct tm *)%0,(char *)%1); '' res zoneNm `thenPrimIO` \ () ->
+        _ccall_ toUTCTime (I# s#) (_ByteArray (error "toCalendarTime") d#) res
 						    `thenPrimIO` \ tm ->
     if tm == (``NULL''::_Addr) then
 	error "toUTCTime{LibTime}: out of range"
@@ -221,7 +229,8 @@ toClockTime (CalendarTime year mon mday hour min sec psec wday yday tzname tz is
         error "toClockTime{LibTime}: timezone offset out of range"
     else
         unsafePerformPrimIO (
-	    _ccall_ toClockSec year mon mday hour min sec tz
+	    allocWords (``sizeof(time_t)'') `thenPrimIO` \ res ->
+	    _ccall_ toClockSec year mon mday hour min sec tz res
 						    `thenPrimIO` \ ptr@(A# ptr#) ->
             if ptr /= ``NULL'' then
 		returnPrimIO (TOD (int2Integer# (indexIntOffAddr# ptr# 0#)) psec)

@@ -238,7 +238,7 @@ costs absC =
 
    CStaticClosure _ _ _ _    -> nullCosts
 			     
-   CClosureInfoAndCode _ _ _ _ _ -> nullCosts
+   CClosureInfoAndCode _ _ _ _ _ _ -> nullCosts
 			     
    CRetVector _ _ _          -> nullCosts
 			     
@@ -449,7 +449,6 @@ primOpCosts (CCallOp _ _ _ _ _) = SAVE_COSTS + CCALL_COSTS_GUESS +
 
 primOpCosts IntMulOp  = Cost (3, 1, 0, 0, 0)  + umul_costs
 primOpCosts IntQuotOp = Cost (3, 1, 0, 0, 0)  + div_costs
-primOpCosts IntDivOp  = Cost (3, 1, 0, 0, 0) -- div dclosure already costed
 primOpCosts IntRemOp  = Cost (3, 1, 0, 0, 0)  + rem_costs
 primOpCosts IntNegOp  = Cost (1, 1, 0, 0, 0) -- translates into 1 sub
 primOpCosts IntAbsOp  = Cost (0, 1, 0, 0, 0) -- abs closure already costed
@@ -539,7 +538,7 @@ data PrimOp
     -- but these take more than that; see special cases in primOpCosts
     -- I counted the generated ass. instructions for these -> checked
     | IntMulOp | IntQuotOp
-    | IntDivOp | IntRemOp | IntNegOp | IntAbsOp
+    | IntRemOp | IntNegOp | IntAbsOp
 
     -- Rest is unchecked so far -- HWL
 

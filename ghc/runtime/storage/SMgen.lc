@@ -57,9 +57,8 @@ P_ heap_space = 0;		/* Address of first word of slab
 P_ hp_start;	        /* Value of Hp when reduction was resumed */
                                 /* Always allocbase - 1 */
 
-I_
-initHeap( sm )
-    smInfo *sm;    
+rtsBool
+initHeap(smInfo * sm)
 {
     I_ heap_error = 0;
     I_ bit_words;
@@ -70,12 +69,13 @@ initHeap( sm )
     if (heap_space == 0) { /* allocates if it doesn't already exist */
 
 	/* Allocate the roots space */
-	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+	sm->roots = (P_ *) stgMallocWords(SM_MAXROOTS, "initHeap (roots)");
 
 	/* Allocate the heap */
-	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+	heap_space = (P_) stgMallocWords(SM_word_heap_size + EXTRA_HEAP_WORDS,
+					 "initHeap (heap)");
 
-	if (SM_force_gc == USE_2s) {
+	if (RTSflags.GcFlags.force2s) {
 	    stat_init("TWOSPACE(GEN)",
 		      " No of Roots  Caf   Caf    Astk   Bstk",
 		      "Astk Bstk Reg  No  bytes  bytes  bytes");
@@ -86,8 +86,8 @@ initHeap( sm )
 	}
     }
 
-    if (SM_force_gc == USE_2s) {
-	genInfo.semi_space = SM_word_heap_size / 2;
+    if (RTSflags.GcFlags.force2s) {
+	genInfo.semi_space = RTSflags.GcFlags.heapSize / 2;
 	genInfo.space[0].base = HEAP_FRAME_BASE(heap_space, genInfo.semi_space);
 	genInfo.space[1].base = HEAP_FRAME_BASE(heap_space + genInfo.semi_space, genInfo.semi_space);
 	genInfo.space[0].lim = HEAP_FRAME_LIMIT(heap_space, genInfo.semi_space);
@@ -97,16 +97,17 @@ initHeap( sm )
 
 	sm->hp = hp_start = genInfo.space[genInfo.semi_space].base - 1;
 
-	if (SM_alloc_size) {
-	    sm->hplim = sm->hp + SM_alloc_size;
-	    SM_alloc_min = 0; /* No min; alloc size specified */
+	if (! RTSflags.GcFlags.allocAreaSizeGiven) {
+	    sm->hplim = genInfo.space[genInfo.semi_space].lim;
+	} else {
+	    sm->hplim = sm->hp + RTSflags.GcFlags.allocAreaSize;
+
+	    RTSflags.GcFlags.minAllocAreaSize = 0; /* specified size takes precedence */
 
 	    if (sm->hplim > genInfo.space[genInfo.semi_space].lim) {
 		fprintf(stderr, "Not enough heap for requested alloc size\n");
-		return -1;
+		return rtsFalse;
 	    }
-	} else {
-	    sm->hplim = genInfo.space[genInfo.semi_space].lim;
 	}
 
 	sm->OldLim = genInfo.oldlim;
@@ -116,25 +117,23 @@ initHeap( sm )
 	initExtensions( sm );
 #endif
 
-	if (SM_trace) {
+	if (RTSflags.GcFlags.trace) {
 	    fprintf(stderr, "GEN(2s) Heap: 0x%lx .. 0x%lx\n",
-		    (W_) heap_space, (W_) (heap_space - 1 + SM_word_heap_size));
+		    (W_) heap_space, (W_) (heap_space - 1 + RTSflags.GcFlags.heapSize));
 	    fprintf(stderr, "Initial: space %ld, base 0x%lx, lim 0x%lx\n         hp 0x%lx, hplim 0x%lx, free %ld\n",
 		    genInfo.semi_space,
 		    (W_) genInfo.space[genInfo.semi_space].base,
 		    (W_) genInfo.space[genInfo.semi_space].lim,
 		    (W_) sm->hp, (W_) sm->hplim, (I_) (sm->hplim - sm->hp));
 	}
-	return 0;
+	return rtsTrue;
     }
 
-    if (SM_alloc_size == 0) SM_alloc_size = DEFAULT_ALLOC_SIZE;
+    genInfo.alloc_words = RTSflags.GcFlags.allocAreaSize;
+    genInfo.new_words   = RTSflags.GcFlags.allocAreaSize;
 
-    genInfo.alloc_words = SM_alloc_size;
-    genInfo.new_words   = SM_alloc_size;
-
-    genInfo.allocbase  = heap_space + SM_word_heap_size - genInfo.alloc_words;
-    genInfo.alloclim   = heap_space + SM_word_heap_size - 1;
+    genInfo.allocbase  = heap_space + RTSflags.GcFlags.heapSize - genInfo.alloc_words;
+    genInfo.alloclim   = heap_space + RTSflags.GcFlags.heapSize - 1;
 
     genInfo.newgen[0].newbase   = genInfo.allocbase - genInfo.new_words;
     genInfo.newgen[0].newlim    = genInfo.newgen[0].newbase - 1;
@@ -144,8 +143,8 @@ initHeap( sm )
 
     genInfo.oldbase = heap_space;
 
-    if (SM_major_gen_size) {
-	genInfo.old_words = SM_major_gen_size;
+    if (RTSflags.GcFlags.specifiedOldGenSize) {
+	genInfo.old_words = RTSflags.GcFlags.specifiedOldGenSize;
 	genInfo.oldend    = heap_space + genInfo.old_words - 1;
 	genInfo.oldthresh = genInfo.oldend - genInfo.new_words;
 	                                 /* ToDo: extra old ind words not accounted for ! */
@@ -161,7 +160,7 @@ initHeap( sm )
 	    if (genInfo.bit_vect + bit_words >= (BitWord *) genInfo.newgen[1].newbase) heap_error = 1;
 	}
     } else {
-	genInfo.old_words = SM_word_heap_size - genInfo.alloc_words - 2 * genInfo.new_words;
+	genInfo.old_words = RTSflags.GcFlags.heapSize - genInfo.alloc_words - 2 * genInfo.new_words;
 	genInfo.oldend    = heap_space + genInfo.old_words - 1;
 	genInfo.oldthresh = genInfo.oldend - genInfo.new_words;
 	                                 /* ToDo: extra old ind words not accounted for ! */
@@ -182,7 +181,7 @@ initHeap( sm )
     }
 
     if (heap_error) {
-	fprintf(stderr, "initHeap: Requested heap size: %ld\n", SM_word_heap_size);
+	fprintf(stderr, "initHeap: Requested heap size: %ld\n", RTSflags.GcFlags.heapSize);
 	fprintf(stderr, "          Alloc area %ld  Delay area %ld  Old area %ld  Bit area %ld\n",
 		                   genInfo.alloc_words, genInfo.new_words * 2, genInfo.old_words,
 		                   genInfo.bit_vect == (BitWord *) genInfo.allocbase ? 0 : bit_words);
@@ -216,9 +215,9 @@ initHeap( sm )
     initExtensions( sm );
 #endif
 
-    if (SM_trace) {
+    if (RTSflags.GcFlags.trace) {
 	fprintf(stderr, "GEN Heap: 0x%lx .. 0x%lx\n",
-		(W_) heap_space, (W_) (heap_space + SM_word_heap_size - 1));
+		(W_) heap_space, (W_) (heap_space + RTSflags.GcFlags.heapSize - 1));
 	fprintf(stderr, "          alloc %ld, new %ld, old %ld, bit %ld\n",
 		genInfo.alloc_words, genInfo.new_words, genInfo.old_words, bit_words);
 	fprintf(stderr, "          allocbase 0x%lx, alloclim 0x%lx\n",
@@ -249,7 +248,7 @@ collect2s(reqsize, sm)
 
     SAVE_REGS(&ScavRegDump); /* Save registers */
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "Start: space %ld, base 0x%lx, lim 0x%lx\n       hp 0x%lx, hplim 0x%lx, req %lu\n",
 		genInfo.semi_space,
 		(W_) genInfo.space[genInfo.semi_space].base,
@@ -344,7 +343,7 @@ collect2s(reqsize, sm)
     /* DONT_DO_MAX_RESIDENCY -- because this collector is utterly hosed */
     free_space = sm->hplim - sm->hp;
 
-    if (SM_stats_verbose) {
+    if (RTSflags.GcFlags.giveStats) {
 	char comment_str[BIG_STRING_LEN];
 #ifndef PAR
 	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu  2s",
@@ -358,12 +357,12 @@ collect2s(reqsize, sm)
 	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu  2s",
 		0, 0, sm->rootno, caf_roots, extra_caf_words*sizeof(W_), 0, 0);
 #endif
-	stat_endGC(alloc, SM_word_heap_size, resident, comment_str);
+	stat_endGC(alloc, RTSflags.GcFlags.heapSize, resident, comment_str);
     } else {
-	stat_endGC(alloc, SM_word_heap_size, resident, "");
+	stat_endGC(alloc, RTSflags.GcFlags.heapSize, resident, "");
     }
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "Done:  space %ld, base 0x%lx, lim 0x%lx\n       hp 0x%lx, hplim 0x%lx, free %lu\n",
 		genInfo.semi_space,
 		(W_) genInfo.space[genInfo.semi_space].base,
@@ -378,7 +377,7 @@ collect2s(reqsize, sm)
 
     RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
 
-    if ((SM_alloc_size > free_space) || (reqsize > free_space))
+    if ((RTSflags.GcFlags.allocAreaSize > free_space) || (reqsize > free_space))
 	return(-1);	/* Heap exhausted */
 
     return(0);          /* Heap OK */
@@ -409,7 +408,7 @@ collectHeap(reqsize, sm)
 
     fflush(stdout);     /* Flush stdout at start of GC */
 
-    if (SM_force_gc == USE_2s) {
+    if (RTSflags.GcFlags.force2s) {
 	return collect2s(reqsize, sm);
     }
 
@@ -423,7 +422,8 @@ collectHeap(reqsize, sm)
 
     SAVE_REGS(&ScavRegDump);        /* Save registers */
 
-    if (SM_trace) fprintf(stderr, "GEN Start: hp 0x%lx, hplim 0x%lx, req %ld  Minor\n",
+    if (RTSflags.GcFlags.trace)
+	fprintf(stderr, "GEN Start: hp 0x%lx, hplim 0x%lx, req %ld  Minor\n",
 			  (W_) sm->hp, (W_) sm->hplim, (I_) (reqsize * sizeof(W_)));
 
     alloc = sm->hp - hp_start;
@@ -632,7 +632,7 @@ collectHeap(reqsize, sm)
     sm->MallocPtrList = NULL;   /* all (new) MallocPtrs have been promoted */
 #endif /* PAR */
 
-    if (SM_stats_verbose) {
+    if (RTSflags.GcFlags.giveStats) {
 	char minor_str[BIG_STRING_LEN];
 #ifndef PAR
 	sprintf(minor_str, "%6lu %4lu   %4lu %4ld %3ld %3ld %4ld  %3ld %3ld %6ld   Minor",
@@ -660,7 +660,7 @@ collectHeap(reqsize, sm)
 	sm->hplim = genInfo.alloclim;
 	sm->OldLim = genInfo.oldlim;
     
-	if (SM_trace)
+	if (RTSflags.GcFlags.trace)
 	    fprintf(stderr, "GEN End: oldbase 0x%lx, oldlim 0x%lx, oldthresh 0x%lx, newbase 0x%lx, newlim 0x%lx\n         hp 0x%lx, hplim 0x%lx, free %lu\n",
 		    (W_) genInfo.oldbase, (W_) genInfo.oldlim, (W_) genInfo.oldthresh,
 		    (W_) genInfo.newgen[genInfo.curnew].newbase,
@@ -786,26 +786,26 @@ collectHeap(reqsize, sm)
     genInfo.oldwas = genInfo.oldlim;
     genInfo.minor_since_major = 0;
 
-    if (SM_stats_verbose) {
+    if (RTSflags.GcFlags.giveStats) {
 	char major_str[BIG_STRING_LEN];
 #ifndef PAR
 	sprintf(major_str, "%6d %4ld   %4u %4ld %3ld %3ld %4d  %3d %3d %6.6s  *Major* %4.1f%%",
 		0, genInfo.OldInNewno,
 		(SUBTRACT_A_STK(MAIN_SpA, stackInfo.botA) + 1),
 		bstk_roots, sm->rootno, genInfo.NewCAFno + genInfo.OldCAFno,
-		0, 0, 0, "", total_resident / (StgFloat) SM_word_heap_size * 100);
+		0, 0, 0, "", total_resident / (StgDouble) RTSflags.GcFlags.heapSize * 100);
 #else
 	sprintf(major_str, "%6d %4ld   %4u %4ld %3ld %3ld %4d  %3d %3d %6.6s  *Major* %4.1f%%",
 		0, genInfo.OldInNewno,
 		0, 0, sm->rootno, genInfo.NewCAFno + genInfo.OldCAFno,
-		0, 0, 0, "", total_resident / (StgFloat) SM_word_heap_size * 100);
+		0, 0, 0, "", total_resident / (StgDouble) RTSflags.GcFlags.heapSize * 100);
 #endif
 	stat_endGC(0, alloc, resident, major_str);
     } else { 
 	stat_endGC(0, alloc, resident, "");
     }
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "GEN Major: oldbase 0x%lx, oldlim 0x%lx, oldthresh 0x%lx, newbase 0x%lx, newlim 0x%lx\n           hp 0x%lx, hplim 0x%lx, free %lu\n",
 		(W_) genInfo.oldbase, (W_) genInfo.oldlim, (W_) genInfo.oldthresh,
 		(W_) genInfo.newgen[genInfo.curnew].newbase,

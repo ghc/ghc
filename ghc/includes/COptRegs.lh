@@ -62,7 +62,7 @@ typedef struct rt {
     P_ rHpLim;
     I_ rTag;
     StgRetAddr rRet;
-    I_ rActivity;
+    I_ rActivity;	/* NB: UNUSED */
     P_ rCstkptr;	/* used for iX86 registerizing only! offset=100 */
     P_ rWrapReturn;	/* ditto; offset=104 */
     P_ rSaveECX;	/* ditto; offset=108 */
@@ -138,9 +138,10 @@ extern STGRegisterTable MainRegTable;
 #define MAIN_Dbl1   	    (MainRegTable.rDbl[0])
 #define MAIN_Dbl2   	    (MainRegTable.rDbl[1])
 
+#define MAIN_Hp    	    (MainRegTable.rHp)
+#define MAIN_HpLim    	    (MainRegTable.rHpLim)
 #define MAIN_Tag    	    (MainRegTable.rTag)
 #define MAIN_Ret    	    (MainRegTable.rRet)
-#define MAIN_Activity 	    (MainRegTable.rActivity)
 
 #define MAIN_StkO   	    (MainStkO)
 #define MAIN_Liveness 	    (MainRegTable.rLiveness)
@@ -175,7 +176,6 @@ extern STGRegisterTable MainRegTable;
 			    
 #define SAVE_Tag    	    MAIN_Tag
 #define SAVE_Ret    	    MAIN_Ret
-#define SAVE_Activity 	    MAIN_Activity
 
 #else
 
@@ -213,7 +213,6 @@ extern STGRegisterTable *CurrentRegTable;
 
 #define SAVE_Tag    	    (CurrentRegTable->rTag)
 #define SAVE_Ret    	    (CurrentRegTable->rRet)
-#define SAVE_Activity 	    (CurrentRegTable->rActivity)
 
 #define SAVE_StkO   	    (CurrentRegTable->rStkO)
 #define SAVE_Liveness 	    (CurrentRegTable->rLiveness)
@@ -772,8 +771,6 @@ RetReg	    	l0           $15    $22	    %r10
 
 Liveness							(CONCURRENT)  
 
-Activity        g5						(DO_SPAT_PROFILING)
-
 StdUpdRetVec#
 StkStub#        i7                  $23
 \end{verbatim}
@@ -840,7 +837,6 @@ context is saved, so the space does not go to waste.
 #define RTBL_HpLim  	    (BaseReg->rHpLim)
 #define RTBL_Tag    	    (BaseReg->rTag)
 #define RTBL_Ret    	    (BaseReg->rRet)
-#define RTBL_Activity  	    (BaseReg->rActivity)
 #define RTBL_StkO   	    (BaseReg->rStkO)
 #define RTBL_Liveness 	    (BaseReg->rLiveness)
 
@@ -860,6 +856,12 @@ GLOBAL_REG_DECL(P_,StkOReg,REG_StkO)
 #define StkOReg RTBL_StkO
 #endif
 
+#ifndef __STG_REGS_AVAIL__ /* driver ensures it is 2 or more */
+# define __STG_REGS_AVAIL__ 8 /* R1 to R8 */
+/* this would only be non-8 if doing weird experiments (WDP 95/11) */
+/* or it might be set lower for a particular arch... */
+#endif
+
 /* R1 is used for Node */
 #ifdef REG_R1
 GLOBAL_REG_DECL(StgUnion,R1,REG_R1)
@@ -877,37 +879,37 @@ GLOBAL_REG_DECL(StgUnion,R2,REG_R2)
 #ifdef REG_R3
 GLOBAL_REG_DECL(StgUnion,R3,REG_R3)
 #else
-#define R3 RTBL_R3
+# define R3 RTBL_R3
 #endif
 
 #ifdef REG_R4
 GLOBAL_REG_DECL(StgUnion,R4,REG_R4)
 #else
-#define R4 RTBL_R4
+# define R4 RTBL_R4
 #endif
 
 #ifdef REG_R5
 GLOBAL_REG_DECL(StgUnion,R5,REG_R5)
 #else
-#define R5 RTBL_R5
+# define R5 RTBL_R5
 #endif
 
 #ifdef REG_R6
 GLOBAL_REG_DECL(StgUnion,R6,REG_R6)
 #else
-#define R6 RTBL_R6
+# define R6 RTBL_R6
 #endif
 
 #ifdef REG_R7
 GLOBAL_REG_DECL(StgUnion,R7,REG_R7)
 #else
-#define R7 RTBL_R7
+# define R7 RTBL_R7
 #endif
 
 #ifdef REG_R8
 GLOBAL_REG_DECL(StgUnion,R8,REG_R8)
 #else
-#define R8 RTBL_R8
+# define R8 RTBL_R8
 #endif
 
 #ifdef REG_Flt1
@@ -1001,12 +1003,6 @@ GLOBAL_REG_DECL(P_,HpLim,REG_HpLim)
 GLOBAL_REG_DECL(I_,LivenessReg,REG_Liveness)
 #else
 #define LivenessReg RTBL_Liveness
-#endif
-
-#ifdef REG_Activity
-GLOBAL_REG_DECL(I_,ActivityReg,REG_Activity)
-#else
-#define ActivityReg RTBL_Activity
 #endif
 
 #ifdef REG_StdUpdRetVec
@@ -1213,18 +1209,10 @@ GLOBAL_REG_DECL(P_,StkStubReg,REG_StkStub)
 #define CALLER_RESTORE_Liveness	/* nothing */
 #endif
 
-#ifdef CALLER_SAVES_Activity
-#define CALLER_SAVE_Activity	SAVE_Activity = ActivityReg;
-#define CALLER_RESTORE_Activity	ActivityReg = SAVE_Activity;
-#else
-#define CALLER_SAVE_Activity	/* nothing */
-#define CALLER_RESTORE_Activity	/* nothing */
-#endif
-
 #ifdef CALLER_SAVES_Base
 #ifndef CONCURRENT
 #define CALLER_SAVE_Base	/* nothing, ever (it holds a fixed value) */
-#define CALLER_RESTORE_Base	BaseReg = MainRegTable;
+#define CALLER_RESTORE_Base	BaseReg = &MainRegTable;
 #else
 #define CALLER_SAVE_Base	/* nothing */
 #define CALLER_RESTORE_Base	BaseReg = CurrentRegTable;

@@ -2,19 +2,14 @@
 interface CoreLint where
 import CmdLineOpts(GlobalSwitch)
 import CoreSyn(CoreBinding, CoreExpr)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import PlainCore(PlainCoreBinding(..))
 import Pretty(PprStyle)
 import SrcLoc(SrcLoc)
-import UniType(UniType)
-import Unique(Unique)
-data CoreBinding a b 	{-# GHC_PRAGMA CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)] #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data CoreBinding a b 
+data Id 
 type PlainCoreBinding = CoreBinding Id Id
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+data PprStyle 
 lintCoreBindings :: PprStyle -> [Char] -> Bool -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 4 _U_ 2122 _N_ _S_ "LLLS" _N_ _N_ #-}
 lintUnfolding :: SrcLoc -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
 

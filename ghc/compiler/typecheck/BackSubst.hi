@@ -7,23 +7,18 @@ import HsExpr(Expr)
 import HsLit(Literal)
 import HsMatches(GRHSsAndBinds, Match)
 import HsPat(TypecheckedPat)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Inst(Inst)
-import Maybes(Labda)
-import PreludeGlaST(_MutableArray)
 import Pretty(PprStyle, PrettyRep)
 import SplitUniq(SplitUniqSupply)
 import SrcLoc(SrcLoc)
 import Subst(Subst)
 import TyVar(TyVar)
 import UniType(UniType)
-import Unique(Unique)
-data Binds a b 	{-# GHC_PRAGMA EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b) #-}
-data MonoBinds a b 	{-# GHC_PRAGMA EmptyMonoBinds | AndMonoBinds (MonoBinds a b) (MonoBinds a b) | PatMonoBind b (GRHSsAndBinds a b) SrcLoc | VarMonoBind Id (Expr a b) | FunMonoBind a [Match a b] SrcLoc #-}
-data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
+data Binds a b 
+data MonoBinds a b 
+data TypecheckedPat 
+data Id 
+data Subst 
 applyTcSubstToBinds :: Binds Id TypecheckedPat -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Binds Id TypecheckedPat, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 1 _U_ 2222222 _N_ _S_ "S" _N_ _N_ #-}
 

@@ -9,8 +9,6 @@
 #define MARK_REG_MAP
 #include "SMinternal.h"
 
-extern I_ doSanityChks; /* ToDo: move tidily */
-
 #if defined(_INFO_MARKING)
 
 #if defined (__STG_GCC_REGS__) /* If we are using registers load _SAVE */
@@ -62,37 +60,6 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
     int pool;
 #endif
 
-#if 0 /* Code to avoid explicit updating of CAF references */
-
-    /* Before marking have to modify CAFs to auxillary info table */
-    P_ CAFptr;
-    DEBUG_STRING("Setting Mark & Upd CAFs:");
-    for (CAFptr = cafs1; CAFptr;
-	 CAFptr = (P_) IND_CLOSURE_LINK(CAFptr)) {
-	INFO_PTR(CAFptr) = (W_) Caf_Mark_Upd_info;
-    }
-    for (CAFptr = cafs2; CAFptr;
-	 CAFptr = (P_) IND_CLOSURE_LINK(CAFptr)) {
-	INFO_PTR(CAFptr) = (W_) Caf_Mark_Upd_info;
-    }
-    DEBUG_STRING("Marking CAFs:");
-    if (cafs1) {
-	MRoot = (P_) cafs1;
-	Mark = (P_) MRoot;
-	MStack = (P_) _PRMarking_MarkNextCAF_closure;
-	/*ToDo: debugify */
-	miniInterpret((StgFunPtr)_startMarkWorld);
-    }
-    if (cafs2) {
-	MRoot = (P_) cafs2;
-	Mark = (P_) MRoot;
-	MStack = (P_) _PRMarking_MarkNextCAF_closure;
-	/*ToDo: debugify */
-	miniInterpret((StgFunPtr)_startMarkWorld);
-    }
-
-#endif /* 0 */
-
     BitArray = bit_array;
     HeapBase = base;
     HeapLim = lim;
@@ -103,14 +70,8 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	MRoot = (P_) sm->roots;
 	Mark = (P_) *MRoot;
 	MStack = (P_) _PRMarking_MarkNextRoot_closure;
-#if defined(__STG_TAILJUMPS__)
+
 	miniInterpret((StgFunPtr)_startMarkWorld);
-#else
-    if (doSanityChks)
-	miniInterpret_debug((StgFunPtr)_startMarkWorld, NULL);
-    else
-	miniInterpret((StgFunPtr)_startMarkWorld);
-#endif /* ! tail-jumping */
     }
 
 #ifdef CONCURRENT
@@ -120,14 +81,8 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	    MRoot = (P_) PendingSparksHd[pool];
 	    Mark = (P_) *MRoot;
 	    MStack = (P_) _PRMarking_MarkNextSpark_closure;
-#if defined(__STG_TAILJUMPS__)
+
 	    miniInterpret((StgFunPtr)_startMarkWorld);
-#else
-	if (doSanityChks)
-	    miniInterpret_debug((StgFunPtr)_startMarkWorld, NULL);
-	else
-	    miniInterpret((StgFunPtr)_startMarkWorld);
-#endif /* ! tail-jumping */
         }
     }
 #endif
@@ -140,14 +95,8 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
     if (MRoot != NULL) {
 	Mark = ((GALA *)MRoot)->la;
 	MStack = (P_) _PRMarking_MarkNextGA_closure;
-#if defined(__STG_TAILJUMPS__)
+
 	miniInterpret((StgFunPtr) _startMarkWorld);
-#else
-	if (doSanityChks)
-	    miniInterpret_debug((StgFunPtr) _startMarkWorld, NULL);
-	else
-	    miniInterpret((StgFunPtr) _startMarkWorld);
-#endif /* ! tail-jumping */
     }
 #else
     /* Note: no *external* stacks in parallel world */
@@ -156,14 +105,8 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 	MRoot = (P_) MAIN_SpA;
 	Mark = (P_) *MRoot;
 	MStack = (P_) _PRMarking_MarkNextAStack_closure;
-#if defined(__STG_TAILJUMPS__)
+
 	miniInterpret((StgFunPtr)_startMarkWorld);
-#else
-    if (doSanityChks)
-	miniInterpret_debug((StgFunPtr)_startMarkWorld, NULL);
-    else
-	miniInterpret((StgFunPtr)_startMarkWorld);
-#endif /* ! tail-jumping */
     }
 
     DEBUG_STRING("Marking B Stack:");
@@ -177,37 +120,25 @@ markHeapRoots(sm, cafs1, cafs2, base, lim, bit_array)
 
     DEBUG_STRING("Marking & Updating CAFs:");
     if (cafs1) {
-	MRoot = cafs1;
-	Mark = (P_) IND_CLOSURE_PTR(MRoot);
+	MRoot  = cafs1;
+	Mark   = (P_) IND_CLOSURE_PTR(MRoot);
 	MStack = (P_) _PRMarking_MarkNextCAF_closure;
-#if defined(__STG_TAILJUMPS__)
+
 	miniInterpret((StgFunPtr)_startMarkWorld);
-#else
-    if (doSanityChks)
-	miniInterpret_debug((StgFunPtr)_startMarkWorld, NULL);
-    else
-	miniInterpret((StgFunPtr)_startMarkWorld);
-#endif /* ! tail-jumping */
     }
 
     if (cafs2) {
-	MRoot = cafs2;
-	Mark = (P_) IND_CLOSURE_PTR(MRoot);
+	MRoot  = cafs2;
+	Mark   = (P_) IND_CLOSURE_PTR(MRoot);
 	MStack = (P_) _PRMarking_MarkNextCAF_closure;
-#if defined(__STG_TAILJUMPS__)
+
 	miniInterpret((StgFunPtr)_startMarkWorld);
-#else
-    if (doSanityChks)
-	miniInterpret_debug((StgFunPtr)_startMarkWorld, NULL);
-    else
-	miniInterpret((StgFunPtr)_startMarkWorld);
-#endif /* ! tail-jumping */
     }
+
     return 0;
 }
 
 #endif /* _INFO_MARKING */
-
 \end{code}
 
 

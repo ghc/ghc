@@ -264,8 +264,9 @@ replace (REmatch arr before@(_,b_end) match after lst)
          acc
        else
          let
-          x@(C# x#) = _headPS repl
-          xs        = _tailPS' repl
+          x  = _headPS repl
+	  x# = case x of { C# c -> c }
+          xs = _tailPS' repl
          in
           case x# of
             '\\'# ->  

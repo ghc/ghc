@@ -23,11 +23,7 @@ import UniqFM(UniqFM)
 type DerivEqn = (Class, TyCon, [TyVar], [(Class, UniType)])
 data TagThingWanted   = GenCon2Tag | GenTag2Con | GenMaxTag
 con2tag_PN :: TyCon -> ProtoName
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 maxtag_PN :: TyCon -> ProtoName
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 tag2con_PN :: TyCon -> ProtoName
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 tcDeriving :: _PackedString -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> Bag InstInfo -> UniqFM TyCon -> [FixityDecl Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Bag InstInfo, Binds Name (InPat Name), PprStyle -> Int -> Bool -> PrettyRep)
-	{-# GHC_PRAGMA _A_ 5 _U_ 22220222222 _N_ _S_ "LLLSA" {_A_ 4 _U_ 2222222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -111,7 +111,7 @@ STGFUN(BQ_entry)
     	QP_Event1("GR", CurrentTSO);
     }
 #ifdef PAR
-    if(do_gr_profile) {
+    if(RTSflags.ParFlags.granSimStats) {
         /* Note that CURRENT_TIME may perform an unsafe call */
 	TIME now = CURRENT_TIME;
         TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
@@ -182,7 +182,7 @@ STGFUN(RBH_entry)
 	QP_Event1("GR", CurrentTSO);
     }
 
-    if(do_gr_profile) {
+    if(RTSflags.ParFlags.granSimStats) {
         /* Note that CURRENT_TIME may perform an unsafe call */
 	TIME now = CURRENT_TIME;
         TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
@@ -211,22 +211,21 @@ STGFUN(RBH_entry)
 %*									*
 %************************************************************************
 
-The normal way of entering a thread is through resumeThread, which 
-short-circuits and indirections to the TSO and StkO, sets up STG registers,
-and jumps to the saved PC.
+The normal way of entering a thread is through \tr{resumeThread},
+which short-circuits any indirections to the TSO and StkO, sets up STG
+registers, and jumps to the saved PC.
 
 \begin{code}
-
 STGFUN(resumeThread)
 {
     FB_
 
-    while((P_) INFO_PTR(CurrentTSO) == Ind_info) {
+    while(IS_INDIRECTION(INFO_PTR(CurrentTSO))) {
     	CurrentTSO = (P_) IND_CLOSURE_PTR(CurrentTSO);
     }
 
 #ifdef PAR
-    if (do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
 	TSO_QUEUE(CurrentTSO) = Q_RUNNING;
 	/* Note that CURRENT_TIME may perform an unsafe call */
         TSO_BLOCKEDAT(CurrentTSO) = CURRENT_TIME;
@@ -235,18 +234,16 @@ STGFUN(resumeThread)
 
     CurrentRegTable = TSO_INTERNAL_PTR(CurrentTSO);
 
-    while((P_) INFO_PTR(SAVE_StkO) == Ind_info) {
+    while(IS_INDIRECTION(INFO_PTR(SAVE_StkO))) {
     	SAVE_StkO = (P_) IND_CLOSURE_PTR(SAVE_StkO);
     }
     RestoreAllStgRegs();
 
     SET_TASK_ACTIVITY(ST_REDUCING);
-    SET_ACTIVITY(ACT_REDN); /* back to normal reduction */
     RESTORE_CCC(TSO_CCC(CurrentTSO));
     JMP_(TSO_PC1(CurrentTSO));
     FE_
 }
-
 \end{code}
 
 Since we normally context switch during a heap check, it is possible
@@ -255,26 +252,22 @@ sufficient heap for the thread to continue.  However, we have cleverly
 stashed away the heap requirements in @TSO_ARG1@ so that we can decide
 whether or not to perform a garbage collection before resuming the
 thread.  The actual thread resumption address (either @EnterNodeCode@
-or elsewhere) is stashed in TSO_PC2.
+or elsewhere) is stashed in @TSO_PC2@.
 
 \begin{code}
-
 STGFUN(CheckHeapCode)
 {
     FB_
 
     ALLOC_HEAP(TSO_ARG1(CurrentTSO)); /* ticky profiling */
-    SET_ACTIVITY(ACT_HEAP_CHK); /* SPAT counting */
     if ((Hp += TSO_ARG1(CurrentTSO)) > HpLim) {
     	ReallyPerformThreadGC(TSO_ARG1(CurrentTSO), rtsFalse);
     	JMP_(resumeThread);
     }
     SET_TASK_ACTIVITY(ST_REDUCING);
-    SET_ACTIVITY(ACT_REDN); /* back to normal reduction */
     RESUME_(TSO_PC2(CurrentTSO));
     FE_
 }
-
 \end{code}
 
 Often, a thread starts (or rather, resumes) by entering the closure
@@ -283,7 +276,6 @@ The saved PC in the TSO can be set to @EnterNodeCode@ whenever we
 want this to happen upon resumption of the thread.
 
 \begin{code}
-
 STGFUN(EnterNodeCode)
 {
     FB_
@@ -293,28 +285,26 @@ STGFUN(EnterNodeCode)
     JMP_(ENTRY_CODE(InfoPtr));
     FE_
 }
-
 \end{code}
 
-Then, there are the occasions when we just want to pick up where we left off.
-We use RESUME_ here instead of JMP_, because when we return to a call site,
-the alpha is going to try to load %gp from %ra rather than %pv, and JMP_ only
-sets %pv.  Resuming to the start of a function is currently okay, but an
-extremely bad practice.  As we add support for more architectures, we can expect 
-the difference between RESUME_ and JMP_ to become more acute.
+Then, there are the occasions when we just want to pick up where we
+left off.  We use \tr{RESUME_} here instead of \tr{JMP_}, because when
+we return to a call site, the Alpha is going to try to load \tr{%gp}
+from \tr{%ra} rather than \tr{%pv}, and \tr{JMP_} only sets \tr{%pv}.
+Resuming to the start of a function is currently okay, but an
+extremely bad practice.  As we add support for more architectures, we
+can expect the difference between \tr{RESUME_} and \tr{JMP_} to become
+more acute.
 
 \begin{code}
-
 STGFUN(Continue)
 {
     FB_
 
     SET_TASK_ACTIVITY(ST_REDUCING);
-    SET_ACTIVITY(ACT_REDN); /* back to normal reduction */
     RESUME_(TSO_PC2(CurrentTSO));
     FE_
 }
-
 \end{code}
 
 %************************************************************************
@@ -324,11 +314,7 @@ STGFUN(Continue)
 %************************************************************************
 
 \begin{code}
-
-extern P_ AvailableStack;
-
 #ifndef PAR
-
 \end{code}
 
 On a uniprocessor, stack underflow causes us no great headaches.  The
@@ -388,6 +374,20 @@ STGFUN(CommonUnderflow)
 
     FB_
     temp = STKO_LINK(StkOReg);
+
+    /* fprintf(stderr,"Stk Underflow from: %lx to: %lx size abandoned: %d\n",StkOReg,temp,STKO_CLOSURE_CTS_SIZE(StkOReg)); */
+
+    /* change the guy we are abandoning into something
+       that will not be "interesting" on the mutables
+       list.  (As long as it is there, it will be
+       scavenged in GC, and we cannot guarantee that
+       it is still a "sane" StkO object).  (And, besides,
+       why continue to keep it [and all it pts to] alive?)
+       Will & Phil 95/10
+    */
+    FREEZE_MUT_HDR(StkOReg, ImMutArrayOfPtrs_info);
+    MUTUPLE_CLOSURE_SIZE(StkOReg) = MUTUPLE_VHS;
+
     StkOReg = temp;
     /* ToDo: Fetch the remote stack object here! */
     RestoreStackStgRegs();

@@ -34,22 +34,22 @@ P_ heap_space = 0;		/* Address of first word of slab
 
 P_ hp_start;	        /* Value of Hp when reduction was resumed */
 
-I_
-initHeap( sm )
-    smInfo *sm;    
+rtsBool
+initHeap(smInfo * sm)
 {
     if (heap_space == 0) { /* allocates if it doesn't already exist */
 
-	I_ semispaceSize = SM_word_heap_size / 2;
+	I_ semispaceSize = RTSflags.GcFlags.heapSize / 2;
 
 	/* Allocate the roots space */
-	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+	sm->roots = (P_ *) stgMallocWords(SM_MAXROOTS, "initHeap (roots)");
 
 	/* Allocate the heap */
-	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+	heap_space = (P_) stgMallocWords(RTSflags.GcFlags.heapSize + EXTRA_HEAP_WORDS,
+					 "initHeap (heap)");
     
 	dualmodeInfo.modeinfo[TWO_SPACE_BOT].heap_words =
-	    dualmodeInfo.modeinfo[TWO_SPACE_TOP].heap_words = SM_word_heap_size;
+	    dualmodeInfo.modeinfo[TWO_SPACE_TOP].heap_words = RTSflags.GcFlags.heapSize;
 
 	dualmodeInfo.modeinfo[TWO_SPACE_BOT].base =
 	    HEAP_FRAME_BASE(heap_space, semispaceSize);
@@ -60,15 +60,15 @@ initHeap( sm )
 	dualmodeInfo.modeinfo[TWO_SPACE_TOP].lim =
 	    HEAP_FRAME_LIMIT(heap_space + semispaceSize, semispaceSize);
 
-	dualmodeInfo.bit_words = (SM_word_heap_size + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
-	dualmodeInfo.bits      = (BitWord *)(heap_space + SM_word_heap_size) - dualmodeInfo.bit_words;
+	dualmodeInfo.bit_words = (RTSflags.GcFlags.heapSize + BITS_IN(BitWord) - 1) / BITS_IN(BitWord);
+	dualmodeInfo.bits      = (BitWord *)(heap_space + RTSflags.GcFlags.heapSize) - dualmodeInfo.bit_words;
 
 	dualmodeInfo.modeinfo[COMPACTING].heap_words =
-	    SM_word_heap_size - dualmodeInfo.bit_words;
+	    RTSflags.GcFlags.heapSize - dualmodeInfo.bit_words;
 	dualmodeInfo.modeinfo[COMPACTING].base =
-	    HEAP_FRAME_BASE(heap_space, SM_word_heap_size - dualmodeInfo.bit_words);
+	    HEAP_FRAME_BASE(heap_space, RTSflags.GcFlags.heapSize - dualmodeInfo.bit_words);
 	dualmodeInfo.modeinfo[COMPACTING].lim =
-	    HEAP_FRAME_LIMIT(heap_space, SM_word_heap_size - dualmodeInfo.bit_words);
+	    HEAP_FRAME_LIMIT(heap_space, RTSflags.GcFlags.heapSize - dualmodeInfo.bit_words);
 
 	stat_init("DUALMODE", "Collection", "  Mode  ");
     }
@@ -77,11 +77,12 @@ initHeap( sm )
 
     if (SM_alloc_size) {
 	sm->hplim = sm->hp + SM_alloc_size;
-	SM_alloc_min = 0; /* No min; alloc size specified */
+
+	RTSflags.GcFlags.minAllocAreaSize = 0; /* specified size takes precedence */
 
 	if (sm->hplim > dualmodeInfo.modeinfo[dualmodeInfo.mode].lim) {
 	    fprintf(stderr, "Not enough heap for requested alloc size\n");
-	    return -1;
+	    return rtsFalse;
 	}
     } else {
 	sm->hplim = dualmodeInfo.modeinfo[dualmodeInfo.mode].lim;
@@ -93,7 +94,7 @@ initHeap( sm )
     initExtensions( sm );
 #endif /* !PAR */
 
-    if (SM_trace) {
+    if (RTSflags.GcFlags.trace) {
 	fprintf(stderr, "DUALMODE Heap: TS base, TS lim, TS base, TS lim, CM base, CM lim, CM bits, bit words\n                0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx\n",
 		(W_) dualmodeInfo.modeinfo[TWO_SPACE_BOT].base,
 		(W_) dualmodeInfo.modeinfo[TWO_SPACE_BOT].lim,
@@ -109,7 +110,7 @@ initHeap( sm )
 		(W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
     }
 
-    return 0;
+    return rtsTrue; /* OK */
 }
 
 I_
@@ -129,7 +130,7 @@ collectHeap(reqsize, sm, do_full_collection)
     fflush(stdout);     /* Flush stdout at start of GC */
     SAVE_REGS(&ScavRegDump); /* Save registers */
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "DUALMODE Start: mode %ld, base 0x%lx, lim 0x%lx\n                      hp 0x%lx, hplim 0x%lx, req %lu\n",
 		dualmodeInfo.mode,
 		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].base,
@@ -227,7 +228,7 @@ collectHeap(reqsize, sm, do_full_collection)
     /* Use residency to determine if a change in mode is required */
 
     resident = sm->hp - (dualmodeInfo.modeinfo[dualmodeInfo.mode].base - 1);
-    residency = resident / (StgFloat) SM_word_heap_size;
+    residency = resident / (StgFloat) RTSflags.GcFlags.heapSize;
     DO_MAX_RESIDENCY(resident); /* stats only */
 
     if ((start_mode == TWO_SPACE_TOP) &&
@@ -264,7 +265,7 @@ collectHeap(reqsize, sm, do_full_collection)
     stat_endGC(alloc, dualmodeInfo.modeinfo[start_mode].heap_words,
 	       resident, dualmodeInfo.modeinfo[start_mode].name);
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "DUALMODE Done: mode %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, free %lu\n",
 		dualmodeInfo.mode,
 		(W_) dualmodeInfo.modeinfo[dualmodeInfo.mode].base,
@@ -279,7 +280,7 @@ collectHeap(reqsize, sm, do_full_collection)
 
     RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
 
-    if ((SM_alloc_min > free_space) || (reqsize > free_space))
+    if (free_space < RTSflags.GcFlags.minAllocAreaSize || free_space < reqsize)
 	return GC_HARD_LIMIT_EXCEEDED;	/* Heap exhausted */
     else 
 	return GC_SUCCESS;		/* Heap OK */

@@ -27,7 +27,7 @@ import StgSyn		-- output
 import SplitUniq
 import Unique		-- the UniqueSupply monadery used herein
 
-import AbsPrel		( unpackCStringId, stringTy,
+import AbsPrel		( unpackCStringId, unpackCString2Id, stringTy,
 			  integerTy, rationalTy, ratioDataCon,
 			  PrimOp(..),		-- For Int2IntegerOp etc
 			  integerZeroId, integerPlusOneId, integerMinusOneId
@@ -97,10 +97,10 @@ we use @bOGUS_LVs@ and @bOGUS_FVs@ as placeholders.
 
 \begin{code}
 bOGUS_LVs :: PlainStgLiveVars
-bOGUS_LVs = panic "bOGUS_LVs"
+bOGUS_LVs = panic "bOGUS_LVs" -- emptyUniqSet (used when pprTracing)
 
 bOGUS_FVs :: [Id]
-bOGUS_FVs = panic "bOGUS_FVs"
+bOGUS_FVs = panic "bOGUS_FVs" -- [] (ditto)
 \end{code}
 
 \begin{code}
@@ -127,7 +127,13 @@ topCoreBindsToStg us core_binds
 
     do_top_bind env bind@(CoNonRec var rhs)
       = coreBindToStg env bind		`thenSUs` \ (stg_binds, new_env, float_binds) ->
-
+{- TESTING:
+	let
+	    ppr_blah xs = ppInterleave ppComma (map pp_x xs)
+	    pp_x (u,x) = ppBesides [pprUnique u, ppStr ": ", ppr PprDebug x]
+	in
+	pprTrace "do_top_bind:" (ppAbove (ppr PprDebug stg_binds) (ppr_blah (ufmToList new_env))) $
+-}
  	case stg_binds of
 	   [StgNonRec var (StgRhsClosure cc bi fvs u [] rhs_body)] -> 
 		-- Mega-special case; there's still a binding there
@@ -291,11 +297,19 @@ litToStgAtom (NoRepStr s)
 -- but instead be unpacked each time.  But on some programs that costs a lot 
 -- [eg hpg], so now we update them.
 
-	val = StgApp (StgVarAtom unpackCStringId) 
-		     [StgLitAtom (MachStr s)] 
+	val = if (any is_NUL (_UNPK_ s)) then -- must cater for NULs in literal string
+		StgApp (StgVarAtom unpackCString2Id) 
+		     [StgLitAtom (MachStr s),
+		      StgLitAtom (mkMachInt (toInteger (_LENGTH_ s)))]
+		     bOGUS_LVs
+	      else
+		StgApp (StgVarAtom unpackCStringId) 
+		     [StgLitAtom (MachStr s)]
 		     bOGUS_LVs
     in
     returnSUs (StgVarAtom var, unitBag (StgNonRec var rhs))
+  where
+    is_NUL c = c == '\0'
 
 litToStgAtom (NoRepInteger i)
   -- extremely convenient to look out for a few very common
@@ -593,8 +607,7 @@ coreExprToStg env (CoCase discrim alts)
 	returnSUs (StgBindDefault binder True{-used? no it is lying-} stg_rhs,
 		  rhs_binds)
       where
-
-
+	--
 	-- We convert	case x of {...; x' -> ...x'...} 
 	--	to
 	--		case x of {...; _  -> ...x... }
@@ -604,7 +617,7 @@ coreExprToStg env (CoCase discrim alts)
 	-- default binder to the scrutinee.
 	--
 	new_env = case discrim of
-		    CoVar v -> addOneToIdEnv env binder (StgVarAtom v)
+		    CoVar v -> addOneToIdEnv env binder (stgLookup env v)
 		    other   -> env
 \end{code}
 
@@ -670,7 +683,9 @@ coreExprToStg env (_,AnnCoParComm ctxt expr comm)
 \end{code}
 
 \begin{code}
+#ifdef DEBUG
 coreExprToStg env other = panic "coreExprToStg: it really failed here"
+#endif
 \end{code}
 
 %************************************************************************

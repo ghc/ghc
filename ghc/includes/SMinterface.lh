@@ -96,12 +96,12 @@ Answer: They're on the heap in a "Stable Pointer Table". (ADR)
 
 The storage manager is accessed exclusively through these routines:
 \begin{code}
-IF_RTS(I_ initSM	    PROTO((I_ rts_argc, char **rts_argv, FILE *statsfile));)
-IF_RTS(I_ exitSM	    PROTO((smInfo *sm));)
-IF_RTS(I_ initStacks	    PROTO((smInfo *sm));)
-IF_RTS(I_ initHeap	    PROTO((smInfo *sm));)
+IF_RTS(void    initSM	    (STG_NO_ARGS);)
+IF_RTS(rtsBool exitSM	    PROTO((smInfo *sm));)
+IF_RTS(rtsBool initStacks   PROTO((smInfo *sm));)
+IF_RTS(rtsBool initHeap	    PROTO((smInfo *sm));)
 #ifdef CONCURRENT
-IF_RTS(rtsBool initThreadPool PROTO((I_ size));)
+IF_RTS(rtsBool initThreadPools (STG_NO_ARGS);)
 #endif
 #ifdef PAR
 IF_RTS(void init_gr_profiling PROTO((int, char **, int, char **));)
@@ -111,7 +111,7 @@ I_ collectHeap	    PROTO((W_ reqsize, smInfo *sm, rtsBool do_full_collection));
 
 IF_RTS(void unmapMiddleStackPage PROTO((char *, int));) /* char * == caddr_t ? */
 
-#if defined(USE_COST_CENTRES) || defined(GUM)
+#if defined(PROFILING) || defined(PAR)
 IF_RTS(void handle_tick_serial(STG_NO_ARGS);)
 IF_RTS(void handle_tick_noserial(STG_NO_ARGS);)
 #endif
@@ -130,10 +130,7 @@ void RebuildGAtables PROTO((rtsBool full));
 
 \end{code}
 
-@initSM@ processes any runtime parameters directed towards the storage
-manager. The @statsfile@ parameter is an open file, which will contain
-any garbage collection statistics requested by the user.  This file
-must be opened for writing.
+@initSM@ finalizes any runtime parameters of the storage manager.
 
 @exitSM@ does any cleaning up required by the storage manager before
 the program is executed. Its main purpose is to print any summary

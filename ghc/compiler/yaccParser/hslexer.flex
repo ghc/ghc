@@ -64,7 +64,7 @@
 #define _isconstr(s) 	(CharTable[*s]&(_C))
 BOOLEAN isconstr PROTO((char *)); /* fwd decl */
 
-unsigned char CharTable[NCHARS] = {
+static unsigned char CharTable[NCHARS] = {
 /* nul */    	0,  	0,  	0,  	0,  	0,  	0,  	0,  	0,
 /* bs  */    	0,  	_S,  	_S,  	_S,  	_S,  	0,  	0,  	0,
 /* dle */    	0,  	0,  	0,  	0,  	0,  	0,  	0,  	0,
@@ -115,12 +115,12 @@ char *input_filename = NULL;	/* Always points to a dynamically allocated string 
  * have been renamed as hsXXXXX rather than yyXXXXX.  --JSM
  */
 
-int hslineno = 0;		/* Line number at end of token */
+static int hslineno = 0;	/* Line number at end of token */
 int hsplineno = 0;		/* Line number at end of previous token */
 
-int hscolno = 0;		/* Column number at end of token */
+static int hscolno = 0;		/* Column number at end of token */
 int hspcolno = 0;		/* Column number at end of previous token */
-int hsmlcolno = 0;		/* Column number for multiple-rule lexemes */
+static int hsmlcolno = 0;	/* Column number for multiple-rule lexemes */
 
 int startlineno = 0;		/* The line number where something starts */
 int endlineno = 0;		/* The line number where something ends */
@@ -142,12 +142,15 @@ static int nested_comments; 	/* For counting comment nesting depth */
 
 /* Essential forward declarations */
 
-static VOID hsnewid 	 PROTO((char *, int));
-static VOID layout_input PROTO((char *, int));
-static VOID cleartext	 (NO_ARGS);
-static VOID addtext 	 PROTO((char *, unsigned));
-static VOID addchar	 PROTO((char));
+static void hsnewid 	 PROTO((char *, int));
+static void layout_input PROTO((char *, int));
+static void cleartext	 (NO_ARGS);
+static void addtext 	 PROTO((char *, unsigned));
+static void addchar	 PROTO((char));
 static char *fetchtext	 PROTO((unsigned *));
+static void new_filename PROTO((char *));
+static int  Return	 PROTO((int));
+static void hsentercontext PROTO((int));
 
 /* Special file handling for IMPORTS */
 /*  Note: imports only ever go *one deep* (hence no need for a stack) WDP 94/09 */
@@ -817,10 +820,14 @@ NL  	    	    	[\n\r]
      * Simple comments and whitespace.  Normally, we would just ignore these, but
      * in case we're processing a string escape, we need to note that we've seen
      * a gap.
+     *
+     * Note that we cater for a comment line that *doesn't* end in a newline.
+     * This is incorrect, strictly speaking, but seems like the right thing
+     * to do.  Reported by Rajiv Mirani.  (WDP 95/08)
      */
 %}
 
-<Code,GlaExt,StringEsc>"--".*{NL}{WS}* |
+<Code,GlaExt,StringEsc>"--".*{NL}?{WS}* |
 <Code,GlaExt,GhcPragma,UserPragma,StringEsc>{WS}+	{ noGap = FALSE; }
 
 %{
@@ -947,11 +954,11 @@ NL  	    	    	[\n\r]
    This allows unnamed sources to be piped into the parser.
 */
 
-void
-yyinit()
-{
-    extern BOOLEAN acceptPrim;
+extern BOOLEAN acceptPrim;
 
+void
+yyinit(void)
+{
     input_filename = xstrdup("<stdin>");
 
     /* We must initialize the input buffer _now_, because we call
@@ -964,9 +971,8 @@ yyinit()
 	PUSH_STATE(Code);
 }
 
-void
-new_filename(f) /* This looks pretty dodgy to me (WDP) */
-  char *f;
+static void
+new_filename(char *f) /* This looks pretty dodgy to me (WDP) */
 {
     if (input_filename != NULL)
 	free(input_filename);
@@ -986,8 +992,8 @@ new_filename(f) /* This looks pretty dodgy to me (WDP) */
 	forcing insertion of ; or } as appropriate
 */
 
-BOOLEAN
-hsshouldindent()
+static BOOLEAN
+hsshouldindent(void)
 {
     return (!forgetindent && INDENTON);
 }
@@ -995,7 +1001,7 @@ hsshouldindent()
 
 /* Enter new context and set new indentation level */
 void
-hssetindent()
+hssetindent(void)
 {
 #ifdef HSP_DEBUG
     fprintf(stderr, "hssetindent:hscolno=%d,hspcolno=%d,INDENTPT[%d]=%d\n", hscolno, hspcolno, icontexts, INDENTPT);
@@ -1024,7 +1030,7 @@ hssetindent()
 
 /* Enter a new context without changing the indentation level */
 void
-hsincindent()
+hsincindent(void)
 {
 #ifdef HSP_DEBUG
     fprintf(stderr, "hsincindent:hscolno=%d,hspcolno=%d,INDENTPT[%d]=%d\n", hscolno, hspcolno, icontexts, INDENTPT);
@@ -1035,16 +1041,15 @@ hsincindent()
 
 /* Turn off indentation processing, usually because an explicit "{" has been seen */
 void
-hsindentoff()
+hsindentoff(void)
 {
     forgetindent = TRUE;
 }
 
 
 /* Enter a new layout context. */
-void
-hsentercontext(indent)
-  int indent;
+static void
+hsentercontext(int indent)
 {
     /* Enter new context and set indentation as specified */
     if (++icontexts >= MAX_CONTEXTS) {
@@ -1063,7 +1068,7 @@ hsentercontext(indent)
 
 /* Exit a layout context */
 void
-hsendindent()
+hsendindent(void)
 {
     --icontexts;
 #ifdef HSP_DEBUG
@@ -1075,9 +1080,8 @@ hsendindent()
  * 	Return checks the indentation level and returns ;, } or the specified token.
  */
 
-int
-Return(tok)
-  int tok;
+static int
+Return(int tok)
 {
 #ifdef HSP_DEBUG
     extern int yyleng;
@@ -1174,12 +1178,11 @@ yylex()
 **********************************************************************/
 
 /* setyyin(file)	open file as new lex input buffer */
-void
-setyyin(file)
-  char *file;
-{
-    extern FILE *yyin;
+extern FILE *yyin;
 
+void
+setyyin(char *file)
+{
     hsbuf_save = YY_CURRENT_BUFFER;
     if ((yyin = fopen(file, "r")) == NULL) {
 	char errbuf[ERR_BUF_SIZE];
@@ -1210,10 +1213,8 @@ setyyin(file)
 #endif
 }
 
-static VOID
-layout_input(text, len)
-char *text;
-int len;
+static void
+layout_input(char *text, int len)
 {
 #ifdef HSP_DEBUG
     fprintf(stderr, "Scanning \"%s\"\n", text);
@@ -1243,7 +1244,7 @@ int len;
 }
 
 void
-setstartlineno()
+setstartlineno(void)
 {
     startlineno = hsplineno;
 #if 1/*etags*/
@@ -1269,8 +1270,8 @@ static struct {
     char *text;
 } textcache = { 0, 0, NULL };
 
-static VOID
-cleartext()
+static void
+cleartext(void)
 {
 /*  fprintf(stderr, "cleartext\n"); */
     textcache.next = 0;
@@ -1280,10 +1281,8 @@ cleartext()
     }
 }
 
-static VOID
-addtext(text, length)
-char *text;
-unsigned length;
+static void
+addtext(char *text, unsigned length)
 {
 /*  fprintf(stderr, "addtext: %d %s\n", length, text); */
 
@@ -1298,13 +1297,8 @@ unsigned length;
     textcache.next += length;
 }
 
-static VOID
-#ifdef __STDC__
+static void
 addchar(char c)
-#else
-addchar(c)
-  char c;
-#endif
 {
 /*  fprintf(stderr, "addchar: %c\n", c); */
 
@@ -1316,8 +1310,7 @@ addchar(c)
 }
 
 static char *
-fetchtext(length)
-unsigned *length;
+fetchtext(unsigned *length)
 {
 /*  fprintf(stderr, "fetchtext: %d\n", textcache.next); */
 
@@ -1338,10 +1331,8 @@ unsigned *length;
 	hsnewid		Enters an id of length n into the symbol table.
 */
 
-static VOID
-hsnewid(name, length)
-char *name;
-int length;
+static void
+hsnewid(char *name, int length)
 {
     char save = name[length];
 
@@ -1351,8 +1342,7 @@ int length;
 }
 
 BOOLEAN 
-isconstr(s) /* walks past leading underscores before using the macro */
-  char *s;
+isconstr(char *s) /* walks past leading underscores before using the macro */
 {
     char *temp = s;
 

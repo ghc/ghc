@@ -23,7 +23,15 @@ EXTDATA_RO(FetchMe_info);
 Local Definitions.
 
 \begin{code}
-static globalAddr PendingGABuffer[(PACK_BUFFER_SIZE-PACK_HDR_SIZE)*2];
+static globalAddr *PendingGABuffer;  /* HWL; init in main; */
+
+void
+InitPendingGABuffer(size)
+W_ size; 
+{
+  PendingGABuffer
+    = (globalAddr *) stgMallocBytes((size-PACK_HDR_SIZE)*2*sizeof(globalAddr), "InitPendingGABuffer");
+}
 \end{code}
 
 @CommonUp@ commons up two closures which we have discovered to be
@@ -31,9 +39,7 @@ variants of the same object.  One is made an indirection to the other.
 
 \begin{code}
 void
-CommonUp(src, dst)
-P_ src;
-P_ dst;
+CommonUp(P_ src, P_ dst)
 {
     P_ bqe;
 
@@ -95,8 +101,11 @@ W_ *nGAs;
     W_ pptr = 0, pptrs = 0, pvhs;
 
     int i;
+    globalAddr *gaga;
 
-    globalAddr *gaga = PendingGABuffer;
+    InitPackBuffer(); /* in case it isn't already init'd */
+
+    gaga = PendingGABuffer;
 
     InitClosureQueue();
 
@@ -169,7 +178,7 @@ W_ *nGAs;
 	    graph[FIXED_HS + i + vhs + ptrs] = *bufptr++;
                 
 	  /* Indirections are never packed */
-	  ASSERT(INFO_PTR(graph) != (W_) Ind_info);
+	  ASSERT(INFO_PTR(graph) != (W_) Ind_info_TO_USE);
 
 	  /* Add to queue for processing */
 	  QueueClosure(graph);

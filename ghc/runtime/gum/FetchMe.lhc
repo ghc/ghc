@@ -55,7 +55,7 @@ STGFUN(FetchMe_entry)
     	QP_Event1("GR", CurrentTSO);
     }
 
-    if(do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
         /* Note that CURRENT_TIME may perform an unsafe call */
 	TIME now = CURRENT_TIME;
         TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
@@ -124,7 +124,7 @@ STGFUN(FMBQ_entry)
     	QP_Event1("GR", CurrentTSO);
     }
 
-    if(do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
         /* Note that CURRENT_TIME may perform an unsafe call */
 	TIME now = CURRENT_TIME;
         TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);

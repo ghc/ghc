@@ -13,7 +13,7 @@
 #include "rtsdefs.h"
 \end{code}
 
-Turn a closure into a revertable black hole.  After the conversion,
+Turn a closure into a revertible black hole.  After the conversion,
 the first two words of the closure will be a link to the mutables
 list (if appropriate for the garbage collector), and a pointer
 to the blocking queue.  The blocking queue is terminated by a 2-word

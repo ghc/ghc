@@ -1,0 +1,1226 @@
+%
+% (c) The GRASP/AQUA Project, Glasgow University, 1995
+%
+\section{Runtime-system runtime flags}
+
+Everything to do with RTS runtime flags, including RTS parameters
+that can be set by them, either directly or indirectly.
+
+@rtsFlags.lh@ defines the data structure that holds all of them.
+
+\begin{code}
+#include "rtsdefs.h"
+
+struct RTS_FLAGS RTSflags; /* actually declare the data structure */
+struct ALL_FLAGS AllFlags;
+
+/* some fwd decls */
+static I_     decode(const char *);
+static void   bad_option(const char *);
+static FILE * open_stats_file (I_ arg,
+		int argc, char *argv[], int rts_argc, char *rts_argv[],
+		const char *FILENAME_FMT);
+
+/* extern decls */
+long strtol  PROTO((const char *, char **, int));
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Initial default values for @RTSFlags@}
+%*									*
+%************************************************************************
+
+\begin{code}
+void
+initRtsFlagsDefaults (STG_NO_ARGS)
+{
+    RTSflags.GcFlags.statsFile		= NULL;
+    RTSflags.GcFlags.giveStats		= NO_GC_STATS;
+
+    RTSflags.GcFlags.stksSize		= 0x10002;  /* 2^16 = 16Kwords = 64Kbytes */
+    RTSflags.GcFlags.heapSize		= 0x100002; /* 2^20 =  1Mwords =  4Mbytes  */
+    RTSflags.GcFlags.allocAreaSize	= 0x4002;   /* 2^14 = 16Kwords = 64Kbytes;
+						       plus 2 cache-friendly words */
+    RTSflags.GcFlags.allocAreaSizeGiven	= rtsFalse;
+    RTSflags.GcFlags.specifiedOldGenSize= 0;	/* means: use all heap available */
+    RTSflags.GcFlags.pcFreeHeap		= 3;	/* 3% */
+    /* minAllocAreaSize is derived; set in initSM,
+       after we know pcFreeHeap and heapSize */
+
+    RTSflags.GcFlags.force2s		= rtsFalse;
+    RTSflags.GcFlags.forceGC		= rtsFalse;
+    RTSflags.GcFlags.forcingInterval	= 5000000; /* 5MB (or words?) */
+    RTSflags.GcFlags.ringBell		= rtsFalse;
+    RTSflags.GcFlags.trace		= 0; /* not turned on */
+
+    RTSflags.GcFlags.lazyBlackHoling	= rtsTrue;
+    RTSflags.GcFlags.doSelectorsAtGC	= rtsTrue;
+    RTSflags.GcFlags.squeezeUpdFrames	= rtsTrue;
+
+#if defined(PROFILING) || defined(PAR)
+    RTSflags.CcFlags.doCostCentres	= 0;
+    RTSflags.CcFlags.sortBy		= SORTCC_TIME;
+
+    /* "ctxtSwitchTicks", "profilerTicks", & "msecsPerTick" are
+	derived info, so they are set after ctxtSwitchTime has been
+	determined.
+    */
+#endif /* PROFILING or PAR */
+
+#ifdef PROFILING
+    RTSflags.ProfFlags.doHeapProfile	= rtsFalse;
+#endif /* PROFILING */
+
+#ifdef CONCURRENT
+    RTSflags.ConcFlags.ctxtSwitchTime	= CS_MIN_MILLISECS;  /* In milliseconds */
+    RTSflags.ConcFlags.maxThreads	= 32;
+    RTSflags.ConcFlags.stkChunkSize	= 1024;
+    RTSflags.ConcFlags.maxLocalSparks	= 500;
+#endif /* CONCURRENT */
+
+#ifdef PAR
+    RTSflags.ParFlags.parallelStats	= rtsFalse;
+    RTSflags.ParFlags.granSimStats	= rtsFalse;
+    RTSflags.ParFlags.granSimStats_Binary = rtsFalse;
+
+    RTSflags.ParFlags.outputDisabled	= rtsFalse;
+
+    RTSflags.ParFlags.packBufferSize	= 1024;
+#endif /* PAR */
+
+#ifdef TICKY_TICKY
+    RTSflags.TickyFlags.showTickyStats	= rtsFalse;
+    RTSflags.TickyFlags.tickyFile	= NULL;
+
+    AllFlags.doUpdEntryCounts		= rtsTrue; /*ToDo:move? */
+#endif
+}
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Usage message for runtime-system (RTS) flags}
+%*									*
+%************************************************************************
+
+\begin{code}
+static const char *
+usage_text[] = {
+"",
+"Usage: <prog> <args> [+RTS <rtsopts> | -RTS <args>] ... --RTS <args>",
+"",
+"   +RTS    Indicates run time system options follow",
+"   -RTS    Indicates program arguments follow",
+"  --RTS    Indicates that ALL subsequent arguments will be given to the",
+"           program (including any of these RTS flags)",
+"",
+"The following run time system options are available:",
+"",
+"  -? -f    Prints this message and exits; the program is not executed",
+"",
+"  -K<size> Sets the stack size (default 64k)    Egs: -K32k   -K512k",
+"  -H<size> Sets the heap size  (default 4M)          -H512k  -H16M",
+"  -s<file> Summary GC statistics   (default file: <program>.stat)",
+"  -S<file> Detailed GC statistics  (with -Sstderr going to stderr)",
+"",
+#if defined(GCap)
+"  -M<n>%   Sets minimum size of alloc area as % of heap (default 3%)",
+"  -A<size> Fixes size of alloc area, overriding any minimum (-A gives 64k)",
+"  -G<size> Fixes size of major generation (default is dynamic threshold)",
+"  -F2s     Forces program compiled for Appel gc to use 2s collection",
+#else
+# if defined(GCgn)
+"  -A<size> Specifies size of alloc area (default 64k)",
+"  -G<size> Fixes size of major generation (default is available heap)",
+"  -F2s     Forces program compiled for Gen gc to use 2s collection",
+# else
+"  -M<n>%   Minimum % of heap which must be available (default 3%)",
+"  -A<size> Fixes size of heap area allocated between GCs (-A gives 64k)",
+# endif
+#endif
+"  -j<size> Forces major GC at every <size> bytes allocated",
+#if defined(GCdu)
+"  -u<percent> Fixes residency threshold at which mode switches (range 0.0..0.95)",
+#endif
+"",
+"  -N       No black-holing during GC (for use when a signal handler is present)",
+"  -Z       Don't squeeze out update frames on stack overflow",
+"  -B       Sound the bell at the start of each (major) garbage collection",
+#if defined(PROFILING) || defined(PAR)
+"",
+"  -p<sort> Produce cost centre time profile  (output file <program>.prof)",
+"             sort: T = time (default), A = alloc, C = cost centre label",
+"  -P<sort> Produce serial time profile (output file <program>.time)",
+"             and a -p profile with detailed caf/enter/tick/alloc info",
+# if defined(PROFILING)
+"",
+"  -h<break-down> Heap residency profile      (output file <program>.hp)",
+"     break-down: C = cost centre (default), M = module, G = group",
+"                 D = closure description, Y = type description",
+"                 T<ints>,<start> = time closure created",
+"                    ints:  no. of interval bands plotted (default 18)",
+"                    start: seconds after which intervals start (default 0.0)",
+"  A subset of closures may be selected by the attached cost centre using:",
+"    -c{mod:lab,mod:lab...}, specific module:label cost centre(s)",
+"    -m{mod,mod...} all cost centres from the specified modules(s)",
+"    -g{grp,grp...} all cost centres from the specified group(s)",
+"  Selections can also be made by description, type, kind and age:",
+"    -d{des,des...} closures with specified closure descriptions",
+"    -y{typ,typ...} closures with specified type descriptions",
+"    -k{knd,knd...} closures of the specified kinds",
+"    -a<age>        closures which survived <age> complete intervals",
+"  The selection logic used is summarised as follows:",
+"    ([-c] or [-m] or [-g]) and ([-d] or [-y] or [-k]) and [-a]",
+"    where an option is true if not specified",
+# endif
+"",
+"  -z<tbl><size>  set hash table <size> for <tbl> (C, M, G, D or Y)",
+"",
+"  -i<secs> Number of seconds in a profiling interval (default 1.0):",
+"           heap profile (-h) and/or serial time profile (-P) frequency",
+#endif /* PROFILING or PAR */
+"",
+#if defined(TICKY_TICKY)
+"  -r<file>  Produce reduction profiling statistics (with -rstderr for stderr)",
+"",
+#endif
+"  -T<level> Trace garbage collection execution (debugging)",
+#ifdef CONCURRENT
+"",
+# ifdef PAR
+"  -N<n>     Use <n> PVMish processors in parallel (default: 2)",
+/* NB: the -N<n> is implemented by the driver!! */
+# endif
+"  -C<secs>  Context-switch interval in seconds",
+"                (0 or no argument means switch as often as possible)",
+"                the default is .01 sec; resolution is .01 sec",
+"  -e<size>        Size of spark pools (default 100)",
+# ifdef PAR
+"  -q        Enable activity profile (output files in ~/<program>*.gr)",
+"  -qb       Enable binary activity profile (output file /tmp/<program>.gb)",
+"  -Q<size>  Set pack-buffer size (default: 1024)",
+# else
+"  -q[v]     Enable quasi-parallel profile (output file <program>.qp)",
+# endif
+"  -t<num>   Set maximum number of advisory threads per PE (default 32)",
+"  -o<num>   Set stack chunk size (default 1024)",
+# ifdef PAR
+"  -d        Turn on PVM-ish debugging",
+"  -O        Disable output for performance measurement",
+# endif /* PAR */
+#endif /* CONCURRENT */
+"",
+"Other RTS options may be available for programs compiled a different way.",
+"The GHC User's Guide has full details.",
+"",
+0
+};
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Processing command-line arguments to set @RTSFlags@}
+%*									*
+%************************************************************************
+
+\begin{code}
+#define RTS 1
+#define PGM 0
+
+#ifndef atof
+extern double atof();
+/* no proto because some machines use const and some do not */
+#endif
+
+static __inline__ rtsBool
+strequal(const char *a, const char * b)
+{
+    return(strcmp(a, b) == 0);
+}
+
+void
+setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
+{
+    rtsBool error = rtsFalse;
+    I_ mode;
+    I_ arg, total_arg;
+    char *last_slash;
+
+    /* Remove directory from argv[0] -- default files in current directory */
+
+    if ((last_slash = (char *) strrchr(argv[0], '/')) != NULL)
+	strcpy(argv[0], last_slash+1);
+
+    /* Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts */
+    /*   argv[0] must be PGM argument -- leave in argv                 */
+
+    total_arg = *argc;
+    arg = 1;
+
+    *argc = 1;
+    *rts_argc = 0;
+
+    for (mode = PGM; arg < total_arg && ! strequal("--RTS", argv[arg]); arg++) {
+	if (strequal("+RTS", argv[arg])) {
+	    mode = RTS;
+	}
+	else if (strequal("-RTS", argv[arg])) {
+	    mode = PGM;
+	}
+	else if (mode == RTS && *rts_argc < MAX_RTS_ARGS-1) {
+	    rts_argv[(*rts_argc)++] = argv[arg];
+	}
+	else if (mode == PGM) {
+	    argv[(*argc)++] = argv[arg];
+	}
+	else {
+    	    fflush(stdout);
+	    fprintf(stderr, "setupRtsFlags: Too many RTS arguments (max %d)\n",
+		    MAX_RTS_ARGS-1);
+	    EXIT(EXIT_FAILURE);
+	}
+    }
+    if (arg < total_arg) {
+	/* arg must be --RTS; process remaining program arguments */
+	while (++arg < total_arg) {
+	    argv[(*argc)++] = argv[arg];
+	}
+    }
+    argv[*argc] = (char *) 0;
+    rts_argv[*rts_argc] = (char *) 0;
+
+    /* Process RTS (rts_argv) part: mainly to determine statsfile */
+
+    for (arg = 0; arg < *rts_argc; arg++) {
+	if (rts_argv[arg][0] != '-') {
+	    fflush(stdout);
+	    fprintf(stderr, "setupRtsFlags: Unexpected RTS argument: %s\n",
+		    rts_argv[arg]);
+	    error = rtsTrue;
+
+        } else {
+	    switch(rts_argv[arg][1]) {
+
+	      /* process: general args, then PROFILING-only ones,
+		 then CONCURRENT-only, PARallel-only, GRAN-only,
+		 TICKY-only (same order as defined in RtsFlags.lh);
+		 within those groups, mostly in case-insensitive
+		 alphabetical order.
+	      */
+
+#ifdef TICKY_TICKY
+# define TICKY_BUILD_ONLY(x) x
+#else
+# define TICKY_BUILD_ONLY(x) \
+fprintf(stderr, "setupRtsFlags: GHC not built for: ticky-ticky stats\n"); \
+error = rtsTrue;
+#endif
+
+#if (defined(PROFILING) || defined(PAR))
+# define COST_CENTRE_USING_BUILD_ONLY(x) x
+#else
+# define COST_CENTRE_USING_BUILD_ONLY(x) \
+fprintf(stderr, "setupRtsFlags: GHC not built for: -prof or -parallel\n"); \
+error = rtsTrue;
+#endif
+
+#ifdef PROFILING
+# define PROFILING_BUILD_ONLY(x)
+#else
+# define PROFILING_BUILD_ONLY(x) \
+fprintf(stderr, "setupRtsFlags: GHC not built for: -prof\n"); \
+error = rtsTrue;
+#endif
+
+#ifdef CONCURRENT
+# define CONCURRENT_BUILD_ONLY(x)
+#else
+# define CONCURRENT_BUILD_ONLY(x) \
+fprintf(stderr, "setupRtsFlags: GHC not built for: -concurrent\n"); \
+error = rtsTrue;
+#endif
+
+#ifdef PAR
+# define PAR_BUILD_ONLY(x)
+#else
+# define PAR_BUILD_ONLY(x) \
+fprintf(stderr, "setupRtsFlags: GHC not built for: -parallel\n"); \
+error = rtsTrue;
+#endif
+
+#ifdef GRAN
+# define GRAN_BUILD_ONLY(x)
+#else
+# define GRAN_BUILD_ONLY(x) \
+fprintf(stderr, "setupRtsFlags: GHC not built for: -gransim\n"); \
+error = rtsTrue;
+#endif
+
+	      /* =========== GENERAL ========================== */
+	      case '?':
+	      case 'f':
+		error = rtsTrue;
+		break;
+
+	      case 'A':
+		RTSflags.GcFlags.allocAreaSize
+		  = decode(rts_argv[arg]+2) / sizeof(W_);
+		RTSflags.GcFlags.allocAreaSizeGiven = rtsTrue;
+		break;
+
+	      case 'B':
+		RTSflags.GcFlags.ringBell = rtsTrue;
+		break;
+
+	      case 'F':
+		if (strequal(rts_argv[arg]+2, "2s")) {
+		    RTSflags.GcFlags.force2s = rtsTrue;
+		} else {
+		    bad_option( rts_argv[arg] );
+		}
+		break;
+
+	      case 'G':
+		RTSflags.GcFlags.specifiedOldGenSize
+		  = decode(rts_argv[arg]+2) / sizeof(W_);
+		break;
+
+	      case 'K':
+		RTSflags.GcFlags.stksSize = decode(rts_argv[arg]+2) / sizeof(W_);
+
+		if (RTSflags.GcFlags.stksSize == 0) bad_option( rts_argv[arg] );
+		break;
+
+	      case 'H':
+		RTSflags.GcFlags.heapSize = decode(rts_argv[arg]+2) / sizeof(W_);
+		/* user give size in *bytes* but "heapSize" is in *words* */
+
+		if (RTSflags.GcFlags.heapSize <= 0) bad_option(rts_argv[arg]);
+		break;
+
+	      case 'j': /* force GC option */
+		RTSflags.GcFlags.forceGC = rtsTrue;
+		if (rts_argv[arg][2]) {
+		    RTSflags.GcFlags.forcingInterval
+			= decode(rts_argv[arg]+2) / sizeof(W_);
+		}
+		break;
+
+	      case 'M':
+		RTSflags.GcFlags.pcFreeHeap = atof(rts_argv[arg]+2);
+
+		if (RTSflags.GcFlags.pcFreeHeap < 0 || RTSflags.GcFlags.pcFreeHeap > 100)
+		    bad_option( rts_argv[arg] );
+		break;
+
+	      case 'N':
+		RTSflags.GcFlags.lazyBlackHoling = rtsFalse;
+		break;
+
+	      case 'n':
+		RTSflags.GcFlags.doSelectorsAtGC = rtsFalse;
+		break;
+
+	      case 'S':	/* NB: no difference at present ! */
+	      case 's':
+		RTSflags.GcFlags.giveStats ++; /* will be VERBOSE_GC_STATS */
+#ifdef PAR
+		/* Opening all those files would almost certainly fail... */
+		RTSflags.ParFlags.parallelStats = rtsTrue;
+		RTSflags.GcFlags.statsFile = stderr; /* temporary; ToDo: rm */
+#else
+		RTSflags.GcFlags.statsFile
+		  = open_stats_file(arg, *argc, argv,
+			*rts_argc, rts_argv, STAT_FILENAME_FMT);
+
+		if (RTSflags.GcFlags.statsFile == NULL) error = rtsTrue;
+#endif
+		break;
+
+	      case 'T':
+		if (rts_argv[arg][2] != '\0')
+		    RTSflags.GcFlags.trace
+		      = (W_) strtol(rts_argv[arg]+2, (char **)NULL, 0);
+		else
+		    RTSflags.GcFlags.trace = 1; /* slightly weird; why, really? */
+		break;
+
+	      case 'Z':
+		RTSflags.GcFlags.squeezeUpdFrames = rtsFalse;
+		break;
+
+	      /* =========== PROFILING ========================== */
+
+	      case 'P': /* detailed cost centre profiling (time/alloc) */
+		COST_CENTRE_USING_BUILD_ONLY(
+		RTSflags.CcFlags.doCostCentres++;
+		)
+	      case 'p': /* cost centre profiling (time/alloc) */
+		COST_CENTRE_USING_BUILD_ONLY(
+		{ char ch;
+		RTSflags.CcFlags.doCostCentres++;
+
+		for (ch = 2; rts_argv[arg][ch]; ch++) {
+		switch (rts_argv[arg][2]) {
+		  case SORTCC_LABEL:
+		  case SORTCC_TIME:
+		  case SORTCC_ALLOC:
+			RTSflags.CcFlags.sortBy = rts_argv[arg][ch];
+		    break;
+		  default:
+		    fprintf(stderr, "Invalid profiling sort option %s\n", rts_argv[arg]);
+		    error = 1;
+		}}}
+		) break;
+
+	      case 'i': /* serial profiling -- initial timer interval */
+		COST_CENTRE_USING_BUILD_ONLY(
+		interval_ticks = (I_) ((atof(rts_argv[arg]+2) * TICK_FREQUENCY));
+		if (interval_ticks <= 0)
+		    interval_ticks = 1;
+		) break;
+
+	      case 'h': /* serial heap profile */
+		PROFILING_BUILD_ONLY(
+		switch (rts_argv[arg][2]) {
+		  case '\0':
+		  case CCchar:
+		    RTSflags.ProfFlags.doHeapProfile = HEAP_BY_CC;
+		    break;
+		  case MODchar:
+		    RTSflags.ProfFlags.doHeapProfile = HEAP_BY_MOD;
+		    break;
+		  case GRPchar:
+		    RTSflags.ProfFlags.doHeapProfile = HEAP_BY_GRP;
+		    break;
+		  case DESCRchar:
+		    RTSflags.ProfFlags.doHeapProfile = HEAP_BY_DESCR;
+		    break;
+		  case TYPEchar:
+		    RTSflags.ProfFlags.doHeapProfile = HEAP_BY_TYPE;
+		    break;
+		  case TIMEchar:
+		    RTSflags.ProfFlags.doHeapProfile = HEAP_BY_TIME;
+		    if (rts_argv[arg][3]) {
+			char *start_str = strchr(rts_argv[arg]+3, ',');
+			I_ intervals;
+			if (start_str) *start_str = '\0';
+
+			if ((intervals = decode(rts_argv[arg]+3)) != 0) {
+			    time_intervals = (hash_t) intervals;
+			    /* ToDo: and what if it *is* zero intervals??? */
+			}
+			if (start_str) {
+			    earlier_ticks = (I_)((atof(start_str + 1) * TICK_FREQUENCY));
+			}
+		    }
+		    break;
+		  default:
+		    fprintf(stderr, "Invalid heap profile option: %s\n",
+			    rts_argv[arg]);
+		    error = 1;
+		}
+		) break;
+
+	      case 'z': /* size of index tables */
+		PROFILING_BUILD_ONLY(
+		switch (rts_argv[arg][2]) {
+		  case CCchar:
+		    max_cc_no = (hash_t) decode(rts_argv[arg]+3);
+		    if (max_cc_no == 0) {
+			fprintf(stderr, "Bad number of cost centres %s\n", rts_argv[arg]);
+			error = 1;
+		    }
+		    break;
+		  case MODchar:
+		    max_mod_no = (hash_t) decode(rts_argv[arg]+3);
+		    if (max_mod_no == 0) {
+			fprintf(stderr, "Bad number of modules %s\n", rts_argv[arg]);
+			error = 1;
+		    }
+		    break;
+		  case GRPchar:
+		    max_grp_no = (hash_t) decode(rts_argv[arg]+3);
+		    if (max_grp_no == 0) {
+			fprintf(stderr, "Bad number of groups %s\n", rts_argv[arg]);
+			error = 1;
+		    }
+		    break;
+		  case DESCRchar:
+		    max_descr_no = (hash_t) decode(rts_argv[arg]+3);
+		    if (max_descr_no == 0) {
+			fprintf(stderr, "Bad number of closure descriptions %s\n", rts_argv[arg]);
+			error = 1;
+		    }
+		    break;
+		  case TYPEchar:
+		    max_type_no = (hash_t) decode(rts_argv[arg]+3);
+		    if (max_type_no == 0) {
+			fprintf(stderr, "Bad number of type descriptions %s\n", rts_argv[arg]);
+			error = 1;
+		    }
+		    break;
+		  default:
+		    fprintf(stderr, "Invalid index table size option: %s\n",
+			    rts_argv[arg]);
+		    error = 1;
+		}
+		) break;
+
+	      case 'c': /* cost centre label select */
+	      case 'm': /* cost centre module select */
+	      case 'g': /* cost centre group select */
+	      case 'd': /* closure descr select */
+	      case 'y': /* closure type select */
+	      case 'k': /* closure kind select */
+		PROFILING_BUILD_ONLY(
+
+		left  = strchr(rts_argv[arg], '{');
+		right = strrchr(rts_argv[arg], '}');
+		if (! left || ! right ||
+		        strrchr(rts_argv[arg], '{') != left ||
+		         strchr(rts_argv[arg], '}') != right) {
+		    fprintf(stderr, "Invalid heap profiling selection bracketing\n   %s\n", rts_argv[arg]);
+		    error = 1;
+		} else {
+		    *right = '\0';
+		    switch (rts_argv[arg][1]) {
+		      case 'c': /* cost centre label select */
+			select_cc = left + 1;
+			break;
+		      case 'm': /* cost centre module select */
+			select_mod = left + 1;
+			break;
+		      case 'g': /* cost centre group select */
+			select_grp = left + 1;
+			break;
+		      case 'd': /* closure descr select */
+			select_descr = left + 1;
+			break;
+		      case 't': /* closure type select */
+			select_type = left + 1;
+			break;
+		      case 'k': /* closure kind select */
+			select_kind = left + 1;
+			break;
+		}
+		}
+		) break;
+
+	      /* =========== CONCURRENT ========================= */
+    	      case 'C':	/* context switch interval */
+		CONCURRENT_BUILD_ONLY (
+		if (rts_argv[arg][2] == '\0')
+    	    	    RTSflags.ConcFlags.ctxtSwitchTime = 0;
+		else {
+		    I_ cst; /* tmp */
+
+		    /* Convert to milliseconds */
+		    cst = (I_) ((atof(rts_argv[arg]+2) * 1000));
+		    cst = (cst / CS_MIN_MILLISECS) * CS_MIN_MILLISECS;
+		    if (cst < CS_MIN_MILLISECS)
+			cst = CS_MIN_MILLISECS;
+
+		    RTSflags.ConcFlags.ctxtSwitchTime = cst;
+		}
+    	    	) break;
+
+	      case 't':
+		CONCURRENT_BUILD_ONLY(
+		if (rts_argv[arg][2] != '\0') {
+		    RTSflags.ConcFlags.maxThreads
+		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+		} else {
+    	    	    fprintf(stderr, "setupRtsFlags: missing size for -t\n");
+    	    	    error = rtsTrue;
+    	    	}
+		) break;
+
+	      case 'o':
+		CONCURRENT_BUILD_ONLY (
+		if (rts_argv[arg][2] != '\0') {
+		    I_ size = decode(rts_argv[arg]+2);
+
+		    if (size < MIN_STKO_CHUNK_SIZE)
+			size = MIN_STKO_CHUNK_SIZE;
+
+		    RTSflags.ConcFlags.stkChunkSize = size;
+		} else {
+    	    	    fprintf(stderr, "setupRtsFlags: missing size for -o\n");
+    	    	    error = rtsTrue;
+    	    	}
+		) break;
+
+	      /* =========== PARALLEL =========================== */
+	      case 'e':
+		CONCURRENT_BUILD_ONLY(
+		if (rts_argv[arg][2] != '\0') { /* otherwise, stick w/ the default */
+
+		    RTSflags.ConcFlags.maxLocalSparks
+		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+
+		    if (RTSflags.ConcFlags.maxLocalSparks <= 0) {
+			fprintf(stderr, "setupRtsFlags: bad value for -e\n");
+			error = rtsTrue;
+		    }
+		}
+		) break;
+
+	      case 'O':
+		PAR_BUILD_ONLY(
+		RTSflags.ParFlags.outputDisabled = rtsTrue;
+		) break;
+
+	      case 'q': /* activity profile option */
+    	    	PAR_BUILD_ONLY(
+		if (rts_argv[arg][2] == 'b')
+		    RTSflags.ParFlags.granSimStats_Binary = rtsTrue;
+    	    	else
+    	    	    RTSflags.ParFlags.granSimStats = rtsTrue;
+		) break;
+
+#if 0 /* or??? */
+	      case 'q': /* quasi-parallel profile option */
+    	    	GRAN_BUILD_ONLY (
+		if (rts_argv[arg][2] == 'v')
+		    do_qp_prof = 2;
+    	    	else
+    	    	    do_qp_prof++;
+		) break;
+#endif /* 0??? */
+
+	      case 'Q': /* Set pack buffer size */
+		PAR_BUILD_ONLY(
+		if (rts_argv[arg][2] != '\0') {
+		    RTSflags.ParFlags.packBufferSize = decode(rts_argv[arg]+2);
+		} else {
+    	    	    fprintf(stderr, "setupRtsFlags: missing size of PackBuffer (for -Q)\n");
+    	    	    error = rtsTrue;
+    	    	}
+		) break;
+
+	      /* =========== GRAN =============================== */
+
+    	      case 'b':
+		GRAN_BUILD_ONLY(
+		process_gran_option();
+		) break;
+
+	      /* =========== TICKY ============================== */
+
+	      case 'r': /* Basic profiling stats */
+		TICKY_BUILD_ONLY(
+
+		RTSflags.TickyFlags.showTickyStats = rtsTrue;
+		RTSflags.TickyFlags.tickyFile
+		  = open_stats_file(arg, *argc, argv,
+			*rts_argc, rts_argv, TICKY_FILENAME_FMT);
+
+		if (RTSflags.TickyFlags.tickyFile == NULL) error = rtsTrue;
+	        ) break;
+
+	      /* =========== OH DEAR ============================ */
+	      default:
+		fprintf(stderr, "setupRtsFlags: Unknown RTS option: %s\n",rts_argv[arg]);
+		error = rtsTrue;
+		break;
+	    }
+	}
+    }
+    if (error) {
+	const char **p;
+
+        fflush(stdout);
+	for (p = usage_text; *p; p++)
+	    fprintf(stderr, "%s\n", *p);
+	EXIT(EXIT_FAILURE);
+    }
+
+}
+
+#ifdef GRAN
+static void
+process_gran_option()
+{
+    if (rts_argv[arg][2] != '\0') {
+
+      /* Should we emulate hbcpp */
+      if(strequal((rts_argv[arg]+2),"roken")) {
+	++DoAlwaysCreateThreads;
+	strcpy(rts_argv[arg]+2,"oring");
+      }
+
+      /* or a ridiculously idealised simulator */
+      if(strequal((rts_argv[arg]+2),"oring")) {
+	gran_latency = gran_fetchtime = gran_additional_latency =
+	  gran_gunblocktime = gran_lunblocktime
+	    = gran_threadcreatetime = gran_threadqueuetime
+	      = gran_threadscheduletime = gran_threaddescheduletime
+		= gran_threadcontextswitchtime
+		  = 0;
+
+	gran_mpacktime = gran_munpacktime = 0;
+
+	gran_arith_cost = gran_float_cost = gran_load_cost
+	  = gran_store_cost = gran_branch_cost = 0;
+
+	gran_heapalloc_cost = 1;
+
+	/* ++DoFairSchedule; */
+	++DoStealThreadsFirst;
+	++DoThreadMigration;
+	RTSflags.ParFlags.granSimStats = rtsTrue;
+      }
+
+      /* or a ridiculously idealised simulator */
+      if(strequal((rts_argv[arg]+2),"onzo")) {
+	gran_latency = gran_fetchtime = gran_additional_latency =
+	  gran_gunblocktime = gran_lunblocktime
+	    = gran_threadcreatetime = gran_threadqueuetime
+	      = gran_threadscheduletime = gran_threaddescheduletime
+		= gran_threadcontextswitchtime
+		  = 0;
+
+	gran_mpacktime = gran_munpacktime = 0;
+
+	/* Keep default values for these
+	gran_arith_cost = gran_float_cost = gran_load_cost
+	  = gran_store_cost = gran_branch_cost = 0;
+	  */
+
+	gran_heapalloc_cost = 1;
+
+	/* ++DoFairSchedule; */       /* -b-R */
+	/* ++DoStealThreadsFirst; */  /* -b-T */
+	++DoReScheduleOnFetch;        /* -bZ */
+	++DoThreadMigration;          /* -bM */
+	RTSflags.ParFlags.granSimStats = rtsTrue; /* -bP */
+#   if defined(GRAN_CHECK) && defined(GRAN)
+	debug = 0x20;       /* print event statistics   */
+#   endif
+      }
+
+      /* Communication and task creation cost parameters */
+      else switch(rts_argv[arg][2]) {
+	case 'l':
+	  if (rts_argv[arg][3] != '\0')
+	    {
+	      gran_gunblocktime = gran_latency = decode(rts_argv[arg]+3);
+	      gran_fetchtime = 2* gran_latency;
+	    }
+	  else
+	    gran_latency = LATENCY;
+	  break;
+
+	case 'a':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_additional_latency = decode(rts_argv[arg]+3);
+	  else
+	    gran_additional_latency = ADDITIONAL_LATENCY;
+	  break;
+
+	case 'm':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_mpacktime = decode(rts_argv[arg]+3);
+	  else
+	    gran_mpacktime = MSGPACKTIME;
+	  break;
+
+	case 'x':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_mtidytime = decode(rts_argv[arg]+3);
+	  else
+	    gran_mtidytime = 0;
+	  break;
+
+	case 'r':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_munpacktime = decode(rts_argv[arg]+3);
+	  else
+	    gran_munpacktime = MSGUNPACKTIME;
+	  break;
+
+	case 'f':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_fetchtime = decode(rts_argv[arg]+3);
+	  else
+	    gran_fetchtime = FETCHTIME;
+	  break;
+
+	case 'n':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_gunblocktime = decode(rts_argv[arg]+3);
+	  else
+	    gran_gunblocktime = GLOBALUNBLOCKTIME;
+	  break;
+
+	case 'u':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_lunblocktime = decode(rts_argv[arg]+3);
+	  else
+	    gran_lunblocktime = LOCALUNBLOCKTIME;
+	  break;
+
+	/* Thread-related metrics */
+	case 't':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_threadcreatetime = decode(rts_argv[arg]+3);
+	  else
+	    gran_threadcreatetime = THREADCREATETIME;
+	  break;
+
+	case 'q':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_threadqueuetime = decode(rts_argv[arg]+3);
+	  else
+	    gran_threadqueuetime = THREADQUEUETIME;
+	  break;
+
+	case 'c':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_threadscheduletime = decode(rts_argv[arg]+3);
+	  else
+	    gran_threadscheduletime = THREADSCHEDULETIME;
+
+	  gran_threadcontextswitchtime = gran_threadscheduletime
+				       + gran_threaddescheduletime;
+	  break;
+
+	case 'd':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_threaddescheduletime = decode(rts_argv[arg]+3);
+	  else
+	    gran_threaddescheduletime = THREADDESCHEDULETIME;
+
+	  gran_threadcontextswitchtime = gran_threadscheduletime
+				       + gran_threaddescheduletime;
+	  break;
+
+	/* Instruction Cost Metrics */
+	case 'A':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_arith_cost = decode(rts_argv[arg]+3);
+	  else
+	    gran_arith_cost = ARITH_COST;
+	  break;
+
+	case 'F':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_float_cost = decode(rts_argv[arg]+3);
+	  else
+	    gran_float_cost = FLOAT_COST;
+	  break;
+
+	case 'B':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_branch_cost = decode(rts_argv[arg]+3);
+	  else
+	    gran_branch_cost = BRANCH_COST;
+	  break;
+
+	case 'L':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_load_cost = decode(rts_argv[arg]+3);
+	  else
+	    gran_load_cost = LOAD_COST;
+	  break;
+
+	case 'S':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_store_cost = decode(rts_argv[arg]+3);
+	  else
+	    gran_store_cost = STORE_COST;
+	  break;
+
+	case 'H':
+	  if (rts_argv[arg][3] != '\0')
+	    gran_heapalloc_cost = decode(rts_argv[arg]+3);
+	  else
+	    gran_heapalloc_cost = 0;
+	  break;
+
+	case 'y':
+	  if (rts_argv[arg][3] != '\0')
+	    FetchStrategy = decode(rts_argv[arg]+3);
+	  else
+	    FetchStrategy = 4; /* default: fetch everything */
+	  break;
+
+	/* General Parameters */
+	case 'p':
+	  if (rts_argv[arg][3] != '\0')
+	    {
+	      max_proc = decode(rts_argv[arg]+3);
+	      if(max_proc > MAX_PROC || max_proc < 1)
+		{
+		  fprintf(stderr,"setupRtsFlags: no more than %u processors allowed\n", MAX_PROC);
+		  error = rtsTrue;
+		}
+	    }
+	  else
+	    max_proc = MAX_PROC;
+	  break;
+
+	case 'C':
+	  ++DoAlwaysCreateThreads;
+	  ++DoThreadMigration;
+	  break;
+
+	case 'G':
+	  ++DoGUMMFetching;
+	  break;
+
+	case 'M':
+	  ++DoThreadMigration;
+	  break;
+
+	case 'R':
+	  ++DoFairSchedule;
+	  break;
+
+	case 'T':
+	  ++DoStealThreadsFirst;
+	  ++DoThreadMigration;
+	  break;
+
+	case 'Z':
+	  ++DoReScheduleOnFetch;
+	  break;
+
+	case 'z':
+	  ++SimplifiedFetch;
+	  break;
+
+	case 'N':
+	  ++PreferSparksOfLocalNodes;
+	  break;
+
+	case 'b':
+	  RTSflags.ParFlags.granSimStats_Binary = rtsTrue;
+	  break;
+
+	case 'P':
+	  RTSflags.ParFlags.granSimStats = rtsTrue;
+	  break;
+
+	case 's':
+	  ++do_sp_profile;
+	  break;
+
+	case '-':
+	  switch(rts_argv[arg][3]) {
+
+	   case 'C':
+	     DoAlwaysCreateThreads=0;
+	     DoThreadMigration=0;
+	     break;
+
+	   case 'G':
+	     DoGUMMFetching=0;
+	     break;
+
+	   case 'M':
+	     DoThreadMigration=0;
+	     break;
+
+	    case 'R':
+	     DoFairSchedule=0;
+	     break;
+
+	   case 'T':
+	     DoStealThreadsFirst=0;
+	     DoThreadMigration=0;
+	     break;
+
+	   case 'Z':
+	     DoReScheduleOnFetch=0;
+	     break;
+
+	   case 'N':
+	     PreferSparksOfLocalNodes=0;
+	     break;
+
+	   case 'P':
+	     RTSflags.ParFlags.granSimStats = rtsFalse;
+	     no_gr_profile=1;
+	     break;
+
+	   case 's':
+	     do_sp_profile=0;
+	     break;
+
+	   case 'b':
+	     RTSflags.ParFlags.granSimStats_Binary = rtsFalse;
+	     break;
+
+	   default:
+	     bad_option( rts_argv[arg] );
+	     break;
+	   }
+	  break;
+
+#   if defined(GRAN_CHECK) && defined(GRAN)
+	case 'D':
+	  switch(rts_argv[arg][3]) {
+	      case 'e':       /* event trace */
+		fprintf(stderr,"Printing event trace.\n");
+		++event_trace;
+		break;
+
+	      case 'f':
+		fprintf(stderr,"Printing forwarding of FETCHNODES.\n");
+		debug |= 0x2; /* print fwd messages */
+		break;
+
+	      case 'z':
+		fprintf(stderr,"Check for blocked on fetch.\n");
+		debug |= 0x4; /* debug non-reschedule-on-fetch */
+		break;
+
+	      case 't':
+		fprintf(stderr,"Check for TSO asleep on fetch.\n");
+		debug |= 0x10; /* debug TSO asleep for fetch  */
+		break;
+
+	      case 'E':
+		fprintf(stderr,"Printing event statistics.\n");
+		debug |= 0x20; /* print event statistics   */
+		break;
+
+	      case 'F':
+		fprintf(stderr,"Prohibiting forward.\n");
+		NoForward = 1; /* prohibit forwarding   */
+		break;
+
+	      case 'm':
+		fprintf(stderr,"Printing fetch misses.\n");
+		PrintFetchMisses = 1; /* prohibit forwarding   */
+		break;
+
+	      case 'd':
+		fprintf(stderr,"Debug mode.\n");
+		debug |= 0x40; 
+		break;
+
+	      case 'D':
+		fprintf(stderr,"Severe debug mode.\n");
+		debug |= 0x80; 
+		break;
+
+	      case '\0':
+		debug = 1;
+		break;
+
+	      default:
+		bad_option( rts_argv[arg] );
+		break;
+	      }
+	  break;
+#   endif
+	default:
+	  bad_option( rts_argv[arg] );
+	  break;
+	}
+    }
+    do_gr_sim++;
+    RTSflags.ConcFlags.ctxtSwitchTime = 0;
+}
+#endif /* GRAN */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Profiling RTS Arguments}
+%*									*
+%************************************************************************
+
+\begin{code}
+I_ MaxResidency = 0;     /* in words; for stats only */
+I_ ResidencySamples = 0; /* for stats only */
+
+void
+initSM(void)
+{
+    RTSflags.GcFlags.minAllocAreaSize
+      = (I_) (RTSflags.GcFlags.heapSize * RTSflags.GcFlags.pcFreeHeap / 100);
+    /*
+	This needs to be here, in case the user changed some of these
+	values with a "hook".
+    */
+}
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection{Utility bits}
+%*									*
+%************************************************************************
+
+\begin{code}
+static FILE *		/* return NULL on error */
+open_stats_file (
+    I_ arg,
+    int argc, char *argv[],
+    int rts_argc, char *rts_argv[],
+    const char *FILENAME_FMT)
+{
+    FILE *f = NULL;
+
+    if (strequal(rts_argv[arg]+2, "stderr")) /* use real stderr */
+	f = stderr;
+    else if (rts_argv[arg][2] != '\0')	    /* stats file specified */
+	f = fopen(rts_argv[arg]+2,"w");
+    else {
+	char stats_filename[STATS_FILENAME_MAXLEN]; /* default <program>.<ext> */
+	sprintf(stats_filename, FILENAME_FMT, argv[0]);
+	f = fopen(stats_filename,"w");
+    }
+    if (f == NULL) {
+	fprintf(stderr, "Can't open stats file %s\n", rts_argv[arg]+2);
+    } else {
+	/* Write argv and rtsv into start of stats file */
+	I_ count;
+	for(count = 0; count < argc; count++)
+	    fprintf(f, "%s ", argv[count]);
+	fprintf(f, "+RTS ");
+	for(count = 0; count < rts_argc; count++)
+	    fprintf(f, "%s ", rts_argv[count]);
+	fprintf(f, "\n");
+    }
+
+    return(f);
+}
+
+static I_
+decode(const char *s)
+{
+    I_ c;
+    StgDouble m;
+
+    if (!*s)
+	return 0;
+
+    m = atof(s);
+    c = s[strlen(s)-1];
+
+    if (c == 'g' || c == 'G')
+	m *= 1000*1000*1000;	/* UNchecked! */
+    else if (c == 'm' || c == 'M')
+	m *= 1000*1000;			/* We do not use powers of 2 (1024) */
+    else if (c == 'k' || c == 'K')	/* to avoid possible bad effects on */
+	m *= 1000;			/* a direct-mapped cache.   	    */ 
+    else if (c == 'w' || c == 'W')
+	m *= sizeof(W_);
+
+    return (I_)m;
+}
+
+static void
+bad_option(const char *s)
+{
+  fflush(stdout);
+  fprintf(stderr, "initSM: Bad RTS option: %s\n", s);
+  EXIT(EXIT_FAILURE);
+}		
+\end{code}

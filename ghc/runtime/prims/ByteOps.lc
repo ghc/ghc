@@ -67,9 +67,7 @@ X2BYTES(double)
     
 #define BYTES2X(ctype,htype)			\
 I_						\
-CAT3(bytes2,ctype,__)(in, out)			\
-  P_ in;					\
-  htype *out;					\
+CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
 {						\
     union {					\
 	ctype i;				\
@@ -88,9 +86,7 @@ CAT3(bytes2,ctype,__)(in, out)			\
     
 static STG_INLINE
 void
-assign_flt(p_dest, src)
-  W_ p_dest[];
-  StgFloat src;
+assign_flt(W_ p_dest[], StgFloat src)
 { 
     float_thing y;
     y.f = src;
@@ -100,9 +96,7 @@ assign_flt(p_dest, src)
 
 static STG_INLINE
 void
-assign_dbl(p_dest, src)
-  W_ p_dest[];
-  StgDouble src;
+assign_dbl(W_ p_dest[], StgDouble src)
 {
     double_thing y;
     y.d = src;
@@ -112,9 +106,7 @@ assign_dbl(p_dest, src)
 
 #define BYTES2FX(ctype,htype,assign_fx)		\
 I_						\
-CAT3(bytes2,ctype,__)(in, out)			\
-  P_ in;					\
-  htype *out;					\
+CAT3(bytes2,ctype,__)(P_ in, htype *out)	\
 {						\
     union {					\
 	ctype i;				\

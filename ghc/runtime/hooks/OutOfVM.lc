@@ -2,9 +2,10 @@
 #include "rtsdefs.h"
 
 void
-MallocFailHook (request_size)
+MallocFailHook (request_size, msg)
   I_ request_size;    /* in bytes */
+  char *msg;
 {
-    fprintf(stderr, "malloc: failed on request for %lu bytes\n", request_size);
+    fprintf(stderr, "malloc: failed on request for %lu bytes; message: %s\n", request_size, msg);
 }
 \end{code}

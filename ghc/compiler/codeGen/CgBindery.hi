@@ -4,85 +4,60 @@ import AbsCSyn(AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId, RegRelativ
 import BasicLit(BasicLit)
 import CLabelInfo(CLabel)
 import CgMonad(CgInfoDownwards, CgState, StubFlag)
-import ClosureInfo(ClosureInfo, LambdaFormInfo, StandardFormInfo)
+import ClosureInfo(ClosureInfo, LambdaFormInfo)
 import CostCentre(CostCentre)
 import HeapOffs(HeapOffset)
-import Id(Id, IdDetails)
+import Id(Id)
 import IdEnv(IdEnv(..))
-import IdInfo(IdInfo)
 import Maybes(Labda)
 import PreludePS(_PackedString)
 import PreludeRatio(Ratio(..))
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import StgSyn(StgAtom)
-import UniType(UniType)
 import UniqFM(UniqFM)
 import UniqSet(UniqSet(..))
 import Unique(Unique)
-data AbstractC 	{-# GHC_PRAGMA AbsCNop | AbsCStmts AbstractC AbstractC | CAssign CAddrMode CAddrMode | CJump CAddrMode | CFallThrough CAddrMode | CReturn CAddrMode ReturnInfo | CSwitch CAddrMode [(BasicLit, AbstractC)] AbstractC | CCodeBlock CLabel AbstractC | CInitHdr ClosureInfo RegRelative CAddrMode Bool | COpStmt [CAddrMode] PrimOp [CAddrMode] Int [MagicId] | CSimultaneous AbstractC | CMacroStmt CStmtMacro [CAddrMode] | CCallProfCtrMacro _PackedString [CAddrMode] | CCallProfCCMacro _PackedString [CAddrMode] | CStaticClosure CLabel ClosureInfo CAddrMode [CAddrMode] | CClosureInfoAndCode ClosureInfo AbstractC (Labda AbstractC) CAddrMode [Char] | CRetVector CLabel [Labda CAddrMode] AbstractC | CRetUnVector CLabel CAddrMode | CFlatRetVector CLabel [CAddrMode] | CCostCentreDecl Bool CostCentre | CClosureUpdInfo AbstractC | CSplitMarker #-}
-data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
-data MagicId 	{-# GHC_PRAGMA BaseReg | StkOReg | VanillaReg PrimKind Int# | FloatReg Int# | DoubleReg Int# | TagReg | RetReg | SpA | SuA | SpB | SuB | Hp | HpLim | LivenessReg | ActivityReg | StdUpdRetVecReg | StkStubReg | CurCostCentre | VoidReg #-}
-data BasicLit 	{-# GHC_PRAGMA MachChar Char | MachStr _PackedString | MachAddr Integer | MachInt Integer Bool | MachFloat (Ratio Integer) | MachDouble (Ratio Integer) | MachLitLit _PackedString PrimKind | NoRepStr _PackedString | NoRepInteger Integer | NoRepRational (Ratio Integer) #-}
+data AbstractC 
+data CAddrMode 
+data MagicId 
+data BasicLit 
 data CLabel 
 type CgBindings = UniqFM CgIdInfo
 data CgIdInfo   = MkCgIdInfo Id VolatileLoc StableLoc LambdaFormInfo
-data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
-data LambdaFormInfo 	{-# GHC_PRAGMA LFReEntrant Bool Int Bool | LFCon Id Bool | LFTuple Id Bool | LFThunk Bool Bool Bool StandardFormInfo | LFArgument | LFImported | LFLetNoEscape Int (UniqFM Id) | LFBlackHole | LFIndirection #-}
+data CgState 
+data LambdaFormInfo 
 data HeapOffset 
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type IdEnv a = UniqFM a
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data StableLoc 	{-# GHC_PRAGMA NoStableLoc | VirAStkLoc Int | VirBStkLoc Int | LitLoc BasicLit | StableAmodeLoc CAddrMode #-}
-data StgAtom a 	{-# GHC_PRAGMA StgVarAtom a | StgLitAtom BasicLit #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data Labda a 
+data StableLoc 
+data StgAtom a 
+data UniqFM a 
 type UniqSet a = UniqFM a
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
-data VolatileLoc 	{-# GHC_PRAGMA NoVolatileLoc | TempVarLoc Unique | RegLoc MagicId | VirHpLoc HeapOffset | VirNodeLoc HeapOffset #-}
+data Unique 
+data VolatileLoc 
 bindArgsToRegs :: [Id] -> [MagicId] -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 2 _U_ 1122 _N_ _S_ "SL" _N_ _N_ #-}
 bindNewPrimToAmode :: Id -> CAddrMode -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
 bindNewToAStack :: (Id, Int) -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 101 _N_ _S_ "U(LL)AU(LLL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 bindNewToBStack :: (Id, Int) -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 101 _N_ _S_ "U(LL)AU(LLL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 bindNewToNode :: Id -> HeapOffset -> LambdaFormInfo -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 5 _U_ 22201 _N_ _S_ "LLLAU(LLL)" {_A_ 4 _U_ 2221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 bindNewToReg :: Id -> MagicId -> LambdaFormInfo -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 5 _U_ 22201 _N_ _S_ "LLLAU(LLL)" {_A_ 4 _U_ 2221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 bindNewToTemp :: Id -> CgInfoDownwards -> CgState -> (CAddrMode, CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 201 _N_ _N_ _N_ _N_ #-}
 getAtomAmode :: StgAtom Id -> CgInfoDownwards -> CgState -> (CAddrMode, CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "S" _N_ _N_ #-}
 getAtomAmodes :: [StgAtom Id] -> CgInfoDownwards -> CgState -> ([CAddrMode], CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "S" _N_ _N_ #-}
 getCAddrMode :: Id -> CgInfoDownwards -> CgState -> (CAddrMode, CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(LLLS)" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getCAddrModeAndInfo :: Id -> CgInfoDownwards -> CgState -> ((CAddrMode, LambdaFormInfo), CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(LLLS)" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getCAddrModeIfVolatile :: Id -> CgInfoDownwards -> CgState -> (Labda CAddrMode, CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(LLLS)" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getVolatileRegs :: UniqFM Id -> CgInfoDownwards -> CgState -> ([MagicId], CgState)
-	{-# GHC_PRAGMA _A_ 1 _U_ 222 _N_ _N_ _N_ _N_ #-}
 heapIdInfo :: Id -> HeapOffset -> LambdaFormInfo -> CgIdInfo
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 idInfoToAmode :: PrimKind -> CgIdInfo -> CgInfoDownwards -> CgState -> (CAddrMode, CgState)
-	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LU(ASLA)" {_A_ 5 _U_ 21122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 letNoEscapeIdInfo :: Id -> Int -> Int -> LambdaFormInfo -> CgIdInfo
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 maybeAStkLoc :: StableLoc -> Labda Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 8 \ (u0 :: StableLoc) -> case u0 of { _ALG_ _ORIG_ CgBindery VirAStkLoc (u1 :: Int) -> _!_ _ORIG_ Maybes Ni [Int] [u1]; (u2 :: StableLoc) -> _!_ _ORIG_ Maybes Hamna [Int] [] } _N_ #-}
 maybeBStkLoc :: StableLoc -> Labda Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 8 \ (u0 :: StableLoc) -> case u0 of { _ALG_ _ORIG_ CgBindery VirBStkLoc (u1 :: Int) -> _!_ _ORIG_ Maybes Ni [Int] [u1]; (u2 :: StableLoc) -> _!_ _ORIG_ Maybes Hamna [Int] [] } _N_ #-}
 newTempAmodeAndIdInfo :: Id -> LambdaFormInfo -> (CAddrMode, CgIdInfo)
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 nukeVolatileBinds :: UniqFM CgIdInfo -> UniqFM CgIdInfo
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 rebindToAStack :: Id -> Int -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 4 _U_ 2201 _N_ _S_ "LLAU(LLL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 rebindToBStack :: Id -> Int -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 4 _U_ 2201 _N_ _S_ "LLAU(LLL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 stableAmodeIdInfo :: Id -> CAddrMode -> LambdaFormInfo -> CgIdInfo
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 

@@ -40,7 +40,8 @@ $DefaultStdoutFile = "$TmpPrefix/no_stdout$$"; # can't use /dev/null (e.g. Alpha
 $DefaultStderrFile = "$TmpPrefix/no_stderr$$";
 @PgmStdoutFile = ();
 @PgmStderrFile = ();
-$AltScript = '';
+$PreScript = '';
+$PostScript = '';
 $TimeCmd = '';
 $StatsFile = "$TmpPrefix/stats$$";
 $SysSpecificTiming = '';
@@ -72,10 +73,10 @@ arg: while ($_ = $ARGV[0]) {
     /^-o2(.*)/	&& do { $out_file = &grab_arg_arg('-o2',$1);
 			push(@PgmStderrFile, $out_file);
 			next arg; };
-    /^-script(.*)/ && do { $AltScript = &grab_arg_arg('-script',$1);
-			   @PgmStdoutFile = (); # re-init
-			   @PgmStderrFile = (); # ditto
-			   next arg; };
+    /^-prescript(.*)/  && do { $PreScript = &grab_arg_arg('-prescript',$1);
+			        next arg; };
+    /^-postscript(.*)/ && do { $PostScript = &grab_arg_arg('-postscript',$1);
+			        next arg; };
     /^-(ghc|hbc)-timing$/ && do { $SysSpecificTiming = $1;
 				  next arg; };
     /^-spix-timing$/ && do { $SysSpecificTiming = 'ghcspix';
@@ -129,19 +130,6 @@ if ( $SysSpecificTiming =~ /^ghc/ ) {
     $TimingMagic = "-S$StatsFile";
 }
 
-if ($AltScript ne '') {
-    local($to_do);
-    $to_do = `cat $AltScript`;
-    # glue in pgm to run...
-    $* = 1;
-    $to_do =~ s/^\$1 /$ToRun /;
-    &run_something($to_do);
-    exit 0;
-#    exec "$AltScript $ToRun";
-#    print STDERR "Failed to exec!!! $AltScript $ToRun\n";
-#    exit 1;
-}
-
 $ToRunOrig = $ToRun;
 if ( $SpixTiming eq 'yes' ) {
     $ToRun .= '.spix';
@@ -159,11 +147,32 @@ if ( $SpixTiming eq 'yes' ) {
     }
     close(SPIXNM); # || die "nm -n $ToRunOrig close failed!\n";
 
-    $SpixifyLine = "spix -o $ToRun -t$FirstSpix,$LastSpix $ToRunOrig";
-    $SpixstatsLine = "spixstats -b $TmpPrefix/runtest$$.3 $ToRunOrig > $ToRunOrig.spixstats";
+    $SpixifyLine1 = "spix -o $ToRun -t$FirstSpix,$LastSpix $ToRunOrig";
+    $SpixstatsLine1 = "spixstats -b $TmpPrefix/runtest$$.3 $ToRunOrig > $ToRunOrig.spixstats1";
+    $SpixifyLine2 = "spix -o $ToRun +t$FirstSpix,$LastSpix $ToRunOrig";
+    $SpixstatsLine2 = "spixstats -b $TmpPrefix/runtest$$.3 $ToRunOrig > $ToRunOrig.spixstats2";
 } else {
-    $SpixifyLine = '';
-    $SpixstatsLine = '';
+    $SpixifyLine1 = '';
+    $SpixstatsLine1 = '';
+    $SpixifyLine2 = '';
+    $SpixstatsLine2 = '';
+}
+
+if ($PreScript ne '') {
+    local($to_do);
+    $PreScriptLines = `cat $PreScript`;
+} else {
+    $PreScriptLines = '';
+}
+
+if ($PostScript ne '') {
+    local($to_do);
+    $PostScriptLines = `cat $PostScript`;
+    $* = 1;
+    $PostScriptLines =~ s#\$o1#$TmpPrefix/runtest$$.1#g;
+    $PostScriptLines =~ s#\$o2#$TmpPrefix/runtest$$.2#g;
+} else {
+    $PostScriptLines = '';
 }
 
 # OK, so we're gonna do the normal thing...
@@ -175,7 +184,8 @@ diffsShown=0
 rm -f $DefaultStdoutFile $DefaultStderrFile
 cat /dev/null > $DefaultStdoutFile
 cat /dev/null > $DefaultStderrFile
-$SpixifyLine
+$PreScriptLines
+$SpixifyLine1
 $TimeCmd /bin/sh -c \'$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1 2> $TmpPrefix/runtest$$.2 3> $TmpPrefix/runtest$$.3\'
 progexit=\$?
 if [ \$progexit -ne $PgmExitStatus ]; then
@@ -183,6 +193,7 @@ if [ \$progexit -ne $PgmExitStatus ]; then
     echo expected exit status $PgmExitStatus not seen \\; got \$progexit
     myexit=1
 else
+    $PostScriptLines
     hit='NO'
     for out_file in @PgmStdoutFile ; do
 	if cmp -s \$out_file $TmpPrefix/runtest$$.1 ; then
@@ -213,7 +224,14 @@ if [ \$hit = 'NO' ] ; then
     myexit=1
     diffsShown=1
 fi
-$SpixstatsLine
+$SpixstatsLine1
+
+if [ $SpixTiming = 'yes' -a \$myexit = 0 ] ; then
+    $SpixifyLine2
+    $TimeCmd /bin/sh -c \'$ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> /dev/null 2> /dev/null 3> $TmpPrefix/runtest$$.3\'
+    $SpixstatsLine2
+fi
+
 $(RM) core $ToRunOrig.spix $DefaultStdoutFile $DefaultStderrFile $TmpPrefix/runtest$$.1 $TmpPrefix/runtest$$.2 $TmpPrefix/runtest$$.3
 exit \$myexit
 EOSCRIPT
@@ -235,16 +253,16 @@ if ( $SysSpecificTiming eq '' ) {
 }
 
 &process_stats_file();
-&process_spixstats_file() if $SpixTiming eq 'yes';
+&process_spixstats_files() if $SpixTiming eq 'yes';
 
 # print out what we found
 if ( $SpixTiming ne 'yes' ) {
     print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $MaxResidency bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
 	" :$SysSpecificTiming>>\n";
 } else {
     print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $MaxResidency bytes residency ($ResidencySamples samples), $TotalInsns instructions, $LoadInsns loads, $StoreInsns stores, $BranchInsns branches, $OtherInsns others",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $TotalInsns[1]/$TotalInsns[2] instructions, $LoadInsns[1]/$LoadInsns[2] loads, $StoreInsns[1]/$StoreInsns[2] stores, $BranchInsns[1]/$BranchInsns[2] branches, $OtherInsns[1]/$OtherInsns[2] others",
 	" :$SysSpecificTiming>>\n";
 }
 
@@ -297,7 +315,11 @@ sub process_stats_file {
 	#NB: nearly the same as in GHC driver's -ghc-timing stuff
 
 	open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
+	local($tot_live) = 0; # for calculating avg residency
+
 	while (<STATS>) {
+	    $tot_live += $1 if /^\s*\d+\s+\d+\s+\d+\.\d+\%\s+(\d+)\s+\d+\.\d+\%/;
+
 	    $BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
 
 	    if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
@@ -315,6 +337,9 @@ sub process_stats_file {
 	    }
 	}
 	close(STATS) || die "Failed when closing $StatsFile\n";
+	if ( defined($ResidencySamples) && $ResidencySamples > 0 ) {
+	    $AvgResidency = int ($tot_live / $ResidencySamples) ;
+	}
 
     } elsif ( $SysSpecificTiming eq 'hbc' ) {
 
@@ -352,6 +377,7 @@ sub process_stats_file {
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
+    $AvgResidency     = 0 unless defined($AvgResidency);
     $ResidencySamples = 0 unless defined($ResidencySamples);
 
     # a bit of tidying
@@ -366,44 +392,47 @@ sub process_stats_file {
     $GcElapsed =~ s/,//g;
 }
 
-sub process_spixstats_file {
+sub process_spixstats_files { # 2 of them; one for mutator, one for GC
 
-    $TotalInsns = 0;
-    $LoadInsns  = 0;
-    $StoreInsns = 0;
-    $BranchInsns= 0;
-    $OtherInsns = 0;
+    @TotalInsns = ();
+    @LoadInsns  = ();
+    @StoreInsns = ();
+    @BranchInsns= ();
+    @OtherInsns = ();
 
-    open(STATS, "< $ToRunOrig.spixstats") || die "Failed when opening $ToRunOrig.spixstats\n";
-    while (<STATS>) {
-	last if /^OPCODES \(STATIC\):/; # party over
+    foreach $f (1, 2) {
 
-	next if /^OPCODES \(DYNAMIC\):/;
-	next if /^$/;
-	next if /^opcode\s+#executed/;
-	next if /^SUBTOTAL/;
+      open(STATS, "< $ToRunOrig.spixstats$f") || die "Failed when opening $ToRunOrig.spixstats$f\n";
+      while (<STATS>) {
+	  last if /^OPCODES \(STATIC\):/; # party over
 
-	if ( /^ld\S*\s+(\d+)/ ) {
-	    $LoadInsns += $1;
+	  next if /^OPCODES \(DYNAMIC\):/;
+	  next if /^$/;
+	  next if /^opcode\s+#executed/;
+	  next if /^SUBTOTAL/;
 
-	} elsif ( /^st\S*\s+(\d+)/ ) {
-	    $StoreInsns += $1;
+	  if ( /^ld\S*\s+(\d+)/ ) {
+	      $LoadInsns[$f] += $1;
 
-	} elsif ( /^(jmpl|call|b\S*)\s+(\d+)/ ) {
-	    $BranchInsns += $2;
+	  } elsif ( /^st\S*\s+(\d+)/ ) {
+	      $StoreInsns[$f] += $1;
 
-	} elsif ( /^TOTAL\s+(\d+)/ ) {
-	    $TotalInsns = $1;
-	    print STDERR "TotalInsns doesn't match categories total!\n"
-		if $TotalInsns !=
-		   ($LoadInsns + $StoreInsns + $BranchInsns + $OtherInsns);
+	  } elsif ( /^(jmpl|call|b\S*)\s+(\d+)/ ) {
+	      $BranchInsns[$f] += $2;
 
-	} elsif ( /^\S+\s+(\d+)/ ) {
-	    $OtherInsns += $1;
+	  } elsif ( /^TOTAL\s+(\d+)/ ) {
+	      $TotalInsns[$f] = $1;
+	      print STDERR "TotalInsns doesn't match categories total!\n"
+		  if $TotalInsns[$f] !=
+		     ($LoadInsns[$f] + $StoreInsns[$f] + $BranchInsns[$f] + $OtherInsns[$f]);
 
-	} else {
-	    die "Funny line?? $_";
-	}
+	  } elsif ( /^\S+\s+(\d+)/ ) {
+	      $OtherInsns[$f] += $1;
+
+	  } else {
+	      die "Funny line?? $_";
+	  }
+      }
+      close(STATS) || die "Failed when closing $ToRunOrig.spixstats\n";
     }
-    close(STATS) || die "Failed when closing $ToRunOrig.spixstats\n";
 }

@@ -99,7 +99,7 @@ i.e. add the (KeyCode,RlCallbackFunction) key to the assoc. list and register
 the generic callback for this KeyCode.
 
 The entry point that $genericRlCback$ calls would then read the
-global variables $current_i$ and $current_kc$ and do a lookup:
+global variables $current\_i$ and $current\_kc$ and do a lookup:
 
 \begin{code}
 rlAddDefun :: String ->			-- Function Name
@@ -121,10 +121,10 @@ rlAddDefun name cback key =
 The C function $genericRlCallback$ puts the callback arguments into
 global variables and enters the Haskell world through the
 $haskellRlEntry$ function. Before exiting, the Haskell function will
-deposit its result in the global varariable $rl_return$.
+deposit its result in the global varariable $rl\_return$.
 
 In the Haskell action that is invoked via $enterStablePtr$, a match
-between the Keycode in $current_kc$ and the Haskell callback needs to
+between the Keycode in $current\_kc$ and the Haskell callback needs to
 be made. To essentially keep the same assoc. list of (KeyCode,cback
 function) as Readline does, we make use of yet another global variable
 $cbackList$:

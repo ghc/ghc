@@ -612,6 +612,12 @@ something...) per PVM processor.  We use the standard \tr{debugger}
 script that comes with PVM3, but we sometimes meddle with the
 \tr{debugger2} script.  We include ours in the GHC distribution,
 in \tr{ghc/utils/pvm/}.
+
+\item[\tr{-e<num>}:]
+\index{-e<num> RTS option (parallel)}
+(PARALLEL ONLY) Limit the number of pending sparks per processor to
+\tr{<num>}. The default is 100. A larger number may be appropriate if
+your program generates large amounts of parallelism initially.
 \end{description}
 
 %************************************************************************

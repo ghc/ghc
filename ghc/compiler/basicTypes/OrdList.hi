@@ -1,14 +1,9 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface OrdList where
-data OrdList a 	{-# GHC_PRAGMA SeqList (OrdList a) (OrdList a) | ParList (OrdList a) (OrdList a) | OrdObj a | NoObj #-}
+data OrdList a 
 flattenOrdList :: OrdList a -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 mkEmptyList :: OrdList a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ OrdList NoObj [u0] [] _N_ #-}
 mkParList :: OrdList a -> OrdList a -> OrdList a
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: OrdList u0) (u2 :: OrdList u0) -> _!_ _ORIG_ OrdList ParList [u0] [u1, u2] _N_ #-}
 mkSeqList :: OrdList a -> OrdList a -> OrdList a
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: OrdList u0) (u2 :: OrdList u0) -> _!_ _ORIG_ OrdList SeqList [u0] [u1, u2] _N_ #-}
 mkUnitList :: a -> OrdList a
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 2 _/\_ u0 -> \ (u1 :: u0) -> _!_ _ORIG_ OrdList OrdObj [u0] [u1] _N_ #-}
 

@@ -120,7 +120,7 @@ newevent(proc,creator,time,evttype,tso,node,spark)
   P_ tso, node;
   sparkq spark;
 {
-  eventq newentry = (eventq) xmalloc(sizeof(struct event));
+  eventq newentry = (eventq) stgMallocBytes(sizeof(struct event), "newevent");
 
   EVENT_PROC(newentry) = proc;
   EVENT_CREATOR(newentry) = creator;
@@ -225,9 +225,9 @@ W_ id;
 
 void
 DumpGranEventAndNode(name, tso, node, proc)
-enum gran_event_types name;
-P_ tso, node;
-PROC proc;
+  enum gran_event_types name;
+  P_ tso, node;
+  PROC proc;
 {
     PROC pe = CURRENT_PROC;
     W_ id;
@@ -243,7 +243,7 @@ PROC proc;
     if (name > GR_EVENT_MAX)
 	name = GR_EVENT_MAX;
 
-    if (do_gr_binary) {
+    if (RTSflags.ParFlags.granSimStats_Binary) {
 	grputw(name);
 	grputw(pe);
  	abort(); /* die please: a single word doesn't represent long long times */
@@ -267,7 +267,7 @@ W_ id;
 
     ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
 
-    if (do_gr_binary) {
+    if (RTSflags.ParFlags.granSimStats_Binary) {
 	grputw(name);
 	grputw(pe);
 	abort(); /* die please: a single word doesn't represent long long times */
@@ -287,7 +287,7 @@ rtsBool mandatory_thread;
     char time_string[500]; /* ToDo: kill magic constant */
     ullong_format_string(CURRENT_TIME, time_string, rtsFalse/*no commas!*/);
 
-    if (do_gr_binary) {
+    if (RTSflags.ParFlags.granSimStats_Binary) {
 	grputw(GR_END);
 	grputw(pe);
 	abort(); /* die please: a single word doesn't represent long long times */
@@ -444,7 +444,7 @@ int prog_argc, rts_argc;
     I_ i;
 
     if (do_gr_sim) {
-	char *extension = do_gr_binary ? "gb" : "gr";
+	char *extension = RTSflags.ParFlags.granSimStats_Binary ? "gb" : "gr";
 
 	sprintf(gr_filename, GR_FILENAME_FMT, prog_argv[0], extension);
 
@@ -516,7 +516,7 @@ int prog_argc, rts_argc;
 	  gran_load_cost, gran_store_cost, gran_float_cost, gran_heapalloc_cost);
 	fputs("\n\n++++++++++++++++++++\n\n", gr_file);
     }
-    if (do_gr_binary)
+    if (RTSflags.ParFlags.granSimStats_Binary)
 	grputw(sizeof(TIME));
 
     Idlers = max_proc;
@@ -538,18 +538,16 @@ end_gr_simulation(STG_NO_ARGS)
 #ifdef PAR
 char gr_filename[STATS_FILENAME_MAXLEN];
 
-I_ do_gr_profile = 0;
 I_ do_sp_profile = 0;
-I_ do_gr_binary = 0;
 
 void
 init_gr_profiling(rts_argc, rts_argv, prog_argc, prog_argv)
-char *prog_argv[], *rts_argv[];
-int prog_argc, rts_argc;
+  char *prog_argv[], *rts_argv[];
+  int prog_argc, rts_argc;
 {
     int i;
 
-    char *extension = do_gr_binary ? "gb" : "gr";
+    char *extension = RTSflags.ParFlags.granSimStats_Binary ? "gb" : "gr";
 
     sprintf(gr_filename, GR_FILENAME_FMT_GUM, prog_argv[0], thisPE, extension);
 
@@ -584,7 +582,7 @@ int prog_argc, rts_argc;
 	fprintf(gr_file, "PE %2u [%lu]: TIME\n", thisPE, (TIME) startTime);
     }
 
-    if (do_gr_binary)
+    if (RTSflags.ParFlags.granSimStats_Binary)
         grputw(sizeof(TIME));
 }
 #endif /* PAR */

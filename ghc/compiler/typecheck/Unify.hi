@@ -10,9 +10,6 @@ import Subst(Subst)
 import TcMonad(TcResult)
 import UniType(UniType)
 unifyTauTy :: UniType -> UniType -> UnifyErrContext -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ()
-	{-# GHC_PRAGMA _A_ 3 _U_ 222222222 _N_ _S_ "SSL" _N_ _N_ #-}
 unifyTauTyList :: [UniType] -> UnifyErrContext -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ()
-	{-# GHC_PRAGMA _A_ 2 _U_ 12222222 _N_ _S_ "SL" _N_ _N_ #-}
 unifyTauTyLists :: [UniType] -> [UniType] -> UnifyErrContext -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ()
-	{-# GHC_PRAGMA _A_ 3 _U_ 112222222 _N_ _S_ "SSL" _N_ _N_ #-}
 

@@ -24,18 +24,19 @@ P_ heap_space = 0;		/* Address of first word of slab
 P_ hp_start;	        /* Value of Hp when reduction was resumed */
 
 
-I_ initHeap( sm )
-    smInfo *sm;    
+rtsBool
+initHeap(smInfo * sm)
 {
     if (heap_space == 0) { /* allocates if it doesn't already exist */
 
-	I_ semispaceSize = SM_word_heap_size / 2;
+	I_ semispaceSize = RTSflags.GcFlags.heapSize / 2;
 
 	/* Allocate the roots space */
-	sm->roots = (P_ *) xmalloc( SM_MAXROOTS * sizeof(W_) );
+	sm->roots = (P_ *) stgMallocWords(SM_MAXROOTS, "initHeap (roots)");
 
 	/* Allocate the heap */
-	heap_space = (P_) xmalloc((SM_word_heap_size + EXTRA_HEAP_WORDS) * sizeof(W_));
+	heap_space = (P_) stgMallocWords(RTSflags.GcFlags.heapSize + EXTRA_HEAP_WORDS,
+					 "initHeap (heap)");
     
 	/* Define the semi-spaces */
 	semispaceInfo[0].base = HEAP_FRAME_BASE(heap_space, semispaceSize);
@@ -52,35 +53,27 @@ I_ initHeap( sm )
     sm->hp = hp_start = semispaceInfo[semispace].base - 1;
     sm->hardHpOverflowSize = 0;
 
-    if (SM_alloc_size) {
-	sm->hplim = sm->hp + SM_alloc_size;
-	SM_alloc_min = 0; /* No min; alloc size specified */
+    if (! RTSflags.GcFlags.allocAreaSizeGiven) {
+	sm->hplim = semispaceInfo[semispace].lim;
+    } else {
+	sm->hplim = sm->hp + RTSflags.GcFlags.allocAreaSize;
+
+	RTSflags.GcFlags.minAllocAreaSize = 0; /* specified size takes precedence */
 
 	if (sm->hplim > semispaceInfo[semispace].lim) {
 	    fprintf(stderr, "Not enough heap for requested alloc size\n");
-	    return -1;
+	    return rtsFalse;
 	}
-    } else {
-	sm->hplim = semispaceInfo[semispace].lim;
     }
 
-#if defined(FORCE_GC)
-    if (force_GC) {
-       if (sm->hplim > sm->hp + GCInterval) {
-          sm->hplim = sm->hp + GCInterval; 
-       }
-       else {
-          force_GC = 0; /* forcing GC has no effect, as semi-space is smaller than GCInterval */ 
+    if (RTSflags.GcFlags.forceGC) {
+       if (sm->hplim > sm->hp + RTSflags.GcFlags.forcingInterval) {
+          sm->hplim = sm->hp + RTSflags.GcFlags.forcingInterval; 
+       } else {
+          RTSflags.GcFlags.forceGC = rtsFalse;
+	  /* forcing GC has no effect, as semi-space is smaller than forcingInterval */ 
        }
     }
-#endif /* FORCE_GC */
-
-#if defined(LIFE_PROFILE)
-    sm->hplim = sm->hp + ((sm->hplim - sm->hp) / 2); /* space for HpLim incr */
-    if (do_life_prof) {
-	sm->hplim = sm->hp + LifeInterval;
-    }
-#endif /* LIFE_PROFILE */
 
     sm->CAFlist = NULL;
 
@@ -88,7 +81,7 @@ I_ initHeap( sm )
     initExtensions( sm );
 #endif /* !PAR */
 
-    if (SM_trace) {
+    if (RTSflags.GcFlags.trace) {
 	fprintf(stderr, "TWO SPACE Heap: 0base, 0lim, 1base, 1lim\n                0x%lx, 0x%lx, 0x%lx, 0x%lx\n",
 		(W_) semispaceInfo[0].base, (W_) semispaceInfo[0].lim,
 		(W_) semispaceInfo[1].base, (W_) semispaceInfo[1].lim);
@@ -99,7 +92,7 @@ I_ initHeap( sm )
 		(W_) sm->hp, (W_) sm->hplim, (W_) (sm->hplim - sm->hp) * sizeof(W_));
     }
 
-    return 0;
+    return rtsTrue; /* OK */
 }
 
 I_
@@ -108,10 +101,6 @@ collectHeap(reqsize, sm, do_full_collection)
     smInfo *sm;
     rtsBool do_full_collection; /* ignored */
 {
-#if defined(LIFE_PROFILE)
-    I_ next_interval;  /* if doing profile */
-#endif
-
     I_ free_space,	/* No of words of free space following GC */
         alloc, 		/* Number of words allocated since last GC */
 	resident,	/* Number of words remaining after GC */
@@ -122,15 +111,11 @@ collectHeap(reqsize, sm, do_full_collection)
     fflush(stdout);     /* Flush stdout at start of GC */
     SAVE_REGS(&ScavRegDump); /* Save registers */
 
-#if defined(LIFE_PROFILE)
-    if (do_life_prof) {	life_profile_setup(); }
-#endif /* LIFE_PROFILE */
-
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     if (interval_expired) { heap_profile_setup(); }
-#endif  /* USE_COST_CENTRES */
+#endif  /* PROFILING */
   
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "TWO SPACE Start: space %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, req %lu\n",
 		semispace, (W_) semispaceInfo[semispace].base,
 		(W_) semispaceInfo[semispace].lim,
@@ -181,19 +166,19 @@ collectHeap(reqsize, sm, do_full_collection)
     resident = sm->hp - (semispaceInfo[semispace].base - 1);
     DO_MAX_RESIDENCY(resident); /* stats only */
 
-    if (SM_alloc_size) {
-	sm->hplim = sm->hp + SM_alloc_size;
+    if (! RTSflags.GcFlags.allocAreaSizeGiven) {
+	sm->hplim = semispaceInfo[semispace].lim;
+	free_space = sm->hplim - sm->hp;
+    } else {
+	sm->hplim = sm->hp + RTSflags.GcFlags.allocAreaSize;
 	if (sm->hplim > semispaceInfo[semispace].lim) {
 	    free_space = 0;
 	} else {
-	    free_space = SM_alloc_size;
+	    free_space = RTSflags.GcFlags.allocAreaSize;
 	}
-    } else {
-	sm->hplim = semispaceInfo[semispace].lim;
-	free_space = sm->hplim - sm->hp;
     }
 
-    if (SM_stats_verbose) {
+    if (RTSflags.GcFlags.giveStats) {
 	char comment_str[BIG_STRING_LEN];
 #ifndef PAR
 	sprintf(comment_str, "%4u %4ld %3ld %3ld %6lu %6lu %6lu",
@@ -208,40 +193,25 @@ collectHeap(reqsize, sm, do_full_collection)
 		0, 0, sm->rootno, caf_roots, extra_caf_words*sizeof(W_), 0, 0);
 #endif
 
-#if defined(LIFE_PROFILE)
-	if (do_life_prof) {
-	    strcat(comment_str, " life");
-	}
-#endif
-#if defined(USE_COST_CENTRES)
-	if (interval_expired) {
-	    strcat(comment_str, " prof");
-	}
+#if defined(PROFILING)
+	if (interval_expired) { strcat(comment_str, " prof"); }
 #endif
 
-	stat_endGC(alloc, SM_word_heap_size, resident, comment_str);
+	stat_endGC(alloc, RTSflags.GcFlags.heapSize, resident, comment_str);
     } else {
-	stat_endGC(alloc, SM_word_heap_size, resident, "");
+	stat_endGC(alloc, RTSflags.GcFlags.heapSize, resident, "");
     }
 
-#if defined(LIFE_PROFILE)
-      free_space = free_space / 2; /* space for HpLim incr */
-      if (do_life_prof) {
-	  next_interval = life_profile_done(alloc, reqsize);
-	  free_space -= next_interval;  /* ensure interval available */
-      }
-#endif /* LIFE_PROFILE */
-
-#if defined(USE_COST_CENTRES) || defined(GUM)
+#if defined(PROFILING) || defined(PAR)
       if (interval_expired) {
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 	  heap_profile_done();
 #endif
 	  report_cc_profiling(0 /*partial*/);
       }
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	fprintf(stderr, "TWO SPACE Done: space %ld, base 0x%lx, lim 0x%lx\n                         hp 0x%lx, hplim 0x%lx, free %lu\n",
 		semispace, (W_) semispaceInfo[semispace].base,
 		(W_) semispaceInfo[semispace].lim,
@@ -257,35 +227,22 @@ collectHeap(reqsize, sm, do_full_collection)
 
     RESTORE_REGS(&ScavRegDump);     /* Restore Registers */
 
-    if ( (SM_alloc_min > free_space) || (reqsize > free_space) ) {
+    if (free_space < RTSflags.GcFlags.minAllocAreaSize || free_sapce < reqsize)
       return( GC_HARD_LIMIT_EXCEEDED );	/* Heap absolutely exhausted */
-    } else {
 
-#if defined(FORCE_GC)
-    if (force_GC) {
-       if (sm->hplim > sm->hp + GCInterval) {
-	  sm->hplim = sm->hp + GCInterval;
-       }
-    }
-#endif /* FORCE_GC */
-+ 	  
-#if defined(LIFE_PROFILE)
-      /* space for HpLim incr */
-      sm->hplim = sm->hp + ((sm->hplim - sm->hp) / 2);
-      if (do_life_prof) {
-	  /* set hplim for next life profile */
-	  sm->hplim = sm->hp + next_interval;
-      }
-#endif /* LIFE_PROFILE */
-	  
-      if (reqsize + sm->hardHpOverflowSize > free_space) {
-	return( GC_SOFT_LIMIT_EXCEEDED );   /* Heap nearly exhausted */
-      } else {
-	return( GC_SUCCESS );		    /* Heap OK */
-      }
+    else {
+	if (RTSflags.GcFlags.forceGC
+	 && sm->hplim > sm->hp + RTSflags.GcFlags.forcingInterval) {
+	      sm->hplim = sm->hp + RTSflags.GcFlags.forcingInterval;
+	}
+
+	if (reqsize + sm->hardHpOverflowSize > free_space) {
+	    return( GC_SOFT_LIMIT_EXCEEDED );   /* Heap nearly exhausted */
+	} else {
+	    return( GC_SUCCESS );		    /* Heap OK */
+	}
     }
 }
 
 #endif /* GC2s */
-
 \end{code}

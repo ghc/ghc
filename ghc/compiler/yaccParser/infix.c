@@ -81,11 +81,14 @@ enteriscope()
   ninfix = 0;
 }
 
+#if 0
+/* UNUSED */
 void
 exitiscope()
 {
   --iscope;
 }
+#endif
 
 void
 exposeis()
@@ -102,9 +105,7 @@ exposeis()
 
 
 static int
-ionelookup(name,iscope)
-  id name;
-  int iscope;
+ionelookup(id name, int iscope)
 {
   int i;
   char *iname = id_to_string(name);
@@ -140,15 +141,13 @@ nfixes()
 }
 
 char *
-fixop(n)
-  int n;
+fixop(int n)
 {
 	return infixtab[iscope][n].iname;
 }
 
 char *
-fixtype(n)
-  int n;
+fixtype(int n)
 {
 	switch(infixtab[iscope][n].ifixity) {
 	case INFIXL:
@@ -165,7 +164,8 @@ fixtype(n)
 	}
 }
 
-
+#if 0
+/* UNUSED? */
 int
 fixity(n)
   int n;
@@ -175,6 +175,7 @@ fixity(n)
 #endif
   return(n < 0? INFIXL: infixtab[iscope][n].ifixity);
 }
+#endif /* 0 */
 
 
 long int

@@ -190,8 +190,7 @@ expressed with a \tr{-O} (or \tr{-O2}) flag, or by its absence.
 \begin{code}
 $OptLevel = 0;	    # no -O == 0; -O == 1; -O2 == 2; -Ofile == 3
 $MinusO2ForC = 0;   # set to 1 if -O2 should be given to C compiler
-$StolenX86Regs = 5; # **HACK*** of the very worst sort
-$SpX86Mangling = 1; # **EXTREME HACK*** of an even worse sort
+$StolenX86Regs = 4; # **HACK*** of the very worst sort
 \end{code}
 
 These variables represent parts of the -O/-O2/etc ``templates,''
@@ -205,6 +204,7 @@ $Oopt_MonadEtaExpansion		= '';
 #OLD:$Oopt_LambdaLift		= '';
 $Oopt_AddAutoSccs		= '';
 $Oopt_FinalStgProfilingMassage	= '';
+$Oopt_StgStats			= '';
 $Oopt_SpecialiseUnboxed		= '';
 $Oopt_FoldrBuild		= 1; # On by default!
 $Oopt_FB_Support		= '-fdo-new-occur-anal -fdo-arity-expand';
@@ -234,6 +234,7 @@ $As	 	= ''; # assembler is normally the same pgm as used for C compilation
 @As_flags	= ();
 
 $Lnkr	 	= ''; # linker is normally the same pgm as used for C compilation
+@Ld_flags	= ();
 
 # 'nm' is used for consistency checking (ToDo: mk-world-ify)
 # ToDo: check the OS or something ("alpha" is surely not the crucial question)
@@ -272,7 +273,9 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 		   '_l',    '$(GHC_BUILD_FLAG_l)',
 		   '_m',    '$(GHC_BUILD_FLAG_m)',
 		   '_n',    '$(GHC_BUILD_FLAG_n)',
-		   '_o',    '$(GHC_BUILD_FLAG_o)' );
+		   '_o',    '$(GHC_BUILD_FLAG_o)',
+		   '_A',    '$(GHC_BUILD_FLAG_A)',
+		   '_B',    '$(GHC_BUILD_FLAG_B)' );
 
 %BuildDescr	= ('',	    'normal sequential',
 		   '_p',    'profiling',
@@ -300,7 +303,9 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 		   '_l',    'user way l',
 		   '_m',    'user way m',
 		   '_n',    'user way n',
-		   '_o',    'user way o' );
+		   '_o',    'user way o',
+		   '_A',    'user way A',
+		   '_B',    'user way B' );
 
 # these are options that are "fed back" through the option processing loop
 %UserSetupOpts	= ('_a', '$(GHC_BUILD_OPTS_a)',
@@ -318,6 +323,8 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 		   '_m', '$(GHC_BUILD_OPTS_m)',
 		   '_n', '$(GHC_BUILD_OPTS_n)',
 		   '_o', '$(GHC_BUILD_OPTS_o)',
+		   '_A', '$(GHC_BUILD_OPTS_A)',
+		   '_B', '$(GHC_BUILD_OPTS_B)',
 
 		   # the GC ones don't have any "fed back" options
 		   '_2s', '',
@@ -329,11 +336,11 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 
 			    # profiled sequential
 		   '_p',    'push(@HsC_flags,  \'-fscc-profiling\');
-			     push(@CcBoth_flags, \'-DUSE_COST_CENTRES\');',
+			     push(@CcBoth_flags, \'-DPROFILING\');',
 
 			    # ticky-ticky sequential
-		   '_t',    'push(@HsC_flags, \'-fstg-reduction-counts\');
-			     push(@CcBoth_flags, \'-DDO_REDN_COUNTING\');',
+		   '_t',    'push(@HsC_flags, \'-fticky-ticky\');
+			     push(@CcBoth_flags, \'-DTICKY_TICKY\');',
 
 			    # unregisterized (ToDo????)
 		   '_u',    '',
@@ -348,19 +355,19 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 		   '_mr',   '$StkChkByPageFaultOK = 0;
 			     push(@HsC_flags,  \'-fconcurrent\', \'-fscc-profiling\');
 			     push(@HsCpp_flags,\'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\');
-			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DUSE_COST_CENTRES\');',
+			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DPROFILING\');',
 
 			    # ticky-ticky concurrent
 		   '_mt',   '$StkChkByPageFaultOK = 0;
-			     push(@HsC_flags,  \'-fconcurrent\', \'-fstg-reduction-counts\');
+			     push(@HsC_flags,  \'-fconcurrent\', \'-fticky-ticky\');
 			     push(@HsCpp_flags,\'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\');
-			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DDO_REDN_COUNTING\');',
+			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DTICKY_TICKY\');',
 
 			    # parallel
 		   '_mp',   '$StkChkByPageFaultOK = 0;
 			     push(@HsC_flags,  \'-fconcurrent\');
 			     push(@HsCpp_flags,\'-D__PARALLEL_HASKELL__\',   \'-DPAR\');
-			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DPAR\', \'-DGUM\');',
+			     push(@Cpp_define, \'-D__CONCURRENT_HASKELL__\', \'-DCONCURRENT\', \'-DPAR\');',
 
 			    # GranSim
 		   '_mg',   '$StkChkByPageFaultOK = 0;
@@ -386,7 +393,9 @@ $BuildTag	= ''; # default is sequential build w/ Appel-style GC
 		   '_l',    '',
 		   '_m',    '',
 		   '_n',    '',
-		   '_o',    '' );
+		   '_o',    '',
+		   '_A',    '',
+		   '_B',    '' );
 \end{code}
 
 Import/include directories (\tr{-I} options) are sufficiently weird to
@@ -453,14 +462,13 @@ $RegisteriseC  = '';    # set to 'o', if using optimised C code (only if avail)
 			#   or if generating equiv asm code
 $DEBUGging = '';	# -DDEBUG and all that it entails (um... not really)
 $PROFing = '';		# set to p or e if profiling
-$PROFaging = '';	# set to a if profiling with age -- only for cc consistency
 $PROFgroup = '';	# set to group if an explicit -Ggroup specified
 $PROFauto = '';	        # set to relevant hsc flag if -auto or -auto-all
 $PROFcaf  = '';	        # set to relevant hsc flag if -caf-all
 #UNUSED:$PROFdict  = '';        # set to relevant hsc flag if -dict-all
 $PROFignore_scc = '';	# set to relevant parser flag if explicit sccs ignored
 $TICKYing = '';    	# set to t if compiling for ticky-ticky profiling
-$PARing = '';		# set to p if compiling for PAR (ie GUM)
+$PARing = '';		# set to p if compiling for PAR
 $CONCURing = '';    	# set to c if compiling for CONCURRENT
 $GRANing = '';		# set to g if compiling for GRAN
 $StkChkByPageFaultOK = 1; # may be set to 0 (false) for some builds
@@ -660,11 +668,6 @@ arg: while($_ = $ARGV[0]) {
 
     /^-prof$/ && do { $PROFing = 'p'; next arg; }; # profiling -- details later!
 
-    /^-fheap-profiling-with-age$/ && do {
-		$PROFaging = 'a'; 
-		push(@CcBoth_flags, '-DHEAP_PROF_WITH_AGE');
-		next arg; };
-
     /^-auto/ && do {
 		# generate auto SCCs on top level bindings
 		# -auto-all = all top level bindings
@@ -701,7 +704,7 @@ arg: while($_ = $ARGV[0]) {
 
     #-------------- "user ways" --------------------------------------------
 
-    (/^-user-setup-([a-o])$/
+    (/^-user-setup-([a-oA-Z])$/
     || /^$(GHC_BUILD_FLAG_a)$/
     || /^$(GHC_BUILD_FLAG_b)$/
     || /^$(GHC_BUILD_FLAG_c)$/
@@ -717,12 +720,14 @@ arg: while($_ = $ARGV[0]) {
     || /^$(GHC_BUILD_FLAG_m)$/
     || /^$(GHC_BUILD_FLAG_n)$/
     || /^$(GHC_BUILD_FLAG_o)$/
+    || /^$(GHC_BUILD_FLAG_A)$/
+    || /^$(GHC_BUILD_FLAG_B)$/
 
     || /^$(GHC_BUILD_FLAG_2s)$/ # GC ones...
     || /^$(GHC_BUILD_FLAG_1s)$/
     || /^$(GHC_BUILD_FLAG_du)$/
     ) && do {
-		/^-user-setup-([a-o])$/  && do { $BuildTag = "_$1"; };
+		/^-user-setup-([a-oA-Z])$/  && do { $BuildTag = "_$1"; };
 
 		/^$(GHC_BUILD_FLAG_a)$/  && do { $BuildTag = '_a';  };
 		/^$(GHC_BUILD_FLAG_b)$/  && do { $BuildTag = '_b';  };
@@ -739,6 +744,8 @@ arg: while($_ = $ARGV[0]) {
 		/^$(GHC_BUILD_FLAG_m)$/  && do { $BuildTag = '_m';  };
 		/^$(GHC_BUILD_FLAG_n)$/  && do { $BuildTag = '_n';  };
 		/^$(GHC_BUILD_FLAG_o)$/  && do { $BuildTag = '_o';  };
+		/^$(GHC_BUILD_FLAG_A)$/  && do { $BuildTag = '_A';  };
+		/^$(GHC_BUILD_FLAG_B)$/  && do { $BuildTag = '_B';  };
 
 		/^$(GHC_BUILD_FLAG_2s)$/ && do { $BuildTag = '_2s'; };
 		/^$(GHC_BUILD_FLAG_1s)$/ && do { $BuildTag = '_1s'; };
@@ -834,7 +841,7 @@ arg: while($_ = $ARGV[0]) {
     #---------- Haskell compiler (hsc) -------------------------------------
 
 # possibly resurrect LATER
-#   /^-fspat-profiling$/  && do { push(@HsC_flags, '-fstg-reduction-counts');
+#   /^-fspat-profiling$/  && do { push(@HsC_flags, '-fticky-ticky');
 #			    $ProduceS = ''; $ProduceC = 1; # must use C compiler
 #			    push(@CcBoth_flags, '-DDO_SPAT_PROFILING');
 #			    push(@CcBoth_flags, '-fno-schedule-insns'); # not essential
@@ -866,7 +873,7 @@ arg: while($_ = $ARGV[0]) {
 			local($sname) = &grab_arg_arg('-split-objs', $1);
 			$sname =~ s/ //g; # no spaces
 
-			if ( $TargetPlatform =~ /^(sparc|alpha|m68k|mips|i[34]86|hppa1\.1)-/ ) {
+			if ( $TargetPlatform =~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|sparc)-/ ) {
 			    $SplitObjFiles = 1;
 			    push(@HsC_flags, "-fglobalise-toplev-names$sname"); 
 			    push(@CcBoth_flags, '-DUSE_SPLIT_MARKERS');
@@ -948,6 +955,21 @@ arg: while($_ = $ARGV[0]) {
     /^-fdo-monad-eta-expansion$/
 		    && do { $Oopt_MonadEtaExpansion = $_; next arg; };
 
+    /^-fno-let-from-(case|app|strict-let)$/ # experimental, really (WDP 95/10)
+		    && do { push(@HsC_flags, $_); next arg; };
+
+    /^(-freturn-in-regs-threshold)(.*)$/
+		    && do { local($what) = $1;
+			    local($num)  = &grab_arg_arg($what, $2);
+			    if ($num < 2 || $num > 8) {
+				die "Bad experimental flag: $_\n";
+			    } else {
+				$ProduceS = ''; $ProduceC = 1; # force using C compiler
+				push(@HsC_flags, "$what$num");
+				push(@CcRegd_flags, "-D__STG_REGS_AVAIL__=$num");
+			    }
+			    next arg; };
+
 #    /^-flambda-lift$/ # so Simon can do some testing; ToDo:rm
 #		    && do { $Oopt_LambdaLift = $_; next arg; };
 
@@ -961,8 +983,13 @@ arg: while($_ = $ARGV[0]) {
 
     # ---------------
 
-    /^-mlong-calls/ && do { # for GCC for HP-PA boxes
-			    unshift(@CcBoth_flags,  ('-mlong-calls'));
+    /^-mlong-calls$/ && do { # for GCC for HP-PA boxes
+			    unshift(@CcBoth_flags, ( $_ ));
+			    next arg; };
+
+    /^-m(v8|sparclite|cypress|supersparc|cpu=(cypress|supersparc))$/
+		     && do { # for GCC for SPARCs
+			    unshift(@CcBoth_flags, ( $_ ));
 			    next arg; };
 
     /^-monly-([432])-regs/ && do { # for iX86 boxes only; no effect otherwise
@@ -970,7 +997,8 @@ arg: while($_ = $ARGV[0]) {
 			    next arg; };
 
     /^-mtoggle-sp-mangling/ && do { # for iX86 boxes only; for RTS only
-			    $SpX86Mangling = 1 - $SpX86Mangling;
+			    print STDERR "$Pgm: warning: -mtoggle-sp-mangling is no longer supported\n";
+#			    $SpX86Mangling = 1 - $SpX86Mangling;
 			    next arg; };
 
     #*************** ... and lots of debugging ones (form: -d* )
@@ -996,6 +1024,7 @@ arg: while($_ = $ARGV[0]) {
     /^-d(dump|ppr)-/         && do { push(@HsC_flags, $_); next arg; };
     /^-dverbose-(simpl|stg)/ && do { push(@HsC_flags, $_); next arg; };
     /^-dsimplifier-stats/    && do { push(@HsC_flags, $_); next arg; };
+    /^-dstg-stats/	     && do { $Oopt_StgStats = $_; next arg; };
 
     #*************** ... and now all these -R* ones for its runtime system...
 
@@ -1125,8 +1154,6 @@ arg: while($_ = $ARGV[0]) {
 			    # in the consistency info
 			    $DEBUGging = 'd';
 			    next arg; };
-# OLD: do it another way
-#   /^-dgc-debug$/  && do { push(@CcBoth_flags, '-D_GC_DEBUG'); next arg; };
 
     #---------- catch unrecognized flags -----------------------------------
 
@@ -1280,7 +1307,7 @@ It really really wants to be the last STG-to-STG pass that is run.
   = (	'-fsimplify',
 	  '\(',
 	  "$Oopt_FB_Support",
-	  '-falways-float-lets-from-lets',
+#	  '-falways-float-lets-from-lets',	# no idea why this was here (WDP 95/09)
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
@@ -1463,6 +1490,7 @@ It really really wants to be the last STG-to-STG pass that is run.
 	'-fupdate-analysis',
 	'-flambda-lift',
 	$Oopt_FinalStgProfilingMassage,
+	$Oopt_StgStats,
 
       # flags for stg2stg
 	'-flet-no-escape',
@@ -1519,7 +1547,7 @@ C or via equivalent native code)?
 \begin{code}
 $RegisteriseC = ( $GccAvailable
 		&& $RegisteriseC ne 'no'    # not explicitly *un*set...
-		&& ($TargetPlatform =~ /^(alpha|hppa1\.1|i[34]86|m68k|mips|sparc)-/)
+		&& ($TargetPlatform =~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|sparc)-/)
 		) ? 'o' : '';
 \end{code}
 
@@ -1597,7 +1625,46 @@ user-specified flags can clobber them (e.g., \tr{-U__STG_REV_TBLS__}).
 Note: a few ``always apply'' flags were set at the very beginning.
 
 \begin{code}
-if ($TargetPlatform =~ /^m68k-/) {
+if ($TargetPlatform =~ /^alpha-/) {
+    # we know how to *mangle* asm for alpha
+    unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
+    unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
+    unshift(@CcBoth_flags,  ('-static')) if $GccAvailable;
+
+} elsif ($TargetPlatform =~ /^hppa/) {
+    # we know how to *mangle* asm for hppa
+    unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
+    unshift(@CcBoth_flags,  ('-static')) if $GccAvailable;
+    # We don't put in '-mlong-calls', because it's only
+    # needed for very big modules (sigh), and we don't want
+    # to hobble ourselves further on all the other modules
+    # (most of them).
+    unshift(@CcBoth_flags,  ('-D_HPUX_SOURCE')) if $GccAvailable;
+        # ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
+        # (very nice, but too bad the HP /usr/include files don't agree.)
+
+} elsif ($TargetPlatform =~ /^i386-/) {
+    # we know how to *mangle* asm for X86
+    unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
+    unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1'))
+	if $StkChkByPageFaultOK && $TargetPlatform !~ /linux/;
+	# NB: cannot do required signal magic on Linux for such stk chks */
+
+    unshift(@CcRegd_flags, ('-m486')); # not worth not doing
+
+    # -fno-defer-pop : basically the same game as for m68k
+    #
+    # -fomit-frame-pointer : *must* ; because we're stealing
+    #	the fp (%ebp) for our register maps.  *All* register
+    #	maps (in MachRegs.lh) must steal it.
+
+    unshift(@CcRegd_flags_hc, '-fno-defer-pop');
+    unshift(@CcRegd_flags,    '-fomit-frame-pointer');
+    unshift(@CcRegd_flags,    "-DSTOLEN_X86_REGS=$StolenX86Regs");
+
+    unshift(@CcBoth_flags,  ('-static')) if $GccAvailable; # maybe unnecessary???
+
+} elsif ($TargetPlatform =~ /^m68k-/) {
     # we know how to *mangle* asm for m68k
     unshift (@CcRegd_flags, ('-D__STG_REV_TBLS__'));
     unshift (@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
@@ -1617,48 +1684,15 @@ if ($TargetPlatform =~ /^m68k-/) {
 	# maybe gives reg alloc a better time
 	# also: -fno-defer-pop is not sufficiently well-behaved without it
 
-} elsif ($TargetPlatform =~ /^i[34]86-/) {
-    # we know how to *mangle* asm for X86
+} elsif ($TargetPlatform =~ /^powerpc-/) {
+    # we know how to *mangle* asm for PowerPC
     unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
     unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
-    unshift(@CcRegd_flags, ('-m486')); # not worth not doing
-
-    # -fno-defer-pop : basically the same game as for m68k
-    #
-    # -fomit-frame-pointer : *must* ; because we're stealing
-    #	the fp (%ebp) for our register maps.  *All* register
-    #	maps (in MachRegs.lh) must steal it.
-
-    unshift(@CcRegd_flags_hc, '-fno-defer-pop');
-    unshift(@CcRegd_flags,    '-fomit-frame-pointer');
-    unshift(@CcRegd_flags,    "-DSTOLEN_X86_REGS=$StolenX86Regs");
-    unshift(@CcRegd_flags_hc, "-DMANGLING_X86_SP=$SpX86Mangling"); # only used for checking
-	# the mangler will insert patch-up code if $StolenX86Regs != 5.
-	# *** HACK *** of the worst sort.
-    unshift(@CcBoth_flags,  ('-static')) if $GccAvailable; # maybe unnecessary???
 
 } elsif ($TargetPlatform =~ /^sparc-/) {
     # we know how to *mangle* asm for SPARC
     unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
     unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
-
-} elsif ($TargetPlatform =~ /^alpha-/) {
-    # we know how to *mangle* asm for alpha
-    unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
-    unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
-    unshift(@CcBoth_flags,  ('-static')) if $GccAvailable;
-
-} elsif ($TargetPlatform =~ /^hppa/) {
-    # we know how to *mangle* asm for hppa
-    unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
-    unshift(@CcBoth_flags,  ('-static')) if $GccAvailable;
-    # We don't put in '-mlong-calls', because it's only
-    # needed for very big modules (sigh), and we don't want
-    # to hobble ourselves further on all the other modules
-    # (most of them).
-    unshift(@CcBoth_flags,  ('-D_HPUX_SOURCE')) if $GccAvailable;
-        # ___HPUX_SOURCE, not _HPUX_SOURCE, is #defined if -ansi!
-        # (very nice, but too bad the HP /usr/include files don't agree.)
 
 } elsif ($TargetPlatform =~ /^mips-/) {
     # we (hope to) know how to *mangle* asm for MIPSen
@@ -1676,8 +1710,9 @@ not an architecture test.  (JSM)
 \begin{code}
 unshift(@Ld_flags,
     (   $TargetPlatform =~ /^alpha-/
-     || $TargetPlatform =~ /^mips-sgi-irix/
      || $TargetPlatform =~ /^hppa/
+     || $TargetPlatform =~ /^mips-sgi-irix/
+     || $TargetPlatform =~ /^powerpc-/
      || $TargetPlatform =~ /-solaris/
     )
     ? ('-u', 'unsafePerformPrimIO_fast1',
@@ -1685,15 +1720,17 @@ unshift(@Ld_flags,
        '-u', 'IZh_static_info',
        '-u', 'False_inregs_info',
        '-u', 'True_inregs_info',
-       '-u', 'CZh_static_info')
+       '-u', 'CZh_static_info',
+       '-u', 'DEBUG_REGS') # just for fun, now...
 
-    # non-Alphas:
+    # nice friendly a.out machines...
     : ('-u', '_unsafePerformPrimIO_fast1',
        '-u', '_Nil_closure',
        '-u', '_IZh_static_info',
        '-u', '_False_inregs_info',
        '-u', '_True_inregs_info',
-       '-u', '_CZh_static_info')
+       '-u', '_CZh_static_info',
+       '-u', '_DEBUG_REGS')
     );
 \end{code}
 
@@ -1890,7 +1927,7 @@ EOSCRIPT1
 	print EXEC <<\EOSCRIPT2;
 # first, some magical shortcuts to run "commands" on the binary
 # (which is hidden)
-if ($#ARGV == 1 && $ARGV[0] eq '+RTS' && $ARGV[1] =~ /^--(size|file|strip|rm)/ ) {
+if ($#ARGV == 1 && $ARGV[0] eq '+RTS' && $ARGV[1] =~ /^--((size|file|strip|rm|nm).*)/ ) {
     local($cmd) = $1;
     system("$cmd $pvm_executable");
     exit(0); # all done
@@ -2262,7 +2299,7 @@ it fails.
 	local($ddebug_flag) = ( $DEBUGging ) ? '-DDEBUG' : '';
 	if ($RegisteriseC) {
 	    $cc       = $CcRegd;
-	    $s_output = ($is_hc_file || $TargetPlatform =~ /^hppa/) ? $cc_as_o : $cc_as;
+	    $s_output = ($is_hc_file || $TargetPlatform =~ /^(hppa|i386)/) ? $cc_as_o : $cc_as;
 	    $c_flags .= " @CcRegd_flags";
 	    $c_flags .= ($is_hc_file) ? " @CcRegd_flags_hc"  : " @CcRegd_flags_c";
 	} else {
@@ -2309,18 +2346,20 @@ EOINCL
 	  || $Dump_asm_insn_counts
 	  || $Dump_asm_globals_info ) {
 	    # dynamically load assembler-fiddling code, which we are about to use
-	    local($target) = '';
-	    $target = 'alpha'	if $TargetPlatform =~ /^alpha-/;
-	    $target = 'hppa'	if $TargetPlatform =~ /^hppa/;
-	    $target = 'iX86'	if $TargetPlatform =~ /^i[34]86-/;
-	    $target = 'm68k'    if $TargetPlatform =~ /^m68k-/;
-	    $target = 'mips'	if $TargetPlatform =~ /^mips-/;
-	    $target = 'solaris' if $TargetPlatform =~ /^sparc-sun-solaris2/;
-	    $target = 'sparc'	if $TargetPlatform =~ /^sparc-sun-sunos4/;
-	    $target ne ''
+	    local($target) = 'oops';
+	    $target = '-alpha'	 if $TargetPlatform =~ /^alpha-/;
+	    $target = '-hppa'	 if $TargetPlatform =~ /^hppa/;
+	    $target = ''	 if $TargetPlatform =~ /^i386-/;
+	    $target = '-m68k'    if $TargetPlatform =~ /^m68k-/;
+	    $target = '-mips'	 if $TargetPlatform =~ /^mips-/;
+	    $target = ''	 if $TargetPlatform =~ /^powerpc-/;
+	    $target = '-solaris' if $TargetPlatform =~ /^sparc-sun-solaris2/;
+	    $target = '-sparc'	 if $TargetPlatform =~ /^sparc-sun-sunos4/;
+
+	    $target ne 'oops'
 	    || &tidy_up_and_die(1,"$Pgm: panic: can't decipher $TargetPlatform!\n");
-	    require("ghc-asm-$target.prl")
-	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm-$target.prl!\n");
+	    require("ghc-asm$target.prl")
+	    || &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm$target.prl!\n");
     	}
 
 	if ( $Dump_raw_asm ) { # to stderr, before mangling
@@ -2332,10 +2371,17 @@ EOINCL
             if ($is_hc_file) {
 		# post-process the assembler [.hc files only]
 		&mangle_asm($cc_as_o, $cc_as);
+
 	    } elsif ($TargetPlatform =~ /^hppa/) {
 		# minor mangling of non-threaded files for hp-pa only
-		require("ghc-asm-hppa.prl")
+		require('ghc-asm-hppa.prl')
 		|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm-hppa.prl!\n");
+		&mini_mangle_asm($cc_as_o, $cc_as);
+
+	    } elsif ($TargetPlatform =~ /^i386/) {
+		# extremely-minor OFFENSIVE mangling of non-threaded just one file
+		require('ghc-asm.prl')
+		|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm.prl!\n");
 		&mini_mangle_asm($cc_as_o, $cc_as);
 	    }
 	}
@@ -2436,8 +2482,8 @@ sub run_something {
 	while ( <CCOUT> ) {
     	    next if /attribute directive ignored/;
 	    next if /call-clobbered/;
-	    next if /In file included .*stgdefs/;
-	    next if /from .*rtsdefs.h:/;
+	    next if /from .*COptRegs\.lh/;
+	    next if /from .*(stg|rts)defs\.h:/;
 	    next if /from ghc\d+.c:\d+:/;
 	    next if /from .*\.lc/;
 	    next if /from .*SMinternal\.lh/;
@@ -2531,7 +2577,11 @@ sub process_ghc_timings {
     local($SysSpecificTiming) = 'ghc';
 
     open(STATS, $StatsFile) || die "Failed when opening $StatsFile\n";
+    local($tot_live) = 0; # for calculating avg residency
+
     while (<STATS>) {
+	$tot_live += $1 if /^\s*\d+\s+\d+\s+\d+\.\d+\%\s+(\d+)\s+\d+\.\d+\%/;
+
 	$BytesAlloc = $1 if /^\s*([0-9,]+) bytes allocated in the heap/;
 
 	if ( /^\s*([0-9,]+) bytes maximum residency .* (\d+) sample/ ) {
@@ -2549,6 +2599,9 @@ sub process_ghc_timings {
 	}
     }
     close(STATS) || die "Failed when closing $StatsFile\n";
+    if ( defined($ResidencySamples) && $ResidencySamples > 0 ) {
+	$AvgResidency = int ($tot_live / $ResidencySamples) ;
+    }
 
     # warn about what we didn't find
     print STDERR "Warning: BytesAlloc not found in stats file\n" unless defined($BytesAlloc);
@@ -2562,6 +2615,7 @@ sub process_ghc_timings {
 
     # things we didn't necessarily expect to find
     $MaxResidency     = 0 unless defined($MaxResidency);
+    $AvgResidency     = 0 unless defined($AvgResidency);
     $ResidencySamples = 0 unless defined($ResidencySamples);
 
     # a bit of tidying
@@ -2577,7 +2631,7 @@ sub process_ghc_timings {
 
     # print out what we found
     print STDERR "<<$SysSpecificTiming: ",
-	"$BytesAlloc bytes, $GCs GCs, $MaxResidency bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
+	"$BytesAlloc bytes, $GCs GCs, $AvgResidency/$MaxResidency avg/max bytes residency ($ResidencySamples samples), $InitTime INIT ($InitElapsed elapsed), $MutTime MUT ($MutElapsed elapsed), $GcTime GC ($GcElapsed elapsed)",
 	" :$SysSpecificTiming>>\n";
 
     # OK, party over

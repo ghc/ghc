@@ -1,0 +1,21 @@
+PROGRAMS =  graph hpView hpView2
+
+OBJS_graph   = Graph.o           HaskXLib.o
+OBJS_hpView  = HpView.o  Parse.o HaskXLib.o
+OBJS_hpView2 = HpView2.o Parse.o HaskXLib.o
+
+HC_OPTS = -hi-diffs -fglasgow-exts -fhaskell-1.3 -O -L/usr/X11/lib -cpp
+CC_OPTS = -ansi -I/usr/X11/include
+
+HaskellSuffixRules()
+
+all :: $(PROGRAMS)
+
+BuildPgmFromHaskellModules(graph,  $(OBJS_graph),  -lX11,)
+BuildPgmFromHaskellModules(hpView, $(OBJS_hpView), -lX11,)
+BuildPgmFromHaskellModules(hpView2,$(OBJS_hpView2),-lX11,)
+
+HaskXLib.o : HaskXLib.c
+	$(CC) -c $(CFLAGS) HaskXLib.c
+
+HaskellDependTarget(Graph.lhs HpView.lhs HpView2.lhs Parse.lhs)

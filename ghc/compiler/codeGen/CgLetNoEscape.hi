@@ -8,5 +8,4 @@ import Maybes(Labda)
 import StgSyn(StgBinderInfo, StgExpr)
 import UniqFM(UniqFM)
 cgLetNoEscapeClosure :: Id -> CostCentre -> StgBinderInfo -> UniqFM Id -> EndOfBlockInfo -> Labda Int -> [Id] -> StgExpr Id Id -> CgInfoDownwards -> CgState -> ((Id, CgIdInfo), CgState)
-	{-# GHC_PRAGMA _A_ 8 _U_ 2002202212 _N_ _S_ "LAALLALL" {_A_ 5 _U_ 2222212 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

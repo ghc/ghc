@@ -142,37 +142,27 @@ than (x-a < n).
 
 \begin{code}
 #define ARGS_CHK_A(n)						\
-	SET_ACTIVITY(ACT_ARGS_CHK); /* SPAT counting */		\
 	if (SuA /*SUBTRACT_A_STK( SpA, SuA )*/ < (SpA+(n))) {	\
 		JMP_( UpdatePAP );				\
-	}							\
-	SET_ACTIVITY(ACT_TAILCALL)
+	}
 
 #define ARGS_CHK_A_LOAD_NODE(n, closure_addr)			\
-	SET_ACTIVITY(ACT_ARGS_CHK); /* SPAT counting */		\
 	if (SuA /*SUBTRACT_A_STK( SpA, SuA )*/ < (SpA+(n))) {	\
 		Node = (P_) closure_addr;			\
 		JMP_( UpdatePAP );				\
-	}							\
-	SET_ACTIVITY(ACT_TAILCALL)
-
+	}
 
 #define ARGS_CHK_B(n)						\
-	SET_ACTIVITY(ACT_ARGS_CHK); /* SPAT counting */		\
 	if (SpB /*SUBTRACT_B_STK( SpB, SuB )*/ < (SuB-(n))) {	\
 		JMP_( UpdatePAP );				\
-	}							\
-	SET_ACTIVITY(ACT_TAILCALL)
+	}
 
 
 #define ARGS_CHK_B_LOAD_NODE(n, closure_addr)			\
-	SET_ACTIVITY(ACT_ARGS_CHK); /* SPAT counting */		\
 	if (SpB /*SUBTRACT_B_STK( SpB, SuB )*/ < (SuB-(n))) {	\
 		Node = (P_) closure_addr;			\
 		JMP_( UpdatePAP );				\
-	}							\
-	SET_ACTIVITY(ACT_TAILCALL)
-
+	}
 \end{code}
 
 %************************************************************************
@@ -190,6 +180,7 @@ words of A stack and @b@ words of B stack.  If not, it calls
 NB: args @a@ and @b@ are pre-direction-ified!
 \begin{code}
 extern I_ SqueezeUpdateFrames PROTO((P_, P_, P_));
+int sanityChk_StkO (P_ stko); /* ToDo: move to a sane place */
 
 #if ! defined(CONCURRENT)
 
@@ -233,7 +224,6 @@ extern I_ StackOverflow PROTO((W_, W_));
 do {								\
   DO_ASTK_HWM(); /* ticky-ticky profiling */			\
   DO_BSTK_HWM();						\
-  /* SET_ACTIVITY(ACT_STK_CHK); /? SPAT counting -- no, using page faulting */	\
   if (STKS_OVERFLOW_OP((a_headroom) + 1, (b_headroom) + 1)) {	\
     STACK_OVERFLOW(liveness_mask,a_headroom,b_headroom,spa,spb,ret_type,reenter);\
   }								\
@@ -295,9 +285,7 @@ void StgPerformGarbageCollection(STG_NO_ARGS);
 
 #define HEAP_OVERFLOW(liveness,n,reenter)	\
     do {					\
-    SET_ACTIVITY(ACT_GC); /* SPAT profiling */	\
     DO_GC((((W_)n)<<8)|(liveness));		\
-    SET_ACTIVITY(ACT_GC_STOP);			\
     } while (0)
 
 #define REQSIZE_BITMASK	((1L << ((BITS_IN(W_) - 8 + 1))) - 1)
@@ -311,9 +299,7 @@ extern void ReallyPerformThreadGC PROTO((W_, rtsBool));
 
 #define HEAP_OVERFLOW(liveness,n,reenter) 	\
     do {					\
-    SET_ACTIVITY(ACT_GC); /* SPAT profiling */	\
     DO_GC((((W_)(n))<<9)|((reenter)<<8)|(liveness)); \
-    SET_ACTIVITY(ACT_GC_STOP);			\
     } while (0)
 
 #define REQSIZE_BITMASK	((1L << ((BITS_IN(W_) - 9 + 1))) - 1)
@@ -357,13 +343,10 @@ do {							\
 	/* THREAD_CONTEXT_SWITCH(liveness_mask,reenter); */	        \
 	ALLOC_HEAP(n); /* ticky profiling */			\
         GRAN_ALLOC_HEAP(n,liveness_mask); /* Granularity Simulation */ \
-	SET_ACTIVITY(ACT_HEAP_CHK); /* SPAT counting */		\
 	if (((Hp = Hp + (n)) > HpLim)) {			\
 	    /* Old:  STGCALL3_GC(PerformGC,liveness_mask,n,StgFalse); */\
 	    HEAP_OVERFLOW(liveness_mask,n,StgFalse); \
-	}							\
-	SET_ACTIVITY(ACT_REDN); /* back to normal reduction */	\
-	}while(0)
+	}}while(0)
 
 #else
 
@@ -372,7 +355,6 @@ do {							\
   /* TICKY_PARANOIA(__FILE__, __LINE__); */		\
   PRE_FETCH(n);						\
   ALLOC_HEAP(n); /* ticky profiling */			\
-  SET_ACTIVITY(ACT_HEAP_CHK); /* SPAT counting */	\
   if (((Hp = Hp + (n)) > HpLim) OR_INTERVAL_EXPIRED OR_CONTEXT_SWITCH OR_MSG_PENDING) {	\
     HEAP_OVERFLOW(liveness_mask,n,reenter);		\
   }							\
@@ -387,13 +369,10 @@ do {							\
   /* TICKY_PARANOIA(__FILE__, __LINE__); */		\
   PRE_FETCH(n);						\
   ALLOC_HEAP(n); /* ticky profiling */			\
-  SET_ACTIVITY(ACT_HEAP_CHK); /* SPAT counting */	\
   if (((Hp = Hp + (n)) > HpLim) OR_INTERVAL_EXPIRED OR_CONTEXT_SWITCH OR_MSG_PENDING) {	\
     HEAP_OVERFLOW(liveness_mask,n,reenter);		\
     n = TSO_ARG1(CurrentTSO);				\
-  }							\
-  SET_ACTIVITY(ACT_REDN); /* back to normal reduction */\
-} while(0)
+  }} while(0)
 
 #else
 
@@ -746,13 +725,11 @@ threaded land.
 	UN_ALLOC_HEAP(n);	/* Undo ticky-ticky */	\
 	SAVE_Hp = Hp;		/* Hand over the hp */	\
 	DEBUG_SetGMPAllocBudget(n)			\
-	OptSaveHpLimRegister()				\
 	}while(0)
 
 #define GMP_HEAP_HANDBACK()				\
 	Hp = SAVE_Hp;					\
-	DEBUG_ResetGMPAllocBudget()			\
-	OptRestoreHpLimRegister()
+	DEBUG_ResetGMPAllocBudget()
 \end{code}
 
 \begin{code}
@@ -768,22 +745,6 @@ extern StgInt DEBUG_GMPAllocBudget;
 #define DEBUG_SetGMPAllocBudget(n)  /*nothing*/
 #define DEBUG_ResetGMPAllocBudget() /*nothing*/
 #endif
-\end{code}
-
-\begin{code}
-#if defined (LIFE_PROFILE)
-
-#define OptSaveHpLimRegister() \
-	SAVE_HpLim = HpLim
-#define OptRestoreHpLimRegister() \
-	HpLim = SAVE_HpLim
-
-#else  /* ! LIFE_PROFILE */
-
-#define OptSaveHpLimRegister()	    /* nothing */
-#define OptRestoreHpLimRegister()   /* nothing */
-
-#endif /* ! LIFE_PROFILE */
 \end{code}
 
 The real business (defining Integer primops):
@@ -928,18 +889,16 @@ Some floating-point format info, made with the \tr{enquire} program
  || alpha_TARGET_ARCH	\
  || hppa1_1_TARGET_ARCH	\
  || i386_TARGET_ARCH	\
- || i486_TARGET_ARCH	\
  || m68k_TARGET_ARCH	\
  || mipsel_TARGET_ARCH	\
  || mipseb_TARGET_ARCH	\
- || rs6000_TARGET_ARCH
+ || powerpc_TARGET_ARCH
 
 /* yes, it is IEEE floating point */
 #include "ieee-flpt.h"
 
 #if alpha_dec_osf1_TARGET	\
  || i386_TARGET_ARCH		\
- || i486_TARGET_ARCH		\
  || mipsel_TARGET_ARCH
 
 #undef BIGENDIAN /* little-endian weirdos... */
@@ -1037,7 +996,6 @@ which uses these anyway.)
 \begin{code}
 #if alpha_TARGET_ARCH	\
  || i386_TARGET_ARCH	\
- || i486_TARGET_ARCH	\
  || m68k_TARGET_ARCH
 
 #define ASSIGN_FLT(dst, src) *(StgFloat *)(dst) = (src);
@@ -1183,12 +1141,15 @@ extern I_ byteArrayHasNUL__ PROTO((const char *, I_));
 
 OK, the easy ops first: (all except \tr{newArr*}:
 
-VERY IMPORTANT!	 The read/write/index primitive ops
+(OLD:) VERY IMPORTANT! The read/write/index primitive ops
 on @ByteArray#@s index the array using a {\em BYTE} offset, even
 if the thing begin gotten out is a multi-byte @Int#@, @Float#@ etc.
 This is because you might be trying to take apart a C struct, where
 the offset from the start of the struct isn't a multiple of the
 size of the thing you're getting.  Hence the @(char *)@ casts.
+
+EVEN MORE IMPORTANT! The above is a lie.  The offsets for BlahArrays
+are in Blahs.  WDP 95/08
 
 In the case of messing with @StgAddrs@ (@A_@), which are really \tr{void *},
 we cast to @P_@, because you can't index off an uncast \tr{void *}.
@@ -1318,7 +1279,6 @@ void newArrZh_init PROTO((P_ result, I_ n, P_ init));
   for (p = result+MUTUPLE_HS; p < (result+MUTUPLE_HS+(n)); p++) { \
 	*p = (W_) (init);				\
   }							\
-  SET_ACTIVITY(ACT_REDN); /* back to normal reduction */\
 							\
   r = result;						\
 }
@@ -1694,6 +1654,7 @@ void blockUserSignals(STG_NO_ARGS);
 void unblockUserSignals(STG_NO_ARGS);
 IF_RTS(void blockVtAlrmSignal(STG_NO_ARGS);)
 IF_RTS(void unblockVtAlrmSignal(STG_NO_ARGS);)
+IF_RTS(void AwaitEvent(I_ delta);)
 
 #ifdef _POSIX_SOURCE
 extern I_ sig_install PROTO((I_, I_, sigset_t *));
@@ -1775,8 +1736,6 @@ IF_RTS(I_ catchSoftHeapOverflow	PROTO((StgStablePtr, I_));)
 IF_RTS(I_ getSoftHeapOverflowHandler(STG_NO_ARGS);)
 IF_RTS(extern StgStablePtr softHeapOverflowHandler;)
 IF_RTS(void shutdownHaskell(STG_NO_ARGS);)
-IF_RTS(extern I_ noBlackHoles;)
-IF_RTS(extern I_ SM_word_stk_size;)
 
 EXTFUN(stopPerformIODirectReturn);
 EXTFUN(startPerformIO);
@@ -1989,9 +1948,12 @@ extern I_ required_thread_count;
   if (SHOULD_SPARK(node) &&				\
    PendingSparksTl[ADVISORY_POOL] < PendingSparksLim[ADVISORY_POOL]) {	\
     *PendingSparksTl[ADVISORY_POOL]++ = (P_)(node);	\
-  } else if (DO_QP_PROF) {				\
-    I_ tid = threadId++;				\
-    SAFESTGCALL2(void,(I_, P_),QP_Event0,tid,node);	\
+  } else {						\
+    sparksIgnored++;					\
+    if (DO_QP_PROF) {					\
+      I_ tid = threadId++;				\
+      SAFESTGCALL2(void,(I_, P_),QP_Event0,tid,node);	\
+    }							\
   }							\
   r = 1; /* Should not be necessary */			\
 }
@@ -2051,7 +2013,7 @@ be a register) to point to the fresh heap object.
 Question: what's this "SET_ACTIVITY" stuff - should I be doing this
 too?  (It's if you want to use the SPAT profiling tools to
 characterize program behavior by ``activity'' -- tail-calling,
-heap-checking, etc. -- see RednCounts.lh.  It is quite specialized.
+heap-checking, etc. -- see Ticky.lh.  It is quite specialized.
 WDP 95/1)
 
 \begin{code}

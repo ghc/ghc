@@ -34,21 +34,12 @@ type RenamedTyDecl = TyDecl Name
 data SpecialisedInstanceSig a   = InstSpecSig a (MonoType a) SrcLoc
 data TyDecl a   = TyData [(a, a)] a [a] [ConDecl a] [a] (DataPragmas a) SrcLoc | TySynonym a [a] (MonoType a) TypePragmas SrcLoc
 eqConDecls :: [ConDecl ProtoName] -> [ConDecl ProtoName] -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
 instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (ClassDecl a b)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a) => Outputable (ConDecl a)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a) => Outputable (DataTypeSig a)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 02 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a) => Outputable (DefaultDecl a)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 02 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a) => Outputable (FixityDecl a)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 4 _U_ 22 _N_ _S_ "LLLS" _N_ _N_ #-}
 instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (InstDecl a b)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a) => Outputable (SpecialisedInstanceSig a)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 02 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a) => Outputable (TyDecl a)
-	{-# GHC_PRAGMA _M_ HsDecls {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

@@ -229,7 +229,7 @@ included only if required.
 \begin{code}
 #define PROFILING_INFO_OFFSET  (FIXED_INFO_WORDS)
 
-#if !defined(USE_COST_CENTRES)
+#if !defined(PROFILING)
 # define PROFILING_INFO_WORDS	0
 # define INCLUDE_PROFILING_INFO(base_name)
 # define INREGS_PROFILING_INFO    
@@ -555,27 +555,10 @@ included only if required.
 # define INFO_EVAC_2S(infoptr)  (((FP_)(INFO_RTBL(infoptr)))[COPY_INFO_OFFSET])
 # define INFO_SCAV_2S(infoptr)  (((FP_)(INFO_RTBL(infoptr)))[COPY_INFO_OFFSET + 1])
 
-# if defined(UPDATES_ENTERED_COUNT)
-
-/* Don't commmon up CONST CHARLIKE and INTLIKE treat as SPEC 1_0 closure */
-/* This broke it -- turning it off. Use LARGE heap so no GC needed */
-#  if 0
-#   define INCLUDE_COPYING_INFO_CONST(evac, scav) \
-	INCLUDE_COPYING_INFO(_Evacuate_1,_Scavenge_1_0)
-#  endif /* 0 */
-
-#  define INCLUDE_COPYING_INFO_CONST(evac, scav) \
-	INCLUDE_COPYING_INFO(evac, scav)
-# else
-#  define INCLUDE_COPYING_INFO_CONST(evac, scav) \
-	INCLUDE_COPYING_INFO(evac, scav)
-# endif
-
 #else  /* ! _INFO_COPYING */
 
 # define COPY_INFO_WORDS 0
 # define INCLUDE_COPYING_INFO(evac, scav)
-# define INCLUDE_COPYING_INFO_CONST(evac, scav)
 
 #endif /* ! _INFO_COPYING */
 \end{code}
@@ -1264,7 +1247,6 @@ the parallel Pack code (@Pack.lc@) and possibly to-be-written debug
 code.
 
 \begin{code}
-
 #define STATIC_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) \
     CAT_DECLARE(infolbl,kind,descr,type) 	\
     entry_localness(entry_code);	    	\
@@ -1284,11 +1266,10 @@ MAYBE_DECLARE_RTBL(Static,,)
 	INCLUDE_TYPE_INFO(STATIC)	\
 	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED) /* NB: in info table! */ \
 	INCLUDE_PAR_INFO		 \
-	INCLUDE_COPYING_INFO(_Evacuate_Static,_Scavenge_Static) \
+	INCLUDE_COPYING_INFO(_Evacuate_Static,_Dummy_Static_entry) \
 	INCLUDE_COMPACTING_INFO(_Dummy_Static_entry,_PRStart_Static, \
 				_Dummy_Static_entry,_Dummy_Static_entry) \
 	}
-
 \end{code}
 
 %************************************************************************
@@ -1354,8 +1335,6 @@ using @SPEC@ closures but this requires explicit use of the value of
 MAYBE_DECLARE_RTBL(BH,U,)
 MAYBE_DECLARE_RTBL(BH,N,)
 
-#define BH_U_SIZE   MIN_UPD_SIZE
-#define BH_N_SIZE   MIN_NONUPD_SIZE
 #define BH_RTBL(kind)								\
     const W_ MK_REP_LBL(BH,kind,)[] = {						\
 	INCLUDE_TYPE_INFO(BH)							\
@@ -1376,7 +1355,7 @@ MAYBE_DECLARE_RTBL(BH,N,)
 
 An indirection simply extracts the pointer from the
 @IND_CLOSURE_PTR(closure)@ field. The garbage collection routines will
-short out the indirection.
+short out the indirection (normally).
 \begin{code}
 
 #define IND_ITBL(infolbl,ind_code,localness,entry_localness) \
@@ -1409,7 +1388,7 @@ look exactly like regular indirections, but they are not short-circuited
 on garbage collection.
 
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING) || defined(TICKY_TICKY)
 
 # define PERM_IND_ITBL(infolbl,ind_code,localness,entry_localness) \
     entry_localness(ind_code);		    	    	\
@@ -1468,35 +1447,33 @@ closure, in fact, it may be another @CAF@. This will cause the second
 @CAF@'s evacuation code to be called before the @CAF@ has been
 evacuated, returning an unevacuated pointer.
 
-Another scheme leaves updating the @CAF@ indirections to the end
-of the garbage collection.
-All the references are evacuated and scavenged as usual (including the
-@CAFlist@). Once collection is complete the @CAFlist@ is traversed
-updating the @CAF@ references with the result of evacuating the
-referenced closure again. This will immediately return as it must be a
-forward reference, a static closure, or a @CAF@ which will indirect by
-evacuating its reference.
+Another scheme leaves updating the @CAF@ indirections to the end of
+the garbage collection.  All the references are evacuated and
+scavenged as usual (including the @CAFlist@). Once collection is
+complete the @CAFlist@ is traversed updating the @CAF@ references with
+the result of evacuating the referenced closure again. This will
+immediately return as it must be a forward reference, a static
+closure, or a @CAF@ which will indirect by evacuating its reference.
 
 The crux of the problem is that the @CAF@ evacuation code needs to
-know if its reference has already been evacuated and updated. If not, then
-the reference can be evacuated, updated and returned safely (possibly
-evacuating another @CAF@). If it has, then the updated reference can be
-returned. This can be done using two @CAF@ info-tables. At the start
-of a collection the @CAFlist@ is traversed and set to an internal {\em
-evacuate and update} info-table. During collection, evacution of such a
-@CAF@ also results in the info-table being reset back to the standard
-@CAF@ {\em return reference} info-table. Thus subsequent evacuations
-will simply return the updated reference. On completion of the
-collection all @CAF@s will have {\em return reference} info-tables
+know if its reference has already been evacuated and updated. If not,
+then the reference can be evacuated, updated and returned safely
+(possibly evacuating another @CAF@). If it has, then the updated
+reference can be returned. This can be done using two @CAF@
+info-tables. At the start of a collection the @CAFlist@ is traversed
+and set to an internal {\em evacuate and update} info-table. During
+collection, evacution of such a @CAF@ also results in the info-table
+being reset back to the standard @CAF@ info-table. Thus subsequent
+evacuations will simply return the updated reference. On completion of
+the collection all @CAF@s will have {\em return reference} info-tables
 again.
 
 This is the scheme we adopt. A @CAF@ indirection has evacuation code
 which returns the evacuated and updated reference. During garbage
-collection all the @CAF@s are overwritten with an internal @CAF@ info
+collection, all the @CAF@s are overwritten with an internal @CAF@ info
 table which has evacuation code which performs this evacuate and
 update and restores the original @CAF@ code. At some point during the
-collection we must ensure that all the @CAF@s are indeed
-evacuated.
+collection we must ensure that all the @CAF@s are indeed evacuated.
 
 The only potential problem with this scheme is a cyclic list of @CAF@s
 all directly referencing (possibly via indirections) another @CAF@!
@@ -1510,15 +1487,14 @@ reference is OK --- all the @CAF@s will now reference the same
 @CAF@ which will reference itself! Construction of such a structure
 indicates the program must be in an infinite loop.
 
-
 \subsubsection{Compacting Collector}
 
-When shorting out a @CAF@, its reference must be marked. A first attempt
-might explicitly mark the @CAF@s, updating the reference with the
-marked reference (possibly short circuting indirections). The actual
-@CAF@ marking code can indicate that they have already been marked
-(though this might not have actually been done yet) and return the
-indirection pointer so it is shorted out. Unfortunately the @CAF@
+When shorting out a @CAF@, its reference must be marked. A first
+attempt might explicitly mark the @CAF@s, updating the reference with
+the marked reference (possibly short circuting indirections). The
+actual @CAF@ marking code can indicate that they have already been
+marked (though this might not have actually been done yet) and return
+the indirection pointer so it is shorted out. Unfortunately the @CAF@
 reference might point to an indirection which will be subsequently
 shorted out. Rather than returning the @CAF@ reference we treat the
 @CAF@ as an indirection, calling the mark code of the reference, which
@@ -1594,21 +1570,20 @@ commented out with @#if 0@.
 %*									*
 %************************************************************************
 
-This declares an info table for @CONST@ closures (size 0). 
-It is the info table for a dynamicaly-allocated closure which
-will redirect references to the corresponding
-static closure @<infolbl>_closure@ during garbage collection. 
-A pointer to the static closure is kept in the info table.  (It is
-assumed that this closure is declared elsewhere.)
+This declares an info table for @CONST@ closures (size 0).  It is the
+info table for a dynamicaly-allocated closure which will redirect
+references to the corresponding static closure @<infolbl>_closure@
+during garbage collection.  A pointer to the static closure is kept in
+the info table.  (It is assumed that this closure is declared
+elsewhere.)
 
-Why do such @CONST@ objects ever exist?  Why don't we just use the static
-object in the first place?  @CONST@ objects are used only for updating
-existing objects.  We could use an indirection, but that risks costing
-extra run-time indirections until the next gc shorts it out.  So
-we update with a @CONST@, and the next gc gets rid of it.
+Why do such @CONST@ objects ever exist?  Why don't we just use the
+static object in the first place?  @CONST@ objects are used only for
+updating existing objects.  We could use an indirection, but that
+risks costing extra run-time indirections until the next GC shorts it
+out.  So we update with a @CONST@, and the next GC gets rid of it.
 
 \begin{code}
-
 #define CONST_ITBL(infolbl,closurelbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*size,ptrs unused*/ \
     CAT_DECLARE(infolbl,kind,descr,type)	\
     entry_localness(entry_code);	    	\
@@ -1624,16 +1599,26 @@ we update with a @CONST@, and the next gc gets rid of it.
 
 MAYBE_DECLARE_RTBL(Const,,)
 
-#define CONST_RTBL()							\
-    const W_ MK_REP_LBL(Const,,)[] = {					\
-	INCLUDE_TYPE_INFO(CONST)					\
-	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)			\
-	INCLUDE_PAR_INFO						\
-	INCLUDE_COPYING_INFO_CONST(_Evacuate_Const,_Scavenge_Const)	\
-	INCLUDE_COMPACTING_INFO(_Dummy_Const_entry,_PRStart_Const,	\
-				_Dummy_Const_entry,_Dummy_Const_entry)	\
-    }
+#ifdef TICKY_TICKY
+    /* we need real routines if we may not be commoning up */
+#define CONST_Scav _Scavenge_0_0
+#define CONST_Link _ScanLink_0_0
+#define CONST_Move _ScanMove_0
+#else
+#define CONST_Scav _Dummy_Const_entry
+#define CONST_Link _Dummy_Const_entry
+#define CONST_Move _Dummy_Const_entry
+#endif
 
+#define CONST_RTBL()						\
+    const W_ MK_REP_LBL(Const,,)[] = {				\
+	INCLUDE_TYPE_INFO(CONST)				\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)		\
+	INCLUDE_PAR_INFO					\
+	INCLUDE_COPYING_INFO(_Evacuate_Const,CONST_Scav)	\
+	INCLUDE_COMPACTING_INFO(CONST_Link,_PRStart_Const,	\
+				CONST_Move,_Dummy_Const_entry)	\
+    }
 \end{code}
 
 This builds an info-table which will have pointers to the closure
@@ -1662,7 +1647,6 @@ pointers to the closure replaced with the appropriate element of the
 @CHARLIKE_closures@ array.
 
 \begin{code}
-
 #define CHARLIKE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*tag,size,ptrs unused*/ \
     CAT_DECLARE(infolbl,kind,descr,type) 	\
     entry_localness(entry_code);	    	\
@@ -1676,32 +1660,34 @@ pointers to the closure replaced with the appropriate element of the
 
 MAYBE_DECLARE_RTBL(CharLike,,)
 
-#define CHARLIKE_RTBL()								\
-    const W_ MK_REP_LBL(CharLike,,)[] = {					\
-	INCLUDE_TYPE_INFO(CHARLIKE)						\
-	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)				\
-	INCLUDE_PAR_INFO							\
-	INCLUDE_COPYING_INFO_CONST(_Evacuate_CharLike,_Scavenge_CharLike)	\
-	INCLUDE_COMPACTING_INFO(_Dummy_CharLike_entry,_PRStart_CharLike,	\
-				_Dummy_CharLike_entry,_Dummy_CharLike_entry)	\
+#ifdef TICKY_TICKY
+    /* we need real routines if we may not be commoning up */
+#define CHARLIKE_Scav _Scavenge_1_0
+#define CHARLIKE_Link _ScanLink_1_0
+#define CHARLIKE_Move _ScanMove_1
+#else
+#define CHARLIKE_Scav _Dummy_CharLike_entry
+#define CHARLIKE_Link _Dummy_CharLike_entry
+#define CHARLIKE_Move _Dummy_CharLike_entry
+#endif
+
+#define CHARLIKE_RTBL()							\
+    const W_ MK_REP_LBL(CharLike,,)[] = {				\
+	INCLUDE_TYPE_INFO(CHARLIKE)					\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)			\
+	INCLUDE_PAR_INFO						\
+	INCLUDE_COPYING_INFO(_Evacuate_CharLike,CHARLIKE_Scav)		\
+	INCLUDE_COMPACTING_INFO(CHARLIKE_Link,_PRStart_CharLike,	\
+				CHARLIKE_Move,_PRIn_Error)		\
 	}
-
 \end{code}
-
 
 Int-like: this builds the info-table required for intlike closures.
 The normal heap-allocated info-table for fixed-size integers (size
-@1@); it is used for updates too. 
-At GC, this is redirected to a static intlike closure if one is
-available.
-
-Note again the sneaky hiding of a reference to the real info-table in
-the part of the info-table that normally holds the size of the
-closure.
-THIS CHANGES IN THE COMMONED INFO-TABLE WORLD.
+@1@); it is used for updates too.  At GC, this is redirected to a
+static intlike closure if one is available.
 
 \begin{code}
-
 #define INTLIKE_ITBL(infolbl,entry_code,upd_code,liveness,tag,size,ptrs,localness,entry_localness,kind,descr,type) /*tag,size,ptrs unused*/ \
     CAT_DECLARE(infolbl,kind,descr,type) 	\
     entry_localness(entry_code);		\
@@ -1720,11 +1706,10 @@ MAYBE_DECLARE_RTBL(IntLike,,)
 	INCLUDE_TYPE_INFO(INTLIKE)					\
 	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)			\
 	INCLUDE_PAR_INFO				  		\
-	INCLUDE_COPYING_INFO_CONST(_Evacuate_IntLike,_Scavenge_1_0) 	\
+	INCLUDE_COPYING_INFO(_Evacuate_IntLike,_Scavenge_1_0) 		\
 	INCLUDE_COMPACTING_INFO(_ScanLink_1_0,_PRStart_IntLike,		\
 				_ScanMove_1,_PRIn_Error) 		\
     }
-
 \end{code}
 
 %************************************************************************

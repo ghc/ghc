@@ -320,6 +320,12 @@ gives the strictness of the function's arguments.  \tr{L} is lazy
 \tr{U(...)} is strict and
 ``unpackable'' (very good), and \tr{A} is absent (very good).
 
+For an ``unpackable'' \tr{U(...)} argument, the info inside
+tells the strictness of its components.  So, if the argument is a
+pair, and it says \tr{U(AU(LSS))}, that means ``the first component of the
+pair isn't used; the second component is itself unpackable, with three
+components (lazy in the first, strict in the second \& third).''
+
 If the function isn't exported, just compile with the extra flag \tr{-ddump-simpl};
 next to the signature for any binder, it will print the self-same
 pragmatic information as would be put in an interface file.

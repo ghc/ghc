@@ -5,44 +5,18 @@ import Maybes(Labda)
 type CmdLineInfo = (GlobalSwitch -> SwitchResult, [CoreToDo], [StgToDo])
 data CoreToDo   = CoreDoSimplify (SimplifierSwitch -> SwitchResult) | CoreDoArityAnalysis | CoreDoCalcInlinings1 | CoreDoCalcInlinings2 | CoreDoFloatInwards | CoreDoFullLaziness | CoreLiberateCase | CoreDoPrintCore | CoreDoStaticArgs | CoreDoStrictness | CoreDoSpecialising | CoreDoDeforest | CoreDoAutoCostCentres | CoreDoFoldrBuildWorkerWrapper | CoreDoFoldrBuildWWAnal
 data GlobalSwitch
-  = ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | AllDemanded | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats
+  = ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | NumbersStrict | AllDemanded | ReturnInRegsThreshold Int | VectoredReturnThreshold Int | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats
 type MainIO a = _State _RealWorld -> (a, _State _RealWorld)
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data SimplifierSwitch   = SimplOkToDupCode | SimplFloatLetsExposingWHNF | SimplOkToFloatPrimOps | SimplAlwaysFloatLetsFromLets | SimplDoCaseElim | SimplReuseCon | SimplCaseOfCase | SimplLetToCase | SimplMayDeleteConjurableIds | SimplPedanticBottoms | SimplDoArityExpand | SimplDoFoldrBuild | SimplDoNewOccurAnal | SimplDoInlineFoldrBuild | IgnoreINLINEPragma | SimplDoLambdaEtaExpansion | SimplDoEtaReduction | EssentialUnfoldingsOnly | ShowSimplifierProgress | MaxSimplifierIterations Int | SimplUnfoldingUseThreshold Int | SimplUnfoldingCreationThreshold Int | KeepSpecPragmaIds | KeepUnusedBindings
+data Labda a 
+data SimplifierSwitch   = SimplOkToDupCode | SimplFloatLetsExposingWHNF | SimplOkToFloatPrimOps | SimplAlwaysFloatLetsFromLets | SimplDoCaseElim | SimplReuseCon | SimplCaseOfCase | SimplLetToCase | SimplMayDeleteConjurableIds | SimplPedanticBottoms | SimplDoArityExpand | SimplDoFoldrBuild | SimplDoNewOccurAnal | SimplDoInlineFoldrBuild | IgnoreINLINEPragma | SimplDoLambdaEtaExpansion | SimplDoEtaReduction | EssentialUnfoldingsOnly | ShowSimplifierProgress | MaxSimplifierIterations Int | SimplUnfoldingUseThreshold Int | SimplUnfoldingCreationThreshold Int | KeepSpecPragmaIds | KeepUnusedBindings | SimplNoLetFromCase | SimplNoLetFromApp | SimplNoLetFromStrictLet
 data StgToDo   = StgDoStaticArgs | StgDoUpdateAnalysis | StgDoLambdaLift | StgDoMassageForProfiling | D_stg_stats
 data SwitchResult   = SwBool Bool | SwString [Char] | SwInt Int
 classifyOpts :: [[Char]] -> _State _RealWorld -> ((GlobalSwitch -> SwitchResult, [CoreToDo], [StgToDo]), _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 intSwitchSet :: (a -> SwitchResult) -> (Int -> a) -> Labda Int
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _N_ _N_ #-}
 stringSwitchSet :: (a -> SwitchResult) -> ([Char] -> a) -> Labda [Char]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _N_ _N_ #-}
 switchIsOn :: (a -> SwitchResult) -> a -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 instance Eq GlobalSwitch
-	{-# GHC_PRAGMA _M_ CmdLineOpts {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(GlobalSwitch -> GlobalSwitch -> Bool), (GlobalSwitch -> GlobalSwitch -> Bool)] [_CONSTM_ Eq (==) (GlobalSwitch), _CONSTM_ Eq (/=) (GlobalSwitch)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance Eq SimplifierSwitch
-	{-# GHC_PRAGMA _M_ CmdLineOpts {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(SimplifierSwitch -> SimplifierSwitch -> Bool), (SimplifierSwitch -> SimplifierSwitch -> Bool)] [_CONSTM_ Eq (==) (SimplifierSwitch), _CONSTM_ Eq (/=) (SimplifierSwitch)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance Ord GlobalSwitch
-	{-# GHC_PRAGMA _M_ CmdLineOpts {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq GlobalSwitch}}, (GlobalSwitch -> GlobalSwitch -> Bool), (GlobalSwitch -> GlobalSwitch -> Bool), (GlobalSwitch -> GlobalSwitch -> Bool), (GlobalSwitch -> GlobalSwitch -> Bool), (GlobalSwitch -> GlobalSwitch -> GlobalSwitch), (GlobalSwitch -> GlobalSwitch -> GlobalSwitch), (GlobalSwitch -> GlobalSwitch -> _CMP_TAG)] [_DFUN_ Eq (GlobalSwitch), _CONSTM_ Ord (<) (GlobalSwitch), _CONSTM_ Ord (<=) (GlobalSwitch), _CONSTM_ Ord (>=) (GlobalSwitch), _CONSTM_ Ord (>) (GlobalSwitch), _CONSTM_ Ord max (GlobalSwitch), _CONSTM_ Ord min (GlobalSwitch), _CONSTM_ Ord _tagCmp (GlobalSwitch)] _N_
-	 (<) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance Ord SimplifierSwitch
-	{-# GHC_PRAGMA _M_ CmdLineOpts {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq SimplifierSwitch}}, (SimplifierSwitch -> SimplifierSwitch -> Bool), (SimplifierSwitch -> SimplifierSwitch -> Bool), (SimplifierSwitch -> SimplifierSwitch -> Bool), (SimplifierSwitch -> SimplifierSwitch -> Bool), (SimplifierSwitch -> SimplifierSwitch -> SimplifierSwitch), (SimplifierSwitch -> SimplifierSwitch -> SimplifierSwitch), (SimplifierSwitch -> SimplifierSwitch -> _CMP_TAG)] [_DFUN_ Eq (SimplifierSwitch), _CONSTM_ Ord (<) (SimplifierSwitch), _CONSTM_ Ord (<=) (SimplifierSwitch), _CONSTM_ Ord (>=) (SimplifierSwitch), _CONSTM_ Ord (>) (SimplifierSwitch), _CONSTM_ Ord max (SimplifierSwitch), _CONSTM_ Ord min (SimplifierSwitch), _CONSTM_ Ord _tagCmp (SimplifierSwitch)] _N_
-	 (<) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

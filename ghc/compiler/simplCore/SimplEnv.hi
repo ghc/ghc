@@ -2,46 +2,39 @@
 interface SimplEnv where
 import BasicLit(BasicLit)
 import BinderInfo(BinderInfo(..), DuplicationDanger, FunOrArg, InsideSCC)
-import Class(Class)
 import CmdLineOpts(GlobalSwitch, SimplifierSwitch, SwitchResult)
 import CoreSyn(CoreArg, CoreAtom, CoreBinding, CoreCaseAlternatives, CoreCaseDefault, CoreExpr)
 import CostCentre(CostCentre)
 import FiniteMap(FiniteMap)
-import Id(Id, IdDetails, applyTypeEnvToId)
-import IdEnv(IdEnv(..), lookupIdEnv)
-import IdInfo(IdInfo, StrictnessInfo)
+import Id(Id)
+import IdEnv(IdEnv(..))
+import IdInfo(StrictnessInfo)
 import MagicUFs(MagicUnfoldingFun)
 import Maybes(Labda)
-import NameTypes(ShortName)
-import Outputable(NamedThing, Outputable)
+import Outputable(Outputable)
 import PreludePS(_PackedString)
 import PreludeRatio(Ratio(..))
 import Pretty(PrettyRep)
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
-import SimplMonad(SimplCount)
-import SplitUniq(SplitUniqSupply)
-import TyCon(TyCon)
-import TyVar(TyVar, TyVarTemplate)
+import TyVar(TyVar)
 import TyVarEnv(TyVarEnv(..), nullTyVarEnv)
-import UniTyFuns(applyTypeEnvToTy)
 import UniType(UniType)
-import UniqFM(UniqFM, emptyUFM, lookupUFM)
+import UniqFM(UniqFM)
 import Unique(Unique)
-data BasicLit 	{-# GHC_PRAGMA MachChar Char | MachStr _PackedString | MachAddr Integer | MachInt Integer Bool | MachFloat (Ratio Integer) | MachDouble (Ratio Integer) | MachLitLit _PackedString PrimKind | NoRepStr _PackedString | NoRepInteger Integer | NoRepRational (Ratio Integer) #-}
+data BasicLit 
 data BinderInfo   = DeadCode | ManyOcc Int | OneOcc FunOrArg DuplicationDanger InsideSCC Int Int
-data DuplicationDanger 	{-# GHC_PRAGMA DupDanger | NoDupDanger #-}
-data FunOrArg 	{-# GHC_PRAGMA FunOcc | ArgOcc #-}
-data InsideSCC 	{-# GHC_PRAGMA InsideSCC | NotInsideSCC #-}
-data GlobalSwitch
-	{-# GHC_PRAGMA ProduceC [Char] | ProduceS [Char] | ProduceHi [Char] | AsmTarget [Char] | ForConcurrent | Haskell_1_3 | GlasgowExts | CompilingPrelude | HideBuiltinNames | HideMostBuiltinNames | EnsureSplittableC [Char] | Verbose | PprStyle_User | PprStyle_Debug | PprStyle_All | DoCoreLinting | EmitArityChecks | OmitInterfacePragmas | OmitDerivedRead | OmitReexportedInstances | UnfoldingUseThreshold Int | UnfoldingCreationThreshold Int | UnfoldingOverrideThreshold Int | ReportWhyUnfoldingsDisallowed | UseGetMentionedVars | ShowPragmaNameErrs | NameShadowingNotOK | SigsRequired | SccProfilingOn | AutoSccsOnExportedToplevs | AutoSccsOnAllToplevs | AutoSccsOnIndividualCafs | SccGroup [Char] | DoTickyProfiling | DoSemiTagging | FoldrBuildOn | FoldrBuildTrace | SpecialiseImports | ShowImportSpecs | OmitUnspecialisedCode | SpecialiseOverloaded | SpecialiseUnboxed | SpecialiseAll | SpecialiseTrace | OmitBlackHoling | StgDoLetNoEscapes | IgnoreStrictnessPragmas | IrrefutableTuples | IrrefutableEverything | AllStrict | AllDemanded | D_dump_rif2hs | D_dump_rn4 | D_dump_tc | D_dump_deriv | D_dump_ds | D_dump_occur_anal | D_dump_simpl | D_dump_spec | D_dump_stranal | D_dump_deforest | D_dump_stg | D_dump_absC | D_dump_flatC | D_dump_realC | D_dump_asm | D_dump_core_passes | D_dump_core_passes_info | D_verbose_core2core | D_verbose_stg2stg | D_simplifier_stats #-}
-data SimplifierSwitch 	{-# GHC_PRAGMA SimplOkToDupCode | SimplFloatLetsExposingWHNF | SimplOkToFloatPrimOps | SimplAlwaysFloatLetsFromLets | SimplDoCaseElim | SimplReuseCon | SimplCaseOfCase | SimplLetToCase | SimplMayDeleteConjurableIds | SimplPedanticBottoms | SimplDoArityExpand | SimplDoFoldrBuild | SimplDoNewOccurAnal | SimplDoInlineFoldrBuild | IgnoreINLINEPragma | SimplDoLambdaEtaExpansion | SimplDoEtaReduction | EssentialUnfoldingsOnly | ShowSimplifierProgress | MaxSimplifierIterations Int | SimplUnfoldingUseThreshold Int | SimplUnfoldingCreationThreshold Int | KeepSpecPragmaIds | KeepUnusedBindings #-}
-data CoreAtom a 	{-# GHC_PRAGMA CoVarAtom a | CoLitAtom BasicLit #-}
-data CoreCaseAlternatives a b 	{-# GHC_PRAGMA CoAlgAlts [(Id, [a], CoreExpr a b)] (CoreCaseDefault a b) | CoPrimAlts [(BasicLit, CoreExpr a b)] (CoreCaseDefault a b) #-}
-data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
+data DuplicationDanger 
+data FunOrArg 
+data InsideSCC 
+data GlobalSwitch 
+data SimplifierSwitch 
+data CoreAtom a 
+data CoreCaseAlternatives a b 
+data CoreExpr a b 
 data EnclosingCcDetails   = NoEnclosingCcDetails | EnclosingCC CostCentre
 data FormSummary   = WhnfForm | BottomForm | OtherForm
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type IdEnv a = UniqFM a
 data IdVal   = InlineIt (UniqFM IdVal) (UniqFM UniType) (CoreExpr (Id, BinderInfo) Id) | ItsAnAtom (CoreAtom Id)
 type InAlts = CoreCaseAlternatives (Id, BinderInfo) Id
@@ -56,8 +49,8 @@ type InIdEnv = UniqFM IdVal
 type InType = UniType
 type InTypeEnv = UniqFM UniType
 type InUniType = UniType
-data MagicUnfoldingFun 	{-# GHC_PRAGMA MUF (SimplEnv -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (Labda (CoreExpr Id Id), SimplCount)) #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data MagicUnfoldingFun 
+data Labda a 
 type OutAlts = CoreCaseAlternatives Id Id
 type OutArg = CoreArg Id
 type OutAtom = CoreAtom Id
@@ -68,96 +61,46 @@ type OutExpr = CoreExpr Id Id
 type OutId = Id
 type OutType = UniType
 type OutUniType = UniType
-data SimplEnv 	{-# GHC_PRAGMA SimplEnv (SimplifierSwitch -> SwitchResult) EnclosingCcDetails (UniqFM UniType) (UniqFM IdVal) UnfoldEnv #-}
+data SimplEnv 
 type SwitchChecker a = a -> SwitchResult
-data SwitchResult 	{-# GHC_PRAGMA SwBool Bool | SwString [Char] | SwInt Int #-}
-data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
+data SwitchResult 
+data TyVar 
 type TyVarEnv a = UniqFM a
-data UnfoldConApp 	{-# GHC_PRAGMA UCA Id [UniType] [CoreAtom Id] #-}
-data UnfoldEnv 	{-# GHC_PRAGMA UFE (UniqFM UnfoldItem) (UniqFM Id) (FiniteMap UnfoldConApp Id) #-}
-data UnfoldItem 	{-# GHC_PRAGMA UnfoldItem Id UnfoldingDetails EnclosingCcDetails #-}
+data UnfoldConApp 
+data UnfoldEnv 
+data UnfoldItem 
 data UnfoldingDetails   = NoUnfoldingDetails | LiteralForm BasicLit | OtherLiteralForm [BasicLit] | ConstructorForm Id [UniType] [CoreAtom Id] | OtherConstructorForm [Id] | GeneralForm Bool FormSummary (CoreExpr (Id, BinderInfo) Id) UnfoldingGuidance | MagicForm _PackedString MagicUnfoldingFun | IWantToBeINLINEd UnfoldingGuidance
 data UnfoldingGuidance   = UnfoldNever | UnfoldAlways | EssentialUnfolding | UnfoldIfGoodArgs Int Int [Bool] Int
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
-applyTypeEnvToId :: UniqFM UniType -> Id -> Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(LLLS)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
-applyTypeEnvToTy :: UniqFM UniType -> UniType -> UniType
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
-emptyUFM :: UniqFM a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
+data UniType 
+data UniqFM a 
+data Unique 
 extendIdEnvWithAtom :: SimplEnv -> (Id, BinderInfo) -> CoreAtom Id -> SimplEnv
-	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "U(LLLLL)U(LL)S" {_A_ 4 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 extendIdEnvWithAtomList :: SimplEnv -> [((Id, BinderInfo), CoreAtom Id)] -> SimplEnv
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 extendIdEnvWithClone :: SimplEnv -> (Id, BinderInfo) -> Id -> SimplEnv
-	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "U(LLLLL)U(LA)L" {_A_ 3 _U_ 112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 extendIdEnvWithClones :: SimplEnv -> [(Id, BinderInfo)] -> [Id] -> SimplEnv
-	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "U(LLLLL)LL" _N_ _N_ #-}
 extendIdEnvWithInlining :: SimplEnv -> SimplEnv -> (Id, BinderInfo) -> CoreExpr (Id, BinderInfo) Id -> SimplEnv
-	{-# GHC_PRAGMA _A_ 4 _U_ 1112 _N_ _S_ "U(LLLLL)LU(LA)L" {_A_ 4 _U_ 1112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 extendTyEnv :: SimplEnv -> TyVar -> UniType -> SimplEnv
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(LLLLL)LL" _N_ _N_ #-}
 extendTyEnvList :: SimplEnv -> [(TyVar, UniType)] -> SimplEnv
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LLLLL)L" _N_ _N_ #-}
 extendUnfoldEnvGivenConstructor :: SimplEnv -> Id -> Id -> [Id] -> SimplEnv
-	{-# GHC_PRAGMA _A_ 4 _U_ 1221 _N_ _S_ "U(LLLLL)LLL" _N_ _N_ #-}
 extendUnfoldEnvGivenFormDetails :: SimplEnv -> Id -> UnfoldingDetails -> SimplEnv
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(LLLLL)LS" _N_ _N_ #-}
 extendUnfoldEnvGivenRhs :: SimplEnv -> (Id, BinderInfo) -> Id -> CoreExpr Id Id -> SimplEnv
-	{-# GHC_PRAGMA _A_ 4 _U_ 1122 _N_ _S_ "U(LLLLL)U(AL)LL" {_A_ 4 _U_ 1122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 filterUnfoldEnvForInlines :: SimplEnv -> SimplEnv
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LLLLA)" {_A_ 4 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getSwitchChecker :: SimplEnv -> SimplifierSwitch -> SwitchResult
-	{-# GHC_PRAGMA _A_ 1 _U_ 12 _N_ _S_ "U(SAAAA)" {_A_ 1 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SimplifierSwitch -> SwitchResult) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: SimplEnv) -> case u0 of { _ALG_ _ORIG_ SimplEnv SimplEnv (u1 :: SimplifierSwitch -> SwitchResult) (u2 :: EnclosingCcDetails) (u3 :: UniqFM UniType) (u4 :: UniqFM IdVal) (u5 :: UnfoldEnv) -> u1; _NO_DEFLT_ } _N_ #-}
 lookForConstructor :: SimplEnv -> Id -> [UniType] -> [CoreAtom Id] -> Labda Id
-	{-# GHC_PRAGMA _A_ 4 _U_ 1222 _N_ _S_ "U(AAAAU(AAL))LLL" {_A_ 4 _U_ 1222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 lookupId :: SimplEnv -> Id -> Labda IdVal
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(AAASA)U(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
-lookupIdEnv :: UniqFM a -> Id -> Labda a
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
-lookupUFM :: NamedThing a => UniqFM b -> a -> Labda b
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "U(AAAAAASAAA)SL" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _SPECIALISE_ [ Name, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 21 _N_ _S_ "SU(U(P)AAA)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ } #-}
 lookupUnfolding :: SimplEnv -> Id -> UnfoldingDetails
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(AAAAL)U(LALS)" {_A_ 4 _U_ 1112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkFormSummary :: StrictnessInfo -> CoreExpr a Id -> FormSummary
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "LS" _N_ _N_ #-}
 nullInEnvs :: (UniqFM UniType, UniqFM IdVal)
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 nullSimplEnv :: (SimplifierSwitch -> SwitchResult) -> SimplEnv
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 nullTyVarEnv :: UniqFM a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
 pprSimplEnv :: SimplEnv -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 1 _U_ 122 _N_ _S_ "U(AAAAU(LAA))" {_A_ 1 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 replaceInEnvs :: SimplEnv -> (UniqFM UniType, UniqFM IdVal) -> SimplEnv
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(LLAAL)U(LL)" {_A_ 5 _U_ 22222 _N_ _N_ _F_ _IF_ARGS_ 0 5 XXXXX 6 \ (u0 :: SimplifierSwitch -> SwitchResult) (u1 :: EnclosingCcDetails) (u2 :: UnfoldEnv) (u3 :: UniqFM UniType) (u4 :: UniqFM IdVal) -> _!_ _ORIG_ SimplEnv SimplEnv [] [u0, u1, u3, u4, u2] _N_} _F_ _ALWAYS_ \ (u0 :: SimplEnv) (u1 :: (UniqFM UniType, UniqFM IdVal)) -> case u0 of { _ALG_ _ORIG_ SimplEnv SimplEnv (u2 :: SimplifierSwitch -> SwitchResult) (u3 :: EnclosingCcDetails) (u4 :: UniqFM UniType) (u5 :: UniqFM IdVal) (u6 :: UnfoldEnv) -> case u1 of { _ALG_ _TUP_2 (u7 :: UniqFM UniType) (u8 :: UniqFM IdVal) -> _!_ _ORIG_ SimplEnv SimplEnv [] [u2, u3, u7, u8, u6]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 setEnclosingCC :: SimplEnv -> EnclosingCcDetails -> SimplEnv
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(LALLL)L" {_A_ 5 _U_ 22222 _N_ _N_ _F_ _IF_ARGS_ 0 5 XXXXX 6 \ (u0 :: SimplifierSwitch -> SwitchResult) (u1 :: UniqFM UniType) (u2 :: UniqFM IdVal) (u3 :: UnfoldEnv) (u4 :: EnclosingCcDetails) -> _!_ _ORIG_ SimplEnv SimplEnv [] [u0, u4, u1, u2, u3] _N_} _F_ _ALWAYS_ \ (u0 :: SimplEnv) (u1 :: EnclosingCcDetails) -> case u0 of { _ALG_ _ORIG_ SimplEnv SimplEnv (u2 :: SimplifierSwitch -> SwitchResult) (u3 :: EnclosingCcDetails) (u4 :: UniqFM UniType) (u5 :: UniqFM IdVal) (u6 :: UnfoldEnv) -> _!_ _ORIG_ SimplEnv SimplEnv [] [u2, u1, u4, u5, u6]; _NO_DEFLT_ } _N_ #-}
 simplTy :: SimplEnv -> UniType -> UniType
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(AALAA)S" {_A_ 2 _U_ 21 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniTyFuns applyTypeEnvToTy _N_} _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: SimplEnv) (u1 :: UniType) -> case u0 of { _ALG_ _ORIG_ SimplEnv SimplEnv (u2 :: SimplifierSwitch -> SwitchResult) (u3 :: EnclosingCcDetails) (u4 :: UniqFM UniType) (u5 :: UniqFM IdVal) (u6 :: UnfoldEnv) -> _APP_  _ORIG_ UniTyFuns applyTypeEnvToTy [ u4, u1 ]; _NO_DEFLT_ } _N_ #-}
 simplTyInId :: SimplEnv -> Id -> Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(AALAA)U(LLLS)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 switchIsSet :: SimplEnv -> SimplifierSwitch -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(SAAAA)L" {_A_ 2 _U_ 12 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _TYAPP_  _ORIG_ CmdLineOpts switchIsOn { SimplifierSwitch } _N_} _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: SimplEnv) (u1 :: SimplifierSwitch) -> case u0 of { _ALG_ _ORIG_ SimplEnv SimplEnv (u2 :: SimplifierSwitch -> SwitchResult) (u3 :: EnclosingCcDetails) (u4 :: UniqFM UniType) (u5 :: UniqFM IdVal) (u6 :: UnfoldEnv) -> _APP_  _TYAPP_  _ORIG_ CmdLineOpts switchIsOn { SimplifierSwitch } [ u2, u1 ]; _NO_DEFLT_ } _N_ #-}
 instance Eq UnfoldConApp
-	{-# GHC_PRAGMA _M_ SimplEnv {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(UnfoldConApp -> UnfoldConApp -> Bool), (UnfoldConApp -> UnfoldConApp -> Bool)] [_CONSTM_ Eq (==) (UnfoldConApp), _CONSTM_ Eq (/=) (UnfoldConApp)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Ord UnfoldConApp
-	{-# GHC_PRAGMA _M_ SimplEnv {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq UnfoldConApp}}, (UnfoldConApp -> UnfoldConApp -> Bool), (UnfoldConApp -> UnfoldConApp -> Bool), (UnfoldConApp -> UnfoldConApp -> Bool), (UnfoldConApp -> UnfoldConApp -> Bool), (UnfoldConApp -> UnfoldConApp -> UnfoldConApp), (UnfoldConApp -> UnfoldConApp -> UnfoldConApp), (UnfoldConApp -> UnfoldConApp -> _CMP_TAG)] [_DFUN_ Eq (UnfoldConApp), _CONSTM_ Ord (<) (UnfoldConApp), _CONSTM_ Ord (<=) (UnfoldConApp), _CONSTM_ Ord (>=) (UnfoldConApp), _CONSTM_ Ord (>) (UnfoldConApp), _CONSTM_ Ord max (UnfoldConApp), _CONSTM_ Ord min (UnfoldConApp), _CONSTM_ Ord _tagCmp (UnfoldConApp)] _N_
-	 (<) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_,
-	 (<=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_,
-	 (>=) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_,
-	 (>) = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "U(U(U(P)AAA)LL)U(U(U(P)AAA)LL)" {_A_ 4 _U_ 2111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Outputable FormSummary
-	{-# GHC_PRAGMA _M_ SimplEnv {-dfun-} _A_ 4 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (FormSummary) _N_
-	 ppr = _A_ 4 _U_ 0120 _N_ _S_ "AELA" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Outputable UnfoldingGuidance
-	{-# GHC_PRAGMA _M_ SimplEnv {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (UnfoldingGuidance) _N_
-	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AS" {_A_ 1 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -302,16 +302,20 @@ instance Outputable Name where
     ppr sty (OtherTopId u n)	   = ppr sty n
 
     ppr sty (ClassOpName u c s i)
-	= case sty of
-		PprForUser     -> ppPStr s
-		PprInterface _ -> ppPStr s
-		other	       -> ppBesides [ppPStr s, ppChar '{',
-					 ppSep [pprUnique u,
-						ppStr "op", ppInt i,
-						ppStr "cls", ppr sty c],
-					 ppChar '}']
+      = let
+	    ps = ppPStr s
+	in
+	case sty of
+	  PprForUser     -> ps
+	  PprInterface _ -> ps
+	  PprDebug	 -> ps
+	  other	         -> ppBesides [ps, ppChar '{',
+				       ppSep [pprUnique u,
+					      ppStr "op", ppInt i,
+					      ppStr "cls", ppr sty c],
+				       ppChar '}']
 
-    ppr sty (Unbound s)		= ppStr ("*UNBOUND*"++ _UNPK_ s)
+    ppr sty (Unbound s) = ppStr ("*UNBOUND*"++ _UNPK_ s)
 
 pp_debug uniq thing
   = ppBesides [ppr PprDebug thing, ppStr "{-", pprUnique uniq, ppStr "-}" ]

@@ -665,9 +665,9 @@ concat			=  foldr (++) []
 # ifndef USE_FOLDR_BUILD
 -- HBC version (stolen)
 concat []		= []
-concat ([]:xss)		= concat xss                    -- for better stack behaiour!
-concat ([x]:xss)	= x : concat xss		-- this should help too ???
-concat (xs:xss)		= xs ++ concat xss
+concat ([]:xss)		= concat xss                    -- for better stack behaviour!
+--NO:bad strictness: concat ([x]:xss)	= x : concat xss -- this should help too ???
+concat ((y:ys):xss)     = y : (ys ++ concat xss)
 # else
 {-# INLINE concat #-}
 concat xs = _build (\ c n -> foldr (\ x y -> foldr c y x) n xs)

@@ -1,10 +1,11 @@
 #define IHaveSubdirs
 
-SUBDIRS = hp2ps \
-	  hscpp \
-	  unlit \
-	  hstags \
-	  mkdependHS \
-	  parallel \
-	  ugen \
-	  stat2resid
+SUBDIRS = heap-view	\
+	  hp2ps		\
+	  hscpp		\
+	  hstags	\
+	  mkdependHS	\
+	  parallel	\
+	  stat2resid	\
+	  ugen		\
+	  unlit

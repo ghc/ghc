@@ -7,55 +7,30 @@ import TyVar(TyVar)
 import UniType(UniType)
 import Unique(Unique)
 aBSENT_ERROR_ID :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 buildId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 eRROR_ID :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 errorTy :: UniType
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 foldlId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 foldrId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 forkId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 integerMinusOneId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 integerPlusOneId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 integerZeroId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 mkBuild :: UniType -> TyVar -> Id -> Id -> Id -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 6 _U_ 222222 _N_ _N_ _N_ _N_ #-}
 mkFoldl :: UniType -> UniType -> Id -> Id -> Id -> CoreExpr a Id
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222 _N_ _N_ _N_ _N_ #-}
 mkFoldr :: UniType -> UniType -> Id -> Id -> Id -> CoreExpr a Id
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222 _N_ _N_ _N_ _N_ #-}
 pAR_ERROR_ID :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 pAT_ERROR_ID :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 pRELUDE_FB :: _PackedString
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 packStringForCId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 parId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 pc_bottoming_Id :: Unique -> _PackedString -> _PackedString -> UniType -> Id
-	{-# GHC_PRAGMA _A_ 0 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 realWorldPrimId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 runSTId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 seqId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 tRACE_ID :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
+unpackCString2Id :: Id
 unpackCStringAppendId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 unpackCStringId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 voidPrimId :: Id
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 

@@ -27,7 +27,7 @@ Hash tables for GUM are ADTs.  Peek inside, and I'll have to kill you.
 The same goes for hash list cells.
 
 \begin{code}
-#ifdef GUM
+#ifdef PAR
 typedef struct hashtable HashTable;
 typedef struct hashlist HashList;
 
@@ -114,7 +114,7 @@ containing the @label@, @module@, @group@, and the statistical meters
 we are collecting.
 
 \begin{code}
-#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+#if defined(PROFILING) || defined(CONCURRENT)
 
 typedef struct cc {
     struct cc *registered;	/* list of registered cost centres 	*/
@@ -150,7 +150,7 @@ typedef struct cc {
 
 } *CostCentre;
 
-#endif /* defined(USE_COST_CENTRES) || defined(CONCURRENT) */
+#endif /* defined(PROFILING) || defined(CONCURRENT) */
 \end{code}
 
 This structure will need to be expanded change as the statistics we

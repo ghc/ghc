@@ -17,7 +17,6 @@ plusInt	(I# x) (I# y) = I# (plusInt# x y)
 minusInt(I# x) (I# y) = I# (minusInt# x y)
 timesInt(I# x) (I# y) = I# (timesInt# x y)
 quotInt	(I# x) (I# y) = I# (quotInt# x y)
-divInt	(I# x) (I# y) = I# (divInt# x y)
 remInt	(I# x) (I# y) = I# (remInt# x y)
 negateInt (I# x)      = I# (negateInt# x)
 gtInt	(I# x) (I# y) = gtInt# x y

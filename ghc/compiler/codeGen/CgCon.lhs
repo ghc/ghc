@@ -417,7 +417,9 @@ found a $con$.
 bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
   = ASSERT(isDataCon con)
-    case (dataReturnConvAlg con) of
+    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+
+    case (dataReturnConvAlg isw_chkr con) of
       ReturnInRegs rs  -> bindArgsToRegs args rs
       ReturnInHeap     ->
 	  let
@@ -443,7 +445,8 @@ cgReturnDataCon :: DataCon -> [CAddrMode] -> Bool -> PlainStgLiveVars -> Code
 
 cgReturnDataCon con amodes all_zero_size_args live_vars
   = ASSERT(isDataCon con)
-    getEndOfBlockInfo		`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
+    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+    getEndOfBlockInfo	`thenFC` \ (EndOfBlockInfo args_spa args_spb sequel) ->
 
     case sequel of
 
@@ -480,7 +483,7 @@ cgReturnDataCon con amodes all_zero_size_args live_vars
 		-- Ignore the sequel: we've already looked at it above
 
       other_sequel ->	-- The usual case
-	    case dataReturnConvAlg con of
+	    case (dataReturnConvAlg isw_chkr con) of
 
 	      ReturnInHeap	    ->
 			-- BUILD THE OBJECT IN THE HEAP
@@ -497,16 +500,16 @@ cgReturnDataCon con amodes all_zero_size_args live_vars
 		  in
 
 			-- RETURN
-		  profCtrC SLIT("RET_NEW_IN_HEAP") []		`thenC`
+		  profCtrC SLIT("RET_NEW_IN_HEAP") [mkIntCLit (length amodes)] `thenC`
 
 		  performReturn reg_assts (mkStaticAlgReturnCode con (Just info_lbl)) live_vars
 
 	      ReturnInRegs regs  ->
-	    	  let reg_assts = mkAbstractCs (zipWith move_to_reg amodes regs)
+	    	  let
+		      reg_assts = mkAbstractCs (zipWith move_to_reg amodes regs)
 		      info_lbl  = mkPhantomInfoTableLabel con
 	          in
---OLD:WDP:94/06	  evalCostCentreC "SET_RetCC" [CReg CurCostCentre] `thenC`
-		  profCtrC SLIT("RET_NEW_IN_REGS") []		   `thenC`
+		  profCtrC SLIT("RET_NEW_IN_REGS") [mkIntCLit (length amodes)] `thenC`
 
 	    	  performReturn reg_assts (mkStaticAlgReturnCode con (Just info_lbl)) live_vars
   where

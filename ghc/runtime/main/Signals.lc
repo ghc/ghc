@@ -19,7 +19,6 @@ Since they're pretty rudimentary, they shouldn't actually cause as
 much pain.
 
 \begin{code}
-
 #include "platform.h"
 
 #if defined(sunos4_TARGET_OS)
@@ -32,9 +31,10 @@ much pain.
 # define _OSF_SOURCE 1
 #endif
 
-#if defined(linuxaout_TARGET_OS) || defined(linux_TARGET_OS)
-    /* I have no idea why this works (WDP 95/03) */
-# define _BSD_SOURCE 1
+#if irix_TARGET_OS
+/* SIGVTALRM not avail w/ POSIX_SOURCE, but worse things happen without */
+/* SIGH: triple SIGH (WDP 95/07) */
+# define SIGVTALRM 28
 #endif
 
 #include "rtsdefs.h"
@@ -45,11 +45,6 @@ much pain.
 
 #if defined(HAVE_SIGNAL_H)
 # include <signal.h>
-#endif
-#if irix_TARGET_OS
-/* SIGVTALRM not avail w/ POSIX_SOURCE, but worse things happen without */
-/* SIGH: triple SIGH (WDP 95/07) */
-# define SIGVTALRM 28
 #endif
 
 #if defined(HAVE_SIGINFO_H)
@@ -72,12 +67,9 @@ that it really was a stack overflow and not some random segmentation
 fault.
 
 \begin{code}
-
 #if STACK_CHECK_BY_PAGE_FAULT
 
 extern P_ stks_space;	    /* Where the stacks live, from SMstacks.lc */
-extern I_ SM_word_stk_size; /* How big they are (ditto) */
-
 \end{code}
 
 SunOS 4.x is too old to have @SA_SIGINFO@ as a flag to @sigaction@, so
@@ -86,20 +78,19 @@ to set up the handler to expect a different collection of arguments.
 Fun, eh?
 
 \begin{code}
-
-# if defined(sunos4_TARGET_OS) || defined(linuxaout_TARGET_OS) || defined(linux_TARGET_OS)
+# if defined(sunos4_TARGET_OS)
 
 static void
 segv_handler(sig, code, scp, addr)
   int sig;
-  int code;
+  int code; /* NB: all except first argument are "implementation defined" */
   struct sigcontext *scp;
   caddr_t addr;
 {
     extern void StackOverflow(STG_NO_ARGS) STG_NORETURN;
 
     if (addr >= (caddr_t) stks_space
-      && addr < (caddr_t) (stks_space + SM_word_stk_size))
+      && addr < (caddr_t) (stks_space + RTSflags.GcFlags.stksSize))
 	StackOverflow();
 
     fflush(stdout);
@@ -108,9 +99,12 @@ segv_handler(sig, code, scp, addr)
 }
 
 int
-install_segv_handler()
+install_segv_handler(void)
 {
-    return (int) signal(SIGSEGV, segv_handler) == -1;
+    return ((int) signal(SIGSEGV, segv_handler) == SIG_ERR);
+    /* I think the "== SIG_ERR" is saying "there was no
+       handler for SIGSEGV before this one".  WDP 95/12
+    */
 }
 
 # else	/* Not SunOS 4 */
@@ -121,16 +115,15 @@ install_segv_handler()
 #  endif
 
 static void
-segv_handler(sig, sip)
-  int sig;
-  siginfo_t *sip;
+segv_handler(int sig, siginfo_t *sip)
+  /* NB: the second "siginfo_t" argument is not really standard */
 {
     fflush(stdout);
     if (sip == NULL) {
 	fprintf(stderr, "Segmentation fault caught, address unknown\n");
     } else {
 	if (sip->si_addr >= (caddr_t) stks_space
-	  && sip->si_addr < (caddr_t) (stks_space + SM_word_stk_size))
+	  && sip->si_addr < (caddr_t) (stks_space + RTSflags.GcFlags.stksSize))
 	    StackOverflow();
 
 	fprintf(stderr, "Segmentation fault caught, address = %08lx\n", (W_) sip->si_addr);
@@ -139,13 +132,14 @@ segv_handler(sig, sip)
 }
 
 int
-install_segv_handler()
+install_segv_handler(STG_NO_ARGS)
 {
     struct sigaction action;
 
     action.sa_handler = segv_handler;
     sigemptyset(&action.sa_mask);
     action.sa_flags = SA_SIGINFO;
+
     return sigaction(SIGSEGV, &action, NULL);
 }
 
@@ -167,27 +161,16 @@ the non-POSIX signal under SunOS 4.1.X, we adopt the same approach
 here.
 
 \begin{code}
-#if (defined(USE_COST_CENTRES) || defined(CONCURRENT)) && !defined(GRAN)
-
-# if defined(USE_COST_CENTRES)
-extern I_ heap_profiling_req;
-# endif
+#if (defined(PROFILING) || defined(CONCURRENT)) && !defined(GRAN)
 
 # ifdef CONCURRENT
 
-#  if defined(USE_COST_CENTRES) || defined(GUM)
-I_ contextSwitchTicks;
-I_ profilerTicks;
-#  endif
-  
 #  ifdef PAR
 extern P_ CurrentTSO;
 #  endif
-extern I_ contextSwitchTime;
 
 static void
-vtalrm_handler(sig)
-  int sig;
+vtalrm_handler(int sig)
 {
 /*
    For the parallel world, currentTSO is set if there is any work
@@ -195,38 +178,41 @@ vtalrm_handler(sig)
    in case other PEs have sent us messages which must be processed.
 */
 
-#  if defined(USE_COST_CENTRES) || defined(GUM)
+#  if defined(PROFILING) || defined(PAR)
     static I_ csTicks = 0, pTicks = 0;
 
     if (time_profiling) {
-	if (++pTicks % profilerTicks == 0) {
-#   if ! defined(USE_COST_CENTRES)
+	if (++pTicks % RTSflags.CcFlags.profilerTicks == 0) {
+#   if ! defined(PROFILING)
 	    handle_tick_serial();
 #   else
-	    if (cc_profiling > 1 || heap_profiling_req != HEAP_NO_PROFILING)
+	    if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
+	     || RTSflags.ProfFlags.doHeapProfile)
 		handle_tick_serial();
 	    else
 		handle_tick_noserial();
 #   endif
 	}
-	if (++csTicks % contextSwitchTicks != 0)
+	if (++csTicks % RTSflags.CcFlags.ctxtSwitchTicks != 0)
 	    return;
     }
 #  endif
 
     if (WaitingThreadsHd != Nil_closure)
-	AwaitEvent(contextSwitchTime);
+	AwaitEvent(RTSflags.ConcFlags.ctxtSwitchTime);
 
 #  ifdef PAR
     if (PendingSparksTl[REQUIRED_POOL] == PendingSparksLim[REQUIRED_POOL] ||
       PendingSparksTl[ADVISORY_POOL] == PendingSparksLim[ADVISORY_POOL]) {
 	PruneSparks();
-	if (PendingSparksTl[REQUIRED_POOL] == PendingSparksLim[REQUIRED_POOL])
+	if (PendingSparksTl[REQUIRED_POOL] == PendingSparksLim[REQUIRED_POOL]) 
 	    PendingSparksTl[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL] +
 	      SparkLimit[REQUIRED_POOL] / 2;
-	if (PendingSparksTl[ADVISORY_POOL] == PendingSparksLim[ADVISORY_POOL])
+	if (PendingSparksTl[ADVISORY_POOL] == PendingSparksLim[ADVISORY_POOL]) {
 	    PendingSparksTl[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL] +
 	      SparkLimit[ADVISORY_POOL] / 2;
+            sparksIgnored += SparkLimit[REQUIRED_POOL] / 2; 
+        }
     }
 
     if (CurrentTSO != NULL ||
@@ -242,22 +228,23 @@ vtalrm_handler(sig)
 
 # endif
 
-# if defined(sunos4_TARGET_OS) || defined(linuxaout_TARGET_OS) || defined(linux_TARGET_OS)
+# if defined(sunos4_TARGET_OS)
 
 int
-install_vtalrm_handler()
+install_vtalrm_handler(void)
 {
     void (*old)();
 
 #  ifdef CONCURRENT
     old = signal(SIGVTALRM, vtalrm_handler);
 #  else
-    if (cc_profiling > 1 || heap_profiling_req != HEAP_NO_PROFILING)
+    if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
+     || RTSflags.ProfFlags.doHeapProfile)
         old = signal(SIGVTALRM, handle_tick_serial);
     else
         old = signal(SIGVTALRM, handle_tick_noserial);
 #  endif
-    return (int) old == -1;
+    return ((int) old == SIG_ERR);
 }
 
 static int vtalrm_mask;
@@ -284,7 +271,8 @@ install_vtalrm_handler(STG_NO_ARGS)
 #  ifdef CONCURRENT
     action.sa_handler = vtalrm_handler;
 #  else
-    if (cc_profiling > 1 || heap_profiling_req != HEAP_NO_PROFILING)
+    if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
+     || RTSflags.ProfFlags.doHeapProfile)
 	action.sa_handler = handle_tick_serial;
     else
 	action.sa_handler = handle_tick_noserial;
@@ -318,9 +306,9 @@ unblockVtAlrmSignal(STG_NO_ARGS)
     (void) sigprocmask(SIG_UNBLOCK, &signals, NULL);
 }
 
-# endif /* SunOS 4 */
+# endif /* ! SunOS 4 */
 
-#endif /* USE_COST_CENTRES || CONCURRENT (but not GRAN) */
+#endif /* PROFILING || CONCURRENT (but not GRAN) */
 
 \end{code}
 
@@ -333,13 +321,13 @@ parallel world.  Sorry.
 #ifdef PAR
 
 void
-blockUserSignals()
+blockUserSignals(void)
 {
     return;
 }
 
 void
-unblockUserSignals()
+unblockUserSignals(void)
 {
     return;
 }
@@ -371,8 +359,7 @@ static I_ *handlers = NULL; /* Dynamically grown array of signal handlers */
 static I_ nHandlers = 0;    /* Size of handlers array */
 
 static void
-more_handlers(sig)
-  I_ sig;
+more_handlers(I_ sig)
 {
     I_ i;
 
@@ -386,7 +373,7 @@ more_handlers(sig)
 
     if (handlers == NULL) {
 	fflush(stdout);
-	fprintf(stderr, "VM exhausted\n");
+	fprintf(stderr, "VM exhausted (in more_handlers)\n");
 	EXIT(EXIT_FAILURE);
     }
     for(i = nHandlers; i <= sig; i++)
@@ -399,12 +386,12 @@ more_handlers(sig)
 # ifdef _POSIX_SOURCE
 
 static void
-generic_handler(sig)
+generic_handler(int sig)
 {
     sigset_t signals;
 
     SAVE_Hp = SAVE_HpLim;	/* Just to be safe */
-    if (initStacks(&StorageMgrInfo) != 0) {
+    if (! initStacks(&StorageMgrInfo)) {
 	fflush(stdout);
 	fprintf(stderr, "initStacks failed!\n");
 	EXIT(EXIT_FAILURE);
@@ -420,19 +407,19 @@ static sigset_t userSignals;
 static sigset_t savedSignals;
 
 void
-initUserSignals()
+initUserSignals(void)
 {
     sigemptyset(&userSignals);
 }
 
 void
-blockUserSignals()
+blockUserSignals(void)
 {
     sigprocmask(SIG_SETMASK, &userSignals, &savedSignals);
 }
 
 void
-unblockUserSignals()
+unblockUserSignals(void)
 {
     sigprocmask(SIG_SETMASK, &savedSignals, NULL);
 }
@@ -485,6 +472,7 @@ sig_install(sig, spi, mask)
 	sigemptyset(&action.sa_mask);
 
     action.sa_flags = sig == SIGCHLD && nocldstop ? SA_NOCLDSTOP : 0;
+
     if (sigaction(sig, &action, NULL) || sigprocmask(SIG_UNBLOCK, &signals, NULL)) {
 	if (previous_spi)
 	  freeStablePointer(handlers[sig]);
@@ -500,7 +488,7 @@ static void
 generic_handler(sig)
 {
     SAVE_Hp = SAVE_HpLim;	/* Just to be safe */
-    if (initStacks(&StorageMgrInfo) != 0) {
+    if (! initStacks(&StorageMgrInfo)) {
 	fflush(stdout);
 	fprintf(stderr, "initStacks failed!\n");
 	EXIT(EXIT_FAILURE);
@@ -514,19 +502,19 @@ static int userSignals;
 static int savedSignals;
 
 void
-initUserSignals()
+initUserSignals(void)
 {
     userSignals = 0;
 }
 
 void
-blockUserSignals()
+blockUserSignals(void)
 {
     savedSignals = sigsetmask(userSignals);
 }
 
 void
-unblockUserSignals()
+unblockUserSignals(void)
 {
     sigsetmask(savedSignals);
 }
@@ -538,7 +526,7 @@ sig_install(sig, spi)
 {
     I_ previous_spi;
     int mask;
-    void (*handler)();
+    void (*handler)(int);
 
     /* Block the signal until we figure out what to do */
     /* Count on this to fail if the signal number is invalid */
@@ -581,7 +569,7 @@ sig_install(sig, spi)
     return previous_spi;
 }
 
-# endif    /* POSIX */
+# endif    /* !POSIX */
 
 #endif	/* PAR */
 

@@ -1,0 +1,55 @@
+I've collected all the Haskell modes for GNU Emacs that I could lay my
+hands on -- there are billions.  A list is attached, grouped by
+"family".
+
+I don't like "mode junk" myself, so I don't use any of them.  I will
+include advertising or testimonials from happy users if they send them
+along...
+
+Will Partain
+partain@dcs.glasgow.ac.uk
+95/12/05
+
+=======================================================================
+
+* "Chalmers Haskell mode family" -- "Major mode for editing Haskell",
+  by Lars Bo Nielsen and Lennart Augustsson.
+
+  chalmers/original -- the original -- version 0.1.
+
+  chalmers/thiemann -- Peter Thiemann added "indentation stuff"
+	and fontification -- version 0.2.
+
+  chalmers/sof -- Sigbjorn Finne's <sof@dcs.glasgow.ac.uk> hacked
+	version of Thiemann's.
+
+.......................................................................
+
+* "Glasgow Haskell mode family" -- originally written by Richard McPhee
+  et al., at Glasgow University, as a student project, for Kevin
+  Hammond.
+
+  glasgow/original : version 1.0, now maintained by
+	gem@minster.york.ac.uk
+
+.......................................................................
+
+* "Simon Marlow Haskell mode family" -- This is the one that comes
+  with GHC, versions 0.16 up to at least 0.26.
+
+  simonm/real : the real thing
+
+  simonm/ghc : the one distributed with GHC 0.16-0.26; no particular
+	reason to prefer this one...
+
+.......................................................................
+
+* "Yale Haskell mode family" -- Especially good for chatting to a
+  Yale-Haskell inferior process :-)
+
+  yale/original : the real thing
+
+  yale/chak : "extended by Manuel M.T. Chakravarty with rudimentary
+	editing features (including better syntax table) and support
+	for the font-lock-mode."  Via Hans Wolfgang Loidl
+	<hwloidl@dcs.glasgow.ac.uk>

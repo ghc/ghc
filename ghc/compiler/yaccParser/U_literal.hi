@@ -3,5 +3,4 @@ interface U_literal where
 import PreludePS(_PackedString)
 data U_literal   = U_integer _PackedString | U_intprim _PackedString | U_floatr _PackedString | U_doubleprim _PackedString | U_floatprim _PackedString | U_charr _PackedString | U_charprim _PackedString | U_string _PackedString | U_stringprim _PackedString | U_clitlit _PackedString _PackedString | U_norepi _PackedString | U_norepr _PackedString _PackedString | U_noreps _PackedString
 rdU_literal :: _Addr -> _PackedString -> _State _RealWorld -> (U_literal, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -665,10 +665,11 @@ gen_Text_binds fixities omit_derived_read tycon
 		data_con_PN = Prel (WiredInVal data_con)
 		bs_needed   = take (getDataConArity data_con) bs_PNs
 		con_pat     = ConPatIn data_con_PN (map VarPatIn bs_needed)
+		is_nullary_con = isNullaryDataCon data_con
 
 		show_con
 		  = let (mod, nm)   = getOrigName data_con
-			space_maybe = if isNullaryDataCon data_con then _NIL_ else SLIT(" ")
+			space_maybe = if is_nullary_con then _NIL_ else SLIT(" ")
 		    in
 			App (Var showString_PN) (Lit (StringLit (nm _APPEND_ space_maybe)))
 
@@ -678,9 +679,13 @@ gen_Text_binds fixities omit_derived_read tycon
 		  = [ App (App (Var showsPrec_PN) (Lit (IntLit 10))) (Var b)
 		  | b <- bs_needed ]
 	    in
-	    ([a_Pat, con_pat],
-		showParen_Expr (OpApp a_Expr (Var ge_PN) (Lit (IntLit 10)))
-			       (nested_compose_Expr show_thingies))
+	    if is_nullary_con then  -- skip the showParen junk...
+		ASSERT(null bs_needed)
+		([a_Pat, con_pat], show_con)
+	    else
+		([a_Pat, con_pat],
+		    showParen_Expr (OpApp a_Expr (Var ge_PN) (Lit (IntLit 10)))
+				   (nested_compose_Expr show_thingies))
 	  where
 	    spacified []     = []
 	    spacified [x]    = [x]
@@ -692,11 +697,9 @@ gen_Text_binds fixities omit_derived_read tycon
 	    read_con_comprehensions
 	      = map read_con (getTyConDataCons tycon)
 	in
-	mk_easy_FunMonoBind readsPrec_PN [a_Pat] [] (
-	   readParen_Expr (OpApp a_Expr (Var gt_PN) (Lit (IntLit 9))) (
-	   Lam (mk_easy_Match [b_Pat] []  (
+	mk_easy_FunMonoBind readsPrec_PN [a_Pat, b_Pat] [] (
 	      foldl1 append_Expr read_con_comprehensions
-	))))
+	)
       where
 	read_con data_con   -- note: "b" is the string being "read"
 	  = let
@@ -705,17 +708,28 @@ gen_Text_binds fixities omit_derived_read tycon
 		as_needed   = take (getDataConArity data_con) as_PNs
 		bs_needed   = take (getDataConArity data_con) bs_PNs
 		con_expr    = foldl App (Var data_con_PN) (map Var as_needed)
+		is_nullary_con = isNullaryDataCon data_con
 
 		con_qual
 		  = GeneratorQual
-		      (TuplePatIn [LitPatIn (StringLit data_con_str), c_Pat])
-		      (App (Var lex_PN) b_Expr)
+		      (TuplePatIn [LitPatIn (StringLit data_con_str), d_Pat])
+		      (App (Var lex_PN) c_Expr)
 
-		field_quals = snd (mapAccumL mk_qual c_Expr (as_needed `zip` bs_needed))
+		field_quals = snd (mapAccumL mk_qual d_Expr (as_needed `zip` bs_needed))
+
+		read_paren_arg
+		  = if is_nullary_con then -- must be False (parens are surely optional)
+		       false_Expr
+		    else -- parens depend on precedence...
+		       OpApp a_Expr (Var gt_PN) (Lit (IntLit 9))
 	    in
-	    ListComp (ExplicitTuple [con_expr,
-			if null bs_needed then c_Expr else Var (last bs_needed)])
-	      (con_qual : field_quals)
+	    App (
+	      readParen_Expr read_paren_arg (
+		 Lam (mk_easy_Match [c_Pat] []  (
+		   ListComp (ExplicitTuple [con_expr,
+			    if null bs_needed then d_Expr else Var (last bs_needed)])
+		    (con_qual : field_quals)))
+	    )) (Var b_PN)
 	  where
 	    mk_qual draw_from (con_field, str_left)
 	      = (Var str_left,	-- what to draw from down the line...

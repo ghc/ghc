@@ -1,76 +1,45 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface CostCentre where
 import CharSeq(CSeq)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Maybes(Labda)
 import PreludePS(_PackedString)
 import Pretty(PprStyle)
-import UniType(UniType)
-import Unique(Unique)
 import Unpretty(Unpretty(..))
-data CSeq 	{-# GHC_PRAGMA CNil | CAppend CSeq CSeq | CIndent Int CSeq | CNewline | CStr [Char] | CCh Char | CInt Int | CPStr _PackedString #-}
-data CcKind 	{-# GHC_PRAGMA UserCC _PackedString | AutoCC Id | DictCC Id #-}
-data CostCentre 	{-# GHC_PRAGMA NoCostCentre | NormalCC CcKind _PackedString _PackedString IsDupdCC IsCafCC | CurrentCC | SubsumedCosts | AllCafsCC _PackedString _PackedString | AllDictsCC _PackedString _PackedString IsDupdCC | OverheadCC | PreludeCafsCC | PreludeDictsCC IsDupdCC | DontCareCC #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data CSeq 
+data CcKind 
+data CostCentre 
+data Id 
 data IsCafCC   = IsCafCC | IsNotCafCC
-data IsDupdCC 	{-# GHC_PRAGMA AnOriginalCC | ADupdCC #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data IsDupdCC 
+data Labda a 
 type Unpretty = CSeq
 cafifyCC :: CostCentre -> CostCentre
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 ccFromThisModule :: CostCentre -> _PackedString -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 ccMentionsId :: CostCentre -> Labda Id
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 cmpCostCentre :: CostCentre -> CostCentre -> Int#
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 costsAreSubsumed :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 12 \ (u0 :: CostCentre) -> case u0 of { _ALG_ _ORIG_ CostCentre SubsumedCosts  -> _!_ True [] []; (u1 :: CostCentre) -> _!_ False [] [] } _N_ #-}
 currentOrSubsumedCosts :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 13 \ (u0 :: CostCentre) -> case u0 of { _ALG_ _ORIG_ CostCentre SubsumedCosts  -> _!_ True [] []; _ORIG_ CostCentre CurrentCC  -> _!_ True [] []; (u1 :: CostCentre) -> _!_ False [] [] } _N_ #-}
 dontCareCostCentre :: CostCentre
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CostCentre DontCareCC [] [] _N_ #-}
 dupifyCC :: CostCentre -> CostCentre
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 isCafCC :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isDictCC :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isDupdCC :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 mkAllCafsCC :: _PackedString -> _PackedString -> CostCentre
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: _PackedString) -> _!_ _ORIG_ CostCentre AllCafsCC [] [u0, u1] _N_ #-}
 mkAllDictsCC :: _PackedString -> _PackedString -> Bool -> CostCentre
-	{-# GHC_PRAGMA _A_ 3 _U_ 221 _N_ _N_ _N_ _N_ #-}
 mkAutoCC :: Id -> _PackedString -> _PackedString -> IsCafCC -> CostCentre
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 mkDictCC :: Id -> _PackedString -> _PackedString -> IsCafCC -> CostCentre
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 mkUserCC :: _PackedString -> _PackedString -> _PackedString -> CostCentre
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 noCostCentre :: CostCentre
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CostCentre NoCostCentre [] [] _N_ #-}
 noCostCentreAttached :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 12 \ (u0 :: CostCentre) -> case u0 of { _ALG_ _ORIG_ CostCentre NoCostCentre  -> _!_ True [] []; (u1 :: CostCentre) -> _!_ False [] [] } _N_ #-}
 overheadCostCentre :: CostCentre
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CostCentre OverheadCC [] [] _N_ #-}
 preludeCafsCostCentre :: CostCentre
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CostCentre PreludeCafsCC [] [] _N_ #-}
 preludeDictsCostCentre :: Bool -> CostCentre
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
 setToAbleCostCentre :: CostCentre -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 showCostCentre :: PprStyle -> Bool -> CostCentre -> [Char]
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "SLS" _N_ _N_ #-}
 subsumedCosts :: CostCentre
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CostCentre SubsumedCosts [] [] _N_ #-}
 unCafifyCC :: CostCentre -> CostCentre
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 uppCostCentre :: PprStyle -> Bool -> CostCentre -> CSeq
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LLS" _N_ _N_ #-}
 uppCostCentreDecl :: PprStyle -> Bool -> CostCentre -> CSeq
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LEL" _N_ _N_ #-}
 useCurrentCostCentre :: CostCentre
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ CostCentre CurrentCC [] [] _N_ #-}
 

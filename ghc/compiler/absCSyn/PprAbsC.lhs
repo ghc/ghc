@@ -337,7 +337,7 @@ pprAbsC sty stmt@(CStaticClosure closure_lbl cl_info cost_centre amodes) _
 	};
 -}
 
-pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr) _
+pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr liveness) _
   = uppAboves [
         uppBesides [
 	    pp_info_rep,
@@ -350,13 +350,13 @@ pprAbsC sty stmt@(CClosureInfoAndCode cl_info slow maybe_fast upd cl_descr) _
 	    then uppBeside (pprCLabel sty (closureLabelFromCI cl_info)) uppComma
 	    else uppNil,
 
-	    pprCLabel sty slow_lbl,		uppComma,
-    	    pprAmode sty upd,			uppComma,
-            uppInt (dataConLiveness cl_info),	uppComma,
+	    pprCLabel sty slow_lbl,	uppComma,
+    	    pprAmode sty upd,		uppComma,
+            uppInt liveness,		uppComma,
 
-	    pp_tag,				uppComma,
-	    pp_size, 				uppComma,
-	    pp_ptr_wds,				uppComma,
+	    pp_tag,			uppComma,
+	    pp_size, 			uppComma,
+	    pp_ptr_wds,			uppComma,
 
 	    ppLocalness info_lbl,				uppComma,
 	    ppLocalnessMacro True{-function-} slow_lbl,		uppComma,
@@ -508,7 +508,7 @@ pp_basic_saves
 	uppPStr SLIT("CALLER_SAVE_SpB"),
 	uppPStr SLIT("CALLER_SAVE_SuB"),
 	uppPStr SLIT("CALLER_SAVE_Ret"),
-	uppPStr SLIT("CALLER_SAVE_Activity"),
+--	uppPStr SLIT("CALLER_SAVE_Activity"),
 	uppPStr SLIT("CALLER_SAVE_Hp"),
 	uppPStr SLIT("CALLER_SAVE_HpLim") ]
 
@@ -520,7 +520,7 @@ pp_basic_restores
 	uppPStr SLIT("CALLER_RESTORE_SpB"),
 	uppPStr SLIT("CALLER_RESTORE_SuB"),
 	uppPStr SLIT("CALLER_RESTORE_Ret"),
-	uppPStr SLIT("CALLER_RESTORE_Activity"),
+--	uppPStr SLIT("CALLER_RESTORE_Activity"),
 	uppPStr SLIT("CALLER_RESTORE_Hp"),
 	uppPStr SLIT("CALLER_RESTORE_HpLim"),
 	uppPStr SLIT("CALLER_RESTORE_StdUpdRetVec"),
@@ -1086,7 +1086,7 @@ pprMagicId sty SuB		    = uppPStr SLIT("SuB")
 pprMagicId sty Hp		    = uppPStr SLIT("Hp")
 pprMagicId sty HpLim		    = uppPStr SLIT("HpLim")
 pprMagicId sty LivenessReg	    = uppPStr SLIT("LivenessReg")
-pprMagicId sty ActivityReg	    = uppPStr SLIT("ActivityReg")
+--UNUSED pprMagicId sty ActivityReg	    = uppPStr SLIT("ActivityReg")
 pprMagicId sty StdUpdRetVecReg      = uppPStr SLIT("StdUpdRetVecReg")
 pprMagicId sty StkStubReg	    = uppPStr SLIT("StkStubReg")
 pprMagicId sty CurCostCentre	    = uppPStr SLIT("CCC")
@@ -1325,7 +1325,7 @@ ppr_decls_AbsC (CStaticClosure closure_lbl closure_info cost_centre amodes)
 	-- ToDo: strictly speaking, should chk "cost_centre" amode
   = ppr_decls_Amodes amodes
 
-ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast upd_lbl closure_descr)
+ppr_decls_AbsC (CClosureInfoAndCode cl_info slow maybe_fast upd_lbl _ _)
   = ppr_decls_Amodes [entry_lbl, upd_lbl]	`thenTE` \ p1 ->
     ppr_decls_AbsC slow				`thenTE` \ p2 ->
     (case maybe_fast of

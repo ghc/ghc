@@ -30,7 +30,7 @@ module CgRetConv (
 import AbsCSyn
 
 import AbsPrel		( PrimOp(..), PrimOpResultInfo(..), primOpCanTriggerGC,
-			  getPrimOpResultInfo, PrimKind
+			  getPrimOpResultInfo, integerDataCon, PrimKind
 			  IF_ATTACK_PRAGMAS(COMMA tagOf_PrimOp)
 			  IF_ATTACK_PRAGMAS(COMMA pprPrimOp)
 			)
@@ -41,7 +41,8 @@ import AbsUniType	( getTyConFamilySize, kindFromType, getTyConDataCons,
 			  IF_ATTACK_PRAGMAS(COMMA cmpUniType)
 			)
 import CgCompInfo	-- various things
-
+import CgMonad		( IntSwitchChecker(..) )
+import CmdLineOpts	( GlobalSwitch(..) )
 import Id		( Id, getDataConSig, fIRST_TAG, isDataCon,
 			  DataCon(..), ConTag(..)
 			)
@@ -88,6 +89,7 @@ The register assignment given by a @ReturnInRegs@ obeys three rules:
 
 \begin{code}
 ctrlReturnConvAlg :: TyCon -> CtrlReturnConvention
+
 ctrlReturnConvAlg tycon
   = case (getTyConFamilySize tycon) of
       Nothing -> -- pprPanic "ctrlReturnConvAlg:" (ppr PprDebug tycon)
@@ -111,17 +113,28 @@ types.	If @assign_reg@ runs out of a particular kind of register,
 then it gives up, returning @ReturnInHeap@.
 
 \begin{code}
-dataReturnConvAlg :: DataCon -> DataReturnConvention
+dataReturnConvAlg :: IntSwitchChecker -> DataCon -> DataReturnConvention
 
-dataReturnConvAlg data_con
+dataReturnConvAlg isw_chkr data_con
   = ASSERT(isDataCon data_con)
     case leftover_kinds of
 	[]    ->	ReturnInRegs reg_assignment
 	other ->	ReturnInHeap	-- Didn't fit in registers
   where
     (_, _, arg_tys, _) = getDataConSig data_con
-    (reg_assignment, leftover_kinds) = assignRegs [node,infoptr] 
-    	    	    	    	    	    	  (map kindFromType arg_tys)
+
+    (reg_assignment, leftover_kinds)
+      = assignRegs isw_chkr_to_use
+		   [node, infoptr] -- taken...
+		   (map kindFromType arg_tys)
+ 
+    isw_chkr_to_use = isw_chkr
+{-OLD:
+      = if is_prim_result_ty {-and therefore *ignore* any return-in-regs threshold-}
+	then \ x -> Nothing
+	else isw_chkr
+-}
+    is_prim_result_ty = data_con == integerDataCon -- ***HACK***! (WDP 95/11)
 \end{code}
 
 \begin{code}
@@ -213,7 +226,7 @@ dataReturnConvPrim kind         = DataReg kind 2 -- Don't Hog a Modifier reg.
 
 \begin{code}
 assignPrimOpResultRegs
-    :: PrimOp	-- The constructors in canonical order
+    :: PrimOp		-- The constructors in canonical order
     -> [MagicId]	-- The return regs all concatenated to together,
 			-- (*including* one for the tag if necy)
 
@@ -222,18 +235,23 @@ assignPrimOpResultRegs op
 
 	ReturnsPrim kind -> [dataReturnConvPrim kind]
 
-	ReturnsAlg tycon -> let cons	    = getTyConDataCons tycon
-				result_regs = concat (map get_return_regs cons)
-			    in
-				-- Since R1 is dead, it can hold the tag if necessary
-			    case cons of
-				[_]   -> result_regs
-				other -> (VanillaReg IntKind ILIT(1)) : result_regs
+	ReturnsAlg tycon
+	  -> let
+		cons	    = getTyConDataCons tycon
+		result_regs = concat (map get_return_regs cons)
+	     in
+	     -- As R1 is dead, it can hold the tag if necessary
+	     case cons of
+		[_]   -> result_regs
+		other -> (VanillaReg IntKind ILIT(1)) : result_regs
+  where
+    get_return_regs con
+      = case (dataReturnConvAlg fake_isw_chkr con) of
+	  ReturnInRegs regs -> regs
+	  ReturnInHeap	    -> panic "getPrimOpAlgResultRegs"
 
- where
-   get_return_regs con = case (dataReturnConvAlg con) of
-			      ReturnInHeap	-> panic "getPrimOpAlgResultRegs"
-			      ReturnInRegs regs -> regs
+    fake_isw_chkr :: IntSwitchChecker
+    fake_isw_chkr x = Nothing
 \end{code}
 
 @assignPrimOpArgsRobust@ is used only for primitive ops which may
@@ -263,24 +281,28 @@ makePrimOpArgsRobust op arg_amodes
 	non_robust_amodes = filter (not . amodeCanSurviveGC) arg_amodes
     	arg_kinds = map getAmodeKind non_robust_amodes
 
-	(arg_regs, extra_args) = assignRegs [{-nothing live-}] arg_kinds
+	(arg_regs, extra_args)
+	  = assignRegs fake_isw_chkr [{-nothing live-}] arg_kinds
 
 		-- Check that all the args fit before returning arg_regs
 	final_arg_regs = case extra_args of
 			   []    -> arg_regs
 			   other -> error ("Cannot allocate enough registers for primop (try rearranging code or reducing number of arguments?) " ++ ppShow 80 (ppr PprDebug op))
 
-	arg_assts = mkAbstractCs (zipWith assign_to_reg arg_regs non_robust_amodes)
+	arg_assts = mkAbstractCs (zipWith assign_to_reg final_arg_regs non_robust_amodes)
 	assign_to_reg reg_id amode = CAssign (CReg reg_id) amode
 
     	safe_arg regs arg 
 		| amodeCanSurviveGC arg = (regs, arg) 
     		| otherwise    		= (tail regs, CReg (head regs))
-    	safe_amodes = snd (mapAccumL safe_arg arg_regs arg_amodes)
+    	safe_amodes = snd (mapAccumL safe_arg final_arg_regs arg_amodes)
 
-	liveness_mask = mkLiveRegsBitMask arg_regs
+	liveness_mask = mkLiveRegsBitMask final_arg_regs
     in
     (safe_amodes, liveness_mask, arg_assts)
+  where
+    fake_isw_chkr :: IntSwitchChecker
+    fake_isw_chkr x = Nothing
 \end{code}
 
 %************************************************************************
@@ -297,15 +319,15 @@ any further registers (even though we might have run out of only one kind of
 register); we just return immediately with the left-overs specified.
 
 \begin{code}
-assignRegs  :: [MagicId]	-- Unavailable registers
+assignRegs  :: IntSwitchChecker
+	    -> [MagicId]	-- Unavailable registers
 	    -> [PrimKind]	-- Arg or result kinds to assign
 	    -> ([MagicId],	-- Register assignment in same order
 				-- for *initial segment of* input list
 		[PrimKind])-- leftover kinds
 
-#ifndef DPH
-assignRegs regs_in_use kinds
- = assign_reg kinds [] (mkRegTbl regs_in_use)
+assignRegs isw_chkr regs_in_use kinds
+ = assign_reg kinds [] (mkRegTbl isw_chkr regs_in_use)
  where
 
     assign_reg	:: [PrimKind]  -- arg kinds being scrutinized
@@ -333,53 +355,6 @@ assignRegs regs_in_use kinds
     --  or, I suppose,
     --  (c) we came across a Kind we couldn't handle (this one shouldn't happen)
     assign_reg leftover_ks acc _ = (reverse acc, leftover_ks)
-#else
-assignRegs node_using_Ret1 kinds
- = if node_using_Ret1
-   then assign_reg kinds [] (tail vanillaRegNos) (tail datRegNos)
-   else assign_reg kinds [] vanillaRegNos        (tail datRegNos)
- where
-    assign_reg:: [PrimKind]  -- arg kinds being scrutinized
-	      -> [MagicId]	  -- accum. regs assigned so far (reversed)
-	      -> [Int]	   -- Vanilla Regs (ptr, int, char, float or double)
-	      -> [Int]	   -- Data Regs    (     int, char, float or double)
-	      -> ([MagicId], [PrimKind])
-
-    assign_reg (k:ks) acc (IBOX(p):ptr_regs) dat_regs
-      | isFollowableKind k	 
-      = assign_reg ks (VanillaReg k p:acc) ptr_regs dat_regs
-
-    assign_reg (CharKind:ks) acc ptr_regs (d:dat_regs)
-      = assign_reg ks (DataReg CharKind d:acc) ptr_regs dat_regs
-
-    assign_reg (IntKind:ks) acc ptr_regs (d:dat_regs)
-      = assign_reg ks (DataReg IntKind d:acc) ptr_regs dat_regs
-
-    assign_reg (WordKind:ks) acc ptr_regs (d:dat_regs)
-      = assign_reg ks (DataReg WordKind d:acc) ptr_regs dat_regs
-
-    assign_reg (AddrKind:ks) acc ptr_regs (d:dat_regs)
-      = assign_reg ks (DataReg AddrKind d:acc) ptr_regs dat_regs
-
-    assign_reg (FloatKind:ks) acc ptr_regs (d:dat_regs)
-      = assign_reg ks (DataReg FloatKind d:acc) ptr_regs dat_regs
-
-    -- Notice how doubles take up two data registers....
-    assign_reg (DoubleKind:ks)   acc ptr_regs (IBOX(d1):d2:dat_regs)
-      = assign_reg ks (DoubleReg d1:acc) ptr_regs dat_regs
-
-    assign_reg (VoidKind:ks) acc ptr_regs dat_regs
-      = assign_reg ks (VoidReg:acc) ptr_regs dat_regs
-
-    -- The catch-all.  It can happen because either
-    --	(a) we've assigned all the regs so leftover_ks is []
-    --  (b) we couldn't find a spare register in the appropriate supply
-    --  or, I suppose,
-    --  (c) we came across a Kind we couldn't handle (this one shouldn't happen)
-    --  ToDo Maybe when dataReg becomes empty, we can start using the
-    --       vanilla registers ????
-    assign_reg leftover_ks acc _ _ = (reverse acc, leftover_ks)
-#endif {- Data Parallel Haskell -}
 \end{code}
 
 Register supplies.  Vanilla registers can contain pointers, Ints, Chars.
@@ -389,34 +364,27 @@ vanillaRegNos :: [Int]
 vanillaRegNos	= [1 .. mAX_Vanilla_REG]
 \end{code}
 
-Only a subset of the registers on the DAP can be used to hold pointers (and most
-of these are taken up with things like the heap pointer and stack pointers). 
-However the resulting registers can hold integers, floats or chars. We therefore
-allocate pointer like things into the @vanillaRegNos@ (and Ints Chars or Floats
-if the remaining registers are empty). See NOTE.regsiterMap for an outline of
-the global and local register allocation scheme.
-
-\begin{code}
-#ifdef DPH
-datRegNos ::[Int]		
-datRegNos = [1..mAX_Data_REG]		-- For Ints, Floats, Doubles or Chars
-#endif {- Data Parallel Haskell -}
-\end{code}
-
 Floats and doubles have separate register supplies.
 
 \begin{code}
-#ifndef DPH
 floatRegNos, doubleRegNos :: [Int]
 floatRegNos	= [1 .. mAX_Float_REG]
 doubleRegNos	= [1 .. mAX_Double_REG]
 
-mkRegTbl :: [MagicId] -> ([Int], [Int], [Int])
-mkRegTbl regs_in_use = (ok_vanilla, ok_float, ok_double)
+mkRegTbl :: IntSwitchChecker -> [MagicId] -> ([Int], [Int], [Int])
+
+mkRegTbl isw_chkr regs_in_use
+  = (ok_vanilla, ok_float, ok_double)
   where
-    ok_vanilla = catMaybes (map (select (VanillaReg VoidKind)) vanillaRegNos)
+    ok_vanilla = catMaybes (map (select (VanillaReg VoidKind)) (taker vanillaRegNos))
     ok_float   = catMaybes (map (select FloatReg)	       floatRegNos)
     ok_double  = catMaybes (map (select DoubleReg)	       doubleRegNos)
+
+    taker :: [Int] -> [Int]
+    taker rs
+      = case (isw_chkr ReturnInRegsThreshold) of
+	  Nothing -> rs -- no flag set; use all of them
+	  Just  n -> take n rs
 
     select :: (FAST_INT -> MagicId) -> Int{-cand-} -> Maybe Int
 	-- one we've unboxed the Int, we make a MagicId
@@ -431,6 +399,4 @@ mkRegTbl regs_in_use = (ok_vanilla, ok_float, ok_double)
 	else Nothing
       where
 	not_elem = isn'tIn "mkRegTbl"
-
-#endif {- Data Parallel Haskell -}
 \end{code}

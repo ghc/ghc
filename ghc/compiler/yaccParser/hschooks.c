@@ -36,8 +36,9 @@ StackOverflowHook (stack_size)
 #if 0
 /* nothing to add here, really */
 void
-MallocFailHook (request_size)
+MallocFailHook (request_size, msg)
   I_ request_size;    /* in bytes */
+  char *msg;
 {
     fprintf(stderr, "malloc: failed on request for %lu bytes\n", request_size);
 }

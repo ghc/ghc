@@ -1,0 +1,40 @@
+%---------------------------------------------------------------*
+%
+\section{Wrappers around malloc}
+%
+%---------------------------------------------------------------*
+
+Routines that deal with memory allocation:
+
+A LONG-AGO WISH: All dynamic allocation must be done before the stacks
+and heap are allocated. This allows us to use the lower level sbrk
+routines if required.
+
+ANOTHER ONE: Should allow use of valloc to align on page boundary.
+
+\begin{code}
+#include "rtsdefs.h"
+
+char *
+stgMallocBytes(n, msg)
+  I_   n;
+  char *msg;
+{
+    char *space;
+
+    if ((space = (char *) malloc((size_t) n)) == NULL) {
+	fflush(stdout);
+	MallocFailHook((W_) n, msg); /*msg*/
+	EXIT(EXIT_FAILURE);
+    }
+    return space;
+}
+
+char *
+stgMallocWords(n, msg)
+  I_   n;
+  char *msg;
+{
+  return(stgMallocBytes(n * sizeof(W_), msg));
+}
+\end{code}

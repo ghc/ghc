@@ -7,6 +7,6 @@ import UgenUtil
 import Util
 %}}
 type finfot;
-	nofinfo	: < >;
+/*OLD:95/08:	nofinfo	: < >; */
 	finfo	: < fi1: stringId; fi2: stringId; >;
 end;

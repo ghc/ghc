@@ -29,14 +29,18 @@ type binding;
 		    gfline	: long; >;
 	abind	: < gabindfst	: binding;
 		    gabindsnd	: binding; >;
+/*OLD:95/08:
 	lbind   : < glbindfst   : binding;
 		    glbindsnd   : binding; >;
-	ebind	: < gebindl	: list;
+*/
+/*OLD:95/08:	ebind	: < gebindl	: list;
 		    gebind	: binding;
 		    geline	: long; >;
-	hbind	: < ghbindl	: list;
+*/
+/*OLD: 95/08:	hbind	: < ghbindl	: list;
 		    ghbind	: binding;
 		    ghline	: long; >;
+*/
 	ibind	: < gibindc	: list;
 		    gibindid	: unkId;
 		    gibindi	: ttype;
@@ -65,6 +69,11 @@ type binding;
 		    giebinddef	: binding;
 		    giebindfile	: stringId;
 		    giebindline	: long; >;
+/* "hiding" is used in a funny way:
+   it has to have the *exact* same structure as "import";
+   because what we do is: create an "import" then change
+   its tag to "hiding".  Yeeps. (WDP 95/08)
+*/
 	hiding	: < gihbindmod	: stringId;
 		    gihbindexp	: list;
 		    gihbindren	: list;

@@ -705,8 +705,28 @@ readVar  :: MutableVar s a -> _ST s a
 writeVar :: MutableVar s a -> a -> _ST s ()
 sameVar  :: MutableVar s a -> MutableVar s a -> Bool
 
+{- MUCH GRATUITOUS INEFFICIENCY: WDP 95/09:
+
 newVar init    s = newArray (0,0) init s
 readVar v      s = readArray v 0 s
 writeVar v val s = writeArray v 0 val s
 sameVar v1 v2    = sameMutableArray v1 v2
+-}
+
+newVar init (S# s#)
+  = case (newArray# 1# init s#)     of { StateAndMutableArray# s2# arr# ->
+    (_MutableArray vAR_IXS arr#, S# s2#) }
+  where
+    vAR_IXS = error "Shouldn't access `bounds' of a MutableVar\n"
+
+readVar (_MutableArray _ var#) (S# s#)
+  = case readArray# var# 0# s#	of { StateAndPtr# s2# r ->
+    (r, S# s2#) }
+
+writeVar (_MutableArray _ var#) val (S# s#)
+  = case writeArray# var# 0# val s# of { s2# ->
+    ((), S# s2#) }
+
+sameVar (_MutableArray _ var1#) (_MutableArray _ var2#)
+  = sameMutableArray# var1# var2#
 \end{code}

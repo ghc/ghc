@@ -26,9 +26,10 @@ module PreludePS{-yes, a Prelude module!-} (
 	_psToByteArray,
 
 	_unpackPS,
-	unpackPS#,
+	unpackPS#, unpackPS2#,
 --	toCString,
 	_putPS,
+	_getPS,
 
 	_headPS,
 	_tailPS,
@@ -110,7 +111,8 @@ _psToByteArray	 :: _PackedString -> _ByteArray Int
 --OLD: packToCString	:: [Char] -> _ByteArray Int -- hmmm... weird name
 
 _unpackPS	:: _PackedString -> [Char]
-unpackPS#	:: Addr#	 -> [Char] -- calls injected by compiler
+unpackPS#	:: Addr#         -> [Char] -- calls injected by compiler
+unpackPS2#	:: Addr# -> Int# -> [Char] -- calls injected by compiler
 --???toCString	:: _PackedString -> ByteArray#
 _putPS		:: _FILE -> _PackedString -> PrimIO () -- ToDo: more sensible type
 \end{code}
@@ -274,6 +276,10 @@ unpackPS# addr -- calls injected by compiler
   where
     len = case (strlen# addr) of { I# x -> x }
 
+unpackPS2# addr len -- calls injected by compiler
+  -- this one is for literal strings with NULs in them; rare.
+  = _unpackPS (_packCBytes (I# len) (A# addr))
+
 -- OK, but this code gets *hammered*:
 -- _unpackPS ps
 --   = [ _indexPS ps n | n <- [ 0::Int .. _lengthPS ps - 1 ] ]
@@ -318,6 +324,38 @@ _putPS file (_CPS addr len)
   | otherwise
   = _ccall_ fputs (A# addr) file `thenPrimIO` \ (I# _){-force type-} ->
     returnPrimIO ()
+\end{code}
+
+The dual to @_putPS@, note that the size of the chunk specified
+is the upper bound of the size of the chunk returned.
+
+\begin{code}
+_getPS :: _FILE -> Int -> PrimIO _PackedString
+_getPS file len@(I# len#)
+ | len# <=# 0# = returnPrimIO _nilPS -- I'm being kind here.
+ | otherwise   =
+    -- Allocate an array for system call to store its bytes into.
+   new_ps_array len#      `thenPrimIO` \ ch_arr ->
+   freeze_ps_array ch_arr `thenPrimIO` \ (_ByteArray _ frozen#) ->
+   let
+    byte_array = _ByteArray (0, I# len#) frozen#
+   in
+   _ccall_ fread byte_array (1::Int) len file `thenPrimIO` \  (I# read#) ->
+   if read# ==# 0# then -- EOF or other error
+      error "_getPS: EOF reached or other error"
+   else
+     {-
+       The system call may not return the number of
+       bytes requested. Instead of failing with an error
+       if the number of bytes read is less than requested,
+       a packed string containing the bytes we did manage
+       to snarf is returned.
+     -}
+     let
+      has_null = byteArrayHasNUL# frozen# read#
+     in 
+     returnPrimIO (_PS frozen# read# has_null)
+
 \end{code}
 
 %************************************************************************

@@ -1,127 +1,43 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface AnnCoreSyn where
 import BasicLit(BasicLit)
-import Class(Class)
 import CoreSyn(CoreAtom, CoreExpr)
-import CostCentre(CcKind, CostCentre, IsCafCC, IsDupdCC)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
-import Maybes(Labda)
-import NameTypes(FullName, ShortName)
+import CostCentre(CostCentre)
+import Id(Id)
 import Outputable(NamedThing, Outputable)
 import PreludePS(_PackedString)
 import PreludeRatio(Ratio(..))
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
-import TyCon(TyCon, cmpTyCon)
-import TyVar(TyVar, TyVarTemplate, cmpTyVar)
-import UniType(UniType, cmpUniType)
-import Unique(Unique)
+import TyCon(TyCon)
+import TyVar(TyVar)
+import UniType(UniType)
 data AnnCoreBinding a b c   = AnnCoNonRec a (c, AnnCoreExpr' a b c) | AnnCoRec [(a, (c, AnnCoreExpr' a b c))]
 data AnnCoreCaseAlternatives a b c   = AnnCoAlgAlts [(Id, [a], (c, AnnCoreExpr' a b c))] (AnnCoreCaseDefault a b c) | AnnCoPrimAlts [(BasicLit, (c, AnnCoreExpr' a b c))] (AnnCoreCaseDefault a b c)
 data AnnCoreCaseDefault a b c   = AnnCoNoDefault | AnnCoBindDefault a (c, AnnCoreExpr' a b c)
 type AnnCoreExpr a b c = (c, AnnCoreExpr' a b c)
 data AnnCoreExpr' a b c   = AnnCoVar b | AnnCoLit BasicLit | AnnCoCon Id [UniType] [CoreAtom b] | AnnCoPrim PrimOp [UniType] [CoreAtom b] | AnnCoLam [a] (c, AnnCoreExpr' a b c) | AnnCoTyLam TyVar (c, AnnCoreExpr' a b c) | AnnCoApp (c, AnnCoreExpr' a b c) (CoreAtom b) | AnnCoTyApp (c, AnnCoreExpr' a b c) UniType | AnnCoCase (c, AnnCoreExpr' a b c) (AnnCoreCaseAlternatives a b c) | AnnCoLet (AnnCoreBinding a b c) (c, AnnCoreExpr' a b c) | AnnCoSCC CostCentre (c, AnnCoreExpr' a b c)
-data BasicLit 	{-# GHC_PRAGMA MachChar Char | MachStr _PackedString | MachAddr Integer | MachInt Integer Bool | MachFloat (Ratio Integer) | MachDouble (Ratio Integer) | MachLitLit _PackedString PrimKind | NoRepStr _PackedString | NoRepInteger Integer | NoRepRational (Ratio Integer) #-}
-data CostCentre 	{-# GHC_PRAGMA NoCostCentre | NormalCC CcKind _PackedString _PackedString IsDupdCC IsCafCC | CurrentCC | SubsumedCosts | AllCafsCC _PackedString _PackedString | AllDictsCC _PackedString _PackedString IsDupdCC | OverheadCC | PreludeCafsCC | PreludeDictsCC IsDupdCC | DontCareCC #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data PrimOp
-	{-# GHC_PRAGMA CharGtOp | CharGeOp | CharEqOp | CharNeOp | CharLtOp | CharLeOp | IntGtOp | IntGeOp | IntEqOp | IntNeOp | IntLtOp | IntLeOp | WordGtOp | WordGeOp | WordEqOp | WordNeOp | WordLtOp | WordLeOp | AddrGtOp | AddrGeOp | AddrEqOp | AddrNeOp | AddrLtOp | AddrLeOp | FloatGtOp | FloatGeOp | FloatEqOp | FloatNeOp | FloatLtOp | FloatLeOp | DoubleGtOp | DoubleGeOp | DoubleEqOp | DoubleNeOp | DoubleLtOp | DoubleLeOp | OrdOp | ChrOp | IntAddOp | IntSubOp | IntMulOp | IntQuotOp | IntDivOp | IntRemOp | IntNegOp | IntAbsOp | AndOp | OrOp | NotOp | SllOp | SraOp | SrlOp | ISllOp | ISraOp | ISrlOp | Int2WordOp | Word2IntOp | Int2AddrOp | Addr2IntOp | FloatAddOp | FloatSubOp | FloatMulOp | FloatDivOp | FloatNegOp | Float2IntOp | Int2FloatOp | FloatExpOp | FloatLogOp | FloatSqrtOp | FloatSinOp | FloatCosOp | FloatTanOp | FloatAsinOp | FloatAcosOp | FloatAtanOp | FloatSinhOp | FloatCoshOp | FloatTanhOp | FloatPowerOp | DoubleAddOp | DoubleSubOp | DoubleMulOp | DoubleDivOp | DoubleNegOp | Double2IntOp | Int2DoubleOp | Double2FloatOp | Float2DoubleOp | DoubleExpOp | DoubleLogOp | DoubleSqrtOp | DoubleSinOp | DoubleCosOp | DoubleTanOp | DoubleAsinOp | DoubleAcosOp | DoubleAtanOp | DoubleSinhOp | DoubleCoshOp | DoubleTanhOp | DoublePowerOp | IntegerAddOp | IntegerSubOp | IntegerMulOp | IntegerQuotRemOp | IntegerDivModOp | IntegerNegOp | IntegerCmpOp | Integer2IntOp | Int2IntegerOp | Word2IntegerOp | Addr2IntegerOp | FloatEncodeOp | FloatDecodeOp | DoubleEncodeOp | DoubleDecodeOp | NewArrayOp | NewByteArrayOp PrimKind | SameMutableArrayOp | SameMutableByteArrayOp | ReadArrayOp | WriteArrayOp | IndexArrayOp | ReadByteArrayOp PrimKind | WriteByteArrayOp PrimKind | IndexByteArrayOp PrimKind | IndexOffAddrOp PrimKind | UnsafeFreezeArrayOp | UnsafeFreezeByteArrayOp | NewSynchVarOp | TakeMVarOp | PutMVarOp | ReadIVarOp | WriteIVarOp | MakeStablePtrOp | DeRefStablePtrOp | CCallOp _PackedString Bool Bool [UniType] UniType | ErrorIOPrimOp | ReallyUnsafePtrEqualityOp | SeqOp | ParOp | ForkOp | DelayOp | WaitOp #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
-cmpTyCon :: TyCon -> TyCon -> Int#
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
-cmpTyVar :: TyVar -> TyVar -> Int#
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
-cmpUniType :: Bool -> UniType -> UniType -> Int#
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
+data BasicLit 
+data CostCentre 
+data Id 
+data PrimOp 
+data TyCon 
+data TyVar 
+data UniType 
 deAnnotate :: (a, AnnCoreExpr' b c a) -> CoreExpr b c
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Eq BasicLit
-	{-# GHC_PRAGMA _M_ BasicLit {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool)] [_CONSTM_ Eq (==) (BasicLit), _CONSTM_ Eq (/=) (BasicLit)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
 instance Eq PrimOp
-	{-# GHC_PRAGMA _M_ PrimOps {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(PrimOp -> PrimOp -> Bool), (PrimOp -> PrimOp -> Bool)] [_CONSTM_ Eq (==) (PrimOp), _CONSTM_ Eq (/=) (PrimOp)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: PrimOp) (u1 :: PrimOp) -> case _APP_  _ORIG_ PrimOps tagOf_PrimOp [ u0 ] of { _PRIM_ (u2 :: Int#) -> case _APP_  _ORIG_ PrimOps tagOf_PrimOp [ u1 ] of { _PRIM_ (u3 :: Int#) -> _#_ eqInt# [] [u2, u3] } } _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 instance Eq TyCon
-	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool)] [_CONSTM_ Eq (==) (TyCon), _CONSTM_ Eq (/=) (TyCon)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyCon) (u1 :: TyCon) -> case _APP_  _ORIG_ TyCon cmpTyCon [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
 instance Eq TyVar
-	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool)] [_CONSTM_ Eq (==) (TyVar), _CONSTM_ Eq (/=) (TyVar)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyVar) (u1 :: TyVar) -> case _APP_  _ORIG_ TyVar cmpTyVar [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: TyVar) (u1 :: TyVar) -> case _APP_  _ORIG_ TyVar cmpTyVar [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
 instance Eq UniType
-	{-# GHC_PRAGMA _M_ UniType {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(UniType -> UniType -> Bool), (UniType -> UniType -> Bool)] [_CONSTM_ Eq (==) (UniType), _CONSTM_ Eq (/=) (UniType)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 instance Ord BasicLit
-	{-# GHC_PRAGMA _M_ BasicLit {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq BasicLit}}, (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> Bool), (BasicLit -> BasicLit -> BasicLit), (BasicLit -> BasicLit -> BasicLit), (BasicLit -> BasicLit -> _CMP_TAG)] [_DFUN_ Eq (BasicLit), _CONSTM_ Ord (<) (BasicLit), _CONSTM_ Ord (<=) (BasicLit), _CONSTM_ Ord (>=) (BasicLit), _CONSTM_ Ord (>) (BasicLit), _CONSTM_ Ord max (BasicLit), _CONSTM_ Ord min (BasicLit), _CONSTM_ Ord _tagCmp (BasicLit)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 instance Ord TyCon
-	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq TyCon}}, (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> Bool), (TyCon -> TyCon -> TyCon), (TyCon -> TyCon -> TyCon), (TyCon -> TyCon -> _CMP_TAG)] [_DFUN_ Eq (TyCon), _CONSTM_ Ord (<) (TyCon), _CONSTM_ Ord (<=) (TyCon), _CONSTM_ Ord (>=) (TyCon), _CONSTM_ Ord (>) (TyCon), _CONSTM_ Ord max (TyCon), _CONSTM_ Ord min (TyCon), _CONSTM_ Ord _tagCmp (TyCon)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 instance Ord TyVar
-	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq TyVar}}, (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> Bool), (TyVar -> TyVar -> TyVar), (TyVar -> TyVar -> TyVar), (TyVar -> TyVar -> _CMP_TAG)] [_DFUN_ Eq (TyVar), _CONSTM_ Ord (<) (TyVar), _CONSTM_ Ord (<=) (TyVar), _CONSTM_ Ord (>=) (TyVar), _CONSTM_ Ord (>) (TyVar), _CONSTM_ Ord max (TyVar), _CONSTM_ Ord min (TyVar), _CONSTM_ Ord _tagCmp (TyVar)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 instance NamedThing TyCon
-	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TyCon -> ExportFlag), (TyCon -> Bool), (TyCon -> (_PackedString, _PackedString)), (TyCon -> _PackedString), (TyCon -> [_PackedString]), (TyCon -> SrcLoc), (TyCon -> Unique), (TyCon -> Bool), (TyCon -> UniType), (TyCon -> Bool)] [_CONSTM_ NamedThing getExportFlag (TyCon), _CONSTM_ NamedThing isLocallyDefined (TyCon), _CONSTM_ NamedThing getOrigName (TyCon), _CONSTM_ NamedThing getOccurrenceName (TyCon), _CONSTM_ NamedThing getInformingModules (TyCon), _CONSTM_ NamedThing getSrcLoc (TyCon), _CONSTM_ NamedThing getTheUnique (TyCon), _CONSTM_ NamedThing hasType (TyCon), _CONSTM_ NamedThing getType (TyCon), _CONSTM_ NamedThing fromPreludeCore (TyCon)] _N_
-	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getTheUnique = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { Unique } [ _NOREP_S_ "NamedThing.TyCon.getTheUnique" ] _N_,
-	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (TyCon -> Bool) } [ _NOREP_S_ "NamedThing.TyCon.hasType", u0 ] _N_,
-	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (TyCon -> UniType) } [ _NOREP_S_ "NamedThing.TyCon.getType", u0 ] _N_,
-	 fromPreludeCore = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 instance NamedThing TyVar
-	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(TyVar -> ExportFlag), (TyVar -> Bool), (TyVar -> (_PackedString, _PackedString)), (TyVar -> _PackedString), (TyVar -> [_PackedString]), (TyVar -> SrcLoc), (TyVar -> Unique), (TyVar -> Bool), (TyVar -> UniType), (TyVar -> Bool)] [_CONSTM_ NamedThing getExportFlag (TyVar), _CONSTM_ NamedThing isLocallyDefined (TyVar), _CONSTM_ NamedThing getOrigName (TyVar), _CONSTM_ NamedThing getOccurrenceName (TyVar), _CONSTM_ NamedThing getInformingModules (TyVar), _CONSTM_ NamedThing getSrcLoc (TyVar), _CONSTM_ NamedThing getTheUnique (TyVar), _CONSTM_ NamedThing hasType (TyVar), _CONSTM_ NamedThing getType (TyVar), _CONSTM_ NamedThing fromPreludeCore (TyVar)] _N_
-	 getExportFlag = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ Outputable NotExported [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TyVar) -> _!_ _ORIG_ Outputable NotExported [] [] _N_,
-	 isLocallyDefined = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TyVar) -> _!_ True [] [] _N_,
-	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getInformingModules = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyVar) -> _APP_  _TYAPP_  _ORIG_ Util panic { [_PackedString] } [ _NOREP_S_ "getInformingModule:TyVar" ] _N_,
-	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 7 \ (u0 :: TyVar) -> case u0 of { _ALG_ _ORIG_ TyVar UserTyVar (u1 :: Unique) (u2 :: ShortName) -> case u2 of { _ALG_ _ORIG_ NameTypes ShortName (u3 :: _PackedString) (u4 :: SrcLoc) -> u4; _NO_DEFLT_ }; (u5 :: TyVar) -> _ORIG_ SrcLoc mkUnknownSrcLoc } _N_,
-	 getTheUnique = _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 8 \ (u0 :: TyVar) -> case u0 of { _ALG_ _ORIG_ TyVar PolySysTyVar (u1 :: Unique) -> u1; _ORIG_ TyVar PrimSysTyVar (u2 :: Unique) -> u2; _ORIG_ TyVar OpenSysTyVar (u3 :: Unique) -> u3; _ORIG_ TyVar UserTyVar (u4 :: Unique) (u5 :: ShortName) -> u4; _NO_DEFLT_ } _N_,
-	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyVar) -> _APP_  _TYAPP_  patError# { (TyVar -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
-	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: TyVar) -> _APP_  _TYAPP_  patError# { (TyVar -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
-	 fromPreludeCore = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: TyVar) -> _!_ False [] [] _N_ #-}
 instance Outputable BasicLit
-	{-# GHC_PRAGMA _M_ BasicLit {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (BasicLit) _N_
-	 ppr = _A_ 0 _U_ 2122 _N_ _N_ _N_ _N_ #-}
 instance Outputable PrimOp
-	{-# GHC_PRAGMA _M_ PrimOps {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PrimOps pprPrimOp _N_
-	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ PrimOps pprPrimOp _N_ #-}
 instance Outputable TyCon
-	{-# GHC_PRAGMA _M_ TyCon {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (TyCon) _N_
-	 ppr = _A_ 2 _U_ 2222 _N_ _S_ "SS" _N_ _N_ #-}
 instance Outputable TyVar
-	{-# GHC_PRAGMA _M_ TyVar {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (TyVar) _N_
-	 ppr = _A_ 2 _U_ 1122 _N_ _S_ "SS" _N_ _N_ #-}
 instance Outputable UniType
-	{-# GHC_PRAGMA _M_ UniType {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniTyFuns pprUniType _N_
-	 ppr = _A_ 2 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _ORIG_ UniTyFuns pprUniType _N_ #-}
 

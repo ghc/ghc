@@ -1,50 +1,30 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface TCE where
 import CharSeq(CSeq)
-import Class(Class)
 import ErrUtils(Error(..))
 import Id(Id)
-import Maybes(Labda, MaybeErr)
+import Maybes(MaybeErr)
 import Name(Name)
 import NameTypes(FullName, ShortName)
 import PreludePS(_PackedString)
 import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
-import PrimKind(PrimKind)
 import SrcLoc(SrcLoc)
 import TyCon(TyCon)
-import TyVar(TyVarTemplate)
-import UniType(UniType)
-import UniqFM(UniqFM, eltsUFM, emptyUFM, plusUFM, singletonDirectlyUFM)
-import Unique(Unique, u2i)
+import UniqFM(UniqFM)
+import Unique(Unique)
 type Error = PprStyle -> Int -> Bool -> PrettyRep
-data MaybeErr a b 	{-# GHC_PRAGMA Succeeded a | Failed b #-}
-data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
+data MaybeErr a b 
+data Name 
 type Pretty = Int -> Bool -> PrettyRep
-data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
-data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
+data PrettyRep 
+data SrcLoc 
 type TCE = UniqFM TyCon
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data TyCon 
+data UniqFM a 
 checkTypeCycles :: UniqFM TyCon -> MaybeErr () (PprStyle -> Int -> Bool -> PrettyRep)
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
-eltsUFM :: UniqFM a -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
-emptyUFM :: UniqFM a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ UniqFM EmptyUFM [u0] [] _N_ #-}
 lookupTCE :: UniqFM TyCon -> Name -> TyCon
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
 nullTCE :: UniqFM TyCon
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ UniqFM EmptyUFM [TyCon] [] _N_ #-}
 plusTCE :: UniqFM TyCon -> UniqFM TyCon -> UniqFM TyCon
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _TYAPP_  _ORIG_ UniqFM plusUFM { TyCon } _N_ #-}
-plusUFM :: UniqFM a -> UniqFM a -> UniqFM a
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 rngTCE :: UniqFM TyCon -> [TyCon]
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _TYAPP_  _ORIG_ UniqFM eltsUFM { TyCon } _N_ #-}
-singletonDirectlyUFM :: Unique -> a -> UniqFM a
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 1 2 XX 3 _/\_ u0 -> \ (u1 :: Int#) (u2 :: u0) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u1, u2] _N_} _F_ _IF_ARGS_ 1 2 CX 4 _/\_ u0 -> \ (u1 :: Unique) (u2 :: u0) -> case u1 of { _ALG_ _ORIG_ Unique MkUnique (u3 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [u0] [u3, u2]; _NO_DEFLT_ } _N_ #-}
-u2i :: Unique -> Int#
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Int#) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: Unique) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u1 :: Int#) -> u1; _NO_DEFLT_ } _N_ #-}
 unitTCE :: Unique -> TyCon -> UniqFM TyCon
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "U(P)L" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: Int#) (u1 :: TyCon) -> _!_ _ORIG_ UniqFM LeafUFM [TyCon] [u0, u1] _N_} _F_ _IF_ARGS_ 0 2 CX 4 \ (u0 :: Unique) (u1 :: TyCon) -> case u0 of { _ALG_ _ORIG_ Unique MkUnique (u2 :: Int#) -> _!_ _ORIG_ UniqFM LeafUFM [TyCon] [u2, u1]; _NO_DEFLT_ } _N_ #-}
 

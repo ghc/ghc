@@ -14,6 +14,7 @@
 #include "utils.h"
 
 /* partain: special version for strings that may have NULs (etc) in them
+   (used in UgenUtil.lhs)
 */
 long
 get_hstring_len(hs)
@@ -137,8 +138,7 @@ hash_index(ident)
   The hash function.  Returns 0 for Null strings.
 */
 
-static unsigned hash_fn(ident)
-char *ident;
+static unsigned hash_fn(char *ident)
 {
   unsigned len = (unsigned) strlen(ident);
   unsigned res;

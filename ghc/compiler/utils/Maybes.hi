@@ -3,29 +3,16 @@ interface Maybes where
 data Labda a   = Hamna | Ni a
 data MaybeErr a b   = Succeeded a | Failed b
 allMaybes :: [Labda a] -> Labda [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 assocMaybe :: Eq a => [(a, b)] -> a -> Labda b
-	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "LSL" _N_ _SPECIALISE_ [ Int, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ [Char], _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ TyVarTemplate, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ TyVar, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ Name, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ Class, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ Id, _N_ ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ } #-}
 catMaybes :: [Labda a] -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 failMaB :: b -> MaybeErr a b
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 2 1 X 2 _/\_ u0 u1 -> \ (u2 :: u1) -> _!_ _ORIG_ Maybes Failed [u0, u1] [u2] _N_ #-}
 failMaybe :: Labda a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 1 _/\_ u0 -> _!_ _ORIG_ Maybes Hamna [u0] [] _N_ #-}
 firstJust :: [Labda a] -> Labda a
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 mapMaybe :: (a -> Labda b) -> [a] -> Labda [b]
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 maybeToBool :: Labda a -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 4 _/\_ u0 -> \ (u1 :: Labda u0) -> case u1 of { _ALG_ _ORIG_ Maybes Hamna  -> _!_ False [] []; _ORIG_ Maybes Ni (u2 :: u0) -> _!_ True [] []; _NO_DEFLT_ } _N_ #-}
 mkLookupFun :: (a -> a -> Bool) -> [(a, b)] -> a -> Labda b
-	{-# GHC_PRAGMA _A_ 3 _U_ 212 _N_ _S_ "LSL" _N_ _N_ #-}
 returnMaB :: a -> MaybeErr a b
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 2 1 X 2 _/\_ u0 u1 -> \ (u2 :: u0) -> _!_ _ORIG_ Maybes Succeeded [u0, u1] [u2] _N_ #-}
 returnMaybe :: a -> Labda a
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 1 1 X 2 _/\_ u0 -> \ (u1 :: u0) -> _!_ _ORIG_ Maybes Ni [u0] [u1] _N_ #-}
 thenMaB :: MaybeErr a c -> (a -> MaybeErr b c) -> MaybeErr b c
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _F_ _IF_ARGS_ 3 2 CX 6 _/\_ u0 u1 u2 -> \ (u3 :: MaybeErr u0 u2) (u4 :: u0 -> MaybeErr u1 u2) -> case u3 of { _ALG_ _ORIG_ Maybes Succeeded (u5 :: u0) -> _APP_  u4 [ u5 ]; _ORIG_ Maybes Failed (u6 :: u2) -> _!_ _ORIG_ Maybes Failed [u1, u2] [u6]; _NO_DEFLT_ } _N_ #-}
 thenMaybe :: Labda a -> (a -> Labda b) -> Labda b
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _F_ _IF_ARGS_ 2 2 CX 5 _/\_ u0 u1 -> \ (u2 :: Labda u0) (u3 :: u0 -> Labda u1) -> case u2 of { _ALG_ _ORIG_ Maybes Hamna  -> _!_ _ORIG_ Maybes Hamna [u1] []; _ORIG_ Maybes Ni (u4 :: u0) -> _APP_  u3 [ u4 ]; _NO_DEFLT_ } _N_ #-}
 

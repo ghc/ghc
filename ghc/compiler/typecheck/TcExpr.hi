@@ -15,5 +15,4 @@ import Subst(Subst)
 import TcMonad(TcResult)
 import UniType(UniType)
 tcExpr :: E -> Expr Name (InPat Name) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Expr Id TypecheckedPat, LIE, UniType)
-	{-# GHC_PRAGMA _A_ 2 _U_ 22222222 _N_ _S_ "LS" _N_ _N_ #-}
 

@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
 interface DefUtils where
 import CoreSyn(CoreAtom, CoreCaseAlternatives, CoreExpr)
 import DefSyn(DefBindee)
@@ -8,37 +8,20 @@ import TyVar(TyVar)
 import UniType(UniType)
 data RenameResult   = NotRenaming | IsRenaming [(Id, Id)] | InconsistentRenaming [(Id, Id)]
 atom2expr :: CoreAtom DefBindee -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 consistent :: [(Id, Id)] -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 deforestable :: Id -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAU(AAAAAAEAAA)A)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: DeforestInfo) -> case u0 of { _ALG_ _ORIG_ IdInfo DoDeforest  -> _!_ True [] []; _ORIG_ IdInfo Don'tDeforest  -> _!_ False [] []; _NO_DEFLT_ } _N_} _F_ _ALWAYS_ \ (u0 :: Id) -> case u0 of { _ALG_ _ORIG_ Id Id (u1 :: Unique) (u2 :: UniType) (u3 :: IdInfo) (u4 :: IdDetails) -> case u3 of { _ALG_ _ORIG_ IdInfo IdInfo (u5 :: ArityInfo) (u6 :: DemandInfo) (u7 :: SpecEnv) (u8 :: StrictnessInfo) (u9 :: UnfoldingDetails) (ua :: UpdateInfo) (ub :: DeforestInfo) (uc :: ArgUsageInfo) (ud :: FBTypeInfo) (ue :: SrcLoc) -> case ub of { _ALG_ _ORIG_ IdInfo DoDeforest  -> _!_ True [] []; _ORIG_ IdInfo Don'tDeforest  -> _!_ False [] []; _NO_DEFLT_ }; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 foldrSUs :: (a -> b -> SplitUniqSupply -> b) -> b -> [a] -> SplitUniqSupply -> b
-	{-# GHC_PRAGMA _A_ 3 _U_ 2212 _N_ _S_ "LLS" _N_ _N_ #-}
 freeTyVars :: CoreExpr Id DefBindee -> [TyVar]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 freeVars :: CoreExpr Id DefBindee -> [Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isArgId :: Id -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAU(AAAAAAEAAA)L)" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkDefLetrec :: [(a, CoreExpr a b)] -> CoreExpr a b -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 newDefId :: UniType -> SplitUniqSupply -> Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(ALA)" {_A_ 2 _U_ 21 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 newTmpId :: UniType -> SplitUniqSupply -> Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(ALA)" {_A_ 2 _U_ 21 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 rebindExpr :: CoreExpr Id DefBindee -> SplitUniqSupply -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 1 _U_ 12 _N_ _S_ "S" _N_ _N_ #-}
 renameExprs :: CoreExpr Id DefBindee -> CoreExpr Id DefBindee -> SplitUniqSupply -> RenameResult
-	{-# GHC_PRAGMA _A_ 2 _U_ 222 _N_ _S_ "SS" _N_ _N_ #-}
 strip :: CoreExpr Id DefBindee -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 stripAtom :: CoreAtom DefBindee -> CoreAtom DefBindee
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 stripCaseAlts :: CoreCaseAlternatives Id DefBindee -> CoreCaseAlternatives Id DefBindee
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 subst :: [(Id, CoreExpr Id DefBindee)] -> CoreExpr Id DefBindee -> SplitUniqSupply -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 2 _U_ 212 _N_ _S_ "LS" _N_ _N_ #-}
 union :: Eq a => [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 212 _N_ _N_ _N_ _SPECIALISE_ [ TyVar ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SS" _N_ _N_ } #-}
 

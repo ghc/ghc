@@ -150,7 +150,7 @@ module Unique (
 	textClassKey,
 	traceIdKey,
 	trueDataConKey,
-	unpackCStringIdKey,
+	unpackCStringIdKey, unpackCString2IdKey, unpackCStringAppendIdKey,
 	packCStringIdKey,
 	integerZeroIdKey, integerPlusOneIdKey, integerMinusOneIdKey,
 	voidPrimIdKey,
@@ -426,8 +426,8 @@ chars62
 \begin{code}
 mkPreludeClassUnique i		= mkUnique '1' i
 mkPreludeTyConUnique i		= mkUnique '2' i
-mkPreludeDataConUnique i	= mkUnique '3' i
-mkTupleDataConUnique i		= mkUnique '4' i
+mkPreludeDataConUnique i	= mkUnique 'Y' i -- must be alphabetic
+mkTupleDataConUnique i		= mkUnique 'Z' i -- ditto (*may* be used in C labels)
 -- mkPrimOpIdUnique op: see below (uses '5')
 mkPreludeMiscIdUnique i		= mkUnique '7' i
 \end{code}
@@ -632,6 +632,8 @@ seqIdKey		= mkPreludeMiscIdUnique 19
 --UNUSED:showSpaceIdKey		= mkPreludeMiscIdUnique	21
 traceIdKey		= mkPreludeMiscIdUnique	22
 unpackCStringIdKey	= mkPreludeMiscIdUnique	23
+unpackCString2IdKey	= mkPreludeMiscIdUnique	20 -- NB: NB: NB
+unpackCStringAppendIdKey= mkPreludeMiscIdUnique	21 -- NB: NB: NB
 voidPrimIdKey		= mkPreludeMiscIdUnique	24
 
 #ifdef GRAN

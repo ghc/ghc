@@ -14,6 +14,57 @@
 %
 \newcommand{\onlyIfSrcLocs}[1]{#1}
 %
+% Aran Lunzer told me to do this magic:
+\def\mytightcode{\codeaux{\leftmargin=0pt}}%
+\let\endmytightcode\endcodeaux
+% what he told me:
+%% CODE environment
+%% ----------------
+%% To get a single line of spacing above and below a code segment, with
+%% zero added indention (like a verbatim environment), and consistent appearance
+%% whether or not you use \codeallowbreaks:
+%% 
+%% 	\def\code{\codeaux{\leftmargin=0pt}}
+%% 
+%% Then for a normal, unbreakable section:
+%% 
+%% 	\begin{code}
+%% 	first line of code
+%% 	...
+%% 	last line of code\end{code}
+%% 
+%% And for a breakable section:
+%% 
+%% 	\begin{code}
+%% 	\codeallowbreaks{}first line of code
+%% 	...
+%% 	last line of code\end{code}
+%% 
+%% 
+%% srcloc marginpars
+%% -----------------
+%% 
+%% To ensure that marginpars appear on the same line as their associated text,
+%% especially in a description list, add a \mbox{} to their definition:
+%% 
+%% 	\renewcommand{\srcloc}[1]{\mbox{}\marginpar{\footnotesize\tt #1}}
+%% 
+%% This empty mbox doesn't introduce anything visible, but can screw up your
+%% spacing unless you are careful.  So...
+%% 
+%% Usage in a description list:
+%% 
+%% 	\item[item description:]\srcloc{no spaces around!}%
+%% 	Here is the item text.
+%% 
+%% In the middle of a sentence:
+%% 
+%% 	And now for something\srcloc{completely} different.
+%% 
+%% Near a period or colon (MUST come before the punctuation):
+%% 
+%% 	Hello, good evening, and welcome\srcloc{foo}.  Here is the fnord.
+%
 \begin{document}
 \title{How to Add an Optimisation Pass\\
 to the Glasgow Haskell compiler\\
@@ -58,7 +109,7 @@ directories.  We assume you already know Haskell.}
 
 Besides the documents listed in the References below, there are
 several internal compiler documents that come with the GHC
-distribution.\srcloc{ghc/docs/README}
+distribution\srcloc{ghc/docs/README}.
 
 If you are hacking GHC, you should be on the @glasgow-haskell-users@
 mailing list.  Send mail to

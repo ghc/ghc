@@ -146,8 +146,11 @@ foreach $sf (@Src_files) {
     # a de-commenter (not implemented);
     # builds up @Depend_lines
     print STDERR "Here we go for source file: $sf\n" if $Verbose;
-    ($of = $sf) =~ s/\.l?hs$/$Obj_suffix/;
-    push(@Depend_lines, "$of : $sf\n");
+    ($bf = $sf) =~ s/\.l?hs$//;
+    push(@Depend_lines, "$bf$Obj_suffix : $sf\n");
+    foreach $suff (@File_suffix) {
+        push(@Depend_lines, "$bf$suff$Obj_suffix : $sf\n");
+    }
 
     # if it's a literate file, .lhs, then we de-literatize it:
     if ( $sf !~ /\.lhs$/ ) {
@@ -220,6 +223,9 @@ sub mangle_command_line_args {
 		$Makefile	= &grab_arg_arg('-f',$1);
 	    } elsif ( /^-o(.*)/ ) {
 		$Obj_suffix	= &grab_arg_arg('-o',$1);
+	    } elsif ( /^-s(.*)/ ) {
+		local($suff)	=  &grab_arg_arg('-s',$1);
+		$File_suffix{$suff} = $suff;
 	    } elsif ( /^-bs(.*)/ ) {
 		$Begin_magic_str = &grab_arg_arg('-bs',$1) . "\n";
 	    } elsif ( /^-es(.*)/ ) {
@@ -236,6 +242,7 @@ sub mangle_command_line_args {
 	    push(@Src_files,$_) if ! /^-/;
 	}
     }
+    @File_suffix = sort (keys %File_suffix);
 }
 
 sub grab_arg_arg {
@@ -263,9 +270,9 @@ sub slurp_file_for_imports {
     # we mangle #include's so they will also leave something
     # behind to indicate the dependency on _them_
 
-    print STDERR "sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
+    print STDERR "/usr/bin/sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |\n" if $Verbose;
 
-    open(SRCFILE, "sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
+    open(SRCFILE, "/usr/bin/sed -e '/^# *include/{p;s/^# *include/!include/;};s/'\\''//g;s/\"//g' $file_to_read | $Cpp $Include_dirs -I$last_seen_dir @Defines |")
 	|| die "$Pgm: Can't open $file_to_read: $!\n";
 
     while (<SRCFILE>) {
@@ -281,9 +288,22 @@ sub slurp_file_for_imports {
 
 		if ($follow_file ne '__syslib__') {
 		    local($int_file);
-		    ($int_file = $follow_file) =~ s/\.l?hs$/\.hi/;
+		    $int_file = $follow_file;
+		    if ( $int_file !~ /\.(l?hs|hi)$/ ) {
+			push(@Depend_lines, "$bf$Obj_suffix : $int_file\n");
+			foreach $suff (@File_suffix) {
+			    push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file\n");
+			}
 
-		    push(@Depend_lines, "$of : $int_file\n");
+		    } else {
+			$int_file =~ s/\.l?hs$//;
+			$int_file =~ s/\.hi$//;
+
+			push(@Depend_lines, "$bf$Obj_suffix : $int_file.hi\n");
+			foreach $suff (@File_suffix) {
+			    push(@Depend_lines, "$bf$suff$Obj_suffix : $int_file$suff.hi\n");
+			}
+		    }
 		}
             } else {
                 die "$orig_src_file: Couldn't handle: $_\n";

@@ -4,8 +4,6 @@ import CmdLineOpts(GlobalSwitch)
 import CoreSyn(CoreBinding)
 import Id(Id)
 import SplitUniq(SplitUniqSupply)
-saTopBinds :: Bool -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
+saTopBinds :: (Bool, Bool) -> [CoreBinding Id Id] -> [CoreBinding Id Id]
 saWwTopBinds :: SplitUniqSupply -> (GlobalSwitch -> Bool) -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "LSL" _N_ _N_ #-}
 

@@ -3,21 +3,18 @@ interface CoreToStg where
 import BasicLit(BasicLit)
 import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
 import CostCentre(CostCentre)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import PrimOps(PrimOp)
 import SplitUniq(SplitUniqSupply)
 import StgSyn(StgAtom, StgBinderInfo, StgBinding, StgExpr, StgRhs, UpdateFlag)
 import TyVar(TyVar)
 import UniType(UniType)
-import Unique(Unique)
-data CoreBinding a b 	{-# GHC_PRAGMA CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)] #-}
-data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data StgBinderInfo 	{-# GHC_PRAGMA NoStgBinderInfo | StgBinderInfo Bool Bool Bool Bool Bool #-}
-data StgBinding a b 	{-# GHC_PRAGMA StgNonRec a (StgRhs a b) | StgRec [(a, StgRhs a b)] #-}
-data StgRhs a b 	{-# GHC_PRAGMA StgRhsClosure CostCentre StgBinderInfo [b] UpdateFlag [a] (StgExpr a b) | StgRhsCon CostCentre Id [StgAtom b] #-}
+data CoreBinding a b 
+data CoreExpr a b 
+data Id 
+data SplitUniqSupply 
+data StgBinderInfo 
+data StgBinding a b 
+data StgRhs a b 
 topCoreBindsToStg :: SplitUniqSupply -> [CoreBinding Id Id] -> [StgBinding Id Id]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "U(ALA)S" {_A_ 2 _U_ 11 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

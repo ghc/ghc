@@ -14,7 +14,7 @@ module TcMonad (
 	recoverTc, recoverQuietlyTc,
 
 	NF_TcM(..),
-	thenNF_Tc, returnNF_Tc, listNF_Tc, mapNF_Tc,
+	thenNF_Tc, thenLazilyNF_Tc, returnNF_Tc, listNF_Tc, mapNF_Tc,
 	fixNF_Tc, noFailTc,
 
 	Baby_TcM(..), Baby_TcResult{-abstract-},
@@ -90,7 +90,7 @@ import SplitUniq
 import Unique
 import Util
 
-infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`
+infixr 9 `thenTc`, `thenTc_`, `thenNF_Tc`, `thenLazilyNF_Tc`
 \end{code}
 
 %************************************************************************
@@ -278,10 +278,12 @@ type NF_TcM result = InTcM (result, Subst, Bag Error)
 
 #ifdef __GLASGOW_HASKELL__
 {-# INLINE thenNF_Tc #-}
+{-# INLINE thenLazilyNF_Tc #-}
 {-# INLINE returnNF_Tc #-}
 #endif
 
-thenNF_Tc :: NF_TcM a -> (a -> InTcM b) -> InTcM b
+thenNF_Tc, thenLazilyNF_Tc :: NF_TcM a -> (a -> InTcM b) -> InTcM b
+-- ...Lazily... is purely a performance thing (WDP 95/09)
 \end{code}
 
 In particular, @thenNF_Tc@ has all of these types:
@@ -294,6 +296,15 @@ thenNF_Tc :: NF_TcM a -> (a -> NF_TcM b) -> NF_TcM b
 thenNF_Tc expr cont sw_chkr dtys subst us errs src_loc
   = case splitUniqSupply us	    of { (s1, s2) ->
     case (expr sw_chkr dtys subst s1 errs src_loc) of
+     (result, subst2, errs2)
+       -> cont result sw_chkr dtys subst2 s2 errs2 src_loc
+    }
+
+thenLazilyNF_Tc expr cont sw_chkr dtys subst us errs src_loc
+  = let
+	(s1, s2) = splitUniqSupply us
+    in
+    case (expr sw_chkr dtys subst s1 errs src_loc) of {
      (result, subst2, errs2)
        -> cont result sw_chkr dtys subst2 s2 errs2 src_loc
     }

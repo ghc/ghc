@@ -1,7 +1,6 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface U_finfot where
 import PreludePS(_PackedString)
-data U_finfot   = U_nofinfo | U_finfo _PackedString _PackedString
+data U_finfot   = U_finfo _PackedString _PackedString
 rdU_finfot :: _Addr -> _PackedString -> _State _RealWorld -> (U_finfot, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -9,87 +9,45 @@ import ProtoName(ProtoName)
 import TcDeriv(TagThingWanted)
 import TyCon(TyCon)
 a_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv a_PN] _N_ #-}
 a_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 a_Pat :: InPat ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ HsPat VarPatIn [ProtoName] [_ORIG_ TcGenDeriv a_PN] _N_ #-}
 ah_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 b_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv b_PN] _N_ #-}
 b_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 b_Pat :: InPat ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ HsPat VarPatIn [ProtoName] [_ORIG_ TcGenDeriv b_PN] _N_ #-}
 bh_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 c_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv c_PN] _N_ #-}
 c_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 c_Pat :: InPat ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ HsPat VarPatIn [ProtoName] [_ORIG_ TcGenDeriv c_PN] _N_ #-}
 ch_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 cmp_eq_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 d_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv d_PN] _N_ #-}
 d_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 d_Pat :: InPat ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 2 _!_ _ORIG_ HsPat VarPatIn [ProtoName] [_ORIG_ TcGenDeriv d_PN] _N_ #-}
 dh_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 eqH_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 eq_TAG_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv eq_TAG_PN] _N_ #-}
 eq_TAG_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 error_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 false_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv false_PN] _N_ #-}
 false_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 geH_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 gen_Binary_binds :: TyCon -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: TyCon) -> _APP_  _TYAPP_  _ORIG_ Util panic { (MonoBinds ProtoName (InPat ProtoName)) } [ _NOREP_S_ "gen_Binary_binds" ] _N_ #-}
 gen_Enum_binds :: TyCon -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 gen_Eq_binds :: TyCon -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
 gen_Ix_binds :: TyCon -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
 gen_Ord_binds :: TyCon -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 0 _U_ 2 _N_ _N_ _N_ _N_ #-}
 gen_Text_binds :: [FixityDecl Name] -> Bool -> TyCon -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 gen_tag_n_con_monobind :: (ProtoName, Name, TyCon, TagThingWanted) -> MonoBinds ProtoName (InPat ProtoName)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LALE)" {_A_ 3 _U_ 211 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 gt_TAG_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv gt_TAG_PN] _N_ #-}
 gt_TAG_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 leH_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 ltH_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 lt_TAG_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv lt_TAG_PN] _N_ #-}
 lt_TAG_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 minusH_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 mkInt_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 rangeSize_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 true_Expr :: Expr ProtoName a
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 1 0 X 2 _/\_ u0 -> _!_ _ORIG_ HsExpr Var [ProtoName, u0] [_ORIG_ TcGenDeriv true_PN] _N_ #-}
 true_PN :: ProtoName
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 

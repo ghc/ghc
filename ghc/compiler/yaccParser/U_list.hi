@@ -3,5 +3,4 @@ interface U_list where
 import PreludePS(_PackedString)
 data U_list   = U_lcons _Addr U_list | U_lnil
 rdU_list :: _Addr -> _PackedString -> _State _RealWorld -> (U_list, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

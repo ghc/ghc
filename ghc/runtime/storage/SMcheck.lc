@@ -14,7 +14,7 @@ required if we're tail-jumping (no mini-interpreter).
 #include "SMinternal.h"
 
 #define isHeapPtr(p) \
-    ((p) >= heap_space && (p) < heap_space + SM_word_heap_size)
+    ((p) >= heap_space && (p) < heap_space + RTSflags.GcFlags.heapSize)
 
 #if nextstep2_TARGET_OS || nextstep3_TARGET_OS /* ToDo: use END_BY_FUNNY_MEANS or something */
 #define validInfoPtr(i) \
@@ -48,7 +48,7 @@ required if we're tail-jumping (no mini-interpreter).
 /* Two cases needed, depending on whether the 2-space GC is forced
    SLPJ 17 June 93 */
 #define validHeapPtr(p)							\
-    (SM_force_gc == USE_2s ? 						\
+    (RTSflags.GcFlags.force2s ?						\
 	    ((p) >= appelInfo.space[appelInfo.semi_space].base && 	\
 	     (p) <= appelInfo.space[appelInfo.semi_space].lim) :	\
 	    (((p) >= appelInfo.oldbase && (p) <= appelInfo.oldlim) ||	\

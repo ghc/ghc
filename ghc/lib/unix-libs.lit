@@ -1,0 +1,35 @@
+\begin{onlystandalone}
+\documentstyle[11pt,literate,a4wide,titlepage]{article}
+\begin{document}
+\title{Adding Unix Libraries to GHC}
+\author{Darren J Moffat}
+\date{July 1995}
+\maketitle
+\tableofcontents
+\end{onlystandalone}
+
+
+\begin{onlypartofdoc}
+\section[UnixLibs]{Unix Libraries}
+\downsection
+\end{onlypartofdoc}
+
+
+\input{ghc/Socket.lhs}
+\input{ghc/SocketPrim.lhs}
+\input{ghc/BSD.lhs}
+\input{ghc/Readline.lhs}
+%\input{DBM.lhs}
+%\input{WWW.lhs}
+
+
+\begin{onlypartofdoc}
+\upsection
+\end{onlypartofdoc}
+
+\begin{onlystandalone}
+\printindex
+\end{document}
+\end{onlystandalone}
+
+

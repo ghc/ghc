@@ -205,7 +205,7 @@ instance NamedThing ShortName where
     getOrigName (ShortName s l)       = (panic "NamedThing.ShortName.getOrigName", s)
     getOccurrenceName (ShortName s l) = s
     getSrcLoc	(ShortName s l)       = l
-    fromPreludeCore (ShortName _ _)   = False
+    fromPreludeCore _		      = False
 #ifdef DEBUG
     getTheUnique (ShortName s l)      = panic "NamedThing.ShortName.getTheUnique" 
     getInformingModules a	      = panic "NamedThing.ShortName.getInformingModule"

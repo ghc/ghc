@@ -7,7 +7,5 @@ import SimplMonad(SimplCount)
 import SplitUniq(SplitUniqSupply)
 import UniType(UniType)
 completeVar :: SimplEnv -> Id -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)
-	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _S_ "U(LLLLL)U(LLLS)L" _N_ _N_ #-}
 leastItCouldCost :: Int -> Int -> Int -> [Bool] -> [UniType] -> Int
-	{-# GHC_PRAGMA _A_ 5 _U_ 21111 _N_ _S_ "LLLSL" _N_ _N_ #-}
 

@@ -21,22 +21,11 @@ type RenamedImportedInterface = ImportedInterface Name (InPat Name)
 type RenamedInterface = Interface Name (InPat Name)
 data Renaming   = MkRenaming _PackedString _PackedString
 getIEStrings :: [IE] -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 getRawIEStrings :: [IE] -> ([(_PackedString, ExportFlag)], [_PackedString])
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 pprRenamings :: PprStyle -> [Renaming] -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 2 _U_ 2222 _N_ _S_ "LS" _N_ _N_ #-}
 instance Outputable IE
-	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (IE) _N_
-	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AS" {_A_ 1 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Outputable IfaceImportDecl
-	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (IfaceImportDecl) _N_
-	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "LU(LLLA)" {_A_ 4 _U_ 222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (ImportedInterface a b)
-	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 instance (NamedThing a, Outputable a, NamedThing b, Outputable b) => Outputable (Interface a b)
-	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 4 _U_ 2222 _N_ _N_ _N_ _N_ #-}
 instance Outputable Renaming
-	{-# GHC_PRAGMA _M_ HsImpExp {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Renaming) _N_
-	 ppr = _A_ 2 _U_ 0122 _N_ _S_ "AU(LL)" {_A_ 2 _U_ 2222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -1,9 +1,6 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface ListSetOps where
 intersectLists :: Eq a => [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 212 _N_ _N_ _N_ _SPECIALISE_ [ TyVar ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SS" _N_ _N_ } #-}
 minusList :: Eq a => [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 3 _U_ 212 _N_ _S_ "LSL" _N_ _SPECIALISE_ [ Int ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ Id ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ }, [ TyVar ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ } #-}
 unionLists :: Eq a => [a] -> [a] -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 212 _N_ _N_ _N_ _SPECIALISE_ [ TyVar ] 1 { _A_ 2 _U_ 12 _N_ _S_ "SS" _N_ _N_ } #-}
 

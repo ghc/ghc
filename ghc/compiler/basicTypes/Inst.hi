@@ -1,6 +1,5 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface Inst where
-import Bag(Bag)
 import Class(Class, ClassOp)
 import HsBinds(Binds)
 import HsExpr(ArithSeqInfo, Expr, Qual, RenamedArithSeqInfo(..), RenamedExpr(..))
@@ -8,14 +7,13 @@ import HsLit(Literal)
 import HsMatches(Match)
 import HsPat(InPat, RenamedPat(..))
 import HsTypes(PolyType)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo, SpecEnv)
-import InstEnv(ClassInstEnv(..), InstTemplate, InstTy, InstanceMapper(..), MatchEnv(..))
+import Id(Id)
+import IdInfo(SpecEnv)
+import InstEnv(ClassInstEnv(..), InstTemplate, InstanceMapper(..), MatchEnv(..))
 import Maybes(Labda)
 import Name(Name)
 import NameTypes(FullName, ShortName)
 import Outputable(Outputable)
-import PreludeGlaST(_MutableArray)
 import PreludePS(_PackedString)
 import PreludeRatio(Ratio(..))
 import Pretty(PprStyle, PrettyRep)
@@ -24,66 +22,47 @@ import SrcLoc(SrcLoc)
 import Subst(Subst)
 import TyCon(TyCon)
 import TyVar(TyVar, TyVarTemplate)
-import UniTyFuns(isTyVarTy)
 import UniType(UniType)
 import Unique(Unique)
-data Class 	{-# GHC_PRAGMA MkClass Unique FullName TyVarTemplate [Class] [Id] [ClassOp] [Id] [Id] [(UniType, InstTemplate)] [(Class, [Class])] #-}
-data ClassOp 	{-# GHC_PRAGMA MkClassOp _PackedString Int UniType #-}
-data ArithSeqInfo a b 	{-# GHC_PRAGMA From (Expr a b) | FromThen (Expr a b) (Expr a b) | FromTo (Expr a b) (Expr a b) | FromThenTo (Expr a b) (Expr a b) (Expr a b) #-}
-data Expr a b 	{-# GHC_PRAGMA Var a | Lit Literal | Lam (Match a b) | App (Expr a b) (Expr a b) | OpApp (Expr a b) (Expr a b) (Expr a b) | SectionL (Expr a b) (Expr a b) | SectionR (Expr a b) (Expr a b) | CCall _PackedString [Expr a b] Bool Bool UniType | SCC _PackedString (Expr a b) | Case (Expr a b) [Match a b] | If (Expr a b) (Expr a b) (Expr a b) | Let (Binds a b) (Expr a b) | ListComp (Expr a b) [Qual a b] | ExplicitList [Expr a b] | ExplicitListOut UniType [Expr a b] | ExplicitTuple [Expr a b] | ExprWithTySig (Expr a b) (PolyType a) | ArithSeqIn (ArithSeqInfo a b) | ArithSeqOut (Expr a b) (ArithSeqInfo a b) | TyLam [TyVar] (Expr a b) | TyApp (Expr a b) [UniType] | DictLam [Id] (Expr a b) | DictApp (Expr a b) [Id] | ClassDictLam [Id] [Id] (Expr a b) | Dictionary [Id] [Id] | SingleDict Id #-}
+data Class 
+data ClassOp 
+data ArithSeqInfo a b 
+data Expr a b 
 data Inst   = Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin
 data InstOrigin   = OccurrenceOf Id SrcLoc | InstanceDeclOrigin SrcLoc | LiteralOrigin Literal SrcLoc | ArithSeqOrigin (ArithSeqInfo Name (InPat Name)) SrcLoc | SignatureOrigin | ClassDeclOrigin SrcLoc | DerivingOrigin (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) Class Bool TyCon SrcLoc | InstanceSpecOrigin (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) Class UniType SrcLoc | DefaultDeclOrigin SrcLoc | ValSpecOrigin Name SrcLoc | CCallOrigin SrcLoc [Char] (Labda (Expr Name (InPat Name))) | LitLitOrigin SrcLoc [Char] | UnknownOrigin
 data OverloadedLit   = OverloadedIntegral Integer Id Id | OverloadedFractional (Ratio Integer) Id
 type RenamedArithSeqInfo = ArithSeqInfo Name (InPat Name)
 type RenamedExpr = Expr Name (InPat Name)
-data Literal 	{-# GHC_PRAGMA CharLit Char | CharPrimLit Char | StringLit _PackedString | StringPrimLit _PackedString | IntLit Integer | FracLit (Ratio Integer) | LitLitLitIn _PackedString | LitLitLit _PackedString UniType | IntPrimLit Integer | FloatPrimLit (Ratio Integer) | DoublePrimLit (Ratio Integer) #-}
-data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+data Literal 
+data InPat a 
 type RenamedPat = InPat Name
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type ClassInstEnv = [(UniType, InstTemplate)]
-data InstTemplate 	{-# GHC_PRAGMA MkInstTemplate Id [UniType] [InstTy] #-}
+data InstTemplate 
 type InstanceMapper = Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)
 type MatchEnv a b = [(a, b)]
-data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
-data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
-data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
-data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
-data TyVarTemplate 	{-# GHC_PRAGMA SysTyVarTemplate Unique _PackedString | UserTyVarTemplate Unique ShortName #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data Name 
+data PrimKind 
+data SrcLoc 
+data Subst 
+data TyCon 
+data TyVar 
+data TyVarTemplate 
+data UniType 
+data Unique 
 applySubstToInst :: Subst -> Inst -> (Subst, Inst)
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 apply_to_Inst :: (UniType -> UniType) -> Inst -> Inst
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 extractConstrainedTyVarsFromInst :: Inst -> [TyVar]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 extractTyVarsFromInst :: Inst -> [TyVar]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 getDictClassAndType :: Inst -> (Class, UniType)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 getInstOrigin :: Inst -> (SrcLoc, PprStyle -> Int -> Bool -> PrettyRep)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 getInstUniType :: Inst -> UniType
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 instBindingRequired :: Inst -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 instCanBeGeneralised :: Inst -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isTyVarDict :: Inst -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 6 \ (u0 :: Inst) -> case u0 of { _ALG_ _ORIG_ Inst Dict (u1 :: Unique) (u2 :: Class) (u3 :: UniType) (u4 :: InstOrigin) -> _APP_  _ORIG_ UniTyFuns isTyVarTy [ u3 ]; (u5 :: Inst) -> _!_ False [] [] } _N_ #-}
-isTyVarTy :: UniType -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 matchesInst :: Inst -> Inst -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
 mkDict :: Unique -> Class -> UniType -> InstOrigin -> Inst
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 4 XXXX 5 \ (u0 :: Unique) (u1 :: Class) (u2 :: UniType) (u3 :: InstOrigin) -> _!_ _ORIG_ Inst Dict [] [u0, u1, u2, u3] _N_ #-}
 mkLitInst :: Unique -> OverloadedLit -> UniType -> InstOrigin -> Inst
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 4 XXXX 5 \ (u0 :: Unique) (u1 :: OverloadedLit) (u2 :: UniType) (u3 :: InstOrigin) -> _!_ _ORIG_ Inst LitInst [] [u0, u1, u2, u3] _N_ #-}
 mkMethod :: Unique -> Id -> [UniType] -> InstOrigin -> Inst
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _N_ _F_ _IF_ARGS_ 0 4 XXXX 5 \ (u0 :: Unique) (u1 :: Id) (u2 :: [UniType]) (u3 :: InstOrigin) -> _!_ _ORIG_ Inst Method [] [u0, u1, u2, u3] _N_ #-}
 instance Outputable Inst
-	{-# GHC_PRAGMA _M_ Inst {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Inst) _N_
-	 ppr = _A_ 2 _U_ 1222 _N_ _S_ "SS" _N_ _N_ #-}
 

@@ -55,30 +55,6 @@ sub mangle_asm {
 	} elsif ( /^\d+:/ ) { # a funny-looking very-local label
 	    $chk[$i] .= $_;
 
-	} elsif ( /^(ret_|djn_)/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
-	    $chksymb[$i] = '';
-
-	} elsif ( /^vtbl_([A-Za-z0-9_]+):$/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'vector';
-	    $chksymb[$i] = $1;
-
-	    $vectorchk{$1} = $i;
-
-	} elsif ( /^([A-Za-z0-9_]+)DirectReturn:$/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'direct';
-	    $chksymb[$i] = $1;
-
-	    $directchk{$1} = $i;
-
-	} elsif ( /^[A-Za-z0-9_]+_upd:$/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
-	    $chksymb[$i] = '';
-
 	} elsif ( /^\$LC(\d+):$/ ) {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'string';
@@ -94,6 +70,8 @@ sub mangle_asm {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'infotbl';
 	    $chksymb[$i] = $symb;
+
+	    die "Info table already? $symb; $i\n" if defined($infochk{$symb});
 
 	    $infochk{$symb} = $i;
 
@@ -135,6 +113,30 @@ sub mangle_asm {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'data';
   	    $chksymb[$i] = '';
+
+	} elsif ( /^(ret_|djn_)/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
+	    $chksymb[$i] = '';
+
+	} elsif ( /^vtbl_([A-Za-z0-9_]+):$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'vector';
+	    $chksymb[$i] = $1;
+
+	    $vectorchk{$1} = $i;
+
+	} elsif ( /^([A-Za-z0-9_]+)DirectReturn:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'direct';
+	    $chksymb[$i] = $1;
+
+	    $directchk{$1} = $i;
+
+	} elsif ( /^[A-Za-z0-9_]+_upd:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
+	    $chksymb[$i] = '';
 
 	} elsif ( /^[A-Za-z0-9_]/ ) {
 	    local($thing);
@@ -265,7 +267,7 @@ sub mangle_asm {
     # print out the header stuff first
     $chk[0] = "\t\.file\t1 \"$ifile_root.hc\"\n" . $chk[0];
 
-    # get rid of horrible "$Revision: 1.1 $" strings
+    # get rid of horrible "<dollar>Revision: .*$" strings
     local(@lines0) = split(/\n/, $chk[0]);
     local($z) = 0;
     while ( $z <= $#lines0 ) {
@@ -348,6 +350,12 @@ sub mangle_asm {
 		print OUTASM &rev_tbl($symb, $chk[$infochk{$symb}], 1);
 		# entry code will be put here!
 
+		# paranoia
+		if ( $chk[$infochk{$symb}] =~ /\.word\s+([A-Za-z0-9_]+_entry)$/
+		  && $1 ne "${symb}_entry" ) {
+		    print STDERR "!!! entry point???\n",$chk[$infochk{$symb}];
+		}
+
 		$chkcat[$infochk{$symb}] = 'DONE ALREADY';
 	    }
 
@@ -356,9 +364,13 @@ sub mangle_asm {
 
     		# teach it to drop through to the fast entry point:
 		$c = $chk[$slowchk{$symb}];
+
     	    	if ( defined($fastchk{$symb}) ) {
     		    $c =~ s/^\tjmp \$31,\(\$27\),0\n\t\.align 4\n\t\.end/\t.align 4\n\t.end/;
     	    	}
+
+		# ToDo??? any good way to look for "dangling" references
+		# to fast-entry pt ???
 
 		print OUTASM "\t\.text\n\t\.align 2\n";
 		print OUTASM $c;

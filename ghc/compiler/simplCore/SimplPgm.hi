@@ -6,5 +6,4 @@ import Id(Id)
 import SimplMonad(SimplCount)
 import SplitUniq(SplitUniqSupply)
 simplifyPgm :: [CoreBinding Id Id] -> (GlobalSwitch -> SwitchResult) -> (SimplifierSwitch -> SwitchResult) -> SimplCount -> SplitUniqSupply -> ([CoreBinding Id Id], Int, SimplCount)
-	{-# GHC_PRAGMA _A_ 5 _U_ 12211 _N_ _S_ "LSSLU(ALL)" _N_ _N_ #-}
 

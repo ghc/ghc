@@ -198,7 +198,11 @@ data GlobalSwitch
   | IrrefutableEverything   -- (TcPat); doing it any earlier would mean that
 			    -- deriving-generated code wouldn't be irrefutablified.
   | AllStrict
+  | NumbersStrict
   | AllDemanded
+
+  | ReturnInRegsThreshold   Int
+  | VectoredReturnThreshold Int -- very likely UNUSED
 
 -- NOT REALLY USED:  | D_dump_type_info	-- for Robin Popplestone stuff
 
@@ -288,6 +292,9 @@ data SimplifierSwitch
   | KeepSpecPragmaIds	    -- We normally *toss* Ids we can do without
   | KeepUnusedBindings
 
+  | SimplNoLetFromCase	    -- used when turning off floating entirely
+  | SimplNoLetFromApp	    -- (for experimentation only) WDP 95/10
+  | SimplNoLetFromStrictLet
 {-
   | Extra__SimplFlag1
   | Extra__SimplFlag2
@@ -389,6 +396,7 @@ classifyOpts opts
 	    maybe_uut		= starts_with "-funfolding-use-threshold"      opt1
 	    maybe_uct		= starts_with "-funfolding-creation-threshold" opt1
 	    maybe_uot		= starts_with "-funfolding-override-threshold" opt1
+	    maybe_rirt		= starts_with "-freturn-in-regs-threshold"     opt1
 	    maybe_gtn		= starts_with "-fglobalise-toplev-names"       opt1
 	    starts_with_fasm	= maybeToBool maybe_fasm
 	    starts_with_G	= maybeToBool maybe_G
@@ -399,6 +407,7 @@ classifyOpts opts
 	    starts_with_uut	= maybeToBool maybe_uut
 	    starts_with_uct	= maybeToBool maybe_uct
 	    starts_with_uot	= maybeToBool maybe_uot
+	    starts_with_rirt	= maybeToBool maybe_rirt
 	    starts_with_gtn	= maybeToBool maybe_gtn
 	    (Just after_fasm)	= maybe_fasm
 	    (Just after_G)	= maybe_G
@@ -409,6 +418,7 @@ classifyOpts opts
 	    (Just after_uut)	= maybe_uut
 	    (Just after_uct)	= maybe_uct
 	    (Just after_uot)	= maybe_uot
+	    (Just after_rirt)	= maybe_rirt
 	    (Just after_gtn)	= maybe_gtn
 	in
 	case opt1 of -- the non-"just match a string" options are at the end...
@@ -452,6 +462,7 @@ classifyOpts opts
 	  "-firrefutable-tuples"	-> GLOBAL_SW(IrrefutableTuples)
 	  "-firrefutable-everything"	-> GLOBAL_SW(IrrefutableEverything)
 	  "-fall-strict"		-> GLOBAL_SW(AllStrict)
+	  "-fnumbers-strict"		-> GLOBAL_SW(NumbersStrict)
 	  "-fall-demanded"		-> GLOBAL_SW(AllDemanded)
 
 	  "-fsemi-tagging"   -> GLOBAL_SW(DoSemiTagging)
@@ -520,7 +531,7 @@ classifyOpts opts
 	  "-fauto-sccs-on-individual-cafs"  -> GLOBAL_SW(AutoSccsOnIndividualCafs)
 --UNUSED: "-fauto-sccs-on-individual-dicts" -> GLOBAL_SW(AutoSccsOnIndividualDicts)
 
-	  "-fstg-reduction-counts"  -> GLOBAL_SW(DoTickyProfiling)
+	  "-fticky-ticky"  -> GLOBAL_SW(DoTickyProfiling)
 
 	  "-dppr-user"	->  	    GLOBAL_SW(PprStyle_User)
 	  "-dppr-debug"	->  	    GLOBAL_SW(PprStyle_Debug)
@@ -551,7 +562,11 @@ classifyOpts opts
 	    | starts_with_uct  -> GLOBAL_SW(UnfoldingCreationThreshold (read after_uct))
 	    | starts_with_uot  -> GLOBAL_SW(UnfoldingOverrideThreshold (read after_uot))
 
+	    | starts_with_rirt -> -- trace ("rirt:"++after_rirt) $
+				  GLOBAL_SW(ReturnInRegsThreshold (read after_rirt))
+
 	    | starts_with_gtn  -> GLOBAL_SW(EnsureSplittableC after_gtn)
+
 
 	  _ -> writeMn stderr ("*** WARNING: bad option: "++opt1++"\n") `thenMn` ( \ _ ->
 		-- NB: the driver is really supposed to handle bad options
@@ -631,6 +646,9 @@ classifyOpts opts
 	  "-fmay-delete-conjurable-ids" -> GLOBAL_SIMPL_SW(SimplMayDeleteConjurableIds)
 	  "-fessential-unfoldings-only" -> GLOBAL_SIMPL_SW(EssentialUnfoldingsOnly) 
 	  "-fignore-inline-pragma"  -> GLOBAL_SIMPL_SW(IgnoreINLINEPragma)
+	  "-fno-let-from-case"  -> GLOBAL_SIMPL_SW(SimplNoLetFromCase)
+	  "-fno-let-from-app"  -> GLOBAL_SIMPL_SW(SimplNoLetFromApp)
+	  "-fno-let-from-strict-let"  -> GLOBAL_SIMPL_SW(SimplNoLetFromStrictLet)
 
 	  _ | starts_with_msi  -> GLOBAL_SIMPL_SW(MaxSimplifierIterations (read after_msi))
 	    | starts_with_suut  -> GLOBAL_SIMPL_SW(SimplUnfoldingUseThreshold (read after_suut))
@@ -720,27 +738,30 @@ tagOf_Switch IgnoreStrictnessPragmas	= ILIT(51)
 tagOf_Switch IrrefutableTuples		= ILIT(52)
 tagOf_Switch IrrefutableEverything	= ILIT(53)
 tagOf_Switch AllStrict			= ILIT(54)
-tagOf_Switch AllDemanded		= ILIT(55)
+tagOf_Switch NumbersStrict		= ILIT(55)
+tagOf_Switch AllDemanded		= ILIT(56)
 -- NOT REALLY USED: tagOf_Switch D_dump_type_info		= ILIT(56)
-tagOf_Switch D_dump_rif2hs		= ILIT(57)
-tagOf_Switch D_dump_rn4			= ILIT(58)
-tagOf_Switch D_dump_tc			= ILIT(59)
-tagOf_Switch D_dump_deriv		= ILIT(60)
-tagOf_Switch D_dump_ds			= ILIT(61)
-tagOf_Switch D_dump_simpl		= ILIT(62)
-tagOf_Switch D_dump_spec		= ILIT(63)
-tagOf_Switch D_dump_occur_anal		= ILIT(64)
-tagOf_Switch D_dump_stranal		= ILIT(65)
-tagOf_Switch D_dump_stg			= ILIT(66)
-tagOf_Switch D_dump_absC		= ILIT(67)
-tagOf_Switch D_dump_flatC		= ILIT(68)
-tagOf_Switch D_dump_realC		= ILIT(69)
-tagOf_Switch D_dump_asm			= ILIT(70)
-tagOf_Switch D_dump_core_passes		= ILIT(71)
-tagOf_Switch D_dump_core_passes_info	= ILIT(72)
-tagOf_Switch D_verbose_core2core	= ILIT(73)
-tagOf_Switch D_verbose_stg2stg		= ILIT(74)
-tagOf_Switch D_simplifier_stats		= ILIT(75) {-note below-}
+tagOf_Switch (ReturnInRegsThreshold _)	= ILIT(57)
+tagOf_Switch (VectoredReturnThreshold _)= ILIT(58)
+tagOf_Switch D_dump_rif2hs		= ILIT(59)
+tagOf_Switch D_dump_rn4			= ILIT(60)
+tagOf_Switch D_dump_tc			= ILIT(61)
+tagOf_Switch D_dump_deriv		= ILIT(62)
+tagOf_Switch D_dump_ds			= ILIT(63)
+tagOf_Switch D_dump_simpl		= ILIT(64)
+tagOf_Switch D_dump_spec		= ILIT(65)
+tagOf_Switch D_dump_occur_anal		= ILIT(66)
+tagOf_Switch D_dump_stranal		= ILIT(67)
+tagOf_Switch D_dump_stg			= ILIT(68)
+tagOf_Switch D_dump_absC		= ILIT(69)
+tagOf_Switch D_dump_flatC		= ILIT(70)
+tagOf_Switch D_dump_realC		= ILIT(71)
+tagOf_Switch D_dump_asm			= ILIT(72)
+tagOf_Switch D_dump_core_passes		= ILIT(73)
+tagOf_Switch D_dump_core_passes_info	= ILIT(74)
+tagOf_Switch D_verbose_core2core	= ILIT(75)
+tagOf_Switch D_verbose_stg2stg		= ILIT(76)
+tagOf_Switch D_simplifier_stats		= ILIT(77) {-see note below!-}
 
 {-
 tagOf_Switch Extra__Flag1		= ILIT(76)
@@ -808,6 +829,10 @@ tagOf_SimplSwitch (SimplUnfoldingUseThreshold _)      = ILIT(22)
 tagOf_SimplSwitch (SimplUnfoldingCreationThreshold _) = ILIT(23)
 tagOf_SimplSwitch KeepSpecPragmaIds		= ILIT(24)
 tagOf_SimplSwitch KeepUnusedBindings		= ILIT(25)
+tagOf_SimplSwitch SimplNoLetFromCase		= ILIT(26)
+tagOf_SimplSwitch SimplNoLetFromApp		= ILIT(27)
+tagOf_SimplSwitch SimplNoLetFromStrictLet	= ILIT(28)
+-- If you add anything here, be sure to change lAST_SIMPL_SWITCH_TAG, too!
 
 {-
 tagOf_SimplSwitch Extra__SimplFlag1		= ILIT(26)
@@ -822,7 +847,7 @@ tagOf_SimplSwitch Extra__SimplFlag8		= ILIT(32)
 tagOf_SimplSwitch _ = case (panic "tagOf_SimplSwitch") of -- BUG avoidance
 			s -> tagOf_SimplSwitch s
 
-lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch KeepUnusedBindings)
+lAST_SIMPL_SWITCH_TAG = IBOX(tagOf_SimplSwitch SimplNoLetFromStrictLet)
 \end{code}
 
 %************************************************************************
@@ -872,6 +897,8 @@ isAmong on_switches
     mk_assoc_elem k@(UnfoldingUseThreshold      lvl) = IBOX(tagOf_Switch k) := SwInt lvl
     mk_assoc_elem k@(UnfoldingCreationThreshold lvl) = IBOX(tagOf_Switch k) := SwInt lvl
     mk_assoc_elem k@(UnfoldingOverrideThreshold lvl) = IBOX(tagOf_Switch k) := SwInt lvl
+
+    mk_assoc_elem k@(ReturnInRegsThreshold lvl) = IBOX(tagOf_Switch k) := SwInt lvl
 
     mk_assoc_elem k = IBOX(tagOf_Switch k) := SwBool True -- I'm here, Mom!
 
@@ -963,7 +990,8 @@ intSwitchSet :: (switch -> SwitchResult)
 	     -> Maybe Int
 
 intSwitchSet lookup_fn switch
-  = case (lookup_fn (switch (panic "intSwitchSet"))) of
+  = -- pprTrace "intSwitchSet:" (ppInt (IBOX (tagOf_Switch (switch (panic "xxx"))))) $
+    case (lookup_fn (switch (panic "intSwitchSet"))) of
       SwInt int -> Just int
       _	    	-> Nothing
 \end{code}

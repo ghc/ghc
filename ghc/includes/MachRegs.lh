@@ -377,9 +377,6 @@ stack pointer.  \tr{%eax} and \tr{%edx} are return values from C functions,
 hence they get trashed across ccalls and are caller saves. \tr{%ebx},
 \tr{%esi}, \tr{%edi}, \tr{%ebp} are all callee-saves.
 
-We only steal \tr{%ebx} for base registers.  SIGH.  SimonM also took
-\tr{%esi} for SpA and \tr{%edi} for SpB.  Maybe later.
-
 \begin{code}
 #if i386_TARGET_ARCH
 
@@ -402,7 +399,9 @@ We only steal \tr{%ebx} for base registers.  SIGH.  SimonM also took
 #define REG_Scav  	ebx
 #define REG_ToHp	ebp
 #if defined(GCap) || defined(GCgn)
+/* NO: -concurrent croaks on SMevac.lc with this
 #define REG_OldGen	esi
+*/
 #endif	/* GCap || GCgn */
 
 #else	/* default: MAIN_REG_MAP */
@@ -424,7 +423,12 @@ We only steal \tr{%ebx} for base registers.  SIGH.  SimonM also took
    - give back ebp
 */
 
-/* SpB and R1 are the two heaviest hitters, followed by SpA */
+/* SpB and R1 are the two heaviest hitters, followed by SpA.
+   Hp comes next, followed closely by R2;
+   then RetReg, then R3 and R4.
+   At least based on some static counts.
+   SIGH.  WDP 95/09
+*/
 #define REG_Base    ebx
 #define REG_SpB	    ebp
 #if STOLEN_X86_REGS >= 3
@@ -435,14 +439,15 @@ We only steal \tr{%ebx} for base registers.  SIGH.  SimonM also took
 # define REG_SpA    edi
 # define CALLEE_SAVES_SpA
 #endif
-/* the mangler will put Hp in %esp!!! */
-#if defined(MANGLING_X86_SP) && MANGLING_X86_SP == 0
-Oops! You should not be here if not mangling %esp!
-#endif
 #if STOLEN_X86_REGS >= 5
-# define REG_R2    ecx
-# define CALLER_SAVES_R2
+/*
+# define REG_Hp    ecx
+# define CALLER_SAVES_Hp
+# define CALLER_SAVES_SYSTEM
+*/
+/* because we *might* have Hp in a caller-saves register */
 #endif
+
 
 #endif	/* SCAV_REG_MAP */
 #endif	/* SCAN_REG_MAP */
@@ -692,7 +697,7 @@ We can steal some, but we might have to save/restore around ccalls.
 
 %************************************************************************
 %*									*
-\subsubsection[mapping-rs6000]{The IBM RS6000 register mapping}
+\subsubsection[mapping-powerpc]{The PowerPC register mapping}
 %*									*
 %************************************************************************
 
@@ -703,25 +708,91 @@ We can steal some, but we might have to save/restore around ccalls.
 
 I think we can do the Whole Business with callee-save registers only!
 
-UTTERLY UNTESTED
-
 \begin{code}
-#if rs6000_TARGET_ARCH
+#if powerpc_TARGET_ARCH
 
-#define REG_Base	????	
-#define REG_R1	
-#define REG_SpA    	
-#define REG_SpB    	
-#define REG_Hp	    	
+#define REG(x) __asm__("%" #x)
 
-#define REG_Flt1	
-#define REG_Flt2	
-#define REG_Flt3	
-#define REG_Flt4	
-#define REG_Dbl1	
-#define REG_Dbl2	
+#if defined(MARK_REG_MAP)
+#define REG_Mark  	r13
+#define REG_MStack  	r14
+#define REG_MRoot	r15
+#define REG_BitArray    r16
+#define REG_HeapBase	r17
+#define REG_HeapLim 	r18
+#else
+#if defined(SCAN_REG_MAP)
+#define REG_Scan  	r13
+#define REG_New  	r14
+#define REG_LinkLim	r15
+#else
+#if defined(SCAV_REG_MAP)
+#define REG_Scav  	r13
+#define REG_ToHp  	r14
+#if defined(GCap) || defined(GCgn)
+#define REG_OldGen	r15
+#endif	/* GCap || GCgn */
+#else	/* default: MAIN_REG_MAP */
 
-#endif /* rs6000 */
+/* callee saves */
+#define CALLEE_SAVES_FltReg1
+#define CALLEE_SAVES_FltReg2
+#define CALLEE_SAVES_FltReg3
+#define CALLEE_SAVES_FltReg4
+#define CALLEE_SAVES_DblReg1
+#define CALLEE_SAVES_DblReg2
+#define CALLEE_SAVES_SpA
+#define CALLEE_SAVES_SuA
+#define CALLEE_SAVES_SpB
+#define CALLEE_SAVES_SuB
+#define CALLEE_SAVES_Hp
+#define CALLEE_SAVES_HpLim
+
+#define CALLEE_SAVES_Ret
+
+#define CALLEE_SAVES_R1
+#define CALLEE_SAVES_R2
+#define CALLEE_SAVES_R3
+#define CALLEE_SAVES_R4
+#define CALLEE_SAVES_R5
+#define CALLEE_SAVES_R6
+#define CALLEE_SAVES_R7
+#define CALLEE_SAVES_R8
+
+#define REG_R1		r13
+#define REG_R2    	r14
+#define REG_R3    	r15
+#define REG_R4    	r16
+#define REG_R5    	r17
+#define REG_R6    	r18
+#define REG_R7    	r19
+#define REG_R8    	r20
+
+#define REG_Flt1	fr14
+#define REG_Flt2	fr15
+#define REG_Flt3	fr16
+#define REG_Flt4	fr17
+
+#define REG_Dbl1	fr18
+#define REG_Dbl2	fr19
+
+#define REG_SpA    	r21
+#define REG_SuA    	r22
+#define REG_SpB    	r23
+#define REG_SuB    	r24
+
+#define REG_Hp	    	r25
+#define REG_HpLim	r26
+
+#define REG_Ret	    	r27
+
+#define REG_StkStub 	r28
+
+#endif	/* SCAV_REG_MAP */
+#endif	/* SCAN_REG_MAP */
+#endif	/* MARK_REG_MAP */
+
+#endif /* powerpc */
 \end{code}
 
 %************************************************************************
@@ -769,19 +840,19 @@ discretion being the better part of valor, we also don't take
 #else
 #if defined(SCAN_REG_MAP)
 #define REG_ScanBase  	g4
+/* NB: *not* defining this (so that everything is done w/ global variables)
+   does *not* work; I suspect that the Sca[nv]RegTable is not being
+   initialised somewhere... WDP 95/10
+*/
 #else
 #if defined(SCAV_REG_MAP)
 #define REG_ScavBase  	g4
+/* see comment above */
 #else	/* default: MAIN_REG_MAP */
 
 /* callee saves (nothing) */
 
-/* caller saves (fp registers and maybe Activity) */
-
-#if defined(DO_SPAT_PROFILING)
-#define CALLER_SAVES_SYSTEM
-#define CALLER_SAVES_Activity
-#endif
+/* caller saves (fp registers) */
 
 #define CALLER_SAVES_USER
 
@@ -806,10 +877,6 @@ discretion being the better part of valor, we also don't take
 #define REG_Flt4	f5
 #define REG_Dbl1	f6
 #define REG_Dbl2	f8
-
-#if defined(DO_SPAT_PROFILING)
-#define REG_Activity	g5
-#endif
 
 #define REG_SpA    	i0
 #define REG_SuA    	i1

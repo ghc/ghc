@@ -375,12 +375,28 @@ unvectorizeHostAddrs :: _Addr -> Int -> PrimIO [_Word]
 unvectorizeHostAddrs ptr n 
   | str == ``NULL'' = returnPrimIO []
   | otherwise = 
-	_casm_ ``%r = (W_)ntohl(((struct hostent*)%0)->h_addr_list[(int)%1]);''
+	_casm_ ``{ u_long tmp;
+		   if ((((struct hostent*)%0)->h_addr_list[(int)%1]) == NULL)
+		      tmp=(W_)0;
+		   else
+		      tmp = (W_)ntohl(((struct in_addr *)(((struct hostent*)%0)->h_addr_list[(int)%1]))->s_addr); 
+		   %r=(W_)tmp;} ''
 		ptr n				    `thenPrimIO` \ x ->
 	unvectorizeHostAddrs ptr (n+1)		    `thenPrimIO` \ xs ->
 	returnPrimIO (x : xs)
   where str = indexAddrOffAddr ptr n
 
+{-
+unvectorizeHostAddrs :: _Addr -> Int -> PrimIO [_Word]
+unvectorizeHostAddrs ptr n 
+  | str == ``NULL'' = returnPrimIO []
+  | otherwise = 
+	_casm_ ``%r = (W_)ntohl(((struct hostent*)%0)->h_addr_list[(int)%1]);''
+		ptr n				    `thenPrimIO` \ x ->
+	unvectorizeHostAddrs ptr (n+1)		    `thenPrimIO` \ xs ->
+	returnPrimIO (x : xs)
+  where str = indexAddrOffAddr ptr n
+-}
 -------------------------------------------------------------------------------
 
 mutByteArr2Addr :: _MutableByteArray _RealWorld Int -> PrimIO  _Addr

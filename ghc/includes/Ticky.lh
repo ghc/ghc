@@ -3,161 +3,104 @@
 %
 %************************************************************************
 %*									*
-\section[RednCounts.lh]{Interface (and macros) for reduction-count statistics}
+\section[Ticky.lh]{Interface (and macros) for reduction-count statistics}
 %*									*
 %************************************************************************
 
 Multi-slurp protection:
 \begin{code}
-#ifndef REDNCOUNTS_H
-#define REDNCOUNTS_H
+#ifndef TICKY_H
+#define TICKY_H
 \end{code}
 
 There are macros in here for:
 \begin{enumerate}
 \item
-``SPAT-profiling'' (\tr{DO_SPAT_PROFILING}), counting instructions
-per ``activity,'' using the SPAT instruction-trace analysis tools.
-\item
-``Ticky-ticky profiling'' (\tr{DO_REDN_COUNTING}), counting the
+``Ticky-ticky profiling'' (\tr{TICKY_TICKY}), counting the
 number of various STG-events (updates, enters, etc.)
 
-This file goes with \tr{RednCounts.lc}, which initialises the counters
+This file goes with \tr{Ticky.lc}, which initialises the counters
 and does the printing [ticky-ticky only].
 
 %************************************************************************
 %*									*
-\subsection[SPAT-macros]{Macros for SPAT instruction counting}
+\subsection{Macros for using the `ticky' field in the fixed header}
 %*									*
 %************************************************************************
 
-These definitions are for instruction tracing, e.g. using SPAT on the
-SPARC.
-
 \begin{code}
-#ifdef DO_SPAT_PROFILING
-
-#define ACT_BASE		0x000000ab /* random; to fit in 13 bits */
-
-#define	ACT_UNKNOWN		(0+ACT_BASE)
-#define	ACT_GC			(1+ACT_BASE)
-#define	ACT_REDN		(2+ACT_BASE)
-#define	ACT_ASTK_STUB		(3+ACT_BASE)
-#define	ACT_FILL_IN_HEAP	(4+ACT_BASE)
-#define	ACT_HEAP_CHK		(5+ACT_BASE)
-#define ACT_RETURN		(6+ACT_BASE)
-#define	ACT_UPDATE		(7+ACT_BASE)
-#define	ACT_PUSH_UPDF		(8+ACT_BASE)
-#define ACT_ARGS_CHK		(9+ACT_BASE)
-#define ACT_UPDATE_PAP		(10+ACT_BASE)
-#define ACT_INDIRECT		(11+ACT_BASE)
-#define ACT_PRIM		(12+ACT_BASE)
-
-#define ACT_OVERHEAD		(14+ACT_BASE) /* only used in analyser */
-#define ACT_TAILCALL		(15+ACT_BASE)
-	/* Note: quite a lot gets lumped under TAILCALL; the analyser
-	   untangles it with other info. WDP 95/01
-	*/
-
-#define ACTIVITIES		16
-
-#define ACT_GC_STOP		(ACTIVITIES+1)
-#define ACT_PRIM_STOP		(ACTIVITIES+2)
-
-/* values that "signal" the start/stop of something,
-   thus suggesting to the analyser that it stop/start something.
-
-   I do not think they are used (WDP 95/01)
-*/
-
-#define ACT_SIGNAL_BASE		0xbababa00 /* pretty random; yes */
-
-#define ACT_START_GOING		(1+ACT_SIGNAL_BASE)
-#define ACT_STOP_GOING		(2+ACT_SIGNAL_BASE)
-#define ACT_START_GC		(3+ACT_SIGNAL_BASE)
-#define ACT_STOP_GC		(4+ACT_SIGNAL_BASE)
-
-#define SET_ACTIVITY(act)	do { /* ActivityReg = (act) */		\
-				__asm__ volatile ("or %%g0,%1,%0"	\
-				: "=r" (ActivityReg)			\
-				: "I" (act));				\
-				} while(0)
-
-#define ALLOC_HEAP(n)		/* nothing */
-#define UN_ALLOC_HEAP(n)	/* nothing */
-#define DO_ASTK_HWM()		/* nothing */
-#define DO_BSTK_HWM()		/* nothing */
-
-#define A_STK_STUB(n)		/* nothing */
-#define A_STK_REUSE(n)		/* not used at all */
-#define B_STK_REUSE(n)		/* ditto */
-
-#define ALLOC_FUN(a,g,s,t) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_THK(a,g,s,t) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_CON(a,g,s,t) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_TUP(a,g,s,t) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_BH(a,g,s,t) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-/*#define ALLOC_PAP(a,g,s,t) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)*/
-#define ALLOC_UPD_PAP(a,g,s,t) 	SET_ACTIVITY(ACT_UPDATE_PAP) /* NB */
-/*#define ALLOC_UPD_CON(a,g,s,t) SET_ACTIVITY(ACT_FILL_IN_HEAP) */
-#define ALLOC_PRIM(a,g,s,t)	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_PRIM2(w)		SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_STK(a,g,s) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_TSO(a,g,s) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_FMBQ(a,g,s) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_FME(a,g,s) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-#define ALLOC_BF(a,g,s) 	SET_ACTIVITY(ACT_FILL_IN_HEAP)
-
-/* we only use the ENT_ macros to be sure activity is set to "reduction" */
-#define ENT_VIA_NODE()		/* nothing */
-#define ENT_THK()		SET_ACTIVITY(ACT_REDN)
-#define ENT_FUN_STD()		SET_ACTIVITY(ACT_REDN)
-#define ENT_FUN_DIRECT(f,f_str,f_arity,Aargs,Bargs,arg_kinds,wrap,wrap_kinds) \
-				SET_ACTIVITY(ACT_REDN)
-#define ENT_CON(n)		SET_ACTIVITY(ACT_REDN)
-#define ENT_IND(n)		SET_ACTIVITY(ACT_REDN)
-#define ENT_PAP(n)		SET_ACTIVITY(ACT_UPDATE_PAP) /* NB */
-
-#define RET_NEW_IN_HEAP()	SET_ACTIVITY(ACT_RETURN)
-#define RET_NEW_IN_REGS()	SET_ACTIVITY(ACT_RETURN)
-#define RET_OLD_IN_HEAP()	SET_ACTIVITY(ACT_RETURN)
-#define RET_OLD_IN_REGS()	SET_ACTIVITY(ACT_RETURN)
-#define RET_SEMI_BY_DEFAULT()	SET_ACTIVITY(ACT_RETURN)
-#define RET_SEMI_IN_HEAP()	SET_ACTIVITY(ACT_RETURN)
-#define RET_SEMI_IN_REGS()	SET_ACTIVITY(ACT_RETURN)
-#define VEC_RETURN()		/* nothing */
-
-#define UPDF_OMITTED()		/* nothing (set directly by PUSH_STD_UPD_FRAME) */
-#define UPDF_STD_PUSHED()	SET_ACTIVITY(ACT_PUSH_UPDF)
-#define UPDF_CON_PUSHED()	/* nothing */
-#define UPDF_HOLE_PUSHED()	/* nothing */
-#define UPDF_RCC_PUSHED()	/* nothing */
-#define UPDF_RCC_OMITTED()	/* nothing */
-
-#define UPD_EXISTING()		/* nothing -- used in .lc code */
-#define UPD_CON_W_NODE()	SET_ACTIVITY(ACT_UPDATE)
-#define UPD_CON_IN_PLACE()	SET_ACTIVITY(ACT_UPDATE)
-#define UPD_PAP_IN_PLACE()	/* nothing -- UpdatePAP has its own activity */
-#define UPD_CON_IN_NEW()	SET_ACTIVITY(ACT_UPDATE)
-#define UPD_PAP_IN_NEW()	/* nothing -- UpdatePAP has its own activity */
+#define TICKY_FIXED_HDR			(TICKY_HDR_SIZE)
+#define TICKY_HDR_POSN			AFTER_PROF_HDR
+#define AFTER_TICKY_HDR			(TICKY_FIXED_HDR+TICKY_HDR_POSN)
 \end{code}
 
-For special subsequent enter counting:
 \begin{code}
+#ifndef TICKY_TICKY
+
+#define TICKY_HDR_SIZE 		0
+#define TICKY_HDR(closure)
+#define SET_TICKY_HDR(closure,to)
+#define	SET_STATIC_TICKY_HDR()
+
+#else
+
+#define TICKY_HDR_SIZE 		1
+#define TICKY_HDR(closure) 	(((P_)(closure))[TICKY_HDR_POSN])
+#define SET_TICKY_HDR(closure,to) TICKY_HDR(closure) = (to)
+#define	SET_STATIC_TICKY_HDR()	,0
+
+#endif /* TICKY_TICKY */
+\end{code}
+
+Here, we add the Ticky word to the fixed-header part of closures.
+This is used to record indicate if a closure has been updated but not
+yet entered. It is set when the closure is updated and cleared when
+subsequently entered.
+
+NB: It is {\em not} an ``entry count'', it is an
+``entries-after-update count.''
+
+The commoning up of @CONST@, @CHARLIKE@ and @INTLIKE@ closures is
+turned off(?) if this is required. This has only been done for 2s
+collection.  It is done using a nasty hack which defines the
+@_Evacuate@ and @_Scavenge@ code for @CONST@, @CHARLIKE@ and @INTLIKE@
+info tables to be @_Evacuate_1@ and @_Scavenge_1_0@.
+
+\begin{code}
+#ifndef TICKY_TICKY
+
 #define UPDATED_SET_UPDATED(n)	 /* nothing */
 #define ENTERED_CHECK_UPDATED(n) /* nothing */
-\end{code}
 
-For a generational collector:
-\begin{code}
-#define UPD_NEW_IND()			/* nothing (set elsewhere [?]) */
-#define UPD_NEW_IN_PLACE_PTRS()		/* nothing */
-#define UPD_NEW_IN_PLACE_NOPTRS()	/* nothing */
-#define UPD_OLD_IND()			/* nothing */
-#define UPD_OLD_IN_PLACE_PTRS()		/* nothing */
-#define UPD_OLD_IN_PLACE_NOPTRS()	/* nothing */
+#else
 
-#endif /* DO_SPAT_PROFILING */
+#define UPDATED_SET_UPDATED(n)	do { TICKY_HDR(n) = 1; } while(0)
+
+#define ENT_UPD_HISTO(n) 					\
+	do { I_ __idx;						\
+	  __idx = (n) - 1;					\
+								\
+	  /* once 9th enter is recorded, we do not tick anymore;*/\
+	  /* we want "TotUpdates - <all 9 cols>" to equal */	\
+	  /* "updates that were never entered" */		\
+	  if ( __idx <= 8 )					\
+	     UPD_ENTERED_hst[__idx] += 1;			\
+								\
+	  /* now undo tick in previous histo slot ... */	\
+	  if ( __idx >= 1 && __idx <= 8 )			\
+	     UPD_ENTERED_hst[(__idx - 1)] -= 1;			\
+	} while(0)
+
+#define ENTERED_CHECK_UPDATED(n)  				\
+	do {							\
+	I_ t_hdr = TICKY_HDR(n);				\
+								\
+	if (t_hdr != 0 && AllFlags.doUpdEntryCounts) {		\
+	    ENT_UPD_HISTO(t_hdr);				\
+	    TICKY_HDR(n) += 1;					\
+	}} while(0)
+
+#endif /* TICKY_TICKY */
 \end{code}
 
 %************************************************************************
@@ -167,9 +110,7 @@ For a generational collector:
 %************************************************************************
 
 \begin{code}
-#ifdef DO_REDN_COUNTING
-
-#define SET_ACTIVITY(act)	/* quickly: make this do NOTHING */
+#ifdef TICKY_TICKY
 \end{code}
 
 Measure what proportion of ...:
@@ -453,23 +394,48 @@ Then we need to report it along with the update-in-place info.
 \end{display}
 
 \begin{code}
-#define RET_NEW_IN_HEAP()	RET_NEW_IN_HEAP_ctr++
-#define RET_OLD_IN_HEAP()	RET_OLD_IN_HEAP_ctr++
+#define RET_HISTO(categ,n,offset) \
+	{ I_ __idx;						 \
+	  __idx = (n) - (offset);				 \
+	 CAT3(RET_,categ,_hst)[((__idx > 8) ? 8 : __idx)] += 1;} 
 
-#define RET_NEW_IN_REGS()	RET_NEW_IN_REGS_ctr++; \
-				ReturnInRegsNodeValid = 0
-#define RET_OLD_IN_REGS()	RET_OLD_IN_REGS_ctr++; \
-				ReturnInRegsNodeValid = 1
+/* "slide" histogramming by (__STG_REGS_AVAIL__ - 1) -- usually 7 --
+   so we do not collect lots and lots of useless zeros for _IN_HEAP.
+   WDP 95/11
+*/
+#define RET_NEW_IN_HEAP(n)	RET_NEW_IN_HEAP_ctr++;	    \
+				RET_HISTO(NEW_IN_HEAP,n,__STG_REGS_AVAIL__ - 1)
+#define RET_OLD_IN_HEAP(n)	RET_OLD_IN_HEAP_ctr++;	    \
+				RET_HISTO(OLD_IN_HEAP,n,__STG_REGS_AVAIL__ - 1)
+#define RET_SEMI_IN_HEAP(n)	RET_SEMI_IN_HEAP_ctr++;	    \
+				RET_HISTO(SEMI_IN_HEAP,n,__STG_REGS_AVAIL__ - 1)
 
-#define RET_SEMI_BY_DEFAULT()	RET_SEMI_BY_DEFAULT_ctr++
-#define RET_SEMI_IN_HEAP()	RET_SEMI_IN_HEAP_ctr++
-#define RET_SEMI_IN_REGS()	RET_SEMI_IN_REGS_ctr++
+#define RET_NEW_IN_REGS(n)	RET_NEW_IN_REGS_ctr++;	    \
+				ReturnInRegsNodeValid = 0;  \
+				RET_HISTO(NEW_IN_REGS,n,0)
+#define RET_OLD_IN_REGS(n)	RET_OLD_IN_REGS_ctr++;	    \
+				ReturnInRegsNodeValid = 1;  \
+				RET_HISTO(OLD_IN_REGS,n,0)
+#define RET_SEMI_IN_REGS(n,u)	RET_SEMI_IN_REGS_ctr++;	    \
+				RET_SEMI_loads_avoided += ((n) - (u)); \
+				RET_HISTO(SEMI_IN_REGS,u,0)
+
+#define RET_SEMI_BY_DEFAULT()/*???*/	RET_SEMI_BY_DEFAULT_ctr++
+
+#define RET_SEMI_FAILED(tag)	do {					\
+				if ((tag) == INFO_IND_TAG)		\
+				    RET_SEMI_FAILED_IND_ctr++;		\
+				else					\
+				    RET_SEMI_FAILED_UNEVAL_ctr++;	\
+				} while (0)
+
 \end{code}
 
 Of all the returns (sum of four categories above), how many were
 vectored?  (The rest were obviously unvectored).
 \begin{code}
-#define VEC_RETURN()		VEC_RETURN_ctr++
+#define VEC_RETURN(n)		VEC_RETURN_ctr++;	    \
+				RET_HISTO(VEC_RETURN,n,0)
 \end{code}
 
 %************************************************************************
@@ -521,29 +487,37 @@ Macro			&	Where						\\ \hline
   			&							\\
 \tr{UPD_EXISTING}	&	Updating with an indirection to something	\\
 			&	already in the heap				\\
-
+\tr{UPD_SQUEEZED}	&	Same as \tr{UPD_EXISTING} but because		\\
+			&	of stack-squeezing				\\
 \tr{UPD_CON_W_NODE}	&	Updating with a CON: by indirecting to Node	\\
-
 \tr{UPD_CON_IN_PLACE}	&	Ditto, but in place				\\
 \tr{UPD_CON_IN_NEW}	&	Ditto, but allocating the object		\\
-
 \tr{UPD_PAP_IN_PLACE}	&	Same, but updating w/ a PAP			\\
 \tr{UPD_PAP_IN_NEW}	&							\\\hline
 \end{tabular}
 %partain:\end{center}
 
 \begin{code}
+#define UPD_HISTO(categ,n) \
+	{ I_ __idx;						 \
+	  __idx = (n);						 \
+	 CAT3(UPD_,categ,_hst)[((__idx > 8) ? 8 : __idx)] += 1;} 
+
 #define UPD_EXISTING()		UPD_EXISTING_ctr++
+#define UPD_SQUEEZED()		UPD_SQUEEZED_ctr++
 
 #define UPD_CON_W_NODE()	UPD_CON_W_NODE_ctr++
 
-#define UPD_CON_IN_NEW()	UPD_CON_IN_NEW_ctr++
-#define UPD_PAP_IN_NEW()	UPD_PAP_IN_NEW_ctr++
+#define UPD_CON_IN_NEW(n)	UPD_CON_IN_NEW_ctr++ ; \
+				UPD_HISTO(CON_IN_NEW,n)
+#define UPD_PAP_IN_NEW(n)	UPD_PAP_IN_NEW_ctr++ ; \
+				UPD_HISTO(PAP_IN_NEW,n)
 /* ToDo: UPD_NEW_COPY_ctr, as below */
 
-#define UPD_CON_IN_PLACE()	UPD_CON_IN_PLACE_ctr++ ; \
-				UPD_IN_PLACE_COPY_ctr += ReturnInRegsNodeValid
-				/* increments if True; otherwise, no */
+#define UPD_CON_IN_PLACE(n)	UPD_CON_IN_PLACE_ctr++ ; \
+				UPD_IN_PLACE_COPY_ctr += ReturnInRegsNodeValid ; \
+				/* increments if True; otherwise, no */ \
+				UPD_HISTO(CON_IN_PLACE,n)
 #define UPD_PAP_IN_PLACE()	UPD_PAP_IN_PLACE_ctr++ ; \
 				UPD_IN_PLACE_COPY_ctr += ReturnInRegsNodeValid
 				/* increments if True; otherwise, no */
@@ -561,49 +535,25 @@ For a generational collector:
 
 %************************************************************************
 %*									*
-\subsubsection[ticky-updates-entered]{Updates Subsequently Entered}
+\subsubsection[ticky-selectors]{Doing selectors at GC time}
 %*									*
 %************************************************************************
 
-If @UPDATES_ENTERED_COUNT@ is defined we add the Age word to the
-closures.  This is used to record indicate if a closure has been
-updated but not yet entered. It is set when the closure is updated and
-cleared when subsequently entered.
-
-The commoning up of @CONST@, @CHARLIKE@ and @INTLIKE@ closures is
-turned if this is required. This has only been done for 2s collection.
-It is done using a nasty hack which defines the @_Evacuate@ and
-@_Scavenge@ code for @CONST@, @CHARLIKE@ and @INTLIKE@ info tables to
-be @_Evacuate_1@ and @_Scavenge_1_0@.
-
-Unfortunately this broke everything so it has not been done ;-(.
-Instead we have to run with enough heap so no garbage collection is
-needed for accurate numbers. ToDo: Fix this!
-
-As implemented it can not be used in conjunction with heap profiling
-or lifetime profiling becasue they make conflicting use the Age word!
+@GC_SEL_ABANDONED@: we could've done the selection, but we gave up
+(e.g., to avoid overflowing the C stack); @GC_SEL_MINOR@: did a
+selection in a minor GC; @GC_SEL_MAJOR@: ditto, but major GC.
 
 \begin{code}
-#if defined(UPDATES_ENTERED_COUNT)
+#define GC_SEL_ABANDONED()		GC_SEL_ABANDONED_ctr++;
+#define GC_SEL_MINOR()			GC_SEL_MINOR_ctr++;
+#define GC_SEL_MAJOR()			GC_SEL_MAJOR_ctr++;
 
-#define UPDATED_SET_UPDATED(n)	AGE_HDR(n) = 1
-
-#define ENTERED_CHECK_UPDATED(n)  	\
-	if (AGE_HDR(n)) { 		\
-	    if (AGE_HDR(n) == 1) {	\
-	        UPD_ENTERED_ctr++;  	\
-	        AGE_HDR(n) += 1;	\
-	    } else {			\
-	        UPD_ENTERED_AGAIN_ctr++; \
-	        AGE_HDR(n) = 0; 	\
-	}}
-
-#else  /* ! UPDATES_ENTERED_COUNT */
-
-#define UPDATED_SET_UPDATED(n)	 /* nothing */
-#define ENTERED_CHECK_UPDATED(n) /* nothing */
-
-#endif /* ! UPDATES_ENTERED_COUNT */
+#define GC_SHORT_IND()			GC_SHORT_IND_ctr++;
+#define GC_SHORT_CAF()			GC_SHORT_CAF_ctr++;
+#define GC_COMMON_CHARLIKE()		GC_COMMON_CHARLIKE_ctr++;
+#define GC_COMMON_INTLIKE()		GC_COMMON_INTLIKE_ctr++;
+#define GC_COMMON_INTLIKE_FAIL()	GC_COMMON_INTLIKE_FAIL_ctr++;
+#define GC_COMMON_CONST()		GC_COMMON_CONST_ctr++;
 \end{code}
 
 %************************************************************************
@@ -714,8 +664,7 @@ extern I_ ENT_IND_ctr;
 extern I_ ENT_PAP_ctr;
 extern I_ ENT_THK_ctr;
 
-extern I_ UPD_ENTERED_ctr;
-extern I_ UPD_ENTERED_AGAIN_ctr;
+extern I_ UPD_ENTERED_hst[9];
 
 extern I_ RET_NEW_IN_HEAP_ctr;
 extern I_ RET_NEW_IN_REGS_ctr;
@@ -725,6 +674,20 @@ extern I_ RET_SEMI_BY_DEFAULT_ctr;
 extern I_ RET_SEMI_IN_HEAP_ctr;
 extern I_ RET_SEMI_IN_REGS_ctr;
 extern I_ VEC_RETURN_ctr;
+
+extern I_ RET_SEMI_FAILED_IND_ctr;
+extern I_ RET_SEMI_FAILED_UNEVAL_ctr;
+
+extern I_ RET_SEMI_loads_avoided;
+
+extern I_ RET_NEW_IN_HEAP_hst[9];
+extern I_ RET_NEW_IN_REGS_hst[9];
+extern I_ RET_OLD_IN_HEAP_hst[9];
+extern I_ RET_OLD_IN_REGS_hst[9];
+/*no such thing: extern I_ RET_SEMI_BY_DEFAULT_hst[9]; */
+extern I_ RET_SEMI_IN_HEAP_hst[9];
+extern I_ RET_SEMI_IN_REGS_hst[9];
+extern I_ RET_VEC_RETURN_hst[9];
 
 extern I_ ReturnInRegsNodeValid; /* see below */
 
@@ -737,11 +700,16 @@ extern I_ UPDF_RCC_PUSHED_ctr;
 extern I_ UPDF_RCC_OMITTED_ctr;
 
 extern I_ UPD_EXISTING_ctr;
+extern I_ UPD_SQUEEZED_ctr;
 extern I_ UPD_CON_W_NODE_ctr;
 extern I_ UPD_CON_IN_PLACE_ctr;
 extern I_ UPD_PAP_IN_PLACE_ctr;
 extern I_ UPD_CON_IN_NEW_ctr;
 extern I_ UPD_PAP_IN_NEW_ctr;
+
+extern I_ UPD_CON_IN_PLACE_hst[9];
+extern I_ UPD_CON_IN_NEW_hst[9];
+extern I_ UPD_PAP_IN_NEW_hst[9];
 
 extern I_ UPD_NEW_IND_ctr;
 extern I_ UPD_NEW_IN_PLACE_PTRS_ctr;
@@ -752,19 +720,27 @@ extern I_ UPD_OLD_IN_PLACE_NOPTRS_ctr;
 
 extern I_ UPD_IN_PLACE_COPY_ctr; /* see below */
 
-#endif /* DO_REDN_COUNTING */
+extern I_ GC_SEL_ABANDONED_ctr;
+extern I_ GC_SEL_MINOR_ctr;
+extern I_ GC_SEL_MAJOR_ctr;
+extern I_ GC_SHORT_IND_ctr;
+extern I_ GC_SHORT_CAF_ctr;
+extern I_ GC_COMMON_CHARLIKE_ctr;
+extern I_ GC_COMMON_INTLIKE_ctr;
+extern I_ GC_COMMON_INTLIKE_FAIL_ctr;
+extern I_ GC_COMMON_CONST_ctr;
+
+#endif /* TICKY_TICKY */
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[RednCounts-nonmacros]{Un-macros for ``none of the above''}
+\subsection[Ticky-nonmacros]{Un-macros for ``none of the above''}
 %*									*
 %************************************************************************
 
 \begin{code}
-#if ! (defined(DO_SPAT_PROFILING) || defined(DO_REDN_COUNTING))
-
-#define SET_ACTIVITY(act) /* nothing */
+#ifndef TICKY_TICKY
 
 #define ALLOC_HEAP(n)	 /* nothing */
 #define UN_ALLOC_HEAP(n) /* nothing */
@@ -800,14 +776,15 @@ extern I_ UPD_IN_PLACE_COPY_ctr; /* see below */
 #define ENT_IND(n)	/* nothing */
 #define ENT_PAP(n)	/* nothing */
 
-#define RET_NEW_IN_HEAP()	/* nothing */
-#define RET_NEW_IN_REGS()	/* nothing */
-#define RET_OLD_IN_HEAP()	/* nothing */
-#define RET_OLD_IN_REGS()	/* nothing */
+#define RET_NEW_IN_HEAP(n)	/* nothing */
+#define RET_NEW_IN_REGS(n)	/* nothing */
+#define RET_OLD_IN_HEAP(n)	/* nothing */
+#define RET_OLD_IN_REGS(n)	/* nothing */
 #define RET_SEMI_BY_DEFAULT()	/* nothing */
-#define RET_SEMI_IN_HEAP()	/* nothing */
-#define RET_SEMI_IN_REGS()	/* nothing */
-#define VEC_RETURN()		/* nothing */
+#define RET_SEMI_IN_HEAP(n)	/* nothing */
+#define RET_SEMI_IN_REGS(n,u)	/* nothing */
+#define RET_SEMI_FAILED(t)	/* nothing */
+#define VEC_RETURN(n)		/* nothing */
 
 #define UPDF_OMITTED()		/* nothing */
 #define UPDF_STD_PUSHED()	/* nothing */
@@ -818,17 +795,23 @@ extern I_ UPD_IN_PLACE_COPY_ctr; /* see below */
 #define UPDF_RCC_OMITTED()	/* nothing */
 
 #define UPD_EXISTING()		/* nothing */
+#define UPD_SQUEEZED()		/* nothing */
 #define UPD_CON_W_NODE()	/* nothing */
-#define UPD_CON_IN_PLACE()	/* nothing */
+#define UPD_CON_IN_PLACE(n)	/* nothing */
 #define UPD_PAP_IN_PLACE()	/* nothing */
-#define UPD_CON_IN_NEW()	/* nothing */
-#define UPD_PAP_IN_NEW()	/* nothing */
-\end{code}
+#define UPD_CON_IN_NEW(n)	/* nothing */
+#define UPD_PAP_IN_NEW(n)	/* nothing */
 
-For special subsequent enter counting:
-\begin{code}
-#define UPDATED_SET_UPDATED(n)	 /* nothing */
-#define ENTERED_CHECK_UPDATED(n) /* nothing */
+#define GC_SEL_ABANDONED()	/* nothing */
+#define GC_SEL_MINOR()		/* nothing */
+#define GC_SEL_MAJOR()		/* nothing */
+
+#define GC_SHORT_IND()		/* nothing */
+#define GC_SHORT_CAF()		/* nothing */
+#define GC_COMMON_CHARLIKE()	/* nothing */
+#define GC_COMMON_INTLIKE()	/* nothing */
+#define GC_COMMON_INTLIKE_FAIL()/* nothing */
+#define GC_COMMON_CONST()	/* nothing */
 \end{code}
 
 For a generational collector:
@@ -845,5 +828,5 @@ For a generational collector:
 
 End of file multi-slurp protection:
 \begin{code}
-#endif /* ! REDNCOUNTS_H */
+#endif /* ! TICKY_H */
 \end{code}

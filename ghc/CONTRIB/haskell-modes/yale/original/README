@@ -1,0 +1,5 @@
+This directory contains GNU Emacs support for editing Haskell files.
+We don't yet have a fancy editing mode, but haskell.el contains stuff
+for running Haskell as an inferior process from Emacs with key bindings
+for evaluating code from buffers, etc.  Look at the comments in haskell.el
+for more information.

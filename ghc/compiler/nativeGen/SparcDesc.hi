@@ -11,14 +11,14 @@ import Pretty(PprStyle)
 import PrimKind(PrimKind)
 import PrimOps(PrimOp)
 import SMRep(SMRep, SMSpecRepKind, SMUpdateKind)
+import SplitUniq(SplitUniqSupply)
 import Stix(CodeSegment, StixReg, StixTree)
-data MagicId 	{-# GHC_PRAGMA BaseReg | StkOReg | VanillaReg PrimKind Int# | FloatReg Int# | DoubleReg Int# | TagReg | RetReg | SpA | SuA | SpB | SuB | Hp | HpLim | LivenessReg | ActivityReg | StdUpdRetVecReg | StkStubReg | CurCostCentre | VoidReg #-}
-data SwitchResult 	{-# GHC_PRAGMA SwBool Bool | SwString [Char] | SwInt Int #-}
-data RegLoc 	{-# GHC_PRAGMA Save StixTree | Always StixTree #-}
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
-data PrimKind 	{-# GHC_PRAGMA PtrKind | CodePtrKind | DataPtrKind | RetKind | InfoPtrKind | CostCentreKind | CharKind | IntKind | WordKind | AddrKind | FloatKind | DoubleKind | MallocPtrKind | StablePtrKind | ArrayKind | ByteArrayKind | VoidKind #-}
-data SMRep 	{-# GHC_PRAGMA StaticRep Int Int | SpecialisedRep SMSpecRepKind Int Int SMUpdateKind | GenericRep Int Int SMUpdateKind | BigTupleRep Int | DataRep Int | DynamicRep | BlackHoleRep | PhantomRep | MuTupleRep Int #-}
-data StixTree 	{-# GHC_PRAGMA StSegment CodeSegment | StInt Integer | StDouble (Ratio Integer) | StString _PackedString | StLitLbl CSeq | StLitLit _PackedString | StCLbl CLabel | StReg StixReg | StIndex PrimKind StixTree StixTree | StInd PrimKind StixTree | StAssign PrimKind StixTree StixTree | StLabel CLabel | StFunBegin CLabel | StFunEnd CLabel | StJump StixTree | StFallThrough CLabel | StCondJump CLabel StixTree | StData PrimKind [StixTree] | StPrim PrimOp [StixTree] | StCall _PackedString PrimKind [StixTree] | StComment _PackedString #-}
-mkSparc :: Bool -> (GlobalSwitch -> SwitchResult) -> Target
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
+data MagicId 
+data SwitchResult 
+data RegLoc 
+data PprStyle 
+data PrimKind 
+data SMRep 
+data StixTree 
+mkSparc :: Bool -> (GlobalSwitch -> SwitchResult) -> (Target, PprStyle -> [[StixTree]] -> SplitUniqSupply -> CSeq, Bool, [Char] -> [Char])
 

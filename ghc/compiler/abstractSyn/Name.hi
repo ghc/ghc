@@ -1,66 +1,27 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface Name where
-import Class(Class)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
-import Maybes(Labda)
-import NameTypes(FullName, Provenance, ShortName)
-import Outputable(ExportFlag, NamedThing, Outputable)
+import Id(Id)
+import NameTypes(FullName, ShortName)
+import Outputable(NamedThing, Outputable)
 import PreludePS(_PackedString)
-import PrimKind(PrimKind)
-import SrcLoc(SrcLoc)
 import TyCon(TyCon)
-import TyVar(TyVarTemplate)
-import UniType(UniType)
 import Unique(Unique)
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data FullName 	{-# GHC_PRAGMA FullName _PackedString _PackedString Provenance ExportFlag Bool SrcLoc #-}
+data Id 
+data FullName 
 data Name   = Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString
-data ShortName 	{-# GHC_PRAGMA ShortName _PackedString SrcLoc #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data ShortName 
+data TyCon 
+data Unique 
 cmpName :: Name -> Name -> Int#
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 eqName :: Name -> Name -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Name) (u1 :: Name) -> case _APP_  _ORIG_ Name cmpName [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_ #-}
 getTagFromClassOpName :: Name -> Int
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 invisibleName :: Name -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isClassName :: Name -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 14 \ (u0 :: Name) -> case u0 of { _ALG_ _ORIG_ Name PreludeClass (u1 :: Unique) (u2 :: FullName) -> _!_ True [] []; _ORIG_ Name OtherClass (u3 :: Unique) (u4 :: FullName) (u5 :: [Name]) -> _!_ True [] []; (u6 :: Name) -> _!_ False [] [] } _N_ #-}
 isClassOpName :: Name -> Name -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _N_ _N_ #-}
 isTyConName :: Name -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 15 \ (u0 :: Name) -> case u0 of { _ALG_ _ORIG_ Name WiredInTyCon (u1 :: TyCon) -> _!_ True [] []; _ORIG_ Name PreludeTyCon (u2 :: Unique) (u3 :: FullName) (u4 :: Int) (u5 :: Bool) -> _!_ True [] []; _ORIG_ Name OtherTyCon (u6 :: Unique) (u7 :: FullName) (u8 :: Int) (u9 :: Bool) (ua :: [Name]) -> _!_ True [] []; (ub :: Name) -> _!_ False [] [] } _N_ #-}
 isUnboundName :: Name -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 13 \ (u0 :: Name) -> case u0 of { _ALG_ _ORIG_ Name Unbound (u1 :: _PackedString) -> _!_ True [] []; (u2 :: Name) -> _!_ False [] [] } _N_ #-}
 instance Eq Name
-	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(Name -> Name -> Bool), (Name -> Name -> Bool)] [_CONSTM_ Eq (==) (Name), _CONSTM_ Eq (/=) (Name)] _N_
-	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Name) (u1 :: Name) -> case _APP_  _ORIG_ Name cmpName [ u0, u1 ] of { _PRIM_ 0# -> _!_ True [] []; (u2 :: Int#) -> _!_ False [] [] } _N_,
-	 (/=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _F_ _IF_ARGS_ 0 2 XX 5 \ (u0 :: Name) (u1 :: Name) -> case _APP_  _ORIG_ Name cmpName [ u0, u1 ] of { _PRIM_ 0# -> _!_ False [] []; (u2 :: Int#) -> _!_ True [] [] } _N_ #-}
 instance Ord Name
-	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq Name}}, (Name -> Name -> Bool), (Name -> Name -> Bool), (Name -> Name -> Bool), (Name -> Name -> Bool), (Name -> Name -> Name), (Name -> Name -> Name), (Name -> Name -> _CMP_TAG)] [_DFUN_ Eq (Name), _CONSTM_ Ord (<) (Name), _CONSTM_ Ord (<=) (Name), _CONSTM_ Ord (>=) (Name), _CONSTM_ Ord (>) (Name), _CONSTM_ Ord max (Name), _CONSTM_ Ord min (Name), _CONSTM_ Ord _tagCmp (Name)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _N_ _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 instance NamedThing Name
-	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(Name -> ExportFlag), (Name -> Bool), (Name -> (_PackedString, _PackedString)), (Name -> _PackedString), (Name -> [_PackedString]), (Name -> SrcLoc), (Name -> Unique), (Name -> Bool), (Name -> UniType), (Name -> Bool)] [_CONSTM_ NamedThing getExportFlag (Name), _CONSTM_ NamedThing isLocallyDefined (Name), _CONSTM_ NamedThing getOrigName (Name), _CONSTM_ NamedThing getOccurrenceName (Name), _CONSTM_ NamedThing getInformingModules (Name), _CONSTM_ NamedThing getSrcLoc (Name), _CONSTM_ NamedThing getTheUnique (Name), _CONSTM_ NamedThing hasType (Name), _CONSTM_ NamedThing getType (Name), _CONSTM_ NamedThing fromPreludeCore (Name)] _N_
-	 getExportFlag = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 isLocallyDefined = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getOrigName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getOccurrenceName = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getInformingModules = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Name) -> _APP_  _TYAPP_  _ORIG_ Util panic { [_PackedString] } [ _NOREP_S_ "getInformingModule:Name" ] _N_,
-	 getSrcLoc = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_,
-	 hasType = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Name) -> _!_ False [] [] _N_,
-	 getType = _A_ 1 _U_ 0 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Name) -> _APP_  _TYAPP_  _ORIG_ Util panic { UniType } [ _NOREP_S_ "NamedThing.Name.getType" ] _N_,
-	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 instance Outputable Name
-	{-# GHC_PRAGMA _M_ Name {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (Name) _N_
-	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
 

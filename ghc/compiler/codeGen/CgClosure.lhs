@@ -434,17 +434,13 @@ closureCodeBody binder_info closure_info cc [] body
 	pprPanic "closureCodeBody:thunk:prim type!" (ppr PprDebug tycon)
     else
 #endif
-    getAbsC body_code 		`thenFC` \ body_absC ->
-#ifndef DPH
-    moduleName			`thenFC` \ mod_name ->
-    absC (CClosureInfoAndCode closure_info body_absC Nothing stdUpd (cl_descr mod_name))
-#else
-    -- Applying a similar scheme to Simon's placing info tables before code...
-    -- ToDo:DPH: update
-    absC (CNativeInfoTableAndCode closure_info
-	    closure_description
-	    (CCodeBlock entry_label body_absC))
-#endif {- Data Parallel Haskell -}
+    getAbsC body_code 	`thenFC` \ body_absC ->
+    moduleName		`thenFC` \ mod_name ->
+    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+
+    absC (CClosureInfoAndCode closure_info body_absC Nothing
+			      stdUpd (cl_descr mod_name)
+			      (dataConLiveness isw_chkr closure_info))
   where
     cl_descr mod_name = closureDescription mod_name (closureId closure_info) [] body
 
@@ -580,48 +576,24 @@ closureCodeBody binder_info closure_info cc all_args body
 		-- Do the business
 	    funWrapper closure_info arg_regs (cgExpr body)
     in
-#ifndef DPH
  	-- Make a labelled code-block for the slow and fast entry code
     forkAbsC (if slow_code_needed then slow_entry_code else absC AbsCNop)  		
-						        `thenFC` \ slow_abs_c ->
-    forkAbsC fast_entry_code		    		`thenFC` \ fast_abs_c ->
-    moduleName						`thenFC` \ mod_name ->
+				`thenFC` \ slow_abs_c ->
+    forkAbsC fast_entry_code	`thenFC` \ fast_abs_c ->
+    moduleName			`thenFC` \ mod_name ->
+    getIntSwitchChkrC		`thenFC` \ isw_chkr ->
+    
 	-- Now either construct the info table, or put the fast code in alone
 	-- (We never have slow code without an info table)
     absC (
-      if info_table_needed 
-      then
-        CClosureInfoAndCode closure_info slow_abs_c 
-                            (Just fast_abs_c) stdUpd (cl_descr mod_name)
+      if info_table_needed then
+        CClosureInfoAndCode closure_info slow_abs_c (Just fast_abs_c)
+			stdUpd (cl_descr mod_name)
+			(dataConLiveness isw_chkr closure_info)
       else 
 	CCodeBlock fast_label fast_abs_c
     )
-
   where
-#else
-    -- The info table goes before the slow entry point.
-    forkAbsC slow_entry_code		    		`thenFC` \ slow_abs_c ->
-    forkAbsC fast_entry_code		    		`thenFC` \ fast_abs_c ->
-    moduleName						`thenFC` \ mod_name ->
-    absC (CNativeInfoTableAndCode 
-		closure_info 
-		(closureDescription mod_name id all_args body)
-                (CCodeBlock slow_label 
-		   (AbsCStmts slow_abs_c
-		      (CCodeBlock fast_label 
-				  fast_abs_c))))
-  where
-    slow_label = if slow_code_needed then
-			mkStdEntryLabel id
-		 else
-			mkErrorStdEntryLabel
-			-- We may need a pointer to stuff in the info table,
-			-- but if the slow entry code isn't needed, this code
-			-- will never be entered, so we can use a standard 
-			-- panic routine.
-
-#endif {- Data Parallel Haskell -}
-
     lf_info = closureLFInfo closure_info
 
     cl_descr mod_name = closureDescription mod_name id all_args body
@@ -904,8 +876,9 @@ setupUpdate :: ClosureInfo -> Code -> Code	-- Only called for thunks
 
 setupUpdate closure_info code
  = if (closureUpdReqd closure_info) then
-	link_caf_if_needed		`thenFC` \ update_closure ->
-	pushUpdateFrame update_closure vector code
+	link_caf_if_needed	`thenFC` \ update_closure ->
+	getIntSwitchChkrC	`thenFC` \ isw_chkr ->
+    	pushUpdateFrame update_closure (vector isw_chkr) code
    else
 	-- Non-updatable thunks still need a resume-cost-centre "update"
 	-- frame to be pushed if we are doing evaluation profiling.
@@ -942,17 +915,20 @@ setupUpdate closure_info code
 
    closure_label = mkClosureLabel (closureId closure_info)
 
-   vector = case (closureType closure_info) of
+   vector isw_chkr
+     = case (closureType closure_info) of
     	Nothing -> CReg StdUpdRetVecReg
     	Just (spec_tycon, _, spec_datacons) ->
-	    case ctrlReturnConvAlg spec_tycon of
+	    case (ctrlReturnConvAlg spec_tycon) of
     	      UnvectoredReturn 1 -> 
        	    	let
 		    spec_data_con = head spec_datacons
                     only_tag = getDataConTag spec_data_con
-    	    	    direct = case dataReturnConvAlg spec_data_con of
+
+    	    	    direct = case (dataReturnConvAlg isw_chkr spec_data_con) of
     	    	        ReturnInRegs _ -> mkConUpdCodePtrVecLabel spec_tycon only_tag
     	    	    	ReturnInHeap   -> mkStdUpdCodePtrVecLabel spec_tycon only_tag
+
     	    	    vectored = mkStdUpdVecTblLabel spec_tycon
     	    	in
     	    	    CUnVecLbl direct vectored

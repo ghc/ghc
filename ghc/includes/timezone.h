@@ -15,14 +15,16 @@
 #endif
 
 #if HAVE_TM_ZONE
-#define ZONE(x)	    (((struct tm *)x)->tm_zone)
-#define GMTOFF(x)   (((struct tm *)x)->tm_gmtoff)
+#define ZONE(x)	         (((struct tm *)x)->tm_zone)
+#define SETZONE(x,z)     (((struct tm *)x)->tm_zone = z)
+#define GMTOFF(x)        (((struct tm *)x)->tm_gmtoff)
 #else 
 #if HAVE_TZNAME
 extern time_t timezone, altzone;
 extern char *tmzone[2];
-#define ZONE(x)	    (((struct tm *)x)->tm_isdst ? tmzone[1] : tmzone[0])
-#define GMTOFF(x)   (((struct tm *)x)->tm_isdst ? altzone : timezone)
+#define ZONE(x)	    	 (((struct tm *)x)->tm_isdst ? tmzone[1] : tmzone[0])
+#define SETZONE(x,z)
+#define GMTOFF(x)   	 (((struct tm *)x)->tm_isdst ? altzone : timezone)
 #endif
 #endif
 

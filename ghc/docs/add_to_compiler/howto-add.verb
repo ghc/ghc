@@ -44,9 +44,9 @@ at least a veneer of uniformity.
 
 \item
 To hook your pass into the compiler, either add something directly to
-the @Main@ module of the compiler,\srcloc{main/Main.lhs} or into the
-Core-to-Core simplification driver,\srcloc{simplCore/SimplCore.lhs} or
-into the STG-to-STG driver.\srcloc{simplStg/SimplStg.lhs}
+the @Main@ module of the compiler\srcloc{main/Main.lhs}, or into the
+Core-to-Core simplification driver\srcloc{simplCore/SimplCore.lhs}, or
+into the STG-to-STG driver\srcloc{simplStg/SimplStg.lhs}.
 
 Also add something to the compilation-system
 driver\srcloc{ghc/driver/ghc.lprl}
@@ -97,26 +97,26 @@ We encourage you to use a monadic style, where appropriate, in
 the code you add to the compiler.  To this end, here is a list of
 monads already in use in the compiler:
 \begin{description}
-\item[@UniqueSupply@ monad:] \srcloc{basicTypes/Unique.lhs}
+\item[@UniqueSupply@ monad:]\srcloc{basicTypes/Unique.lhs}%
 To carry a name supply around; do a @getUnique@ when you
 need one.  Used in several parts of the compiler.
 
-\item[Typechecker monad:] \srcloc{typecheck/TcMonad.lhs}
+\item[Typechecker monad:]\srcloc{typecheck/TcMonad.lhs}%
 Quite a complicated monad; carries around a substitution, some
 source-location information, and a @UniqueSupply@; also plumbs
 typechecker success/failure back up to the right place.
 
-\item[Desugarer monad:] \srcloc{deSugar/DsMonad.lhs}
+\item[Desugarer monad:]\srcloc{deSugar/DsMonad.lhs}%
 Carries around a @UniqueSupply@ and source-location information (to
 put in pattern-matching-failure error messages).
 
-\item[Code-generator monad:] \srcloc{codeGen/CgMonad.lhs}
+\item[Code-generator monad:]\srcloc{codeGen/CgMonad.lhs}%
 Carries around an environment that maps variables to addressing modes
 (e.g., ``in this block, @f@ is at @Node@ offset 3''); also, carries
 around stack- and heap-usage information.  Quite tricky plumbing, in
 part so that the ``Abstract~C'' output will be produced lazily.
 
-\item[Monad for underlying I/O machinery:] \srcloc{ghc/lib/io/GlaIOMonad.lhs}
+\item[Monad for underlying I/O machinery:]\srcloc{ghc/lib/io/GlaIOMonad.lhs}%
 This is the basis of our I/O implementation.  See the paper about it
 \cite{peyton-jones92b}.
 \end{description}
@@ -265,30 +265,32 @@ various ways in which the program text is represented as it makes its
 way through the compiler.  These are notable in that you are allowed
 to see/make-use-of all of their constructors:
 \begin{description}
-\item[Prefix form:]\srcloc{reader/PrefixSyn.lhs}  You shouldn't need
-this. 
+\item[Prefix form:]\srcloc{reader/PrefixSyn.lhs}%
+You shouldn't need this. 
 
-\item[Abstract Haskell syntax:]\srcloc{abstractSyn/AbsSyn.lhs}  Access
-via the @AbsSyn@ interface.  An example of what you should {\em not}
+\item[Abstract Haskell syntax:]\srcloc{abstractSyn/AbsSyn.lhs}%
+Access via the @AbsSyn@ interface.  An example of what you should {\em not}
 do is import the @AbsSynFuns@ (or @HsBinds@ or ...) interface
 directly.  @AbsSyn@ tells you what you're supposed to see.
 
-\item[Core syntax:]\srcloc{coreSyn/*Core.lhs}  Core syntax is
-parameterised, and you should access it {\em via one of the
+\item[Core syntax:]\srcloc{coreSyn/*Core.lhs}%
+Core syntax is parameterised, and you should access it {\em via one of the
 parameterisations}.  The most common is @PlainCore@; another is
 @TaggedCore@.  Don't use @CoreSyn@, though.
 
-\item[STG syntax:]\srcloc{stgSyn/StgSyn.lhs} Access via the @StgSyn@ interface.
+\item[STG syntax:]\srcloc{stgSyn/StgSyn.lhs}%
+Access via the @StgSyn@ interface.
 
-\item[Abstract~C syntax:]\srcloc{absCSyn/AbsCSyn.lhs} Access via the
-@AbsCSyn@ interface.
+\item[Abstract~C syntax:]\srcloc{absCSyn/AbsCSyn.lhs}%
+Access via the @AbsCSyn@ interface.
 \end{description}
 
 The second major group of datatypes are the ``basic entity''
 datatypes; these are notable in that you don't need to know their
 representation to use them.  Several have already been mentioned:
 \begin{description}
-\item[UniTypes:]\srcloc{uniType/AbsUniType.lhs} This is a gigantic
+\item[UniTypes:]\srcloc{uniType/AbsUniType.lhs}%
+This is a gigantic
 interface onto the world of @UniTypes@; accessible via the
 @AbsUniType@ interface.  You should import operations on all the {\em
 pieces} of @UniTypes@ (@TyVars@, @TyVarTemplates@, @TyCons@,
@@ -299,12 +301,13 @@ pieces} of @UniTypes@ (@TyVars@, @TyVarTemplates@, @TyCons@,
 behind @AbsUniType@'s back!}  (Otherwise, we won't discover the
 shortcomings of the interface...)
 
-\item[Identifiers:]\srcloc{basicTypes/Id.lhs}  Interface: @Id@.
+\item[Identifiers:]\srcloc{basicTypes/Id.lhs}%
+Interface: @Id@.
 
-\item[``Core'' literals:]\srcloc{basicTypes/CoreLit.lhs}  These are
-the unboxed literals used in Core syntax onwards.  Interface: @CoreLit@.
+\item[``Core'' literals:]\srcloc{basicTypes/CoreLit.lhs}%
+These are the unboxed literals used in Core syntax onwards.  Interface: @CoreLit@.
 
-\item[Environments:]\srcloc{envs/GenericEnv.lhs}
+\item[Environments:]\srcloc{envs/GenericEnv.lhs}%
 A generic environment datatype, plus a generally useful set of
 operations, is provided via the @GenericEnv@ interface.  We encourage
 you to use this, rather than roll your own; then your code will
@@ -312,13 +315,14 @@ benefit when we speed up the generic code.  All of the typechecker's
 environment stuff (of which there is plenty) is built on @GenericEnv@,
 so there are plenty of examples to follow.
 
-\item[@Uniques@:]\srcloc{basicTypes/Unique.lhs} Essentially @Ints@.
+\item[@Uniques@:]\srcloc{basicTypes/Unique.lhs}%
+Essentially @Ints@.
 When you need something unique for fast comparisons.  Interface:
 @Unique@.  This interface also provides a simple @UniqueSupply@ monad;
 often just the thing...
 
-\item[Wired-in standard prelude knowledge:]\srcloc{prelude/} The
-compiler has to know a lot about the standard prelude.  What it knows
+\item[Wired-in standard prelude knowledge:]\srcloc{prelude/}%
+The compiler has to know a lot about the standard prelude.  What it knows
 is in the @compiler/prelude@ directory; all the rest of the compiler
 gets its prelude knowledge through the @AbsPrel@ interface.
 

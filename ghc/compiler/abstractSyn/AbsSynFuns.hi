@@ -17,35 +17,19 @@ import TyVar(TyVar)
 import UniType(UniType)
 type PreludeNameFun = _PackedString -> Labda Name
 cmpInstanceTypes :: MonoType ProtoName -> MonoType ProtoName -> Int#
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 collectBinders :: Bind a (InPat a) -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectMonoBinders :: MonoBinds a (InPat a) -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectMonoBindersAndLocs :: MonoBinds a (InPat a) -> [(a, SrcLoc)]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectPatBinders :: InPat a -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectQualBinders :: [Qual Name (InPat Name)] -> [Name]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectTopLevelBinders :: Binds a (InPat a) -> [a]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectTypedBinders :: Bind Id TypecheckedPat -> [Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 collectTypedPatBinders :: TypecheckedPat -> [Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 extractMonoTyNames :: (a -> a -> Bool) -> MonoType a -> [a]
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 getMentionedVars :: (_PackedString -> Labda Name) -> [IE] -> [FixityDecl ProtoName] -> [ClassDecl ProtoName (InPat ProtoName)] -> [InstDecl ProtoName (InPat ProtoName)] -> Binds ProtoName (InPat ProtoName) -> (Bool, [_PackedString])
-	{-# GHC_PRAGMA _A_ 6 _U_ 210111 _N_ _S_ "LSALLL" {_A_ 5 _U_ 21111 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getNonPrelOuterTyCon :: MonoType ProtoName -> Labda ProtoName
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 0 1 C 10 \ (u0 :: MonoType ProtoName) -> case u0 of { _ALG_ _ORIG_ HsTypes MonoTyCon (u1 :: ProtoName) (u2 :: [MonoType ProtoName]) -> _!_ _ORIG_ Maybes Ni [ProtoName] [u1]; (u3 :: MonoType ProtoName) -> _!_ _ORIG_ Maybes Hamna [ProtoName] [] } _N_ #-}
 mkDictApp :: Expr Id TypecheckedPat -> [Id] -> Expr Id TypecheckedPat
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _F_ _IF_ARGS_ 0 2 XC 6 \ (u0 :: Expr Id TypecheckedPat) (u1 :: [Id]) -> case u1 of { _ALG_ (:) (u2 :: Id) (u3 :: [Id]) -> _!_ _ORIG_ HsExpr DictApp [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u0; _NO_DEFLT_ } _N_ #-}
 mkDictLam :: [Id] -> Expr Id TypecheckedPat -> Expr Id TypecheckedPat
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 6 \ (u0 :: [Id]) (u1 :: Expr Id TypecheckedPat) -> case u0 of { _ALG_ (:) (u2 :: Id) (u3 :: [Id]) -> _!_ _ORIG_ HsExpr DictLam [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
 mkTyApp :: Expr Id TypecheckedPat -> [UniType] -> Expr Id TypecheckedPat
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _F_ _IF_ARGS_ 0 2 XC 6 \ (u0 :: Expr Id TypecheckedPat) (u1 :: [UniType]) -> case u1 of { _ALG_ (:) (u2 :: UniType) (u3 :: [UniType]) -> _!_ _ORIG_ HsExpr TyApp [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u0; _NO_DEFLT_ } _N_ #-}
 mkTyLam :: [TyVar] -> Expr Id TypecheckedPat -> Expr Id TypecheckedPat
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 6 \ (u0 :: [TyVar]) (u1 :: Expr Id TypecheckedPat) -> case u0 of { _ALG_ (:) (u2 :: TyVar) (u3 :: [TyVar]) -> _!_ _ORIG_ HsExpr TyLam [Id, TypecheckedPat] [u0, u1]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
 

@@ -40,7 +40,8 @@ static void init_qp_profiling(STG_NO_ARGS); /* forward decl */
 @AvailableStack@ is used to determine whether an existing stack can be
 reused without new allocation, so reducing garbage collection, and
 stack setup time.  At present, it is only used for the first stack
-chunk of a thread, the one that's got @StkOChunkSize@ words.
+chunk of a thread, the one that's got
+@RTSflags.ConcFlags.stkChunkSize@ words.
 
 \begin{code}
 P_ AvailableStack = Nil_closure;
@@ -58,7 +59,6 @@ which should be <= the length of a word in bits.  -- HWL
 /* mattson thinks this is obsolete */
 
 # if 0 && defined(GRAN)
-extern FILE *main_statsfile;         /* Might be of general interest  HWL */
 
 typedef unsigned long TIME;
 typedef unsigned char PROC;
@@ -145,8 +145,6 @@ I_ nUPDs = 0, nUPDs_old = 0, nUPDs_new = 0, nUPDs_BQ = 0, nPAPs = 0,
    BQ_lens = 0;
 # endif
 
-I_ do_gr_binary = 0;
-I_ do_gr_profile = 0;        /* Full .gr profile or only END events? */
 I_ no_gr_profile = 0;        /* Don't create any .gr file at all? */
 I_ do_sp_profile = 0;
 I_ do_gr_migration = 0;
@@ -297,7 +295,7 @@ static eventq getnextevent()
   if(EventHd == NULL)
     {
       fprintf(stderr,"No next event\n");
-      exit(EXIT_FAILURE); /* ToDo: abort()? EXIT??? */
+      exit(EXIT_FAILURE); /* ToDo: abort()? EXIT? */
     }
 
   if(entry != NULL)
@@ -361,8 +359,7 @@ EVTTYPE evttype;
 P_ tso, node;
 sparkq spark;
 {
-  extern P_ xmalloc();
-  eventq newentry = (eventq) xmalloc(sizeof(struct event));
+  eventq newentry = (eventq) stgMallocBytes(sizeof(struct event), "newevent");
 
   EVENT_PROC(newentry) = proc;
   EVENT_CREATOR(newentry) = creator;
@@ -395,7 +392,6 @@ PP_ PendingSparksTl[SPARK_POOLS];
 
 static jmp_buf scheduler_loop;
 
-I_ MaxThreads = DEFAULT_MAX_THREADS;
 I_ required_thread_count = 0;
 I_ advisory_thread_count = 0;
 
@@ -405,27 +401,26 @@ P_ NewThread PROTO((P_, W_));
 
 I_ context_switch = 0;
 
-I_ contextSwitchTime = CS_MIN_MILLISECS;  /* In milliseconds */
-
 #if !defined(GRAN)
 
 I_ threadId = 0;
+I_ sparksIgnored =0;
 
-I_ MaxLocalSparks = DEFAULT_MAX_LOCAL_SPARKS;
 I_ SparkLimit[SPARK_POOLS];
 
-extern I_ doSanityChks;
-extern void checkAStack(STG_NO_ARGS);
-
 rtsBool
-initThreadPools(size)
-I_ size;
+initThreadPools(STG_NO_ARGS)
 {
+    I_ size = RTSflags.ConcFlags.maxLocalSparks;
+
     SparkLimit[ADVISORY_POOL] = SparkLimit[REQUIRED_POOL] = size;
+
     if ((PendingSparksBase[ADVISORY_POOL] = (PP_) malloc(size * sizeof(P_))) == NULL)
 	return rtsFalse;
+
     if ((PendingSparksBase[REQUIRED_POOL] = (PP_) malloc(size * sizeof(P_))) == NULL)
 	return rtsFalse;
+
     PendingSparksLim[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL] + size;
     PendingSparksLim[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL] + size;
     return rtsTrue;
@@ -440,15 +435,17 @@ void
 ScheduleThreads(topClosure)
 P_ topClosure;
 {
+#ifdef GRAN
     I_ i;
+#endif
     P_ tso;
 
-#if defined(USE_COST_CENTRES) || defined(GUM)
-    if (time_profiling || contextSwitchTime > 0) {
-        if (initialize_virtual_timer(tick_millisecs)) {
+#if defined(PROFILING) || defined(PAR)
+    if (time_profiling || RTSflags.ConcFlags.ctxtSwitchTime > 0) {
+        if (initialize_virtual_timer(RTSflags.CcFlags.msecsPerTick)) {
 #else
-    if (contextSwitchTime > 0) {
-        if (initialize_virtual_timer(contextSwitchTime)) {
+    if (RTSflags.ConcFlags.ctxtSwitchTime > 0) {
+        if (initialize_virtual_timer(RTSflags.ConcFlags.ctxtSwitchTime)) {
 #endif
             fflush(stdout);
             fprintf(stderr, "Can't initialize virtual timer.\n");
@@ -486,8 +483,8 @@ P_ topClosure;
         init_qp_profiling();
 
     /*
-     * We perform GC so that a signal handler can install a new TopClosure and start
-     * a new main thread.
+     * We perform GC so that a signal handler can install a new
+     * TopClosure and start a new main thread.
      */
 #ifdef PAR
     if (IAmMainThread) {
@@ -517,7 +514,7 @@ P_ topClosure;
 #endif
 
 #ifdef PAR
-    if (do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
 	DumpGranEvent(GR_START, tso);
 	sameThread = rtsTrue;
     }
@@ -574,33 +571,37 @@ P_ topClosure;
 	    fprintf(stderr, "No runnable threads!\n");
 	    EXIT(EXIT_FAILURE);
 	}
-	AwaitEvent(0);
+	AwaitEvent(RTSflags.ConcFlags.ctxtSwitchTime);
     }
 #else
     if (RunnableThreadsHd == Nil_closure) {
-	if (advisory_thread_count < MaxThreads &&
+	if (advisory_thread_count < RTSflags.ConcFlags.maxThreads &&
           (PendingSparksHd[REQUIRED_POOL] < PendingSparksTl[REQUIRED_POOL] ||
 	  PendingSparksHd[ADVISORY_POOL] < PendingSparksTl[ADVISORY_POOL])) {
 	    /* 
-             * If we're here (no runnable threads) and we have pending sparks,
-	     * we must have a space problem.  Get enough space to turn one of
-             * those pending sparks into a thread...ReallyPerformGC doesn't 
-             * return until the space is available, so it may force global GC.
-             * ToDo: Is this unnecessary here?  Duplicated in ReSchedule()? --JSM
+	     * If we're here (no runnable threads) and we have pending
+	     * sparks, we must have a space problem.  Get enough space
+	     * to turn one of those pending sparks into a
+	     * thread... ReallyPerformGC doesn't return until the
+	     * space is available, so it may force global GC.  ToDo:
+	     * Is this unnecessary here?  Duplicated in ReSchedule()?
+	     * --JSM
              */
 	    ReallyPerformThreadGC(THREAD_SPACE_REQUIRED, rtsTrue);
 	    SAVE_Hp -= THREAD_SPACE_REQUIRED;
 	} else {
 	    /*
-             * We really have absolutely no work.  Send out a fish (there may be
-             * some out there already), and wait for something to arrive.  We 
-             * clearly can't run any threads until a SCHEDULE or RESUME arrives, 
-             * and so that's what we're hoping to see.  (Of course, we still have 
-             * to respond to other types of messages.)
+	     * We really have absolutely no work.  Send out a fish
+	     * (there may be some out there already), and wait for
+	     * something to arrive.  We clearly can't run any threads
+	     * until a SCHEDULE or RESUME arrives, and so that's what
+	     * we're hoping to see.  (Of course, we still have to
+	     * respond to other types of messages.)
              */
 	    if (!fishing)
 	        sendFish(choosePE(), mytid, NEW_FISH_AGE, NEW_FISH_HISTORY, 
                   NEW_FISH_HUNGER);
+
 	    processMessages();
 	}
 	ReSchedule(0);
@@ -614,7 +615,7 @@ P_ topClosure;
     }
 
 #ifdef PAR
-    if (do_gr_profile && !sameThread)
+    if (RTSflags.ParFlags.granSimStats && !sameThread)
         DumpGranEvent(GR_SCHEDULE, RunnableThreadsHd);
 #endif
 
@@ -635,7 +636,7 @@ P_ topClosure;
 #endif
 
     /* If we're not running a timer, just leave the flag on */
-    if (contextSwitchTime > 0)
+    if (RTSflags.ConcFlags.ctxtSwitchTime > 0)
         context_switch = 0;
 
 #if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
@@ -661,14 +662,7 @@ P_ topClosure;
     }
 #endif
 
-# if defined(__STG_TAILJUMPS__)
     miniInterpret((StgFunPtr)resumeThread);
-# else
-    if (doSanityChks)
-        miniInterpret_debug((StgFunPtr)resumeThread, checkAStack);
-    else
-        miniInterpret((StgFunPtr)resumeThread);
-# endif /* __STG_TAILJUMPS__ */
 }
 \end{code}
 
@@ -724,13 +718,13 @@ int what_next;           /* Run the current thread again? */
       /* This code does round-Robin, if preferred. */
       if(DoFairSchedule && TSO_LINK(CurrentTSO) != Nil_closure)
         {
-          if(do_gr_profile)
+          if(RTSflags.ParFlags.granSimStats)
             DumpGranEvent(GR_DESCHEDULE,ThreadQueueHd);
           ThreadQueueHd =           TSO_LINK(CurrentTSO);
           TSO_LINK(ThreadQueueTl) = CurrentTSO;
           ThreadQueueTl =           CurrentTSO;
           TSO_LINK(CurrentTSO) =    Nil_closure;
-          if (do_gr_profile)
+          if (RTSflags.ParFlags.granSimStats)
             DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
           CurrentTime[CurrentProc] += gran_threadcontextswitchtime;
         }
@@ -747,7 +741,7 @@ int what_next;           /* Run the current thread again? */
         }
 #endif
 
-      if(do_gr_profile)
+      if(RTSflags.ParFlags.granSimStats)
         DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
 
       CurrentTSO = ThreadQueueHd;
@@ -908,7 +902,7 @@ int what_next;           /* Run the current thread again? */
           ++TSO_FETCHCOUNT(EVENT_TSO(event));
           TSO_FETCHTIME(EVENT_TSO(event)) += gran_fetchtime;
               
-          if (do_gr_profile)
+          if (RTSflags.ParFlags.granSimStats)
             DumpGranEventAndNode(GR_REPLY,EVENT_TSO(event),
                                  EVENT_NODE(event),EVENT_CREATOR(event));
 
@@ -926,7 +920,7 @@ int what_next;           /* Run the current thread again? */
                      CONTINUETHREAD,Nil_closure,Nil_closure,NULL);
             TSO_BLOCKTIME(EVENT_TSO(event)) += CurrentTime[CurrentProc] - 
                                                TSO_BLOCKEDAT(EVENT_TSO(event));
-            if(do_gr_profile)
+            if(RTSflags.ParFlags.granSimStats)
               DumpGranEvent(GR_RESUME,EVENT_TSO(event));
             continue;
           } else {
@@ -991,7 +985,7 @@ int what_next;           /* Run the current thread again? */
                       if(do_sp_profile)
                         DumpSparkGranEvent(SP_PRUNED,spark);
 
-                      assert(spark != NULL);
+		      ASSERT(spark != NULL);
 
                       SparkQueueHd = SPARK_NEXT(spark);
                       if(SparkQueueHd == NULL)
@@ -1058,7 +1052,7 @@ int what_next;           /* Run the current thread again? */
                   newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc],
                            STARTTHREAD,tso,Nil_closure,NULL);
 
-                  assert(spark != NULL);
+		  ASSERT(spark != NULL);
 
                   SparkQueueHd = SPARK_NEXT(spark);
                   if(SparkQueueHd == NULL)
@@ -1128,11 +1122,11 @@ int again;  	    	    	    	/* Run the current thread again? */
 #ifdef PAR
     /* 
      * In the parallel world, we do unfair scheduling for the moment.
-     * Ultimately, this should all be merged with the more sophicticated
-     * GrAnSim scheduling options.  (Of course, some provision should be
-     * made for *required* threads to make sure that they don't starve,
-     * but for now we assume that no one is running concurrent Haskell on
-     * a multi-processor platform.)
+     * Ultimately, this should all be merged with the more
+     * sophisticated GrAnSim scheduling options.  (Of course, some
+     * provision should be made for *required* threads to make sure
+     * that they don't starve, but for now we assume that no one is
+     * running concurrent Haskell on a multi-processor platform.)
      */
 
     sameThread = again;
@@ -1186,7 +1180,7 @@ int again;  	    	    	    	/* Run the current thread again? */
             if (RunnableThreadsHd == Nil_closure) {
         	RunnableThreadsHd = tso;
 #ifdef PAR
-		if (do_gr_profile) {
+		if (RTSflags.ParFlags.granSimStats) {
 		    DumpGranEvent(GR_START, tso);
 		    sameThread = rtsTrue;
 		}
@@ -1194,7 +1188,7 @@ int again;  	    	    	    	/* Run the current thread again? */
 	    } else {
         	TSO_LINK(RunnableThreadsTl) = tso;
 #ifdef PAR
-		if (do_gr_profile)
+		if (RTSflags.ParFlags.granSimStats)
 		    DumpGranEvent(GR_STARTQ, tso);
 #endif
 	    }
@@ -1224,14 +1218,14 @@ int again;  	    	    	    	/* Run the current thread again? */
 	      (RunnableThreadsHd != Nil_closure ||
 	       (required_thread_count == 0 && IAmMainThread)) || 
 #endif
-   	      advisory_thread_count == MaxThreads ||
+   	      advisory_thread_count == RTSflags.ConcFlags.maxThreads ||
 	      (tso = NewThread(spark, T_ADVISORY)) == NULL)
 	    	break;
     	    advisory_thread_count++;
             if (RunnableThreadsHd == Nil_closure) {
         	RunnableThreadsHd = tso;
 #ifdef PAR
-		if (do_gr_profile) {
+		if (RTSflags.ParFlags.granSimStats) {
 		    DumpGranEvent(GR_START, tso);
 		    sameThread = rtsTrue;
 		}
@@ -1239,7 +1233,7 @@ int again;  	    	    	    	/* Run the current thread again? */
             } else {
         	TSO_LINK(RunnableThreadsTl) = tso;
 #ifdef PAR
-		if (do_gr_profile)
+		if (RTSflags.ParFlags.granSimStats)
 		    DumpGranEvent(GR_STARTQ, tso);
 #endif
 	    }
@@ -1288,7 +1282,7 @@ enum gran_event_types event_type;
       CurrentTSO = ThreadQueueHd = ThreadQueueTl = EVENT_TSO(event);
       newevent(CurrentProc,CurrentProc,CurrentTime[CurrentProc]+gran_threadqueuetime,
                CONTINUETHREAD,Nil_closure,Nil_closure,NULL);
-      if(do_gr_profile)
+      if(RTSflags.ParFlags.granSimStats)
         DumpGranEvent(event_type,EVENT_TSO(event));
     }
   else
@@ -1299,7 +1293,7 @@ enum gran_event_types event_type;
       if(DoThreadMigration)
         ++SurplusThreads;
 
-      if(do_gr_profile)
+      if(RTSflags.ParFlags.granSimStats)
         DumpGranEvent(event_type+1,EVENT_TSO(event));
 
     }
@@ -1498,7 +1492,7 @@ PROC proc;
               MAKE_BUSY(proc);
               --SurplusThreads;
 
-              if(do_gr_profile)
+              if(RTSflags.ParFlags.granSimStats)
                 DumpRawGranEvent(p,GR_STEALING,TSO_ID(thread));
           
               CurrentTime[p] += 5l * gran_mtidytime;
@@ -1543,7 +1537,7 @@ UNVEC(EXTFUN(stopThreadDirectReturn);,EXTDATA(vtbl_stopStgWorld);)
 
 #if defined(GRAN)
 
-/* Slow but relatively reliable method uses xmalloc */
+/* Slow but relatively reliable method uses stgMallocBytes */
 /* Eventually change that to heap allocated sparks. */
 
 sparkq 
@@ -1551,8 +1545,8 @@ NewSpark(node,name,local)
 P_ node;
 I_ name, local;
 {
-  extern P_ xmalloc();
-  sparkq newspark = (sparkq) xmalloc(sizeof(struct spark));
+  sparkq newspark = (sparkq) stgMallocBytes(sizeof(struct spark), "NewSpark");
+
   SPARK_PREV(newspark) = SPARK_NEXT(newspark) = NULL;
   SPARK_NODE(newspark) = node;
   SPARK_NAME(newspark) = name;
@@ -1594,8 +1588,6 @@ sparkq spark;
 
 #endif
 
-I_ StkOChunkSize = DEFAULT_STKO_CHUNK_SIZE;
-
 /* Create a new TSO, with the specified closure to enter and thread type */
 
 P_
@@ -1622,7 +1614,9 @@ W_ type;
     }
 
     TSO_LINK(tso) = Nil_closure;
+#ifdef PAR
     TSO_CCC(tso) = (CostCentre)STATIC_CC_REF(CC_MAIN);
+#endif
     TSO_NAME(tso) = (P_) INFO_PTR(topClosure);  /* A string would be nicer -- JSM */
     TSO_ID(tso) = threadId++;
     TSO_TYPE(tso) = type;
@@ -1630,7 +1624,7 @@ W_ type;
     TSO_ARG1(tso) = TSO_EVENT(tso) = 0;
     TSO_SWITCH(tso) = NULL;
 
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
     TSO_AHWM(tso) = 0;
     TSO_BHWM(tso) = 0;
 #endif
@@ -1672,15 +1666,15 @@ W_ type;
             SET_PROCS(stko,ThisPE);
 #endif
 	    AvailableStack = STKO_LINK(AvailableStack);
-        } else if (SAVE_Hp + STKO_HS + StkOChunkSize > SAVE_HpLim) {
+        } else if (SAVE_Hp + STKO_HS + RTSflags.ConcFlags.stkChunkSize > SAVE_HpLim) {
             return(NULL);
         } else {
-            ALLOC_STK(STKO_HS,StkOChunkSize,0);
+            ALLOC_STK(STKO_HS,RTSflags.ConcFlags.stkChunkSize,0);
             stko = SAVE_Hp + 1;
-    	    SAVE_Hp += STKO_HS + StkOChunkSize;
+    	    SAVE_Hp += STKO_HS + RTSflags.ConcFlags.stkChunkSize;
             SET_STKO_HDR(stko, StkO_info, CCC);
         }
-        STKO_SIZE(stko) = StkOChunkSize + STKO_VHS;
+        STKO_SIZE(stko) = RTSflags.ConcFlags.stkChunkSize + STKO_VHS;
         STKO_SpB(stko) = STKO_SuB(stko) = STKO_BSTK_BOT(stko) + BREL(1);
         STKO_SpA(stko) = STKO_SuA(stko) = STKO_ASTK_BOT(stko) + AREL(1);
         STKO_LINK(stko) = Nil_closure;
@@ -1689,7 +1683,7 @@ W_ type;
     }
 # endif
     
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
     STKO_ADEP(stko) = STKO_BDEP(stko) = 0;
 #endif
 
@@ -1700,6 +1694,8 @@ W_ type;
 
     SAVE_Ret = (StgRetAddr) UNVEC(stopThreadDirectReturn,vtbl_stopStgWorld);
     SAVE_StkO = stko;
+
+    ASSERT(sanityChk_StkO(stko));
 
     if (DO_QP_PROF) {
         QP_Event1(do_qp_prof > 1 ? "*A" : "*G", tso);
@@ -1716,14 +1712,14 @@ EndThread(STG_NO_ARGS)
 #ifdef PAR
     TIME now = CURRENT_TIME;
 #endif
-#ifdef DO_REDN_COUNTING
-    extern FILE *tickyfile;
-
-    if (tickyfile != NULL) {
-	fprintf(tickyfile, "Thread %d (%lx)\n\tA stack max. depth: %ld words\n",
-	  TSO_ID(CurrentTSO), TSO_NAME(CurrentTSO), TSO_AHWM(CurrentTSO));
-	fprintf(tickyfile, "\tB stack max. depth: %ld words\n",
-	  TSO_BHWM(CurrentTSO));
+#ifdef TICKY_TICKY
+    if (RTSflags.TickyFlags.showTickyStats) {
+	fprintf(RTSflags.TickyFlags.tickyFile,
+		"Thread %d (%lx)\n\tA stack max. depth: %ld words\n",
+		TSO_ID(CurrentTSO), TSO_NAME(CurrentTSO), TSO_AHWM(CurrentTSO));
+	fprintf(RTSflags.TickyFlags.tickyFile,
+		"\tB stack max. depth: %ld words\n",
+		TSO_BHWM(CurrentTSO));
     }
 #endif
 
@@ -1732,7 +1728,7 @@ EndThread(STG_NO_ARGS)
     }
 
 #if defined(GRAN)
-    assert(CurrentTSO == ThreadQueueHd);
+    ASSERT(CurrentTSO == ThreadQueueHd);
     ThreadQueueHd = TSO_LINK(CurrentTSO);
 
     if(ThreadQueueHd == Nil_closure)
@@ -1754,7 +1750,7 @@ EndThread(STG_NO_ARGS)
                   /* make the job of bookkeeping the running, runnable, */
                   /* blocked threads easier for scripts like gr2ps  -- HWL */ 
 
-                  if (do_gr_profile && !is_first)
+                  if (RTSflags.ParFlags.granSimStats && !is_first)
                     DumpRawGranEvent(i,GR_SCHEDULE,
                                      TSO_ID(RunnableThreadsHd[i]));
 		  if (!no_gr_profile)
@@ -1790,19 +1786,19 @@ EndThread(STG_NO_ARGS)
         /* Note ThreadQueueHd is Nil when the main thread terminates */
         if(ThreadQueueHd != Nil_closure)
           {
-            if (do_gr_profile && !no_gr_profile)
+            if (RTSflags.ParFlags.granSimStats && !no_gr_profile)
               DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
             CurrentTime[CurrentProc] += gran_threadscheduletime;
           }
 
-        else if (do_gr_binary && TSO_TYPE(CurrentTSO)==T_MAIN &&
+        else if (RTSflags.ParFlags.granSimStats_Binary && TSO_TYPE(CurrentTSO)==T_MAIN &&
 		 !no_gr_profile)
           grterminate(CurrentTime[CurrentProc]);
       }
 #endif  /* GRAN */
 
 #ifdef PAR
-    if (do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
         TSO_EXECTIME(CurrentTSO) += now - TSO_BLOCKEDAT(CurrentTSO);
 	DumpGranInfo(thisPE, CurrentTSO, TSO_TYPE(CurrentTSO) != T_ADVISORY);
     }
@@ -1812,7 +1808,7 @@ EndThread(STG_NO_ARGS)
     case T_MAIN:
         required_thread_count--;
 #ifdef PAR
-        if (do_gr_binary)
+        if (RTSflags.ParFlags.granSimStats_Binary)
             grterminate(now);
 #endif
 
@@ -1913,7 +1909,7 @@ AwakenBlockingQueue(bqe)
 		QP_Event2(do_qp_prof > 1 ? "RA" : "RG", bqe, CurrentTSO);
 	    }
 # ifdef PAR
-	    if (do_gr_profile) {
+	    if (RTSflags.ParFlags.granSimStats) {
 		DumpGranEvent(GR_RESUMEQ, bqe);
 		switch (TSO_QUEUE(bqe)) {
 		case Q_BLOCKED:
@@ -1993,7 +1989,7 @@ AwakenBlockingQueue(node)
 
         while(tso != Nil_closure) {
           W_ proc;
-          assert(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
+	  ASSERT(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
 
 # if defined(COUNT)
           ++BQ_lens;
@@ -2028,14 +2024,14 @@ AwakenBlockingQueue(node)
 	  TSO_LINK(ThreadQueueTl) = tso;
 
         while(TSO_LINK(tso) != Nil_closure) {
-          assert(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
+          ASSERT(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
           if (DO_QP_PROF) {
             QP_Event2(do_qp_prof > 1 ? "RA" : "RG", tso, CurrentTSO);
           }
           tso = TSO_LINK(tso);
         }
         
-        assert(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
+        ASSERT(TSO_INTERNAL_PTR(tso)->rR[0].p == node);
         if (DO_QP_PROF) {
           QP_Event2(do_qp_prof > 1 ? "RA" : "RG", tso, CurrentTSO);
         }
@@ -2060,7 +2056,7 @@ W_ args;
 	QP_Event1("GR", CurrentTSO);
     }
 #ifdef PAR
-    if (do_gr_profile) {
+    if (RTSflags.ParFlags.granSimStats) {
         /* Note that CURRENT_TIME may perform an unsafe call */
 	TSO_EXECTIME(CurrentTSO) += CURRENT_TIME - TSO_BLOCKEDAT(CurrentTSO);
     }
@@ -2100,7 +2096,8 @@ FetchNode(node,from,to)
 P_ node;
 PROC from, to;
 {
-  assert(to==CurrentProc);
+  ASSERT(to==CurrentProc);
+
   if (!IS_LOCAL_TO(PROCS(node),from) &&
       !IS_LOCAL_TO(PROCS(node),to) ) 
     return 1;
@@ -2135,7 +2132,7 @@ PROC p;
     {                               /* start tso                           */ 
       newevent(p,CurrentProc,
                CurrentTime[CurrentProc] /* +gran_latency */,
-               FETCHREPLY,tso,node,NULL);            /* node needed ?? */
+               FETCHREPLY,tso,node,NULL);            /* node needed ? */
       CurrentTime[CurrentProc] += gran_mtidytime;
     }
   else if (IS_LOCAL_TO(PROCS(node),CurrentProc) )   /* Is node still here? */
@@ -2146,7 +2143,7 @@ PROC p;
 
       newevent(p,CurrentProc,
                CurrentTime[CurrentProc]+gran_latency,
-               FETCHREPLY,tso,node,NULL);            /* node needed ?? */
+               FETCHREPLY,tso,node,NULL);            /* node needed ? */
       
       CurrentTime[CurrentProc] += gran_mtidytime;
     }
@@ -2159,7 +2156,7 @@ PROC p;
       if (NoForward) {
         newevent(p,p_new,
                  max(CurrentTime[p_new],CurrentTime[CurrentProc])+gran_latency,
-                 FETCHREPLY,tso,node,NULL);            /* node needed ?? */
+                 FETCHREPLY,tso,node,NULL);            /* node needed ? */
         CurrentTime[CurrentProc] += gran_mtidytime;
         return;
       }
@@ -2205,7 +2202,7 @@ int prog_argc, rts_argc;
 
     if(do_gr_sim)
       { 
-        char *extension = do_gr_binary? "gb": "gr";
+        char *extension = RTSflags.ParFlags.granSimStats_Binary? "gb": "gr";
         sprintf(gr_filename, GR_FILENAME_FMT, prog_argv[0],extension);
 
         if ((gr_file = fopen(gr_filename,"w")) == NULL ) 
@@ -2283,7 +2280,7 @@ int prog_argc, rts_argc;
         fputs("\n\n++++++++++++++++++++\n\n",gr_file);
       }
 
-    if(do_gr_binary)
+    if(RTSflags.ParFlags.granSimStats_Binary)
       grputw(sizeof(TIME));
 
     Idlers = max_proc;
@@ -2339,7 +2336,10 @@ init_qp_profiling(STG_NO_ARGS)
             fputc(' ', qp_file);
             fputs(prog_argv[i], qp_file);
         }
-        fprintf(qp_file, " +RTS -C%d -t%d\n", contextSwitchTime, MaxThreads);
+        fprintf(qp_file, " +RTS -C%d -t%d\n"
+		, RTSflags.ConcFlags.ctxtSwitchTime
+		, RTSflags.ConcFlags.maxThreads);
+
         fputs(time_str(), qp_file);
         fputc('\n', qp_file);
     }
@@ -2406,7 +2406,7 @@ ActivateNextThread ()
   if(ThreadQueueHd==Nil_closure) {
     MAKE_IDLE(CurrentProc);
     ThreadQueueTl = Nil_closure;
-  } else if (do_gr_profile) {
+  } else if (RTSflags.ParFlags.granSimStats) {
     CurrentTime[CurrentProc] += gran_threadcontextswitchtime;
     DumpGranEvent(GR_SCHEDULE,ThreadQueueHd);
   }
@@ -2526,7 +2526,7 @@ P_ node;
                  -- assumes head of queue == CurrentTSO */
               if(!DoFairSchedule)
                 {
-                  if(do_gr_profile)
+                  if(RTSflags.ParFlags.granSimStats)
                     DumpGranEventAndNode(GR_FETCH,CurrentTSO,node,p);
 
                   ActivateNextThread();
@@ -2560,7 +2560,7 @@ P_ node;
           else                                /* !DoReScheduleOnFetch */
             {
               /* Note: CurrentProc is still busy as it's blocked on fetch */
-              if(do_gr_profile)
+              if(RTSflags.ParFlags.granSimStats)
                 DumpGranEventAndNode(GR_FETCH,CurrentTSO,node,p);
 
 #if defined(GRAN_CHECK) && defined(GRAN) /* Just for testing */
@@ -2640,7 +2640,7 @@ I_ identifier;
 void 
 GranSimBlock()
 {
-  if(do_gr_profile)
+  if(RTSflags.ParFlags.granSimStats)
     DumpGranEvent(GR_BLOCK,CurrentTSO);
 
   ++TSO_BLOCKCOUNT(CurrentTSO);
@@ -2717,7 +2717,7 @@ I_ num_ptr_roots;
             {
 #if defined(GRAN_CHECK) && defined(GRAN)
 	      if ( debug & 0x40 ) 
-		fprintf(main_statsfile,"Saving Spark Root %d(proc: %d; pool: %d) -- 0x%lx\n",
+		fprintf(RTSflags.GcFlags.statsFile,"Saving Spark Root %d(proc: %d; pool: %d) -- 0x%lx\n",
 			num_ptr_roots,proc,i,SPARK_NODE(spark));
 #endif       
               StorageMgrInfo.roots[num_ptr_roots++] = SPARK_NODE(spark);
@@ -2735,7 +2735,7 @@ I_ num_ptr_roots;
             }
         }  /* forall spark ... */
         if (prunedSparks>0) {
-          fprintf(main_statsfile,"Pruning and disposing %lu excess sparks (> %lu) on proc %d for GC purposes\n",
+          fprintf(RTSflags.GcFlags.statsFile,"Pruning and disposing %lu excess sparks (> %lu) on proc %d for GC purposes\n",
                   prunedSparks,MAX_SPARKS,proc);
 	  if (disposeQ == PendingSparksHd[proc][i])
 	    PendingSparksHd[proc][i] = NULL;
@@ -2806,14 +2806,14 @@ I_ num_ptr_roots, sparkroots;
           SPARK_NODE(spark) = StorageMgrInfo.roots[--num_ptr_roots];
 #if defined(GRAN_CHECK) && defined(GRAN)
 	  if ( debug & 0x40 ) 
-	    fprintf(main_statsfile,"Restoring Spark Root %d -- new: 0x%lx \n",
+	    fprintf(RTSflags.GcFlags.statsFile,"Restoring Spark Root %d -- new: 0x%lx \n",
 		    num_ptr_roots,SPARK_NODE(spark));
 #endif
         }
       else
 #if defined(GRAN_CHECK) && defined(GRAN)
 	  if ( debug & 0x40 ) 
-	    fprintf(main_statsfile,"Error in RestoreSpkRoots (%d; @ spark 0x%x): More than MAX_SPARKS (%d) sparks\n",
+	    fprintf(RTSflags.GcFlags.statsFile,"Error in RestoreSpkRoots (%d; @ spark 0x%x): More than MAX_SPARKS (%d) sparks\n",
 		    num_ptr_roots,SPARK_NODE(spark),MAX_SPARKS);
 #endif
 
@@ -2882,7 +2882,7 @@ PROC proc;
   if(name > GR_EVENT_MAX)
     name = GR_EVENT_MAX;
 
-  if(do_gr_binary)
+  if(RTSflags.ParFlags.granSimStats_Binary)
     {
       grputw(name);
       grputw(pe);
@@ -2902,7 +2902,7 @@ W_ id;
   if(name > GR_EVENT_MAX)
     name = GR_EVENT_MAX;
 
-  if(do_gr_binary)
+  if(RTSflags.ParFlags.granSimStats_Binary)
     {
       grputw(name);
       grputw(pe);
@@ -2919,7 +2919,7 @@ PROC pe;
 P_ tso;
 I_ mandatory_thread;
 {
-  if(do_gr_binary)
+  if(RTSflags.ParFlags.granSimStats_Binary)
     {
       grputw(GR_END);
       grputw(pe);
@@ -3327,7 +3327,7 @@ P_ node;
    fprintf(stderr," [GA: 0x%lx]",GA(node));
 #endif
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
    fprintf(stderr," [CC: 0x%lx]",CC_HDR(node));
 #endif
 
@@ -3399,7 +3399,7 @@ P_ node;
   fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
 #endif
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
   fprintf(stderr,"Cost Centre (???):       0x%lx\n",INFO_CAT(info_ptr));
 #endif
 
@@ -3659,7 +3659,10 @@ init_qp_profiling(STG_NO_ARGS)
     	    fputc(' ', qp_file);
 	    fputs(prog_argv[i], qp_file);
     	}
-    	fprintf(qp_file, "+RTS -C%ld -t%ld\n", contextSwitchTime, MaxThreads);
+    	fprintf(qp_file, "+RTS -C%ld -t%ld\n"
+		, RTSflags.ConcFlags.ctxtSwitchTime
+		, RTSflags.ConcFlags.maxThreads);
+
     	fputs(time_str(), qp_file);
     	fputc('\n', qp_file);
     }
@@ -3700,35 +3703,24 @@ unsigned CurrentProc = 0;
 W_ IdleProcs = ~0l, Idlers = 32; 
 
 void 
-GranSimAllocate(n,node,liveness)
-I_ n;
-P_ node;
-W_ liveness;
+GranSimAllocate(I_ n, P_ node, W_ liveness)
 { }
 
 void 
-GranSimUnallocate(n,node,liveness)
-W_ n;
-P_ node;
-W_ liveness;
+GranSimUnallocate(W_ n, P_ node, W_ liveness)
 { }
-
 
 void 
-GranSimExec(ariths,branches,loads,stores,floats)
-W_ ariths,branches,loads,stores,floats;
+GranSimExec(W_ ariths, W_ branches, W_ loads, W_ stores, W_ floats)
 { }
 
-I_ 
-GranSimFetch(node /* , liveness_mask */ )
-P_ node;
+int
+GranSimFetch(P_ node /* , liveness_mask */ )
 /* I_ liveness_mask; */
-{ }
+{ return(9999999); }
 
 void 
-GranSimSpark(local,node)
-W_ local;
-P_ node;
+GranSimSpark(W_ local, P_ node)
 { }
 
 #if 0
@@ -3741,7 +3733,7 @@ I_ identifier;
 #endif
 
 void 
-GranSimBlock()
+GranSimBlock(STG_NO_ARGS)
 { }
 #endif 
 

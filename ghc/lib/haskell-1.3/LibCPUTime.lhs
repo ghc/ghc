@@ -10,12 +10,14 @@ import PreludeGlaST
 
 getCPUTime :: IO Integer
 getCPUTime =
-    _ccall_ getCPUTime				    `thenPrimIO` \ ptr@(A# ptr#) ->
-    if ptr /= ``NULL'' then
-        return (fromInt (I# (indexIntOffAddr# ptr# 0#)) * 1000000000 + 
-                fromInt (I# (indexIntOffAddr# ptr# 1#)) + 
-		fromInt (I# (indexIntOffAddr# ptr# 2#)) * 1000000000 + 
-                fromInt (I# (indexIntOffAddr# ptr# 3#)))
+    newIntArray (0,3)				    `thenPrimIO` \ marr ->
+    unsafeFreezeByteArray marr			    `thenPrimIO` \ barr@(_ByteArray _ frozen#) ->
+    _ccall_ getCPUTime barr			    `thenPrimIO` \ ptr ->
+    if (ptr::_Addr) /= ``NULL'' then
+        return (fromInt (I# (indexIntArray# frozen# 0#)) * 1000000000 + 
+                fromInt (I# (indexIntArray# frozen# 1#)) + 
+		fromInt (I# (indexIntArray# frozen# 2#)) * 1000000000 + 
+                fromInt (I# (indexIntArray# frozen# 3#)))
     else
 	failWith (UnsupportedOperation "can't get CPU time")
 
@@ -29,3 +31,4 @@ implementation-dependent.
 
 
 
+ 

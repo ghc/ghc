@@ -7,6 +7,8 @@
 
 \begin{code}
 #include "rtsdefs.h"
+
+#include "ghcReadline.h" /* to make sure the code here agrees...*/
 \end{code}
 
 Wrapper around the callback mechanism to allow Haskell side functions
@@ -18,8 +20,7 @@ function. Before exiting, the Haskell function will deposit its result
 in the global variable $rl_return$.
 
 \begin{code}
-
-int current_narg, rl_return, current_kc;
+I_ current_narg, rl_return, current_kc;
 
 char* rl_prompt_hack;
 
@@ -27,7 +28,8 @@ StgStablePtr haskellRlEntry;
 StgStablePtr cbackList;
 
 
-int genericRlCback (int narg,int kc)
+I_
+genericRlCback (I_ narg, I_ kc)
 {
   current_narg = narg;
   current_kc = kc;

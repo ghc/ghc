@@ -50,10 +50,11 @@
  * seconds to overflow 31 bits.
  */
 
-StgAddr
-getCPUTime(STG_NO_ARGS)
+StgByteArray
+getCPUTime(cpuStruct)
+StgByteArray cpuStruct;
 {
-    static StgInt cpu[4];
+    StgInt *cpu=(StgInt *)cpuStruct;
 
 #if defined(HAVE_GETRUSAGE) && ! irix_TARGET_OS
     struct rusage t;
@@ -84,7 +85,7 @@ getCPUTime(STG_NO_ARGS)
     return NULL;
 # endif
 #endif
-    return (StgAddr) cpu;
+    return (StgByteArray) cpuStruct;
 }
 
 \end{code}

@@ -1,18 +1,16 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface StgSAT where
 import CostCentre(CostCentre)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import PrimOps(PrimOp)
 import SplitUniq(SplitUniqSupply)
 import StgSyn(PlainStgProgram(..), StgAtom, StgBinding, StgCaseAlternatives, StgExpr, StgRhs)
 import UniType(UniType)
 import UniqFM(UniqFM)
 import Unique(Unique)
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type PlainStgProgram = [StgBinding Id Id]
-data StgBinding a b 	{-# GHC_PRAGMA StgNonRec a (StgRhs a b) | StgRec [(a, StgRhs a b)] #-}
-data StgExpr a b 	{-# GHC_PRAGMA StgApp (StgAtom b) [StgAtom b] (UniqFM b) | StgConApp Id [StgAtom b] (UniqFM b) | StgPrimApp PrimOp [StgAtom b] (UniqFM b) | StgCase (StgExpr a b) (UniqFM b) (UniqFM b) Unique (StgCaseAlternatives a b) | StgLet (StgBinding a b) (StgExpr a b) | StgLetNoEscape (UniqFM b) (UniqFM b) (StgBinding a b) (StgExpr a b) | StgSCC UniType CostCentre (StgExpr a b) #-}
+data StgBinding a b 
+data StgExpr a b 
 doStaticArgs :: [StgBinding Id Id] -> SplitUniqSupply -> [StgBinding Id Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 22 _N_ _S_ "S" _N_ _N_ #-}
 

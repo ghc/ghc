@@ -366,6 +366,28 @@ GHC_BUILD_FLAG_o = -build-o-not-defined
 GHC_BUILD_OPTS_o = -build-o-not-defined-error
 #endif
 
+#define GhcBuild_A NO /*@GhcBuild_A@*/		/* "user way" A */
+#if GhcBuild_A == YES
+# define IfGhcBuild_A(x) x
+GHC_BUILD_FLAG_A = -build-A-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_A = -build-A-not-defined-error
+#else
+# define IfGhcBuild_A(x) /**/
+GHC_BUILD_FLAG_A = -build-A-not-defined
+GHC_BUILD_OPTS_A = -build-A-not-defined-error
+#endif
+
+#define GhcBuild_B NO /*@GhcBuild_B@*/		/* "user way" B */
+#if GhcBuild_B == YES
+# define IfGhcBuild_B(x) x
+GHC_BUILD_FLAG_B = -build-B-not-defined /* >>>change here<<< if required */
+GHC_BUILD_OPTS_B = -build-B-not-defined-error
+#else
+# define IfGhcBuild_B(x) /**/
+GHC_BUILD_FLAG_B = -build-B-not-defined
+GHC_BUILD_OPTS_B = -build-B-not-defined-error
+#endif
+
 /* ======= END OF BUILD INFO ==================================== */
 
 

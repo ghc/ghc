@@ -5,40 +5,29 @@ import BasicLit(BasicLit)
 import CLabelInfo(CLabel)
 import CgBindery(CgIdInfo)
 import CgMonad(CgInfoDownwards, CgState, CompilationInfo, EndOfBlockInfo, Sequel, StubFlag)
-import Class(Class)
 import ClosureInfo(LambdaFormInfo)
 import CostCentre(CostCentre)
 import HeapOffs(HeapOffset)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Maybes(Labda)
-import NameTypes(FullName)
 import PreludePS(_PackedString)
 import PrimKind(PrimKind)
 import StgSyn(StgAtom)
 import TyCon(TyCon)
-import TyVar(TyVarTemplate)
-import UniType(UniType)
 import UniqFM(UniqFM)
 import Unique(Unique)
-data CAddrMode 	{-# GHC_PRAGMA CVal RegRelative PrimKind | CAddr RegRelative | CReg MagicId | CTableEntry CAddrMode CAddrMode PrimKind | CTemp Unique PrimKind | CLbl CLabel PrimKind | CUnVecLbl CLabel CLabel | CCharLike CAddrMode | CIntLike CAddrMode | CString _PackedString | CLit BasicLit | CLitLit _PackedString PrimKind | COffset HeapOffset | CCode AbstractC | CLabelledCode CLabel AbstractC | CJoinPoint Int Int | CMacroExpr PrimKind CExprMacro [CAddrMode] | CCostCentre CostCentre Bool #-}
-data CgInfoDownwards 	{-# GHC_PRAGMA MkCgInfoDown CompilationInfo (UniqFM CgIdInfo) EndOfBlockInfo #-}
-data CgState 	{-# GHC_PRAGMA MkCgState AbstractC (UniqFM CgIdInfo) ((Int, [(Int, StubFlag)], Int, Int), (Int, [Int], Int, Int), (HeapOffset, HeapOffset)) #-}
+data CAddrMode 
+data CgInfoDownwards 
+data CgState 
 data HeapOffset 
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data StgAtom a 	{-# GHC_PRAGMA StgVarAtom a | StgLitAtom BasicLit #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
+data Id 
+data Labda a 
+data StgAtom a 
+data TyCon 
 cgTailCall :: StgAtom Id -> [StgAtom Id] -> UniqFM Id -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 12222 _N_ _S_ "SSL" _N_ _N_ #-}
 mkDynamicAlgReturnCode :: TyCon -> CAddrMode -> Sequel -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 12222 _N_ _S_ "SLS" _N_ _N_ #-}
 mkPrimReturnCode :: Sequel -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "SLL" _N_ _N_ #-}
 mkStaticAlgReturnCode :: Id -> Labda CLabel -> Sequel -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 3 _U_ 21222 _N_ _S_ "LLS" _N_ _N_ #-}
 performReturn :: AbstractC -> (Sequel -> CgInfoDownwards -> CgState -> CgState) -> UniqFM Id -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 5 _U_ 21221 _N_ _S_ "LSLU(LLU(LLL))L" _N_ _N_ #-}
 tailCallBusiness :: Id -> CAddrMode -> LambdaFormInfo -> [CAddrMode] -> UniqFM Id -> AbstractC -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 6 _U_ 22222222 _N_ _S_ "LSLLLL" _N_ _N_ #-}
 

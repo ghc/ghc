@@ -56,13 +56,16 @@ int minAcceptablePragmaVersion = 5;  /* 0.26 or greater ONLY */
 int maxAcceptablePragmaVersion = 5;  /* 0.26+ */
 int thisIfacePragmaVersion = 0;
 
-char 	*input_file_dir;	/* The directory where the input file is.        */
+static char *input_file_dir; /* The directory where the input file is. */
 
 char HiSuffix[64] = ".hi";		/* can be changed with -h flag */
 char PreludeHiSuffix[64] = ".hi";	/* can be changed with -g flag */
 
-BOOLEAN ExplicitHiSuffixGiven = 0;
+/* OLD 95/08: BOOLEAN ExplicitHiSuffixGiven = 0; */
 static BOOLEAN verbose = FALSE;		/* Set for verbose messages. */
+
+/* Forward decls */
+static void who_am_i PROTO((void));
 
 /**********************************************************************
 *                                                                     *
@@ -116,7 +119,7 @@ process_args(argc,argv)
 
 	    case 'h':
 		    strcpy(HiSuffix, *argv+1);
-		    ExplicitHiSuffixGiven = 1;
+/*OLD 95/08:	    ExplicitHiSuffixGiven = 1; */
 		    keep_munging_option = FALSE;
 		    break;
 
@@ -228,8 +231,8 @@ error(s)
 	exit(1);
 }
 
-void
-who_am_i()
+static void
+who_am_i(void)
 {
   fprintf(stderr,"Glasgow Haskell parser, version %s\n", PARSER_VERSION);
 }
@@ -258,9 +261,7 @@ lconc(l1, l2)
 }
 
 list
-lapp(l1, l2)
-  list l1;
-  VOID_STAR l2;
+lapp(list l1, VOID_STAR l2)
 {
 	list t;
 

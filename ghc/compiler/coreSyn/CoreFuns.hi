@@ -1,102 +1,62 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface CoreFuns where
 import BasicLit(BasicLit)
-import Class(Class)
 import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
 import CostCentre(CostCentre)
-import Id(Id, IdDetails)
+import Id(Id)
 import IdEnv(IdEnv(..))
-import IdInfo(IdInfo)
 import Maybes(Labda)
 import PrimOps(PrimOp)
-import SplitUniq(SplitUniqSupply)
-import TyCon(TyCon)
-import TyVar(TyVar, TyVarTemplate)
+import TyVar(TyVar)
 import TyVarEnv(TyVarEnv(..))
 import UniType(UniType)
 import UniqFM(UniqFM)
 import Unique(UniqSM(..), Unique, UniqueSupply)
-data CoreAtom a 	{-# GHC_PRAGMA CoVarAtom a | CoLitAtom BasicLit #-}
-data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data CoreAtom a 
+data CoreExpr a b 
+data Id 
 type IdEnv a = UniqFM a
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Labda a 
 type TyVarEnv a = UniqFM a
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data UniType 
+data UniqFM a 
 type UniqSM a = UniqueSupply -> (UniqueSupply, a)
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
-data UniqueSupply 	{-# GHC_PRAGMA MkUniqueSupply Int# | MkNewSupply SplitUniqSupply #-}
+data Unique 
+data UniqueSupply 
 atomToExpr :: CoreAtom b -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 2 1 C 6 _/\_ u0 u1 -> \ (u2 :: CoreAtom u1) -> case u2 of { _ALG_ _ORIG_ CoreSyn CoVarAtom (u3 :: u1) -> _!_ _ORIG_ CoreSyn CoVar [u0, u1] [u3]; _ORIG_ CoreSyn CoLitAtom (u4 :: BasicLit) -> _!_ _ORIG_ CoreSyn CoLit [u0, u1] [u4]; _NO_DEFLT_ } _N_ #-}
 bindersOf :: CoreBinding b a -> [b]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 coreExprArity :: (Id -> Labda (CoreExpr a Id)) -> CoreExpr a Id -> Int
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 digForLambdas :: CoreExpr a b -> ([TyVar], [a], CoreExpr a b)
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 escErrorMsg :: [Char] -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 exprSmallEnoughToDup :: CoreExpr a Id -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 instCoreBindings :: UniqueSupply -> [CoreBinding Id Id] -> (UniqueSupply, [CoreBinding Id Id])
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
 instCoreExpr :: UniqueSupply -> CoreExpr Id Id -> (UniqueSupply, CoreExpr Id Id)
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "LS" _N_ _N_ #-}
 isWrapperFor :: CoreExpr Id Id -> Id -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 manifestlyBottom :: CoreExpr a Id -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 manifestlyWHNF :: CoreExpr a Id -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 maybeErrorApp :: CoreExpr a Id -> Labda UniType -> Labda (CoreExpr a Id)
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoApps :: CoreExpr Id Id -> [CoreExpr Id Id] -> UniqueSupply -> (UniqueSupply, CoreExpr Id Id)
-	{-# GHC_PRAGMA _A_ 2 _U_ 212 _N_ _S_ "LS" _N_ _N_ #-}
 mkCoLam :: [a] -> CoreExpr a b -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 mkCoLetAny :: CoreBinding Id Id -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoLetNoUnboxed :: CoreBinding Id Id -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoLetUnboxedToCase :: CoreBinding Id Id -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoLetrecAny :: [(Id, CoreExpr Id Id)] -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoLetrecNoUnboxed :: [(Id, CoreExpr Id Id)] -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoLetsAny :: [CoreBinding Id Id] -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 7 \ (u0 :: [CoreBinding Id Id]) (u1 :: CoreExpr Id Id) -> case u0 of { _ALG_ (:) (u2 :: CoreBinding Id Id) (u3 :: [CoreBinding Id Id]) -> _APP_  _TYAPP_  _TYAPP_  foldr { (CoreBinding Id Id) } { (CoreExpr Id Id) } [ _ORIG_ CoreFuns mkCoLetAny, u1, u0 ]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
 mkCoLetsNoUnboxed :: [CoreBinding Id Id] -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 7 \ (u0 :: [CoreBinding Id Id]) (u1 :: CoreExpr Id Id) -> case u0 of { _ALG_ (:) (u2 :: CoreBinding Id Id) (u3 :: [CoreBinding Id Id]) -> _APP_  _TYAPP_  _TYAPP_  foldr { (CoreBinding Id Id) } { (CoreExpr Id Id) } [ _ORIG_ CoreFuns mkCoLetNoUnboxed, u1, u0 ]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
 mkCoLetsUnboxedToCase :: [CoreBinding Id Id] -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _F_ _IF_ARGS_ 0 2 CX 7 \ (u0 :: [CoreBinding Id Id]) (u1 :: CoreExpr Id Id) -> case u0 of { _ALG_ (:) (u2 :: CoreBinding Id Id) (u3 :: [CoreBinding Id Id]) -> _APP_  _TYAPP_  _TYAPP_  foldr { (CoreBinding Id Id) } { (CoreExpr Id Id) } [ _ORIG_ CoreFuns mkCoLetUnboxedToCase, u1, u0 ]; _NIL_  -> u1; _NO_DEFLT_ } _N_ #-}
 mkCoTyApps :: CoreExpr a b -> [UniType] -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 mkCoTyLam :: [TyVar] -> CoreExpr a b -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 mkCoreIfThenElse :: CoreExpr a Id -> CoreExpr a Id -> CoreExpr a Id -> CoreExpr a Id
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "SLL" _N_ _N_ #-}
 mkErrorCoApp :: UniType -> Id -> [Char] -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 mkFunction :: [TyVar] -> [a] -> CoreExpr a b -> CoreExpr a b
-	{-# GHC_PRAGMA _A_ 3 _U_ 122 _N_ _S_ "SLL" _N_ _N_ #-}
 nonErrorRHSs :: CoreCaseAlternatives a Id -> [CoreExpr a Id]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 pairsFromCoreBinds :: [CoreBinding a b] -> [(a, CoreExpr a b)]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 squashableDictishCcExpr :: CostCentre -> CoreExpr a b -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SL" _N_ _N_ #-}
 substCoreExpr :: UniqueSupply -> UniqFM (CoreExpr Id Id) -> UniqFM UniType -> CoreExpr Id Id -> (UniqueSupply, CoreExpr Id Id)
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _S_ "LSLL" _F_ _IF_ARGS_ 0 4 XXXX 5 \ (u0 :: UniqueSupply) (u1 :: UniqFM (CoreExpr Id Id)) (u2 :: UniqFM UniType) (u3 :: CoreExpr Id Id) -> _APP_  _ORIG_ CoreFuns substCoreExprUS [ u1, u2, u3, u0 ] _N_ #-}
 substCoreExprUS :: UniqFM (CoreExpr Id Id) -> UniqFM UniType -> CoreExpr Id Id -> UniqueSupply -> (UniqueSupply, CoreExpr Id Id)
-	{-# GHC_PRAGMA _A_ 3 _U_ 2222 _N_ _S_ "SLL" _N_ _N_ #-}
 typeOfCoreAlts :: CoreCaseAlternatives Id Id -> UniType
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 typeOfCoreExpr :: CoreExpr Id Id -> UniType
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 unTagBinders :: CoreExpr (Id, a) b -> CoreExpr Id b
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
 unTagBindersAlts :: CoreCaseAlternatives (Id, a) b -> CoreCaseAlternatives Id b
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
 

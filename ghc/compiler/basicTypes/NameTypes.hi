@@ -4,56 +4,22 @@ import Outputable(ExportFlag, NamedThing, Outputable)
 import PreludePS(_PackedString)
 import SrcLoc(SrcLoc)
 import Unique(Unique)
-data ExportFlag 	{-# GHC_PRAGMA ExportAll | ExportAbs | NotExported #-}
-data FullName 	{-# GHC_PRAGMA FullName _PackedString _PackedString Provenance ExportFlag Bool SrcLoc #-}
+data ExportFlag 
+data FullName 
 data Provenance   = ThisModule | InventedInThisModule | ExportedByPreludeCore | OtherPrelude _PackedString | OtherModule _PackedString [_PackedString] | HereInPreludeCore | OtherInstance _PackedString [_PackedString]
-data ShortName 	{-# GHC_PRAGMA ShortName _PackedString SrcLoc #-}
-data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data ShortName 
+data SrcLoc 
+data Unique 
 fromPrelude :: _PackedString -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 invisibleFullName :: FullName -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAAAEA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: Bool) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> u5; _NO_DEFLT_ } _N_ #-}
 mkFullName :: _PackedString -> _PackedString -> Provenance -> ExportFlag -> SrcLoc -> FullName
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222 _N_ _N_ _N_ _N_ #-}
 mkPreludeCoreName :: _PackedString -> _PackedString -> FullName
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkPrivateFullName :: _PackedString -> _PackedString -> Provenance -> ExportFlag -> SrcLoc -> FullName
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222 _N_ _N_ _N_ _N_ #-}
 mkShortName :: _PackedString -> SrcLoc -> ShortName
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: SrcLoc) -> _!_ _ORIG_ NameTypes ShortName [] [u0, u1] _N_ #-}
 unlocaliseFullName :: FullName -> FullName
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(LLLALL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 unlocaliseShortName :: _PackedString -> Unique -> ShortName -> FullName
-	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "LLU(LL)" {_A_ 4 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance NamedThing FullName
-	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(FullName -> ExportFlag), (FullName -> Bool), (FullName -> (_PackedString, _PackedString)), (FullName -> _PackedString), (FullName -> [_PackedString]), (FullName -> SrcLoc), (FullName -> Unique), (FullName -> Bool), (FullName -> UniType), (FullName -> Bool)] [_CONSTM_ NamedThing getExportFlag (FullName), _CONSTM_ NamedThing isLocallyDefined (FullName), _CONSTM_ NamedThing getOrigName (FullName), _CONSTM_ NamedThing getOccurrenceName (FullName), _CONSTM_ NamedThing getInformingModules (FullName), _CONSTM_ NamedThing getSrcLoc (FullName), _CONSTM_ NamedThing getTheUnique (FullName), _CONSTM_ NamedThing hasType (FullName), _CONSTM_ NamedThing getType (FullName), _CONSTM_ NamedThing fromPreludeCore (FullName)] _N_
-	 getExportFlag = _A_ 1 _U_ 1 _N_ _S_ "U(AAAEAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ExportFlag) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> u4; _NO_DEFLT_ } _N_,
-	 isLocallyDefined = _A_ 1 _U_ 1 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 11 \ (u0 :: Provenance) -> case u0 of { _ALG_ _ORIG_ NameTypes ThisModule  -> _!_ True [] []; _ORIG_ NameTypes InventedInThisModule  -> _!_ True [] []; _ORIG_ NameTypes HereInPreludeCore  -> _!_ True [] []; (u1 :: Provenance) -> _!_ False [] [] } _N_} _N_ _N_,
-	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "U(LLAAAA)" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 0 2 XX 3 \ (u0 :: _PackedString) (u1 :: _PackedString) -> _!_ _TUP_2 [_PackedString, _PackedString] [u0, u1] _N_} _F_ _IF_ARGS_ 0 1 C 4 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> _!_ _TUP_2 [_PackedString, _PackedString] [u1, u2]; _NO_DEFLT_ } _N_,
-	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "U(ALSAAA)" {_A_ 2 _U_ 11 _N_ _N_ _F_ _IF_ARGS_ 0 2 XC 10 \ (u0 :: _PackedString) (u1 :: Provenance) -> case u1 of { _ALG_ _ORIG_ NameTypes OtherPrelude (u2 :: _PackedString) -> u2; _ORIG_ NameTypes OtherModule (u3 :: _PackedString) (u4 :: [_PackedString]) -> u3; (u5 :: Provenance) -> u0 } _N_} _N_ _N_,
-	 getInformingModules = _A_ 1 _U_ 1 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 1 _N_ _N_ _N_ _N_} _N_ _N_,
-	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "U(AAAAAS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SrcLoc) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: FullName) -> case u0 of { _ALG_ _ORIG_ NameTypes FullName (u1 :: _PackedString) (u2 :: _PackedString) (u3 :: Provenance) (u4 :: ExportFlag) (u5 :: Bool) (u6 :: SrcLoc) -> u6; _NO_DEFLT_ } _N_,
-	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: FullName) -> _APP_  _TYAPP_  patError# { (FullName -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
-	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: FullName) -> _APP_  _TYAPP_  patError# { (FullName -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
-	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: FullName) -> _APP_  _TYAPP_  patError# { (FullName -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
-	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "U(AASAAA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 C 10 \ (u0 :: Provenance) -> case u0 of { _ALG_ _ORIG_ NameTypes ExportedByPreludeCore  -> _!_ True [] []; _ORIG_ NameTypes HereInPreludeCore  -> _!_ True [] []; (u1 :: Provenance) -> _!_ False [] [] } _N_} _N_ _N_ #-}
 instance NamedThing ShortName
-	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 11 _!_ _TUP_10 [(ShortName -> ExportFlag), (ShortName -> Bool), (ShortName -> (_PackedString, _PackedString)), (ShortName -> _PackedString), (ShortName -> [_PackedString]), (ShortName -> SrcLoc), (ShortName -> Unique), (ShortName -> Bool), (ShortName -> UniType), (ShortName -> Bool)] [_CONSTM_ NamedThing getExportFlag (ShortName), _CONSTM_ NamedThing isLocallyDefined (ShortName), _CONSTM_ NamedThing getOrigName (ShortName), _CONSTM_ NamedThing getOccurrenceName (ShortName), _CONSTM_ NamedThing getInformingModules (ShortName), _CONSTM_ NamedThing getSrcLoc (ShortName), _CONSTM_ NamedThing getTheUnique (ShortName), _CONSTM_ NamedThing hasType (ShortName), _CONSTM_ NamedThing getType (ShortName), _CONSTM_ NamedThing fromPreludeCore (ShortName)] _N_
-	 getExportFlag = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ _ORIG_ Outputable NotExported [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ShortName) -> _!_ _ORIG_ Outputable NotExported [] [] _N_,
-	 isLocallyDefined = _A_ 1 _U_ 0 _N_ _S_ "A" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ True [] [] _N_} _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: ShortName) -> _!_ True [] [] _N_,
-	 getOrigName = _A_ 1 _U_ 1 _N_ _S_ "U(LA)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
-	 getOccurrenceName = _A_ 1 _U_ 1 _N_ _S_ "U(SA)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: _PackedString) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ShortName) -> case u0 of { _ALG_ _ORIG_ NameTypes ShortName (u1 :: _PackedString) (u2 :: SrcLoc) -> u1; _NO_DEFLT_ } _N_,
-	 getInformingModules = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> [_PackedString]) } [ _NOREP_S_ "%DOutputable.NamedThing.getInformingModules\"", u0 ] _N_,
-	 getSrcLoc = _A_ 1 _U_ 1 _N_ _S_ "U(AS)" {_A_ 1 _U_ 1 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 1 \ (u0 :: SrcLoc) -> u0 _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ShortName) -> case u0 of { _ALG_ _ORIG_ NameTypes ShortName (u1 :: _PackedString) (u2 :: SrcLoc) -> u2; _NO_DEFLT_ } _N_,
-	 getTheUnique = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> Unique) } [ _NOREP_S_ "%DOutputable.NamedThing.getTheUnique\"", u0 ] _N_,
-	 hasType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> Bool) } [ _NOREP_S_ "%DOutputable.NamedThing.hasType\"", u0 ] _N_,
-	 getType = _A_ 1 _U_ 2 _N_ _S_ _!_ _F_ _IF_ARGS_ 0 1 X 3 \ (u0 :: ShortName) -> _APP_  _TYAPP_  patError# { (ShortName -> UniType) } [ _NOREP_S_ "%DOutputable.NamedThing.getType\"", u0 ] _N_,
-	 fromPreludeCore = _A_ 1 _U_ 1 _N_ _S_ "U(AA)" {_A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _!_ False [] [] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: ShortName) -> case u0 of { _ALG_ _ORIG_ NameTypes ShortName (u1 :: _PackedString) (u2 :: SrcLoc) -> _!_ False [] []; _NO_DEFLT_ } _N_ #-}
 instance Outputable FullName
-	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 2 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (FullName) _N_
-	 ppr = _A_ 2 _U_ 2122 _N_ _S_ "SU(LLLLAA)" {_A_ 5 _U_ 2222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 instance Outputable ShortName
-	{-# GHC_PRAGMA _M_ NameTypes {-dfun-} _A_ 4 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 1 _CONSTM_ Outputable ppr (ShortName) _N_
-	 ppr = _A_ 4 _U_ 0120 _N_ _S_ "AU(LA)LA" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

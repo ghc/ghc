@@ -51,106 +51,106 @@ See SMscav.lhc for calling convention documentation.
 
 /*** DEBUGGING MACROS ***/
 
-#if defined(_GC_DEBUG)
+#if defined(DEBUG)
 
 #define DEBUG_EVAC(sizevar) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, info 0x%lx, size %ld\n", \
 		evac, ToHp, INFO_PTR(evac), sizevar)
 
 #define DEBUG_EVAC_DYN   \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, Dyn info 0x%lx, size %lu\n", \
 		evac, ToHp, INFO_PTR(evac), DYN_CLOSURE_SIZE(evac))
 
 #define DEBUG_EVAC_TUPLE \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, Tuple info 0x%lx, size %lu\n", \
 		evac, ToHp, INFO_PTR(evac), TUPLE_CLOSURE_SIZE(evac))
 
 #define DEBUG_EVAC_MUTUPLE \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, MuTuple info 0x%lx, size %lu\n", \
 		evac, ToHp, INFO_PTR(evac), MUTUPLE_CLOSURE_SIZE(evac))
 
 #define DEBUG_EVAC_DATA  \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, Data info 0x%lx, size %lu\n", \
 		evac, ToHp, INFO_PTR(evac), DATA_CLOSURE_SIZE(evac))
 
 #define DEBUG_EVAC_BH(sizevar) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, BH info 0x%lx, size %ld\n", \
 		evac, ToHp, INFO_PTR(evac), sizevar)
 
 #define DEBUG_EVAC_FORWARD \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Forward 0x%lx -> 0x%lx, info 0x%lx\n", \
 		evac, FORWARD_ADDRESS(evac), INFO_PTR(evac))
    
 #define DEBUG_EVAC_IND1 \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Indirection 0x%lx -> Evac(0x%lx), info 0x%lx\n", \
 		evac, IND_CLOSURE_PTR(evac), INFO_PTR(evac))
 
 #define DEBUG_EVAC_IND2 \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Indirection Done -> 0x%lx\n", evac)
 
 #define DEBUG_EVAC_PERM_IND \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Permanent Indirection 0x%lx -> Evac(0x%lx), info 0x%lx\n", \
 		evac, IND_CLOSURE_PTR(evac), INFO_PTR(evac))
 
 #define DEBUG_EVAC_CAF_EVAC1 \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Caf 0x%lx -> Evac(0x%lx), info 0x%lx\n", \
 		evac, IND_CLOSURE_PTR(evac), INFO_PTR(evac))
 
 #define DEBUG_EVAC_CAF_EVAC2 \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Caf Done -> 0x%lx\n", evac)
 
 #define DEBUG_EVAC_CAF_RET \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Caf 0x%lx -> 0x%lx, info 0x%lx\n", \
 		evac, IND_CLOSURE_PTR(evac), INFO_PTR(evac))
 
 #define DEBUG_EVAC_STAT \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Static 0x%lx -> 0x%lx, info 0x%lx\n", \
 		evac, evac, INFO_PTR(evac))
 
 #define DEBUG_EVAC_CONST \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: Const 0x%lx -> 0x%lx, info 0x%lx\n", \
 		evac, CONST_STATIC_CLOSURE(INFO_PTR(evac)), INFO_PTR(evac))
 
 #define DEBUG_EVAC_CHARLIKE \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: CharLike (%lx) 0x%lx -> 0x%lx, info 0x%lx\n", \
 		evac, CHARLIKE_VALUE(evac), CHARLIKE_CLOSURE(CHARLIKE_VALUE(evac)), INFO_PTR(evac))
 
 #define	DEBUG_EVAC_INTLIKE_TO_STATIC \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
         fprintf(stderr, "Evac: IntLike to Static (%ld) 0x%lx -> 0x%lx, info 0x%lx\n", \
 		INTLIKE_VALUE(evac), evac, INTLIKE_CLOSURE(INTLIKE_VALUE(evac)), INFO_PTR(evac))
 
 #define DEBUG_EVAC_TO_OLD \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
 	fprintf(stderr, "Old ")
 
 #define DEBUG_EVAC_TO_NEW \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
 	fprintf(stderr, "New ")
 
 #define DEBUG_EVAC_OLD_TO_NEW(oldind, evac, new) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
 	fprintf(stderr, "  OldRoot: 0x%lx -> Old 0x%lx (-> New 0x%lx)\n", \
 			 evac, oldind, newevac)
 
 #define DEBUG_EVAC_OLDROOT_FORWARD \
-    if (SM_trace & 2) { \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) { \
 	fprintf(stderr, "Evac: OldRoot Forward 0x%lx -> Old 0x%lx ", evac, FORWARD_ADDRESS(evac)); \
 	if (! InOldGen(Scav)) fprintf(stderr, "-> New 0x%lx ", IND_CLOSURE_PTR(FORWARD_ADDRESS(evac))); \
         fprintf(stderr, "info 0x%lx\n", INFO_PTR(evac)); \
@@ -158,23 +158,23 @@ See SMscav.lhc for calling convention documentation.
 
 #ifdef CONCURRENT
 #define DEBUG_EVAC_BQ \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, BQ info 0x%lx, size %lu\n", \
 		evac, ToHp, INFO_PTR(evac), BQ_CLOSURE_SIZE(evac))
 
 #define DEBUG_EVAC_TSO(size) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Evac TSO: 0x%lx -> 0x%lx, size %ld\n", \
 		evac, ToHp, size)
 
 #define DEBUG_EVAC_STKO(a,b) \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Evac StkO: 0x%lx -> 0x%lx, size %ld (A), %ld (B)\n", \
 		evac, ToHp, a, b)
 
 # ifdef PAR
 #  define DEBUG_EVAC_BF \
-    if (SM_trace & 2) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_CONCURRENT) \
         fprintf(stderr, "Evac: 0x%lx -> 0x%lx, BF info 0x%lx, size %lu\n", \
 		evac, ToHp, INFO_PTR(evac), BF_CLOSURE_SIZE(dummy))
 # endif
@@ -214,7 +214,7 @@ See SMscav.lhc for calling convention documentation.
 # endif
 #endif
 
-#endif /* not _GC_DEBUG */
+#endif /* not DEBUG */
 
 
 #if defined(GCgn)
@@ -285,9 +285,7 @@ extern P_ _Evacuate_Old_to_New();
             FORWARD_ADDRESS(closure) = (W_)(forw)
 
 
-P_
-_Evacuate_Old_Forward_Ref(evac)
-P_ evac;
+EVAC_FN(Old_Forward_Ref)
 {
     /* Forward ref to old generation -- just return */
     DEBUG_EVAC_FORWARD;
@@ -296,9 +294,7 @@ P_ evac;
     return(evac);
 }
 
-P_
-_Evacuate_New_Forward_Ref(evac)
-P_ evac;
+EVAC_FN(New_Forward_Ref)
 {
     /* Forward ref to new generation -- check scavenged from the old gen */
     DEBUG_EVAC_FORWARD;
@@ -311,9 +307,7 @@ P_ evac;
     return(evac);
 }
 
-P_
-_Evacuate_OldRoot_Forward(evac)
-P_ evac;
+EVAC_FN(OldRoot_Forward)
 {
     /* Forward ref to old generation root -- return old root or new gen closure */
     DEBUG_EVAC_OLDROOT_FORWARD;
@@ -353,11 +347,11 @@ P_ newevac, evac;
 
     DEBUG_EVAC_OLD_TO_NEW(oldind, evac, newevac);
     
-    INFO_PTR(evac) = (W_) OldRoot_Forward_Ref_info;
-    FORWARD_ADDRESS(evac) = (W_)oldind;
+    INFO_PTR(evac)	     = (W_) OldRoot_Forward_Ref_info;
+    FORWARD_ADDRESS(evac)    = (W_)oldind;
 	    
-    INFO_PTR(oldind) = (W_) OldRoot_info;
-    IND_CLOSURE_PTR(oldind) = (W_) newevac;
+    INFO_PTR(oldind)         = (W_) OldRoot_info;
+    IND_CLOSURE_PTR(oldind)  = (W_) newevac;
     IND_CLOSURE_LINK(oldind) = (W_) genInfo.OldInNew;
     genInfo.OldInNew = oldind;
     genInfo.OldInNewno++;
@@ -387,9 +381,7 @@ P_ newevac, evac;
 
 /*** Real Evac Code -- simply passed closure ***/
 
-#define EVAC_FN(suffix) \
-	P_ CAT2(_Evacuate_,suffix)(evac) \
-	P_ evac;
+#define EVAC_FN(suffix)	P_ CAT2(_Evacuate_,suffix)(P_ evac)
 
 /*** FORWARD REF STUFF ***/
 
@@ -511,7 +503,7 @@ BIG_SPEC_EVAC_FN(12)
 
 \end{code}
 
-A @SPEC_RBH@ must be at least size @MIN_UPD_SIZE@ (Who are we fooling?
+A @SPEC_RBH@ must be at least size @MIN_UPD_SIZE@ (Whom are we fooling?
 This means 2), and the first word after the fixed header is a
 @MUT_LINK@.  The second word is a pointer to a blocking queue.
 Remaining words are the same as the underlying @SPEC@ closure.  Unlike
@@ -527,19 +519,24 @@ turns you on.
 
 #ifdef PAR
 
-#define SPEC_RBH_EVAC_FN(n) \
-EVAC_FN(CAT2(RBH_,n)) \
-{ \
-    int i; \
-    START_ALLOC(n); \
-    DEBUG_EVAC(n); \
-    COPY_FIXED_HDR; \
-    for (i = 0; i < n - 1; i++) { COPY_WORD(SPEC_RBH_HS + i); } \
-    SET_FORWARD_REF(evac,ToHp); \
-    evac = ToHp; \
-    FINISH_ALLOC(n); \
-    PROMOTE_MUTABLE(evac);\
-    return(evac); \
+#define SPEC_RBH_EVAC_FN(n)					\
+EVAC_FN(CAT2(RBH_,n)) 						\
+{ 								\
+    I_ count = FIXED_HS - 1;					\
+    I_ size  = SPEC_RBH_VHS + (n); 				\
+    START_ALLOC(size); 						\
+    DEBUG_EVAC(size); 						\
+    COPY_FIXED_HDR; 						\
+    while (++count <= size + (FIXED_HS - 1)) {			\
+	COPY_WORD(count);					\
+    }								\
+    SET_FORWARD_REF(evac,ToHp); 				\
+    evac = ToHp; 						\
+    FINISH_ALLOC(size);						\
+								\
+    PROMOTE_MUTABLE(evac);					\
+								\
+    return(evac); 						\
 }
 
 /* instantiate for 2--12 */
@@ -560,11 +557,12 @@ SPEC_RBH_EVAC_FN(12)
 #ifndef PAR
 EVAC_FN(MallocPtr)
 {
-    START_ALLOC(MallocPtr_SIZE);
-    DEBUG_EVAC(MallocPtr_SIZE);
+    I_ size = MallocPtr_SIZE;
+    START_ALLOC(size);
+    DEBUG_EVAC(size);
 
-#if defined(_GC_DEBUG)
-    if (SM_trace & 16) {
+#if defined(DEBUG)
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
       printf("DEBUG: Evacuating MallocPtr(%x)=<%x,_,%x,%x>", evac, evac[0], evac[2], evac[3]);
       printf(" Data = %x, Next = %x\n", 
 	     MallocPtr_CLOSURE_DATA(evac), MallocPtr_CLOSURE_LINK(evac) );
@@ -577,8 +575,8 @@ EVAC_FN(MallocPtr)
     MallocPtr_CLOSURE_DATA(ToHp) = MallocPtr_CLOSURE_DATA(evac);
     MallocPtr_CLOSURE_LINK(ToHp) = MallocPtr_CLOSURE_LINK(evac);
 
-#if defined(_GC_DEBUG)
-    if (SM_trace & 16) {
+#if defined(DEBUG)
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
       printf("DEBUG: Evacuated  MallocPtr(%x)=<%x,_,%x,%x>", ToHp, ToHp[0], ToHp[2], ToHp[3]);
       printf(" Data = %x, Next = %x\n", 
 	     MallocPtr_CLOSURE_DATA(ToHp), MallocPtr_CLOSURE_LINK(ToHp) );
@@ -586,7 +584,7 @@ EVAC_FN(MallocPtr)
 #endif
 
     evac = ToHp;
-    FINISH_ALLOC(MallocPtr_SIZE);
+    FINISH_ALLOC(size);
     return(evac);
 }
 #endif /* !PAR */
@@ -733,86 +731,103 @@ EVAC_FN(Data)
                Evac already contains this address -- just return   */
 /* Scavenging: Static closures should never be scavenged */
 
-P_
-_Evacuate_Static(evac)
-P_ evac;
+EVAC_FN(Static)
 {
     DEBUG_EVAC_STAT;
     return(evac);
 }
 
-void
-_Scavenge_Static(STG_NO_ARGS)
-{
-    fprintf(stderr,"Called _Scavenge_Static: Closure %lx Info %lx\nShould never occur!\n", (W_) Scav, INFO_PTR(Scav));
-    abort();
-}
-
-
 /*** BLACK HOLE CODE ***/
 
 EVAC_FN(BH_U)
 {
-    START_ALLOC(MIN_UPD_SIZE);
-    DEBUG_EVAC_BH(MIN_UPD_SIZE);
+    START_ALLOC(BH_U_SIZE);
+    DEBUG_EVAC_BH(BH_U_SIZE);
     COPY_FIXED_HDR;
     SET_FORWARD_REF(evac,ToHp);
     evac = ToHp;
-    FINISH_ALLOC(MIN_UPD_SIZE);
+    FINISH_ALLOC(BH_U_SIZE);
     return(evac);
 }
 
 EVAC_FN(BH_N)
 {
-    START_ALLOC(MIN_NONUPD_SIZE);
-    DEBUG_EVAC_BH(MIN_NONUPD_SIZE);
+    START_ALLOC(BH_N_SIZE);
+    DEBUG_EVAC_BH(BH_N_SIZE);
     COPY_FIXED_HDR;
     SET_FORWARD_REF(evac,ToHp);
     evac = ToHp;
-    FINISH_ALLOC(MIN_NONUPD_SIZE);
+    FINISH_ALLOC(BH_N_SIZE);
     return(evac);
 }
 
 /*** INDIRECTION CODE ***/
 
-/* Evacuation: Evacuate closure pointed to */
+/* permanent indirections first */
+#if defined(PROFILING) || defined(TICKY_TICKY)
+#undef PI
 
-P_
-_Evacuate_Ind(evac)
-P_ evac;
+EVAC_FN(PI) /* used for ticky in case just below... */
 {
-    DEBUG_EVAC_IND1;
-    evac = (P_) IND_CLOSURE_PTR(evac);
+#ifdef TICKY_TICKY
+    if (! AllFlags.doUpdEntryCounts) {
+	DEBUG_EVAC_IND1;
+	GC_SHORT_IND(); /* ticky: record that we shorted an indirection */
 
-#if defined(GCgn) || defined(GCap)
-    if (evac > OldGen)  /* Only evacuate new gen with generational collector */
+	evac = (P_) IND_CLOSURE_PTR(evac);
+
+# if defined(GCgn) || defined(GCap)
+	if (evac > OldGen)  /* Only evacuate new gen with generational collector */
+	    evac = EVACUATE_CLOSURE(evac);
+# else
 	evac = EVACUATE_CLOSURE(evac);
-#else
-    evac = EVACUATE_CLOSURE(evac);
+# endif
+
+	DEBUG_EVAC_IND2;
+    } else {
 #endif
 
-    DEBUG_EVAC_IND2;
+	/* *not* shorting one out... */
+	START_ALLOC(IND_CLOSURE_SIZE(dummy));
+	DEBUG_EVAC_PERM_IND;
+	COPY_FIXED_HDR;
+	COPY_WORD(IND_HS);
+	SET_FORWARD_REF(evac,ToHp);
+	evac = ToHp;
+	FINISH_ALLOC(IND_CLOSURE_SIZE(dummy));
+
+#ifdef TICKY_TICKY
+    }
+#endif
     return(evac);
+}
+#endif /* PROFILING or TICKY */
+
+EVAC_FN(Ind) /* Indirections are shorted-out; if doing weird ticky
+		stuff, we will have used *permanent* indirections
+		for overwriting updatees...
+	     */
+{
+    DEBUG_EVAC_IND1;
+    GC_SHORT_IND(); /* ticky: record that we shorted an indirection */
+
+    evac = (P_) IND_CLOSURE_PTR(evac);
+
+# if defined(GCgn) || defined(GCap)
+    if (evac > OldGen)  /* Only evacuate new gen with generational collector */
+	evac = EVACUATE_CLOSURE(evac);
+# else
+    evac = EVACUATE_CLOSURE(evac);
+# endif
+
+    DEBUG_EVAC_IND2;
 
     /* This will generate a stack of returns for a chain of indirections!
        However chains can only be 2 long.
-   */
-}
+    */
 
-#ifdef USE_COST_CENTRES
-#undef PI
-EVAC_FN(PI)
-{
-    START_ALLOC(MIN_UPD_SIZE);
-    DEBUG_EVAC_PERM_IND;
-    COPY_FIXED_HDR;
-    COPY_WORD(IND_HS);
-    SET_FORWARD_REF(evac,ToHp);
-    evac = ToHp;
-    FINISH_ALLOC(MIN_UPD_SIZE);
     return(evac);
 }
-#endif
 
 /*** SELECTORS CODE (much like an indirection) ***/
 
@@ -830,30 +845,70 @@ EVAC_FN(PI)
    the n'th field is.
 
    ToDo: what if the constructor is a Gen thing?
+   
+   "selector_depth" stuff below: (WDP 95/12)
+
+      It is possible to have a *very* considerable number of selectors
+      all chained together, which will cause the code here to chew up
+      enormous C stack space (very deeply nested set of calls), which
+      can crash the program.
+
+      Various solutions are possible, but we opt for a simple one --
+      we run a "selector_depth" counter, and we stop doing the
+      selections if we get beyond that depth.  The main nice property
+      is that it doesn't affect (or slow down) any of the rest of the
+      GC.
+      
+      What should the depth be?  For SPARC friendliness, it should
+      probably be very small (e.g., 8 or 16), to avoid register-window
+      spillage.  However, that would increase the chances that
+      selectors are left undone and lots of junk is promoted to the
+      old generation.  So we set it quite a bit higher -- we'd like to
+      do all the selections except in the most extreme circumstances.
 */
+static int selector_depth = 0;
+#define MAX_SELECTOR_DEPTH 100 /* reasonably arbitrary */
+
 static P_
-_EvacuateSelector_n(evac, n)
-  P_ evac;
-  I_ n;
+_EvacuateSelector_n(P_ evac, I_ n)
 {
     P_ maybe_con = (P_) evac[_FHS];
 
     /* must be a SPEC 2 1 closure */
     ASSERT(MIN_UPD_SIZE == 2); /* otherwise you are hosed */
 
-#if defined(_GC_DEBUG)
-    if (SM_trace & 2)
-        fprintf(stderr, "Evac Selector: 0x%lx, info 0x%lx, maybe_con 0x%lx, info 0x%lx, tag %ld\n",
-		evac, INFO_PTR(evac), maybe_con,
+#ifdef TICKY_TICKY
+    /* if a thunk, its update-entry count must be zero */
+    ASSERT(TICKY_HDR(evac) == 0);
+#endif
+
+    selector_depth++; /* see story above */
+
+#if defined(DEBUG)
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC)
+        fprintf(stderr, "Evac Selector (depth %ld): 0x%lx, info 0x%lx, maybe_con 0x%lx, info 0x%lx, tag %ld\n",
+		selector_depth, evac, INFO_PTR(evac), maybe_con,
 		INFO_PTR(maybe_con), INFO_TAG(INFO_PTR(maybe_con)));
 #endif
 
-    if (INFO_TAG(INFO_PTR(maybe_con)) < 0) /* not in WHNF */
+    if (INFO_TAG(INFO_PTR(maybe_con)) < 0   /* not in WHNF */
+#if !defined(CONCURRENT)
+        || (! RTSflags.GcFlags.lazyBlackHoling) /* see "price of laziness" paper */
+#endif
+	|| selector_depth > MAX_SELECTOR_DEPTH
+	|| (! RTSflags.GcFlags.doSelectorsAtGC)
+       ) {
+#ifdef TICKY_TICKY
+	  if (INFO_TAG(INFO_PTR(maybe_con)) >= 0) { /* we *could* have done it */
+	     GC_SEL_ABANDONED();
+	  }
+#endif
 	  /* Evacuate as normal (it is size *2* because of MIN_UPD_SIZE) */
 	  return( _Evacuate_2(evac) );
+    }
 
-#if defined(_GC_DEBUG)
-    if (SM_trace & 2)
+#if defined(DEBUG)
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC)
         fprintf(stderr, "Evac Selector:shorting: 0x%lx -> 0x%lx\n",
 		evac, maybe_con[_FHS + n]);
 #endif
@@ -861,12 +916,16 @@ _EvacuateSelector_n(evac, n)
     /* Ha!  Short it out */
     evac = (P_) (maybe_con[_FHS + n]);	/* evac now has the result of the selection */
 
+    GC_SEL_MINOR(); /* ticky-ticky */
+
 #if defined(GCgn) || defined(GCap)
     if (evac > OldGen)  /* Only evacuate new gen with generational collector */
 	evac = EVACUATE_CLOSURE(evac);
 #else
     evac = EVACUATE_CLOSURE(evac);
 #endif
+
+    selector_depth--; /* see story above */
 
     return(evac);
 }
@@ -893,7 +952,7 @@ DEF_SEL_EVAC(12)
 #ifdef CONCURRENT
 EVAC_FN(BQ)
 {
-    START_ALLOC(MIN_UPD_SIZE);
+    START_ALLOC(BQ_CLOSURE_SIZE(dummy));
     DEBUG_EVAC_BQ;
 
     COPY_FIXED_HDR;
@@ -901,7 +960,7 @@ EVAC_FN(BQ)
 
     SET_FORWARD_REF(evac,ToHp);
     evac = ToHp;
-    FINISH_ALLOC(MIN_UPD_SIZE);
+    FINISH_ALLOC(BQ_CLOSURE_SIZE(dummy));
 
     /* Add to OldMutables list (if evacuated to old generation) */
     PROMOTE_MUTABLE(evac);
@@ -912,9 +971,10 @@ EVAC_FN(BQ)
 EVAC_FN(TSO)
 {
     I_ count;
+    I_ size = TSO_VHS + TSO_CTS_SIZE;
 
-    START_ALLOC(TSO_VHS + TSO_CTS_SIZE);
-    DEBUG_EVAC_TSO(TSO_VHS + TSO_CTS_SIZE);
+    START_ALLOC(size);
+    DEBUG_EVAC_TSO(size);
 
     COPY_FIXED_HDR;
     for (count = FIXED_HS; count < FIXED_HS + TSO_VHS; count++) {
@@ -925,7 +985,7 @@ EVAC_FN(TSO)
 
     SET_FORWARD_REF(evac, ToHp);
     evac = ToHp;
-    FINISH_ALLOC(TSO_VHS + TSO_CTS_SIZE);
+    FINISH_ALLOC(size);
 
     /* Add to OldMutables list (if evacuated to old generation) */
     PROMOTE_MUTABLE(evac);
@@ -936,17 +996,19 @@ EVAC_FN(TSO)
 EVAC_FN(StkO)
 {
     I_ count;
-    I_ size  = STKO_CLOSURE_SIZE(evac);
+    I_ size       = STKO_CLOSURE_SIZE(evac);
     I_ spa_offset = STKO_SpA_OFFSET(evac);
     I_ spb_offset = STKO_SpB_OFFSET(evac);
     I_ sub_offset = STKO_SuB_OFFSET(evac);
     I_ offset;
 
+    ASSERT(sanityChk_StkO(evac));
+
     START_ALLOC(size);
     DEBUG_EVAC_STKO(STKO_CLOSURE_CTS_SIZE(evac) - spa_offset + 1, spb_offset);
 
     COPY_FIXED_HDR;
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
     COPY_WORD(STKO_ADEP_LOCN);
     COPY_WORD(STKO_BDEP_LOCN);
 #endif
@@ -1018,8 +1080,9 @@ EVAC_FN(FetchMe)
 EVAC_FN(BF)
 {
     I_ count;
+    I_ size = BF_CLOSURE_SIZE(evac);
 
-    START_ALLOC(BF_CLOSURE_SIZE(evac));
+    START_ALLOC(size);
     DEBUG_EVAC_BF;
 
     COPY_FIXED_HDR;
@@ -1034,7 +1097,7 @@ EVAC_FN(BF)
 
     SET_FORWARD_REF(evac, ToHp);
     evac = ToHp;
-    FINISH_ALLOC(BF_CLOSURE_SIZE(evac));
+    FINISH_ALLOC(size);
 
     /* Add to OldMutables list (if evacuated to old generation) */
     PROMOTE_MUTABLE(evac);
@@ -1047,30 +1110,28 @@ EVAC_FN(BF)
 /*** SPECIAL CAF CODE ***/
 
 /* Evacuation: Return closure pointed to (already explicitly evacuated) */
-/* Scavenging: Should not be scavenged */  
 
-P_
-_Evacuate_Caf(evac)
-P_ evac;
+EVAC_FN(Caf)
 {
     DEBUG_EVAC_CAF_RET;
+    GC_SHORT_CAF(); /* ticky: record that we shorted an indirection */
+
     evac = (P_) IND_CLOSURE_PTR(evac);
     return(evac);
 }
 
 /* In addition we need an internal Caf indirection which evacuates,
-   updates and returns the indirection. Before GC is started the
+   updates and returns the indirection. Before GC is started, the
    @CAFlist@ must be traversed and the info tables set to this.
 */
 
-P_
-_Evacuate_Caf_Evac_Upd(evac)
-  P_ evac;
+EVAC_FN(Caf_Evac_Upd)
 {
     P_ closure = evac;
 
     DEBUG_EVAC_CAF_EVAC1;
-    INFO_PTR(evac) = (W_) Caf_info;		/* Change to return CAF */
+
+    INFO_PTR(evac) = (W_) Caf_info;	/* Change back to Caf_info */
 
     evac = (P_) IND_CLOSURE_PTR(evac);          /* Grab reference and evacuate */
 
@@ -1095,44 +1156,56 @@ _Evacuate_Caf_Evac_Upd(evac)
 /*** CONST CLOSURE CODE ***/
 
 /* Evacuation: Just return address of the static closure stored in the info table */
-/* Scavenging: Const closures should never be scavenged */
 
-P_
-_Evacuate_Const(evac)
-P_ evac;
+EVAC_FN(Const)
 {
+#ifdef TICKY_TICKY
+     if (AllFlags.doUpdEntryCounts) {
+	/* evacuate as if a closure of size 0
+	   (there is no _Evacuate_0 to call)
+	*/
+	START_ALLOC(0);
+	DEBUG_EVAC(0);
+	COPY_FIXED_HDR;
+	SET_FORWARD_REF(evac,ToHp);
+	evac = ToHp;
+	FINISH_ALLOC(0);
+
+     } else {
+#endif
+
     DEBUG_EVAC_CONST;
+    GC_COMMON_CONST(); /* ticky */
+
     evac = CONST_STATIC_CLOSURE(INFO_PTR(evac));
+
+#ifdef TICKY_TICKY
+    }
+#endif
     return(evac);
 }
-
-void
-_Scavenge_Const(STG_NO_ARGS)
-{
-    fprintf(stderr,"Called _Scavenge_Const: Closure %lx Info %lx\nShould never occur!\n", (W_) Scav, INFO_PTR(Scav));
-    abort();
-}
-
 
 /*** CHARLIKE CLOSURE CODE ***/
 
 /* Evacuation: Just return address of the static closure stored fixed array */
-/* Scavenging: CharLike closures should never be scavenged */
 
-P_
-_Evacuate_CharLike(evac)
-P_ evac;
+EVAC_FN(CharLike)
 {
+#ifdef TICKY_TICKY
+     if (AllFlags.doUpdEntryCounts) {
+	evac = _Evacuate_1(evac);  /* evacuate closure of size 1 */
+     } else {
+#endif
+
     DEBUG_EVAC_CHARLIKE;
-    evac = (P_) CHARLIKE_CLOSURE(CHARLIKE_VALUE(evac));
-    return(evac);
-}
+    GC_COMMON_CHARLIKE(); /* ticky */
 
-void
-_Scavenge_CharLike(STG_NO_ARGS)
-{
-    fprintf(stderr,"Called _Scavenge_CharLike: Closure %lx Info %lx\nShould never occur!\n", (W_) Scav, INFO_PTR(Scav));
-    abort();
+    evac = (P_) CHARLIKE_CLOSURE(CHARLIKE_VALUE(evac));
+
+#ifdef TICKY_TICKY
+    }
+#endif
+    return(evac);
 }
 \end{code}
 
@@ -1140,8 +1213,6 @@ _Scavenge_CharLike(STG_NO_ARGS)
 
 Evacuation: Return address of the static closure if available
 Otherwise evacuate converting to aux closure.
-
-Scavenging: IntLike closures should never be scavenged.
 
 There are some tricks here:
 \begin{enumerate}
@@ -1158,19 +1229,25 @@ EVAC_FN(IntLike)
 {
     I_ val = INTLIKE_VALUE(evac);
  
-    if ((val <= MAX_INTLIKE) && (val >= MIN_INTLIKE)) {   /* in range of static closures */
+    if (val >= MIN_INTLIKE   /* in range of static closures */
+     && val <= MAX_INTLIKE
+#ifdef TICKY_TICKY
+     && !AllFlags.doUpdEntryCounts
+#endif
+       ) {
 	DEBUG_EVAC_INTLIKE_TO_STATIC;
-	evac = (P_) INTLIKE_CLOSURE(val);             /* return appropriate static closure */
+	GC_COMMON_INTLIKE(); /* ticky */
+
+	evac = (P_) INTLIKE_CLOSURE(val); /* return appropriate static closure */
     }
     else {
-	START_ALLOC(1);                                   /* evacuate closure of size 1 */
-	DEBUG_EVAC(1);
-	COPY_FIXED_HDR;
-	SPEC_COPY_FREE_VAR(1);
-	SET_FORWARD_REF(evac,ToHp);
-	evac = ToHp;
-	FINISH_ALLOC(1);
+	evac = _Evacuate_1(evac); /* evacuate closure of size 1 */
+
+#ifdef TICKY_TICKY
+	if (!AllFlags.doUpdEntryCounts) GC_COMMON_INTLIKE_FAIL();
+#endif
     }
+
     return(evac);
 }
 

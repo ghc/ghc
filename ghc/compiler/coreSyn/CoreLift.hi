@@ -3,29 +3,23 @@ interface CoreLift where
 import BasicLit(BasicLit)
 import CoreSyn(CoreAtom, CoreBinding, CoreCaseAlternatives, CoreExpr)
 import CostCentre(CostCentre)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import PlainCore(PlainCoreBinding(..), PlainCoreExpr(..))
 import PrimOps(PrimOp)
 import SplitUniq(SplitUniqSupply)
 import TyVar(TyVar)
 import UniType(UniType)
 import Unique(Unique)
-data CoreBinding a b 	{-# GHC_PRAGMA CoNonRec a (CoreExpr a b) | CoRec [(a, CoreExpr a b)] #-}
-data CoreExpr a b 	{-# GHC_PRAGMA CoVar b | CoLit BasicLit | CoCon Id [UniType] [CoreAtom b] | CoPrim PrimOp [UniType] [CoreAtom b] | CoLam [a] (CoreExpr a b) | CoTyLam TyVar (CoreExpr a b) | CoApp (CoreExpr a b) (CoreAtom b) | CoTyApp (CoreExpr a b) UniType | CoCase (CoreExpr a b) (CoreCaseAlternatives a b) | CoLet (CoreBinding a b) (CoreExpr a b) | CoSCC CostCentre (CoreExpr a b) #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data CoreBinding a b 
+data CoreExpr a b 
+data Id 
 type PlainCoreBinding = CoreBinding Id Id
 type PlainCoreExpr = CoreExpr Id Id
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data SplitUniqSupply 
+data Unique 
 applyBindUnlifts :: [CoreExpr Id Id -> CoreExpr Id Id] -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 bindUnlift :: Id -> Id -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _N_ _N_ _N_ #-}
 liftCoreBindings :: SplitUniqSupply -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "LS" _N_ _N_ #-}
 liftExpr :: Id -> CoreExpr Id Id -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkLiftedId :: Id -> Unique -> (Id, Id)
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

@@ -20,9 +20,7 @@
 **********************************************************************/
 
 int
-main(argc, argv)
-  int argc;
-  char **argv;
+main(int argc, char **argv)
 {
     Lnil = mklnil();	/* The null list -- used in lsing, etc. */
     all = mklnil();		/* This should be the list of all derivable types */

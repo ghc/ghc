@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
 interface DefSyn where
 import CoreSyn(CoreArg, CoreAtom, CoreBinding, CoreCaseAlternatives, CoreCaseDefault, CoreExpr)
 import Id(Id)
@@ -11,5 +11,4 @@ type DefCoreArg = CoreArg DefBindee
 type DefExpr = CoreExpr Id DefBindee
 type DefProgram = [CoreBinding Id DefBindee]
 mkLabel :: CoreExpr Id DefBindee -> CoreExpr Id DefBindee -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

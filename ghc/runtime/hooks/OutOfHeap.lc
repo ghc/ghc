@@ -2,10 +2,11 @@
 #include "rtsdefs.h"
 
 void
-OutOfHeapHook (request_size, heap_size)
+OutOfHeapHook (request_size)
   W_ request_size; /* in bytes */
-  W_ heap_size;    /* in bytes */
 {
+    W_ heap_size = RTSflags.GcFlags.heapSize * sizeof(W_); /* i.e., in bytes */
+
     fprintf(stderr, "Heap exhausted;\nwhile trying to allocate %lu bytes in a %lu-byte heap;\nuse `+RTS -H<size>' to increase the total heap size.\n",
 	request_size,
 	heap_size);

@@ -125,7 +125,7 @@ Constants for semi-tagging; the tags associated with the data
 constructors will start at 0 and go up.
 \begin{code}
 oTHER_TAG = (INFO_OTHER_TAG :: Integer)	-- (-1) unevaluated, probably
-iND_TAG	  = (INFO_IND_TAG   :: Integer) -- (-1) NOT USED, REALLY
+iND_TAG	  = (INFO_IND_TAG   :: Integer) -- (-2) NOT USED, REALLY
 \end{code}
 
 Stuff for liveness masks:

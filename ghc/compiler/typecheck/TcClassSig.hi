@@ -16,5 +16,4 @@ import TyVar(TyVarTemplate)
 import UniType(UniType)
 import UniqFM(UniqFM)
 tcClassSigs :: E -> UniqFM UniType -> Class -> (ClassOp -> SpecEnv) -> TyVarTemplate -> [Sig Name] -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult ([ClassOp], [(Name, Id)], [Id], [Id])
-	{-# GHC_PRAGMA _A_ 6 _U_ 2222212122 _N_ _S_ "LLLLLS" _N_ _N_ #-}
 

@@ -11,5 +11,4 @@ import SplitUniq(SplitUniqSupply)
 import SrcLoc(SrcLoc)
 import TcMonad(Baby_TcResult)
 tcInterfaceSigs :: E -> [Sig Name] -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult [(Name, Id)]
-	{-# GHC_PRAGMA _A_ 6 _U_ 212122 _N_ _S_ "LSLLLL" _N_ _N_ #-}
 

@@ -43,6 +43,9 @@ extern StgEvacFun _EvacuateSelector_10;
 extern StgEvacFun _EvacuateSelector_11;
 extern StgEvacFun _EvacuateSelector_12;
 
+#ifdef TICKY_TICKY
+extern StgScavFun _Scavenge_0_0;
+#endif
 extern StgScavFun _Scavenge_1_0;
 extern StgScavFun _Scavenge_2_0;
 extern StgScavFun _Scavenge_3_0;
@@ -126,7 +129,6 @@ extern StgEvacFun _Evacuate_BH_U;
 extern StgScavFun _Scavenge_BH_U;
 
 extern StgEvacFun _Evacuate_Static;
-extern StgScavFun _Scavenge_Static;
 
 extern StgEvacFun _Evacuate_Ind;
 extern StgScavFun _Scavenge_Ind;
@@ -134,19 +136,16 @@ extern StgScavFun _Scavenge_Ind;
 extern StgEvacFun _Evacuate_Caf;
 extern StgScavFun _Scavenge_Caf;
 
-#ifdef USE_COST_CENTRES
+#if defined(PROFILING) || defined(TICKY_TICKY)
 extern StgEvacFun _Evacuate_PI;
 extern StgScavFun _Scavenge_PI;
 #endif
 
 extern StgEvacFun _Evacuate_Const;
-extern StgScavFun _Scavenge_Const;
 
 extern StgEvacFun _Evacuate_CharLike;
-extern StgScavFun _Scavenge_CharLike;
 
 extern StgEvacFun _Evacuate_IntLike;
-extern StgScavFun _Scavenge_IntLike;
 
 #ifdef CONCURRENT
 extern StgEvacFun _Evacuate_BQ;
@@ -158,7 +157,6 @@ extern StgScavFun _Scavenge_TSO;
 extern StgEvacFun _Evacuate_StkO;
 extern StgScavFun _Scavenge_StkO;
 #endif
-
 \end{code}
 
 \begin{code}

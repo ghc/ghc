@@ -10,15 +10,18 @@ No doubt there will be more...
 #include "HsVersions.h"
 
 module MachDesc (
-	Target, mkTarget, RegLoc(..), 
+	Target(..){-(..) for target_STRICT only-}, mkTarget, RegLoc(..), 
 
     	saveLoc,
 
-	targetSwitches, fixedHeaderSize, varHeaderSize, stgReg,
-	nativeOpt, sizeof, volatileSaves, volatileRestores, hpRel,
+--	targetSwitches, UNUSED FOR NOW
+	fixedHeaderSize, varHeaderSize, stgReg,
+--	nativeOpt, UNUSED FOR NOW
+	sizeof, volatileSaves, volatileRestores, hpRel,
 	amodeToStix, amodeToStix', charLikeClosureSize,
 	intLikeClosureSize, mutHS, dataHS, primToStix, macroCode,
-	heapCheck, codeGen, underscore, fmtAsmLbl,
+	heapCheck,
+--	codeGen, underscore, fmtAsmLbl, UNUSED FOR NOW (done a diff way)
 
 	-- and, for self-sufficiency...
 	AbstractC, CAddrMode, CExprMacro, CStmtMacro, MagicId,
@@ -49,57 +52,69 @@ Think of this as a big runtime class dictionary
 \begin{code}
 
 data Target = Target
-    (GlobalSwitch -> SwitchResult)  	-- switches
+--  (GlobalSwitch -> SwitchResult)  	-- switches
     Int     	    	    	    	-- fixedHeaderSize
     (SMRep -> Int)     	    	    	-- varHeaderSize
     (MagicId -> RegLoc)     	    	-- stgReg
-    (StixTree -> StixTree)         	-- nativeOpt
+--  (StixTree -> StixTree)         	-- nativeOpt
     (PrimKind -> Int)     	    	-- sizeof
-    ([MagicId] -> [StixTree])     	-- volatileSaves
-    ([MagicId] -> [StixTree])     	-- volatileRestores
     (HeapOffset -> Int)	    	    	-- hpRel
     (CAddrMode -> StixTree)     	-- amodeToStix
     (CAddrMode -> StixTree)     	-- amodeToStix'
-    Int 	    	    	    	-- charLikeClosureSize
-    Int 	    	    	    	-- intLikeClosureSize
-    StixTree    	    	    	-- mutHS
-    StixTree    	    	    	-- dataHS
-    ([CAddrMode] -> PrimOp -> [CAddrMode] -> SUniqSM StixTreeList)
+    (
+    ([MagicId] -> [StixTree]),     	-- volatileSaves
+    ([MagicId] -> [StixTree]),     	-- volatileRestores
+    Int, 	    	    	    	-- charLikeClosureSize
+    Int, 	    	    	    	-- intLikeClosureSize
+    StixTree,    	    	    	-- mutHS
+    StixTree,    	    	    	-- dataHS
+    ([CAddrMode] -> PrimOp -> [CAddrMode] -> SUniqSM StixTreeList),
     	    	    	    	    	-- primToStix
-    (CStmtMacro -> [CAddrMode] -> SUniqSM StixTreeList)
+    (CStmtMacro -> [CAddrMode] -> SUniqSM StixTreeList),
     	    	    	    	    	-- macroCode
     (StixTree -> StixTree -> StixTree -> SUniqSM StixTreeList)
     	    	    	    	    	-- heapCheck
-
+    )
+{- UNUSED: done a diff way:
     (PprStyle -> [[StixTree]] -> SUniqSM Unpretty)
     	    	    	    	    	-- codeGen
 
     Bool    	    	   	    	-- underscore
     (String -> String)    	    	-- fmtAsmLbl
+-}
 
 mkTarget = Target
 
-targetSwitches (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = sw
-fixedHeaderSize (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = fhs
-varHeaderSize (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = vhs
-stgReg (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = reg
-nativeOpt (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = opt
-sizeof (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = size
-volatileSaves (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = vsave
-volatileRestores (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = vrest
-hpRel (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = hprel
-amodeToStix (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = am
-amodeToStix' (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = am'
-charLikeClosureSize (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = csz
-intLikeClosureSize (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = isz
-mutHS (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = mhs
-dataHS (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = dhs
-primToStix (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = ps
-macroCode (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = mc
-heapCheck (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = hc
-codeGen (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = cg
-underscore (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = us
-fmtAsmLbl (Target sw fhs vhs reg opt size vsave vrest hprel am am' csz isz mhs dhs ps mc hc cg us fmt) = fmt
+{- UNUSED FOR NOW:
+targetSwitches (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = {-sw-} x
+-}
+fixedHeaderSize (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) = fhs
+varHeaderSize (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = vhs x
+stgReg (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = reg x
+{- UNUSED FOR NOW:
+nativeOpt (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = {-opt-} x
+-}
+sizeof (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = size x
+-- used only for wrapper-hungry PrimOps:
+hpRel (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = hprel x
+amodeToStix (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = am x
+amodeToStix' (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' ~(vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = am' x
+
+volatileSaves (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = vsave x
+-- used only for wrapper-hungry PrimOps:
+volatileRestores (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = vrest x
+charLikeClosureSize (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) = csz
+intLikeClosureSize (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) = isz
+mutHS (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) = mhs
+dataHS (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) = dhs
+primToStix (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x y z = ps x y z
+macroCode (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x y = mc x y
+heapCheck (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x y z = hc x y z
+{- UNUSED: done a diff way:
+codeGen (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x y = cg x y
+underscore (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) = us
+fmtAsmLbl (Target {-sw-} fhs vhs reg {-opt-} size hprel am am' (vsave, vrest, csz, isz, mhs, dhs, ps, mc, hc) {-cg us fmt-}) x = fmt x
+-}
 \end{code}
 
 Trees for register save locations

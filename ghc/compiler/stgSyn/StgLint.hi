@@ -1,16 +1,12 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface StgLint where
 import CmdLineOpts(GlobalSwitch)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Pretty(PprStyle)
 import StgSyn(PlainStgBinding(..), StgBinding, StgRhs)
-import UniType(UniType)
-import Unique(Unique)
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+data Id 
+data PprStyle 
 type PlainStgBinding = StgBinding Id Id
-data StgBinding a b 	{-# GHC_PRAGMA StgNonRec a (StgRhs a b) | StgRec [(a, StgRhs a b)] #-}
+data StgBinding a b 
 lintStgBindings :: PprStyle -> [Char] -> [StgBinding Id Id] -> [StgBinding Id Id]
-	{-# GHC_PRAGMA _A_ 3 _U_ 212 _N_ _S_ "LLS" _N_ _N_ #-}
 

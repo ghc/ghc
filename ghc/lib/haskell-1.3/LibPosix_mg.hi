@@ -1,6 +1,6 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface LibPosix where
-import LibDirectory(removeDirectory)
+import LibDirectory(getCurrentDirectory, removeDirectory, setCurrentDirectory)
 import LibPosixDB(GroupEntry(..), UserEntry(..), getGroupEntryForID, getGroupEntryForName, getUserEntryForID, getUserEntryForName, groupID, groupMembers, groupName, homeDirectory, userGroupID, userID, userName, userShell)
 import LibPosixErr(ErrorCode(..), argumentListTooLong, badChannel, brokenPipe, directoryNotEmpty, e2BIG, eACCES, eAGAIN, eBADF, eBUSY, eCHILD, eDEADLK, eEXIST, eFBIG, eINTR, eINVAL, eIO, eISDIR, eMFILE, eMLINK, eNAMETOOLONG, eNFILE, eNODEV, eNOENT, eNOEXEC, eNOLCK, eNOMEM, eNOSPC, eNOSYS, eNOTDIR, eNOTEMPTY, eNOTTY, eNXIO, ePERM, ePIPE, eROFS, eSPIPE, eSRCH, eXDEV, execFormatError, fileAlreadyExists, fileTooLarge, filenameTooLong, getErrorCode, improperLink, inappropriateIOControlOperation, inputOutputError, interruptedOperation, invalidArgument, invalidSeek, isADirectory, noChildProcess, noError, noLocksAvailable, noSpaceLeftOnDevice, noSuchDeviceOrAddress, noSuchFileOrDirectory, noSuchOperationOnDevice, noSuchProcess, notADirectory, notEnoughMemory, operationNotImplemented, operationNotPermitted, permissionDenied, readOnlyFileSystem, resourceBusy, resourceDeadlockAvoided, resourceTemporarilyUnavailable, setErrorCode, tooManyLinks, tooManyOpenFiles, tooManyOpenFilesInSystem)
 import LibPosixFiles(DeviceID(..), DirStream(..), FileID(..), FileMode(..), FileStatus(..), OpenMode(..), PathVar(..), accessModes, accessTime, changeWorkingDirectory, closeDirStream, createDirectory, createFile, createLink, createNamedPipe, deviceID, fileGroup, fileID, fileMode, fileOwner, fileSize, getChannelStatus, getChannelVar, getFileStatus, getPathVar, getWorkingDirectory, groupExecuteMode, groupModes, groupReadMode, groupWriteMode, intersectFileModes, isBlockDevice, isCharacterDevice, isDirectory, isNamedPipe, isRegularFile, linkCount, modificationTime, nullFileMode, openChannel, openDirStream, otherExecuteMode, otherModes, otherReadMode, otherWriteMode, ownerExecuteMode, ownerModes, ownerReadMode, ownerWriteMode, queryAccess, queryFile, readDirStream, removeLink, rename, rewindDirStream, setFileCreationMask, setFileMode, setFileTimes, setGroupIDMode, setOwnerAndGroup, setUserIDMode, statusChangeTime, stdError, stdFileMode, stdInput, stdOutput, touchFile, unionFileModes)
@@ -54,6 +54,8 @@ type ProcessGroupID = Int
 type ProcessID = Int
 type UserID = Int
 data ExitCode 	{-# GHC_PRAGMA ExitSuccess | ExitFailure Int #-}
+getCurrentDirectory :: _State _RealWorld -> (Either IOError13 [Char], _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 removeDirectory :: [Char] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getGroupEntryForID :: Int -> _State _RealWorld -> (Either IOError13 GroupEntry, _State _RealWorld)
@@ -271,7 +273,7 @@ modificationTime :: _ByteArray () -> Int
 nullFileMode :: _Word
 	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 openChannel :: [Char] -> OpenMode -> Maybe _Word -> Bool -> Bool -> Bool -> Bool -> Bool -> _State _RealWorld -> (Either IOError13 Int, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 9 _U_ 202111112 _N_ _S_ "SASEEEEEL" {_A_ 8 _U_ 22111112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	{-# GHC_PRAGMA _A_ 9 _U_ 212111112 _N_ _S_ "SESEEEEEL" _N_ _N_ #-}
 openDirStream :: [Char] -> _State _RealWorld -> (Either IOError13 _Addr, _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 otherExecuteMode :: _Word
@@ -318,6 +320,8 @@ readChannel :: Int -> Int -> _State _RealWorld -> (Either IOError13 ([Char], Int
 	{-# GHC_PRAGMA _A_ 3 _U_ 111 _N_ _S_ "LU(P)U(P)" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 runProcess :: [Char] -> [[Char]] -> Maybe [([Char], [Char])] -> Maybe [Char] -> Maybe (_MVar _Handle) -> Maybe (_MVar _Handle) -> Maybe (_MVar _Handle) -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 8 _U_ 22111111 _N_ _S_ "LLLLLLLU(P)" _N_ _N_ #-}
+setCurrentDirectory :: [Char] -> _State _RealWorld -> (Either IOError13 (), _State _RealWorld)
+	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(P)" {_A_ 2 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 userGroupID :: UserEntry -> Int
 	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(AAU(P)AA)" {_A_ 1 _U_ 2 _N_ _N_ _F_ _IF_ARGS_ 0 1 X 2 \ (u0 :: Int#) -> _!_ I# [] [u0] _N_} _F_ _IF_ARGS_ 0 1 C 2 \ (u0 :: UserEntry) -> case u0 of { _ALG_ _ORIG_ LibPosixDB UE (u1 :: [Char]) (u2 :: Int) (u3 :: Int) (u4 :: [Char]) (u5 :: [Char]) -> u3; _NO_DEFLT_ } _N_ #-}
 userID :: UserEntry -> Int

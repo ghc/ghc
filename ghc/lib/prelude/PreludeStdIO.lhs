@@ -160,6 +160,7 @@ _bufferMode (_ReadHandle _ m _) = m
 _bufferMode (_WriteHandle _ m _) = m
 _bufferMode (_AppendHandle _ m _) = m
 _bufferMode (_ReadWriteHandle _ m _) = m
+_bufferMode (_SocketHandle _ _) = (Just NoBuffering)
 
 _markHandle :: _Handle -> _Handle
 _markHandle h@(_ReadHandle fp m b)
@@ -476,9 +477,11 @@ hSetBuffering handle mode =
                 _SemiClosedHandle _ _ ->
 		    putMVar handle htype		    >>
 		    failWith (IllegalOperation "handle is closed")
+{-
 		_SocketHandle _ _ ->
 		    putMVar handle htype		    >>
 		    failWith (IllegalOperation "buffering not supported for socket handles")
+-}
                 other ->
                     _ccall_ setBuffering (_filePtr other) bsize
 							    `thenPrimIO` \ rc -> 
@@ -511,6 +514,7 @@ hSetBuffering handle mode =
     hcon (_WriteHandle _ _ _) = _WriteHandle
     hcon (_AppendHandle _ _ _) = _AppendHandle
     hcon (_ReadWriteHandle _ _ _) = _ReadWriteHandle
+    hcon (_SocketHandle _ _) = \ a _ v -> _SocketHandle a v
 
 \end{code}
 

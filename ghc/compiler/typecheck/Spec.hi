@@ -14,7 +14,5 @@ import Subst(Subst)
 import TyVar(TyVar)
 import UniType(UniType)
 specId :: Id -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ((Expr Id TypecheckedPat, LIE, UniType), Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 7 _U_ 2002222 _N_ _S_ "U(LSLL)AALLLL" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 specTy :: InstOrigin -> UniType -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (([TyVar], [Inst], UniType), Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 2 _U_ 22002120 _N_ _N_ _N_ _N_ #-}
 

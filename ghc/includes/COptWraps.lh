@@ -185,7 +185,7 @@ void Yield_wrapper PROTO((W_));
 
 Call wrappers need to be able to call arbitrary functions, regardless of
 their arguments and return types.  (Okay, we actually only allow up to
-five arguments, because on the sparc it gets more complicated to handle
+five arguments, because on the SPARC it gets more complicated to handle
 any more.)  The nasty bit is that the return value can be in either an
 integer register or a floating point register, and we don't know which.
 (We {\em don't} handle structure returns, and we don't want to.)
@@ -200,7 +200,7 @@ chock full of assembly gook for the current platform.  These are
 results, and @MAGIC_RETURN@, which collects all possible results back
 up again.
 
-For example, in the sparc version, the @SETUP@ guarantees that we
+For example, in the SPARC version, the @SETUP@ guarantees that we
 have enough space to store all of our argument registers for a wee
 bit, and it gives a `C' name to the register that we're going to use
 for the call.  (It helps to do the call in actual `C' fashion, so that
@@ -223,8 +223,7 @@ gets whatever it's after.
 
 #if defined(__GNUC__) && defined(__STG_GCC_REGS__)
 
-#if alpha_dec_osf1_TARGET
-    /* Is this too specific */
+#if alpha_TARGET_ARCH
 
 #define MAGIC_CALL_SETUP	\
     long WeNeedThisSpace[7];  	\
@@ -277,7 +276,7 @@ gets whatever it's after.
 
 #define SET_RETADDR(loc)  { register StgFunPtrFunPtr ra __asm__ ("$26"); loc = ra; }
 
-#define WRAPPER_SETUP(f)  SaveAllStgContext();
+#define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
 #define WRAPPER_RETURN(x)   \
     do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
@@ -296,8 +295,7 @@ gets whatever it's after.
 
 \begin{code}
 
-#if hppa1_1_hp_hpux_TARGET
-    /* Is this too specific */
+#if hppa1_1_TARGET_ARCH
 
 #define MAGIC_CALL_SETUP	    \
     long SavedIntArgRegs[4];	    \
@@ -353,7 +351,7 @@ gets whatever it's after.
 
 #define SET_RETADDR(loc)  __asm__ volatile ("stw %%r2, %0" : "=m" ((void *)(loc)));
 
-#define WRAPPER_SETUP(f)  SaveAllStgContext();
+#define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
 #define WRAPPER_RETURN(x)   \
     do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
@@ -371,65 +369,57 @@ gets whatever it's after.
 %************************************************************************
 
 \begin{code}
-
-#if i386_TARGET_ARCH || i486_TARGET_ARCH
+#if i386_TARGET_ARCH
 
 /* modelled loosely on SPARC stuff */
 
 /* NB: no MAGIC_CALL_SETUP, MAGIC_CALL, or MAGIC_RETURN! */
 
-#define WRAPPER_NAME(f)	  __asm__("L" #f "_wrapper")
+#define WRAPPER_NAME(f) /*nothing*/
 
+#ifdef solaris2_TARGET_OS
+#define REAL_NAME(f)   #f
+#else
 #define REAL_NAME(f)   "_" #f
+#endif
 
-/* when we come into PerformGC_wrapper:
+/* 
+   Threaded code needs to be able to grab the return address, in case we have
+   an intervening context switch.
+ */
 
-    - %esp holds Hp (!); get it into 80(%ebx) -- quick!
+#define SET_RETADDR(loc,val) loc = val;
 
-    - %esp needs to be bumped by (at least) 4, because
-      C thinks an argument was passed on the stack
-      (use 64 just for fun)
+/* the grab-%eax-quickly HACK is here because we use a VERY SPECIAL
+   calling convention on iX86 just for calling PerformGC_wrapper.
+   (WDP 95/09)
 
-    - %eax holds the argument for PerformGC
-
-    - 104(%ebx) hold the return address -- address we want to
-      go back to
-
-    - 100(%ebx) holds a %esp value that we can re-load with
-      if need be
-
+   NB: mangler makes sure that __temp_{eax,esp} get loaded.
+   (This is about as ugly as it can get.)
 */
-#define WRAPPER_SETUP(f)		    	\
-    __asm__ volatile (			    	\
-        ".globl " REAL_NAME(f) "_wrapper\n" 	\
-        REAL_NAME(f) "_wrapper:\n"	    	\
-        "\tmovl %%esp,80(%%ebx)\n"	    	\
-        "\tmovl 100(%%ebx),%%esp\n"		\
-        "\tmovl %%eax,%0\n"			\
-	"\tincl _SP_stack_ptr\n"		\
-	"\tmovl _SP_stack_ptr,%%eax\n"		\
-	"\tmovl %%esp,_SP_stack(,%%eax,4)\n"	\
-	"\tsubl $64,%%esp"			\
-	: "=r" (args));				\
-    SaveAllStgContext();
 
-#define WRAPPER_RETURN(x)			\
-    do {P_ foo;					\
-	RestoreAllStgRegs();			\
-	if(x) JMP_(EnterNodeCode); /* never used? */ \
-	__asm__ volatile (			\
-	"movl %1,%0\n"				\
-	"\tmovl %0,_MainRegTable+100"		\
-	: "=r" (foo) : "m" (SP_stack[SP_stack_ptr--]) ); \
-	__asm__ volatile (			\
-	"movl 80(%ebx),%esp\n"			\
-	"\tjmp *104(%ebx)" );			\
-    } while(0);
+#define WRAPPER_SETUP(f,ret_addr,args)			\
+    __asm__ volatile (					\
+    	"movl "   REAL_NAME(__temp_esp)  ",%%edx\n"	\
+	"\tmovl (%%edx),%0\n"				\
+	"\tmovl " REAL_NAME(__temp_eax) ",%1"		\
+    	: "=r" (ret_addr), "=r" (args) );		\
+    SaveAllStgContext(ret_addr);
+
+/* Note re WRAPPER_SETUP: we have special code just for PerformGC_wrapper;
+   pls see its definition.  WDP 95/09
+
+   Also note the EXTREMELY UGLY slamming in of an "sp_offset"; the
+   return address *is* on the stack, but it is hard to get there
+   before GCC has moved the sp pointer... WDP 95/11
+*/
+
+#define WRAPPER_RETURN(x)   \
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
 
 #define SEPARATE_WRAPPER_RESTORE    /* none */
 
 #endif /* iX86 */
-
 \end{code}
 
 %************************************************************************
@@ -466,7 +456,7 @@ gets whatever it's after.
 
 #define WRAPPER_NAME(f)	  /* nothing */
 
-#define WRAPPER_SETUP(f)  SaveAllStgContext();
+#define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
 #define WRAPPER_RETURN(x)  \
     do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
@@ -513,7 +503,7 @@ gets whatever it's after.
 
 #define WRAPPER_NAME(f)	  /* nothing */
 
-#define WRAPPER_SETUP(f)  SaveAllStgContext();
+#define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
 
 #define WRAPPER_RETURN(x)  \
     do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
@@ -521,6 +511,52 @@ gets whatever it's after.
 #define SEPARATE_WRAPPER_RESTORE    /* none */
 
 #endif /* mips */
+\end{code}
+
+%************************************************************************
+%*									*
+\subsubsection[powerpc-magic]{Call-wrapper MAGIC for PowerPC}
+%*									*
+%************************************************************************
+
+\begin{code}
+#if powerpc_TARGET_ARCH
+
+/* shift 4 arg registers down one */
+
+#define MAGIC_CALL_SETUP  \
+    register void (*f)() __asm__("$2");	\
+    __asm__ volatile (			\
+    "move $2,$4\n"			\
+    "\tmove $4,$5\n"			\
+    "\tmove $5,$6\n"			\
+    "\tmove $6,$7\n"			\
+    "\tlw $7,16($sp)\n"			\
+    "\taddu $sp,$sp,4\n"		\
+    : : : "$2" );
+
+#define MAGIC_CALL		\
+    (*f)();   	    		\
+     __asm__ volatile (		\
+    "subu $sp,$sp,4\n"		\
+    "\ts.d $f0, -8($sp)\n"  	\
+    "\tsw  $2, -12($sp)");
+
+#define MAGIC_RETURN		\
+    __asm__ volatile (		\
+    "l.d $f0, -8($sp)\n"	\
+    "\tlw  $2, -12($sp)");
+
+#define WRAPPER_NAME(f)	  /* nothing */
+
+#define WRAPPER_SETUP(f,ignore1,ignore2)  SaveAllStgContext();
+
+#define WRAPPER_RETURN(x)  \
+    do {RestoreAllStgRegs(); if(x) JMP_(EnterNodeCode);} while(0);
+
+#define SEPARATE_WRAPPER_RESTORE    /* none */
+
+#endif /* powerpc */
 \end{code}
 
 %************************************************************************
@@ -561,10 +597,10 @@ gets whatever it's after.
         "\tldd [%fp-32],%i0");
 
 /* 
-   We rename the entry points for wrappers so that we can
-   introduce a new entry point after the prologue.  We want to ensure
-   that the register window does not slide!  However, we insert a 
-   call to abort() to make gcc _believe_ that the window slid.
+   We rename the entry points for wrappers so that we can introduce a
+   new entry point after the prologue.  We want to ensure that the
+   register window does not slide!  However, we insert a call to
+   abort() to make gcc _believe_ that the window slid.
  */
 
 #define WRAPPER_NAME(f)	  __asm__("L" #f "_wrapper")
@@ -575,7 +611,7 @@ gets whatever it's after.
 #define REAL_NAME(f)   "_" #f
 #endif
 
-#define WRAPPER_SETUP(f)		    \
+#define WRAPPER_SETUP(f,ignore1,ignore2)    \
     __asm__ volatile (			    \
         ".global " REAL_NAME(f) "_wrapper\n"\
         REAL_NAME(f) "_wrapper:\n"	    \
@@ -587,15 +623,17 @@ gets whatever it's after.
 	"\tmov %i0,%o0\n"		    \
 	"\tmov %i1,%o1");
 /* 
- * In the above, we want to ensure that the arguments are both in the %i registers
- * and the %o registers, with the assumption that gcc will expect them now to be in
- * one or the other.  This is a terrible hack.
+ * In the above, we want to ensure that the arguments are both in the
+ * %i registers and the %o registers, with the assumption that gcc
+ * will expect them now to be in one or the other.  This is a terrible
+ * hack.
  */
 
 /* 
-   Threaded code needs to be able to grab the return address, in case we have
-   an intervening context switch.  Note that we want the address of the next
-   instruction to be executed, so we add 8 to the link address.
+   Threaded code needs to be able to grab the return address, in case
+   we have an intervening context switch.  Note that we want the
+   address of the next instruction to be executed, so we add 8 to the
+   link address.
  */
 
 #define SET_RETADDR(loc)	\

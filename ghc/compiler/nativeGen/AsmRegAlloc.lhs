@@ -11,7 +11,7 @@ module AsmRegAlloc (
 	FutureLive(..), RegLiveness(..), RegUsage(..), Reg(..),
 	MachineRegisters(..), MachineCode(..),
 
-	mkReg, runRegAllocate,
+	mkReg, runRegAllocate, runHairyRegAllocate,
 	extractMappedRegNos,
 
 	-- And, for self-sufficiency
@@ -35,20 +35,29 @@ import Util
 
 #if ! OMIT_NATIVE_CODEGEN
 
-#if sparc_TARGET_ARCH
-import SparcCode	-- ( SparcInstr, SparcRegs ) -- for specializing
-
-{-# SPECIALIZE
-    runRegAllocate :: SparcRegs -> [Int] -> (OrdList SparcInstr) -> [SparcInstr]
-  #-}
-#endif
-#if alpha_TARGET_ARCH
+# if alpha_TARGET_ARCH
 import AlphaCode	-- ( AlphaInstr, AlphaRegs ) -- for specializing
 
 {-# SPECIALIZE
     runRegAllocate :: AlphaRegs -> [Int] -> (OrdList AlphaInstr) -> [AlphaInstr]
   #-}
-#endif
+# endif
+
+# if i386_TARGET_ARCH
+import I386Code		-- ( I386Instr, I386Regs ) -- for specializing
+
+{-# SPECIALIZE
+    runRegAllocate :: I386Regs -> [Int] -> (OrdList I386Instr) -> [I386Instr]
+  #-}
+# endif
+
+# if sparc_TARGET_ARCH
+import SparcCode	-- ( SparcInstr, SparcRegs ) -- for specializing
+
+{-# SPECIALIZE
+    runRegAllocate :: SparcRegs -> [Int] -> (OrdList SparcInstr) -> [SparcInstr]
+  #-}
+# endif
 
 #endif
 
@@ -229,6 +238,17 @@ runRegAllocate regs reserve_regs instrs =
     simpleAlloc = simpleRegAlloc regs [] emptyFM flatInstrs
     hairyAlloc	= hairyRegAlloc regs reserve_regs flatInstrs
 
+runHairyRegAllocate		-- use only hairy for i386!
+    :: (MachineRegisters a, MachineCode b)
+    => a
+    -> [Int]
+    -> (OrdList b)
+    -> [b]
+
+runHairyRegAllocate regs reserve_regs instrs
+  = hairyRegAlloc regs reserve_regs flatInstrs
+  where
+    flatInstrs	= flattenOrdList instrs
 \end{code}
 
 Here is the simple register allocator.	Just dole out registers until

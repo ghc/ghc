@@ -63,10 +63,12 @@ Older code (less fancy ==> more reliable)
   DEBUG_UPDATES(frames)		Print "frames" update frames
   DEBUG_REGS()			Print register values
   DEBUG_MP()                    Print the MallocPtr Lists
+  DEBUG_TSO(tso)		(CONCURRENT) Print a Thread State Object
+
+Not yet implemented:
+  DEBUG_STKO(stko)		(CONCURRENT) Print a STacK Object
 
 \begin{code}
-#if defined(RUNTIME_DEBUGGING)
-
 #include "rtsdefs.h"
 \end{code}
 
@@ -76,8 +78,8 @@ NB: this assumes a.out files - won't work on Alphas.
 ToDo: At least add some #ifdefs
 
 \begin{code}
-#include <a.out.h>
-#include <stab.h>
+/* #include <a.out.h> */
+/* #include <stab.h> */
 /* #include <nlist.h> */
 
 #include <stdio.h>
@@ -99,26 +101,26 @@ static int max_table_size;
 static int table_size;
 static struct entry* table;
 
-static
-void reset_table( int size )
+static void
+reset_table( int size )
 {
   max_table_size = size;
   table_size = 0;
-  table = (struct entry *) malloc( size * sizeof( struct entry ) );
+  table = (struct entry *) stgMallocBytes(size * sizeof(struct entry), "reset_table");
 }
 
-static
-void prepare_table()
+static void
+prepare_table()
 {
   /* Could sort it... */
 }
 
-static
-void insert( unsigned value, int index, char *name )
+static void
+insert( unsigned value, int index, char *name )
 {
   if ( table_size >= max_table_size ) {
     fprintf( stderr, "Symbol table overflow\n" );
-    exit( 1 );
+    EXIT( 1 );
   }
   table[table_size].value = value;
   table[table_size].index = index;
@@ -126,8 +128,8 @@ void insert( unsigned value, int index, char *name )
   table_size = table_size + 1;
 }
 
-static
-int lookup( unsigned value, int *result )
+static int
+lookup( unsigned value, int *result )
 {
   int i;
   for( i = 0; i < table_size && table[i].value != value; ++i ) {
@@ -140,7 +142,8 @@ int lookup( unsigned value, int *result )
   }
 }
 
-static int lookup_name( char *name, unsigned *result )
+static int
+lookup_name( char *name, unsigned *result )
 {
   int i;
   for( i = 0; i < table_size && strcmp(name,table[i].name) != 0; ++i ) {
@@ -339,11 +342,13 @@ static void printName( P_ addr )
   }
 }
   
+#if 0		/* OMIT load-symbol stuff cos it doesn't work on Alphas */
+
 /* Fairly ad-hoc piece of code that seems to filter out a lot of
    rubbish like the obj-splitting symbols */
 
-static
-int isReal( unsigned char type, char *name )
+static int
+isReal( unsigned char type, char *name )
 {
   int external = type & N_EXT;
   int tp = type & N_TYPE;
@@ -355,7 +360,8 @@ int isReal( unsigned char type, char *name )
   }
 }
 
-void DEBUG_LoadSymbols( char *name )
+void
+DEBUG_LoadSymbols( char *name )
 {
   FILE *binary;
 
@@ -381,11 +387,11 @@ void DEBUG_LoadSymbols( char *name )
 
   if (fread( &header,  sizeof( struct exec ), 1, binary ) != 1) { 
     fprintf( stderr, "Can't read symbol table header.\n" );
-    exit( 1 );
+    EXIT( 1 );
   }
   if ( N_BADMAG( header ) ) {
     fprintf( stderr, "Bad magic number in symbol table header.\n" );
-    exit( 1 );
+    EXIT( 1 );
   }
 
 
@@ -395,41 +401,30 @@ void DEBUG_LoadSymbols( char *name )
   num_syms = sym_size / sizeof( struct nlist );
   fseek( binary, sym_offset, FROM_START );
 
-  symbol_table = (struct nlist *) malloc( sym_size );
-  if (symbol_table == NULL) {
-    fprintf( stderr, "Can't allocate symbol table of size %d\n", sym_size );
-    exit( 1 );
-  }
-
+  symbol_table = (struct nlist *) stgMallocBytes(sym_size, "symbol table (DEBUG_LoadSymbols)");
   printf("Reading %d symbols\n", num_syms);
 
   if (fread( symbol_table, sym_size, 1, binary ) != 1) {
     fprintf( stderr, "Can't read symbol table\n");
-    exit( 1 );
+    EXIT( 1 );
   }
-
-
 
   str_offset = N_STROFF( header );
   fseek( binary, str_offset, FROM_START );
 
   if (fread( &str_size, 4, 1, binary ) != 1) {
     fprintf( stderr, "Can't read string table size\n");
-    exit( 1 );
+    EXIT( 1 );
   }
 
   /* apparently the size of the string table includes the 4 bytes that
    * store the size...
    */
-  string_table = (char *) malloc( str_size );
-  if (string_table == NULL) {
-    fprintf( stderr, "Can't allocate string table of size %d\n", str_size );
-    exit( 1 );
-  }
+  string_table = (char *) stgMallocBytes(str_size, "string table (DEBUG_LoadSymbols)");
 
   if (fread( string_table+4, str_size-4, 1, binary ) != 1) {
     fprintf( stderr, "Can't read string table\n");
-    exit( 1 );
+    EXIT( 1 );
   }
 
   num_real_syms = 0;
@@ -478,6 +473,7 @@ void DEBUG_LoadSymbols( char *name )
 
   prepare_table();
 }
+#endif /* 0 */
 \end{code}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -510,8 +506,7 @@ static int DEBUG_details = 2;
 
 \begin{code}
 /* Determine the size and number of pointers for this kind of closure */
-static
-void 
+static void 
 getClosureShape( P_ node, int *vhs, int *size, int *ptrs, char **type )
 {
   /* The result is used for printing out closure contents.  If the
@@ -718,28 +713,26 @@ getClosureShape( P_ node, int *vhs, int *size, int *ptrs, char **type )
     }
 }  
 
-static
-void 
+static void 
 printWord( W_ word )
 {
   printf("0x%08lx", word);
 }
 
-static
-void
+static void
 printAddress( P_ address )
 {
-#ifdef PAR
+# ifdef CONCURRENT
   PP_ SpA  = STKO_SpA(SAVE_StkO);
   PP_ SuA  = STKO_SuA(SAVE_StkO);
   P_  SpB  = STKO_SpB(SAVE_StkO);
   P_  SuB  = STKO_SuB(SAVE_StkO);
-#else
+# else
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
   P_  SpB  = SAVE_SpB;
   P_  SuB  = SAVE_SuB;
-#endif
+# endif
   P_  Hp   = SAVE_Hp;
 
   PP_ botA = stackInfo.botA;
@@ -753,9 +746,13 @@ printAddress( P_ address )
   /* The @-1@s in stack comparisions are because we sometimes use the
      address of just below the stack... */
 
+#if 0
   if (lookupForName( address, &name )) {
     printZcoded( name );
-  } else {
+  }
+  else
+#endif
+  {
     if (DEBUG_details > 1) {
       printWord( (W_) address );
       printf(" : ");
@@ -773,8 +770,7 @@ printAddress( P_ address )
   }
 }
 
-static
-void
+static void
 printIndentation( int indentation )
 {
   int i;
@@ -782,15 +778,14 @@ printIndentation( int indentation )
 }
 
 /* The weight parameter is used to (eventually) break cycles */
-static 
-void 
+static void 
 printStandardShapeClosure( 
       int indentation, 
       int weight, 
       P_ closure, int vhs, int size, int noPtrs
 )
 {
-#ifdef PAR
+#ifdef CONCURRENT
   PP_ SpA  = STKO_SpA(SAVE_StkO);
   PP_ SuA  = STKO_SuA(SAVE_StkO);
   P_  SpB  = STKO_SpB(SAVE_StkO);
@@ -1013,7 +1008,8 @@ minimum(int a, int b)
   }
 }
 
-void DEBUG_PrintA( int depth, int weight )
+void
+DEBUG_PrintA( int depth, int weight )
 {
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
@@ -1034,7 +1030,8 @@ void DEBUG_PrintA( int depth, int weight )
   }
 }
 
-void DEBUG_PrintB( int depth, int weight )
+void
+DEBUG_PrintB( int depth, int weight )
 {
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
@@ -1111,10 +1108,10 @@ ToDo:
 
 \begin{code}
 /* How many real stacks are there on SpA and SpB? */
-static
-int numStacks( )
+static int
+numStacks( )
 {
-#ifdef PAR
+#ifdef CONCURRENT
   PP_ SpA  = STKO_SpA(SAVE_StkO);
   PP_ SuA  = STKO_SuA(SAVE_StkO);
   P_  SpB  = STKO_SpB(SAVE_StkO);
@@ -1136,8 +1133,8 @@ int numStacks( )
   return depth;
 }
 
-static
-void printLocalAStack( int depth, int indentation, int weight, PP_ SpA, int size )
+static void
+printLocalAStack( int depth, int indentation, int weight, PP_ SpA, int size )
 {
   int i;
 
@@ -1153,8 +1150,8 @@ void printLocalAStack( int depth, int indentation, int weight, PP_ SpA, int size
   }
 }
 
-static
-void printLocalBStack( int depth, int indentation, int weight, P_ SpB, int size )
+static void
+printLocalBStack( int depth, int indentation, int weight, P_ SpB, int size )
 {
   int i;
 
@@ -1170,8 +1167,8 @@ void printLocalBStack( int depth, int indentation, int weight, P_ SpB, int size 
   }
 }
 
-static
-void printEnvironment( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
+static void
+printEnvironment( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
 {
   int sizeA = SUBTRACT_A_STK(SpA, SuA);
   int sizeB = SUBTRACT_B_STK(SpB, SuB);
@@ -1215,8 +1212,8 @@ ToDo:
 \begin{code}
 static int maxDepth = 5;
 
-static
-int printCases( int depth, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
+static int
+printCases( int depth, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
 {
   int indentation;
 
@@ -1255,8 +1252,8 @@ int printCases( int depth, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
 
 /* ToDo: pay more attention to format of vector tables in SMupdate.lh */
 
-static
-int isVTBLEntry( P_ entry )
+static int
+isVTBLEntry( P_ entry )
 {
   char *raw;
 
@@ -1273,8 +1270,8 @@ int isVTBLEntry( P_ entry )
   }
 }
 
-static
-void printVectorTable( int indentation, PP_ vtbl )
+static void
+printVectorTable( int indentation, PP_ vtbl )
 {
   if (isVTBLEntry( (P_) vtbl )) { /* Direct return */
     printName( (P_) vtbl );
@@ -1290,8 +1287,8 @@ void printVectorTable( int indentation, PP_ vtbl )
   }
 }
 
-static
-void printContinuations( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
+static void
+printContinuations( int depth, int indentation, int weight, PP_ SpA, PP_ SuA, P_ SpB, P_ SuB )
 {
   if (depth < maxDepth && SUBTRACT_B_STK(SuB, stackInfo.botB) >= 0) {
     PP_ nextSpA, nextSuA;
@@ -1340,10 +1337,10 @@ void printContinuations( int depth, int indentation, int weight, PP_ SpA, PP_ Su
   }
 }
 
-
-void DEBUG_Where( int depth, int weight )
+void
+DEBUG_Where( int depth, int weight )
 {
-#ifdef PAR
+#ifdef CONCURRENT
   PP_ SpA  = STKO_SpA(SAVE_StkO);
   PP_ SuA  = STKO_SuA(SAVE_StkO);
   P_  SpB  = STKO_SpB(SAVE_StkO);
@@ -1380,11 +1377,9 @@ void DEBUG_Where( int depth, int weight )
 
 
 \begin{code}
-#if defined(RUNTIME_DEBUGGING)
-
 void
 DEBUG_INFO_TABLE(node)
-P_ node;
+  P_ node;
 {
   int vhs, size, ptrs; /* not used */
   char *ip_type;
@@ -1404,9 +1399,9 @@ P_ node;
   fprintf(stderr,"Enter Flush Entry: 0x%lx;\tExit Flush Entry: 0x%lx\n",INFO_FLUSHENT(info_ptr),INFO_FLUSH(info_ptr));
 #endif /* PAR */
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
   fprintf(stderr,"Cost Centre:       0x%lx\n",INFO_CAT(info_ptr));
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 
 #if defined(_INFO_COPYING)
   fprintf(stderr,"Evacuate Entry:    0x%lx;\tScavenge Entry: 0x%lx\n",
@@ -1428,7 +1423,7 @@ P_ node;
 void
 DEBUG_REGS()
 {
-#ifdef PAR
+#ifdef CONCURRENT
   PP_ SpA  = STKO_SpA(SAVE_StkO);
   PP_ SuA  = STKO_SuA(SAVE_StkO);
   P_  SpB  = STKO_SpB(SAVE_StkO);
@@ -1481,6 +1476,8 @@ DEBUG_REGS()
   fprintf(stderr,"Dble:  %8g, %8g\n",DblReg1,DblReg2);
 }
 
+#ifndef CONCURRENT
+
 void
 DEBUG_MP()
 {
@@ -1500,7 +1497,7 @@ DEBUG_MP()
 */
   }
 
-#if defined(GCap) || defined(GCgn)
+# if defined(GCap) || defined(GCgn)
   fprintf(stderr,"\nOldMallocPtr List\n\n");
 
   for(mp = StorageMgrInfo.OldMallocPtrList; 
@@ -1512,12 +1509,11 @@ DEBUG_MP()
    DEBUG_PRINT_NODE(mp);
 */
   }
-#endif /* GCap || GCgn */
+# endif /* GCap || GCgn */
 
   fprintf(stderr, "\n");
 }
 
-#ifndef PAR
 void
 DEBUG_SPT(int weight)
 { 
@@ -1555,23 +1551,21 @@ DEBUG_SPT(int weight)
   fprintf(stderr, "\n\n");
 
 }
-#endif /* !PAR */       
-
+#endif /* !CONCURRENT */       
 
 /*
   These routines crawl over the A and B stacks, printing
   a maximum "lines" lines at the top of the stack.
 */
 
-
 #define	STACK_VALUES_PER_LINE	5
 
-#if !defined(PAR)
+#ifndef CONCURRENT
 /* (stack stuff is really different on parallel machines) */
 
 void
 DEBUG_ASTACK(lines)
-I_ lines;
+  I_ lines;
 {
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
@@ -1599,10 +1593,9 @@ I_ lines;
   fprintf(stderr, "\n");
 }
 
-
 void
 DEBUG_BSTACK(lines)
-I_ lines;
+  I_ lines;
 {
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
@@ -1629,49 +1622,76 @@ I_ lines;
       }
   fprintf(stderr, "\n");
 }
-#endif /* not parallel */
+#endif /* not concurrent */
 
 /*
   This should disentangle update frames from both stacks.
 */
 
-#if ! defined(PAR)
+#ifndef CONCURRENT
 void
 DEBUG_UPDATES(limit)
-I_ limit;
+  I_ limit;
 {
   PP_ SpA  = SAVE_SpA;
   PP_ SuA  = SAVE_SuA;
   P_  SpB  = SAVE_SpB;
   P_  SuB  = SAVE_SuB;
 
-  P_ updatee, retreg;
-  PP_ sua;
-  P_ sub;
-  PP_ spa = SuA;
-  P_ spb = SuB;
-  I_ count = 0;
+  P_  updatee, retreg;
+  PP_ sua, spa;
+  P_  sub, spb;
+  I_  count = 0;
 
   fprintf(stderr,"Update Frame Stack Dump:\n\n");
   
-  for(spb = SuB;
+  for(spa = SuA, spb = SuB;
       SUBTRACT_B_STK(spb, stackInfo.botB) > 0 && count++ < limit;
-      /* re-init given explicitly */)
-    {
+      spa = GRAB_SuA(spb), spb = GRAB_SuB(spb) ) {
+
       updatee = GRAB_UPDATEE(spb); 	   /* Thing to be updated  */
       retreg  = (P_) GRAB_RET(spb); 	   /* Return vector below */
 
-      fprintf(stderr,"SuA: 0x%08lx, SuB: 0x%08lx, Updatee 0x%08lx, RetReg 0x%x\n",
+      fprintf(stderr,"SuA: 0x%08lx, SuB: 0x%08lx, Updatee 0x%08lx (Info 0x%08lx), RetReg 0x%x\n",
 	             (W_) spa, (W_) spb,
-		     (W_) updatee, (W_) retreg);
+		     (W_) updatee, (W_) INFO_PTR(updatee), (W_) retreg);
+  }
+}
 
-      spa = GRAB_SuA(spb);                 /* Next SuA, SuB */
-      spb = GRAB_SuB(spb);
+#endif /* not concurrent */
+\end{code}
+
+\begin{code}
+#ifdef CONCURRENT
+
+void
+DEBUG_TSO(P_ tso)
+{
+    STGRegisterTable *r = TSO_INTERNAL_PTR(tso);
+    W_ liveness = r->rLiveness;
+    I_ i;
+
+    fprintf(stderr,"TSO:\ntso=%lx, regs=%lx, liveness=%lx\nlink=%lx,name=%lx,id=%lx,type=%lx,pc1=%lx,arg1=%lx,switch=%lx\n"
+	    , tso
+	    , r
+	    , liveness
+	    , TSO_LINK(tso)
+	    , TSO_NAME(tso)
+	    , TSO_ID(tso)
+	    , TSO_TYPE(tso)
+	    , TSO_PC1(tso)
+	    , TSO_ARG1(tso)
+	    , TSO_SWITCH(tso)
+	    );
+
+    for (i = 0; liveness != 0; liveness >>= 1, i++) {
+    	if (liveness & 1) {
+	    fprintf(stderr, "live reg %d (%lx)\n",i, r->rR[i].p);
+    	} else {
+	    fprintf(stderr, "reg %d (%lx) not live\n", i, r->rR[i].p);
+	}
     }
 }
-#endif /* not parallel */
 
-#endif /* RUNTIME_DEBUGGING */
-
-#endif /* PAR || RUNTIME_DEBUGGING */
+#endif /* concurrent */
 \end{code}

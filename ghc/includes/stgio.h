@@ -14,7 +14,7 @@ StgInt closeFile PROTO((StgAddr));
 StgInt createDirectory PROTO((StgByteArray));
 
 /* env.lc */
-char *	strdup		PROTO((const char *));
+char *	strdup		PROTO((char *));
 int	setenviron	PROTO((char **));
 int	copyenv		(STG_NO_ARGS);
 int	setenv		PROTO((char *));
@@ -58,7 +58,7 @@ StgInt	getBufferMode PROTO((StgAddr));
 StgInt	getClockTime PROTO((StgByteArray, StgByteArray));
 
 /* getCPUTime.lc */
-StgAddr getCPUTime(STG_NO_ARGS);
+StgByteArray getCPUTime PROTO((StgByteArray));
 
 /* getCurrentDirectory.lc */
 StgAddr getCurrentDirectory(STG_NO_ARGS);
@@ -105,19 +105,19 @@ StgInt	setBuffering PROTO((StgAddr, StgInt));
 StgInt setCurrentDirectory PROTO((StgByteArray));
 
 /* showTime.lc */
-StgAddr showTime PROTO((StgInt, StgByteArray));
+StgAddr showTime PROTO((StgInt, StgByteArray, StgByteArray));
 
 /* system.lc */
 StgInt	systemCmd PROTO((StgByteArray));
 
 /* toLocalTime.lc */
-StgAddr toLocalTime PROTO((StgInt, StgByteArray));
+StgAddr toLocalTime PROTO((StgInt, StgByteArray, StgByteArray));
 
 /* toUTCTime.lc */
-StgAddr toUTCTime PROTO((StgInt, StgByteArray));
+StgAddr toUTCTime PROTO((StgInt, StgByteArray, StgByteArray));
 
 /* toClockSec.lc */
-StgAddr toClockSec PROTO((StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt));
+StgAddr toClockSec PROTO((StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgInt, StgByteArray));
 
 /* writeFile.lc */
 StgInt	writeFile PROTO((StgAddr, StgAddr, StgInt));

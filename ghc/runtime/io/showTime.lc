@@ -13,35 +13,36 @@
 #endif
 
 StgAddr
-showTime(size, d)
+showTime(size, d, buf)
 StgInt size;
 StgByteArray d;
+StgByteArray buf;
 {
     time_t t;
     struct tm *tm;
-    static char buf[32];
 
     switch(size) {
 	default:
-	    return (StgAddr) "ClockTime.show{LibTime}: out of range";
+            return (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: out of range");
 	case 0:
 	    t = 0;
 	    break;
 	case -1:
 	    t = - (time_t) ((StgInt *)d)[0];
 	    if (t > 0) 
-		return (StgAddr) "ClockTime.show{LibTime}: out of range";
+                return
+ (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: out of range");
 	    break;
 	case 1:
 	    t = (time_t) ((StgInt *)d)[0];
 	    if (t < 0) 
-		return (StgAddr) "ClockTime.show{LibTime}: out of range";
+               return (StgAddr) strcpy(buf, "ClockTime.show{LibTime}: out of range");
 	    break;
 	}
     tm = localtime(&t);
-    if (tm != NULL && strftime(buf, sizeof(buf), "%a %b %d %T %Z %Y", tm) > 0)
-	    return (StgAddr) buf;
-    return (StgAddr) "ClockTime.show{LibTime}: internal error";
+    if (tm != NULL && strftime(buf, 32 /*Magic number*/, "%a %b %d %T %Z %Y", tm) > 0)
+       return (StgAddr)buf;
+    return (StgAddr)strcpy(buf, "ClockTime.show{LibTime}: internal error");
 }
 
 \end{code}

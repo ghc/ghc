@@ -36,7 +36,7 @@ module CgMonad (
 --	addFreeASlots,	-- no need to export it
 	addFreeBSlots,	-- ToDo: Belong elsewhere
 
-	isSwitchSetC, isStringSwitchSetC,
+	isSwitchSetC, isStringSwitchSetC, getIntSwitchChkrC,
 
 	noBlackHolingFlag,
 	profCtrC, --UNUSED: concurrentC,
@@ -50,7 +50,7 @@ module CgMonad (
 	CgBindings(..),
 	CgInfoDownwards(..), CgState(..),	-- non-abstract
 	CgIdInfo, -- abstract
-	CompilationInfo(..),
+	CompilationInfo(..), IntSwitchChecker(..),
 	GlobalSwitch, -- abstract
 
 	stableAmodeIdInfo, heapIdInfo,
@@ -111,8 +111,11 @@ data CompilationInfo
   = MkCompInfo
 	(GlobalSwitch -> Bool)
 			-- use it to look up whatever we like in command-line flags
+	IntSwitchChecker-- similar; for flags that have an Int assoc.
+			-- with them, notably number of regs available.
 	FAST_STRING	-- the module name
-		
+
+type IntSwitchChecker = (Int -> GlobalSwitch) -> Maybe Int
 
 data CgState
   = MkCgState
@@ -599,17 +602,22 @@ nothing.
 \begin{code}
 isSwitchSetC :: GlobalSwitch -> FCode Bool
 
-isSwitchSetC switch (MkCgInfoDown (MkCompInfo sw_chkr _) _ _) state
+isSwitchSetC switch (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
   = (sw_chkr switch, state)
 
 isStringSwitchSetC :: (String -> GlobalSwitch) -> FCode Bool
 
-isStringSwitchSetC switch (MkCgInfoDown (MkCompInfo sw_chkr _) _ _) state
+isStringSwitchSetC switch (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
   = (sw_chkr (switch (panic "isStringSwitchSetC")), state)
+
+getIntSwitchChkrC :: FCode IntSwitchChecker
+
+getIntSwitchChkrC (MkCgInfoDown (MkCompInfo _ isw_chkr _) _ _) state
+  = (isw_chkr, state)
 
 costCentresC :: FAST_STRING -> [CAddrMode] -> Code
 
-costCentresC macro args (MkCgInfoDown (MkCompInfo sw_chkr _) _ _)
+costCentresC macro args (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
 			state@(MkCgState absC binds usage)
   = if sw_chkr SccProfilingOn
     then MkCgState (mkAbsCStmts absC (CCallProfCCMacro macro args)) binds usage
@@ -617,7 +625,7 @@ costCentresC macro args (MkCgInfoDown (MkCompInfo sw_chkr _) _ _)
 
 profCtrC :: FAST_STRING -> [CAddrMode] -> Code
 
-profCtrC macro args (MkCgInfoDown (MkCompInfo sw_chkr _) _ _)
+profCtrC macro args (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
 			state@(MkCgState absC binds usage)
   = if not (sw_chkr DoTickyProfiling)
     then state
@@ -635,7 +643,7 @@ profCtrC macro args (MkCgInfoDown (MkCompInfo sw_chkr _) _ _)
 {- UNUSED, as it happens:
 concurrentC :: AbstractC -> Code
 
-concurrentC more_absC (MkCgInfoDown (MkCompInfo sw_chkr _) _ _)
+concurrentC more_absC (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _)
 			state@(MkCgState absC binds usage)
   = if not (sw_chkr ForConcurrent)
     then state
@@ -661,17 +669,17 @@ getAbsC code info_down (MkCgState absC binds usage)
 \begin{code}
 noBlackHolingFlag, costCentresFlag :: FCode Bool
 
-noBlackHolingFlag (MkCgInfoDown (MkCompInfo sw_chkr _) _ _) state
+noBlackHolingFlag (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
   = (sw_chkr OmitBlackHoling, state)
 
-costCentresFlag	  (MkCgInfoDown (MkCompInfo sw_chkr _) _ _) state
+costCentresFlag	  (MkCgInfoDown (MkCompInfo sw_chkr _ _) _ _) state
   = (sw_chkr SccProfilingOn, state)
 \end{code}
 
 \begin{code}
 
 moduleName :: FCode FAST_STRING
-moduleName (MkCgInfoDown (MkCompInfo _ mod_name) _ _) state
+moduleName (MkCgInfoDown (MkCompInfo _ _ mod_name) _ _) state
   = (mod_name, state)
 
 \end{code}

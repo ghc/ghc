@@ -61,11 +61,10 @@ instance Enum Bool where
 
 ----------------------------------------------------------------------
 instance Text Bool where
-    readsPrec p
-      = readParen (p > 9)
-            (\ b -> [ (False, c) | ("False", c) <- lex b ]
-		 ++ [ (True,  c) | ("True",  c) <- lex b ])
+    readsPrec p r
+      = readParen False (\ b -> [ (False, c) | ("False", c) <- lex b ]) r
+     ++ readParen False (\ b -> [ (True,  c) | ("True",  c) <- lex b ]) r
 
-    showsPrec d p r = (if p then "True" else "False") ++ r
+    showsPrec d p = showString (if p then "True" else "False")
 
 -- ToDo: Binary

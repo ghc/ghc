@@ -14,9 +14,6 @@ import SrcLoc(SrcLoc)
 import UniType(UniType)
 import UniqFM(UniqFM)
 match :: [Id] -> [EquationInfo] -> [EquationInfo] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (MatchResult, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 3 _U_ 222222222 _N_ _S_ "SSS" _N_ _N_ #-}
 matchSimply :: CoreExpr Id Id -> TypecheckedPat -> UniType -> CoreExpr Id Id -> CoreExpr Id Id -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222222222 _N_ _S_ "SLLLL" _N_ _N_ #-}
 matchWrapper :: DsMatchKind -> [Match Id TypecheckedPat] -> [Char] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (([Id], CoreExpr Id Id), Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 3 _U_ 222222222 _N_ _S_ "LSL" _N_ _N_ #-}
 

@@ -188,6 +188,9 @@ g_tagfun(typid)
 {
     fprintf(fh, "#ifdef __GNUC__\n");
 
+    /* to satisfy GCC when in really-picky mode: */
+    fprintf(fh, "T%s t%s(%s t);\n", typid, typid, typid);
+    /* the real thing: */
     fprintf(fh, "extern __inline__ T%s t%s(%s t)\n{\n\treturn(t -> tag);\n}\n",
 		typid, typid, typid);
 
@@ -238,19 +241,37 @@ gencons(typid, t)
   id typid;
   tree t; /* of kind 'def'. */
 {
+	tree itemlist = gditemlist(t);
+
 	fprintf(fh, "extern %s mk%s PROTO((", typid, gdid(t));
-	genmkprotodekl(gditemlist(t));
+	switch (ttree(itemlist)) {
+	  case emitemlist: /* empty list */
+	    fprintf(fh, "void");
+	    break;
+	  default:
+	    genmkprotodekl(itemlist);
+	    break;
+	}
 	fprintf(fh, "));\n");
 
 	fprintf(fc, "%s mk%s(", typid, gdid(t));
-	genmkparamlist(gditemlist(t));
+	switch (ttree(itemlist)) {
+	  case emitemlist: /* empty list */
+	    fprintf(fc, "void");
+	    break;
+	  default:
+	    genmkparamlist(itemlist);
+	    break;
+	}
 	fprintf(fc, ")\n");
-	genmkparamdekl(gditemlist(t));
+
+	genmkparamdekl(itemlist);
+
 	fprintf(fc, "{\n\tregister struct S%s *pp =\n", gdid(t));
 	fprintf(fc, "\t\t(struct S%s *) malloc(sizeof(struct S%s));\n",
 		    gdid(t), gdid(t));
 	fprintf(fc, "\tpp -> tag = %s;\n", gdid(t));
-	genmkfillin(gditemlist(t));
+	genmkfillin(itemlist);
 	fprintf(fc, "\treturn((%s)pp);\n", typid);
 	fprintf(fc, "}\n");
 }
@@ -354,6 +375,10 @@ gensels(typid, variantid, t)
 	  case item:
 		fprintf(fh, "#ifdef __GNUC__\n");
 
+		/* to satisfy GCC when in extremely-picky mode: */
+		fprintf(fh, "\n%s *R%s PROTO((struct S%s *));\n", 
+			     gitemtypid(t), gitemfunid(t), variantid);
+		/* the real thing: */
 		fprintf(fh, "\nextern __inline__ %s *R%s(struct S%s *t)\n{\n", 
 			     gitemtypid(t), gitemfunid(t), variantid);
 		fprintf(fh, "#ifdef UGEN_DEBUG\n");

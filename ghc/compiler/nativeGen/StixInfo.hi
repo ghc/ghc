@@ -1,9 +1,8 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface StixInfo where
-import AbsCSyn(AbstractC)
-import MachDesc(Target)
+import AbsCSyn(AbstractC, CAddrMode)
+import HeapOffs(HeapOffset)
 import SplitUniq(SplitUniqSupply)
 import Stix(StixTree)
-genCodeInfoTable :: Target -> AbstractC -> SplitUniqSupply -> [StixTree] -> [StixTree]
-	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
+genCodeInfoTable :: (HeapOffset -> Int) -> (CAddrMode -> StixTree) -> AbstractC -> SplitUniqSupply -> [StixTree] -> [StixTree]
 

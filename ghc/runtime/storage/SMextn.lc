@@ -63,7 +63,7 @@ TrashMem(from, to)
 {
 /* assertion overly strong - if free_mem == 0, sm->hp == sm->hplim */
 /*  ASSERT( from <= to ); */
-    if (SM_trace)
+    if (RTSflags.GcFlags.trace)
 	printf("Trashing from 0x%lx to 0x%lx inclusive\n", (W_) from, (W_) to);
     while (from <= to) {
 	*from++ = DEALLOCATED_TRASH;
@@ -113,10 +113,11 @@ themselves, we'll trash its contents when we're done with it.
 void
 Trash_MallocPtr_Closure(mptr)
   P_ mptr;
-{ int i;
-  for( i = 0; i != MallocPtr_SIZE + _FHS; i++ ) {
-    mptr[ i ] = DEALLOCATED_TRASH;
-  }
+{
+    int i;
+    for( i = 0; i < MallocPtr_SIZE + _FHS; i++ ) {
+      mptr[ i ] = DEALLOCATED_TRASH;
+    }
 }
 \end{code}
 
@@ -160,7 +161,7 @@ void
 Trace_MallocPtr( MPptr )
   P_ MPptr;
 {
-  if (SM_trace & 16) {
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
     printf("DEBUG: MallocPtr(%lx)=<%lx,_,%lx,%lx,%lx>\n", (W_) MPptr, (W_) MPptr[0], (W_) MPptr[1], (W_) MPptr[2], (W_) MPptr[3]);
     printf(" Data = %lx, Next = %lx\n", 
 	(W_) MallocPtr_CLOSURE_DATA(MPptr), (W_) MallocPtr_CLOSURE_LINK(MPptr) );
@@ -170,7 +171,7 @@ Trace_MallocPtr( MPptr )
 void
 Trace_MPdies()
 {
-  if (SM_trace & 16) {
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
     printf(" dying\n");
   }
 }
@@ -178,8 +179,8 @@ Trace_MPdies()
 void
 Trace_MPlives()
 {
-  if (SM_trace & 16) { 
-    printf(" lived to tell the tale \n"); 
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) { 
+    printf(" lived to tell the tale\n"); 
   }
 }
 
@@ -187,7 +188,7 @@ void
 Trace_MPforwarded( MPPtr, newAddress )
   P_ MPPtr, newAddress;
 {
-  if (SM_trace & 16) {
+  if (RTSflags.GcFlags.trace & DEBUG_TRACE_MALLOCPTRS) {
     printf(" forwarded to %lx\n", (W_) newAddress);
   }
 }

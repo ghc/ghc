@@ -1,99 +1,48 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface CLabelInfo where
 import CharSeq(CSeq)
-import Class(Class)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
-import Maybes(Labda)
-import NameTypes(FullName)
+import Id(Id)
 import PreludePS(_PackedString)
 import Pretty(PprStyle, PrettyRep)
-import PrimKind(PrimKind)
 import TyCon(TyCon)
-import TyVar(TyVarTemplate)
-import UniType(UniType)
 import Unique(Unique)
 data CLabel 
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data TyCon 	{-# GHC_PRAGMA SynonymTyCon Unique FullName Int [TyVarTemplate] UniType Bool | DataTyCon Unique FullName Int [TyVarTemplate] [Id] [Class] Bool | TupleTyCon Int | PrimTyCon Unique FullName Int ([PrimKind] -> PrimKind) | SpecTyCon TyCon [Labda UniType] #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data Id 
+data TyCon 
+data Unique 
 cSEP :: _PackedString
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 charToC :: Char -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 charToEasyHaskell :: Char -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "U(P)" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 externallyVisibleCLabel :: CLabel -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 identToC :: _PackedString -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 1 _U_ 222 _N_ _S_ "S" _N_ _N_ #-}
 isAsmTemp :: CLabel -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 isReadOnly :: CLabel -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 mkAltLabel :: Unique -> Int -> CLabel
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkAsmTempLabel :: Unique -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkBlackHoleInfoTableLabel :: CLabel
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 mkClosureLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkConEntryLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkConUpdCodePtrVecLabel :: TyCon -> Int -> CLabel
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkDefaultLabel :: Unique -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkErrorStdEntryLabel :: CLabel
-	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 mkFastEntryLabel :: Id -> Int -> CLabel
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkInfoTableLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkInfoTableVecTblLabel :: TyCon -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkPhantomInfoTableLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkRednCountsLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkReturnPtLabel :: Unique -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkStaticConEntryLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkStaticInfoTableLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkStdEntryLabel :: Id -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkStdUpdCodePtrVecLabel :: TyCon -> Int -> CLabel
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkStdUpdVecTblLabel :: TyCon -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 mkVapEntryLabel :: Id -> Bool -> CLabel
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkVapInfoTableLabel :: Id -> Bool -> CLabel
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 mkVecTblLabel :: Unique -> CLabel
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 modnameToC :: _PackedString -> _PackedString
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 needsCDecl :: CLabel -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 pprCLabel :: PprStyle -> CLabel -> CSeq
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 stringToC :: [Char] -> [Char]
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 instance Eq CLabel
-	{-# GHC_PRAGMA _M_ CLabelInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(CLabel -> CLabel -> Bool), (CLabel -> CLabel -> Bool)] [_CONSTM_ Eq (==) (CLabel), _CONSTM_ Eq (/=) (CLabel)] _N_
-	 (==) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_,
-	 (/=) = _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
 instance Ord CLabel
-	{-# GHC_PRAGMA _M_ CLabelInfo {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 9 _!_ _TUP_8 [{{Eq CLabel}}, (CLabel -> CLabel -> Bool), (CLabel -> CLabel -> Bool), (CLabel -> CLabel -> Bool), (CLabel -> CLabel -> Bool), (CLabel -> CLabel -> CLabel), (CLabel -> CLabel -> CLabel), (CLabel -> CLabel -> _CMP_TAG)] [_DFUN_ Eq (CLabel), _CONSTM_ Ord (<) (CLabel), _CONSTM_ Ord (<=) (CLabel), _CONSTM_ Ord (>=) (CLabel), _CONSTM_ Ord (>) (CLabel), _CONSTM_ Ord max (CLabel), _CONSTM_ Ord min (CLabel), _CONSTM_ Ord _tagCmp (CLabel)] _N_
-	 (<) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (<=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>=) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 (>) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 max = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 min = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,
-	 _tagCmp = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 

@@ -120,7 +120,7 @@ because some are reloaded from constants.
 \begin{code}
 
 vsaves switches vols = 
-    map save ((filter callerSaves) ([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg,ActivityReg] ++ vols))
+    map save ((filter callerSaves) ([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg{-,ActivityReg-}] ++ vols))
     where
         save x = StAssign (kindFromMagicId x) loc reg
     	    	    where reg = StReg (StixMagicId x)
@@ -130,7 +130,7 @@ vsaves switches vols =
 
 vrests switches vols = 
     map restore ((filter callerSaves) 
-    	([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg,ActivityReg,StkStubReg,StdUpdRetVecReg] ++ vols))
+    	([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg{-,ActivityReg-},StkStubReg,StdUpdRetVecReg] ++ vols))
     where
         restore x = StAssign (kindFromMagicId x) reg loc
     	    	    where reg = StReg (StixMagicId x)
@@ -170,10 +170,16 @@ Setting up a sparc target.
 
 \begin{code}
 
-mkSparc :: Bool -> (GlobalSwitch -> SwitchResult) -> Target
+mkSparc :: Bool
+	-> (GlobalSwitch -> SwitchResult)
+	-> (Target,
+	    (PprStyle -> [[StixTree]] -> SUniqSM Unpretty), -- codeGen
+	    Bool,					    -- underscore
+	    (String -> String))				    -- fmtAsmLbl
 
 mkSparc decentOS switches = 
-    let fhs' = fhs switches
+    let
+	fhs' = fhs switches
     	vhs' = vhs switches
     	sparcReg' = sparcReg switches
     	vsaves' = vsaves switches
@@ -187,13 +193,11 @@ mkSparc decentOS switches =
     	dhs' = dhs switches
     	ps = genPrimCode target
     	mc = genMacroCode target
-    	hc = doHeapCheck target
-    	target = mkTarget switches fhs' vhs' sparcReg' id size vsaves' vrests' 
-    	    	    	  hprel as as' csz isz mhs' dhs' ps mc hc
-    	    	    	  sparcCodeGen decentOS id
-    in target
-
+    	hc = doHeapCheck --UNUSED NOW: target
+    	target = mkTarget {-switches-} fhs' vhs' sparcReg' {-id-} size
+    	    	    	  hprel as as'
+			  (vsaves', vrests', csz, isz, mhs', dhs', ps, mc, hc)
+    	    	    	  {-sparcCodeGen decentOS id-}
+    in
+    (target, sparcCodeGen, decentOS, id)
 \end{code}
-            
-
-

@@ -252,7 +252,13 @@ register void *_procedure __asm__("$27");
 %************************************************************************
 
 \begin{code}
-#if i386_TARGET_ARCH || i486_TARGET_ARCH
+#if i386_TARGET_ARCH
+
+#ifdef solaris2_TARGET_OS
+#define MINI_INTERPRET_END   "miniInterpretEnd"
+#else
+#define MINI_INTERPRET_END   "_miniInterpretEnd"
+#endif
 
 /* do FUNBEGIN/END the easy way */
 #define FUNBEGIN    __asm__ volatile ("--- BEGIN ---");
@@ -272,9 +278,6 @@ extern void __DISCARD__(STG_NO_ARGS);
 
 /* The safe part of the stack frame is near the top */
 
-extern P_ SP_stack[];
-extern I_ SP_stack_ptr;
-
 #define MINI_INTERPRETER_SETUP	    	    			\
     StgChar space[RESERVED_C_STACK_BYTES+4*sizeof(long)];	\
     __asm__ volatile ("leal %c0(%%esp),%%eax\n"			\
@@ -282,22 +285,21 @@ extern I_ SP_stack_ptr;
 		      "\tmovl %%esi,4(%%eax)\n"			\
 		      "\tmovl %%edi,8(%%eax)\n"			\
 		      "\tmovl %%ebp,12(%%eax)\n"		\
-		      "\tmovl %%esp,_MainRegTable+100"		\
 			: : "n" (RESERVED_C_STACK_BYTES) 	\
-			: "%eax"); 				\
-    __asm__ volatile ("movl %%esp,%0"				\
-			: "=r" (SP_stack[++SP_stack_ptr]));
+			: "%eax");
+
+/* the initial "addl $f,%esp" in ..._END compensates for
+   the "call" (rather than a jump) in miniInterpret.
+*/
 
 #define MINI_INTERPRETER_END 	    	    		\
     __asm__ volatile (".align 4\n"			\
-		      ".globl _miniInterpretEnd\n"	\
-		      "_miniInterpretEnd:\n"  	    	\
+		      ".globl " MINI_INTERPRET_END "\n"	\
+		      MINI_INTERPRET_END ":\n" 	    	\
 		      "\tnop"				\
 			: : : "memory" );		\
-    __asm__ volatile ("movl %0,%%esp\n"			\
-		      "\tmovl %%esp,_MainRegTable+100"	\
-			: : "m" (SP_stack[SP_stack_ptr--]) ); \
-    __asm__ volatile ("leal %c0(%%esp),%%eax\n"		\
+    __asm__ volatile ("addl $4,%%esp\n"			\
+		      "\tleal %c0(%%esp),%%eax\n"	\
 		      "\tmovl 0(%%eax),%%ebx\n"		\
 		      "\tmovl 4(%%eax),%%esi\n"		\
 		      "\tmovl 8(%%eax),%%edi\n"		\
@@ -436,17 +438,77 @@ extern void __DISCARD__(STG_NO_ARGS);
 
 %************************************************************************
 %*									*
-\subsubsection[COptJumps-RS6000]{Tail-jumping on an IBM RS6000 running AIX}
+\subsubsection[COptJumps-powerpc]{Tail-jumping on an IBM PowerPC running AIX}
 %*									*
 %************************************************************************
 
 \begin{code}
-#if rs6000_ibm_aix_TARGET
+#if powerpc_TARGET_ARCH
 
-#define JMP_(cont)	((F_) (cont))()
-/* partain: untested */
+/* do FUNBEGIN/END the easy way */
+#define FUNBEGIN    __asm__ volatile ("--- BEGIN ---");
+#define FUNEND      __asm__ volatile ("--- END ---");
 
-#endif /* rs6000-ibm-aix* */
+/* try "m68k-style" for now */
+extern void __DISCARD__(STG_NO_ARGS);
+
+/* this is "alpha-style" */
+#define JMP_(cont)				\
+    do { void *_procedure = (void *)(cont); 	\
+         goto *_procedure;    	    		\
+       } while(0)
+
+#define RESUME_(target)	JMP_(target)
+
+/* _All_ callee-saved regs, whether we steal them or not, must be saved
+   (and restored).
+*/
+
+#define MINI_INTERPRETER_SETUP	    	    	\
+    StgChar space[RESERVED_C_STACK_BYTES+6*sizeof(double)+9*sizeof(long)]; \
+    __asm__ volatile ("addu $2,$sp,%0\n"	\
+                      "\ts.d $f20,0($2)\n"	\
+                      "\ts.d $f22,8($2)\n"	\
+                      "\ts.d $f24,16($2)\n"	\
+                      "\ts.d $f26,24($2)\n"	\
+                      "\ts.d $f28,32($2)\n"	\
+                      "\ts.d $f30,40($2)\n"	\
+		      "\tsw  $16,48($2)\n"    	\
+                      "\tsw  $17,52($2)\n"    	\
+                      "\tsw  $18,56($2)\n"	\
+                      "\tsw  $19,60($2)\n"	\
+                      "\tsw  $20,64($2)\n"	\
+                      "\tsw  $21,68($2)\n"	\
+                      "\tsw  $22,72($2)\n"	\
+                      "\tsw  $23,76($2)\n"	\
+                      "\tsw  $fp,80($2)\n" 	\
+                      : : "I" (RESERVED_C_STACK_BYTES+16) : "$2" );
+
+    /* the 16 bytes is for the argument-register save-area above $sp */
+
+#define MINI_INTERPRETER_END	    	    	\
+    __asm__ volatile (".align 2\n"		\
+               	      ".globl miniInterpretEnd\n" \
+                      "miniInterpretEnd:\n"    	\
+		      "\taddu $2,$sp,%0\n"	\
+                      "\tl.d $f20,0($2)\n"	\
+                      "\tl.d $f22,8($2)\n"	\
+                      "\tl.d $f24,16($2)\n"	\
+                      "\tl.d $f26,24($2)\n"	\
+                      "\tl.d $f28,32($2)\n"	\
+                      "\tl.d $f30,40($2)\n"	\
+		      "\tlw  $16,48($2)\n"    	\
+                      "\tlw  $17,52($2)\n"    	\
+                      "\tlw  $18,56($2)\n"	\
+                      "\tlw  $19,60($2)\n"	\
+                      "\tlw  $20,64($2)\n"	\
+                      "\tlw  $21,68($2)\n"	\
+                      "\tlw  $22,72($2)\n"	\
+                      "\tlw  $23,76($2)\n"	\
+                      "\tlw  $fp,80($2)\n" 	\
+                      : : "I" (RESERVED_C_STACK_BYTES+16) : "$2" );
+
+#endif /* powerpc */
 \end{code}
 
 %************************************************************************

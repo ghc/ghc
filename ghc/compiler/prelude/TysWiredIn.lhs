@@ -39,6 +39,7 @@ module TysWiredIn (
 	intTyCon,
 	integerTy,
 	integerTyCon,
+	integerDataCon,
 	liftDataCon,
 	liftTyCon,
 	listTyCon,

@@ -9,11 +9,9 @@ import Maybes(Labda)
 import SplitUniq(SplitUniqSupply)
 import TyCon(TyCon)
 import UniType(UniType)
-data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
-data FiniteMap a b 	{-# GHC_PRAGMA EmptyFM | Branch a b Int# (FiniteMap a b) (FiniteMap a b) #-}
+data Bag a 
+data FiniteMap a b 
 data SpecialiseData   = SpecData Bool Bool [TyCon] [TyCon] (FiniteMap TyCon [[Labda UniType]]) (Bag (Id, [Labda UniType])) (Bag (Id, [Labda UniType])) (Bag (TyCon, [Labda UniType]))
 initSpecData :: [TyCon] -> FiniteMap TyCon [[Labda UniType]] -> SpecialiseData
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 specProgram :: (GlobalSwitch -> Bool) -> SplitUniqSupply -> [CoreBinding Id Id] -> SpecialiseData -> ([CoreBinding Id Id], SpecialiseData)
-	{-# GHC_PRAGMA _A_ 4 _U_ 2121 _N_ _S_ "LU(ALL)LU(EALALLLL)" {_A_ 5 _U_ 22221 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -24,12 +24,12 @@ Figure~\ref{fig:overview}, respectively.
 
 The front end, discussed further in Section~\ref{sec:front-end}, is
 the part that may report errors back to the user.  The two main pieces
-are a {\em renamer},\srcloc{renamer/} which handles naming issues,
+are a {\em renamer}\srcloc{renamer/}, which handles naming issues,
 including support of the Haskell module system, and the {\em
-typechecker}.\srcloc{typecheck/}
+typechecker}\srcloc{typecheck/}.
 
 The front end operates on a collection of data types that we call
-``abstract syntax.''\srcloc{abstractSyn/}  These types
+``abstract syntax\srcloc{abstractSyn/}.''  These types
 match the Haskell language, construct for construct.  For example,
 if you write @... [ x | x <- [1..n] ] ...@, the typechecker
 will actually see something like:
@@ -48,7 +48,7 @@ lucidly, in terms of the original program text.
 A conventional desugaring pass\srcloc{deSugar/} (basically Wadler's
 Chapter~5 of Peyton Jones's 1987 implementation book
 \cite{peyton-jones87b}) converts the typechecker's abstract-syntax output
-(with types attached) into the ``CoreSyntax''\srcloc{coreSyn/} data
+(with types attached) into the ``CoreSyntax\srcloc{coreSyn/}'' data
 type.  This data type is little more than the second-order polymorphic
 lambda calculus and is intended to be the {\em lingua franca} of the
 compiler's back end, including almost all of the optimisation passes.
@@ -63,7 +63,7 @@ after the intended Spineless Tagless G-machine\footnote{Oops!  Make
 that ``shared term graph'' language!  (Who's fooling who here,
 Simon?)} target architecture), then some STG-to-STG transformations,
 and finally out of the functional world\srcloc{codeGen/} into
-``Abstract~C,''\srcloc{absCSyn/} a datatype intended as an adequate
+``Abstract~C\srcloc{absCSyn/},'' a datatype intended as an adequate
 launching pad into both portable C and into get-your-hands-{\em
 really}-dirty native-code generation for a particular instruction-set
 architecture.  We can generate C, or native-code for SPARCs and DEC

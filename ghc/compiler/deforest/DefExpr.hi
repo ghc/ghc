@@ -1,4 +1,4 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
 interface DefExpr where
 import CmdLineOpts(SwitchResult)
 import CoreSyn(CoreArg, CoreExpr)
@@ -8,5 +8,4 @@ import SplitUniq(SplitUniqSupply)
 import UniType(UniType)
 import UniqFM(UniqFM)
 tran :: (a -> SwitchResult) -> UniqFM (CoreExpr Id DefBindee) -> UniqFM UniType -> CoreExpr Id DefBindee -> [CoreArg DefBindee] -> SplitUniqSupply -> CoreExpr Id DefBindee
-	{-# GHC_PRAGMA _A_ 5 _U_ 222222 _N_ _S_ "LLLSL" _N_ _N_ #-}
 

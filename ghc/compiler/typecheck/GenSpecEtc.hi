@@ -11,14 +11,12 @@ import HsBinds(Bind, Binds, MonoBinds, Sig)
 import HsExpr(Expr)
 import HsLit(Literal)
 import HsPat(TypecheckedPat)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Inst(Inst, InstOrigin, OverloadedLit)
 import LIE(LIE)
 import Maybes(Labda)
 import Name(Name)
 import NameTypes(FullName, ShortName)
-import PreludeGlaST(_MutableArray)
 import PreludePS(_PackedString)
 import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
 import SimplEnv(UnfoldingGuidance)
@@ -27,32 +25,29 @@ import SrcLoc(SrcLoc)
 import Subst(Subst)
 import TcMonad(TcResult)
 import TyCon(TyCon)
-import TyVar(TyVar, TyVarTemplate)
+import TyVar(TyVar)
 import UniType(UniType)
-import UniqFM(UniqFM)
 import Unique(Unique, UniqueSupply)
-data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
-data E 	{-# GHC_PRAGMA MkE (UniqFM TyCon) (UniqFM Id) (UniqFM Id) (UniqFM Class) #-}
+data Bag a 
+data E 
 type Error = PprStyle -> Int -> Bool -> PrettyRep
-data Bind a b 	{-# GHC_PRAGMA EmptyBind | NonRecBind (MonoBinds a b) | RecBind (MonoBinds a b) #-}
-data Binds a b 	{-# GHC_PRAGMA EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b) #-}
-data TypecheckedPat 	{-# GHC_PRAGMA WildPat UniType | VarPat Id | LazyPat TypecheckedPat | AsPat Id TypecheckedPat | ConPat Id UniType [TypecheckedPat] | ConOpPat TypecheckedPat Id TypecheckedPat UniType | ListPat UniType [TypecheckedPat] | TuplePat [TypecheckedPat] | LitPat Literal UniType | NPat Literal UniType (Expr Id TypecheckedPat) | NPlusKPat Id Literal UniType (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) (Expr Id TypecheckedPat) #-}
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
-data Inst 	{-# GHC_PRAGMA Dict Unique Class UniType InstOrigin | Method Unique Id [UniType] InstOrigin | LitInst Unique OverloadedLit UniType InstOrigin #-}
-data LIE 	{-# GHC_PRAGMA MkLIE [Inst] #-}
-data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+data Bind a b 
+data Binds a b 
+data TypecheckedPat 
+data Id 
+data Inst 
+data LIE 
+data Name 
+data PprStyle 
 type Pretty = Int -> Bool -> PrettyRep
-data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
+data PrettyRep 
 data SignatureInfo   = TySigInfo Id [TyVar] [Inst] UniType SrcLoc | ValSpecInfo Name UniType (Labda Name) SrcLoc | ValInlineInfo Name UnfoldingGuidance SrcLoc | ValDeforestInfo Name SrcLoc | ValMagicUnfoldingInfo Name _PackedString SrcLoc
-data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
-data Subst 	{-# GHC_PRAGMA MkSubst (_MutableArray _RealWorld Int (Labda UniType)) [(Int, Bag (Int, Labda UniType))] (_State _RealWorld) Int #-}
-data TcResult a 	{-# GHC_PRAGMA TcSucceeded a Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) | TcFailed Subst (Bag (PprStyle -> Int -> Bool -> PrettyRep)) #-}
-data TyVar 	{-# GHC_PRAGMA PrimSysTyVar Unique | PolySysTyVar Unique | OpenSysTyVar Unique | UserTyVar Unique ShortName #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
-data UniqueSupply 	{-# GHC_PRAGMA MkUniqueSupply Int# | MkNewSupply SplitUniqSupply #-}
+data SrcLoc 
+data Subst 
+data TcResult a 
+data TyVar 
+data UniType 
+data UniqueSupply 
 checkSigTyVars :: [TyVar] -> [TyVar] -> UniType -> UniType -> UnifyErrContext -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult [TyVar]
-	{-# GHC_PRAGMA _A_ 11 _U_ 22222222122 _N_ _S_ "LSLSLLLLU(AAS)LL" _N_ _N_ #-}
 genBinds :: Bool -> E -> Bind Id TypecheckedPat -> LIE -> [(Name, Id)] -> [SignatureInfo] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Binds Id TypecheckedPat, LIE, [(Name, Id)])
-	{-# GHC_PRAGMA _A_ 12 _U_ 212112222122 _N_ _S_ "LU(AASA)LLLSLLLU(AAS)LL" _N_ _N_ #-}
 

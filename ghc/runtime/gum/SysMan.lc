@@ -52,9 +52,7 @@ HandleException(STG_NO_ARGS)
 \end{code}
 
 \begin{code}
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     int rbufid;
     int opcode, nbytes;
@@ -113,7 +111,22 @@ char **argv;
 #endif
 
 	}
-	/* Join the PE  sysman groups in order to allow barrier synchronisation */
+	/*
+	   SysMan joins PECTLGROUP, so that it can wait (at the
+	   barrier sysnchronisation a few instructions later) for the
+	   other PE-tasks to start.
+	   
+	   Other comments on PVM groupery:
+	   
+	   The manager group (MGRGROUP) is vestigial at the moment. It
+	   may eventually include a statistics manager, garbage
+	   collector manager.
+
+	   I suspect that you're [Kei Davis] right: Sysman shouldn't
+	   be in PEGROUP, it's a hangover from GRIP.
+	   
+	   (Phil Trinder, 95/10)
+	*/
 	checkerr(pvm_joingroup(PECTLGROUP));
 #if 0
 	fprintf(stderr, "Joined PECTLGROUP /* PWT */\n");
@@ -232,6 +245,7 @@ char **argv;
 	    }
 	}
     }
+    return(0);
 }
 \end{code}
 

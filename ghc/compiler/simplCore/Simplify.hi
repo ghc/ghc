@@ -8,9 +8,6 @@ import SimplMonad(SimplCount)
 import SplitUniq(SplitUniqSupply)
 import UniType(UniType)
 simplBind :: SimplEnv -> CoreBinding (Id, BinderInfo) Id -> (SimplEnv -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)) -> UniType -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)
-	{-# GHC_PRAGMA _A_ 4 _U_ 212222 _N_ _S_ "LSLL" _N_ _N_ #-}
 simplExpr :: SimplEnv -> CoreExpr (Id, BinderInfo) Id -> [CoreArg Id] -> SplitUniqSupply -> SimplCount -> (CoreExpr Id Id, SimplCount)
-	{-# GHC_PRAGMA _A_ 3 _U_ 22222 _N_ _S_ "LSL" _N_ _N_ #-}
 simplTopBinds :: SimplEnv -> [CoreBinding (Id, BinderInfo) Id] -> SplitUniqSupply -> SimplCount -> ([CoreBinding Id Id], SimplCount)
-	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
 

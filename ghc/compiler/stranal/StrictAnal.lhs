@@ -88,15 +88,15 @@ saWwTopBinds :: SplitUniqSupply
 
 saWwTopBinds us switch_chker binds
   = let
-	do_all_strict = switch_chker AllStrict
+	strflags = (switch_chker AllStrict, switch_chker NumbersStrict)
 
 	-- mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
 	(binds_w_strictness, sa_stats)
-	  = sa_top_binds do_all_strict binds nullSaStats
+	  = sa_top_binds strflags binds nullSaStats
 #else
 	binds_w_strictness
-	  = sa_top_binds do_all_strict binds
+	  = sa_top_binds strflags binds
 #endif
     in
     -- possibly show what we decided about strictness...
@@ -151,18 +151,21 @@ environment which maps @Id@s to their abstract values (i.e., an
 @AbsValEnv@ maps an @Id@ to its @AbsVal@).
 
 \begin{code}
-saTopBinds   :: Bool -> [PlainCoreBinding] -> [PlainCoreBinding]     -- exported
-sa_top_binds :: Bool -> [PlainCoreBinding] -> SaM [PlainCoreBinding] -- not exported
+saTopBinds   :: StrAnalFlags -> [PlainCoreBinding] -> [PlainCoreBinding]     -- exported
+sa_top_binds :: StrAnalFlags -> [PlainCoreBinding] -> SaM [PlainCoreBinding] -- not exported
 
-saTopBinds do_all_strict binds
+saTopBinds strflags binds
 #ifndef OMIT_STRANAL_STATS
-  = fst (sa_top_binds do_all_strict binds nullSaStats)
+  = fst (sa_top_binds strflags binds nullSaStats)
 #else
-  = sa_top_binds do_all_strict binds
+  = sa_top_binds strflags binds
 #endif
 
-sa_top_binds do_all_strict binds
-  = do_it (nullAbsValEnv do_all_strict) (nullAbsValEnv False) binds
+sa_top_binds strflags binds
+  = let
+	starting_abs_env = nullAbsValEnv strflags
+    in
+    do_it starting_abs_env starting_abs_env binds
   where
     do_it _    _    [] = returnSa []
     do_it senv aenv (b:bs)
@@ -184,17 +187,22 @@ saTopBind :: StrictEnv -> AbsenceEnv
 saTopBind str_env abs_env (CoNonRec binder rhs)
   = saExpr str_env abs_env rhs 	`thenSa` \ new_rhs ->
     let
-	str_rhs    = absEval StrAnal rhs str_env
-	abs_rhs	   = absEval AbsAnal rhs abs_env
+	strflags = getStrAnalFlags str_env
+
+	str_rhs = absEval StrAnal rhs str_env
+	abs_rhs = absEval AbsAnal rhs abs_env
 
 	widened_str_rhs = widen StrAnal str_rhs
 	widened_abs_rhs = widen AbsAnal abs_rhs
 		-- The widening above is done for efficiency reasons.
 		-- See notes on CoLet case in SaAbsInt.lhs
 
-	new_binder = addStrictnessInfoToId widened_str_rhs widened_abs_rhs
-			binder
-			rhs
+	new_binder
+	  = addStrictnessInfoToId
+		strflags
+		widened_str_rhs widened_abs_rhs
+		binder
+		rhs
 
 	  -- Augment environments with a mapping of the
 	  -- binder to its abstract values, computed by absEval
@@ -205,13 +213,15 @@ saTopBind str_env abs_env (CoNonRec binder rhs)
 
 saTopBind str_env abs_env (CoRec pairs)
   = let
+	strflags    = getStrAnalFlags str_env
 	(binders,rhss) = unzip pairs
 	str_rhss    = fixpoint StrAnal binders rhss str_env
 	abs_rhss    = fixpoint AbsAnal binders rhss abs_env
 		      -- fixpoint returns widened values
       	new_str_env = growAbsValEnvList str_env (binders `zip` str_rhss)
       	new_abs_env = growAbsValEnvList abs_env (binders `zip` abs_rhss)
-	new_binders = zipWith4 addStrictnessInfoToId str_rhss abs_rhss binders rhss
+	new_binders = zipWith4 (addStrictnessInfoToId strflags)
+				str_rhss abs_rhss binders rhss
     in
     mapSa (saExpr new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
     let
@@ -289,6 +299,8 @@ saExpr str_env abs_env (CoLet (CoNonRec binder rhs) body)
   =	-- Analyse the RHS in the environment at hand
     saExpr str_env abs_env rhs  `thenSa` \ new_rhs  ->
     let
+	strflags = getStrAnalFlags str_env
+
 	-- Bind this binder to the abstract value of the RHS; analyse
 	-- the body of the `let' in the extended environment.
       	str_rhs_val  	= absEval StrAnal rhs str_env
@@ -304,7 +316,8 @@ saExpr str_env abs_env (CoLet (CoNonRec binder rhs) body)
 
 	-- Now determine the strictness of this binder; use that info
 	-- to record DemandInfo/StrictnessInfo in the binder.
-	new_binder = addStrictnessInfoToId widened_str_rhs widened_abs_rhs
+	new_binder = addStrictnessInfoToId strflags
+			widened_str_rhs widened_abs_rhs
 			(addDemandInfoToId str_env abs_env body binder)
 			rhs
     in
@@ -314,6 +327,7 @@ saExpr str_env abs_env (CoLet (CoNonRec binder rhs) body)
 
 saExpr str_env abs_env (CoLet (CoRec pairs) body)
   = let
+	strflags       = getStrAnalFlags str_env
 	(binders,rhss) = unzip pairs
 	str_vals       = fixpoint StrAnal binders rhss str_env
 	abs_vals       = fixpoint AbsAnal binders rhss abs_env
@@ -336,7 +350,9 @@ saExpr str_env abs_env (CoLet (CoRec pairs) body)
 --		   deciding that y is absent, which is plain wrong!
 --		It's much easier simply not to do this.
 
-	improved_binders = zipWith4 addStrictnessInfoToId str_vals abs_vals binders rhss
+	improved_binders = zipWith4 (addStrictnessInfoToId strflags)
+				    str_vals abs_vals binders rhss
+
 	whiter_than_white_binders = launder improved_binders
 
       	new_pairs   = whiter_than_white_binders `zip` new_rhss
@@ -365,25 +381,27 @@ saDefault str_env abs_env (CoBindDefault bdr rhs)
 %*									*
 %************************************************************************
 
-Important note (Sept 93).  @addStrictnessInfoToId@ is used only for let(rec) 
-bound variables, and is use to attach the strictness (not demand) info
-to the binder.  We are careful to restrict this strictness info to the
-lambda-bound arguments which are actually visible, at the top level,
-lest we accidentally lose laziness by eagerly looking for an "extra" argument.
-So we "dig for lambdas" in a rather syntactic way.
+Important note (Sept 93).  @addStrictnessInfoToId@ is used only for
+let(rec) bound variables, and is use to attach the strictness (not
+demand) info to the binder.  We are careful to restrict this
+strictness info to the lambda-bound arguments which are actually
+visible, at the top level, lest we accidentally lose laziness by
+eagerly looking for an "extra" argument.  So we "dig for lambdas" in a
+rather syntactic way.
 
 A better idea might be to have some kind of arity analysis to
 tell how many args could safely be grabbed.
 
 \begin{code}
 addStrictnessInfoToId 
-	:: AbsVal 		-- Abstract strictness value
+	:: StrAnalFlags
+	-> AbsVal 		-- Abstract strictness value
 	-> AbsVal		-- Ditto absence
 	-> Id 			-- The id
 	-> PlainCoreExpr	-- Its RHS
 	-> Id			-- Augmented with strictness
 
-addStrictnessInfoToId str_val abs_val binder body
+addStrictnessInfoToId strflags str_val abs_val binder body
   = if isWrapperId binder then
 	binder	-- Avoid clobbering existing strictness info 
 		-- (and, more importantly, worker info).
@@ -395,7 +413,7 @@ addStrictnessInfoToId str_val abs_val binder body
 	case (digForLambdas body) of { (_, lambda_bounds, rhs) ->
         let
 		tys        = map getIdUniType lambda_bounds
-		strictness = findStrictness tys str_val abs_val
+		strictness = findStrictness strflags tys str_val abs_val
 	in
 	binder `addIdStrictness` mkStrictnessInfo strictness Nothing
 	}

@@ -5,11 +5,7 @@ import Pretty(PprStyle, PrettyRep)
 import SrcLoc(SrcLoc)
 type Error = PprStyle -> Int -> Bool -> PrettyRep
 addErrLoc :: SrcLoc -> [Char] -> (PprStyle -> Int -> Bool -> PrettyRep) -> PprStyle -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 4 _U_ 221222 _N_ _N_ _N_ _N_ #-}
 addShortErrLocLine :: SrcLoc -> (PprStyle -> Int -> Bool -> PrettyRep) -> PprStyle -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 3 _U_ 21222 _N_ _S_ "SLL" _N_ _N_ #-}
 dontAddErrLoc :: [Char] -> (PprStyle -> Int -> Bool -> PrettyRep) -> PprStyle -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 3 _U_ 21222 _N_ _N_ _N_ _N_ #-}
 pprBagOfErrors :: PprStyle -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
 

@@ -27,9 +27,12 @@ module LibPosix  (
     ProcessGroupID(..),
     UserID(..),
     
-    ExitCode
-    )  where
+    ExitCode,
 
+    -- make interface complete:
+    setCurrentDirectory{-pragmas-}, getCurrentDirectory{-pragmas-}
+
+    )  where
 
 import LibPosixDB
 import LibPosixErr
@@ -43,7 +46,7 @@ import LibPosixUtil
 -- runProcess is our candidate for the high-level OS-independent primitive 
 -- If accepted, it will be moved out of LibPosix into LibSystem.
 
-import LibDirectory	( setCurrentDirectory )
+import LibDirectory	( setCurrentDirectory, getCurrentDirectory{-pragmas-} )
 
 import PreludeGlaST
 import PreludePrimIO	( takeMVar, putMVar, _MVar )

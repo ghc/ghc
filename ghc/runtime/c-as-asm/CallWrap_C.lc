@@ -52,7 +52,6 @@ callWrapper(STG_NO_ARGS)
     CALLER_SAVE_Hp
     CALLER_SAVE_HpLim
     CALLER_SAVE_Liveness
-    CALLER_SAVE_Activity
     CALLER_SAVE_Ret
 
     MAGIC_CALL
@@ -82,7 +81,6 @@ callWrapper(STG_NO_ARGS)
     CALLER_RESTORE_Hp
     CALLER_RESTORE_HpLim
     CALLER_RESTORE_Liveness
-    CALLER_RESTORE_Activity
     CALLER_RESTORE_Ret
     
     /* These next two are restore-only */
@@ -108,7 +106,6 @@ callWrapper_safe(STG_NO_ARGS)
     CALLER_SAVE_Hp
     CALLER_SAVE_HpLim
     CALLER_SAVE_Liveness
-    CALLER_SAVE_Activity
     CALLER_SAVE_Ret
 
     MAGIC_CALL
@@ -123,7 +120,6 @@ callWrapper_safe(STG_NO_ARGS)
     CALLER_RESTORE_Hp
     CALLER_RESTORE_HpLim
     CALLER_RESTORE_Liveness
-    CALLER_RESTORE_Activity
     CALLER_RESTORE_Ret
     
     /* These next two are restore-only */
@@ -160,22 +156,37 @@ ADR */
 
 EXTFUN(EnterNodeCode);
 
+void *__temp_esp, *__temp_eax;
+
 void PerformGC_wrapper PROTO((W_))	    WRAPPER_NAME(PerformGC);
 void PerformGC_wrapper(args)
 W_ args;
 {
-    WRAPPER_SETUP(PerformGC)
+#if i386_TARGET_ARCH
+    void *ret_addr;
+
+    WRAPPER_SETUP(PerformGC,ret_addr,args)
+#else
+    WRAPPER_SETUP(PerformGC, ignore_me, ignore_me)
+#endif
     PerformGC(args);
     WRAPPER_RETURN(0)
 }
 
 # ifdef CONCURRENT
 
+void __DISCARD__ (STG_NO_ARGS) { /*nothing*/ }
+
 void StackOverflow_wrapper PROTO((W_,W_))   WRAPPER_NAME(StackOverflow);
 void StackOverflow_wrapper(args1,args2)
 W_ args1, args2;
 {
-    WRAPPER_SETUP(StackOverflow)
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(StackOverflow,ret_addr,ignore_me)
+#else
+    WRAPPER_SETUP(StackOverflow, ignore_me, ignore_me)
+#endif
     if(StackOverflow(args1,args2)) {
 	WRAPPER_RETURN(1)
     }
@@ -186,7 +197,12 @@ void Yield_wrapper PROTO((W_))		    WRAPPER_NAME(Yield);
 void Yield_wrapper(args)
 W_ args;
 {
-    WRAPPER_SETUP(Yield)
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(Yield, ret_addr, ignore_me)
+#else
+    WRAPPER_SETUP(Yield, ignore_me, ignore_me)
+#endif
     Yield(args);
     WRAPPER_RETURN(0)
 }
@@ -200,7 +216,12 @@ void PerformReschedule_wrapper(liveness, always_reenter_node)
   W_ liveness;
   W_  always_reenter_node;
 {
-    WRAPPER_SETUP(PerformReschedule)
+#if i386_TARGET_ARCH
+    void *ret_addr, *ignore_me;
+    WRAPPER_SETUP(PerformReschedule, ret_addr, ignore_me)
+#else
+    WRAPPER_SETUP(PerformReschedule, ignore_me, ignore_me)
+#endif
     PerformReschedule(liveness, always_reenter_node);
     WRAPPER_RETURN(0)
 }

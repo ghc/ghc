@@ -19,9 +19,7 @@ import Subst(Subst)
 import TcMonad(TcResult)
 import UniType(UniType)
 import UniqFM(UniqFM)
-data ClassInfo 	{-# GHC_PRAGMA ClassInfo Class (MonoBinds Name (InPat Name)) #-}
+data ClassInfo 
 tcClassDecls1 :: E -> (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv)) -> [ClassDecl Name (InPat Name)] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ([ClassInfo], UniqFM Class, [(Name, Id)])
-	{-# GHC_PRAGMA _A_ 9 _U_ 221222122 _N_ _S_ "LLSLLLLLL" _N_ _N_ #-}
 tcClassDecls2 :: E -> [ClassInfo] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ((LIE, Binds Id TypecheckedPat), Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 2 _U_ 21222222 _N_ _S_ "LS" _N_ _N_ #-}
 

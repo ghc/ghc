@@ -22,7 +22,7 @@ import CgHeapery	( heapCheck )
 import CgRetConv	( assignRegs )
 import CgStackery	( mkVirtStkOffsets )
 import CgUsages		( setRealAndVirtualSps, getVirtSps )
-import CLabelInfo	( mkFastEntryLabel )
+import CLabelInfo	( mkStdEntryLabel )
 import ClosureInfo	( mkLFLetNoEscape )
 import Id		( getIdKind )
 import Util
@@ -151,7 +151,7 @@ cgLetNoEscapeClosure binder cc bi full_live_in_rhss rhs_eob_info maybe_cc_slot a
 	(forkAbsC (cgLetNoEscapeBody args body)) 
 	    	    	    	     	`thenFC` \ (vA, vB, code) ->
     let
-	label = mkFastEntryLabel binder arity
+	label = mkStdEntryLabel binder -- arity
     in
     absC (CCodeBlock label code) `thenC` 
     returnFC (binder, letNoEscapeIdInfo binder vA vB lf_info)
@@ -163,10 +163,11 @@ cgLetNoEscapeBody :: [Id]		-- Args
 		  -> Code
 
 cgLetNoEscapeBody all_args rhs
-  = getVirtSps				`thenFC` \ (vA, vB) ->
+  = getVirtSps		`thenFC` \ (vA, vB) ->
+    getIntSwitchChkrC	`thenFC` \ isw_chkr ->
     let
 	arg_kinds	= map getIdKind all_args
-	(arg_regs, _)	= assignRegs [{-nothing live-}] arg_kinds
+	(arg_regs, _)	= assignRegs isw_chkr [{-nothing live-}] arg_kinds
     	stk_args	= drop (length arg_regs) all_args
 
     	-- stk_args is the args which are passed on the stack at the fast-entry point

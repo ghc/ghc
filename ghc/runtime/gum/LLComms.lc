@@ -67,13 +67,13 @@ unsigned op;
 	return ("Unknown PE Opcode");
 }
 
-void NullException(STG_NO_ARGS)
+void
+NullException(STG_NO_ARGS)
 {
   fprintf(stderr,"Null_Exception: called");
 }
+
 void (*ExceptionHandler)() = NullException;
-
-
 \end{code}
 
 @trace_SendOp@ handles the tracing of messages at the OS level.  If
@@ -87,10 +87,7 @@ last message sent was for a PE or an IMU.
 rtsBool PETrace = rtsFalse, IMUTrace = rtsFalse, SystemTrace = rtsFalse, ReplyTrace = rtsFalse;
 
 static void
-trace_SendOp(op, dest, data1, data2)
-OPCODE op;
-GLOBAL_TASK_ID dest;
-unsigned data1, data2;
+trace_SendOp(OPCODE op, GLOBAL_TASK_ID dest, unsigned int data1, unsigned int data2)
 {
     char *OpName;
 
@@ -164,28 +161,14 @@ For example,
 \end{verbatim}
 
 \begin{code}
-
-#ifdef __STDC__
 void
 SendOpV(OPCODE op, GLOBAL_TASK_ID task, int n, ...)
-#else
-void
-SendOpV(op, task, n, va_alist)
-OPCODE op;
-GLOBAL_TASK_ID task;
-int n;
-va_dcl
-#endif
 {
     va_list ap;
     int i;
     StgWord arg;
 
-#ifdef __STDC__
     va_start(ap, n);
-#else
-    va_start(ap);
-#endif
 
     trace_SendOp(op, task, 0, 0);
 
@@ -216,29 +199,14 @@ Important: The variable arguments must all be StgWords.
 
 \begin{code}
 
-#ifdef __STDC__
 void
 SendOpNV(OPCODE op, GLOBAL_TASK_ID task, int nelem, StgWord *datablock, int narg, ...)
-#else
-void
-SendOpNV(op, task, nelem, datablock, narg, va_alist)
-OPCODE op;
-GLOBAL_TASK_ID task;
-int nelem;
-StgWord *datablock;
-int narg;
-va_dcl
-#endif
 {
     va_list ap;
     int i;
     StgWord arg;
 
-#ifdef __STDC__
     va_start(ap, narg);
-#else
-    va_start(ap);
-#endif
 
     trace_SendOp(op, task, 0, 0);
 /*  fprintf(stderr,"SendOpNV: op = %x, task = %x, narg = %d, nelem = %d\n",op,task,narg,nelem); */
@@ -368,28 +336,15 @@ synchronises with the other PEs. Finally it receives from Control the
 array of Global Task Ids.
 
 \begin{code}
-
-static char *
-xmalloc(n)
-unsigned n;
-{
-    char *p = malloc(n);
-
-    if (p == NULL) {
-	fprintf(stderr, "Memory allocation of %u bytes failed\n", n);
-	EXIT(EXIT_FAILURE);
-    }
-    return p;
-}
-
 GLOBAL_TASK_ID *
 PEStartUp(nPEs)
 unsigned nPEs;
 {
     int i;
     PACKET addr;
-    long *buffer = (long *) xmalloc(sizeof(long) * nPEs);
-    GLOBAL_TASK_ID *PEs = (GLOBAL_TASK_ID *) xmalloc(sizeof(GLOBAL_TASK_ID) * nPEs);
+    long *buffer = (long *) stgMallocBytes(sizeof(long) * nPEs, "PEStartUp (buffer)");
+    GLOBAL_TASK_ID *PEs
+      = (GLOBAL_TASK_ID *) stgMallocBytes(sizeof(GLOBAL_TASK_ID) * nPEs, "PEStartUp (PEs)");
 
     mytid = _my_gtid;		/* Initialise PVM and get task id into global
 				 * variable */

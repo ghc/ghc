@@ -747,6 +747,8 @@ STGFUN(_PRStart_Ind)
 {
     FUNBEGIN;
     DEBUG_PR_IND;
+    GC_SHORT_IND(); /* ticky: record that we shorted an indirection */
+
     Mark = (P_) IND_CLOSURE_PTR(Mark);
     JUMP_MARK;
     FUNEND;
@@ -756,29 +758,25 @@ STGFUN(_PRStart_Ind)
 ``Permanent indirection''---used in profiling.  Works basically
 like @_PRStart_1@ (one pointer).
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING) || defined(TICKY_TICKY)
+
 STGFUN(_PRStart_PI)
 {
     FUNBEGIN;
-/* This test would be here if it really was like a PRStart_1.
-   But maybe it is not needed because a PI cannot have two
-   things pointing at it (so no need to mark it), because
-   they are only created in exactly one place in UpdatePAP.
-   ??? WDP 95/07
 
     if (IS_MARK_BIT_SET(Mark)) {
 	DEBUG_PR_MARKED;
 	JUMP_MARK_RETURN;
     } else {
-*/
 	INIT_MARK_NODE("PI  ",1);
 	/* the "1" above is dodgy (i.e. wrong), but it is never
 	   used except in debugging info.  ToDo??? WDP 95/07
 	*/
 	INIT_MSTACK(PERM_IND_CLOSURE_PTR);
-/*  } */
+    }
     FUNEND;
 }
+
 STGFUN(_PRIn_PI)
 {
     FUNBEGIN;
@@ -788,7 +786,8 @@ STGFUN(_PRIn_PI)
     */
     FUNEND;
 }
-#endif
+
+#endif /* PROFILING or TICKY */
 \end{code}
 
 Marking a ``selector closure'': This is a size-2 SPEC thunk that
@@ -800,39 +799,26 @@ unevaluated, then we behave {\em exactly as for a SPEC-2 thunk}.
 or ``on the way back up'' (\tr{_PRIn_Selector})?}  Answer: probably on
 the way down.  Downside: we are flummoxed by indirections, so we'll
 have to wait until the {\em next} major GC to do the selections (after
-the indirections are sorted out in this GC).  But the downside of
+the indirections are shorted out in this GC).  But the downside of
 doing selections on the way back up is that we are then in a world of
 reversed pointers, and selecting a reversed pointer---we've see this
 on selectors for very recursive structures---is a total disaster.
 (WDP 94/12)
 
 \begin{code}
-#if defined(_GC_DEBUG)
+#if defined(DEBUG)
 #define IF_GC_DEBUG(x) x
 #else
 #define IF_GC_DEBUG(x) /*nothing*/
 #endif
 
-/* _PRStartSelector_<n> is a (very) glorified _PRStart_1 */
+#if !defined(CONCURRENT)
+# define NOT_BLACKHOLING (! RTSflags.GcFlags.lazyBlackHoling)
+#else
+# define NOT_BLACKHOLING 0
+#endif
 
-#if 0
-/* testing */
-#define MARK_SELECTOR(n)						\
-STGFUN(CAT2(_PRStartSelector_,n))					\
-{									\
-    P_ maybe_con;							\
-    FUNBEGIN;								\
-									\
-    /* must be a SPEC 2 1 closure */					\
-    ASSERT(INFO_SIZE(INFO_PTR(Mark)) == 2);				\
-    ASSERT(INFO_NoPTRS(INFO_PTR(Mark)) == 1);				\
-    ASSERT(MIN_UPD_SIZE == 2); /* otherwise you are hosed */		\
-									\
-    JMP_(_PRStart_1);							\
-									\
-    FUNEND;								\
-}
-#endif /* 0 */
+/* _PRStartSelector_<n> is a (very) glorified _PRStart_1 */
 
 #define MARK_SELECTOR(n)						\
 STGFUN(CAT2(_PRStartSelector_,n))					\
@@ -853,8 +839,8 @@ STGFUN(CAT2(_PRStartSelector_,n))					\
     maybe_con = (P_) *(Mark + _FHS);					\
 									\
     IF_GC_DEBUG(							\
-    if (SM_trace & 2)  {						\
-        fprintf(stderr, "Start Selector %d: 0x%lx, info 0x%lx, size %ld, ptrs %ld, maybe_con 0x%lx, marked? 0x%%lx, info 0x%lx", \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)  {						\
+        fprintf(stderr, "Start Selector %d: 0x%lx, info 0x%lx, size %ld, ptrs %ld, maybe_con 0x%lx, info 0x%lx", \
 		(n), Mark, INFO_PTR(Mark), INFO_SIZE(INFO_PTR(Mark)),	\
 		INFO_NoPTRS(INFO_PTR(Mark)),				\
 		maybe_con, /*danger:IS_MARK_BIT_SET(maybe_con),*/	\
@@ -864,10 +850,6 @@ STGFUN(CAT2(_PRStartSelector_,n))					\
 	    INFO_SIZE(INFO_PTR(maybe_con)),				\
 	    INFO_NoPTRS(INFO_PTR(maybe_con)));				\
 	if (INFO_TAG(INFO_PTR(maybe_con)) >=0) {			\
-	    /* int i; */						\
-	    /* for (i = 0; i < INFO_SIZE(INFO_PTR(maybe_con)); i++) { */ \
-		/* fprintf(stderr, ", 0x%lx", maybe_con[_FHS + i]); */ 	\
-	    /*}*/							\
 	    fprintf(stderr, "=> 0x%lx", maybe_con[_FHS + (n)]);		\
 	}								\
 	fprintf(stderr, "\n");						\
@@ -875,7 +857,9 @@ STGFUN(CAT2(_PRStartSelector_,n))					\
 									\
     if (IS_STATIC(INFO_PTR(maybe_con)) /* static: cannot chk mark bit */\
      || IS_MARK_BIT_SET(maybe_con)   /* been here: may be mangled */	\
-     ||	INFO_TAG(INFO_PTR(maybe_con)) < 0) /* not in WHNF */		\
+     ||	INFO_TAG(INFO_PTR(maybe_con)) < 0 /* not in WHNF */		\
+     || NOT_BLACKHOLING  /* see "price of laziness" paper */		\
+     || (! RTSflags.GcFlags.doSelectorsAtGC ))				\
 	/* see below for OLD test we used here (WDP 95/04) */		\
 	/* ToDo: decide WHNFness another way? */			\
 	JMP_(_PRStart_1);						\
@@ -885,6 +869,7 @@ STGFUN(CAT2(_PRStartSelector_,n))					\
     /* ASSERT((n) < INFO_SIZE(INFO_PTR(maybe_con))); not true if static */ \
 									\
     /* OK, it is evaluated: behave just like an indirection */		\
+    GC_SEL_MAJOR(); /* ticky-ticky */					\
 									\
     Mark = (P_) (maybe_con[_FHS + (n)]);				\
     /* Mark now has the result of the selection */			\
@@ -932,7 +917,27 @@ STGFUN(_PRStart_Const)
 {
     FUNBEGIN;
     DEBUG_PR_CONST;
+
+#ifndef TICKY_TICKY
+    /* normal stuff */
     Mark = (P_) CONST_STATIC_CLOSURE(INFO_PTR(Mark));
+
+#else /* TICKY */
+    if (IS_MARK_BIT_SET(Mark)) {
+	DEBUG_PR_MARKED;
+    } else {
+	if (!AllFlags.doUpdEntryCounts) {
+
+	    GC_COMMON_CONST(); /* ticky */
+
+	    Mark = (P_) CONST_STATIC_CLOSURE(INFO_PTR(Mark));
+
+	} else { /* no commoning */
+	    INIT_MARK_NODE("CONST ",0);
+	}
+    }
+#endif /* TICKY */
+
     JUMP_MARK_RETURN;
     FUNEND;
 }
@@ -945,9 +950,37 @@ closure.
 \begin{code}
 STGFUN(_PRStart_CharLike)
 {
+    I_ val;
+
     FUNBEGIN;
+
     DEBUG_PR_CHARLIKE;
+
+#ifndef TICKY_TICKY
+    /* normal stuff */
+
     Mark = (P_) CHARLIKE_CLOSURE(CHARLIKE_VALUE(Mark));
+
+#else /* TICKY */
+
+    if (IS_MARK_BIT_SET(Mark)) {
+	DEBUG_PR_MARKED;
+    } else {
+	val = CHARLIKE_VALUE(Mark);
+
+	if (!AllFlags.doUpdEntryCounts) {
+	    GC_COMMON_CHARLIKE(); /* ticky */
+
+	    INFO_PTR(Mark) = (W_) Ind_info;
+	    IND_CLOSURE_PTR(Mark) = (W_) CHARLIKE_CLOSURE(val);
+	    Mark = (P_) IND_CLOSURE_PTR(Mark);
+
+	} else { /* no commoning */
+	    INIT_MARK_NODE("CHAR ",0);
+	}
+    }
+#endif /* TICKY */
+
     JUMP_MARK_RETURN;
     FUNEND;
 }
@@ -966,55 +999,32 @@ STGFUN(_PRStart_IntLike)
     if (IS_MARK_BIT_SET(Mark)) {
 	DEBUG_PR_MARKED;
     } else {
-    val = INTLIKE_VALUE(Mark);
+	val = INTLIKE_VALUE(Mark);
 
-    if ((val <= MAX_INTLIKE) && (val >= MIN_INTLIKE)) {
-	DEBUG_PR_INTLIKE_TO_STATIC;
+	if (val >= MIN_INTLIKE
+	 && val <= MAX_INTLIKE
+#ifdef TICKY_TICKY
+	 && !AllFlags.doUpdEntryCounts
+#endif
+	   ) {
+	    DEBUG_PR_INTLIKE_TO_STATIC;
+	    GC_COMMON_INTLIKE(); /* ticky */
+
 	    INFO_PTR(Mark) = (W_) Ind_info;
 	    IND_CLOSURE_PTR(Mark) = (W_) INTLIKE_CLOSURE(val);
 	    Mark = (P_) IND_CLOSURE_PTR(Mark);
-	} else {	
-	    /* out of range of static closures */
-	DEBUG_PR_INTLIKE_IN_HEAP;
+
+	} else {	/* out of range of static closures */
+	    DEBUG_PR_INTLIKE_IN_HEAP;
+#ifdef TICKY_TICKY
+	    if (!AllFlags.doUpdEntryCounts) GC_COMMON_INTLIKE_FAIL();
+#endif
 	    INIT_MARK_NODE("INT ",0);
-    }
+	}
     }
     JUMP_MARK_RETURN;
     FUNEND;
 }
-\end{code}
-
-CHANGE THIS FOR THE @COMMON_ITBLS@ WORLD!
-
-\begin{code}
-#if defined(GCgn)
-
-/* Marking an OldGen root -- treat as indirection if it references the old generation */
-
-STGFUN(_PRStart_OldRoot)
-{
-    P_ oldroot;
-
-    FUNBEGIN;
-    oldroot = (P_) IND_CLOSURE_PTR(Mark);
-
-    if (oldroot <= HeapLim)                               /* does the root reference the old generation ? */
-      {
-	DEBUG_PR_OLDIND;
-	Mark = oldroot;                                   /* short circut if the old generation root */
-	JUMP_MARK;                                        /* references an old generation closure    */
-      }
-
-    else
-      {
-	INIT_MARK_NODE("OldRoot",1);                   /* oldroot to new generation */
-	INIT_MSTACK(SPEC_CLOSURE_PTR);                    /* treat as _PRStart_1       */
-      }
-    FUNEND;
-}
-
-#endif /* GCgn */
-
 \end{code}
 
 Special error routine, used for closures which should never call their
@@ -1232,6 +1242,9 @@ STGFUN(_PRStart_StkO)
     I_ cts_size;
 
     FUNBEGIN;
+
+    /* ToDo: ASSERT(sanityChk_StkO(Mark)); ??? */
+
     if (IS_MARK_BIT_SET(Mark)) {
 	DEBUG_PR_MARKED;
 	JUMP_MARK_RETURN;
@@ -1323,7 +1336,7 @@ STGFUN(_PRIn_StkO)
 %
 %****************************************************************************
 
-A CAF is shorted out as if it is an indirection.
+A CAF is shorted out as if it were an indirection.
 The CAF reference is explicitly updated by the garbage collector.
 
 \begin{code}
@@ -1331,89 +1344,12 @@ STGFUN(_PRStart_Caf)
 {
     FUNBEGIN;
     DEBUG_PR_CAF;
+    GC_SHORT_CAF(); /* ticky */
+
     Mark = (P_) IND_CLOSURE_PTR(Mark);
     JUMP_MARK;
     FUNEND;
 }
-
-#if 0 /* Code to avoid explicit updating of CAF references */
-      /* We need auxiliary mark and update reference info table */
-
-CAF_MARK_UPD_ITBL(Caf_Mark_Upd_info,const);
-
-/* Start marking a CAF -- special mark upd info table */
-/* Change to marking state and mark reference */
-
-STGFUN(_PRStart_Caf) 
-{
-    FUNBEGIN;
-    if (IS_MARK_BIT_SET(Mark)) {
-	DEBUG_PR_MARKED;
-	JUMP_MARK_RETURN;
-    } else {
-	INIT_MARK_NODE("CAF ",1);
-    INIT_MSTACK(IND_CLOSURE_PTR2);
-    }
-    FUNEND;
-}
-
-/* Completed marking a CAF -- special mark upd info table */
-/* Change info table back to normal CAF info, return reference (Mark) */
-
-STGFUN(_PRInLast_Caf) 
-{
-    P_ temp;
-
-    FUNBEGIN;
-    DEBUG_PRLAST_CAF;
-    SET_INFO_PTR(MStack, Caf_info); /* normal marked CAF */
-
-    /* Like POP_MSTACK */
-    temp = MStack;
-    MStack = (P_) IND_CLOSURE_PTR(temp);
-    IND_CLOSURE_PTR(temp) = (W_) Mark;
-
-    /* Mark left unmodified so CAF reference is returned */
-    JUMP_MARK_RETURN;
-    FUNEND;
-}
-
-/* Marking a CAF currently being marked -- special mark upd info table */
-/* Just return CAF as if marked -- wont be shorted out */
-/* Marking once reference marked and updated -- normal CAF info table */
-/* Return reference to short CAF out */
-
-STGFUN(_PRStart_Caf) 
-{
-    FUNBEGIN;
-    if (IS_MARK_BIT_SET(Mark)) {
-        DEBUG_PR_MARKING_CAF;
-	JUMP_MARK_RETURN;
-    } else {
-    DEBUG_PR_MARKED_CAF;
-    Mark = (P_) IND_CLOSURE_PTR(Mark);
-    JUMP_MARK_RETURN;
-    }
-    FUNEND;
-}
-
-#define DEBUG_PR_MARKED_CAF \
-    if (SM_trace & 8)   \
-        fprintf(stderr, "PRMark CAF (Marked): 0x%lx -> 0x%lx, info 0x%lx\n", \
-		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
-
-#define DEBUG_PR_MARKING_CAF \
-    if (SM_trace & 8)   \
-        fprintf(stderr, "PRMark CAF (Marking): 0x%lx -> 0x%lx, info 0x%lx\n", \
-		Mark, Mark, INFO_PTR(Mark))
-
-#define DEBUG_PRLAST_CAF \
-    if (SM_trace & 8)    \
-        fprintf(stderr, "PRRet  Last  (CAF ): 0x%lx -> 0x%lx, info 0x%lx -> 0x%lx ptrs 1\n", \
-                MStack, Mark, INFO_PTR(MStack), Caf_info)
-
-#endif /* 0 */
-
 \end{code}
 
 %****************************************************************************
@@ -1432,9 +1368,23 @@ STGFUN(_Dummy_PRReturn_entry)
     FUNBEGIN;
     fprintf(stderr,"Called _Dummy_PRReturn_entry\nShould never occur!\n");
     abort();
-    return(0);    /* won't happen; quiets compiler warnings */
     FUNEND;
 }
+
+/* various ways to call _Dummy_PRReturn_entry: */
+
+INTFUN(_PRMarking_MarkNextRoot_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+#ifdef CONCURRENT
+INTFUN(_PRMarking_MarkNextSpark_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+#endif
+#ifdef PAR
+INTFUN(_PRMarking_MarkNextGA_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+#endif
+INTFUN(_PRMarking_MarkNextAStack_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+INTFUN(_PRMarking_MarkNextBStack_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+INTFUN(_PRMarking_MarkNextCAF_entry)	{ FB_; JMP_(_Dummy_PRReturn_entry); FE_; }
+
+/* end of various ways to call _Dummy_PRReturn_entry */
 
 EXTFUN(_PRMarking_MarkNextRoot);
 EXTFUN(_PRMarking_MarkNextCAF);
@@ -1456,42 +1406,42 @@ CAT_DECLARE(Dummy_PrReturn,INTERNAL_KIND,"DUMMY_PRRETURN","DUMMY_PRRETURN")
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextRoot_closure,
 		       _PRMarking_MarkNextRoot_info,
 		       _PRMarking_MarkNextRoot,
-		       _Dummy_PRReturn_entry);
+		       _PRMarking_MarkNextRoot_entry);
 
 #ifdef CONCURRENT
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextSpark_closure,
 		       _PRMarking_MarkNextSpark_info,
 		       _PRMarking_MarkNextSpark,
-		       _Dummy_PRReturn_entry);
+		       _PRMarking_MarkNextSpark_entry);
 #endif
 
 #ifdef PAR
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextGA_closure,
 		       _PRMarking_MarkNextGA_info,
 		       _PRMarking_MarkNextGA,
-		       _Dummy_PRReturn_entry);
+		       _PRMarking_MarkNextGA_entry);
 #else
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextAStack_closure,
 		       _PRMarking_MarkNextAStack_info,
 		       _PRMarking_MarkNextAStack,
-		       _Dummy_PRReturn_entry);
+		       _PRMarking_MarkNextAStack_entry);
 
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextBStack_closure,
 		       _PRMarking_MarkNextBStack_info,
 		       _PRMarking_MarkNextBStack,
-		       _Dummy_PRReturn_entry);
+		       _PRMarking_MarkNextBStack_entry);
 
 #endif /* PAR */
 
 DUMMY_PRRETURN_CLOSURE(_PRMarking_MarkNextCAF_closure,
 		       _PRMarking_MarkNextCAF_info,
 		       _PRMarking_MarkNextCAF,
-		       _Dummy_PRReturn_entry);
+		       _PRMarking_MarkNextCAF_entry);
+
+extern P_ sm_roots_end;	/* &roots[rootno] -- one beyond the end */
 
 STGFUN(_PRMarking_MarkNextRoot)
 {
-    extern P_ sm_roots_end;	/* &roots[rootno] -- one beyond the end */
-
     FUNBEGIN;
     /* Update root -- may have short circuited Ind */
     *MRoot = (W_) Mark;
@@ -1506,10 +1456,10 @@ STGFUN(_PRMarking_MarkNextRoot)
 }
 
 #ifdef CONCURRENT
+extern P_ sm_roots_end;	/* PendingSparksTl[pool] */
+
 STGFUN(_PRMarking_MarkNextSpark)
 {
-    extern P_ sm_roots_end;	/* PendingSparksTl[pool] */
-
     FUNBEGIN;
     /* Update root -- may have short circuited Ind */
     *MRoot = (W_) Mark;
@@ -1587,7 +1537,8 @@ Mark the next CAF in the CAF list.
 STGFUN(_PRMarking_MarkNextCAF)
 {
     FUNBEGIN;
-    /* Update root -- may have short circuted Ind */
+
+    /* Update root -- may have short circuited Ind */
     IND_CLOSURE_PTR(MRoot) = (W_) Mark;
 
     MRoot = (P_) IND_CLOSURE_LINK(MRoot);
@@ -1596,29 +1547,12 @@ STGFUN(_PRMarking_MarkNextCAF)
     if (MRoot == 0)
 	RESUME_(miniInterpretEnd);
 
+    GC_SHORT_CAF(); /* ticky (ToDo: wrong?) */
+
     Mark = (P_) IND_CLOSURE_PTR(MRoot);
     JUMP_MARK;
     FUNEND;
 }
-\end{code}
-
-\begin{code}
-#if 0 /* Code to avoid explicit updating of CAF references */
-
-STGFUN(_PRMarking_MarkNextCAF)
-{
-    FUNBEGIN;
-    MRoot = (P_) IND_CLOSURE_LINK(MRoot);
-
-    /* Is the next CAF the end of the list */
-    if (MRoot == 0)
-	RESUME_(miniInterpretEnd);
-
-    Mark = MRoot;
-    JUMP_MARK;
-    FUNEND;
-}
-#endif /* 0 */
 \end{code}
 
 Multi-slurp protection.

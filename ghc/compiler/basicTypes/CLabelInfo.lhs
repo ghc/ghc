@@ -222,7 +222,7 @@ data RtsLabelInfo
 mkClosureLabel	      	id 		= IdLabel (CLabelId id) Closure
 mkInfoTableLabel      	id 		= IdLabel (CLabelId id) InfoTbl
 mkStdEntryLabel	      	id 		= IdLabel (CLabelId id) EntryStd
-mkFastEntryLabel      	id arity	= --false:ASSERT(arity > 0)
+mkFastEntryLabel      	id arity	= ASSERT(arity > 0)
 					  IdLabel (CLabelId id) (EntryFast arity)
 mkConEntryLabel	      	id		= IdLabel (CLabelId id) ConEntry
 mkStaticConEntryLabel 	id		= IdLabel (CLabelId id) StaticConEntry

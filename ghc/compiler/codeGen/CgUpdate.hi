@@ -3,5 +3,4 @@ interface CgUpdate where
 import AbsCSyn(CAddrMode)
 import CgMonad(CgInfoDownwards, CgState)
 pushUpdateFrame :: CAddrMode -> CAddrMode -> (CgInfoDownwards -> CgState -> CgState) -> CgInfoDownwards -> CgState -> CgState
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222 _N_ _S_ "LLSU(U(LL)LU(LLS))U(LLU(LU(LLLL)L))" _N_ _N_ #-}
 

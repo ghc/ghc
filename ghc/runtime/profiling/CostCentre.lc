@@ -4,15 +4,15 @@
 #include "rtsdefs.h"
 \end{code}
 
-Only have cost centres if @USE_COST_CENTRES@ defined (by the driver),
-or if running CONCURRENT.
+Only have cost centres if @PROFILING@ defined (by the driver),
+or if running PAR.
 
 \begin{code}
-#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+#if defined(PROFILING) || defined(PAR)
 CC_DECLARE(CC_MAIN, "MAIN", "MAIN", "MAIN", CC_IS_BORING,/*not static*/);
 CC_DECLARE(CC_GC,   "GC",   "GC",   "GC",   CC_IS_BORING,/*not static*/);
 
-# ifdef GUM
+# ifdef PAR
 CC_DECLARE(CC_MSG,  "MSG",  "MSG",  "MSG",  CC_IS_BORING,/*not static*/);
 CC_DECLARE(CC_IDLE, "IDLE", "IDLE", "IDLE", CC_IS_BORING,/*not static*/);
 # endif
@@ -25,23 +25,23 @@ would try to increment some @sub_scc_count@ of the @CCC@ (nothing!).
 \begin{code}
 CostCentre CCC; /* _not_ initialised */
 
-#endif /* defined(USE_COST_CENTRES) || defined(CONCURRENT) */
+#endif /* defined(PROFILING) || defined(PAR) */
 \end{code}
 
 The rest is for real cost centres (not thread activities).
 
 \begin{code}
-#if defined(USE_COST_CENTRES) || defined(GUM)
+#if defined(PROFILING) || defined(PAR)
 \end{code}
 %************************************************************************
 %*									*
-\subsection[initial-cost-centres]{Initial Cost Centres}
+\subsection{Initial Cost Centres}
 %*									*
 %************************************************************************
 
 Cost centres which are always required:
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 
 CC_DECLARE(CC_OVERHEAD,  "OVERHEAD_of", "PROFILING", "MAIN", CC_IS_CAF,/*not static*/);
 CC_DECLARE(CC_SUBSUMED,  "SUBSUMED",    "MAIN",      "MAIN", CC_IS_SUBSUMED,/*not static*/);
@@ -54,18 +54,14 @@ The list of registered cost centres, initially empty:
 CostCentre Registered_CC = REGISTERED_END;
 \end{code}
 
+
 %************************************************************************
 %*									*
-\subsection[profiling-arguments]{Profiling RTS Arguments}
+\subsection{Profiling RTS Arguments}
 %*									*
 %************************************************************************
 
 \begin{code}
-I_  cc_profiling = 0; /* 0  => not "cc_profiling"
-			 >1 => do serial time profile
-			 (other magic meanings, too, apparently) WDP 94/07
-		      */
-char cc_profiling_sort = SORTCC_TIME;
 I_  dump_intervals = 0;
 
 /* And for the report ... */
@@ -82,202 +78,47 @@ init_cc_profiling(rts_argc, rts_argv, prog_argv)
     I_ rts_argc;
     char *rts_argv[], *prog_argv[];
 {
-    I_ arg, ch, error = 0;
-    I_ prof_req = 0;
+    I_ arg, ch;
+#ifndef PAR
     char *select_cc = 0;
     char *select_mod = 0;
     char *select_grp = 0;
     char *select_descr = 0;
     char *select_type = 0;
     char *select_kind = 0;
-    I_  select_age = 0;
     char *left, *right;
+#endif
 
     prog_argv_save = prog_argv;
     rts_argv_save = rts_argv;
 
-#ifdef GUM
+#ifdef PAR
     sprintf(prof_filename, PROF_FILENAME_FMT_GUM, prog_argv[0], thisPE);
 #else
     sprintf(prof_filename, PROF_FILENAME_FMT, prog_argv[0]);
 #endif
 
-    for (arg = 0; arg < rts_argc; arg++) {
-	if (rts_argv[arg][0] == '-') {
-	    switch (rts_argv[arg][1]) {
-	      case 'P': /* detailed cost centre profiling (time/alloc) */
-		cc_profiling++;
-	      case 'p': /* cost centre profiling (time/alloc) */
-		cc_profiling++;
-		for (ch = 2; rts_argv[arg][ch]; ch++) {
-		switch (rts_argv[arg][2]) {
-		  case SORTCC_LABEL:
-		  case SORTCC_TIME:
-		  case SORTCC_ALLOC:
-			cc_profiling_sort = rts_argv[arg][ch];
-		    break;
-		  default:
-		    fprintf(stderr, "Invalid profiling sort option %s\n", rts_argv[arg]);
-		    error = 1;
-		}}
-		break;
-
-#if defined(USE_COST_CENTRES)
-	      case 'h': /* serial heap profile */
-		switch (rts_argv[arg][2]) {
-		  case '\0':
-		  case CCchar:
-		    prof_req = HEAP_BY_CC;
-		    break;
-		  case MODchar:
-		    prof_req = HEAP_BY_MOD;
-		    break;
-		  case GRPchar:
-		    prof_req = HEAP_BY_GRP;
-		    break;
-		  case DESCRchar:
-		    prof_req = HEAP_BY_DESCR;
-		    break;
-		  case TYPEchar:
-		    prof_req = HEAP_BY_TYPE;
-		    break;
-		  case TIMEchar:
-		    prof_req = HEAP_BY_TIME;
-		    if (rts_argv[arg][3]) {
-			char *start_str = strchr(rts_argv[arg]+3, ',');
-			I_ intervals;
-			if (start_str) *start_str = '\0';
-
-			if ((intervals = decode(rts_argv[arg]+3)) != 0) {
-			    time_intervals = (hash_t) intervals;
-			    /* ToDo: and what if it *is* zero intervals??? */
-			}
-			if (start_str) {
-			    earlier_ticks = (I_)((atof(start_str + 1) * TICK_FREQUENCY));
-			}
-		    }
-		    break;
-		  default:
-		    fprintf(stderr, "Invalid heap profile option: %s\n",
-			    rts_argv[arg]);
-		    error = 1;
-		}
-		break;
-
-	      case 'z': /* size of index tables */
-		switch (rts_argv[arg][2]) {
-		  case CCchar:
-		    max_cc_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_cc_no == 0) {
-			fprintf(stderr, "Bad number of cost centres %s\n", rts_argv[arg]);
-			error = 1;
-		    }
-		    break;
-		  case MODchar:
-		    max_mod_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_mod_no == 0) {
-			fprintf(stderr, "Bad number of modules %s\n", rts_argv[arg]);
-			error = 1;
-		    }
-		    break;
-		  case GRPchar:
-		    max_grp_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_grp_no == 0) {
-			fprintf(stderr, "Bad number of groups %s\n", rts_argv[arg]);
-			error = 1;
-		    }
-		    break;
-		  case DESCRchar:
-		    max_descr_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_descr_no == 0) {
-			fprintf(stderr, "Bad number of closure descriptions %s\n", rts_argv[arg]);
-			error = 1;
-		    }
-		    break;
-		  case TYPEchar:
-		    max_type_no = (hash_t) decode(rts_argv[arg]+3);
-		    if (max_type_no == 0) {
-			fprintf(stderr, "Bad number of type descriptions %s\n", rts_argv[arg]);
-			error = 1;
-		    }
-		    break;
-		  default:
-		    fprintf(stderr, "Invalid index table size option: %s\n",
-			    rts_argv[arg]);
-		    error = 1;
-		}
-		break;
-
-	      case 'c': /* cost centre label select */
-	      case 'm': /* cost centre module select */
-	      case 'g': /* cost centre group select */
-	      case 'd': /* closure descr select */
-	      case 'y': /* closure type select */
-	      case 'k': /* closure kind select */
-		left  = strchr(rts_argv[arg], '{');
-		right = strrchr(rts_argv[arg], '}');
-		if (! left || ! right ||
-		        strrchr(rts_argv[arg], '{') != left ||
-		         strchr(rts_argv[arg], '}') != right) {
-		    fprintf(stderr, "Invalid heap profiling selection bracketing\n   %s\n", rts_argv[arg]);
-		    error = 1;
-		} else {
-		    *right = '\0';
-		    switch (rts_argv[arg][1]) {
-		      case 'c': /* cost centre label select */
-			select_cc = left + 1;
-		break;
-		      case 'm': /* cost centre module select */
-			select_mod = left + 1;
-			break;
-		      case 'g': /* cost centre group select */
-			select_grp = left + 1;
-			break;
-		      case 'd': /* closure descr select */
-			select_descr = left + 1;
-			break;
-		      case 't': /* closure type select */
-			select_type = left + 1;
-			break;
-		      case 'k': /* closure kind select */
-			select_kind = left + 1;
-			break;
-		}
-		}
-		break;
-
-	      case 'a': /* closure age select */
-		select_age = decode(rts_argv[arg]+2);
-
-#endif /* defined(USE_COST_CENTRES) */
-
-	      case 'i': /* serial profiling -- initial timer interval */
-		interval_ticks = (I_) ((atof(rts_argv[arg]+2) * TICK_FREQUENCY));
-		if (interval_ticks <= 0)
-		    interval_ticks = 1;
-		break;
-	    }
-	}
-    }
-    if (error) return 1;
-
     /* Now perform any work to initialise profiling ... */
 
-    if (cc_profiling || prof_req != HEAP_NO_PROFILING) {
+    if (RTSflags.CcFlags.doCostCentres
+#ifdef PROFILING
+     || RTSflags.ProfFlags.doHeapProfile
+#endif
+       ) {
 
 	time_profiling++;
 
         /* set dump_intervals: if heap profiling only dump every 10 intervals */
-	if (prof_req == HEAP_NO_PROFILING) {
-	    dump_intervals = 1;
-	} else {
-	    dump_intervals = 10;
-	}
+#ifdef PROFILING
+	dump_intervals = (RTSflags.ProfFlags.doHeapProfile) ? 10 : 1;
+#else
+	dump_intervals = 1;
+#endif
 
-	if (cc_profiling > 1) {
+	if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
 	    /* produce serial time profile */
     
-#ifdef GUM
+#ifdef PAR
 	    sprintf(serial_filename, TIME_FILENAME_FMT_GUM, prog_argv[0], thisPE);
 #else
 	    sprintf(serial_filename, TIME_FILENAME_FMT, prog_argv[0]);
@@ -296,7 +137,11 @@ init_cc_profiling(rts_argc, rts_argv, prog_argv)
 	    fprintf(serial_file, "DATE \"%s\"\n", time_str());
     
 	    fprintf(serial_file, "SAMPLE_UNIT \"seconds\"\n");
+#ifdef PAR
+	    fprintf(serial_file, "VALUE_UNIT \"percentage time\"\n");
+#else
 	    fprintf(serial_file, "VALUE_UNIT \"time ticks\"\n");
+#endif
     
 	    /* output initial 0 sample */
 	    fprintf(serial_file, "BEGIN_SAMPLE 0.00\n");
@@ -304,10 +149,10 @@ init_cc_profiling(rts_argc, rts_argv, prog_argv)
 	}
     }
 
-#if defined(USE_COST_CENTRES)
-    if (heap_profile_init(prof_req, select_cc, select_mod, select_grp,
-			            select_descr, select_type, select_kind,
-			            select_age, prog_argv))
+#if defined(PROFILING)
+    if (heap_profile_init(select_cc, select_mod, select_grp,
+			  select_descr, select_type, select_kind,
+			  prog_argv))
 	return 1;
 #endif
     
@@ -321,7 +166,6 @@ the area to hold the stack of modules still to register.
 \begin{code}
 extern P_ heap_space;    /* pointer to the heap space */
 StgFunPtr * register_stack;  /* stack of register routines -- heap area used */
-extern I_ heap_profiling_req;
 
 EXTFUN(startCcRegisteringWorld);
 
@@ -331,12 +175,12 @@ cc_register()
     REGISTER_CC(CC_MAIN);	/* register cost centre CC_MAIN */
     REGISTER_CC(CC_GC);		/* register cost centre CC_GC */
 
-#if defined(GUM)
+#if defined(PAR)
     REGISTER_CC(CC_MSG);	/* register cost centre CC_MSG */
     REGISTER_CC(CC_IDLE);	/* register cost centre CC_MSG */
 #endif
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     REGISTER_CC(CC_OVERHEAD);	/* register cost centre CC_OVERHEAD */
     REGISTER_CC(CC_DONTZuCARE);	/* register cost centre CC_DONT_CARE Right??? ToDo */
 #endif
@@ -345,9 +189,9 @@ cc_register()
     CCC = (CostCentre)STATIC_CC_REF(CC_MAIN);
     CCC->scc_count++;
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 /*  always register -- if we do not, we get warnings (WDP 94/12) */
-/*  if (cc_profiling || heap_profiling_req != HEAP_NO_PROFILING) */
+/*  if (RTSflags.CcFlags.doCostCentres || RTSflags.ProfFlags.doHeapProfile) */
 
     register_stack = (StgFunPtr *) heap_space;
     miniInterpret((StgFunPtr) startCcRegisteringWorld);
@@ -357,25 +201,48 @@ cc_register()
 
 %************************************************************************
 %*									*
-\subsection[cost-centre-profiling]{Cost Centre Profiling Report}
+\subsection{Cost Centre Profiling Report}
 %*									*
 %************************************************************************
 
 \begin{code}
-
 static I_ dump_interval = 0;
+
+rtsBool
+cc_to_ignore (CostCentre cc)
+  /* return rtsTrue if it is one of the ones that
+     should not be reported normally (because it confuses
+     the users)
+  */
+{
+#   if !defined(PROFILING)
+    /* in parallel land, everything is interesting (not ignorable) */
+    return rtsFalse;
+
+#   else
+    if ( cc == CC_OVERHEAD || cc == CC_DONTZuCARE ||  cc == CC_GC ) {
+	return rtsTrue;
+    } else {
+	return rtsFalse;
+    }
+#   endif /* PROFILING */
+}
 
 void
 report_cc_profiling(final)
-I_ final;
+  I_ final;
 {
     FILE *prof_file;
     CostCentre cc;
     I_ count;
-    char temp[32];
-    W_ total_ticks = 0, total_alloc = 0, total_allocs = 0;
+    char temp[128]; /* sigh: magic constant */
+    W_ total_ticks   = 0, total_alloc   = 0, total_allocs   = 0;
+    W_ ignored_ticks = 0, ignored_alloc = 0, ignored_allocs = 0;
+#ifdef PAR
+    I_ final_ticks = 0;				/*No. ticks in last sample*/
+#endif
 
-    if (!cc_profiling)
+    if (!RTSflags.CcFlags.doCostCentres)
 	return;
 
     blockVtAlrmSignal();
@@ -384,24 +251,41 @@ I_ final;
 	StgFloat seconds = (previous_ticks + current_ticks) / (StgFloat) TICK_FREQUENCY;
 
 	if (final) {
-	    /* ignore partial sample at end of execution */
+    	    fprintf(serial_file, "BEGIN_SAMPLE %0.2f\n", seconds);
+#ifdef PAR
+	    /*In the parallel world we're particularly interested in the last sample*/
+	    for (cc = Registered_CC; cc != REGISTERED_END; cc = cc->registered) {
+		if (! cc_to_ignore(cc))
+		    final_ticks += cc->time_ticks;
+	    }
 
-	    /* output final 0 sample */
-	    fprintf(serial_file, "BEGIN_SAMPLE %0.2f\n", seconds);
+	    for (cc = Registered_CC; cc != REGISTERED_END; cc = cc->registered) {
+		if (cc->time_ticks != 0 && ! cc_to_ignore(cc))
+		    fprintf(serial_file, "  %0.11s:%0.16s %3ld\n",
+			cc->module, cc->label, cc->time_ticks*100 / final_ticks);
+	    }
+#endif
+	    /* In the sequential world, ignore partial sample at end of execution */
 	    fprintf(serial_file, "END_SAMPLE %0.2f\n", seconds);
 	    fclose(serial_file);
 	    serial_file = NULL;
 
 	} else {
-	    /* output serail profile sample */
+	    /* output serial profile sample */
 
 	    fprintf(serial_file, "BEGIN_SAMPLE %0.2f\n", seconds);
 
 	    for (cc = Registered_CC; cc != REGISTERED_END; cc = cc->registered) {
 		ASSERT_IS_REGISTERED(cc, 0);
-		if (cc->time_ticks) {
+		if (cc->time_ticks != 0 && !cc_to_ignore(cc)) {
+#ifdef PAR                                          
+		  /* Print _percentages_ in the parallel world */
+		    fprintf(serial_file, "  %0.11s:%0.16s %3ld\n",
+		      cc->module, cc->label, cc->time_ticks * 100/TICK_FREQUENCY);
+#else
 		    fprintf(serial_file, "  %0.11s:%0.16s %3ld\n",
 		      cc->module, cc->label, cc->time_ticks);
+#endif
 		}
 	    }
 
@@ -415,13 +299,19 @@ I_ final;
 	cc->prev_ticks += cc->time_ticks;
 	cc->time_ticks = 0;
 
-	total_ticks  += cc->prev_ticks;
-	total_alloc  += cc->mem_alloc;
-	total_allocs += cc->mem_allocs;
+	if ( cc_to_ignore(cc) ) { /* reporting these just confuses users... */
+	    ignored_ticks  += cc->prev_ticks;
+	    ignored_alloc  += cc->mem_alloc;
+	    ignored_allocs += cc->mem_allocs;
+	} else {
+	    total_ticks  += cc->prev_ticks;
+	    total_alloc  += cc->mem_alloc;
+	    total_allocs += cc->mem_allocs;
+	}
     }
 
-    if (total_ticks != current_ticks + previous_ticks)
-	fprintf(stderr, "Warning: Cost Centre tick inconsistency: total=%ld, current=%ld, previous=%ld\n", total_ticks, current_ticks, previous_ticks);
+    if (total_ticks + ignored_ticks != current_ticks + previous_ticks)
+	fprintf(stderr, "Warning: Cost Centre tick inconsistency: total=%ld, ignored=%ld, current=%ld, previous=%ld\n", total_ticks, ignored_ticks, current_ticks, previous_ticks);
 
     unblockVtAlrmSignal();
 
@@ -433,7 +323,7 @@ I_ final;
     dump_interval = 0;
 
     /* sort cost centres */
-    cc_sort(&Registered_CC, cc_profiling_sort);
+    cc_sort(&Registered_CC, RTSflags.CcFlags.sortBy);
 
     /* open profiling output file */
     if ((prof_file = fopen(prof_filename, "w")) == NULL) {
@@ -466,7 +356,7 @@ I_ final;
 */
     fprintf(prof_file, " %5s %5s %6s %6s", "scc", "subcc", "%time", "%alloc");
 
-    if (cc_profiling > 1)
+    if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE)
 	fprintf(prof_file, " %11s  %13s %8s %8s %8s (%5s %8s)", "cafcc", "thunks", "funcs", "PAPs", "closures", "ticks", "bytes");
     fprintf(prof_file, "\n\n");
 
@@ -475,13 +365,15 @@ I_ final;
 
 	/* Only print cost centres with non 0 data ! */
 
-	if (cc->scc_count || cc->sub_scc_count || cc->prev_ticks || cc->mem_alloc
-	    || (cc_profiling > 1
-		&& (cc->thunk_count || cc->function_count || cc->pap_count
-	         || cc->cafcc_count || cc->sub_cafcc_count))
-	    || (cc_profiling > 2
-		/* print all cost centres if -P -P */ )
-	    ) {
+	if ( (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_ALL
+		/* force printing of *all* cost centres if -P -P */ )
+
+	  || ( ! cc_to_ignore(cc)
+	    && (cc->scc_count || cc->sub_scc_count || cc->prev_ticks || cc->mem_alloc
+		|| (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE
+		    && (cc->thunk_count || cc->function_count || cc->pap_count
+		     || cc->cafcc_count || cc->sub_cafcc_count))))
+	   ) {
 
 	    fprintf(prof_file, "%-16.16s %-11.11s", cc->label, cc->module);
 /* ToDo:group
@@ -492,7 +384,7 @@ I_ final;
 	      total_ticks == 0 ? 0.0 : (cc->prev_ticks / (StgFloat) total_ticks * 100),
 	      total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat) total_alloc * 100));
 
-	    if (cc_profiling > 1)
+	    if (RTSflags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE)
 		fprintf(prof_file, " %8ld %-8ld %8ld %8ld %8ld %8ld (%5ld %8ld)",
 			cc->cafcc_count, cc->sub_cafcc_count,
 			cc->thunk_count, cc->function_count, cc->pap_count,
@@ -509,7 +401,7 @@ I_ final;
 
 %************************************************************************
 %*									*
-\subsection[profiling-misc]{Miscellanious Profiling Routines}
+\subsection{Miscellaneous profiling routines}
 %*									*
 %************************************************************************
 
@@ -519,8 +411,7 @@ insertion sort. First we need the different comparison routines.
 \begin{code}
 
 static I_
-cc_lt_label(cc1, cc2)
-    CostCentre cc1, cc2;
+cc_lt_label(CostCentre cc1, CostCentre cc2)
 {
     I_ cmp;
 
@@ -542,8 +433,7 @@ cc_lt_label(cc1, cc2)
 }
 
 static I_
-cc_gt_time(cc1, cc2)
-    CostCentre cc1, cc2;
+cc_gt_time(CostCentre cc1, CostCentre cc2)
 {
     /* ToDo: normal then caf then dict (instead of scc at top) */
 
@@ -571,8 +461,7 @@ cc_gt_time(cc1, cc2)
 }
 
 static I_
-cc_gt_alloc(cc1, cc2)
-    CostCentre cc1, cc2;
+cc_gt_alloc(CostCentre cc1, CostCentre cc2)
 {
     /* ToDo: normal then caf then dict (instead of scc at top) */
 
@@ -599,15 +488,8 @@ cc_gt_alloc(cc1, cc2)
     return (cc_lt_label(cc1, cc2));                 /* all data equal: cmp labels */
 }
 
-#ifdef __STDC__
 void
 cc_sort(CostCentre *sort, char sort_on)
-#else
-void
-cc_sort(sort, sort_on)
-    CostCentre *sort;
-    char sort_on;
-#endif
 {
     I_ (*cc_lt)();
     CostCentre sorted, insert, *search, insert_rest;
@@ -649,5 +531,5 @@ cc_sort(sort, sort_on)
 \end{code}
 
 \begin{code}
-#endif /* USE_COST_CENTRES || GUM */
+#endif /* PROFILING || PAR */
 \end{code}

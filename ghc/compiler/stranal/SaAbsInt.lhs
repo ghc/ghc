@@ -20,7 +20,11 @@ import Pretty
 --import FiniteMap
 import Outputable
 
-import AbsPrel		( PrimOp(..), PrimKind )
+import AbsPrel		( PrimOp(..),
+			  intTyCon, integerTyCon, doubleTyCon,
+			  floatTyCon, wordTyCon, addrTyCon,
+			  PrimKind
+			)
 import AbsUniType	( isPrimType, getUniDataTyCon_maybe,
 			  maybeSingleConstructorTyCon,
 			  returnsRealWorld,
@@ -736,51 +740,53 @@ unbound variables in an @AbsValEnv@ are implicitly mapped to that.
 See notes on @addStrictnessInfoToId@.
 
 \begin{code}
-findStrictness :: [UniType]	-- Types of args in which strictness is wanted
+findStrictness :: StrAnalFlags
+	       -> [UniType]	-- Types of args in which strictness is wanted
 	       -> AbsVal 	-- Abstract strictness value of function 
 	       -> AbsVal	-- Abstract absence value of function
 	       -> [Demand]	-- Resulting strictness annotation
 
-findStrictness [] str_val abs_val = []
+findStrictness strflags [] str_val abs_val = []
 
-findStrictness (ty:tys) str_val abs_val
+findStrictness strflags (ty:tys) str_val abs_val
   = let
-	demand 	     = findRecDemand [] str_fn abs_fn ty
+	demand 	     = findRecDemand strflags [] str_fn abs_fn ty
 	str_fn val   = absApply StrAnal str_val val
 	abs_fn val   = absApply AbsAnal abs_val val
 
-	demands = findStrictness tys (absApply StrAnal str_val AbsTop)
-			             (absApply AbsAnal abs_val AbsTop)
+	demands = findStrictness strflags tys
+			(absApply StrAnal str_val AbsTop)
+			(absApply AbsAnal abs_val AbsTop)
     in
-    -- pprTrace "findRecDemand:" (ppCat [ppr PprDebug demand, ppr PprDebug ty]) (
     demand : demands
-    -- )
 \end{code}
 
 
 \begin{code}
 findDemandStrOnly str_env expr binder 	-- Only strictness environment available
-  = findRecDemand [] str_fn abs_fn (getIdUniType binder)
+  = findRecDemand strflags [] str_fn abs_fn (getIdUniType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = AbsBot		-- Always says poison; so it looks as if
 				-- nothing is absent; safe
-  
+    strflags   = getStrAnalFlags str_env
 
 findDemandAbsOnly abs_env expr binder 	-- Only absence environment available
-  = findRecDemand [] str_fn abs_fn (getIdUniType binder)
+  = findRecDemand strflags [] str_fn abs_fn (getIdUniType binder)
   where
     str_fn val = AbsBot		-- Always says non-termination;
 				-- that'll make findRecDemand peer into the
 				-- structure of the value.
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
+    strflags   = getStrAnalFlags abs_env
   
 
 findDemand str_env abs_env expr binder
-  = findRecDemand [] str_fn abs_fn (getIdUniType binder)
+  = findRecDemand strflags [] str_fn abs_fn (getIdUniType binder)
   where
     str_fn val = absEval StrAnal expr (addOneToAbsValEnv str_env binder val)
     abs_fn val = absEval AbsAnal expr (addOneToAbsValEnv abs_env binder val)
+    strflags   = getStrAnalFlags str_env
 \end{code}
 
 @findRecDemand@ is where we finally convert strictness/absence info
@@ -816,14 +822,15 @@ then we'd let-to-case it:
 Ho hum.
 
 \begin{code}
-findRecDemand :: [TyCon]	    -- TyCons already seen; used to avoid
+findRecDemand :: StrAnalFlags
+	      -> [TyCon]	    -- TyCons already seen; used to avoid
 				    -- zooming into recursive types
 	      -> (AbsVal -> AbsVal) -- The strictness function
 	      -> (AbsVal -> AbsVal) -- The absence function
 	      -> UniType 	    -- The type of the argument
 	      -> Demand
 
-findRecDemand seen str_fn abs_fn ty
+findRecDemand strflags seen str_fn abs_fn ty
   = if isPrimType ty then -- It's a primitive type!
        wwPrim
 
@@ -831,10 +838,12 @@ findRecDemand seen str_fn abs_fn ty
        -- We prefer absence over strictness: see NOTE above.
        WwLazy True
 
-    else if not (isBot (str_fn AbsBot)) then -- It's not strict
-       WwLazy False
+    else if not (all_strict ||
+		 (num_strict && is_numeric_type ty) ||
+		 (isBot (str_fn AbsBot))) then
+	WwLazy False -- It's not strict and we're not pretending
 
-    else -- It's strict!
+    else -- It's strict (or we're pretending it is)!
 
        case getUniDataTyCon_maybe ty of
 
@@ -847,7 +856,7 @@ findRecDemand seen str_fn abs_fn ty
 	      prod_len = length cmpnt_tys
 
 	      compt_strict_infos
-		= [ findRecDemand (tycon:seen)
+		= [ findRecDemand strflags (tycon:seen)
 			 (\ cmpnt_val ->
 			       str_fn (mkMainlyTopProd prod_len i cmpnt_val)
 			 )
@@ -874,6 +883,21 @@ findRecDemand seen str_fn abs_fn ty
 	    else
 		wwStrict
   where
+    (all_strict, num_strict) = strflags
+
+    is_numeric_type ty
+      = case (getUniDataTyCon_maybe ty) of -- NB: duplicates stuff done above
+	  Nothing -> False
+	  Just (tycon, _, _)
+	    | tycon `is_elem`
+	      [intTyCon, integerTyCon,
+	       doubleTyCon, floatTyCon,
+	       wordTyCon, addrTyCon]
+	    -> True
+	  _{-something else-} -> False
+      where
+	is_elem = isIn "is_numeric_type"
+
     -- mkMainlyTopProd: make an AbsProd that is all AbsTops ("n"-1 of
     -- them) except for a given value in the "i"th position.
 

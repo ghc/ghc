@@ -6,5 +6,4 @@ import U_coresyn(U_coresyn)
 import U_list(U_list)
 data U_hpragma   = U_no_pragma | U_idata_pragma U_list U_list | U_itype_pragma | U_iclas_pragma U_list | U_iclasop_pragma U_hpragma U_hpragma | U_iinst_simpl_pragma _PackedString U_hpragma | U_iinst_const_pragma _PackedString U_hpragma U_list | U_iinst_spec_pragma _PackedString U_hpragma U_list | U_igen_pragma U_hpragma U_hpragma U_hpragma U_hpragma U_hpragma U_list | U_iarity_pragma Int | U_iupdate_pragma _PackedString | U_ideforest_pragma | U_istrictness_pragma _PackedString U_hpragma | U_imagic_unfolding_pragma _PackedString | U_iunfolding_pragma U_hpragma U_coresyn | U_iunfold_always | U_iunfold_if_args Int Int _PackedString Int | U_iname_pragma_pr ProtoName U_hpragma | U_itype_pragma_pr U_list Int U_hpragma | U_iinst_pragma_3s U_list Int U_hpragma U_list | U_idata_pragma_4s U_list
 rdU_hpragma :: _Addr -> _PackedString -> _State _RealWorld -> (U_hpragma, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 3 _U_ 121 _N_ _S_ "U(P)LU(P)" {_A_ 3 _U_ 222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

@@ -20,29 +20,17 @@ is even more dated.)
 
 extern StgPtr unstable_Closure;
 
-#ifndef __STG_TAILJUMPS__
-extern int doSanityChks;
-extern void checkAStack(STG_NO_ARGS);
-#endif
-
 void
 enterStablePtr(stableIndex, startCode)
   StgStablePtr stableIndex;
   StgFunPtr startCode;
 {
-  unstable_Closure = _deRefStablePointer(stableIndex, StorageMgrInfo.StablePointerTable);
+    unstable_Closure
+      = _deRefStablePointer(stableIndex, StorageMgrInfo.StablePointerTable);
 
 /* ToDo: Set arity to right value - if necessary */
 
-#if defined(__STG_TAILJUMPS__)
-  miniInterpret(startCode);
-#else
-  if (doSanityChks)
-    miniInterpret_debug(startCode, checkAStack);
-  else
     miniInterpret(startCode);
-#endif /* not tail-jumping */
-
 }
 \end{code}
 

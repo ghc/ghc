@@ -53,30 +53,6 @@ sub mangle_asm {
 
 	    $chk[$i] .= $_;
 
-	} elsif ( /^(ret_|djn_)/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
-	    $chksymb[$i] = '';
-
-	} elsif ( /^vtbl_([A-Za-z0-9_]+):$/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'vector';
-	    $chksymb[$i] = $1;
-
-	    $vectorchk{$1} = $i;
-
-	} elsif ( /^([A-Za-z0-9_]+)DirectReturn:$/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'direct';
-	    $chksymb[$i] = $1;
-
-	    $directchk{$1} = $i;
-
-	} elsif ( /^[A-Za-z0-9_]+_upd:$/ ) {
-	    $chk[++$i] .= $_;
-	    $chkcat[$i] = 'misc';
-	    $chksymb[$i] = '';
-
 	} elsif ( /^\.LLC(\d+):$/ ) {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'string';
@@ -92,6 +68,8 @@ sub mangle_asm {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'infotbl';
 	    $chksymb[$i] = $symb;
+
+	    die "Info table already? $symb; $i\n" if defined($infochk{$symb});
 
 	    $infochk{$symb} = $i;
 
@@ -132,6 +110,30 @@ sub mangle_asm {
 	       ) {
 	    $chk[++$i] .= $_;
 	    $chkcat[$i] = 'data';
+	    $chksymb[$i] = '';
+
+	} elsif ( /^(ret_|djn_)/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
+	    $chksymb[$i] = '';
+
+	} elsif ( /^vtbl_([A-Za-z0-9_]+):$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'vector';
+	    $chksymb[$i] = $1;
+
+	    $vectorchk{$1} = $i;
+
+	} elsif ( /^([A-Za-z0-9_]+)DirectReturn:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'direct';
+	    $chksymb[$i] = $1;
+
+	    $directchk{$1} = $i;
+
+	} elsif ( /^[A-Za-z0-9_]+_upd:$/ ) {
+	    $chk[++$i] .= $_;
+	    $chkcat[$i] = 'misc';
 	    $chksymb[$i] = '';
 
 	} elsif ( /^[A-Za-z0-9_]/ ) {
@@ -269,6 +271,12 @@ sub mangle_asm {
 		print OUTASM &rev_tbl($symb, $chk[$infochk{$symb}], 1);
 		# entry code will be put here!
 
+		# paranoia
+		if ( $chk[$infochk{$symb}] =~ /\.word\s+([A-Za-z0-9_]+_entry)$/
+		  && $1 ne "${symb}_entry" ) {
+		    print STDERR "!!! entry point???\n",$chk[$infochk{$symb}];
+		}
+
 		$chkcat[$infochk{$symb}] = 'DONE ALREADY';
 	    }
 
@@ -277,11 +285,14 @@ sub mangle_asm {
 
 		# teach it to drop through to the fast entry point:
 		$c = $chk[$slowchk{$symb}];
-		$c =~ s/^\tcall _${symb}_fast\d+,.*\n\tnop\n//;
-		$c =~ s/^\tcall _${symb}_fast\d+,.*\n(\t[a-z].*\n)/\1/;
+
+		if ( defined($fastchk{$symb}) ) {
+		    $c =~ s/^\tcall ${symb}_fast\d+,.*\n\tnop\n//;
+		    $c =~ s/^\tcall ${symb}_fast\d+,.*\n(\t[a-z].*\n)/\1/;
+		}
 
 		print STDERR "still has jump to fast entry point:\n$c"
-		    if $c =~ /_${symb}_fast/;
+		    if $c =~ /${symb}_fast/; # NB: paranoia
 
 		print OUTASM "\.text\n\t\.align 4\n";
 		print OUTASM $c;

@@ -1,55 +1,35 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface SATMonad where
-import Class(Class)
 import CoreSyn(CoreBinding, CoreExpr)
-import Id(Id, IdDetails)
-import IdInfo(IdInfo)
+import Id(Id)
 import Maybes(Labda)
 import PlainCore(PlainCoreExpr(..))
 import SplitUniq(SplitUniqSupply)
-import TyCon(TyCon)
-import TyVar(TyVar, TyVarTemplate)
 import UniType(UniType)
 import UniqFM(UniqFM)
-import Unique(Unique)
 infixr 9 `thenSAT`
 infixr 9 `thenSAT_`
 data Arg a   = Static a | NotStatic
-data Id 	{-# GHC_PRAGMA Id Unique UniType IdInfo IdDetails #-}
+data Id 
 type PlainCoreExpr = CoreExpr Id Id
 type SATEnv = UniqFM ([Arg UniType], [Arg Id])
 type SATInfo = ([Arg UniType], [Arg Id])
 type SatM a = SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> (a, UniqFM ([Arg UniType], [Arg Id]))
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data UniType 	{-# GHC_PRAGMA UniTyVar TyVar | UniFun UniType UniType | UniData TyCon [UniType] | UniSyn TyCon [UniType] UniType | UniDict Class UniType | UniTyVarTemplate TyVarTemplate | UniForall TyVarTemplate UniType #-}
+data SplitUniqSupply 
+data UniType 
 dropStatics :: [Arg a] -> [b] -> [b]
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SS" _N_ _N_ #-}
 emptyEnvSAT :: SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> ((), UniqFM ([Arg UniType], [Arg Id]))
-	{-# GHC_PRAGMA _A_ 2 _U_ 00 _N_ _S_ "AA" {_A_ 0 _N_ _N_ _N_ _N_ _N_} _N_ _N_ #-}
 getArgLists :: CoreExpr Id Id -> ([Arg UniType], [Arg Id])
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 getSATInfo :: Id -> SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> (Labda ([Arg UniType], [Arg Id]), UniqFM ([Arg UniType], [Arg Id]))
-	{-# GHC_PRAGMA _A_ 3 _U_ 102 _N_ _S_ "LAL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 initSAT :: (SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> (a, UniqFM ([Arg UniType], [Arg Id]))) -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 insSAEnv :: Id -> ([Arg UniType], [Arg Id]) -> SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> ((), UniqFM ([Arg UniType], [Arg Id]))
-	{-# GHC_PRAGMA _A_ 4 _U_ 1202 _N_ _S_ "LLAL" {_A_ 3 _U_ 122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 isStatic :: Arg a -> Bool
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 1 1 C 4 _/\_ u0 -> \ (u1 :: Arg u0) -> case u1 of { _ALG_ _ORIG_ SATMonad Static (u2 :: u0) -> _!_ True [] []; _ORIG_ SATMonad NotStatic  -> _!_ False [] []; _NO_DEFLT_ } _N_ #-}
 mapSAT :: (a -> SplitUniqSupply -> c -> (b, c)) -> [a] -> SplitUniqSupply -> c -> ([b], c)
-	{-# GHC_PRAGMA _A_ 2 _U_ 2122 _N_ _S_ "LS" _N_ _N_ #-}
 newSATName :: Id -> UniType -> SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> (Id, UniqFM ([Arg UniType], [Arg Id]))
-	{-# GHC_PRAGMA _A_ 4 _U_ 1212 _N_ _N_ _N_ _N_ #-}
 returnSAT :: b -> a -> c -> (b, c)
-	{-# GHC_PRAGMA _A_ 3 _U_ 202 _N_ _S_ "LAL" {_A_ 2 _U_ 22 _N_ _N_ _F_ _IF_ARGS_ 3 2 XX 3 _/\_ u0 u1 u2 -> \ (u3 :: u1) (u4 :: u2) -> _!_ _TUP_2 [u1, u2] [u3, u4] _N_} _F_ _IF_ARGS_ 3 3 XXX 3 _/\_ u0 u1 u2 -> \ (u3 :: u1) (u4 :: u0) (u5 :: u2) -> _!_ _TUP_2 [u1, u2] [u3, u5] _N_ #-}
 saTransform :: Id -> CoreExpr Id Id -> SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> (CoreBinding Id Id, UniqFM ([Arg UniType], [Arg Id]))
-	{-# GHC_PRAGMA _A_ 2 _U_ 2212 _N_ _N_ _N_ _N_ #-}
 thenSAT :: (SplitUniqSupply -> c -> (a, b)) -> (a -> SplitUniqSupply -> b -> d) -> SplitUniqSupply -> c -> d
-	{-# GHC_PRAGMA _A_ 4 _U_ 1112 _N_ _S_ "SSU(ALL)L" {_A_ 5 _U_ 11222 _N_ _N_ _F_ _IF_ARGS_ 4 5 XXXXX 8 _/\_ u0 u1 u2 u3 -> \ (u4 :: SplitUniqSupply -> u2 -> (u0, u1)) (u5 :: u0 -> SplitUniqSupply -> u1 -> u3) (u6 :: SplitUniqSupply) (u7 :: SplitUniqSupply) (u8 :: u2) -> case _APP_  u4 [ u6, u8 ] of { _ALG_ _TUP_2 (u9 :: u0) (ua :: u1) -> _APP_  u5 [ u9, u7, ua ]; _NO_DEFLT_ } _N_} _F_ _ALWAYS_ _/\_ u0 u1 u2 u3 -> \ (u4 :: SplitUniqSupply -> u2 -> (u0, u1)) (u5 :: u0 -> SplitUniqSupply -> u1 -> u3) (u6 :: SplitUniqSupply) (u7 :: u2) -> case u6 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u8 :: Int) (u9 :: SplitUniqSupply) (ua :: SplitUniqSupply) -> case _APP_  u4 [ u9, u7 ] of { _ALG_ _TUP_2 (ub :: u0) (uc :: u1) -> _APP_  u5 [ ub, ua, uc ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 thenSAT_ :: (SplitUniqSupply -> c -> (a, b)) -> (SplitUniqSupply -> b -> d) -> SplitUniqSupply -> c -> d
-	{-# GHC_PRAGMA _A_ 4 _U_ 1112 _N_ _S_ "SSU(ALL)L" {_A_ 5 _U_ 11222 _N_ _N_ _F_ _IF_ARGS_ 4 5 XXXXX 7 _/\_ u0 u1 u2 u3 -> \ (u4 :: SplitUniqSupply -> u2 -> (u0, u1)) (u5 :: SplitUniqSupply -> u1 -> u3) (u6 :: SplitUniqSupply) (u7 :: SplitUniqSupply) (u8 :: u2) -> case _APP_  u4 [ u6, u8 ] of { _ALG_ _TUP_2 (u9 :: u0) (ua :: u1) -> _APP_  u5 [ u7, ua ]; _NO_DEFLT_ } _N_} _F_ _IF_ARGS_ 4 4 XXCX 8 _/\_ u0 u1 u2 u3 -> \ (u4 :: SplitUniqSupply -> u2 -> (u0, u1)) (u5 :: SplitUniqSupply -> u1 -> u3) (u6 :: SplitUniqSupply) (u7 :: u2) -> case u6 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u8 :: Int) (u9 :: SplitUniqSupply) (ua :: SplitUniqSupply) -> case _APP_  u4 [ u9, u7 ] of { _ALG_ _TUP_2 (ub :: u0) (uc :: u1) -> _APP_  u5 [ ua, uc ]; _NO_DEFLT_ }; _NO_DEFLT_ } _N_ #-}
 updSAEnv :: Labda (Id, ([Arg UniType], [Arg Id])) -> SplitUniqSupply -> UniqFM ([Arg UniType], [Arg Id]) -> ((), UniqFM ([Arg UniType], [Arg Id]))
-	{-# GHC_PRAGMA _A_ 3 _U_ 112 _N_ _S_ "S" _N_ _N_ #-}
 instance Eq a => Eq (Arg a)
-	{-# GHC_PRAGMA _M_ SATMonad {-dfun-} _A_ 1 _U_ 1 _N_ _N_ _N_ _N_ #-}
 

@@ -7,5 +7,4 @@ import PreludePS(_PackedString)
 import SplitUniq(SplitUniqSupply)
 import StgSyn(StgBinding)
 stgMassageForProfiling :: _PackedString -> _PackedString -> SplitUniqSupply -> (GlobalSwitch -> Bool) -> [StgBinding Id Id] -> (([CostCentre], [CostCentre]), [StgBinding Id Id])
-	{-# GHC_PRAGMA _A_ 5 _U_ 22221 _N_ _N_ _N_ _N_ #-}
 

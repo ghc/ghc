@@ -37,11 +37,13 @@ data___rtbl	= sStLitLbl SLIT("Data___rtbl")
 dyn___rtbl	= sStLitLbl SLIT("Dyn___rtbl")
 
 genCodeInfoTable
-    :: Target
+    :: {-Target-}
+       (HeapOffset -> Int)	-- needed bit of Target
+    -> (CAddrMode -> StixTree)	-- ditto
     -> AbstractC
     -> SUniqSM StixTreeList
 
-genCodeInfoTable target (CClosureInfoAndCode cl_info _ _ upd cl_descr) =
+genCodeInfoTable hp_rel amode2stix (CClosureInfoAndCode cl_info _ _ upd cl_descr _) =
     returnSUs (\xs -> info : lbl : xs)
 
     where
@@ -132,10 +134,10 @@ genCodeInfoTable target (CClosureInfoAndCode cl_info _ _ upd cl_descr) =
 
 	size	= if isSpecRep sm_rep
 		  then closureNonHdrSize cl_info
-		  else hpRel target (closureSizeWithoutFixedHdr cl_info)
+		  else hp_rel (closureSizeWithoutFixedHdr cl_info)
 	ptrs	= closurePtrsSize cl_info
 
-	upd_code = amodeToStix target upd
+	upd_code = amode2stix upd
 
 	info_unused = StInt (-1)
 

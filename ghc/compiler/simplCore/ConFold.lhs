@@ -6,7 +6,6 @@
 ToDo:
    check boundaries before folding, e.g. we can fold the Float addition
    (i1 + i2) only if it results	in a valid Float.
-   See the @IntDivOp@ below.
 
 \begin{code}
 #include "HsVersions.h"
@@ -47,7 +46,16 @@ Now, we know that the seq# primitive will never return 0#, but we
 don't let the simplifier know that.  We also use a special error
 value, parError#, which is *not* a bottoming Id, so as far as the
 simplifier is concerned, we have to evaluate seq# a before we know
-whether or not b will be evaluated.
+whether or not y will be evaluated.  
+
+If we didn't have the extra case, then after inlining the compiler might
+see:
+	f p q = case seq# p of { _ -> p+q }
+
+If it sees that, it can see that f is strict in q, and hence it might
+evaluate q before p!  The "0# ->" case prevents this happening.
+By having the parError# branch we make sure that anything in the
+other branch stays there!
   
 This is fine, but we'd like to get rid of the extraneous code.  Hence,
 we *do* let the simplifier know that seq# is strict in its argument.
@@ -176,7 +184,6 @@ completePrim env op tys args
     twoIntLits IntSubOp	 i1 i2		 = return_int (i1-i2)
     twoIntLits IntMulOp	 i1 i2		 = return_int (i1*i2)
     twoIntLits IntQuotOp i1 i2 | i2 /= 0 = return_int (i1 `quot` i2)
-    twoIntLits IntDivOp  i1 i2 | i2 /= 0 = return_int (i1 `div` i2)
     twoIntLits IntRemOp  i1 i2 | i2 /= 0 = return_int (i1 `rem` i2)
     twoIntLits IntGtOp	 i1 i2		 = return_bool (i1 >  i2)
     twoIntLits IntGeOp	 i1 i2		 = return_bool (i1 >= i2)

@@ -27,15 +27,9 @@ import UniType(UniType)
 import UniqFM(UniqFM)
 data InstInfo   = InstInfo Class [TyVarTemplate] UniType [(Class, UniType)] [(Class, UniType)] Id [Id] (MonoBinds Name (InPat Name)) Bool _PackedString SrcLoc [Sig Name]
 buildInstanceEnvs :: Bag InstInfo -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Class -> ([(UniType, InstTemplate)], ClassOp -> SpecEnv))
-	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
 mkInstanceRelatedIds :: E -> Bool -> InstancePragmas Name -> a -> Class -> [TyVarTemplate] -> UniType -> [(Class, UniType)] -> [Sig Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Id, [(Class, UniType)], [Id])
-	{-# GHC_PRAGMA _A_ 15 _U_ 222022221222122 _N_ _S_ "LLSALSLLLLLLU(ALS)LL" {_A_ 14 _U_ 22222221222122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 processInstBinds :: E -> [TyVar] -> (Int -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Expr Id TypecheckedPat, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))) -> [TyVar] -> [Inst] -> [Id] -> MonoBinds Name (InPat Name) -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult ([Inst], MonoBinds Id TypecheckedPat)
-	{-# GHC_PRAGMA _A_ 7 _U_ 2222222222122 _N_ _S_ "LLLLLLS" _N_ _N_ #-}
 tcInstDecls1 :: E -> UniqFM Class -> UniqFM TyCon -> [InstDecl Name (InPat Name)] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> (Bag InstInfo, Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 4 _U_ 2221222222 _N_ _S_ "LLLS" _N_ _N_ #-}
 tcInstDecls2 :: E -> Bag InstInfo -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> ((LIE, Binds Id TypecheckedPat), Subst, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 2 _U_ 21222222 _N_ _S_ "LS" _N_ _N_ #-}
 tcSpecInstSigs :: E -> UniqFM Class -> UniqFM TyCon -> Bag InstInfo -> [SpecialisedInstanceSig Name] -> (GlobalSwitch -> Bool) -> [UniType] -> Subst -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> TcResult (Bag InstInfo)
-	{-# GHC_PRAGMA _A_ 5 _U_ 22222222222 _N_ _S_ "LLLLS" _N_ _N_ #-}
 

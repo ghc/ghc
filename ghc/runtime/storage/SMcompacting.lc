@@ -77,9 +77,7 @@ LinkSparks(STG_NO_ARGS)
 #ifdef PAR
 
 void
-LinkLiveGAs(base, bits)
-P_ base;
-BitWord *bits;
+LinkLiveGAs(P_ base, BitWord *bits)
 {
     GALA *gala;
     GALA *next;
@@ -97,7 +95,7 @@ BitWord *bits;
 	    prev = gala;
 	} else {
 	    /* Since we have all of the weight, this GA is no longer needed */
-	    W_ pga = PACK_GA(thisPE, gala->ga.loc.gc.slot);
+	    W_ pga = PackGA(thisPE, gala->ga.loc.gc.slot);
 
 #ifdef FREE_DEBUG
 	    fprintf(stderr, "Freeing slot %d\n", gala->ga.loc.gc.slot);
@@ -124,8 +122,7 @@ BitWord *bits;
 	bit = 1L << (_hp_word & (BITS_IN(BitWord) - 1));
 	if (!(bits[bit_index] & bit)) {
 	    int pe = taskIDtoPE(gala->ga.loc.gc.gtid);
-	    W_ pga = PACK_GA(pe, gala->ga.loc.gc.slot);
-	    int i;
+	    W_ pga = PackGA(pe, gala->ga.loc.gc.slot);
 
 	    (void) removeHashTable(pGAtoGALAtable, pga, (void *) gala);
 	    freeRemoteGA(pe, &(gala->ga));
@@ -182,14 +179,12 @@ P_ botB;			/* stackB points to topmost update frame */
 
     DEBUG_STRING("Linking B Stack:");
     for (updateFramePtr = stackB;
-      SUBTRACT_B_STK(updateFramePtr, botB) > 0;
-      /* re-initialiser given explicitly */ ) {
+	 SUBTRACT_B_STK(updateFramePtr, botB) > 0;
+	 updateFramePtr = GRAB_SuB(updateFramePtr)) {
 
 	P_ updateClosurePtr = updateFramePtr + BREL(UF_UPDATEE);
 
 	LINK_LOCATION_TO_CLOSURE(updateClosurePtr);
-
-	updateFramePtr = GRAB_SuB(updateFramePtr);
     }
 }
 #endif /* not PAR */
@@ -197,8 +192,7 @@ P_ botB;			/* stackB points to topmost update frame */
 
 \begin{code}
 I_
-CountCAFs(CAFlist)
-P_ CAFlist;
+CountCAFs(P_ CAFlist)
 {
     I_ caf_no = 0;
 
@@ -211,8 +205,7 @@ P_ CAFlist;
 
 \begin{code}
 void
-LinkCAFs(CAFlist)
-P_ CAFlist;
+LinkCAFs(P_ CAFlist)
 {
     DEBUG_STRING("Linking CAF Ptr Locations:");
     while(CAFlist != NULL) {
@@ -221,14 +214,6 @@ P_ CAFlist;
 	CAFlist = (P_) IND_CLOSURE_LINK(CAFlist);
     }
 }
-
-\end{code}
-
-\begin{code}
-
-#ifdef PAR
-
-#endif /* PAR */
 
 #endif /* defined(_INFO_COMPACTING) */
 \end{code}

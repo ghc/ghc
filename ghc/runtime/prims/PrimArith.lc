@@ -54,12 +54,7 @@ See \tr{imports/StgMacros.h} for more about these things.
 
 STG_INLINE
 void
-#ifdef __STDC__
 ASSIGN_DBL(W_ p_dest[], StgDouble src)
-#else
-ASSIGN_DBL(p_dest, src)
-  W_ p_dest[]; StgDouble src;
-#endif
 {
     double_thing y;
     y.d = src;
@@ -69,12 +64,7 @@ ASSIGN_DBL(p_dest, src)
 
 STG_INLINE
 StgDouble
-#ifdef __STDC__
 PK_DBL(W_ p_src[])
-#else
-PK_DBL(p_src)
-  W_ p_src[];
-#endif
 {
     double_thing y;
     y.du.dhi = p_src[0];
@@ -84,12 +74,7 @@ PK_DBL(p_src)
 
 STG_INLINE
 void
-#ifdef __STDC__
 ASSIGN_FLT(W_ p_dest[], StgFloat src)
-#else
-ASSIGN_FLT(p_dest, src)
-  W_ p_dest[]; StgFloat src;
-#endif
 { 
     float_thing y;
     y.f = src;
@@ -98,12 +83,7 @@ ASSIGN_FLT(p_dest, src)
 
 STG_INLINE
 StgFloat
-#ifdef __STDC__
 PK_FLT(W_ p_src[])
-#else
-PK_FLT(p_src)
-  W_ p_src[];
-#endif
 {
     float_thing y;
     y.fu = *p_src;
@@ -153,12 +133,7 @@ Encoding and decoding Doubles.  Code based on the HBC code
 
 \begin{code}
 StgDouble
-#if __STDC__
 __encodeDouble (MP_INT *s, I_ e) /* result = s * 2^e */
-#else
-__encodeDouble (s, e)
-  MP_INT *s; I_ e;
-#endif /* ! __STDC__ */
 {
     StgDouble r;
     I_ i;
@@ -182,7 +157,7 @@ __encodeDouble (s, e)
 	r = -r;
 
 /*
-    temp = xmalloc(mpz_sizeinbase(s,10)+2);
+    temp = stgMallocBytes(mpz_sizeinbase(s,10)+2);
     fprintf(stderr, "__encodeDouble(%s, %ld) => %g\n", mpz_get_str(temp,10,s), e, r);
 */
 
@@ -192,12 +167,7 @@ __encodeDouble (s, e)
 #if ! alpha_TARGET_ARCH
     /* On the alpha, Stg{Floats,Doubles} are the same */
 StgFloat
-#if __STDC__
 __encodeFloat (MP_INT *s, I_ e) /* result = s * 2^e */
-#else
-__encodeFloat (s, e)
-  MP_INT *s; I_ e;
-#endif /* ! __STDC__ */
 {
     StgFloat r;
     I_ i;
@@ -219,14 +189,7 @@ __encodeFloat (s, e)
 #endif	/* alpha */
 
 void
-#if __STDC__
 __decodeDouble (MP_INT *man, I_ *exp, StgDouble dbl)
-#else
-__decodeDouble (man, exp, dbl)
-  MP_INT    *man;
-  I_        *exp;
-  StgDouble dbl;
-#endif /* ! __STDC__ */
 {
 #if ! IEEE_FLOATING_POINT
     fprintf(stderr, "__decodeDouble: non-IEEE not yet supported\n");
@@ -287,7 +250,7 @@ __decodeDouble (man, exp, dbl)
     }
 
 /*
-    temp = xmalloc(mpz_sizeinbase(man,10)+2);
+    temp = stgMallocBytes(mpz_sizeinbase(man,10)+2);
     fprintf(stderr, "__decodeDouble(%g) => %s, %ld\n", dbl, mpz_get_str(temp,10,man), *exp);
 */
 
@@ -297,14 +260,7 @@ __decodeDouble (man, exp, dbl)
 #if ! alpha_TARGET_ARCH
     /* Again, on the alpha we do not have separate "StgFloat" routines */
 void
-#if __STDC__
 __decodeFloat (MP_INT *man, I_ *exp, StgFloat flt)
-#else
-__decodeFloat (man, exp, flt)
-  MP_INT    *man;
-  I_    *exp;
-  StgFloat flt;
-#endif /* ! __STDC__ */
 {
 #if ! IEEE_FLOATING_POINT
     fprintf(stderr, "__decodeFloat: non-IEEE not yet supported\n");
@@ -414,21 +370,14 @@ stgAllocForGMP (size_in_bytes)
     */
     SAVE_Hp += total_size_in_words;
 
-#if ! defined(DO_SPAT_PROFILING)
-    /* Note: ActivityReg is not defined in this .lc file */
-
     ALLOC_HEAP(total_size_in_words); /* ticky-ticky profiling */
 /*  ALLOC_CON(DATA_HS,data_size_in_words,0); */
     ALLOC_PRIM(DATA_HS,data_size_in_words,0,total_size_in_words);
-#endif /* ! DO_SPAT_PROFILING */
+
     CC_ALLOC(CCC,total_size_in_words,CON_K); /* cc profiling */
     /* NB: HACK WARNING: The above line will do The WRONG THING 
 	if the CurrCostCentre reg is ever put in a Real Machine Register (TM).
     */
-
-#if defined(LIFE_PROFILE)  /* HACK warning -- Bump HpLim (see also StgMacros.lh)*/
-    SAVE_HpLim += 1;	   /* SET_DATA_HDR attempted HpLim++ in wrong window	*/
-#endif
 
     /* and return what we said we would */
     return(stuff_ptr);

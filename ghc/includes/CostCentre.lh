@@ -15,7 +15,7 @@ environment to be defined, despite the fact that we don't have CostCentre
 fields in closures.
 
 \begin{code}
-#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+#if defined(PROFILING) || defined(CONCURRENT)
 
 # define CC_EXTERN(cc_ident) 					\
      extern struct cc CAT2(cc_ident,_struct);			\
@@ -28,7 +28,7 @@ extern CostCentre Registered_CC;/* registered cost centre list */
 CC_EXTERN(CC_MAIN);		/* initial MAIN cost centre */
 CC_EXTERN(CC_GC);		/* Garbage Collection cost center */
 
-# ifdef GUM
+# ifdef PAR
 CC_EXTERN(CC_MSG);		/* Communications cost center */
 CC_EXTERN(CC_IDLE);             /* Idle-time cost centre */
 # endif
@@ -59,7 +59,7 @@ source using the @CC_DECLARE@ macro where @label@, @module@ and
 	   subsumed, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};	\
      is_local CostCentre cc_ident = STATIC_CC_REF(cc_ident)
 
-#endif /* defined(USE_COST_CENTRES) || defined(CONCURRENT) */
+#endif /* defined(PROFILING) || defined(CONCURRENT) */
 \end{code}
 
 Definitions relating to the profiling field as a whole.
@@ -79,13 +79,13 @@ Definitions relating to the profiling field as a whole.
 %************************************************************************
 
 The cost-centre profiling is only on if the driver turns on
-@USE_COST_CENTRES@.
+@PROFILING@.
 
 These are the {\em dummy} definitions in force if we do {\em NOT}
-turn on @USE_COST_CENTRES@.  Get them out of the way....
+turn on @PROFILING@.  Get them out of the way....
 
 \begin{code}
-#if !defined(USE_COST_CENTRES)
+#if !defined(PROFILING)
 
 /*** Declaration Definitions ***/
 
@@ -114,13 +114,13 @@ turn on @USE_COST_CENTRES@.  Get them out of the way....
 # define CC_ALLOC(cc, size, kind)
 # define HEAP_PROFILE_CLOSURE(closure,size)
 
-# ifndef GUM
+# ifndef PAR
 #  define START_TIME_PROFILER
 #  define RESTART_TIME_PROFILER
 #  define STOP_TIME_PROFILER
 # endif
 
-#endif /* !defined(USE_COST_CENTRES) */
+#endif /* !defined(PROFILING) */
 \end{code}
 
 %************************************************************************
@@ -142,7 +142,7 @@ an additional cost centre field within the fixed header of all
 closures. This is adjacent to the info pointer.
 
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 
 CC_EXTERN(CC_SUBSUMED);  	/* top level fns SUBSUMED cost centre */
 CC_EXTERN(CC_OVERHEAD);  	/* costs due only to profiling machinery */
@@ -278,7 +278,7 @@ On entering a closure we only count the enter to thunks ...
 # define ENTER_CC_PAP_CL(closure)			\
 	ENTER_CC_PAP(CC_HDR(closure))
 
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 \end{code}
 
 %************************************************************************
@@ -306,7 +306,7 @@ centre. @REGISTER_IMPORT@ pushes a modules registering routine onto
 the register stack.
 
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 
 extern F_ _regMain (STG_NO_ARGS);
 extern F_ *register_stack;
@@ -316,8 +316,6 @@ extern F_ *register_stack;
 
 # define POP_REGISTER_STACK						\
 	*(--register_stack)
-
-extern I_ SM_trace;
 
 # define START_REGISTER_CCS(reg_mod_name)				\
 	static int _module_registered = 0;				\
@@ -350,12 +348,12 @@ extern I_ SM_trace;
 	} while(0);							\
 	FUNEND; }
 
-#endif  /* USE_COST_CENTRES */
+#endif  /* PROFILING */
 \end{code}
 
 We don't want to attribute costs to an unregistered cost-centre:
 \begin{code}
-#if !defined(USE_COST_CENTRES) || !defined(DEBUG)
+#if !defined(PROFILING) || !defined(DEBUG)
 # define ASSERT_IS_REGISTERED(cc,chk_not_overhead) /*nothing*/
 #else
 # define ASSERT_IS_REGISTERED(cc,chk_not_overhead)				\
@@ -401,7 +399,7 @@ Similarily, the SP stuff should probably be the highly uninformative
 @INTERNAL_KIND@.
 
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 
 # define CON_K		1
 # define FN_K		2
@@ -438,7 +436,7 @@ typedef struct ClCat {
 # define CAT_DECLARE(base_name, kind, descr, type) \
 	static struct ClCat MK_CAT_IDENT(base_name) = {UNHASHED,-1,kind,descr,type};
 
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 \end{code}
 
 %************************************************************************
@@ -449,7 +447,7 @@ typedef struct ClCat {
 
 Stuff to do with timer signals:
 \begin{code}
-#if defined(USE_COST_CENTRES) || defined(GUM)
+#if defined(PROFILING) || defined(PAR)
 
 extern I_ time_profiling;	/* Flag indicating if timer/serial profiling is required */
 
@@ -468,11 +466,6 @@ extern void stop_time_profiler(STG_NO_ARGS);
 # define TICK_FREQUENCY		50		  	/* ticks per second */
 # define TICK_MILLISECS		(1000/TICK_FREQUENCY)	/* milli-seconds per tick */
 
-# ifdef CONCURRENT
-extern I_ profilerTicks;
-extern I_ tick_millisecs;
-# endif
-
 # define DEFAULT_INTERVAL	TICK_FREQUENCY		/* 1 second */
 
 /* These are never called directly from threaded code */
@@ -480,7 +473,7 @@ extern I_ tick_millisecs;
 # define RESTART_TIME_PROFILER	ULTRASAFESTGCALL0(void,(void *),restart_time_profiler)		/*R StgOverflow.lc */
 # define STOP_TIME_PROFILER	ULTRASAFESTGCALL0(void,(void *),stop_time_profiler)		/*R StgOverflow.lc */
 
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
 #  define OR_INTERVAL_EXPIRED	|| (interval_expired)		/*R StgMacros.h */
 # endif
 \end{code}
@@ -528,7 +521,7 @@ which to store profiling information based on the return table size
 value(s).
 
 \begin{code}
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
 
 #  define DEFAULT_MAX_CC     4096
 #  define DEFAULT_MAX_MOD     256
@@ -561,7 +554,7 @@ extern ClCategory *index_type_table;
 extern hash_t init_index_type(STG_NO_ARGS);
 extern hash_t index_type PROTO((ClCategory clcat));
 
-# endif /* USE_COST_CENTRES */
+# endif /* PROFILING */
 \end{code}
 
 
@@ -582,12 +575,12 @@ memory alloc macros.
 	centre->time_ticks += 1;					\
 	} while(0)
 
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
 #  define CC_ALLOC(cc, size, kind) 					\
 	do { CostCentre cc_ = (CostCentre) (cc);			\
 	ASSERT_IS_REGISTERED(cc_,0/*OK if OVERHEAD*/);			\
 	cc_->mem_allocs	+= 1;						\
-	cc_->mem_alloc	+= (size) - (PROF_FIXED_HDR + AGE_FIXED_HDR);	\
+	cc_->mem_alloc	+= (size) - (PROF_FIXED_HDR + TICKY_FIXED_HDR);	\
 	} while(0) /* beware name-capture by ASSERT_IS...! */
 # endif
 \end{code}
@@ -600,19 +593,12 @@ memory alloc macros.
 %************************************************************************
 
 \begin{code}
-extern I_  cc_profiling;	/* Are we performing/reporting cc profiling? */
-extern I_  heap_profiling_reqd;	/* Are we performing heap profiling? */
+I_	init_cc_profiling PROTO((I_ rts_argc, char *rts_argv[], char *prog_argv[]));
+void	report_cc_profiling PROTO((I_ final));
 
-# define SORTCC_LABEL	'C'
-# define SORTCC_TIME 	'T'
-# define SORTCC_ALLOC	'A'
-extern char cc_profiling_sort;	/* How to sort cost centre report */
-
-extern I_  init_cc_profiling PROTO((I_ rts_argc, char *rts_argv[], char *prog_argv[]));
-extern void report_cc_profiling PROTO((I_ final));
-
-extern void cc_register(STG_NO_ARGS);
-extern void cc_sort PROTO((CostCentre *sort, char sort_on));
+void	cc_register(STG_NO_ARGS);
+void	cc_sort PROTO((CostCentre *sort, char sort_on));
+rtsBool cc_to_ignore PROTO((CostCentre));
 \end{code}
 
 %************************************************************************
@@ -622,32 +608,14 @@ extern void cc_sort PROTO((CostCentre *sort, char sort_on));
 %************************************************************************
 
 \begin{code}
-# define HEAP_NO_PROFILING	0	/* N.B. Used as indexes into arrays */
+# if defined(PROFILING)
 
-# if defined(USE_COST_CENTRES)
-
-#  define HEAP_BY_CC		1
-#  define HEAP_BY_MOD		2
-#  define HEAP_BY_GRP		3
-#  define HEAP_BY_DESCR		4
-#  define HEAP_BY_TYPE		5
-#  define HEAP_BY_TIME		6
-  
-#  define CCchar    'C'
-#  define MODchar   'M'
-#  define GRPchar   'G'
-#  define DESCRchar 'D'
-#  define TYPEchar  'Y'
-#  define TIMEchar  'T'
-
-extern I_ heap_profile_init PROTO((I_ prof,
-				   char *select_cc_str,
+extern I_ heap_profile_init PROTO((char *select_cc_str,
 				   char *select_mod_str,
 				   char *select_grp_str,
 				   char *select_descr_str,
 				   char *select_typ_str,
 				   char *select_kind_str,
-				   I_  select_age,
 				   char *argv[]));
 
 extern void heap_profile_finish(STG_NO_ARGS);
@@ -663,12 +631,12 @@ extern hash_t time_intervals;		/* no. of time intervals reported -- 18 */
 #  define HEAP_PROFILE_CLOSURE(closure,size) \
 	STGCALL2(void,(void *, P_, I_),(*heap_profile_fn),closure,size)			/*R SM2s.lh */
 
-# endif	/* USE_COST_CENTRES */
+# endif	/* PROFILING */
 \end{code}
 
 End multi-slurp protection:
 \begin{code}
-#endif /* USE_COST_CENTRES || GUM */
+#endif /* PROFILING || PAR */
 
 #endif /* CostCentre_H */
 \end{code}

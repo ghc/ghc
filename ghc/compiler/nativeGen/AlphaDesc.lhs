@@ -122,7 +122,7 @@ because some are reloaded from constants.
 \begin{code}
 
 vsaves switches vols = 
-    map save ((filter callerSaves) ([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg,ActivityReg] ++ vols))
+    map save ((filter callerSaves) ([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg{-,ActivityReg-}] ++ vols))
     where
         save x = StAssign (kindFromMagicId x) loc reg
     	    	    where reg = StReg (StixMagicId x)
@@ -132,7 +132,7 @@ vsaves switches vols =
 
 vrests switches vols = 
     map restore ((filter callerSaves) 
-    	([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg,ActivityReg,StkStubReg,StdUpdRetVecReg] ++ vols))
+    	([BaseReg,SpA,SuA,SpB,SuB,Hp,HpLim,RetReg,{-ActivityReg,-}StkStubReg,StdUpdRetVecReg] ++ vols))
     where
         restore x = StAssign (kindFromMagicId x) reg loc
     	    	    where reg = StReg (StixMagicId x)
@@ -172,10 +172,15 @@ Setting up a alpha target.
 
 \begin{code}
 
-mkAlpha :: (GlobalSwitch -> SwitchResult) -> Target
+mkAlpha :: (GlobalSwitch -> SwitchResult)
+	-> (Target,
+	    (PprStyle -> [[StixTree]] -> SUniqSM Unpretty), -- codeGen
+	    Bool,					    -- underscore
+	    (String -> String))				    -- fmtAsmLbl
 
 mkAlpha switches = 
-    let fhs' = fhs switches
+    let
+	fhs' = fhs switches
     	vhs' = vhs switches
     	alphaReg' = alphaReg switches
     	vsaves' = vsaves switches
@@ -189,12 +194,13 @@ mkAlpha switches =
     	dhs' = dhs switches
     	ps = genPrimCode target
     	mc = genMacroCode target
-    	hc = doHeapCheck target
-    	target = mkTarget switches fhs' vhs' alphaReg' id size vsaves' vrests' 
-    	    	    	  hprel as as' csz isz mhs' dhs' ps mc hc
-    	    	    	  alphaCodeGen False mungeLabel
-    in target
-
+    	hc = doHeapCheck --UNUSED NOW: target
+    	target = mkTarget {-switches-} fhs' vhs' alphaReg' {-id-} size
+    	    	    	  hprel as as'
+			  (vsaves', vrests', csz, isz, mhs', dhs', ps, mc, hc)
+    	    	    	  {-alphaCodeGen False mungeLabel-}
+    in
+    (target, alphaCodeGen, False, mungeLabel)
 \end{code}
 
 The alpha assembler likes temporary labels to look like \tr{$L123}

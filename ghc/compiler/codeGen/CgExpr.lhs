@@ -98,10 +98,10 @@ Here is where we insert real live machine instructions.
 
 \begin{code}
 cgExpr x@(StgPrimApp op args live_vars)
-  = -- trace ("cgExpr:PrimApp:"++(ppShow 80 (ppr PprDebug x))) (
-    getPrimOpArgAmodes op args			`thenFC` \ arg_amodes ->
+  = getIntSwitchChkrC		`thenFC` \ isw_chkr ->
+    getPrimOpArgAmodes op args	`thenFC` \ arg_amodes ->
     let
-	result_regs   = assignPrimOpResultRegs op
+	result_regs   = assignPrimOpResultRegs {-NO:isw_chkr-} op
 	result_amodes = map CReg result_regs
 	may_gc  = primOpCanTriggerGC op
 	dyn_tag = head result_amodes
@@ -113,19 +113,16 @@ cgExpr x@(StgPrimApp op args live_vars)
 	-- (Can-trigger-gc primops guarantee to have their args in regs)
 	let
 	    (arg_robust_amodes, liveness_mask, arg_assts) 
-	      = makePrimOpArgsRobust op arg_amodes
+	      = makePrimOpArgsRobust {-NO:isw_chkr-} op arg_amodes
 
 	    liveness_arg = mkIntCLit liveness_mask
 	in
  	returnFC (
 	    arg_assts,
-	    mkAbstractCs [
-	      spat_prim_macro,
-	      COpStmt result_amodes op
-		      (pin_liveness op liveness_arg arg_robust_amodes)
-		      liveness_mask
-		      [{-no vol_regs-}],
-	      spat_prim_stop_macro ]
+	    COpStmt result_amodes op
+		    (pin_liveness op liveness_arg arg_robust_amodes)
+		    liveness_mask
+		    [{-no vol_regs-}]
 	)
      else
 	-- Use args from their current amodes.
@@ -133,13 +130,8 @@ cgExpr x@(StgPrimApp op args live_vars)
 	  liveness_mask = panic "cgExpr: liveness of non-GC-ing primop touched\n"
 	in
  	returnFC (
---	  DO NOT want CCallProfMacros in CSimultaneous stuff.  Yurgh.  (WDP 95/01)
---		Arises in compiling PreludeGlaST (and elsewhere??)
---	  mkAbstractCs [
---	    spat_prim_macro,
 	    COpStmt result_amodes op arg_amodes liveness_mask [{-no vol_regs-}],
---	    spat_prim_stop_macro ],
-	  AbsCNop
+	    AbsCNop
 	)
     )				`thenFC` \ (do_before_stack_cleanup,
 					     do_just_before_jump) ->
@@ -157,7 +149,7 @@ cgExpr x@(StgPrimApp op args live_vars)
 
 	ReturnsAlg tycon ->
 --OLD:	    evalCostCentreC "SET_RetCC" [CReg CurCostCentre]	`thenC`	
-	    profCtrC SLIT("RET_NEW_IN_REGS") []			`thenC`
+	    profCtrC SLIT("RET_NEW_IN_REGS") [num_of_fields]	`thenC`
 
 	    performReturn do_before_stack_cleanup
 			  (\ sequel -> robustifySequel may_gc sequel
@@ -189,12 +181,20 @@ cgExpr x@(StgPrimApp op args live_vars)
     	    	    	        dyn_tag DataPtrKind
 
 		data_con = head (getTyConDataCons tycon)
-		dir_lbl  = case dataReturnConvAlg data_con of
-    	    		    	ReturnInRegs _ -> CLbl (mkPhantomInfoTableLabel data_con) 
-						       DataPtrKind
-    	    	    		ReturnInHeap   -> panic "CgExpr: can't return prim in heap"
-					  -- Never used, and no point in generating
-					  -- the code for it!
+
+		(dir_lbl, num_of_fields)
+		  = case (dataReturnConvAlg fake_isw_chkr data_con) of
+		      ReturnInRegs rs
+			-> (CLbl (mkPhantomInfoTableLabel data_con) DataPtrKind,
+--OLD:			    pprTrace "CgExpr:prim datacon:" (ppr PprDebug data_con) $
+			    mkIntCLit (length rs)) -- for ticky-ticky only
+
+    	    	      ReturnInHeap
+			-> pprPanic "CgExpr: can't return prim in heap:" (ppr PprDebug data_con)
+			  -- Never used, and no point in generating
+			  -- the code for it!
+
+		fake_isw_chkr x = Nothing
   where
     -- for all PrimOps except ccalls, we pin the liveness info
     -- on as the first "argument"
@@ -212,10 +212,6 @@ cgExpr x@(StgPrimApp op args live_vars)
 	sequelToAmode sequel			`thenFC` \ amode ->
 	returnFC (CAssign (CReg RetReg) amode, InRetReg)
     robustifySequel _ sequel = returnFC (AbsCNop, sequel)
-    
-    spat_prim_macro	 = CCallProfCtrMacro SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_PRIM") IntKind]
-    spat_prim_stop_macro = CCallProfCtrMacro SLIT("SET_ACTIVITY") [CLitLit SLIT("ACT_PRIM_STOP") IntKind]
-
 \end{code}
 
 %********************************************************

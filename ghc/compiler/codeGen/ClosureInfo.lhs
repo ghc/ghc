@@ -297,7 +297,7 @@ data LambdaFormInfo
 
   -- This last one is really only for completeness;
   -- it isn't actually used for anything interesting
-  | LFIndirection
+  {- | LFIndirection -}
 
 data StandardFormInfo	-- Tells whether this thunk has one of a small number
 			-- of standard forms
@@ -858,8 +858,9 @@ getEntryConvention :: Id			-- Function being applied
 		   -> FCode EntryConvention
 
 getEntryConvention id lf_info arg_kinds
- =  nodeMustPointToIt lf_info		`thenFC` \ node_points ->
-    isSwitchSetC ForConcurrent		`thenFC` \ is_concurrent -> 
+ =  nodeMustPointToIt lf_info	`thenFC` \ node_points ->
+    isSwitchSetC ForConcurrent	`thenFC` \ is_concurrent -> 
+    getIntSwitchChkrC		`thenFC` \ isw_chkr ->
     returnFC (
 
     if (node_points && is_concurrent) then ViaNode else
@@ -872,7 +873,7 @@ getEntryConvention id lf_info arg_kinds
 	    else 
 		DirectEntry (mkFastEntryLabel id arity) arity arg_regs
 	  where
-	    (arg_regs, _) = assignRegs live_regs (take arity arg_kinds)
+	    (arg_regs, _) = assignRegs isw_chkr live_regs (take arity arg_kinds)
     	    live_regs = if node_points then [node] else []
 
         LFCon con zero_arity  
@@ -900,9 +901,9 @@ getEntryConvention id lf_info arg_kinds
 
 	LFLetNoEscape arity _
 	  -> ASSERT(arity == length arg_kinds)
-	     DirectEntry (mkFastEntryLabel id arity) arity arg_regs
+	     DirectEntry (mkStdEntryLabel id) arity arg_regs
 	 where
-	    (arg_regs, _) = assignRegs live_regs arg_kinds
+	    (arg_regs, _) = assignRegs isw_chkr live_regs arg_kinds
     	    live_regs     = if node_points then [node] else []
     )
 
@@ -1171,7 +1172,7 @@ closureSemiTag (MkClosureInfo _ lf_info _)
   = case lf_info of
       LFCon data_con _ -> getDataConTag data_con - fIRST_TAG
       LFTuple _ _      -> 0
-      LFIndirection    -> fromInteger iND_TAG
+      --UNUSED: LFIndirection  -> fromInteger iND_TAG
       _	    	       -> fromInteger oTHER_TAG
 \end{code}
 
@@ -1204,9 +1205,9 @@ infoTableLabelFromCI (MkClosureInfo id lf_info rep)
 					-- Ditto for selectors
 -}
 
-	other -> if isStaticRep rep
+	other -> {-NO: if isStaticRep rep
 		 then mkStaticInfoTableLabel id
-		 else mkInfoTableLabel       id
+		 else -} mkInfoTableLabel id
 
 mkConInfoPtr :: Id -> SMRep -> CLabel
 mkConInfoPtr id rep = 
@@ -1261,7 +1262,7 @@ allocProfilingMsg (MkClosureInfo _ lf_info _)
       LFTuple _ _		-> SLIT("ALLOC_CON")
       LFThunk _ _ _ _ 		-> SLIT("ALLOC_THK")
       LFBlackHole		-> SLIT("ALLOC_BH")
-      LFIndirection		-> panic "ALLOC_IND"
+      --UNUSED: LFIndirection	-> panic "ALLOC_IND"
       LFImported		-> panic "ALLOC_IMP"
 \end{code}
 
@@ -1279,12 +1280,12 @@ information is never used, we don't care.
 
 \begin{code}
 
-dataConLiveness (MkClosureInfo con _ PhantomRep)
-  = case dataReturnConvAlg con of
+dataConLiveness isw_chkr (MkClosureInfo con _ PhantomRep)
+  = case (dataReturnConvAlg isw_chkr con) of
       ReturnInRegs regs -> mkLiveRegsBitMask regs
       ReturnInHeap -> panic "dataConLiveness:PhantomRep in heap???"
 
-dataConLiveness _ = mkLiveRegsBitMask [node]
+dataConLiveness _ _ = mkLiveRegsBitMask [node]
 \end{code}
 
 %************************************************************************
@@ -1315,7 +1316,7 @@ closureKind (MkClosureInfo _ lf _)
       LFTuple _ _		-> "CON_K"
       LFThunk _ _ _ _ 		-> "THK_K"
       LFBlackHole		-> "THK_K" -- consider BHs as thunks for the moment... (ToDo?)
-      LFIndirection		-> panic "IND_KIND"
+      --UNUSED: LFIndirection	-> panic "IND_KIND"
       LFImported		-> panic "IMP_KIND"
 
 closureTypeDescr :: ClosureInfo -> String

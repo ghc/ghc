@@ -131,8 +131,8 @@ MallocPtr_ITBL(MallocPtr_info,MallocPtr_entry,UpdErr,0,INFO_OTHER_TAG,,,const,EF
 /* Ditto for the unused Stable Pointer info table. [ADR]
 */
 
-extern void raiseError PROTO((StgStablePtr));
-extern StgStablePtr errorHandler;
+void raiseError PROTO((StgStablePtr));
+extern StgStablePtr errorHandler; /* NB: prone to magic-value-ery (WDP 95/12) */
 
 /* Unused Stable Pointer (ie unused slot in a stable pointer table) */
 STATICFUN(UnusedSP_entry)
@@ -145,12 +145,22 @@ STATICFUN(UnusedSP_entry)
     FE_
 }
 
-STATIC_ITBL(UnusedSP_static_info,UnusedSP_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,CON_K,"UNUSED STABLE PTR","USP");
+STATIC_ITBL(UnusedSP_info,UnusedSP_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,CON_K,"UNUSED STABLE PTR","USP");
 
-SET_STATIC_HDR(UnusedSP_closure,UnusedSP_static_info,CC_SUBSUMED,,ED_RO_)
+SET_STATIC_HDR(UnusedSP_closure,UnusedSP_info,CC_SUBSUMED,,ED_RO_)
 };
 
 /* Entry point and Info table for Stable Pointer Table. */
+
+STATICFUN(EmptyStablePointerTable_entry)
+{
+    FB_
+    /* Don't wrap the calls; we're done with STG land */
+    fflush(stdout);
+    fprintf(stderr, "Entered *empty* stable pointer table---this shouldn't happen!\n");
+    abort();
+    FE_
+}
 
 STATICFUN(StablePointerTable_entry)
 {
@@ -162,7 +172,7 @@ STATICFUN(StablePointerTable_entry)
     FE_
 }
 
-STATIC_ITBL(EmptyStablePointerTable_static_info,StablePointerTable_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,SPT_K,"SP_TABLE","SP_TABLE");
+STATIC_ITBL(EmptyStablePointerTable_info,EmptyStablePointerTable_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,SPT_K,"SP_TABLE","SP_TABLE");
 /* ToDo: could put a useful tag in there!!! */
 
 DYN_ITBL(StablePointerTable_info,StablePointerTable_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,IF_,SPT_K,"SP_TABLE","SP_TABLE");
@@ -174,7 +184,7 @@ DYN_ITBL(StablePointerTable_info,StablePointerTable_entry,UpdErr,0,INFO_OTHER_TA
    overflow will trigger creation of a table of useful size.
 */
 
-SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_static_info,CC_SUBSUMED,,ED_RO_)
+SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_info,CC_SUBSUMED,,ED_RO_)
 , (W_) DYN_VHS + 0 + 1 + 0  /* size = DYN_VHS + n + 1 + n with n = 0 */
 , (W_) 0   /* number of ptrs */
 , (W_) 0   /* top of stack */
@@ -206,10 +216,6 @@ STGFUN(startStgWorld)
        The smInfo storage-management info block is assumed to be
        up to date, and is used to load the STG registers.
     */
-
-#if defined (DO_SPAT_PROFILING)
-    SET_ACTIVITY(ACT_REDN); /* init: do this first, so we count the restore insns  */
-#endif
 
     RestoreAllStgRegs();    /* inline! */
 
@@ -340,7 +346,7 @@ STGFUN(ErrorIO_innards)
     default:
         /* Don't wrap the calls; we're done with STG land */
         fflush(stdout);
-	fprintf(stderr,"ErrorIO: %x unknown\n", TSO_TYPE(CurrentTSO));
+	fprintf(stderr,"ErrorIO: %lx unknown\n", TSO_TYPE(CurrentTSO));
     	EXIT(EXIT_FAILURE);
     }
 
@@ -353,7 +359,7 @@ STGFUN(ErrorIO_innards)
     STKO_LINK(StkOReg) = Nil_closure;
     STKO_RETURN(StkOReg) = NULL;
 
-#ifdef DO_REDN_COUNTING
+#ifdef TICKY_TICKY
     STKO_ADEP(StkOReg) = STKO_BDEP(StkOReg) = 0;
 #endif
 
@@ -395,7 +401,7 @@ ErrorIO_innards(STG_NO_ARGS)
 
     SaveAllStgRegs();	/* inline! */
 
-    if ( initStacks( &StorageMgrInfo ) != 0) {
+    if (! initStacks( &StorageMgrInfo )) {
         /* Don't wrap the calls; we're done with STG land */
         fflush(stdout);
 	fprintf(stderr, "initStacks failed!\n");
@@ -477,10 +483,10 @@ STGFUN(STK_STUB_entry) {
 }
 
 /* info table */
-STATIC_ITBL(STK_STUB_static_info,STK_STUB_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,EF_,INTERNAL_KIND,"STK_STUB","STK_STUB");
+STATIC_ITBL(STK_STUB_info,STK_STUB_entry,UpdErr,0,INFO_OTHER_TAG,0,0,const,EF_,INTERNAL_KIND,"STK_STUB","STK_STUB");
 
 /* closure */
-SET_STATIC_HDR(STK_STUB_closure,STK_STUB_static_info,CC_SUBSUMED,,EXTDATA_RO)
+SET_STATIC_HDR(STK_STUB_closure,STK_STUB_info,CC_SUBSUMED,,EXTDATA_RO)
   , (W_)0, (W_)0
 };
 \end{code}
@@ -595,7 +601,7 @@ N.B. ALL prelude cost centres should be declared here as none will
 ToDo: Explicit cost centres in prelude for Input and Output costs.
 
 \begin{code}
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 
 STGFUN(startCcRegisteringWorld)
 {

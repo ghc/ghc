@@ -187,7 +187,14 @@ recommended for everyday use!
 \item[\tr{-B}:]
 \index{-B RTS option}
 Sound the bell at the start of each (major) garbage collection.
-[Why anyone would do this, I cannot imagine.]
+
+Oddly enough, people really do use this option!  Our pal in Durham
+(England), PaulCallaghan, writes: ``Some people here use it for a
+variety of purposes---honestly!---e.g., confirmation that the
+code/machine is doing something, infinite loop detection, gauging cost
+of recently added code. Certain people can even tell what stage [the
+program] is in by the beep pattern. But the major use is for annoying
+others in the same office...''
 
 \item[\tr{-I}:]
 Use the ``debugging mini-interpreter'' with sanity-checking; you have

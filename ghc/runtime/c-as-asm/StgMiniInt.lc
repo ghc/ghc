@@ -43,12 +43,6 @@ less code.
 \begin{code}
 #if defined(__STG_TAILJUMPS__) && defined(__GNUC__)
 
-#if i386_TARGET_ARCH || i486_TARGET_ARCH
-/* All together now: "Hack me gently, hack me dead ..." */
-P_ SP_stack[8]; /* two/three? is all that is really needed, I think (WDP) */
-I_ SP_stack_ptr = -1;
-#endif
-
 void
 miniInterpret(start_cont)
     StgFunPtr start_cont;
@@ -154,91 +148,6 @@ void miniInterpretEnd(STG_NO_ARGS)
     /* ToDo: save real register in something somewhere */
     longjmp(jmp_environment, 1);
 }
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection[StgMiniInt-portable-debugging]{Debugging mini-interpreter for ``portable~C''}
-%*									*
-%************************************************************************
-
-See comments about @jmp_environment@ in section above.
-
-The debugging mini-interpreter, which is invoked if suitable RTS flags
-are given, offers two extra ``features:''
-\begin{description}
-
-\item[Circular buffer of last @NUM_SAVED_CONTINUATIONS@ continuations:]
-These are in @savedCont@, with @savedContCtr@ pointing to where the
-last one was slotted in.
-
-Reference is frequently made to this buffer when \tr{gdb}-ing broken C
-out of the compiler!
-
-\item[Hygiene-checking:]
-
-This version of the mini-interpreter can be given a hygiene-checking
-function which will be invoked each time 'round the loop.  Again,
-given suitable RTS flags, we pass along a routine that walks over the
-stack checking for Bad Stuff.  An example might be: pointers from the
-A stack into the wrong semi-space of the heap (indicating a
-garbage-collection bug)...
-\end{description}
-
-\begin{code}
-extern I_ doSanityChks; /* ToDo: move tidily */
-
-#define	  NUM_SAVED_CONTINUATIONS 32	/* For debug */
-I_	  totalContCtr;
-I_	  savedContCtr;
-StgFunPtr savedCont[NUM_SAVED_CONTINUATIONS];
-
-void miniInterpret_debug(start_cont, hygiene)
-    StgFunPtr start_cont;
-    void (*hygiene)();
-{
-    StgFunPtr continuation = (StgFunPtr) start_cont;
-    StgFunPtr next_continuation;
-    jmp_buf save_buf;
-    bcopy((char *) jmp_environment, (char *) save_buf, sizeof(jmp_buf));	
-        /* Save jmp_environment for previous call to miniInterpret */
-    
-    if (setjmp(jmp_environment) == 0) {
-
-	totalContCtr = 0;
-	savedContCtr = 0;
-	savedCont[0] = start_cont;
-
-	while ( 1 ) {
-	    next_continuation = (StgFunPtr) (continuation)();
-
-	    totalContCtr += 1;
-	    savedContCtr = (savedContCtr + 1) % NUM_SAVED_CONTINUATIONS;
-	    savedCont[savedContCtr] = next_continuation;
-
-	    continuation = next_continuation;
-
-	    /* hygiene chk can't be at start of loop, because it's the
-	       first continuation-thingy that loads up the registers.
-	    */
-	    if (doSanityChks && hygiene) {
-		(hygiene)();
-	    }
-	}
-    }
-    /* Restore jmp_environment for previous call */
-    bcopy((char *) save_buf, (char *) jmp_environment, sizeof(jmp_buf));
-
-    /* ToDo: restore real registers ... (see longjmp) */
-    return;
-    /*
-       Note that on returning (after miniInterpretEnd is called)
-       the values variables declared as real machine registers
-       will be undefined.
-    */
-}
-
-/* debugging version uses same "miniInterpretEnd" as the regular one */
 
 #endif /* ! __STG_TAILJUMPS__ */
 \end{code}

@@ -37,17 +37,11 @@ static void BlackHoleUpdateStack(STG_NO_ARGS);
 #endif /* CONCURRENT */
 
 extern smInfo StorageMgrInfo;
-extern void PrintRednCountInfo(STG_NO_ARGS);
-extern I_   showRednCountStats;
-extern I_   SM_word_heap_size;
-extern I_   squeeze_upd_frames;
+extern void PrintTickyInfo(STG_NO_ARGS);
 
 #if defined(GRAN_CHECK) && defined(GRAN)
 extern W_ debug;
 #endif
-#ifdef GRAN
-extern FILE *main_statsfile;         /* Might be of general interest  HWL */
-#endif       
 
 /* the real work is done by this function --- see wrappers at end */
 
@@ -61,18 +55,23 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
     I_ num_ptr_roots = 0; /* we bump this counter as we
 			         store roots; de-bump it
 			         as we re-store them. */
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     CostCentre Save_CCC;
 #endif
 
     /* stop the profiling timer --------------------- */
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 /*    STOP_TIME_PROFILER; */
 #endif
 
 #ifdef CONCURRENT
 
     SAVE_Liveness = liveness;
+
+    /*
+    fprintf(stderr,"RealGC:liveness=0x%lx,reqsize=0x%lx,reenter=%lx,do_full=%d,context_switch=%ld\n",
+	liveness, reqsize,always_reenter_node,do_full_collection,context_switch);
+    */
 
     /* 
        Even on a uniprocessor, we may have to reenter node after a 
@@ -86,7 +85,7 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
     	    return;
     	}
 	/* Set up to re-enter Node, so as to be sure it's really there. */
-    	assert(liveness & LIVENESS_R1);
+	ASSERT(liveness & LIVENESS_R1);
     	TSO_SWITCH(CurrentTSO) = TSO_PC2(CurrentTSO);
 	TSO_PC2(CurrentTSO) = EnterNodeCode;
     }
@@ -94,7 +93,7 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
     SAVE_Hp -= reqsize;
 
     if (context_switch && !do_full_collection
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
        && !interval_expired
 # endif
       ) {
@@ -102,7 +101,7 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
     	TSO_ARG1(CurrentTSO) = reqsize;
     	TSO_PC1(CurrentTSO) = CheckHeapCode;
 # ifdef PAR
-	if (do_gr_profile) {
+	if (RTSflags.ParFlags.granSimStats) {
 	    TSO_EXECTIME(CurrentTSO) += CURRENT_TIME - TSO_BLOCKEDAT(CurrentTSO);
 	}
 # endif
@@ -114,17 +113,19 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
     }
 
     /* Don't use SET_CCC, because we don't want to bump the sub_scc_count */
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
     Save_CCC = CCC;
 # endif
+# if defined(PAR)
     CCC = (CostCentre)STATIC_CC_REF(CC_GC);
     CCC->scc_count++;
+# endif
 
     ReallyPerformThreadGC(reqsize, do_full_collection);
 
 #else	/* !CONCURRENT */
 
-# if defined(USE_COST_CENTRES)
+# if defined(PROFILING)
     /* Don't use SET_CCC, because we don't want to bump the sub_scc_count */
     Save_CCC = CCC;
     CCC = (CostCentre)STATIC_CC_REF(CC_GC);
@@ -152,8 +153,10 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
      * Before we garbage collect we may have to squeeze update frames and/or
      * black hole the update stack 
     */
-    if (squeeze_upd_frames) {
-	/* Squeeze and/or black hole update frames */
+    if (! RTSflags.GcFlags.squeezeUpdFrames) {
+	BlackHoleUpdateStack();    	
+
+    } else { /* Squeeze and/or black hole update frames */
 	I_ displacement;
 
 	displacement = SqueezeUpdateFrames(stackInfo.botB + BREL(1), MAIN_SpB, MAIN_SuB);
@@ -162,13 +165,9 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
 	MAIN_SpB += BREL(displacement);
 	/* fprintf(stderr, "B size %d, squeezed out %d\n", MAIN_SpB - stackInfo.botB,
                 displacement); */
-    }	/* note the conditional else clause below */
-# if defined(SM_DO_BH_UPDATE)
-    else
-	BlackHoleUpdateStack();    	
-# endif	/* SM_DO_BH_UPDATE */
+    }
 
-    assert(num_ptr_roots <= SM_MAXROOTS);
+    ASSERT(num_ptr_roots <= SM_MAXROOTS);
     StorageMgrInfo.rootno = num_ptr_roots;
 
     SAVE_Hp -= reqsize;
@@ -189,7 +188,7 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
       GC_result = collectHeap(reqsize, &StorageMgrInfo, do_full_collection);
 
       if ( GC_result == GC_HARD_LIMIT_EXCEEDED ) {
-	OutOfHeapHook(reqsize * sizeof(W_), SM_word_heap_size * sizeof(W_)); /*msg*/
+	OutOfHeapHook(reqsize * sizeof(W_)); /*msg*/
 	shutdownHaskell();
 	EXIT(EXIT_FAILURE);
 
@@ -206,10 +205,8 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
       } else { /* This should not happen */
 	fprintf(stderr, "Panic: garbage collector returned %d please report it as a bug to glasgow-haskell-bugs@dcs.gla.ac.uk\n", GC_result );
 
-# if defined(DO_REDN_COUNTING)
-	if (showRednCountStats) {
-	   PrintRednCountInfo();
-	}
+# if defined(TICKY_TICKY)
+	if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
 # endif
 	abort();
       }
@@ -241,13 +238,13 @@ RealPerformGC(liveness, reqsize, always_reenter_node, do_full_collection)
     __DEROOT_PTR_REG(IS_LIVE_R2(liveness),2);
     __DEROOT_PTR_REG(IS_LIVE_R1(liveness),1);
 
-    assert(num_ptr_roots == 0); /* we have put it all back */
+    ASSERT(num_ptr_roots == 0); /* we have put it all back */
 
     unblockUserSignals();
 
 #endif	/* !CONCURRENT */
 
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     CCC = Save_CCC;
 
     RESTART_TIME_PROFILER;
@@ -309,7 +306,7 @@ PerformReschedule(liveness, always_reenter_node)
     	}
 
       /* Set up to re-enter Node, so as to be sure it's really there. */
-      assert(liveness & LIVENESS_R1);
+      ASSERT(liveness & LIVENESS_R1);
       TSO_SWITCH(CurrentTSO) = TSO_PC2(CurrentTSO);
       TSO_PC2(CurrentTSO) = (void *) EnterNodeCode;
     }
@@ -382,7 +379,7 @@ PruneSparks(STG_NO_ARGS)
 	     (SPARK_NODE(spark) == Nil_closure) ) {
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	      if ( debug & 0x40 ) 
-		fprintf(main_statsfile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Nil_closure\n", spark);
+		fprintf(RTSflags.GcFlags.statsFile,"PruneSparks: Warning: spark @ 0x%lx points to NULL or Nil_closure\n", spark);
 #  endif
     	    if (do_qp_prof)
     	    	QP_Event0(threadId++, SPARK_NODE(spark));
@@ -418,7 +415,7 @@ PruneSparks(STG_NO_ARGS)
     	SPARK_NEXT(prev) = NULL;
     PendingSparksTl[proc][pool] = prev;
     if (prunedSparks>0) 
-      fprintf(main_statsfile,"Pruning and disposing %lu excess sparks (> %lu) on proc %ld in PruneSparks\n",
+      fprintf(RTSflags.GcFlags.statsFile,"Pruning and disposing %lu excess sparks (> %lu) on proc %ld in PruneSparks\n",
 	      prunedSparks,(W_) MAX_SPARKS,proc);
    }  /* forall pool ... */
   }   /* forall proc ... */
@@ -477,7 +474,19 @@ rtsBool do_full_collection;
 			            as we re-store them. */
     P_ stack, tso, next;
 
-    /* Discard the saved stack and TSO space */
+    /* Discard the saved stack and TSO space.
+       What's going on here:  TSOs and StkOs are on the mutables
+       list (mutable things in the old generation). Here, we change
+       them to immutable, so that the scavenger (which chks all
+       mutable objects) can detect their immutability and remove
+       them from the list.  Setting to MUTUPLE_VHS as the size is
+       essentially saying "No pointers in here" (i.e., empty).
+
+       Without this change of status, these
+       objects might not really die, probably with some horrible
+       disastrous consequence that we don't want to think about.
+       Will & Phil 95/10
+    */
 
     for(stack = AvailableStack; stack != Nil_closure; stack = next) {
 	next = STKO_LINK(stack);
@@ -509,7 +518,7 @@ rtsBool do_full_collection;
 
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	      if ( debug & 0x40 ) 
-		fprintf(main_statsfile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
+		fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsHd %d (proc: %d) -- 0x%lx\n",
 			num_ptr_roots,proc,RunnableThreadsHd[proc]);
 #  endif
 
@@ -517,7 +526,7 @@ rtsBool do_full_collection;
 
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	      if ( debug & 0x40 ) 
-		fprintf(main_statsfile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
+		fprintf(RTSflags.GcFlags.statsFile,"Saving RunnableThreadsTl %d (proc: %d) -- 0x%lx\n",
 			num_ptr_roots,proc,RunnableThreadsTl[proc]);
 #  endif       
     StorageMgrInfo.roots[num_ptr_roots++] = RunnableThreadsTl[proc];
@@ -537,7 +546,7 @@ rtsBool do_full_collection;
 
 # if defined(GRAN_CHECK) && defined(GRAN)
     if ( debug & 0x40 ) 
-      fprintf(main_statsfile,"Saving CurrentTSO %d -- 0x%lx\n",
+      fprintf(RTSflags.GcFlags.statsFile,"Saving CurrentTSO %d -- 0x%lx\n",
 	      num_ptr_roots,CurrentTSO);
 # endif
 
@@ -553,12 +562,10 @@ rtsBool do_full_collection;
     
     if (collectHeap(reqsize, &StorageMgrInfo, do_full_collection) != GC_SUCCESS) { 
 
-	OutOfHeapHook(reqsize * sizeof(W_), SM_word_heap_size * sizeof(W_)); /*msg*/
+	OutOfHeapHook(reqsize * sizeof(W_)); /*msg*/
 
-# if defined(DO_REDN_COUNTING)
-	if (showRednCountStats) {
-	    PrintRednCountInfo();
-	}
+# if defined(TICKY_TICKY)
+	if (RTSflags.TickyFlags.showTickyStats) PrintTickyInfo();
 # endif
 	EXIT(EXIT_FAILURE);
     }
@@ -570,7 +577,7 @@ rtsBool do_full_collection;
 
 # if defined(GRAN_CHECK) && defined(GRAN)
 	  if ( debug & 0x40 ) 
-	    fprintf(main_statsfile,"Restoring CurrentTSO %d -- new: 0x%lx\n",
+	    fprintf(RTSflags.GcFlags.statsFile,"Restoring CurrentTSO %d -- new: 0x%lx\n",
 		    num_ptr_roots-1,StorageMgrInfo.roots[num_ptr_roots-1]);
 # endif
 
@@ -599,7 +606,7 @@ rtsBool do_full_collection;
 
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	  if ( debug & 0x40 ) 
-	    fprintf(main_statsfile,"Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
+	    fprintf(RTSflags.GcFlags.statsFile,"Restoring RunnableThreadsTl %d (proc: %d) -- new: 0x%lx\n",
 		    num_ptr_roots-1,proc,StorageMgrInfo.roots[num_ptr_roots-1]);
 #  endif
 
@@ -607,7 +614,7 @@ rtsBool do_full_collection;
 
 #  if defined(GRAN_CHECK) && defined(GRAN)
 	  if ( debug & 0x40 ) 
-	    fprintf(main_statsfile,"Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
+	    fprintf(RTSflags.GcFlags.statsFile,"Restoring RunnableThreadsHd %d (proc: %d) -- new: 0x%lx\n",
 		    num_ptr_roots,proc,StorageMgrInfo.roots[num_ptr_roots]);
 #  endif
 
@@ -639,7 +646,7 @@ This routine rattles down the B stack, black-holing any
 pending updates to avoid space leaks from them.
 
 \begin{code}
-#if !defined(CONCURRENT) && defined(SM_DO_BH_UPDATE)
+#if !defined(CONCURRENT)
 
 static
 void
@@ -647,7 +654,7 @@ BlackHoleUpdateStack(STG_NO_ARGS)
 {
     P_ PtrToUpdateFrame;
 
-    if (noBlackHoles)
+    if (! RTSflags.GcFlags.lazyBlackHoling)
     	return;
 
     PtrToUpdateFrame = MAIN_SuB;
@@ -663,17 +670,14 @@ BlackHoleUpdateStack(STG_NO_ARGS)
 	PtrToUpdateFrame = GRAB_SuB(PtrToUpdateFrame);
     }
 }
-#endif	/* CONCURRENT && SM_DO_BH_UPDATE */
+#endif	/* CONCURRENT */
 \end{code}
 
 
 \begin{code}
 #if defined(CONCURRENT) && !defined(GRAN)
 void
-PerformReschedule(liveness, always_reenter_node)
-  W_ liveness;
-  W_  always_reenter_node;
-
+PerformReschedule(W_ liveness, W_ always_reenter_node)
 { }
 #endif
 \end{code}

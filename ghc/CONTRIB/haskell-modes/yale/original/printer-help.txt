@@ -1,0 +1,26 @@
+General messages
+      compiling       Printed when the compilation system starts a compilation
+      loading         Printed when a previously compiled unit is loaded
+      reading         Prints the name of the file being parsed
+      pad             Enables printing within scratch pads
+      interactive     Print verbose messages in command loop
+      prompt          Print prompt in command loop
+Timings
+      time            Prints the time that it takes to execute a computation
+      phase-time      Prints the time of each phase of compilation
+Compiler passes
+      parse           Prints the program recreated from ast
+      import          Lists all symbols imported and exported for each module
+      scope           Print the program after scoping and precedence parsing
+      depend          Prints entire program in nested let's
+      type            Prints signatures during inference
+      cfn             Prints entire program after context free normalization
+      depend2         Like depend
+      flic            Prints entire program as flic code
+      optimize        Prints entire program as optimized flic code
+      optimize-extra  Prints extra verbose information during optimization
+      strictness      Print strictness of all functions and variables
+      codegen         Prints generated Lisp code
+      codegen-flic    Prints generated Lisp code and associated flic code
+      dumper          Prints the code in the interface
+      dump-stat       Prints statistics for the interface file

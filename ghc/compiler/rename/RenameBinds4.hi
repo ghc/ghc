@@ -1,7 +1,6 @@
 {-# GHC_PRAGMA INTERFACE VERSION 5 #-}
 interface RenameBinds4 where
 import Bag(Bag)
-import CharSeq(CSeq)
 import CmdLineOpts(GlobalSwitch)
 import ErrUtils(Error(..))
 import FiniteMap(FiniteMap)
@@ -16,7 +15,7 @@ import Maybes(Labda)
 import Name(Name)
 import NameTypes(FullName, ShortName)
 import PreludePS(_PackedString)
-import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import Pretty(PprStyle, Pretty(..), PrettyRep)
 import ProtoName(ProtoName)
 import RenameAuxFuns(GlobalNameFun(..))
 import SplitUniq(SplitUniqSupply)
@@ -26,29 +25,26 @@ import TyVar(TyVar)
 import UniqFM(UniqFM)
 import UniqSet(UniqSet(..))
 import Unique(Unique)
-data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data Bag a 
 type Error = PprStyle -> Int -> Bool -> PrettyRep
-data Binds a b 	{-# GHC_PRAGMA EmptyBinds | ThenBinds (Binds a b) (Binds a b) | SingleBind (Bind a b) | BindWith (Bind a b) [Sig a] | AbsBinds [TyVar] [Id] [(Id, Id)] [(Inst, Expr a b)] (Bind a b) #-}
+data Binds a b 
 type DefinedVars = UniqFM Name
 type FreeVars = UniqFM Name
-data MonoBinds a b 	{-# GHC_PRAGMA EmptyMonoBinds | AndMonoBinds (MonoBinds a b) (MonoBinds a b) | PatMonoBind b (GRHSsAndBinds a b) SrcLoc | VarMonoBind Id (Expr a b) | FunMonoBind a [Match a b] SrcLoc #-}
-data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+data MonoBinds a b 
+data InPat a 
+data Labda a 
+data Name 
+data PprStyle 
 type Pretty = Int -> Bool -> PrettyRep
-data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
-data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data PrettyRep 
+data ProtoName 
 type GlobalNameFun = ProtoName -> Labda Name
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data SrcLoc 	{-# GHC_PRAGMA SrcLoc _PackedString _PackedString | SrcLoc2 _PackedString Int# #-}
-data UniqFM a 	{-# GHC_PRAGMA EmptyUFM | LeafUFM Int# a | NodeUFM Int# Int# (UniqFM a) (UniqFM a) #-}
+data SplitUniqSupply 
+data SrcLoc 
+data UniqFM a 
 type UniqSet a = UniqFM a
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data Unique 
 rnBinds4 :: Binds ProtoName (InPat ProtoName) -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> ((Binds Name (InPat Name), UniqFM Name, [Name]), Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
 rnMethodBinds4 :: Name -> MonoBinds ProtoName (InPat ProtoName) -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (MonoBinds Name (InPat Name), Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 2 _U_ 22222222 _N_ _S_ "LS" _N_ _N_ #-}
 rnTopBinds4 :: Binds ProtoName (InPat ProtoName) -> (GlobalSwitch -> Bool) -> (ProtoName -> Labda Name, ProtoName -> Labda Name) -> FiniteMap _PackedString Name -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SplitUniqSupply -> SrcLoc -> (Binds Name (InPat Name), Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
 

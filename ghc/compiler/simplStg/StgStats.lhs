@@ -34,19 +34,19 @@ import Util
 
 \begin{code}
 data CounterType
-  = AlgCases
-  | PrimCases
-  | LetNoEscapes
-  | NonUpdatableLets
-  | UpdatableLets
+  = Literals
   | Applications
+  | ConstructorApps
   | PrimitiveApps
+  | LetNoEscapes
+  | AlgCases
+  | PrimCases
   | FreeVariables
-  | Closures	-- does not include lets bound to constructors
---| UpdatableTopLevelDefs
---| NonUpdatableTopLevelDefs
-  | Constructors
-  deriving (Eq, Ord, Text)
+  | ConstructorBinds Bool{-True<=>top-level-}
+  | ReEntrantBinds   Bool{-ditto-}
+  | SingleEntryBinds Bool{-ditto-}
+  | UpdatableBinds   Bool{-ditto-}
+  deriving (Eq, Ord)
 
 type Count	= Int
 type StatEnv	= FiniteMap CounterType Count
@@ -77,23 +77,34 @@ countN = singletonFM
 
 \begin{code}
 showStgStats :: PlainStgProgram -> String
-showStgStats prog = concat (map showc (fmToList (gatherStgStats prog)))
+
+showStgStats prog
+  = "STG Statistics:\n\n"
+    ++ concat (map showc (fmToList (gatherStgStats prog)))
   where
-    showc (AlgCases,n)         = "AlgCases               " ++ show n ++ "\n"
-    showc (PrimCases,n)        = "PrimCases              " ++ show n ++ "\n"
-    showc (LetNoEscapes,n)     = "LetNoEscapes           " ++ show n ++ "\n"
-    showc (NonUpdatableLets,n) = "NonUpdatableLets       " ++ show n ++ "\n"
-    showc (UpdatableLets,n)    = "UpdatableLets          " ++ show n ++ "\n"
-    showc (Applications,n)     = "Applications           " ++ show n ++ "\n"
-    showc (PrimitiveApps,n)    = "PrimitiveApps          " ++ show n ++ "\n"
-    showc (Closures,n)         = "Closures               " ++ show n ++ "\n"
-    showc (FreeVariables,n)    = "Free Vars in Closures  " ++ show n ++ "\n"
-    showc (Constructors,n)     = "Constructors           " ++ show n ++ "\n"
+    showc (x,n) = (showString (s x) . shows n) "\n"
+
+    s Literals		      = "Literals                   "
+    s Applications	      = "Applications               "
+    s ConstructorApps	      = "ConstructorApps            "
+    s PrimitiveApps	      = "PrimitiveApps              "
+    s LetNoEscapes	      = "LetNoEscapes               "
+    s AlgCases		      = "AlgCases                   "
+    s PrimCases		      = "PrimCases                  "
+    s FreeVariables	      = "FreeVariables              "
+    s (ConstructorBinds True) = "ConstructorBinds_Top       "
+    s (ReEntrantBinds True)   = "ReEntrantBinds_Top         "
+    s (SingleEntryBinds True) = "SingleEntryBinds_Top       "
+    s (UpdatableBinds True)   = "UpdatableBinds_Top         "
+    s (ConstructorBinds _)    = "ConstructorBinds_Nested    "
+    s (ReEntrantBinds _)      = "ReEntrantBindsBinds_Nested "
+    s (SingleEntryBinds _)    = "SingleEntryBinds_Nested    "
+    s (UpdatableBinds _)      = "UpdatableBinds_Nested      "
 
 gatherStgStats :: PlainStgProgram -> StatEnv
 
 gatherStgStats binds 
-  = combineSEs (map statBinding binds)
+  = combineSEs (map (statBinding True{-top-level-}) binds)
 \end{code}
 
 %************************************************************************
@@ -103,28 +114,30 @@ gatherStgStats binds
 %************************************************************************
 
 \begin{code}
-statBinding :: PlainStgBinding -> StatEnv
+statBinding :: Bool -- True <=> top-level; False <=> nested
+	    -> PlainStgBinding
+	    -> StatEnv
 
-statBinding (StgNonRec b rhs)
-  = statRhs (b, rhs)
+statBinding top (StgNonRec b rhs)
+  = statRhs top (b, rhs)
 
-statBinding (StgRec pairs)
-  = combineSEs (map statRhs pairs)
+statBinding top (StgRec pairs)
+  = combineSEs (map (statRhs top) pairs)
 
-statRhs :: (Id, PlainStgRhs) -> StatEnv
+statRhs :: Bool -> (Id, PlainStgRhs) -> StatEnv
 
-statRhs (b, StgRhsCon cc con args)
-  = countOne Constructors		`combineSE` 
-    countOne NonUpdatableLets
+statRhs top (b, StgRhsCon cc con args)
+  = countOne (ConstructorBinds top)
 
-statRhs (b, StgRhsClosure cc bi fv u args body)
+statRhs top (b, StgRhsClosure cc bi fv u args body)
   = statExpr body			`combineSE` 
     countN FreeVariables (length fv)	`combineSE`
-    countOne Closures			`combineSE` 
-    (case u of
-       Updatable -> countOne UpdatableLets
-       _         -> countOne NonUpdatableLets)
-
+    countOne (
+      case u of
+	ReEntrant   -> ReEntrantBinds   top
+	Updatable   -> UpdatableBinds   top
+	SingleEntry -> SingleEntryBinds top
+    )
 \end{code}
 
 %************************************************************************
@@ -137,12 +150,12 @@ statRhs (b, StgRhsClosure cc bi fv u args body)
 statExpr :: PlainStgExpr -> StatEnv
 
 statExpr (StgApp _ [] lvs) 
-  = emptySE
+  = countOne Literals
 statExpr (StgApp _ _ lvs) 
   = countOne Applications
 
 statExpr (StgConApp con as lvs)
-  = countOne Constructors
+  = countOne ConstructorApps
 
 statExpr (StgPrimApp op as lvs)
   = countOne PrimitiveApps
@@ -151,12 +164,12 @@ statExpr (StgSCC ty l e)
   = statExpr e
 
 statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
-  = statBinding binds	`combineSE`
-    statExpr body	`combineSE` 
+  = statBinding False{-not top-level-} binds	`combineSE`
+    statExpr body				`combineSE` 
     countOne LetNoEscapes
 
 statExpr (StgLet binds body)
-  = statBinding binds	`combineSE` 
+  = statBinding False{-not top-level-} binds	`combineSE` 
     statExpr body
 
 statExpr (StgCase expr lve lva uniq alts)
@@ -164,25 +177,19 @@ statExpr (StgCase expr lve lva uniq alts)
     stat_alts alts
     where
       stat_alts (StgAlgAlts ty alts def)
-	= combineSEs (map stat_alg_alt alts)	`combineSE` 
-	  stat_deflt def			`combineSE`
+	= combineSEs (map statExpr [ e | (_,_,_,e) <- alts ])
+					`combineSE` 
+	  stat_deflt def		`combineSE`
 	  countOne AlgCases
-	where
-	  stat_alg_alt (id, bs, use_mask, e)
-	    = statExpr e
 
       stat_alts (StgPrimAlts ty alts def)
-	= combineSEs (map stat_prim_alt alts) 	`combineSE`
-	  stat_deflt def			`combineSE`
+	= combineSEs (map statExpr [ e | (_,e) <- alts ])
+					`combineSE`
+	  stat_deflt def		`combineSE`
 	  countOne PrimCases
-	where
-	  stat_prim_alt (l, e)
-	    = statExpr e
 
-      stat_deflt StgNoDefault
-	= emptySE
+      stat_deflt StgNoDefault = emptySE
 
-      stat_deflt (StgBindDefault b u expr)
-	= statExpr expr	
+      stat_deflt (StgBindDefault b u expr) = statExpr expr	
 \end{code}
 

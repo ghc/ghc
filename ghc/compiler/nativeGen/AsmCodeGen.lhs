@@ -28,12 +28,14 @@ import CmdLineOpts  ( GlobalSwitch(..), stringSwitchSet, switchIsOn, SwitchResul
 import MachDesc
 import Maybes	    ( Maybe(..) )
 import Outputable
-#if alpha_dec_osf1_TARGET
+#if alpha_TARGET_ARCH
 import AlphaDesc    ( mkAlpha )
-#else
+#endif
+#if i386_TARGET_ARCH
+import I386Desc	    ( mkI386 )
+#endif
 #if sparc_TARGET_ARCH
 import SparcDesc    ( mkSparc )
-#endif
 #endif
 import Stix
 import SplitUniq
@@ -141,21 +143,25 @@ code flags absC =
     let 
 	stix = map (map (genericOpt target)) treelists
     in
-	codeGen target sty stix
+    codeGen {-target-} sty stix
   where
-    sty = PprForAsm (switchIsOn flags) (underscore target) (fmtAsmLbl target)
+    sty = PprForAsm (switchIsOn flags) (underscore {-target-}) (fmtAsmLbl {-target-})
 
-    target = case stringSwitchSet flags AsmTarget of
+    (target, codeGen, underscore, fmtAsmLbl)
+      = case stringSwitchSet flags AsmTarget of
 #if ! OMIT_NATIVE_CODEGEN
-#if sparc_sun_sunos4_TARGET
-    	Just _ {-???"sparc-sun-sunos4"-} -> mkSparc True flags
-#endif
-#if sparc_sun_solaris2_TARGET
-    	Just _ {-???"sparc-sun-solaris2"-} -> mkSparc False flags
-#endif
-#if alpha_TARGET_ARCH
+# if alpha_TARGET_ARCH
     	Just _ {-???"alpha-dec-osf1"-} -> mkAlpha flags
-#endif
+# endif
+# if i386_TARGET_ARCH
+    	Just _ {-???"i386_unknown_linuxaout"-} -> mkI386 True flags
+# endif
+# if sparc_sun_sunos4_TARGET
+    	Just _ {-???"sparc-sun-sunos4"-} -> mkSparc True flags
+# endif
+# if sparc_sun_solaris2_TARGET
+    	Just _ {-???"sparc-sun-solaris2"-} -> mkSparc False flags
+# endif
 #endif
         _ -> error
 	     ("ERROR:Trying to generate assembly language for an unsupported architecture\n"++
@@ -190,8 +196,10 @@ genericOpt
 For most nodes, just optimize the children.
 
 \begin{code}
+-- hacking with Uncle Will:
+#define target_STRICT target@(Target _ _ _ _ _ _ _ _)
 
-genericOpt target (StInd pk addr) =
+genericOpt target_STRICT (StInd pk addr) =
     StInd pk (genericOpt target addr)
 
 genericOpt target (StAssign pk dst src) =
@@ -275,7 +283,6 @@ primOpt op args@[StInt x, StInt y] =
     	IntSubOp -> StInt (x - y)
     	IntMulOp -> StInt (x * y)
     	IntQuotOp -> StInt (x `quot` y)
-    	IntDivOp -> StInt (x `div` y)
     	IntRemOp -> StInt (x `rem` y)
     	IntGtOp -> StInt (if x > y then 1 else 0)
     	IntGeOp -> StInt (if x >= y then 1 else 0)
@@ -321,7 +328,6 @@ primOpt op args@[x, y@(StInt 0)] =
 primOpt op args@[x, y@(StInt 1)] = 
     case op of
     	IntMulOp -> x
-    	IntDivOp -> x
     	IntQuotOp -> x
     	IntRemOp -> StInt 0
     	_ -> StPrim op args

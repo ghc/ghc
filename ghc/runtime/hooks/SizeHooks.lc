@@ -1,8 +1,15 @@
 \begin{code}
 #include "rtsdefs.h"
-#include "storage/SMinternal.h" /* DEFAULT_* here */
 
-I_   SM_word_heap_size   = DEFAULT_HEAP_SIZE;
-StgFloat SM_pc_free_heap = DEFAULT_PC_FREE;
-I_   SM_word_stk_size    = DEFAULT_STACKS_SIZE;
+void
+defaultsHook (void)
+{ /* this is called *after* RTSflags has had
+     its defaults set, but *before* we start
+     processing the RTS command-line options.
+
+     This default version does *nothing*.
+     The user may provide a more interesting
+     one.
+  */
+}
 \end{code}

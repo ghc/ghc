@@ -1,9 +1,9 @@
-Only have cost centres etc if @USE_COST_CENTRES@ defined
+Only have cost centres etc if @PROFILING@ defined
 
 \begin{code}
 #define NULL_REG_MAP	/* Not threaded */
-#include "../storage/SMinternal.h"  /* for xmalloc */
-#if defined (USE_COST_CENTRES)
+#include "../storage/SMinternal.h"  /* for ??? */
+#if defined (PROFILING)
 \end{code}
 
 %************************************************************************
@@ -40,8 +40,10 @@ init_index_cc()
     max_cc_no = max2;
     mask_cc = max2 - 1;
 
-    index_cc_table = (CostCentre *) xmalloc(max2 * sizeof(CostCentre));
-    for (count = 0; count < max2; count++) index_cc_table[count] = 0;
+    index_cc_table = (CostCentre *) stgMallocBytes(max2 * sizeof(CostCentre), "init_index_cc");
+
+    for (count = 0; count < max2; count++)
+	index_cc_table[count] = 0;
 
     return max2;
 }
@@ -95,13 +97,16 @@ init_index_mod()
     max_mod_no = max2;
     mask_mod = max2 - 1;
 
-    index_mod_table = (CostCentre *) xmalloc(max2 * sizeof(CostCentre));
-    for (count = 0; count < max2; count++) index_mod_table[count] = 0;
+    index_mod_table = (CostCentre *) stgMallocBytes(max2 * sizeof(CostCentre), "init_index_mod");
+
+    for (count = 0; count < max2; count++)
+	index_mod_table[count] = 0;
 
     return max2;
 }
 
-hash_t index_mod(cc)
+hash_t
+index_mod(cc)
     CostCentre cc;
 {
     if (cc->index_val == UNHASHED) {
@@ -152,13 +157,16 @@ init_index_grp()
     max_grp_no = max2;
     mask_grp = max2 - 1;
 
-    index_grp_table = (CostCentre *) xmalloc(max2 * sizeof(CostCentre));
-    for (count = 0; count < max2; count++) index_grp_table[count] = 0;
+    index_grp_table = (CostCentre *) stgMallocBytes(max2 * sizeof(CostCentre), "init_index_grp");
+
+    for (count = 0; count < max2; count++)
+	index_grp_table[count] = 0;
 
     return max2;
 }
 
-hash_t index_grp(cc)
+hash_t
+index_grp(cc)
     CostCentre cc;
 {
     if (cc->index_val == UNHASHED) {
@@ -209,13 +217,16 @@ init_index_descr()
     max_descr_no = max2;
     mask_descr = max2 - 1;
 
-    index_descr_table = (ClCategory *) xmalloc(max2 * sizeof(ClCategory));
-    for (count = 0; count < max2; count++) index_descr_table[count] = 0;
+    index_descr_table = (ClCategory *) stgMallocBytes(max2 * sizeof(ClCategory), "init_index_descr");
+
+    for (count = 0; count < max2; count++)
+	index_descr_table[count] = 0;
 
     return max2;
 }
 
-hash_t index_descr(clcat)
+hash_t
+index_descr(clcat)
     ClCategory clcat;
 {
     if (clcat->index_val == UNHASHED) {
@@ -266,8 +277,10 @@ init_index_type()
     max_type_no = max2;
     mask_type = max2 - 1;
 
-    index_type_table = (ClCategory *) xmalloc(max2 * sizeof(ClCategory));
-    for (count = 0; count < max2; count++) index_type_table[count] = 0;
+    index_type_table = (ClCategory *) stgMallocBytes(max2 * sizeof(ClCategory), "init_index_type");
+
+    for (count = 0; count < max2; count++)
+	index_type_table[count] = 0;
 
     return max2;
 }
@@ -297,5 +310,5 @@ hash_t index_type(clcat)
 \end{code}
 
 \begin{code}
-#endif /* USE_COST_CENTRES */
+#endif /* PROFILING */
 \end{code}

@@ -317,6 +317,6 @@ static const W_ INTLIKE_closures_def[] = {
     INTLIKE_HDR(16)	/* MAX_INTLIKE == 16 */
 };
 
-P_ INTLIKE_closures = (P_) __INTLIKE_CLOSURE(0);
+const P_ INTLIKE_closures = (const P_) __INTLIKE_CLOSURE(0);
 
 \end{code}

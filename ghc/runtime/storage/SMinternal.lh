@@ -22,29 +22,13 @@ This stuff needs to be documented.  KH
 #include <sys/vadvise.h>
 #endif
 
-extern I_   SM_force_gc;
-#define USE_2s	1
-#define USE_1s	2
-
-extern I_   SM_word_heap_size; /* all defined in SMinit.lc */
-extern I_   SM_alloc_min;
-extern StgFloat SM_pc_free_heap;
-extern I_   SM_alloc_size;
-extern I_   SM_major_gen_size;
-/*moved: extern I_   SM_word_stk_size; */
-extern FILE    *SM_statsfile;
-extern I_   SM_trace;
-extern I_   SM_stats_summary;
-extern I_   SM_stats_verbose;
-extern I_   SM_ring_bell;
-
 extern P_ heap_space;
 extern P_ hp_start;
 
-extern void stat_init    PROTO((char *collector, char *c1, char *c2));
-extern void stat_startGC PROTO((I_ alloc));
-extern void stat_endGC   PROTO((I_ alloc, I_ collect, I_ live, char *comment));
-extern void stat_exit    PROTO((I_ alloc));
+void stat_init    PROTO((char *collector, char *c1, char *c2));
+void stat_startGC PROTO((I_ alloc));
+void stat_endGC   PROTO((I_ alloc, I_ collect, I_ live, char *comment));
+void stat_exit    PROTO((I_ alloc));
 
 extern I_ MaxResidency;     /* in words; for stats only */
 extern I_ ResidencySamples; /* for stats only */
@@ -58,34 +42,19 @@ extern I_ ResidencySamples; /* for stats only */
 	}					\
     } while (0)
 
-extern StgFunPtr _Dummy_entry(STG_NO_ARGS);
-extern char *xmalloc PROTO((size_t));
+StgFunPtr _Dummy_entry(STG_NO_ARGS);
 
-#if defined(_GC_DEBUG)
+#if defined(DEBUG)
 #define DEBUG_SCAN(str, pos, to, topos) \
-	if (SM_trace & 2) fprintf(stderr, "%s: 0x%lx, %s 0x%lx\n", str, pos, to, topos)
+	if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
+	    fprintf(stderr, "%s: 0x%lx, %s 0x%lx\n", str, pos, to, topos)
 #define DEBUG_STRING(str) \
-	if (SM_trace & 2) fprintf(stderr, "%s\n", str)
+	if (RTSflags.GcFlags.trace & DEBUG_TRACE_MINOR_GC) \
+	    fprintf(stderr, "%s\n", str)
 #else
 #define DEBUG_SCAN(str, pos, to, topos)
 #define DEBUG_STRING(str)
 #endif
-
-/************************ Default HEAP and STACK sizes **********************/
-
-/* A user can change these main defaults with a
-   "hooks" file equiv to runtime/hooks/SizeHooks.lc.
-*/
-
-#define DEFAULT_STACKS_SIZE  	 0x10002  /* 2^16 = 16Kwords = 64Kbytes */
-
-#define DEFAULT_HEAP_SIZE  	 0x100002 /* 2^20 = 1Mwords = 4Mbytes  */
-#define DEFAULT_ALLOC_SIZE       0x4002   /* 2^14 = 16k words = 64k bytes */
-#define DEFAULT_PC_FREE          3	  /* 3% */
-
-/* I added a couple of extra words above, to be more sure of avoiding
-    bad effects on direct-mapped caches. (WDP)
-*/
 
 #define NEXT_SEMI_SPACE(space) ((space + 1) % 2)
 
@@ -262,8 +231,8 @@ extern genData genInfo;
 #define EVAC_CODE(infoptr)  ((StgEvacPtr) ((P_)(INFO_RTBL(infoptr)))[COPY_INFO_OFFSET])
 #define SCAV_CODE(infoptr)  ((StgScavPtr) ((P_)(INFO_RTBL(infoptr)))[COPY_INFO_OFFSET+1])
 
-extern void Scavenge(STG_NO_ARGS);
-extern void  _Scavenge_Forward_Ref(STG_NO_ARGS);
+void Scavenge(STG_NO_ARGS);
+void  _Scavenge_Forward_Ref(STG_NO_ARGS);
 
 /* Note: any change to FORWARD_ADDRESS should be
    reflected in layout of MallocPtrs (includes/SMClosures.lh)
@@ -294,7 +263,7 @@ MAYBE_DECLARE_RTBL(,_Evacuate_Forward_Ref,)
     const W_ MK_REP_LBL(,evac_forward,)[] = { \
 	INCLUDE_TYPE_INFO(INTERNAL)				\
 	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)		\
-	INCLUDE_PAR_INFO				\
+	INCLUDE_PAR_INFO					\
 	INCLUDE_COPYING_INFO(evac_forward,_Scavenge_Forward_Ref)\
 	INCLUDE_COMPACTING_INFO(INFO_UNUSED,INFO_UNUSED,INFO_UNUSED,INFO_UNUSED) \
 	}
@@ -317,7 +286,7 @@ MAYBE_DECLARE_RTBL(Caf_Evac_Upd,,)
     const W_ MK_REP_LBL(Caf_Evac_Upd,,)[] = { \
 	INCLUDE_TYPE_INFO(INTERNAL)				\
 	INCLUDE_SIZE_INFO(MIN_UPD_SIZE,INFO_UNUSED)		\
-	INCLUDE_PAR_INFO		\
+	INCLUDE_PAR_INFO					\
 	INCLUDE_COPYING_INFO(_Evacuate_Caf_Evac_Upd,_Scavenge_Caf) \
 	INCLUDE_COMPACTING_INFO(INFO_UNUSED,INFO_UNUSED,INFO_UNUSED,INFO_UNUSED) \
     }
@@ -332,8 +301,8 @@ MAYBE_DECLARE_RTBL(Caf_Evac_Upd,,)
 
 #if defined(_INFO_MARKING)
 
-extern I_ markHeapRoots PROTO((smInfo *sm, P_ cafs1, P_ cafs2,
-				P_ base, P_ lim, BitWord *bit_array));
+I_ markHeapRoots PROTO((smInfo *sm, P_ cafs1, P_ cafs2,
+			P_ base, P_ lim, BitWord *bit_array));
 
 #define PRMARK_CODE(infoptr) \
 	  (((FP_)(INFO_RTBL(infoptr)))[COMPACTING_INFO_OFFSET+1])
@@ -381,12 +350,12 @@ MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextSpark,)
 MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextRoot,)
 MAYBE_DECLARE_RTBL(,_PRMarking_MarkNextCAF,)
 
-#define DUMMY_PRRETURN_RTBL(prreturn_code,dummy_code) \
-    const W_ MK_REP_LBL(,prreturn_code,)[] = {	    \
-	INCLUDE_TYPE_INFO(INTERNAL)		    \
-	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)  \
-	INCLUDE_PAR_INFO   \
-	INCLUDE_COPYING_INFO(dummy_code,dummy_code) \
+#define DUMMY_PRRETURN_RTBL(prreturn_code,dummy_code) 	\
+    const W_ MK_REP_LBL(,prreturn_code,)[] = {	    	\
+	INCLUDE_TYPE_INFO(INTERNAL)		    	\
+	INCLUDE_SIZE_INFO(INFO_UNUSED,INFO_UNUSED)  	\
+	INCLUDE_PAR_INFO   				\
+	INCLUDE_COPYING_INFO(dummy_code,dummy_code) 	\
 	INCLUDE_COMPACTING_INFO(dummy_code,dummy_code,dummy_code,prreturn_code) \
     }
 
@@ -477,11 +446,11 @@ MAYBE_DECLARE_RTBL(OldRoot,,)
 
 #endif /* ! GCgn */
 
-#if defined(_GC_DEBUG)
+#if defined(DEBUG)
 
 #if defined(GCgn)
 #define DEBUG_LINK_LOCATION(location, closure, linklim)	\
-    if (SM_trace & 4) {	        		\
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MAJOR_GC) {	        		\
 	if (DYNAMIC_CLOSURE(closure) && (closure <= linklim)) \
             fprintf(stderr, "  Link Loc: 0x%lx to 0x%lx\n", location, closure); \
 	else if (! DYNAMIC_CLOSURE(closure))   	\
@@ -491,7 +460,7 @@ MAYBE_DECLARE_RTBL(OldRoot,,)
     }
 #else /* ! GCgn */
 #define DEBUG_LINK_LOCATION(location, closure)	\
-    if (SM_trace & 4) {	        		\
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MAJOR_GC) {	        		\
 	if (DYNAMIC_CLOSURE(closure))		\
             fprintf(stderr, "  Link Loc: 0x%lx to 0x%lx\n", location, closure); \
 	else					\
@@ -500,15 +469,15 @@ MAYBE_DECLARE_RTBL(OldRoot,,)
 #endif /* ! GCgn */
 
 #define DEBUG_UNLINK_LOCATION(location, closure, newlocation) 	\
-    if (SM_trace & 4)                     			\
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MAJOR_GC)                     			\
         fprintf(stderr, "  UnLink Loc: 0x%lx, 0x%lx -> 0x%lx\n", location, closure, newlocation)
 
 #define DEBUG_LINK_CAF(caf) \
-    if (SM_trace & 4)        	\
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MAJOR_GC)        	\
 	fprintf(stderr, "Caf: 0x%lx  Closure: 0x%lx\n", caf, IND_CLOSURE_PTR(caf))
 
 #define DEBUG_SET_MARK(closure, hp_word) \
-    if (SM_trace & 8)			 \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)			 \
         fprintf(stderr, "  Set Mark Bit: 0x%lx, word %ld, bit_word %ld, bit %d\n", closure, hp_word, hp_word / BITS_IN(BitWord), hp_word & (BITS_IN(BitWord) - 1))
 
 #else

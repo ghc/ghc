@@ -22,7 +22,8 @@ system (GUM).
 Static data and code declarations.
 
 \begin{code}
-static W_      PackBuffer[PACK_BUFFER_SIZE+PACK_HDR_SIZE];
+static W_ *PackBuffer = NULL; /* size: can be set via option */
+
 static W_      packlocn, clqsize, clqpos;
 static W_      unpackedsize;
 static W_      reservedPAsize;                   /*Space reserved for primitive arrays*/
@@ -66,6 +67,8 @@ W_ *packbuffersize;
 {
     /* Ensure enough heap for all possible RBH_Save closures */
 
+    ASSERT(RTSflags.ParFlags.packBufferSize > 0);
+
     if (SAVE_Hp + PACK_HEAP_REQUIRED > SAVE_HpLim)
 	return NULL;
 
@@ -80,7 +83,7 @@ W_ *packbuffersize;
     PackBuffer[0] = unpackedsize;
 
     /* Set the size parameter */
-    ASSERT(packlocn <= PACK_BUFFER_SIZE);
+    ASSERT(packlocn <= RTSflags.ParFlags.packBufferSize);
     *packbuffersize = packlocn;
 
     DonePacking();
@@ -146,8 +149,8 @@ P_ closure;
     W_ size, ptrs, nonptrs, vhs;
     int i, clpacklocn;
 
-    while ((P_) INFO_PTR(closure) == Ind_info) {	/* Don't pack indirection
-							 * closures */
+    while (IS_INDIRECTION(INFO_PTR(closure))) {
+	/* Don't pack indirection closures */
 #ifdef PACK_DEBUG
 	fprintf(stderr, "Shorted an indirection at %x", closure);
 #endif
@@ -161,9 +164,10 @@ P_ closure;
 	P_ info;
 
 	/*
-	 * PLCs reside on all of the PEs already. Just pack the address as a GA (a
-	 * bit of a kludge, since an address may not fit in *any* of the individual
-	 * GA fields). Const, charlike and small intlike closures are converted into
+	 * PLCs reside on all of the PEs already. Just pack the
+	 * address as a GA (a bit of a kludge, since an address may
+	 * not fit in *any* of the individual GA fields). Const,
+	 * charlike and small intlike closures are converted into
 	 * PLCs.
 	 */
 	switch (INFO_TYPE(INFO_PTR(closure))) {
@@ -320,10 +324,10 @@ data into the pack buffer and increments the pack location.
 \begin{code}
 static void
 Pack(data)
-W_ data;
+  W_ data;
 {
-  ASSERT(packlocn < PACK_BUFFER_SIZE);
-  PackBuffer[packlocn++] = data;
+    ASSERT(packlocn < RTSflags.ParFlags.packBufferSize);
+    PackBuffer[packlocn++] = data;
 }
 \end{code}
 
@@ -400,9 +404,24 @@ static HashTable *offsettable;
 @InitPacking@ initialises the packing buffer etc.
 
 \begin{code}
+void
+InitPackBuffer(STG_NO_ARGS)
+{
+  if (PackBuffer == NULL) { /* not yet allocated */
+
+      PackBuffer = (W_ *) stgMallocWords(RTSflags.ParFlags.packBufferSize+PACK_HDR_SIZE,
+					 "InitPackBuffer");
+
+      InitPendingGABuffer(RTSflags.ParFlags.packBufferSize);
+      AllocClosureQueue(RTSflags.ParFlags.packBufferSize);
+  }
+}
+
 static void
 InitPacking(STG_NO_ARGS)
 {
+  /* InitPackBuffer();    now done in ParInit  HWL_ */
+
   packlocn = PACK_HDR_SIZE;
   unpackedsize = 0;
   reservedPAsize = 0;
@@ -445,8 +464,7 @@ packed.
 
 \begin{code}
 static int
-OffsetFor(closure)
-P_ closure;
+OffsetFor(P_ closure)
 {
     return (int) (W_) lookupHashTable(offsettable, (W_) closure);
 }
@@ -480,7 +498,7 @@ W_ size, ptrs;
 {
     if (RoomInBuffer &&
       (packlocn + reservedPAsize + size +
-	((clqsize - clqpos) + ptrs) * PACK_FETCHME_SIZE >= PACK_BUFFER_SIZE)) {
+	((clqsize - clqpos) + ptrs) * PACK_FETCHME_SIZE >= RTSflags.ParFlags.packBufferSize)) {
 #ifdef PACK_DEBUG
 	fprintf(stderr, "Buffer full\n");
 #endif
@@ -500,16 +518,29 @@ These routines manage the closure queue.
 
 \begin{code}
 static W_ clqpos, clqsize;
-static P_ ClosureQueue[PACK_BUFFER_SIZE];
+
+static P_ *ClosureQueue = NULL;   /* HWL: init in main */
 \end{code}
 
 @InitClosureQueue@ initialises the closure queue.
 
 \begin{code}
 void
+AllocClosureQueue(size)
+  W_ size;
+{
+  ASSERT(ClosureQueue == NULL);
+  ClosureQueue = (P_ *) stgMallocWords(size, "AllocClosureQueue");
+}
+
+void
 InitClosureQueue(STG_NO_ARGS)
 {
   clqpos = clqsize = 0;
+
+  if ( ClosureQueue == NULL ) {
+     AllocClosureQueue(RTSflags.ParFlags.packBufferSize);
+  }
 }
 \end{code}
 
@@ -531,7 +562,7 @@ void
 QueueClosure(closure)
 P_ closure;
 {
-  if(clqsize < PACK_BUFFER_SIZE)
+  if(clqsize < RTSflags.ParFlags.packBufferSize)
     ClosureQueue[clqsize++] = closure;
   else
     {

@@ -15,19 +15,11 @@ type RenamedContext = [(Name, Name)]
 type RenamedMonoType = MonoType Name
 type RenamedPolyType = PolyType Name
 cmpList :: (a -> a -> Int#) -> [a] -> [a] -> Int#
-	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "LSS" _N_ _N_ #-}
 cmpMonoType :: (a -> a -> Int#) -> MonoType a -> MonoType a -> Int#
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
 cmpPolyType :: (a -> a -> Int#) -> PolyType a -> PolyType a -> Int#
-	{-# GHC_PRAGMA _A_ 3 _U_ 222 _N_ _S_ "LSS" _N_ _N_ #-}
 eqMonoType :: MonoType ProtoName -> MonoType ProtoName -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_ #-}
 pprContext :: Outputable a => PprStyle -> [(a, a)] -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 3 _U_ 22122 _N_ _S_ "LLS" _N_ _N_ #-}
 pprParendMonoType :: Outputable a => PprStyle -> MonoType a -> Int -> Bool -> PrettyRep
-	{-# GHC_PRAGMA _A_ 1 _U_ 22122 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (MonoType a)
-	{-# GHC_PRAGMA _M_ HsTypes {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (PolyType a)
-	{-# GHC_PRAGMA _M_ HsTypes {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 

@@ -35,12 +35,7 @@ import AbsUniType
 import E
 import CE		( lookupCE )
 
-#ifndef DPH
-import Errors		( badMatchErr, UnifyErrContext(..) )
-#else
-import Errors		( badMatchErr, podCompLhsError, UnifyErrContext(..) )
-#endif {- Data Parallel Haskell -}
-
+import Errors
 import GenSpecEtc	( checkSigTyVars )
 import Id		( mkInstId, getIdUniType, Id )
 import Inst
@@ -79,8 +74,8 @@ tcExpr e (Var name)
 	-- isTauTy is over-paranoid, because we don't expect
 	-- any submerged polymorphism other than rank-2 polymorphism
 
-    checkTc (not (isTauTy ty)) (error "tcExpr Var: MISSING ERROR MESSAGE") -- ToDo:
-					`thenTc_`
+    getSrcLocTc			  `thenNF_Tc` \ loc ->
+    checkTc (not (isTauTy ty)) (lurkingRank2Err name ty loc) `thenTc_`
  
     returnTc stuff
 \end{code}
@@ -563,14 +558,15 @@ tcApp build_result_expression e orig_fun arg_exprs
 	unify_args (arg_no+1) (App fun arg'') (lie `plusLIE` lie_arg') args arg_tys fun_res_ty
 
     unify_args arg_no fun lie [] arg_tys fun_res_ty
-      = -- We've run out of actual arguments Check that none of
-	-- arg_tys has a for-all at the top For example, "build" on
+      = -- We've run out of actual arguments.  Check that none of
+	-- arg_tys has a for-all at the top. For example, "build" on
 	-- its own is no good; it must be applied to something.
 	let
 	   result_ty = glueTyArgs arg_tys fun_res_ty
 	in
+	getSrcLocTc	`thenNF_Tc` \ loc ->
 	checkTc (not (isTauTy result_ty))
-		(error "ERROR: 2 rank failure (NEED ERROR MSG [ToDo])") `thenTc_` 
+		(underAppliedTyErr result_ty loc) `thenTc_`
 	returnTc (fun, lie, result_ty)
 
     -- When we run out of arg_tys we go back to unify_fun in the hope

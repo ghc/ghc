@@ -54,7 +54,7 @@ sub split_asm_file {
 
     %LocalConstant = (); # we have to subvert C compiler's commoning-up of constants...
 
-    $s_stuff = &ReadTMPIUpToAMarker( '' );
+    $s_stuff = &ReadTMPIUpToAMarker( '', $octr );
     # that first stuff is a prologue for all .s outputs
     $prologue_stuff = &process_asm_block ( $s_stuff );
     # $_ already has some of the next stuff in it...
@@ -66,14 +66,14 @@ sub split_asm_file {
     $prologue_stuff =~ s|"/tmp/ghc\d+\.c"|"$ifile_root\.hc"|g;
 
     while ( $_ ne '' ) { # not EOF
+	$octr++;
 
 	# grab and de-mangle a section of the .s file...
-	$s_stuff = &ReadTMPIUpToAMarker ( $_ );
+	$s_stuff = &ReadTMPIUpToAMarker ( $_, $octr );
 	$this_piece = &process_asm_block ( $s_stuff );
 
 	# output to a file of its own
 	# open a new output file...
-	$octr++;
 	$ofname = "${Tmp_prefix}__${octr}.s";
 	open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
 
@@ -124,7 +124,7 @@ sub collectExports_mips { # Note: MIPS only
 }
 
 sub ReadTMPIUpToAMarker {
-    local($str) = @_; # already read bits
+    local($str, $count) = @_; # already read bits
 
     
     for ( $_ = <TMPI>; $_ ne '' && ! /_?__stg_split_marker/; $_ = <TMPI> ) {
@@ -154,7 +154,7 @@ sub ReadTMPIUpToAMarker {
 	$_ = <TMPI>;
     }
 
-    print STDERR "### BLOCK:\n$str" if $Dump_asm_splitting_info;
+    print STDERR "### BLOCK:$count:\n$str" if $Dump_asm_splitting_info;
 
     # return str
     $str;

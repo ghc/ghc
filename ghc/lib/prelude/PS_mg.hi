@@ -82,6 +82,8 @@ _wordsPS :: _PackedString -> [_PackedString]
 	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 unpackPS# :: Addr# -> [Char]
 	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "P" _N_ _N_ #-}
+unpackPS2# :: Addr# -> Int# -> [Char]
+	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "PP" _N_ _N_ #-}
 instance Eq _PackedString
 	{-# GHC_PRAGMA _M_ PreludePS {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 3 _!_ _TUP_2 [(_PackedString -> _PackedString -> Bool), (_PackedString -> _PackedString -> Bool)] [_CONSTM_ Eq (==) (_PackedString), _CONSTM_ Eq (/=) (_PackedString)] _N_
 	 (==) = _A_ 2 _U_ 22 _N_ _S_ "SS" _N_ _N_,

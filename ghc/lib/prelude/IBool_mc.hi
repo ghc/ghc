@@ -26,7 +26,7 @@ instance Ord Bool
 	 _tagCmp = _A_ 2 _U_ 11 _N_ _S_ "EE" _N_ _N_ #-}
 instance Text Bool
 	{-# GHC_PRAGMA _M_ PreludeCore {-dfun-} _A_ 0 _N_ _N_ _N_ _F_ _IF_ARGS_ 0 0 X 5 _!_ _TUP_4 [(Int -> [Char] -> [(Bool, [Char])]), (Int -> Bool -> [Char] -> [Char]), ([Char] -> [([Bool], [Char])]), ([Bool] -> [Char] -> [Char])] [_CONSTM_ Text readsPrec (Bool), _CONSTM_ Text showsPrec (Bool), _CONSTM_ Text readList (Bool), _CONSTM_ Text showList (Bool)] _N_
-	 readsPrec = _A_ 1 _U_ 12 _N_ _S_ "U(P)" {_A_ 1 _U_ 22 _N_ _N_ _N_ _N_} _N_ _N_,
+	 readsPrec = _A_ 2 _U_ 02 _N_ _S_ "AL" {_A_ 1 _U_ 2 _N_ _N_ _N_ _N_} _N_ _N_,
 	 showsPrec = _A_ 3 _U_ 012 _N_ _S_ "AEL" {_A_ 2 _U_ 12 _N_ _N_ _N_ _N_} _N_ _N_,
 	 readList = _A_ 0 _U_ 2 _N_ _N_ _N_ _N_,
 	 showList = _A_ 0 _U_ 12 _N_ _N_ _N_ _N_ #-}

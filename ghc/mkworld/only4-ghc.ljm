@@ -12,15 +12,15 @@
 #endif
 /* ProjectVersion is something printable */
 #ifndef ProjectVersion
-#define ProjectVersion  0.26
+#define ProjectVersion  0.27
 #endif
 /* A patchlevel change is something *very minor* */
 #ifndef ProjectPatchLevel
-#define ProjectPatchLevel patchlevel 1
+#define ProjectPatchLevel patchlevel 0
 #endif
 /* GhcBuildeeVersion is something CPP-testable (ProjectVersion * 100) */
 #ifndef GhcBuildeeVersion
-#define GhcBuildeeVersion  26
+#define GhcBuildeeVersion  27
 #endif
 \end{code}
 

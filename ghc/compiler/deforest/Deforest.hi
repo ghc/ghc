@@ -1,9 +1,8 @@
-{-# GHC_PRAGMA INTERFACE VERSION 5 #-}
+{-# GHC_PRAGMA INTERFACE VERSION 3 #-}
 interface Deforest where
 import CmdLineOpts(GlobalSwitch, SwitchResult)
 import CoreSyn(CoreBinding)
 import Id(Id)
 import SplitUniq(SplitUniqSupply)
 deforestProgram :: (GlobalSwitch -> SwitchResult) -> [CoreBinding Id Id] -> SplitUniqSupply -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 3 _U_ 211 _N_ _S_ "SLU(ALL)" {_A_ 4 _U_ 2122 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

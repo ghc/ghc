@@ -5,15 +5,13 @@ import Maybes(Labda)
 import Name(Name)
 import PreludePS(_PackedString)
 import ProtoName(ProtoName)
-data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
+data Bag a 
 type GlobalNameFun = ProtoName -> Labda Name
 type GlobalNameFuns = (ProtoName -> Labda Name, ProtoName -> Labda Name)
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
+data Labda a 
 type PreludeNameFun = _PackedString -> Labda Name
 type PreludeNameFuns = (_PackedString -> Labda Name, _PackedString -> Labda Name)
-data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data ProtoName 
 mkGlobalNameFun :: _PackedString -> (_PackedString -> Labda Name) -> [(ProtoName, Name)] -> ProtoName -> Labda Name
-	{-# GHC_PRAGMA _A_ 3 _U_ 2111 _N_ _N_ _N_ _N_ #-}
 mkNameFun :: Bag (_PackedString, a) -> (_PackedString -> Labda a, [[(_PackedString, a)]])
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _N_ _N_ #-}
 

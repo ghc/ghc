@@ -1,9 +1,9 @@
-Only have cost centres etc if @USE_COST_CENTRES@ defined
+Only have cost centres etc if @PROFILING@ defined
 
 \begin{code}
 #include "rtsdefs.h"
 
-#if defined (USE_COST_CENTRES) || defined(GUM)
+#if defined (PROFILING) || defined(PAR)
 \end{code}
 
 %************************************************************************
@@ -26,13 +26,8 @@ I_ interval_ticks = DEFAULT_INTERVAL;  /* No of ticks in an interval */
 I_ previous_ticks = 0;                 /* ticks in previous intervals */
 I_ current_ticks = 0;                  /* ticks in current interval */
 
-#ifdef CONCURRENT
-I_ tick_millisecs;		       /* milliseconds per timer tick */
-#endif
-
 void
-set_profile_timer(ms)
-I_ ms;
+set_profile_timer(I_ ms)
 {
     if (initialize_virtual_timer(ms)) {
 	fflush(stdout);
@@ -47,14 +42,14 @@ handle_tick_serial(STG_NO_ARGS)
     CC_TICK(CCC);
 
     /* fprintf(stderr,"tick for %s\n", CCC->label); */
-#if defined(USE_COST_CENTRES) && defined(DEBUG)
+#if defined(PROFILING) && defined(DEBUG)
     /* Why is this here?  --JSM  Debugging --WDP */
     if (CCC == STATIC_CC_REF(CC_OVERHEAD))
 	abort();
 #endif
 
     if (++current_ticks >= interval_ticks && CCC != STATIC_CC_REF(CC_GC)) {
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
 	interval_expired = 1;	/* stop to process interval */
 #else
 	report_cc_profiling(0 /*partial*/);
@@ -68,6 +63,7 @@ void
 handle_tick_noserial(STG_NO_ARGS)
 {
     CC_TICK(CCC);
+    ++current_ticks;
     return;
 }
 
@@ -82,7 +78,7 @@ stop_time_profiler()
 void
 restart_time_profiler()
 {				/* Restarts time profile */
-#if defined(USE_COST_CENTRES)
+#if defined(PROFILING)
     if (interval_expired)
 #endif
     {
@@ -97,8 +93,8 @@ void
 start_time_profiler()
 {				/* Starts time profile */
     if (time_profiling) {
-#ifdef CONCURRENT
-	set_profile_timer(tick_millisecs);
+#ifdef PAR
+	set_profile_timer(RTSflags.CcFlags.msecsPerTick);
 #else
 	set_profile_timer(TICK_MILLISECS);
 #endif
@@ -107,5 +103,5 @@ start_time_profiler()
 \end{code}
 
 \begin{code}
-#endif /* USE_COST_CENTRES || GUM */
+#endif /* PROFILING || PAR */
 \end{code}

@@ -239,65 +239,65 @@ a closure.
 Define some debugging macros.
 
 \begin{code}
-#if defined(_GC_DEBUG)
+#if defined(DEBUG)
 
 #define DEBUG_PRSTART(type, ptrsvar) \
-    if (SM_trace & 8)                         \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)                         \
         fprintf(stderr, "PRMark Start (%s): 0x%lx, info 0x%lx ptrs %ld\n", \
                 type, Mark, INFO_PTR(Mark), ptrsvar)
 
 #define DEBUG_PRIN(type, posvar) \
-    if (SM_trace & 8)                     \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)                     \
         fprintf(stderr, "PRRet  In    (%s): 0x%lx, info 0x%lx pos %ld\n", \
                 type, MStack, INFO_PTR(MStack), posvar)
 
 #define DEBUG_PRLAST(type, ptrvar) \
-    if (SM_trace & 8)                       \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)                       \
         fprintf(stderr, "PRRet  Last  (%s): 0x%lx, info 0x%lx ptrs %ld\n", \
                 type, MStack, INFO_PTR(MStack), ptrvar)
 
 #define DEBUG_PR_MARKED \
-    if (SM_trace & 8)   \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)   \
         fprintf(stderr, "PRMark Marked      : 0x%lx, info 0x%lx\n", \
 		Mark, INFO_PTR(Mark))
 
 #define DEBUG_PR_STAT \
-    if (SM_trace & 8) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING) \
         fprintf(stderr, "PRMark Static      : 0x%lx, info 0x%lx\n", \
 		Mark, INFO_PTR(Mark))
 
 #define DEBUG_PR_IND  \
-    if (SM_trace & 8) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING) \
         fprintf(stderr, "PRMark Ind : 0x%lx -> PRMark(0x%lx), info 0x%lx\n", \
 		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
 
 #define DEBUG_PR_CAF  \
-    if (SM_trace & 8) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING) \
         fprintf(stderr, "PRMark Caf : 0x%lx -> PRMark(0x%lx), info 0x%lx\n", \
 		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
 
 #define DEBUG_PR_CONST \
-    if (SM_trace & 8)  \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)  \
         fprintf(stderr, "PRMark Const : 0x%lx -> 0x%lx, info 0x%lx\n", \
 		Mark, CONST_STATIC_CLOSURE(INFO_PTR(Mark)), INFO_PTR(Mark))
 
 #define DEBUG_PR_CHARLIKE \
-    if (SM_trace & 8)  \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)  \
         fprintf(stderr, "PRMark CharLike (%lx) : 0x%lx -> 0x%lx, info 0x%lx\n", \
 		CHARLIKE_VALUE(Mark), Mark, CHARLIKE_CLOSURE(CHARLIKE_VALUE(Mark)), INFO_PTR(Mark))
 
 #define	DEBUG_PR_INTLIKE_TO_STATIC \
-    if (SM_trace & 8)  \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)  \
         fprintf(stderr, "PRMark IntLike to Static (%ld) : 0x%lx -> 0x%lx, info 0x%lx\n", \
 		INTLIKE_VALUE(Mark), Mark, INTLIKE_CLOSURE(INTLIKE_VALUE(Mark)), INFO_PTR(Mark))
 
 #define	DEBUG_PR_INTLIKE_IN_HEAP \
-    if (SM_trace & 8)  \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING)  \
         fprintf(stderr, "PRMark IntLike in Heap   (%ld) : 0x%lx, info 0x%lx\n", \
 		INTLIKE_VALUE(Mark), Mark, INFO_PTR(Mark))
 
 #define DEBUG_PR_OLDIND \
-    if (SM_trace & 8) \
+    if (RTSflags.GcFlags.trace & DEBUG_TRACE_MARKING) \
         fprintf(stderr, "PRMark OldRoot Ind : 0x%lx -> PRMark(0x%lx), info 0x%lx\n", \
 		Mark, IND_CLOSURE_PTR(Mark), INFO_PTR(Mark))
 

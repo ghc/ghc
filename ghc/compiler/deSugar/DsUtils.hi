@@ -18,33 +18,18 @@ data CanItFail   = CanFail | CantFail
 data EquationInfo   = EqnInfo [TypecheckedPat] MatchResult
 data MatchResult   = MatchResult CanItFail UniType (CoreExpr Id Id -> CoreExpr Id Id) DsMatchContext
 combineGRHSMatchResults :: MatchResult -> MatchResult -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (MatchResult, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 2 _U_ 11222222 _N_ _S_ "U(ELLL)L" {_A_ 5 _U_ 22221222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 combineMatchResults :: MatchResult -> MatchResult -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (MatchResult, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 2 _U_ 11222222 _N_ _S_ "U(ELLL)L" {_A_ 5 _U_ 22221222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 dsExprToAtom :: CoreExpr Id Id -> (CoreAtom Id -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)) -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 2 _U_ 22222222 _N_ _S_ "SS" _N_ _N_ #-}
 mkCoAlgCaseMatchResult :: Id -> [(Id, [Id], MatchResult)] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (MatchResult, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 2 _U_ 12222222 _N_ _S_ "U(LSLL)L" {_A_ 5 _U_ 22222222222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkCoAppDs :: CoreExpr Id Id -> CoreExpr Id Id -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 2 _U_ 22222222 _N_ _S_ "LS" _N_ _N_ #-}
 mkCoConDs :: Id -> [UniType] -> [CoreExpr Id Id] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 3 _U_ 221222222 _N_ _S_ "LLS" _N_ _N_ #-}
 mkCoLetsMatchResult :: [CoreBinding Id Id] -> MatchResult -> MatchResult
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LU(LLLL)" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkCoPrimCaseMatchResult :: Id -> [(BasicLit, MatchResult)] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (MatchResult, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 8 _U_ 22120002 _N_ _S_ "LLU(ALA)LLLLL" _N_ _N_ #-}
 mkCoPrimDs :: PrimOp -> [UniType] -> [CoreExpr Id Id] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (CoreExpr Id Id, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 3 _U_ 221222222 _N_ _S_ "LLS" _N_ _N_ #-}
 mkFailurePair :: UniType -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> ((CoreExpr Id Id -> CoreBinding Id Id, CoreExpr Id Id), Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 1 _U_ 2222222 _N_ _S_ "S" _N_ _N_ #-}
 mkGuardedMatchResult :: CoreExpr Id Id -> MatchResult -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (MatchResult, Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 8 _U_ 21000002 _N_ _S_ "LU(ALLL)AAAAAL" {_A_ 5 _U_ 22222 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 mkSelectorBinds :: [TyVar] -> TypecheckedPat -> [(Id, Id)] -> CoreExpr Id Id -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> ([(Id, CoreExpr Id Id)], Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222122222 _N_ _S_ "LSSL" _N_ _N_ #-}
 mkTupleBind :: [TyVar] -> [Id] -> [(Id, Id)] -> CoreExpr Id Id -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> ([(Id, CoreExpr Id Id)], Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222222222 _N_ _S_ "LLSL" _N_ _N_ #-}
 mkTupleExpr :: [Id] -> CoreExpr Id Id
-	{-# GHC_PRAGMA _A_ 1 _U_ 2 _N_ _S_ "S" _N_ _N_ #-}
 selectMatchVars :: [TypecheckedPat] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> ([Id], Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
 

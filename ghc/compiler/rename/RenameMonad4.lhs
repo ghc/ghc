@@ -79,6 +79,7 @@ type Rn4M result
 #ifdef __GLASGOW_HASKELL__
 {-# INLINE andRn4 #-}
 {-# INLINE thenRn4 #-}
+{-# INLINE thenLazilyRn4 #-}
 {-# INLINE thenRn4_ #-}
 {-# INLINE returnRn4 #-}
 #endif
@@ -92,7 +93,8 @@ initRn4 :: (GlobalSwitch -> Bool)
 initRn4 sw_chkr gnfs renamer init_us
   = renamer sw_chkr gnfs emptyFM emptyBag init_us mkUnknownSrcLoc
 
-thenRn4  :: Rn4M a -> (a -> Rn4M b) -> Rn4M b
+thenRn4, thenLazilyRn4
+	 :: Rn4M a -> (a -> Rn4M b) -> Rn4M b
 thenRn4_ :: Rn4M a -> Rn4M b -> Rn4M b
 andRn4   :: (a -> a -> a) -> Rn4M a -> Rn4M a -> Rn4M a
 
@@ -101,6 +103,14 @@ thenRn4 expr cont sw_chkr gnfs ss errs uniqs locn
     case (expr      sw_chkr gnfs ss errs  s1 locn) of { (res1, errs1) ->
     case (cont res1 sw_chkr gnfs ss errs1 s2 locn) of { (res2, errs2) ->
     (res2, errs2) }}}
+
+thenLazilyRn4 expr cont sw_chkr gnfs ss errs uniqs locn
+  = let
+	(s1, s2)      = splitUniqSupply uniqs
+	(res1, errs1) = expr      sw_chkr gnfs ss errs  s1 locn
+	(res2, errs2) = cont res1 sw_chkr gnfs ss errs1 s2 locn
+    in
+    (res2, errs2)
 
 thenRn4_ expr cont sw_chkr gnfs ss errs uniqs locn
   = case (splitUniqSupply uniqs)    	      of { (s1, s2) ->
@@ -260,7 +270,7 @@ value is not visible to the user (e.g., came out of a pragma).
 
 \begin{code}
 lookupValue v {-Rn4-} sw_chkr gnfs ss errs_so_far us locn
-  = (lookup_val v	`thenRn4` \ name ->
+  = (lookup_val v	`thenLazilyRn4` \ name ->
     if invisibleName name
     then failButContinueRn4 (unboundName v) (unknownNameErr "value" v mkUnknownSrcLoc)
     else returnRn4 name
@@ -317,7 +327,7 @@ lookupTyCon, lookupTyConEvenIfInvisible :: ProtoName -> Rn4M Name
 -- The global name funs handle Prel things
 
 lookupTyCon tc {-Rn4-} sw_chkr gnfs ss errs_so_far us locn
-  = (lookup_tycon tc `thenRn4` \ name ->
+  = (lookup_tycon tc `thenLazilyRn4` \ name ->
     if invisibleName name
     then failButContinueRn4 (unboundName tc) (unknownNameErr "type constructor" tc mkUnknownSrcLoc)
     else returnRn4 name

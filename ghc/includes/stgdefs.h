@@ -39,6 +39,11 @@ void _stgAssert PROTO((char *, unsigned int));
 #else
 #define _POSIX_SOURCE 1
 #define _POSIX_C_SOURCE 199301L
+/* Alphas set _POSIX_VERSION (unistd.h) */
+/* ditto _POSIX2_C_VERSION
+	 _POSIX2_VERSION
+	 _POSIX_4SOURCE
+*/
 #include <unistd.h>
 #include <signal.h>
 #endif
@@ -121,6 +126,21 @@ yikes! no register map defined!
 /* macros to deal with stacks (no longer heap) growing in either dirn */
 #include "StgDirections.h"
 
+/* declarations for all the runtime flags for the RTS */
+#ifdef IN_GHC_RTS
+#include "RtsFlags.h"
+#endif
+/* and those that are visible *everywhere* (RTS + Haskell code) */
+struct ALL_FLAGS {
+#ifdef TICKY_TICKY
+    W_ doUpdEntryCounts;    /* if true, we cannot short-circuit Inds,
+				 common-up {Int,Char}Likes or Consts
+			    */
+#endif
+    W_ dummy_entry; /* so there is *something* in it... */
+};
+extern struct ALL_FLAGS AllFlags;
+
 /* declarations for garbage collection routines */
 #include "SMinterface.h"
 
@@ -129,12 +149,11 @@ yikes! no register map defined!
 #include "COptRegs.h"
 #include "COptWraps.h"
 
-/* these will come into play if you use -DDO_RUNTIME_PROFILING (default: off) */
-#include "RednCounts.h"
+/* these will come into play if you use -DTICKY_TICKY (default: off) */
+#include "Ticky.h"
 
-extern hash_t hash_str   PROTO((char *str));
-extern hash_t hash_fixed PROTO((char *data, I_ len));
-extern I_     decode	 PROTO((char *s));
+hash_t hash_str   PROTO((char *str));
+hash_t hash_fixed PROTO((char *data, I_ len));
 
 /* ullong (64bit) formatting */
 char *ullong_format_string PROTO((ullong x, char *s, rtsBool with_commas));
@@ -149,19 +168,13 @@ char *ullong_format_string PROTO((ullong x, char *s, rtsBool with_commas));
 #include "Threads.h"
 #include "Parallel.h"
 
-/* Things will happen in here if the driver does -DUSE_COST_CENTRES */
+/* Things will happen in here if the driver does -DPROFILING */
 #include "CostCentre.h"
-
-/* These will come into play if you use -DLIFE_PROFILE or -DHEAP_PROF_WITH_AGE */
-#include "AgeProfile.h"
-
-/* These will come into play if you use -DFORCE_GC  */
-#include "Force_GC.h"
 
 /* GRAN and PAR stuff */
 #include "GranSim.h"
 
-#if defined(USE_COST_CENTRES) || defined(CONCURRENT)
+#if defined(PROFILING) || defined(CONCURRENT)
 char * time_str(STG_NO_ARGS);
 #endif
 
@@ -176,9 +189,9 @@ extern StgFunPtr impossible_jump_after_switch(STG_NO_ARGS);
 
 /* hooks: user might write some of their own */
 extern void ErrorHdrHook	PROTO((FILE *));
-extern void OutOfHeapHook	PROTO((W_, W_));
+extern void OutOfHeapHook	PROTO((W_));
 extern void StackOverflowHook	PROTO((I_));
-extern void MallocFailHook	PROTO((I_));
+extern void MallocFailHook	PROTO((I_, char *));
 extern void PatErrorHdrHook	PROTO((FILE *));
 extern void PreTraceHook	PROTO((FILE *));
 extern void PostTraceHook	PROTO((FILE *));
@@ -191,15 +204,17 @@ EXTFUN(resumeThread);
 #endif
 
 extern char **prog_argv; /* from runtime/main/main.lc */
-extern I_     prog_argc;
+extern int    prog_argc;
 extern char **environ; /* we can get this one straight */
 
 EXTDATA(STK_STUB_closure);
 
 /* now these really *DO* need to be somewhere else... */
-extern char 	*time_str(STG_NO_ARGS);
-extern I_	stg_exit PROTO((I_));
-extern I_	_stg_rem PROTO((I_, I_));
+char   *time_str(STG_NO_ARGS);
+I_	stg_exit PROTO((I_));
+I_	_stg_rem PROTO((I_, I_));
+char   *stgMallocBytes PROTO((I_, char *));
+char   *stgMallocWords PROTO((I_, char *));
 
 /* definitions for closures */
 #include "SMClosures.h"

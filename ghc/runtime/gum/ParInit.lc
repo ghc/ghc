@@ -49,13 +49,11 @@ Flag handling.
 
 \begin{code}
 rtsBool TraceSparks =    rtsFalse;		/* Enable the spark trace mode 			*/
-rtsBool OutputDisabled = rtsFalse;		/* Disable output for performance purposes 	*/
 rtsBool SparkLocally =   rtsFalse;		/* Use local threads if possible 		*/
 rtsBool DelaySparks =    rtsFalse;		/* Use delayed sparking 			*/
 rtsBool LocalSparkStrategy =   rtsFalse;	/* Either delayed threads or local threads	*/
 rtsBool GlobalSparkStrategy =   rtsFalse;	/* Export all threads	    	    	    	*/
 
-rtsBool ParallelStats =	 rtsFalse;		/* Gather parallel statistics			*/
 rtsBool DeferGlobalUpdates =	 rtsFalse;	/* Defer updating of global nodes		*/
 rtsBool fishing = rtsFalse;                     /* We have no fish out in the stream            */
 \end{code}
@@ -71,9 +69,8 @@ StgPtr program_closure;
 	return;
 
     /* Show that we've started */
-    if (IAmMainThread && !OutputDisabled)
+    if (IAmMainThread && ! RTSflags.ParFlags.outputDisabled)
 	fprintf(stderr, "Starting main program...\n");
-
 
     /* Record the start time for statistics purposes. */
     main_start_time = usertime();
@@ -108,7 +105,7 @@ I_ n;
     else
       WaitForPEOp(PP_FINISH, SysManTask);
     PEShutDown();
-    fprintf(stderr,"Processor %lx shutting down, %ld Threads run\n", mytid, threadId);
+    fprintf(stderr,"PE %lx shutting down, %ld Threads run, %ld Sparks Ignored\n", (W_) mytid, threadId, sparksIgnored);
 
     /* And actually terminate -- always with code 0 */
     longjmp(exit_parallel_system, 1);
@@ -122,17 +119,18 @@ time_t time PROTO((time_t *));
 void
 initParallelSystem(STG_NO_ARGS)
 {
+    /* Don't buffer standard channels... */
+    setbuf(stdout,NULL);
+    setbuf(stderr,NULL);
 
-  /* Don't buffer standard channels... */
-  setbuf(stdout,NULL);
-  setbuf(stderr,NULL);
+    srand48(time(NULL) * getpid());	/*Initialise Random-number generator seed*/
 
-  srand48(time(NULL) * getpid());	/*Initialise Random-number generator seed*/
-
-  OkToGC = rtsFalse;		/* Must not GC till we have set up the environment */
-			        /* because C is hanging onto heap pointers */
-			        /* maybe bogus for the new RTS? -- KH */
-				/* And for the GUM system? PWT */
+    OkToGC = rtsFalse;	/* Must not GC till we have set up the environment */
+			/* because C is hanging onto heap pointers */
+			/* maybe bogus for the new RTS? -- KH */
+			/* And for the GUM system? PWT */
+    InitPackBuffer();
+    InitMoreBuffers();
 }
 \end{code}
 

@@ -65,7 +65,7 @@ int size;
     }
     if (mprotect(middle, pagesize, PROT_NONE) == -1) {
 	perror("mprotect");
-	exit(1);
+	EXIT(EXIT_FAILURE);
     }
     if (install_segv_handler()) {
 	fprintf(stderr, "Can't install SIGSEGV handler for stack overflow check.\n");

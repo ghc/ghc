@@ -10,11 +10,11 @@ extern int rl_pending_input;
 
 
 /* Our C Hackery stuff for Callbacks */
-typedef int KeyCode;
+typedef I_ KeyCode;
 extern StgStablePtr cbackList;
-extern int genericRlCback ();
+extern I_ genericRlCback PROTO((I_, I_));
 extern StgStablePtr haskellRlEntry;
-extern int current_narg, rl_return;
+extern I_ current_narg, rl_return;
 extern KeyCode current_kc;
 extern char* rl_prompt_hack;
 

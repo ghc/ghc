@@ -416,7 +416,7 @@ which are used to define them must all be defined consistently.
 
 \begin{code}
 
-#define FIXED_HS 		(INFO_FIXED_HDR + PAR_FIXED_HDR + PROF_FIXED_HDR + AGE_FIXED_HDR)
+#define FIXED_HS (INFO_FIXED_HDR + PAR_FIXED_HDR + PROF_FIXED_HDR + TICKY_FIXED_HDR)
 
 /* NB: this *defines* the intended order for the pieces of 
    the fixed header.  Care should be taken to ensure that this
@@ -430,13 +430,17 @@ which are used to define them must all be defined consistently.
         SET_GRAN_HDR(closure,ThisPE);			\
 	SET_PAR_HDR(closure,LOCAL_GA); 			\
 	SET_PROF_HDR(closure,costcentre);		\
-	SET_AGE_HDR(closure)
+	SET_TICKY_HDR(closure,0)
 
 #define UPD_FIXED_HDR(closure,infolbl,costcentre)	\
 	SET_INFO_PTR(closure,infolbl);			\
-	SET_PROF_HDR(closure,costcentre)
+	SET_PROF_HDR(closure,costcentre);		\
+	SET_TICKY_HDR(closure,1)
 	/* fiddling SET_PAR_HDR would be a bug (says Patrick) */
-	/* no SET_AGE_HDR for inplace updates */
+	/* We set ticky-hdr to 1 because the only place we
+	   use this macro is when we have just done an update
+	   (WDP 96/01)
+	*/
 
 /* These items are comma-separated */
 
@@ -445,7 +449,7 @@ which are used to define them must all be defined consistently.
         SET_STATIC_PROCS(closure)			\
 	SET_STATIC_PAR_HDR(closure) 			\
 	SET_STATIC_PROF_HDR(cc_ident)			\
-	SET_STATIC_AGE_HDR()
+	SET_STATIC_TICKY_HDR()
 
 \end{code}
 
@@ -486,7 +490,10 @@ to reserve in the variable header for mutable closures:
 they will hear about it soon enough (WDP 95/05).
 
 \begin{code}
-#define SPEC_HS				(FIXED_HS)
+#define SPEC_HS		(FIXED_HS)
+
+#define SPEC_SIZE(fields) (FIXED_HS + (fields))
+			/*notational convenience; in SMscan.lc + elsewhere */
 
 #define SPEC_CLOSURE_PTR(closure, no)	(((P_)(closure))[SPEC_HS + (no) - 1])
 #define SPEC_CLOSURE_SIZE(closure)	((W_)INFO_SIZE(INFO_PTR(closure)))
@@ -687,12 +694,12 @@ do {                                 \
 } while (0)
 
 EXTDATA_RO(StablePointerTable_info);
-EXTDATA_RO(EmptyStablePointerTable_static_info);
+EXTDATA_RO(EmptyStablePointerTable_info);
 EXTDATA(EmptySPTable_closure);
 extern int ValidateSPTable PROTO(( P_ SPTable ));
 
 #  define CHECK_SPT_InfoTable( closure ) \
-  ASSERT( (*((PP_) (closure)) == EmptyStablePointerTable_static_info && (closure == EmptySPTable_closure) ) || \
+  ASSERT( (*((PP_) (closure)) == EmptyStablePointerTable_info && (closure == EmptySPTable_closure) ) || \
 	  (*((PP_) (closure)) == StablePointerTable_info) )
 
 #  define CHECK_SPT_Size( closure ) \
@@ -910,35 +917,37 @@ on @MUT_LINK@ being defined.
 
 #define IND_CLOSURE_SIZE(closure) (MIN_UPD_SIZE)
 #define IND_CLOSURE_NoPTRS(closure) 1
-#define IND_CLOSURE_NoNONPTRS(closure)	(IND_CLOSURE_SIZE(closure)-IND_CLOSURE_NoPTRS(closure)-IND_VHS)
+#define IND_CLOSURE_NoNONPTRS(closure) \
+	    (IND_CLOSURE_SIZE(closure)-IND_CLOSURE_NoPTRS(closure)-IND_VHS)
 \end{code}
 
 Indirections must store a pointer to the closure which is the target
 of the indirection:
 \begin{code}
-#define IND_CLOSURE_PTR(closure)    	(((P_)(closure))[IND_HS])
+#define IND_CLOSURE_PTR(closure)  (((P_)(closure))[IND_HS])
+#define IND_CLOSURE_LINK(closure) (((P_)(closure))[FIXED_HS])
 \end{code}
 
-\begin{code}
-#define IND_CLOSURE_LINK(closure)	(((P_)(closure))[FIXED_HS])
-\end{code}
+When we are profiling, we occasionally use ``permanent indirections''
+to store cost centres associated in some way with PAPs.  Don't ask me
+why.  For now, a permanent indirection must have the same shape as a
+regular indirection.  The only difference is that it is, well,
+permanent.  That is to say, it is never short-circuited.  (What is the
+point, anyway?)
 
-When we are profiling, we occasionally use ``permanent indirections'' to
-store cost centres associated in some way with PAPs.  Don't ask me why.
-For now, a permanent indirection must have the same shape as a regular
-indirection.  The only difference is that it is, well, permanent.  That is
-to say, it is never short-circuited.  (What is the point, anyway?)
-
-Presumably, such objects could shrink as they moved into the old generation,
-but then their header size would change as well (the word that they get to
-lose is the VHS word of a standard indirection), and I just don't feel up
-to it today.  --JSM.
+Presumably, such objects could shrink as they moved into the old
+generation, but then their header size would change as well (the word
+that they get to lose is the VHS word of a standard indirection), and
+I just don't feel up to it today.  --JSM.
 
 \begin{code}
-#ifdef USE_COST_CENTRES
+#if defined(PROFILING) || defined(TICKY_TICKY)
 
-#define	PERM_IND_CLOSURE_PTR(closure,dummy)	IND_CLOSURE_PTR(closure)
-
+#define	PERM_IND_CLOSURE_PTR(closure,dummy) IND_CLOSURE_PTR(closure)
+    /* really *must* be the same as IND_CLOSURE_PTR; it is
+       merely a "two-argument" variant, to fit in with the
+       bizarre goings-on in SMmark.lhc and friends. WDP 95/12
+    */
 #endif
 \end{code}
 
@@ -963,8 +972,11 @@ The compiler will also allocate an updatable black hole on entering a
 @CAF@.
 
 \begin{code}
-#define BH_HS			(FIXED_HS)
-#define BH_VHS			0L
+#define BH_HS		(FIXED_HS)
+#define BH_VHS		0L
+
+#define BH_U_SIZE	MIN_UPD_SIZE
+#define BH_N_SIZE	MIN_NONUPD_SIZE
 
 #define BH_CLOSURE_SIZE(closure)	((W_)INFO_SIZE(INFO_PTR(closure)))
 #define BH_CLOSURE_NoPTRS(closure)	0L
@@ -977,13 +989,13 @@ The compiler will also allocate an updatable black hole on entering a
 
 %************************************************************************
 %*									*
-\subsubsection[RBH-closures]{@RBH@ (revertable black hole) closure macros}
+\subsubsection[RBH-closures]{@RBH@ (revertible black hole) closure macros}
 %*									*
 %************************************************************************
 
-There are two kinds of revertable black holes, produced from GEN or
+There are two kinds of revertible black holes, produced from GEN or
 SPEC closures, respectively.  There's no @SET_RBH_HDR@ macro -- use
-@TurnIntoRBH@ instead!!
+@convertToRBH@ instead!!
 
 Note that the NoPTRS and NoNONPTRS macros refer to the *original* closure.
 
@@ -994,7 +1006,7 @@ Note that the NoPTRS and NoNONPTRS macros refer to the *original* closure.
 #define SPEC_RBH_CLOSURE_PTR(closure, no)	(((P_)(closure))[SPEC_RBH_HS + (no) - 1])
 #define SPEC_RBH_CLOSURE_SIZE(closure)		((W_)INFO_SIZE(REVERT_INFOPTR(INFO_PTR(closure))))
 #define SPEC_RBH_CLOSURE_NoPTRS(closure)	((W_)INFO_NoPTRS(REVERT_INFOPTR(INFO_PTR(closure))))
-#define SPEC_RBH_CLOSURE_NoNONPTRS(closure)	(SPEC_RBH_CLOSURE_SIZE(closure)-SPEC_RBH_CLOSURE_NoPTRS(closure)/*-SPEC_VHS*/)
+#define SPEC_RBH_CLOSURE_NoNONPTRS(closure)	(SPEC_RBH_CLOSURE_SIZE(closure)-SPEC_RBH_CLOSURE_NoPTRS(closure))
 
 #define SPEC_RBH_BQ_LOCN			(SPEC_RBH_HS)
 #define SPEC_RBH_BQ(closure)			(((P_)(closure))[SPEC_RBH_BQ_LOCN])

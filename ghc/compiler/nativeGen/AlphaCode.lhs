@@ -212,7 +212,7 @@ data AlphaInstr =
 	      | FUNEND CLabel
 	      | COMMENT FAST_STRING
 	      | SEGMENT CodeSegment
-	      | ASCII Bool String
+	      | ASCII Bool String   -- needs backslash conversion?
 	      | DATA Size [Imm]
 
 type AlphaCode	= OrdList AlphaInstr
@@ -1120,7 +1120,7 @@ baseRegOffset SuB		     = OFFSET_SuB
 baseRegOffset Hp		     = OFFSET_Hp
 baseRegOffset HpLim		     = OFFSET_HpLim
 baseRegOffset LivenessReg	     = OFFSET_Liveness
-baseRegOffset ActivityReg	     = OFFSET_Activity
+--baseRegOffset ActivityReg	     = OFFSET_Activity
 #ifdef DEBUG
 baseRegOffset BaseReg		     = panic "baseRegOffset:BaseReg"
 baseRegOffset StdUpdRetVecReg	     = panic "baseRegOffset:StgUpdRetVecReg"
@@ -1206,7 +1206,7 @@ callerSaves HpLim		= True
 callerSaves LivenessReg		= True
 #endif
 #ifdef CALLER_SAVES_Activity
-callerSaves ActivityReg		= True
+--callerSaves ActivityReg		= True
 #endif
 #ifdef CALLER_SAVES_StdUpdRetVec
 callerSaves StdUpdRetVecReg	= True
@@ -1293,7 +1293,7 @@ stgRegMap HpLim		   = Just (FixedReg ILIT(REG_HpLim))
 stgRegMap LivenessReg	   = Just (FixedReg ILIT(REG_Liveness))
 #endif
 #ifdef REG_Activity
-stgRegMap ActivityReg	   = Just (FixedReg ILIT(REG_Activity))
+--stgRegMap ActivityReg	   = Just (FixedReg ILIT(REG_Activity))
 #endif
 #ifdef REG_StdUpdRetVec
 stgRegMap StdUpdRetVecReg  = Just (FixedReg ILIT(REG_StdUpdRetVec))
@@ -1397,7 +1397,7 @@ freeReg ILIT(REG_HpLim) = _FALSE_
 freeReg ILIT(REG_Liveness) = _FALSE_
 #endif
 #ifdef REG_Activity
-freeReg ILIT(REG_Activity) = _FALSE_
+--freeReg ILIT(REG_Activity) = _FALSE_
 #endif
 #ifdef REG_StdUpdRetVec
 freeReg ILIT(REG_StdUpdRetVec) = _FALSE_

@@ -29,7 +29,7 @@ module AbsPrel (
 
 	-- *odd* values that need to be reached out and grabbed:
 	eRROR_ID, pAT_ERROR_ID, aBSENT_ERROR_ID,
-	unpackCStringId, packStringForCId, unpackCStringAppendId,
+	unpackCStringId, unpackCString2Id, packStringForCId, unpackCStringAppendId,
 	integerZeroId, integerPlusOneId, integerMinusOneId,
 
 #ifdef DPH
@@ -76,12 +76,13 @@ module AbsPrel (
 
 	-- types: Addr#, Int#, Word#, Int
 	intPrimTy, intTy, intPrimTyCon, intTyCon, intDataCon,
-	wordPrimTyCon, wordPrimTy, wordTy, wordDataCon,
-	addrPrimTyCon, addrPrimTy, addrTy, addrDataCon,
+	wordPrimTyCon, wordPrimTy, wordTy, wordTyCon, wordDataCon,
+	addrPrimTyCon, addrPrimTy, addrTy, addrTyCon, addrDataCon,
 
 	-- types: Integer, Rational (= Ratio Integer)
 	integerTy, rationalTy,
-	integerTyCon, rationalTyCon, ratioDataCon,
+	integerTyCon, integerDataCon,
+	rationalTyCon, ratioDataCon,
 
 	-- type: Lift
 	liftTyCon, liftDataCon, mkLiftTy,
@@ -259,12 +260,13 @@ totally_wired_in_Ids
      (SLIT("foldl"),		WiredInVal foldlId),
      (SLIT("foldr"),		WiredInVal foldrId),
      (SLIT("_runST"),		WiredInVal runSTId),
-     (SLIT("realWorld#"),	WiredInVal realWorldPrimId)
+     (SLIT("_seq_"),		WiredInVal seqId),  -- yes, used in sequential-land, too
+						    -- WDP 95/11
+    (SLIT("realWorld#"),	WiredInVal realWorldPrimId)
     ]
 
 parallel_vals
-  =[(SLIT("_seq_"),		WiredInVal seqId),
-    (SLIT("_par_"),		WiredInVal parId),
+  =[(SLIT("_par_"),		WiredInVal parId),
     (SLIT("_fork_"),		WiredInVal forkId)
 #ifdef GRAN
     ,
@@ -455,7 +457,6 @@ lots_of_primops
 	IntSubOp,
 	IntMulOp,
 	IntQuotOp,
-	IntDivOp,
 	IntRemOp,
 	IntNegOp,
 	AndOp,

@@ -17,11 +17,7 @@ data UnfoldingCoreExpr a   = UfCoVar (UfId a) | UfCoLit BasicLit | UfCoCon a [Po
 data UnfoldingPrimOp a   = UfCCallOp _PackedString Bool Bool [PolyType a] (PolyType a) | UfOtherOp PrimOp
 type UnfoldingType a = PolyType a
 eqUfExpr :: UnfoldingCoreExpr ProtoName -> UnfoldingCoreExpr ProtoName -> Bool
-	{-# GHC_PRAGMA _A_ 2 _U_ 11 _N_ _S_ "SS" _N_ _N_ #-}
 instance Outputable a => Outputable (UnfoldingCoreAtom a)
-	{-# GHC_PRAGMA _M_ HsCore {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (UnfoldingCoreExpr a)
-	{-# GHC_PRAGMA _M_ HsCore {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 instance Outputable a => Outputable (UnfoldingPrimOp a)
-	{-# GHC_PRAGMA _M_ HsCore {-dfun-} _A_ 1 _U_ 2 _N_ _N_ _N_ _N_ #-}
 

@@ -27,14 +27,14 @@
 # endif
 
 void
-AwaitEvent(delta)
-I_ delta;
+AwaitEvent(I_ delta)
 {
     P_ tso, prev, next;
     rtsBool ready;
     fd_set rfd;
     I_ us;
     I_ min;
+    I_ maxfd=0;
     struct timeval tv;
 
     min = delta == 0 ? 0x7fffffff : 0;
@@ -42,6 +42,9 @@ I_ delta;
     /* 
      * Collect all of the fd's that we're interested in, and capture
      * the minimum waiting time for the delayed threads.
+     *
+     * (I_)TSO_EVENT(tso) < 0 => thread waiting on fd (-(I_)TSO_EVENT(tso))
+     *
      */
     FD_ZERO(&rfd);
     for(tso = WaitingThreadsHd; tso != Nil_closure; tso = TSO_LINK(tso)) {
@@ -52,6 +55,7 @@ I_ delta;
 		min = us;
 	} else {
 	    /* Looking at a wait event */
+	    maxfd = ((-us)> maxfd) ? (-us) : maxfd;
 	    FD_SET((-us), &rfd);
 	}
     }
@@ -61,16 +65,16 @@ I_ delta;
     tv.tv_sec = min / 1000000;
     tv.tv_usec = min % 1000000;
 
-    while (select(FD_SETSIZE, &rfd, NULL, NULL, &tv) < 0) {
+    while (select((maxfd==0 ? 0 : (maxfd+1)), &rfd, NULL, NULL, &tv) < 0) {
 	if (errno != EINTR) {
 	    fflush(stdout);
 	    fprintf(stderr, "AwaitEvent: select failed\n");
 	    EXIT(EXIT_FAILURE);
 	}
     }	
-
+ 
     if (delta == 0)
-	delta = min;
+	delta=min;
 
     prev = NULL;
     for(tso = WaitingThreadsHd; tso != Nil_closure; tso = next) {

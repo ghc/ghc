@@ -3,8 +3,10 @@
 %
 % Last Modified: Fri Jul 21 15:14:43 1995
 % Darren J Moffat <moffatd@dcs.gla.ac.uk>
-\section[Socket]{Haskell 1.3 Socket bindings}
+\section[SocketPrim]{Low-level socket bindings}
 
+The @SocketPrim@ module is for when you want full control over the
+sockets, something like what you have in C (which is very messy).
 
 \begin{code}	   
 module SocketPrim (
@@ -98,27 +100,26 @@ on sockets.
 
 
 \begin{code}  
-data SocketStatus = 
-		 -- Returned Status		  Function called
-		   NotConnected			-- socket
-		 | Bound			-- bindSocket
-		 | Listening			-- listen
-		 | Connected			-- connect/accept
-		 | Error String			-- Any
-		   deriving (Eq, Text)
+data SocketStatus
+  -- Returned Status	Function called
+  = NotConnected	-- socket
+  | Bound		-- bindSocket
+  | Listening		-- listen
+  | Connected		-- connect/accept
+  | Error String	-- Any
+  deriving (Eq, Text)
 
-data Socket = MkSocket 
-		Int					-- File Descriptor Part
-		Family
-		SocketType
-		Int					-- Protocol Number
-		(MutableVar _RealWorld SocketStatus)	-- Status Flag
-
-
+data Socket
+  = MkSocket 
+     Int				  -- File Descriptor Part
+     Family				  
+     SocketType				  
+     Int				  -- Protocol Number
+     (MutableVar _RealWorld SocketStatus) -- Status Flag
 \end{code}
 
-In C bind takes either a $struct sockaddr_in$ or a $struct
-sockaddr_un$ but these are always type cast to $struct sockaddr$.  We
+In C bind takes either a $struct sockaddr\_in$ or a $struct
+sockaddr\_un$ but these are always type cast to $struct sockaddr$.  We
 attempt to emulate this and provide better type checking. Note that
 the socket family fields are redundant since this is caputured in the
 constructor names, it has thus be left out of the Haskell $SockAddr$
@@ -128,16 +129,15 @@ data type.
 \begin{code}
 type HostAddress = _Word
 
-data SockAddr =		-- C Names				
-    SockAddrUnix	-- struct sockaddr_un
+data SockAddr		-- C Names				
+  = SockAddrUnix	-- struct sockaddr_un
 	String		-- sun_path
 		  
   | SockAddrInet	-- struct sockaddr_in
 	Int		-- sin_port
 	HostAddress	-- sin_addr
 
-    deriving Eq
-      
+  deriving Eq
 \end{code}
 
 
@@ -154,7 +154,6 @@ equivalent C functions have been preserved where possible. It should
 be noted that some of these names used in the C library, bind in
 particular, have a different meaning to many Haskell programmers and
 have thus been renamed by appending the prefix Socket.
-
 
 Create an unconnected socket of the given family, type and protocol.
 The most common invocation of $socket$ is the following:
@@ -202,7 +201,7 @@ Given a port number this {\em binds} the socket to that port. This
 means that the programmer is only interested in data being sent to
 that port number. The $Family$ passed to $bindSocket$ must
 be the same as that passed to $socket$.	 If the special port
-number $aNY_PORT$ is passed then the system assigns the next
+number $aNY\_PORT$ is passed then the system assigns the next
 available use port.
 
 Port numbers for standard unix services can be found by calling
@@ -210,7 +209,7 @@ $getServiceEntry$.  These are traditionally port numbers below
 1000; although there are afew, namely NFS and IRC, which used higher
 numbered ports.
 
-The port number allocated to a socket bound by using $aNY_PORT$ can be
+The port number allocated to a socket bound by using $aNY\_PORT$ can be
 found by calling $port$
 
 \begin{code}
@@ -251,7 +250,6 @@ bindSocket (MkSocket s family stype protocol status) addr =
 	else
 	  writeVar status (Bound)				`seqPrimIO`
 	  return ()
-
 \end{code}
 	
 
@@ -403,7 +401,6 @@ accept sock@(MkSocket s family stype protocol status) =
 	    unpackSockAddr ptr			`thenPrimIO` \ addr ->
 	    newVar Connected			`thenPrimIO` \ status ->
 	    return ((MkSocket sock family stype protocol status), addr)
-
 \end{code}
 
 %************************************************************************
@@ -520,12 +517,11 @@ readSocketAll s =
 	    return xs
     in
 	loop ""
-
 \end{code}
 
 The port number the given socket is currently connected to can be
 determined by calling $port$, is generally only useful when bind
-was given $aNY_PORT$.
+was given $aNY\_PORT$.
 
 \begin{code}
 socketPort :: Socket ->			-- Connected & Bound Socket
@@ -618,9 +614,9 @@ A calling sequence table for the main functions is shown in the table below.
 \begin{center}
 \begin{tabular}{|l|c|c|c|c|c|c|c|}
 \hline
-\textbf{A Call to} & socket & connect & bindSocket & listen & accept & read & write \\
+{\bf A Call to} & socket & connect & bindSocket & listen & accept & read & write \\
 \hline
-\textbf{Precedes} & & & & & & & \\
+{\bf Precedes} & & & & & & & \\
 \hline 
 socket &	&	  &	       &	&	 &	& \\
 \hline
@@ -644,7 +640,7 @@ write  &	&   +	  &	       &  +	&  +	 &  +	& + \\
 
 %************************************************************************
 %*									*
-\subsection[Socket-OSDefs]{OS Dependant Definitions}
+\subsection[Socket-OSDefs]{OS Dependent Definitions}
 %*									*
 %************************************************************************
 
@@ -653,8 +649,8 @@ The following Family and Socket Type declarations were manually derived
 from /usr/include/sys/socket.h on the appropriate machines.
 
 Maybe a configure script that could parse the socket.h file to produce
-the following declaration is required to make it "portable" rather than
-using the dreded \#ifdefs.
+the following declaration is required to make it ``portable'' rather than
+using the dreaded \#ifdefs.
 
 Presently only the following machine/os combinations are supported:
 
@@ -666,7 +662,6 @@ Presently only the following machine/os combinations are supported:
 \end{itemize}
 
 \begin{code}
-
 unpackFamily	:: Int -> Family
 packFamily	:: Family -> Int
 
@@ -795,7 +790,6 @@ data SocketType =
 
 packSocketType stype = 1 + (index (Stream, Packet) stype)	
 #endif
-
 \end{code}
 
 %************************************************************************

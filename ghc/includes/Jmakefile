@@ -1,5 +1,6 @@
 LH_FILES = \
-rtsTypes.lh	/* runtime system */ \
+RtsTypes.lh	/* runtime system */ \
+RtsFlags.lh \
 \
 SMinterface.lh	/* storage-management related */ \
 SMClosures.lh \
@@ -19,13 +20,11 @@ COptWraps.lh \
 \
 GhcConstants.lh \
 \
-RednCounts.lh 	/* "ticky-ticky" profiling */ \
+Ticky.lh 	/* "ticky-ticky" profiling */ \
 \
 Info.lh		/* Info pointer definitions */ \
 \
 CostCentre.lh   /* for cost centre profiling */ \
-AgeProfile.lh	/* age stuff for heap and lifetime profiling */ \
-Force_GC.lh	/* for forcing GC */ \
 \
 GranSim.lh  \
 Parallel.lh 	/* for PAR build */ \

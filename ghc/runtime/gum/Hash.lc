@@ -56,9 +56,7 @@ next bucket to be split, re-hash using the larger table.
 \begin{code}
 
 static int
-hash(table, key)
-HashTable *table;
-StgWord key;
+hash(HashTable *table, W_ key)
 {
     int bucket;
 
@@ -82,15 +80,9 @@ Allocate a new segment of the dynamically growing hash table.
 \begin{code}
 
 static void
-allocSegment(table, segment)
-HashTable *table;
-int segment;
+allocSegment(HashTable *table, int segment)
 {
-    if ((table->dir[segment] = (HashList **) malloc(HSEGSIZE * sizeof(HashList *))) == NULL) {
-	fflush(stdout);
-	fprintf(stderr, "VM exhausted\n");
-	EXIT(EXIT_FAILURE);
-    }
+    table->dir[segment] = (HashList **) stgMallocBytes(HSEGSIZE * sizeof(HashList *), "allocSegment");
 }
 
 \end{code}
@@ -102,8 +94,7 @@ by @table->split@ is affected by the expansion.
 \begin{code}
 
 static void
-expand(table)
-HashTable *table;
+expand(HashTable *table)
 {
     int oldsegment;
     int oldindex;
@@ -201,22 +192,19 @@ allocHashList(STG_NO_ARGS)
 
     if ((hl = freeList) != NULL) {
 	freeList = hl->next;
-    } else if ((hl = (HashList *) malloc(HCHUNK * sizeof(HashList))) != NULL) {
+    } else {
+	hl = (HashList *) stgMallocBytes(HCHUNK * sizeof(HashList), "allocHashList");
+
 	freeList = hl + 1;
 	for (p = freeList; p < hl + HCHUNK - 1; p++)
 	    p->next = p + 1;
 	p->next = NULL;
-    } else {
-	fflush(stdout);
-	fprintf(stderr, "VM exhausted\n");
-	EXIT(EXIT_FAILURE);
     }
     return hl;
 }
 
 static void
-freeHashList(hl)
-HashList *hl;
+freeHashList(HashList *hl)
 {
     hl->next = freeList;
     freeList = hl;
@@ -347,14 +335,13 @@ allocHashTable(STG_NO_ARGS)
     HashTable *table;
     HashList **hb;
 
-    if ((table = (HashTable *) malloc(sizeof(HashTable))) == NULL) {
-	fflush(stdout);
-	fprintf(stderr, "VM exhausted\n");
-	EXIT(EXIT_FAILURE);
-    }
+    table = (HashTable *) stgMallocBytes(sizeof(HashTable),"allocHashTable");
+
     allocSegment(table, 0);
+
     for (hb = table->dir[0]; hb < table->dir[0] + HSEGSIZE; hb++)
 	*hb = NULL;
+
     table->split = 0;
     table->max = HSEGSIZE;
     table->mask1 = HSEGSIZE - 1;

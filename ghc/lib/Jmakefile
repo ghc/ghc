@@ -209,6 +209,8 @@ CAT2(blob,_HC_l)    = $(CAT2(blob,_HS):.hs=_l.hc)	@@\
 CAT2(blob,_HC_m)    = $(CAT2(blob,_HS):.hs=_m.hc)	@@\
 CAT2(blob,_HC_n)    = $(CAT2(blob,_HS):.hs=_n.hc)	@@\
 CAT2(blob,_HC_o)    = $(CAT2(blob,_HS):.hs=_o.hc)	@@\
+CAT2(blob,_HC_A)    = $(CAT2(blob,_HS):.hs=_A.hc)	@@\
+CAT2(blob,_HC_B)    = $(CAT2(blob,_HS):.hs=_B.hc)	@@\
 							@@\
 CAT2(blob,_DEP_norm) = $(CAT2(blob,_HC_norm):.hc=.o)	@@\
 CAT2(blob,_DEP_p)   = $(CAT2(blob,_HC_p):.hc=.o)	@@\
@@ -237,6 +239,8 @@ CAT2(blob,_DEP_l)   = $(CAT2(blob,_HC_l):.hc=.o)	@@\
 CAT2(blob,_DEP_m)   = $(CAT2(blob,_HC_m):.hc=.o)	@@\
 CAT2(blob,_DEP_n)   = $(CAT2(blob,_HC_n):.hc=.o)	@@\
 CAT2(blob,_DEP_o)   = $(CAT2(blob,_HC_o):.hc=.o)	@@\
+CAT2(blob,_DEP_A)   = $(CAT2(blob,_HC_A):.hc=.o)	@@\
+CAT2(blob,_DEP_B)   = $(CAT2(blob,_HC_B):.hc=.o)	@@\
 							@@\
 CAT2(blob,_HIs_p)   = $(CAT2(blob,_HIs):.hi=_p.hi)	@@\
 CAT2(blob,_HIs_t)   = $(CAT2(blob,_HIs):.hi=_t.hi)	@@\
@@ -263,7 +267,9 @@ CAT2(blob,_HIs_k)   = $(CAT2(blob,_HIs):.hi=_k.hi)	@@\
 CAT2(blob,_HIs_l)   = $(CAT2(blob,_HIs):.hi=_l.hi)	@@\
 CAT2(blob,_HIs_m)   = $(CAT2(blob,_HIs):.hi=_m.hi)	@@\
 CAT2(blob,_HIs_n)   = $(CAT2(blob,_HIs):.hi=_n.hi)	@@\
-CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=_o.hi)
+CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=_o.hi)	@@\
+CAT2(blob,_HIs_A)   = $(CAT2(blob,_HIs):.hi=_A.hi)	@@\
+CAT2(blob,_HIs_B)   = $(CAT2(blob,_HIs):.hi=_B.hi)
 
 
 #define PrintFileStuff(blob,outf) \
@@ -295,6 +301,8 @@ CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=_o.hi)
 	@echo 'IfGhcBuild_m('  CAT2(blob,_HC_m)  = $(CAT2(blob,_HC_m))  ')' >> outf @@\
 	@echo 'IfGhcBuild_n('  CAT2(blob,_HC_n)  = $(CAT2(blob,_HC_n))  ')' >> outf @@\
 	@echo 'IfGhcBuild_o('  CAT2(blob,_HC_o)  = $(CAT2(blob,_HC_o))  ')' >> outf @@\
+	@echo 'IfGhcBuild_A('  CAT2(blob,_HC_A)  = $(CAT2(blob,_HC_A))  ')' >> outf @@\
+	@echo 'IfGhcBuild_B('  CAT2(blob,_HC_B)  = $(CAT2(blob,_HC_B))  ')' >> outf @@\
 	@echo 'IfGhcBuild_p('  CAT2(blob,_DEP_p)  = $(CAT2(blob,_DEP_p))  ')' >> outf @@\
 	@echo 'IfGhcBuild_t('  CAT2(blob,_DEP_t)  = $(CAT2(blob,_DEP_t))  ')' >> outf @@\
 	@echo 'IfGhcBuild_u('  CAT2(blob,_DEP_u)  = $(CAT2(blob,_DEP_u))  ')' >> outf @@\
@@ -321,6 +329,8 @@ CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=_o.hi)
 	@echo 'IfGhcBuild_m('  CAT2(blob,_DEP_m)  = $(CAT2(blob,_DEP_m))  ')' >> outf @@\
 	@echo 'IfGhcBuild_n('  CAT2(blob,_DEP_n)  = $(CAT2(blob,_DEP_n))  ')' >> outf @@\
 	@echo 'IfGhcBuild_o('  CAT2(blob,_DEP_o)  = $(CAT2(blob,_DEP_o))  ')' >> outf @@\
+	@echo 'IfGhcBuild_A('  CAT2(blob,_DEP_A)  = $(CAT2(blob,_DEP_A))  ')' >> outf @@\
+	@echo 'IfGhcBuild_B('  CAT2(blob,_DEP_B)  = $(CAT2(blob,_DEP_B))  ')' >> outf @@\
 	@echo 'IfGhcBuild_p('  CAT2(blob,_HIs_p)  = $(CAT2(blob,_HIs_p))  ')' >> outf @@\
 	@echo 'IfGhcBuild_t('  CAT2(blob,_HIs_t)  = $(CAT2(blob,_HIs_t))  ')' >> outf @@\
 	@echo 'IfGhcBuild_u('  CAT2(blob,_HIs_u)  = $(CAT2(blob,_HIs_u))  ')' >> outf @@\
@@ -346,7 +356,9 @@ CAT2(blob,_HIs_o)   = $(CAT2(blob,_HIs):.hi=_o.hi)
 	@echo 'IfGhcBuild_l('  CAT2(blob,_HIs_l)  = $(CAT2(blob,_HIs_l))  ')' >> outf @@\
 	@echo 'IfGhcBuild_m('  CAT2(blob,_HIs_m)  = $(CAT2(blob,_HIs_m))  ')' >> outf @@\
 	@echo 'IfGhcBuild_n('  CAT2(blob,_HIs_n)  = $(CAT2(blob,_HIs_n))  ')' >> outf @@\
-	@echo 'IfGhcBuild_o('  CAT2(blob,_HIs_o)  = $(CAT2(blob,_HIs_o))  ')' >> outf
+	@echo 'IfGhcBuild_o('  CAT2(blob,_HIs_o)  = $(CAT2(blob,_HIs_o))  ')' >> outf @@\
+	@echo 'IfGhcBuild_A('  CAT2(blob,_HIs_A)  = $(CAT2(blob,_HIs_A))  ')' >> outf @@\
+	@echo 'IfGhcBuild_B('  CAT2(blob,_HIs_B)  = $(CAT2(blob,_HIs_B))  ')' >> outf
 
 BASIC_HS	= $(BASIC_LHS:.lhs=.hs) $(BASIC_HS_PREL)
 BASIC_OBJS_DIRS	= $(BASIC_HS:.hs=)
@@ -534,6 +546,8 @@ IfGhcBuild_l(hcs_l   :: $(BASIC_HC_l)  $(ONE3_HC_l)  $(GHCLIB_HC_l)  $(HBCLIB_HC
 IfGhcBuild_m(hcs_m   :: $(BASIC_HC_m)  $(ONE3_HC_m)  $(GHCLIB_HC_m)  $(HBCLIB_HC_m))
 IfGhcBuild_n(hcs_n   :: $(BASIC_HC_n)  $(ONE3_HC_n)  $(GHCLIB_HC_n)  $(HBCLIB_HC_n))
 IfGhcBuild_o(hcs_o   :: $(BASIC_HC_o)  $(ONE3_HC_o)  $(GHCLIB_HC_o)  $(HBCLIB_HC_o))
+IfGhcBuild_A(hcs_A   :: $(BASIC_HC_A)  $(ONE3_HC_A)  $(GHCLIB_HC_A)  $(HBCLIB_HC_A))
+IfGhcBuild_B(hcs_B   :: $(BASIC_HC_B)  $(ONE3_HC_B)  $(GHCLIB_HC_B)  $(HBCLIB_HC_B))
 
 IfGhcBuild_normal(libs:: libHS.a    libHS13.a    libHSghc.a    libHShbc.a)
 IfGhcBuild_p(libs_p   :: libHS_p.a  libHS13_p.a  libHSghc_p.a  libHShbc_p.a)
@@ -562,9 +576,11 @@ IfGhcBuild_l(libs_l   :: libHS_l.a  libHS13_l.a  libHSghc_l.a  libHShbc_l.a)
 IfGhcBuild_m(libs_m   :: libHS_m.a  libHS13_m.a  libHSghc_m.a  libHShbc_m.a)
 IfGhcBuild_n(libs_n   :: libHS_n.a  libHS13_n.a  libHSghc_n.a  libHShbc_n.a)
 IfGhcBuild_o(libs_o   :: libHS_o.a  libHS13_o.a  libHSghc_o.a  libHShbc_o.a)
+IfGhcBuild_A(libs_A   :: libHS_A.a  libHS13_A.a  libHSghc_A.a  libHShbc_A.a)
+IfGhcBuild_B(libs_B   :: libHS_B.a  libHS13_B.a  libHSghc_B.a  libHShbc_B.a)
 
 /* maybe for GNU make only? */
-.PHONY :: hcs hcs_p hcs_t hcs_mg hcs_mr hcs_mt hcs_mp hcs_mg hcs_a hcs_b hcs_c hcs_d hcs_e hcs_f hcs_g hcs_h hcs_i hcs_j hcs_k hcs_l hcs_m hcs_n hcs_o
+.PHONY :: hcs hcs_p hcs_t hcs_mg hcs_mr hcs_mt hcs_mp hcs_mg hcs_a hcs_b hcs_c hcs_d hcs_e hcs_f hcs_g hcs_h hcs_i hcs_j hcs_k hcs_l hcs_m hcs_n hcs_o hcs_A hcs_B
 
 #endif /* reasonable make */
 
@@ -900,6 +916,20 @@ IfGhcBuild_o(BigBuildTarget(_o,'*_o.o',his_o	\
 , $(ONE3_DEP_o),   $(ONE3_HIs_o)		\
 ))
 
+IfGhcBuild_A(BigBuildTarget(_A,'*_A.o',his_A	\
+, $(BASIC_DEP_A),  $(BASIC_HIs_A)		\
+, $(GHCLIB_DEP_A), $(GHCLIB_HIs_A)		\
+, $(HBCLIB_DEP_A), $(HBCLIB_HIs_A)		\
+, $(ONE3_DEP_A),   $(ONE3_HIs_A)		\
+))
+
+IfGhcBuild_B(BigBuildTarget(_B,'*_B.o',his_B	\
+, $(BASIC_DEP_B),  $(BASIC_HIs_B)		\
+, $(GHCLIB_DEP_B), $(GHCLIB_HIs_B)		\
+, $(HBCLIB_DEP_B), $(HBCLIB_HIs_B)		\
+, $(ONE3_DEP_B),   $(ONE3_HIs_B)		\
+))
+
 /****************************************************************
 *								*
 * Creating the individual .hc files: 				*
@@ -972,7 +1002,9 @@ IfGhcBuild_k(DoHs(file,isuf,_k,   flags $(GHC_OPTS_k),   '_k.o',  '*_k.o'))	\
 IfGhcBuild_l(DoHs(file,isuf,_l,   flags $(GHC_OPTS_l),   '_l.o',  '*_l.o'))	\
 IfGhcBuild_m(DoHs(file,isuf,_m,   flags $(GHC_OPTS_m),   '_m.o',  '*_m.o'))	\
 IfGhcBuild_n(DoHs(file,isuf,_n,   flags $(GHC_OPTS_n),   '_n.o',  '*_n.o'))	\
-IfGhcBuild_o(DoHs(file,isuf,_o,   flags $(GHC_OPTS_o),   '_o.o',  '*_o.o'))
+IfGhcBuild_o(DoHs(file,isuf,_o,   flags $(GHC_OPTS_o),   '_o.o',  '*_o.o'))	\
+IfGhcBuild_A(DoHs(file,isuf,_A,   flags $(GHC_OPTS_A),   '_A.o',  '*_A.o'))	\
+IfGhcBuild_B(DoHs(file,isuf,_B,   flags $(GHC_OPTS_B),   '_B.o',  '*_B.o'))
 
 /* now use the macro: */
 
@@ -1085,7 +1117,7 @@ CompilePreludishly(ghc/Readline,lhs,	-ighc -fhaskell-1.3 '-#include"ghcReadline.
 #endif
 #if GhcWithSockets == YES
 CompilePreludishly(ghc/Socket,lhs,	-ighc -fhaskell-1.3)
-CompilePreludishly(ghc/SocketPrim,lhs,	-ighc -fhaskell-1.3 -K2m -optcO-DNON_POSIX_SOURCE '-#include"ghcSockets.h"')
+CompilePreludishly(ghc/SocketPrim,lhs,	-ighc -fhaskell-1.3 -H12m -K2m -optcO-DNON_POSIX_SOURCE '-#include"ghcSockets.h"')
 CompilePreludishly(ghc/BSD,lhs,		-ighc -fhaskell-1.3 -optcO-DNON_POSIX_SOURCE '-#include"ghcSockets.h"')
 CompilePreludishly(ghc/CError,lhs,	-ighc -fhaskell-1.3 -K2m -fomit-derived-read)
 #endif
@@ -1147,6 +1179,10 @@ print_file_list5 :
 
 /* now include the extra dependencies so generated */
 #include "Jmake.inc5"
+
+/* for unix-libs.lit */
+LitSuffixRule(.lhs,.hs)
+LitDocRootTarget(unix-libs,lit)
 
 /* should be *LAST* */
 #if HaskellCompilerType != HC_USE_HC_FILES

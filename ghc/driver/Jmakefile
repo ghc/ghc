@@ -10,7 +10,7 @@ DYN_LOADABLE_BITS = \
 	ghc-asm-sparc.prl \
 	ghc-asm-solaris.prl \
 	ghc-asm-m68k.prl \
-	ghc-asm-iX86.prl \
+	ghc-asm.prl \
 	ghc-asm-alpha.prl \
 	ghc-asm-hppa.prl \
 	ghc-asm-mips.prl \

@@ -116,11 +116,17 @@ int2IntegerId
 
 unpackCStringId
   = pcMiscPrelId unpackCStringIdKey pRELUDE_PS SLIT("unpackPS#")
-	(UniFun addrPrimTy{-a char *-} stringTy) noIdInfo
+		 (addrPrimTy{-a char *-} `UniFun` stringTy) noIdInfo
+
+unpackCString2Id -- for cases when a string has a NUL in it
+  = pcMiscPrelId unpackCString2IdKey pRELUDE_PS SLIT("unpackPS2#")
+		 (addrPrimTy{-a char *-}
+	`UniFun` (intPrimTy -- length
+	`UniFun` stringTy)) noIdInfo
 
 --------------------------------------------------------------------
 unpackCStringAppendId
-  = pcMiscPrelId unpackCStringIdKey pRELUDE_BUILTIN SLIT("unpackCStringAppend#")
+  = pcMiscPrelId unpackCStringAppendIdKey pRELUDE_BUILTIN SLIT("unpackCStringAppend#")
 				(addrPrimTy{-a "char *" pointer-} 
 		`UniFun`	(stringTy
 		`UniFun`	stringTy)) noIdInfo

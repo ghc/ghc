@@ -4,39 +4,28 @@ import FiniteMap(FiniteMap)
 import HsImpExp(IE)
 import Maybes(Labda)
 import Name(Name)
-import NameTypes(FullName, Provenance)
+import NameTypes(FullName)
 import Outputable(ExportFlag)
 import PreludePS(_PackedString)
 import ProtoName(ProtoName)
-import SplitUniq(SplitUniqSupply, splitUniqSupply)
+import SplitUniq(SplitUniqSupply)
 import SrcLoc(SrcLoc)
 import Unique(Unique)
 infixr 9 `thenRn3`
-data IE 	{-# GHC_PRAGMA IEVar _PackedString | IEThingAbs _PackedString | IEThingAll _PackedString | IEConWithCons _PackedString [_PackedString] | IEClsWithOps _PackedString [_PackedString] | IEModuleContents _PackedString #-}
-data FullName 	{-# GHC_PRAGMA FullName _PackedString _PackedString Provenance ExportFlag Bool SrcLoc #-}
-data ExportFlag 	{-# GHC_PRAGMA ExportAll | ExportAbs | NotExported #-}
-data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data IE 
+data FullName 
+data ExportFlag 
+data ProtoName 
 type Rn3M a = (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
-data Unique 	{-# GHC_PRAGMA MkUnique Int# #-}
+data SplitUniqSupply 
+data Unique 
 andRn3 :: (a -> a -> a) -> ((FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> ((FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 6 _U_ 111221 _N_ _S_ "SLLLLU(ALL)" _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: u0 -> u0 -> u0) (u2 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u0) (u3 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u0) (u4 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) (u5 :: _PackedString) (u6 :: SplitUniqSupply) -> case u6 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u7 :: Int) (u8 :: SplitUniqSupply) (u9 :: SplitUniqSupply) -> let {(ua :: u0) = _APP_  u2 [ u4, u5, u8 ]} in let {(ub :: u0) = _APP_  u3 [ u4, u5, u9 ]} in _APP_  u1 [ ua, ub ]; _NO_DEFLT_ } _N_ #-}
 fixRn3 :: (a -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 4 _U_ 2222 _N_ _S_ "SLLL" _F_ _IF_ARGS_ 1 4 XXXX 7 _/\_ u0 -> \ (u1 :: u0 -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u0) (u2 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) (u3 :: _PackedString) (u4 :: SplitUniqSupply) -> _LETREC_ {(u5 :: u0) = _APP_  u1 [ u5, u2, u3, u4 ]} in u5 _N_ #-}
 initRn3 :: ((FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 mapRn3 :: (a -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> b) -> [a] -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> [b]
-	{-# GHC_PRAGMA _A_ 2 _U_ 21222 _N_ _S_ "LS" _N_ _N_ #-}
 newFullNameM3 :: ProtoName -> SrcLoc -> Bool -> Labda ExportFlag -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> (Unique, FullName)
-	{-# GHC_PRAGMA _A_ 7 _U_ 1211121 _N_ _N_ _N_ _N_ #-}
 newInvisibleNameM3 :: ProtoName -> SrcLoc -> Bool -> Labda ExportFlag -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> (Unique, FullName)
-	{-# GHC_PRAGMA _A_ 7 _U_ 1211121 _N_ _N_ _N_ _N_ #-}
 putInfoDownM3 :: _PackedString -> [IE] -> ((FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 6 _U_ 221002 _N_ _S_ "LLSAAL" {_A_ 4 _U_ 2212 _N_ _N_ _F_ _IF_ARGS_ 1 4 XXXX 7 _/\_ u0 -> \ (u1 :: _PackedString) (u2 :: [IE]) (u3 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u0) (u4 :: SplitUniqSupply) -> let {(u5 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) = _APP_  _ORIG_ HsImpExp getIEStrings [ u2 ]} in _APP_  u3 [ u5, u1, u4 ] _N_} _F_ _IF_ARGS_ 1 6 XXXXXX 7 _/\_ u0 -> \ (u1 :: _PackedString) (u2 :: [IE]) (u3 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u0) (u4 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) (u5 :: _PackedString) (u6 :: SplitUniqSupply) -> let {(u7 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) = _APP_  _ORIG_ HsImpExp getIEStrings [ u2 ]} in _APP_  u3 [ u7, u1, u6 ] _N_ #-}
 returnRn3 :: a -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 4 _U_ 1000 _N_ _S_ "SLLL" _F_ _ALWAYS_ _/\_ u0 -> \ (u1 :: u0) (u2 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) (u3 :: _PackedString) (u4 :: SplitUniqSupply) -> u1 _N_ #-}
-splitUniqSupply :: SplitUniqSupply -> (SplitUniqSupply, SplitUniqSupply)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _ALWAYS_ \ (u0 :: SplitUniqSupply) -> case u0 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u1 :: Int) (u2 :: SplitUniqSupply) (u3 :: SplitUniqSupply) -> _!_ _TUP_2 [SplitUniqSupply, SplitUniqSupply] [u2, u3]; _NO_DEFLT_ } _N_ #-}
 thenRn3 :: ((FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> (a -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> b) -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> b
-	{-# GHC_PRAGMA _A_ 5 _U_ 11221 _N_ _S_ "LSLLU(ALL)" _F_ _ALWAYS_ _/\_ u0 u1 -> \ (u2 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u0) (u3 :: u0 -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> u1) (u4 :: (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ())) (u5 :: _PackedString) (u6 :: SplitUniqSupply) -> case u6 of { _ALG_ _ORIG_ SplitUniq MkSplitUniqSupply (u7 :: Int) (u8 :: SplitUniqSupply) (u9 :: SplitUniqSupply) -> let {(ua :: u0) = _APP_  u2 [ u4, u5, u8 ]} in _APP_  u3 [ ua, u4, u5, u9 ]; _NO_DEFLT_ } _N_ #-}
 

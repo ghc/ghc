@@ -39,7 +39,7 @@
 *                                                                     *
 **********************************************************************/
 
-BOOLEAN expect_ccurly = FALSE; /* Used to signal that a CCURLY could be inserted here */
+static BOOLEAN expect_ccurly = FALSE; /* Used to signal that a CCURLY could be inserted here */
 
 extern BOOLEAN nonstandardFlag;
 extern BOOLEAN etags;
@@ -81,7 +81,7 @@ extern int startlineno;
 *                                                                     *
 **********************************************************************/
 
-list fixlist;
+/* OLD 95/08: list fixlist; */
 static int Fixity = 0, Precedence = 0;
 struct infix;
 
@@ -927,7 +927,7 @@ iimport :  importkey modid OPAREN import_list CPAREN
 
 interface:
   	   INTERFACE modid
-		{ fixlist = Lnil;
+		{ /* OLD 95/08: fixlist = Lnil; */
 		  strcpy(iface_name, id_to_string($2));
 		}
 	   WHERE ibody
@@ -1505,10 +1505,7 @@ kexp	:  LAMBDA
 
 	/* SCC Expression */
 	|  SCC STRING exp
-		{ extern BOOLEAN ignoreSCC;
-		  extern BOOLEAN warnSCC;
-
-		  if (ignoreSCC) {
+		{ if (ignoreSCC) {
 		    if (warnSCC)
 			fprintf(stderr,
 				"\"%s\", line %d: _scc_ (`set [profiling] cost centre') ignored\n",
@@ -1565,26 +1562,6 @@ aexp	:  var					{ $$ = mkident($1); }
 
 	The xpatk business is to do with accurately recording
 	the starting line for definitions.
-*/
-
-/*TESTTEST
-bind	:  opatk
-	|  vark lampats
-		{ $$ = mkap($1,$2); }
-	|  opatk varop opat %prec PLUS
-		{
-		  $$ = mkinfixop($2,$1,$3);
-		}
-	;
-
-opatk	:  dpatk
-	|  opatk conop opat %prec PLUS
-		{
-		  $$ = mkinfixop($2,$1,$3);
-		  precparse($$);
-		}
-	;
-
 */
 
 opatk	:  dpatk
@@ -1676,12 +1653,6 @@ aapatk	:  conk		 				{ $$ = mkident($1); }
 	;
 
 
-/*
-   The mkpars are so that infix parsing doesn't get confused.
-
-   KH.
-*/
-
 tuple	:  OPAREN exp COMMA texps CPAREN
   		{ if (ttree($4) == tuple)
 		    $$ = mktuple(mklcons($2, gtuplelist((struct Stuple *) $4)));
@@ -1692,6 +1663,11 @@ tuple	:  OPAREN exp COMMA texps CPAREN
 		{ $$ = mktuple(Lnil); }
 	;
 
+/*
+   The mkpar is so that infix parsing doesn't get confused.
+
+   KH.
+*/
 texps	:  exp	{ $$ = mkpar($1); }
 	|  exp COMMA texps
 		{ if (ttree($3) == tuple)
@@ -1736,11 +1712,13 @@ quals	:  qual					{ $$ = lsing($1); }
 	;
 
 qual	:  	{ inpat = TRUE; } exp { inpat = FALSE; } qualrest
-		{ if ($4 == NULL)
+		{ if ($4 == NULL) {
+		    patternOrExpr(/*wanted:*/ LEGIT_EXPR,$2);
 		    $$ = mkguard($2);
-		  else
-		    {
-		      checkpatt($2);
+		  } else {
+		    patternOrExpr(/*wanted:*/ LEGIT_PATT,$2);
+		    $$ = mkqual($2,$4);
+/* OLD: WDP 95/08
 		      if(ttree($4)==def)
 			{
 			  tree prevpatt_save = PREVPATT;
@@ -1749,8 +1727,8 @@ qual	:  	{ inpat = TRUE; } exp { inpat = FALSE; } qualrest
 			  PREVPATT = prevpatt_save;
 			}
 		      else
-			$$ = mkqual($2,$4);
-		    }
+*/
+		  }
 		}
 	;
 
@@ -2062,13 +2040,13 @@ hsperror(s)
     yyerror(s);
 }
 
+extern char *yytext;
+extern int yyleng;
+
 void
 yyerror(s)
   char *s;
 {
-    extern char *yytext;
-    extern int yyleng;
-
     /* We want to be able to distinguish 'error'-raised yyerrors
        from yyerrors explicitly coded by the parser hacker.
     */

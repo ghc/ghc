@@ -32,11 +32,14 @@ These basic definitions need to be around, one way or the other:
 
 \begin{code}
 # ifdef PAR
-#  define MAX_PES	128		/* Maximum number of processors */
+#  define MAX_PES	256		/* Maximum number of processors */
+	/* MAX_PES is enforced by SysMan, which does not
+	   allow more than this many "processors".
+	   This is important because PackGA [GlobAddr.lc]
+	   **assumes** that a PE# can fit in 8+ bits.
+	*/
 
-extern I_ do_gr_profile;
 extern I_ do_sp_profile;
-extern I_ do_gr_binary;
 
 extern P_ PendingFetches;
 extern GLOBAL_TASK_ID *PEs;
@@ -164,8 +167,11 @@ global address for a local closure which did not previously have one.
   
 #  define MAX_GA_WEIGHT			0	/* Treat as 2^n */
   
-#  define PACK_GA(pe,slot)    ((((W_)(pe)) << (BITS_IN(W_)/2)) | ((W_)(slot)))
-
+W_ PackGA PROTO((W_, int));
+   /* There was a PACK_GA macro here; but we turned it into the PackGA
+      routine [GlobAddr.lc] (because it needs to do quite a bit of
+      paranoia checking.  Phil & Will (95/08)
+   */
 \end{code}
 
 At the moment, there is no activity profiling for GUM.  This may change.
@@ -464,7 +470,8 @@ This constant defines how many words of data we can pack into a single
 packet in the parallel (GUM) system.
 
 \begin{code}
-#  ifdef GUM
+#  ifdef PAR
+void	InitPackBuffer(STG_NO_ARGS);
 P_      PackNearbyGraph PROTO((P_ closure,W_ *size));
 P_      PackTSO PROTO((P_ tso, W_ *size));
 P_      PackStkO PROTO((P_ stko, W_ *size));
@@ -485,13 +492,25 @@ void    doGlobalGC(STG_NO_ARGS);
 P_ UnpackGraph PROTO((W_ *buffer, globalAddr **gamap, W_ *nGAs));
 #  endif
 
-#  define PACK_BUFFER_SIZE	1024
-#  define PACK_HEAP_REQUIRED  \
-    ((PACK_BUFFER_SIZE - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (SPEC_HS + 2))
-
 \end{code}
 
 \begin{code}
+#  define PACK_HEAP_REQUIRED  \
+    ((RTSflags.ParFlags.packBufferSize - PACK_HDR_SIZE) / (PACK_GA_SIZE + _FHS) * (SPEC_HS + 2))
+
+extern W_      *PackBuffer;      /* size: can be set via option */
+extern long *buffer;             /* HWL_ */
+extern W_ *freeBuffer;           /* HWL_ */
+extern W_ *packBuffer;           /* HWL_ */
+
+extern void    InitPackBuffer(STG_NO_ARGS);
+extern void    InitMoreBuffers(STG_NO_ARGS);
+extern void    InitPendingGABuffer(W_ size); 
+extern void    AllocClosureQueue(W_ size);
+
+#  define MAX_GAS 	(RTSflags.ParFlags.packBufferSize / PACK_GA_SIZE)
+
+
 #  define PACK_GA_SIZE	3	/* Size of a packed GA in words */
 			        /* Size of a packed fetch-me in words */
 #  define PACK_FETCHME_SIZE (PACK_GA_SIZE + FIXED_HS)
@@ -500,8 +519,6 @@ P_ UnpackGraph PROTO((W_ *buffer, globalAddr **gamap, W_ *nGAs));
 
 #  define PACK_PLC_SIZE	2	/* Size of a packed PLC in words */
   
-#  define MAX_GAS 	(PACK_BUFFER_SIZE / PACK_GA_SIZE)
-
 \end{code}
 End multi-slurp protection:
 \begin{code}

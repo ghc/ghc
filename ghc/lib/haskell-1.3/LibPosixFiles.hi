@@ -77,7 +77,7 @@ modificationTime :: _ByteArray () -> Int
 nullFileMode :: _Word
 	{-# GHC_PRAGMA _A_ 0 _N_ _N_ _N_ _N_ _N_ #-}
 openChannel :: [Char] -> OpenMode -> Maybe _Word -> Bool -> Bool -> Bool -> Bool -> Bool -> _State _RealWorld -> (Either IOError13 Int, _State _RealWorld)
-	{-# GHC_PRAGMA _A_ 9 _U_ 202111112 _N_ _S_ "SASEEEEEL" {_A_ 8 _U_ 22111112 _N_ _N_ _N_ _N_} _N_ _N_ #-}
+	{-# GHC_PRAGMA _A_ 9 _U_ 212111112 _N_ _S_ "SESEEEEEL" _N_ _N_ #-}
 openDirStream :: [Char] -> _State _RealWorld -> (Either IOError13 _Addr, _State _RealWorld)
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _S_ "SL" _N_ _N_ #-}
 otherExecuteMode :: _Word

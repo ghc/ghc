@@ -82,7 +82,7 @@ data PrimOp
     -- Int#-related ops:
     -- IntAbsOp unused?? ADR
     | IntAddOp | IntSubOp | IntMulOp | IntQuotOp
-    | IntDivOp | IntRemOp | IntNegOp | IntAbsOp
+    | IntDivOp{-UNUSED-} | IntRemOp | IntNegOp | IntAbsOp
 
     -- Word#-related ops:
     | AndOp  | OrOp   | NotOp
@@ -314,7 +314,7 @@ tagOf_PrimOp IntAddOp			= ILIT( 39)
 tagOf_PrimOp IntSubOp			= ILIT( 40)
 tagOf_PrimOp IntMulOp			= ILIT( 41)
 tagOf_PrimOp IntQuotOp			= ILIT( 42)
-tagOf_PrimOp IntDivOp			= ILIT( 43)
+--UNUSED:tagOf_PrimOp IntDivOp			= ILIT( 43)
 tagOf_PrimOp IntRemOp			= ILIT( 44)
 tagOf_PrimOp IntNegOp			= ILIT( 45)
 tagOf_PrimOp IntAbsOp			= ILIT( 46)
@@ -611,7 +611,7 @@ primOpInfo IntAddOp  = Dyadic SLIT("plusInt#")	 intPrimTy
 primOpInfo IntSubOp  = Dyadic SLIT("minusInt#") intPrimTy
 primOpInfo IntMulOp  = Dyadic SLIT("timesInt#") intPrimTy
 primOpInfo IntQuotOp = Dyadic SLIT("quotInt#")	 intPrimTy
-primOpInfo IntDivOp  = Dyadic SLIT("divInt#")	 intPrimTy
+--UNUSED:primOpInfo IntDivOp  = Dyadic SLIT("divInt#")	 intPrimTy
 primOpInfo IntRemOp  = Dyadic SLIT("remInt#")	 intPrimTy
 
 primOpInfo IntNegOp  = Monadic SLIT("negateInt#") intPrimTy
@@ -1006,9 +1006,9 @@ Here's what the operations and types are supposed to be (from
 state-interface document).
 
 \begin{verbatim}
-makeStablePointer#  :: a -> State# _RealWorld -> StateAndStablePtr# _RealWorld a
-freeStablePointer#  :: StablePtr# a -> State# _RealWorld -> State# _RealWorld
-deRefStablePointer# :: StablePtr# a -> State# _RealWorld -> StateAndPtr _RealWorld a
+makeStablePtr#  :: a -> State# _RealWorld -> StateAndStablePtr# _RealWorld a
+freeStablePtr#  :: StablePtr# a -> State# _RealWorld -> State# _RealWorld
+deRefStablePtr# :: StablePtr# a -> State# _RealWorld -> StateAndPtr _RealWorld a
 \end{verbatim}
 
 It may seem a bit surprising that @makeStablePtr#@ is a @PrimIO@
@@ -1017,10 +1017,10 @@ reason is that if some optimisation pass decided to duplicate calls to
 @makeStablePtr#@ and we only pass one of the stable pointers over, a
 massive space leak can result.  Putting it into the PrimIO monad
 prevents this.  (Another reason for putting them in a monad is to
-ensure correct sequencing wrt the side-effecting @freeStablePointer#@
+ensure correct sequencing wrt the side-effecting @freeStablePtr#@
 operation.)
 
-Note that we can implement @freeStablePointer#@ using @_ccall_@ (and,
+Note that we can implement @freeStablePtr#@ using @_ccall_@ (and,
 besides, it's not likely to be used from Haskell) so it's not a
 primop.
 
@@ -1330,7 +1330,7 @@ of by data dependencies.
 primOpOkForSpeculation :: PrimOp -> Bool
 
 -- Int.
-primOpOkForSpeculation IntDivOp		= False		-- Divide by zero
+--UNUSED:primOpOkForSpeculation IntDivOp		= False		-- Divide by zero
 primOpOkForSpeculation IntQuotOp	= False		-- Divide by zero
 primOpOkForSpeculation IntRemOp		= False		-- Divide by zero
 
@@ -1408,7 +1408,7 @@ primOpNeedsWrapper :: PrimOp -> Bool
 
 primOpNeedsWrapper (CCallOp _ _ _ _ _) 	= True
 
-primOpNeedsWrapper IntDivOp 	    	= True
+--UNUSED:primOpNeedsWrapper IntDivOp 	    	= True
 
 primOpNeedsWrapper NewArrayOp     	= True	-- ToDo: for nativeGen only!(JSM)
 primOpNeedsWrapper (NewByteArrayOp _)  	= True

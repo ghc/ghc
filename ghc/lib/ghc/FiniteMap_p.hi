@@ -52,4 +52,6 @@ singletonFM :: a -> b -> FiniteMap a b
 	{-# GHC_PRAGMA _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 sizeFM :: FiniteMap a b -> Int
 	{-# GHC_PRAGMA _A_ 1 _U_ 1 _N_ _S_ "S" _F_ _IF_ARGS_ 2 1 C 6 _/\_ u0 u1 -> \ (u2 :: FiniteMap u0 u1) -> case u2 of { _ALG_ _ORIG_ FiniteMap EmptyFM  -> _!_ I# [] [0#]; _ORIG_ FiniteMap Branch (u3 :: u0) (u4 :: u1) (u5 :: Int#) (u6 :: FiniteMap u0 u1) (u7 :: FiniteMap u0 u1) -> _!_ I# [] [u5]; _NO_DEFLT_ } _N_ #-}
+instance (Eq a, Eq b) => Eq (FiniteMap a b)
+	{-# GHC_PRAGMA _M_ FiniteMap {-dfun-} _A_ 2 _U_ 22 _N_ _N_ _N_ _N_ #-}
 

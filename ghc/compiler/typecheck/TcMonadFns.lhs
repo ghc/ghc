@@ -71,21 +71,21 @@ copyTyVars old_tyvars
 
 newOpenTyVarTys :: Int -> NF_TcM [UniType]
 newOpenTyVarTys n
-  = getTyVarUniquesTc n	`thenNF_Tc` \ new_uniqs ->
+  = getTyVarUniquesTc n	`thenLazilyNF_Tc` \ new_uniqs ->
     returnNF_Tc [mkTyVarTy (mkOpenSysTyVar u) | u <- new_uniqs]
 
 newPolyTyVarTys :: Int -> NF_TcM [UniType]
 newPolyTyVarTys n
-  = getTyVarUniquesTc n	`thenNF_Tc` \ new_uniqs ->
+  = getTyVarUniquesTc n	`thenLazilyNF_Tc` \ new_uniqs ->
     returnNF_Tc [mkTyVarTy (mkPolySysTyVar u) | u <- new_uniqs]
 
 newOpenTyVarTy, newPolyTyVarTy :: NF_TcM UniType
 newOpenTyVarTy
-  = getTyVarUniqueTc `thenNF_Tc` \ new_uniq ->
+  = getTyVarUniqueTc `thenLazilyNF_Tc` \ new_uniq ->
     returnNF_Tc (mkTyVarTy (mkOpenSysTyVar new_uniq))
 
 newPolyTyVarTy
-  = getTyVarUniqueTc `thenNF_Tc` \ new_uniq ->
+  = getTyVarUniqueTc `thenLazilyNF_Tc` \ new_uniq ->
     returnNF_Tc (mkTyVarTy (mkPolySysTyVar new_uniq))
 \end{code}
 

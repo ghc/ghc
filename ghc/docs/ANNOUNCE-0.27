@@ -1,0 +1,72 @@
+A binary-only from-working-sources no-guarantees snapshot of the
+Glasgow Haskell compiler (GHC) for i386-unknown-linuxaout and
+i386-unknown-solaris2 platforms is now available from
+ftp://ftp.dcs.glasgow.ac.uk/pub/haskell/glasgow/ghc-0.27-<platform>.tar.gz.
+(The files ghc-0.26-docs-and-examples.tar.gz and
+ghc-0.26-ps-docs.tar.gz [PostScript] may also be of interest.)
+
+This pseudo-release adds profiling and concurrent-Haskell support for
+i386-*-linuxaout.  It is the first GHC that works on i386-*-solaris2
+machines (sequential, profiling, and concurrent support provided).
+
+As 0.27 is a snapshot and not a "proper" release, it may have serious,
+show-stopping bugs in it.  If you *need* what 0.27 provides, use it;
+otherwise, you should stick with 0.26.
+
+It should be relatively straightforward to tweak
+ghc/driver/ghc-asm.(l)prl to support Linux ELF format; ditto for other
+Unices on x86 platforms.  Please let us know if you make such changes.
+
+GCC 2.7.x is required; GCC 2.6.x will *not* work.
+
+Binaries (.o files and executables) produced by GHC 0.27 cannot be
+intermixed with those from GHC 0.26 or 0.25; you'll need to recompile
+everything.
+
+The -concurrent stuff *definitely* has at least one bug we haven't
+been able to catch.  Concurrent programs that show
+readily-reproducible buggy behavior would be most welcome.
+
+The profiling libraries for *solaris2 are huge, for reasons we don't
+understand.  If you need to scrap them for space reasons, see the end
+of the installation notes below.  Insights into the problem would also
+be most appreciated.
+
+Please report any bugs to glasgow-haskell-bugs@dcs.glasgow.ac.uk.
+
+Will Partain
+AQUA project (slave)
+
+Dated: 95/12/20
+
+=== INSTALLATION NOTES ==============================================
+
+Ignore the installation instructions in any documentation.  This is
+the stuff that applies for this distribution.
+
+Unpack the distribution.
+
+Move "ghc-0.27-<platform>" to wherever you like.
+
+Make a link to ghc-0.27-<platform>/ghc/driver/ghc, so that "ghc" will
+be in your PATH.
+
+Change the hardwired paths in ghc/driver/ghc and in
+ghc/utils/hscpp/hscpp to point to where things are on your system.
+(Also: ghc/utils/mkdependHS/mkdependHS, if you want to use it.)
+Notably: where "perl" is (first line of each script), where $TopPwd is
+(ghc script), where your gcc cpp ($OrigCpp) is (hscpp and mkdependHS
+scripts).  *Don't* set any environment variables to do this.
+
+GHC should then work.  Try "ghc -v" on something simple, to make sure
+it compiles and links a program correctly.
+
+If you don't want the profiling libraries (e.g., to save disk space), do:
+
+    cd ghc
+    rm runtime/*_p.a lib/*_p.a
+
+If you don't want to concurrent-Haskell libraries (e.g., same reason), do:
+
+    cd ghc
+    rm runtime/*_mc.a lib/*_mc.a

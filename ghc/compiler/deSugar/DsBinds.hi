@@ -15,7 +15,5 @@ import SrcLoc(SrcLoc)
 import TyVar(TyVar)
 import UniqFM(UniqFM)
 dsBinds :: Binds Id TypecheckedPat -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> ([CoreBinding Id Id], Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 1 _U_ 1222222 _N_ _S_ "S" _N_ _N_ #-}
 dsInstBinds :: [TyVar] -> [(Inst, Expr Id TypecheckedPat)] -> SplitUniqSupply -> SrcLoc -> (GlobalSwitch -> SwitchResult) -> (_PackedString, _PackedString) -> UniqFM (CoreExpr Id Id) -> Bag DsMatchContext -> (([(Id, CoreExpr Id Id)], [(Id, CoreExpr Id Id)]), Bag DsMatchContext)
-	{-# GHC_PRAGMA _A_ 2 _U_ 21222222 _N_ _S_ "LS" _N_ _N_ #-}
 

@@ -15,5 +15,4 @@ import TyVar(TyVarTemplate)
 import UniType(UniType)
 import UniqFM(UniqFM)
 tcConDecls :: UniqFM TyCon -> UniqFM UniType -> TyCon -> [TyVarTemplate] -> SpecEnv -> [ConDecl Name] -> (GlobalSwitch -> Bool) -> SplitUniqSupply -> Bag (PprStyle -> Int -> Bool -> PrettyRep) -> SrcLoc -> Baby_TcResult [(Name, Id)]
-	{-# GHC_PRAGMA _A_ 10 _U_ 2222212122 _N_ _S_ "LLLLLSLLLL" _N_ _N_ #-}
 

@@ -11,7 +11,8 @@ module Stix (
 
 	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg, 
 	stgSpA, stgSuA, stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg,
-	stgActivityReg, stgStdUpdRetVecReg, stgStkStubReg,
+--	stgActivityReg,
+	stgStdUpdRetVecReg, stgStkStubReg,
 	getUniqLabelNCG,
 
 	-- And for self-sufficiency, by golly...
@@ -147,7 +148,7 @@ type StixTreeList = [StixTree] -> [StixTree]
 \begin{code}
 
 stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg, stgSpA, stgSuA,
-    stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg, stgActivityReg, stgStdUpdRetVecReg,
+    stgSpB, stgSuB, stgHp, stgHpLim, stgLivenessReg{-, stgActivityReg-}, stgStdUpdRetVecReg,
     stgStkStubReg :: StixTree
 
 stgBaseReg = StReg (StixMagicId BaseReg)
@@ -163,7 +164,7 @@ stgSuB = StReg (StixMagicId SuB)
 stgHp = StReg (StixMagicId Hp)
 stgHpLim = StReg (StixMagicId HpLim)
 stgLivenessReg = StReg (StixMagicId LivenessReg)
-stgActivityReg = StReg (StixMagicId ActivityReg)
+--stgActivityReg = StReg (StixMagicId ActivityReg)
 stgStdUpdRetVecReg = StReg (StixMagicId StdUpdRetVecReg)
 stgStkStubReg = StReg (StixMagicId StkStubReg)
 

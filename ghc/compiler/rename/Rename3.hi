@@ -2,8 +2,6 @@
 interface Rename3 where
 import AbsSyn(Module)
 import Bag(Bag)
-import CharSeq(CSeq)
-import CmdLineOpts(GlobalSwitch)
 import FiniteMap(FiniteMap)
 import HsBinds(Binds, Sig)
 import HsDecls(ClassDecl, DataTypeSig, DefaultDecl, FixityDecl, InstDecl, SpecialisedInstanceSig, TyDecl)
@@ -16,7 +14,7 @@ import Name(Name)
 import NameTypes(FullName, ShortName)
 import Outputable(ExportFlag)
 import PreludePS(_PackedString)
-import Pretty(Delay, PprStyle, Pretty(..), PrettyRep)
+import Pretty(PprStyle, Pretty(..), PrettyRep)
 import ProtoName(ProtoName)
 import RenameAuxFuns(PreludeNameFun(..), PreludeNameFuns(..))
 import RenameMonad3(Rn3M(..), initRn3)
@@ -24,23 +22,21 @@ import SplitUniq(SplitUniqSupply)
 import SrcLoc(SrcLoc)
 import TyCon(TyCon)
 import Unique(Unique)
-data Module a b 	{-# GHC_PRAGMA Module _PackedString [IE] [ImportedInterface a b] [FixityDecl a] [TyDecl a] [DataTypeSig a] [ClassDecl a b] [InstDecl a b] [SpecialisedInstanceSig a] [DefaultDecl a] (Binds a b) [Sig a] SrcLoc #-}
-data Bag a 	{-# GHC_PRAGMA EmptyBag | UnitBag a | TwoBags (Bag a) (Bag a) | ListOfBags [Bag a] #-}
-data InPat a 	{-# GHC_PRAGMA WildPatIn | VarPatIn a | LitPatIn Literal | LazyPatIn (InPat a) | AsPatIn a (InPat a) | ConPatIn a [InPat a] | ConOpPatIn (InPat a) a (InPat a) | ListPatIn [InPat a] | TuplePatIn [InPat a] | NPlusKPatIn a Literal #-}
+data Module a b 
+data Bag a 
+data InPat a 
 type ProtoNamePat = InPat ProtoName
-data Labda a 	{-# GHC_PRAGMA Hamna | Ni a #-}
-data Name 	{-# GHC_PRAGMA Short Unique ShortName | WiredInTyCon TyCon | WiredInVal Id | PreludeVal Unique FullName | PreludeTyCon Unique FullName Int Bool | PreludeClass Unique FullName | OtherTyCon Unique FullName Int Bool [Name] | OtherClass Unique FullName [Name] | OtherTopId Unique FullName | ClassOpName Unique Name _PackedString Int | Unbound _PackedString #-}
-data ExportFlag 	{-# GHC_PRAGMA ExportAll | ExportAbs | NotExported #-}
-data PprStyle 	{-# GHC_PRAGMA PprForUser | PprDebug | PprShowAll | PprInterface (GlobalSwitch -> Bool) | PprForC (GlobalSwitch -> Bool) | PprUnfolding (GlobalSwitch -> Bool) | PprForAsm (GlobalSwitch -> Bool) Bool ([Char] -> [Char]) #-}
+data Labda a 
+data Name 
+data ExportFlag 
+data PprStyle 
 type Pretty = Int -> Bool -> PrettyRep
-data PrettyRep 	{-# GHC_PRAGMA MkPrettyRep CSeq (Delay Int) Bool Bool #-}
-data ProtoName 	{-# GHC_PRAGMA Unk _PackedString | Imp _PackedString _PackedString [_PackedString] _PackedString | Prel Name #-}
+data PrettyRep 
+data ProtoName 
 type PreludeNameFun = _PackedString -> Labda Name
 type PreludeNameFuns = (_PackedString -> Labda Name, _PackedString -> Labda Name)
 type Rn3M a = (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a
-data SplitUniqSupply 	{-# GHC_PRAGMA MkSplitUniqSupply Int SplitUniqSupply SplitUniqSupply #-}
+data SplitUniqSupply 
 initRn3 :: ((FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> a) -> SplitUniqSupply -> a
-	{-# GHC_PRAGMA _A_ 2 _U_ 12 _N_ _S_ "SL" _N_ _N_ #-}
 rnModule3 :: (_PackedString -> Labda Name, _PackedString -> Labda Name) -> [_PackedString] -> Module ProtoName (InPat ProtoName) -> (FiniteMap _PackedString ExportFlag, FiniteMap _PackedString ()) -> _PackedString -> SplitUniqSupply -> ([(ProtoName, Name)], [(ProtoName, Name)], ProtoName -> Labda Name, ProtoName -> Labda Name, Bag (PprStyle -> Int -> Bool -> PrettyRep))
-	{-# GHC_PRAGMA _A_ 6 _U_ 121001 _N_ _S_ "U(LL)LU(LLLASASAAALLA)AAU(ALS)" {_A_ 5 _U_ 22211 _N_ _N_ _N_ _N_} _N_ _N_ #-}
 

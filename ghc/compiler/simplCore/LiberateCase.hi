@@ -3,5 +3,4 @@ interface LiberateCase where
 import CoreSyn(CoreBinding)
 import Id(Id)
 liberateCase :: Int -> [CoreBinding Id Id] -> [CoreBinding Id Id]
-	{-# GHC_PRAGMA _A_ 2 _U_ 21 _N_ _S_ "LS" _N_ _N_ #-}
 
