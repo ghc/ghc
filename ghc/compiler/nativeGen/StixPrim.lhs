@@ -487,13 +487,6 @@ iNTLIKE_closure = StCLbl mkIntlikeClosureLabel
 cHARLIKE_closure :: StixTree
 cHARLIKE_closure = StCLbl mkCharlikeClosureLabel
 
--- Trees for the ErrorIOPrimOp
-
-topClosure, errorIO :: StixTree
-
-topClosure = StInd PtrRep (StCLbl mkTopClosureLabel)
-errorIO = StJump (StInd PtrRep (StCLbl mkErrorIO_innardsLabel))
-
 mutArrPtrsFrozen_info = StCLbl mkMAP_FROZEN_infoLabel
 
 -- these are the sizes of charLike and intLike closures, in _bytes_.
