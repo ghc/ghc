@@ -11,26 +11,27 @@ module Rename ( renameModule ) where
 import PreludeGlaST	( thenPrimIO )
 
 IMP_Ubiq()
+IMPORT_1_3(List(partition))
 
 import HsSyn
 import RdrHsSyn		( RdrNameHsModule(..), RdrNameImportDecl(..) )
-import RnHsSyn		( RnName(..){-.. is for Ix hack only-}, RenamedHsModule(..), isRnTyConOrClass, isRnWired )
+import RnHsSyn		( RnName(..){-.. is for Ix hack only-}, SYN_IE(RenamedHsModule), isRnTyConOrClass, isRnWired )
 
 --ToDo:rm: all for debugging only
-import Maybes
-import Name
-import Outputable
-import RnIfaces
-import PprStyle
-import Pretty
-import FiniteMap
-import Util (pprPanic, pprTrace)
+--import Maybes
+--import Name
+--import Outputable
+--import RnIfaces
+--import PprStyle
+--import Pretty
+--import FiniteMap
+--import Util (pprPanic, pprTrace)
 
 import ParseUtils	( ParsedIface(..), RdrIfaceDecl(..), RdrIfaceInst(..),
 			  UsagesMap(..), VersionsMap(..)
 			)
 import RnMonad
-import RnNames		( getGlobalNames, GlobalNameInfo(..) )
+import RnNames		( getGlobalNames, SYN_IE(GlobalNameInfo) )
 import RnSource		( rnSource )
 import RnIfaces		( rnIfaces, initIfaceCache, IfaceCache )
 import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv, emptyRnEnv )
@@ -38,14 +39,19 @@ import RnUtils		( SYN_IE(RnEnv), extendGlobalRnEnv, emptyRnEnv )
 import Bag		( isEmptyBag, unionBags, unionManyBags, bagToList, listToBag )
 import CmdLineOpts	( opt_HiMap, opt_NoImplicitPrelude )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
-import FiniteMap	( emptyFM, eltsFM, fmToList, lookupFM{-ToDo:rm-} )
+import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, lookupFM{-ToDo:rm-}, FiniteMap )
 import Maybes		( catMaybes )
-import Name		( isLocallyDefined, mkWiredInName, Name, RdrName(..), ExportFlag(..) )
+import Name		( isLocallyDefined, mkWiredInName, getLocalName, isLocalName,
+			  origName,
+			  Name, RdrName(..), ExportFlag(..)
+			)
+import PprStyle		-- ToDo:rm
 import PrelInfo		( builtinNameInfo, SYN_IE(BuiltinNames), SYN_IE(BuiltinKeys) )
+import Pretty		-- ToDo:rm
 import Unique		( ixClassKey )
 import UniqFM		( emptyUFM, lookupUFM, addListToUFM_C, eltsUFM )
 import UniqSupply	( splitUniqSupply )
-import Util		( panic, assertPanic )
+import Util		( panic, assertPanic, pprTrace{-ToDo:rm-} )
 \end{code}
 
 \begin{code}

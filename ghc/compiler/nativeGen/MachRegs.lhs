@@ -19,7 +19,7 @@ module MachRegs (
 	Imm(..),
 	Addr(..),
 	RegLoc(..),
-	RegNo(..),
+	SYN_IE(RegNo),
 
 	addrOffset,
 	argRegs,
@@ -44,7 +44,7 @@ module MachRegs (
 	, allArgRegs
 	, fits8Bits
 	, fReg
-	, gp, pv, ra, sp, t9, t10, t11, t12, v0, f0, zero
+	, gp, pv, ra, sp, t9, t10, t11, t12, v0, f0, zeroh
 #endif
 #if i386_TARGET_ARCH
 	, eax, ebx, ecx, edx, esi, esp
@@ -73,7 +73,7 @@ import Unique		( mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3,
 			  Unique{-instance Ord3-}
 			)
 import UniqSupply	( getUnique, returnUs, thenUs, SYN_IE(UniqSM) )
-import Unpretty		( uppStr, Unpretty(..) )
+import Unpretty		( uppStr, SYN_IE(Unpretty) )
 import Util		( panic )
 \end{code}
 
@@ -378,14 +378,14 @@ is defined in StgRegs.h.  We are, of course, prepared for any eventuality.
 fReg :: Int -> Int
 fReg x = (32 + x)
 
-v0, f0, ra, pv, gp, sp, zero :: Reg
-v0   = realReg 0
-f0   = realReg (fReg 0)
-ra   = FixedReg ILIT(26)
-pv   = t12
-gp   = FixedReg ILIT(29)
-sp   = FixedReg ILIT(30)
-zero = FixedReg ILIT(31)
+v0, f0, ra, pv, gp, sp, zeroh :: Reg
+v0    = realReg 0
+f0    = realReg (fReg 0)
+ra    = FixedReg ILIT(26)
+pv    = t12
+gp    = FixedReg ILIT(29)
+sp    = FixedReg ILIT(30)
+zeroh = FixedReg ILIT(31) -- "zero" is used in 1.3 (MonadZero method)
 
 t9, t10, t11, t12 :: Reg
 t9  = realReg 23
@@ -910,7 +910,7 @@ freeReg ILIT(26) = _FALSE_  -- return address (ra)
 freeReg ILIT(28) = _FALSE_  -- reserved for the assembler (at)
 freeReg ILIT(29) = _FALSE_  -- global pointer (gp)
 freeReg ILIT(30) = _FALSE_  -- stack pointer (sp)
-freeReg ILIT(31) = _FALSE_  -- always zero (zero)
+freeReg ILIT(31) = _FALSE_  -- always zero (zeroh)
 freeReg ILIT(63) = _FALSE_  -- always zero (f31)
 #endif
 

@@ -17,7 +17,7 @@ IMP_Ubiq()
 import HsSyn		( MonoBinds(..), HsExpr(..), InPat, OutPat, HsLit, 
 			  Match, HsBinds, Qualifier, PolyType, ArithSeqInfo,
 			  GRHSsAndBinds, Stmt, Fake )
-import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcExpr(..), TcMonoBinds(..) )
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcExpr), SYN_IE(TcMonoBinds) )
 
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( lookupInst, lookupSimpleInst,
@@ -25,11 +25,11 @@ import Inst		( lookupInst, lookupSimpleInst,
 			  matchesInst, instToId, instBindingRequired,
 			  instCanBeGeneralised, newDictsAtLoc,
 			  pprInst,
-			  Inst(..), LIE(..), zonkLIE, emptyLIE,
+			  Inst(..), SYN_IE(LIE), zonkLIE, emptyLIE,
 			  plusLIE, unitLIE, consLIE, InstOrigin(..),
 			  OverloadedLit )
 import TcEnv		( tcGetGlobalTyVars )
-import TcType		( TcType(..), TcTyVar(..), TcTyVarSet(..), TcMaybe, tcInstType )
+import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), TcMaybe, tcInstType )
 import Unify		( unifyTauTy )
 
 import Bag		( Bag, unitBag, listToBag, foldBag, filterBag, emptyBag, bagToList, 

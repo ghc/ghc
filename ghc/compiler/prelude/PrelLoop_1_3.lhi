@@ -4,5 +4,6 @@ __exports__
 Name mkWiredInName (..)
 Type mkSigmaTy (..)
 Type mkFunTys (..)
+Type mkFunTy (..)
 IdUtils primOpNameInfo (..)
 \end{code}

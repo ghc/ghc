@@ -20,7 +20,7 @@ import CgMonad
 import AbsCSyn
 
 import AbsCUtils	( mkAbsCStmts, mkAbstractCs )
-import CgBindery	( getArgAmodes )
+import CgBindery	( getArgAmodes, CgIdInfo )
 import CgCase		( cgCase, saveVolatileVarsAndRegs )
 import CgClosure	( cgRhsClosure )
 import CgCon		( buildDynCon, cgReturnDataCon )

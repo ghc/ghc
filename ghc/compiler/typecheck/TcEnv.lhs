@@ -25,13 +25,13 @@ IMP_Ubiq()
 IMPORT_DELOOPER(TcMLoop)  -- for paranoia checking
 
 import Id	( SYN_IE(Id), GenId, idType, mkUserLocal )
-import TcHsSyn	( TcIdBndr(..), TcIdOcc(..) )
+import TcHsSyn	( SYN_IE(TcIdBndr), TcIdOcc(..) )
 import TcKind	( TcKind, newKindVars, tcDefaultKind, kindToTcKind )
-import TcType	( TcType(..), TcMaybe, TcTyVar(..), TcTyVarSet(..),
+import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar), SYN_IE(TcTyVarSet),
 		  newTyVarTys, tcInstTyVars, zonkTcTyVars
 		)
 import TyVar	( mkTyVar, tyVarKind, unionTyVarSets, emptyTyVarSet )
-import Type	( tyVarsOfTypes )
+import Type	( tyVarsOfTypes, splitForAllTy )
 import TyCon	( TyCon, tyConKind, synTyConArity )
 import Class	( SYN_IE(Class), GenClass, classSig )
 
@@ -41,7 +41,6 @@ import Name		( getOccName, getSrcLoc, Name{-instance NamedThing-} )
 import PprStyle
 import Pretty
 import RnHsSyn		( RnName(..) )
-import Type		( splitForAllTy )
 import Unique		( pprUnique10, pprUnique{-ToDo:rm-} )
 import UniqFM	     
 import Util		( zipEqual, zipWithEqual, zipWith3Equal, zipLazy,

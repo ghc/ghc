@@ -34,7 +34,8 @@ import CgStackery	( adjustRealSps, mkStkAmodes )
 import CgUsages		( getSpARelOffset )
 import CLabel		( mkStdUpdCodePtrVecLabel, mkConUpdCodePtrVecLabel )
 import ClosureInfo	( nodeMustPointToIt,
-			  getEntryConvention, EntryConvention(..)
+			  getEntryConvention, EntryConvention(..),
+			  LambdaFormInfo
 			)
 import CmdLineOpts	( opt_DoSemiTagging )
 import HeapOffs		( zeroOff, SYN_IE(VirtualSpAOffset) )

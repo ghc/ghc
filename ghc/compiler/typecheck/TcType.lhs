@@ -3,17 +3,17 @@
 
 module TcType (
 
-  TcTyVar(..),
+  SYN_IE(TcTyVar),
   newTcTyVar,
   newTyVarTy,	-- Kind -> NF_TcM s (TcType s)
   newTyVarTys,	-- Int -> Kind -> NF_TcM s [TcType s]
 
 
-  TcTyVarSet(..),
+  SYN_IE(TcTyVarSet),
 
   -----------------------------------------
-  TcType(..), TcMaybe(..),
-  TcTauType(..), TcThetaType(..), TcRhoType(..),
+  SYN_IE(TcType), TcMaybe(..),
+  SYN_IE(TcTauType), SYN_IE(TcThetaType), SYN_IE(TcRhoType),
 
 	-- Find the type to which a type variable is bound
   tcWriteTyVar,		-- :: TcTyVar s -> TcType s -> NF_TcM (TcType s)
@@ -229,37 +229,37 @@ zonkTcTypeToType env ty
 
 
 tcConvert bind_fn occ_fn env ty_to_convert
-  = do env ty_to_convert
+  = doo env ty_to_convert
   where
-    do env (TyConTy tycon usage) = returnNF_Tc (TyConTy tycon usage)
+    doo env (TyConTy tycon usage) = returnNF_Tc (TyConTy tycon usage)
 
-    do env (SynTy tycon tys ty)  = mapNF_Tc (do env) tys	`thenNF_Tc` \ tys' ->
-				   do env ty			`thenNF_Tc` \ ty' ->
+    doo env (SynTy tycon tys ty)  = mapNF_Tc (doo env) tys	`thenNF_Tc` \ tys' ->
+				   doo env ty			`thenNF_Tc` \ ty' ->
 				   returnNF_Tc (SynTy tycon tys' ty')
 
-    do env (FunTy arg res usage) = do env arg		`thenNF_Tc` \ arg' ->
-				   do env res		`thenNF_Tc` \ res' ->
+    doo env (FunTy arg res usage) = doo env arg		`thenNF_Tc` \ arg' ->
+				   doo env res		`thenNF_Tc` \ res' ->
 				   returnNF_Tc (FunTy arg' res' usage)
 
-    do env (AppTy fun arg)	 = do env fun		`thenNF_Tc` \ fun' ->
-				   do env arg		`thenNF_Tc` \ arg' ->
+    doo env (AppTy fun arg)	 = doo env fun		`thenNF_Tc` \ fun' ->
+				   doo env arg		`thenNF_Tc` \ arg' ->
 				   returnNF_Tc (AppTy fun' arg')
 
-    do env (DictTy clas ty usage)= do env ty		`thenNF_Tc` \ ty' ->
+    doo env (DictTy clas ty usage)= doo env ty		`thenNF_Tc` \ ty' ->
 				   returnNF_Tc (DictTy clas ty' usage)
 
-    do env (ForAllUsageTy u us ty) = do env ty	`thenNF_Tc` \ ty' ->
+    doo env (ForAllUsageTy u us ty) = doo env ty	`thenNF_Tc` \ ty' ->
 				     returnNF_Tc (ForAllUsageTy u us ty')
 
 	-- The two interesting cases!
-    do env (TyVarTy tv) 	 = occ_fn env tv
+    doo env (TyVarTy tv) 	 = occ_fn env tv
 
-    do env (ForAllTy tyvar ty)
+    doo env (ForAllTy tyvar ty)
 	= bind_fn tyvar		`thenNF_Tc` \ tyvar' ->
 	  let
 		new_env = addOneToTyVarEnv env tyvar (TyVarTy tyvar')
 	  in
-	  do new_env ty		`thenNF_Tc` \ ty' ->
+	  doo new_env ty		`thenNF_Tc` \ ty' ->
 	  returnNF_Tc (ForAllTy tyvar' ty')
 
 

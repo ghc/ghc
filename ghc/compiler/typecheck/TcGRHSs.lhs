@@ -13,14 +13,14 @@ IMPORT_DELOOPER(TcLoop) -- for paranoia checking
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 			  HsExpr, HsBinds(..), InPat, OutPat, Bind, Sig, Fake )
-import RnHsSyn		( RenamedGRHSsAndBinds(..), RenamedGRHS(..) )
-import TcHsSyn		( TcGRHSsAndBinds(..), TcGRHS(..), TcIdOcc(..) )
+import RnHsSyn		( SYN_IE(RenamedGRHSsAndBinds), SYN_IE(RenamedGRHS) )
+import TcHsSyn		( SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), TcIdOcc(..) )
 
 import TcMonad		hiding ( rnMtoTcM )
-import Inst		( Inst, LIE(..), plusLIE )
+import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcBinds		( tcBindsAndThen )
 import TcExpr		( tcExpr )
-import TcType		( TcType(..) ) 
+import TcType		( SYN_IE(TcType) ) 
 import Unify		( unifyTauTy )
 
 import TysWiredIn	( boolTy )

@@ -13,7 +13,7 @@ module DsUtils (
 
 	combineGRHSMatchResults,
 	combineMatchResults,
-	dsExprToAtom, DsCoreArg(..),
+	dsExprToAtom, SYN_IE(DsCoreArg),
 	mkCoAlgCaseMatchResult,
 	mkAppDs, mkConDs, mkPrimDs, mkErrorAppDs,
 	mkCoLetsMatchResult,
@@ -32,7 +32,7 @@ IMPORT_DELOOPER(DsLoop)		( match, matchSimply )
 
 import HsSyn		( HsExpr(..), OutPat(..), HsLit(..),
 			  Match, HsBinds, Stmt, Qualifier, PolyType, ArithSeqInfo )
-import TcHsSyn		( TypecheckedPat(..) )
+import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import DsHsSyn		( outPatType )
 import CoreSyn
 
@@ -47,7 +47,7 @@ import Id		( idType, dataConArgTys, mkTupleCon,
 			  SYN_IE(DataCon), SYN_IE(DictVar), SYN_IE(Id), GenId )
 import Literal		( Literal(..) )
 import TyCon		( mkTupleTyCon, isNewTyCon, tyConDataCons )
-import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTys,
+import Type		( mkTyVarTys, mkRhoTy, mkForAllTys, mkFunTy,
 			  mkTheta, isUnboxedType, applyTyCon, getAppTyCon
 			)
 import TysPrim		( voidTy )
@@ -578,7 +578,7 @@ mkFailurePair :: Type		-- Result type of the whole case expression
 				-- applied to unit tuple
 mkFailurePair ty
   | isUnboxedType ty
-  = newFailLocalDs (mkFunTys [voidTy] ty)	`thenDs` \ fail_fun_var ->
+  = newFailLocalDs (voidTy `mkFunTy` ty)	`thenDs` \ fail_fun_var ->
     newSysLocalDs voidTy			`thenDs` \ fail_fun_arg ->
     returnDs (\ body ->
 		NonRec fail_fun_var (Lam (ValBinder fail_fun_arg) body),

@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module CgBindery (
-	CgBindings(..), CgIdInfo(..){-dubiously concrete-},
+	SYN_IE(CgBindings), CgIdInfo(..){-dubiously concrete-},
 	StableLoc, VolatileLoc,
 
 	maybeAStkLoc, maybeBStkLoc,
@@ -34,7 +34,7 @@ import CgMonad
 
 import CgUsages		( getHpRelOffset, getSpARelOffset, getSpBRelOffset )
 import CLabel		( mkClosureLabel )
-import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument )
+import ClosureInfo	( mkLFImported, mkConLFInfo, mkLFArgument, LambdaFormInfo )
 import HeapOffs		( SYN_IE(VirtualHeapOffset),
 			  SYN_IE(VirtualSpAOffset), SYN_IE(VirtualSpBOffset)
 			)

@@ -10,20 +10,20 @@ checker.
 #include "HsVersions.h"
 
 module TcHsSyn (
-	TcIdBndr(..), TcIdOcc(..),
+	SYN_IE(TcIdBndr), TcIdOcc(..),
 	
-	TcMonoBinds(..), TcHsBinds(..), TcBind(..), TcPat(..),
-	TcExpr(..), TcGRHSsAndBinds(..), TcGRHS(..), TcMatch(..),
-	TcQual(..), TcStmt(..), TcArithSeqInfo(..), TcRecordBinds(..),
-	TcHsModule(..),
+	SYN_IE(TcMonoBinds), SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcPat),
+	SYN_IE(TcExpr), SYN_IE(TcGRHSsAndBinds), SYN_IE(TcGRHS), SYN_IE(TcMatch),
+	SYN_IE(TcQual), SYN_IE(TcStmt), SYN_IE(TcArithSeqInfo), SYN_IE(TcRecordBinds),
+	SYN_IE(TcHsModule),
 	
-	TypecheckedHsBinds(..), TypecheckedBind(..),
-	TypecheckedMonoBinds(..), TypecheckedPat(..),
-	TypecheckedHsExpr(..), TypecheckedArithSeqInfo(..),
-	TypecheckedQual(..), TypecheckedStmt(..),
-	TypecheckedMatch(..), TypecheckedHsModule(..),
-	TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
-	TypecheckedRecordBinds(..),
+	SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedBind),
+	SYN_IE(TypecheckedMonoBinds), SYN_IE(TypecheckedPat),
+	SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedArithSeqInfo),
+	SYN_IE(TypecheckedQual), SYN_IE(TypecheckedStmt),
+	SYN_IE(TypecheckedMatch), SYN_IE(TypecheckedHsModule),
+	SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
+	SYN_IE(TypecheckedRecordBinds),
 
 	mkHsTyApp, mkHsDictApp,
 	mkHsTyLam, mkHsDictLam,
@@ -37,7 +37,7 @@ IMP_Ubiq(){-uitous-}
 
 -- friends:
 import HsSyn	-- oodles of it
-import Id	( GenId(..), IdDetails, PragmaInfo,	-- Can meddle modestly with Ids
+import Id	( GenId(..), IdDetails,	-- Can meddle modestly with Ids
 		  SYN_IE(DictVar), idType,
 		  SYN_IE(IdEnv), growIdEnvList, lookupIdEnv
 		)
@@ -45,7 +45,7 @@ import Id	( GenId(..), IdDetails, PragmaInfo,	-- Can meddle modestly with Ids
 -- others:
 import Name	( Name{--O only-} )
 import TcMonad	hiding ( rnMtoTcM )
-import TcType	( TcType(..), TcMaybe, TcTyVar(..),
+import TcType	( SYN_IE(TcType), TcMaybe, SYN_IE(TcTyVar),
 		  zonkTcTypeToType, zonkTcTyVarToTyVar
 		)
 import Usage	( SYN_IE(UVar) )

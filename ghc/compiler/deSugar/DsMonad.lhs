@@ -7,7 +7,7 @@
 #include "HsVersions.h"
 
 module DsMonad (
-	DsM(..),
+	SYN_IE(DsM),
 	initDs, returnDs, thenDs, andDs, mapDs, listDs,
 	mapAndUnzipDs, zipWithDs,
 	uniqSMtoDsM,
@@ -17,7 +17,7 @@ module DsMonad (
 	getSrcLocDs, putSrcLocDs,
 	getModuleAndGroupDs,
 	extendEnvDs, lookupEnvDs, lookupEnvWithDefaultDs,
-	DsIdEnv(..),
+	SYN_IE(DsIdEnv),
 	lookupId,
 
 	dsShadowError,
@@ -38,7 +38,7 @@ import PprType		( GenType, GenTyVar )
 import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( unpackSrcLoc, mkUnknownSrcLoc, SrcLoc )
-import TcHsSyn		( TypecheckedPat(..) )
+import TcHsSyn		( SYN_IE(TypecheckedPat) )
 import TyVar		( nullTyVarEnv, cloneTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instances-} )
 import UniqSupply	( splitUniqSupply, getUnique, getUniques,

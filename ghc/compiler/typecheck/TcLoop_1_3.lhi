@@ -1,5 +1,5 @@
 \begin{code}
 interface TcLoop_1_3 1
 __exports__
-Outputable Outputable (..)
+TcGRHSs tcGRHSsAndBinds (..)
 \end{code}

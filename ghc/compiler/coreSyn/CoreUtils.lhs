@@ -50,7 +50,7 @@ import SrcLoc		( mkUnknownSrcLoc )
 import TyVar		( cloneTyVar,
 			  isNullTyVarEnv, addOneToTyVarEnv, SYN_IE(TyVarEnv)
 			)
-import Type		( mkFunTys, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
+import Type		( mkFunTy, mkForAllTy, mkForAllUsageTy, mkTyVarTy,
 			  getFunTy_maybe, applyTy, isPrimType,
 			  splitSigmaTy, splitFunTy, eqTy, applyTypeEnvToTy
 			)
@@ -91,7 +91,7 @@ coreExprType (Con con args) = applyTypeToArgs (idType    con) args
 coreExprType (Prim op args) = applyTypeToArgs (primOpType op) args
 
 coreExprType (Lam (ValBinder binder) expr)
-  = mkFunTys [idType binder] (coreExprType expr)
+  = idType binder `mkFunTy` coreExprType expr
 
 coreExprType (Lam (TyBinder tyvar) expr)
   = mkForAllTy tyvar (coreExprType expr)

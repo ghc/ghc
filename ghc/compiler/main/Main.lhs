@@ -9,6 +9,7 @@
 module Main ( main ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(IO(hGetContents,stdin,stderr,hPutStr,hClose,openFile,IOMode(..)))
 
 import HsSyn
 

@@ -16,8 +16,7 @@ import CgMonad
 import AbsCUtils	( mkAbsCStmts, mkAbstractCs, magicIdPrimRep )
 import CgCompInfo	( uF_UPDATEE )
 import CgHeapery	( heapCheck, allocDynClosure )
-import CgRetConv	( mkLiveRegsMask,
-			  dataReturnConvAlg, ctrlReturnConvAlg,
+import CgRetConv	( dataReturnConvAlg, ctrlReturnConvAlg,
 			  CtrlReturnConvention(..),
 			  DataReturnConvention(..)
 			)
@@ -33,7 +32,7 @@ import ClosureInfo	( layOutStaticClosure, layOutDynCon,
 			  infoTableLabelFromCI, dataConLiveness
 			)
 import CostCentre	( dontCareCostCentre )
-import FiniteMap	( fmToList )
+import FiniteMap	( fmToList, FiniteMap )
 import HeapOffs		( zeroOff, SYN_IE(VirtualHeapOffset) )
 import Id		( dataConTag, dataConRawArgTys,
 			  dataConNumFields, fIRST_TAG,

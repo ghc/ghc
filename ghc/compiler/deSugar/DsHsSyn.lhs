@@ -12,8 +12,8 @@ IMP_Ubiq()
 
 import HsSyn		( OutPat(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Sig, HsExpr, GRHSsAndBinds, Match, HsLit )
-import TcHsSyn		( TypecheckedPat(..), TypecheckedBind(..), 
-			  TypecheckedMonoBinds(..) )
+import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedBind), 
+			  SYN_IE(TypecheckedMonoBinds) )
 
 import Id		( idType )
 import TysWiredIn	( mkListTy, mkTupleTy, unitTy )

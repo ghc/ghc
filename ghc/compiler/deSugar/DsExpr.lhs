@@ -16,9 +16,9 @@ import HsSyn		( failureFreePat,
 			  Stmt(..), Match(..), Qualifier, HsBinds, PolyType,
 			  GRHSsAndBinds
 			)
-import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
-			  TypecheckedRecordBinds(..), TypecheckedPat(..),
-			  TypecheckedStmt(..)
+import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
+			  SYN_IE(TypecheckedRecordBinds), SYN_IE(TypecheckedPat),
+			  SYN_IE(TypecheckedStmt)
 			)
 import CoreSyn
 
@@ -28,7 +28,7 @@ import DsHsSyn		( outPatType )
 import DsListComp	( dsListComp )
 import DsUtils		( mkAppDs, mkConDs, mkPrimDs, dsExprToAtom,
 			  mkErrorAppDs, showForErr, EquationInfo,
-			  MatchResult, DsCoreArg(..)
+			  MatchResult, SYN_IE(DsCoreArg)
 			)
 import Match		( matchWrapper )
 

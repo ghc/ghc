@@ -19,17 +19,19 @@ module MkIface (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(IO(Handle,hPutStr,openFile,hClose,IOMode(..)))
 
-import Bag		( emptyBag, snocBag, bagToList )
+import Bag		( bagToList )
 import Class		( GenClass(..){-instance NamedThing-}, GenClassOp(..) )
 import CmdLineOpts	( opt_ProduceHi )
 import FieldLabel	( FieldLabel{-instance NamedThing-} )
-import FiniteMap	( fmToList, eltsFM )
+import FiniteMap	( emptyFM, addToFM, lookupFM, fmToList, eltsFM, FiniteMap )
 import HsSyn
 import Id		( idType, dataConRawArgTys, dataConFieldLabels,
 			  dataConStrictMarks, StrictnessMark(..),
 			  GenId{-instance NamedThing/Outputable-}
 			)
+import Maybes		( maybeToBool )
 import Name		( origName, nameOf, moduleOf,
 			  exportFlagOn, nameExportFlag, ExportFlag(..),
 			  isLexSym, isLocallyDefined, isWiredInName,
@@ -45,12 +47,12 @@ import PprType		-- most of it (??)
 import PrelInfo		( builtinNameInfo )
 import Pretty		( prettyToUn )
 import Unpretty		-- ditto
-import RnHsSyn		( RenamedHsModule(..), RnName{-instance NamedThing-} )
-import TcModule		( TcIfaceInfo(..) )
+import RnHsSyn		( isRnConstr, SYN_IE(RenamedHsModule), RnName{-instance NamedThing-} )
+import TcModule		( SYN_IE(TcIfaceInfo) )
 import TcInstUtil	( InstInfo(..) )
 import TyCon		( TyCon(..){-instance NamedThing-}, NewOrData(..) )
 import Type		( mkSigmaTy, mkDictTy, getAppTyCon, splitForAllTy )
-import Util		( sortLt, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}, pprTrace{-ToDo:rm-} )
+import Util		( sortLt, removeDups, zipWithEqual, zipWith3Equal, assertPanic, panic{-ToDo:rm-}, pprTrace{-ToDo:rm-} )
 
 uppSemid   x = uppBeside (prettyToUn (ppr PprInterface x)) uppSemi -- micro util
 ppr_ty	  ty = prettyToUn (pprType PprInterface ty)
@@ -189,24 +191,23 @@ ifaceExportList (Just if_hdl)
   = let
 	(vals_wired, tcs_wired)
 	  = case builtinNameInfo of { ((vals_fm,tcs_fm), _, _) ->
-	    ([ getName rn | rn <- eltsFM vals_fm ]
-	    ,[ getName rn | rn <- eltsFM tcs_fm  ]) }
+	    (eltsFM vals_fm, eltsFM tcs_fm) }
 
-	name_flag_pairs :: Bag (OrigName, ExportFlag)
+	name_flag_pairs :: FiniteMap OrigName ExportFlag
 	name_flag_pairs
-	  = foldr from_wired
-	   (foldr from_wired
+	  = foldr (from_wired True{-val-ish-})
+	   (foldr (from_wired False{-tycon-ish-})
 	   (foldr from_ty
 	   (foldr from_cls
 	   (foldr from_sig
-	   (from_binds binds emptyBag{-init accum-})
+	   (from_binds binds emptyFM{-init accum-})
 	     sigs)
 	     classdecls)
 	     typedecls)
 	     tcs_wired)
 	     vals_wired
 
-	sorted_pairs = sortLt lexical_lt (bagToList name_flag_pairs)
+	sorted_pairs = sortLt lexical_lt (fmToList name_flag_pairs)
 
     in
     hPutStr if_hdl "\n__exports__\n" >>
@@ -223,21 +224,33 @@ ifaceExportList (Just if_hdl)
     from_binds bs acc = maybe_add_list acc (collectTopLevelBinders bs)
 
     --------------
-    from_wired n acc
-      | exportFlagOn ef = acc `snocBag` (origName "maybe_add" n, ef)
-      | otherwise       = acc
-      where
-	ef = export_fn n
-
-    --------------
-    maybe_add :: Bag (OrigName, ExportFlag) -> RnName -> Bag (OrigName, ExportFlag)
-
-    maybe_add acc rn
-      | exportFlagOn ef = acc `snocBag` (origName "maybe_add" n, ef)
+    from_wired is_val_ish rn acc
+      | on_in_acc	= acc -- if already in acc (presumably from real decl),
+			      -- don't take the dubious export flag from the
+			      -- wired-in chappy
+      | is_val_ish && isRnConstr rn
+			= acc -- these things don't cause export-ery
+      | exportFlagOn ef = addToFM acc on ef
       | otherwise       = acc
       where
 	n  = getName rn
+	ef = export_fn n
+	on = origName "from_wired" n
+	(OrigName _ str) = on
+	on_in_acc = maybeToBool (lookupFM acc on)
+
+    --------------
+    maybe_add :: FiniteMap OrigName ExportFlag -> RnName -> FiniteMap OrigName ExportFlag
+
+    maybe_add acc rn
+      | on_in_acc	= trace "maybe_add?" acc -- surprising!
+      | exportFlagOn ef = addToFM acc on ef
+      | otherwise       = acc
+      where
 	ef = nameExportFlag n
+	n  = getName rn
+	on = origName "maybe_add" n
+	on_in_acc = maybeToBool (lookupFM acc on)
 
     --------------
     maybe_add_list acc []     = acc

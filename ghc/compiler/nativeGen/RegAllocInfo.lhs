@@ -24,8 +24,8 @@ module RegAllocInfo (
 	regUsage,
 
 	FutureLive(..),
-	RegAssignment(..),
-	RegConflicts(..),
+	SYN_IE(RegAssignment),
+	SYN_IE(RegConflicts),
 	RegFuture(..),
 	RegHistory(..),
 	RegInfo(..),
@@ -37,7 +37,7 @@ module RegAllocInfo (
 	regLiveness,
 	spillReg,
 
-	RegSet(..),
+	SYN_IE(RegSet),
 	elementOfRegSet,
 	emptyRegSet,
 	isEmptyRegSet,
@@ -52,15 +52,16 @@ module RegAllocInfo (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(List(partition))
 
 import MachMisc
 import MachRegs
-import MachCode		( InstrList(..) )
+import MachCode		( SYN_IE(InstrList) )
 
 import AbsCSyn		( MagicId )
 import BitSet		( unitBS, mkBS, minusBS, unionBS, listBS, BitSet )
 import CLabel		( pprCLabel_asm, CLabel{-instance Ord-} )
-import FiniteMap	( addToFM, lookupFM )
+import FiniteMap	( addToFM, lookupFM, FiniteMap )
 import OrdList		( mkUnitList, OrdList )
 import PrimRep		( PrimRep(..) )
 import Stix		( StixTree, CodeSegment )

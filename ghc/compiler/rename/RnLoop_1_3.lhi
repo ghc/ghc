@@ -1,5 +1,7 @@
 \begin{code}
 interface RnLoop_1_3 1
 __exports__
-Outputable Outputable (..)
+RnBinds  rnBinds (..)
+RnBinds  FreeVars
+RnSource rnPolyType (..)
 \end{code}

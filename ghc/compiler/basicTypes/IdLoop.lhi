@@ -70,7 +70,7 @@ data UnfoldingDetails
   | OtherLitForm [Literal]
   | OtherConForm [GenId (GenType (GenTyVar (GenUsage Unique)) Unique)]
   | GenForm FormSummary (GenCoreExpr (GenId (GenType (GenTyVar (GenUsage Unique)) Unique), BinderInfo) (GenId (GenType (GenTyVar (GenUsage Unique)) Unique)) (GenTyVar (GenUsage Unique)) Unique) UnfoldingGuidance
-  | MagicForm _PackedString MagicUnfoldingFun
+  | MagicForm Unique MagicUnfoldingFun
 
 data UnfoldingGuidance
   = UnfoldNever

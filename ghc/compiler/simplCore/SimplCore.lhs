@@ -9,6 +9,7 @@
 module SimplCore ( core2core ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(IO(hPutStr,stderr))
 
 import AnalFBWW		( analFBWW )
 import Bag		( isEmptyBag, foldBag )
@@ -35,6 +36,7 @@ import CoreSyn
 import CoreUnfold
 import CoreUtils	( substCoreBindings, manifestlyWHNF )
 import ErrUtils		( ghcExit )
+import FiniteMap	( FiniteMap )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FoldrBuildWW	( mkFoldrBuildWW )

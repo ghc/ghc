@@ -13,20 +13,19 @@ IMP_Ubiq()
 import HsSyn		( Match(..), GRHSsAndBinds(..), GRHS(..), InPat,
 			  HsExpr, HsBinds, OutPat, Fake,
 			  collectPatBinders, pprMatch )
-import RnHsSyn		( RenamedMatch(..) )
-import TcHsSyn		( TcIdOcc(..), TcMatch(..) )
+import RnHsSyn		( SYN_IE(RenamedMatch), RnName{-instance Outputable-} )
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcMatch) )
 
 import TcMonad		hiding ( rnMtoTcM )
-import Inst		( Inst, LIE(..), plusLIE )
+import Inst		( Inst, SYN_IE(LIE), plusLIE )
 import TcEnv		( newMonoIds )
 IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcPat		( tcPat )
-import TcType		( TcType(..), TcMaybe, zonkTcType )
+import TcType		( SYN_IE(TcType), TcMaybe, zonkTcType )
 import Unify		( unifyTauTy, unifyTauTyList )
 
 import Kind		( Kind, mkTypeKind )
 import Pretty
-import RnHsSyn		( RnName{-instance Outputable-} )
 import Type		( isTyVarTy, mkFunTy, getFunTy_maybe )
 import Util
 \end{code}

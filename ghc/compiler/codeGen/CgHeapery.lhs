@@ -20,7 +20,6 @@ import AbsCSyn
 import CgMonad
 
 import AbsCUtils	( mkAbstractCs, getAmodeRep )
-import CgRetConv	( mkLiveRegsMask )
 import CgUsages		( getVirtAndRealHp, setVirtHp, setRealHp,
 			  initHeapUsage
 			)

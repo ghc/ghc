@@ -15,12 +15,12 @@ module GenSpecEtc (
 IMP_Ubiq()
 
 import TcMonad		hiding ( rnMtoTcM )
-import Inst		( Inst, InstOrigin(..), LIE(..), plusLIE, 
+import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), plusLIE, 
 			  newDicts, tyVarsOfInst, instToId )
 import TcEnv		( tcGetGlobalTyVars, tcExtendGlobalTyVars )
 import TcSimplify	( tcSimplify, tcSimplifyAndCheck )
-import TcType		( TcType(..), TcThetaType(..), TcTauType(..), 
-			  TcTyVarSet(..), TcTyVar(..),
+import TcType		( SYN_IE(TcType), SYN_IE(TcThetaType), SYN_IE(TcTauType), 
+			  SYN_IE(TcTyVarSet), SYN_IE(TcTyVar),
 			  newTyVarTy, zonkTcType, zonkTcTyVar, zonkTcTyVars 
 			)
 import Unify		( unifyTauTy )
@@ -28,7 +28,7 @@ import Unify		( unifyTauTy )
 import HsSyn		( HsBinds(..), Bind(..), MonoBinds(..), HsExpr, OutPat(..), 
 			  Sig, HsLit, ArithSeqInfo, InPat, GRHSsAndBinds, Match, Fake
 			)
-import TcHsSyn		( TcIdOcc(..), TcIdBndr(..), TcHsBinds(..), TcBind(..), TcExpr(..), tcIdType )
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcIdBndr), SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcExpr), tcIdType )
 
 import Bag		( Bag, foldBag, bagToList, listToBag, isEmptyBag )
 import Class		( GenClass )

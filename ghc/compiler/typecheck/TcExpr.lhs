@@ -15,18 +15,18 @@ import HsSyn		( HsExpr(..), Qualifier(..), Stmt(..),
 			  ArithSeqInfo(..), HsLit(..), Sig, GRHSsAndBinds,
 			  Match, Fake, InPat, OutPat, PolyType,
 			  failureFreePat, collectPatBinders )
-import RnHsSyn		( RenamedHsExpr(..), RenamedQual(..),
-			  RenamedStmt(..), RenamedRecordBinds(..),
+import RnHsSyn		( SYN_IE(RenamedHsExpr), SYN_IE(RenamedQual),
+			  SYN_IE(RenamedStmt), SYN_IE(RenamedRecordBinds),
 			  RnName{-instance Outputable-}
 			)
-import TcHsSyn		( TcExpr(..), TcQual(..), TcStmt(..),
-			  TcIdOcc(..), TcRecordBinds(..),
+import TcHsSyn		( SYN_IE(TcExpr), SYN_IE(TcQual), SYN_IE(TcStmt),
+			  TcIdOcc(..), SYN_IE(TcRecordBinds),
 			  mkHsTyApp
 			)
 
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, InstOrigin(..), OverloadedLit(..),
-			  LIE(..), emptyLIE, plusLIE, plusLIEs, newOverloadedLit,
+			  SYN_IE(LIE), emptyLIE, plusLIE, plusLIEs, newOverloadedLit,
 			  newMethod, newMethodWithGivenTy, newDicts )
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
@@ -37,7 +37,7 @@ import TcMatches	( tcMatchesCase, tcMatch )
 import TcMonoType	( tcPolyType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
-import TcType		( TcType(..), TcMaybe(..),
+import TcType		( SYN_IE(TcType), TcMaybe(..),
 			  tcInstId, tcInstType, tcInstSigTcType,
 			  tcInstSigType, tcInstTcType, tcInstTheta,
 			  newTyVarTy, zonkTcTyVars, zonkTcType )
@@ -57,11 +57,11 @@ import Type		( mkFunTy, mkAppTy, mkTyVarTy, mkTyVarTys, mkRhoTy,
 			)
 import TyVar		( GenTyVar, SYN_IE(TyVarSet), unionTyVarSets, mkTyVarSet )
 import TysPrim		( intPrimTy, charPrimTy, doublePrimTy,
-			  floatPrimTy, addrPrimTy
+			  floatPrimTy, addrPrimTy, realWorldTy
 			)
 import TysWiredIn	( addrTy,
 			  boolTy, charTy, stringTy, mkListTy,
-			  mkTupleTy, mkPrimIoTy, primIoDataCon
+			  mkTupleTy, mkPrimIoTy, stDataCon
 			)
 import Unify		( unifyTauTy, unifyTauTyList, unifyTauTyLists, unifyFunTy )
 import Unique		( Unique, cCallableClassKey, cReturnableClassKey, 
@@ -269,7 +269,7 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty)
     mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args arg_tys)    `thenNF_Tc` \ ccarg_dicts_s ->
     newDicts result_origin [(cReturnableClass, result_ty)]	    `thenNF_Tc` \ (ccres_dict, _) ->
 
-    returnTc (HsCon primIoDataCon [result_ty] [CCall lbl args' may_gc is_asm result_ty],
+    returnTc (HsCon stDataCon [realWorldTy, result_ty] [CCall lbl args' may_gc is_asm result_ty],
 	      -- do the wrapping in the newtype constructor here
 	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie,
 	      mkPrimIoTy result_ty)

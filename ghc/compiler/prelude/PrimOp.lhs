@@ -44,7 +44,7 @@ import Pretty
 import SMRep	    	( SMRep(..), SMSpecRepKind(..), SMUpdateKind(..) )
 import TyCon		( TyCon{-instances-} )
 import Type		( getAppDataTyConExpandingDicts, maybeAppDataTyConExpandingDicts,
-			  mkForAllTys, mkFunTys, applyTyCon, typePrimRep
+			  mkForAllTys, mkFunTy, mkFunTys, applyTyCon, typePrimRep
 			)
 import TyVar		( alphaTyVar, betaTyVar, gammaTyVar, GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-} )
@@ -1332,7 +1332,7 @@ primOpInfo ErrorIOPrimOp -- errorIO# :: PrimIO () -> State# RealWorld#
 	statePrimTyCon VoidRep [realWorldTy]
   where
     primio_ish_ty result
-      = mkFunTys [mkStateTy realWorldTy] (mkTupleTy 2 [result, mkStateTy realWorldTy])
+      = mkFunTy (mkStateTy realWorldTy) (mkTupleTy 2 [result, mkStateTy realWorldTy])
 \end{code}
 
 %************************************************************************
@@ -1660,7 +1660,7 @@ primOpType op
       Dyadic str ty ->	    dyadic_fun_ty ty
       Monadic str ty ->	    monadic_fun_ty ty
       Compare str ty ->	    compare_fun_ty ty
-      Coercing str ty1 ty2 -> mkFunTys [ty1] ty2
+      Coercing str ty1 ty2 -> mkFunTy ty1 ty2
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->
 	mkForAllTys tyvars (mkFunTys arg_tys (applyTyCon prim_tycon res_tys))
@@ -1726,7 +1726,7 @@ commutableOp _		  = False
 Utils:
 \begin{code}
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
-monadic_fun_ty ty = mkFunTys [ty] ty
+monadic_fun_ty ty = mkFunTy  ty ty
 compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 \end{code}
 

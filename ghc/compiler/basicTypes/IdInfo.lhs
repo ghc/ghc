@@ -83,6 +83,7 @@ import PprStyle		( PprStyle(..) )
 import Pretty
 import SrcLoc		( mkUnknownSrcLoc )
 import Type		( eqSimpleTy, splitFunTyExpandingDicts )
+import Unique		( pprUnique )
 import Util		( mapAccumL, panic, assertPanic, pprPanic )
 
 #ifdef REALLY_HASKELL_1_3
@@ -766,7 +767,7 @@ pp_unfolding sty for_this_id inline_env uf_details
     pp NoUnfoldingDetails = pp_NONE
 
     pp (MagicForm tag _)
-      = ppCat [ppPStr SLIT("_MF_"), ppPStr tag]
+      = ppCat [ppPStr SLIT("_MF_"), pprUnique tag]
 
     pp (GenForm _ _ BadUnfolding) = pp_NONE
 

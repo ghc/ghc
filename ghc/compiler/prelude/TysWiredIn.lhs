@@ -48,11 +48,11 @@ module TysWiredIn (
 	mkTupleTy,
 	nilDataCon,
 	primIoTyCon,
-	primIoDataCon,
 	realWorldStateTy,
 	return2GMPsTyCon,
 	returnIntAndGMPTyCon,
 	stTyCon,
+	stDataCon,
 	stablePtrTyCon,
 	stateAndAddrPrimTyCon,
 	stateAndArrayPrimTyCon,
@@ -101,7 +101,7 @@ import TyCon		( mkDataTyCon, mkTupleTyCon, mkSynTyCon,
 			  NewOrData(..), TyCon
 			)
 import Type		( mkTyConTy, applyTyCon, mkSigmaTy,
-			  mkFunTys, maybeAppTyCon,
+			  mkFunTy, maybeAppTyCon,
 			  GenType(..), SYN_IE(ThetaType), SYN_IE(TauType) )
 import TyVar		( tyVarKind, alphaTyVar, betaTyVar )
 import Unique
@@ -129,6 +129,11 @@ pc_tycon new_or_data key mod str tyvars cons
 		new_or_data
   where
     tycon_kind = foldr (mkArrowKind . tyVarKind) mkBoxedTypeKind tyvars
+
+pcSynTyCon key mod str kind arity tyvars expansion
+  = mkSynTyCon
+     (mkWiredInName key (OrigName mod str) ExportAll)
+     kind arity tyvars expansion
 
 pcDataCon :: Unique{-DataConKey-} -> Module -> FAST_STRING
 	  -> [TyVar] -> ThetaType -> [TauType] -> TyCon -> SpecEnv -> Id
@@ -442,28 +447,27 @@ This is really just an ordinary synonym, except it is ABSTRACT.
 mkStateTransformerTy s a = applyTyCon stTyCon [s, a]
 
 stTyCon = pcNewTyCon stTyConKey gHC__ SLIT("ST") alpha_beta_tyvars [stDataCon]
-  where
-    ty = mkFunTys [mkStateTy alphaTy] (mkTupleTy 2 [betaTy, mkStateTy alphaTy])
 
-    stDataCon = pcDataCon stDataConKey gHC__ SLIT("ST")
+stDataCon = pcDataCon stDataConKey gHC__ SLIT("ST")
 			alpha_beta_tyvars [] [ty] stTyCon nullSpecEnv
+  where
+    ty = mkFunTy (mkStateTy alphaTy) (mkTupleTy 2 [betaTy, mkStateTy alphaTy])
 \end{code}
 
 %************************************************************************
 %*									*
-\subsection[TysWiredIn-IO]{The @PrimIO@ and @IO@ monadic-I/O types}
+\subsection[TysWiredIn-IO]{The @PrimIO@ monadic-I/O type}
 %*									*
 %************************************************************************
 
 \begin{code}
-mkPrimIoTy a = applyTyCon primIoTyCon [a]
+mkPrimIoTy a = mkStateTransformerTy realWorldTy a
 
-primIoTyCon = pcNewTyCon primIoTyConKey gHC__ SLIT("PrimIO") alpha_tyvar [primIoDataCon]
-
-primIoDataCon = pcDataCon primIoDataConKey gHC__ SLIT("PrimIO")
-		    alpha_tyvar [] [ty] primIoTyCon nullSpecEnv
-  where
-    ty = mkFunTys [mkStateTy realWorldTy] (mkTupleTy 2 [alphaTy, mkStateTy realWorldTy])
+primIoTyCon
+  = pcSynTyCon
+     primIoTyConKey gHC__ SLIT("PrimIO")
+     (mkBoxedTypeKind `mkArrowKind` mkBoxedTypeKind)
+     1 alpha_tyvar (mkPrimIoTy alphaTy)
 \end{code}
 
 %************************************************************************

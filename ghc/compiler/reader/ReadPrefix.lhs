@@ -10,6 +10,7 @@ module ReadPrefix ( rdModule )  where
 
 IMP_Ubiq()
 IMPORT_1_3(IO(hPutStr, stderr))
+IMPORT_1_3(GHCio(stThen))
 
 import UgenAll		-- all Yacc parser gumpff...
 import PrefixSyn	-- and various syntaxen.
@@ -80,7 +81,7 @@ cvFlag 1 = True
 \begin{code}
 #if __GLASGOW_HASKELL__ >= 200
 # define PACK_STR packCString
-# define CCALL_THEN `GHCbase.ccallThen`
+# define CCALL_THEN `stThen`
 #else
 # define PACK_STR _packCString
 # define CCALL_THEN `thenPrimIO`
@@ -410,8 +411,13 @@ wlkPat pat
 			             (\sty -> ppInterleave ppSP (map (ppr sty) (lpat:lpats)))
 		     msg = ppShow 100 (err PprForUser)
 		 in
+#if __GLASGOW_HASKELL__ >= 200
+	         ioToUgnM  (GHCbase.ioToPrimIO (hPutStr stderr msg)) `thenUgn` \ _ ->
+		 ioToUgnM  (GHCbase.ioToPrimIO (ghcExit 1))	     `thenUgn` \ _ ->
+#else
 	         ioToUgnM  (hPutStr stderr msg) `thenUgn` \ _ ->
 		 ioToUgnM  (ghcExit 1)		`thenUgn` \ _ ->
+#endif
 		 returnUgn (error "ReadPrefix")
 
 	)			`thenUgn` \ (n, arg_pats) ->

@@ -63,8 +63,8 @@ import PrimRep		( getPrimRepSize, isFollowableRep, retPrimRepSize,
 			)
 import TyCon		( isEnumerationTyCon )
 import Type		( typePrimRep,
-			  getAppSpecDataTyConExpandingDicts, maybeAppSpecDataTyConExpandingDicts,
-			  isEnumerationTyCon
+			  getAppSpecDataTyConExpandingDicts,
+			  maybeAppSpecDataTyConExpandingDicts
 			)
 import Util		( sortLt, isIn, isn'tIn, zipEqual,
 			  pprError, panic, assertPanic

@@ -132,7 +132,6 @@ module Unique (
 	parIdKey,
 	patErrorIdKey,
 	primIoTyConKey,
-	primIoDataConKey,
 	ratioDataConKey,
 	ratioTyConKey,
 	rationalTyConKey,
@@ -590,7 +589,6 @@ stateDataConKey				= mkPreludeDataConUnique 39
 trueDataConKey				= mkPreludeDataConUnique 40
 wordDataConKey				= mkPreludeDataConUnique 41
 stDataConKey				= mkPreludeDataConUnique 42
-primIoDataConKey			= mkPreludeDataConUnique 43
 \end{code}
 
 %************************************************************************

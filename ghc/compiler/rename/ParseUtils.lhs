@@ -209,7 +209,7 @@ mk_class ctxt (qclas@(Qual mod clas), tyvar) ops_and_sigs
   where
     opify (Sig f ty _ loc) = ClassOpSig f ty noClassOpPragmas loc
 
-mk_inst	:: Maybe [RdrName] -- ToDo: de-maybe
+mk_inst	:: [RdrName]
 	-> RdrNameContext
 	-> RdrName -- class
 	-> RdrNameMonoType  -- fish the tycon out yourself...
@@ -217,9 +217,7 @@ mk_inst	:: Maybe [RdrName] -- ToDo: de-maybe
 
 mk_inst	tvs ctxt qclas@(Qual cmod cname) mono_ty
   = let
-	ty = case tvs of
-	       Nothing -> HsPreForAllTy ctxt mono_ty -- ToDo: get rid of this
-	       Just ts -> HsForAllTy ts ctxt mono_ty
+	ty = HsForAllTy tvs ctxt mono_ty
     in
     -- pprTrace "mk_inst:" (ppr PprDebug ty) $
     InstSig qclas (tycon_name mono_ty) mkIfaceSrcLoc $ \ mod ->

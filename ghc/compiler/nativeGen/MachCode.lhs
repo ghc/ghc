@@ -12,7 +12,7 @@ structure should not be too overwhelming.
 #include "HsVersions.h"
 #include "nativeGen/NCG.h"
 
-module MachCode ( stmt2Instrs, asmVoid, InstrList(..) ) where
+module MachCode ( stmt2Instrs, asmVoid, SYN_IE(InstrList) ) where
 
 IMP_Ubiq(){-uitious-}
 
@@ -334,46 +334,46 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
-      CharGtOp -> trivialCode (CMP LT) y x
+      CharGtOp -> trivialCode (CMP LTT) y x
       CharGeOp -> trivialCode (CMP LE) y x
-      CharEqOp -> trivialCode (CMP EQ) x y
+      CharEqOp -> trivialCode (CMP EQQ) x y
       CharNeOp -> int_NE_code x y
-      CharLtOp -> trivialCode (CMP LT) x y
+      CharLtOp -> trivialCode (CMP LTT) x y
       CharLeOp -> trivialCode (CMP LE) x y
 
-      IntGtOp  -> trivialCode (CMP LT) y x
+      IntGtOp  -> trivialCode (CMP LTT) y x
       IntGeOp  -> trivialCode (CMP LE) y x
-      IntEqOp  -> trivialCode (CMP EQ) x y
+      IntEqOp  -> trivialCode (CMP EQQ) x y
       IntNeOp  -> int_NE_code x y
-      IntLtOp  -> trivialCode (CMP LT) x y
+      IntLtOp  -> trivialCode (CMP LTT) x y
       IntLeOp  -> trivialCode (CMP LE) x y
 
       WordGtOp -> trivialCode (CMP ULT) y x
       WordGeOp -> trivialCode (CMP ULE) x y
-      WordEqOp -> trivialCode (CMP EQ)  x y
+      WordEqOp -> trivialCode (CMP EQQ)  x y
       WordNeOp -> int_NE_code x y
       WordLtOp -> trivialCode (CMP ULT) x y
       WordLeOp -> trivialCode (CMP ULE) x y
 
       AddrGtOp -> trivialCode (CMP ULT) y x
       AddrGeOp -> trivialCode (CMP ULE) y x
-      AddrEqOp -> trivialCode (CMP EQ)  x y
+      AddrEqOp -> trivialCode (CMP EQQ)  x y
       AddrNeOp -> int_NE_code x y
       AddrLtOp -> trivialCode (CMP ULT) x y
       AddrLeOp -> trivialCode (CMP ULE) x y
 
-      FloatGtOp -> cmpF_code (FCMP TF LE) EQ x y
-      FloatGeOp -> cmpF_code (FCMP TF LT) EQ x y
-      FloatEqOp -> cmpF_code (FCMP TF EQ) NE x y
-      FloatNeOp -> cmpF_code (FCMP TF EQ) EQ x y
-      FloatLtOp -> cmpF_code (FCMP TF LT) NE x y
+      FloatGtOp -> cmpF_code (FCMP TF LE) EQQ x y
+      FloatGeOp -> cmpF_code (FCMP TF LTT) EQQ x y
+      FloatEqOp -> cmpF_code (FCMP TF EQQ) NE x y
+      FloatNeOp -> cmpF_code (FCMP TF EQQ) EQQ x y
+      FloatLtOp -> cmpF_code (FCMP TF LTT) NE x y
       FloatLeOp -> cmpF_code (FCMP TF LE) NE x y
 
-      DoubleGtOp -> cmpF_code (FCMP TF LE) EQ x y
-      DoubleGeOp -> cmpF_code (FCMP TF LT) EQ x y
-      DoubleEqOp -> cmpF_code (FCMP TF EQ) NE x y
-      DoubleNeOp -> cmpF_code (FCMP TF EQ) EQ x y
-      DoubleLtOp -> cmpF_code (FCMP TF LT) NE x y
+      DoubleGtOp -> cmpF_code (FCMP TF LE) EQQ x y
+      DoubleGeOp -> cmpF_code (FCMP TF LTT) EQQ x y
+      DoubleEqOp -> cmpF_code (FCMP TF EQQ) NE x y
+      DoubleNeOp -> cmpF_code (FCMP TF EQQ) EQQ x y
+      DoubleLtOp -> cmpF_code (FCMP TF LTT) NE x y
       DoubleLeOp -> cmpF_code (FCMP TF LE) NE x y
 
       IntAddOp  -> trivialCode (ADD Q False) x y
@@ -416,7 +416,7 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
     int_NE_code :: StixTree -> StixTree -> UniqSM Register
 
     int_NE_code x y
-      = trivialCode (CMP EQ) x y	`thenUs` \ register ->
+      = trivialCode (CMP EQQ) x y	`thenUs` \ register ->
 	getNewRegNCG IntRep		`thenUs` \ tmp ->
 	let
 	    code = registerCode register tmp
@@ -443,9 +443,9 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
 	    result  = registerName register tmp
 
 	    code__2 dst = code . mkSeqInstrs [
-		OR zero (RIImm (ImmInt 1)) dst,
-		BF cond result (ImmCLbl lbl),
-		OR zero (RIReg zero) dst,
+		OR zeroh (RIImm (ImmInt 1)) dst,
+		BF cond  result (ImmCLbl lbl),
+		OR zeroh (RIReg zeroh) dst,
 		LABEL lbl]
 	in
 	returnUs (Any IntRep code__2)
@@ -466,7 +466,7 @@ getRegister (StInd pk mem)
 getRegister (StInt i)
   | fits8Bits i
   = let
-    	code dst = mkSeqInstr (OR zero (RIImm src) dst)
+    	code dst = mkSeqInstr (OR zeroh (RIImm src) dst)
     in
     returnUs (Any IntRep code)
   | otherwise
@@ -584,46 +584,46 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
-      CharGtOp -> condIntReg GT x y
+      CharGtOp -> condIntReg GTT x y
       CharGeOp -> condIntReg GE x y
-      CharEqOp -> condIntReg EQ x y
+      CharEqOp -> condIntReg EQQ x y
       CharNeOp -> condIntReg NE x y
-      CharLtOp -> condIntReg LT x y
+      CharLtOp -> condIntReg LTT x y
       CharLeOp -> condIntReg LE x y
 
-      IntGtOp  -> condIntReg GT x y
+      IntGtOp  -> condIntReg GTT x y
       IntGeOp  -> condIntReg GE x y
-      IntEqOp  -> condIntReg EQ x y
+      IntEqOp  -> condIntReg EQQ x y
       IntNeOp  -> condIntReg NE x y
-      IntLtOp  -> condIntReg LT x y
+      IntLtOp  -> condIntReg LTT x y
       IntLeOp  -> condIntReg LE x y
 
       WordGtOp -> condIntReg GU  x y
       WordGeOp -> condIntReg GEU x y
-      WordEqOp -> condIntReg EQ  x y
+      WordEqOp -> condIntReg EQQ  x y
       WordNeOp -> condIntReg NE  x y
       WordLtOp -> condIntReg LU  x y
       WordLeOp -> condIntReg LEU x y
 
       AddrGtOp -> condIntReg GU  x y
       AddrGeOp -> condIntReg GEU x y
-      AddrEqOp -> condIntReg EQ  x y
+      AddrEqOp -> condIntReg EQQ  x y
       AddrNeOp -> condIntReg NE  x y
       AddrLtOp -> condIntReg LU  x y
       AddrLeOp -> condIntReg LEU x y
 
-      FloatGtOp -> condFltReg GT x y
+      FloatGtOp -> condFltReg GTT x y
       FloatGeOp -> condFltReg GE x y
-      FloatEqOp -> condFltReg EQ x y
+      FloatEqOp -> condFltReg EQQ x y
       FloatNeOp -> condFltReg NE x y
-      FloatLtOp -> condFltReg LT x y
+      FloatLtOp -> condFltReg LTT x y
       FloatLeOp -> condFltReg LE x y
 
-      DoubleGtOp -> condFltReg GT x y
+      DoubleGtOp -> condFltReg GTT x y
       DoubleGeOp -> condFltReg GE x y
-      DoubleEqOp -> condFltReg EQ x y
+      DoubleEqOp -> condFltReg EQQ x y
       DoubleNeOp -> condFltReg NE x y
-      DoubleLtOp -> condFltReg LT x y
+      DoubleLtOp -> condFltReg LTT x y
       DoubleLeOp -> condFltReg LE x y
 
       IntAddOp  -> {- ToDo: fix this, whatever it is (WDP 96/04)...
@@ -931,46 +931,46 @@ getRegister (StPrim primop [x]) -- unary PrimOps
 
 getRegister (StPrim primop [x, y]) -- dyadic PrimOps
   = case primop of
-      CharGtOp -> condIntReg GT x y
+      CharGtOp -> condIntReg GTT x y
       CharGeOp -> condIntReg GE x y
-      CharEqOp -> condIntReg EQ x y
+      CharEqOp -> condIntReg EQQ x y
       CharNeOp -> condIntReg NE x y
-      CharLtOp -> condIntReg LT x y
+      CharLtOp -> condIntReg LTT x y
       CharLeOp -> condIntReg LE x y
 
-      IntGtOp  -> condIntReg GT x y
+      IntGtOp  -> condIntReg GTT x y
       IntGeOp  -> condIntReg GE x y
-      IntEqOp  -> condIntReg EQ x y
+      IntEqOp  -> condIntReg EQQ x y
       IntNeOp  -> condIntReg NE x y
-      IntLtOp  -> condIntReg LT x y
+      IntLtOp  -> condIntReg LTT x y
       IntLeOp  -> condIntReg LE x y
 
       WordGtOp -> condIntReg GU  x y
       WordGeOp -> condIntReg GEU x y
-      WordEqOp -> condIntReg EQ  x y
+      WordEqOp -> condIntReg EQQ  x y
       WordNeOp -> condIntReg NE  x y
       WordLtOp -> condIntReg LU  x y
       WordLeOp -> condIntReg LEU x y
 
       AddrGtOp -> condIntReg GU  x y
       AddrGeOp -> condIntReg GEU x y
-      AddrEqOp -> condIntReg EQ  x y
+      AddrEqOp -> condIntReg EQQ  x y
       AddrNeOp -> condIntReg NE  x y
       AddrLtOp -> condIntReg LU  x y
       AddrLeOp -> condIntReg LEU x y
 
-      FloatGtOp -> condFltReg GT x y
+      FloatGtOp -> condFltReg GTT x y
       FloatGeOp -> condFltReg GE x y
-      FloatEqOp -> condFltReg EQ x y
+      FloatEqOp -> condFltReg EQQ x y
       FloatNeOp -> condFltReg NE x y
-      FloatLtOp -> condFltReg LT x y
+      FloatLtOp -> condFltReg LTT x y
       FloatLeOp -> condFltReg LE x y
 
-      DoubleGtOp -> condFltReg GT x y
+      DoubleGtOp -> condFltReg GTT x y
       DoubleGeOp -> condFltReg GE x y
-      DoubleEqOp -> condFltReg EQ x y
+      DoubleEqOp -> condFltReg EQQ x y
       DoubleNeOp -> condFltReg NE x y
-      DoubleLtOp -> condFltReg LT x y
+      DoubleLtOp -> condFltReg LTT x y
       DoubleLeOp -> condFltReg LE x y
 
       IntAddOp -> trivialCode (ADD False False) x y
@@ -1263,46 +1263,46 @@ getCondCode = panic "MachCode.getCondCode: not on Alphas"
 
 getCondCode (StPrim primop [x, y])
   = case primop of
-      CharGtOp -> condIntCode GT  x y
+      CharGtOp -> condIntCode GTT  x y
       CharGeOp -> condIntCode GE  x y
-      CharEqOp -> condIntCode EQ  x y
+      CharEqOp -> condIntCode EQQ  x y
       CharNeOp -> condIntCode NE  x y
-      CharLtOp -> condIntCode LT  x y
+      CharLtOp -> condIntCode LTT  x y
       CharLeOp -> condIntCode LE  x y
  
-      IntGtOp  -> condIntCode GT  x y
+      IntGtOp  -> condIntCode GTT  x y
       IntGeOp  -> condIntCode GE  x y
-      IntEqOp  -> condIntCode EQ  x y
+      IntEqOp  -> condIntCode EQQ  x y
       IntNeOp  -> condIntCode NE  x y
-      IntLtOp  -> condIntCode LT  x y
+      IntLtOp  -> condIntCode LTT  x y
       IntLeOp  -> condIntCode LE  x y
 
       WordGtOp -> condIntCode GU  x y
       WordGeOp -> condIntCode GEU x y
-      WordEqOp -> condIntCode EQ  x y
+      WordEqOp -> condIntCode EQQ  x y
       WordNeOp -> condIntCode NE  x y
       WordLtOp -> condIntCode LU  x y
       WordLeOp -> condIntCode LEU x y
 
       AddrGtOp -> condIntCode GU  x y
       AddrGeOp -> condIntCode GEU x y
-      AddrEqOp -> condIntCode EQ  x y
+      AddrEqOp -> condIntCode EQQ  x y
       AddrNeOp -> condIntCode NE  x y
       AddrLtOp -> condIntCode LU  x y
       AddrLeOp -> condIntCode LEU x y
 
-      FloatGtOp -> condFltCode GT x y
+      FloatGtOp -> condFltCode GTT x y
       FloatGeOp -> condFltCode GE x y
-      FloatEqOp -> condFltCode EQ x y
+      FloatEqOp -> condFltCode EQQ x y
       FloatNeOp -> condFltCode NE x y
-      FloatLtOp -> condFltCode LT x y
+      FloatLtOp -> condFltCode LTT x y
       FloatLeOp -> condFltCode LE x y
 
-      DoubleGtOp -> condFltCode GT x y
+      DoubleGtOp -> condFltCode GTT x y
       DoubleGeOp -> condFltCode GE x y
-      DoubleEqOp -> condFltCode EQ x y
+      DoubleEqOp -> condFltCode EQQ x y
       DoubleNeOp -> condFltCode NE x y
-      DoubleLtOp -> condFltCode LT x y
+      DoubleLtOp -> condFltCode LTT x y
       DoubleLeOp -> condFltCode LE x y
 
 #endif {- i386_TARGET_ARCH || sparc_TARGET_ARCH -}
@@ -1460,8 +1460,8 @@ condFltCode cond x y
 fix_FP_cond :: Cond -> Cond
 
 fix_FP_cond GE  = GEU
-fix_FP_cond GT  = GU
-fix_FP_cond LT  = LU
+fix_FP_cond GTT  = GU
+fix_FP_cond LTT  = LU
 fix_FP_cond LE  = LEU
 fix_FP_cond any = any
 
@@ -1570,7 +1570,7 @@ assignIntCode pk dst src
   = getRegister dst	    	    	    `thenUs` \ register1 ->
     getRegister src	    	    	    `thenUs` \ register2 ->
     let
-    	dst__2  = registerName register1 zero
+    	dst__2  = registerName register1 zeroh
     	code    = registerCode register2 dst__2
     	src__2  = registerName register2 dst__2
     	code__2 = if isFixed register2
@@ -1704,7 +1704,7 @@ assignFltCode pk dst src
   = getRegister dst	    	    	    `thenUs` \ register1 ->
     getRegister src	    	    	    `thenUs` \ register2 ->
     let
-    	dst__2  = registerName register1 zero
+    	dst__2  = registerName register1 zeroh
     	code    = registerCode register2 dst__2
     	src__2  = registerName register2 dst__2
     	code__2 = if isFixed register2
@@ -1853,7 +1853,7 @@ genJump :: StixTree{-the branch target-} -> UniqSM InstrBlock
 
 genJump (StCLbl lbl)
   | isAsmTemp lbl = returnInstr (BR target)
-  | otherwise     = returnInstrs [LDA pv (AddrImm target), JMP zero (AddrReg pv) 0]
+  | otherwise     = returnInstrs [LDA pv (AddrImm target), JMP zeroh (AddrReg pv) 0]
   where
     target = ImmCLbl lbl
 
@@ -1866,9 +1866,9 @@ genJump tree
     	target = registerName register pv
     in
     if isFixed register then
-	returnSeq code [OR dst (RIReg dst) pv, JMP zero (AddrReg pv) 0]
+	returnSeq code [OR dst (RIReg dst) pv, JMP zeroh (AddrReg pv) 0]
     else
-    returnUs (code . mkSeqInstr (JMP zero (AddrReg pv) 0))
+    returnUs (code . mkSeqInstr (JMP zeroh (AddrReg pv) 0))
 
 #endif {- alpha_TARGET_ARCH -}
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1973,30 +1973,30 @@ genCondJump lbl (StPrim op [x, StInt 0])
     in
     returnSeq code [BI (cmpOp op) value target]
   where
-    cmpOp CharGtOp = GT
+    cmpOp CharGtOp = GTT
     cmpOp CharGeOp = GE
-    cmpOp CharEqOp = EQ
+    cmpOp CharEqOp = EQQ
     cmpOp CharNeOp = NE
-    cmpOp CharLtOp = LT
+    cmpOp CharLtOp = LTT
     cmpOp CharLeOp = LE
-    cmpOp IntGtOp = GT
+    cmpOp IntGtOp = GTT
     cmpOp IntGeOp = GE
-    cmpOp IntEqOp = EQ
+    cmpOp IntEqOp = EQQ
     cmpOp IntNeOp = NE
-    cmpOp IntLtOp = LT
+    cmpOp IntLtOp = LTT
     cmpOp IntLeOp = LE
     cmpOp WordGtOp = NE
     cmpOp WordGeOp = ALWAYS
-    cmpOp WordEqOp = EQ
+    cmpOp WordEqOp = EQQ
     cmpOp WordNeOp = NE
     cmpOp WordLtOp = NEVER
-    cmpOp WordLeOp = EQ
+    cmpOp WordLeOp = EQQ
     cmpOp AddrGtOp = NE
     cmpOp AddrGeOp = ALWAYS
-    cmpOp AddrEqOp = EQ
+    cmpOp AddrEqOp = EQQ
     cmpOp AddrNeOp = NE
     cmpOp AddrLtOp = NEVER
-    cmpOp AddrLeOp = EQ
+    cmpOp AddrLeOp = EQQ
 
 genCondJump lbl (StPrim op [x, StDouble 0.0])
   = getRegister x	  	    	    `thenUs` \ register ->
@@ -2010,17 +2010,17 @@ genCondJump lbl (StPrim op [x, StDouble 0.0])
     in
     returnUs (code . mkSeqInstr (BF (cmpOp op) value target))
   where
-    cmpOp FloatGtOp = GT
+    cmpOp FloatGtOp = GTT
     cmpOp FloatGeOp = GE
-    cmpOp FloatEqOp = EQ
+    cmpOp FloatEqOp = EQQ
     cmpOp FloatNeOp = NE
-    cmpOp FloatLtOp = LT
+    cmpOp FloatLtOp = LTT
     cmpOp FloatLeOp = LE
-    cmpOp DoubleGtOp = GT
+    cmpOp DoubleGtOp = GTT
     cmpOp DoubleGeOp = GE
-    cmpOp DoubleEqOp = EQ
+    cmpOp DoubleEqOp = EQQ
     cmpOp DoubleNeOp = NE
-    cmpOp DoubleLtOp = LT
+    cmpOp DoubleLtOp = LTT
     cmpOp DoubleLeOp = LE
 
 genCondJump lbl (StPrim op [x, y])
@@ -2051,17 +2051,17 @@ genCondJump lbl (StPrim op [x, y])
 	DoubleLeOp -> True
 	_ -> False
     (instr, cond) = case op of
-	FloatGtOp -> (FCMP TF LE, EQ)
-	FloatGeOp -> (FCMP TF LT, EQ)
-	FloatEqOp -> (FCMP TF EQ, NE)
-	FloatNeOp -> (FCMP TF EQ, EQ)
-	FloatLtOp -> (FCMP TF LT, NE)
+	FloatGtOp -> (FCMP TF LE, EQQ)
+	FloatGeOp -> (FCMP TF LTT, EQQ)
+	FloatEqOp -> (FCMP TF EQQ, NE)
+	FloatNeOp -> (FCMP TF EQQ, EQQ)
+	FloatLtOp -> (FCMP TF LTT, NE)
 	FloatLeOp -> (FCMP TF LE, NE)
-	DoubleGtOp -> (FCMP TF LE, EQ)
-	DoubleGeOp -> (FCMP TF LT, EQ)
-	DoubleEqOp -> (FCMP TF EQ, NE)
-	DoubleNeOp -> (FCMP TF EQ, EQ)
-	DoubleLtOp -> (FCMP TF LT, NE)
+	DoubleGtOp -> (FCMP TF LE, EQQ)
+	DoubleGeOp -> (FCMP TF LTT, EQQ)
+	DoubleEqOp -> (FCMP TF EQQ, NE)
+	DoubleNeOp -> (FCMP TF EQQ, EQQ)
+	DoubleLtOp -> (FCMP TF LTT, NE)
 	DoubleLeOp -> (FCMP TF LE, NE)
 
 genCondJump lbl (StPrim op [x, y])
@@ -2075,28 +2075,28 @@ genCondJump lbl (StPrim op [x, y])
     returnUs (code . mkSeqInstr (BI cond result target))
   where
     (instr, cond) = case op of
-	CharGtOp -> (CMP LE, EQ)
-	CharGeOp -> (CMP LT, EQ)
-	CharEqOp -> (CMP EQ, NE)
-	CharNeOp -> (CMP EQ, EQ)
-	CharLtOp -> (CMP LT, NE)
+	CharGtOp -> (CMP LE, EQQ)
+	CharGeOp -> (CMP LTT, EQQ)
+	CharEqOp -> (CMP EQQ, NE)
+	CharNeOp -> (CMP EQQ, EQQ)
+	CharLtOp -> (CMP LTT, NE)
 	CharLeOp -> (CMP LE, NE)
-	IntGtOp -> (CMP LE, EQ)
-	IntGeOp -> (CMP LT, EQ)
-	IntEqOp -> (CMP EQ, NE)
-	IntNeOp -> (CMP EQ, EQ)
-	IntLtOp -> (CMP LT, NE)
+	IntGtOp -> (CMP LE, EQQ)
+	IntGeOp -> (CMP LTT, EQQ)
+	IntEqOp -> (CMP EQQ, NE)
+	IntNeOp -> (CMP EQQ, EQQ)
+	IntLtOp -> (CMP LTT, NE)
 	IntLeOp -> (CMP LE, NE)
-	WordGtOp -> (CMP ULE, EQ)
-	WordGeOp -> (CMP ULT, EQ)
-	WordEqOp -> (CMP EQ, NE)
-	WordNeOp -> (CMP EQ, EQ)
+	WordGtOp -> (CMP ULE, EQQ)
+	WordGeOp -> (CMP ULT, EQQ)
+	WordEqOp -> (CMP EQQ, NE)
+	WordNeOp -> (CMP EQQ, EQQ)
 	WordLtOp -> (CMP ULT, NE)
 	WordLeOp -> (CMP ULE, NE)
-	AddrGtOp -> (CMP ULE, EQ)
-	AddrGeOp -> (CMP ULT, EQ)
-	AddrEqOp -> (CMP EQ, NE)
-	AddrNeOp -> (CMP EQ, EQ)
+	AddrGtOp -> (CMP ULE, EQQ)
+	AddrGeOp -> (CMP ULT, EQQ)
+	AddrEqOp -> (CMP EQQ, NE)
+	AddrNeOp -> (CMP EQQ, EQQ)
 	AddrLtOp -> (CMP ULT, NE)
 	AddrLeOp -> (CMP ULE, NE)
 
@@ -2453,7 +2453,7 @@ condFltReg cond x y
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if sparc_TARGET_ARCH
 
-condIntReg EQ x (StInt 0)
+condIntReg EQQ x (StInt 0)
   = getRegister x		`thenUs` \ register ->
     getNewRegNCG IntRep		`thenUs` \ tmp ->
     let
@@ -2465,7 +2465,7 @@ condIntReg EQ x (StInt 0)
     in
     returnUs (Any IntRep code__2)
 
-condIntReg EQ x y
+condIntReg EQQ x y
   = getRegister x		`thenUs` \ register1 ->
     getRegister y		`thenUs` \ register2 ->
     getNewRegNCG IntRep		`thenUs` \ tmp1 ->

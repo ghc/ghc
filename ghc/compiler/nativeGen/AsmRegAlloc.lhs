@@ -10,7 +10,7 @@ module AsmRegAlloc ( runRegAllocate, runHairyRegAllocate ) where
 
 IMP_Ubiq(){-uitous-}
 
-import MachCode		( InstrList(..) )
+import MachCode		( SYN_IE(InstrList) )
 import MachMisc		( Instr )
 import MachRegs
 import RegAllocInfo

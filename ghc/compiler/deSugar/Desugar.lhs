@@ -11,7 +11,7 @@ module Desugar ( deSugar, DsMatchContext, pprDsWarnings ) where
 IMP_Ubiq(){-uitous-}
 
 import HsSyn		( HsBinds, HsExpr )
-import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..) )
+import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr) )
 import CoreSyn
 
 import DsMonad

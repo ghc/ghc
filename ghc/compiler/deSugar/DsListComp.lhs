@@ -12,7 +12,7 @@ IMP_Ubiq()
 IMPORT_DELOOPER(DsLoop)		-- break dsExpr-ish loop
 
 import HsSyn		( Qualifier(..), HsExpr, HsBinds )
-import TcHsSyn		( TypecheckedQual(..), TypecheckedHsExpr(..) , TypecheckedHsBinds(..) )
+import TcHsSyn		( SYN_IE(TypecheckedQual), SYN_IE(TypecheckedHsExpr) , SYN_IE(TypecheckedHsBinds) )
 import DsHsSyn		( outPatType )
 import CoreSyn
 
@@ -22,7 +22,7 @@ import DsUtils
 import CmdLineOpts	( opt_FoldrBuildOn )
 import CoreUtils	( coreExprType, mkCoreIfThenElse )
 import PrelVals		( mkBuild, foldrId )
-import Type		( mkTyVarTy, mkForAllTy, mkFunTys )
+import Type		( mkTyVarTy, mkForAllTy, mkFunTys, mkFunTy )
 import TysPrim		( alphaTy )
 import TysWiredIn	( nilDataCon, consDataCon, listTyCon )
 import TyVar		( alphaTyVar )
@@ -49,11 +49,14 @@ dsListComp expr quals
     else -- foldr/build lives!
 	new_alpha_tyvar		    `thenDs` \ (n_tyvar, n_ty) ->
 	let
-	    alpha_to_alpha = mkFunTys [alphaTy] alphaTy
+	    alpha_to_alpha = alphaTy `mkFunTy` alphaTy
 
 	    c_ty = mkFunTys [expr_ty, n_ty] n_ty
 	    g_ty = mkForAllTy alphaTyVar (
-			(mkFunTys [expr_ty, alpha_to_alpha] alpha_to_alpha))
+			(expr_ty `mkFunTy` alpha_to_alpha)
+			`mkFunTy` 
+			alpha_to_alpha
+		   )
 	in
 	newSysLocalsDs [c_ty,n_ty,g_ty]  `thenDs` \ [c, n, g] ->
 
@@ -138,7 +141,7 @@ deListComp expr ((GeneratorQual pat list1):quals) core_list2 -- rule A' above
 	u2_ty = outPatType pat
 
 	res_ty = coreExprType core_list2
-	h_ty = mkFunTys [u1_ty] res_ty
+	h_ty   = u1_ty `mkFunTy` res_ty
     in
     newSysLocalsDs [h_ty, u1_ty, u2_ty, u3_ty]
 				    `thenDs` \ [h', u1, u2, u3] ->

@@ -12,9 +12,9 @@ IMP_Ubiq(){-uitous-}
 
 import HsSyn		( PolyType(..), MonoType(..), Fake )
 import RnHsSyn		( RenamedPolyType(..), RenamedMonoType(..), 
-			  RenamedContext(..), RnName(..)
+			  RenamedContext(..), RnName(..),
+			  isRnLocal, isRnClass, isRnTyCon
 			)
-
 
 import TcMonad		hiding ( rnMtoTcM )
 import TcEnv		( tcLookupTyVar, tcLookupClass, tcLookupTyCon, 
@@ -26,19 +26,15 @@ import TcKind		( TcKind, mkTcTypeKind, mkBoxedTypeKind,
 			)
 import Type		( GenType, SYN_IE(Type), SYN_IE(ThetaType), 
 			  mkTyVarTy, mkTyConTy, mkFunTy, mkAppTy, mkSynTy,
-			  mkSigmaTy
+			  mkSigmaTy, mkDictTy
 			)
 import TyVar		( GenTyVar, SYN_IE(TyVar) )
-import Type		( mkDictTy )
 import Class		( cCallishClassKeys )
 import TyCon		( TyCon )
 import TysWiredIn	( mkListTy, mkTupleTy )
 import Unique		( Unique )
 import PprStyle
 import Pretty
-import RnHsSyn		( isRnLocal, isRnClass, isRnTyCon,
-			  RnName{-instance NamedThing-}
-			)
 import Util		( zipWithEqual, panic, pprPanic{-ToDo:rm-} )
 \end{code}
 

@@ -13,8 +13,8 @@ IMPORT_DELOOPER(DsLoop)		-- break match-ish and dsExpr-ish loops
 
 import HsSyn		( HsLit(..), OutPat(..), HsExpr(..),
 			  Match, HsBinds, Stmt, Qualifier, PolyType, ArithSeqInfo )
-import TcHsSyn		( TypecheckedHsExpr(..), TypecheckedHsBinds(..),
-			  TypecheckedPat(..)
+import TcHsSyn		( SYN_IE(TypecheckedHsExpr), SYN_IE(TypecheckedHsBinds),
+			  SYN_IE(TypecheckedPat)
 			)
 import CoreSyn		( SYN_IE(CoreExpr), SYN_IE(CoreBinding) )
 

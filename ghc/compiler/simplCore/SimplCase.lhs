@@ -34,7 +34,7 @@ import PrimOp		( primOpOkForSpeculation, PrimOp{-instance Eq-} )
 import SimplEnv
 import SimplMonad
 import SimplUtils	( mkValLamTryingEta )
-import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTys, eqTy )
+import Type		( isPrimType, maybeAppDataTyConExpandingDicts, mkFunTy, mkFunTys, eqTy )
 import TysPrim		( voidTy )
 import Unique		( Unique{-instance Eq-} )
 import Usage		( GenUsage{-instance Eq-} )
@@ -475,7 +475,7 @@ bindLargeRhs env args rhs_ty rhs_c
     dead DeadCode  = True
     dead other     = False
 
-    prim_rhs_fun_ty = mkFunTys [voidTy] rhs_ty
+    prim_rhs_fun_ty = mkFunTy voidTy rhs_ty
 \end{code}
 
 Case alternatives when we don't know the scrutinee

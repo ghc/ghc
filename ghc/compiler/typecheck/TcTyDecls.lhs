@@ -24,7 +24,7 @@ import RnHsSyn		( RenamedTyDecl(..), RenamedConDecl(..),
 			  RnName{-instance Outputable-}
 			)
 import TcHsSyn		( mkHsTyLam, mkHsDictLam, tcIdType,
-			  TcHsBinds(..), TcIdOcc(..)
+			  SYN_IE(TcHsBinds), TcIdOcc(..)
 			)
 import Inst		( newDicts, InstOrigin(..), Inst )
 import TcMonoType	( tcMonoTypeKind, tcMonoType, tcPolyType, tcContext )
@@ -36,7 +36,9 @@ import TcEnv		( tcLookupTyCon, tcLookupTyVar, tcLookupClass,
 import TcMonad		hiding ( rnMtoTcM )
 import TcKind		( TcKind, unifyKind, mkTcArrowKind, mkTcTypeKind )
 
-import PprType		( GenClass, GenType{-instance Outputable-} )
+import PprType		( GenClass, GenType{-instance Outputable-},
+			  GenTyVar{-instance Outputable-}{-ToDo:possibly rm-}
+			)
 import Class		( GenClass{-instance Eq-}, classInstEnv )
 import Id		( mkDataCon, dataConSig, mkRecordSelId, idType,
 			  dataConFieldLabels, dataConStrictMarks,
@@ -59,7 +61,6 @@ import Type		( GenType, -- instances
 			  applyTyCon, mkTyVarTys, mkForAllTys, mkFunTy,
 			  splitFunTy, mkTyVarTy, getTyVar_maybe
 			)
-import PprType		( GenTyVar{-instance Outputable-}{-ToDo:possibly rm-} )
 import TyVar		( tyVarKind, elementOfTyVarSet, GenTyVar{-instance Eq-} )
 import Unique		( Unique {- instance Eq -}, evalClassKey )
 import UniqSet		( emptyUniqSet, mkUniqSet, uniqSetToList, unionManyUniqSets, SYN_IE(UniqSet) )

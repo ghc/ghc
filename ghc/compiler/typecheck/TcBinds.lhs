@@ -14,15 +14,15 @@ import HsSyn		( HsBinds(..), Bind(..), Sig(..), MonoBinds(..),
 			  HsExpr, Match, PolyType, InPat, OutPat(..),
 			  GRHSsAndBinds, ArithSeqInfo, HsLit, Fake,
 			  collectBinders )
-import RnHsSyn		( RenamedHsBinds(..), RenamedBind(..), RenamedSig(..), 
-			  RenamedMonoBinds(..), RnName(..)
+import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedBind), RenamedSig(..), 
+			  SYN_IE(RenamedMonoBinds), RnName(..) 
 			)
-import TcHsSyn		( TcHsBinds(..), TcBind(..), TcMonoBinds(..),
-			  TcIdOcc(..), TcIdBndr(..) )
+import TcHsSyn		( SYN_IE(TcHsBinds), SYN_IE(TcBind), SYN_IE(TcMonoBinds),
+			  TcIdOcc(..), SYN_IE(TcIdBndr) )
 
 import TcMonad		hiding ( rnMtoTcM )	
 import GenSpecEtc	( checkSigTyVars, genBinds, TcSigInfo(..) )
-import Inst		( Inst, LIE(..), emptyLIE, plusLIE, InstOrigin(..) )
+import Inst		( Inst, SYN_IE(LIE), emptyLIE, plusLIE, InstOrigin(..) )
 import TcEnv		( tcExtendLocalValEnv, tcLookupLocalValueOK, newMonoIds )
 IMPORT_DELOOPER(TcLoop)		( tcGRHSsAndBinds )
 import TcMatches	( tcMatchesFun )
@@ -36,10 +36,9 @@ import Kind		( mkBoxedTypeKind, mkTypeKind )
 import Id		( GenId, idType, mkUserId )
 import IdInfo		( noIdInfo )
 import Maybes		( assocMaybe, catMaybes )
-import Name		( pprNonSym )
+import Name		( pprNonSym, Name )
 import PragmaInfo	( PragmaInfo(..) )
 import Pretty
-import RnHsSyn		( RnName )	-- instances
 import Type		( mkTyVarTy, mkTyVarTys, isTyVarTy,
 			  mkSigmaTy, splitSigmaTy,
 			  splitRhoTy, mkForAllTy, splitForAllTy )

@@ -230,9 +230,8 @@ class		:  gtycon VARID			{ ($1, Unqual $2) }
 
 ctype		:: { RdrNamePolyType }
 ctype		: FORALL OBRACK tyvars CBRACK context DARROW type  { HsForAllTy (map Unqual $3) $5 $7 }
-		| FORALL OBRACK tyvars CBRACK type		       { HsForAllTy (map Unqual $3) [] $5 }
-		| context DARROW type	{{-ToDo:rm-} HsPreForAllTy $1 $3 }
-		| type		        {{-ToDo:change-} HsPreForAllTy [] $1 }
+		| FORALL OBRACK tyvars CBRACK type		   { HsForAllTy (map Unqual $3) [] $5 }
+		| type	{ HsForAllTy [] [] $1 }
 
 type		:: { RdrNameMonoType }
 type		:  btype		{ $1 }
@@ -364,10 +363,9 @@ instdecls	:  instd		    { unitBag $1 }
 		|  instdecls instd	    { $1 `snocBag` $2 }
 
 instd		:: { RdrIfaceInst }
-instd		:  INSTANCE FORALL OBRACK tyvars CBRACK context DARROW gtycon restrict_inst SEMI { mk_inst (Just (map Unqual $4)) $6 $8 $9 }
-		|  INSTANCE FORALL OBRACK tyvars CBRACK		       gtycon general_inst  SEMI { mk_inst (Just (map Unqual $4)) [] $6 $7 }
-		|  INSTANCE context DARROW gtycon restrict_inst	SEMI {{-ToDo:rm-} mk_inst Nothing $2 $4 $5 }
-		|  INSTANCE		   gtycon general_inst	SEMI {{-ToDo:rm-} mk_inst Nothing [] $2 $3 }
+instd		:  INSTANCE FORALL OBRACK tyvars CBRACK context DARROW gtycon restrict_inst SEMI { mk_inst (map Unqual $4) $6 $8 $9 }
+		|  INSTANCE FORALL OBRACK tyvars CBRACK		       gtycon general_inst  SEMI { mk_inst (map Unqual $4) [] $6 $7 }
+		|  INSTANCE gtycon general_inst	SEMI { mk_inst [] [] $2 $3 }
 
 restrict_inst	:: { RdrNameMonoType }
 restrict_inst	:  gtycon				{ MonoTyApp $1 [] }

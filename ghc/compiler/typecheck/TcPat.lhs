@@ -13,17 +13,17 @@ IMP_Ubiq(){-uitous-}
 import HsSyn		( InPat(..), OutPat(..), HsExpr(..), HsLit(..),
 			  Match, HsBinds, Qualifier, PolyType,
 			  ArithSeqInfo, Stmt, Fake )
-import RnHsSyn		( RenamedPat(..) )
-import TcHsSyn		( TcPat(..), TcIdOcc(..) )
+import RnHsSyn		( SYN_IE(RenamedPat), RnName{-instance Outputable-} )
+import TcHsSyn		( SYN_IE(TcPat), TcIdOcc(..) )
 
 import TcMonad		hiding ( rnMtoTcM )
 import Inst		( Inst, OverloadedLit(..), InstOrigin(..),
-			  emptyLIE, plusLIE, plusLIEs, LIE(..),
+			  emptyLIE, plusLIE, plusLIEs, SYN_IE(LIE),
 			  newMethod, newOverloadedLit
 			)
 import TcEnv		( tcLookupGlobalValue, tcLookupGlobalValueByKey, 
 			  tcLookupLocalValueOK )
-import TcType 		( TcType(..), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
+import TcType 		( SYN_IE(TcType), TcMaybe, newTyVarTy, newTyVarTys, tcInstId )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Bag		( Bag )
@@ -34,7 +34,6 @@ import Maybes		( maybeToBool )
 import PprType		( GenType, GenTyVar )
 import PprStyle--ToDo:rm
 import Pretty
-import RnHsSyn		( RnName{-instance Outputable-} )
 import Type		( splitFunTy, splitRhoTy, splitSigmaTy, mkTyVarTys,
 			  getFunTy_maybe, maybeAppDataTyCon,
 			  SYN_IE(Type), GenType

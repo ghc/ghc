@@ -27,7 +27,7 @@ import OrdList		( OrdList )
 import PprStyle		( PprStyle(..) )
 import SMRep		( SMRep(..), SMSpecRepKind, SMUpdateKind )
 import Stix
-import StixMacro	( heapCheck, smStablePtrTable )
+import StixMacro	( heapCheck )
 import StixInteger	{- everything -}
 import UniqSupply	( returnUs, thenUs, SYN_IE(UniqSM) )
 import Unpretty		( uppBeside, uppPStr, uppInt )

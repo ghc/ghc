@@ -8,6 +8,7 @@
 module AsmCodeGen ( writeRealAsm, dumpRealAsm ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(IO(Handle))
 
 import MachMisc
 import MachRegs
@@ -23,7 +24,7 @@ import PrimRep		( PrimRep{-instance Eq-} )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..), CodeSegment )
 import UniqSupply	( returnUs, thenUs, mapUs, SYN_IE(UniqSM) )
-import Unpretty		( uppPutStr, uppShow, uppAboves, Unpretty(..) )
+import Unpretty		( uppPutStr, uppShow, uppAboves, SYN_IE(Unpretty) )
 \end{code}
 
 The 96/03 native-code generator has machine-independent and

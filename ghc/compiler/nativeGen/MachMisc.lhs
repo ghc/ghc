@@ -44,6 +44,7 @@ module MachMisc (
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(AbsCLoop)		( fixedHdrSizeInWords, varHdrSizeInWords ) -- paranoia
 IMPORT_DELOOPER(NcgLoop)		( underscorePrefix, fmtAsmLbl ) -- paranoia
+IMPORT_1_3(Char(isDigit))
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
@@ -295,11 +296,11 @@ exactLog2 x
 data Cond
 #if alpha_TARGET_ARCH
   = ALWAYS	-- For BI (same as BR)
-  | EQ		-- For CMP and BI
+  | EQQ		-- For CMP and BI (NB: "EQ" is a 1.3 Prelude name)
   | GE		-- For BI only
-  | GT		-- For BI only
+  | GTT		-- For BI only (NB: "GT" is a 1.3 Prelude name)
   | LE		-- For CMP and BI
-  | LT		-- For CMP and BI
+  | LTT		-- For CMP and BI (NB: "LT" is a 1.3 Prelude name)
   | NE		-- For BI only
   | NEVER	-- For BI (null instruction)
   | ULE		-- For CMP only
@@ -307,14 +308,14 @@ data Cond
 #endif
 #if i386_TARGET_ARCH
   = ALWAYS	-- What's really used? ToDo
-  | EQ
+  | EQQ
   | GE
   | GEU
-  | GT
+  | GTT
   | GU
   | LE
   | LEU
-  | LT
+  | LTT
   | LU
   | NE
   | NEG
@@ -322,14 +323,14 @@ data Cond
 #endif
 #if sparc_TARGET_ARCH
   = ALWAYS	-- What's really used? ToDo
-  | EQ
+  | EQQ
   | GE
   | GEU
-  | GT
+  | GTT
   | GU
   | LE
   | LEU
-  | LT
+  | LTT
   | LU
   | NE
   | NEG

@@ -10,9 +10,9 @@ module Inst (
 	Inst(..), 	-- Visible only to TcSimplify
 
 	InstOrigin(..), OverloadedLit(..),
-	LIE(..), emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE, plusLIEs,
+	SYN_IE(LIE), emptyLIE, unitLIE, plusLIE, consLIE, zonkLIE, plusLIEs,
 
-        InstanceMapper(..),
+        SYN_IE(InstanceMapper),
 
 	newDicts, newDictsAtLoc, newMethod, newMethodWithGivenTy, newOverloadedLit,
 
@@ -29,22 +29,25 @@ module Inst (
     ) where
 
 IMP_Ubiq()
+IMPORT_1_3(Ratio(Rational))
 
 import HsSyn	( HsLit(..), HsExpr(..), HsBinds, 
 		  InPat, OutPat, Stmt, Qualifier, Match,
 		  ArithSeqInfo, PolyType, Fake )
-import RnHsSyn	( RenamedArithSeqInfo(..), RenamedHsExpr(..) )
-import TcHsSyn	( TcIdOcc(..), TcExpr(..), TcIdBndr(..),
+import RnHsSyn	( SYN_IE(RenamedArithSeqInfo), SYN_IE(RenamedHsExpr),
+		  RnName{-instance NamedThing-}
+		)
+import TcHsSyn	( TcIdOcc(..), SYN_IE(TcExpr), SYN_IE(TcIdBndr),
 		  mkHsTyApp, mkHsDictApp, tcIdTyVars )
 
 import TcMonad	hiding ( rnMtoTcM )
 import TcEnv	( tcLookupGlobalValueByKey, tcLookupTyConByKey )
-import TcType	( TcType(..), TcRhoType(..), TcMaybe, TcTyVarSet(..),
+import TcType	( SYN_IE(TcType), SYN_IE(TcRhoType), TcMaybe, SYN_IE(TcTyVarSet),
 		  tcInstType, zonkTcType )
 
 import Bag	( emptyBag, unitBag, unionBags, unionManyBags, listToBag, consBag )
 import Class	( isCcallishClass, isNoDictClass, classInstEnv,
-		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv)
+		  SYN_IE(Class), GenClass, SYN_IE(ClassInstEnv), SYN_IE(ClassOp)
 		)
 import ErrUtils ( addErrLoc, SYN_IE(Error) )
 import Id	( GenId, idType, mkInstId )
@@ -54,7 +57,6 @@ import Outputable
 import PprType	( GenClass, TyCon, GenType, GenTyVar )	
 import PprStyle	( PprStyle(..) )
 import Pretty
-import RnHsSyn	( RnName{-instance NamedThing-} )
 import SpecEnv	( SYN_IE(SpecEnv) )
 import SrcLoc	( SrcLoc, mkUnknownSrcLoc )
 import Type	( GenType, eqSimpleTy, instantiateTy,

@@ -27,6 +27,7 @@ import AbsCSyn
 
 import AbsCUtils	( mkAbstractCs, mkAbsCStmts )
 import Bag		( foldBag )
+import CgBindery	( CgIdInfo )
 import CgClosure	( cgTopRhsClosure )
 import CgCon		( cgTopRhsCon )
 import CgConTbls	( genStaticConBits )
@@ -35,6 +36,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_CompilingGhcInternals,
 			  opt_EnsureSplittableC, opt_SccGroup
 			)
 import CStrings		( modnameToC )
+import FiniteMap	( FiniteMap )
 import Maybes		( maybeToBool )
 import PrimRep		( getPrimRepSize, PrimRep(..) )
 import Util		( panic, assertPanic )

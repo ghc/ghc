@@ -14,7 +14,7 @@ module TyVar (
 	-- TyVars and "sets" containing TyVars:
 	SYN_IE(TyVarEnv),
 	nullTyVarEnv, mkTyVarEnv, addOneToTyVarEnv,
-	growTyVarEnvList, isNullTyVarEnv, lookupTyVarEnv,
+	growTyVarEnvList, isNullTyVarEnv, lookupTyVarEnv, delFromTyVarEnv,
 
 	SYN_IE(GenTyVarSet), SYN_IE(TyVarSet),
 	emptyTyVarSet, unitTyVarSet, unionTyVarSets,
@@ -33,7 +33,7 @@ import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 -- others
 import UniqSet		-- nearly all of it
 import UniqFM		( emptyUFM, listToUFM, addToUFM, lookupUFM,
-			  plusUFM, sizeUFM, UniqFM
+			  plusUFM, sizeUFM, delFromUFM, UniqFM
 			)
 import Name		( mkLocalName, changeUnique, Name, RdrName(..) )
 import Pretty		( SYN_IE(Pretty), PrettyRep, ppBeside, ppPStr )
@@ -107,11 +107,13 @@ addOneToTyVarEnv :: TyVarEnv a -> GenTyVar flexi -> a -> TyVarEnv a
 growTyVarEnvList :: TyVarEnv a -> [(GenTyVar flexi, a)] -> TyVarEnv a
 isNullTyVarEnv	 :: TyVarEnv a -> Bool
 lookupTyVarEnv	 :: TyVarEnv a -> GenTyVar flexi -> Maybe a
+delFromTyVarEnv	 :: TyVarEnv a -> GenTyVar flexi -> TyVarEnv a
 
 nullTyVarEnv	 = emptyUFM
 mkTyVarEnv	 = listToUFM
 addOneToTyVarEnv = addToUFM
 lookupTyVarEnv   = lookupUFM
+delFromTyVarEnv  = delFromUFM
 
 growTyVarEnvList env pairs = plusUFM env (listToUFM pairs)
 isNullTyVarEnv   env	   = sizeUFM env == 0

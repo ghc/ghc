@@ -21,21 +21,21 @@ import HsSyn		( InstDecl(..), FixityDecl, Sig(..),
 			  InPat(..), OutPat(..), HsExpr(..), HsLit(..),
 			  Stmt, Qualifier, ArithSeqInfo, Fake,
 			  PolyType(..), MonoType )
-import RnHsSyn		( RenamedHsBinds(..), RenamedMonoBinds(..),
+import RnHsSyn		( SYN_IE(RenamedHsBinds), SYN_IE(RenamedMonoBinds),
 			  RenamedInstDecl(..), RenamedFixityDecl(..),
 			  RenamedSig(..), RenamedSpecInstSig(..),
 			  RnName(..){-incl instance Outputable-}
 			)
-import TcHsSyn		( TcIdOcc(..), TcHsBinds(..),
-			  TcMonoBinds(..), TcExpr(..), tcIdType,
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds),
+			  SYN_IE(TcMonoBinds), SYN_IE(TcExpr), tcIdType,
 			  mkHsTyLam, mkHsTyApp,
 			  mkHsDictLam, mkHsDictApp )
 
 
 import TcMonad		hiding ( rnMtoTcM )
 import GenSpecEtc	( checkSigTyVars )
-import Inst		( Inst, InstOrigin(..), InstanceMapper(..),
-			  newDicts, newMethod, LIE(..), emptyLIE, plusLIE )
+import Inst		( Inst, InstOrigin(..), SYN_IE(InstanceMapper),
+			  newDicts, newMethod, SYN_IE(LIE), emptyLIE, plusLIE )
 import TcBinds		( tcPragmaSigs )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcLookupClass, tcTyVarScope, newLocalId, tcExtendGlobalTyVars )
@@ -45,7 +45,7 @@ import TcKind		( TcKind, unifyKind )
 import TcMatches	( tcMatchesFun )
 import TcMonoType	( tcContext, tcMonoTypeKind )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcType(..), TcTyVar(..), TcTyVarSet(..), 
+import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), SYN_IE(TcTyVarSet), 
 			  tcInstSigTyVars, tcInstType, tcInstTheta, tcInstTcType
 			)
 import Unify		( unifyTauTy, unifyTauTyLists )

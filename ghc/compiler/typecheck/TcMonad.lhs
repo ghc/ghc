@@ -2,7 +2,7 @@
 #include "HsVersions.h"
 
 module TcMonad(
-	TcM(..), NF_TcM(..), TcDown, TcEnv, 
+	SYN_IE(TcM), SYN_IE(NF_TcM), TcDown, TcEnv, 
 	SST_R, FSST_R,
 
 	initTc,
@@ -28,22 +28,26 @@ module TcMonad(
 
 	rnMtoTcM,
 
-	TcError(..), TcWarning(..),
+	SYN_IE(TcError), SYN_IE(TcWarning),
 	mkTcErr, arityErr,
 
 	-- For closure
-	MutableVar(..), _MutableArray
+	SYN_IE(MutableVar),
+#if __GLASGOW_HASKELL__ >= 200
+	GHCbase.MutableArray
+#else
+	_MutableArray
+#endif
   ) where
 
 IMP_Ubiq(){-uitous-}
 
-IMPORT_DELOOPER(TcMLoop)		( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
+IMPORT_DELOOPER(TcMLoop) ( TcEnv, initEnv, TcMaybe )  -- We need the type TcEnv and an initial Env
 
 import Type		( SYN_IE(Type), GenType )
 import TyVar		( SYN_IE(TyVar), GenTyVar )
 import Usage		( SYN_IE(Usage), GenUsage )
-import ErrUtils		( SYN_IE(Error), SYN_IE(Message), ErrCtxt(..),
-			  SYN_IE(Warning) )
+import ErrUtils		( SYN_IE(Error), SYN_IE(Message), SYN_IE(Warning) )
 
 import SST
 import RnMonad		( SYN_IE(RnM), RnDown, initRn, setExtraRn,
@@ -55,7 +59,6 @@ import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, keysFM{-ToDo:rm-} )
 --import Outputable	( Outputable(..), NamedThing(..), ExportFlag )
-import ErrUtils		( SYN_IE(Error) )
 import Maybes		( MaybeErr(..) )
 --import Name		( Name )
 import SrcLoc		( SrcLoc, mkUnknownSrcLoc )
@@ -79,11 +82,17 @@ type TcM    s r =  TcDown s -> TcEnv s -> FSST s r ()
 \end{code}
 
 \begin{code}
+#if __GLASGOW_HASKELL__ >= 200
+# define REAL_WORLD RealWorld
+#else
+# define REAL_WORLD _RealWorld
+#endif
+
 -- With a builtin polymorphic type for runSST the type for
 -- initTc should use  TcM s r  instead of  TcM RealWorld r 
 
 initTc :: UniqSupply
-       -> TcM _RealWorld r
+       -> TcM REAL_WORLD r
        -> MaybeErr (r, Bag Warning)
 		   (Bag Error, Bag  Warning)
 
@@ -465,7 +474,7 @@ getErrCtxt (TcDown def us loc ctxt errs)     = ctxt
 %~~~~~~~~~~~~~~~~~~
 
 \begin{code}
-rnMtoTcM :: RnEnv -> RnM _RealWorld a -> NF_TcM s (a, Bag Error)
+rnMtoTcM :: RnEnv -> RnM REAL_WORLD a -> NF_TcM s (a, Bag Error)
 
 rnMtoTcM rn_env rn_action down env
   = readMutVarSST u_var				`thenSST` \ uniq_supply ->

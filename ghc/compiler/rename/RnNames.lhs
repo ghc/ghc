@@ -8,10 +8,10 @@
 
 module RnNames (
 	getGlobalNames,
-	GlobalNameInfo(..)
+	SYN_IE(GlobalNameInfo)
     ) where
 
-import PreludeGlaST	( MutableVar(..) )
+import PreludeGlaST	( SYN_IE(MutableVar) )
 
 IMP_Ubiq()
 
@@ -31,7 +31,7 @@ import Bag		( emptyBag, unitBag, consBag, snocBag, unionBags,
 			  unionManyBags, mapBag, filterBag, listToBag, bagToList )
 import CmdLineOpts	( opt_NoImplicitPrelude, opt_CompilingGhcInternals )
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning), addErrLoc, addShortErrLocLine, addShortWarnLocLine )
-import FiniteMap	( emptyFM, addToFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, keysFM{-ToDo:rm-} )
+import FiniteMap	( emptyFM, addToFM, addListToFM, lookupFM, fmToList, eltsFM, delListFromFM, keysFM{-ToDo:rm-}, FiniteMap )
 import Id		( GenId )
 import Maybes		( maybeToBool, catMaybes, MaybeErr(..) )
 import Name		( RdrName(..), Name, isQual, mkTopLevName, mkWiredInName, origName,
@@ -514,7 +514,7 @@ doImport :: IfaceCache
 
 doImport iface_cache info us (ImportDecl mod qual maybe_as maybe_spec src_loc)
   = let
-	(b_vals, b_tcs, maybe_spec') = getBuiltins info mod maybe_spec 
+	(b_vals, b_tcs, maybe_spec') = getBuiltins info mod maybe_spec -- NB: a no-op ToDo:rm
     in
     (if mod == gHC_BUILTINS then
      	return (Succeeded (panic "doImport:GHC fake import!"),
@@ -591,9 +591,10 @@ getBuiltins :: ImportNameInfo
 	       )
 
 getBuiltins _ modname maybe_spec
-  | modname `notElem` modulesWithBuiltins
+--OLD:  | modname `notElem` modulesWithBuiltins
   = (emptyBag, emptyBag, maybe_spec)
 
+{-
 getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) modname maybe_spec
   = case maybe_spec of 
       Nothing           -> (all_vals, all_tcs, Nothing)
@@ -649,6 +650,7 @@ getBuiltins (((b_val_names,b_tc_names),_,_,_),_,_,_) modname maybe_spec
 		 _ -> panic "importing builtin names (2)"
       where
         (vals, tcs, ies_left) = do_builtin ies
+-}
 
 -------------------------
 getOrigIEs :: ParsedIface

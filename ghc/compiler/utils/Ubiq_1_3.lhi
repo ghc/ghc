@@ -2,10 +2,8 @@
 interface Ubiq_1_3 1
 __exports__
 GHCbase trace (..)
-GHCbase PrimIO -- this is here because of the bug preventing it getting into PreludeGlaST
+GHCps tailPS (..)
 GHCps nilPS (..)
--- GHCps substrPS (..)
--- GHCps tailPS (..)
 GHCps appendPS (..)
 GHCps concatPS (..)
 GHCps consPS (..)
@@ -21,6 +19,7 @@ BinderInfo BinderInfo
 CLabel CLabel
 Class Class
 ClosureInfo ClosureInfo
+CmdLineOpts SwitchResult
 CoreSyn GenCoreExpr
 CoreUnfold UnfoldingDetails
 CoreUnfold UnfoldingGuidance
@@ -50,6 +49,7 @@ Name OrigName (..)
 Name RdrName (..)
 Outputable Outputable (..)
 PprStyle PprStyle
+PragmaInfo PragmaInfo
 PrimOp PrimOp
 PrimRep PrimRep
 SrcLoc SrcLoc

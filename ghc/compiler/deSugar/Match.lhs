@@ -13,8 +13,8 @@ IMPORT_DELOOPER(DsLoop)		-- here for paranoia-checking reasons
 			-- and to break dsExpr/dsBinds-ish loop
 
 import HsSyn		hiding ( collectBinders{-also from CoreSyn-} )
-import TcHsSyn		( TypecheckedPat(..), TypecheckedMatch(..),
-			  TypecheckedHsBinds(..), TypecheckedHsExpr(..)	)
+import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedMatch),
+			  SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)	)
 import DsHsSyn		( outPatType, collectTypedPatBinders )
 import CoreSyn
 

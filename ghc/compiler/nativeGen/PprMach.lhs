@@ -14,6 +14,13 @@ We start with the @pprXXX@s with some cross-platform commonality
 module PprMach ( pprInstr ) where
 
 IMP_Ubiq(){-uitious-}
+IMPORT_1_3(Char(isPrint,isDigit))
+IMPORT_1_3(qualified GHCbase(Addr(..))) -- to see innards
+#if __GLASGOW_HASKELL__ >= 200
+# define A_HASH GHCbase.A#
+#else
+# define A_HASH A#
+#endif
 
 import MachRegs		-- may differ per-platform
 import MachMisc
@@ -237,20 +244,20 @@ pprCond :: Cond -> Unpretty
 
 pprCond c = uppPStr (case c of {
 #if alpha_TARGET_ARCH
-	EQ  -> SLIT("eq");
-	LT  -> SLIT("lt");
+	EQQ  -> SLIT("eq");
+	LTT  -> SLIT("lt");
 	LE  -> SLIT("le");
 	ULT -> SLIT("ult");
 	ULE -> SLIT("ule");
 	NE  -> SLIT("ne");
-	GT  -> SLIT("gt");
+	GTT  -> SLIT("gt");
 	GE  -> SLIT("ge")
 #endif
 #if i386_TARGET_ARCH
 	GEU	-> SLIT("ae");	LU    -> SLIT("b");
-	EQ	-> SLIT("e");	GT    -> SLIT("g");
+	EQQ	-> SLIT("e");	GTT    -> SLIT("g");
 	GE	-> SLIT("ge");	GU    -> SLIT("a");
-	LT	-> SLIT("l");	LE    -> SLIT("le");
+	LTT	-> SLIT("l");	LE    -> SLIT("le");
 	LEU	-> SLIT("be");	NE    -> SLIT("ne");
 	NEG	-> SLIT("s");	POS   -> SLIT("ns");
 	ALWAYS	-> SLIT("mp")	-- hack
@@ -258,9 +265,9 @@ pprCond c = uppPStr (case c of {
 #if sparc_TARGET_ARCH
 	ALWAYS	-> SLIT("");	NEVER -> SLIT("n");
 	GEU	-> SLIT("geu");	LU    -> SLIT("lu");
-	EQ	-> SLIT("e");	GT    -> SLIT("g");
+	EQQ	-> SLIT("e");	GTT   -> SLIT("g");
 	GE	-> SLIT("ge");	GU    -> SLIT("gu");
-	LT	-> SLIT("l");	LE    -> SLIT("le");
+	LTT	-> SLIT("l");	LE    -> SLIT("le");
 	LEU	-> SLIT("leu");	NE    -> SLIT("ne");
 	NEG	-> SLIT("neg");	POS   -> SLIT("pos");
 	VC	-> SLIT("vc");	VS    -> SLIT("vs")
@@ -289,12 +296,12 @@ pprImm (ImmLab s) | underscorePrefix = uppBeside (uppChar '_') s
 pprImm (LO i)
   = uppBesides [ pp_lo, pprImm i, uppRparen ]
   where
-    pp_lo = uppPStr (_packCString (A# "%lo("#))
+    pp_lo = uppPStr (_packCString (A_HASH "%lo("#))
 
 pprImm (HI i)
   = uppBesides [ pp_hi, pprImm i, uppRparen ]
   where
-    pp_hi = uppPStr (_packCString (A# "%hi("#))
+    pp_hi = uppPStr (_packCString (A_HASH "%hi("#))
 #endif
 \end{code}
 
@@ -808,8 +815,14 @@ pprInstr (FUNBEGIN clab)
     ]
     where
 	pp_lab = pprCLabel_asm clab
-	pp_ldgp  = uppPStr (_packCString (A# ":\n\tldgp $29,0($27)\n"#))
-	pp_frame = uppPStr (_packCString (A# "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
+
+#if __GLASGOW_HASKELL__ >= 200
+# define PACK_STR packCString
+#else
+# define PACK_STR _packCString
+#endif
+	pp_ldgp  = uppPStr (PACK_STR (A_HASH ":\n\tldgp $29,0($27)\n"#))
+	pp_frame = uppPStr (PACK_STR (A_HASH "..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1"#))
 
 pprInstr (FUNEND clab)
   = uppBeside (uppPStr SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
@@ -1318,10 +1331,10 @@ pprRIReg name b ri reg1
 	pprReg reg1
     ]
 
-pp_ld_lbracket    = uppPStr (_packCString (A# "\tld\t["#))
-pp_rbracket_comma = uppPStr (_packCString (A# "],"#))
-pp_comma_lbracket = uppPStr (_packCString (A# ",["#))
-pp_comma_a	  = uppPStr (_packCString (A# ",a"#))
+pp_ld_lbracket    = uppPStr (PACK_STR (A_HASH "\tld\t["#))
+pp_rbracket_comma = uppPStr (PACK_STR (A_HASH "],"#))
+pp_comma_lbracket = uppPStr (PACK_STR (A_HASH ",["#))
+pp_comma_a	  = uppPStr (PACK_STR (A_HASH ",a"#))
 
 #endif {-sparc_TARGET_ARCH-}
 \end{code}

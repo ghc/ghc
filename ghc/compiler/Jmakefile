@@ -611,7 +611,7 @@ compile(reader/PrefixToHs,lhs,)
 compile(reader/ReadPrefix,lhs,if_ghc(-fvia-C -I$(COMPINFO_DIR) -Iparser '-#include"hspincl.h"'))
 compile(reader/RdrHsSyn,lhs,)
 
-compile(rename/ParseIface,hs,)
+compile(rename/ParseIface,hs,-Onot) /* sigh */
 compile(rename/ParseUtils,lhs,)
 compile(rename/RnHsSyn,lhs,)
 compile(rename/RnMonad,lhs,if_ghc(-fvia-C))

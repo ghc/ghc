@@ -16,11 +16,11 @@ import HsSyn		( FixityDecl, Sig, HsBinds(..), Bind(..), MonoBinds(..),
 			  GRHSsAndBinds, Match, HsExpr, HsLit, InPat,
 			  ArithSeqInfo, Fake, MonoType )
 import HsPragmas	( InstancePragmas(..) )
-import RnHsSyn		( mkRnName, RnName(..), RenamedHsBinds(..), RenamedFixityDecl(..) )
+import RnHsSyn		( mkRnName, RnName(..), SYN_IE(RenamedHsBinds), RenamedFixityDecl(..) )
 import TcHsSyn		( TcIdOcc )
 
 import TcMonad
-import Inst		( InstanceMapper(..) )
+import Inst		( SYN_IE(InstanceMapper) )
 import TcEnv		( getEnv_TyCons, tcLookupClassByKey )
 import TcKind		( TcKind )
 import TcGenDeriv	-- Deriv stuff

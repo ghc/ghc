@@ -24,15 +24,14 @@ import CgBindery	( getCAddrMode, getArgAmodes,
 			  getCAddrModeAndInfo, bindNewToNode,
 			  bindNewToAStack, bindNewToBStack,
 			  bindNewToReg, bindArgsToRegs,
-			  stableAmodeIdInfo, heapIdInfo
+			  stableAmodeIdInfo, heapIdInfo, CgIdInfo
 			)
 import CgCompInfo	( spARelToInt, spBRelToInt )
 import CgUpdate		( pushUpdateFrame )
 import CgHeapery	( allocDynClosure, heapCheck
 			  , heapCheckOnly, fetchAndReschedule, yield  -- HWL
 			)
-import CgRetConv	( mkLiveRegsMask,
-			  ctrlReturnConvAlg, dataReturnConvAlg, 
+import CgRetConv	( ctrlReturnConvAlg, dataReturnConvAlg, 
 			  CtrlReturnConvention(..), DataReturnConvention(..)
 			)
 import CgStackery	( getFinalStackHW, mkVirtStkOffsets,

@@ -20,7 +20,8 @@ import CgMonad
 import AbsCSyn
 
 import CgBindery	( letNoEscapeIdInfo, bindArgsToRegs,
-			  bindNewToAStack, bindNewToBStack
+			  bindNewToAStack, bindNewToBStack,
+			  CgIdInfo
 			)
 import CgHeapery	( heapCheck )
 import CgRetConv	( assignRegs )

@@ -26,7 +26,7 @@ import AbsCUtils	( mkAbstractCs, getAmodeRep )
 import CgBindery	( getArgAmodes, bindNewToNode,
 			  bindArgsToRegs, newTempAmodeAndIdInfo,
 			  idInfoToAmode, stableAmodeIdInfo,
-			  heapIdInfo
+			  heapIdInfo, CgIdInfo
 			)
 import CgClosure	( cgTopRhsClosure )
 import CgCompInfo	( mAX_INTLIKE, mIN_INTLIKE )

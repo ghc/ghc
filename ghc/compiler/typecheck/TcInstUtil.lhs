@@ -17,15 +17,17 @@ module TcInstUtil (
 IMP_Ubiq()
 
 import HsSyn		( MonoBinds, Fake, InPat, Sig )
-import RnHsSyn		( RenamedMonoBinds(..), RenamedSig(..), 
+import RnHsSyn		( SYN_IE(RenamedMonoBinds), RenamedSig(..), 
 			  RenamedInstancePragmas(..) )
 
 import TcMonad		hiding ( rnMtoTcM )
-import Inst		( InstanceMapper(..) )
+import Inst		( SYN_IE(InstanceMapper) )
 
 import Bag		( bagToList )
 import Class		( GenClass, GenClassOp, SYN_IE(ClassInstEnv),
-			  classBigSig, classOps, classOpLocalType )
+			  classBigSig, classOps, classOpLocalType,
+			  SYN_IE(ClassOp)
+			)
 import CoreSyn		( GenCoreExpr(..), mkValLam, mkTyApp )
 import Id		( GenId, mkDictFunId, mkConstMethodId, mkSysLocal )
 import MatchEnv		( nullMEnv, insertMEnv )

@@ -6,9 +6,7 @@
 \begin{code}
 #include "HsVersions.h"
 
-module TcClassDcl (
-	tcClassDecl1, tcClassDecls2
-    ) where
+module TcClassDcl ( tcClassDecl1, tcClassDecls2 ) where
 
 IMP_Ubiq()
 
@@ -18,27 +16,26 @@ import HsSyn		( ClassDecl(..), HsBinds(..), Bind(..), MonoBinds(..),
 			  Stmt, Qualifier, ArithSeqInfo, InPat, Fake )
 import HsPragmas	( ClassPragmas(..) )
 import RnHsSyn		( RenamedClassDecl(..), RenamedClassPragmas(..),
-			  RenamedClassOpSig(..), RenamedMonoBinds(..),
+			  RenamedClassOpSig(..), SYN_IE(RenamedMonoBinds),
 			  RenamedGenPragmas(..), RenamedContext(..),
 			  RnName{-instance Uniquable-}
 			)
-import TcHsSyn		( TcIdOcc(..), TcHsBinds(..), TcMonoBinds(..), TcExpr(..),
+import TcHsSyn		( TcIdOcc(..), SYN_IE(TcHsBinds), SYN_IE(TcMonoBinds), SYN_IE(TcExpr),
 			  mkHsTyApp, mkHsTyLam, mkHsDictApp, mkHsDictLam, tcIdType )
 
-import Inst		( Inst, InstOrigin(..), LIE(..), emptyLIE, plusLIE, newDicts, newMethod )
+import Inst		( Inst, InstOrigin(..), SYN_IE(LIE), emptyLIE, plusLIE, newDicts, newMethod )
 import TcEnv		( tcLookupClass, tcLookupTyVar, tcLookupTyCon, newLocalIds, tcExtendGlobalTyVars )
 import TcInstDcls	( processInstBinds )
-import TcKind		( TcKind )
-import TcKind		( unifyKind )
+import TcKind		( unifyKind, TcKind )
 import TcMonad		hiding ( rnMtoTcM )
 import TcMonoType	( tcPolyType, tcMonoType, tcContext )
 import TcSimplify	( tcSimplifyAndCheck )
-import TcType		( TcType(..), TcTyVar(..), tcInstType, tcInstSigTyVars, tcInstSigType )
+import TcType		( SYN_IE(TcType), SYN_IE(TcTyVar), tcInstType, tcInstSigTyVars, tcInstSigType )
 
 import Bag		( foldBag, unionManyBags )
 import Class		( GenClass, mkClass, mkClassOp, classBigSig, 
 			  classOps, classOpString, classOpLocalType,
-			  classOpTagByString
+			  classOpTagByString, SYN_IE(ClassOp)
 			)
 import Id		( mkSuperDictSelId, mkMethodSelId, mkDefaultMethodId,
 			  idType )

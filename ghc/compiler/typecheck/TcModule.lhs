@@ -8,11 +8,11 @@
 
 module TcModule (
 	typecheckModule,
-	TcResults(..),
-	TcResultBinds(..),
-	TcIfaceInfo(..),
-	TcSpecialiseRequests(..),
-	TcDDumpDeriv(..)
+	SYN_IE(TcResults),
+	SYN_IE(TcResultBinds),
+	SYN_IE(TcIfaceInfo),
+	SYN_IE(TcSpecialiseRequests),
+	SYN_IE(TcDDumpDeriv)
     ) where
 
 IMP_Ubiq(){-uitous-}
@@ -22,8 +22,8 @@ import HsSyn		( HsModule(..), HsBinds(..), Bind, HsExpr,
 			  SpecInstSig, DefaultDecl, Sig, Fake, InPat,
  			  FixityDecl, IE, ImportDecl
 			)
-import RnHsSyn		( RenamedHsModule(..), RenamedFixityDecl(..) )
-import TcHsSyn		( TypecheckedHsBinds(..), TypecheckedHsExpr(..),
+import RnHsSyn		( SYN_IE(RenamedHsModule), RenamedFixityDecl(..) )
+import TcHsSyn		( SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr),
 			  TcIdOcc(..), zonkBinds, zonkDictBinds )
 
 import TcMonad		hiding ( rnMtoTcM )
@@ -59,7 +59,7 @@ import UniqFM		( lookupUFM_Directly, lookupWithDefaultUFM_Directly,
 import Unique		( iOTyConKey, mainIdKey, mainPrimIOIdKey )
 import Util
 
-import FiniteMap	( emptyFM )
+import FiniteMap	( emptyFM, FiniteMap )
 tycon_specs = emptyFM
 \end{code}
 

@@ -18,13 +18,13 @@ import HsSyn		( TyDecl(..),  ConDecl(..), BangType(..),
 import RnHsSyn		( isRnTyCon, RenamedTyDecl(..), RenamedClassDecl(..),
 			  RnName(..){-instance Uniquable-}
 			)
-import TcHsSyn		( TcHsBinds(..), TcIdOcc(..) )
+import TcHsSyn		( SYN_IE(TcHsBinds), TcIdOcc(..) )
 
 import TcMonad		hiding ( rnMtoTcM )
-import Inst		( InstanceMapper(..) )
+import Inst		( SYN_IE(InstanceMapper) )
 import TcClassDcl	( tcClassDecl1 )
 import TcEnv		( tcExtendTyConEnv, tcExtendClassEnv,
-			  tcTyVarScope, tcGetEnv )
+			  tcTyVarScope )
 import TcKind		( TcKind, newKindVars )
 import TcTyDecls	( tcTyDecl, mkDataBinds )
 

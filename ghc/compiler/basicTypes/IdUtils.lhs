@@ -20,7 +20,7 @@ import PrelMods		( gHC_BUILTINS )
 import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
 			  PrimOpInfo(..), PrimOpResultInfo(..) )
 import RnHsSyn		( RnName(..) )
-import Type		( mkForAllTys, mkFunTys, mkTyVarTy, applyTyCon )
+import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyVarTy, applyTyCon )
 import TysWiredIn	( boolTy )
 import Unique		( mkPrimOpIdUnique )
 import Util		( panic )
@@ -44,7 +44,7 @@ primOpId op
 	mk_prim_Id op str [] [ty,ty] (compare_fun_ty ty) 2
 
       Coercing str ty1 ty2 ->
-	mk_prim_Id op str [] [ty1] (mkFunTys [ty1] ty2) 1
+	mk_prim_Id op str [] [ty1] (ty1 `mkFunTy` ty2) 1
 
       PrimResult str tyvars arg_tys prim_tycon kind res_tys ->
 	mk_prim_Id op str
@@ -72,7 +72,7 @@ primOpId op
 
 \begin{code}
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
-monadic_fun_ty ty = mkFunTys [ty] ty
+monadic_fun_ty ty = ty `mkFunTy` ty
 compare_fun_ty ty = mkFunTys [ty, ty] boolTy
 \end{code}
 

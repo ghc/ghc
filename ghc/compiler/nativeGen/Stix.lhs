@@ -6,7 +6,7 @@
 #include "HsVersions.h"
 
 module Stix (
-	CodeSegment(..), StixReg(..), StixTree(..), StixTreeList(..),
+	CodeSegment(..), StixReg(..), StixTree(..), SYN_IE(StixTreeList),
 	sStLitLbl,
 
 	stgBaseReg, stgStkOReg, stgNode, stgTagReg, stgRetReg,
@@ -16,12 +16,13 @@ module Stix (
     ) where
 
 IMP_Ubiq(){-uitous-}
+IMPORT_1_3(Ratio(Rational))
 
 import AbsCSyn		( node, infoptr, MagicId(..) )
 import AbsCUtils	( magicIdPrimRep )
 import CLabel		( mkAsmTempLabel )
 import UniqSupply	( returnUs, thenUs, getUnique, SYN_IE(UniqSM) )
-import Unpretty		( uppPStr, Unpretty(..) )
+import Unpretty		( uppPStr, SYN_IE(Unpretty) )
 \end{code}
 
 Here is the tag at the nodes of our @StixTree@.	 Notice its

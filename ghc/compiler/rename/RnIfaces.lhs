@@ -15,7 +15,15 @@ module RnIfaces (
 
 IMP_Ubiq()
 
-import PreludeGlaST	( thenPrimIO, seqPrimIO, newVar, readVar, writeVar, MutableVar(..) )
+import PreludeGlaST	( thenPrimIO, newVar, readVar, writeVar, SYN_IE(MutableVar) )
+#if __GLASGOW_HASKELL__ >= 200
+# define ST_THEN `stThen`
+# define TRY_IO  tryIO
+IMPORT_1_3(GHCio(stThen,tryIO))
+#else
+# define ST_THEN `thenPrimIO`
+# define TRY_IO	 try
+#endif
 
 import HsSyn
 import HsPragmas	( noGenPragmas )
@@ -35,16 +43,15 @@ import Bag		( emptyBag, unitBag, consBag, snocBag,
 import ErrUtils		( SYN_IE(Error), SYN_IE(Warning) )
 import FiniteMap	( emptyFM, lookupFM, addToFM, addToFM_C, plusFM, eltsFM,
 			  fmToList, delListFromFM, sizeFM, foldFM, unitFM,
-			  plusFM_C, addListToFM, keysFM{-ToDo:rm-}
+			  plusFM_C, addListToFM, keysFM{-ToDo:rm-}, FiniteMap
 			)
-import Maybes		( maybeToBool )
+import Maybes		( maybeToBool, MaybeErr(..) )
 import Name		( origName, moduleOf, nameOf, qualToOrigName, OrigName(..),
 			  isLexCon, RdrName(..), Name{-instance NamedThing-} )
 import PprStyle		-- ToDo:rm
 import Outputable	-- ToDo:rm
 import PrelInfo		( builtinNameInfo, SYN_IE(BuiltinNames) )
 import Pretty
-import Maybes		( MaybeErr(..) )
 import UniqFM		( emptyUFM )
 import UniqSupply	( splitUniqSupply )
 import Util		( sortLt, removeDups, cmpPString, startsWith,
@@ -55,19 +62,25 @@ import Util		( sortLt, removeDups, cmpPString, startsWith,
 type ModuleToIfaceContents = FiniteMap Module ParsedIface
 type ModuleToIfaceFilePath = FiniteMap Module FilePath
 
+#if __GLASGOW_HASKELL__ >= 200
+# define REAL_WORLD RealWorld
+#else
+# define REAL_WORLD _RealWorld
+#endif
+
 data IfaceCache
   = IfaceCache
 	Module			 -- the name of the module being compiled
 	BuiltinNames		 -- so we can avoid going after things
 				 -- the compiler already knows about
-        (MutableVar _RealWorld
+        (MutableVar REAL_WORLD
 	 (ModuleToIfaceContents, -- interfaces for individual interface files
 	  ModuleToIfaceContents, -- merged interfaces based on module name
 				 -- used for extracting info about original names
 	  ModuleToIfaceFilePath))
 
 initIfaceCache mod hi_files
-  = newVar (emptyFM,emptyFM,hi_files) `thenPrimIO` \ iface_var ->
+  = newVar (emptyFM,emptyFM,hi_files) ST_THEN \ iface_var ->
     return (IfaceCache mod b_names iface_var)
   where
     b_names = case builtinNameInfo of (b_names,_,_) -> b_names
@@ -110,7 +123,7 @@ cachedIface :: IfaceCache
 	    -> IO (MaybeErr ParsedIface Error)
 
 cachedIface (IfaceCache _ _ iface_var) want_orig_iface item modname
-  = readVar iface_var `thenPrimIO` \ (iface_fm, orig_fm, file_fm) ->
+  = readVar iface_var ST_THEN \ (iface_fm, orig_fm, file_fm) ->
 
     case (lookupFM iface_fm modname) of
       Just iface -> return (want_iface iface orig_fm)
@@ -127,7 +140,7 @@ cachedIface (IfaceCache _ _ iface_var) want_orig_iface item modname
 		    iface_fm' = addToFM iface_fm modname iface
 		    orig_fm'  = addToFM_C mergeIfaces orig_fm (iface_mod iface) iface
 		in
-		writeVar iface_var (iface_fm', orig_fm', file_fm) `seqPrimIO`
+		writeVar iface_var (iface_fm', orig_fm', file_fm) ST_THEN \ _ ->
 		return (want_iface iface orig_fm')
   where
     want_iface iface orig_fm 
@@ -274,7 +287,7 @@ readIface :: FilePath -> Module -> FAST_STRING -> IO (MaybeErr ParsedIface Error
 
 readIface file modname item
   = --hPutStr stderr ("  reading "++file++" ("++ _UNPK_ item ++")") >>
-    readFile file		`thenPrimIO` \ read_result ->
+    TRY_IO (readFile file)  >>= \ read_result ->
     case read_result of
       Left  err      -> return (Failed (cannaeReadErr file err))
       Right contents -> --hPutStr stderr ".."   >>
@@ -540,7 +553,7 @@ data AddedDecl -- purely local
   | AddedSig	RenamedSig
 
 rnIfaceDecl :: RdrIfaceDecl
-	    -> RnM_Fixes _RealWorld
+	    -> RnM_Fixes REAL_WORLD
 		   (AddedDecl,	-- the resulting decl to add to the pot
 		    ([(RdrName,RnName)], [(RdrName,RnName)]),
 				-- new val/tycon-class names that have
@@ -621,7 +634,7 @@ sub (val_ment, tc_ment) (val_defds, tc_defds)
 cacheInstModules :: IfaceCache -> [Module] -> IO (Bag Error)
 
 cacheInstModules iface_cache@(IfaceCache _ _ iface_var) imp_mods
-  = readVar iface_var		`thenPrimIO` \ (iface_fm, _, _) ->
+  = readVar iface_var		ST_THEN \ (iface_fm, _, _) ->
     let
 	imp_ifaces      = [ iface | Just iface <- map (lookupFM iface_fm) imp_mods ]
 	(imp_imods, _)  = removeDups cmpPString (bagToList (unionManyBags (map get_ims imp_ifaces)))
@@ -634,7 +647,7 @@ cacheInstModules iface_cache@(IfaceCache _ _ iface_var) imp_mods
     -- Assert that instance modules given by direct imports contains
     -- instance modules extracted from all visited modules
 
-    readVar iface_var		`thenPrimIO` \ (all_iface_fm, _, _) ->
+    readVar iface_var		ST_THEN \ (all_iface_fm, _, _) ->
     let
 	all_ifaces     = eltsFM all_iface_fm
 	(all_imods, _) = removeDups cmpPString (bagToList (unionManyBags (map get_ims (all_ifaces))))
@@ -670,7 +683,7 @@ rnIfaceInstStuff iface_cache@(IfaceCache _ _ iface_var) modname us occ_env done_
   = -- all the instance decls we might even want to consider
     -- are in the ParsedIfaces that are in our cache
 
-    readVar iface_var	`thenPrimIO` \ (_, orig_iface_fm, _) ->
+    readVar iface_var	ST_THEN \ (_, orig_iface_fm, _) ->
     let
 	all_ifaces	  = eltsFM orig_iface_fm
 	all_insts	  = concat (map get_insts all_ifaces)
@@ -752,7 +765,7 @@ rnIfaceInstStuff iface_cache@(IfaceCache _ _ iface_var) modname us occ_env done_
 \end{code}
 
 \begin{code}
-rnIfaceInst :: (Module, RdrIfaceInst) -> RnM_Fixes _RealWorld RenamedInstDecl
+rnIfaceInst :: (Module, RdrIfaceInst) -> RnM_Fixes REAL_WORLD RenamedInstDecl
 
 rnIfaceInst (imod, InstSig _ _ _ inst_decl) = rnInstDecl (inst_decl imod)
 \end{code}
@@ -778,7 +791,7 @@ finalIfaceInfo iface_cache@(IfaceCache _ _ iface_var) modname if_final_env@((qua
 --  pprTrace "usageIf:unqual:"    (ppCat (map ppPStr (keysFM unqual))) $
 --  pprTrace "usageIf:tc_qual:"   (ppCat [ppBesides[ppPStr m,ppChar '.',ppPStr n] | (n,m) <- keysFM tc_qual]) $
 --  pprTrace "usageIf:tc_unqual:" (ppCat (map ppPStr (keysFM tc_unqual))) $
-    readVar iface_var	`thenPrimIO` \ (_, orig_iface_fm, _) ->
+    readVar iface_var	ST_THEN \ (_, orig_iface_fm, _) ->
     let
 	all_ifaces = eltsFM orig_iface_fm
 	-- all the interfaces we have looked at

@@ -18,7 +18,7 @@ import TcMonad	hiding ( rnMtoTcM )
 import Type	( GenType(..), typeKind, mkFunTy, getFunTy_maybe )
 import TyCon	( TyCon, mkFunTyCon )
 import TyVar	( GenTyVar(..), SYN_IE(TyVar), tyVarKind )
-import TcType	( TcType(..), TcMaybe(..), TcTauType(..), TcTyVar(..),
+import TcType	( SYN_IE(TcType), TcMaybe(..), SYN_IE(TcTauType), SYN_IE(TcTyVar),
 		  newTyVarTy, tcReadTyVar, tcWriteTyVar, zonkTcType
 		)
 -- others:

@@ -10,6 +10,7 @@ module Simplify ( simplTopBinds, simplExpr, simplBind ) where
 
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(SmplLoop)		-- paranoia checking
+IMPORT_1_3(List(partition))
 
 import BinderInfo
 import CmdLineOpts	( SimplifierSwitch(..) )

@@ -53,7 +53,7 @@ import TyCon	( mkFunTyCon, mkTupleTyCon, isFunTyCon,
 		  tyConKind, tyConDataCons, getSynTyConDefn, TyCon )
 import TyVar	( tyVarKind, GenTyVar{-instances-}, SYN_IE(GenTyVarSet),
 		  emptyTyVarSet, unionTyVarSets, minusTyVarSet,
-		  unitTyVarSet, nullTyVarEnv, lookupTyVarEnv,
+		  unitTyVarSet, nullTyVarEnv, lookupTyVarEnv, delFromTyVarEnv,
 		  addOneToTyVarEnv, SYN_IE(TyVarEnv), SYN_IE(TyVar) )
 import Usage	( usageOmega, GenUsage, SYN_IE(Usage), SYN_IE(UVar), SYN_IE(UVarEnv),
 		  nullUVarEnv, addOneToUVarEnv, lookupUVarEnv, eqUVar,
@@ -612,20 +612,38 @@ instantiateTauTy tenv ty
     bound_forall_tv_BAD = panic "instantiateTauTy:bound_forall_tv"
     deflt_forall_tv tv  = panic "instantiateTauTy:deflt_forall_tv"
 
+
+-- applyTypeEnv applies a type environment to a type.
+-- It can handle shadowing; for example:
+--	f = /\ t1 t2 -> \ d ->
+--	   letrec f' = /\ t1 -> \x -> ...(f' t1 x')...
+--         in f' t1
+-- Here, when we clone t1 to t1', say, we'll come across shadowing
+-- when applying the clone environment to the type of f'.
+--
+-- As a sanity check, we should also check that name capture 
+-- doesn't occur, but that means keeping track of the free variables of the
+-- range of the TyVarEnv, which I don't do just yet.
+--
+-- We don't use instant_help because we need to carry in the environment
+
 applyTypeEnvToTy tenv ty
-  = instant_help ty lookup_tv deflt_tv choose_tycon
-		    if_usage if_forall bound_forall_tv_BAD deflt_forall_tv
+  = go tenv ty
   where
-    lookup_tv = lookupTyVarEnv tenv
-    deflt_tv tv = TyVarTy tv
-    choose_tycon ty _ _ = ty
-    if_usage ty = ty
-    if_forall ty = ty
-    bound_forall_tv_BAD = False -- ToDo: probably should be True (i.e., no shadowing)
-    deflt_forall_tv tv  = case (lookup_tv tv) of
-			    Nothing -> tv
-			    Just (TyVarTy tv2) -> tv2
-			    _ -> pprPanic "applyTypeEnvToTy:" (ppAbove (ppr PprShowAll tv) (ppr PprShowAll ty))
+    go tenv ty@(TyVarTy tv)	   	= case (lookupTyVarEnv tenv tv) of
+				       	     Nothing -> ty
+				       	     Just ty -> ty
+    go tenv ty@(TyConTy tycon usage)	= ty
+    go tenv (SynTy tycon tys ty)	= SynTy tycon (map (go tenv) tys) (go tenv ty)
+    go tenv (FunTy arg res usage)	= FunTy (go tenv arg) (go tenv res) usage
+    go tenv (AppTy fun arg)		= AppTy (go tenv fun) (go tenv arg)
+    go tenv (DictTy clas ty usage)	= DictTy clas (go tenv ty) usage
+    go tenv (ForAllUsageTy uvar bds ty) = ForAllUsageTy uvar bds (go tenv ty)
+    go tenv (ForAllTy tv ty)		= ForAllTy tv (go tenv' ty)
+					where
+					  tenv' = case lookupTyVarEnv tenv tv of
+						    Nothing -> tenv
+						    Just _  -> delFromTyVarEnv tenv tv
 \end{code}
 
 \begin{code}

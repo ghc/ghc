@@ -10,6 +10,7 @@ module RnSource ( rnSource, rnTyDecl, rnClassDecl, rnInstDecl, rnPolyType ) wher
 
 IMP_Ubiq()
 IMPORT_DELOOPER(RnLoop)		-- *check* the RnPass/RnExpr/RnBinds loop-breaking
+IMPORT_1_3(List(partition))
 
 import HsSyn
 import HsPragmas

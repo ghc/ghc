@@ -20,6 +20,9 @@ module PprAbsC (
 
 IMP_Ubiq(){-uitous-}
 IMPORT_DELOOPER(AbsCLoop)		-- break its dependence on ClosureInfo
+IMPORT_1_3(IO(Handle))
+IMPORT_1_3(Char(isDigit,isPrint))
+IMPORT_1_3(GHCbase(Addr(..)) ) -- to see innards
 
 import AbsCSyn
 
@@ -35,7 +38,7 @@ import CmdLineOpts	( opt_SccProfilingOn )
 import CostCentre	( uppCostCentre, uppCostCentreDecl )
 import Costs		( costs, addrModeCosts, CostRes(..), Side(..) )
 import CStrings		( stringToC )
-import FiniteMap	( addToFM, emptyFM, lookupFM )
+import FiniteMap	( addToFM, emptyFM, lookupFM, FiniteMap )
 import HeapOffs		( isZeroOff, subOff, pprHeapOffset )
 import Literal		( showLiteral, Literal(..) )
 import Maybes		( maybeToBool, catMaybes )
@@ -799,7 +802,11 @@ process_casm results args string = process results args string
 	    _   -> panic ("process_casm: casm with many results while processing _casm_ \"" ++ string ++ "\".\n")
 
 	other ->
-	  case readDec other of
+	  let
+		read_int :: ReadS Int
+		read_int = reads
+	  in
+	  case (read_int other) of
 	    [(num,css)] ->
 		  if 0 <= num && num < length args
 		  then uppBeside (uppParens (args !! num))

@@ -13,9 +13,9 @@ IMPORT_DELOOPER(DsLoop)		-- break dsExpr/dsBinds-ish loop
 
 import HsSyn		( GRHSsAndBinds(..), GRHS(..),
 			  HsExpr, HsBinds )
-import TcHsSyn		( TypecheckedGRHSsAndBinds(..), TypecheckedGRHS(..),
-			  TypecheckedPat(..), TypecheckedHsBinds(..),
-			  TypecheckedHsExpr(..)	)
+import TcHsSyn		( SYN_IE(TypecheckedGRHSsAndBinds), SYN_IE(TypecheckedGRHS),
+			  SYN_IE(TypecheckedPat), SYN_IE(TypecheckedHsBinds),
+			  SYN_IE(TypecheckedHsExpr)	)
 import CoreSyn		( SYN_IE(CoreBinding), SYN_IE(CoreExpr), mkCoLetsAny )
 
 import DsMonad
@@ -78,23 +78,21 @@ dsGRHSs ty kind pats (grhs:grhss)
     combineGRHSMatchResults match_result1 match_result2
 
 dsGRHS ty kind pats (OtherwiseGRHS expr locn)
-  = putSrcLocDs locn		 (
+  = putSrcLocDs locn $
     dsExpr expr 	`thenDs` \ core_expr ->
     let
 	expr_fn = \ ignore -> core_expr
     in
     returnDs (MatchResult CantFail ty expr_fn (DsMatchContext kind pats locn))
-    )
 
 dsGRHS ty kind pats (GRHS guard expr locn)
-  = putSrcLocDs locn		 (
+  = putSrcLocDs locn $
     dsExpr guard 	`thenDs` \ core_guard ->
     dsExpr expr  	`thenDs` \ core_expr  ->
     let
 	expr_fn = \ fail -> mkCoreIfThenElse core_guard core_expr fail
     in
     returnDs (MatchResult CanFail ty expr_fn (DsMatchContext kind pats locn))
-    )
 \end{code}
 
 
