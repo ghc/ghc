@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.45 2000/08/02 15:27:25 simonmar Exp $
+-- $Id: Main.hs,v 1.46 2000/08/03 13:43:00 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -596,7 +596,7 @@ hsc_minusO_flags = do
 -----------------------------------------------------------------------------
 -- Paths & Libraries
 
-split_marker = ':'   -- not configurable
+split_marker = ':'   -- not configurable (ToDo)
 
 import_paths, include_paths, library_paths :: IORef [String]
 GLOBAL_VAR(import_paths,  ["."], [String])
@@ -605,22 +605,10 @@ GLOBAL_VAR(library_paths, [],	 [String])
 
 GLOBAL_VAR(cmdline_libraries,   [], [String])
 
-augment_import_paths :: String -> IO ()
-augment_import_paths "" = writeIORef import_paths []
-augment_import_paths path
-  = do paths <- readIORef import_paths
-       writeIORef import_paths (paths ++ dirs)
-  where dirs = split split_marker path
-
-augment_include_paths :: String -> IO ()
-augment_include_paths path
-  = do paths <- readIORef include_paths
-       writeIORef include_paths (paths ++ split split_marker path)
-
-augment_library_paths :: String -> IO ()
-augment_library_paths path
-  = do paths <- readIORef library_paths
-       writeIORef library_paths (paths ++ split split_marker path)
+addToDirList :: IORef [String] -> String -> IO ()
+addToDirList ref paths
+  = do paths <- readIORef ref
+       writeIORef ref (paths ++ split split_marker path)
 
 -----------------------------------------------------------------------------
 -- Packages
@@ -1451,9 +1439,12 @@ depEndMarker   = "# DO NOT DELETE: End of Haskell dependencies"
 -- for compatibility with the old mkDependHS, we accept options of the form
 -- -optdep-f -optdep.depend, etc.
 dep_opts = [
-   (  "s", 	SepArg (add dep_suffixes) ),
-   (  "f", 	SepArg (writeIORef dep_makefile) ),
-   (  "w", 	NoArg (writeIORef dep_warnings False))
+   (  "s", 			SepArg (add dep_suffixes) ),
+   (  "f", 			SepArg (writeIORef dep_makefile) ),
+   (  "w", 			NoArg (writeIORef dep_warnings False) ),
+   (  "-include-prelude",  	NoArg (writeIORef dep_include_prelude True) ),
+   (  "X", 			Prefix (addToDirList dep_ignore_dirs) ),
+   (  "-exclude-directory=",	Prefix (addToDirList dep_ignore_dirs) )
  ]
 
 beginMkDependHS :: IO ()
@@ -2139,11 +2130,11 @@ driver_opts =
 				) )
   
 	------- Include/Import Paths ----------------------------------------
-  ,  ( "i"		, OptPrefix augment_import_paths )
-  ,  ( "I" 		, Prefix augment_include_paths )
+  ,  ( "i"		, OptPrefix (addToDirList import_paths) )
+  ,  ( "I" 		, Prefix    (addToDirList include_paths) )
 
 	------- Libraries ---------------------------------------------------
-  ,  ( "L"		, Prefix augment_library_paths )
+  ,  ( "L"		, Prefix (addToDirList library_paths) )
   ,  ( "l"		, Prefix (add cmdline_libraries) )
 
         ------- Packages ----------------------------------------------------
