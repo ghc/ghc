@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.26 2004/11/11 09:36:55 simonmar Exp $
+# $Id: Makefile,v 1.27 2005/03/02 09:57:41 simonmar Exp $
 #
 
 TOP=.
@@ -38,7 +38,7 @@ endif
 
 SRC_DIST_FILES += configure
 
-DIST_CLEAN_FILES += config.cache config.status ghc.spec
+DIST_CLEAN_FILES += VERSION config.cache config.status ghc.spec
 
 extraclean::
 	$(RM) -rf autom4te.cache
