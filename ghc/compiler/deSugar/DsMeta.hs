@@ -42,7 +42,8 @@ import HsSyn  	  ( Pat(..), HsExpr(..), Stmt(..), HsLit(..), HsOverLit(..),
 		    toHsType
 		  )
 
-import PrelNames  ( mETA_META_Name, rationalTyConName, negateName )
+import PrelNames  ( mETA_META_Name, rationalTyConName, negateName,
+		    parrTyConName )
 import MkIface	  ( ifaceTyThing )
 import Name       ( Name, nameOccName, nameModule )
 import OccName	  ( isDataOcc, isTvOcc, occNameUserString )
@@ -64,7 +65,7 @@ import TysWiredIn ( stringTy )
 import CoreSyn
 import CoreUtils  ( exprType )
 import SrcLoc	  ( noSrcLoc )
-import Maybe	  ( catMaybes )
+import Maybe	  ( catMaybes, fromMaybe )
 import Panic	  ( panic )
 import Unique	  ( mkPreludeTyConUnique, mkPreludeMiscIdUnique )
 import BasicTypes ( NewOrData(..), StrictnessMark(..), isBoxed ) 
@@ -210,7 +211,7 @@ repTyClD (ClassDecl { tcdCtxt = cxt, tcdName = cls,
 	})
  = do { cls1 <- lookupOcc cls ;		-- See note [Binders and occurrences] 
 	tvs1 <- repTvs tvs ;
-	cxt1 <- repCtxt cxt ;
+	cxt1 <- repContext cxt ;
 	sigs1  <- rep_sigs sigs ;
 	binds1 <- rep_monobind binds ;
 	decls1 <- coreList declTyConName (sigs1 ++ binds1) ;
@@ -226,7 +227,7 @@ repTyClD d = do { addDsWarn (hang msg 4 (ppr d)) ;
 
 repInstD (InstDecl ty binds _ _ loc)
 	-- Ignore user pragmas for now
- = do { cxt1 <- repCtxt cxt ;
+ = do { cxt1 <- repContext cxt ;
 	inst_ty1 <- repPred (HsClassP cls tys) ;
 	binds1 <- rep_monobind binds ;
 	decls1 <- coreList declTyConName binds1 ;
@@ -294,45 +295,87 @@ rep_proto nm ty = do { nm1 <- lookupBinder nm ;
 -- 			Types
 -------------------------------------------------------
 
+-- represent a list of type variables in a usage position that does not need
+-- gensym'ing
+--
 repTvs :: [HsTyVarBndr Name] -> DsM (Core [String])
 repTvs tvs = do { tvs1 <- mapM (localVar . hsTyVarName) tvs ;
 		  return (coreList' stringTy tvs1) } 
 
------------------
-repCtxt :: HsContext Name -> DsM (Core M.Ctxt)
-repCtxt ctxt = do { preds <- mapM repPred ctxt; 
-		    coreList typeTyConName preds }
+-- represent a type context
+--
+repContext :: HsContext Name -> DsM (Core M.Ctxt)
+repContext ctxt = do 
+	            preds    <- mapM repPred ctxt
+		    predList <- coreList typeTyConName preds
+		    repCtxt predList
 
------------------
+-- represent a type predicate
+--
 repPred :: HsPred Name -> DsM (Core M.Type)
-repPred (HsClassP cls tys)
-  = do { tc1 <- lookupOcc cls; tcon <- repNamedTyCon tc1;
-	 tys1 <- repTys tys; repTapps tcon tys1 }
-repPred (HsIParam _ _) = panic "No implicit parameters yet"
+repPred (HsClassP cls tys) = do
+			       tcon <- repTy (HsTyVar cls)
+			       tys1 <- repTys tys
+			       repTapps tcon tys1
+repPred (HsIParam _ _)     = 
+  panic "DsMeta.repTy: Can't represent predicates with implicit parameters"
 
------------------
+-- yield the representation of a list of types
+--
 repTys :: [HsType Name] -> DsM [Core M.Type]
 repTys tys = mapM repTy tys
 
------------------
+-- represent a type
+--
 repTy :: HsType Name -> DsM (Core M.Type)
-
+repTy (HsForAllTy bndrs ctxt ty)  = 
+  do
+    let names = map hsTyVarName (fromMaybe [] bndrs)
+    freshNames <- mkGenSyms names
+    forallTy   <- addBinds freshNames $ do
+		    bndrs' <- mapM lookupBinder names 
+		    ctxt'  <- repContext ctxt
+		    ty'    <- repTy ty
+		    repTForall (coreList' stringTy bndrs') ctxt' ty'
+    wrapGenSyns typTyConName freshNames forallTy
 repTy (HsTyVar n)
-  | isTvOcc (nameOccName n) = do { tv1 <- localVar n ; repTvar tv1 }
-  | otherwise		    = do { tc1 <- lookupOcc n; repNamedTyCon tc1 }
-repTy (HsAppTy f a) = do { f1 <- repTy f ; a1 <- repTy a ; repTapp f1 a1 }
-repTy (HsFunTy f a) = do { f1 <- repTy f ; a1 <- repTy a ; 
-			   tcon <- repArrowTyCon ; repTapps tcon [f1,a1] }
-repTy (HsListTy t)  = do { t1 <- repTy t ; tcon <- repListTyCon ; repTapp tcon t1 }
-repTy (HsTupleTy tc tys)	  = do { tys1 <- repTys tys; 
-					 tcon <- repTupleTyCon (length tys);
-					 repTapps tcon tys1 }
+  | isTvOcc (nameOccName n)       = do 
+				      tv1 <- lookupBinder n
+				      repTvar tv1
+  | otherwise		          = do 
+				      tc1 <- lookupOcc n
+				      repNamedTyCon tc1
+repTy (HsAppTy f a)               = do 
+				      f1 <- repTy f
+				      a1 <- repTy a
+				      repTapp f1 a1
+repTy (HsFunTy f a)               = do 
+				      f1   <- repTy f
+				      a1   <- repTy a
+				      tcon <- repArrowTyCon
+				      repTapps tcon [f1, a1]
+repTy (HsListTy t)		  = do
+				      t1   <- repTy t
+				      tcon <- repListTyCon
+				      repTapp tcon t1
+repTy (HsPArrTy t)                = do
+				      t1   <- repTy t
+				      tcon <- repTy (HsTyVar parrTyConName)
+				      repTapp tcon t1
+repTy (HsTupleTy tc tys)	  = do
+				      tys1 <- repTys tys 
+				      tcon <- repTupleTyCon (length tys)
+				      repTapps tcon tys1
 repTy (HsOpTy ty1 HsArrow ty2) 	  = repTy (HsFunTy ty1 ty2)
-repTy (HsOpTy ty1 (HsTyOp n) ty2) = repTy ((HsTyVar n `HsAppTy` ty1) `HsAppTy` ty2)
+repTy (HsOpTy ty1 (HsTyOp n) ty2) = repTy ((HsTyVar n `HsAppTy` ty1) 
+					   `HsAppTy` ty2)
 repTy (HsParTy t)  	       	  = repTy t
-repTy (HsPredTy (HsClassP c tys)) = repTy (foldl HsAppTy (HsTyVar c) tys)
+repTy (HsNumTy i)                 =
+  panic "DsMeta.repTy: Can't represent number types (for generics)"
+repTy (HsPredTy pred)             = repPred pred
+repTy (HsKindSig ty kind)	  = 
+  panic "DsMeta.repTy: Can't represent explicit kind signatures yet"
 
-repTy other_ty = pprPanic "repTy" (ppr other_ty)	-- HsForAllTy, HsKindSig
 
 -----------------------------------------------------------------------------
 -- 		Expressions
@@ -672,19 +715,31 @@ repListPat (p:ps) = do { p2 <- repP p
 ----------------------------------------------------------
 --	The meta-environment
 
+-- A name/identifier association for fresh names of locally bound entities
+--
 type GenSymBind = (Name, Id)	-- Gensym the string and bind it to the Id
 				-- I.e.		(x, x_id) means
 				--	let x_id = gensym "x" in ...
 
-addBinds :: [GenSymBind] -> DsM a -> DsM a
-addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,Bound id) | (n,id) <- bs]) m
-
+-- Generate a fresh name for a locally bound entity
+--
 mkGenSym :: Name -> DsM GenSymBind
 mkGenSym nm = do { id <- newUniqueId nm stringTy; return (nm,id) }
 
+-- Ditto for a list of names
+--
 mkGenSyms :: [Name] -> DsM [GenSymBind]
 mkGenSyms ns = mapM mkGenSym ns
 	     
+-- Add a list of fresh names for locally bound entities to the meta
+-- environment (which is part of the state carried around by the desugarer
+-- monad) 
+--
+addBinds :: [GenSymBind] -> DsM a -> DsM a
+addBinds bs m = dsExtendMetaEnv (mkNameEnv [(n,Bound id) | (n,id) <- bs]) m
+
+-- Look up a locally bound name
+--
 lookupBinder :: Name -> DsM (Core String)
 lookupBinder n 
   = do { mb_val <- dsLookupMetaEnv n;
@@ -692,6 +747,11 @@ lookupBinder n
 	    Just (Bound x) -> return (coreVar x)
 	    other	   -> pprPanic "Failed binder lookup:" (ppr n) }
 
+-- Look up a name that is either locally bound or a global name
+--
+-- * If it is a global name, generate the "original name" representation (ie,
+--   the <module>:<name> form) for the associated entity
+--
 lookupOcc :: Name -> DsM (Core String)
 -- Lookup an occurrence; it can't be a splice.
 -- Use the in-scope bindings if they exist
@@ -913,10 +973,16 @@ repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC ds) = rep2 classDName [cxt, cls, tvs
 repProto :: Core String -> Core M.Type -> DsM (Core M.Decl)
 repProto (MkC s) (MkC ty) = rep2 protoName [s, ty]
 
+repCtxt :: Core [M.Type] -> DsM (Core M.Ctxt)
+repCtxt (MkC tys) = rep2 ctxtName [tys]
+
 repConstr :: Core String -> Core [M.Type] -> DsM (Core M.Cons)
-repConstr (MkC con) (MkC tys) = rep2 constrName [con,tys]
+repConstr (MkC con) (MkC tys) = rep2 constrName [con, tys]
 
 ------------ Types -------------------
+
+repTForall :: Core [String] -> Core M.Ctxt -> Core M.Type -> DsM (Core M.Type)
+repTForall (MkC tvars) (MkC ctxt) (MkC ty) = rep2 tforallName [tvars, ctxt, ty]
 
 repTvar :: Core String -> DsM (Core M.Type)
 repTvar (MkC s) = rep2 tvarName [s]
@@ -1043,9 +1109,9 @@ templateHaskellNames
 		funName, valName, liftName,
 	  	gensymName, returnQName, bindQName, sequenceQName,
 		matchName, clauseName, funName, valName, dataDName, classDName,
-		instName, protoName, tvarName, tconName, tappName, 
+		instName, protoName, tforallName, tvarName, tconName, tappName,
 		arrowTyConName, tupleTyConName, listTyConName, namedTyConName,
-		constrName,
+		ctxtName, constrName,
 		exprTyConName, declTyConName, pattTyConName, mtchTyConName, 
 		clseTyConName, stmtTyConName, consTyConName, typeTyConName,
 		qTyConName, expTyConName, matTyConName, clsTyConName,
@@ -1121,15 +1187,19 @@ instName       = varQual FSLIT("inst")          instIdKey
 protoName      = varQual FSLIT("proto")         protoIdKey
 			 
 -- data Typ = ...	 
+tforallName    = varQual FSLIT("tforall")       tforallIdKey
 tvarName       = varQual FSLIT("tvar")          tvarIdKey
 tconName       = varQual FSLIT("tcon")          tconIdKey
 tappName       = varQual FSLIT("tapp")          tappIdKey
 			 
 -- data Tag = ...	 
-arrowTyConName = varQual FSLIT("arrowTyCon")   arrowIdKey
-tupleTyConName = varQual FSLIT("tupleTyCon")   tupleIdKey
-listTyConName  = varQual FSLIT("listTyCon")    listIdKey
-namedTyConName = varQual FSLIT("namedTyCon")   namedTyConIdKey
+arrowTyConName = varQual FSLIT("arrowTyCon")    arrowIdKey
+tupleTyConName = varQual FSLIT("tupleTyCon")    tupleIdKey
+listTyConName  = varQual FSLIT("listTyCon")     listIdKey
+namedTyConName = varQual FSLIT("namedTyCon")    namedTyConIdKey
+
+-- type Ctxt = ...
+ctxtName       = varQual FSLIT("ctxt")          ctxtIdKey
 			 
 -- data Con = ...	 
 constrName     = varQual FSLIT("constr")        constrIdKey
@@ -1225,21 +1295,24 @@ letStIdKey      = mkPreludeMiscIdUnique 248
 noBindStIdKey   = mkPreludeMiscIdUnique 249
 parStIdKey      = mkPreludeMiscIdUnique 250
 
-tvarIdKey	= mkPreludeMiscIdUnique 251
-tconIdKey	= mkPreludeMiscIdUnique 252
-tappIdKey	= mkPreludeMiscIdUnique 253
+tforallIdKey	= mkPreludeMiscIdUnique 251
+tvarIdKey	= mkPreludeMiscIdUnique 252
+tconIdKey	= mkPreludeMiscIdUnique 253
+tappIdKey	= mkPreludeMiscIdUnique 254
 
-arrowIdKey	= mkPreludeMiscIdUnique 254
-tupleIdKey	= mkPreludeMiscIdUnique 255
-listIdKey	= mkPreludeMiscIdUnique 256
-namedTyConIdKey	= mkPreludeMiscIdUnique 257
+arrowIdKey	= mkPreludeMiscIdUnique 255
+tupleIdKey	= mkPreludeMiscIdUnique 256
+listIdKey	= mkPreludeMiscIdUnique 257
+namedTyConIdKey	= mkPreludeMiscIdUnique 258
 
-constrIdKey	= mkPreludeMiscIdUnique 258
+ctxtIdKey	= mkPreludeMiscIdUnique 259
 
-stringLIdKey	= mkPreludeMiscIdUnique 259
-rationalLIdKey	= mkPreludeMiscIdUnique 260
+constrIdKey	= mkPreludeMiscIdUnique 260
 
-sigExpIdKey     = mkPreludeMiscIdUnique 261
+stringLIdKey	= mkPreludeMiscIdUnique 261
+rationalLIdKey	= mkPreludeMiscIdUnique 262
+
+sigExpIdKey     = mkPreludeMiscIdUnique 263
 
 
 
