@@ -29,7 +29,7 @@ module BasicTypes(
 
 	TopLevelFlag(..), isTopLevel, isNotTopLevel,
 
-	OccInfo(..), seqOccInfo, isFragileOccInfo,
+	OccInfo(..), seqOccInfo, isFragileOccInfo, isLoopBreaker,
 	InsideLam, insideLam, notInsideLam,
 	OneBranch, oneBranch, notOneBranch
 
@@ -203,6 +203,10 @@ type OneBranch = Bool	-- True <=> Occurs in only one case branch
 			--	so no code-duplication issue to worry about
 oneBranch    = True
 notOneBranch = False
+
+isLoopBreaker :: OccInfo -> Bool
+isLoopBreaker IAmALoopBreaker = True
+isLoopBreaker other	      = False
 
 isFragileOccInfo :: OccInfo -> Bool
 isFragileOccInfo (OneOcc _ _) = True

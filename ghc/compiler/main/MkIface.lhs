@@ -14,7 +14,9 @@ import IO		( Handle, hPutStr, openFile,
 			  hClose, hPutStrLn, IOMode(..) )
 
 import HsSyn
-import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..) )
+import BasicTypes	( Fixity(..), FixityDirection(..), NewOrData(..), 
+			  OccInfo, isLoopBreaker
+			)
 import RnMonad
 import RnEnv		( availName )
 
@@ -32,7 +34,7 @@ import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo, InlinePragInfo(..), inli
 			  strictnessInfo, ppStrictnessInfo, isBottomingStrictness,
 			  cafInfo, ppCafInfo, specInfo,
 			  cprInfo, ppCprInfo, pprInlinePragInfo,
-			  occInfo, OccInfo(..),
+			  occInfo, 
 			  workerExists, workerInfo, ppWorkerInfo, WorkerInfo(..)
 			)
 import CoreSyn		( CoreExpr, CoreBind, Bind(..), rulesRules, rulesRhsFreeVars )
@@ -366,9 +368,7 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
 
     ------------  Occ info  --------------
-    loop_breaker  = case occInfo core_idinfo of
-			IAmALoopBreaker -> True
-			other		-> False
+    loop_breaker  = isLoopBreaker (occInfo core_idinfo)
 
     ------------  Unfolding  --------------
     inline_pragma  = inlinePragInfo core_idinfo

@@ -10,7 +10,7 @@
 \begin{code}
 module PprCore (
 	pprCoreExpr, pprParendExpr, pprIfaceUnfolding, 
-	pprCoreBinding, pprCoreBindings, pprIdBndr,
+	pprCoreBinding, pprCoreBindings,
 	pprCoreRules, pprCoreRule
     ) where
 
@@ -22,7 +22,7 @@ import Id		( Id, idType, isDataConId_maybe, idLBVarInfo, idArity,
 			  idInfo, idInlinePragma, idDemandInfo, idOccInfo
 			)
 import Var		( isTyVar )
-import IdInfo		( IdInfo, megaSeqIdInfo,
+import IdInfo		( IdInfo, megaSeqIdInfo, occInfo,
 			  arityInfo, ppArityInfo, ppFlavourInfo, flavourInfo,
 			  demandInfo, updateInfo, ppUpdateInfo, specInfo, 
 			  strictnessInfo, ppStrictnessInfo, cafInfo, ppCafInfo,
@@ -342,7 +342,7 @@ pprIdBndr id = ppr id <+>
 	       (megaSeqIdInfo (idInfo id) `seq`
 			-- Useful for poking on black holes
 	        ifPprDebug (ppr (idInlinePragma id) <+> ppr (idOccInfo id) <+> 
-				      ppr (idDemandInfo id)) <+> ppr (idLBVarInfo id))
+			    ppr (idDemandInfo id)) <+> ppr (idLBVarInfo id))
 \end{code}
 
 
@@ -355,16 +355,15 @@ ppIdInfo info
 	    ppUpdateInfo u,
 	    ppWorkerInfo (workerInfo info),
 	    ppStrictnessInfo s,
-	    ppr d,
 	    ppCafInfo c,
             ppCprInfo m,
-	    ppr (lbvarInfo info),
 	    pprIfaceCoreRules p
-	-- Inline pragma printed out with all binders; see PprCore.pprIdBndr
+	-- Inline pragma, occ, demand, lbvar info
+	-- printed out with all binders (when debug is on); 
+	-- see PprCore.pprIdBndr
 	]
   where
     a = arityInfo info
-    d = demandInfo info
     s = strictnessInfo info
     u = updateInfo info
     c = cafInfo info

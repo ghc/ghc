@@ -295,20 +295,21 @@ substPred subst (IParam n ty)    = IParam n (subst_ty subst ty)
 subst_ty subst ty
    = go ty
   where
-    go (TyConApp tc tys)	  = let args = map go tys
-				    in  args `seqList` TyConApp tc args
-    go (NoteTy (SynNote ty1) ty2) = NoteTy (SynNote $! (go ty1)) $! (go ty2)
-    go (NoteTy (FTVNote _) ty2)   = go ty2		-- Discard the free tyvar note
-    go (FunTy arg res)   	  = (FunTy $! (go arg)) $! (go res)
+    go (TyConApp tc tys)	   = let args = map go tys
+				     in  args `seqList` TyConApp tc args
+    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
+    go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
     go (NoteTy (UsgNote usg)  ty2) = (NoteTy $! UsgNote usg) $! go ty2  	-- Keep usage annot
     go (NoteTy (UsgForAll uv) ty2) = (NoteTy $! UsgForAll uv) $! go ty2  	-- Keep uvar bdr
     go (NoteTy (IPNote nm) ty2)	   = (NoteTy $! IPNote nm) $! go ty2		-- Keep ip note
-    go (AppTy fun arg)   	  = mkAppTy (go fun) $! (go arg)
-    go ty@(TyVarTy tv)   	  = case (lookupSubst subst tv) of
+
+    go (FunTy arg res)   	   = (FunTy $! (go arg)) $! (go res)
+    go (AppTy fun arg)   	   = mkAppTy (go fun) $! (go arg)
+    go ty@(TyVarTy tv)   	   = case (lookupSubst subst tv) of
 	       				Nothing 	   -> ty
        					Just (DoneTy ty')  -> ty'
 					
-    go (ForAllTy tv ty)		  = case substTyVar subst tv of
+    go (ForAllTy tv ty)		   = case substTyVar subst tv of
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
 \end{code}
 
@@ -530,13 +531,12 @@ substWorker :: Subst -> WorkerInfo -> WorkerInfo
 substWorker subst NoWorker
   = NoWorker
 substWorker subst (HasWorker w a)
-  = case lookupSubst subst w of
-	Nothing		       -> HasWorker w a
-	Just (DoneId w1 _)     -> HasWorker w1 a
-	Just (DoneEx (Var w1)) -> HasWorker w1 a
-	Just (DoneEx other)    -> WARN( True, text "substWorker: DoneEx" <+> ppr w )
+  = case lookupIdSubst subst w of
+	(DoneId w1 _)     -> HasWorker w1 a
+	(DoneEx (Var w1)) -> HasWorker w1 a
+	(DoneEx other)    -> WARN( True, text "substWorker: DoneEx" <+> ppr w )
 				  NoWorker	-- Worker has got substituted away altogether
-	Just (ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
+	(ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
 				  NoWorker	-- Ditto
 			
 substRules :: Subst -> CoreRules -> CoreRules
@@ -549,8 +549,7 @@ substRules subst rules
 substRules subst (Rules rules rhs_fvs)
   = seqRules new_rules `seq` new_rules
   where
-    new_rules = Rules (map do_subst rules)
-		      (subst_fvs (substEnv subst) rhs_fvs)
+    new_rules = Rules (map do_subst rules) (substVarSet subst rhs_fvs)
 
     do_subst rule@(BuiltinRule _) = rule
     do_subst (Rule name tpl_vars lhs_args rhs)
@@ -560,13 +559,12 @@ substRules subst (Rules rules rhs_fvs)
 	where
 	  (subst', tpl_vars') = substBndrs subst tpl_vars
 
-    subst_fvs se fvs
-	= foldVarSet (unionVarSet . subst_fv) emptyVarSet rhs_fvs
-	where
-	  subst_fv fv = case lookupSubstEnv se fv of
-				Nothing			  -> unitVarSet fv
-				Just (DoneId fv' _)	  -> unitVarSet fv'
-				Just (DoneEx expr)	  -> exprFreeVars expr
-				Just (DoneTy ty)  	  -> tyVarsOfType ty 
-				Just (ContEx se' expr) -> subst_fvs se' (exprFreeVars expr)
+substVarSet subst fvs 
+  = foldVarSet (unionVarSet . subst_fv subst) emptyVarSet fvs
+  where
+    subst_fv subst fv = case lookupIdSubst subst fv of
+			    DoneId fv' _    -> unitVarSet fv'
+			    DoneEx expr	    -> exprFreeVars expr
+			    DoneTy ty  	    -> tyVarsOfType ty 
+			    ContEx se' expr -> substVarSet (setSubstEnv subst se') (exprFreeVars expr)
 \end{code}

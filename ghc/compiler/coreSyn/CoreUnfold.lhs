@@ -515,7 +515,7 @@ callSiteInline :: Bool			-- True <=> the Id is black listed
 callSiteInline black_listed inline_call occ id arg_infos interesting_cont
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
-	OtherCon _  -> Nothing ;
+	OtherCon cs -> Nothing ;
 	CompulsoryUnfolding unf_template | black_listed -> Nothing 
 					 | otherwise 	-> Just unf_template ;
 		-- Constructors have compulsory unfoldings, but

@@ -36,7 +36,7 @@ import Id		( Id, idType, idInfo, idUnique, isDataConId, isDataConId_maybe,
 import IdInfo		( InlinePragInfo(..), OccInfo(..), StrictnessInfo(..), 
 		 	  ArityInfo(..), atLeastArity, arityLowerBound, unknownArity,
 			  specInfo, inlinePragInfo, setArityInfo, setInlinePragInfo, setUnfoldingInfo,
-			  CprInfo(..), cprInfo
+			  CprInfo(..), cprInfo, occInfo
 			)
 import Demand		( Demand, isStrict, wwLazy )
 import DataCon		( DataCon, dataConNumInstArgs, dataConRepStrictness, dataConRepArity,
@@ -66,7 +66,7 @@ import Subst		( Subst, mkSubst, emptySubst, substTy, substExpr,
 import TyCon		( isDataTyCon, tyConDataCons, tyConClass_maybe, tyConArity, isDataTyCon )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
-import BasicTypes	( TopLevelFlag(..), isTopLevel )
+import BasicTypes	( TopLevelFlag(..), isTopLevel, isLoopBreaker )
 import Maybes		( maybeToBool )
 import Util		( zipWithEqual, lengthExceeds )
 import PprCore
@@ -551,9 +551,16 @@ completeBinding old_bndr new_bndr top_lvl black_listed new_rhs thing_inside
 	old_info      = idInfo old_bndr
 	new_bndr_info = substIdInfo subst old_info (idInfo new_bndr)
 		        `setArityInfo` ArityAtLeast (exprArity new_rhs)
-			`setUnfoldingInfo` mkUnfolding top_lvl new_rhs
 
-	final_id = new_bndr `setIdInfo` new_bndr_info
+	-- Add the unfolding *only* for non-loop-breakers
+	-- Making loop breakers not have an unfolding at all 
+	-- means that we can avoid tests in exprIsConApp, for example.
+	-- This is important: if exprIsConApp says 'yes' for a recursive
+	-- thing we can get into an infinite loop
+	info_w_unf | isLoopBreaker (occInfo old_info) = new_bndr_info
+		   | otherwise = new_bndr_info `setUnfoldingInfo` mkUnfolding top_lvl new_rhs
+
+	final_id = new_bndr `setIdInfo` info_w_unf
      in
 	-- These seqs forces the Id, and hence its IdInfo,
 	-- and hence any inner substitutions
@@ -980,8 +987,8 @@ postInlineUnconditionally :: Bool  	-- Black listed
 postInlineUnconditionally black_listed occ_info bndr rhs
   | isExportedId bndr	|| 
     black_listed 	|| 
-    loop_breaker	= False			-- Don't inline these
-  | otherwise	        = exprIsTrivial rhs	-- Duplicating is free
+    isLoopBreaker occ_info = False		-- Don't inline these
+  | otherwise	           = exprIsTrivial rhs	-- Duplicating is free
 	-- Don't inline even WHNFs inside lambdas; doing so may
 	-- simply increase allocation when the function is called
 	-- This isn't the last chance; see NOTE above.
@@ -993,10 +1000,6 @@ postInlineUnconditionally black_listed occ_info bndr rhs
 	-- NB: Even NOINLINEis ignored here: if the rhs is trivial
 	-- it's best to inline it anyway.  We often get a=E; b=a
 	-- from desugaring, with both a and b marked NOINLINE.
-  where
-    loop_breaker = case occ_info of
-			IAmALoopBreaker -> True
-			other		-> False
 \end{code}
 
 
