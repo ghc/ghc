@@ -19,15 +19,16 @@ module Weak (
 	-- instance Eq (Weak v)  
 
 	mkWeak,      		-- :: k -> v -> IO () -> IO (Weak v)
-	deRefWeak 		-- :: Weak v -> IO (Maybe v)
+	deRefWeak, 		-- :: Weak v -> IO (Maybe v)
+	finalise,		-- :: Weak v -> IO ()
 
 	-- Not yet implemented
-	-- finalise		-- :: Weak v -> IO ()
 	-- replaceFinaliser	-- :: Weak v -> IO () -> IO ()
 
-	mkWeakPtr 		-- :: k -> IO () -> IO (Weak k)
-	mkWeakPair 		-- :: k -> v -> IO () -> IO (Weak (k,v))
-	addFinaliser 		-- :: k -> IO () -> IO ()
+	mkWeakPtr, 		-- :: k -> IO () -> IO (Weak k)
+	mkWeakPair, 		-- :: k -> v -> IO () -> IO (Weak (k,v))
+	mkWeakNoFinaliser,	-- :: k -> v -> IO (Weak v)
+	addFinaliser, 		-- :: k -> IO () -> IO ()
 	addForeignFinaliser 	-- :: ForeignObj -> IO () -> IO ()
    ) where
 </verb></tscreen>
@@ -187,6 +188,26 @@ weak pointers:
 
 These more general weak pointers are enough to implement memo
 tables properly.
+
+A weak pointer can be finalised early, using the <tt/finalise/ operation:
+
+<tscreen><verb>
+finalise :: Weak v -> IO ()
+</verb></tscreen>
+
+When you don't need a finaliser, we provide the following operation:
+
+<tscreen><verb>
+mkWeakNoFinaliser :: k -> v -> IO (Weak v)
+mkWeakNoFinaliser k v = mkWeak k v (return ())
+</verb></tscreen>
+
+Which creates a weak pointer with a null finaliser.  Lots of null
+finalisers can be expensive, because each one runs in a separate
+thread, so the intention is that <tt/mkWeakNoFinaliser> avoids all the
+extra costs by generating a special kind of weak pointer without a
+finaliser.  So although the semantics of mkWeakNoFinaliser is as given
+above, its actual implementation is somewhat different.
 
 <sect1> A precise semantics
 <p>
