@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.24 2003/05/16 10:14:20 simonmar Exp $
+# $Id: package.mk,v 1.25 2003/05/17 00:11:30 ross Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -8,11 +8,11 @@ ifneq "$(PACKAGE)" ""
 
 ifeq "$(way)" ""
 
-$(PACKAGE).conf.inplace   : $(PACKAGE).conf.in
+package.conf.inplace   : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
 
-$(PACKAGE).conf.installed : $(PACKAGE).conf.in
+package.conf.installed : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -I$(GHC_INCLUDE_DIR) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
 
@@ -34,12 +34,12 @@ ifneq "$(BootingFromHc)" "YES"
 boot all :: $(STAMP_PKG_CONF)
 endif
 
-$(STAMP_PKG_CONF) : $(PACKAGE).conf.inplace $(PACKAGE).conf.installed
-	$(GHC_PKG_INPLACE) --update-package <$(PACKAGE).conf.inplace
-	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --update-package <$(PACKAGE).conf.installed
+$(STAMP_PKG_CONF) : package.conf.inplace package.conf.installed
+	$(GHC_PKG_INPLACE) --update-package <package.conf.inplace
+	$(GHC_PKG_INPLACE)  -f $(GHC_DRIVER_DIR)/package.conf --update-package <package.conf.installed
 	@touch $(STAMP_PKG_CONF)
 
-CLEAN_FILES += $(PACKAGE).conf.installed $(PACKAGE).conf.inplace 
+CLEAN_FILES += package.conf.installed package.conf.inplace 
 
 endif # $(way) == ""
 
