@@ -31,6 +31,8 @@ case "$configopts" in
 cat >mk/build.mk <<END
 GhcWithInterpreter=NO
 GhcWithNativeCodeGen=NO
+SplitObjs=NO
+GhcLibWays=
 END
 ;;
 
