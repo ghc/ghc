@@ -371,7 +371,10 @@ tc_type wimp_out (HsFunTy ty1 ty2)
   = tc_type wimp_out ty1			`thenTc` \ tau_ty1 ->
 	-- Function argument can be polymorphic, but
 	-- must not be an unboxed tuple
-    checkTc (not (isUnboxedTupleType tau_ty1))
+	--
+	-- In a recursive loop we can't ask whether the thing is
+	-- unboxed -- might be a synonym inside a synonym inside a group
+    checkTc (isRec wimp_out || not (isUnboxedTupleType tau_ty1))
 	    (ubxArgTyErr ty1)			`thenTc_`
     tc_type wimp_out ty2			`thenTc` \ tau_ty2 ->
     returnTc (mkFunTy tau_ty1 tau_ty2)
@@ -433,9 +436,9 @@ tc_arg_type wimp_out arg_ty
   = tc_type wimp_out arg_ty
 
   | otherwise
-  = tc_type wimp_out arg_ty						`thenTc` \ arg_ty' ->
-    checkTc (not (isForAllTy arg_ty'))	       (polyArgTyErr arg_ty)	`thenTc_`
-    checkTc (not (isUnboxedTupleType arg_ty')) (ubxArgTyErr arg_ty)	`thenTc_`
+  = tc_type wimp_out arg_ty								`thenTc` \ arg_ty' ->
+    checkTc (isRec wimp_out || not (isForAllTy arg_ty'))	 (polyArgTyErr arg_ty)	`thenTc_`
+    checkTc (isRec wimp_out || not (isUnboxedTupleType arg_ty')) (ubxArgTyErr arg_ty)	`thenTc_`
     returnTc arg_ty'
 
 tc_arg_types wimp_out arg_tys = mapTc (tc_arg_type wimp_out) arg_tys
