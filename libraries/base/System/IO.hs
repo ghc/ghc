@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: IO.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: IO.hs,v 1.3 2002/02/05 17:32:27 simonmar Exp $
 --
 -- The standard IO library.
 --
@@ -108,6 +108,7 @@ import GHC.Show
 
 import Data.Dynamic
 import Control.Monad.Fix
+import System.IO.Error
 
 -- -----------------------------------------------------------------------------
 -- MonadFix instance

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsCore.h,v 1.6 2002/01/02 14:40:11 simonmar Exp $
+ * $Id: HsCore.h,v 1.7 2002/02/05 17:32:27 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -175,14 +175,104 @@ __hscore_o_binary()
 #endif
 }
 
+INLINE int
+__hscore_o_rdonly()
+{
+#ifdef O_RDONLY
+  return O_RDONLY;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_wronly( void )
+{
+#ifdef O_WRONLY
+  return O_WRONLY;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_rdwr( void )
+{
+#ifdef O_RDWR
+  return O_RDWR;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_append( void )
+{
+#ifdef O_APPEND
+  return O_APPEND;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_creat( void )
+{
+#ifdef O_CREAT
+  return O_CREAT;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_excl( void )
+{
+#ifdef O_EXCL
+  return O_EXCL;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_trunc( void )
+{
+#ifdef O_TRUNC
+  return O_TRUNC;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_noctty( void )
+{
+#ifdef O_NOCTTY
+  return O_NOCTTY;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_o_nonblock( void )
+{
+#ifdef O_NONBLOCK
+  return O_NONBLOCK;
+#else
+  return 0;
+#endif
+}
+
 INLINE HsInt
-__hscore_seek_set()
+__hscore_seek_set( void )
 {
   return SEEK_SET;
 }
 
 INLINE HsInt
-__hscore_seek_end()
+__hscore_seek_end( void )
 {
   return SEEK_END;
 }
@@ -220,6 +310,210 @@ __hscore_PrelHandle_read( HsInt fd, HsBool isSock, HsAddr ptr,
 #endif
   return read(fd,ptr + off, sz);
 
+}
+
+#ifdef mingw32_TARGET_OS
+INLINE long *
+__hscore_Time_ghcTimezone( void ) { return &_timezone; }
+
+INLINE char **
+__hscore_Time_ghcTzname( void ) { return _tzname; }
+#endif
+
+INLINE HsInt
+__hscore_mkdir( HsAddr pathName, HsInt mode )
+{
+#if defined(mingw32_TARGET_OS)
+  return mkdir(pathName);
+#else
+  return mkdir(pathName,mode);
+#endif
+}
+
+INLINE HsInt
+__hscore_lstat( HsAddr fname, HsAddr st )
+{
+#ifdef HAVE_LSTAT
+  return lstat((const char*)fname, (struct stat*)st);
+#else
+  return stat((const char*)fname, (struct stat*)st);
+#endif
+}
+
+INLINE HsInt __hscore_path_max() { return PATH_MAX; }
+
+INLINE mode_t __hscore_R_OK() { return R_OK; }
+INLINE mode_t __hscore_W_OK() { return W_OK; }
+INLINE mode_t __hscore_X_OK() { return X_OK; }
+
+INLINE mode_t __hscore_S_IRUSR() { return S_IRUSR; }
+INLINE mode_t __hscore_S_IWUSR() { return S_IWUSR; }
+INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
+
+INLINE HsAddr
+__hscore_d_name( struct dirent* d )
+{ 
+#ifndef mingw32_TARGET_OS
+  return (HsAddr)(&d->d_name);
+#else
+  return (HsAddr)(d->d_name);
+#endif
+}
+
+INLINE HsInt
+__hscore_end_of_dir( void )
+{
+#ifndef mingw32_TARGET_OS
+  return 0;
+#else
+  return ENOENT;
+#endif  
+}
+
+INLINE void
+__hscore_free_dirent(HsAddr dEnt)
+{
+#if HAVE_READDIR_R
+  free(dEnt);
+#endif
+}
+
+INLINE HsInt
+__hscore_sizeof_stat( void )
+{
+  return sizeof(struct stat);
+}
+
+INLINE time_t __hscore_st_mtime ( struct stat* st ) { return st->st_mtime; }
+INLINE off_t  __hscore_st_size  ( struct stat* st ) { return st->st_size; }
+INLINE mode_t __hscore_st_mode  ( struct stat* st ) { return st->st_mode; }
+
+#if HAVE_TERMIOS_H
+INLINE tcflag_t __hscore_lflag( struct termios* ts ) { return ts->c_lflag; }
+
+INLINE void
+__hscore_poke_lflag( struct termios* ts, tcflag_t t ) { ts->c_lflag = t; }
+
+INLINE unsigned char*
+__hscore_ptr_c_cc( struct termios* ts ) 
+{ return (unsigned char*) &ts->c_cc; }
+#endif
+
+INLINE HsInt
+__hscore_sizeof_termios( void )
+{
+#ifndef mingw32_TARGET_OS
+  return sizeof(struct termios);
+#else
+  return 0;
+#endif
+}
+
+INLINE HsInt
+__hscore_sizeof_sigset_t( void )
+{
+#ifndef mingw32_TARGET_OS
+  return sizeof(sigset_t);
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_echo( void )
+{
+#ifdef ECHO
+  return ECHO;
+#else
+  return 0;
+#endif
+
+}
+
+INLINE int
+__hscore_tcsanow( void )
+{
+#ifdef TCSANOW
+  return TCSANOW;
+#else
+  return 0;
+#endif
+
+}
+
+INLINE int
+__hscore_icanon( void )
+{
+#ifdef ICANON
+  return ICANON;
+#else
+  return 0;
+#endif
+}
+
+INLINE int __hscore_vmin( void )
+{
+#ifdef VMIN
+  return VMIN;
+#else
+  return 0;
+#endif
+}
+
+INLINE int __hscore_vtime( void )
+{
+#ifdef VTIME
+  return VTIME;
+#else
+  return 0;
+#endif
+}
+
+INLINE int __hscore_sigttou( void )
+{
+#ifdef SIGTTOU
+  return SIGTTOU;
+#else
+  return 0;
+#endif
+}
+
+INLINE int __hscore_sig_block( void )
+{
+#ifdef SIG_BLOCK
+  return SIG_BLOCK;
+#else
+  return 0;
+#endif
+}
+
+INLINE int __hscore_sig_setmask( void )
+{
+#ifdef SIG_SETMASK
+  return SIG_SETMASK;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_f_getfl( void )
+{
+#ifdef F_GETFL
+  return F_GETFL;
+#else
+  return 0;
+#endif
+}
+
+INLINE int
+__hscore_f_setfl( void )
+{
+#ifdef F_SETFL
+  return F_SETFL;
+#else
+  return 0;
+#endif
 }
 
 #endif

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Directory.hsc,v 1.1 2001/08/17 12:45:27 simonmar Exp $
+-- $Id: Directory.hs,v 1.1 2002/02/05 17:32:27 simonmar Exp $
 --
 -- System-independent interface to directory manipulation.
 --
@@ -71,11 +71,6 @@ import GHC.Posix
 import GHC.IOBase	( IOException(..), IOErrorType(..), ioException )
 #endif
 
--- to get config.h
-#include "HsCore.h"
-
-#include <limits.h>
-
 -----------------------------------------------------------------------------
 -- Permissions
 
@@ -129,11 +124,7 @@ createDirectory :: FilePath -> IO ()
 createDirectory path = do
     withCString path $ \s -> do
       throwErrnoIfMinus1Retry_ "createDirectory" $
-#if defined(mingw32_TARGET_OS)
-        c_mkdir s
-#else
-        c_mkdir s 0o777
-#endif
+	mkdir s 0o777
 
 {-
 @removeDirectory dir@ removes an existing directory {\em dir}.  The
@@ -304,7 +295,7 @@ Either path refers to an existing directory.
 
 renameFile :: FilePath -> FilePath -> IO ()
 renameFile opath npath =
-   withFileStatus opath $ \st -> do
+   withFileOrSymlinkStatus opath $ \st -> do
    is_dir <- isDirectory st
    if is_dir
 	then ioException (IOError Nothing InappropriateType "renameFile"
@@ -344,34 +335,34 @@ The path refers to an existing non-directory object.
 
 getDirectoryContents :: FilePath -> IO [FilePath]
 getDirectoryContents path = do
-   p <- withCString path $ \s ->
+   alloca $ \ ptr_dEnt -> do
+    p <- withCString path $ \s ->
 	  throwErrnoIfNullRetry "getDirectoryContents" (c_opendir s)
-   loop p
+    loop ptr_dEnt p
   where
-    loop :: Ptr CDir -> IO [String]
-    loop dir = do
+    loop :: Ptr (Ptr CDirent) -> Ptr CDir -> IO [String]
+    loop ptr_dEnt dir = do
       resetErrno
-      p <- c_readdir dir
-      if (p /= nullPtr)
+      r <- readdir dir ptr_dEnt
+      if (r == 0) 
 	 then do
-#ifdef mingw32_TARGET_OS
-                 entryp <- (#peek struct dirent,d_name) p
-                 entry <- peekCString entryp -- on mingwin it's a char *, not a char []
-#else
-                 entry <- peekCString ((#ptr struct dirent,d_name) p)
-#endif
-		 entries <- loop dir
-		 return (entry:entries)
+	         dEnt    <- peek ptr_dEnt
+		 if (dEnt == nullPtr) 
+		   then return []
+		   else do
+	 	    entry   <- (d_name dEnt >>= peekCString)
+		    freeDirEnt dEnt
+		    entries <- loop ptr_dEnt dir
+		    return (entry:entries)
 	 else do errno <- getErrno
-		 if (errno == eINTR) then loop dir else do
+		 if (errno == eINTR) then loop ptr_dEnt dir else do
 		 throwErrnoIfMinus1_ "getDirectoryContents" $ c_closedir dir
-#ifdef mingw32_TARGET_OS
-		 if (errno == eNOENT) -- mingwin (20001111) cunningly sets errno to ENOENT when it runs out of files
-#else
-		 if (errno == eOK)
-#endif
+		 let (Errno eo) = errno
+		 if (eo == end_of_dir)
 		    then return []
 		    else throwErrno "getDirectoryContents"
+
+
 
 {-
 If the operating system has a notion of current directories,
@@ -398,8 +389,8 @@ The operating system has no notion of current directory.
 
 getCurrentDirectory :: IO FilePath
 getCurrentDirectory = do
-  p <- mallocBytes (#const PATH_MAX)
-  go p (#const PATH_MAX)
+  p <- mallocBytes path_max
+  go p path_max
   where go p bytes = do
     	  p' <- c_getcwd p (fromIntegral bytes)
 	  if p' /= nullPtr 
@@ -474,9 +465,9 @@ getModificationTime name =
 getPermissions :: FilePath -> IO Permissions
 getPermissions name = do
   withCString name $ \s -> do
-  read  <- c_access s (#const R_OK)
-  write <- c_access s (#const W_OK)
-  exec  <- c_access s (#const X_OK)
+  read  <- c_access s r_OK
+  write <- c_access s w_OK
+  exec  <- c_access s x_OK
   withFileStatus name $ \st -> do
   is_dir <- isDirectory st
   is_reg <- isRegularFile st
@@ -492,9 +483,9 @@ getPermissions name = do
 setPermissions :: FilePath -> Permissions -> IO ()
 setPermissions name (Permissions r w e s) = do
     let
-     read  = if r      then (#const S_IRUSR) else emptyCMode
-     write = if w      then (#const S_IWUSR) else emptyCMode
-     exec  = if e || s then (#const S_IXUSR) else emptyCMode
+     read  = if r      then s_IRUSR else emptyCMode
+     write = if w      then s_IWUSR else emptyCMode
+     exec  = if e || s then s_IXUSR else emptyCMode
 
      mode  = read `unionCMode` (write `unionCMode` exec)
 
@@ -503,34 +494,59 @@ setPermissions name (Permissions r w e s) = do
 
 withFileStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
 withFileStatus name f = do
-    allocaBytes (#const sizeof(struct stat)) $ \p ->
+    allocaBytes sizeof_stat $ \p ->
       withCString name $ \s -> do
         throwErrnoIfMinus1Retry_ "withFileStatus" (c_stat s p)
 	f p
 
+withFileOrSymlinkStatus :: FilePath -> (Ptr CStat -> IO a) -> IO a
+withFileOrSymlinkStatus name f = do
+    allocaBytes sizeof_stat $ \p ->
+      withCString name $ \s -> do
+        throwErrnoIfMinus1Retry_ "withFileOrSymlinkStatus" (lstat s p)
+	f p
+
 modificationTime :: Ptr CStat -> IO ClockTime
 modificationTime stat = do
-    mtime <- (#peek struct stat, st_mtime) stat
+    mtime <- st_mtime stat
     return (TOD (toInteger (mtime :: CTime)) 0)
-
+    
 isDirectory :: Ptr CStat -> IO Bool
 isDirectory stat = do
-  mode <- (#peek struct stat, st_mode) stat
-  return (s_ISDIR mode /= 0)
+  mode <- st_mode stat
+  return (s_isdir mode)
 
 isRegularFile :: Ptr CStat -> IO Bool
 isRegularFile stat = do
-  mode <- (#peek struct stat, st_mode) stat
-  return (s_ISREG mode /= 0)
-
-foreign import ccall unsafe s_ISDIR :: CMode -> Int
-#def inline HsInt s_ISDIR(m) {return S_ISDIR(m);}
-
-foreign import ccall unsafe s_ISREG :: CMode -> Int
-#def inline HsInt s_ISREG(m) {return S_ISREG(m);}
+  mode <- st_mode stat
+  return (s_isreg mode)
 
 emptyCMode     :: CMode
 emptyCMode     = 0
 
 unionCMode     :: CMode -> CMode -> CMode
 unionCMode     = (+)
+
+
+foreign import ccall unsafe "__hscore_path_max"
+  path_max :: Int
+
+foreign import ccall unsafe "__hscore_readdir"
+  readdir  :: Ptr CDir -> Ptr (Ptr CDirent) -> IO CInt
+
+foreign import ccall unsafe "__hscore_free_dirent"
+  freeDirEnt  :: Ptr CDirent -> IO ()
+
+foreign import ccall unsafe "__hscore_end_of_dir"
+  end_of_dir :: CInt
+
+foreign import ccall unsafe "__hscore_d_name"
+  d_name :: Ptr CDirent -> IO CString
+
+foreign import ccall unsafe "__hscore_R_OK" r_OK :: CMode
+foreign import ccall unsafe "__hscore_W_OK" w_OK :: CMode
+foreign import ccall unsafe "__hscore_X_OK" x_OK :: CMode
+
+foreign import ccall unsafe "__hscore_S_IRUSR" s_IRUSR :: CMode
+foreign import ccall unsafe "__hscore_S_IWUSR" s_IWUSR :: CMode
+foreign import ccall unsafe "__hscore_S_IXUSR" s_IXUSR :: CMode

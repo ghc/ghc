@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Alloc.hs,v 1.4 2001/12/21 15:07:22 simonmar Exp $
+-- $Id: Alloc.hs,v 1.5 2002/02/05 17:32:25 simonmar Exp $
 --
 -- Marshalling support: basic routines for memory allocation
 --
@@ -124,6 +124,6 @@ failWhenNULL name f = do
 
 -- basic C routines needed for memory allocation
 --
-foreign import "malloc"  unsafe _malloc  ::          CSize -> IO (Ptr a)
-foreign import "realloc" unsafe _realloc :: Ptr a -> CSize -> IO (Ptr a)
-foreign import "free"	 unsafe _free    :: Ptr a -> IO ()
+foreign import ccall unsafe "malloc"  _malloc  ::          CSize -> IO (Ptr a)
+foreign import ccall unsafe "realloc" _realloc :: Ptr a -> CSize -> IO (Ptr a)
+foreign import ccall unsafe "free"    _free    :: Ptr a -> IO ()

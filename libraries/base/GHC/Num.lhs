@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Num.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
+% $Id: Num.lhs,v 1.4 2002/02/05 17:32:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -382,33 +382,29 @@ instance  Enum Integer  where
     {-# INLINE enumFromThen #-}
     {-# INLINE enumFromTo #-}
     {-# INLINE enumFromThenTo #-}
-    enumFrom x             = efdInteger  x 1
-    enumFromThen x y       = efdInteger  x (y-x)
-    enumFromTo x lim	   = efdtInteger x 1     lim
-    enumFromThenTo x y lim = efdtInteger x (y-x) lim
-
-
-efdInteger  = enumDeltaIntegerList
-efdtInteger = enumDeltaToIntegerList
+    enumFrom x             = enumDeltaInteger  x 1
+    enumFromThen x y       = enumDeltaInteger  x (y-x)
+    enumFromTo x lim	   = enumDeltaToInteger x 1     lim
+    enumFromThenTo x y lim = enumDeltaToInteger x (y-x) lim
 
 {-# RULES
-"efdInteger"		forall x y.  efdInteger x y	    = build (\c _ -> enumDeltaIntegerFB c x y)
-"efdtInteger"		forall x y l.efdtInteger x y l	    = build (\c n -> enumDeltaToIntegerFB c n x y l)
-"enumDeltaInteger" 	enumDeltaIntegerFB   (:)    = enumDeltaIntegerList
-"enumDeltaToInteger" 	enumDeltaToIntegerFB (:) [] = enumDeltaToIntegerList
+"enumDeltaInteger"	[~1] forall x y.  enumDeltaInteger x y     = build (\c _ -> enumDeltaIntegerFB c x y)
+"efdtInteger"		[~1] forall x y l.enumDeltaToInteger x y l = build (\c n -> enumDeltaToIntegerFB c n x y l)
+"enumDeltaInteger" 	[1] enumDeltaIntegerFB   (:)    = enumDeltaInteger
+"enumDeltaToInteger" 	[1] enumDeltaToIntegerFB (:) [] = enumDeltaToInteger
  #-}
 
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
 enumDeltaIntegerFB c x d = x `c` enumDeltaIntegerFB c (x+d) d
 
-enumDeltaIntegerList :: Integer -> Integer -> [Integer]
-enumDeltaIntegerList x d = x : enumDeltaIntegerList (x+d) d
+enumDeltaInteger :: Integer -> Integer -> [Integer]
+enumDeltaInteger x d = x : enumDeltaInteger (x+d) d
 
 enumDeltaToIntegerFB c n x delta lim
   | delta >= 0 = up_fb c n x delta lim
   | otherwise  = dn_fb c n x delta lim
 
-enumDeltaToIntegerList x delta lim
+enumDeltaToInteger x delta lim
   | delta >= 0 = up_list x delta lim
   | otherwise  = dn_list x delta lim
 

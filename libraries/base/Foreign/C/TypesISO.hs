@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: TypesISO.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: TypesISO.hs,v 1.3 2002/02/05 17:32:25 simonmar Exp $
 --
 -- A mapping of C types defined by the ISO C standard to corresponding Haskell
 -- types. Like CTypes, this is a cool hack...
@@ -25,6 +25,7 @@ module Foreign.C.TypesISO
 	  -- Typeable, Storable
 	, CClock(..),   CTime(..),
 
+          -- Instances of: Eq and Storable
 	, CFile,        CFpos,     CJmpBuf
 	) where
 
@@ -64,12 +65,9 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 INTEGRAL_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 INTEGRAL_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
--- TODO: Instances. But which...?  :-}
-
+-- FIXME: Implement and provide instances for Eq and Storable
 data CFile = CFile
-
 data CFpos = CFpos
-
 data CJmpBuf = CJmpBuf
 
 -- C99 types which are still missing include:

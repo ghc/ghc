@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: Posix.hsc,v 1.6 2002/01/02 15:01:44 simonmar Exp $
+-- $Id: Posix.hs,v 1.1 2002/02/05 17:32:26 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -10,10 +10,7 @@
 
 module GHC.Posix where
 
--- See above comment for non-Posixness reasons.
--- #include "PosixSource.h"
-
-#include "HsCore.h"
+#include "config.h"
 
 import Control.Monad
 
@@ -46,22 +43,22 @@ type CTms	= ()
 type CUtimbuf   = ()
 type CUtsname   = ()
 
-type CDev    = #type dev_t
-type CIno    = #type ino_t
-type CMode   = #type mode_t
-type COff    = #type off_t
-type CPid    = #type pid_t
+type CDev    = HTYPE_DEV_T
+type CIno    = HTYPE_INO_T
+type CMode   = HTYPE_MODE_T
+type COff    = HTYPE_OFF_T
+type CPid    = HTYPE_PID_T
 
 #ifdef mingw32_TARGET_OS
-type CSsize  = #type size_t
+type CSsize  = HTYPE_SIZE_T
 #else
-type CGid    = #type gid_t
-type CNlink  = #type nlink_t
-type CSsize  = #type ssize_t
-type CUid    = #type uid_t
-type CCc     = #type cc_t
-type CSpeed  = #type speed_t
-type CTcflag = #type tcflag_t
+type CGid    = HTYPE_GID_T
+type CNlink  = HTYPE_NLINK_T
+type CSsize  = HTYPE_SSIZE_T
+type CUid    = HTYPE_UID_T
+type CCc     = HTYPE_CC_T
+type CSpeed  = HTYPE_SPEED_T
+type CTcflag = HTYPE_TCFLAG_T
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -69,14 +66,14 @@ type CTcflag = #type tcflag_t
 
 fdFileSize :: Int -> IO Integer
 fdFileSize fd = 
-  allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
-    throwErrnoIfMinus1Retry "fdFileSize" $
+  allocaBytes sizeof_stat $ \ p_stat -> do
+    throwErrnoIfMinus1Retry "fileSize" $
 	c_fstat (fromIntegral fd) p_stat
-    c_mode <- (#peek struct stat, st_mode) p_stat :: IO CMode 
+    c_mode <- st_mode p_stat :: IO CMode 
     if not (s_isreg c_mode)
 	then return (-1)
 	else do
-    c_size <- (#peek struct stat, st_size) p_stat :: IO COff
+    c_size <- st_size p_stat :: IO COff
     return (fromIntegral c_size)
 
 data FDType  = Directory | Stream | RegularFile
@@ -84,7 +81,7 @@ data FDType  = Directory | Stream | RegularFile
 
 fileType :: FilePath -> IO FDType
 fileType file =
-  allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
+  allocaBytes sizeof_stat $ \ p_stat -> do
   withCString file $ \p_file -> do
     throwErrnoIfMinus1Retry "fileType" $
       c_stat p_file p_stat
@@ -94,13 +91,13 @@ fileType file =
 -- referring to file handles. i.e., it'll fail for socket FDs.
 fdType :: Int -> IO FDType
 fdType fd = 
-  allocaBytes (#const sizeof(struct stat)) $ \ p_stat -> do
+  allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fdType" $
 	c_fstat (fromIntegral fd) p_stat
     statGetType p_stat
 
 statGetType p_stat = do
-  c_mode <- (#peek struct stat, st_mode) p_stat :: IO CMode
+  c_mode <- st_mode p_stat :: IO CMode
   case () of
       _ | s_isdir c_mode 	 	     -> return Directory
         | s_isfifo c_mode || s_issock c_mode -> return Stream
@@ -129,7 +126,7 @@ closeFd isStream fd
   | isStream  = c_closesocket fd
   | otherwise = c_close fd
 
-foreign import "closesocket" unsafe
+foreign import ccall unsafe "closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
 
@@ -143,44 +140,45 @@ fdIsTTY fd = c_isatty (fromIntegral fd) >>= return.toBool
 
 setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
-  allocaBytes (#const sizeof(struct termios))  $ \p_tios -> do
+  allocaBytes sizeof_termios  $ \p_tios -> do
     throwErrnoIfMinus1Retry "setEcho"
 	(c_tcgetattr (fromIntegral fd) p_tios)
-    c_lflag <- (#peek struct termios, c_lflag) p_tios :: IO CTcflag
-    let new_c_lflag | on        = c_lflag .|. (#const ECHO)
-	            | otherwise = c_lflag .&. complement (#const ECHO)
-    (#poke struct termios, c_lflag) p_tios (new_c_lflag :: CTcflag)
-    tcSetAttr fd (#const TCSANOW) p_tios
+    c_lflag <- c_lflag p_tios :: IO CTcflag
+    let new_c_lflag
+	 | on        = c_lflag .|. fromIntegral const_echo
+	 | otherwise = c_lflag .&. complement (fromIntegral const_echo)
+    poke_c_lflag p_tios (new_c_lflag :: CTcflag)
+    tcSetAttr fd const_tcsanow p_tios
 
 getEcho :: Int -> IO Bool
 getEcho fd = do
-  allocaBytes (#const sizeof(struct termios))  $ \p_tios -> do
+  allocaBytes sizeof_termios  $ \p_tios -> do
     throwErrnoIfMinus1Retry "setEcho"
 	(c_tcgetattr (fromIntegral fd) p_tios)
-    c_lflag <- (#peek struct termios, c_lflag) p_tios :: IO CTcflag
-    return ((c_lflag .&. (#const ECHO)) /= 0)
+    c_lflag <- c_lflag p_tios :: IO CTcflag
+    return ((c_lflag .&. fromIntegral const_echo) /= 0)
 
 setCooked :: Int -> Bool -> IO ()
 setCooked fd cooked = 
-  allocaBytes (#const sizeof(struct termios))  $ \p_tios -> do
+  allocaBytes sizeof_termios  $ \p_tios -> do
     throwErrnoIfMinus1Retry "setCooked"
 	(c_tcgetattr (fromIntegral fd) p_tios)
 
     -- turn on/off ICANON
-    c_lflag <- (#peek struct termios, c_lflag) p_tios :: IO CTcflag
-    let new_c_lflag | cooked    = c_lflag .|. (#const ICANON)
-	            | otherwise = c_lflag .&. complement (#const ICANON)
-    (#poke struct termios, c_lflag) p_tios (new_c_lflag :: CTcflag)
+    c_lflag <- c_lflag p_tios :: IO CTcflag
+    let new_c_lflag | cooked    = c_lflag .|. (fromIntegral const_icanon)
+	            | otherwise = c_lflag .&. complement (fromIntegral const_icanon)
+    poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
     when cooked $ do
-	    let c_cc  = (#ptr struct termios, c_cc) p_tios
-		vmin  = c_cc `plusPtr` (#const VMIN)  :: Ptr Word8
-		vtime = c_cc `plusPtr` (#const VTIME) :: Ptr Word8
+            c_cc <- ptr_c_cc p_tios
+	    let vmin  = (c_cc `plusPtr` (fromIntegral const_vmin))  :: Ptr Word8
+		vtime = (c_cc `plusPtr` (fromIntegral const_vtime)) :: Ptr Word8
 	    poke vmin  1
 	    poke vtime 0
 
-    tcSetAttr fd (#const TCSANOW) p_tios
+    tcSetAttr fd const_tcsanow p_tios
 
 -- tcsetattr() when invoked by a background process causes the process
 -- to be sent SIGTTOU regardless of whether the process has TOSTOP set
@@ -190,14 +188,14 @@ setCooked fd cooked =
 
 tcSetAttr :: FD -> CInt -> Ptr CTermios -> IO ()
 tcSetAttr fd options p_tios = do
-  allocaBytes (#const sizeof(sigset_t)) $ \ p_sigset -> do
-  allocaBytes (#const sizeof(sigset_t)) $ \ p_old_sigset -> do
+  allocaBytes sizeof_sigset_t $ \ p_sigset -> do
+  allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
      c_sigemptyset p_sigset
-     c_sigaddset   p_sigset (#const SIGTTOU)
-     c_sigprocmask (#const SIG_BLOCK) p_sigset p_old_sigset
+     c_sigaddset   p_sigset const_sigttou
+     c_sigprocmask const_sig_block p_sigset p_old_sigset
      throwErrnoIfMinus1Retry_ "tcSetAttr" $
 	 c_tcsetattr (fromIntegral fd) options p_tios
-     c_sigprocmask (#const SIG_SETMASK) p_old_sigset nullPtr
+     c_sigprocmask const_sig_setmask p_old_sigset nullPtr
 
 #else
 
@@ -220,12 +218,11 @@ getEcho fd = return False
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
-		 (c_fcntl_read (fromIntegral fd) (#const F_GETFL))
+		 (c_fcntl_read (fromIntegral fd) const_f_getfl)
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
-  c_fcntl_write (fromIntegral fd) 
-	(#const F_SETFL) (flags .|. #const O_NONBLOCK)
+  c_fcntl_write (fromIntegral fd) const_f_setfl (flags .|. o_NONBLOCK)
 #else
 
 -- bogus defns for win32
@@ -236,172 +233,184 @@ setNonBlockingFD fd = return ()
 -- -----------------------------------------------------------------------------
 -- foreign imports
 
--- POSIX flags only:
-o_RDONLY    = (#const O_RDONLY)	   :: CInt
-o_WRONLY    = (#const O_WRONLY)	   :: CInt
-o_RDWR      = (#const O_RDWR)	   :: CInt
-o_APPEND    = (#const O_APPEND)	   :: CInt
-o_CREAT     = (#const O_CREAT)	   :: CInt
-o_EXCL	    = (#const O_EXCL)	   :: CInt
-o_TRUNC     = (#const O_TRUNC)	   :: CInt
-
-#ifdef mingw32_TARGET_OS
-o_NOCTTY    = 0 :: CInt
-o_NONBLOCK  = 0 :: CInt
-#else
-o_NOCTTY    = (#const O_NOCTTY)	   :: CInt
-o_NONBLOCK  = (#const O_NONBLOCK)  :: CInt
-#endif
-
-#ifdef HAVE_O_BINARY
-o_BINARY    = (#const O_BINARY)	   :: CInt
-#endif
-
-foreign import ccall "access" unsafe
+foreign import ccall unsafe "access"
    c_access :: CString -> CMode -> IO CInt
 
-foreign import ccall "chmod" unsafe
+foreign import ccall unsafe "chmod"
    c_chmod :: CString -> CMode -> IO CInt
 
-foreign import ccall "chdir" unsafe
+foreign import ccall unsafe "chdir"
    c_chdir :: CString -> IO CInt
 
-foreign import ccall "chown" unsafe
+foreign import ccall unsafe "chown"
    c_chown :: CString -> CUid -> CGid -> IO CInt
 
-foreign import ccall "close" unsafe
+foreign import ccall unsafe "close"
    c_close :: CInt -> IO CInt
 
-foreign import ccall "closedir" unsafe 
+foreign import ccall unsafe "closedir" 
    c_closedir :: Ptr CDir -> IO CInt
 
-foreign import ccall "creat" unsafe
+foreign import ccall unsafe "creat"
    c_creat :: CString -> CMode -> IO CInt
 
-foreign import ccall "dup" unsafe
+foreign import ccall unsafe "dup"
    c_dup :: CInt -> IO CInt
 
-foreign import ccall "dup2" unsafe
+foreign import ccall unsafe "dup2"
    c_dup2 :: CInt -> CInt -> IO CInt
 
-foreign import ccall "fpathconf" unsafe
+foreign import ccall unsafe "fpathconf"
    c_fpathconf :: CInt -> CInt -> IO CLong
 
-foreign import ccall "fstat" unsafe
+foreign import ccall unsafe "fstat"
    c_fstat :: CInt -> Ptr CStat -> IO CInt
 
-foreign import ccall "getcwd" unsafe
+foreign import ccall unsafe "getcwd"
    c_getcwd   :: Ptr CChar -> CInt -> IO (Ptr CChar)
 
-foreign import ccall "isatty" unsafe
+foreign import ccall unsafe "isatty"
    c_isatty :: CInt -> IO CInt
 
-foreign import ccall "link" unsafe
+foreign import ccall unsafe "link"
    c_link :: CString -> CString -> IO CInt
 
-foreign import ccall "lseek" unsafe
+foreign import ccall unsafe "lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
-#ifdef HAVE_LSTAT
-foreign import ccall "lstat" unsafe
-   c_lstat :: CString -> Ptr CStat -> IO CInt
-#endif
+foreign import ccall unsafe "__hscore_lstat"
+   lstat :: CString -> Ptr CStat -> IO CInt
 
-foreign import ccall "open" unsafe
+foreign import ccall unsafe "open"
    c_open :: CString -> CInt -> CMode -> IO CInt
 
-foreign import ccall "opendir" unsafe 
+foreign import ccall unsafe "opendir" 
    c_opendir :: CString  -> IO (Ptr CDir)
 
-foreign import ccall "mkdir" unsafe
-#if defined(mingw32_TARGET_OS)
-   c_mkdir :: CString -> IO CInt
-#else
-   c_mkdir :: CString -> CMode -> IO CInt
-#endif
+foreign import ccall unsafe "__hscore_mkdir"
+   mkdir :: CString -> CInt -> IO CInt
 
-foreign import ccall "mkfifo" unsafe
+foreign import ccall unsafe "mkfifo"
    c_mkfifo :: CString -> CMode -> IO CInt
 
-foreign import ccall "pathconf" unsafe
+foreign import ccall unsafe "pathconf"
    c_pathconf :: CString -> CInt -> IO CLong
 
-foreign import ccall "pipe" unsafe
+foreign import ccall unsafe "pipe"
    c_pipe :: Ptr CInt -> IO CInt
 
-foreign import ccall "read" unsafe 
+foreign import ccall unsafe "read" 
    c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
-foreign import ccall "readdir" unsafe 
+foreign import ccall unsafe "readdir" 
    c_readdir :: Ptr CDir -> IO (Ptr CDirent)
 
-foreign import ccall "rename" unsafe
+foreign import ccall unsafe "rename"
    c_rename :: CString -> CString -> IO CInt
 		     
-foreign import ccall "rewinddir" unsafe
+foreign import ccall unsafe "rewinddir"
    c_rewinddir :: Ptr CDir -> IO ()
 
-foreign import ccall "rmdir" unsafe
+foreign import ccall unsafe "rmdir"
    c_rmdir :: CString -> IO CInt
 
-foreign import ccall "stat" unsafe
+foreign import ccall unsafe "stat"
    c_stat :: CString -> Ptr CStat -> IO CInt
 
-foreign import ccall "umask" unsafe
+foreign import ccall unsafe "umask"
    c_umask :: CMode -> IO CMode
 
-foreign import ccall "utime" unsafe
+foreign import ccall unsafe "utime"
    c_utime :: CString -> Ptr CUtimbuf -> IO CMode
 
-foreign import ccall "write" unsafe 
+foreign import ccall unsafe "write" 
    c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
 #ifndef mingw32_TARGET_OS
-foreign import ccall "fcntl" unsafe
+foreign import ccall unsafe "fcntl"
    c_fcntl_read  :: CInt -> CInt -> IO CInt
 
-foreign import ccall "fcntl" unsafe
+foreign import ccall unsafe "fcntl"
    c_fcntl_write :: CInt -> CInt -> CInt -> IO CInt
 
-foreign import ccall "fcntl" unsafe
+foreign import ccall unsafe "fcntl"
    c_fcntl_lock  :: CInt -> CInt -> Ptr CFLock -> IO CInt
 
-foreign import ccall "fork" unsafe
+foreign import ccall unsafe "fork"
    c_fork :: IO CPid 
 
-foreign import ccall "__hscore_sigemptyset" unsafe
+foreign import ccall unsafe "__hscore_sigemptyset"
    c_sigemptyset :: Ptr CSigset -> IO ()
 
-foreign import ccall "sigaddset" unsafe
+foreign import ccall unsafe "sigaddset"
    c_sigaddset :: Ptr CSigset -> CInt -> IO ()
 
-foreign import ccall "sigprocmask" unsafe
+foreign import ccall unsafe "sigprocmask"
    c_sigprocmask :: CInt -> Ptr CSigset -> Ptr CSigset -> IO ()
 
-foreign import ccall "tcgetattr" unsafe
+foreign import ccall unsafe "tcgetattr"
    c_tcgetattr :: CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall "tcsetattr" unsafe
+foreign import ccall unsafe "tcsetattr"
    c_tcsetattr :: CInt -> CInt -> Ptr CTermios -> IO CInt
 
-foreign import ccall "uname" unsafe
+foreign import ccall unsafe "uname"
    c_uname :: Ptr CUtsname -> IO CInt
 
-foreign import ccall "unlink" unsafe
+foreign import ccall unsafe "unlink"
    c_unlink :: CString -> IO CInt
 
-foreign import ccall "waitpid" unsafe
+foreign import ccall unsafe "waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
 #endif
 
-foreign import "__hscore_s_isreg"  unsafe s_isreg  :: CMode -> Bool
-foreign import "__hscore_s_ischr"  unsafe s_ischr  :: CMode -> Bool
-foreign import "__hscore_s_isblk"  unsafe s_isblk  :: CMode -> Bool
-foreign import "__hscore_s_isdir"  unsafe s_isdir  :: CMode -> Bool
-foreign import "__hscore_s_isfifo" unsafe s_isfifo :: CMode -> Bool
+-- POSIX flags only:
+foreign import ccall unsafe "__hscore_o_rdonly" o_RDONLY :: CInt
+foreign import ccall unsafe "__hscore_o_wronly" o_WRONLY :: CInt
+foreign import ccall unsafe "__hscore_o_rdwr"   o_RDWR   :: CInt
+foreign import ccall unsafe "__hscore_o_append" o_APPEND :: CInt
+foreign import ccall unsafe "__hscore_o_creat"  o_CREAT  :: CInt
+foreign import ccall unsafe "__hscore_o_excl"   o_EXCL   :: CInt
+foreign import ccall unsafe "__hscore_o_trunc"  o_TRUNC  :: CInt
+
+-- non-POSIX flags.
+foreign import ccall unsafe "__hscore_o_noctty"   o_NOCTTY   :: CInt
+foreign import ccall unsafe "__hscore_o_nonblock" o_NONBLOCK :: CInt
+foreign import ccall unsafe "__hscore_o_binary"   o_BINARY   :: CInt
+
+foreign import ccall unsafe "__hscore_s_isreg"  s_isreg  :: CMode -> Bool
+foreign import ccall unsafe "__hscore_s_ischr"  s_ischr  :: CMode -> Bool
+foreign import ccall unsafe "__hscore_s_isblk"  s_isblk  :: CMode -> Bool
+foreign import ccall unsafe "__hscore_s_isdir"  s_isdir  :: CMode -> Bool
+foreign import ccall unsafe "__hscore_s_isfifo" s_isfifo :: CMode -> Bool
+
+foreign import ccall unsafe "__hscore_sizeof_stat" sizeof_stat :: Int
+foreign import ccall unsafe "__hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
+foreign import ccall unsafe "__hscore_st_size" st_size :: Ptr CStat -> IO COff
+foreign import ccall unsafe "__hscore_st_mode" st_mode :: Ptr CStat -> IO CMode
+
+foreign import ccall unsafe "__hscore_lflag" c_lflag :: Ptr CTermios -> IO CTcflag
+foreign import ccall unsafe "__hscore_poke_lflag" poke_c_lflag :: Ptr CTermios -> CTcflag -> IO ()
+foreign import ccall unsafe "__hscore_ptr_c_cc" ptr_c_cc  :: Ptr CTermios -> IO (Ptr Word8)
+
+foreign import ccall unsafe "__hscore_echo"         const_echo :: CInt
+foreign import ccall unsafe "__hscore_tcsanow"      const_tcsanow :: CInt
+foreign import ccall unsafe "__hscore_icanon"       const_icanon :: CInt
+foreign import ccall unsafe "__hscore_vmin"         const_vmin   :: CInt
+foreign import ccall unsafe "__hscore_vtime"        const_vtime  :: CInt
+foreign import ccall unsafe "__hscore_sigttou"      const_sigttou :: CInt
+foreign import ccall unsafe "__hscore_sig_block"    const_sig_block :: CInt
+foreign import ccall unsafe "__hscore_sig_setmask"  const_sig_setmask :: CInt
+foreign import ccall unsafe "__hscore_f_getfl"      const_f_getfl :: CInt
+foreign import ccall unsafe "__hscore_f_setfl"      const_f_setfl :: CInt
 
 #ifndef mingw32_TARGET_OS
-foreign import "__hscore_s_issock" s_issock :: CMode -> Bool
+foreign import ccall unsafe "__hscore_sizeof_termios"  sizeof_termios :: Int
+foreign import ccall unsafe "__hscore_sizeof_sigset_t" sizeof_sigset_t :: Int
+#endif
+
+#ifndef mingw32_TARGET_OS
+foreign import ccall unsafe "__hscore_s_issock" s_issock :: CMode -> Bool
 #else
 s_issock :: CMode -> Bool
 s_issock cmode = False

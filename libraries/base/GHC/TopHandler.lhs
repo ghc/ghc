@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: TopHandler.lhs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: TopHandler.lhs,v 1.4 2002/02/05 17:32:27 simonmar Exp $
 --
 -- (c) The University of Glasgow, 2001
 --
@@ -43,6 +43,9 @@ real_handler ex =
 	ExitException ExitSuccess     -> shutdownHaskellAndExit 0
 	ExitException (ExitFailure n) -> shutdownHaskellAndExit n
 
+	Deadlock    -> reportError True 
+			"no threads to run:  infinite loop or deadlock?"
+  
 	ErrorCall s -> reportError True s
 	other       -> reportError True (showsPrec 0 other "\n")
 

@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hs,v 1.2 2002/01/02 14:40:10 simonmar Exp $
+-- $Id: Handle.hs,v 1.3 2002/02/05 17:32:26 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -16,7 +16,8 @@ module GHC.Handle (
   
   newEmptyBuffer, allocateBuffer, readCharFromBuffer, writeCharIntoBuffer,
   flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, fillReadBuffer,
-  read_off,
+  read_off,  read_off_ba,
+  write_off, write_off_ba,
 
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
@@ -32,7 +33,6 @@ module GHC.Handle (
 
   hIsOpen, hIsClosed, hIsReadable, hIsWritable, hGetBuffering, hIsSeekable,
   hSetEcho, hGetEcho, hIsTerminalDevice,
-  ioeGetFileName, ioeGetErrorString, ioeGetHandle, 
 
 #ifdef DEBUG_DUMP
   puts,
@@ -45,6 +45,7 @@ import Data.Bits
 import Data.Maybe
 import Foreign
 import Foreign.C
+import System.IO.Error
 
 import GHC.Posix
 import GHC.Real
@@ -416,17 +417,19 @@ flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
      then return (buf{ bufRPtr=0, bufWPtr=0 })
      else do
   res <- throwErrnoIfMinus1RetryMayBlock "flushWriteBuffer"
-		(write_off (fromIntegral fd) is_stream b (fromIntegral r)
-			(fromIntegral bytes))
+		(write_off_ba (fromIntegral fd) is_stream b (fromIntegral r)
+			      (fromIntegral bytes))
 		(threadWaitWrite fd)
   let res' = fromIntegral res
   if res' < bytes 
      then flushWriteBuffer fd is_stream (buf{ bufRPtr = r + res' })
      else return buf{ bufRPtr=0, bufWPtr=0 }
 
-foreign import "__hscore_PrelHandle_write" unsafe
-   write_off :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+foreign import ccall unsafe "__hscore_PrelHandle_write"
+   write_off_ba :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 
+foreign import ccall unsafe "__hscore_PrelHandle_write"
+   write_off :: CInt -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 
 fillReadBuffer :: FD -> Bool -> Bool -> Buffer -> IO Buffer
 fillReadBuffer fd is_line is_stream
@@ -450,7 +453,7 @@ fillReadBufferLoop fd is_line is_stream buf b w size = do
   puts ("fillReadBufferLoop: bytes = " ++ show bytes ++ "\n")
 #endif
   res <- throwErrnoIfMinus1RetryMayBlock "fillReadBuffer"
-	    (read_off fd is_stream b (fromIntegral w) (fromIntegral bytes))
+	    (read_off_ba fd is_stream b (fromIntegral w) (fromIntegral bytes))
 	    (threadWaitRead fd)
   let res' = fromIntegral res
 #ifdef DEBUG_DUMP
@@ -464,8 +467,11 @@ fillReadBufferLoop fd is_line is_stream buf b w size = do
      	     then fillReadBufferLoop fd is_line is_stream buf b (w+res') size
      	     else return buf{ bufRPtr=0, bufWPtr=w+res' }
  
-foreign import "__hscore_PrelHandle_read" unsafe
-   read_off :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+foreign import ccall unsafe "__hscore_PrelHandle_read"
+   read_off_ba :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import ccall unsafe "__hscore_PrelHandle_read"
+   read_off :: FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles
@@ -580,7 +586,7 @@ openFile' filepath ex_mode =
 	       | otherwise	   = False
 
       binary_flags
-	  | binary    = GHC.Handle.o_BINARY
+	  | binary    = o_BINARY
 	  | otherwise = 0
 
       oflags = oflags1 .|. binary_flags
@@ -652,10 +658,10 @@ openFd fd mb_fd_type filepath mode binary truncate = do
 	   mkFileHandle fd is_stream filepath ha_type binary
 
 
-foreign import "lockFile" unsafe
+foreign import ccall unsafe "lockFile"
   lockFile :: CInt -> CInt -> CInt -> IO CInt
 
-foreign import "unlockFile" unsafe
+foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
 
 mkStdHandle :: FD -> FilePath -> HandleType -> IORef Buffer -> BufferMode
@@ -754,17 +760,22 @@ hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return handle_
       _ -> do
-	  let fd = fromIntegral (haFD handle_)
+	  let fd = haFD handle_
+	      c_fd = fromIntegral fd
+
 	  flushWriteBufferOnly handle_
 
-	  -- close the file descriptor, but not when this is the read side
-	  -- of a duplex handle.
+	  -- close the file descriptor, but not when this is the read
+	  -- side of a duplex handle, and not when this is one of the
+	  -- std file handles.
 	  case haOtherSide handle_ of
-	    Nothing -> throwErrnoIfMinus1Retry_ "hClose" 
+	    Nothing -> 
+		when (fd /= fd_stdin && fd /= fd_stdout && fd /= fd_stderr) $
+			throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_TARGET_OS
-	    					(closeFd (haIsStream handle_) fd)
+	    			(closeFd (haIsStream handle_) c_fd)
 #else
-	    					(c_close fd)
+	    			(c_close c_fd)
 #endif
 	    Just _  -> return ()
 
@@ -772,7 +783,7 @@ hClose_help handle_ =
 	  writeIORef (haBuffers handle_) BufferListNil
 
 	  -- unlock it
-	  unlockFile fd
+	  unlockFile c_fd
 
 	  -- we must set the fd to -1, because the finalizer is going
 	  -- to run eventually and try to close/unlock it.
@@ -1168,49 +1179,25 @@ hSetBinaryMode handle bin =
           (setmode (fromIntegral (haFD handle_)) bin)
        return handle_{haIsBin=bin}
   
-foreign import "__hscore_setmode" unsafe
+foreign import ccall unsafe "__hscore_setmode"
   setmode :: CInt -> Bool -> IO CInt
-
--- -----------------------------------------------------------------------------
--- Miscellaneous
-
--- These three functions are meant to get things out of an IOError.
-
-ioeGetFileName        :: IOError -> Maybe FilePath
-ioeGetErrorString     :: IOError -> String
-ioeGetHandle          :: IOError -> Maybe Handle
-
-ioeGetHandle (IOException (IOError h _ _ _ _)) = h
-ioeGetHandle (UserError _) = Nothing
-ioeGetHandle _ = error "IO.ioeGetHandle: not an IO error"
-
-ioeGetErrorString (IOException (IOError _ iot _ _ _)) = show iot
-ioeGetErrorString (UserError str) = str
-ioeGetErrorString _ = error "IO.ioeGetErrorString: not an IO error"
-
-ioeGetFileName (IOException (IOError _ _ _ _ fn)) = fn
-ioeGetFileName (UserError _) = Nothing
-ioeGetFileName _ = error "IO.ioeGetFileName: not an IO error"
 
 -- ---------------------------------------------------------------------------
 -- debugging
 
 #ifdef DEBUG_DUMP
 puts :: String -> IO ()
-puts s = withCString s $ \cstr -> do c_write 1 cstr (fromIntegral (length s))
+puts s = withCString s $ \cstr -> do write_off_ba 1 False cstr 0 (fromIntegral (length s))
 				     return ()
 #endif
 
 -- -----------------------------------------------------------------------------
 -- wrappers to platform-specific constants:
 
-foreign import ccall "__hscore_supportsTextMode" unsafe 
+foreign import ccall unsafe "__hscore_supportsTextMode"
   tEXT_MODE_SEEK_ALLOWED :: Bool
 
-foreign import ccall "__hscore_bufsiz"   unsafe dEFAULT_BUFFER_SIZE :: Int
-foreign import ccall "__hscore_seek_cur" unsafe sEEK_CUR :: CInt
-foreign import ccall "__hscore_seek_set" unsafe sEEK_SET :: CInt
-foreign import ccall "__hscore_seek_end" unsafe sEEK_END :: CInt
-foreign import ccall "__hscore_o_binary" unsafe o_BINARY :: CInt
-
-
+foreign import ccall unsafe "__hscore_bufsiz"   dEFAULT_BUFFER_SIZE :: Int
+foreign import ccall unsafe "__hscore_seek_cur" sEEK_CUR :: CInt
+foreign import ccall unsafe "__hscore_seek_set" sEEK_SET :: CInt
+foreign import ccall unsafe "__hscore_seek_end" sEEK_END :: CInt

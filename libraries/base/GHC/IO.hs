@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: IO.hs,v 1.2 2002/01/02 14:40:10 simonmar Exp $
+-- $Id: IO.hs,v 1.3 2002/02/05 17:32:26 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -18,6 +18,7 @@ module GHC.IO (
 import Foreign
 import Foreign.C
 
+import System.IO.Error
 import Data.Maybe
 import Control.Monad
 
@@ -58,7 +59,7 @@ hWaitForInput h msecs = do
 	  (inputReady (fromIntegral (haFD handle_)) (fromIntegral msecs) (haIsStream handle_))
   return (r /= 0)
 
-foreign import "inputReady" unsafe
+foreign import ccall unsafe "inputReady"
   inputReady :: CInt -> CInt -> Bool -> IO CInt
 
 -- ---------------------------------------------------------------------------
@@ -91,7 +92,7 @@ hGetChar handle =
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
-	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
+	        (read_off_ba (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then ioe_EOF
@@ -271,7 +272,7 @@ lazyRead' h handle_ = do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
-	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
+	        (read_off_ba (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then do handle_ <- hClose_help handle_ 
@@ -330,7 +331,7 @@ hPutChar handle c =
 	NoBuffering      ->
 		withObject (castCharToCChar c) $ \buf ->
 		throwErrnoIfMinus1RetryMayBlock_ "hPutChar"
-		   (c_write (fromIntegral fd) buf 1)
+		   (write_off (fromIntegral fd) (haIsStream handle_) buf 0 1)
 		   (threadWaitWrite fd)
 
 
@@ -689,13 +690,13 @@ slurpFile fname = do
 -- ---------------------------------------------------------------------------
 -- memcpy wrappers
 
-foreign import "__hscore_memcpy_src_off" unsafe 
+foreign import ccall unsafe "__hscore_memcpy_src_off"
    memcpy_ba_baoff :: RawBuffer -> RawBuffer -> Int -> CSize -> IO (Ptr ())
-foreign import "__hscore_memcpy_src_off" unsafe 
+foreign import ccall unsafe "__hscore_memcpy_src_off"
    memcpy_ptr_baoff :: Ptr a -> RawBuffer -> Int -> CSize -> IO (Ptr ())
-foreign import "__hscore_memcpy_dst_off" unsafe 
+foreign import ccall unsafe "__hscore_memcpy_dst_off"
    memcpy_baoff_ba :: RawBuffer -> Int -> RawBuffer -> CSize -> IO (Ptr ())
-foreign import "__hscore_memcpy_dst_off" unsafe 
+foreign import ccall unsafe "__hscore_memcpy_dst_off"
    memcpy_baoff_ptr :: RawBuffer -> Int -> Ptr a -> CSize -> IO (Ptr ())
 
 -----------------------------------------------------------------------------

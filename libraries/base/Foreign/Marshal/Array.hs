@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Array.hs,v 1.3 2001/08/17 12:50:34 simonmar Exp $
+-- $Id: Array.hs,v 1.4 2002/02/05 17:32:25 simonmar Exp $
 --
 -- Marshalling support: routines allocating, storing, and retrieving Haskell
 -- lists that are represented as arrays in the foreign language
@@ -45,11 +45,6 @@ module Foreign.Marshal.Array (
   withArray,      -- :: Storable a =>      [a] -> (Ptr a -> IO b) -> IO b
   withArray0,     -- :: Storable a => a -> [a] -> (Ptr a -> IO b) -> IO b
 
-  -- destruction
-  --
-  destructArray,  -- :: Storable a =>         Int -> Ptr a -> IO ()
-  destructArray0, -- :: (Storable a, Eq a) => a   -> Ptr a -> IO ()
-
   -- copying (argument order: destination, source)
   --
   copyArray,      -- :: Storable a => Ptr a -> Ptr a -> Int -> IO ()
@@ -61,14 +56,14 @@ module Foreign.Marshal.Array (
 
   -- indexing
   --
-  advancePtr      -- :: Storable a => Ptr a -> Int -> Ptr a
+  advancePtr,     -- :: Storable a => Ptr a -> Int -> Ptr a
 ) where
 
 import Control.Monad
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.Ptr	        (Ptr, plusPtr)
-import GHC.Storable     (Storable(sizeOf,peekElemOff,pokeElemOff,destruct))
+import GHC.Storable     (Storable(sizeOf,peekElemOff,pokeElemOff))
 import Foreign.Marshal.Alloc (mallocBytes, allocaBytes, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 import GHC.IOBase
@@ -191,7 +186,6 @@ withArray vals f  =
   allocaArray len $ \ptr -> do
       pokeArray ptr vals
       res <- f ptr
-      destructArray len ptr
       return res
   where
     len = length vals
@@ -203,29 +197,9 @@ withArray0 marker vals f  =
   allocaArray0 len $ \ptr -> do
       pokeArray0 marker ptr vals
       res <- f ptr
-      destructArray (len+1) ptr
       return res
   where
     len = length vals
-
-
--- destruction
--- -----------
-
--- destruct each element of an array (in reverse order)
---
-destructArray          :: Storable a => Int -> Ptr a -> IO ()
-destructArray size ptr  =
-  sequence_ [destruct (ptr `advancePtr` i)
-    | i <- [size-1, size-2 .. 0]]
-
--- like `destructArray', but a terminator indicates where the array ends
---
-destructArray0            :: (Storable a, Eq a) => a -> Ptr a -> IO ()
-destructArray0 marker ptr  = do
-  size <- lengthArray0 marker ptr
-  sequence_ [destruct (ptr `advancePtr` i)
-    | i <- [size, size-1 .. 0]]
 
 
 -- copying (argument order: destination, source)

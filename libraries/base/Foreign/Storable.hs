@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Storable.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Storable.hs,v 1.3 2002/02/05 17:32:25 simonmar Exp $
 --
 -- A class for primitive marshaling
 --
@@ -24,8 +24,7 @@ module Foreign.Storable
 	     peekByteOff,    -- :: Ptr b -> Int      -> IO a
 	     pokeByteOff,    -- :: Ptr b -> Int -> a -> IO ()
 	     peek,           -- :: Ptr a             -> IO a
-	     poke,           -- :: Ptr a        -> a -> IO ()
-	     destruct)       -- :: Ptr a             -> IO ()
+	     poke)           -- :: Ptr a        -> a -> IO ()
 	) where
 
 #ifdef __GLASGOW_HASKELL__

@@ -1,14 +1,14 @@
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Numeric
--- Copyright   :  (c) The University of Glasgow 2001
+-- Copyright   :  (c) The University of Glasgow 2002
 -- License     :  BSD-style (see the file libraries/core/LICENSE)
 -- 
 -- Maintainer  :  libraries@haskell.org
--- Stability   :  experimental
+-- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Numeric.hs,v 1.3 2002/01/02 14:40:09 simonmar Exp $
+-- $Id: Numeric.hs,v 1.4 2002/02/05 17:32:24 simonmar Exp $
 --
 -- Odds and ends, mostly functions for reading and showing
 -- RealFloat-like kind of values.
@@ -20,34 +20,28 @@ module Numeric (
         fromRat,          -- :: (RealFloat a) => Rational -> a
 	showSigned,       -- :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
 	readSigned,       -- :: (Real a) => ReadS a -> ReadS a
-	showInt,          -- :: Integral a => a -> ShowS
+
 	readInt,          -- :: (Integral a) => a -> (Char -> Bool)
 			  --         -> (Char -> Int) -> ReadS a
-	
 	readDec,          -- :: (Integral a) => ReadS a
 	readOct,          -- :: (Integral a) => ReadS a
 	readHex,          -- :: (Integral a) => ReadS a
 
+	showInt,          -- :: Integral a => a -> ShowS
+        showIntAtBase,    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
         showHex,          -- :: Integral a => a -> ShowS
         showOct,          -- :: Integral a => a -> ShowS
         showBin,          -- :: Integral a => a -> ShowS
-      
+
 	showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
 	showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
 	showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
 	showFloat,        -- :: (RealFloat a) => a -> ShowS
 	readFloat,        -- :: (RealFloat a) => ReadS a
 	
-	 
 	floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
 	lexDigits,        -- :: ReadS String
 
-          -- general purpose number->string converter.
-        showIntAtBase,    -- :: Integral a 
-			  -- => a		-- base
-			  -- -> (a -> Char)      -- digit to char
-			  -- -> a                -- number to show.
-			  -- -> ShowS
 	) where
 
 import Prelude		-- For dependencies

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: List.lhs,v 1.5 2001/12/21 15:07:25 simonmar Exp $
+% $Id: List.lhs,v 1.6 2002/02/05 17:32:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -118,18 +118,20 @@ length l                =  len l 0#
 -- filter, applied to a predicate and a list, returns the list of those
 -- elements that satisfy the predicate; i.e.,
 -- filter p xs = [ x | x <- xs, p x]
-{-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
-filter = filterList
+filter _pred []    = []
+filter pred (x:xs)
+  | pred x         = x : filter pred xs
+  | otherwise	   = filter pred xs
 
-{-# INLINE [0] filter #-}
+{-# NOINLINE [0] filterFB #-}
 filterFB c p x r | p x       = x `c` r
 		 | otherwise = r
 
 {-# RULES
-"filter"	forall p xs.	filter p xs = build (\c n -> foldr (filterFB c p) n xs)
-"filterFB"	forall c p q.	filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
-"filterList" 	forall p.	foldr (filterFB (:) p) [] = filterList p
+"filter"     [~1] forall p xs.  filter p xs = build (\c n -> foldr (filterFB c p) n xs)
+"filterList" [1]  forall p.	foldr (filterFB (:) p) [] = filter p
+"filterFB"	  forall c p q. filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
  #-}
 
 -- Note the filterFB rule, which has p and q the "wrong way round" in the RHS.
@@ -141,11 +143,6 @@ filterFB c p x r | p x       = x `c` r
 -- I originally wrote (\x -> p x && q x), which is wrong, and actually
 -- gave rise to a live bug report.  SLPJ.
 
-filterList :: (a -> Bool) -> [a] -> [a]
-filterList _pred []    = []
-filterList pred (x:xs)
-  | pred x         = x : filterList pred xs
-  | otherwise	   = filterList pred xs
 
 -- foldl, applied to a binary operator, a starting value (typically the
 -- left-identity of the operator), and a list, reduces the list using
@@ -204,32 +201,30 @@ scanr1 f (x:xs)		=  f x q : qs
 -- iterate f x returns an infinite list of repeated applications of f to x:
 -- iterate f x == [x, f x, f (f x), ...]
 iterate :: (a -> a) -> a -> [a]
-{-# NOINLINE [1] iterate #-}
-iterate = iterateList
+iterate f x =  x : iterate f (f x)
 
 iterateFB c f x = x `c` iterateFB c f (f x)
 
-iterateList f x =  x : iterateList f (f x)
 
 {-# RULES
-"iterate"	forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
-"iterateFB" 			iterateFB (:) = iterateList
+"iterate"    [~1] forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
+"iterateFB"  [1]		iterateFB (:) = iterate
  #-}
 
 
 -- repeat x is an infinite list, with x the value of every element.
 repeat :: a -> [a]
-{-# NOINLINE [1] repeat #-}
-repeat = repeatList
+{-# INLINE [0] repeat #-}
+-- The pragma just gives the rules more chance to fire
+repeat x = xs where xs = x : xs
 
-{-# INLINE [0] repeatFB #-}
+{-# INLINE [0] repeatFB #-}	-- ditto
 repeatFB c x = xs where xs = x `c` xs
 
-repeatList x = xs where xs = x :   xs
 
 {-# RULES
-"repeat"	forall x. repeat x	= build (\c _n -> repeatFB c x)
-"repeatFB" 		  repeatFB (:)	= repeatList
+"repeat"    [~1] forall x. repeat x = build (\c _n -> repeatFB c x)
+"repeatFB"  [1]  repeatFB (:)	    = repeat
  #-}
 
 -- replicate n x is a list of length n with x the value of every element
@@ -445,7 +440,9 @@ concat = foldr (++) []
 
 {-# RULES
   "concat" forall xs. concat xs = build (\c n -> foldr (\x y -> foldr c y x) n xs)
+-- We don't bother to turn non-fusible applications of concat back into concat
  #-}
+
 \end{code}
 
 
@@ -520,20 +517,15 @@ tuples are in the List module.
 \begin{code}
 ----------------------------------------------
 zip :: [a] -> [b] -> [(a,b)]
-{-# NOINLINE [1] zip #-}
-zip = zipList
+zip (a:as) (b:bs) = (a,b) : zip as bs
+zip _      _      = []
 
 {-# INLINE [0] zipFB #-}
 zipFB c x y r = (x,y) `c` r
 
-
-zipList               :: [a] -> [b] -> [(a,b)]
-zipList (a:as) (b:bs) = (a,b) : zipList as bs
-zipList _      _      = []
-
 {-# RULES
-"zip"		forall xs ys. zip xs ys	= build (\c n -> foldr2 (zipFB c) n xs ys)
-"zipList"	foldr2 (zipFB (:)) []   = zipList
+"zip"	   [~1]	forall xs ys. zip xs ys	= build (\c n -> foldr2 (zipFB c) n xs ys)
+"zipList"  [1]	foldr2 (zipFB (:)) []   = zip
  #-}
 \end{code}
 
@@ -556,19 +548,15 @@ zip3 _      _      _      = []
 \begin{code}
 ----------------------------------------------
 zipWith :: (a->b->c) -> [a]->[b]->[c]
-{-# NOINLINE [1] zipWith #-}
-zipWith = zipWithList
+zipWith f (a:as) (b:bs) = f a b : zipWith f as bs
+zipWith _ _      _      = []
 
 {-# INLINE [0] zipWithFB #-}
 zipWithFB c f x y r = (x `f` y) `c` r
 
-zipWithList                 :: (a->b->c) -> [a] -> [b] -> [c]
-zipWithList f (a:as) (b:bs) = f a b : zipWithList f as bs
-zipWithList _ _      _      = []
-
 {-# RULES
-"zipWith"	forall f xs ys.	zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
-"zipWithList"	forall f. 	foldr2 (zipWithFB (:) f) [] = zipWithList f
+"zipWith"	[~1] forall f xs ys.	zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
+"zipWithList"	[1]  forall f. 	foldr2 (zipWithFB (:) f) [] = zipWith f
   #-}
 \end{code}
 

@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Float.lhs,v 1.3 2001/12/21 15:07:22 simonmar Exp $
+% $Id: Float.lhs,v 1.4 2002/02/05 17:32:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -883,27 +883,27 @@ powerDouble  (D# x) (D# y) = D# (x **## y)
 \end{code}
 
 \begin{code}
-foreign import ccall "__encodeFloat" unsafe 
+foreign import ccall unsafe "__encodeFloat"
 	encodeFloat# :: Int# -> ByteArray# -> Int -> Float
-foreign import ccall "__int_encodeFloat" unsafe 
+foreign import ccall unsafe "__int_encodeFloat"
 	int_encodeFloat# :: Int# -> Int -> Float
 
 
-foreign import ccall "isFloatNaN" unsafe isFloatNaN :: Float -> Int
-foreign import ccall "isFloatInfinite" unsafe isFloatInfinite :: Float -> Int
-foreign import ccall "isFloatDenormalized" unsafe isFloatDenormalized :: Float -> Int
-foreign import ccall "isFloatNegativeZero" unsafe isFloatNegativeZero :: Float -> Int
+foreign import ccall unsafe "isFloatNaN" isFloatNaN :: Float -> Int
+foreign import ccall unsafe "isFloatInfinite" isFloatInfinite :: Float -> Int
+foreign import ccall unsafe "isFloatDenormalized" isFloatDenormalized :: Float -> Int
+foreign import ccall unsafe "isFloatNegativeZero" isFloatNegativeZero :: Float -> Int
 
 
-foreign import ccall "__encodeDouble" unsafe 
+foreign import ccall unsafe "__encodeDouble"
 	encodeDouble# :: Int# -> ByteArray# -> Int -> Double
-foreign import ccall "__int_encodeDouble" unsafe 
+foreign import ccall unsafe "__int_encodeDouble"
 	int_encodeDouble# :: Int# -> Int -> Double
 
-foreign import ccall "isDoubleNaN" unsafe isDoubleNaN :: Double -> Int
-foreign import ccall "isDoubleInfinite" unsafe isDoubleInfinite :: Double -> Int
-foreign import ccall "isDoubleDenormalized" unsafe isDoubleDenormalized :: Double -> Int
-foreign import ccall "isDoubleNegativeZero" unsafe isDoubleNegativeZero :: Double -> Int
+foreign import ccall unsafe "isDoubleNaN" isDoubleNaN :: Double -> Int
+foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int
+foreign import ccall unsafe "isDoubleDenormalized" isDoubleDenormalized :: Double -> Int
+foreign import ccall unsafe "isDoubleNegativeZero" isDoubleNegativeZero :: Double -> Int
 \end{code}
 
 %*********************************************************

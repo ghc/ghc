@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Storable.lhs,v 1.3 2001/12/21 15:07:25 simonmar Exp $
+% $Id: Storable.lhs,v 1.4 2002/02/05 17:32:27 simonmar Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -20,8 +20,7 @@ module GHC.Storable
 	     peekByteOff,    -- :: Ptr b -> Int      -> IO a
 	     pokeByteOff,    -- :: Ptr b -> Int -> a -> IO ()
 	     peek,           -- :: Ptr a             -> IO a
-	     poke,           -- :: Ptr a        -> a -> IO ()
-	     destruct)       -- :: Ptr a             -> IO ()
+	     poke)           -- :: Ptr a        -> a -> IO ()
         ) where
 \end{code}
 
@@ -68,10 +67,6 @@ class Storable a where
    peek        :: Ptr a      -> IO a
    poke        :: Ptr a -> a -> IO ()
 
-   -- free memory associated with the object
-   -- (except the object pointer itself)
-   destruct    :: Ptr a -> IO ()
-
    -- circular default instances
    peekElemOff = peekElemOff_ undefined
       where peekElemOff_ :: a -> Ptr a -> Int -> IO a
@@ -83,8 +78,6 @@ class Storable a where
 
    peek ptr = peekElemOff ptr 0
    poke ptr = pokeElemOff ptr 0
-
-   destruct _ = return ()
 \end{code}
 
 System-dependent, but rather obvious instances

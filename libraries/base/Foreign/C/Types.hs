@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Types.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Types.hs,v 1.3 2002/02/05 17:32:25 simonmar Exp $
 --
 -- Mapping of C types to corresponding Haskell types. A cool hack...
 --
@@ -18,13 +18,14 @@
 module Foreign.C.Types
 	( -- Integral types, instances of: Eq, Ord, Num, Read, Show, Enum,
 	  -- Typeable, Storable, Bounded, Real, Integral, Bits
-	  CChar(..),    CSChar(..),  CUChar(..)
-	, CShort(..),   CUShort(..), CInt(..),    CUInt(..)
-	, CLong(..),    CULong(..),  CLLong(..),  CULLong(..)
+	  CChar(..),  CSChar(..),  CUChar(..)
+	, CShort(..), CUShort(..), CInt(..),   CUInt(..)
+	, CLong(..),  CULong(..),  CLLong(..), CULLong(..)
 
 	  -- Floating types, instances of: Eq, Ord, Num, Read, Show, Enum,
-	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac, RealFloat
-	, CFloat(..),   CDouble(..), CLDouble(..)
+	  -- Typeable, Storable, Real, Fractional, Floating, RealFrac,
+	  -- RealFloat 
+	, CFloat(..),  CDouble(..), CLDouble(..)
 	) where
 
 import Data.Bits	( Bits(..) )

@@ -8,7 +8,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Time.hsc,v 1.6 2001/12/21 15:07:26 simonmar Exp $
+-- $Id: Time.hsc,v 1.7 2002/02/05 17:32:27 simonmar Exp $
 --
 -- The standard Time library.
 --
@@ -321,8 +321,6 @@ foreign label tzname :: Ptr (Ptr CChar)
 #  else
 foreign import "ghcTimezone" unsafe timezone :: Ptr CLong
 foreign import "ghcTzname" unsafe tzname :: Ptr (Ptr CChar)
-#   def inline long  *ghcTimezone(void) { return &_timezone; }
-#   def inline char **ghcTzname(void) { return _tzname; }
 #  endif
 zone x = do 
   dst <- (#peek struct tm,tm_isdst) x

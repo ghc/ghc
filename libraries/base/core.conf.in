@@ -14,10 +14,19 @@ Package {
         library_dirs   = [ "$libdir/libraries/core"
                          , "$libdir/libraries/core/cbits" ],
 #endif
-        hs_libraries      = [ "HScore" ],
+        hs_libraries      =
+#                           ifndef mingw32_TARGET_OS
+                            [ "HScore" ],
+#                           else
+                            -- This splitting is the subject of a totally 
+                            -- horrible hack, which glues HSstd1 and HSstd2 
+                            -- back into HSstd for the purposes of static linking.
+                            -- See DriverState.getPackageLibraries for details.
+                            [ "HScore1", "HScore2" ],
+#                           endif
 	extra_libraries   = [ "HScore_cbits"
 #ifdef mingw32_TARGET_OS
-                            , "wsock32", "msvcrt"
+                            , "wsock32", "msvcrt", "kernel32", "user32"
 #endif
 			    ],
 #ifdef INSTALLING

@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.4 2001/12/21 15:07:22 simonmar Exp $
+-- $Id: Error.hs,v 1.5 2002/02/05 17:32:25 simonmar Exp $
 --
 -- C-specific Marshalling support: Handling of C "errno" error codes
 --
@@ -121,7 +121,7 @@ import System.IO		( IOError, Handle, ioError )
 -- This function exists because errno is a variable on some systems, but on
 -- Windows it is a macro for a function...
 -- [yes, global variables and thread safety don't really go hand-in-hand. -- sof]
-foreign import "ghcErrno" unsafe _errno :: Ptr CInt
+foreign import ccall unsafe "ghcErrno" _errno :: Ptr CInt
 
 -- Haskell representation for "errno" values
 --
@@ -513,107 +513,107 @@ errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
     return (userError (loc ++ ": " ++ str ++ maybe "" (": "++) maybeName))
 #endif
 
-foreign import unsafe strerror :: Errno -> IO (Ptr CChar)
+foreign import ccall unsafe strerror :: Errno -> IO (Ptr CChar)
 
 
 -- Dreadfully tedious callouts to wrappers which define  the
 -- actual values for the error codes.
-foreign import ccall "prel_error_E2BIG" unsafe cCONST_E2BIG :: CInt
-foreign import ccall "prel_error_EACCES" unsafe cCONST_EACCES :: CInt
-foreign import ccall "prel_error_EADDRINUSE" unsafe cCONST_EADDRINUSE :: CInt
-foreign import ccall "prel_error_EADDRNOTAVAIL" unsafe cCONST_EADDRNOTAVAIL :: CInt
-foreign import ccall "prel_error_EADV" unsafe cCONST_EADV :: CInt
-foreign import ccall "prel_error_EAFNOSUPPORT" unsafe cCONST_EAFNOSUPPORT :: CInt
-foreign import ccall "prel_error_EAGAIN" unsafe cCONST_EAGAIN :: CInt
-foreign import ccall "prel_error_EALREADY" unsafe cCONST_EALREADY :: CInt
-foreign import ccall "prel_error_EBADF" unsafe cCONST_EBADF :: CInt
-foreign import ccall "prel_error_EBADMSG" unsafe cCONST_EBADMSG :: CInt
-foreign import ccall "prel_error_EBADRPC" unsafe cCONST_EBADRPC :: CInt
-foreign import ccall "prel_error_EBUSY" unsafe cCONST_EBUSY :: CInt
-foreign import ccall "prel_error_ECHILD" unsafe cCONST_ECHILD :: CInt
-foreign import ccall "prel_error_ECOMM" unsafe cCONST_ECOMM :: CInt
-foreign import ccall "prel_error_ECONNABORTED" unsafe cCONST_ECONNABORTED :: CInt
-foreign import ccall "prel_error_ECONNREFUSED" unsafe cCONST_ECONNREFUSED :: CInt
-foreign import ccall "prel_error_ECONNRESET" unsafe cCONST_ECONNRESET :: CInt
-foreign import ccall "prel_error_EDEADLK" unsafe cCONST_EDEADLK :: CInt
-foreign import ccall "prel_error_EDESTADDRREQ" unsafe cCONST_EDESTADDRREQ :: CInt
-foreign import ccall "prel_error_EDIRTY" unsafe cCONST_EDIRTY :: CInt
-foreign import ccall "prel_error_EDOM" unsafe cCONST_EDOM :: CInt
-foreign import ccall "prel_error_EDQUOT" unsafe cCONST_EDQUOT :: CInt
-foreign import ccall "prel_error_EEXIST" unsafe cCONST_EEXIST :: CInt
-foreign import ccall "prel_error_EFAULT" unsafe cCONST_EFAULT :: CInt
-foreign import ccall "prel_error_EFBIG" unsafe cCONST_EFBIG :: CInt
-foreign import ccall "prel_error_EFTYPE" unsafe cCONST_EFTYPE :: CInt
-foreign import ccall "prel_error_EHOSTDOWN" unsafe cCONST_EHOSTDOWN :: CInt
-foreign import ccall "prel_error_EHOSTUNREACH" unsafe cCONST_EHOSTUNREACH :: CInt
-foreign import ccall "prel_error_EIDRM" unsafe cCONST_EIDRM :: CInt
-foreign import ccall "prel_error_EILSEQ" unsafe cCONST_EILSEQ :: CInt
-foreign import ccall "prel_error_EINPROGRESS" unsafe cCONST_EINPROGRESS :: CInt
-foreign import ccall "prel_error_EINTR" unsafe cCONST_EINTR :: CInt
-foreign import ccall "prel_error_EINVAL" unsafe cCONST_EINVAL :: CInt
-foreign import ccall "prel_error_EIO" unsafe cCONST_EIO :: CInt
-foreign import ccall "prel_error_EISCONN" unsafe cCONST_EISCONN :: CInt
-foreign import ccall "prel_error_EISDIR" unsafe cCONST_EISDIR :: CInt
-foreign import ccall "prel_error_ELOOP" unsafe cCONST_ELOOP :: CInt
-foreign import ccall "prel_error_EMFILE" unsafe cCONST_EMFILE :: CInt
-foreign import ccall "prel_error_EMLINK" unsafe cCONST_EMLINK :: CInt
-foreign import ccall "prel_error_EMSGSIZE" unsafe cCONST_EMSGSIZE :: CInt
-foreign import ccall "prel_error_EMULTIHOP" unsafe cCONST_EMULTIHOP :: CInt
-foreign import ccall "prel_error_ENAMETOOLONG" unsafe cCONST_ENAMETOOLONG :: CInt
-foreign import ccall "prel_error_ENETDOWN" unsafe cCONST_ENETDOWN :: CInt
-foreign import ccall "prel_error_ENETRESET" unsafe cCONST_ENETRESET :: CInt
-foreign import ccall "prel_error_ENETUNREACH" unsafe cCONST_ENETUNREACH :: CInt
-foreign import ccall "prel_error_ENFILE" unsafe cCONST_ENFILE :: CInt
-foreign import ccall "prel_error_ENOBUFS" unsafe cCONST_ENOBUFS :: CInt
-foreign import ccall "prel_error_ENODATA" unsafe cCONST_ENODATA :: CInt
-foreign import ccall "prel_error_ENODEV" unsafe cCONST_ENODEV :: CInt
-foreign import ccall "prel_error_ENOENT" unsafe cCONST_ENOENT :: CInt
-foreign import ccall "prel_error_ENOEXEC" unsafe cCONST_ENOEXEC :: CInt
-foreign import ccall "prel_error_ENOLCK" unsafe cCONST_ENOLCK :: CInt
-foreign import ccall "prel_error_ENOLINK" unsafe cCONST_ENOLINK :: CInt
-foreign import ccall "prel_error_ENOMEM" unsafe cCONST_ENOMEM :: CInt
-foreign import ccall "prel_error_ENOMSG" unsafe cCONST_ENOMSG :: CInt
-foreign import ccall "prel_error_ENONET" unsafe cCONST_ENONET :: CInt
-foreign import ccall "prel_error_ENOPROTOOPT" unsafe cCONST_ENOPROTOOPT :: CInt
-foreign import ccall "prel_error_ENOSPC" unsafe cCONST_ENOSPC :: CInt
-foreign import ccall "prel_error_ENOSR" unsafe cCONST_ENOSR :: CInt
-foreign import ccall "prel_error_ENOSTR" unsafe cCONST_ENOSTR :: CInt
-foreign import ccall "prel_error_ENOSYS" unsafe cCONST_ENOSYS :: CInt
-foreign import ccall "prel_error_ENOTBLK" unsafe cCONST_ENOTBLK :: CInt
-foreign import ccall "prel_error_ENOTCONN" unsafe cCONST_ENOTCONN :: CInt
-foreign import ccall "prel_error_ENOTDIR" unsafe cCONST_ENOTDIR :: CInt
-foreign import ccall "prel_error_ENOTEMPTY" unsafe cCONST_ENOTEMPTY :: CInt
-foreign import ccall "prel_error_ENOTSOCK" unsafe cCONST_ENOTSOCK :: CInt
-foreign import ccall "prel_error_ENOTTY" unsafe cCONST_ENOTTY :: CInt
-foreign import ccall "prel_error_ENXIO" unsafe cCONST_ENXIO :: CInt
-foreign import ccall "prel_error_EOPNOTSUPP" unsafe cCONST_EOPNOTSUPP :: CInt
-foreign import ccall "prel_error_EPERM" unsafe cCONST_EPERM :: CInt
-foreign import ccall "prel_error_EPFNOSUPPORT" unsafe cCONST_EPFNOSUPPORT :: CInt
-foreign import ccall "prel_error_EPIPE" unsafe cCONST_EPIPE :: CInt
-foreign import ccall "prel_error_EPROCLIM" unsafe cCONST_EPROCLIM :: CInt
-foreign import ccall "prel_error_EPROCUNAVAIL" unsafe cCONST_EPROCUNAVAIL :: CInt
-foreign import ccall "prel_error_EPROGMISMATCH" unsafe cCONST_EPROGMISMATCH :: CInt
-foreign import ccall "prel_error_EPROGUNAVAIL" unsafe cCONST_EPROGUNAVAIL :: CInt
-foreign import ccall "prel_error_EPROTO" unsafe cCONST_EPROTO :: CInt
-foreign import ccall "prel_error_EPROTONOSUPPORT" unsafe cCONST_EPROTONOSUPPORT :: CInt
-foreign import ccall "prel_error_EPROTOTYPE" unsafe cCONST_EPROTOTYPE :: CInt
-foreign import ccall "prel_error_ERANGE" unsafe cCONST_ERANGE :: CInt
-foreign import ccall "prel_error_EREMCHG" unsafe cCONST_EREMCHG :: CInt
-foreign import ccall "prel_error_EREMOTE" unsafe cCONST_EREMOTE :: CInt
-foreign import ccall "prel_error_EROFS" unsafe cCONST_EROFS :: CInt
-foreign import ccall "prel_error_ERPCMISMATCH" unsafe cCONST_ERPCMISMATCH :: CInt
-foreign import ccall "prel_error_ERREMOTE" unsafe cCONST_ERREMOTE :: CInt
-foreign import ccall "prel_error_ESHUTDOWN" unsafe cCONST_ESHUTDOWN :: CInt
-foreign import ccall "prel_error_ESOCKTNOSUPPORT" unsafe cCONST_ESOCKTNOSUPPORT :: CInt
-foreign import ccall "prel_error_ESPIPE" unsafe cCONST_ESPIPE :: CInt
-foreign import ccall "prel_error_ESRCH" unsafe cCONST_ESRCH :: CInt
-foreign import ccall "prel_error_ESRMNT" unsafe cCONST_ESRMNT :: CInt
-foreign import ccall "prel_error_ESTALE" unsafe cCONST_ESTALE :: CInt
-foreign import ccall "prel_error_ETIME" unsafe cCONST_ETIME :: CInt
-foreign import ccall "prel_error_ETIMEDOUT" unsafe cCONST_ETIMEDOUT :: CInt
-foreign import ccall "prel_error_ETOOMANYREFS" unsafe cCONST_ETOOMANYREFS :: CInt
-foreign import ccall "prel_error_ETXTBSY" unsafe cCONST_ETXTBSY :: CInt
-foreign import ccall "prel_error_EUSERS" unsafe cCONST_EUSERS :: CInt
-foreign import ccall "prel_error_EWOULDBLOCK" unsafe cCONST_EWOULDBLOCK :: CInt
-foreign import ccall "prel_error_EXDEV" unsafe cCONST_EXDEV :: CInt
+foreign import ccall unsafe "prel_error_E2BIG" cCONST_E2BIG :: CInt
+foreign import ccall unsafe "prel_error_EACCES" cCONST_EACCES :: CInt
+foreign import ccall unsafe "prel_error_EADDRINUSE" cCONST_EADDRINUSE :: CInt
+foreign import ccall unsafe "prel_error_EADDRNOTAVAIL" cCONST_EADDRNOTAVAIL :: CInt
+foreign import ccall unsafe "prel_error_EADV" cCONST_EADV :: CInt
+foreign import ccall unsafe "prel_error_EAFNOSUPPORT" cCONST_EAFNOSUPPORT :: CInt
+foreign import ccall unsafe "prel_error_EAGAIN" cCONST_EAGAIN :: CInt
+foreign import ccall unsafe "prel_error_EALREADY" cCONST_EALREADY :: CInt
+foreign import ccall unsafe "prel_error_EBADF" cCONST_EBADF :: CInt
+foreign import ccall unsafe "prel_error_EBADMSG" cCONST_EBADMSG :: CInt
+foreign import ccall unsafe "prel_error_EBADRPC" cCONST_EBADRPC :: CInt
+foreign import ccall unsafe "prel_error_EBUSY" cCONST_EBUSY :: CInt
+foreign import ccall unsafe "prel_error_ECHILD" cCONST_ECHILD :: CInt
+foreign import ccall unsafe "prel_error_ECOMM" cCONST_ECOMM :: CInt
+foreign import ccall unsafe "prel_error_ECONNABORTED" cCONST_ECONNABORTED :: CInt
+foreign import ccall unsafe "prel_error_ECONNREFUSED" cCONST_ECONNREFUSED :: CInt
+foreign import ccall unsafe "prel_error_ECONNRESET" cCONST_ECONNRESET :: CInt
+foreign import ccall unsafe "prel_error_EDEADLK" cCONST_EDEADLK :: CInt
+foreign import ccall unsafe "prel_error_EDESTADDRREQ" cCONST_EDESTADDRREQ :: CInt
+foreign import ccall unsafe "prel_error_EDIRTY" cCONST_EDIRTY :: CInt
+foreign import ccall unsafe "prel_error_EDOM" cCONST_EDOM :: CInt
+foreign import ccall unsafe "prel_error_EDQUOT" cCONST_EDQUOT :: CInt
+foreign import ccall unsafe "prel_error_EEXIST" cCONST_EEXIST :: CInt
+foreign import ccall unsafe "prel_error_EFAULT" cCONST_EFAULT :: CInt
+foreign import ccall unsafe "prel_error_EFBIG" cCONST_EFBIG :: CInt
+foreign import ccall unsafe "prel_error_EFTYPE" cCONST_EFTYPE :: CInt
+foreign import ccall unsafe "prel_error_EHOSTDOWN" cCONST_EHOSTDOWN :: CInt
+foreign import ccall unsafe "prel_error_EHOSTUNREACH" cCONST_EHOSTUNREACH :: CInt
+foreign import ccall unsafe "prel_error_EIDRM" cCONST_EIDRM :: CInt
+foreign import ccall unsafe "prel_error_EILSEQ" cCONST_EILSEQ :: CInt
+foreign import ccall unsafe "prel_error_EINPROGRESS" cCONST_EINPROGRESS :: CInt
+foreign import ccall unsafe "prel_error_EINTR" cCONST_EINTR :: CInt
+foreign import ccall unsafe "prel_error_EINVAL" cCONST_EINVAL :: CInt
+foreign import ccall unsafe "prel_error_EIO" cCONST_EIO :: CInt
+foreign import ccall unsafe "prel_error_EISCONN" cCONST_EISCONN :: CInt
+foreign import ccall unsafe "prel_error_EISDIR" cCONST_EISDIR :: CInt
+foreign import ccall unsafe "prel_error_ELOOP" cCONST_ELOOP :: CInt
+foreign import ccall unsafe "prel_error_EMFILE" cCONST_EMFILE :: CInt
+foreign import ccall unsafe "prel_error_EMLINK" cCONST_EMLINK :: CInt
+foreign import ccall unsafe "prel_error_EMSGSIZE" cCONST_EMSGSIZE :: CInt
+foreign import ccall unsafe "prel_error_EMULTIHOP" cCONST_EMULTIHOP :: CInt
+foreign import ccall unsafe "prel_error_ENAMETOOLONG" cCONST_ENAMETOOLONG :: CInt
+foreign import ccall unsafe "prel_error_ENETDOWN" cCONST_ENETDOWN :: CInt
+foreign import ccall unsafe "prel_error_ENETRESET" cCONST_ENETRESET :: CInt
+foreign import ccall unsafe "prel_error_ENETUNREACH" cCONST_ENETUNREACH :: CInt
+foreign import ccall unsafe "prel_error_ENFILE" cCONST_ENFILE :: CInt
+foreign import ccall unsafe "prel_error_ENOBUFS" cCONST_ENOBUFS :: CInt
+foreign import ccall unsafe "prel_error_ENODATA" cCONST_ENODATA :: CInt
+foreign import ccall unsafe "prel_error_ENODEV" cCONST_ENODEV :: CInt
+foreign import ccall unsafe "prel_error_ENOENT" cCONST_ENOENT :: CInt
+foreign import ccall unsafe "prel_error_ENOEXEC" cCONST_ENOEXEC :: CInt
+foreign import ccall unsafe "prel_error_ENOLCK" cCONST_ENOLCK :: CInt
+foreign import ccall unsafe "prel_error_ENOLINK" cCONST_ENOLINK :: CInt
+foreign import ccall unsafe "prel_error_ENOMEM" cCONST_ENOMEM :: CInt
+foreign import ccall unsafe "prel_error_ENOMSG" cCONST_ENOMSG :: CInt
+foreign import ccall unsafe "prel_error_ENONET" cCONST_ENONET :: CInt
+foreign import ccall unsafe "prel_error_ENOPROTOOPT" cCONST_ENOPROTOOPT :: CInt
+foreign import ccall unsafe "prel_error_ENOSPC" cCONST_ENOSPC :: CInt
+foreign import ccall unsafe "prel_error_ENOSR" cCONST_ENOSR :: CInt
+foreign import ccall unsafe "prel_error_ENOSTR" cCONST_ENOSTR :: CInt
+foreign import ccall unsafe "prel_error_ENOSYS" cCONST_ENOSYS :: CInt
+foreign import ccall unsafe "prel_error_ENOTBLK" cCONST_ENOTBLK :: CInt
+foreign import ccall unsafe "prel_error_ENOTCONN" cCONST_ENOTCONN :: CInt
+foreign import ccall unsafe "prel_error_ENOTDIR" cCONST_ENOTDIR :: CInt
+foreign import ccall unsafe "prel_error_ENOTEMPTY" cCONST_ENOTEMPTY :: CInt
+foreign import ccall unsafe "prel_error_ENOTSOCK" cCONST_ENOTSOCK :: CInt
+foreign import ccall unsafe "prel_error_ENOTTY" cCONST_ENOTTY :: CInt
+foreign import ccall unsafe "prel_error_ENXIO" cCONST_ENXIO :: CInt
+foreign import ccall unsafe "prel_error_EOPNOTSUPP" cCONST_EOPNOTSUPP :: CInt
+foreign import ccall unsafe "prel_error_EPERM" cCONST_EPERM :: CInt
+foreign import ccall unsafe "prel_error_EPFNOSUPPORT" cCONST_EPFNOSUPPORT :: CInt
+foreign import ccall unsafe "prel_error_EPIPE" cCONST_EPIPE :: CInt
+foreign import ccall unsafe "prel_error_EPROCLIM" cCONST_EPROCLIM :: CInt
+foreign import ccall unsafe "prel_error_EPROCUNAVAIL" cCONST_EPROCUNAVAIL :: CInt
+foreign import ccall unsafe "prel_error_EPROGMISMATCH" cCONST_EPROGMISMATCH :: CInt
+foreign import ccall unsafe "prel_error_EPROGUNAVAIL" cCONST_EPROGUNAVAIL :: CInt
+foreign import ccall unsafe "prel_error_EPROTO" cCONST_EPROTO :: CInt
+foreign import ccall unsafe "prel_error_EPROTONOSUPPORT" cCONST_EPROTONOSUPPORT :: CInt
+foreign import ccall unsafe "prel_error_EPROTOTYPE" cCONST_EPROTOTYPE :: CInt
+foreign import ccall unsafe "prel_error_ERANGE" cCONST_ERANGE :: CInt
+foreign import ccall unsafe "prel_error_EREMCHG" cCONST_EREMCHG :: CInt
+foreign import ccall unsafe "prel_error_EREMOTE" cCONST_EREMOTE :: CInt
+foreign import ccall unsafe "prel_error_EROFS" cCONST_EROFS :: CInt
+foreign import ccall unsafe "prel_error_ERPCMISMATCH" cCONST_ERPCMISMATCH :: CInt
+foreign import ccall unsafe "prel_error_ERREMOTE" cCONST_ERREMOTE :: CInt
+foreign import ccall unsafe "prel_error_ESHUTDOWN" cCONST_ESHUTDOWN :: CInt
+foreign import ccall unsafe "prel_error_ESOCKTNOSUPPORT" cCONST_ESOCKTNOSUPPORT :: CInt
+foreign import ccall unsafe "prel_error_ESPIPE" cCONST_ESPIPE :: CInt
+foreign import ccall unsafe "prel_error_ESRCH" cCONST_ESRCH :: CInt
+foreign import ccall unsafe "prel_error_ESRMNT" cCONST_ESRMNT :: CInt
+foreign import ccall unsafe "prel_error_ESTALE" cCONST_ESTALE :: CInt
+foreign import ccall unsafe "prel_error_ETIME" cCONST_ETIME :: CInt
+foreign import ccall unsafe "prel_error_ETIMEDOUT" cCONST_ETIMEDOUT :: CInt
+foreign import ccall unsafe "prel_error_ETOOMANYREFS" cCONST_ETOOMANYREFS :: CInt
+foreign import ccall unsafe "prel_error_ETXTBSY" cCONST_ETXTBSY :: CInt
+foreign import ccall unsafe "prel_error_EUSERS" cCONST_EUSERS :: CInt
+foreign import ccall unsafe "prel_error_EWOULDBLOCK" cCONST_EWOULDBLOCK :: CInt
+foreign import ccall unsafe "prel_error_EXDEV" cCONST_EXDEV :: CInt
 

@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.3 2002/01/02 14:40:10 simonmar Exp $
+-- $Id: IO.hs,v 1.4 2002/02/05 17:32:25 simonmar Exp $
 --
 -- Mutable boxed/unboxed arrays in the IO monad.
 --
@@ -407,7 +407,7 @@ readChunk fd is_stream ptr init_off bytes = loop init_off bytes
   loop off bytes | bytes <= 0 = return (off - init_off)
   loop off bytes = do
     r' <- throwErrnoIfMinus1RetryMayBlock "readChunk"
-	    (read_off (fromIntegral fd) is_stream ptr 
+	    (read_off_ba (fromIntegral fd) is_stream ptr 
 		(fromIntegral off) (fromIntegral bytes))
 	    (threadWaitRead fd)
     let r = fromIntegral r'

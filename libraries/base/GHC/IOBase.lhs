@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: IOBase.lhs,v 1.5 2001/12/21 15:07:25 simonmar Exp $
+% $Id: IOBase.lhs,v 1.6 2002/02/05 17:32:26 simonmar Exp $
 % 
 % (c) The University of Glasgow, 1994-2001
 %
@@ -387,8 +387,8 @@ data Exception
   | DynException	Dynamic		-- Dynamic exceptions
   | AsyncException	AsyncException	-- Externally generated errors
   | BlockedOnDeadMVar			-- Blocking on a dead MVar
+  | Deadlock				-- no threads can run (raised in main thread)
   | NonTermination
-  | UserError		String
 
 data ArithException
   = Overflow
@@ -451,7 +451,25 @@ instance Show Exception where
   showsPrec _ (AsyncException e)	 = shows e
   showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
-  showsPrec _ (UserError err)            = showString err
+  showsPrec _ (Deadlock)                 = showString "<<deadlock>>"
+
+instance Eq Exception where
+  IOException e1      == IOException e2      = e1 == e2
+  ArithException e1   == ArithException e2   = e1 == e2
+  ArrayException e1   == ArrayException e2   = e1 == e2
+  ErrorCall e1        == ErrorCall e2	     = e1 == e2
+  ExitException	e1    == ExitException e2    = e1 == e2
+  NoMethodError e1    == NoMethodError e2    = e1 == e2
+  PatternMatchFail e1 == PatternMatchFail e2 = e1 == e2
+  RecSelError e1      == RecSelError e2      = e1 == e2
+  RecConError e1      == RecConError e2      = e1 == e2
+  RecUpdError e1      == RecUpdError e2      = e1 == e2
+  AssertionFailed e1  == AssertionFailed e2  = e1 == e2
+  DynException _      == DynException _      = False -- incomparable
+  AsyncException e1   == AsyncException e2   = e1 == e2
+  BlockedOnDeadMVar   == BlockedOnDeadMVar   = True
+  NonTermination      == NonTermination      = True
+  Deadlock            == Deadlock            = True
 
 -- -----------------------------------------------------------------------------
 -- The ExitCode type
@@ -492,13 +510,14 @@ ioException err =  IO $ \s -> throw (IOException err) s
 type IOError = Exception
 
 data IOException
- = IOError
-     (Maybe Handle)   -- the handle used by the action flagging the
-		      --   the error.
-     IOErrorType      -- what it was.
-     String	      -- location.
-     String           -- error type specific information.
-     (Maybe FilePath) -- filename the error is related to.
+ = IOError {
+     ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging 
+				     -- the error.
+     ioe_type     :: IOErrorType,    -- what it was.
+     ioe_location :: String,	     -- location.
+     ioe_descr    :: String,         -- error type specific information.
+     ioe_filename :: Maybe FilePath  -- filename the error is related to.
+   }
 
 instance Eq IOException where
   (IOError h1 e1 loc1 str1 fn1) == (IOError h2 e2 loc2 str2 fn2) = 
@@ -507,12 +526,13 @@ instance Eq IOException where
 data IOErrorType
   -- Haskell 98:
   = AlreadyExists
-  | EOF
-  | IllegalOperation
   | NoSuchThing
-  | PermissionDenied
   | ResourceBusy
   | ResourceExhausted
+  | EOF
+  | IllegalOperation
+  | PermissionDenied
+  | UserError
   -- GHC only:
   | UnsatisfiedConstraints
   | SystemError
@@ -538,62 +558,28 @@ instance Show IOErrorType where
     showString $
     case e of
       AlreadyExists	-> "already exists"
-      HardwareFault	-> "hardware fault"
+      NoSuchThing       -> "does not exist"
+      ResourceBusy      -> "resource busy"
+      ResourceExhausted -> "resource exhausted"
+      EOF		-> "end of file"
       IllegalOperation	-> "illegal operation"
+      PermissionDenied  -> "permission denied"
+      UserError		-> "user error"
+      HardwareFault	-> "hardware fault"
       InappropriateType -> "inappropriate type"
       Interrupted       -> "interrupted"
       InvalidArgument   -> "invalid argument"
-      NoSuchThing       -> "does not exist"
       OtherError        -> "failed"
-      PermissionDenied  -> "permission denied"
       ProtocolError     -> "protocol error"
-      ResourceBusy      -> "resource busy"
-      ResourceExhausted -> "resource exhausted"
       ResourceVanished  -> "resource vanished"
       SystemError	-> "system error"
       TimeExpired       -> "timeout"
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
       UnsupportedOperation -> "unsupported operation"
-      EOF		-> "end of file"
       DynIOError{}      -> "unknown IO error"
 
 userError       :: String  -> IOError
-userError str	=  UserError str
-
--- ---------------------------------------------------------------------------
--- Predicates on IOError
-
-isAlreadyExistsError :: IOError -> Bool
-isAlreadyExistsError (IOException (IOError _ AlreadyExists _ _ _)) = True
-isAlreadyExistsError _                                             = False
-
-isAlreadyInUseError :: IOError -> Bool
-isAlreadyInUseError (IOException (IOError _ ResourceBusy _ _ _)) = True
-isAlreadyInUseError _                                            = False
-
-isFullError :: IOError -> Bool
-isFullError (IOException (IOError _ ResourceExhausted _ _ _)) = True
-isFullError _                                                 = False
-
-isEOFError :: IOError -> Bool
-isEOFError (IOException (IOError _ EOF _ _ _)) = True
-isEOFError _                                   = False
-
-isIllegalOperation :: IOError -> Bool
-isIllegalOperation (IOException (IOError _ IllegalOperation _ _ _)) = True
-isIllegalOperation _                                                = False
-
-isPermissionError :: IOError -> Bool
-isPermissionError (IOException (IOError _ PermissionDenied _ _ _)) = True
-isPermissionError _                                                = False
-
-isDoesNotExistError :: IOError -> Bool
-isDoesNotExistError (IOException (IOError _ NoSuchThing _ _ _)) = True
-isDoesNotExistError _                                           = False
-
-isUserError :: IOError -> Bool
-isUserError (UserError _) = True
-isUserError _             = False
+userError str	=  IOException (IOError Nothing UserError "" str Nothing)
 
 -- ---------------------------------------------------------------------------
 -- Showing IOErrors

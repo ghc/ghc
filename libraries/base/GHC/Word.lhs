@@ -465,29 +465,29 @@ instance Bits Word32 where
     bitSize  _                = 32
     isSigned _                = False
 
-foreign import "stg_eqWord32"      unsafe eqWord32#      :: Word32# -> Word32# -> Bool
-foreign import "stg_neWord32"      unsafe neWord32#      :: Word32# -> Word32# -> Bool
-foreign import "stg_ltWord32"      unsafe ltWord32#      :: Word32# -> Word32# -> Bool
-foreign import "stg_leWord32"      unsafe leWord32#      :: Word32# -> Word32# -> Bool
-foreign import "stg_gtWord32"      unsafe gtWord32#      :: Word32# -> Word32# -> Bool
-foreign import "stg_geWord32"      unsafe geWord32#      :: Word32# -> Word32# -> Bool
-foreign import "stg_int32ToWord32" unsafe int32ToWord32# :: Int32# -> Word32#
-foreign import "stg_word32ToInt32" unsafe word32ToInt32# :: Word32# -> Int32#
-foreign import "stg_intToInt32"    unsafe intToInt32#    :: Int# -> Int32#
-foreign import "stg_wordToWord32"  unsafe wordToWord32#  :: Word# -> Word32#
-foreign import "stg_word32ToWord"  unsafe word32ToWord#  :: Word32# -> Word#
-foreign import "stg_plusInt32"     unsafe plusInt32#     :: Int32# -> Int32# -> Int32#
-foreign import "stg_minusInt32"    unsafe minusInt32#    :: Int32# -> Int32# -> Int32#
-foreign import "stg_timesInt32"    unsafe timesInt32#    :: Int32# -> Int32# -> Int32#
-foreign import "stg_negateInt32"   unsafe negateInt32#   :: Int32# -> Int32#
-foreign import "stg_quotWord32"    unsafe quotWord32#    :: Word32# -> Word32# -> Word32#
-foreign import "stg_remWord32"     unsafe remWord32#     :: Word32# -> Word32# -> Word32#
-foreign import "stg_and32"         unsafe and32#         :: Word32# -> Word32# -> Word32#
-foreign import "stg_or32"          unsafe or32#          :: Word32# -> Word32# -> Word32#
-foreign import "stg_xor32"         unsafe xor32#         :: Word32# -> Word32# -> Word32#
-foreign import "stg_not32"         unsafe not32#         :: Word32# -> Word32#
-foreign import "stg_shiftL32"      unsafe shiftL32#      :: Word32# -> Int# -> Word32#
-foreign import "stg_shiftRL32"     unsafe shiftRL32#     :: Word32# -> Int# -> Word32#
+foreign import unsafe "stg_eqWord32"      eqWord32#      :: Word32# -> Word32# -> Bool
+foreign import unsafe "stg_neWord32"      neWord32#      :: Word32# -> Word32# -> Bool
+foreign import unsafe "stg_ltWord32"      ltWord32#      :: Word32# -> Word32# -> Bool
+foreign import unsafe "stg_leWord32"      leWord32#      :: Word32# -> Word32# -> Bool
+foreign import unsafe "stg_gtWord32"      gtWord32#      :: Word32# -> Word32# -> Bool
+foreign import unsafe "stg_geWord32"      geWord32#      :: Word32# -> Word32# -> Bool
+foreign import unsafe "stg_int32ToWord32" int32ToWord32# :: Int32# -> Word32#
+foreign import unsafe "stg_word32ToInt32" word32ToInt32# :: Word32# -> Int32#
+foreign import unsafe "stg_intToInt32"    intToInt32#    :: Int# -> Int32#
+foreign import unsafe "stg_wordToWord32"  wordToWord32#  :: Word# -> Word32#
+foreign import unsafe "stg_word32ToWord"  word32ToWord#  :: Word32# -> Word#
+foreign import unsafe "stg_plusInt32"     plusInt32#     :: Int32# -> Int32# -> Int32#
+foreign import unsafe "stg_minusInt32"    minusInt32#    :: Int32# -> Int32# -> Int32#
+foreign import unsafe "stg_timesInt32"    timesInt32#    :: Int32# -> Int32# -> Int32#
+foreign import unsafe "stg_negateInt32"   negateInt32#   :: Int32# -> Int32#
+foreign import unsafe "stg_quotWord32"    quotWord32#    :: Word32# -> Word32# -> Word32#
+foreign import unsafe "stg_remWord32"     remWord32#     :: Word32# -> Word32# -> Word32#
+foreign import unsafe "stg_and32"         and32#         :: Word32# -> Word32# -> Word32#
+foreign import unsafe "stg_or32"          or32#          :: Word32# -> Word32# -> Word32#
+foreign import unsafe "stg_xor32"         xor32#         :: Word32# -> Word32# -> Word32#
+foreign import unsafe "stg_not32"         not32#         :: Word32# -> Word32#
+foreign import unsafe "stg_shiftL32"      shiftL32#      :: Word32# -> Int# -> Word32#
+foreign import unsafe "stg_shiftRL32"     shiftRL32#     :: Word32# -> Int# -> Word32#
 
 {-# RULES
 "fromIntegral/Int->Word32"    fromIntegral = \(I#   x#) -> W32# (int32ToWord32# (intToInt32# x#))
@@ -723,31 +723,31 @@ instance Bits Word64 where
     bitSize  _                = 64
     isSigned _                = False
 
-foreign import "stg_eqWord64"      unsafe eqWord64#      :: Word64# -> Word64# -> Bool
-foreign import "stg_neWord64"      unsafe neWord64#      :: Word64# -> Word64# -> Bool
-foreign import "stg_ltWord64"      unsafe ltWord64#      :: Word64# -> Word64# -> Bool
-foreign import "stg_leWord64"      unsafe leWord64#      :: Word64# -> Word64# -> Bool
-foreign import "stg_gtWord64"      unsafe gtWord64#      :: Word64# -> Word64# -> Bool
-foreign import "stg_geWord64"      unsafe geWord64#      :: Word64# -> Word64# -> Bool
-foreign import "stg_int64ToWord64" unsafe int64ToWord64# :: Int64# -> Word64#
-foreign import "stg_word64ToInt64" unsafe word64ToInt64# :: Word64# -> Int64#
-foreign import "stg_intToInt64"    unsafe intToInt64#    :: Int# -> Int64#
-foreign import "stg_wordToWord64"  unsafe wordToWord64#  :: Word# -> Word64#
-foreign import "stg_word64ToWord"  unsafe word64ToWord#  :: Word64# -> Word#
-foreign import "stg_plusInt64"     unsafe plusInt64#     :: Int64# -> Int64# -> Int64#
-foreign import "stg_minusInt64"    unsafe minusInt64#    :: Int64# -> Int64# -> Int64#
-foreign import "stg_timesInt64"    unsafe timesInt64#    :: Int64# -> Int64# -> Int64#
-foreign import "stg_negateInt64"   unsafe negateInt64#   :: Int64# -> Int64#
-foreign import "stg_quotWord64"    unsafe quotWord64#    :: Word64# -> Word64# -> Word64#
-foreign import "stg_remWord64"     unsafe remWord64#     :: Word64# -> Word64# -> Word64#
-foreign import "stg_and64"         unsafe and64#         :: Word64# -> Word64# -> Word64#
-foreign import "stg_or64"          unsafe or64#          :: Word64# -> Word64# -> Word64#
-foreign import "stg_xor64"         unsafe xor64#         :: Word64# -> Word64# -> Word64#
-foreign import "stg_not64"         unsafe not64#         :: Word64# -> Word64#
-foreign import "stg_shiftL64"      unsafe shiftL64#      :: Word64# -> Int# -> Word64#
-foreign import "stg_shiftRL64"     unsafe shiftRL64#     :: Word64# -> Int# -> Word64#
+foreign import ccall unsafe "stg_eqWord64"      eqWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "stg_neWord64"      neWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "stg_ltWord64"      ltWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "stg_leWord64"      leWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "stg_gtWord64"      gtWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "stg_geWord64"      geWord64#      :: Word64# -> Word64# -> Bool
+foreign import ccall unsafe "stg_int64ToWord64" int64ToWord64# :: Int64# -> Word64#
+foreign import ccall unsafe "stg_word64ToInt64" word64ToInt64# :: Word64# -> Int64#
+foreign import ccall unsafe "stg_intToInt64"    intToInt64#    :: Int# -> Int64#
+foreign import ccall unsafe "stg_wordToWord64"  wordToWord64#  :: Word# -> Word64#
+foreign import ccall unsafe "stg_word64ToWord"  word64ToWord#  :: Word64# -> Word#
+foreign import ccall unsafe "stg_plusInt64"     plusInt64#     :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "stg_minusInt64"    minusInt64#    :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "stg_timesInt64"    timesInt64#    :: Int64# -> Int64# -> Int64#
+foreign import ccall unsafe "stg_negateInt64"   negateInt64#   :: Int64# -> Int64#
+foreign import ccall unsafe "stg_quotWord64"    quotWord64#    :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "stg_remWord64"     remWord64#     :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "stg_and64"         and64#         :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "stg_or64"          or64#          :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "stg_xor64"         xor64#         :: Word64# -> Word64# -> Word64#
+foreign import ccall unsafe "stg_not64"         not64#         :: Word64# -> Word64#
+foreign import ccall unsafe "stg_shiftL64"      shiftL64#      :: Word64# -> Int# -> Word64#
+foreign import ccall unsafe "stg_shiftRL64"     shiftRL64#     :: Word64# -> Int# -> Word64#
 
-foreign import "stg_integerToWord64" unsafe integerToWord64# :: Int# -> ByteArray# -> Word64#
+foreign import ccall unsafe "stg_integerToWord64" integerToWord64# :: Int# -> ByteArray# -> Word64#
 
 
 {-# RULES

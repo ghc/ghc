@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.4 2001/12/21 15:07:22 simonmar Exp $
+% $Id: Base.lhs,v 1.5 2002/02/05 17:32:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -272,8 +272,10 @@ augment g xs = g (:) xs
 "foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) . 
 		foldr k z (augment g xs) = g k (foldr k z xs)
 
-"foldr/id"    	foldr (:) [] = \x->x
-"foldr/app"    	forall xs ys. foldr (:) ys xs = append xs ys
+"foldr/id"    			  foldr (:) [] = \x->x
+"foldr/app"    	[1] forall xs ys. foldr (:) ys xs = xs ++ ys
+	-- Only activate this from phase 1, because that's
+	-- when we disable the rule that expands (++) into foldr
 
 -- The foldr/cons rule looks nice, but it can give disastrously
 -- bloated code when commpiling
@@ -304,21 +306,36 @@ augment g xs = g (:) xs
 
 \begin{code}
 map :: (a -> b) -> [a] -> [b]
-{-# NOINLINE [1] map #-}
-map = mapList
+map _ []     = []
+map f (x:xs) = f x : map f xs
 
 -- Note eta expanded
 mapFB ::  (elt -> lst -> lst) -> (a -> elt) -> a -> lst -> lst
+{-# INLINE [0] mapFB #-}
 mapFB c f x ys = c (f x) ys
 
-mapList :: (a -> b) -> [a] -> [b]
-mapList _ []     = []
-mapList f (x:xs) = f x : mapList f xs
+-- The rules for map work like this.
+-- 
+-- Up to (but not including) phase 1, we use the "map" rule to
+-- rewrite all saturated applications of map with its build/fold 
+-- form, hoping for fusion to happen.
+-- In phase 1 and 0, we switch off that rule, inline build, and
+-- switch on the "mapList" rule, which rewrites the foldr/mapFB
+-- thing back into plain map.  
+--
+-- It's important that these two rules aren't both active at once 
+-- (along with build's unfolding) else we'd get an infinite loop 
+-- in the rules.  Hence the activation control below.
+--
+-- The "mapFB" rule optimises compositions of map.
+--
+-- This same pattern is followed by many other functions: 
+-- e.g. append, filter, iterate, repeat, etc.
 
 {-# RULES
-"map"	    forall f xs.	map f xs		= build (\c n -> foldr (mapFB c f) n xs)
+"map"	    [~1] forall f xs.	map f xs		= build (\c n -> foldr (mapFB c f) n xs)
+"mapList"   [1]  forall f.	foldr (mapFB (:) f) []	= map f
 "mapFB"	    forall c f g.	mapFB (mapFB c f) g	= mapFB c (f.g) 
-"mapList"   forall f.		foldr (mapFB (:) f) []	= mapList f
   #-}
 \end{code}
 
@@ -328,16 +345,13 @@ mapList f (x:xs) = f x : mapList f xs
 ----------------------------------------------
 \begin{code}
 (++) :: [a] -> [a] -> [a]
-{-# NOINLINE [1] (++) #-}
-(++) = append
+(++) []     ys = ys
+(++) (x:xs) ys = x : xs ++ ys
 
 {-# RULES
-"++"	forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
+"++"	[~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
   #-}
 
-append :: [a] -> [a] -> [a]
-append []     ys = ys
-append (x:xs) ys = x : append xs ys
 \end{code}
 
 
@@ -802,9 +816,9 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
 	    ch -> unpack (C# ch : acc) (i# -# 1#)
 
 {-# RULES
-"unpack"	 forall a   . unpackCString# a		   = build (unpackFoldrCString# a)
-"unpack-list"    forall a   . unpackFoldrCString# a (:) [] = unpackCStringList# a
-"unpack-append"  forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
+"unpack"       [~1] forall a   . unpackCString# a		   = build (unpackFoldrCString# a)
+"unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCStringList# a
+"unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
 -- There's a built-in rule (in GHC.Rules.lhs) for
 -- 	unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n

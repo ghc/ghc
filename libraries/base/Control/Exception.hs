@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Exception.hs,v 1.5 2001/12/21 15:07:21 simonmar Exp $
+-- $Id: Exception.hs,v 1.6 2002/02/05 17:32:25 simonmar Exp $
 --
 -- The External API for exceptions.  The functions provided in this
 -- module allow catching of exceptions in the IO monad.
@@ -76,6 +76,7 @@ module Control.Exception (
 
 #ifdef __GLASGOW_HASKELL__
 import Prelude 		hiding (catch)
+import System.IO.Error
 import GHC.Base		( assert )
 import GHC.Exception 	hiding (try, catch, bracket, bracket_)
 import GHC.Conc		( throwTo, ThreadId )
@@ -199,7 +200,7 @@ dynExceptions _ = Nothing
 asyncExceptions (AsyncException e) = Just e
 asyncExceptions _ = Nothing
 
-userErrors (UserError e) = Just e
+userErrors e | isUserError e = Just (ioeGetErrorString e)
 userErrors _ = Nothing
 
 -----------------------------------------------------------------------------

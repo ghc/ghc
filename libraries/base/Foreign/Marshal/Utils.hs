@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Utils.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: Utils.hs,v 1.3 2002/02/05 17:32:25 simonmar Exp $
 --
 -- Utilities for primitive marshaling
 --
@@ -52,11 +52,11 @@ import Data.Maybe
 
 #ifdef __GLASGOW_HASKELL__
 import Foreign.Ptr	        ( Ptr, nullPtr )
-import GHC.Storable	( Storable(poke,destruct) )
-import Foreign.C.TypesISO    ( CSize )
-import Foreign.Marshal.Alloc ( malloc, alloca )
+import GHC.Storable		( Storable(poke) )
+import Foreign.C.TypesISO    	( CSize )
+import Foreign.Marshal.Alloc 	( malloc, alloca )
 import GHC.IOBase
-import GHC.Real		( fromIntegral )
+import GHC.Real			( fromIntegral )
 import GHC.Num
 import GHC.Base
 #endif
@@ -83,7 +83,6 @@ withObject val f  =
   alloca $ \ptr -> do
     poke ptr val
     res <- f ptr
-    destruct ptr
     return res
 
 
@@ -164,5 +163,5 @@ moveBytes dest src size  = memmove dest src (fromIntegral size)
 
 -- basic C routines needed for memory copying
 --
-foreign import unsafe memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
-foreign import unsafe memmove :: Ptr a -> Ptr a -> CSize -> IO ()
+foreign import ccall unsafe memcpy  :: Ptr a -> Ptr a -> CSize -> IO ()
+foreign import ccall unsafe memmove :: Ptr a -> Ptr a -> CSize -> IO ()

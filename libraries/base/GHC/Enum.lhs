@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Enum.lhs,v 1.6 2001/12/21 15:07:22 simonmar Exp $
+% $Id: Enum.lhs,v 1.7 2002/02/05 17:32:26 simonmar Exp $
 %
 % (c) The University of Glasgow, 1992-2000
 %
@@ -205,20 +205,13 @@ instance  Enum Char  where
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
 
-{-# NOINLINE [1] eftChar #-}
-{-# NOINLINE [1] efdChar #-}
-{-# NOINLINE [1] efdtChar #-}
-eftChar  = eftCharList
-efdChar  = efdCharList
-efdtChar = efdtCharList
-
 {-# RULES
-"eftChar"	forall x y.	eftChar x y	  = build (\c n -> eftCharFB c n x y)
-"efdChar"	forall x1 x2.	efdChar x1 x2	  = build (\ c n -> efdCharFB c n x1 x2)
-"efdtChar"	forall x1 x2 l.	efdtChar x1 x2 l  = build (\ c n -> efdtCharFB c n x1 x2 l)
-"eftCharList"	eftCharFB  (:) [] = eftCharList
-"efdCharList"	efdCharFB  (:) [] = efdCharList
-"efdtCharList"	efdtCharFB (:) [] = efdtCharList
+"eftChar"	[~1] forall x y.	eftChar x y	  = build (\c n -> eftCharFB c n x y)
+"efdChar"	[~1] forall x1 x2.	efdChar x1 x2	  = build (\ c n -> efdCharFB c n x1 x2)
+"efdtChar"	[~1] forall x1 x2 l.	efdtChar x1 x2 l  = build (\ c n -> efdtCharFB c n x1 x2 l)
+"eftCharList"	[1]  eftCharFB  (:) [] = eftChar
+"efdCharList"	[1]  efdCharFB  (:) [] = efdChar
+"efdtCharList"	[1]  efdtCharFB (:) [] = efdtChar
  #-}
 
 
@@ -230,8 +223,8 @@ eftCharFB c n x y = go x
 		    go x | x ># y    = n
 			 | otherwise = C# (chr# x) `c` go (x +# 1#)
 
-eftCharList x y | x ># y    = [] 
-	        | otherwise = C# (chr# x) : eftCharList (x +# 1#) y
+eftChar x y | x ># y    = [] 
+	        | otherwise = C# (chr# x) : eftChar (x +# 1#) y
 
 
 -- For enumFromThenTo we give up on inlining
@@ -242,7 +235,7 @@ efdCharFB c n x1 x2
   where
     delta = x2 -# x1
 
-efdCharList x1 x2
+efdChar x1 x2
   | delta >=# 0# = go_up_char_list x1 delta 0x10FFFF#
   | otherwise    = go_dn_char_list x1 delta 0#
   where
@@ -255,7 +248,7 @@ efdtCharFB c n x1 x2 lim
   where
     delta = x2 -# x1
 
-efdtCharList x1 x2 lim
+efdtChar x1 x2 lim
   | delta >=# 0# = go_up_char_list x1 delta lim
   | otherwise    = go_dn_char_list x1 delta lim
   where
@@ -330,21 +323,14 @@ instance  Enum Int  where
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (I# x1) (I# x2) (I# y) = efdtInt x1 x2 y
 
-{-# NOINLINE [1] eftInt #-}
-{-# NOINLINE [1] efdInt #-}
-{-# NOINLINE [1] efdtInt #-}
-eftInt 	= eftIntList
-efdInt 	= efdIntList
-efdtInt = efdtIntList
-
 {-# RULES
-"eftInt"	forall x y.	eftInt x y	 = build (\ c n -> eftIntFB c n x y)
-"efdInt"	forall x1 x2.	efdInt x1 x2	 = build (\ c n -> efdIntFB c n x1 x2)
-"efdtInt"	forall x1 x2 l.	efdtInt x1 x2 l	 = build (\ c n -> efdtIntFB c n x1 x2 l)
+"eftInt"	[~1] forall x y.	eftInt x y	 = build (\ c n -> eftIntFB c n x y)
+"efdInt"	[~1] forall x1 x2.	efdInt x1 x2	 = build (\ c n -> efdIntFB c n x1 x2)
+"efdtInt"	[~1] forall x1 x2 l.	efdtInt x1 x2 l	 = build (\ c n -> efdtIntFB c n x1 x2 l)
 
-"eftIntList"	eftIntFB  (:) [] = eftIntList
-"efdIntList"	efdIntFB  (:) [] = efdIntList
-"efdtIntList"	efdtIntFB (:) [] = efdtIntList
+"eftIntList"	[1] eftIntFB  (:) [] = eftInt
+"efdIntList"	[1] efdIntFB  (:) [] = efdInt
+"efdtIntList"	[1] efdtIntFB (:) [] = efdtInt
  #-}
 
 
@@ -358,7 +344,7 @@ eftIntFB c n x y | x ># y    = n
 	-- so that when eftInfFB is inlined we can inline
 	-- whatver is bound to "c"
 
-eftIntList x y | x ># y    = []
+eftInt x y | x ># y    = []
 	       | otherwise = go x
 	       where
 		 go x = I# x : if x ==# y then [] else go (x +# 1#)
@@ -374,7 +360,7 @@ efdtIntFB c n x1 x2 y
     delta = x2 -# x1
     lim   = y -# delta
 
-efdtIntList x1 x2 y
+efdtInt x1 x2 y
   | delta >=# 0# = if x1 ># y then [] else go_up_int_list x1 delta lim
   | otherwise    = if x1 <# y then [] else go_dn_int_list x1 delta lim
   where
@@ -388,7 +374,7 @@ efdIntFB c n x1 x2
   where
     delta = x2 -# x1
 
-efdIntList x1 x2
+efdInt x1 x2
   | delta >=# 0# = case maxInt of I# y -> go_up_int_list x1 delta (y -# delta)
   | otherwise    = case minInt of I# y -> go_dn_int_list x1 delta (y -# delta)
   where
