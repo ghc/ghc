@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: openFile.c,v 1.8 1999/09/17 09:38:35 sof Exp $
+ * $Id: openFile.c,v 1.9 1999/09/19 19:15:26 sof Exp $
  *
  * openFile Runtime Support
  */
@@ -34,9 +34,8 @@
 #endif
 
 IOFileObject*
-openStdFile(fd,flags,rd)
+openStdFile(fd,rd)
 StgInt fd;
-StgInt flags;
 StgInt rd;
 {
     IOFileObject* fo;
@@ -48,7 +47,7 @@ StgInt rd;
     fo->buf      = NULL;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
-    fo->flags   = flags | FILEOBJ_STD | ( rd ? FILEOBJ_READ : FILEOBJ_WRITE);
+    fo->flags    = FILEOBJ_STD | ( rd ? FILEOBJ_READ : (FILEOBJ_WRITE | FILEOBJ_FLUSH));
     fo->connectedTo = NULL;
  
     /* MS Win32 CRT doesn't support fcntl() -- the workaround is to
@@ -70,11 +69,10 @@ StgInt rd;
 #define OPENFILE_READ_WRITE 3
 
 IOFileObject*
-openFile(file, how, binary, flags)
+openFile(file, how, binary)
 StgByteArray file;
 StgInt how;
 StgInt binary;
-StgInt flags;
 {
     FILE *fp;
     int fd;
@@ -83,6 +81,7 @@ StgInt flags;
     int created = 0;
     struct stat sb;
     IOFileObject* fo;
+    int flags = 0;
 
 #if defined(_WIN32) && !(defined(__CYGWIN__) || defined(__CYGWIN32__))
 #define O_NONBLOCK 0
@@ -97,17 +96,21 @@ StgInt flags;
       case OPENFILE_APPEND:
         oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY | O_APPEND; 
 	for_writing = 1;
+	flags |= FILEOBJ_WRITE | FILEOBJ_FLUSH;
 	break;
       case OPENFILE_WRITE:
 	oflags = O_NONBLOCK | O_WRONLY | O_NOCTTY;
+	flags |= FILEOBJ_WRITE | FILEOBJ_FLUSH;
 	for_writing = 1;
 	break;
     case OPENFILE_READ_ONLY:
         oflags = O_NONBLOCK | O_RDONLY | O_NOCTTY;
+	flags |= FILEOBJ_READ;
 	for_writing = 0;
 	break;
     case OPENFILE_READ_WRITE:
 	oflags = O_NONBLOCK | O_RDWR | O_NOCTTY;
+	flags |= FILEOBJ_READ | FILEOBJ_WRITE | FILEOBJ_FLUSH;
 	for_writing = 1;
 	break;
     default:
@@ -116,8 +119,10 @@ StgInt flags;
     }
 
 #if HAVE_O_BINARY
-    if (binary) 
+    if (binary) {
       oflags |= O_BINARY;
+      flags  |= FILEOBJ_BINARY;
+    }
 #endif
 
     /* First try to open without creating */
@@ -277,8 +282,7 @@ StgInt flags;
     fo->buf      = NULL;
     fo->bufWPtr  = 0;
     fo->bufRPtr  = 0;
-    fo->flags   = flags | ( (how == OPENFILE_READ_ONLY || how == OPENFILE_READ_WRITE) ? FILEOBJ_READ  : 0)
-			| ( (how == OPENFILE_APPEND    || how == OPENFILE_READ_WRITE) ? FILEOBJ_WRITE : 0);
+    fo->flags    = flags;
     fo->connectedTo = NULL;
     return fo;
 }
