@@ -4,10 +4,11 @@ Digraph.hs:19:
 	Quantified type variable `v' escapes
 	It is mentioned in the environment
 	The following variables in the environment mention `v'
-	    es :: [Edge v]
-	    vs :: [v]
-    When checking the type signature
-	reversed_edges :: forall v1. (Eq v1) => [Edge v1]
+	  vs :: [v]
+	  es :: [Edge v]
+    Signature type:     forall v. (Eq v) => [Edge v]
+    Type to generalise: [Edge v]
+    When checking the type signature for `reversed_edges'
     In an equation for function `stronglyConnComp':
 	stronglyConnComp es vs
 			   = snd (span_tree (new_range reversed_edges)
