@@ -317,14 +317,18 @@ data BufferMode
 -- ---------------------------------------------------------------------------
 -- IORefs
 
+-- |A mutable variable in the 'IO' monad
 newtype IORef a = IORef (STRef RealWorld a) deriving Eq
 
+-- |Build a new 'IORef'
 newIORef    :: a -> IO (IORef a)
 newIORef v = stToIO (newSTRef v) >>= \ var -> return (IORef var)
 
+-- |Read the value of an 'IORef'
 readIORef   :: IORef a -> IO a
 readIORef  (IORef var) = stToIO (readSTRef var)
 
+-- |Write a new value into an 'IORef'
 writeIORef  :: IORef a -> a -> IO ()
 writeIORef (IORef var) v = stToIO (writeSTRef var v)
 
