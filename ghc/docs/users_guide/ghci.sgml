@@ -150,6 +150,16 @@ Main> fac 17
       in the same directory and you can't call them all
       <filename>Main.hs</filename>.</para>
 
+      <para>One consequence of the way that GHCi follows dependencies
+      to find modules to load is that every module must have a source
+      file.  The only exception to the rule is modules that come from
+      a package, including the <literal>Prelude</literal> and standard
+      libraries such as <literal>IO</literal> and
+      <literal>Complex</literal>.  If you attempt to load a module for
+      which GHCi can't find a source file, even if there are object
+      and interface files for the module, you'll get an error
+      message.</para>
+
       <para>One final note: if you load a module called Main, it must
       contain a <literal>main</literal> function, just like in
       GHC.</para>
