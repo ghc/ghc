@@ -10,6 +10,7 @@ individual operations.
 \begin{code}
 module PrelBits where
 
+import Prelude		-- To generate the dependency
 #ifdef __GLASGOW_HASKELL__
 import PrelGHC
 import PrelBase
