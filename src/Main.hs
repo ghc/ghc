@@ -51,6 +51,12 @@ import Regex
 import PackedString
 #endif
 
+#if defined(mingw32_HOST_OS)
+import Foreign.Marshal.Array
+import Foreign
+import Foreign.C
+#endif
+
 -----------------------------------------------------------------------------
 -- Top-level stuff
 main :: IO ()
@@ -161,7 +167,10 @@ run flags files = do
 			(t:_) -> Just t
 
   libdir <- case [str | Flag_Lib str <- flags] of
-		[] -> dieMsg "no --lib option"
+		[] -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
+			 case maybe_exec_dir of
+                                       Nothing  -> return "."
+                                       Just dir -> return (dir ++ "\\imports")
 		fs -> return (last fs)
 
   let css_file = case [str | Flag_CSS str <- flags] of
@@ -1125,3 +1134,33 @@ collectInstances mod_ifaces
 type ErrMsg = String
 type ErrMsgM a = Writer [ErrMsg] a
 
+getBaseDir :: IO (Maybe String)
+#if defined(mingw32_HOST_OS)
+getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
+		buf <- mallocArray len
+                ret <- getModuleFileName nullPtr buf len
+                if ret == 0 then free buf >> return Nothing
+                            else do s <- peekCString buf
+                                    free buf
+                                    return (Just (rootDir s))
+  where
+    rootDir s = reverse (dropList "/haddock.exe" (reverse (normalisePath s)))
+
+foreign import stdcall "GetModuleFileNameA" unsafe
+  getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
+#else
+getBaseDir :: IO (Maybe String) = do return Nothing
+#endif
+normalisePath :: String -> String
+-- Just changes '\' to '/'
+
+#if defined(mingw32_HOST_OS)
+normalisePath xs = subst '\\' '/' xs
+subst a b ls = map (\ x -> if x == a then b else x) ls
+#else
+normalisePath xs   = xs
+#endif
+dropList :: [b] -> [a] -> [a]
+dropList [] xs    = xs
+dropList _  xs@[] = xs
+dropList (_:xs) (_:ys) = dropList xs ys

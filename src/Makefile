@@ -27,6 +27,10 @@ endif
 
 HS_PROG = haddock$(HS_PROG_EXT)
 
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+Main_HC_OPTS += -Dmingw32_HOST_OS=1
+endif
+
 HsParser_HC_OPTS      += -Onot
 HaddockParse_HC_OPTS  += -Onot
 HaddockVersion_HC_OPTS = -DHADDOCK_VERSION=$(ProjectVersion)
