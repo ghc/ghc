@@ -284,7 +284,7 @@ ppr_expr pe expr@(Lam _ _)
     in
     hang (hsep [pp_vars SLIT("/u\\") (pUVar    pe) uvars,
 		pp_vars SLIT("_/\\_")  (pTyVarB  pe) tyvars,
-		pp_vars SLIT("\\")   (pMajndr pe) vars])
+		pp_vars SLIT("\\")   (pMajBndr pe) vars])
 	 4 (ppr_expr pe body)
   where
     pp_vars lam pp [] = empty
