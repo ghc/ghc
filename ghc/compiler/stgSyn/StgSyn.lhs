@@ -33,7 +33,7 @@ module StgSyn (
 	SRT(..),
 
 	-- utils
-	stgArgHasCafRefs,
+	stgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
 	isDllConApp, isStgTypeArg,
 	stgArgType,
 
@@ -396,6 +396,19 @@ The second flavour of right-hand-side is for constructors (simple but important)
 \end{code}
 
 \begin{code}
+stgRhsArity :: StgRhs -> Int
+stgRhsArity (StgRhsClosure _ _ _ _ _ bndrs _) = count isId bndrs
+  -- The arity never includes type parameters, so
+  -- when keeping type arguments and binders in the Stg syntax 
+  -- (opt_RuntimeTypes) we have to fliter out the type binders.
+stgRhsArity (StgRhsCon _ _ _) = 0
+\end{code}
+
+\begin{code}
+stgBindHasCafRefs :: GenStgBinding bndr Id -> Bool
+stgBindHasCafRefs (StgNonRec _ rhs) = rhsHasCafRefs rhs
+stgBindHasCafRefs (StgRec binds)    = any rhsHasCafRefs (map snd binds)
+
 rhsHasCafRefs (StgRhsClosure _ _ _ upd srt _ _) 
   = isUpdatable upd || nonEmptySRT srt
 rhsHasCafRefs (StgRhsCon _ _ args)
