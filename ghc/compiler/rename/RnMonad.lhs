@@ -20,7 +20,9 @@ module RnMonad(
 
 #include "HsVersions.h"
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 302
+#if   defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 405
+import IOExts		( fixIO )
+#elif defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 302
 import PrelIOBase	( fixIO )	-- Should be in GlaExts
 #else
 import IOBase		( fixIO )
