@@ -149,9 +149,11 @@ void grabCapability(Capability** cap)
   free_capabilities = (*cap)->link;
   rts_n_free_capabilities--;
 #endif
-    IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%p): got capability\n",
-	     	osThreadId()));
+#ifdef RTS_SUPPORTS_THREADS
+  IF_DEBUG(scheduler,
+	   fprintf(stderr,"worker thread (%p): got capability\n",
+		   osThreadId()));
+#endif
 }
 
 /*
@@ -199,9 +201,11 @@ void releaseCapability(Capability* cap
     signalCondition(&thread_ready_cond);
   }
 #endif
-    IF_DEBUG(scheduler,
-	     fprintf(stderr,"worker thread (%p): released capability\n",
-	     	osThreadId()));
+#ifdef RTS_SUPPORTS_THREADS
+  IF_DEBUG(scheduler,
+	   fprintf(stderr,"worker thread (%p): released capability\n",
+		   osThreadId()));
+#endif
  return;
 }
 
