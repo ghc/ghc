@@ -55,18 +55,18 @@
 
     <itemizedlist>
       <listitem>
-	<para><ulink URL="http://www.haskell.org/" >Haskell home
+	<para><ulink url="http://www.haskell.org/" >Haskell home
 	page</ulink></para>
       </listitem>
 
       <listitem>
-	<para><ulink URL="http://www.haskell.org/ghc/">GHC home
+	<para><ulink url="http://www.haskell.org/ghc/">GHC home
 	page</ulink></para>
       </listitem>
 
       <listitem>
 	<para><ulink
-	URL="http://www.cs.nott.ac.uk/~gmh/faq.html">comp.lang.functional
+	url="http://www.cs.nott.ac.uk/~gmh/faq.html">comp.lang.functional
 	FAQ</ulink></para>
       </listitem>
 

@@ -544,7 +544,7 @@ To install GHC, use the following steps:
 <listitem><para>Download the Installshield <filename>setup.exe</filename>
 from the GHC download page
 <ulink
-URL="http://www.haskell.org/ghc">haskell.org</ulink>.
+url="http://www.haskell.org/ghc">haskell.org</ulink>.
 </para></listitem>
 
 <listitem><para>Run <filename>setup.exe</filename>.
@@ -687,7 +687,7 @@ on or rebooting may be the quickest cure.
 <!-- doesn't add much value any longer; leave out [sof 7/2002].
 <para>
 Further information on using GHC under Windows can be found in <ulink
-URL="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
+url="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
 pages</ulink>. Note: ignore the installation instructions, which are rather
 out of date; the <emphasis>Miscellaneous</emphasis> section at the bottom of
 the page is of most interest, covering topics beyond the scope of this

@@ -590,7 +590,7 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
       <para>Patrick Sansom had a workshop paper about how all this is
       done (though the details have changed quite a bit). <ulink
-      URL="mailto:sansom@dcs.gla.ac.uk">Ask him</ulink> if you want a
+      url="mailto:sansom@dcs.gla.ac.uk">Ask him</ulink> if you want a
       copy.</para>
 
     </sect2>

@@ -27,7 +27,7 @@ a single Unix process on a single processor.
 
 <para>
 You will find at least one paper about Concurrent Haskell hanging off
-of <ulink URL="http://research.microsoft.com/~simonpj/">Simon Peyton
+of <ulink url="http://research.microsoft.com/~simonpj/">Simon Peyton
 Jones's Web page</ulink>.
 </para>
 

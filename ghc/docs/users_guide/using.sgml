@@ -1509,7 +1509,7 @@ for concurrent/parallel execution.
 <variablelist>
 
 <varlistentry>
-<Term><option>-qp&lt;N&gt;</option>:</Term>
+<term><option>-qp&lt;N&gt;</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-qp&lt;N&gt; RTS option</primary></indexterm>
@@ -1554,7 +1554,7 @@ check (with <option>-C</option>).
 </listitem>
 </varlistentry>
 <varlistentry>
-<Term><option>-qt&lt;num&gt;</option>:</Term>
+<term><option>-qt&lt;num&gt;</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-qt&lt;num&gt; RTS option</primary></indexterm>
@@ -1568,7 +1568,7 @@ translates to 4K bytes, and for 64-bit machines, 8K bytes.)
 </varlistentry>
 <!-- no more -HWL
 <varlistentry>
-<Term><option>-d</option>:</Term>
+<term><option>-d</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-d RTS option (parallel)</primary></indexterm>
@@ -1582,7 +1582,7 @@ in <filename>ghc/utils/pvm/</filename>.
 </varlistentry>
 -->
 <varlistentry>
-<Term><option>-qe&lt;num&gt;</option>:</Term>
+<term><option>-qe&lt;num&gt;</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-qe&lt;num&gt; RTS option
@@ -1595,7 +1595,7 @@ initially.
 </listitem>
 </varlistentry>
 <varlistentry>
-<Term><option>-qQ&lt;num&gt;</option>:</Term>
+<term><option>-qQ&lt;num&gt;</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-qQ&lt;num&gt; RTS option (parallel)</primary></indexterm>
@@ -1607,7 +1607,7 @@ computation speed.
 </listitem>
 </varlistentry>
 <varlistentry>
-<Term><option>-qh&lt;num&gt;</option>:</Term>
+<term><option>-qh&lt;num&gt;</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-qh&lt;num&gt; RTS option (parallel)</primary></indexterm>
@@ -1622,7 +1622,7 @@ of the load in the system.
 </listitem>
 </varlistentry>
 <varlistentry>
-<Term><option>-qg&lt;num&gt;</option>:</Term>
+<term><option>-qg&lt;num&gt;</option>:</term>
 <listitem>
 <para>
 <indexterm><primary>-qg&lt;num&gt; RTS option
