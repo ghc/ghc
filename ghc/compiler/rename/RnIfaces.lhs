@@ -66,6 +66,7 @@ import Outputable
 import Unique		( Unique )
 import StringBuffer     ( StringBuffer, hGetStringBuffer )
 import FastString	( mkFastString )
+import ErrUtils         ( Message )
 import Lex
 import Outputable
 
@@ -936,12 +937,8 @@ readIface the_mod file_path
 	          PFailed err                    -> failWithRn Nothing err 
 		  POk _  (PIface mod_nm iface) ->
 		    warnCheckRn (mod_nm == moduleName the_mod)
-			(hsep [ ptext SLIT("Something is amiss; requested module name")
-		        , pprModule the_mod
-		        , ptext SLIT("differs from name found in the interface file ")
-			, pprModuleName mod_nm
-			])
-		    `thenRn_` returnRn (Just (the_mod, iface))
+		    	        (hiModuleNameMismatchWarn the_mod mod_nm) `thenRn_`
+		    returnRn (Just (the_mod, iface))
 
         Left err
 	  | isDoesNotExistError err -> returnRn Nothing
@@ -986,4 +983,13 @@ importDeclWarn name
 warnRedundantSourceImport mod_name
   = ptext SLIT("Unnecessary {- SOURCE -} in the import of module")
           <+> quotes (pprModuleName mod_name)
+
+hiModuleNameMismatchWarn :: Module -> ModuleName -> Message
+hiModuleNameMismatchWarn requested_mod mod_nm = 
+    hsep [ ptext SLIT("Something is amiss; requested module name")
+	 , pprModule requested_mod
+	 , ptext SLIT("differs from name found in the interface file ")
+   	 , pprModuleName mod_nm
+  	 ]
+
 \end{code}
