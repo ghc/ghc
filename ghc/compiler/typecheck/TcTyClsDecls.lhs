@@ -29,18 +29,19 @@ import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsSigType, kcCheckHsType,
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcUnify		( unifyKind )
-import TcType		( TcKind, ThetaType, TcType,
+import TcType		( TcKind, ThetaType, TcType, tyVarsOfType,
 			  mkArrowKind, liftedTypeKind, 
 			  tcSplitSigmaTy, tcEqType )
 import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
 import FieldLabel	( fieldLabelName, fieldLabelType )
 import Generics		( validGenericMethodType, canDoGenerics )
-import Class		( Class, className, classTyCon, DefMeth(..), classBigSig )
+import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, ArgVrcs, DataConDetails(..), 
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
 			  tyConTheta, getSynTyConDefn, tyConDataCons, isSynTyCon, tyConName )
 import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
 import Var		( TyVar, idType, idName )
+import VarSet		( elemVarSet )
 import Name		( Name, getSrcLoc )
 import Outputable
 import Util		( zipLazy, isSingleton, notNull )
@@ -505,18 +506,23 @@ checkValidClass cls
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
 
     check_op (sel_id, dm) 
-	= addErrCtxt (classOpCtxt sel_id) (
-	  checkValidTheta SigmaCtxt (tail theta) 	`thenM_`
+      = addErrCtxt (classOpCtxt sel_id tau) $ do
+	{ checkValidTheta SigmaCtxt (tail theta)
 		-- The 'tail' removes the initial (C a) from the
 		-- class itself, leaving just the method type
 
-	  checkValidType (FunSigCtxt op_name) tau	`thenM_`
+	; checkValidType (FunSigCtxt op_name) tau
+
+		-- Check that the type mentions at least one of
+		-- the class type variables
+	; checkTc (any (`elemVarSet` tyVarsOfType tau) tyvars)
+	          (noClassTyVarErr cls sel_id)
 
 		-- Check that for a generic method, the type of 
 		-- the method is sufficiently simple
-	  checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
+	; checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
 		  (badGenericMethodType op_name op_ty)
-	)
+	}
 	where
 	  op_name = idName sel_id
 	  op_ty   = idType sel_id
@@ -544,8 +550,8 @@ dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
 			     [ ppr n <+> dcolon <+> ppr ty 
 			     | (n,ty) <- fields `zip` arg_tys]))
 
-classOpCtxt sel_id = sep [ptext SLIT("When checking the class method:"),
-			  nest 2 (ppr sel_id <+> dcolon <+> ppr (idType sel_id))]
+classOpCtxt sel_id tau = sep [ptext SLIT("When checking the class method:"),
+			      nest 2 (ppr sel_id <+> dcolon <+> ppr tau)]
 
 nullaryClassErr cls
   = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
@@ -553,6 +559,11 @@ nullaryClassErr cls
 classArityErr cls
   = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
 	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
+
+noClassTyVarErr clas op
+  = sep [ptext SLIT("The class method") <+> quotes (ppr op),
+	 ptext SLIT("mentions none of the type variables of the class") <+> 
+		ppr clas <+> hsep (map ppr (classTyVars clas))]
 
 genericMultiParamErr clas
   = ptext SLIT("The multi-parameter class") <+> quotes (ppr clas) <+> 
