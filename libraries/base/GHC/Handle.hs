@@ -40,7 +40,7 @@ module GHC.Handle (
 
   hClose, hClose_help,
 
-  HandlePosn(..), hGetPosn, hSetPosn,
+  HandlePosition, HandlePosn(..), hGetPosn, hSetPosn,
   SeekMode(..), hSeek, hTell,
 
   hIsOpen, hIsClosed, hIsReadable, hIsWritable, hGetBuffering, hIsSeekable,
