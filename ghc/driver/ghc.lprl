@@ -570,7 +570,6 @@ Now slurp through the arguments.
 if (  $Status == 0 && $Only_generate_deps ) {
 
     push (@MkDependHS_flags, "-o$Osuffix") if $Osuffix;
-    push (@MkDependHS_flags, "-s$BuildTag") if $BuildTag;
     # They're not (currently) needed, but we need to quote any -#include options
     foreach (@Cmd_opts) {
     	s/-#include.*$/'$&'/g;
@@ -720,6 +719,10 @@ sub setupOptimiseFlags {
 					#  ==> ...(case (case x of I# x# -> fw x#) of ...)...
 					#  ==> ...(case x of I# x# -> case fw x# of ...)...
 					# and now the redex (f x) isn't floatable any more
+
+		'-fno-rules',		# Similarly, don't apply any rules until after full laziness
+					# Notably, list fusion can prevent floating.
+
 		'-fmax-simplifier-iterations2',
 	  ']',
 
@@ -774,14 +777,23 @@ sub setupOptimiseFlags {
 		# No -finline-phase: allow all Ids to be inlined now
 	  ']',
 
-	'-fcse',	# CSE must immediately follow a simplification pass, because it relies
-			# on the no-shadowing invariant.  See comments at the top of CSE.lhs
-		 
 	'-ffull-laziness',	# nofib/spectral/hartel/wang doubles in speed if you
 				# do full laziness late in the day.  It only happens
 				# after fusion and other stuff, so the early pass doesn't
 				# catch it.  For the record, the redex is 
 				#	f_el22 (f_el21 r_midblock)
+
+	# We want CSE to follow the final full-laziness pass, because it may
+	# succeed in commoning up things floated out by full laziness.
+	#
+	# CSE must immediately follow a simplification pass, because it relies
+	# on the no-shadowing invariant.  See comments at the top of CSE.lhs
+	# So it must NOT follow float-inwards, which can give rise to shadowing,
+	# even if its input doesn't have shadows.  Hence putting it between
+	# the two passes.
+	'-fcse',	
+			
+
 	'-ffloat-inwards',
 
 # Case-liberation for -O2.  This should be after
@@ -790,6 +802,8 @@ sub setupOptimiseFlags {
 #	( ($OptLevel != 2)
 #        ? ''
 #	: "-fliberate-case -fsimplify [ $Oopt_FB_Support -ffloat-lets-exposing-whnf -ffloat-primops-ok -fcase-of-case -fdo-case-elim -fcase-merge -fdo-lambda-eta-expansion -freuse-con -flet-to-case $Oopt_PedanticBottoms $Oopt_MaxSimplifierIterations $Oopt_ShowSimplifierProgress ]" ),
+
+#	'-fliberate-case',
 
 # Final clean-up simplification:
 
@@ -3127,6 +3141,9 @@ arg: while($_ = $Args[0]) {
     # ---------------
 
     /^-funfolding-.*$/
+		    && do { push(@HsC_flags, $_); next arg };
+
+    /^-fliberate-case-.*$/
 		    && do { push(@HsC_flags, $_); next arg };
 
     /^-funfold-casms-in-hi-file$/
