@@ -39,7 +39,7 @@ Ok, modules loaded: Main, B, C, D.
 Main> main
 "hello world84"
 Main> 
-Main> -- change A, recompile & reload
+Main> -- change D, recompile & reload
 Main> :! cp D2.hs D.hs
 Main> :! $HC $HC_OPTS -no-recomp -c D.hs
 Main> :reload

@@ -15,7 +15,7 @@
 :type a
 a 42
 
--- sigh; sleep 1, because the comp manager only stores times in seconds
+-- sigh; sleep 1, because the filesystem only stores times in seconds
 :! sleep 1; cp D2.hs D.hs
 :reload
 :type (Main.a,B.b,C.c,D.d)

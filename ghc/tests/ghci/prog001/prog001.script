@@ -25,7 +25,7 @@ main
 :reload
 main
 
--- change A, recompile & reload
+-- change D, recompile & reload
 :! cp D2.hs D.hs
 :! $HC $HC_OPTS -no-recomp -c D.hs
 :reload
