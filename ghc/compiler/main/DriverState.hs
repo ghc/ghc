@@ -576,7 +576,8 @@ way_details :: [ (WayName, Way) ]
 way_details =
   [ (WayThreaded, Way "thr" True "Threaded" [
 #if defined(freebsd_TARGET_OS)
-	"-optc-pthread"
+	  "-optc-pthread"
+        , "-optl-pthread"
 #endif
 	] ),
 
