@@ -47,7 +47,7 @@ project-check :
 # -----------------------------------------------------------------------------
 # Targets: all, stage1, stage2, stage3
 
-DIST_CLEAN_FILES += config.cache config.status
+DIST_CLEAN_FILES += config.cache config.status mk/config.mk mk/config.h mk/stamp-h
 
 extraclean::
 	$(RM) -rf autom4te.cache
