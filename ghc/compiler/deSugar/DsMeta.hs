@@ -332,6 +332,7 @@ repE (HsSplice n e loc)
 repE (HsLam m)      = repLambda m
 repE (HsApp x y)    = do {a <- repE x; b <- repE y; repApp a b}
 repE (NegApp x nm)  = panic "No negate yet"
+repE (HsPar x)      = repE x
 repE (SectionL x y) = do { a <- repE x; b <- repE y; repSectionL a b } 
 repE (SectionR x y) = do { a <- repE x; b <- repE y; repSectionR a b } 
 
@@ -371,11 +372,15 @@ repE (HsLet bs e) = do { (ss,ds) <- repBinds bs
 repE (ExplicitList ty es)     = do { xs <- repEs es; repListExp xs } 
 repE (ExplicitTuple es boxed) = do { xs <- repEs es; repTup xs }
 
-repE (ExplicitPArr ty es)   = panic "No parallel arrays yet"
-repE (RecordConOut _ _ _)   = panic "No record construction yet"
-repE (RecordUpdOut _ _ _ _) = panic "No record update yet"
-repE (ExprWithTySig e ty)   = panic "No expressions with type signatures yet"
-
+repE (ExplicitPArr ty es)   = panic "repE: No parallel arrays yet"
+repE (RecordConOut _ _ _)   = panic "repE: No record construction yet"
+repE (RecordUpdOut _ _ _ _) = panic "repE: No record update yet"
+repE (ExprWithTySig e ty)   = 
+  panic "repE: No expressions with type signatures yet" 
+repE (HsCCall _ _ _ _ _)    = panic "repE: Can't represent __ccall__"
+repE (HsSCC _ _)            = panic "repE: Can't represent SCC"
+repE (HsBracketOut _ _)     = panic "repE: No Oxford brackets yet"
+repE (HsReify _)            = panic "repE: No reification yet"
 
 -----------------------------------------------------------------------------
 -- Building representations of auxillary structures like Match, Clause, Stmt, 
