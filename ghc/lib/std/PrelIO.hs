@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hs,v 1.2 2001/11/08 17:02:41 simonmar Exp $
+-- $Id: PrelIO.hs,v 1.3 2001/11/14 11:35:23 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -350,7 +350,6 @@ lazyRead' h handle_ = do
      NoBuffering      -> do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
-	    fd  = haFD handle_
 	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
 	        (read_off (fromIntegral fd) raw 0 1)
 	        (threadWaitRead fd)
