@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.39 2000/10/12 15:17:07 sewardj Exp $
+% $Id: CLabel.lhs,v 1.40 2000/10/16 13:57:43 sewardj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -85,7 +85,7 @@ import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
 import Module		( ModuleName, moduleName, moduleNameFS, 
-			  Module, isLocalModule )
+			  Module, isModuleInThisPackage )
 import Name		( Name, getName, isDllName, isExternallyVisibleName )
 import TyCon		( TyCon )
 import Unique		( pprUnique, Unique )
@@ -388,7 +388,7 @@ labelDynamic lbl =
    DataConLabel n k  -> isDllName n
    TyConLabel tc     -> isDllName (getName tc)
    ForeignLabel _ d  -> d
-   ModuleInitLabel m -> (not opt_Static) && (not (isLocalModule m))
+   ModuleInitLabel m -> (not opt_Static) && (not (isModuleInThisPackage m))
    _ 		     -> False
 \end{code}
 

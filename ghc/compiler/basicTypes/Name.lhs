@@ -446,7 +446,7 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
 
         global m | codeStyle sty
                  = ppr (moduleName m) <> char '_' <> pprOccName occ
-                 | debugStyle sty || not (isLocalModule m)
+                 | debugStyle sty || not (isModuleInThisPackage m)
                  = ppr (moduleName m) <> dot <> pprOccName occ
                  | otherwise
                  = pprOccName occ
