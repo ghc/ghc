@@ -85,4 +85,10 @@ with 'Prel' to reduce namespace pollution.
 	UnsafeST  ==> PrelUnsafeST
 </verb> </tscreen>
 
+<item> Unboxed types are now not allowed in the field of a newtype
+constructor.
+
+<item> Report the context properly for type errors in newtype
+declarations.
+
 </itemize>
