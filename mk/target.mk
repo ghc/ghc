@@ -257,7 +257,13 @@ endif
 ifneq "$(PACKAGE)" ""
 
 # add syslib dependencies and current package name
+
+# HACK!!! The conditional below is needed because we pass $(HC_OPTS)
+# directly to mkdependC and sometimes the C compiler in ghc/rts. Todo.
+ifneq "$(PACKAGE)" "rts"
 SRC_HC_OPTS += -package-name $(PACKAGE)
+endif
+
 SRC_HC_OPTS += $(patsubst %, -package %, $(PACKAGE_DEPS))
 
 ifeq "$(IS_CBITS_LIB)" "YES"
