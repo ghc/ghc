@@ -1,5 +1,5 @@
 q-----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.1 2002/04/04 16:23:43 simonmar Exp $
+$Id: HsParser.ly,v 1.2 2002/04/10 13:23:55 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2000
 
@@ -443,7 +443,7 @@ Datatype declarations
 >	| srcloc sbtype conop sbtype maybe_doc
 >		{ HsConDecl $1 $3 [$2,$4] $5 }
 >	| srcloc con '{' fielddecls '}' maybe_doc
->		{ HsRecDecl $1 (toTyClsHsName $2) $4 $6 }
+>		{ HsRecDecl $1 $2 $4 $6 }
 
 > maybe_doc :: { Maybe String }
 > 	: DOCPREV			{ Just $1 }
