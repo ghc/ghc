@@ -45,6 +45,7 @@ then
 	CoreUtils (PprCore.pprCoreExpr, CoreFVs.exprFreeVars,
 		   CoreSyn.isEvaldUnfolding CoreSyn.maybeUnfoldingTemplate)
 then	
+	CoreLint( CoreUtils )
 	OccurAnal (CoreUtils.exprIsTrivial)
 then
 	CoreUnfold (OccurAnal.occurAnalyseGlobalExpr)
@@ -57,4 +58,5 @@ then
 	MkId (CoreUnfold.mkUnfolding, Subst, Rule.addRule)
 then
 	PrelInfo (MkId)
+	HscTypes( Rules.RuleBase )
 

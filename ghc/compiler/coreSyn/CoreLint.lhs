@@ -7,7 +7,7 @@
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding, 
-	showPass, endPass, endPassWithRules
+	showPass, endPass
     ) where
 
 #include "HsVersions.h"
@@ -15,7 +15,6 @@ module CoreLint (
 import IO		( hPutStr, hPutStrLn, stdout )
 
 import CoreSyn
-import Rules            ( RuleBase, pprRuleBase )
 import CoreFVs		( idFreeVars )
 import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
 
@@ -49,28 +48,18 @@ infixr 9 `thenL`, `seqL`
 
 %************************************************************************
 %*									*
-\subsection{Start and end pass}
+\subsection{End pass}
 %*									*
 %************************************************************************
 
-@beginPass@ and @endPass@ don't really belong here, but it makes a convenient
+@showPass@ and @endPass@ don't really belong here, but it makes a convenient
 place for them.  They print out stuff before and after core passes,
 and do Core Lint when necessary.
 
 \begin{code}
 endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
 endPass dflags pass_name dump_flag binds
-  = do  
-        (binds, _) <- endPassWithRules dflags pass_name dump_flag binds Nothing
-        return binds
-
-endPassWithRules :: DynFlags -> String -> DynFlag -> [CoreBind] 
-		 -> Maybe RuleBase
-                 -> IO ([CoreBind], Maybe RuleBase)
-endPassWithRules dflags pass_name dump_flag binds rules
   = do 
-        -- ToDo: force the rules?
-
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
 	if verbosity dflags >= 2 then
@@ -79,16 +68,12 @@ endPassWithRules dflags pass_name dump_flag binds rules
 	   return ()
 
 	-- Report verbosely, if required
-	dumpIfSet_core dflags dump_flag pass_name
-		  (pprCoreBindings binds $$ case rules of
-                                              Nothing -> empty
-                                              Just rb -> pprRuleBase rb)
+	dumpIfSet_core dflags dump_flag pass_name (pprCoreBindings binds)
 
 	-- Type check
 	lintCoreBindings dflags pass_name binds
-        -- ToDo: lint the rules
 
-	return (binds, rules)
+	return binds
 \end{code}
 
 
