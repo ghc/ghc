@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.126 2003/08/18 09:27:54 dons Exp $
+ * $Id: Linker.c,v 1.127 2003/08/29 16:00:26 simonmar Exp $
  *
  * (c) The GHC Team, 2000-2003
  *
@@ -2008,6 +2008,9 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
 #elif defined(i386_TARGET_ARCH)
 #  define ELF_TARGET_386    /* Used inside <elf.h> */
+#elif defined(x86_64_TARGET_ARCH)
+#  define ELF_TARGET_X64_64
+#  define ELF_64BIT
 #elif defined (ia64_TARGET_ARCH)
 #  define ELF_TARGET_IA64   /* Used inside <elf.h> */
 #  define ELF_64BIT

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.h,v 1.17 2003/07/30 10:38:42 simonmar Exp $
+ * $Id: MBlock.h,v 1.18 2003/08/29 16:00:29 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -69,6 +69,17 @@ extern StgWord8 mblock_map[];
 					&& mblock_map[MBLOCK_MAP_ENTRY(p)])
 # define MARK_HEAP_ALLOCED(p)	((MBLOCK_MAP_ENTRY(p) < MBLOCK_MAP_SIZE) \
 					&& (mblock_map[MBLOCK_MAP_ENTRY(p)] = 1))
+
+#elif defined(x86_64_TARGET_ARCH)
+/* XXX: This is a HACK, and will not work in general!  We just use the
+ * lower 32 bits of the address, and do the same as for the 32-bit
+ * version.  As long as the OS gives us memory in a roughly linear
+ * fashion, it won't go wrong until we've allocated 4G.  */
+# define MBLOCK_MAP_SIZE	4096
+# define MBLOCK_MAP_ENTRY(p)	(((StgWord)(p) & 0xffffffff) >> MBLOCK_SHIFT)
+# define HEAP_ALLOCED(p)	(mblock_map[MBLOCK_MAP_ENTRY(p)])
+# define MARK_HEAP_ALLOCED(p)	(mblock_map[MBLOCK_MAP_ENTRY(p)] = 1)
+
 
 #else
 # error HEAP_ALLOCED not defined

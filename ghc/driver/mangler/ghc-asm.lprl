@@ -230,6 +230,32 @@ sub init_TARGET_STUFF {
     $T_HDR_direct   = "\.text\n\t\.align 8\n";
 
     #--------------------------------------------------------#
+    } elsif ( $TargetPlatform =~ /^x86_64-.*-linux$/ ) {
+
+    $T_STABBY       = 0; # 1 iff .stab things (usually if a.out format)
+    $T_US           = ''; # _ if symbols have an underscore on the front
+    $T_PRE_APP      = '#';
+    $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
+    $T_POST_LBL     = ':';
+
+    $T_MOVE_DIRVS   = '^(\s*\.(globl|text|data|section|align|size|type|ident|local)\s+.*\n)';
+    $T_COPY_DIRVS   = '\.(globl|local)';
+
+    $T_hsc_cc_PAT   = '\.string.*\)(hsc|cc) (.*)\\\\t(.*)"';
+    $T_DOT_WORD     = '\.(quad|long|value|byte|zero)';
+    $T_DOT_GLOBAL   = '\.global';
+    $T_HDR_literal  = "\.section\t\.rodata\n";
+    $T_HDR_misc     = "\.text\n\t\.align 8\n";
+    $T_HDR_data     = "\.data\n\t\.align 8\n";
+    $T_HDR_consist  = "\.text\n";
+    $T_HDR_closure  = "\.data\n\t\.align 8\n";
+    $T_HDR_srt      = "\.text\n\t\.align 8\n";
+    $T_HDR_info     = "\.text\n\t\.align 8\n";
+    $T_HDR_entry    = "\.text\n\t\.align 8\n";
+    $T_HDR_vector   = "\.text\n\t\.align 8\n";
+    $T_HDR_direct   = "\.text\n\t\.align 8\n";
+
+    #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/ ) {
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -701,6 +727,11 @@ sub mangle_asm {
 			  $p = $` . $';
 			  $r = $& . $r;
 		    }
+
+		} elsif ($TargetPlatform =~ /^x86_64-/) {
+		    $p =~ s/^\tpushq\s+\%r(bx|bp|12|13|14)\n//g;
+		    $p =~ s/^\tmovq\s+\%r(bx|bp|12|13|14),\s*\d*\(\%rsp\)\n//g;
+		    $p =~ s/^\tsubq\s+\$\d+,\s*\%rsp\n//;
 
 		} elsif ($TargetPlatform =~ /^ia64-/) {
 		    $p =~ s/^\t\.prologue .*\n//;

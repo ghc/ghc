@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MachRegs.h,v 1.13 2002/12/11 15:36:37 simonmar Exp $
+ * $Id: MachRegs.h,v 1.14 2003/08/29 16:00:26 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -218,6 +218,47 @@
 #define MAX_REAL_LONG_REG    0
 
 #endif /* iX86 */
+
+/* -----------------------------------------------------------------------------
+  The x86-64 register mapping
+
+  		callee-saves
+  %rax
+  %rbx		YES
+  %rcx
+  %rdx		(seem to be used as arg regs on x86-64)
+  %rsi		(seem to be used as arg regs on x86-64)
+  %rdi		(seem to be used as arg regs on x86-64)
+  %rbp		YES
+  %rsp		(unavailable - stack pointer)
+  %r8
+  %r9
+  %r10
+  %r11		
+  %r12		YES
+  %r13		YES
+  %r14		YES
+  %r15		YES
+  --------------------------------------------------------------------------- */
+
+#if x86_64_TARGET_ARCH
+
+#define REG(x) __asm__("%" #x)
+
+#define REG_Base  rbx
+#define REG_Sp    rbp
+#define REG_Hp    r12
+#define REG_R1    r13
+#define REG_SpLim r14
+#define REG_HpLim r15
+/* ToDo: try R2/R3 instead of SpLim/HpLim? */
+
+#define MAX_REAL_VANILLA_REG 1
+#define MAX_REAL_FLOAT_REG   0
+#define MAX_REAL_DOUBLE_REG  0
+#define MAX_REAL_LONG_REG    0
+
+#endif /* x86_64 */
 
 /* -----------------------------------------------------------------------------
    The Motorola 680x0 register mapping
