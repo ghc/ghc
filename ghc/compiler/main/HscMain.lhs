@@ -28,7 +28,7 @@ import Linker		( HValue, linkExpr )
 import TidyPgm		( tidyCoreExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
-import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, tcRnType ) 
+import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnGetInfo, GetInfoResult, tcRnType ) 
 import RdrName		( rdrNameOcc )
 import OccName		( occNameUserString )
 import Type		( Type )
@@ -697,8 +697,6 @@ hscParseThing parser dflags str
 
 \begin{code}
 #ifdef GHCI
-type GetInfoResult = (String, (IfaceDecl, Fixity, SrcLoc, [(IfaceInst,SrcLoc)]))
-
 hscGetInfo -- like hscStmt, but deals with a single identifier
   :: HscEnv
   -> InteractiveContext		-- Context for compiling
@@ -713,14 +711,10 @@ hscGetInfo hsc_env ic str
 
 	maybe_tc_result <- tcRnGetInfo hsc_env ic rdr_name
 
-	let 	-- str' is the the naked occurrence name
-		-- after stripping off qualification and parens (+)
-	   str' = occNameUserString (rdrNameOcc rdr_name)
-
-	case maybe_tc_result of {
-	     Nothing     -> return [] ;
-	     Just things -> return [(str', t) | t <- things]
- 	}}
+	case maybe_tc_result of
+	     Nothing     -> return []
+	     Just things -> return things
+ 	}
 #endif
 \end{code}
 

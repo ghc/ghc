@@ -48,7 +48,7 @@ module TcMType (
 -- friends:
 import HsSyn		( LHsType )
 import TypeRep		( Type(..), PredType(..), TyNote(..),	 -- Friend; can see representation
-			  Kind, ThetaType
+			  ThetaType
 			) 
 import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  TcTyVarSet, TcKind, TcTyVar, TcTyVarDetails(..), 
@@ -56,7 +56,7 @@ import TcType		( TcType, TcThetaType, TcTauType, TcPredType,
 			  tcCmpPred, isClassPred, 
 			  tcSplitPhiTy, tcSplitPredTy_maybe, tcSplitAppTy_maybe, 
 			  tcSplitTyConApp_maybe, tcSplitForAllTys,
-			  tcIsTyVarTy, tcSplitSigmaTy, tcIsTyVarTy,
+			  tcIsTyVarTy, tcSplitSigmaTy, 
 			  isUnLiftedType, isIPPred, isImmutableTyVar,
 			  typeKind, isFlexi, isSkolemTyVar,
 			  mkAppTy, mkTyVarTy, mkTyVarTys, 

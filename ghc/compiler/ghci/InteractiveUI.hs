@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.192 2005/02/28 16:01:52 simonpj Exp $
+-- $Id: InteractiveUI.hs,v 1.193 2005/03/08 09:47:43 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -18,7 +18,7 @@ import CompManager
 import HscTypes		( GhciMode(..) )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 			  IfaceConDecl(..), IfaceType,
-		   	  IfaceInst(..), pprIfaceDeclHead, pprParendIfaceType,
+		   	  pprIfaceDeclHead, pprParendIfaceType,
 			  pprIfaceForAllPart, pprIfaceType )
 import FunDeps		( pprFundeps )
 import DriverFlags
@@ -509,7 +509,7 @@ info s  = do { let names = words s
      		   vcat (intersperse (text "") (map (showThing exts) stuff)))) }
 
 showThing :: Bool -> GetInfoResult -> SDoc
-showThing exts (wanted_str, (thing, fixity, src_loc, insts)) 
+showThing exts (wanted_str, thing, fixity, src_loc, insts) 
     = vcat [ showWithLoc src_loc (showDecl exts want_name thing),
 	     show_fixity fixity,
 	     vcat (map show_inst insts)]
@@ -520,8 +520,8 @@ showThing exts (wanted_str, (thing, fixity, src_loc, insts))
 	| fix == defaultFixity = empty
 	| otherwise            = ppr fix <+> text wanted_str
 
-    show_inst (iface_inst, loc)
-	= showWithLoc loc (ptext SLIT("instance") <+> ppr (ifInstHead iface_inst))
+    show_inst (inst_ty, loc)
+	= showWithLoc loc (ptext SLIT("instance") <+> ppr inst_ty)
 
 showWithLoc :: SrcLoc -> SDoc -> SDoc
 showWithLoc loc doc 

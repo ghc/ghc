@@ -7,7 +7,8 @@
 module TcRnDriver (
 #ifdef GHCI
 	mkExportEnv, getModuleContents, tcRnStmt, 
-	tcRnGetInfo, tcRnExpr, tcRnType,
+	tcRnGetInfo, GetInfoResult,
+	tcRnExpr, tcRnType,
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -99,14 +100,15 @@ import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType,
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
 import Inst		( tcStdSyntaxName, tcGetInstEnvs )
-import InstEnv		( classInstances, instEnvElts )
+import InstEnv		( DFunId, classInstances, instEnvElts )
 import RnExpr		( rnStmts, rnLExpr )
 import RnNames		( exportsToAvails )
 import LoadIface	( loadSrcInterface, ifaceInstGates )
 import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..), 
 			  IfaceExtName(..), IfaceConDecls(..), IfaceInst(..),
 			  tyThingToIfaceDecl, dfunToIfaceInst )
-import IfaceType	( IfaceTyCon(..), interactiveExtNameFun, isLocalIfaceExtName )
+import IfaceType	( IfaceTyCon(..), IfaceType, toIfaceType, 
+			  interactiveExtNameFun, isLocalIfaceExtName )
 import IfaceEnv		( lookupOrig )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId, setIdType, globalIdDetails )
@@ -119,6 +121,7 @@ import SrcLoc		( interactiveSrcLoc, unLoc )
 import Kind		( Kind )
 import Var		( globaliseId )
 import Name		( nameOccName )
+import OccName		( occNameUserString )
 import NameEnv		( delListFromNameEnv )
 import PrelNames	( iNTERACTIVE, ioTyConName, printName, monadNames, itName, returnIOName )
 import HscTypes		( InteractiveContext(..), HomeModInfo(..), typeEnvElts, typeEnvClasses,
@@ -1142,12 +1145,15 @@ noRdrEnvErr mod = ptext SLIT("No top-level environment available for module")
 \end{code}
 
 \begin{code}
+type GetInfoResult = (String, IfaceDecl, Fixity, SrcLoc, 
+			      [(IfaceType,SrcLoc)]	-- Instances
+		     )
+
 tcRnGetInfo :: HscEnv
 	    -> InteractiveContext
 	    -> RdrName
-	    -> IO (Maybe [(IfaceDecl, 
-			   Fixity, SrcLoc, 
-			   [(IfaceInst, SrcLoc)])])
+	    -> IO (Maybe [GetInfoResult])
+
 -- Used to implemnent :info in GHCi
 --
 -- Look up a RdrName and return all the TyThings it might be
@@ -1189,9 +1195,17 @@ tcRnGetInfo hsc_env ictxt rdr_name
 	-- their parent declaration
     let { do_one name = do { thing  <- tcLookupGlobal name
 		           ; fixity <- lookupFixityRn name
-			   ; insts  <- lookupInsts ext_nm thing
-		           ; return (toIfaceDecl ext_nm thing, fixity, 
-				     getSrcLoc thing, insts) } } ;
+			   ; dfuns  <- lookupInsts ext_nm thing
+		           ; return (str, toIfaceDecl ext_nm thing, fixity, 
+				     getSrcLoc thing, 
+				     [(toIfaceType ext_nm (idType dfun), getSrcLoc dfun) | dfun <- dfuns]
+			     ) } 
+		where
+		 	-- str is the the naked occurrence name
+			-- after stripping off qualification and parens (+)
+		  str = occNameUserString (nameOccName name)
+	} ;
+
 		-- For the SrcLoc, the 'thing' has better info than
 		-- the 'name' because getting the former forced the
 		-- declaration to be loaded into the cache
@@ -1200,20 +1214,20 @@ tcRnGetInfo hsc_env ictxt rdr_name
     return (fst (removeDups cmp results))
     }
   where
-    cmp (d1,_,_,_) (d2,_,_,_) = ifName d1 `compare` ifName d2
+    cmp (_,d1,_,_,_) (_,d2,_,_,_) = ifName d1 `compare` ifName d2
     ext_nm = interactiveExtNameFun (icPrintUnqual ictxt)
 
 
-lookupInsts :: (Name -> IfaceExtName) -> TyThing -> TcM [(IfaceInst, SrcLoc)]
+lookupInsts :: (Name -> IfaceExtName) -> TyThing -> TcM [DFunId]
 -- Filter the instances by the ones whose tycons (or clases resp) 
 -- are in scope unqualified.  Otherwise we list a whole lot too many!
 lookupInsts ext_nm (AClass cls)
   = do	{ loadImportedInsts cls []	-- [] means load all instances for cls
 	; inst_envs <- tcGetInstEnvs
-	; return [ (inst, getSrcLoc dfun)
+	; return [ dfun
 		 | (_,_,dfun) <- classInstances inst_envs cls
-		 , let inst = dfunToIfaceInst ext_nm dfun
-		       (_, tycons) = ifaceInstGates (ifInstHead inst)
+		 , let (_, tycons) = ifaceInstGates (ifInstHead (dfunToIfaceInst ext_nm dfun))
+			-- Rather an indirect/inefficient test, but there we go
 		 , all print_tycon_unqual tycons ] }
   where
     print_tycon_unqual (IfaceTc nm) = isLocalIfaceExtName nm
@@ -1227,11 +1241,10 @@ lookupInsts ext_nm (ATyCon tc)
 	; mapM_ (\c -> loadImportedInsts c [])
 		(typeEnvClasses (eps_PTE eps))
 	; (pkg_ie, home_ie) <- tcGetInstEnvs	-- Search all
-	; return [ (inst, getSrcLoc dfun)
+	; return [ dfun
 		 | (_, _, dfun) <- instEnvElts home_ie ++ instEnvElts pkg_ie
 		 , relevant dfun
-		 , let inst     = dfunToIfaceInst ext_nm dfun
-		       (cls, _) = ifaceInstGates (ifInstHead inst)
+		 , let (cls, _) = ifaceInstGates (ifInstHead (dfunToIfaceInst ext_nm dfun))
 		 , isLocalIfaceExtName cls ]  }
   where
     relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
