@@ -727,7 +727,7 @@ binary-dist-pre::
 	-rm -rf $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)
 	-rm -f $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME).tar.gz
 	@for i in $(BIN_DIST_DIRS); do 		 	 \
-	  if (test -d "$$i"); then 			 \
+	  if test -d "$$i"; then 			 \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
 	   $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/bin/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
 	   echo $(MKDIRHIER) $(BIN_DIST_TMPDIR)/$(BIN_DIST_NAME)/lib/$(TARGETPLATFORM)/$(ProjectNameShort)-$(ProjectVersion); \
