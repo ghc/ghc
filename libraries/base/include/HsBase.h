@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.5 2002/03/26 10:53:03 simonmar Exp $
+ * $Id: HsBase.h,v 1.6 2002/03/26 23:50:56 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -68,7 +68,7 @@
 #ifdef HAVE_SYS_TIMES_H
 #include <sys/times.h>
 #endif
-#ifdef HAVE_WINSOCK_H
+#if defined(HAVE_WINSOCK_H) && defined(__MINGW32__)
 #include <winsock.h>
 #endif
 #ifdef HAVE_LIMITS_H
@@ -98,7 +98,7 @@
 #include "dirUtils.h"
 #include "errUtils.h"
 
-#ifdef _WIN32
+#if defined(__MINGW32__)
 #include <io.h>
 #include <fcntl.h>
 #include "timeUtils.h"
@@ -343,7 +343,7 @@ __hscore_seek_end( void )
 INLINE HsInt
 __hscore_setmode( HsInt fd, HsBool toBin )
 {
-#ifdef _WIN32
+#if defined(__MINGW32__)
   return setmode(fd,(toBin == HS_BOOL_TRUE) ? _O_BINARY : _O_TEXT);
 #else
   return 0;
@@ -354,7 +354,7 @@ INLINE HsInt
 __hscore_PrelHandle_write( HsInt fd, HsBool isSock, HsAddr ptr, 
 			   HsInt off, int sz )
 {
-#ifdef _WIN32
+#if defined(__MINGW32__)
   if (isSock) {
     return send(fd,ptr + off, sz, 0);
   }
@@ -366,7 +366,7 @@ INLINE HsInt
 __hscore_PrelHandle_read( HsInt fd, HsBool isSock, HsAddr ptr, 
 			  HsInt off, int sz )
 {
-#ifdef _WIN32
+#if defined(__MINGW32__)
   if (isSock) {
     return recv(fd,ptr + off, sz, 0);
   }
@@ -375,7 +375,7 @@ __hscore_PrelHandle_read( HsInt fd, HsBool isSock, HsAddr ptr,
 
 }
 
-#ifdef mingw32_TARGET_OS
+#if defined(__MINGW32__)
 INLINE long *
 __hscore_Time_ghcTimezone( void ) { return &_timezone; }
 
@@ -386,7 +386,7 @@ __hscore_Time_ghcTzname( void ) { return _tzname; }
 INLINE HsInt
 __hscore_mkdir( HsAddr pathName, HsInt mode )
 {
-#if defined(mingw32_TARGET_OS)
+#if defined(__MINGW32__)
   return mkdir(pathName);
 #else
   return mkdir(pathName,mode);
