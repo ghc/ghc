@@ -14,7 +14,6 @@ module HscMain ( HscResult(..), hscMain,
 
 #ifdef GHCI
 import RdrHsSyn		( RdrNameHsExpr )
-import CoreToStg	( coreToStgExpr )
 import StringBuffer	( stringToStringBuffer, freeStringBuffer )
 import Unique		( Uniquable(..) )
 import Type		( splitTyConApp_maybe )
@@ -40,7 +39,8 @@ import Desugar
 import SimplCore
 import CoreUtils	( coreBindsSize )
 import CoreTidy		( tidyCorePgm )
-import CoreToStg	( topCoreBindsToStg )
+import CoreSat
+import CoreToStg	( coreToStg, coreExprToStg )
 import StgSyn		( collectFinalStgBinders )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
@@ -138,8 +138,11 @@ hscMain ghci_mode dflags source_unchanged location maybe_old_iface hst hit pcs
 -- we definitely expect to have the old interface available
 hscNoRecomp ghci_mode dflags location (Just old_iface) hst hit pcs_ch
  | ghci_mode == OneShot
- = let bomb = panic "hscNoRecomp:OneShot"
-   in  return (HscNoRecomp pcs_ch bomb bomb)
+ = do {
+      hPutStrLn stderr "compilation IS NOT required";
+      let bomb = panic "hscNoRecomp:OneShot";
+      return (HscNoRecomp pcs_ch bomb bomb)
+      }
  | otherwise
  = do {
       hPutStr stderr "compilation IS NOT required";
@@ -174,7 +177,7 @@ hscRecomp ghci_mode dflags location maybe_checked_iface hst hit pcs_ch
       	; when (verbosity dflags >= 1) $
 		hPutStr stderr "compilation IS required";
 	  -- mode -v1 tries to keep everything on one line
-	  when (verbosity dflags /= 1) $
+	  when (verbosity dflags > 1) $
 		hPutStrLn stderr "";
 
       	  -- what target are we shooting for?
@@ -341,19 +344,23 @@ restOfCodeGeneration dflags toInterp this_mod imported_module_names cost_centre_
 
 
 dsThenSimplThenTidy dflags pcs hst this_mod print_unqual is_exported tc_result
- = do --------------------------  Desugaring ----------------
+ = do ------------------  Desugaring ---------------------------------
       -- _scc_     "DeSugar"
       (desugared, rules, h_code, c_code, fe_binders) 
          <- deSugar dflags pcs hst this_mod print_unqual tc_result
 
-      --------------------------  Main Core-language transformations ----------------
+      ------------------  Main Core-language transformations ---------
       -- _scc_     "Core2Core"
       (simplified, orphan_rules) 
          <- core2core dflags pcs hst is_exported desugared rules
 
+      -- Do saturation and convert to A-normal form
+      --    NOTE: future passes cannot transform the syntax, only annotate it
+      saturated <- coreSatPgm dflags simplified
+
       -- Do the final tidy-up
       (pcs', tidy_binds, tidy_orphan_rules) 
-         <- tidyCorePgm dflags this_mod pcs simplified orphan_rules
+         <- tidyCorePgm dflags this_mod pcs saturated orphan_rules
       
       return (pcs', tidy_binds, tidy_orphan_rules, (fe_binders,h_code,c_code))
 
@@ -366,7 +373,7 @@ myCoreToStg dflags this_mod tidy_binds
       -- thoroughout code generation
 
       -- _scc_     "Core2Stg"
-      stg_binds <- topCoreBindsToStg dflags this_mod tidy_binds
+      stg_binds <- coreToStg dflags this_mod tidy_binds
 
       -- _scc_     "Stg2Stg"
       (stg_binds2, cost_centre_info) <- stg2stg dflags this_mod stg_binds
@@ -445,10 +452,13 @@ hscExpr dflags hst hit pcs0 this_module expr
 		-- Simplify it
 	simpl_expr <- simplifyExpr dflags pcs2 hst ds_expr;
 
-		-- Convert to STG
-	stg_expr <- coreToStgExpr dflags simpl_expr;
+		-- Saturate it
+	sat_expr <- coreSatExpr dflags simpl_expr;
 
-		-- ToDo: need to do StgVarInfo?  or SRTs?
+		-- Convert to STG
+	stg_expr <- coreToStgExpr dflags sat_expr;
+
+		-- ToDo: need to do SRTs?
 
 		-- Convert to InterpSyn
 	unlinked_iexpr <- stgExprToInterpSyn dflags stg_expr;
