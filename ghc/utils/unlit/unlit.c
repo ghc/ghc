@@ -75,6 +75,8 @@ static int crunchnl = 0; /* don't print \n for removed lines                 */
 static int leavecpp = 1; /* leave preprocessor lines */
 static int ignore_shebang = 1; /* Leave out shebang (#!) lines */
 
+static char* prefix_str = NULL; /* Prefix output with a string */
+
 /* complain(file,line,what)
  *
  * print error message `what' for `file' at `line'.  The error is suppressed
@@ -302,7 +304,16 @@ char **argv; {
             noisy = 0;
         else if (strcmp(*argv,"-c")==0)
 	    crunchnl = 1;
-        else if (strcmp(*argv,"-#")==0)
+        else if (strcmp(*argv,"-h")==0) {
+	  if (argc > 1) {
+	    argc--; argv++;
+	    if (prefix_str) 
+	      free(prefix_str);
+	    prefix_str = (char*)malloc(sizeof(char)*(1+strlen(*argv)));
+	    if (prefix_str) 
+	      strcpy(prefix_str, *argv);
+	  }
+        } else if (strcmp(*argv,"-#")==0)
 	    ignore_shebang = 0;
         else
             break;
@@ -335,6 +346,11 @@ char **argv; {
             fprintf(stderr, CANNOTOPEN, argv[1]);
             exit(1);
         }
+
+    /* Prefix the output with line pragmas */
+    if (prefix_str) {
+      fprintf(ostream, "# 1 \"%s\"\n{-# LINE 1 \"%s\" #-}\n", prefix_str, prefix_str);
+    }
 
     unlit(file, istream, ostream);
 
