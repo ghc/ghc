@@ -174,7 +174,7 @@ convertFromRBH(closure)  /* The corresponding function in GUM is: */
 P_ closure;
 {
     P_ ip = (P_) INFO_PTR(closure);
-    P_ bqe, rbh_save = Prelude_Z91Z93_closure;
+    P_ bqe, rbh_save = PrelBase_Z91Z93_closure;
     int isSpec;
 #if defined(GCap) || defined(GCgn)    
     rtsBool linked = IS_MUTABLE(ip) && MUT_LINK(closure) != MUT_NOT_LINKED;
@@ -236,7 +236,7 @@ P_ closure;
     }
 
     /* Put data from special RBH save closures back into the closure */
-    if ( rbh_save == Prelude_Z91Z93_closure ) {
+    if ( rbh_save == PrelBase_Z91Z93_closure ) {
       fprintf(stderr,"convertFromRBH: No RBH_Save_? closure found at end of BQ!\n");
       EXIT(EXIT_FAILURE);
     } else {

@@ -263,33 +263,33 @@ Manager's requirements.
 #endif
 
 #ifdef CONCURRENT
-    AvailableStack = AvailableTSO = Prelude_Z91Z93_closure;
+    AvailableStack = AvailableTSO = PrelBase_Z91Z93_closure;
 # if defined(GRAN)                                                 /* HWL */
     /* Moved in here from ScheduleThreads, to handle a restart_main 
        (because of a signal) properly. */
     for (i=0; i<RTSflags.GranFlags.proc; i++) 
       {
-        RunnableThreadsHd[i] = RunnableThreadsTl[i] = Prelude_Z91Z93_closure;
-	WaitThreadsHd[i] = WaitThreadsTl[i] = Prelude_Z91Z93_closure;
+        RunnableThreadsHd[i] = RunnableThreadsTl[i] = PrelBase_Z91Z93_closure;
+	WaitThreadsHd[i] = WaitThreadsTl[i] = PrelBase_Z91Z93_closure;
         PendingSparksHd[i][REQUIRED_POOL] = PendingSparksHd[i][ADVISORY_POOL] = 
         PendingSparksTl[i][REQUIRED_POOL] = PendingSparksTl[i][ADVISORY_POOL] = 
             NULL; 
       }
 # else
-    RunnableThreadsHd = RunnableThreadsTl = Prelude_Z91Z93_closure;
-    WaitingThreadsHd = WaitingThreadsTl = Prelude_Z91Z93_closure;
+    RunnableThreadsHd = RunnableThreadsTl = PrelBase_Z91Z93_closure;
+    WaitingThreadsHd = WaitingThreadsTl = PrelBase_Z91Z93_closure;
     PendingSparksHd[REQUIRED_POOL] = 
       PendingSparksTl[REQUIRED_POOL] = PendingSparksBase[REQUIRED_POOL];
     PendingSparksHd[ADVISORY_POOL] = 
       PendingSparksTl[ADVISORY_POOL] = PendingSparksBase[ADVISORY_POOL];
 # endif
 
-    CurrentTSO = Prelude_Z91Z93_closure;
+    CurrentTSO = PrelBase_Z91Z93_closure;
 
 # ifdef PAR
     RunParallelSystem(TopClosure);
 # else
-    STKO_LINK(MainStkO) = Prelude_Z91Z93_closure;
+    STKO_LINK(MainStkO) = PrelBase_Z91Z93_closure;
     ScheduleThreads(TopClosure);
 # endif	/* PAR */
 

@@ -1282,10 +1282,10 @@ char *type;
      *size = *ptrs = *nonptrs = *vhs = 0; 
      strcpy(type,"ERROR in get_closure_info");
      return;
-   } else if (closure==Prelude_Z91Z93_closure) {
-     /* fprintf(stderr, "Qagh {get_closure_info}Daq: Prelude_Z91Z93_closure closure\n"); */
+   } else if (closure==PrelBase_Z91Z93_closure) {
+     /* fprintf(stderr, "Qagh {get_closure_info}Daq: PrelBase_Z91Z93_closure closure\n"); */
      *size = *ptrs = *nonptrs = *vhs = 0; 
-     strcpy(type,"Prelude_Z91Z93_closure");
+     strcpy(type,"PrelBase_Z91Z93_closure");
      return;
    };
 

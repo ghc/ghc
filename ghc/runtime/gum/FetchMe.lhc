@@ -41,7 +41,7 @@ STGFUN(FetchMe_entry)
     rGA = FETCHME_GA(Node);
     ASSERT(rGA->loc.gc.gtid != mytid);
 
-    TSO_LINK(CurrentTSO) = Prelude_Z91Z93_closure;
+    TSO_LINK(CurrentTSO) = PrelBase_Z91Z93_closure;
     SET_INFO_PTR(Node, FMBQ_info);
     FMBQ_ENTRIES(Node) = (W_) CurrentTSO;
 

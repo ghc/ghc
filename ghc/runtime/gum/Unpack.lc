@@ -56,7 +56,7 @@ CommonUp(P_ src, P_ dst)
 	bqe = (P_) GEN_RBH_BQ(src);
 	break;
     case INFO_FETCHME_TYPE:
-	bqe = Prelude_Z91Z93_closure;
+	bqe = PrelBase_Z91Z93_closure;
 	break;
     case INFO_FMBQ_TYPE:
 	bqe = (P_) FMBQ_ENTRIES(src);
