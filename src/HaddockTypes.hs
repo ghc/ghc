@@ -28,6 +28,10 @@ data Interface
 	iface_env :: NameEnv,
 		-- ^ environment mapping names to *original* names
 
+	iface_sub :: FiniteMap HsName [HsName],
+		-- ^ maps names to "subordinate" names 
+		-- (eg. tycon to constrs & fields, class to methods)
+
 	iface_exports :: [ExportItem],
 		-- ^ the exports used to construct the documentation 
 

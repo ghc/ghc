@@ -8,8 +8,8 @@
 module HaddockUtil (
 
   -- * Misc utilities
-  nameOfQName, collectNames, declBinders, declMainBinder, splitTyConApp,
-  restrictTo, declDoc, parseModuleHeader, freeTyCons, unbang,
+  nameOfQName, collectNames, declBinders, declMainBinder, declSubBinders, 
+  splitTyConApp, restrictTo, declDoc, parseModuleHeader, freeTyCons, unbang,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -26,6 +26,7 @@ import HsSyn
 
 import FiniteMap
 import List	( intersect )
+import Maybe
 import IO	( hPutStr, stderr )
 import System
 import RegexString
@@ -44,6 +45,8 @@ collectNames ds = concat (map declBinders ds)
 unbang (HsUnBangedTy ty) = ty
 unbang (HsBangedTy   ty) = ty
 
+declBinders d = maybeToList (declMainBinder d) ++ declSubBinders d
+
 declMainBinder :: HsDecl -> Maybe HsName
 declMainBinder d = 
    case d of
@@ -56,15 +59,15 @@ declMainBinder d =
      HsForeignImport _ _ _ _ n _ _ -> Just n
      _                             -> Nothing
 
-declBinders :: HsDecl -> [HsName]
-declBinders d =
+declSubBinders :: HsDecl -> [HsName]
+declSubBinders d =
    case d of
-     HsTypeDecl _ n _ _ _          -> [n]
-     HsDataDecl _ _ n _ cons _ _   -> n : concat (map conDeclBinders cons)
-     HsNewTypeDecl _ _ n _ con _ _ -> n : conDeclBinders con
-     HsClassDecl _ _ n _ _ decls _ -> n : collectNames decls
-     HsTypeSig _ ns _ _            -> ns
-     HsForeignImport _ _ _ _ n _ _ -> [n]
+     HsTypeDecl _ n _ _ _          -> []
+     HsDataDecl _ _ n _ cons _ _   -> concat (map conDeclBinders cons)
+     HsNewTypeDecl _ _ n _ con _ _ -> conDeclBinders con
+     HsClassDecl _ _ n _ _ decls _ -> collectNames decls
+     HsTypeSig _ ns _ _            -> []
+     HsForeignImport _ _ _ _ n _ _ -> []
      _                             -> []
 
 conDeclBinders (HsConDecl _ n _ _ _ _) = [n]

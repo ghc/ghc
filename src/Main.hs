@@ -57,6 +57,7 @@ usage = usageInfo "usage: haddock [OPTION] file...\n" options
 data Flag
   = Flag_Verbose
   | Flag_DocBook
+  | Flag_Debug
   | Flag_Html
   | Flag_Heading String
   | Flag_Prologue FilePath
@@ -73,6 +74,8 @@ options =
   [ 
     Option ['d']  ["docbook"]  (NoArg Flag_DocBook)
 	"output in docbook (SGML)",
+    Option ['D']  ["debug"]  (NoArg Flag_Debug)
+	"extra debugging output",
     Option ['h']  ["html"]     (NoArg Flag_Html)
 	"output in HTML",
     Option ['o']  ["odir"]     (ReqArg Flag_OutputDir "DIR")
@@ -168,6 +171,11 @@ run flags files = do
 
   let inst_maps = collectInstances these_mod_ifaces
 
+  when (Flag_Debug `elem` flags) $ do
+    mapM_ putStrLn (map show [ (mod, fmToList (iface_env i), 
+				     fmToList (iface_sub i))
+			     | (mod, i) <-  these_mod_ifaces ])
+
   when (Flag_Html `elem` flags) $
     ppHtml title source_url these_mod_ifaces odir css_file 
 	libdir inst_maps prologue
@@ -180,8 +188,9 @@ run flags files = do
 	put_ bh prepared_ifaces
 	writeBinMem bh fn
       where
-	prepared_ifaces = [ (mod, fmToList (iface_env iface))
-		          | (mod, iface) <- these_mod_ifaces ]
+	prepared_ifaces = 
+	  [ (mod, fmToList (iface_env iface), fmToList (iface_sub iface))
+	  | (mod, iface) <- these_mod_ifaces ]
 
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
@@ -195,10 +204,11 @@ readIface filename = do
   stuff <- get bh
   return (map to_interface stuff)
  where 
-   to_interface (mod, env) = 
+   to_interface (mod, env, sub) = 
 	  (mod, Interface { 
 		   iface_filename     = "",
 		   iface_env          = listToFM env,
+		   iface_sub	      = listToFM sub,
 		   iface_exports      = [],
 		   iface_orig_exports = [],
 		   iface_insts	      = [],
@@ -262,8 +272,12 @@ mkInterface no_implicit_prelude mod_map filename
 		Nothing      -> return []
 
   let
+     -- expand type signatures with multiple variables into multiple
+     -- type signatures
+     expanded_decls = concat (map expandDecl decls)
+
      -- first, attach documentation to declarations
-     annotated_decls = collectDoc decls
+     annotated_decls = collectDoc expanded_decls
 
      -- now find the defined names
      locally_defined_names = collectNames annotated_decls
@@ -293,14 +307,11 @@ mkInterface no_implicit_prelude mod_map filename
      (orig_decls, missing_names2)
 	= runRnFM orig_env (mapM renameDecl annotated_decls)
 
-     orig_decl_map :: FiniteMap HsName HsDecl
-     orig_decl_map = listToFM [ (n,d) | d <- orig_decls, n <- declBinders d ]
-
      -- gather up a list of entities that are exported (original names)
      (exported_names, exported_visible_names)
-	 = exportedNames mod mod_map orig_decls
-			locally_defined_names orig_exports
-			orig_decl_map options
+	 = exportedNames mod mod_map
+			locally_defined_names orig_env
+			orig_exports options
 
      -- build the import env, which maps original names to import names
      local_import_env = listToFM (zip qual_local_names qual_local_names)
@@ -309,7 +320,7 @@ mkInterface no_implicit_prelude mod_map filename
 			implicit_imps
 
   let
-     final_decls = concat (map expandDecl orig_decls)
+     final_decls = orig_decls
 
      decl_map :: FiniteMap HsName HsDecl
      decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
@@ -357,6 +368,7 @@ mkInterface no_implicit_prelude mod_map filename
 		   iface_filename     = filename,
 		   iface_env          = name_env,
 		   iface_exports      = renamed_export_list,
+		   iface_sub	      = mkSubNames final_decls,
 		   iface_orig_exports = pruned_export_list,
 		   iface_insts	      = instances,
 		   iface_decls        = decl_map,
@@ -507,37 +519,49 @@ pruneExportItems items = filter has_doc items
 	has_doc _ = True
 
 -- -----------------------------------------------------------------------------
+-- Make a sub-name map for this module
+
+mkSubNames :: [HsDecl] -> FiniteMap HsName [HsName]
+mkSubNames decls = 
+  listToFM [ (n, subs) | d <- decls, 
+		         Just n <- [declMainBinder d],
+			 subs@(_:_) <- [declSubBinders d] ]
+
+-- -----------------------------------------------------------------------------
 -- Gather a list of original names exported from this module
 
-exportedNames :: Module -> ModuleMap -> [HsDecl] -> [HsName]
+exportedNames :: Module -> ModuleMap -> [HsName]
+	-> FiniteMap HsQName HsQName
 	-> Maybe [HsExportSpec]
-	-> FiniteMap HsName HsDecl
 	-> [DocOption]
 	-> ([HsQName], [HsQName])
 
-exportedNames mod mod_map decls local_names maybe_exps decl_map options
+exportedNames mod mod_map local_names orig_env maybe_exps options
   | Nothing <- maybe_exps 	    = all_local_names_pr
   | OptIgnoreExports `elem` options = all_local_names_pr
   | Just expspecs <- maybe_exps     = 
-	(concat (map extract expspecs), concat (map extract_vis expspecs))
+	(concat (map extract expspecs), 
+	 concat (map extract_vis expspecs))
  where
   all_local_names = map (Qual mod) local_names
   all_local_names_pr = (all_local_names,all_local_names)
+
+  in_scope = eltsFM orig_env
 
   extract e = 
    case e of
     HsEVar x -> [x]
     HsEAbs t -> [t]
-    HsEThingAll t
-	|  Just decl <- export_lookup t 
-	-> t : map (Qual t_mod) (declBinders decl)
-	where t_mod = case t of Qual m _ -> m; otherwise -> mod
+    HsEThingAll t@(Qual m _) -> 
+	t : filter (`elem` in_scope) (
+		map (Qual m) (all_subs_of_qname mod_map t)
+	     )
     HsEThingWith t cs -> t : cs
     HsEModuleContents m
 	| m == mod  -> map (Qual mod) local_names
 	| otherwise ->
 	  case lookupFM mod_map m of
-	    Just iface -> eltsFM (iface_env iface)
+	    Just iface -> filter (`elem` in_scope) (eltsFM (iface_env iface))
 	    Nothing    -> trace ("Warning: module not found: " ++ show m) $ []
     _ -> []
 
@@ -551,22 +575,22 @@ exportedNames mod mod_map decls local_names maybe_exps decl_map options
 	| otherwise ->
 	  case lookupFM mod_map m of
 	    Just iface
-		| OptHide `elem` iface_options iface -> eltsFM (iface_env iface)
+		| OptHide `elem` iface_options iface ->
+			filter (`elem` in_scope) (eltsFM (iface_env iface))
 		| otherwise -> []
 	    Nothing
 		-> trace ("Warning: module not found: " ++ show m) $ []
     _ -> extract e
 
-  export_lookup :: HsQName -> Maybe HsDecl
-  export_lookup (UnQual n)
-	= trace ("Warning(exportedNames): UnQual! " ++ show n) $ Nothing
-  export_lookup (Qual m n)
-	| m == mod  = lookupFM decl_map n
-	| otherwise
-	    = case lookupFM mod_map m of
-		Just iface -> lookupFM (iface_decls iface) n
-		Nothing    -> trace ("Warning: module not found: " ++ show m) 
-				Nothing
+
+-- for a given entity, find all the names it "owns" (ie. all the
+-- constructors and field names of a tycon, or all the methods of a
+-- class).
+all_subs_of_qname :: ModuleMap -> HsQName -> [HsName]
+all_subs_of_qname mod_map (Qual mod nm) =
+  case lookupFM mod_map mod of
+	Just iface -> lookupWithDefaultFM (iface_sub iface) [] nm
+	Nothing -> []
 
 -- -----------------------------------------------------------------------------
 -- Building name environments
@@ -575,22 +599,58 @@ buildOrigEnv :: ModuleMap -> [HsImportDecl] -> FiniteMap HsQName HsQName
 buildOrigEnv mod_map imp_decls
   = foldr plusFM emptyFM (map build imp_decls)
   where
-  build (HsImportDecl _ mod qual maybe_as _)
+  build (HsImportDecl _ mod qual maybe_as spec)
     = case lookupFM mod_map mod of
        Nothing -> 
 	  trace ("Warning: module not found: " ++ show mod) $ emptyFM
        Just iface -> 
-	  listToFM (concat (map orig_map (fmToList (iface_env iface))))
-    where
+	  case spec of
+		-- no import specs
+	    Nothing -> import_everything
+		-- hiding
+	    Just (True, specs) -> 
+		import_everything `minusFM` 
+			listToFM (concat (map names_from_spec specs))
+		-- not hiding
+	    Just (False, specs) -> listToFM (concat (map names_from_spec specs))
+        where
+        import_everything = listToFM (concat (map orig_map (fmToList env)))
+
 	-- bring both qualified and unqualified names into scope, unless
 	-- the import was 'qualified'.
 	orig_map (nm,qnm)
 	  | qual      = [ (Qual qual_module nm, qnm) ]
-	  | otherwise = [ (UnQual nm, qnm), (Qual qual_module nm, qnm) ]
+	  | otherwise = [ (Qual qual_module nm, qnm), (UnQual nm, qnm) ]
 
         qual_module
 	  | Just m <- maybe_as = m
 	  | otherwise          = mod
+
+	env = iface_env iface
+
+	names_from_spec :: HsImportSpec -> [(HsQName,HsQName)]
+	names_from_spec (HsIVar nm) = one_name nm
+	names_from_spec (HsIAbs nm) = one_name nm
+	names_from_spec (HsIThingAll nm) = one_name nm ++ get_sub_names nm
+	names_from_spec (HsIThingWith nm nms) =
+	  one_name nm ++ concat (map one_name (
+				filter (`elem` nms) (sub_names nm)))
+
+	sub_names :: HsName -> [HsName]
+	sub_names nm =
+	  case lookupFM env nm of
+	    Just qnm -> filter (`elemFM` env) (all_subs_of_qname mod_map qnm)
+	    _ -> []
+
+	get_sub_names = concat . map one_name . sub_names
+
+	one_name :: HsName -> [(HsQName,HsQName)]
+	one_name nm = 
+	   case lookupFM env nm of
+		Nothing ->  trace ("Warning: " ++ show mod
+				    ++ " does not export " ++ show nm) []
+		Just qnm -> orig_map (nm,qnm)
+
 
 buildImportEnv :: ModuleMap -> Module -> [HsQName] -> [HsImportDecl]
 	-> FiniteMap HsQName HsQName
