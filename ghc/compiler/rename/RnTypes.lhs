@@ -558,7 +558,7 @@ sectionPrecErr op arg_op section
 
 infixTyConWarn op
   = vcat [ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op),
-	  ftext FSLIT("Use -fglasgow-exts to avoid this warning"))
+	  ftext FSLIT("Use -fglasgow-exts to avoid this warning")]
 
 patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
