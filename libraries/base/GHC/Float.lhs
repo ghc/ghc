@@ -164,14 +164,14 @@ instance  RealFrac Float  where
 
     {-# SPECIALIZE properFraction :: Float -> (Int, Float) #-}
     {-# SPECIALIZE round    :: Float -> Int #-}
-    {-# SPECIALIZE ceiling  :: Float -> Int #-}
-    {-# SPECIALIZE floor    :: Float -> Int #-}
 
-    {-# SPECIALIZE properFraction :: Float -> (Integer, Float) #-}
-    {-# SPECIALIZE truncate :: Float -> Integer #-}
+    {-# SPECIALIZE properFraction :: Float  -> (Integer, Float) #-}
     {-# SPECIALIZE round    :: Float -> Integer #-}
-    {-# SPECIALIZE ceiling  :: Float -> Integer #-}
-    {-# SPECIALIZE floor    :: Float -> Integer #-}
+
+	-- ceiling, floor, and truncate are all small
+    {-# INLINE ceiling #-}
+    {-# INLINE floor #-}
+    {-# INLINE truncate #-}
 
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
@@ -328,14 +328,14 @@ instance  RealFrac Double  where
 
     {-# SPECIALIZE properFraction :: Double -> (Int, Double) #-}
     {-# SPECIALIZE round    :: Double -> Int #-}
-    {-# SPECIALIZE ceiling  :: Double -> Int #-}
-    {-# SPECIALIZE floor    :: Double -> Int #-}
 
     {-# SPECIALIZE properFraction :: Double -> (Integer, Double) #-}
-    {-# SPECIALIZE truncate :: Double -> Integer #-}
     {-# SPECIALIZE round    :: Double -> Integer #-}
-    {-# SPECIALIZE ceiling  :: Double -> Integer #-}
-    {-# SPECIALIZE floor    :: Double -> Integer #-}
+
+	-- ceiling, floor, and truncate are all small
+    {-# INLINE ceiling #-}
+    {-# INLINE floor #-}
+    {-# INLINE truncate #-}
 
     properFraction x
       = case (decodeFloat x)      of { (m,n) ->
