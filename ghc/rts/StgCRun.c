@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.35 2002/06/07 09:40:10 matthewc Exp $
+ * $Id: StgCRun.c,v 1.36 2002/06/13 21:14:51 wolfgang Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -483,7 +483,7 @@ static void StgRunIsImplementedInAssembler(void)
 		"\tla r1,8480(r1)\n"
 		"\tlmw r14,-216(r1)\n"
 		"\tb restFP # f14\n"
-	);
+	);	/* RESERVED_C_STACK_BYTES + stack frame size == 8192 + 288 == 8480 */
 }
 
 #endif
