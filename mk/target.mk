@@ -806,13 +806,6 @@ install:: $(INSTALL_INCLUDES)
 endif
 
 ifneq "$(INSTALL_DOCS)" ""
-ifneq "$(SGMLDocWays)" ""
-install-docs:: $(INSTALL_DOCS)
-	@$(INSTALL_DIR) $(datadir)	
-	for i in $(INSTALL_DOCS); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
-	done
-endif
 ifneq "$(XMLDocWays)" ""
 install-docs:: $(INSTALL_DOCS)
 	@$(INSTALL_DIR) $(datadir)	
@@ -839,23 +832,6 @@ install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-
 		if [ $$i = "html-no-chunks" ]; then \
 			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
 			$(CP) $(FPTOOLS_CSS_ABS) $(datadir); \
-		fi \
-	done
-endif
-endif
-
-ifneq "$(INSTALL_SGML_DOC)" ""
-ifneq "$(SGMLDocWays)" ""
-install-docs:: $(foreach i,$(SGMLDocWays),$(INSTALL_SGML_DOC).$i)
-	@$(INSTALL_DIR) $(datadir)	
-	@for i in $(SGMLDocWays); do \
-		if [ $$i = "html" ]; then \
-			$(INSTALL_DIR) $(datadir)/html; \
-			echo $(CP) -r $(INSTALL_SGML_DOC) $(datadir)/html; \
-			$(CP) -r $(INSTALL_SGML_DOC) $(datadir)/html; \
-		else \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$i $(datadir); \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$i $(datadir); \
 		fi \
 	done
 endif
@@ -941,52 +917,6 @@ endif
 
 show:
 	@echo '$(VALUE)="$($(VALUE))"'
-
-################################################################################
-#
-#			SGML Documentation
-#
-################################################################################
-
-.PHONY: dvi ps html pdf rtf
-
-ifneq "$(SGML_DOC)" ""
-
-all :: $(SGMLDocWays)
-
-# multi-file SGML document: main document name is specified in $(SGML_DOC),
-# sub-documents (.sgml files) listed in $(SGML_SRCS).
-
-ifeq "$(SGML_SRCS)" ""
-SGML_SRCS = $(wildcard *.sgml)
-endif
-
-SGML_TEX  = $(addsuffix .tex,$(SGML_DOC))
-SGML_DVI  = $(addsuffix .dvi,$(SGML_DOC))
-SGML_PS   = $(addsuffix .ps,$(SGML_DOC))
-SGML_PDF  = $(addsuffix .pdf,$(SGML_DOC))
-SGML_RTF  = $(addsuffix .rtf,$(SGML_DOC))
-SGML_HTML = $(addsuffix .html,$(SGML_DOC))
-# HTML output goes in a subdirectory on its own.
-SGML_TEXT = $(addsuffix .txt,$(SGML_DOC))
-
-$(SGML_DVI) $(SGML_PS) $(SGML_HTML) $(SGML_TEXT) $(SGML_PDF) :: $(SGML_SRCS)
-
-dvi  :: $(SGML_DVI)
-ps   :: $(SGML_PS)
-pdf  :: $(SGML_PDF)
-rtf  :: $(SGML_RTF)
-html :: $(SGML_HTML)
-txt  :: $(SGML_TEXT)
-
-CLEAN_FILES += $(SGML_TEXT) $(SGML_TEX) $(SGML_PS) $(SGML_DVI) $(SGML_PDF) $(SGML_RTF) $(SGML_HTML) $(SGML_DOC)-*.html
-# can't use $(SGML_SRCS) here, it was maybe used elsewhere
-
-extraclean ::
-	$(RM) -rf DBTOHTML_OUTPUT_*
-	$(RM) -rf *.junk/
-	$(RM) -rf $(SGML_DOC)
-endif
 
 ################################################################################
 #

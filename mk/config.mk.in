@@ -900,27 +900,6 @@ TROFF			= troff
 UNAME			= uname
 
 #-----------------------------------------------------------------------------
-# SGML stuff
-
-JADE			= @JadeCmd@
-
-SGML2DVI		= $(DOCBOOK_PREFIX)db2dvi
-SGML2HTML		= $(DOCBOOK_PREFIX)db2html
-SGML2PS			= $(DOCBOOK_PREFIX)db2ps
-SGML2PDF		= $(DOCBOOK_PREFIX)db2pdf
-SGML2RTF		= $(DOCBOOK_PREFIX)db2rtf
-
-SGMLSTYLESHEET          = $(FPTOOLS_TOP_ABS)/docs/fptools-both.dsl
-
-SRC_SGML2DVI_OPTS       = -d $(SGMLSTYLESHEET)
-SRC_SGML2HTML_OPTS      = -d $(SGMLSTYLESHEET)
-SRC_SGML2PS_OPTS      	= -d $(SGMLSTYLESHEET)
-SRC_SGML2RTF_OPTS       = -d $(SGMLSTYLESHEET)
-SRC_SGML2PDF_OPTS       = -d $(SGMLSTYLESHEET)
-
-DOCBOOK_CATALOG		= @Catalog@
-
-#-----------------------------------------------------------------------------
 # DocBook XML stuff
 
 XSLTPROC		= @XsltprocCmd@
