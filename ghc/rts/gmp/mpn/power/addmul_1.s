@@ -1,21 +1,21 @@
-# IBM POWER __mpn_addmul_1 -- Multiply a limb vector with a limb and add
+# IBM POWER __gmpn_addmul_1 -- Multiply a limb vector with a limb and add
 # the result to a second limb vector.
 
-# Copyright (C) 1992, 1994 Free Software Foundation, Inc.
+# Copyright (C) 1992, 1994, 1999, 2000 Free Software Foundation, Inc.
 
 # This file is part of the GNU MP Library.
 
 # The GNU MP Library is free software; you can redistribute it and/or modify
-# it under the terms of the GNU Library General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or (at your
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or (at your
 # option) any later version.
 
 # The GNU MP Library is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 # License for more details.
 
-# You should have received a copy of the GNU Library General Public License
+# You should have received a copy of the GNU Lesser General Public License
 # along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 # the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 # MA 02111-1307, USA.
@@ -27,26 +27,25 @@
 # size		r5
 # s2_limb	r6
 
-# The RS/6000 has no unsigned 32x32->64 bit multiplication instruction.  To
-# obtain that operation, we have to use the 32x32->64 signed multiplication
-# instruction, and add the appropriate compensation to the high limb of the
-# result.  We add the multiplicand if the multiplier has its most significant
-# bit set, and we add the multiplier if the multiplicand has its most
-# significant bit set.  We need to preserve the carry flag between each
+# The POWER architecture has no unsigned 32x32->64 bit multiplication
+# instruction.  To obtain that operation, we have to use the 32x32->64 signed
+# multiplication instruction, and add the appropriate compensation to the high
+# limb of the result.  We add the multiplicand if the multiplier has its most
+# significant bit set, and we add the multiplier if the multiplicand has its
+# most significant bit set.  We need to preserve the carry flag between each
 # iteration, so we have to compute the compensation carefully (the natural,
-# srai+and doesn't work).  Since the POWER architecture has a branch unit
-# we can branch in zero cycles, so that's how we perform the additions.
+# srai+and doesn't work).  Since the POWER architecture has a branch unit we
+# can branch in zero cycles, so that's how we perform the additions.
 
 	.toc
-	.csect .__mpn_addmul_1[PR]
-	.align 2
-	.globl __mpn_addmul_1
-	.globl .__mpn_addmul_1
-	.csect __mpn_addmul_1[DS]
-__mpn_addmul_1:
-	.long .__mpn_addmul_1[PR], TOC[tc0], 0
-	.csect .__mpn_addmul_1[PR]
-.__mpn_addmul_1:
+	.globl	__gmpn_addmul_1
+	.globl	.__gmpn_addmul_1
+	.csect	__gmpn_addmul_1[DS]
+__gmpn_addmul_1:
+	.long	.__gmpn_addmul_1, TOC[tc0], 0
+	.csect	.text[PR]
+	.align	2
+.__gmpn_addmul_1:
 
 	cal	3,-4(3)
 	l	0,0(4)

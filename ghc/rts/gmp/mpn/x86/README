@@ -1,0 +1,40 @@
+
+                      X86 MPN SUBROUTINES
+
+
+This directory contains mpn functions for various 80x86 chips.
+
+
+CODE ORGANIZATION
+
+	x86              i386, i486, generic
+	x86/pentium      Intel Pentium (P5, P54)
+	x86/pentium/mmx  Intel Pentium with MMX (P55)
+	x86/p6           Intel Pentium Pro
+	x86/p6/mmx       Intel Pentium II, III
+	x86/p6/p3mmx     Intel Pentium III
+	x86/k6           AMD K6, K6-2, K6-3
+	x86/k6/mmx
+	x86/k6/k62mmx    AMD K6-2
+	x86/k7           AMD Athlon
+	x86/k7/mmx
+
+
+The x86 directory is also the main support for P6 at the moment, and
+is something of a blended style, meant to be reasonable on all x86s.
+
+	
+
+STATUS
+
+The code is well-optimized for AMD and Intel chips, but not so well
+optimized for Cyrix chips.
+
+
+
+RELEVANT OPTIMIZATION ISSUES
+
+For implementations with slow double shift instructions (SHLD and
+SHRD), it might be better to mimic their operation with SHL+SHR+OR.
+(M2 is likely to benefit from that, but not Pentium due to its slow
+plain SHL and SHR.)

@@ -1,21 +1,22 @@
 /* mpz_fdiv_q_2exp -- Divide an integer by 2**CNT.  Round the quotient
    towards -infinity.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1996, 1998, 1999 Free Software Foundation,
+Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -86,9 +87,18 @@ mpz_fdiv_q_2exp (w, u, cnt)
   if (usize < 0 && round != 0)
     {
       mp_limb_t cy;
-      cy = mpn_add_1 (wp, wp, wsize, 1);
-      wp[wsize] = cy;
-      wsize += cy;
+      if (wsize != 0)
+	{
+	  cy = mpn_add_1 (wp, wp, wsize, (mp_limb_t) 1);
+	  wp[wsize] = cy;
+	  wsize += cy;
+	}
+      else
+	{
+	  /* We shifted something negative to zero.  The result is -1.  */
+	  wp[0] = 1;
+	  wsize = 1;
+	}
     }
   w->_mp_size = usize >= 0 ? wsize : -wsize;
 }

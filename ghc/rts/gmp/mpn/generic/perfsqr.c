@@ -1,46 +1,31 @@
 /* mpn_perfect_square_p(u,usize) -- Return non-zero if U is a perfect square,
    zero otherwise.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1996, 1997, 2000 Free Software Foundation,
+Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
 
+#include <stdio.h> /* for NULL */
 #include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
-#ifndef UMUL_TIME
-#define UMUL_TIME 1
-#endif
-
-#ifndef UDIV_TIME
-#define UDIV_TIME UMUL_TIME
-#endif
-
-#if BITS_PER_MP_LIMB == 32
-#define PP 0xC0CFD797L		/* 3 x 5 x 7 x 11 x 13 x ... x 29 */
-#define PP_INVERTED 0x53E5645CL
-#endif
-
-#if BITS_PER_MP_LIMB == 64
-#define PP 0xE221F97C30E94E1DL	/* 3 x 5 x 7 x 11 x 13 x ... x 53 */
-#define PP_INVERTED 0x21CFE6CFC938B36BL
-#endif
 
 /* sq_res_0x100[x mod 0x100] == 1 iff x mod 0x100 is a quadratic residue
    modulo 0x100.  */
@@ -92,17 +77,17 @@ mpn_perfect_square_p (up, usize)
      size of A.  */
 
 #if BITS_PER_MP_LIMB == 64
-  if (((0x12DD703303AED3L >> rem % 53) & 1) == 0)
+  if (((CNST_LIMB(0x12DD703303AED3) >> rem % 53) & 1) == 0)
     return 0;
-  if (((0x4351B2753DFL >> rem % 47) & 1) == 0)
+  if (((CNST_LIMB(0x4351B2753DF) >> rem % 47) & 1) == 0)
     return 0;
-  if (((0x35883A3EE53L >> rem % 43) & 1) == 0)
+  if (((CNST_LIMB(0x35883A3EE53) >> rem % 43) & 1) == 0)
     return 0;
-  if (((0x1B382B50737L >> rem % 41) & 1) == 0)
+  if (((CNST_LIMB(0x1B382B50737) >> rem % 41) & 1) == 0)
     return 0;
-  if (((0x165E211E9BL >> rem % 37) & 1) == 0)
+  if (((CNST_LIMB(0x165E211E9B) >> rem % 37) & 1) == 0)
     return 0;
-  if (((0x121D47B7L >> rem % 31) & 1) == 0)
+  if (((CNST_LIMB(0x121D47B7) >> rem % 31) & 1) == 0)
     return 0;
 #endif
   if (((0x13D122F3L >> rem % 29) & 1) == 0)

@@ -15,7 +15,7 @@ dependent instruction really far from each other.
 STATUS
 
 1. mpn_mul_1 could be improved to 6.5 cycles/limb on the PA7100, using the
-   instructions bwlow (but some sw pipelining is needed to avoid the
+   instructions below (but some sw pipelining is needed to avoid the
    xmpyu-fstds delay):
 
 	fldds	s1_ptr
@@ -82,3 +82,10 @@ STATUS
 	stws	res_ptr
 
 	addib
+
+3. For the PA8000 we have to stick to using 32-bit limbs before compiler
+   support emerges.  But we want to use 64-bit operations whenever possible,
+   in particular for loads and stores.  It is possible to handle mpn_add_n
+   efficiently by rotating (when s1/s2 are aligned), masking+bit field
+   inserting when (they are not).  The speed should double compared to the
+   code used today.

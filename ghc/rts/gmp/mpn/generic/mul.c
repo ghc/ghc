@@ -1,20 +1,27 @@
 /* mpn_mul -- Multiply two natural numbers.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+   THE HELPER FUNCTIONS IN THIS FILE (meaning everything except mpn_mul)
+   ARE INTERNAL FUNCTIONS WITH MUTABLE INTERFACES.  IT IS ONLY SAFE TO REACH
+   THEM THROUGH DOCUMENTED INTERFACES.  IN FACT, IT IS ALMOST GUARANTEED
+   THAT THEY'LL CHANGE OR DISAPPEAR IN A FUTURE GNU MP RELEASE.
+
+
+Copyright (C) 1991, 1993, 1994, 1996, 1997, 1999, 2000 Free Software
+Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -22,131 +29,162 @@ MA 02111-1307, USA. */
 #include "gmp.h"
 #include "gmp-impl.h"
 
-/* Multiply the natural numbers u (pointed to by UP, with USIZE limbs)
-   and v (pointed to by VP, with VSIZE limbs), and store the result at
-   PRODP.  USIZE + VSIZE limbs are always stored, but if the input
-   operands are normalized.  Return the most significant limb of the
-   result.
+/* Multiply the natural numbers u (pointed to by UP, with UN limbs) and v
+   (pointed to by VP, with VN limbs), and store the result at PRODP.  The
+   result is UN + VN limbs.  Return the most significant limb of the result.
 
-   NOTE: The space pointed to by PRODP is overwritten before finished
-   with U and V, so overlap is an error.
+   NOTE: The space pointed to by PRODP is overwritten before finished with U
+   and V, so overlap is an error.
 
    Argument constraints:
-   1. USIZE >= VSIZE.
-   2. PRODP != UP and PRODP != VP, i.e. the destination
-      must be distinct from the multiplier and the multiplicand.  */
+   1. UN >= VN.
+   2. PRODP != UP and PRODP != VP, i.e. the destination must be distinct from
+      the multiplier and the multiplicand.  */
 
-/* If KARATSUBA_THRESHOLD is not already defined, define it to a
-   value which is good on most machines.  */
-#ifndef KARATSUBA_THRESHOLD
-#define KARATSUBA_THRESHOLD 32
+void
+#if __STDC__
+mpn_sqr_n (mp_ptr prodp,
+         mp_srcptr up, mp_size_t un)
+#else
+mpn_sqr_n (prodp, up, un)
+     mp_ptr prodp;
+     mp_srcptr up;
+     mp_size_t un;
 #endif
+{
+  if (un < KARATSUBA_SQR_THRESHOLD)
+    { /* plain schoolbook multiplication */
+      if (un == 0)
+	return;
+      mpn_sqr_basecase (prodp, up, un);
+    }
+  else if (un < TOOM3_SQR_THRESHOLD)
+    { /* karatsuba multiplication */
+      mp_ptr tspace;
+      TMP_DECL (marker);
+      TMP_MARK (marker);
+      tspace = (mp_ptr) TMP_ALLOC (2 * (un + BITS_PER_MP_LIMB) * BYTES_PER_MP_LIMB);
+      mpn_kara_sqr_n (prodp, up, un, tspace);
+      TMP_FREE (marker);
+    }
+#if WANT_FFT || TUNE_PROGRAM_BUILD
+  else if (un < FFT_SQR_THRESHOLD)
+#else
+  else
+#endif
+    { /* toom3 multiplication */
+      mp_ptr tspace;
+      TMP_DECL (marker);
+      TMP_MARK (marker);
+      tspace = (mp_ptr) TMP_ALLOC (2 * (un + BITS_PER_MP_LIMB) * BYTES_PER_MP_LIMB);
+      mpn_toom3_sqr_n (prodp, up, un, tspace);
+      TMP_FREE (marker);
+    }
+#if WANT_FFT || TUNE_PROGRAM_BUILD
+  else
+    {
+      /* schoenhage multiplication */
+      mpn_mul_fft_full (prodp, up, un, up, un);
+    }
+#endif
+}
 
 mp_limb_t
 #if __STDC__
 mpn_mul (mp_ptr prodp,
-	 mp_srcptr up, mp_size_t usize,
-	 mp_srcptr vp, mp_size_t vsize)
+	 mp_srcptr up, mp_size_t un,
+	 mp_srcptr vp, mp_size_t vn)
 #else
-mpn_mul (prodp, up, usize, vp, vsize)
+mpn_mul (prodp, up, un, vp, vn)
      mp_ptr prodp;
      mp_srcptr up;
-     mp_size_t usize;
+     mp_size_t un;
      mp_srcptr vp;
-     mp_size_t vsize;
+     mp_size_t vn;
 #endif
 {
-  mp_ptr prod_endp = prodp + usize + vsize - 1;
-  mp_limb_t cy;
-  mp_ptr tspace;
-  TMP_DECL (marker);
+  mp_size_t l;
+  mp_limb_t c;
 
-  if (vsize < KARATSUBA_THRESHOLD)
+  if (up == vp && un == vn)
     {
-      /* Handle simple cases with traditional multiplication.
+      mpn_sqr_n (prodp, up, un);
+      return prodp[2 * un - 1];
+    }
 
-	 This is the most critical code of the entire function.  All
-	 multiplies rely on this, both small and huge.  Small ones arrive
-	 here immediately.  Huge ones arrive here as this is the base case
-	 for Karatsuba's recursive algorithm below.  */
-      mp_size_t i;
-      mp_limb_t cy_limb;
-      mp_limb_t v_limb;
+  if (vn < KARATSUBA_MUL_THRESHOLD)
+    { /* long multiplication */
+      mpn_mul_basecase (prodp, up, un, vp, vn);
+      return prodp[un + vn - 1];
+    }
 
-      if (vsize == 0)
-	return 0;
+  mpn_mul_n (prodp, up, vp, vn);
+  if (un != vn)
+    { mp_limb_t t;
+      mp_ptr ws;
+      TMP_DECL (marker);
+      TMP_MARK (marker);
 
-      /* Multiply by the first limb in V separately, as the result can be
-	 stored (not added) to PROD.  We also avoid a loop for zeroing.  */
-      v_limb = vp[0];
-      if (v_limb <= 1)
+      prodp += vn;
+      l = vn;
+      up += vn;
+      un -= vn;
+
+      if (un < vn) 
 	{
-	  if (v_limb == 1)
-	    MPN_COPY (prodp, up, usize);
-	  else
-	    MPN_ZERO (prodp, usize);
-	  cy_limb = 0;
+	  /* Swap u's and v's. */
+          MPN_SRCPTR_SWAP (up,un, vp,vn);
 	}
-      else
-	cy_limb = mpn_mul_1 (prodp, up, usize, v_limb);
 
-      prodp[usize] = cy_limb;
-      prodp++;
+      ws = (mp_ptr) TMP_ALLOC (((vn >= KARATSUBA_MUL_THRESHOLD ? vn : un) + vn)
+			       * BYTES_PER_MP_LIMB);
 
-      /* For each iteration in the outer loop, multiply one limb from
-	 U with one limb from V, and add it to PROD.  */
-      for (i = 1; i < vsize; i++)
+      t = 0;
+      while (vn >= KARATSUBA_MUL_THRESHOLD)
 	{
-	  v_limb = vp[i];
-	  if (v_limb <= 1)
+	  mpn_mul_n (ws, up, vp, vn);
+	  if (l <= 2*vn) 
 	    {
-	      cy_limb = 0;
-	      if (v_limb == 1)
-		cy_limb = mpn_add_n (prodp, prodp, up, usize);
+	      t += mpn_add_n (prodp, prodp, ws, l);
+	      if (l != 2*vn)
+		{
+		  t = mpn_add_1 (prodp + l, ws + l, 2*vn - l, t);
+		  l = 2*vn;
+		}
 	    }
 	  else
-	    cy_limb = mpn_addmul_1 (prodp, up, usize, v_limb);
-
-	  prodp[usize] = cy_limb;
-	  prodp++;
+	    {
+	      c = mpn_add_n (prodp, prodp, ws, 2*vn);
+	      t += mpn_add_1 (prodp + 2*vn, prodp + 2*vn, l - 2*vn, c);
+	    }
+	  prodp += vn;
+	  l -= vn;
+	  up += vn;
+	  un -= vn;
+	  if (un < vn) 
+	    {
+	      /* Swap u's and v's. */
+              MPN_SRCPTR_SWAP (up,un, vp,vn);
+	    }
 	}
-      return cy_limb;
-    }
 
-  TMP_MARK (marker);
-
-  tspace = (mp_ptr) TMP_ALLOC (2 * vsize * BYTES_PER_MP_LIMB);
-  MPN_MUL_N_RECURSE (prodp, up, vp, vsize, tspace);
-
-  prodp += vsize;
-  up += vsize;
-  usize -= vsize;
-  if (usize >= vsize)
-    {
-      mp_ptr tp = (mp_ptr) TMP_ALLOC (2 * vsize * BYTES_PER_MP_LIMB);
-      do
+      if (vn)
 	{
-	  MPN_MUL_N_RECURSE (tp, up, vp, vsize, tspace);
-	  cy = mpn_add_n (prodp, prodp, tp, vsize);
-	  mpn_add_1 (prodp + vsize, tp + vsize, vsize, cy);
-	  prodp += vsize;
-	  up += vsize;
-	  usize -= vsize;
+	  mpn_mul_basecase (ws, up, un, vp, vn);
+	  if (l <= un + vn) 
+	    {
+	      t += mpn_add_n (prodp, prodp, ws, l);
+	      if (l != un + vn)
+		t = mpn_add_1 (prodp + l, ws + l, un + vn - l, t);
+	    } 
+	  else
+	    {
+	      c = mpn_add_n (prodp, prodp, ws, un + vn);
+	      t += mpn_add_1 (prodp + un + vn, prodp + un + vn, l - un - vn, c);
+	    }
 	}
-      while (usize >= vsize);
-    }
 
-  /* True: usize < vsize.  */
-
-  /* Make life simple: Recurse.  */
-
-  if (usize != 0)
-    {
-      mpn_mul (tspace, vp, vsize, up, usize);
-      cy = mpn_add_n (prodp, prodp, tspace, vsize);
-      mpn_add_1 (prodp + vsize, tspace + vsize, usize, cy);
-    }
-
-  TMP_FREE (marker);
-  return *prod_endp;
+    TMP_FREE (marker);
+  }
+  return prodp[un + vn - 1];
 }

@@ -1,24 +1,26 @@
 /* mpz_powm_ui(res,base,exp,mod) -- Set RES to (base**exp) mod MOD.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1996, 1997, 2000 Free Software Foundation,
+Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
 
+#include <stdio.h> /* for NULL */
 #include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
@@ -49,12 +51,14 @@ mpz_powm_ui (res, base, exp, mod)
   rp = res->_mp_d;
 
   if (msize == 0)
-    msize = 1 / msize;		/* provoke a signal */
+    DIVIDE_BY_ZERO;
 
   if (exp == 0)
     {
-      rp[0] = 1;
+      /* Exponent is zero, result is 1 mod MOD, i.e., 1 or 0
+	 depending on if MOD equals 1.  */
       res->_mp_size = (msize == 1 && (mod->_mp_d)[0] == 1) ? 0 : 1;
+      rp[0] = 1;
       return;
     }
 
@@ -166,6 +170,7 @@ mpz_powm_ui (res, base, exp, mod)
 
 	mpn_mul_n (xp, rp, rp, rsize);
 	xsize = 2 * rsize;
+	xsize -= xp[xsize - 1] == 0;
 	if (xsize > msize)
 	  {
 	    mpn_divmod (xp + msize, xp, xsize, mp, msize);
@@ -179,6 +184,7 @@ mpz_powm_ui (res, base, exp, mod)
 	  {
 	    mpn_mul (xp, rp, rsize, bp, bsize);
 	    xsize = rsize + bsize;
+	    xsize -= xp[xsize - 1] == 0;
 	    if (xsize > msize)
 	      {
 		mpn_divmod (xp + msize, xp, xsize, mp, msize);
@@ -226,7 +232,15 @@ mpz_powm_ui (res, base, exp, mod)
     MPN_NORMALIZE (rp, rsize);
   }
 
-  res->_mp_size = negative_result == 0 ? rsize : -rsize;
+  if (negative_result && rsize != 0)
+    {
+      if (mod_shift_cnt != 0)
+	mpn_rshift (mp, mp, msize, mod_shift_cnt);
+      mpn_sub (rp, mp, msize, rp, rsize);
+      rsize = msize;
+      MPN_NORMALIZE (rp, rsize);
+    }
+  res->_mp_size = rsize;
 
   if (free_me != NULL)
     (*_mp_free_func) (free_me, free_me_size * BYTES_PER_MP_LIMB);

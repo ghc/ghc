@@ -1,0 +1,38 @@
+This directory contains mpn functions for 64-bit PA-RISC 2.0.
+
+RELEVANT OPTIMIZATION ISSUES
+
+The PA8000 has a multi-issue pipeline with large buffers for instructions
+awaiting pending results.  Therefore, no latency scheduling is necessary
+(and might actually be harmful).
+
+Two 64-bit loads can be completed per cycle.  One 64-bit store can be
+completed per cycle.  A store cannot complete in the same cycle as a load.
+
+STATUS
+
+* mpn_lshift, mpn_rshift, mpn_add_n, mpn_sub_n are all well-tuned and run at
+  the peak cache bandwidth; 1.5 cycles/limb for shifting and 2.0 cycles/limb
+  for add/subtract.
+
+* The multiplication functions run at 11 cycles/limb.  The cache bandwidth
+  allows 7.5 cycles/limb.  Perhaps it would be possible, using unrolling or
+  better scheduling, to get closer to the cache bandwidth limit.
+
+* xaddmul_1.S contains a quicker method for forming the 128 bit product.  It
+  uses some fewer operations, and keep the carry flag live across the loop
+  boundary.  But it seems hard to make it run more than 1/4 cycle faster
+  than the old code.  Perhaps we really ought to unroll this loop be 2x?
+  2x should suffice since register latency schedling is never needed,
+  but the unrolling would hide the store-load latency.  Here is a sketch:
+
+	1. A multiply and store 64-bit products
+	2. B sum 64-bit products 128-bit product
+	3. B load  64-bit products to integer registers
+	4. B multiply and store 64-bit products
+	5. A sum 64-bit products 128-bit product
+	6. A load  64-bit products to integer registers
+	7. goto 1
+
+  In practice, adjacent groups (1 and 2, 2 and 3, etc) will be interleaved
+  for better instruction mix.

@@ -1,0 +1,2 @@
+This directory contains mpn functions for 64-bit PA-RISC 2.0
+using 64-bit pointers (2.0W).

@@ -1,0 +1,48 @@
+This directory contains mpn functions for 64-bit V9 SPARC
+
+RELEVANT OPTIMIZATION ISSUES
+
+The Ultra I/II pipeline executes up to two simple integer arithmetic operations
+per cycle.  The 64-bit integer multiply instruction mulx takes from 5 cycles to
+35 cycles, depending on the position of the most significant bit of the 1st
+source operand.  It cannot overlap with other instructions.  For our use of
+mulx, it will take from 5 to 20 cycles.
+
+Integer conditional move instructions cannot dual-issue with other integer
+instructions.  No conditional move can issue 1-5 cycles after a load.  (Or
+something such bizzare.)
+
+Integer branches can issue with two integer arithmetic instructions.  Likewise
+for integer loads.  Four instructions may issue (arith, arith, ld/st, branch)
+but only if the branch is last.
+
+(The V9 architecture manual recommends that the 2nd operand of a multiply
+instruction be the smaller one.  For UltraSPARC, they got things backwards and
+optimize for the wrong operand!  Really helpful in the light of that multiply
+is incredibly slow on these CPUs!)
+
+STATUS
+
+There is new code in ~/prec/gmp-remote/sparc64.  Not tested or completed, but
+the pipelines are worked out.  Here are the timings:
+
+* lshift, rshift: The code is well-optimized and runs at 2.0 cycles/limb.
+
+* add_n, sub_n: add3.s currently runs at 6 cycles/limb.  We use a bizarre
+  scheme of compares and branches (with some nops and fnops to align things)
+  and carefully stay away from the instructions intended for this application
+  (i.e., movcs and movcc).
+
+  Using movcc/movcs, even with deep unrolling, seems to get down to 7
+  cycles/limb.
+
+  The most promising approach is to split operands in 32-bit pieces using
+  srlx, then use two addccc, and finally compile the results with sllx+or.
+  The result could run at 5 cycles/limb, I think.  It might be possible to
+  do without unrolling, or with minimal unrolling.
+
+* addmul_1/submul_1: Should optimize for when scalar operand < 2^32.
+* addmul_1/submul_1: Since mulx is horrendously slow on UltraSPARC I/II,
+  Karatsuba's method should save up to 16 cycles (i.e. > 20%).
+* mul_1 (and possibly the other multiply functions): Handle carry in the
+  same tricky way as add_n,sub_n.

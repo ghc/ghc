@@ -1,26 +1,29 @@
 /* mpz_add -- Add two integers.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1996, 2000 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
 
 #include "gmp.h"
 #include "gmp-impl.h"
+#ifdef BERKELEY_MP
+#include "mp.h"
+#endif
 
 #ifndef BERKELEY_MP
 void
@@ -58,9 +61,9 @@ madd (u, v, w)
   if (abs_usize < abs_vsize)
     {
       /* Swap U and V. */
-      {const __mpz_struct *t = u; u = v; v = t;}
-      {mp_size_t t = usize; usize = vsize; vsize = t;}
-      {mp_size_t t = abs_usize; abs_usize = abs_vsize; abs_vsize = t;}
+      MPZ_SRCPTR_SWAP (u, v);
+      MP_SIZE_T_SWAP (usize, vsize);
+      MP_SIZE_T_SWAP (abs_usize, abs_vsize);
     }
 
   /* True: ABS_USIZE >= ABS_VSIZE.  */

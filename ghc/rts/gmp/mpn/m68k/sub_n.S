@@ -1,21 +1,21 @@
-/* mc68020 __mpn_sub_n -- Subtract two limb vectors of the same length > 0 and
+/* mc68020 __gmpn_sub_n -- Subtract two limb vectors of the same length > 0 and
    store difference in a third limb vector.
 
-Copyright (C) 1992, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1992, 1994, 1996, 1999, 2000 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -28,15 +28,14 @@ MA 02111-1307, USA. */
   size		(sp + 12)
 */
 
-#include "sysdep.h"
 #include "asm-syntax.h"
 
 	TEXT
 	ALIGN
-	GLOBL	C_SYMBOL_NAME(__mpn_sub_n)
+	GLOBL	C_SYMBOL_NAME(__gmpn_sub_n)
 
-C_SYMBOL_NAME(__mpn_sub_n:)
-PROLOG(__mpn_sub_n)
+C_SYMBOL_NAME(__gmpn_sub_n:)
+PROLOG(__gmpn_sub_n)
 /* Save used registers on the stack.  */
 	movel	R(d2),MEM_PREDEC(sp)
 	movel	R(a2),MEM_PREDEC(sp)
@@ -77,4 +76,4 @@ L(L2:)
 	movel	MEM_POSTINC(sp),R(d2)
 
 	rts
-EPILOG(__mpn_sub_n)
+EPILOG(__gmpn_sub_n)

@@ -1,0 +1,23 @@
+This directory contains functions for GMP's integer function layer.
+
+In this version of GMP, integers are represented like in the figure below.
+(Please note that the format might change between every version, and that
+depending on the internal format in any way is a bad idea.)
+
+   most				least
+significant		     significant
+   limb				limb
+
+				 _mp_d
+				  /
+				 /
+				\/
+	 ____ ____ ____ ____ ____
+	|____|____|____|____|____|
+
+	<------- _mp_size ------->
+
+
+The most significant limb will be non-zero.  The _mp_size field's sign
+reflects the sign of the number.  Its absolute value is the count of limbs
+in the number.

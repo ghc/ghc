@@ -1,21 +1,21 @@
-; mc88100 __mpn_mul_1 -- Multiply a limb vector with a single limb and
+; mc88100 __gmpn_mul_1 -- Multiply a limb vector with a single limb and
 ; store the product in a second limb vector.
 
-; Copyright (C) 1992, 1994, 1995 Free Software Foundation, Inc.
+; Copyright (C) 1992, 1994, 1995, 2000 Free Software Foundation, Inc.
 
 ; This file is part of the GNU MP Library.
 
 ; The GNU MP Library is free software; you can redistribute it and/or modify
-; it under the terms of the GNU Library General Public License as published by
-; the Free Software Foundation; either version 2 of the License, or (at your
+; it under the terms of the GNU Lesser General Public License as published by
+; the Free Software Foundation; either version 2.1 of the License, or (at your
 ; option) any later version.
 
 ; The GNU MP Library is distributed in the hope that it will be useful, but
 ; WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 ; License for more details.
 
-; You should have received a copy of the GNU Library General Public License
+; You should have received a copy of the GNU Lesser General Public License
 ; along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 ; the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 ; MA 02111-1307, USA.
@@ -50,8 +50,8 @@
 
 	text
 	align	 16
-	global	 ___mpn_mul_1
-___mpn_mul_1:
+	global	 ___gmpn_mul_1
+___gmpn_mul_1:
 
 	; Make S1_PTR and RES_PTR point at the end of their blocks
 	; and negate SIZE.

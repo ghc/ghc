@@ -1,20 +1,20 @@
 /* mpz_pow_ui(res, base, exp) -- Set RES to BASE**EXP.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1996, 1997 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -49,7 +49,7 @@ rpow (b, e, r)
 #endif /* BERKELEY_MP */
 {
   mp_ptr rp, bp, tp, xp;
-  mp_size_t rsize, bsize;
+  mp_size_t ralloc, rsize, bsize;
   int cnt, i;
   mp_limb_t blimb;
   TMP_DECL (marker);
@@ -82,13 +82,13 @@ rpow (b, e, r)
       /* Estimate space requirements accurately.  Using the code from the
 	 `else' path would over-estimate space requirements wildly.   */
       float lb = __mp_bases[blimb].chars_per_bit_exactly;
-      rsize = 2 + ((mp_size_t) (e / lb) / BITS_PER_MP_LIMB);
+      ralloc = 3 + ((mp_size_t) (e / lb) / BITS_PER_MP_LIMB);
     }
   else
     {
       /* Over-estimate space requirements somewhat.  */
       count_leading_zeros (cnt, blimb);
-      rsize = bsize * e - cnt * e / BITS_PER_MP_LIMB + 1;
+      ralloc = bsize * e - cnt * e / BITS_PER_MP_LIMB + 2;
     }
 
   TMP_MARK (marker);
@@ -97,8 +97,8 @@ rpow (b, e, r)
      product for mpn_mul.  (This scheme is used to fulfill the requirements
      of mpn_mul; that the product space may not be the same as any of the
      input operands.)  */
-  rp = (mp_ptr) TMP_ALLOC (rsize * BYTES_PER_MP_LIMB);
-  tp = (mp_ptr) TMP_ALLOC (rsize * BYTES_PER_MP_LIMB);
+  rp = (mp_ptr) TMP_ALLOC (ralloc * BYTES_PER_MP_LIMB);
+  tp = (mp_ptr) TMP_ALLOC (ralloc * BYTES_PER_MP_LIMB);
 
   MPN_COPY (rp, bp, bsize);
   rsize = bsize;

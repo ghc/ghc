@@ -1,20 +1,21 @@
 /* mpz_divexact -- finds quotient when known that quot * den == num && den != 0.
 
-Copyright (C) 1991, 1993, 1994, 1995 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1995, 1996, 1997, 1998, 2000 Free Software
+Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA.  */
@@ -27,8 +28,8 @@ MA 02111-1307, USA.  */
     de Matema'tica at Universidade Federal do Rio Grande do Sul (UFRGS).
 
     References:
-        T. Jebelean, An algorithm for exact division, Journal of Symbolic
-        Computation, v. 15, 1993, pp. 169-180.  */
+	T. Jebelean, An algorithm for exact division, Journal of Symbolic
+	Computation, v. 15, 1993, pp. 169-180.	*/
 
 #include "gmp.h"
 #include "gmp-impl.h"
@@ -46,30 +47,42 @@ mpz_divexact (quot, num, den)
 {
   mp_ptr qp, tp;
   mp_size_t qsize, tsize;
-
-  mp_srcptr np = num->_mp_d;
-  mp_srcptr dp = den->_mp_d;
-  mp_size_t nsize = ABS (num->_mp_size);
-  mp_size_t dsize = ABS (den->_mp_size);
+  mp_srcptr np, dp;
+  mp_size_t nsize, dsize;
   TMP_DECL (marker);
 
-  /*  Generate divide-by-zero error if dsize == 0.  */
-  if (dsize == 0)
-    {
-      quot->_mp_size = 1 / dsize;
-      return;
-    }
-
-  if (nsize == 0)
-    {
-      quot->_mp_size = 0;
-      return;
-    }
+  nsize = ABS (num->_mp_size);
+  dsize = ABS (den->_mp_size);
 
   qsize = nsize - dsize + 1;
   if (quot->_mp_alloc < qsize)
     _mpz_realloc (quot, qsize);
+
+  np = num->_mp_d;
+  dp = den->_mp_d;
   qp = quot->_mp_d;
+
+  if (nsize == 0)
+    {
+      if (dsize == 0)
+	DIVIDE_BY_ZERO;
+      quot->_mp_size = 0;
+      return;
+    }
+
+  if (dsize <= 1)
+    {
+      if (dsize == 1)
+	{
+	  mpn_divmod_1 (qp, np, nsize, dp[0]);
+	  qsize -= qp[qsize - 1] == 0;
+	  quot->_mp_size = (num->_mp_size ^ den->_mp_size) >= 0 ? qsize : -qsize;
+	  return;
+	}
+
+      /*  Generate divide-by-zero error since dsize == 0.  */
+      DIVIDE_BY_ZERO;
+    }
 
   TMP_MARK (marker);
 
@@ -77,36 +90,36 @@ mpz_divexact (quot, num, den)
   while (dp[0] == 0)
     np += 1, nsize -= 1, dp += 1, dsize -= 1;
   tsize = MIN (qsize, dsize);
-  if (dp[0] & 1)
+  if ((dp[0] & 1) != 0)
     {
-      if (qp != dp)
-	MPN_COPY (qp, np, qsize);
-      if (qp == dp)		/*  QUOT and DEN overlap.  */
+      if (quot == den)		/*  QUOT and DEN overlap.  */
 	{
-	  tp = (mp_ptr) TMP_ALLOC (sizeof (mp_limb_t) * tsize);
+	  tp = (mp_ptr) TMP_ALLOC (tsize * BYTES_PER_MP_LIMB);
 	  MPN_COPY (tp, dp, tsize);
 	}
       else
 	tp = (mp_ptr) dp;
+      if (qp != np)
+	MPN_COPY_INCR (qp, np, qsize);
     }
   else
     {
-      unsigned long int r;
-      tp = (mp_ptr) TMP_ALLOC (sizeof (mp_limb_t) * tsize);
+      unsigned int r;
+      tp = (mp_ptr) TMP_ALLOC (tsize * BYTES_PER_MP_LIMB);
       count_trailing_zeros (r, dp[0]);
       mpn_rshift (tp, dp, tsize, r);
       if (dsize > tsize)
-	tp[tsize-1] |= dp[tsize] << (BITS_PER_MP_LIMB - r);
+	tp[tsize - 1] |= dp[tsize] << (BITS_PER_MP_LIMB - r);
       mpn_rshift (qp, np, qsize, r);
       if (nsize > qsize)
-	qp[qsize-1] |= np[qsize] << (BITS_PER_MP_LIMB - r);
+	qp[qsize - 1] |= np[qsize] << (BITS_PER_MP_LIMB - r);
     }
 
   /*  Now QUOT <-- QUOT/T.  */
   mpn_bdivmod (qp, qp, qsize, tp, tsize, qsize * BITS_PER_MP_LIMB);
   MPN_NORMALIZE (qp, qsize);
 
-  quot->_mp_size = (num->_mp_size < 0) == (den->_mp_size < 0) ? qsize : -qsize;
+  quot->_mp_size = (num->_mp_size ^ den->_mp_size) >= 0 ? qsize : -qsize;
 
   TMP_FREE (marker);
 }

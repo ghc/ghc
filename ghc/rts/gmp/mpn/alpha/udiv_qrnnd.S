@@ -1,34 +1,34 @@
  # Alpha 21064 __udiv_qrnnd
 
- # Copyright (C) 1992, 1994, 1995 Free Software Foundation, Inc.
+ # Copyright (C) 1992, 1994, 1995, 1997, 2000 Free Software Foundation, Inc.
 
  # This file is part of the GNU MP Library.
 
  # The GNU MP Library is free software; you can redistribute it and/or modify
- # it under the terms of the GNU Library General Public License as published by
- # the Free Software Foundation; either version 2 of the License, or (at your
+ # it under the terms of the GNU Lesser General Public License as published by
+ # the Free Software Foundation; either version 2.1 of the License, or (at your
  # option) any later version.
 
  # The GNU MP Library is distributed in the hope that it will be useful, but
  # WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- # or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+ # or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
  # License for more details.
 
- # You should have received a copy of the GNU Library General Public License
+ # You should have received a copy of the GNU Lesser General Public License
  # along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
  # the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
  # MA 02111-1307, USA.
 
 
-        .set noreorder
-        .set noat
+	.set noreorder
+	.set noat
 .text
-        .align	3
-        .globl	__udiv_qrnnd
-        .ent	__udiv_qrnnd
-__udiv_qrnnd:
-        .frame $30,0,$26,0
-        .prologue 0
+	.align	3
+	.globl	__gmpn_udiv_qrnnd
+	.ent	__gmpn_udiv_qrnnd
+__gmpn_udiv_qrnnd:
+	.frame $30,0,$26,0
+	.prologue 0
 #define cnt	$2
 #define tmp	$3
 #define rem_ptr	$16
@@ -148,4 +148,4 @@ __udiv_qrnnd:
 	bis	$31,n0,$0
 	ret	$31,($26),1
 
-	.end	__udiv_qrnnd
+	.end	__gmpn_udiv_qrnnd

@@ -1,0 +1,14 @@
+The (poorly optimized) code in this directory was originally written for a
+j90 system, but finished on a c90.  It should work on all Cray vector
+computers.  For the T3E and T3D systems, the `alpha' subdirectory at the
+same level as the directory containing this file, is much better.
+
+* `+' seems to be faster than `|' when combining carries.
+
+* It is possible that the best multiply performance would be achived by
+  storing only 24 bits per element, and using lazy carry propagation.  Before
+  calling i24mult, full carry propagation would be needed.
+
+* Supply tasking versions of the C loops.
+
+

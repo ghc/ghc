@@ -1,0 +1,34 @@
+# Copyright (C) 1999 Free Software Foundation, Inc.
+
+# This file is part of the GNU MP Library.
+
+# The GNU MP Library is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or (at your
+# option) any later version.
+
+# The GNU MP Library is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+# License for more details.
+
+# You should have received a copy of the GNU Lesser General Public License
+# along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
+# the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
+# MA 02111-1307, USA.
+
+	.toc
+	.globl	__sdiv_qrnnd
+	.globl	.__sdiv_qrnnd
+	.csect	__sdiv_qrnnd[DS]
+__sdiv_qrnnd:
+	.long	.__sdiv_qrnnd, TOC[tc0], 0
+	.csect	.text[PR]
+	.align	2
+.__sdiv_qrnnd:
+	mtmq	5
+	div	0,4,6
+	mfmq	9
+	st	9,0(3)
+	mr	3,0
+	br

@@ -1,20 +1,20 @@
 /* mpn_hamdist --
 
-Copyright (C) 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1994, 1996, 2000 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -23,7 +23,9 @@ MA 02111-1307, USA. */
 #include "gmp-impl.h"
 
 #if defined __GNUC__
-#if defined __sparc_v9__ && BITS_PER_MP_LIMB == 64
+/* No processor claiming to be SPARC v9 compliant seem to
+   implement the POPC instruction.  Disable pattern for now.  */
+#if 0 && defined __sparc_v9__ && BITS_PER_MP_LIMB == 64
 #define popc_limb(a) \
   ({									\
     DItype __res;							\
@@ -39,15 +41,19 @@ MA 02111-1307, USA. */
    You have to figure out how this works, I won't tell you!  */
 
 static inline unsigned int
+#if __STDC__
+popc_limb (mp_limb_t x)
+#else
 popc_limb (x)
      mp_limb_t x;
+#endif
 {
 #if BITS_PER_MP_LIMB == 64
   /* We have to go into some trouble to define these constants.
      (For mp_limb_t being `long long'.)  */
   mp_limb_t cnst;
-  cnst = 0x55555555L | ((mp_limb_t) 0x55555555L << BITS_PER_MP_LIMB/2);
-  x = ((x & ~cnst) >> 1) + (x & cnst);
+  cnst = 0xaaaaaaaaL | ((mp_limb_t) 0xaaaaaaaaL << BITS_PER_MP_LIMB/2);
+  x -= (x & cnst) >> 1;
   cnst = 0x33333333L | ((mp_limb_t) 0x33333333L << BITS_PER_MP_LIMB/2);
   x = ((x & ~cnst) >> 2) + (x & cnst);
   cnst = 0x0f0f0f0fL | ((mp_limb_t) 0x0f0f0f0fL << BITS_PER_MP_LIMB/2);
@@ -57,7 +63,7 @@ popc_limb (x)
   x = ((x >> 32) + x) & 0xff;
 #endif
 #if BITS_PER_MP_LIMB == 32
-  x = ((x >> 1) & 0x55555555L) + (x & 0x55555555L);
+  x -= (x & 0xaaaaaaaa) >> 1;
   x = ((x >> 2) & 0x33333333L) + (x & 0x33333333L);
   x = ((x >> 4) + x) & 0x0f0f0f0fL;
   x = ((x >> 8) + x);

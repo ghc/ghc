@@ -1,21 +1,21 @@
-! SH __mpn_sub_n -- Subtract two limb vectors of the same length > 0 and store
+! SH __gmpn_sub_n -- Subtract two limb vectors of the same length > 0 and store
 ! difference in a third limb vector.
 
-! Copyright (C) 1995 Free Software Foundation, Inc.
+! Copyright (C) 1995, 1997, 2000 Free Software Foundation, Inc.
 
 ! This file is part of the GNU MP Library.
 
 ! The GNU MP Library is free software; you can redistribute it and/or modify
-! it under the terms of the GNU Library General Public License as published by
-! the Free Software Foundation; either version 2 of the License, or (at your
+! it under the terms of the GNU Lesser General Public License as published by
+! the Free Software Foundation; either version 2.1 of the License, or (at your
 ! option) any later version.
 
 ! The GNU MP Library is distributed in the hope that it will be useful, but
 ! WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-! or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+! or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 ! License for more details.
 
-! You should have received a copy of the GNU Library General Public License
+! You should have received a copy of the GNU Lesser General Public License
 ! along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 ! the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 ! MA 02111-1307, USA.
@@ -29,8 +29,8 @@
 
 	.text
 	.align 2
-	.global	___mpn_sub_n
-___mpn_sub_n:
+	.global	___gmpn_sub_n
+___gmpn_sub_n:
 	mov	#0,r3		! clear cy save reg
 
 Loop:	mov.l	@r5+,r1
@@ -44,4 +44,4 @@ Loop:	mov.l	@r5+,r1
 	 add	#4,r4
 
 	rts
-	movt	r0		! return carry-out from most sign. limb
+	mov	r3,r0		! return carry-out from most sign. limb

@@ -1,0 +1,36 @@
+PPC630 (aka Power3) pipeline information:
+
+Decoding is 4-way and issue is 8-way with some out-of-order capability.
+LS1  - ld/st unit 1
+LS2  - ld/st unit 2
+FXU1 - integer unit 1, handles any simple integer instructions
+FXU2 - integer unit 2, handles any simple integer instructions
+FXU3 - integer unit 3, handles integer multiply and divide
+FPU1 - floating-point unit 1
+FPU2 - floating-point unit 2
+
+Memory:		  Any two memory operations can issue, but memory subsystem
+		  can sustain just one store per cycle.
+Simple integer:	  2 operations (such as add, rl*)
+Integer multiply: 1 operation every 9th cycle worst case; exact timing depends
+		  on 2nd operand most significant bit position (10 bits per
+		  cycle).  Multiply unit is not pipelined, only one multiply
+		  operation in progress is allowed.
+Integer divide:	  ?
+Floating-point:	  Any plain 2 arithmetic instructions (such as fmul, fadd, fmadd)
+		  Latency = 4.
+Floating-point divide:
+		  ?
+Floating-point square root:
+		  ?
+
+Best possible times for the main loops:
+shift:	      1.5 cycles limited by integer unit contention.
+	      With 63 special loops, one for each shift count, we could
+	      reduce the needed integer instructions to 2, which would
+	      reduce the best possible time to 1 cycle.
+add/sub:      1.5 cycles, limited by ld/st unit contention.
+mul:	      18 cycles (average) unless floating-point operations are used,
+	      but that would only help for multiplies of perhaps 10 and more
+	      limbs.
+addmul/submul:Same situation as for mul.

@@ -1,20 +1,21 @@
 /* mpz_and -- Logical and.
 
-Copyright (C) 1991, 1993, 1994, 1996 Free Software Foundation, Inc.
+Copyright (C) 1991, 1993, 1994, 1996, 1997, 2000 Free Software Foundation,
+Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -116,7 +117,7 @@ mpz_and (res, op1, op2)
 	      _mpz_realloc (res, res_alloc);
 	      res_ptr = res->_mp_d;
 	      /* Don't re-read OP1_PTR and OP2_PTR.  They point to
-		 temporary space--never to the space RES->_mp_D used
+		 temporary space--never to the space RES->_mp_d used
 		 to point to before reallocation.  */
 	    }
 
@@ -152,9 +153,8 @@ mpz_and (res, op1, op2)
 	{
 	  /* We should compute -OP1 & OP2.  Swap OP1 and OP2 and fall
 	     through to the code that handles OP1 & -OP2.  */
-	  {mpz_srcptr t = op1; op1 = op2; op2 = t;}
-	  {mp_srcptr t = op1_ptr; op1_ptr = op2_ptr; op2_ptr = t;}
-	  {mp_size_t t = op1_size; op1_size = op2_size; op2_size = t;}
+          MPZ_SRCPTR_SWAP (op1, op2);
+          MPN_SRCPTR_SWAP (op1_ptr,op1_size, op2_ptr,op2_size);
 	}
 
     }
@@ -173,7 +173,7 @@ mpz_and (res, op1, op2)
        operand as the result for those limbs is going to become zero
        anyway.  */
 
-    /* Scan for the least significant. non-zero OP2 limb, and zero the
+    /* Scan for the least significant non-zero OP2 limb, and zero the
        result meanwhile for those limb positions.  (We will surely
        find a non-zero limb, so we can write the loop with one
        termination condition only.)  */
@@ -237,7 +237,7 @@ mpz_and (res, op1, op2)
 	    res_ptr = res->_mp_d;
 	    op1_ptr = op1->_mp_d;
 	    /* Don't re-read OP2_PTR.  It points to temporary space--never
-	       to the space RES->_mp_D used to point to before reallocation.  */
+	       to the space RES->_mp_d used to point to before reallocation.  */
 	  }
 
 	MPN_COPY (res_ptr + op2_size, op1_ptr + op2_size,
@@ -264,7 +264,7 @@ mpz_and (res, op1, op2)
 	    res_ptr = res->_mp_d;
 	    op1_ptr = op1->_mp_d;
 	    /* Don't re-read OP2_PTR.  It points to temporary space--never
-	       to the space RES->_mp_D used to point to before reallocation.  */
+	       to the space RES->_mp_d used to point to before reallocation.  */
 	  }
 
 	for (i = res_size - 1; i >= 0; i--)

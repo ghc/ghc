@@ -1,20 +1,20 @@
-/* mc68020 __mpn_lshift -- Shift left a low-level natural-number integer.
+/* mc68020 __gmpn_lshift -- Shift left a low-level natural-number integer.
 
-Copyright (C) 1996 Free Software Foundation, Inc.
+Copyright (C) 1996, 1999, 2000 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -27,7 +27,6 @@ MA 02111-1307, USA. */
   cnt		(sp + 12)
 */
 
-#include "sysdep.h"
 #include "asm-syntax.h"
 
 #define res_ptr a1
@@ -37,10 +36,10 @@ MA 02111-1307, USA. */
 
 	TEXT
 	ALIGN
-	GLOBL	C_SYMBOL_NAME(__mpn_lshift)
+	GLOBL	C_SYMBOL_NAME(__gmpn_lshift)
 
-C_SYMBOL_NAME(__mpn_lshift:)
-PROLOG(__mpn_lshift)
+C_SYMBOL_NAME(__gmpn_lshift:)
+PROLOG(__gmpn_lshift)
 
 /* Save used registers on the stack.  */
 	moveml	R(d2)-R(d6)/R(a2),MEM_PREDEC(sp)
@@ -148,4 +147,4 @@ L(LLend:)
 /* Restore used registers from stack frame.  */
 	moveml	MEM_POSTINC(sp),R(d2)-R(d6)/R(a2)
 	rts
-EPILOG(__mpn_lshift)
+EPILOG(__gmpn_lshift)

@@ -1,20 +1,20 @@
 /* mpz_set_d(integer, val) -- Assign INTEGER with a double value VAL.
 
-Copyright (C) 1995 Free Software Foundation, Inc.
+Copyright (C) 1995, 1996, 2000 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
 The GNU MP Library is free software; you can redistribute it and/or modify
-it under the terms of the GNU Library General Public License as published by
-the Free Software Foundation; either version 2 of the License, or (at your
+it under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at your
 option) any later version.
 
 The GNU MP Library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 License for more details.
 
-You should have received a copy of the GNU Library General Public License
+You should have received a copy of the GNU Lesser General Public License
 along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 MA 02111-1307, USA. */
@@ -32,9 +32,9 @@ mpz_set_d (r, d)
 #endif
 {
   int negative;
-  mp_size_t size;
   mp_limb_t tp[3];
   mp_ptr rp;
+  mp_size_t rn;
 
   negative = d < 0;
   d = ABS (d);
@@ -49,19 +49,20 @@ mpz_set_d (r, d)
       return;
     }
 
-  size = __gmp_extract_double (tp, d);
+  rn = __gmp_extract_double (tp, d);
 
-  if (ALLOC(r) < size)
-    _mpz_realloc (r, size);
+  if (ALLOC(r) < rn)
+    _mpz_realloc (r, rn);
 
   rp = PTR (r);
 
 #if BITS_PER_MP_LIMB == 32
-  switch (size)
+  switch (rn)
     {
     default:
-      MPN_ZERO (rp, size - 3);
-      rp += size - 3;
+      MPN_ZERO (rp, rn - 3);
+      rp += rn - 3;
+      /* fall through */
     case 3:
       rp[2] = tp[2];
       rp[1] = tp[1];
@@ -72,22 +73,24 @@ mpz_set_d (r, d)
       rp[0] = tp[1];
       break;
     case 1:
+      /* handled in "small aguments" case above */
       abort ();
     }
 #else
-  switch (size)
+  switch (rn)
     {
     default:
-      MPN_ZERO (rp, size - 2);
-      rp += size - 2;
+      MPN_ZERO (rp, rn - 2);
+      rp += rn - 2;
+      /* fall through */
     case 2:
-      rp[1] = tp[1];
-      rp[0] = tp[0];
+      rp[1] = tp[1], rp[0] = tp[0];
       break;
     case 1:
+      /* handled in "small aguments" case above */
       abort ();
     }
 #endif
 
-  SIZ(r) = negative ? -size : size;
+  SIZ(r) = negative ? -rn : rn;
 }

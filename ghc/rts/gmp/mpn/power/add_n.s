@@ -1,20 +1,21 @@
-# IBM POWER __mpn_add_n -- Add two limb vectors of equal, non-zero length.
+# IBM POWER __gmpn_add_n -- Add two limb vectors of equal, non-zero length.
 
-# Copyright (C) 1992, 1994, 1995, 1996 Free Software Foundation, Inc.
+# Copyright (C) 1992, 1994, 1995, 1996, 1999, 2000 Free Software Foundation,
+# Inc.
 
 # This file is part of the GNU MP Library.
 
 # The GNU MP Library is free software; you can redistribute it and/or modify
-# it under the terms of the GNU Library General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or (at your
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2.1 of the License, or (at your
 # option) any later version.
 
 # The GNU MP Library is distributed in the hope that it will be useful, but
 # WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Library General Public
+# or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
 # License for more details.
 
-# You should have received a copy of the GNU Library General Public License
+# You should have received a copy of the GNU Lesser General Public License
 # along with the GNU MP Library; see the file COPYING.LIB.  If not, write to
 # the Free Software Foundation, Inc., 59 Temple Place - Suite 330, Boston,
 # MA 02111-1307, USA.
@@ -27,17 +28,14 @@
 # size		r6
 
 	.toc
-	.extern __mpn_add_n[DS]
-	.extern .__mpn_add_n
-.csect [PR]
-	.align 2
-	.globl __mpn_add_n
-	.globl .__mpn_add_n
-	.csect __mpn_add_n[DS]
-__mpn_add_n:
-	.long .__mpn_add_n, TOC[tc0], 0
-	.csect [PR]
-.__mpn_add_n:
+	.globl	__gmpn_add_n
+	.globl	.__gmpn_add_n
+	.csect	__gmpn_add_n[DS]
+__gmpn_add_n:
+	.long	.__gmpn_add_n, TOC[tc0], 0
+	.csect	.text[PR]
+	.align	2
+.__gmpn_add_n:
 	andil.	10,6,1		# odd or even number of limbs?
 	l	8,0(4)		# load least significant s1 limb
 	l	0,0(5)		# load least significant s2 limb
@@ -49,7 +47,7 @@ __mpn_add_n:
 
 # We have an odd # of limbs.  Add the first limbs separately.
 	cmpi	1,10,0		# is count for unrolled loop zero?
-	bne	1,L1		# branch if not
+	bc	4,6,L1		# bne cr1,L1 (misassembled by gas)
 	st	7,4(3)
 	aze	3,10		# use the fact that r10 is zero...
 	br			# return
