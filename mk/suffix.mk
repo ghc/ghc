@@ -22,17 +22,6 @@
 
 .DELETE_ON_ERROR:
 
-# However, if $(way) is set then we have to define $(way_) and $(_way)
-# from it in the obvious fashion.
-# This must be done here (or earlier), but not in target.mk with the other
-# way management, because the pattern rules in this file take a snapshot of
-# the value of $(way_) and $(_way), and it's no good setting them later!
-
-ifneq "$(way)" ""
-  way_ := $(way)_
-  _way := _$(way)
-endif
-
 #-----------------------------------------------------------------------------
 # Haskell Suffix Rules
 
