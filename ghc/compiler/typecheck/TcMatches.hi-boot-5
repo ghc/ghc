@@ -2,11 +2,11 @@ __interface TcMatches 1 0 where
 __export TcMatches tcGRHSs tcMatchesFun;
 1 tcGRHSs ::  HsExpr.HsMatchContext Name.Name
 	      -> RnHsSyn.RenamedGRHSs
-	      -> TcType.TcType
+	      -> TcUnify.Expected TcType.TcType
 	      -> TcRnTypes.TcM TcHsSyn.TcGRHSs ;
 1 tcMatchesFun :: 
 		Name.Name
-	     -> TcType.TcType
 	     -> [RnHsSyn.RenamedMatch]
+	     -> TcUnify.Expected TcType.TcType
 	     -> TcRnTypes.TcM [TcHsSyn.TcMatch] ;
 

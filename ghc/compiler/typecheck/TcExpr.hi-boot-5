@@ -1,10 +1,14 @@
 __interface TcExpr 1 0 where
-__export TcExpr tcExpr tcMonoExpr ;
-1 tcExpr :: 
+__export TcExpr tcCheckSigma tcCheckRho tcMonoExpr ;
+1 tcCheckSigma :: 
+	  RnHsSyn.RenamedHsExpr
+       -> TcType.TcType
+       -> TcRnTypes.TcM TcHsSyn.TcExpr ;
+1 tcCheckRho :: 
 	  RnHsSyn.RenamedHsExpr
        -> TcType.TcType
        -> TcRnTypes.TcM TcHsSyn.TcExpr ;
 1 tcMonoExpr :: 
 	  RnHsSyn.RenamedHsExpr
-       -> TcType.TcType
+       -> TcUnify.Expected TcType.TcType
        -> TcRnTypes.TcM TcHsSyn.TcExpr ;
