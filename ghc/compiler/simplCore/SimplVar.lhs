@@ -22,13 +22,13 @@ import CoreUtils	( coreExprCc )
 import BinderInfo	( BinderInfo, noBinderInfo )
 
 import CostCentre	( CostCentre, noCostCentreAttached, isCurrentCostCentre )
-import Id		( idType, getIdUnfolding, 
+import Id		( idType, getIdUnfolding, externallyVisibleId,
 			  getIdSpecialisation, setIdSpecialisation,
 			  idMustBeINLINEd, idHasNoFreeTyVars,
 			  mkIdWithNewUniq, mkIdWithNewType, 
 			  IdEnv, lookupIdEnv, delOneFromIdEnv, elemIdEnv, isNullIdEnv, addOneToIdEnv
 			)
-import SpecEnv		( lookupSpecEnv )
+import SpecEnv		( lookupSpecEnv, isEmptySpecEnv, emptySpecEnv )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
@@ -177,7 +177,7 @@ When we hit a binder we may need to
 \begin{code}
 simplBinder :: SimplEnv -> InBinder -> SmplM (SimplEnv, OutId)
 simplBinder env (id, occ_info)
-  |  not_in_scope	 	-- Not in scope, so no need to clone
+  |  no_need_to_clone	 	-- Not in scope (or cloning disabled), so no need to clone
   && empty_ty_subst 		-- No type substitution to do inside the Id
   && isNullIdEnv id_subst	-- No id substitution to do inside the Id
   = let 
@@ -196,37 +196,57 @@ simplBinder env (id, occ_info)
        -- id1 has its type zapped
        id1 | empty_ty_subst = id
            | otherwise      = mkIdWithNewType id ty'
+       -- id2 has its SpecEnv zapped (see comment inside Simplify.completeBind)
+       id2 | empty_spec_env = id1
+           | otherwise      = setIdSpecialisation id1 emptySpecEnv
     in
-    if not_in_scope then
+    if no_need_to_clone then
 	-- No need to clone, but we *must* zap any current substitution
 	-- for the variable.  For example:
 	--	(\x.e) with id_subst = [x |-> e']
 	-- Here we must simply zap the substitution for x
 	let
-	    env' = setIdEnv env (new_in_scope_ids id1, 
-				 delOneFromIdEnv id_subst id)
+	    new_id_subst = delOneFromIdEnv id_subst id
+	    new_env      = setIdEnv env (new_in_scope_ids id2, new_id_subst)
 	in
-	returnSmpl (env', id1)
+	returnSmpl (new_env, id2)
     else
 	-- Must clone
 	getUniqueSmpl         `thenSmpl` \ uniq ->
 	let
-	    id2 = mkIdWithNewUniq id1 uniq
-	    env' = setIdEnv env (new_in_scope_ids id2,
-				 addOneToIdEnv id_subst id (SubstVar id2))
+	    id3     = mkIdWithNewUniq id2 uniq
+	    new_env = setIdEnv env (new_in_scope_ids id3,
+				    addOneToIdEnv id_subst id (SubstVar id3))
 	in
-	returnSmpl (env', id2)
+	returnSmpl (new_env, id3)
     )
   where
     ((in_scope_tyvars, ty_subst), (in_scope_ids, id_subst)) = getEnvs env
 
-    empty_ty_subst   	 = isEmptyTyVarEnv ty_subst
-    not_in_scope     	 = not (id `elemIdEnv` in_scope_ids)
+    empty_ty_subst    = isEmptyTyVarEnv ty_subst
+    empty_spec_env    = isEmptySpecEnv (getIdSpecialisation id)
+
+    no_need_to_clone  = not need_to_clone
+    need_to_clone     = not (externallyVisibleId id) &&
+			( elemIdEnv id in_scope_ids || clone_binds_please)
+     {-
+       The SimplCloneBinds option isn't just here as another simplifier knob we can 
+       twiddle. Prior to floating bindings outwards, we have to make sure that no
+       duplicate bindings exist as floating may cause bindings with identical
+       uniques to come into scope, with disastrous consequences. 
+
+       To avoid this situation, we make sure that cloning is turned *on* in the
+       simplifier pass prior to running an outward floating pass.
+     -}
+    clone_binds_please = switchIsOn sw_chkr SimplCloneBinds
 
     new_in_scope_ids id' = addOneToIdEnv in_scope_ids id' (id', occ_info, NoUnfolding)
     
     ty               	 = idType id
     ty'              	 = instantiateTy ty_subst ty
+
+    sw_chkr		 = getSwitchChecker env
+
 
 simplBinders :: SimplEnv -> [InBinder] -> SmplM (SimplEnv, [OutId])
 simplBinders env binders = mapAccumLSmpl simplBinder env binders
@@ -235,7 +255,7 @@ simplBinders env binders = mapAccumLSmpl simplBinder env binders
 \begin{code}	
 simplTyBinder :: SimplEnv -> TyVar -> SmplM (SimplEnv, TyVar)
 simplTyBinder env tyvar
-  | not (tyvar `elementOfTyVarSet` tyvars)
+  | no_need_to_clone
   = 	-- No need to clone; but must zap any binding for tyvar
 	-- see comments with simplBinder above
     let
@@ -254,8 +274,13 @@ simplTyBinder env tyvar
     returnSmpl (env', tyvar')
   where
     ((tyvars, ty_subst), (ids, id_subst)) = getEnvs env
+    no_need_to_clone			  = not (tyvar `elementOfTyVarSet` tyvars) && 
+					    not clone_binds_please
+
+    clone_binds_please			  = switchIsOn sw_chkr SimplCloneBinds
+    sw_chkr				  = getSwitchChecker env
+
 
 simplTyBinders :: SimplEnv -> [TyVar] -> SmplM (SimplEnv, [TyVar])
 simplTyBinders env binders = mapAccumLSmpl simplTyBinder env binders
 \end{code}
-
