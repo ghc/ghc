@@ -8,4 +8,4 @@ tcfail103.hs:14:
     Signature type:     forall t. ST t Int
     Type to generalise: ST s Int
     When checking the type signature for `f'
-    When generalising the type(s) for f
+    When generalising the type(s) for `f'
