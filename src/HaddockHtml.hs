@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2002
 --
 
-module HaddockHtml ( ppHtml ) where
+module HaddockHtml ( ppHtml, copyHtmlBits, ppHtmlIndex ) where
 
 import Prelude hiding (div)
 import HaddockVersion
@@ -45,13 +45,29 @@ ppHtml	:: String
 	-> Maybe String
 	-> [(Module, Interface)]
 	-> FilePath			-- destination directory
-	-> Maybe String			-- CSS file
-	-> String			-- $libdir
 	-> Maybe Doc			-- prologue text, maybe
 	-> Bool				-- do MS Help stuff
+	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
 
-ppHtml doctitle source_url ifaces odir maybe_css libdir prologue do_ms_help =  do
+ppHtml doctitle source_url ifaces odir prologue do_ms_help maybe_index_url =  do
+  let
+	visible_ifaces = filter visible ifaces
+	visible (_, i) = OptHide `notElem` iface_options i
+
+  ppHtmlContents odir doctitle maybe_index_url (map fst visible_ifaces) prologue
+  ppHtmlIndex odir doctitle visible_ifaces
+
+  -- Generate index and contents page for MS help if requested
+  when do_ms_help $ do
+    ppHHContents odir (map fst visible_ifaces)
+    ppHHIndex odir visible_ifaces
+
+  mapM_ (ppHtmlModule odir doctitle source_url maybe_index_url) visible_ifaces
+
+
+copyHtmlBits :: FilePath -> FilePath -> Maybe FilePath -> IO ()
+copyHtmlBits odir libdir maybe_css = do
   let 
 	css_file = case maybe_css of
 			Nothing -> libdir ++ pathSeparator:cssFile
@@ -60,28 +76,16 @@ ppHtml doctitle source_url ifaces odir maybe_css libdir prologue do_ms_help =  d
 
 	icon_file        = libdir ++ pathSeparator:iconFile
 	icon_destination = odir   ++ pathSeparator:iconFile
-
-	visible_ifaces = filter visible ifaces
-	visible (_, i) = OptHide `notElem` iface_options i
-
+  
   css_contents <- readFile css_file
   writeFile css_destination css_contents
   icon_contents <- readFile icon_file
   writeFile icon_destination icon_contents
 
-  ppHtmlContents odir doctitle source_url (map fst visible_ifaces) prologue
-  ppHtmlIndex odir doctitle visible_ifaces
-
-  -- Generate index and contents page for MS help if requested
-  when do_ms_help $ do
-    ppHHContents odir (map fst visible_ifaces)
-    ppHHIndex odir visible_ifaces
-
-  mapM_ (ppHtmlModule odir doctitle source_url) visible_ifaces
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
-indexHtmlFile    = "doc-index.html"
+indexHtmlFile = "doc-index.html"
 
 subIndexHtmlFile :: Char -> String
 subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
@@ -119,22 +123,26 @@ contentsButton :: HtmlTable
 contentsButton = topButBox (anchor ! [href contentsHtmlFile] << 
 				toHtml "Contents")
 
-indexButton :: HtmlTable
-indexButton = topButBox (anchor ! [href indexHtmlFile] << toHtml "Index")
+indexButton :: Maybe String -> HtmlTable
+indexButton maybe_index_url 
+ = topButBox (anchor ! [href url] << toHtml "Index")
+  where url = case maybe_index_url of
+			Nothing -> indexHtmlFile
+			Just url -> url
 
-simpleHeader :: String -> HtmlTable
-simpleHeader doctitle = 
+simpleHeader :: String -> Maybe String -> HtmlTable
+simpleHeader doctitle maybe_index_url = 
   (tda [theclass "topbar"] << 
      vanillaTable << (
        (td << 
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " " ]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	contentsButton <-> indexButton
+	contentsButton <-> indexButton maybe_index_url
    ))
 
-pageHeader :: String -> Interface -> String -> Maybe String -> HtmlTable
-pageHeader mdl iface doctitle source_url =
+pageHeader :: String -> Interface -> String -> Maybe String -> Maybe String -> HtmlTable
+pageHeader mdl iface doctitle source_url maybe_index_url =
   (tda [theclass "topbar"] << 
     vanillaTable << (
        (td << 
@@ -144,7 +152,7 @@ pageHeader mdl iface doctitle source_url =
 	src_button source_url mdl (iface_filename iface) <->
 	parent_button mdl <->
 	contentsButton <->
-	indexButton
+	indexButton maybe_index_url
     )
    ) </>
    tda [theclass "modulebar"] <<
@@ -173,14 +181,14 @@ moduleInfo iface =
 
 ppHtmlContents :: FilePath -> String -> Maybe String -> [Module] -> Maybe Doc
    -> IO ()
-ppHtmlContents odir doctitle _ mdls prologue = do
+ppHtmlContents odir doctitle maybe_index_url mdls prologue = do
   let tree = mkModuleTree mdls  
       html = 
 	header (thetitle (toHtml doctitle) +++
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-   	    simpleHeader doctitle </>
+   	    simpleHeader doctitle maybe_index_url </>
 	    ppPrologue prologue </>
 	    ppModuleTree doctitle tree </>
 	    s15 </>
@@ -225,7 +233,7 @@ ppHtmlIndex odir doctitle ifaces = do
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-	    simpleHeader doctitle </>
+	    simpleHeader doctitle Nothing </>
 	    index_html
 	   )
 
@@ -262,7 +270,7 @@ ppHtmlIndex odir doctitle ifaces = do
 		thelink ! [href cssFile, 
 		  rel "stylesheet", thetype "text/css"]) +++
              body << vanillaTable << (
-	        simpleHeader doctitle </>
+	        simpleHeader doctitle Nothing </>
 		indexInitialLetterLinks </>
 	        tda [theclass "section1"] << 
 	      	toHtml ("Index (" ++ c:")") </>
@@ -329,15 +337,15 @@ ppHtmlIndex odir doctitle ifaces = do
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
 
-ppHtmlModule :: FilePath -> String -> Maybe String -> 
+ppHtmlModule :: FilePath -> String -> Maybe String -> Maybe String ->
 	(Module,Interface) -> IO ()
-ppHtmlModule odir doctitle source_url (Module mdl,iface) = do
+ppHtmlModule odir doctitle source_url maybe_index_url (Module mdl,iface) = do
   let html = 
 	header (thetitle (toHtml mdl) +++
 		thelink ! [href cssFile,
 		  rel "stylesheet", thetype "text/css"]) +++
         body << vanillaTable << (
-	    pageHeader mdl iface doctitle source_url </> s15 </>
+	    pageHeader mdl iface doctitle source_url maybe_index_url </> s15 </>
 	    ifaceToHtml mdl iface </> s15 </>
 	    footer
          )
@@ -542,6 +550,8 @@ ppHsDataDecl summary instances is_newty
 			)
 
 	instances_bit
+	   | null instances = Html.emptyTable
+	   | otherwise
 	   =  inst_hdr </>
 		 tda [theclass "body"] << spacedTable1 << (
 			aboves (map (declBox.ppInstHead) instances)

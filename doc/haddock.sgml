@@ -493,6 +493,32 @@
 	  <para>Output version information and exit.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term><option>--use-index=<replaceable>URL</replaceable></option></term>
+	<indexterm><primary><option>--use-index</option></primary></indexterm>
+	<listitem>
+	  <para>When generating HTML, do not generate an index.
+	  Instead, redirect the Index link on each page to
+	  <replaceable>URL</replaceable>.  This option is intended for
+	  use in conjuction with <option>--gen-index</option> for
+	  generating a separate index covering multiple
+	  libraries.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>--gen-index</option></term>
+	<indexterm><primary><option>--gen-index</option></primary></indexterm>
+	<listitem>
+	  <para>Generate an HTML index containing entries pulled from
+	  all the specified interfaces (interfaces are specified using
+	  <option>-i</option> or <option>--read-interface).  This is
+	  used to generate a single index for multiple sets of Haddock
+	  documentstation.</option>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
 
   </chapter>

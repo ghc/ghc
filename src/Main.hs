@@ -80,6 +80,8 @@ data Flag
   | Flag_Help
   | Flag_Verbose
   | Flag_Version
+  | Flag_UseIndex String
+  | Flag_GenIndex
   deriving (Eq)
 
 options :: [OptDescr Flag]
@@ -116,7 +118,11 @@ options =
     Option ['V']  ["version"]  (NoArg Flag_Version)
 	"output version information and exit",
     Option ['v']  ["verbose"]  (NoArg Flag_Verbose)
-        "increase verbosity"
+        "increase verbosity",
+    Option [] ["use-index"] (ReqArg Flag_UseIndex "URL")
+	"use a separately-generated HTML index",
+    Option [] ["gen-index"] (NoArg Flag_GenIndex)
+	"generate an HTML index from specified interfaces"
   ]
 
 saved_flags :: IORef [Flag]
@@ -161,11 +167,24 @@ run flags files = do
       no_implicit_prelude = Flag_NoImplicitPrelude `elem` flags
       verbose = Flag_Verbose `elem` flags
 
+      maybe_index_url = 
+	case [url | Flag_UseIndex url <- flags] of
+		[] -> Nothing
+		us -> Just (last us)
+
   prologue <- getPrologue flags
 
   read_ifaces_s <- mapM readIface (map snd ifaces_to_read)
 
   updateHTMLXRefs (map fst ifaces_to_read) read_ifaces_s
+
+  if Flag_GenIndex `elem` flags
+     then do 
+	when (not (null files)) $
+	   die ("--gen-index: expected no additional file arguments")	
+	ppHtmlIndex odir title (concat read_ifaces_s)
+        copyHtmlBits odir libdir css_file
+     else do
 
   writeIORef saved_flags flags
   parsed_mods <- mapM parse_file files
@@ -204,9 +223,10 @@ run flags files = do
 				     fmToList (iface_sub i))
 			     | (mdl, i) <-  these_mod_ifaces ])
 
-  when (Flag_Html `elem` flags) $
-    ppHtml title source_url these_mod_ifaces odir css_file 
-	libdir prologue (Flag_MSHtmlHelp `elem` flags)
+  when (Flag_Html `elem` flags) $ do
+    ppHtml title source_url these_mod_ifaces odir
+	prologue (Flag_MSHtmlHelp `elem` flags) maybe_index_url
+    copyHtmlBits odir libdir css_file
 
   -- dump an interface if requested
   case dump_iface of
