@@ -37,6 +37,10 @@ ifneq "$(way)" "dll"
 SRC_HC_OPTS += -static
 endif
 
+ifdef USE_REPORT_PRELUDE
+SRC_HC_OPTS += -DUSE_REPORT_PRELUDE=1
+endif
+
 #
 # Object and interface files have suffixes tagged with their ways
 #
@@ -46,12 +50,10 @@ endif
 
 # per-module flags
 PrelArrExtra_HC_OPTS     += -monly-2-regs
-Directory_HC_OPTS   	 += -monly-3-regs 
-Time_HC_OPTS        	 += -monly-3-regs
 
 # Far too much heap is needed to compile PrelNumExtra with -O at the
 # moment, but there you go..
-PrelNumExtra_HC_OPTS     += -H34m -K2m
+PrelNumExtra_HC_OPTS     += -H24m -K2m
 
 PrelPack_HC_OPTS	 += -K4m
 PrelBase_HC_OPTS         += -H12m
@@ -63,7 +65,6 @@ PrelHandle_HC_OPTS       += -H20m
 Time_HC_OPTS             += -H24m -K2m
 Complex_HC_OPTS          += -H10m
 IO_HC_OPTS	         += -H12m
-PrelMain_HC_OPTS	 += -fno-prune-tydecls # avoids an apparent bug; ToDo
 List_HC_OPTS             += -H8m
 Directory_HC_OPTS        += -H8m
 
