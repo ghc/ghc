@@ -339,6 +339,7 @@ pprImportedSymbol importedLbl
             vcat [
                 ptext SLIT(".section __TEXT,__picsymbolstub1,")
                   <> ptext SLIT("symbol_stubs,pure_instructions,32"),
+                ptext SLIT("\t.align 2"),
                 ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
                     ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
                     ptext SLIT("\tmflr r0"),
