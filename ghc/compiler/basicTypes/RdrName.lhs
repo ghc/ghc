@@ -126,8 +126,8 @@ mkRdrQual mod occ = Qual mod occ
 mkOrig :: ModuleName -> OccName -> RdrName
 mkOrig mod occ = Orig mod occ
 
-mkIfaceOrig :: NameSpace -> (EncodedFS, EncodedFS) -> RdrName
-mkIfaceOrig ns (m,n) = Qual (mkSysModuleNameFS m) (mkSysOccFS ns n)
+mkIfaceOrig :: NameSpace -> EncodedFS -> EncodedFS -> RdrName
+mkIfaceOrig ns m n = Orig (mkSysModuleNameFS m) (mkSysOccFS ns n)
 
 
 	-- These two are used when parsing source files
@@ -154,6 +154,9 @@ unqualifyRdrName rdr_name = Unqual (rdrNameOcc rdr_name)
 mkRdrNameWkr :: RdrName -> RdrName 	-- Worker-ify it
 mkRdrNameWkr rdr_name = Qual (rdrNameModule rdr_name)
 		 	     (mkWorkerOcc (rdrNameOcc rdr_name))
+
+origFromName :: Name -> RdrName
+origFromName n = Orig (moduleName (nameModule n)) (nameOccName n)
 \end{code}
 
 \begin{code}
@@ -185,7 +188,7 @@ isExact (Exact _) = True
 isExact other	= False
 
 isExact_maybe (Exact n) = Just n
-isExact_maybe other	  = Nothing
+isExact_maybe other	= Nothing
 \end{code}
 
 
@@ -222,18 +225,17 @@ instance Ord RdrName where
     a >	 b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
 
 	-- Unqual < Qual < Orig < Exact
+    compare (Exact n1)    (Exact n2)  = n1 `compare` n2
     compare (Qual m1 o1) (Qual m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2) 
     compare (Orig m1 o1) (Orig m2 o2) = (o1 `compare` o2) `thenCmp` (m1 `compare` m2) 
     compare (Unqual o1)  (Unqual  o2) = o1 `compare` o2
-    compare (Exact n1)    (Exact n2)  = n1 `compare` n2
  
+	-- Convert Exact to Orig
+    compare (Exact n1)    n2	      = origFromName n1 `compare` n2
+    compare n1		  (Exact n2)  = n1 `compare` origFromName n2
+
     compare (Unqual _)   _ 	      = LT
-  
     compare (Qual _ _)   (Orig _ _)   = LT
-    compare (Qual _ _)   (Exact _)    = LT
- 
-    compare (Orig _ _)   (Exact _)    = LT
- 
     compare _		 _	      = GT
 \end{code}
 
