@@ -17,14 +17,14 @@ import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, isTyVarTy,
 		  isUnLiftedType, isUnboxedTupleType, repType,	
 		  uaUTy, usOnce, usMany, eqUsage, seqType )
-import Demand	( Demand, isStrict, wwLazy, StrictnessInfo(..) )
+import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
 import PrimOp	( PrimOp(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
-import Id	( mkSysLocal, idType, idStrictness, idDemandInfo, idArity,
+import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  setIdType, isPrimOpId_maybe, isFCallId, isLocalId, 
-		  hasNoBinding
+		  hasNoBinding, idNewStrictness
 		)
 import HscTypes ( ModDetails(..) )
 import UniqSupply
@@ -284,8 +284,8 @@ corePrepExprFloat env expr@(App _ _)
         = collect_args fun (depth+1)   `thenUs` \ (fun',hd,fun_ty,floats,ss) ->
 	  let
 	      (ss1, ss_rest)   = case ss of
-				   (ss1:ss_rest) -> (ss1, ss_rest)
-				   []	       -> (wwLazy, [])
+				   (ss1:ss_rest) -> (ss1,     ss_rest)
+				   []	         -> (lazyDmd, [])
               (arg_ty, res_ty) = expectJust "corePrepExprFloat:collect_args" $
                                  splitFunTy_maybe fun_ty
 	  in
@@ -297,11 +297,10 @@ corePrepExprFloat env expr@(App _ _)
 	  let v2 = lookupVarEnv env v1 `orElse` v1 in
 	  returnUs (Var v2, (Var v2, depth), idType v2, nilOL, stricts)
 	where
-	  stricts = case idStrictness v of
-			StrictnessInfo demands _ 
+	  stricts = case idNewStrictness v of
+			StrictSig (DmdType _ demands _)
 			    | depth >= length demands -> demands
 			    | otherwise               -> []
-			other			      -> []
 		-- If depth < length demands, then we have too few args to 
 		-- satisfy strictness  info so we have to  ignore all the 
 		-- strictness info, e.g. + (error "urk")
@@ -381,7 +380,7 @@ mkNonRec bndr dem floats rhs
 	-- because floating the case would make it evaluated too early
     returnUs (floats `snocOL` FloatLet (NonRec bndr rhs))
     
-  |  isUnLiftedType bndr_rep_ty	|| isStrictDem dem 
+  |  isUnLiftedType bndr_rep_ty	|| isStrict dem 
 	-- It's a strict let, or the binder is unlifted,
 	-- so we definitely float all the bindings
   = ASSERT( not (isUnboxedTupleType bndr_rep_ty) )
@@ -519,15 +518,15 @@ mkCase scrut bndr alts = Case scrut bndr alts
 
 \begin{code}
 data RhsDemand
-     = RhsDemand { isStrictDem :: Bool,  -- True => used at least once
+     = RhsDemand { isStrict :: Bool,  -- True => used at least once
                    isOnceDem   :: Bool   -- True => used at most once
                  }
 
 mkDem :: Demand -> Bool -> RhsDemand
-mkDem strict once = RhsDemand (isStrict strict) once
+mkDem strict once = RhsDemand (isStrictDmd strict) once
 
 mkDemTy :: Demand -> Type -> RhsDemand
-mkDemTy strict ty = RhsDemand (isStrict strict) (isOnceTy ty)
+mkDemTy strict ty = RhsDemand (isStrictDmd strict) (isOnceTy ty)
 
 isOnceTy :: Type -> Bool
 isOnceTy ty
@@ -543,7 +542,7 @@ isOnceTy ty
          | isTyVarTy u 	       = False  -- if unknown at compile-time, is Top ie usMany
 
 bdrDem :: Id -> RhsDemand
-bdrDem id = mkDem (idDemandInfo id) (isOnceTy (idType id))
+bdrDem id = mkDem (idNewDemandInfo id) (isOnceTy (idType id))
 
 safeDem, onceDem :: RhsDemand
 safeDem = RhsDemand False False  -- always safe to use this

@@ -36,8 +36,8 @@ import Class		( Class, classTyCon )
 import Name		( Name, NamedThing(..), nameUnique )
 import Var		( TyVar, Id )
 import FieldLabel	( FieldLabel )
-import BasicTypes	( Arity )
-import Demand		( Demand, StrictnessMark(..), wwStrict, wwLazy )
+import BasicTypes	( Arity, StrictnessMark(..) )
+import NewDemand 	( Demand, lazyDmd, seqDmd )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
@@ -443,15 +443,14 @@ chooseBoxingStrategy tycon arg_ty strict
 		     		Just (arg_tycon, _) -> isProductTyCon arg_tycon
 
 unbox_strict_arg_ty 
-	:: StrictnessMark	-- After strategy choice; can't be MkaredUserStrict
+	:: StrictnessMark	-- After strategy choice; can't be MarkedUserStrict
 	-> Type			-- Source argument type
 	-> [(Demand,Type)]	-- Representation argument types and demamds
 
-unbox_strict_arg_ty NotMarkedStrict ty = [(wwLazy,   ty)]
-unbox_strict_arg_ty MarkedStrict    ty = [(wwStrict, ty)]
+unbox_strict_arg_ty NotMarkedStrict ty = [(lazyDmd, ty)]
+unbox_strict_arg_ty MarkedStrict    ty = [(seqDmd,  ty)]
 unbox_strict_arg_ty MarkedUnboxed   ty 
   = zipEqual "unbox_strict_arg_ty" (dataConRepStrictness arg_data_con) arg_tys
   where
-    (_, _, arg_data_con, arg_tys)
-	 = splitProductType "unbox_strict_arg_ty" (repType ty)
+    (_, _, arg_data_con, arg_tys) = splitProductType "unbox_strict_arg_ty" (repType ty)
 \end{code}

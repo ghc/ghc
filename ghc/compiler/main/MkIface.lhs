@@ -237,7 +237,7 @@ ifaceTyCls (AnId id) so_far
     caf_info   = cgCafInfo cg_info
 
     hs_idinfo | opt_OmitInterfacePragmas = []
- 	      | otherwise		 = arity_hsinfo  ++ caf_hsinfo  ++ cpr_hsinfo ++ 
+ 	      | otherwise		 = arity_hsinfo  ++ caf_hsinfo  ++ 
 					   strict_hsinfo ++ wrkr_hsinfo ++ unfold_hsinfo
 
     ------------  Arity  --------------
@@ -249,15 +249,10 @@ ifaceTyCls (AnId id) so_far
 		   NoCafRefs -> [HsNoCafRefs]
 		   otherwise -> []
 
-    ------------ CPR Info --------------
-    cpr_hsinfo = case cprInfo id_info of
-		   ReturnsCPR -> [HsCprInfo]
-		   NoCPRInfo  -> []
-
     ------------  Strictness  --------------
-    strict_hsinfo = case strictnessInfo id_info of
-			NoStrictnessInfo -> []
-			info		 -> [HsStrictness info]
+    strict_hsinfo = case newStrictnessInfo id_info of
+			Nothing  -> []
+			Just sig -> [HsStrictness sig]
 
     ------------  Worker  --------------
     work_info   = workerInfo id_info

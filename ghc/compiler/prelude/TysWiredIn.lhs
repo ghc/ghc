@@ -98,13 +98,12 @@ import Name		( Name, nameRdrName, nameUnique, nameOccName,
 import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import RdrName		( rdrNameOcc )
 import DataCon		( DataCon, mkDataCon, dataConId )
-import Demand		( StrictnessMark(..) )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), tyConDataCons,
 			  mkTupleTyCon, isUnLiftedTyCon, mkAlgTyCon
 			)
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
 
 import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTys, 
 			  mkArrowKinds, liftedTypeKind, unliftedTypeKind,

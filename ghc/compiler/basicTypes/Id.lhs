@@ -44,8 +44,8 @@ module Id (
 	-- IdInfo stuff
 	setIdUnfolding,
 	setIdArityInfo,
-	setIdDemandInfo,
-	setIdStrictness,
+	setIdDemandInfo, setIdNewDemandInfo,
+	setIdStrictness, setIdNewStrictness,
         setIdTyGenInfo,
 	setIdWorkerInfo,
 	setIdSpecialisation,
@@ -54,8 +54,8 @@ module Id (
 	setIdOccInfo,
 
 	idArity, idArityInfo, 
-	idDemandInfo,
-	idStrictness,
+	idDemandInfo, idNewDemandInfo,
+	idStrictness, idNewStrictness, idNewStrictness_maybe, getNewStrictness,
         idTyGenInfo,
 	idWorkerInfo,
 	idUnfolding,
@@ -66,6 +66,8 @@ module Id (
 	idCprInfo,
 	idLBVarInfo,
 	idOccInfo,
+
+	newStrictnessFromOld 	-- Temporary
 
     ) where
 
@@ -88,7 +90,10 @@ import Type		( Type, typePrimRep, addFreeTyVars,
 
 import IdInfo 
 
-import Demand		( Demand )
+import qualified Demand	( Demand )
+import NewDemand	( Demand, DmdResult(..), StrictSig, topSig, isBotRes,
+			  isBottomingSig, splitStrictSig, strictSigResInfo
+			)
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
 			  getOccName, getSrcLoc
@@ -97,6 +102,7 @@ import OccName		( UserFS, mkWorkerOcc )
 import PrimRep		( PrimRep )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
+import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
 import Outputable
 import Unique		( Unique, mkBuiltinUnique )
@@ -105,6 +111,8 @@ infixl 	1 `setIdUnfolding`,
 	  `setIdArityInfo`,
 	  `setIdDemandInfo`,
 	  `setIdStrictness`,
+	  `setIdNewDemandInfo`,
+	  `setIdNewStrictness`,
 	  `setIdTyGenInfo`,
 	  `setIdWorkerInfo`,
 	  `setIdSpecialisation`,
@@ -311,16 +319,43 @@ setIdArityInfo :: Id -> Arity -> Id
 setIdArityInfo id arity = modifyIdInfo (`setArityInfo` arity) id
 
 	---------------------------------
-	-- STRICTNESS
+	-- STRICTNESS 
 idStrictness :: Id -> StrictnessInfo
-idStrictness id = strictnessInfo (idInfo id)
+idStrictness id = case strictnessInfo (idInfo id) of
+			NoStrictnessInfo -> case idNewStrictness_maybe id of
+						Just sig -> oldStrictnessFromNew sig
+						Nothing  -> NoStrictnessInfo
+			strictness -> strictness
 
 setIdStrictness :: Id -> StrictnessInfo -> Id
 setIdStrictness id strict_info = modifyIdInfo (`setStrictnessInfo` strict_info) id
 
 -- isBottomingId returns true if an application to n args would diverge
 isBottomingId :: Id -> Bool
-isBottomingId id = isBottomingStrictness (idStrictness id)
+isBottomingId id = isBottomingSig (idNewStrictness id)
+
+idNewStrictness_maybe :: Id -> Maybe StrictSig
+idNewStrictness :: Id -> StrictSig
+
+idNewStrictness_maybe id = newStrictnessInfo (idInfo id)
+idNewStrictness       id = idNewStrictness_maybe id `orElse` topSig
+
+getNewStrictness :: Id -> StrictSig
+-- First tries the "new-strictness" field, and then
+-- reverts to the old one. This is just until we have
+-- cross-module info for new strictness
+getNewStrictness id = idNewStrictness_maybe id `orElse` newStrictnessFromOld id
+		      
+newStrictnessFromOld :: Id -> StrictSig
+newStrictnessFromOld id = mkNewStrictnessInfo id (idArity id) (idStrictness id) (idCprInfo id)
+
+oldStrictnessFromNew :: StrictSig -> StrictnessInfo
+oldStrictnessFromNew sig = mkStrictnessInfo (map oldDemand dmds, isBotRes res_info)
+			 where
+			   (dmds, res_info) = splitStrictSig sig
+
+setIdNewStrictness :: Id -> StrictSig -> Id
+setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` Just sig) id
 
 	---------------------------------
 	-- TYPE GENERALISATION
@@ -348,11 +383,17 @@ setIdUnfolding id unfolding = modifyIdInfo (`setUnfoldingInfo` unfolding) id
 
 	---------------------------------
 	-- DEMAND
-idDemandInfo :: Id -> Demand
+idDemandInfo :: Id -> Demand.Demand
 idDemandInfo id = demandInfo (idInfo id)
 
-setIdDemandInfo :: Id -> Demand -> Id
+setIdDemandInfo :: Id -> Demand.Demand -> Id
 setIdDemandInfo id demand_info = modifyIdInfo (`setDemandInfo` demand_info) id
+
+idNewDemandInfo :: Id -> NewDemand.Demand
+idNewDemandInfo id = newDemandInfo (idInfo id)
+
+setIdNewDemandInfo :: Id -> NewDemand.Demand -> Id
+setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` dmd) id
 
 	---------------------------------
 	-- SPECIALISATION
@@ -383,14 +424,17 @@ idCafInfo id = cgCafInfo (idCgInfo id)
 
 	---------------------------------
 	-- CG ARITY
-
 idCgArity :: Id -> Arity
 idCgArity id = cgArity (idCgInfo id)
 
 	---------------------------------
 	-- CPR INFO
 idCprInfo :: Id -> CprInfo
-idCprInfo id = cprInfo (idInfo id)
+idCprInfo id = case cprInfo (idInfo id) of
+		 NoCPRInfo -> case strictSigResInfo (idNewStrictness id) of
+				RetCPR -> ReturnsCPR
+				other  -> NoCPRInfo
+		 ReturnsCPR -> ReturnsCPR
 
 setIdCprInfo :: Id -> CprInfo -> Id
 setIdCprInfo id cpr_info = modifyIdInfo (`setCprInfo` cpr_info) id

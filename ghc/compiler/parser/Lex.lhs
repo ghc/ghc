@@ -40,7 +40,8 @@ import IdInfo		( InlinePragInfo(..) )
 import PrelNames	( mkTupNameStr )
 import CmdLineOpts	( opt_HiVersion, opt_NoHiCheck )
 import ForeignCall	( Safety(..) )
-import Demand		( Demand(..) {- instance Read -} )
+import NewDemand	( StrictSig(..), Demand(..), Keepity(..), 
+			  DmdResult(..), Deferredness(..), mkTopDmdType )
 import UniqFM           ( listToUFM, lookupUFM )
 import BasicTypes	( Boxity(..) )
 import SrcLoc		( SrcLoc, incSrcLine, srcLocFile, srcLocLine,
@@ -152,7 +153,7 @@ data Token
   | ITspecialise
   | ITnocaf
   | ITunfold InlinePragInfo
-  | ITstrict ([Demand], Bool)
+  | ITstrict StrictSig
   | ITrules
   | ITcprinfo
   | ITdeprecated
@@ -818,27 +819,36 @@ silly_escape_chars = [
 lex_demand cont buf = 
  case read_em [] buf of { (ls,buf') -> 
  case currentChar# buf' of
-   'B'# -> cont (ITstrict (ls, True )) (incLexeme buf')
-   _    -> cont (ITstrict (ls, False)) buf'
+   'X'# -> cont (ITstrict (StrictSig (mkTopDmdType ls BotRes))) (incLexeme buf')
+   'M'# -> cont (ITstrict (StrictSig (mkTopDmdType ls RetCPR))) (incLexeme buf')
+   _    -> cont (ITstrict (StrictSig (mkTopDmdType ls TopRes))) buf'
  }
  where
    -- code snatched from Demand.lhs
   read_em acc buf = 
    case currentChar# buf of
-    'L'# -> read_em (WwLazy False : acc) (stepOn buf)
-    'A'# -> read_em (WwLazy True  : acc) (stepOn buf)
-    'S'# -> read_em (WwStrict     : acc) (stepOn buf)
-    'P'# -> read_em (WwPrim       : acc) (stepOn buf)
-    'E'# -> read_em (WwEnum       : acc) (stepOn buf)
+    'L'# -> read_em (Lazy : acc) (stepOn buf)
+    'A'# -> read_em (Abs : acc) (stepOn buf)
+    'V'# -> read_em (Eval : acc) (stepOn buf)
     ')'# -> (reverse acc, stepOn buf)
-    'U'# -> do_unpack True  acc (stepOnBy# buf 2#)
-    'u'# -> do_unpack False acc (stepOnBy# buf 2#)
+    'C'# -> do_call acc (stepOnBy# buf 2#)
+    'U'# -> do_unpack1 Drop Now acc (stepOnBy# buf 1#)
+    'S'# -> do_unpack1 Keep Now acc (stepOnBy# buf 1#)
     _    -> (reverse acc, buf)
 
-  do_unpack wrapper_unpacks acc buf
-   = case read_em [] buf of
-      (stuff, rest) -> read_em (WwUnpack wrapper_unpacks stuff : acc) rest
+  do_unpack1 keepity defer acc buf
+    = case currentChar# buf of
+	'*'# -> do_unpack1 keepity Defer acc (stepOnBy# buf 1#)
+	'('# -> do_unpack2 keepity defer acc (stepOnBy# buf 1#)
+	_    -> read_em (Seq keepity defer [] : acc) buf
 
+  do_unpack2 keepity defer acc buf
+    = case read_em [] buf of
+        (stuff, rest) -> read_em (Seq keepity defer stuff : acc) rest
+
+  do_call acc buf
+    = case read_em [] buf of
+        ([dmd], rest) -> read_em (Call dmd : acc) rest
 
 ------------------
 lex_scc cont buf =

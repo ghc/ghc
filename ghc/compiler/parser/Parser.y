@@ -1,6 +1,6 @@
 {-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.71 2001/07/13 13:29:57 simonpj Exp $
+$Id: Parser.y,v 1.72 2001/07/23 10:54:48 simonpj Exp $
 
 Haskell grammar.
 
@@ -27,9 +27,8 @@ import ForeignCall	( Safety(..), CExportSpec(..), CCallSpec(..),
 import OccName		( UserFS, varName, tcName, dataName, tcClsName, tvName )
 import SrcLoc		( SrcLoc )
 import Module
-import Demand		( StrictnessMark(..) )
 import CmdLineOpts	( opt_SccProfilingOn )
-import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..) )
+import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), NewOrData(..), StrictnessMark(..) )
 import Panic
 
 import GlaExts

@@ -80,7 +80,12 @@ strict workers.
 
 \begin{code}
 saBinds :: DynFlags -> [CoreBind] -> IO [CoreBind]
+#ifndef DEBUG
+-- Omit strictness analyser if DEBUG is off
 
+saBinds dflags binds = return binds
+
+#else
 saBinds dflags binds
   = do {
 	showPass dflags "Strictness analysis";
@@ -483,4 +488,5 @@ sequenceSa []     = returnSa []
 sequenceSa (m:ms) = m		  `thenSa` \ r ->
 		    sequenceSa ms `thenSa` \ rs ->
 		    returnSa (r:rs)
+#endif /* DEBUG */
 \end{code}

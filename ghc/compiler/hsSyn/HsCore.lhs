@@ -33,13 +33,13 @@ import HsTypes		( HsType, pprParendHsType, pprHsTyVarBndr, toHsType,
 -- others:
 import Id		( idArity, idType, isDataConId_maybe, isFCallId_maybe )
 import Var		( varType, isId )
-import IdInfo		( InlinePragInfo, pprInlinePragInfo, ppStrictnessInfo )
+import IdInfo		( InlinePragInfo, pprInlinePragInfo )
 import Name		( Name, NamedThing(..), getName, toRdrName )
 import RdrName		( RdrName, rdrNameOcc )
 import OccName		( isTvOcc )
 import CoreSyn
 import CostCentre	( pprCostCentreCore )
-import Demand		( StrictnessInfo )
+import NewDemand	( StrictSig, pprIfaceStrictSig )
 import Literal		( Literal, maybeLitLit )
 import ForeignCall	( ForeignCall )
 import DataCon		( dataConTyCon, dataConSourceArity )
@@ -379,10 +379,9 @@ pprHsIdInfo info = ptext SLIT("{-##") <+> hsep (map ppr_hs_info info) <+> ptext 
 
 data HsIdInfo name
   = HsArity		Arity
-  | HsStrictness	StrictnessInfo
+  | HsStrictness	StrictSig
   | HsUnfold		InlinePragInfo (UfExpr name)
   | HsNoCafRefs
-  | HsCprInfo
   | HsWorker		name Arity	-- Worker, if any see IdInfo.WorkerInfo
 					-- for why we want arity here.
   deriving( Eq )
@@ -391,9 +390,8 @@ data HsIdInfo name
 
 ppr_hs_info (HsUnfold prag unf) = ptext SLIT("__U") <> pprInlinePragInfo prag <+> parens (pprUfExpr noParens unf)
 ppr_hs_info (HsArity arity)     = ptext SLIT("__A") <+> int arity
-ppr_hs_info (HsStrictness str)  = ptext SLIT("__S") <+> ppStrictnessInfo str
+ppr_hs_info (HsStrictness str)  = ptext SLIT("__S") <+> pprIfaceStrictSig str
 ppr_hs_info HsNoCafRefs		= ptext SLIT("__C")
-ppr_hs_info HsCprInfo		= ptext SLIT("__M")
 ppr_hs_info (HsWorker w a)	= ptext SLIT("__P") <+> ppr w <+> int a
 \end{code}
 

@@ -19,13 +19,13 @@ module IdInfo (
 	shortableIdInfo, copyIdInfo,
 
 	-- Arity
-	ArityInfo(..),
+	ArityInfo,
 	exactArity, unknownArity, hasArity,
 	arityInfo, setArityInfo, ppArityInfo, arityLowerBound,
 
 	-- New demand and strictness info
  	newStrictnessInfo, setNewStrictnessInfo, mkNewStrictnessInfo,
-  	newDemandInfo, setNewDemandInfo, newDemand,
+  	newDemandInfo, setNewDemandInfo, newDemand, oldDemand,
 
 	-- Strictness; imported from Demand
 	StrictnessInfo(..),
@@ -95,8 +95,12 @@ import DataCon		( DataCon )
 import ForeignCall	( ForeignCall )
 import FieldLabel	( FieldLabel )
 import Type		( usOnce, usMany )
-import Demand		-- Lots of stuff
-import qualified NewDemand
+import Demand		hiding( Demand )
+import NewDemand	( Demand(..), Keepity(..), Deferredness(..), DmdResult(..),
+			  lazyDmd, topDmd,
+			  StrictSig, mkStrictSig, 
+			  DmdType, mkTopDmdType
+			)
 import Outputable	
 import Util		( seqList )
 import List		( replicate )
@@ -129,30 +133,35 @@ infixl 	1 `setDemandInfo`,
 To be removed later
 
 \begin{code}
-mkNewStrictnessInfo :: Id -> Arity -> StrictnessInfo -> CprInfo -> NewDemand.StrictSig
-mkNewStrictnessInfo id arity NoStrictnessInfo cpr
-  = NewDemand.mkStrictSig id
-	arity
-	(NewDemand.mkTopDmdType (replicate arity NewDemand.Lazy) (newRes False cpr))
+mkNewStrictnessInfo :: Id -> Arity -> Demand.StrictnessInfo -> CprInfo -> StrictSig
+mkNewStrictnessInfo id arity Demand.NoStrictnessInfo cpr
+  = mkStrictSig id arity $
+    mkTopDmdType (replicate arity lazyDmd) (newRes False cpr)
 
-mkNewStrictnessInfo id arity (StrictnessInfo ds res) cpr
-  = NewDemand.mkStrictSig id
-	arity
-	(NewDemand.mkTopDmdType (take arity (map newDemand ds)) (newRes res cpr))
+mkNewStrictnessInfo id arity (Demand.StrictnessInfo ds res) cpr
+  = mkStrictSig id arity $
+    mkTopDmdType (take arity (map newDemand ds)) (newRes res cpr)
 	-- Sometimes the old strictness analyser has more
 	-- demands than the arity justifies
 
-newRes True  _ 	        = NewDemand.BotRes
-newRes False ReturnsCPR = NewDemand.RetCPR
-newRes False NoCPRInfo  = NewDemand.TopRes
+newRes True  _ 	        = BotRes
+newRes False ReturnsCPR = RetCPR
+newRes False NoCPRInfo  = TopRes
 
-newDemand :: Demand -> NewDemand.Demand
-newDemand (WwLazy True)      = NewDemand.Abs
-newDemand (WwLazy False)     = NewDemand.Lazy
-newDemand WwStrict	     = NewDemand.Eval
-newDemand (WwUnpack unpk ds) = NewDemand.Seq NewDemand.Drop NewDemand.Now (map newDemand ds)
-newDemand WwPrim	     = NewDemand.Lazy
-newDemand WwEnum	     = NewDemand.Eval
+newDemand :: Demand.Demand -> NewDemand.Demand
+newDemand (WwLazy True)      = Abs
+newDemand (WwLazy False)     = Lazy
+newDemand WwStrict	     = Eval
+newDemand (WwUnpack unpk ds) = Seq Drop Now (map newDemand ds)
+newDemand WwPrim	     = Lazy
+newDemand WwEnum	     = Eval
+
+oldDemand :: NewDemand.Demand -> Demand.Demand
+oldDemand Abs	       = WwLazy True
+oldDemand Lazy	       = WwLazy False
+oldDemand Eval	       = WwStrict
+oldDemand (Seq _ _ ds) = WwUnpack True (map oldDemand ds)
+oldDemand (Call _)     = WwStrict
 \end{code}
 
 
@@ -219,7 +228,7 @@ case.  KSW 1999-04).
 data IdInfo
   = IdInfo {
 	arityInfo 	:: ArityInfo,		-- Its arity
-	demandInfo 	:: Demand,		-- Whether or not it is definitely demanded
+	demandInfo 	:: Demand.Demand,	-- Whether or not it is definitely demanded
 	specInfo 	:: CoreRules,		-- Specialisations of this function which exist
         tyGenInfo       :: TyGenInfo,           -- Restrictions on usage-generalisation of this Id
 	strictnessInfo	:: StrictnessInfo,	-- Strictness properties
@@ -231,8 +240,8 @@ data IdInfo
 	inlinePragInfo	:: InlinePragInfo,	-- Inline pragma
 	occInfo		:: OccInfo,		-- How it occurs
 
-	newStrictnessInfo :: Maybe NewDemand.StrictSig,
-	newDemandInfo	  :: NewDemand.Demand
+	newStrictnessInfo :: Maybe StrictSig,
+	newDemandInfo	  :: Demand
     }
 
 seqIdInfo :: IdInfo -> ()
@@ -295,7 +304,7 @@ setCprInfo        info cp = info { cprInfo = cp }
 setLBVarInfo      info lb = info { lbvarInfo = lb }
 
 setNewDemandInfo     info dd = info { newDemandInfo = dd }
-setNewStrictnessInfo info dd = info { newStrictnessInfo = Just dd }
+setNewStrictnessInfo info dd = info { newStrictnessInfo = dd }
 \end{code}
 
 
@@ -315,7 +324,7 @@ vanillaIdInfo
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= NoInlinePragInfo,
 	    occInfo		= NoOccInfo,
-	    newDemandInfo	= NewDemand.topDmd,
+	    newDemandInfo	= topDmd,
 	    newStrictnessInfo   = Nothing
 	   }
 

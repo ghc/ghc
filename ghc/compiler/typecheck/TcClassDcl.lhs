@@ -16,7 +16,7 @@ import HsSyn		( TyClDecl(..), Sig(..), MonoBinds(..),
 			  isClassOpSig, isPragSig,
 			  getClassDeclSysNames, placeHolderType
 			)
-import BasicTypes	( TopLevelFlag(..), RecFlag(..) )
+import BasicTypes	( TopLevelFlag(..), RecFlag(..), StrictnessMark(..) )
 import RnHsSyn		( RenamedTyClDecl, 
 			  RenamedClassOpSig, RenamedMonoBinds,
 			  RenamedContext, RenamedSig, 
@@ -42,7 +42,6 @@ import Class		( classTyVars, classBigSig, classTyCon,
 			  Class, ClassOpItem, DefMeth (..) )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
-import Demand		( StrictnessMark(..) )
 import Id		( Id, idType, idName )
 import Module		( Module )
 import Name		( Name, NamedThing(..) )

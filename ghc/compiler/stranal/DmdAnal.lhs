@@ -11,17 +11,17 @@ module DmdAnal ( dmdAnalPgm ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..) )
+import CmdLineOpts	( DynFlags, DynFlag(..), opt_MaxWorkerArgs )
 import NewDemand	-- All of it
 import CoreSyn
 import CoreUtils	( exprIsValue, exprArity )
 import DataCon		( dataConTyCon )
 import TyCon		( isProductTyCon, isRecursiveTyCon )
-import Id		( Id, idType, idInfo, idArity, idStrictness, idCprInfo, idDemandInfo,
-			  modifyIdInfo, isDataConId, isImplicitId, isGlobalId )
-import IdInfo		( newStrictnessInfo, setNewStrictnessInfo, mkNewStrictnessInfo,
-			  newDemandInfo, setNewDemandInfo, newDemand
-			)
+import Id		( Id, idType, idInfo, idArity, idCprInfo, idDemandInfo,
+			  modifyIdInfo, isDataConId, isImplicitId, isGlobalId,
+			  idNewStrictness, idNewStrictness_maybe, getNewStrictness, setIdNewStrictness,
+			  idNewDemandInfo, setIdNewDemandInfo, newStrictnessFromOld )
+import IdInfo		( newDemand )
 import Var		( Var )
 import VarEnv
 import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
@@ -36,7 +36,13 @@ import Outputable
 import FastTypes
 \end{code}
 
-ToDo:	set a noinline pragma on bottoming Ids
+To think about
+
+* set a noinline pragma on bottoming Ids
+
+* Consider f x = x+1 `fatbar` error (show x)
+  We'd like to unbox x, even if that means reboxing it in the error case.
+
 \begin{code}
 instance Outputable TopLevelFlag where
   ppr flag = empty
@@ -50,12 +56,6 @@ instance Outputable TopLevelFlag where
 
 \begin{code}
 dmdAnalPgm :: DynFlags -> [CoreBind] -> IO [CoreBind]
-#ifndef DEBUG
-
-dmdAnalPgm dflags binds = return binds
-
-#else
-
 dmdAnalPgm dflags binds
   = do {
 	showPass dflags "Demand analysis" ;
@@ -292,14 +292,25 @@ downRhs top_lvl sigs (id, rhs)
  where
   arity		    = exprArity rhs   -- The idArity may not be up to date
   (rhs_ty, rhs')    = dmdAnal sigs (vanillaCall arity) rhs
-  (lazy_fv, sig_ty) = mkSigTy rhs rhs_ty
-  sig		    = mkStrictSig id arity sig_ty
-  id'		    = id `setIdNewStrictness` sig
-  sigs'		    = extendSigEnv top_lvl sigs id sig
+  (lazy_fv, sig_ty) = mkSigTy id arity rhs rhs_ty
+  id'		    = id `setIdNewStrictness` sig_ty
+  sigs'		    = extendSigEnv top_lvl sigs id sig_ty
+\end{code}
 
-mkSigTy rhs (DmdType fv dmds res) 
-  = (lazy_fv, DmdType strict_fv lazified_dmds res')
+%************************************************************************
+%*									*
+\subsection{Strictness signatures and types}
+%*									*
+%************************************************************************
+
+\begin{code}
+mkSigTy :: Id -> Arity -> CoreExpr -> DmdType -> (DmdEnv, StrictSig)
+-- Take a DmdType and turn it into a StrictSig
+mkSigTy id arity rhs (DmdType fv dmds res) 
+  = (lazy_fv, mkStrictSig id arity dmd_ty)
   where
+    dmd_ty = DmdType strict_fv lazified_dmds res'
+
     lazy_fv   = filterUFM (not . isStrictDmd) fv
     strict_fv = filterUFM isStrictDmd         fv
 	-- We put the strict FVs in the DmdType of the Id, so 
@@ -334,7 +345,9 @@ mkSigTy rhs (DmdType fv dmds res)
 
     lazified_dmds = map lazify dmds
 	-- Get rid of defers in the arguments
-
+    final_dmds = setUnpackStrategy lazified_dmds
+	-- Set the unpacking strategy
+	
     res' = case (dmds, res) of
 		([], RetCPR) | not (exprIsValue rhs) -> TopRes
 		other	 			     -> res
@@ -354,12 +367,59 @@ mkSigTy rhs (DmdType fv dmds res)
 	-- if r doesn't have the CPR property then neither does modInt
 \end{code}
 
+The unpack strategy determines whether we'll *really* unpack the argument,
+or whether we'll just remember its strictness.  If unpacking would give
+rise to a *lot* of worker args, we may decide not to unpack after all.
+
+\begin{code}
+setUnpackStrategy :: [Demand] -> [Demand]
+setUnpackStrategy ds
+  = snd (go (opt_MaxWorkerArgs - nonAbsentArgs ds) ds)
+  where
+    go :: Int 			-- Max number of args available for sub-components of [Demand]
+       -> [Demand]
+       -> (Int, [Demand])	-- Args remaining after subcomponents of [Demand] are unpacked
+
+    go n (Seq keep _ cs : ds) 
+	| n' >= 0    = Seq keep Now cs' `cons` go n'' ds
+        | otherwise  = Eval `cons` go n ds
+	where
+	  (n'',cs') = go n' cs
+	  n' = n + box - non_abs_args
+	  box = case keep of
+		   Keep -> 0
+		   Drop -> 1	-- Add one to the budget if we drop the top-level arg
+	  non_abs_args = nonAbsentArgs cs
+		-- Delete # of non-absent args to which we'll now be committed
+				
+    go n (d:ds) = d `cons` go n ds
+    go n []     = (n,[])
+
+    cons d (n,ds) = (n, d:ds)
+
+nonAbsentArgs :: [Demand] -> Int
+nonAbsentArgs []	 = 0
+nonAbsentArgs (Abs : ds) = nonAbsentArgs ds
+nonAbsentArgs (d   : ds) = 1 + nonAbsentArgs ds
+\end{code}
+
 
 %************************************************************************
 %*									*
 \subsection{Strictness signatures and types}
 %*									*
 %************************************************************************
+
+\begin{code}
+splitDmdTy :: DmdType -> (Demand, DmdType)
+-- Split off one function argument
+splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
+splitDmdTy ty@(DmdType fv [] TopRes)         = (topDmd, ty)
+splitDmdTy ty@(DmdType fv [] BotRes)         = (Abs,    ty)
+	-- We already have a suitable demand on all
+	-- free vars, so no need to add more!
+splitDmdTy (DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
+\end{code}
 
 \begin{code}
 unitVarDmd var dmd = DmdType (unitVarEnv var dmd) [] TopRes
@@ -401,28 +461,6 @@ removeFV fv var res = (fv', dmd)
 
 %************************************************************************
 %*									*
-\subsection{Demand types}
-%*									*
-%************************************************************************
-
-\begin{code}
-splitDmdTy :: DmdType -> (Demand, DmdType)
--- Split off one function argument
-splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
-splitDmdTy ty@(DmdType fv [] TopRes)         = (topDmd, ty)
-splitDmdTy ty@(DmdType fv [] BotRes)         = (Abs,    ty)
-	-- We already have a suitable demand on all
-	-- free vars, so no need to add more!
-splitDmdTy (DmdType fv [] RetCPR)   	  = panic "splitDmdTy"
-
--------------------------
-dmdTypeRes :: DmdType -> DmdResult
-dmdTypeRes (DmdType _ _ res_ty) = res_ty
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Strictness signatures}
 %*									*
 %************************************************************************
@@ -455,27 +493,27 @@ dmdTransform sigs var dmd
 ------ 	DATA CONSTRUCTOR
   | isDataConId var,		-- Data constructor
     Seq k Now ds <- res_dmd,	-- and the demand looks inside its fields
-    let StrictSig arity dmd_ty = idNewStrictness var	-- It must have a strictness sig
-  = if arity == length ds then	-- Saturated, so unleash the demand
+    let StrictSig dmd_ty = idNewStrictness var	-- It must have a strictness sig
+  = if dmdTypeDepth dmd_ty == length ds then	-- Saturated, so unleash the demand
 	-- ds can be empty, when we are just seq'ing the thing
 	mkDmdType emptyDmdEnv ds (dmdTypeRes dmd_ty)
-		-- Need to extract whether it's a product
+		-- Need to extract whether it's a product, hence dmdTypeRes
     else
 	topDmdType
 
 ------ 	IMPORTED FUNCTION
   | isGlobalId var,		-- Imported function
-    let StrictSig arity dmd_ty = getNewStrictness var
-  = if arity <= depth then	-- Saturated, so unleash the demand
+    let StrictSig dmd_ty = getNewStrictness var
+  = if dmdTypeDepth dmd_ty <= call_depth then	-- Saturated, so unleash the demand
 	dmd_ty
     else
 	topDmdType
 
 ------ 	LOCAL LET/REC BOUND THING
-  | Just (StrictSig arity dmd_ty, top_lvl) <- lookupVarEnv sigs var
+  | Just (StrictSig dmd_ty, top_lvl) <- lookupVarEnv sigs var
   = let
-	fn_ty | arity <= depth = dmd_ty 
-	      | otherwise      = deferType dmd_ty
+	fn_ty | dmdTypeDepth dmd_ty <= call_depth = dmd_ty 
+	      | otherwise   		          = deferType dmd_ty
 	-- NB: it's important to use deferType, and not just return topDmdType
 	-- Consider	let { f x y = p + x } in f 1
 	-- The application isn't saturated, but we must nevertheless propagate 
@@ -488,17 +526,7 @@ dmdTransform sigs var dmd
   = unitVarDmd var dmd
 
   where
-    (depth, res_dmd) = splitCallDmd dmd
-\end{code}
-
-\begin{code}
-squashDmdEnv (StrictSig a (DmdType fv ds res)) = StrictSig a (DmdType emptyDmdEnv ds res)
-
-betterStrict :: StrictSig -> StrictSig -> Bool
-betterStrict (StrictSig ar1 t1) (StrictSig ar2 t2)
-  = (ar1 >= ar2) && (t1 `betterDmdType` t2)
-
-betterDmdType t1 t2 = (t1 `lubType` t2) == t2
+    (call_depth, res_dmd) = splitCallDmd dmd
 \end{code}
 
 
@@ -530,24 +558,25 @@ defer Abs	   = Abs
 defer (Seq k _ ds) = Seq k Defer ds
 defer other	   = Lazy
 
-isStrictDmd :: Demand -> Bool
-isStrictDmd Bot 	  = True
-isStrictDmd Err 	  = True    	   
-isStrictDmd (Seq _ Now _) = True
-isStrictDmd Eval	  = True
-isStrictDmd (Call _)	  = True
-isStrictDmd other	  = False
-
 lazify :: Demand -> Demand
 -- The 'Defer' demands are just Lazy at function boundaries
 lazify (Seq k Defer ds) = Lazy
 lazify (Seq k Now   ds) = Seq k Now (map lazify ds)
 lazify Bot		= Abs	-- Don't pass args that are consumed by bottom
 lazify d		= d
+\end{code}
+
+\begin{code}
+betterStrictness :: StrictSig -> StrictSig -> Bool
+betterStrictness (StrictSig t1) (StrictSig t2) = betterDmdType t1 t2
+
+betterDmdType t1 t2 = (t1 `lubType` t2) == t2
 
 betterDemand :: Demand -> Demand -> Bool
 -- If d1 `better` d2, and d2 `better` d2, then d1==d2
 betterDemand d1 d2 = (d1 `lub` d2) == d2
+
+squashDmdEnv (StrictSig (DmdType fv ds res)) = StrictSig (DmdType emptyDmdEnv ds res)
 \end{code}
 
 
@@ -704,33 +733,6 @@ modifyEnv need_to_modify zapper env1 env2 env
 
 
 \begin{code}
--- Move these to Id.lhs
-idNewStrictness_maybe :: Id -> Maybe StrictSig
-idNewStrictness :: Id -> StrictSig
-
-idNewStrictness_maybe id = newStrictnessInfo (idInfo id)
-idNewStrictness       id = idNewStrictness_maybe id `orElse` topSig
-
-getNewStrictness :: Id -> StrictSig
--- First tries the "new-strictness" field, and then
--- reverts to the old one. This is just until we have
--- cross-module info for new strictness
-getNewStrictness id = idNewStrictness_maybe id `orElse` newStrictnessFromOld id
-		      
-newStrictnessFromOld :: Id -> StrictSig
-newStrictnessFromOld id = mkNewStrictnessInfo id (idArity id) (idStrictness id) (idCprInfo id)
-
-setIdNewStrictness :: Id -> StrictSig -> Id
-setIdNewStrictness id sig = modifyIdInfo (`setNewStrictnessInfo` sig) id
-
-idNewDemandInfo :: Id -> Demand
-idNewDemandInfo id = newDemandInfo (idInfo id)
-
-setIdNewDemandInfo :: Id -> Demand -> Id
-setIdNewDemandInfo id dmd = modifyIdInfo (`setNewDemandInfo` dmd) id
-\end{code}
-
-\begin{code}
 get_changes binds = vcat (map get_changes_bind binds)
 
 get_changes_bind (Rec pairs) = vcat (map get_changes_pr pairs)
@@ -765,8 +767,8 @@ get_changes_str id
     info = (text "Old" <+> ppr old) $$ (text "New" <+> ppr new)
     new = squashDmdEnv (idNewStrictness id)	-- Don't report diffs in the env
     old = newStrictnessFromOld id
-    old_better = old `betterStrict` new
-    new_better = new `betterStrict` old
+    old_better = old `betterStrictness` new
+    new_better = new `betterStrictness` old
 
 get_changes_dmd id
   | isUnLiftedType (idType id) = empty	-- Not useful
@@ -781,5 +783,4 @@ get_changes_dmd id
     old = newDemand (idDemandInfo id)
     new_better = new `betterDemand` old 
     old_better = old `betterDemand` new
-#endif 	/* DEBUG */
 \end{code}

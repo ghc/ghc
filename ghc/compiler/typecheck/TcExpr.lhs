@@ -15,8 +15,7 @@ import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
 import TcHsSyn		( TcExpr, TcRecordBinds, mkHsLet )
 
 import TcMonad
-import BasicTypes	( RecFlag(..) )
-
+import BasicTypes	( RecFlag(..),  isMarkedStrict )
 import Inst		( InstOrigin(..), 
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethod, newIPDict,
@@ -50,7 +49,6 @@ import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
 import DataCon		( dataConFieldLabels, dataConSig, 
 			  dataConStrictMarks
 			)
-import Demand		( isMarkedStrict )
 import Name		( Name )
 import TyCon		( TyCon, tyConTyVars, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )

@@ -83,6 +83,7 @@ module CmdLineOpts (
 	opt_SimplDoLambdaEtaExpansion,
 	opt_SimplCaseMerge,
 	opt_SimplExcessPrecision,
+	opt_MaxWorkerArgs,
 
 	-- Unfolding control
 	opt_UF_CreationThreshold,
@@ -551,6 +552,7 @@ opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
 opt_UnfoldCasms		        = lookUp  SLIT("-funfold-casms-in-hi-file")
 opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
 opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
+opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 {-
    The optional '-inpackage=P' flag tells what package
@@ -652,6 +654,7 @@ isStaticHscFlag f =
   || any (flip prefixMatch f) [
 	"fcontext-stack",
 	"fliberate-case-threshold",
+	"fmax-worker-args",
 	"fhistory-size",
 	"funfolding-creation-threshold",
 	"funfolding-use-threshold",

@@ -4,6 +4,11 @@
 \section[SaAbsInt]{Abstract interpreter for strictness analysis}
 
 \begin{code}
+#ifndef DEBUG
+-- If DEBUG is off, omit all exports 
+module SaAbsInt () where
+
+#else
 module SaAbsInt (
 	findStrictness,
 	findDemand, findDemandAlts,
@@ -12,7 +17,7 @@ module SaAbsInt (
 	fixpoint,
 	isBot
     ) where
-
+#endif /* DEBUG */
 #include "HsVersions.h"
 
 import CmdLineOpts	( opt_AllStrict, opt_NumbersStrict )

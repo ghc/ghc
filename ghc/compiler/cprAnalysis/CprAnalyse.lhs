@@ -131,6 +131,11 @@ ids decorated with their CprInfo pragmas.
 \begin{code}
 
 cprAnalyse :: DynFlags -> [CoreBind] -> IO [CoreBind]
+#ifndef DEBUG
+-- Omit unless DEBUG is on
+cprAnalyse dflags binds = return binds
+
+#else
 cprAnalyse dflags binds
   = do {
 	showPass dflags "Constructed Product analysis" ;
@@ -306,4 +311,5 @@ getCprAbsVal v = case idCprInfo v of
 		 arity = idArity v
 	-- Imported (non-nullary) constructors will have the CPR property
 	-- in their IdInfo, so no need to look at their unfolding
+#endif /* DEBUG */
 \end{code}

@@ -32,8 +32,7 @@ import HsCore		( UfExpr, UfBinder, HsIdInfo, pprHsIdInfo,
 			  eq_ufBinders, eq_ufExpr, pprUfExpr 
 			)
 import CoreSyn		( CoreRule(..) )
-import BasicTypes	( NewOrData(..) )
-import Demand		( StrictnessMark(..) )
+import BasicTypes	( NewOrData(..), StrictnessMark(..) )
 import ForeignCall	( CExportSpec, CCallSpec, DNCallSpec, CCallConv )
 
 -- others:

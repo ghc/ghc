@@ -30,13 +30,13 @@ import CoreUtils	( exprIsTrivial, cheapEqExpr, exprType, exprIsCheap,
 import Subst		( InScopeSet, mkSubst, substExpr )
 import qualified Subst	( simplBndrs, simplBndr, simplLetId )
 import Id		( idType, idName, 
-			  idUnfolding, idStrictness,
+			  idUnfolding, idNewStrictness,
 			  mkLocalId, idInfo
 			)
 import IdInfo		( StrictnessInfo(..) )
 import Maybes		( maybeToBool, catMaybes )
 import Name		( setNameUnique )
-import Demand		( isStrict )
+import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
 import Type		( Type, mkForAllTys, seqType, 
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
@@ -230,8 +230,8 @@ getContArgs fun orig_cont
 	-- after that number of value args have been consumed
 	-- Otherwise it's infinite, extended with False
     fun_stricts
-      = case idStrictness fun of
-	  StrictnessInfo demands result_bot 
+      = case splitStrictSig (idNewStrictness fun) of
+	  (demands, result_info)
 		| not (demands `lengthExceeds` countValArgs orig_cont)
 		-> 	-- Enough args, use the strictness given.
 			-- For bottoming functions we used to pretend that the arg
@@ -240,10 +240,10 @@ getContArgs fun orig_cont
 			-- top-level bindings for (say) strings into 
 			-- calls to error.  But now we are more careful about
 			-- inlining lone variables, so its ok (see SimplUtils.analyseCont)
-		   if result_bot then
-			map isStrict demands		-- Finite => result is bottom
+		   if isBotRes result_info then
+			map isStrictDmd demands		-- Finite => result is bottom
 		   else
-			map isStrict demands ++ vanilla_stricts
+			map isStrictDmd demands ++ vanilla_stricts
 
 	  other -> vanilla_stricts	-- Not enough args, or no strictness
 

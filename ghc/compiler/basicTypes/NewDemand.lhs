@@ -5,11 +5,17 @@
 
 \begin{code}
 module NewDemand(
-	Demand(..), Keepity(..), Deferredness(..), topDmd,
-	StrictSig(..), topSig, botSig, mkStrictSig,
-	DmdType(..), topDmdType, mkDmdType, mkTopDmdType,
+	Demand(..), Keepity(..), Deferredness(..), 
+	topDmd, lazyDmd, seqDmd, evalDmd, isStrictDmd,
+
+	DmdType(..), topDmdType, mkDmdType, mkTopDmdType, 
+		dmdTypeDepth, dmdTypeRes,
 	DmdEnv, emptyDmdEnv,
-	DmdResult(..), isBotRes
+	DmdResult(..), isBotRes, returnsCPR,
+
+	StrictSig(..), mkStrictSig, topSig, botSig, 
+	splitStrictSig, strictSigResInfo,
+	pprIfaceStrictSig, appIsBottom, isBottomingSig
      ) where
 
 #include "HsVersions.h"
@@ -20,31 +26,6 @@ import VarEnv		( VarEnv, emptyVarEnv )
 import UniqFM		( ufmToList )
 import qualified Demand
 import Outputable
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Strictness signatures
-%*									*
-%************************************************************************
-
-\begin{code}
-data StrictSig = StrictSig Arity DmdType
-	       deriving( Eq )
-	-- Equality needed when comparing strictness 
-	-- signatures for fixpoint finding
-
-topSig = StrictSig 0 topDmdType
-botSig = StrictSig 0 botDmdType
-
-mkStrictSig :: Id -> Arity -> DmdType -> StrictSig
-mkStrictSig id arity ty 
-  = WARN( arity /= dmdTypeDepth ty, ppr id <+> (ppr arity $$ ppr ty) )
-    StrictSig arity ty
-
-instance Outputable StrictSig where
-  ppr (StrictSig arity ty) = ppr ty
 \end{code}
 
 
@@ -71,7 +52,9 @@ type DmdEnv = VarEnv Demand
 data DmdResult = TopRes	-- Nothing known	
 	       | RetCPR	-- Returns a constructed product
 	       | BotRes	-- Diverges or errors
-	       deriving( Eq )
+	       deriving( Eq, Show )
+	-- Equality for fixpoints
+	-- Show needed for Show in Lex.Token (sigh)
 
 -- Equality needed for fixpoints in DmdAnal
 instance Eq DmdType where
@@ -88,7 +71,7 @@ instance Outputable DmdType where
       pp_elt (uniq, dmd) = ppr uniq <> text "->" <> ppr dmd
 
 instance Outputable DmdResult where
-  ppr TopRes = char 'T'
+  ppr TopRes = empty
   ppr RetCPR = char 'M'
   ppr BotRes = char 'X'
 
@@ -100,6 +83,10 @@ isBotRes :: DmdResult -> Bool
 isBotRes BotRes = True
 isBotRes other  = False
 
+returnsCPR :: DmdResult -> Bool
+returnsCPR RetCPR = True
+returnsCPR other  = False
+
 mkDmdType :: DmdEnv -> [Demand] -> DmdResult -> DmdType
 mkDmdType fv ds res = DmdType fv ds res
 
@@ -108,8 +95,80 @@ mkTopDmdType ds res = DmdType emptyDmdEnv ds res
 
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
+
+dmdTypeRes :: DmdType -> DmdResult
+dmdTypeRes (DmdType _ _ res_ty) = res_ty
 \end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Strictness signature
+%*									*
+%************************************************************************
+
+In a let-bound Id we record its strictness info.  
+In principle, this strictness info is a demand transformer, mapping
+a demand on the Id into a DmdType, which gives
+	a) the free vars of the Id's value
+	b) the Id's arguments
+	c) an indication of the result of applying 
+	   the Id to its arguments
+
+However, in fact we store in the Id an extremely emascuated demand transfomer,
+namely 
+		a single DmdType
+(Nevertheless we dignify StrictSig as a distinct type.)
+
+This DmdType gives the demands unleashed by the Id when it is applied
+to as many arguments as are given in by the arg demands in the DmdType.
+
+For example, the demand transformer described by the DmdType
+		DmdType {x -> U(LL)} [V,A] Top
+says that when the function is applied to two arguments, it
+unleashes demand U(LL) on the free var x, V on the first arg,
+and A on the second.  
+
+If this same function is applied to one arg, all we can say is
+that it uses x with U*(LL), and its arg with demand L.
+
+\begin{code}
+newtype StrictSig = StrictSig DmdType
+		  deriving( Eq )
+
+instance Outputable StrictSig where
+   ppr (StrictSig ty) = ppr ty
+
+instance Show StrictSig where
+   show (StrictSig ty) = showSDoc (ppr ty)
+
+mkStrictSig :: Id -> Arity -> DmdType -> StrictSig
+mkStrictSig id arity dmd_ty
+  = WARN( arity /= dmdTypeDepth dmd_ty, ppr id <+> (ppr arity $$ ppr dmd_ty) )
+    StrictSig dmd_ty
+
+splitStrictSig :: StrictSig -> ([Demand], DmdResult)
+splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
+
+strictSigResInfo :: StrictSig -> DmdResult
+strictSigResInfo (StrictSig (DmdType _ _ res)) = res
+
+topSig = StrictSig topDmdType
+botSig = StrictSig botDmdType
+
+-- appIsBottom returns true if an application to n args would diverge
+appIsBottom (StrictSig (DmdType _ ds BotRes)) n = n >= length ds
+appIsBottom _				      _ = False
+
+isBottomingSig (StrictSig (DmdType _ _ BotRes)) = True
+isBottomingSig _				= False
+
+pprIfaceStrictSig :: StrictSig -> SDoc
+-- Used for printing top-level strictness pragmas in interface files
+pprIfaceStrictSig (StrictSig (DmdType _ dmds res))
+  = hcat (map ppr dmds) <> ppr res
+\end{code}
+    
 
 %************************************************************************
 %*									*
@@ -138,8 +197,19 @@ data Deferredness = Now | Defer
 data Keepity = Keep | Drop
 	     deriving( Eq )
 
-topDmd :: Demand	-- The most uninformative demand
-topDmd = Lazy
+topDmd, lazyDmd, seqDmd :: Demand
+topDmd  = Lazy			-- The most uninformative demand
+lazyDmd = Lazy
+seqDmd  = Seq Keep Now []	-- Polymorphic seq demand
+evalDmd = Eval
+
+isStrictDmd :: Demand -> Bool
+isStrictDmd Bot 	  = True
+isStrictDmd Err 	  = True    	   
+isStrictDmd (Seq _ Now _) = True
+isStrictDmd Eval	  = True
+isStrictDmd (Call _)	  = True
+isStrictDmd other	  = False
 
 instance Outputable Demand where
     ppr Lazy 	     = char 'L'
@@ -148,6 +218,7 @@ instance Outputable Demand where
     ppr Err          = char 'X'
     ppr Bot          = char 'B'
     ppr (Call d)     = char 'C' <> parens (ppr d)
+    ppr (Seq k l []) = ppr k <> ppr l
     ppr (Seq k l ds) = ppr k <> ppr l <> parens (hcat (map ppr ds))
 
 instance Outputable Deferredness where

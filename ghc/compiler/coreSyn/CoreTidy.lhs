@@ -25,6 +25,7 @@ import Id		( idType, idInfo, idName, isExportedId,
 			  setIdUnfolding, hasNoBinding, mkUserLocal
 			) 
 import IdInfo		{- loads of stuff -}
+import NewDemand	( isBottomingSig, topSig )
 import Name		( getOccName, nameOccName, globaliseName, setNameOcc, 
 		  	  localiseName, isGlobalName, setNameUnique
 			)
@@ -306,7 +307,7 @@ addExternal (id,rhs) needed
     idinfo	   = idInfo id
     dont_inline	   = isNeverInlinePrag (inlinePragInfo idinfo)
     loop_breaker   = isLoopBreaker (occInfo idinfo)
-    bottoming_fn   = isBottomingStrictness (strictnessInfo idinfo)
+    bottoming_fn   = isBottomingSig (newStrictnessInfo idinfo `orElse` topSig)
     spec_ids	   = rulesRhsFreeVars (specInfo idinfo)
     worker_info	   = workerInfo idinfo
 
@@ -465,18 +466,17 @@ tidyIdInfo tidy_env is_external unfold_info cg_info id
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't external, or if we don't have -O
   = vanillaIdInfo 
-	`setCgInfo` 	    cg_info
-	`setStrictnessInfo` strictnessInfo core_idinfo
+	`setCgInfo` 	       cg_info
+	`setNewStrictnessInfo` newStrictnessInfo core_idinfo
 	-- Keep strictness; it's used by CorePrep
 
   | otherwise
   =  vanillaIdInfo 
-	`setCgInfo` 	    cg_info
-	`setCprInfo`	    cprInfo core_idinfo
-	`setStrictnessInfo` strictnessInfo core_idinfo
-	`setInlinePragInfo` inlinePragInfo core_idinfo
-	`setUnfoldingInfo`  unfold_info
-	`setWorkerInfo`	    tidyWorker tidy_env (workerInfo core_idinfo)
+	`setCgInfo` 	       cg_info
+	`setNewStrictnessInfo` newStrictnessInfo core_idinfo
+	`setInlinePragInfo`    inlinePragInfo core_idinfo
+	`setUnfoldingInfo`     unfold_info
+	`setWorkerInfo`	       tidyWorker tidy_env (workerInfo core_idinfo)
 	-- NB: we throw away the Rules
 	-- They have already been extracted by findExternalRules
   where

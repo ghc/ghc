@@ -50,14 +50,14 @@ import Name		( hashName )
 import Literal		( hashLiteral, literalType, litIsDupable )
 import DataCon		( DataCon, dataConRepArity )
 import PrimOp		( primOpOkForSpeculation, primOpIsCheap )
-import Id		( Id, idType, globalIdDetails, idStrictness, idLBVarInfo, 
+import Id		( Id, idType, globalIdDetails, idNewStrictness, idLBVarInfo, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo, isOneShotLambda,
 			  isDataConId_maybe, mkSysLocal, hasNoBinding
 			)
 import IdInfo		( LBVarInfo(..),  
 			  GlobalIdDetails(..),
 			  megaSeqIdInfo )
-import Demand		( appIsBottom )
+import NewDemand	( appIsBottom )
 import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe, 
 			  applyTys, isUnLiftedType, seqType, mkUTy, mkTyVarTy,
 			  splitForAllTy_maybe, isForAllTy, splitNewType_maybe, eqType
@@ -508,7 +508,7 @@ exprIsBottom e = go 0 e
 		 go n (Lam _ _)	   = False
 
 idAppIsBottom :: Id -> Int -> Bool
-idAppIsBottom id n_val_args = appIsBottom (idStrictness id) n_val_args
+idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
 \end{code}
 
 @exprIsValue@ returns true for expressions that are certainly *already* 

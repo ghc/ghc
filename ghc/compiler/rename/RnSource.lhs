@@ -287,10 +287,10 @@ rnTyClDecl (IfaceSig {tcdName = name, tcdType = ty, tcdIdInfo = id_infos, tcdLoc
   where
     doc_str = text "In the interface signature for" <+> quotes (ppr name)
 
-rnTyClDecl (ForeignType {tcdName = name, tcdFoType = spec, tcdLoc = loc})
+rnTyClDecl (ForeignType {tcdName = name, tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
   = pushSrcLocRn loc 			$
     lookupTopBndrRn name		`thenRn` \ name' ->
-    returnRn (ForeignType {tcdName = name', tcdFoType = spec, tcdLoc = loc})
+    returnRn (ForeignType {tcdName = name', tcdFoType = fo_type, tcdExtName = ext_name, tcdLoc = loc})
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdName = tycon,
 		    tcdTyVars = tyvars, tcdCons = condecls, tcdNCons = nconstrs,
@@ -713,7 +713,6 @@ rnIdInfo (HsUnfold inline expr)	= rnCoreExpr expr `thenRn` \ expr' ->
 rnIdInfo (HsStrictness str)     = returnRn (HsStrictness str)
 rnIdInfo (HsArity arity)	= returnRn (HsArity arity)
 rnIdInfo HsNoCafRefs		= returnRn HsNoCafRefs
-rnIdInfo HsCprInfo		= returnRn HsCprInfo
 \end{code}
 
 @UfCore@ expressions.

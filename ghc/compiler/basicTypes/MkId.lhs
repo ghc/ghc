@@ -31,7 +31,7 @@ module MkId (
 #include "HsVersions.h"
 
 
-import BasicTypes	( Arity )
+import BasicTypes	( Arity, StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
 import TysPrim		( openAlphaTyVars, alphaTyVar, alphaTy, 
 			  intPrimTy, realWorldStatePrimTy
 			)
@@ -58,8 +58,6 @@ import Name		( mkWiredInName, mkFCallName, Name )
 import OccName		( mkVarOcc )
 import PrimOp		( PrimOp(DataToTagOp), primOpSig, mkPrimOpIdName )
 import ForeignCall	( ForeignCall )
-import Demand		( wwStrict, wwPrim, mkStrictnessInfo, noStrictnessInfo,
-			  StrictnessMark(..), isMarkedUnboxed, isMarkedStrict )
 import DataCon		( DataCon, 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
 			  dataConArgTys, dataConRepType, dataConRepStrictness, 
@@ -70,16 +68,17 @@ import DataCon		( DataCon,
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
 			  mkTemplateLocals, mkTemplateLocalsNum,
-			  mkTemplateLocal, idCprInfo, idName
+			  mkTemplateLocal, idNewStrictness, idName
 			)
 import IdInfo		( IdInfo, noCafNoTyGenIdInfo,
 			  exactArity, setUnfoldingInfo, setCprInfo,
 			  setArityInfo, setSpecInfo,  setCgInfo,
-			  setStrictnessInfo,
 			  mkNewStrictnessInfo, setNewStrictnessInfo,
 			  GlobalIdDetails(..), CafInfo(..), CprInfo(..), 
 			  CgInfo(..), setCgArity
 			)
+import NewDemand	( mkStrictSig, strictSigResInfo, DmdResult(..),
+			  mkTopDmdType, topDmd, evalDmd )
 import FieldLabel	( mkFieldLabel, fieldLabelName, 
 			  firstFieldLabelTag, allFieldLabelTags, fieldLabelType
 			)
@@ -143,22 +142,20 @@ mkDataConId work_name data_con
   where
     id = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
     info = noCafNoTyGenIdInfo
-	   `setCgArity`		arity
-	   `setArityInfo`	arity
-	   `setCprInfo`		cpr_info
-	   `setStrictnessInfo`	strict_info
-	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info cpr_info
+	   `setCgArity`			arity
+	   `setArityInfo`		arity
+	   `setNewStrictnessInfo`	Just strict_sig
 
     arity = dataConRepArity data_con
-    strict_info = mkStrictnessInfo (dataConRepStrictness data_con, False)
+    strict_sig = mkStrictSig id arity (mkTopDmdType (dataConRepStrictness data_con) cpr_info)
 
     tycon = dataConTyCon data_con
     cpr_info | isProductTyCon tycon && 
 	       isDataTyCon tycon    &&
 	       arity > 0 	    &&
-	       arity <= mAX_CPR_SIZE	= ReturnsCPR
-	     | otherwise 		= NoCPRInfo
-	-- ReturnsCPR is only true for products that are real data types;
+	       arity <= mAX_CPR_SIZE	= RetCPR
+	     | otherwise 		= TopRes
+	-- RetCPR is only true for products that are real data types;
 	-- that is, not unboxed tuples or [non-recursive] newtypes
 
 mAX_CPR_SIZE :: Arity
@@ -219,21 +216,23 @@ mkDataConWrapId data_con
 
     info = noCafNoTyGenIdInfo
 	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
-	   `setCprInfo`		cpr_info
-		-- The Cpr info can be important inside INLINE rhss, where the
-		-- wrapper constructor isn't inlined
 	   `setCgArity` 	arity
 		-- The NoCaf-ness is set by noCafNoTyGenIdInfo
 	   `setArityInfo`	arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
-	   `setNewStrictnessInfo` 	mkNewStrictnessInfo wrap_id arity noStrictnessInfo cpr_info
+	   `setNewStrictnessInfo` 	Just wrap_sig
 
     wrap_ty = mkForAllTys all_tyvars $
 	      mkFunTys all_arg_tys
 	      result_ty
 
-    cpr_info = idCprInfo work_id
+    res_info = strictSigResInfo (idNewStrictness work_id)
+    wrap_sig = mkStrictSig wrap_id arity (mkTopDmdType (replicate arity topDmd) res_info)
+	-- The Cpr info can be important inside INLINE rhss, where the
+	-- wrapper constructor isn't inlined
+	-- But we are sloppy about the argument demands, because we expect 
+	-- to inline the constructor very vigorously.
 
     wrap_rhs | isNewTyCon tycon
 	     = ASSERT( null ex_tyvars && null ex_dict_args && length orig_arg_tys == 1 )
@@ -606,8 +605,8 @@ mkPrimOpId prim_op
 	   `setSpecInfo`	rules
 	   `setCgArity` 	arity
 	   `setArityInfo` 	arity
-	   `setStrictnessInfo`	strict_info
-	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info NoCPRInfo
+	   `setNewStrictnessInfo`	Just (mkNewStrictnessInfo id arity strict_info NoCPRInfo)
+	-- Until we modify the primop generation code
 
     rules = maybe emptyCoreRules (addRule emptyCoreRules id)
 		(primOpRule prim_op)
@@ -637,15 +636,14 @@ mkFCallId uniq fcall ty
     name = mkFCallName uniq occ_str
 
     info = noCafNoTyGenIdInfo
-	   `setCgArity` 	arity
-	   `setArityInfo` 	arity
-	   `setStrictnessInfo`	strict_info
-	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info NoCPRInfo
+	   `setCgArity` 		arity
+	   `setArityInfo` 		arity
+	   `setNewStrictnessInfo`	Just strict_sig
 
     (_, tau) 	 = tcSplitForAllTys ty
     (arg_tys, _) = tcSplitFunTys tau
     arity	 = length arg_tys
-    strict_info  = mkStrictnessInfo (take arity (repeat wwPrim), False)
+    strict_sig   = mkStrictSig id arity (mkTopDmdType (replicate arity evalDmd) TopRes)
 \end{code}
 
 
@@ -838,12 +836,9 @@ pc_bottoming_Id key mod name ty
  = id
  where
     id = pcMiscPrelId key mod name ty bottoming_info
-    strict_info = mkStrictnessInfo ([wwStrict], True)
-    bottoming_info = noCafNoTyGenIdInfo 
-		     `setStrictnessInfo`  strict_info
-	  	     `setNewStrictnessInfo`	mkNewStrictnessInfo id 1 strict_info NoCPRInfo
-
-
+    arity	   = 1
+    strict_sig	   = mkStrictSig id arity (mkTopDmdType [evalDmd] BotRes)
+    bottoming_info = noCafNoTyGenIdInfo `setNewStrictnessInfo` Just strict_sig
 	-- these "bottom" out, no matter what their arguments
 
 generic_ERROR_ID u n = pc_bottoming_Id u pREL_ERR n errorTy

@@ -25,7 +25,7 @@ import VarEnv
 import Literal		( Literal )
 import Id		( Id, idType, idInfo, isDataConId, hasNoBinding,
 			  idUnfolding, setIdUnfolding, isExportedId, isDeadBinder,
-			  idDemandInfo, setIdInfo,
+			  idNewDemandInfo, setIdInfo,
 			  idOccInfo, setIdOccInfo, 
 			  zapLamIdInfo, setOneShotLambda, 
 			)
@@ -34,7 +34,7 @@ import IdInfo		( OccInfo(..), isDeadOcc, isLoopBreaker,
 			  setUnfoldingInfo, 
 			  occInfo
 			)
-import Demand		( isStrict )
+import NewDemand	( isStrictDmd )
 import DataCon		( dataConNumInstArgs, dataConRepStrictness,
 			  dataConSig, dataConArgTys
 			)
@@ -485,7 +485,7 @@ simplNonRecBind bndr rhs rhs_se cont_ty thing_inside
 	-- has arisen from an application (\x. E) RHS, perhaps they aren't
 	bndr''    = simplIdInfo bndr_subst (idInfo bndr) bndr'
 	bndr_ty'  = idType bndr'
-	is_strict = isStrict (idDemandInfo bndr) || isStrictType bndr_ty'
+	is_strict = isStrictDmd (idNewDemandInfo bndr) || isStrictType bndr_ty'
     in
     modifyInScope bndr'' bndr''				$
 
@@ -739,7 +739,7 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 		-- we only float if arg' is a WHNF,
 		-- and so there can't be any 'will be demanded' bindings in the floats.
 		-- Hence the assert
-    WARN( any demanded_float (fromOL floats2), ppr (fromOL floats2) )
+    WARN( any demanded_float (fromOL floats2), ppr (filter demanded_float (fromOL floats2)) )
 
 	-- 			Transform the RHS
 	-- It's important that we do eta expansion on function *arguments* (which are
@@ -767,7 +767,7 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 		-- Don't do the float
 	thing_inside (wrapFloats floats1 rhs1)
 
-demanded_float (NonRec b r) = isStrict (idDemandInfo b) && not (isUnLiftedType (idType b))
+demanded_float (NonRec b r) = isStrictDmd (idNewDemandInfo b) && not (isUnLiftedType (idType b))
 		-- Unlifted-type (cheap-eagerness) lets may well have a demanded flag on them
 demanded_float (Rec _)	    = False
 
@@ -1227,7 +1227,7 @@ canEliminateCase scrut bndr alts
     (rhs1:other_rhss)		 = rhssOfAlts alts
     binders_unused (_, bndrs, _) = all isDeadBinder bndrs
 
-    var_demanded_later (Var v) = isStrict (idDemandInfo bndr)	-- It's going to be evaluated later
+    var_demanded_later (Var v) = isStrictDmd (idNewDemandInfo bndr)	-- It's going to be evaluated later
     var_demanded_later other   = False
 
 
@@ -1469,9 +1469,9 @@ simplAlts zap_occ_info scrut_cons case_bndr' alts cont'
 
     cat_evals [] [] = []
     cat_evals (v:vs) (str:strs)
-	| isTyVar v    = v				     : cat_evals vs (str:strs)
-	| isStrict str = (v' `setIdUnfolding` mkOtherCon []) : cat_evals vs strs
-	| otherwise    = v'				     : cat_evals vs strs
+	| isTyVar v       = v				        : cat_evals vs (str:strs)
+	| isStrictDmd str = (v' `setIdUnfolding` mkOtherCon []) : cat_evals vs strs
+	| otherwise       = v'				        : cat_evals vs strs
 	where
 	  v' = zap_occ_info v
 \end{code}

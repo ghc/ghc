@@ -36,13 +36,11 @@ import HsSyn		-- quite a bit of stuff
 import RdrHsSyn		-- oodles of synonyms
 import HsTypes		( mkHsForAllTy, mkHsTupCon )
 import HsCore
-import Demand		( mkStrictnessInfo )
 import Literal		( Literal(..), mkMachInt, mkMachInt64, mkMachWord, mkMachWord64 )
-import BasicTypes	( Fixity(..), FixityDirection(..), 
+import BasicTypes	( Fixity(..), FixityDirection(..), StrictnessMark(..),
 			  NewOrData(..), Version, initialVersion, Boxity(..)
 			)
 import CostCentre       ( CostCentre(..), IsCafCC(..), IsDupdCC(..) )
-import Demand		( StrictnessMark(..) )
 import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
 import IdInfo           ( InlinePragInfo(..) )
 import ForeignCall	( ForeignCall(..), CCallConv(..), CCallSpec(..), CCallTarget(..) )
@@ -746,8 +744,7 @@ id_info		:: { [HsIdInfo RdrName] }
 id_info_item	:: { HsIdInfo RdrName }
 		: '__A' INTEGER			{ HsArity (fromInteger $2) }
 		| '__U' inline_prag core_expr	{ HsUnfold $2 $3 }
-		| '__M'				{ HsCprInfo }
-		| '__S'				{ HsStrictness (mkStrictnessInfo $1) }
+		| '__S'				{ HsStrictness $1 }
 		| '__C'                         { HsNoCafRefs }
 		| '__P' qvar_name INTEGER	{ HsWorker $2 (fromInteger $3) }
 

@@ -35,7 +35,6 @@ import Type		( mkTyVarTys, splitTyConApp )
 import TysWiredIn	( tupleCon )
 import Var		( mkTyVar, tyVarKind )
 import Name		( Name, nameIsLocalOrFrom )
-import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
 import Outputable	
 import Util		( zipWithEqual )
@@ -87,7 +86,6 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
     init_info = vanillaIdInfo `setCgInfo` vanillaCgInfo
 
     tcPrag info (HsNoCafRefs)   = returnTc (info `setCafInfo`	 NoCafRefs)
-    tcPrag info HsCprInfo       = returnTc (info `setCprInfo`	 ReturnsCPR)
 
     tcPrag info (HsArity arity) = 
 	returnTc (info `setArityInfo` arity
@@ -107,7 +105,7 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
 	  returnTc info2
 
     tcPrag info (HsStrictness strict_info)
-	= returnTc (info `setStrictnessInfo` strict_info)
+	= returnTc (info `setNewStrictnessInfo` Just strict_info)
 
     tcPrag info (HsWorker nm arity)
 	= tcWorkerInfo unf_env ty info nm arity
@@ -115,7 +113,7 @@ tcIdInfo unf_env in_scope_vars name ty info_ins
 
 \begin{code}
 tcWorkerInfo unf_env ty info worker_name arity
-  = uniqSMToTcM (mkWrapper ty arity demands res_bot cpr_info) `thenNF_Tc` \ wrap_fn ->
+  = uniqSMToTcM (mkWrapper ty strict_sig) `thenNF_Tc` \ wrap_fn ->
     let
 	-- Watch out! We can't pull on unf_env too eagerly!
 	info' = case tcLookupRecId_maybe unf_env worker_name of
@@ -128,15 +126,11 @@ tcWorkerInfo unf_env ty info worker_name arity
     in
     returnTc info'
   where
-	-- We are relying here on cpr and strictness info always appearing 
+    	-- We are relying here on strictness info always appearing 
 	-- before worker info,  fingers crossed ....
-      cpr_info   = cprInfo info
-
-      (demands, res_bot)
-	= case strictnessInfo info of
-	 	StrictnessInfo d r -> (d,r)
-		_                  -> (take arity (repeat wwLazy),False)
-					-- Noncommittal
+      strict_sig = case newStrictnessInfo info of
+		 	Just sig -> sig
+			Nothing  -> pprPanic "Worker info but no strictness for" (ppr worker_name)
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check

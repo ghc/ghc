@@ -12,16 +12,19 @@ import CoreSyn
 import CoreUnfold	( certainlyWillInline )
 import CoreLint		( showPass, endPass )
 import CoreUtils	( exprType )
-import Id		( Id, idType, idStrictness, idArity, isOneShotLambda,
-			  setIdStrictness, idInlinePragma, mkWorkerId,
+import Id		( Id, idType, idNewStrictness, idArity, isOneShotLambda,
+			  setIdNewStrictness, idInlinePragma, mkWorkerId,
 			  setIdWorkerInfo, idCprInfo, setInlinePragma )
 import Type		( Type )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  CprInfo(..), InlinePragInfo(..), isNeverInlinePrag,
 			  WorkerInfo(..)
 			)
-import Demand           ( Demand )
+import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
+			  mkTopDmdType, isBotRes, returnsCPR
+			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
+import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import WwLib
 import Outputable
@@ -99,20 +102,18 @@ wwBind	:: CoreBind
 				-- as appropriate.
 
 wwBind (NonRec binder rhs)
-  = wwExpr rhs						`thenUs` \ new_rhs ->
-    tryWW True {- non-recursive -} binder new_rhs 	`thenUs` \ new_pairs ->
+  = wwExpr rhs				`thenUs` \ new_rhs ->
+    tryWW NonRecursive binder new_rhs 	`thenUs` \ new_pairs ->
     returnUs [NonRec b e | (b,e) <- new_pairs]
       -- Generated bindings must be non-recursive
       -- because the original binding was.
-
-------------------------------
 
 wwBind (Rec pairs)
   = mapUs do_one pairs		`thenUs` \ new_pairs ->
     returnUs [Rec (concat new_pairs)]
   where
     do_one (binder, rhs) = wwExpr rhs 	`thenUs` \ new_rhs ->
-			   tryWW False {- recursive -} binder new_rhs
+			   tryWW Recursive binder new_rhs
 \end{code}
 
 @wwExpr@ basically just walks the tree, looking for appropriate
@@ -174,7 +175,7 @@ reason), then we don't w-w it.
 The only reason this is monadised is for the unique supply.
 
 \begin{code}
-tryWW	:: Bool				-- True <=> a non-recursive binding
+tryWW	:: RecFlag
 	-> Id				-- The fn binder
 	-> CoreExpr			-- The bound rhs; its innards
 					--   are already ww'd
@@ -183,12 +184,12 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- the orig "wrapper" lives on);
 					-- if two, then a worker and a
 					-- wrapper.
-tryWW non_rec fn_id rhs
-  | isNeverInlinePrag inline_prag || arity == 0
-  = 	-- Don't split things that will never be inlined
-    returnUs [ (fn_id, rhs) ]
-
-  | non_rec && certainlyWillInline fn_id
+tryWW is_rec fn_id rhs
+  |  arity == 0
+	-- Don't worker-wrapper thunks
+  || isNeverInlinePrag inline_prag
+	-- Don't split things that will never be inlined
+  || isNonRec is_rec && certainlyWillInline fn_id
 	-- No point in worker/wrappering a function that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)
@@ -202,41 +203,27 @@ tryWW non_rec fn_id rhs
 	--	fw = \ab -> (__inline (\x -> E)) (a,b)
 	-- and the original __inline now vanishes, so E is no longer
 	-- inside its __inline wrapper.  Death!  Disaster!
-	--
-	-- OUT OF DATE NOTE:
-	-- 	[Out of date because the size calculation in CoreUnfold now
-	--	 makes wrappers look very cheap even when they are inlined.]
-	--   In this case we add an INLINE pragma to the RHS.  Why?
-	--   Because consider
-	--	  f = \x -> g x x
-	--	  g = \yz -> ...		-- And g is strict
-	--   Then f is small, so we don't w/w it.  But g is big, and we do, so
-	--   g's wrapper will get inlined in f's RHS, which makes f look big now.
-	--   So f doesn't get inlined, but it is strict and we have failed to w/w it.
+  || not (worthSplitting strict_sig)
+	-- Strictness info suggests not to w/w
   = returnUs [ (fn_id, rhs) ]
 
-  | not (do_strict_ww || do_cpr_ww)
-  = returnUs [ (fn_id, rhs) ]
-
-  | otherwise		-- Do w/w split
-  = mkWwBodies fun_ty arity wrap_dmds result_bot one_shots cpr_info	`thenUs` \ (work_demands, wrap_fn, work_fn) ->
-    getUniqueUs								`thenUs` \ work_uniq ->
+  | otherwise		-- Do w/w split!
+  = WARN( arity /= length wrap_dmds, ppr fn_id <+> (ppr arity $$ ppr strict_sig) )
+	-- The arity should match the signature
+    mkWwBodies fun_ty wrap_dmds res_info one_shots 	`thenUs` \ (work_demands, wrap_fn, work_fn) ->
+    getUniqueUs						`thenUs` \ work_uniq ->
     let
-	work_rhs      = work_fn rhs
-	proto_work_id = mkWorkerId work_uniq fn_id (exprType work_rhs) 
+	work_rhs = work_fn rhs
+	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
 			`setInlinePragma` inline_prag
-
-	work_id | has_strictness = proto_work_id `setIdStrictness` mkStrictnessInfo (work_demands, result_bot)
-		| otherwise	 = proto_work_id
+			`setIdNewStrictness` StrictSig (mkTopDmdType work_demands work_res_info)
+				-- Even though we may not be at top level, 
+				-- it's ok to give it an empty DmdEnv
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdStrictness`      wrapper_strictness
-                         `setIdWorkerInfo`	HasWorker work_id arity
-			 `setInlinePragma`	NoInlinePragInfo	-- Put it on the worker instead
-		-- Add info to the wrapper:
-		--	(a) we want to set its arity
-		-- 	(b) we want to pin on its revised strictness info
-		--	(c) we pin on its worker id 
+	wrap_id  = fn_id `setIdWorkerInfo`	HasWorker work_id arity
+			 `setInlinePragma`	NoInlinePragInfo	-- Zap any inline pragma;
+									-- Put it on the worker instead
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
@@ -246,38 +233,13 @@ tryWW non_rec fn_id rhs
     arity  = idArity fn_id	-- The arity is set by the simplifier using exprEtaExpandArity
 				-- So it may be more than the number of top-level-visible lambdas
 
-    inline_prag  = idInlinePragma fn_id
+    inline_prag = idInlinePragma fn_id
+    strict_sig  = idNewStrictness fn_id
 
-    strictness_info           = idStrictness fn_id
-    has_strictness	      = case strictness_info of
-					StrictnessInfo _ _ -> True
-					NoStrictnessInfo   -> False
-    (arg_demands, result_bot) = case strictness_info of
-					StrictnessInfo d r -> (d,  r)
-					NoStrictnessInfo   -> ([], False)
+    StrictSig (DmdType _ wrap_dmds res_info) = strict_sig
+    work_res_info | isBotRes res_info = BotRes	-- Cpr stuff done by wrapper
+		  | otherwise	      = TopRes
 
-    wrap_dmds = setUnpackStrategy arg_demands
-    do_strict_ww = WARN( has_strictness && not result_bot && arity < length arg_demands && worthSplitting wrap_dmds result_bot, 
-			 text "Insufficient arity" <+> ppr fn_id <+> ppr arity <+> ppr arg_demands )
-		    (result_bot || arity >= length arg_demands)	-- Only if there's enough visible arity
-		 &&						-- (else strictness info isn't valid)
-								-- 
-		    worthSplitting wrap_dmds result_bot		-- And it's useful
-	-- worthSplitting returns False for an empty list of demands,
-	-- and hence do_strict_ww is False if arity is zero
-	-- Also it's false if there is no strictness (arg_demands is [])
-
-    wrapper_strictness | has_strictness = mkStrictnessInfo (wrap_dmds, result_bot)
-	               | otherwise      = noStrictnessInfo
-
-	-------------------------------------------------------------
-    cpr_info  = idCprInfo fn_id
-    do_cpr_ww = arity > 0 &&
-		case cpr_info of
-			ReturnsCPR -> True
-			other	   -> False
-
-	-------------------------------------------------------------
     one_shots = get_one_shots rhs
 
 -- If the original function has one-shot arguments, it is important to
@@ -289,6 +251,37 @@ get_one_shots (Lam b e)
   | otherwise = get_one_shots e
 get_one_shots (Note _ e) = get_one_shots e
 get_one_shots other	 = noOneShotInfo
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Functions over Demands}
+%*									*
+%************************************************************************
+
+\begin{code}
+worthSplitting :: StrictSig -> Bool
+		-- True <=> the wrapper would not be an identity function
+worthSplitting (StrictSig (DmdType _ ds res))
+  = any worth_it ds || returnsCPR res
+	-- worthSplitting returns False for an empty list of demands,
+	-- and hence do_strict_ww is False if arity is zero
+
+	-- We used not to split if the result is bottom.
+	-- [Justification:  there's no efficiency to be gained.]
+	-- But it's sometimes bad not to make a wrapper.  Consider
+	--	fw = \x# -> let x = I# x# in case e of
+	--					p1 -> error_fn x
+	--					p2 -> error_fn x
+	--					p3 -> the real stuff
+	-- The re-boxing code won't go away unless error_fn gets a wrapper too.
+	-- [We don't do reboxing now, but in general it's better to pass 
+	--  an unboxed thing to f, and have it reboxed in the error cases....]
+  where
+    worth_it Abs	  = True	-- Absent arg
+    worth_it (Seq _ _ ds) = True	-- Arg to evaluate
+    worth_it other	  = False
 \end{code}
 
 
@@ -304,14 +297,11 @@ the function and the name of its worker, and we want to make its body (the wrapp
 
 \begin{code}
 mkWrapper :: Type		-- Wrapper type
-	  -> Int		-- Arity
-	  -> [Demand]		-- Wrapper strictness info
-	  -> Bool		-- Function returns bottom
-	  -> CprInfo            -- Wrapper cpr info
+	  -> StrictSig		-- Wrapper strictness info
 	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
 
-mkWrapper fun_ty arity demands res_bot cpr_info
-  = mkWwBodies fun_ty arity demands res_bot noOneShotInfo cpr_info	`thenUs` \ (_, wrap_fn, _) ->
+mkWrapper fun_ty (StrictSig (DmdType _ demands res_info))
+  = mkWwBodies fun_ty demands res_info noOneShotInfo	`thenUs` \ (_, wrap_fn, _) ->
     returnUs wrap_fn
 
 noOneShotInfo = repeat False
