@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Array.lhs,v 1.14 2000/08/29 16:36:23 simonpj Exp $
+% $Id: Array.lhs,v 1.15 2000/11/08 15:54:05 simonpj Exp $
 %
 % (c) The University of Glasgow, 1994-2000
 %
@@ -40,11 +40,16 @@ module  Array
     ) where
 
 #ifndef __HUGS__
+	------------ GHC --------------------
 import Ix
 import PrelList
 import PrelArr		-- Most of the hard work is done here
 import PrelBase
+	------------ End of GHC --------------------
+
+
 #else
+	------------ HUGS --------------------
 import PrelPrim ( PrimArray
 		, runST
 		, primNewArray
@@ -55,12 +60,13 @@ import PrelPrim ( PrimArray
 		)
 import Ix
 import List( (\\) )
-#endif
 
 infixl 9  !, //
+	------------ End of HUGS --------------------
+#endif
+
 \end{code}
 
-#ifndef __HUGS__
 
 
 %*********************************************************
@@ -69,9 +75,10 @@ infixl 9  !, //
 %*							*
 %*********************************************************
 
+#ifndef __HUGS__
+	------------ GHC --------------------
+
 \begin{code}
-
-
 {-# SPECIALISE listArray :: (Int,Int) -> [b] -> Array Int b #-}
 listArray	      :: (Ix a) => (a,a) -> [b] -> Array a b
 listArray b vs	      =  array b (zip (range b) vs)
@@ -84,6 +91,9 @@ ixmap		      :: (Ix a, Ix b) => (a,a) -> (a -> b) -> Array b c -> Array a c
 ixmap b f a           =  array b [(i, a ! f i) | i <- range b]
 \end{code}
 
+	------------ End of GHC --------------------
+#else
+
 
 %*********************************************************
 %*							*
@@ -91,8 +101,8 @@ ixmap b f a           =  array b [(i, a ! f i) | i <- range b]
 %*							*
 %*********************************************************
 
+	------------ HUGS (rest of file) --------------------
 
-#else
 \begin{code}
 data Array ix elt = Array (ix,ix) (PrimArray elt)
 
@@ -126,7 +136,7 @@ assocs	          :: Ix a => Array a b -> [(a,b)]
 assocs a          =  [(i, a!i) | i <- indices a]
 
 (//)              :: Ix a => Array a b -> [(a,b)] -> Array a b
-a // us           =  array (bounds a)
+(//) a us           =  array (bounds a)
                         ([(i,a!i) | i <- indices a \\ [i | (i,_) <- us]]
                          ++ us)
 
