@@ -784,6 +784,12 @@
 /* Define if you have the `popen' function. */
 #undef HAVE_POPEN
 
+/* Define if you have the `setenv' function. */
+#undef HAVE_SETENV
+
+/* Define if you have the `unsetenv' function. */
+#undef HAVE_UNSETENV
+
 /* Define if you have the <pthread.h> header file. */
 #undef HAVE_PTHREAD_H
 

@@ -953,6 +953,7 @@ AC_CHECK_FUNCS(vsnprintf _vsnprintf)
 AC_CHECK_FUNCS(snprintf  _snprintf )  
 AC_CHECK_FUNCS(popen     _popen )  
 AC_CHECK_FUNCS(pclose    _pclose )  
+AC_CHECK_FUNCS(setenv unsetenv)
 
 
 dnl ** check for specific library functions that we are interested in
