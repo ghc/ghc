@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.2 2002/02/13 10:17:29 simonmar Exp $
+ * $Id: HsBase.h,v 1.3 2002/02/14 07:31:34 sof Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -101,6 +101,7 @@
 #ifdef _WIN32
 #include <io.h>
 #include <fcntl.h>
+#include "timeUtils.h"
 #endif
 
 /* in ghc_errno.c */
