@@ -5,7 +5,7 @@
 
 \begin{code}
 module CmSummarise ( ModImport(..), mi_name,
-                     ModSummary(..), summarise )
+                     ModSummary(..), summarise, ms_get_imports )
 where
 
 #include "HsVersions.h"
@@ -34,6 +34,10 @@ data ModImport
 
 mi_name (MINormal nm) = nm
 mi_name (MISource nm) = nm
+
+ms_get_imports :: ModSummary -> [ModImport]
+ms_get_imports summ
+   = case ms_imports summ of { Just is -> is; Nothing -> [] }
 
 type Fingerprint = Int
 

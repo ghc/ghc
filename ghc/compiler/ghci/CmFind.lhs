@@ -48,7 +48,6 @@ isPackageLoc _               = False
 mkFinder :: [(ModName,PkgName,Path)] -> [Path] -> Finder
 mkFinder pkg_ifaces home_dirs modnm
    = do found <- mkFinderX pkg_ifaces home_dirs modnm
-        putStrLn ("FINDER pkginfo\n" ++ unlines (map show pkg_ifaces) ++ "\n")
         putStrLn ("FINDER: request  = " ++ modnm ++ "\n" ++
                   "FINDER: response = " ++ show found)
         return found
@@ -107,13 +106,13 @@ homeModuleExists modname path
 
         maybeTime :: String -> IO (Maybe ClockTime)
         maybeTime f
-           = do putStrLn ("maybeTime: " ++ f)
+           = do -- putStrLn ("maybeTime: " ++ f)
                 exists <- doesFileExist f
                 if not exists 
-                 then do putStrLn " ... no"
+                 then do -- putStrLn " ... no"
                          return Nothing
                  else do tm <- getModificationTime f
-                         putStrLn (" ... " ++ show tm)
+                         -- putStrLn (" ... " ++ show tm)
                          return (Just tm)
 
 

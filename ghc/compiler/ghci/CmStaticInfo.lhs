@@ -5,7 +5,7 @@
 
 \begin{code}
 module CmStaticInfo ( FLAGS, Package(..), PCI, 
-                      mkSI, SI -- abstract
+                      mkSI, SI(..)
                     )
 where
 
@@ -35,10 +35,10 @@ data Package
   deriving (Read, Show)
 
 
-data SI = MkSI FLAGS PCI
+data SI = SI { flags :: FLAGS, pci :: PCI }
 
 mkSI :: FLAGS -> PCI -> SI
-mkSI = MkSI
+mkSI flags pci = SI { flags = flags, pci = pci }
 
 
 \end{code}

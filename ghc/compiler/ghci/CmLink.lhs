@@ -4,7 +4,9 @@
 \section[CmLink]{Linker for GHCI}
 
 \begin{code}
-module CmLink ( Linkable(..), LinkResult(..),
+module CmLink ( Linkable(..), 
+		filterModuleLinkables, modname_of_linkable,
+		LinkResult(..),
                 HValue,
                 link, 
                 PLS{-abstractly!-}, emptyPLS )
@@ -17,7 +19,9 @@ import Module		( Module )
 import Outputable	( SDoc )
 import FiniteMap	( FiniteMap, emptyFM )
 import RdrName		( RdrName )
+import Digraph		( SCC )
 import Addr		( Addr )
+import Panic		( panic )
 
 #include "HsVersions.h"
 
@@ -33,7 +37,7 @@ data PLS
 data HValue = HValue -- fix this ... just temporary?
 
 
-link :: PCI -> [[Linkable]] -> PLS -> IO LinkResult
+link :: PCI -> [SCC Linkable] -> PLS -> IO LinkResult
 link pci linkabless pls
    = return (error "link:unimp")
 
@@ -48,8 +52,23 @@ data Unlinked
    -- | Trees [StgTree RdrName]
 
 data Linkable
-   = LM Module [Unlinked]
+   = LM {-should be:Module-} String{- == ModName-} [Unlinked]
    | LP PkgName
+
+modname_of_linkable (LM nm _) = nm
+modname_of_linkable (LP _)    = panic "modname_of_linkable: package"
+
+filterModuleLinkables :: (String{- ==ModName-} -> Bool) 
+                      -> [Linkable] 
+                      -> [Linkable]
+filterModuleLinkables p [] = []
+filterModuleLinkables p (li:lis)
+   = case li of
+        LP _       -> retain
+        LM modnm _ -> if p modnm then retain else dump
+     where
+        dump   = filterModuleLinkables p lis
+        retain = li : dump
 
 emptyPLS :: IO PLS
 emptyPLS = return (MkPLS { source_symtab = emptyFM, 

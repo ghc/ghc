@@ -67,8 +67,8 @@ emptyPCS = return (MkPCS emptyPIT emptyPST emptyHoldingPen)
 
 -- These two are only here to avoid recursion between CmCompile and
 -- CompManager.  They really ought to be in the latter.
-type HST = FiniteMap Module ModDetails
-type HIT = FiniteMap Module ModIFace
+type HST = FiniteMap {-really:Module-} String{- == ModName-} ModDetails
+type HIT = FiniteMap {-really:Module-} String{- == ModName-} ModIFace
 
 
 data PCS = MkPCS PIT         -- Package interface table
