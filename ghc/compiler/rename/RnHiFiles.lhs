@@ -232,7 +232,6 @@ tryLoadInterface doc_str mod_name from
 			      iRules	  = new_rules,
 			      iImpModInfo = mod_map2  }
     in
-    seq mod_map2 $
     setIfacesRn new_ifaces		`thenRn_`
     returnRn (mod_iface, Nothing)
     }}
