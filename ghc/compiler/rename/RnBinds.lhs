@@ -217,8 +217,7 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
   =	-- Extract all the binders in this group,
 	-- and extend current scope, inventing new names for the new binders
 	-- This also checks that the names form a set
-    bindLocatedLocalsRn (text "In a binding group") 
-			mbinders_w_srclocs	$ \ new_mbinders ->
+    bindLocatedLocalsRn doc mbinders_w_srclocs	$ \ new_mbinders ->
     let
 	binder_set = mkNameSet new_mbinders
     in
@@ -246,6 +245,9 @@ rnMonoBinds mbinds sigs	thing_inside -- Non-empty monobinds
     returnRn (result, delListFromNameSet all_fvs new_mbinders)
   where
     mbinders_w_srclocs = collectLocatedMonoBinders mbinds
+    doc = text "In the binding group for" <+> pp_bndrs mbinders_w_srclocs
+    pp_bndrs [(b,_)] = quotes (ppr b)
+    pp_bndrs bs      = fsep (punctuate comma [ppr b | (b,_) <- bs])
 \end{code}
 
 
