@@ -94,7 +94,7 @@ HTML format. Alternatively, the documentation is available online at
 
 %build
 test -f configure || autoreconf
-./configure --prefix=%{prefix}
+./configure --prefix=%{prefix} --enable-hopengl
 make
 make ps html
  
