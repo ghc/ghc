@@ -47,6 +47,7 @@ module SysTools (
 import DriverPhases     ( isHaskellUserSrcFilename )
 import Config
 import Outputable
+import ErrUtils		( putMsg )
 import Panic		( GhcException(..) )
 import Util		( Suffix, global, notNull, consIORef,
 			  normalisePath, pgmPath, platformPath )
@@ -621,8 +622,8 @@ traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
 -- b) don't do it at all if dry-run is set
 traceCmd dflags phase_name cmd_line action
  = do	{ let verb = verbosity dflags
-	; when (verb >= 2) $ hPutStrLn stderr ("*** " ++ phase_name)
-	; when (verb >= 3) $ hPutStrLn stderr cmd_line
+	; when (verb >= 2) $ putMsg ("*** " ++ phase_name)
+	; when (verb >= 3) $ putMsg cmd_line
 	; hFlush stderr
 	
 	   -- Test for -n flag

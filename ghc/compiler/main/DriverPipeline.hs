@@ -22,7 +22,7 @@ module DriverPipeline (
         -- DLL building
    doMkDLL,
 
-   matchOptions, -- used in module GHC
+   getOptionsFromStringBuffer, -- used in module GHC
   ) where
 
 #include "HsVersions.h"
@@ -48,11 +48,12 @@ import StringBuffer	( hGetStringBuffer )
 import BasicTypes	( SuccessFlag(..) )
 import Maybes		( expectJust )
 import Ctype		( is_ident )
-
-import ParserCoreUtils ( getCoreModuleName )
+import StringBuffer	( StringBuffer(..), lexemeToString )
+import ParserCoreUtils	( getCoreModuleName )
 
 import EXCEPTION
 import DATA_IOREF	( readIORef, writeIORef, IORef )
+import GLAEXTS		( Int(..) )
 
 import Directory
 import System
@@ -118,12 +119,13 @@ compile hsc_env mod_summary maybe_old_linkable old_iface = do
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
    let input_fnpp = expectJust "compile:hspp" (ms_hspp_file mod_summary)
 
-   when (verb >= 2) (hPutStrLn stderr ("compile: input file " ++ input_fnpp))
+   when (verb >= 2) (putMsg ("compile: input file " ++ input_fnpp))
 
    -- Add in the OPTIONS from the source file
    -- This is nasty: we've done this once already, in the compilation manager
    -- It might be better to cache the flags in the ml_hspp_file field,say
-   opts <- getOptionsFromSource input_fnpp
+   let hspp_buf = expectJust "compile:hspp_buf" (ms_hspp_buf mod_summary)
+       opts = getOptionsFromStringBuffer hspp_buf
    (dflags1,unhandled_flags) <- parseDynamicFlags dflags0 opts
    checkProcessArgsResult unhandled_flags input_fn
 
@@ -247,6 +249,9 @@ link Interactive dflags batch_attempt_linking hpt
     = do -- Not Linking...(demand linker will do the job)
 	 return Succeeded
 #endif
+
+link JustTypecheck dflags batch_attempt_linking hpt
+   = return Succeeded
 
 link BatchCompile dflags batch_attempt_linking hpt
    | batch_attempt_linking
@@ -1304,6 +1309,24 @@ getOptionsFromSource file
 		       	-> do rest <- look h
                               return (opts ++ rest)
 		       | otherwise -> return []
+
+getOptionsFromStringBuffer :: StringBuffer -> [String]
+getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) = 
+  let 
+	ls = lines (lexemeToString buffer (I# len#))  -- lazy, so it's ok
+  in
+  look ls
+  where
+	look [] = []
+	look (l':ls) = do
+	    let l = removeSpaces l'
+	    case () of
+		() | null l -> look ls
+		   | prefixMatch "#" l -> look ls
+		   | prefixMatch "{-# LINE" l -> look ls   -- -}
+		   | Just opts <- matchOptions l
+			-> opts ++ look ls
+		   | otherwise -> []
 
 -- detect {-# OPTIONS_GHC ... #-}.  For the time being, we accept OPTIONS
 -- instead of OPTIONS_GHC, but that is deprecated.

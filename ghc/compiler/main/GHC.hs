@@ -122,10 +122,10 @@ import Module
 import FiniteMap
 import Panic
 import Digraph
-import ErrUtils		( showPass, Messages )
+import ErrUtils		( showPass, Messages, putMsg )
 import qualified ErrUtils
 import Util
-import StringBuffer	( StringBuffer(..), hGetStringBuffer, lexemeToString )
+import StringBuffer	( StringBuffer, hGetStringBuffer )
 import Outputable
 import SysTools		( cleanTempFilesExcept )
 import BasicTypes	( SuccessFlag(..), succeeded, failed )
@@ -140,7 +140,6 @@ import Monad		( unless, when, foldM )
 import System		( exitWith, ExitCode(..) )
 import Time		( ClockTime )
 import EXCEPTION as Exception hiding (handle)
-import GLAEXTS		( Int(..) )
 import DATA_IOREF
 import IO
 import Prelude hiding (init)
@@ -480,8 +479,7 @@ load s@(Session ref) how_much
 
          then 
            -- Easy; just relink it all.
-           do when (verb >= 2) $ 
-		 hPutStrLn stderr "Upsweep completely successful."
+           do when (verb >= 2) $ putMsg "Upsweep completely successful."
 
 	      -- Clean up after ourselves
 	      cleanTempFilesExcept dflags (ppFilesFromSummaries modsDone)
@@ -504,7 +502,7 @@ load s@(Session ref) how_much
 
 	      when (ghci_mode == BatchCompile && isJust ofile && not do_linking
 		     && verb > 0) $
-	         hPutStrLn stderr ("Warning: output was redirected with -o, " ++
+	         	putMsg ("Warning: output was redirected with -o, " ++
 				   "but no output will be generated\n" ++
 				   "because there is no " ++ main_mod ++ " module.")
 
@@ -517,8 +515,7 @@ load s@(Session ref) how_much
            -- Tricky.  We need to back out the effects of compiling any
            -- half-done cycles, both so as to clean up the top level envs
            -- and to avoid telling the interactive linker to link them.
-           do when (verb >= 2) $
-		hPutStrLn stderr "Upsweep partially successful."
+           do when (verb >= 2) $ putMsg "Upsweep partially successful."
 
               let modsDone_names
                      = map ms_mod modsDone
@@ -613,7 +610,8 @@ checkModule session@(Session ref) mod msg_act = do
 unload :: HscEnv -> [Linkable] -> IO ()
 unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
   = case ghcMode (hsc_dflags hsc_env) of
-	BatchCompile -> return ()
+	BatchCompile  -> return ()
+	JustTypecheck -> return ()
 #ifdef GHCI
 	Interactive -> Linker.unload (hsc_dflags hsc_env) stable_linkables
 #else
@@ -1334,25 +1332,6 @@ preprocessFile dflags src_fn (Just (buf, time))
 
 	return (dflags', "<buffer>", buf)
 
-
--- code adapted from the file-based version in DriverUtil
-getOptionsFromStringBuffer :: StringBuffer -> [String]
-getOptionsFromStringBuffer buffer@(StringBuffer _ len# _) = 
-  let 
-	ls = lines (lexemeToString buffer (I# len#))  -- lazy, so it's ok
-  in
-  look ls
-  where
-	look [] = []
-	look (l':ls) = do
-	    let l = removeSpaces l'
-	    case () of
-		() | null l -> look ls
-		   | prefixMatch "#" l -> look ls
-		   | prefixMatch "{-# LINE" l -> look ls   -- -}
-		   | Just opts <- matchOptions l
-			-> opts ++ look ls
-		   | otherwise -> []
 
 -----------------------------------------------------------------------------
 -- 			Error messages
