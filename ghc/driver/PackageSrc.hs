@@ -226,8 +226,7 @@ package_details installing
                              else [ cFPTOOLS_TOP_ABS ++ "/hslibs/net"
                                   , cFPTOOLS_TOP_ABS ++ "/hslibs/net/cbits" ],
          hs_libraries      = [ "HSnet" ],
-	 extra_libraries   = [ "HSnet_cbits" ] 
-                             ++ if suffixMatch "solaris2" cTARGETPLATFORM
+	 extra_libraries   = if suffixMatch "solaris2" cTARGETPLATFORM
                                 then [ "nsl",  "socket" ]
                                 else []
                              ,
