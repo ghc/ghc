@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.9 1999/11/26 15:56:52 simonmar Exp $
+# $Id: Makefile,v 1.10 1999/12/04 15:17:42 panne Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -53,6 +53,6 @@ endif
 # install header files for the I/O library.  Other code might want to
 # plug 
 override datadir:=$(libdir)/includes
-INSTALL_DATAS += $(H_FILES) $(H_CONFIG)
+INSTALL_DATAS += $(wildcard *.h)
 
 include $(TOP)/mk/target.mk
