@@ -466,6 +466,9 @@ getPackageLinkOpts dflags pkgs = do
      -- THIS IS A STRICTLY TEMPORARY HACK (famous last words ...)
      -- JRS 04 Sept 01: Same appalling hack for HSwin32[1,2]
      -- KAA 29 Mar  02: Same appalling hack for HSobjectio[1,2,3,4]
+     --
+     -- [sof 03/05: Renamed the (moribund) HSwin32 to HSwin_32 so as to
+     --  avoid filename conflicts with the 'Win32' package on a case-insensitive filesystem]
      hACK libs
 #      if !defined(mingw32_TARGET_OS) && !defined(cygwin32_TARGET_OS)
        = libs
@@ -473,8 +476,8 @@ getPackageLinkOpts dflags pkgs = do
        = if   "HSbase1" `elem` libs && "HSbase2" `elem` libs && "HSbase3" `elem` libs
          then "HSbase" : filter (not.(isPrefixOf "HSbase")) libs
          else
-         if   "HSwin321" `elem` libs && "HSwin322" `elem` libs
-         then "HSwin32" : filter (not.(isPrefixOf "HSwin32")) libs
+         if   "HSwin_321" `elem` libs && "HSwin_322" `elem` libs
+         then "HSwin_32" : filter (not.(isPrefixOf "HSwin_32")) libs
          else 
          if   "HSobjectio1" `elem` libs && "HSobjectio2" `elem` libs && "HSobjectio3" `elem` libs && "HSobjectio4" `elem` libs
 	 then "HSobjectio" : filter (not.(isPrefixOf "HSobjectio")) libs
