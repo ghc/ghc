@@ -9,6 +9,9 @@ test('TH_repE2', normal, compile_and_run, [''])
 test('TH_repE3', normal, compile, [''])
 test('TH_repPrim', normal, compile, [''])
 test('TH_repPrimOutput', normal, compile_and_run, [''])
+test('TH_repGuard', normal, compile, [''])
+test('TH_repGuardOutput', normal, compile_and_run, [''])
+test('TH_repPatSig', normal, compile, [''])
 
 test('TH_reifyDecl1', normal, compile, [''])
 
