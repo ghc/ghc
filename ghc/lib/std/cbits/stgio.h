@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: stgio.h,v 1.20 2000/05/18 11:33:21 panne Exp $
+ * $Id: stgio.h,v 1.21 2000/05/28 17:47:27 panne Exp $
  *
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1999
  *
@@ -216,11 +216,11 @@ StgInt  sizeof_time_t    ( void );
 char*   get_ZONE         ( StgAddr );
 
 /* toLocalTime.c */
-StgAddr toLocalTime (StgInt, StgByteArray, StgByteArray);
+StgInt toLocalTime (StgInt, StgByteArray, StgByteArray);
 StgInt prim_toLocalTime ( StgInt64,StgByteArray );
 
 /* toUTCTime.c */
-StgAddr toUTCTime (StgInt, StgByteArray, StgByteArray);
+StgInt toUTCTime (StgInt, StgByteArray, StgByteArray);
 StgInt prim_toUTCTime ( StgInt64,StgByteArray );
 
 /* toClockSec.c */

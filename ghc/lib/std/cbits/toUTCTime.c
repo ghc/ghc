@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: toUTCTime.c,v 1.4 1999/11/26 16:25:57 simonmar Exp $
+ * $Id: toUTCTime.c,v 1.5 2000/05/28 17:47:27 panne Exp $
  *
  * toUTCTime Runtime Support
  */
@@ -10,7 +10,7 @@
 #include "stgio.h"
 #include "timezone.h"
 
-StgAddr 
+StgInt
 toUTCTime(I_ size, StgByteArray d, StgByteArray res)
 {
     time_t t;
@@ -18,25 +18,25 @@ toUTCTime(I_ size, StgByteArray d, StgByteArray res)
 
     switch(size) {
 	default:
-	    return NULL;
+	    return 0;
 	case 0:
 	    t = 0;
 	    break;
 	case -1:
 	    t = - (time_t) ((StgInt *)d)[0];
 	    if (t > 0) 
-		return NULL;
+		return 0;
 	    break;
 	case 1:
 	    t = (time_t) ((StgInt *)d)[0];
 	    if (t < 0) 
-		return NULL;
+		return 0;
 	    break;
 	}
     tm = gmtime(&t);
     
     if (tm == NULL)
-	return NULL;
+	return 0;
 
     /*
       gmtime() may return a ptr to statically allocated storage,
@@ -63,7 +63,7 @@ toUTCTime(I_ size, StgByteArray d, StgByteArray res)
     tmp->tm_gmtoff = tm->tm_gmtoff;
 #endif
 
-    return (StgAddr)res;
+    return 1;
 }
 
 StgInt
@@ -74,7 +74,7 @@ prim_toUTCTime(StgInt64 d, StgByteArray res)
 
     t = (time_t) d;
     if (t < 0) 
-      return 0;
+        return 0;
 
     tm = gmtime(&t);
     

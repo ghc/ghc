@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: toLocalTime.c,v 1.4 1999/11/26 16:25:56 simonmar Exp $
+ * $Id: toLocalTime.c,v 1.5 2000/05/28 17:47:27 panne Exp $
  *
  * toCalendarTime Runtime Support
  */
@@ -10,33 +10,33 @@
 #include "stgio.h"
 #include "timezone.h"
 
-StgAddr
+StgInt
 toLocalTime(I_ size, StgByteArray d, StgByteArray res)
 {
-    struct tm *tm,*tmp=(struct tm *)res;
     time_t t;
+    struct tm *tm,*tmp=(struct tm *)res;
 
     switch(size) {
 	default:
-	    return NULL;
+	    return 0;
 	case 0:
 	    t = 0;
 	    break;
 	case -1:
 	    t = - (time_t) ((StgInt *)d)[0];
 	    if (t > 0) 
-		return NULL;
+		return 0;
 	    break;
 	case 1:
 	    t = (time_t) ((StgInt *)d)[0];
 	    if (t < 0) 
-		return NULL;
+		return 0;
 	    break;
 	}
     tm = localtime(&t);
     
     if (tm == NULL)
-	return NULL;
+	return 0;
 
     /*
       localtime() may return a ptr to statically allocated storage,
@@ -63,18 +63,16 @@ toLocalTime(I_ size, StgByteArray d, StgByteArray res)
     tmp->tm_gmtoff = tm->tm_gmtoff;
 #endif
 
-    return (StgAddr)res;
+    return 1;
 }
 
-/* Note that we DO NOT return res as a result.
- * res is typically a MutableByteArray and it seems very dubious
- * to return a pointer into the middle of it.
- */
-StgInt prim_toLocalTime ( StgInt64 d, StgByteArray res)
+StgInt
+prim_toLocalTime(StgInt64 d, StgByteArray res)
 {
+    time_t t;
     struct tm *tm,*tmp=(struct tm *)res;
-    time_t t = (time_t) d;
 
+    t = (time_t) d;
     if (t < 0) 
         return 0;
 
