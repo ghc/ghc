@@ -1,28 +1,128 @@
-#-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.4 1997/01/07 13:19:38 simonm Exp $
+#################################################################################
+#
+#			    ghc/lib/Makefile
+#
+#		Makefile for building the GHC Prelude libraries umpteen ways
+#
+# 	$Id: Makefile,v 1.5 1997/03/14 05:30:36 sof Exp $
+#
+#	
+#################################################################################
 
-TOP = ../..
-include $(TOP)/ghc/mk/ghc.mk
+TOP = ..
+include $(TOP)/mk/boilerplate.mk
 
+ifeq "$(way)" ""
 SUBDIRS = cbits
 ifeq ($(IncludeTestDirsInBuild),YES)
   SUBDIRS += tests
 endif
-include $(TOP)/mk/subdir.mk
+else
+SUBDIRS=
+endif
 
-# per-build options: shared with runtime system
-include ../mk/buildflags.mk
+#-----------------------------------------------------------------------------
+# 	Setting the standard variables
+#
 
-MAKEFILE=Makefile.libHS
-DESCR=libraries
-include $(TOP)/ghc/mk/ways.mk
+LIB_DIRS = ghc required glaExts concurrent
 
-# Shortcut for typical case when testing: just make the "normal" version
-# (simonm Todo: better way to do this?)
-libHS.a ::
-	$(MAKE)  -f Makefile.libHS suffix=norm
+LIBRARY = libHS$(_way).a
+HS_SRCS	= $(foreach d, $(LIB_DIRS), $(wildcard $(d)/*.lhs))
+HS_OBJS = $(HS_SRCS:.lhs=.$(way_)o)
+LIBOBJS = $(HS_OBJS)
+HS_IFACES= $(HS_SRCS:.lhs=.$(way_)hi) ghc/GHC.hi
 
-# install MODULES file
+#-----------------------------------------------------------------------------
+# 	Setting the GHC compile options
 
-install ::
-	$(INSTALL) $(INSTDATAFLAGS) MODULES $(INSTDATADIR_GHC)/imports
+SRC_HC_OPTS += -recomp -cpp -fglasgow-exts -fvia-C $(GhcLibHcOpts)
+
+#
+# Profiling options
+WAY_p_HC_OPTS += -prof -GPrelude
+WAY_mr_HC_OPTS += -prof -GPrelude
+
+#
+# Object and interface files have suffixes tagged with their ways
+#
+ifneq "$(way)" ""
+SRC_HC_OPTS += -hisuf $(way_)hi
+endif
+
+# per-module flags
+
+ghc/PackedString_HC_OPTS    = -monly-3-regs
+required/Directory_HC_OPTS  = -monly-3-regs
+concurrent/Parallel_HC_OPTS = -fglasgow-exts
+
+#-----------------------------------------------------------------------------
+# 	Dependency generation
+
+SRC_MKDEPENDHS_OPTS += -irequired:ghc:hbc:glaExts:concurrent
+
+#-----------------------------------------------------------------------------
+# 	Rules
+
+# In preparation for building the various libHS* libraries,
+# we create the interface files needed to boot their build.
+#
+# Note that the creation of IOBase, Main and GHC interface
+# files for umpteen ways is strictly not necessary, they're
+# all the same, but having the redundant files prevents us
+# from having to treat the said interface files specially
+# when creating the dependencies. 
+#
+# Note: if you change the *.hi-boot files, this will not be
+# picked up by the Makefile, you'll have to `make hi-boot'
+#
+# Note2: hsc will only read from ghc/GHC.hi regardless of 
+# which `way' you're compiling, so the copies of the GHC
+# interface file for the different ways are only there
+# to pacify `make'
+
+HIBOOTS=GHC Main IOBase
+
+hi-boot :
+	@for i in norm $(WAYS); do \
+		echo "Booting interface files for way $$i "; \
+		if [ "$$i" != "norm" ]; then \
+		   j="$${i}_hi"; \
+		else \
+		   j='hi'; \
+		fi; \
+		for ifile in $(HIBOOTS); do \
+			echo ".. ghc/$${ifile}.$$j "; \
+			cp ghc/$${ifile}.hi-boot ghc/$${ifile}.$${j}; \
+		done; \
+	done
+	@touch ghc/IOBase.lhs
+
+boot :: hi-boot
+
+#-----------------------------------------------------------------------------
+# 	Installation; need to install .hi files as well as libraries
+#
+# The interface files are put inside the $(libdir), since they
+# might (potentially) be platform specific..
+#
+# Note: we use `override' here to ignore the setting of datadir
+# which may have been set on the command-line..naughty, as it
+# prevents `datadir' from being used from the command-line.
+# This only applies to binary-distributions, though.n
+
+ifeq "$(BIN_DIST)" "1"
+override datadir:=$(libdir)/imports
+else
+datadir:=$(libdir)/imports
+endif
+
+#
+# Files to install from here
+# 
+INSTALL_LIBS  += $(LIBRARY)
+INSTALL_DATAS += $(HS_IFACES)
+
+include $(TOP)/mk/target.mk
+
+
