@@ -60,7 +60,7 @@ import Name	( OccName, Name, mkDictOcc, mkMethodOcc, mkIPOcc,
 import PprType	( pprPred )	
 import Type	( Type, PredType(..), ThetaType,
 		  mkTyVarTy, isTyVarTy, mkDictTy, mkPredTy,
-		  splitForAllTys, splitSigmaTy,
+		  splitForAllTys, splitSigmaTy, funArgTy,
 		  splitRhoTy, tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 		  mkSynTy, tidyOpenType, tidyOpenTypes
 		)
@@ -703,14 +703,11 @@ lookupInst inst@(LitInst u (OverloadedFractional f) ty loc)
 
   | otherwise 
   = tcLookupValueByKey fromRationalClassOpKey	`thenNF_Tc` \ from_rational ->
-
-	-- The type Rational isn't wired in so we have to conjure it up
-    tcLookupTyConByKey rationalTyConKey	`thenNF_Tc` \ rational_tycon ->
+    newMethodAtLoc loc from_rational [ty]	`thenNF_Tc` \ (method_inst, method_id) ->
     let
-	rational_ty  = mkSynTy rational_tycon []
+	rational_ty  = funArgTy (idType method_id)
 	rational_lit = HsLitOut (HsFrac f) rational_ty
     in
-    newMethodAtLoc loc from_rational [ty]		`thenNF_Tc` \ (method_inst, method_id) ->
     returnNF_Tc (GenInst [method_inst] (HsApp (HsVar method_id) rational_lit))
 
   where
