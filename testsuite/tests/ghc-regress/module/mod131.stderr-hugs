@@ -1,0 +1,2 @@
+ERROR "mod131.hs" - Conflicting exports of entity "f"
+*** Could refer to Mod131_A.f or Mod131_B.f

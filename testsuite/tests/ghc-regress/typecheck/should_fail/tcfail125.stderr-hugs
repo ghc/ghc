@@ -1,0 +1,5 @@
+ERROR "tcfail125.hs":11 - Cannot justify constraints in explicitly typed binding
+*** Expression    : f
+*** Type          : Obs a -> String
+*** Given context : ()
+*** Constraints   : Show a

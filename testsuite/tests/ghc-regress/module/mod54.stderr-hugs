@@ -1,0 +1,4 @@
+ERROR "mod54.hs":3 - Cannot build superclass instance
+*** Instance            : Ord T
+*** Context supplied    : ()
+*** Required superclass : Eq T

@@ -1,0 +1,1 @@
+ERROR "tcfail044.hs":5 - Repeated type variable "a" in instance head

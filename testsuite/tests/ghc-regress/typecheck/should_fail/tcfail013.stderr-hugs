@@ -1,0 +1,4 @@
+ERROR "tcfail013.hs":4 - Type error in function binding
+*** Term           : f
+*** Type           : Bool -> b
+*** Does not match : [a] -> b

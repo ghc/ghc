@@ -1,0 +1,5 @@
+ERROR "tcfail102.hs":8 - Cannot justify constraints in explicitly typed binding
+*** Expression    : f
+*** Type          : Integral a => P (Ratio a) -> P (Ratio a)
+*** Given context : Integral a
+*** Constraints   : Integral (Ratio a)

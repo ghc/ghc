@@ -1,0 +1,3 @@
+ERROR "tcfail116.hs":6 - Ambiguous type signature in class declaration
+*** ambiguous type : Foo a => ()
+*** assigned to    : bug

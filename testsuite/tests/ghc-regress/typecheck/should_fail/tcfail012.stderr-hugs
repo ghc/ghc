@@ -1,0 +1,4 @@
+ERROR "tcfail012.hs":3 - Type error in right hand side
+*** Term           : []
+*** Type           : [a]
+*** Does not match : Bool

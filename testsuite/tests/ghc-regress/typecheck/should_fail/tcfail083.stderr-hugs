@@ -1,0 +1,1 @@
+ERROR "tcfail083.hs":8 - No constructor has all of the fields specified in Bar {flag = f, baz = b}

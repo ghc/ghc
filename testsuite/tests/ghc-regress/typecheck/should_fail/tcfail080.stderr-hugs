@@ -1,0 +1,3 @@
+ERROR "tcfail080.hs":25 - Ambiguous type signature in inferred type
+*** ambiguous type : Collection a b => b -> Bool
+*** assigned to    : q

@@ -1,0 +1,2 @@
+ERROR "rnfail029.hs" - Conflicting exports of entity "map"
+*** Could refer to Hugs.Prelude.map or ShouldFail.map

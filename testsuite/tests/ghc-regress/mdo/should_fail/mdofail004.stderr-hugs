@@ -1,0 +1,1 @@
+ERROR "mdofail004.hs":17 - Instance of MonadFix X required for definition of z

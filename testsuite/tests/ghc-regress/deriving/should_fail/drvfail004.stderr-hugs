@@ -1,0 +1,4 @@
+ERROR "drvfail004.hs":6 - Cannot build superclass instance
+*** Instance            : Ord (Foo a b)
+*** Context supplied    : (Ord a, Ord b)
+*** Required superclass : Eq (Foo a b)

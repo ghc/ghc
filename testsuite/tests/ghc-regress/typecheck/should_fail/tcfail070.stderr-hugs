@@ -1,0 +1,1 @@
+ERROR "tcfail070.hs":15 - Illegal type "[] Int Bool" in constructor application

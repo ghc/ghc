@@ -1,0 +1,2 @@
+ERROR "mod144.hs" - Conflicting exports of entity "Bar"
+*** Could refer to Mod143_A.Bar or M.Bar

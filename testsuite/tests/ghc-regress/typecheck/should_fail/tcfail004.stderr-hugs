@@ -1,0 +1,4 @@
+ERROR "tcfail004.hs":3 - Type error in right hand side
+*** Term           : (1,2,3)
+*** Type           : (c,d,e)
+*** Does not match : (a,b)

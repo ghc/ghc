@@ -1,0 +1,1 @@
+ERROR "drvfail003.hs":13 - An instance of Show (Pair a b (Pair a b c)) is required to derive Show (Square_ a b c)

@@ -1,0 +1,4 @@
+ERROR "tcfail042.hs":15 - Cannot build superclass instance
+*** Instance            : Bar [a]
+*** Context supplied    : (Eq a, Show a)
+*** Required superclass : Foo [a]

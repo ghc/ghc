@@ -1,0 +1,3 @@
+ERROR "tcfail043.hs":38 - Unresolved top-level overloading
+*** Binding             : search
+*** Outstanding context : Ord_ b

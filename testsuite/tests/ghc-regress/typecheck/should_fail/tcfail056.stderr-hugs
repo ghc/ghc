@@ -1,0 +1,4 @@
+ERROR "tcfail056.hs":8 - Overlapping instances for class "Eq"
+*** This instance   : Eq Foo
+*** Overlaps with   : Eq Foo
+*** Common instance : Eq Foo

@@ -1,0 +1,5 @@
+ERROR "tcfail033.hs":4 - Type error in function binding
+*** Term           : buglet
+*** Type           : [a]
+*** Does not match : [(a,b)]
+*** Because        : unification would give infinite type

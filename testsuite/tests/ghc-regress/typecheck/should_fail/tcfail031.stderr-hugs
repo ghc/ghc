@@ -1,0 +1,5 @@
+ERROR "tcfail031.hs":3 - Type error in conditional
+*** Expression     : if 'a' then 1 else 2
+*** Term           : 'a'
+*** Type           : Char
+*** Does not match : Bool

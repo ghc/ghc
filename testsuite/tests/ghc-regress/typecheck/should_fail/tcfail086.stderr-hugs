@@ -1,0 +1,1 @@
+ERROR "tcfail086.hs":6 - Cannot derive instances for types with existentially typed components

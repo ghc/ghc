@@ -1,0 +1,4 @@
+ERROR "tcfail076.hs":18 - Inferred type is not general enough
+*** Expression    : \cont' -> cont a
+*** Expected type : (_29 -> _28 a) -> _28 a
+*** Inferred type : (_29 -> _28 _30) -> _28 _30

@@ -1,0 +1,5 @@
+ERROR "tcfail072.hs":23 - Cannot justify constraints in explicitly typed binding
+*** Expression    : g
+*** Type          : (Ord a, Ord b) => AB a b -> Bool
+*** Given context : (Ord a, Ord b)
+*** Constraints   : (Ord c, Ord d)

@@ -1,0 +1,1 @@
+ERROR "tcfail015.hs":7 - Instance of Num Bool required for definition of g

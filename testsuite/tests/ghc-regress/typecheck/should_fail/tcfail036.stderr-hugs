@@ -1,0 +1,4 @@
+ERROR "tcfail036.hs":8 - Overlapping instances for class "Num"
+*** This instance   : Num NUM
+*** Overlaps with   : Num NUM
+*** Common instance : Num NUM

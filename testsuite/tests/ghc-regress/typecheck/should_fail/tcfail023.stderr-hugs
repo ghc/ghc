@@ -1,0 +1,4 @@
+ERROR "tcfail023.hs":13 - Overlapping instances for class "A"
+*** This instance   : A B
+*** Overlaps with   : A B
+*** Common instance : A B

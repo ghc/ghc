@@ -1,0 +1,5 @@
+ERROR "tcfail009.hs":3 - Type error in application
+*** Expression     : enumFromTo 1 2
+*** Term           : 1
+*** Type           : Int
+*** Does not match : Integer

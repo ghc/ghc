@@ -1,0 +1,1 @@
+ERROR "rnfail024.hs":3 - Missing binding for variable "sig_without_a_defn" in type signature

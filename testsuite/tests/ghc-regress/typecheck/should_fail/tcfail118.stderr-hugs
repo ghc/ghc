@@ -1,0 +1,4 @@
+ERROR "tcfail118.hs":11 - Overlapping instances for class "Eq"
+*** This instance   : Eq Foo
+*** Overlaps with   : Eq Foo
+*** Common instance : Eq Foo

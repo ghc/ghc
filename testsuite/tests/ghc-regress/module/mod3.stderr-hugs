@@ -1,0 +1,1 @@
+ERROR "mod3.hs" - Explicit constructor list given for type synonym "T" in export list of module "M"

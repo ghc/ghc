@@ -1,0 +1,4 @@
+ERROR "tcfail017.hs":10 - Cannot build superclass instance
+*** Instance            : B [a]
+*** Context supplied    : B a
+*** Required superclass : C [a]

@@ -1,0 +1,2 @@
+ERROR "rnfail040.hs" - Conflicting exports of entity "nub"
+*** Could refer to Data.List.nub or Rnfail040_A.nub

@@ -1,0 +1,4 @@
+ERROR "tcfail005.hs":3 - Type error in right hand side
+*** Term           : (1,'a')
+*** Type           : (b,Char)
+*** Does not match : [a]

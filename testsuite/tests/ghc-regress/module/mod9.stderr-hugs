@@ -1,0 +1,1 @@
+ERROR "mod9.hs" - Explicit export list given for non-class/datatype "T" in export list of module "M"

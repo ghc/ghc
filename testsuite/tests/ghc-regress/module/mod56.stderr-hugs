@@ -1,0 +1,1 @@
+ERROR "mod56.hs":4 - Can only derive instances of Ix for enumeration or product types

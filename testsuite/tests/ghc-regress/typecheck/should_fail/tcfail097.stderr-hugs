@@ -1,0 +1,3 @@
+ERROR "tcfail097.hs":5 - Ambiguous type signature in type declaration
+*** ambiguous type : Eq a => Int -> Int
+*** assigned to    : f

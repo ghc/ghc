@@ -1,0 +1,3 @@
+ERROR "mod153.hs" - Ambiguous export of entity "id"
+*** Could refer to: M.id Hugs.Prelude.id 
+

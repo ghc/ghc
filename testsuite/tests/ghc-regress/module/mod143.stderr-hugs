@@ -1,0 +1,2 @@
+ERROR "mod143.hs" - Conflicting exports of entity "Foo"
+*** Could refer to M.Foo or Mod143_A.Foo

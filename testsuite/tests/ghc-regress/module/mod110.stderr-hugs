@@ -1,0 +1,2 @@
+ERROR "mod110.hs":11 - Ambiguous class occurrence "Eq"
+*** Could refer to: M.Eq Hugs.Prelude.Eq 
