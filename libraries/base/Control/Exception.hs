@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: Exception.hs,v 1.1 2001/06/28 14:15:01 simonmar Exp $
+-- $Id: Exception.hs,v 1.2 2001/07/31 14:34:23 simonmar Exp $
 --
 -- The External API for exceptions.  The functions provided in this
 -- module allow catching of exceptions in the IO monad.
@@ -29,9 +29,12 @@ module Control.Exception (
 	catch,     -- :: IO a -> (Exception -> IO a) -> IO a
 	catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 
+	handle,	   -- :: (Exception -> IO a) -> IO a -> IO a
+	handleJust,-- :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
+
 	evaluate,  -- :: a -> IO a
 
-	-- Exception predicates (for catchJust, tryJust)
+	-- Exception predicates (for tryJust, catchJust, handleJust)
 
 	ioErrors,		-- :: Exception -> Maybe IOError
 	arithExceptions, 	-- :: Exception -> Maybe ArithException
@@ -105,16 +108,22 @@ INSTANCE_TYPEABLE0(AsyncException,asyncExceptionTc,"AsyncException")
 -----------------------------------------------------------------------------
 -- Catching exceptions
 
--- PrelException defines 'catchException' for us.
+-- GHC.Exception defines 'catchException' for us.
 
-catch :: IO a -> (Exception -> IO a) -> IO a
-catch =  catchException
+catch	  :: IO a -> (Exception -> IO a) -> IO a
+catch 	  =  catchException
 
 catchJust :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 catchJust p a handler = catch a handler'
   where handler' e = case p e of 
 			Nothing -> throw e
 			Just b  -> handler b
+
+handle	   :: (Exception -> IO a) -> IO a -> IO a
+handle     =  flip catch
+
+handleJust :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
+handleJust p =  flip (catchJust p)
 
 -----------------------------------------------------------------------------
 -- evaluate
