@@ -10,7 +10,7 @@ quantities.
 \begin{code}
 #include "MachDeps.h"
 
-module Word
+module Word 
 	( Word8		 -- all abstract.
 	, Word16         -- instances: Eq, Ord
 	, Word32         --  Num, Bounded, Real,
@@ -18,6 +18,7 @@ module Word
 	                 --  Read, Show, Bits,
 			 --  CCallable, CReturnable
 			 --  (last two are GHC specific.)
+
 
 	, word8ToWord16   -- :: Word8  -> Word16
 	, word8ToWord32   -- :: Word8  -> Word32
@@ -55,6 +56,7 @@ module Word
 	, integerToWord32 -- :: Integer -> Word32
 	, integerToWord64 -- :: Integer -> Word64
 
+#ifndef __HUGS__
 	-- NB! GHC SPECIFIC:
  	, wordToWord8     -- :: Word   -> Word8
 	, wordToWord16    -- :: Word   -> Word16
@@ -65,6 +67,7 @@ module Word
 	, word16ToWord    -- :: Word16 -> Word
 	, word32ToWord    -- :: Word32 -> Word
 	, word64ToWord    -- :: Word64 -> Word
+#endif
 
 	-- The "official" place to get these from is Addr.
 	, indexWord8OffAddr
@@ -89,6 +92,7 @@ module Word
 
 	-- The "official" place to get these from is Foreign
 #ifndef __PARALLEL_HASKELL__
+#ifndef __HUGS__
 	, indexWord8OffForeignObj
 	, indexWord16OffForeignObj
 	, indexWord32OffForeignObj
@@ -104,31 +108,34 @@ module Word
 	, writeWord32OffForeignObj
 	, writeWord64OffForeignObj
 #endif
+#endif
 	
 	-- non-standard, GHC specific
 	, wordToInt
 
+#ifndef __HUGS__
 	-- Internal, do not use.
 	, word8ToWord#
 	, word16ToWord#
 	, word32ToWord#
+#endif
 
 	) where
 
-#ifdef __HUGS__
-import PreludeBuiltin
-#else
+#ifndef __HUGS__
 import PrelBase
 import CCall
 import PrelForeign
 import PrelIOBase
 import PrelAddr
+import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 #endif
 import Ix
-import PrelNum ( Num(..), Integral(..) )	-- To get fromInt/toInt
 import Bits
 import Ratio
 import Numeric (readDec, showInt)
+
+#ifndef __HUGS__
 
 -----------------------------------------------------------------------------
 -- The "official" coercion functions
@@ -1476,3 +1483,454 @@ divZeroError meth v
   = error ("Integral." ++ meth ++ ": divide by 0 (" ++ show v ++ " / 0)")
 
 \end{code}
+#else
+-- Here is the Hugs version
+-----------------------------------------------------------------------------
+-- The "official" coercion functions
+-----------------------------------------------------------------------------
+
+word8ToWord32  :: Word8  -> Word32
+word32ToWord8  :: Word32 -> Word8
+word16ToWord32 :: Word16 -> Word32
+word32ToWord16 :: Word32 -> Word16
+
+word8ToInt   :: Word8  -> Int
+intToWord8   :: Int    -> Word8
+word16ToInt  :: Word16 -> Int
+intToWord16  :: Int    -> Word16
+
+word8ToInt  = word32ToInt    . word8ToWord32
+intToWord8  = word32ToWord8  . intToWord32
+word16ToInt = word32ToInt    . word16ToWord32
+intToWord16 = word32ToWord16 . intToWord32
+
+intToWord = Word32
+wordToInt = unWord32
+
+--primitive intToWord32 "intToWord" :: Int    -> Word32
+--primitive word32ToInt "wordToInt" :: Word32 -> Int
+
+-----------------------------------------------------------------------------
+-- Word8
+-----------------------------------------------------------------------------
+
+newtype Word8  = W8 Word32
+
+word8ToWord32 (W8 x) = x .&. 0xff
+word32ToWord8 = W8
+
+instance Eq  Word8     where (==)    = binop (==)
+instance Ord Word8     where compare = binop compare
+
+instance Num Word8 where
+    x + y         = to (binop (+) x y)
+    x - y         = to (binop (-) x y)
+    negate        = to . negate . from
+    x * y         = to (binop (*) x y)
+    abs           = absReal
+    signum        = signumReal
+--    fromInteger   = to . primIntegerToWord
+    fromInt       = intToWord8
+
+instance Bounded Word8 where
+    minBound = 0
+    maxBound = 0xff
+
+instance Real Word8 where
+    toRational x = toInteger x % 1
+
+instance Integral Word8 where
+    x `div` y     = to  (binop div x y)
+    x `quot` y    = to  (binop quot x y)
+    x `rem` y     = to  (binop rem x y)
+    x `mod` y     = to  (binop mod x y)
+    x `quotRem` y = to2 (binop quotRem x y)
+    divMod        = quotRem
+    even          = even      . from
+    toInteger     = toInteger . from
+    toInt         = word8ToInt
+
+instance Ix Word8 where
+    range (m,n)          = [m..n]
+    index b@(m,n) i
+	   | inRange b i = word32ToInt (from (i - m))
+	   | otherwise   = error "index: Index out of range"
+    inRange (m,n) i      = m <= i && i <= n
+
+instance Enum Word8 where
+    toEnum         = to . intToWord32
+    fromEnum       = word32ToInt . from
+    enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Word8)]
+    enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Word8)]
+		       where last = if d < c then minBound else maxBound
+
+instance Read Word8 where
+    readsPrec p = readDec
+
+instance Show Word8 where
+    showsPrec p = showInt  -- a particularily counterintuitive name!
+
+instance Bits Word8 where
+  x .&. y       = to (binop (.&.) x y)
+  x .|. y       = to (binop (.|.) x y)
+  x `xor` y     = to (binop xor x y)
+  complement    = to . complement . from
+  x `shift` i   = to (from x `shift` i)
+--  rotate      
+  bit           = to . bit
+  setBit x i    = to (setBit (from x) i)
+  clearBit x i  = to (clearBit (from x) i)
+  complementBit x i = to (complementBit (from x) i)
+  testBit x i   = testBit (from x) i
+  bitSize  _    = 8
+  isSigned _    = False
+
+sizeofWord8 :: Word32
+sizeofWord8 = 1
+
+writeWord8OffAddr :: Addr -> Int -> Word8 -> IO ()
+writeWord8OffAddr = error "TODO: writeWord8OffAddr"
+readWord8OffAddr :: Addr -> Int -> IO Word8
+readWord8OffAddr = error "TODO: readWord8OffAddr"
+indexWord8OffAddr :: Addr -> Int -> Word8
+indexWord8OffAddr = error "TODO: indexWord8OffAddr"
+
+-----------------------------------------------------------------------------
+-- Word16
+-----------------------------------------------------------------------------
+
+newtype Word16 = W16 Word32
+
+word16ToWord32 (W16 x) = x .&. 0xffff
+word32ToWord16 = W16
+
+instance Eq  Word16     where (==)    = binop (==)
+instance Ord Word16     where compare = binop compare
+
+instance Num Word16 where
+    x + y         = to (binop (+) x y)
+    x - y         = to (binop (-) x y)
+    negate        = to . negate . from
+    x * y         = to (binop (*) x y)
+    abs           = absReal
+    signum        = signumReal
+--    fromInteger   = to . primIntegerToWord
+    fromInt       = intToWord16
+
+instance Bounded Word16 where
+    minBound = 0
+    maxBound = 0xffff
+
+instance Real Word16 where
+  toRational x = toInteger x % 1
+
+instance Integral Word16 where
+  x `div` y     = to  (binop div x y)
+  x `quot` y    = to  (binop quot x y)
+  x `rem` y     = to  (binop rem x y)
+  x `mod` y     = to  (binop mod x y)
+  x `quotRem` y = to2 (binop quotRem x y)
+  divMod        = quotRem
+  even          = even      . from
+  toInteger     = toInteger . from
+  toInt         = word16ToInt
+
+instance Ix Word16 where
+  range (m,n)          = [m..n]
+  index b@(m,n) i
+         | inRange b i = word32ToInt (from (i - m))
+         | otherwise   = error "index: Index out of range"
+  inRange (m,n) i      = m <= i && i <= n
+
+instance Enum Word16 where
+  toEnum         = to . intToWord32
+  fromEnum       = word32ToInt . from
+  enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Word16)]
+  enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Word16)]
+		       where last = if d < c then minBound else maxBound
+
+instance Read Word16 where
+  readsPrec p = readDec
+
+instance Show Word16 where
+  showsPrec p = showInt  -- a particularily counterintuitive name!
+
+instance Bits Word16 where
+  x .&. y       = to (binop (.&.) x y)
+  x .|. y       = to (binop (.|.) x y)
+  x `xor` y     = to (binop xor x y)
+  complement    = to . complement . from
+  x `shift` i   = to (from x `shift` i)
+--  rotate      
+  bit           = to . bit
+  setBit x i    = to (setBit (from x) i)
+  clearBit x i  = to (clearBit (from x) i)
+  complementBit x i = to (complementBit (from x) i)
+  testBit x i   = testBit (from x) i
+  bitSize  _    = 16
+  isSigned _    = False
+
+sizeofWord16 :: Word32
+sizeofWord16 = 2
+
+writeWord16OffAddr :: Addr -> Int -> Word16 -> IO ()
+writeWord16OffAddr = error "TODO: writeWord16OffAddr"
+readWord16OffAddr :: Addr -> Int -> IO Word16
+readWord16OffAddr = error "TODO: readWord16OffAddr"
+indexWord16OffAddr :: Addr -> Int -> Word16
+indexWord16OffAddr = error "TODO: indexWord16OffAddr"
+
+-----------------------------------------------------------------------------
+-- Word32
+-----------------------------------------------------------------------------
+-- This presumes that Word is 32 bits long
+newtype Word32 = Word32 { unWord32 :: Word }
+	deriving (Eq,Ord)
+
+to_ = Word32
+to2_ (x,y) = (to_ x, to_ y)
+from_ = unWord32
+binop_ op x y = from_ x `op` from_ y
+intToWord32 :: Int -> Word32
+intToWord32 = to_ . primIntToWord
+word32ToInt :: Word32 -> Int
+word32ToInt = primWordToInt . unWord32
+
+
+instance Num Word32 where
+    (+) x y       = to_ (binop_ primPlusWord x y)
+    (-) x y       = to_ (binop_ primMinusWord x y)
+    negate        = to_ . primNegateWord . from_
+    (*) x y       = to_ (binop_ primTimesWord x y)
+    abs           = absReal
+    signum        = signumReal
+    fromInteger   = intToWord32 . toInt	-- overflow issues?
+    fromInt       = intToWord32
+
+instance Bounded Word32 where
+    minBound = 0
+--    maxBound = primMaxWord
+
+instance Real Word32 where
+    toRational x = toInteger x % 1
+
+instance Integral Word32 where
+  x `div` y     = fromInteger (toInteger x `div` toInteger y)
+  x `quot` y    = fromInteger (toInteger x `quot` toInteger y)
+  x `rem` y     = fromInteger (toInteger x `rem` toInteger y)
+  x `mod` y     = fromInteger (toInteger x `mod` toInteger y)
+  x `quotRem` y = (x `quot` y,x `rem` y)
+  divMod        = quotRem
+  even          = even      . toInt
+  toInteger x    = (toInteger (word32ToInt x) + twoToPower32)
+				`rem` twoToPower32
+			
+  toInt         = word32ToInt
+
+instance Ix Word32 where
+    range (m,n)          = [m..n]
+    index b@(m,n) i
+	   | inRange b i = word32ToInt (i - m)
+	   | otherwise   = error "index: Index out of range"
+    inRange (m,n) i      = m <= i && i <= n
+
+instance Enum Word32 where
+    toEnum        = intToWord32
+    fromEnum      = word32ToInt
+
+    --No: suffers from overflow problems: 
+    --   [4294967295 .. 1] :: [Word32]
+    --   = [4294967295,0,1]
+    --enumFrom c       = map toEnum [fromEnum c .. fromEnum (maxBound::Word32)]
+    --enumFromThen c d = map toEnum [fromEnum c, fromEnum d .. fromEnum (last::Word32)]
+    --     	           where last = if d < c then minBound else maxBound
+
+    enumFrom       = numericEnumFrom
+    enumFromTo     = numericEnumFromTo
+    enumFromThen   = numericEnumFromThen
+    enumFromThenTo = numericEnumFromThenTo
+
+instance Read Word32 where
+    readsPrec p = readDec
+
+instance Show Word32 where
+    showsPrec p = showInt . toInteger 
+
+instance Bits Word32 where
+  x .&. y       = to_ (binop_ primAndWord x y)
+  x .|. y       = to_ (binop_ primOrWord x y)
+  x `xor` y     = to_ (binop_ primXorWord x y)
+  complement    = xor ((-1) :: Word32)  
+  x `shift` i   | i == 0 = x
+		| i > 0  = to_ (primShiftLWord (from_ x) (primIntToWord i))
+		| i < 0  = to_ (primShiftRLWord (from_ x) (primIntToWord (-i)))
+--  rotate      
+  bit           = shift 0x1
+  setBit x i    = x .|. bit i
+  clearBit x i  = x .&. (bit i `xor` (complement 0))
+  complementBit x i = x `xor` bit i
+  testBit x i   = (0x1 .&. shift x i) == (0x1 :: Word32)
+  bitSize  _    = 32
+  isSigned _    = False
+
+sizeofWord32 :: Word32
+sizeofWord32 = 4
+
+writeWord32OffAddr :: Addr -> Int -> Word32 -> IO ()
+writeWord32OffAddr = error "TODO: writeWord32OffAddr"
+readWord32OffAddr :: Addr -> Int -> IO Word32
+readWord32OffAddr = error "TODO: readWord32OffAddr"
+indexWord32OffAddr :: Addr -> Int -> Word32
+indexWord32OffAddr = error "TODO: indexWord32OffAddr"
+
+-----------------------------------------------------------------------------
+-- Word64
+-----------------------------------------------------------------------------
+
+data Word64 = Word64 {lo,hi::Word32} deriving (Eq, Ord, Bounded)
+
+word64ToInteger Word64{lo=lo,hi=hi} 
+	= toInteger lo + twoToPower32 * toInteger hi 
+integerToWord64 x = case x `quotRem` twoToPower32 of 
+                 (h,l) -> Word64{lo=fromInteger l, hi=fromInteger h}
+
+twoToPower32 :: Integer
+twoToPower32 = 4294967296 -- 0x100000000
+
+instance Show Word64 where
+  showsPrec p = showInt . word64ToInteger
+
+instance Read Word64 where
+  readsPrec p s = [ (integerToWord64 x,r) | (x,r) <- readDec s ]
+
+sizeofWord64 :: Word32
+sizeofWord64 = 8
+
+writeWord64OffAddr :: Addr -> Int -> Word64 -> IO ()
+writeWord64OffAddr = error "TODO: writeWord64OffAddr"
+readWord64OffAddr :: Addr -> Int -> IO Word64
+readWord64OffAddr = error "TODO: readWord64OffAddr"
+indexWord64OffAddr :: Addr -> Int -> Word64
+indexWord64OffAddr = error "TODO: indexWord64OffAddr"
+
+intToWord64 = error "TODO: intToWord64"
+word64ToInt = error "TODO: word64ToInt"
+
+word64ToWord32 = error "TODO: word64ToWord32"
+word64ToWord16 = error "TODO: word64ToWord16"
+word64ToWord8 = error "TODO: word64ToWord8"
+
+word32ToWord64 = error "TODO: word32ToWord64"
+word16ToWord64 = error "TODO: word16ToWord64"
+word8ToWord64 = error "TODO: word64ToWord64"
+
+-----------------------------------------------------------------------------
+-- End of exported definitions
+--
+-- The remainder of this file consists of definitions which are only
+-- used in the implementation.
+-----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+-- Enumeration code: copied from Prelude
+-----------------------------------------------------------------------------
+
+numericEnumFrom        :: Real a => a -> [a]
+numericEnumFromThen    :: Real a => a -> a -> [a]
+numericEnumFromTo      :: Real a => a -> a -> [a]
+numericEnumFromThenTo  :: Real a => a -> a -> a -> [a]
+numericEnumFrom n            = n : (numericEnumFrom $! (n+1))
+numericEnumFromThen n m      = iterate ((m-n)+) n
+numericEnumFromTo n m        = takeWhile (<= m) (numericEnumFrom n)
+numericEnumFromThenTo n n' m = takeWhile (if n' >= n then (<= m) else (>= m))
+                                         (numericEnumFromThen n n')
+
+-----------------------------------------------------------------------------
+-- Coercions - used to make the instance declarations more uniform
+-----------------------------------------------------------------------------
+
+class Coerce a where
+  to   :: Word32 -> a
+  from :: a -> Word32
+
+instance Coerce Word8 where
+  from = word8ToWord32
+  to   = word32ToWord8
+
+instance Coerce Word16 where
+  from = word16ToWord32
+  to   = word32ToWord16
+
+binop :: Coerce word => (Word32 -> Word32 -> a) -> (word -> word -> a)
+binop op x y = from x `op` from y
+
+to2 :: Coerce word => (Word32, Word32) -> (word, word)
+to2 (x,y) = (to x, to y)
+
+-----------------------------------------------------------------------------
+-- primitives
+-----------------------------------------------------------------------------
+{-
+primitive primEqWord        :: Word32 -> Word32 -> Bool
+primitive primCmpWord       :: Word32 -> Word32 -> Ordering
+primitive primPlusWord,
+	  primMinusWord,
+	  primMulWord	    :: Word32 -> Word32 -> Word32
+primitive primNegateWord    :: Word32 -> Word32
+primitive primIntegerToWord :: Integer -> Word32
+primitive primMaxWord       :: Word32
+primitive primDivWord,
+	  primQuotWord,
+	  primRemWord,
+	  primModWord       :: Word32 -> Word32 -> Word32
+primitive primQrmWord       :: Word32 -> Word32 -> (Word32,Word32)
+primitive primEvenWord      :: Word32 -> Bool
+primitive primWordToInteger :: Word32 -> Integer
+primitive primAndWord       :: Word32 -> Word32 -> Word32
+primitive primOrWord        :: Word32 -> Word32 -> Word32
+primitive primXorWord       :: Word32 -> Word32 -> Word32
+primitive primComplementWord:: Word32 -> Word32
+primitive primShiftWord     :: Word32 -> Int -> Word32
+primitive primBitWord       :: Int -> Word32
+primitive primTestWord      :: Word32 -> Int -> Bool
+-}
+-----------------------------------------------------------------------------
+-- Code copied from the Prelude
+-----------------------------------------------------------------------------
+
+absReal x    | x >= 0    = x
+	     | otherwise = -x
+
+signumReal x | x == 0    =  0
+	     | x > 0     =  1
+	     | otherwise = -1
+
+-----------------------------------------------------------------------------
+-- An theres more
+-----------------------------------------------------------------------------
+
+integerToWord8 :: Integer -> Word8
+integerToWord8 = fromInteger
+integerToWord16 :: Integer -> Word16
+integerToWord16 = fromInteger
+integerToWord32 :: Integer -> Word32
+integerToWord32 = fromInteger
+--integerToWord64 :: Integer -> Word64
+--integerToWord64 = fromInteger
+
+word8ToInteger :: Word8  -> Integer
+word8ToInteger = toInteger
+word16ToInteger :: Word16 -> Integer
+word16ToInteger = toInteger
+word32ToInteger :: Word32 -> Integer
+word32ToInteger = toInteger
+--word64ToInteger :: Word64 -> Integer
+--word64ToInteger = toInteger
+
+word16ToWord8 = error "TODO; word16ToWord8"
+word8ToWord16 = error "TODO; word8ToWord16"
+
+-----------------------------------------------------------------------------
+-- End
+-----------------------------------------------------------------------------
+#endif
