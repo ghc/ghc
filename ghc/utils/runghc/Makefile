@@ -1,7 +1,7 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-HS_PROG		= runghc
+HS_PROG		= runghc$(exeext)
 INSTALL_PROGS   += $(HS_PROG)
 
 UseGhcForCc = YES
@@ -34,7 +34,7 @@ SRC_MKDEPENDHS_OPTS += \
 all :: runhaskell
 
 runhaskell : $(HS_PROG)
-	$(CP) $< runhaskell
+	$(CP) $< runhaskell$(exeext)
 
 # Only install runhaskell if there isn't already one installed
 ifneq "$(findstring install, $(MAKECMDGOALS))" ""
