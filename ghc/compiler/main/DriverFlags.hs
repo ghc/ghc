@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.25 2000/12/04 16:42:14 rrt Exp $
+-- $Id: DriverFlags.hs,v 1.26 2000/12/05 12:19:49 rrt Exp $
 --
 -- Driver flags
 --
@@ -194,7 +194,7 @@ static_flags =
 
 	------- Miscellaneous -----------------------------------------------
   ,  ( "no-link-chk"    , NoArg (return ()) ) -- ignored for backwards compat
-  ,  ( "no-hs-main"     , NoArg (writeIORef no_hs_main True) )
+  ,  ( "no-hs-main"     , NoArg (writeIORef v_noHsMain True) )
 
 	------- Output Redirection ------------------------------------------
   ,  ( "odir"		, HasArg (writeIORef v_Output_dir  . Just) )
