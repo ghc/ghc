@@ -1,4 +1,4 @@
-$diff = "diff -c2"
+$diff = "diff -C 2"
 $rm   = "rm -f"
 $cp   = "cp"
 

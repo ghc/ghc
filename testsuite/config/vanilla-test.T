@@ -68,7 +68,7 @@ def simple_build_Main_WRK ( $_extra_args, $compile_only )
 	     	  else if $compile_only 
                   	then " -c " 
                   	else " -o " ++ $testname ++ " ")
-          ++ $srcname ++ " &> " ++ $errname
+          ++ $srcname ++ " >" ++ $errname ++ " 2>&1"
    $res = runCmd($cmd)
    return $res
 }
