@@ -130,15 +130,25 @@ footer =
 	)
    
 
-src_button :: Maybe String -> String -> String -> HtmlTable
-src_button source_url _ file
+src_button :: Maybe String -> String -> Interface -> HtmlTable
+src_button source_url _ iface
   | Just u <- source_url = 
-	let src_url = if (last u == '/') then u ++ file else u ++ '/':file
+	let src_url = spliceSrcURL iface u
 	in
 	topButBox (anchor ! [href src_url] << toHtml "Source code")
   | otherwise =
 	Html.emptyTable
   
+spliceSrcURL :: Interface -> String -> String
+spliceSrcURL iface url = run url
+  where run "" = ""
+        run ('%':'M':rest) = modl_str ++ run rest
+        run ('%':'F':rest) = iface_filename iface ++ run rest
+	run (c:rest) = c : run rest
+	
+	modl_str = case iface_module iface of { Module m -> 
+		   map (\x -> if x == '.' then '/' else x) m }
+
 contentsButton :: Maybe String -> HtmlTable
 contentsButton maybe_contents_url 
   = topButBox (anchor ! [href url] << toHtml "Contents")
@@ -173,7 +183,7 @@ pageHeader mdl iface doctitle source_url maybe_contents_url maybe_index_url =
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	src_button source_url mdl (iface_filename iface) <->
+	src_button source_url mdl iface <->
 	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
@@ -257,36 +267,47 @@ ppPrologue title (Just doc) =
 ppModuleTree :: String -> [ModuleTree] -> HtmlTable
 ppModuleTree _ ts = 
   tda [theclass "section1"] << toHtml "Modules" </>
-  pad_td Nothing << fst (genTable empty 0 ts)
+  td << vanillaTable2 << htmlTable
   where
-    genTable html id []     = (html,id)
-    genTable html id (x:xs) = genTable (html +++ u) id' xs      
+    genTable htmlTable id []     = (htmlTable,id)
+    genTable htmlTable id (x:xs) = genTable (htmlTable </> u) id' xs      
       where
-        (u,id') = mkNode [] x id
+        (u,id') = mkNode [] x 0 id
 
-mkNode :: [String] -> ModuleTree -> Int -> (Html,Int)
-mkNode ss (Node s leaf pkg short ts) id = htmlNode
+    (htmlTable,_) = genTable emptyTable 0 ts
+
+mkNode :: [String] -> ModuleTree -> Int -> Int -> (HtmlTable,Int)
+mkNode ss (Node s leaf pkg short ts) depth id = htmlNode
   where
     htmlNode = case ts of
-      [] -> (node  << (htmlModule +++ shortDescr +++ htmlPkg), id)
-      _  -> (cnode << (collapsebutton id_s +++ htmlModule +++ shortDescr
-			 +++ htmlPkg +++ sub_tree), id')
+      [] -> (td_pad_w 1.25 depth << htmlModule  <-> shortDescr <-> htmlPkg,id)
+      _  -> (td_w depth << (collapsebutton id_s +++ htmlModule) <-> shortDescr <-> htmlPkg </> 
+                (td_subtree << sub_tree), id')
 
-    node  = thediv ! [theclass "node"]
-    cnode = thediv ! [theclass "cnode"]
+    mod_width = 50::Int {-em-}
 
-    shortDescr :: Html
+    td_pad_w pad depth = 
+	tda [thestyle ("padding-left: " ++ show pad ++ "em;" ++
+		       "width: " ++ show (mod_width - depth*2) ++ "em")]
+
+    td_w depth = 
+	tda [thestyle ("width: " ++ show (mod_width - depth*2) ++ "em")]
+
+    td_subtree =
+	tda [thestyle ("padding: 0; padding-left: 2em")]
+
+    shortDescr :: HtmlTable
     shortDescr = case short of
-	Nothing  -> empty
-	Just doc -> thespan ! [theclass "rdoc"] << (docToHtml doc)
+	Nothing -> td empty
+	Just doc -> tda [theclass "rdoc"] (docToHtml doc)
 
     htmlModule 
       | leaf      = ppHsModule mdl
       | otherwise = toHtml s
 
     htmlPkg = case pkg of
-      Nothing -> empty
-      Just p  -> thespan ! [theclass "pkg"] << toHtml p
+      Nothing -> td << empty
+      Just p  -> td << toHtml p
 
     mdl = foldr (++) "" (s' : map ('.':) ss')
     (s':ss') = reverse (s:ss)
@@ -294,19 +315,15 @@ mkNode ss (Node s leaf pkg short ts) id = htmlNode
     
     id_s = "n:" ++ show id
     
-    (sub_tree,id') = genSubTree empty (id+1) ts
+    (sub_tree,id') = genSubTree emptyTable (id+1) ts
     
-    genSubTree :: Html -> Int -> [ModuleTree] -> (Html,Int)
-    genSubTree html id [] = (sub_tree,id)
+    genSubTree :: HtmlTable -> Int -> [ModuleTree] -> (Html,Int)
+    genSubTree htmlTable id [] = (sub_tree,id)
       where
-        sub_tree = collapsed thediv id_s html
-    genSubTree html id (x:xs) = genSubTree (html +++ u) id' xs      
+        sub_tree = collapsed vanillaTable2 id_s htmlTable
+    genSubTree htmlTable id (x:xs) = genSubTree (htmlTable </> u) id' xs      
       where
-        (u,id') = mkNode (s:ss) x id
-
-pad_td :: Maybe Float -> Html -> HtmlTable
-pad_td Nothing  = tda [width "100%"]
-pad_td (Just n) = tda [thestyle ("padding-left:" ++ show n ++ "em"), width "100%"]
+        (u,id') = mkNode (s:ss) x (depth+1) id
 
 -- ---------------------------------------------------------------------------
 -- Generate the index
@@ -1138,6 +1155,7 @@ topButBox html = tda [theclass "topbut"] << html
 -- a narrow table is the same but without width 100%.
 vanillaTable, narrowTable :: Html -> Html
 vanillaTable = table ! [theclass "vanilla", cellspacing 0, cellpadding 0]
+vanillaTable2 = table ! [theclass "vanilla2", cellspacing 0, cellpadding 0]
 narrowTable  = table ! [theclass "narrow",  cellspacing 0, cellpadding 0]
 
 spacedTable1, spacedTable5 :: Html -> Html

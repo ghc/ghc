@@ -16,6 +16,10 @@ TABLE.vanilla {
   /* I can't seem to specify cellspacing or cellpadding properly using CSS... */
 }
 
+TABLE.vanilla2 {
+  border-width: 0px;
+}
+
 /* <TT> font is a little too small in MSIE */
 TT  { font-size: 100%; }
 PRE { font-size: 100%; }
