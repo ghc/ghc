@@ -4,10 +4,13 @@
 import IO
 import System
 import IOExts (trace)
+import RegexString
+import Maybe
 
 main = do
     prog <- getProgName
-    hPutStr stderr (shows prog "\n")
+    let Just (name:_) = matchRegex (mkRegex ".*(cg025.bin)") prog
+    hPutStr stderr (shows name "\n")
     args <- getArgs
     hPutStr stderr (shows args "\n")
     path <- getEnv "PATH"

@@ -5,12 +5,10 @@ module Main ( main ) where
 import PrelBase
 import Addr
 import ST
-import IOExts
 import ST
 import MutableArray
 import ByteArray
 import Int( Num(fromInt) )
-import CString (packString)
 	
 import Ratio
 import Array
@@ -27,20 +25,40 @@ main = putStr
 -- Arr# Char# -------------------------------------------
 -- (main effort is in packString#)
 
-foreign label "stdout" addrOfStdout :: Addr
-
-stdout :: Addr
-stdout = indexAddrOffAddr addrOfStdout 0
-
 test_chars :: String
 test_chars
-  = let str = reverse "Now is the time for all good men to come to...\n"
+  = let arr# = f 1000
     in
-    unsafePerformIO (
-	_ccall_ fprintf stdout (packString "%d %s\n") (93::Int) (packString str) >>
-	_ccall_ fflush  stdout >>
-	return ""
+	shows (lookup_range arr# 42# 416#) "\n"
+  where
+    f :: Int -> ByteArray Int
+
+    f size@(I# size#)
+      = runST (
+	    -- allocate an array of the specified size
+	  newCharArray (0, (size-1))	>>= \ arr# ->
+
+	    -- fill in all elements; elem i has "i" put in it
+	  fill_in arr# 0# (size# -# 1#) >>
+
+	    -- freeze the puppy:
+	  freezeByteArray arr#
 	)
+
+    fill_in :: MutableByteArray s Int -> Int# -> Int# -> ST s ()
+
+    fill_in arr_in# first# last#
+      = if (first# ># last#)
+	then return ()
+	else writeCharArray arr_in# (I# first#) ((chr (I# first#))) >>
+	     fill_in arr_in# (first# +# 1#) last#
+
+    lookup_range :: ByteArray Int -> Int# -> Int# -> [Char]
+    lookup_range arr from# to#
+      = if (from# ># to#)
+	then []
+	else (indexCharArray arr (I# from#))
+	     : (lookup_range arr (from# +# 1#) to#)
 
 -- Arr# Int# -------------------------------------------
 
