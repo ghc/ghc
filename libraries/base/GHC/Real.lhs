@@ -154,7 +154,7 @@ numericEnumFromThenTo   :: (Ord a, Fractional a) => a -> a -> a -> [a]
 numericEnumFromThenTo e1 e2 e3 = takeWhile pred (numericEnumFromThen e1 e2)
 				where
 				 mid = (e2 - e1) / 2
-				 pred | e2 > e1   = (<= e3 + mid)
+				 pred | e2 >= e1  = (<= e3 + mid)
 				      | otherwise = (>= e3 + mid)
 \end{code}
 
