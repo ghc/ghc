@@ -299,7 +299,8 @@ ppSummary s
             = ""
             | otherwise
             = "\nThe following tests had framework failures:\n"
-              ++ unlines (map (("   "++).show) (frame_fails s))
+              ++ unlines (map (("   "++). ppTestID . testid_of_TestResult) 
+                              (frame_fails s))
      in
          (summary_short,
           summary_big ++ unexpected_summary ++ framefail_summary)
