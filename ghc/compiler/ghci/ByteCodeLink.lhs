@@ -606,17 +606,18 @@ lookupIE ie con_nm
 
 linkFail :: String -> String -> IO a
 linkFail who what
-   = throwDyn (ProgramError (
-        "\nDuring interactive linking, GHCi couldn't find the following symbol:\n" ++
-        "   " ++ what ++ "\n" ++
-        "This may be due to you not asking GHCi to load extra object files,\n" ++
-        "archives or DLLs needed by your current session.  Restart GHCi, specifying\n" ++
-        "the missing library using the -L/path/to/object/dir and -lmissinglibname\n" ++
-        "flags, or simply by naming the relevant files on the GHCi command line.\n" ++
-        "Alternatively, this link failure might indicate a bug in GHCi.\n" ++
-        "If you suspect the latter, please send a bug report to:\n" ++
-        "   glasgow-haskell-bugs@haskell.org\n"
-     ))
+   = throwDyn (ProgramError $
+        unlines [ ""
+	        , "During interactive linking, GHCi couldn't find the following symbol:"
+		, ' ' : ' ' : what 
+		, "This may be due to you not asking GHCi to load extra object files,"
+		, "archives or DLLs needed by your current session.  Restart GHCi, specifying"
+		, "the missing library using the -L/path/to/object/dir and -lmissinglibname"
+		, "flags, or simply by naming the relevant files on the GHCi command line."
+		, "Alternatively, this link failure might indicate a bug in GHCi."
+		, "If you suspect the latter, please send a bug report to:"
+		, "  glasgow-haskell-bugs@haskell.org"
+		])
 
 -- HACKS!!!  ToDo: cleaner
 nameToCLabel :: Name -> String{-suffix-} -> String

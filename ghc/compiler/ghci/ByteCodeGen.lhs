@@ -33,7 +33,8 @@ import TyCon		( TyCon(..), tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isFunTyCon, isUnboxedTupleTyCon )
 import Class		( Class, classTyCon )
 import Type		( Type, repType, splitRepFunTys )
-import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
+import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem,
+			  isSingleton, lengthIs )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
 import PrimRep		( isFollowableRep )
@@ -539,7 +540,7 @@ schemeT d s p app
          isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
      in  is_con_call && isUnboxedTupleCon con 
          && ( (args_r_to_l `lengthIs` 2 && isVoidRepAtom (last (args_r_to_l)))
-              || (isSingleton args_r_to_l) )
+              || (isSingleton args_r_to_l)
             )
    = --trace (if isSingleton args_r_to_l
      --       then "schemeT: unboxed singleton"

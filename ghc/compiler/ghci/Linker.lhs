@@ -15,10 +15,13 @@ module Linker (
    addDLL	 -- :: String -> IO (Ptr CChar)
   )  where
 
+import PrelByteArr
+import PrelPack 	( packString )
+
+import Monad            ( when )
+
 import CTypes		( CChar )
 import Foreign		( Ptr, nullPtr )
-import PrelByteArr
-import PrelPack 	(packString)
 import Panic		( panic )
 import DriverUtil       ( prefixUnderscore )
 
@@ -26,6 +29,7 @@ import DriverUtil       ( prefixUnderscore )
 -- RTS Linker Interface
 -- ---------------------------------------------------------------------------
 
+lookupSymbol :: String -> IO (Maybe (Ptr a))
 lookupSymbol str_in = do
    let str = prefixUnderscore str_in
    addr <- c_lookupSymbol (packString str)
@@ -33,25 +37,33 @@ lookupSymbol str_in = do
 	then return Nothing
 	else return (Just addr)
 
+loadObj :: String -> IO ()
 loadObj str = do
    r <- c_loadObj (packString str)
-   if (r == 0)
-	then panic "loadObj: failed"
-	else return ()
+   when (r == 0) (panic "loadObj: failed")
 
+unloadObj :: String -> IO ()
 unloadObj str = do
    r <- c_unloadObj (packString str)
-   if (r == 0)
-	then panic "unloadObj: failed"
-	else return ()
+   when (r == 0) (panic "unloadObj: failed")
 
+resolveObjs :: IO Bool
 resolveObjs = do
    r <- c_resolveObjs
    return (r /= 0)  -- returns True <=> success
 
+addDLL :: String -> String -> IO (Ptr CChar)
 addDLL path lib = do
    maybe_errmsg <- c_addDLL (packString path) (packString lib)
    return maybe_errmsg
+
+
+foreign import "initLinker" unsafe
+   initLinker :: IO ()
+
+-- ---------------------------------------------------------------------------
+-- Foreign declaractions to RTS entry points which does the real work;
+-- ---------------------------------------------------------------------------
 
 type PackedString = ByteArray Int
 
@@ -66,9 +78,6 @@ foreign import "unloadObj" unsafe
 
 foreign import "resolveObjs" unsafe
    c_resolveObjs :: IO Int
-
-foreign import "initLinker" unsafe
-   initLinker :: IO ()
 
 foreign import "addDLL" unsafe 
    c_addDLL :: PackedString -> PackedString -> IO (Ptr CChar)

@@ -19,6 +19,7 @@ import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import Constants	( mIN_SIZE_NonUpdHeapObject )
 import ClosureInfo	( mkVirtHeapOffsets )
 import FastString	( FastString(..) )
+import Util             ( lengthIs, listLengthCmp )
 
 import Foreign		( Storable(..), Word8, Word16, Word32, Word64, Ptr(..), 
 			  malloc, castPtr, plusPtr, Addr )
@@ -55,7 +56,7 @@ mkITbl :: TyCon -> IO ItblEnv
 mkITbl tc
    | not (isDataTyCon tc) 
    = return emptyFM
-   | n == length dcs  -- paranoia; this is an assertion.
+   | dcs `lengthIs` n -- paranoia; this is an assertion.
    = make_constr_itbls dcs
      where
         dcs = tyConDataCons tc
@@ -67,7 +68,7 @@ cONSTR = 1  -- as defined in ghc/includes/ClosureTypes.h
 -- Assumes constructors are numbered from zero, not one
 make_constr_itbls :: [DataCon] -> IO ItblEnv
 make_constr_itbls cons
-   | length cons <= 8
+   | listLengthCmp cons 8 /= GT -- <= 8 elements in the list
    = do is <- mapM mk_vecret_itbl (zip cons [0..])
 	return (listToFM is)
    | otherwise

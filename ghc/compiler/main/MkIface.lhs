@@ -59,7 +59,7 @@ import TcType		( tcSplitSigmaTy, tidyTopType, deNoteType, namesOfDFunHead )
 import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
-import Util		( sortLt )
+import Util		( sortLt, dropList )
 import ErrUtils		( dumpIfSet_dyn )
 
 import Monad		( when )
@@ -238,7 +238,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
 	where
 	  (tyvars1, _, ex_tyvars, ex_theta, arg_tys, tycon1) = dataConSig data_con
           field_labels   = dataConFieldLabels data_con
-          strict_marks   = drop (length ex_theta) (dataConStrictMarks data_con)
+          strict_marks   = dropList ex_theta (dataConStrictMarks data_con)
 				-- The 'drop' is because dataConStrictMarks
 				-- includes the existential dictionaries
 	  details | null field_labels

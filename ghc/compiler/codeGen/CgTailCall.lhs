@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgTailCall.lhs,v 1.30 2001/06/25 14:36:04 simonpj Exp $
+% $Id: CgTailCall.lhs,v 1.31 2001/10/25 05:07:32 sof Exp $
 %
 %********************************************************
 %*							*
@@ -52,7 +52,7 @@ import StgSyn		( StgArg )
 import Type		( isUnLiftedType )
 import TyCon            ( TyCon )
 import PrimOp		( PrimOp )
-import Util		( zipWithEqual )
+import Util		( zipWithEqual, splitAtList )
 import ListSetOps	( assocMaybe )
 import Outputable
 import Panic		( panic, assertPanic )
@@ -396,7 +396,7 @@ doTailCall arg_amodes arg_regs finish_code arity pending_assts
   = getEndOfBlockInfo	`thenFC` \ eob@(EndOfBlockInfo args_sp sequel) ->
 
     let
-	(reg_arg_amodes, stk_arg_amodes) = splitAt (length arg_regs) arg_amodes
+	(reg_arg_amodes, stk_arg_amodes) = splitAtList arg_regs arg_amodes
 	    -- We get some stk_arg_amodes if (a) no regs, or 
 	    --				     (b) args beyond arity
 
