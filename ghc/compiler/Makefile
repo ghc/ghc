@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.148 2001/03/27 09:38:02 simonmar Exp $
+# $Id: Makefile,v 1.149 2001/03/27 10:32:42 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -63,12 +63,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cHaveLibGmp           = \"$(HaveLibGmp)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> $(CONFIG_HS)
-	@echo "clibdir               = \"$(libdir)\"" >> $(CONFIG_HS)
-	@echo "clibexecdir           = \"$(libexecdir)\"" >> $(CONFIG_HS)
-	@echo "cdatadir              = \"$(datadir)\"" >> $(CONFIG_HS)
-	@echo "cbindir               = \"$(bindir)\"" >> $(CONFIG_HS)
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
-	@echo "cFPTOOLS_TOP_ABS      = \"$(FPTOOLS_TOP_ABS)\"" >> $(CONFIG_HS)
 	@echo "cRAWCPP               = \"$(RAWCPP)\"" >> $(CONFIG_HS)
 	@echo done.
 
