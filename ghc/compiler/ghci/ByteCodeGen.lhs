@@ -13,8 +13,8 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName, nameModule )
-import Id		( Id, idType, isDataConId_maybe )
+import Name		( Name, getName, nameModule, mkSysLocalName )
+import Id		( Id, idType, isDataConId_maybe, mkVanillaId )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
 import FiniteMap	( FiniteMap, addListToFM, listToFM, filterFM,
@@ -38,12 +38,12 @@ import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
 import ClosureInfo	( mkVirtHeapOffsets )
 import Module		( ModuleName, moduleName )
+import Unique		( mkPseudoUnique3 )
 
 import List		( intersperse )
 import Monad		( foldM )
 import ST		( runST )
-import MArray		( MArray(..), IOArray, IOUArray, HasBounds(..), freeze, 
-		          mapArray, castSTUArray,
+import MArray		( castSTUArray, 
 			  newFloatArray, writeFloatArray,
 			  newDoubleArray,  writeDoubleArray,
 			  newIntArray, writeIntArray,
@@ -54,7 +54,7 @@ import Addr		( Word, Addr, addrToInt, nullAddr )
 import Bits		( Bits(..), shiftR )
 
 import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, ByteArray#, Array# )
-import IOExts		( IORef, readIORef, writeIORef, fixIO )
+import IOExts		( IORef, fixIO )
 import ArrayBase	
 import PrelArr		( Array(..) )
 import PrelIOBase	( IO(..) )
@@ -100,14 +100,18 @@ coreExprToBCOs :: DynFlags
                -> IO UnlinkedBCOExpr
 coreExprToBCOs dflags expr
  = do showPass dflags "ByteCodeGen"
-      let invented_id = panic "invented_id" :: Id
-          (BcM_State all_proto_bcos final_ctr) 
+
+      -- create a totally bogus name for the top-level BCO; this
+      -- should be harmless, since it's never used for anything
+      let invented_name = mkSysLocalName (mkPseudoUnique3 0) SLIT("Expr-Top-Level")
+      let invented_id   = mkVanillaId invented_name (panic "invented_id's type")
+
+      let (BcM_State all_proto_bcos final_ctr) 
              = runBc (BcM_State [] 0) 
                      (schemeR (invented_id, freeVars expr))
-      dumpIfSet_dyn dflags Opt_D_dump_InterpSyn
+      dumpIfSet_dyn dflags Opt_D_dump_BCOs
          "Proto-bcos" (vcat (intersperse (char ' ') (map ppr all_proto_bcos)))
 
-      let invented_name = getName invented_id
       let root_proto_bco 
              = case filter ((== invented_name).nameOfProtoBCO) all_proto_bcos of
                   [root_bco] -> root_bco
@@ -121,27 +125,26 @@ coreExprToBCOs dflags expr
 
 
 
-
 data UnlinkedBCO
    = UnlinkedBCO Name
-                 Int (IOUArray Int Word16)	-- insns
-                 Int (IOUArray Int Word)	-- literals
-                 Int (IOArray Int Name)		-- ptrs
-                 Int (IOArray Int Name)		-- itbl refs
+                 (SizedSeq Word16)	-- insns
+                 (SizedSeq Word)	-- literals
+                 (SizedSeq Name)	-- ptrs
+                 (SizedSeq Name)	-- itbl refs
 
-nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _ _ _ _ _) = nm
+nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _) = nm
 
 -- When translating expressions, we need to distinguish the root
 -- BCO for the expression
 type UnlinkedBCOExpr = (UnlinkedBCO, [UnlinkedBCO])
 
 instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm n_insns insns n_lits lits n_ptrs ptrs n_itbls itbls)
+   ppr (UnlinkedBCO nm insns lits ptrs itbls)
       = sep [text "BCO", ppr nm, text "with", 
-             int n_insns, text "insns",
-             int n_lits, text "lits",
-             int n_ptrs, text "ptrs",
-             int n_itbls, text "itbls"]
+             int (sizeSS insns), text "insns",
+             int (sizeSS lits), text "lits",
+             int (sizeSS ptrs), text "ptrs",
+             int (sizeSS itbls), text "itbls"]
 
 
 -- these need a proper home
@@ -165,8 +168,6 @@ filterNameMap mods env
 
 type LocalLabel = Int
 
-data UnboxedLit = UnboxedI Int | UnboxedF Float | UnboxedD Double
-
 data BCInstr
    -- Messing with the stack
    = ARGCHECK  Int
@@ -182,7 +183,7 @@ data BCInstr
    -- Pushing literals
    | PUSH_UBX  Literal	Int 
                         -- push this int/float/double, NO TAG, on the stack
-			-- Int is # of items in literal pool to push
+			-- Int is # of words to copy from literal pool
    | PUSH_TAG  Int      -- push this tag on the stack
 
    | SLIDE     Int{-this many-} Int{-down by this much-}
@@ -220,10 +221,15 @@ instance Outputable BCInstr where
    ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
    ppr (PUSH_AS nm pk)       = text "PUSH_AS " <+> ppr nm <+> ppr pk
+   ppr (PUSH_UBX lit nw)     = text "PUSH_UBX" <+> parens (int nw) <+> ppr lit
+   ppr (PUSH_TAG n)          = text "PUSH_TAG" <+> int n
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
    ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
+   ppr (UPK_TAG n m k)       = text "UPK_TAG " <+> int n <> text "words" 
+                                               <+> int m <> text "conoff"
+                                               <+> int k <> text "stkoff"
    ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
    ppr (LABEL     lab)       = text "__"       <> int lab <> colon
    ppr (TESTLT_I  i lab)     = text "TESTLT_I" <+> int i <+> text "__" <> int lab
@@ -237,10 +243,6 @@ instance Outputable BCInstr where
    ppr CASEFAIL              = text "CASEFAIL"
    ppr ENTER                 = text "ENTER"
    ppr RETURN                = text "RETURN"
-
-pprAltCode discrs_n_codes
-   = vcat (map f discrs_n_codes)
-     where f (discr, code) = ppr discr <> colon <+> vcat (map ppr (fromOL code))
 
 instance Outputable a => Outputable (ProtoBCO a) where
    ppr (ProtoBCO name instrs origin)
@@ -724,12 +726,12 @@ instance Outputable Discr where
 
 -- Find things in the BCEnv (the what's-on-the-stack-env)
 -- See comment preceding pushAtom for precise meaning of env contents
-lookupBCEnv :: BCEnv -> Id -> Int
-lookupBCEnv env nm
-   = case lookupFM env nm of
-        Nothing -> pprPanic "lookupBCEnv" 
-                            (ppr nm $$ char ' ' $$ vcat (map ppr (fmToList env)))
-        Just xx -> xx
+--lookupBCEnv :: BCEnv -> Id -> Int
+--lookupBCEnv env nm
+--   = case lookupFM env nm of
+--        Nothing -> pprPanic "lookupBCEnv" 
+--                            (ppr nm $$ char ' ' $$ vcat (map ppr (fmToList env)))
+--        Just xx -> xx
 
 lookupBCEnv_maybe :: BCEnv -> Id -> Maybe Int
 lookupBCEnv_maybe = lookupFM
@@ -767,9 +769,6 @@ data BcM_State
                  nextlabel :: Int }		-- for generating local labels
 
 type BcM result = BcM_State -> (result, BcM_State)
-
-mkBcM_State :: [ProtoBCO Name] -> Int -> BcM_State
-mkBcM_State = BcM_State
 
 runBc :: BcM_State -> BcM () -> BcM_State
 runBc init_st m = case m init_st of { (r,st) -> st }
@@ -834,36 +833,28 @@ assembleBCO (ProtoBCO nm instrs origin)
             = case lookupFM label_env lab of
                  Just bco_offset -> bco_offset
                  Nothing -> pprPanic "assembleBCO.findLabel" (int lab)
-
-         init_n_insns = 10
-         init_n_lits  = 4
-         init_n_ptrs  = 4
-         init_n_itbls = 4
      in
-     do  insns <- newXIOUArray init_n_insns :: IO (XIOUArray Word16)
-         lits  <- newXIOUArray init_n_lits  :: IO (XIOUArray Word)
-         ptrs  <- newXIOArray  init_n_ptrs  -- :: IO (XIOArray Name)
-         itbls <- newXIOArray  init_n_itbls -- :: IO (XIOArray Name)
-
-         -- pass 2: generate the instruction, ptr and nonptr bits
+     do  -- pass 2: generate the instruction, ptr and nonptr bits
+         insns <- return emptySS :: IO (SizedSeq Word16)
+         lits  <- return emptySS :: IO (SizedSeq Word)
+         ptrs  <- return emptySS :: IO (SizedSeq Name)
+         itbls <- return emptySS :: IO (SizedSeq Name)
          let init_asm_state = (insns,lits,ptrs,itbls)
-         final_asm_state <- mkBits findLabel init_asm_state instrs         
+         (final_insns, final_lits, final_ptrs, final_itbls) 
+            <- mkBits findLabel init_asm_state instrs         
 
-         -- unwrap the expandable arrays
-         let final_insns = stuffXIOU insns
-             final_lits  = stuffXIOU lits
-             final_ptrs  = stuffXIO  ptrs
-             final_itbls = stuffXIO  itbls
-
-         return (UnlinkedBCO nm
-                             (usedXIOU insns) final_insns 
-                             (usedXIOU lits)  final_lits 
-                             (usedXIO  ptrs)  final_ptrs 
-                             (usedXIO  itbls) final_itbls)
-
+         return (UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls)
 
 -- instrs nonptrs ptrs itbls
-type AsmState = (XIOUArray Word16, XIOUArray Word, XIOArray Name, XIOArray Name)
+type AsmState = (SizedSeq Word16, SizedSeq Word, SizedSeq Name, SizedSeq Name)
+
+data SizedSeq a = SizedSeq !Int [a]
+emptySS = SizedSeq 0 []
+addToSS (SizedSeq n r_xs) x = return (SizedSeq (n+1) (x:r_xs))
+addListToSS (SizedSeq n r_xs) xs 
+   = return (SizedSeq (n + length xs) (reverse xs ++ r_xs))
+sizeSS (SizedSeq n r_xs) = n
+listFromSS (SizedSeq n r_xs) = return (reverse r_xs)
 
 
 -- This is where all the action is (pass 2 of the assembler)
@@ -887,8 +878,8 @@ mkBits findLabel st proto_insns
                PUSH_AS   nm pk    -> do (p, st2)  <- ptr st nm
                                         (np, st3) <- ret_itbl st2 pk
                                         instr3 st3 i_PUSH_AS p np
-               PUSH_UBX lit nw32s -> do (np, st2) <- literal st lit
-                                        instr3 st2 i_PUSH_UBX np nw32s
+               PUSH_UBX  lit nws  -> do (np, st2) <- literal st lit
+                                        instr3 st2 i_PUSH_UBX np nws
                PUSH_TAG  tag      -> instr2 st i_PUSH_TAG tag
                SLIDE     n by     -> instr3 st i_SLIDE n by
                ALLOC     n        -> instr2 st i_ALLOC n
@@ -922,54 +913,54 @@ mkBits findLabel st proto_insns
        i2s = fromIntegral
 
        instr1 (st_i0,st_l0,st_p0,st_I0) i1
-          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
+          = do st_i1 <- addToSS st_i0 (i2s i1)
                return (st_i1,st_l0,st_p0,st_I0)
 
        instr2 (st_i0,st_l0,st_p0,st_I0) i1 i2
-          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
-               st_i2 <- addToXIOUArray st_i1 (i2s i2)
+          = do st_i1 <- addToSS st_i0 (i2s i1)
+               st_i2 <- addToSS st_i1 (i2s i2)
                return (st_i2,st_l0,st_p0,st_I0)
 
        instr3 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3
-          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
-               st_i2 <- addToXIOUArray st_i1 (i2s i2)
-               st_i3 <- addToXIOUArray st_i2 (i2s i3)
+          = do st_i1 <- addToSS st_i0 (i2s i1)
+               st_i2 <- addToSS st_i1 (i2s i2)
+               st_i3 <- addToSS st_i2 (i2s i3)
                return (st_i3,st_l0,st_p0,st_I0)
 
        instr4 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3 i4
-          = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
-               st_i2 <- addToXIOUArray st_i1 (i2s i2)
-               st_i3 <- addToXIOUArray st_i2 (i2s i3)
-               st_i4 <- addToXIOUArray st_i3 (i2s i4)
+          = do st_i1 <- addToSS st_i0 (i2s i1)
+               st_i2 <- addToSS st_i1 (i2s i2)
+               st_i3 <- addToSS st_i2 (i2s i3)
+               st_i4 <- addToSS st_i3 (i2s i4)
                return (st_i4,st_l0,st_p0,st_I0)
 
        float (st_i0,st_l0,st_p0,st_I0) f
-          = do let w32s = mkLitF f
-               st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
+          = do let ws = mkLitF f
+               st_l1 <- addListToSS st_l0 ws
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        double (st_i0,st_l0,st_p0,st_I0) d
-          = do let w32s = mkLitD d
-               st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
+          = do let ws = mkLitD d
+               st_l1 <- addListToSS st_l0 ws
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        int (st_i0,st_l0,st_p0,st_I0) i
-          = do let w32s = mkLitI i
-               st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
+          = do let ws = mkLitI i
+               st_l1 <- addListToSS st_l0 ws
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        addr (st_i0,st_l0,st_p0,st_I0) a
-          = do let w32s = mkLitA a
-               st_l1 <- addListToXIOUArray st_l0 w32s
-               return (usedXIOU st_l0, (st_i0,st_l1,st_p0,st_I0))
+          = do let ws = mkLitA a
+               st_l1 <- addListToSS st_l0 ws
+               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
 
        ptr (st_i0,st_l0,st_p0,st_I0) p
-          = do st_p1 <- addToXIOArray st_p0 p
-               return (usedXIO st_p0, (st_i0,st_l0,st_p1,st_I0))
+          = do st_p1 <- addToSS st_p0 p
+               return (sizeSS st_p0, (st_i0,st_l0,st_p1,st_I0))
 
        itbl (st_i0,st_l0,st_p0,st_I0) dcon
-          = do st_I1 <- addToXIOArray st_I0 (getName dcon)
-               return (usedXIO st_I0, (st_i0,st_l0,st_p0,st_I1))
+          = do st_I1 <- addToSS st_I0 (getName dcon)
+               return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
 
        literal st (MachInt j)    = int st (fromIntegral j)
        literal st (MachFloat r)  = float st (fromRational r)
@@ -1000,10 +991,14 @@ instrSizeB instr
         PUSH_LL  _ _   -> 6
         PUSH_LLL _ _ _ -> 8
         PUSH_G   _     -> 4
+        PUSH_AS  _ _   -> 6
+        PUSH_UBX _ _   -> 6
+        PUSH_TAG _     -> 4
         SLIDE    _ _   -> 6
         ALLOC    _     -> 4
         MKAP     _ _   -> 6
         UNPACK   _     -> 4
+        UPK_TAG  _ _ _ -> 8
         PACK     _ _   -> 6
         LABEL    _     -> 4
         TESTLT_I _ _   -> 6
@@ -1073,67 +1068,6 @@ mkLitA a
         return [w0]
      )
 
-
--- Zero-based expandable arrays
-data XIOUArray ele 
-   = XIOUArray { usedXIOU :: Int, stuffXIOU :: (IOUArray Int ele) }
-data XIOArray ele 
-   = XIOArray { usedXIO :: Int , stuffXIO :: (IOArray Int ele) }
-
-newXIOUArray size
-   = do arr <- newArray (0, size-1)
-        return (XIOUArray 0 arr)
-
-addListToXIOUArray xarr []
-   = return xarr
-addListToXIOUArray xarr (x:xs)
-   = addToXIOUArray xarr x >>= \ xarr' -> addListToXIOUArray xarr' xs
-
-
-addToXIOUArray :: MArray IOUArray a IO
-                  => XIOUArray a -> a -> IO (XIOUArray a)
-addToXIOUArray (XIOUArray n_arr arr) x
-   = case bounds arr of
-        (lo, hi) -> ASSERT(lo == 0)
-                    if   n_arr > hi
-                    then do new_arr <- newArray (0, 2*hi-1)
-                            copy hi arr new_arr
-                            addToXIOUArray (XIOUArray n_arr new_arr) x
-                    else do writeArray arr n_arr x
-                            return (XIOUArray (n_arr+1) arr)
-     where
-        copy :: MArray IOUArray a IO
-                => Int -> IOUArray Int a -> IOUArray Int a -> IO ()
-        copy n src dst
-           | n < 0     = return ()
-           | otherwise = do nx <- readArray src n
-                            writeArray dst n nx
-                            copy (n-1) src dst
-
-
-
-newXIOArray size
-   = do arr <- newArray (0, size-1)
-        return (XIOArray 0 arr)
-
-addToXIOArray :: XIOArray a -> a -> IO (XIOArray a)
-addToXIOArray (XIOArray n_arr arr) x
-   = case bounds arr of
-        (lo, hi) -> ASSERT(lo == 0)
-                    if   n_arr > hi
-                    then do new_arr <- newArray (0, 2*hi-1)
-                            copy hi arr new_arr
-                            addToXIOArray (XIOArray n_arr new_arr) x
-                    else do writeArray arr n_arr x
-                            return (XIOArray (n_arr+1) arr)
-     where
-        copy :: Int -> IOArray Int a -> IOArray Int a -> IO ()
-        copy n src dst
-           | n < 0     = return ()
-           | otherwise = do nx <- readArray src n
-                            writeArray dst n nx
-                            copy (n-1) src dst
-
 \end{code}
 
 %************************************************************************
@@ -1157,19 +1091,15 @@ data BCO# = BCO# ByteArray# 		-- instrs   :: array Word16#
                  ByteArray#		-- itbls    :: Array Addr#
 -}
 
-data LinkedBCO = LinkedBCO BCO#
-
-
-
 GLOBAL_VAR(v_cafTable, [], [HValue])
 
-addCAF :: HValue -> IO ()
-addCAF x = do xs <- readIORef v_cafTable; writeIORef v_cafTable (x:xs)
+--addCAF :: HValue -> IO ()
+--addCAF x = do xs <- readIORef v_cafTable; writeIORef v_cafTable (x:xs)
 
-bcosToHValue :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr -> IO HValue
-bcosToHValue ie ce (root_bco, other_bcos)
-   = do linked_expr <- linkIExpr ie ce (root_bco, other_bcos)
-	return linked_expr
+--bcosToHValue :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr -> IO HValue
+--bcosToHValue ie ce (root_bco, other_bcos)
+--   = do linked_expr <- linkIExpr ie ce (root_bco, other_bcos)
+--	return linked_expr
 
 
 linkIModules :: ItblEnv    -- incoming global itbl env; returned updated
@@ -1211,32 +1141,49 @@ linkBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO]
          -> IO [HValue]   -- IO [BCO#] really
 linkBCOs ie ce binds = mapM (linkBCO ie ce) binds
 
-linkBCO ie ce (UnlinkedBCO nm 
-                           n_insns insns n_literals literals 
-                           n_ptrs ptrs n_itbls itbls)
-   = do linked_ptrs <- mapArray (lookupCE ce) ptrs
-        linked_itbls <- mapArray (lookupIE ie) itbls
+linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
+   = do insns    <- listFromSS insnsSS
+        literals <- listFromSS literalsSS
+        ptrs     <- listFromSS ptrsSS
+        itbls    <- listFromSS itblsSS
 
-        ptrs_froz <- freeze linked_ptrs
-        let ptrs_parr = case ptrs_froz of Array lo hi parr -> parr
+        let linked_ptrs  = map (lookupCE ce) ptrs
+            linked_itbls = map (lookupIE ie) itbls
 
-        insns_froz <- freeze insns
-        let insns_barr = case insns_froz of UArray lo hi barr -> barr
+        let n_insns    = sizeSS insnsSS
+            n_literals = sizeSS literalsSS
+            n_ptrs     = sizeSS ptrsSS
+            n_itbls    = sizeSS itblsSS
 
-        literals_froz <- freeze literals
-        let literals_barr = case literals_froz of UArray lo hi barr -> barr
+        let ptrs_arr = array (0, n_ptrs-1) (indexify linked_ptrs)
+                       :: Array Int HValue
+            ptrs_parr = case ptrs_arr of Array lo hi parr -> parr
 
-        itbls_froz <- freeze linked_itbls
-        let itbls_barr = case itbls_froz of UArray lo hi barr -> barr
+            itbls_arr = array (0, n_itbls-1) (indexify linked_itbls)
+                        :: UArray Int Addr
+            itbls_barr = case itbls_arr of UArray lo hi barr -> barr
+
+            insns_arr = array (0, n_insns-1) (indexify insns)
+                        :: UArray Int Word16
+            insns_barr = case insns_arr of UArray lo hi barr -> barr
+
+            literals_arr = array (0, n_literals-1) (indexify literals)
+                           :: UArray Int Word
+            literals_barr = case literals_arr of UArray lo hi barr -> barr
+
+            indexify :: [a] -> [(Int, a)]
+            indexify xs = zip [0..] xs
 
         BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
      
         return (unsafeCoerce# bco#)
 
+
 data BCO = BCO BCO#
 
 newBCO :: ByteArray# -> ByteArray# -> Array# a -> ByteArray# -> IO BCO
-newBCO a b c d = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
+newBCO a b c d
+   = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
 
 
 lookupCE :: ClosureEnv -> Name -> HValue
@@ -1428,7 +1375,6 @@ foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Addr
 
 
 
-data Constructor = Constructor Int{-ptrs-} Int{-nptrs-}
 
 
 -- Ultra-minimalist version specially for constructors
