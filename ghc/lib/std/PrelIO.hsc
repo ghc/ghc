@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hsc,v 1.1 2001/05/18 16:54:05 simonmar Exp $
+-- $Id: PrelIO.hsc,v 1.2 2001/05/21 14:05:04 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -451,13 +451,13 @@ hPutStr handle str = do
 
 
 getSpareBuffer :: Handle__ -> IO (BufferMode, Buffer)
-getSpareBuffer handle_ = do
-   let mode = haBufferMode handle_
+getSpareBuffer Handle__{haBuffer=ref, 
+			haBuffers=spare_ref,
+			haBufferMode=mode}
+ = do
    case mode of
      NoBuffering -> return (mode, error "no buffer!")
      _ -> do
-	  let spare_ref = haBuffers handle_
-	      ref = haBuffer handle_
           bufs <- readIORef spare_ref
 	  buf  <- readIORef ref
 	  case bufs of
