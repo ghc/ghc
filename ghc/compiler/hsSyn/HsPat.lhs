@@ -127,11 +127,16 @@ data OutPat tyvar uvar id
 		    [id]			-- methods
 \end{code}
 
+Now name in Inpat is not need to be in NAmedThing to be Outputable.
+Needed by ../deSugar/Check.lhs
+
+JJQC-2-12-97
+
 \begin{code}
-instance (Outputable name, NamedThing name) => Outputable (InPat name) where
+instance (Outputable name) => Outputable (InPat name) where
     ppr = pprInPat
 
-pprInPat :: (Outputable name, NamedThing name) => PprStyle -> InPat name -> Doc
+pprInPat :: (Outputable name) => PprStyle -> InPat name -> Doc
 
 pprInPat sty (WildPatIn)	= char '_'
 pprInPat sty (VarPatIn var)	= ppr sty var
