@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+-- $Id: Directory.hsc,v 1.2 2001/01/12 15:48:56 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -57,6 +57,7 @@ import Time             ( ClockTime(..) )
 import PrelStorable
 import PrelCString
 import PrelMarshalAlloc
+import PrelCTypesISO
 import PrelCTypes
 import PrelPosixTypes
 import PrelCError
