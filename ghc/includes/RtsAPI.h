@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.12 2000/04/10 14:28:14 sewardj Exp $
+ * $Id: RtsAPI.h,v 1.13 2000/04/26 09:29:37 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -14,10 +14,10 @@
  * Running the scheduler
  */
 typedef enum {
-    NoStatus,    /* not finished yet                                   */
-    Success,      
-    Killed,	 /* another thread killed us                           */
-    Interrupted, /* stopped in response to a call to interruptStgRts   */
+    NoStatus,    /* not finished yet */
+    Success,	 /* completed successfully */
+    Killed,	 /* uncaught exception */
+    Interrupted, /* stopped in response to a call to interruptStgRts */
     Deadlock	 /* no threads to run, but main thread hasn't finished */
 } SchedulerStatus;
 
