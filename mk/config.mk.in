@@ -402,6 +402,7 @@ endif
 # FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
 
 FPTOOLS_TOP_ABS		= @hardtop@
+FPTOOLS_TOP_ABS_UNIX    = @hardtop@
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
 FPTOOLS_TOP_ABS		= $(subst \,/,$(shell cygpath -w @hardtop@))
 endif
