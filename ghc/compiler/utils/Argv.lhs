@@ -13,6 +13,7 @@ import PreludeGlaST	( indexAddrOffAddr )
 #endif
 
 CHK_Ubiq() -- debugging consistency check
+IMP_FASTSTRING()
 
 #if __GLASGOW_HASKELL__ == 201
 # define ADDR	    GHCbase.Addr
