@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.48 1999/01/07 12:48:13 simonpj Exp $
+# $Id: Makefile,v 1.49 1999/01/14 16:59:51 sof Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -94,6 +94,18 @@ SRCS_UGN_OBJS = $(patsubst %.c, %.o, $(SRCS_UGNC))
 # generate correct dependencies for them.
 #
 C_SRCS += $(SRCS_UGNC)
+#
+# Add misc .c helper code (used by the frontend.)
+#
+C_SRCS += parser/ctypes.c parser/hschooks.c parser/hsclink.c \
+          parser/id.c parser/infix.c parser/main.c parser/printtree.c \
+	  parser/syntax.c parser/type2context.c parser/util.c
+
+#
+# Big Fudge to get around inherent problem that Makefile setup
+# has got with 'mkdependC'.
+# 
+SRC_MKDEPENDC_OPTS += -D__GLASGOW_HASKELL__=$(ProjectVersionInt)
 
 LIBOBJS = \
   $(SRCS_UGN_OBJS) parser/hslexer.o parser/hsparser.tab.o \
