@@ -35,6 +35,7 @@ import Data.Dynamic
 import GHC.Base
 import GHC.IOBase
 import GHC.Num
+import GHC.Ptr	( Ptr(..) )
 import GHC.Err
 #endif
 
