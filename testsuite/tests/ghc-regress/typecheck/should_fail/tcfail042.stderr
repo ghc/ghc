@@ -1,0 +1,6 @@
+
+tcfail042.hs:15:
+    Could not deduce `Num a' from the context (Eq a, Show a)
+    Probable fix:
+	Add `Num a' to the instance declaration context
+    arising from an instance declaration at tcfail042.hs:15

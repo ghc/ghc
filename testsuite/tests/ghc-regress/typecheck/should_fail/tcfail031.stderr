@@ -1,0 +1,7 @@
+
+tcfail031.hs:3:
+    Couldn't match `Bool' against `Char'
+	Expected type: Bool
+	Inferred type: Char
+    In the predicate expression: 'a'
+    in the definition of function `f': if 'a' then 1 else 2

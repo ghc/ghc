@@ -1,0 +1,4 @@
+
+tcfail046.hs:17:
+    No instance for `Eq (Process a)'
+    When deriving classes for `Message'

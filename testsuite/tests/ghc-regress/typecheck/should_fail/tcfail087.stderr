@@ -1,0 +1,4 @@
+
+tcfail087.hs:8:
+    Illegal unboxed tuple type as argument: (# Int, Int #)
+    In a type signature for `f'

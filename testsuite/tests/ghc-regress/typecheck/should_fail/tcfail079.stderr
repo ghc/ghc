@@ -1,0 +1,4 @@
+
+tcfail079.hs:7:
+    failed to load interface for `GlaExts':
+	Could not find interface file for `GlaExts'

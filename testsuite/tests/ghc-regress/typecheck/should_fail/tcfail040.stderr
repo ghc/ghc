@@ -1,0 +1,6 @@
+
+tcfail040.hs:19:
+    Ambiguous type variable(s) `a' in the constraint `ORD a'
+    arising from use of `<<' at tcfail040.hs:19
+    In the second argument of `(===)', namely `(<<)'
+    in the definition of function `f': (<<) === (<<)

@@ -1,0 +1,7 @@
+
+tcfail014.hs:5:
+    Occurs check: cannot construct the infinite type: t = t -> t1
+	Expected type: t
+	Inferred type: t -> t1
+    In the first argument of `z', namely `z'
+    in the definition of function `h': z z

@@ -1,0 +1,7 @@
+
+tcfail070.hs:15:
+    Couldn't match `*' against `* -> k'
+	Expected kind: *
+	Inferred kind: * -> k
+    When checking kinds in `[Int] Bool'
+    In the type synonym declaration for `State'

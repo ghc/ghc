@@ -1,0 +1,4 @@
+
+Duplicate instance declarations:
+  tcfail035.hs:6: Num NUM
+  tcfail035.hs:7: Num NUM

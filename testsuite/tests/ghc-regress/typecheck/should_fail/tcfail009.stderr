@@ -1,0 +1,6 @@
+
+tcfail009.hs:3:
+    Couldn't match `Integer' against `Int'
+	Expected type: Integer
+	Inferred type: Int
+    In an expression with a type signature: 2 :: Integer

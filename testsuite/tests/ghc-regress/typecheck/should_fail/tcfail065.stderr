@@ -1,0 +1,8 @@
+
+tcfail065.hs:28:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `x' is unified with `x'
+    Signature type:     forall x. x -> X x1 -> X x1
+    Type to generalise: x -> X x -> X x
+    When checking the type signature for `setX'
+    In the definition for method `setX'

@@ -1,0 +1,12 @@
+
+tcfail008.hs:3:
+    No instance for `Num [t]'
+    arising from the literal `2' at tcfail008.hs:3
+    In the second argument of `(:)', namely `2'
+    in the definition of function `o': 1 : 2
+
+tcfail008.hs:3:
+    Ambiguous type variable(s) `t' in the constraint `Num t'
+    arising from the literal `1' at tcfail008.hs:3
+    In the first argument of `(:)', namely `1'
+    in the definition of function `o': 1 : 2

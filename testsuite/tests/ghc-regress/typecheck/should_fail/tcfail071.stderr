@@ -1,0 +1,13 @@
+
+tcfail071.hs:5:
+    Mismatched contexts
+    When matching the contexts of the signatures for `g' and `f'
+	(the signature contexts in a mutually recursive group should all be identical)
+
+tcfail071.hs:10:
+    Cannot unify the type-signature variable `c'
+	with the type `a -> b -> b'
+	Expected type: a -> b -> b
+	Inferred type: c
+    In the first argument of `f', namely `c'
+    In the first argument of `foldr', namely `(f c)'

@@ -1,0 +1,9 @@
+
+Duplicate instance declarations:
+  tcfail036.hs:6: Num NUM
+  tcfail036.hs:8: Num NUM
+
+tcfail036.hs:9:
+    Class `Num' used as a type
+    When checking kinds in `Eq Num'
+    In the instance declaration for `Eq Num'

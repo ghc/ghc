@@ -1,0 +1,6 @@
+
+tcfail002.hs:4:
+    Occurs check: cannot construct the infinite type: t = [t]
+	Expected type: t
+	Inferred type: [t]
+    in the definition of function `c': z

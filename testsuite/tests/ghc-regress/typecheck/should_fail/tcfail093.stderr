@@ -1,0 +1,5 @@
+
+tcfail093.hs:14:
+    No instance for `Call (IO Int) h'
+    arising from use of `call' at tcfail093.hs:14
+    In the definition of `dup': call primDup

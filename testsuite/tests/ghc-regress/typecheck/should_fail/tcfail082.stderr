@@ -1,0 +1,10 @@
+
+Duplicate or overlapping instance declarations:
+  ./Inst82_1.hi:8: {Read FooData}
+  ./Inst82_2.hi:8: {Read FooData}
+
+tcfail082.hs:8:
+    No instance for `Show FooData'
+    arising from use of `print' at tcfail082.hs:8
+    In the right-hand side of an equation for `main':
+	print ((read "FooData") :: FooData)

@@ -1,0 +1,6 @@
+
+tcfail010.hs:3:
+    No instance for `Num [t]'
+    arising from the literal `2' at tcfail010.hs:3
+    In the second argument of `(+)', namely `2'
+    in a lambda abstraction: z + 2

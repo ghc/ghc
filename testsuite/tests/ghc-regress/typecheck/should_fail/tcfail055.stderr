@@ -1,0 +1,6 @@
+
+tcfail055.hs:3:
+    Couldn't match `Int' against `Float'
+	Expected type: Int
+	Inferred type: Float
+    In an expression with a type signature: x + 1 :: Int

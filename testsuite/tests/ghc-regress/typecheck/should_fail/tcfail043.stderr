@@ -1,0 +1,10 @@
+
+tcfail043.hs:38:
+    Ambiguous type variable(s) `a' in the constraint `Ord_ a'
+    arising from use of `gt' at tcfail043.hs:38
+    In the predicate expression: gt (hd bs) a
+    in a lambda abstraction:
+	if gt (hd bs) a then
+	    False
+	else
+	    if eq a (hd bs) then True else search a (tl bs)

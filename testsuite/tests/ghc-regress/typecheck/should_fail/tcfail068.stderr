@@ -1,0 +1,58 @@
+
+tcfail068.hs:12:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It is reachable from the type variable(s) `a'
+	  which is free in the signature
+    Signature type:     forall s. ST s a
+    Type to generalise: ST s1 (IndTree s1 a1)
+    When checking an expression type signature
+    In the first argument of `runST', namely
+	`(newSTArray ((1, 1), n) x)'
+    in the definition of function `itgen':
+	runST (newSTArray ((1, 1), n) x)
+
+tcfail068.hs:17:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	  arr :: IndTree s1 a
+    Signature type:     forall s. ST s a1
+    Type to generalise: ST s1 (IndTree s1 a)
+    When checking an expression type signature
+    In the first argument of `runST', namely
+	`((readSTArray arr i)
+	  >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))'
+    in the definition of function `itiap':
+	runST ((readSTArray arr i)
+	       >>= (\ val -> (writeSTArray arr i (f val)) >> (return arr)))
+
+tcfail068.hs:23:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	  itrap' :: Int -> Int -> ST s1 (IndTree s1 a)
+	  itrapsnd :: Int -> Int -> ST s1 (IndTree s1 a)
+	  arr :: IndTree s1 a
+    Signature type:     forall s. ST s a1
+    Type to generalise: ST s1 (IndTree s1 a)
+    When checking an expression type signature
+    In the first argument of `runST', namely `(itrap' i k)'
+    in the definition of function `itrap': runST (itrap' i k)
+
+tcfail068.hs:35:
+    Inferred type is less polymorphic than expected
+	Quantified type variable `s' escapes
+	It unifies with `s1', which is mentioned in the environment
+	The following variables in the environment mention `s1'
+	  itrapstate' :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
+	  itrapstatesnd :: Int -> Int -> c -> ST s1 (c, IndTree s1 b)
+	  arr :: IndTree s1 b
+    Signature type:     forall s. ST s a
+    Type to generalise: ST s1 (c, IndTree s1 b)
+    When checking an expression type signature
+    In the first argument of `runST', namely `(itrapstate' i k s)'
+    in the definition of function `itrapstate':
+	runST (itrapstate' i k s)

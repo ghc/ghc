@@ -1,0 +1,4 @@
+
+tcfail057.hs:5:
+    Class `RealFrac' used as a type
+    In a type signature for `f'

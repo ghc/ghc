@@ -1,0 +1,3 @@
+
+tcfail045.hs:10:
+    Unacceptable instance type for ccall-ish class CCallable Socket

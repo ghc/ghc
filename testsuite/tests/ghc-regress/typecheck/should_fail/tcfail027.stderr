@@ -1,0 +1,4 @@
+
+Cycle in class declarations:
+    `A' at tcfail027.hs:4
+    `B' at tcfail027.hs:7

@@ -1,0 +1,7 @@
+
+tcfail028.hs:4:
+    Couldn't match `k -> k1' against `Type bx'
+	Expected kind: k -> k1
+	Inferred kind: Type bx
+    When checking that `A a' is a type
+    In the data type declaration for `A'

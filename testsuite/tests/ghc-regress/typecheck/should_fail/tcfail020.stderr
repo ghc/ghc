@@ -1,0 +1,7 @@
+
+tcfail020.hs:10:
+    Could not deduce `A [a]' from the context (A a)
+    Probable fix:
+	Add `A [a]' to the instance declaration context
+	Or add an instance declaration for `A [a]'
+    arising from an instance declaration at tcfail020.hs:10

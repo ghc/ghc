@@ -1,0 +1,5 @@
+
+tcfail084.hs:10:
+    Constructor `F' does not have field `y'
+    In the record construction: F {y = 2}
+    in the definition of function `z': F {y = 2}
