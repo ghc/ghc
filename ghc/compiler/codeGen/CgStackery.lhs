@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgStackery.lhs,v 1.26 2004/08/17 15:23:48 simonpj Exp $
+% $Id: CgStackery.lhs,v 1.27 2004/09/30 10:35:49 simonpj Exp $
 %
 \section[CgStackery]{Stack management functions}
 

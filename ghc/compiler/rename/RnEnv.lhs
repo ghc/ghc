@@ -42,14 +42,13 @@ import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
 			  isLocalGRE, extendLocalRdrEnv, elemLocalRdrEnv, lookupLocalRdrEnv,
 			  Provenance(..), pprNameProvenance, ImportSpec(..) 
 			)
-import HsTypes		( hsTyVarName, replaceTyVarName )
+import HsTypes		( replaceTyVarName )
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isInternalName,
 			  nameSrcLoc, nameOccName, nameModuleName, nameParent )
 import NameSet
-import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused,
-			  isVarOcc )
+import OccName		( tcName, isDataOcc, occNameFlavour, reportIfUnused )
 import Module		( Module, ModuleName, moduleName, mkHomeModule )
 import PrelNames	( mkUnboundName, rOOT_MAIN_Name, iNTERACTIVE, consDataConKey, hasKey )
 import UniqSupply
@@ -130,7 +129,7 @@ lookupLocatedBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedBndrRn = wrapLocM lookupBndrRn
 
 lookupBndrRn :: RdrName -> RnM Name
--- NOTE: assumes that the SrcSpan of the binder has already been addSrcSpan'd
+-- NOTE: assumes that the SrcSpan of the binder has already been setSrcSpan'd
 lookupBndrRn rdr_name
   = getLocalRdrEnv		`thenM` \ local_env ->
     case lookupLocalRdrEnv local_env rdr_name of 
@@ -590,7 +589,7 @@ bindTyVarsRn :: SDoc -> [LHsTyVarBndr RdrName]
 	      -> RnM a
 bindTyVarsRn doc_str tyvar_names enclosed_scope
   = let
-	located_tyvars = [L loc (hsTyVarName tv) | L loc tv <- tyvar_names] 
+	located_tyvars = hsLTyVarLocNames tyvar_names
     in
     bindLocatedLocalsRn doc_str located_tyvars	$ \ names ->
     enclosed_scope (zipWith replace tyvar_names names)
@@ -641,7 +640,7 @@ checkShadowing doc_str loc_rdr_names
       check_shadow (L loc rdr_name)
 	|  rdr_name `elemLocalRdrEnv` local_env 
  	|| not (null (lookupGRE_RdrName rdr_name global_env ))
-	= addSrcSpan loc $ addWarn (shadowedNameWarn doc_str rdr_name)
+	= setSrcSpan loc $ addWarn (shadowedNameWarn doc_str rdr_name)
         | otherwise = returnM ()
     in
     mappM_ check_shadow loc_rdr_names
@@ -675,7 +674,7 @@ warnUnusedModules :: [(ModuleName,SrcSpan)] -> RnM ()
 warnUnusedModules mods
   = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where
-    bleat (mod,loc) = addSrcSpan loc $ addWarn (mk_warn mod)
+    bleat (mod,loc) = setSrcSpan loc $ addWarn (mk_warn mod)
     mk_warn m = vcat [ptext SLIT("Module") <+> quotes (ppr m) <+> 
 			 text "is imported, but nothing from it is used",
 			 parens (ptext SLIT("except perhaps instances visible in") <+>
@@ -749,7 +748,7 @@ badOrigBinding name
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
 dupNamesErr descriptor (L loc name : dup_things)
-  = addSrcSpan loc $
+  = setSrcSpan loc $
     addErr ((ptext SLIT("Conflicting definitions for") <+> quotes (ppr name))
 	      $$ 
 	      descriptor)

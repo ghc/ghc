@@ -28,7 +28,7 @@ import TyCon            ( TyCon, ArgVrcs, tyConArity, tyConDataCons, tyConTyVars
                           getSynTyConDefn, isSynTyCon, isAlgTyCon, isHiBootTyCon,
 			  tyConName, isNewTyCon, isProductTyCon, tyConArgVrcs, newTyConRhs )
 import Class		( classTyCon )
-import DataCon          ( dataConRepArgTys, dataConOrigArgTys )
+import DataCon          ( dataConOrigArgTys )
 import Var              ( TyVar )
 import VarSet
 import Name		( Name, isTyVarName )
@@ -362,7 +362,7 @@ calcTyConArgVrcs tyclss
       where
        	data_cons = tyConDataCons tc
        	vs        = tyConTyVars tc
-       	argtys    = concatMap dataConRepArgTys data_cons	-- Rep? or Orig?
+       	argtys    = concatMap dataConOrigArgTys data_cons	-- Rep? or Orig?
 
     tcaoIter oi tc | isSynTyCon tc
       = let (tyvs,ty) = getSynTyConDefn tc

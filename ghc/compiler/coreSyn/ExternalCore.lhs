@@ -15,6 +15,7 @@ data Tdef
 
 data Cdef 
   = Constr Dcon [Tbind] [Ty]
+  | GadtConstr Dcon Ty
 
 data Vdefg 
   = Rec [Vdef]
@@ -30,7 +31,7 @@ data Exp
   | Appt Exp Ty
   | Lam Bind Exp 	  
   | Let Vdefg Exp
-  | Case Exp Vbind [Alt] {- non-empty list -}
+  | Case Exp Vbind Ty [Alt] {- non-empty list -}
   | Coerce Ty Exp 
   | Note String Exp
   | External String Ty

@@ -1,4 +1,4 @@
-\begin{code}
+ \begin{code}
 module TcRnMonad(
 	module TcRnMonad,
 	module TcRnTypes,
@@ -10,13 +10,14 @@ module TcRnMonad(
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
+import HsSyn		( emptyLHsBinds )
 import HscTypes		( HscEnv(..), ModGuts(..), ModIface(..),
-			  TyThing, Dependencies(..), TypeEnv, emptyTypeEnv,
+			  TyThing, TypeEnv, emptyTypeEnv,
 			  ExternalPackageState(..), HomePackageTable,
 			  ModDetails(..), HomeModInfo(..), 
 			  Deprecs(..), FixityEnv, FixItem,
 			  GhciMode, lookupType, unQualInScope )
-import Module		( Module, ModuleName, unitModuleEnv, foldModuleEnv, emptyModuleEnv )
+import Module		( Module, ModuleName, unitModuleEnv, foldModuleEnv )
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, 	
 			  LocalRdrEnv, emptyLocalRdrEnv )
 import Name		( Name, isInternalName )
@@ -25,9 +26,9 @@ import NameEnv		( extendNameEnvList )
 import InstEnv		( InstEnv, emptyInstEnv, extendInstEnv )
 
 import VarSet		( emptyVarSet )
-import VarEnv		( TidyEnv, emptyTidyEnv )
+import VarEnv		( TidyEnv, emptyTidyEnv, emptyVarEnv )
 import ErrUtils		( Message, Messages, emptyMessages, errorsFound, 
-			  mkErrMsg, mkWarnMsg, printErrorsAndWarnings,
+			  mkWarnMsg, printErrorsAndWarnings,
 			  mkLocMessage, mkLongErrMsg )
 import SrcLoc		( mkGeneralSrcSpan, isGoodSrcSpan, SrcSpan, Located(..) )
 import NameEnv		( emptyNameEnv )
@@ -90,7 +91,7 @@ initTc hsc_env mod do_this
 		tcg_exports  = emptyNameSet,
 		tcg_imports  = init_imports,
 		tcg_dus      = emptyDUs,
-		tcg_binds    = emptyBag,
+		tcg_binds    = emptyLHsBinds,
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],
 		tcg_rules    = [],
@@ -106,7 +107,8 @@ initTc hsc_env mod do_this
 		tcl_arrow_ctxt = topArrowCtxt,
 		tcl_env        = emptyNameEnv,
 		tcl_tyvars     = tvs_var,
-		tcl_lie	       = panic "initTc:LIE"	-- LIE only valid inside a getLIE
+		tcl_lie	       = panic "initTc:LIE",	-- LIE only valid inside a getLIE
+		tcl_gadt       = emptyVarEnv
 	     } ;
 	} ;
    
@@ -385,26 +387,26 @@ getSrcSpanM :: TcRn SrcSpan
 	-- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (tcl_loc env) }
 
-addSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-addSrcSpan loc thing_inside
+setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
+setSrcSpan loc thing_inside
   | isGoodSrcSpan loc = updLclEnv (\env -> env { tcl_loc = loc }) thing_inside
   | otherwise	      = thing_inside	-- Don't overwrite useful info with useless
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
-addLocM fn (L loc a) = addSrcSpan loc $ fn a
+addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
-wrapLocM fn (L loc a) = addSrcSpan loc $ do b <- fn a; return (L loc b)
+wrapLocM fn (L loc a) = setSrcSpan loc $ do b <- fn a; return (L loc b)
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =
-  addSrcSpan loc $ do
+  setSrcSpan loc $ do
     (b,c) <- fn a
     return (L loc b, c)
 
 wrapLocSndM :: (a -> TcM (b,c)) -> Located a -> TcM (b, Located c)
 wrapLocSndM fn (L loc a) =
-  addSrcSpan loc $ do
+  setSrcSpan loc $ do
     (b,c) <- fn a
     return (b, L loc c)
 \end{code}
@@ -595,24 +597,30 @@ failIfErrsM = ifErrsM failM (return ())
 %************************************************************************
 
 \begin{code}
-setErrCtxtM, addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, Message)) -> TcM a -> TcM a
-setErrCtxtM msg = updCtxt (\ msgs -> [msg])
+getErrCtxt :: TcM ErrCtxt
+getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
+
+setErrCtxt :: ErrCtxt -> TcM a -> TcM a
+setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
+
+addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, Message)) -> TcM a -> TcM a
 addErrCtxtM msg = updCtxt (\ msgs -> msg : msgs)
 
-setErrCtxt, addErrCtxt :: Message -> TcM a -> TcM a
-setErrCtxt msg = setErrCtxtM (\env -> returnM (env, msg))
+addErrCtxt :: Message -> TcM a -> TcM a
 addErrCtxt msg = addErrCtxtM (\env -> returnM (env, msg))
-
-popErrCtxt :: TcM a -> TcM a
-popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (m:ms) -> ms })
-
-getErrCtxt :: TcM ErrCtxt
-getErrCtxt = do { env <- getLclEnv ; return (tcl_ctxt env) }
 
 -- Helper function for the above
 updCtxt :: (ErrCtxt -> ErrCtxt) -> TcM a -> TcM a
 updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) -> 
 			   env { tcl_ctxt = upd ctxt })
+
+-- Conditionally add an error context
+maybeAddErrCtxt :: Maybe Message -> TcM a -> TcM a
+maybeAddErrCtxt (Just msg) thing_inside = addErrCtxt msg thing_inside
+maybeAddErrCtxt Nothing    thing_inside = thing_inside
+
+popErrCtxt :: TcM a -> TcM a
+popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (m:ms) -> ms })
 
 getInstLoc :: InstOrigin -> TcM InstLoc
 getInstLoc origin
@@ -623,7 +631,7 @@ addInstCtxt :: InstLoc -> TcM a -> TcM a
 -- Add the SrcSpan and context from the first Inst in the list
 -- 	(they all have similar locations)
 addInstCtxt (InstLoc _ src_loc ctxt) thing_inside
-  = addSrcSpan src_loc (updCtxt (\ old_ctxt -> ctxt) thing_inside)
+  = setSrcSpan src_loc (updCtxt (\ old_ctxt -> ctxt) thing_inside)
 \end{code}
 
     The addErrTc functions add an error message, but do not cause failure.
@@ -693,7 +701,18 @@ ctxt_to_use ctxt | opt_PprStyle_Debug = ctxt
 		 | otherwise	      = take 3 ctxt
 \end{code}
 
-%************************************************************************
+debugTc is useful for monadi debugging code
+
+\begin{code}
+debugTc :: TcM () -> TcM ()
+#ifdef DEBUG
+debugTc thing = thing
+#else
+debugTc thing = return ()
+#endif
+\end{code}
+
+ %************************************************************************
 %*									*
 	     Type constraints (the so-called LIE)
 %*									*
@@ -913,4 +932,18 @@ forkM doc thing_inside
 	; return (case mb_res of 
 			Nothing -> pprPanic "forkM" doc
 			Just r  -> r) }
+\end{code}
+
+%************************************************************************
+%*									*
+	     Stuff for GADTs
+%*									*
+%************************************************************************
+
+\begin{code}
+getTypeRefinement :: TcM GadtRefinement
+getTypeRefinement = do { lcl_env <- getLclEnv; return (tcl_gadt lcl_env) }
+
+setTypeRefinement :: GadtRefinement -> TcM a -> TcM a
+setTypeRefinement gadt = updLclEnv (\env -> env { tcl_gadt = gadt })
 \end{code}

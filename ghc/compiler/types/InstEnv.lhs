@@ -17,13 +17,13 @@ module InstEnv (
 #include "HsVersions.h"
 
 import Class		( Class, classTvsFds )
-import Var		( Id, isTcTyVar )
+import Var		( Id )
 import VarSet
-import VarEnv
+import Type		( TvSubstEnv )
 import TcType		( Type, tcTyConAppTyCon, tcIsTyVarTy,
-			  tcSplitDFunTy, tyVarsOfTypes, isExistentialTyVar,
-			  matchTys, unifyTyListsX
+			  tcSplitDFunTy, tyVarsOfTypes, isSkolemTyVar
 			)
+import Unify		( matchTys, unifyTys )
 import FunDeps		( checkClsFD )
 import TyCon		( TyCon )
 import Outputable
@@ -271,7 +271,7 @@ lookupInstEnv :: DynFlags
 	      -> (InstEnv 	-- External package inst-env
 		 ,InstEnv) 	-- Home-package inst-env
 	      -> Class -> [Type]			-- What we are looking for
-	      -> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
+	      -> ([(TvSubstEnv, InstEnvElt)], 	-- Successful matches
 		  [Id])					-- These don't match but do unify
 	-- The second component of the tuple happens when we look up
 	--	Foo [a]
@@ -303,7 +303,7 @@ lookupInstEnv dflags (pkg_ie, home_ie) cls tys
 lookup_inst_env :: InstEnv 				-- The envt
 	      	-> Class -> [Type]			-- What we are looking for
 		-> Bool 				-- All the [Type] are tyvars
-	      	-> ([(TyVarSubstEnv, InstEnvElt)], 	-- Successful matches
+	      	-> ([(TvSubstEnv, InstEnvElt)], 	-- Successful matches
 	 	    [Id])				-- These don't match but do unify
 lookup_inst_env env key_cls key_tys key_all_tvs
   = case lookupUFM env key_cls of
@@ -315,7 +315,7 @@ lookup_inst_env env key_cls key_tys key_all_tvs
 	  | otherwise -> find insts [] []
   where
     key_vars = filterVarSet not_existential (tyVarsOfTypes key_tys)
-    not_existential tv = not (isTcTyVar tv && isExistentialTyVar tv)
+    not_existential tv = not (isSkolemTyVar tv)
 	-- The key_tys can contain skolem constants, and we can guarantee that those
 	-- are never going to be instantiated to anything, so we should not involve
 	-- them in the unification test.  Example:
@@ -332,20 +332,22 @@ lookup_inst_env env key_cls key_tys key_all_tvs
     find [] ms us = (ms, us)
     find (item@(tpl_tyvars, tpl, dfun_id) : rest) ms us
       = case matchTys tpl_tyvars tpl key_tys of
-	  Just (subst, leftovers) -> ASSERT( null leftovers )
-				     find rest ((subst,item):ms) us
+	  Just subst -> find rest ((subst,item):ms) us
 	  Nothing 
 		-- Does not match, so next check whether the things unify
 		-- [see notes about overlapping instances above]
-	   -> ASSERT( not (key_vars `intersectsVarSet` tpl_tyvars) )
+	   -> ASSERT2( not (key_vars `intersectsVarSet` tpl_tyvars),
+		       (ppr key_cls <+> ppr key_tys <+> ppr key_all_tvs) $$
+		       (ppr dfun_id <+> ppr tpl_tyvars <+> ppr tpl)
+		      )
 		-- Unification will break badly if the variables overlap
 		-- They shouldn't because we allocate separate uniques for them
-	      case unifyTyListsX (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
+	      case unifyTys (key_vars `unionVarSet` tpl_tyvars) key_tys tpl of
 	        Just _   -> find rest ms (dfun_id:us)
 	        Nothing  -> find rest ms us
 
-insert_overlapping :: (TyVarSubstEnv, InstEnvElt) -> [(TyVarSubstEnv, InstEnvElt)] 
-		   -> [(TyVarSubstEnv, InstEnvElt)]
+insert_overlapping :: (TvSubstEnv, InstEnvElt) -> [(TvSubstEnv, InstEnvElt)] 
+		   -> [(TvSubstEnv, InstEnvElt)]
 -- Add a new solution, knocking out strictly less specific ones
 insert_overlapping new_item [] = [new_item]
 insert_overlapping new_item (item:items)

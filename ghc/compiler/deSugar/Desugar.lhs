@@ -10,8 +10,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), GhciMode(..),
-			  Dependencies(..), TypeEnv, 
-	  		  unQualInScope, availsToNameSet )
+			  Dependencies(..), TypeEnv, unQualInScope )
 import HsSyn		( RuleDecl(..), RuleBndr(..), HsExpr(..), LHsExpr,
 			  HsBindGroup(..), LRuleDecl, HsBind(..) )
 import TcRnTypes	( TcGblEnv(..), ImportAvails(..) )
@@ -20,14 +19,14 @@ import Id		( Id, setIdLocalExported, idName )
 import Name		( Name, isExternalName )
 import CoreSyn
 import PprCore		( pprIdRules, pprCoreExpr )
-import Subst		( substExpr, mkSubst, mkInScopeSet )
+import Subst		( SubstResult(..), substExpr, mkSubst, extendIdSubstList )
 import DsMonad
 import DsExpr		( dsLExpr )
 import DsBinds		( dsHsBinds, AutoScc(..) )
 import DsForeign	( dsForeigns )
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
-import Module		( Module, moduleEnvElts, emptyModuleEnv )
+import Module		( Module, moduleEnvElts )
 import Id		( Id )
 import RdrName	 	( GlobalRdrEnv )
 import NameSet
@@ -277,12 +276,10 @@ ds_lhs all_vars lhs
 	-- Substitute the dict bindings eagerly,
 	-- and take the body apart into a (f args) form
     let
-	subst_env = mkSubstEnv [id		     | (id,rhs) <- dict_binds']
-			       [ContEx subst_env rhs | (id,rhs) <- dict_binds']
+	subst = extendIdSubstList (mkSubst all_vars) pairs
+	pairs = [(id, ContEx subst rhs) | (id,rhs) <- dict_binds']
 			-- Note recursion here... substitution won't terminate
 			-- if there is genuine recursion... which there isn't
-
-	subst = mkSubst all_vars subst_env
 	body'' = substExpr subst body'
     in
 	

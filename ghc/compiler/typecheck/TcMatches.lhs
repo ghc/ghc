@@ -13,40 +13,38 @@ module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcCheckRho, tcMonoExpr )
+import {-# SOURCE #-}	TcExpr( tcCheckRho, tcInferRho, tcMonoExpr )
 
-import HsSyn		( HsExpr(..), LHsExpr, HsBindGroup(..),
+import HsSyn		( HsExpr(..), LHsExpr, MatchGroup(..),
 			  Match(..), LMatch, GRHSs(..), GRHS(..), 
 			  Stmt(..), LStmt, HsMatchContext(..), HsStmtContext(..),
 			  ReboundNames, LPat,
 			  pprMatch, isDoExpr,
 			  pprMatchContext, pprStmtContext, pprStmtResultContext,
-			  collectSigTysFromPats, glueBindsOnGRHSs
+			  collectPatsBinders, glueBindsOnGRHSs
 			)
-import TcHsSyn		( ExprCoFn, TcDictBinds, isIdCoercion, (<$>), (<.>) )
+import TcHsSyn		( ExprCoFn, isIdCoercion, (<$>), (<.>) )
 
 import TcRnMonad
-import TcHsType		( tcAddScopedTyVars, tcHsSigType, UserTypeCtxt(..) )
+import TcHsType		( tcHsPatSigType, UserTypeCtxt(..) )
 import Inst		( tcSyntaxName, tcInstCall )
-import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendLocalValEnv, tcExtendLocalValEnv2 )
-import TcPat		( tcPat, tcMonoPatBndr )
-import TcMType		( newTyVarTy, newTyVarTys, zonkTcType ) 
-import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType,
-			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy, typeKind,
-			  mkFunTy, isOverloadedTy, liftedTypeKind, openTypeKind, 
-			  mkArrowKind, mkAppTy )
+import TcEnv		( TcId, tcLookupLocalIds, tcLookupId, tcExtendIdEnv, 
+			  tcExtendTyVarEnv )
+import TcPat		( PatCtxt(..), tcPats )
+import TcMType		( newTyFlexiVarTy, newTyFlexiVarTys, zonkTcType, isRigidType ) 
+import TcType		( TcType, TcTyVar, TcSigmaType, TcRhoType, mkFunTys,
+			  tyVarsOfTypes, tidyOpenTypes, isSigmaTy, mkTyConApp,
+			  liftedTypeKind, openTypeKind, mkArrowKind, mkAppTy )
 import TcBinds		( tcBindsAndThen )
-import TcUnify		( Expected(..), newHole, zapExpectedType, zapExpectedBranches, readExpectedType,
-			  unifyTauTy, subFunTys, unifyPArrTy, unifyListTy, unifyFunTy,
-			  checkSigTyVarsWrt, tcSubExp, tcGen )
-import TcSimplify	( tcSimplifyCheck, bindInstsOfLocalFuns )
+import TcUnify		( Expected(..), zapExpectedType, readExpectedType,
+			  unifyTauTy, subFunTys, unifyListTy, unifyTyConApp,
+			  checkSigTyVarsWrt, zapExpectedBranches, tcSubExp, tcGen,
+			  unifyAppTy )
 import Name		( Name )
-import TysWiredIn	( boolTy, mkListTy, mkPArrTy )
+import TysWiredIn	( boolTy, parrTyCon, listTyCon )
 import Id		( idType, mkLocalId )
 import CoreFVs		( idFreeTyVars )
-import BasicTypes	( RecFlag(..) )
 import VarSet
-import Bag
 import Util		( isSingleton, notNull )
 import Outputable
 import SrcLoc		( Located(..), noLoc )
@@ -67,26 +65,30 @@ same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
 tcMatchesFun :: Name
-	     -> [LMatch Name]
-	     -> Expected TcRhoType 		-- Expected type
-	     -> TcM [LMatch TcId]
+	     -> MatchGroup Name
+	     -> Expected TcRhoType 	-- Expected type of function
+	     -> TcM (MatchGroup TcId)	-- Returns type of body
 
-tcMatchesFun fun_name matches@(first_match:_) expected_ty
-  =	 -- Check that they all have the same no of arguments
-	 -- Location is in the monad, set the caller so that 
-	 -- any inter-equation error messages get some vaguely
-	 -- sensible location.	Note: we have to do this odd
-	 -- ann-grabbing, because we don't always have annotations in
-	 -- hand when we call tcMatchesFun...
-    checkTc (sameNoOfArgs matches)
-	    (varyingArgsErr fun_name matches)			 `thenM_`
+tcMatchesFun fun_name matches exp_ty
+  = do	{  -- Check that they all have the same no of arguments
+	   -- Location is in the monad, set the caller so that 
+	   -- any inter-equation error messages get some vaguely
+	   -- sensible location.	Note: we have to do this odd
+	   -- ann-grabbing, because we don't always have annotations in
+	   -- hand when we call tcMatchesFun...
+	  checkTc (sameNoOfArgs matches) (varyingArgsErr fun_name matches)
 
 	-- ToDo: Don't use "expected" stuff if there ain't a type signature
 	-- because inconsistency between branches
 	-- may show up as something wrong with the (non-existent) type signature
 
-	-- No need to zonk expected_ty, because subFunTys does that on the fly
-    tcMatches match_ctxt matches expected_ty
+		-- This is one of two places places we call subFunTys
+		-- The point is that if expected_y is a "hole", we want 
+		-- to make pat_tys and rhs_ty as "holes" too.
+	; exp_ty' <- zapExpectedBranches matches exp_ty
+	; subFunTys matches exp_ty' 	$ \ pat_tys rhs_ty -> 
+	  tcMatches match_ctxt pat_tys rhs_ty matches
+	}
   where
     match_ctxt = MC { mc_what = FunRhs fun_name,
 		      mc_body = tcMonoExpr }
@@ -97,29 +99,19 @@ parser guarantees that each equation has exactly one argument.
 
 \begin{code}
 tcMatchesCase :: TcMatchCtxt		-- Case context
-	      -> [LMatch Name]		-- The case alternatives
+	      -> TcRhoType		-- Type of scrutinee
+	      -> MatchGroup Name	-- The case alternatives
 	      -> Expected TcRhoType 	-- Type of whole case expressions
-	      -> TcM (TcRhoType,	-- Inferred type of the scrutinee
-		      [LMatch TcId]) 	-- Translated alternatives
+	      -> TcM (MatchGroup TcId)	-- Translated alternatives
 
-tcMatchesCase ctxt matches (Check expr_ty)
-  = newTyVarTy openTypeKind 					`thenM` \ scrut_ty ->
-	-- openTypeKind because the scrutinee can be an unboxed type
-    tcMatches ctxt matches (Check (mkFunTy scrut_ty expr_ty))	`thenM` \ matches' ->
-    returnM (scrut_ty, matches')
+tcMatchesCase ctxt scrut_ty matches exp_ty
+  = do	{ exp_ty' <- zapExpectedBranches matches exp_ty
+	; tcMatches ctxt [Check scrut_ty] exp_ty' matches }
 
-tcMatchesCase ctxt matches (Infer hole)
-  = newHole					`thenM` \ fun_hole ->
-    tcMatches ctxt matches (Infer fun_hole)	`thenM` \ matches' ->
-    readMutVar fun_hole				`thenM` \ fun_ty ->
-	-- The result of tcMatches is bound to be a function type
-    unifyFunTy fun_ty				`thenM` \ (scrut_ty, res_ty) ->
-    writeMutVar hole res_ty			`thenM_` 
-    returnM (scrut_ty, matches')
-    
-
-tcMatchLambda :: LMatch Name -> Expected TcRhoType -> TcM (LMatch TcId)
-tcMatchLambda match res_ty = tcMatch match_ctxt res_ty match
+tcMatchLambda :: MatchGroup Name -> Expected TcRhoType -> TcM (MatchGroup TcId)
+tcMatchLambda match exp_ty 	-- One branch so no unifyBranches needed
+  = subFunTys match exp_ty 	$ \ pat_tys rhs_ty ->
+    tcMatches match_ctxt pat_tys rhs_ty match
   where
     match_ctxt = MC { mc_what = LambdaExpr,
 		      mc_body = tcMonoExpr }
@@ -137,26 +129,6 @@ tcGRHSsPat grhss exp_ty = tcGRHSs match_ctxt grhss exp_ty
 		      mc_body = tcMonoExpr }
 \end{code}
 
-\begin{code}
-data TcMatchCtxt 	-- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext Name,	-- What kind of thing this is
-    	 mc_body :: LHsExpr Name 		-- Type checker for a body of an alternative
-		    -> Expected TcRhoType 
-		    -> TcM (LHsExpr TcId) }	
-
-tcMatches :: TcMatchCtxt
-	  -> [LMatch Name]
-	  -> Expected TcRhoType
-	  -> TcM [LMatch TcId]
-
-tcMatches ctxt matches exp_ty
-  = 	-- If there is more than one branch, and exp_ty is a 'hole',
-	-- all branches must be types, not type schemes, otherwise the
-	-- order in which we check them would affect the result.
-    zapExpectedBranches matches exp_ty 	`thenM` \ exp_ty' ->
-    mappM (tcMatch ctxt exp_ty') matches
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -165,52 +137,68 @@ tcMatches ctxt matches exp_ty
 %************************************************************************
 
 \begin{code}
+tcMatches :: TcMatchCtxt
+	  -> [Expected TcRhoType] 	-- Expected pattern types
+	  -> Expected TcRhoType		-- Expected result-type of the Match.
+	  -> MatchGroup Name
+	  -> TcM (MatchGroup TcId)
+
+data TcMatchCtxt 	-- c.f. TcStmtCtxt, also in this module
+  = MC { mc_what :: HsMatchContext Name,	-- What kind of thing this is
+    	 mc_body :: LHsExpr Name 		-- Type checker for a body of an alternative
+		 -> Expected TcRhoType 
+		 -> TcM (LHsExpr TcId) }	
+
+tcMatches ctxt pat_tys rhs_ty (MatchGroup matches _)
+  = do	{ matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
+	; pat_tys' <- mapM readExpectedType pat_tys
+	; rhs_ty'  <- readExpectedType rhs_ty
+	; return (MatchGroup matches' (mkFunTys pat_tys' rhs_ty')) }
+
+-------------
 tcMatch :: TcMatchCtxt
-	-> Expected TcRhoType 	-- Expected result-type of the Match.
-			-- Early unification with this guy gives better error messages
-			-- We regard the Match as having type 
-			--	(ty1 -> ... -> tyn -> result_ty)
-			-- where there are n patterns.
+	-> [Expected TcRhoType] 	-- Expected pattern types
+	-> Expected TcRhoType	 	-- Expected result-type of the Match.
 	-> LMatch Name
 	-> TcM (LMatch TcId)
 
-tcMatch ctxt exp_ty match = wrapLocM (tc_match ctxt exp_ty) match
+tcMatch ctxt pat_tys rhs_ty match 
+  = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
 
-tc_match ctxt expected_ty match@(Match pats maybe_rhs_sig grhss)
-  = addErrCtxt (matchCtxt (mc_what ctxt) match)	$	-- I'm not sure why, so I put it back
-    subFunTys pats expected_ty			$ \ pats_w_tys rhs_ty ->
-	-- This is the unique place we call subFunTys
-	-- The point is that if expected_y is a "hole", we want 
-	-- to make arg_ty and rest_ty as "holes" too.
-    tcMatchPats pats_w_tys rhs_ty (tc_grhss rhs_ty)	`thenM` \ (pats', grhss', ex_binds) ->
-    returnM (Match pats' Nothing (glueBindsOnGRHSs ex_binds grhss'))
+tc_match ctxt pat_tys rhs_ty match@(Match pats maybe_rhs_sig grhss)
+  = addErrCtxt (matchCtxt (mc_what ctxt) match)	$	
+    do	{ (pats', grhss') <- tcMatchPats pats pat_tys rhs_ty $
+			     tc_grhss ctxt maybe_rhs_sig grhss rhs_ty
+	; returnM (Match pats' Nothing grhss') }
 
-  where
-    tc_grhss rhs_ty 
-	= case maybe_rhs_sig of  -- Deal with the result signature
-	    Nothing  ->  tcGRHSs ctxt grhss rhs_ty
 
-	    Just sig ->	 tcAddScopedTyVars [sig]	$
-				-- Bring into scope the type variables in the signature
-			 tcHsSigType ResSigCtxt sig					`thenM` \ sig_ty ->
-			 tcThingWithSig sig_ty (tcGRHSs ctxt grhss . Check) rhs_ty	`thenM` \ (co_fn, grhss') ->
+-------------
+tc_grhss ctxt Nothing grhss rhs_ty 
+  = tcGRHSs ctxt grhss rhs_ty	-- No result signature
 
-			-- Pushes the coercion down to the right hand sides,
-			-- because there is no convenient place to hang it otherwise.
-			 if isIdCoercion co_fn then
-				returnM grhss'
-			 else
-			 readExpectedType rhs_ty		`thenM` \ rhs_ty' ->
-			 returnM (lift_grhss co_fn rhs_ty' grhss')
+tc_grhss ctxt (Just res_sig) grhss rhs_ty 
+  = do	{ (sig_tvs, sig_ty) <- tcHsPatSigType ResSigCtxt res_sig
+	; traceTc (text "tc_grhss" <+> ppr sig_tvs)
+	; (co_fn, grhss') <- tcExtendTyVarEnv sig_tvs $
+			     tcThingWithSig sig_ty (tcGRHSs ctxt grhss . Check) rhs_ty
 
-lift_grhss co_fn rhs_ty (GRHSs grhss binds ty)
-  = GRHSs (map (fmap lift_grhs) grhss) binds rhs_ty	-- Change the type, since the coercion does
+		-- Push the coercion down to the right hand sides,
+		-- because there is no convenient place to hang it otherwise.
+	; if isIdCoercion co_fn then
+		return grhss'
+	  else
+		return (lift_grhss co_fn grhss') }
+
+-------------
+lift_grhss co_fn (GRHSs grhss binds)
+  = GRHSs (map (fmap lift_grhs) grhss) binds
   where
     lift_grhs (GRHS stmts) = GRHS (map lift_stmt stmts)
 	      
     lift_stmt (L loc (ResultStmt e)) = L loc (ResultStmt (fmap (co_fn <$>) e))
     lift_stmt stmt	  	     = stmt
 
+-------------
 tcGRHSs :: TcMatchCtxt -> GRHSs Name
 	-> Expected TcRhoType
 	-> TcM (GRHSs TcId)
@@ -221,13 +209,12 @@ tcGRHSs :: TcMatchCtxt -> GRHSs Name
   --	f = \(x::forall a.a->a) -> <stuff>
   -- This is a consequence of the fact that tcStmts takes a TcType,
   -- not a Expected TcType, a decision we could revisit if necessary
-tcGRHSs ctxt (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs)])] binds _) exp_ty
+tcGRHSs ctxt (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs)])] binds) exp_ty
   = tcBindsAndThen glueBindsOnGRHSs binds 	$
     mc_body ctxt rhs exp_ty			`thenM` \ rhs' ->
-    readExpectedType exp_ty			`thenM` \ exp_ty' ->
-    returnM (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs')])] [] exp_ty')
+    returnM (GRHSs [L loc1 (GRHS [L loc2 (ResultStmt rhs')])] [])
 
-tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
+tcGRHSs ctxt (GRHSs grhss binds) exp_ty
   = tcBindsAndThen glueBindsOnGRHSs binds 	$
     zapExpectedType exp_ty openTypeKind		`thenM` \ exp_ty' ->
 	-- Even if there is only one guard, we zap the RHS type to
@@ -235,7 +222,7 @@ tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
 	-- and even a one-armed guard has a notional second arm
     let
       stmt_ctxt = SC { sc_what = PatGuard (mc_what ctxt), 
-		       sc_rhs  = tcCheckRho, 
+		       sc_rhs  = tcInferRho, 
 		       sc_body = sc_body,
 		       sc_ty   = exp_ty' }
       sc_body body = mc_body ctxt body (Check exp_ty')
@@ -245,7 +232,7 @@ tcGRHSs ctxt (GRHSs grhss binds _) exp_ty
 	  returnM (GRHS guarded')
     in
     mappM (wrapLocM tc_grhs) grhss	`thenM` \ grhss' ->
-    returnM (GRHSs grhss' [] exp_ty')
+    returnM (GRHSs grhss' [])
 \end{code}
 
 
@@ -267,7 +254,7 @@ tcThingWithSig sig_ty thing_inside res_ty
 	-- else we risk instantiating a ? res_ty to a forall-type
 	-- which breaks the invariant that tcMonoExpr only returns phi-types
     tcGen sig_ty emptyVarSet thing_inside	`thenM` \ (gen_fn, result) ->
-    tcInstCall SignatureOrigin sig_ty		`thenM` \ (inst_fn, inst_sig_ty) ->
+    tcInstCall InstSigOrigin sig_ty		`thenM` \ (inst_fn, _, inst_sig_ty) ->
     tcSubExp res_ty inst_sig_ty			`thenM` \ co_fn ->
     returnM (co_fn <.> inst_fn <.> gen_fn,  result)
 	-- Note that we generalise, then instantiate. Ah well.
@@ -281,109 +268,48 @@ tcThingWithSig sig_ty thing_inside res_ty
 %************************************************************************
 
 \begin{code}	  
-tcMatchPats
-	:: [(LPat Name, Expected TcRhoType)]
-	-> Expected TcRhoType
-	-> TcM a
-	-> TcM ([LPat TcId], a, HsBindGroup TcId)
+tcMatchPats :: [LPat Name] 
+	    -> [Expected TcSigmaType]	-- Pattern types
+	    -> Expected TcRhoType	-- Result type;
+					-- used only to check existential escape
+	    -> TcM a
+	    -> TcM ([LPat TcId], a)
 -- Typecheck the patterns, extend the environment to bind the variables,
 -- do the thing inside, use any existentially-bound dictionaries to 
 -- discharge parts of the returning LIE, and deal with pattern type
 -- signatures
 
-tcMatchPats pats_w_tys body_ty thing_inside
-  = 	-- STEP 1: Bring pattern-signature type variables into scope
-    tcAddScopedTyVars (collectSigTysFromPats (map fst pats_w_tys))	(
+tcMatchPats pats tys body_ty thing_inside
+  = do	{ do_refinement <- can_refine body_ty
+	; (pats', ex_tvs, res) <- tcPats (LamPat do_refinement) pats tys thing_inside 
+	; tcCheckExistentialPat pats' ex_tvs tys body_ty
+	; returnM (pats', res) }
+  where
+	-- Do GADT refinement if we are doing checking (not inference)
+	-- and the body_ty is completely rigid
+	-- ToDo: explain why
+    can_refine (Infer _)  = return False
+    can_refine (Check ty) = isRigidType ty
 
-	-- STEP 2: Typecheck the patterns themselves, gathering all the stuff
-	--	   then do the thing inside
-        getLIE (tc_match_pats pats_w_tys thing_inside)
-
-    ) `thenM` \ ((pats', ex_tvs, ex_ids, ex_lie, result), lie_req) -> 
-
-	-- STEP 4: Check for existentially bound type variables
-	-- Do this *outside* the scope of the tcAddScopedTyVars, else checkSigTyVars
-	-- complains that 'a' is captured by the inscope 'a'!  (Test (d) in checkSigTyVars.)
-	--
-	-- I'm a bit concerned that lie_req1 from an 'inner' pattern in the list
-	-- might need (via lie_req2) something made available from an 'outer' 
-	-- pattern.  But it's inconvenient to deal with, and I can't find an example
-    tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req 
-			  pats_w_tys body_ty 		`thenM` \ ex_binds ->
-	-- NB: we *must* pass "pats_w_tys" not just "body_ty" to tcCheckExistentialPat
+tcCheckExistentialPat :: [LPat TcId]		-- Patterns (just for error message)
+		      -> [TcTyVar]		-- Existentially quantified tyvars bound by pattern
+		      -> [Expected TcSigmaType] -- Types of the patterns
+		      -> Expected TcRhoType	-- Type of the body of the match
+		      				-- Tyvars in either of these must not escape
+		      -> TcM ()
+	-- NB: we *must* pass "pats_tys" not just "body_ty" to tcCheckExistentialPat
 	-- For example, we must reject this program:
 	--	data C = forall a. C (a -> Int) 
 	-- 	f (C g) x = g x
 	-- Here, result_ty will be simply Int, but expected_ty is (C -> a -> Int).
 
-    returnM (pats', result, HsBindGroup ex_binds [] Recursive)
+tcCheckExistentialPat pats [] pat_tys body_ty
+  = return ()	-- Short cut for case when there are no existentials
 
-tc_match_pats [] thing_inside
-  = thing_inside 	`thenM` \ answer ->
-    returnM ([], emptyBag, [], [], answer)
-
-tc_match_pats ((pat,pat_ty):pats) thing_inside
-  = tcPat tcMonoPatBndr pat pat_ty	`thenM` \ (pat', ex_tvs, pat_bndrs, ex_lie) ->
-    let
-	xve    = bagToList pat_bndrs
-	ex_ids = [id | (_, id) <- xve]
-		-- ex_ids is all the pattern-bound Ids, a superset
-		-- of the existential Ids used in checkExistentialPat
-    in
-    tcExtendLocalValEnv2 xve 			$
-    traceTc (text "tc_match_pats" <+> (ppr xve $$ ppr (map (idType . snd) xve) $$ 
-					ppr (map (typeKind . idType . snd) xve))) `thenM_`
-    tc_match_pats pats thing_inside	`thenM` \ (pats', exs_tvs, exs_ids, exs_lie, answer) ->
-    returnM (	pat':pats',
-		ex_tvs `unionBags` exs_tvs,
-		ex_ids ++ exs_ids,
-		ex_lie ++ exs_lie,
-		answer
-    )
-
-
-tcCheckExistentialPat :: Bag TcTyVar	-- Existentially quantified tyvars bound by pattern
-		      -> [TcId]		-- Ids bound by this pattern; used 
-					--   (a) by bindsInstsOfLocalFuns
-					--   (b) to generate helpful error messages
-		      -> [Inst]		--   and context
-		      -> [Inst]		-- Required context
-		      -> [(pat,Expected TcRhoType)] 	-- Types of the patterns
-		      -> Expected TcRhoType		-- Type of the body of the match
-		      					-- Tyvars in either of these must not escape
-		      -> TcM TcDictBinds	-- LIE to float out and dict bindings
-tcCheckExistentialPat ex_tvs ex_ids ex_lie lie_req pats_w_tys body_ty
-  | isEmptyBag ex_tvs && all not_overloaded ex_ids
-	-- Short cut for case when there are no existentials
-	-- and no polymorphic overloaded variables
-	--  e.g. f :: (forall a. Ord a => a -> a) -> Int -> Int
-	--	 f op x = ....
-	--  Here we must discharge op Methods
-  = ASSERT( null ex_lie )
-    extendLIEs lie_req		`thenM_` 
-    returnM emptyBag
-
-  | otherwise
-  =	-- Read the by-now-filled-in expected types
-    mapM readExpectedType (body_ty : map snd pats_w_tys)	`thenM` \ tys ->
-    addErrCtxtM (sigPatCtxt tv_list ex_ids tys)			$
-
-    	-- In case there are any polymorpic, overloaded binders in the pattern
-	-- (which can happen in the case of rank-2 type signatures, or data constructors
-	-- with polymorphic arguments), we must do a bindInstsOfLocalFns here
-    getLIE (bindInstsOfLocalFuns lie_req ex_ids)	`thenM` \ (inst_binds, lie) ->
-
-	-- Deal with overloaded functions bound by the pattern
-    tcSimplifyCheck doc tv_list ex_lie lie		`thenM` \ dict_binds ->
-
-	-- Check for type variable escape
-    checkSigTyVarsWrt (tyVarsOfTypes tys) tv_list		`thenM_` 
-
-    returnM (dict_binds `unionBags` inst_binds)
-  where
-    doc     = text ("existential context of a data constructor")
-    tv_list = bagToList ex_tvs
-    not_overloaded id = not (isOverloadedTy (idType id))
+tcCheckExistentialPat pats ex_tvs pat_tys body_ty
+  = do	{ tys <- mapM readExpectedType (body_ty : pat_tys)
+	; addErrCtxtM (sigPatCtxt (collectPatsBinders pats) ex_tvs tys)	$
+    	  checkSigTyVarsWrt (tyVarsOfTypes tys) ex_tvs }
 \end{code}
 
 
@@ -399,22 +325,24 @@ tcDoStmts :: HsStmtContext Name
 	  -> TcRhoType		-- To keep it simple, we don't have an "expected" type here
 	  -> TcM ([LStmt TcId], ReboundNames TcId)
 tcDoStmts PArrComp stmts method_names res_ty
-  = unifyPArrTy res_ty					`thenM` \elt_ty ->
-    tcComprehension PArrComp mkPArrTy elt_ty stmts	`thenM` \ stmts' ->
-    returnM (stmts', [{- unused -}])
+  = do 	{ [elt_ty] <- unifyTyConApp parrTyCon res_ty
+	; stmts' <- tcComprehension PArrComp parrTyCon elt_ty stmts
+	; return (stmts', [{- unused -}]) }
 
 tcDoStmts ListComp stmts method_names res_ty
   = unifyListTy res_ty				`	thenM` \ elt_ty ->
-    tcComprehension ListComp mkListTy elt_ty stmts	`thenM` \ stmts' ->
+    tcComprehension ListComp listTyCon elt_ty stmts	`thenM` \ stmts' ->
     returnM (stmts', [{- unused -}])
 
 tcDoStmts do_or_mdo stmts method_names res_ty
-  = newTyVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenM` \ m_ty ->
-    newTyVarTy liftedTypeKind 					`thenM` \ elt_ty ->
+  = newTyFlexiVarTy (mkArrowKind liftedTypeKind liftedTypeKind)	`thenM` \ m_ty ->
+    newTyFlexiVarTy liftedTypeKind 				`thenM` \ elt_ty ->
     unifyTauTy res_ty (mkAppTy m_ty elt_ty)			`thenM_`
     let
 	ctxt = SC { sc_what = do_or_mdo,
-		    sc_rhs  = \ rhs rhs_elt_ty -> tcCheckRho rhs (mkAppTy m_ty rhs_elt_ty),
+		    sc_rhs  = \ rhs -> do { (rhs', rhs_ty) <- tcInferRho rhs
+					  ; rhs_elt_ty <- unifyAppTy m_ty rhs_ty
+					  ; return (rhs', rhs_elt_ty) },
 		    sc_body = \ body -> tcCheckRho body res_ty,
 		    sc_ty   = res_ty }
     in	
@@ -431,13 +359,15 @@ tcDoStmts do_or_mdo stmts method_names res_ty
 
     returnM (stmts', methods)
 
-tcComprehension do_or_lc mk_mty elt_ty stmts
+tcComprehension do_or_lc m_tycon elt_ty stmts
   = tcStmts ctxt stmts
   where
     ctxt = SC { sc_what = do_or_lc,
-		sc_rhs  = \ rhs rhs_elt_ty -> tcCheckRho rhs (mk_mty rhs_elt_ty),
-		sc_body = \ body -> tcCheckRho body elt_ty,	-- Note: no mk_mty!
-		sc_ty   = mk_mty elt_ty }
+		sc_rhs  = \ rhs -> do { (rhs', rhs_ty) <- tcInferRho rhs
+				      ; [rhs_elt_ty] <- unifyTyConApp m_tycon rhs_ty
+				      ; return (rhs', rhs_elt_ty) },
+		sc_body = \ body -> tcCheckRho body elt_ty,	-- Note: no m_tycon here!
+		sc_ty   = mkTyConApp m_tycon [elt_ty] }
 \end{code}
 
 
@@ -476,10 +406,17 @@ tcStmts ctxt stmts
 
 data TcStmtCtxt 
   = SC { sc_what :: HsStmtContext Name,				-- What kind of thing this is
-    	 sc_rhs  :: LHsExpr Name -> TcType -> TcM (LHsExpr TcId),	-- Type checker for RHS computations
+    	 sc_rhs  :: LHsExpr Name -> TcM (LHsExpr TcId, TcType),	-- Type inference for RHS computations
 	 sc_body :: LHsExpr Name -> TcM (LHsExpr TcId),		-- Type checker for return computation
 	 sc_ty   :: TcType }					-- Return type; used *only* to check
 								-- for escape in existential patterns
+	-- We use type *inference* for the RHS computations, becuase of GADTs. 
+	-- 	do { pat <- rhs; <rest> }
+	-- is rather like
+	--	case rhs of { pat -> <rest> }
+	-- We do inference on rhs, so that information about its type can be refined
+	-- when type-checking the pattern. 
+
 tcStmtsAndThen
 	:: (LStmt TcId -> thing -> thing)	-- Combiner
 	-> TcStmtCtxt
@@ -505,25 +442,21 @@ tcStmtAndThen combine ctxt (L _ (LetStmt binds)) thing_inside
 
 	-- BindStmt
 tcStmtAndThen combine ctxt (L src_loc stmt@(BindStmt pat exp)) thing_inside
-  = addSrcSpan src_loc					$
+  = setSrcSpan src_loc					$
     addErrCtxt (stmtCtxt ctxt stmt)			$
-    newTyVarTy liftedTypeKind				`thenM` \ pat_ty ->
-    sc_rhs ctxt exp pat_ty				`thenM` \ exp' ->
-    tcMatchPats [(pat, Check pat_ty)] (Check (sc_ty ctxt)) (
-	popErrCtxt thing_inside
-    )							`thenM` \ ([pat'], thing, dict_binds) ->
-    returnM (combine (L src_loc (BindStmt pat' exp'))
-		     (glue_binds combine dict_binds thing))
+    do	{ (exp', pat_ty)  <- sc_rhs ctxt exp
+	; ([pat'], thing) <- tcMatchPats [pat] [Check pat_ty] (Check (sc_ty ctxt)) $
+			     popErrCtxt thing_inside
+	; return (combine (L src_loc (BindStmt pat' exp')) thing) }
 
 	-- ExprStmt
 tcStmtAndThen combine ctxt (L src_loc stmt@(ExprStmt exp _)) thing_inside
-  = addSrcSpan src_loc		(
+  = setSrcSpan src_loc		(
     	addErrCtxt (stmtCtxt ctxt stmt) $
 	if isDoExpr (sc_what ctxt)
 	then	-- do or mdo; the expression is a computation
-		newTyVarTy liftedTypeKind 	`thenM` \ any_ty ->
-		sc_rhs ctxt exp any_ty		`thenM` \ exp' ->
-		returnM (L src_loc (ExprStmt exp' any_ty))
+		sc_rhs ctxt exp			`thenM` \ (exp', exp_ty) ->
+		returnM (L src_loc (ExprStmt exp' exp_ty))
 	else	-- List comprehensions, pattern guards; expression is a boolean
 		tcCheckRho exp boolTy		`thenM` \ exp' ->
 		returnM (L src_loc (ExprStmt exp' boolTy))
@@ -553,18 +486,19 @@ tcStmtAndThen combine ctxt (L src_loc (ParStmt bndr_stmts_s)) thing_inside
 
 	-- RecStmt
 tcStmtAndThen combine ctxt (L src_loc (RecStmt stmts laterNames recNames _)) thing_inside
-  = newTyVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
+-- gaw 2004
+  = newTyFlexiVarTys (length recNames) liftedTypeKind		`thenM` \ recTys ->
     let
 	rec_ids = zipWith mkLocalId recNames recTys
     in
-    tcExtendLocalValEnv rec_ids			$
+    tcExtendIdEnv rec_ids			$
     tcStmtsAndThen combine_rec ctxt stmts (
 	zipWithM tc_ret recNames recTys		`thenM` \ rec_rets ->
 	tcLookupLocalIds laterNames		`thenM` \ later_ids ->
 	returnM ([], (later_ids, rec_rets))
     )						`thenM` \ (stmts', (later_ids, rec_rets)) ->
 
-    tcExtendLocalValEnv later_ids		$
+    tcExtendIdEnv later_ids		$
 	-- NB:	The rec_ids for the recursive things 
 	-- 	already scope over this part
     thing_inside				`thenM` \ thing ->
@@ -604,8 +538,9 @@ glue_binds combine binds thing = combine (noLoc (LetStmt [binds])) thing
 number of args are used in each equation.
 
 \begin{code}
-sameNoOfArgs :: [LMatch Name] -> Bool
-sameNoOfArgs matches = isSingleton (nub (map args_in_match matches))
+sameNoOfArgs :: MatchGroup Name -> Bool
+sameNoOfArgs (MatchGroup matches _)
+   = isSingleton (nub (map args_in_match matches))
   where
     args_in_match :: LMatch Name -> Int
     args_in_match (L _ (Match pats _ _)) = length pats
@@ -624,7 +559,7 @@ stmtCtxt ctxt stmt = hang (ptext SLIT("In") <+> pp_ctxt (sc_what ctxt) <> colon)
 			ResultStmt _ -> pprStmtResultContext
 			other	     -> pprStmtContext
 			
-sigPatCtxt bound_tvs bound_ids tys tidy_env 
+sigPatCtxt bound_ids bound_tvs tys tidy_env 
   = 	-- tys is (body_ty : pat_tys)  
     mapM zonkTcType tys		`thenM` \ tys' ->
     let

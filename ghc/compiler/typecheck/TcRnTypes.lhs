@@ -20,7 +20,7 @@ module TcRnTypes(
 	WhereFrom(..), mkModDeps,
 
 	-- Typechecker types
-	TcTyThing(..),
+	TcTyThing(..), GadtRefinement,
 
 	-- Template Haskell
 	ThStage(..), topStage, topSpliceStage,
@@ -36,19 +36,20 @@ module TcRnTypes(
 	plusLIEs, mkLIE, isEmptyLIE, lieToList, listToLIE,
 
 	-- Misc other types
-	TcId, TcIdSet
+	TcId, TcIdSet, TcDictBinds
   ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( PendingSplice, HsOverLit, LHsBind, LRuleDecl, LForeignDecl,
-			  Pat, ArithSeqInfo )
+import HsSyn		( PendingSplice, HsOverLit, LRuleDecl, LForeignDecl,
+			  ArithSeqInfo, DictBinds, LHsBinds )
 import HscTypes		( FixityEnv,
 			  HscEnv, TypeEnv, TyThing, 
-			  Avails, GenAvailInfo(..), AvailInfo,
+			  GenAvailInfo(..), AvailInfo,
 			  availName, IsBootInterface, Deprecations )
 import Packages		( PackageName )
-import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, 
+import Type		( Type, TvSubstEnv )
+import TcType		( TcTyVarSet, TcType, TcTauType, TcThetaType, SkolemInfo,
 			  TcPredType, TcKind, tcCmpPred, tcCmpType, tcCmpTypes )
 import InstEnv		( DFunId, InstEnv )
 import IOEnv
@@ -57,8 +58,6 @@ import Name		( Name )
 import NameEnv
 import NameSet		( NameSet, emptyNameSet, DefUses )
 import OccName		( OccEnv )
-import Type		( Type )
-import Class		( Class )
 import Var		( Id, TyVar )
 import VarEnv		( TidyEnv )
 import Module
@@ -85,9 +84,12 @@ import ListSetOps	( unionLists )
 The monad itself has to be defined here, because it is mentioned by ErrCtxt
 
 \begin{code}
-type TcRef a = IORef a
-type TcId    = Id 			-- Type may be a TcType
-type TcIdSet = IdSet
+type TcRef a 	 = IORef a
+type TcId    	 = Id 			-- Type may be a TcType
+type TcIdSet 	 = IdSet
+type TcDictBinds = DictBinds TcId	-- Bag of dictionary bindings
+
+
 
 type TcRnIf a b c = IOEnv (Env a b) c
 type IfM lcl a  = TcRnIf IfGblEnv lcl a		-- Iface stuff
@@ -187,7 +189,7 @@ data TcGblEnv
 		-- The next fields accumulate the payload of the module
 		-- The binds, rules and foreign-decl fiels are collected
 		-- initially in un-zonked form and are finally zonked in tcRnSrcDecls
-	tcg_binds   :: Bag (LHsBind Id),	-- Value bindings in this module
+	tcg_binds   :: LHsBinds Id,		-- Value bindings in this module
 	tcg_deprecs :: Deprecations,		-- ...Deprecations 
 	tcg_insts   :: [DFunId],		-- ...Instances
 	tcg_rules   :: [LRuleDecl Id],		-- ...Rules
@@ -273,9 +275,11 @@ data TcLclEnv		-- Changes as we move inside an expression
 		-- We still need the unsullied global name env so that
     		--   we can look up record field names
 
-	tcl_env    :: NameEnv TcTyThing,  -- The local type environment: Ids and TyVars
-					  -- defined in this module
+	tcl_env  :: NameEnv TcTyThing,  -- The local type environment: Ids and TyVars
+					-- defined in this module
 					
+	tcl_gadt :: GadtRefinement,	-- The current type refinement for GADTs
+
 	tcl_tyvars :: TcRef TcTyVarSet,	-- The "global tyvars"
 			-- Namely, the in-scope TyVars bound in tcl_lenv, 
 			-- plus the tyvars mentioned in the types of Ids bound in tcl_lenv
@@ -283,6 +287,9 @@ data TcLclEnv		-- Changes as we move inside an expression
 
 	tcl_lie :: TcRef LIE		-- Place to accumulate type constraints
     }
+
+type GadtRefinement = TvSubstEnv	-- Binds rigid type variables to their refinements
+
 
 ---------------------------
 -- Template Haskell levels 
@@ -638,7 +645,7 @@ data Inst
 	--	type of (f tys dicts(from theta)) = tau
 
 	-- INVARIANT 2: tau must not be of form (Pred -> Tau)
-	--   Reason: two methods are considerd equal if the 
+	--   Reason: two methods are considered equal if the 
 	--   	     base Id matches, and the instantiating types
 	--	     match.  The TcThetaType should then match too.
 	--   This only bites in the call to tcInstClassOp in TcClassDcl.mkMethodBind
@@ -723,91 +730,54 @@ instLocSrcSpan :: InstLoc -> SrcSpan
 instLocSrcSpan (InstLoc _ src_span _) = src_span
 
 data InstOrigin
-  = OccurrenceOf Name		-- Occurrence of an overloaded identifier
+  = SigOrigin SkolemInfo	-- Pattern, class decl, inst decl etc;
+				-- Places that bind type variables and introduce
+				-- available constraints
 
-  | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
   | IPBindOrigin (IPName Name)	-- Binding site of an implicit parameter
 
-  | RecordUpdOrigin
+	-------------------------------------------------------
+	-- The rest are all occurrences: Insts that are 'wanted'
+	-------------------------------------------------------
+  | OccurrenceOf Name		-- Occurrence of an overloaded identifier
 
-  | DataDeclOrigin		-- Typechecking a data declaration
-
-  | InstanceDeclOrigin		-- Typechecking an instance decl
+  | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
 
   | LiteralOrigin HsOverLit	-- Occurrence of a literal
-
-  | PatOrigin (Pat Name)
 
   | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
   | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
 
-  | SignatureOrigin		-- A dict created from a type signature
-  | Rank2Origin			-- A dict created when typechecking the argument
-				-- of a rank-2 typed function
+  | InstSigOrigin	-- A dict occurrence arising from instantiating
+			-- a polymorphic type during a subsumption check
 
-  | DoOrigin			-- The monad for a do expression
-  | ProcOrigin			-- A proc expression
-
-  | ClassDeclOrigin		-- Manufactured during a class decl
-
-  | InstanceSpecOrigin	Class	-- in a SPECIALIZE instance pragma
-			Type
-
-	-- When specialising instances the instance info attached to
-	-- each class is not yet ready, so we record it inside the
-	-- origin information.  This is a bit of a hack, but it works
-	-- fine.  (Patrick is to blame [WDP].)
-
-  | ValSpecOrigin	Name	-- in a SPECIALIZE pragma for a value
-
-	-- Argument or result of a ccall
-	-- Dictionaries with this origin aren't actually mentioned in the
-	-- translated term, and so need not be bound.  Nor should they
-	-- be abstracted over.
-
-  | UnknownOrigin	-- Help! I give up...
+  | RecordUpdOrigin
+  | InstScOrigin	-- Typechecking superclasses of an instance declaration
+  | DerivOrigin		-- Typechecking deriving
+  | DefaultOrigin	-- Typechecking a default decl
+  | DoOrigin		-- Arising from a do expression
+  | ProcOrigin		-- Arising from a proc expression
 \end{code}
 
 \begin{code}
 pprInstLoc :: InstLoc -> SDoc
-pprInstLoc (InstLoc orig locn ctxt)
+pprInstLoc (InstLoc (SigOrigin info) locn _) 
+  = text "arising from" <+> ppr info	-- I don't think this happens much, if at all
+pprInstLoc (InstLoc orig locn _)
   = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
   where
-    pp_orig (OccurrenceOf name)
-      	= hsep [ptext SLIT("use of"), quotes (ppr name)]
-    pp_orig (IPOccOrigin name)
-      	= hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]
-    pp_orig (IPBindOrigin name)
-      	= hsep [ptext SLIT("binding for implicit parameter"), quotes (ppr name)]
-    pp_orig RecordUpdOrigin
-	= ptext SLIT("a record update")
-    pp_orig DataDeclOrigin
-	= ptext SLIT("the data type declaration")
-    pp_orig InstanceDeclOrigin
-	= ptext SLIT("the instance declaration")
-    pp_orig (LiteralOrigin lit)
-	= hsep [ptext SLIT("the literal"), quotes (ppr lit)]
-    pp_orig (PatOrigin pat)
-	= hsep [ptext SLIT("the pattern"), quotes (ppr pat)]
-    pp_orig (ArithSeqOrigin seq)
-	= hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
-    pp_orig (PArrSeqOrigin seq)
-	= hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
-    pp_orig (SignatureOrigin)
-	=  ptext SLIT("a type signature")
-    pp_orig (Rank2Origin)
-	=  ptext SLIT("a function with an overloaded argument type")
-    pp_orig (DoOrigin)
-	=  ptext SLIT("a do statement")
-    pp_orig (ProcOrigin)
-	=  ptext SLIT("a proc expression")
-    pp_orig (ClassDeclOrigin)
-	=  ptext SLIT("a class declaration")
-    pp_orig (InstanceSpecOrigin clas ty)
-	= hsep [text "a SPECIALIZE instance pragma; class",
-	        quotes (ppr clas), text "type:", ppr ty]
-    pp_orig (ValSpecOrigin name)
-	= hsep [ptext SLIT("a SPECIALIZE user-pragma for"), quotes (ppr name)]
-    pp_orig (UnknownOrigin)
-	= ptext SLIT("...oops -- I don't know where the overloading came from!")
+    pp_orig (OccurrenceOf name)  = hsep [ptext SLIT("use of"), quotes (ppr name)]
+    pp_orig (IPOccOrigin name)   = hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]
+    pp_orig (IPBindOrigin name)  = hsep [ptext SLIT("binding for implicit parameter"), quotes (ppr name)]
+    pp_orig RecordUpdOrigin 	 = ptext SLIT("a record update")
+    pp_orig (LiteralOrigin lit)	 = hsep [ptext SLIT("the literal"), quotes (ppr lit)]
+    pp_orig (ArithSeqOrigin seq) = hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
+    pp_orig (PArrSeqOrigin seq)	 = hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
+    pp_orig InstSigOrigin	 =  ptext SLIT("instantiating a type signature")
+    pp_orig InstScOrigin	 =  ptext SLIT("the superclasses of an instance declaration")
+    pp_orig DerivOrigin	 	 = ptext SLIT("the 'deriving' clause of a data type declaration")
+    pp_orig DefaultOrigin	 = ptext SLIT("a 'default' declaration")
+    pp_orig DoOrigin		 =  ptext SLIT("a do statement")
+    pp_orig ProcOrigin		 =  ptext SLIT("a proc expression")
+    pp_orig (SigOrigin info) 	 = ppr info
 \end{code}

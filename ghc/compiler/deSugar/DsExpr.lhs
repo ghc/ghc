@@ -11,11 +11,11 @@ module DsExpr ( dsExpr, dsLExpr, dsLet, dsLit ) where
 
 import Match		( matchWrapper, matchSimply )
 import MatchLit		( dsLit )
-import DsBinds		( dsHsBinds, AutoScc(..) )
+import DsBinds		( dsHsNestedBinds )
 import DsGRHSs		( dsGuarded )
 import DsListComp	( dsListComp, dsPArrComp )
-import DsUtils		( mkErrorAppDs, mkStringLit, mkConsExpr, mkNilExpr,
-			  mkCoreTupTy, selectMatchVarL,
+import DsUtils		( mkErrorAppDs, mkStringExpr, mkConsExpr, mkNilExpr,
+			  mkCoreTupTy, selectSimpleMatchVarL,
 			  dsReboundNames, lookupReboundName )
 import DsArrows		( dsProcExpr )
 import DsMonad
@@ -33,21 +33,19 @@ import TcHsSyn		( hsPatType )
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppArgs,
-			  tcSplitTyConApp, isUnLiftedType, Type,
-			  mkAppTy )
-import Type		( splitFunTys )
+import TcType		( tcSplitAppTy, tcSplitFunTys, tcTyConAppTyCon, tcTyConAppArgs,
+			  tcTyConAppArgs, isUnLiftedType, Type, mkAppTy )
+import Type		( mkFunTys, funArgTy, splitFunTys, isUnboxedTupleType, mkFunTy )
 import CoreSyn
 import CoreUtils	( exprType, mkIfThenElse, bindNonRec )
 
-import FieldLabel	( FieldLabel, fieldLabelTyCon )
 import CostCentre	( mkUserCC )
-import Id		( Id, idType, idName, recordSelectorFieldLabel )
+import Id		( Id, idType, idName )
 import PrelInfo		( rEC_CON_ERROR_ID, iRREFUT_PAT_ERROR_ID )
 import DataCon		( DataCon, dataConWrapId, dataConFieldLabels, dataConInstOrigArgTys )
-import DataCon		( isExistentialDataCon )
+import DataCon		( isVanillaDataCon )
 import Name		( Name )
-import TyCon		( tyConDataCons )
+import TyCon		( FieldLabel, tyConDataCons )
 import TysWiredIn	( tupleCon )
 import BasicTypes	( RecFlag(..), Boxity(..), ipNameName )
 import PrelNames	( toPName,
@@ -115,14 +113,14 @@ dsBindGroup body bind@(HsBindGroup hsbinds sigs is_rec)
     in
     case bagToList binds of
       [L loc (FunBind (L _ fun) _ matches)]
-	-> putSrcSpanDs loc				$
-	   matchWrapper (FunRhs (idName fun)) matches 	`thenDs` \ (args, rhs) ->
+	-> putSrcSpanDs loc					$
+	   matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
 	   returnDs (bindNonRec fun rhs body_w_exports)
 
-      [L loc (PatBind pat grhss)]
+      [L loc (PatBind pat grhss ty)]
 	-> putSrcSpanDs loc			$
-	   dsGuarded grhss 			`thenDs` \ rhs ->
+	   dsGuarded grhss ty 			`thenDs` \ rhs ->
 	   mk_error_app pat			`thenDs` \ error_expr ->
 	   matchSimply rhs PatBindRhs pat body_w_exports error_expr
 
@@ -130,7 +128,7 @@ dsBindGroup body bind@(HsBindGroup hsbinds sigs is_rec)
 
 -- Ordinary case for bindings
 dsBindGroup body (HsBindGroup binds sigs is_rec)
-  = dsHsBinds NoSccs binds []  `thenDs` \ prs ->
+  = dsHsNestedBinds binds	`thenDs` \ prs ->
     returnDs (Let (Rec prs) body)
 	-- Use a Rec regardless of is_rec. 
 	-- Why? Because it allows the binds to be all
@@ -164,7 +162,7 @@ dsExpr (HsLit lit)  = dsLit lit
 -- HsOverLit has been gotten rid of by the type checker
 
 dsExpr expr@(HsLam a_Match)
-  = matchWrapper LambdaExpr [a_Match]	`thenDs` \ (binders, matching_code) ->
+  = matchWrapper LambdaExpr a_Match	`thenDs` \ (binders, matching_code) ->
     returnDs (mkLams binders matching_code)
 
 dsExpr expr@(HsApp fun arg)      
@@ -244,23 +242,19 @@ dsExpr (HsCoreAnn fs expr)
   = dsLExpr expr        `thenDs` \ core_expr ->
     returnDs (Note (CoreNote $ unpackFS fs) core_expr)
 
--- special case to handle unboxed tuple patterns.
-
-dsExpr (HsCase discrim matches)
- | all ubx_tuple_match matches
+-- Special case to handle unboxed tuple patterns; they can't appear nested
+dsExpr (HsCase discrim matches@(MatchGroup _ ty))
+ | isUnboxedTupleType (funArgTy ty)
  =  dsLExpr discrim			`thenDs` \ core_discrim ->
     matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
     case matching_code of
-	Case (Var x) bndr alts | x == discrim_var -> 
-		returnDs (Case core_discrim bndr alts)
+	Case (Var x) bndr ty alts | x == discrim_var -> 
+		returnDs (Case core_discrim bndr ty alts)
 	_ -> panic ("dsLExpr: tuple pattern:\n" ++ showSDoc (ppr matching_code))
-  where
-    ubx_tuple_match (L _ (Match [L _ (TuplePat _ Unboxed)] _ _)) = True
-    ubx_tuple_match _ = False
 
 dsExpr (HsCase discrim matches)
   = dsLExpr discrim			`thenDs` \ core_discrim ->
-    matchWrapper CaseAlt matches	`thenDs` \ ([discrim_var], matching_code) ->
+    matchWrapper CaseAlt matches 	`thenDs` \ ([discrim_var], matching_code) ->
     returnDs (bindNonRec discrim_var core_discrim matching_code)
 
 dsExpr (HsLet binds body)
@@ -274,7 +268,7 @@ dsExpr (HsDo ListComp stmts _ result_ty)
   =	-- Special case for list comprehensions
     dsListComp stmts elt_ty
   where
-    (_, [elt_ty]) = tcSplitTyConApp result_ty
+    [elt_ty] = tcTyConAppArgs result_ty
 
 dsExpr (HsDo do_or_lc stmts ids result_ty)
   | isDoExpr do_or_lc
@@ -284,7 +278,7 @@ dsExpr (HsDo PArrComp stmts _ result_ty)
   =	-- Special case for array comprehensions
     dsPArrComp (map unLoc stmts) elt_ty
   where
-    (_, [elt_ty]) = tcSplitTyConApp result_ty
+    [elt_ty] = tcTyConAppArgs result_ty
 
 dsExpr (HsIf guard_expr then_expr else_expr)
   = dsLExpr guard_expr	`thenDs` \ core_guard ->
@@ -412,9 +406,8 @@ dsExpr (RecordConOut data_con con_expr rbinds)
 	-- A newtype in the corner should be opaque; 
 	-- hence TcType.tcSplitFunTys
 
-	mk_arg (arg_ty, lbl)
-	  = case [rhs | (L _ sel_id, rhs) <- rbinds,
-			lbl == recordSelectorFieldLabel sel_id] of
+	mk_arg (arg_ty, lbl)	-- Selector id has the field label as its name
+	  = case [rhs | (L _ sel_id, rhs) <- rbinds, lbl == idName sel_id] of
 	      (rhs:rhss) -> ASSERT( null rhss )
 		 	    dsLExpr rhs
 	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showSDoc (ppr lbl))
@@ -465,16 +458,17 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
     let
 	in_inst_tys  = tcTyConAppArgs record_in_ty	-- Newtype opaque
 	out_inst_tys = tcTyConAppArgs record_out_ty	-- Newtype opaque
+	in_out_ty    = mkFunTy record_in_ty record_out_ty
 
 	mk_val_arg field old_arg_id 
-	  = case [rhs | (L _ sel_id, rhs) <- rbinds, 
-			field == recordSelectorFieldLabel sel_id] of
+	  = case [rhs | (L _ sel_id, rhs) <- rbinds, field == idName sel_id] of
 	      (rhs:rest) -> ASSERT(null rest) rhs
 	      []	 -> nlHsVar old_arg_id
 
 	mk_alt con
 	  = newSysLocalsDs (dataConInstOrigArgTys con in_inst_tys) `thenDs` \ arg_ids ->
 		-- This call to dataConArgTys won't work for existentials
+		-- but existentials don't have record types anyway
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
 					(dataConFieldLabels con) arg_ids
@@ -483,34 +477,33 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
 				out_inst_tys)
 			  val_args
 	    in
-	    returnDs (mkSimpleMatch [noLoc $ ConPatOut con (PrefixCon (map nlVarPat arg_ids)) record_in_ty [] []]
-				    rhs
-				    record_out_ty)
+	    returnDs (mkSimpleMatch [noLoc $ ConPatOut con [] [] emptyLHsBinds 
+						       (PrefixCon (map nlVarPat arg_ids)) record_in_ty]
+				    rhs)
     in
 	-- Record stuff doesn't work for existentials
 	-- The type checker checks for this, but we need 
 	-- worry only about the constructors that are to be updated
-    ASSERT2( all (not . isExistentialDataCon) cons_to_upd, ppr expr )
+    ASSERT2( all isVanillaDataCon cons_to_upd, ppr expr )
 
 	-- It's important to generate the match with matchWrapper,
 	-- and the right hand sides with applications of the wrapper Id
 	-- so that everything works when we are doing fancy unboxing on the
 	-- constructor aguments.
-    mappM mk_alt cons_to_upd		`thenDs` \ alts ->
-    matchWrapper RecUpd alts		`thenDs` \ ([discrim_var], matching_code) ->
+    mappM mk_alt cons_to_upd				`thenDs` \ alts ->
+    matchWrapper RecUpd (MatchGroup alts in_out_ty)	`thenDs` \ ([discrim_var], matching_code) ->
 
     returnDs (bindNonRec discrim_var record_expr' matching_code)
 
   where
     updated_fields :: [FieldLabel]
-    updated_fields = [ recordSelectorFieldLabel sel_id 
-		     | (L _ sel_id,_) <- rbinds]
+    updated_fields = [ idName sel_id | (L _ sel_id,_) <- rbinds]
 
-	-- Get the type constructor from the first field label, 
+	-- Get the type constructor from the record_in_ty
 	-- so that we are sure it'll have all its DataCons
 	-- (In GHCI, it's possible that some TyCons may not have all
 	--  their constructors, in a module-loop situation.)
-    tycon       = fieldLabelTyCon (head updated_fields)
+    tycon       = tcTyConAppTyCon record_in_ty
     data_cons   = tyConDataCons tycon
     cons_to_upd = filter has_all_fields data_cons
 
@@ -608,14 +601,14 @@ dsDo do_or_lc stmts ids result_ty
 	go (BindStmt pat expr : stmts)
 	  = go stmts			`thenDs` \ body -> 
 	    dsLExpr expr 	 	`thenDs` \ rhs ->
-	    mkStringLit (mk_msg (getLoc pat))	`thenDs` \ core_msg ->
+	    mkStringExpr (mk_msg (getLoc pat))	`thenDs` \ core_msg ->
 	    let
 		-- In a do expression, pattern-match failure just calls
 		-- the monadic 'fail' rather than throwing an exception
 		fail_expr  = mkApps fail_id [Type b_ty, core_msg]
 		a_ty       = hsPatType pat
 	    in
-	    selectMatchVarL pat		 	 		`thenDs` \ var ->
+	    selectSimpleMatchVarL pat		 		`thenDs` \ var ->
     	    matchSimply (Var var) (StmtCtxt do_or_lc) pat
 			body fail_expr				`thenDs` \ match_code ->
 	    returnDs (mkApps bind_id [Type a_ty, Type b_ty, rhs, Lam var match_code])
@@ -655,18 +648,20 @@ dsRecStmt m_ty ds_meths stmts later_vars rec_vars rec_rets
 	one_var          = null rest
 
 	mfix_app = nlHsApp (noLoc $ TyApp (nlHsVar mfix_id) [tup_ty]) mfix_arg
-	mfix_arg = noLoc $ HsLam (mkSimpleMatch [tup_pat] body tup_ty)
+	mfix_arg = noLoc $ HsLam (MatchGroup [mkSimpleMatch [tup_pat] body]
+					     (mkFunTy tup_ty body_ty))
 
 	tup_expr | one_var   = ret1
 		 | otherwise = noLoc $ ExplicitTuple rets Boxed
-	tup_ty   	     = mkCoreTupTy (map idType vars)
-					-- Deals with singleton case
+	var_tys		     = map idType vars
+	tup_ty   	     = mkCoreTupTy var_tys  -- Deals with singleton case
 	tup_pat  | one_var   = nlVarPat var1
 		 | otherwise = noLoc $ LazyPat (noLoc $ TuplePat (map nlVarPat vars) Boxed)
 
 	body = noLoc $ HsDo DoExpr (stmts ++ [return_stmt]) 
 			   [(n, HsVar id) | (n,id) <- ds_meths]	-- A bit of a hack
-			   (mkAppTy m_ty tup_ty)
+			   body_ty
+	body_ty = mkAppTy m_ty tup_ty
 
   	Var return_id = lookupReboundName ds_meths returnMName
 	Var mfix_id   = lookupReboundName ds_meths mfixName

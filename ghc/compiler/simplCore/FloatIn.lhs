@@ -323,10 +323,11 @@ bindings are: (a)~inside the scrutinee, (b)~inside one of the
 alternatives/default [default FVs always {\em first}!].
 
 \begin{code}
-fiExpr to_drop (_, AnnCase scrut case_bndr alts)
+-- gaw 2004
+fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
   = mkCoLets' drop_here1 $
     mkCoLets' drop_here2 $
-    Case (fiExpr scrut_drops scrut) case_bndr
+    Case (fiExpr scrut_drops scrut) case_bndr ty
 	 (zipWith fi_alt alts_drops_s alts)
   where
 	-- Float into the scrut and alts-considered-together just like App

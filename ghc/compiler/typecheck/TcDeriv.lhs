@@ -29,17 +29,17 @@ import RnEnv		( bindLocalNames )
 import HscTypes		( DFunId, FixityEnv )
 
 import Class		( className, classArity, classKey, classTyVars, classSCTheta, Class )
-import Subst		( mkTyVarSubst, substTheta )
+import Type		( zipTvSubst, substTheta )
 import ErrUtils		( dumpIfSet_dyn )
 import MkId		( mkDictFunId )
-import DataCon		( isNullaryDataCon, isExistentialDataCon, dataConOrigArgTys )
+import DataCon		( isNullarySrcDataCon, isVanillaDataCon, dataConOrigArgTys )
 import Maybes		( catMaybes )
 import RdrName		( RdrName )
 import Name		( Name, getSrcLoc )
 import NameSet		( NameSet, emptyNameSet, duDefs )
 import Kind		( splitKindFunTys )
 import TyCon		( tyConTyVars, tyConDataCons, tyConArity, tyConHasGenerics,
-			  tyConTheta, isProductTyCon, isDataTyCon, newTyConRhs,
+			  tyConStupidTheta, isProductTyCon, isDataTyCon, newTyConRhs,
 			  isEnumerationTyCon, isRecursiveTyCon, TyCon
 			)
 import TcType		( TcType, ThetaType, mkTyVarTys, mkTyConApp, tcTyConAppTyCon,
@@ -247,7 +247,7 @@ tcDeriving tycl_decls
 
 -----------------------------------------
 deriveOrdinaryStuff []	-- Short cut
-  = returnM ([], emptyBag)
+  = returnM ([], emptyLHsBinds)
 
 deriveOrdinaryStuff eqns
   = do	{	-- Take the equation list and solve it, to deliver a list of
@@ -327,7 +327,7 @@ makeDerivEqns tycl_decls
 
     mk_eqn (new_or_data, tycon_name, hs_deriv_ty)
       = tcLookupTyCon tycon_name		`thenM` \ tycon ->
-	addSrcSpan (srcLocSpan (getSrcLoc tycon))		$
+	setSrcSpan (srcLocSpan (getSrcLoc tycon))		$
         addErrCtxt (derivCtxt Nothing tycon)	$
 	tcExtendTyVarEnv (tyConTyVars tycon)	$	-- Deriving preds may (now) mention
 							-- the type variables for the type constructor
@@ -431,7 +431,7 @@ makeDerivEqns tycl_decls
 		-- There's no 'corece' needed because after the type checker newtypes
 		-- are transparent.
 
-	sc_theta = substTheta (mkTyVarSubst clas_tyvars inst_tys)
+	sc_theta = substTheta (zipTvSubst clas_tyvars inst_tys)
 			      (classSCTheta clas)
 
 		-- If there are no tyvars, there's no need
@@ -544,16 +544,13 @@ mkDataTypeEqn tycon clas
   where
     tyvars            = tyConTyVars tycon
     constraints       = extra_constraints ++ ordinary_constraints
-    extra_constraints = tyConTheta tycon
+    extra_constraints = tyConStupidTheta tycon
 	 -- "extra_constraints": see note [Data decl contexts] above
 
     ordinary_constraints
       = [ mkClassPred clas [arg_ty] 
         | data_con <- tyConDataCons tycon,
           arg_ty   <- dataConOrigArgTys data_con,
-    		-- Use the same type variables
-    		-- as the type constructor,
-    		-- hence no need to instantiate
           not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
         ]
 
@@ -606,9 +603,9 @@ andCond c1 c2 tc = case c1 tc of
 
 cond_std :: Condition
 cond_std (gla_exts, tycon)
-  | any isExistentialDataCon data_cons 	= Just existential_why     
-  | null data_cons		    	= Just no_cons_why
-  | otherwise      			= Nothing
+  | any (not . isVanillaDataCon) data_cons = Just existential_why     
+  | null data_cons		    	   = Just no_cons_why
+  | otherwise      			   = Nothing
   where
     data_cons       = tyConDataCons tycon
     no_cons_why	    = quotes (ppr tycon) <+> ptext SLIT("has no data constructors")
@@ -711,7 +708,7 @@ solveDerivEqns orig_eqns
     ------------------------------------------------------------------
 
     gen_soln (_, clas, tc,tyvars,deriv_rhs)
-      = addSrcSpan (srcLocSpan (getSrcLoc tc))		$
+      = setSrcSpan (srcLocSpan (getSrcLoc tc))		$
 	addErrCtxt (derivCtxt (Just clas) tc)	$
 	tcSimplifyDeriv tyvars deriv_rhs	`thenM` \ theta ->
 	returnM (sortLe (<=) theta)	-- Canonicalise before returning the soluction
@@ -815,7 +812,7 @@ genInst dfun
 
 genDerivBinds clas fix_env tycon
   | className clas `elem` typeableClassNames
-  = (gen_Typeable_binds tycon, emptyBag)
+  = (gen_Typeable_binds tycon, emptyLHsBinds)
 
   | otherwise
   = case assocMaybe gen_list (getUnique clas) of
@@ -836,7 +833,7 @@ genDerivBinds clas fix_env tycon
 
       -- no_aux_binds is used for generators that don't 
       -- need to produce any auxiliary bindings
-    no_aux_binds f fix_env tc = (f fix_env tc, emptyBag)
+    no_aux_binds f fix_env tc = (f fix_env tc, emptyLHsBinds)
     ignore_fix_env f fix_env tc = f tc
 \end{code}
 
@@ -887,7 +884,7 @@ genTaggeryBinds dfuns
     do_con2tag acc_Names tycon
       | isDataTyCon tycon &&
         ((we_are_deriving eqClassKey tycon
-	    && any isNullaryDataCon (tyConDataCons tycon))
+	    && any isNullarySrcDataCon (tyConDataCons tycon))
 	 || (we_are_deriving ordClassKey  tycon
 	    && not (isProductTyCon tycon))
 	 || (we_are_deriving enumClassKey tycon)

@@ -1,4 +1,4 @@
-%
+%ilter
 % (c) The AQUA Project, Glasgow University, 1994-1998
 %
 \section[UniqFM]{Specialised finite maps, for things with @Uniques@}
@@ -34,7 +34,7 @@ module UniqFM (
 	foldUFM,
 	mapUFM,
 	elemUFM,
-	filterUFM,
+	filterUFM, filterUFM_Directly,
 	sizeUFM,
 	hashUFM,
 	isNullUFM,
@@ -103,6 +103,7 @@ intersectUFM_C	:: (elt1 -> elt2 -> elt3)
 foldUFM		:: (elt -> a -> a) -> a -> UniqFM elt -> a
 mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
+filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
 
 sizeUFM		:: UniqFM elt -> Int
 hashUFM		:: UniqFM elt -> Int
@@ -192,6 +193,7 @@ data UniqFM ele
 	    FastInt	    -- the delta
 	    (UniqFM ele)
 	    (UniqFM ele)
+-- INVARIANT: the children of a NodeUFM are never EmptyUFMs
 
 {-
 -- for debugging only :-)
@@ -512,7 +514,14 @@ mapUFM fn EmptyUFM    = EmptyUFM
 mapUFM fn fm	      = map_tree fn fm
 
 filterUFM fn EmptyUFM = EmptyUFM
-filterUFM fn fm	      = filter_tree fn fm
+filterUFM fn fm	      = filter_tree pred fm
+	where
+	  pred (i::FastInt) e = fn e
+
+filterUFM_Directly fn EmptyUFM = EmptyUFM
+filterUFM_Directly fn fm       = filter_tree pred fm
+	where
+	  pred i e = fn (mkUniqueGrimily (iBox i)) e
 \end{code}
 
 Note, this takes a long time, O(n), but
@@ -704,11 +713,12 @@ map_tree f _ = panic "map_tree failed"
 \end{code}
 
 \begin{code}
+filter_tree :: (FastInt -> a -> Bool) -> UniqFM a -> UniqFM a
 filter_tree f nd@(NodeUFM j p t1 t2)
   = mkSSNodeUFM (NodeUFMData j p) (filter_tree f t1) (filter_tree f t2)
 
 filter_tree f lf@(LeafUFM i obj)
-  | f obj = lf
+  | f i obj = lf
   | otherwise = EmptyUFM
 filter_tree f _ = panic "filter_tree failed"
 \end{code}

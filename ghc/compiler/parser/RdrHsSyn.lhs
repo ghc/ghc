@@ -107,6 +107,7 @@ extract_lty (L loc (HsTyVar tv)) acc
   | otherwise = acc
 extract_lty ty acc = extract_ty (unLoc ty) acc
 
+extract_ty (HsBangTy _ ty)           acc = extract_lty ty acc
 extract_ty (HsAppTy ty1 ty2)         acc = extract_lty ty1 (extract_lty ty2 acc)
 extract_ty (HsListTy ty)             acc = extract_lty ty acc
 extract_ty (HsPArrTy ty)             acc = extract_lty ty acc
@@ -131,8 +132,8 @@ extractGenericPatTyVars :: LHsBinds RdrName -> [Located RdrName]
 extractGenericPatTyVars binds
   = nubBy eqLocated (foldrBag get [] binds)
   where
-    get (L _ (FunBind _ _ ms)) acc = foldr (get_m.unLoc) acc ms
-    get other	               acc = acc
+    get (L _ (FunBind _ _ (MatchGroup ms _))) acc = foldr (get_m.unLoc) acc ms
+    get other	    			      acc = acc
 
     get_m (Match (L _ (TypePat ty) : _) _ _) acc = extract_lty ty acc
     get_m other			       		   acc = acc
@@ -187,9 +188,11 @@ mkHsNegApp (L loc e) = f e
 %*									*
 %************************************************************************
 
-mkBootIface, and its boring helper functions, have two purposes:
+mkBootIface, and its deeply boring helper functions, have two purposes:
+
 a) HsSyn to IfaceSyn.  The parser parses the former, but we're reading
 	an hi-boot file, and interfaces consist of the latter
+
 b) Convert unqualifed names from the "current module" to qualified Orig
    names.  E.g.
 	module This where
@@ -197,7 +200,10 @@ b) Convert unqualifed names from the "current module" to qualified Orig
    becomes
 	 This.foo :: GHC.Base.Int -> GHC.Base.Int
 
-It assumes that everything is well kinded, of course.
+It assumes that everything is well kinded, of course.  Failure causes a
+fatal error using pgmError, rather than a monadic error.  You're supposed
+to get hi-boot files right!
+
 
 \begin{code}
 mkBootIface :: ModuleName -> [HsDecl RdrName] -> ModIface
@@ -233,22 +239,6 @@ hsIfaceDecl (SigD (Sig name ty))
 	      ifType = hsIfaceLType ty,
 	      ifIdInfo = NoInfo }
 
-hsIfaceDecl (TyClD decl@(TySynonym {}))
-  = IfaceSyn { ifName = rdrNameOcc (tcdName decl), 
-	       ifTyVars = hsIfaceTvs (tcdTyVars decl), 
-	       ifSynRhs = hsIfaceLType (tcdSynRhs decl), 
-	       ifVrcs = [] } 
-
-hsIfaceDecl (TyClD decl@(TyData {}))
-  = IfaceData { ifName = rdrNameOcc (tcdName decl), 
-	        ifTyVars = hsIfaceTvs (tcdTyVars decl), 
-		ifCtxt = hsIfaceCtxt (unLoc (tcdCtxt decl)),
-		ifCons = hsIfaceCons (tcdND decl) (tcdCons decl), 
-		ifRec = NonRecursive,
-		ifVrcs = [], ifGeneric = False }
-	-- I'm not sure that [] is right for ifVrcs, but
-	-- since we don't use them I'm not going to fiddle
-
 hsIfaceDecl (TyClD decl@(ClassDecl {}))
   = IfaceClass { ifName = rdrNameOcc (tcdName decl), 
 	         ifTyVars = hsIfaceTvs (tcdTyVars decl), 
@@ -257,33 +247,69 @@ hsIfaceDecl (TyClD decl@(ClassDecl {}))
 		 ifSigs = [], 	-- Is this right??
 		 ifRec = NonRecursive, ifVrcs = [] }
 
-hsIfaceDecl decl = pprPanic "hsIfaceDecl" (ppr decl)
+hsIfaceDecl (TyClD decl@(TySynonym {}))
+  = IfaceSyn { ifName = rdrNameOcc (tcdName decl), 
+	       ifTyVars = hsIfaceTvs (tcdTyVars decl), 
+	       ifSynRhs = hsIfaceLType (tcdSynRhs decl), 
+	       ifVrcs = [] } 
 
-hsIfaceCons :: NewOrData -> [LConDecl RdrName] -> IfaceConDecls
-hsIfaceCons DataType []	-- data T a, meaning "constructors unspecified", 
-  = IfAbstractTyCon	-- not "no constructors"
+hsIfaceDecl (TyClD decl@(TyData {}))
+  = IfaceData { ifName = rdrNameOcc (tcdName decl), 
+	        ifTyVars = tvs,
+		ifCons = hsIfaceCons tvs decl,
+		ifRec = NonRecursive,
+		ifVrcs = [], ifGeneric = False }
+	-- I'm not sure that [] is right for ifVrcs, but
+	-- since we don't use them I'm not going to fiddle
+  where
+    tvs = hsIfaceTvs (tcdTyVars decl)
 
-hsIfaceCons DataType cons	-- data type
-  = IfDataTyCon (map (hsIfaceCon . unLoc) cons)
+hsIfaceDecl decl = pprPgmError "Illegal declaration in hi-boot file:" (ppr decl)
 
-hsIfaceCons NewType [con]	-- newtype
-  = IfNewTyCon (hsIfaceCon (unLoc con))
+hsIfaceCons :: [IfaceTvBndr] -> TyClDecl RdrName -> IfaceConDecls
+hsIfaceCons tvs decl@(TyData {tcdCtxt = L _ stupid_ctxt})
+  | not (null stupid_ctxt)	-- Keep it simple: no data type contexts
+				-- Else we'll have to do "thinning"; sigh
+  = pprPgmError "Can't do data type contexts in hi-boot file:" (ppr decl)
+
+hsIfaceCons tvs (TyData {tcdND = DataType, tcdCons = []})
+  =	-- data T a, meaning "constructors unspecified", 
+    IfAbstractTyCon		-- not "no constructors"
+
+hsIfaceCons tvs (TyData {tcdND = DataType, tcdCons = cons})
+  = IfDataTyCon Nothing (map (hsIfaceCon tvs . unLoc) cons)
+
+hsIfaceCons tvs (TyData {tcdND = NewType, tcdCons = [con]})
+  = IfNewTyCon (hsIfaceCon tvs (unLoc con))
+
+hsIfaceCons tvs decl = pprPgmError "Illegal declaration in hi-boot file:" (ppr decl)
 
 
-hsIfaceCon :: ConDecl RdrName -> IfaceConDecl
-hsIfaceCon (ConDecl lname ex_tvs ex_ctxt details)
-  = IfaceConDecl (get_occ lname) is_infix
-		 (hsIfaceTvs ex_tvs)
-		 (hsIfaceCtxt (unLoc ex_ctxt))
-		 (map (hsIfaceLType . getBangType       . unLoc) args)
-		 (map (hsStrictMark . getBangStrictness . unLoc) args)
-		 flds
+hsIfaceCon :: [IfaceTvBndr] -> ConDecl RdrName -> IfaceConDecl
+hsIfaceCon tvs (ConDecl lname ex_tvs ex_ctxt details)
+  | null ex_tvs && null (unLoc ex_ctxt)
+  = IfVanillaCon { ifConOcc = get_occ lname,
+		   ifConInfix = is_infix,
+		   ifConArgTys = map hsIfaceLType args,
+		   ifConStricts = map (hsStrictMark . getBangStrictness) args,
+		   ifConFields = flds }
+  | null flds
+  = IfGadtCon    { ifConOcc = get_occ lname,
+		   ifConTyVars = tvs ++ hsIfaceTvs ex_tvs,
+		   ifConCtxt = hsIfaceCtxt (unLoc ex_ctxt),
+		   ifConArgTys = map hsIfaceLType args,
+		   ifConResTys = map (IfaceTyVar . fst) tvs,
+		   ifConStricts = map (hsStrictMark . getBangStrictness) args }
+  | otherwise = pprPgmError "Fields illegal in existential" (ppr (unLoc lname))
   where
     (is_infix, args, flds) = case details of
 				PrefixCon args -> (False, args, [])
 				InfixCon a1 a2 -> (True, [a1,a2], [])
 				RecCon fs      -> (False, map snd fs, map (get_occ . fst) fs)
     get_occ lname = rdrNameOcc (unLoc lname)
+
+hsIfaceCon _tvs (GadtDecl lname con_ty)	-- Not yet
+  = pprPgmError "Can't use GADTs in hi-boot files (yet)" (ppr (unLoc lname))
 
 hsStrictMark :: HsBang -> StrictnessMark
 -- Warning: in source files the {-# UNPACK #-} pragma (HsUnbox) is a request
@@ -318,10 +344,11 @@ hsIfaceType (HsPArrTy t)       = IfaceTyConApp IfacePArrTc [hsIfaceLType t]
 hsIfaceType (HsTupleTy bx ts)  = IfaceTyConApp (IfaceTupTc bx (length ts)) (hsIfaceLTypes ts)
 hsIfaceType (HsOpTy t1 tc t2)  = hs_tc_app (HsTyVar (unLoc tc)) (hsIfaceLTypes [t1, t2])
 hsIfaceType (HsParTy t)	       = hsIfaceLType t
+hsIfaceType (HsBangTy _ t)     = hsIfaceLType t
 hsIfaceType (HsPredTy p)       = IfacePredTy (hsIfacePred p)
 hsIfaceType (HsKindSig t _)    = hsIfaceLType t
-hsIfaceType (HsNumTy n)	       = panic "hsIfaceType:HsNum"
-hsIfaceType (HsSpliceTy _)     = panic "hsIfaceType:HsSpliceTy"
+hsIfaceType ty		       = pprPanic "hsIfaceType" (ppr ty)
+				-- HsNumTy, HsSpliceTy
 
 -----------
 hsIfaceLTypes tys = map (hsIfaceType.unLoc) tys
@@ -347,6 +374,7 @@ hs_tc_app (HsTyVar n) args
 hs_tc_app ty args 	   = foldl IfaceAppTy (hsIfaceType ty) args
 
 -----------
+hsIfaceTvs :: [LHsTyVarBndr RdrName] -> [IfaceTvBndr]
 hsIfaceTvs tvs = map (hsIfaceTv.unLoc) tvs
 
 -----------
@@ -414,15 +442,16 @@ getMonoBind :: LHsBind RdrName -> [LHsDecl RdrName]
 --
 -- No AndMonoBinds or EmptyMonoBinds here; just single equations
 
-getMonoBind (L loc (FunBind lf@(L _ f) inf mtchs)) binds
+-- gaw 2004
+getMonoBind (L loc (FunBind lf@(L _ f) inf (MatchGroup mtchs _))) binds
   | has_args mtchs
   = go mtchs loc binds
   where
-    go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 mtchs2)) : binds)
+    go mtchs1 loc1 (L loc2 (ValD (FunBind f2 inf2 (MatchGroup mtchs2 _))) : binds)
 	| f == unLoc f2 = go (mtchs2++mtchs1) loc binds
 	where loc = combineSrcSpans loc1 loc2
     go mtchs1 loc binds
-	= (L loc (FunBind lf inf (reverse mtchs1)), binds)
+	= (L loc (FunBind lf inf (mkMatchGroup (reverse mtchs1))), binds)
 	-- reverse the final matches, to get it back in the right order
 
 getMonoBind bind binds = (bind, binds)
@@ -520,7 +549,7 @@ mkPrefixCon :: LHsType RdrName -> [LBangType RdrName]
 mkPrefixCon ty tys
  = split ty tys
  where
-   split (L _ (HsAppTy t u)) ts = split t (unbangedType u : ts)
+   split (L _ (HsAppTy t u)) ts = split t (u : ts)
    split (L l (HsTyVar tc))  ts = do data_con <- tyConToDataCon l tc
 				     return (data_con, PrefixCon ts)
    split (L l _) _ 		= parseError l "parse error in data/newtype declaration"
@@ -772,13 +801,12 @@ checkValDef lhs opt_sig (L rhs_span grhss)
 					showRdrName (unLoc f))
 	else do ps <- checkPatterns es
 		let match_span = combineSrcSpans (getLoc lhs) rhs_span
-		return (FunBind f inf [L match_span (Match ps opt_sig grhss)])
-	-- the span of the match covers the entire equation.  That isn't
-	-- quite right, but it'll do for now.
+		return (FunBind f inf (mkMatchGroup [L match_span (Match ps opt_sig grhss)]))
+	-- The span of the match covers the entire equation.  
+	-- That isn't quite right, but it'll do for now.
   | otherwise = do
 	lhs <- checkPattern lhs
-	return (PatBind lhs grhss)
-	
+	return (PatBind lhs grhss placeHolderType)
 
 checkValSig
 	:: LHsExpr RdrName

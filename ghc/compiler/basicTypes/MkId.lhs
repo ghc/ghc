@@ -52,22 +52,22 @@ import TcType		( Type, ThetaType, mkDictTy, mkPredTys, mkTyConApp,
 			)
 import CoreUtils	( exprType )
 import CoreUnfold 	( mkTopUnfolding, mkCompulsoryUnfolding, mkOtherCon )
-import Literal		( Literal(..), nullAddrLit )
+import Literal		( nullAddrLit, mkStringLit )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
-                          tyConTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
-import Class		( Class, classTyCon, classTyVars, classSelIds )
+                          tyConStupidTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
+import Class		( Class, classTyCon, classSelIds )
 import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet )
 import Name		( mkFCallName, mkWiredInName, Name, BuiltInSyntax(..) )
 import OccName		( mkOccFS, varName )
 import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
-import DataCon		( DataCon, DataConIds(..),
+import DataCon		( DataCon, DataConIds(..), dataConTyVars,
 			  dataConFieldLabels, dataConRepArity, 
-			  dataConArgTys, dataConRepType, 
-			  dataConOrigArgTys, dataConTheta,
+			  dataConRepArgTys, dataConRepType, 
+			  dataConStupidTheta, dataConOrigArgTys,
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
-			  splitProductType
+			  splitProductType, isVanillaDataCon
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal, 
 			  mkTemplateLocals, mkTemplateLocalsNum, mkExportedLocalId,
@@ -81,9 +81,6 @@ import IdInfo		( IdInfo, noCafIdInfo,  setUnfoldingInfo,
 import NewDemand	( mkStrictSig, DmdResult(..),
 			  mkTopDmdType, topDmd, evalDmd, lazyDmd, retCPR,
 			  Demand(..), Demands(..) )
-import FieldLabel	( fieldLabelName, firstFieldLabelTag, 
-			  allFieldLabelTags, fieldLabelType
-			)
 import DmdAnal		( dmdAnalTopRhs )
 import CoreSyn
 import Unique		( mkBuiltinUnique, mkPrimOpIdUnique )
@@ -94,7 +91,6 @@ import Util             ( dropList, isSingleton )
 import Outputable
 import FastString
 import ListSetOps	( assoc, assocMaybe )
-import UnicodeUtil      ( stringToUtf8 )
 import List		( nubBy )
 \end{code}		
 
@@ -200,14 +196,13 @@ mkDataConIds wrap_name wkr_name data_con
   | otherwise					-- Algebraic, no wrapper
   = AlgDC Nothing wrk_id
   where
-    (tyvars, _, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
-    all_tyvars = tyvars ++ ex_tyvars
+    (tyvars, theta, orig_arg_tys, tycon, res_tys) = dataConSig data_con
 
-    ex_dict_tys  = mkPredTys ex_theta
-    all_arg_tys  = ex_dict_tys ++ orig_arg_tys
-    result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
+    dict_tys    = mkPredTys theta
+    all_arg_tys = dict_tys ++ orig_arg_tys
+    result_ty   = mkTyConApp tycon res_tys
 
-    wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
+    wrap_ty = mkForAllTys tyvars (mkFunTys all_arg_tys result_ty)
 	-- We used to include the stupid theta in the wrapper's args
 	-- but now we don't.  Instead the type checker just injects these
 	-- extra constraints where necessary.
@@ -251,8 +246,8 @@ mkDataConIds wrap_name wkr_name data_con
     nt_wrap_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
 		  `setArityInfo` 1	-- Arity 1
 		  `setUnfoldingInfo`     newtype_unf
-    newtype_unf  = ASSERT( null ex_tyvars && null ex_theta && 
-			  isSingleton orig_arg_tys )
+    newtype_unf  = ASSERT( isVanillaDataCon data_con &&
+			   isSingleton orig_arg_tys )
 	  	   -- No existentials on a newtype, but it can have a context
 	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
 	  	   mkTopUnfolding $ Note InlineMe $
@@ -285,18 +280,18 @@ mkDataConIds wrap_name wkr_name data_con
 	-- we want to see that w is strict in its two arguments
 
     alg_unf = mkTopUnfolding $ Note InlineMe $
-	      mkLams all_tyvars $ 
-	      mkLams ex_dict_args $ mkLams id_args $
+	      mkLams tyvars $ 
+	      mkLams dict_args $ mkLams id_args $
 	      foldr mk_case con_app 
-		    (zip (ex_dict_args ++ id_args) all_strict_marks)
+		    (zip (dict_args ++ id_args) all_strict_marks)
 		    i3 []
 
     con_app i rep_ids = mkApps (Var wrk_id)
-			       (map varToCoreExpr (all_tyvars ++ reverse rep_ids))
+			       (map varToCoreExpr (tyvars ++ reverse rep_ids))
 
-    (ex_dict_args,i2)  = mkLocals 1  ex_dict_tys
-    (id_args,i3)       = mkLocals i2 orig_arg_tys
-    alg_arity	       = i3-1
+    (dict_args,i2) = mkLocals 1  dict_tys
+    (id_args,i3)   = mkLocals i2 orig_arg_tys
+    alg_arity	   = i3-1
 
     mk_case 
 	   :: (Id, StrictnessMark)	-- Arg, strictness
@@ -310,12 +305,14 @@ mkDataConIds wrap_name wkr_name data_con
 		MarkedStrict 
 		   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
 		   | otherwise ->
-			Case (Var arg) arg [(DEFAULT,[], body i (arg:rep_args))]
+-- gaw 2004
+			Case (Var arg) arg result_ty [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
 		   -> case splitProductType "do_unbox" (idType arg) of
 			   (tycon, tycon_args, con, tys) ->
-				   Case (Var arg) arg [(DataAlt con, con_args,
+-- gaw 2004
+				   Case (Var arg) arg result_ty  [(DataAlt con, con_args,
 					body i' (reverse con_args ++ rep_args))]
 			      where 
 				(con_args, i') = mkLocals i tys
@@ -382,12 +379,11 @@ Similarly for (recursive) newtypes
 	unN = /\b -> \n:N -> (coerce (forall a. a->a) n)
 
 \begin{code}
-mkRecordSelId tycon field_label
+mkRecordSelId tycon field_label field_ty
 	-- Assumes that all fields with the same field label have the same type
   = sel_id
   where
-    sel_id     = mkGlobalId (RecordSelId field_label) (fieldLabelName field_label) selector_ty info
-    field_ty   = fieldLabelType field_label
+    sel_id     = mkGlobalId (RecordSelId tycon field_label) field_label selector_ty info
     data_cons  = tyConDataCons tycon
     tyvars     = tyConTyVars tycon	-- These scope over the types in 
 					-- the FieldLabels of constructors of this type
@@ -405,9 +401,7 @@ mkRecordSelId tycon field_label
 	--
 	-- NB: this code relies on the fact that DataCons are quantified over
 	-- the identical type variables as their parent TyCon
-    tycon_theta	 = tyConTheta tycon	-- The context on the data decl
-					--   eg data (Eq a, Ord b) => T a b = ...
-    needed_preds = [pred | (DataAlt dc, _, _) <- the_alts, pred <- dataConTheta dc]
+    needed_preds = [pred | (DataAlt dc, _, _) <- the_alts, pred <- dataConStupidTheta dc]
     dict_tys     = map mkPredTy (nubBy tcEqPred needed_preds)
     n_dict_tys   = length dict_tys
 
@@ -447,16 +441,17 @@ mkRecordSelId tycon field_label
 	   `setAllStrictnessInfo` Just strict_sig
 
 	-- Allocate Ids.  We do it a funny way round because field_dict_tys is
-	-- almost always empty.  Also note that we use length_tycon_theta
+	-- almost always empty.  Also note that we use max_dict_tys
  	-- rather than n_dict_tys, because the latter gives an infinite loop:
 	-- n_dict tys depends on the_alts, which depens on arg_ids, which depends
 	-- on arity, which depends on n_dict tys.  Sigh!  Mega sigh!
-    field_dict_base    = length tycon_theta + 1
-    dict_id_base       = field_dict_base + n_field_dict_tys
-    field_base	       = dict_id_base + 1
-    dict_ids	       = mkTemplateLocalsNum  1		      dict_tys
-    field_dict_ids     = mkTemplateLocalsNum  field_dict_base field_dict_tys
-    data_id	       = mkTemplateLocal      dict_id_base    data_ty
+    dict_ids	    = mkTemplateLocalsNum  1		   dict_tys
+    max_dict_tys    = length (tyConStupidTheta tycon)
+    field_dict_base = max_dict_tys + 1
+    field_dict_ids  = mkTemplateLocalsNum  field_dict_base field_dict_tys
+    dict_id_base    = field_dict_base + n_field_dict_tys
+    data_id	    = mkTemplateLocal      dict_id_base    data_ty
+    arg_base	    = dict_id_base + 1
 
     alts      = map mk_maybe_alt data_cons
     the_alts  = catMaybes alts
@@ -474,7 +469,7 @@ mkRecordSelId tycon field_label
 	      Lam data_id     $ sel_body
 
     sel_body | isNewTyCon tycon = mk_result (mkNewTypeBody tycon field_ty (Var data_id))
-	     | otherwise	= Case (Var data_id) data_id (default_alt ++ the_alts)
+	     | otherwise	= Case (Var data_id) data_id field_tau (default_alt ++ the_alts)
 
     mk_result poly_result = mkVarApps (mkVarApps poly_result field_tyvars) field_dict_ids
 	-- We pull the field lambdas to the top, so we need to 
@@ -487,18 +482,17 @@ mkRecordSelId tycon field_label
     mk_maybe_alt data_con 
 	= case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con arg_ids body)
-				where
-			    	   body = mk_result (Var the_arg_id)
+		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con arg_ids $
+			    	         mk_result (Var the_arg_id))
 	where
-            arg_ids = mkTemplateLocalsNum field_base (dataConOrigArgTys data_con)
-			-- No need to instantiate; same tyvars in datacon as tycon
-			-- Records can't be existential, so no existential tyvars or dicts
+            arg_ids = ASSERT( isVanillaDataCon data_con )
+		      mkTemplateLocalsNum arg_base (dataConOrigArgTys data_con)
+		-- Records can't be existential, so no existential tyvars or dicts
+		-- Vanilla data con => tycon's tyvars will do
 
-	    unpack_base = field_base + length arg_ids
+	    unpack_base = arg_base + length arg_ids
 	    uniqs = map mkBuiltinUnique [unpack_base..]
 
-				-- arity+1 avoids all shadowing
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
 
@@ -602,8 +596,6 @@ mkDictSelId name clas
 	-- But it's type must expose the representation of the dictionary
 	-- to gat (say)		C a -> (a -> a)
 
-    tag  = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` allFieldLabelTags) name
-
     info = noCafIdInfo
 		`setArityInfo`	    	1
 		`setUnfoldingInfo`  	mkTopUnfolding rhs
@@ -621,21 +613,19 @@ mkDictSelId name clas
 	    | otherwise	       = Eval (Prod [ if the_arg_id == id then evalDmd else Abs
 					    | id <- arg_ids ])
 
-    tyvars  = classTyVars clas
-
     tycon      = classTyCon clas
     [data_con] = tyConDataCons tycon
-    tyvar_tys  = mkTyVarTys tyvars
-    arg_tys    = dataConArgTys data_con tyvar_tys
-    the_arg_id = arg_ids !! (tag - firstFieldLabelTag)
+    tyvars     = dataConTyVars data_con
+    arg_tys    = dataConRepArgTys data_con
+    the_arg_id = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` arg_ids) name
 
-    pred	      = mkClassPred clas tyvar_tys
+    pred	      = mkClassPred clas (mkTyVarTys tyvars)
     (dict_id:arg_ids) = mkTemplateLocals (mkPredTy pred : arg_tys)
 
     rhs | isNewTyCon tycon = mkLams tyvars $ Lam dict_id $ 
 			     mkNewTypeBody tycon (head arg_tys) (Var dict_id)
 	| otherwise	   = mkLams tyvars $ Lam dict_id $
-			     Case (Var dict_id) dict_id
+			     Case (Var dict_id) dict_id (idType the_arg_id)
 			     	  [(DataAlt data_con, arg_ids, Var the_arg_id)]
 
 mkNewTypeBody tycon result_ty result_expr
@@ -760,7 +750,7 @@ mkDictFunId dfun_name inst_tyvars dfun_theta clas inst_tys
 
     (class_tyvars, sc_theta, _, _) = classBigSig clas
     not_const (clas, tys) = not (isEmptyVarSet (tyVarsOfTypes tys))
-    sc_theta' = substClasses (mkTopTyVarSubst class_tyvars inst_tys) sc_theta
+    sc_theta' = substClasses (zipTopTvSubst class_tyvars inst_tys) sc_theta
     dfun_theta = case inst_decl_theta of
 		   []    -> []	-- If inst_decl_theta is empty, then we don't
 				-- want to have any dict arguments, so that we can
@@ -860,7 +850,8 @@ seqId
     ty  = mkForAllTys [alphaTyVar,openBetaTyVar]
 		      (mkFunTy alphaTy (mkFunTy openBetaTy openBetaTy))
     [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
-    rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x [(DEFAULT, [], Var y)])
+-- gaw 2004
+    rhs = mkLams [alphaTyVar,openBetaTyVar,x,y] (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
 
 -- lazy :: forall a?. a? -> a?	 (i.e. works for unboxed types too)
 -- Used to lazify pseq:		pseq a b = a `seq` lazy b
@@ -936,7 +927,7 @@ mkRuntimeErrorApp
 mkRuntimeErrorApp err_id res_ty err_msg 
   = mkApps (Var err_id) [Type res_ty, err_string]
   where
-    err_string = Lit (MachStr (mkFastString (stringToUtf8 err_msg)))
+    err_string = Lit (mkStringLit err_msg)
 
 rEC_SEL_ERROR_ID		= mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID	 	= mkRuntimeErrorId runtimeErrorName

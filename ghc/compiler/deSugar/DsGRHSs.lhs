@@ -14,8 +14,8 @@ import {-# SOURCE #-} Match   ( matchSinglePat )
 import HsSyn		( Stmt(..), HsExpr(..), GRHSs(..), GRHS(..), 
 			  HsMatchContext(..), Pat(..) )
 import CoreSyn		( CoreExpr )
-import Type		( Type )
 import Var		( Id )
+import Type		( Type )
 
 import DsMonad
 import DsUtils
@@ -39,11 +39,11 @@ producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
 
 \begin{code}
-dsGuarded :: GRHSs Id -> DsM CoreExpr
+dsGuarded :: GRHSs Id -> Type -> DsM CoreExpr
 
-dsGuarded grhss
-  = dsGRHSs PatBindRhs [] grhss 				`thenDs` \ (err_ty, match_result) ->
-    mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID err_ty ""	`thenDs` \ error_expr ->
+dsGuarded grhss rhs_ty
+  = dsGRHSs PatBindRhs [] grhss rhs_ty 				`thenDs` \ match_result ->
+    mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty ""	`thenDs` \ error_expr ->
     extractMatchResult match_result error_expr
 \end{code}
 
@@ -52,19 +52,20 @@ In contrast, @dsGRHSs@ produces a @MatchResult@.
 \begin{code}
 dsGRHSs :: HsMatchContext Name -> [Pat Id]	-- These are to build a MatchContext from
 	-> GRHSs Id				-- Guarded RHSs
-	-> DsM (Type, MatchResult)
+	-> Type					-- Type of RHS
+	-> DsM MatchResult
 
-dsGRHSs kind pats (GRHSs grhss binds ty)
-  = mappM (dsGRHS kind pats) grhss		`thenDs` \ match_results ->
+dsGRHSs kind pats (GRHSs grhss binds) rhs_ty
+  = mappM (dsGRHS kind pats rhs_ty) grhss	`thenDs` \ match_results ->
     let 
 	match_result1 = foldr1 combineMatchResults match_results
 	match_result2 = adjustMatchResultDs (dsLet binds) match_result1
 		-- NB: nested dsLet inside matchResult
     in
-    returnDs (ty, match_result2)
+    returnDs match_result2
 
-dsGRHS kind pats (L loc (GRHS guard))
-  = matchGuard (map unLoc guard) (DsMatchContext kind pats loc)
+dsGRHS kind pats rhs_ty (L loc (GRHS guard))
+  = matchGuard (map unLoc guard) (DsMatchContext kind pats loc) rhs_ty
 \end{code}
 
 
@@ -76,39 +77,43 @@ dsGRHS kind pats (L loc (GRHS guard))
 
 \begin{code}
 matchGuard :: [Stmt Id] 	-- Guard
-           -> DsMatchContext            -- Context
+           -> DsMatchContext	-- Context
+	   -> Type		-- Type of RHS of guard
 	   -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what an ExprStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)	
 
-matchGuard [ResultStmt expr] ctx 
-  = dsLExpr expr 	`thenDs` \ core_expr ->
-    returnDs (cantFailMatchResult core_expr)
+matchGuard [ResultStmt expr] ctx rhs_ty
+  = do	{ core_expr <- dsLExpr expr
+	; return (cantFailMatchResult core_expr) }
 
 	-- ExprStmts must be guards
 	-- Turn an "otherwise" guard is a no-op
-matchGuard (ExprStmt (L _ (HsVar v)) _ : stmts) ctx
+matchGuard (ExprStmt (L _ (HsVar v)) _ : stmts) ctx rhs_ty
   |  v `hasKey` otherwiseIdKey
   || v `hasKey` getUnique trueDataConId	
 	-- trueDataConId doesn't have the same 
 	-- unique as trueDataCon
-  = matchGuard stmts ctx
+  = matchGuard stmts ctx rhs_ty
 
-matchGuard (ExprStmt expr _ : stmts) ctx
-  = matchGuard stmts ctx 	`thenDs` \ match_result ->
+matchGuard (ExprStmt expr _ : stmts) ctx rhs_ty
+  = matchGuard stmts ctx rhs_ty	`thenDs` \ match_result ->
     dsLExpr expr		`thenDs` \ pred_expr ->
     returnDs (mkGuardedMatchResult pred_expr match_result)
 
-matchGuard (LetStmt binds : stmts) ctx
-  = matchGuard stmts ctx 	`thenDs` \ match_result ->
+matchGuard (LetStmt binds : stmts) ctx rhs_ty
+  = matchGuard stmts ctx rhs_ty	`thenDs` \ match_result ->
     returnDs (adjustMatchResultDs (dsLet binds) match_result)
 	-- NB the dsLet occurs inside the match_result
+	-- Reason: dsLet takes the body expression as its argument
+	--	   so we can't desugar the bindings without the
+	--	   body expression in hand
 
-matchGuard (BindStmt pat rhs : stmts) ctx
-  = matchGuard stmts ctx 		`thenDs` \ match_result ->
-    dsLExpr rhs				`thenDs` \ core_rhs ->
-    matchSinglePat core_rhs ctx pat match_result
+matchGuard (BindStmt pat bind_rhs : stmts) ctx rhs_ty
+  = matchGuard stmts ctx rhs_ty	`thenDs` \ match_result ->
+    dsLExpr bind_rhs		`thenDs` \ core_rhs ->
+    matchSinglePat core_rhs ctx pat rhs_ty match_result
 \end{code}
 
 Should {\em fail} if @e@ returns @D@

@@ -7,41 +7,129 @@
 module VarEnv (
 	VarEnv, IdEnv, TyVarEnv,
 	emptyVarEnv, unitVarEnv, mkVarEnv,
-	elemVarEnv, rngVarEnv,
+	elemVarEnv, varEnvElts,
 	extendVarEnv, extendVarEnv_C, extendVarEnvList,
 	plusVarEnv, plusVarEnv_C,
 	delVarEnvList, delVarEnv,
 	lookupVarEnv, lookupVarEnv_NF, lookupWithDefaultVarEnv,
 	mapVarEnv, zipVarEnv,
 	modifyVarEnv, modifyVarEnv_Directly,
-	isEmptyVarEnv, foldVarEnv,
+	isEmptyVarEnv, foldVarEnv, 
+	lookupVarEnv_Directly,
+	filterVarEnv_Directly,
+
+	-- InScopeSet
+	InScopeSet, emptyInScopeSet, mkInScopeSet, delInScopeSet,
+	extendInScopeSet, extendInScopeSetList, modifyInScopeSet,
+	getInScopeVars, lookupInScope, elemInScopeSet, uniqAway, 
 
 	-- TidyEnvs
-	TidyEnv, emptyTidyEnv,
-
-	-- SubstEnvs
-	SubstEnv, TyVarSubstEnv, SubstResult(..),
-	emptySubstEnv, substEnvEnv, elemSubstEnv,
-	mkSubstEnv, lookupSubstEnv, extendSubstEnv, extendSubstEnvList,
-	delSubstEnv, delSubstEnvList, noTypeSubst, isEmptySubstEnv
+	TidyEnv, emptyTidyEnv
     ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	CoreSyn( CoreExpr )
-import {-# SOURCE #-}	TypeRep( Type )
-
-import BasicTypes ( OccInfo )
 import OccName	  ( TidyOccEnv, emptyTidyOccEnv )
-import Var	  ( Var, Id )
+import Var	  ( Var, setVarUnique )
+import VarSet
 import UniqFM  
+import Unique	  ( Unique, deriveUnique, getUnique )
 import Util	  ( zipEqual )
+import CmdLineOpts	( opt_PprStyle_Debug )
+import Outputable
+import FastTypes
 \end{code}
 
 
 %************************************************************************
 %*									*
-\subsection{Tidying}
+		In-scope sets
+%*									*
+%************************************************************************
+
+\begin{code}
+data InScopeSet = InScope (VarEnv Var) FastInt
+	-- The Int# is a kind of hash-value used by uniqAway
+	-- For example, it might be the size of the set
+	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
+
+instance Outputable InScopeSet where
+  ppr (InScope s i) = ptext SLIT("InScope") <+> ppr s
+
+emptyInScopeSet :: InScopeSet
+emptyInScopeSet = InScope emptyVarSet 1#
+
+getInScopeVars ::  InScopeSet -> VarEnv Var
+getInScopeVars (InScope vs _) = vs
+
+mkInScopeSet :: VarEnv Var -> InScopeSet
+mkInScopeSet in_scope = InScope in_scope 1#
+
+extendInScopeSet :: InScopeSet -> Var -> InScopeSet
+extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# 1#)
+
+extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
+extendInScopeSetList (InScope in_scope n) vs
+   = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
+		    (n +# iUnbox (length vs))
+
+modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
+-- Exploit the fact that the in-scope "set" is really a map
+-- 	Make old_v map to new_v
+modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_scope old_v new_v) (n +# 1#)
+
+delInScopeSet :: InScopeSet -> Var -> InScopeSet
+delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
+
+elemInScopeSet :: Var -> InScopeSet -> Bool
+elemInScopeSet v (InScope in_scope n) = v `elemVarEnv` in_scope
+
+lookupInScope :: InScopeSet -> Var -> Maybe Var
+-- It's important to look for a fixed point
+-- When we see (case x of y { I# v -> ... })
+-- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder).
+-- When we lookup up an occurrence of x, we map to y, but then
+-- we want to look up y in case it has acquired more evaluation information by now.
+lookupInScope (InScope in_scope n) v 
+  = go v
+  where
+    go v = case lookupVarEnv in_scope v of
+		Just v' | v == v'   -> Just v'	-- Reached a fixed point
+			| otherwise -> go v'
+		Nothing		    -> Nothing
+\end{code}
+
+\begin{code}
+uniqAway :: InScopeSet -> Var -> Var
+-- (uniqAway in_scope v) finds a unique that is not used in the
+-- in-scope set, and gives that to v.  It starts with v's current unique, of course,
+-- in the hope that it won't have to change it, and thereafter uses a combination
+-- of that and the hash-code found in the in-scope set
+uniqAway (InScope set n) var
+  | not (var `elemVarSet` set) = var				-- Nothing to do
+  | otherwise		       = try 1#
+  where
+    orig_unique = getUnique var
+    try k 
+#ifdef DEBUG
+	  | k ># 1000#
+	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
+#endif			    
+	  | uniq `elemVarSetByKey` set = try (k +# 1#)
+#ifdef DEBUG
+	  | opt_PprStyle_Debug && k ># 3#
+	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
+	    setVarUnique var uniq
+#endif			    
+	  | otherwise = setVarUnique var uniq
+	  where
+	    uniq = deriveUnique orig_unique (iBox (n *# k))
+\end{code}
+
+
+%************************************************************************
+%*									*
+		Tidying
 %*									*
 %************************************************************************
 
@@ -53,66 +141,6 @@ type TidyEnv = (TidyOccEnv, VarEnv Var)
 
 emptyTidyEnv :: TidyEnv
 emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{Substitution environments}
-%*									*
-%************************************************************************
-
-\begin{code}
-
-noTys :: SubstResult -> Bool -> Bool
-noTys (DoneTy ty) no_tys = False
-noTys other	  no_tys = no_tys
-
-data SubstEnv      = SE (VarEnv SubstResult)
-			Bool		-- True => definitely no type substitutions in the env
-
-noTypeSubst :: SubstEnv -> Bool
-noTypeSubst (SE _ nt) = nt
-
-substEnvEnv :: SubstEnv -> VarEnv SubstResult
-substEnvEnv (SE env _) = env
-
-type TyVarSubstEnv = SubstEnv	-- of the form (DoneTy ty) *only*
-
-data SubstResult
-  = DoneEx CoreExpr		-- Completed term
-  | DoneId Id OccInfo		-- Completed term variable, with occurrence info; only 
-				-- used by the simplifier
-  | DoneTy Type			-- Completed type
-  | ContEx SubstEnv CoreExpr  	-- A suspended substitution
-
-emptySubstEnv :: SubstEnv
-emptySubstEnv = SE emptyVarEnv True
-
-isEmptySubstEnv :: SubstEnv -> Bool
-isEmptySubstEnv (SE s _) = isEmptyVarEnv s
-
-lookupSubstEnv :: SubstEnv -> Var -> Maybe SubstResult
-lookupSubstEnv (SE s _) v = lookupVarEnv s v
-
-elemSubstEnv :: Var -> SubstEnv -> Bool
-elemSubstEnv v (SE s _) = elemVarEnv v s
-
-extendSubstEnv :: SubstEnv -> Var -> SubstResult -> SubstEnv
-extendSubstEnv (SE s nt) v r = SE (extendVarEnv s v r) (noTys r nt)
-
-mkSubstEnv :: [Var] -> [SubstResult] -> SubstEnv
-mkSubstEnv bs vs = extendSubstEnvList emptySubstEnv bs vs
-
-extendSubstEnvList :: SubstEnv -> [Var] -> [SubstResult] -> SubstEnv
-extendSubstEnvList env	       []     []     = env
-extendSubstEnvList (SE env nt) (b:bs) (r:rs) = extendSubstEnvList (SE (extendVarEnv env b r) (noTys r nt)) bs rs
-
-delSubstEnv :: SubstEnv -> Var -> SubstEnv
-delSubstEnv (SE s nt) v = SE (delVarEnv s v) nt
-
-delSubstEnvList :: SubstEnv -> [Var] -> SubstEnv
-delSubstEnvList (SE s nt) vs = SE (delVarEnvList s vs) nt
 \end{code}
 
 
@@ -136,12 +164,14 @@ extendVarEnv_C	  :: (a->a->a) -> VarEnv a -> Var -> a -> VarEnv a
 plusVarEnv	  :: VarEnv a -> VarEnv a -> VarEnv a
 extendVarEnvList  :: VarEnv a -> [(Var, a)] -> VarEnv a
 		  
+lookupVarEnv_Directly :: VarEnv a -> Unique -> Maybe a
+filterVarEnv_Directly :: (Unique -> a -> Bool) -> VarEnv a -> VarEnv a
 delVarEnvList     :: VarEnv a -> [Var] -> VarEnv a
 delVarEnv	  :: VarEnv a -> Var -> VarEnv a
 plusVarEnv_C	  :: (a -> a -> a) -> VarEnv a -> VarEnv a -> VarEnv a
 mapVarEnv	  :: (a -> b) -> VarEnv a -> VarEnv b
 modifyVarEnv	  :: (a -> a) -> VarEnv a -> Var -> VarEnv a
-rngVarEnv	  :: VarEnv a -> [a]
+varEnvElts	  :: VarEnv a -> [a]
 		  
 isEmptyVarEnv	  :: VarEnv a -> Bool
 lookupVarEnv	  :: VarEnv a -> Var -> Maybe a
@@ -165,10 +195,12 @@ lookupWithDefaultVarEnv = lookupWithDefaultUFM
 mapVarEnv	 = mapUFM
 mkVarEnv	 = listToUFM
 emptyVarEnv	 = emptyUFM
-rngVarEnv	 = eltsUFM
+varEnvElts	 = eltsUFM
 unitVarEnv	 = unitUFM
 isEmptyVarEnv	 = isNullUFM
 foldVarEnv	 = foldUFM
+lookupVarEnv_Directly = lookupUFM_Directly
+filterVarEnv_Directly = filterUFM_Directly
 
 zipVarEnv tyvars tys       = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
 lookupVarEnv_NF env id     = case (lookupVarEnv env id) of { Just xx -> xx }

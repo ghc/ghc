@@ -330,10 +330,11 @@ floatExpr lvl (Let bind body)
   where
     bind_lvl = getBindLevel bind
 
-floatExpr lvl (Case scrut (TB case_bndr case_lvl) alts)
+-- gaw 2004
+floatExpr lvl (Case scrut (TB case_bndr case_lvl) ty alts)
   = case floatExpr lvl scrut	of { (fse, fde, scrut') ->
     case floatList float_alt alts	of { (fsa, fda, alts')  ->
-    (add_stats fse fsa, fda ++ fde, Case scrut' case_bndr alts')
+    (add_stats fse fsa, fda ++ fde, Case scrut' case_bndr ty alts')
     }}
   where
 	-- Use floatRhs for the alternatives, so that we

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverMkDepend.hs,v 1.32 2004/06/24 09:41:11 simonmar Exp $
+-- $Id: DriverMkDepend.hs,v 1.33 2004/09/30 10:37:10 simonpj Exp $
 --
 -- GHC Driver
 --

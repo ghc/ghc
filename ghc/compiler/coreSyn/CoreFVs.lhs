@@ -127,8 +127,10 @@ expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
 
-expr_fvs (Case scrut bndr alts)
-  = expr_fvs scrut `union` addBndr bndr (foldr (union . alt_fvs) noVars alts)
+-- gaw 2004
+expr_fvs (Case scrut bndr ty alts)
+  = expr_fvs scrut `union` someVars (tyVarsOfType ty) `union` addBndr bndr  
+      (foldr (union . alt_fvs) noVars alts)
   where
     alt_fvs (con, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
 
@@ -179,8 +181,10 @@ exprFreeNames (Let (Rec prs) e) = (exprsFreeNames rs `unionNameSets` exprFreeNam
 				where
 				  (bs, rs) = unzip prs
 
-exprFreeNames (Case e b as) = exprFreeNames e `unionNameSets` 
-			      (unionManyNameSets (map altFreeNames as) `delFromNameSet` varName b)
+-- gaw 2004
+exprFreeNames (Case e b ty as) = exprFreeNames e `unionNameSets` tyClsNamesOfType ty 
+                                 `unionNameSets`
+			         (unionManyNameSets (map altFreeNames as) `delFromNameSet` varName b)
 
 -- Helpers
 altFreeNames (_,bs,r) = exprFreeNames r `del_binders` bs
@@ -321,9 +325,10 @@ freeVars (App fun arg)
     fun2 = freeVars fun
     arg2 = freeVars arg
 
-freeVars (Case scrut bndr alts)
-  = ((bndr `delBinderFV` alts_fvs) `unionFVs` freeVarsOf scrut2,
-     AnnCase scrut2 bndr alts2)
+freeVars (Case scrut bndr ty alts)
+-- gaw 2004
+  = ((bndr `delBinderFV` alts_fvs) `unionFVs` freeVarsOf scrut2 `unionFVs` tyVarsOfType ty,
+     AnnCase scrut2 bndr ty alts2)
   where
     scrut2 = freeVars scrut
 

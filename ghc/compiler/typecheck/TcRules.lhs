@@ -8,14 +8,14 @@ module TcRules ( tcRules ) where
 
 #include "HsVersions.h"
 
-import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), collectRuleBndrSigTys, mkHsLet )
+import HsSyn		( RuleDecl(..), LRuleDecl, RuleBndr(..), mkHsLet )
 import TcRnMonad
 import TcSimplify	( tcSimplifyToDicts, tcSimplifyInferCheck )
-import TcMType		( newTyVarTy )
+import TcMType		( newTyFlexiVarTy, zonkQuantifiedTyVar )
 import TcType		( tyVarsOfTypes, openTypeKind )
-import TcHsType		( tcHsSigType, UserTypeCtxt(..), tcAddScopedTyVars )
+import TcHsType		( UserTypeCtxt(..), tcHsPatSigType )
 import TcExpr		( tcCheckRho )
-import TcEnv		( tcExtendLocalValEnv )
+import TcEnv		( tcExtendIdEnv, tcExtendTyVarEnv )
 import Inst		( instToId )
 import Id		( idType, mkLocalId )
 import Name		( Name )
@@ -32,19 +32,13 @@ tcRule (HsRule name act vars lhs rhs)
   = addErrCtxt (ruleCtxt name)			$
     traceTc (ptext SLIT("---- Rule ------")
 		 <+> ppr name)			`thenM_` 
-    newTyVarTy openTypeKind			`thenM` \ rule_ty ->
+    newTyFlexiVarTy openTypeKind		`thenM` \ rule_ty ->
 
 	-- Deal with the tyvars mentioned in signatures
-    tcAddScopedTyVars (collectRuleBndrSigTys vars) (
-
-		-- Ditto forall'd variables
-	mappM new_id vars			`thenM` \ ids ->
-	tcExtendLocalValEnv ids			$
-	
+    tcRuleBndrs vars (\ ids ->
 		-- Now LHS and RHS
 	getLIE (tcCheckRho lhs rule_ty)	`thenM` \ (lhs', lhs_lie) ->
 	getLIE (tcCheckRho rhs rule_ty)	`thenM` \ (rhs', rhs_lie) ->
-	
 	returnM (ids, lhs', rhs', lhs_lie, rhs_lie)
     )				`thenM` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
 
@@ -85,18 +79,27 @@ tcRule (HsRule name act vars lhs rhs)
     tcSimplifyInferCheck (text "tcRule")
 			 forall_tvs
 			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
+    mappM zonkQuantifiedTyVar forall_tvs1 	`thenM` \ forall_tvs2 ->
+	-- This zonk is exactly the same as the one in TcBinds.tcBindWithSigs
 
     returnM (HsRule name act
-		    (map (RuleBndr . noLoc) (forall_tvs1 ++ tpl_ids))	-- yuk
+		    (map (RuleBndr . noLoc) (forall_tvs2 ++ tpl_ids))	-- yuk
 		    (mkHsLet lhs_binds lhs')
 		    (mkHsLet rhs_binds rhs'))
   where
-    new_id (RuleBndr var) 	   = newTyVarTy openTypeKind			`thenM` \ ty ->
-		          	     returnM (mkLocalId (unLoc var) ty)
-    new_id (RuleBndrSig var rn_ty) = tcHsSigType (RuleSigCtxt nl_var) rn_ty	`thenM` \ ty ->
-				     returnM (mkLocalId nl_var ty)
-				   where
-				     nl_var = unLoc var
+
+tcRuleBndrs [] thing_inside = thing_inside []
+tcRuleBndrs (RuleBndr var : vars) thing_inside
+  = do 	{ ty <- newTyFlexiVarTy openTypeKind
+	; let id = mkLocalId (unLoc var) ty
+	; tcExtendIdEnv [id] $
+	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
+tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
+  = do	{ (tyvars, ty) <- tcHsPatSigType (RuleSigCtxt (unLoc var)) rn_ty
+	; let id = mkLocalId (unLoc var) ty
+	; tcExtendTyVarEnv tyvars $
+	  tcExtendIdEnv [id] $
+	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
 
 ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)

@@ -13,28 +13,28 @@ import TcBinds		( tcSpecSigs )
 import TcClassDcl	( tcMethodBind, mkMethodBind, badMethodErr, 
 			  tcClassDecl2, getGenericInstances )
 import TcRnMonad       
-import TcMType		( tcInstType, checkValidTheta, checkValidInstHead, instTypeErr, 
+import TcMType		( tcSkolType, checkValidTheta, checkValidInstHead, instTypeErr, 
 			  checkAmbiguity, SourceTyCtxt(..) )
-import TcType		( mkClassPred, tcSplitForAllTys, tyVarsOfType,
+import TcType		( mkClassPred, tcSplitForAllTys, tyVarsOfType, 
 			  tcSplitSigmaTy, getClassPredTys, tcSplitPredTy_maybe, mkTyVarTys,
-			  TyVarDetails(..), tcSplitDFunTy, pprClassPred )
+			  SkolemInfo(InstSkol), tcSplitDFunTy, pprClassPred )
 import Inst		( tcInstClassOp, newDicts, instToId, showLIE, tcExtendLocalInstEnv )
 import TcDeriv		( tcDeriving )
 import TcEnv		( tcExtendGlobalValEnv, tcExtendTyVarEnv2,
  			  InstInfo(..), InstBindings(..), 
-			  newDFunName, tcExtendLocalValEnv
+			  newDFunName, tcExtendIdEnv
 			)
 import TcHsType		( kcHsSigType, tcHsKindedType )
 import TcUnify		( checkSigTyVars )
 import TcSimplify	( tcSimplifyCheck, tcSimplifyTop )
-import Subst		( mkTyVarSubst, substTheta, substTy )
+import Type		( zipTvSubst, substTheta, substTys )
 import DataCon		( classDataCon )
 import Class		( classBigSig )
 import Var		( Id, idName, idType )
 import MkId		( mkDictFunId, rUNTIME_ERROR_ID )
 import FunDeps		( checkInstFDs )
 import Name		( Name, getSrcLoc )
-import NameSet		( unitNameSet, emptyNameSet, nameSetToList, unionNameSets )
+import NameSet		( unitNameSet, emptyNameSet, unionNameSets )
 import UnicodeUtil	( stringToUtf8 )
 import Maybe		( catMaybes )
 import SrcLoc		( srcLocSpan, unLoc, noLoc, Located(..), srcSpanStart )
@@ -186,7 +186,7 @@ tcLocalInstDecl1 :: LInstDecl Name
 tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags))
   =	-- Prime error recovery, set source location
     recoverM (returnM Nothing)		$
-    addSrcSpan loc			$
+    setSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$
 
 	-- Typecheck the instance type itself.  We can't use 
@@ -227,7 +227,7 @@ tcInstDecls2 tycl_decls inst_decls
   = do	{	-- (a) Default methods from class decls
 	  (dm_binds_s, dm_ids_s) <- mapAndUnzipM tcClassDecl2 $
 			            filter (isClassDecl.unLoc) tycl_decls
-	; tcExtendLocalValEnv (concat dm_ids_s) 	$ do 
+	; tcExtendIdEnv (concat dm_ids_s) 	$ do 
     
 	 	-- (b) instance declarations
 	; inst_binds_s <- mappM tcInstDecl2 inst_decls
@@ -310,10 +310,11 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 
 tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
   =	 -- Prime error recovery
-    recoverM (returnM emptyBag)			$
-    addSrcSpan (srcLocSpan (getSrcLoc dfun_id))	$
+    recoverM (returnM emptyLHsBinds)		$
+    setSrcSpan (srcLocSpan (getSrcLoc dfun_id))	$
     addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
     let
+	rigid_info	 = InstSkol dfun_id
 	inst_ty 	 = idType dfun_id
 	(inst_tyvars, _) = tcSplitForAllTys inst_ty
 		-- The tyvars of the instance decl scope over the 'where' part
@@ -322,18 +323,18 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
     in
 
 	-- Instantiate the instance decl with tc-style type variables
-    tcInstType InstTv inst_ty		`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
+    tcSkolType rigid_info inst_ty	`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
     let
 	Just pred         = tcSplitPredTy_maybe inst_head'
 	(clas, inst_tys') = getClassPredTys pred
         (class_tyvars, sc_theta, _, op_items) = classBigSig clas
 
         -- Instantiate the super-class context with inst_tys
-	sc_theta' = substTheta (mkTyVarSubst class_tyvars inst_tys') sc_theta
-	origin	  = InstanceDeclOrigin
+	sc_theta' = substTheta (zipTvSubst class_tyvars inst_tys') sc_theta
+	origin	  = SigOrigin rigid_info
     in
 	 -- Create dictionary Ids from the specified instance contexts.
-    newDicts origin sc_theta'		`thenM` \ sc_dicts ->
+    newDicts InstScOrigin sc_theta'	`thenM` \ sc_dicts ->
     newDicts origin dfun_theta'		`thenM` \ dfun_arg_dicts ->
     newDicts origin [pred] 		`thenM` \ [this_dict] ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
@@ -344,13 +345,16 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
     let		-- These insts are in scope; quite a few, eh?
 	avail_insts = [this_dict] ++ dfun_arg_dicts ++ sc_dicts
     in
-    tcMethods clas inst_tyvars inst_tyvars' 
+    tcMethods origin clas inst_tyvars inst_tyvars' 
 	      dfun_theta' inst_tys' avail_insts 
 	      op_items binds		`thenM` \ (meth_ids, meth_binds) ->
 
 	-- Figure out bindings for the superclass context
     tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts	
-		`thenM` \ (zonked_inst_tyvars, sc_binds_inner, sc_binds_outer) ->
+		`thenM` \ (sc_binds_inner, sc_binds_outer) ->
+
+	-- It's possible that the superclass stuff might have done unification
+    checkSigTyVars inst_tyvars' 	`thenM_`
 
 	-- Deal with 'SPECIALISE instance' pragmas by making them
 	-- look like SPECIALISE pragmas for the dfun
@@ -413,10 +417,10 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	all_binds  = dict_bind `consBag` (sc_binds_inner `unionBags` meth_binds)
 
 	main_bind = noLoc $ AbsBinds
-		 	 zonked_inst_tyvars
-		 	 (map instToId dfun_arg_dicts)
-		 	 [(inst_tyvars', dfun_id, this_dict_id)] 
-		 	 inlines all_binds
+		 	    inst_tyvars'
+		 	    (map instToId dfun_arg_dicts)
+		 	    [(inst_tyvars', dfun_id, this_dict_id)] 
+		 	    inlines all_binds
     in
     showLIE (text "instance") 		`thenM_`
     returnM (unitBag main_bind `unionBags` 
@@ -424,7 +428,7 @@ tcInstDecl2 (InstInfo { iDFunId = dfun_id, iBinds = binds })
 	     sc_binds_outer)
 
 
-tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
+tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items (VanillaInst monobinds uprags)
   = 	-- Check that all the method bindings come from this class
     let
@@ -435,7 +439,7 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 
 	-- Make the method bindings
     let
-	mk_method_bind = mkMethodBind InstanceDeclOrigin clas inst_tys' monobinds
+	mk_method_bind = mkMethodBind origin clas inst_tys' monobinds
     in
     mapAndUnzipM mk_method_bind op_items 	`thenM` \ (meth_insts, meth_infos) ->
 
@@ -472,17 +476,18 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	all_insts      = avail_insts ++ catMaybes meth_insts
 	xtve	       = inst_tyvars `zip` inst_tyvars'
 	tc_method_bind = tcMethodBind xtve inst_tyvars' dfun_theta' all_insts uprags 
+	meth_ids       = [meth_id | (_,meth_id,_) <- meth_infos]
     in
+
     mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
    
-    returnM ([meth_id | (_,meth_id,_) <- meth_infos], 
-	     unionManyBags meth_binds_s)
+    returnM (meth_ids, unionManyBags meth_binds_s)
 
 
 -- Derived newtype instances
-tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
+tcMethods origin clas inst_tyvars inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items (NewTypeDerived rep_tys)
-  = getInstLoc InstanceDeclOrigin		`thenM` \ inst_loc ->
+  = getInstLoc origin				`thenM` \ inst_loc ->
     mapAndUnzip3M (do_one inst_loc) op_items	`thenM` \ (meth_ids, meth_binds, rhs_insts) ->
     
     tcSimplifyCheck
@@ -507,8 +512,8 @@ tcMethods clas inst_tyvars inst_tyvars' dfun_theta' inst_tys'
 	  return (meth_id, noLoc (VarBind meth_id (nlHsVar (instToId rhs_inst))), rhs_inst)
 
 	-- Instantiate rep_tys with the relevant type variables
-    rep_tys' = map (substTy subst) rep_tys
-    subst    = mkTyVarSubst inst_tyvars (mkTyVarTys inst_tyvars')
+    rep_tys' = substTys subst rep_tys
+    subst    = zipTvSubst inst_tyvars (mkTyVarTys inst_tyvars')
 \end{code}
 
 Note: [Superclass loops]
@@ -559,15 +564,12 @@ tcSuperClasses inst_tyvars' dfun_arg_dicts sc_dicts
 			    dfun_arg_dicts
 			    sc_dicts)		`thenM` \ (sc_binds1, sc_lie) ->
 
-	-- It's possible that the superclass stuff might have done unification
-    checkSigTyVars inst_tyvars' 	`thenM` \ zonked_inst_tyvars ->
-
 	-- We must simplify this all the way down 
 	-- lest we build superclass loops
 	-- See Note [Superclass loops] above
     tcSimplifyTop sc_lie		`thenM` \ sc_binds2 ->
 
-    returnM (zonked_inst_tyvars, sc_binds1, sc_binds2)
+    returnM (sc_binds1, sc_binds2)
 
   where
     doc = ptext SLIT("instance declaration superclass context")

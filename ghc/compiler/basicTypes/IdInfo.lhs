@@ -87,8 +87,8 @@ import BasicTypes	( OccInfo(..), isFragileOcc, isDeadOcc, seqOccInfo, isLoopBrea
 			  Activation(..)
 			)
 import DataCon		( DataCon )
+import TyCon		( TyCon, FieldLabel )
 import ForeignCall	( ForeignCall )
-import FieldLabel	( FieldLabel )
 import NewDemand
 import Outputable	
 import Maybe		( isJust )
@@ -230,7 +230,8 @@ an IdInfo.hi-boot, but no Id.hi-boot, and GlobalIdDetails is imported
 data GlobalIdDetails
   = VanillaGlobal		-- Imported from elsewhere, a default method Id.
 
-  | RecordSelId FieldLabel	-- The Id for a record selector
+  | RecordSelId TyCon FieldLabel  -- The Id for a record selector
+
   | DataConWorkId DataCon	-- The Id for a data constructor *worker*
   | DataConWrapId DataCon	-- The Id for a data constructor *wrapper*
 				-- [the only reasons we need to know is so that
@@ -255,7 +256,7 @@ instance Outputable GlobalIdDetails where
     ppr (ClassOpId _)     = ptext SLIT("[ClassOp]")
     ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
     ppr (FCallId _)       = ptext SLIT("[ForeignCall]")
-    ppr (RecordSelId _)   = ptext SLIT("[RecSel]")
+    ppr (RecordSelId _ _) = ptext SLIT("[RecSel]")
 \end{code}
 
 

@@ -326,37 +326,40 @@ pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
       Internal    	      -> pprInternal sty uniq occ
 
 pprExternal sty uniq mod occ is_wired is_builtin
-  | codeStyle sty        = ppr mod_name <> char '_' <> pprOccName occ
+  | codeStyle sty        = ppr mod_name <> char '_' <> ppr_occ_name occ
 	-- In code style, always qualify
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
-  | debugStyle sty       = sep [ppr mod_name <> dot <> pprOccName occ,
-				hsep [text "{-" 
-				     , if is_wired then ptext SLIT("(w)") else empty
-				     , pprUnique uniq
--- (overkill)			     , case mb_p of
---				 	 Nothing -> empty
---					 Just n  -> brackets (ppr n)
-				     , text "-}"]]
-  | BuiltInSyntax <- is_builtin  = pprOccName occ
+  | debugStyle sty       = ppr mod_name <> dot <> ppr_occ_name occ
+			   <> braces (hsep [if is_wired then ptext SLIT("(w)") else empty,
+					    text (briefOccNameFlavour occ), 
+		 			    pprUnique uniq])
+  | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
 	-- never qualify builtin syntax
-  | unqualStyle sty mod_name occ = pprOccName occ
-  | otherwise		 	 = ppr mod_name <> dot <> pprOccName occ
+  | unqualStyle sty mod_name occ = ppr_occ_name occ
+  | otherwise		 	 = ppr mod_name <> dot <> ppr_occ_name occ
   where
     mod_name = moduleName mod
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | debugStyle sty = pprOccName occ <> text "{-" <> pprUnique uniq <> text "-}"
-  | otherwise      = pprOccName occ	-- User style
+  | debugStyle sty = ppr_occ_name occ <> braces (hsep [text (briefOccNameFlavour occ), 
+				 		       pprUnique uniq])
+  | otherwise      = ppr_occ_name occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
 pprSystem sty uniq occ
   | codeStyle sty  = pprUnique uniq
-  | otherwise	   = pprOccName occ <> char '_' <> pprUnique uniq
+  | debugStyle sty = ppr_occ_name occ <> char '_' <> pprUnique uniq
+		     <> braces (text (briefOccNameFlavour occ))
+  | otherwise	   = ppr_occ_name occ <> char '_' <> pprUnique uniq
 				-- If the tidy phase hasn't run, the OccName
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
+
+ppr_occ_name occ = pprEncodedFS (occNameFS occ)
+	-- Don't use pprOccName; instead, just print the string of the OccName; 
+	-- we print the namespace in the debug stuff above
 \end{code}
 
 %************************************************************************

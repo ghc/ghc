@@ -1,4 +1,4 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcType]{Types used in the typechecker}
@@ -21,9 +21,11 @@ module TcType (
   TcTyVar, TcTyVarSet, TcKind, 
 
   --------------------------------
-  -- TyVarDetails
-  TyVarDetails(..), isUserTyVar, isSkolemTyVar, isExistentialTyVar,
-  tyVarBindingInfo,
+  -- MetaDetails
+  TcTyVarDetails(..),
+  MetaDetails(Flexi, Indirect), SkolemInfo(..), pprSkolemTyVar,
+  isImmutableTyVar, isSkolemTyVar, isMetaTyVar, skolemTvInfo, metaTvRef,
+  isFlexi, isIndirect,
 
   --------------------------------
   -- Builders
@@ -46,7 +48,6 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy,
   isIntegerTy, isAddrTy, isBoolTy, isUnitTy,
   isTauTy, tcIsTyVarTy, tcIsForAllTy,
-  allDistinctTyVars,
 
   ---------------------------------
   -- Misc type manipulators
@@ -77,11 +78,6 @@ module TcType (
   
   toDNType,            -- :: Type -> DNType
 
-  ---------------------------------
-  -- Unifier and matcher  
-  unifyTysX, unifyTyListsX, unifyExtendTyListsX,
-  matchTy, matchTys, match,
-
   --------------------------------
   -- Rexported from Type
   Kind, 	-- Stuff to do with kinds is insensitive to pre/post Tc
@@ -94,6 +90,14 @@ module TcType (
   mkFunTy, mkFunTys, zipFunTys, 
   mkTyConApp, mkGenTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
   mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys, 
+
+  -- Type substitutions
+  TvSubst(..), 	-- Representation visible to a few friends
+  TvSubstEnv, emptyTvSubst,
+  mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
+  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
+  extendTvSubst, extendTvSubstList, isInScope,
+  substTy, substTys, substTyWith, substTheta, substTyVar, 
 
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
@@ -137,14 +141,22 @@ import Type		(	-- Re-exports
 			  tidyTyVarBndr, tidyOpenTyVar,
 			  tidyOpenTyVars, 
 			  isSubKind, 
+			  TvSubst(..),
+			  TvSubstEnv, emptyTvSubst,
+			  mkTvSubst, zipTvSubst, zipTopTvSubst, mkTopTvSubst,
+			  getTvSubstEnv, setTvSubstEnv, getTvInScope, extendTvInScope,
+			  extendTvSubst, extendTvSubstList, isInScope,
+		  	  substTy, substTys, substTyWith, substTheta, substTyVar, 
+
 			  typeKind, repType,
 			  pprKind, pprParendKind,
 			  pprType, pprParendType,
 			  pprPred, pprTheta, pprThetaArrow, pprClassPred
 			)
 import TyCon		( TyCon, isUnLiftedTyCon, tyConUnique )
+import DataCon		( DataCon )
 import Class		( Class )
-import Var		( TyVar, tyVarKind, tcTyVarDetails )
+import Var		( TyVar, Id, isTcTyVar, tcTyVarDetails )
 import ForeignCall	( Safety, playSafe, DNType(..) )
 import VarEnv
 import VarSet
@@ -158,10 +170,11 @@ import PrelNames	-- Lots (e.g. in isFFIArgumentTy)
 import TysWiredIn	( unitTyCon, charTyCon, listTyCon )
 import BasicTypes	( IPName(..), ipNameName )
 import Unique		( Unique, Uniquable(..) )
-import SrcLoc		( SrcLoc )
-import Util		( cmpList, thenCmp, equalLength, snocView )
+import SrcLoc		( SrcLoc, SrcSpan )
+import Util		( cmpList, thenCmp, snocView )
 import Maybes		( maybeToBool, expectJust )
 import Outputable
+import DATA_IOREF
 \end{code}
 
 
@@ -212,8 +225,8 @@ type TcThetaType    = ThetaType
 type TcSigmaType    = TcType
 type TcRhoType      = TcType
 type TcTauType      = TcType
-
 type TcKind         = Kind
+type TcTyVarSet     = TyVarSet
 \end{code}
 
 
@@ -231,67 +244,89 @@ why Var.lhs shouldn't actually have the definition, but it "belongs" here.
 \begin{code}
 type TcTyVar = TyVar  	-- Used only during type inference
 
-data TyVarDetails
-  = SigTv	-- Introduced when instantiating a type signature,
-		-- prior to checking that the defn of a fn does 
-		-- have the expected type.  Should not be instantiated.
-		-- 	f :: forall a. a -> a
-		-- 	f = e
-		-- When checking e, with expected type (a->a), we 
-		-- should not instantiate a
+-- A TyVarDetails is inside a TyVar
+data TcTyVarDetails
+  = SkolemTv SkolemInfo		-- A skolem constant
+  | MetaTv (IORef MetaDetails)	-- A meta type variable stands for a tau-type
 
-   | ClsTv	-- Scoped type variable introduced by a class decl
-		--	class C a where ...
+data SkolemInfo
+  = SigSkol Name	-- Bound at a type signature
+  | ClsSkol Class	-- Bound at a class decl
+  | InstSkol Id		-- Bound at an instance decl
+  | PatSkol DataCon	-- An existential type variable bound by a pattern for
+	    SrcSpan	-- a data constructor with an existential type. E.g.
+			--	data T = forall a. Eq a => MkT a
+			-- 	f (MkT x) = ...
+			-- The pattern MkT x will allocate an existential type
+			-- variable for 'a'.  
+  | ArrowSkol SrcSpan	-- An arrow form (see TcArrows)
 
-   | InstTv	-- Ditto, but instance decl
+  | GenSkol TcType	-- Bound when doing a subsumption check for this type
+	    SrcSpan
 
-   | PatSigTv	-- Scoped type variable, introduced by a pattern
-		-- type signature	\ x::a -> e
+data MetaDetails
+  = Flexi          -- Flexi type variables unify to become 
+                   -- Indirects.  
 
-   | ExistTv	-- An existential type variable bound by a pattern for
-		-- a data constructor with an existential type. E.g.
-		--	data T = forall a. Eq a => MkT a
-		-- 	f (MkT x) = ...
-		-- The pattern MkT x will allocate an existential type
-		-- variable for 'a'.  We distinguish these from all others
-		-- on one place, namely InstEnv.lookupInstEnv.
+  | Indirect TcType  -- Type indirections, treated as wobbly 
+                     -- for the purpose of GADT unification.
 
-   | VanillaTv	-- Everything else
+pprSkolemTyVar :: TcTyVar -> SDoc
+pprSkolemTyVar tv
+  = ASSERT( isSkolemTyVar tv )
+    quotes (ppr tv) <+> ptext SLIT("is bound by") <+> ppr (skolemTvInfo tv)
 
-isUserTyVar :: TcTyVar -> Bool	-- Avoid unifying these if possible
-isUserTyVar tv = case tcTyVarDetails tv of
-		   VanillaTv -> False
-		   other     -> True
+instance Outputable SkolemInfo where
+  ppr (SigSkol id)  = ptext SLIT("the type signature for") <+> quotes (ppr id)
+  ppr (ClsSkol cls) = ptext SLIT("the class declaration for") <+> quotes (ppr cls)
+  ppr (InstSkol df) = ptext SLIT("the instance declaration at") <+> ppr (getSrcLoc df)
+  ppr (ArrowSkol loc)  = ptext SLIT("the arrow form at") <+> ppr loc
+  ppr (PatSkol dc loc) = sep [ptext SLIT("the pattern for") <+> quotes (ppr dc),
+	       		    nest 2 (ptext SLIT("at") <+> ppr loc)]
+  ppr (GenSkol ty loc) = sep [ptext SLIT("the polymorphic type") <+> quotes (ppr ty),
+			    nest 2 (ptext SLIT("at") <+> ppr loc)]
 
-isSkolemTyVar :: TcTyVar -> Bool
-isSkolemTyVar tv = case tcTyVarDetails tv of
-		      SigTv   -> True
-		      ClsTv   -> True
-		      InstTv  -> True
-		      ExistTv -> True
-		      other   -> False
+instance Outputable MetaDetails where
+  ppr Flexi 	    = ptext SLIT("Flexi")
+  ppr (Indirect ty) = ptext SLIT("Indirect") <+> ppr ty
 
-isExistentialTyVar :: TcTyVar -> Bool
-isExistentialTyVar tv = case tcTyVarDetails tv of
-			      ExistTv -> True
-			      other   -> False
+isImmutableTyVar, isSkolemTyVar, isMetaTyVar :: TyVar -> Bool
+isImmutableTyVar tv
+  | isTcTyVar tv = isSkolemTyVar tv
+  | otherwise    = True
 
-tyVarBindingInfo :: TcTyVar -> SDoc	-- Used in checkSigTyVars
-tyVarBindingInfo tv
-  = sep [ptext SLIT("is bound by the") <+> details (tcTyVarDetails tv),
-	 ptext SLIT("at") <+> ppr (getSrcLoc tv)]
-  where
-    details SigTv     = ptext SLIT("type signature")
-    details ClsTv     = ptext SLIT("class declaration")
-    details InstTv    = ptext SLIT("instance declaration")
-    details PatSigTv  = ptext SLIT("pattern type signature")
-    details ExistTv   = ptext SLIT("existential constructor")
-    details VanillaTv = ptext SLIT("//vanilla//")	-- Ditto
+isSkolemTyVar tv 
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+	SkolemTv _ -> True
+	MetaTv _   -> False
+
+isMetaTyVar tv 
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+	SkolemTv _ -> False
+	MetaTv _   -> True
+
+skolemTvInfo :: TyVar -> SkolemInfo
+skolemTvInfo tv 
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+	SkolemTv info -> info
+
+metaTvRef :: TyVar -> IORef MetaDetails
+metaTvRef tv 
+  = ASSERT( isTcTyVar tv )
+    case tcTyVarDetails tv of
+	 MetaTv ref -> ref
+
+isFlexi, isIndirect :: MetaDetails -> Bool
+isFlexi Flexi = True
+isFlexi other = False
+
+isIndirect (Indirect _) = True
+isIndirect other        = False
 \end{code}
 
-\begin{code}
-type TcTyVarSet = TyVarSet
-\end{code}
 
 %************************************************************************
 %*									*
@@ -472,30 +507,6 @@ tcSplitDFunTy ty
     (tvs, theta, clas, tys) }}
 \end{code}
 
-(allDistinctTyVars tys tvs) = True 
-	iff 
-all the types tys are type variables, 
-distinct from each other and from tvs.
-
-This is useful when checking that unification hasn't unified signature
-type variables.  For example, if the type sig is
-	f :: forall a b. a -> b -> b
-we want to check that 'a' and 'b' havn't 
-	(a) been unified with a non-tyvar type
-	(b) been unified with each other (all distinct)
-	(c) been unified with a variable free in the environment
-
-\begin{code}
-allDistinctTyVars :: [Type] -> TyVarSet -> Bool
-
-allDistinctTyVars []       acc
-  = True
-allDistinctTyVars (ty:tys) acc 
-  = case tcGetTyVar_maybe ty of
-	Nothing 		      -> False 	-- (a)
-	Just tv | tv `elemVarSet` acc -> False	-- (b) or (c)
-		| otherwise           -> allDistinctTyVars tys (acc `extendVarSet` tv)
-\end{code}    
 
 
 %************************************************************************
@@ -959,251 +970,3 @@ isByteArrayLikeTyCon tc =
 \end{code}
 
 
-%************************************************************************
-%*									*
-\subsection{Unification with an explicit substitution}
-%*									*
-%************************************************************************
-
-Unify types with an explicit substitution and no monad.
-
-\begin{code}
-type MySubst
-   = (TyVarSet,		-- Set of template tyvars
-      TyVarSubstEnv)	-- Not necessarily idempotent
-
-unifyTysX :: TyVarSet		-- Template tyvars
-	  -> Type
-          -> Type
-          -> Maybe TyVarSubstEnv
-unifyTysX tmpl_tyvars ty1 ty2
-  = uTysX ty1 ty2 (\(_,s) -> Just s) (tmpl_tyvars, emptySubstEnv)
-
-unifyExtendTyListsX 
-	:: TyVarSet		-- Template tyvars
-	-> TyVarSubstEnv	-- Substitution to start with
-	-> [Type]
-	-> [Type]
-        -> Maybe TyVarSubstEnv	-- Extended substitution
-unifyExtendTyListsX tmpl_tyvars subst tys1 tys2
-  = uTyListsX tys1 tys2 (\(_,s) -> Just s) (tmpl_tyvars, subst)
-
-unifyTyListsX :: TyVarSet -> [Type] -> [Type]
-              -> Maybe TyVarSubstEnv
-unifyTyListsX tmpl_tyvars tys1 tys2
-  = uTyListsX tys1 tys2 (\(_,s) -> Just s) (tmpl_tyvars, emptySubstEnv)
-
-
-uTysX :: Type
-      -> Type
-      -> (MySubst -> Maybe result)
-      -> MySubst
-      -> Maybe result
-
-uTysX (NoteTy _ ty1) ty2 k subst = uTysX ty1 ty2 k subst
-uTysX ty1 (NoteTy _ ty2) k subst = uTysX ty1 ty2 k subst
-
-	-- Variables; go for uVar
-uTysX (TyVarTy tyvar1) (TyVarTy tyvar2) k subst 
-  | tyvar1 == tyvar2
-  = k subst
-uTysX (TyVarTy tyvar1) ty2 k subst@(tmpls,_)
-  | tyvar1 `elemVarSet` tmpls
-  = uVarX tyvar1 ty2 k subst
-uTysX ty1 (TyVarTy tyvar2) k subst@(tmpls,_)
-  | tyvar2 `elemVarSet` tmpls
-  = uVarX tyvar2 ty1 k subst
-
-	-- Predicates
-uTysX (PredTy (IParam n1 t1)) (PredTy (IParam n2 t2)) k subst
-  | n1 == n2 = uTysX t1 t2 k subst
-uTysX (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2)) k subst
-  | c1 == c2 = uTyListsX tys1 tys2 k subst
-
-	-- Functions; just check the two parts
-uTysX (FunTy fun1 arg1) (FunTy fun2 arg2) k subst
-  = uTysX fun1 fun2 (uTysX arg1 arg2 k) subst
-
-	-- Type constructors must match
-uTysX (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) k subst
-  | tc1 == tc2 = uTyListsX tys1 tys2 k subst
-uTysX (TyConApp con1 tys1) (TyConApp con2 tys2) k subst
-  | (con1 == con2 && equalLength tys1 tys2)
-  = uTyListsX tys1 tys2 k subst
-
-	-- Applications need a bit of care!
-	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
-	-- NB: we've already dealt with type variables and Notes,
-	-- so if one type is an App the other one jolly well better be too
-uTysX (AppTy s1 t1) ty2 k subst
-  = case tcSplitAppTy_maybe ty2 of
-      Just (s2, t2) -> uTysX s1 s2 (uTysX t1 t2 k) subst
-      Nothing       -> Nothing    -- Fail
-
-uTysX ty1 (AppTy s2 t2) k subst
-  = case tcSplitAppTy_maybe ty1 of
-      Just (s1, t1) -> uTysX s1 s2 (uTysX t1 t2 k) subst
-      Nothing       -> Nothing    -- Fail
-
-	-- Not expecting for-alls in unification
-#ifdef DEBUG
-uTysX (ForAllTy _ _) ty2 k subst = panic "Unify.uTysX subst:ForAllTy (1st arg)"
-uTysX ty1 (ForAllTy _ _) k subst = panic "Unify.uTysX subst:ForAllTy (2nd arg)"
-#endif
-
-	-- Anything else fails
-uTysX ty1 ty2 k subst = Nothing
-
-
-uTyListsX []         []         k subst = k subst
-uTyListsX (ty1:tys1) (ty2:tys2) k subst = uTysX ty1 ty2 (uTyListsX tys1 tys2 k) subst
-uTyListsX tys1	     tys2       k subst = Nothing   -- Fail if the lists are different lengths
-\end{code}
-
-\begin{code}
--- Invariant: tv1 is a unifiable variable
-uVarX tv1 ty2 k subst@(tmpls, env)
-  = case lookupSubstEnv env tv1 of
-      Just (DoneTy ty1) ->    -- Already bound
-		     uTysX ty1 ty2 k subst
-
-      Nothing	     -- Not already bound
-	       |  typeKind ty2 == tyVarKind tv1
-	       && occur_check_ok ty2
-	       ->     -- No kind mismatch nor occur check
-                  k (tmpls, extendSubstEnv env tv1 (DoneTy ty2))
-
-	       | otherwise -> Nothing	-- Fail if kind mis-match or occur check
-  where
-    occur_check_ok ty = all occur_check_ok_tv (varSetElems (tyVarsOfType ty))
-    occur_check_ok_tv tv | tv1 == tv = False
-			 | otherwise = case lookupSubstEnv env tv of
-				         Nothing	   -> True
-					 Just (DoneTy ty)  -> occur_check_ok ty
-\end{code}
-
-
-
-%************************************************************************
-%*									*
-\subsection{Matching on types}
-%*									*
-%************************************************************************
-
-Matching is a {\em unidirectional} process, matching a type against a
-template (which is just a type with type variables in it).  The
-matcher assumes that there are no repeated type variables in the
-template, so that it simply returns a mapping of type variables to
-types.  It also fails on nested foralls.
-
-@matchTys@ matches corresponding elements of a list of templates and
-types.  It and @matchTy@ both ignore usage annotations, unlike the
-main function @match@.
-
-\begin{code}
-matchTy :: TyVarSet			-- Template tyvars
-	-> Type  			-- Template
-	-> Type				-- Proposed instance of template
-	-> Maybe TyVarSubstEnv		-- Matching substitution
-					
-
-matchTys :: TyVarSet			-- Template tyvars
-	 -> [Type]			-- Templates
-	 -> [Type]			-- Proposed instance of template
-	 -> Maybe (TyVarSubstEnv,		-- Matching substitution
-		   [Type])		-- Left over instance types
-
-matchTy tmpls ty1 ty2 = match ty1 ty2 tmpls (\ senv -> Just senv) emptySubstEnv
-
-matchTys tmpls tys1 tys2 = match_list tys1 tys2 tmpls 
-				      (\ (senv,tys) -> Just (senv,tys))
-				      emptySubstEnv
-\end{code}
-
-@match@ is the main function.  It takes a flag indicating whether
-usage annotations are to be respected.
-
-\begin{code}
-match :: Type -> Type    	    		-- Current match pair
-      -> TyVarSet				-- Template vars
-      -> (TyVarSubstEnv -> Maybe result)	-- Continuation
-      -> TyVarSubstEnv				-- Current subst
-      -> Maybe result
-
--- When matching against a type variable, see if the variable
--- has already been bound.  If so, check that what it's bound to
--- is the same as ty; if not, bind it and carry on.
-
-match (TyVarTy v) ty tmpls k senv
-  | v `elemVarSet` tmpls
-  =     -- v is a template variable
-    case lookupSubstEnv senv v of
-	Nothing | typeKind ty `isSubKind` tyVarKind v	
-			-- We do a kind check, just as in the uVarX above
-			-- The kind check is needed to avoid bogus matches
-			-- of (a b) with (c d), where the kinds don't match
-			-- An occur check isn't needed when matching.
-		-> k (extendSubstEnv senv v (DoneTy ty))
-
-		| otherwise  -> Nothing -- Fails
-
-	Just (DoneTy ty')  | ty' `tcEqType` ty   -> k senv   -- Succeeds
-			   | otherwise	         -> Nothing  -- Fails
-
-  | otherwise
-  =     -- v is not a template variable; ty had better match
-        -- Can't use (==) because types differ
-    case tcGetTyVar_maybe ty of
-        Just v' | v == v' -> k senv    -- Success
-        other    	  -> Nothing   -- Failure
-    -- This tcGetTyVar_maybe is *required* because it must strip Notes.
-    -- I guess the reason the Note-stripping case is *last* rather than first
-    -- is to preserve type synonyms etc., so I'm not moving it to the
-    -- top; but this means that (without the deNotetype) a type
-    -- variable may not match the pattern (TyVarTy v') as one would
-    -- expect, due to an intervening Note.  KSW 2000-06.
-
-	-- Predicates
-match (PredTy (IParam n1 t1)) (PredTy (IParam n2 t2)) tmpls k senv
-  | n1 == n2 = match t1 t2 tmpls k senv
-match (PredTy (ClassP c1 tys1)) (PredTy (ClassP c2 tys2)) tmpls k senv
-  | c1 == c2 = match_list_exactly tys1 tys2 tmpls k senv
-
-	-- Functions; just check the two parts
-match (FunTy arg1 res1) (FunTy arg2 res2) tmpls k senv
-  = match arg1 arg2 tmpls (match res1 res2 tmpls k) senv
-
-	-- If the template is an application, try to make the 
-	-- thing we are matching look like an application
-match (AppTy fun1 arg1) ty2 tmpls k senv 
-  = case tcSplitAppTy_maybe ty2 of
-	Just (fun2,arg2) -> match fun1 fun2 tmpls (match arg1 arg2 tmpls k) senv
-	Nothing 	 -> Nothing	-- Fail
-
-	-- Newtypes are opaque; predicate types should not happen
-match (NewTcApp tc1 tys1) (NewTcApp tc2 tys2) tmpls k senv
-  | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
-match (TyConApp tc1 tys1) (TyConApp tc2 tys2) tmpls k senv
-  | tc1 == tc2 = match_list_exactly tys1 tys2 tmpls k senv
-
-	-- With type synonyms, we have to be careful for the exact
-	-- same reasons as in the unifier.  Please see the
-	-- considerable commentary there before changing anything
-	-- here! (WDP 95/05)
-match (NoteTy n1 ty1) ty2      tmpls k senv = match ty1 ty2 tmpls k senv
-match ty1      (NoteTy n2 ty2) tmpls k senv = match ty1 ty2 tmpls k senv
-
--- Catch-all fails
-match _ _ _ _ _ = Nothing
-
-match_list_exactly tys1 tys2 tmpls k senv
-  = match_list tys1 tys2 tmpls k' senv
-  where
-    k' (senv', tys2') | null tys2' = k senv'	-- Succeed
-		      | otherwise  = Nothing	-- Fail	
-
-match_list []         tys2       tmpls k senv = k (senv, tys2)
-match_list (ty1:tys1) []         tmpls k senv = Nothing	-- Not enough arg tys => failure
-match_list (ty1:tys1) (ty2:tys2) tmpls k senv
-  = match ty1 ty2 tmpls (match_list tys1 tys2 tmpls k) senv
-\end{code}

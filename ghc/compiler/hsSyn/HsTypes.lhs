@@ -10,6 +10,9 @@ module HsTypes (
 	HsExplicitForAll(..),
 	HsContext, LHsContext,
 	HsPred(..), LHsPred,
+
+	LBangType, BangType, HsBang(..), 
+        getBangType, getBangStrictness, 
 	
 	mkExplicitHsForAllTy, mkImplicitHsForAllTy, 
 	hsTyVarName, hsTyVarNames, replaceTyVarName,
@@ -71,6 +74,35 @@ placeHolderName = mkInternalName unboundKey
 			noSrcLoc
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Bang annotations}
+%*									*
+%************************************************************************
+
+\begin{code}
+type LBangType name = Located (BangType name)
+type BangType name  = HsType name	-- Bangs are in the HsType data type
+
+data HsBang = HsNoBang	-- Only used as a return value for getBangStrictness,
+			-- never appears on a HsBangTy
+	    | HsStrict	-- ! 
+	    | HsUnbox	-- {-# UNPACK #-} ! (GHC extension, meaning "unbox")
+
+instance Outputable HsBang where
+    ppr (HsNoBang) = empty
+    ppr (HsStrict) = char '!'
+    ppr (HsUnbox)  = ptext SLIT("!!")
+
+getBangType :: LHsType a -> LHsType a
+getBangType (L _ (HsBangTy _ ty)) = ty
+getBangType ty                    = ty
+
+getBangStrictness :: LHsType a -> HsBang
+getBangStrictness (L _ (HsBangTy s _)) = s
+getBangStrictness _                    = HsNoBang
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -102,6 +134,8 @@ data HsType name
 		(LHsType name)
 
   | HsTyVar		name		-- Type variable or type constructor
+
+  | HsBangTy	HsBang (LHsType name)	-- Bang-style type annotations 
 
   | HsAppTy		(LHsType name)
 			(LHsType name)
@@ -210,36 +244,15 @@ splitHsInstDeclTy
     -> ([LHsTyVarBndr name], HsContext name, name, [LHsType name])
 	-- Split up an instance decl type, returning the pieces
 
--- In interface files, the instance declaration head is created
--- by HsTypes.toHsType, which does not guarantee to produce a
--- HsForAllTy.  For example, if we had the weird decl
---	instance Foo T => Foo [T]
--- then we'd get the instance type
---	Foo T -> Foo [T]
--- So when colleting the instance context, to be on the safe side
--- we gather predicate arguments
--- 
--- For source code, the parser ensures the type will have the right shape.
--- (e.g. see ParseUtil.checkInstType)
-
 splitHsInstDeclTy inst_ty
   = case inst_ty of
-	HsForAllTy _ tvs cxt1 tau 	-- The type vars should have been
-					-- computed by now, even if they were implicit
-	      -> (tvs, unLoc cxt1 ++ cxt2, cls, tys)
-	      where
-		 (cxt2, cls, tys) = split_tau (unLoc tau)
-
-	other -> ([],  cxt2,  cls, tys)
-	      where
-		 (cxt2, cls, tys) = split_tau inst_ty
-
+	HsParTy (L _ ty)	      -> splitHsInstDeclTy ty
+	HsForAllTy _ tvs cxt (L _ ty) -> split_tau tvs (unLoc cxt) ty
+	other 			      -> split_tau []  []          other
+    -- The type vars should have been computed by now, even if they were implicit
   where
-    split_tau (HsFunTy (L loc (HsPredTy p)) ty) = (L loc p : ps, cls, tys)
-					where
-					  (ps, cls, tys) = split_tau (unLoc ty)
-    split_tau (HsPredTy (HsClassP cls tys)) = ([], cls, tys)
-    split_tau other = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
+    split_tau tvs cxt (HsPredTy (HsClassP cls tys)) = (tvs, cxt, cls, tys)
+    split_tau tvs cxt (HsParTy (L _ ty))	    = split_tau tvs cxt ty
 \end{code}
 
 
@@ -320,6 +333,8 @@ ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
     sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
+-- gaw 2004
+ppr_mono_ty ctxt_prec (HsBangTy b ty)     = ppr b <> ppr ty
 ppr_mono_ty ctxt_prec (HsTyVar name)      = ppr name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
 ppr_mono_ty ctxt_prec (HsTupleTy con tys) = tupleParens con (interpp'SP tys)

@@ -16,8 +16,6 @@ import IdInfo		( workerExists )
 import CoreUtils	( hashExpr, cheapEqExpr, exprIsBig, mkAltExpr, exprIsCheap )
 import DataCon		( isUnboxedTupleCon )
 import Type		( tyConAppArgs )
-import Subst		( InScopeSet, uniqAway, emptyInScopeSet, 
-			  extendInScopeSet, elemInScopeSet )
 import CoreSyn
 import VarEnv	
 import CoreLint		( showPass, endPass )
@@ -177,7 +175,8 @@ cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
 				     in Lam b' (cseExpr env' e)
 cseExpr env (Let bind e)    	   = let (env', bind') = cseBind env bind
 				     in Let bind' (cseExpr env' e)
-cseExpr env (Case scrut bndr alts) = Case scrut' bndr' (cseAlts env' scrut' bndr bndr' alts)
+-- gaw 2004
+cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr' ty (cseAlts env' scrut' bndr bndr' alts)
 				   where
 				     scrut' = tryForCSE env scrut
 				     (env', bndr') = addBinder env bndr

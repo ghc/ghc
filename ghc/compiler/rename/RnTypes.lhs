@@ -110,7 +110,7 @@ rnHsType doc (HsTyVar tyvar)
     returnM (HsTyVar tyvar')
 
 rnHsType doc (HsOpTy ty1 (L loc op) ty2)
-  = addSrcSpan loc (
+  = setSrcSpan loc (
       lookupOccRn op			`thenM` \ op' ->
       lookupTyFixityRn (L loc op')	`thenM` \ fix ->
       rnLHsType doc ty1			`thenM` \ ty1' ->
@@ -121,6 +121,10 @@ rnHsType doc (HsOpTy ty1 (L loc op) ty2)
 rnHsType doc (HsParTy ty)
   = rnLHsType doc ty 	        `thenM` \ ty' ->
     returnM (HsParTy ty')
+
+rnHsType doc (HsBangTy b ty)
+  = rnLHsType doc ty 	        `thenM` \ ty' ->
+    returnM (HsBangTy b ty')
 
 rnHsType doc (HsNumTy i)
   | i == 1    = returnM (HsNumTy i)
@@ -169,8 +173,8 @@ rnLHsTypes doc tys = mappM (rnLHsType doc) tys
 
 
 \begin{code}
-rnForAll :: SDoc -> HsExplicitForAll -> [LHsTyVarBndr RdrName] -> LHsContext RdrName
-  -> LHsType RdrName -> RnM (HsType Name)
+rnForAll :: SDoc -> HsExplicitForAll -> [LHsTyVarBndr RdrName]
+	 -> LHsContext RdrName -> LHsType RdrName -> RnM (HsType Name)
 
 rnForAll doc exp [] (L _ []) (L _ ty) = rnHsType doc ty
 	-- One reason for this case is that a type like Int#
@@ -210,7 +214,7 @@ by the presence of ->
 lookupTyFixityRn (L loc n)
   = doptM Opt_GlasgowExts 			`thenM` \ glaExts ->
     when (not glaExts) 
-    	(addSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
+    	(setSrcSpan loc $ addWarn (infixTyConWarn n))	`thenM_`
     lookupFixityRn n
 
 -- Building (ty1 `op1` (ty21 `op2` ty22))
@@ -531,7 +535,7 @@ checkTupSize tup_size
 
 forAllWarn doc ty (L loc tyvar)
   = ifOptM Opt_WarnUnusedMatches 	$
-    addSrcSpan loc $
+    setSrcSpan loc $
     addWarn (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
 		   nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
 		   $$

@@ -53,7 +53,7 @@ import OccName		( mkLocalOcc )
 import TyCon            ( isDataTyCon )
 import Module		( Module, mkModuleName )
 import ErrUtils		( dumpIfSet_dyn, showPass )
-import Panic		( assertPanic, trace )
+import Panic		( assertPanic )
 import qualified Module ( moduleName )
 
 #ifdef DEBUG

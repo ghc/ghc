@@ -22,7 +22,7 @@ module DsMeta( dsBracket,
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
 import MatchLit	  ( dsLit )
-import DsUtils    ( mkListExpr, mkStringLit, mkCoreTup, mkIntExpr )
+import DsUtils    ( mkListExpr, mkStringExpr, mkCoreTup, mkIntExpr )
 import DsMonad
 
 import qualified Language.Haskell.TH as TH
@@ -280,10 +280,10 @@ repC (L loc con_decl)
   = do	{ dsWarn (loc, hang ds_msg 4 (ppr con_decl))
 	; return (panic "DsMeta:repC") }
   where
-
+-- gaw 2004 FIX! Need a case for GadtDecl
 
 repBangTy :: LBangType Name -> DsM (Core (TH.StrictTypeQ))
-repBangTy (L _ (BangType str ty)) = do 
+repBangTy (L _ (HsBangTy str ty)) = do 
   MkC s <- rep2 strName []
   MkC t <- repLTy ty
   rep2 strictTypeName [s, t]
@@ -462,7 +462,7 @@ repE (HsIPVar x) = panic "DsMeta.repE: Can't represent implicit parameters"
 	-- HsOverlit can definitely occur
 repE (HsOverLit l) = do { a <- repOverloadedLiteral l; repLit a }
 repE (HsLit l)     = do { a <- repLiteral l;           repLit a }
-repE (HsLam m)     = repLambda m
+repE (HsLam (MatchGroup [m] _)) = repLambda m
 repE (HsApp x y)   = do {a <- repLE x; b <- repLE y; repApp a b}
 
 repE (OpApp e1 op fix e2) =
@@ -477,9 +477,9 @@ repE (NegApp x nm)        = do
 repE (HsPar x)            = repLE x
 repE (SectionL x y)       = do { a <- repLE x; b <- repLE y; repSectionL a b } 
 repE (SectionR x y)       = do { a <- repLE x; b <- repLE y; repSectionR a b } 
-repE (HsCase e ms)        = do { arg <- repLE e
-			       ; ms2 <- mapM repMatchTup ms
-			       ; repCaseE arg (nonEmptyCoreList ms2) }
+repE (HsCase e (MatchGroup ms _)) = do { arg <- repLE e
+				       ; ms2 <- mapM repMatchTup ms
+				       ; repCaseE arg (nonEmptyCoreList ms2) }
 repE (HsIf x y z)         = do
 			      a <- repLE x
 			      b <- repLE y
@@ -548,7 +548,7 @@ repE e = pprPanic "DsMeta.repE: Illegal expression form" (ppr e)
 -- Building representations of auxillary structures like Match, Clause, Stmt, 
 
 repMatchTup ::  LMatch Name -> DsM (Core TH.MatchQ) 
-repMatchTup (L _ (Match [p] ty (GRHSs guards wheres ty2))) =
+repMatchTup (L _ (Match [p] ty (GRHSs guards wheres))) =
   do { ss1 <- mkGenSyms (collectPatBinders p) 
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
@@ -559,7 +559,7 @@ repMatchTup (L _ (Match [p] ty (GRHSs guards wheres ty2))) =
      ; wrapGenSyns (ss1++ss2) match }}}
 
 repClauseTup ::  LMatch Name -> DsM (Core TH.ClauseQ)
-repClauseTup (L _ (Match ps ty (GRHSs guards wheres ty2))) =
+repClauseTup (L _ (Match ps ty (GRHSs guards wheres))) =
   do { ss1 <- mkGenSyms (collectPatsBinders ps) 
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
@@ -695,7 +695,7 @@ rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
 -- Note GHC treats declarations of a variable (not a pattern) 
 -- e.g.  x = g 5 as a Fun MonoBinds. This is indicated by a single match 
 -- with an empty list of patterns
-rep_bind (L loc (FunBind fn infx [L _ (Match [] ty (GRHSs guards wheres ty2))]))
+rep_bind (L loc (FunBind fn infx (MatchGroup [L _ (Match [] ty (GRHSs guards wheres))] _)))
  = do { (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
 	; fn'  <- lookupLBinder fn
@@ -704,13 +704,13 @@ rep_bind (L loc (FunBind fn infx [L _ (Match [] ty (GRHSs guards wheres ty2))]))
 	; ans' <- wrapGenSyns ss ans
 	; return (loc, ans') }
 
-rep_bind (L loc (FunBind fn infx ms))
+rep_bind (L loc (FunBind fn infx (MatchGroup ms _)))
  =   do { ms1 <- mapM repClauseTup ms
 	; fn' <- lookupLBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
         ; return (loc, ans) }
 
-rep_bind (L loc (PatBind pat (GRHSs guards wheres ty2)))
+rep_bind (L loc (PatBind pat (GRHSs guards wheres) ty2))
  =   do { patcore <- repLP pat 
         ; (ss,wherecore) <- repBinds wheres
 	; guardcore <- addBinds ss (repGuards guards)
@@ -752,7 +752,7 @@ rep_bind (L loc (VarBind v e))
 -- (\ p1 .. pn -> exp) by causing an error.  
 
 repLambda :: LMatch Name -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [L _ (ResultStmt e)])] [] _)))
+repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [L _ (ResultStmt e)])] [])))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
@@ -1273,7 +1273,7 @@ corePair :: (Core a, Core b) -> Core (a,b)
 corePair (MkC x, MkC y) = MkC (mkCoreTup [x,y])
 
 coreStringLit :: String -> DsM (Core String)
-coreStringLit s = do { z <- mkStringLit s; return(MkC z) }
+coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
 coreIntLit :: Int -> DsM (Core Int)
 coreIntLit i = return (MkC (mkIntExpr (fromIntegral i)))

@@ -37,11 +37,12 @@ import Var		( Id )
 import CoreLint		( lintUnfolding )
 import DsMeta		( templateHaskellNames )
 import BasicTypes	( Fixity )
+import SrcLoc		( SrcLoc, noSrcLoc )
 #endif
 
 import RdrName		( RdrName )
 import HsSyn		( HsModule )
-import SrcLoc		( SrcLoc, noSrcLoc, Located(..) )
+import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer )
 import Parser
 import Lexer		( P(..), ParseResult(..), mkPState )

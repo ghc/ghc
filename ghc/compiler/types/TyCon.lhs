@@ -5,7 +5,7 @@
 
 \begin{code}
 module TyCon(
-	TyCon, ArgVrcs, 
+	TyCon, ArgVrcs, FieldLabel,
 
 	PrimRep(..),
 	tyConPrimRep,
@@ -33,9 +33,9 @@ module TyCon(
 	tyConUnique,
 	tyConTyVars,
 	tyConArgVrcs,
-	algTyConRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
-	tyConSelIds,
-	tyConTheta,
+	algTcRhs, tyConDataCons, tyConDataCons_maybe, tyConFamilySize,
+	tyConFields, tyConSelIds,
+	tyConStupidTheta,
 	tyConArity,
 	isClassTyCon, tyConClass_maybe,
 	getSynTyConDefn,
@@ -53,7 +53,7 @@ import {-# SOURCE #-} TypeRep ( Type, PredType )
  -- Should just be Type(Type), but this fails due to bug present up to
  -- and including 4.02 involving slurping of hi-boot files.  Bug is now fixed.
 
-import {-# SOURCE #-} DataCon ( DataCon, isExistentialDataCon )
+import {-# SOURCE #-} DataCon ( DataCon, isVanillaDataCon )
 
 
 import Var   		( TyVar, Id )
@@ -90,21 +90,27 @@ data TyCon
 	tyConKind   :: Kind,
 	tyConArity  :: Arity,
 	
-	tyConTyVars   :: [TyVar],
-	argVrcs       :: ArgVrcs,
-	algTyConTheta :: [PredType],
+	tyConTyVars :: [TyVar],		-- Scopes over (a) the [PredType] in DataTyCon
+					--	       (b) the cached types in NewTyCon
+					--	       (c) the types in algTcFields
+					-- But not over the data constructors
+	argVrcs     :: ArgVrcs,
 
-	selIds      :: [Id],		-- Its record selectors (if any)
+	algTcFields :: [(FieldLabel, Type, Id)],  
+					-- Its fields (empty if none): 
+					-- * field name
+					-- * its type (scoped over tby tyConTyVars)
+					-- * record selector (name = field name)
 
-	algRhs :: AlgTyConRhs,	-- Data constructors in here
+	algTcRhs :: AlgTyConRhs,	-- Data constructors in here
 
-	algTyConRec :: RecFlag,		-- Tells whether the data type is part of 
+	algTcRec :: RecFlag,		-- Tells whether the data type is part of 
 					-- a mutually-recursive group or not
 
 	hasGenerics :: Bool,		-- True <=> generic to/from functions are available
 					--	    (in the exports of the data type's source module)
 
-	algTyConClass :: Maybe Class
+	algTcClass :: Maybe Class
 		-- Just cl if this tycon came from a class declaration
     }
 
@@ -149,6 +155,8 @@ data TyCon
 	argVrcs :: ArgVrcs
     }
 
+type FieldLabel = Name
+
 type ArgVrcs = [(Bool,Bool)]  -- Tyvar variance info: [(occPos,occNeg)]
 	-- [] means "no information, assume the worst"
 
@@ -159,6 +167,13 @@ data AlgTyConRhs
 			-- an hi file
 
   | DataTyCon 
+	(Maybe [PredType])	-- Just theta => this tycon was declared in H98 syntax
+				--		 with the specified "stupid theta"
+				--	e.g. data Ord a => T a = ...
+				-- Nothing => this tycon was declared by giving the
+				--	      type signatures for each constructor
+				--	      (new GADT stuff)
+				--	e.g. data T a where { ... }
 	[DataCon]	-- The constructors; can be empty if the user declares
 			--   the type to have no constructors
 	Bool		-- Cached: True <=> an enumeration type
@@ -184,9 +199,9 @@ data AlgTyConRhs
 	--     newtypes.
 
 visibleDataCons :: AlgTyConRhs -> [DataCon]
-visibleDataCons AbstractTyCon    = []
-visibleDataCons (DataTyCon cs _) = cs
-visibleDataCons (NewTyCon c _ _) = [c]
+visibleDataCons AbstractTyCon      = []
+visibleDataCons (DataTyCon _ cs _) = cs
+visibleDataCons (NewTyCon c _ _)   = [c]
 \end{code}
 
 %************************************************************************
@@ -251,36 +266,34 @@ mkFunTyCon name kind
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
-mkAlgTyCon name kind tyvars theta argvrcs rhs sels is_rec gen_info
+mkAlgTyCon name kind tyvars argvrcs rhs flds is_rec gen_info
   = AlgTyCon {	
-	tyConName      = name,
-	tyConUnique    = nameUnique name,
-	tyConKind      = kind,
-	tyConArity     = length tyvars,
-	tyConTyVars    = tyvars,
-	argVrcs	       = argvrcs,
-	algTyConTheta  = theta,
-	algRhs         = rhs,
-	selIds	       = sels,
-	algTyConClass  = Nothing,
-	algTyConRec    = is_rec,
-	hasGenerics    = gen_info
+	tyConName 	 = name,
+	tyConUnique	 = nameUnique name,
+	tyConKind	 = kind,
+	tyConArity	 = length tyvars,
+	tyConTyVars	 = tyvars,
+	argVrcs		 = argvrcs,
+	algTcRhs         = rhs,
+	algTcFields	 = flds,
+	algTcClass	 = Nothing,
+	algTcRec	 = is_rec,
+	hasGenerics = gen_info
     }
 
 mkClassTyCon name kind tyvars argvrcs rhs clas is_rec
   = AlgTyCon {	
-	tyConName      = name,
-	tyConUnique    = nameUnique name,
-	tyConKind      = kind,
-	tyConArity     = length tyvars,
-	tyConTyVars    = tyvars,
-	argVrcs	       = argvrcs,
-	algTyConTheta  = [],
-	algRhs	       = rhs,
-	selIds	       = [],
-	algTyConClass  = Just clas,
-	algTyConRec    = is_rec,
-	hasGenerics    = False
+	tyConName 	 = name,
+	tyConUnique	 = nameUnique name,
+	tyConKind	 = kind,
+	tyConArity	 = length tyvars,
+	tyConTyVars	 = tyvars,
+	argVrcs		 = argvrcs,
+	algTcRhs	 = rhs,
+	algTcFields	 = [],
+	algTcClass	 = Just clas,
+	algTcRec	 = is_rec,
+	hasGenerics = False
     }
 
 
@@ -351,7 +364,7 @@ isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
 
 isAbstractTyCon :: TyCon -> Bool
-isAbstractTyCon (AlgTyCon { algRhs = AbstractTyCon }) = True
+isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
 isAbstractTyCon _ = False
 
 isPrimTyCon :: TyCon -> Bool
@@ -369,10 +382,6 @@ isAlgTyCon (AlgTyCon {})   = True
 isAlgTyCon (TupleTyCon {}) = True
 isAlgTyCon other 	   = False
 
-algTyConRhs :: TyCon -> AlgTyConRhs
-algTyConRhs (AlgTyCon {algRhs = rhs})   = rhs
-algTyConRhs (TupleTyCon {dataCon = dc}) = DataTyCon [dc] False
-
 isDataTyCon :: TyCon -> Bool
 -- isDataTyCon returns True for data types that are represented by
 -- heap-allocated constructors.
@@ -381,18 +390,18 @@ isDataTyCon :: TyCon -> Bool
 --	True for all @data@ types
 --	False for newtypes
 --		  unboxed tuples
-isDataTyCon (AlgTyCon {algRhs = rhs})  
+isDataTyCon (AlgTyCon {algTcRhs = rhs})  
   = case rhs of
-	DataTyCon _ _  -> True
-	NewTyCon _ _ _ -> False
-	AbstractTyCon  -> panic "isDataTyCon"
+	DataTyCon _ _ _  -> True
+	NewTyCon _ _ _   -> False
+	AbstractTyCon    -> panic "isDataTyCon"
 
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon :: TyCon -> Bool
-isNewTyCon (AlgTyCon {algRhs = NewTyCon _ _ _}) = True 
-isNewTyCon other			        = False
+isNewTyCon (AlgTyCon {algTcRhs = NewTyCon _ _ _}) = True 
+isNewTyCon other			          = False
 
 isProductTyCon :: TyCon -> Bool
 -- A "product" tycon
@@ -402,10 +411,10 @@ isProductTyCon :: TyCon -> Bool
 --	may be  DataType or NewType, 
 -- 	may be  unboxed or not, 
 --	may be  recursive or not
-isProductTyCon tc@(AlgTyCon {}) = case algRhs tc of
-				    DataTyCon [data_con] _ -> not (isExistentialDataCon data_con)
-				    NewTyCon _ _ _         -> True
-				    other		   -> False
+isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
+				    DataTyCon _ [data_con] _ -> isVanillaDataCon data_con
+				    NewTyCon _ _ _           -> True
+				    other		     -> False
 isProductTyCon (TupleTyCon {})  = True   
 isProductTyCon other		= False
 
@@ -414,8 +423,8 @@ isSynTyCon (SynTyCon {}) = True
 isSynTyCon _		 = False
 
 isEnumerationTyCon :: TyCon -> Bool
-isEnumerationTyCon (AlgTyCon {algRhs = DataTyCon _ is_enum}) = is_enum
-isEnumerationTyCon other					  = False
+isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon _ _ is_enum}) = is_enum
+isEnumerationTyCon other				   	 = False
 
 isTupleTyCon :: TyCon -> Bool
 -- The unit tycon didn't used to be classed as a tuple tycon
@@ -435,13 +444,13 @@ isBoxedTupleTyCon other = False
 tupleTyConBoxity tc = tyConBoxed tc
 
 isRecursiveTyCon :: TyCon -> Bool
-isRecursiveTyCon (AlgTyCon {algTyConRec = Recursive}) = True
+isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
 isRecursiveTyCon other				      = False
 
 isHiBootTyCon :: TyCon -> Bool
 -- Used for knot-tying in hi-boot files
-isHiBootTyCon (AlgTyCon {algRhs = AbstractTyCon}) = True
-isHiBootTyCon other			          = False
+isHiBootTyCon (AlgTyCon {algTcRhs = AbstractTyCon}) = True
+isHiBootTyCon other			            = False
 
 isForeignTyCon :: TyCon -> Bool
 -- isForeignTyCon identifies foreign-imported type constructors
@@ -461,42 +470,44 @@ tyConDataCons :: TyCon -> [DataCon]
 tyConDataCons tycon = tyConDataCons_maybe tycon `orElse` []
 
 tyConDataCons_maybe :: TyCon -> Maybe [DataCon]
-tyConDataCons_maybe (AlgTyCon {algRhs = DataTyCon cons _}) = Just cons
-tyConDataCons_maybe (AlgTyCon {algRhs = NewTyCon con _ _}) = Just [con]
-tyConDataCons_maybe (TupleTyCon {dataCon = con})	   = Just [con]
-tyConDataCons_maybe other			           = Nothing
+tyConDataCons_maybe (AlgTyCon {algTcRhs = DataTyCon _ cons _}) = Just cons
+tyConDataCons_maybe (AlgTyCon {algTcRhs = NewTyCon con _ _})   = Just [con]
+tyConDataCons_maybe (TupleTyCon {dataCon = con})	       = Just [con]
+tyConDataCons_maybe other			               = Nothing
 
 tyConFamilySize  :: TyCon -> Int
-tyConFamilySize (AlgTyCon {algRhs = DataTyCon cons _}) = length cons
-tyConFamilySize (AlgTyCon {algRhs = NewTyCon _ _ _})   = 1
-tyConFamilySize (TupleTyCon {})	 		       = 1
+tyConFamilySize (AlgTyCon {algTcRhs = DataTyCon _ cons _}) = length cons
+tyConFamilySize (AlgTyCon {algTcRhs = NewTyCon _ _ _})     = 1
+tyConFamilySize (TupleTyCon {})	 			   = 1
 #ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 #endif
 
+tyConFields :: TyCon -> [(FieldLabel,Type,Id)]
+tyConFields (AlgTyCon {algTcFields = fs}) = fs
+tyConFields other_tycon		          = []
+
 tyConSelIds :: TyCon -> [Id]
-tyConSelIds (AlgTyCon {selIds = sels}) = sels
-tyConSelIds other_tycon		       = []
+tyConSelIds tc = [id | (_,_,id) <- tyConFields tc]
 \end{code}
 
 \begin{code}
 newTyConRep :: TyCon -> ([TyVar], Type)
-newTyConRep (AlgTyCon {tyConTyVars = tvs, algRhs = NewTyCon _ _ rep}) = (tvs, rep)
+newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ _ rep}) = (tvs, rep)
 
 newTyConRhs :: TyCon -> ([TyVar], Type)
-newTyConRhs (AlgTyCon {tyConTyVars = tvs, algRhs = NewTyCon _ rhs _}) = (tvs, rhs)
-\end{code}
+newTyConRhs (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon _ rhs _}) = (tvs, rhs)
 
-\begin{code}
 tyConPrimRep :: TyCon -> PrimRep
 tyConPrimRep (PrimTyCon {primTyConRep = rep}) = rep
 tyConPrimRep tc = ASSERT(not (isUnboxedTupleTyCon tc)) PtrRep
 \end{code}
 
 \begin{code}
-tyConTheta :: TyCon -> [PredType]
-tyConTheta (AlgTyCon {algTyConTheta = theta}) = theta
-tyConTheta (TupleTyCon {}) = []
+tyConStupidTheta :: TyCon -> [PredType]
+tyConStupidTheta (AlgTyCon {algTcRhs = DataTyCon mb_th _ _}) = mb_th `orElse` []
+tyConStupidTheta (AlgTyCon {algTcRhs = other})               = []
+tyConStupidTheta (TupleTyCon {})				= []
 -- shouldn't ask about anything else
 \end{code}
 
@@ -520,22 +531,22 @@ getSynTyConDefn (SynTyCon {tyConTyVars = tyvars, synTyConDefn = ty}) = (tyvars,t
 
 \begin{code}
 maybeTyConSingleCon :: TyCon -> Maybe DataCon
-maybeTyConSingleCon (AlgTyCon {algRhs = DataTyCon [c] _}) = Just c
-maybeTyConSingleCon (AlgTyCon {algRhs = NewTyCon c _ _})  = Just c
-maybeTyConSingleCon (AlgTyCon {})	        	  = Nothing
-maybeTyConSingleCon (TupleTyCon {dataCon = con}) 	  = Just con
-maybeTyConSingleCon (PrimTyCon {})               	  = Nothing
-maybeTyConSingleCon (FunTyCon {})                	  = Nothing  -- case at funty
+maybeTyConSingleCon (AlgTyCon {algTcRhs = DataTyCon _ [c] _}) = Just c
+maybeTyConSingleCon (AlgTyCon {algTcRhs = NewTyCon c _ _})    = Just c
+maybeTyConSingleCon (AlgTyCon {})	        	      = Nothing
+maybeTyConSingleCon (TupleTyCon {dataCon = con}) 	      = Just con
+maybeTyConSingleCon (PrimTyCon {})               	      = Nothing
+maybeTyConSingleCon (FunTyCon {})                	      = Nothing  -- case at funty
 maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $ ppr tc
 \end{code}
 
 \begin{code}
 isClassTyCon :: TyCon -> Bool
-isClassTyCon (AlgTyCon {algTyConClass = Just _}) = True
+isClassTyCon (AlgTyCon {algTcClass = Just _}) = True
 isClassTyCon other_tycon			 = False
 
 tyConClass_maybe :: TyCon -> Maybe Class
-tyConClass_maybe (AlgTyCon {algTyConClass = maybe_clas}) = maybe_clas
+tyConClass_maybe (AlgTyCon {algTcClass = maybe_clas}) = maybe_clas
 tyConClass_maybe ther_tycon				 = Nothing
 \end{code}
 

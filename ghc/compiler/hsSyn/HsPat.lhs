@@ -9,14 +9,11 @@ module HsPat (
 	
 	HsConDetails(..), hsConArgs,
 
-	mkPrefixConPat, mkCharLitPat, mkNilPat,
+	mkPrefixConPat, mkCharLitPat, mkNilPat, 
 
 	isWildPat, 
 	patsAreAllCons, isConPat, isSigPat,
-	patsAreAllLits,	isLitPat,
-	collectPatBinders, collectPatsBinders,
-	collectLocatedPatBinders, collectLocatedPatsBinders,
-	collectSigTysFromPat, collectSigTysFromPats
+	patsAreAllLits,	isLitPat
     ) where
 
 #include "HsVersions.h"
@@ -25,10 +22,12 @@ module HsPat (
 import {-# SOURCE #-} HsExpr		( HsExpr )
 
 -- friends:
+import HsBinds		( DictBinds, emptyLHsBinds, pprLHsBinds )
 import HsLit		( HsLit(HsCharPrim), HsOverLit )
 import HsTypes		( LHsType, SyntaxName, PostTcType )
 import BasicTypes	( Boxity, tupleParens )
 -- others:
+import PprCore		( {- instance OutputableBndr TyVar -} )
 import TysWiredIn	( nilDataCon, charDataCon, charTy )
 import Var		( TyVar )
 import DataCon		( DataCon )
@@ -48,6 +47,8 @@ data Pat id
   =	------------ Simple patterns ---------------
     WildPat	PostTcType		-- Wild card
   | VarPat	id			-- Variable
+  | VarPatOut	id (DictBinds id)	-- Used only for overloaded Ids; the 
+					-- bindings give its overloaded instances
   | LazyPat	(LPat id)		-- Lazy pattern
   | AsPat	(Located id) (LPat id)  -- As pattern
   | ParPat      (LPat id)		-- Parenthesised pattern
@@ -67,10 +68,11 @@ data Pat id
 		(HsConDetails id (LPat id))
 
   | ConPatOut	DataCon 
-		(HsConDetails id (LPat id))
-		Type    		-- The type of the pattern
 		[TyVar]			-- Existentially bound type variables
 		[id]			-- Ditto dictionaries
+		(DictBinds id)		-- Bindings involving those dictionaries
+		(HsConDetails id (LPat id))
+		Type    		-- The type of the pattern
 
 	------------ Literal and n+k patterns ---------------
   | LitPat	    HsLit		-- Used for *non-overloaded* literal patterns:
@@ -83,7 +85,6 @@ data Pat id
   | NPatOut	    HsLit		-- Used for literal patterns where there's an equality function to call
 		    			-- The literal is retained so that the desugarer can readily identify
 					-- equations with identical literal-patterns
-					-- Always HsInteger, HsRat or HsString.
 					-- Always HsInteger, HsRat or HsString.
 					-- *Unlike* NPatIn, for negative literals, the
 					-- 	literal is acutally negative!
@@ -110,10 +111,8 @@ data Pat id
   | SigPatIn	    (LPat id)		-- Pattern with a type signature
 		    (LHsType id)
 
-  | SigPatOut	    (LPat id)		-- Pattern p
-		    Type		-- Type, t, of the whole pattern
-		    (HsExpr id)		-- Coercion function,
-					-- of type t -> typeof(p)
+  | SigPatOut	    (LPat id)		-- Pattern with a type signature
+		    Type
 
 	------------ Dictionary patterns (translation only) ---------------
   | DictPat	    -- Used when destructing Dictionaries with an explicit case
@@ -146,9 +145,8 @@ hsConArgs (InfixCon p1 p2) = [p1,p2]
 instance (OutputableBndr name) => Outputable (Pat name) where
     ppr = pprPat
 
-pprPat :: (OutputableBndr name) => Pat name -> SDoc
-
-pprPat (VarPat var)	  	-- Print with type info if -dppr-debug is on
+pprPatBndr :: OutputableBndr name => name -> SDoc
+pprPatBndr var		  	-- Print with type info if -dppr-debug is on
   = getPprStyle $ \ sty ->
     if debugStyle sty then
 	parens (pprBndr LambdaBind var)		-- Could pass the site to pprPat
@@ -156,6 +154,10 @@ pprPat (VarPat var)	  	-- Print with type info if -dppr-debug is on
     else
 	ppr var
 
+pprPat :: (OutputableBndr name) => Pat name -> SDoc
+
+pprPat (VarPat var)  	  = pprPatBndr var
+pprPat (VarPatOut var bs) = parens (pprPatBndr var <+> braces (ppr bs))
 pprPat (WildPat _)	  = char '_'
 pprPat (LazyPat pat)      = char '~' <> ppr pat
 pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
@@ -165,35 +167,35 @@ pprPat (ListPat pats _)   = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)   = pabrackets (interpp'SP pats)
 pprPat (TuplePat pats bx) = tupleParens bx (interpp'SP pats)
 
-pprPat (ConPatIn c details) 	   = pprConPat c details
-pprPat (ConPatOut c details _ _ _) = pprConPat c details
+pprPat (ConPatIn con details) = pprUserCon con details
+pprPat (ConPatOut con tvs dicts binds details _) 
+  = getPprStyle $ \ sty ->	-- Tiresome; in TcBinds.tcRhs we print out a 
+    if debugStyle sty then 	-- typechecked Pat in an error message, 
+				-- and we want to make sure it prints nicely
+	ppr con <+> sep [ hsep (map pprPatBndr tvs) <+> hsep (map pprPatBndr dicts),
+		   	  pprLHsBinds binds, pprConArgs details]
+    else pprUserCon con details
 
 pprPat (LitPat s)	      = ppr s
 pprPat (NPatIn l _)	      = ppr l
 pprPat (NPatOut l _ _)        = ppr l
 pprPat (NPlusKPatIn n k _)    = hcat [ppr n, char '+', ppr k]
 pprPat (NPlusKPatOut n k _ _) = hcat [ppr n, char '+', integer k]
+pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
+pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
+pprPat (DictPat ds ms)	      = parens (sep [ptext SLIT("{-dict-}"),
+					     brackets (interpp'SP ds),
+					     brackets (interpp'SP ms)])
 
-pprPat (TypePat ty) = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
+pprUserCon c (InfixCon p1 p2) = ppr p1 <+> ppr c <+> ppr p2
+pprUserCon c details          = ppr c <+> pprConArgs details
 
-pprPat (SigPatIn pat ty)    = ppr pat <+> dcolon <+> ppr ty
-pprPat (SigPatOut pat ty _) = ppr pat <+> dcolon <+> ppr ty
-
-pprPat (DictPat dicts methods)
- = parens (sep [ptext SLIT("{-dict-}"),
-		  brackets (interpp'SP dicts),
-		  brackets (interpp'SP methods)])
-
-
-
-pprConPat con (PrefixCon pats) 	   = ppr con <+> interppSP pats -- inner ParPats supply the necessary parens.
-pprConPat con (InfixCon pat1 pat2) = hsep [ppr pat1, ppr con, ppr pat2] -- ParPats put in parens
-	-- ToDo: use pprSym to print op (but this involves fiddling various
-	-- contexts & I'm lazy...); *PatIns are *rarely* printed anyway... (WDP)
-pprConPat con (RecCon rpats)
-  = ppr con <+> braces (hsep (punctuate comma (map (pp_rpat) rpats)))
-  where
-    pp_rpat (v, p) = hsep [ppr v, char '=', ppr p]
+pprConArgs (PrefixCon pats) = interppSP pats
+pprConArgs (InfixCon p1 p2) = interppSP [p1,p2]
+pprConArgs (RecCon rpats)   = braces (hsep (punctuate comma (map (pp_rpat) rpats)))
+			    where
+			      pp_rpat (v, p) = hsep [ppr v, char '=', ppr p]
 
 
 -- add parallel array brackets around a document
@@ -212,7 +214,7 @@ pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \begin{code}
 mkPrefixConPat :: DataCon -> [OutPat id] -> Type -> OutPat id
 -- Make a vanilla Prefix constructor pattern
-mkPrefixConPat dc pats ty = noLoc $ ConPatOut dc (PrefixCon pats) ty [] []
+mkPrefixConPat dc pats ty = noLoc $ ConPatOut dc [] [] emptyLHsBinds (PrefixCon pats) ty
 
 mkNilPat :: Type -> OutPat id
 mkNilPat ty = mkPrefixConPat nilDataCon [] ty
@@ -258,18 +260,18 @@ isWildPat other	      = False
 patsAreAllCons :: [Pat id] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
-isConPat (AsPat _ pat)		= isConPat (unLoc pat)
-isConPat (ConPatIn _ _)		= True
-isConPat (ConPatOut _ _ _ _ _)	= True
-isConPat (ListPat _ _)		= True
-isConPat (PArrPat _ _)		= True
-isConPat (TuplePat _ _)		= True
-isConPat (DictPat ds ms)	= (length ds + length ms) > 1
-isConPat other			= False
+isConPat (AsPat _ pat)		 = isConPat (unLoc pat)
+isConPat (ConPatIn _ _)		 = True
+isConPat (ConPatOut _ _ _ _ _ _) = True
+isConPat (ListPat _ _)		 = True
+isConPat (PArrPat _ _)		 = True
+isConPat (TuplePat _ _)		 = True
+isConPat (DictPat ds ms)	 = (length ds + length ms) > 1
+isConPat other			 = False
 
-isSigPat (SigPatIn _ _)    = True
-isSigPat (SigPatOut _ _ _) = True
-isSigPat other		   = False
+isSigPat (SigPatIn _ _)  = True
+isSigPat (SigPatOut _ _) = True
+isSigPat other		 = False
 
 patsAreAllLits :: [Pat id] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list
@@ -283,80 +285,3 @@ isLitPat (NPlusKPatOut _ _ _ _) = True
 isLitPat other		        = False
 \end{code}
 
-%************************************************************************
-%*									*
-%* 		Gathering stuff out of patterns
-%*									*
-%************************************************************************
-
-This function @collectPatBinders@ works with the ``collectBinders''
-functions for @HsBinds@, etc.  The order in which the binders are
-collected is important; see @HsBinds.lhs@.
-
-It collects the bounds *value* variables in renamed patterns; type variables
-are *not* collected.
-
-\begin{code}
-collectPatBinders :: LPat a -> [a]
-collectPatBinders pat = map unLoc (collectLocatedPatBinders pat)
-
-collectLocatedPatBinders :: LPat a -> [Located a]
-collectLocatedPatBinders pat = collectl pat []
-
-collectPatsBinders :: [LPat a] -> [a]
-collectPatsBinders pats = map unLoc (collectLocatedPatsBinders pats)
-
-collectLocatedPatsBinders :: [LPat a] -> [Located a]
-collectLocatedPatsBinders pats = foldr collectl [] pats
-
-collectl (L l (VarPat var)) bndrs = L l var : bndrs
-collectl pat                bndrs = collect (unLoc pat) bndrs
-
-collect (WildPat _)	      	 bndrs = bndrs
-collect (LazyPat pat)     	 bndrs = collectl pat bndrs
-collect (AsPat a pat)     	 bndrs = a : collectl pat bndrs
-collect (ParPat  pat)     	 bndrs = collectl pat bndrs
-
-collect (ListPat pats _)    	 bndrs = foldr collectl bndrs pats
-collect (PArrPat pats _)    	 bndrs = foldr collectl bndrs pats
-collect (TuplePat pats _)  	 bndrs = foldr collectl bndrs pats
-
-collect (ConPatIn c ps)   	 bndrs = foldr collectl bndrs (hsConArgs ps)
-collect (ConPatOut c ps _ _ ds)	 bndrs = map noLoc ds
-					  ++ foldr collectl bndrs (hsConArgs ps)
-
-collect (LitPat _)	      	 bndrs = bndrs
-collect (NPatIn _ _)		 bndrs = bndrs
-collect (NPatOut _ _ _)		 bndrs = bndrs
-
-collect (NPlusKPatIn n _ _)      bndrs = n : bndrs
-collect (NPlusKPatOut n _ _ _)   bndrs = n : bndrs
-
-collect (SigPatIn pat _)	 bndrs = collectl pat bndrs
-collect (SigPatOut pat _ _)	 bndrs = collectl pat bndrs
-collect (TypePat ty)             bndrs = bndrs
-collect (DictPat ids1 ids2)      bndrs = map noLoc ids1 ++ map noLoc ids2
-					   ++ bndrs
-\end{code}
-
-\begin{code}
-collectSigTysFromPats :: [InPat name] -> [LHsType name]
-collectSigTysFromPats pats = foldr collect_lpat [] pats
-
-collectSigTysFromPat :: InPat name -> [LHsType name]
-collectSigTysFromPat pat = collect_lpat pat []
-
-collect_lpat pat acc = collect_pat (unLoc pat) acc
-
-collect_pat (SigPatIn pat ty)  acc = collect_lpat pat (ty:acc)
-collect_pat (TypePat ty)       acc = ty:acc
-
-collect_pat (LazyPat pat)      acc = collect_lpat pat acc
-collect_pat (AsPat a pat)      acc = collect_lpat pat acc
-collect_pat (ParPat  pat)      acc = collect_lpat pat acc
-collect_pat (ListPat pats _)   acc = foldr collect_lpat acc pats
-collect_pat (PArrPat pats _)   acc = foldr collect_lpat acc pats
-collect_pat (TuplePat pats _)  acc = foldr collect_lpat acc pats
-collect_pat (ConPatIn c ps)    acc = foldr collect_lpat acc (hsConArgs ps)
-collect_pat other	       acc = acc 	-- Literals, vars, wildcard
-\end{code}

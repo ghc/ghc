@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgExpr.lhs,v 1.59 2004/08/13 13:05:58 simonmar Exp $
+% $Id: CgExpr.lhs,v 1.60 2004/09/30 10:35:43 simonpj Exp $
 %
 %********************************************************
 %*							*

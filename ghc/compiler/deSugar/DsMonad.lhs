@@ -31,14 +31,13 @@ import TcRnMonad
 import HsSyn		( HsExpr, HsMatchContext, Pat )
 import TcIface		( tcIfaceGlobal )
 import HscTypes		( TyThing(..), TypeEnv, HscEnv, 
-			  IsBootInterface,
 			  tyThingId, tyThingTyCon, tyThingDataCon  )
 import Bag		( emptyBag, snocBag, Bag )
 import DataCon		( DataCon )
 import TyCon		( TyCon )
 import DataCon		( DataCon )
 import Id		( mkSysLocal, setIdUnique, Id )
-import Module		( Module, ModuleName, ModuleEnv )
+import Module		( Module )
 import Var		( TyVar, setTyVarUnique )
 import Outputable
 import SrcLoc		( noSrcSpan, SrcSpan )

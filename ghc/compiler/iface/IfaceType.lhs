@@ -30,7 +30,7 @@ import TyCon		( TyCon, isTupleTyCon, tyConArity, tupleTyConBoxity )
 import Var		( isId, tyVarKind, idType )
 import TysWiredIn	( listTyConName, parrTyConName, tupleTyCon, intTyConName, charTyConName, boolTyConName )
 import OccName		( OccName )
-import Name		( Name, getName, getOccName, nameModuleName, nameOccName, isInternalName )
+import Name		( Name, getName, getOccName, nameModuleName, nameOccName )
 import Module		( ModuleName )
 import BasicTypes	( IPName(..), Arity, Version, mapIPName, tupleParens, Boxity )
 import Outputable

@@ -14,10 +14,10 @@ import TcType		( Type, mkTyVarTy, tcSplitSigmaTy,
 			  tyVarsOfTypes, tyVarsOfTheta, isClassPred,
 			  mkForAllTys, tcCmpType
 			)
-import Subst		( Subst, mkSubst, substTy, mkSubst, extendSubstList, mkInScopeSet,
-			  simplBndr, simplBndrs, 
+import Subst		( Subst, SubstResult(..), mkSubst, mkSubst, extendTvSubstList, 
+			  simplBndr, simplBndrs, substTy,
 			  substAndCloneId, substAndCloneIds, substAndCloneRecIds,
-			  lookupIdSubst, substInScope
+			  substId, substInScope
 			) 
 import Var		( zapSpecPragmaId )
 import VarSet
@@ -595,7 +595,7 @@ specProgram dflags us binds
 	-- accidentally re-use a unique that's already in use
 	-- Easiest thing is to do it all at once, as if all the top-level
 	-- decls were mutually recursive
-    top_subst	    = mkSubst (mkInScopeSet (mkVarSet (bindersOfBinds binds))) emptySubstEnv
+    top_subst	    = mkSubst (mkInScopeSet (mkVarSet (bindersOfBinds binds)))
 
     go []	    = returnSM ([], emptyUDs)
     go (bind:binds) = go binds 				`thenSM` \ (binds', uds) ->
@@ -611,7 +611,7 @@ specProgram dflags us binds
 
 \begin{code}
 specVar :: Subst -> Id -> CoreExpr
-specVar subst v = case lookupIdSubst subst v of
+specVar subst v = case substId subst v of
 			DoneEx e   -> e
 			DoneId v _ -> Var v
 
@@ -658,10 +658,11 @@ specExpr subst e@(Lam _ _)
 	-- More efficient to collect a group of binders together all at once
 	-- and we don't want to split a lambda group with dumped bindings
 
-specExpr subst (Case scrut case_bndr alts)
+-- gaw 2004
+specExpr subst (Case scrut case_bndr ty alts)
   = specExpr subst scrut			`thenSM` \ (scrut', uds_scrut) ->
     mapAndCombineSM spec_alt alts	`thenSM` \ (alts', uds_alts) ->
-    returnSM (Case scrut' case_bndr' alts', uds_scrut `plusUDs` uds_alts)
+    returnSM (Case scrut' case_bndr' (substTy subst ty) alts', uds_scrut `plusUDs` uds_alts)
   where
     (subst_alt, case_bndr') = simplBndr subst case_bndr
 	-- No need to clone case binder; it can't float like a let(rec)
@@ -871,7 +872,7 @@ specDefn subst calls (fn, rhs)
 		       where
 		 	 mk_ty_arg rhs_tyvar Nothing   = Type (mkTyVarTy rhs_tyvar)
 			 mk_ty_arg rhs_tyvar (Just ty) = Type ty
-	   rhs_subst  = extendSubstList subst spec_tyvars [DoneTy ty | Just ty <- call_ts]
+	   rhs_subst  = extendTvSubstList subst (spec_tyvars `zip` [ty | Just ty <- call_ts])
 	in
 	cloneBinders rhs_subst rhs_dicts 		`thenSM` \ (rhs_subst', rhs_dicts') ->
 	let

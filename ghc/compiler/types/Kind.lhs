@@ -97,11 +97,6 @@ finding the GLB of the two.  Since the partial order is a tree, they only
 have a glb if one is a sub-kind of the other.  In that case, we bind the
 less-informative one to the more informative one.  Neat, eh?
 
-In the olden days, when we generalise, we make generic type variables
-whose kind is simple.  So generic type variables (other than built-in
-constants like 'error') always have simple kinds.  But I don't see any
-reason to do that any more (TcMType.zapTcTyVarToTyVar).
-
 
 \begin{code}
 liftedTypeKind   = LiftedTypeKind
@@ -165,6 +160,18 @@ isSubKind k1 k2 = False
 
 defaultKind :: Kind -> Kind
 -- Used when generalising: default kind '?' and '??' to '*'
+-- 
+-- When we generalise, we make generic type variables whose kind is
+-- simple (* or *->* etc).  So generic type variables (other than
+-- built-in constants like 'error') always have simple kinds.  This is important;
+-- consider
+--	f x = True
+-- We want f to get type
+--	f :: forall (a::*). a -> Bool
+-- Not 
+--	f :: forall (a::??). a -> Bool
+-- because that would allow a call like (f 3#) as well as (f True),
+--and the calling conventions differ.  This defaulting is done in TcMType.zonkTcTyVarBndr.
 defaultKind OpenTypeKind = LiftedTypeKind
 defaultKind ArgTypeKind  = LiftedTypeKind
 defaultKind kind	 = kind

@@ -45,13 +45,15 @@ import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe,
 import ForeignCall	( CExportSpec(..), CCallTarget(..), 
 			  CLabelString, isCLabelString,
 			  isDynamicTarget, withDNTypes, DNKind(..), DNCallSpec(..) ) 
-import MachOp		( machRepByteWidth )
 import PrelNames	( hasKey, ioTyConKey )
 import CmdLineOpts	( dopt_HscLang, HscLang(..) )
 import Outputable
 import SrcLoc		( Located(..), srcSpanStart )
-import Bag		( emptyBag, consBag )
+import Bag		( consBag )
 
+#if alpha_TARGET_ARCH
+import MachOp		( machRepByteWidth )
+#endif
 \end{code}
 
 \begin{code}
@@ -200,7 +202,7 @@ checkFEDArgs arg_tys = returnM ()
 tcForeignExports :: [LForeignDecl Name] 
     		 -> TcM (LHsBinds TcId, [LForeignDecl TcId])
 tcForeignExports decls
-  = foldlM combine (emptyBag, []) (filter isForeignExport decls)
+  = foldlM combine (emptyLHsBinds, []) (filter isForeignExport decls)
   where
    combine (binds, fs) fe = 
        wrapLocSndM tcFExport fe	`thenM` \ (b, f) ->

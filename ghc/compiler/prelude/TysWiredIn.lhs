@@ -69,11 +69,9 @@ import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
 			)
 
-import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..),
-			  Fixity(..), FixityDirection(..), defaultFixity )
+import BasicTypes	( Arity, RecFlag(..), Boxity(..), isBoxed, StrictnessMark(..) )
 
-import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, 
-			  ThetaType, TyThing(..) )
+import Type		( Type, mkTyConTy, mkTyConApp, mkTyVarTy, mkTyVarTys, TyThing(..) )
 import Kind		( mkArrowKinds, liftedTypeKind, ubxTupleKind )
 import Unique		( incrUnique, mkTupleTyConUnique,
 			  mkTupleDataConUnique, mkPArrDataConUnique )
@@ -177,10 +175,9 @@ pcTyCon is_enum is_rec name tyvars argvrcs cons
     tycon = mkAlgTyCon name
 		(mkArrowKinds (map tyVarKind tyvars) liftedTypeKind)
                 tyvars
-                []              -- No context
                 argvrcs
-                (DataTyCon cons is_enum)
-		[]		-- No record selectors
+                (DataTyCon (Just []) cons is_enum)
+		[] 		-- No record selectors
                 is_rec
 		True		-- All the wired-in tycons have generics
 
@@ -198,11 +195,12 @@ pcDataConWithFixity :: Bool -> Name -> [TyVar] -> [Type] -> TyCon -> DataCon
 pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
   = data_con
   where
-    data_con = mkDataCon dc_name declared_infix
+    data_con = mkDataCon dc_name declared_infix True {- Vanilla -}
                 (map (const NotMarkedStrict) arg_tys)
                 [{- No labelled fields -}]
-                tyvars [] [] [] arg_tys tycon 
+                tyvars [] [] arg_tys tycon (mkTyVarTys tyvars)
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
+		
 
     mod      = nameModule dc_name
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)

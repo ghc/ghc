@@ -10,7 +10,7 @@ module DsArrows ( dsProcExpr ) where
 
 import Match		( matchSimply )
 import DsUtils		( mkErrorAppDs,
-			  mkCoreTupTy, mkCoreTup, selectMatchVarL,
+			  mkCoreTupTy, mkCoreTup, selectSimpleMatchVarL,
 			  mkTupleCase, mkBigCoreTup, mkTupleType,
 			  mkTupleExpr, mkTupleSelector,
 			  dsReboundNames, lookupReboundName )
@@ -26,8 +26,8 @@ import TcHsSyn		( hsPatType )
 
 import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLet )
 
-import TcType		( Type, tcSplitAppTy )
-import Type		( mkTyConApp )
+import TcType		( Type, tcSplitAppTy, mkFunTy )
+import Type		( mkTyConApp, funArgTy )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( mkIfThenElse, bindNonRec, exprType )
@@ -44,7 +44,7 @@ import PrelNames	( eitherTyConName, leftDataConName, rightDataConName,
 import Util		( mapAccumL )
 import Outputable
 
-import HsPat		( collectPatBinders, collectPatsBinders )
+import HsUtils		( collectPatBinders, collectPatsBinders )
 import VarSet		( IdSet, mkVarSet, varSetElems,
 			  intersectVarSet, minusVarSet, extendVarSetList, 
 			  unionVarSet, unionVarSets, elemVarSet )
@@ -139,7 +139,8 @@ coreCaseTuple uniqs scrut_var vars body
 
 coreCasePair :: Id -> Id -> Id -> CoreExpr -> CoreExpr
 coreCasePair scrut_var var1 var2 body
-  = Case (Var scrut_var) scrut_var
+-- gaw 2004 
+  = Case (Var scrut_var) scrut_var (exprType body)
          [(DataAlt (tupleCon Boxed 2), [var1, var2], body)]
 \end{code}
 
@@ -258,7 +259,7 @@ dsProcExpr pat (L _ (HsCmdTop cmd [] cmd_ty ids))
 	env_ty = mkTupleType env_ids
     in
     mkFailExpr ProcExpr env_ty		`thenDs` \ fail_expr ->
-    selectMatchVarL pat			`thenDs` \ var ->
+    selectSimpleMatchVarL pat		`thenDs` \ var ->
     matchSimply (Var var) ProcExpr pat (mkTupleExpr env_ids) fail_expr
 					`thenDs` \ match_code ->
     let
@@ -388,7 +389,7 @@ dsCmd ids local_vars env_ids stack res_ty (HsApp cmd arg)
 --		---> arr (\ ((((xs), p1), ... pk)*ts) -> ((ys)*ts)) >>> c
 
 dsCmd ids local_vars env_ids stack res_ty
-    (HsLam (L _ (Match pats _ (GRHSs [L _ (GRHS [L _ (ResultStmt body)])] _ _cmd_ty))))
+    (HsLam (MatchGroup [L _ (Match pats _ (GRHSs [L _ (GRHS [L _ (ResultStmt body)])] _ ))] _))
   = let
 	pat_vars = mkVarSet (collectPatsBinders pats)
 	local_vars' = local_vars `unionVarSet` pat_vars
@@ -489,7 +490,7 @@ case bodies, containing the following fields:
    bodies with |||.
 
 \begin{code}
-dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches)
+dsCmd ids local_vars env_ids stack res_ty (HsCase exp (MatchGroup matches match_ty))
   = dsLExpr exp				`thenDs` \ core_exp ->
     mappM newSysLocalDs stack		`thenDs` \ stack_ids ->
 
@@ -535,8 +536,13 @@ dsCmd ids local_vars env_ids stack res_ty (HsCase exp matches)
 	(_, matches') = mapAccumL (replaceLeavesMatch res_ty) leaves' matches
 	in_ty = envStackType env_ids stack
 	fvs_exp = exprFreeVars core_exp `intersectVarSet` local_vars
+
+	pat_ty    = funArgTy match_ty
+	match_ty' = mkFunTy pat_ty sum_ty
+	-- Note that we replace the HsCase result type by sum_ty,
+	-- which is the type of matches'
     in
-    dsExpr (HsCase exp matches') `thenDs` \ core_body ->
+    dsExpr (HsCase exp (MatchGroup matches' match_ty')) `thenDs` \ core_body ->
     matchEnvStack env_ids stack_ids core_body
 					`thenDs` \ core_matches ->
     returnDs(do_map_arrow ids in_ty sum_ty res_ty core_matches core_choices,
@@ -755,7 +761,6 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd)
     -- projection function
     --		\ (p, (xs2)) -> (zs)
 
-    selectMatchVarL pat			`thenDs` \ pat_id ->
     newSysLocalDs env_ty2		`thenDs` \ env_id ->
     newUniqueSupply			`thenDs` \ uniqs ->
     let
@@ -764,6 +769,7 @@ dsCmdStmt ids local_vars env_ids out_ids (BindStmt pat cmd)
 	body_expr = coreCaseTuple uniqs env_id env_ids2 (mkTupleExpr out_ids)
     in
     mkFailExpr (StmtCtxt DoExpr) out_ty	`thenDs` \ fail_expr ->
+    selectSimpleMatchVarL pat		`thenDs` \ pat_id ->
     matchSimply (Var pat_id) (StmtCtxt DoExpr) pat body_expr fail_expr
 					`thenDs` \ match_code ->
     newSysLocalDs after_c_ty		`thenDs` \ pair_id ->
@@ -999,7 +1005,7 @@ List of leaf expressions, with set of variables bound in each
 
 \begin{code}
 leavesMatch :: LMatch Id -> [(LHsExpr Id, IdSet)]
-leavesMatch (L _ (Match pats _ (GRHSs grhss binds _ty)))
+leavesMatch (L _ (Match pats _ (GRHSs grhss binds)))
   = let
 	defined_vars = mkVarSet (collectPatsBinders pats)
 			`unionVarSet`
@@ -1021,11 +1027,11 @@ replaceLeavesMatch
 	-> LMatch Id	-- the matches of a case command
 	-> ([LHsExpr Id],-- remaining leaf expressions
 	    LMatch Id)	-- updated match
-replaceLeavesMatch res_ty leaves (L loc (Match pat mt (GRHSs grhss binds _ty)))
+replaceLeavesMatch res_ty leaves (L loc (Match pat mt (GRHSs grhss binds)))
   = let
 	(leaves', grhss') = mapAccumL replaceLeavesGRHS leaves grhss
     in
-    (leaves', L loc (Match pat mt (GRHSs grhss' binds res_ty)))
+    (leaves', L loc (Match pat mt (GRHSs grhss' binds)))
 
 replaceLeavesGRHS
 	:: [LHsExpr Id]	-- replacement leaf expressions of that type

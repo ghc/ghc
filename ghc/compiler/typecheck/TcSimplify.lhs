@@ -21,7 +21,7 @@ module TcSimplify (
 
 import {-# SOURCE #-} TcUnify( unifyTauTy )
 import TcEnv		-- temp
-import HsSyn		( HsBind(..), LHsBinds, HsExpr(..), LHsExpr, pprLHsBinds )
+import HsSyn		( HsBind(..), HsExpr(..), LHsExpr, emptyLHsBinds )
 import TcHsSyn		( TcId, TcDictBinds, mkHsApp, mkHsTyApp, mkHsDictApp )
 
 import TcRnMonad
@@ -41,8 +41,8 @@ import Inst		( lookupInst, LookupInstResult(..),
 import TcEnv		( tcGetGlobalTyVars, tcLookupId, findGlobals )
 import InstEnv		( lookupInstEnv, classInstances )
 import TcMType		( zonkTcTyVarsAndFV, tcInstTyVars, checkAmbiguity )
-import TcType		( TcTyVar, TcTyVarSet, ThetaType, TyVarDetails(VanillaTv),
-			  mkClassPred, isOverloadedTy, mkTyConApp,
+import TcType		( TcTyVar, TcTyVarSet, ThetaType, 
+                          mkClassPred, isOverloadedTy, mkTyConApp,
 			  mkTyVarTy, tcGetTyVar, isTyVarClassPred, mkTyVarTys,
 			  tyVarsOfPred, tcEqType, pprPred )
 import Id		( idType, mkUserLocal )
@@ -54,7 +54,7 @@ import FunDeps		( oclose, grow, improve, pprEquationDoc )
 import PrelInfo		( isNumericClass ) 
 import PrelNames	( splitName, fstName, sndName, integerTyConName,
 			  showClassKey, eqClassKey, ordClassKey )
-import Subst		( mkTopTyVarSubst, substTheta, substTy )
+import Type		( zipTopTvSubst, substTheta, substTy )
 import TysWiredIn	( pairTyCon, doubleTy )
 import ErrUtils		( Message )
 import VarSet
@@ -651,7 +651,8 @@ inferLoop doc tau_tvs wanteds
 	  | isClassDict inst 		  = DontReduceUnlessConstant	-- Dicts
 	  | otherwise	    		  = ReduceMe 			-- Lits and Methods
     in
-    traceTc (text "infloop" <+> vcat [ppr tau_tvs', ppr wanteds', ppr preds, ppr (grow preds tau_tvs'), ppr qtvs])	`thenM_`
+    traceTc (text "infloop" <+> vcat [ppr tau_tvs', ppr wanteds', ppr preds, 
+				      ppr (grow preds tau_tvs'), ppr qtvs])	`thenM_`
 		-- Step 2
     reduceContext doc try_me [] wanteds'    `thenM` \ (no_improvement, frees, binds, irreds) ->
 
@@ -765,7 +766,8 @@ tcSimplifyCheck doc qtvs givens wanted_lie
 		 givens wanted_lie	`thenM` \ (qtvs', binds) ->
     returnM binds
   where
-    get_qtvs = zonkTcTyVarsAndFV qtvs
+--    get_qtvs = zonkTcTyVarsAndFV qtvs
+    get_qtvs = return (mkVarSet qtvs)
 
 
 -- tcSimplifyInferCheck is used when we know the constraints we are to simplify
@@ -1170,30 +1172,37 @@ For each method @Inst@ in the @init_lie@ that mentions one of the
 @LIE@), as well as the @HsBinds@ generated.
 
 \begin{code}
-bindInstsOfLocalFuns ::	[Inst] -> [TcId] -> TcM (LHsBinds TcId)
+bindInstsOfLocalFuns ::	[Inst] -> [TcId] -> TcM TcDictBinds
+-- Simlifies only MethodInsts, and generate only bindings of form 
+--	fm = f tys dicts
+-- We're careful not to even generate bindings of the form
+--	d1 = d2
+-- You'd think that'd be fine, but it interacts with what is
+-- arguably a bug in Match.tidyEqnInfo (see notes there)
 
 bindInstsOfLocalFuns wanteds local_ids
   | null overloaded_ids
 	-- Common case
   = extendLIEs wanteds		`thenM_`
-    returnM emptyBag
+    returnM emptyLHsBinds
 
   | otherwise
-  = simpleReduceLoop doc try_me wanteds		`thenM` \ (frees, binds, irreds) ->
+  = simpleReduceLoop doc try_me for_me	`thenM` \ (frees, binds, irreds) ->
     ASSERT( null irreds )
+    extendLIEs not_for_me	`thenM_`
     extendLIEs frees		`thenM_`
     returnM binds
   where
     doc		     = text "bindInsts" <+> ppr local_ids
     overloaded_ids   = filter is_overloaded local_ids
     is_overloaded id = isOverloadedTy (idType id)
+    (for_me, not_for_me) = partition (isMethodFor overloaded_set) wanteds
 
     overloaded_set = mkVarSet overloaded_ids	-- There can occasionally be a lot of them
 						-- so it's worth building a set, so that
 						-- lookup (in isMethodFor) is faster
-
-    try_me inst | isMethodFor overloaded_set inst = ReduceMe
-		| otherwise		          = Free
+    try_me inst | isMethod inst = ReduceMe
+		| otherwise	= Free
 \end{code}
 
 
@@ -1562,8 +1571,8 @@ tcImprove avails
 	returnM False
   where
     unify ((qtvs, pairs), doc)
-	 = addErrCtxt doc				$
-	   tcInstTyVars VanillaTv (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
+	 = addErrCtxt doc			$
+	   tcInstTyVars (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
 	   mapM_ (unif_pr tenv) pairs
     unif_pr tenv (ty1,ty2) =  unifyTauTy (substTy tenv ty1) (substTy tenv ty2)
 \end{code}
@@ -1772,7 +1781,7 @@ addSCs is_loop avails dict
   where
     (clas, tys) = getDictClassTys dict
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
-    sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
+    sc_theta' = substTheta (zipTopTvSubst tyvars tys) sc_theta
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
       | add_me sc_dict = addSCs is_loop avails' sc_dict
@@ -2116,11 +2125,11 @@ tcSimplifyDeriv :: [TyVar]
 	        -> TcM ThetaType	-- Needed
 
 tcSimplifyDeriv tyvars theta
-  = tcInstTyVars VanillaTv tyvars			`thenM` \ (tvs, _, tenv) ->
+  = tcInstTyVars tyvars			`thenM` \ (tvs, _, tenv) ->
 	-- The main loop may do unification, and that may crash if 
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
-    newDicts DataDeclOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
+    newDicts DerivOrigin (substTheta tenv theta)	`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds		`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )			-- reduceMe never returns Free
 
@@ -2152,7 +2161,7 @@ tcSimplifyDeriv tyvars theta
 	  -- of problems; in particular, it's hard to compare solutions for
 	  -- equality when finding the fixpoint.  So I just rule it out for now.
   
-	rev_env = mkTopTyVarSubst tvs (mkTyVarTys tyvars)
+	rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
 		-- This reverse-mapping is a Royal Pain, 
 		-- but the result should mention TyVars not TcTyVars
     in
@@ -2174,7 +2183,7 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 		  -> TcM ()
 
 tcSimplifyDefault theta
-  = newDicts DataDeclOrigin theta		`thenM` \ wanteds ->
+  = newDicts DefaultOrigin theta		`thenM` \ wanteds ->
     simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, _, irreds) ->
     ASSERT( null frees )	-- try_me never returns Free
     addNoInstanceErrs Nothing []  irreds 	`thenM_`
@@ -2330,7 +2339,7 @@ addTopAmbigErrs dicts
     report :: [(Inst,[TcTyVar])] -> TcM ()
     report pairs@((inst,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
 	= mkMonomorphismMsg tidy_env dicts	`thenM` \ (tidy_env, mono_msg) ->
-	  addSrcSpan (instLocSrcSpan (instLoc inst)) $
+	  setSrcSpan (instLocSrcSpan (instLoc inst)) $
 		-- the location of the first one will do for the err message
 	  addErrTcM (tidy_env, msg $$ mono_msg)
 	where

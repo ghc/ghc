@@ -5,20 +5,13 @@
 
 \begin{code}
 module Subst (
-	-- In-scope set
-	InScopeSet, emptyInScopeSet, mkInScopeSet,
-	extendInScopeSet, extendInScopeSetList,
-	lookupInScope, elemInScopeSet, uniqAway,
-
-
 	-- Substitution stuff
-	Subst, TyVarSubst, IdSubst,
-	emptySubst, mkSubst, substEnv, substInScope,
-	lookupSubst, lookupIdSubst, isEmptySubst, extendSubst, extendSubstList,
+	Subst, SubstResult(..),
+	emptySubst, mkSubst, substInScope, substTy,
+	lookupIdSubst, lookupTvSubst, isEmptySubst, 
+ 	extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
 	zapSubstEnv, setSubstEnv, 
-	setInScope, 
-	extendInScope, extendInScopeList, extendNewInScope, extendNewInScopeList, 
-	isInScope, modifyInScope,
+	getTvSubst, getTvSubstEnv, setTvSubstEnv, 
 
 	bindSubst, unBindSubst, bindSubstList, unBindSubstList,
 
@@ -26,17 +19,16 @@ module Subst (
 	simplBndr, simplBndrs, simplLetId, simplLamBndr, simplIdInfo,
 	substAndCloneId, substAndCloneIds, substAndCloneRecIds,
 
-	-- Type stuff
-	mkTyVarSubst, mkTopTyVarSubst, 
-	substTyWith, substTy, substTheta, deShadowTy,
+	setInScope, setInScopeSet, 
+	extendInScope, extendInScopeIds,
+	isInScope, modifyInScope,
 
 	-- Expression stuff
-	substExpr, substRules
+	substExpr, substRules, substId
     ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( opt_PprStyle_Debug )
 import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			  CoreRules(..), CoreRule(..), 
 			  isEmptyCoreRules, seqRules, hasUnfolding, noUnfolding, hasSomeUnfolding,
@@ -44,10 +36,10 @@ import CoreSyn		( Expr(..), Bind(..), Note(..), CoreExpr,
 			)
 import CoreFVs		( exprFreeVars )
 import CoreUtils	( exprIsTrivial )
-import TypeRep		( Type(..), TyNote(..) )  -- friend
-import Type		( ThetaType, PredType(..), 
-			  tyVarsOfType, tyVarsOfTypes, mkAppTy, 
-			)
+
+import qualified Type	( substTy )
+import Type		( Type, tyVarsOfType, mkTyVarTy,
+			  TvSubstEnv, TvSubst(..), substTyVar )
 import VarSet
 import VarEnv
 import Var		( setVarUnique, isId, mustHaveLocalBinding )
@@ -62,96 +54,13 @@ import IdInfo		( IdInfo, vanillaIdInfo,
 			  WorkerInfo(..), workerExists, workerInfo, setWorkerInfo, WorkerInfo
 			)
 import BasicTypes	( OccInfo(..) )
-import Unique		( Unique, Uniquable(..), deriveUnique )
-import UniqSet		( elemUniqSet_Directly )
+import Unique		( Unique )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply )
 import Var		( Var, Id, TyVar, isTyVar )
 import Outputable
 import PprCore		()		-- Instances
-import UniqFM		( ufmToList )	-- Yuk (add a new op to VarEnv)
-import Util		( mapAccumL, foldl2, seqList )
+import Util		( mapAccumL, foldl2 )
 import FastTypes
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection{The in-scope set}
-%*									*
-%************************************************************************
-
-\begin{code}
-data InScopeSet = InScope (VarEnv Var) FastInt
-	-- The Int# is a kind of hash-value used by uniqAway
-	-- For example, it might be the size of the set
-	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
-
-emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyVarSet 1#
-
-mkInScopeSet :: VarEnv Var -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope 1#
-
-extendInScopeSet :: InScopeSet -> Var -> InScopeSet
-extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# 1#)
-
-extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
-extendInScopeSetList (InScope in_scope n) vs
-   = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
-		    (n +# iUnbox (length vs))
-
-modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
--- Exploit the fact that the in-scope "set" is really a map
--- 	Make old_v map to new_v
-modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_scope old_v new_v) (n +# 1#)
-
-delInScopeSet :: InScopeSet -> Var -> InScopeSet
-delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
-
-elemInScopeSet :: Var -> InScopeSet -> Bool
-elemInScopeSet v (InScope in_scope n) = v `elemVarEnv` in_scope
-
-lookupInScope :: InScopeSet -> Var -> Var
--- It's important to look for a fixed point
--- When we see (case x of y { I# v -> ... })
--- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder).
--- When we lookup up an occurrence of x, we map to y, but then
--- we want to look up y in case it has acquired more evaluation information by now.
-lookupInScope (InScope in_scope n) v 
-  = go v
-  where
-    go v = case lookupVarEnv in_scope v of
-		Just v' | v == v'   -> v'	-- Reached a fixed point
-			| otherwise -> go v'
-		Nothing		    -> WARN( mustHaveLocalBinding v, ppr v )
-				       v
-\end{code}
-
-\begin{code}
-uniqAway :: InScopeSet -> Var -> Var
--- (uniqAway in_scope v) finds a unique that is not used in the
--- in-scope set, and gives that to v.  It starts with v's current unique, of course,
--- in the hope that it won't have to change it, and thereafter uses a combination
--- of that and the hash-code found in the in-scope set
-uniqAway (InScope set n) var
-  | not (var `elemVarSet` set) = var				-- Nothing to do
-  | otherwise		       = try 1#
-  where
-    orig_unique = getUnique var
-    try k 
-#ifdef DEBUG
-	  | k ># 1000#
-	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
-#endif			    
-	  | uniq `elemUniqSet_Directly` set = try (k +# 1#)
-#ifdef DEBUG
-	  | opt_PprStyle_Debug && k ># 3#
-	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
-	    setVarUnique var uniq
-#endif			    
-	  | otherwise = setVarUnique var uniq
-	  where
-	    uniq = deriveUnique orig_unique (iBox (n *# k))
 \end{code}
 
 
@@ -162,8 +71,11 @@ uniqAway (InScope set n) var
 %************************************************************************
 
 \begin{code}
-data Subst = Subst InScopeSet		-- In scope
-		   SubstEnv		-- Substitution itself
+data Subst 
+  = Subst InScopeSet	-- Variables in in scope (both Ids and TyVars)
+	  IdSubstEnv	-- Substitution for Ids
+	  TvSubstEnv	-- Substitution for TyVars
+
 	-- INVARIANT 1: The (domain of the) in-scope set is a superset
 	-- 	        of the free vars of the range of the substitution
 	--		that might possibly clash with locally-bound variables
@@ -190,7 +102,14 @@ data Subst = Subst InScopeSet		-- In scope
 	--	 other is an out-Id. So the substitution is idempotent in the sense
 	--	 that we *must not* repeatedly apply it.]
 
-type IdSubst    = Subst
+
+type IdSubstEnv = IdEnv SubstResult
+
+data SubstResult
+  = DoneEx CoreExpr		-- Completed term
+  | DoneId Id OccInfo		-- Completed term variable, with occurrence info;
+				-- only used by the simplifier
+  | ContEx Subst CoreExpr  	-- A suspended substitution
 \end{code}
 
 The general plan about the substitution and in-scope set for Ids is as follows
@@ -232,90 +151,90 @@ The general plan about the substitution and in-scope set for Ids is as follows
 
 \begin{code}
 isEmptySubst :: Subst -> Bool
-isEmptySubst (Subst _ env) = isEmptySubstEnv env
+isEmptySubst (Subst _ id_env tv_env) = isEmptyVarEnv id_env && isEmptyVarEnv tv_env
 
 emptySubst :: Subst
-emptySubst = Subst emptyInScopeSet emptySubstEnv
+emptySubst = Subst emptyInScopeSet emptyVarEnv emptyVarEnv
 
-mkSubst :: InScopeSet -> SubstEnv -> Subst
-mkSubst in_scope env = Subst in_scope env
+mkSubst :: InScopeSet -> Subst
+mkSubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv
 
-substEnv :: Subst -> SubstEnv
-substEnv (Subst _ env) = env
+getTvSubst :: Subst -> TvSubst
+getTvSubst (Subst in_scope _ tv_env) = TvSubst in_scope tv_env
+
+getTvSubstEnv :: Subst -> TvSubstEnv
+getTvSubstEnv (Subst _ _ tv_env) = tv_env
+
+setTvSubstEnv :: Subst -> TvSubstEnv -> Subst
+setTvSubstEnv (Subst in_scope ids _) tvs = Subst in_scope ids tvs
+
+
 
 substInScope :: Subst -> InScopeSet
-substInScope (Subst in_scope _) = in_scope
+substInScope (Subst in_scope _ _) = in_scope
 
 zapSubstEnv :: Subst -> Subst
-zapSubstEnv (Subst in_scope env) = Subst in_scope emptySubstEnv
+zapSubstEnv (Subst in_scope _ _) = Subst in_scope emptyVarEnv emptyVarEnv
 
 -- ToDo: add an ASSERT that fvs(subst-result) is already in the in-scope set
-extendSubst :: Subst -> Var -> SubstResult -> Subst
-extendSubst (Subst in_scope env) v r = Subst in_scope (extendSubstEnv env v r)
+extendIdSubst :: Subst -> Id -> SubstResult -> Subst
+extendIdSubst (Subst in_scope ids tvs) v r = Subst in_scope (extendVarEnv ids v r) tvs
 
-extendSubstList :: Subst -> [Var] -> [SubstResult] -> Subst
-extendSubstList (Subst in_scope env) v r = Subst in_scope (extendSubstEnvList env v r)
+extendIdSubstList :: Subst -> [(Id, SubstResult)] -> Subst
+extendIdSubstList (Subst in_scope ids tvs) prs = Subst in_scope (extendVarEnvList ids prs) tvs
 
-lookupSubst :: Subst -> Var -> Maybe SubstResult
-lookupSubst (Subst _ env) v = lookupSubstEnv env v
+extendTvSubst :: Subst -> TyVar -> Type -> Subst
+extendTvSubst (Subst in_scope ids tvs) v r = Subst in_scope ids (extendVarEnv tvs v r) 
 
-lookupIdSubst :: Subst -> Id -> SubstResult
--- Does the lookup in the in-scope set too
-lookupIdSubst (Subst in_scope env) v
-  = case lookupSubstEnv env v of
-	Just (DoneId v' occ) -> DoneId (lookupInScope in_scope v') occ
-	Just res	     -> res
-	Nothing  	     -> DoneId v' (idOccInfo v')
-				-- We don't use DoneId for LoopBreakers, so the idOccInfo is
-				-- very important!  If isFragileOcc returned True for
-				-- loop breakers we could avoid this call, but at the expense
-				-- of adding more to the substitution, and building new Ids
-				-- in substId a bit more often than really necessary
-			     where
-				    v' = lookupInScope in_scope v
+extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
+extendTvSubstList (Subst in_scope ids tvs) prs = Subst in_scope ids (extendVarEnvList tvs prs)
 
+lookupIdSubst :: Subst -> Id -> Maybe SubstResult
+lookupIdSubst (Subst in_scope ids tvs) v = lookupVarEnv ids v
+
+lookupTvSubst :: Subst -> TyVar -> Maybe Type
+lookupTvSubst (Subst _ ids tvs) v = lookupVarEnv tvs v
+
+------------------------------
 isInScope :: Var -> Subst -> Bool
-isInScope v (Subst in_scope _) = v `elemInScopeSet` in_scope
+isInScope v (Subst in_scope _ _) = v `elemInScopeSet` in_scope
 
 modifyInScope :: Subst -> Var -> Var -> Subst
-modifyInScope (Subst in_scope env) old_v new_v = Subst (modifyInScopeSet in_scope old_v new_v) env
+modifyInScope (Subst in_scope ids tvs) old_v new_v 
+  = Subst (modifyInScopeSet in_scope old_v new_v) ids tvs
 	-- make old_v map to new_v
 
 extendInScope :: Subst -> Var -> Subst
-	-- Add a new variable as in-scope
-	-- Remember to delete any existing binding in the substitution!
-extendInScope (Subst in_scope env) v = Subst (in_scope `extendInScopeSet` v)
-					     (env `delSubstEnv` v)
+extendInScope (Subst in_scope ids tvs) v
+  = Subst (in_scope `extendInScopeSet` v) 
+	  (ids `delVarEnv` v) (tvs `delVarEnv` v)
 
-extendInScopeList :: Subst -> [Var] -> Subst
-extendInScopeList (Subst in_scope env) vs = Subst (extendInScopeSetList in_scope vs)
-						  (delSubstEnvList env vs)
-
--- The "New" variants are guaranteed to be adding freshly-allocated variables
--- It's not clear that the gain (not needing to delete it from the substitution)
--- is worth the extra proof obligation
-extendNewInScope :: Subst -> Var -> Subst
-extendNewInScope (Subst in_scope env) v = Subst (in_scope `extendInScopeSet` v) env
-
-extendNewInScopeList :: Subst -> [Var] -> Subst
-extendNewInScopeList (Subst in_scope env) vs = Subst (in_scope `extendInScopeSetList` vs) env
+extendInScopeIds :: Subst -> [Id] -> Subst
+extendInScopeIds (Subst in_scope ids tvs) vs 
+  = Subst (in_scope `extendInScopeSetList` vs) 
+	  (ids `delVarEnvList` vs) tvs
 
 -------------------------------
 bindSubst :: Subst -> Var -> Var -> Subst
 -- Extend with a substitution, v1 -> Var v2
 -- and extend the in-scopes with v2
-bindSubst (Subst in_scope env) old_bndr new_bndr
+bindSubst (Subst in_scope ids tvs) old_bndr new_bndr
+  | isId old_bndr
   = Subst (in_scope `extendInScopeSet` new_bndr)
-	  (extendSubstEnv env old_bndr subst_result)
-  where
-    subst_result | isId old_bndr = DoneEx (Var new_bndr)
-		 | otherwise	 = DoneTy (TyVarTy new_bndr)
+	  (extendVarEnv ids old_bndr (DoneEx (Var new_bndr)))
+	  tvs
+  | otherwise
+  = Subst (in_scope `extendInScopeSet` new_bndr)
+	  ids
+	  (extendVarEnv tvs old_bndr (mkTyVarTy new_bndr))
 
 unBindSubst :: Subst -> Var -> Var -> Subst
 -- Reverse the effect of bindSubst
 -- If old_bndr was already in the substitution, this doesn't quite work
-unBindSubst (Subst in_scope env) old_bndr new_bndr
-  = Subst (in_scope `delInScopeSet` new_bndr) (delSubstEnv env old_bndr)
+unBindSubst (Subst in_scope ids tvs) old_bndr new_bndr
+  = Subst (in_scope `delInScopeSet` new_bndr)
+	  (delVarEnv ids old_bndr) 
+	  (delVarEnv tvs old_bndr)
 
 -- And the "List" forms
 bindSubstList :: Subst -> [Var] -> [Var] -> Subst
@@ -328,16 +247,20 @@ unBindSubstList subst old_bndrs new_bndrs
 
 
 -------------------------------
-setInScope :: Subst 	-- Take env part from here
-	   -> InScopeSet
-	   -> Subst
-setInScope (Subst in_scope1 env1) in_scope2
-  = Subst in_scope2 env1
+setInScopeSet :: Subst -> InScopeSet -> Subst
+setInScopeSet (Subst _ ids tvs) in_scope
+  = Subst in_scope ids tvs 
 
-setSubstEnv :: Subst 		-- Take in-scope part from here
-	    -> SubstEnv		-- ... and env part from here
+setInScope :: Subst 	-- Take env part from here
+	   -> Subst	-- Take in-scope part from here
+	   -> Subst
+setInScope (Subst _ ids tvs) (Subst in_scope _ _)
+  = Subst in_scope ids tvs 
+
+setSubstEnv :: Subst 	-- Take in-scope part from here
+	    -> Subst	-- ... and env part from here
 	    -> Subst
-setSubstEnv (Subst in_scope1 _) env2 = Subst in_scope1 env2
+setSubstEnv s1 s2 = setInScope s2 s1
 \end{code}
 
 Pretty printing, for debugging only
@@ -347,141 +270,13 @@ instance Outputable SubstResult where
   ppr (DoneEx e)   = ptext SLIT("DoneEx") <+> ppr e
   ppr (DoneId v _) = ptext SLIT("DoneId") <+> ppr v
   ppr (ContEx _ e) = ptext SLIT("ContEx") <+> ppr e
-  ppr (DoneTy t)   = ptext SLIT("DoneTy") <+> ppr t
-
-instance Outputable SubstEnv where
-  ppr se = brackets (fsep (punctuate comma (map ppr_elt (ufmToList (substEnvEnv se)))))
-	where
-	   ppr_elt (uniq,sr) = ppr uniq <+> ptext SLIT("->") <+> ppr sr
 
 instance Outputable Subst where
-  ppr (Subst (InScope in_scope _) se) 
-	=  ptext SLIT("<InScope =") <+> braces   (fsep (map ppr (rngVarEnv in_scope)))
-	$$ ptext SLIT(" Subst   =") <+> ppr se <> char '>'
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Type substitution}
-%*									*
-%************************************************************************
-
-\begin{code}
-type TyVarSubst = Subst	-- TyVarSubst are expected to have range elements
-	-- (We could have a variant of Subst, but it doesn't seem worth it.)
-
--- mkTyVarSubst generates the in-scope set from
--- the types given; but it's just a thunk so with a bit of luck
--- it'll never be evaluated
-mkTyVarSubst :: [TyVar] -> [Type] -> Subst
-mkTyVarSubst tyvars tys = Subst (mkInScopeSet (tyVarsOfTypes tys)) 
-				(zipTyEnv tyvars tys)
-
--- mkTopTyVarSubst is called when doing top-level substitutions.
--- Here we expect that the free vars of the range of the
--- substitution will be empty.
-mkTopTyVarSubst :: [TyVar] -> [Type] -> Subst
-mkTopTyVarSubst tyvars tys = Subst emptyInScopeSet (zipTyEnv tyvars tys)
-
-zipTyEnv tyvars tys
-#ifdef DEBUG
-  | length tyvars /= length tys
-  = pprTrace "mkTopTyVarSubst" (ppr tyvars $$ ppr tys) emptySubstEnv
-  | otherwise
-#endif
-  = zip_ty_env tyvars tys emptySubstEnv
-
--- Later substitutions in the list over-ride earlier ones
-zip_ty_env []       []       env = env
-zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendSubstEnv env tv (DoneTy ty))
-	-- There used to be a special case for when 
-	--	ty == TyVarTy tv
-	-- (a not-uncommon case) in which case the substitution was dropped.
-	-- But the type-tidier changes the print-name of a type variable without
-	-- changing the unique, and that led to a bug.   Why?  Pre-tidying, we had 
-	-- a type {Foo t}, where Foo is a one-method class.  So Foo is really a newtype.
-	-- And it happened that t was the type variable of the class.  Post-tiding, 
-	-- it got turned into {Foo t2}.  The ext-core printer expanded this using
-	-- sourceTypeRep, but that said "Oh, t == t2" because they have the same unique,
-	-- and so generated a rep type mentioning t not t2.  
-	--
-	-- Simplest fix is to nuke the "optimisation"
-\end{code}
-
-substTy works with general Substs, so that it can be called from substExpr too.
-
-\begin{code}
-substTyWith :: [TyVar] -> [Type] -> Type -> Type
-substTyWith tvs tys = substTy (mkTyVarSubst tvs tys)
-
-substTy :: Subst -> Type  -> Type
-substTy subst ty | isEmptySubst subst = ty
-	         | otherwise	      = subst_ty subst ty
-
-deShadowTy :: Type -> Type		-- Remove any shadowing from the type
-deShadowTy ty = subst_ty emptySubst ty
-
-substTheta :: TyVarSubst -> ThetaType -> ThetaType
-substTheta subst theta
-  | isEmptySubst subst = theta
-  | otherwise	       = map (substPred subst) theta
-
-substPred :: TyVarSubst -> PredType -> PredType
-substPred subst (IParam n ty)     = IParam n (subst_ty subst ty)
-substPred subst (ClassP clas tys) = ClassP clas (map (subst_ty subst) tys)
-
-subst_ty subst ty
-   = go ty
-  where
-    go (TyConApp tc tys)	   = let args = map go tys
-				     in  args `seqList` TyConApp tc args
-
-    go (NewTcApp tc tys)	   = let args = map go tys
-				     in  args `seqList` NewTcApp tc args
-
-    go (PredTy p)  		   = PredTy $! (substPred subst p)
-
-    go (NoteTy (SynNote ty1) ty2)  = NoteTy (SynNote $! (go ty1)) $! (go ty2)
-    go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
-
-    go (FunTy arg res)   	   = (FunTy $! (go arg)) $! (go res)
-    go (AppTy fun arg)   	   = mkAppTy (go fun) $! (go arg)
-    go ty@(TyVarTy tv)   	   = case (lookupSubst subst tv) of
-	       				Nothing 	   -> ty
-       					Just (DoneTy ty')  -> ty'
-					
-    go (ForAllTy tv ty)		   = case substTyVar subst tv of
-					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
-\end{code}
-
-Here is where we invent a new binder if necessary.
-
-\begin{code}
-substTyVar :: Subst -> TyVar -> (Subst, TyVar)	
-substTyVar subst@(Subst in_scope env) old_var
-  | old_var == new_var	-- No need to clone
-			-- But we *must* zap any current substitution for the variable.
-			--  For example:
-			--	(\x.e) with id_subst = [x |-> e']
-			-- Here we must simply zap the substitution for x
-			--
-			-- The new_id isn't cloned, but it may have a different type
-			-- etc, so we must return it, not the old id
-  = (Subst (in_scope `extendInScopeSet` new_var)
-	   (delSubstEnv env old_var),
-     new_var)
-
-  | otherwise	-- The new binder is in scope so
-		-- we'd better rename it away from the in-scope variables
-		-- Extending the substitution to do this renaming also
-		-- has the (correct) effect of discarding any existing
-		-- substitution for that variable
-  = (Subst (in_scope `extendInScopeSet` new_var) 
-	   (extendSubstEnv env old_var (DoneTy (TyVarTy new_var))),
-     new_var)
-  where
-    new_var = uniqAway in_scope old_var
-	-- The uniqAway part makes sure the new variable is not already in scope
+  ppr (Subst in_scope ids tvs) 
+	=  ptext SLIT("<InScope =") <+> braces (fsep (map ppr (varEnvElts (getInScopeVars in_scope))))
+	$$ ptext SLIT(" IdSubst   =") <+> ppr ids
+	$$ ptext SLIT(" TvSubst   =") <+> ppr tvs
+ 	 <> char '>'
 \end{code}
 
 
@@ -513,9 +308,7 @@ substExpr subst expr
 
   = go expr
   where
-    go (Var v) = -- See the notes at the top, with the Subst data type declaration
-		 case lookupIdSubst subst v of
-	
+    go (Var v) = case substId subst v of
 		    ContEx env' e' -> substExpr (setSubstEnv subst env') e'
 		    DoneId v _	   -> Var v
 		    DoneEx e'      -> e'
@@ -538,10 +331,9 @@ substExpr subst expr
 				(subst', bndrs') = substRecBndrs subst (map fst pairs)
 				pairs'	= bndrs' `zip` rhss'
 				rhss'	= map (substExpr subst' . snd) pairs
-
-    go (Case scrut bndr alts) = Case (go scrut) bndr' (map (go_alt subst') alts)
-			      where
-				(subst', bndr') = substBndr subst bndr
+    go (Case scrut bndr ty alts) = Case (go scrut) bndr' (go_ty ty) (map (go_alt subst') alts)
+			         where
+			  	 (subst', bndr') = substBndr subst bndr
 
     go_alt subst (con, bndrs, rhs) = (con, bndrs', substExpr subst' rhs)
 				 where
@@ -552,6 +344,31 @@ substExpr subst expr
 
     go_ty ty = substTy subst ty
 
+substId :: Subst -> Id -> SubstResult
+substId (Subst in_scope ids tvs) v 
+  = case lookupVarEnv ids v of
+	Just (DoneId v occ) -> DoneId (lookup v) occ
+	Just res	    -> res
+	Nothing		    -> let v' = lookup v
+			       in DoneId v' (idOccInfo v')
+		-- Note [idOccInfo] 
+		-- We don't use DoneId for LoopBreakers, so the idOccInfo is
+		-- very important!  If isFragileOcc returned True for
+		-- loop breakers we could avoid this call, but at the expense
+		-- of adding more to the substitution, and building new Ids
+		-- in substId a bit more often than really necessary
+  where
+	-- Get the most up-to-date thing from the in-scope set
+	-- Even though it isn't in the substitution, it may be in
+	-- the in-scope set with a different type (we only use the
+	-- substitution if the unique changes).
+    lookup v = case lookupInScope in_scope v of
+		 Just v' -> v'
+		 Nothing -> WARN( mustHaveLocalBinding v, ppr v ) v
+
+
+substTy :: Subst -> Type -> Type 
+substTy subst ty = Type.substTy (getTvSubst subst) ty
 \end{code}
 
 
@@ -571,7 +388,7 @@ simplBndr :: Subst -> Var -> (Subst, Var)
 -- The substitution is extended only if the variable is cloned, because
 -- we *don't* need to use it to track occurrence info.
 simplBndr subst bndr
-  | isTyVar bndr  = substTyVar subst bndr
+  | isTyVar bndr  = subst_tv subst bndr
   | otherwise     = subst_id False subst subst bndr
 
 simplBndrs :: Subst -> [Var] -> (Subst, [Var])
@@ -603,8 +420,8 @@ simplLetId :: Subst -> Id -> (Subst, Id)
 --	if the unique changed, *or* 
 --	if there's interesting occurrence info
 
-simplLetId subst@(Subst in_scope env) old_id
-  = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
+simplLetId subst@(Subst in_scope env tvs) old_id
+  = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
   where
     old_info = idInfo old_id
     id1	    = uniqAway in_scope old_id
@@ -616,9 +433,9 @@ simplLetId subst@(Subst in_scope env) old_id
 	-- See the notes with substTyVar for the delSubstEnv
     occ_info = occInfo old_info
     new_env | new_id /= old_id || isFragileOcc occ_info
-	    = extendSubstEnv env old_id (DoneId new_id occ_info)
+	    = extendVarEnv env old_id (DoneId new_id occ_info)
 	    | otherwise 
-	    = delSubstEnv env old_id
+	    = delVarEnv env old_id
 
 simplIdInfo :: Subst -> IdInfo -> IdInfo
   -- Used by the simplifier to compute new IdInfo for a let(rec) binder,
@@ -636,7 +453,7 @@ simplIdInfo subst old_info
 
 substBndr :: Subst -> Var -> (Subst, Var)
 substBndr subst bndr
-  | isTyVar bndr  = substTyVar subst bndr
+  | isTyVar bndr  = subst_tv subst bndr
   | otherwise     = subst_id True {- keep fragile info -} subst subst bndr
 
 substBndrs :: Subst -> [Var] -> (Subst, [Var])
@@ -654,6 +471,13 @@ substRecBndrs subst bndrs
 
 
 \begin{code}
+subst_tv :: Subst -> TyVar -> (Subst, TyVar)
+-- Unpackage and re-package for substTyVar
+subst_tv (Subst in_scope id_env tv_env) tv
+  = case substTyVar (TvSubst in_scope tv_env) tv of
+	(TvSubst in_scope' tv_env', tv') 
+	   -> (Subst in_scope' id_env tv_env', tv')
+
 subst_id :: Bool		-- True <=> keep fragile info
 	 -> Subst		-- Substitution to use for the IdInfo
 	 -> Subst -> Id 	-- Substitition and Id to transform
@@ -670,8 +494,8 @@ subst_id :: Bool		-- True <=> keep fragile info
 --	  In this case, the var in the DoneId is the same as the
 --	  var returned
 
-subst_id keep_fragile rec_subst subst@(Subst in_scope env) old_id
-  = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
+subst_id keep_fragile rec_subst subst@(Subst in_scope env tvs) old_id
+  = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
   where
 	-- id1 is cloned if necessary
     id1 = uniqAway in_scope old_id
@@ -687,9 +511,9 @@ subst_id keep_fragile rec_subst subst@(Subst in_scope env) old_id
 	-- Extend the substitution if the unique has changed
 	-- See the notes with substTyVar for the delSubstEnv
     new_env | new_id /= old_id
-	    = extendSubstEnv env old_id (DoneId new_id (idOccInfo old_id))
+	    = extendVarEnv env old_id (DoneId new_id (idOccInfo old_id))
 	    | otherwise 
-	    = delSubstEnv env old_id
+	    = delVarEnv env old_id
 \end{code}
 
 Now a variant that unconditionally allocates a new unique.
@@ -700,14 +524,14 @@ subst_clone_id :: Subst			-- Substitution to use (lazily) for the rules and work
 	       -> Subst -> (Id, Unique)	-- Substitition and Id to transform
 	       -> (Subst, Id)		-- Transformed pair
 
-subst_clone_id rec_subst subst@(Subst in_scope env) (old_id, uniq)
-  = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
+subst_clone_id rec_subst subst@(Subst in_scope env tvs) (old_id, uniq)
+  = (Subst (in_scope `extendInScopeSet` new_id) new_env tvs, new_id)
   where
     id1	 = setVarUnique old_id uniq
     id2  = substIdType subst id1
 
     new_id  = maybeModifyIdInfo (substIdInfo False rec_subst) id2
-    new_env = extendSubstEnv env old_id (DoneId new_id NoOccInfo)
+    new_env = extendVarEnv env old_id (DoneId new_id NoOccInfo)
 
 substAndCloneIds :: Subst -> UniqSupply -> [Id] -> (Subst, [Id])
 substAndCloneIds subst us ids
@@ -721,7 +545,7 @@ substAndCloneRecIds subst us ids
 			       (ids `zip` uniqsFromSupply us)
 
 substAndCloneId :: Subst -> UniqSupply -> Id -> (Subst, Id)
-substAndCloneId subst@(Subst in_scope env) us old_id
+substAndCloneId subst us old_id
   = subst_clone_id subst subst (old_id, uniqFromSupply us)
 \end{code}
 
@@ -779,9 +603,9 @@ substIdInfo keep_fragile subst info
 
 ------------------
 substIdType :: Subst -> Id -> Id
-substIdType subst@(Subst in_scope env) id
-  |  noTypeSubst env || isEmptyVarSet (tyVarsOfType old_ty) = id
-  | otherwise						    = setIdType id (substTy subst old_ty)
+substIdType subst@(Subst in_scope id_env tv_env) id
+  | isEmptyVarEnv tv_env || isEmptyVarSet (tyVarsOfType old_ty) = id
+  | otherwise	= setIdType id (Type.substTy (TvSubst in_scope tv_env) old_ty)
 		-- The tyVarsOfType is cheaper than it looks
 		-- because we cache the free tyvars of the type
 		-- in a Note in the id's type itself
@@ -796,15 +620,15 @@ substWorker :: Subst -> WorkerInfo -> WorkerInfo
 substWorker subst NoWorker
   = NoWorker
 substWorker subst (HasWorker w a)
-  = case lookupIdSubst subst w of
-	(DoneId w1 _)     -> HasWorker w1 a
-	(DoneEx (Var w1)) -> HasWorker w1 a
-	(DoneEx other)    -> WARN( not (exprIsTrivial other), text "substWorker: DoneEx" <+> ppr w )
-				  NoWorker	-- Worker has got substituted away altogether
+  = case substId subst w of
+	DoneId w1 _     -> HasWorker w1 a
+	DoneEx (Var w1) -> HasWorker w1 a
+	DoneEx other    -> WARN( not (exprIsTrivial other), text "substWorker: DoneEx" <+> ppr w )
+			   NoWorker	-- Worker has got substituted away altogether
 						-- This can happen if it's trivial, 
 						-- via postInlineUnconditionally
-	(ContEx se1 e)    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
-				  NoWorker	-- Ditto
+	ContEx se1 e    -> WARN( True, text "substWorker: ContEx" <+> ppr w <+> ppr e)
+			   NoWorker	-- Ditto
 			
 ------------------
 substUnfolding subst NoUnfolding     		 = NoUnfolding
@@ -837,9 +661,12 @@ substRules subst (Rules rules rhs_fvs)
 substVarSet subst fvs 
   = foldVarSet (unionVarSet . subst_fv subst) emptyVarSet fvs
   where
-    subst_fv subst fv = case lookupIdSubst subst fv of
-			    DoneId fv' _    -> unitVarSet fv'
-			    DoneEx expr	    -> exprFreeVars expr
-			    DoneTy ty  	    -> tyVarsOfType ty 
-			    ContEx se' expr -> substVarSet (setSubstEnv subst se') (exprFreeVars expr)
+    subst_fv subst fv 
+	| isId fv = case substId subst fv of
+			DoneId fv' _    -> unitVarSet fv'
+			DoneEx expr     -> exprFreeVars expr
+			ContEx se' expr -> substVarSet (setSubstEnv subst se') (exprFreeVars expr)
+	| otherwise = case lookupTvSubst subst fv of
+			    Nothing -> unitVarSet fv
+			    Just ty -> substVarSet subst (tyVarsOfType ty)
 \end{code}

@@ -32,8 +32,7 @@ import HsSyn
 import RdrName		( RdrName, mkVarUnqual, getRdrName, mkRdrUnqual,
 			   mkDerivedRdrName )
 import BasicTypes	( Fixity(..), maxPrecedence, Boxity(..) )
-import FieldLabel       ( fieldLabelName )
-import DataCon		( isNullaryDataCon, dataConTag,
+import DataCon		( isNullarySrcDataCon, dataConTag,
 			  dataConOrigArgTys, dataConSourceArity, fIRST_TAG,
 			  DataCon, dataConName, dataConIsInfix,
 			  dataConFieldLabels )
@@ -153,7 +152,7 @@ gen_Eq_binds tycon
 
         (nullary_cons, nonnullary_cons)
            | isNewTyCon tycon = ([], tyConDataCons tycon)
-           | otherwise	      = partition isNullaryDataCon (tyConDataCons tycon)
+           | otherwise	      = partition isNullarySrcDataCon (tyConDataCons tycon)
 
 	rest
 	  = if (null nullary_cons) then
@@ -168,7 +167,7 @@ gen_Eq_binds tycon
     in
     listToBag [
       mk_FunBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest),
-      mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] emptyBag (
+      mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] emptyLHsBinds (
 	nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
     ]
   where
@@ -315,7 +314,7 @@ gen_Ord_binds tycon
     single_con_type = isSingleton tycon_data_cons
     (nullary_cons, nonnullary_cons)
        | isNewTyCon tycon = ([], tyConDataCons tycon)
-       | otherwise	  = partition isNullaryDataCon tycon_data_cons
+       | otherwise	  = partition isNullarySrcDataCon tycon_data_cons
 
     cmp_eq = mk_FunBind tycon_loc cmp_eq_RDR cmp_eq_match
     cmp_eq_match
@@ -418,7 +417,7 @@ gen_Enum_binds tycon
     occ_nm    = getOccString tycon
 
     succ_enum
-      = mk_easy_FunBind tycon_loc succ_RDR [a_Pat] emptyBag $
+      = mk_easy_FunBind tycon_loc succ_RDR [a_Pat] emptyLHsBinds $
 	untag_Expr tycon [(a_RDR, ah_RDR)] $
 	nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR tycon),
 			       nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -428,7 +427,7 @@ gen_Enum_binds tycon
 		 			nlHsIntLit 1]))
 		    
     pred_enum
-      = mk_easy_FunBind tycon_loc pred_RDR [a_Pat] emptyBag $
+      = mk_easy_FunBind tycon_loc pred_RDR [a_Pat] emptyLHsBinds $
 	untag_Expr tycon [(a_RDR, ah_RDR)] $
 	nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
 			       nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -438,7 +437,7 @@ gen_Enum_binds tycon
 					       nlHsLit (HsInt (-1))]))
 
     to_enum
-      = mk_easy_FunBind tycon_loc toEnum_RDR [a_Pat] emptyBag $
+      = mk_easy_FunBind tycon_loc toEnum_RDR [a_Pat] emptyLHsBinds $
 	nlHsIf (nlHsApps and_RDR
 		[nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [nlHsVar a_RDR, nlHsVar (maxtag_RDR tycon)]])
@@ -446,7 +445,7 @@ gen_Enum_binds tycon
 	     (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
 
     enum_from
-      = mk_easy_FunBind tycon_loc enumFrom_RDR [a_Pat] emptyBag $
+      = mk_easy_FunBind tycon_loc enumFrom_RDR [a_Pat] emptyLHsBinds $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  nlHsApps map_RDR 
 		[nlHsVar (tag2con_RDR tycon),
@@ -455,7 +454,7 @@ gen_Enum_binds tycon
 			    (nlHsVar (maxtag_RDR tycon)))]
 
     enum_from_then
-      = mk_easy_FunBind tycon_loc enumFromThen_RDR [a_Pat, b_Pat] emptyBag $
+      = mk_easy_FunBind tycon_loc enumFromThen_RDR [a_Pat, b_Pat] emptyLHsBinds $
 	  untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
 	  nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
 	    nlHsPar (enum_from_then_to_Expr
@@ -468,7 +467,7 @@ gen_Enum_binds tycon
 			   ))
 
     from_enum
-      = mk_easy_FunBind tycon_loc fromEnum_RDR [a_Pat] emptyBag $
+      = mk_easy_FunBind tycon_loc fromEnum_RDR [a_Pat] emptyLHsBinds $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  (nlHsVarApps intDataCon_RDR [ah_RDR])
 \end{code}
@@ -582,7 +581,7 @@ gen_Ix_binds tycon
 
     enum_range
       = mk_easy_FunBind tycon_loc range_RDR 
-		[nlTuplePat [a_Pat, b_Pat] Boxed] emptyBag $
+		[nlTuplePat [a_Pat, b_Pat] Boxed] emptyLHsBinds $
 	  untag_Expr tycon [(a_RDR, ah_RDR)] $
 	  untag_Expr tycon [(b_RDR, bh_RDR)] $
 	  nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
@@ -594,7 +593,7 @@ gen_Ix_binds tycon
       = mk_easy_FunBind tycon_loc index_RDR 
 		[noLoc (AsPat (noLoc c_RDR) 
 			   (nlTuplePat [a_Pat, nlWildPat] Boxed)), 
-				d_Pat] emptyBag (
+				d_Pat] emptyLHsBinds (
 	nlHsIf (nlHsPar (nlHsVarApps inRange_RDR [c_RDR, d_RDR])) (
 	   untag_Expr tycon [(a_RDR, ah_RDR)] (
 	   untag_Expr tycon [(d_RDR, dh_RDR)] (
@@ -611,7 +610,7 @@ gen_Ix_binds tycon
 
     enum_inRange
       = mk_easy_FunBind tycon_loc inRange_RDR 
-	  [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] emptyBag (
+	  [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] emptyLHsBinds (
 	  untag_Expr tycon [(a_RDR, ah_RDR)] (
 	  untag_Expr tycon [(b_RDR, bh_RDR)] (
 	  untag_Expr tycon [(c_RDR, ch_RDR)] (
@@ -645,7 +644,7 @@ gen_Ix_binds tycon
     --------------------------------------------------------------
     single_con_range
       = mk_easy_FunBind tycon_loc range_RDR 
-	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] emptyBag $
+	  [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] emptyLHsBinds $
 	nlHsDo ListComp stmts
       where
 	stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
@@ -676,7 +675,7 @@ gen_Ix_binds tycon
 
 	range_size
 	  = mk_easy_FunBind tycon_loc rangeSize_RDR 
-			[nlTuplePat [a_Pat, b_Pat] Boxed] emptyBag (
+			[nlTuplePat [a_Pat, b_Pat] Boxed] emptyLHsBinds (
 		genOpApp (
 		    (nlHsApps index_RDR [nlTuple [a_Expr, b_Expr] Boxed,
 					 b_Expr])
@@ -687,7 +686,7 @@ gen_Ix_binds tycon
       = mk_easy_FunBind tycon_loc inRange_RDR 
 		[nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
 		 con_pat cs_needed]
-			   emptyBag (
+			   emptyLHsBinds (
 	  foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range as_needed bs_needed cs_needed))
       where
     	in_range a b c = nlHsApps inRange_RDR [nlTuple [nlHsVar a, nlHsVar b] Boxed,
@@ -752,7 +751,7 @@ gen_Read_binds get_fixity tycon
 
     loc       = getSrcSpan tycon
     data_cons = tyConDataCons tycon
-    (nullary_cons, non_nullary_cons) = partition isNullaryDataCon data_cons
+    (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon data_cons
     
     read_prec = mkVarBind loc readPrec_RDR
 	 		      (nlHsApp (nlHsVar parens_RDR) read_cons)
@@ -844,7 +843,7 @@ gen_Read_binds get_fixity tycon
 		    bindLex (symbol_pat lbl_lit),
 		    read_punc ")"]
 		 where	
-		   lbl_str = occNameUserString (getOccName (fieldLabelName lbl)) 
+		   lbl_str = occNameUserString (getOccName lbl) 
 		   lbl_lit = mkHsString lbl_str
 		   is_id_start c = isAlpha c || c == '_'
 \end{code}
@@ -928,7 +927,7 @@ gen_Show_binds get_fixity tycon
 			-- lexeme.  Only the space after the '=' is necessary, but
 			-- it seems tidier to have them both sides.
 		 where
-		   occ_nm   = getOccName (fieldLabelName l)
+		   occ_nm   = getOccName l
 		   nm       = occNameUserString_with_parens occ_nm
 
              show_args 		     = zipWith show_arg bs_needed arg_tys
@@ -1006,7 +1005,7 @@ gen_Typeable_binds tycon
   = unitBag $
 	mk_easy_FunBind tycon_loc 
 		(mk_typeOf_RDR tycon) 	-- Name of appropriate type0f function
-		[nlWildPat] emptyBag
+		[nlWildPat] emptyLHsBinds
 		(nlHsApps mkTypeRep_RDR [tycon_rep, nlList []])
   where
     tycon_loc = getSrcSpan tycon
@@ -1112,7 +1111,7 @@ gen_Data_binds fix_env tycon
                         tycon_loc
                         dataTypeOf_RDR
 			[nlWildPat]
-                        emptyBag
+                        emptyLHsBinds
                         (nlHsVar data_type_name)
 
 	------------ $dT
@@ -1141,7 +1140,7 @@ gen_Data_binds fix_env tycon
            nlList  labels,					-- Field labels
 	   nlHsVar fixity]					-- Fixity
 	where
-          labels   = map (nlHsLit . mkHsString . getOccString . fieldLabelName)
+          labels   = map (nlHsLit . mkHsString . getOccString)
                          (dataConFieldLabels dc)
 	  dc_occ   = getOccName dc
 	  is_infix = isDataSymOcc dc_occ
@@ -1342,9 +1341,8 @@ eq_Expr tycon ty a b = genOpApp a eq_op b
  where
    eq_op
     | not (isUnLiftedType ty) = eq_RDR
-    | otherwise               =
+    | otherwise               = primOpRdrName (assoc_ty_id "Eq" tycon eq_op_tbl ty)
          -- we have to do something special for primitive things...
-	primOpRdrName (assoc_ty_id "Eq" tycon eq_op_tbl ty)
 \end{code}
 
 \begin{code}

@@ -20,16 +20,17 @@ import CoreFVs		( exprFreeVars, ruleRhsFreeVars )
 import CoreUnfold	( isCheapUnfolding, unfoldingTemplate )
 import CoreUtils	( eqExpr )
 import CoreTidy		( pprTidyIdRules )
-import Subst		( Subst, InScopeSet, mkInScopeSet, lookupSubst, extendSubst,
-			  substEnv, setSubstEnv, emptySubst, isInScope, emptyInScopeSet,
-			  bindSubstList, unBindSubstList, substInScope, uniqAway
+import Subst		( Subst, SubstResult(..), extendIdSubst,
+			  getTvSubstEnv, setTvSubstEnv,
+			  emptySubst, isInScope, lookupIdSubst, lookupTvSubst,
+			  bindSubstList, unBindSubstList, substInScope
 			)
 import Id		( Id, idUnfolding, idSpecialisation, setIdSpecialisation ) 
-import Var		( isId )
+import Var		( Var, isId )
 import VarSet
 import VarEnv
 import TcType		( mkTyVarTy )
-import qualified TcType ( match )
+import qualified Unify  ( matchTyX )
 import BasicTypes	( Activation, CompilerPhase, isActive )
 
 import Outputable
@@ -171,13 +172,19 @@ matchRule is_active in_scope rule@(Rule rn act tpl_vars tpl_args rhs) args
 
    -----------------------
    app_match subst fn vs = foldl go fn vs
-	where	
-	  senv    = substEnv subst
-	  go fn v = case lookupSubstEnv senv v of
-			Just (DoneEx ex)  -> fn `App` ex 
-			Just (DoneTy ty)  -> fn `App` Type ty
-			-- Substitution should bind them all!
+     where	
+	go fn v = case lookupVar subst v of
+		    Just e  -> fn `App` e 
+		    Nothing -> pprPanic "app_match: unbound tpl" (ppr v)
 
+lookupVar :: Subst -> Var -> Maybe CoreExpr
+lookupVar subst v
+   | isId v    = case lookupIdSubst subst v of
+		   Just (DoneEx ex) -> Just ex
+		   other 	    -> Nothing
+   | otherwise = case lookupTvSubst subst v of
+		   Just ty -> Just (Type ty)
+		   Nothing -> Nothing
 
    -----------------------
 {-	The code below tries to match even if there are more 
@@ -229,10 +236,13 @@ type Matcher result =  VarSet			-- Template variables
 		    -> Subst  -> Maybe result	-- Substitution so far -> result
 -- The *SubstEnv* in these Substs apply to the TEMPLATE only 
 
--- The *InScopeSet* in these Substs gives variables bound so far in the
+-- The *InScopeSet* in these Substs is HIJACKED,
+-- 	to give the set of variables bound so far in the
 --	target term.  So when matching forall a. (\x. a x) against (\y. y y)
 --	while processing the body of the lambdas, the in-scope set will be {y}.
 --	That lets us do the occurs-check when matching 'a' against 'y'
+--
+--	It starts off empty
 
 match :: CoreExpr		-- Template
       -> CoreExpr		-- Target
@@ -240,14 +250,18 @@ match :: CoreExpr		-- Template
 
 match_fail = Nothing
 
-match (Var v1) e2 tpl_vars kont subst
-  = case lookupSubst subst v1 of
+-- ToDo: remove this debugging junk
+-- match e1 e2 tpls kont subst = pprTrace "match" (ppr e1 <+> ppr e2 <+> ppr subst) $ match_ e1 e2 tpls kont subst
+match = match_
+
+match_ (Var v1) e2 tpl_vars kont subst
+  = case lookupIdSubst subst v1 of
 	Nothing	| v1 `elemVarSet` tpl_vars  	-- v1 is a template variable
 		-> if (any (`isInScope` subst) (varSetElems (exprFreeVars e2))) then
 			 match_fail		-- Occurs check failure
 						-- e.g. match forall a. (\x-> a x) against (\y. y y)
 		   else
-			 kont (extendSubst subst v1 (DoneEx e2))
+			 kont (extendIdSubst subst v1 (DoneEx e2))
 
 
 		| eqExpr (Var v1) e2	   -> kont subst
@@ -257,27 +271,32 @@ match (Var v1) e2 tpl_vars kont subst
 
 	other -> match_fail
 
-match (Lit lit1) (Lit lit2) tpl_vars kont subst
+match_ (Lit lit1) (Lit lit2) tpl_vars kont subst
   | lit1 == lit2
   = kont subst
 
-match (App f1 a1) (App f2 a2) tpl_vars kont subst
+match_ (App f1 a1) (App f2 a2) tpl_vars kont subst
   = match f1 f2 tpl_vars (match a1 a2 tpl_vars kont) subst
 
-match (Lam x1 e1) (Lam x2 e2) tpl_vars kont subst
+match_ (Lam x1 e1) (Lam x2 e2) tpl_vars kont subst
   = bind [x1] [x2] (match e1 e2) tpl_vars kont subst
 
 -- This rule does eta expansion
 --		(\x.M)  ~  N 	iff	M  ~  N x
 -- See assumption A3
-match (Lam x1 e1) e2 tpl_vars kont subst
+match_ (Lam x1 e1) e2 tpl_vars kont subst
   = bind [x1] [x1] (match e1 (App e2 (mkVarArg x1))) tpl_vars kont subst
 
 -- Eta expansion the other way
 --	M  ~  (\y.N)	iff   \y.M y  ~  \y.N
 --			iff   M	y     ~  N
 -- Remembering that by (A), y can't be free in M, we get this
-match e1 (Lam x2 e2) tpl_vars kont subst
+match_ e1 (Lam x2 e2) tpl_vars kont subst
+  | new_id == x2	-- If the two are equal, don't bind, else we get
+			-- a substitution looking like x->x, and that sends
+			-- Unify.matchTy into a loop
+  = match (App e1 (mkVarArg new_id)) e2 tpl_vars kont subst
+  | otherwise
   = bind [new_id] [x2] (match (App e1 (mkVarArg new_id)) e2) tpl_vars kont subst
   where
     new_id = uniqAway (substInScope subst) x2
@@ -289,16 +308,18 @@ match e1 (Lam x2 e2) tpl_vars kont subst
 	-- The first \x is ok, but when we inline k, hoping it might
 	-- match (:) we find a second \x.
 
-match (Case e1 x1 alts1) (Case e2 x2 alts2) tpl_vars kont subst
-  = match e1 e2 tpl_vars case_kont subst
+-- gaw 2004
+match_ (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2) tpl_vars kont subst
+  = (match_ty ty1 ty2 tpl_vars $
+     match e1 e2 tpl_vars case_kont) subst
   where
     case_kont subst = bind [x1] [x2] (match_alts alts1 (sortLe le_alt alts2))
 				     tpl_vars kont subst
 
-match (Type ty1) (Type ty2) tpl_vars kont subst
+match_ (Type ty1) (Type ty2) tpl_vars kont subst
   = match_ty ty1 ty2 tpl_vars kont subst
 
-match (Note (Coerce to1 from1) e1) (Note (Coerce to2 from2) e2)
+match_ (Note (Coerce to1 from1) e1) (Note (Coerce to2 from2) e2)
       tpl_vars kont subst
   = (match_ty to1   to2   tpl_vars $
      match_ty from1 from2 tpl_vars $
@@ -325,7 +346,7 @@ match e1 (Let bind e2) tpl_vars kont subst
 -- variable, we expand it so long as its unfolding is a WHNF
 -- (Its occurrence information is not necessarily up to date,
 --  so we don't use it.)
-match e1 (Var v2) tpl_vars kont subst
+match_ e1 (Var v2) tpl_vars kont subst
   | isCheapUnfolding unfolding
   = match e1 (unfoldingTemplate unfolding) tpl_vars kont subst
   where
@@ -334,7 +355,7 @@ match e1 (Var v2) tpl_vars kont subst
 
 -- We can't cope with lets in the template
 
-match e1 e2 tpl_vars kont subst = match_fail
+match_ e1 e2 tpl_vars kont subst = match_fail
 
 
 ------------------------------------------
@@ -368,7 +389,7 @@ bind vs1 vs2 matcher tpl_vars kont subst
     subst'        = bindSubstList subst vs1 vs2
 
 	-- The unBindSubst relies on no shadowing in the template
-    not_in_subst v = isNothing (lookupSubst subst v)
+    not_in_subst v = isNothing (lookupVar subst v)
     bug_msg = sep [ppr vs1, ppr vs2]
 
 ----------------------------------------
@@ -386,9 +407,9 @@ We only want to replace (f T) with f', not (f Int).
 \begin{code}
 ----------------------------------------
 match_ty ty1 ty2 tpl_vars kont subst
-  = TcType.match ty1 ty2 tpl_vars kont' (substEnv subst)
-  where
-    kont' senv = kont (setSubstEnv subst senv) 
+  = case Unify.matchTyX tpl_vars (getTvSubstEnv subst) ty1 ty2 of
+	Just tv_env' -> kont (setTvSubstEnv subst tv_env')
+	Nothing      -> match_fail
 \end{code}
 
 
@@ -514,8 +535,9 @@ ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
 ruleCheck env (Note n e)    = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
 ruleCheck env (Lam b e)     = ruleCheck env e
-ruleCheck env (Case e _ as) = ruleCheck env e `unionBags` 
-			      unionManyBags [ruleCheck env r | (_,_,r) <- as]
+-- gaw 2004
+ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags` 
+			        unionManyBags [ruleCheck env r | (_,_,r) <- as]
 
 ruleCheckApp env (App f a) as = ruleCheck env a `unionBags` ruleCheckApp env f (a:as)
 ruleCheckApp env (Var f) as   = ruleCheckFun env f as

@@ -8,12 +8,14 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-module DsBinds ( dsHsBinds, AutoScc(..) ) where
+module DsBinds ( dsHsBinds, dsHsNestedBinds, AutoScc(..) ) where
 
 #include "HsVersions.h"
 
 
 import {-# SOURCE #-}	DsExpr( dsLExpr )
+import {-# SOURCE #-}	Match( matchWrapper )
+
 import DsMonad
 import DsGRHSs		( dsGuarded )
 import DsUtils
@@ -21,21 +23,18 @@ import DsUtils
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils	( exprType, mkInlineMe, mkSCC )
-import Match		( matchWrapper )
 
 import CmdLineOpts	( opt_AutoSccsOnAllToplevs, opt_AutoSccsOnExportedToplevs )
 import CostCentre	( mkAutoCC, IsCafCC(..) )
 import Id		( idType, idName, isExportedId, isSpecPragmaId, Id )
 import NameSet
 import VarSet
-import TcType		( mkTyVarTy )
-import Subst		( substTyWith )
+import Type		( mkTyVarTy, substTyWith )
 import TysWiredIn	( voidTy )
 import Outputable
 import SrcLoc		( Located(..) )
 import Maybe		( isJust )
-import Bag		( Bag, bagToList )
-
+import Bag		( bagToList )
 import Monad		( foldM )
 \end{code}
 
@@ -46,13 +45,16 @@ import Monad		( foldM )
 %************************************************************************
 
 \begin{code}
+dsHsNestedBinds :: LHsBinds Id -> DsM [(Id,CoreExpr)]
+dsHsNestedBinds binds = dsHsBinds NoSccs binds []
+
 dsHsBinds :: AutoScc		 -- scc annotation policy (see below)
-	  -> Bag (LHsBind Id)
+	  -> LHsBinds Id
 	  -> [(Id,CoreExpr)]	 -- Put this on the end (avoid quadratic append)
 	  -> DsM [(Id,CoreExpr)] -- Result
 
-dsHsBinds auto_scc binds rest = 
-  foldM (dsLHsBind auto_scc) rest (bagToList binds)
+dsHsBinds auto_scc binds rest
+  =  foldM (dsLHsBind auto_scc) rest (bagToList binds)
 
 dsLHsBind :: AutoScc
 	 -> [(Id,CoreExpr)]	-- Put this on the end (avoid quadratic append)
@@ -86,12 +88,12 @@ dsHsBind auto_scc rest (VarBind var expr)
     returnDs ((var, core_expr'') : rest)
 
 dsHsBind auto_scc rest (FunBind (L _ fun) _ matches)
-  = matchWrapper (FunRhs (idName fun)) matches	`thenDs` \ (args, body) ->
-    addAutoScc auto_scc (fun, mkLams args body)	`thenDs` \ pair ->
+  = matchWrapper (FunRhs (idName fun)) matches		`thenDs` \ (args, body) ->
+    addAutoScc auto_scc (fun, mkLams args body)		`thenDs` \ pair ->
     returnDs (pair : rest)
 
-dsHsBind auto_scc rest (PatBind pat grhss)
-  = dsGuarded grhss				`thenDs` \ body_expr ->
+dsHsBind auto_scc rest (PatBind pat grhss ty)
+  = dsGuarded grhss ty				`thenDs` \ body_expr ->
     mkSelectorBinds pat body_expr		`thenDs` \ sel_binds ->
     mappM (addAutoScc auto_scc) sel_binds	`thenDs` \ sel_binds ->
     returnDs (sel_binds ++ rest)

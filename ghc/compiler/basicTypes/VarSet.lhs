@@ -13,7 +13,8 @@ module VarSet (
 	intersectVarSet, intersectsVarSet,
 	isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
 	minusVarSet, foldVarSet, filterVarSet,
-	lookupVarSet, mapVarSet, sizeVarSet, seqVarSet
+	lookupVarSet, mapVarSet, sizeVarSet, seqVarSet,
+	elemVarSetByKey
     ) where
 
 #include "HsVersions.h"
@@ -59,6 +60,7 @@ filterVarSet	:: (Var -> Bool) -> VarSet -> VarSet
 extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
 
 delVarSetByKey	:: VarSet -> Unique -> VarSet
+elemVarSetByKey :: Unique -> VarSet -> Bool
 
 emptyVarSet	= emptyUniqSet
 unitVarSet	= unitUniqSet
@@ -87,6 +89,7 @@ sizeVarSet	= sizeUniqSet
 filterVarSet	= filterUniqSet
 extendVarSet_C combine s x = addToUFM_C combine s x x
 delVarSetByKey	= delFromUFM_Directly	-- Can't be bothered to add this to UniqSet
+elemVarSetByKey	= elemUniqSet_Directly
 \end{code}
 
 \begin{code}

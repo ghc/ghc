@@ -13,7 +13,7 @@ module Var (
 	TyVar, mkTyVar, mkTcTyVar,
 	tyVarName, tyVarKind,
 	setTyVarName, setTyVarUnique,
-	tcTyVarRef, tcTyVarDetails,
+	tcTyVarDetails,
 
 	-- Ids
 	Id, DictId,
@@ -34,9 +34,8 @@ module Var (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TypeRep( Type )
-import {-# SOURCE #-}	TcType( TyVarDetails )
-import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId,
-				IdInfo, seqIdInfo )
+import {-# SOURCE #-}	TcType( TcTyVarDetails )
+import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, IdInfo, seqIdInfo )
 
 import Name		( Name, OccName, NamedThing(..),
 			  setNameUnique, setNameOcc, nameUnique
@@ -45,7 +44,6 @@ import Kind		( Kind )
 import Unique		( Unique, Uniquable(..), mkUniqueGrimily, getKey# )
 import FastTypes
 import Outputable
-import DATA_IOREF
 \end{code}
 
 
@@ -71,11 +69,10 @@ data Var
 	tyVarKind :: Kind }
 
   | TcTyVar { 				-- Used only during type inference
-	varName        :: !Name,	-- Could we get away without a Name?
+	varName        :: !Name,
 	realUnique     :: FastInt,
 	tyVarKind      :: Kind,
-	tcTyVarRef     :: IORef (Maybe Type),
-	tcTyVarDetails :: TyVarDetails }
+	tcTyVarDetails :: TcTyVarDetails }
 
   | GlobalId { 			-- Used for imported Ids, dict selectors etc
 	varName    :: !Name,
@@ -180,12 +177,11 @@ mkTyVar name kind = TyVar { varName    = name
 			  , tyVarKind  = kind
 			}
 
-mkTcTyVar :: Name -> Kind -> TyVarDetails -> IORef (Maybe Type) -> TyVar
-mkTcTyVar name kind details ref
+mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
+mkTcTyVar name kind details
   = TcTyVar {	varName    = name,
 		realUnique = getKey# (nameUnique name),
 		tyVarKind  = kind,
-		tcTyVarRef = ref,
 		tcTyVarDetails = details
 	}
 \end{code}

@@ -30,7 +30,7 @@ import TcSimplify	( tcSimplifyTop, tcSimplifyBracket )
 import TcUnify		( Expected, zapExpectedTo, zapExpectedType )
 import TcType		( TcType, TcKind, liftedTypeKind, mkAppTy, tcSplitSigmaTy )
 import TcEnv		( spliceOK, tcMetaTy, bracketOK )
-import TcMType		( newTyVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
+import TcMType		( newTyFlexiVarTy, newKindVar, UserTypeCtxt(ExprSigCtxt), zonkTcType, zonkTcTyVar )
 import TcHsType		( tcHsSigType, kcHsType )
 import TcIface		( tcImportDecl )
 import TypeRep		( Type(..), PredType(..), TyThing(..) )	-- For reification
@@ -44,9 +44,11 @@ import Module		( moduleUserString, mkModuleName )
 import TcRnMonad
 import IfaceEnv		( lookupOrig )
 import Class		( Class, classBigSig )
-import TyCon		( TyCon, tyConTheta, tyConTyVars, getSynTyConDefn, isSynTyCon, isNewTyCon, tyConDataCons )
+import TyCon		( TyCon, AlgTyConRhs(..), tyConTyVars, getSynTyConDefn, 
+			  isSynTyCon, isNewTyCon, tyConDataCons, algTcRhs )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConStrictMarks, 
-			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix )
+			  dataConName, dataConFieldLabels, dataConWrapId, dataConIsInfix, 
+			  isVanillaDataCon )
 import Id		( idName, globalIdDetails )
 import IdInfo		( GlobalIdDetails(..) )
 import TysWiredIn	( mkListTy )
@@ -62,6 +64,7 @@ import FastString	( LitString )
 
 import GHC.Base		( unsafeCoerce#, Int#, Int(..) )	-- Should have a better home in the module hierarchy
 import Monad 		( liftM )
+import Maybes		( orElse )
 
 #ifdef GHCI
 import FastString	( mkFastString )
@@ -126,8 +129,8 @@ tc_bracket (VarBr v)
 	-- Result type is Var (not Q-monadic)
 
 tc_bracket (ExpBr expr) 
-  = newTyVarTy liftedTypeKind	`thenM` \ any_ty ->
-    tcCheckRho expr any_ty	`thenM_`
+  = newTyFlexiVarTy liftedTypeKind	`thenM` \ any_ty ->
+    tcCheckRho expr any_ty		`thenM_`
     tcMetaTy expQTyConName
 	-- Result type is Expr (= Q Exp)
 
@@ -156,7 +159,7 @@ tc_bracket (DecBr decls)
 
 \begin{code}
 tcSpliceExpr (HsSplice name expr) res_ty
-  = addSrcSpan (getLoc expr) 	$
+  = setSrcSpan (getLoc expr) 	$
     getStage		`thenM` \ level ->
     case spliceOK level of {
 	Nothing 	-> failWithTc (illegalSplice level) ;
@@ -256,7 +259,7 @@ Very like splicing an expression, but we don't yet share code.
 
 \begin{code}
 kcSpliceType (HsSplice name hs_expr)
-  = addSrcSpan (getLoc hs_expr) $ do 	
+  = setSrcSpan (getLoc hs_expr) $ do 	
 	{ level <- getStage
 	; case spliceOK level of {
 		Nothing 	-> failWithTc (illegalSplice level) ;
@@ -565,20 +568,22 @@ reifyTyCon tc
 	; rhs' <- reifyType rhs
 	; return (TH.TySynD (reifyName tc) (reifyTyVars tvs) rhs') }
 
-  | isNewTyCon tc
-  = do 	{ cxt <- reifyCxt (tyConTheta tc)
-	; con <- reifyDataCon (head (tyConDataCons tc))
-	; return (TH.NewtypeD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
-			      con [{- Don't know about deriving -}]) }
+reifyTyCon tc
+  = case algTcRhs tc of
+      NewTyCon data_con _ _ 
+	-> do	{ con <- reifyDataCon data_con
+		; return (TH.NewtypeD [] (reifyName tc) (reifyTyVars (tyConTyVars tc))
+				      con [{- Don't know about deriving -}]) }
 
-  | otherwise	-- Algebraic
-  = do	{ cxt <- reifyCxt (tyConTheta tc)
-	; cons <- mapM reifyDataCon (tyConDataCons tc)
-	; return (TH.DataD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
-			      cons [{- Don't know about deriving -}]) }
+      DataTyCon mb_cxt cons _
+	-> do	{ cxt <- reifyCxt (mb_cxt `orElse` [])
+		; cons <- mapM reifyDataCon (tyConDataCons tc)
+		; return (TH.DataD cxt (reifyName tc) (reifyTyVars (tyConTyVars tc))
+				      cons [{- Don't know about deriving -}]) }
 
 reifyDataCon :: DataCon -> TcM TH.Con
 reifyDataCon dc
+  | isVanillaDataCon dc
   = do 	{ arg_tys <- reifyTypes (dataConOrigArgTys dc)
 	; let stricts = map reifyStrict (dataConStrictMarks dc)
 	      fields  = dataConFieldLabels dc
@@ -594,6 +599,9 @@ reifyDataCon dc
 	     return (TH.InfixC (s1,a1) name (s1,a2))
 	  else
 	     return (TH.NormalC name (stricts `zip` arg_tys)) }
+  | otherwise
+  = failWithTc (ptext SLIT("Can't reify a non-Haskell-98 data constructor:") 
+		<+> quotes (ppr dc))
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Dec

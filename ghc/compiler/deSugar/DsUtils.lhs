@@ -7,22 +7,23 @@ This module exports some utility functions of no great interest.
 
 \begin{code}
 module DsUtils (
-	CanItFail(..), EquationInfo(..), MatchResult(..),
-        EqnNo, EqnSet,
-
-	tidyLitPat, tidyNPat,
+	EquationInfo(..), 
+	firstPat, shiftEqns,
 
 	mkDsLet,
 
-	cantFailMatchResult, extractMatchResult,
-	combineMatchResults, 
-	adjustMatchResult, adjustMatchResultDs,
-	mkCoLetsMatchResult, mkGuardedMatchResult, 
+	MatchResult(..), CanItFail(..), 
+	cantFailMatchResult, alwaysFailMatchResult,
+	extractMatchResult, combineMatchResults, 
+	adjustMatchResult,  adjustMatchResultDs,
+	mkCoLetsMatchResult, mkCoLetMatchResult,
+	mkGuardedMatchResult, 
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
+	bindInMatchResult, bindOneInMatchResult,
 
 	mkErrorAppDs, mkNilExpr, mkConsExpr, mkListExpr,
 	mkIntExpr, mkCharExpr,
-	mkStringLit, mkStringLitFS, mkIntegerExpr, 
+	mkStringExpr, mkStringExprFS, mkIntegerExpr, 
 
 	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
 	mkTupleType, mkTupleCase, mkBigCoreTup,
@@ -30,7 +31,7 @@ module DsUtils (
 	
 	dsReboundNames, lookupReboundName,
 
-	selectMatchVarL, selectMatchVar
+	selectSimpleMatchVarL, selectMatchVars
     ) where
 
 #include "HsVersions.h"
@@ -47,29 +48,28 @@ import DsMonad
 import CoreUtils	( exprType, mkIfThenElse, mkCoerce, bindNonRec )
 import MkId		( iRREFUT_PAT_ERROR_ID, mkReboxingAlt, mkNewTypeBody )
 import Id		( idType, Id, mkWildId, mkTemplateLocals, mkSysLocal )
+import Var		( Var )
 import Name		( Name )
-import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
+import Literal		( Literal(..), mkStringLit, inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, dataConSourceArity )
-import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp )
-import TcType		( tcTyConAppTyCon, isIntTy, isFloatTy, isDoubleTy )
+import DataCon		( DataCon, dataConSourceArity, dataConTyCon )
+import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp, mkTyVarTy )
+import TcType		( tcTyConAppTyCon, tcEqType )
 import TysPrim		( intPrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon, mkTupleTy,
 			  unitDataConId, unitTy,
                           charTy, charDataCon, 
                           intTy, intDataCon, 
-			  floatDataCon, 
-                          doubleDataCon,
-			  stringTy, isPArrFakeCon )
+			  isPArrFakeCon )
 import BasicTypes	( Boxity(..) )
-import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet, UniqSet )
+import UniqSet		( mkUniqSet, minusUniqSet, isEmptyUniqSet )
 import UniqSupply	( splitUniqSupply, uniqFromSupply, uniqsFromSupply )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name, 
 			  plusIntegerName, timesIntegerName, smallIntegerDataConName, 
 			  lengthPName, indexPName )
 import Outputable
-import UnicodeUtil      ( intsToUtf8, stringToUtf8 )
+import UnicodeUtil      ( intsToUtf8 )
 import SrcLoc		( Located(..), unLoc, noLoc )
 import Util             ( isSingleton, notNull, zipEqual )
 import ListSetOps	( assocDefault )
@@ -111,43 +111,6 @@ lookupReboundName prs std_name
 
 %************************************************************************
 %*									*
-\subsection{Tidying lit pats}
-%*									*
-%************************************************************************
-
-\begin{code}
-tidyLitPat :: HsLit -> LPat Id -> LPat Id
-tidyLitPat (HsChar c) pat = mkCharLitPat c
-tidyLitPat lit	      pat = pat
-
-tidyNPat :: HsLit -> Type -> LPat Id -> LPat Id
-tidyNPat (HsString s) _ pat
-  | lengthFS s <= 1	-- Short string literals only
-  = foldr (\c pat -> mkPrefixConPat consDataCon [mkCharLitPat c,pat] stringTy)
-	  (mkNilPat stringTy) (unpackFS s)
-	-- The stringTy is the type of the whole pattern, not 
-	-- the type to instantiate (:) or [] with!
-  where
-
-tidyNPat lit lit_ty default_pat
-  | isIntTy lit_ty     	= mkPrefixConPat intDataCon    [noLoc $ LitPat (mk_int lit)]    lit_ty 
-  | isFloatTy lit_ty  	= mkPrefixConPat floatDataCon  [noLoc $ LitPat (mk_float lit)]  lit_ty 
-  | isDoubleTy lit_ty 	= mkPrefixConPat doubleDataCon [noLoc $ LitPat (mk_double lit)] lit_ty 
-  | otherwise		= default_pat
-
-  where
-    mk_int    (HsInteger i _) = HsIntPrim i
-
-    mk_float  (HsInteger i _) = HsFloatPrim (fromInteger i)
-    mk_float  (HsRat f _)     = HsFloatPrim f
-
-    mk_double (HsInteger i _) = HsDoublePrim (fromInteger i)
-    mk_double (HsRat f _)     = HsDoublePrim f
-\end{code}
-
-
-%************************************************************************
-%*									*
 \subsection{Building lets}
 %*									*
 %************************************************************************
@@ -158,7 +121,8 @@ back again.
 \begin{code}
 mkDsLet :: CoreBind -> CoreExpr -> CoreExpr
 mkDsLet (NonRec bndr rhs) body
-  | isUnLiftedType (idType bndr) = Case rhs bndr [(DEFAULT,[],body)]
+  | isUnLiftedType (idType bndr) 
+  = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
 mkDsLet bind body
   = Let bind body
 
@@ -179,14 +143,36 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 
 \begin{code}
-selectMatchVarL :: LPat Id -> DsM Id
-selectMatchVarL pat = selectMatchVar (unLoc pat)
+selectSimpleMatchVarL :: LPat Id -> DsM Id
+selectSimpleMatchVarL pat = selectMatchVar (unLoc pat) (hsPatType pat)
 
-selectMatchVar (VarPat var)     = returnDs var
-selectMatchVar (AsPat var pat)  = returnDs (unLoc var)
-selectMatchVar (LazyPat pat)    = selectMatchVarL pat
-selectMatchVar other_pat        = newSysLocalDs (hsPatType (noLoc other_pat))
-				 -- OK, better make up one...
+-- (selectMatchVars ps tys) chooses variables of type tys
+-- to use for matching ps against.  If the pattern is a variable,
+-- we try to use that, to save inventing lots of fresh variables.
+-- But even if it is a variable, its type might not match.  Consider
+--	data T a where
+--	  T1 :: Int -> T Int
+--	  T2 :: a   -> T a
+--
+--	f :: T a -> a -> Int
+--	f (T1 i) (x::Int) = x
+--	f (T2 i) (y::a)   = 0
+-- Then we must not choose (x::Int) as the matching variable!
+
+selectMatchVars :: [Pat Id] -> [Type] -> DsM [Id]
+selectMatchVars []     [] 	= return []
+selectMatchVars (p:ps) (ty:tys) = do { v  <- selectMatchVar  p  ty
+				     ; vs <- selectMatchVars ps tys
+				     ; return (v:vs) }
+
+selectMatchVar (LazyPat pat)   pat_ty  = selectMatchVar (unLoc pat) pat_ty
+selectMatchVar (VarPat var)    pat_ty  = try_for var 	     pat_ty
+selectMatchVar (AsPat var pat) pat_ty  = try_for (unLoc var) pat_ty
+selectMatchVar other_pat       pat_ty  = newSysLocalDs pat_ty   -- OK, better make up one...
+
+try_for var pat_ty 
+  | idType var `tcEqType` pat_ty = returnDs var
+  | otherwise			 = newSysLocalDs pat_ty
 \end{code}
 
 
@@ -201,25 +187,30 @@ The ``equation info'' used by @match@ is relatively complicated and
 worthy of a type synonym and a few handy functions.
 
 \begin{code}
-
-type EqnNo   = Int
-type EqnSet  = UniqSet EqnNo
-
 data EquationInfo
-  = EqnInfo
-	EqnNo		-- The number of the equation
+  = EqnInfo { eqn_pats :: [Pat Id],    	-- The patterns for an eqn
+	      eqn_rhs  :: MatchResult }	-- What to do after match
 
-	DsMatchContext	-- The context info is used when producing warnings
-			-- about shadowed patterns.  It's the context
-			-- of the *first* thing matched in this group.
-			-- Should perhaps be a list of them all!
+-- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
+--	\fail. wrap (case vs of { pats -> rhs fail })
+-- where vs are not in the domain of wrap
 
-	[Pat Id]    	-- The patterns for an eqn
+firstPat :: EquationInfo -> Pat Id
+firstPat eqn = head (eqn_pats eqn)
 
-      	MatchResult	    -- Encapsulates the guards and bindings
+shiftEqns :: [EquationInfo] -> [EquationInfo]
+-- Drop the outermost layer of the first pattern in each equation
+shiftEqns eqns = [ eqn { eqn_pats = shiftPats (eqn_pats eqn) }
+		 | eqn <- eqns ]
+
+shiftPats :: [Pat Id] -> [Pat Id]
+shiftPats (ConPatOut _ _ _ _ (PrefixCon arg_pats) _ : pats) = map unLoc arg_pats ++ pats
+shiftPats (pat_with_no_sub_pats			    : pats) = pats
 \end{code}
 
+
 \begin{code}
+-- A MatchResult is an expression with a hole in it
 data MatchResult
   = MatchResult
 	CanItFail	-- Tells whether the failure expression is used
@@ -237,6 +228,9 @@ orFail _        _	 = CanFail
 Functions on MatchResults
 
 \begin{code}
+alwaysFailMatchResult :: MatchResult
+alwaysFailMatchResult = MatchResult CanFail (\fail -> returnDs fail)
+
 cantFailMatchResult :: CoreExpr -> MatchResult
 cantFailMatchResult expr = MatchResult CantFail (\ ignore -> returnDs expr)
 
@@ -263,7 +257,6 @@ combineMatchResults (MatchResult CanFail      body_fn1)
 combineMatchResults match_result1@(MatchResult CantFail body_fn1) match_result2
   = match_result1
 
-
 adjustMatchResult :: (CoreExpr -> CoreExpr) -> MatchResult -> MatchResult
 adjustMatchResult encl_fn (MatchResult can_it_fail body_fn)
   = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
@@ -274,11 +267,27 @@ adjustMatchResultDs encl_fn (MatchResult can_it_fail body_fn)
   = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
 				      encl_fn body)
 
+bindInMatchResult :: [(Var,Var)] -> MatchResult -> MatchResult
+bindInMatchResult binds = adjustMatchResult (\e -> foldr bind e binds)
+  where
+    bind (new,old) body = bindMR new old body
+
+bindOneInMatchResult :: Var -> Var -> MatchResult -> MatchResult
+bindOneInMatchResult new old = adjustMatchResult (bindMR new old)
+
+bindMR :: Var -> Var -> CoreExpr -> CoreExpr
+bindMR new old body
+  | new==old    = body
+  | isTyVar new = App (Lam new body) (Type (mkTyVarTy old))
+  | otherwise   = Let (NonRec new (Var old)) body
 
 mkCoLetsMatchResult :: [CoreBind] -> MatchResult -> MatchResult
 mkCoLetsMatchResult binds match_result
   = adjustMatchResult (mkDsLets binds) match_result
 
+mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
+mkCoLetMatchResult bind match_result
+  = adjustMatchResult (mkDsLet bind) match_result
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
 mkGuardedMatchResult pred_expr (MatchResult can_it_fail body_fn)
@@ -286,27 +295,28 @@ mkGuardedMatchResult pred_expr (MatchResult can_it_fail body_fn)
 				  returnDs (mkIfThenElse pred_expr body fail))
 
 mkCoPrimCaseMatchResult :: Id				-- Scrutinee
+                    -> Type                             -- Type of the case
 		    -> [(Literal, MatchResult)]		-- Alternatives
 		    -> MatchResult
-mkCoPrimCaseMatchResult var match_alts
+mkCoPrimCaseMatchResult var ty match_alts
   = MatchResult CanFail mk_case
   where
     mk_case fail
       = mappM (mk_alt fail) match_alts		`thenDs` \ alts ->
-	returnDs (Case (Var var) var ((DEFAULT, [], fail) : alts))
+	returnDs (Case (Var var) var ty ((DEFAULT, [], fail) : alts))
 
     mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
 					       returnDs (LitAlt lit, [], body)
 
 
 mkCoAlgCaseMatchResult :: Id					-- Scrutinee
+                    -> Type                                     -- Type of exp
 		    -> [(DataCon, [CoreBndr], MatchResult)]	-- Alternatives
 		    -> MatchResult
-
-mkCoAlgCaseMatchResult var match_alts
+mkCoAlgCaseMatchResult var ty match_alts 
   | isNewTyCon tycon		-- Newtype case; use a let
-  = ASSERT( null (tail match_alts) && null (tail arg_ids) )
-    mkCoLetsMatchResult [NonRec arg_id newtype_rhs] match_result
+  = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
+    mkCoLetsMatchResult [NonRec arg_id1 newtype_rhs] match_result1
 
   | isPArrFakeAlts match_alts	-- Sugared parallel array; use a literal case 
   = MatchResult CanFail mk_parrCase
@@ -314,14 +324,14 @@ mkCoAlgCaseMatchResult var match_alts
   | otherwise			-- Datatype case; use a case
   = MatchResult fail_flag mk_case
   where
-	-- Common stuff
-    scrut_ty = idType var
-    tycon    = tcTyConAppTyCon scrut_ty		-- Newtypes must be opaque here
+    tycon = dataConTyCon con1
+	-- [Interesting: becuase of GADTs, we can't rely on the type of 
+	--  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
 	-- Stuff for newtype
-    (_, arg_ids, match_result) = head match_alts
-    arg_id 	       	       = head arg_ids
-    newtype_rhs 	       = mkNewTypeBody tycon (idType arg_id) (Var var)
+    (con1, arg_ids1, match_result1) = head match_alts
+    arg_id1 	= head arg_ids1
+    newtype_rhs = mkNewTypeBody tycon (idType arg_id1) (Var var)
 		
 	-- Stuff for data types
     data_cons      = tyConDataCons tycon
@@ -334,7 +344,7 @@ mkCoAlgCaseMatchResult var match_alts
 
     wild_var = mkWildId (idType var)
     mk_case fail = mappM (mk_alt fail) match_alts	`thenDs` \ alts ->
-		   returnDs (Case (Var var) wild_var (mk_default fail ++ alts))
+		   returnDs (Case (Var var) wild_var ty (mk_default fail ++ alts))
 
     mk_alt fail (con, args, MatchResult _ body_fn)
 	= body_fn fail				`thenDs` \ body ->
@@ -381,7 +391,7 @@ mkCoAlgCaseMatchResult var match_alts
     mk_parrCase fail = 		   
       dsLookupGlobalId lengthPName			`thenDs` \lengthP  ->
       unboxAlt						`thenDs` \alt      ->
-      returnDs (Case (len lengthP) (mkWildId intTy) [alt])
+      returnDs (Case (len lengthP) (mkWildId intTy) ty [alt])
       where
 	elemTy      = case splitTyConApp (idType var) of
 		        (_, [elemTy]) -> elemTy
@@ -393,7 +403,7 @@ mkCoAlgCaseMatchResult var match_alts
 	  newSysLocalDs intPrimTy			`thenDs` \l	   ->
 	  dsLookupGlobalId indexPName		`thenDs` \indexP   ->
 	  mappM (mkAlt indexP) match_alts               `thenDs` \alts     ->
-	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild (dft : alts)))
+	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild ty (dft : alts)))
           where
 	    wild = mkWildId intPrimTy
 	    dft  = (DEFAULT, [], fail)
@@ -431,7 +441,7 @@ mkErrorAppDs err_id ty msg
   = getSrcSpanDs		`thenDs` \ src_loc ->
     let
 	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
-	core_msg = Lit (MachStr (mkFastString (stringToUtf8 full_msg)))
+	core_msg = Lit (mkStringLit full_msg)
     in
     returnDs (mkApps (Var err_id) [Type ty, core_msg])
 \end{code}
@@ -444,11 +454,11 @@ mkErrorAppDs err_id ty msg
 %************************************************************************
 
 \begin{code}
-mkCharExpr    :: Char	    -> CoreExpr	     -- Returns	C# c :: Int
-mkIntExpr     :: Integer    -> CoreExpr	     -- Returns	I# i :: Int
-mkIntegerExpr :: Integer    -> DsM CoreExpr  -- Result :: Integer
-mkStringLit   :: String     -> DsM CoreExpr  -- Result :: String
-mkStringLitFS :: FastString -> DsM CoreExpr  -- Result :: String
+mkCharExpr     :: Char	     -> CoreExpr      -- Returns	C# c :: Int
+mkIntExpr      :: Integer    -> CoreExpr      -- Returns	I# i :: Int
+mkIntegerExpr  :: Integer    -> DsM CoreExpr  -- Result :: Integer
+mkStringExpr   :: String     -> DsM CoreExpr  -- Result :: String
+mkStringExprFS :: FastString -> DsM CoreExpr  -- Result :: String
 
 mkIntExpr  i = mkConApp intDataCon  [mkIntLit i]
 mkCharExpr c = mkConApp charDataCon [mkLit (MachChar c)]
@@ -486,9 +496,9 @@ mkIntegerExpr i
 
 mkSmallIntegerLit small_integer_data_con i = mkConApp small_integer_data_con [mkIntLit i]
 
-mkStringLit str	= mkStringLitFS (mkFastString str)
+mkStringExpr str = mkStringExprFS (mkFastString str)
 
-mkStringLitFS str
+mkStringExprFS str
   | nullFastString str
   = returnDs (mkNilExpr charTy)
 
@@ -602,11 +612,11 @@ mkSelectorBinds pat val_expr
 
     is_simple_lpat p = is_simple_pat (unLoc p)
 
-    is_simple_pat (TuplePat ps Boxed)    = all is_triv_lpat ps
-    is_simple_pat (ConPatOut _ ps _ _ _) = all is_triv_lpat (hsConArgs ps)
-    is_simple_pat (VarPat _)	       	 = True
-    is_simple_pat (ParPat p)		 = is_simple_lpat p
-    is_simple_pat other		       	 = False
+    is_simple_pat (TuplePat ps Boxed)      = all is_triv_lpat ps
+    is_simple_pat (ConPatOut _ _ _ _ ps _) = all is_triv_lpat (hsConArgs ps)
+    is_simple_pat (VarPat _)	       	   = True
+    is_simple_pat (ParPat p)		   = is_simple_lpat p
+    is_simple_pat other		       	   = False
 
     is_triv_lpat p = is_triv_pat (unLoc p)
 
@@ -762,7 +772,9 @@ mkSmallTupleCase
 mkSmallTupleCase [var] body _scrut_var scrut
   = bindNonRec var scrut body
 mkSmallTupleCase vars body scrut_var scrut
-  = Case scrut scrut_var [(DataAlt (tupleCon Boxed (length vars)), vars, body)]
+-- gaw 2004
+-- One branch no refinement?
+  = Case scrut scrut_var (exprType body) [(DataAlt (tupleCon Boxed (length vars)), vars, body)]
 \end{code}
 
 %************************************************************************
@@ -812,7 +824,8 @@ mkCoreSel [var] should_be_the_same_var scrut_var scrut
 
 mkCoreSel vars the_var scrut_var scrut
   = ASSERT( notNull vars )
-    Case scrut scrut_var 
+-- gaw 2004
+    Case scrut scrut_var (idType the_var)
 	 [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
 \end{code}
 

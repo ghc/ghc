@@ -22,15 +22,14 @@ import CmdLineOpts	( DynFlags( verbosity ), DynFlag( Opt_IgnoreInterfacePragmas 
 			  opt_InPackage )
 import Parser		( parseIface )
 
-import IfaceSyn		( IfaceDecl(..), IfaceConDecls(..), IfaceConDecl(..), IfaceClassOp(..), 
+import IfaceSyn		( IfaceDecl(..), IfaceConDecl(..), IfaceClassOp(..), IfaceConDecls(..),
 			  IfaceInst(..), IfaceRule(..), IfaceExpr(..), IfaceTyCon(..), IfaceIdInfo(..), 
-			  IfaceType(..), IfacePredType(..), IfaceExtName, visibleIfConDecls, mkIfaceExtName )
+			  IfaceType(..), IfacePredType(..), IfaceExtName, mkIfaceExtName )
 import IfaceEnv		( newGlobalBinder, lookupIfaceExt, lookupIfaceTc )
-import HscTypes		( HscEnv(..), ModIface(..), TyThing, emptyModIface, EpsStats(..), addEpsInStats,
+import HscTypes		( ModIface(..), TyThing, emptyModIface, EpsStats(..), addEpsInStats,
 			  ExternalPackageState(..), PackageTypeEnv, emptyTypeEnv, 
 			  lookupIfaceByModName, emptyPackageIfaceTable,
-			  IsBootInterface, mkIfaceFixCache, mkTypeEnv,
-			  Gated, implicitTyThings,
+			  IsBootInterface, mkIfaceFixCache, Gated, implicitTyThings,
 			  addRulesToPool, addInstsToPool
 			 )
 
@@ -40,7 +39,7 @@ import Type		( funTyCon )
 import TcRnMonad
 
 import PrelNames	( gHC_PRIM_Name )
-import PrelInfo		( ghcPrimExports, wiredInThings )
+import PrelInfo		( ghcPrimExports )
 import PrelRules	( builtinRules )
 import Rules		( emptyRuleBase )
 import InstEnv		( emptyInstEnv )
@@ -50,7 +49,7 @@ import NameEnv
 import MkId		( seqId )
 import Packages		( basePackage )
 import Module		( Module, ModuleName, ModLocation(ml_hi_file),
-			  moduleName, isHomeModule, emptyModuleEnv, moduleEnvElts,
+			  moduleName, isHomeModule, emptyModuleEnv, 
 			  extendModuleEnv, lookupModuleEnvByName, moduleUserString
 			)
 import OccName		( OccName, mkOccEnv, lookupOccEnv, mkClassTyConOcc, mkClassDataConOcc,
@@ -330,26 +329,30 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, ifSigs = sigs
 
 ifaceDeclSubBndrs (IfaceData {ifCons = IfAbstractTyCon}) 
   = []
-ifaceDeclSubBndrs (IfaceData {ifCons = IfNewTyCon (IfaceConDecl con_occ _ _ _ _ _ fields)}) 
+-- Newtype
+ifaceDeclSubBndrs (IfaceData {ifCons = IfNewTyCon (IfVanillaCon { ifConOcc = con_occ, 
+								  ifConFields = fields})}) 
   = fields ++ [con_occ, mkDataConWrapperOcc con_occ] 	
 	-- Wrapper, no worker; see MkId.mkDataConIds
 
-ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon cons})
+ifaceDeclSubBndrs (IfaceData {ifCons = IfDataTyCon _ cons})
   = nub (concatMap fld_occs cons) 	-- Eliminate duplicate fields
     ++ concatMap dc_occs cons
   where
-    fld_occs (IfaceConDecl _ _ _ _ _ _ fields) = fields
-    dc_occs (IfaceConDecl con_occ _ _ _ _ strs _)
+    fld_occs (IfVanillaCon { ifConFields = fields }) = fields
+    fld_occs (IfGadtCon {}) 			     = []
+    dc_occs con_decl
 	| has_wrapper = [con_occ, work_occ, wrap_occ]
 	| otherwise   = [con_occ, work_occ]
 	where
+	  con_occ = ifConOcc con_decl
+	  strs    = ifConStricts con_decl
 	  wrap_occ = mkDataConWrapperOcc con_occ
 	  work_occ = mkDataConWorkerOcc con_occ
 	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
 		-- ToDo: may miss strictness in existential dicts
 
-ifaceDeclSubBndrs _other = []
-
+ifaceDeclSubBndrs _other 		      = []
 
 -----------------------------------------------------
 --	Loading instance decls

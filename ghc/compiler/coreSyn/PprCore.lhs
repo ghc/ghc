@@ -153,11 +153,12 @@ ppr_expr add_par expr@(App fun arg)
 	other -> add_par (hang (pprParendExpr fun) 2 pp_args)
     }
 
-ppr_expr add_par (Case expr var [(con,args,rhs)])
+-- gaw 2004
+ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = add_par $
-    sep [sep [ptext SLIT("case") <+> pprCoreExpr expr,
+    sep [sep [ptext SLIT("case") <+> parens (ppr ty) <+> pprCoreExpr expr,
 	      hsep [ptext SLIT("of"),
-		    ppr_bndr var,
+		    ppr_bndr var, 
 		    char '{',
 		    ppr_case_pat con args
 	  ]],
@@ -167,9 +168,10 @@ ppr_expr add_par (Case expr var [(con,args,rhs)])
   where
     ppr_bndr = pprBndr CaseBind
 
-ppr_expr add_par (Case expr var alts)
+-- gaw 2004
+ppr_expr add_par (Case expr var ty alts)
   = add_par $
-    sep [sep [ptext SLIT("case") <+> pprCoreExpr expr,
+    sep [sep [ptext SLIT("case") <+> parens (ppr ty) <+> pprCoreExpr expr,
 	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
 	 nest 2 (sep (punctuate semi (map pprCoreAlt alts))),
 	 char '}'

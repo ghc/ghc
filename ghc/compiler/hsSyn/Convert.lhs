@@ -53,13 +53,13 @@ mk_con con = L loc0 $ case con of
 	 -> ConDecl (noLoc (cName c)) noExistentials noContext
 		  (InfixCon (mk_arg st1) (mk_arg st2))
   where
-    mk_arg (IsStrict, ty)  = noLoc $ BangType HsStrict (cvtType ty)
-    mk_arg (NotStrict, ty) = noLoc $ BangType HsNoBang (cvtType ty)
+    mk_arg (IsStrict, ty)  = noLoc $ HsBangTy HsStrict (cvtType ty)
+    mk_arg (NotStrict, ty) = noLoc $ HsBangTy HsNoBang (cvtType ty)
 
     mk_id_arg (i, IsStrict, ty)
-        = (noLoc (vName i), noLoc $ BangType HsStrict (cvtType ty))
+        = (noLoc (vName i), noLoc $ HsBangTy HsStrict (cvtType ty))
     mk_id_arg (i, NotStrict, ty)
-        = (noLoc (vName i), noLoc $ BangType HsNoBang (cvtType ty))
+        = (noLoc (vName i), noLoc $ HsBangTy HsNoBang (cvtType ty))
 
 mk_derivs [] = Nothing
 mk_derivs cs = Just [noLoc $ HsPredTy $ HsClassP (tconName c) [] | c <- cs]
@@ -183,12 +183,12 @@ cvt (LitE l)
   | otherwise	    = HsLit (cvtLit l)
 
 cvt (AppE x y)     = HsApp (cvtl x) (cvtl y)
-cvt (LamE ps e)    = HsLam (mkSimpleMatch (map cvtlp ps) (cvtl e) void)
+cvt (LamE ps e)    = HsLam (mkMatchGroup [mkSimpleMatch (map cvtlp ps) (cvtl e)])
 cvt (TupE [e])	  = cvt e
 cvt (TupE es)	  = ExplicitTuple(map cvtl es) Boxed
 cvt (CondE x y z)  = HsIf (cvtl x) (cvtl y) (cvtl z)
 cvt (LetE ds e)	  = HsLet (cvtdecs ds) (cvtl e)
-cvt (CaseE e ms)   = HsCase (cvtl e) (map cvtm ms)
+cvt (CaseE e ms)   = HsCase (cvtl e) (mkMatchGroup (map cvtm ms))
 cvt (DoE ss)	  = HsDo DoExpr (cvtstmts ss) [] void
 cvt (CompE ss)     = HsDo ListComp (cvtstmts ss) [] void
 cvt (ArithSeqE dd) = ArithSeqIn (cvtdd dd)
@@ -223,11 +223,11 @@ cvtd :: TH.Dec -> LHsBind RdrName
 -- Used only for declarations in a 'let/where' clause,
 -- not for top level decls
 cvtd (TH.ValD (TH.VarP s) body ds) 
-  = noLoc $ FunBind (noLoc (vName s)) False [cvtclause (Clause [] body ds)]
+  = noLoc $ FunBind (noLoc (vName s)) False (mkMatchGroup [cvtclause (Clause [] body ds)])
 cvtd (FunD nm cls)
-  = noLoc $ FunBind (noLoc (vName nm)) False (map cvtclause cls)
+  = noLoc $ FunBind (noLoc (vName nm)) False (mkMatchGroup (map cvtclause cls))
 cvtd (TH.ValD p body ds)
-  = noLoc $ PatBind (cvtlp p) (GRHSs (cvtguard body) (cvtdecs ds) void)
+  = noLoc $ PatBind (cvtlp p) (GRHSs (cvtguard body) (cvtdecs ds)) void
 
 cvtd d = cvtPanic "Illegal kind of declaration in where clause" 
 		  (text (TH.pprint d))
@@ -235,7 +235,7 @@ cvtd d = cvtPanic "Illegal kind of declaration in where clause"
 
 cvtclause :: TH.Clause -> Hs.LMatch RdrName
 cvtclause (Clause ps body wheres)
-    = noLoc $ Hs.Match (map cvtlp ps) Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void)
+    = noLoc $ Hs.Match (map cvtlp ps) Nothing (GRHSs (cvtguard body) (cvtdecs wheres))
 
 
 
@@ -256,7 +256,7 @@ cvtstmts (TH.ParS dss : ss)  = nlParStmt [(cvtstmts ds, undefined) | ds <- dss] 
 
 cvtm :: TH.Match -> Hs.LMatch RdrName
 cvtm (TH.Match p body wheres)
-    = noLoc (Hs.Match [cvtlp p] Nothing (GRHSs (cvtguard body) (cvtdecs wheres) void))
+    = noLoc (Hs.Match [cvtlp p] Nothing (GRHSs (cvtguard body) (cvtdecs wheres)))
 
 cvtguard :: TH.Body -> [LGRHS RdrName]
 cvtguard (GuardedB pairs) = map cvtpair pairs

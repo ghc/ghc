@@ -35,10 +35,9 @@ module SimplMonad (
 	getEnclosingCC, setEnclosingCC,
 
 	-- Environments
-	SimplEnv, emptySimplEnv, getSubst, setSubst,
-	getSubstEnv, extendSubst, extendSubstList,
+	SimplEnv, emptySimplEnv, getSubst, setSubst, extendIdSubst, extendTvSubst, 
+	zapSubstEnv, setSubstEnv, getTvSubst, setTvSubstEnv,
 	getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
-	setSubstEnv, zapSubstEnv,
 
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, unitFloat, addFloats, flattenFloats,
@@ -59,14 +58,10 @@ import PprCore		()	-- Instances
 import CostCentre	( CostCentreStack, subsumedCCS )
 import Var	
 import VarEnv
-import VarSet
 import OrdList
 import qualified Subst
-import Subst		( Subst, emptySubst, substEnv, 
-			  InScopeSet, mkInScopeSet, substInScope,
-			  isInScope 
-			)
-import Type             ( Type, isUnLiftedType )
+import Subst		( Subst, SubstResult, emptySubst, substInScope, isInScope )
+import Type             ( Type, TvSubst, TvSubstEnv, isUnLiftedType )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
@@ -166,7 +161,7 @@ emptyFloats env = Floats nilOL (getInScope env) True
 unitFloat :: SimplEnv -> OutId -> OutExpr -> Floats
 -- A single non-rec float; extend the in-scope set
 unitFloat env var rhs = Floats (unitOL (NonRec var rhs))
-			       (Subst.extendInScopeSet (getInScope env) var)
+			       (extendInScopeSet (getInScope env) var)
 			       (not (isUnLiftedType (idType var)))
 
 addFloats :: SimplEnv -> Floats 
@@ -625,16 +620,23 @@ setEnclosingCC env cc = env {seCC = cc}
 getSubst :: SimplEnv -> Subst
 getSubst env = seSubst env
 
+getTvSubst :: SimplEnv -> TvSubst
+getTvSubst env = Subst.getTvSubst (seSubst env)
+
+setTvSubstEnv :: SimplEnv -> TvSubstEnv -> SimplEnv
+setTvSubstEnv env@(SimplEnv {seSubst = subst}) tv_subst_env
+  = env {seSubst = Subst.setTvSubstEnv subst tv_subst_env}
+
 setSubst :: SimplEnv -> Subst -> SimplEnv
 setSubst env subst = env {seSubst = subst}
 
-extendSubst :: SimplEnv -> CoreBndr -> SubstResult -> SimplEnv
-extendSubst env@(SimplEnv {seSubst = subst}) var res
-  = env {seSubst = Subst.extendSubst subst var res}
+extendIdSubst :: SimplEnv -> Id -> SubstResult -> SimplEnv
+extendIdSubst env@(SimplEnv {seSubst = subst}) var res
+  = env {seSubst = Subst.extendIdSubst subst var res}
 
-extendSubstList :: SimplEnv -> [CoreBndr] -> [SubstResult] -> SimplEnv
-extendSubstList env@(SimplEnv {seSubst = subst}) vars ress
-  = env {seSubst = Subst.extendSubstList subst vars ress}
+extendTvSubst :: SimplEnv -> TyVar -> Type -> SimplEnv
+extendTvSubst env@(SimplEnv {seSubst = subst}) var res
+  = env {seSubst = Subst.extendTvSubst subst var res}
 
 ---------------------
 getInScope :: SimplEnv -> InScopeSet
@@ -645,28 +647,25 @@ setInScope env env_with_in_scope = setInScopeSet env (getInScope env_with_in_sco
 
 setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
 setInScopeSet env@(SimplEnv {seSubst = subst}) in_scope
-  = env {seSubst = Subst.setInScope subst in_scope}
+  = env {seSubst = Subst.setInScopeSet subst in_scope}
 
 addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
 	-- The new Ids are guaranteed to be freshly allocated
 addNewInScopeIds env@(SimplEnv {seSubst = subst}) vs
-  = env {seSubst = Subst.extendNewInScopeList subst vs}
+  = env {seSubst = Subst.extendInScopeIds subst vs}
 
 modifyInScope :: SimplEnv -> CoreBndr -> CoreBndr -> SimplEnv
 modifyInScope env@(SimplEnv {seSubst = subst}) v v'
   = env {seSubst = Subst.modifyInScope subst v v'}
 
 ---------------------
-getSubstEnv :: SimplEnv -> SubstEnv
-getSubstEnv env = substEnv (seSubst env)
-
-setSubstEnv :: SimplEnv -> SubstEnv -> SimplEnv
-setSubstEnv env@(SimplEnv {seSubst = subst}) senv
-  = env {seSubst = Subst.setSubstEnv subst senv}
-
 zapSubstEnv :: SimplEnv -> SimplEnv
 zapSubstEnv env@(SimplEnv {seSubst = subst})
   = env {seSubst = Subst.zapSubstEnv subst}
+
+setSubstEnv :: SimplEnv -> Subst -> SimplEnv
+setSubstEnv env@(SimplEnv {seSubst = subst}) subst_with_env
+  = env {seSubst = Subst.setSubstEnv subst subst_with_env}
 \end{code}
 
 

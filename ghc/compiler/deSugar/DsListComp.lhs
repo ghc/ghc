@@ -212,8 +212,10 @@ deBindComp pat core_list1 quals core_list2
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
 	rhs = Lam u1 $
-	      Case (Var u1) u1 [(DataAlt nilDataCon,  [], 	core_list2),
-			        (DataAlt consDataCon, [u2, u3], core_match)]
+-- gaw 2004
+	      Case (Var u1) u1 res_ty
+		   [(DataAlt nilDataCon,  [], 	    core_list2),
+		    (DataAlt consDataCon, [u2, u3], core_match)]
     in
     returnDs (Let (Rec [(h, rhs)]) letrec_body)
 \end{code}
@@ -242,13 +244,16 @@ mkZipBind elt_tys
     in
     returnDs (zip_fn, mkLams ass zip_body)
   where
-    list_tys   = map mkListTy elt_tys
-    ret_elt_ty = mkCoreTupTy elt_tys
-    zip_fn_ty  = mkFunTys list_tys (mkListTy ret_elt_ty)
+    list_tys    = map mkListTy elt_tys
+    ret_elt_ty  = mkCoreTupTy elt_tys
+    list_ret_ty = mkListTy ret_elt_ty
+    zip_fn_ty   = mkFunTys list_tys list_ret_ty
 
     mk_case (as, a', as') rest
-	  = Case (Var as) as [(DataAlt nilDataCon,  [],        mkNilExpr ret_elt_ty),
-			      (DataAlt consDataCon, [a', as'], rest)]
+-- gaw 2004
+	  = Case (Var as) as list_ret_ty
+		  [(DataAlt nilDataCon,  [],        mkNilExpr ret_elt_ty),
+		   (DataAlt consDataCon, [a', as'], rest)]
 
 -- Helper functions that makes an HsTuple only for non-1-sized tuples
 mk_hs_tuple_expr :: [Id] -> LHsExpr Id
@@ -318,7 +323,7 @@ dfListComp c_id n_id (BindStmt pat list1 : quals)
     dfListComp c_id b quals			`thenDs` \ core_rest ->
 
     -- build the pattern match
-    matchSimply (Var x) (StmtCtxt ListComp) 
+    matchSimply (Var x) (StmtCtxt ListComp)
 		pat core_rest (Var b)		`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
@@ -460,7 +465,7 @@ deLambda ty p e  =
   let errTy    = exprType ce
       errMsg   = "DsListComp.deLambda: internal error!"
   in
-  mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
+  mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    -> 
   matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr	  `thenDs` \res	    ->
   returnDs (mkLams [v] res, errTy)
 

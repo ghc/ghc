@@ -13,7 +13,7 @@ module SimplUtils (
 	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 	contIsDupable, contResultType,
 	countValArgs, countArgs, pushContArgs,
-	mkBoringStop, mkStop, contIsRhs, contIsRhsOrArg,
+	mkBoringStop, mkRhsStop, contIsRhs, contIsRhsOrArg,
 	getContArgs, interestingCallContext, interestingArg, isStrictType
 
     ) where
@@ -42,7 +42,7 @@ import TcType		( isDictTy )
 import Name		( mkSysTvName )
 import OccName		( EncodedFS )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
-import DataCon		( dataConRepArity, dataConExistentialTyVars, dataConArgTys )
+import DataCon		( dataConRepArity, dataConTyVars, dataConArgTys, isVanillaDataCon )
 import Var		( tyVarKind, mkTyVar )
 import VarSet
 import Util		( lengthExceeds, mapAccumL )
@@ -115,11 +115,9 @@ instance Outputable DupFlag where
 
 
 -------------------
-mkBoringStop :: OutType -> SimplCont
+mkBoringStop, mkRhsStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty AnArg (canUpdateInPlace ty)
-
-mkStop :: OutType -> LetRhsFlag -> SimplCont
-mkStop ty is_rhs = Stop ty is_rhs (canUpdateInPlace ty)
+mkRhsStop    ty = Stop ty AnRhs (canUpdateInPlace ty)
 
 contIsRhs :: SimplCont -> Bool
 contIsRhs (Stop _ AnRhs _)    = True
@@ -136,8 +134,8 @@ contIsDupable (Stop _ _ _)     		 = True
 contIsDupable (ApplyTo  OkToDup _ _ _)   = True
 contIsDupable (Select   OkToDup _ _ _ _) = True
 contIsDupable (CoerceIt _ cont)          = contIsDupable cont
-contIsDupable (InlinePlease cont)	 = contIsDupable cont
-contIsDupable other			 = False
+contIsDupable (InlinePlease cont)        = contIsDupable cont
+contIsDupable other	  	         = False
 
 -------------------
 discardableCont :: SimplCont -> Bool
@@ -372,9 +370,9 @@ interestingCallContext :: Bool 		-- False <=> no args at all
 interestingCallContext some_args some_val_args cont
   = interesting cont
   where
-    interesting (InlinePlease _)       = True
-    interesting (Select _ _ _ _ _)     = some_args
-    interesting (ApplyTo _ _ _ _)      = True	-- Can happen if we have (coerce t (f x)) y
+    interesting (InlinePlease _)         = True
+    interesting (Select _ _ _ _ _)       = some_args
+    interesting (ApplyTo _ _ _ _)        = True	-- Can happen if we have (coerce t (f x)) y
 						-- Perhaps True is a bit over-keen, but I've
 						-- seen (coerce f) x, where f has an INLINE prag,
 						-- So we have to give some motivaiton for inlining it
@@ -903,16 +901,22 @@ prepareDefault case_bndr handled_cons Nothing
   = returnSmpl []
 
 mk_args missing_con inst_tys
-  = getUniquesSmpl 		`thenSmpl` \ tv_uniqs ->
-    getUniquesSmpl 		`thenSmpl` \ id_uniqs ->
-    let
-	ex_tyvars   = dataConExistentialTyVars missing_con
-	ex_tyvars'  = zipWith mk tv_uniqs ex_tyvars
-	mk uniq tv  = mkTyVar (mkSysTvName uniq FSLIT("t")) (tyVarKind tv)
-	arg_tys     = dataConArgTys missing_con (inst_tys ++ mkTyVarTys ex_tyvars')
-	arg_ids     = zipWith (mkSysLocal FSLIT("a")) id_uniqs arg_tys
-    in 
-    returnSmpl (ex_tyvars' ++ arg_ids)
+  = mk_tv_bndrs missing_con inst_tys	`thenSmpl` \ (tv_bndrs, inst_tys') ->
+    getUniquesSmpl			`thenSmpl` \ id_uniqs ->
+    let arg_tys = dataConArgTys missing_con inst_tys'
+	arg_ids = zipWith (mkSysLocal FSLIT("a")) id_uniqs arg_tys
+    in
+    returnSmpl (tv_bndrs ++ arg_ids)
+
+mk_tv_bndrs missing_con inst_tys
+  | isVanillaDataCon missing_con
+  = returnSmpl ([], inst_tys)
+  | otherwise
+  = getUniquesSmpl		`thenSmpl` \ tv_uniqs ->
+    let new_tvs    = zipWith mk tv_uniqs (dataConTyVars missing_con)
+	mk uniq tv = mkTyVar (mkSysTvName uniq FSLIT("t")) (tyVarKind tv)
+    in
+    returnSmpl (new_tvs, mkTyVarTys new_tvs)
 \end{code}
 
 
@@ -925,11 +929,11 @@ mk_args missing_con inst_tys
 mkCase puts a case expression back together, trying various transformations first.
 
 \begin{code}
-mkCase :: OutExpr -> OutId -> [OutAlt] -> SimplM OutExpr
+mkCase :: OutExpr -> OutId -> OutType -> [OutAlt] -> SimplM OutExpr
 
-mkCase scrut case_bndr alts
+mkCase scrut case_bndr ty alts
   = mkAlts scrut case_bndr alts	`thenSmpl` \ better_alts ->
-    mkCase1 scrut case_bndr better_alts
+    mkCase1 scrut case_bndr ty better_alts
 \end{code}
 
 
@@ -1016,7 +1020,8 @@ mkAlts scrut outer_bndr outer_alts
   mkAlts' dflags scrut outer_bndr outer_alts
     | dopt Opt_CaseMerge dflags,
       (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
-      Just (Case (Var scrut_var) inner_bndr inner_alts) <- maybe_outer_deflt,
+-- gaw 2004
+      Just (Case (Var scrut_var) inner_bndr _ inner_alts) <- maybe_outer_deflt,
       scruting_same_var scrut_var
 
     = let    --  Eliminate any inner alts which are shadowed by the outer ones
@@ -1199,7 +1204,7 @@ I don't really know how to improve this situation.
 --------------------------------------------------
 
 #ifdef DEBUG
-mkCase1 scrut case_bndr []
+mkCase1 scrut case_bndr ty []
   = pprTrace "mkCase1: null alts" (ppr case_bndr <+> ppr scrut) $
     returnSmpl scrut
 #endif
@@ -1208,7 +1213,7 @@ mkCase1 scrut case_bndr []
 --	1. Eliminate the case altogether if poss
 --------------------------------------------------
 
-mkCase1 scrut case_bndr [(con,bndrs,rhs)]
+mkCase1 scrut case_bndr ty [(con,bndrs,rhs)]
   -- See if we can get rid of the case altogether
   -- See the extensive notes on case-elimination above
   -- mkCase made sure that if all the alternatives are equal, 
@@ -1250,7 +1255,7 @@ mkCase1 scrut case_bndr [(con,bndrs,rhs)]
 --	2. Identity case
 --------------------------------------------------
 
-mkCase1 scrut case_bndr alts	-- Identity case
+mkCase1 scrut case_bndr ty alts	-- Identity case
   | all identity_alt alts
   = tick (CaseIdentity case_bndr)		`thenSmpl_`
     returnSmpl (re_note scrut)
@@ -1280,7 +1285,8 @@ mkCase1 scrut case_bndr alts	-- Identity case
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
-mkCase1 scrut bndr alts = returnSmpl (Case scrut bndr alts)
+-- gaw 2004
+mkCase1 scrut bndr ty alts = returnSmpl (Case scrut bndr ty alts)
 \end{code}
 
 

@@ -10,18 +10,21 @@ module MatchCon ( matchConFamily ) where
 
 import {-# SOURCE #-} Match	( match )
 
-import HsSyn		( Pat(..), HsConDetails(..) )
-
+import HsSyn		( Pat(..), HsConDetails(..), isEmptyLHsBinds )
+import DsBinds		( dsHsNestedBinds )
+import DataCon		( isVanillaDataCon, dataConTyVars, dataConOrigArgTys )
+import TcType		( tcTyConAppArgs )
+import Type		( substTys, zipTopTvSubst, mkTyVarTys )
+import CoreSyn
 import DsMonad
 import DsUtils
 
 import Id		( Id )
-import Subst		( mkSubst, mkInScopeSet, bindSubst, substExpr )
-import CoreFVs		( exprFreeVars )
-import VarEnv		( emptySubstEnv )
+import Type             ( Type )
 import ListSetOps	( equivClassesByUniq )
 import SrcLoc		( unLoc )
 import Unique		( Uniquable(..) )
+import Outputable
 \end{code}
 
 We are confronted with the first column of patterns in a set of
@@ -76,76 +79,65 @@ have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 \begin{code}
 matchConFamily :: [Id]
+               -> Type
 	       -> [EquationInfo]
 	       -> DsM MatchResult
-
-matchConFamily (var:vars) eqns_info
+matchConFamily (var:vars) ty eqns_info
   = let
 	-- Sort into equivalence classes by the unique on the constructor
 	-- All the EqnInfos should start with a ConPat
 	eqn_groups = equivClassesByUniq get_uniq eqns_info
-	get_uniq (EqnInfo _ _ (ConPatOut data_con _ _ _ _ : _) _) = getUnique data_con
+	get_uniq (EqnInfo { eqn_pats = ConPatOut data_con _ _ _ _ _ : _}) = getUnique data_con
     in
 	-- Now make a case alternative out of each group
-    mappM (match_con vars) eqn_groups	`thenDs` \ alts ->
-
-    returnDs (mkCoAlgCaseMatchResult var alts)
+    mappM (match_con vars ty) eqn_groups	`thenDs` \ alts ->
+    returnDs (mkCoAlgCaseMatchResult var ty alts)
 \end{code}
 
 And here is the local function that does all the work.  It is
 more-or-less the @matchCon@/@matchClause@ functions on page~94 in
-Wadler's chapter in SLPJ.
+Wadler's chapter in SLPJ.  The function @shift_con_pats@ does what the
+list comprehension in @matchClause@ (SLPJ, p.~94) does, except things
+are trickier in real life.  Works for @ConPats@, and we want it to
+fail catastrophically for anything else (which a list comprehension
+wouldn't).  Cf.~@shift_lit_pats@ in @MatchLits@.
 
 \begin{code}
-match_con vars (eqn1@(EqnInfo _ _ (ConPatOut data_con (PrefixCon arg_pats) _ ex_tvs ex_dicts : _) _)
-		: other_eqns)
-  = -- Make new vars for the con arguments; avoid new locals where possible
-    mappM selectMatchVarL arg_pats	`thenDs` \ arg_vars ->
+match_con vars ty eqns
+  = do	{ -- Make new vars for the con arguments; avoid new locals where possible
+	  arg_vars <- selectMatchVars (map unLoc arg_pats1) arg_tys
 
-    -- Now do the business to make the alt for _this_ ConPat ...
-    match (arg_vars ++ vars) 
-	  (map shift_con_pat (eqn1:other_eqns))	`thenDs` \ match_result ->
+	; match_result <- match (arg_vars ++ vars) ty (shiftEqns eqns)
 
-    --		[See "notes on do_subst" below this function]
-    -- Make the ex_tvs and ex_dicts line up with those
-    -- in the first pattern.  Remember, they are all guaranteed to be variables
-    let
-	match_result' | null ex_tvs     = match_result
-		      | null other_eqns = match_result
-		      | otherwise       = adjustMatchResult do_subst match_result
-    in
+	; binds <- mapM ds_binds [ bind | ConPatOut _ _ _ bind _ _ <- pats,
+					  not (isEmptyLHsBinds bind) ]
+
+	; let match_result' = bindInMatchResult (line_up other_pats) $
+			      mkCoLetsMatchResult binds match_result
 	
-    returnDs (data_con, ex_tvs ++ ex_dicts ++ arg_vars, match_result')
+	; return (data_con, tvs1 ++ dicts1 ++ arg_vars, match_result') }
   where
-    shift_con_pat :: EquationInfo -> EquationInfo
-    shift_con_pat (EqnInfo n ctx (ConPatOut _ (PrefixCon arg_pats) _ _ _ : pats) match_result)
-      = EqnInfo n ctx (map unLoc arg_pats ++ pats) match_result
+    pats@(pat1 : other_pats) = map firstPat eqns
+    ConPatOut data_con tvs1 dicts1 _ (PrefixCon arg_pats1) pat_ty = pat1
 
-    other_pats = [p | EqnInfo _ _ (p:_) _ <- other_eqns]
+    ds_binds bind = do { prs <- dsHsNestedBinds bind; return (Rec prs) }
 
-    var_prs = concat [ (ex_tvs'   `zip` ex_tvs) ++ 
-		       (ex_dicts' `zip` ex_dicts) 
-		     | ConPatOut _ _ _ ex_tvs' ex_dicts' <- other_pats ]
+    line_up pats 
+	| null tvs1 && null dicts1 = []		-- Common case
+	| otherwise = [ pr | ConPatOut _ ts ds _ _ _ <- pats,
+			     pr <- (ts `zip` tvs1) ++ (ds `zip` dicts1)]
 
-    do_subst e = substExpr subst e
-	       where
-		 subst    = foldl (\ s (v', v) -> bindSubst s v' v) in_scope var_prs
-		 in_scope = mkSubst (mkInScopeSet (exprFreeVars e)) emptySubstEnv
-			-- We put all the free variables of e into the in-scope 
-			-- set of the substitution, not because it is necessary,
-			-- but to suppress the warning in Subst.lookupInScope
-			-- Tiresome, but doing the substitution at all is rare.
+     	-- Get the arg types, which we use to type the new vars
+	-- to match on, from the "outside"; the types of pats1 may 
+	-- be more refined, and hence won't do
+    arg_tys = substTys (zipTopTvSubst (dataConTyVars data_con) inst_tys)
+		       (dataConOrigArgTys data_con)
+    inst_tys | isVanillaDataCon data_con = tcTyConAppArgs pat_ty	-- Newtypes opaque!
+	     | otherwise		 = mkTyVarTys tvs1
 \end{code}
 
-Note on @shift_con_pats@ just above: does what the list comprehension in
-@matchClause@ (SLPJ, p.~94) does, except things are trickier in real
-life.  Works for @ConPats@, and we want it to fail catastrophically
-for anything else (which a list comprehension wouldn't).
-Cf.~@shift_lit_pats@ in @MatchLits@.
-
-
-Notes on do_subst stuff
-~~~~~~~~~~~~~~~~~~~~~~~
+Note [Existentials in shift_con_pat]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 	data T = forall a. Ord a => T a (a->Int)
 
@@ -155,7 +147,7 @@ Consider
 When we put in the tyvars etc we get
 
 	f (T a (d::Ord a) (x::a) (f::a->Int)) True =  ...expr1...
-	f (T b (e::Ord a) (y::a) (g::a->Int)) True =  ...expr2...
+	f (T b (e::Ord b) (y::a) (g::a->Int)) True =  ...expr2...
 
 After desugaring etc we'll get a single case:
 
@@ -167,12 +159,11 @@ After desugaring etc we'll get a single case:
 		False -> ...expr2...
 
 *** We have to substitute [a/b, d/e] in expr2! **
-That is what do_subst is doing.
+Hence
+		False -> ....((/\b\(e:Ord b).expr2) a d)....
 
 Originally I tried to use 
 	(\b -> let e = d in expr2) a 
 to do this substitution.  While this is "correct" in a way, it fails
 Lint, because e::Ord b but d::Ord a.  
-
-So now I simply do the substitution properly using substExpr.
 

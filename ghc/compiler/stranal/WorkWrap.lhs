@@ -158,10 +158,12 @@ wwExpr (Let bind expr)
     wwExpr expr			`thenUs` \ new_expr ->
     returnUs (mkLets intermediate_bind new_expr)
 
-wwExpr (Case expr binder alts)
+-- gaw 2004
+wwExpr (Case expr binder ty alts)
   = wwExpr expr				`thenUs` \ new_expr ->
     mapUs ww_alt alts			`thenUs` \ new_alts ->
-    returnUs (Case new_expr binder new_alts)
+-- gaw 2004 
+    returnUs (Case new_expr binder ty new_alts)
   where
     ww_alt (con, binders, rhs)
       =	wwExpr rhs			`thenUs` \ new_rhs ->

@@ -19,8 +19,8 @@ import Class
 import TypeRep
 import Type
 import PprExternalCore	-- Instances
-import DataCon	( DataCon, dataConExistentialTyVars, dataConRepArgTys, 
-		  dataConName, dataConWrapId_maybe )
+import DataCon	( DataCon, dataConTyVars, dataConRepArgTys, 
+		  dataConName, dataConTyCon, dataConWrapId_maybe )
 import CoreSyn
 import Var
 import IdInfo
@@ -112,7 +112,7 @@ make_cdef dcon =  C.Constr dcon_name existentials tys
   where 
     dcon_name    = make_var_id (dataConName dcon)
     existentials = map make_tbind ex_tyvars
-    ex_tyvars    = dataConExistentialTyVars dcon
+    ex_tyvars    = drop (tyConArity (dataConTyCon dcon)) (dataConTyVars dcon)
     tys 	 = map make_ty (dataConRepArgTys dcon)
 
 make_tbind :: TyVar -> C.Tbind
@@ -144,7 +144,8 @@ make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
 make_exp (Lam v e) | isTyVar v = C.Lam (C.Tb (make_tbind v)) (make_exp e)
 make_exp (Lam v e) | otherwise = C.Lam (C.Vb (make_vbind v)) (make_exp e)
 make_exp (Let b e) = C.Let (make_vdef b) (make_exp e)
-make_exp (Case e v alts) = C.Case (make_exp e) (make_vbind v) (map make_alt alts)
+-- gaw 2004
+make_exp (Case e v ty alts) = C.Case (make_exp e) (make_vbind v) (make_ty ty) (map make_alt alts)
 make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary
 make_exp (Note (Coerce t_to t_from) e) = C.Coerce (make_ty t_to) (make_exp e)
 make_exp (Note InlineCall e) = C.Note "InlineCall" (make_exp e)

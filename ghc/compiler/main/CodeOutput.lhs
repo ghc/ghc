@@ -40,7 +40,6 @@ import ListSetOps	( removeDupsEq )
 import Maybes		( firstJust )
 
 import Directory	( doesFileExist )
-import Data.List	( intersperse )
 import Monad		( when )
 import IO
 \end{code}

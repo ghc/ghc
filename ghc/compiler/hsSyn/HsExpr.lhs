@@ -43,8 +43,9 @@ data HsExpr id
   | HsOverLit	HsOverLit	-- Overloaded literals; eliminated by type checker
   | HsLit	HsLit		-- Simple (non-overloaded) literals
 
-  | HsLam	(LMatch  id)	-- lambda
-  | HsApp	(LHsExpr id)	-- application
+  | HsLam	(MatchGroup  id)	-- Currently always a single match
+
+  | HsApp	(LHsExpr id)		-- Application
 		(LHsExpr id)
 
   -- Operator applications:
@@ -72,7 +73,7 @@ data HsExpr id
 		(LHsExpr id)	-- operand
 				
   | HsCase	(LHsExpr id)
-		[LMatch id]
+		(MatchGroup id)
 
   | HsIf	(LHsExpr id)	--  predicate
 		(LHsExpr id)	--  then part
@@ -267,8 +268,6 @@ ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
 ppr_expr (HsOverLit lit) = ppr lit
 
-ppr_expr (HsLam match) = pprMatch LambdaExpr (unLoc match)
-
 ppr_expr (HsApp e1 e2)
   = let (fun, args) = collect_args e1 [e2] in
     (ppr_lexpr fun) <+> (sep (map pprParendExpr args))
@@ -316,6 +315,9 @@ ppr_expr (SectionR op expr)
 		       4 ((<>) pp_expr rparen)
     pp_infixly v
       = parens (sep [ppr v, pp_expr])
+
+ppr_expr (HsLam matches) 
+  = pprMatches LambdaExpr matches
 
 ppr_expr (HsCase expr matches)
   = sep [ sep [ptext SLIT("case"), nest 4 (ppr expr), ptext SLIT("of")],
@@ -590,6 +592,13 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 
 \begin{code}
+data MatchGroup id 
+  = MatchGroup 
+	[LMatch id] 	-- The alternatives
+	PostTcType	-- The type is the type of the entire group
+			-- 	t1 -> ... -> tn -> tr
+			-- where there are n patterns
+
 type LMatch id = Located (Match id)
 
 data Match id
@@ -597,14 +606,18 @@ data Match id
 	[LPat id]		-- The patterns
 	(Maybe (LHsType id))	-- A type signature for the result of the match
 				--	Nothing after typechecking
-
 	(GRHSs id)
+
+-- gaw 2004
+hsLMatchPats :: LMatch id -> [LPat id]
+hsLMatchPats (L _ (Match pats _ _)) = pats
 
 -- GRHSs are used both for pattern bindings and for Matches
 data GRHSs id	
   = GRHSs [LGRHS id]		-- Guarded RHSs
 	  [HsBindGroup id]	-- The where clause
-	  PostTcType		-- Type of RHS (after type checking)
+-- gaw 2004
+--	  PostTcType		-- Type of RHS (after type checking)
 
 type LGRHS id = Located (GRHS id)
 
@@ -615,23 +628,24 @@ data GRHS id
 We know the list must have at least one @Match@ in it.
 
 \begin{code}
-pprMatches :: (OutputableBndr id) => HsMatchContext id -> [LMatch id] -> SDoc
-pprMatches ctxt matches = vcat (map (pprMatch ctxt) (map unLoc matches))
+pprMatches :: (OutputableBndr id) => HsMatchContext id -> MatchGroup id -> SDoc
+pprMatches ctxt (MatchGroup matches _) = vcat (map (pprMatch ctxt) (map unLoc matches))
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprFunBind :: (OutputableBndr id) => id -> [LMatch id] -> SDoc
+pprFunBind :: (OutputableBndr id) => id -> MatchGroup id -> SDoc
 pprFunBind fun matches = pprMatches (FunRhs fun) matches
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprPatBind :: (OutputableBndr id)
-	   => LPat id -> GRHSs id -> SDoc
+pprPatBind :: (OutputableBndr bndr, OutputableBndr id)
+	   => LPat bndr -> GRHSs id -> SDoc
 pprPatBind pat grhss = sep [ppr pat, nest 4 (pprGRHSs PatBindRhs grhss)]
 
 
 pprMatch :: OutputableBndr id => HsMatchContext id -> Match id -> SDoc
+-- gaw 2004
 pprMatch ctxt (Match pats maybe_ty grhss)
   = pp_name ctxt <+> sep [sep (map ppr pats), 
-		     ppr_maybe_ty,
+		     ppr_maybe_ty, 
 		     nest 2 (pprGRHSs ctxt grhss)]
   where
     pp_name (FunRhs fun) = ppr fun	-- Not pprBndr; the AbsBinds will
@@ -645,7 +659,8 @@ pprMatch ctxt (Match pats maybe_ty grhss)
 
 
 pprGRHSs :: OutputableBndr id => HsMatchContext id -> GRHSs id -> SDoc
-pprGRHSs ctxt (GRHSs grhss binds ty)
+-- gaw 2004
+pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
     $$
     (if null binds then empty

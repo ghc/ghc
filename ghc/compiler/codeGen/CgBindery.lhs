@@ -258,9 +258,9 @@ cgLookupPanic id
 	pprPanic "cgPanic"
 		(vcat [ppr id,
 		ptext SLIT("static binds for:"),
-		vcat [ ppr (cg_id info) | info <- rngVarEnv static_binds ],
+		vcat [ ppr (cg_id info) | info <- varEnvElts static_binds ],
 		ptext SLIT("local binds for:"),
-		vcat [ ppr (cg_id info) | info <- rngVarEnv local_binds ],
+		vcat [ ppr (cg_id info) | info <- varEnvElts local_binds ],
 	        ptext SLIT("SRT label") <+> pprCLabel srt
 	      ])
 \end{code}
@@ -277,7 +277,7 @@ we don't leave any (NoVolatile, NoStable) binds around...
 \begin{code}
 nukeVolatileBinds :: CgBindings -> CgBindings
 nukeVolatileBinds binds
-  = mkVarEnv (foldr keep_if_stable [] (rngVarEnv binds))
+  = mkVarEnv (foldr keep_if_stable [] (varEnvElts binds))
   where
     keep_if_stable (CgIdInfo { cg_stb = NoStableLoc }) acc = acc
     keep_if_stable info acc
@@ -443,7 +443,7 @@ nukeDeadBindings live_vars = do
 	let (dead_stk_slots, bs') =
 		dead_slots live_vars 
 			[] []
-			[ (cg_id b, b) | b <- rngVarEnv binds ]
+			[ (cg_id b, b) | b <- varEnvElts binds ]
 	setBinds $ mkVarEnv bs'
 	freeStackSlots dead_stk_slots
 \end{code}
@@ -486,6 +486,6 @@ getLiveStackSlots :: FCode [VirtualSpOffset]
 getLiveStackSlots 
   = do 	{ binds <- getBinds
 	; return [off | CgIdInfo { cg_stb = VirStkLoc off, 
-				   cg_rep = rep } <- rngVarEnv binds, 
+				   cg_rep = rep } <- varEnvElts binds, 
 		        isFollowableArg rep] }
 \end{code}

@@ -65,7 +65,7 @@ import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
 			  opt_Parallel, opt_DoTickyProfiling,
 			  opt_SMP )
 import Id		( Id, idType, idArity, idName )
-import DataCon		( DataCon, dataConTyCon, isNullaryDataCon, dataConName )
+import DataCon		( DataCon, dataConTyCon, isNullaryRepDataCon, dataConName )
 import Name		( Name, nameUnique, getOccName, getOccString )
 import OccName		( occNameUserString )
 import Type		( isUnLiftedType, Type, repType, splitTyConApp_maybe )
@@ -663,7 +663,7 @@ staticClosureNeedsLink :: ClosureInfo -> Bool
 staticClosureNeedsLink (ClosureInfo { closureSRT = srt })
   = needsSRT srt
 staticClosureNeedsLink (ConInfo { closureSMRep = sm_rep, closureCon = con })
-  = not (isNullaryDataCon con) && not_nocaf_constr
+  = not (isNullaryRepDataCon con) && not_nocaf_constr
   where
     not_nocaf_constr = 
 	case sm_rep of 

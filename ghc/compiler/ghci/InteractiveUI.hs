@@ -1,6 +1,6 @@
 {-# OPTIONS -#include "Linker.h" #-}
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.175 2004/08/20 15:02:40 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.176 2004/09/30 10:36:47 simonpj Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -532,17 +532,28 @@ showDecl want_name (IfaceSyn {ifName = tycon, ifTyVars = tyvars, ifSynRhs = mono
   = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
        2 (equals <+> ppr mono_ty)
 
-showDecl want_name (IfaceData {ifCtxt = context, ifName = tycon, 
+showDecl want_name (IfaceData {ifName = tycon, 
 		     ifTyVars = tyvars, ifCons = condecls})
   = hang (pp_nd <+> pprIfaceDeclHead context tycon tyvars)
        2 (add_bars (ppr_trim show_con cs))
   where
-    show_con (IfaceConDecl con_name is_infix ex_tvs ex_cxt tys strs flds)
+    show_con (IfVanillaCon { ifConOcc = con_name, ifConInfix = is_infix, ifConArgTys = tys, 
+			     ifConStricts = strs, ifConFields = flds})
 	| want_name tycon || want_name con_name || any want_name flds
-	= Just (pprIfaceForAllPart ex_tvs ex_cxt (show_guts con_name is_infix tys_w_strs flds))
+	= Just (show_guts con_name is_infix tys_w_strs flds)
 	| otherwise = Nothing
 	where
 	  tys_w_strs = tys `zip` (strs ++ repeat NotMarkedStrict)
+    show_con (IfGadtCon { ifConOcc = con_name, ifConTyVars = tvs, ifConCtxt = theta, 
+			  ifConArgTys = arg_tys, ifConResTys = res_tys, ifConStricts = strs })
+	| want_name tycon || want_name con_name
+	= Just (ppr_bndr con_name <+> colon <+> pprIfaceForAllPart tvs theta pp_tau)
+	| otherwise = Nothing
+	where
+	  tys_w_strs = arg_tys `zip` (strs ++ repeat NotMarkedStrict)
+	  pp_tau = foldr add pp_res_ty tys_w_strs
+	  pp_res_ty = ppr_bndr tycon <+> hsep (map pprParendIfaceType res_tys)
+	  add bty pp_ty = ppr_bangty bty <+> arrow <+> pp_ty
 
     show_guts con True [ty1, ty2] flds = sep [ppr_bangty ty1, ppr con, ppr_bangty ty2]
     show_guts con _ tys []   = ppr_bndr con <+> sep (map ppr_bangty tys)
@@ -553,10 +564,11 @@ showDecl want_name (IfaceData {ifCtxt = context, ifName = tycon,
 			      = Just (ppr_bndr fld <+> dcolon <+> ppr_bangty bty)
 			      | otherwise = Nothing
 
-    (pp_nd, cs) = case condecls of
-		    IfAbstractTyCon -> (ptext SLIT("data"),    [])
-		    IfDataTyCon cs  -> (ptext SLIT("data"),    cs)
-		    IfNewTyCon c    -> (ptext SLIT("newtype"), [c])
+    (pp_nd, context, cs) = case condecls of
+		    IfAbstractTyCon 	      -> (ptext SLIT("data"), [],   [])
+		    IfDataTyCon (Just cxt) cs -> (ptext SLIT("data"), cxt, cs)
+		    IfDataTyCon Nothing cs    -> (ptext SLIT("data"), [],  cs)
+		    IfNewTyCon c    	      -> (ptext SLIT("newtype"), [], [c])
 
     add_bars []      = empty
     add_bars [c]     = equals <+> c

@@ -13,12 +13,12 @@ module TcEnv(
 	tcLookupLocatedGlobal,	tcLookupGlobal, 
 	tcLookupGlobalId, tcLookupTyCon, tcLookupClass, tcLookupDataCon,
 	tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
-	tcLookupLocatedClass, tcLookupLocatedDataCon,
+	tcLookupLocatedClass, 
 	
 	-- Local environment
 	tcExtendKindEnv,
-	tcExtendTyVarEnv,    tcExtendTyVarEnv2, 
-	tcExtendLocalValEnv, tcExtendLocalValEnv2, 
+	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
+	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds,
 	tcLookupId, tcLookupTyVar,
 	lclEnvElts, getInLocalScope, findGlobals, 
@@ -51,7 +51,7 @@ import TcRnMonad
 import TcMType		( zonkTcType, zonkTcTyVar, zonkTcTyVarsAndFV )
 import TcType		( Type, TcKind, TcTyVar, TcTyVarSet, 
 			  tyVarsOfType, tyVarsOfTypes, tcSplitDFunTy, mkGenTyConApp,
-			  getDFunTyKey, tcTyConAppTyCon, tyVarBindingInfo, 
+			  getDFunTyKey, tcTyConAppTyCon, 
 			  tidyOpenType, tidyOpenTyVar
 			)
 import qualified Type	( getTyVar_maybe )
@@ -72,7 +72,6 @@ import HscTypes		( DFunId, extendTypeEnvList, lookupType,
 
 import SrcLoc		( SrcLoc, Located(..) )
 import Outputable
-import Maybe		( isJust )
 \end{code}
 
 
@@ -100,7 +99,7 @@ tcLookupGlobal name
 	  then	-- It's defined in this module
 	      case lookupNameEnv (tcg_type_env env) name of
 		Just thing -> return thing
-		Nothing	   -> notFound "tcLookupGlobal" name
+		Nothing	   -> notFound  name	-- Panic!
 	 
 	  else do 		-- It's imported
 	{ (eps,hpt) <- getEpsAndHpt
@@ -139,9 +138,6 @@ tcLookupTyCon name
 
 tcLookupLocatedGlobalId :: Located Name -> TcM Id
 tcLookupLocatedGlobalId = addLocM tcLookupId
-
-tcLookupLocatedDataCon :: Located Name -> TcM DataCon
-tcLookupLocatedDataCon = addLocM tcLookupDataCon
 
 tcLookupLocatedClass :: Located Name -> TcM Class
 tcLookupLocatedClass = addLocM tcLookupClass
@@ -281,22 +277,21 @@ tc_extend_tv_env binds tyvars thing_inside
 
 
 \begin{code}
-tcExtendLocalValEnv :: [TcId] -> TcM a -> TcM a
-tcExtendLocalValEnv ids thing_inside
-  = getLclEnv		`thenM` \ env ->
-    let
-	extra_global_tyvars = tyVarsOfTypes [idType id | id <- ids]
-	th_lvl		    = thLevel (tcl_th_ctxt env)
-	proc_lvl	    = proc_level (tcl_arrow_ctxt env)
-	extra_env	    = [(idName id, ATcId id th_lvl proc_lvl) | id <- ids]
-	le'		    = extendNameEnvList (tcl_env env) extra_env
-	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) (map idName ids)
-    in
-    tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
-    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
+tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
+-- Invariant: the TcIds are fully zonked. Reasons:
+--	(a) The kinds of the forall'd type variables are defaulted
+--	    (see Kind.defaultKind, done in zonkQuantifiedTyVar)
+--	(b) There are no via-Indirect occurrences of the bound variables
+--	    in the types, because instantiation does not look through such things
+--	(c) The call to tyVarsOfTypes is ok without looking through refs
+tcExtendIdEnv ids thing_inside = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
 
-tcExtendLocalValEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
-tcExtendLocalValEnv2 names_w_ids thing_inside
+tcExtendIdEnv1 :: Name -> TcId -> TcM a -> TcM a
+tcExtendIdEnv1 name id thing_inside = tcExtendIdEnv2 [(name,id)] thing_inside
+
+tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
+-- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
+tcExtendIdEnv2 names_w_ids thing_inside
   = getLclEnv		`thenM` \ env ->
     let
 	extra_global_tyvars = tyVarsOfTypes [idType id | (name,id) <- names_w_ids]
@@ -361,8 +356,7 @@ find_thing ignore_it tidy_env (ATyVar tv)
 		   tv == tv' = empty
 		 | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	
-	bound_at = tyVarBindingInfo tv
+	bound_at = ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
     in
     returnM (tidy_env2, Just msg)
 \end{code}
@@ -603,8 +597,9 @@ simpleInstInfoTyCon inst = tcTyConAppTyCon (simpleInstInfoTy inst)
 %************************************************************************
 
 \begin{code}
-notFound wheRe name = failWithTc (text wheRe <> colon <+> quotes (ppr name) <+> 
-				  ptext SLIT("is not in scope"))
+notFound name 
+  = failWithTc (ptext SLIT("GHC internal error:") <+> quotes (ppr name) <+> 
+		ptext SLIT("is not in scope"))
 
 wrongThingErr expected thing name
   = failWithTc (pp_thing thing <+> quotes (ppr name) <+> 

@@ -10,7 +10,6 @@ module TypeRep (
 	PredType(..),	 		-- to friends
 	
  	Kind, ThetaType,		-- Synonyms
-	TyVarSubst,
 
 	funTyCon,
 
@@ -31,8 +30,7 @@ import {-# SOURCE #-} DataCon( DataCon, dataConName )
 
 -- friends:
 import Kind
-import Var	  ( Id, TyVar, tyVarKind )
-import VarEnv     ( TyVarEnv )
+import Var	  ( Var, Id, TyVar, tyVarKind )
 import VarSet     ( TyVarSet )
 import Name	  ( Name, NamedThing(..), BuiltInSyntax(..), mkWiredInName )
 import OccName	  ( mkOccFS, tcName )
@@ -41,7 +39,7 @@ import TyCon	  ( TyCon, mkFunTyCon, tyConArity, tupleTyConBoxity, isTupleTyCon, 
 import Class	  ( Class )
 
 -- others
-import PrelNames	( gHC_PRIM, funTyConKey, listTyConKey, parrTyConKey, hasKey )
+import PrelNames  ( gHC_PRIM, funTyConKey, listTyConKey, parrTyConKey, hasKey )
 import Outputable
 \end{code}
 
@@ -146,14 +144,13 @@ to cut all loops.  The other members of the loop may be marked 'non-recursive'.
 
 
 \begin{code}
-type TyVarSubst = TyVarEnv Type
-
 data Type
   = TyVarTy TyVar	
 
   | AppTy
-	Type		-- Function is *not* a TyConApp
-	Type
+	Type		-- Function is *not* a TyConApp or NewTcApp
+	Type		-- It must be another AppTy, or TyVarTy
+			-- (or NoteTy of these)
 
   | TyConApp		-- Application of a TyCon
 	TyCon		-- *Invariant* saturated appliations of FunTyCon and

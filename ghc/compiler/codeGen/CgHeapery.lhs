@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgHeapery.lhs,v 1.40 2004/08/13 13:06:00 simonmar Exp $
+% $Id: CgHeapery.lhs,v 1.41 2004/09/30 10:35:45 simonpj Exp $
 %
 \section[CgHeapery]{Heap management functions}
 

@@ -220,8 +220,9 @@ libCase env (Let bind body)
   where
     (env_body, bind') = libCaseBind env bind
 
-libCase env (Case scrut bndr alts)
-  = Case (libCase env scrut) bndr (map (libCaseAlt env_alts) alts)
+-- gaw 2004
+libCase env (Case scrut bndr ty alts)
+  = Case (libCase env scrut) bndr ty (map (libCaseAlt env_alts) alts)
   where
     env_alts = addBinders env_with_scrut [bndr]
     env_with_scrut = case scrut of

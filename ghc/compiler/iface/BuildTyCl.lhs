@@ -14,12 +14,11 @@ module BuildTyCl (
 import IfaceEnv		( newImplicitBinder )
 import TcRnMonad
 
-import Subst		( substTyWith )
 import Util		( zipLazy )
-import FieldLabel	( allFieldLabelTags, mkFieldLabel, fieldLabelName )
-import VarSet
-import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, mkDataCon, dataConFieldLabels )
+import DataCon		( DataCon, isNullarySrcDataCon,
+			  mkDataCon, dataConFieldLabels, dataConOrigArgTys )
 import Var		( tyVarKind, TyVar, Id )
+import VarSet		( isEmptyVarSet, intersectVarSet )
 import TysWiredIn  	( unitTy )
 import BasicTypes	( RecFlag, StrictnessMark(..) )
 import Name		( Name )
@@ -27,11 +26,12 @@ import OccName		( mkDataConWrapperOcc, mkDataConWorkerOcc, mkClassTyConOcc,
 			  mkClassDataConOcc, mkSuperDictSelOcc )
 import MkId		( mkDataConIds, mkRecordSelId, mkDictSelId )
 import Class		( mkClass, Class( classTyCon), FunDep, DefMeth(..) )
-import TyCon		( mkSynTyCon, mkAlgTyCon, visibleDataCons,
+import TyCon		( FieldLabel, mkSynTyCon, mkAlgTyCon, visibleDataCons, tyConStupidTheta,
 			  tyConDataCons, isNewTyCon, mkClassTyCon, TyCon( tyConTyVars ),
 			  ArgVrcs, AlgTyConRhs(..), newTyConRhs, visibleDataCons )
-import Type		( mkArrowKinds, liftedTypeKind, tyVarsOfTypes, typeKind,
-			  tyVarsOfPred, splitTyConApp_maybe, mkPredTys, ThetaType, Type )
+import Type		( mkArrowKinds, liftedTypeKind, typeKind, tyVarsOfTypes, tyVarsOfPred,
+			  splitTyConApp_maybe, mkPredTys, mkTyVarTys, ThetaType, Type,
+			  substTyWith, zipTopTvSubst, substTheta )
 import Outputable
 import List		( nubBy )
 
@@ -47,17 +47,17 @@ buildSynTyCon name tvs rhs_ty arg_vrcs
 
 
 ------------------------------------------------------
-buildAlgTyCon :: Name -> [TyVar] -> ThetaType
+buildAlgTyCon :: Name -> [TyVar] 
 	      -> AlgTyConRhs
 	      -> ArgVrcs -> RecFlag
 	      -> Bool			-- True <=> want generics functions
 	      -> TcRnIf m n TyCon
 
-buildAlgTyCon tc_name tvs ctxt rhs arg_vrcs is_rec want_generics
-  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs ctxt arg_vrcs
-				   rhs sel_ids is_rec want_generics
+buildAlgTyCon tc_name tvs rhs arg_vrcs is_rec want_generics
+  = do	{ let { tycon = mkAlgTyCon tc_name kind tvs arg_vrcs
+				   rhs fields is_rec want_generics
 	      ; kind    = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
-	      ; sel_ids = mkRecordSelectors tycon rhs
+	      ; fields  = mkTyConFields tycon rhs
 	  }
 	; return tycon }
 
@@ -65,37 +65,63 @@ buildAlgTyCon tc_name tvs ctxt rhs arg_vrcs is_rec want_generics
 mkAbstractTyConRhs :: AlgTyConRhs
 mkAbstractTyConRhs = AbstractTyCon
 
-mkDataTyConRhs :: [DataCon] -> AlgTyConRhs
-mkDataTyConRhs cons
-  = DataTyCon cons (all is_nullary cons)
-  where
-    is_nullary con = null (dataConOrigArgTys con)
-	-- NB (null . dataConOrigArgTys).  It used to say isNullaryDataCon
-	-- but that looks at the *representation* arity, and isEnumerationType
-	-- refers to the *source* code definition
+mkDataTyConRhs :: Maybe ThetaType -> [DataCon] -> AlgTyConRhs
+mkDataTyConRhs mb_theta cons
+  = DataTyCon mb_theta cons (all isNullarySrcDataCon cons)
 
-mkNewTyConRhs :: DataCon -> AlgTyConRhs
-mkNewTyConRhs con 
-  = NewTyCon con 				-- The constructor
-	     (head (dataConOrigArgTys con))	-- The RHS type
-	     (mkNewTyConRep (dataConTyCon con))	-- The ultimate rep type
+mkNewTyConRhs :: TyCon -> DataCon -> AlgTyConRhs
+mkNewTyConRhs tycon con 
+  = NewTyCon con rhs_ty (mkNewTyConRep tycon)
+  where
+    rhs_ty = head (dataConOrigArgTys con)
+	-- Newtypes are guaranteed vanilla, so OrigArgTys will do
 				
+mkNewTyConRep :: TyCon		-- The original type constructor
+	      -> Type		-- Chosen representation type
+				-- (guaranteed not to be another newtype)
+
+-- Find the representation type for this newtype TyCon
+-- Remember that the representation type is the *ultimate* representation
+-- type, looking through other newtypes.
+-- 
+-- The non-recursive newtypes are easy, because they look transparent
+-- to splitTyConApp_maybe, but recursive ones really are represented as
+-- TyConApps (see TypeRep).
+-- 
+-- The trick is to to deal correctly with recursive newtypes
+-- such as	newtype T = MkT T
+
+mkNewTyConRep tc
+  | null (tyConDataCons tc) = unitTy
+	-- External Core programs can have newtypes with no data constructors
+  | otherwise		    = go [] tc
+  where
+	-- Invariant: tc is a NewTyCon
+	-- 	      tcs have been seen before
+    go tcs tc 
+	| tc `elem` tcs = unitTy
+	| otherwise
+	= case splitTyConApp_maybe rhs_ty of
+	    Just (tc', tys) | isNewTyCon tc'
+			   -> substTyWith tc_tvs tys (go (tc:tcs) tc')
+	    other 	   -> rhs_ty 
+	where
+	  (tc_tvs, rhs_ty) = newTyConRhs tc
+
 
 ------------------------------------------------------
-buildDataCon :: Name -> Bool
+buildDataCon :: Name -> Bool -> Bool
 	    -> [StrictnessMark] 
 	    -> [Name]			-- Field labels
 	    -> [TyVar] -> ThetaType
-	    -> [TyVar] -> ThetaType
-	    -> [Type] -> TyCon
+	    -> [Type] -> TyCon -> [Type]
 	    -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --	allocating its unique (hence monadic)
-buildDataCon src_name declared_infix arg_stricts field_lbl_names 
-	     tyvars ctxt ex_tyvars ex_ctxt 
-	     arg_tys tycon
+buildDataCon src_name declared_infix vanilla arg_stricts field_lbls
+	     tyvars ctxt arg_tys tycon res_tys
   = do	{ wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
 	; work_name <- newImplicitBinder src_name mkDataConWorkerOcc
 	-- This last one takes the name of the data constructor in the source
@@ -103,43 +129,44 @@ buildDataCon src_name declared_infix arg_stricts field_lbl_names
 	-- space, and makes it into a "real data constructor name"
 
 	; let
-		-- Make the FieldLabels
-		-- The zipLazy avoids forcing the arg_tys too early
-		final_lbls = [ mkFieldLabel name tycon ty tag 
-			     | ((name, tag), ty) <- (field_lbl_names `zip` allFieldLabelTags)
-						    `zipLazy` arg_tys
-			     ]
-
-		ctxt' = thinContext arg_tys ctxt
-		data_con = mkDataCon src_name declared_infix 
-				     arg_stricts final_lbls
-				     tyvars ctxt'
-				     ex_tyvars ex_ctxt
-				     arg_tys tycon dc_ids
+		stupid_ctxt = mkDataConStupidTheta tycon arg_tys res_tys
+		data_con = mkDataCon src_name declared_infix vanilla
+				     arg_stricts field_lbls
+				     tyvars stupid_ctxt ctxt
+				     arg_tys tycon res_tys dc_ids
 		dc_ids = mkDataConIds wrap_name work_name data_con
 
 	; returnM data_con }
 
--- The context for a data constructor should be limited to
+
+-- The stupid context for a data constructor should be limited to
 -- the type variables mentioned in the arg_tys
-thinContext arg_tys ctxt
-  = filter in_arg_tys ctxt
+mkDataConStupidTheta tycon arg_tys res_tys
+  | null stupid_theta = []	-- The common case
+  | otherwise 	      = filter in_arg_tys stupid_theta
   where
-      arg_tyvars = tyVarsOfTypes arg_tys
-      in_arg_tys pred = not $ isEmptyVarSet $ 
+    tc_subst	    = zipTopTvSubst (tyConTyVars tycon) res_tys
+    stupid_theta    = substTheta tc_subst (tyConStupidTheta tycon)
+    arg_tyvars      = tyVarsOfTypes arg_tys
+    in_arg_tys pred = not $ isEmptyVarSet $ 
 			tyVarsOfPred pred `intersectVarSet` arg_tyvars
 
 ------------------------------------------------------
-mkRecordSelectors :: TyCon -> AlgTyConRhs -> [Id]
-mkRecordSelectors tycon data_cons
+mkTyConFields :: TyCon -> AlgTyConRhs -> [(FieldLabel,Type,Id)]
+mkTyConFields tycon rhs
   = 	-- We'll check later that fields with the same name 
 	-- from different constructors have the same type.
-     [ mkRecordSelId tycon field 
-     | field <- nubBy eq_name fields ]
+     [ (fld, ty, mkRecordSelId tycon fld ty) 
+     | (fld, ty) <- nubBy eq_fld all_fld_tys ]
   where
-    fields = [ field | con <- visibleDataCons data_cons, 
-		       field <- dataConFieldLabels con ]
-    eq_name field1 field2 = fieldLabelName field1 == fieldLabelName field2
+    all_fld_tys    = concatMap fld_tys_of (visibleDataCons rhs)
+    fld_tys_of con = dataConFieldLabels con `zipLazy` 
+		     dataConOrigArgTys con
+		-- The laziness means that the type isn't sucked in prematurely
+		-- Only vanilla datacons have fields at all, and they
+		-- share the tycon's type variables => datConOrigArgTys will do
+
+    eq_fld (f1,_) (f2,_) = f1 == f2
 \end{code}
 
 
@@ -177,13 +204,13 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 			   | (op_name, dm_info, _) <- sig_stuff ] }
 	  		-- Build the selector id and default method id
 
-	; dict_con <- buildDataCon datacon_name False {- Not declared infix -}
+	; dict_con <- buildDataCon datacon_name 
+				   False 	-- Not declared infix
+				   True		-- Is vanilla; tyvars same as tycon
 				   (map (const NotMarkedStrict) dict_component_tys)
 				   [{- No labelled fields -}]
-				   tvs [{-No context-}]
-				   [{-No existential tyvars-}] [{-Or context-}]
-				   dict_component_tys
-				   (classTyCon clas)
+				   tvs [{-No context-}] dict_component_tys
+				   (classTyCon clas) (mkTyVarTys tvs)
 
 	; let {	clas = mkClass class_name tvs fds
 		       sc_theta sc_sel_ids op_items
@@ -202,47 +229,11 @@ buildClass class_name tvs sc_theta fds sig_stuff tc_isrec tc_vrcs
 	      ; clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
  	      ; rhs = case dict_component_tys of
-			    [rep_ty] -> mkNewTyConRhs dict_con
-			    other    -> mkDataTyConRhs [dict_con]
+			    [rep_ty] -> mkNewTyConRhs tycon dict_con
+			    other    -> mkDataTyConRhs Nothing [dict_con]
 	      }
 	; return clas
 	})}
 \end{code}
 
 
-------------------------------------------------------
-\begin{code}
-mkNewTyConRep :: TyCon		-- The original type constructor
-	      -> Type		-- Chosen representation type
-				-- (guaranteed not to be another newtype)
-
--- Find the representation type for this newtype TyCon
--- Remember that the representation type is the *ultimate* representation
--- type, looking through other newtypes.
--- 
--- The non-recursive newtypes are easy, because they look transparent
--- to splitTyConApp_maybe, but recursive ones really are represented as
--- TyConApps (see TypeRep).
--- 
--- The trick is to to deal correctly with recursive newtypes
--- such as	newtype T = MkT T
-
-mkNewTyConRep tc
-  | null (tyConDataCons tc) = unitTy
-	-- External Core programs can have newtypes with no data constructors
-  | otherwise		    = go [] tc
-  where
-	-- Invariant: tc is a NewTyCon
-	-- 	      tcs have been seen before
-    go tcs tc 
-	| tc `elem` tcs = unitTy
-	| otherwise
-	= case splitTyConApp_maybe rep_ty of
-	    Nothing -> rep_ty 
-	    Just (tc', tys) | not (isNewTyCon tc') -> rep_ty
-			    | otherwise	           -> go1 (tc:tcs) tc' tys
-	where
-	  (_,rep_ty) = newTyConRhs tc
-	  
-    go1 tcs tc tys = substTyWith (tyConTyVars tc) tys (go tcs tc)
-\end{code}

@@ -75,7 +75,8 @@ arrUsage (Let (Rec bnds) expr) =
     t2 = arrUsage expr
   in if isArrayUsage t1 then Array else t2
 
-arrUsage (Case expr b alts) = 
+-- gaw 2004
+arrUsage (Case expr b _ alts) = 
   let 
     t1 = arrUsage expr
     t2 = scanType (map (arrUsage . (\ (_,_,x) -> x)) alts)

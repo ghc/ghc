@@ -28,7 +28,7 @@ import PrimOp		( PrimOp(..) )
 import CoreFVs		( freeVars )
 import Type		( isUnLiftedType, splitTyConApp_maybe )
 import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
-                          isUnboxedTupleCon, isNullaryDataCon, dataConWorkId,
+                          isUnboxedTupleCon, isNullaryRepDataCon, dataConWorkId,
 			  dataConRepArity )
 import TyCon		( tyConFamilySize, isDataTyCon, tyConDataCons,
 			  isUnboxedTupleTyCon )
@@ -210,7 +210,7 @@ schemeTopBind :: (Id, AnnExpr Id VarSet) -> BcM (ProtoBCO Name)
 
 schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
-    isNullaryDataCon data_con
+    isNullaryRepDataCon data_con
   = 	-- Special case for the worker of a nullary data con.
 	-- It'll look like this:	Nil = /\a -> Nil a
 	-- If we feed it into schemeR, we'll get 
@@ -391,7 +391,7 @@ schemeE d s p (AnnLet binds (_,body))
 
 
 
-schemeE d s p (AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
+schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc, VoidArg <- typeCgRep (idType bind1)
 	-- Convert 
 	--	case .... of x { (# VoidArg'd-thing, a #) -> ... }
@@ -409,7 +409,7 @@ schemeE d s p (AnnCase scrut bndr [(DataAlt dc, [bind1, bind2], rhs)])
    = --trace "automagic mashing of case alts (# a, VoidArg #)" $
      doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
 
-schemeE d s p (AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
+schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleCon dc
 	-- Similarly, convert
 	--	case .... of x { (# a #) -> ... }
@@ -418,7 +418,7 @@ schemeE d s p (AnnCase scrut bndr [(DataAlt dc, [bind1], rhs)])
    = --trace "automagic mashing of case alts (# a #)"  $
      doCase d s p scrut bind1 [(DEFAULT, [], rhs)] True{-unboxed tuple-}
 
-schemeE d s p (AnnCase scrut bndr alts)
+schemeE d s p (AnnCase scrut bndr _ alts)
    = doCase d s p scrut bndr alts False{-not an unboxed tuple-}
 
 schemeE d s p (AnnNote note (_, body))
@@ -541,7 +541,7 @@ mkConAppCode :: Int -> Sequel -> BCEnv
 	     -> BcM BCInstrList
 
 mkConAppCode orig_d s p con []	-- Nullary constructor
-  = ASSERT( isNullaryDataCon con )
+  = ASSERT( isNullaryRepDataCon con )
     returnBc (unitOL (PUSH_G (getName (dataConWorkId con))))
 	-- Instead of doing a PACK, which would allocate a fresh
 	-- copy of this constructor, use the single shared version.
@@ -591,9 +591,9 @@ doTailCall init_d s p fn args
   = do_pushes init_d args (map atomRep args)
   where
   do_pushes d [] reps = do
-	ASSERTM( null reps )
+	ASSERT( null reps ) return ()
         (push_fn, sz) <- pushAtom d p (AnnVar fn)
-	ASSERTM( sz == 1 )
+	ASSERT( sz == 1 ) return ()
 	returnBc (push_fn `appOL` (
 		  mkSLIDE ((d-init_d) + 1) (init_d - s) `appOL`
 		  unitOL ENTER))

@@ -11,12 +11,13 @@ module TcTyClsDecls (
 #include "HsVersions.h"
 
 import HsSyn		( TyClDecl(..),  HsConDetails(..), HsTyVarBndr(..),
-			  ConDecl(..),   Sig(..), BangType(..), HsBang(..), NewOrData(..), 
-			  tyClDeclTyVars, getBangType, getBangStrictness, isSynDecl,
-			  LTyClDecl, tcdName, LHsTyVarBndr
+			  ConDecl(..),   Sig(..), , NewOrData(..), 
+			  tyClDeclTyVars, isSynDecl, LConDecl,
+			  LTyClDecl, tcdName, LHsTyVarBndr, LHsContext
 			)
+import HsTypes          ( HsBang(..), getBangStrictness )
 import BasicTypes	( RecFlag(..), StrictnessMark(..) )
-import HscTypes		( implicitTyThings, lookupFixity )
+import HscTypes		( implicitTyThings )
 import BuildTyCl	( buildClass, buildAlgTyCon, buildSynTyCon, buildDataCon,
 			  mkDataTyConRhs, mkNewTyConRhs )
 import TcRnMonad
@@ -26,22 +27,24 @@ import TcEnv		( TcTyThing(..), TyThing(..),
 			  tcExtendRecEnv, tcLookupTyVar )
 import TcTyDecls	( calcTyConArgVrcs, calcRecFlags, calcClassCycles, calcSynCycles )
 import TcClassDcl	( tcClassSigs, tcAddDeclCtxt )
-import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsSigType, kcHsType,
-			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext )
+import TcHsType		( kcHsTyVars, kcHsLiftedSigType, kcHsType, 
+			  kcHsContext, tcTyVarBndrs, tcHsKindedType, tcHsKindedContext,
+			  kcHsSigType, tcHsBangType, tcLHsConSig )
 import TcMType		( newKindVar, checkValidTheta, checkValidType, checkFreeness, 
 			  UserTypeCtxt(..), SourceTyCtxt(..) ) 
 import TcUnify		( unifyKind )
-import TcType		( TcKind, ThetaType, TcType, tyVarsOfType,
-			  mkArrowKind, liftedTypeKind, 
+import TcType		( TcKind, ThetaType, TcType, tyVarsOfType, 
+			  mkArrowKind, liftedTypeKind, mkTyVarTys, tcEqTypes,
 			  tcSplitSigmaTy, tcEqType )
 import Type		( splitTyConApp_maybe, pprThetaArrow, pprParendType )
-import FieldLabel	( fieldLabelName, fieldLabelType )
 import Generics		( validGenericMethodType, canDoGenerics )
 import Class		( Class, className, classTyCon, DefMeth(..), classBigSig, classTyVars )
 import TyCon		( TyCon, ArgVrcs, 
 			  tyConDataCons, mkForeignTyCon, isProductTyCon, isRecursiveTyCon,
-			  tyConTheta, getSynTyConDefn, tyConDataCons, isSynTyCon, tyConName )
-import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, dataConFieldLabels )
+			  tyConStupidTheta, getSynTyConDefn, tyConDataCons, isSynTyCon, tyConName )
+import DataCon		( DataCon, dataConWrapId, dataConName, dataConSig, 
+			  dataConFieldLabels, dataConOrigArgTys, dataConTyCon )
+import Type		( zipTopTvSubst, substTys )
 import Var		( TyVar, idType, idName )
 import VarSet		( elemVarSet )
 import Name		( Name )
@@ -274,6 +277,9 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	do { ex_ctxt' <- kcHsContext ex_ctxt
 	   ; details' <- kc_con_details details 
 	   ; return (ConDecl name ex_tvs' ex_ctxt' details')}
+    kc_con_decl (GadtDecl name ty)
+        = do { ty' <- kcHsSigType ty
+	     ; return (GadtDecl name ty') }
 
     kc_con_details (PrefixCon btys) 
 	= do { btys' <- mappM kc_larg_ty btys ; return (PrefixCon btys') }
@@ -284,14 +290,12 @@ kcTyClDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 
     kc_field (fld, bty) = do { bty' <- kc_larg_ty bty ; return (fld, bty') }
 
-    kc_larg_ty = wrapLocM kc_arg_ty
-
-    kc_arg_ty (BangType str ty) = do { ty' <- kc_arg_ty_body ty; return (BangType str ty') }
-    kc_arg_ty_body = case new_or_data of
-		   	 DataType -> kcHsSigType
-			 NewType  -> kcHsLiftedSigType
-	    -- Can't allow an unlifted type for newtypes, because we're effectively
-	    -- going to remove the constructor while coercing it to a lifted type.
+    kc_larg_ty bty = case new_or_data of
+			DataType -> kcHsSigType bty
+			NewType  -> kcHsLiftedSigType bty
+	-- Can't allow an unlifted type for newtypes, because we're effectively
+	-- going to remove the constructor while coercing it to a lifted type.
+	-- And newtypes can't be bang'd
 
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt,  tcdSigs = sigs})
   = kcTyClDeclBody decl	$ \ tvs' ->
@@ -357,16 +361,16 @@ tcTyClDecl1 calc_vrcs calc_isrec
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
 	   tcdLName = L _ tc_name, tcdCons = cons})
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
-  { ctxt' 	 <- tcHsKindedContext ctxt
+  { stupid_theta <- tcStupidTheta ctxt cons
   ; want_generic <- doptM Opt_Generics
   ; tycon <- fixM (\ tycon -> do 
-	{ data_cons <- mappM (addLocM (tcConDecl new_or_data tycon tvs' ctxt')) cons
+	{ unbox_strict <- doptM Opt_UnboxStrictFields
+	; data_cons <- mappM (addLocM (tcConDecl unbox_strict new_or_data tycon tvs')) cons
 	; let tc_rhs = case new_or_data of
-			DataType -> mkDataTyConRhs data_cons
+			DataType -> mkDataTyConRhs stupid_theta data_cons
 			NewType  -> ASSERT( isSingleton data_cons )
-				    mkNewTyConRhs (head data_cons)
-	; buildAlgTyCon tc_name tvs' ctxt' 
-  			tc_rhs arg_vrcs is_rec
+				    mkNewTyConRhs tycon (head data_cons)
+	; buildAlgTyCon tc_name tvs' tc_rhs arg_vrcs is_rec
 			(want_generic && canDoGenerics data_cons)
 	})
   ; return (ATyCon tycon)
@@ -405,37 +409,72 @@ tcTyClDecl1 calc_vrcs calc_isrec
   = returnM (ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0 []))
 
 -----------------------------------
-tcConDecl :: NewOrData -> TyCon -> [TyVar] -> ThetaType 
+tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
+	  -> NewOrData -> TyCon -> [TyVar]
 	  -> ConDecl Name -> TcM DataCon
 
-tcConDecl new_or_data tycon tyvars ctxt 
-	   (ConDecl name ex_tvs ex_ctxt details)
+tcConDecl unbox_strict new_or_data tycon tc_tvs
+	  (ConDecl name ex_tvs ex_ctxt details)
   = tcTyVarBndrs ex_tvs		$ \ ex_tvs' -> do 
     { ex_ctxt' <- tcHsKindedContext ex_ctxt
-    ; unbox_strict <- doptM Opt_UnboxStrictFields
     ; let 
+	is_vanilla = null ex_tvs && null (unLoc ex_ctxt) 
+		-- Vanilla iff no ex_tvs and no context
+
 	tc_datacon is_infix field_lbls btys
-	  = do { let { ubtys = map unLoc btys }
-	       ; arg_tys <- mappM (tcHsKindedType . getBangType) ubtys
-    	       ; buildDataCon (unLoc name) is_infix
-    		    (argStrictness unbox_strict tycon ubtys arg_tys)
+	  = do { let { bangs = map getBangStrictness btys }
+	       ; arg_tys <- mappM tcHsBangType btys
+    	       ; buildDataCon (unLoc name) is_infix is_vanilla
+    		    (argStrictness unbox_strict tycon bangs arg_tys)
     		    (map unLoc field_lbls)
-    		    tyvars ctxt ex_tvs' ex_ctxt'
-    		    arg_tys tycon }
+    		    (tc_tvs ++ ex_tvs')
+		    ex_ctxt'
+    		    arg_tys
+		    tycon (mkTyVarTys tc_tvs) }
     ; case details of
 	PrefixCon btys     -> tc_datacon False [] btys
 	InfixCon bty1 bty2 -> tc_datacon True [] [bty1,bty2]
-	RecCon fields      -> do { checkTc (null ex_tvs') (exRecConErr name)
+	RecCon fields      -> do { checkTc is_vanilla (exRecConErr name)
 				 ; let { (field_names, btys) = unzip fields }
 				 ; tc_datacon False field_names btys } }
 
+tcConDecl unbox_strict new_or_data tycon tc_tvs
+	  decl@(GadtDecl name con_ty)
+  = do	{ traceTc (text "tcConDecl"  <+> ppr name)
+	; (tvs, theta, bangs, arg_tys, tc, res_tys) <- tcLHsConSig con_ty
+		
+	; traceTc (text "tcConDecl1"  <+> ppr name)
+	; let 	-- Now dis-assemble the type, and check its form
+	      is_vanilla = null theta && mkTyVarTys tvs `tcEqTypes` res_tys
+
+		-- Vanilla datacons guarantee to use the same
+		-- type variables as the parent tycon
+	      (tvs', arg_tys', res_tys') 
+		  | is_vanilla = (tc_tvs, substTys subst arg_tys, substTys subst res_tys)
+		  | otherwise  = (tvs, arg_tys, res_tys)
+	      subst = zipTopTvSubst tvs (mkTyVarTys tc_tvs)
+
+	; traceTc (text "tcConDecl3"  <+> ppr name)
+	; buildDataCon (unLoc name) False {- Not infix -} is_vanilla
+    		       (argStrictness unbox_strict tycon bangs arg_tys)
+		       [{- No field labels -}]
+		       tvs' theta arg_tys' tycon res_tys' }
+
+tcStupidTheta :: LHsContext Name -> [LConDecl Name] -> TcM (Maybe ThetaType)
+-- For GADTs we don't allow a context on the data declaration
+-- whereas for standard Haskell style data declarations, we do
+tcStupidTheta ctxt (L _ (ConDecl _ _ _ _) : _)
+  = do { theta <- tcHsKindedContext ctxt; return (Just theta) }
+tcStupidTheta ctxt other	-- Includes an empty constructor list
+  = ASSERT( null (unLoc ctxt) ) return Nothing
+
+-------------------
 argStrictness :: Bool		-- True <=> -funbox-strict_fields
-	      -> TyCon -> [BangType Name] 
+	      -> TyCon -> [HsBang]
 	      -> [TcType] -> [StrictnessMark]
-argStrictness unbox_strict tycon btys arg_tys
- = zipWith (chooseBoxingStrategy unbox_strict tycon) 
-	   arg_tys 
-	   (map getBangStrictness btys ++ repeat HsNoBang)
+argStrictness unbox_strict tycon bangs arg_tys
+ = ASSERT( length bangs == length arg_tys )
+   zipWith (chooseBoxingStrategy unbox_strict tycon) arg_tys bangs
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The field is marked '!!', or
@@ -496,10 +535,10 @@ checkValidTyCon tc
   = checkValidType syn_ctxt syn_rhs
   | otherwise
   = 	-- Check the context on the data decl
-    checkValidTheta (DataTyCtxt name) (tyConTheta tc)	`thenM_` 
+    checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)	`thenM_` 
 	
 	-- Check arg types of data constructors
-    mappM_ checkValidDataCon data_cons			`thenM_`
+    mappM_ (checkValidDataCon tc) data_cons			`thenM_`
 
 	-- Check that fields with the same name share a type
     mappM_ check_fields groups
@@ -510,33 +549,36 @@ checkValidTyCon tc
     (_, syn_rhs) = getSynTyConDefn tc
     data_cons    = tyConDataCons tc
 
-    fields = [field | con <- data_cons, field <- dataConFieldLabels con]
-    groups = equivClasses cmp_name fields
-    cmp_name field1 field2 = fieldLabelName field1 `compare` fieldLabelName field2
+    groups = equivClasses cmp_fld (concatMap get_fields data_cons)
+    cmp_fld (f1,_) (f2,_) = f1 `compare` f2
+    get_fields con = dataConFieldLabels con `zip` dataConOrigArgTys con
+	-- dataConFieldLabels may return the empty list, which is fine
 
-    check_fields fields@(first_field_label : other_fields)
+    check_fields fields@((first_field_label, field_ty) : other_fields)
 	-- These fields all have the same name, but are from
 	-- different constructors in the data type
 	= 	-- Check that all the fields in the group have the same type
 		-- NB: this check assumes that all the constructors of a given
 		-- data type use the same type variables
-	  checkTc (all (tcEqType field_ty) other_tys) (fieldTypeMisMatch field_name)
-	where
-	    field_ty   = fieldLabelType first_field_label
-	    field_name = fieldLabelName first_field_label
-	    other_tys  = map fieldLabelType other_fields
+	  checkTc (all (tcEqType field_ty . snd) other_fields) 
+		  (fieldTypeMisMatch first_field_label)
 
 -------------------------------
-checkValidDataCon :: DataCon -> TcM ()
-checkValidDataCon con
-  = addErrCtxt (dataConCtxt con) (
-      checkValidType ctxt (idType (dataConWrapId con))	`thenM_`
+checkValidDataCon :: TyCon -> DataCon -> TcM ()
+checkValidDataCon tc con
+  = addErrCtxt (dataConCtxt con) $ 
+    do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
+	; checkValidType ctxt (idType (dataConWrapId con)) }
+
 		-- This checks the argument types and
 		-- ambiguity of the existential context (if any)
-      checkFreeness ex_tvs ex_theta)
+		-- 
+		-- Note [Sept 04] Now that tvs is all the tvs, this
+		-- test doesn't actually check anything
+--	; checkFreeness tvs ex_theta }
   where
     ctxt = ConArgCtxt (dataConName con) 
-    (_, _, ex_tvs, ex_theta, _, _) = dataConSig con
+    (tvs, ex_theta, _, _, _) = dataConSig con
 
 
 -------------------------------
@@ -597,7 +639,7 @@ fieldTypeMisMatch field_name
 dataConCtxt con = sep [ptext SLIT("When checking the data constructor:"),
 		       nest 2 (ex_part <+> pprThetaArrow ex_theta <+> ppr con <+> arg_part)]
   where
-    (_, _, ex_tvs, ex_theta, arg_tys, _) = dataConSig con
+    (ex_tvs, ex_theta, arg_tys, _, _) = dataConSig con
     ex_part | null ex_tvs = empty
 	    | otherwise   = ptext SLIT("forall") <+> hsep (map ppr ex_tvs) <> dot
 	-- The 'ex_theta' part could be non-empty, if the user (bogusly) wrote
@@ -635,21 +677,25 @@ badGenericMethodType op op_ty
 		ptext SLIT("You can only use type variables, arrows, and tuples")])
 
 recSynErr syn_decls
-  = addSrcSpan (getLoc (head syn_decls)) $
+  = setSrcSpan (getLoc (head syn_decls)) $
     addErr (sep [ptext SLIT("Cycle in type synonym declarations:"),
 		 nest 2 (vcat (map ppr_decl syn_decls))])
   where
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr decl
 
 recClsErr cls_decls
-  = addSrcSpan (getLoc (head cls_decls)) $
+  = setSrcSpan (getLoc (head cls_decls)) $
     addErr (sep [ptext SLIT("Cycle in class declarations (via superclasses):"),
 		 nest 2 (vcat (map ppr_decl cls_decls))])
   where
     ppr_decl (L loc decl) = ppr loc <> colon <+> ppr (decl { tcdSigs = [] })
 
 exRecConErr name
-  = ptext SLIT("Can't combine named fields with locally-quantified type variables")
+  = ptext SLIT("Can't combine named fields with locally-quantified type variables or context")
     $$
     (ptext SLIT("In the declaration of data constructor") <+> ppr name)
+
+badDataConTyCon data_con
+  = hang (ptext SLIT("Data constructor does not return its parent type:"))
+       2 (ppr data_con)
 \end{code}

@@ -330,7 +330,8 @@ coreToStgExpr (Note other_note expr)
 
 -- Cases require a little more real work.
 
-coreToStgExpr (Case scrut bndr alts)
+-- gaw 2004
+coreToStgExpr (Case scrut bndr _ alts)
   = extendVarEnvLne [(bndr, LambdaBound)]	(
 	 mapAndUnzip3Lne vars_alt alts	`thenLne` \ (alts2, fvs_s, escs_s) ->
 	 returnLne ( alts2,
@@ -1021,12 +1022,12 @@ lookupFVInfo fvs id
 			Just (_,_,info) -> info
 
 allFreeIds :: FreeVarsInfo -> [(Id,HowBound)]	-- Both top level and non-top-level Ids
-allFreeIds fvs = [(id,how_bound) | (id,how_bound,_) <- rngVarEnv fvs, isId id]
+allFreeIds fvs = [(id,how_bound) | (id,how_bound,_) <- varEnvElts fvs, isId id]
 
 -- Non-top-level things only, both type variables and ids
 -- (type variables only if opt_RuntimeTypes)
 getFVs :: FreeVarsInfo -> [Var]	
-getFVs fvs = [id | (id, how_bound, _) <- rngVarEnv fvs, 
+getFVs fvs = [id | (id, how_bound, _) <- varEnvElts fvs, 
 		    not (topLevelBound how_bound) ]
 
 getFVSet :: FreeVarsInfo -> VarSet

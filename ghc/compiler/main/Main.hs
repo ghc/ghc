@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.138 2004/08/13 13:07:05 simonmar Exp $
+-- $Id: Main.hs,v 1.139 2004/09/30 10:37:17 simonpj Exp $
 --
 -- GHC Driver program
 --

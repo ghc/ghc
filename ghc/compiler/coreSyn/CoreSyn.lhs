@@ -78,7 +78,8 @@ data Expr b	-- "b" for the type of binders,
   | App   (Expr b) (Arg b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
-  | Case  (Expr b) b [Alt b]  	-- Binder gets bound to value of scrutinee
+  -- gaw 2004, added Type field
+  | Case  (Expr b) b Type [Alt b]  	-- Binder gets bound to value of scrutinee
 	-- Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
 	--	      meaning that it covers all cases that can occur
 	--	      See the example below
@@ -554,14 +555,15 @@ valArgCount (other  : args) = 1 + valArgCount args
 
 \begin{code}
 seqExpr :: CoreExpr -> ()
-seqExpr (Var v)       = v `seq` ()
-seqExpr (Lit lit)     = lit `seq` ()
-seqExpr (App f a)     = seqExpr f `seq` seqExpr a
-seqExpr (Lam b e)     = seqBndr b `seq` seqExpr e
-seqExpr (Let b e)     = seqBind b `seq` seqExpr e
-seqExpr (Case e b as) = seqExpr e `seq` seqBndr b `seq` seqAlts as
-seqExpr (Note n e)    = seqNote n `seq` seqExpr e
-seqExpr (Type t)      = seqType t
+seqExpr (Var v)         = v `seq` ()
+seqExpr (Lit lit)       = lit `seq` ()
+seqExpr (App f a)       = seqExpr f `seq` seqExpr a
+seqExpr (Lam b e)       = seqBndr b `seq` seqExpr e
+seqExpr (Let b e)       = seqBind b `seq` seqExpr e
+-- gaw 2004
+seqExpr (Case e b t as) = seqExpr e `seq` seqBndr b `seq` seqType t `seq` seqAlts as
+seqExpr (Note n e)      = seqNote n `seq` seqExpr e
+seqExpr (Type t)        = seqType t
 
 seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
@@ -608,7 +610,8 @@ data AnnExpr' bndr annot
   | AnnLit	Literal
   | AnnLam	bndr (AnnExpr bndr annot)
   | AnnApp	(AnnExpr bndr annot) (AnnExpr bndr annot)
-  | AnnCase	(AnnExpr bndr annot) bndr [AnnAlt bndr annot]
+-- gaw 2004
+  | AnnCase	(AnnExpr bndr annot) bndr Type [AnnAlt bndr annot]
   | AnnLet	(AnnBind bndr annot) (AnnExpr bndr annot)
   | AnnNote	Note (AnnExpr bndr annot)
   | AnnType	Type
@@ -637,8 +640,9 @@ deAnnotate' (AnnLet bind body)
     deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
     deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
-deAnnotate' (AnnCase scrut v alts)
-  = Case (deAnnotate scrut) v (map deAnnAlt alts)
+-- gaw 2004
+deAnnotate' (AnnCase scrut v t alts)
+  = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
 deAnnAlt :: AnnAlt bndr annot -> Alt bndr
 deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)

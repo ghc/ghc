@@ -18,10 +18,8 @@ module IfaceEnv (
 import TcRnMonad
 import IfaceType	( IfaceExtName(..), IfaceTyCon(..), ifaceTyConName )
 import TysWiredIn	( tupleTyCon, tupleCon )
-import HscTypes		( NameCache(..), HscEnv(..), 
-			  TyThing, ExternalPackageState(..), OrigNameCache )
+import HscTypes		( NameCache(..), HscEnv(..), OrigNameCache )
 import TyCon		( TyCon, tyConName )
-import Class		( Class )
 import DataCon		( dataConWorkId, dataConName )
 import Var		( TyVar, Id, varName )
 import Name		( Name, nameUnique, nameModule, 
@@ -29,11 +27,9 @@ import Name		( Name, nameUnique, nameModule,
 			  getOccName, nameParent_maybe,
 		  	  isWiredInName, mkIPName,
 			  mkExternalName, mkInternalName )
-import NameEnv
 import OccName		( OccName, isTupleOcc_maybe, tcName, dataName,
 			  lookupOccEnv, unitOccEnv, extendOccEnv, extendOccEnvList )
 import PrelNames	( gHC_PRIM_Name, pREL_TUP_Name )
-import HscTypes		( ExternalPackageState, NameCache, TyThing(..) )
 import Module		( Module, ModuleName, moduleName, mkPackageModule, 
 			  emptyModuleEnv, lookupModuleEnvByName, extendModuleEnv_C )
 import UniqSupply	( UniqSupply, splitUniqSupply, uniqFromSupply, uniqsFromSupply )

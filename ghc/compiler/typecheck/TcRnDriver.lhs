@@ -33,7 +33,7 @@ import RdrName		( RdrName, mkRdrUnqual, emptyGlobalRdrEnv,
 import TcHsSyn		( zonkTopDecls )
 import TcExpr 		( tcInferRho )
 import TcRnMonad
-import TcType		( tidyTopType, isUnLiftedType )
+import TcType		( tidyTopType )
 import Inst		( showLIE )
 import TcBinds		( tcTopBinds )
 import TcDefaults	( tcDefaults )
@@ -41,7 +41,7 @@ import TcEnv		( tcExtendGlobalValEnv )
 import TcRules		( tcRules )
 import TcForeign	( tcForeignImports, tcForeignExports )
 import TcInstDcls	( tcInstDecls1, tcInstDecls2 )
-import TcIface		( tcExtCoreBindings, loadImportedInsts )
+import TcIface		( tcExtCoreBindings )
 import TcSimplify	( tcSimplifyTop )
 import TcTyClsDecls	( tcTyAndClassDecls )
 import LoadIface	( loadOrphanModules )
@@ -56,13 +56,13 @@ import Id		( mkExportedLocalId, isLocalId, idName, idType )
 import Var		( Var )
 import Module           ( mkHomeModule, mkModuleName, moduleName, moduleEnvElts )
 import OccName		( mkVarOcc )
-import Name		( Name, isExternalName, getSrcLoc, getOccName, nameSrcLoc )
+import Name		( Name, isExternalName, getSrcLoc, getOccName )
 import NameSet
 import TyCon		( tyConHasGenerics )
-import SrcLoc		( SrcLoc, srcLocSpan, Located(..), noLoc )
+import SrcLoc		( srcLocSpan, Located(..), noLoc )
 import Outputable
-import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState( eps_is_boot ),
-			  GhciMode(..), isOneShot, Dependencies(..), noDependencies,
+import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState(..),
+			  GhciMode(..), noDependencies, isOneShot,
 			  Deprecs( NoDeprecs ), plusDeprecs,
 			  ForeignStubs(NoStubs), TypeEnv, 
 			  extendTypeEnvWithIds, typeEnvIds, typeEnvTyCons, 
@@ -70,7 +70,7 @@ import HscTypes		( ModGuts(..), HscEnv(..), ExternalPackageState( eps_is_boot ),
 			)
 #ifdef GHCI
 import HsSyn		( HsStmtContext(..), Stmt(..), HsExpr(..), HsBindGroup(..), 
-			  LStmt, LHsExpr, LHsType,
+			  LStmt, LHsExpr, LHsType, mkMatchGroup,
 			  collectStmtsBinders, mkSimpleMatch, placeHolderType,
 			  nlLetStmt, nlExprStmt, nlBindStmt, nlResultStmt, nlVarPat )
 import RdrName		( GlobalRdrEnv, mkGlobalRdrEnv, GlobalRdrElt(..),
@@ -80,10 +80,13 @@ import RnSource		( addTcgDUs )
 import TcHsSyn		( mkHsLet, zonkTopLExpr, zonkTopBndrs )
 import TcHsType		( kcHsType )
 import TcExpr		( tcCheckRho )
+import TcIface		( loadImportedInsts )
 import TcMType		( zonkTcType )
+import TcUnify		( unifyTyConApp )
 import TcMatches	( tcStmtsAndThen, TcStmtCtxt(..) )
 import TcSimplify	( tcSimplifyInteractive, tcSimplifyInfer )
-import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, tyClsNamesOfDFunHead )
+import TcType		( Type, mkForAllTys, mkFunTys, mkTyConApp, tyVarsOfType, 
+			  isUnLiftedType, tyClsNamesOfDFunHead )
 import TcEnv		( tcLookupTyCon, tcLookupId, tcLookupGlobal )
 import RnTypes		( rnLHsType )
 import Inst		( tcStdSyntaxName, tcGetInstEnvs )
@@ -96,7 +99,6 @@ import IfaceSyn		( IfaceDecl(..), IfaceClassOp(..), IfaceConDecl(..),
 			  tyThingToIfaceDecl, dfunToIfaceInst )
 import RnEnv		( lookupOccRn, dataTcOccs, lookupFixityRn )
 import Id		( Id, isImplicitId, globalIdDetails )
-import FieldLabel	( fieldLabelTyCon )
 import MkId		( unsafeCoerceId )
 import DataCon		( dataConTyCon )
 import TyCon		( tyConName )
@@ -112,11 +114,12 @@ import Module		( ModuleName, lookupModuleEnvByName )
 import HscTypes		( InteractiveContext(..), ExternalPackageState( eps_PTE ),
 			  HomeModInfo(..), typeEnvElts, typeEnvClasses,
 			  TyThing(..), availName, availNames, icPrintUnqual,
-			  ModIface(..), ModDetails(..) )
+			  ModIface(..), ModDetails(..), Dependencies(..) )
 import BasicTypes	( RecFlag(..), Fixity )
 import Bag		( unitBag )
 import ListSetOps	( removeDups )
 import Panic		( ghcError, GhcException(..) )
+import SrcLoc		( SrcLoc )
 #endif
 
 import FastString	( mkFastString )
@@ -151,7 +154,7 @@ tcRnModule hsc_env (L loc (HsModule maybe_mod exports
 					-- The normal case
 		
    initTc hsc_env this_mod $ 
-   addSrcSpan loc $
+   setSrcSpan loc $
    do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 
@@ -572,7 +575,7 @@ check_main ghci_mode tcg_env main_mod main_fn
 	{ let { rhs = nlHsApp (nlHsVar runIOName) (nlHsVar main_name) }
 		   	-- :Main.main :: IO () = runIO main 
 
-	; (main_expr, ty) <- addSrcSpan (srcLocSpan (getSrcLoc main_name)) $
+	; (main_expr, ty) <- setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
 			     tcInferRho rhs
 
 	; let { root_main_id = mkExportedLocalId rootMainName ty ;
@@ -706,7 +709,7 @@ tcUserStmt (L _ (ExprStmt expr _))
     let 
 	fresh_it = itName uniq
         the_bind = noLoc $ FunBind (noLoc fresh_it) False 
-			[ mkSimpleMatch [] expr placeHolderType ]
+			     (mkMatchGroup [mkSimpleMatch [] expr])
     in
     tryTcLIE_ (do { 	-- Try this if the other fails
 		traceTc (text "tcs 1b") ;
@@ -731,12 +734,14 @@ tc_stmts stmts
 	    names = map unLoc (collectStmtsBinders stmts) ;
 
 	    stmt_ctxt = SC { sc_what = DoExpr, 
-			     sc_rhs  = check_rhs,
+			     sc_rhs  = infer_rhs,
 			     sc_body = check_body,
 			     sc_ty   = ret_ty } ;
 
-	    check_rhs rhs rhs_ty = tcCheckRho rhs  (mkTyConApp ioTyCon [rhs_ty]) ;
-	    check_body body      = tcCheckRho body io_ret_ty ;
+	    infer_rhs rhs   = do { (rhs', rhs_ty) <- tcInferRho rhs
+				 ; [pat_ty] <- unifyTyConApp ioTyCon rhs_ty
+				 ; return (rhs', pat_ty) } ;
+	    check_body body = tcCheckRho body io_ret_ty ;
 
 		-- mk_return builds the expression
 		--	returnIO @ [()] [coerce () x, ..,  coerce () z]
@@ -927,16 +932,16 @@ getModuleContents hsc_env ictxt mod exports_only
 ---------------------
 filter_decl occs decl@(IfaceClass {ifSigs = sigs})
   = decl { ifSigs = filter (keep_sig occs) sigs }
-filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon cons})
-  = decl { ifCons = IfDataTyCon (filter (keep_con occs) cons) }
+filter_decl occs decl@(IfaceData {ifCons = IfDataTyCon th cons})
+  = decl { ifCons = IfDataTyCon th (filter (keep_con occs) cons) }
 filter_decl occs decl@(IfaceData {ifCons = IfNewTyCon con})
   | keep_con occs con = decl
   | otherwise	      = decl {ifCons = IfAbstractTyCon}	-- Hmm?
 filter_decl occs decl
   = decl
 
-keep_sig occs (IfaceClassOp occ _ _)	     = occ `elem` occs
-keep_con occs (IfaceConDecl occ _ _ _ _ _ _) = occ `elem` occs
+keep_sig occs (IfaceClassOp occ _ _) = occ `elem` occs
+keep_con occs con		     = ifConOcc con `elem` occs
 
 availOccs avail = map nameOccName (availNames avail)
 
@@ -1048,9 +1053,9 @@ toIfaceDecl thing
 	-- munge transforms a thing to it's "parent" thing
     munge (ADataCon dc) = ATyCon (dataConTyCon dc)
     munge (AnId id) = case globalIdDetails id of
-			RecordSelId lbl -> ATyCon (fieldLabelTyCon lbl)
-			ClassOpId cls   -> AClass cls
-			other		-> AnId id
+			RecordSelId tc lbl -> ATyCon tc
+			ClassOpId cls      -> AClass cls
+			other		   -> AnId id
     munge other_thing = other_thing
 
 #endif /* GHCI */

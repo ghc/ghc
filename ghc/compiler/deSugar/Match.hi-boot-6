@@ -1,13 +1,14 @@
 module Match where
 
 match 	:: [Var.Id]
+        -> TcType.TcType
 	-> [DsUtils.EquationInfo]
 	-> DsMonad.DsM DsUtils.MatchResult
 
-matchExport
-	:: [Var.Id]
-	-> [DsUtils.EquationInfo]
-	-> DsMonad.DsM DsUtils.MatchResult
+matchWrapper
+	:: HsExpr.HsMatchContext Name.Name
+        -> HsExpr.MatchGroup Var.Id
+	-> DsMonad.DsM ([Var.Id], CoreSyn.CoreExpr)
 
 matchSimply
 	:: CoreSyn.CoreExpr
@@ -21,5 +22,6 @@ matchSinglePat
 	:: CoreSyn.CoreExpr
 	-> DsMonad.DsMatchContext
 	-> HsPat.LPat Var.Id
+        -> TcType.TcType
 	-> DsUtils.MatchResult
 	-> DsMonad.DsM DsUtils.MatchResult

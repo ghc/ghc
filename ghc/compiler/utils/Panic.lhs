@@ -12,9 +12,10 @@ some unnecessary loops in the module dependency graph.
 module Panic  
    ( 
      GhcException(..), ghcError, progName, 
+     pgmError,
      panic, panic#, assertPanic, trace,
      showException, showGhcException, tryMost,
-     installSignalHandlers,
+     installSignalHandlers, 
 
      catchJust, tryJust, ioErrors, throwTo,
    ) where
@@ -136,8 +137,9 @@ instance Typeable GhcException where
 Panics and asserts.
 
 \begin{code}
-panic :: String -> a
-panic x = Exception.throwDyn (Panic x)
+panic, pgmError :: String -> a
+panic    x = Exception.throwDyn (Panic x)
+pgmError x = Exception.throwDyn (ProgramError x)
 
 -- #-versions because panic can't return an unboxed int, and that's
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)

@@ -13,7 +13,6 @@ import Module
 import ParserCoreUtils
 import LexCore
 import Literal
-import BasicTypes
 import SrcLoc
 import TysPrim( wordPrimTyCon, intPrimTyCon, charPrimTyCon, 
 		floatPrimTyCon, doublePrimTyCon, addrPrimTyCon )
@@ -95,7 +94,7 @@ tdef	:: { TyClDecl RdrName }
 trep    :: { OccName -> [LConDecl RdrName] }
         : {- empty -}   { (\ tc_occ -> []) }
         | '=' ty        { (\ tc_occ -> let { dc_name  = mkRdrUnqual (setOccNameSpace dataName tc_occ) ;
-			                      con_info = PrefixCon [unbangedType (toHsType $2)] }
+			                     con_info = PrefixCon [toHsType $2] }
 			                in [noLoc $ ConDecl (noLoc dc_name) []
 					   (noLoc []) con_info]) }
 
@@ -105,7 +104,9 @@ cons1	:: { [LConDecl RdrName] }
 
 con	:: { LConDecl RdrName }
 	: d_pat_occ attv_bndrs hs_atys 
-		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) $2 (noLoc []) (PrefixCon (map unbangedType $3))}
+		{ noLoc $ ConDecl (noLoc (mkRdrUnqual $1)) $2 (noLoc []) (PrefixCon $3)}
+        | d_pat_occ '::' ty
+                { noLoc $ GadtDecl (noLoc (mkRdrUnqual $1)) (toHsType $3) } 
 
 attv_bndrs :: { [LHsTyVarBndr RdrName] }
 	: {- empty -} 	         { [] }
@@ -218,8 +219,9 @@ exp	:: { IfaceExpr }
 	: fexp		              { $1 }
 	| '\\' bndrs '->' exp 	      { foldr IfaceLam $4 $2 }
 	| '%let' let_bind '%in' exp   { IfaceLet $2 $4 }
-	| '%case' aexp '%of' id_bndr
-	  '{' alts1 '}'		      { IfaceCase $2 (fst $4) $6 }
+-- gaw 2004
+	| '%case' '(' ty ')' aexp '%of' id_bndr
+	  '{' alts1 '}'		      { IfaceCase $5 (fst $7) $3 $9 }
 	| '%coerce' aty exp   	      { IfaceNote (IfaceCoerce $2) $3 }
 	| '%note' STRING exp 	   
 	    { case $2 of

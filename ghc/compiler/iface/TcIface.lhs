@@ -26,10 +26,9 @@ import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
 import HscTypes		( ExternalPackageState(..), EpsStats(..), PackageInstEnv, 
 			  HscEnv, TyThing(..), implicitTyThings, tyThingClass, tyThingTyCon, 
-			  ModIface(..), ModDetails(..), InstPool, ModGuts,
-			  TypeEnv, mkTypeEnv, extendTypeEnv, extendTypeEnvList, 
-			  lookupTypeEnv, lookupType, typeEnvIds,
-			  RulePool )
+			  ModIface(..), ModDetails(..), ModGuts,
+			  mkTypeEnv, extendTypeEnv, 
+			  lookupTypeEnv, lookupType, typeEnvIds )
 import InstEnv		( extendInstEnv )
 import CoreSyn
 import PprCore		( pprIdRules )
@@ -46,13 +45,12 @@ import IdInfo		( IdInfo, CafInfo(..), WorkerInfo(..),
 			  setArityInfo, setInlinePragInfo, setCafInfo, 
 			  vanillaIdInfo, newStrictnessInfo )
 import Class		( Class )
-import TyCon		( tyConDataCons, tyConTyVars, isTupleTyCon, mkForeignTyCon )
-import DataCon		( DataCon, dataConWorkId, dataConExistentialTyVars, dataConArgTys )
-import TysWiredIn	( intTyCon, boolTyCon, charTyCon, listTyCon, parrTyCon, 
-			  tupleTyCon, tupleCon )
+import TyCon		( tyConDataCons, isTupleTyCon, mkForeignTyCon )
+import DataCon		( DataCon, dataConWorkId, dataConTyVars, dataConArgTys, isVanillaDataCon )
+import TysWiredIn	( tupleCon, tupleTyCon, listTyCon, intTyCon, boolTyCon, charTyCon, parrTyCon )
 import Var		( TyVar, mkTyVar, tyVarKind )
-import Name		( Name, NamedThing(..), nameModuleName, nameModule, nameOccName, nameIsLocalOrFrom, 
-			  isWiredInName, wiredInNameTyThing_maybe, nameParent, nameParent_maybe )
+import Name		( Name, nameModuleName, nameModule, nameIsLocalOrFrom, 
+			  isWiredInName, wiredInNameTyThing_maybe, nameParent )
 import NameEnv
 import OccName		( OccName )
 import Module		( Module, ModuleName, moduleName )
@@ -60,11 +58,7 @@ import UniqSupply	( initUs_ )
 import Outputable	
 import SrcLoc		( noSrcLoc )
 import Util		( zipWithEqual, dropList, equalLength, zipLazy )
-import Maybes		( expectJust )
 import CmdLineOpts	( DynFlag(..) )
-
-import UniqFM (sizeUFM)
-
 \end{code}
 
 This module takes
@@ -262,35 +256,22 @@ tcIfaceDecl (IfaceId {ifName = occ_name, ifType = iface_type, ifIdInfo = info})
 	; return (AnId (mkVanillaGlobal name ty info)) }
 
 tcIfaceDecl (IfaceData {ifName = occ_name, 
-			ifTyVars = tv_bndrs, ifCtxt = rdr_ctxt,
+			ifTyVars = tv_bndrs, 
 			ifCons = rdr_cons, 
 			ifVrcs = arg_vrcs, ifRec = is_rec, 
 			ifGeneric = want_generic })
   = do	{ tc_name <- lookupIfaceTop occ_name
 	; bindIfaceTyVars tv_bndrs $ \ tyvars -> do
 
-	{ traceIf (text "tcIfaceDecl" <+> ppr rdr_ctxt)
-
-	; ctxt <- forkM (ptext SLIT("Ctxt of data decl") <+> ppr tc_name) $
-		     tcIfaceCtxt rdr_ctxt
-	 	-- The reason for laziness here is to postpone
-		-- looking at the context, because the class may not
-		-- be in the type envt yet.  E.g. 
-		--	class Real a where { toRat :: a -> Ratio Integer }
-		--	data (Real a) => Ratio a = ...
-		-- We suck in the decl for Real, and type check it, which sucks
-		-- in the data type Ratio; but we must postpone typechecking the
-		-- context
-
-	; tycon <- fixM ( \ tycon -> do
-	    { cons <- tcIfaceDataCons tycon tyvars ctxt rdr_cons
-	    ; tycon <- buildAlgTyCon tc_name tyvars ctxt cons 
+	{ tycon <- fixM ( \ tycon -> do
+	    { cons  <- tcIfaceDataCons tycon tyvars rdr_cons
+	    ; tycon <- buildAlgTyCon tc_name tyvars cons 
 			    arg_vrcs is_rec want_generic
 	    ; return tycon
 	    })
         ; traceIf (text "tcIfaceDecl4" <+> ppr tycon)
 	; return (ATyCon tycon)
-    } }
+    }}
 
 tcIfaceDecl (IfaceSyn {ifName = occ_name, ifTyVars = tv_bndrs, 
 		       ifSynRhs = rdr_rhs_ty, ifVrcs = arg_vrcs})
@@ -330,30 +311,58 @@ tcIfaceDecl (IfaceForeign {ifName = rdr_name, ifExtName = ext_name})
 	; return (ATyCon (mkForeignTyCon name ext_name 
 					 liftedTypeKind 0 [])) }
 
-tcIfaceDataCons tycon tyvars ctxt if_cons
+tcIfaceDataCons tycon tc_tyvars if_cons
   = case if_cons of
-	IfAbstractTyCon  -> return mkAbstractTyConRhs
-	IfDataTyCon cons -> do 	{ data_cons <- mappM tc_con_decl cons
-				; return (mkDataTyConRhs data_cons) }
-	IfNewTyCon con   -> do 	{ data_con <- tc_con_decl con
-				; return (mkNewTyConRhs data_con) }
+	IfAbstractTyCon		 -> return mkAbstractTyConRhs
+	IfDataTyCon mb_ctxt cons -> do 	{ mb_theta <- tc_ctxt mb_ctxt
+					; data_cons <- mappM tc_con_decl cons
+					; return (mkDataTyConRhs mb_theta data_cons) }
+	IfNewTyCon con		 -> do 	{ data_con <- tc_con_decl con
+					; return (mkNewTyConRhs tycon data_con) }
   where
-    tc_con_decl (IfaceConDecl occ is_infix ex_tvs ex_ctxt args stricts field_lbls)
-      = bindIfaceTyVars ex_tvs	$ \ ex_tyvars -> do
-	{ name <- lookupIfaceTop occ
-	; ex_theta <- tcIfaceCtxt ex_ctxt	-- Laziness seems not worth the bother here
+    tc_ctxt Nothing     = return Nothing
+    tc_ctxt (Just ctxt) = do { theta <- tcIfaceCtxt ctxt; return (Just theta) }
+
+    tc_con_decl (IfVanillaCon {	ifConOcc = occ, ifConInfix = is_infix, ifConArgTys = args, 
+				ifConStricts = stricts, ifConFields = field_lbls})
+      = do { name  <- lookupIfaceTop occ
+		-- Read the argument types, but lazily to avoid faulting in
+		-- the component types unless they are really needed
+ 	   ; arg_tys <- forkM (mk_doc name) (mappM tcIfaceType args)
+	   ; lbl_names <- mappM lookupIfaceTop field_lbls
+	   ; buildDataCon name is_infix True {- Vanilla -} 
+			  stricts lbl_names
+			  tc_tyvars [] arg_tys tycon
+			  (mkTyVarTys tc_tyvars)	-- Vanilla => we know result tys
+	   }  
+
+    tc_con_decl (IfGadtCon {	ifConTyVars = con_tvs,
+				ifConOcc = occ, ifConCtxt = ctxt, 
+				ifConArgTys = args, ifConResTys = ress, 
+				ifConStricts = stricts})
+      = bindIfaceTyVars con_tvs	$ \ con_tyvars -> do
+	{ name  <- lookupIfaceTop occ
+	; theta <- tcIfaceCtxt ctxt	-- Laziness seems not worth the bother here
+	 	-- At one stage I thought that this context checking *had*
+		-- to be lazy, because of possible mutual recursion between the
+		-- type and the classe: 
+		-- E.g. 
+		--	class Real a where { toRat :: a -> Ratio Integer }
+		--	data (Real a) => Ratio a = ...
+		-- But now I think that the laziness in checking class ops breaks 
+		-- the loop, so no laziness needed
 
 	-- Read the argument types, but lazily to avoid faulting in
 	-- the component types unless they are really needed
- 	; arg_tys <- forkM (mk_doc name args) (mappM tcIfaceType args) ;
+ 	; arg_tys <- forkM (mk_doc name) (mappM tcIfaceType args)
+ 	; res_tys <- forkM (mk_doc name) (mappM tcIfaceType ress)
 
-	; lbl_names <- mappM lookupIfaceTop field_lbls
-
-	; buildDataCon name is_infix stricts lbl_names
-		       tyvars ctxt ex_tyvars ex_theta 
-		       arg_tys tycon
+	; buildDataCon name False {- Not infix -} False {- Not vanilla -}
+		       stricts [{- No fields -}]
+		       con_tyvars theta 
+		       arg_tys tycon res_tys
 	}
-    mk_doc con_name args = ptext SLIT("Constructor") <+> sep [ppr con_name, ppr args]
+    mk_doc con_name = ptext SLIT("Constructor") <+> ppr con_name
 \end{code}	
 
 
@@ -626,7 +635,8 @@ tcIfaceExpr (IfaceApp fun arg)
     tcIfaceExpr arg		`thenM` \ arg' ->
     returnM (App fun' arg')
 
-tcIfaceExpr (IfaceCase scrut case_bndr alts) 
+-- gaw 2004
+tcIfaceExpr (IfaceCase scrut case_bndr ty alts) 
   = tcIfaceExpr scrut		`thenM` \ scrut' ->
     newIfaceName case_bndr	`thenM` \ case_bndr_name ->
     let
@@ -641,7 +651,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)
     in
     extendIfaceIdEnv [case_bndr']	$
     mappM (tcIfaceAlt tc_app) alts	`thenM` \ alts' ->
-    returnM (Case scrut' case_bndr' alts')
+    tcIfaceType ty		`thenM` \ ty' ->
+    returnM (Case scrut' case_bndr' ty' alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body)
   = tcIfaceExpr rhs		`thenM` \ rhs' ->
@@ -683,45 +694,42 @@ tcIfaceAlt _ (IfaceLitAlt lit, names, rhs)
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
 tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_occs, rhs)
-  = let	
-	tycon_mod = nameModuleName (tyConName tycon)
-    in
-    tcIfaceDataCon (ExtPkg tycon_mod data_occ)	`thenM` \ con ->
-    newIfaceNames arg_occs			`thenM` \ arg_names ->
-    let
-	ex_tyvars   = dataConExistentialTyVars con
-	main_tyvars = tyConTyVars tycon
-	ex_tyvars'  = [mkTyVar name (tyVarKind tv) | (name,tv) <- arg_names `zip` ex_tyvars] 
-	ex_tys'	    = mkTyVarTys ex_tyvars'
-	arg_tys	    = dataConArgTys con (inst_tys ++ ex_tys')
-	id_names    = dropList ex_tyvars arg_names
-	arg_ids
-#ifdef DEBUG
-		| not (equalLength id_names arg_tys)
-		= pprPanic "tcIfaceAlts" (ppr (con, arg_names, rhs) $$
-					 (ppr main_tyvars <+> ppr ex_tyvars) $$
-					 ppr arg_tys)
-		| otherwise
-#endif
-		= zipWithEqual "tcIfaceAlts" mkLocalId id_names arg_tys
-    in
-    ASSERT2( con `elem` tyConDataCons tycon && equalLength inst_tys main_tyvars,
-	     ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon) $$ ppr arg_tys $$  ppr main_tyvars  )
-    extendIfaceTyVarEnv ex_tyvars'	$
-    extendIfaceIdEnv arg_ids		$
-    tcIfaceExpr rhs			`thenM` \ rhs' ->
-    returnM (DataAlt con, ex_tyvars' ++ arg_ids, rhs')
+  = do	{ let tycon_mod = nameModuleName (tyConName tycon)
+	; con <- tcIfaceDataCon (ExtPkg tycon_mod data_occ)
+	; ASSERT2( con `elem` tyConDataCons tycon,
+		   ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon) )
+		  
+	  if isVanillaDataCon con then
+		tcVanillaAlt con inst_tys arg_occs rhs
+	  else
+    do 	{ 	-- General case
+	  arg_names <- newIfaceNames arg_occs
+	; let	tyvars   = [ mkTyVar name (tyVarKind tv) 
+			   | (name,tv) <- arg_names `zip` dataConTyVars con] 
+		arg_tys	 = dataConArgTys con (mkTyVarTys tyvars)
+		id_names = dropList tyvars arg_names
+		arg_ids  = ASSERT2( equalLength id_names arg_tys,
+				    ppr (con, arg_names, rhs) $$ ppr tyvars $$ ppr arg_tys )
+			   zipWith mkLocalId id_names arg_tys
+
+	; rhs' <- extendIfaceTyVarEnv tyvars	$
+		  extendIfaceIdEnv arg_ids	$
+		  tcIfaceExpr rhs
+	; return (DataAlt con, tyvars ++ arg_ids, rhs') }}
 
 tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
-  = newIfaceNames arg_occs	`thenM` \ arg_names ->
-    let
-	[con]   = tyConDataCons tycon
-	arg_ids = zipWithEqual "tcIfaceAlts" mkLocalId arg_names inst_tys
-    in
-    ASSERT( isTupleTyCon tycon )
-    extendIfaceIdEnv arg_ids		$
-    tcIfaceExpr rhs			`thenM` \ rhs' ->
-    returnM (DataAlt con, arg_ids, rhs')
+  = ASSERT( isTupleTyCon tycon )
+    do	{ let [data_con] = tyConDataCons tycon
+	; tcVanillaAlt data_con inst_tys arg_occs rhs }
+
+tcVanillaAlt data_con inst_tys arg_occs rhs
+  = do	{ arg_names <- newIfaceNames arg_occs
+	; let arg_tys = dataConArgTys data_con inst_tys
+	; let arg_ids = ASSERT2( equalLength arg_names arg_tys,
+				 ppr data_con <+> ppr inst_tys <+> ppr arg_occs $$ ppr rhs )
+			zipWith mkLocalId arg_names arg_tys
+	; rhs' <- extendIfaceIdEnv arg_ids (tcIfaceExpr rhs)
+	; returnM (DataAlt data_con, arg_ids, rhs') }
 \end{code}
 
 

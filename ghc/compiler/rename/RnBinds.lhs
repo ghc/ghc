@@ -23,7 +23,7 @@ import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnTypes		( rnHsSigType, rnLHsType, rnLPat )
-import RnExpr		( rnMatch, rnGRHSs, checkPrecMatch )
+import RnExpr		( rnMatchGroup, rnMatch, rnGRHSs, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn, 
 			  lookupLocatedInstDeclBndr,
 			  lookupLocatedSigOccRn, bindPatSigTyVars, bindPatSigTyVarsFV,
@@ -41,10 +41,7 @@ import List		( unzip4 )
 import SrcLoc		( mkSrcSpan, Located(..), unLoc )
 import Bag
 import Outputable
-
 import Monad		( foldM )
-
-import SrcLoc (getLoc) -- tmp
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -157,7 +154,7 @@ it expects the global environment to contain bindings for the binders
 contains bindings for the binders of this particular binding.
 
 \begin{code}
-rnTopBinds :: Bag (LHsBind RdrName)
+rnTopBinds :: LHsBinds RdrName
 	   -> [LSig RdrName]
 	   -> RnM ([HsBindGroup Name], DefUses)
 
@@ -239,7 +236,7 @@ This is done {\em either} by pass 3 (for the top-level bindings),
 
 \begin{code}
 rnBinds :: TopLevelFlag
-	-> Bag (LHsBind RdrName)
+	-> LHsBinds RdrName
 	-> [LSig RdrName]
 	-> RnM ([HsBindGroup Name], DefUses)
 
@@ -287,13 +284,13 @@ unique ``vertex tags'' on its output; minor plumbing required.
 
 \begin{code}
 mkBindVertices :: [LSig Name]		-- Signatures
-	       -> Bag (LHsBind RdrName)
+	       -> LHsBinds RdrName
 	       -> RnM [BindVertex]
 mkBindVertices sigs = mapM (mkBindVertex sigs) . bagToList
 
 mkBindVertex :: [LSig Name] -> LHsBind RdrName -> RnM BindVertex
-mkBindVertex sigs (L loc (PatBind pat grhss))
-  = addSrcSpan loc $
+mkBindVertex sigs (L loc (PatBind pat grhss ty))
+  = setSrcSpan loc $
     rnLPat pat				`thenM` \ (pat', pat_fvs) ->
 
 	 -- Find which things are bound in this group
@@ -304,19 +301,19 @@ mkBindVertex sigs (L loc (PatBind pat grhss))
     rnGRHSs PatBindRhs grhss		`thenM` \ (grhss', fvs) ->
     returnM 
 	(names_bound_here, fvs `plusFV` pat_fvs,
-	  L loc (PatBind pat' grhss'), sigs_for_me
+	  L loc (PatBind pat' grhss' ty), sigs_for_me
 	)
 
 mkBindVertex sigs (L loc (FunBind name inf matches))
-  = addSrcSpan loc $ 
+  = setSrcSpan loc $ 
     lookupLocatedBndrRn name				`thenM` \ new_name ->
     let
 	plain_name = unLoc new_name
 	names_bound_here = unitNameSet plain_name
     in
     sigsForMe names_bound_here sigs			`thenM` \ sigs_for_me ->
-    mapFvRn (rnMatch (FunRhs plain_name)) matches	`thenM` \ (new_matches, fvs) ->
-    mappM_ (checkPrecMatch inf plain_name) new_matches	`thenM_`
+    rnMatchGroup (FunRhs plain_name) matches		`thenM` \ (new_matches, fvs) ->
+    checkPrecMatch inf plain_name new_matches		`thenM_`
     returnM
       (unitNameSet plain_name, fvs,
 	L loc (FunBind new_name inf new_matches), sigs_for_me
@@ -354,7 +351,7 @@ a binder.
 \begin{code}
 rnMethodBinds :: Name			-- Class name
 	      -> [Name]			-- Names for generic type variables
-	      -> (LHsBinds RdrName)
+	      -> LHsBinds RdrName
 	      -> RnM (LHsBinds Name, FreeVars)
 
 rnMethodBinds cls gen_tyvars binds
@@ -363,19 +360,21 @@ rnMethodBinds cls gen_tyvars binds
 	   (bind', fvs_bind) <- rnMethodBind cls gen_tyvars bind
 	   return (bind' `unionBags` binds, fvs_bind `plusFV` fvs)
 
-
-rnMethodBind cls gen_tyvars (L loc (FunBind name inf matches))
-  =  addSrcSpan loc $ 
+rnMethodBind cls gen_tyvars (L loc (FunBind name inf (MatchGroup matches _)))
+  =  setSrcSpan loc $ 
      lookupLocatedInstDeclBndr cls name			`thenM` \ sel_name -> 
      let plain_name = unLoc sel_name in
 	-- We use the selector name as the binder
 
     mapFvRn (rn_match plain_name) matches		`thenM` \ (new_matches, fvs) ->
-    mappM_ (checkPrecMatch inf plain_name) new_matches	`thenM_`
-    returnM (unitBag (L loc (FunBind sel_name inf new_matches)), fvs `addOneFV` plain_name)
+    let 
+	new_group = MatchGroup new_matches placeHolderType
+    in
+    checkPrecMatch inf plain_name new_group		`thenM_`
+    returnM (unitBag (L loc (FunBind sel_name inf new_group)), fvs `addOneFV` plain_name)
   where
-	-- Gruesome; bring into scope the correct members of the generic type variables
-	-- See comments in RnSource.rnSourceDecl(ClassDecl)
+	-- Truly gruesome; bring into scope the correct members of the generic 
+	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
     rn_match sel_name match@(L _ (Match (L _ (TypePat ty) : _) _ _))
 	= extendTyVarEnvFVRn gen_tvs 	$
 	  rnMatch (FunRhs sel_name) match
@@ -387,7 +386,7 @@ rnMethodBind cls gen_tyvars (L loc (FunBind name inf matches))
 
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind cls gen_tyvars mbind@(L loc (PatBind other_pat _))
+rnMethodBind cls gen_tyvars mbind@(L loc (PatBind other_pat _ _))
   = addLocErr mbind methodBindErr	`thenM_`
     returnM (emptyBag, emptyFVs) 
 \end{code}

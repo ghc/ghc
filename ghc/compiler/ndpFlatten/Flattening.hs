@@ -285,11 +285,13 @@ vectorise (Let bind body) =
     (vbody, vbodyTy) <- vectorise body
     return ((Let vbind vbody), vbodyTy)
 
-vectorise (Case expr b alts) =
+-- gaw 2004
+vectorise (Case expr b ty alts) =
   do 
     (vexpr, vexprTy) <- vectorise expr
     valts <- mapM vectorise' alts
-    return (Case vexpr (setIdType b vexprTy) (map fst valts), snd (head valts))
+    let res_ty = snd (head valts)
+    return (Case vexpr (setIdType b vexprTy) res_ty (map fst valts), res_ty)
   where vectorise' (con, bs, expr) = 
           do 
             (vexpr, vexprTy) <- vectorise expr
@@ -441,7 +443,8 @@ lift (Let (Rec binds) expr2) =
 --        otherwise (a) compute index vector for simpleAlts (for def permute
 --                      later on
 --                  (b) 
-lift cExpr@(Case expr b alts)  =
+-- gaw 2004 FIX? 
+lift cExpr@(Case expr b _ alts)  =
   do  
     (lExpr, _) <- lift expr
     lb    <- liftBinderType  b     -- lift alt-expression
@@ -802,7 +805,8 @@ showCoreExpr (Let bnds expr) =
   where showBinds (NonRec b e) = showBind (b,e)
         showBinds (Rec bnds)   = concat (map showBind bnds)
         showBind (b,e) = "  b = " ++ (showCoreExpr e)++ "\n"
-showCoreExpr (Case ex b alts) =
+-- gaw 2004 FIX?
+showCoreExpr (Case ex b ty alts) =
   "Case b = " ++ (showCoreExpr ex) ++ " of \n" ++ (showAlts alts)
   where showAlts _ = ""  
 showCoreExpr (Note _ ex) = "Note n " ++ (showCoreExpr ex)

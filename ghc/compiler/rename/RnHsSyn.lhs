@@ -14,6 +14,7 @@ import TysWiredIn	( tupleTyCon, listTyCon, parrTyCon, charTyCon )
 import Name		( Name, getName, isTyVarName )
 import NameSet
 import BasicTypes	( Boxity )
+-- gaw 2004
 import SrcLoc		( Located(..), unLoc )
 \end{code}
 
@@ -54,6 +55,7 @@ extractHsTyNames ty
     get (HsPredTy p)	       = extractHsPredTyNames p
     get (HsOpTy ty1 op ty2)    = getl ty1 `unionNameSets` getl ty2 `unionNameSets` unitNameSet (unLoc op)
     get (HsParTy ty)           = getl ty
+    get (HsBangTy _ ty)        = getl ty
     get (HsNumTy n)            = emptyNameSet
     get (HsTyVar tv)	       = unitNameSet tv
     get (HsSpliceTy _)         = emptyNameSet	-- Type splices mention no type variables
@@ -110,12 +112,15 @@ conDeclFVs (L _ (ConDecl _ tyvars context details))
   = delFVs (map hsLTyVarName tyvars) $
     extractHsCtxtTyNames context	  `plusFV`
     conDetailsFVs details
+-- gaw 2004
+conDeclFVs (L _ (GadtDecl _ ty)) 
+  = extractHsTyNames ty
 
-conDetailsFVs (PrefixCon btys)    = plusFVs (map bangTyFVs btys)
+conDetailsFVs (PrefixCon btys)     = plusFVs (map bangTyFVs btys)
 conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
 conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (_, bty) <- flds]
 
-bangTyFVs bty = extractHsTyNames (getBangType (unLoc bty))
+bangTyFVs bty = extractHsTyNames (getBangType bty)
 \end{code}
 
 

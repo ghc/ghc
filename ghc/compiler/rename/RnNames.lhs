@@ -33,7 +33,6 @@ import Name		( Name, nameSrcLoc, nameOccName, nameModuleName, isWiredInName,
 			  nameParent, nameParent_maybe, isExternalName, nameModule,
 			  isBuiltInSyntax )
 import NameSet
-import NameEnv
 import OccName		( srcDataName, isTcOcc, occNameFlavour, OccEnv, 
 			  mkOccEnv, lookupOccEnv, emptyOccEnv, extendOccEnv )
 import HscTypes		( GenAvailInfo(..), AvailInfo, Avails, GhciMode(..),
@@ -49,7 +48,7 @@ import RdrName		( RdrName, rdrNameOcc, setRdrNameSpace,
 			  Provenance(..), ImportSpec(..), 
 			  isLocalGRE, pprNameProvenance )
 import Outputable
-import Maybes		( isJust, isNothing, catMaybes, mapCatMaybes, seqMaybe )
+import Maybes		( isNothing, catMaybes, mapCatMaybes, seqMaybe )
 import SrcLoc		( noSrcLoc, Located(..), mkGeneralSrcSpan,
 			  unLoc, noLoc, srcLocSpan, SrcSpan )
 import BasicTypes	( DeprecTxt )
@@ -133,7 +132,7 @@ importsFromImportDecl :: Module
 importsFromImportDecl this_mod
 	(L loc (ImportDecl loc_imp_mod_name want_boot qual_only as_mod imp_details))
   = 
-    addSrcSpan loc $
+    setSrcSpan loc $
 
 	-- If there's an error in loadInterface, (e.g. interface
 	-- file not found) we get lots of spurious errors from 'filterImports'
@@ -738,7 +737,7 @@ reportDeprecations tcg_env
     check hpt pit (GRE {gre_name = name, gre_prov = Imported (imp_spec:_) _})
       | name `elemNameSet` used_names
       ,	Just deprec_txt <- lookupDeprec hpt pit name
-      = addSrcSpan (is_loc imp_spec) $
+      = setSrcSpan (is_loc imp_spec) $
 	addWarn (sep [ptext SLIT("Deprecated use of") <+> 
 			occNameFlavour (nameOccName name) <+> 
 		 	quotes (ppr name),

@@ -11,7 +11,7 @@ free variables.
 
 \begin{code}
 module RnExpr (
-	rnMatch, rnGRHSs, rnLExpr, rnExpr, rnStmts,
+	rnMatchGroup, rnMatch, rnGRHSs, rnLExpr, rnExpr, rnStmts,
 	checkPrecMatch, checkTH
    ) where
 
@@ -60,6 +60,11 @@ import List		( unzip4 )
 ************************************************************************
 
 \begin{code}
+rnMatchGroup :: HsMatchContext Name -> MatchGroup RdrName -> RnM (MatchGroup Name, FreeVars)
+rnMatchGroup ctxt (MatchGroup ms _)
+  = mapFvRn (rnMatch ctxt) ms	`thenM` \ (new_ms, ms_fvs) ->
+    returnM (MatchGroup new_ms placeHolderType, ms_fvs)
+
 rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
 rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
 
@@ -99,10 +104,11 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 \begin{code}
 rnGRHSs :: HsMatchContext Name -> GRHSs RdrName -> RnM (GRHSs Name, FreeVars)
 
-rnGRHSs ctxt (GRHSs grhss binds _)
+-- gaw 2004
+rnGRHSs ctxt (GRHSs grhss binds)
   = rnBindGroupsAndThen binds	$ \ binds' ->
     mapFvRn (rnGRHS ctxt) grhss	`thenM` \ (grhss', fvGRHSs) ->
-    returnM (GRHSs grhss' binds' placeHolderType, fvGRHSs)
+    returnM (GRHSs grhss' binds', fvGRHSs)
 
 rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
 rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
@@ -184,10 +190,6 @@ rnExpr (HsOverLit lit)
   = rnOverLit lit		`thenM` \ (lit', fvs) ->
     returnM (HsOverLit lit', fvs)
 
-rnExpr (HsLam match)
-  = rnMatch LambdaExpr match	`thenM` \ (match', fvMatch) ->
-    returnM (HsLam match', fvMatch)
-
 rnExpr (HsApp fun arg)
   = rnLExpr fun		`thenM` \ (fun',fvFun) ->
     rnLExpr arg		`thenM` \ (arg',fvArg) ->
@@ -251,10 +253,14 @@ rnExpr (HsSCC lbl expr)
   = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
     returnM (HsSCC lbl expr', fvs_expr)
 
-rnExpr (HsCase expr ms)
+rnExpr (HsLam matches)
+  = rnMatchGroup LambdaExpr matches	`thenM` \ (matches', fvMatch) ->
+    returnM (HsLam matches', fvMatch)
+
+rnExpr (HsCase expr matches)
   = rnLExpr expr		 	`thenM` \ (new_expr, e_fvs) ->
-    mapFvRn (rnMatch CaseAlt) ms	`thenM` \ (new_ms, ms_fvs) ->
-    returnM (HsCase new_expr new_ms, e_fvs `plusFV` ms_fvs)
+    rnMatchGroup CaseAlt matches	`thenM` \ (new_matches, ms_fvs) ->
+    returnM (HsCase new_expr new_matches, e_fvs `plusFV` ms_fvs)
 
 rnExpr (HsLet binds expr)
   = rnBindGroupsAndThen binds		$ \ binds' ->
@@ -455,9 +461,7 @@ convertOpFormsLCmd = fmap convertOpFormsCmd
 convertOpFormsCmd :: HsCmd id -> HsCmd id
 
 convertOpFormsCmd (HsApp c e) = HsApp (convertOpFormsLCmd c) e
-
 convertOpFormsCmd (HsLam match) = HsLam (convertOpFormsMatch match)
-
 convertOpFormsCmd (OpApp c1 op fixity c2)
   = let
 	arg1 = L (getLoc c1) $ HsCmdTop (convertOpFormsLCmd c1) [] placeHolderType []
@@ -467,8 +471,9 @@ convertOpFormsCmd (OpApp c1 op fixity c2)
 
 convertOpFormsCmd (HsPar c) = HsPar (convertOpFormsLCmd c)
 
+-- gaw 2004
 convertOpFormsCmd (HsCase exp matches)
-  = HsCase exp (map convertOpFormsMatch matches)
+  = HsCase exp (convertOpFormsMatch matches)
 
 convertOpFormsCmd (HsIf exp c1 c2)
   = HsIf exp (convertOpFormsLCmd c1) (convertOpFormsLCmd c2)
@@ -494,12 +499,13 @@ convertOpFormsStmt (RecStmt stmts lvs rvs es)
   = RecStmt (map (fmap convertOpFormsStmt) stmts) lvs rvs es
 convertOpFormsStmt stmt = stmt
 
-convertOpFormsMatch = fmap convert
+convertOpFormsMatch (MatchGroup ms ty)
+  = MatchGroup (map (fmap convert) ms) ty
  where convert (Match pat mty grhss)
 	  = Match pat mty (convertOpFormsGRHSs grhss)
 
-convertOpFormsGRHSs (GRHSs grhss binds ty)
-  = GRHSs (map convertOpFormsGRHS grhss) binds ty
+convertOpFormsGRHSs (GRHSs grhss binds)
+  = GRHSs (map convertOpFormsGRHS grhss) binds
 
 convertOpFormsGRHS = fmap convert
  where convert (GRHS stmts)
@@ -538,7 +544,7 @@ methodNamesCmd (HsApp c e) = methodNamesLCmd c
 methodNamesCmd (HsLam match) = methodNamesMatch match
 
 methodNamesCmd (HsCase scrut matches)
-  = plusFVs (map methodNamesMatch matches) `addOneFV` choiceAName
+  = methodNamesMatch matches `addOneFV` choiceAName
 
 methodNamesCmd other = emptyFVs
    -- Other forms can't occur in commands, but it's not convenient 
@@ -546,10 +552,14 @@ methodNamesCmd other = emptyFVs
    -- The type checker will complain later
 
 ---------------------------------------------------
-methodNamesMatch (L _ (Match pats sig_ty grhss)) = methodNamesGRHSs grhss
+methodNamesMatch (MatchGroup ms ty)
+  = plusFVs (map do_one ms)
+ where 
+    do_one (L _ (Match pats sig_ty grhss)) = methodNamesGRHSs grhss
 
 -------------------------------------------------
-methodNamesGRHSs (GRHSs grhss binds ty) = plusFVs (map methodNamesGRHS grhss)
+-- gaw 2004
+methodNamesGRHSs (GRHSs grhss binds) = plusFVs (map methodNamesGRHS grhss)
 
 -------------------------------------------------
 methodNamesGRHS (L _ (GRHS stmts)) = methodNamesLStmt (last stmts)
@@ -1055,18 +1065,20 @@ not_op_app other	   = True
 \end{code}
 
 \begin{code}
-checkPrecMatch :: Bool -> Name -> LMatch Name -> RnM ()
-
-checkPrecMatch False fn match
-  = returnM ()
-
-checkPrecMatch True op (L _ (Match (p1:p2:_) _ _))
+checkPrecMatch :: Bool -> Name -> MatchGroup Name -> RnM ()
 	-- True indicates an infix lhs
-  = 	-- See comments with rnExpr (OpApp ...) about "deriving"
-    checkPrec op (unLoc p1) False	`thenM_`
-    checkPrec op (unLoc p2) True
+	-- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch True op _ = panic "checkPrecMatch"
+checkPrecMatch False fn match 
+  = returnM ()
+checkPrecMatch True op (MatchGroup ms _)	
+  = mapM_ check ms			 	
+  where
+    check (L _ (Match (p1:p2:_) _ _))
+      = checkPrec op (unLoc p1) False	`thenM_`
+        checkPrec op (unLoc p2) True
+
+    check _ = panic "checkPrecMatch"
 
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right
   = lookupFixityRn op		`thenM` \  op_fix@(Fixity op_prec  op_dir) ->

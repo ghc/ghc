@@ -389,9 +389,9 @@ emitSetCCC :: CostCentre -> Code
 emitSetCCC cc
   | not opt_SccProfilingOn = nopC
   | otherwise = do 
-    ASSERTM(sccAbleCostCentre cc)
     tmp <- newTemp wordRep
-    pushCostCentre tmp curCCS cc
+    ASSERT( sccAbleCostCentre cc )
+      pushCostCentre tmp curCCS cc
     stmtC (CmmStore curCCSAddr (CmmReg tmp))
     when (isSccCountCostCentre cc) $ 
 	stmtC (bumpSccCount curCCS)

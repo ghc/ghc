@@ -7,7 +7,7 @@
 module Literal
 	( Literal(..)		-- Exported to ParseIface
 	, mkMachInt, mkMachWord
-	, mkMachInt64, mkMachWord64
+	, mkMachInt64, mkMachWord64, mkStringLit,
 	, litSize
 	, litIsDupable, litIsTrivial
 	, literalType, 
@@ -35,6 +35,7 @@ import FastTypes
 import FastString
 import Binary
 
+import UnicodeUtil	( stringToUtf8 )
 import Ratio 		( numerator )
 import FastString	( uniqueOfFS, lengthFS )
 import DATA_INT		( Int8,  Int16,  Int32 )
@@ -203,6 +204,9 @@ mkMachWord x   = -- ASSERT2( inWordRange x, integer x )
 		 MachWord x
 mkMachInt64  x = MachInt64 x
 mkMachWord64 x = MachWord64 x
+
+mkStringLit :: String -> Literal
+mkStringLit s = MachStr (mkFastString (stringToUtf8 s))
 
 inIntRange, inWordRange :: Integer -> Bool
 inIntRange  x = x >= tARGET_MIN_INT && x <= tARGET_MAX_INT

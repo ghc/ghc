@@ -16,11 +16,10 @@ module FunDeps (
 import Name		( getSrcLoc )
 import Var		( Id, TyVar )
 import Class		( Class, FunDep, classTvsFds )
-import Subst		( mkSubst, emptyInScopeSet, substTy )
-import TcType		( Type, ThetaType, PredType(..), 
-			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred,
-			  unifyTyListsX, unifyExtendTyListsX, tcEqType
-			)
+import Unify		( unifyTys, unifyTysX )
+import Type		( mkTvSubst, substTy )
+import TcType		( Type, ThetaType, PredType(..), tcEqType,
+			  predTyUnique, mkClassPred, tyVarsOfTypes, tyVarsOfPred )
 import VarSet
 import VarEnv
 import Outputable
@@ -299,19 +298,21 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 --
 -- We can instantiate x to t1, and then we want to force
 -- 	(Tree x) [t1/x]  :=:   t2
-
--- We use 'unify' even though we are often only matching
--- unifyTyListsX will only bind variables in qtvs, so it's OK!
-  = case unifyTyListsX qtvs ls1 ls2 of
+--
+-- The same function is also used from InstEnv.badFunDeps, when we need
+-- to *unify*; in which case the qtvs are the variables of both ls1 and ls2.
+-- However unifying with the qtvs being the left-hand lot *is* just matching,
+-- so we can call unifyTys in both cases
+  = case unifyTys qtvs ls1 ls2 of
 	Nothing   -> []
-	Just unif | maybeToBool (unifyExtendTyListsX qtvs unif rs1 rs2)
+	Just unif | maybeToBool (unifyTysX qtvs unif rs1 rs2)
 			-- Don't include any equations that already hold. 
 			-- Reason: then we know if any actual improvement has happened,
 			-- 	   in which case we need to iterate the solver
 			-- In making this check we must taking account of the fact that any 
 			-- qtvs that aren't already instantiated can be instantiated to anything 
 			-- at all
-			-- NB: qtvs, not qtvs' because unifyExtendTyListsX only tries to
+			-- NB: qtvs, not qtvs' because matchTysX only tries to
 			--     look template tyvars up in the substitution
 		  -> []
 
@@ -323,10 +324,9 @@ checkClsFD qtvs fd clas_tvs tys1 tys2
 			-- executed.  What we're doing instead is recording the partial
 			-- work of the ls1/ls2 unification leaving a smaller unification problem
 		  where
-		    full_unif = mkSubst emptyInScopeSet unif
-			-- No for-alls in sight; hmm
+		    full_unif = mkTvSubst unif
 
-		    qtvs' = filterVarSet (\v -> not (v `elemSubstEnv` unif)) qtvs
+		    qtvs' = filterVarSet (\v -> not (v `elemVarEnv` unif)) qtvs
 			-- qtvs' are the quantified type variables
 			-- that have not been substituted out
 			--	

@@ -274,7 +274,8 @@ lvlExpr ctxt_lvl env (_, AnnApp fun arg)
     lvlMFE  False ctxt_lvl env arg	`thenLvl` \ arg' ->
     returnLvl (App fun' arg')
   where
-    lvl_fun (_, AnnCase _ _ _) = lvlMFE True ctxt_lvl env fun
+-- gaw 2004
+    lvl_fun (_, AnnCase _ _ _ _) = lvlMFE True ctxt_lvl env fun
     lvl_fun other 	       = lvlExpr ctxt_lvl env fun
 	-- We don't do MFE on partial applications generally,
 	-- but we do if the function is big and hairy, like a case
@@ -331,13 +332,14 @@ lvlExpr ctxt_lvl env (_, AnnLet bind body)
     lvlExpr ctxt_lvl new_env body		`thenLvl` \ body' ->
     returnLvl (Let bind' body')
 
-lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr alts)
+-- gaw 2004
+lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr ty alts)
   = lvlMFE True ctxt_lvl env expr	`thenLvl` \ expr' ->
     let
 	alts_env = extendCaseBndrLvlEnv env expr' case_bndr incd_lvl
     in
     mapLvl (lvl_alt alts_env) alts	`thenLvl` \ alts' ->
-    returnLvl (Case expr' (TB case_bndr incd_lvl) alts')
+    returnLvl (Case expr' (TB case_bndr incd_lvl) ty alts')
   where
       incd_lvl  = incMinorLvl ctxt_lvl
 
@@ -680,7 +682,7 @@ extendLvlEnv (float_lams, lvl_env, subst, id_env) prs
 extendCaseBndrLvlEnv (float_lams, lvl_env, subst, id_env) (Var scrut_var) case_bndr lvl
   = (float_lams,
      extendVarEnv lvl_env case_bndr lvl,
-     extendSubst subst case_bndr (DoneEx (Var scrut_var)),
+     extendIdSubst subst case_bndr (DoneEx (Var scrut_var)),
      extendVarEnv id_env case_bndr ([scrut_var], Var scrut_var))
      
 extendCaseBndrLvlEnv env scrut case_bndr lvl
@@ -693,7 +695,7 @@ extendPolyLvlEnv dest_lvl (float_lams, lvl_env, subst, id_env) abs_vars bndr_pai
      foldl add_id    id_env  bndr_pairs)
   where
      add_lvl   env (v,v') = extendVarEnv env v' dest_lvl
-     add_subst env (v,v') = extendSubst  env v (DoneEx (mkVarApps (Var v') abs_vars))
+     add_subst env (v,v') = extendIdSubst env v (DoneEx (mkVarApps (Var v') abs_vars))
      add_id    env (v,v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
 extendCloneLvlEnv lvl (float_lams, lvl_env, _, id_env) new_subst bndr_pairs

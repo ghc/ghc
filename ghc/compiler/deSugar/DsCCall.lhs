@@ -19,7 +19,7 @@ import CoreSyn
 
 import DsMonad
 
-import CoreUtils	( exprType, mkCoerce2 )
+import CoreUtils	( exprType, coreAltType, mkCoerce2 )
 import Id		( Id, mkWildId )
 import MkId		( mkFCallId, realWorldPrimId, mkPrimOpId )
 import Maybes		( maybeToBool )
@@ -47,7 +47,7 @@ import TysWiredIn	( unitDataConId,
 			  unboxedSingletonTyCon, unboxedPairTyCon,
 			  trueDataCon, falseDataCon, 
 			  trueDataConId, falseDataConId,
-			  listTyCon, charTyCon, 
+			  listTyCon, charTyCon, boolTy, 
 			  tupleTyCon, tupleCon
 			)
 import BasicTypes       ( Boxity(..) )
@@ -169,10 +169,13 @@ unboxArg arg
     tc `hasKey` boolTyConKey
   = newSysLocalDs intPrimTy		`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
-	      \ body -> Case (Case arg (mkWildId arg_ty)
+-- gaw 2004 
+	      \ body -> Case (Case arg (mkWildId arg_ty) intPrimTy
   		                       [(DataAlt falseDataCon,[],mkIntLit 0),
 	                                (DataAlt trueDataCon, [],mkIntLit 1)])
-                             prim_arg 
+                             prim_arg
+-- gaw 2004
+                             (exprType body) 
 			     [(DEFAULT,[],body)])
 
   -- Data types with a single constructor, which has a single, primitive-typed arg
@@ -183,7 +186,8 @@ unboxArg arg
     newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalDs data_con_arg_ty1	`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
-	      \ body -> Case arg case_bndr [(DataAlt data_con,[prim_arg],body)]
+-- gaw 2004
+	      \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,[prim_arg],body)]
     )
 
   -- Byte-arrays, both mutable and otherwise; hack warning
@@ -199,7 +203,9 @@ unboxArg arg
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[l_var, r_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
-	      \ body -> Case arg case_bndr [(DataAlt data_con,vars,body)]
+-- gaw 2004
+	      \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
+
     )
 
   | Just (tc, [arg_ty]) <- splitTyConApp_maybe arg_ty,
@@ -303,6 +309,8 @@ boxResult arg_ids augment mbTopCon result_ty
 					     Lam state_id $
 					      Case (App the_call (Var state_id))
 						   (mkWildId ccall_res_ty)
+-- gaw 2004
+                                                   (coreAltType the_alt) 
 						   [the_alt]
 					   ]
 		   in
@@ -319,6 +327,8 @@ boxResult arg_ids augment mbTopCon result_ty
 		 let
 		    wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
 					      (mkWildId ccall_res_ty)
+-- gaw 2004
+                                              (coreAltType the_alt)
 					      [the_alt]
 		 in
 		 returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
@@ -387,6 +397,8 @@ resultWrapper result_ty
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
   = returnDs
      (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
+-- gaw 2004 
+                                   boolTy
 	                           [(DEFAULT             ,[],Var trueDataConId ),
 				    (LitAlt (mkMachInt 0),[],Var falseDataConId)])
 

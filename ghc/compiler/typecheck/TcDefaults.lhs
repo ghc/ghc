@@ -42,7 +42,7 @@ tcDefaults [L locn (DefaultDecl [])]
   = returnM (Just [])		-- Default declaration specifying no types
 
 tcDefaults [L locn (DefaultDecl mono_tys)]
-  = addSrcSpan locn 			$
+  = setSrcSpan locn 			$
     addErrCtxt defaultDeclCtxt		$
     tcLookupClass numClassName		`thenM` \ num_class ->
     mappM tc_default_ty mono_tys	`thenM` \ tau_tys ->
@@ -54,7 +54,7 @@ tcDefaults [L locn (DefaultDecl mono_tys)]
     returnM (Just tau_tys)
 
 tcDefaults decls@(L locn (DefaultDecl _) : _) =
-    addSrcSpan locn $
+    setSrcSpan locn $
     failWithTc (dupDefaultDeclErr decls)
 
 

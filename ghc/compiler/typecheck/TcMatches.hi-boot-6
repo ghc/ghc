@@ -5,6 +5,6 @@ tcGRHSsPat    :: HsExpr.GRHSs Name.Name
 	      -> TcRnTypes.TcM (HsExpr.GRHSs Var.Id)
 
 tcMatchesFun :: Name.Name
-	     -> [HsExpr.LMatch Name.Name]
+	     -> HsExpr.MatchGroup Name.Name
 	     -> TcUnify.Expected TcType.TcType
-	     -> TcRnTypes.TcM [HsExpr.LMatch Var.Id]
+	     -> TcRnTypes.TcM (HsExpr.MatchGroup Var.Id)

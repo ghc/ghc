@@ -13,9 +13,9 @@ module Check ( check , ExhaustivePat ) where
 import HsSyn		
 import TcHsSyn		( hsPatType )
 import TcType		( tcTyConAppTyCon )
-import DsUtils		( EquationInfo(..), MatchResult(..), EqnSet, 
-			  CanItFail(..),  tidyLitPat, tidyNPat, 
- 			)
+import DsUtils		( EquationInfo(..), MatchResult(..), 
+			  CanItFail(..), firstPat )
+import MatchLit		( tidyLitPat, tidyNPat )
 import Id		( Id, idType )
 import DataCon		( DataCon, dataConTyCon, dataConOrigArgTys, dataConFieldLabels )
 import Name             ( Name, mkInternalName, getOccName, isDataSymOcc, getName, mkVarOcc )
@@ -96,17 +96,22 @@ Then we need to use InPats.
      Juan Quintela 5 JUL 1998\\
 	  User-friendliness and compiler writers are no friends.
 \end{quotation}
-\begin{code}
 
+\begin{code}
 type WarningPat = InPat Name
 type ExhaustivePat = ([WarningPat], [(Name, [HsLit])])
+type EqnNo  = Int
+type EqnSet = UniqSet EqnNo
 
 
-check :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
-check qs = (untidy_warns, incomplete)
+check :: [EquationInfo] -> ([ExhaustivePat], [EquationInfo])
+	-- Second result is the shadowed equations
+check qs = (untidy_warns, shadowed_eqns)
       where
-	(warns, incomplete) = check' (simplify_eqns qs)
+	(warns, used_nos) = check' ([1..] `zip` map simplify_eqn qs)
 	untidy_warns = map untidy_exhaustive warns 
+	shadowed_eqns = [eqn | (eqn,i) <- qs `zip` [1..], 
+				not (i `elementOfUniqSet` used_nos)]
 
 untidy_exhaustive :: ExhaustivePat -> ExhaustivePat
 untidy_exhaustive ([pat], messages) = 
@@ -184,21 +189,19 @@ There are several cases:
 
 \begin{code}
 
-check' :: [EquationInfo] -> ([ExhaustivePat],EqnSet)  
-check' []                                              = ([([],[])],emptyUniqSet)
+check' :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat], EqnSet)  
+check' [] = ([([],[])],emptyUniqSet)
 
-check' [EqnInfo n ctx ps (MatchResult CanFail _)] 
+check' [(n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult CanFail _ })] 
    | all_vars ps  = ([(takeList ps (repeat nlWildPat),[])],  unitUniqSet n)
 
-check' qs@((EqnInfo n ctx ps (MatchResult CanFail _)):rs)
+check' ((n, EqnInfo { eqn_pats = ps, eqn_rhs = MatchResult CanFail _}) : rs)
    | all_vars ps  = (pats,  addOneToUniqSet indexs n)
   where
     (pats,indexs) = check' rs
 
-check' qs@((EqnInfo n ctx ps result):_) 
+check' qs@((n, EqnInfo { eqn_pats = ps }) : _) 
    | all_vars ps  = ([],  unitUniqSet n)
---   | nplusk       = panic "Check.check': Work in progress: nplusk"
---   | npat         = panic "Check.check': Work in progress: npat ?????"
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
@@ -206,12 +209,10 @@ check' qs@((EqnInfo n ctx ps result):_)
   where
      -- Note: RecPats will have been simplified to ConPats
      --       at this stage.
-    first_pats   = ASSERT2( okGroup qs, pprGroup qs ) map firstPat qs
+    first_pats   = ASSERT2( okGroup qs, pprGroup qs ) map firstPatN qs
     constructors = any is_con first_pats
     literals     = any is_lit first_pats
     only_vars    = all is_var first_pats
---    npat         = or (map is_npat qs)
---    nplusk       = or (map is_nplusk qs)
 \end{code}
 
 Here begins the code to deal with literals, we need to split the matrix
@@ -219,7 +220,7 @@ in different matrix beginning by each literal and a last matrix with the
 rest of values.
 
 \begin{code}
-split_by_literals :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
+split_by_literals :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat], EqnSet)
 split_by_literals qs = process_literals used_lits qs
            where
              used_lits = get_used_lits qs
@@ -229,12 +230,11 @@ split_by_literals qs = process_literals used_lits qs
 in the column of the matrix. 
 
 \begin{code}
-process_explicit_literals :: [HsLit] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+process_explicit_literals :: [HsLit] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 process_explicit_literals lits qs = (concat pats, unionManyUniqSets indexs)
     where                  
       pats_indexs   = map (\x -> construct_literal_matrix x qs) lits
       (pats,indexs) = unzip pats_indexs 
-
 \end{code}
 
 
@@ -244,14 +244,14 @@ must be one Variable to be complete.
 
 \begin{code}
 
-process_literals :: [HsLit] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+process_literals :: [HsLit] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 process_literals used_lits qs 
-  | null default_eqns  = ([make_row_vars used_lits (head qs)]++pats,indexs)
+  | null default_eqns  = ([make_row_vars used_lits (head qs)] ++ pats,indexs)
   | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = process_explicit_literals used_lits qs
        default_eqns    = ASSERT2( okGroup qs, pprGroup qs ) 
-			 map remove_var (filter (is_var . firstPat) qs)
+			 [remove_var q | q <- qs, is_var (firstPatN q)]
        (pats',indexs') = check' default_eqns 
        pats_default    = [(nlWildPat:ps,constraints) | (ps,constraints) <- (pats')] ++ pats 
        indexs_default  = unionUniqSets indexs' indexs
@@ -261,7 +261,7 @@ Here we have selected the literal and we will select all the equations that
 begins for that literal and create a new matrix.
 
 \begin{code}
-construct_literal_matrix :: HsLit -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+construct_literal_matrix :: HsLit -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 construct_literal_matrix lit qs =
     (map (\ (xs,ys) -> (new_lit:xs,ys)) pats,indexs) 
   where
@@ -269,42 +269,37 @@ construct_literal_matrix lit qs =
     new_lit = nlLitPat lit
 
 remove_first_column_lit :: HsLit
-                        -> [EquationInfo] 
-                        -> [EquationInfo]
+                        -> [(EqnNo, EquationInfo)] 
+                        -> [(EqnNo, EquationInfo)]
 remove_first_column_lit lit qs
   = ASSERT2( okGroup qs, pprGroup qs ) 
-    map shift_pat (filter (is_var_lit lit . firstPat) qs)
+    [(n, shift_pat eqn) | q@(n,eqn) <- qs, is_var_lit lit (firstPatN q)]
   where
-     shift_pat (EqnInfo n ctx []     result) =  panic "Check.shift_var: no patterns"
-     shift_pat (EqnInfo n ctx (_:ps) result) =  EqnInfo n ctx ps result
-
+     shift_pat eqn@(EqnInfo { eqn_pats = _:ps}) = eqn { eqn_pats = ps }
+     shift_pat eqn@(EqnInfo { eqn_pats = []})   = panic "Check.shift_var: no patterns"
 \end{code}
 
 This function splits the equations @qs@ in groups that deal with the 
 same constructor.
 
 \begin{code}
-
-split_by_constructor :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
-
+split_by_constructor :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat], EqnSet)
 split_by_constructor qs 
   | notNull unused_cons = need_default_case used_cons unused_cons qs 
   | otherwise           = no_need_default_case used_cons qs 
                        where 
                           used_cons   = get_used_cons qs 
                           unused_cons = get_unused_cons used_cons 
-
 \end{code}
 
 The first column of the patterns matrix only have vars, then there is 
 nothing to do.
 
 \begin{code}
-first_column_only_vars :: [EquationInfo] -> ([ExhaustivePat],EqnSet)
+first_column_only_vars :: [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 first_column_only_vars qs = (map (\ (xs,ys) -> (nlWildPat:xs,ys)) pats,indexs)
                           where
-                            (pats,indexs) = check' (map remove_var qs)
-       
+                            (pats, indexs) = check' (map remove_var qs)
 \end{code}
 
 This equation takes a matrix of patterns and split the equations by 
@@ -316,19 +311,20 @@ constructors or not explicitly. The reasoning is similar to @process_literals@,
 the difference is that here the default case is not always needed.
 
 \begin{code}
-no_need_default_case :: [Pat Id] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+no_need_default_case :: [Pat Id] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 no_need_default_case cons qs = (concat pats, unionManyUniqSets indexs)
     where                  
       pats_indexs   = map (\x -> construct_matrix x qs) cons
       (pats,indexs) = unzip pats_indexs 
 
-need_default_case :: [Pat Id] -> [DataCon] -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+need_default_case :: [Pat Id] -> [DataCon] -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 need_default_case used_cons unused_cons qs 
   | null default_eqns  = (pats_default_no_eqns,indexs)
   | otherwise          = (pats_default,indexs_default)
      where
        (pats,indexs)   = no_need_default_case used_cons qs
-       default_eqns    = ASSERT2( okGroup qs, pprGroup qs ) map remove_var (filter (is_var . firstPat) qs)
+       default_eqns    = ASSERT2( okGroup qs, pprGroup qs ) 
+			 [remove_var q | q <- qs, is_var (firstPatN q)]
        (pats',indexs') = check' default_eqns 
        pats_default    = [(make_whole_con c:ps,constraints) | 
                           c <- unused_cons, (ps,constraints) <- pats'] ++ pats
@@ -336,7 +332,7 @@ need_default_case used_cons unused_cons qs
        pats_default_no_eqns =  [(make_whole_con c:new_wilds,[]) | c <- unused_cons] ++ pats
        indexs_default  = unionUniqSets indexs' indexs
 
-construct_matrix :: Pat Id -> [EquationInfo] -> ([ExhaustivePat],EqnSet)
+construct_matrix :: Pat Id -> [(EqnNo, EquationInfo)] -> ([ExhaustivePat],EqnSet)
 construct_matrix con qs =
     (map (make_con con) pats,indexs) 
   where
@@ -359,41 +355,47 @@ is transformed in:
 
 \begin{code}
 remove_first_column :: Pat Id                -- Constructor 
-                    -> [EquationInfo] 
-                    -> [EquationInfo]
-remove_first_column (ConPatOut con (PrefixCon con_pats) _ _ _) qs
+                    -> [(EqnNo, EquationInfo)] 
+                    -> [(EqnNo, EquationInfo)]
+remove_first_column (ConPatOut con _ _ _ (PrefixCon con_pats) _) qs
   = ASSERT2( okGroup qs, pprGroup qs ) 
-    map shift_var (filter (is_var_con con . firstPat) qs)
+    [(n, shift_var eqn) | q@(n, eqn) <- qs, is_var_con con (firstPatN q)]
   where
      new_wilds = [WildPat (hsPatType arg_pat) | arg_pat <- con_pats]
-     shift_var (EqnInfo n ctx (ConPatOut _ (PrefixCon ps') _ _ _:ps) result) = 
-                EqnInfo n ctx (map unLoc ps'++ps)               result 
-     shift_var (EqnInfo n ctx (WildPat _     :ps)     result) = 
-                EqnInfo n ctx (new_wilds ++   ps)     result
+     shift_var eqn@(EqnInfo { eqn_pats = ConPatOut _ _ _ _ (PrefixCon ps') _ : ps}) 
+ 	= eqn { eqn_pats = map unLoc ps' ++ ps }
+     shift_var eqn@(EqnInfo { eqn_pats = WildPat _ : ps })
+  	= eqn { eqn_pats = new_wilds ++ ps }
      shift_var _ = panic "Check.Shift_var:No done"
 
-make_row_vars :: [HsLit] -> EquationInfo -> ExhaustivePat
-make_row_vars used_lits (EqnInfo _ _ pats _ ) = 
-   (nlVarPat new_var:takeList (tail pats) (repeat nlWildPat),[(new_var,used_lits)])
-  where new_var = hash_x
+make_row_vars :: [HsLit] -> (EqnNo, EquationInfo) -> ExhaustivePat
+make_row_vars used_lits (_, EqnInfo { eqn_pats = pats})
+   = (nlVarPat new_var:takeList (tail pats) (repeat nlWildPat),[(new_var,used_lits)])
+  where 
+     new_var = hash_x
 
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
 		     (mkVarOcc FSLIT("#x"))
 		     noSrcLoc
 
-make_row_vars_for_constructor :: EquationInfo -> [WarningPat]
-make_row_vars_for_constructor (EqnInfo _ _ pats _ ) = takeList (tail pats) (repeat nlWildPat)
+make_row_vars_for_constructor :: (EqnNo, EquationInfo) -> [WarningPat]
+make_row_vars_for_constructor (_, EqnInfo { eqn_pats = pats}) 
+  = takeList (tail pats) (repeat nlWildPat)
 
 compare_cons :: Pat Id -> Pat Id -> Bool
-compare_cons (ConPatOut id1 _ _ _ _) (ConPatOut id2 _ _ _ _) = id1 == id2  
+compare_cons (ConPatOut id1 _ _ _ _ _) (ConPatOut id2 _ _ _ _ _) = id1 == id2  
 
 remove_dups :: [Pat Id] -> [Pat Id]
 remove_dups []     = []
 remove_dups (x:xs) | or (map (\y -> compare_cons x y) xs) = remove_dups  xs
                    | otherwise                            = x : remove_dups xs
 
-get_used_cons :: [EquationInfo] -> [Pat Id]
-get_used_cons qs = remove_dups [con | (EqnInfo _ _ (con@(ConPatOut _ _ _ _ _):_) _) <- qs ]
+get_used_cons :: [(EqnNo, EquationInfo)] -> [Pat Id]
+get_used_cons qs = remove_dups [pat | q <- qs, let pat = firstPatN q, 
+				      isConPatOut pat]
+
+isConPatOut (ConPatOut {}) = True
+isConPatOut other	   = False
 
 remove_dups' :: [HsLit] -> [HsLit] 
 remove_dups' []                   = []
@@ -401,27 +403,27 @@ remove_dups' (x:xs) | x `elem` xs = remove_dups' xs
                     | otherwise   = x : remove_dups' xs 
 
 
-get_used_lits :: [EquationInfo] -> [HsLit]
+get_used_lits :: [(EqnNo, EquationInfo)] -> [HsLit]
 get_used_lits qs = remove_dups' all_literals
 	         where
 	           all_literals = get_used_lits' qs
 
-get_used_lits' :: [EquationInfo] -> [HsLit]
+get_used_lits' :: [(EqnNo, EquationInfo)] -> [HsLit]
 get_used_lits' [] = []
-get_used_lits' ((EqnInfo _ _ ((LitPat lit):_) _):qs) = 
-	       lit : get_used_lits qs
-get_used_lits' ((EqnInfo _ _ ((NPatOut lit _ _):_) _):qs) = 
-	       lit : get_used_lits qs
-get_used_lits' (q:qs)                                  =       
-	       get_used_lits qs
+get_used_lits' (q:qs) 
+  | LitPat lit      <- first_pat = lit : get_used_lits qs
+  | NPatOut lit _ _ <- first_pat = lit : get_used_lits qs
+  | otherwise		         = get_used_lits qs
+  where
+    first_pat = firstPatN q
 
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = unused_cons
      where
-       (ConPatOut _ _ ty _ _) = head used_cons
+       (ConPatOut _ _ _ _ _ ty) = head used_cons
        ty_con 		      = tcTyConAppTyCon ty		-- Newtype observable
        all_cons        	      = tyConDataCons ty_con
-       used_cons_as_id 	      = map (\ (ConPatOut d _ _ _ _) -> d) used_cons
+       used_cons_as_id 	      = map (\ (ConPatOut d _ _ _ _ _) -> d) used_cons
        unused_cons     	      = uniqSetToList
 		 (mkUniqSet all_cons `minusUniqSet` mkUniqSet used_cons_as_id) 
 
@@ -430,19 +432,15 @@ all_vars []             = True
 all_vars (WildPat _:ps) = all_vars ps
 all_vars _              = False
 
-remove_var :: EquationInfo -> EquationInfo
-remove_var (EqnInfo n ctx (WildPat _:ps) result) = EqnInfo n ctx ps result
-remove_var _                                     =
-	 panic "Check.remove_var: equation does not begin with a variable"
+remove_var :: (EqnNo, EquationInfo) -> (EqnNo, EquationInfo)
+remove_var (n, eqn@(EqnInfo { eqn_pats = WildPat _ : ps})) = (n, eqn { eqn_pats = ps })
+remove_var _  = panic "Check.remove_var: equation does not begin with a variable"
 
 -----------------------
-eqnPats :: EquationInfo -> [Pat Id]
-eqnPats (EqnInfo _ _ ps _) = ps
+eqnPats :: (EqnNo, EquationInfo) -> [Pat Id]
+eqnPats (_, eqn) = eqn_pats eqn
 
-firstPat :: EquationInfo -> Pat Id
-firstPat eqn_info = head (eqnPats eqn_info)
-
-okGroup :: [EquationInfo] -> Bool
+okGroup :: [(EqnNo, EquationInfo)] -> Bool
 -- True if all equations have at least one pattern, and
 -- all have the same number of patterns
 okGroup [] = True
@@ -454,8 +452,12 @@ okGroup (e:es) = n_pats > 0 && and [length (eqnPats e) == n_pats | e <- es]
 pprGroup es = vcat (map pprEqnInfo es)
 pprEqnInfo e = ppr (eqnPats e)
 
+
+firstPatN :: (EqnNo, EquationInfo) -> Pat Id
+firstPatN (_, eqn) = firstPat eqn
+
 is_con :: Pat Id -> Bool
-is_con (ConPatOut _ _ _ _ _) = True
+is_con (ConPatOut _ _ _ _ _ _) = True
 is_con _                     = False
 
 is_lit :: Pat Id -> Bool
@@ -463,22 +465,14 @@ is_lit (LitPat _)      = True
 is_lit (NPatOut _ _ _) = True
 is_lit _               = False
 
-is_npat :: Pat Id -> Bool
-is_npat (NPatOut _ _ _) = True
-is_npat _               = False
-
-is_nplusk :: Pat Id -> Bool
-is_nplusk (NPlusKPatOut _ _ _ _) = True
-is_nplusk _                      = False
-
 is_var :: Pat Id -> Bool
 is_var (WildPat _) = True
 is_var _           = False
 
 is_var_con :: DataCon -> Pat Id -> Bool
-is_var_con con (WildPat _)                        = True
-is_var_con con (ConPatOut id _ _ _ _) | id == con = True
-is_var_con con _                                  = False
+is_var_con con (WildPat _)                          = True
+is_var_con con (ConPatOut id _ _ _ _ _) | id == con = True
+is_var_con con _                                    = False
 
 is_var_lit :: HsLit -> Pat Id -> Bool
 is_var_lit lit (WildPat _)	                = True
@@ -540,13 +534,12 @@ make_list p (ListPat ps ty) = ListPat (p:ps) ty
 make_list _ _               = panic "Check.make_list: Invalid argument"
 
 make_con :: Pat Id -> ExhaustivePat -> ExhaustivePat           
-make_con (ConPatOut id _ _ _ _) (lp:lq:ps, constraints) 
+make_con (ConPatOut id _ _ _ _ _) (lp:lq:ps, constraints) 
      | return_list id q = (noLoc (make_list lp q) : ps, constraints)
      | isInfixCon id    = (nlInfixConPat (getName id) lp lq : ps, constraints) 
-   where p  = unLoc lp
-	 q  = unLoc lq	
+   where q  = unLoc lq	
 
-make_con (ConPatOut id (PrefixCon pats) _ _ _) (ps, constraints) 
+make_con (ConPatOut id _ _ _ (PrefixCon pats) _) (ps, constraints) 
       | isTupleTyCon tc  = (noLoc (TuplePat pats_con (tupleTyConBoxity tc)) : rest_pats, constraints) 
       | isPArrFakeCon id = (noLoc (PArrPat pats_con placeHolderType)        : rest_pats, constraints) 
       | otherwise        = (nlConPat name pats_con      : rest_pats, constraints)
@@ -576,12 +569,8 @@ constraints.
 
 \begin{code}
 
-simplify_eqns :: [EquationInfo] -> [EquationInfo]
-simplify_eqns []                               = []
-simplify_eqns ((EqnInfo n ctx pats result):qs) = 
- (EqnInfo n ctx pats' result) : simplify_eqns qs
- where
-  pats' = map simplify_pat pats
+simplify_eqn :: EquationInfo -> EquationInfo
+simplify_eqn eqn = eqn { eqn_pats = map simplify_pat (eqn_pats eqn) }
 
 simplify_lpat :: LPat Id -> LPat Id  
 simplify_lpat p = fmap simplify_pat p
@@ -589,13 +578,14 @@ simplify_lpat p = fmap simplify_pat p
 simplify_pat :: Pat Id -> Pat Id
 simplify_pat pat@(WildPat gt) = pat
 simplify_pat (VarPat id)      = WildPat (idType id) 
+simplify_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
+simplify_pat (ParPat p)       = unLoc (simplify_lpat p)
+simplify_pat (LazyPat p)      = unLoc (simplify_lpat p)
+simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
+simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
 
-simplify_pat (ParPat p)      	 = unLoc (simplify_lpat p)
-simplify_pat (LazyPat p)      	 = unLoc (simplify_lpat p)
-simplify_pat (AsPat id p)     	 = unLoc (simplify_lpat p)
-simplify_pat (SigPatOut p ty fn) = unLoc (simplify_lpat p)	-- I'm not sure this is right
-
-simplify_pat (ConPatOut id ps ty tvs dicts) = ConPatOut id (simplify_con id ps) ty tvs dicts
+simplify_pat (ConPatOut id tvs dicts binds ps ty) 
+  = ConPatOut id tvs dicts binds (simplify_con id ps) ty
 
 simplify_pat (ListPat ps ty) = 
   unLoc $ foldr (\ x y -> mkPrefixConPat consDataCon [x,y] list_ty)
@@ -607,16 +597,14 @@ simplify_pat (ListPat ps ty) =
 -- arrays with the existing machinery for constructor pattern
 --
 simplify_pat (PArrPat ps ty)
-  = ConPatOut (parrFakeCon arity)
-	      (PrefixCon (map simplify_lpat ps)) 
-	      (mkPArrTy ty) [] [] 
-  where
-    arity = length ps
+  = mk_simple_con_pat (parrFakeCon (length ps))
+		      (PrefixCon (map simplify_lpat ps)) 
+		      (mkPArrTy ty)
 
 simplify_pat (TuplePat ps boxity)
-  = ConPatOut (tupleCon boxity arity)
-	      (PrefixCon (map simplify_lpat ps))
-	      (mkTupleTy boxity arity (map hsPatType ps)) [] []
+  = mk_simple_con_pat (tupleCon boxity arity)
+		      (PrefixCon (map simplify_lpat ps))
+		      (mkTupleTy boxity arity (map hsPatType ps))
   where
     arity = length ps
 
@@ -625,12 +613,10 @@ simplify_pat pat@(LitPat lit) = unLoc (tidyLitPat lit (noLoc pat))
 -- unpack string patterns fully, so we can see when they overlap with
 -- each other, or even explicit lists of Chars.
 simplify_pat pat@(NPatOut (HsString s) _ _) = 
-   foldr (\c pat -> ConPatOut consDataCon (PrefixCon [mk_char_lit c,noLoc pat]) stringTy [] [])
-	 (ConPatOut nilDataCon (PrefixCon []) stringTy [] []) (unpackFS s)
+   foldr (\c pat -> mk_simple_con_pat consDataCon (PrefixCon [mk_char_lit c,noLoc pat]) stringTy)
+	 (mk_simple_con_pat nilDataCon (PrefixCon []) stringTy) (unpackFS s)
   where
-    mk_char_lit c = noLoc $
-		     ConPatOut charDataCon (PrefixCon [nlLitPat (HsCharPrim c)]) 
-			      charTy [] [] 
+    mk_char_lit c = noLoc (mk_simple_con_pat charDataCon (PrefixCon [nlLitPat (HsCharPrim c)]) charTy)
 
 simplify_pat pat@(NPatOut lit lit_ty hsexpr) = unLoc (tidyNPat lit lit_ty (noLoc pat))
 
@@ -646,6 +632,8 @@ simplify_pat (DictPat dicts methods)
        num_of_d_and_ms	 = length dicts + length methods
        dict_and_method_pats = map VarPat (dicts ++ methods)
 
+mk_simple_con_pat con args ty = ConPatOut con [] [] emptyLHsBinds args ty
+
 -----------------
 simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
 simplify_con con (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
@@ -655,8 +643,7 @@ simplify_con con (RecCon fs)
   | otherwise = PrefixCon (map (simplify_lpat.snd) all_pats)
   where
      -- pad out all the missing fields with WildPats.
-    field_pats = map (\ f -> (getName f, nlWildPat))
-		     (dataConFieldLabels con)
+    field_pats = map (\ f -> (f, nlWildPat)) (dataConFieldLabels con)
     all_pats = foldr (\ (id,p) acc -> insertNm (getName (unLoc id)) p acc)
 		     field_pats fs
        

@@ -68,7 +68,7 @@ import Name		( Name, NamedThing, getName, nameOccName, nameModule, nameModuleNam
 import NameEnv
 import NameSet	
 import OccName		( OccName, OccEnv, lookupOccEnv, mkOccEnv, emptyOccEnv, 
-			  extendOccEnv, foldOccEnv )
+			  extendOccEnv )
 import Module
 import InstEnv		( InstEnv, DFunId )
 import Rules		( RuleBase )
@@ -77,7 +77,7 @@ import Id		( Id )
 import Type		( TyThing(..) )
 
 import Class		( Class, classSelIds, classTyCon )
-import TyCon		( TyCon, isClassTyCon, tyConSelIds, tyConDataCons )
+import TyCon		( TyCon, tyConSelIds, tyConDataCons )
 import DataCon		( dataConImplicitIds )
 import Packages		( PackageName )
 import CmdLineOpts	( DynFlags )

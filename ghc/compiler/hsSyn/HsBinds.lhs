@@ -11,21 +11,18 @@ module HsBinds where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr ( HsExpr, pprExpr, LHsExpr,
-			       LMatch, pprFunBind,
+			       MatchGroup, pprFunBind,
 			       GRHSs, pprPatBind )
+import {-# SOURCE #-} HsPat  ( LPat )
 
--- friends:
-import HsPat		( LPat )
-import HsTypes		( LHsType )
-
---others:
+import HsTypes		( LHsType, PostTcType )
 import Name		( Name )
 import NameSet		( NameSet, elemNameSet, nameSetToList )
 import BasicTypes	( IPName, RecFlag(..), Activation(..), Fixity )
 import Outputable	
 import SrcLoc		( Located(..), unLoc )
 import Var		( TyVar )
-import Bag		( Bag, bagToList )
+import Bag		( Bag, emptyBag, isEmptyBag, bagToList )
 \end{code}
 
 %************************************************************************
@@ -81,11 +78,20 @@ instance (OutputableBndr id) => Outputable (IPBind id) where
 
 -- -----------------------------------------------------------------------------
 
-type LHsBinds id = Bag (LHsBind id)
-type LHsBind  id = Located (HsBind id)
+type LHsBinds id  = Bag (LHsBind id)
+type DictBinds id = LHsBinds id		-- Used for dictionary or method bindings
+type LHsBind  id  = Located (HsBind id)
+
+emptyLHsBinds :: LHsBinds id
+emptyLHsBinds = emptyBag
+
+isEmptyLHsBinds :: LHsBinds id -> Bool
+isEmptyLHsBinds = isEmptyBag
 
 pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
-pprLHsBinds binds = lbrace <+> vcat (map ppr (bagToList binds)) <+> rbrace
+pprLHsBinds binds 
+  | isEmptyLHsBinds binds = empty
+  | otherwise = lbrace <+> vcat (map ppr (bagToList binds)) <+> rbrace
 
 data HsBind id
   = FunBind     (Located id)
@@ -98,11 +104,12 @@ data HsBind id
 			-- FunBinds, so if you change this, you'll need to
 			-- change e.g. rnMethodBinds
 		Bool	-- True => infix declaration
-		[LMatch id]
+		(MatchGroup id)
 
   | PatBind     (LPat id)	-- The pattern is never a simple variable;
 				-- That case is done by FunBind
 		(GRHSs id)
+		PostTcType	-- Type of the GRHSs
 
   | VarBind id (Located (HsExpr id))	-- Dictionary binding and suchlike;
 					-- located only for consistency
@@ -152,7 +159,7 @@ instance OutputableBndr id => Outputable (HsBind id) where
 
 ppr_monobind :: OutputableBndr id => HsBind id -> SDoc
 
-ppr_monobind (PatBind pat grhss)       = pprPatBind pat grhss
+ppr_monobind (PatBind pat grhss ty)    = pprPatBind pat grhss
 ppr_monobind (VarBind var rhs)         = ppr var <+> equals <+> pprExpr (unLoc rhs)
 ppr_monobind (FunBind fun inf matches) = pprFunBind (unLoc fun) matches
       -- ToDo: print infix if appropriate

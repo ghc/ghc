@@ -4,32 +4,33 @@
 \section[Main_match]{The @match@ function}
 
 \begin{code}
-module Match ( match, matchExport, matchWrapper, matchSimply, matchSinglePat ) where
+module Match ( match, matchWrapper, matchSimply, matchSinglePat ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} DsExpr( dsExpr )
 import CmdLineOpts	( DynFlag(..), dopt )
 import HsSyn		
 import TcHsSyn		( hsPatType )
 import Check            ( check, ExhaustivePat )
 import CoreSyn
-import CoreUtils	( bindNonRec )
+import CoreUtils	( bindNonRec, exprType )
 import DsMonad
+import DsBinds		( dsHsNestedBinds )
 import DsGRHSs		( dsGRHSs )
 import DsUtils
-import Id		( idType, recordSelectorFieldLabel, Id )
-import DataCon		( dataConFieldLabels, dataConInstOrigArgTys )
+import Id		( idName, idType, Id )
+import DataCon		( dataConFieldLabels, dataConInstOrigArgTys, isVanillaDataCon )
 import MatchCon		( matchConFamily )
-import MatchLit		( matchLiterals )
+import MatchLit		( matchLiterals, matchNPlusKPats, matchNPats, tidyLitPat, tidyNPat )
 import PrelInfo		( pAT_ERROR_ID )
-import TcType		( mkTyVarTys, Type, tcTyConAppArgs, tcEqType )
+import TcType		( Type, tcTyConAppArgs )
+import Type		( splitFunTysN )
 import TysWiredIn	( consDataCon, mkTupleTy, mkListTy,
 			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
-import UniqSet
+import ListSetOps	( runs )
 import SrcLoc		( noSrcSpan, noLoc, unLoc, Located(..) )
-import Util             ( lengthExceeds, isSingleton, notNull )
+import Util             ( lengthExceeds, notNull )
 import Name		( Name )
 import Outputable
 \end{code}
@@ -42,36 +43,34 @@ It can not be called matchWrapper because this name already exists :-(
 JJCQ 30-Nov-1997
 
 \begin{code}
-matchExport :: [Id]	        -- Vars rep'ing the exprs we're matching with
+matchCheck ::  DsMatchContext
+	    -> [Id]	        -- Vars rep'ing the exprs we're matching with
+            -> Type             -- Type of the case expression
             -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
             -> DsM MatchResult  -- Desugared result!
 
-
-matchExport vars qs
+matchCheck ctx vars ty qs
    = getDOptsDs 				`thenDs` \ dflags ->
-     matchExport_really dflags vars qs
+     matchCheck_really dflags ctx vars ty qs
 
-matchExport_really dflags vars qs@((EqnInfo _ ctx _ (MatchResult _ _)) : _)
+matchCheck_really dflags ctx vars ty qs
   | incomplete && shadow = 
       dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
       dsIncompleteWarn ctx pats			`thenDs`   \ () ->
-      match vars qs
+      match vars ty qs
   | incomplete            = 
       dsIncompleteWarn ctx pats			`thenDs`   \ () ->
-      match vars qs
+      match vars ty qs
   | shadow                = 
       dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
-      match vars qs
+      match vars ty qs
   | otherwise             =
-      match vars qs
-  where (pats,indexs) = check qs
+      match vars ty qs
+  where (pats, eqns_shadow) = check qs
         incomplete    = dopt Opt_WarnIncompletePatterns dflags
 			&& (notNull pats)
         shadow        = dopt Opt_WarnOverlappingPatterns dflags
-			&& sizeUniqSet indexs < no_eqns
-        no_eqns       = length qs
-	unused_eqns   = uniqSetToList (mkUniqSet [1..no_eqns] `minusUniqSet` indexs)
-	eqns_shadow   = map (\n -> qs!!(n - 1)) unused_eqns
+			&& not (null eqns_shadow)
 \end{code}
 
 This variable shows the maximum number of lines of output generated for warnings.
@@ -135,7 +134,7 @@ ppr_incomplete_pats kind (pats,constraints) =
 
 ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`notElem`"), ppr pats]
 
-ppr_eqn prefixF kind (EqnInfo _ _ pats _) = prefixF (ppr_shadow_pats kind pats)
+ppr_eqn prefixF kind eqn = prefixF (ppr_shadow_pats kind (eqn_pats eqn))
 \end{code}
 
 
@@ -192,6 +191,7 @@ chance of working in our post-upheaval world of @Locals@.)
 So, the full type signature:
 \begin{code}
 match :: [Id]		  -- Variables rep'ing the exprs we're matching with
+      -> Type             -- Type of the case expression
       -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
       -> DsM MatchResult  -- Desugared result!
 \end{code}
@@ -239,11 +239,13 @@ than the Wadler-chapter code for @match@ (p.~93, first @match@ clause).
 And gluing the ``success expressions'' together isn't quite so pretty.
 
 \begin{code}
-match [] eqns_info
-  = returnDs (foldr1 combineMatchResults match_results)
+match [] ty eqns_info
+  = ASSERT( not (null eqns_info) )
+    returnDs (foldr1 combineMatchResults match_results)
   where
-    match_results = [ ASSERT( null pats) mr
-		    | EqnInfo _ _ pats mr <- eqns_info ]
+    match_results = [ ASSERT( null (eqn_pats eqn) ) 
+		      eqn_rhs eqn
+		    | eqn <- eqns_info ]
 \end{code}
 
 
@@ -266,27 +268,39 @@ Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
 corresponds roughly to @matchVarCon@.
 
 \begin{code}
-match vars@(v:vs) eqns_info
-  = mappM (tidyEqnInfo v) eqns_info	`thenDs` \ tidy_eqns_info ->
-    let
-	tidy_eqns_blks = unmix_eqns tidy_eqns_info
-    in
-    mappM (matchEqnBlock vars) tidy_eqns_blks	`thenDs` \ match_results ->
-    returnDs (foldr1 combineMatchResults match_results)
+match vars@(v:_) ty eqns_info
+  = do	{ tidy_eqns <- mappM (tidyEqnInfo v) eqns_info
+	; let eqns_blks = runs same_family tidy_eqns
+	; match_results <- mappM match_block eqns_blks
+	; ASSERT( not (null match_results) )
+	  return (foldr1 combineMatchResults match_results) }
   where
-    unmix_eqns []    = []
-    unmix_eqns [eqn] = [ [eqn] ]
-    unmix_eqns (eq1@(EqnInfo _ _ (p1:p1s) _) : eq2@(EqnInfo _ _ (p2:p2s) _) : eqs)
-      = if (  (isWildPat p1 && isWildPat p2)
-	   || (isConPat  p1 && isConPat  p2)
-	   || (isLitPat  p1 && isLitPat  p2) ) then
-	    eq1 `tack_onto` unmixed_rest
-	else
-	    [ eq1 ] : unmixed_rest
-      where
-	unmixed_rest = unmix_eqns (eq2:eqs)
+    same_family eqn1 eqn2 
+      = samePatFamily (firstPat eqn1) (firstPat eqn2)
+ 
+    match_block eqns
+      = case firstPat (head eqns) of
+	  WildPat {}      -> matchVariables  vars ty eqns
+	  ConPatOut {}    -> matchConFamily  vars ty eqns
+	  NPlusKPatOut {} -> matchNPlusKPats vars ty eqns
+	  NPatOut {}	  -> matchNPats	     vars ty eqns
+	  LitPat {}	  -> matchLiterals   vars ty eqns
 
-	x `tack_onto` xss   = ( x : head xss) : tail xss
+-- After tidying, there are only five kinds of patterns
+samePatFamily (WildPat {})	(WildPat {})	  = True
+samePatFamily (ConPatOut {})	(ConPatOut {})	  = True
+samePatFamily (NPlusKPatOut {}) (NPlusKPatOut {}) = True
+samePatFamily (NPatOut {})	(NPatOut {}) 	  = True
+samePatFamily (LitPat {})       (LitPat {})	  = True
+samePatFamily _			_		  = False
+
+matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+-- Real true variables, just like in matchVar, SLPJ p 94
+-- No binding to do: they'll all be wildcards by now (done in tidy)
+matchVariables (var:vars) ty eqns = match vars ty (shiftEqns eqns)
+\end{code}
+
+
 \end{code}
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
@@ -326,7 +340,8 @@ Float, 	Double, at least) are converted to unboxed form; e.g.,
 
 \begin{code}
 tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
-	-- DsM'd because of internal call to "match".
+	-- DsM'd because of internal call to dsHsNestedBinds
+	-- 	and mkSelectorBinds.
 	-- "tidy1" does the interesting stuff, looking at
 	-- one pattern and fiddling the list of bindings.
 	--
@@ -336,21 +351,31 @@ tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
 	--	NPat
 	--	LitPat
 	--	NPlusKPat
-	--	SigPat
 	-- but no other
 
-tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
-  = tidy1 v pat match_result	`thenDs` \ (pat', match_result') ->
-    returnDs (EqnInfo n ctx (pat' : pats) match_result')
-
+tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats, eqn_rhs = rhs })
+  = tidy1 v pat rhs 	`thenDs` \ (pat', rhs') ->
+    returnDs (eqn { eqn_pats = pat' : pats, eqn_rhs = rhs' })
 
 tidy1 :: Id 			-- The Id being scrutinised
       -> Pat Id 		-- The pattern against which it is to be matched
-      -> MatchResult		-- Current thing do do after matching
+      -> MatchResult		-- What to do afterwards
       -> DsM (Pat Id, 		-- Equivalent pattern
-	      MatchResult)	-- Augmented thing to do afterwards
-				-- The augmentation usually takes the form
-				-- of new bindings to be added to the front
+	      MatchResult)	-- Extra bindings around what to do afterwards
+
+-- The extra bindings etc are all wrapped around the RHS of the match
+-- so they are only available when matching is complete.  But that's ok
+-- becuase, for example, in the pattern x@(...), the x can only be
+-- used in the RHS, not in the nested pattern, nor subsquent patterns
+--
+-- However this does have an awkward consequence.  The bindings in 
+-- a VarPatOut get wrapped around the result in right to left order,
+-- rather than left to right.  This only matters if one set of 
+-- bindings can mention things used in another, and that can happen
+-- if we allow equality dictionary bindings of form d1=d2.  
+-- bindIInstsOfLocalFuns is now careful not to do this, but it's a wart.
+-- (Without this care in bindInstsOfLocalFuns, compiling 
+-- Data.Generics.Schemes.hs fails in function everywhereBut.)
 
 -------------------------------------------------------
 --	(pat', mr') = tidy1 v pat mr
@@ -358,33 +383,31 @@ tidy1 :: Id 			-- The Id being scrutinised
 -- It eliminates many pattern forms (as-patterns, variable patterns,
 -- list patterns, etc) yielding one of:
 --	WildPat
---	ConPat
+--	ConPatOut
 --	LitPat
 --	NPat
 --	NPlusKPat
---
 
-tidy1 v (ParPat pat) match_result 
-  = tidy1 v (unLoc pat) match_result
+tidy1 v (ParPat pat)      wrap = tidy1 v (unLoc pat) wrap 
+tidy1 v (SigPatOut pat _) wrap = tidy1 v (unLoc pat) wrap 
+tidy1 v (WildPat ty)      wrap = returnDs (WildPat ty, wrap)
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
-tidy1 v (VarPat var) match_result
-  = returnDs (WildPat (idType var), match_result')
-  where
-    match_result' | v == var  = match_result
-		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
+tidy1 v (VarPat var) rhs
+  = returnDs (WildPat (idType var), bindOneInMatchResult var v rhs)
+
+tidy1 v (VarPatOut var binds) rhs
+  = do	{ prs <- dsHsNestedBinds binds
+	; return (WildPat (idType var), 
+		  bindOneInMatchResult var v $
+		  mkCoLetMatchResult (Rec prs) rhs) }
 
 	-- case v of { x@p -> mr[] }
 	-- = case v of { p -> let x=v in mr[] }
-tidy1 v (AsPat (L _ var) pat) match_result
-  = tidy1 v (unLoc pat) match_result'
-  where
-    match_result' | v == var  = match_result
-		  | otherwise = adjustMatchResult (bindNonRec var (Var v)) match_result
+tidy1 v (AsPat (L _ var) pat) rhs
+  = tidy1 v (unLoc pat) (bindOneInMatchResult var v rhs)
 
-tidy1 v (WildPat ty) match_result
-  = returnDs (WildPat ty, match_result)
 
 {- now, here we handle lazy patterns:
     tidy1 v ~p bs = (v, v1 = case v of p -> v1 :
@@ -397,90 +420,93 @@ tidy1 v (WildPat ty) match_result
     The case expr for v_i is just: match [v] [(p, [], \ x -> Var v_i)] any_expr
 -}
 
-tidy1 v (LazyPat pat) match_result
-  = mkSelectorBinds pat (Var v)		`thenDs` \ sel_binds ->
-    returnDs (WildPat (idType v),
-	      mkCoLetsMatchResult [NonRec b rhs | (b,rhs) <- sel_binds] match_result)
+tidy1 v (LazyPat pat) rhs
+  = do	{ v' <- newSysLocalDs (idType v)
+	; sel_prs <- mkSelectorBinds pat (Var v)
+	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
+	; returnDs (WildPat (idType v), 
+		    bindOneInMatchResult v' v $
+		    mkCoLetsMatchResult sel_binds rhs) }
 
 -- re-express <con-something> as (ConPat ...) [directly]
 
-tidy1 v (ConPatOut con ps pat_ty ex_tvs dicts) match_result
-  = returnDs (ConPatOut con tidy_ps pat_ty ex_tvs dicts, match_result)
+tidy1 v (ConPatOut con ex_tvs dicts binds ps pat_ty) rhs
+  = returnDs (ConPatOut con ex_tvs dicts binds tidy_ps pat_ty, rhs)
   where
-    tidy_ps = PrefixCon (tidy_con con pat_ty ex_tvs ps)
+    tidy_ps = PrefixCon (tidy_con con pat_ty ps)
 
-tidy1 v (ListPat pats ty) match_result
-  = returnDs (unLoc list_ConPat, match_result)
+tidy1 v (ListPat pats ty) rhs
+  = returnDs (unLoc list_ConPat, rhs)
   where
     list_ty     = mkListTy ty
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
 	      	  	(mkNilPat list_ty)
 	      	  	pats
 
--- introduce fake parallel array constructors to be able to handle parallel
+-- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
---
-tidy1 v (PArrPat pats ty) match_result
-  = returnDs (unLoc parrConPat, match_result)
+tidy1 v (PArrPat pats ty) rhs
+  = returnDs (unLoc parrConPat, rhs)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
-tidy1 v (TuplePat pats boxity) match_result
-  = returnDs (unLoc tuple_ConPat, match_result)
+tidy1 v (TuplePat pats boxity) rhs
+  = returnDs (unLoc tuple_ConPat, rhs)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats
 				  (mkTupleTy boxity arity (map hsPatType pats))
 
-tidy1 v (DictPat dicts methods) match_result
+tidy1 v (DictPat dicts methods) rhs
   = case num_of_d_and_ms of
-	0 -> tidy1 v (TuplePat [] Boxed) match_result
-	1 -> tidy1 v (unLoc (head dict_and_method_pats)) match_result
-	_ -> tidy1 v (TuplePat dict_and_method_pats Boxed) match_result
+	0 -> tidy1 v (TuplePat [] Boxed) rhs
+	1 -> tidy1 v (unLoc (head dict_and_method_pats)) rhs
+	_ -> tidy1 v (TuplePat dict_and_method_pats Boxed) rhs
   where
     num_of_d_and_ms	 = length dicts + length methods
     dict_and_method_pats = map nlVarPat (dicts ++ methods)
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 v pat@(LitPat lit) match_result
-  = returnDs (unLoc (tidyLitPat lit (noLoc pat)), match_result)
+tidy1 v pat@(LitPat lit) rhs
+  = returnDs (unLoc (tidyLitPat lit (noLoc pat)), rhs)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v pat@(NPatOut lit lit_ty _) match_result
-  = returnDs (unLoc (tidyNPat lit lit_ty (noLoc pat)), match_result)
+tidy1 v pat@(NPatOut lit lit_ty _) rhs
+  = returnDs (unLoc (tidyNPat lit lit_ty (noLoc pat)), rhs)
 
 -- and everything else goes through unchanged...
 
-tidy1 v non_interesting_pat match_result
-  = returnDs (non_interesting_pat, match_result)
+tidy1 v non_interesting_pat rhs
+  = returnDs (non_interesting_pat, rhs)
 
 
-tidy_con data_con pat_ty ex_tvs (PrefixCon ps)   = ps
-tidy_con data_con pat_ty ex_tvs (InfixCon p1 p2) = [p1,p2]
-tidy_con data_con pat_ty ex_tvs (RecCon rpats)
+tidy_con data_con pat_ty (PrefixCon ps)   = ps
+tidy_con data_con pat_ty (InfixCon p1 p2) = [p1,p2]
+tidy_con data_con pat_ty (RecCon rpats)
   | null rpats
   =	-- Special case for C {}, which can be used for 
 	-- a constructor that isn't declared to have
 	-- fields at all
-    map (noLoc.WildPat) con_arg_tys'
+    map (noLoc . WildPat) con_arg_tys'
 
   | otherwise
-  = map mk_pat tagged_arg_tys
+  = ASSERT( isVanillaDataCon data_con )
+	-- We're in a record case, so the data con must be vanilla
+	-- and hence no existentials to worry about
+    map mk_pat tagged_arg_tys
   where
 	-- Boring stuff to find the arg-tys of the constructor
+	
     inst_tys         = tcTyConAppArgs pat_ty	-- Newtypes must be opaque
-    con_arg_tys'     = dataConInstOrigArgTys data_con (inst_tys ++ mkTyVarTys ex_tvs)
-    tagged_arg_tys   = con_arg_tys' `zip` (dataConFieldLabels data_con)
+    con_arg_tys'     = dataConInstOrigArgTys data_con inst_tys
+    tagged_arg_tys   = con_arg_tys' `zip` dataConFieldLabels data_con
 
 	-- mk_pat picks a WildPat of the appropriate type for absent fields,
 	-- and the specified pattern for present fields
     mk_pat (arg_ty, lbl) = 
-	case [ pat | (sel_id,pat) <- rpats,
-		     recordSelectorFieldLabel (unLoc sel_id) == lbl
-	     ] of
-	  (pat:pats) -> ASSERT( null pats )
-	  		pat
+	case [ pat | (sel_id,pat) <- rpats, idName (unLoc sel_id) == lbl] of
+	  (pat:pats) -> ASSERT( null pats ) pat
 	  []	     -> noLoc (WildPat arg_ty)
 \end{code}
 
@@ -551,91 +577,6 @@ Presumably just a variant on the constructor case (as it is now).
 
 %************************************************************************
 %*									*
-%* match on an unmixed block: the real business				*
-%*									*
-%************************************************************************
-\subsection[matchEqnBlock]{@matchEqnBlock@: getting down to business}
-
-The function @matchEqnBlock@ is where the matching stuff sets to
-work a block of equations, to which the mixture rule has been applied.
-Its arguments and results are the same as for the ``top-level'' @match@.
-
-\begin{code}
-matchEqnBlock :: [Id]
-	      -> [EquationInfo]
-	      -> DsM MatchResult
-
-matchEqnBlock [] _ = panic "matchEqnBlock: no names"
-
-matchEqnBlock all_vars@(var:vars) eqns_info 
-  | isWildPat first_pat
-  = ASSERT( all isWildPat column_1_pats )	-- Sanity check
-  	-- Real true variables, just like in matchVar, SLPJ p 94
-	-- No binding to do: they'll all be wildcards by now (done in tidy)
-    match vars remaining_eqns_info
-
-  | isConPat first_pat
-  = ASSERT( patsAreAllCons column_1_pats )
-    matchConFamily all_vars eqns_info 
-
-  | isLitPat first_pat
-  = ASSERT( patsAreAllLits column_1_pats )
-  	-- see notes in MatchLiteral
-	-- not worried about the same literal more than once in a column
-	-- (ToDo: sort this out later)
-    matchLiterals all_vars eqns_info
-
-  | isSigPat first_pat
-  = ASSERT( isSingleton eqns_info )
-    matchSigPat all_vars (head eqns_info)
-  where
-    first_pat		= head column_1_pats
-    column_1_pats 	= [pat		                   | EqnInfo _ _   (pat:_)  _            <- eqns_info]
-    remaining_eqns_info = [EqnInfo n ctx pats match_result | EqnInfo n ctx (_:pats) match_result <- eqns_info]
-\end{code}
-
-A SigPat is a type coercion and must be handled one at at time.  We can't
-combine them unless the type of the pattern inside is identical, and we don't
-bother to check for that.  For example:
-
-	data T = T1 Int | T2 Bool
-	f :: (forall a. a -> a) -> T -> t
-	f (g::Int->Int)   (T1 i) = T1 (g i)
-	f (g::Bool->Bool) (T2 b) = T2 (g b)
-
-We desugar this as follows:
-
-	f = \ g::(forall a. a->a) t::T ->
-	    let gi = g Int
-	    in case t of { T1 i -> T1 (gi i)
-			   other ->
-	    let	gb = g Bool
-	    in case t of { T2 b -> T2 (gb b)
-			   other -> fail }}
-
-Note that we do not treat the first column of patterns as a
-column of variables, because the coerced variables (gi, gb)
-would be of different types.  So we get rather grotty code.
-But I don't think this is a common case, and if it was we could
-doubtless improve it.
-
-Meanwhile, the strategy is:
-	* treat each SigPat coercion (always non-identity coercions)
-		as a separate block
-	* deal with the stuff inside, and then wrap a binding round
-		the result to bind the new variable (gi, gb, etc)
-
-\begin{code}
-matchSigPat :: [Id] -> EquationInfo -> DsM MatchResult
-matchSigPat (var:vars) (EqnInfo n ctx (SigPatOut pat ty co_fn : pats) result)
-  = selectMatchVarL pat						`thenDs` \ new_var ->
-    dsExpr (HsApp (noLoc co_fn) (nlHsVar var))		`thenDs` \ rhs ->
-    match (new_var:vars) [EqnInfo n ctx (unLoc pat:pats) result] `thenDs` \ result' ->
-    returnDs (adjustMatchResult (bindNonRec new_var rhs) result')
-\end{code}	
-
-%************************************************************************
-%*									*
 %*  matchWrapper: a convenient way to call @match@			*
 %*									*
 %************************************************************************
@@ -680,7 +621,7 @@ Call @match@ with all of this information!
 
 \begin{code}
 matchWrapper :: HsMatchContext Name	-- For shadowing warning messages
-	     -> [LMatch Id]		-- Matches being desugared
+	     -> MatchGroup Id		-- Matches being desugared
 	     -> DsM ([Id], CoreExpr) 	-- Results
 \end{code}
 
@@ -707,24 +648,35 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 
 \begin{code}
-matchWrapper ctxt matches
-  = getDOptsDs					`thenDs` \ dflags ->
-    flattenMatches ctxt matches			`thenDs` \ (result_ty, eqns_info) ->
-    let
-	EqnInfo _ _ arg_pats _ : _ = eqns_info
-	error_string = matchContextErrString ctxt
-    in
-    mappM selectMatchVar arg_pats		`thenDs` \ new_vars ->
-    match_fun dflags new_vars eqns_info 	`thenDs` \ match_result ->
+matchWrapper ctxt (MatchGroup matches match_ty)
+  = do	{ eqns_info <- mapM mk_eqn_info matches
+	; dflags <- getDOptsDs
+	; locn <- getSrcSpanDs
+	; let   ds_ctxt      = DsMatchContext ctxt arg_pats locn
+		error_string = matchContextErrString ctxt
 
-    mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->
-    extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
-    returnDs (new_vars, result_expr)
-  where match_fun dflags
-           = case ctxt of 
-                LambdaExpr | dopt Opt_WarnSimplePatterns dflags -> matchExport 
-                           | otherwise                          -> match
-                _                                               -> matchExport
+	; new_vars     <- selectMatchVars arg_pats pat_tys
+	; match_result <- match_fun dflags ds_ctxt new_vars rhs_ty eqns_info
+
+	; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_string
+	; result_expr <- extractMatchResult match_result fail_expr
+	; return (new_vars, result_expr) }
+  where 
+    arg_pats          = map unLoc (hsLMatchPats (head matches))
+    n_pats	      = length arg_pats
+    (pat_tys, rhs_ty) = splitFunTysN n_pats match_ty
+
+    mk_eqn_info (L _ (Match pats _ grhss))
+      = do { let upats = map unLoc pats
+	   ; match_result <- dsGRHSs ctxt upats grhss rhs_ty
+	   ; return (EqnInfo { eqn_pats = upats, 
+			       eqn_rhs = match_result}) }
+
+    match_fun dflags ds_ctxt
+       = case ctxt of 
+           LambdaExpr | dopt Opt_WarnSimplePatterns dflags -> matchCheck ds_ctxt
+                      | otherwise                          -> match
+           _                                               -> matchCheck ds_ctxt
 \end{code}
 
 %************************************************************************
@@ -750,54 +702,27 @@ matchSimply scrut kind pat result_expr fail_expr
     let
       ctx 	   = DsMatchContext kind [unLoc pat] locn
       match_result = cantFailMatchResult result_expr
+      rhs_ty	   = exprType fail_expr
+	-- Use exprType of fail_expr, because won't refine in the case of failure!
     in 
-    matchSinglePat scrut ctx pat match_result	`thenDs` \ match_result' ->
+    matchSinglePat scrut ctx pat rhs_ty match_result	`thenDs` \ match_result' ->
     extractMatchResult match_result' fail_expr
 
 
 matchSinglePat :: CoreExpr -> DsMatchContext -> LPat Id
-	       -> MatchResult -> DsM MatchResult
-
-matchSinglePat (Var var) ctx pat match_result
+	       -> Type -> MatchResult -> DsM MatchResult
+matchSinglePat (Var var) ctx pat ty match_result
   = getDOptsDs					`thenDs` \ dflags ->
-    match_fn dflags [var] [EqnInfo 1 ctx [unLoc pat] match_result]
+    match_fn dflags [var] ty [EqnInfo { eqn_pats = [unLoc pat],
+					eqn_rhs  = match_result }]
   where
     match_fn dflags
-       | dopt Opt_WarnSimplePatterns dflags = matchExport
+       | dopt Opt_WarnSimplePatterns dflags = matchCheck ctx
        | otherwise	                    = match
 
-matchSinglePat scrut ctx pat match_result
-  = selectMatchVarL pat		 	 		`thenDs` \ var ->
-    matchSinglePat (Var var) ctx pat match_result	`thenDs` \ match_result' ->
+matchSinglePat scrut ctx pat ty match_result
+  = selectSimpleMatchVarL pat 		 		`thenDs` \ var ->
+    matchSinglePat (Var var) ctx pat ty match_result	`thenDs` \ match_result' ->
     returnDs (adjustMatchResult (bindNonRec var scrut) match_result')
 \end{code}
 
-%************************************************************************
-%*									*
-%*  flattenMatches : create a list of EquationInfo			*
-%*									*
-%************************************************************************
-
-\subsection[flattenMatches]{@flattenMatches@: create @[EquationInfo]@}
-
-This is actually local to @matchWrapper@.
-
-\begin{code}
-flattenMatches :: HsMatchContext Name
-	       -> [LMatch Id]
-	       -> DsM (Type, [EquationInfo])
-
-flattenMatches kind matches
-  = mapAndUnzipDs flatten_match (matches `zip` [1..])	`thenDs` \ (result_tys, eqn_infos) ->
-    let
-	result_ty = head result_tys
-    in
-    ASSERT( all (tcEqType result_ty) result_tys )
-    returnDs (result_ty, eqn_infos)
-  where
-    flatten_match (L _ (Match pats _ grhss), n)
-      = dsGRHSs kind upats grhss	`thenDs` \ (ty, match_result) ->
-        getSrcSpanDs				`thenDs` \ locn ->
-	returnDs (ty, EqnInfo n (DsMatchContext kind upats locn) upats match_result)
-	where upats = map unLoc pats
-\end{code}

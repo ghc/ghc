@@ -90,6 +90,7 @@ import Var		( Id, DictId,
 			  globalIdDetails
 			)
 import qualified Var	( mkLocalId, mkGlobalId, mkSpecPragmaId, mkExportedLocalId )
+import TyCon		( FieldLabel, TyCon )
 import Type		( Type, typePrimRep, addFreeTyVars, seqType, 
 			  splitTyConApp_maybe, PrimRep )
 import TysPrim		( statePrimTyCon )
@@ -106,7 +107,6 @@ import Name	 	( Name, OccName, nameIsLocalOrFrom,
 			) 
 import Module		( Module )
 import OccName		( EncodedFS, mkWorkerOcc )
-import FieldLabel	( FieldLabel )
 import Maybes		( orElse )
 import SrcLoc		( SrcLoc )
 import Outputable
@@ -239,13 +239,13 @@ Meanwhile, it is not discarded as dead code.
 
 
 \begin{code}
-recordSelectorFieldLabel :: Id -> FieldLabel
+recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
 recordSelectorFieldLabel id = case globalIdDetails id of
-				 RecordSelId lbl -> lbl
+				 RecordSelId tycon lbl -> (tycon,lbl)
 				 other -> panic "recordSelectorFieldLabel"
 
 isRecordSelector id = case globalIdDetails id of
-			RecordSelId lbl -> True
+			RecordSelId _ _ -> True
 			other	  	-> False
 
 isPrimOpId id = case globalIdDetails id of
@@ -290,7 +290,7 @@ isImplicitId :: Id -> Bool
 	-- file, even if it's mentioned in some other interface unfolding.
 isImplicitId id
   = case globalIdDetails id of
-	RecordSelId _   -> True
+	RecordSelId _ _ -> True
         FCallId _       -> True
         PrimOpId _      -> True
 	ClassOpId _	-> True

@@ -333,6 +333,8 @@ ifacedecl :: { HsDecl RdrName }
  		{ let (tc,tvs) = $2 in TyClD (TySynonym tc tvs $4) }
 	| 'data' tycl_hdr constrs	-- No deriving in hi-boot
 		{ TyClD (mkTyData DataType (unLoc $2) (reverse (unLoc $3)) Nothing) }
+        | 'data' tycl_hdr 'where' gadt_constrlist	
+		{ TyClD (mkTyData DataType (unLoc $2) (reverse (unLoc $4)) Nothing) }
 	| 'newtype' tycl_hdr 		-- Constructor is optional
 		{ TyClD (mkTyData NewType (unLoc $2) [] Nothing) }
 	| 'newtype' tycl_hdr '=' newconstr
@@ -454,6 +456,10 @@ tycl_decl :: { LTyClDecl RdrName }
 	| 'data' tycl_hdr constrs deriving
 		{ L (comb4 $1 $2 $3 $4)
 		    (mkTyData DataType (unLoc $2) (reverse (unLoc $3)) (unLoc $4)) }
+
+        | 'data' tycl_hdr 'where' gadt_constrlist	-- No deriving for GADTs
+		{ L (comb4 $1 $2 $3 $4)
+		    (mkTyData DataType (unLoc $2) (reverse (unLoc $4)) Nothing) }
 
 	| 'newtype' tycl_hdr '=' newconstr deriving
 		{ L (comb3 $1 $4 $5)
@@ -742,6 +748,10 @@ sig_vars :: { Located [Located RdrName] }
 -----------------------------------------------------------------------------
 -- Types
 
+strict_mark :: { Located HsBang }
+	: '!'				{ L1 HsStrict }
+	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
+
 -- A ctype is a for-all type
 ctype	:: { LHsType RdrName }
 	: 'forall' tv_bndrs '.' ctype	{ LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
@@ -773,6 +783,7 @@ btype :: { LHsType RdrName }
 atype :: { LHsType RdrName }
 	: gtycon			{ L1 (HsTyVar (unLoc $1)) }
 	| tyvar				{ L1 (HsTyVar (unLoc $1)) }
+	| strict_mark atype		{ LL (HsBangTy (unLoc $1) $2) }
 	| '(' type ',' comma_types1 ')'	{ LL $ HsTupleTy Boxed  ($2:$4) }
 	| '(#' comma_types1 '#)'	{ LL $ HsTupleTy Unboxed $2     }
 	| '[' type ']'			{ LL $ HsListTy  $2 }
@@ -787,7 +798,7 @@ atype :: { LHsType RdrName }
 -- It's kept as a single type, with a MonoDictTy at the right
 -- hand corner, for convenience.
 inst_type :: { LHsType RdrName }
-	: ctype				{% checkInstType $1 }
+	: sigtype			{% checkInstType $1 }
 
 inst_types1 :: { [LHsType RdrName] }
 	: inst_type			{ [$1] }
@@ -841,11 +852,21 @@ akind	:: { Kind }
 -- Datatype declarations
 
 newconstr :: { LConDecl RdrName }
-	: conid atype	{ LL $ ConDecl $1 [] (noLoc []) 
-				(PrefixCon [(unbangedType $2)]) }
+	: conid atype	{ LL $ ConDecl $1 [] (noLoc []) (PrefixCon [$2]) }
 	| conid '{' var '::' ctype '}'
-			{ LL $ ConDecl $1 [] (noLoc []) 
-				  (RecCon [($3, (unbangedType $5))]) }
+			{ LL $ ConDecl $1 [] (noLoc []) (RecCon [($3, $5)]) }
+
+gadt_constrlist :: { Located [LConDecl RdrName] }
+	: '{'            gadt_constrs '}'	{ LL (unLoc $2) }
+	|     vocurly    gadt_constrs close	{ $2 }
+
+gadt_constrs :: { Located [LConDecl RdrName] }
+        : gadt_constrs ';' gadt_constr  { LL ($3 : unLoc $1) }
+        | gadt_constr                   { L1 [$1] } 
+
+gadt_constr :: { LConDecl RdrName }
+        : qcon '::' sigtype
+              { LL (GadtDecl $1 $3) } 
 
 constrs :: { Located [LConDecl RdrName] }
         : {- empty; a GHC extension -}  { noLoc [] }
@@ -868,39 +889,24 @@ forall :: { Located [LHsTyVarBndr RdrName] }
 	| {- empty -}			{ noLoc [] }
 
 constr_stuff :: { Located (Located RdrName, HsConDetails RdrName (LBangType RdrName)) }
+-- We parse the constructor declaration 
+--	C t1 t2
+-- as a btype (treating C as a type constructor) and then convert C to be
+-- a data constructor.  Reason: it might continue like this:
+--	C t1 t2 %: D Int
+-- in which case C really would be a type constructor.  We can't resolve this
+-- ambiguity till we come across the constructor oprerator :% (or not, more usually)
 	: btype				{% mkPrefixCon $1 [] >>= return.LL }
-	| btype bang_atype satypes	{% do { r <- mkPrefixCon $1 ($2 : unLoc $3);
-					        return (L (comb3 $1 $2 $3) r) } }
 	| oqtycon '{' '}' 		{% mkRecCon $1 [] >>= return.LL }
 	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.LL }
-	| sbtype conop sbtype		{ LL ($2, InfixCon $1 $3) }
-
-bang_atype :: { LBangType RdrName }
-	: strict_mark atype		{ LL (BangType (unLoc $1) $2) }
-
-satypes	:: { Located [LBangType RdrName] }
-	: atype satypes			{ LL (unbangedType $1 : unLoc $2) }
-	| bang_atype satypes		{ LL ($1 : unLoc $2) }
-	| {- empty -}			{ noLoc [] }
-
-sbtype :: { LBangType RdrName }
-	: btype				{ unbangedType $1 }
-	| strict_mark atype		{ LL (BangType (unLoc $1) $2) }
+	| btype conop btype		{ LL ($2, InfixCon $1 $3) }
 
 fielddecls :: { [([Located RdrName], LBangType RdrName)] }
 	: fielddecl ',' fielddecls	{ unLoc $1 : $3 }
 	| fielddecl			{ [unLoc $1] }
 
 fielddecl :: { Located ([Located RdrName], LBangType RdrName) }
-	: sig_vars '::' stype		{ LL (reverse (unLoc $1), $3) }
-
-stype :: { LBangType RdrName }
-	: ctype				{ unbangedType $1 }
-	| strict_mark atype		{ LL (BangType (unLoc $1) $2) }
-
-strict_mark :: { Located HsBang }
-	: '!'				{ L1 HsStrict }
-	| '{-# UNPACK' '#-}' '!'	{ LL HsUnbox }
+	: sig_vars '::' ctype		{ LL (reverse (unLoc $1), $3) }
 
 -- We allow the odd-looking 'inst_type' in a deriving clause, so that
 -- we can do deriving( forall a. C [a] ) in a newtype (GHC extension).
@@ -945,8 +951,8 @@ decl 	:: { Located (OrdList (LHsDecl RdrName)) }
 						return (LL $ unitOL (LL $ ValD r)) } }
 
 rhs	:: { Located (GRHSs RdrName) }
-	: '=' exp wherebinds	{ L (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) placeHolderType }
-	| gdrhs	wherebinds	{ LL $ GRHSs (reverse (unLoc $1)) (unLoc $2) placeHolderType }
+	: '=' exp wherebinds	{ L (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) }
+	| gdrhs	wherebinds	{ LL $ GRHSs (reverse (unLoc $1)) (unLoc $2) }
 
 gdrhs :: { Located [LGRHS RdrName] }
 	: gdrhs gdrh		{ LL ($2 : unLoc $1) }
@@ -993,12 +999,12 @@ infixexp :: { LHsExpr RdrName }
 exp10 :: { LHsExpr RdrName }
 	: '\\' aexp aexps opt_asig '->' exp	
 			{% checkPatterns ($2 : reverse $3) >>= \ ps -> 
-			   return (LL $ HsLam (LL $ Match ps $4
+			   return (LL $ HsLam (mkMatchGroup [LL $ Match ps $4
 					    (GRHSs (unguardedRHS $6) []
-							placeHolderType))) }
+							)])) }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
 	| 'if' exp 'then' exp 'else' exp	{ LL $ HsIf $2 $4 $6 }
-   	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (unLoc $4) }
+   	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
 	| '-' fexp				{ LL $ mkHsNegApp $2 }
 
   	| 'do' stmtlist			{% let loc = comb2 $1 $2 in
@@ -1192,8 +1198,7 @@ alt 	:: { LMatch RdrName }
 			    		    return (LL (Match [p] $2 (unLoc $3))) }
 
 alt_rhs :: { Located (GRHSs RdrName) }
-	: ralt wherebinds		{ LL (GRHSs (unLoc $1) (unLoc $2)
-						 placeHolderType) }
+	: ralt wherebinds		{ LL (GRHSs (unLoc $1) (unLoc $2)) }
 
 ralt :: { Located [LGRHS RdrName] }
 	: '->' exp			{ LL (unguardedRHS $2) }
@@ -1462,7 +1467,7 @@ special_sym : '!'	{ L1 FSLIT("!") }
 -----------------------------------------------------------------------------
 -- Data constructors
 
-qconid :: { Located RdrName }	-- Qualified or unqualifiedb
+qconid :: { Located RdrName }	-- Qualified or unqualified
 	: conid			{ $1 }
 	| QCONID		{ L1 $ mkQual dataName (getQCONID $1) }
 

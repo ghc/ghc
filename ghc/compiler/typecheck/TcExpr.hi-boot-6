@@ -10,6 +10,10 @@ tcCheckRho ::
        -> TcType.TcType
        -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
+tcInferRho :: 
+  	  HsExpr.LHsExpr Name.Name
+       -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id, TcType.TcType)
+
 tcMonoExpr :: 
   	  HsExpr.LHsExpr Name.Name
        -> TcUnify.Expected TcType.TcType

@@ -693,10 +693,13 @@ instance Binary IfaceExpr where
 	    putByte bh 4
 	    put_ bh ag
 	    put_ bh ah
-    put_ bh (IfaceCase ai aj ak) = do
+-- gaw 2004
+    put_ bh (IfaceCase ai aj al ak) = do
 	    putByte bh 5
 	    put_ bh ai
 	    put_ bh aj
+-- gaw 2004
+            put_ bh al
 	    put_ bh ak
     put_ bh (IfaceLet al am) = do
 	    putByte bh 6
@@ -734,8 +737,11 @@ instance Binary IfaceExpr where
 		      return (IfaceApp ag ah)
 	      5 -> do ai <- get bh
 		      aj <- get bh
+-- gaw 2004
+                      al <- get bh                   
 		      ak <- get bh
-		      return (IfaceCase ai aj ak)
+-- gaw 2004
+		      return (IfaceCase ai aj al ak)
 	      6 -> do al <- get bh
 		      am <- get bh
 		      return (IfaceLet al am)
@@ -874,7 +880,7 @@ instance Binary IfaceDecl where
 	    put_ bh idinfo
     put_ bh (IfaceForeign ae af) = 
 	error "Binary.put_(IfaceDecl): IfaceForeign"
-    put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7) = do
+    put_ bh (IfaceData a1 a2 a3 a4 a5 a6) = do
 	    putByte bh 2
 	    put_ bh a1
 	    put_ bh a2
@@ -882,7 +888,6 @@ instance Binary IfaceDecl where
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
-	    put_ bh a7
 
     put_ bh (IfaceSyn aq ar as at) = do
 	    putByte bh 3
@@ -914,8 +919,7 @@ instance Binary IfaceDecl where
 		    a4 <- get bh
 		    a5 <- get bh
 		    a6 <- get bh
-		    a7 <- get bh
-		    return (IfaceData a1 a2 a3 a4 a5 a6 a7)
+		    return (IfaceData a1 a2 a3 a4 a5 a6)
 	      3 -> do
 		    aq <- get bh
 		    ar <- get bh
@@ -942,37 +946,53 @@ instance Binary IfaceInst where
 
 instance Binary IfaceConDecls where
     put_ bh IfAbstractTyCon = putByte bh 0
-    put_ bh (IfDataTyCon cs) = do { putByte bh 1
-				  ; put_ bh cs }
+    put_ bh (IfDataTyCon st cs) = do { putByte bh 1
+				     ; put_ bh st
+				     ; put_ bh cs }
     put_ bh (IfNewTyCon c)  = do { putByte bh 2
 				  ; put_ bh c }
     get bh = do
 	    h <- getByte bh
 	    case h of
 	      0 -> return IfAbstractTyCon
-	      1 -> do aa <- get bh
-		      return (IfDataTyCon aa)
+	      1 -> do st <- get bh
+		      cs <- get bh
+		      return (IfDataTyCon st cs)
 	      _ -> do aa <- get bh
 		      return (IfNewTyCon aa)
 
 instance Binary IfaceConDecl where
-    put_ bh (IfaceConDecl a1 a2 a3 a4 a5 a6 a7) = do
+    put_ bh (IfVanillaCon a1 a2 a3 a4 a5) = do
+	    putByte bh 0
+	    put_ bh a1
+	    put_ bh a2
+	    put_ bh a3
+	    put_ bh a4
+	    put_ bh a5
+    put_ bh (IfGadtCon a1 a2 a3 a4 a5 a6) = do
+	    putByte bh 1
 	    put_ bh a1
 	    put_ bh a2
 	    put_ bh a3
 	    put_ bh a4
 	    put_ bh a5
 	    put_ bh a6
-	    put_ bh a7
     get bh = do
-	    a1 <- get bh
-	    a2 <- get bh
-	    a3 <- get bh
-	    a4 <- get bh
-	    a5 <- get bh
-	    a6 <- get bh
-	    a7 <- get bh
-	    return (IfaceConDecl a1 a2 a3 a4 a5 a6 a7)
+	    h <- getByte bh
+	    case h of
+	      0 -> do a1 <- get bh
+		      a2 <- get bh
+		      a3 <- get bh	      
+		      a4 <- get bh
+		      a5 <- get bh
+		      return (IfVanillaCon a1 a2 a3 a4 a5)
+	      _ -> do a1 <- get bh
+		      a2 <- get bh
+		      a3 <- get bh	      
+		      a4 <- get bh
+		      a5 <- get bh
+		      a6 <- get bh
+		      return (IfGadtCon a1 a2 a3 a4 a5 a6)
 
 instance Binary IfaceClassOp where
    put_ bh (IfaceClassOp n def ty) = do	

@@ -64,21 +64,14 @@ name = Util.global (value) :: IORef (ty); \
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
-#define ASSERTM(e) ASSERT(e) do
+#define ASSERTM(mbool) do { bool <- mbool; ASSERT(bool) return () }
+#define ASSERTM2(mbool,msg) do { bool <- mbool; ASSERT2(bool,msg) return () }
 #else
 #define ASSERT(e)      if False then error "ASSERT"  else
 #define ASSERT2(e,msg) if False then error "ASSERT2" else
 #define ASSERTM(e)
+#define ASSERTM2(e)
 #define WARN(e,msg)    if False then error "WARN"    else
-#endif
-
--- temporary usage assertion control KSW 2000-10
-#ifdef DO_USAGES
-#define UASSERT(e) ASSERT(e)
-#define UASSERT2(e,msg) ASSERT2(e,msg)
-#else
-#define UASSERT(e)
-#define UASSERT2(e,msg)
 #endif
 
 -- This #ifndef lets us switch off the "import FastString"

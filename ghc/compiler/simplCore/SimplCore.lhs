@@ -28,7 +28,7 @@ import SimplUtils	( simplBinders )
 import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
-import Subst		( mkInScopeSet )
+import VarEnv		( mkInScopeSet )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import Id		( idIsFrom, idSpecialisation, setIdSpecialisation )

@@ -39,7 +39,7 @@ import Name		( Name )
 import NameSet
 import NameEnv
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc )
+import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import CmdLineOpts	( DynFlag(..) )
 				-- Warn of unused for-all'd tyvars
 import Maybes		( seqMaybe )
@@ -155,7 +155,7 @@ rnSrcFixityDecls fix_decls
 
 rnFixityDecl :: FixityEnv -> LFixitySig RdrName -> RnM FixityEnv
 rnFixityDecl fix_env (L loc (FixitySig rdr_name fixity))
-  = addSrcSpan loc $
+  = setSrcSpan loc $
         -- GHC extension: look up both the tycon and data con 
 	-- for con-like things
 	-- If neither are in scope, report an error; otherwise
@@ -486,24 +486,50 @@ rnTyClDecl (ForeignType {tcdLName = name, tcdFoType = fo_type, tcdExtName = ext_
 	     emptyFVs)
 
 rnTyClDecl (TyData {tcdND = new_or_data, tcdCtxt = context, tcdLName = tycon,
-		       tcdTyVars = tyvars, tcdCons = condecls, 
-		       tcdDerivs = derivs})
-  = lookupLocatedTopBndrRn tycon	    	`thenM` \ tycon' ->
-    bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
-    rnContext data_doc context 			`thenM` \ context' ->
-    rn_derivs derivs 				`thenM` \ (derivs', deriv_fvs) ->
-    checkDupNames data_doc con_names	`thenM_`
-    rnConDecls (unLoc tycon') condecls	`thenM` \ condecls' ->
-    returnM (TyData {tcdND = new_or_data, tcdCtxt = context', tcdLName = tycon',
-		     tcdTyVars = tyvars', tcdCons = condecls', 
-		     tcdDerivs = derivs'}, 
-	     delFVs (map hsLTyVarName tyvars')	$
-	     extractHsCtxtTyNames context'	`plusFV`
-	     plusFVs (map conDeclFVs condecls') `plusFV`
-	     deriv_fvs)
+		    tcdTyVars = tyvars, tcdCons = condecls, 
+		    tcdDerivs = derivs})
+  | is_vanilla	-- Normal Haskell data type decl
+  = bindTyVarsRn data_doc tyvars		$ \ tyvars' ->
+    do	{ tycon' <- lookupLocatedTopBndrRn tycon
+	; context' <- rnContext data_doc context
+	; (derivs', deriv_fvs) <- rn_derivs derivs
+	; checkDupNames data_doc con_names
+	; condecls' <- rnConDecls (unLoc tycon') condecls
+	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', tcdLName = tycon',
+			   tcdTyVars = tyvars', tcdCons = condecls', 
+			   tcdDerivs = derivs'}, 
+		   delFVs (map hsLTyVarName tyvars')	$
+	     	   extractHsCtxtTyNames context'	`plusFV`
+	     	   plusFVs (map conDeclFVs condecls') `plusFV`
+	     	   deriv_fvs) }
+
+  | otherwise	-- GADT
+  = ASSERT( null (unLoc context) )
+    do	{ tycon' <- lookupLocatedTopBndrRn tycon
+	; tyvars' <- bindTyVarsRn data_doc tyvars 
+				  (\ tyvars' -> return tyvars')
+		-- For GADTs, the type variables in the declaration 
+		-- do not scope over the constructor signatures
+		-- 	data T a where { T1 :: forall b. b-> b }
+	; (derivs', deriv_fvs) <- rn_derivs derivs
+	; checkDupNames data_doc con_names
+	; condecls' <- rnConDecls (unLoc tycon') condecls
+	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], tcdLName = tycon',
+			   tcdTyVars = tyvars', tcdCons = condecls', 
+			   tcdDerivs = derivs'}, 
+	     	   plusFVs (map conDeclFVs condecls') `plusFV` deriv_fvs) }
+
   where
+    is_vanilla = case condecls of	-- Yuk
+		     [] 		   -> True
+		     L _ (ConDecl {}) : _  -> True
+		     other		   -> False
+
     data_doc = text "In the data type declaration for" <+> quotes (ppr tycon)
-    con_names = [ n | L _ (ConDecl n _ _ _) <- condecls ]
+    con_names = map con_names_helper condecls
+
+    con_names_helper (L _ (ConDecl n _ _ _)) = n
+    con_names_helper (L _ (GadtDecl n _)) = n
 
     rn_derivs Nothing   = returnM (Nothing, emptyFVs)
     rn_derivs (Just ds) = rnLHsTypes data_doc ds	`thenM` \ ds' -> 
@@ -608,13 +634,21 @@ rnConDecl (ConDecl name tvs cxt details)
   where
     doc = text "In the definition of data constructor" <+> quotes (ppr name)
 
+rnConDecl (GadtDecl name ty) 
+  = addLocM checkConName name		`thenM_` 
+    lookupLocatedTopBndrRn name		`thenM` \ new_name ->
+    rnHsSigType doc ty                  `thenM` \ new_ty ->
+    returnM (GadtDecl new_name new_ty)
+  where
+    doc = text "In the definition of data constructor" <+> quotes (ppr name)
+
 rnConDetails doc (PrefixCon tys)
-  = mappM (rnLBangTy doc) tys	`thenM` \ new_tys  ->
+  = mappM (rnLHsType doc) tys	`thenM` \ new_tys  ->
     returnM (PrefixCon new_tys)
 
 rnConDetails doc (InfixCon ty1 ty2)
-  = rnLBangTy doc ty1  		`thenM` \ new_ty1 ->
-    rnLBangTy doc ty2  		`thenM` \ new_ty2 ->
+  = rnLHsType doc ty1  		`thenM` \ new_ty1 ->
+    rnLHsType doc ty2  		`thenM` \ new_ty2 ->
     returnM (InfixCon new_ty1 new_ty2)
 
 rnConDetails doc (RecCon fields)
@@ -626,14 +660,8 @@ rnConDetails doc (RecCon fields)
 
 rnField doc (name, ty)
   = lookupLocatedTopBndrRn name	`thenM` \ new_name ->
-    rnLBangTy doc ty		`thenM` \ new_ty ->
+    rnLHsType doc ty		`thenM` \ new_ty ->
     returnM (new_name, new_ty) 
-
-rnLBangTy doc = wrapLocM (rnBangTy doc)
-
-rnBangTy doc (BangType s ty)
-  = rnLHsType doc ty		`thenM` \ new_ty ->
-    returnM (BangType s new_ty)
 
 -- This data decl will parse OK
 --	data T = a Int

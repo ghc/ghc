@@ -12,10 +12,10 @@ module Inst (
 
 	tidyInsts, tidyMoreInsts,
 
-	newDictsFromOld, newDicts, cloneDict, 
+	newDictsFromOld, newDicts, newDictsAtLoc, cloneDict, 
 	newOverloadedLit, newIPDict, 
 	newMethod, newMethodFromName, newMethodWithGivenTy, 
-	tcInstClassOp, tcInstCall, tcInstDataCon, 
+	tcInstClassOp, tcInstCall, tcInstStupidTheta,
 	tcSyntaxName, tcStdSyntaxName,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
@@ -53,38 +53,39 @@ import TcIface	( loadImportedInsts )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, 
 		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
-import TcType	( Type, TcType, TcThetaType, TcTyVarSet,
-		  PredType(..), TyVarDetails(VanillaTv), typeKind,
-		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
+import TcType	( Type, TcType, TcThetaType, TcTyVarSet, TcTyVar,
+		  PredType(..), typeKind,
+		  tcSplitForAllTys, tcSplitForAllTys, 
 		  tcSplitPhiTy, tcIsTyVarTy, tcSplitDFunTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
 		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tidyPred,
 		  isClassPred, isTyVarClassPred, isLinearPred, 
 		  getClassPredTys, getClassPredTys_maybe, mkPredName,
-		  isInheritablePred, isIPPred, matchTys,
+		  isInheritablePred, isIPPred, 
 		  tidyType, tidyTypes, tidyFreeTyVars, tcSplitSigmaTy, 
 		  pprPred, pprParendType, pprThetaArrow, pprTheta, pprClassPred
 		)
+import Type	( substTy, substTys, substTyWith, substTheta, zipTopTvSubst )
+import Unify	( matchTys )
 import Kind	( isSubKind )
 import HscTypes	( ExternalPackageState(..) )
 import CoreFVs	( idFreeTyVars )
-import DataCon	( DataCon,dataConSig )
+import DataCon	( DataCon, dataConTyVars, dataConStupidTheta, dataConName )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
 import PrelInfo	( isStandardClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName, getSrcLoc, isHomePackageName, isInternalName )
 import NameSet	( addOneToNameSet )
-import Subst	( substTy, substTyWith, substTheta, mkTopTyVarSubst )
 import Literal	( inIntRange )
 import Var	( TyVar, tyVarKind )
-import VarEnv	( TidyEnv, emptyTidyEnv, lookupSubstEnv, SubstResult(..) )
+import VarEnv	( TidyEnv, emptyTidyEnv, lookupVarEnv )
 import VarSet	( elemVarSet, emptyVarSet, unionVarSet, mkVarSet )
 import TysWiredIn ( floatDataCon, doubleDataCon )
 import PrelNames	( integerTyConName, fromIntegerName, fromRationalName, rationalTyConName )
 import BasicTypes( IPName(..), mapIPName, ipNameName )
 import UniqSupply( uniqsFromSupply )
 import SrcLoc	( mkSrcSpan, noLoc, unLoc, Located(..) )
-import CmdLineOpts( DynFlags, DynFlag( Opt_AllowUndecidableInstances ), dopt )
+import CmdLineOpts( DynFlags )
 import Maybes	( isJust )
 import Outputable
 \end{code}
@@ -267,53 +268,28 @@ newIPDict orig ip_name ty
 
 
 \begin{code}
-tcInstCall :: InstOrigin  -> TcType -> TcM (ExprCoFn, TcType)
+tcInstCall :: InstOrigin -> TcType -> TcM (ExprCoFn, [TcTyVar], TcType)
 tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
-  = tcInstType VanillaTv fun_ty	`thenM` \ (tyvars, theta, tau) ->
-    newDicts orig theta		`thenM` \ dicts ->
-    extendLIEs dicts		`thenM_`
-    let
-	inst_fn e = DictApp (mkHsTyApp (noLoc e) (mkTyVarTys tyvars)) (map instToId dicts)
-    in
-    returnM (mkCoercion inst_fn, tau)
+  = do	{ (tyvars, theta, tau) <- tcInstType fun_ty
+	; dicts <- newDicts orig theta
+	; extendLIEs dicts
+	; let inst_fn e = unLoc (mkHsDictApp (mkHsTyApp (noLoc e) (mkTyVarTys tyvars)) 
+				 	     (map instToId dicts))
+	; return (mkCoercion inst_fn, tyvars, tau) }
 
-tcInstDataCon :: InstOrigin
-	      -> TyVarDetails	-- Use this for the existential tyvars
-				-- ExistTv when pattern-matching, 
-				-- VanillaTv at a call of the constructor
-	      -> DataCon
-	      -> TcM ([TcType],	-- Types to instantiate at
-		      [Inst],	-- Existential dictionaries to apply to
-		      [TcType],	-- Argument types of constructor
-		      TcType,	-- Result type
-		      [TyVar])	-- Existential tyvars
-tcInstDataCon orig ex_tv_details data_con
-  = let 
-	(tvs, stupid_theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
-	     -- We generate constraints for the stupid theta even when 
-	     -- pattern matching (as the Report requires)
-    in
-    mappM (tcInstTyVar VanillaTv)     tvs	`thenM` \ tvs' ->
-    mappM (tcInstTyVar ex_tv_details) ex_tvs	`thenM` \ ex_tvs' ->
-    let
-	tv_tys'	   = mkTyVarTys tvs'
-	ex_tv_tys' = mkTyVarTys ex_tvs'
-	all_tys'   = tv_tys' ++ ex_tv_tys'
-
-	tenv          = mkTopTyVarSubst (tvs ++ ex_tvs) all_tys'
-	stupid_theta' = substTheta tenv stupid_theta
-	ex_theta'     = substTheta tenv ex_theta
-	arg_tys'      = map (substTy tenv) arg_tys
-	result_ty'    = mkTyConApp tycon tv_tys'
-    in
-    newDicts orig stupid_theta'	`thenM` \ stupid_dicts ->
-    newDicts orig ex_theta'	`thenM` \ ex_dicts ->
-
-	-- Note that we return the stupid theta *only* in the LIE;
-	-- we don't otherwise use it at all
-    extendLIEs stupid_dicts	`thenM_`
-
-    returnM (all_tys', ex_dicts, arg_tys', result_ty', ex_tvs')
+tcInstStupidTheta :: DataCon -> [TcType] -> TcM ()
+-- Instantiate the "stupid theta" of the data con, and throw 
+-- the constraints into the constraint set
+tcInstStupidTheta data_con inst_tys
+  | null stupid_theta
+  = return ()
+  | otherwise
+  = do	{ stupid_dicts <- newDicts (OccurrenceOf (dataConName data_con))
+				   (substTheta tenv stupid_theta)
+	; extendLIEs stupid_dicts }
+  where
+    stupid_theta = dataConStupidTheta data_con
+    tenv = zipTopTvSubst (dataConTyVars data_con) inst_tys
 
 newMethodFromName :: InstOrigin -> TcType -> Name -> TcM TcId
 newMethodFromName origin ty name
@@ -363,7 +339,7 @@ checkKind tv ty
 	  then return ()
 	  else do
 	{ traceTc (text "checkKind: adding kind constraint" <+> ppr tv <+> ppr ty)
-	; tv1 <- tcInstTyVar VanillaTv tv
+	; tv1 <- tcInstTyVar tv
 	; unifyTauTy (mkTyVarTy tv1) ty1 }}
 
 
@@ -542,8 +518,6 @@ pprDFuns dfuns = vcat [ hang (ppr (getSrcLoc dfun) <> colon)
 		      , let (_, theta, clas, tys) = tcSplitDFunTy (idType dfun) ]
 	-- Print without the for-all, which the programmer doesn't write
 
-show_uniq u = ifPprDebug (text "{-" <> ppr u <> text "-}")
-
 tidyInst :: TidyEnv -> Inst -> Inst
 tidyInst env (LitInst u lit ty loc) 	     = LitInst u lit (tidyType env ty) loc
 tidyInst env (Dict u pred loc)     	     = Dict u (tidyPred env pred) loc
@@ -592,7 +566,8 @@ addInst :: DynFlags -> InstEnv -> DFunId -> TcM InstEnv
 addInst dflags home_ie dfun
   = do	{ 	-- Load imported instances, so that we report
 		-- duplicates correctly
-	  pkg_ie  <- loadImportedInsts cls tys
+	  let (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
+	; pkg_ie  <- loadImportedInsts cls tys
 
 		-- Check functional dependencies
 	; case checkFunDeps (pkg_ie, home_ie) dfun of
@@ -600,9 +575,13 @@ addInst dflags home_ie dfun
 		Nothing    -> return ()
 
 		-- Check for duplicate instance decls
-	; let { (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys
+		-- We instantiate the dfun type because the instance lookup
+		-- requires nice fresh types in the thing to be looked up
+	; (tvs', _, tenv) <- tcInstTyVars tvs
+	; let { tys' = substTys tenv tys
+	      ; (matches, _) = lookupInstEnv dflags (pkg_ie, home_ie) cls tys'
 	      ;	dup_dfuns = [dup_dfun | (_, (_, dup_tys, dup_dfun)) <- matches,
-			  		isJust (matchTys (mkVarSet tvs) tys dup_tys)] }
+			  		isJust (matchTys (mkVarSet tvs) tys' dup_tys)] }
 		-- Find memebers of the match list which 
 		-- dfun itself matches. If the match is 2-way, it's a duplicate
 	; case dup_dfuns of
@@ -611,8 +590,7 @@ addInst dflags home_ie dfun
 
 		-- OK, now extend the envt
 	; return (extendInstEnv home_ie dfun) }
-  where
-    (tvs, _, cls, tys) = tcSplitDFunTy (idType dfun)
+
 
 traceDFuns dfuns
   = traceTc (text "Adding instances:" <+> vcat (map pp dfuns))
@@ -629,7 +607,7 @@ dupInstErr dfun dup_dfun
 	       2 (pprDFuns [dfun, dup_dfun]))
 
 addDictLoc dfun thing_inside
-  = addSrcSpan (mkSrcSpan loc loc) thing_inside
+  = setSrcSpan (mkSrcSpan loc loc) thing_inside
   where
    loc = getSrcLoc dfun
 \end{code}
@@ -717,7 +695,13 @@ lookupInst (Dict _ _ _) = returnM NoInstance
 
 -----------------
 instantiate_dfun tenv dfun_id pred loc
-  = traceTc (text "lookupInst success" <+> 
+  = -- tenv is a substitution that instantiates the dfun_id 
+    -- to match the requested result type.   However, the dfun
+    -- might have some tyvars that only appear in arguments
+    --	dfun :: forall a b. C a b, Ord b => D [a]
+    -- We instantiate b to a flexi type variable -- it'll presumably
+    -- become fixed later via functional dependencies
+    traceTc (text "lookupInst success" <+> 
 		vcat [text "dict" <+> ppr pred, 
 		      text "witness" <+> ppr dfun_id <+> ppr (idType dfun_id) ]) `thenM_`
 	-- Record that this dfun is needed
@@ -733,17 +717,17 @@ instantiate_dfun tenv dfun_id pred loc
     		    (topIdLvl dfun_id) use_stage		`thenM_`
     let
     	(tyvars, rho) = tcSplitForAllTys (idType dfun_id)
-    	mk_ty_arg tv  = case lookupSubstEnv tenv tv of
-    			   Just (DoneTy ty) -> returnM ty
-    			   Nothing 	    -> tcInstTyVar VanillaTv tv `thenM` \ tc_tv ->
-    					       returnM (mkTyVarTy tc_tv)
+    	mk_ty_arg tv  = case lookupVarEnv tenv tv of
+    			   Just ty -> returnM ty
+    			   Nothing -> tcInstTyVar tv `thenM` \ tc_tv ->
+    				      returnM (mkTyVarTy tc_tv)
     in
     mappM mk_ty_arg tyvars	`thenM` \ ty_args ->
     let
-    	dfun_rho   = substTy (mkTopTyVarSubst tyvars ty_args) rho
+    	dfun_rho   = substTy (zipTopTvSubst tyvars ty_args) rho
 		-- Since the tyvars are freshly made,
 		-- they cannot possibly be captured by
-		-- any existing for-alls.  Hence mkTopTyVarSubst
+		-- any existing for-alls.  Hence zipTopTyVarSubst
     	(theta, _) = tcSplitPhiTy dfun_rho
     	ty_app     = mkHsTyApp (L (instLocSrcSpan loc) (HsVar dfun_id)) ty_args
     in

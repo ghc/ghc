@@ -191,7 +191,7 @@ import HscTypes		( ModIface(..), TyThing(..),
 			  Dependencies(..), FixItem(..), 
 			  mkIfaceDepCache, mkIfaceFixCache, mkIfaceVerCache,
 			  typeEnvElts, 
-			  Avails, AvailInfo, GenAvailInfo(..), availName, 
+			  GenAvailInfo(..), availName, 
 			  ExternalPackageState(..),
 			  Usage(..), IsBootInterface,
 			  Deprecs(..), IfaceDeprecs, Deprecations,
@@ -209,10 +209,9 @@ import OccName		( OccName, OccEnv, mkOccEnv, lookupOccEnv, emptyOccEnv, extendOc
 			  extendOccSet, extendOccSetList,
 			  isEmptyOccSet, intersectOccSet, intersectsOccSet,
 			  occNameFS, isTcOcc )
-import TyCon		( visibleDataCons, tyConDataCons, isNewTyCon, newTyConRep )
+import TyCon		( tyConDataCons, isNewTyCon, newTyConRep )
 import Class		( classSelIds )
 import DataCon		( dataConName, dataConFieldLabels )
-import FieldLabel	( fieldLabelName )
 import Module		( Module, ModuleName, moduleNameFS, moduleName, isHomeModule,
 			  ModLocation(..), mkSysModuleNameFS, moduleUserString,
 			  ModuleEnv, emptyModuleEnv, lookupModuleEnv,
@@ -358,9 +357,7 @@ mustExposeThing exports (ATyCon tc)
 	-- can only do that if it can "see" the newtype representation
   where	 	
      exported_data_con con 
-	= any (`elemNameSet` exports) (dataConName con : field_names)
-	where
-	  field_names = map fieldLabelName (dataConFieldLabels con)
+	= any (`elemNameSet` exports) (dataConName con : dataConFieldLabels con)
      		
 mustExposeThing exports (AClass cls) 
   = any exported_class_op (classSelIds cls)
@@ -535,7 +532,7 @@ addVersionInfo (Just old_iface@(ModIface { mi_mod_vers  = old_mod_vers,
 	  eq_ind_occs [op | IfaceClassOp op _ _ <- sigs] 
     eq_indirects (IfaceData {ifName = tc_occ, ifCons = cons})
 	= same_insts tc_occ &&& same_fixity tc_occ &&&	-- The TyCon can have a fixity too
-	  eq_ind_occs [occ | IfaceConDecl occ _ _ _ _ _ _ <- visibleIfConDecls cons]
+	  eq_ind_occs (map ifConOcc (visibleIfConDecls cons))
     eq_indirects other = Equal	-- Synonyms and foreign declarations
 
     eq_ind_occ :: OccName -> IfaceEq	-- For class ops and Ids; check fixity and rules
@@ -766,7 +763,6 @@ mkIfaceExports exports
 			     (unitFM avail_fs avail)
       where
 	occ    = nameOccName name
-	occ_fs = occNameFS occ
 	mod_fs = moduleNameFS (nameModuleName name)
 	avail | Just p <- nameParent_maybe name	= AvailTC (nameOccName p) [occ]
 	      | isTcOcc occ 			= AvailTC occ [occ]

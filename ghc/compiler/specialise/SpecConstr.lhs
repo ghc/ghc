@@ -335,11 +335,13 @@ scExpr env (Note n e) = scExpr env e	`thenUs` \ (usg,e') ->
 scExpr env (Lam b e)  = scExpr (extendBndr env b) e	`thenUs` \ (usg,e') ->
 			returnUs (usg, Lam b e')
 
-scExpr env (Case scrut b alts) 
+-- gaw 2004
+scExpr env (Case scrut b ty alts) 
   = sc_scrut scrut		`thenUs` \ (scrut_usg, scrut') ->
     mapAndUnzipUs sc_alt alts	`thenUs` \ (alts_usgs, alts') ->
+-- gaw 2004
     returnUs (combineUsages alts_usgs `combineUsage` scrut_usg,
-	      Case scrut' b alts')
+	      Case scrut' b ty alts')
   where
     sc_scrut e@(Var v) = returnUs (varUsage env v CaseScrut, e)
     sc_scrut e	       = scExpr env e

@@ -45,7 +45,7 @@ import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import Constants	( mIN_INTLIKE, mAX_INTLIKE, mIN_CHARLIKE, mAX_CHARLIKE )
 import TyCon		( TyCon, tyConDataCons, isEnumerationTyCon, tyConName )
-import DataCon		( DataCon, dataConRepArgTys, isNullaryDataCon,
+import DataCon		( DataCon, dataConRepArgTys, isNullaryRepDataCon,
 			  isUnboxedTupleCon, dataConWorkId, 
 			  dataConName, dataConRepArity
 			)
@@ -404,7 +404,7 @@ static closure, for a constructor.
 cgDataCon :: DataCon -> Code
 cgDataCon data_con
   = do	{     -- Don't need any dynamic closure code for zero-arity constructors
-	  whenC (not (isNullaryDataCon data_con))
+	  whenC (not (isNullaryRepDataCon data_con))
 	 	(emit_info dyn_cl_info tickyEnterDynCon)
 
 		-- Dynamic-Closure first, to reduce forward references

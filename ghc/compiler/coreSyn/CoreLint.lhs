@@ -15,26 +15,26 @@ module CoreLint (
 import CoreSyn
 import CoreFVs		( idFreeVars )
 import CoreUtils	( findDefault, exprOkForSpeculation, coreBindsSize, mkPiType )
-
+import Unify      	( coreRefineTys )
 import Bag
 import Literal		( literalType )
-import DataCon		( dataConRepType )
+import DataCon		( dataConRepType, isVanillaDataCon, dataConTyCon )
 import Var		( Var, Id, TyVar, idType, tyVarKind, isTyVar, isId, mustHaveLocalBinding )
 import VarSet
-import Subst		( substTyWith )
 import Name		( getSrcLoc )
 import PprCore
 import ErrUtils		( dumpIfSet_core, ghcExit, Message, showPass,
 			  mkLocMessage, debugTraceMsg )
 import SrcLoc		( SrcLoc, noSrcLoc, mkSrcSpan )
 import Type		( Type, tyVarsOfType, eqType,
-			  splitFunTy_maybe, mkTyVarTy,
-			  splitForAllTy_maybe, splitTyConApp_maybe, splitTyConApp,
+			  splitFunTy_maybe, 
+			  splitForAllTy_maybe, splitTyConApp_maybe,
 			  isUnLiftedType, typeKind, 
-			  isUnboxedTupleType,
-			  isSubKind
-			)
-import TyCon		( isPrimTyCon )
+			  isUnboxedTupleType, isSubKind,
+			  substTyWith, emptyTvSubst, extendTvInScope, 
+			  TvSubst, TvSubstEnv, setTvSubstEnv, substTy,
+			  extendTvSubst, isInScope )
+import TyCon		( isPrimTyCon, TyCon )
 import BasicTypes	( RecFlag(..), isNonRec )
 import CmdLineOpts
 import Outputable
@@ -45,7 +45,6 @@ import Util             ( notNull )
 
 import Maybe
 
-infixr 9 `thenL`, `seqL`
 \end{code}
 
 %************************************************************************
@@ -124,10 +123,9 @@ lintCoreBindings dflags whoDunnit binds
 	-- This is because transformation rules can bring something
 	-- into use 'unexpectedly'
     lint_binds binds = addInScopeVars (bindersOfBinds binds) $
-		       mapL lint_bind binds
+		       mapM lint_bind binds 
 
-    lint_bind (Rec prs)		= mapL (lintSingleBinding Recursive) prs	`seqL`
-				  returnL ()
+    lint_bind (Rec prs)		= mapM_ (lintSingleBinding Recursive) prs
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
     display bad_news
@@ -171,22 +169,17 @@ Check a core binding, returning the list of variables bound.
 \begin{code}
 lintSingleBinding rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
-
-	-- Check the rhs
-    lintCoreExpr rhs				`thenL` \ ty ->
-
-	-- Check match to RHS type
-    lintBinder binder				`seqL`
-    checkTys binder_ty ty (mkRhsMsg binder ty)	`seqL`
-
-	-- Check (not isUnLiftedType) (also checks for bogus unboxed tuples)
-    checkL (not (isUnLiftedType binder_ty)
+         -- Check the rhs 
+    do { ty <- lintCoreExpr rhs	
+       ; lintBinder binder -- Check match to RHS type
+       ; binder_ty <- applySubst binder_ty
+       ; checkTys binder_ty ty (mkRhsMsg binder ty)
+        -- Check (not isUnLiftedType) (also checks for bogus unboxed tuples)
+       ; checkL (not (isUnLiftedType binder_ty)
             || (isNonRec rec_flag && exprOkForSpeculation rhs))
- 	   (mkRhsPrimMsg binder rhs)		`seqL`
-
+ 	   (mkRhsPrimMsg binder rhs)
         -- Check whether binder's specialisations contain any out-of-scope variables
-    mapL (checkBndrIdInScope binder) bndr_vars	`seqL`
-    returnL ()
+       ; mapM_ (checkBndrIdInScope binder) bndr_vars }
 	  
 	-- We should check the unfolding, if any, but this is tricky because
 	-- the unfolding is a SimplifiableCoreExpr. Give up for now.
@@ -202,76 +195,112 @@ lintSingleBinding rec_flag (binder,rhs)
 %************************************************************************
 
 \begin{code}
-lintCoreExpr :: CoreExpr -> LintM Type
 
-lintCoreExpr (Var var) = checkIdInScope var `seqL` returnL (idType var)
-lintCoreExpr (Lit lit) = returnL (literalType lit)
+lintCoreExpr :: CoreExpr -> LintM Type
+-- The returned type has the substitution from the monad 
+-- already applied to it:
+--	lintCoreExpr e subst = exprTpye (subst e)
+
+lintCoreExpr (Var var)
+  = do	{ checkIdInScope var 
+ 	; applySubst (idType var) }
+
+lintCoreExpr (Lit lit)
+  = return (literalType lit)
 
 lintCoreExpr (Note (Coerce to_ty from_ty) expr)
-  = lintCoreExpr expr 	`thenL` \ expr_ty ->
-    lintTy to_ty	`seqL`
-    lintTy from_ty	`seqL`
-    checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)	`seqL`
-    returnL to_ty
+  = do	{ expr_ty <- lintCoreExpr expr
+	; to_ty <- lintTy to_ty
+	; from_ty <- lintTy from_ty	
+	; checkTys from_ty expr_ty (mkCoerceErr from_ty expr_ty)
+	; return to_ty }
 
 lintCoreExpr (Note other_note expr)
   = lintCoreExpr expr
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
-  = lintSingleBinding NonRecursive (bndr,rhs)	`seqL`
-    addLoc (BodyOfLetRec [bndr])
-	   (addInScopeVars [bndr] (lintCoreExpr body))
+  = do	{ lintSingleBinding NonRecursive (bndr,rhs)
+	; addLoc (BodyOfLetRec [bndr])
+		 (addInScopeVars [bndr] (lintCoreExpr body)) }
 
-lintCoreExpr (Let (Rec pairs) body)
+lintCoreExpr (Let (Rec pairs) body) 
   = addInScopeVars bndrs	$
-    mapL (lintSingleBinding Recursive) pairs	`seqL`
-    addLoc (BodyOfLetRec bndrs) (lintCoreExpr body)
+    do	{ mapM (lintSingleBinding Recursive) pairs	
+	; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
   where
     bndrs = map fst pairs
 
+lintCoreExpr (App fun (Type ty))
+-- This is like 'let' for types
+-- It's needed when dealing with desugarer output for GADTs. Consider
+--   data T = forall a. T a (a->Int) Bool
+--    f :: T -> ... -> 
+--    f (T x f True)  = <e1>
+--    f (T y g False) = <e2>
+-- After desugaring we get
+--	f t b = case t of 
+--		  T a (x::a) (f::a->Int) (b:Bool) ->
+--		    case b of 
+--			True -> <e1>
+--			False -> (/\b. let y=x; g=f in <e2>) a
+-- And for a reason I now forget, the ...<e2>... can mention a; so 
+-- we want Lint to know that b=a.  Ugh.
+--
+-- I tried quite hard to make the necessity for this go away, by changing the 
+-- desugarer, but the fundamental problem is this:
+--	
+--	T a (x::a) (y::Int) -> let fail::a = ...
+--			       in (/\b. ...(case ... of       
+--						True  -> x::b
+--					 	False -> fail)
+--				  ) a
+-- Now the inner case look as though it has incompatible branches.
+  = go fun [ty]
+  where
+    go (App fun (Type ty)) tys
+	= do { go fun (ty:tys) }
+    go (Lam tv body) (ty:tys)
+	= do  { checkL (isTyVar tv) (mkKindErrMsg tv ty)	-- Not quite accurate
+	      ; ty' <- lintTy ty; 
+	      ; checkKinds tv ty'
+		-- Now extend the substitution so we 
+		-- take advantage of it in the body
+	      ; addInScopeVars [tv] $
+	        extendSubstL tv ty' $
+		go body tys }
+    go fun tys
+	= do  { fun_ty <- lintCoreExpr fun
+	      ; lintCoreArgs fun_ty (map Type tys) }
+
 lintCoreExpr e@(App fun arg)
-  = lintCoreExpr fun 	`thenL` \ ty ->
-    addLoc (AnExpr e)	$
-    lintCoreArg ty arg
+  = do	{ ty <- lintCoreExpr fun
+	; addLoc (AnExpr e) $
+          lintCoreArg ty arg }
 
 lintCoreExpr (Lam var expr)
-  = addLoc (LambdaBodyOf var)	$
-    (if isId var then    
-       checkL (not (isUnboxedTupleType (idType var))) (mkUnboxedTupleMsg var)
-     else
-       returnL ())
-				`seqL`
-    (addInScopeVars [var]	$
-     lintCoreExpr expr		`thenL` \ ty ->
+  = addLoc (LambdaBodyOf var) $
+    do	{ lintBinder var 	
+	; ty <- addInScopeVars [var] $
+                lintCoreExpr expr
+	; applySubst (mkPiType var ty) }
+	-- The applySubst is needed to apply the subst to var
 
-     returnL (mkPiType var ty))
+lintCoreExpr e@(Case scrut var alt_ty alts) =
+       -- Check the scrutinee
+  do { scrut_ty <- lintCoreExpr scrut
+     ; alt_ty   <- lintTy alt_ty  
+     ; var_ty   <- lintTy (idType var)	
+	-- Don't use lintId on var, because unboxed tuple is legitimate
 
-lintCoreExpr e@(Case scrut var alts)
- = 	-- Check the scrutinee
-   lintCoreExpr scrut			`thenL` \ scrut_ty ->
+     ; checkTys var_ty scrut_ty (mkScrutMsg var scrut_ty)
 
-	-- Check the binder
-   lintBinder var						`seqL`
-
-    	-- If this is an unboxed tuple case, then the binder must be dead
-   {-
-   checkL (if isUnboxedTupleType (idType var) 
-		then isDeadBinder var 
-		else True) (mkUnboxedTupleMsg var)		`seqL`
-   -}
-		
-   checkTys (idType var) scrut_ty (mkScrutMsg var scrut_ty)	`seqL`
-
-   addInScopeVars [var]				(
-
-	-- Check the alternatives
-   checkCaseAlts e scrut_ty alts		`seqL`
-
-   mapL (lintCoreAlt scrut_ty) alts		`thenL` \ (alt_ty : alt_tys) ->
-   mapL (check alt_ty) alt_tys			`seqL`
-   returnL alt_ty)
- where
-   check alt_ty1 alt_ty2 = checkTys alt_ty1 alt_ty2 (mkCaseAltMsg e)
+     -- If the binder is an unboxed tuple type, don't put it in scope
+     ; let vars = if (isUnboxedTupleType (idType var)) then [] else [var]
+     ; addInScopeVars vars $
+       do { -- Check the alternatives
+            checkCaseAlts e scrut_ty alts
+          ; mapM (lintCoreAlt scrut_ty alt_ty) alts
+          ; return alt_ty } }
 
 lintCoreExpr e@(Type ty)
   = addErrL (mkStrangeTyMsg e)
@@ -288,66 +317,59 @@ subtype of the required type, as one would expect.
 
 \begin{code}
 lintCoreArgs :: Type -> [CoreArg] -> LintM Type
-lintCoreArgs = lintCoreArgs0 checkTys
-
-lintCoreArg :: Type -> CoreArg -> LintM Type
-lintCoreArg = lintCoreArg0 checkTys
-\end{code}
-
-The primitive version of these functions takes a check argument,
-allowing a different comparison.
-
-\begin{code}
-lintCoreArgs0 check_tys ty [] = returnL ty
-lintCoreArgs0 check_tys ty (a : args)
-  = lintCoreArg0  check_tys ty a	`thenL` \ res ->
-    lintCoreArgs0 check_tys res args
-
-lintCoreArg0 check_tys ty a@(Type arg_ty)
-  = lintTy arg_ty			`seqL`
-    lintTyApp ty arg_ty
-
-lintCoreArg0 check_tys fun_ty arg
-  = -- Make sure function type matches argument
-    lintCoreExpr arg		`thenL` \ arg_ty ->
-    let
-      err = mkAppMsg fun_ty arg_ty
-    in
-    case splitFunTy_maybe fun_ty of
-      Just (arg,res) -> check_tys arg arg_ty err `seqL`
-                        returnL res
-      _              -> addErrL err
+lintCoreArg  :: Type -> CoreArg   -> LintM Type
+-- First argument has already had substitution applied to it
 \end{code}
 
 \begin{code}
+lintCoreArgs ty [] = return ty
+lintCoreArgs ty (a : args) = 
+  do { res <- lintCoreArg ty a
+     ; lintCoreArgs res args }
+
+lintCoreArg ty a@(Type arg_ty) = 
+  do { arg_ty <- lintTy arg_ty	
+     ; lintTyApp ty arg_ty }
+
+lintCoreArg fun_ty arg = 
+       -- Make sure function type matches argument
+  do { arg_ty <- lintCoreExpr arg
+     ; let err = mkAppMsg fun_ty arg_ty
+     ; case splitFunTy_maybe fun_ty of
+        Just (arg,res) -> 
+          do { checkTys arg arg_ty err 
+             ; return res }
+        _ -> addErrL err }
+\end{code}
+
+\begin{code}
+-- Both args have had substitution applied
 lintTyApp ty arg_ty 
   = case splitForAllTy_maybe ty of
       Nothing -> addErrL (mkTyAppMsg ty arg_ty)
 
-      Just (tyvar,body) ->
-        if not (isTyVar tyvar) then addErrL (mkTyAppMsg ty arg_ty) else
-	let
-	    tyvar_kind = tyVarKind tyvar
-	    argty_kind = typeKind arg_ty
-	in
-	if argty_kind `isSubKind` tyvar_kind
-		-- Arg type might be boxed for a function with an uncommitted
-		-- tyvar; notably this is used so that we can give
-		-- 	error :: forall a:*. String -> a
-		-- and then apply it to both boxed and unboxed types.
-	 then
-	    returnL (substTyWith [tyvar] [arg_ty] body)
-	else
-	    addErrL (mkKindErrMsg tyvar arg_ty)
+      Just (tyvar,body)
+        -> do	{ checkL (isTyVar tyvar) (mkTyAppMsg ty arg_ty)
+		; checkKinds tyvar arg_ty
+		; return (substTyWith [tyvar] [arg_ty] body) }
 
-lintTyApps fun_ty []
-  = returnL fun_ty
+lintTyApps fun_ty [] = return fun_ty
 
-lintTyApps fun_ty (arg_ty : arg_tys)
-  = lintTyApp fun_ty arg_ty		`thenL` \ fun_ty' ->
-    lintTyApps fun_ty' arg_tys
+lintTyApps fun_ty (arg_ty : arg_tys) = 
+  do { fun_ty' <- lintTyApp fun_ty arg_ty
+     ; lintTyApps fun_ty' arg_tys }
+
+checkKinds tyvar arg_ty
+	-- Arg type might be boxed for a function with an uncommitted
+	-- tyvar; notably this is used so that we can give
+	-- 	error :: forall a:*. String -> a
+	-- and then apply it to both boxed and unboxed types.
+  = checkL (argty_kind `isSubKind` tyvar_kind)
+	   (mkKindErrMsg tyvar arg_ty)
+  where
+    tyvar_kind = tyVarKind tyvar
+    argty_kind = typeKind arg_ty
 \end{code}
-
 
 
 %************************************************************************
@@ -368,10 +390,10 @@ checkCaseAlts :: CoreExpr -> Type -> [CoreAlt] -> LintM ()
 checkCaseAlts e ty [] 
   = addErrL (mkNullAltsMsg e)
 
-checkCaseAlts e ty alts
-  = checkL (all non_deflt con_alts) (mkNonDefltMsg e)	`seqL`
-    checkL (isJust maybe_deflt || not is_infinite_ty)
-	   (nonExhaustiveAltsMsg e)
+checkCaseAlts e ty alts = 
+  do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
+     ; checkL (isJust maybe_deflt || not is_infinite_ty)
+	   (nonExhaustiveAltsMsg e) }
   where
     (con_alts, maybe_deflt) = findDefault alts
 
@@ -384,48 +406,67 @@ checkCaseAlts e ty alts
 \end{code}
 
 \begin{code}
+checkAltExpr :: CoreExpr -> Type -> LintM ()
+checkAltExpr expr ty	
+  = do { actual_ty <- lintCoreExpr expr 
+       ; ty' <- applySubst ty
+       ; checkTys actual_ty ty' (mkCaseAltMsg expr actual_ty ty') }
+
 lintCoreAlt :: Type  			-- Type of scrutinee
+            -> Type                     -- Type of the alternative
 	    -> CoreAlt
-	    -> LintM Type		-- Type of alternatives
+	    -> LintM ()
 
-lintCoreAlt scrut_ty alt@(DEFAULT, args, rhs)
-  = checkL (null args) (mkDefaultArgsMsg args)	`seqL`
-    lintCoreExpr rhs
+lintCoreAlt scrut_ty alt_ty alt@(DEFAULT, args, rhs) = 
+  do { checkL (null args) (mkDefaultArgsMsg args)
+     ; checkAltExpr rhs alt_ty }
 
-lintCoreAlt scrut_ty alt@(LitAlt lit, args, rhs)
-  = checkL (null args) (mkDefaultArgsMsg args)	`seqL`
-    checkTys lit_ty scrut_ty
-	     (mkBadPatMsg lit_ty scrut_ty)	`seqL`
-    lintCoreExpr rhs
+lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) = 
+  do { checkL (null args) (mkDefaultArgsMsg args)
+     ; checkTys lit_ty scrut_ty
+	  (mkBadPatMsg lit_ty scrut_ty)	
+     ; checkAltExpr rhs alt_ty } 
   where
     lit_ty = literalType lit
 
-lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
-  = addLoc (CaseAlt alt) (
+lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
+  | isVanillaDataCon con
+  = addLoc (CaseAlt alt) $
+    addInScopeVars args $
+    do { mapM lintBinder args 
+        -- FIX! Add check that all args are Ids.
+	 -- Check the pattern
+	 -- Scrutinee type must be a tycon applicn; checked by caller
+	 -- This code is remarkably compact considering what it does!
+	 -- NB: args must be in scope here so that the lintCoreArgs line works.
+         -- NB: relies on existential type args coming *after* ordinary type args
 
-    mapL (\arg -> checkL (not (isId arg && isUnboxedTupleType (idType arg)))
-			 (mkUnboxedTupleMsg arg)) args `seqL`
-
-    addInScopeVars args (
-
-	-- Check the pattern
-	-- Scrutinee type must be a tycon applicn; checked by caller
-	-- This code is remarkably compact considering what it does!
-	-- NB: args must be in scope here so that the lintCoreArgs line works.
-	-- NB: relies on existential type args coming *after* ordinary type args
-    case splitTyConApp scrut_ty of { (tycon, tycon_arg_tys) ->
-	lintTyApps (dataConRepType con) tycon_arg_tys	`thenL` \ con_type ->
-	lintCoreArgs con_type (map mk_arg args)		`thenL` \ con_result_ty ->
-	checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty)
-    }						`seqL`
-
-	-- Check the RHS
-    lintCoreExpr rhs
-    ))
-  where
-    mk_arg b | isTyVar b = Type (mkTyVarTy b)
-	     | isId    b = Var b
-             | otherwise = pprPanic "lintCoreAlt:mk_arg " (ppr b)
+       ; case splitTyConApp_maybe scrut_ty of { 
+           Just (tycon, tycon_arg_tys) ->
+            do { con_type <- lintTyApps (dataConRepType con) tycon_arg_tys
+                 -- Can just map Var as we know that this is a vanilla datacon
+	       ; con_result_ty <- lintCoreArgs con_type (map Var args)
+	       ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
+ 	         -- Check the RHS
+               ; checkAltExpr rhs alt_ty } ;
+            Nothing -> addErrL (mkBadAltMsg scrut_ty alt)
+         } }
+ 
+  | otherwise 
+  = addLoc (CaseAlt alt) $
+    addInScopeVars args $	-- Put the args in scope before lintBinder, because
+				-- the Ids mention the type variables
+    do { mapM lintBinder args
+       ; case splitTyConApp_maybe scrut_ty of {
+          Nothing -> addErrL (mkBadAltMsg scrut_ty alt) ;
+          Just (tycon, tycon_args_tys) ->
+           do { checkL (tycon == dataConTyCon con) (mkIncTyconMsg tycon alt) 
+              ; pat_res_ty <- lintCoreArgs (dataConRepType con) (map varToCoreExpr args)
+              ; subst <- getTvSubst 
+              ; case coreRefineTys args subst pat_res_ty scrut_ty of
+                 Just senv -> updateTvSubstEnv senv (checkAltExpr rhs alt_ty)
+                 Nothing   -> return ()	-- Alternative is dead code
+              } } }
 \end{code}
 
 %************************************************************************
@@ -436,14 +477,24 @@ lintCoreAlt scrut_ty alt@(DataAlt con, args, rhs)
 
 \begin{code}
 lintBinder :: Var -> LintM ()
-lintBinder v = nopL
--- ToDo: lint its type
--- ToDo: lint its rules
+lintBinder var | isId var  = lintId var >> return ()
+	       | otherwise = return ()
 
-lintTy :: Type -> LintM ()
-lintTy ty = mapL checkIdInScope (varSetElems (tyVarsOfType ty))	`seqL`
-	    returnL ()
-	-- ToDo: check the kind structure of the type
+lintId :: Var -> LintM Type
+-- ToDo: lint its rules
+lintId id
+  = do 	{ checkL (not (isUnboxedTupleType (idType id))) 
+		 (mkUnboxedTupleMsg id)
+		-- No variable can be bound to an unboxed tuple.
+	; lintTy (idType id) }
+
+lintTy :: Type -> LintM Type
+-- Check the type, and apply the substitution to it
+-- ToDo: check the kind structure of the type
+lintTy ty 
+  = do	{ ty' <- applySubst ty
+	; mapM_ checkIdInScope (varSetElems (tyVarsOfType ty'))
+	; return ty' }
 \end{code}
 
     
@@ -454,10 +505,23 @@ lintTy ty = mapL checkIdInScope (varSetElems (tyVarsOfType ty))	`seqL`
 %************************************************************************
 
 \begin{code}
-type LintM a = [LintLocInfo] 	-- Locations
-	    -> IdSet		-- Local vars in scope
-	    -> Bag Message	-- Error messages so far
-	    -> (Maybe a, Bag Message)  -- Result and error messages (if any)
+newtype LintM a = 
+   LintM { unLintM :: 
+            [LintLocInfo] ->         -- Locations
+            TvSubst ->               -- Current type substitution; we also use this
+				     -- to keep track of all the variables in scope,
+				     -- both Ids and TyVars
+	    Bag Message ->           -- Error messages so far
+	    (Maybe a, Bag Message) } -- Result and error messages (if any)
+
+instance Monad LintM where
+  return x = LintM (\ loc subst errs -> (Just x, errs))
+  fail err = LintM (\ loc subst errs -> (Nothing, addErr subst errs (text err) loc))
+  m >>= k  = LintM (\ loc subst errs -> 
+                       let (res, errs') = unLintM m loc subst errs in
+                         case res of
+                           Just r -> unLintM (k r) loc subst errs'
+                           Nothing -> (Nothing, errs'))
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -468,65 +532,58 @@ data LintLocInfo
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
 \end{code}
 
+                 
 \begin{code}
 initL :: LintM a -> Maybe Message {- errors -}
 initL m
-  = case m [] emptyVarSet emptyBag of
+  = case unLintM m [] emptyTvSubst emptyBag of
       (_, errs) | isEmptyBag errs -> Nothing
 		| otherwise	  -> Just (vcat (punctuate (text "") (bagToList errs)))
-
-returnL :: a -> LintM a
-returnL r loc scope errs = (Just r, errs)
-
-nopL :: LintM a
-nopL loc scope errs = (Nothing, errs)
-
-thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k loc scope errs
-  = case m loc scope errs of
-      (Just r, errs')  -> k r loc scope errs'
-      (Nothing, errs') -> (Nothing, errs')
-
-seqL :: LintM a -> LintM b -> LintM b
-seqL m k loc scope errs
-  = case m loc scope errs of
-      (_, errs') -> k loc scope errs'
-
-mapL :: (a -> LintM b) -> [a] -> LintM [b]
-mapL f [] = returnL []
-mapL f (x:xs)
-  = f x 	`thenL` \ r ->
-    mapL f xs	`thenL` \ rs ->
-    returnL (r:rs)
 \end{code}
 
 \begin{code}
 checkL :: Bool -> Message -> LintM ()
-checkL True  msg = nopL
+checkL True  msg = return ()
 checkL False msg = addErrL msg
 
 addErrL :: Message -> LintM a
-addErrL msg loc scope errs = (Nothing, addErr errs msg loc)
+addErrL msg = LintM (\ loc subst errs -> (Nothing, addErr subst errs msg loc))
 
-addErr :: Bag Message -> Message -> [LintLocInfo] -> Bag Message
-addErr errs_so_far msg locs
+addErr :: TvSubst -> Bag Message -> Message -> [LintLocInfo] -> Bag Message
+addErr subst errs_so_far msg locs
   = ASSERT( notNull locs )
     errs_so_far `snocBag` mk_msg msg
   where
    (loc, cxt1) = dumpLoc (head locs)
    cxts        = [snd (dumpLoc loc) | loc <- locs]   
-   context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1
+   context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1 $$
+				      ptext SLIT("Substitution:") <+> ppr subst
 	       | otherwise	    = cxt1
  
    mk_msg msg = mkLocMessage (mkSrcSpan loc loc) (context $$ msg)
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m loc scope errs
-  = m (extra_loc:loc) scope errs
+addLoc extra_loc m =
+  LintM (\ loc subst errs -> unLintM m (extra_loc:loc) subst errs)
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
-addInScopeVars ids m loc scope errs
-  = m loc (extendVarSetList scope ids) errs
+addInScopeVars vars m = 
+  LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
+
+-- gaw 2004
+updateTvSubstEnv :: TvSubstEnv -> LintM a -> LintM a
+updateTvSubstEnv substenv m = 
+  LintM (\ loc subst errs -> unLintM m loc (setTvSubstEnv subst substenv) errs)
+
+getTvSubst :: LintM TvSubst
+getTvSubst = LintM (\ loc subst errs -> (Just subst, errs))
+
+applySubst :: Type -> LintM Type
+applySubst ty = do { subst <- getTvSubst; return (substTy subst ty) }
+
+extendSubstL :: TyVar -> Type -> LintM a -> LintM a
+extendSubstL tv ty m
+  = LintM (\ loc subst errs -> unLintM m loc (extendTvSubst subst tv ty) errs)
 \end{code}
 
 \begin{code}
@@ -542,20 +599,17 @@ checkBndrIdInScope binder id
 	   ppr binder
 
 checkInScope :: SDoc -> Var -> LintM ()
-checkInScope loc_msg var loc scope errs
-  |  mustHaveLocalBinding var && not (var `elemVarSet` scope)
-  = (Nothing, addErr errs (hsep [ppr var, loc_msg]) loc)
-  | otherwise
-  = nopL loc scope errs
+checkInScope loc_msg var =
+ do { subst <- getTvSubst
+    ; checkL (not (mustHaveLocalBinding var) || (var `isInScope` subst))
+             (hsep [ppr var, loc_msg]) }
 
 checkTys :: Type -> Type -> Message -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
-checkTys ty1 ty2 msg
-  | ty1 `eqType` ty2 = nopL
-  | otherwise        = addErrL msg
+-- Assumes ty1,ty2 are have alrady had the substitution applied
+checkTys ty1 ty2 msg = checkL (ty1 `eqType` ty2) msg
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -580,7 +634,7 @@ dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
 
 dumpLoc (CaseAlt (con, args, rhs))
-  = (noSrcLoc, text "In a case pattern:" <+> parens (ppr con <+> ppr args))
+  = (noSrcLoc, text "In a case alternative:" <+> parens (ppr con <+> ppr args))
 
 dumpLoc (ImportedUnfolding locn)
   = (locn, brackets (ptext SLIT("in an imported unfolding")))
@@ -607,10 +661,10 @@ mkDefaultArgsMsg args
   = hang (text "DEFAULT case with binders")
 	 4 (ppr args)
 
-mkCaseAltMsg :: CoreExpr -> Message
-mkCaseAltMsg e
-  = hang (text "Type of case alternatives not the same:")
-	 4 (ppr e)
+mkCaseAltMsg :: CoreExpr -> Type -> Type -> Message
+mkCaseAltMsg e ty1 ty2
+  = hang (text "Type of case alternatives not the same as the annotation on case:")
+	 4 (vcat [ppr ty1, ppr ty2, ppr e])
 
 mkScrutMsg :: Id -> Type -> Message
 mkScrutMsg var scrut_ty
@@ -633,6 +687,19 @@ mkBadPatMsg con_result_ty scrut_ty
 	text "Pattern result type:" <+> ppr con_result_ty,
 	text "Scrutinee type:" <+> ppr scrut_ty
     ]
+
+mkBadAltMsg :: Type -> CoreAlt -> Message
+mkBadAltMsg scrut_ty alt
+  = vcat [ text "Data alternative when scrutinee is not a tycon application",
+	   text "Scrutinee type:" <+> ppr scrut_ty,
+	   text "Alternative:" <+> pprCoreAlt alt ]
+
+mkIncTyconMsg :: TyCon -> CoreAlt -> Message
+mkIncTyconMsg tycon1 alt@(DataAlt con,_,_)
+  = vcat [ text "Incompatible tycon applications in alternative",
+	   text "Scrutinee tycon:" <+> ppr tycon1,
+	   text "Alternative tycon:" <+> ppr (dataConTyCon con),
+	   text "Alternative:" <+> pprCoreAlt alt ]
 
 ------------------------------------------------------
 --	Other error messages

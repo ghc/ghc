@@ -31,7 +31,8 @@ import Literal		( Literal(..), mkMachInt, mkMachWord
 			, float2DoubleLit, double2FloatLit
 			)
 import PrimOp		( PrimOp(..), primOpOcc )
-import TysWiredIn	( trueDataConId, falseDataConId )
+-- gaw 2004
+import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
 import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils	( cheapEqExpr, exprIsConApp_maybe )
@@ -288,7 +289,8 @@ litEq is_eq [expr, Lit lit] = do_lit_eq is_eq lit expr
 litEq is_eq other	    = Nothing
 
 do_lit_eq is_eq lit expr
-  = Just (Case expr (mkWildId (literalType lit))
+-- gaw 2004
+  = Just (Case expr (mkWildId (literalType lit)) boolTy
 		[(DEFAULT,    [], val_if_neq),
 		 (LitAlt lit, [], val_if_eq)])
   where

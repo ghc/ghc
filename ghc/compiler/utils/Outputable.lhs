@@ -42,10 +42,10 @@ module Outputable (
 	showSDocUnqual, showsPrecSDoc,
 	pprHsChar, pprHsString,
 
-
 	-- error handling
-	pprPanic, pprPanic#, pprError, pprTrace, assertPprPanic, warnPprTrace,
-	trace, panic, panic#, assertPanic
+	pprPanic, assertPprPanic, pprPanic#, pprPgmError, 
+	pprTrace, warnPprTrace,
+	trace, pgmError, panic, panic#, assertPanic
     ) where
 
 #include "HsVersions.h"
@@ -470,12 +470,13 @@ speakNTimes t | t == 1 	   = ptext SLIT("once")
 %************************************************************************
 
 \begin{code}
-pprPanic :: String -> SDoc -> a
-pprError :: String -> SDoc -> a
+pprPanic, pprPgmError :: String -> SDoc -> a
 pprTrace :: String -> SDoc -> a -> a
-pprPanic  = pprAndThen panic
-pprError  = pprAndThen error
-pprTrace  = pprAndThen trace
+pprPanic    = pprAndThen panic		-- Throw an exn saying "bug in GHC"
+
+pprPgmError = pprAndThen pgmError	-- Throw an exn saying "bug in pgm being compiled"
+					--	(used for unusual pgm errors)
+pprTrace    = pprAndThen trace
 
 pprPanic# heading pretty_msg = panic# (show (doc PprDebug))
 			     where

@@ -14,10 +14,10 @@ module CoreUtils (
 	findDefault, findAlt,
 
 	-- Properties of expressions
-	exprType,
+	exprType, coreAltType,
 	exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,exprOkForSpeculation, exprIsBig, 
-	exprIsConApp_maybe, 
+	exprIsConApp_maybe, exprIsBottom,
 	rhsIsStatic,
 
 	-- Arity and eta expansion
@@ -47,7 +47,7 @@ import Name		( hashName, isDllName )
 import Literal		( hashLiteral, literalType, litIsDupable, 
 			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
-			  isExistentialDataCon, dataConTyCon )
+			  isVanillaDataCon, dataConTyCon )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
 import Id		( Id, idType, globalIdDetails, idNewStrictness, 
 			  mkWildId, idArity, idName, idUnfolding, idInfo,
@@ -64,6 +64,7 @@ import Type		( Type, mkFunTy, mkForAllTy, splitFunTy_maybe,
 			  funResultTy, applyTy
 			)
 import TyCon		( tyConArity )
+-- gaw 2004
 import TysWiredIn	( boolTy, trueDataCon, falseDataCon )
 import CostCentre	( CostCentre )
 import BasicTypes	( Arity )
@@ -86,7 +87,8 @@ exprType :: CoreExpr -> Type
 exprType (Var var)		= idType var
 exprType (Lit lit)		= literalType lit
 exprType (Let _ body)	   	= exprType body
-exprType (Case _ _ alts)        = coreAltsType alts
+-- gaw 2004
+exprType (Case _ _ ty alts)     = ty
 exprType (Note (Coerce ty _) e) = ty  -- **! should take usage from e
 exprType (Note other_note e)    = exprType e
 exprType (Lam binder expr)      = mkPiType binder (exprType expr)
@@ -96,8 +98,8 @@ exprType e@(App _ _)
 
 exprType other = pprTrace "exprType" (pprCoreExpr other) alphaTy
 
-coreAltsType :: [CoreAlt] -> Type
-coreAltsType ((_,_,rhs) : _) = exprType rhs
+coreAltType :: CoreAlt -> Type
+coreAltType (_,_,rhs) = exprType rhs
 \end{code}
 
 @mkPiType@ makes a (->) type or a forall type, depending on whether
@@ -240,8 +242,10 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- It's used by the desugarer to avoid building bindings
 -- that give Core Lint a heart attack.  Actually the simplifier
 -- deals with them perfectly well.
+
 bindNonRec bndr rhs body 
-  | needsCaseBinding (idType bndr) rhs = Case rhs bndr [(DEFAULT,[],body)]
+-- gaw 2004
+  | needsCaseBinding (idType bndr) rhs = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
   | otherwise			       = Let (NonRec bndr rhs) body
 
 needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
@@ -261,7 +265,9 @@ mkAltExpr (LitAlt lit) [] []
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
-  = Case guard (mkWildId boolTy) 
+-- gaw 2004
+-- Not going to be refining, so okay to take the type of the "then" clause
+  = Case guard (mkWildId boolTy) (exprType then_expr) 
 	 [ (DataAlt trueDataCon,  [], then_expr),
 	   (DataAlt falseDataCon, [], else_expr) ]
 \end{code}
@@ -399,13 +405,14 @@ because sharing will make sure it is only evaluated once.
 
 \begin{code}
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap (Lit lit) 		  = True
-exprIsCheap (Type _)        	  = True
-exprIsCheap (Var _)         	  = True
-exprIsCheap (Note InlineMe e)  	  = True
-exprIsCheap (Note _ e)      	  = exprIsCheap e
-exprIsCheap (Lam x e)       	  = isRuntimeVar x || exprIsCheap e
-exprIsCheap (Case e _ alts)       = exprIsCheap e && 
+exprIsCheap (Lit lit) 		    = True
+exprIsCheap (Type _)        	    = True
+exprIsCheap (Var _)         	    = True
+exprIsCheap (Note InlineMe e)  	    = True
+exprIsCheap (Note _ e)      	    = exprIsCheap e
+exprIsCheap (Lam x e)               = isRuntimeVar x || exprIsCheap e
+-- gaw 2004
+exprIsCheap (Case e _ _ alts)       = exprIsCheap e && 
 				    and [exprIsCheap rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
 	-- (and case __coerce x etc.)
@@ -442,7 +449,7 @@ idAppIsCheap id n_val_args
 				-- counts as WHNF
   | otherwise = case globalIdDetails id of
 		  DataConWorkId _ -> True			
-		  RecordSelId _   -> True	-- I'm experimenting with making record selection
+		  RecordSelId _ _ -> True	-- I'm experimenting with making record selection
 		  ClassOpId _     -> True	-- look cheap, so we will substitute it inside a
 						-- lambda.  Particularly for dictionary field selection
 
@@ -534,13 +541,14 @@ exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
 exprIsBottom e = go 0 e
 	       where
 		-- n is the number of args
-		 go n (Note _ e)   = go n e
-		 go n (Let _ e)    = go n e
-		 go n (Case e _ _) = go 0 e	-- Just check the scrut
-		 go n (App e _)    = go (n+1) e
-		 go n (Var v)      = idAppIsBottom v n
-		 go n (Lit _)      = False
-		 go n (Lam _ _)	   = False
+		 go n (Note _ e)     = go n e
+		 go n (Let _ e)      = go n e
+-- gaw 2004
+		 go n (Case e _ _ _) = go 0 e	-- Just check the scrut
+		 go n (App e _)      = go (n+1) e
+		 go n (Var v)        = idAppIsBottom v n
+		 go n (Lit _)        = False
+		 go n (Lam _ _)	     = False
 
 idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
@@ -627,9 +635,9 @@ exprIsConApp_maybe (Note (Coerce to_ty from_ty) expr)
   
     case splitTyConApp_maybe to_ty of {
 	Nothing -> Nothing ;
-	Just (tc, tc_arg_tys) | tc /= dataConTyCon dc   -> Nothing
-			      | isExistentialDataCon dc -> Nothing
-			      | otherwise	        ->
+	Just (tc, tc_arg_tys) | tc /= dataConTyCon dc     -> Nothing
+			      | not (isVanillaDataCon dc) -> Nothing
+			      | otherwise	          ->
 		-- Type constructor must match
 		-- We knock out existentials to keep matters simple(r)
     let
@@ -807,7 +815,8 @@ arityType (App f a)  	   = case arityType f of
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
-arityType (Case scrut _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
+-- gaw 2004  
+arityType (Case scrut _ _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
 				  xs@(AFun one_shot _) | one_shot -> xs
 				  xs | exprIsCheap scrut	  -> xs
 				     | otherwise	 	  -> ATop
@@ -1038,8 +1047,10 @@ eqExpr e1 e2
 				     where
 				       env' = extendVarEnvList env [(v1,v2) | ((v1,_),(v2,_)) <- zip ps1 ps2]
 				       eq_rhs (_,r1) (_,r2) = eq env' r1 r2
-    eq env (Case e1 v1 a1)
-	   (Case e2 v2 a2)	     = eq env e1 e2 &&
+-- gaw 2004
+    eq env (Case e1 v1 t1 a1)
+	   (Case e2 v2 t2 a2)	     = eq env e1 e2 &&
+                                       t1 `eqType` t2 &&                      
 				       equalLength a1 a2 &&
 				       and (zipWith (eq_alt env') a1 a2)
 				     where
@@ -1077,14 +1088,15 @@ coreBindsSize bs = foldr ((+) . bindSize) 0 bs
 exprSize :: CoreExpr -> Int
 	-- A measure of the size of the expressions
 	-- It also forces the expression pretty drastically as a side effect
-exprSize (Var v)       = v `seq` 1
-exprSize (Lit lit)     = lit `seq` 1
-exprSize (App f a)     = exprSize f + exprSize a
-exprSize (Lam b e)     = varSize b + exprSize e
-exprSize (Let b e)     = bindSize b + exprSize e
-exprSize (Case e b as) = exprSize e + varSize b + foldr ((+) . altSize) 0 as
-exprSize (Note n e)    = noteSize n + exprSize e
-exprSize (Type t)      = seqType t `seq` 1
+exprSize (Var v)         = v `seq` 1
+exprSize (Lit lit)       = lit `seq` 1
+exprSize (App f a)       = exprSize f + exprSize a
+exprSize (Lam b e)       = varSize b + exprSize e
+exprSize (Let b e)       = bindSize b + exprSize e
+-- gaw 2004
+exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
+exprSize (Note n e)      = noteSize n + exprSize e
+exprSize (Type t)        = seqType t `seq` 1
 
 noteSize (SCC cc)       = cc `seq` 1
 noteSize (Coerce t1 t2) = seqType t1 `seq` seqType t2 `seq` 1
@@ -1125,7 +1137,8 @@ hashExpr e | hash < 0  = 77	-- Just in case we hit -maxInt
 hash_expr (Note _ e)   		  = hash_expr e
 hash_expr (Let (NonRec b r) e)    = hashId b
 hash_expr (Let (Rec ((b,r):_)) e) = hashId b
-hash_expr (Case _ b _)		  = hashId b
+-- gaw 2004
+hash_expr (Case _ b _ _)	  = hashId b
 hash_expr (App f e)   		  = hash_expr f * fast_hash_expr e
 hash_expr (Var v)     		  = hashId v
 hash_expr (Lit lit)	   	  = hashLiteral lit

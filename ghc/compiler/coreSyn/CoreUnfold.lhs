@@ -218,7 +218,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       where
 	rhs_size = foldr (addSize . size_up . snd) sizeZero pairs
 
-    size_up (Case (Var v) _ alts) 
+-- gaw 2004
+    size_up (Case (Var v) _ _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
 	= 
 {-	I'm nuking this special case; BUT see the comment with case alternatives.
@@ -266,9 +267,9 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 			-- The 1+ is a little discount for reduced allocation in the caller
 	  alts_size tot_size _ = tot_size
 
-
-    size_up (Case e _ alts) = nukeScrutDiscount (size_up e) `addSize` 
-			      foldr (addSize . size_up_alt) sizeZero alts
+-- gaw 2004
+    size_up (Case e _ _ alts) = nukeScrutDiscount (size_up e) `addSize` 
+			         foldr (addSize . size_up_alt) sizeZero alts
 	  	-- We don't charge for the case itself
 		-- It's a strict thing, and the price of the call
 		-- is paid by scrut.  Also consider

@@ -15,17 +15,17 @@ import SimplMonad
 import SimplUtils	( mkCase, mkLam, newId, prepareAlts,
 			  simplBinder, simplBinders, simplLamBndrs, simplRecBndrs, simplLetBndr,
 			  SimplCont(..), DupFlag(..), LetRhsFlag(..), 
-			  mkStop, mkBoringStop,  pushContArgs,
+			  mkRhsStop, mkBoringStop,  pushContArgs,
 			  contResultType, countArgs, contIsDupable, contIsRhsOrArg,
 			  getContArgs, interestingCallContext, interestingArg, isStrictType
 			)
-import Var		( mustHaveLocalBinding )
-import VarEnv
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  setIdUnfolding, isDeadBinder,
-			  idNewDemandInfo, setIdInfo,
+			  idNewDemandInfo, setIdInfo, 
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
 			)
+import MkId		( eRROR_ID )
+import Literal		( mkStringLit )
 import OccName		( encodeFS )
 import IdInfo		( OccInfo(..), isLoopBreaker,
 			  setArityInfo, zapDemandInfo,
@@ -33,7 +33,9 @@ import IdInfo		( OccInfo(..), isLoopBreaker,
 			  occInfo
 			)
 import NewDemand	( isStrictDmd )
-import DataCon		( dataConNumInstArgs, dataConRepStrictness )
+import Unify		( coreRefineTys )
+import DataCon		( dataConTyCon, dataConRepStrictness, isVanillaDataCon )
+import TyCon		( tyConArity )
 import CoreSyn
 import PprCore		( pprParendExpr, pprCoreExpr )
 import CoreUnfold	( mkOtherCon, mkUnfolding, callSiteInline )
@@ -41,17 +43,16 @@ import CoreUtils	( exprIsDupable, exprIsTrivial, needsCaseBinding,
 			  exprIsConApp_maybe, mkPiTypes, findAlt, 
 			  exprType, exprIsValue, 
 			  exprOkForSpeculation, exprArity, 
-			  mkCoerce, mkCoerce2, mkSCC, mkInlineMe, mkAltExpr, applyTypeToArg
+			  mkCoerce, mkCoerce2, mkSCC, mkInlineMe, applyTypeToArg
 			)
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, eqType
+			  splitFunTy_maybe, splitFunTy, eqType, substTy
 			)
-import Subst		( mkSubst, substTy, substExpr, 
-			  isInScope, lookupIdSubst, simplIdInfo
-			)
+import Subst		( SubstResult(..), emptySubst, substExpr, 
+			  substId, simplIdInfo )
 import TysPrim		( realWorldStatePrimTy )
 import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
@@ -299,7 +300,7 @@ simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
 simplNonRecBind env bndr rhs rhs_se cont_ty thing_inside
   | preInlineUnconditionally env NotTopLevel bndr
   = tick (PreInlineUnconditionally bndr)		`thenSmpl_`
-    thing_inside (extendSubst env bndr (ContEx (getSubstEnv rhs_se) rhs))
+    thing_inside (extendIdSubst env bndr (ContEx (getSubst rhs_se) rhs))
 
 
   | isStrictDmd (idNewDemandInfo bndr) || isStrictType (idType bndr)	-- A strict let
@@ -347,7 +348,9 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- because quotInt# can fail.
   = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
     thing_inside env 		`thenSmpl` \ (floats, body) ->
-    returnSmpl (emptyFloats env, Case new_rhs bndr' [(DEFAULT, [], wrapFloats floats body)])
+-- gaw 2004
+    let body' = wrapFloats floats body in 
+    returnSmpl (emptyFloats env, Case new_rhs bndr' (exprType body') [(DEFAULT, [], body')])
 
   | preInlineUnconditionally env NotTopLevel  bndr
   	-- This happens; for example, the case_bndr during case of
@@ -358,7 +361,7 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- Similarly, single occurrences can be inlined vigourously
 	-- e.g.  case (f x, g y) of (a,b) -> ....
 	-- If a,b occur once we can avoid constructing the let binding for them.
-  = thing_inside (extendSubst env bndr (ContEx emptySubstEnv new_rhs))
+  = thing_inside (extendIdSubst env bndr (ContEx emptySubst new_rhs))
 
   | otherwise
   = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
@@ -420,7 +423,7 @@ simplRecOrTopPair :: SimplEnv
 simplRecOrTopPair env top_lvl bndr bndr' rhs
   | preInlineUnconditionally env top_lvl bndr  	-- Check for unconditional inline
   = tick (PreInlineUnconditionally bndr)	`thenSmpl_`
-    returnSmpl (emptyFloats env, extendSubst env bndr (ContEx (getSubstEnv env) rhs))
+    returnSmpl (emptyFloats env, extendIdSubst env bndr (ContEx (getSubst env) rhs))
 
   | otherwise
   = simplLazyBind env top_lvl Recursive bndr bndr' rhs env
@@ -488,9 +491,9 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 	rhs_env      	  = setInScope rhs_se env1
  	is_top_level	  = isTopLevel top_lvl
 	ok_float_unlifted = not is_top_level && isNonRec is_rec
-	rhs_cont	  = mkStop (idType bndr1) AnRhs
+	rhs_cont	  = mkRhsStop (idType bndr1)
     in
-  	-- Simplify the RHS; note the mkStop, which tells 
+  	-- Simplify the RHS; note the mkRhsStop, which tells 
 	-- the simplifier that this is the RHS of a let.
     simplExprF rhs_env rhs rhs_cont		`thenSmpl` \ (floats, rhs1) ->
 
@@ -604,7 +607,7 @@ completeLazyBind env top_lvl old_bndr new_bndr new_rhs
   | postInlineUnconditionally env new_bndr occ_info new_rhs
   = 		-- Drop the binding
     tick (PostInlineUnconditionally old_bndr)	`thenSmpl_`
-    returnSmpl (emptyFloats env, extendSubst env old_bndr (DoneEx new_rhs))
+    returnSmpl (emptyFloats env, extendIdSubst env old_bndr (DoneEx new_rhs))
 		-- Use the substitution to make quite, quite sure that the substitution
 		-- will happen, since we are going to discard the binding
 
@@ -699,9 +702,9 @@ might do the same again.
 
 \begin{code}
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
-simplExpr env expr = simplExprC env expr (mkStop expr_ty' AnArg)
+simplExpr env expr = simplExprC env expr (mkBoringStop expr_ty')
 		   where
-		     expr_ty' = substTy (getSubst env) (exprType expr)
+		     expr_ty' = substTy (getTvSubst env) (exprType expr)
 	-- The type in the Stop continuation, expr_ty', is usually not used
 	-- It's only needed when discarding continuations after finding
 	-- a function that returns bottom.
@@ -728,7 +731,8 @@ simplExprF env (Type ty) cont
     simplType env ty			`thenSmpl` \ ty' ->
     rebuild env (Type ty') cont
 
-simplExprF env (Case scrut bndr alts) cont
+-- gaw 2004
+simplExprF env (Case scrut bndr case_ty alts) cont
   | not (switchIsOn (getSwitchChecker env) NoCaseOfCase)
   = 	-- Simplify the scrutinee with a Select continuation
     simplExprF env scrut (Select NoDup bndr alts env cont)
@@ -739,7 +743,8 @@ simplExprF env (Case scrut bndr alts) cont
     simplExprC env scrut case_cont	`thenSmpl` \ case_expr' ->
     rebuild env case_expr' cont
   where
-    case_cont = Select NoDup bndr alts env (mkBoringStop (contResultType cont))
+    case_cont = Select NoDup bndr alts env (mkBoringStop case_ty')
+    case_ty'  = substTy (getTvSubst env) case_ty	-- c.f. defn of simplExpr
 
 simplExprF env (Let (Rec pairs) body) cont
   = simplRecBndrs env (map fst pairs) 		`thenSmpl` \ (env, bndrs') -> 
@@ -762,7 +767,7 @@ simplType :: SimplEnv -> InType -> SimplM OutType
 simplType env ty
   = seqType new_ty   `seq`   returnSmpl new_ty
   where
-    new_ty = substTy (getSubst env) ty
+    new_ty = substTy (getTvSubst env) ty
 \end{code}
 
 
@@ -784,7 +789,7 @@ simplLam env fun cont
       =	ASSERT( isTyVar bndr )
 	tick (BetaReduction bndr)			`thenSmpl_`
 	simplType (setInScope arg_se env) ty_arg 	`thenSmpl` \ ty_arg' ->
-	go (extendSubst env bndr (DoneTy ty_arg')) body body_cont
+	go (extendTvSubst env bndr ty_arg') body body_cont
 
 	-- Ordinary beta reduction
     go env (Lam bndr body) cont@(ApplyTo _ arg arg_se body_cont)
@@ -829,8 +834,6 @@ mkLamBndrZapper fun n_args
 \begin{code}
 simplNote env (Coerce to from) body cont
   = let
-	in_scope = getInScope env 
-
 	addCoerce s1 k1 (CoerceIt t1 cont)
 		-- 	coerce T1 S1 (coerce S1 K1 e)
 		-- ==>
@@ -862,7 +865,8 @@ simplNote env (Coerce to from) body cont
 		-- But it isn't a common case.
 	  = let 
 		(t1,t2) = splitFunTy t1t2
-		new_arg = mkCoerce2 s1 t1 (substExpr (mkSubst in_scope (getSubstEnv arg_se)) arg)
+		new_arg = mkCoerce2 s1 t1 (substExpr subst arg)
+		subst   = getSubst (setInScope arg_se env)
 	    in
 	    ApplyTo dup new_arg (zapSubstEnv env) (addCoerce t2 s2 cont)
 			
@@ -908,12 +912,11 @@ simplNote env (CoreNote s) e cont
 
 \begin{code}
 simplVar env var cont
-  = case lookupIdSubst (getSubst env) var of
+  = case substId (getSubst env) var of
 	DoneEx e	-> simplExprF (zapSubstEnv env) e cont
 	ContEx se e     -> simplExprF (setSubstEnv env se) e cont
-	DoneId var1 occ -> WARN( not (isInScope var1 (getSubst env)) && mustHaveLocalBinding var1,
-				 text "simplVar:" <+> ppr var )
-			   completeCall (zapSubstEnv env) var1 occ cont
+	DoneId var1 occ -> completeCall (zapSubstEnv env) var1 occ cont
+		-- Note [zapSubstEnv]
 		-- The template is already simplified, so don't re-substitute.
 		-- This is VITAL.  Consider
 		--	let x = e in
@@ -1024,7 +1027,7 @@ makeThatCall orig_env var fun@(Lam _ _) args cont
     go env (Lam bndr body) (Type ty_arg : args)
       =	ASSERT( isTyVar bndr )
 	tick (BetaReduction bndr)			`thenSmpl_`
-	go (extendSubst env bndr (DoneTy ty_arg)) body args
+	go (extendTvSubst env bndr ty_arg) body args
 
 	-- Ordinary beta reduction
     go env (Lam bndr body) (arg : args)
@@ -1108,7 +1111,7 @@ simplifyArg env fn_ty (val_arg, arg_se, is_strict) cont_ty thing_inside
 		-- have to be very careful about bogus strictness through 
 		-- floating a demanded let.
   = simplExprC (setInScope arg_se env) val_arg
-	       (mkStop arg_ty AnArg)		`thenSmpl` \ arg1 ->
+	       (mkBoringStop arg_ty)		`thenSmpl` \ arg1 ->
    thing_inside env arg1
   where
     arg_ty = funArgTy fn_ty
@@ -1237,7 +1240,8 @@ addAtomicBindsE env ((v,r):bs) thing_inside
   | needsCaseBinding (idType v) r
   = addAtomicBindsE (addNewInScopeIds env [v]) bs thing_inside	`thenSmpl` \ (floats, expr) ->
     WARN( exprIsTrivial expr, ppr v <+> pprCoreExpr expr )
-    returnSmpl (emptyFloats env, Case r v [(DEFAULT,[], wrapFloats floats expr)])
+    (let body = wrapFloats floats expr in 
+     returnSmpl (emptyFloats env, Case r v (exprType body) [(DEFAULT,[],body)]))
 
   | otherwise
   = addAuxiliaryBind env (NonRec v r) 	$ \ env -> 
@@ -1306,15 +1310,27 @@ rebuildCase env scrut case_bndr alts cont
     prepareCaseCont env better_alts cont	`thenSmpl` \ (floats, (dup_cont, nondup_cont)) ->
     addFloats env floats			$ \ env ->	
 
+    let
+	-- The case expression is annotated with the result type of the continuation
+	-- This may differ from the type originally on the case.  For example
+	-- 	case(T) (case(Int#) a of { True -> 1#; False -> 0# }) of
+	--	   a# -> <blob>
+	-- ===>
+	--	let j a# = <blob>
+	--	in case(T) a of { True -> j 1#; False -> j 0# }
+	-- Note that the case that scrutinises a now returns a T not an Int#
+	res_ty' = contResultType dup_cont
+    in
+
 	-- Deal with variable scrutinee
     simplCaseBinder env scrut case_bndr 	`thenSmpl` \ (alt_env, case_bndr', zap_occ_info) ->
 
 	-- Deal with the case alternatives
     simplAlts alt_env zap_occ_info handled_cons
-	      case_bndr' better_alts dup_cont	`thenSmpl` \ alts' ->
+	      case_bndr' better_alts dup_cont res_ty'	`thenSmpl` \ alts' ->
 
 	-- Put the case back together
-    mkCase scrut case_bndr' alts'		`thenSmpl` \ case_expr ->
+    mkCase scrut case_bndr' res_ty' alts'	`thenSmpl` \ case_expr ->
 
 	-- Notice that rebuildDone returns the in-scope set from env, not alt_env
 	-- The case binder *not* scope over the whole returned case-expression
@@ -1422,25 +1438,28 @@ simplAlts :: SimplEnv
 					-- in the default case
 	  -> OutId			-- Case binder
 	  -> [InAlt] -> SimplCont
+	  -> OutType			-- Result type
 	  -> SimplM [OutAlt]		-- Includes the continuation
 
-simplAlts env zap_occ_info handled_cons case_bndr' alts cont'
+simplAlts env zap_occ_info handled_cons case_bndr' alts cont' res_ty'
   = mapSmpl simpl_alt alts
   where
-    inst_tys' = tyConAppArgs (idType case_bndr')
+    mk_rhs_env env case_bndr_unf
+	= modifyInScope env case_bndr' (case_bndr' `setIdUnfolding` case_bndr_unf)
 
     simpl_alt (DEFAULT, _, rhs)
-	= let
-		-- In the default case we record the constructors that the
-		-- case-binder *can't* be.
-		-- We take advantage of any OtherCon info in the case scrutinee
-		case_bndr_w_unf = case_bndr' `setIdUnfolding` mkOtherCon handled_cons
-		env_with_unf    = modifyInScope env case_bndr' case_bndr_w_unf 
-	  in
-	  simplExprC env_with_unf rhs cont'	`thenSmpl` \ rhs' ->
+	= let unf = mkOtherCon handled_cons in
+		-- Record the constructors that the case-binder *can't* be.
+	  simplExprC (mk_rhs_env env unf) rhs cont'	`thenSmpl` \ rhs' ->
 	  returnSmpl (DEFAULT, [], rhs')
 
-    simpl_alt (con, vs, rhs)
+    simpl_alt (LitAlt lit, _, rhs)
+	= let unf = mkUnfolding False (Lit lit) in
+	  simplExprC (mk_rhs_env env unf) rhs cont'	`thenSmpl` \ rhs' ->
+	  returnSmpl (LitAlt lit, [], rhs')
+
+    simpl_alt (DataAlt con, vs, rhs)
+	| isVanillaDataCon con
 	= 	-- Deal with the pattern-bound variables
 		-- Mark the ones that are in ! positions in the data constructor
 		-- as certainly-evaluated.
@@ -1450,13 +1469,34 @@ simplAlts env zap_occ_info handled_cons case_bndr' alts cont'
 	  simplBinders env (add_evals con vs)		`thenSmpl` \ (env, vs') ->
 
 		-- Bind the case-binder to (con args)
-	  let
-		unfolding    = mkUnfolding False (mkAltExpr con vs' inst_tys')
-		env_with_unf = modifyInScope env case_bndr' (case_bndr' `setIdUnfolding` unfolding)
+	  let unf = mkUnfolding False (mkConApp con con_args)
+	      inst_tys' = tyConAppArgs (idType case_bndr')
+	      con_args  = map Type inst_tys' ++ map varToCoreExpr vs' 
 	  in
-	  simplExprC env_with_unf rhs cont'		`thenSmpl` \ rhs' ->
-	  returnSmpl (con, vs', rhs')
+	  simplExprC (mk_rhs_env env unf) rhs cont'	`thenSmpl` \ rhs' ->
+	  returnSmpl (DataAlt con, vs', rhs')
 
+
+	| otherwise	-- GADT case
+	= simplBinders env (add_evals con vs)		`thenSmpl` \ (env, vs') ->
+	  let unf         = mkUnfolding False con_app
+	      con_app    = mkConApp con con_args
+	      con_args   = map varToCoreExpr vs' 	-- NB: no inst_tys'
+	      pat_res_ty = exprType con_app
+	      env_w_unf  = mk_rhs_env env unf
+	      tv_subst   = getTvSubst env
+	  in
+	  case coreRefineTys vs' tv_subst pat_res_ty (idType case_bndr') of
+	     Just tv_subst_env -> 
+		simplExprC (setTvSubstEnv env_w_unf tv_subst_env) rhs cont'	`thenSmpl` \ rhs' ->
+		returnSmpl (DataAlt con, vs', rhs')
+	     Nothing -> 	-- Dead code; for now, I'm just going to put in an
+				-- error case so I can see them
+		let rhs' = mkApps (Var eRROR_ID) 
+				[Type (substTy tv_subst (exprType rhs)),
+				 Lit (mkStringLit "Impossible alternative (GADT)")]
+		in 
+		returnSmpl (DataAlt con, vs', rhs')
 
 	-- add_evals records the evaluated-ness of the bound variables of
 	-- a case pattern.  This is *important*.  Consider
@@ -1467,15 +1507,14 @@ simplAlts env zap_occ_info handled_cons case_bndr' alts cont'
 	-- We really must record that b is already evaluated so that we don't
 	-- go and re-evaluate it when constructing the result.
 
-    add_evals (DataAlt dc) vs = cat_evals dc vs (dataConRepStrictness dc)
-    add_evals other_con    vs = vs
+    add_evals dc vs = cat_evals dc vs (dataConRepStrictness dc)
 
     cat_evals dc vs strs
 	= go vs strs
 	where
 	  go [] [] = []
+	  go (v:vs) strs | isTyVar v = v : go vs strs
 	  go (v:vs) (str:strs)
-	    | isTyVar v          = v	    : go vs (str:strs)
 	    | isMarkedStrict str = evald_v  : go vs strs
 	    | otherwise          = zapped_v : go vs strs
 	    where
@@ -1527,25 +1566,31 @@ knownCon env con args bndr alts cont
 				  simplNonRecX env bndr (Lit lit)	$ \ env ->
 				  simplExprF env rhs cont
 
-	(DataAlt dc, bs, rhs)  -> ASSERT( length bs + n_tys == length args )
-				  bind_args env bs (drop n_tys args)	$ \ env ->
-				  let
-				    con_app  = mkConApp dc (take n_tys args ++ con_args)
-				    con_args = [substExpr (getSubst env) (varToCoreExpr b) | b <- bs]
+	(DataAlt dc, bs, rhs)  
+		-> ASSERT( n_drop_tys + length bs == length args )
+		   bind_args env bs (drop n_drop_tys args)	$ \ env ->
+		   let
+			con_app  = mkConApp dc (take n_drop_tys args ++ con_args)
+			con_args = [substExpr (getSubst env) (varToCoreExpr b) | b <- bs]
 					-- args are aready OutExprs, but bs are InIds
-				  in
-				  simplNonRecX env bndr con_app		$ \ env ->
-			          simplExprF env rhs cont
-			       where
-				  n_tys = dataConNumInstArgs dc	-- Non-existential type args
+		   in
+		   simplNonRecX env bndr con_app		$ \ env ->
+		   simplExprF env rhs cont
+	        where
+		   n_drop_tys | isVanillaDataCon dc = tyConArity (dataConTyCon dc)
+			      | otherwise	    = 0
+			-- Vanilla data constructors lack type arguments in the pattern
+
 -- Ugh!
 bind_args env [] _ thing_inside = thing_inside env
 
 bind_args env (b:bs) (Type ty : args) thing_inside
-  = bind_args (extendSubst env b (DoneTy ty)) bs args thing_inside
+  = ASSERT( isTyVar b )
+    bind_args (extendTvSubst env b ty) bs args thing_inside
     
 bind_args env (b:bs) (arg : args) thing_inside
-  = simplNonRecX env b arg	$ \ env ->
+  = ASSERT( isId b )
+    simplNonRecX env b arg	$ \ env ->
     bind_args env bs args thing_inside
 \end{code}
 
@@ -1639,7 +1684,7 @@ mkDupableCont env (ApplyTo _ arg se cont)
 	-- This has been this way for a long time, so I'll leave it,
 	-- but I can't convince myself that it's right.
 
-
+-- gaw 2004
 mkDupableCont env (Select _ case_bndr alts se cont)
   = 	-- e.g.		(case [...hole...] of { pi -> ei })
 	--	===>

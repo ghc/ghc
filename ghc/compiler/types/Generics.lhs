@@ -11,7 +11,7 @@ import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			)
 import TcHsSyn		( mkSimpleHsAlt )
 import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy, isTauTy )
-import DataCon          ( DataCon, dataConOrigArgTys, isExistentialDataCon,
+import DataCon          ( DataCon, dataConOrigArgTys, isVanillaDataCon,
 			  dataConSourceArity )
 
 import TyCon            ( TyCon, tyConName, tyConDataCons, 
@@ -228,7 +228,7 @@ canDoGenerics data_cons
   =  not (any bad_con data_cons) 	-- See comment below
   && not (null data_cons)		-- No values of the type
   where
-    bad_con dc = any bad_arg_type (dataConOrigArgTys dc) || isExistentialDataCon dc
+    bad_con dc = any bad_arg_type (dataConOrigArgTys dc) || not (isVanillaDataCon dc)
   	-- If any of the constructor has an unboxed type as argument,
 	-- then we can't build the embedding-projection pair, because
 	-- it relies on instantiating *polymorphic* sum and product types
@@ -253,11 +253,11 @@ type FromAlt = (LPat RdrName, LHsExpr RdrName)
 mkTyConGenericBinds :: TyCon -> LHsBinds RdrName
 mkTyConGenericBinds tycon
   = unitBag (L loc (FunBind (L loc from_RDR) False {- Not infix -}
-		 	    [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts]))
+		 	    (mkMatchGroup [mkSimpleHsAlt pat rhs | (pat,rhs) <- from_alts])))
 
 	`unionBags`
     unitBag (L loc (FunBind (L loc to_RDR) False 
-			    [mkSimpleHsAlt to_pat to_body]))
+			    (mkMatchGroup [mkSimpleHsAlt to_pat to_body])))
   where
     loc	     = srcLocSpan (getSrcLoc tycon)
     datacons = tyConDataCons tycon
@@ -305,8 +305,8 @@ mk_sum_stuff us datacons
   = (wrap inlDataCon_RDR l_from_alts ++ wrap inrDataCon_RDR r_from_alts,
      nlVarPat to_arg,
      noLoc (HsCase (nlHsVar to_arg) 
-	    [mkSimpleHsAlt (nlConPat inlDataCon_RDR [l_to_pat]) l_to_body,
-	     mkSimpleHsAlt (nlConPat inrDataCon_RDR [r_to_pat]) r_to_body]))
+	    (mkMatchGroup [mkSimpleHsAlt (nlConPat inlDataCon_RDR [l_to_pat]) l_to_body,
+			   mkSimpleHsAlt (nlConPat inrDataCon_RDR [r_to_pat]) r_to_body])))
   where
     (l_datacons, r_datacons)		= splitInHalf datacons
     (l_from_alts, l_to_pat, l_to_body)	= mk_sum_stuff us' l_datacons
@@ -364,8 +364,9 @@ mk_prod_stuff us arg_vars	-- Two or more
   = (us'', 
      nlHsApps crossDataCon_RDR [l_alt_rhs, r_alt_rhs],
      nlVarPat to_arg, 
-     \x -> noLoc (HsCase (nlHsVar to_arg)
-		  [mkSimpleHsAlt pat (l_to_body_fn (r_to_body_fn x))]))
+-- gaw 2004 FIX?
+     \x -> noLoc (HsCase (nlHsVar to_arg) 
+		  (mkMatchGroup [mkSimpleHsAlt pat (l_to_body_fn (r_to_body_fn x))])))
   where
     to_arg = mkGenericLocal us
     (l_arg_vars, r_arg_vars) 		      = splitInHalf arg_vars
