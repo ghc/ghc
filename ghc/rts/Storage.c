@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.58 2002/01/24 01:45:55 sof Exp $
+ * $Id: Storage.c,v 1.59 2002/02/04 20:21:22 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -21,6 +21,7 @@
 
 #include "Storage.h"
 #include "Schedule.h"
+#include "OSThreads.h"
 #include "StoragePriv.h"
 
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
@@ -48,7 +49,7 @@ lnat total_allocated = 0;	/* total memory allocated during run */
  * simultaneous access by two STG threads.
  */
 #ifdef SMP
-pthread_mutex_t sm_mutex = PTHREAD_MUTEX_INITIALIZER;
+Mutex sm_mutex = INIT_MUTEX_VAR;
 #endif
 
 /*
@@ -80,6 +81,10 @@ initStorage( void )
 
   initBlockAllocator();
   
+#if defined(SMP)
+  initCondition(&sm_mutex);
+#endif
+
   /* allocate generation info array */
   generations = (generation *)stgMallocBytes(RtsFlags.GcFlags.generations 
 					     * sizeof(struct _generation),
@@ -190,8 +195,8 @@ initStorage( void )
   /* Tell GNU multi-precision pkg about our custom alloc functions */
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
 
-#ifdef SMP
-  pthread_mutex_init(&sm_mutex, NULL);
+#if defined(SMP)
+  initMutex(&sm_mutex);
 #endif
 
   IF_DEBUG(gc, statDescribeGens());
@@ -254,7 +259,7 @@ newCAF(StgClosure* caf)
    * come to do a major GC we won't need the mut_link field
    * any more and can use it as a STATIC_LINK.
    */
-  ACQUIRE_LOCK(&sm_mutex);
+  ACQUIRE_SM_LOCK;
 
   if (is_dynamically_loaded_rwdata_ptr((StgPtr)caf)) {
       ((StgIndStatic *)caf)->saved_info  = (StgInfoTable *)caf->header.info;
@@ -266,7 +271,7 @@ newCAF(StgClosure* caf)
       oldest_gen->mut_once_list = (StgMutClosure *)caf;
   }
 
-  RELEASE_LOCK(&sm_mutex);
+  RELEASE_SM_LOCK;
 
 #ifdef PAR
   /* If we are PAR or DIST then  we never forget a CAF */
@@ -438,7 +443,7 @@ allocate( nat n )
   bdescr *bd;
   StgPtr p;
 
-  ACQUIRE_LOCK(&sm_mutex);
+  ACQUIRE_SM_LOCK;
 
   TICK_ALLOC_HEAP_NOCTR(n);
   CCS_ALLOC(CCCS,n);
@@ -459,7 +464,7 @@ allocate( nat n )
      * much difference.
      */
     alloc_blocks += req_blocks;
-    RELEASE_LOCK(&sm_mutex);
+    RELEASE_SM_LOCK;
     return bd->start;
 
   /* small allocation (<LARGE_OBJECT_THRESHOLD) */
@@ -480,7 +485,7 @@ allocate( nat n )
 
   p = alloc_Hp;
   alloc_Hp += n;
-  RELEASE_LOCK(&sm_mutex);
+  RELEASE_SM_LOCK;
   return p;
 }
 
@@ -519,7 +524,7 @@ allocatePinned( nat n )
     StgPtr p;
     bdescr *bd = pinned_object_block;
 
-    ACQUIRE_LOCK(&sm_mutex);
+    ACQUIRE_SM_LOCK;
     
     TICK_ALLOC_HEAP_NOCTR(n);
     CCS_ALLOC(CCCS,n);
@@ -527,7 +532,7 @@ allocatePinned( nat n )
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	RELEASE_LOCK(&sm_mutex);
+	RELEASE_SM_LOCK;
 	return allocate(n);
     }
 
@@ -545,7 +550,7 @@ allocatePinned( nat n )
 
     p = bd->free;
     bd->free += n;
-    RELEASE_LOCK(&sm_mutex);
+    RELEASE_SM_LOCK;
     return p;
 }
 
