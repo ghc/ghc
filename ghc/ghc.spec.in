@@ -139,6 +139,8 @@ rm -rf $RPM_BUILD_ROOT
 make prefix=$RPM_BUILD_ROOT%{prefix} install-dirs
 
 make prefix=$RPM_BUILD_ROOT%{prefix} install
+mkdir -p $RPM_BUILD_ROOT%{prefix}/share/doc/ghc-%{version}
+cp ghc/ANNOUNCE ghc/README $RPM_BUILD_ROOT%{prefix}/share/doc/ghc-%{version}
 
 make prefix=$RPM_BUILD_ROOT%{prefix} datadir=$RPM_BUILD_ROOT%{prefix}/share/doc/ghc-%{version} SGMLDocWays="html ps" install-docs
 
@@ -166,10 +168,12 @@ cd $dir
 rm -rf $RPM_BUILD_ROOT
 
 %files -f rpm-noprof-lib-files
-%doc ghc/ANNOUNCE ghc/README
+%doc %{prefix}/share/doc/ghc-%{version}/ANNOUNCE
+%doc %{prefix}/share/doc/ghc-%{version}/README
 %{prefix}/bin/*
 
 %files prof -f rpm-prof-lib-files
 
 %files doc
-%doc %{prefix}/share/doc/ghc-%{version}
+%doc %{prefix}/share/doc/ghc-%{version}/*.ps
+%doc %{prefix}/share/doc/ghc-%{version}/html
