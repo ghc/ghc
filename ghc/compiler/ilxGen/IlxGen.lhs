@@ -67,7 +67,8 @@ import CmdLineOpts	( opt_InPackage, opt_SimplDoEtaReduction )
 ilxGen :: Module -> [TyCon] -> [(StgBinding,[Id])] -> SDoc
 	-- The TyCons should include those arising from classes
 ilxGen mod tycons binds_w_srts
-  =  vcat [vcat (map (ilxImportPackage topenv) (uniqSetToList import_packages)),
+  =  vcat [ text ".assembly extern ilx 'mscorlib' {}",
+	    vcat (map (ilxImportPackage topenv) (uniqSetToList import_packages)),
             vcat (map (ilxImportModule topenv) (uniqSetToList import_modules)),
             vcat (map (ilxImportTyCon topenv) (uniqSetToList import_tycons)),
             vcat (map (ilxImportCCall topenv) (map snd (ufmToList import_ccalls))),
@@ -214,7 +215,7 @@ ilxImportCCall env (c,cc,args,ret) =
     text ".method static assembly pinvokeimpl" <+> 
     parens (doubleQuotes (text "HSstd_cbits.dll") <+> text "cdecl") <+> retdoc <+> singleQuotes (pprCLabelString c) <+> 
     pprCValArgTys ilxTypeL env (map deepIlxRepType (filter (not. isVoidIlxRepType) args)) <+> 
-    text "native unmanaged preservesig { }"
+    text "unmanaged preservesig { }"
   where 
     retdoc = 
           if isVoidIlxRepType ret then text "void" 
@@ -1092,7 +1093,7 @@ pushLit env (MachFloat f)  = text "ldc.r4" <+> rational f
 pushLit env (MachDouble f) = text "ldc.r8" <+> rational f
 pushLit env (MachLitLit _ _) = trace "WARNING: Cannot compile MachLitLit to ILX in IlxGen.lhs" (text "// MachLitLit!!!  Not valid in ILX!!")
 pushLit env (MachAddr w) = text "ldc.i4" <+> integer w <+> text "conv.i"
-
+pushLit env (MachLabel l) = trace "WARNING: Cannot compile MachLabel to ILX in IlxGen.lhs" (text "// MachLabel!!!  Not valid in ILX!!")
 
 pprIlxTopVar env v
   | isGlobalName n = (nameReference env n) <> pprId (nameModule n) <> text "::" <> singleQuotes (ppr (nameModule n) <> text "_" <> ppr (nameOccName n))
@@ -1971,8 +1972,8 @@ ilxPrimOpTable op
 	IndexOffAddrOp_WideChar    -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
 	IndexOffAddrOp_Int     -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
 	IndexOffAddrOp_Word    -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
-	IndexOffAddrOp_Addr    -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.i")
-	IndexOffAddrOp_StablePtr   -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.ref")
+	IndexOffAddrOp_Addr    -> simp_op (ilxOp "sizeof unsigned int mul add ldind.i")
+	IndexOffAddrOp_StablePtr   -> simp_op (ilxOp "sizeof unsigned int mul add ldind.ref")
 	IndexOffAddrOp_Float   -> simp_op (ilxOp "sizeof float32 mul add ldind.r4")
 	IndexOffAddrOp_Double  -> simp_op (ilxOp "sizeof float64 mul add ldind.r8")
 	IndexOffAddrOp_Int8   -> simp_op (ilxOp "sizeof int8 mul add ldind.i1")
@@ -1990,8 +1991,8 @@ ilxPrimOpTable op
 	IndexOffForeignObjOp_WideChar    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.u4"])
 	IndexOffForeignObjOp_Int     -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int32 mul add ldind.i4"])
 	IndexOffForeignObjOp_Word    -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int32 mul add ldind.u4"])
-	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof native unsigned int mul add ldind.i  "])
-	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof native unsigned int mul add ldind.ref  "])
+	IndexOffForeignObjOp_Addr    ->  arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int mul add ldind.i  "])
+	IndexOffForeignObjOp_StablePtr    ->  ty1_arg2_op (\ty fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof unsigned int mul add ldind.ref  "])
 	IndexOffForeignObjOp_Float   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof float32 mul add ldind.r4"])
 	IndexOffForeignObjOp_Double  -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof float64 mul add ldind.r8"])
 	IndexOffForeignObjOp_Int8   -> arg2_op (\fobj n -> ilxOpSeq [fobj, ilxAddrOfForeignOp, n, ilxOp "sizeof int8 mul add ldind.i1"])
@@ -2007,10 +2008,10 @@ ilxPrimOpTable op
 	ReadOffAddrOp_WideChar -> simp_op (ilxOp "sizeof int32 mul add ldind.u4")
 	ReadOffAddrOp_Int    -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
 	ReadOffAddrOp_Word   -> simp_op (ilxOp "sizeof unsigned int32 mul add ldind.u4")
-	ReadOffAddrOp_Addr   -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.i")
+	ReadOffAddrOp_Addr   -> simp_op (ilxOp "sizeof unsigned int mul add ldind.i")
 	ReadOffAddrOp_Float  -> simp_op (ilxOp "sizeof float32 mul add ldind.r4")
 	ReadOffAddrOp_Double -> simp_op (ilxOp "sizeof float64 mul add ldind.r8")
-	ReadOffAddrOp_StablePtr  -> simp_op (ilxOp "sizeof native unsigned int mul add ldind.ref")
+	ReadOffAddrOp_StablePtr  -> simp_op (ilxOp "sizeof unsigned int mul add ldind.ref")
 	ReadOffAddrOp_Int8  -> simp_op (ilxOp "sizeof int8 mul add ldind.i1")
 	ReadOffAddrOp_Int16  -> simp_op (ilxOp "sizeof int16 mul add ldind.i2")
 	ReadOffAddrOp_Int32  -> simp_op (ilxOp "sizeof int32 mul add ldind.i4")
@@ -2025,10 +2026,10 @@ ilxPrimOpTable op
 	WriteOffAddrOp_WideChar   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.u4"])
 	WriteOffAddrOp_Int    -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.i4"])
 	WriteOffAddrOp_Word   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof int32 mul add", v, ilxOp "stind.u4"])
-	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.i"])
-	WriteOffAddrOp_ForeignObj   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.ref"])
+	WriteOffAddrOp_Addr   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof unsigned int mul add", v, ilxOp "stind.i"])
+	WriteOffAddrOp_ForeignObj   -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof unsigned int mul add", v, ilxOp "stind.ref"])
 	WriteOffAddrOp_Float  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof float32 mul add", v,ilxOp "stind.r4"])
-	WriteOffAddrOp_StablePtr   -> ty2_arg4_op (\ty1 sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof native unsigned int mul add", v, ilxOp "stind.ref"])
+	WriteOffAddrOp_StablePtr   -> ty2_arg4_op (\ty1 sty addr n v s -> ilxOpSeq [addr, n, ilxOp "sizeof unsigned int mul add", v, ilxOp "stind.ref"])
 	WriteOffAddrOp_Double -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof float64 mul add",v,ilxOp "stind.r8"])
 	WriteOffAddrOp_Int8  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int8 mul add",v,ilxOp "stind.i1"])
 	WriteOffAddrOp_Int16  -> ty1_arg4_op (\sty addr n v s -> ilxOpSeq [addr,n,ilxOp "sizeof int16 mul add",v,ilxOp "stind.i2"])
