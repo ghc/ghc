@@ -468,8 +468,16 @@ make_con (ConPat id ty pats) (ps,constraints)
       | otherwise     = (ConPatIn name pats_con : rest_pats, constraints)
     where num_args  = length pats
           name      = BS (getOccString id)
-          pats_con  = (take num_args ps)
-          rest_pats = drop num_args ps         
+          pats_con  = map paren_conpat_arg (take num_args ps)
+          rest_pats = drop num_args ps
+	  
+-- if needed, wrap a ParPatIn around a ConPatIn arg
+-- (for prettier printing.)
+paren_conpat_arg p@(ConPatIn _ []) = p
+paren_conpat_arg p@(ConPatIn _ _)  = ParPatIn p
+paren_conpat_arg p@(ConOpPatIn _ _ _ _) = ParPatIn p
+paren_conpat_arg p = p
+
 
 make_whole_con :: Id -> WarningPat
 make_whole_con con | isInfixCon con = ParPatIn(ConOpPatIn new_wild_pat name fixity new_wild_pat)
@@ -478,7 +486,7 @@ make_whole_con con | isInfixCon con = ParPatIn(ConOpPatIn new_wild_pat name fixi
                   fixity = panic "Check.make_whole_con: Guessing fixity"
                   name   = BS (getOccString con)
                   arity  = get_int_arity con 
-                  pats   = take arity (repeat new_wild_pat)
+                  pats   = map paren_conpat_arg (take arity (repeat new_wild_pat))
 
 
 new_wild_pat :: WarningPat
