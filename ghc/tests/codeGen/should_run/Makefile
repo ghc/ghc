@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.18 2001/03/28 14:26:34 simonmar Exp $
+# $Id: Makefile,v 1.19 2001/05/18 08:49:27 simonpj Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -28,6 +28,7 @@ cg033_HC_OPTS = -fglasgow-exts
 cg035_HC_OPTS = -package lang -fglasgow-exts
 cg042_HC_OPTS = -package lang -fglasgow-exts
 cg044_HC_OPTS = -package lang
+cg049_HC_OPTS = -funbox-strict-fields
 
 cg016_RUNTEST_OPTS = -x 1	# should override the -x 0 above.
 cg021_RUNTEST_OPTS = +RTS -K2m
