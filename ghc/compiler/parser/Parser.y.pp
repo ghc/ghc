@@ -16,7 +16,7 @@ INCLUDE "HsVersions.h"
 
 import HsSyn
 import RdrHsSyn
-import HscTypes		( ModIface, IsBootInterface, DeprecTxt )
+import HscTypes		( IsBootInterface, DeprecTxt )
 import Lexer
 import RdrName
 import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
@@ -36,7 +36,6 @@ import Type		( Kind, mkArrowKind, liftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..) )
 import OrdList
-import Bag		( emptyBag )
 import Panic
 
 import FastString
@@ -437,15 +436,20 @@ topdecl :: { OrdList (LHsDecl RdrName) }
       	| decl					{ unLoc $1 }
 
 tycl_decl :: { LTyClDecl RdrName }
- 	: 'type' syn_hdr '=' ctype	
-		-- Note ctype, not sigtype.
+ 	: 'type' type '=' ctype	
+		-- Note type on the left of the '='; this allows
+		-- infix type constructors to be declared
+		-- 
+		-- Note ctype, not sigtype, on the right
 		-- We allow an explicit for-all but we don't insert one
 		-- in 	type Foo a = (b,b)
 		-- Instead we just say b is out of scope
- 		{ LL $ let (tc,tvs) = $2 in TySynonym tc tvs $4 }
+ 		{% do { (tc,tvs) <- checkSynHdr $2
+		      ; return (LL (TySynonym tc tvs $4)) } }
 
 	| 'data' tycl_hdr constrs deriving
-		{ L (comb4 $1 $2 $3 $4)
+		{ L (comb4 $1 $2 $3 $4)	-- We need the location on tycl_hdr 
+					-- in case constrs and deriving are both empty
 		    (mkTyData DataType $2 Nothing (reverse (unLoc $3)) (unLoc $4)) }
 
         | 'data' tycl_hdr opt_kind_sig 'where' gadt_constrlist	-- No deriving for GADTs
@@ -467,12 +471,6 @@ opt_kind_sig :: { Maybe Kind }
 	: 				{ Nothing }
 	| '::' kind			{ Just $2 }
 
-syn_hdr :: { (Located RdrName, [LHsTyVarBndr RdrName]) }
-		-- We don't retain the syntax of an infix
-		-- type synonym declaration. Oh well.
-	: tycon tv_bndrs		{ ($1, $2) }
-	| tv_bndr tyconop tv_bndr 	{ ($2, [$1,$3]) }
-
 -- tycl_hdr parses the header of a type or class decl,
 -- which takes the form
 --	T a b
@@ -480,7 +478,7 @@ syn_hdr :: { (Located RdrName, [LHsTyVarBndr RdrName]) }
 --	(Eq a, Ord b) => T a b
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { Located (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName]) }
-	: context '=>' type		{% checkTyClHdr $1 $3 >>= return.LL }
+	: context '=>' type		{% checkTyClHdr $1         $3 >>= return.LL }
 	| type				{% checkTyClHdr (noLoc []) $1 >>= return.L1 }
 
 -----------------------------------------------------------------------------

@@ -925,18 +925,34 @@ Nevertheless, they can be useful when defining "phantom types".</para>
 </sect3>
 
 <sect3 id="infix-tycons">
-<title>Infix type constructors</title>
+<title>Infix type constructors and classes</title>
 
 <para>
-GHC allows type constructors to be operators, and to be written infix, very much 
+GHC allows type constructors and classes to be operators, and to be written infix, very much 
 like expressions.  More specifically:
 <itemizedlist>
 <listitem><para>
-  A type constructor can be an operator, beginning with a colon; e.g. <literal>:*:</literal>.
+  A type constructor or class can be an operator, beginning with a colon; e.g. <literal>:*:</literal>.
   The lexical syntax is the same as that for data constructors.
   </para></listitem>
 <listitem><para>
-  Types can be written infix.  For example <literal>Int :*: Bool</literal>.  
+  Data type and type-synonym declarations can be written infix, parenthesised
+  if you want further arguments.  E.g.
+<screen>
+  data a :*: b = Foo a b
+  type a :+: b = Either a b
+  class a :=: b where ...
+
+  data (a :**: b) x = Baz a b x
+  type (a :++: b) y = Either (a,b) y
+</screen>
+  </para></listitem>
+<listitem><para>
+  Types, and class constraints, can be written infix.  For example
+  <screen>
+	x :: Int :*: Bool
+        f :: (a :=: b) => a -> b
+  </screen>
   </para></listitem>
 <listitem><para>
   Back-quotes work
@@ -944,7 +960,7 @@ like expressions.  More specifically:
   <literal>Int `a` Bool</literal>.  Similarly, parentheses work the same; e.g.  <literal>(:*:) Int Bool</literal>.
   </para></listitem>
 <listitem><para>
-  Fixities may be declared for type constructors just as for data constructors.  However,
+  Fixities may be declared for type constructors, or classes, just as for data constructors.  However,
   one cannot distinguish between the two in a fixity declaration; a fixity declaration
   sets the fixity for a data constructor and the corresponding type constructor.  For example:
 <screen>
@@ -956,13 +972,6 @@ like expressions.  More specifically:
   </para></listitem>
 <listitem><para>
   Function arrow is <literal>infixr</literal> with fixity 0.  (This might change; I'm not sure what it should be.)
-  </para></listitem>
-<listitem><para>
-  Data type and type-synonym declarations can be written infix.  E.g.
-<screen>
-  data a :*: b = Foo a b
-  type a :+: b = Either a b
-</screen>
   </para></listitem>
 <listitem><para>
   The only thing that differs between operators in types and operators in expressions is that

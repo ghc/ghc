@@ -34,7 +34,8 @@ module RdrHsSyn (
 	, checkPrecP 	      -- Int -> P Int
 	, checkContext	      -- HsType -> P HsContext
 	, checkPred	      -- HsType -> P HsPred
-	, checkTyClHdr	      -- HsType -> (name,[tyvar])
+	, checkTyClHdr
+	, checkSynHdr	
 	, checkInstType	      -- HsType -> P HsType
 	, checkPattern	      -- HsExp -> P HsPat
 	, checkPatterns	      -- SrcLoc -> [HsExp] -> P [HsPat]
@@ -48,25 +49,16 @@ module RdrHsSyn (
 #include "HsVersions.h"
 
 import HsSyn		-- Lots of it
-import IfaceType
-import Packages		( PackageIdH(..) )
-import HscTypes		( ModIface(..), emptyModIface, mkIfaceVerCache,
-			  Dependencies(..), IsBootInterface, noDependencies )
-import IfaceSyn		( IfaceDecl(..), IfaceIdInfo(..), IfaceConDecl(..), IfaceConDecls(..) )
 import RdrName		( RdrName, isRdrTyVar, mkUnqual, rdrNameOcc, 
 			  isRdrTyVar, isRdrDataCon, isUnqual, getRdrName, isQual,
-			  setRdrNameSpace, rdrNameModule )
-import BasicTypes	( RecFlag(..), mapIPName, maxPrecedence, initialVersion )
+			  setRdrNameSpace )
+import BasicTypes	( RecFlag(..), maxPrecedence )
 import Lexer		( P, failSpanMsgP )
-import Kind		( liftedTypeKind )
-import HscTypes		( GenAvailInfo(..) )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
-import OccName  	( OccName, srcDataName, varName, isDataOcc, isTcOcc, 
-			  occNameUserString, isValOcc )
-import BasicTypes	( initialVersion, StrictnessMark(..) )
-import Module		( Module )
+import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
+			  occNameUserString )
 import SrcLoc
 import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
@@ -389,6 +381,10 @@ checkTyVars tvs
     chk (L l other)
 	= parseError l "Type found where type variable expected"
 
+checkSynHdr :: LHsType RdrName -> P (Located RdrName, [LHsTyVarBndr RdrName])
+checkSynHdr ty = do { (_, tc, tvs) <- checkTyClHdr (noLoc []) ty
+		    ; return (tc, tvs) }
+
 checkTyClHdr :: LHsContext RdrName -> LHsType RdrName
   -> P (LHsContext RdrName, Located RdrName, [LHsTyVarBndr RdrName])
 -- The header of a type or class decl should look like
@@ -450,11 +446,12 @@ checkPred (L spn ty)
   where
     checkl (L l ty) args = check l ty args
 
-    check loc (HsTyVar t)   args | not (isRdrTyVar t) 
-		  	     = return (L spn (HsClassP t args))
-    check loc (HsAppTy l r) args = checkl l (r:args)
-    check loc (HsParTy t)   args = checkl t args
-    check loc _             _    = parseError loc  "malformed class assertion"
+    check _loc (HsTyVar t)             args | not (isRdrTyVar t) 
+		 		  	    = return (L spn (HsClassP t args))
+    check _loc (HsAppTy l r)           args = checkl l (r:args)
+    check _loc (HsOpTy l (L loc tc) r) args = check loc (HsTyVar tc) (l:r:args)
+    check _loc (HsParTy t)  	       args = checkl t args
+    check loc _                        _    = parseError loc  "malformed class assertion"
 
 checkDictTy :: LHsType RdrName -> P (LHsType RdrName)
 checkDictTy (L spn ty) = check ty []
