@@ -241,15 +241,20 @@ processParsedTFile test_filter tfilepath initial_global_env topdefs
      }}
      where
         doOne global_env macro_env (TTest tname stmts)
-           = do putStr "\n"
+           = do putStr "\n\n"
                 let test_id = TestID tfilepath tname
                 officialMsg ("=== " ++ show test_id ++ " ===")
                 r <- doOneTest (("testname", tname):global_env)
                                 macro_env stmts
                 case r of
-                   Left barfage -> do officialMsg barfage
-                                      return (test_id, Nothing)
-                   Right res -> return (test_id, Just res)
+                   Left barfage 
+                      -> do officialMsg barfage
+                            return (test_id, Nothing)
+                   Right res@(exp,act)
+                      -> do officialMsg ("=== outcome for " ++ tname 
+                                         ++ ": exp:" ++ show exp
+                                         ++ ", act:" ++ show act ++ " ===")
+                            return (test_id, Just res)
 
 
 getApplicableTests :: Maybe [String] -> [TopDef] -> [TopDef]
@@ -426,7 +431,7 @@ doStmt (SRun var expr)
 
 doStmt (SFFail expr)
    = evalExpr expr				`thenEV` \ res ->
-     failagainEV ("user-framework-fail: " ++ res)
+     failagainEV ("=== user-framework-fail: " ++ res)
 doStmt (SResult res expr)
    = evalExprToBool expr			`thenEV` \ b ->
      whenEV b (setResult True{-actual-} res)	`thenEV_`
@@ -557,12 +562,10 @@ evalExpr (ECond c t maybe_f)
              Nothing -> returnEV ""
              Just f  -> evalExpr f
 evalExpr (EVar v)
-   = --trace (show v) (
-     lookupVar v
-     --)
+   = lookupVar v
 evalExpr (EFFail expr)
    = evalExpr expr				`thenEV` \ res ->
-     failEV ("user-framework-fail: " ++ res)
+     failEV ("=== user-framework-fail: " ++ res)
 
 evalExpr (EMacro mnm args)
    = runMacro mnm args				`thenEV` \ maybe_v ->
