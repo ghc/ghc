@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS += -syslib lang
+HC_OPTS += -package lang
 
 all :: runtest
 

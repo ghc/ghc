@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.10 2000/05/10 14:33:41 rrt Exp $
+# $Id: Makefile,v 1.11 2000/06/12 16:26:59 panne Exp $
 
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
@@ -10,7 +10,7 @@ endif
 
 include $(TOP)/mk/should_run.mk
 
-SRC_HC_OPTS += -dcore-lint
+HC_OPTS += -dcore-lint
 
 cg012_HC_OPTS = -fglasgow-exts
 cg015_HC_OPTS = -fglasgow-exts

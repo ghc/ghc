@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS += -fglasgow-exts -cpp -optP-imacros -optPhawk-macros.h
+HC_OPTS += -fglasgow-exts -cpp -optP-imacros -optPhawk-macros.h
 # Lack sensible input file to test it with.
 SRC_RUNTEST_OPTS += -count /dev/null
 

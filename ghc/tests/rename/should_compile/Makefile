@@ -2,7 +2,7 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_compile.mk
 
-SRC_HC_OPTS += -dcore-lint
+HC_OPTS += -dcore-lint
 # There used to be a -noC flag, but I removed it because
 # Rn037Help needs to generate an interface file, and
 # if -noC is on I can't see how to.  (Driver grottiness.)

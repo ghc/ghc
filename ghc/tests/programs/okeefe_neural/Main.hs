@@ -1,4 +1,4 @@
-{-# OPTIONS -syslib lang #-}
+{-# OPTIONS -package lang #-}
 
 module Main(main) where
 

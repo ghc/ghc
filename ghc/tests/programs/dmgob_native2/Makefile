@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS += -cpp -syslib misc -syslib exts
+HC_OPTS += -cpp -package misc -package exts
 
 all :: runtest
 

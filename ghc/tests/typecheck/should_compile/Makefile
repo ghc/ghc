@@ -2,12 +2,12 @@ TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/should_compile.mk
 
-SRC_HC_OPTS += -noC -dcore-lint -fno-warn-incomplete-patterns -hi-with-declarations -hi-with-instances -hi-with-exports
+HC_OPTS += -noC -dcore-lint -fno-warn-incomplete-patterns -hi-with-declarations -hi-with-instances -hi-with-exports
 
 tc019_HC_OPTS = -fglasgow-exts
-tc065_HC_OPTS = -syslib lang -syslib data
+tc065_HC_OPTS = -package lang -package data
 tc087_HC_OPTS = -fglasgow-exts
-tc088_HC_OPTS = -syslib lang
+tc088_HC_OPTS = -package lang
 tc089_HC_OPTS = -H12m
 tc097_HC_OPTS = -fglasgow-exts
 tc100_HC_OPTS = -O

@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
-SRC_HC_OPTS += -fglasgow-exts
+HC_OPTS += -fglasgow-exts
 
 all :: runtest
 

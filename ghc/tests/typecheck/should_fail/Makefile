@@ -5,7 +5,7 @@ include $(TOP)/mk/should_fail.mk
 HS_SRCS = $(wildcard *.hs)
 
 # The -noC messes up the Data82 compilation
-# SRC_HC_OPTS += -noC
+# HC_OPTS += -noC
 
 tcfail045_HC_OPTS = -fglasgow-exts
 tcfail068_HC_OPTS = -fglasgow-exts
