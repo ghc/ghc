@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.10 $
- * $Date: 1999/10/16 02:17:26 $
+ * $Revision: 1.11 $
+ * $Date: 1999/11/12 17:32:48 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1825,7 +1825,6 @@ Class c; {				/* defaults for class c		   */
 	name(hd(dsels)).defn = singleton(pair(pat,
 					      ap(mkInt(cclass(c).line),
 						 nthArg(i++,hd(pat)))));
-        name(hd(dsels)).inlineMe = TRUE;
 	genDefns	     = cons(hd(dsels),genDefns);
     }
     for (mems=cclass(c).members; nonNull(mems); mems=tl(mems)) {
@@ -1930,8 +1929,6 @@ Inst in; {                              /* member functions for instance in*/
     name(inst(in).builder).defn			/* Register builder imp	   */
 	     = singleton(pair(args,ap(LETREC,pair(singleton(locs),
 						  ap(l,d)))));
-    name(inst(in).builder).inlineMe   = TRUE;
-    name(inst(in).builder).isDBuilder = TRUE;
     genDefns = cons(inst(in).builder,genDefns);
 }
 
@@ -2378,8 +2375,8 @@ Name s; {                               /* particular selector, s.         */
     Type rng  = NIL;                    /* Inferred range                  */
     Cell nv   = inventVar();
     List alts = NIL;
-    Int  o;
-    Int  m;
+    Int  o    = 0;                      /* bogus init to keep gcc -O happy */
+    Int  m    = 0;                      /* bogus init to keep gcc -O happy */
 
 #ifdef DEBUG_SELS
     Printf("Selector %s, cns=",textToStr(name(s).text));

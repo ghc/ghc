@@ -13,8 +13,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: options.h,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/12 16:38:33 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/12 17:32:36 $
  * ------------------------------------------------------------------------*/
 
 
@@ -118,7 +118,7 @@
 
 #define MINIMUMHEAP        Pick(7500,   19000,      19000)
 #define MAXIMUMHEAP        Pick(32765,  0,          0)
-#define DEFAULTHEAP        Pick(28000,  50000,      650000)
+#define DEFAULTHEAP        Pick(28000,  50000,      300000)
 
 #define NUM_SCRIPTS        Pick(64,     100,        100)
 #define NUM_MODULE         NUM_SCRIPTS
@@ -201,16 +201,6 @@
 /* Is the default default (Int,Double) or (Integer,Double)?
  */
 #define DEFAULT_BIGNUM 1
-
-/* Should lambda lifter lift constant expressions out to top level?
- * Experimental optimisation.
- */
-#define LIFT_CONSTANTS 0
-
-/* Should we run optimizer on Hugs code?
- * Experimental optimisation.
- */
-#define USE_HUGS_OPTIMIZER 1
 
 /* Are things being used in an interactive setting or a batch setting?
  * In an interactive setting, System.exitWith should not call _exit

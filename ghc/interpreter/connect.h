@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.14 $
- * $Date: 1999/10/29 11:41:04 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/12 17:32:38 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -160,7 +160,6 @@ extern Bool  gcMessages;                /* TRUE => print GC messages       */
 extern Bool  literateScripts;           /* TRUE => default lit scripts     */
 extern Bool  literateErrors;            /* TRUE => report errs in lit scrs */
 extern Bool  showInstRes;               /* TRUE => show instance resolution */
-extern Bool  optimise;                  /* TRUE => simplify STG            */
 
 extern Int   cutoff;                    /* Constraint Cutoff depth         */
 
@@ -532,7 +531,6 @@ extern Void unlexStrConst  Args((Text));
 extern Void unlexVar       Args((Text));
 extern List offsetTyvarsIn          Args((Type,List));
 
-extern Void optimiseTopBinds  Args((List));
 extern List cfunSfuns;                  /* List of (Cfun,[SelectorVar])    */
 
 extern Void  interface        Args((Int));

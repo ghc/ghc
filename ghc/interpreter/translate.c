@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/11/01 11:07:07 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/12 17:32:48 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -455,11 +455,6 @@ Void stgDefn( Name n, Int arity, Cell e )
     }
     stgVarBody(name(n).stgVar) 
        = makeStgLambda(vs,stgExpr(e,arity,sc,namePMFail));
-    s = stgSize(stgVarBody(name(n).stgVar));
-    name(n).stgSize = s;
-    if (s <= SMALL_INLINE_SIZE && !name(n).inlineMe) {
-       name(n).inlineMe = TRUE;
-    }
 }
 
 Void implementCfun(c,scs)               /* Build implementation for constr */
@@ -487,8 +482,6 @@ List scs; {                             /* in incr order of strict comps.  */
         StgVar v = mkStgVar(mkStgCon(c,NIL),NIL);
         name(c).stgVar = v;
     }
-    name(c).inlineMe = TRUE;
-    name(c).stgSize = stgSize(stgVarBody(name(c).stgVar));
     stgGlobals = cons(pair(c,name(c).stgVar),stgGlobals); 
     /* printStg(stderr, name(c).stgVar); fprintf(stderr,"\n\n"); */
 }
@@ -752,8 +745,6 @@ Name n; {
     StgRhs   rhs = makeStgPrim(n,p->monad!=MONAD_Id,NIL,p->args,p->results);
     StgVar   v   = mkStgVar(rhs,NIL);
     name(n).stgVar   = v;
-    name(n).stgSize  = stgSize(stgVarBody(v));
-    name(n).inlineMe = TRUE;
     stgGlobals=cons(pair(n,v),stgGlobals);  /* so it will get codegened */
 }
 
@@ -848,11 +839,8 @@ Void implementForeignImport ( Name n )
                 textToStr(textOf(fst(extName)))
             EEND;
         }
-        /* ppStg(v); */
         name(n).defn     = NIL;
         name(n).stgVar   = v;
-        name(n).stgSize  = stgSize(stgVarBody(v));
-        name(n).inlineMe = TRUE; 
         stgGlobals=cons(pair(n,v),stgGlobals);/*so it will get codegen'd */
     }
 }
@@ -958,12 +946,9 @@ Void implementForeignExport ( Name n )
              );
 
     v = mkStgVar(fun,NIL);
-    /* ppStg(v); */
 
     name(n).defn     = NIL;    
     name(n).stgVar   = v;
-    name(n).stgSize  = stgSize(stgVarBody(v));
-    name(n).inlineMe = FALSE;
     stgGlobals       = cons(pair(n,v),stgGlobals);
     }
 }

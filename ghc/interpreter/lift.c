@@ -12,8 +12,8 @@
  * included in the distribution.
  *
  * $RCSfile: lift.c,v $
- * $Revision: 1.6 $
- * $Date: 1999/10/15 21:40:51 $
+ * $Revision: 1.7 $
+ * $Date: 1999/11/12 17:32:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -67,19 +67,7 @@ static inline Bool isTopLevel( StgVar v )
     } else if (stgVarInfo(v) == NONE) {
         return TRUE;  /* those at top level are already there */
     } else {
-#if LIFT_CONSTANTS
-#error lift constants
-        StgRhs rhs  = stgVarBody(v);
-        switch (whatIs(rhs)) {
-        case STGCON:
-        case STGAPP:
-                return isNull(stgVarInfo(v));
-        default:
-                return FALSE;
-        }
-#else
         return FALSE;
-#endif
     }
 }
 
@@ -106,31 +94,10 @@ static List liftLetBinds( List binds, Bool topLevel )
         StgVar bind = hd(binds);
         StgRhs rhs  = stgVarBody(bind);
         List   fvs  = filterFreeVars(stgVarInfo(bind));
-        /* stgVarInfo(bind) = NIL; */ /* ToDo: discard fv list */
-
-        /* if starting on a new top-level inlineable bind, ensure that
-           the lifted-out binds get marked inlineable too
-        */
-        if (topLevel) {
-           Name n         = nameFromStgVar(bind);
-           makeInlineable = FALSE;
-           if (nonNull(n) && name(n).inlineMe==TRUE) makeInlineable = TRUE;
-        }
 
         switch (whatIs(rhs)) {
         case STGCON:
         case STGAPP:
-#if LIFT_CONSTANTS
-#error lift constants
-                if (isNull(fvs)) {
-                    StgVar v = mkStgVar(rhs,NONE);
-                    stgVarBody(bind) = mkStgLet(singleton(v),v);
-                    /* ppStg(v); */ /* check inlinable */
-                    liftedBinds = cons(bind,liftedBinds);
-                    break;
-                }
-                /* deliberate fall through */
-#endif
         case STGVAR:
         case NAME:
                 bs = cons(bind,bs);
@@ -146,26 +113,11 @@ static List liftLetBinds( List binds, Bool topLevel )
                        sprintf(s,"lam%d",inlineCounter++);
                        n = newName(findText(s),NIL);
                        name(n).stgVar = v;
-                       name(n).simplified = TRUE; /* optimiser is upstream of lifter */
-                       if (makeInlineable) name(n).inlineMe = TRUE;
                        stgVarBody(bind) = makeStgApp(n, fvs);
                     } else {
                        stgVarBody(bind) = makeStgApp(v, fvs);
                     }
                 }
-#if LIFT_CONSTANTS
-#error lift constants
-                else {
-                    StgVar r = mkStgVar(rhs,NIL); /* copy the var */
-                    StgVar v = mkStgVar(mkStgLet(singleton(r),r),NONE);
-                    stgVarBody(bind) = v; /* indirection to r */
-                    /* ppStg(v); */
-                    liftedBinds = cons(v,liftedBinds);
-                    bs = cons(bind,bs); /* keep the old binding */
-                    break;
-                }
-                /* deliberate fall through */
-#endif
                 bs = cons(bind,bs);
                 break;
         }
@@ -227,15 +179,8 @@ List liftBinds( List binds )
     }
 
     liftedBinds = NIL;
-    binds = liftLetBinds(binds,TRUE);
-    binds = revOnto(liftedBinds,binds);
-
-    for (bs=binds; nonNull(bs); bs=tl(bs)) {
-       Name n = nameFromStgVar(hd(bs));
-       if (nonNull(n))
-          name(n).stgSize = stgSize(stgVarBody(name(n).stgVar));
-    }
-    
+    binds       = liftLetBinds(binds,TRUE);
+    binds       = revOnto(liftedBinds,binds);
     liftedBinds = NIL;
     return binds;
 }

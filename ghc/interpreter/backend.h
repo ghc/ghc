@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: backend.h,v $
- * $Revision: 1.5 $
- * $Date: 1999/10/15 21:41:02 $
+ * $Revision: 1.6 $
+ * $Date: 1999/11/12 17:32:37 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -128,8 +128,6 @@ extern Bool    isStgVar      ( StgRhs rhs );
 extern Bool    isAtomic      ( StgRhs rhs );
 extern StgVar  mkStgVar      ( StgRhs rhs, Cell info );
 
-extern Int     stgSize       ( StgExpr e );
-
 #define mkStgRep(c) mkChar(c)
 
 /*-------------------------------------------------------------------------*/
@@ -181,10 +179,8 @@ extern List liftBinds( List binds );
 extern Void liftControl ( Int what );
 
 extern StgExpr substExpr ( List sub, StgExpr e );
-extern StgExpr zubstExpr ( List sub, StgExpr e );
 
 extern List freeVarsBind Args((List, StgVar));
-extern Void optimiseBind Args((StgVar));
 
 #ifdef CRUDE_PROFILING
 extern void cp_init ( void );

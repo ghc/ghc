@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: derive.c,v $
- * $Revision: 1.8 $
- * $Date: 1999/11/01 04:17:37 $
+ * $Revision: 1.9 $
+ * $Date: 1999/11/12 17:32:38 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -927,7 +927,6 @@ Tycon t; {
         name(nm).arity  = 1;
         name(nm).stgVar = mkStgVar(mkStgLambda(singleton(v),mkStgCase(v,alts)),
                                    NIL);
-        name(nm).stgSize = stgSize(stgVarBody(name(nm).stgVar));
         tycon(t).conToTag = nm;
         /* hack to make it print out */
         stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 
@@ -1007,7 +1006,6 @@ Tycon t; {
                                     mkStgPrimCase(v2,alts))))),
                             NIL
                           );
-        name(nm).stgSize = stgSize(stgVarBody(name(nm).stgVar));
         tycon(t).tagToCon = nm;
         /* hack to make it print out */
         stgGlobals = cons(pair(nm,name(nm).stgVar),stgGlobals); 

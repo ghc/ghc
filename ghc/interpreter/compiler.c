@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/11 17:42:31 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/12 17:32:37 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1602,14 +1602,6 @@ Void compileDefns() {                  /* compile script definitions       */
 
     binds = addGlobals(binds);
     done();
-#if USE_HUGS_OPTIMIZER
-    if (optimise) {
-       t = length(binds);
-       setGoal("Simplifying",t);
-       optimiseTopBinds(binds);
-       done();
-    }
-#endif
     setGoal("Generating code",t);
     stgCGBinds(binds);
 

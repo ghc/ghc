@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.18 $
- * $Date: 1999/11/12 14:32:44 $
+ * $Revision: 1.19 $
+ * $Date: 1999/11/12 17:32:39 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -114,7 +114,6 @@ static Bool   useDots      = RISCOS;    /* TRUE => use dots in progress    */
 static Bool   quiet        = FALSE;     /* TRUE => don't show progress     */
 static Bool   lastWasObject = FALSE;
        Bool   preludeLoaded = FALSE;
-       Bool   optimise      = FALSE;
 
 typedef 
    struct { 
@@ -189,10 +188,9 @@ return;
                   scriptInfo[i].path
              );
    }
-   //   printf ( "\n" );
    fflush(stdout);fflush(stderr);
-ppScripts();
-ppModules();
+   ppScripts();
+   ppModules();
    printf ( "\n" );
 }
 
@@ -321,7 +319,6 @@ String argv[]; {
 #ifdef DEBUG
     DEBUG_LoadSymbols(argv_0_orig);
 #endif
-
 
 
 #if 0
@@ -749,7 +746,6 @@ struct options toggle[] = {             /* List of command line toggles    */
     {'w', 1, "Always show which modules are loaded",  &listScripts},
     {'k', 1, "Show kind errors in full",              &kindExpert},
     {'o', 0, "Allow overlapping instances",           &allowOverlap},
-    {'O', 1, "Optimise (improve?) generated code",    &optimise},
 
 
 #if DEBUG_CODE
@@ -1583,7 +1579,6 @@ static Void local dumpStg( void ) {       /* print STG stuff                 */
 
         if (isNull(n) && whatIs(v)==STGVAR) {
            Printf ( "\n{- `%s' has no nametable entry -}\n", s );
-           Printf ( "{- stgSize of body is %d -}\n\n", stgSize(stgVarBody(v)));
            printStg(stderr, v );
         } else
         if (isNull(n)) {
@@ -1596,8 +1591,6 @@ static Void local dumpStg( void ) {       /* print STG stuff                 */
            Printf ( "Doesn't have a STG tree: %s\n", s );
         } else {
            Printf ( "\n{- stgVar of `%s' is id%d -}\n", s, -name(n).stgVar);
-           Printf ( "{- stgSize of body is %d -}\n\n", 
-                    stgSize(stgVarBody(name(n).stgVar)));
            printStg(stderr, name(n).stgVar);
         }
     }
@@ -2349,7 +2342,6 @@ Int what; {                     /* system to respond as appropriate ...    */
     typeChecker(what);
     compiler(what);   
     codegen(what);
-    optimiser(what);
 }
 
 /* --------------------------------------------------------------------------

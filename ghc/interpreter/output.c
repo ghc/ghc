@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/11 16:24:12 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/12 17:32:42 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -378,7 +378,7 @@ static Void local putAp(d,e)            /* print application (args>=1)     */
 Int  d;
 Cell e; {
     Cell   h;
-    Text   t;
+    Text   t = 0;                       /* bogus init to keep gcc -O happy */
     Syntax sy;
     Int    args = 0;
 

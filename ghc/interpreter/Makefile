@@ -1,6 +1,6 @@
 
 # ----------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.16 1999/11/12 16:38:31 sewardj Exp $                        #
+# $Id: Makefile,v 1.17 1999/11/12 17:32:37 sewardj Exp $                        #
 # ----------------------------------------------------------------------------- #
 
 TOP = ../..
@@ -21,7 +21,7 @@ DYN_EXT=.so
 LIB_DL=-ldl
 endif
 
-ifeq "$(HaveLibReadLine)$" "YES"
+ifeq "$(HaveLibReadline)$" "YES"
 LIB_READLINE=-lreadline
 else
 LIB_READLINE=
@@ -37,7 +37,7 @@ HS_SRCS =
 
 Y_SRCS = parser.y
 C_SRCS = link.c type.c static.c storage.c derive.c input.c compiler.c subst.c \
-     translate.c codegen.c lift.c free.c stgSubst.c optimise.c output.c   \
+     translate.c codegen.c lift.c free.c stgSubst.c output.c   \
      hugs.c dynamic.c stg.c sainteger.c interface.c
 
 SRC_CC_OPTS = -g -O -I$(GHC_DIR)/interpreter -I$(GHC_DIR)/includes -I$(GHC_DIR)/rts -D__HUGS__ -DCOMPILING_RTS -Wall -Wstrict-prototypes -Wno-unused -DDEBUG -DDEBUG_EXTRA -Winline
@@ -50,8 +50,8 @@ all :: parser.c $(GHC_LIBS_NEEDED) nHandle.$(DYN_EXT) hugs
 hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o \
       ../rts/Evaluator.o ../rts/ForeignCall.o ../rts/GC.o ../rts/Printer.o \
       ../rts/StgCRun.o
-	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) -lreadline \
-               -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lm
+	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
+		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) -lm
 
 nHandle.$(DYN_EXT): nHandle.c
 ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.15 $
- * $Date: 1999/11/09 00:40:12 $
+ * $Revision: 1.16 $
+ * $Date: 1999/11/12 17:32:43 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -1541,7 +1541,6 @@ Class parent; {
     name(m).arity    = 1;
     name(m).number   = mfunNo(no);
     name(m).type     = t;
-    name(m).inlineMe = TRUE;
     return m;
 }
 
@@ -4888,7 +4887,7 @@ Void checkExp() {                       /* Top level static check on Expr  */
     staticAnalysis(RESET);
 }
 
-Void checkContext() {			/* Top level static check on Expr  */
+Void checkContext(void) {		/* Top level static check on Expr  */
     List vs, qs;
 
     staticAnalysis(RESET);

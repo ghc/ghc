@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.7 $
- * $Date: 1999/10/15 21:40:57 $
+ * $Revision: 1.8 $
+ * $Date: 1999/11/12 17:32:45 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -183,7 +183,6 @@ static Void putStgAlts    ( Int left, List alts );
 static Void local putStgVar(StgVar v) 
 {
     if (isName(v)) {
-        if (name(v).inlineMe) putStr("IL__");
         unlexVar(name(v).text);
     } else {
         putStr("id");
@@ -535,7 +534,6 @@ StgVar b;
     beginStgPP(fp);
     n = nameFromStgVar(b);
     if (nonNull(n)) {
-       if (name(n).inlineMe) { putStr("INLINE\n"); pIndent(0); };
        putStr(textToStr(name(n).text));
     } else {
        putStgVar(b);

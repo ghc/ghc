@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.11 $
- * $Date: 1999/11/01 11:01:11 $
+ * $Revision: 1.12 $
+ * $Date: 1999/11/12 17:32:40 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -492,7 +492,6 @@ Void linkPreludeNames(void) {           /* Hook to names defined in Prelude */
         namePmInt          = linkName("primPmInt");
         namePmInteger      = linkName("primPmInteger");
         namePmDouble       = linkName("primPmDouble");
-        name(namePmInt).inlineMe = TRUE;
     }
 }
 
@@ -554,16 +553,12 @@ Int what; {
                        pFun(nameComp,           ".");
                        pFun(nameAnd,            "&&");
                        pFun(nameCompAux,        "primCompAux");
-                       name(nameCompAux).inlineMe = TRUE;
                        pFun(nameMap,            "map");
 
                        /* implementTagToCon                     */
                        pFun(namePMFail,         "primPmFail");
 		       pFun(nameError,          "error");
 		       pFun(nameUnpackString,   "primUnpackString");
-
-		       //                       /* foreign export dynamic */
-		       //pFun(nameCreateAdjThunk, "primCreateAdjThunk");
 
                        /* hooks for handwritten bytecode */
                        pFun(namePrimSeq,        "primSeq");

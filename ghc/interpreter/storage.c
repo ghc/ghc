@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.14 $
- * $Date: 1999/10/26 17:27:43 $
+ * $Revision: 1.15 $
+ * $Date: 1999/11/12 17:32:46 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -434,10 +434,6 @@ Cell parent; {
     name(nameHw).number       = EXECNAME;
     name(nameHw).defn         = NIL;
     name(nameHw).stgVar       = NIL;
-    name(nameHw).stgSize      = 0;
-    name(nameHw).inlineMe     = FALSE;
-    name(nameHw).simplified   = FALSE;
-    name(nameHw).isDBuilder   = FALSE;
     name(nameHw).callconv     = NIL;
     name(nameHw).type         = NIL;
     name(nameHw).primop       = 0;

@@ -5,7 +5,7 @@ echo "runallnofib: Can't cd to nofibtmp"
 exit
 fi
 
-TROOT=/home/v-julsew/Oct11
+TROOT=/home/v-julsew/Oct19
 NROOT=$TROOT/fpO/nofib
 
 cd nofibtmp
@@ -15,7 +15,7 @@ cd nofibtmp
 
 ../runnofib imaginary exp3_8
 ../runnofib imaginary gen_regexps
-../runnofib imaginary paraffins
+../runnofib imaginary paraffins 
 ../runnofib imaginary primes
 ../runnofib imaginary rfib
 ../runnofib imaginary tak
