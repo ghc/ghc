@@ -212,6 +212,87 @@
 
   </sect1>
 
+  <sect1 id="bug-reporting">
+    <title>Reporting bugs in GHC</title>
+    <indexterm><primary>bugs</primary><secondary>reporting</secondary>
+    </indexterm>
+    <indexterm><primary>reporting bugs</primary>
+    </indexterm>
+
+    <para>Glasgow Haskell is a changing system so there are sure to be
+    bugs in it. </para>
+
+    <para>To repot a bug, either:</para>
+
+    <itemizedlist>
+      <listitem>
+	<para>Go to the <ulink
+    url="http://sourceforge.net/projects/ghc/">SoureForge GHC
+    page</ulink>, go to the <quote>bugs</quote> section, click on
+    <quote>submit</quote>, and enter your bug report.  You can also
+    check the outstanding bugs here to make sure it hasn't already
+    been reported.  Or:</para>
+      </listitem>
+      <listitem>
+	<para>Email your bug report to
+    <Email>glasgow-haskell-bugs@haskell.org</Email>. </para>
+      </listitem>
+    </itemizedlist>
+
+    <sect2>
+      <title>What to put in a bug report</title>
+      <indexterm><primary>bug reports</primary><secondary>contents</secondary></indexterm>
+
+      <para>The name of the bug-reporting game is: facts, facts,
+      facts.  Don't omit them because &ldquo;Oh, they won't be
+      interested&hellip;&rdquo;</para>
+
+      <orderedlist>
+	<listitem>
+	  <para>What kind of machine are you running on, and exactly
+          what version of the operating system are you using?
+          (on a Unix system, <Command>uname -a</Command> or <Command>cat
+          /etc/motd</Command> will show the desired information.)</para>
+	</listitem>
+
+	<listitem>
+	  <para> What version of GCC are you using? <Command>gcc
+	  -v</Command> will tell you.</para>
+	</listitem>
+
+	<listitem>
+	  <para> Run the sequence of compiles/runs that caused the
+          offending behaviour, capturing all the input/output in a
+          &ldquo;script&rdquo; (a UNIX command) or in an Emacs shell
+          window.  We'd prefer to see the whole thing.</para>
+	</listitem>
+
+	<listitem>
+	  <para> Be sure any Haskell compilations are run with a
+          <Option>-v</Option> (verbose) flag, so we can see exactly
+          what was run, what versions of things you have, etc.</para>
+	</listitem>
+
+	<listitem>
+	  <para> What is the program behaviour that is wrong, in your
+	  opinion?</para>
+	</listitem>
+
+	<listitem>
+	  <para> If practical, please send enough source files for us
+          to duplicate the problem.</para>
+	</listitem>
+
+	<listitem>
+	  <para> If you are a Hero and track down the problem in the
+          compilation-system sources, please send us patches relative
+          to a known released version of GHC, or whole files if you
+          prefer.</para>
+	</listitem>
+      </orderedlist>
+    </sect2>
+  </sect1>
+
   <sect1 id="version-numbering">
     <title>GHC version numbering policy</title>
     <indexterm><primary>version, of ghc</primary></indexterm>

@@ -1542,10 +1542,10 @@ which you can then display.  For example, to run your program
 <Para>
 
 <Screen>
-<prompt> ./a.out +RTS -qP -qp8
-<prompt> grs2gr *.???.gr &#62; temp.gr # combine the 8 .gr files into one
-<prompt> gr2ps -O temp.gr              # cvt to .ps; output in temp.ps
-<prompt> ghostview -seascape temp.ps   # look at it!
+<prompt>&dollar;</prompt> ./a.out +RTS -qP -qp8
+<prompt>&dollar;</prompt> grs2gr *.???.gr &#62; temp.gr # combine the 8 .gr files into one
+<prompt>&dollar;</prompt> gr2ps -O temp.gr              # cvt to .ps; output in temp.ps
+<prompt>&dollar;</prompt> ghostview -seascape temp.ps   # look at it!
 </Screen>
 
 </Para>
@@ -1654,7 +1654,7 @@ translates to 4K bytes, and for 64-bit machines, 8K bytes.)
 </Para>
 </ListItem>
 </VarListEntry>
-<!-- no more -- HWL
+<!-- no more -HWL
 <VarListEntry>
 <Term><Option>-d</Option>:</Term>
 <ListItem>

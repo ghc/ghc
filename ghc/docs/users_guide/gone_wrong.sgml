@@ -8,9 +8,10 @@
 
 <Para>
 If you still have a problem after consulting this section, then you
-may have found a <Emphasis>bug</Emphasis>&mdash;please report it!  See <XRef LinkEnd="bug-reports"> for a
-list of things we'd like to know about your bug.  If in doubt, send a
-report&mdash;we love mail from irate users :-!
+may have found a <Emphasis>bug</Emphasis>&mdash;please report it!  See
+<XRef LinkEnd="bug-reporting"> for details on how to report a bug and
+a list of things we'd like to know about your bug.  If in doubt, send
+a report&mdash;we love mail from irate users :-!
 </Para>
 
 <Para>
@@ -153,28 +154,7 @@ proper dependency order.
 </Para>
 </ListItem>
 </VarListEntry>
-<VarListEntry>
-<Term>&ldquo;What's a `consistency error'?&rdquo;</Term>
-<ListItem>
-<Para>
-(These are reported just after linking your program.)
-</Para>
 
-<Para>
-You tried to link incompatible object files, e.g., normal ones
-(registerised, Appel garbage-collector) with profiling ones (two-space
-collector).  Or those compiled by a previous version of GHC
-with an incompatible newer version.
-</Para>
-
-<Para>
-If you run <Command>nm -o *.o &verbar; egrep 't (cc&verbar;hsc)\.'</Command> (or, on
-unregisterised files: <Command>what *.o</Command>), you'll see all the consistency
-tags/strings in your object files.  They must all be the same!
-(ToDo: tell you what they mean&hellip;)
-</Para>
-</ListItem>
-</VarListEntry>
 <VarListEntry>
 <Term>&ldquo;Is this line number right?&rdquo;</Term>
 <ListItem>
@@ -286,7 +266,8 @@ GHC-compiled program, please see <XRef LinkEnd="hard-core-debug">.
 <Term>&ldquo;My program entered an `absent' argument.&rdquo;</Term>
 <ListItem>
 <Para>
-This is definitely caused by a bug in GHC. Please report it.
+This is definitely caused by a bug in GHC. Please report it (see <xref
+linkend="bug-reporting">).
 </Para>
 </ListItem>
 </VarListEntry>
@@ -307,96 +288,6 @@ exception (please report it if it does).
 
 </Sect1>
 
-<Sect1 id="bug-reports">
-<Title>How to report a bug in the GHC system
-</Title>
-
-<Para>
-<IndexTerm><Primary>bug reports</Primary></IndexTerm>
-</Para>
-
-<Para>
-Glasgow Haskell is a changing system so there are sure to be bugs in
-it.  Please report them to
-<Email>glasgow-haskell-bugs@haskell.org</Email>!  (However, please
-check the earlier part of this section to be sure it's not a known
-not-really-a problem.)
-</Para>
-
-<Para>
-The name of the bug-reporting game is: facts, facts, facts.
-Don't omit them because &ldquo;Oh, they won't be interested&hellip;&rdquo;
-</Para>
-
-<Para>
-
-<OrderedList>
-<ListItem>
-
-<Para>
-What kind of machine are you running on, and exactly what version of
-the operating system are you using? (<Command>uname -a</Command> or
-<Command>cat /etc/motd</Command> will show the desired information.)
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- What version of GCC are you using? <Command>gcc -v</Command> will tell you.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- Run the sequence of compiles/runs that caused the offending
-behaviour, capturing all the input/output in a &ldquo;script&rdquo; (a UNIX
-command) or in an Emacs shell window.  We'd prefer to see the whole
-thing.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- Be sure any Haskell compilations are run with a <Option>-v</Option> (verbose)
-flag, so we can see exactly what was run, what versions of things you
-have, etc.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- What is the program behaviour that is wrong, in your opinion?
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- If practical, please send enough source files for us to duplicate the
- problem.
-
-</Para>
-</ListItem>
-<ListItem>
-
-<Para>
- If you are a Hero and track down the problem in the
-compilation-system sources, please send us patches relative to a known
-released version of GHC, or whole files if you prefer.
-
-</Para>
-</ListItem>
-
-</OrderedList>
-
-</Para>
-
-</Sect1>
-
 <Sect1 id="hard-core-debug">
 <Title>Hard-core debugging of GHC-compiled programs
 </Title>
@@ -407,7 +298,7 @@ released version of GHC, or whole files if you prefer.
 
 <Para>
 If your program is crashing, you should almost surely file a bug
-report, as outlined in previous sections.
+report, as outlined in <xref linkend="bug-reporting">.
 </Para>
 
 <Para>
