@@ -15,6 +15,7 @@ extern BOOLEAN hashIds;
 extern BOOLEAN etags;
 				  
 extern BOOLEAN ignoreSCC;
+extern BOOLEAN warnSCC;
 				  
 extern unsigned hash_table_size;
 

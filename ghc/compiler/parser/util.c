@@ -14,11 +14,12 @@ tree root; 		/* The root of the built syntax tree. */
 list Lnil;
 
 BOOLEAN nonstandardFlag = FALSE;  /* Set if non-std Haskell extensions to be used. */
-BOOLEAN haskell1_2Flag = FALSE;	  /* Set if we are compiling for 1.2    	   */
 BOOLEAN etags = FALSE;		  /* Set if we're parsing only to produce tags.	   */
 BOOLEAN hashIds = FALSE; 	  /* Set if Identifiers should be hashed.          */
 				  
 BOOLEAN ignoreSCC = TRUE;         /* Set if we ignore/filter scc expressions.      */
+BOOLEAN warnSCC = FALSE;          /* Set if we want to inform the user what _scc_s are
+                                     being ignored. */
 				  
 /**********************************************************************
 *                                                                     *
@@ -47,18 +48,6 @@ process_args(argc,argv)
 	while (keep_munging_option && *++*argv != '\0') {
 	    switch(**argv) {
 
-	    case 'N':
-		    nonstandardFlag = TRUE;
-		    break;
-
-	    case '2':
-		    haskell1_2Flag = TRUE;
-		    break;
-
-	    case 'S':
-		    ignoreSCC = FALSE;
-		    break;
-
 	    case 'D':
 #ifdef HSP_DEBUG
 		    { extern int yydebug;
@@ -67,15 +56,28 @@ process_args(argc,argv)
 #endif
 		    break;
 
+	    case 'E':
+		    etags = TRUE;
+		    break;
+
 	    /* -Hn -- Use Hash Table, Size n (if given) */
 	    case 'H':
 		    hashIds = TRUE;
 		    if(*(*argv+1)!= '\0')
 		      hash_table_size = atoi(*argv+1);
 		    break;
-	    case 'E':
-		    etags = TRUE;
+	    case 'N':
+		    nonstandardFlag = TRUE;
 		    break;
+
+	    case 'S':
+		    ignoreSCC = FALSE;
+		    break;
+
+	    case 'W':
+		    warnSCC = TRUE;
+		    break;
+
 	    }
 	}
 	argc--, argv++;
