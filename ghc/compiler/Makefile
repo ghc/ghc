@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.110 2000/11/07 14:01:53 simonmar Exp $
+# $Id: Makefile,v 1.111 2000/11/07 14:07:09 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -107,7 +107,7 @@ endif
 ifeq "$(GhcWithInterpreter)" "YES"
 ghc_409_at_least = $(shell expr "$(GhcMinVersion)" \>= 9)
 ifeq "$(ghc_409_at_least)" "1"
-SRC_HC_OPTS += -DGHCI
+SRC_HC_OPTS += -DGHCI -optc-DGHCI
 DIRS += ghci
 endif
 endif
