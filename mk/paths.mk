@@ -194,7 +194,7 @@ TAGS_C_SRCS=$(C_SRCS)
 #                        that may require extra tools to create.
 #
 #
-MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS)
+MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS)
 CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) $(HS_IFACES) $(HS_SS) a.out \
 		      $(DERIVED_SRCS)
