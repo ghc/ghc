@@ -72,14 +72,9 @@ import Hugs.Array
 import Array		-- Haskell'98 arrays
 #endif
 
-#ifndef __NHC__
 import Data.Typeable
-#endif
-
-#ifndef __NHC__
 #include "Typeable.h"
 INSTANCE_TYPEABLE2(Array,arrayTc,"Array")
-#endif
 
 #ifdef __GLASGOW_HASKELL__
 
