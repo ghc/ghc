@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1998
  *
- * $Id: writeError.c,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+ * $Id: writeError.c,v 1.2 2001/07/31 11:51:09 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -20,12 +20,6 @@ implementation in one or two places.)
 #include "RtsUtils.h"
 #include "HsCore.h"
 
-HsAddr
-addrOf_ErrorHdrHook(void)
-{
-  return &ErrorHdrHook;
-}
-
 void
 writeErrString__ (HsAddr msg_hdr, HsAddr msg, HsInt len)
 {
@@ -33,7 +27,9 @@ writeErrString__ (HsAddr msg_hdr, HsAddr msg, HsInt len)
   char* p  = (char*)msg;
   char  nl = '\n';
 
+#ifndef DLLized
   resetNonBlockingFd(2);
+#endif
 
   /* Print error msg header */
   if (msg_hdr) {

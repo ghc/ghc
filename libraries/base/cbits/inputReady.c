@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+ * $Id: inputReady.c,v 1.2 2001/07/31 11:51:09 simonmar Exp $
  *
  * hReady Runtime Support
  */
@@ -21,8 +21,8 @@
 int
 inputReady(int fd, int msecs)
 {
-    int maxfd, ready;
 #ifndef mingw32_TARGET_OS
+    int maxfd, ready;
     fd_set rfd;
     struct timeval tv;
 #endif

@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: system.c,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+ * $Id: system.c,v 1.2 2001/07/31 11:51:09 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -18,6 +18,7 @@
 HsInt
 systemCmd(HsAddr cmd)
 {
+  /* -------------------- WINDOWS VERSION --------------------- */
 #if defined(mingw32_TARGET_OS)
   STARTUPINFO sInfo;
   PROCESS_INFORMATION pInfo;
@@ -31,14 +32,22 @@ systemCmd(HsAddr cmd)
   sInfo.lpTitle         = NULL;
   sInfo.dwFlags         = 0;
 
-  if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &sInfo, &pInfo))
+  if (!CreateProcess(NULL, cmd, NULL, NULL, TRUE, 0, NULL, NULL, &sInfo, &pInfo))
+    /* The 'TRUE' says that the created process should share
+       handles with the current process.  This is vital to ensure
+       that error messages sent to stderr actually appear on the screen.
+       Since we are going to wait for the process to terminate anyway,
+       there is no problem with such sharing. */
+
     return -1;
   WaitForSingleObject(pInfo.hProcess, INFINITE);
   if (GetExitCodeProcess(pInfo.hProcess, &retCode) == 0) return -1;
   CloseHandle(pInfo.hProcess);
   CloseHandle(pInfo.hThread);
   return retCode;
+
 #else
+  /* -------------------- UNIX VERSION --------------------- */
     int pid;
     int wstat;
 
