@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Numeric.lhs,v 1.13 2001/02/28 00:01:03 qrczak Exp $
+% $Id: Numeric.lhs,v 1.14 2002/02/01 11:31:27 simonmar Exp $
 %
 % (c) The University of Glasgow, 1997-2000
 %
@@ -16,9 +16,8 @@ module Numeric
         ( fromRat          -- :: (RealFloat a) => Rational -> a
 	, showSigned       -- :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
 	, readSigned       -- :: (Real a) => ReadS a -> ReadS a
-	, showInt          -- :: Integral a => a -> ShowS
+
 	, readInt          -- :: (Integral a) => a -> (Char -> Bool) -> (Char -> Int) -> ReadS a
-	
 	, readDec          -- :: (Integral a) => ReadS a
 	, readOct          -- :: (Integral a) => ReadS a
 	, readHex          -- :: (Integral a) => ReadS a
@@ -29,11 +28,14 @@ module Numeric
 	, showFloat        -- :: (RealFloat a) => a -> ShowS
 	, readFloat        -- :: (RealFloat a) => ReadS a
 	
-	 
+	, showInt          -- :: Integral a => a -> ShowS
+        , showIntAtBase    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
+        , showHex          -- :: Integral a => a -> ShowS
+        , showOct          -- :: Integral a => a -> ShowS
+        , showBin          -- :: Integral a => a -> ShowS
+
 	, floatToDigits    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
 	, lexDigits        -- :: ReadS String
-
-          -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 	) where
 
 import Char
@@ -93,10 +95,45 @@ showGFloat    :: (RealFloat a) => Maybe Int -> a -> ShowS
 showEFloat d x =  showString (formatRealFloat FFExponent d x)
 showFFloat d x =  showString (formatRealFloat FFFixed d x)
 showGFloat d x =  showString (formatRealFloat FFGeneric d x)
-
 \end{code}
 
-#else	
+\begin{code}
+showIntAtBase :: Integral a => a -> (a -> Char) -> a -> ShowS
+showIntAtBase base toChr n r
+  | n < 0  = error ("NumExts.showIntAtBase: applied to negative number " ++ show n)
+  | otherwise = 
+    case quotRem n base of { (n', d) ->
+    let c = toChr d in
+    c `seq` -- stricter than necessary
+    let
+	r' = c : r
+    in
+    if n' == 0 then r' else showIntAtBase base toChr n' r'
+    }
+
+showHex :: Integral a => a -> ShowS
+showHex n r = 
+ showString "0x" $
+ showIntAtBase 16 (toChrHex) n r
+ where  
+  toChrHex d
+    | d < 10    = chr (ord '0' + fromIntegral d)
+    | otherwise = chr (ord 'a' + fromIntegral (d - 10))
+
+showOct :: Integral a => a -> ShowS
+showOct n r = 
+ showString "0o" $
+ showIntAtBase 8 (toChrOct) n r
+ where toChrOct d = chr (ord '0' + fromIntegral d)
+
+showBin :: Integral a => a -> ShowS
+showBin n r = 
+ showString "0b" $
+ showIntAtBase 2 (toChrOct) n r
+ where toChrOct d = chr (ord '0' + fromIntegral d)
+\end{code}
+
+#else
 
 %*********************************************************
 %*							*
