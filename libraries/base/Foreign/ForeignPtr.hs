@@ -25,10 +25,15 @@ module Foreign.ForeignPtr
 	, foreignPtrToPtr	 -- :: ForeignPtr a -> Ptr a
 	, touchForeignPtr        -- :: ForeignPtr a -> IO ()
 	, castForeignPtr	 -- :: ForeignPtr a -> ForeignPtr b
+
+	-- * GHC extensions
+	, mallocForeignPtr	--  :: Storable a => IO (ForeignPtr a)
+	, mallocForeignPtrBytes	--  :: Int -> IO (ForeignPtr a)
         ) 
 	where
 
 import Foreign.Ptr
+import Foreign.Storable
 import Data.Dynamic
 
 #ifdef __GLASGOW_HASKELL__
@@ -59,16 +64,17 @@ INSTANCE_TYPEABLE1(ForeignPtr,foreignPtrTc,"ForeignPtr")
 -- type argument of 'ForeignPtr' should normally be an instance of
 -- class 'Storable'.
 --
-data ForeignPtr a = ForeignPtr ForeignObj#
-
-instance CCallable (ForeignPtr a)
+data ForeignPtr a 
+  = ForeignPtr ForeignObj#
+  | MallocPtr  (MutableByteArray# RealWorld)
 
 eqForeignPtr  :: ForeignPtr a -> ForeignPtr a -> Bool
 eqForeignPtr (ForeignPtr fo1#) (ForeignPtr fo2#) = eqForeignObj# fo1# fo2#
+eqForeignPtr (MallocPtr fo1#)  (MallocPtr fo2#)  = sameMutableByteArray# fo1# fo2#
+eqForeignPtr _ _ = False
 
 instance Eq (ForeignPtr a) where 
     p == q = eqForeignPtr p q
-    p /= q = not (eqForeignPtr p q)
 
 newForeignPtr :: Ptr a -> IO () -> IO (ForeignPtr a)
 -- ^Turns a plain memory reference into a foreign object
@@ -85,11 +91,41 @@ newForeignPtr p finalizer
        addForeignPtrFinalizer fObj finalizer
        return fObj
 
+-- | allocates some memory and returns a ForeignPtr to it.  The memory
+-- will be released automatically when the ForeignPtr is discarded.
+--
+-- @mallocForeignPtr@ is equivalent to
+--
+-- >    do { p <- malloc; newForeignPtr p free }
+-- 
+-- although it may be implemented differently internally.  You may not
+-- assume that the memory returned by 'mallocForeignPtr' has been
+-- allocated with C's @malloc()@.
+
+mallocForeignPtr :: Storable a => IO (ForeignPtr a)
+mallocForeignPtr = doMalloc undefined
+  where doMalloc :: Storable a => a -> IO (ForeignPtr a)
+        doMalloc a = IO $ \s ->
+	  case newPinnedByteArray# size s of { (# s, mbarr# #) ->
+	   (# s, MallocPtr mbarr# #)
+          }
+	  where (I# size) = sizeOf a
+
+-- | similar to 'mallocForeignPtr', except that the size of the memory required
+-- is given explicitly as a number of bytes.
+mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
+mallocForeignPtrBytes (I# size) = IO $ \s ->
+  case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
+   (# s, MallocPtr mbarr# #)
+  }
+
 addForeignPtrFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds another finaliser to the given
 -- foreign object.  No guarantees are made on the order in
 -- which multiple finalisers for a single object are run.
 addForeignPtrFinalizer (ForeignPtr fo) finalizer = 
+  IO $ \s -> case mkWeak# fo () finalizer s of { (# s1, w #) -> (# s1, () #) }
+addForeignPtrFinalizer (MallocPtr fo) finalizer = 
   IO $ \s -> case mkWeak# fo () finalizer s of { (# s1, w #) -> (# s1, () #) }
 
 mkForeignPtr :: Ptr a -> IO (ForeignPtr a) {- not exported -}
@@ -117,6 +153,8 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- requirement that the exterior pointer must not be finalized
 -- until the interior pointer is no longer referenced.
 touchForeignPtr (ForeignPtr fo) 
+   = IO $ \s -> case touch# fo s of s -> (# s, () #)
+touchForeignPtr (MallocPtr fo) 
    = IO $ \s -> case touch# fo s of s -> (# s, () #)
 
 withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
@@ -160,10 +198,12 @@ foreignPtrToPtr :: ForeignPtr a -> Ptr a
 -- 'touchForeignPtr'.  However, the later routines
 -- are occasionally preferred in tool generated marshalling code.
 foreignPtrToPtr (ForeignPtr fo) = Ptr (foreignObjToAddr# fo)
+foreignPtrToPtr (MallocPtr  fo) = Ptr (byteArrayContents# (unsafeCoerce# fo))
 
 castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'
 -- parameterised by one type into another type.
 castForeignPtr (ForeignPtr a) = ForeignPtr a
+castForeignPtr (MallocPtr  a) = MallocPtr  a
 #endif
 
