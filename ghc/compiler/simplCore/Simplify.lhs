@@ -26,6 +26,7 @@ import Id		( Id, idType, idInfo, idArity, isDataConId,
 			  idNewDemandInfo, setIdInfo,
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
 			)
+import OccName		( encodeFS )
 import IdInfo		( OccInfo(..), isLoopBreaker,
 			  setArityInfo, 
 			  setUnfoldingInfo, 
@@ -1139,7 +1140,7 @@ mkAtomicArgs is_strict ok_float_unlifted rhs
 	| otherwise	-- Don't forget to do it recursively
 			-- E.g.  x = a:b:c:[]
 	=  mkAtomicArgs is_strict ok_float_unlifted arg	`thenSmpl` \ (arg_binds, arg') ->
-	   newId SLIT("a") arg_ty			`thenSmpl` \ arg_id ->
+	   newId FSLIT("a") arg_ty			`thenSmpl` \ arg_id ->
 	   go fun ((arg_binds `snocOL` (arg_id,arg')) `appOL` binds) 
 	      (Var arg_id : rev_args) args
 	where
@@ -1552,7 +1553,7 @@ mkDupableCont env (ApplyTo _ arg se cont)
     if exprIsDupable arg' then
 	returnSmpl (emptyFloats env, (ApplyTo OkToDup arg' (zapSubstEnv se) dup_cont, nondup_cont))
     else
-    newId SLIT("a") (exprType arg')			`thenSmpl` \ arg_id ->
+    newId FSLIT("a") (exprType arg')			`thenSmpl` \ arg_id ->
 
     tick (CaseOfCase arg_id)				`thenSmpl_`
 	-- Want to tick here so that we go round again,
@@ -1671,14 +1672,14 @@ mkDupableAlt env case_bndr' cont alt@(con, bndrs, rhs)
 	-- (the \v alone is enough to make CPR happy) but I think it's rare
 
     ( if null used_bndrs' 
-	then newId SLIT("w") realWorldStatePrimTy  	`thenSmpl` \ rw_id ->
+	then newId FSLIT("w") realWorldStatePrimTy  	`thenSmpl` \ rw_id ->
 	     returnSmpl ([rw_id], [Var realWorldPrimId])
 	else 
 	     returnSmpl (used_bndrs', map varToCoreExpr used_bndrs')
     )							`thenSmpl` \ (final_bndrs', final_args) ->
 
 	-- See comment about "$j" name above
-    newId SLIT("$j") (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
+    newId (encodeFS SLIT("$j")) (mkPiTypes final_bndrs' rhs_ty')	`thenSmpl` \ join_bndr ->
 	-- Notice the funky mkPiTypes.  If the contructor has existentials
 	-- it's possible that the join point will be abstracted over
 	-- type varaibles as well as term variables.

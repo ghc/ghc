@@ -28,6 +28,7 @@ import Name		( mkGlobalName, nameModule, nameOccName, getOccString,
 			  mkForeignExportOcc, isLocalName,
 			  NamedThing(..),
 			)
+import OccName		( encodeFS )
 import Type		( repType, eqType )
 import TcType		( Type, mkFunTys, mkForAllTys, mkTyConApp,
 			  mkFunTy, applyTy, 
@@ -200,7 +201,7 @@ dsFCall mod_Name fn_id fcall
 	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
  	the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
 	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-	work_id       = mkSysLocal SLIT("$wccall") work_uniq worker_ty
+	work_id       = mkSysLocal (encodeFS SLIT("$wccall")) work_uniq worker_ty
 
 	-- Build the wrapper
 	work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args

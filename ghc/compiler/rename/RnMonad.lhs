@@ -39,12 +39,12 @@ import RnHsSyn		( RenamedFixitySig )
 import HscTypes		( AvailEnv, emptyAvailEnv, lookupType,
 			  NameSupply(..), 
 			  ImportedModuleInfo, WhetherHasOrphans, ImportVersion, 
-			  PersistentRenamerState(..), 
+			  PersistentRenamerState(..),  RdrExportItem,
 			  DeclsMap, IfaceInsts, IfaceRules, 
 			  HomeSymbolTable, TyThing,
-			  PersistentCompilerState(..), GlobalRdrEnv, LocalRdrEnv,
-			  HomeIfaceTable, PackageIfaceTable,
-			  RdrAvailInfo )
+			  PersistentCompilerState(..), GlobalRdrEnv, 
+			  LocalRdrEnv,
+			  HomeIfaceTable, PackageIfaceTable )
 import BasicTypes	( Version, defaultFixity )
 import ErrUtils		( addShortErrLocLine, addShortWarnLocLine,
 			  Message, Messages, errorsFound, warningsFound,
@@ -202,13 +202,13 @@ lookupLocalFixity env name
 	Nothing		  	 -> defaultFixity
 \end{code}
 
-
-%===================================================
-\subsubsection{		INTERFACE FILE STUFF}
-%===================================================
+%************************************************************************
+%*									*
+\subsection{Interface file stuff}
+%*									*
+%************************************************************************
 
 \begin{code}
-type ExportItem   = (ModuleName, [RdrAvailInfo])
 type IfaceDeprecs = Maybe (Either DeprecTxt [(RdrName,DeprecTxt)])
 	-- Nothing	  => NoDeprecs
 	-- Just (Left t)  => DeprecAll
@@ -221,9 +221,9 @@ data ParsedIface
       pi_vers	   :: Version,		 		-- Module version number
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
-      pi_exports   :: (Version, [ExportItem]),		-- Exports
+      pi_exports   :: (Version, [RdrExportItem]),	-- Exports
       pi_decls	   :: [(Version, RdrNameTyClDecl)],	-- Local definitions
-      pi_fixity	   :: [RdrNameFixitySig],		-- Local fixity declarations,
+      pi_fixity	   :: [(RdrName,Fixity)],		-- Local fixity declarations,
       pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
       pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
       pi_deprecs   :: IfaceDeprecs			-- Deprecations

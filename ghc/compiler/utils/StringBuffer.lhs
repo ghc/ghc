@@ -523,7 +523,7 @@ lexemeToByteArray (StringBuffer fo _ start_pos# current#) =
 lexemeToFastString :: StringBuffer -> FastString
 lexemeToFastString (StringBuffer fo l# start_pos# current#) =
  if start_pos# ==# current# then
-    mkFastCharString2 (A# fo) (I# 0#)
+    mkFastString ""
  else
     mkFastSubString (A# fo) (I# start_pos#) (I# (current# -# start_pos#))
 

@@ -36,6 +36,7 @@ import CStrings		( pprFSInCStyle )
 
 import Outputable
 import FastTypes
+import Binary
 import Util		( thenCmp )
 
 import Ratio 		( numerator )
@@ -120,6 +121,60 @@ data Literal
 	-- the C file, and can therefore be any C expression,
 	-- macro call, #defined constant etc.
   | MachLitLit  FAST_STRING Type	-- Type might be Addr# or Int# etc
+\end{code}
+
+Binary instance: must do this manually, because we don't want the type
+arg of MachLitLit involved.
+
+\begin{code}
+instance Binary Literal where
+    put_ bh (MachChar aa)     = do putByte bh 0; put_ bh aa
+    put_ bh (MachStr ab)      = do putByte bh 1; put_ bh ab
+    put_ bh (MachAddr ac)     = do putByte bh 2; put_ bh ac
+    put_ bh (MachInt ad)      = do putByte bh 3; put_ bh ad
+    put_ bh (MachInt64 ae)    = do putByte bh 4; put_ bh ae
+    put_ bh (MachWord af)     = do putByte bh 5; put_ bh af
+    put_ bh (MachWord64 ag)   = do putByte bh 6; put_ bh ag
+    put_ bh (MachFloat ah)    = do putByte bh 7; put_ bh ah
+    put_ bh (MachDouble ai)   = do putByte bh 8; put_ bh ai
+    put_ bh (MachLabel aj)    = do putByte bh 9; put_ bh aj
+    put_ bh (MachLitLit ak _) = do putByte bh 10; put_ bh ak
+    get bh = do
+	    h <- getByte bh
+	    case h of
+	      0 -> do
+		    aa <- get bh
+		    return (MachChar aa)
+	      1 -> do
+		    ab <- get bh
+		    return (MachStr ab)
+	      2 -> do
+		    ac <- get bh
+		    return (MachAddr ac)
+	      3 -> do
+		    ad <- get bh
+		    return (MachInt ad)
+	      4 -> do
+		    ae <- get bh
+		    return (MachInt64 ae)
+	      5 -> do
+		    af <- get bh
+		    return (MachWord af)
+	      6 -> do
+		    ag <- get bh
+		    return (MachWord64 ag)
+	      7 -> do
+		    ah <- get bh
+		    return (MachFloat ah)
+	      8 -> do
+		    ai <- get bh
+		    return (MachDouble ai)
+	      9 -> do
+		    aj <- get bh
+		    return (MachLabel aj)
+	      10 -> do
+		    ak <- get bh
+		    return (MachLitLit ak (error "MachLitLit: no type"))
 \end{code}
 
 \begin{code}

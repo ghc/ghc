@@ -424,7 +424,7 @@ newOverloadedLit orig lit ty
     tcGetUnique			`thenNF_Tc` \ new_uniq ->
     let
 	lit_inst = LitInst lit_id lit ty loc
-	lit_id   = mkSysLocal SLIT("lit") new_uniq ty
+	lit_id   = mkSysLocal FSLIT("lit") new_uniq ty
     in
     returnNF_Tc (HsVar (instToId lit_inst), unitLIE lit_inst)
 

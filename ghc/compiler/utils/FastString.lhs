@@ -22,7 +22,7 @@ module FastString
 	mkFastCharString#,  -- :: Addr# -> FastString
 	mkFastCharString2,  -- :: Addr -> Int -> FastString
 
-	mkFastString#,      -- :: Addr# -> Int# -> FastString
+	mkFastString#,      -- :: Addr# -> FastString
         mkFastSubStringBA#, -- :: ByteArray# -> Int# -> Int# -> FastString
         mkFastSubString#,   -- :: Addr# -> Int# -> Int# -> FastString
 
@@ -112,8 +112,22 @@ data FastString
       [Int]      -- character numbers
 
 instance Eq FastString where
-  a == b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> False }
-  a /= b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
+	-- shortcut for real FastStrings
+  (FastString u1 _ _) == (FastString u2 _ _) = u1 ==# u2
+  a == b = 
+#ifdef DEBUG
+	trace ("slow FastString comparison: " ++ 
+		unpackFS a ++ "/" ++ unpackFS b) $
+#endif
+	case cmpFS a b of { LT -> False; EQ -> True;  GT -> False }
+
+  (FastString u1 _ _) == (FastString u2 _ _) = u1 /=# u2
+  a /= b = 
+#ifdef DEBUG
+	trace ("slow FastString comparison: " ++ 
+		unpackFS a ++ "/" ++ unpackFS b) $
+#endif
+	case cmpFS a b of { LT -> True;  EQ -> False; GT -> True  }
 
 instance Ord FastString where
     a <= b = case cmpFS a b of { LT -> True;  EQ -> True;  GT -> False }
@@ -193,7 +207,7 @@ consFS c fs = mkFastStringInt (ord c : unpackIntFS fs)
 
 uniqueOfFS :: FastString -> Int#
 uniqueOfFS (FastString u# _ _) = u#
-uniqueOfFS (CharStr a# l#)     = case mkFastString# a# l# of { FastString u# _ _ -> u#} -- Ugh!
+uniqueOfFS (CharStr a# l#)     = case mkFastStringLen# a# l# of { FastString u# _ _ -> u#} -- Ugh!
    {-
      [A somewhat moby hack]: to avoid entering all sorts
      of junk into the hash table, all C char strings
@@ -244,8 +258,12 @@ updTbl fs_table_var (FastStringTable uid# arr#) i# ls =
 	(# s2#, () #) }) >>
  writeIORef fs_table_var (FastStringTable (uid# +# 1#) arr#)
 
-mkFastString# :: Addr# -> Int# -> FastString
-mkFastString# a# len# =
+mkFastString# :: Addr# -> FastString
+mkFastString# a# =
+ case strLength (A# a#) of { (I# len#) -> mkFastStringLen# a# len# }
+
+mkFastStringLen# :: Addr# -> Int# -> FastString
+mkFastStringLen# a# len# =
  unsafePerformIO  (
   readIORef string_table	>>= \ ft@(FastStringTable uid# tbl#) ->
   let
@@ -409,7 +427,7 @@ mkFastStringInt str = if all good str
 
 mkFastSubString :: Addr -> Int -> Int -> FastString
 mkFastSubString (A# a#) (I# start#) (I# len#) =
- mkFastString# (addrOffset# a# start#) len#
+ mkFastStringLen# (addrOffset# a# start#) len#
 \end{code}
 
 \begin{code}

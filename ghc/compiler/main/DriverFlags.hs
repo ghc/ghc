@@ -1,7 +1,7 @@
 {-# OPTIONS -#include "hschooks.h" #-}
 
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.86 2002/02/11 08:20:41 chak Exp $
+-- $Id: DriverFlags.hs,v 1.87 2002/03/04 17:01:30 simonmar Exp $
 --
 -- Driver flags
 --
@@ -19,6 +19,8 @@ module DriverFlags (
 #include "HsVersions.h"
 #include "../includes/config.h"
 
+import BinIface		( compileIface )
+import MkIface		( showIface )
 import DriverState
 import DriverPhases
 import DriverUtil
@@ -163,6 +165,12 @@ static_flags =
   ,  ( "-numeric-version", NoArg (do putStrLn cProjectVersion
 				     exitWith ExitSuccess))
 
+      ------- interfaces ----------------------------------------------------
+  ,  ( "-show-iface"     , HasArg (\f -> do showIface f
+					    exitWith ExitSuccess))
+  ,  ( "-compile-iface"  , HasArg (\f -> do compileIface f
+					    exitWith ExitSuccess))
+
       ------- verbosity ----------------------------------------------------
   ,  ( "n"              , NoArg setDryRun )
 
@@ -268,7 +276,17 @@ static_flags =
   ,  ( "syslib"         , HasArg (addPackage) )	-- for compatibility w/ old vsns
 
         ------- Specific phases  --------------------------------------------
-  ,  ( "pgm"           , HasArg setPgm )
+  ,  ( "pgmP"           , HasArg setPgmP )
+  ,  ( "pgmF"           , HasArg setPgmF )
+  ,  ( "pgmc"           , HasArg setPgmc )
+  ,  ( "pgmm"           , HasArg setPgmm )
+  ,  ( "pgms"           , HasArg setPgms )
+  ,  ( "pgma"           , HasArg setPgma )
+  ,  ( "pgml"           , HasArg setPgml )
+#ifdef ILX
+  ,  ( "pgmI"           , HasArg setPgmI )
+  ,  ( "pgmi"           , HasArg setPgmi )
+#endif
 
   ,  ( "optdep"		, HasArg (add v_Opt_dep) )
   ,  ( "optl"		, HasArg (add v_Opt_l) )

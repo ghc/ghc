@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.91 2002/03/03 03:59:03 sof Exp $
+$Id: Parser.y,v 1.92 2002/03/04 17:01:31 simonmar Exp $
 
 Haskell grammar.
 
@@ -1217,35 +1217,35 @@ qvarid :: { RdrName }
 
 varid :: { RdrName }
 	: varid_no_unsafe 	{ $1 }
-	| 'unsafe'		{ mkUnqual varName SLIT("unsafe") }
-	| 'safe'		{ mkUnqual varName SLIT("safe") }
-	| 'threadsafe'		{ mkUnqual varName SLIT("threadsafe") }
+	| 'unsafe'		{ mkUnqual varName FSLIT("unsafe") }
+	| 'safe'		{ mkUnqual varName FSLIT("safe") }
+	| 'threadsafe'		{ mkUnqual varName FSLIT("threadsafe") }
 
 varid_no_unsafe :: { RdrName }
 	: VARID			{ mkUnqual varName $1 }
 	| special_id		{ mkUnqual varName $1 }
-	| 'forall'		{ mkUnqual varName SLIT("forall") }
+	| 'forall'		{ mkUnqual varName FSLIT("forall") }
 
 tyvar 	:: { RdrName }
 	: VARID			{ mkUnqual tvName $1 }
 	| special_id		{ mkUnqual tvName $1 }
-	| 'unsafe' 		{ mkUnqual tvName SLIT("unsafe") }
-	| 'safe' 		{ mkUnqual tvName SLIT("safe") }
-	| 'threadsafe' 		{ mkUnqual tvName SLIT("threadsafe") }
+	| 'unsafe' 		{ mkUnqual tvName FSLIT("unsafe") }
+	| 'safe' 		{ mkUnqual tvName FSLIT("safe") }
+	| 'threadsafe' 		{ mkUnqual tvName FSLIT("threadsafe") }
 
 -- These special_ids are treated as keywords in various places, 
 -- but as ordinary ids elsewhere.   'special_id' collects all these
 -- except 'unsafe' and 'forall' whose treatment differs depending on context
 special_id :: { UserFS }
 special_id
-	: 'as'			{ SLIT("as") }
-	| 'qualified'		{ SLIT("qualified") }
-	| 'hiding'		{ SLIT("hiding") }
-	| 'export'		{ SLIT("export") }
-	| 'label'		{ SLIT("label")  }
-	| 'dynamic'		{ SLIT("dynamic") }
-	| 'stdcall'             { SLIT("stdcall") }
-	| 'ccall'               { SLIT("ccall") }
+	: 'as'			{ FSLIT("as") }
+	| 'qualified'		{ FSLIT("qualified") }
+	| 'hiding'		{ FSLIT("hiding") }
+	| 'export'		{ FSLIT("export") }
+	| 'label'		{ FSLIT("label")  }
+	| 'dynamic'		{ FSLIT("dynamic") }
+	| 'stdcall'             { FSLIT("stdcall") }
+	| 'ccall'               { FSLIT("ccall") }
 
 -----------------------------------------------------------------------------
 -- ConIds
@@ -1283,7 +1283,7 @@ qvarsym1 : QVARSYM		{ mkQual varName $1 }
 
 varsym :: { RdrName }
 	: varsym_no_minus 	{ $1 }
-	| '-'			{ mkUnqual varName SLIT("-") }
+	| '-'			{ mkUnqual varName FSLIT("-") }
 
 varsym_no_minus :: { RdrName } -- varsym not including '-'
 	: VARSYM		{ mkUnqual varName $1 }
@@ -1292,9 +1292,9 @@ varsym_no_minus :: { RdrName } -- varsym not including '-'
 
 -- See comments with special_id
 special_sym :: { UserFS }
-special_sym : '!'	{ SLIT("!") }
-	    | '.' 	{ SLIT(".") }
- 	    | '*' 	{ SLIT("*") }
+special_sym : '!'	{ FSLIT("!") }
+	    | '.' 	{ FSLIT(".") }
+ 	    | '*' 	{ FSLIT("*") }
 
 -----------------------------------------------------------------------------
 -- Literals

@@ -221,7 +221,7 @@ tcSub_fun exp_arg exp_res act_arg act_res
 	-- co_fn_arg :: HsExpr exp_arg -> HsExpr act_arg
 	-- co_fn_res :: HsExpr act_res -> HsExpr exp_res
 	-- co_fn     :: HsExpr (act_arg -> act_res) -> HsExpr (exp_arg -> exp_res)
-	arg_id = mkSysLocal SLIT("sub") uniq exp_arg
+	arg_id = mkSysLocal FSLIT("sub") uniq exp_arg
    	coercion | isIdCoercion co_fn_arg,
 		   isIdCoercion co_fn_res = idCoercion
 	         | otherwise	          = mkCoercion co_fn

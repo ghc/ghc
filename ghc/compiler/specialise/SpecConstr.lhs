@@ -561,7 +561,7 @@ argToPat env us (Var v)	-- Don't uniqify existing vars,
   = (us, Var v)		-- so that we can spot when we pass them twice
 
 argToPat env us arg
-  = (us1, Var (mkSysLocal SLIT("sc") (uniqFromSupply us2) (exprType arg)))
+  = (us1, Var (mkSysLocal FSLIT("sc") (uniqFromSupply us2) (exprType arg)))
   where
     (us1,us2) = splitUniqSupply us
 

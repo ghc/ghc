@@ -82,10 +82,11 @@ import HscTypes	    (HomeSymbolTable, PersistentCompilerState(..),
 		     TyThing(..), lookupType)
 import PrelNames    (charPrimTyConName, intPrimTyConName, floatPrimTyConName,
 		     doublePrimTyConName, fstName, andName, orName,
-		     eqCharName, eqIntName, eqFloatName, eqDoubleName,
-		     neqCharName, neqIntName, neqFloatName, neqDoubleName,
 		     lengthPName, replicatePName, mapPName, bpermutePName,
 		     bpermuteDftPName, indexOfPName)
+import PrimOp	    (eqCharName, eqIntName, eqFloatName, eqDoubleName,
+		     neqIntName)
+		     -- neqCharName, neqFloatName,neqDoubleName,
 import CoreSyn      (Expr(..), Bind(..), CoreBndr, CoreExpr, CoreBind, mkApps,
 		     bindersOfBinds)
 import CoreUtils    (exprType)
@@ -384,10 +385,10 @@ mk'neq ty a1 a2  = mkFunApp neqName [a1, a2]
 		   where
 		     name = tyConName . tyConAppTyCon $ ty
 		     --
-		     neqName | name == charPrimTyConName   = neqCharName
+		     neqName {- | name == charPrimTyConName   = neqCharName -}
 			     | name == intPrimTyConName    = neqIntName
-			     | name == floatPrimTyConName  = neqFloatName
-			     | name == doublePrimTyConName = neqDoubleName
+			     {- | name == floatPrimTyConName  = neqFloatName -}
+			     {- | name == doublePrimTyConName = neqDoubleName -}
 			     | otherwise		   =
 			       pprPanic "FlattenMonad.mk'neq: " (ppr ty)
 

@@ -139,13 +139,13 @@ it easier to read debugging output.
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDs ty dflags us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
-    (mkSysLocal SLIT("ds") assigned_uniq ty, warns) }
+    (mkSysLocal FSLIT("ds") assigned_uniq ty, warns) }
 
 newSysLocalsDs tys = mapDs newSysLocalDs tys
 
 newFailLocalDs ty dflags us genv loc mod warns
   = case uniqFromSupply us of { assigned_uniq ->
-    (mkSysLocal SLIT("fail") assigned_uniq ty, warns) }
+    (mkSysLocal FSLIT("fail") assigned_uniq ty, warns) }
 	-- The UserLocal bit just helps make the code a little clearer
 
 getUniqueDs :: DsM Unique

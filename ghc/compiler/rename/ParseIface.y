@@ -46,10 +46,10 @@ import Type		( Kind, mkArrowKind, liftedTypeKind, openTypeKind, usageTypeKind )
 import ForeignCall	( ForeignCall(..), CCallConv(..), CCallSpec(..), CCallTarget(..) )
 import Lex		
 
-import RnMonad		( ParsedIface(..), ExportItem, IfaceDeprecs ) 
+import RnMonad		( ParsedIface(..), IfaceDeprecs ) 
 import HscTypes         ( WhetherHasOrphans, IsBootInterface, GenAvailInfo(..), 
                           ImportVersion, WhatsImported(..),
-                          RdrAvailInfo )
+                          RdrAvailInfo, RdrExportItem )
 
 import RdrName          ( RdrName, mkRdrUnqual, mkIfaceOrig )
 import TyCon		( DataConDetails(..) )
@@ -244,7 +244,7 @@ name_version_pair   :  var_occ version			        { ($1, $2) }
 
 --------------------------------------------------------------------------
 
-exports_part	:: { [ExportItem] }
+exports_part	:: { [RdrExportItem] }
 exports_part	:  					{ [] }
 		| '__export' mod_name entities ';'
 			exports_part 			{ ({-mkSysModuleNameFS-} $2, $3) : $5 }
@@ -274,16 +274,16 @@ val_occs	:: { [OccName] }
 
 --------------------------------------------------------------------------
 
-fix_decl_part :: { [RdrNameFixitySig] }
+fix_decl_part :: { [(RdrName,Fixity)] }
 fix_decl_part : {- empty -}				{ [] }
 	      | fix_decls ';'				{ $1 }
 
-fix_decls     :: { [RdrNameFixitySig] }
+fix_decls     :: { [(RdrName,Fixity)] }
 fix_decls     : 					{ [] }
 	      | fix_decl fix_decls			{ $1 : $2 }
 
-fix_decl :: { RdrNameFixitySig }
-fix_decl : src_loc fixity prec var_or_data_name		{ FixitySig $4 (Fixity $3 $2) $1 }
+fix_decl    :: { (RdrName,Fixity) }
+fix_decl    : fixity prec var_or_data_name		{ ($3, Fixity $2 $1) }
 
 fixity      :: { FixityDirection }
 fixity      : 'infixl'                                  { InfixL }
@@ -590,18 +590,18 @@ mod_name	:: { ModuleName }
 ---------------------------------------------------
 var_fs          :: { EncodedFS }
 		: VARID			{ $1 }
-		| 'as'			{ SLIT("as") }
-		| 'qualified'		{ SLIT("qualified") }
-		| 'hiding'		{ SLIT("hiding") }
-		| 'forall'		{ SLIT("forall") }
-		| 'foreign'		{ SLIT("foreign") }
-		| 'export'		{ SLIT("export") }
-		| 'label'		{ SLIT("label") }
-		| 'dynamic'		{ SLIT("dynamic") }
-		| 'unsafe'		{ SLIT("unsafe") }
-		| 'with'		{ SLIT("with") }
-		| 'ccall' 		{ SLIT("ccall") }
-		| 'stdcall' 		{ SLIT("stdcall") }
+		| 'as'			{ FSLIT("as") }
+		| 'qualified'		{ FSLIT("qualified") }
+		| 'hiding'		{ FSLIT("hiding") }
+		| 'forall'		{ FSLIT("forall") }
+		| 'foreign'		{ FSLIT("foreign") }
+		| 'export'		{ FSLIT("export") }
+		| 'label'		{ FSLIT("label") }
+		| 'dynamic'		{ FSLIT("dynamic") }
+		| 'unsafe'		{ FSLIT("unsafe") }
+		| 'with'		{ FSLIT("with") }
+		| 'ccall' 		{ FSLIT("ccall") }
+		| 'stdcall' 		{ FSLIT("stdcall") }
 
 var_occ	        :: { OccName }
 		:  var_fs		{ mkSysOccFS varName $1 }
@@ -686,9 +686,9 @@ kind		:: { Kind }
 
 akind		:: { Kind }
                 : '*'                   { liftedTypeKind }
-		| VARSYM		{ if $1 == SLIT("?") then
+		| VARSYM		{ if $1 == FSLIT("?") then
 						openTypeKind
-					  else if $1 == SLIT("\36") then
+					  else if $1 == FSLIT("\36") then
                                                 usageTypeKind  -- dollar
                                           else panic "ParseInterface: akind"
 					}

@@ -104,7 +104,7 @@ import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
 			  getOccName, getSrcLoc
 			) 
-import OccName		( UserFS, mkWorkerOcc )
+import OccName		( EncodedFS, UserFS, mkWorkerOcc )
 import PrimRep		( PrimRep )
 import TysPrim		( statePrimTyCon )
 import FieldLabel	( FieldLabel )
@@ -160,9 +160,11 @@ mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 -- SysLocal: for an Id being created by the compiler out of thin air...
 -- UserLocal: an Id with a name the user might recognize...
 mkUserLocal :: OccName -> Unique -> Type -> SrcLoc -> Id
-mkSysLocal  :: UserFS  -> Unique -> Type -> Id
+mkSysLocal  :: EncodedFS  -> Unique -> Type -> Id
 mkVanillaGlobal :: Name -> Type -> IdInfo -> Id
 
+-- for SysLocal, we assume the base name is already encoded, to avoid
+-- re-encoding the same string over and over again.
 mkSysLocal  fs uniq ty      = mkLocalId (mkSysLocalName uniq fs)      ty
 mkUserLocal occ uniq ty loc = mkLocalId (mkLocalName    uniq occ loc) ty
 mkVanillaGlobal 	    = mkGlobalId VanillaGlobal
@@ -175,7 +177,7 @@ instantiated before use.
 \begin{code}
 -- "Wild Id" typically used when you need a binder that you don't expect to use
 mkWildId :: Type -> Id
-mkWildId ty = mkSysLocal SLIT("wild") (mkBuiltinUnique 1) ty
+mkWildId ty = mkSysLocal FSLIT("wild") (mkBuiltinUnique 1) ty
 
 mkWorkerId :: Unique -> Id -> Type -> Id
 -- A worker gets a local name.  CoreTidy will globalise it if necessary.
@@ -193,7 +195,7 @@ mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
 mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocal SLIT("tpl") (mkBuiltinUnique i) ty
+mkTemplateLocal i ty = mkSysLocal FSLIT("tpl") (mkBuiltinUnique i) ty
 \end{code}
 
 

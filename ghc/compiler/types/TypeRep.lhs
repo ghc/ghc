@@ -36,6 +36,7 @@ import Name	  ( Name )
 import BasicTypes ( IPName )
 import TyCon	  ( TyCon, KindCon, mkFunTyCon, mkKindCon, mkSuperKindCon )
 import Class	  ( Class )
+import Binary
 
 -- others
 import PrelNames	( superKindName, superBoxityName, liftedConName, 
@@ -172,6 +173,7 @@ data TyNote
   | SynNote Type	-- Used for type synonyms
 			-- The Type is always a TyConApp, and is the un-expanded form.
 			-- The type to which the note is attached is the expanded form.
+
 \end{code}
 
 -------------------------------------
@@ -286,9 +288,11 @@ Define boxities: @*@ and @#@
 
 \begin{code}
 liftedBoxity, unliftedBoxity :: Kind		-- :: BX
-liftedBoxity  = TyConApp (mkKindCon liftedConName superBoxity) []
+liftedBoxity   = TyConApp liftedBoxityCon   []
+unliftedBoxity = TyConApp unliftedBoxityCon []
 
-unliftedBoxity  = TyConApp (mkKindCon unliftedConName superBoxity) []
+liftedBoxityCon   = mkKindCon liftedConName superBoxity
+unliftedBoxityCon = mkKindCon unliftedConName superBoxity
 \end{code}
 
 ------------------------------------------
@@ -321,6 +325,29 @@ mkArrowKinds :: [Kind] -> Kind -> Kind
 mkArrowKinds arg_kinds result_kind = foldr mkArrowKind result_kind arg_kinds
 \end{code}
 
+-----------------------------------------------------------------------------
+Binary kinds for interface files
+
+\begin{code}
+instance Binary Kind where
+  put_ bh k@(TyConApp tc [])
+	| tc == openKindCon  = putByte bh 0
+	| tc == usageKindCon = putByte bh 1
+  put_ bh k@(TyConApp tc [TyConApp bc _])
+	| tc == typeCon && bc == liftedBoxityCon   = putByte bh 2
+	| tc == typeCon && bc == unliftedBoxityCon = putByte bh 3
+  put_ bh (FunTy f a) = do putByte bh 4;	put_ bh f; put_ bh a
+  put_ bh _ = error "Binary.put(Kind): strange-looking Kind"
+
+  get bh = do 
+	b <- getByte bh
+	case b of 
+	  0 -> return openTypeKind
+	  1 -> return usageTypeKind
+	  2 -> return liftedTypeKind
+	  3 -> return unliftedTypeKind
+	  _ -> do f <- get bh; a <- get bh; return (FunTy f a)
+\end{code}
 
 %************************************************************************
 %*									*

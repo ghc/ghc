@@ -195,7 +195,7 @@ mkSysTyVar uniq kind = Var { varName    = name
 			   , varInfo    = pprPanic "mkSysTyVar" (ppr name)
 			   }
 		     where
-		       name = mkSysLocalName uniq SLIT("t")
+		       name = mkSysLocalName uniq FSLIT("t")
 
 newMutTyVar :: Name -> Kind -> TyVarDetails -> IO TyVar
 newMutTyVar name kind details 

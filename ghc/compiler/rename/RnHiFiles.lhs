@@ -22,14 +22,14 @@ import CmdLineOpts	( opt_IgnoreIfacePragmas )
 import HscTypes		( ModuleLocation(..),
 			  ModIface(..), emptyModIface,
 			  VersionInfo(..), ImportedModuleInfo,
-			  lookupIfaceByModName, 
+			  lookupIfaceByModName, RdrExportItem,
 			  ImportVersion, WhetherHasOrphans, IsBootInterface,
 			  DeclsMap, GatedDecl, IfaceInsts, IfaceRules,
 			  AvailInfo, GenAvailInfo(..), Avails, Deprecations(..)
 			 )
-import HsSyn		( TyClDecl(..), InstDecl(..),
-			  FixitySig(..), RuleDecl(..),
-			  tyClDeclNames, tyClDeclSysNames, hsTyVarNames, getHsInstHead,
+import HsSyn		( TyClDecl(..), InstDecl(..), RuleDecl(..),
+			  tyClDeclNames, tyClDeclSysNames, hsTyVarNames, 
+			  getHsInstHead,
 			)
 import RdrHsSyn		( RdrNameTyClDecl, RdrNameInstDecl, RdrNameRuleDecl )
 import RnHsSyn		( extractHsTyNames_s )
@@ -57,10 +57,16 @@ import FiniteMap
 import ListSetOps	( minusList )
 import Outputable
 import Bag
+import BinIface		( {- just instances -} )
+import qualified Binary
+import Panic
 import Config
 
 import IOExts
+import Exception	( tryAllIO, Exception(DynException) )
+import Dynamic		( fromDynamic )
 import Directory
+import List		( isSuffixOf )
 \end{code}
 
 
@@ -278,13 +284,13 @@ addModDeps mod is_loaded new_deps mod_deps
 --	Loading the export list
 -----------------------------------------------------
 
-loadExports :: (Version, [ExportItem]) -> RnM d (Version, [(ModuleName,Avails)])
+loadExports :: (Version, [RdrExportItem]) -> RnM d (Version, [(ModuleName,Avails)])
 loadExports (vers, items)
   = mapRn loadExport items	`thenRn` \ avails_s ->
     returnRn (vers, avails_s)
 
 
-loadExport :: ExportItem -> RnM d (ModuleName, Avails)
+loadExport :: RdrExportItem -> RnM d (ModuleName, Avails)
 loadExport (mod, entities)
   = mapRn (load_entity mod) entities	`thenRn` \ avails ->
     returnRn (mod, avails)
@@ -336,7 +342,7 @@ loadFixDecls mod decls
   where
     mod_name = moduleName mod
 
-loadFixDecl mod_name sig@(FixitySig rdr_name fixity loc)
+loadFixDecl mod_name (rdr_name, fixity)
   = newGlobalName mod_name (rdrNameOcc rdr_name) 	`thenRn` \ name ->
     returnRn (name, fixity)
 
@@ -554,15 +560,31 @@ readIface file_path
   = --ioToRnM (putStrLn ("reading iface " ++ file_path)) `thenRn_`
     traceRn (ptext SLIT("readIFace") <+> text file_path) 	`thenRn_` 
 
-    ioToRnM (hGetStringBuffer False file_path)			`thenRn` \ read_result ->
-    case read_result of {
-	Left io_error  -> bale_out (text (show io_error)) ;
+  let hi_boot_ver = "hi-boot-" ++ cHscIfaceFileVersion in
+  if ".hi-boot" `isSuffixOf` file_path
+     || hi_boot_ver `isSuffixOf` file_path then
+
+      ioToRnM (hGetStringBuffer False file_path) `thenRn` \ read_result ->
+      case read_result of {
+	Left io_error  -> bale_out (text (show io_error));
 	Right contents -> 
 
-    case parseIface contents (mkPState loc exts) of
-	POk _ iface          -> returnRn (Right iface)
+      case parseIface contents (mkPState loc exts) of {
+	POk _ iface          -> returnRn (Right iface);
 	PFailed err 	     -> bale_out err
-    }
+     }}
+
+  else
+      ioToRnM_no_fail (tryAllIO (Binary.getBinFileWithDict file_path)) 
+	  `thenRn` \ either_iface ->
+
+      case either_iface of
+        Right iface -> returnRn (Right iface)
+	Left (DynException d) | Just e <- fromDynamic d
+		-> bale_out (text (show (e :: GhcException)))
+
+        Left err -> bale_out (text (show err))
+
   where
     exts = ExtFlags {glasgowExtsEF = True,
 		     parrEF	   = True}

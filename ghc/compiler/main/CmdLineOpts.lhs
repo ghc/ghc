@@ -120,6 +120,7 @@ import IOExts	( IORef, readIORef, writeIORef )
 import Constants	-- Default values for some flags
 import Util
 import FastTypes
+import FastString	( FastString, mkFastString )
 import Config
 
 import Maybes		( firstJust )
@@ -496,14 +497,14 @@ minusWallOpts
 -- main/DriverState.
 GLOBAL_VAR(v_Static_hsc_opts, [], [String])
 
-lookUp	       	 :: FAST_STRING -> Bool
+lookUp	       	 :: FastString -> Bool
 lookup_int     	 :: String -> Maybe Int
 lookup_def_int   :: String -> Int -> Int
 lookup_def_float :: String -> Float -> Float
 lookup_str       :: String -> Maybe String
 
 unpacked_static_opts = unsafePerformIO (readIORef v_Static_hsc_opts)
-packed_static_opts   = map _PK_ unpacked_static_opts
+packed_static_opts   = map mkFastString unpacked_static_opts
 
 lookUp     sw = sw `elem` packed_static_opts
 	
@@ -547,38 +548,38 @@ unpacked_opts =
 
 \begin{code}
 -- debugging opts
-opt_PprStyle_NoPrags		= lookUp  SLIT("-dppr-noprags")
-opt_PprStyle_Debug		= lookUp  SLIT("-dppr-debug")
-opt_PprStyle_RawTypes		= lookUp  SLIT("-dppr-rawtypes")
+opt_PprStyle_NoPrags		= lookUp  FSLIT("-dppr-noprags")
+opt_PprStyle_Debug		= lookUp  FSLIT("-dppr-debug")
+opt_PprStyle_RawTypes		= lookUp  FSLIT("-dppr-rawtypes")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
 -- profiling opts
-opt_AutoSccsOnAllToplevs	= lookUp  SLIT("-fauto-sccs-on-all-toplevs")
-opt_AutoSccsOnExportedToplevs	= lookUp  SLIT("-fauto-sccs-on-exported-toplevs")
-opt_AutoSccsOnIndividualCafs	= lookUp  SLIT("-fauto-sccs-on-individual-cafs")
-opt_AutoSccsOnDicts		= lookUp  SLIT("-fauto-sccs-on-dicts")
-opt_SccProfilingOn		= lookUp  SLIT("-fscc-profiling")
-opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
+opt_AutoSccsOnAllToplevs	= lookUp  FSLIT("-fauto-sccs-on-all-toplevs")
+opt_AutoSccsOnExportedToplevs	= lookUp  FSLIT("-fauto-sccs-on-exported-toplevs")
+opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
+opt_AutoSccsOnDicts		= lookUp  FSLIT("-fauto-sccs-on-dicts")
+opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
+opt_DoTickyProfiling		= lookUp  FSLIT("-fticky-ticky")
 
 -- language opts
-opt_AllStrict			= lookUp  SLIT("-fall-strict")
-opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
-opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
+opt_AllStrict			= lookUp  FSLIT("-fall-strict")
+opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
+opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH
-opt_NumbersStrict		= lookUp  SLIT("-fnumbers-strict")
-opt_Parallel			= lookUp  SLIT("-fparallel")
-opt_SMP				= lookUp  SLIT("-fsmp")
-opt_Flatten			= lookUp  SLIT("-fflatten")
+opt_NumbersStrict		= lookUp  FSLIT("-fnumbers-strict")
+opt_Parallel			= lookUp  FSLIT("-fparallel")
+opt_SMP				= lookUp  FSLIT("-fsmp")
+opt_Flatten			= lookUp  FSLIT("-fflatten")
 
 -- optimisation opts
-opt_NoMethodSharing		= lookUp  SLIT("-fno-method-sharing")
-opt_DoSemiTagging		= lookUp  SLIT("-fsemi-tagging")
-opt_FoldrBuildOn		= lookUp  SLIT("-ffoldr-build-on")
+opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
+opt_DoSemiTagging		= lookUp  FSLIT("-fsemi-tagging")
+opt_FoldrBuildOn		= lookUp  FSLIT("-ffoldr-build-on")
 opt_LiberateCaseThreshold	= lookup_def_int "-fliberate-case-threshold" (10::Int)
-opt_StgDoLetNoEscapes		= lookUp  SLIT("-flet-no-escape")
-opt_UnfoldCasms		        = lookUp  SLIT("-funfold-casms-in-hi-file")
-opt_UsageSPOn           	= lookUp  SLIT("-fusagesp-on")
-opt_UnboxStrictFields		= lookUp  SLIT("-funbox-strict-fields")
+opt_StgDoLetNoEscapes		= lookUp  FSLIT("-flet-no-escape")
+opt_UnfoldCasms		        = lookUp  FSLIT("-funfold-casms-in-hi-file")
+opt_UsageSPOn           	= lookUp  FSLIT("-fusagesp-on")
+opt_UnboxStrictFields		= lookUp  FSLIT("-funbox-strict-fields")
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
 {-
@@ -588,44 +589,44 @@ opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 -}
 opt_InPackage			= case lookup_str "-inpackage=" of
 				    Just p  -> _PK_ p
-				    Nothing -> SLIT("Main")	-- The package name if none is specified
+				    Nothing -> FSLIT("Main")	-- The package name if none is specified
 
-opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
-opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
-opt_GranMacros			= lookUp  SLIT("-fgransim")
+opt_EmitCExternDecls	        = lookUp  FSLIT("-femit-extern-decls")
+opt_EnsureSplittableC		= lookUp  FSLIT("-fglobalise-toplev-names")
+opt_GranMacros			= lookUp  FSLIT("-fgransim")
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
-opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
-opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
-opt_NoHiCheck                   = lookUp  SLIT("-fno-hi-version-check")
-opt_OmitBlackHoling		= lookUp  SLIT("-dno-black-holing")
-opt_OmitInterfacePragmas	= lookUp  SLIT("-fomit-interface-pragmas")
-opt_RuntimeTypes		= lookUp  SLIT("-fruntime-types")
+opt_IgnoreAsserts               = lookUp  FSLIT("-fignore-asserts")
+opt_IgnoreIfacePragmas		= lookUp  FSLIT("-fignore-interface-pragmas")
+opt_NoHiCheck                   = lookUp  FSLIT("-fno-hi-version-check")
+opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
+opt_OmitInterfacePragmas	= lookUp  FSLIT("-fomit-interface-pragmas")
+opt_RuntimeTypes		= lookUp  FSLIT("-fruntime-types")
 
 -- Simplifier switches
-opt_SimplNoPreInlining		= lookUp  SLIT("-fno-pre-inlining")
+opt_SimplNoPreInlining		= lookUp  FSLIT("-fno-pre-inlining")
 	-- NoPreInlining is there just to see how bad things
 	-- get if you don't do it!
-opt_SimplDoEtaReduction		= lookUp  SLIT("-fdo-eta-reduction")
-opt_SimplDoLambdaEtaExpansion	= lookUp  SLIT("-fdo-lambda-eta-expansion")
-opt_SimplCaseMerge		= lookUp  SLIT("-fcase-merge")
-opt_SimplExcessPrecision	= lookUp  SLIT("-fexcess-precision")
+opt_SimplDoEtaReduction		= lookUp  FSLIT("-fdo-eta-reduction")
+opt_SimplDoLambdaEtaExpansion	= lookUp  FSLIT("-fdo-lambda-eta-expansion")
+opt_SimplCaseMerge		= lookUp  FSLIT("-fcase-merge")
+opt_SimplExcessPrecision	= lookUp  FSLIT("-fexcess-precision")
 
 -- Unfolding control
 opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45::Int)
 opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
 opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::Float)
-opt_UF_UpdateInPlace		= lookUp  SLIT("-funfolding-update-in-place")
+opt_UF_UpdateInPlace		= lookUp  FSLIT("-funfolding-update-in-place")
 
 opt_UF_CheapOp  = ( 1 :: Int)	-- Only one instruction; and the args are charged for
 opt_UF_DearOp   = ( 4 :: Int)
 			
-opt_NoPruneDecls		= lookUp  SLIT("-fno-prune-decls")
-opt_NoPruneTyDecls		= lookUp  SLIT("-fno-prune-tydecls")
-opt_Static			= lookUp  SLIT("-static")
-opt_Unregisterised		= lookUp  SLIT("-funregisterised")
-opt_EmitExternalCore		= lookUp  SLIT("-fext-core")
+opt_NoPruneDecls		= lookUp  FSLIT("-fno-prune-decls")
+opt_NoPruneTyDecls		= lookUp  FSLIT("-fno-prune-tydecls")
+opt_Static			= lookUp  FSLIT("-static")
+opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
+opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
 \end{code}
 
 %************************************************************************
@@ -664,7 +665,6 @@ isStaticHscFlag f =
 	"fno-hi-version-check",
 	"dno-black-holing",
 	"fno-method-sharing",
-        "fno-monomorphism-restriction",
 	"fomit-interface-pragmas",
 	"fruntime-types",
 	"fno-pre-inlining",

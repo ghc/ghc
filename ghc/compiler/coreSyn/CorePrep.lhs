@@ -764,5 +764,5 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty			`seq`
    getUniqueUs	 		`thenUs` \ uniq ->
-   returnUs (mkSysLocal SLIT("sat") uniq ty)
+   returnUs (mkSysLocal FSLIT("sat") uniq ty)
 \end{code}

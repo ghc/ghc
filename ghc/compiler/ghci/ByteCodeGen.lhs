@@ -115,8 +115,9 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_id   = mkSysLocal SLIT("Expr-Top-Level") (mkPseudoUnique3 0) 
-				     (panic "invented_id's type")
+      let invented_id   = mkSysLocal FSLIT("Expr-Top-Level") 
+				(mkPseudoUnique3 0) 
+				(panic "invented_id's type")
       let invented_name = idName invented_id
 
       	  annexpr = freeVars expr
@@ -641,16 +642,14 @@ schemeT d s p app
      )
 
    -- Case 2
-   | let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
+   | [arg1,arg2] <- args_r_to_l,
+     let isVoidRepAtom (_, AnnVar v)    = VoidRep == typePrimRep (idType v)
          isVoidRepAtom (_, AnnNote n e) = isVoidRepAtom e
-     in  is_con_call && isUnboxedTupleCon con 
-         && ( (args_r_to_l `lengthIs` 2 && isVoidRepAtom (last (args_r_to_l)))
-              || (isSingleton args_r_to_l)
-            )
+     in  isVoidRepAtom arg2
    = --trace (if isSingleton args_r_to_l
      --       then "schemeT: unboxed singleton"
      --       else "schemeT: unboxed pair with Void first component") (
-     schemeT d s p (head args_r_to_l)
+     schemeT d s p arg1
      --)
 
    -- Case 3

@@ -15,7 +15,9 @@ module PrimOp (
 	primOpOkForSpeculation, primOpIsCheap, primOpIsDupable,
 	primOpHasSideEffects,
 
-	getPrimOpResultInfo,  PrimOpResultInfo(..)
+	getPrimOpResultInfo,  PrimOpResultInfo(..),
+
+	eqCharName, eqIntName, eqFloatName, eqDoubleName, neqIntName,
     ) where
 
 #include "HsVersions.h"
@@ -477,4 +479,12 @@ pprPrimOp other_op
     occ = primOpOcc other_op
 \end{code}
 
+Names for some primops (for ndpFlatten/FlattenMonad.lhs)
 
+\begin{code}
+eqCharName	  = mkPrimOpIdName CharEqOp
+eqIntName	  = mkPrimOpIdName IntEqOp
+eqFloatName	  = mkPrimOpIdName FloatEqOp
+eqDoubleName	  = mkPrimOpIdName DoubleEqOp
+neqIntName	  = mkPrimOpIdName IntNeOp
+\end{code}

@@ -547,7 +547,7 @@ rebuildConArgs (arg:args) (str:stricts) us
 	(_, tycon_args, pack_con, con_arg_tys)
 	 	 = splitProductType "rebuildConArgs" arg_ty
 
-	unpacked_args  = zipWith (mkSysLocal SLIT("rb")) us con_arg_tys
+	unpacked_args  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
 	(binds, args') = rebuildConArgs args stricts (dropList con_arg_tys us)
 	con_app	       = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
     in
@@ -787,7 +787,7 @@ another gun with which to shoot yourself in the foot.
 \begin{code}
 -- unsafeCoerce# :: forall a b. a -> b
 unsafeCoerceId
-  = pcMiscPrelId unsafeCoerceIdKey pREL_GHC SLIT("unsafeCoerce#") ty info
+  = pcMiscPrelId unsafeCoerceIdKey pREL_GHC FSLIT("unsafeCoerce#") ty info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
@@ -802,13 +802,13 @@ unsafeCoerceId
 -- The reason is is here is because we don't provide 
 -- a way to write this literal in Haskell.
 nullAddrId 
-  = pcMiscPrelId nullAddrIdKey pREL_GHC SLIT("nullAddr#") addrPrimTy info
+  = pcMiscPrelId nullAddrIdKey pREL_GHC FSLIT("nullAddr#") addrPrimTy info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` 
 	   mkCompulsoryUnfolding (Lit nullAddrLit)
 
 seqId
-  = pcMiscPrelId seqIdKey pREL_GHC SLIT("seq") ty info
+  = pcMiscPrelId seqIdKey pREL_GHC FSLIT("seq") ty info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	   
@@ -824,7 +824,7 @@ evaluate its argument and call the dataToTag# primitive.
 
 \begin{code}
 getTagId
-  = pcMiscPrelId getTagIdKey pREL_GHC SLIT("getTag#") ty info
+  = pcMiscPrelId getTagIdKey pREL_GHC FSLIT("getTag#") ty info
   where
     info = noCafNoTyGenIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 	-- We don't provide a defn for this; you must inline it
@@ -849,7 +849,7 @@ This comes up in strictness analysis
 
 \begin{code}
 realWorldPrimId	-- :: State# RealWorld
-  = pcMiscPrelId realWorldPrimIdKey pREL_GHC SLIT("realWorld#")
+  = pcMiscPrelId realWorldPrimIdKey pREL_GHC FSLIT("realWorld#")
 		 realWorldStatePrimTy
 		 (noCafNoTyGenIdInfo `setUnfoldingInfo` mkOtherCon [])
 	-- The mkOtherCon makes it look that realWorld# is evaluated
@@ -858,7 +858,7 @@ realWorldPrimId	-- :: State# RealWorld
 	-- to be inlined
 
 voidArgId 	-- :: State# RealWorld
-  = mkSysLocal SLIT("void") voidArgIdKey realWorldStatePrimTy
+  = mkSysLocal FSLIT("void") voidArgIdKey realWorldStatePrimTy
 \end{code}
 
 
@@ -885,31 +885,31 @@ templates, but we don't ever expect to generate code for it.
 
 \begin{code}
 eRROR_ID
-  = pc_bottoming_Id errorIdKey pREL_ERR SLIT("error") errorTy
+  = pc_bottoming_Id errorIdKey pREL_ERR FSLIT("error") errorTy
 eRROR_CSTRING_ID
-  = pc_bottoming_Id errorCStringIdKey pREL_ERR SLIT("errorCString") 
+  = pc_bottoming_Id errorCStringIdKey pREL_ERR FSLIT("errorCString") 
 		    (mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy))
 pAT_ERROR_ID
-  = generic_ERROR_ID patErrorIdKey SLIT("patError")
+  = generic_ERROR_ID patErrorIdKey FSLIT("patError")
 rEC_SEL_ERROR_ID
-  = generic_ERROR_ID recSelErrIdKey SLIT("recSelError")
+  = generic_ERROR_ID recSelErrIdKey FSLIT("recSelError")
 rEC_CON_ERROR_ID
-  = generic_ERROR_ID recConErrorIdKey SLIT("recConError")
+  = generic_ERROR_ID recConErrorIdKey FSLIT("recConError")
 rEC_UPD_ERROR_ID
-  = generic_ERROR_ID recUpdErrorIdKey SLIT("recUpdError")
+  = generic_ERROR_ID recUpdErrorIdKey FSLIT("recUpdError")
 iRREFUT_PAT_ERROR_ID
-  = generic_ERROR_ID irrefutPatErrorIdKey SLIT("irrefutPatError")
+  = generic_ERROR_ID irrefutPatErrorIdKey FSLIT("irrefutPatError")
 nON_EXHAUSTIVE_GUARDS_ERROR_ID
-  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey SLIT("nonExhaustiveGuardsError")
+  = generic_ERROR_ID nonExhaustiveGuardsErrorIdKey FSLIT("nonExhaustiveGuardsError")
 nO_METHOD_BINDING_ERROR_ID
-  = generic_ERROR_ID noMethodBindingErrorIdKey SLIT("noMethodBindingError")
+  = generic_ERROR_ID noMethodBindingErrorIdKey FSLIT("noMethodBindingError")
 
 aBSENT_ERROR_ID
-  = pc_bottoming_Id absentErrorIdKey pREL_ERR SLIT("absentErr")
+  = pc_bottoming_Id absentErrorIdKey pREL_ERR FSLIT("absentErr")
 	(mkSigmaTy [openAlphaTyVar] [] openAlphaTy)
 
 pAR_ERROR_ID
-  = pcMiscPrelId parErrorIdKey pREL_ERR SLIT("parError")
+  = pcMiscPrelId parErrorIdKey pREL_ERR FSLIT("parError")
     (mkSigmaTy [openAlphaTyVar] [] openAlphaTy) noCafNoTyGenIdInfo
 \end{code}
 

@@ -281,7 +281,7 @@ applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
 mk_wrap_arg uniq ty dmd one_shot 
-  = set_one_shot one_shot (setIdNewDemandInfo (mkSysLocal SLIT("w") uniq ty) dmd)
+  = set_one_shot one_shot (setIdNewDemandInfo (mkSysLocal FSLIT("w") uniq ty) dmd)
   where
     set_one_shot True  id = setOneShotLambda id
     set_one_shot False id = id
@@ -506,5 +506,5 @@ sanitiseCaseBndr :: Id -> Id
 -- like		(x+y) `seq` ....
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
-mk_ww_local uniq ty = mkSysLocal SLIT("ww") uniq ty
+mk_ww_local uniq ty = mkSysLocal FSLIT("ww") uniq ty
 \end{code}

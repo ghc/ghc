@@ -49,6 +49,7 @@ import qualified FastString
 # define USE_FAST_STRINGS 1
 # define FAST_STRING	FastString.FastString
 # define SLIT(x)	(FastString.mkFastCharString# (x#))
+# define FSLIT(x)	(FastString.mkFastString# (x#))
 # define _NULL_		FastString.nullFastString
 # define _NIL_		(FastString.mkFastString "")
 # define _CONS_		FastString.consFS

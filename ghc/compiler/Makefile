@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.212 2002/02/14 08:23:25 sof Exp $
+# $Id: Makefile,v 1.213 2002/03/04 17:01:27 simonmar Exp $
 
 TOP = ..
 
@@ -361,6 +361,14 @@ INSTALL_LIBEXECS += $(HS_PROG)
 else
 INSTALL_PROGS += $(HS_PROG)
 endif
+
+# ----------------------------------------------------------------------------
+# profiling.
+
+rename/Rename_HC_OPTS += -auto-all
+rename/RnEnv_HC_OPTS += -auto-all
+rename/RnHiFiles_HC_OPTS += -auto-all
+rename/RnSource_HC_OPTS += -auto-all
 
 #-----------------------------------------------------------------------------
 # 		clean

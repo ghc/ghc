@@ -10,7 +10,18 @@
 module SysTools (
 	-- Initialisation
 	initSysTools,
-	setPgm,			-- String -> IO ()
+
+	setPgmP,		-- String -> IO ()
+	setPgmF,
+	setPgmc,
+	setPgmm,
+	setPgms,
+	setPgma,
+	setPgml,
+#ifdef ILX
+	setPgmI,
+	setPgmi,
+#endif
 				-- Command-line override
 	setDryRun,
 
@@ -408,27 +419,25 @@ foreign import stdcall "GetTempPathA" unsafe getTempPath :: Int -> CString -> IO
 #endif
 \end{code}
 
-setPgm is called when a command-line option like
+The various setPgm functions are called when a command-line option
+like
+
 	-pgmLld
+
 is used to override a particular program with a new one
 
 \begin{code}
-setPgm :: String -> IO ()
--- The string is the flag, minus the '-pgm' prefix
--- So the first character says which program to override
-
-setPgm ('P' : pgm) = writeIORef v_Pgm_P pgm
-setPgm ('F' : pgm) = writeIORef v_Pgm_F pgm
-setPgm ('c' : pgm) = writeIORef v_Pgm_c pgm
-setPgm ('m' : pgm) = writeIORef v_Pgm_m pgm
-setPgm ('s' : pgm) = writeIORef v_Pgm_s pgm
-setPgm ('a' : pgm) = writeIORef v_Pgm_a pgm
-setPgm ('l' : pgm) = writeIORef v_Pgm_l pgm
+setPgmP = writeIORef v_Pgm_P
+setPgmF = writeIORef v_Pgm_F
+setPgmc = writeIORef v_Pgm_c
+setPgmm = writeIORef v_Pgm_m
+setPgms = writeIORef v_Pgm_s
+setPgma = writeIORef v_Pgm_a
+setPgml = writeIORef v_Pgm_l
 #ifdef ILX
-setPgm ('I' : pgm) = writeIORef v_Pgm_I pgm
-setPgm ('i' : pgm) = writeIORef v_Pgm_i pgm
+setPgmI = writeIORef v_Pgm_I
+setPgmi = writeIORef v_Pgm_i
 #endif
-setPgm pgm	   = unknownFlagErr ("-pgm" ++ pgm)
 \end{code}
 
 

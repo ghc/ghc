@@ -863,7 +863,7 @@ eta_expand n us expr ty
     	case splitFunTy_maybe ty of {
  	  Just (arg_ty, res_ty) -> Lam arg1 (eta_expand (n-1) us2 (App expr (Var arg1)) res_ty)
 				where
-				   arg1	      = mkSysLocal SLIT("eta") uniq arg_ty
+				   arg1	      = mkSysLocal FSLIT("eta") uniq arg_ty
  				   (uniq:us2) = us
 				   
 	; Nothing ->

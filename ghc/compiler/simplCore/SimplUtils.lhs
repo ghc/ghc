@@ -40,7 +40,7 @@ import Type		( Type, seqType, splitRepFunTys, isStrictType,
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys
 			)
 import TcType		( isDictTy )
-import OccName		( UserFS )
+import OccName		( EncodedFS )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
 import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
 import Var		( mkSysTyVar, tyVarKind )
@@ -471,7 +471,7 @@ seqBndr b | isTyVar b = b `seq` ()
 
 
 \begin{code}
-newId :: UserFS -> Type -> SimplM Id
+newId :: EncodedFS -> Type -> SimplM Id
 newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
 	      returnSmpl (mkSysLocal fs uniq ty)
 \end{code}
@@ -889,7 +889,7 @@ mk_args missing_con inst_tys
 	ex_tyvars'  = zipWith mk tv_uniqs ex_tyvars
 	mk uniq tv  = mkSysTyVar uniq (tyVarKind tv)
 	arg_tys     = dataConArgTys missing_con (inst_tys ++ mkTyVarTys ex_tyvars')
-	arg_ids     = zipWith (mkSysLocal SLIT("a")) id_uniqs arg_tys
+	arg_ids     = zipWith (mkSysLocal FSLIT("a")) id_uniqs arg_tys
     in 
     returnSmpl (ex_tyvars' ++ arg_ids)
 \end{code}

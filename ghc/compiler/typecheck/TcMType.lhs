@@ -101,7 +101,7 @@ import Outputable
 newTyVar :: Kind -> NF_TcM TcTyVar
 newTyVar kind
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("t")) kind VanillaTv
+    tcNewMutTyVar (mkSysLocalName uniq FSLIT("t")) kind VanillaTv
 
 newTyVarTy  :: Kind -> NF_TcM TcType
 newTyVarTy kind
@@ -110,7 +110,7 @@ newTyVarTy kind
 
 newHoleTyVarTy :: NF_TcM TcType
   = tcGetUnique 	`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
+    tcNewMutTyVar (mkSysLocalName uniq FSLIT("h")) openTypeKind HoleTv	`thenNF_Tc` \ tv ->
     returnNF_Tc (TyVarTy tv)
 
 newTyVarTys :: Int -> Kind -> NF_TcM [TcType]
@@ -119,7 +119,7 @@ newTyVarTys n kind = mapNF_Tc newTyVarTy (nOfThem n kind)
 newKindVar :: NF_TcM TcKind
 newKindVar
   = tcGetUnique 							`thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
+    tcNewMutTyVar (mkSysLocalName uniq FSLIT("k")) superKind VanillaTv	`thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 
 newKindVars :: Int -> NF_TcM [TcKind]
@@ -128,7 +128,7 @@ newKindVars n = mapNF_Tc (\ _ -> newKindVar) (nOfThem n ())
 newBoxityVar :: NF_TcM TcKind
 newBoxityVar
   = tcGetUnique 							  `thenNF_Tc` \ uniq ->
-    tcNewMutTyVar (mkSysLocalName uniq SLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
+    tcNewMutTyVar (mkSysLocalName uniq FSLIT("bx")) superBoxity VanillaTv  `thenNF_Tc` \ kv ->
     returnNF_Tc (TyVarTy kv)
 \end{code}
 

@@ -66,7 +66,7 @@ import Panic	  ( panic )
 This *local* name is used by the interactive stuff
 
 \begin{code}
-itName uniq = mkLocalName uniq (mkOccFS varName SLIT("it")) noSrcLoc
+itName uniq = mkLocalName uniq (mkOccFS varName FSLIT("it")) noSrcLoc
 \end{code}
 
 \begin{code}
@@ -211,15 +211,7 @@ knownKeyNames
 
 	-- Others (needed for flattening and not mentioned before)
 	andName,
-	orName,
-	eqCharName, 
-	eqIntName,
-	eqFloatName, 
-	eqDoubleName, 
-	neqCharName, 
-	neqIntName,
-	neqFloatName, 
-	neqDoubleName
+	orName
     ]
 \end{code}
 
@@ -232,7 +224,8 @@ knownKeyNames
 
 \begin{code}
 pRELUDE_Name      = mkModuleName "Prelude"
-pREL_GHC_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
+gHC_PRIM_Name     = mkModuleName "GHC.Prim"	   -- Primitive types and values
+gHC_BUILTIN_Name  = mkModuleName "GHC.Builtin"
 pREL_BASE_Name    = mkModuleName "GHC.Base"
 pREL_ENUM_Name    = mkModuleName "GHC.Enum"
 pREL_SHOW_Name    = mkModuleName "GHC.Show"
@@ -267,7 +260,8 @@ aDDR_Name	  = mkModuleName "Addr"
 
 gLA_EXTS_Name   = mkModuleName "GlaExts"
 
-pREL_GHC     	= mkPrelModule pREL_GHC_Name
+gHC_PRIM     	= mkPrelModule gHC_PRIM_Name
+gHC_BUILTIN    	= mkPrelModule gHC_BUILTIN_Name
 pREL_BASE    	= mkPrelModule pREL_BASE_Name
 pREL_ADDR    	= mkPrelModule pREL_ADDR_Name
 pREL_PTR    	= mkPrelModule pREL_PTR_Name
@@ -292,7 +286,7 @@ iNTERACTIVE     = mkHomeModule (mkModuleName "$Interactive")
 \begin{code}
 mkTupNameStr :: Boxity -> Int -> (ModuleName, UserFS)
 
-mkTupNameStr Boxed 0 = (pREL_BASE_Name, SLIT("()"))
+mkTupNameStr Boxed 0 = (pREL_BASE_Name, FSLIT("()"))
 mkTupNameStr Boxed 1 = panic "Name.mkTupNameStr: 1 ???"
 mkTupNameStr Boxed 2 = (pREL_TUP_Name, _PK_ "(,)")   -- not strictly necessary
 mkTupNameStr Boxed 3 = (pREL_TUP_Name, _PK_ "(,,)")  -- ditto
@@ -300,11 +294,11 @@ mkTupNameStr Boxed 4 = (pREL_TUP_Name, _PK_ "(,,,)") -- ditto
 mkTupNameStr Boxed n = (pREL_TUP_Name, _PK_ ("(" ++ nOfThem (n-1) ',' ++ ")"))
 
 mkTupNameStr Unboxed 0 = panic "Name.mkUbxTupNameStr: 0 ???"
-mkTupNameStr Unboxed 1 = (pREL_GHC_Name, _PK_ "(# #)") -- 1 and 0 both make sense!!!
-mkTupNameStr Unboxed 2 = (pREL_GHC_Name, _PK_ "(#,#)")
-mkTupNameStr Unboxed 3 = (pREL_GHC_Name, _PK_ "(#,,#)")
-mkTupNameStr Unboxed 4 = (pREL_GHC_Name, _PK_ "(#,,,#)")
-mkTupNameStr Unboxed n = (pREL_GHC_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
+mkTupNameStr Unboxed 1 = (gHC_PRIM_Name, _PK_ "(# #)") -- 1 and 0 both make sense!!!
+mkTupNameStr Unboxed 2 = (gHC_PRIM_Name, _PK_ "(#,#)")
+mkTupNameStr Unboxed 3 = (gHC_PRIM_Name, _PK_ "(#,,#)")
+mkTupNameStr Unboxed 4 = (gHC_PRIM_Name, _PK_ "(#,,,#)")
+mkTupNameStr Unboxed n = (gHC_PRIM_Name, _PK_ ("(#" ++ nOfThem (n-1) ',' ++ "#)"))
 
 mkTupConRdrName :: NameSpace -> Boxity -> Arity -> RdrName 
 mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
@@ -320,7 +314,7 @@ mkTupConRdrName space boxity arity   = case mkTupNameStr boxity arity of
 
 \begin{code}
 main_RDR_Unqual :: RdrName
-main_RDR_Unqual = mkUnqual varName SLIT("main")
+main_RDR_Unqual = mkUnqual varName FSLIT("main")
 -- Don't get a RdrName from PrelNames.mainName, because nameRdrName
 -- gets an Orig RdrName, and we want a Qual or Unqual one.  An Unqual
 -- one will do fine.
@@ -338,246 +332,238 @@ compiler (notably the deriving mechanism) need to mention their names,
 and it's convenient to write them all down in one place.
 
 \begin{code}
-dollarMainName = varQual mAIN_Name SLIT("$main") dollarMainKey
-runMainName    = varQual pREL_TOP_HANDLER_Name SLIT("runMain") runMainKey
+dollarMainName = varQual mAIN_Name FSLIT("$main") dollarMainKey
+runMainName    = varQual pREL_TOP_HANDLER_Name FSLIT("runMain") runMainKey
 
 -- Stuff from PrelGHC
-usOnceTyConName  = kindQual SLIT(".") usOnceTyConKey
-usManyTyConName  = kindQual SLIT("!") usManyTyConKey
-superKindName    = kindQual SLIT("KX") kindConKey
-superBoxityName  = kindQual SLIT("BX") boxityConKey
-liftedConName    = kindQual SLIT("*") liftedConKey
-unliftedConName  = kindQual SLIT("#") unliftedConKey
-openKindConName  = kindQual SLIT("?") anyBoxConKey
-usageKindConName = kindQual SLIT("$") usageConKey
-typeConName	 = kindQual SLIT("Type") typeConKey
+usOnceTyConName  = kindQual FSLIT(".") usOnceTyConKey
+usManyTyConName  = kindQual FSLIT("!") usManyTyConKey
+superKindName    = kindQual FSLIT("KX") kindConKey
+superBoxityName  = kindQual FSLIT("BX") boxityConKey
+liftedConName    = kindQual FSLIT("*") liftedConKey
+unliftedConName  = kindQual FSLIT("#") unliftedConKey
+openKindConName  = kindQual FSLIT("?") anyBoxConKey
+usageKindConName = kindQual FSLIT("$") usageConKey
+typeConName	 = kindQual FSLIT("Type") typeConKey
 
-funTyConName	    	      = tcQual  pREL_GHC_Name SLIT("(->)")  funTyConKey
-charPrimTyConName    	      = tcQual  pREL_GHC_Name SLIT("Char#") charPrimTyConKey 
-intPrimTyConName     	      = tcQual  pREL_GHC_Name SLIT("Int#") intPrimTyConKey 
-int32PrimTyConName	      = tcQual  pREL_GHC_Name SLIT("Int32#") int32PrimTyConKey 
-int64PrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("Int64#") int64PrimTyConKey 
-wordPrimTyConName    	      = tcQual  pREL_GHC_Name SLIT("Word#") wordPrimTyConKey 
-word32PrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Word32#") word32PrimTyConKey 
-word64PrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Word64#") word64PrimTyConKey 
-addrPrimTyConName    	      = tcQual  pREL_GHC_Name SLIT("Addr#") addrPrimTyConKey 
-floatPrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("Float#") floatPrimTyConKey 
-doublePrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Double#") doublePrimTyConKey 
-statePrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("State#") statePrimTyConKey 
-realWorldTyConName   	      = tcQual  pREL_GHC_Name SLIT("RealWorld") realWorldTyConKey 
-arrayPrimTyConName   	      = tcQual  pREL_GHC_Name SLIT("Array#") arrayPrimTyConKey 
-byteArrayPrimTyConName	      = tcQual  pREL_GHC_Name SLIT("ByteArray#") byteArrayPrimTyConKey 
-mutableArrayPrimTyConName     = tcQual  pREL_GHC_Name SLIT("MutableArray#") mutableArrayPrimTyConKey 
-mutableByteArrayPrimTyConName = tcQual  pREL_GHC_Name SLIT("MutableByteArray#") mutableByteArrayPrimTyConKey 
-mutVarPrimTyConName	      = tcQual  pREL_GHC_Name SLIT("MutVar#") mutVarPrimTyConKey 
-mVarPrimTyConName	      = tcQual  pREL_GHC_Name SLIT("MVar#") mVarPrimTyConKey 
-stablePtrPrimTyConName        = tcQual  pREL_GHC_Name SLIT("StablePtr#") stablePtrPrimTyConKey 
-stableNamePrimTyConName       = tcQual  pREL_GHC_Name SLIT("StableName#") stableNamePrimTyConKey 
-foreignObjPrimTyConName       = tcQual  pREL_GHC_Name SLIT("ForeignObj#") foreignObjPrimTyConKey 
-bcoPrimTyConName 	      = tcQual  pREL_GHC_Name SLIT("BCO#") bcoPrimTyConKey 
-weakPrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("Weak#") weakPrimTyConKey 
-threadIdPrimTyConName  	      = tcQual  pREL_GHC_Name SLIT("ThreadId#") threadIdPrimTyConKey 
-cCallableClassName   	      = clsQual pREL_GHC_Name SLIT("CCallable") cCallableClassKey
-cReturnableClassName 	      = clsQual pREL_GHC_Name SLIT("CReturnable") cReturnableClassKey
+funTyConName	    	      = tcQual  gHC_PRIM_Name FSLIT("(->)")  funTyConKey
+charPrimTyConName    	      = tcQual  gHC_PRIM_Name FSLIT("Char#") charPrimTyConKey 
+intPrimTyConName     	      = tcQual  gHC_PRIM_Name FSLIT("Int#") intPrimTyConKey 
+int32PrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("Int32#") int32PrimTyConKey 
+int64PrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("Int64#") int64PrimTyConKey 
+wordPrimTyConName    	      = tcQual  gHC_PRIM_Name FSLIT("Word#") wordPrimTyConKey 
+word32PrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Word32#") word32PrimTyConKey 
+word64PrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Word64#") word64PrimTyConKey 
+addrPrimTyConName    	      = tcQual  gHC_PRIM_Name FSLIT("Addr#") addrPrimTyConKey 
+floatPrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("Float#") floatPrimTyConKey 
+doublePrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Double#") doublePrimTyConKey 
+statePrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("State#") statePrimTyConKey 
+realWorldTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("RealWorld") realWorldTyConKey 
+arrayPrimTyConName   	      = tcQual  gHC_PRIM_Name FSLIT("Array#") arrayPrimTyConKey 
+byteArrayPrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("ByteArray#") byteArrayPrimTyConKey 
+mutableArrayPrimTyConName     = tcQual  gHC_PRIM_Name FSLIT("MutableArray#") mutableArrayPrimTyConKey 
+mutableByteArrayPrimTyConName = tcQual  gHC_PRIM_Name FSLIT("MutableByteArray#") mutableByteArrayPrimTyConKey 
+mutVarPrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("MutVar#") mutVarPrimTyConKey 
+mVarPrimTyConName	      = tcQual  gHC_PRIM_Name FSLIT("MVar#") mVarPrimTyConKey 
+stablePtrPrimTyConName        = tcQual  gHC_PRIM_Name FSLIT("StablePtr#") stablePtrPrimTyConKey 
+stableNamePrimTyConName       = tcQual  gHC_PRIM_Name FSLIT("StableName#") stableNamePrimTyConKey 
+foreignObjPrimTyConName       = tcQual  gHC_PRIM_Name FSLIT("ForeignObj#") foreignObjPrimTyConKey 
+bcoPrimTyConName 	      = tcQual  gHC_PRIM_Name FSLIT("BCO#") bcoPrimTyConKey 
+weakPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("Weak#") weakPrimTyConKey 
+threadIdPrimTyConName  	      = tcQual  gHC_PRIM_Name FSLIT("ThreadId#") threadIdPrimTyConKey 
+cCallableClassName   	      = clsQual gHC_BUILTIN_Name FSLIT("CCallable") cCallableClassKey
+cReturnableClassName 	      = clsQual gHC_BUILTIN_Name FSLIT("CReturnable") cReturnableClassKey
 
 -- PrelBase data types and constructors
-charTyConName	  = tcQual   pREL_BASE_Name SLIT("Char") charTyConKey
-charDataConName   = dataQual pREL_BASE_Name SLIT("C#") charDataConKey
-intTyConName	  = tcQual   pREL_BASE_Name SLIT("Int") intTyConKey
-intDataConName	  = dataQual pREL_BASE_Name SLIT("I#") intDataConKey
-orderingTyConName = tcQual   pREL_BASE_Name SLIT("Ordering") orderingTyConKey
-boolTyConName	  = tcQual   pREL_BASE_Name SLIT("Bool") boolTyConKey
-falseDataConName  = dataQual pREL_BASE_Name SLIT("False") falseDataConKey
-trueDataConName	  = dataQual pREL_BASE_Name SLIT("True") trueDataConKey
-listTyConName	  = tcQual   pREL_BASE_Name SLIT("[]") listTyConKey
-nilDataConName 	  = dataQual pREL_BASE_Name SLIT("[]") nilDataConKey
-consDataConName	  = dataQual pREL_BASE_Name SLIT(":") consDataConKey
+charTyConName	  = tcQual   pREL_BASE_Name FSLIT("Char") charTyConKey
+charDataConName   = dataQual pREL_BASE_Name FSLIT("C#") charDataConKey
+intTyConName	  = tcQual   pREL_BASE_Name FSLIT("Int") intTyConKey
+intDataConName	  = dataQual pREL_BASE_Name FSLIT("I#") intDataConKey
+orderingTyConName = tcQual   pREL_BASE_Name FSLIT("Ordering") orderingTyConKey
+boolTyConName	  = tcQual   pREL_BASE_Name FSLIT("Bool") boolTyConKey
+falseDataConName  = dataQual pREL_BASE_Name FSLIT("False") falseDataConKey
+trueDataConName	  = dataQual pREL_BASE_Name FSLIT("True") trueDataConKey
+listTyConName	  = tcQual   pREL_BASE_Name FSLIT("[]") listTyConKey
+nilDataConName 	  = dataQual pREL_BASE_Name FSLIT("[]") nilDataConKey
+consDataConName	  = dataQual pREL_BASE_Name FSLIT(":") consDataConKey
 
 -- PrelTup
-fstName		  = varQual pREL_TUP_Name SLIT("fst") fstIdKey
-sndName		  = varQual pREL_TUP_Name SLIT("snd") sndIdKey
+fstName		  = varQual pREL_TUP_Name FSLIT("fst") fstIdKey
+sndName		  = varQual pREL_TUP_Name FSLIT("snd") sndIdKey
 
 -- Generics
-crossTyConName     = tcQual   pREL_BASE_Name SLIT(":*:") crossTyConKey
-crossDataConName   = dataQual pREL_BASE_Name SLIT(":*:") crossDataConKey
-plusTyConName      = tcQual   pREL_BASE_Name SLIT(":+:") plusTyConKey
-inlDataConName     = dataQual pREL_BASE_Name SLIT("Inl") inlDataConKey
-inrDataConName     = dataQual pREL_BASE_Name SLIT("Inr") inrDataConKey
-genUnitTyConName   = tcQual   pREL_BASE_Name SLIT("Unit") genUnitTyConKey
-genUnitDataConName = dataQual pREL_BASE_Name SLIT("Unit") genUnitDataConKey
+crossTyConName     = tcQual   pREL_BASE_Name FSLIT(":*:") crossTyConKey
+crossDataConName   = dataQual pREL_BASE_Name FSLIT(":*:") crossDataConKey
+plusTyConName      = tcQual   pREL_BASE_Name FSLIT(":+:") plusTyConKey
+inlDataConName     = dataQual pREL_BASE_Name FSLIT("Inl") inlDataConKey
+inrDataConName     = dataQual pREL_BASE_Name FSLIT("Inr") inrDataConKey
+genUnitTyConName   = tcQual   pREL_BASE_Name FSLIT("Unit") genUnitTyConKey
+genUnitDataConName = dataQual pREL_BASE_Name FSLIT("Unit") genUnitDataConKey
 
 -- Random PrelBase functions
-unsafeCoerceName  = varQual pREL_BASE_Name SLIT("unsafeCoerce") 
+unsafeCoerceName  = varQual pREL_BASE_Name FSLIT("unsafeCoerce") 
 							     unsafeCoerceIdKey
-otherwiseIdName   = varQual pREL_BASE_Name SLIT("otherwise") otherwiseIdKey
-appendName	  = varQual pREL_BASE_Name SLIT("++")	     appendIdKey
-foldrName	  = varQual pREL_BASE_Name SLIT("foldr")     foldrIdKey
-mapName	   	  = varQual pREL_BASE_Name SLIT("map")	     mapIdKey
-buildName	  = varQual pREL_BASE_Name SLIT("build")     buildIdKey
-augmentName	  = varQual pREL_BASE_Name SLIT("augment")   augmentIdKey
-eqStringName	  = varQual pREL_BASE_Name SLIT("eqString")  eqStringIdKey
-andName		  = varQual pREL_BASE_Name SLIT("&&")	     andIdKey
-orName		  = varQual pREL_BASE_Name SLIT("||")	     orIdKey
-eqCharName	  = varQual pREL_GHC_Name  SLIT("eqChar#")   eqCharIdKey
-eqIntName	  = varQual pREL_GHC_Name  SLIT("==#")       eqIntIdKey
-eqFloatName	  = varQual pREL_GHC_Name  SLIT("eqFloat#")  eqFloatIdKey
-eqDoubleName	  = varQual pREL_GHC_Name  SLIT("==##")	     eqDoubleIdKey
-neqCharName	  = varQual pREL_GHC_Name  SLIT("neqChar#")  neqCharIdKey
-neqIntName	  = varQual pREL_GHC_Name  SLIT("/=#")       neqIntIdKey
-neqFloatName	  = varQual pREL_GHC_Name  SLIT("neqFloat#") neqFloatIdKey
-neqDoubleName	  = varQual pREL_GHC_Name  SLIT("/=##")	     neqDoubleIdKey
+otherwiseIdName   = varQual pREL_BASE_Name FSLIT("otherwise") otherwiseIdKey
+appendName	  = varQual pREL_BASE_Name FSLIT("++")	     appendIdKey
+foldrName	  = varQual pREL_BASE_Name FSLIT("foldr")     foldrIdKey
+mapName	   	  = varQual pREL_BASE_Name FSLIT("map")	     mapIdKey
+buildName	  = varQual pREL_BASE_Name FSLIT("build")     buildIdKey
+augmentName	  = varQual pREL_BASE_Name FSLIT("augment")   augmentIdKey
+eqStringName	  = varQual pREL_BASE_Name FSLIT("eqString")  eqStringIdKey
+andName		  = varQual pREL_BASE_Name FSLIT("&&")	     andIdKey
+orName		  = varQual pREL_BASE_Name FSLIT("||")	     orIdKey
 
 -- Strings
-unpackCStringName       = varQual pREL_BASE_Name SLIT("unpackCString#") unpackCStringIdKey
-unpackCStringAppendName = varQual pREL_BASE_Name SLIT("unpackAppendCString#") unpackCStringAppendIdKey
-unpackCStringFoldrName  = varQual pREL_BASE_Name SLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
-unpackCStringUtf8Name   = varQual pREL_BASE_Name SLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
+unpackCStringName       = varQual pREL_BASE_Name FSLIT("unpackCString#") unpackCStringIdKey
+unpackCStringAppendName = varQual pREL_BASE_Name FSLIT("unpackAppendCString#") unpackCStringAppendIdKey
+unpackCStringFoldrName  = varQual pREL_BASE_Name FSLIT("unpackFoldrCString#") unpackCStringFoldrIdKey
+unpackCStringUtf8Name   = varQual pREL_BASE_Name FSLIT("unpackCStringUtf8#") unpackCStringUtf8IdKey
 
 -- Classes Eq and Ord
-eqClassName	  = clsQual pREL_BASE_Name SLIT("Eq") eqClassKey
-ordClassName	  = clsQual pREL_BASE_Name SLIT("Ord") ordClassKey
-eqName		  = varQual  pREL_BASE_Name SLIT("==") eqClassOpKey
-geName		  = varQual  pREL_BASE_Name SLIT(">=") geClassOpKey
+eqClassName	  = clsQual pREL_BASE_Name FSLIT("Eq") eqClassKey
+ordClassName	  = clsQual pREL_BASE_Name FSLIT("Ord") ordClassKey
+eqName		  = varQual  pREL_BASE_Name FSLIT("==") eqClassOpKey
+geName		  = varQual  pREL_BASE_Name FSLIT(">=") geClassOpKey
 
 -- Class Monad
-monadClassName	   = clsQual pREL_BASE_Name SLIT("Monad") monadClassKey
-thenMName	   = varQual pREL_BASE_Name SLIT(">>=") thenMClassOpKey
-returnMName	   = varQual pREL_BASE_Name SLIT("return") returnMClassOpKey
-failMName	   = varQual pREL_BASE_Name SLIT("fail") failMClassOpKey
+monadClassName	   = clsQual pREL_BASE_Name FSLIT("Monad") monadClassKey
+thenMName	   = varQual pREL_BASE_Name FSLIT(">>=") thenMClassOpKey
+returnMName	   = varQual pREL_BASE_Name FSLIT("return") returnMClassOpKey
+failMName	   = varQual pREL_BASE_Name FSLIT("fail") failMClassOpKey
 
 -- Class Functor
-functorClassName  = clsQual pREL_BASE_Name SLIT("Functor") functorClassKey
+functorClassName  = clsQual pREL_BASE_Name FSLIT("Functor") functorClassKey
 
 -- Class Show
-showClassName	  = clsQual pREL_SHOW_Name SLIT("Show") showClassKey
+showClassName	  = clsQual pREL_SHOW_Name FSLIT("Show") showClassKey
 
 -- Class Read
-readClassName	  = clsQual pREL_READ_Name SLIT("Read") readClassKey
+readClassName	  = clsQual pREL_READ_Name FSLIT("Read") readClassKey
 
 -- Module PrelNum
-numClassName	  = clsQual pREL_NUM_Name SLIT("Num") numClassKey
-fromIntegerName   = varQual pREL_NUM_Name SLIT("fromInteger") fromIntegerClassOpKey
-minusName	  = varQual pREL_NUM_Name SLIT("-") minusClassOpKey
-negateName	  = varQual pREL_NUM_Name SLIT("negate") negateClassOpKey
-plusIntegerName   = varQual pREL_NUM_Name SLIT("plusInteger") plusIntegerIdKey
-timesIntegerName  = varQual pREL_NUM_Name SLIT("timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual  pREL_NUM_Name SLIT("Integer") integerTyConKey
-smallIntegerDataConName = dataQual pREL_NUM_Name SLIT("S#") smallIntegerDataConKey
-largeIntegerDataConName = dataQual pREL_NUM_Name SLIT("J#") largeIntegerDataConKey
+numClassName	  = clsQual pREL_NUM_Name FSLIT("Num") numClassKey
+fromIntegerName   = varQual pREL_NUM_Name FSLIT("fromInteger") fromIntegerClassOpKey
+minusName	  = varQual pREL_NUM_Name FSLIT("-") minusClassOpKey
+negateName	  = varQual pREL_NUM_Name FSLIT("negate") negateClassOpKey
+plusIntegerName   = varQual pREL_NUM_Name FSLIT("plusInteger") plusIntegerIdKey
+timesIntegerName  = varQual pREL_NUM_Name FSLIT("timesInteger") timesIntegerIdKey
+integerTyConName  = tcQual  pREL_NUM_Name FSLIT("Integer") integerTyConKey
+smallIntegerDataConName = dataQual pREL_NUM_Name FSLIT("S#") smallIntegerDataConKey
+largeIntegerDataConName = dataQual pREL_NUM_Name FSLIT("J#") largeIntegerDataConKey
 
 -- PrelReal types and classes
-rationalTyConName   = tcQual   pREL_REAL_Name  SLIT("Rational") rationalTyConKey
-ratioTyConName	    = tcQual   pREL_REAL_Name  SLIT("Ratio") ratioTyConKey
-ratioDataConName    = dataQual pREL_REAL_Name  SLIT(":%") ratioDataConKey
-realClassName	    = clsQual  pREL_REAL_Name  SLIT("Real") realClassKey
-integralClassName   = clsQual  pREL_REAL_Name  SLIT("Integral") integralClassKey
-realFracClassName   = clsQual  pREL_REAL_Name  SLIT("RealFrac") realFracClassKey
-fractionalClassName = clsQual  pREL_REAL_Name  SLIT("Fractional") fractionalClassKey
-fromRationalName    = varQual  pREL_REAL_Name  SLIT("fromRational") fromRationalClassOpKey
+rationalTyConName   = tcQual   pREL_REAL_Name  FSLIT("Rational") rationalTyConKey
+ratioTyConName	    = tcQual   pREL_REAL_Name  FSLIT("Ratio") ratioTyConKey
+ratioDataConName    = dataQual pREL_REAL_Name  FSLIT(":%") ratioDataConKey
+realClassName	    = clsQual  pREL_REAL_Name  FSLIT("Real") realClassKey
+integralClassName   = clsQual  pREL_REAL_Name  FSLIT("Integral") integralClassKey
+realFracClassName   = clsQual  pREL_REAL_Name  FSLIT("RealFrac") realFracClassKey
+fractionalClassName = clsQual  pREL_REAL_Name  FSLIT("Fractional") fractionalClassKey
+fromRationalName    = varQual  pREL_REAL_Name  FSLIT("fromRational") fromRationalClassOpKey
 
 -- PrelFloat classes
-floatTyConName	   = tcQual   pREL_FLOAT_Name SLIT("Float") floatTyConKey
-floatDataConName   = dataQual pREL_FLOAT_Name SLIT("F#") floatDataConKey
-doubleTyConName    = tcQual   pREL_FLOAT_Name SLIT("Double") doubleTyConKey
-doubleDataConName  = dataQual pREL_FLOAT_Name SLIT("D#") doubleDataConKey
-floatingClassName  = clsQual  pREL_FLOAT_Name SLIT("Floating") floatingClassKey
-realFloatClassName = clsQual  pREL_FLOAT_Name SLIT("RealFloat") realFloatClassKey
+floatTyConName	   = tcQual   pREL_FLOAT_Name FSLIT("Float") floatTyConKey
+floatDataConName   = dataQual pREL_FLOAT_Name FSLIT("F#") floatDataConKey
+doubleTyConName    = tcQual   pREL_FLOAT_Name FSLIT("Double") doubleTyConKey
+doubleDataConName  = dataQual pREL_FLOAT_Name FSLIT("D#") doubleDataConKey
+floatingClassName  = clsQual  pREL_FLOAT_Name FSLIT("Floating") floatingClassKey
+realFloatClassName = clsQual  pREL_FLOAT_Name FSLIT("RealFloat") realFloatClassKey
 
 -- Class Ix
-ixClassName	   = clsQual pREL_ARR_Name SLIT("Ix") ixClassKey
+ixClassName	   = clsQual pREL_ARR_Name FSLIT("Ix") ixClassKey
 
 -- Class Enum
-enumClassName 	   = clsQual pREL_ENUM_Name SLIT("Enum") enumClassKey
-toEnumName	   = varQual pREL_ENUM_Name SLIT("toEnum") toEnumClassOpKey
-fromEnumName	   = varQual pREL_ENUM_Name SLIT("fromEnum") fromEnumClassOpKey
-enumFromName	   = varQual pREL_ENUM_Name SLIT("enumFrom") enumFromClassOpKey
-enumFromToName	   = varQual pREL_ENUM_Name SLIT("enumFromTo") enumFromToClassOpKey
-enumFromThenName   = varQual pREL_ENUM_Name SLIT("enumFromThen") enumFromThenClassOpKey
-enumFromThenToName = varQual pREL_ENUM_Name SLIT("enumFromThenTo") enumFromThenToClassOpKey
+enumClassName 	   = clsQual pREL_ENUM_Name FSLIT("Enum") enumClassKey
+toEnumName	   = varQual pREL_ENUM_Name FSLIT("toEnum") toEnumClassOpKey
+fromEnumName	   = varQual pREL_ENUM_Name FSLIT("fromEnum") fromEnumClassOpKey
+enumFromName	   = varQual pREL_ENUM_Name FSLIT("enumFrom") enumFromClassOpKey
+enumFromToName	   = varQual pREL_ENUM_Name FSLIT("enumFromTo") enumFromToClassOpKey
+enumFromThenName   = varQual pREL_ENUM_Name FSLIT("enumFromThen") enumFromThenClassOpKey
+enumFromThenToName = varQual pREL_ENUM_Name FSLIT("enumFromThenTo") enumFromThenToClassOpKey
 
 -- Overloaded via Class Enum
-enumFromToPName	   = varQual pREL_PARR_Name SLIT("enumFromToP") enumFromToPIdKey
-enumFromThenToPName= varQual pREL_PARR_Name SLIT("enumFromThenToP") enumFromThenToPIdKey
+enumFromToPName	   = varQual pREL_PARR_Name FSLIT("enumFromToP") enumFromToPIdKey
+enumFromThenToPName= varQual pREL_PARR_Name FSLIT("enumFromThenToP") enumFromThenToPIdKey
 
 -- Class Bounded
-boundedClassName  = clsQual pREL_ENUM_Name SLIT("Bounded") boundedClassKey
+boundedClassName  = clsQual pREL_ENUM_Name FSLIT("Bounded") boundedClassKey
 
 -- List functions
-concatName	  = varQual pREL_LIST_Name SLIT("concat") concatIdKey
-filterName	  = varQual pREL_LIST_Name SLIT("filter") filterIdKey
-zipName	   	  = varQual pREL_LIST_Name SLIT("zip") zipIdKey
+concatName	  = varQual pREL_LIST_Name FSLIT("concat") concatIdKey
+filterName	  = varQual pREL_LIST_Name FSLIT("filter") filterIdKey
+zipName	   	  = varQual pREL_LIST_Name FSLIT("zip") zipIdKey
 
 -- parallel array types and functions
-parrTyConName	  = tcQual  pREL_PARR_Name SLIT("[::]")       parrTyConKey
-parrDataConName   = dataQual pREL_PARR_Name SLIT("PArr")      parrDataConKey
-nullPName	  = varQual pREL_PARR_Name SLIT("nullP")      nullPIdKey
-lengthPName	  = varQual pREL_PARR_Name SLIT("lengthP")    lengthPIdKey
-replicatePName	  = varQual pREL_PARR_Name SLIT("replicateP") replicatePIdKey
-mapPName	  = varQual pREL_PARR_Name SLIT("mapP")       mapPIdKey
-filterPName	  = varQual pREL_PARR_Name SLIT("filterP")    filterPIdKey
-zipPName	  = varQual pREL_PARR_Name SLIT("zipP")       zipPIdKey
-crossPName	  = varQual pREL_PARR_Name SLIT("crossP")     crossPIdKey
-indexPName	  = varQual pREL_PARR_Name SLIT("!:")	      indexPIdKey
-toPName	          = varQual pREL_PARR_Name SLIT("toP")	      toPIdKey
-bpermutePName     = varQual pREL_PARR_Name SLIT("bpermuteP")  bpermutePIdKey
-bpermuteDftPName  = varQual pREL_PARR_Name SLIT("bpermuteDftP") 
+parrTyConName	  = tcQual  pREL_PARR_Name FSLIT("[::]")       parrTyConKey
+parrDataConName   = dataQual pREL_PARR_Name FSLIT("PArr")      parrDataConKey
+nullPName	  = varQual pREL_PARR_Name FSLIT("nullP")      nullPIdKey
+lengthPName	  = varQual pREL_PARR_Name FSLIT("lengthP")    lengthPIdKey
+replicatePName	  = varQual pREL_PARR_Name FSLIT("replicateP") replicatePIdKey
+mapPName	  = varQual pREL_PARR_Name FSLIT("mapP")       mapPIdKey
+filterPName	  = varQual pREL_PARR_Name FSLIT("filterP")    filterPIdKey
+zipPName	  = varQual pREL_PARR_Name FSLIT("zipP")       zipPIdKey
+crossPName	  = varQual pREL_PARR_Name FSLIT("crossP")     crossPIdKey
+indexPName	  = varQual pREL_PARR_Name FSLIT("!:")	      indexPIdKey
+toPName	          = varQual pREL_PARR_Name FSLIT("toP")	      toPIdKey
+bpermutePName     = varQual pREL_PARR_Name FSLIT("bpermuteP")  bpermutePIdKey
+bpermuteDftPName  = varQual pREL_PARR_Name FSLIT("bpermuteDftP") 
 							      bpermuteDftPIdKey
-indexOfPName      = varQual pREL_PARR_Name SLIT("indexOfP")   indexOfPIdKey
+indexOfPName      = varQual pREL_PARR_Name FSLIT("indexOfP")   indexOfPIdKey
 
 -- IOBase things
-ioTyConName	  = tcQual   pREL_IO_BASE_Name SLIT("IO") ioTyConKey
-ioDataConName     = dataQual pREL_IO_BASE_Name SLIT("IO") ioDataConKey
-bindIOName	  = varQual  pREL_IO_BASE_Name SLIT("bindIO") bindIOIdKey
-returnIOName	  = varQual  pREL_IO_BASE_Name SLIT("returnIO") returnIOIdKey
-failIOName	  = varQual  pREL_IO_BASE_Name SLIT("failIO") failIOIdKey
+ioTyConName	  = tcQual   pREL_IO_BASE_Name FSLIT("IO") ioTyConKey
+ioDataConName     = dataQual pREL_IO_BASE_Name FSLIT("IO") ioDataConKey
+bindIOName	  = varQual  pREL_IO_BASE_Name FSLIT("bindIO") bindIOIdKey
+returnIOName	  = varQual  pREL_IO_BASE_Name FSLIT("returnIO") returnIOIdKey
+failIOName	  = varQual  pREL_IO_BASE_Name FSLIT("failIO") failIOIdKey
 
 -- IO things
-printName	  = varQual sYSTEM_IO_Name SLIT("print") printIdKey
+printName	  = varQual sYSTEM_IO_Name FSLIT("print") printIdKey
 
 -- Int, Word, and Addr things
-int8TyConName     = tcQual pREL_INT_Name  SLIT("Int8") int8TyConKey
-int16TyConName    = tcQual pREL_INT_Name  SLIT("Int16") int16TyConKey
-int32TyConName    = tcQual pREL_INT_Name  SLIT("Int32") int32TyConKey
-int64TyConName    = tcQual pREL_INT_Name  SLIT("Int64") int64TyConKey
+int8TyConName     = tcQual pREL_INT_Name  FSLIT("Int8") int8TyConKey
+int16TyConName    = tcQual pREL_INT_Name  FSLIT("Int16") int16TyConKey
+int32TyConName    = tcQual pREL_INT_Name  FSLIT("Int32") int32TyConKey
+int64TyConName    = tcQual pREL_INT_Name  FSLIT("Int64") int64TyConKey
 
-word8TyConName    = tcQual pREL_WORD_Name SLIT("Word8")  word8TyConKey
-word16TyConName   = tcQual pREL_WORD_Name SLIT("Word16") word16TyConKey
-word32TyConName   = tcQual pREL_WORD_Name SLIT("Word32") word32TyConKey
-word64TyConName   = tcQual pREL_WORD_Name SLIT("Word64") word64TyConKey
+word8TyConName    = tcQual pREL_WORD_Name FSLIT("Word8")  word8TyConKey
+word16TyConName   = tcQual pREL_WORD_Name FSLIT("Word16") word16TyConKey
+word32TyConName   = tcQual pREL_WORD_Name FSLIT("Word32") word32TyConKey
+word64TyConName   = tcQual pREL_WORD_Name FSLIT("Word64") word64TyConKey
 
-wordTyConName     = tcQual   pREL_WORD_Name SLIT("Word")   wordTyConKey
-wordDataConName   = dataQual pREL_WORD_Name SLIT("W#")     wordDataConKey
+wordTyConName     = tcQual   pREL_WORD_Name FSLIT("Word")   wordTyConKey
+wordDataConName   = dataQual pREL_WORD_Name FSLIT("W#")     wordDataConKey
 
-addrTyConName	  = tcQual   aDDR_Name SLIT("Addr") addrTyConKey
-addrDataConName   = dataQual aDDR_Name SLIT("A#") addrDataConKey
+addrTyConName	  = tcQual   aDDR_Name FSLIT("Addr") addrTyConKey
+addrDataConName   = dataQual aDDR_Name FSLIT("A#") addrDataConKey
 
-ptrTyConName	  = tcQual   pREL_PTR_Name SLIT("Ptr") ptrTyConKey
-ptrDataConName    = dataQual pREL_PTR_Name SLIT("Ptr") ptrDataConKey
+ptrTyConName	  = tcQual   pREL_PTR_Name FSLIT("Ptr") ptrTyConKey
+ptrDataConName    = dataQual pREL_PTR_Name FSLIT("Ptr") ptrDataConKey
 
-funPtrTyConName	  = tcQual   pREL_PTR_Name SLIT("FunPtr") funPtrTyConKey
-funPtrDataConName = dataQual pREL_PTR_Name SLIT("FunPtr") funPtrDataConKey
+funPtrTyConName	  = tcQual   pREL_PTR_Name FSLIT("FunPtr") funPtrTyConKey
+funPtrDataConName = dataQual pREL_PTR_Name FSLIT("FunPtr") funPtrDataConKey
 
 -- Byte array types
-byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  SLIT("ByteArray") byteArrayTyConKey
-mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") mutableByteArrayTyConKey
+byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  FSLIT("ByteArray") byteArrayTyConKey
+mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  FSLIT("MutableByteArray") mutableByteArrayTyConKey
 
 -- Foreign objects and weak pointers
-foreignObjTyConName   = tcQual   fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjTyConKey
-foreignObjDataConName = dataQual fOREIGNOBJ_Name SLIT("ForeignObj") foreignObjDataConKey
-foreignPtrTyConName   = tcQual   fOREIGN_PTR_Name SLIT("ForeignPtr") foreignPtrTyConKey
-foreignPtrDataConName = dataQual fOREIGN_PTR_Name SLIT("ForeignPtr") foreignPtrDataConKey
-stablePtrTyConName    = tcQual   pREL_STABLE_Name SLIT("StablePtr") stablePtrTyConKey
-stablePtrDataConName  = dataQual pREL_STABLE_Name SLIT("StablePtr") stablePtrDataConKey
-deRefStablePtrName    = varQual  pREL_STABLE_Name SLIT("deRefStablePtr") deRefStablePtrIdKey
-newStablePtrName      = varQual  pREL_STABLE_Name SLIT("newStablePtr") newStablePtrIdKey
+foreignObjTyConName   = tcQual   fOREIGNOBJ_Name FSLIT("ForeignObj") foreignObjTyConKey
+foreignObjDataConName = dataQual fOREIGNOBJ_Name FSLIT("ForeignObj") foreignObjDataConKey
+foreignPtrTyConName   = tcQual   fOREIGN_PTR_Name FSLIT("ForeignPtr") foreignPtrTyConKey
+foreignPtrDataConName = dataQual fOREIGN_PTR_Name FSLIT("ForeignPtr") foreignPtrDataConKey
+stablePtrTyConName    = tcQual   pREL_STABLE_Name FSLIT("StablePtr") stablePtrTyConKey
+stablePtrDataConName  = dataQual pREL_STABLE_Name FSLIT("StablePtr") stablePtrDataConKey
+deRefStablePtrName    = varQual  pREL_STABLE_Name FSLIT("deRefStablePtr") deRefStablePtrIdKey
+newStablePtrName      = varQual  pREL_STABLE_Name FSLIT("newStablePtr") newStablePtrIdKey
 
-errorName	   = varQual pREL_ERR_Name SLIT("error") errorIdKey
-assertName         = varQual pREL_GHC_Name SLIT("assert") assertIdKey
-getTagName	   = varQual pREL_GHC_Name SLIT("getTag#") getTagIdKey
-runSTRepName	   = varQual pREL_ST_Name  SLIT("runSTRep") runSTRepIdKey
+errorName	   = varQual pREL_ERR_Name FSLIT("error") errorIdKey
+assertName         = varQual gHC_BUILTIN_Name FSLIT("assert") assertIdKey
+getTagName	   = varQual gHC_BUILTIN_Name FSLIT("getTag#") getTagIdKey
+runSTRepName	   = varQual pREL_ST_Name  FSLIT("runSTRep") runSTRepIdKey
 
 -- The "split" Id for splittable implicit parameters
-splitName          = varQual pREL_SPLIT_Name SLIT("split") splitIdKey
+splitName          = varQual pREL_SPLIT_Name FSLIT("split") splitIdKey
 \end{code}
 
 %************************************************************************
@@ -602,44 +588,44 @@ tupleTyCon_RDR    = mkTupConRdrName tcName   Boxed
 ubxTupleCon_RDR   = mkTupConRdrName dataName Unboxed
 ubxTupleTyCon_RDR = mkTupConRdrName tcName   Unboxed
 
-unitCon_RDR   	  = dataQual_RDR pREL_BASE_Name SLIT("()")
-unitTyCon_RDR 	  = tcQual_RDR   pREL_BASE_Name SLIT("()")
+unitCon_RDR   	  = dataQual_RDR pREL_BASE_Name FSLIT("()")
+unitTyCon_RDR 	  = tcQual_RDR   pREL_BASE_Name FSLIT("()")
 
-and_RDR	   	   = varQual_RDR  pREL_BASE_Name SLIT("&&")
-not_RDR	   	   = varQual_RDR  pREL_BASE_Name SLIT("not")
-compose_RDR	   = varQual_RDR  pREL_BASE_Name SLIT(".")
-ne_RDR		   = varQual_RDR  pREL_BASE_Name SLIT("/=")
-le_RDR		   = varQual_RDR  pREL_BASE_Name SLIT("<=")
-lt_RDR		   = varQual_RDR  pREL_BASE_Name SLIT("<")
-gt_RDR		   = varQual_RDR  pREL_BASE_Name SLIT(">")
-ltTag_RDR      	   = dataQual_RDR pREL_BASE_Name SLIT("LT")
-eqTag_RDR      	   = dataQual_RDR pREL_BASE_Name SLIT("EQ")
-gtTag_RDR      	   = dataQual_RDR pREL_BASE_Name SLIT("GT")
-max_RDR		   = varQual_RDR  pREL_BASE_Name SLIT("max")
-min_RDR		   = varQual_RDR  pREL_BASE_Name SLIT("min")
-compare_RDR	   = varQual_RDR  pREL_BASE_Name SLIT("compare")
-showList_RDR	   = varQual_RDR  pREL_SHOW_Name SLIT("showList")
-showList___RDR     = varQual_RDR  pREL_SHOW_Name SLIT("showList__")
-showsPrec_RDR	   = varQual_RDR  pREL_SHOW_Name SLIT("showsPrec")
-showSpace_RDR	   = varQual_RDR  pREL_SHOW_Name SLIT("showSpace")
-showString_RDR	   = varQual_RDR  pREL_SHOW_Name SLIT("showString")
-showParen_RDR	   = varQual_RDR  pREL_SHOW_Name SLIT("showParen")
-readsPrec_RDR	   = varQual_RDR  pREL_READ_Name SLIT("readsPrec")
-readList_RDR	   = varQual_RDR  pREL_READ_Name SLIT("readList")
-readParen_RDR	   = varQual_RDR  pREL_READ_Name SLIT("readParen")
-lex_RDR		   = varQual_RDR  pREL_READ_Name SLIT("lex")
-readList___RDR     = varQual_RDR  pREL_READ_Name SLIT("readList__")
-times_RDR	   = varQual_RDR  pREL_NUM_Name SLIT("*")
-plus_RDR	   = varQual_RDR  pREL_NUM_Name SLIT("+")
-negate_RDR	   = varQual_RDR  pREL_NUM_Name SLIT("negate")
-range_RDR	   = varQual_RDR  pREL_ARR_Name SLIT("range")
-index_RDR	   = varQual_RDR  pREL_ARR_Name SLIT("index")
-inRange_RDR	   = varQual_RDR  pREL_ARR_Name SLIT("inRange")
-succ_RDR	   = varQual_RDR  pREL_ENUM_Name SLIT("succ")
-pred_RDR	   = varQual_RDR  pREL_ENUM_Name SLIT("pred")
-minBound_RDR	   = varQual_RDR  pREL_ENUM_Name SLIT("minBound")
-maxBound_RDR	   = varQual_RDR  pREL_ENUM_Name SLIT("maxBound")
-assertErr_RDR      = varQual_RDR  pREL_ERR_Name SLIT("assertError")
+and_RDR	   	   = varQual_RDR  pREL_BASE_Name FSLIT("&&")
+not_RDR	   	   = varQual_RDR  pREL_BASE_Name FSLIT("not")
+compose_RDR	   = varQual_RDR  pREL_BASE_Name FSLIT(".")
+ne_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("/=")
+le_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("<=")
+lt_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("<")
+gt_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT(">")
+ltTag_RDR      	   = dataQual_RDR pREL_BASE_Name FSLIT("LT")
+eqTag_RDR      	   = dataQual_RDR pREL_BASE_Name FSLIT("EQ")
+gtTag_RDR      	   = dataQual_RDR pREL_BASE_Name FSLIT("GT")
+max_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("max")
+min_RDR		   = varQual_RDR  pREL_BASE_Name FSLIT("min")
+compare_RDR	   = varQual_RDR  pREL_BASE_Name FSLIT("compare")
+showList_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showList")
+showList___RDR     = varQual_RDR  pREL_SHOW_Name FSLIT("showList__")
+showsPrec_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showsPrec")
+showSpace_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showSpace")
+showString_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showString")
+showParen_RDR	   = varQual_RDR  pREL_SHOW_Name FSLIT("showParen")
+readsPrec_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readsPrec")
+readList_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readList")
+readParen_RDR	   = varQual_RDR  pREL_READ_Name FSLIT("readParen")
+lex_RDR		   = varQual_RDR  pREL_READ_Name FSLIT("lex")
+readList___RDR     = varQual_RDR  pREL_READ_Name FSLIT("readList__")
+times_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("*")
+plus_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("+")
+negate_RDR	   = varQual_RDR  pREL_NUM_Name FSLIT("negate")
+range_RDR	   = varQual_RDR  pREL_ARR_Name FSLIT("range")
+index_RDR	   = varQual_RDR  pREL_ARR_Name FSLIT("index")
+inRange_RDR	   = varQual_RDR  pREL_ARR_Name FSLIT("inRange")
+succ_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("succ")
+pred_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("pred")
+minBound_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("minBound")
+maxBound_RDR	   = varQual_RDR  pREL_ENUM_Name FSLIT("maxBound")
+assertErr_RDR      = varQual_RDR  pREL_ERR_Name FSLIT("assertError")
 \end{code}
 
 These RDR names also have known keys, so we need to get back the RDR names to
@@ -938,16 +924,6 @@ runMainKey		      = mkPreludeMiscIdUnique 56
 
 andIdKey		      = mkPreludeMiscIdUnique 57
 orIdKey			      = mkPreludeMiscIdUnique 58
-eqCharIdKey		      = mkPreludeMiscIdUnique 59
-eqIntIdKey		      = mkPreludeMiscIdUnique 60
-eqFloatIdKey		      = mkPreludeMiscIdUnique 61
-eqDoubleIdKey		      = mkPreludeMiscIdUnique 62
-neqCharIdKey		      = mkPreludeMiscIdUnique 63
-neqIntIdKey		      = mkPreludeMiscIdUnique 64
-neqFloatIdKey		      = mkPreludeMiscIdUnique 65
-neqDoubleIdKey		      = mkPreludeMiscIdUnique 66
-
--- NB: Currently a gap of four slots
 
 -- Parallel array functions
 nullPIdKey	              = mkPreludeMiscIdUnique 70

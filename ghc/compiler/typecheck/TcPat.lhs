@@ -473,7 +473,7 @@ tcSubPat sig_ty exp_ty
    else
    tcGetUnique				`thenNF_Tc` \ uniq ->
    let
-	arg_id  = mkSysLocal SLIT("sub") uniq exp_ty
+	arg_id  = mkSysLocal FSLIT("sub") uniq exp_ty
 	the_fn  = DictLam [arg_id] (co_fn <$> HsVar arg_id)
 	pat_co_fn p = SigPat p exp_ty the_fn
    in

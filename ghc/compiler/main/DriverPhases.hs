@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.15 2002/01/04 16:02:04 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.16 2002/03/04 17:01:30 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -16,6 +16,7 @@ module DriverPhases (
 
    haskellish_file, haskellish_suffix,
    haskellish_src_file, haskellish_src_suffix,
+   hsbootish_file, hsbootish_suffix,
    objish_file, objish_suffix,
    cish_file, cish_suffix
  ) where
@@ -43,6 +44,7 @@ data Phase
 	| Cpp
 	| HsPp
 	| Hsc
+	| HsBoot
 	| Cc
 	| HCc		-- Haskellised C (as opposed to vanilla C) compilation
 	| Mangle	-- assembly mangling, now done by a separate script.
@@ -62,6 +64,7 @@ startPhase "lhs"   = Unlit
 startPhase "hs"    = Cpp
 startPhase "hscpp" = HsPp
 startPhase "hspp"  = Hsc
+startPhase "hs-boot" = HsBoot
 startPhase "hc"    = HCc
 startPhase "c"     = Cc
 startPhase "cpp"   = Cc
@@ -88,6 +91,7 @@ phaseInputExt As          = "s"
 phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
 phaseInputExt MkDependHS  = "dep"
+phaseInputExt HsBoot      = "hs-boot"
 #ifdef ILX
 phaseInputExt Ilx2Il      = "ilx"
 phaseInputExt Ilasm       = "il"
@@ -96,6 +100,7 @@ phaseInputExt Ilasm       = "il"
 haskellish_suffix     = (`elem` [ "hs", "hspp", "hscpp", "lhs", "hc", "raw_s" ])
 haskellish_src_suffix = (`elem` [ "hs", "hspp", "hscpp", "lhs" ])
 cish_suffix           = (`elem` [ "c", "cpp", "C", "cc", "cxx", "s", "S" ])
+hsbootish_suffix      = (`elem` [ "hs-boot" ])
 
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
 objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
@@ -107,3 +112,4 @@ haskellish_file     = haskellish_suffix     . getFileSuffix
 haskellish_src_file = haskellish_src_suffix . getFileSuffix
 cish_file           = cish_suffix           . getFileSuffix
 objish_file         = objish_suffix         . getFileSuffix
+hsbootish_file      = hsbootish_suffix      . getFileSuffix

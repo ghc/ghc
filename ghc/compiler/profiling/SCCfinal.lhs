@@ -295,7 +295,7 @@ boxHigherOrderArgs almost_expr args
       =     -- make a trivial let-binding for the top-level function
 	getUniqueMM		`thenMM` \ uniq ->
 	let
-	    new_var = mkSysLocal SLIT("sf") uniq var_type
+	    new_var = mkSysLocal FSLIT("sf") uniq var_type
 	in
 	returnMM ( (new_var, old_var) : bindings, StgVarArg new_var )
       where

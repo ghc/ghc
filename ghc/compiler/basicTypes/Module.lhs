@@ -92,6 +92,7 @@ import FastString	( FastString )
 import Unique		( Uniquable(..) )
 import UniqFM
 import UniqSet
+import Binary
 \end{code}
 
 
@@ -117,6 +118,10 @@ renamer href here.)
 \begin{code}
 data Module = Module ModuleName !PackageInfo
 
+instance Binary Module where
+   put_ bh (Module m p) = put_ bh m
+   get bh = do m <- get bh; return (Module m DunnoYet)
+
 data PackageInfo
   = ThisPackage				-- A module from the same package 
 					-- as the one being compiled
@@ -131,12 +136,12 @@ data PackageInfo
 type PackageName = FastString		-- No encoding at all
 
 preludePackage :: PackageName
-preludePackage = SLIT("std")
+preludePackage = FSLIT("std")
 
 packageInfoPackage :: PackageInfo -> PackageName
 packageInfoPackage ThisPackage        = opt_InPackage
-packageInfoPackage DunnoYet	      = SLIT("<?>")
-packageInfoPackage AnotherPackage     = SLIT("<pkg>")
+packageInfoPackage DunnoYet	      = FSLIT("<?>")
+packageInfoPackage AnotherPackage     = FSLIT("<pkg>")
 
 instance Outputable PackageInfo where
 	-- Just used in debug prints of lex tokens and in debug modde
@@ -179,6 +184,10 @@ instance Outputable WhereFrom where
 newtype ModuleName = ModuleName EncodedFS
 	-- Haskell module names can include the quote character ',
 	-- so the module names have the z-encoding applied to them
+
+instance Binary ModuleName where
+   put_ bh (ModuleName m) = put_ bh m
+   get bh = do m <- get bh; return (ModuleName m)
 
 instance Uniquable ModuleName where
   getUnique (ModuleName nm) = getUnique nm

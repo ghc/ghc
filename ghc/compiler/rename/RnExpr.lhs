@@ -906,7 +906,7 @@ mkAssertExpr =
   if opt_IgnoreAsserts then
     getUniqRn				`thenRn` \ uniq ->
     let
-     vname = mkSysLocalName uniq SLIT("v")
+     vname = mkSysLocalName uniq FSLIT("v")
      expr  = HsLam ignorePredMatch
      loc   = nameSrcLoc vname
      ignorePredMatch = mkSimpleMatch [WildPatIn, VarPatIn vname] (HsVar vname) placeHolderType loc

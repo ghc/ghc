@@ -21,7 +21,7 @@ module HscTypes (
 	IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
 
 	VersionInfo(..), initialVersionInfo, lookupVersion,
-	FixityEnv, lookupFixity,
+	FixityEnv, lookupFixity, collectFixities,
 
 	TyThing(..), isTyClThing, implicitTyThingIds,
 
@@ -35,6 +35,7 @@ module HscTypes (
 	NameSupply(..), OrigNameCache, OrigIParamCache,
 	Avails, AvailEnv, emptyAvailEnv,
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
+	ExportItem, RdrExportItem,
 	PersistentCompilerState(..),
 
 	Deprecations(..), lookupDeprec,
@@ -70,13 +71,14 @@ import DataCon		( dataConId, dataConWrapId )
 
 import BasicTypes	( Version, initialVersion, Fixity, defaultFixity, IPName )
 
-import HsSyn		( DeprecTxt, tyClDeclName, ifaceRuleDeclName )
+import HsSyn		( DeprecTxt, TyClDecl, tyClDeclName, ifaceRuleDeclName,
+			  tyClDeclNames )
 import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
 
-import FiniteMap	( FiniteMap )
+import FiniteMap
 import Bag		( Bag )
 import Maybes		( seqMaybe, orElse )
 import Outputable
@@ -170,7 +172,7 @@ data ModIface
 		-- whether to write a new iface file (changing usages
 		-- doesn't affect the version of this module)
 
-        mi_exports  :: ![(ModuleName,Avails)],
+        mi_exports  :: ![ExportItem],
 		-- What it exports Kept sorted by (mod,occ), to make
 		-- version comparisons easier
 
@@ -477,11 +479,14 @@ data GenAvailInfo name	= Avail name	 -- An ordinary identifier
 			deriving( Eq )
 			-- Equality used when deciding if the interface has changed
 
+type RdrExportItem = (ModuleName, [RdrAvailInfo])
+type ExportItem    = (ModuleName, [AvailInfo])
+
 type AvailEnv = NameEnv AvailInfo	-- Maps a Name to the AvailInfo that contains it
 
 emptyAvailEnv :: AvailEnv
 emptyAvailEnv = emptyNameEnv
-				
+
 instance Outputable n => Outputable (GenAvailInfo n) where
    ppr = pprAvail
 
@@ -498,6 +503,13 @@ type FixityEnv = NameEnv Fixity
 
 lookupFixity :: FixityEnv -> Name -> Fixity
 lookupFixity env n = lookupNameEnv env n `orElse` defaultFixity
+
+collectFixities :: FixityEnv -> [TyClDecl Name pat] -> [(Name,Fixity)]
+collectFixities env decls
+  = [ (n, fix) 
+    | d <- decls, (n,_) <- tyClDeclNames d,
+      Just fix <- [lookupNameEnv env n]
+    ]
 \end{code}
 
 

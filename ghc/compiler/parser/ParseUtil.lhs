@@ -210,7 +210,7 @@ checkPat e [] = case e of
 		  	   | plus == plus_RDR
 			   -> returnP (mkNPlusKPat n lit)
 			   where
-			      plus_RDR = mkUnqual varName SLIT("+")	-- Hack
+			      plus_RDR = mkUnqual varName FSLIT("+")	-- Hack
 
 	OpApp l op fix r   -> checkPat l [] `thenP` \l ->
 			      checkPat r [] `thenP` \r ->
@@ -340,9 +340,9 @@ parseCImport :: FAST_STRING
 	     -> P ForeignImport
 parseCImport entity cconv safety v
   -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
-  | entity == SLIT ("dynamic") = 
+  | entity == FSLIT ("dynamic") = 
     returnP $ CImport cconv safety _NIL_ _NIL_ (CFunction DynamicTarget)
-  | entity == SLIT ("wrapper") =
+  | entity == FSLIT ("wrapper") =
     returnP $ CImport cconv safety _NIL_ _NIL_ CWrapper
   | otherwise		       = parse0 (_UNPK_ entity)
     where

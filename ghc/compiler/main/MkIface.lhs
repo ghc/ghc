@@ -6,8 +6,8 @@
 
 \begin{code}
 module MkIface ( 
-	mkFinalIface,
-	pprModDetails, pprIface, pprUsage,
+	showIface, mkFinalIface,
+	pprModDetails, pprIface, pprUsage, pprUsages, pprExports,
 	ifaceTyThing,
   ) where
 
@@ -24,9 +24,11 @@ import NewDemand	( isTopSig )
 import RnMonad
 import RnHsSyn		( RenamedInstDecl, RenamedTyClDecl )
 import HscTypes		( VersionInfo(..), ModIface(..), ModDetails(..),
-			  ModuleLocation(..), GhciMode(..), FixityEnv, lookupFixity,
+			  ModuleLocation(..), GhciMode(..), 
+			  FixityEnv, lookupFixity, collectFixities,
 			  IfaceDecls, mkIfaceDecls, dcl_tycl, dcl_rules, dcl_insts,
-			  TyThing(..), DFunId, Avails, TypeEnv,
+			  TyThing(..), DFunId, TypeEnv,
+			  GenAvailInfo,
 			  WhatsImported(..), GenAvailInfo(..), 
 			  ImportVersion, AvailInfo, Deprecations(..),
 			  lookupVersion, typeEnvIds
@@ -56,13 +58,52 @@ import SrcLoc		( noSrcLoc )
 import Outputable
 import Module		( ModuleName )
 import Util		( sortLt, dropList )
+import Binary		( getBinFileWithDict )
+import BinIface		( writeBinIface )
 import ErrUtils		( dumpIfSet_dyn )
 
 import Monad		( when )
 import Maybe		( catMaybes )
-import IO		( IOMode(..), openFile, hClose )
+import IO		( IOMode(..), openFile, hClose, putStrLn )
 \end{code}
 
+
+%************************************************************************
+%*				 					*
+\subsection{Print out the contents of a binary interface}
+%*				 					*
+%************************************************************************
+
+\begin{code}
+showIface :: FilePath -> IO ()
+showIface filename = do
+   parsed_iface <- Binary.getBinFileWithDict filename
+   let ParsedIface{
+      pi_mod=pi_mod, pi_pkg=pi_pkg, pi_vers=pi_vers,
+      pi_orphan=pi_orphan, pi_usages=pi_usages,
+      pi_exports=pi_exports, pi_decls=pi_decls,
+      pi_fixity=pi_fixity, pi_insts=pi_insts,
+      pi_rules=pi_rules, pi_deprecs=pi_deprecs } = parsed_iface
+   putStrLn (showSDoc (vcat [
+	text "__interface" <+> doubleQuotes (ppr pi_pkg)
+	   <+> ppr pi_mod <+> ppr pi_vers 
+	   <+> (if pi_orphan then char '!' else empty)
+	   <+> ptext SLIT("where"),
+	-- no instance Outputable (WhatsImported):
+	pprExports id (snd pi_exports),
+	pprUsages  id pi_usages,
+	hsep (map ppr_fix pi_fixity) <> semi,
+	vcat (map ppr_inst pi_insts),
+	vcat (map ppr_decl pi_decls),
+	ppr pi_rules
+	-- no instance Outputable (Either):
+	-- ppr pi_deprecs
+	]))
+   where
+    ppr_fix (n,f) = ppr f <+> ppr n
+    ppr_inst i  = ppr i <+> semi
+    ppr_decl (v,d)  = int v <+> ppr d <> semi
+\end{code}
 
 %************************************************************************
 %*				 					*
@@ -100,7 +141,8 @@ mkFinalIface ghci_mode dflags location maybe_old_iface
 
 		-- Write the interface file, if necessary
 	; when (must_write_hi_file maybe_diffs)
-	       (writeIface hi_file_path final_iface)
+		(writeBinIface hi_file_path final_iface)
+--		(writeIface hi_file_path final_iface)
 
 		-- Debug printing
 	; write_diffs dflags final_iface maybe_diffs
@@ -519,7 +561,7 @@ writeIface hi_path mod_iface
 	-- Print names unqualified if they are from this module
     from_this_mod n = nameModule n == this_mod
     this_mod = mi_module mod_iface
-	 
+
 pprIface :: ModIface -> SDoc
 pprIface iface
  = vcat [ ptext SLIT("__interface")
@@ -530,8 +572,8 @@ pprIface iface
 		<+> int opt_HiVersion
 		<+> ptext SLIT("where")
 
-	, vcat (map pprExport (mi_exports iface))
-	, vcat (map pprUsage (mi_usages iface))
+	, pprExports nameOccName (mi_exports iface)
+	, pprUsages  nameOccName (mi_usages iface)
 
 	, pprFixities (mi_fixities iface) (dcl_tycl decls)
 	, pprIfaceDecls (vers_decls version_info) decls
@@ -541,6 +583,7 @@ pprIface iface
     version_info = mi_version iface
     decls	 = mi_decls iface
     exp_vers     = vers_exports version_info
+
     rule_vers	 = vers_rules version_info
 
     pp_sub_vers | exp_vers == initialVersion && rule_vers == initialVersion = empty
@@ -553,18 +596,22 @@ When printing export lists, we print like this:
 	AvailTC C [x, y]	C!(x,y)		-- Exporting x, y but not C
 
 \begin{code}
-pprExport :: (ModuleName, Avails) -> SDoc
-pprExport (mod, items)
+pprExports :: Eq a => (a -> OccName) -> [(ModuleName, [GenAvailInfo a])] -> SDoc
+pprExports getOcc exports = vcat (map (pprExport getOcc) exports)
+
+pprExport :: Eq a => (a -> OccName) -> (ModuleName, [GenAvailInfo a]) -> SDoc
+pprExport getOcc (mod, items)
  = hsep [ ptext SLIT("__export "), ppr mod, hsep (map pp_avail items) ] <> semi
   where
-    pp_avail :: AvailInfo -> SDoc
-    pp_avail (Avail name)    		     = pprOcc name
+    --pp_avail :: GenAvailInfo a -> SDoc
+    pp_avail (Avail name)    		     = ppr (getOcc name)
     pp_avail (AvailTC _ [])		     = empty
-    pp_avail (AvailTC n (n':ns)) | n==n'     = pprOcc n		    <> pp_export ns
-				 | otherwise = pprOcc n <> char '|' <> pp_export (n':ns)
+    pp_avail (AvailTC n (n':ns)) 
+	| n==n'     = ppr (getOcc n) <> pp_export ns
+ 	| otherwise = ppr (getOcc n) <> char '|' <> pp_export (n':ns)
     
     pp_export []    = empty
-    pp_export names = braces (hsep (map pprOcc names))
+    pp_export names = braces (hsep (map (ppr.getOcc) names))
 
 pprOcc :: Name -> SDoc	-- Print the occurrence name only
 pprOcc n = pprOccName (nameOccName n)
@@ -572,8 +619,11 @@ pprOcc n = pprOccName (nameOccName n)
 
 
 \begin{code}
-pprUsage :: ImportVersion Name -> SDoc
-pprUsage (m, has_orphans, is_boot, whats_imported)
+pprUsages :: (a -> OccName) -> [ImportVersion a] -> SDoc
+pprUsages getOcc usages = vcat (map (pprUsage getOcc) usages)
+
+pprUsage :: (a -> OccName) -> ImportVersion a -> SDoc
+pprUsage getOcc (m, has_orphans, is_boot, whats_imported)
   = hsep [ptext SLIT("import"), ppr m, 
 	  pp_orphan, pp_boot,
 	  pp_versions whats_imported
@@ -587,8 +637,9 @@ pprUsage (m, has_orphans, is_boot, whats_imported)
 	-- Importing the whole module is indicated by an empty list
     pp_versions NothingAtAll   		    = empty
     pp_versions (Everything v) 		    = dcolon <+> int v
-    pp_versions (Specifically vm ve nvs vr) = dcolon <+> int vm <+> pp_export_version ve <+> int vr 
-					      <+> hsep [ pprOcc n <+> int v | (n,v) <- nvs ]
+    pp_versions (Specifically vm ve nvs vr) = 
+	dcolon <+> int vm <+> pp_export_version ve <+> int vr 
+	<+> hsep [ ppr (getOcc n) <+> int v | (n,v) <- nvs ]
 
     pp_export_version Nothing  = empty
     pp_export_version (Just v) = int v
@@ -610,15 +661,12 @@ pprIfaceDecls version_map decls
 \end{code}
 
 \begin{code}
-pprFixities :: (Outputable a)
-	    => NameEnv a
+pprFixities :: NameEnv Fixity
 	    -> [TyClDecl Name pat]
 	    -> SDoc
 pprFixities fixity_map decls
   = hsep [ ppr fix <+> ppr n 
-	 | d <- decls, 
-	   (n,_) <- tyClDeclNames d, 
-	   Just fix <- [lookupNameEnv fixity_map n]] <> semi
+	 | (n,fix) <- collectFixities fixity_map decls ] <> semi
 
 -- Disgusting to print these two together, but that's 
 -- the way the interface parser currently expects them.

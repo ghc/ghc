@@ -35,11 +35,13 @@ module Name (
 
 import OccName		-- All of it
 import Module		( Module, moduleName, mkVanillaModule, isHomeModule )
-import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc, rdrNameModule )
+import RdrName		( RdrName, mkRdrOrig, mkRdrUnqual, rdrNameOcc,
+			  rdrNameModule, mkRdrQual )
 import CmdLineOpts	( opt_Static )
 import SrcLoc		( builtinSrcLoc, noSrcLoc, SrcLoc )
 import Unique		( Unique, Uniquable(..), u2i, pprUnique )
 import FastTypes
+import Binary
 import Outputable
 \end{code}
 
@@ -180,7 +182,7 @@ mkKnownKeyGlobal rdr_name uniq
 mkWiredInName :: Module -> OccName -> Unique -> Name
 mkWiredInName mod occ uniq = mkGlobalName uniq mod occ builtinSrcLoc
 
-mkSysLocalName :: Unique -> UserFS -> Name
+mkSysLocalName :: Unique -> EncodedFS -> Name
 mkSysLocalName uniq fs = Name { n_uniq = uniq, n_sort = System, 
 				n_occ = mkVarOcc fs, n_loc = noSrcLoc }
 
@@ -267,6 +269,26 @@ instance NamedThing Name where
     getName n = n
 \end{code}
 
+%************************************************************************
+%*									*
+\subsection{Binary output}
+%*									*
+%************************************************************************
+
+\begin{code}
+instance Binary Name where
+  -- we must print these as RdrNames, because that's how they will be read in
+  put_ bh Name {n_sort = sort, n_uniq = uniq, n_occ = occ} =
+   case sort of
+    Global mod
+	| this_mod == mod -> put_ bh (mkRdrUnqual occ)
+	| otherwise       -> put_ bh (mkRdrOrig (moduleName mod) occ)
+        where (this_mod,_,_,_) = getUserData bh
+    _ -> do 
+	put_ bh (mkRdrUnqual occ)
+
+  get bh = error "can't Binary.get a Name"    
+\end{code}
 
 %************************************************************************
 %*									*

@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.95 2002/03/04 14:40:54 simonmar Exp $
+-- $Id: Main.hs,v 1.96 2002/03/04 17:01:30 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -107,7 +107,10 @@ main =
 	   case exception of
 		-- an IO exception probably isn't our fault, so don't panic
 		IOException _ ->  hPutStr stderr (show exception)
-		_other 	      ->  hPutStr stderr (show (Panic (show exception)))
+		AsyncException StackOverflow ->
+			hPutStrLn stderr "stack overflow: use +RTS -K<size> \ 
+					 \to increase it"
+		_other ->  hPutStr stderr (show (Panic (show exception)))
 	   exitWith (ExitFailure 1)
          ) $ do
 
