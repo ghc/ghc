@@ -323,6 +323,7 @@ ifaceToHtml mod iface
 
 	has_doc (ExportDecl d)
 	 | Just x <- declMainBinder d = isJust (lookupFM doc_map x)
+	has_doc (ExportModule _) = False
 	has_doc _ = True
 
 	no_doc_at_all = not (any has_doc exports)
