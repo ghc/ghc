@@ -3473,7 +3473,7 @@ genCCall fn cconv kind args
 	(argReps,argCodes,vregs) = unzip3 preppedArgs
 
 	    -- size of linkage area + size of arguments, in bytes
-	stackDelta = roundTo16 $ (24 +) $ (4 *) $ sum $ map getPrimRepSize argReps
+	stackDelta = roundTo16 $ (24 +) $ max 32 $ (4 *) $ sum $ map getPrimRepSize argReps
 	roundTo16 x | x `mod` 16 == 0 = x
 		    | otherwise = x + 16 - (x `mod` 16)
 
