@@ -1,9 +1,9 @@
 #!/bin/sh
 
 # $1 is $(platform)
-# $2 is root of final installation tree
-# $3 is $(package)-$(version) ie ghc-4.11 
+# $2 is $(libdir)
 
-###echo POST_INSTALL_SCRIPT $1 $2 $3
+# This script is run just after installing a binary distribution, to
+# generate a correct package.conf for the new installation.
 
-bin/$1/pkgconf install "$1" "" "YES" "" "$2/lib/$3" "$2/lib/$3" "$2/lib/$3" "" "$2/lib/$3/include" "" > $2/lib/$3/package.conf
+bin/$1/pkgconf install "$1" "" "NO" "???readline???" "$2" "" "" "" "" "" > $2/package.conf
