@@ -18,7 +18,7 @@ PrelGHC
 -- void CAF is defined in PrelBase
 
 -- Magical assert thingy
-  assert__
+  assert
 
 -- I/O primitives
   RealWorld
@@ -93,6 +93,10 @@ PrelGHC
   int2Word#
   word2Int#
   
+  Word64#
+
+  Int64#
+
   Addr#
   gtAddr#
   geAddr#
@@ -175,6 +179,10 @@ PrelGHC
   integer2Word#
   int2Integer#
   word2Integer#
+  integerToInt64#
+  integerToWord64#
+  int64ToInteger#
+  word64ToInteger#
   
   Array#
   ByteArray#
@@ -199,6 +207,8 @@ PrelGHC
   indexFloatArray#
   indexDoubleArray#
   indexAddrArray#
+  indexInt64Array#
+  indexWord64Array#
   
 --  indexOffAddr#
 indexCharOffAddr#
@@ -207,6 +217,17 @@ indexWordOffAddr#
 indexAddrOffAddr#
 indexFloatOffAddr#
 indexDoubleOffAddr#
+indexInt64OffAddr#
+indexWord64OffAddr#
+
+writeCharOffAddr#
+writeIntOffAddr#
+writeWordOffAddr#
+writeAddrOffAddr#
+writeFloatOffAddr#
+writeDoubleOffAddr#
+writeInt64OffAddr#
+writeWord64OffAddr#
 
 --  indexOffForeignObj#
 indexCharOffForeignObj#
@@ -215,6 +236,8 @@ indexWordOffForeignObj#
 indexAddrOffForeignObj#
 indexFloatOffForeignObj#
 indexDoubleOffForeignObj#
+indexInt64OffForeignObj#
+indexWord64OffForeignObj#
   
   writeArray#
   writeCharArray#
@@ -223,6 +246,8 @@ indexDoubleOffForeignObj#
   writeFloatArray#
   writeDoubleArray#
   writeAddrArray#
+  writeInt64Array#
+  writeWord64Array#
   
   readArray#
   readCharArray#
@@ -231,6 +256,8 @@ indexDoubleOffForeignObj#
   readFloatArray#
   readDoubleArray#
   readAddrArray#
+  readInt64Array#
+  readWord64Array#
   
   unsafeFreezeArray#
   unsafeFreezeByteArray#
@@ -254,3 +281,4 @@ _declarations_
 
 1 class CCallable a :: ** ;
 1 class CReturnable a :: ** ;
+1 assert _:_ _forall_ [a] => PrelBase.Bool -> a -> a ;;
