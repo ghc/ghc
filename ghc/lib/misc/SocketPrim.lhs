@@ -54,6 +54,10 @@ module SocketPrim (
     sIsReadable,	-- :: Socket -> IO Bool
     sIsWritable,	-- :: Socket -> IO Bool
 
+    -- socket opts
+    SocketOption(..),
+    getSocketOption,     -- :: Socket -> SocketOption -> IO Int
+    setSocketOption,     -- :: Socket -> SocketOption -> Int -> IO ()
 
     PortNumber(..),
     mkPortNumber,	    -- :: Int -> PortNumber
@@ -62,7 +66,6 @@ module SocketPrim (
 
     aNY_PORT,
     iNADDR_ANY,
---    sOL_SOCKET,
     sOMAXCONN,
     maxListenQueue,
 
@@ -520,39 +523,66 @@ getSocketName (MkSocket s family stype protocol status) = do
 %************************************************************************
 
 \begin{code}
-{-
-data SocketOption =
-      Debug
-    | AcceptConnection
-    | ReuseAddr
-    | KeepAlive
-    | DontRoute
-    | Broadcast
-    | UseLoopBack
-    | Linger
-    | OOBInline
-    | SendBuffer
-    | RecvBuffer
-    | SendLowWater
-    | RecvLowWater
-    | SendTimeOut
-    | RecvTimeOut
-    | Error
-    | Type
+data SocketOption
+    = Broadcast     {- SO_BROADCAST -}
+    | Debug         {- SO_DEBUG     -}
+    | DontRoute     {- SO_DONTROUTE -}
+    | SoError       {- SO_ERROR     -}
+    | KeepAlive     {- SO_KEEPALIVE -}
+--    | Linger        {- SO_LINGER    -}
+    | OOBInline     {- SO_OOBINLINE -}
+    | RecvBuffer    {- SO_RCVBUF    -}
+    | SendBuffer    {- SO_SNDBUF    -}
+    | RecvLowWater  {- SO_RCVLOWAT  -}
+    | SendLowWater  {- SO_SNDLOWAT  -}
+    | RecvTimeOut   {- SO_RCVTIMEO  -}
+    | SendTimeOut   {- SO_SNDTIMEO  -}
+    | ReuseAddr     {- SO_REUSEADDR -}
+    | Type          {- SO_TYPE      -}
+    | UseLoopBack   {- SO_USELOOPBACK -}  -- not used, I believe.
+    | MaxSegment    {- TCP_MAXSEG   -}
+    | NoDelay       {- TCP_NODELAY  -}
 
-sOL_SOCKET = ``SOL_SOCKET''
+packSocketOption :: SocketOption -> Int
+packSocketOption so =
+  case so of
+    Broadcast     -> ``SO_BROADCAST''
+    Debug         -> ``SO_DEBUG''
+    DontRoute     -> ``SO_DONTROUTE''
+    SoError       -> ``SO_ERROR''
+    KeepAlive     -> ``SO_KEEPALIVE''
+    OOBInline     -> ``SO_OOBINLINE''
+    RecvBuffer    -> ``SO_RCVBUF''
+    SendBuffer    -> ``SO_SNDBUF''
+    RecvLowWater  -> ``SO_RCVLOWAT''
+    SendLowWater  -> ``SO_SNDLOWAT''
+    RecvTimeOut   -> ``SO_RCVTIMEO''
+    SendTimeOut   -> ``SO_SNDTIMEO''
+    ReuseAddr     -> ``SO_REUSEADDR''
+    Type          -> ``SO_TYPE''
+    UseLoopBack   -> ``SO_USELOOPBACK''
+    MaxSegment    -> ``TCP_MAXSEG''
+    NoDelay       -> ``TCP_NODELAY''
 
-setSocketOptions :: Socket ->
-		    Int ->		-- Level
-		    SocketOption ->	-- Option Name
-		    String ->		-- Option Value
-		    IO ()
+setSocketOption :: Socket 
+		-> SocketOption -- Option Name
+		-> Int		 -- Option Value
+		-> IO ()
+setSocketOption (MkSocket s family stype protocol status) so v = do
+   rc <- _ccall_ setSocketOption__ s (packSocketOption so) v
+   if rc /= 0
+    then constructErrorAndFail "setSocketOption"
+    else return ()
 
-getSocketOptions :: Socket ->
-		   Int ->		-- Level
-		   SocketOption ->	-- Option Name
-		   IO String		-- Option Value
--}
+getSocketOption :: Socket
+		-> SocketOption  -- Option Name
+		-> IO Int	  -- Option Value
+getSocketOption (MkSocket s family stype protocol status) so = do
+   rc <- _ccall_ getSocketOption__ s (packSocketOption so)
+   if rc == -1 -- let's just hope that value isn't taken..
+    then constructErrorAndFail "getSocketOption"
+    else return rc
+
 \end{code}
 
 A calling sequence table for the main functions is shown in the table below.
