@@ -391,9 +391,9 @@ hashSubStrBA ba# start# len# =
    2# -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# len#) `remInt#` hASH_TBL_SIZE#
    _  -> ((ord# c0 *# 631#) +# (ord# c1 *# 217#) +# (ord# c2 *# 43#) +# len#) `remInt#` hASH_TBL_SIZE#
   where
-    c0 = indexCharArray# ba# 0#
-    c1 = indexCharArray# ba# (len# `quotInt#` 2# -# 1#)
-    c2 = indexCharArray# ba# (len# -# 1#)
+    c0 = indexCharArray# ba# (start# +# 0#)
+    c1 = indexCharArray# ba# (start# +# (len# `quotInt#` 2# -# 1#))
+    c2 = indexCharArray# ba# (start# +# (len# -# 1#))
 
 --    c1 = indexCharArray# ba# 1#
 --    c2 = indexCharArray# ba# 2#
