@@ -1,6 +1,6 @@
 
 # --------------------------------------------------------------------------- #
-# $Id: Makefile,v 1.31 2000/04/14 15:11:25 sewardj Exp $                      #
+# $Id: Makefile,v 1.32 2000/04/21 18:05:19 panne Exp $                      #
 # --------------------------------------------------------------------------- #
 
 TOP = ..
@@ -17,12 +17,6 @@ LIB_DL=
 else
 DYN_EXT=.so
 LIB_DL=-ldl
-endif
-
-ifeq "$(HaveLibReadline)$" "YES"
-LIB_READLINE=-lreadline -ltermcap
-else
-LIB_READLINE=
 endif
 
 ifeq "$(HaveLibGmp)$" "YES"
@@ -56,7 +50,7 @@ hugs: $(C_OBJS) ../rts/Sanity.o ../rts/Assembler.o ../rts/Disassembler.o   \
       ../rts/StgCRun.o ../rts/PrimOps.o ../rts/Prelude.o ../rts/Storage.o \
       ../rts/Schedule.o ../rts/libHSrts.a
 	$(CC) -o $@ $(CC_OPTS) $^ $(GHC_LIBS_NEEDED) \
-		 -lbfd -liberty $(LIB_READLINE) $(LIB_DL) \
+		 -lbfd -liberty $(LibsReadline) $(LIB_DL) \
 		 $(LIB_GMP) -lm
 
 foobar:
@@ -120,7 +114,7 @@ CLEAN_FILES += parser.c
 
 INSTALL_LIBEXECS = hugs
 
-depend :: $(LOOPS) $(SRCS_UGNHS)
+depend :: parser.c $(LOOPS) $(SRCS_UGNHS)
 
 
 include $(TOP)/mk/target.mk

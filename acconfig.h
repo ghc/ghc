@@ -81,6 +81,12 @@
 /* Define if compiler supports prototypes. */
 #define HAVE_PROTOTYPES 0
 
+/* Define if readline/readline.h and readline/history.h exist */
+#undef HAVE_READLINE_HEADERS
+
+/* Define if readline plus any additional libs needed for it exist */
+#undef HAVE_READLINE_LIBS
+
 /* Define if time.h or sys/time.h define the timezone variable */
 #undef HAVE_TIMEZONE
 
@@ -89,9 +95,6 @@
 
 /* Define if you support the production (and use) of Win32 DLLs. */
 #undef HAVE_WIN32_DLL_SUPPORT
-
-/* Define if you have and want to use readline in Hugs. */
-#undef HAVE_LIBREADLINE
 
 /* Define if C Symbols have a leading underscore added by the compiler */
 #undef LEADING_UNDERSCORE

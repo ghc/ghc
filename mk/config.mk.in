@@ -269,13 +269,15 @@ GhcLibToolsHcOpts=-O
 
 # Build the Haskell Readline bindings?
 #
-GhcLibsWithReadline=NO
-#
+GhcLibsWithReadline=@HaveReadlineHeaders@
+
+# Libraries needed for linking with readline
+LibsReadline=@LibsReadline@
+
 # Include path to readline.h
 # (no path == in standard include path)
 #
 ReadlineIncludePath=
-HaveLibReadline=@HaveLibReadline@
 
 ################################################################################
 #

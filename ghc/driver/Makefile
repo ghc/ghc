@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.27 1999/11/25 10:38:59 simonpj Exp $
+# $Id: Makefile,v 1.28 2000/04/21 18:05:19 panne Exp $
 
 # We create two driver scripts: 
 #	- one to run in-place in the build tree for building libraries
@@ -53,7 +53,7 @@ SCRIPT_SUBST_VARS := \
   GHC_LIB_DIR GHC_RUNTIME_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
   GHC_UNLIT GHC_HSCPP GHC_MKDEPENDHS GHC_HSC GHC_SYSMAN EnableWin32DLLs \
-  CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised \
+  CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised LibsReadline \
   $(USER_WAY_NAMES) $(USER_WAY_OPTS)
 
 #

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: input.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/04/06 00:36:12 $
+ * $Revision: 1.28 $
+ * $Date: 2000/04/21 18:05:19 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -31,7 +31,7 @@
 #undef IN
 #endif
 
-#if HAVE_LIBREADLINE && HAVE_READLINE_READLINE_H && HAVE_READLINE_HISTORY_H
+#if HAVE_READLINE_LIBS && HAVE_READLINE_HEADERS
 #define USE_READLINE 1
 #else
 #define USE_READLINE 0

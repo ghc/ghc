@@ -504,7 +504,19 @@ dnl ** check for full ANSI header (.h) files
 AC_HEADER_STDC
 
 dnl ** check for specific header (.h) files that we are interested in
-AC_CHECK_HEADERS(Files.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdint.h stdlib.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h vfork.h readline/readline.h readline/history.h bfd.h winsock.h)
+AC_CHECK_HEADERS(Files.h assert.h console.h ctype.h dirent.h errno.h fcntl.h float.h ftw.h grp.h ieee754.h malloc.h memory.h nlist.h pascal.h pwd.h sgtty.h siginfo.h signal.h stat.h stdint.h stdlib.h stdarg.h string.h sys/fault.h sys/file.h sys/ioctl.h sys/limits.h sys/mman.h sys/param.h sys/procfs.h sys/resource.h sys/signal.h sys/socket.h netinet/tcp.h sys/stat.h sys/syscall.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/types.h sys/utsname.h sys/vadvise.h sys/wait.h termio.h termios.h time.h types.h unistd.h utime.h values.h vfork.h bfd.h winsock.h)
+
+AC_CHECK_HEADER(readline/readline.h, HaveReadlineReadlineH=YES, HaveReadlineReadlineH=NO)
+AC_CHECK_HEADER(readline/history.h, HaveReadlineHistoryH=YES, HaveReadlineHistoryH=NO)
+
+if test $HaveReadlineReadlineH = YES && test $HaveReadlineHistoryH = YES ; then
+  HaveReadlineHeaders=YES
+  AC_DEFINE(HAVE_READLINE_HEADERS,1)
+else
+  HaveReadlineHeaders=NO
+  AC_DEFINE(HAVE_READLINE_HEADERS,0)
+fi
+AC_SUBST(HaveReadlineHeaders)
 
 dnl ** check for DOS include files
 AC_CHECK_HEADERS(dos.h conio.h io.h std.h) 
@@ -669,22 +681,27 @@ dnl    the order of these tests matters: bfd needs liberty
 AC_CHECK_LIB(iberty, xmalloc)
 AC_CHECK_LIB(bfd,    bfd_init)
 
-dnl ** check for readline, for Hugs
-dnl termcap is obsoleted by ncurses, but for compatibility, we have to
-dnl check for both...
-AC_SEARCH_LIBS(tputs, [ncurses termcap])
+dnl ** check for readline, for Hugs and hslibs' Readline
+dnl ncurses supersedes termcap and curses, but for compatibility,
+dnl we have to check for all...
+AC_CHECK_LIB(ncurses, tputs, HaveLibTermcap=YES; LibTermcap=ncurses,
+  AC_CHECK_LIB(termcap, tputs, HaveLibTermcap=YES; LibTermcap=termcap,
+    AC_CHECK_LIB(curses, tputs, HaveLibTermcap=YES; LibTermcap=curses,
+      HaveLibTermcap=NO; LibTermcap=not-installed)))
 
-AC_CHECK_LIB(readline, readline,
-[
-AC_DEFINE(HAVE_LIBREADLINE,1)
-HaveLibReadline=YES
-],
-[
-AC_DEFINE(HAVE_LIBREADLINE,0)
-HaveLibReadline=NO
-])
-AC_SUBST(HaveLibReadline)
+if test $HaveLibTermcap = YES ; then
+  LIBS="-l$LibTermcap $LIBS"
+  AC_CHECK_LIB(readline, readline, HaveLibReadline=YES, HaveLibReadline=NO)
+fi
 
+if test $HaveLibTermcap = YES && test x"$HaveLibReadline" = xYES ; then
+  AC_DEFINE(HAVE_READLINE_LIBS,1)
+  LibsReadline="-lreadline -l$LibTermcap"
+else
+  AC_DEFINE(HAVE_READLINE_LIBS,0)
+  LibsReadline=
+fi
+AC_SUBST(LibsReadline)
 
 dnl ################################################################
 dnl Check for libraries
