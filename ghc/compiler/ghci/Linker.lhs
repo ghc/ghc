@@ -42,7 +42,7 @@ import HscTypes		( Linkable(..), isObjectLinkable, nameOfObject, byteCodeOfObjec
 import Name		( Name,  nameModule, isExternalName )
 import NameEnv
 import NameSet		( nameSetToList )
-import Module		( ModLocation(..), Module, ModuleName, moduleName, lookupModuleEnvByName )
+import Module		( ModLocation(..), Module, ModuleName, isHomeModule, moduleName, lookupModuleEnvByName )
 import FastString	( FastString(..), unpackFS )
 import ListSetOps	( minusList )
 import CmdLineOpts	( DynFlags(verbosity) )
@@ -219,20 +219,16 @@ getLinkDeps hpt pit mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {	pls <- readIORef v_PersistentLinkerState ;
 	let {
-	-- 1.  Find the iface for each module (must exist), 
-	--     and extract its dependencies
-	    deps = [ mi_deps (get_iface mod) | mod <- mods ] ;
+	-- 1.  Find the dependent home-pkg-modules/packages from each iface
+	    (mods_s, pkgs_s) = unzip (map get_deps mods) ;
 
-	-- 2.  Find the dependent home-pkg-modules/packages from each iface
-	--     Include mods themselves; and exclude ones already linked
-	    mods_needed = nub (map moduleName mods ++ [m | dep <- deps, (m,_) <- dep_mods dep])
-			    `minusList`
-		          linked_mods ;
-	    linked_mods = map linkableModName (objs_loaded pls ++ bcos_loaded pls) ;
+	-- 2.  Exclude ones already linked
+	--	Main reason: avoid findModule calls in get_linkable
+	    mods_needed = nub (concat mods_s) `minusList` linked_mods     ;
+	    pkgs_needed = nub (concat pkgs_s) `minusList` pkgs_loaded pls ;
 
-	    pkgs_needed = nub (concatMap dep_pkgs deps)
-			     `minusList`
-		          pkgs_loaded pls } ;
+	    linked_mods = map linkableModName (objs_loaded pls ++ bcos_loaded pls)
+	} ;
 	
 	-- 3.  For each dependent module, find its linkable
 	--     This will either be in the HPT or (in the case of one-shot compilation)
@@ -241,9 +237,21 @@ getLinkDeps hpt pit mods
 
 	return (lnks_needed, pkgs_needed) }
   where
+    get_deps :: Module -> ([ModuleName],[PackageName])
+	-- Get the things needed for the specified module
+	-- This is rather similar to the code in RnNames.importsFromImportDecl
+    get_deps mod
+	| isHomeModule (mi_module iface) 
+	= (moduleName mod : [m | (m,_) <- dep_mods deps], dep_pkgs deps)
+	| otherwise
+	= ([], mi_package iface : dep_pkgs deps)
+	where
+	  iface = get_iface mod
+	  deps  = mi_deps iface
+
     get_iface mod = case lookupIface hpt pit mod of
-			Just iface -> iface
-			Nothing    -> pprPanic "getLinkDeps" (no_iface mod)
+			    Just iface -> iface
+			    Nothing    -> pprPanic "getLinkDeps" (no_iface mod)
     no_iface mod = ptext SLIT("No iface for") <+> ppr mod
 	-- This one is a GHC bug
 
