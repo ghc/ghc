@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.33 2005/03/04 19:19:56 sof Exp $
+-- $Id: primops.txt.pp,v 1.34 2005/03/07 14:52:20 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -64,7 +64,7 @@ defaults
 -- matched pairs of embedded curly brackets.
 
 #include "MachDeps.h"
-#include "ghcconfig.h"
+#include "ghc_boot_platform.h"
 
 section "The word size story."
 	{Haskell98 specifies that signed integers (type {\tt Int})
