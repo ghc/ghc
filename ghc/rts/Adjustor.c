@@ -134,6 +134,31 @@ stgAllocStable(size_t size_in_bytes, StgStablePtr *stable)
 }
 #endif
 
+#if defined(powerpc64_TARGET_ARCH)
+// We don't need to generate dynamic code on powerpc64-[linux|AIX],
+// but we do need a piece of (static) inline assembly code:
+
+static void
+adjustorCodeWrittenInAsm()
+{
+	__asm__ volatile (
+		"adjustorCode:\n\t"
+		"mr 10,8\n\t"
+		"mr 9,7\n\t"
+		"mr 8,6\n\t"
+		"mr 7,5\n\t"
+		"mr 6,4\n\t"
+		"mr 5,3\n\t"
+		"mr 3,11\n\t"
+		"ld 0,0(2)\n\t"
+		"ld 11,16(2)\n\t"
+		"mtctr 0\n\t"
+		"ld 2,8(2)\n\t"
+		"bctr"
+		: : );
+}
+#endif
+
 void*
 createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
 {
@@ -404,6 +429,28 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
 			__asm__ volatile ("sync\n\tisync");
 		}
 	}
+#elif defined(powerpc64_TARGET_ARCH)
+	// This is for powerpc64 linux and powerpc64 AIX.
+	// It probably won't apply to powerpc64-darwin.
+	
+	{
+		typedef struct {
+			StgFunPtr		code;
+			void*			toc;
+			void*			env;
+		} FunDesc;
+		
+		FunDesc *desc = malloc(sizeof(FunDesc));
+		extern void *adjustorCode;
+		
+		desc->code = (void*) &adjustorCode;
+		desc->toc = (void*) wptr;
+		desc->env = (void*) hptr;
+		
+		adjustor = (void*) desc;
+	}
+	break;
+
 #elif defined(ia64_TARGET_ARCH)
 /*
     Up to 8 inputs are passed in registers.  We flush the last two inputs to
