@@ -13,59 +13,44 @@ module ByteCodeGen ( UnlinkedBCO, UnlinkedBCOExpr, ItblEnv, ClosureEnv, HValue,
 #include "HsVersions.h"
 
 import Outputable
-import Name		( Name, getName, nameModule, mkSysLocalName, toRdrName )
-import RdrName		( rdrNameOcc, rdrNameModule )
-import OccName		( occNameString )
+import Name		( Name, getName, mkSysLocalName )
 import Id		( Id, idType, isDataConId_maybe, mkVanillaId )
 import OrdList		( OrdList, consOL, snocOL, appOL, unitOL, 
 			  nilOL, toOL, concatOL, fromOL )
-import FiniteMap	( FiniteMap, addListToFM, listToFM, filterFM,
-			  addToFM, lookupFM, fmToList, emptyFM, plusFM )
+import FiniteMap	( FiniteMap, addListToFM, listToFM,
+			  addToFM, lookupFM, fmToList, plusFM )
 import CoreSyn
-import PprCore		( pprCoreExpr, pprCoreAlt )
+import PprCore		( pprCoreExpr )
 import Literal		( Literal(..), literalPrimRep )
 import PrimRep		( PrimRep(..) )
 import CoreFVs		( freeVars )
 import Type		( typePrimRep )
-import DataCon		( DataCon, dataConTag, fIRST_TAG, dataConTyCon, 
-			  dataConRepArgTys )
-import TyCon		( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
+import DataCon		( dataConTag, fIRST_TAG, dataConTyCon )
+import TyCon		( TyCon, tyConFamilySize )
 import Class		( Class, classTyCon )
-import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem, global )
+import Util		( zipEqual, zipWith4Equal, naturalMergeSortLe, nOfThem )
 import Var		( isTyVar )
 import VarSet		( VarSet, varSetElems )
 import PrimRep		( getPrimRepSize, isFollowableRep )
-import Constants	( wORD_SIZE )
 import CmdLineOpts	( DynFlags, DynFlag(..) )
 import ErrUtils		( showPass, dumpIfSet_dyn )
-import ClosureInfo	( mkVirtHeapOffsets )
-import Module		( ModuleName, moduleName, moduleNameFS )
 import Unique		( mkPseudoUnique3 )
-import Linker		( lookupSymbol )
 import FastString	( FastString(..) )
-
+import PprType		( pprType )
+import ByteCodeInstr	( BCInstr(..), ProtoBCO(..), nameOfProtoBCO )
+import ByteCodeItbls	( ItblEnv, mkITbls )
+import ByteCodeLink	( UnlinkedBCO, UnlinkedBCOExpr, assembleBCO,
+			  ClosureEnv, HValue, linkSomeBCOs, filterNameMap )
 
 import List		( intersperse )
-import Monad		( foldM )
-import ST		( runST )
-import MArray		( castSTUArray, 
-			  newFloatArray, writeFloatArray,
-			  newDoubleArray, writeDoubleArray,
-			  newIntArray, writeIntArray,
-			  newAddrArray, writeAddrArray )
-import Foreign		( Storable(..), Word8, Word16, Word32, Ptr(..), 
-			  malloc, castPtr, plusPtr, mallocBytes )
-import Addr		( Word, addrToInt, writeCharOffAddr )
-import Bits		( Bits(..), shiftR )
+import Foreign		( Ptr(..), mallocBytes )
+import Addr		( addrToInt, writeCharOffAddr )
 import CTypes		( CInt )
 
 import PrelBase		( Int(..) )
 import PrelAddr		( Addr(..) )
-import PrelGHC		( BCO#, newBCO#, unsafeCoerce#, 
-			  ByteArray#, Array#, addrToHValue# )
-import IOExts		( IORef, fixIO, unsafePerformIO )
-import ArrayBase	
-import PrelArr		( Array(..) )
+import PrelGHC		( ByteArray# )
+import IOExts		( unsafePerformIO )
 import PrelIOBase	( IO(..) )
 
 \end{code}
@@ -152,158 +137,6 @@ linkIExpr ie ce (root_ul_bco, aux_ul_bcos)
    = do (aux_ce, _) <- linkSomeBCOs ie ce aux_ul_bcos
         (_, [root_bco]) <- linkSomeBCOs ie aux_ce [root_ul_bco]
         return root_bco
-
--- Link a bunch of BCOs and return them + updated closure env.
-linkSomeBCOs :: ItblEnv -> ClosureEnv -> [UnlinkedBCO]
-                -> IO (ClosureEnv, [HValue])
-linkSomeBCOs ie ce_in ul_bcos
-   = do let nms = map nameOfUnlinkedBCO ul_bcos
-        hvals <- fixIO 
-                    ( \ hvs -> let ce_out = addListToFM ce_in (zipLazily nms hvs)
-                               in  mapM (linkBCO ie ce_out) ul_bcos )
-        let ce_out = addListToFM ce_in (zip nms hvals)
-        return (ce_out, hvals)
-     where
-        -- A lazier zip, in which no demand is propagated to the second
-        -- list unless some demand is propagated to the snd of one of the
-        -- result list elems.
-        zipLazily []     ys = []
-        zipLazily (x:xs) ys = (x, head ys) : zipLazily xs (tail ys)
-
-
-data UnlinkedBCO
-   = UnlinkedBCO Name
-                 (SizedSeq Word16)	-- insns
-                 (SizedSeq Word)	-- literals
-                 (SizedSeq Name)	-- ptrs
-                 (SizedSeq Name)	-- itbl refs
-
-nameOfUnlinkedBCO (UnlinkedBCO nm _ _ _ _) = nm
-
--- When translating expressions, we need to distinguish the root
--- BCO for the expression
-type UnlinkedBCOExpr = (UnlinkedBCO, [UnlinkedBCO])
-
-instance Outputable UnlinkedBCO where
-   ppr (UnlinkedBCO nm insns lits ptrs itbls)
-      = sep [text "BCO", ppr nm, text "with", 
-             int (sizeSS insns), text "insns",
-             int (sizeSS lits), text "lits",
-             int (sizeSS ptrs), text "ptrs",
-             int (sizeSS itbls), text "itbls"]
-
-
--- these need a proper home
-type ItblEnv    = FiniteMap Name (Ptr StgInfoTable)
-type ClosureEnv = FiniteMap Name HValue
-data HValue     = HValue  -- dummy type, actually a pointer to some Real Code.
-
--- remove all entries for a given set of modules from the environment
-filterNameMap :: [ModuleName] -> FiniteMap Name a -> FiniteMap Name a
-filterNameMap mods env 
-   = filterFM (\n _ -> moduleName (nameModule n) `notElem` mods) env
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Bytecodes, and Outputery.}
-%*									*
-%************************************************************************
-
-\begin{code}
-
-type LocalLabel = Int
-
-data BCInstr
-   -- Messing with the stack
-   = ARGCHECK  Int
-   -- Push locals (existing bits of the stack)
-   | PUSH_L    Int{-offset-}
-   | PUSH_LL   Int Int{-2 offsets-}
-   | PUSH_LLL  Int Int Int{-3 offsets-}
-   -- Push a ptr
-   | PUSH_G    Name
-   -- Push an alt continuation
-   | PUSH_AS   Name PrimRep	-- push alts and BCO_ptr_ret_info
-				-- PrimRep so we know which itbl
-   -- Pushing literals
-   | PUSH_UBX  Literal	Int 
-                        -- push this int/float/double, NO TAG, on the stack
-			-- Int is # of words to copy from literal pool
-   | PUSH_TAG  Int      -- push this tag on the stack
-
-   | SLIDE     Int{-this many-} Int{-down by this much-}
-   -- To do with the heap
-   | ALLOC     Int	-- make an AP_UPD with this many payload words, zeroed
-   | MKAP      Int{-ptr to AP_UPD is this far down stack-} Int{-# words-}
-   | UNPACK    Int	-- unpack N ptr words from t.o.s Constr
-   | UPK_TAG   Int Int Int
-			-- unpack N non-ptr words from offset M in constructor
-			-- K words down the stack
-   | PACK      DataCon Int
-			-- after assembly, the DataCon is an index into the
-			-- itbl array
-   -- For doing case trees
-   | LABEL     LocalLabel
-   | TESTLT_I  Int    LocalLabel
-   | TESTEQ_I  Int    LocalLabel
-   | TESTLT_F  Float  LocalLabel
-   | TESTEQ_F  Float  LocalLabel
-   | TESTLT_D  Double LocalLabel
-   | TESTEQ_D  Double LocalLabel
-
-   -- The Int value is a constructor number and therefore
-   -- stored in the insn stream rather than as an offset into
-   -- the literal pool.
-   | TESTLT_P  Int    LocalLabel
-   | TESTEQ_P  Int    LocalLabel
-
-   | CASEFAIL
-   -- To Infinity And Beyond
-   | ENTER
-   | RETURN	PrimRep
-		-- unboxed value on TOS.  Use tag to find underlying ret itbl
-		-- and return as per that.
-
-
-instance Outputable BCInstr where
-   ppr (ARGCHECK n)          = text "ARGCHECK" <+> int n
-   ppr (PUSH_L offset)       = text "PUSH_L  " <+> int offset
-   ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> int o1 <+> int o2
-   ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
-   ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
-   ppr (PUSH_AS nm pk)       = text "PUSH_AS " <+> ppr nm <+> ppr pk
-   ppr (PUSH_UBX lit nw)     = text "PUSH_UBX" <+> parens (int nw) <+> ppr lit
-   ppr (PUSH_TAG n)          = text "PUSH_TAG" <+> int n
-   ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
-   ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
-   ppr (MKAP offset sz)      = text "MKAP    " <+> int sz <+> text "words," 
-                                               <+> int offset <+> text "stkoff"
-   ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
-   ppr (UPK_TAG n m k)       = text "UPK_TAG " <+> int n <> text "words" 
-                                               <+> int m <> text "conoff"
-                                               <+> int k <> text "stkoff"
-   ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
-   ppr (LABEL     lab)       = text "__"       <> int lab <> colon
-   ppr (TESTLT_I  i lab)     = text "TESTLT_I" <+> int i <+> text "__" <> int lab
-   ppr (TESTEQ_I  i lab)     = text "TESTEQ_I" <+> int i <+> text "__" <> int lab
-   ppr (TESTLT_F  f lab)     = text "TESTLT_F" <+> float f <+> text "__" <> int lab
-   ppr (TESTEQ_F  f lab)     = text "TESTEQ_F" <+> float f <+> text "__" <> int lab
-   ppr (TESTLT_D  d lab)     = text "TESTLT_D" <+> double d <+> text "__" <> int lab
-   ppr (TESTEQ_D  d lab)     = text "TESTEQ_D" <+> double d <+> text "__" <> int lab
-   ppr (TESTLT_P  i lab)     = text "TESTLT_P" <+> int i <+> text "__" <> int lab
-   ppr (TESTEQ_P  i lab)     = text "TESTEQ_P" <+> int i <+> text "__" <> int lab
-   ppr CASEFAIL              = text "CASEFAIL"
-   ppr ENTER                 = text "ENTER"
-   ppr (RETURN pk)           = text "RETURN  " <+> ppr pk
-
-instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs origin)
-      = (text "ProtoBCO" <+> ppr name <> colon)
-        $$ nest 6 (vcat (map ppr instrs))
-        $$ case origin of
-              Left alts -> vcat (map (pprCoreAlt.deAnnAlt) alts)
-              Right rhs -> pprCoreExpr (deAnnotate rhs)
 \end{code}
 
 %************************************************************************
@@ -315,16 +148,6 @@ instance Outputable a => Outputable (ProtoBCO a) where
 \begin{code}
 
 type BCInstrList = OrdList BCInstr
-
-data ProtoBCO a 
-   = ProtoBCO a 			-- name, in some sense
-              [BCInstr] 		-- instrs
-					-- what the BCO came from
-              (Either [AnnAlt Id VarSet]
-                      (AnnExpr Id VarSet))
-
-nameOfProtoBCO (ProtoBCO nm insns origin) = nm
-
 
 type Sequel = Int	-- back off to this depth before ENTER
 
@@ -399,10 +222,11 @@ schemeE :: Int -> Sequel -> BCEnv -> AnnExpr Id VarSet -> BcM BCInstrList
 
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(fvs, AnnApp f a) 
-   = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnApp f a))
+   = returnBc (schemeT d s p (fvs, AnnApp f a))
 schemeE d s p e@(fvs, AnnVar v)
    | isFollowableRep v_rep
-   = returnBc (schemeT (should_args_be_tagged e) d s 0 p (fvs, AnnVar v))
+   = returnBc (schemeT d s p (fvs, AnnVar v))
+
    | otherwise
    = -- returning an unboxed value.  Heave it on the stack, SLIDE, and RETURN.
      let (push, szw) = pushAtom True d p (AnnVar v)
@@ -481,13 +305,20 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         -- given an alt, return a discr and code for it.
         codeAlt alt@(discr, binds_f, rhs)
            | isAlgCase 
-           = let binds_r        = reverse binds_f
-                 binds_r_t_szsw = map taggedIdSizeW binds_r
-                 binds_t_szw    = sum binds_r_t_szsw
-                 p''            = addListToFM 
-                                   p' (zip binds_r (mkStackOffsets d' binds_r_t_szsw))
-                 d''            = d' + binds_t_szw
-                 unpack_code    = mkUnpackCode {-0 0-} (map (typePrimRep.idType) binds_f)
+           = let -- The constr args in r->l order
+                 binds_r = reverse binds_f
+                 -- r->l order, but nptrs first, then ptrs
+                 -- this is the reverse order of the heap representation
+                 binds_r_split = filter (not.isPtr) binds_r ++ filter isPtr binds_r
+                 isPtr = isFollowableRep . typePrimRep . idType
+
+                 binds_r_tszsw = map taggedIdSizeW binds_r_split
+                 binds_tszw = sum binds_r_tszsw
+                 p'' = addListToFM 
+                          p' (zip (reverse binds_r_split) (mkStackOffsets d' (reverse binds_r_tszsw)))
+                 d'' = d' + binds_tszw
+                 unpack_code = mkUnpackCode (map (typePrimRep.idType) 
+                                                 (reverse binds_r_split))
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
                 returnBc (my_discr alt, unpack_code `appOL` rhs_code)
            | otherwise 
@@ -532,60 +363,92 @@ schemeE d s p other
                (pprCoreExpr (deAnnotate other))
 
 
--- Compile code to do a tail call.  Doesn't need to be monadic.
-schemeT :: Bool 	-- do tagging?
-        -> Int 		-- Stack depth
+-- Compile code to do a tail call.  If the function eventually
+-- to be called is a constructor, split the args into ptrs and
+-- non-ptrs, and push the nonptrs, then the ptrs, and then do PACK.
+-- *** This assumes that the root expression passed in represents
+-- a saturated constructor call.  ***
+--
+-- Otherwise, just push the args right-to-left, SLIDE and ENTER.
+
+schemeT :: Int 		-- Stack depth
         -> Sequel 	-- Sequel depth
-        -> Int 		-- # arg words so far
         -> BCEnv 	-- stack env
         -> AnnExpr Id VarSet 
         -> BCInstrList
 
-schemeT enTag d s narg_words p (_, AnnApp f a)
-   = case snd a of
-        AnnType _ -> schemeT enTag d s narg_words p f
-        other
-           -> let (push, arg_words) = pushAtom enTag d p (snd a)
-              in push 
-                 `appOL` schemeT enTag (d+arg_words) s (narg_words+arg_words) p f
+schemeT d s p app
+   = code
+     where
+         -- Extract the args (R->L) and fn
+         (args_r_to_l_raw, fn) = chomp app
+         chomp expr
+            = case snd expr of
+                 AnnVar v   -> ([], v)
+                 AnnApp f a -> case chomp f of (az, f) -> (snd a:az, f)
+                 other      -> pprPanic "schemeT" 
+                                  (ppr (deAnnotate (panic "schemeT.chomp", other)))
+         
+         args_r_to_l = filter (not.isTypeAtom) args_r_to_l_raw
+         isTypeAtom (AnnType _) = True
+         isTypeAtom _           = False
 
-schemeT enTag d s narg_words p (_, AnnVar f)
-   | Just con <- isDataConId_maybe f
-   = ASSERT(enTag == False)
-     --trace ("schemeT: d = " ++ show d ++ ", s = " ++ show s ++ ", naw = " ++ show narg_words) (
-     PACK con narg_words `consOL` (mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
-     --)
-   | otherwise
-   = ASSERT(enTag == True)
-     let (push, arg_words) = pushAtom True d p (AnnVar f)
-     in  push 
-         `appOL`  mkSLIDE (narg_words+arg_words) (d - s - narg_words)
-         `snocOL` ENTER
+         -- decide if this is a constructor call, and rearrange
+         -- args appropriately.
+         maybe_dcon  = isDataConId_maybe fn
+         is_con_call = case maybe_dcon of Nothing -> False; Just _ -> True
+
+         args_final_r_to_l
+            | not is_con_call
+            = args_r_to_l
+            | otherwise
+            = filter (not.isPtr) args_r_to_l ++ filter isPtr args_r_to_l
+              where isPtr = isFollowableRep . atomRep
+
+         -- make code to push the args and then do the SLIDE-ENTER thing
+         code = do_pushery d args_final_r_to_l
+
+         tag_when_push = not is_con_call
+         narg_words    = sum (map (get_arg_szw . atomRep) args_r_to_l)
+         get_arg_szw   = if tag_when_push then taggedSizeW else untaggedSizeW
+
+         do_pushery d (arg:args)
+            = let (push, arg_words) = pushAtom tag_when_push d p arg
+              in  push `appOL` do_pushery (d+arg_words) args
+         do_pushery d []
+            = case maybe_dcon of
+                 Just con -> PACK con narg_words `consOL` (
+                             mkSLIDE 1 (d - narg_words - s) `snocOL` ENTER)
+                 Nothing
+                    -> let (push, arg_words) = pushAtom True d p (AnnVar fn)
+                       in  push 
+                           `appOL` mkSLIDE (narg_words+arg_words) 
+                                           (d - s - narg_words)
+                           `snocOL` ENTER
 
 mkSLIDE n d 
    = if d == 0 then nilOL else unitOL (SLIDE n d)
 
-should_args_be_tagged (_, AnnVar v)
-   = case isDataConId_maybe v of
-        Just dcon -> False; Nothing -> True
-should_args_be_tagged (_, AnnApp f a)
-   = should_args_be_tagged f
-should_args_be_tagged (_, other)
-   = panic "should_args_be_tagged: tail call to non-con, non-var"
-
+atomRep (AnnVar v)    = typePrimRep (idType v)
+atomRep (AnnLit l)    = literalPrimRep l
+atomRep (AnnNote n b) = atomRep (snd b)
+atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
+atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
 
 -- Make code to unpack the top-of-stack constructor onto the stack, 
 -- adding tags for the unboxed bits.  Takes the PrimReps of the 
 -- constructor's arguments.  off_h and off_s are travelling offsets
 -- along the constructor and the stack.
+-- 
+-- The supplied PrimReps are in heap rep order, that is,
+-- left to right, but with all the ptrs first, then the nonptrs.
 mkUnpackCode :: [PrimRep] -> BCInstrList
 mkUnpackCode reps
    = all_code
      where
         all_code = ptrs_code `appOL` do_nptrs ptrs_szw ptrs_szw reps_nptr
 
-        reps_ptr  = filter isFollowableRep reps
-        reps_nptr = filter (not.isFollowableRep) reps
+        (reps_ptr, reps_nptr) = span isFollowableRep reps
         
         ptrs_szw  = sum (map untaggedSizeW reps_ptr)
         ptrs_code | null reps_ptr = nilOL
@@ -630,18 +493,20 @@ mkUnpackCode reps
 
 pushAtom :: Bool -> Int -> BCEnv -> AnnExpr' Id VarSet -> (BCInstrList, Int)
 pushAtom tagged d p (AnnVar v) 
-   = let str = "\npushAtom " ++ showSDocDebug (ppr v) ++ ", depth = " ++ show d
-               ++ ", env =\n" ++ 
+   = let str = "\npushAtom " ++ showSDocDebug (ppr v) 
+               ++ " :: " ++ showSDocDebug (pprType (idType v))
+               ++ ", depth = " ++ show d
+               ++ ", tagged = " ++ show tagged ++ ", env =\n" ++ 
                showSDocDebug (nest 4 (vcat (map ppr (fmToList p))))
-               ++ " -->\n" ++
+               ++ " --> words: " ++ show (snd result) ++ "\n" ++
                showSDoc (nest 4 (vcat (map ppr (fromOL (fst result)))))
                ++ "\nendPushAtom " ++ showSDocDebug (ppr v)
          str' = if str == str then str else str
 
          result
             = case lookupBCEnv_maybe p v of
-                 Just d_v -> (toOL (nOfThem nwords (PUSH_L (d-d_v+sz_t-2))), sz_t)
-                 Nothing  -> ASSERT(sz_t == 1) (unitOL (PUSH_G nm), sz_t)
+                 Just d_v -> (toOL (nOfThem nwords (PUSH_L (d-d_v+sz_t-2))), nwords)
+                 Nothing  -> ASSERT(sz_t == 1) (unitOL (PUSH_G nm), nwords)
 
          nm = case isDataConId_maybe v of
                  Just c  -> getName c
@@ -651,7 +516,7 @@ pushAtom tagged d p (AnnVar v)
          sz_u   = untaggedIdSizeW v
          nwords = if tagged then sz_t else sz_u
      in
-         --trace str'
+         trace str'
          result
 
 pushAtom True d p (AnnLit lit)
@@ -920,628 +785,5 @@ emitBc bco st
 getLabelBc :: BcM Int
 getLabelBc st
    = (nextlabel st, st{nextlabel = 1 + nextlabel st})
-
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{The bytecode assembler}
-%*									*
-%************************************************************************
-
-The object format for bytecodes is: 16 bits for the opcode, and 16 for
-each field -- so the code can be considered a sequence of 16-bit ints.
-Each field denotes either a stack offset or number of items on the
-stack (eg SLIDE), and index into the pointer table (eg PUSH_G), an
-index into the literal table (eg PUSH_I/D/L), or a bytecode address in
-this BCO.
-
-\begin{code}
--- Top level assembler fn.
-assembleBCO :: ProtoBCO Name -> IO UnlinkedBCO
-
-assembleBCO (ProtoBCO nm instrs origin)
-   = let
-         -- pass 1: collect up the offsets of the local labels.
-         -- Remember that the first insn starts at offset 1 since offset 0
-         -- (eventually) will hold the total # of insns.
-         label_env = mkLabelEnv emptyFM 1 instrs
-
-         mkLabelEnv env i_offset [] = env
-         mkLabelEnv env i_offset (i:is)
-            = let new_env 
-                     = case i of LABEL n -> addToFM env n i_offset ; _ -> env
-              in  mkLabelEnv new_env (i_offset + instrSize16s i) is
-
-         findLabel lab
-            = case lookupFM label_env lab of
-                 Just bco_offset -> bco_offset
-                 Nothing -> pprPanic "assembleBCO.findLabel" (int lab)
-     in
-     do  -- pass 2: generate the instruction, ptr and nonptr bits
-         insns <- return emptySS :: IO (SizedSeq Word16)
-         lits  <- return emptySS :: IO (SizedSeq Word)
-         ptrs  <- return emptySS :: IO (SizedSeq Name)
-         itbls <- return emptySS :: IO (SizedSeq Name)
-         let init_asm_state = (insns,lits,ptrs,itbls)
-         (final_insns, final_lits, final_ptrs, final_itbls) 
-            <- mkBits findLabel init_asm_state instrs         
-
-         return (UnlinkedBCO nm final_insns final_lits final_ptrs final_itbls)
-
--- instrs nonptrs ptrs itbls
-type AsmState = (SizedSeq Word16, SizedSeq Word, SizedSeq Name, SizedSeq Name)
-
-data SizedSeq a = SizedSeq !Int [a]
-emptySS = SizedSeq 0 []
-addToSS (SizedSeq n r_xs) x = return (SizedSeq (n+1) (x:r_xs))
-addListToSS (SizedSeq n r_xs) xs 
-   = return (SizedSeq (n + length xs) (reverse xs ++ r_xs))
-sizeSS (SizedSeq n r_xs) = n
-listFromSS (SizedSeq n r_xs) = return (reverse r_xs)
-
-
--- This is where all the action is (pass 2 of the assembler)
-mkBits :: (Int -> Int) 			-- label finder
-       -> AsmState
-       -> [BCInstr]			-- instructions (in)
-       -> IO AsmState
-
-mkBits findLabel st proto_insns
-  = foldM doInstr st proto_insns
-    where
-       doInstr :: AsmState -> BCInstr -> IO AsmState
-       doInstr st i
-          = case i of
-               ARGCHECK  n        -> instr2 st i_ARGCHECK n
-               PUSH_L    o1       -> instr2 st i_PUSH_L o1
-               PUSH_LL   o1 o2    -> instr3 st i_PUSH_LL o1 o2
-               PUSH_LLL  o1 o2 o3 -> instr4 st i_PUSH_LLL o1 o2 o3
-               PUSH_G    nm       -> do (p, st2) <- ptr st nm
-                                        instr2 st2 i_PUSH_G p
-               PUSH_AS   nm pk    -> do (p, st2)  <- ptr st nm
-                                        (np, st3) <- ctoi_itbl st2 pk
-                                        instr3 st3 i_PUSH_AS p np
-               PUSH_UBX  lit nws  -> do (np, st2) <- literal st lit
-                                        instr3 st2 i_PUSH_UBX np nws
-               PUSH_TAG  tag      -> instr2 st i_PUSH_TAG tag
-               SLIDE     n by     -> instr3 st i_SLIDE n by
-               ALLOC     n        -> instr2 st i_ALLOC n
-               MKAP      off sz   -> instr3 st i_MKAP off sz
-               UNPACK    n        -> instr2 st i_UNPACK n
-               UPK_TAG   n m k    -> instr4 st i_UPK_TAG n m k
-               PACK      dcon sz  -> do (itbl_no,st2) <- itbl st dcon
-                                        instr3 st2 i_PACK itbl_no sz
-               LABEL     lab      -> return st
-               TESTLT_I  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 i_TESTLT_I np (findLabel l)
-               TESTEQ_I  i l      -> do (np, st2) <- int st i
-                                        instr3 st2 i_TESTEQ_I np (findLabel l)
-               TESTLT_F  f l      -> do (np, st2) <- float st f
-                                        instr3 st2 i_TESTLT_F np (findLabel l)
-               TESTEQ_F  f l      -> do (np, st2) <- float st f
-                                        instr3 st2 i_TESTEQ_F np (findLabel l)
-               TESTLT_D  d l      -> do (np, st2) <- double st d
-                                        instr3 st2 i_TESTLT_D np (findLabel l)
-               TESTEQ_D  d l      -> do (np, st2) <- double st d
-                                        instr3 st2 i_TESTEQ_D np (findLabel l)
-               TESTLT_P  i l      -> instr3 st i_TESTLT_P i (findLabel l)
-               TESTEQ_P  i l      -> instr3 st i_TESTEQ_P i (findLabel l)
-               CASEFAIL           -> instr1 st i_CASEFAIL
-               ENTER              -> instr1 st i_ENTER
-               RETURN rep         -> do (itbl_no,st2) <- itoc_itbl st rep
-                                        instr2 st2 i_RETURN itbl_no
-
-       i2s :: Int -> Word16
-       i2s = fromIntegral
-
-       instr1 (st_i0,st_l0,st_p0,st_I0) i1
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               return (st_i1,st_l0,st_p0,st_I0)
-
-       instr2 (st_i0,st_l0,st_p0,st_I0) i1 i2
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               st_i2 <- addToSS st_i1 (i2s i2)
-               return (st_i2,st_l0,st_p0,st_I0)
-
-       instr3 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               st_i2 <- addToSS st_i1 (i2s i2)
-               st_i3 <- addToSS st_i2 (i2s i3)
-               return (st_i3,st_l0,st_p0,st_I0)
-
-       instr4 (st_i0,st_l0,st_p0,st_I0) i1 i2 i3 i4
-          = do st_i1 <- addToSS st_i0 (i2s i1)
-               st_i2 <- addToSS st_i1 (i2s i2)
-               st_i3 <- addToSS st_i2 (i2s i3)
-               st_i4 <- addToSS st_i3 (i2s i4)
-               return (st_i4,st_l0,st_p0,st_I0)
-
-       float (st_i0,st_l0,st_p0,st_I0) f
-          = do let ws = mkLitF f
-               st_l1 <- addListToSS st_l0 ws
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
-
-       double (st_i0,st_l0,st_p0,st_I0) d
-          = do let ws = mkLitD d
-               st_l1 <- addListToSS st_l0 ws
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
-
-       int (st_i0,st_l0,st_p0,st_I0) i
-          = do let ws = mkLitI i
-               st_l1 <- addListToSS st_l0 ws
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
-
-       addr (st_i0,st_l0,st_p0,st_I0) a
-          = do let ws = mkLitA a
-               st_l1 <- addListToSS st_l0 ws
-               return (sizeSS st_l0, (st_i0,st_l1,st_p0,st_I0))
-
-       ptr (st_i0,st_l0,st_p0,st_I0) p
-          = do st_p1 <- addToSS st_p0 p
-               return (sizeSS st_p0, (st_i0,st_l0,st_p1,st_I0))
-
-       itbl (st_i0,st_l0,st_p0,st_I0) dcon
-          = do st_I1 <- addToSS st_I0 (getName dcon)
-               return (sizeSS st_I0, (st_i0,st_l0,st_p0,st_I1))
-
-       literal st (MachInt j)    = int st (fromIntegral j)
-       literal st (MachFloat r)  = float st (fromRational r)
-       literal st (MachDouble r) = double st (fromRational r)
-       literal st (MachChar c)   = int st c
-
-       ctoi_itbl st pk
-          = addr st ret_itbl_addr
-            where
-               ret_itbl_addr = case pk of
-                                  PtrRep    -> stg_ctoi_ret_R1_info
-                                  IntRep    -> stg_ctoi_ret_R1_info
-                                  CharRep   -> stg_ctoi_ret_R1_info
-                                  FloatRep  -> stg_ctoi_ret_F1_info
-                                  DoubleRep -> stg_ctoi_ret_D1_info
-                                  _ -> pprPanic "mkBits.ctoi_itbl" (ppr pk)
-
-       itoc_itbl st pk
-          = addr st ret_itbl_addr
-            where
-               ret_itbl_addr = case pk of
-                                  IntRep    -> stg_gc_unbx_r1_info
-                                  FloatRep  -> stg_gc_f1_info
-                                  DoubleRep -> stg_gc_d1_info
-                     
-foreign label "stg_ctoi_ret_R1_info" stg_ctoi_ret_R1_info :: Addr
-foreign label "stg_ctoi_ret_F1_info" stg_ctoi_ret_F1_info :: Addr
-foreign label "stg_ctoi_ret_D1_info" stg_ctoi_ret_D1_info :: Addr
-
-foreign label "stg_gc_unbx_r1_info" stg_gc_unbx_r1_info :: Addr
-foreign label "stg_gc_f1_info"      stg_gc_f1_info :: Addr
-foreign label "stg_gc_d1_info"      stg_gc_d1_info :: Addr
-
--- The size in 16-bit entities of an instruction.
-instrSize16s :: BCInstr -> Int
-instrSize16s instr
-   = case instr of
-        ARGCHECK _     -> 2
-        PUSH_L   _     -> 2
-        PUSH_LL  _ _   -> 3
-        PUSH_LLL _ _ _ -> 4
-        PUSH_G   _     -> 2
-        PUSH_AS  _ _   -> 3
-        PUSH_UBX _ _   -> 3
-        PUSH_TAG _     -> 2
-        SLIDE    _ _   -> 3
-        ALLOC    _     -> 2
-        MKAP     _ _   -> 3
-        UNPACK   _     -> 2
-        UPK_TAG  _ _ _ -> 4
-        PACK     _ _   -> 3
-        LABEL    _     -> 0	-- !!
-        TESTLT_I _ _   -> 3
-        TESTEQ_I _ _   -> 3
-        TESTLT_F _ _   -> 3
-        TESTEQ_F _ _   -> 3
-        TESTLT_D _ _   -> 3
-        TESTEQ_D _ _   -> 3
-        TESTLT_P _ _   -> 3
-        TESTEQ_P _ _   -> 3
-        CASEFAIL       -> 1
-        ENTER          -> 1
-        RETURN   _     -> 2
-
-
--- Make lists of host-sized words for literals, so that when the
--- words are placed in memory at increasing addresses, the
--- bit pattern is correct for the host's word size and endianness.
-mkLitI :: Int    -> [Word]
-mkLitF :: Float  -> [Word]
-mkLitD :: Double -> [Word]
-mkLitA :: Addr   -> [Word]
-
-mkLitF f
-   = runST (do
-        arr <- newFloatArray ((0::Int),0)
-        writeFloatArray arr 0 f
-        f_arr <- castSTUArray arr
-        w0 <- readWordArray f_arr 0
-        return [w0]
-     )
-
-mkLitD d
-   | wORD_SIZE == 4
-   = runST (do
-        arr <- newDoubleArray ((0::Int),1)
-        writeDoubleArray arr 0 d
-        d_arr <- castSTUArray arr
-        w0 <- readWordArray d_arr 0
-        w1 <- readWordArray d_arr 1
-        return [w0,w1]
-     )
-   | wORD_SIZE == 8
-   = runST (do
-        arr <- newDoubleArray ((0::Int),0)
-        writeDoubleArray arr 0 d
-        d_arr <- castSTUArray arr
-        w0 <- readWordArray d_arr 0
-        return [w0]
-     )
-
-mkLitI i
-   = runST (do
-        arr <- newIntArray ((0::Int),0)
-        writeIntArray arr 0 i
-        i_arr <- castSTUArray arr
-        w0 <- readWordArray i_arr 0
-        return [w0]
-     )
-
-mkLitA a
-   = runST (do
-        arr <- newAddrArray ((0::Int),0)
-        writeAddrArray arr 0 a
-        a_arr <- castSTUArray arr
-        w0 <- readWordArray a_arr 0
-        return [w0]
-     )
-
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Linking interpretables into something we can run}
-%*									*
-%************************************************************************
-
-\begin{code}
-
-{- 
-data BCO# = BCO# ByteArray# 		-- instrs   :: array Word16#
-                 ByteArray# 		-- literals :: array Word32#
-                 PtrArray# 		-- ptrs     :: Array HValue
-                 ByteArray#		-- itbls    :: Array Addr#
--}
-
-GLOBAL_VAR(v_cafTable, [], [HValue])
-
---addCAF :: HValue -> IO ()
---addCAF x = do xs <- readIORef v_cafTable; writeIORef v_cafTable (x:xs)
-
---bcosToHValue :: ItblEnv -> ClosureEnv -> UnlinkedBCOExpr -> IO HValue
---bcosToHValue ie ce (root_bco, other_bcos)
---   = do linked_expr <- linkIExpr ie ce (root_bco, other_bcos)
---	return linked_expr
-
-linkBCO ie ce (UnlinkedBCO nm insnsSS literalsSS ptrsSS itblsSS)
-   = do insns    <- listFromSS insnsSS
-        literals <- listFromSS literalsSS
-        ptrs     <- listFromSS ptrsSS
-        itbls    <- listFromSS itblsSS
-
-        linked_ptrs  <- mapM (lookupCE ce) ptrs
-        linked_itbls <- mapM (lookupIE ie) itbls
-
-        let n_insns    = sizeSS insnsSS
-            n_literals = sizeSS literalsSS
-            n_ptrs     = sizeSS ptrsSS
-            n_itbls    = sizeSS itblsSS
-
-        let ptrs_arr = array (0, n_ptrs-1) (indexify linked_ptrs)
-                       :: Array Int HValue
-            ptrs_parr = case ptrs_arr of Array lo hi parr -> parr
-
-            itbls_arr = array (0, n_itbls-1) (indexify linked_itbls)
-                        :: UArray Int Addr
-            itbls_barr = case itbls_arr of UArray lo hi barr -> barr
-
-            insns_arr | n_insns > 65535
-                      = panic "linkBCO: >= 64k insns in BCO"
-                      | otherwise 
-                      = array (0, n_insns) 
-                              (indexify (fromIntegral n_insns:insns))
-                        :: UArray Int Word16
-            insns_barr = case insns_arr of UArray lo hi barr -> barr
-
-            literals_arr = array (0, n_literals-1) (indexify literals)
-                           :: UArray Int Word
-            literals_barr = case literals_arr of UArray lo hi barr -> barr
-
-            indexify :: [a] -> [(Int, a)]
-            indexify xs = zip [0..] xs
-
-        BCO bco# <- newBCO insns_barr literals_barr ptrs_parr itbls_barr
-
-        return (unsafeCoerce# bco#)
-
-
-data BCO = BCO BCO#
-
-newBCO :: ByteArray# -> ByteArray# -> Array# a -> ByteArray# -> IO BCO
-newBCO a b c d
-   = IO (\s -> case newBCO# a b c d s of (# s1, bco #) -> (# s1, BCO bco #))
-
-
-lookupCE :: ClosureEnv -> Name -> IO HValue
-lookupCE ce nm 
-   = case lookupFM ce nm of
-        Just aa -> return aa
-        Nothing 
-           -> do m <- lookupSymbol (nameToCLabel nm "closure")
-                 case m of
-                    Just (A# addr) -> case addrToHValue# addr of
-                                         (# hval #) -> return hval
-                    Nothing        -> pprPanic "ByteCodeGen.lookupCE" (ppr nm)
-
-lookupIE :: ItblEnv -> Name -> IO Addr
-lookupIE ie con_nm 
-   = case lookupFM ie con_nm of
-        Just (Ptr a) -> return a
-        Nothing
-           -> do -- try looking up in the object files.
-                 m <- lookupSymbol (nameToCLabel con_nm "con_info")
-                 case m of
-                    Just addr -> return addr
-                    Nothing 
-                       -> do -- perhaps a nullary constructor?
-                             n <- lookupSymbol (nameToCLabel con_nm "static_info")
-                             case n of
-                                Just addr -> return addr
-                                Nothing -> pprPanic "ByteCodeGen.lookupIE" (ppr con_nm)
-
--- HACK!!!  ToDo: cleaner
-nameToCLabel :: Name -> String{-suffix-} -> String
-nameToCLabel n suffix
-   = _UNPK_(moduleNameFS (rdrNameModule rn)) 
-     ++ '_':occNameString(rdrNameOcc rn) ++ '_':suffix
-     where rn = toRdrName n
-
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Manufacturing of info tables for DataCons}
-%*									*
-%************************************************************************
-
-\begin{code}
-
-#if __GLASGOW_HASKELL__ <= 408
-type ItblPtr = Addr
-#else
-type ItblPtr = Ptr StgInfoTable
-#endif
-
--- Make info tables for the data decls in this module
-mkITbls :: [TyCon] -> IO ItblEnv
-mkITbls [] = return emptyFM
-mkITbls (tc:tcs) = do itbls  <- mkITbl tc
-                      itbls2 <- mkITbls tcs
-                      return (itbls `plusFM` itbls2)
-
-mkITbl :: TyCon -> IO ItblEnv
-mkITbl tc
-   | not (isDataTyCon tc) 
-   = return emptyFM
-   | n == length dcs  -- paranoia; this is an assertion.
-   = make_constr_itbls dcs
-     where
-        dcs = tyConDataCons tc
-        n   = tyConFamilySize tc
-
-cONSTR :: Int
-cONSTR = 1  -- as defined in ghc/includes/ClosureTypes.h
-
--- Assumes constructors are numbered from zero, not one
-make_constr_itbls :: [DataCon] -> IO ItblEnv
-make_constr_itbls cons
-   | length cons <= 8
-   = do is <- mapM mk_vecret_itbl (zip cons [0..])
-	return (listToFM is)
-   | otherwise
-   = do is <- mapM mk_dirret_itbl (zip cons [0..])
-	return (listToFM is)
-     where
-        mk_vecret_itbl (dcon, conNo)
-           = mk_itbl dcon conNo (vecret_entry conNo)
-        mk_dirret_itbl (dcon, conNo)
-           = mk_itbl dcon conNo stg_interp_constr_entry
-
-        mk_itbl :: DataCon -> Int -> Addr -> IO (Name,ItblPtr)
-        mk_itbl dcon conNo entry_addr
-           = let (tot_wds, ptr_wds, _) 
-                    = mkVirtHeapOffsets typePrimRep (dataConRepArgTys dcon)
-                 ptrs = ptr_wds
-                 nptrs  = tot_wds - ptr_wds
-                 itbl  = StgInfoTable {
-                           ptrs = fromIntegral ptrs, nptrs = fromIntegral nptrs,
-                           tipe = fromIntegral cONSTR,
-                           srtlen = fromIntegral conNo,
-                           code0 = fromIntegral code0, code1 = fromIntegral code1,
-                           code2 = fromIntegral code2, code3 = fromIntegral code3,
-                           code4 = fromIntegral code4, code5 = fromIntegral code5,
-                           code6 = fromIntegral code6, code7 = fromIntegral code7 
-                        }
-                 -- Make a piece of code to jump to "entry_label".
-                 -- This is the only arch-dependent bit.
-                 -- On x86, if entry_label has an address 0xWWXXYYZZ,
-                 -- emit   movl $0xWWXXYYZZ,%eax  ;  jmp *%eax
-                 -- which is
-                 -- B8 ZZ YY XX WW FF E0
-                 (code0,code1,code2,code3,code4,code5,code6,code7)
-                    = (0xB8, byte 0 entry_addr_w, byte 1 entry_addr_w, 
-                             byte 2 entry_addr_w, byte 3 entry_addr_w, 
-                       0xFF, 0xE0, 
-                       0x90 {-nop-})
-
-                 entry_addr_w :: Word32
-                 entry_addr_w = fromIntegral (addrToInt entry_addr)
-             in
-                 do addr <- malloc
-                    --putStrLn ("SIZE of itbl is " ++ show (sizeOf itbl))
-                    --putStrLn ("# ptrs  of itbl is " ++ show ptrs)
-                    --putStrLn ("# nptrs of itbl is " ++ show nptrs)
-                    poke addr itbl
-                    return (getName dcon, addr `plusPtr` 8)
-
-
-byte :: Int -> Word32 -> Word32
-byte 0 w = w .&. 0xFF
-byte 1 w = (w `shiftR` 8) .&. 0xFF
-byte 2 w = (w `shiftR` 16) .&. 0xFF
-byte 3 w = (w `shiftR` 24) .&. 0xFF
-
-
-vecret_entry 0 = stg_interp_constr1_entry
-vecret_entry 1 = stg_interp_constr2_entry
-vecret_entry 2 = stg_interp_constr3_entry
-vecret_entry 3 = stg_interp_constr4_entry
-vecret_entry 4 = stg_interp_constr5_entry
-vecret_entry 5 = stg_interp_constr6_entry
-vecret_entry 6 = stg_interp_constr7_entry
-vecret_entry 7 = stg_interp_constr8_entry
-
--- entry point for direct returns for created constr itbls
-foreign label "stg_interp_constr_entry" stg_interp_constr_entry :: Addr
--- and the 8 vectored ones
-foreign label "stg_interp_constr1_entry" stg_interp_constr1_entry :: Addr
-foreign label "stg_interp_constr2_entry" stg_interp_constr2_entry :: Addr
-foreign label "stg_interp_constr3_entry" stg_interp_constr3_entry :: Addr
-foreign label "stg_interp_constr4_entry" stg_interp_constr4_entry :: Addr
-foreign label "stg_interp_constr5_entry" stg_interp_constr5_entry :: Addr
-foreign label "stg_interp_constr6_entry" stg_interp_constr6_entry :: Addr
-foreign label "stg_interp_constr7_entry" stg_interp_constr7_entry :: Addr
-foreign label "stg_interp_constr8_entry" stg_interp_constr8_entry :: Addr
-
-
-
-
-
--- Ultra-minimalist version specially for constructors
-data StgInfoTable = StgInfoTable {
-   ptrs :: Word16,
-   nptrs :: Word16,
-   srtlen :: Word16,
-   tipe :: Word16,
-   code0, code1, code2, code3, code4, code5, code6, code7 :: Word8
-}
-
-
-instance Storable StgInfoTable where
-
-   sizeOf itbl 
-      = (sum . map (\f -> f itbl))
-        [fieldSz ptrs, fieldSz nptrs, fieldSz srtlen, fieldSz tipe,
-         fieldSz code0, fieldSz code1, fieldSz code2, fieldSz code3, 
-         fieldSz code4, fieldSz code5, fieldSz code6, fieldSz code7]
-
-   alignment itbl 
-      = (sum . map (\f -> f itbl))
-        [fieldAl ptrs, fieldAl nptrs, fieldAl srtlen, fieldAl tipe,
-         fieldAl code0, fieldAl code1, fieldAl code2, fieldAl code3, 
-         fieldAl code4, fieldAl code5, fieldAl code6, fieldAl code7]
-
-   poke a0 itbl
-      = do a1 <- store (ptrs   itbl) (castPtr a0)
-           a2 <- store (nptrs  itbl) a1
-           a3 <- store (tipe   itbl) a2
-           a4 <- store (srtlen itbl) a3
-           a5 <- store (code0  itbl) a4
-           a6 <- store (code1  itbl) a5
-           a7 <- store (code2  itbl) a6
-           a8 <- store (code3  itbl) a7
-           a9 <- store (code4  itbl) a8
-           aA <- store (code5  itbl) a9
-           aB <- store (code6  itbl) aA
-           aC <- store (code7  itbl) aB
-           return ()
-
-   peek a0
-      = do (a1,ptrs)   <- load (castPtr a0)
-           (a2,nptrs)  <- load a1
-           (a3,tipe)   <- load a2
-           (a4,srtlen) <- load a3
-           (a5,code0)  <- load a4
-           (a6,code1)  <- load a5
-           (a7,code2)  <- load a6
-           (a8,code3)  <- load a7
-           (a9,code4)  <- load a8
-           (aA,code5)  <- load a9
-           (aB,code6)  <- load aA
-           (aC,code7)  <- load aB
-           return StgInfoTable { ptrs = ptrs, nptrs = nptrs, 
-                                 srtlen = srtlen, tipe = tipe,
-                                 code0 = code0, code1 = code1, code2 = code2,
-                                 code3 = code3, code4 = code4, code5 = code5,
-                                 code6 = code6, code7 = code7 }
-
-fieldSz :: (Storable a, Storable b) => (a -> b) -> a -> Int
-fieldSz sel x = sizeOf (sel x)
-
-fieldAl :: (Storable a, Storable b) => (a -> b) -> a -> Int
-fieldAl sel x = alignment (sel x)
-
-store :: Storable a => a -> Ptr a -> IO (Ptr b)
-store x addr = do poke addr x
-                  return (castPtr (addr `plusPtr` sizeOf x))
-
-load :: Storable a => Ptr a -> IO (Ptr b, a)
-load addr = do x <- peek addr
-               return (castPtr (addr `plusPtr` sizeOf x), x)
-
-\end{code}
-
-%************************************************************************
-%*									*
-\subsection{Connect to actual values for bytecode opcodes}
-%*									*
-%************************************************************************
-
-\begin{code}
-
-#include "Bytecodes.h"
-
-i_ARGCHECK = (bci_ARGCHECK :: Int)
-i_PUSH_L   = (bci_PUSH_L :: Int)
-i_PUSH_LL  = (bci_PUSH_LL :: Int)
-i_PUSH_LLL = (bci_PUSH_LLL :: Int)
-i_PUSH_G   = (bci_PUSH_G :: Int)
-i_PUSH_AS  = (bci_PUSH_AS :: Int)
-i_PUSH_UBX = (bci_PUSH_UBX :: Int)
-i_PUSH_TAG = (bci_PUSH_TAG :: Int)
-i_SLIDE    = (bci_SLIDE :: Int)
-i_ALLOC    = (bci_ALLOC :: Int)
-i_MKAP     = (bci_MKAP :: Int)
-i_UNPACK   = (bci_UNPACK :: Int)
-i_UPK_TAG  = (bci_UPK_TAG :: Int)
-i_PACK     = (bci_PACK :: Int)
-i_TESTLT_I = (bci_TESTLT_I :: Int)
-i_TESTEQ_I = (bci_TESTEQ_I :: Int)
-i_TESTLT_F = (bci_TESTLT_F :: Int)
-i_TESTEQ_F = (bci_TESTEQ_F :: Int)
-i_TESTLT_D = (bci_TESTLT_D :: Int)
-i_TESTEQ_D = (bci_TESTEQ_D :: Int)
-i_TESTLT_P = (bci_TESTLT_P :: Int)
-i_TESTEQ_P = (bci_TESTEQ_P :: Int)
-i_CASEFAIL = (bci_CASEFAIL :: Int)
-i_ENTER    = (bci_ENTER :: Int)
-i_RETURN   = (bci_RETURN :: Int)
 
 \end{code}
