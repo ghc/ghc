@@ -30,73 +30,38 @@
 
 
   <sect1 id="sec-getting">
-    <title>Getting the Glasgow <Literal>fptools</Literal> suite</title>
+    <title>Getting the sources</title>
+    
+    <para>You can get your hands on the <literal>fptools</literal>
+    in two ways:</para>
 
-    <para>Building the Glasgow tools <Emphasis>can</Emphasis> be
-    complicated, mostly because there are so many permutations of
-    what/why/how, e.g., ``Build Happy with HBC, everything else with
-    GHC, leave out profiling, and test it all on the `real' NoFib
-    programs.''  Yeeps!</para>
+    <variablelist>
 
-    <para>Happily, such complications don't apply to most people.  A
-    few common ``strategies'' serve most purposes.  Pick one and
-    proceed as suggested:</para>
+      <varlistentry>
+	<term><indexterm><primary>Source
+	distributions</primary></indexterm>Source distributions</term>
+	<listitem>
+	  <para>You have a supported platform, but (a)&nbsp;you like
+          the warm fuzzy feeling of compiling things yourself;
+          (b)&nbsp;you want to build something ``extra&rdquo;&mdash;e.g., a
+          set of libraries with strictness-analysis turned off; or
+          (c)&nbsp;you want to hack on GHC yourself.</para>
 
-<VariableList>
-
-<VarListEntry>
-<term><indexterm><primary>Binary distribution</primary></indexterm>Binary distribution.</term>
-<listitem>
-<para>
-If your only purpose is to install some of the
-<Literal>fptools</Literal> suite then the easiest thing to do is to
-get a binary distribution. In the binary distribution everything is
-pre-compiled for your particular machine architecture and operating
-system, so all you should have to do is install the binaries and
-libraries in suitable places. The user guide describes how to do this.
-</para>
-
-<para>
-A binary distribution may not work for you for two reasons.  First, we
-may not have built the suite for the particular architecture/OS
-platform you want. That may be due to lack of time and energy (in
-which case you can get a source distribution and build from it; see
-below).  Alternatively, it may be because we haven't yet ported the
-suite to your architecture, in which case you are considerably worse
-off.
-</para>
-
-<para>
-The second reason a binary distribution may not be what you want is
-if you want to read or modify the souce code.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><indexterm><primary>Source distribution</primary></indexterm>Source distribution.</term>
-<listitem>
-<para>
-You have a supported
-platform, but (a)&nbsp;you like the warm fuzzy feeling of compiling things
-yourself; (b)&nbsp;you want to build something ``extra''&mdash;e.g., a set of
-libraries with strictness-analysis turned off; or (c)&nbsp;you want to hack
-on GHC yourself.
-</para>
-
-<para>
-A source distribution contains complete sources for one or more
-projects in the <Literal>fptools</Literal> suite.  Not only that, but
-the more awkward machine-independent steps are done for you.  For
-example, if you don't have
-<Command>happy</Command><indexterm><primary>happy</primary></indexterm>
-you'll find it convenient that the source distribution contains the
-result of running <Command>happy</Command> on the parser
-specifications.  If you don't want to alter the parser then this saves
-you having to find and install <Command>happy</Command>. You will
-still need a working version of GHC (preferably version 4.08+) on your
-machine in order to compile (most of) the sources, however.
-</para>
-
-</listitem></VarListEntry>
+	  <para>A source distribution contains complete sources for
+          one or more projects in the <literal>fptools</literal>
+          suite.  Not only that, but the more awkward
+          machine-independent steps are done for you.  For example, if
+          you don't have
+          <command>happy</command><indexterm><primary>happy</primary></indexterm>
+          you'll find it convenient that the source distribution
+          contains the result of running <command>happy</command> on
+          the parser specifications.  If you don't want to alter the
+          parser then this saves you having to find and install
+          <command>happy</command>. You will still need a working
+          version of GHC (preferably version 4.08+) on your machine in
+          order to compile (most of) the sources, however.</para>
+	</listitem>
+      </varlistentry>
 
       <varlistentry>
 	<term>The CVS repository.</term>
@@ -107,7 +72,7 @@ machine in order to compile (most of) the sources, however.
           up-to-the minute (but less tested) source code then you need
           to get access to our CVS repository.</para>
 
-	  <para>All the <Literal>fptools</Literal> source code is held
+	  <para>All the <literal>fptools</literal> source code is held
           in a CVS repository. CVS is a pretty good source-code
           control system, and best of all it works over the
           network.</para>
@@ -120,33 +85,6 @@ machine in order to compile (most of) the sources, however.
 
 	  <para>More information about our CVS repository can be found
           in <xref linkend="sec-cvs">.</para>
-
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>Build GHC from intermediate C <Filename>.hc</Filename> files<indexterm><primary>hc files</primary></indexterm>:</term>
-	<listitem>
-	  <para><emphasis>NOTE: GHC version 5.xx is significantly
-	  harder to bootstrap from C than previous versions.  We
-	  recommend starting from version 4.08.2 if you need to
-	  bootstrap in this way.</emphasis></para>
-
-	  <para>You need a working GHC to use a source distribution.
-          What if you don't have a working GHC? Then you may be able
-          to bootstrap up from the intermediate C
-          (<filename>.hc</filename>) files that we provide.  Building
-          GHC on an unsupported platform falls into this category.
-          Beware: this route is not for the faint hearted!  Please see
-          <Xref LinkEnd="sec-booting-from-C">.</para>
-
-	  <para>Once you have built GHC, you can build the other
-          Glasgow tools with it.</para>
-
-	  <para>In theory, you can (could?) build GHC with another
-          Haskell compiler (e.g., HBC). We haven't tried to do this
-          for ages and it almost certainly doesn't work any more (for
-          tedious reasons).</para>
 	</listitem>
       </varlistentry>
     </variablelist>
@@ -384,7 +322,7 @@ machine in order to compile (most of) the sources, however.
 	<listitem>
 	<para>
 	<constant>$SHELL</constant>: To use bash as the shell in Emacs, you need to
-	set this to point to <Filename>bash.exe</Filename>.
+	set this to point to <filename>bash.exe</filename>.
 	</para>
 	</listitem>
 
@@ -818,6 +756,16 @@ $ cvs checkout nofib/spectral
       </varlistentry>
 
       <varlistentry>
+	<term><literal>haddock</literal></term>
+	<indexterm><primary><literal>haddock</literal></primary><secondary>project</secondary></indexterm>
+	<listitem>
+	  <para>The <ulink
+	  url="http://www.haskell.org/haddock/">Haddock</ulink>
+	  documentation tool.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><literal>happy</literal></term>
 	<indexterm><primary><literal>happy</literal></primary><secondary>project</secondary></indexterm>
 	<listitem>
@@ -850,7 +798,8 @@ $ cvs checkout nofib/spectral
 	<term><literal>hslibs</literal></term>
 	<indexterm><primary><literal>hslibs</literal></primary><secondary>project</secondary></indexterm>
 	<listitem>
-	  <para>GHC's libraries.  Required for building GHC.</para>
+	  <para>Supplemental libraries for GHC
+	  (<emphasis>required</emphasis> for building GHC).</para>
 	</listitem>
       </varlistentry>
 
@@ -859,7 +808,7 @@ $ cvs checkout nofib/spectral
 	<indexterm><primary><literal></literal></primary><secondary>project</secondary></indexterm>
 	<listitem>
 	  <para>Hierarchical Haskell library suite
-	  (experimental).</para>
+	  (<emphasis>required</emphasis> for building GHC).</para>
 	</listitem>
       </varlistentry>
 
@@ -891,9 +840,9 @@ $ cvs checkout nofib/spectral
     </variablelist>
 
     <para>So, to build GHC you need at least the
-    <literal>ghc</literal> and <literal>hslibs</literal> projects (a
-    GHC source distribution will already include the bits you
-    need).</para>
+    <literal>ghc</literal>, <literal>libraries</literal> and
+    <literal>hslibs</literal> projects (a GHC source distribution will
+    already include the bits you need).</para>
   </sect1>
 
   <sect1 id="sec-build-checks">
@@ -913,111 +862,98 @@ $ cvs checkout nofib/spectral
       </listitem>
 
       <listitem>
-	<para>Use an appropriate machine, compilers, and things.
-        SPARC boxes, PCs running Linux or FreeBSD, and Alphas running
-        OSF/1 are all fully supported.  Win32 and HP boxes are in
-        pretty good shape.  PCs running Solaris, DEC Alphas running
-        Linux or some BSD variant, MIPS and AIX boxes will need some
-        minimal porting effort before they work (as of 4.06).  <xref
-        linkend="sec-port-info"> gives the full run-down on ports or
-        lack thereof.</para>
+	<para>Use an appropriate machine / operating system.  <xref
+	linkend="sec-port-info"> lists the supported platforms; if
+	yours isn't amongst these then you can try porting GHC (see
+	<xref linkend="sec-porting-ghc">).</para>
       </listitem>
 
       <listitem>
-	<para>Be sure that the ``pre-supposed'' utilities are
+	<para>Be sure that the &ldquo;pre-supposed&rdquo; utilities are
         installed.  <Xref LinkEnd="sec-pre-supposed">
         elaborates.</para>
       </listitem>
 
       <listitem>
 	<para>If you have any problem when building or installing the
-        Glasgow tools, please check the ``known pitfalls'' (<Xref
+        Glasgow tools, please check the &ldquo;known pitfalls&rdquo; (<Xref
         LinkEnd="sec-build-pitfalls">).  Also check the FAQ for the
-        version you're building, which should be available from the
-        relevant download page on the <ULink
-        URL="http://www.haskell.org/ghc/" >GHC web
-        site</ULink>.</para>
+        version you're building, which is part of the User's Guide and
+        available on the <ulink URL="http://www.haskell.org/ghc/" >GHC web
+        site</ulink>.</para>
 
-	<indexterm><primary>known bugs</primary></indexterm>
-	<indexterm><primary>bugs, known</primary></indexterm>
+	<indexterm><primary>bugs</primary><secondary>known</secondary></indexterm>
 
 	<para>If you feel there is still some shortcoming in our
         procedure or instructions, please report it.</para>
 
-	<para>For GHC, please see the bug-reporting section of the GHC
-        Users' Guide (separate document), to maximise the usefulness
-        of your report.</para>
+	<para>For GHC, please see the <ulink
+	url="http://www.haskell.org/ghc/docs/latest/set/bug-reporting.html">bug-reporting
+	section of the GHC Users' Guide</ulink>, to maximise the
+	usefulness of your report.</para>
 
 	<indexterm><primary>bugs</primary><secondary>seporting</secondary></indexterm>
-
 	<para>If in doubt, please send a message to
-<email>glasgow-haskell-bugs@haskell.org</email>.
-<indexterm><primary>bugs</primary><secondary>mailing
-list</secondary></indexterm></para>
-
+	<email>glasgow-haskell-bugs@haskell.org</email>.
+	<indexterm><primary>bugs</primary><secondary>mailing
+	list</secondary></indexterm></para>
       </listitem>
     </orderedlist>
   </sect1>
 
-<Sect1 id="sec-port-info">
-<Title>What machines the Glasgow tools run on
-</Title>
+  <sect1 id="sec-port-info">
+    <title>What machines the Glasgow tools run on</title>
 
-<para>
-<indexterm><primary>ports, GHC</primary></indexterm>
-<indexterm><primary>GHC ports</primary></indexterm>
-<indexterm><primary>supported platforms</primary></indexterm>
-<indexterm><primary>platforms, supported</primary></indexterm>
-The main question is whether or not the Haskell compiler (GHC) runs on
-your platform.
-</para>
+<indexterm><primary>ports</primary><secondary>GHC</secondary></indexterm>
+<indexterm><primary>GHC</primary><secondary>ports</secondary></indexterm>
+<indexterm><primary>platforms</primary><secondary>supported</secondary></indexterm>
 
-<para>
-A ``platform'' is a architecture/manufacturer/operating-system
-combination, such as <Literal>sparc-sun-solaris2</Literal>.  Other common ones are
-<Literal>alpha-dec-osf2</Literal>, <Literal>hppa1.1-hp-hpux9</Literal>, <Literal>i386-unknown-linux</Literal>,
-<Literal>i386-unknown-solaris2</Literal>, <Literal>i386-unknown-freebsd</Literal>,
-<Literal>i386-unknown-cygwin32</Literal>, <Literal>m68k-sun-sunos4</Literal>, <Literal>mips-sgi-irix5</Literal>,
-<Literal>sparc-sun-sunos4</Literal>, <Literal>sparc-sun-solaris2</Literal>, <Literal>powerpc-ibm-aix</Literal>.
-</para>
+    <para>The main question is whether or not the Haskell compiler
+    (GHC) runs on your platform.</para>
 
-<para>
-Bear in mind that certain ``bundles'', e.g. parallel Haskell, may not
-work on all machines for which basic Haskell compiling is supported.
-</para>
+    <para>A &ldquo;platform&rdquo; is a
+    architecture/manufacturer/operating-system combination, such as
+    <literal>sparc-sun-solaris2</literal>.  Other common ones are
+    <literal>alpha-dec-osf2</literal>,
+    <literal>hppa1.1-hp-hpux9</literal>,
+    <literal>i386-unknown-linux</literal>,
+    <literal>i386-unknown-solaris2</literal>,
+    <literal>i386-unknown-freebsd</literal>,
+    <literal>i386-unknown-cygwin32</literal>,
+    <literal>m68k-sun-sunos4</literal>,
+    <literal>mips-sgi-irix5</literal>,
+    <literal>sparc-sun-sunos4</literal>,
+    <literal>sparc-sun-solaris2</literal>,
+    <literal>powerpc-ibm-aix</literal>.</para>
 
-<para>
-Some libraries may only work on a limited number of platforms; for
-example, a sockets library is of no use unless the operating system
-supports the underlying BSDisms.
-</para>
+    <para>Some libraries may only work on a limited number of
+    platforms; for example, a sockets library is of no use unless the
+    operating system supports the underlying BSDisms.</para>
 
-<Sect2>
-<Title>What platforms the Haskell compiler (GHC) runs on</Title>
+    <sect2>
+      <title>What platforms the Haskell compiler (GHC) runs on</title>
 
-<para>
-<indexterm><primary>fully-supported platforms</primary></indexterm>
-<indexterm><primary>native-code generator</primary></indexterm>
-<indexterm><primary>registerised ports</primary></indexterm>
-<indexterm><primary>unregisterised ports</primary></indexterm>
-The GHC hierarchy of Porting Goodness: (a)&nbsp;Best is a native-code
-generator; (b)&nbsp;next best is a ``registerised''
-port; (c)&nbsp;the bare minimum is an ``unregisterised'' port.
-(``Unregisterised'' is so terrible that we won't say more about it).
-</para>
+      <indexterm><primary>fully-supported platforms</primary></indexterm>
+      <indexterm><primary>native-code generator</primary></indexterm>
+      <indexterm><primary>registerised ports</primary></indexterm>
+      <indexterm><primary>unregisterised ports</primary></indexterm>
 
-<para>
-We use Sparcs running Solaris 2.7 and x86 boxes running FreeBSD and
-Linux, so those are the best supported platforms, unsurprisingly.
-</para>
+      <para>The GHC hierarchy of Porting Goodness: (a)&nbsp;Best is a
+      native-code generator; (b)&nbsp;next best is a
+      &ldquo;registerised&rdquo; port; (c)&nbsp;the bare minimum is an
+      &ldquo;unregisterised&rdquo; port.
+      (&ldquo;Unregisterised&rdquo; is so terrible that we won't say
+      more about it).</para>
 
-<para>
-Here's everything that's known about GHC ports.  We identify platforms
-by their ``canonical'' CPU/Manufacturer/OS triple.
-</para>
+      <para>We use Sparcs running Solaris 2.7 and x86 boxes running
+      FreeBSD and Linux, so those are the best supported platforms,
+      unsurprisingly.</para>
+
+      <para>Here's everything that's known about GHC ports.  We
+      identify platforms by their &ldquo;canonical&rdquo;
+      CPU/Manufacturer/OS triple.</para>
 
       <variablelist>
-
 	<varlistentry>
 	  <term>alpha-dec-{osf,linux,freebsd,openbsd,netbsd}:</term>
 	  <indexterm><primary>alpha-dec-osf</primary></indexterm>
@@ -1047,8 +983,8 @@ by their ``canonical'' CPU/Manufacturer/OS triple.
 	  <term>sparc-sun-solaris2</term>
 	  <indexterm><primary>sparc-sun-solaris2</primary></indexterm>
 	  <listitem>
-	    <para>Fully supported, including native-code
-	    generator.</para>
+	    <para>Fully supported (at least for Solaris 2.7),
+	    including native-code generator.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1056,8 +992,9 @@ by their ``canonical'' CPU/Manufacturer/OS triple.
 	  <term>hppa1.1-hp-hpux (HP-PA boxes running HPUX 9.x)</term>
 	  <indexterm><primary>hppa1.1-hp-hpux</primary></indexterm>
 	  <listitem>
-	    <para>Works registerised.  No native-code
-	    generator.</para>
+	    <para>A registerised port is available for version 4.08,
+	    but GHC hasn't been built on that platform since (as far
+	    as we know).  No native-code generator.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1078,22 +1015,32 @@ by their ``canonical'' CPU/Manufacturer/OS triple.
 	</varlistentry>
 
 	<varlistentry>
-	  <term>i386-unknown-freebsd (PCs running FreeBSD 2.2
-or higher)</term>
+	  <term>i386-unknown-freebsd (PCs running FreeBSD 2.2 or
+	  higher)</term>
 	  <indexterm><primary>i386-unknown-freebsd</primary></indexterm>
 	  <listitem>
 	    <para>GHC works registerised.  Pre-built packages are
             available in the native package format, so if you just
             need binaries you're better off just installing the
-            package.</para>
+            package (it might even be on your installation
+            CD!).</para>
 	  </listitem>
 	</varlistentry>
-	
+
 	<varlistentry>
-	  <term>i386-unknown-{netbsd,openbsd) (PCs running NetBSD
-	    and OpenBSD)</term>
-	  <indexterm><primary>i386-unknown-netbsd</primary></indexterm> 
+	  <term>i386-unknown-openbsd (PCs running OpenBSD)</term>
 	  <indexterm><primary>i386-unknown-openbsd</primary></indexterm> 
+	  <listitem>
+	    <para>Supported, with native code generator.  Packages are
+	    available through the ports system in the native package
+	    format.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>i386-unknown-netbsd (PCs running NetBSD and
+	    OpenBSD)</term>
+	    <indexterm><primary>i386-unknown-netbsd</primary></indexterm>
 	  <listitem>
 	    <para>Will require some minor porting effort, but should
 	    work registerised.</para>
@@ -1101,13 +1048,14 @@ or higher)</term>
 	</varlistentry>
 
 	<varlistentry>
-	  <term>i386-unknown-mingw32:</term>
+	  <term>i386-unknown-mingw32 (PCs running Windows)</term>
 	  <indexterm><primary>i386-unknown-mingw32</primary></indexterm>
 	  <listitem>
 	    <para>Fully supported under Win9x, WinNT, Win2k, and
             WinXP.  Includes a native code generator.  Building from
-            source requires a recent <Literal>cygwin32</Literal>
-            distribution to be installed.</para>
+            source requires a recent <ulink
+            url="http://www.cygwin.com/">Cygwin</ulink> distribution
+            to be installed.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1115,10 +1063,11 @@ or higher)</term>
 	  <term>mips-sgi-irix5</term>
 	  <indexterm><primary>mips-sgi-irix[5-6]</primary></indexterm>
 	  <listitem>
-	    <para>Port currently doesn't work, needs some minimal
-            porting effort.  As usual, we don't have access to
-            machines and there hasn't been an overwhelming demand for
-            this port, but feel free to get in touch.</para>
+	    <para>Port has worked in the past, but hasn't been tested
+            for some time (and will certainly have rotted in various
+            ways).  As usual, we don't have access to machines and
+            there hasn't been an overwhelming demand for this port,
+            but feel free to get in touch.</para>
 	  </listitem>
 	</varlistentry>
 
@@ -1137,7 +1086,16 @@ or higher)</term>
 	  <term>powerpc-apple-darwin</term>
 	  <indexterm><primary>powerpc-apple-darwin</primary></indexterm> 
 	  <listitem>
-	    <para>Works, unregisterised only at the moment.</para>
+	    <para>Supported registerised.  No native code
+	    generator.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>powerpc-apple-linux</term>
+	  <indexterm><primary>powerpc-apple-linux</primary></indexterm> 
+	  <listitem>
+	    <para>Not supported (yet).</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -1157,613 +1115,581 @@ or higher)</term>
   </sect1>
 
 
-<Sect1 id="sec-pre-supposed">
-<Title>Installing pre-supposed utilities
-
-<indexterm><primary>pre-supposed utilities</primary></indexterm>
-<indexterm><primary>utilities, pre-supposed</primary></indexterm></Title>
-
-<para>
-Here are the gory details about some utility programs you may need;
-<Command>perl</Command>, <Command>gcc</Command> and
-<command>happy</command> are the only important
-ones. (PVM<indexterm><primary>PVM</primary></indexterm> is important
-if you're going for Parallel Haskell.)  The
-<Command>configure</Command><indexterm><primary>configure</primary></indexterm>
-script will tell you if you are missing something.
-</para>
-
-<para>
-<VariableList>
-
-<VarListEntry>
-<term>Perl:</term>
-<indexterm><primary>pre-supposed: Perl</primary></indexterm>
-<indexterm><primary>Perl, pre-supposed</primary></indexterm>
-<listitem>
-<para>
-<Emphasis>You have to have Perl to proceed!</Emphasis> Perl version 5
-at least is required.  GHC has been known to tickle bugs in Perl, so
-if you find that Perl crashes when running GHC try updating (or
-downgrading) your Perl installation.  Versions of Perl that we use and
-are known to be fairly stable are 5.005 and 5.6.1.
-</para>
-
-<para>
-For Win32 platforms, you should use the binary supplied in the
-InstallShield (copy it to <filename>/bin</filename>).  The
-Cygwin-supplied Perl seems not to work.
-</para>
-
-<para>
-Perl should be put somewhere so that it can be invoked by the
-<Literal>&num;!</Literal> script-invoking mechanism. The full
-pathname may need to be less than 32 characters long on some
-systems.
-</para>
-
-</listitem></VarListEntry>
-<VarListEntry>
-<term>GNU C (<Command>gcc</Command>):</term>
-<indexterm><primary>pre-supposed: GCC (GNU C compiler)</primary></indexterm>
-<indexterm><primary>GCC (GNU C compiler), pre-supposed</primary></indexterm>
-<listitem>
-
-<para>
-We recommend using GCC version 2.95.2 on all platforms.  Failing that,
-version 2.7.2 is stable on most platforms.  Earlier versions of GCC
-can be assumed not to work, and versions in between 2.7.2 and 2.95.2
-(including <command>egcs</command>) have varying degrees of stability
-depending on the platform.
-</para>
-
-<para>
-If your GCC dies with ``internal error'' on some GHC source file,
-please let us know, so we can report it and get things improved.
-(Exception: on iX86 boxes&mdash;you may need to fiddle with GHC's
-<Option>-monly-N-regs</Option> option; see the User's Guide)
-</para>
-</listitem></VarListEntry>
-
-<varlistentry>
-<term>Happy:</term>
-<indexterm><primary>Happy</primary></indexterm>
-<listitem>
-<para>Happy is a parser generator tool for Haskell, and is used to
-generate GHC's parsers.  Happy is written in Haskell, and is a project
-in the CVS repository (<literal>fptools/happy</literal>).  It can be
-built from source, but bear in mind that you'll need GHC installed in
-order to build it.  To avoid the chicken/egg problem, install a binary
-distribtion of either Happy or GHC to get started.  Happy
-distributions are available from <ulink
-url="http://www.haskell.org/happy/">Happy's Web Page</ulink>.
-</para>
-</listitem>
-</varlistentry>
-
-<VarListEntry>
-<term>Autoconf:</term>
-<indexterm><primary>pre-supposed: Autoconf</primary></indexterm>
-<indexterm><primary>Autoconf, pre-supposed</primary></indexterm>
-<listitem>
-<para>
-GNU Autoconf is needed if you intend to build from the CVS sources, it
-is <Emphasis>not</Emphasis> needed if you just intend to build a
-standard source distribution.
-</para>
-
-<para>
-Autoconf builds the <Command>configure</Command> script from
-<Filename>configure.in</Filename> and <Filename>aclocal.m4</Filename>.
-If you modify either of these files, you'll need
-<command>autoconf</command> to rebuild <Filename>configure</Filename>.
-</para>
-
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Command>sed</Command></term>
-<indexterm><primary>pre-supposed: sed</primary></indexterm>
-<indexterm><primary>sed, pre-supposed</primary></indexterm>
-<listitem>
-<para>
-You need a working <Command>sed</Command> if you are going to build
-from sources.  The build-configuration stuff needs it.  GNU sed
-version 2.0.4 is no good!  It has a bug in it that is tickled by the
-build-configuration.  2.0.5 is OK. Others are probably OK too
-(assuming we don't create too elaborate configure scripts.)
-</para>
-</listitem></VarListEntry>
-</VariableList>
-</para>
-
-<para>
-One <Literal>fptools</Literal> project is worth a quick note at this
-point, because it is useful for all the others:
-<Literal>glafp-utils</Literal> contains several utilities which aren't
-particularly Glasgow-ish, but Occasionally Indispensable.  Like
-<Command>lndir</Command> for creating symbolic link trees.
-</para>
-
-<Sect2 id="pre-supposed-gph-tools">
-<Title>Tools for building parallel GHC (GPH)
-</Title>
-
-<para>
-<VariableList>
-
-<VarListEntry>
-<term>PVM version 3:</term>
-<indexterm><primary>pre-supposed: PVM3 (Parallel Virtual Machine)</primary></indexterm>
-<indexterm><primary>PVM3 (Parallel Virtual Machine), pre-supposed</primary></indexterm>
-<listitem>
-
-<para>
-PVM is the Parallel Virtual Machine on which Parallel Haskell programs
-run.  (You only need this if you plan to run Parallel Haskell.
-Concurent Haskell, which runs concurrent threads on a uniprocessor
-doesn't need it.)  Underneath PVM, you can have (for example) a
-network of workstations (slow) or a multiprocessor box (faster).
-</para>
-
-<para>
-The current version of PVM is 3.3.11; we use 3.3.7.  It is readily
-available on the net; I think I got it from
-<Literal>research.att.com</Literal>, in <Filename>netlib</Filename>.
-</para>
-
-<para>
-A PVM installation is slightly quirky, but easy to do.  Just follow
-the <Filename>Readme</Filename> instructions.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Command>bash</Command>:</term>
-<indexterm><primary>bash, presupposed (Parallel Haskell only)</primary></indexterm>
-<listitem>
-<para>
-Sadly, the <Command>gr2ps</Command> script, used to convert ``parallelism profiles''
-to PostScript, is written in Bash (GNU's Bourne Again shell).
-This bug will be fixed (someday).
-</para>
-</listitem></VarListEntry>
-</VariableList>
-</para>
-
-</Sect2>
-
-<Sect2 id="pre-supposed-doc-tools">
-<Title>Tools for building the Documentation
-</Title>
-
-<para>
-The following additional tools are required if you want to format the
-documentation that comes with the <Literal>fptools</Literal> projects:
-</para>
-
-<para>
-<VariableList>
-
-<VarListEntry>
-<term>DocBook:</term>
-<indexterm><primary>pre-supposed: DocBook</primary></indexterm>
-<indexterm><primary>DocBook, pre-supposed</primary></indexterm>
-<listitem>
-<para>
-All our documentation is written in SGML, using the DocBook DTD.
-Instructions on installing and configuring the DocBook tools are in the
-installation guide (in the GHC user guide).
-</para>
-
-</listitem></VarListEntry>
-<VarListEntry>
-<term>TeX:</term>
-<indexterm><primary>pre-supposed: TeX</primary></indexterm>
-<indexterm><primary>TeX, pre-supposed</primary></indexterm>
-<listitem>
-<para>
-A decent TeX distribution is required if you want to produce printable
-documentation.  We recomment teTeX, which includes just about
-everything you need.
-</para>
-</listitem></VarListEntry>
-</VariableList>
-</para>
-
-      <para>
-	In order to actually build any documentation, you need to set
-	<constant>SGMLDocWays</constant> in your
-	<filename>build.mk</filename>. Valid values to add to this
-	list are: <literal>dvi</literal>, <literal>ps</literal>,
-	<literal>pdf</literal>, <literal>html</literal>, and
-	<literal>rtf</literal>.
-      </para>
-      
-</Sect2>
-
-<Sect2 id="pre-supposed-other-tools">
-<Title>Other useful tools
-</Title>
-
-<VariableList>
-<VarListEntry>
-<term>Flex:</term>
-<indexterm><primary>pre-supposed: flex</primary></indexterm> 
-<indexterm><primary>flex, pre-supposed</primary></indexterm>
-<listitem>
-
-<para>
-This is a quite-a-bit-better-than-Lex lexer.  Used to build a couple
-of utilities in <Literal>glafp-utils</Literal>.  Depending on your
-operating system, the supplied <Command>lex</Command> may or may not
-work; you should get the GNU version.
-</para>
-</listitem></VarListEntry>
-</VariableList>
-
-</Sect2>
-
-</Sect1>
-
-<Sect1 id="sec-building-from-source">
-<Title>Building from source
-
-<indexterm><primary>Building from source</primary></indexterm>
-<indexterm><primary>Source, building from</primary></indexterm></Title>
-
-<para>
-You've been rash enough to want to build some of
-the Glasgow Functional Programming tools (GHC, Happy,
-nofib, etc.) from source.  You've slurped the source,
-from the CVS repository or from a source distribution, and
-now you're sitting looking at a huge mound of bits, wondering
-what to do next.
-</para>
-
-<para>
-Gingerly, you type <Command>make</Command>.  Wrong already!
-</para>
-
-<para>
-This rest of this guide is intended for duffers like me, who aren't
-really interested in Makefiles and systems configurations, but who
-need a mental model of the interlocking pieces so that they can make
-them work, extend them consistently when adding new software, and lay
-hands on them gently when they don't work.
-</para>
-
-<Sect2 id="sec-source-tree">
-<Title>Your source tree
-</Title>
-
-<para>
-The source code is held in your <Emphasis>source tree</Emphasis>.
-The root directory of your source tree <Emphasis>must</Emphasis>
-contain the following directories and files:
-</para>
-
-<para>
-
-<ItemizedList>
-<listitem>
-
-<para>
-<Filename>Makefile</Filename>: the root Makefile.
-</para>
-</listitem>
-<listitem>
-
-<para>
-<Filename>mk/</Filename>: the directory that contains the
-main Makefile code, shared by all the
-<Literal>fptools</Literal> software.
-</para>
-</listitem>
-<listitem>
-
-<para>
- <Filename>configure.in</Filename>, <Filename>config.sub</Filename>, <Filename>config.guess</Filename>:
-these files support the configuration process.
-</para>
-</listitem>
-<listitem>
-
-<para>
- <Filename>install-sh</Filename>.
-</para>
-</listitem>
-
-</ItemizedList>
-
-</para>
-
-<para>
-All the other directories are individual <Emphasis>projects</Emphasis> of the
-<Literal>fptools</Literal> system&mdash;for example, the Glasgow Haskell Compiler
-(<Literal>ghc</Literal>), the Happy parser generator (<Literal>happy</Literal>), the <Literal>nofib</Literal> benchmark
-suite, and so on.  You can have zero or more of these.  Needless to
-say, some of them are needed to build others.
-</para>
-
-<para>
-The important thing to remember is that even if you want only one
-project (<Literal>happy</Literal>, say), you must have a source tree whose root
-directory contains <Filename>Makefile</Filename>, <Filename>mk/</Filename>, <Filename>configure.in</Filename>, and the
-project(s) you want (<Filename>happy/</Filename> in this case).  You cannot get by with
-just the <Filename>happy/</Filename> directory.
-</para>
-
-</Sect2>
-
-<Sect2>
-<Title>Build trees
-<indexterm><primary>build trees</primary></indexterm>
-<indexterm><primary>link trees, for building</primary></indexterm></Title>
-
-<para>
-While you can build a system in the source tree, we don't recommend it.
-We often want to build multiple versions of our software
-for different architectures, or with different options (e.g. profiling).
-It's very desirable to share a single copy of the source code among
-all these builds.
-</para>
-
-<para>
-So for every source tree we have zero or more <Emphasis>build trees</Emphasis>.  Each
-build tree is initially an exact copy of the source tree, except that
-each file is a symbolic link to the source file, rather than being a
-copy of the source file.  There are ``standard'' Unix utilities that
-make such copies, so standard that they go by different names:
-<Command>lndir</Command><indexterm><primary>lndir</primary></indexterm>, <Command>mkshadowdir</Command><indexterm><primary>mkshadowdir</primary></indexterm> are two (If you
-don't have either, the source distribution includes sources for the
-X11 <Command>lndir</Command>&mdash;check out <Filename>fptools/glafp-utils/lndir</Filename>). See <Xref LinkEnd="sec-storysofar"> for a typical invocation.
-</para>
-
-<para>
-The build tree does not need to be anywhere near the source tree in
-the file system.  Indeed, one advantage of separating the build tree
-from the source is that the build tree can be placed in a
-non-backed-up partition, saving your systems support people from
-backing up untold megabytes of easily-regenerated, and
-rapidly-changing, gubbins.  The golden rule is that (with a single
-exception&mdash;<XRef LinkEnd="sec-build-config">)
-<Emphasis>absolutely everything in the build tree is either a symbolic
-link to the source tree, or else is mechanically generated</Emphasis>.
-It should be perfectly OK for your build tree to vanish overnight; an
-hour or two compiling and you're on the road again.
-</para>
-
-<para>
-You need to be a bit careful, though, that any new files you create
-(if you do any development work) are in the source tree, not a build tree!
-</para>
-
-<para>
-Remember, that the source files in the build tree are <Emphasis>symbolic
-links</Emphasis> to the files in the source tree.  (The build tree soon
-accumulates lots of built files like <Filename>Foo.o</Filename>, as well.)  You
-can <Emphasis>delete</Emphasis> a source file from the build tree without affecting
-the source tree (though it's an odd thing to do).  On the other hand,
-if you <Emphasis>edit</Emphasis> a source file from the build tree, you'll edit the
-source-tree file directly.  (You can set up Emacs so that if you edit
-a source file from the build tree, Emacs will silently create an
-edited copy of the source file in the build tree, leaving the source
-file unchanged; but the danger is that you think you've edited the
-source file whereas actually all you've done is edit the build-tree
-copy.  More commonly you do want to edit the source file.)
-</para>
-
-<para>
-Like the source tree, the top level of your build tree must be (a
-linked copy of) the root directory of the <Literal>fptools</Literal> suite.  Inside
-Makefiles, the root of your build tree is called
-<constant>&dollar;(FPTOOLS&lowbar;TOP)</constant><indexterm><primary>FPTOOLS&lowbar;TOP</primary></indexterm>.  In the rest of this document path
-names are relative to <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> unless otherwise stated.  For
-example, the file <Filename>ghc/mk/target.mk</Filename> is actually
-<Filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/ghc/mk/target.mk</Filename>.
-</para>
-
-</Sect2>
-
-<Sect2 id="sec-build-config">
-<Title>Getting the build you want
-</Title>
-
-<para>
-When you build <Literal>fptools</Literal> you will be compiling code on a particular
-<Emphasis>host platform</Emphasis>, to run on a particular <Emphasis>target platform</Emphasis>
-(usually the same as the host platform)<indexterm><primary>platform</primary></indexterm>.  The
-difficulty is that there are minor differences between different
-platforms; minor, but enough that the code needs to be a bit different
-for each.  There are some big differences too: for a different
-architecture we need to build GHC with a different native-code
-generator.
-</para>
-
-<para>
-There are also knobs you can turn to control how the <Literal>fptools</Literal>
-software is built.  For example, you might want to build GHC optimised
-(so that it runs fast) or unoptimised (so that you can compile it fast
-after you've modified it.  Or, you might want to compile it with
-debugging on (so that extra consistency-checking code gets included)
-or off.  And so on.
-</para>
-
-<para>
-All of this stuff is called the <Emphasis>configuration</Emphasis> of your build.
-You set the configuration using a three-step process.
-<VariableList>
-
-<VarListEntry>
-<term>Step 1: get ready for configuration.</term>
-<listitem>
-	      <para>Change directory to
-              <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
-              issue the command
-              <Command>autoconf</Command><indexterm><primary>autoconf</primary></indexterm>
-              (with no arguments). This GNU program converts
-              <Filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.in</Filename>
-              to a shell script called
-              <Filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure</Filename>.
-              </para>
-
-	      <para>Some projects, including GHC, have their own
-              configure script.  If there's an
-              <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</constant>,
-              then you need to run <command>autoconf</command> in that
-              directory too.</para>
-
-	      <para>Both these steps are completely
-              platform-independent; they just mean that the
-              human-written file (<Filename>configure.in</Filename>)
-              can be short, although the resulting shell script,
-              <Command>configure</Command>, and
-              <Filename>mk/config.h.in</Filename>, are long.</para>
-
-	      <para>In case you don't have <Command>autoconf</Command>
-              we distribute the results, <Command>configure</Command>,
-              and <Filename>mk/config.h.in</Filename>, with the source
-              distribution.  They aren't kept in the repository,
-              though.</para>
-	    </listitem>
-	  </varlistentry>
-
-	  <varlistentry>
-	    <term>Step 2: system configuration.</term>
-	    <listitem>
-	      <para>Runs the newly-created
-	      <Command>configure</Command> script, thus:</para>
+  <sect1 id="sec-pre-supposed">
+    <title>Installing pre-supposed utilities</title>
+
+    <indexterm><primary>pre-supposed utilities</primary></indexterm>
+    <indexterm><primary>utilities, pre-supposed</primary></indexterm>
+
+    <para>Here are the gory details about some utility programs you
+    may need; <command>perl</command>, <command>gcc</command> and
+    <command>happy</command> are the only important
+    ones. (PVM<indexterm><primary>PVM</primary></indexterm> is
+    important if you're going for Parallel Haskell.)  The
+    <command>configure</command><indexterm><primary>configure</primary></indexterm>
+    script will tell you if you are missing something.</para>
+
+    <variablelist>
+
+      <varlistentry>
+	<term>Perl</term>
+	<indexterm><primary>pre-supposed: Perl</primary></indexterm>
+	<indexterm><primary>Perl, pre-supposed</primary></indexterm>
+	<listitem>
+	  <para><emphasis>You have to have Perl to proceed!</emphasis>
+          Perl version 5 at least is required.  GHC has been known to
+          tickle bugs in Perl, so if you find that Perl crashes when
+          running GHC try updating (or downgrading) your Perl
+          installation.  Versions of Perl that we use and are known to
+          be fairly stable are 5.005 and 5.6.1.</para>
+
+	  <para>For Win32 platforms, you should use the binary
+          supplied in the InstallShield (copy it to
+          <filename>/bin</filename>).  The Cygwin-supplied Perl seems
+          not to work.</para>
+
+	  <para>Perl should be put somewhere so that it can be invoked
+          by the <literal>&num;!</literal> script-invoking
+          mechanism. The full pathname may need to be less than 32
+          characters long on some systems.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>GNU C (<command>gcc</command>)</term>
+	<indexterm><primary>pre-supposed: GCC (GNU C
+	compiler)</primary></indexterm> <indexterm><primary>GCC (GNU C
+	compiler), pre-supposed</primary></indexterm>
+	<listitem>
+	  <para>We recommend using GCC version 2.95.2 on all
+          platforms.  Failing that, version 2.7.2 is stable on most
+          platforms.  Earlier versions of GCC can be assumed not to
+          work, and versions in between 2.7.2 and 2.95.2 (including
+          <command>egcs</command>) have varying degrees of stability
+          depending on the platform.</para>
+
+	  <para>If your GCC dies with &ldquo;internal error&rdquo; on
+          some GHC source file, please let us know, so we can report
+          it and get things improved.  (Exception: on iX86
+          boxes&mdash;you may need to fiddle with GHC's
+          <option>-monly-N-regs</option> option; see the User's
+          Guide)</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>GNU Make</term>
+	<indexterm><primary>make</primary><secondary>GNU</secondary>
+	</indexterm>
+	<listitem>
+	  <para>The fptools build system makes heavy use of features
+	  specific to GNU <command>make</command>, so you must have
+	  this installed in order to build any of the fptools
+	  suite.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Happy</term>
+	<indexterm><primary>Happy</primary></indexterm>
+	<listitem>
+	  <para>Happy is a parser generator tool for Haskell, and is
+          used to generate GHC's parsers.  Happy is written in
+          Haskell, and is a project in the CVS repository
+          (<literal>fptools/happy</literal>).  It can be built from
+          source, but bear in mind that you'll need GHC installed in
+          order to build it.  To avoid the chicken/egg problem,
+          install a binary distribtion of either Happy or GHC to get
+          started.  Happy distributions are available from <ulink
+          url="http://www.haskell.org/happy/">Happy's Web
+          Page</ulink>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Autoconf</term>
+	<indexterm><primary>pre-supposed: Autoconf</primary></indexterm>
+	<indexterm><primary>Autoconf, pre-supposed</primary></indexterm>
+	<listitem>
+	  <para>GNU Autoconf is needed if you intend to build from the
+          CVS sources, it is <emphasis>not</emphasis> needed if you
+          just intend to build a standard source distribution.</para>
+
+	  <para>Autoconf builds the <command>configure</command>
+          script from <filename>configure.in</filename> and
+          <filename>aclocal.m4</filename>.  If you modify either of
+          these files, you'll need <command>autoconf</command> to
+          rebuild <filename>configure</filename>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><command>sed</command></term>
+	<indexterm><primary>pre-supposed: sed</primary></indexterm>
+	<indexterm><primary>sed, pre-supposed</primary></indexterm>
+	<listitem>
+	  <para>You need a working <command>sed</command> if you are
+          going to build from sources.  The build-configuration stuff
+          needs it.  GNU sed version 2.0.4 is no good!  It has a bug
+          in it that is tickled by the build-configuration.  2.0.5 is
+          OK. Others are probably OK too (assuming we don't create too
+          elaborate configure scripts.)</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+
+    <para>One <literal>fptools</literal> project is worth a quick note
+    at this point, because it is useful for all the others:
+    <literal>glafp-utils</literal> contains several utilities which
+    aren't particularly Glasgow-ish, but Occasionally Indispensable.
+    Like <command>lndir</command> for creating symbolic link
+    trees.</para>
+
+    <sect2 id="pre-supposed-gph-tools">
+      <title>Tools for building parallel GHC (GPH)</title>
+
+      <variablelist>
+	<varlistentry>
+	  <term>PVM version 3:</term>
+	  <indexterm><primary>pre-supposed: PVM3 (Parallel Virtual Machine)</primary></indexterm>
+	  <indexterm><primary>PVM3 (Parallel Virtual Machine), pre-supposed</primary></indexterm>
+	  <listitem>
+	    <para>PVM is the Parallel Virtual Machine on which
+            Parallel Haskell programs run.  (You only need this if you
+            plan to run Parallel Haskell.  Concurent Haskell, which
+            runs concurrent threads on a uniprocessor doesn't need
+            it.)  Underneath PVM, you can have (for example) a network
+            of workstations (slow) or a multiprocessor box
+            (faster).</para>
+
+	    <para>The current version of PVM is 3.3.11; we use 3.3.7.
+            It is readily available on the net; I think I got it from
+            <literal>research.att.com</literal>, in
+            <filename>netlib</filename>.</para>
+
+	    <para>A PVM installation is slightly quirky, but easy to
+            do.  Just follow the <filename>Readme</filename>
+            instructions.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><command>bash</command>:</term>
+	  <indexterm><primary>bash, presupposed (Parallel Haskell only)</primary></indexterm>
+	  <listitem>
+	    <para>Sadly, the <command>gr2ps</command> script, used to
+            convert &ldquo;parallelism profiles&rdquo; to PostScript,
+            is written in Bash (GNU's Bourne Again shell).  This bug
+            will be fixed (someday).</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+
+    <sect2 id="pre-supposed-doc-tools">
+      <title>Tools for building the Documentation</title>
+
+      <para>The following additional tools are required if you want to
+      format the documentation that comes with the
+      <literal>fptools</literal> projects:</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term>DocBook</term>
+	  <indexterm><primary>pre-supposed: DocBook</primary></indexterm>
+	  <indexterm><primary>DocBook, pre-supposed</primary></indexterm>
+	  <listitem>
+	    <para>All our documentation is written in SGML, using the
+            DocBook DTD.  Instructions on installing and configuring
+            the DocBook tools are in the installation guide (in the
+            GHC user guide).</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>TeX</term>
+	  <indexterm><primary>pre-supposed: TeX</primary></indexterm>
+	  <indexterm><primary>TeX, pre-supposed</primary></indexterm>
+	  <listitem>
+	    <para>A decent TeX distribution is required if you want to
+            produce printable documentation.  We recomment teTeX,
+            which includes just about everything you need.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para> In order to actually build any documentation, you need to
+      set <constant>SGMLDocWays</constant> in your
+      <filename>build.mk</filename>. Valid values to add to this list
+      are: <literal>dvi</literal>, <literal>ps</literal>,
+      <literal>pdf</literal>, <literal>html</literal>, and
+      <literal>rtf</literal>.</para>
+    </sect2>
+
+    <sect2 id="pre-supposed-other-tools">
+      <title>Other useful tools</title>
+
+      <variablelist>
+	<varlistentry>
+	  <term>Flex</term>
+	  <indexterm><primary>pre-supposed: flex</primary></indexterm> 
+	  <indexterm><primary>flex, pre-supposed</primary></indexterm>
+	  <listitem>
+	    <para>This is a quite-a-bit-better-than-Lex lexer.  Used
+            to build a couple of utilities in
+            <literal>glafp-utils</literal>.  Depending on your
+            operating system, the supplied <command>lex</command> may
+            or may not work; you should get the GNU version.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
+  </sect1>
+
+  <sect1 id="sec-building-from-source">
+    <title>Building from source</title>
+
+    <indexterm><primary>Building from source</primary></indexterm>
+    <indexterm><primary>Source, building from</primary></indexterm>
+
+    <para>You've been rash enough to want to build some of the Glasgow
+    Functional Programming tools (GHC, Happy, nofib, etc.) from
+    source.  You've slurped the source, from the CVS repository or
+    from a source distribution, and now you're sitting looking at a
+    huge mound of bits, wondering what to do next.</para>
+
+    <para>Gingerly, you type <command>make</command>.  Wrong
+    already!</para>
+
+    <para>This rest of this guide is intended for duffers like me, who
+    aren't really interested in Makefiles and systems configurations,
+    but who need a mental model of the interlocking pieces so that
+    they can make them work, extend them consistently when adding new
+    software, and lay hands on them gently when they don't
+    work.</para>
+
+    <sect2 id="sec-source-tree">
+      <title>Your source tree</title>
+
+      <para>The source code is held in your <emphasis>source
+      tree</emphasis>.  The root directory of your source tree
+      <emphasis>must</emphasis> contain the following directories and
+      files:</para>
+
+      <itemizedlist>
+	<listitem>
+	  <para><filename>Makefile</filename>: the root
+	  Makefile.</para>
+	</listitem>
+
+	<listitem>
+	  <para><filename>mk/</filename>: the directory that contains
+          the main Makefile code, shared by all the
+          <literal>fptools</literal> software.</para>
+	</listitem>
+
+	<listitem>
+	  <para><filename>configure.in</filename>,
+          <filename>config.sub</filename>,
+          <filename>config.guess</filename>: these files support the
+          configuration process.</para>
+	</listitem>
+
+	<listitem>
+	  <para><filename>install-sh</filename>.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>All the other directories are individual
+      <emphasis>projects</emphasis> of the <literal>fptools</literal>
+      system&mdash;for example, the Glasgow Haskell Compiler
+      (<literal>ghc</literal>), the Happy parser generator
+      (<literal>happy</literal>), the <literal>nofib</literal>
+      benchmark suite, and so on.  You can have zero or more of these.
+      Needless to say, some of them are needed to build others.</para>
+
+      <para>The important thing to remember is that even if you want
+      only one project (<literal>happy</literal>, say), you must have
+      a source tree whose root directory contains
+      <filename>Makefile</filename>, <filename>mk/</filename>,
+      <filename>configure.in</filename>, and the project(s) you want
+      (<filename>happy/</filename> in this case).  You cannot get by
+      with just the <filename>happy/</filename> directory.</para>
+    </sect2>
+
+    <sect2>
+      <title>Build trees</title>
+      <indexterm><primary>build trees</primary></indexterm>
+      <indexterm><primary>link trees, for building</primary></indexterm>
+
+      <para>If you just want to build the software once on a single
+      platform, then your source tree can also be your build tree, and
+      you can skip the rest of this section.</para>
+
+      <para>We often want to build multiple versions of our software
+      for different architectures, or with different options
+      (e.g. profiling).  It's very desirable to share a single copy of
+      the source code among all these builds.</para>
+
+      <para>So for every source tree we have zero or more
+      <emphasis>build trees</emphasis>.  Each build tree is initially
+      an exact copy of the source tree, except that each file is a
+      symbolic link to the source file, rather than being a copy of
+      the source file.  There are &ldquo;standard&rdquo; Unix
+      utilities that make such copies, so standard that they go by
+      different names:
+      <command>lndir</command><indexterm><primary>lndir</primary></indexterm>,
+      <command>mkshadowdir</command><indexterm><primary>mkshadowdir</primary></indexterm>
+      are two (If you don't have either, the source distribution
+      includes sources for the X11
+      <command>lndir</command>&mdash;check out
+      <filename>fptools/glafp-utils/lndir</filename>). See <Xref
+      LinkEnd="sec-storysofar"> for a typical invocation.</para>
+
+      <para>The build tree does not need to be anywhere near the
+      source tree in the file system.  Indeed, one advantage of
+      separating the build tree from the source is that the build tree
+      can be placed in a non-backed-up partition, saving your systems
+      support people from backing up untold megabytes of
+      easily-regenerated, and rapidly-changing, gubbins.  The golden
+      rule is that (with a single exception&mdash;<XRef
+      LinkEnd="sec-build-config">) <emphasis>absolutely everything in
+      the build tree is either a symbolic link to the source tree, or
+      else is mechanically generated</emphasis>.  It should be
+      perfectly OK for your build tree to vanish overnight; an hour or
+      two compiling and you're on the road again.</para>
+
+      <para>You need to be a bit careful, though, that any new files
+      you create (if you do any development work) are in the source
+      tree, not a build tree!</para>
+
+      <para>Remember, that the source files in the build tree are
+      <emphasis>symbolic links</emphasis> to the files in the source
+      tree.  (The build tree soon accumulates lots of built files like
+      <filename>Foo.o</filename>, as well.)  You can
+      <emphasis>delete</emphasis> a source file from the build tree
+      without affecting the source tree (though it's an odd thing to
+      do).  On the other hand, if you <emphasis>edit</emphasis> a
+      source file from the build tree, you'll edit the source-tree
+      file directly.  (You can set up Emacs so that if you edit a
+      source file from the build tree, Emacs will silently create an
+      edited copy of the source file in the build tree, leaving the
+      source file unchanged; but the danger is that you think you've
+      edited the source file whereas actually all you've done is edit
+      the build-tree copy.  More commonly you do want to edit the
+      source file.)</para>
+
+      <para>Like the source tree, the top level of your build tree
+      must be (a linked copy of) the root directory of the
+      <literal>fptools</literal> suite.  Inside Makefiles, the root of
+      your build tree is called
+      <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant><indexterm><primary>FPTOOLS&lowbar;TOP</primary></indexterm>.
+      In the rest of this document path names are relative to
+      <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> unless
+      otherwise stated.  For example, the file
+      <filename>ghc/mk/target.mk</filename> is actually
+      <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/ghc/mk/target.mk</filename>.</para>
+    </sect2>
+
+    <sect2 id="sec-build-config">
+      <title>Getting the build you want</title>
+
+      <para>When you build <literal>fptools</literal> you will be
+      compiling code on a particular <emphasis>host
+      platform</emphasis>, to run on a particular <emphasis>target
+      platform</emphasis> (usually the same as the host
+      platform)<indexterm><primary>platform</primary></indexterm>.
+      The difficulty is that there are minor differences between
+      different platforms; minor, but enough that the code needs to be
+      a bit different for each.  There are some big differences too:
+      for a different architecture we need to build GHC with a
+      different native-code generator.</para>
+
+      <para>There are also knobs you can turn to control how the
+      <literal>fptools</literal> software is built.  For example, you
+      might want to build GHC optimised (so that it runs fast) or
+      unoptimised (so that you can compile it fast after you've
+      modified it.  Or, you might want to compile it with debugging on
+      (so that extra consistency-checking code gets included) or off.
+      And so on.</para>
+
+      <para>All of this stuff is called the
+      <emphasis>configuration</emphasis> of your build.  You set the
+      configuration using a three-step process.</para>
+
+      <variablelist>
+	<varlistentry>
+	  <term>Step 1: get ready for configuration.</term>
+	  <listitem>
+	    <para>Change directory to
+            <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant> and
+            issue the command
+            <command>autoconf</command><indexterm><primary>autoconf</primary></indexterm>
+            (with no arguments). This GNU program converts
+            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure.in</filename>
+            to a shell script called
+            <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/configure</filename>.
+            </para>
+
+	    <para>Some projects, including GHC, have their own
+            configure script.  If there's an
+            <constant>&dollar;(FPTOOLS&lowbar;TOP)/&lt;project&gt;/configure.in</constant>,
+            then you need to run <command>autoconf</command> in that
+            directory too.</para>
+
+	    <para>Both these steps are completely
+            platform-independent; they just mean that the
+            human-written file (<filename>configure.in</filename>) can
+            be short, although the resulting shell script,
+            <command>configure</command>, and
+            <filename>mk/config.h.in</filename>, are long.</para>
+
+	    <para>In case you don't have <command>autoconf</command>
+            we distribute the results, <command>configure</command>,
+            and <filename>mk/config.h.in</filename>, with the source
+            distribution.  They aren't kept in the repository,
+            though.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>Step 2: system configuration.</term>
+	  <listitem>
+	    <para>Runs the newly-created <command>configure</command>
+	    script, thus:</para>
 
 <ProgramListing>
 ./configure <optional><parameter>args</parameter></optional>
 </ProgramListing>
 
-	      <para><Command>configure</Command>'s mission is to
-              scurry round your computer working out what architecture
-              it has, what operating system, whether it has the
-              <Function>vfork</Function> system call, where
-              <Command>yacc</Command> is kept, whether
-              <Command>gcc</Command> is available, where various
-              obscure <Literal>&num;include</Literal> files are,
-              whether it's a leap year, and what the systems manager
-              had for lunch.  It communicates these snippets of
-              information in two ways:</para>
+	    <para><command>configure</command>'s mission is to scurry
+            round your computer working out what architecture it has,
+            what operating system, whether it has the
+            <Function>vfork</Function> system call, where
+            <command>yacc</command> is kept, whether
+            <command>gcc</command> is available, where various obscure
+            <literal>&num;include</literal> files are, whether it's a
+            leap year, and what the systems manager had for lunch.  It
+            communicates these snippets of information in two
+            ways:</para>
 
-	      <itemizedlist>
-		<listitem>
-
-		  <para>It translates
-                  <Filename>mk/config.mk.in</Filename><indexterm><primary>config.mk.in</primary></indexterm>
-                  to
-                  <Filename>mk/config.mk</Filename><indexterm><primary>config.mk</primary></indexterm>,
-                  substituting for things between
-                  ``<Literal>@</Literal>'' brackets.  So,
-                  ``<Literal>@HaveGcc@</Literal>'' will be replaced by
-                  ``<Literal>YES</Literal>'' or
-                  ``<Literal>NO</Literal>'' depending on what
-                  <Command>configure</Command> finds.
-                  <Filename>mk/config.mk</Filename> is included by
-                  every Makefile (directly or indirectly), so the
-                  configuration information is thereby communicated to
-                  all Makefiles.</para>
+	    <itemizedlist>
+	      <listitem>
+		
+		<para>It translates
+                <filename>mk/config.mk.in</filename><indexterm><primary>config.mk.in</primary></indexterm>
+                to
+                <filename>mk/config.mk</filename><indexterm><primary>config.mk</primary></indexterm>,
+                substituting for things between
+                &ldquo;<literal>@</literal>&rdquo; brackets.  So,
+                &ldquo;<literal>@HaveGcc@</literal>&rdquo; will be
+                replaced by &ldquo;<literal>YES</literal>&rdquo; or
+                &ldquo;<literal>NO</literal>&rdquo; depending on what
+                <command>configure</command> finds.
+                <filename>mk/config.mk</filename> is included by every
+                Makefile (directly or indirectly), so the
+                configuration information is thereby communicated to
+                all Makefiles.</para>
 		</listitem>
 
+	      <listitem>
+		<para> It translates
+                <filename>mk/config.h.in</filename><indexterm><primary>config.h.in</primary></indexterm>
+                to
+                <filename>mk/config.h</filename><indexterm><primary>config.h</primary></indexterm>.
+                The latter is <literal>&num;include</literal>d by
+                various C programs, which can thereby make use of
+                configuration information.</para>
+	      </listitem>
+	    </itemizedlist>
+
+	    <para><command>configure</command> takes some optional
+	    arguments.  Use <literal>./configure --help</literal> to
+	    get a list of the available arguments.  Here are some of
+	    the ones you might need:</para>
+
+	    <variablelist>
+	      <varlistentry>
+		<term><literal>--with-ghc=<parameter>path</parameter></literal></term>
+		<indexterm><primary><literal>--with-ghc</literal></primary>
+		</indexterm>
 		<listitem>
-		  <para> It translates
-                  <Filename>mk/config.h.in</Filename><indexterm><primary>config.h.in</primary></indexterm>
-                  to
-                  <Filename>mk/config.h</Filename><indexterm><primary>config.h</primary></indexterm>.
-                  The latter is <Literal>&num;include</Literal>d by
-                  various C programs, which can thereby make use of
-                  configuration information.</para>
+		  <para>Specifies the path to an installed GHC which
+		  you would like to use.  This compiler will be used
+		  for compiling GHC-specific code (eg. GHC itself).
+		  This option <emphasis>cannot</emphasis> be specified
+		  using <filename>build.mk</filename> (see later),
+		  because <command>configure</command> needs to
+		  auto-detect the version of GHC you're using.  The
+		  default is to look for a compiler named
+		  <literal>ghc</literal> in your path.</para>
 		</listitem>
-	      </itemizedlist>
+	      </varlistentry>
+	      
+	      <varlistentry>
+		<term><literal>--with-hc=<parameter>path</parameter></literal></term>
+		<indexterm><primary><literal>--with-hc</literal></primary>
+		</indexterm>
+		<listitem>
+		  <para>Specifies the path to any installed Haskell
+		  compiler.  This compiler will be used for compiling
+		  generic Haskell code.  The default is to use
+		  <literal>ghc</literal>.</para>
+		</listitem>
+	      </varlistentry>
+	      
+	      <varlistentry>
+		<term><literal>--with-gcc=<parameter>path</parameter></literal></term>
+		<indexterm><primary><literal>--with-gcc</literal></primary>
+		</indexterm>
+		<listitem>
+		  <para>Specifies the path to the installed GCC. This
+		  compiler will be used to compile all C files,
+		  <emphasis>except</emphasis> any generated by the
+		  installed Haskell compiler, which will have its own
+		  idea of which C compiler (if any) to use.  The
+		  default is to use <literal>gcc</literal>.</para>
+		</listitem>
+	      </varlistentry>
+	    </variablelist>
+	    
+	    <para><command>configure</command> caches the results of
+            its run in <filename>config.cache</filename>.  Quite often
+            you don't want that; you're running
+            <command>configure</command> a second time because
+            something has changed.  In that case, simply delete
+            <filename>config.cache</filename>.</para>
+	  </listitem>
+	</varlistentry>
+	
+	<varlistentry>
+	  <term>Step 3: build configuration.</term>
+	  <listitem>
+	    <para>Next, you say how this build of
+            <literal>fptools</literal> is to differ from the standard
+            defaults by creating a new file
+            <filename>mk/build.mk</filename><indexterm><primary>build.mk</primary></indexterm>
+            <emphasis>in the build tree</emphasis>.  This file is the
+            one and only file you edit in the build tree, precisely
+            because it says how this build differs from the source.
+            (Just in case your build tree does die, you might want to
+            keep a private directory of <filename>build.mk</filename>
+            files, and use a symbolic link in each build tree to point
+            to the appropriate one.)  So
+            <filename>mk/build.mk</filename> never exists in the
+            source tree&mdash;you create one in each build tree from
+            the template.  We'll discuss what to put in it
+            shortly.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-	      <para><command>configure</command> takes some optional
-	      arguments.  Use <literal>./configure --help</literal> to
-	      get a list of the available arguments.  Here are some of
-	      the ones you might need:</para>
-
-	      <variablelist>
-		<varlistentry>
-		  <term><literal>--with-ghc=<parameter>path</parameter></literal></term>
-		  <indexterm><primary><literal>--with-ghc</literal></primary>
-		  </indexterm>
-		  <listitem>
-		    <para>Specifies the path to an installed GHC which
-		    you would like to use.  This compiler will be used
-		    for compiling GHC-specific code (eg. GHC itself).
-		    This option <emphasis>cannot</emphasis> be
-		    specified using <filename>build.mk</filename> (see
-		    later), because <command>configure</command> needs
-		    to auto-detect the version of GHC you're using.
-		    The default is to look for a compiler named
-		    <literal>ghc</literal> in your path.</para>
-		  </listitem>
-		</varlistentry>
-		  
-		<varlistentry>
-		  <term><literal>--with-hc=<parameter>path</parameter></literal></term>
-		  <indexterm><primary><literal>--with-hc</literal></primary>
-		  </indexterm>
-		  <listitem>
-		    <para>Specifies the path to any installed Haskell
-		    compiler.  This compiler will be used for
-		    compiling generic Haskell code.  The default is to
-		    use <literal>ghc</literal>.</para>
-		  </listitem>
-		</varlistentry>
-
-		<varlistentry>
-		  <term><literal>--with-gcc=<parameter>path</parameter></literal></term>
-		  <indexterm><primary><literal>--with-gcc</literal></primary>
-		  </indexterm>
-		  <listitem>
-		    <para>Specifies the path to the installed
-		    GCC. This compiler will be used to compile all C
-		    files, <emphasis>except</emphasis> any generated
-		    by the installed Haskell compiler, which will have
-		    its own idea of which C compiler (if any) to use.
-		    The default is to use <literal>gcc</literal>.</para>
-		  </listitem>
-		</varlistentry>
-	      </variablelist>
-
-	      <para><command>configure</command> caches the results of
-              its run in <Filename>config.cache</Filename>.  Quite
-              often you don't want that; you're running
-              <Command>configure</Command> a second time because
-              something has changed.  In that case, simply delete
-              <Filename>config.cache</Filename>.</para>
-	    </listitem>
-	  </varlistentry>
-
-<VarListEntry>
-<term>Step 3: build configuration.</term>
-<listitem>
-<para>
-Next, you say how this build of <Literal>fptools</Literal> is to differ from the
-standard defaults by creating a new file <Filename>mk/build.mk</Filename><indexterm><primary>build.mk</primary></indexterm>
-<Emphasis>in the build tree</Emphasis>.  This file is the one and only file you edit
-in the build tree, precisely because it says how this build differs
-from the source.  (Just in case your build tree does die, you might
-want to keep a private directory of <Filename>build.mk</Filename> files, and use a
-symbolic link in each build tree to point to the appropriate one.)  So
-<Filename>mk/build.mk</Filename> never exists in the source tree&mdash;you create one in
-each build tree from the template.  We'll discuss what to put in it
-shortly.  
-</para>
-</listitem></VarListEntry>
-</VariableList>
-</para>
-
-<para>
-And that's it for configuration. Simple, eh?
-</para>
+      <para>And that's it for configuration. Simple, eh?</para>
 
       <para>What do you put in your build-specific configuration file
-      <filename>mk/build.mk</filename>?  <Emphasis>For almost all
+      <filename>mk/build.mk</filename>?  <emphasis>For almost all
       purposes all you will do is put make variable definitions that
-      override those in</Emphasis>
+      override those in</emphasis>
       <filename>mk/config.mk.in</filename>.  The whole point of
       <filename>mk/config.mk.in</filename>&mdash;and its derived
       counterpart <filename>mk/config.mk</filename>&mdash;is to define
@@ -1789,15 +1715,15 @@ GhcHcOpts=-O -Rghc-timing
       development, it is wise to add <literal>-DDEBUG</literal>, to
       enable debugging code.  So you would add the following to
       <filename>build.mk</filename>:</para>
-
+      
       <para>or, if you prefer,</para>
 
 <ProgramListing>
 GhcHcOpts += -DDEBUG
 </ProgramListing>
 
-      <para>GNU <Command>make</Command> allows existing definitions to
-      have new text appended using the ``<Literal>+=</Literal>''
+      <para>GNU <command>make</command> allows existing definitions to
+      have new text appended using the &ldquo;<literal>+=</literal>&rdquo;
       operator, which is quite a convenient feature.)</para>
 
       <para>If you want to remove the <literal>-O</literal> as well (a
@@ -1810,9 +1736,9 @@ GhcHcOpts=-DDEBUG -Rghc-timing
 </ProgramListing>
 
       <para>When reading <filename>config.mk.in</filename>, remember
-      that anything between ``@...@'' signs is going to be substituted
-      by <Command>configure</Command> later.  You
-      <Emphasis>can</Emphasis> override the resulting definition if
+      that anything between &ldquo;@...@&rdquo; signs is going to be substituted
+      by <command>configure</command> later.  You
+      <emphasis>can</emphasis> override the resulting definition if
       you want, but you need to be a bit surer what you are doing.
       For example, there's a line that says:</para>
 
@@ -1821,31 +1747,31 @@ YACC = @YaccCmd@
 </ProgramListing>
 
       <para>This defines the Make variables <constant>YACC</constant>
-      to the pathname for a <Command>yacc</Command> that
-      <Command>configure</Command> finds somewhere.  If you have your
-      own pet <Command>yacc</Command> you want to use instead, that's
+      to the pathname for a <command>yacc</command> that
+      <command>configure</command> finds somewhere.  If you have your
+      own pet <command>yacc</command> you want to use instead, that's
       fine. Just add this line to <filename>mk/build.mk</filename>:</para>
 
 <ProgramListing>
 YACC = myyacc
 </ProgramListing>
 
-      <para>You do not <Emphasis>have</Emphasis> to have a
+      <para>You do not <emphasis>have</emphasis> to have a
       <filename>mk/build.mk</filename> file at all; if you don't,
       you'll get all the default settings from
       <filename>mk/config.mk.in</filename>.</para>
 
       <para>You can also use <filename>build.mk</filename> to override
-      anything that <Command>configure</Command> got wrong.  One place
+      anything that <command>configure</command> got wrong.  One place
       where this happens often is with the definition of
       <constant>FPTOOLS&lowbar;TOP&lowbar;ABS</constant>: this
       variable is supposed to be the canonical path to the top of your
       source tree, but if your system uses an automounter then the
       correct directory is hard to find automatically.  If you find
-      that <Command>configure</Command> has got it wrong, just put the
+      that <command>configure</command> has got it wrong, just put the
       correct definition in <filename>build.mk</filename>.</para>
 
-</Sect2>
+    </sect2>
 
     <sect2 id="sec-storysofar">
       <title>The story so far</title>
@@ -1865,15 +1791,15 @@ YACC = myyacc
 
 	<listitem>
 
-	  <para>(Optional) Use <Command>lndir</Command> or
-	  <Command>mkshadowdir</Command> to create a build tree.</para>
+	  <para>(Optional) Use <command>lndir</command> or
+	  <command>mkshadowdir</command> to create a build tree.</para>
 
 <programlisting>
 $ cd myfptools
 $ mkshadowdir . /scratch/joe-bloggs/myfptools-sun4
 </programlisting>
 
-	  <para>(N.B. <Command>mkshadowdir</Command>'s first argument
+	  <para>(N.B. <command>mkshadowdir</command>'s first argument
           is taken relative to its second.) You probably want to give
           the build tree a name that suggests its main defining
           characteristic (in your mind at least), in case you later
@@ -1939,26 +1865,26 @@ $ emacs mk/build.mk
       <filename>mk/build.mk</filename> as often as you like.  You do
       not have to run any further configuration programs to make these
       changes take effect. In theory you should, however, say
-      <Command>gmake clean</Command>, <Command>gmake all</Command>,
+      <command>gmake clean</command>, <command>gmake all</command>,
       because configuration option changes could affect
       anything&mdash;but in practice you are likely to know what's
       affected.</para>
     </sect2>
 
     <sect2>
-      <Title>Making things</Title>
+      <title>Making things</title>
 
       <para>At this point you have made yourself a fully-configured
       build tree, so you are ready to start building real
       things.</para>
 
-      <para>The first thing you need to know is that <Emphasis>you
-      must use GNU <Command>make</Command>, usually called
-      <Command>gmake</Command>, not standard Unix
-      <Command>make</Command></Emphasis>.  If you use standard Unix
-      <Command>make</Command> you will get all sorts of error messages
-      (but no damage) because the <Literal>fptools</Literal>
-      <Command>Makefiles</Command> use GNU <Command>make</Command>'s
+      <para>The first thing you need to know is that <emphasis>you
+      must use GNU <command>make</command>, usually called
+      <command>gmake</command>, not standard Unix
+      <command>make</command></emphasis>.  If you use standard Unix
+      <command>make</command> you will get all sorts of error messages
+      (but no damage) because the <literal>fptools</literal>
+      <command>Makefiles</command> use GNU <command>make</command>'s
       facilities extensively.</para>
 
       <para>To just build the whole thing, <command>cd</command> to
@@ -1966,279 +1892,273 @@ $ emacs mk/build.mk
       <command>gmake</command>.  This will prepare the tree and build
       the various projects in the correct order.</para>
 
-    </Sect2>
+    </sect2>
 
-    <Sect2 id="sec-standard-targets">
-      <Title>Standard Targets</title>
+    <sect2 id="sec-standard-targets">
+      <title>Standard Targets</title>
       <indexterm><primary>targets, standard makefile</primary></indexterm>
       <indexterm><primary>makefile targets</primary></indexterm>
 
-      <para>In any directory you should be able to make the following:
+      <para>In any directory you should be able to make the following:</para>
 
-<VariableList>
+      <variablelist>
+	<varlistentry>
+	  <term><literal>boot</literal></term>
+	  <listitem>
+	    <para>does the one-off preparation required to get ready
+            for the real work.  Notably, it does <command>gmake
+            depend</command> in all directories that contain programs.
+            It also builds the necessary tools for compilation to
+            proceed.</para>
 
-<VarListEntry>
-<term><Literal>boot</Literal>:</term>
-<listitem>
-<para>does the one-off preparation required to get ready for the real
-work.  Notably, it does <Command>gmake depend</Command> in all
-directories that contain programs.  It also builds the necessary tools
-for compilation to proceed.</para>
+	    <para>Invoking the <literal>boot</literal> target
+            explicitly is not normally necessary.  From the top-level
+            <literal>fptools</literal> directory, invoking
+            <literal>gmake</literal> causes <literal>gmake boot
+            all</literal> to be invoked in each of the project
+            subdirectories, in the order specified by
+            <literal>&dollar;(AllTargets)</literal> in
+            <literal>config.mk</literal>.</para>
 
-<para>Invoking the <literal>boot</literal> target explicitly is not
-normally necessary.  From the top-level <literal>fptools</literal>
-directory, invoking <literal>gmake</literal> causes <literal>gmake
-boot all</literal> to be invoked in each of the project
-subdirectories, in the order specified by
-<literal>&dollar;(AllTargets)</literal> in
-<literal>config.mk</literal>.</para>
+	    <para>If you're working in a subdirectory somewhere and
+            need to update the dependencies, <literal>gmake
+            boot</literal> is a good way to do it.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>If you're working in a subdirectory somewhere and need to update
-the dependencies, <literal>gmake boot</literal> is a good way to do it.</para>
+	<varlistentry>
+	  <term><literal>all</literal></term>
+	  <listitem>
+	    <para>makes all the final target(s) for this Makefile.
+            Depending on which directory you are in a &ldquo;final
+            target&rdquo; may be an executable program, a library
+            archive, a shell script, or a Postscript file.  Typing
+            <command>gmake</command> alone is generally the same as
+            typing <command>gmake all</command>.</para>
+	  </listitem>
+	</varlistentry>
 
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>all</Literal>:</term>
-<listitem>
-<para>
-makes all the final target(s) for this Makefile.
-Depending on which directory you are in a ``final target'' may be an
-executable program, a library archive, a shell script, or a Postscript
-file.  Typing <Command>gmake</Command> alone is generally the same as typing <Command>gmake all</Command>.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>install</Literal>:</term>
-<listitem>
-<para>
-installs the things built by <Literal>all</Literal> (except for the documentation).  Where does it
-install them?  That is specified by
-<filename>mk/config.mk.in</filename>; you can override it in
-<filename>mk/build.mk</filename>, or by running
-<command>configure</command> with command-line arguments like
-<literal>--bindir=/home/simonpj/bin</literal>;  see <literal>./configure
---help</literal> for the full details.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>install-docs</Literal>:</term>
-<listitem>
-<para>
-installs the documentation. Otherwise behaves just like <literal>install</literal>.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>uninstall</Literal>:</term>
-<listitem>
-<para>
-reverses the effect of <Literal>install</Literal>.
-</para>
-</listitem></VarListEntry>
+	<varlistentry>
+	  <term><literal>install</literal></term>
+	  <listitem>
+	    <para>installs the things built by <literal>all</literal>
+            (except for the documentation).  Where does it install
+            them?  That is specified by
+            <filename>mk/config.mk.in</filename>; you can override it
+            in <filename>mk/build.mk</filename>, or by running
+            <command>configure</command> with command-line arguments
+            like <literal>--bindir=/home/simonpj/bin</literal>; see
+            <literal>./configure --help</literal> for the full
+            details.</para>
+	  </listitem>
+	</varlistentry>
 
-<VarListEntry>
-<term><Literal>clean</Literal>:</term>
-<listitem>
-<para>
-Delete all files from the current directory that are normally created
-by building the program.  Don't delete the files that record the
-configuration, or files generated by <Command>gmake boot</Command>.
-Also preserve files that could be made by building, but normally
-aren't because the distribution comes with them.</para>
-</listitem></VarListEntry>
+	<varlistentry>
+	  <term><literal>install-docs</literal></term>
+	  <listitem>
+	    <para>installs the documentation. Otherwise behaves just
+	    like <literal>install</literal>.</para>
+	  </listitem>
+	</varlistentry>
 
-<varlistentry>
-<term><literal>distclean</literal>:</term>
-<listitem>
-<para>Delete all files from the current directory that are created by
-configuring or building the program. If you have unpacked the source
-and built the program without creating any other files, <literal>make
-distclean</literal> should leave only the files that were in the
-distribution.</para>
-</listitem>
-</varlistentry>
+	<varlistentry>
+	  <term><literal>uninstall</literal></term>
+	  <listitem>
+	    <para>reverses the effect of
+            <literal>install</literal>.</para>
+	  </listitem>
+	</varlistentry>
 
-<varlistentry>
-<term><literal>mostlyclean</literal>:</term>
-<listitem>
-<para>Like <literal>clean</literal>, but may refrain from deleting a
-few files that people normally don't want to recompile.</para>
-</listitem>
-</varlistentry>
+	<varlistentry>
+	  <term><literal>clean</literal></term>
+	  <listitem>
+	    <para>Delete all files from the current directory that are
+            normally created by building the program.  Don't delete
+            the files that record the configuration, or files
+            generated by <command>gmake boot</command>.  Also preserve
+            files that could be made by building, but normally aren't
+            because the distribution comes with them.</para>
+	  </listitem>
+	</varlistentry>
 
-<VarListEntry>
-<term><Literal>maintainer-clean</Literal>:</term>
-<listitem>
-<para>
-Delete everything from the current directory that can be reconstructed
-with this Makefile.  This typically includes everything deleted by
-<literal>distclean</literal>, plus more: C source files produced by
-Bison, tags tables, Info files, and so on.</para>
+	<varlistentry>
+	  <term><literal>distclean</literal></term>
+	  <listitem>
+	    <para>Delete all files from the current directory that are
+            created by configuring or building the program. If you
+            have unpacked the source and built the program without
+            creating any other files, <literal>make
+            distclean</literal> should leave only the files that were
+            in the distribution.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>One exception, however: <literal>make maintainer-clean</literal>
-should not delete <filename>configure</filename> even if
-<filename>configure</filename> can be remade using a rule in the
-<filename>Makefile</filename>. More generally, <literal>make
-maintainer-clean</literal> should not delete anything that needs to
-exist in order to run <filename>configure</filename> and then begin to
-build the program.</para>
-</listitem>
-</varlistentry>
+	<varlistentry>
+	  <term><literal>mostlyclean</literal></term>
+	  <listitem>
+	    <para>Like <literal>clean</literal>, but may refrain from
+            deleting a few files that people normally don't want to
+            recompile.</para>
+	  </listitem>
+	</varlistentry>
 
-<VarListEntry>
-<term><Literal>check</Literal>:</term>
-<listitem>
-<para>
-run the test suite.
-</para>
-</listitem></VarListEntry>
-</VariableList>
-</para>
+	<varlistentry>
+	  <term><literal>maintainer-clean</literal></term>
+	  <listitem>
+	    <para>Delete everything from the current directory that
+            can be reconstructed with this Makefile.  This typically
+            includes everything deleted by
+            <literal>distclean</literal>, plus more: C source files
+            produced by Bison, tags tables, Info files, and so
+            on.</para>
 
-<para>
-All of these standard targets automatically recurse into
-sub-directories.  Certain other standard targets do not:
-</para>
+	    <para>One exception, however: <literal>make
+            maintainer-clean</literal> should not delete
+            <filename>configure</filename> even if
+            <filename>configure</filename> can be remade using a rule
+            in the <filename>Makefile</filename>. More generally,
+            <literal>make maintainer-clean</literal> should not delete
+            anything that needs to exist in order to run
+            <filename>configure</filename> and then begin to build the
+            program.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-<VariableList>
+	<varlistentry>
+	  <term><literal>check</literal></term>
+	  <listitem>
+	    <para>run the test suite.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-<VarListEntry>
-<term><Literal>configure</Literal>:</term>
-<listitem>
-<para>
-is only available in the root directory
-<constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>; it has been discussed in <XRef LinkEnd="sec-build-config">.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>depend</Literal>:</term>
-<listitem>
-<para>
-make a <filename>.depend</filename> file in each directory that needs
-it. This <filename>.depend</filename> file contains mechanically-generated dependency
-information; for example, suppose a directory contains a Haskell 
-source module <filename>Foo.lhs</filename> which imports another module <Literal>Baz</Literal>.
-Then the generated <filename>.depend</filename> file will contain the dependency:
-</para>
+      <para>All of these standard targets automatically recurse into
+      sub-directories.  Certain other standard targets do not:</para>
 
-<para>
+      <variablelist>
+	<varlistentry>
+	  <term><literal>configure</literal></term>
+	  <listitem>
+	    <para>is only available in the root directory
+            <constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>; it has
+            been discussed in <XRef
+            LinkEnd="sec-build-config">.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><literal>depend</literal></term>
+	  <listitem>
+	    <para>make a <filename>.depend</filename> file in each
+            directory that needs it. This <filename>.depend</filename>
+            file contains mechanically-generated dependency
+            information; for example, suppose a directory contains a
+            Haskell source module <filename>Foo.lhs</filename> which
+            imports another module <literal>Baz</literal>.  Then the
+            generated <filename>.depend</filename> file will contain
+            the dependency:</para>
 
 <ProgramListing>
 Foo.o : Baz.hi
 </ProgramListing>
 
-</para>
+	    <para>which says that the object file
+            <filename>Foo.o</filename> depends on the interface file
+            <filename>Baz.hi</filename> generated by compiling module
+            <literal>Baz</literal>.  The <filename>.depend</filename>
+            file is automatically included by every Makefile.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-which says that the object file <filename>Foo.o</filename> depends on the interface file
-<filename>Baz.hi</filename> generated by compiling module <Literal>Baz</Literal>.  The <filename>.depend</filename> file is
-automatically included by every Makefile.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>binary-dist</Literal>:</term>
-<listitem>
-<para>
-make a binary distribution.  This is the
-target we use to build the binary distributions of GHC and Happy.
-</para>
-</listitem></VarListEntry>
-<VarListEntry>
-<term><Literal>dist</Literal>:</term>
-<listitem>
-<para>
-make a source distribution.  Note that this target does &ldquo;make
-distclean&rdquo; as part of its work; don't use it if you want to keep
-what you've built.
-</para>
-</listitem></VarListEntry>
-</VariableList>
-</para>
+	<varlistentry>
+	  <term><literal>binary-dist</literal></term>
+	  <listitem>
+	    <para>make a binary distribution.  This is the target we
+            use to build the binary distributions of GHC and
+            Happy.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-Most <filename>Makefile</filename>s have targets other than these.  You can discover them by looking in the <filename>Makefile</filename> itself.
-</para>
+	<varlistentry>
+	  <term><literal>dist</literal></term>
+	  <listitem>
+	    <para>make a source distribution.  Note that this target
+            does &ldquo;make distclean&rdquo; as part of its work;
+            don't use it if you want to keep what you've built.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
 
-</Sect2>
+      <para>Most <filename>Makefile</filename>s have targets other
+      than these.  You can discover them by looking in the
+      <filename>Makefile</filename> itself.</para>
+    </sect2>
 
-<sect2>
-<title>Using a project from the build tree</title>
-<para>
-If you want to build GHC (say) and just use it direct from the build
-tree without doing <literal>make install</literal> first, you can run
-the in-place driver script:
-<filename>ghc/compiler/ghc-inplace</filename>.
-</para>
+    <sect2>
+      <title>Using a project from the build tree</title> 
 
-<para> Do <emphasis>NOT</emphasis> use
-<filename>ghc/compiler/ghc</filename>, or
-<filename>ghc/compiler/ghc-5.xx</filename>, as these are the scripts
-intended for installation, and contain hard-wired paths to the
-installed libraries, rather than the libraries in the build tree.
-</para>
+      <para>If you want to build GHC (say) and just use it direct from
+      the build tree without doing <literal>make install</literal>
+      first, you can run the in-place driver script:
+      <filename>ghc/compiler/ghc-inplace</filename>.</para>
 
-<para>
-Happy can similarly be run from the build tree, using
-<filename>happy/src/happy-inplace</filename>.
-</para>
-</sect2>
+      <para> Do <emphasis>NOT</emphasis> use
+      <filename>ghc/compiler/ghc</filename>, or
+      <filename>ghc/compiler/ghc-5.xx</filename>, as these are the
+      scripts intended for installation, and contain hard-wired paths
+      to the installed libraries, rather than the libraries in the
+      build tree.</para>
 
-<Sect2>
-<Title>Fast Making <indexterm><primary>fastmake</primary></indexterm>
-<indexterm><primary>dependencies, omitting</primary></indexterm>
-<indexterm><primary>FAST, makefile
-variable</primary></indexterm></Title>
+      <para>Happy can similarly be run from the build tree, using
+      <filename>happy/src/happy-inplace</filename>.</para>
+    </sect2>
 
-<para>
-Sometimes the dependencies get in the way: if you've made a small
-change to one file, and you're absolutely sure that it won't affect
-anything else, but you know that <Command>make</Command> is going to rebuild everything
-anyway, the following hack may be useful:
-</para>
+    <sect2>
+      <title>Fast Making</title>
 
-<para>
+      <indexterm><primary>fastmake</primary></indexterm>
+      <indexterm><primary>dependencies, omitting</primary></indexterm>
+      <indexterm><primary>FAST, makefile variable</primary></indexterm>
+
+      <para>Sometimes the dependencies get in the way: if you've made
+      a small change to one file, and you're absolutely sure that it
+      won't affect anything else, but you know that
+      <command>make</command> is going to rebuild everything anyway,
+      the following hack may be useful:</para>
 
 <ProgramListing>
 gmake FAST=YES 
 </ProgramListing>
 
-</para>
+      <para>This tells the make system to ignore dependencies and just
+      build what you tell it to.  In other words, it's equivalent to
+      temporarily removing the <filename>.depend</filename> file in
+      the current directory (where <command>mkdependHS</command> and
+      friends store their dependency information).</para>
 
-<para>
-This tells the make system to ignore dependencies and just build what
-you tell it to.  In other words, it's equivalent to temporarily
-removing the <filename>.depend</filename> file in the current directory (where
-<Command>mkdependHS</Command> and friends store their dependency information).
-</para>
+      <para>A bit of history: GHC used to come with a
+      <command>fastmake</command> script that did the above job, but
+      GNU make provides the features we need to do it without
+      resorting to a script.  Also, we've found that fastmaking is
+      less useful since the advent of GHC's recompilation checker (see
+      the User's Guide section on "Separate Compilation").</para>
+    </sect2>
+  </sect1>
 
-<para>
-A bit of history: GHC used to come with a <Command>fastmake</Command> script that did
-the above job, but GNU make provides the features we need to do it
-without resorting to a script.  Also, we've found that fastmaking is
-less useful since the advent of GHC's recompilation checker (see the
-User's Guide section on "Separate Compilation").
-</para>
+  <sect1 id="sec-makefile-arch">
+    <title>The <filename>Makefile</filename> architecture</title>
+    <indexterm><primary>makefile architecture</primary></indexterm>
 
-</Sect2>
+    <para><command>make</command> is great if everything
+    works&mdash;you type <command>gmake install</command> and lo! the
+    right things get compiled and installed in the right places.  Our
+    goal is to make this happen often, but somehow it often doesn't;
+    instead some weird error message eventually emerges from the
+    bowels of a directory you didn't know existed.</para>
 
-</Sect1>
-
-<Sect1 id="sec-makefile-arch">
-<Title>The <filename>Makefile</filename> architecture
-<indexterm><primary>makefile architecture</primary></indexterm></Title>
-
-<para>
-<Command>make</Command> is great if everything works&mdash;you type <Command>gmake install</Command> and
-lo! the right things get compiled and installed in the right places.
-Our goal is to make this happen often, but somehow it often doesn't;
-instead some weird error message eventually emerges from the bowels of
-a directory you didn't know existed.
-</para>
-
-<para>
-The purpose of this section is to give you a road-map to help you figure
-out what is going right and what is going wrong.
-</para>
+    <para>The purpose of this section is to give you a road-map to
+    help you figure out what is going right and what is going
+    wrong.</para>
 
     <sect2>
       <title>Debugging</title>
@@ -2261,18 +2181,20 @@ out what is going right and what is going wrong.
       recompilations.</para>
     </sect2>
 
-<Sect2>
-<Title>A small project</Title>
+    <sect2>
+      <title>A small project</title>
 
-<para>
-To get started, let us look at the <filename>Makefile</filename> for an imaginary small
-<Literal>fptools</Literal> project, <Literal>small</Literal>.  Each project in <Literal>fptools</Literal> has its own
-directory in <constant>FPTOOLS&lowbar;TOP</constant>, so the <Literal>small</Literal> project will have its own
-directory <constant>FPOOLS&lowbar;TOP/small/</constant>.  Inside the <filename>small/</filename> directory there
-will be a <filename>Makefile</filename>, looking something like this:
-</para>
+      <para>To get started, let us look at the
+      <filename>Makefile</filename> for an imaginary small
+      <literal>fptools</literal> project, <literal>small</literal>.
+      Each project in <literal>fptools</literal> has its own directory
+      in <constant>FPTOOLS&lowbar;TOP</constant>, so the
+      <literal>small</literal> project will have its own directory
+      <constant>FPOOLS&lowbar;TOP/small/</constant>.  Inside the
+      <filename>small/</filename> directory there will be a
+      <filename>Makefile</filename>, looking something like
+      this:</para>
 
-<para>
 <indexterm><primary>Makefile, minimal</primary></indexterm>
 
 <ProgramListing>
@@ -2287,174 +2209,169 @@ HS_PROG = small
 include $(TOP)/target.mk
 </ProgramListing>
 
-</para>
+      <para>this <filename>Makefile</filename> has three
+      sections:</para>
 
-<para>
-This <filename>Makefile</filename> has three sections:
-</para>
-
-<para>
-
-<OrderedList>
-<listitem>
-
-<para>
- The first section includes
-<FOOTNOTE>
-
+      <orderedlist>
+	<listitem>
+	  <para>The first section includes
+<footnote>
 <para>
 One of the most important
-features of GNU <Command>make</Command> that we use is the ability for a <filename>Makefile</filename> to
-include another named file, very like <Command>cpp</Command>'s <Literal>&num;include</Literal>
+features of GNU <command>make</command> that we use is the ability for a <filename>Makefile</filename> to
+include another named file, very like <command>cpp</command>'s <literal>&num;include</literal>
 directive.
 </para>
+</footnote>
 
-</FOOTNOTE>
- a file of ``boilerplate'' code from the level
-above (which in this case will be
-<filename><constant>FPTOOLS&lowbar;TOP</constant>/mk/boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm>).  As its name
-suggests, <filename>boilerplate.mk</filename> consists of a large quantity of standard
-<filename>Makefile</filename> code.  We discuss this boilerplate in more detail in
-<XRef LinkEnd="sec-boiler">.
-<indexterm><primary>include, directive in Makefiles</primary></indexterm>
-<indexterm><primary>Makefile inclusion</primary></indexterm>
+          a file of &ldquo;boilerplate&rdquo; code from the level
+          above (which in this case will be
+          <filename><constant>FPTOOLS&lowbar;TOP</constant>/mk/boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm>).
+          As its name suggests, <filename>boilerplate.mk</filename>
+          consists of a large quantity of standard
+          <filename>Makefile</filename> code.  We discuss this
+          boilerplate in more detail in <XRef LinkEnd="sec-boiler">.
+          <indexterm><primary>include, directive in
+          Makefiles</primary></indexterm> <indexterm><primary>Makefile
+          inclusion</primary></indexterm></para>
 
-Before the <Literal>include</Literal> statement, you must define the <Command>make</Command> variable
-<constant>TOP</constant><indexterm><primary>TOP</primary></indexterm> to be the directory containing the <filename>mk</filename> directory in
-which the <filename>boilerplate.mk</filename> file is.  It is <Emphasis>not</Emphasis> OK to simply say
-
+          <para>Before the <literal>include</literal> statement, you
+          must define the <command>make</command> variable
+          <constant>TOP</constant><indexterm><primary>TOP</primary></indexterm>
+          to be the directory containing the <filename>mk</filename>
+          directory in which the <filename>boilerplate.mk</filename>
+          file is.  It is <emphasis>not</emphasis> OK to simply say</para>
 
 <ProgramListing>
 include ../mk/boilerplate.mk  # NO NO NO
 </ProgramListing>
 
 
-Why?  Because the <filename>boilerplate.mk</filename> file needs to know where it is, so
-that it can, in turn, <Literal>include</Literal> other files.  (Unfortunately, when an
-<Literal>include</Literal>d file does an <Literal>include</Literal>, the filename is treated relative to
-the directory in which <Command>gmake</Command> is being run, not the directory in
-which the <Literal>include</Literal>d sits.)  In general, <Emphasis>every file <filename>foo.mk</filename>
-assumes that <filename><constant>&dollar;(TOP)</constant>/mk/foo.mk</filename> refers to itself.</Emphasis> It is up to the
-<filename>Makefile</filename> doing the <Literal>include</Literal> to ensure this is the case.
+          <para>Why?  Because the <filename>boilerplate.mk</filename>
+          file needs to know where it is, so that it can, in turn,
+          <literal>include</literal> other files.  (Unfortunately,
+          when an <literal>include</literal>d file does an
+          <literal>include</literal>, the filename is treated relative
+          to the directory in which <command>gmake</command> is being
+          run, not the directory in which the
+          <literal>include</literal>d sits.)  In general,
+          <emphasis>every file <filename>foo.mk</filename> assumes
+          that
+          <filename><constant>&dollar;(TOP)</constant>/mk/foo.mk</filename>
+          refers to itself.</emphasis> It is up to the
+          <filename>Makefile</filename> doing the
+          <literal>include</literal> to ensure this is the case.</para>
 
-Files intended for inclusion in other <filename>Makefile</filename>s are written to have
-the following property: <Emphasis>after <filename>foo.mk</filename> is <Literal>include</Literal>d, it leaves
-<constant>TOP</constant> containing the same value as it had just before the <Literal>include</Literal>
-statement</Emphasis>.  In our example, this invariant guarantees that the
-<Literal>include</Literal> for <filename>target.mk</filename> will look in the same directory as that for
-<filename>boilerplate.mk</filename>.
+          <para>Files intended for inclusion in other
+          <filename>Makefile</filename>s are written to have the
+          following property: <emphasis>after
+          <filename>foo.mk</filename> is <literal>include</literal>d,
+          it leaves <constant>TOP</constant> containing the same value
+          as it had just before the <literal>include</literal>
+          statement</emphasis>.  In our example, this invariant
+          guarantees that the <literal>include</literal> for
+          <filename>target.mk</filename> will look in the same
+          directory as that for <filename>boilerplate.mk</filename>.</para>
+	</listitem>
 
-</para>
-</listitem>
-<listitem>
+	<listitem>
+	  <para> The second section defines the following standard
+          <command>make</command> variables:
+          <constant>SRCS</constant><indexterm><primary>SRCS</primary></indexterm>
+          (the source files from which is to be built), and
+          <constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>
+          (the executable binary to be built).  We will discuss in
+          more detail what the &ldquo;standard variables&rdquo; are,
+          and how they affect what happens, in <XRef
+          LinkEnd="sec-targets">.</para>
 
-<para>
- The second section defines the following standard <Command>make</Command>
-variables: <constant>SRCS</constant><indexterm><primary>SRCS</primary></indexterm> (the source files from which is to be
-built), and <constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm> (the executable binary to be
-built).  We will discuss in more detail what the ``standard
-variables'' are, and how they affect what happens, in <XRef LinkEnd="sec-targets">.
+	  <para>The definition for <constant>SRCS</constant> uses the
+          useful GNU <command>make</command> construct
+          <literal>&dollar;(wildcard&nbsp;$pat$)</literal><indexterm><primary>wildcard</primary></indexterm>,
+          which expands to a list of all the files matching the
+          pattern <literal>pat</literal> in the current directory.  In
+          this example, <constant>SRCS</constant> is set to the list
+          of all the <filename>.lhs</filename> and
+          <filename>.c</filename> files in the directory.  (Let's
+          suppose there is one of each, <filename>Foo.lhs</filename>
+          and <filename>Baz.c</filename>.)</para>
+	</listitem>
 
-The definition for <constant>SRCS</constant> uses the useful GNU <Command>make</Command> construct
-<Literal>&dollar;(wildcard&nbsp;$pat$)</Literal><indexterm><primary>wildcard</primary></indexterm>, which expands to a list of all
-the files matching the pattern <Literal>pat</Literal> in the current directory.  In
-this example, <constant>SRCS</constant> is set to the list of all the <filename>.lhs</filename> and <filename>.c</filename>
-files in the directory.  (Let's suppose there is one of each,
-<filename>Foo.lhs</filename> and <filename>Baz.c</filename>.)
+	<listitem>
+	  <para>The last section includes a second file of standard
+          code, called
+          <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>.
+          It contains the rules that tell <command>gmake</command> how
+          to make the standard targets (<Xref
+          LinkEnd="sec-standard-targets">).  Why, you ask, can't this
+          standard code be part of
+          <filename>boilerplate.mk</filename>?  Good question.  We
+          discuss the reason later, in <Xref
+          LinkEnd="sec-boiler-arch">.</para>
 
-</para>
-</listitem>
-<listitem>
+          <para>You do not <emphasis>have</emphasis> to
+          <literal>include</literal> the
+          <filename>target.mk</filename> file.  Instead, you can write
+          rules of your own for all the standard targets.  Usually,
+          though, you will find quite a big payoff from using the
+          canned rules in <filename>target.mk</filename>; the price
+          tag is that you have to understand what canned rules get
+          enabled, and what they do (<Xref
+          LinkEnd="sec-targets">).</para>
+	</listitem>
+      </orderedlist>
 
-<para>
- The last section includes a second file of standard code,
-called <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>.  It contains the rules that tell
-<Command>gmake</Command> how to make the standard targets (<Xref LinkEnd="sec-standard-targets">).  Why, you ask,
-can't this standard code be part of <filename>boilerplate.mk</filename>?  Good question.
-We discuss the reason later, in <Xref LinkEnd="sec-boiler-arch">.
+      <para>In our example <filename>Makefile</filename>, most of the
+      work is done by the two <literal>include</literal>d files.  When
+      you say <command>gmake all</command>, the following things
+      happen:</para>
 
-You do not <Emphasis>have</Emphasis> to <Literal>include</Literal> the <filename>target.mk</filename> file.  Instead, you
-can write rules of your own for all the standard targets.  Usually,
-though, you will find quite a big payoff from using the canned rules
-in <filename>target.mk</filename>; the price tag is that you have to understand what
-canned rules get enabled, and what they do (<Xref LinkEnd="sec-targets">).
+      <itemizedlist>
+	<listitem>
+	  <para><command>gmake</command> figures out that the object
+          files are <filename>Foo.o</filename> and
+          <filename>Baz.o</filename>.</para>
+	</listitem>
 
-</para>
-</listitem>
+	<listitem>
+	  <para>It uses a boilerplate pattern rule to compile
+          <filename>Foo.lhs</filename> to <filename>Foo.o</filename>
+          using a Haskell compiler.  (Which one?  That is set in the
+          build configuration.)</para>
+	</listitem>
 
-</OrderedList>
+	<listitem>
+	  <para>It uses another standard pattern rule to compile
+          <filename>Baz.c</filename> to <filename>Baz.o</filename>,
+          using a C compiler.  (Ditto.)</para>
+	</listitem>
 
-</para>
+	<listitem>
+	  <para>It links the resulting <filename>.o</filename> files
+          together to make <literal>small</literal>, using the Haskell
+          compiler to do the link step.  (Why not use
+          <command>ld</command>?  Because the Haskell compiler knows
+          what standard libraries to link in.  How did
+          <command>gmake</command> know to use the Haskell compiler to
+          do the link, rather than the C compiler?  Because we set the
+          variable <constant>HS&lowbar;PROG</constant> rather than
+          <constant>C&lowbar;PROG</constant>.)</para>
+	</listitem>
+      </itemizedlist>
 
-<para>
-In our example <filename>Makefile</filename>, most of the work is done by the two
-<Literal>include</Literal>d files.  When you say <Command>gmake all</Command>, the following things
-happen:
-</para>
+      <para>All <filename>Makefile</filename>s should follow the above
+      three-section format.</para>
+    </sect2>
 
-<para>
+    <sect2>
+      <title>A larger project</title>
 
-<ItemizedList>
-<listitem>
-
-<para>
- <Command>gmake</Command> figures out that the object files are <filename>Foo.o</filename> and
-<filename>Baz.o</filename>.
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- It uses a boilerplate pattern rule to compile <filename>Foo.lhs</filename> to
-<filename>Foo.o</filename> using a Haskell compiler.  (Which one?  That is set in the
-build configuration.)
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- It uses another standard pattern rule to compile <filename>Baz.c</filename> to
-<filename>Baz.o</filename>, using a C compiler.  (Ditto.)
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- It links the resulting <filename>.o</filename> files together to make <Literal>small</Literal>,
-using the Haskell compiler to do the link step.  (Why not use <Command>ld</Command>?
-Because the Haskell compiler knows what standard libraries to link in.
-How did <Command>gmake</Command> know to use the Haskell compiler to do the link,
-rather than the C compiler?  Because we set the variable <constant>HS&lowbar;PROG</constant>
-rather than <constant>C&lowbar;PROG</constant>.)
-
-</para>
-</listitem>
-
-</ItemizedList>
-
-</para>
-
-<para>
-All <filename>Makefile</filename>s should follow the above three-section format.
-</para>
-
-</Sect2>
-
-<Sect2>
-<Title>A larger project</Title>
-
-<para>
-Larger projects are usually structured into a number of sub-directories,
-each of which has its own <filename>Makefile</filename>.  (In very large projects, this
-sub-structure might be iterated recursively, though that is rare.)
-To give you the idea, here's part of the directory structure for
-the (rather large) GHC project:
-</para>
-
-<para>
+      <para>Larger projects are usually structured into a number of
+      sub-directories, each of which has its own
+      <filename>Makefile</filename>.  (In very large projects, this
+      sub-structure might be iterated recursively, though that is
+      rare.)  To give you the idea, here's part of the directory
+      structure for the (rather large) GHC project:</para>
 
 <Screen>
 $(FPTOOLS_TOP)/ghc/
@@ -2475,211 +2392,194 @@ $(FPTOOLS_TOP)/ghc/
     ...etc...
 </Screen>
 
-</para>
+      <para>The sub-directories <filename>docs</filename>,
+      <filename>driver</filename>, <filename>compiler</filename>, and
+      so on, each contains a sub-component of GHC, and each has its
+      own <filename>Makefile</filename>.  There must also be a
+      <filename>Makefile</filename> in
+      <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/ghc</filename>.
+      It does most of its work by recursively invoking
+      <command>gmake</command> on the <filename>Makefile</filename>s
+      in the sub-directories.  We say that
+      <filename>ghc/Makefile</filename> is a <emphasis>non-leaf
+      <filename>Makefile</filename></emphasis>, because it does little
+      except organise its children, while the
+      <filename>Makefile</filename>s in the sub-directories are all
+      <emphasis>leaf <filename>Makefile</filename>s</emphasis>.  (In
+      principle the sub-directories might themselves contain a
+      non-leaf <filename>Makefile</filename> and several
+      sub-sub-directories, but that does not happen in GHC.)</para>
 
-<para>
-The sub-directories <filename>docs</filename>, <filename>driver</filename>, <filename>compiler</filename>, and so on, each
-contains a sub-component of GHC, and each has its own <filename>Makefile</filename>.
-There must also be a <filename>Makefile</filename> in <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/ghc</filename>.  It does most
-of its work by recursively invoking <Command>gmake</Command> on the <filename>Makefile</filename>s in the
-sub-directories.  We say that <filename>ghc/Makefile</filename> is a <Emphasis>non-leaf
-<filename>Makefile</filename></Emphasis>, because it does little except organise its children,
-while the <filename>Makefile</filename>s in the sub-directories are all <Emphasis>leaf
-<filename>Makefile</filename>s</Emphasis>.  (In principle the sub-directories might themselves
-contain a non-leaf <filename>Makefile</filename> and several sub-sub-directories, but
-that does not happen in GHC.)
-</para>
+      <para>The <filename>Makefile</filename> in
+      <filename>ghc/compiler</filename> is considered a leaf
+      <filename>Makefile</filename> even though the
+      <filename>ghc/compiler</filename> has sub-directories, because
+      these sub-directories do not themselves have
+      <filename>Makefile</filename>s in them.  They are just used to
+      structure the collection of modules that make up GHC, but all
+      are managed by the single <filename>Makefile</filename> in
+      <filename>ghc/compiler</filename>.</para>
 
-<para>
-The <filename>Makefile</filename> in <filename>ghc/compiler</filename> is considered a leaf <filename>Makefile</filename> even
-though the <filename>ghc/compiler</filename> has sub-directories, because these sub-directories
-do not themselves have <filename>Makefile</filename>s in them.  They are just used to structure
-the collection of modules that make up GHC, but all are managed by the
-single <filename>Makefile</filename> in <filename>ghc/compiler</filename>.
-</para>
+      <para>You will notice that <filename>ghc/</filename> also
+      contains a directory <filename>ghc/mk/</filename>.  It contains
+      GHC-specific <filename>Makefile</filename> boilerplate code.
+      More precisely:</para>
 
-<para>
-You will notice that <filename>ghc/</filename> also contains a directory <filename>ghc/mk/</filename>.  It
-contains GHC-specific <filename>Makefile</filename> boilerplate code.  More precisely:
-</para>
+      <itemizedlist>
+	<listitem>
+	  <para><filename>ghc/mk/boilerplate.mk</filename> is included
+          at the top of <filename>ghc/Makefile</filename>, and of all
+          the leaf <filename>Makefile</filename>s in the
+          sub-directories.  It in turn <literal>include</literal>s the
+          main boilerplate file
+          <filename>mk/boilerplate.mk</filename>.</para>
+	</listitem>
 
-<para>
+	<listitem>
+	  <para><filename>ghc/mk/target.mk</filename> is
+          <literal>include</literal>d at the bottom of
+          <filename>ghc/Makefile</filename>, and of all the leaf
+          <filename>Makefile</filename>s in the sub-directories.  It
+          in turn <literal>include</literal>s the file
+          <filename>mk/target.mk</filename>.</para>
+	</listitem>
+      </itemizedlist>
 
-<ItemizedList>
-<listitem>
+      <para>So these two files are the place to look for GHC-wide
+      customisation of the standard boilerplate.</para>
+    </sect2>
 
-<para>
- <filename>ghc/mk/boilerplate.mk</filename> is included at the top of
-<filename>ghc/Makefile</filename>, and of all the leaf <filename>Makefile</filename>s in the
-sub-directories.  It in turn <Literal>include</Literal>s the main boilerplate file
-<filename>mk/boilerplate.mk</filename>.
+    <sect2 id="sec-boiler-arch">
+      <title>Boilerplate architecture</title>
+      <indexterm><primary>boilerplate architecture</primary></indexterm>
 
+      <para>Every <filename>Makefile</filename> includes a
+      <filename>boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm>
+      file at the top, and
+      <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm>
+      file at the bottom.  In this section we discuss what is in these
+      files, and why there have to be two of them.  In general:</para>
 
-</para>
-</listitem>
-<listitem>
+      <itemizedlist>
+	<listitem>
+	  <para><filename>boilerplate.mk</filename> consists of:</para>
 
-<para>
- <filename>ghc/mk/target.mk</filename> is <Literal>include</Literal>d at the bottom of
-<filename>ghc/Makefile</filename>, and of all the leaf <filename>Makefile</filename>s in the
-sub-directories.  It in turn <Literal>include</Literal>s the file <filename>mk/target.mk</filename>.
+	  <itemizedlist>
+	    <listitem>
+	      <para><emphasis>Definitions of millions of
+              <command>make</command> variables</emphasis> that
+              collectively specify the build configuration.  Examples:
+              <constant>HC&lowbar;OPTS</constant><indexterm><primary>HC&lowbar;OPTS</primary></indexterm>,
+              the options to feed to the Haskell compiler;
+              <constant>NoFibSubDirs</constant><indexterm><primary>NoFibSubDirs</primary></indexterm>,
+              the sub-directories to enable within the
+              <literal>nofib</literal> project;
+              <constant>GhcWithHc</constant><indexterm><primary>GhcWithHc</primary></indexterm>,
+              the name of the Haskell compiler to use when compiling
+              GHC in the <literal>ghc</literal> project.</para>
+	    </listitem>
 
-</para>
-</listitem>
+	    <listitem>
+	      <para><emphasis>Standard pattern rules</emphasis> that
+              tell <command>gmake</command> how to construct one file
+              from another.</para>
+	    </listitem>
+	  </itemizedlist>
 
-</ItemizedList>
+	  <para><filename>boilerplate.mk</filename> needs to be
+          <literal>include</literal>d at the <emphasis>top</emphasis>
+          of each <filename>Makefile</filename>, so that the user can
+          replace the boilerplate definitions or pattern rules by
+          simply giving a new definition or pattern rule in the
+          <filename>Makefile</filename>.  <command>gmake</command>
+          simply takes the last definition as the definitive one.</para>
 
-</para>
-
-<para>
-So these two files are the place to look for GHC-wide customisation
-of the standard boilerplate.
-</para>
-
-</Sect2>
-
-<Sect2 id="sec-boiler-arch">
-<Title>Boilerplate architecture
-<indexterm><primary>boilerplate architecture</primary></indexterm>
-</Title>
-
-<para>
-Every <filename>Makefile</filename> includes a <filename>boilerplate.mk</filename><indexterm><primary>boilerplate.mk</primary></indexterm> file
-at the top, and <filename>target.mk</filename><indexterm><primary>target.mk</primary></indexterm> file at the bottom.  In
-this section we discuss what is in these files, and why there have to
-be two of them.  In general:
-</para>
-
-<para>
-
-<ItemizedList>
-<listitem>
-
-<para>
- <filename>boilerplate.mk</filename> consists of:
-
-<ItemizedList>
-<listitem>
-
-<para>
- <Emphasis>Definitions of millions of <Command>make</Command> variables</Emphasis> that
-collectively specify the build configuration.  Examples:
-<constant>HC&lowbar;OPTS</constant><indexterm><primary>HC&lowbar;OPTS</primary></indexterm>, the options to feed to the Haskell compiler;
-<constant>NoFibSubDirs</constant><indexterm><primary>NoFibSubDirs</primary></indexterm>, the sub-directories to enable within the
-<Literal>nofib</Literal> project; <constant>GhcWithHc</constant><indexterm><primary>GhcWithHc</primary></indexterm>, the name of the Haskell
-compiler to use when compiling GHC in the <Literal>ghc</Literal> project.  
-</para>
-</listitem>
-<listitem>
-
-<para>
-<Emphasis>Standard pattern rules</Emphasis> that tell <Command>gmake</Command> how to construct one
-file from another.
-</para>
-</listitem>
-
-</ItemizedList>
-
-
-<filename>boilerplate.mk</filename> needs to be <Literal>include</Literal>d at the <Emphasis>top</Emphasis>
-of each <filename>Makefile</filename>, so that the user can replace the
-boilerplate definitions or pattern rules by simply giving a new
-definition or pattern rule in the <filename>Makefile</filename>.  <Command>gmake</Command>
-simply takes the last definition as the definitive one.
-
-Instead of <Emphasis>replacing</Emphasis> boilerplate definitions, it is also quite
-common to <Emphasis>augment</Emphasis> them. For example, a <filename>Makefile</filename> might say:
-
+	  <para>Instead of <emphasis>replacing</emphasis> boilerplate
+          definitions, it is also quite common to
+          <emphasis>augment</emphasis> them. For example, a
+          <filename>Makefile</filename> might say:</para>
 
 <ProgramListing>
 SRC_HC_OPTS += -O
 </ProgramListing>
 
+	  <para>thereby adding &ldquo;<option>-O</option>&rdquo; to
+	  the end of
+	  <constant>SRC&lowbar;HC&lowbar;OPTS</constant><indexterm><primary>SRC&lowbar;HC&lowbar;OPTS</primary></indexterm>.</para>
+	</listitem>
 
-thereby adding ``<Option>-O</Option>'' to the end of <constant>SRC&lowbar;HC&lowbar;OPTS</constant><indexterm><primary>SRC&lowbar;HC&lowbar;OPTS</primary></indexterm>.
+	<listitem>
+	  <para><filename>target.mk</filename> contains
+          <command>make</command> rules for the standard targets
+          described in <Xref LinkEnd="sec-standard-targets">.  These
+          rules are selectively included, depending on the setting of
+          certain <command>make</command> variables.  These variables
+          are usually set in the middle section of the
+          <filename>Makefile</filename> between the two
+          <literal>include</literal>s.</para>
 
-</para>
-</listitem>
-<listitem>
+	  <para><filename>target.mk</filename> must be included at the
+          end (rather than being part of
+          <filename>boilerplate.mk</filename>) for several tiresome
+          reasons:</para>
 
-<para>
- <filename>target.mk</filename> contains <Command>make</Command> rules for the standard
-targets described in <Xref LinkEnd="sec-standard-targets">.  These rules are selectively included,
-depending on the setting of certain <Command>make</Command> variables.  These
-variables are usually set in the middle section of the
-<filename>Makefile</filename> between the two <Literal>include</Literal>s.
+	  <itemizedlist>
+	    <listitem>
 
-<filename>target.mk</filename> must be included at the end (rather than being part of
-<filename>boilerplate.mk</filename>) for several tiresome reasons:
-
-
-<ItemizedList>
-<listitem>
-
-<para>
- <Command>gmake</Command> commits target and dependency lists earlier than
-it should.  For example, <FIlename>target.mk</FIlename> has a rule that looks like
-this: 
-
+	      <para><command>gmake</command> commits target and
+              dependency lists earlier than it should.  For example,
+              <FIlename>target.mk</FIlename> has a rule that looks
+              like this:</para>
 
 <ProgramListing>
 $(HS_PROG) : $(OBJS)
       $(HC) $(LD_OPTS) $&#60; -o $@
 </ProgramListing>
 
+	      <para>If this rule was in
+              <filename>boilerplate.mk</filename> then
+              <constant>&dollar;(HS&lowbar;PROG)</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>
+              and
+              <constant>&dollar;(OBJS)</constant><indexterm><primary>OBJS</primary></indexterm>
+              would not have their final values at the moment
+              <command>gmake</command> encountered the rule.  Alas,
+              <command>gmake</command> takes a snapshot of their
+              current values, and wires that snapshot into the rule.
+              (In contrast, the commands executed when the rule
+              &ldquo;fires&rdquo; are only substituted at the moment
+              of firing.)  So, the rule must follow the definitions
+              given in the <filename>Makefile</filename> itself.</para>
+	    </listitem>
 
-If this rule was in <filename>boilerplate.mk</filename> then <constant>&dollar;(HS&lowbar;PROG)</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>
-and <constant>&dollar;(OBJS)</constant><indexterm><primary>OBJS</primary></indexterm> would not have their final values at the
-moment <Command>gmake</Command> encountered the rule.  Alas, <Command>gmake</Command> takes a snapshot
-of their current values, and wires that snapshot into the rule.  (In
-contrast, the commands executed when the rule ``fires'' are only
-substituted at the moment of firing.)  So, the rule must follow the
-definitions given in the <filename>Makefile</filename> itself.
+	    <listitem>
+	      <para>Unlike pattern rules, ordinary rules cannot be
+              overriden or replaced by subsequent rules for the same
+              target (at least, not without an error message).
+              Including ordinary rules in
+              <filename>boilerplate.mk</filename> would prevent the
+              user from writing rules for specific targets in specific
+              cases.</para>
+	    </listitem>
 
-</para>
-</listitem>
-<listitem>
+	    <listitem>
+	      <para>There are a couple of other reasons I've
+              forgotten, but it doesn't matter too much.</para>
+	    </listitem>
+	  </itemizedlist>
+	</listitem>
+      </itemizedlist>
+    </sect2>
 
-<para>
- Unlike pattern rules, ordinary rules cannot be overriden or
-replaced by subsequent rules for the same target (at least, not without an
-error message).  Including ordinary rules in <filename>boilerplate.mk</filename> would
-prevent the user from writing rules for specific targets in specific cases.
+    <sect2 id="sec-boiler">
+      <title>The main <filename>mk/boilerplate.mk</filename> file</title>
+      <indexterm><primary>boilerplate.mk</primary></indexterm>
 
-</para>
-</listitem>
-<listitem>
-
-<para>
- There are a couple of other reasons I've forgotten, but it doesn't
-matter too much.
-</para>
-</listitem>
-
-</ItemizedList>
-
-</para>
-</listitem>
-
-</ItemizedList>
-
-</para>
-
-</Sect2>
-
-<Sect2 id="sec-boiler">
-<Title>The main <filename>mk/boilerplate.mk</filename> file
-
-<indexterm><primary>boilerplate.mk</primary></indexterm></Title>
-
-<para>
-If you look at <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/mk/boilerplate.mk</filename> you will find
-that it consists of the following sections, each held in a separate
-file: 
-</para>
+      <para>If you look at
+      <filename><constant>&dollar;(FPTOOLS&lowbar;TOP)</constant>/mk/boilerplate.mk</filename>
+      you will find that it consists of the following sections, each
+      held in a separate file:</para>
 
       <variablelist>
-
 	<varlistentry>
 	  <term><filename>config.mk</filename></term>
 	  <indexterm><primary>config.mk</primary></indexterm>
@@ -2693,7 +2593,7 @@ file:
 	  <term><filename>paths.mk</filename></term>
 	  <indexterm><primary>paths.mk</primary></indexterm>
 	  <listitem>
-	    <para>defines <Command>make</Command> variables for
+	    <para>defines <command>make</command> variables for
             pathnames and file lists.  This file contains code for
             automatically compiling lists of source files and deriving
             lists of object files from those.  The results can be
@@ -2879,7 +2779,7 @@ file:
 	  <term><filename>opts.mk</filename></term>
 	  <indexterm><primary>opts.mk</primary></indexterm>
 	  <listitem>
-	    <para>defines <Command>make</Command> variables for option
+	    <para>defines <command>make</command> variables for option
             strings to pass to each program. For example, it defines
             <constant>HC&lowbar;OPTS</constant><indexterm><primary>HC&lowbar;OPTS</primary></indexterm>,
             the option strings to pass to the Haskell compiler.  See
@@ -2897,33 +2797,29 @@ file:
 	</varlistentry>
       </variablelist>
 
-<para>
-Any of the variables and pattern rules defined by the boilerplate file
-can easily be overridden in any particular <filename>Makefile</filename>, because the
-boilerplate <Literal>include</Literal> comes first.  Definitions after this <Literal>include</Literal>
-directive simply override the default ones in <filename>boilerplate.mk</filename>.
-</para>
+      <para>Any of the variables and pattern rules defined by the
+      boilerplate file can easily be overridden in any particular
+      <filename>Makefile</filename>, because the boilerplate
+      <literal>include</literal> comes first.  Definitions after this
+      <literal>include</literal> directive simply override the default
+      ones in <filename>boilerplate.mk</filename>.</para>
+    </sect2>
 
-</Sect2>
+    <sect2 id="sec-suffix">
+      <title>Pattern rules and options</title>
+      <indexterm><primary>Pattern rules</primary></indexterm>
 
-<Sect2 id="sec-suffix">
-<Title>Pattern rules and options
+      <para>The file
+      <filename>suffix.mk</filename><indexterm><primary>suffix.mk</primary></indexterm>
+      defines standard <emphasis>pattern rules</emphasis> that say how
+      to build one kind of file from another, for example, how to
+      build a <filename>.o</filename> file from a
+      <filename>.c</filename> file.  (GNU <command>make</command>'s
+      <emphasis>pattern rules</emphasis> are more powerful and easier
+      to use than Unix <command>make</command>'s <emphasis>suffix
+      rules</emphasis>.)</para>
 
-<indexterm><primary>Pattern rules</primary></indexterm></Title>
-
-<para>
-The file <filename>suffix.mk</filename><indexterm><primary>suffix.mk</primary></indexterm> defines standard <Emphasis>pattern
-rules</Emphasis> that say how to build one kind of file from another, for
-example, how to build a <filename>.o</filename> file from a <filename>.c</filename> file.  (GNU <Command>make</Command>'s
-<Emphasis>pattern rules</Emphasis> are more powerful and easier to use than Unix
-<Command>make</Command>'s <Emphasis>suffix rules</Emphasis>.)
-</para>
-
-<para>
-Almost all the rules look something like this:
-</para>
-
-<para>
+      <para>Almost all the rules look something like this:</para>
 
 <ProgramListing>
 %.o : %.c
@@ -2931,256 +2827,247 @@ Almost all the rules look something like this:
       $(CC) $(CC_OPTS) -c $&#60; -o $@
 </ProgramListing>
 
-</para>
+      <para>Here's how to understand the rule.  It says that
+      <emphasis>something</emphasis><filename>.o</filename> (say
+      <filename>Foo.o</filename>) can be built from
+      <emphasis>something</emphasis><filename>.c</filename>
+      (<filename>Foo.c</filename>), by invoking the C compiler (path
+      name held in <constant>&dollar;(CC)</constant>), passing to it
+      the options <constant>&dollar;(CC&lowbar;OPTS)</constant> and
+      the rule's dependent file of the rule
+      <literal>&dollar;&lt;</literal> (<filename>Foo.c</filename> in
+      this case), and putting the result in the rule's target
+      <literal>&dollar;@</literal> (<filename>Foo.o</filename> in this
+      case).</para>
 
-<para>
-Here's how to understand the rule.  It says that
-<Emphasis>something</Emphasis><filename>.o</filename> (say <filename>Foo.o</filename>) can be built from
-<Emphasis>something</Emphasis><filename>.c</filename> (<filename>Foo.c</filename>), by invoking the C compiler
-(path name held in <constant>&dollar;(CC)</constant>), passing to it the options
-<constant>&dollar;(CC&lowbar;OPTS)</constant> and the rule's dependent file of the rule
-<Literal>&dollar;&lt;</Literal> (<filename>Foo.c</filename> in this case), and putting the result in
-the rule's target <Literal>&dollar;@</Literal> (<filename>Foo.o</filename> in this case).
-</para>
+      <para>Every program is held in a <command>make</command>
+      variable defined in <filename>mk/config.mk</filename>&mdash;look
+      in <filename>mk/config.mk</filename> for the complete list.  One
+      important one is the Haskell compiler, which is called
+      <constant>&dollar;(HC)</constant>.</para>
 
-<para>
-Every program is held in a <Command>make</Command> variable defined in
-<filename>mk/config.mk</filename>&mdash;look in <filename>mk/config.mk</filename> for the
-complete list.  One important one is the Haskell compiler, which is
-called <constant>&dollar;(HC)</constant>.
-</para>
-
-<para>
-Every program's options are are held in a <Command>make</Command> variables called
-<constant>&lt;prog&gt;&lowbar;OPTS</constant>.  the <constant>&lt;prog&gt;&lowbar;OPTS</constant> variables are defined in
-<filename>mk/opts.mk</filename>.  Almost all of them are defined like this:
-</para>
-
-<para>
+      <para>Every program's options are are held in a
+      <command>make</command> variables called
+      <constant>&lt;prog&gt;&lowbar;OPTS</constant>.  the
+      <constant>&lt;prog&gt;&lowbar;OPTS</constant> variables are
+      defined in <filename>mk/opts.mk</filename>.  Almost all of them
+      are defined like this:</para>
 
 <ProgramListing>
 CC_OPTS = $(SRC_CC_OPTS) $(WAY$(_way)_CC_OPTS) $($*_CC_OPTS) $(EXTRA_CC_OPTS)
 </ProgramListing>
 
-</para>
+      <para>The four variables from which
+       <constant>CC&lowbar;OPTS</constant> is built have the following
+      meaning:</para>
 
-<para>
-The four variables from which <constant>CC&lowbar;OPTS</constant> is built have the following meaning:
-</para>
+      <variablelist>
+	<varlistentry>
+	  <term><constant>SRC&lowbar;CC&lowbar;OPTS</constant><indexterm><primary>SRC&lowbar;CC&lowbar;OPTS</primary></indexterm>:</term>
+	  <listitem>
+	    <para>options passed to all C compilations.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-<VariableList>
+	<varlistentry>
+	  <term><constant>WAY&lowbar;&lt;way&gt;&lowbar;CC&lowbar;OPTS</constant>:</term>
+	  <listitem>
+	    <para>options passed to C compilations for way
+            <literal>&lt;way&gt;</literal>. For example,
+            <constant>WAY&lowbar;mp&lowbar;CC&lowbar;OPTS</constant>
+            gives options to pass to the C compiler when compiling way
+            <literal>mp</literal>.  The variable
+            <constant>WAY&lowbar;CC&lowbar;OPTS</constant> holds
+            options to pass to the C compiler when compiling the
+            standard way.  (<Xref LinkEnd="sec-ways"> dicusses
+            multi-way compilation.)</para>
+	  </listitem>
+	</varlistentry>
 
-<varlistentry>
-<term><constant>SRC&lowbar;CC&lowbar;OPTS</constant><indexterm><primary>SRC&lowbar;CC&lowbar;OPTS</primary></indexterm>:</term>
-<listitem>
-<para>
-options passed to all C
-compilations.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>WAY&lowbar;&lt;way&gt;&lowbar;CC&lowbar;OPTS</constant>:</term>
-<listitem>
-<para>
-options passed to C
-compilations for way <Literal>&lt;way&gt;</Literal>. For example,
-<constant>WAY&lowbar;mp&lowbar;CC&lowbar;OPTS</constant> gives options to pass to the C compiler when
-compiling way <Literal>mp</Literal>.  The variable <constant>WAY&lowbar;CC&lowbar;OPTS</constant> holds
-options to pass to the C compiler when compiling the standard way.
-(<Xref LinkEnd="sec-ways"> dicusses multi-way
-compilation.)  
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>&lt;module&gt;&lowbar;CC&lowbar;OPTS</constant>:</term>
-<listitem>
-<para>
-options to
-pass to the C compiler that are specific to module <Literal>&lt;module&gt;</Literal>.  For example, <constant>SMap&lowbar;CC&lowbar;OPTS</constant> gives the specific options
-to pass to the C compiler when compiling <filename>SMap.c</filename>.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>EXTRA&lowbar;CC&lowbar;OPTS</constant><indexterm><primary>EXTRA&lowbar;CC&lowbar;OPTS</primary></indexterm>:</term>
-<listitem>
-<para>
-extra options to pass to all
-C compilations.  This is intended for command line use, thus:
-</para>
+	<varlistentry>
+	  <term><constant>&lt;module&gt;&lowbar;CC&lowbar;OPTS</constant>:</term>
+	  <listitem>
+	    <para>options to pass to the C compiler that are specific
+            to module <literal>&lt;module&gt;</literal>.  For example,
+            <constant>SMap&lowbar;CC&lowbar;OPTS</constant> gives the
+            specific options to pass to the C compiler when compiling
+            <filename>SMap.c</filename>.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
+	<varlistentry>
+	  <term><constant>EXTRA&lowbar;CC&lowbar;OPTS</constant><indexterm><primary>EXTRA&lowbar;CC&lowbar;OPTS</primary></indexterm>:</term>
+	  <listitem>
+	    <para>extra options to pass to all C compilations.  This
+            is intended for command line use, thus:</para>
 
 <ProgramListing>
 gmake libHS.a EXTRA_CC_OPTS="-v"
 </ProgramListing>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+    </sect2>
 
-</para>
-</listitem></varlistentry>
-</VariableList>
-</para>
+    <sect2 id="sec-targets">
+      <title>The main <filename>mk/target.mk</filename> file</title>
+      <indexterm><primary>target.mk</primary></indexterm>
 
-</Sect2>
+      <para><filename>target.mk</filename> contains canned rules for
+      all the standard targets described in <Xref
+      LinkEnd="sec-standard-targets">.  It is complicated by the fact
+      that you don't want all of these rules to be active in every
+      <filename>Makefile</filename>.  Rather than have a plethora of
+      tiny files which you can include selectively, there is a single
+      file, <filename>target.mk</filename>, which selectively includes
+      rules based on whether you have defined certain variables in
+      your <filename>Makefile</filename>.  This section explains what
+      rules you get, what variables control them, and what the rules
+      do.  Hopefully, you will also get enough of an idea of what is
+      supposed to happen that you can read and understand any weird
+      special cases yourself.</para>
 
-<Sect2 id="sec-targets">
-<Title>The main <filename>mk/target.mk</filename> file
+      <variablelist>
+	<varlistentry>
+	  <term><constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>.</term>
+	  <listitem>
+	    <para>If <constant>HS&lowbar;PROG</constant> is defined,
+            you get rules with the following targets:</para>
 
-<indexterm><primary>target.mk</primary></indexterm></Title>
+	    <variablelist>
+	      <varlistentry>
+		<term><filename>HS&lowbar;PROG</filename><indexterm><primary>HS&lowbar;PROG</primary></indexterm></term>
+		<listitem>
+		  <para>itself.  This rule links
+                  <constant>&dollar;(OBJS)</constant> with the Haskell
+                  runtime system to get an executable called
+                  <constant>&dollar;(HS&lowbar;PROG)</constant>.</para>
+		</listitem>
+	      </varlistentry>
 
-<para>
-<filename>target.mk</filename> contains canned rules for all the standard targets
-described in <Xref LinkEnd="sec-standard-targets">.  It is complicated by the fact that you don't want all of
-these rules to be active in every <filename>Makefile</filename>.  Rather than have a
-plethora of tiny files which you can include selectively, there is a
-single file, <filename>target.mk</filename>, which selectively includes rules based on
-whether you have defined certain variables in your <filename>Makefile</filename>.  This
-section explains what rules you get, what variables control them, and
-what the rules do.  Hopefully, you will also get enough of an idea of
-what is supposed to happen that you can read and understand any weird
-special cases yourself.
-</para>
+	      <varlistentry>
+		<term><literal>install</literal><indexterm><primary>install</primary></indexterm></term>
+		<listitem>
+		  <para>installs
+                  <constant>&dollar;(HS&lowbar;PROG)</constant> in
+                  <constant>&dollar;(bindir)</constant>.</para>
+		</listitem>
+	      </varlistentry>
+	    </variablelist>
 
-<para>
-<VariableList>
+	  </listitem>
+	</varlistentry>
 
-<varlistentry>
-<term><constant>HS&lowbar;PROG</constant><indexterm><primary>HS&lowbar;PROG</primary></indexterm>.</term>
-<listitem>
-<para>
-If <constant>HS&lowbar;PROG</constant> is defined, you get
-rules with the following targets:
-<VariableList>
+	<varlistentry>
+	  <term><constant>C&lowbar;PROG</constant><indexterm><primary>C&lowbar;PROG</primary></indexterm></term>
+	  <listitem>
+	    <para>is similar to <constant>HS&lowbar;PROG</constant>,
+            except that the link step links
+            <constant>&dollar;(C&lowbar;OBJS)</constant> with the C
+            runtime system.</para>
+	  </listitem>
+	</varlistentry>
 
-<varlistentry>
-<term><filename>HS&lowbar;PROG</filename><indexterm><primary>HS&lowbar;PROG</primary></indexterm></term>
-<listitem>
-<para>
-itself.  This rule links <constant>&dollar;(OBJS)</constant>
-with the Haskell runtime system to get an executable called
-<constant>&dollar;(HS&lowbar;PROG)</constant>.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><Literal>install</Literal><indexterm><primary>install</primary></indexterm></term>
-<listitem>
-<para>
-installs <constant>&dollar;(HS&lowbar;PROG)</constant>
-in <constant>&dollar;(bindir)</constant>.
-</para>
-</listitem></varlistentry>
-</VariableList>
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>C&lowbar;PROG</constant><indexterm><primary>C&lowbar;PROG</primary></indexterm></term>
-<listitem>
-<para>
-is similar to <constant>HS&lowbar;PROG</constant>, except that
-the link step links <constant>&dollar;(C&lowbar;OBJS)</constant> with the C runtime system.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>LIBRARY</constant><indexterm><primary>LIBRARY</primary></indexterm></term>
-<listitem>
-<para>
-is similar to <constant>HS&lowbar;PROG</constant>, except that
-it links <constant>&dollar;(LIB&lowbar;OBJS)</constant> to make the library archive <constant>&dollar;(LIBRARY)</constant>, and
-<Literal>install</Literal> installs it in <constant>&dollar;(libdir)</constant>.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>LIB&lowbar;DATA</constant><indexterm><primary>LIB&lowbar;DATA</primary></indexterm></term>
-<listitem>
-<para>
-&hellip;
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>LIB&lowbar;EXEC</constant><indexterm><primary>LIB&lowbar;EXEC</primary></indexterm></term>
-<listitem>
-<para>
-&hellip;
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><constant>HS&lowbar;SRCS</constant><indexterm><primary>HS&lowbar;SRCS</primary></indexterm>, <constant>C&lowbar;SRCS</constant><indexterm><primary>C&lowbar;SRCS</primary></indexterm>.</term>
-<listitem>
-<para>
-If <constant>HS&lowbar;SRCS</constant>
-is defined and non-empty, a rule for the target <Literal>depend</Literal> is included,
-which generates dependency information for Haskell programs.
-Similarly for <constant>C&lowbar;SRCS</constant>.
-</para>
-</listitem></varlistentry>
-</VariableList>
-</para>
+	<varlistentry>
+	  <term><constant>LIBRARY</constant><indexterm><primary>LIBRARY</primary></indexterm></term>
+	  <listitem>
+	    <para>is similar to <constant>HS&lowbar;PROG</constant>,
+            except that it links
+            <constant>&dollar;(LIB&lowbar;OBJS)</constant> to make the
+            library archive <constant>&dollar;(LIBRARY)</constant>,
+            and <literal>install</literal> installs it in
+            <constant>&dollar;(libdir)</constant>.</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
-All of these rules are ``double-colon'' rules, thus
-</para>
+	<varlistentry>
+	  <term><constant>LIB&lowbar;DATA</constant><indexterm><primary>LIB&lowbar;DATA</primary></indexterm></term>
+	  <listitem>
+	    <para>&hellip;</para>
+	  </listitem>
+	</varlistentry>
 
-<para>
+	<varlistentry>
+	  <term><constant>LIB&lowbar;EXEC</constant><indexterm><primary>LIB&lowbar;EXEC</primary></indexterm></term>
+	  <listitem>
+	    <para>&hellip;</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term><constant>HS&lowbar;SRCS</constant><indexterm><primary>HS&lowbar;SRCS</primary></indexterm>, <constant>C&lowbar;SRCS</constant><indexterm><primary>C&lowbar;SRCS</primary></indexterm>.</term>
+	  <listitem>
+	    <para>If <constant>HS&lowbar;SRCS</constant> is defined
+            and non-empty, a rule for the target
+            <literal>depend</literal> is included, which generates
+            dependency information for Haskell programs.  Similarly
+            for <constant>C&lowbar;SRCS</constant>.</para>
+	  </listitem>
+	</varlistentry>
+      </variablelist>
+
+      <para>All of these rules are &ldquo;double-colon&rdquo; rules,
+      thus</para>
 
 <ProgramListing>
 install :: $(HS_PROG)
       ...how to install it...
 </ProgramListing>
 
-</para>
+      <para>GNU <command>make</command> treats double-colon rules as
+      separate entities.  If there are several double-colon rules for
+      the same target it takes each in turn and fires it if its
+      dependencies say to do so.  This means that you can, for
+      example, define both <constant>HS&lowbar;PROG</constant> and
+      <constant>LIBRARY</constant>, which will generate two rules for
+      <literal>install</literal>.  When you type <command>gmake
+      install</command> both rules will be fired, and both the program
+      and the library will be installed, just as you wanted.</para>
+    </sect2>
 
-<para>
-GNU <Command>make</Command> treats double-colon rules as separate entities.  If there
-are several double-colon rules for the same target it takes each in
-turn and fires it if its dependencies say to do so.  This means that
-you can, for example, define both <constant>HS&lowbar;PROG</constant> and <constant>LIBRARY</constant>, which will
-generate two rules for <Literal>install</Literal>.  When you type <Command>gmake install</Command> both
-rules will be fired, and both the program and the library will be
-installed, just as you wanted.
-</para>
+    <sect2 id="sec-subdirs">
+      <title>Recursion</title>
+      <indexterm><primary>recursion, in makefiles</primary></indexterm>
+      <indexterm><primary>Makefile, recursing into subdirectories</primary></indexterm>
 
-</Sect2>
+      <para>In leaf <filename>Makefile</filename>s the variable
+      <constant>SUBDIRS</constant><indexterm><primary>SUBDIRS</primary></indexterm>
+      is undefined.  In non-leaf <filename>Makefile</filename>s,
+      <constant>SUBDIRS</constant> is set to the list of
+      sub-directories that contain subordinate
+      <filename>Makefile</filename>s.  <emphasis>It is up to you to
+      set <constant>SUBDIRS</constant> in the
+      <filename>Makefile</filename>.</emphasis> There is no automation
+      here&mdash;<constant>SUBDIRS</constant> is too important to
+      automate.</para>
 
-<Sect2 id="sec-subdirs">
-<Title>Recursion
+      <para>When <constant>SUBDIRS</constant> is defined,
+      <filename>target.mk</filename> includes a rather neat rule for
+      the standard targets (<Xref LinkEnd="sec-standard-targets"> that
+      simply invokes <command>make</command> recursively in each of
+      the sub-directories.</para>
 
-<indexterm><primary>recursion, in makefiles</primary></indexterm>
-<indexterm><primary>Makefile, recursing into subdirectories</primary></indexterm></Title>
-
-<para>
-In leaf <filename>Makefile</filename>s the variable <constant>SUBDIRS</constant><indexterm><primary>SUBDIRS</primary></indexterm> is undefined.
-In non-leaf <filename>Makefile</filename>s, <constant>SUBDIRS</constant> is set to the list of
-sub-directories that contain subordinate <filename>Makefile</filename>s.  <Emphasis>It is up to
-you to set <constant>SUBDIRS</constant> in the <filename>Makefile</filename>.</Emphasis> There is no automation here&mdash;<constant>SUBDIRS</constant> is too important to automate.
-</para>
-
-<para>
-When <constant>SUBDIRS</constant> is defined, <filename>target.mk</filename> includes a rather
-neat rule for the standard targets (<Xref LinkEnd="sec-standard-targets"> that simply invokes
-<Command>make</Command> recursively in each of the sub-directories.
-</para>
-
-<para>
-<Emphasis>These recursive invocations are guaranteed to occur in the order
-in which the list of directories is specified in <constant>SUBDIRS</constant>. </Emphasis>This
-guarantee can be important.  For example, when you say <Command>gmake boot</Command> it
-can be important that the recursive invocation of <Command>make boot</Command> is done
-in one sub-directory (the include files, say) before another (the
-source files).  Generally, put the most independent sub-directory
-first, and the most dependent last.
-</para>
-
-</Sect2>
+      <para><emphasis>These recursive invocations are guaranteed to
+      occur in the order in which the list of directories is specified
+      in <constant>SUBDIRS</constant>. </emphasis>This guarantee can
+      be important.  For example, when you say <command>gmake
+      boot</command> it can be important that the recursive invocation
+      of <command>make boot</command> is done in one sub-directory
+      (the include files, say) before another (the source files).
+      Generally, put the most independent sub-directory first, and the
+      most dependent last.</para>
+    </sect2>
 
     <sect2 id="sec-ways">
       <title>Way management</title>
       <indexterm><primary>way management</primary></indexterm>
 
       <para>We sometimes want to build essentially the same system in
-      several different ``ways''.  For example, we want to build GHC's
+      several different &ldquo;ways&rdquo;.  For example, we want to build GHC's
       <literal>Prelude</literal> libraries with and without profiling,
       so that there is an appropriately-built library archive to link
       with when the user compiles his program.  It would be possible
-      to have a completely separate build tree for each such ``way'',
+      to have a completely separate build tree for each such &ldquo;way&rdquo;,
       but it would be horribly bureaucratic, especially since often
       only parts of the build tree need to be constructed in multiple
       ways.</para>
@@ -3206,46 +3093,46 @@ first, and the most dependent last.
       way tag the other side of the dot, for boring reasons; thus,
       <filename>libHS&lowbar;mp.a</filename>.</para>
 
-      <para>A <Command>make</Command> variable called
+      <para>A <command>make</command> variable called
       <constant>way</constant> holds the current way tag.
       <emphasis><constant>way</constant> is only ever set on the
-      command line of <Command>gmake</Command></emphasis> (usually in
+      command line of <command>gmake</command></emphasis> (usually in
       a recursive invocation of <command>gmake</command> by the
       system).  It is never set inside a
       <filename>Makefile</filename>.  So it is a global constant for
-      any one invocation of <Command>gmake</Command>.  Two other
-      <Command>make</Command> variables,
+      any one invocation of <command>gmake</command>.  Two other
+      <command>make</command> variables,
       <constant>way&lowbar;</constant> and
       <constant>&lowbar;way</constant> are immediately derived from
       <constant>&dollar;(way)</constant> and never altered.  If
       <constant>way</constant> is not set, then neither are
       <constant>way&lowbar;</constant> and
       <constant>&lowbar;way</constant>, and the invocation of
-      <Command>make</Command> will build the <quote>normal
+      <command>make</command> will build the <quote>normal
       way</quote>.  If <constant>way</constant> is set, then the other
       two variables are set in sympathy.  For example, if
-      <constant>&dollar;(way)</constant> is ``<Literal>mp</Literal>'',
+      <constant>&dollar;(way)</constant> is &ldquo;<literal>mp</literal>&rdquo;,
       then <constant>way&lowbar;</constant> is set to
-      ``<Literal>mp&lowbar;</Literal>'' and
+      &ldquo;<literal>mp&lowbar;</literal>&rdquo; and
       <constant>&lowbar;way</constant> is set to
-      ``<Literal>&lowbar;mp</Literal>''.  These three variables are
+      &ldquo;<literal>&lowbar;mp</literal>&rdquo;.  These three variables are
       then used when constructing file names.</para>
 
-      <para>So how does <Command>make</Command> ever get recursively
+      <para>So how does <command>make</command> ever get recursively
       invoked with <constant>way</constant> set?  There are two ways
       in which this happens:</para>
 
       <itemizedlist>
 	<listitem>
 	  <para>For some (but not all) of the standard targets, when
-          in a leaf sub-directory, <Command>make</Command> is
+          in a leaf sub-directory, <command>make</command> is
           recursively invoked for each way tag in
           <constant>&dollar;(WAYS)</constant>.  You set
           <constant>WAYS</constant> in the
           <filename>Makefile</filename> to the list of way tags you
           want these targets built for.  The mechanism here is very
           much like the recursive invocation of
-          <Command>make</Command> in sub-directories (<Xref
+          <command>make</command> in sub-directories (<Xref
           LinkEnd="sec-subdirs">).  It is up to you to set
           <constant>WAYS</constant> in your
           <filename>Makefile</filename>; this is how you control what
@@ -3256,14 +3143,14 @@ first, and the most dependent last.
 	  <para>For a useful collection of targets (such as
           <filename>libHS&lowbar;mp.a</filename>,
           <filename>Foo.mp&lowbar;o</filename>) there is a rule which
-          recursively invokes <Command>make</Command> to make the
+          recursively invokes <command>make</command> to make the
           specified target, setting the <constant>way</constant>
-          variable.  So if you say <Command>gmake
-          Foo.mp&lowbar;o</Command> you should see a recursive
-          invocation <Command>gmake Foo.mp&lowbar;o way=mp</Command>,
-          and <Emphasis>in this recursive invocation the pattern rule
+          variable.  So if you say <command>gmake
+          Foo.mp&lowbar;o</command> you should see a recursive
+          invocation <command>gmake Foo.mp&lowbar;o way=mp</command>,
+          and <emphasis>in this recursive invocation the pattern rule
           for compiling a Haskell file into a <filename>.o</filename>
-          file will match</Emphasis>.  The key pattern rules (in
+          file will match</emphasis>.  The key pattern rules (in
           <filename>suffix.mk</filename>) look like this:
 
 <ProgramListing>
@@ -3288,102 +3175,360 @@ $ make way=p
           directory. </para>
 	</listitem>
       </itemizedlist>
+    </sect2>
 
-</Sect2>
+    <sect2>
+      <title>When the canned rule isn't right</title>
 
-<Sect2>
-<Title>When the canned rule isn't right</Title>
+      <para>Sometimes the canned rule just doesn't do the right thing.
+      For example, in the <literal>nofib</literal> suite we want the
+      link step to print out timing information.  The thing to do here
+      is <emphasis>not</emphasis> to define
+      <constant>HS&lowbar;PROG</constant> or
+      <constant>C&lowbar;PROG</constant>, and instead define a special
+      purpose rule in your own <filename>Makefile</filename>.  By
+      using different variable names you will avoid the canned rules
+      being included, and conflicting with yours.</para>
+    </sect2>
+  </sect1>
 
-<para>
-Sometimes the canned rule just doesn't do the right thing.  For
-example, in the <Literal>nofib</Literal> suite we want the link step to print out
-timing information.  The thing to do here is <Emphasis>not</Emphasis> to define
-<constant>HS&lowbar;PROG</constant> or <constant>C&lowbar;PROG</constant>, and instead define a special purpose rule in
-your own <filename>Makefile</filename>.  By using different variable names you will avoid
-the canned rules being included, and conflicting with yours.
-</para>
+  <sect1 id="sec-porting-ghc">
+    <title>Porting GHC</title>
 
-</Sect2>
+    <para>This section describes how to port GHC to a currenly
+    unsupported platform.  There are two distinct
+    possibilities:</para>
 
-</Sect1>
+    <itemizedlist>
+      <listitem>
+	<para>The hardware architecture for your system is already
+	supported by GHC, but you're running an OS that isn't
+	supported (or perhaps has been supported in the past, but
+	currently isn't).  This is the easiest type of porting job,
+	but it still requires some careful bootstrapping.  Proceed to
+	<xref linkend="sec-booting-from-hc">.</para>
+      </listitem>
+      
+      <listitem>
+	<para>Your system's hardware architecture isn't supported by
+	GHC.  This will be a more difficult port (though by comparison
+	perhaps not as difficult as porting gcc).  Proceed to <xref
+	linkend="unregisterised-porting">.</para>
+      </listitem>
+    </itemizedlist>
+    
+    <sect2 id="sec-booting-from-hc">
+      <title>Booting/porting from C (<filename>.hc</filename>) files</title>
 
-<Sect1 id="sec-booting-from-C">
-<Title>Booting/porting from C (<filename>.hc</filename>) files
+      <indexterm><primary>building GHC from .hc files</primary></indexterm>
+      <indexterm><primary>booting GHC from .hc files</primary></indexterm>
+      <indexterm><primary>porting GHC</primary></indexterm>
 
-<indexterm><primary>building GHC from .hc files</primary></indexterm>
-<indexterm><primary>booting GHC from .hc files</primary></indexterm>
-<indexterm><primary>porting GHC</primary></indexterm></Title>
+      <para>Bootstrapping GHC on a system without GHC already
+      installed is achieved by taking the intermediate C files (known
+      as HC files) from a GHC compilation on a supported system to the
+      target machine, and compiling them using gcc to get a working
+      GHC.</para>
 
-    <para><emphasis>NOTE: GHC version 5.xx is significantly harder to
-    bootstrap from C than previous versions.  We recommend starting
-    from version 4.08.2 if you need to bootstrap in this
-    way.</emphasis></para>
+      <para><emphasis>NOTE: GHC version 5.xx is significantly harder
+      to bootstrap from C than previous versions.  We recommend
+      starting from version 4.08.2 if you need to bootstrap in this
+      way.</emphasis></para>
 
-<para>
-This section is for people trying to get GHC going by using the supplied
-intermediate C (<filename>.hc</filename>) files.  This would probably be
-because no binaries have been provided, or because the machine is not ``fully
-supported''.
-</para>
+      <para>HC files are architecture-dependent (but not
+      OS-dependent), so you have to get a set that were generated on
+      similar hardware.  There may be some supplied on the GHC
+      download page, otherwise you'll have to compile some up
+      yourself, or start from <emphasis>unregisterised</emphasis> HC
+      files - see <xref linkend="unregisterised-porting">.</para>
 
-<para>
-The intermediate C files are normally made available together with a source
-release, please check the announce message for exact directions of where to
-find them. If we haven't made them available or you can't find them, please
-ask.
-</para>
+      <para>The following steps should result in a working GHC build
+      with full libraries:</para>
 
-<para>
-Assuming you've got them, unpack them on top of a fresh source tree.  This
-will place matching <filename>.hc</filename> files next to the corresponding
-Haskell source in the compiler subdirectory <filename>ghc</filename> and in
-the language package of hslibs (i.e., in <filename>hslibs/lang</filename>).
-Then follow the `normal' instructions in <Xref
-LinkEnd="sec-building-from-source"> for setting up a build tree.
-</para>
+      <itemizedlist>
+	<listitem>
+	  <para>Unpack the HC files on top of a fresh source tree
+          (make sure the source tree version matches the version of
+          the HC files <emphasis>exactly</emphasis>!).  This will
+          place matching <filename>.hc</filename> files next to the
+          corresponding Haskell source (<filename>.hs</filename> or
+          <filename>.lhs</filename>) in the compiler subdirectory
+          <filename>ghc/compiler</filename> and in the libraries
+          (<filename>ghc/lib</filename>, and subdirectories of
+          <filename>hslibs</filename>).</para>
+	</listitem>
 
-<para>
-The actual build process is fully automated by the
-<filename>hc-build</filename> script located in the
-<filename>distrib</filename> directory.  If you eventually want to install GHC
-into the directory <filename>INSTALL_DIRECTORY</filename>, the following
-command will execute the whole build process (it won't install yet):
-</para>
+	<listitem>
+	  <para>The actual build process is fully automated by the
+          <filename>hc-build</filename> script located in the
+          <filename>distrib</filename> directory.  If you eventually
+          want to install GHC into the directory
+          <replaceable>dir</replaceable>, the following
+          command will execute the whole build process (it won't
+          install yet):</para>
+
 <Screen>
-foo% distrib/hc-build --prefix=INSTALL_DIRECTORY
+foo% distrib/hc-build --prefix=<replaceable>dir</replaceable>
 </Screen>
 <indexterm><primary>--hc-build</primary></indexterm>
-<para>
-By default, the installation directory is <filename>/usr/local</filename>.  If
-that is what you want, you may omit the argument to
-<filename>hc-build</filename>.  Generally, any option given to
-<filename>hc-build</filename> is passed through to the configuration script
-<filename>configure</filename>.  If <filename>hc-build</filename>
-successfully completes the build process, you can install the resulting
-system, as normal, with
-</para>
+
+	  <para>By default, the installation directory is
+          <filename>/usr/local</filename>.  If that is what you want,
+          you may omit the argument to <filename>hc-build</filename>.
+          Generally, any option given to <filename>hc-build</filename>
+          is passed through to the configuration script
+          <filename>configure</filename>.  If
+          <filename>hc-build</filename> successfully completes the
+          build process, you can install the resulting system, as
+          normal, with</para>
+
 <Screen>
 foo% make install
 </Screen>
+	</listitem>
+      </itemizedlist>
+    </sect2>
 
-<para>
-That's the mechanics of the boot process, but, of course, if you're
-trying to boot on a platform that is not supported and significantly
-`different' from any of the supported ones, this is only the start of
-the adventure&hellip;(ToDo: porting tips&mdash;stuff to look out for, etc.)
-</para>
+    <sect2 id="unregisterised-porting">
+      <title>Porting GHC to a new architecture</title>
+      
+      <para>The first step in porting to a new architecture is to get
+      an <firstterm>unregisterised</firstterm> build working.  An
+      unregisterised build is one that compiles via vanilla C only.
+      By contrast, a registerised build uses the following
+      architecture-specific hacks for speed:</para>
 
-</Sect1>
+      <itemizedlist>
+	<listitem>
+	  <para>Global register variables: certain abstract machine
+	  <quote>registers</quote> are mapped to real machine
+	  registers, depending on how many machine registers are
+	  available (see
+	  <filename>ghc/includes/MachRegs.h</filename>).</para>
+	</listitem>
 
-<Sect1 id="sec-build-pitfalls">
-<Title>Known pitfalls in building Glasgow Haskell
+	<listitem>
+	  <para>Assembly-mangling: when compiling via C, we feed the
+	  assembly generated by gcc though a Perl script known as the
+	  <firstterm>mangler</firstterm> (see
+	  <filename>ghc/driver/mangler/ghc-asm.lprl</filename>).  The
+	  mangler rearranges the assembly to support tail-calls and
+	  various other optimisations.</para>
+	</listitem>
+      </itemizedlist>
+
+      <para>In an unregisterised build, neither of these hacks are
+      used &mdash; the idea is that the C code generated by the
+      compiler should compile using gcc only.  The lack of these
+      optimisations costs about a factor of two in performance, but
+      since unregisterised compilation is usually just a step on the
+      way to a full registerised port, we don't mind too much.</para>
+
+      <sect3>
+	<title>Building an unregisterised port</title>
+	
+	<para>The first step is to get some unregisterised HC files.
+	Either (a)&nbsp;download them from the GHC site (if there are
+	some available for the right version of GHC), or
+	(b)&nbsp;build them yourself on any machine with a working
+	GHC.</para>
+
+	<para>There is a script available which should automate the
+	process of doing the 2-stage bootstrap necessary to get the
+	unregisterised HC files - it's available in <ulink
+	url="http://cvs.haskell.org/cgi-bin/cvsweb.cgi/fptools/distrib/cross-port"><filename>fptools/distrib/cross-port</filename></ulink>
+	in CVS.</para>
+
+	<para>Now take these unregisterised HC files to the target
+	platform and bootstrap a compiler from them as per the
+	instructions in <xref linkend="sec-booting-from-hc">.  In
+	<filename>build.mk</filename>, you need to tell the build
+	system that the compiler you're building is
+	(a)&nbsp;unregisterised itself, and (b)&nbsp;builds
+	unregisterised binaries.  This varies depending on the GHC
+	version you're bootstraping:</para>
+
+<programlisting>
+# build.mk for GHC 4.08.x
+GhcWithRegisterised=NO
+</programlisting>
+
+<programlisting>
+# build.mk for GHC 5.xx
+GhcUnregisterised=YES
+</programlisting>
+
+	<para>Version 5.xx only: use the option
+	<option>--enable-hc-boot-unregisterised</option> instead of
+	<option>--enable-hc-boot</option> when running
+	<filename>./configure</filename>.</para>
+
+	<para>The build may not go through cleanly.  We've tried to
+	stick to writing portable code in most parts of the compiler,
+	so it should compile on any POSIXish system with gcc, but in
+	our experience most systems differ from the standards in one
+	way or another.  Deal with any problems as they arise - if you
+	get stuck, ask the experts on
+	<email>glasgow-haskell-users@haskell.org</email>.</para>
+	
+	<para>Once you have the unregisterised compiler up and
+	running, you can use it to start a registerised port.  The
+	following sections describe the various parts of the system
+	that will need architecture-specific tweaks in order to get a
+	registerised build going.</para>
+
+	<para>Lots of useful information about the innards of GHC is
+	available in the <ulink
+	url="http://www.cse.unsw.edu.au/~chak/haskell/ghc/comm/">GHC
+	Commentary</ulink>, which might be helpful if you run into
+	some code which needs tweaking for your system.</para>
+      </sect3>
+
+      <sect3>
+	<title>Porting the RTS</title>
+	
+	<para>The following files need architecture-specific code for a
+	registerised build:</para>
+
+	<variablelist>
+	  <varlistentry>
+	    <term><filename>ghc/includes/MachRegs.h</filename></term>
+	    <indexterm><primary><filename>MachRegs.h</filename></primary>
+	    </indexterm>
+	    <listitem>
+	      <para>Defines the STG-register to machine-register
+	      mapping.  You need to know your platform's C calling
+	      convention, and which registers are generally available
+	      for mapping to global register variables.  There are
+	      plenty of useful comments in this file.</para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><filename>ghc/includes/TailCalls.h</filename></term>
+	    <indexterm><primary><filename>TailCalls.h</filename></primary>
+	    </indexterm>
+	    <listitem>
+	      <para>Macros that cooperate with the mangler (see <xref
+	      linkend="sec-mangler">) to make proper tail-calls
+	      work.</para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><filename>ghc/rts/Adjustor.c</filename></term>
+	    <indexterm><primary><filename>Adjustor.c</filename></primary>
+	    </indexterm>
+	    <listitem>
+	      <para>Support for
+	      <literal>foreign&nbsp;import&nbsp;"wrapper"</literal>
+	      (aka
+	      <literal>foreign&nbsp;export&nbsp;dynamic</literal>).
+	      Not essential for getting GHC bootstrapped, so this file
+	      can be deferred until later if necessary.</para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><filename>ghc/rts/StgCRun.c</filename></term>
+	    <indexterm><primary><filename>StgCRun.c</filename></primary>
+	    </indexterm>
+	    <listitem>
+	      <para>The little assembly layer between the C world and
+	      the Haskell world.  See the comments and code for the
+	      other architectures in this file for pointers.</para>
+	    </listitem>
+	  </varlistentry>
+	  <varlistentry>
+	    <term><filename>ghc/rts/MBlock.h</filename></term>
+	    <term><filename>ghc/rts/MBlock.c</filename></term>
+	    <indexterm><primary><filename>MBlock.h</filename></primary>
+	    </indexterm>
+	    <indexterm><primary><filename>MBlock.c</filename></primary>
+	    </indexterm>
+	    <listitem>
+	      <para>These files are really OS-specific rather than
+	      architecture-specific.  In <filename>MBlock.h</filename>
+	      is specified the absolute location at which the RTS
+	      should try to allocate memory on your platform (try to
+	      find an area which doesn't conflict with code or dynamic
+	      libraries).  In <filename>Mblock.c</filename> you might
+	      need to tweak the call to <literal>mmap()</literal> for
+	      your OS.</para>
+	    </listitem>
+	  </varlistentry>
+	</variablelist>
+      </sect3>
+
+      <sect3 id="sec-mangler">
+	<title>The mangler</title>
+	
+	<para>The mangler is an evil Perl-script that rearranges the
+	assembly code output from gcc to do two main things:</para>
+
+	<itemizedlist>
+	  <listitem>
+	    <para>Remove function prologues and epilogues, and all
+	    movement of the C stack pointer.  This is to support
+	    tail-calls: every code block in Haskell code ends in an
+	    explicit jump, so we don't want the C-stack overflowing
+	    while we're jumping around between code blocks.</para>
+	  </listitem>
+	  <listitem>
+	    <para>Move the <firstterm>info table</firstterm> for a
+	    closure next to the entry code for that closure.  In
+	    unregisterised code, info tables contain a pointer to the
+	    entry code, but in registerised compilation we arrange
+	    that the info table is shoved right up against the entry
+	    code, and addressed backwards from the entry code pointer
+	    (this saves a word in the info table and an extra
+	    indirection when jumping to the closure entry
+	    code).</para>
+	  </listitem>
+	</itemizedlist>
+
+	<para>The mangler is abstracted to a certain extent over some
+	architecture-specific things such as the particular assembler
+	directives used to herald symbols.  Take a look at the
+	definitions for other architectures and use these as a
+	starting point.</para>
+      </sect3>
+
+      <sect3>
+	<title>The native code generator</title>
+
+	<para>The native code generator isn't essential to getting a
+	registerised build going, but it's a desirable thing to have
+	because it can cut compilation times in half.  The native code
+	generator is described in some detail in the <ulink
+	url="http://www.cse.unsw.edu.au/~chak/haskell/ghc/comm/">GHC
+	commentary</ulink>.</para>
+      </sect3>
+
+      <sect3>
+	<title>GHCi</title>
+
+	<para>To support GHCi, you need to port the dynamic linker
+	(<filename>fptools/ghc/rts/Linker.c</filename>).  The linker
+	currently supports the ELF and PEi386 object file formats - if
+	your platform uses one of these then you probably don't have
+	to do anything except fiddle with the
+	<literal>#ifdef</literal>s at the top of
+	<filename>Linker.c</filename> to tell it about your OS.</para>
+	
+	<para>If your system uses a different object file format, then
+	you have to write a linker &mdash; good luck!</para>
+      </sect3>
+    </sect2>
+
+  </sect1>
+
+<sect1 id="sec-build-pitfalls">
+<title>Known pitfalls in building Glasgow Haskell
 
 <indexterm><primary>problems, building</primary></indexterm>
 <indexterm><primary>pitfalls, in building</primary></indexterm>
-<indexterm><primary>building pitfalls</primary></indexterm></Title>
+<indexterm><primary>building pitfalls</primary></indexterm></title>
 
 <para>
-WARNINGS about pitfalls and known ``problems'':
+WARNINGS about pitfalls and known &ldquo;problems&rdquo;:
 </para>
 
 <para>
@@ -3398,8 +3543,8 @@ compensate for the vagaries of different sysadmin approaches to temp
 space.)
 <indexterm><primary>tmp, running out of space in</primary></indexterm>
 
-The quickest way around it is <Command>setenv TMPDIR /usr/tmp</Command><indexterm><primary>TMPDIR</primary></indexterm> or
-even <Command>setenv TMPDIR .</Command> (or the equivalent incantation with your shell
+The quickest way around it is <command>setenv TMPDIR /usr/tmp</command><indexterm><primary>TMPDIR</primary></indexterm> or
+even <command>setenv TMPDIR .</command> (or the equivalent incantation with your shell
 of choice).
 
 The best way around it is to say
@@ -3409,7 +3554,7 @@ export TMPDIR=&#60;dir&#62;
 </ProgramListing>
 
 in your <filename>build.mk</filename> file.
-Then GHC and the other <Literal>fptools</Literal> programs will use the appropriate directory
+Then GHC and the other <literal>fptools</literal> programs will use the appropriate directory
 in all cases.
 
 
@@ -3427,15 +3572,15 @@ are OK.
 <listitem>
 
 <para>
-When compiling via C, you'll sometimes get ``warning: assignment from
-incompatible pointer type'' out of GCC.  Harmless.
+When compiling via C, you'll sometimes get &ldquo;warning: assignment from
+incompatible pointer type&rdquo; out of GCC.  Harmless.
 
 </para>
 </listitem>
 <listitem>
 
 <para>
-Similarly, <Command>ar</Command>chiving warning messages like the following are not
+Similarly, <command>ar</command>chiving warning messages like the following are not
 a problem:
 
 <Screen>
@@ -3450,22 +3595,22 @@ ar: filename GlaIOMonad__2_2s.o truncated to GlaIOMonad_
 <listitem>
 
 <para>
- In compiling the compiler proper (in <filename>compiler/</filename>), you <Emphasis>may</Emphasis>
-get an ``Out of heap space'' error message.  These can vary with the
+ In compiling the compiler proper (in <filename>compiler/</filename>), you <emphasis>may</emphasis>
+get an &ldquo;Out of heap space&rdquo; error message.  These can vary with the
 vagaries of different systems, it seems.  The solution is simple:
 
 
-<ItemizedList>
+<itemizedlist>
 <listitem>
 
 <para>
  If you're compiling with GHC 4.00 or later, then the
-<Emphasis>maximum</Emphasis> heap size must have been reached.  This
+<emphasis>maximum</emphasis> heap size must have been reached.  This
 is somewhat unlikely, since the maximum is set to 64M by default.
 Anyway, you can raise it with the
-<Option>-optCrts-M&lt;size&gt;</Option> flag (add this flag to
+<option>-optCrts-M&lt;size&gt;</option> flag (add this flag to
 <constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</constant>
-<Command>make</Command> variable in the appropriate
+<command>make</command> variable in the appropriate
 <filename>Makefile</filename>).
 
 </para>
@@ -3473,16 +3618,16 @@ Anyway, you can raise it with the
 <listitem>
 
 <para>
- For GHC &#60; 4.00, add a suitable <Option>-H</Option> flag to the <filename>Makefile</filename>, as
+ For GHC &#60; 4.00, add a suitable <option>-H</option> flag to the <filename>Makefile</filename>, as
 above.
 
 </para>
 </listitem>
 
-</ItemizedList>
+</itemizedlist>
 
 
-and try again: <Command>gmake</Command>.  (see <Xref LinkEnd="sec-suffix"> for information about
+and try again: <command>gmake</command>.  (see <Xref LinkEnd="sec-suffix"> for information about
 <constant>&lt;module&gt;&lowbar;HC&lowbar;OPTS</constant>.)
 
 Alternatively, just cut to the chase:
@@ -3500,9 +3645,9 @@ Alternatively, just cut to the chase:
 <para>
 If you try to compile some Haskell, and you get errors from GCC about
 lots of things from <filename>/usr/include/math.h</filename>, then your GCC was
-mis-installed.  <Command>fixincludes</Command> wasn't run when it should've been.
+mis-installed.  <command>fixincludes</command> wasn't run when it should've been.
 
-As <Command>fixincludes</Command> is now automagically run as part of GCC installation,
+As <command>fixincludes</command> is now automagically run as part of GCC installation,
 this bug also suggests that you have an old GCC.
 
 
@@ -3511,7 +3656,7 @@ this bug also suggests that you have an old GCC.
 <listitem>
 
 <para>
-You <Emphasis>may</Emphasis> need to re-<Command>ranlib</Command><indexterm><primary>ranlib</primary></indexterm> your libraries (on Sun4s).
+You <emphasis>may</emphasis> need to re-<command>ranlib</command><indexterm><primary>ranlib</primary></indexterm> your libraries (on Sun4s).
 
 
 <Screen>
@@ -3531,7 +3676,7 @@ We'd be interested to know if this is still necessary.
 <listitem>
 
 <para>
-GHC's sources go through <Command>cpp</Command> before being compiled, and <Command>cpp</Command> varies
+GHC's sources go through <command>cpp</command> before being compiled, and <command>cpp</command> varies
 a bit from one Unix to another.  One particular gotcha is macro calls
 like this:
 
@@ -3541,7 +3686,7 @@ SLIT("Hello, world")
 </ProgramListing>
 
 
-Some <Command>cpp</Command>s treat the comma inside the string as separating two macro
+Some <command>cpp</command>s treat the comma inside the string as separating two macro
 arguments, so you get
 
 
@@ -3550,9 +3695,9 @@ arguments, so you get
 </Screen>
 
 
-Alas, <Command>cpp</Command> doesn't tell you the offending file!
+Alas, <command>cpp</command> doesn't tell you the offending file!
 
-Workaround: don't put weird things in string args to <Command>cpp</Command> macros.
+Workaround: don't put weird things in string args to <command>cpp</command> macros.
 </para>
 </listitem>
 
@@ -3560,10 +3705,10 @@ Workaround: don't put weird things in string args to <Command>cpp</Command> macr
 
 </para>
 
-</Sect1>
+</sect1>
 
 
-<Sect1 id="winbuild"><Title>Notes for building under Windows</Title>
+<sect1 id="winbuild"><title>Notes for building under Windows</title>
 
 <para>
 This section summarises how to get the utilities you need on your
@@ -3575,15 +3720,15 @@ guide) before continuing to read these notes.
 </para>
 
 
-<Sect2><Title>Before you start</Title>
+<sect2><title>Before you start</title>
 
 <itemizedlist>
 <listitem>
 <para>
 Make sure that the user environment variable
-<constant>MAKE_MODE</constant> is set to <Literal>UNIX</Literal>. If you
+<constant>MAKE_MODE</constant> is set to <literal>UNIX</literal>. If you
 don't do this you get very weird messages when you type
-<Command>make</Command>, such as:
+<command>make</command>, such as:
 <Screen>
 /c: /c: No such file or directory
 </Screen>
@@ -3605,169 +3750,9 @@ Install a version of GHC, and put it in your
 you need to add upon completion.)
 </para>
 </listitem>
-
-<!--
-<listitem>
-<para>
-Because of various hard-wired infelicities, you need to copy
-<Filename>bash.exe</Filename>, <Filename>perl.exe</Filename> and
-<Filename>cat.exe</Filename> (from Cygwin's <Filename>bin</Filename>
-directory), to <Filename>/bin</Filename> (discover where your Cygwin
-root directory is by typing <Command>mount</Command>). If
-<Command>/bin</Command> points to the Cygwin <Filename>bin</Filename>
-directory, there's no need to copy anything.
-</para>
-</listitem>
-
-<listitem>
-<para>
-By default, cygwin provides the command shell <filename>ash</filename>
-as <filename>sh.exe</filename>. It has a couple of 'issues', so
-in your <filename>/bin</filename> directory, make sure that <filename>
-bash.exe</filename> is also provided as <filename>sh.exe</filename>.
-</para>
-</listitem>
-
-
-<listitem>
-<para> Both <command>cvs</command> and <command>ssh</command>
-come with Cygwin, but make sure you select them when running
-the Cygwin installer.
-</listitem>
-
-<listitem>
-<para> Check out a copy of GHC sources from
-the CVS repository, following the instructions above (<xref linkend="cvs-access">).
-</para>
-</listitem>
-</itemizedlist>
-</sect2>
-
-<Sect2><Title>Building GHC</Title>
-      
-<ItemizedList>
-
-<listitem>
-<para>
-Run <Command>autoconf</Command> both in <filename>fptools</filename>
-and in <filename>fptools/ghc</filename>.  If you omit the latter step you'll
-get an error when you run <filename>./configure</filename>:
-<Screen>
-...lots of stuff...
-creating mk/config.h
-mk/config.h is unchanged
-configuring in ghc
-running /bin/sh ./configure  --cache-file=.././config.cache --srcdir=.
-./configure: ./configure: No such file or directory
-configure: error: ./configure failed for ghc
-</Screen>
-</para>
-</listitem>
-
-<listitem>
-<para>
-You either need to add <filename>ghc</filename> to your
-<constant>PATH</constant> before you invoke
-<Command>configure</Command>, or use the <Command>configure</Command>
-option <option>--with-ghc=c:/ghc/ghc-some-version/bin/ghc</option>.
-
-</para>
-<para>
-The Windows installer for GHC tells you at the end what
-additions you need to make to your <constant>PATH</constant>.
-</para>
-</listitem>
-
-<listitem>
-  <para> 
-    After <command>autoconf</command> run <command>./configure</command> in
-    <filename>fptools/</filename> thus:
-
-<Screen>
-  ./configure --host=i386-unknown-mingw32 --with-gcc=/mingw/bin/gcc
-</Screen>
-
-Both these options are important! It's possible to get into
-trouble using the wrong C compiler!
-</para>
-</listitem>
-
-</ItemizedList>
-</Sect2>
-
-
-<!--
-    <sect2>
-      <title>Building the Windows InstallShield&reg; Installer</title>
-
-      <para>
-	This section is intended for GHC developers only; no-one else
-	should need to build an InstallShield.
-      </para>
-
-      <para>
-	Having built a second-stage tree and done <command>make
-	install</command> on it, open the InstallShield
-	(<filename>.ism</filename>) file. Open the Project screen, and
-	then the Project subfolder of the Path variables folder, and
-	set <literal>SourceFiles</literal> to the top of your
-	tree. You might also need to set <literal>GHCBITS</literal> to
-	point to the tree of various external bits that are added into
-	the IS mix. You should then be able to build an InstallShield.
-      </para>
-
-      <sect3>
-	<title>Extra features of the InstallShield</title>
-
-	<para>
-	  The InstallShield has some IS-specific twiddles:
-
-	  <itemizedlist>
-	    <listitem>
-	      <para>
-		Two registry entries are set under
-		<literal>HKEY_LOCAL_MACHINE\SOFTWARE\GHC</literal>:
-		<literal>Path</literal> and
-		<literal>Version</literal>, which record respectively
-		the directory in which GHC was installed, and the
-		version number.
-	      </para>
-	    </listitem>
-	    <listitem>
-	      <para>
-		The InstallShield adds some entries to the Program
-		menu, for GHCi and for the documentation. See under
-		Setup Design and the individual components (each
-		component can add entries to the menu).
-	      </para>
-	    </listitem>
-	  </itemizedlist>
-	</para>
-      </sect3>
-      
-      <sect3>
-	<title>External add-ins</title>
-
-	<para>
-	  The external add-ins consist of Mingwin gcc and Mingwin
-	  Perl. The layout of the add-ins tree is as follows:
-
-	  <screen>
-extra-bin/
-  gcc.exe
-  perl.exe    (Mingwin perl)
-  perl56.dll
-gcc-lib/
-  Mingwin gcc binaries, libraries and headers
-include/
-  Mingwin includes
-</screen>
-	  </para>
-	</sect3>
-      
+      </itemizedlist>
     </sect2>
--->
 
-</Sect1>
+</sect1>
 
 </Article>
