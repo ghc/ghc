@@ -465,12 +465,16 @@ formatDocString :: (String -> Maybe HsQName) -> DocString
   -> (Doc,[String])
 formatDocString lookup string = format parseParas lookup string
 
-format 	:: ([Token] -> ParsedDoc)
+format 	:: ([Token] -> Either String ParsedDoc)
 	-> (String -> Maybe HsQName)
 	-> DocString
        	-> (Doc, [String])
 format parse lookup string
-  = runRn lookup $ resolveDoc $ parse $ tokenise $ string
+  = case parse (tokenise string) of
+	Left error -> trace ("Warning: parse error in doc string beginning:\n\ 
+			     \    " ++ take 40 string) (DocEmpty, [])
+	Right doc -> runRn lookup (resolveDoc doc)
+  
 
 -- ---------------------------------------------------------------------------
 -- Looking up names in documentation

@@ -3,6 +3,8 @@ module HaddockParse (parseParas, parseString) where
 
 import HaddockLex
 import HaddockTypes
+
+import MonadError
 }
 
 %tokentype { Token }
@@ -17,6 +19,8 @@ import HaddockTypes
 	'(n)'	{ TokNumber }
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
+
+%monad { Either String }
 
 %name parseParas  doc
 %name parseString seq
@@ -53,5 +57,7 @@ elem	:: { ParsedDoc }
 	| '[' seq ']'		{ DocMonospaced $2 }
 
 {
-happyError toks = error ("parse error in doc string: "  ++ show (take 3 toks))
+happyError :: [Token] -> Either String a
+happyError toks = 
+  throwError ("parse error in doc string: "  ++ show (take 3 toks))
 }
