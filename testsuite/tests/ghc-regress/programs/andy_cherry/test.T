@@ -7,5 +7,5 @@ include ($confdir ++ "/../multimod-test.T")
 
 -- The program wants to read stuff from its own directory,
 -- so we pass it the test dir as its single argument.
-test "andy_cherry" { mtr("-package lang -cpp", $testdir, "") }
+test "andy_cherry" { mtr("-package lang -cpp", ".", "") }
 
