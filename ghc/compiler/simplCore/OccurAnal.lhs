@@ -18,7 +18,6 @@ module OccurAnal (
     ) where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_DELOOPER(IdLoop)	-- paranoia
 IMPORT_1_3(List(partition))
 
 import BinderInfo
@@ -26,7 +25,7 @@ import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
 import Digraph		( stronglyConnComp, stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
-			  idType, idUnique,
+			  idType, idUnique, SYN_IE(Id),
 			  isConstMethodId,
 			  emptyIdSet, unionIdSets, mkIdSet,
 			  unitIdSet, elementOfIdSet,
@@ -39,9 +38,8 @@ import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 import Name		( isExported, isLocallyDefined )
 import Type		( getFunTy_maybe, splitForAllTy )
 import Maybes		( maybeToBool )
-import Outputable	( Outputable(..){-instance * (,) -} )
+import Outputable	( PprStyle(..), Outputable(..){-instance * (,) -} )
 import PprCore
-import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import Pretty		( Doc, vcat, ptext, nest, punctuate, comma, hcat, text )
 import TyVar		( GenTyVar{-instance Eq-} )

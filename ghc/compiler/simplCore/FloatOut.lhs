@@ -20,9 +20,8 @@ import CostCentre	( dupifyCC, CostCentre )
 import Id		( nullIdEnv, addOneToIdEnv, growIdEnvList, SYN_IE(IdEnv),
 			  GenId{-instance Outputable-}, SYN_IE(Id)
 			)
-import Outputable	( Outputable(..){-instance (,)-} )
+import Outputable	( PprStyle(..), Outputable(..){-instance (,)-} )
 import PprCore
-import PprStyle		( PprStyle(..) )
 import PprType		( GenTyVar )
 import Pretty		( Doc, int, ptext, hcat, vcat )
 import SetLevels	-- all of it
