@@ -13,8 +13,8 @@
  * included in the distribution.
  *
  * $RCSfile: machdep.c,v $
- * $Revision: 1.23 $
- * $Date: 2000/03/24 14:32:03 $
+ * $Revision: 1.24 $
+ * $Date: 2000/03/24 14:51:50 $
  * ------------------------------------------------------------------------*/
 
 #ifdef HAVE_SIGNAL_H
@@ -1169,7 +1169,7 @@ Int readTerminalChar() {                /* read character from terminal    */
 static Void installHandlers ( void ) { /* Install handlers for all fatal   */ 
                                       /* signals except SIGINT and SIGBREAK*/
 #if IS_WIN32
-    SetConsoleCtrlHandler(consoleHandler,TRUE);
+    /* SetConsoleCtrlHandler(consoleHandler,TRUE); */
 #endif
 #if !DONT_PANIC && !DOS
 # ifdef SIGABRT
