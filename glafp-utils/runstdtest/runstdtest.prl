@@ -240,8 +240,8 @@ fi
 if [ "$Heimdall" = "1" ]; then
   egrep '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $HeimdallStats
 fi
-egrep -v '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
-mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
+# egrep -v '^=== HEIMDALL: ' < $TmpPrefix/runtest$$.2 > $TmpPrefix/runtest$$.2b
+# mv -f $TmpPrefix/runtest$$.2b $TmpPrefix/runtest$$.2
 
 hit='NO'
 for out_file in @PgmStderrFile ; do
