@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 
 module System.Cmd
-    ( system        -- :: String -> IO ExitCode
+    ( system,        -- :: String -> IO ExitCode
+      rawSystem,     -- :: String -> IO ExitCode
     ) where
 
 import Prelude
@@ -66,3 +67,20 @@ system cmd =
 
 foreign import ccall unsafe "systemCmd" primSystem :: CString -> IO Int
 #endif  /* __HUGS__ */
+
+{- | 
+The same as 'system', but bypasses the shell.  Will behave more portably between
+systems, because there is no interpretation of shell metasyntax.
+-}
+
+rawSystem :: String -> IO ExitCode
+rawSystem "" = ioException (IOError Nothing InvalidArgument "rawSystem" "null command" Nothing)
+rawSystem cmd =
+  withCString cmd $ \s -> do
+    status <- throwErrnoIfMinus1 "rawSystem" (primRawSystem s)
+    case status of
+        0  -> return ExitSuccess
+        n  -> return (ExitFailure n)
+
+foreign import ccall unsafe "rawSystemCmd" primRawSystem :: CString -> IO Int
+

@@ -14,12 +14,15 @@
 
 module System.Environment
     ( 
-      getArgs	    -- :: IO [String]
-    , getProgName   -- :: IO String
-    , getEnv        -- :: String -> IO String
+      getArgs,	     -- :: IO [String]
+      getProgName,   -- :: IO String
+      getEnv,        -- :: String -> IO String
+      withArgs,
+      withProgName,
   ) where
 
 import Prelude
+import System.IO 	( bracket )
 
 #ifndef __HUGS__
 import Foreign
@@ -112,3 +115,43 @@ getEnv name =
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
 #endif  /* __HUGS__ */
+
+{-|
+@withArgs args act@ - while executing action @act@, have 'System.getArgs'
+return @args@.
+-}
+withArgs xs act = do
+   p <- System.Environment.getProgName
+   withArgv (p:xs) act
+
+{-|
+@withProgName name act@ - while executing action @act@, have 'System.getProgName'return @name@.
+-}
+withProgName nm act = do
+   xs <- System.Environment.getArgs
+   withArgv (nm:xs) act
+
+-- Worker routine which marshals and replaces an argv vector for
+-- the duration of an action.
+
+withArgv new_args act = do
+  pName <- System.Environment.getProgName
+  existing_args <- System.Environment.getArgs
+  bracket (setArgs new_args) 
+	  (\argv -> do setArgs (pName:existing_args); freeArgv argv)
+  	  (const act)
+
+freeArgv :: Ptr CString -> IO ()
+freeArgv argv = do
+  size <- lengthArray0 nullPtr argv
+  sequence_ [peek (argv `advancePtr` i) >>= free | i <- [size, size-1 .. 0]]
+  free argv
+
+setArgs :: [String] -> IO (Ptr CString)
+setArgs argv = do
+  vs <- mapM newCString argv >>= newArray0 nullPtr
+  setArgsPrim (length argv) vs
+  return vs
+
+foreign import ccall unsafe "setProgArgv" 
+  setArgsPrim  :: Int -> Ptr CString -> IO ()
