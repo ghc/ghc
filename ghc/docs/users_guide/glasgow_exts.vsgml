@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.14 1999/08/16 15:53:50 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.15 1999/08/16 16:25:12 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -2124,10 +2124,60 @@ policy is controlled by the per-simplification-pass flag @-finline-phase@n.
 <item> All rules are implicitly exported from the module, and are therefore
 in force in any module that imports the module that defined the rule, directly
 or indirectly.  (That is, if A imports B, which imports C, then C's rules are
-in force when compiling A.)  The situation is very like that for instance
+in force when compiling A.)  The situation is very similar to that for instance
 declarations.
 </itemize>
 
+<sect2>List fusion
+<p>
+
+The RULES mechanism is used to implement fusion (deforestation) of common list functions.
+If a "good consumer" consumes an intermediate list constructed by a "good producer", the 
+intermediate list should be eliminated entirely.
+<p>
+The following are good producers:
+<itemize>
+<item> List comprehensions
+<item> Enumerations of @Int@ and @Char@ (e.g. ['a'..'z']).
+<item> Explicit lists (e.g. @[True, False]@)
+<item> The cons constructor (e.g @3:4:[]@)
+<item> @++@
+<item> @map@
+<item> @filter@
+<item> @iterate@, @repeat@
+<item> @zip@, @zipWith@
+</itemize>
+
+The following are good consumers:
+<itemize>
+<item> List comprehensions
+<item> @array@ (on its second argument)
+<item> @length@
+<item> @++@ (on its first argument)
+<item> @map@
+<item> @filter@
+<item> @concat@
+<item> @unzip@, @unzip2@, @unzip3@, @unzip4@
+<item> @zip@, @zipWith@ (but on one argument only; if both are good producers, @zip@
+will fuse with one but not the other)
+<item> @partition@
+<item> @head@
+<item> @and@, @or@, @any@, @all@
+<item> @sequence_@
+<item> @msum@
+<item> @sortBy@
+</itemize>
+
+So, for example, the following should generate no intermediate lists:
+<tscreen><verb>
+	array (1,10) [(i,i*i) | i <- map (+ 1) [0..9]]
+</verb></tscreen>
+
+This list could readily be extended; if there are Prelude functions that you use
+a lot which are not included, please tell us.
+<p>
+If you want to write your own good consumers or producers, look at the
+Prelude definitions of the above functions to see how to do so.
 
 <sect2>Controlling what's going on
 <p>
