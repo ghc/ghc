@@ -103,7 +103,7 @@ signalQSemN (QSemN sem) n
    where
     free avail [] = return (avail,[])
     free avail ((req,block):blocked) =
-     if avail > req then
+     if avail >= req then
 	putMVar block () >>
 	free (avail-req) blocked
      else
