@@ -23,11 +23,11 @@ module HsTypes (
 
 IMP_Ubiq()
 
-import Outputable	--( interppSP, ifnotPprForUser )
+import CmdLineOpts      ( opt_PprUserLength )
+import Outputable	( Outputable(..), PprStyle(..), interppSP, ifnotPprForUser )
 import Kind		( Kind {- instance Outputable -} )
 import Name		( nameOccName )
 import Pretty
-import PprStyle		( PprStyle(..) )
 import Util		( thenCmp, cmpList, isIn, panic# )
 \end{code}
 
@@ -112,7 +112,7 @@ instance (Outputable name) => Outputable (HsTyVar name) where
 -- When we do, we want the type variables to come out with their original names, not
 -- some new unique (or else interfaces wobble too much).  So when we come to one of
 -- these type variables we sneakily change the style to PprForUser!
-ppr_hs_tyname PprInterface tv_name = ppr PprForUser tv_name
+ppr_hs_tyname PprInterface tv_name = ppr (PprForUser opt_PprUserLength) tv_name
 ppr_hs_tyname other_sty    tv_name = ppr other_sty tv_name
 
 ppr_forall sty ctxt_prec [] [] ty
