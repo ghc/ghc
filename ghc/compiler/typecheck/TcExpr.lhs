@@ -159,7 +159,8 @@ tcPolyExpr arg expected_arg_ty
     returnTc ( generalised_arg, free_insts,
 	       arg', sig_tau, lie_arg )
   where
-    sig_msg ty = ptext SLIT("In an expression with expected type:") <+> ppr ty
+    sig_msg ty = sep [ptext SLIT("In an expression with expected type:"),
+		      nest 4 (ppr ty)]
 \end{code}
 
 %************************************************************************

@@ -886,8 +886,7 @@ forAllErr doc ty tyvar
       (ptext SLIT("In") <+> doc))
 
 ctxtErr explicit_forall doc tyvars constraint ty
-  = sep [ptext SLIT("None of the type variable(s) in the constraint") <+> quotes (pprClassAssertion constraint) <+>
-		   ptext SLIT("does not mention any of"),
+  = sep [ptext SLIT("None of the type variable(s) in the constraint") <+> quotes (pprClassAssertion constraint),
 	 if explicit_forall then
  	   nest 4 (ptext SLIT("is universally quantified (i.e. bound by the forall)"))
 	 else

@@ -170,7 +170,7 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
 	-- The type checker occasionally prints a type in an error message,
 	-- and it had better come out looking like a user type
        sep [ ptext SLIT("forall") <+> pp_tyvars <> ptext SLIT("."), 
-	     ppr_theta theta <+> ptext SLIT("=>"),
+	     ppr_theta theta,
 	     ppr_ty env tOP_PREC tau
 	   ]
   where		
@@ -179,7 +179,10 @@ ppr_ty env ctxt_prec ty@(ForAllTy _ _)
     
     pp_tyvars = hsep (map (pBndr env LambdaBind) tyvars)
     
-    ppr_theta theta     = parens (hsep (punctuate comma (map ppr_dict theta)))
+    ppr_theta []	= empty
+    ppr_theta theta     = parens (hsep (punctuate comma (map ppr_dict theta))) 
+			  <+> ptext SLIT("=>")
+
     ppr_dict (clas,tys) = ppr clas <+> hsep (map (ppr_ty env tYCON_PREC) tys)
 
 
