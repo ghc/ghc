@@ -327,6 +327,7 @@ sub gather_import_dirs {
 	   }
            if ( $lib eq 'text' && ! $INSTALLING ) {
               push(@Import_dirs, "${TopPwd}/hslibs/${lib}/html");
+              push(@Import_dirs, "${TopPwd}/hslibs/${lib}/haxml/lib");
 	   }
            if ( $lib eq 'data' && ! $INSTALLING ) {
               push(@Import_dirs, "${TopPwd}/hslibs/${lib}/edison");
