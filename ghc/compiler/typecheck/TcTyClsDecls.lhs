@@ -650,7 +650,7 @@ checkValidClass cls
 
 		-- Check that for a generic method, the type of 
 		-- the method is sufficiently simple
-	; checkTc (dm /= GenDefMeth || validGenericMethodType op_ty)
+	; checkTc (dm /= GenDefMeth || validGenericMethodType tau)
 		  (badGenericMethodType op_name op_ty)
 	}
 	where
