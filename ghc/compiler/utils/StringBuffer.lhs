@@ -13,10 +13,8 @@ module StringBuffer
 
 	 -- creation/destruction
         hGetStringBuffer,     -- :: FilePath     -> IO StringBuffer
-#ifdef GHCI
 	stringToStringBuffer, -- :: String       -> IO StringBuffer
 	freeStringBuffer,     -- :: StringBuffer -> IO ()
-#endif
 
          -- Lookup
 	currentChar,      -- :: StringBuffer -> Char
@@ -77,6 +75,7 @@ import Addr		( Addr(..) )
 #endif
 import Foreign
 import Char		( chr )
+import Panic		( panic )
 
 -- urk!
 #include "../lib/std/cbits/stgerror.h"
@@ -195,8 +194,10 @@ unsafeWriteBuffer s@(StringBuffer a _ _ _) i# ch# =
 -- Turn a String into a StringBuffer
 
 \begin{code}
-#ifdef GHCI
 stringToStringBuffer :: String -> IO StringBuffer
+freeStringBuffer :: StringBuffer -> IO ()
+
+#if __GLASGOW_HASKELL__ >= 411
 stringToStringBuffer str =
   do let sz@(I# sz#) = length str + 1
      (Ptr a#) <- mallocBytes sz
@@ -209,9 +210,12 @@ stringToStringBuffer str =
     writeCharOffAddr a 0 c 
     fill_in cs (a `plusAddr` 1)
 
-freeStringBuffer :: StringBuffer -> IO ()
 freeStringBuffer (StringBuffer a# _ _ _) = Foreign.free (Ptr a#)
+#else
+stringToStringBuffer = panic "stringToStringBuffer: not implemented"
+freeStringBuffer sb  = return ()
 #endif
+
 \end{code}
 
 -----------------------------------------------------------------------------

@@ -15,7 +15,6 @@ module HscMain ( HscResult(..), hscMain,
 #ifdef GHCI
 import RdrHsSyn		( RdrNameHsExpr )
 import Rename		( renameExpr )
-import StringBuffer	( stringToStringBuffer, freeStringBuffer )
 import Unique		( Uniquable(..) )
 import Type		( Type, splitTyConApp_maybe )
 import PrelNames	( ioTyConKey )
@@ -24,7 +23,8 @@ import ByteCodeGen	( byteCodeGen )
 
 import HsSyn
 
-import StringBuffer	( hGetStringBuffer )
+import StringBuffer	( hGetStringBuffer, 
+                          stringToStringBuffer, freeStringBuffer )
 import Parser
 import Lex		( PState(..), ParseResult(..) )
 import SrcLoc		( mkSrcLoc )
@@ -296,7 +296,7 @@ myParseModule dflags src_filename
   			           loc = mkSrcLoc (_PK_ src_filename) 1 } of {
 
 	PFailed err -> do { hPutStrLn stderr (showSDoc err);
---	Not yet implemented in <4.11		    freeStringBuffer buf;
+                            freeStringBuffer buf;
                             return Nothing };
 
 	POk _ rdr_module@(HsModule mod_name _ _ _ _ _ _) -> do {
