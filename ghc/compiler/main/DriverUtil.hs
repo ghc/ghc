@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.8 2000/11/17 13:33:17 sewardj Exp $
+-- $Id: DriverUtil.hs,v 1.9 2000/11/19 19:40:08 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -39,7 +39,7 @@ long_usage = do
   exitWith ExitSuccess
   where
      dump "" = return ()
-     dump ('$':'$':s) = hPutStr stderr get_prog_name >> dump s
+     dump ('$':'$':s) = hPutStr stderr prog_name >> dump s
      dump (c:s) = hPutChar stderr c >> dump s
 
 data BarfKind
@@ -49,22 +49,25 @@ data BarfKind
   | OtherError String			-- just prints the error message
   deriving Eq
 
-GLOBAL_VAR(v_Prog_name, "ghc", String)
-
-get_prog_name = unsafePerformIO (readIORef v_Prog_name) -- urk!
+prog_name = unsafePerformIO (getProgName)
+{-# NOINLINE prog_name #-}
 
 instance Show BarfKind where
-  showsPrec _ e = showString get_prog_name . showString ": " . showBarf e
+  showsPrec _ e = showString prog_name . showString ": " . showBarf e
 
-showBarf (UsageError str) = showString str . showChar '\n' . showString short_usage
-showBarf (OtherError str) = showString str
-showBarf (PhaseFailed phase code) = 
-	showString phase . showString " failed, code = " . shows code
-showBarf (Interrupted) = showString "interrupted"
+showBarf (UsageError str)
+   = showString str . showChar '\n' . showString short_usage
+showBarf (OtherError str)
+   = showString str
+showBarf (PhaseFailed phase code)
+   = showString phase . showString " failed, code = " . shows code
+showBarf (Interrupted)
+   = showString "interrupted"
 
 unknownFlagErr f = throwDyn (UsageError ("unrecognised flag: " ++ f))
 
 barfKindTc = mkTyCon "BarfKind"
+{-# NOINLINE barfKindTc #-}
 instance Typeable BarfKind where
   typeOf _ = mkAppTy barfKindTc []
 

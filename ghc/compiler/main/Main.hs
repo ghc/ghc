@@ -1,6 +1,6 @@
 {-# OPTIONS -W -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.25 2000/11/17 16:53:27 simonmar Exp $
+-- $Id: Main.hs,v 1.26 2000/11/19 19:40:08 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -113,9 +113,6 @@ main =
    installHandler sigQUIT sig_handler Nothing 
    installHandler sigINT  sig_handler Nothing
 #endif
-
-   pgm    <- getProgName
-   writeIORef v_Prog_name pgm
 
    argv   <- getArgs
 
@@ -254,6 +251,7 @@ main =
 	-- pragmas during the compilation, and we'll need to restore it
 	-- before starting the next compilation.
    saved_driver_state <- readIORef v_Driver_state
+   writeIORef v_InitDriverState saved_driver_state
 
    let compileFile (src, phases) = do
 	  writeIORef v_Driver_state saved_driver_state

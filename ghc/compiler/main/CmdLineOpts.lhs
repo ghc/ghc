@@ -91,8 +91,7 @@ module CmdLineOpts (
 	opt_NoPruneTyDecls,
 	opt_NoPruneDecls,
 	opt_Static,
-	opt_Unregisterised,
-	opt_Verbose
+	opt_Unregisterised
     ) where
 
 #include "HsVersions.h"
@@ -103,6 +102,7 @@ import IOExts	( IORef, readIORef )
 import Constants	-- Default values for some flags
 import Util
 import FastTypes
+import Config
 
 import Maybes		( firstJust )
 import Panic		( panic )
@@ -416,7 +416,7 @@ opt_InPackage			= case lookup_str "-inpackage=" of
 opt_EmitCExternDecls	        = lookUp  SLIT("-femit-extern-decls")
 opt_EnsureSplittableC		= lookUp  SLIT("-fglobalise-toplev-names")
 opt_GranMacros			= lookUp  SLIT("-fgransim")
-opt_HiVersion			= lookup_def_int "-fhi-version=" 0 -- what version we're compiling.
+opt_HiVersion			= read cProjectVersionInt :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
 opt_IgnoreAsserts               = lookUp  SLIT("-fignore-asserts")
 opt_IgnoreIfacePragmas		= lookUp  SLIT("-fignore-interface-pragmas")
@@ -450,7 +450,6 @@ opt_NoPruneDecls		= lookUp SLIT("-fno-prune-decls")
 opt_NoPruneTyDecls		= lookUp SLIT("-fno-prune-tydecls")
 opt_Static			= lookUp SLIT("-static")
 opt_Unregisterised		= lookUp SLIT("-funregisterised")
-opt_Verbose			= lookUp SLIT("-v")
 \end{code}
 
 %************************************************************************
@@ -501,12 +500,11 @@ isStaticHscFlag f =
 	"fno-prune-decls",
 	"fno-prune-tydecls",
 	"static",
-	"funregisterised",
-	"v" ]
+	"funregisterised"
+	]
   || any (flip prefixMatch f) [
 	"fcontext-stack",
 	"fliberate-case-threshold",
-	"fhi-version=",
 	"fhistory-size",
 	"funfolding-interface-threshold",
 	"funfolding-creation-threshold",

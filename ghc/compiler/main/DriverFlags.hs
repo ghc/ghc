@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.19 2000/11/14 16:28:38 simonmar Exp $
+-- $Id: DriverFlags.hs,v 1.20 2000/11/19 19:40:08 simonmar Exp $
 --
 -- Driver flags
 --
@@ -162,7 +162,6 @@ static_flags =
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addNoDups v_Ways	WayProf) )
   ,  ( "unreg"		, NoArg (addNoDups v_Ways	WayUnreg) )
-  ,  ( "dll"            , NoArg (addNoDups v_Ways WayDll) )
   ,  ( "ticky"		, NoArg (addNoDups v_Ways	WayTicky) )
   ,  ( "parallel"	, NoArg (addNoDups v_Ways	WayPar) )
   ,  ( "gransim"	, NoArg (addNoDups v_Ways	WayGran) )
@@ -218,7 +217,7 @@ static_flags =
 					    "warning: don't know how to  split \
 					    \object files on this architecture"
 				) )
-  
+
 	------- Include/Import Paths ----------------------------------------
   ,  ( "i"		, OptPrefix (addToDirList v_Import_paths) )
   ,  ( "I" 		, Prefix    (addToDirList v_Include_paths) )
@@ -258,6 +257,11 @@ static_flags =
 
 	----- Linker --------------------------------------------------------
   ,  ( "static" 	, NoArg (writeIORef v_Static True) )
+
+	----- RTS opts ------------------------------------------------------
+#ifdef not_yet
+  ,  ( "H"                 , HasArg (setHeapSize . fromIntegral . decodeSize) )
+#endif
 
         ------ Compiler flags -----------------------------------------------
   ,  ( "O2-for-C"	   , NoArg (writeIORef v_minus_o2_for_C True) )
@@ -431,13 +435,17 @@ floatOpt :: IORef Double -> String -> IO ()
 floatOpt ref str
   = writeIORef ref (read str :: Double)
 
+#ifdef not_yet
+foreign import "setHeapSize" unsafe setHeapSize :: Int -> IO ()
+#endif
+
 -----------------------------------------------------------------------------
 -- Build the Hsc static command line opts
 
 buildStaticHscOpts :: IO [String]
 buildStaticHscOpts = do
 
-  opt_C_ <- getStaticOpts v_Opt_C		-- misc hsc opts
+  opt_C_ <- getStaticOpts v_Opt_C	-- misc hsc opts from the command line
 
 	-- optimisation
   minus_o <- readIORef v_OptLevel
@@ -458,10 +466,7 @@ buildStaticHscOpts = do
   let basic_opts = opt_C_ ++ optimisation_opts ++ stg_opts
       filtered_opts = filter (`notElem` anti_flags) basic_opts
 
-  verb <- is_verbose
-  let hi_vers = "-fhi-version="++cProjectVersionInt
-
   static <- (do s <- readIORef v_Static; if s then return "-static" 
 					      else return "")
 
-  return ( filtered_opts ++ [ hi_vers, static, verb ] )
+  return ( static : filtered_opts )

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.29 2000/11/17 13:33:17 sewardj Exp $
+-- $Id: DriverPipeline.hs,v 1.30 2000/11/19 19:40:08 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -723,7 +723,10 @@ doLink o_files = do
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
   ASSERT(haskellish_file filename) 
-  do pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
+  do init_driver_state <- readIORef v_InitDriverState
+     writeIORef v_Driver_state init_driver_state
+
+     pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
 			defaultHscLang filename
      runPipeline pipeline filename False{-no linking-} False{-no -o flag-}
 
@@ -771,6 +774,8 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 
    init_dyn_flags <- readIORef v_InitDynFlags
    writeIORef v_DynFlags init_dyn_flags
+   init_driver_state <- readIORef v_InitDriverState
+   writeIORef v_Driver_state init_driver_state
 
    let location   = ms_location summary   
    let input_fn   = unJust (ml_hs_file location) "compile:hs"

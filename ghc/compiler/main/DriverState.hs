@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverState.hs,v 1.14 2000/11/16 11:39:37 simonmar Exp $
+-- $Id: DriverState.hs,v 1.15 2000/11/19 19:40:08 simonmar Exp $
 --
 -- Settings for the driver
 --
@@ -67,7 +67,15 @@ initDriverState = DriverState {
 	opt_m			= [],
    }
 	
-GLOBAL_VAR(v_Driver_state, initDriverState, DriverState)
+-- The driver state is first initialized from the command line options,
+-- and then reset to this initial state before each compilation.
+-- v_InitDriverState contains the saved initial state, and v_DriverState
+-- contains the current state (modified by any OPTIONS pragmas, for example).
+--
+-- v_InitDriverState may also be modified from the GHCi prompt, using :set.
+--
+GLOBAL_VAR(v_InitDriverState, initDriverState, DriverState)
+GLOBAL_VAR(v_Driver_state,    initDriverState, DriverState)
 
 readState :: (DriverState -> a) -> IO a
 readState f = readIORef v_Driver_state >>= return . f
@@ -75,11 +83,11 @@ readState f = readIORef v_Driver_state >>= return . f
 updateState :: (DriverState -> DriverState) -> IO ()
 updateState f = readIORef v_Driver_state >>= writeIORef v_Driver_state . f
 
-addOpt_L     a = updateState (\s -> s{opt_L      =  a : opt_L      s})
-addOpt_P     a = updateState (\s -> s{opt_P      =  a : opt_P      s})
-addOpt_c     a = updateState (\s -> s{opt_c      =  a : opt_c      s})
-addOpt_a     a = updateState (\s -> s{opt_a      =  a : opt_a      s})
-addOpt_m     a = updateState (\s -> s{opt_m      =  a : opt_m      s})
+addOpt_L     a = updateState (\s -> s{opt_L =  a : opt_L s})
+addOpt_P     a = updateState (\s -> s{opt_P =  a : opt_P s})
+addOpt_c     a = updateState (\s -> s{opt_c =  a : opt_c s})
+addOpt_a     a = updateState (\s -> s{opt_a =  a : opt_a s})
+addOpt_m     a = updateState (\s -> s{opt_m =  a : opt_m s})
 
 addCmdlineHCInclude a = 
    updateState (\s -> s{cmdline_hc_includes =  a : cmdline_hc_includes s})
@@ -98,7 +106,6 @@ cHaskell1Version = "5" -- i.e., Haskell 98
 
 -- location of compiler-related files
 GLOBAL_VAR(v_TopDir,  clibdir, String)
-GLOBAL_VAR(v_Inplace, False,   Bool)
 
 -- Cpp-related flags
 v_Hs_source_cpp_opts = global
@@ -142,14 +149,14 @@ GLOBAL_VAR(v_Split_prefix,		"",		String)
 GLOBAL_VAR(v_N_split_files,		0,		Int)
 	
 can_split :: Bool
-can_split =  prefixMatch "i386" cTARGETPLATFORM
-	  || prefixMatch "alpha" cTARGETPLATFORM
-	  || prefixMatch "hppa" cTARGETPLATFORM
-	  || prefixMatch "m68k" cTARGETPLATFORM
-	  || prefixMatch "mips" cTARGETPLATFORM
+can_split =  prefixMatch "i386"    cTARGETPLATFORM
+	  || prefixMatch "alpha"   cTARGETPLATFORM
+	  || prefixMatch "hppa"    cTARGETPLATFORM
+	  || prefixMatch "m68k"    cTARGETPLATFORM
+	  || prefixMatch "mips"    cTARGETPLATFORM
 	  || prefixMatch "powerpc" cTARGETPLATFORM
-	  || prefixMatch "rs6000" cTARGETPLATFORM
-	  || prefixMatch "sparc" cTARGETPLATFORM
+	  || prefixMatch "rs6000"  cTARGETPLATFORM
+	  || prefixMatch "sparc"   cTARGETPLATFORM
 
 -----------------------------------------------------------------------------
 -- Compiler output options
@@ -263,6 +270,10 @@ hsc_minusO_flags =
  	"-fcase-merge",
 	"-flet-to-case"
    ]
+
+getStaticOptimisationFlags 0 = hsc_minusNoO_flags
+getStaticOptimisationFlags 1 = hsc_minusO_flags
+getStaticOptimisationFlags n = hsc_minusO2_flags
 
 buildCoreToDo :: IO [CoreToDo]
 buildCoreToDo = do
