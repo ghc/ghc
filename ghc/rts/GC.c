@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.88 2000/11/13 14:41:13 simonmar Exp $
+ * $Id: GC.c,v 1.89 2000/11/20 11:19:21 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -889,7 +889,7 @@ traverse_weak_ptr_list(void)
 	  next = t->global_link;
 	  *prev = next;
 	  continue;
-      default:
+      default: ;
       }
 
       /* Threads which have already been determined to be alive are
