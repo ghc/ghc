@@ -1,6 +1,6 @@
 {-# OPTIONS -fno-warn-incomplete-patterns #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.63 2001/04/26 13:52:57 simonmar Exp $
+-- $Id: Main.hs,v 1.64 2001/05/08 10:58:48 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -33,7 +33,7 @@ import DriverFlags
 import DriverMkDepend
 import DriverUtil
 import Panic
-import DriverPhases	( Phase(..), haskellish_file, objish_file )
+import DriverPhases	( Phase(..), haskellish_src_file, objish_file )
 import CmdLineOpts
 import TmpFiles
 import Finder		( initFinder )
@@ -291,8 +291,8 @@ main =
 	  -- OPTIONS pragma that affects the compilation pipeline (eg. -fvia-C)
 	  let (basename, suffix) = splitFilename src
 
-	  -- just preprocess
-	  pp <- if not (haskellish_file src) || mode == StopBefore Hsc
+	  -- just preprocess (Haskell source only)
+	  pp <- if not (haskellish_src_file src) || mode == StopBefore Hsc
 			then return src else do
 		phases <- genPipeline (StopBefore Hsc) stop_flag
 			    False{-not persistent-} defaultHscLang src

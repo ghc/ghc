@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.8 2001/05/04 15:18:00 simonmar Exp $
+-- $Id: DriverPhases.hs,v 1.9 2001/05/08 10:58:48 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -13,6 +13,7 @@ module DriverPhases (
    phaseInputExt, 	-- :: Phase -> String
 
    haskellish_file, haskellish_suffix,
+   haskellish_src_file, haskellish_src_suffix,
    objish_file, objish_suffix,
    cish_file, cish_suffix
  ) where
@@ -75,8 +76,9 @@ phaseInputExt SplitAs     = "split_s"   -- not really generated
 phaseInputExt Ln          = "o"
 phaseInputExt MkDependHS  = "dep"
 
-haskellish_suffix = (`elem` [ "hs", "hspp", "lhs", "hc", "raw_s" ])
-cish_suffix       = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
+haskellish_suffix     = (`elem` [ "hs", "hspp", "lhs", "hc", "raw_s" ])
+haskellish_src_suffix = (`elem` [ "hs", "hspp", "lhs" ])
+cish_suffix           = (`elem` [ "c", "s", "S" ])  -- maybe .cc et al.??
 
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
 objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
@@ -84,6 +86,7 @@ objish_suffix     = (`elem` [ "o", "O", "obj", "OBJ" ])
 objish_suffix     = (`elem` [ "o" ])
 #endif
 
-haskellish_file f = haskellish_suffix suf where (_,suf) = splitFilename f
-cish_file       f = cish_suffix       suf where (_,suf) = splitFilename f
-objish_file     f = objish_suffix     suf where (_,suf) = splitFilename f
+haskellish_file     = haskellish_suffix     . getFileSuffix
+haskellish_src_file = haskellish_src_suffix . getFileSuffix
+cish_file           = cish_suffix           . getFileSuffix
+objish_file         = objish_suffix         . getFileSuffix

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.20 2001/04/26 14:33:44 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.21 2001/05/08 10:58:48 simonmar Exp $
 --
 -- Utils for the driver
 --
@@ -124,6 +124,9 @@ addNoDups var x = do
 
 splitFilename :: String -> (String,String)
 splitFilename f = split_longest_prefix f '.'
+
+getFileSuffix :: String -> String
+getFileSuffix f = drop_longest_prefix f '.'
 
 -- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
 splitFilename3 :: String -> (String,String,String)

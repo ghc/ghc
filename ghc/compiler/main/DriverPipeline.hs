@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.65 2001/05/01 16:01:06 simonmar Exp $
+-- $Id: DriverPipeline.hs,v 1.66 2001/05/08 10:58:48 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -167,8 +167,8 @@ genPipeline todo stop_flag persistent_output lang filename
     cish = cish_suffix suffix
 
        -- for a .hc file we need to force lang to HscC
-    real_lang | start_phase == HCc  = HscC
-	      | otherwise           = lang
+    real_lang | start_phase == HCc || start_phase == Mangle = HscC
+	      | otherwise                                   = lang
 
    let
    ----------- -----  ----   ---   --   --  -  -  -
@@ -260,6 +260,8 @@ genPipeline todo stop_flag persistent_output lang filename
 		("flag " ++ stop_flag
 		 ++ " is incompatible with source file `" ++ filename ++ "'"))
       else do
+
+   print (show pipeline ++ show annotated_pipeline ++ show stop_phase)
 
    return (
      takeWhile (phase_ne stop_phase ) $
@@ -914,7 +916,7 @@ doMkDLL o_files = do
 
 preprocess :: FilePath -> IO FilePath
 preprocess filename =
-  ASSERT(haskellish_file filename) 
+  ASSERT(haskellish_src_file filename) 
   do init_dyn_flags <- readIORef v_InitDynFlags
      writeIORef v_DynFlags init_dyn_flags
      pipeline <- genPipeline (StopBefore Hsc) ("preprocess") False 
