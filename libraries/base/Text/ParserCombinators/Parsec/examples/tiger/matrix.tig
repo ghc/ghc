@@ -1,0 +1,122 @@
+let
+
+type vec    = array of int
+type vector = {dim : int, d : vec}
+
+type mat    = array of vector
+type matrix = {x : int, y : int, d : mat}
+
+function vectorCreate(n : int) : vector =
+  vector{dim = n, d = vec[n] of 0}
+
+function vectorLiftedAdd(X : vector, Y : vector) : vector =
+  let var tmp : vector := vectorCreate(X.dim)
+   in for i := 0 to X.dim do
+        tmp.d[i] := X.d[i] + Y.d[i];
+      tmp
+  end
+
+function vectorLiftedMul(X : vector, Y : vector) : vector =
+  let var tmp : vector := vectorCreate(X.dim)
+   in for i := 0 to X.dim do
+        tmp.d[i] := X.d[i] * Y.d[i];
+      tmp
+  end
+
+function vectorInProduct(X : vector, Y : vector) : int =
+  let var tmp : int := 0
+   in for i := 0 to X.dim do
+        tmp := tmp + X.d[i] * Y.d[i];
+      tmp
+  end
+
+
+
+function matrixCreate(n : int, m : int) : matrix =
+  let var tmp := matrix{x = n, y = m, d = mat[n] of nil}
+   in for i := 0 to n do 
+        tmp.d[i] := vectorCreate(m);
+      tmp
+  end
+
+function matrixRow(A : matrix, i : int) : vector =
+  A.d[i]
+
+function matrixCol(A : matrix, j : int) : vector =
+  let var tmp := vectorCreate(A.y)
+   in for i := 0 to A.y do
+        tmp.d[i] := A.d[i].d[j];
+      tmp
+  end
+
+function matrixTranspose(A : matrix) : matrix =
+  let var tmp := matrixCreate(A.y, A.x)
+   in for i := 0 to A.x do
+        for j := 0 to A.y do
+          tmp.d[j].d[i] := A.d[i].d[j];
+      tmp
+  end
+
+function matrixLiftedAdd(A : matrix, B : matrix) : matrix =
+  let var tmp := matrixCreate(A.x, A.y)
+   in if A.x <> B.x | A.y <> B.y then exit(1)
+      else for i := 0 to A.x do
+             for j := 0 to A.y do
+               tmp.d[i].d[j] := A.d[i].d[j] + B.d[i].d[j];
+      tmp
+  end
+
+function matrixLiftedMul(A : matrix, B : matrix) : matrix =
+  let var tmp := matrixCreate(A.x, A.y)
+   in if A.x <> B.x | A.y <> B.y then exit(1)
+      else for i := 0 to A.x do
+             for j := 0 to A.y do
+               tmp.d[i].d[j] := A.d[i].d[j] * B.d[i].d[j];
+      tmp
+  end
+
+function matrixMul(A : matrix, B : matrix) : matrix =
+  let var tmp := matrixCreate(A.x, B.y)
+   in if A.y <> B.x then exit(1)
+      else for i := 0 to A.x do
+             for j := 0 to B.y do
+               tmp.d[i].d[j] := vectorInProduct(matrixRow(A,i), matrixCol(B,j));
+      tmp
+  end
+
+function createDiagMat(X : vector) : matrix =
+  let var tmp := matrixCreate(X.dim, X.dim)
+   in for i := 0 to X.dim do
+        tmp.d[i].d[i] := X.d[i];
+      tmp
+  end
+
+/* matrixMul(A, B) where B is a diagonal matrix, which can be represented
+ by a vector
+*/
+
+function matrixMulDiag(A : matrix, X : vector) : matrix =
+  let var tmp := matrixCreate(A.x, A.y)
+   in if A.y <> X.dim then exit(1)
+      else for i := 0 to A.x do
+             for j := 0 to A.y do
+               tmp.d[i].d[j] := A.d[i].d[j] * X.d[j];
+      tmp
+  end
+
+/* Challenge: matrixMul(A, createDiagMat(X)) == matrixMulDiag(A, X)
+i.e., derive the rhs from the lhs by specialization
+
+What are the laws involved?
+
+Challenge: matrixMul(A, create5shapeMatrix(a,b,c,d,e)) == efficient algorithm
+
+*/
+
+in
+
+  /* matrixLiftedAdd(matrixCreate(8),matrixCreate(8)) */
+
+  matrixMul(A, createDiagMat(X))
+
+end

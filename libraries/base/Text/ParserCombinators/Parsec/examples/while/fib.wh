@@ -1,0 +1,11 @@
+v := 1; 
+u := 1; 
+if n <= 2 then 
+  skip 
+else 
+  while n > 2 do (
+    t := u; 
+    u := v; 
+    v := u + t
+    )
+    
