@@ -385,10 +385,22 @@ NoFibHcOpts = -O
 # setting the TMPDIR env var would have no effect in the build tree.
 
 DEFAULT_TMPDIR		= /tmp
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+DEFAULT_TMPDIR		= C:/TEMP
+endif
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+DEFAULT_TMPDIR		= C:/TEMP
+endif
 
 # FPTOOLS_TOP: the top of the fptools hierarchy, absolute path.
 
 FPTOOLS_TOP_ABS		= @hardtop@
+ifeq "$(TARGETPLATFORM)" "i386-unknown-cygwin32"
+FPTOOLS_TOP_ABS		= $(patsubst /cygdrive/%/,%:/,@hardtop@)
+endif
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+FPTOOLS_TOP_ABS		= $(patsubst /cygdrive/%/,%:/,@hardtop@)
+endif
 
 #
 # Installation directories, we don't use half of these,
