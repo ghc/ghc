@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.19 2001/12/30 19:51:33 sof Exp $
+-- $Id: Main.hs,v 1.20 2002/02/03 17:06:12 sof Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -15,8 +15,12 @@ import GetOpt
 import Pretty
 import Monad
 import Directory
-import System
+import System	( getEnv, getArgs, 
+		  system, exitWith,
+		  ExitCode(..)
+		)
 import IO
+import List ( isPrefixOf )
 
 #include "../../includes/config.h"
 
@@ -35,7 +39,8 @@ main = do
 data Flag 
   = Config FilePath
   | Input FilePath
-  | List | Add | Update | Remove String | Show String 
+  | List | Add Bool {- True => replace existing info -}
+  | Remove String | Show String 
   | Field String | AutoGHCiLibs
 
 isAction (Config _)     = False
@@ -51,9 +56,9 @@ flags = [
 	"Use the specified package config file",
   Option ['l'] ["list-packages"] (NoArg List)
  	"List the currently installed packages",
-  Option ['a'] ["add-package"] (NoArg Add)
+  Option ['a'] ["add-package"] (NoArg (Add False))
  	"Add a new package",
-  Option ['u'] ["update-package"] (NoArg Update)
+  Option ['u'] ["update-package"] (NoArg (Add True))
  	"Update package with new configuration",
   Option ['i'] ["input-file"] (ReqArg Input "FILE")
 	"Read new package info from specified file",
@@ -101,31 +106,31 @@ runit clis = do
   fields <- mapM toField [ f | Field f <- clis ]
 
   s <- readFile conf_file
-  let details = read s :: [PackageConfig]
-  eval_catch details (\_ -> die "parse error in package config file")
+  let packages = read s :: [PackageConfig]
+  eval_catch packages (\_ -> die "parse error in package config file")
 
   let auto_ghci_libs = any isAuto clis 
 	 where isAuto AutoGHCiLibs = True; isAuto _ = False
       input_file = head ([ f | (Input f) <- clis] ++ ["-"])
 
   case [ c | c <- clis, isAction c ] of
-    [ List ]     -> listPackages details
-    [ Add  ]     -> addPackage details conf_file input_file auto_ghci_libs False{-add-}
-    [ Update ]   -> addPackage details conf_file input_file auto_ghci_libs True{-update-}
-    [ Remove p ] -> removePackage details conf_file p
-    [ Show p ]   -> showPackage details conf_file p fields
+    [ List ]     -> listPackages packages
+    [ Add upd ]  -> addPackage packages conf_file input_file auto_ghci_libs upd
+    [ Remove p ] -> removePackage packages conf_file p
+    [ Show p ]   -> showPackage packages conf_file p fields
     _            -> die (usageInfo usageHeader flags)
 
 
 listPackages :: [PackageConfig] -> IO ()
-listPackages details = do 
-  hPutStr stdout (listPkgs details)
-  hPutChar stdout '\n'
+listPackages packages = hPutStrLn stdout (listPkgs packages)
 
-showPackage :: [PackageConfig] -> FilePath -> String
-	 -> [PackageConfig->[String]] -> IO ()
-showPackage details pkgconf pkg_name fields =
-  case [ p | p <- details, name p == pkg_name ] of
+showPackage :: [PackageConfig]
+	    -> FilePath
+	    -> String
+	    -> [PackageConfig -> [String]]
+	    -> IO ()
+showPackage packages pkgconf pkg_name fields =
+  case [ p | p <- packages, name p == pkg_name ] of
     []    -> die ("can't find package `" ++ pkg_name ++ "'")
     [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
 	  | otherwise   -> hPutStrLn stdout (render (vcat 
@@ -133,7 +138,7 @@ showPackage details pkgconf pkg_name fields =
     _     -> die "showPackage: internal error"
 
 addPackage :: [PackageConfig] -> FilePath -> FilePath -> Bool -> Bool -> IO ()
-addPackage details pkgconf inputFile auto_ghci_libs updatePkg = do
+addPackage packages pkgconf inputFile auto_ghci_libs updatePkg = do
   checkConfigAccess pkgconf
   s <-
     case inputFile of
@@ -146,20 +151,22 @@ addPackage details pkgconf inputFile auto_ghci_libs updatePkg = do
   let new_pkg = read s :: PackageConfig
   eval_catch new_pkg (\_ -> die "parse error in package info")
   hPutStrLn stdout "done."
-  new_details <- validatePackageConfig new_pkg details auto_ghci_libs updatePkg
+  hPutStr stdout "Expanding embedded variables..."
+  new_exp_pkg <- expandEnvVars new_pkg
+  hPutStrLn stdout "done."
+  new_details <- validatePackageConfig new_exp_pkg packages auto_ghci_libs updatePkg
   savePackageConfig pkgconf
   maybeRestoreOldConfig pkgconf $
     writeNewConfig pkgconf new_details
 
 removePackage :: [PackageConfig] -> FilePath -> String -> IO ()
-removePackage details pkgconf pkgName = do  
+removePackage packages pkgconf pkgName = do  
   checkConfigAccess pkgconf
-  if (pkgName `notElem` map name details)
-	then die ("package `" ++ pkgName ++ "' not installed")
-	else do
+  when (pkgName `notElem` map name packages)
+       (die ("package `" ++ pkgName ++ "' not installed"))
   savePackageConfig pkgconf
   maybeRestoreOldConfig pkgconf $
-    writeNewConfig pkgconf (filter ((/= pkgName) . name) details)
+    writeNewConfig pkgconf (filter ((/= pkgName) . name) packages)
 
 checkConfigAccess :: FilePath -> IO ()
 checkConfigAccess pkgconf = do
@@ -179,10 +186,10 @@ maybeRestoreOldConfig conf_file io
     )
 
 writeNewConfig :: String -> [PackageConfig] -> IO ()
-writeNewConfig conf_file details = do
+writeNewConfig conf_file packages = do
   hPutStr stdout "Writing new package config file... "
   h <- openFile conf_file WriteMode
-  hPutStrLn h (dumpPackages details)
+  hPutStrLn h (dumpPackages packages)
   hClose h
   hPutStrLn stdout "done."
 
@@ -215,9 +222,8 @@ validatePackageConfig :: PackageConfig
 		      -> Bool
 		      -> IO [PackageConfig]
 validatePackageConfig pkg pkgs auto_ghci_libs updatePkg = do
-  if (not updatePkg && (name pkg `elem` map name pkgs))
-	then die ("package `" ++ name pkg ++ "' is already installed")
-	else do
+  when (not updatePkg && (name pkg `elem` map name pkgs))
+       (die ("package `" ++ name pkg ++ "' is already installed"))
   mapM_	(checkDep pkgs) (package_deps pkg)
   mapM_	checkDir (import_dirs pkg)
   mapM_	checkDir (source_dirs pkg)
@@ -233,9 +239,9 @@ validatePackageConfig pkg pkgs auto_ghci_libs updatePkg = do
   return (existing_pkgs ++ [pkg])
 
 checkDir d = do
-  b <- doesDirectoryExist d
-  if b then return ()
-       else die ("`" ++ d ++ "' doesn't exist or isn't a directory")
+  there <- doesDirectoryExist d
+  when (not there)
+       (die ("`" ++ d ++ "' doesn't exist or isn't a directory"))
 
 checkDep :: [PackageConfig] -> String -> IO ()
 checkDep pkgs n
@@ -275,9 +281,59 @@ autoBuildGHCiLib dir batch_file ghci_file = do
   hPutStrLn stderr (" done.")
 
 -----------------------------------------------------------------------------
+expandEnvVars :: PackageConfig -> IO PackageConfig
+expandEnvVars pkg = do
+   -- permit _all_ strings to contain ${..} environment variable references,
+   -- arguably too flexible.
+  nm       <- expandString (name pkg)
+  imp_dirs <- expandStrings (import_dirs pkg) 
+  src_dirs <- expandStrings (source_dirs pkg) 
+  lib_dirs <- expandStrings (library_dirs pkg) 
+  hs_libs  <- expandStrings (hs_libraries pkg)
+  ex_libs  <- expandStrings (extra_libraries pkg)
+  inc_dirs <- expandStrings (include_dirs pkg)
+  c_incs   <- expandStrings (c_includes pkg)
+  p_deps   <- expandStrings (package_deps pkg)
+  e_g_opts <- expandStrings (extra_ghc_opts pkg)
+  e_c_opts <- expandStrings (extra_cc_opts pkg)
+  e_l_opts <- expandStrings (extra_ld_opts pkg)
+  return (pkg { name            = nm
+  	      , import_dirs     = imp_dirs
+	      , source_dirs     = src_dirs
+	      , library_dirs    = lib_dirs
+	      , hs_libraries    = hs_libs
+	      , extra_libraries = ex_libs
+	      , include_dirs    = inc_dirs
+	      , c_includes      = c_incs
+	      , package_deps    = p_deps
+	      , extra_ghc_opts  = e_g_opts
+	      , extra_cc_opts   = e_c_opts
+	      , extra_ld_opts   = e_l_opts
+	      })
+  where
+   expandStrings = mapM expandString
+   
+    -- Just for fun, keep this in the IO monad.
+   expandString :: String -> IO String
+   expandString str =
+     case break (=='$') str of
+       (xs, _:'{':rs) ->
+         case span (/='}') rs of
+	   (nm,_:remainder) -> do
+	      nm'  <- lookupEnvVar nm
+	      str' <- expandString remainder
+	      return (nm' ++ str')
+	   _ -> return str -- no closing '}'
+       _ -> return str	   
+
+   lookupEnvVar nm = 
+	catch (System.getEnv nm)
+	      (\ _ -> die ("Unable to expand variable " ++ show nm))
+
+-----------------------------------------------------------------------------
 
 die :: String -> IO a
-die s = do { hPutStrLn stderr s; exitWith (ExitFailure 1) }
+die s = do { hFlush stdout ; hPutStrLn stderr s; exitWith (ExitFailure 1) }
 
 -----------------------------------------------------------------------------
 -- Exceptions
