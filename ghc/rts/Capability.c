@@ -17,9 +17,10 @@
  * --------------------------------------------------------------------------*/
 #include "PosixSource.h"
 #include "Rts.h"
-#include "Schedule.h"
 #include "RtsUtils.h"
+#include "OSThreads.h"
 #include "Capability.h"
+#include "Schedule.h"  /* to get at EMPTY_RUN_QUEUE() */
 
 #if !defined(SMP)
 Capability MainCapability;     /* for non-SMP, we have one global capability */
@@ -42,12 +43,40 @@ Condition returning_worker_cond = INIT_COND_VAR;
  * the task(s) that enter the Scheduler will check to see whether
  * there are one or more worker threads blocked waiting on
  * returning_worker_cond.
- *
- * Locks needed: sched_mutex
  */
-nat rts_n_waiting_workers = 0;
+static nat rts_n_waiting_workers = 0;
+
+/* thread_ready_cond: when signalled, a thread has become runnable for a
+ * task to execute.
+ *
+ * In the non-SMP case, it also implies that the thread that is woken up has
+ * exclusive access to the RTS and all its data structures (that are not
+ * locked by the Scheduler's mutex).
+ *
+ * thread_ready_cond is signalled whenever COND_NO_THREADS_READY doesn't hold.
+ *
+ */
+Condition thread_ready_cond = INIT_COND_VAR;
+#if 0
+/* For documentation purposes only */
+#define COND_NO_THREADS_READY() (noCapabilities() || EMPTY_RUN_QUEUE())
 #endif
 
+/*
+ * To be able to make an informed decision about whether or not 
+ * to create a new task when making an external call, keep track of
+ * the number of tasks currently blocked waiting on thread_ready_cond.
+ * (if > 0 => no need for a new task, just unblock an existing one).
+ *
+ * waitForWork() takes care of keeping it up-to-date; Task.startTask()
+ * uses its current value.
+ */
+nat rts_n_waiting_tasks = 0;
+#endif
+
+/* -----------------------------------------------------------------------------
+   Initialisation
+   -------------------------------------------------------------------------- */
 static
 void
 initCapability( Capability *cap )
@@ -76,6 +105,7 @@ initCapabilities()
 {
 #if defined(RTS_SUPPORTS_THREADS)
   initCondition(&returning_worker_cond);
+  initCondition(&thread_ready_cond);
 #endif
 
 #if defined(SMP)
@@ -88,12 +118,14 @@ initCapabilities()
   return;
 }
 
-/* Free capability list.
- * Locks required: sched_mutex.
- */
 #if defined(SMP)
+/* Free capability list. */
 static Capability *free_capabilities; /* Available capabilities for running threads */
 #endif
+
+/* -----------------------------------------------------------------------------
+   Acquiring capabilities
+   -------------------------------------------------------------------------- */
 
 /*
  * Function:  grabCapability(Capability**)
@@ -102,11 +134,8 @@ static Capability *free_capabilities; /* Available capabilities for running thre
  *            remove one from the free capabilities list (which
  *            may just have one entry). In threaded builds, worker
  *            threads are prevented from doing so willy-nilly
- *            through the use of the sched_mutex lock along with
- *            condition variables thread_ready_cond and
+ *            via the condition variables thread_ready_cond and
  *            returning_worker_cond.
- *
- * Pre-condition:  sched_mutex is held (in threaded builds only).
  *
  */ 
 void grabCapability(Capability** cap)
@@ -124,10 +153,10 @@ void grabCapability(Capability** cap)
 /*
  * Function:  releaseCapability(Capability*)
  *
- * Purpose:   Letting go of a capability.
+ * Purpose:   Letting go of a capability. Causes a
+ *            'returning worker' thread or a 'waiting worker'
+ *            to wake up, in that order.
  *
- * Pre-condition: sched_mutex is assumed held by current thread.
- * Post-condition:
  */
 void releaseCapability(Capability* cap
 #if !defined(SMP)
@@ -176,7 +205,7 @@ void releaseCapability(Capability* cap
  *    value of rts_n_waiting_workers. If > 0, the worker thread
  *    will yield its capability to let a returning worker thread
  *    proceed with returning its result -- this is done via
- *    yieldCapability().
+ *    yieldToReturningWorker().
  *  - the worker thread that yielded its capability then tries
  *    to re-grab a capability and re-enter the Scheduler.
  */
@@ -190,57 +219,91 @@ void releaseCapability(Capability* cap
  * result of the ext. call back to the Haskell thread that
  * made it.
  *
- * Pre-condition:  sched_mutex isn't held.
- * Post-condition: sched_mutex is held and a capability has
+ * Pre-condition:  pMutex isn't held.
+ * Post-condition: pMutex is held and a capability has
  *                 been assigned to the worker thread.
  */
 void
-grabReturnCapability(Capability** pCap)
+grabReturnCapability(Mutex* pMutex, Capability** pCap)
 {
   IF_DEBUG(scheduler,
-	   fprintf(stderr,"worker (%ld): returning, waiting for sched. lock.\n", osThreadId()));
-  ACQUIRE_LOCK(&sched_mutex);
+	   fprintf(stderr,"worker (%ld): returning, waiting for lock.\n", osThreadId()));
+  ACQUIRE_LOCK(pMutex);
   rts_n_waiting_workers++;
   IF_DEBUG(scheduler,
 	   fprintf(stderr,"worker (%ld): returning; workers waiting: %d\n",
 		   osThreadId(), rts_n_waiting_workers));
   while ( noCapabilities() ) {
-    waitCondition(&returning_worker_cond, &sched_mutex);
+    waitCondition(&returning_worker_cond, pMutex);
   }
   
   grabCapability(pCap);
   return;
 }
 
+
+/* -----------------------------------------------------------------------------
+   Yielding/waiting for capabilities
+   -------------------------------------------------------------------------- */
+
 /*
- * Function: yieldCapability(Capability**)
+ * Function: yieldToReturningWorker(Mutex*,Capability*)
  *
  * Purpose:  when, upon entry to the Scheduler, an OS worker thread
  *           spots that one or more threads are blocked waiting for
  *           permission to return back their result, it gives up
  *           its Capability. 
  *
- * Pre-condition:  sched_mutex is held and the thread possesses
+ * Pre-condition:  pMutex is assumed held and the thread possesses
  *                 a Capability.
- * Post-condition: sched_mutex isn't held and the Capability has
+ * Post-condition: pMutex isn't held and the Capability has
  *                 been given back.
  */
 void
-yieldCapability(Capability* cap)
+yieldToReturningWorker(Mutex* pMutex, Capability* cap)
 {
+  if ( rts_n_waiting_workers > 0 && noCapabilities() ) {
     IF_DEBUG(scheduler,
 	     fprintf(stderr,"worker thread (%ld): giving up RTS token\n", osThreadId()));
     releaseCapability(cap);
-    RELEASE_LOCK(&sched_mutex);
+    RELEASE_LOCK(pMutex);
     yieldThread();
-    /* At this point, sched_mutex has been given up & we've 
+    /* At this point, pMutex has been given up & we've 
      * forced a thread context switch. Guaranteed to be
      * enough for the signalled worker thread to race
-     * ahead?
+     * ahead of us?
      */
-    return;
+
+    /* Re-grab the mutex */
+    ACQUIRE_LOCK(pMutex);
+  }
+  return;
 }
 
+
+/*
+ * Function: waitForWorkCapability(Mutex*, Capability**, rtsBool)
+ *
+ * Purpose:  wait for a Capability to become available. In
+ *           the process of doing so, updates the number
+ *           of tasks currently blocked waiting for a capability/more
+ *           work. That counter is used when deciding whether or
+ *           not to create a new worker thread when an external
+ *           call is made.
+ *
+ * Pre-condition: pMutex is held.
+ */
+void 
+waitForWorkCapability(Mutex* pMutex, Capability** pCap, rtsBool runnable)
+{
+  while ( noCapabilities() || (runnable && EMPTY_RUN_QUEUE()) ) {
+    rts_n_waiting_tasks++;
+    waitCondition(&thread_ready_cond, pMutex);
+    rts_n_waiting_tasks--;
+  }
+  grabCapability(pCap);
+  return;
+}
 #endif /* RTS_SUPPORTS_THREADS */
 
 #if defined(SMP)
@@ -251,9 +314,6 @@ yieldCapability(Capability* cap)
  *           holding 'n' Capabilities. Only for SMP, since
  *           it is the only build that supports multiple
  *           capabilities within the RTS.
- * 
- * Pre-condition: sched_mutex is held.
- *
  */
 static void
 initCapabilities_(nat n)

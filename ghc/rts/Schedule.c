@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.123 2002/02/14 07:52:05 sof Exp $
+ * $Id: Schedule.c,v 1.124 2002/02/15 07:50:36 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -266,38 +266,6 @@ static void sched_belch(char *s, ...);
 Mutex     sched_mutex       = INIT_MUTEX_VAR;
 Mutex     term_mutex        = INIT_MUTEX_VAR;
 
-
-
-
-/* thread_ready_cond: when signalled, a thread has become runnable for a
- * task to execute.
- *
- * In the non-SMP case, it also implies that the thread that is woken up has
- * exclusive access to the RTS and all its data structures (that are not
- * under sched_mutex's control).
- *
- * thread_ready_cond is signalled whenever COND_NO_THREADS_READY doesn't hold.
- *
- */
-Condition thread_ready_cond = INIT_COND_VAR;
-#if 0
-/* For documentation purposes only */
-#define COND_NO_THREADS_READY() (noCapabilities() || EMPTY_RUN_QUEUE())
-#endif
-
-/*
- * To be able to make an informed decision about whether or not 
- * to create a new task when making an external call, keep track of
- * the number of tasks currently blocked waiting on thread_ready_cond.
- * (if > 0 => no need for a new task, just unblock an existing one).
- *
- * waitForWork() takes care of keeping it up-to-date; Task.startTask()
- * uses its current value.
- */
-nat rts_n_waiting_tasks = 0;
-
-static void waitForWork(void);
-
 # if defined(SMP)
 static Condition gc_pending_cond = INIT_COND_VAR;
 nat await_death;
@@ -410,36 +378,19 @@ schedule( void )
 # endif
 #endif
   rtsBool was_interrupted = rtsFalse;
-
-#if defined(RTS_SUPPORTS_THREADS)
-schedule_start:
-#endif
   
-#if defined(RTS_SUPPORTS_THREADS)
   ACQUIRE_LOCK(&sched_mutex);
-#endif
  
 #if defined(RTS_SUPPORTS_THREADS)
-  /* ToDo: consider SMP support */
-  if ( rts_n_waiting_workers > 0 && noCapabilities() ) {
-    /* (At least) one native thread is waiting to
-     * deposit the result of an external call. So,
-     * be nice and hand over our capability.
-     */
-    yieldCapability(cap);
-    /* Lost our sched_mutex lock, try to re-enter the scheduler. */
-    goto schedule_start;
-  }
-#endif
+  /* Check to see whether there are any worker threads
+     waiting to deposit external call results. If so,
+     yield our capability */
+  yieldToReturningWorker(&sched_mutex, cap);
 
-#if defined(RTS_SUPPORTS_THREADS)
-  while ( noCapabilities() ) {
-    waitForWork();
-  }
+  waitForWorkCapability(&sched_mutex, &cap, rtsFalse);
 #endif
 
 #if defined(GRAN)
-
   /* set up first event to get things going */
   /* ToDo: assign costs for system setup and init MainTSO ! */
   new_event(CurrentProc, CurrentProc, CurrentTime[CurrentProc],
@@ -723,16 +674,19 @@ schedule_start:
     if ( EMPTY_RUN_QUEUE() ) {
       /* Give up our capability */
       releaseCapability(cap);
-      while ( noCapabilities() || EMPTY_RUN_QUEUE() ) {
-	IF_DEBUG(scheduler, sched_belch("thread %d: waiting for work", osThreadId()));
-	waitForWork();
-	IF_DEBUG(scheduler, sched_belch("thread %d: work now available %d %d", osThreadId(), getFreeCapabilities(),EMPTY_RUN_QUEUE()));
+      IF_DEBUG(scheduler, sched_belch("thread %d: waiting for work", osThreadId()));
+      waitForWorkCapability(&sched_mutex, &cap, rtsTrue);
+      IF_DEBUG(scheduler, sched_belch("thread %d: work now available", osThreadId()));
+#if 0
+      while ( EMPTY_RUN_QUEUE() ) {
+	waitForWorkCapability(&sched_mutex, &cap);
+	IF_DEBUG(scheduler, sched_belch("thread %d: work now available", osThreadId()));
       }
+#endif
     }
 #endif
 
 #if defined(GRAN)
-
     if (RtsFlags.GranFlags.Light)
       GranSimLight_enter_system(event, &ActiveTSO); // adjust ActiveTSO etc
 
@@ -978,7 +932,7 @@ schedule_start:
 	     belch("--=^ %d threads, %d sparks on [%#x]", 
 		   run_queue_len(), spark_queue_len(pool), CURRENT_PROC));
 
-#if 1
+# if 1
     if (0 && RtsFlags.ParFlags.ParStats.Full && 
 	t && LastTSO && t->id != LastTSO->id && 
 	LastTSO->why_blocked == NotBlocked && 
@@ -1003,7 +957,7 @@ schedule_start:
       emitSchedule = rtsFalse;
     }
      
-#endif
+# endif
 #else /* !GRAN && !PAR */
   
     /* grab a thread from the run queue */
@@ -1377,12 +1331,11 @@ schedule_start:
     }
 #endif
 
+    if (ready_to_gc 
 #ifdef SMP
-    if (ready_to_gc && allFreeCapabilities() )
-#else
-    if (ready_to_gc) 
+	&& allFreeCapabilities() 
 #endif
-      {
+	) {
       /* everybody back, start the GC.
        * Could do it in this thread, or signal a condition var
        * to do it in another thread.  Either way, we need to
@@ -1512,7 +1465,7 @@ suspendThread( StgRegTable *reg )
      for one (i.e., if there's only one Concurrent Haskell thread alive,
      there's no need to create a new task).
   */
-  IF_DEBUG(scheduler, sched_belch("worker thread (%d): leaving RTS\n", tok));
+  IF_DEBUG(scheduler, sched_belch("worker thread (%d): leaving RTS", tok));
   startTask(taskStart);
 #endif
 
@@ -1528,8 +1481,8 @@ resumeThread( StgInt tok )
   Capability *cap;
 
 #if defined(RTS_SUPPORTS_THREADS)
-  /* Wait for permission to re-enter the RTS with the result.. */
-  grabReturnCapability(&cap);
+  /* Wait for permission to re-enter the RTS with the result. */
+  grabReturnCapability(&sched_mutex, &cap);
 #else
   grabCapability(&cap);
 #endif
@@ -1556,18 +1509,6 @@ resumeThread( StgInt tok )
   cap->r.rCurrentTSO = tso;
   return &cap->r;
 }
-
-
-#if defined(RTS_SUPPORTS_THREADS)
-static void
-waitForWork()
-{
-  rts_n_waiting_tasks++;
-  waitCondition(&thread_ready_cond, &sched_mutex);
-  rts_n_waiting_tasks--;
-  return;
-}
-#endif
 
 
 /* ---------------------------------------------------------------------------
@@ -1870,10 +1811,13 @@ activateSpark (rtsSpark spark)
  * on this thread's stack before the scheduler is invoked.
  * ------------------------------------------------------------------------ */
 
+static void scheduleThread_ (StgTSO* tso, rtsBool createTask);
+
 void
 scheduleThread_(StgTSO *tso
-#if defined(THREADED_RTS)
 	       , rtsBool createTask
+#if !defined(THREADED_RTS)
+		 STG_UNUSED
 #endif
 	      )
 {
@@ -1903,11 +1847,12 @@ scheduleThread_(StgTSO *tso
 
 void scheduleThread(StgTSO* tso)
 {
-#if defined(THREADED_RTS)
+  return scheduleThread_(tso, rtsFalse);
+}
+
+void scheduleExtThread(StgTSO* tso)
+{
   return scheduleThread_(tso, rtsTrue);
-#else
-  return scheduleThread_(tso);
-#endif
 }
 
 /* ---------------------------------------------------------------------------
@@ -3688,7 +3633,6 @@ sched_belch(char *s, ...)
 //@subsection Index
 
 //@index
-//* MainRegTable::  @cindex\s-+MainRegTable
 //* StgMainThread::  @cindex\s-+StgMainThread
 //* awaken_blocked_queue::  @cindex\s-+awaken_blocked_queue
 //* blocked_queue_hd::  @cindex\s-+blocked_queue_hd
@@ -3706,5 +3650,4 @@ sched_belch(char *s, ...)
 //* schedule::  @cindex\s-+schedule
 //* take_off_run_queue::  @cindex\s-+take_off_run_queue
 //* term_mutex::  @cindex\s-+term_mutex
-//* thread_ready_cond::  @cindex\s-+thread_ready_cond
 //@end index

@@ -37,8 +37,9 @@ extern void releaseCapability(Capability* cap);
 extern nat rts_n_free_capabilities;  
 extern nat rts_n_waiting_workers;
 
-extern void grabReturnCapability(Capability** pCap);
-extern void yieldCapability(Capability* cap);
+extern void grabReturnCapability(Mutex* pMutex, Capability** pCap);
+extern void yieldToReturningWorker(Mutex* pMutex, Capability* cap);
+extern void waitForWorkCapability(Mutex* pMutex, Capability** pCap, rtsBool runnable);
 
 static inline nat getFreeCapabilities (void)
 {

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.28 2002/02/13 08:48:07 sof Exp $
+ * $Id: Schedule.h,v 1.29 2002/02/15 07:50:37 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -164,11 +164,6 @@ extern SchedulerStatus waitThread_(StgTSO *tso,
 				   , rtsBool blockWaiting
 #endif
 				   );
-extern void scheduleThread_(StgTSO *tso
-#if defined(THREADED_RTS)
-			   , rtsBool createTask
-#endif
-			    );
 extern SchedulerStatus rts_mainEvalIO(HaskellObj p, /*out*/HaskellObj *ret);
 
 
