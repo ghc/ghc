@@ -14,3 +14,5 @@ typecheck/should_fail
 rename/should_compile
    rn037 issues
 
+stranal/should_compile
+

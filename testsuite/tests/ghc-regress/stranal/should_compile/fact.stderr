@@ -1,0 +1,21 @@
+
+
+================================================================================
+Simplified:
+Rec {
+`$g0'  ::  `GHC.Int# -> PrelBase.Int'
+`$g0' =
+    \ `$x0'  ::  `GHC.Int#'
+      `$x0' ->
+	case# `$x0' of {
+	  0 -> `PrelBase.I#' {2};
+	  `$x1' ->
+	      case `$g0' `$x0' of { `PrelBase.I#' `$x2'  ->
+	      case# *#! `$x2' `$x0' of { `$x3' -> `PrelBase.I#' {`$x3'};};};
+	}
+end Rec }
+`fact'  ::  `PrelBase.Int -> PrelBase.Int'
+`fact' =
+    \ `$x0'  ::  `PrelBase.Int'
+      `$x0' ->
+	case `$x0' of { `PrelBase.I#' `$x1'  -> `$g0' `$x1';}
