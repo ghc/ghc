@@ -31,10 +31,10 @@ module Text.Show (
 import GHC.Show
 #endif   
 
-#ifdef __GLASGOW_HASKELL__
 showListWith :: (a -> ShowS) -> [a] -> ShowS 
 showListWith = showList__
-#else
+
+#ifndef __GLASGOW_HASKELL__
 showList__ :: (a -> ShowS) ->  [a] -> ShowS
 showList__ _     []     s = "[]" ++ s
 showList__ showx (x:xs) s = '[' : showx x (showl xs)

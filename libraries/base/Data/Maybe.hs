@@ -35,6 +35,7 @@ import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
 #endif
 
+#ifndef __HUGS__
 -- ---------------------------------------------------------------------------
 -- The Maybe type, and instances
 
@@ -71,6 +72,7 @@ instance  Monad Maybe  where
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybe n _ Nothing  = n
 maybe _ f (Just x) = f x
+#endif  /* __HUGS__ */
 
 isJust         :: Maybe a -> Bool
 isJust Nothing = False

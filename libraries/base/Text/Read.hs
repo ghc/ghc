@@ -28,12 +28,14 @@ module Text.Read (
    readParen, 		-- :: Bool -> ReadS a -> ReadS a
    lex,			-- :: ReadS String
 
+#ifdef __GLASGOW_HASKELL__
    -- * New parsing functions
    module Text.ParserCombinators.ReadPrec,
    L.Lexeme(..),	
    lexP,		-- :: ReadPrec Lexeme
    readListDefault,	-- :: Read a => ReadS [a]
    readListPrecDefault,	-- :: Read a => ReadPrec [a]
+#endif
 
  ) where
 

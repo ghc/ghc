@@ -15,9 +15,7 @@
 
 module Data.List
    ( 
-    [] (..)
-
-   , elemIndex	       -- :: (Eq a) => a -> [a] -> Maybe Int
+     elemIndex	       -- :: (Eq a) => a -> [a] -> Maybe Int
    , elemIndices       -- :: (Eq a) => a -> [a] -> [Int]
 
    , find	       -- :: (a -> Bool) -> [a] -> Maybe a
@@ -597,6 +595,7 @@ foldl'           :: (a -> b -> a) -> a -> [b] -> a
 foldl' f a []     = a
 foldl' f a (x:xs) = let a' = f a x in a' `seq` foldl' f a' xs
 
+#ifndef __HUGS__
 -- -----------------------------------------------------------------------------
 -- List sum and product
 
@@ -619,3 +618,4 @@ product	l	= prod l 1
     prod []     a = a
     prod (x:xs) a = prod xs (a*x)
 #endif
+#endif  /* __HUGS__ */

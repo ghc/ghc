@@ -51,6 +51,7 @@ import GHC.List
 import GHC.Base
 #endif
 
+#ifndef __HUGS__
 infixr 1 =<<
 
 -- -----------------------------------------------------------------------------
@@ -77,6 +78,7 @@ mapM f as       =  sequence (map f as)
 mapM_           :: Monad m => (a -> m b) -> [a] -> m ()
 {-# INLINE mapM_ #-}
 mapM_ f as      =  sequence_ (map f as)
+#endif  /* __HUGS__ */
 
 -- -----------------------------------------------------------------------------
 -- Monadic classes: MonadPlus
