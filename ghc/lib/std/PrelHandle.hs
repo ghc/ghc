@@ -4,7 +4,7 @@
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelHandle.hs,v 1.6 2001/11/27 01:53:23 sof Exp $
+-- $Id: PrelHandle.hs,v 1.7 2001/12/27 09:28:10 sof Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --
@@ -16,7 +16,8 @@ module PrelHandle (
   
   newEmptyBuffer, allocateBuffer, readCharFromBuffer, writeCharIntoBuffer,
   flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, fillReadBuffer,
-  read_off,
+  read_off,  read_off_ba,
+  write_off, write_off_ba,
 
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
@@ -424,8 +425,8 @@ flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
      then return (buf{ bufRPtr=0, bufWPtr=0 })
      else do
   res <- throwErrnoIfMinus1RetryMayBlock "flushWriteBuffer"
-		(write_off (fromIntegral fd) is_stream b (fromIntegral r)
-			(fromIntegral bytes))
+		(write_off_ba (fromIntegral fd) is_stream b (fromIntegral r)
+			      (fromIntegral bytes))
 		(threadWaitWrite fd)
   let res' = fromIntegral res
   if res' < bytes 
@@ -433,8 +434,10 @@ flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  = do
      else return buf{ bufRPtr=0, bufWPtr=0 }
 
 foreign import "prel_PrelHandle_write" unsafe
-   write_off :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+   write_off_ba :: CInt -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 
+foreign import "prel_PrelHandle_write" unsafe
+   write_off :: CInt -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 
 fillReadBuffer :: FD -> Bool -> Bool -> Buffer -> IO Buffer
 fillReadBuffer fd is_line is_stream
@@ -458,7 +461,7 @@ fillReadBufferLoop fd is_line is_stream buf b w size = do
   puts ("fillReadBufferLoop: bytes = " ++ show bytes ++ "\n")
 #endif
   res <- throwErrnoIfMinus1RetryMayBlock "fillReadBuffer"
-	    (read_off fd is_stream b (fromIntegral w) (fromIntegral bytes))
+	    (read_off_ba fd is_stream b (fromIntegral w) (fromIntegral bytes))
 	    (threadWaitRead fd)
   let res' = fromIntegral res
 #ifdef DEBUG_DUMP
@@ -473,7 +476,10 @@ fillReadBufferLoop fd is_line is_stream buf b w size = do
      	     else return buf{ bufRPtr=0, bufWPtr=w+res' }
  
 foreign import "prel_PrelHandle_read" unsafe
-   read_off :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+   read_off_ba :: FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
+
+foreign import "prel_PrelHandle_read" unsafe
+   read_off :: FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
 
 -- ---------------------------------------------------------------------------
 -- Standard Handles
@@ -1202,7 +1208,7 @@ ioeGetFileName _ = error "IO.ioeGetFileName: not an IO error"
 
 #ifdef DEBUG_DUMP
 puts :: String -> IO ()
-puts s = withCString s $ \cstr -> do c_write 1 cstr (fromIntegral (length s))
+puts s = withCString s $ \cstr -> do write_off_ba 1 False cstr 0 (fromIntegral (length s))
 				     return ()
 #endif
 

@@ -284,12 +284,6 @@ foreign import "closesocket" unsafe
 foreign import "lseek" unsafe
    c_lseek :: CInt -> COff -> CInt -> IO COff
 
-foreign import "write" unsafe 
-   c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
-
-foreign import "read" unsafe 
-   c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
-
 #ifndef mingw32_TARGET_OS
 foreign import "fcntl" unsafe
    fcntl_read  :: CInt -> CInt -> IO CInt

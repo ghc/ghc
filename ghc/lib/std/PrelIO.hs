@@ -3,7 +3,7 @@
 #undef DEBUG_DUMP
 
 -- -----------------------------------------------------------------------------
--- $Id: PrelIO.hs,v 1.5 2001/12/03 20:59:08 sof Exp $
+-- $Id: PrelIO.hs,v 1.6 2001/12/27 09:28:11 sof Exp $
 --
 -- (c) The University of Glasgow, 1992-2001
 --
@@ -171,7 +171,7 @@ hGetChar handle =
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "hGetChar"
-	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
+	        (read_off_ba (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then ioe_EOF
@@ -351,7 +351,7 @@ lazyRead' h handle_ = do
 	-- make use of the minimal buffer we already have
 	let raw = bufBuf buf
 	r <- throwErrnoIfMinus1RetryMayBlock "lazyRead"
-	        (read_off (fromIntegral fd) (haIsStream handle_) raw 0 1)
+	        (read_off_ba (fromIntegral fd) (haIsStream handle_) raw 0 1)
 	        (threadWaitRead fd)
 	if r == 0
 	   then do handle_ <- hClose_help handle_ 
@@ -410,7 +410,7 @@ hPutChar handle c =
 	NoBuffering      ->
 		withObject (castCharToCChar c) $ \buf ->
 		throwErrnoIfMinus1RetryMayBlock_ "hPutChar"
-		   (c_write (fromIntegral fd) buf 1)
+		   (write_off (fromIntegral fd) (haIsStream handle_) buf 0 1)
 		   (threadWaitWrite fd)
 
 
