@@ -703,15 +703,6 @@ upsweep_mod ghci_mode dflags oldUI threaded1 summary1 reachable_from_here
         let mod_name = name_of_summary summary1
 	let verb = verbosity dflags
 
-        when (verb == 1) $
-	   if (ghci_mode == Batch)
-		then hPutStr stderr (progName ++ ": module " 
-                       	++ moduleNameUserString mod_name
-			++ ": ")
-		else hPutStr stderr ("Compiling "
-		       	++ moduleNameUserString mod_name
-		 	++ " ... ")
-
         let (CmThreaded pcs1 hst1 hit1) = threaded1
         let old_iface = lookupUFM hit1 mod_name
 

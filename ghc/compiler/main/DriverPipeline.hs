@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.50 2001/02/05 17:52:49 rrt Exp $
+-- $Id: DriverPipeline.hs,v 1.51 2001/02/26 15:50:21 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -36,6 +36,7 @@ import DriverPhases
 import DriverFlags
 import HscMain
 import TmpFiles
+import Finder
 import HscTypes
 import Outputable
 import Module
@@ -461,13 +462,12 @@ run_phase Hsc basename suff input_fn output_fn
 				  then return True
 				  else return False
 
-   -- build a ModuleLocation to pass to hscMain.
-        let location = ModuleLocation {
-                          ml_hs_file   = Nothing,
-                          ml_hspp_file = Just input_fn,
-                          ml_hi_file   = Just hifile,
-                          ml_obj_file  = Just o_file
-                       }
+	 -- build a ModuleLocation to pass to hscMain.
+        modsrc <- readFile input_fn
+        let (srcimps,imps,mod_name) = getImports modsrc
+
+	Just (mod, location)
+	   <- mkHomeModuleLocn mod_name basename (basename ++ '.':suff)
 
   -- get the DynFlags
         dyn_flags <- readIORef v_DynFlags
@@ -476,8 +476,9 @@ run_phase Hsc basename suff input_fn output_fn
         pcs <- initPersistentCompilerState
 	result <- hscMain OneShot
                           dyn_flags{ hscOutName = output_fn }
+			  mod
+			  location{ ml_hspp_file=Just input_fn }
 			  source_unchanged
-			  location
 			  Nothing	 -- no iface
 			  emptyModuleEnv -- HomeSymbolTable
 			  emptyModuleEnv -- HomeIfaceTable
@@ -882,8 +883,8 @@ compile ghci_mode summary source_unchanged old_iface hst hit pcs = do
 
    -- run the compiler
    hsc_result <- hscMain ghci_mode dyn_flags{ hscOutName = output_fn } 
-			 source_unchanged
-                         location old_iface hst hit pcs
+			 (ms_mod summary) location
+			 source_unchanged old_iface hst hit pcs
 
    case hsc_result of
       HscFail pcs -> return (CompErrs pcs)

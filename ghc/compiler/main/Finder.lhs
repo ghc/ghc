@@ -95,11 +95,15 @@ maybeHomeModule mod_name = do
        lhs = basename ++ ".lhs"
 
    case lookupFM home_map hs of {
+	  -- special case to avoid getting "./foo.hs" all the time
+	Just "."  -> mkHomeModuleLocn mod_name basename hs;
 	Just path -> mkHomeModuleLocn mod_name 
 			(path ++ '/':basename) (path ++ '/':hs);
 	Nothing ->
 
    case lookupFM home_map lhs of {
+	  -- special case to avoid getting "./foo.hs" all the time
+	Just "."  -> mkHomeModuleLocn mod_name basename lhs;
 	Just path ->  mkHomeModuleLocn mod_name
 			(path ++ '/':basename) (path ++ '/':lhs);
 	Nothing -> do
