@@ -456,6 +456,9 @@ FPTOOLS_CHECK_ALIGNMENT(double)
 dnl ** do we have long longs?
 FPTOOLS_C_LONG_LONG
 
+dnl ** can we open files in binary mode?
+FPTOOLS_O_BINARY
+
 #
 dnl ** check for specific library functions that we are interested in
 #
