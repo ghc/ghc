@@ -28,7 +28,7 @@ module Data.Graph(
 
 	-- ** Building graphs
 
-	graphFromEdges, buildG, transposeG,
+	graphFromEdges, graphFromEdges', buildG, transposeG,
 	-- reverseE,
 
 	-- ** Graph properties
@@ -121,7 +121,7 @@ stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEd
 stronglyConnCompR edges0
   = map decode forest
   where
-    (graph, vertex_fn) = graphFromEdges edges0
+    (graph, vertex_fn,_) = graphFromEdges edges0
     forest	       = scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
 		       | otherwise	   = AcyclicSCC (vertex_fn v)
@@ -179,6 +179,16 @@ outdegree  = mapT numEdges
 indegree :: Graph -> Table Int
 indegree  = outdegree . transposeG
 
+-- | Identical to 'graphFromEdges', except that the return value
+-- does not include the function which maps keys to vertices.  This
+-- version of 'graphFromEdges' is for backwards compatibility.
+graphFromEdges'
+	:: Ord key
+	=> [(node, key, [key])]
+	-> (Graph, Vertex -> (node, key, [key]))
+graphFromEdges' x = (a,b) where
+    (a,b,_) = graphFromEdges x
+
 -- | Build a graph from a list of nodes uniquely identified by keys,
 -- with a list of keys of nodes this node should have edges to.
 -- The out-list may contain keys that don't correspond to
@@ -186,9 +196,9 @@ indegree  = outdegree . transposeG
 graphFromEdges
 	:: Ord key
 	=> [(node, key, [key])]
-	-> (Graph, Vertex -> (node, key, [key]))
+	-> (Graph, Vertex -> (node, key, [key]), key -> Maybe Vertex)
 graphFromEdges edges0
-  = (graph, \v -> vertex_map ! v)
+  = (graph, \v -> vertex_map ! v, key_vertex)
   where
     max_v      	    = length edges0 - 1
     bounds0         = (0,max_v) :: (Vertex, Vertex)
