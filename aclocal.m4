@@ -1,27 +1,10 @@
-dnl $Id: aclocal.m4,v 1.24 1998/08/06 10:28:34 simonm Exp $
+dnl $Id: aclocal.m4,v 1.25 1998/08/14 15:24:10 simonm Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
 dnl To be a good autoconf citizen, names of local macros have
 dnl prefixed with FPTOOLS_ to ensure we don't clash
 dnl with any pre-supplied autoconf ones.
-
-dnl 
-dnl Are we running under the GNU libc?  Need -D_GNU_SOURCE to get 
-dnl caddr_t and such.
-dnl 
-AC_DEFUN(FPTOOLS_GNU_LIBC,
-[AC_CACHE_CHECK([GNU libc], fptools_cv_gnu_libc,
-[AC_EGREP_CPP(yes,
-[#include <features.h>
-#ifdef __GLIBC__
-yes
-#endif
-], fptools_cv_gnu_libc=yes, fptools_cv_gnu_libc=no)])
-if test "$fptools_cv_gnu_libc" = yes; then
-  AC_DEFINE(_GNU_SOURCE)
-fi
-])
 
 dnl
 dnl Has timezone the type time_t or long (HP-UX 10.20 apparently
