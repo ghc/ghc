@@ -2752,8 +2752,8 @@ directive.
 	      </varlistentry>
 
 	      <varlistentry>
-		<term><literal>EXCLUDE_SRCS</literal>
-                  <indexterm><primary><literal>EXCLUDE_SRCS</literal></primary></indexterm>
+		<term><literal>EXCLUDED_SRCS</literal>
+                  <indexterm><primary><literal>EXCLUDED_SRCS</literal></primary></indexterm>
                 </term>
 		<listitem>
 		  <para>Set to a list of source files (relative to the
@@ -2771,7 +2771,7 @@ directive.
 
 	      <varlistentry>
 		<term><literal>EXTRA_SRCS</literal>
-                  <indexterm><primary><literal>EXCLUDE_SRCS</literal></primary></indexterm>
+                  <indexterm><primary><literal>EXTRA_SRCS</literal></primary></indexterm>
                 </term>
 		  <listitem>
 		  <para>Set to a list of extra source files (perhaps
