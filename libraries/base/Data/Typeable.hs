@@ -48,6 +48,7 @@ module Data.Typeable
 	withType,		-- :: a -> TypeVal a -> a
 	argType,		-- :: (a -> b) -> TypeVal a
 	resType,		-- :: (a -> b) -> TypeVal b
+	paraType,		-- :: t a -> TypeVal a
 	TypeFun			-- functions on types
 
   ) where
@@ -374,6 +375,11 @@ argType _ = typeVal
 -- | The result type of a function
 resType :: (a -> b) -> TypeVal b
 resType _ = typeVal
+
+
+-- | The parameter type of type constructor
+paraType :: t a -> TypeVal a
+paraType _ = typeVal
 
 
 -- Type functions,

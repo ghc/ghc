@@ -40,7 +40,7 @@ import Data.Generics.Schemes
 
 -- | Count the number of immediate subterms of the given term
 glength :: GenericQ Int
-glength = length . gmapL (const ())
+glength = length . gmapQ (const ())
 
 
 -- | Determine the number of all suitable nodes in a given term

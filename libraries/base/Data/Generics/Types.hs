@@ -70,6 +70,6 @@ typeReachableFrom (a::TypeVal a) (b::TypeVal b) =
     -- See if a is reachable from immediate subterms of a kind of b 
     recurse :: b -> Bool
     recurse = or
-            . gmapL ( typeReachableFrom a 
+            . gmapQ ( typeReachableFrom a 
                     . typeValOf
                     )

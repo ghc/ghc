@@ -49,9 +49,10 @@ module Data.Generics.Basics (
         -- * Generic maps defined in terms of gfoldl 
 	gmapT,
         gmapQ, 
-        gmapL,
+        gmapQl,
+        gmapQr,
         gmapM,
-        gmapF,
+        gmapMp,
 
 	-- * Generic unfolding defined in terms of gfoldl and fromConstr
 	gunfoldM	-- :: Monad m => ... -> m a
@@ -146,9 +147,9 @@ fold.
 
 {-
 
-The combinators gmapT, gmapQ, gmapL, gmapM, gmapF can all be defined
-in terms of gfoldl. We provide corresponding default definitions
-leaving open the opportunity to provide datatype-specific definitions.
+The combinators gmapT, gmapQ, gmapM, ... can all be defined in terms
+of gfoldl. We provide corresponding default definitions leaving open
+the opportunity to provide datatype-specific definitions.
 
 (The inclusion of the gmap combinators as members of class Data allows
 the programmer or the compiler to derive specialised, and maybe more
@@ -177,24 +178,40 @@ arguments. Technically, we also need to identify the type constructor
       k (ID c) x = ID (c (f x))
 
 
-  -- | A generic query with monoid-like operators
-  gmapQ :: (r -> r -> r) -> r -> (forall a. Data a => a -> r) -> a -> r
-  gmapQ o r f = unCONST . gfoldl k z
+  -- | A generic query with a left-associative binary operator
+  gmapQl :: (r -> r' -> r) -> r -> (forall a. Data a => a -> r') -> a -> r
+  gmapQl o r f = unCONST . gfoldl k z
     where
       k c x = CONST $ (unCONST c) `o` f x 
       z _   = CONST r
 
+{-
+
+In the definition of gmapQ? combinators, we use phantom type
+constructors for the "c" in the type of "gfoldl" because the result
+type of a query does not involve the (polymorphic) type of the term
+argument. In the definition of gmapQl we simply use the plain constant
+type constructor because gfoldl is left-associative anyway and so it
+is readily suited to fold a left-associative binary operation over the
+immediate subterms. In the definition of gmapQr, extra effort is
+needed. We use a higher-order accumulation trick to mediate between
+left-associative constructor application vs. right-associative binary
+operation (e.g., (:)). When the query is meant to compute a value of
+type r, then the result type withing generic folding is r -> r. So the
+result of folding is a function to which we finally pass the right
+unit.
+
+-}
+
+  -- | A generic query with a right-associative binary operator
+  gmapQr :: (r' -> r -> r) -> r -> (forall a. Data a => a -> r') -> a -> r
+  gmapQr o r f x = unQr (gfoldl k (const (Qr id)) x) r
+    where
+      k (Qr c) x = Qr (\r -> c (f x `o` r))
 
   -- | A generic query that processes the immediate subterms and returns a list
-  gmapL   :: (forall a. Data a => a -> u) -> a -> [u]
-
-  -- Use a phantom + function datatype constructor QL (see below),
-  -- to instantiate the type constructor c in the type of gfoldl,
-  -- and perform injections QL and projections unQL accordingly.
-  --
-  gmapL f x = unQL (gfoldl k (const (QL id)) x) []
-    where
-      k (QL c) x = QL (\rs -> c (f x : rs))
+  gmapQ :: (forall a. Data a => a -> u) -> a -> [u]
+  gmapQ f = gmapQr (:) [] f
 
 
   -- | A generic monadic transformation that maps over the immediate subterms
@@ -212,17 +229,22 @@ arguments. Technically, we also need to identify the type constructor
 
 
   -- | Transformation of at least one immediate subterm does not fail
-  gmapF :: MonadPlus m => (forall a. Data a => a -> m a) -> a -> m a
+  gmapMp :: MonadPlus m => (forall a. Data a => a -> m a) -> a -> m a
 
-  -- Use a datatype constructor F (see below)
-  -- to instantiate the type constructor c in the type of gfoldl.
-  --  
-  gmapF f x = unFAIL (gfoldl k z x) >>= \(x',b) ->
-              if b then return x' else mzero
+{-
+
+The type constructor that we use here simply keeps track of the fact
+if we already succeeded for an immediate subterm; see Mp below. To
+this end, we couple the monadic computation with a Boolean.
+
+-}
+
+  gmapMp f x = unMp (gfoldl k z x) >>= \(x',b) ->
+                if b then return x' else mzero
     where
-      z g = FAIL (return (g,False))
-      k (FAIL c) x
-        = FAIL ( c >>= \(h,b) -> 
+      z g = Mp (return (g,False))
+      k (Mp c) x
+        = Mp ( c >>= \(h,b) -> 
                  (f x >>= \x' -> return (h x',True))
                  `mplus` return (h x, b)
                )
@@ -232,20 +254,16 @@ arguments. Technically, we also need to identify the type constructor
 newtype ID x = ID { unID :: x }
 
 
--- | The constant type constructor needed for the definition of gmapQ
+-- | The constant type constructor needed for the definition of gmapQl
 newtype CONST c a = CONST { unCONST :: c }
 
 
--- | A phantom datatype constructor used in definition of gmapL;
---   the function-typed component is needed to mediate between
---   left-associative constructor application vs. right-associative lists.
--- 
-newtype QL r a = QL { unQL  :: [r] -> [r] }
+-- | The type constructor used in definition of gmapQr
+newtype Qr r a = Qr { unQr  :: r -> r }
 
 
--- | A pairing type constructor needed for the definition of gmapF;
--- we keep track of the fact if a subterm was ever transformed successfully.
-newtype FAIL m x = FAIL { unFAIL :: m (x, Bool) }
+-- | The type constructor used in definition of gmapMp
+newtype Mp m x = Mp { unMp :: m (x, Bool) }
 
 
 
@@ -375,6 +393,7 @@ conIndex _                    = undefined
 stringCon :: DataType -> String -> Maybe Constr
 stringCon (DataType cs) str = worker cs
   where
+    worker []     = Nothing
     worker (c:cs) =
       case c of
         (DataConstr _ str' _) -> if str == str'
@@ -490,8 +509,8 @@ instance Data a => Data [a] where
 --
   gmapT  f   []     = []
   gmapT  f   (x:xs) = (f x:f xs)
-  gmapL  f   []     = []
-  gmapL  f   (x:xs) = [f x,f xs]
+--  gmapL  f   []     = []
+--  gmapL  f   (x:xs) = [f x,f xs]
   gmapM  f   []     = return []
   gmapM  f   (x:xs) = f x >>= \x' -> f xs >>= \xs' -> return (x':xs')
 

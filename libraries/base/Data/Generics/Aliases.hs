@@ -16,8 +16,8 @@
 module Data.Generics.Aliases ( 
 
 	-- * Combinators to \"make\" generic functions via cast
-	mkT, mkQ, mkM, mkF, mkB,
-	extT, extQ, extM, extF, extB,
+	mkT, mkQ, mkM, mkMp, mkB,
+	extT, extQ, extM, extMp, extB,
 
 	-- * Type synonyms for generic function types
 	GenericT, 
@@ -31,9 +31,9 @@ module Data.Generics.Aliases (
 	orElse,
 
 	-- * Function combinators on generic functions
-	recoverF,
+	recoverMp,
 	recoverQ,
-	choiceF,
+	choiceMp,
 	choiceQ
 
   ) where
@@ -99,14 +99,14 @@ use a point-free style whenever possible.
 -- | Make a generic monadic transformation for MonadPlus;
 --   use \"const mzero\" (i.e., failure) instead of return as default.
 --
-mkF :: ( MonadPlus m,
-         Typeable a,
-         Typeable b,
-         Typeable (m a),
-         Typeable (m b)
-       )
+mkMp :: ( MonadPlus m,
+          Typeable a,
+          Typeable b,
+          Typeable (m a),
+          Typeable (m b)
+        )
     => (b -> m b) -> a -> m a
-mkF = maybe (const mzero) id . cast
+mkMp = maybe (const mzero) id . cast
 
 
 -- | Make a generic builder;
@@ -142,14 +142,14 @@ extM f = maybe f id . cast
 
 
 -- | Extend a generic MonadPlus transformation by a type-specific case
-extF :: ( MonadPlus m,
-          Typeable a,
-          Typeable b,
-          Typeable (m a),
-          Typeable (m b)
-        )
+extMp :: ( MonadPlus m,
+           Typeable a,
+           Typeable b,
+           Typeable (m a),
+           Typeable (m b)
+         )
      => (a -> m a) -> (b -> m b) -> a -> m a
-extF = extM
+extMp = extM
 
 
 
@@ -229,8 +229,8 @@ queries a given constant is returned.
 -}
 
 -- | Choice for monadic transformations
-choiceF :: MonadPlus m => GenericM m -> GenericM m -> GenericM m
-choiceF f g x = f x `mplus` g x
+choiceMp :: MonadPlus m => GenericM m -> GenericM m -> GenericM m
+choiceMp f g x = f x `mplus` g x
 
 
 -- | Choice for monadic queries
@@ -239,8 +239,8 @@ choiceQ f g x = f x `mplus` g x
 
 
 -- | Recover from the failure of monadic transformation by identity
-recoverF :: MonadPlus m => GenericM m -> GenericM m
-recoverF f = f `choiceF` return
+recoverMp :: MonadPlus m => GenericM m -> GenericM m
+recoverMp f = f `choiceMp` return
 
 
 -- | Recover from the failure of monadic query by a constant

@@ -40,7 +40,7 @@ gshow :: Data a => a -> String
 gshow = ( \t ->
                 "("
              ++ conString (toConstr t)
-             ++ concat (gmapL ((++) " " . gshow) t)
+             ++ concat (gmapQ ((++) " " . gshow) t)
              ++ ")"
         ) `extQ` (show :: String -> String)
 
@@ -48,65 +48,95 @@ gshow = ( \t ->
 -- | The type constructor for gunfold a la ReadS from the Prelude;
 --   we don't use lists here for simplicity but only maybes.
 --
-newtype GRead a = GRead (String -> Maybe (a, String))
+newtype GRead a = GRead (String -> Maybe (a, String)) deriving Typeable
 unGRead (GRead x) = x
 
-{-
+
 -- | Turn GRead into a monad.
 instance Monad GRead where
   return x = GRead (\s -> Just (x, s))
   (GRead f) >>= g = GRead (\s -> 
                              maybe Nothing 
                                    (\(a,s') -> unGRead (g a) s')
-                                   f s
+                                   (f s)
                           )
--}
+
+instance MonadPlus GRead where
+ mzero = GRead (\_ -> Nothing)
+ mplus = undefined
+
+
+-- | Special parsing operators
+trafo f = GRead (\s -> Just ((), f s))
+query f = GRead (\s -> if f s then Just ((), s) else Nothing)
+
 
 -- | Generic read: an alternative to \"deriving Read\"
-gread :: GenericB Maybe
+gread :: Data a => String -> Maybe (a, String)
 
 {-
 
 This is a read operation which insists on prefix notation.  (The
-Haskell 98 read deals with infix operators as well. We will be able to
-deal with such special cases as well as sonn as we include fixity
-information into the definition of "Constr".)  We use gunfold to
-"parse" the input. To be precise, gunfold is used for all result types
-except String. The type-specific case for String uses basic String
-read. Another source of customisation would be to properly deal with
-infix operators subject to the capture of that information in the
-definition of Constr. The "gread" combinator properly checks the 
-validity of constructors before invoking gunfold in order to rule
-out run-time errors.
+Haskell 98 read deals with infix operators subject to associativity
+and precedence as well.) We use gunfoldM to "parse" the input. To be
+precise, gunfoldM is used for all types except String. The
+type-specific case for String uses basic String read.
 
 -}
 
-gread = undefined
 
-{-
-gdefault `extB` scase
+gread = unGRead gread' 
 
  where
 
-  -- a specific case for strings
-  scase s = case reads s of
-              [x::(String,String)] -> Just x
-              _ -> Nothing
+  gread' :: GenericB GRead
+  gread' = gdefault `extB` scase
 
-  -- the generic default of gread
-  gdefault s = undefined
+   where
 
--}
+    -- a specific case for strings
+    scase = GRead ( \s -> case reads s of
+                            [x::(String,String)] -> Just x
+                            _ -> Nothing
+                  ) 
 
+    -- the generic default for gread
+    gdefault = 
+      do 
+  	trafo $  dropWhile ((==) ' ')
+	query $  not . (==) ""
+	query $  (==) '(' . head
+	trafo $  tail
+	trafo $  dropWhile ((==) ' ')                
+	str   <- parseConstr
+        con   <- str2con str
+        x     <- gunfoldM con gread'
+	trafo $  dropWhile ((==) ' ')
+	query $  not . (==) ""
+	query $  (==) ')' . head
+	trafo $  tail
+        return x
+
+     where
+       -- Turn string into constructor driven by gdefault's type
+       str2con = maybe mzero return
+               .
+	         (    stringCon		-- look up constructor at hand
+                    $ dataTypeOf	-- get handle on all constructurs
+                    $ undefinedType	-- turn type value into undefined
+                    $ paraType		-- get a handle on a in m a
+                    $ gdefault		-- use as type argument
+                 )
 {-
+  foo = 
     do s' <- return $ dropWhile ((==) ' ') s
        guard (not (s' == ""))
        guard (head s' == '(')
-       (c,s'')  <- prefixConstr (dropWhile ((==) ' ') (tail s'))
+       (c,s'')  <- parseConstr (dropWhile ((==) ' ') (tail s'))
        u  <- return undefined 
        dt <- return $ dataTypeOf u
        case stringCon dt c of
-        Nothing -> error "Generics: gread failed"
+        Nothing -> error "Data.Generics.String: gread failed"
         Just c' -> 
           gunfoldm c' gread
 
@@ -119,39 +149,25 @@ gdefault `extB` scase
        guard (not (s''' == "")) 
        guard (head s''' == ')')
        return (a, tail s''')
-
-
-  -- To force two types to be the same
-  constrainTypes :: a -> a -> ()
-  constrainTypes _ _ = ()
-
-  -- Argument f for unfolding
-  f :: Data a => GRead (a -> b) -> GRead b
-  f x = GRead (\s -> do (r,s') <- unGRead x s
-                        (t,s'')  <- gread s'
-                        return (r t,s''))
-
-  -- Argument z for unfolding
-  z ::  forall g. g -> GRead g
-  z g = GRead (\s -> return (g,s))
-
-
-  -- Get Constr at front of string
-  prefixConstr :: String -> Maybe (Constr, String)
-
-  -- Assume an infix operators in parantheses
-  prefixConstr ('(':s)
-    = case break ((==) ')') s of
-        (s'@(_:_),(')':s'')) -> Just (Constr ("(" ++ s' ++ ")"), s'')
-        _ -> Nothing
-
-  -- Special treatment of multiple token constructors
-  prefixConstr ('[':']':s) = Just (Constr "[]",s)
-
-  -- Try lex for ordinary constructor and basic datatypes
-  prefixConstr s
-    = case lex s of
-        [(s'@(_:_),s'')] -> Just (Constr s',s'')
-        _ -> Nothing
-
 -}
+
+  -- Get a Constr's string at the front of an input string
+  parseConstr :: GRead String
+
+  parseConstr = GRead ( \s -> case s of
+
+    -- Infix operators are prefixed in parantheses
+    ('(':s) -> case break ((==) ')') s of
+                 (s'@(_:_),(')':s'')) -> Just ("(" ++ s' ++ ")", s'')
+                 _ -> Nothing
+
+    -- Special treatment of multiple token constructors
+    ('[':']':s) -> Just ("[]",s)
+
+    -- Try lex for ordinary constructor and basic datatypes
+    s -> case lex s of
+           [(s'@(_:_),s'')] -> Just (s',s'')
+           _ -> Nothing
+
+    )
+

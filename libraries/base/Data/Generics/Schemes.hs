@@ -79,18 +79,18 @@ somewhere :: MonadPlus m => GenericM m -> GenericM m
 -- at the root of the term. The transformation fails if "f" fails
 -- everywhere, say succeeds nowhere.
 -- 
-somewhere f x = f x `mplus` gmapF (somewhere f) x
+somewhere f x = f x `mplus` gmapMp (somewhere f) x
 
 
 -- | Summarise all nodes in top-down, left-to-right order
 everything :: (r -> r -> r) -> GenericQ r -> GenericQ r
 
 -- Apply f to x to summarise top-level node;
--- use gmapL to recurse into immediate subterms;
+-- use gmapQ to recurse into immediate subterms;
 -- use ordinary foldl to reduce list of intermediate results
 -- 
 everything k f x 
-  = foldl k (f x) (gmapL (everything k f) x)
+  = foldl k (f x) (gmapQ (everything k f) x)
 
 
 -- | Get a list of all entities that meet a predicate
@@ -114,4 +114,4 @@ something = everything orElse
 --   3rd argument f updates the sythesised data according to the given term
 --
 synthesize :: s  -> (s -> s -> s) -> GenericQ (s -> s) -> GenericQ s
-synthesize z o f x = f x (foldr o z (gmapL (synthesize z o f) x))
+synthesize z o f x = f x (foldr o z (gmapQ (synthesize z o f) x))

@@ -20,7 +20,7 @@ module Data.Generics.Twins (
 
 	-- * Twin mapping combinators
 	tmapT,
-	tmapQ,
+	tmapQl,
 	tmapM,
 
 	-- * Prime examples of twin traversal
@@ -79,7 +79,7 @@ tfoldl :: (forall a b. Data a => c (a -> b) -> c a -> c b)
 
 tfoldl k z t xs ys = case gfoldl k' z' ys of { TWIN _ c -> c }
  where
-   l = gmapL (\x -> Generic' (t x)) xs
+   l = gmapQ (\x -> Generic' (t x)) xs
    k' (TWIN (r:rs) c) y = TWIN rs (k c (unGeneric' r y))
    z' f                 = TWIN l (z f)
 
@@ -103,11 +103,11 @@ tmapT f x y = unID $ tfoldl k z f' x y
   z = ID
 
 
-tmapQ :: (r -> r -> r) 
-      -> r
-      -> GenericQ (GenericQ r)
-      -> GenericQ (GenericQ r)
-tmapQ o r f x y = unCONST $ tfoldl k z f' x y
+tmapQl :: (r -> r -> r) 
+       -> r
+       -> GenericQ (GenericQ r)
+       -> GenericQ (GenericQ r)
+tmapQl o r f x y = unCONST $ tfoldl k z f' x y
  where
   f' x y = CONST $ f x y
   k (CONST c) (CONST x) = CONST (c `o` x)  
@@ -127,7 +127,7 @@ tmapM f x y = tfoldl k z f x y
 newtype ID x = ID { unID :: x }
 
 
--- The constant type constructor needed for the definition of tmapQ
+-- The constant type constructor needed for the definition of tmapQl
 newtype CONST c a = CONST { unCONST :: c }
 
 
@@ -160,7 +160,7 @@ geq x y = geq' x y
  where
   geq' :: forall a b. (Data a, Data b) => a -> b -> Bool
   geq' x y = and [ (toConstr x == toConstr y)
-                 , tmapQ (\b1 b2 -> and [b1,b2]) True geq' x y
+                 , tmapQl (\b1 b2 -> and [b1,b2]) True geq' x y
                  ]
 
 
