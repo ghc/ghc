@@ -305,6 +305,24 @@ details.</para>
       </listitem>
     </varlistentry>
 
+    <varlistentry>
+      <term>Why does linking take so long?</term>
+      <listitem>
+	<para>Linking a small program should take no more than a few
+	seconds.  Larger programs can take longer, but even linking
+	GHC itself only takes 3-4 seconds on our development
+	machines.</para>
+	
+	<para>Long link times have been attributed to using Sun's
+	linker on Solaris, as compared to GNU <command>ld</command>
+	which appears to be much faster.  So if you're on a Sun box,
+	try switching to GNU <command>ld</command>.  <ulink
+	url="http://www.haskell.org/pipermail/glasgow-haskell-users/2002-November/004477.html">This
+	article</ulink> from the mailing list has more
+	information.</para>
+      </listitem>
+    </varlistentry>
+
   </variablelist>
 </chapter>
 
