@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.3 1996/11/22 13:33:29 simonm Exp $
+# $Id: Makefile,v 1.4 1996/12/18 18:42:48 dnt Exp $
 
 TOP = ../..
 FlexSuffixRules = YES
@@ -151,6 +151,25 @@ rename/ParseIface.hs : rename/ParseIface.y
 	@$(RM) rename/ParseIface.hs rename/ParseIface.hinfo
 	happy -g rename/ParseIface.y
 	@chmod 444 rename/ParseIface.hs
+
+# ----------------------------------------------------------------------------
+# Special extra dependencies for yukky ugen stuff
+
+hspincl.h : $(UGNH)
+parser/UgenAll.o : parser/hspincl.h
+parser/UgenUtil.o : parser/hspincl.h
+parser/U_constr.o : parser/hspincl.h
+parser/U_binding.o : parser/hspincl.h
+parser/U_pbinding.o : parser/hspincl.h
+parser/U_entidt.o : parser/hspincl.h
+parser/U_list.o : parser/hspincl.h
+parser/U_literal.o : parser/hspincl.h
+parser/U_maybe.o : parser/hspincl.h
+parser/U_either.o : parser/hspincl.h
+parser/U_qid.o : parser/hspincl.h
+parser/U_tree.o : parser/hspincl.h
+parser/U_ttype.o : parser/hspincl.h
+reader/ReadPrefix.o : parser/hspincl.h
 
 # ----------------------------------------------------------------------------
 # Special flags for particular modules
