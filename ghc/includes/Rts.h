@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Rts.h,v 1.18 2002/02/14 16:58:13 sof Exp $
+ * $Id: Rts.h,v 1.19 2002/07/18 06:07:37 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -22,14 +22,6 @@ extern "C" {
 /* -----------------------------------------------------------------------------
    RTS Exit codes
    -------------------------------------------------------------------------- */
-
-#if ! defined(EXIT_SUCCESS) || ! defined(EXIT_FAILURE)
-/* "stdlib.h" should have defined these; but at least
-   on SunOS 4.1.3, this is not so.
-*/
-#define EXIT_SUCCESS 0
-#define EXIT_FAILURE 1
-#endif
 
 /* 255 is allegedly used by dynamic linkers to report linking failure */
 #define EXIT_INTERNAL_ERROR 254
