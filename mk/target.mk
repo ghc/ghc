@@ -967,13 +967,15 @@ install-docs:: $(INSTALL_DOCS) $(foreach j,$(SGMLDocWays),$(INSTALL_SGML_DOC).$j
 	for i in $(INSTALL_DOCS); do \
 		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
 	done
-	for i in $(SGMLDocWays); do \
-		if [ $$j = "html" ]; then \
-			$(CP) -r $(INSTALL_SGML_DOC) $(datadir); \
-		else \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$j $(datadir); \
-		fi \
-	done
+	ifneq "$(SGMLDocWays)" "" \
+		for i in $(SGMLDocWays); do \
+			if [ $$j = "html" ]; then \
+				$(CP) -r $(INSTALL_SGML_DOC) $(datadir); \
+			else \
+				$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_SGML_DOC).$$j $(datadir); \
+			fi \
+		done \
+	fi
 endif
 
 #
