@@ -165,6 +165,9 @@ derefDLL tree
                 StReg    _             -> t
                 _                      -> pprPanic "derefDLL: unhandled case" 
                                                    (pprStixExpr t)
+
+assignMachOp :: Maybe012 StixVReg -> MachOp -> [StixExpr] 
+             -> NatM InstrBlock
 \end{code}
 
 %************************************************************************
@@ -185,7 +188,8 @@ mangleIndexTree (StIndex pk base off)
   = StMachOp MO_Nat_Add [
        base,
        let s = shift pk
-       in  if s == 0 then off else StMachOp MO_Nat_Shl [off, StInt (toInteger s)]
+       in  if s == 0 then off 
+                     else StMachOp MO_Nat_Shl [off, StInt (toInteger s)]
     ]
   where
     shift :: PrimRep -> Int
@@ -240,7 +244,7 @@ data ChildCode64 	-- a.k.a "Register64"
 	-- which contains the result; use getHiVRegFromLo to find
 	-- the other VRegUnique.
 	-- Rules of this simplified insn selection game are
-	-- therefore that the returned VRegUniques may be modified
+	-- therefore that the returned VRegUnique may be modified
 
 assignMem_I64Code :: StixExpr -> StixExpr -> NatM InstrBlock
 assignReg_I64Code :: StixReg  -> StixExpr -> NatM InstrBlock
@@ -337,6 +341,97 @@ iselExpr64 expr
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+#if sparc_TARGET_ARCH
+
+assignMem_I64Code addrTree valueTree
+   = iselExpr64 valueTree		`thenNat` \ (ChildCode64 vcode vrlo) ->
+     getRegister addrTree		`thenNat` \ register_addr ->
+     getNewRegNCG IntRep		`thenNat` \ t_addr ->
+     let rlo = VirtualRegI vrlo
+         rhi = getHiVRegFromLo rlo
+         code_addr = registerCode register_addr t_addr
+         reg_addr  = registerName register_addr t_addr
+         -- Big-endian store
+         mov_hi = ST W rhi (AddrRegImm reg_addr (ImmInt 0))
+         mov_lo = ST W rlo (AddrRegImm reg_addr (ImmInt 4))
+     in
+         returnNat (vcode `appOL` code_addr `snocOL` mov_hi `snocOL` mov_lo)
+
+
+assignReg_I64Code (StixTemp (StixVReg u_dst pk)) valueTree
+   = iselExpr64 valueTree		`thenNat` \ (ChildCode64 vcode vr_src_lo) ->
+     let 
+         r_dst_lo = mkVReg u_dst IntRep
+         r_src_lo = VirtualRegI vr_src_lo
+         r_dst_hi = getHiVRegFromLo r_dst_lo
+         r_src_hi = getHiVRegFromLo r_src_lo
+         mov_lo = mkMOV r_src_lo r_dst_lo
+         mov_hi = mkMOV r_src_hi r_dst_hi
+         mkMOV sreg dreg = OR False g0 (RIReg sreg) dreg
+     in
+         returnNat (
+            vcode `snocOL` mov_hi `snocOL` mov_lo
+         )
+assignReg_I64Code lvalue valueTree
+   = pprPanic "assignReg_I64Code(sparc): invalid lvalue"
+              (pprStixReg lvalue)
+
+
+-- Don't delete this -- it's very handy for debugging.
+--iselExpr64 expr 
+--   | trace ("iselExpr64: " ++ showSDoc (pprStixExpr expr)) False
+--   = panic "iselExpr64(???)"
+
+iselExpr64 (StInd pk addrTree)
+   | is64BitRep pk
+   = getRegister addrTree		`thenNat` \ register_addr ->
+     getNewRegNCG IntRep		`thenNat` \ t_addr ->
+     getNewRegNCG IntRep		`thenNat` \ rlo ->
+     let rhi = getHiVRegFromLo rlo
+         code_addr = registerCode register_addr t_addr
+         reg_addr  = registerName register_addr t_addr
+         mov_hi = LD W (AddrRegImm reg_addr (ImmInt 0)) rhi
+         mov_lo = LD W (AddrRegImm reg_addr (ImmInt 4)) rlo
+     in
+         returnNat (
+            ChildCode64 (code_addr `snocOL` mov_hi `snocOL` mov_lo) 
+                        (getVRegUnique rlo)
+         )
+
+iselExpr64 (StReg (StixTemp (StixVReg vu pk)))
+   | is64BitRep pk
+   = getNewRegNCG IntRep 		`thenNat` \ r_dst_lo ->
+     let r_dst_hi = getHiVRegFromLo r_dst_lo
+         r_src_lo = mkVReg vu IntRep
+         r_src_hi = getHiVRegFromLo r_src_lo
+         mov_lo = mkMOV r_src_lo r_dst_lo
+         mov_hi = mkMOV r_src_hi r_dst_hi
+         mkMOV sreg dreg = OR False g0 (RIReg sreg) dreg
+     in
+         returnNat (
+            ChildCode64 (toOL [mov_hi, mov_lo]) (getVRegUnique r_dst_lo)
+         )
+
+iselExpr64 (StCall fn cconv kind args)
+  | is64BitRep kind
+  = genCCall fn cconv kind args			`thenNat` \ call ->
+    getNewRegNCG IntRep				`thenNat` \ r_dst_lo ->
+    let r_dst_hi = getHiVRegFromLo r_dst_lo
+        mov_lo = mkMOV o0 r_dst_lo
+        mov_hi = mkMOV o1 r_dst_hi
+        mkMOV sreg dreg = OR False g0 (RIReg sreg) dreg
+    in
+    returnNat (
+       ChildCode64 (call `snocOL` mov_hi `snocOL` mov_lo) 
+                   (getVRegUnique r_dst_lo)
+    )
+
+iselExpr64 expr
+   = pprPanic "iselExpr64(sparc)" (pprStixExpr expr)
+
+#endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 \end{code}
 
@@ -400,6 +495,8 @@ Generate code to get a subtree into a @Register@:
 \begin{code}
 
 getRegisterReg :: StixReg -> NatM Register
+getRegister :: StixExpr -> NatM Register
+
 
 getRegisterReg (StixMagicId mid)
   = case get_MagicId_reg_or_addr mid of
@@ -416,7 +513,10 @@ getRegisterReg (StixTemp (StixVReg u pk))
 
 -------------
 
-getRegister :: StixExpr -> NatM Register
+-- Don't delete this -- it's very handy for debugging.
+--getRegister expr 
+--   | trace ("getRegiste: " ++ showSDoc (pprStixExpr expr)) False
+--   = panic "getRegister(???)"
 
 getRegister (StReg reg) 
   = getRegisterReg reg
@@ -457,8 +557,7 @@ getRegister (StString s)
     in
     returnNat (Any PtrRep code)
 
-
-
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 -- end of machine-"independent" bit; here we go on the rest...
 
 #if alpha_TARGET_ARCH
@@ -692,7 +791,9 @@ getRegister leaf
     imm__2 = case imm of Just x -> x
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 getRegister (StFloat f)
@@ -751,9 +852,9 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       MO_Flt_Tan  -> trivialUFCode FloatRep  (GTAN F) x
       MO_Dbl_Tan  -> trivialUFCode DoubleRep (GTAN DF) x
 
-      MO_Flt_to_NatS -> coerceFP2Int x
+      MO_Flt_to_NatS -> coerceFP2Int FloatRep x
       MO_NatS_to_Flt -> coerceInt2FP FloatRep x
-      MO_Dbl_to_NatS -> coerceFP2Int x
+      MO_Dbl_to_NatS -> coerceFP2Int DoubleRep x
       MO_NatS_to_Dbl -> coerceInt2FP DoubleRep x
 
       -- Conversions which are a nop on x86
@@ -770,6 +871,7 @@ getRegister (StMachOp mop [x]) -- unary MachOps
       MO_Dbl_to_Flt   -> conversionNop FloatRep  x
       MO_Flt_to_Dbl   -> conversionNop DoubleRep x
 
+      -- sign-extending widenings
       MO_8U_to_NatU   -> integerExtend False 24 x
       MO_8S_to_NatS   -> integerExtend True  24 x
       MO_16U_to_NatU  -> integerExtend False 16 x
@@ -1072,8 +1174,6 @@ getRegister leaf
     imm__2 = case imm of Just x -> x
 
 
-assignMachOp :: Maybe012 StixVReg -> MachOp -> [StixExpr] 
-             -> NatM InstrBlock
 
 assignMachOp (Just2 sv_rr sv_cc) mop [aa,bb]
   | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC] 
@@ -1108,9 +1208,10 @@ assignMachOp (Just2 sv_rr sv_cc) mop [aa,bb]
     in
        returnNat (codeaa `appOL` codebb `appOL` code)
 
-
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 getRegister (StFloat d)
@@ -1139,171 +1240,167 @@ getRegister (StDouble d)
     in
     	returnNat (Any DoubleRep code)
 
--- The 6-word scratch area is immediately below the frame pointer.
--- Below that is the spill area.
-getRegister (StScratchWord i)
-   | i >= 0 && i < 6
-   = let
-         code dst = unitOL (fpRelEA (i-6) dst)
-     in 
-     returnNat (Any PtrRep code)
 
+getRegister (StMachOp mop [x]) -- unary PrimOps
+  = case mop of
+      MO_NatS_Neg      -> trivialUCode (SUB False False g0) x
+      MO_Nat_Not       -> trivialUCode (XNOR False g0) x
 
-getRegister (StPrim primop [x]) -- unary PrimOps
-  = case primop of
-      IntNegOp       -> trivialUCode (SUB False False g0) x
-      NotOp          -> trivialUCode (XNOR False g0) x
+      MO_Flt_Neg       -> trivialUFCode FloatRep (FNEG F) x
+      MO_Dbl_Neg       -> trivialUFCode DoubleRep (FNEG DF) x
 
-      FloatNegOp     -> trivialUFCode FloatRep (FNEG F) x
-      DoubleNegOp    -> trivialUFCode DoubleRep (FNEG DF) x
+      MO_Dbl_to_Flt    -> coerceDbl2Flt x
+      MO_Flt_to_Dbl    -> coerceFlt2Dbl x
 
-      Double2FloatOp -> trivialUFCode FloatRep  (FxTOy DF F) x
-      Float2DoubleOp -> trivialUFCode DoubleRep (FxTOy F DF) x
+      MO_Flt_to_NatS   -> coerceFP2Int FloatRep x
+      MO_NatS_to_Flt   -> coerceInt2FP FloatRep x
+      MO_Dbl_to_NatS   -> coerceFP2Int DoubleRep x
+      MO_NatS_to_Dbl   -> coerceInt2FP DoubleRep x
 
-      OrdOp          -> coerceIntCode IntRep x
-      ChrOp          -> chrCode x
+      -- Conversions which are a nop on sparc
+      MO_32U_to_NatS   -> conversionNop IntRep   x
+      MO_NatS_to_32U   -> conversionNop WordRep  x
 
-      Float2IntOp    -> coerceFP2Int x
-      Int2FloatOp    -> coerceInt2FP FloatRep x
-      Double2IntOp   -> coerceFP2Int x
-      Int2DoubleOp   -> coerceInt2FP DoubleRep x
+      MO_NatU_to_NatS -> conversionNop IntRep    x
+      MO_NatS_to_NatU -> conversionNop WordRep   x
+      MO_NatP_to_NatU -> conversionNop WordRep   x
+      MO_NatU_to_NatP -> conversionNop PtrRep    x
+      MO_NatS_to_NatP -> conversionNop PtrRep    x
+      MO_NatP_to_NatS -> conversionNop IntRep    x
+
+      -- sign-extending widenings
+      MO_8U_to_NatU   -> integerExtend False 24 x
+      MO_8S_to_NatS   -> integerExtend True  24 x
+      MO_16U_to_NatU  -> integerExtend False 16 x
+      MO_16S_to_NatS  -> integerExtend True  16 x
 
       other_op ->
-        let
-           fixed_x = if   is_float_op  -- promote to double
-                     then StPrim Float2DoubleOp [x]
-                     else x
+        let fixed_x = if   is_float_op  -- promote to double
+                      then StMachOp MO_Flt_to_Dbl [x]
+                      else x
 	in
 	getRegister (StCall fn CCallConv DoubleRep [fixed_x])
-       where
+    where
+        integerExtend signed nBits x
+           = getRegister (
+                StMachOp (if signed then MO_Nat_Sar else MO_Nat_Shr) 
+                         [StInt nBits, StMachOp MO_Nat_Shl [StInt nBits, x]]
+             )
+        conversionNop new_rep expr
+            = getRegister expr		`thenNat` \ e_code ->
+              returnNat (swizzleRegisterRep e_code new_rep)
+
 	(is_float_op, fn)
-	  = case primop of
-	      FloatExpOp    -> (True,  SLIT("exp"))
-	      FloatLogOp    -> (True,  SLIT("log"))
-	      FloatSqrtOp   -> (True,  SLIT("sqrt"))
+	  = case mop of
+	      MO_Flt_Exp    -> (True,  SLIT("exp"))
+	      MO_Flt_Log    -> (True,  SLIT("log"))
+	      MO_Flt_Sqrt   -> (True,  SLIT("sqrt"))
 
-	      FloatSinOp    -> (True,  SLIT("sin"))
-	      FloatCosOp    -> (True,  SLIT("cos"))
-	      FloatTanOp    -> (True,  SLIT("tan"))
+	      MO_Flt_Sin    -> (True,  SLIT("sin"))
+	      MO_Flt_Cos    -> (True,  SLIT("cos"))
+	      MO_Flt_Tan    -> (True,  SLIT("tan"))
 
-	      FloatAsinOp   -> (True,  SLIT("asin"))
-	      FloatAcosOp   -> (True,  SLIT("acos"))
-	      FloatAtanOp   -> (True,  SLIT("atan"))
+	      MO_Flt_Asin   -> (True,  SLIT("asin"))
+	      MO_Flt_Acos   -> (True,  SLIT("acos"))
+	      MO_Flt_Atan   -> (True,  SLIT("atan"))
 
-	      FloatSinhOp   -> (True,  SLIT("sinh"))
-	      FloatCoshOp   -> (True,  SLIT("cosh"))
-	      FloatTanhOp   -> (True,  SLIT("tanh"))
+	      MO_Flt_Sinh   -> (True,  SLIT("sinh"))
+	      MO_Flt_Cosh   -> (True,  SLIT("cosh"))
+	      MO_Flt_Tanh   -> (True,  SLIT("tanh"))
 
-	      DoubleExpOp   -> (False, SLIT("exp"))
-	      DoubleLogOp   -> (False, SLIT("log"))
-	      DoubleSqrtOp  -> (False, SLIT("sqrt"))
+	      MO_Dbl_Exp    -> (False, SLIT("exp"))
+	      MO_Dbl_Log    -> (False, SLIT("log"))
+	      MO_Dbl_Sqrt   -> (False, SLIT("sqrt"))
 
-	      DoubleSinOp   -> (False, SLIT("sin"))
-	      DoubleCosOp   -> (False, SLIT("cos"))
-	      DoubleTanOp   -> (False, SLIT("tan"))
+	      MO_Dbl_Sin    -> (False, SLIT("sin"))
+	      MO_Dbl_Cos    -> (False, SLIT("cos"))
+	      MO_Dbl_Tan    -> (False, SLIT("tan"))
 
-	      DoubleAsinOp  -> (False, SLIT("asin"))
-	      DoubleAcosOp  -> (False, SLIT("acos"))
-	      DoubleAtanOp  -> (False, SLIT("atan"))
+	      MO_Dbl_Asin   -> (False, SLIT("asin"))
+	      MO_Dbl_Acos   -> (False, SLIT("acos"))
+	      MO_Dbl_Atan   -> (False, SLIT("atan"))
 
-	      DoubleSinhOp  -> (False, SLIT("sinh"))
-	      DoubleCoshOp  -> (False, SLIT("cosh"))
-	      DoubleTanhOp  -> (False, SLIT("tanh"))
+	      MO_Dbl_Sinh   -> (False, SLIT("sinh"))
+	      MO_Dbl_Cosh   -> (False, SLIT("cosh"))
+	      MO_Dbl_Tanh   -> (False, SLIT("tanh"))
 
-              other
-                 -> ncgPrimopMoan "getRegister(sparc,monadicprimop)" 
-                                  (pprStixTree (StPrim primop [x]))
+              other -> pprPanic "getRegister(sparc) - binary StMachOp (2)" 
+                                (pprMachOp mop)
 
-getRegister (StPrim primop [x, y]) -- dyadic PrimOps
-  = case primop of
-      CharGtOp -> condIntReg GTT x y
-      CharGeOp -> condIntReg GE x y
-      CharEqOp -> condIntReg EQQ x y
-      CharNeOp -> condIntReg NE x y
-      CharLtOp -> condIntReg LTT x y
-      CharLeOp -> condIntReg LE x y
 
-      IntGtOp  -> condIntReg GTT x y
-      IntGeOp  -> condIntReg GE x y
-      IntEqOp  -> condIntReg EQQ x y
-      IntNeOp  -> condIntReg NE x y
-      IntLtOp  -> condIntReg LTT x y
-      IntLeOp  -> condIntReg LE x y
+getRegister (StMachOp mop [x, y]) -- dyadic PrimOps
+  = case mop of
+      MO_32U_Gt  -> condIntReg GTT x y
+      MO_32U_Ge  -> condIntReg GE x y
+      MO_32U_Eq  -> condIntReg EQQ x y
+      MO_32U_Ne  -> condIntReg NE x y
+      MO_32U_Lt  -> condIntReg LTT x y
+      MO_32U_Le  -> condIntReg LE x y
 
-      WordGtOp -> condIntReg GU  x y
-      WordGeOp -> condIntReg GEU x y
-      WordEqOp -> condIntReg EQQ  x y
-      WordNeOp -> condIntReg NE  x y
-      WordLtOp -> condIntReg LU  x y
-      WordLeOp -> condIntReg LEU x y
+      MO_Nat_Eq   -> condIntReg EQQ x y
+      MO_Nat_Ne   -> condIntReg NE x y
 
-      AddrGtOp -> condIntReg GU  x y
-      AddrGeOp -> condIntReg GEU x y
-      AddrEqOp -> condIntReg EQQ  x y
-      AddrNeOp -> condIntReg NE  x y
-      AddrLtOp -> condIntReg LU  x y
-      AddrLeOp -> condIntReg LEU x y
+      MO_NatS_Gt  -> condIntReg GTT x y
+      MO_NatS_Ge  -> condIntReg GE x y
+      MO_NatS_Lt  -> condIntReg LTT x y
+      MO_NatS_Le  -> condIntReg LE x y
 
-      FloatGtOp -> condFltReg GTT x y
-      FloatGeOp -> condFltReg GE x y
-      FloatEqOp -> condFltReg EQQ x y
-      FloatNeOp -> condFltReg NE x y
-      FloatLtOp -> condFltReg LTT x y
-      FloatLeOp -> condFltReg LE x y
+      MO_NatU_Gt  -> condIntReg GU  x y
+      MO_NatU_Ge  -> condIntReg GEU x y
+      MO_NatU_Lt  -> condIntReg LU  x y
+      MO_NatU_Le  -> condIntReg LEU x y
 
-      DoubleGtOp -> condFltReg GTT x y
-      DoubleGeOp -> condFltReg GE x y
-      DoubleEqOp -> condFltReg EQQ x y
-      DoubleNeOp -> condFltReg NE x y
-      DoubleLtOp -> condFltReg LTT x y
-      DoubleLeOp -> condFltReg LE x y
+      MO_Flt_Gt -> condFltReg GTT x y
+      MO_Flt_Ge -> condFltReg GE x y
+      MO_Flt_Eq -> condFltReg EQQ x y
+      MO_Flt_Ne -> condFltReg NE x y
+      MO_Flt_Lt -> condFltReg LTT x y
+      MO_Flt_Le -> condFltReg LE x y
 
-      IntAddOp -> trivialCode (ADD False False) x y
-      IntSubOp -> trivialCode (SUB False False) x y
+      MO_Dbl_Gt -> condFltReg GTT x y
+      MO_Dbl_Ge -> condFltReg GE x y
+      MO_Dbl_Eq -> condFltReg EQQ x y
+      MO_Dbl_Ne -> condFltReg NE x y
+      MO_Dbl_Lt -> condFltReg LTT x y
+      MO_Dbl_Le -> condFltReg LE x y
+
+      MO_Nat_Add -> trivialCode (ADD False False) x y
+      MO_Nat_Sub -> trivialCode (SUB False False) x y
 
 	-- ToDo: teach about V8+ SPARC mul/div instructions
-      IntMulOp  -> imul_div SLIT(".umul") x y
-      IntQuotOp -> imul_div SLIT(".div")  x y
-      IntRemOp  -> imul_div SLIT(".rem")  x y
+      MO_NatS_Quot -> imul_div SLIT(".div")  x y
+      MO_NatS_Rem  -> imul_div SLIT(".rem")  x y
+      MO_NatU_Quot -> imul_div SLIT(".udiv")  x y
+      MO_NatU_Rem  -> imul_div SLIT(".urem")  x y
 
-      WordAddOp -> trivialCode (ADD False False) x y
-      WordSubOp -> trivialCode (SUB False False) x y
-      WordMulOp -> imul_div SLIT(".umul") x y
+      MO_NatS_Mul  -> imul_div SLIT(".umul") x y
+      MO_NatU_Mul  -> imul_div SLIT(".umul") x y
 
-      FloatAddOp  -> trivialFCode FloatRep  FADD x y
-      FloatSubOp  -> trivialFCode FloatRep  FSUB x y
-      FloatMulOp  -> trivialFCode FloatRep  FMUL x y
-      FloatDivOp  -> trivialFCode FloatRep  FDIV x y
+      MO_Flt_Add   -> trivialFCode FloatRep  FADD x y
+      MO_Flt_Sub   -> trivialFCode FloatRep  FSUB x y
+      MO_Flt_Mul   -> trivialFCode FloatRep  FMUL x y
+      MO_Flt_Div   -> trivialFCode FloatRep  FDIV x y
 
-      DoubleAddOp -> trivialFCode DoubleRep FADD x y
-      DoubleSubOp -> trivialFCode DoubleRep FSUB x y
-      DoubleMulOp -> trivialFCode DoubleRep FMUL x y
-      DoubleDivOp -> trivialFCode DoubleRep FDIV x y
+      MO_Dbl_Add   -> trivialFCode DoubleRep FADD x y
+      MO_Dbl_Sub   -> trivialFCode DoubleRep FSUB x y
+      MO_Dbl_Mul   -> trivialFCode DoubleRep FMUL x y
+      MO_Dbl_Div   -> trivialFCode DoubleRep FDIV x y
 
-      AddrAddOp -> trivialCode (ADD False False) x y
-      AddrSubOp -> trivialCode (SUB False False) x y
-      AddrRemOp -> imul_div SLIT(".rem")  x y
+      MO_Nat_And   -> trivialCode (AND False) x y
+      MO_Nat_Or    -> trivialCode (OR  False) x y
+      MO_Nat_Xor   -> trivialCode (XOR False) x y
 
-      AndOp -> trivialCode (AND False) x y
-      OrOp  -> trivialCode (OR  False) x y
-      XorOp -> trivialCode (XOR False) x y
-      SllOp -> trivialCode SLL x y
-      SrlOp -> trivialCode SRL x y
+      MO_Nat_Shl   -> trivialCode SLL x y
+      MO_Nat_Shr   -> trivialCode SRL x y
+      MO_Nat_Sar   -> trivialCode SRA x y
 
-      ISllOp -> trivialCode SLL x y
-      ISraOp -> trivialCode SRA x y
-      ISrlOp -> trivialCode SRL x y
-
-      FloatPowerOp  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
+      MO_Flt_Pwr  -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [promote x, promote y])
-		       where promote x = StPrim Float2DoubleOp [x]
-      DoublePowerOp -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
+		       where promote x = StMachOp MO_Flt_to_Dbl [x]
+      MO_Dbl_Pwr -> getRegister (StCall SLIT("pow") CCallConv DoubleRep 
                                            [x, y])
 
-      other
-         -> ncgPrimopMoan "getRegister(sparc,dyadic primop)" 
-                          (pprStixTree (StPrim primop [x, y]))
-
+      other -> pprPanic "getRegister(sparc) - binary StMachOp (1)" (pprMachOp mop)
   where
     imul_div fn x y = getRegister (StCall fn CCallConv IntRep [x, y])
 
@@ -1334,12 +1431,52 @@ getRegister leaf
     in
     	returnNat (Any PtrRep code)
   | otherwise
-  = ncgPrimopMoan "getRegister(sparc)" (pprStixTree leaf)
+  = ncgPrimopMoan "getRegister(sparc)" (pprStixExpr leaf)
   where
     imm = maybeImm leaf
     imm__2 = case imm of Just x -> x
 
+
+
+assignMachOp (Just2 sv_rr sv_cc) mop [aa,bb]
+  = panic "assignMachOp(sparc)"
+{-
+  | mop `elem` [MO_NatS_AddC, MO_NatS_SubC, MO_NatS_MulC] 
+  = getRegister aa			`thenNat` \ registeraa ->
+    getRegister bb			`thenNat` \ registerbb ->
+    getNewRegNCG IntRep			`thenNat` \ tmp ->
+    getNewRegNCG IntRep			`thenNat` \ tmpaa ->
+    getNewRegNCG IntRep			`thenNat` \ tmpbb ->
+    let stixVReg_to_VReg (StixVReg u rep) = mkVReg u rep
+        rr = stixVReg_to_VReg sv_rr
+        cc = stixVReg_to_VReg sv_cc
+        codeaa = registerCode registeraa tmpaa
+        srcaa  = registerName registeraa tmpaa
+        codebb = registerCode registerbb tmpbb
+        srcbb  = registerName registerbb tmpbb
+
+        insn = case mop of MO_NatS_AddC -> ADD; MO_NatS_SubC -> SUB
+                           MO_NatS_MulC -> IMUL
+        cond = if mop == MO_NatS_MulC then OFLO else CARRY
+        str  = showSDoc (pprMachOp mop)
+
+        code = toOL [
+                 COMMENT (_PK_ ("begin " ++ str)),
+                 MOV L (OpReg srcbb) (OpReg tmp),
+                 insn L (OpReg srcaa) (OpReg tmp),
+                 MOV L (OpReg tmp) (OpReg rr),
+                 MOV L (OpImm (ImmInt 0)) (OpReg eax),
+                 SETCC cond (OpReg eax),
+                 MOV L (OpReg eax) (OpReg cc),
+                 COMMENT (_PK_ ("end " ++ str))
+               ]
+    in
+       returnNat (codeaa `appOL` codebb `appOL` code)
+-}
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 \end{code}
 
 %************************************************************************
@@ -1376,6 +1513,8 @@ temporary, then do the other computation, and then use the temporary:
 getAmode :: StixExpr -> NatM Amode
 
 getAmode tree@(StIndex _ _ _) = getAmode (mangleIndexTree tree)
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if alpha_TARGET_ARCH
 
@@ -1416,7 +1555,9 @@ getAmode other
     returnNat (Amode (AddrReg reg) code)
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 -- This is all just ridiculous, since it carefully undoes 
@@ -1482,10 +1623,12 @@ getAmode other
     returnNat (Amode (AddrBaseIndex (Just reg) Nothing (ImmInt 0)) code)
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
-getAmode (StPrim IntSubOp [x, StInt i])
+getAmode (StMachOp MO_Nat_Sub [x, StInt i])
   | fits13Bits (-i)
   = getNewRegNCG PtrRep		`thenNat` \ tmp ->
     getRegister x		`thenNat` \ register ->
@@ -1497,7 +1640,7 @@ getAmode (StPrim IntSubOp [x, StInt i])
     returnNat (Amode (AddrRegImm reg off) code)
 
 
-getAmode (StPrim IntAddOp [x, StInt i])
+getAmode (StMachOp MO_Nat_Add [x, StInt i])
   | fits13Bits i
   = getNewRegNCG PtrRep		`thenNat` \ tmp ->
     getRegister x		`thenNat` \ register ->
@@ -1508,7 +1651,7 @@ getAmode (StPrim IntAddOp [x, StInt i])
     in
     returnNat (Amode (AddrRegImm reg off) code)
 
-getAmode (StPrim IntAddOp [x, y])
+getAmode (StMachOp MO_Nat_Add [x, y])
   = getNewRegNCG PtrRep    	`thenNat` \ tmp1 ->
     getNewRegNCG IntRep    	`thenNat` \ tmp2 ->
     getRegister x    	    	`thenNat` \ register1 ->
@@ -1544,6 +1687,8 @@ getAmode other
     returnNat (Amode (AddrRegImm reg off) code)
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -1566,9 +1711,12 @@ Set up a condition code for a conditional branch.
 \begin{code}
 getCondCode :: StixExpr -> NatM CondCode
 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if alpha_TARGET_ARCH
 getCondCode = panic "MachCode.getCondCode: not on Alphas"
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if i386_TARGET_ARCH || sparc_TARGET_ARCH
@@ -1615,6 +1763,8 @@ getCondCode (StMachOp mop [x, y])
 getCondCode other =  pprPanic "getCondCode(2)(x86,sparc)" (pprStixExpr other)
 
 #endif {- i386_TARGET_ARCH || sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 % -----------------
@@ -1783,10 +1933,10 @@ condFltCode cond x y
     in
     returnNat (CondCode True (fix_FP_cond cond) code__2)
 
-
-
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 condIntCode cond x (StInt y)
@@ -1850,6 +2000,8 @@ condFltCode cond x y
     returnNat (CondCode True cond code__2)
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -1872,6 +2024,8 @@ assignReg_IntCode :: PrimRep -> StixReg  -> StixExpr -> NatM InstrBlock
 
 assignMem_FltCode :: PrimRep -> StixExpr -> StixExpr -> NatM InstrBlock
 assignReg_FltCode :: PrimRep -> StixReg  -> StixExpr -> NatM InstrBlock
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if alpha_TARGET_ARCH
 
@@ -1903,7 +2057,9 @@ assignIntCode pk dst src
     returnNat code__2
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 -- non-FP assignment to memory
@@ -1925,7 +2081,6 @@ assignMem_IntCode pk addr src
                 = codesrc `snocOL`
 		  MOV (primRepToSize pk) opsrc (OpAddr dst__a)
                 | otherwise
-
                 = codea `snocOL` 
                   LEA L (OpAddr dst__a) (OpReg tmp) `appOL`
                   codesrc `snocOL`
@@ -1990,12 +2145,14 @@ assignReg_IntCode pk reg src
     returnNat code
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
-assignIntCode pk (StInd _ dst) src
-  = getNewRegNCG IntRep    	    `thenNat` \ tmp ->
-    getAmode dst    	    	    `thenNat` \ amode ->
+assignMem_IntCode pk addr src
+  = getNewRegNCG IntRep 	   	    `thenNat` \ tmp ->
+    getAmode addr	    	    	    `thenNat` \ amode ->
     getRegister src	    	    	    `thenNat` \ register ->
     let
     	code1   = amodeCode amode
@@ -2007,9 +2164,9 @@ assignIntCode pk (StInd _ dst) src
     in
     returnNat code__2
 
-assignIntCode pk dst src
-  = getRegister dst	    	    	    `thenNat` \ register1 ->
-    getRegister src	    	    	    `thenNat` \ register2 ->
+assignReg_IntCode pk reg src
+  = getRegister src	    	    	    `thenNat` \ register2 ->
+    getRegisterReg reg	    	    	    `thenNat` \ register1 ->
     let
     	dst__2  = registerName register1 g0
     	code    = registerCode register2 dst__2
@@ -2021,12 +2178,16 @@ assignIntCode pk dst src
     returnNat code__2
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 % --------------------------------
 Floating-point assignments:
 % --------------------------------
+
 \begin{code}
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 #if alpha_TARGET_ARCH
 
 assignFltCode pk (StInd _ dst) src
@@ -2057,7 +2218,9 @@ assignFltCode pk dst src
     returnNat code__2
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 -- Floating point assignment to memory
@@ -2100,12 +2263,15 @@ assignReg_FltCode pk reg src
 
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
-assignFltCode pk (StInd _ dst) src
+-- Floating point assignment to memory
+assignMem_FltCode pk addr src
   = getNewRegNCG pk        	    `thenNat` \ tmp1 ->
-    getAmode dst    	    	    `thenNat` \ amode ->
+    getAmode addr    	    	    `thenNat` \ amode ->
     getRegister src	      	    `thenNat` \ register ->
     let
     	sz      = primRepToSize pk
@@ -2125,8 +2291,10 @@ assignFltCode pk (StInd _ dst) src
     in
     returnNat code__2
 
-assignFltCode pk dst src
-  = getRegister dst	    	    	    `thenNat` \ register1 ->
+-- Floating point assignment to a register/temporary
+-- Why is this so bizarrely ugly?
+assignReg_FltCode pk reg src
+  = getRegisterReg reg	    	    	    `thenNat` \ register1 ->
     getRegister src	    	    	    `thenNat` \ register2 ->
     let 
         pk__2   = registerRep register2 
@@ -2136,14 +2304,9 @@ assignFltCode pk dst src
     let
     	sz     	= primRepToSize pk
     	dst__2 	= registerName register1 g0    -- must be Fixed
- 
-
     	reg__2 	= if pk /= pk__2 then tmp else dst__2
- 
     	code   	= registerCode register2 reg__2
-
     	src__2 	= registerName register2 reg__2
-
 	code__2 = 
 	        if pk /= pk__2 then
 		     code `snocOL` FxTOy sz__2 sz src__2 dst__2
@@ -2155,6 +2318,8 @@ assignFltCode pk dst src
     returnNat code__2
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -2173,6 +2338,8 @@ register allocator.
 
 \begin{code}
 genJump :: DestInfo -> StixExpr{-the branch target-} -> NatM InstrBlock
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if alpha_TARGET_ARCH
 
@@ -2196,7 +2363,9 @@ genJump tree
     returnNat (code . mkSeqInstr (JMP zeroh (AddrReg pv) 0))
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 genJump dsts (StInd pk mem)
@@ -2224,7 +2393,9 @@ genJump dsts tree
     target = case imm of Just x -> x
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 genJump dsts (StCLbl lbl)
@@ -2244,6 +2415,8 @@ genJump dsts tree
     returnNat (code `snocOL` JMP dsts (AddrRegReg target g0) `snocOL` NOP)
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -2276,6 +2449,8 @@ genCondJump
     :: CLabel	    -- the branch target
     -> StixExpr     -- the condition on which to branch
     -> NatM InstrBlock
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if alpha_TARGET_ARCH
 
@@ -2419,7 +2594,9 @@ genCondJump lbl (StPrim op [x, y])
 	AddrLeOp -> (CMP ULE, NE)
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 genCondJump lbl bool
@@ -2431,7 +2608,9 @@ genCondJump lbl bool
     returnNat (code `snocOL` JXX cond lbl)
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 genCondJump lbl bool
@@ -2451,6 +2630,8 @@ genCondJump lbl bool
     )
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -2473,6 +2654,8 @@ genCCall
     -> PrimRep		-- type of the result
     -> [StixExpr]	-- arguments (of mixed type)
     -> NatM InstrBlock
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if alpha_TARGET_ARCH
 
@@ -2541,7 +2724,9 @@ genCCall fn cconv kind args
 	returnNat (([], offset + 1), code . mkSeqInstr (ST sz src (spRel offset)))
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 genCCall fn cconv ret_rep [StInt i]
@@ -2610,6 +2795,7 @@ genCCall fn cconv ret_rep args
         let r_lo = VirtualRegI vr_lo
             r_hi = getHiVRegFromLo r_lo
         in  returnNat (8,
+                       code `appOL`
                        toOL [PUSH L (OpReg r_hi), DELTA (delta - 4),
                              PUSH L (OpReg r_lo), DELTA (delta - 8)]
             )
@@ -2653,7 +2839,9 @@ genCCall fn cconv ret_rep args
 	returnNat (code, reg, sz)
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 {- 
    The SPARC calling convention is an absolute
@@ -2735,8 +2923,14 @@ genCCall fn cconv kind args
 
      -- generate code to calculate an argument, and move it into one
      -- or two integer vregs.
-     arg_to_int_vregs :: StixTree -> NatM (OrdList Instr, [Reg])
+     arg_to_int_vregs :: StixExpr -> NatM (OrdList Instr, [Reg])
      arg_to_int_vregs arg
+        | is64BitRep (repOfStixExpr arg)
+        = iselExpr64 arg		`thenNat` \ (ChildCode64 code vr_lo) ->
+          let r_lo = VirtualRegI vr_lo
+              r_hi = getHiVRegFromLo r_lo
+          in  returnNat (code, [r_hi, r_lo])
+        | otherwise
         = getRegister arg                     `thenNat` \ register ->
           getNewRegNCG (registerRep register) `thenNat` \ tmp ->
           let code = registerCode register tmp
@@ -2775,6 +2969,8 @@ genCCall fn cconv kind args
                    [v1]
                 )
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -2798,12 +2994,15 @@ register allocator.
 \begin{code}
 condIntReg, condFltReg :: Cond -> StixExpr -> StixExpr -> NatM Register
 
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if alpha_TARGET_ARCH
 condIntReg = panic "MachCode.condIntReg (not on Alpha)"
 condFltReg = panic "MachCode.condFltReg (not on Alpha)"
 #endif {- alpha_TARGET_ARCH -}
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 condIntReg cond x y
@@ -2837,7 +3036,9 @@ condFltReg cond x y
     returnNat (Any IntRep code__2)
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 condIntReg EQQ x (StInt 0)
@@ -2934,6 +3135,8 @@ condFltReg cond x y
     returnNat (Any IntRep code__2)
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -2986,6 +3189,8 @@ trivialUFCode
       ,)))
     -> StixExpr -- the one argument
     -> NatM Register
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 #if alpha_TARGET_ARCH
 
@@ -3056,7 +3261,9 @@ trivialUFCode _ instr x
     returnNat (Any DoubleRep code__2)
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 \end{code}
 The Rules of the Game are:
@@ -3235,7 +3442,9 @@ trivialUFCode pk instr x
     returnNat (Any pk code__2)
 
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 trivialCode instr x (StInt y)
@@ -3321,6 +3530,8 @@ trivialUFCode pk instr x
     returnNat (Any pk code__2)
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}
 
 %************************************************************************
@@ -3329,40 +3540,26 @@ trivialUFCode pk instr x
 %*									*
 %************************************************************************
 
-@coerce(Int|Flt)Code@ are simple coercions that don't require any code
-to be generated.  Here we just change the type on the Register passed
-on up.  The code is machine-independent.
-
 @coerce(Int2FP|FP2Int)@ are more complicated integer/float
 conversions.  We have to store temporaries in memory to move
 between the integer and the floating point register sets.
 
+@coerceDbl2Flt@ and @coerceFlt2Dbl@ are done this way because we
+pretend, on sparc at least, that double and float regs are seperate
+kinds, so the value has to be computed into one kind before being
+explicitly "converted" to live in the other kind.
+
 \begin{code}
-coerceIntCode :: PrimRep -> StixExpr -> NatM Register
-coerceFltCode ::	    StixExpr -> NatM Register
-
 coerceInt2FP :: PrimRep -> StixExpr -> NatM Register
-coerceFP2Int :: 	   StixExpr -> NatM Register
+coerceFP2Int :: PrimRep -> StixExpr -> NatM Register
 
-coerceIntCode pk x
-  = getRegister x		`thenNat` \ register ->
-    returnNat (
-    case register of
-    	Fixed _ reg code -> Fixed pk reg code
-    	Any   _ code     -> Any   pk code
-    )
-
--------------
-coerceFltCode x
-  = getRegister x		`thenNat` \ register ->
-    returnNat (
-    case register of
-    	Fixed _ reg code -> Fixed DoubleRep reg code
-    	Any   _ code     -> Any   DoubleRep code
-    )
+coerceDbl2Flt :: StixExpr -> NatM Register
+coerceFlt2Dbl :: StixExpr -> NatM Register
 \end{code}
 
 \begin{code}
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if alpha_TARGET_ARCH
 
 coerceInt2FP _ x
@@ -3395,7 +3592,9 @@ coerceFP2Int x
     returnNat (Any IntRep code__2)
 
 #endif {- alpha_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if i386_TARGET_ARCH
 
 coerceInt2FP pk x
@@ -3410,7 +3609,7 @@ coerceInt2FP pk x
     returnNat (Any pk code__2)
 
 ------------
-coerceFP2Int x
+coerceFP2Int fprep x
   = getRegister x		`thenNat` \ register ->
     getNewRegNCG DoubleRep	`thenNat` \ tmp ->
     let
@@ -3423,8 +3622,14 @@ coerceFP2Int x
     in
     returnNat (Any IntRep code__2)
 
+------------
+coerceDbl2Flt x = panic "MachCode.coerceDbl2Flt: unused on x86"
+coerceFlt2Dbl x = panic "MachCode.coerceFlt2Dbl: unused on x86"
+
 #endif {- i386_TARGET_ARCH -}
+
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
 #if sparc_TARGET_ARCH
 
 coerceInt2FP pk x
@@ -3442,74 +3647,42 @@ coerceInt2FP pk x
     returnNat (Any pk code__2)
 
 ------------
-coerceFP2Int x
-  = getRegister x		`thenNat` \ register ->
-    getNewRegNCG IntRep		`thenNat` \ reg ->
+coerceFP2Int fprep x
+  = ASSERT(fprep == DoubleRep || fprep == FloatRep)
+    getRegister x		`thenNat` \ register ->
+    getNewRegNCG fprep		`thenNat` \ reg ->
     getNewRegNCG FloatRep	`thenNat` \ tmp ->
     let
     	code = registerCode register reg
     	src  = registerName register reg
-    	pk   = registerRep  register
-
     	code__2 dst = code `appOL` toOL [
-    	    FxTOy (primRepToSize pk) W src tmp,
+    	    FxTOy (primRepToSize fprep) W src tmp,
     	    ST W tmp (spRel (-2)),
     	    LD W (spRel (-2)) dst]
     in
     returnNat (Any IntRep code__2)
 
-#endif {- sparc_TARGET_ARCH -}
-\end{code}
-
-%************************************************************************
-%*									*
-\subsubsection{Coercing integer to @Char@...}
-%*									*
-%************************************************************************
-
-Integer to character conversion.
-
-\begin{code}
-chrCode :: StixExpr -> NatM Register
-
-#if alpha_TARGET_ARCH
-
--- TODO: This is probably wrong, but I don't know Alpha assembler.
--- It should coerce a 64-bit value to a 32-bit value.
-
-chrCode x
+------------
+coerceDbl2Flt x
   = getRegister x		`thenNat` \ register ->
-    getNewRegNCG IntRep		`thenNat` \ reg ->
-    let
-    	code = registerCode register reg
-    	src  = registerName register reg
-    	code__2 dst = code . mkSeqInstr (ZAPNOT src (RIImm (ImmInt 1)) dst)
+    getNewRegNCG DoubleRep	`thenNat` \ tmp ->
+    let code = registerCode register tmp
+        src  = registerName register tmp
     in
-    returnNat (Any IntRep code__2)
+        returnNat (Any FloatRep 
+                       (\dst -> code `snocOL` FxTOy DF F src dst)) 
 
-#endif {- alpha_TARGET_ARCH -}
--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if i386_TARGET_ARCH
-
-chrCode x
+------------
+coerceFlt2Dbl x
   = getRegister x		`thenNat` \ register ->
-    returnNat (
-    case register of
-    	Fixed _ reg code -> Fixed IntRep reg code
-    	Any   _ code     -> Any   IntRep code
-    )
-
-#endif {- i386_TARGET_ARCH -}
--- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#if sparc_TARGET_ARCH
-
-chrCode x
-  = getRegister x		`thenNat` \ register ->
-    returnNat (
-    case register of
-    	Fixed _ reg code -> Fixed IntRep reg code
-    	Any   _ code     -> Any   IntRep code
-    )
+    getNewRegNCG FloatRep	`thenNat` \ tmp ->
+    let code = registerCode register tmp
+        src  = registerName register tmp
+    in
+        returnNat (Any DoubleRep
+                       (\dst -> code `snocOL` FxTOy F DF src dst)) 
 
 #endif {- sparc_TARGET_ARCH -}
+
+-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 \end{code}

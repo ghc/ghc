@@ -1486,7 +1486,10 @@ pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg SLIT("andn") b reg1 ri reg2
 
 pprInstr (OR b reg1 ri reg2)
   | not b && reg1 == g0
-  = hcat [ ptext SLIT("\tmov\t"), pprRI ri, comma, pprReg reg2 ]
+  = let doit = hcat [ ptext SLIT("\tmov\t"), pprRI ri, comma, pprReg reg2 ]
+    in  case ri of
+           RIReg rrr | rrr == reg2 -> empty
+           other                   -> doit
   | otherwise
   = pprRegRIReg SLIT("or") b reg1 ri reg2
 

@@ -47,7 +47,7 @@ module MachRegs (
 #if sparc_TARGET_ARCH
 	, fits13Bits
 	, fpRel, gReg, iReg, lReg, oReg, largeOffsetError
-	, fp, sp, g0, g1, g2, o0, f0, f6, f8, f26, f27
+	, fp, sp, g0, g1, g2, o0, o1, f0, f6, f8, f26, f27
 	
 #endif
     ) where
@@ -55,7 +55,7 @@ module MachRegs (
 #include "HsVersions.h"
 
 import AbsCSyn		( MagicId(..) )
-import CLabel           ( CLabel, mkMainRegTableLabel )
+import CLabel           ( CLabel, mkMainCapabilityLabel )
 import MachOp		( MachOp(..) )
 import PrimRep		( PrimRep(..), isFloatingRep )
 import Stix		( StixExpr(..), StixReg(..),
@@ -187,16 +187,26 @@ get_MagicId_reg_or_addr mid
         Nothing -> Right (get_MagicId_addr mid)
 
 get_MagicId_addr BaseReg
-   = panic "MachRegs.get_MagicId_addr of BaseReg"
+   = -- This arch doesn't have BaseReg in a register, so we have to 
+     -- use &MainRegTable.r instead.
+     StIndex PtrRep (StCLbl mkMainCapabilityLabel)
+                    (StInt (toInteger OFFW_Capability_r))
 get_MagicId_addr mid
    = get_Regtable_addr_from_offset (baseRegOffset mid)
 
 get_Regtable_addr_from_offset offset_in_words
-   = case magicIdRegMaybe BaseReg of
-        Nothing -> panic "MachRegs.get_Regtable_addr_from_offset: BaseReg not in a reg"
-        Just rr -> StMachOp MO_Nat_Add 
-                            [StReg (StixMagicId BaseReg),
-                             StInt (toInteger (offset_in_words*BYTES_PER_WORD))]
+   = let ptr_to_RegTable
+            = case magicIdRegMaybe BaseReg of
+                 Nothing 
+                    -> -- This arch doesn't have BaseReg in a register, so we have to 
+                       -- use &MainRegTable.r instead.
+                       StIndex PtrRep (StCLbl mkMainCapabilityLabel)
+                                      (StInt (toInteger OFFW_Capability_r))
+                 Just _
+                    -> -- It's in a reg, so leave it as it is
+                       StReg (StixMagicId BaseReg)
+     in
+         StIndex PtrRep ptr_to_RegTable (StInt (toInteger offset_in_words))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -468,7 +478,7 @@ showReg n
    | n >= 32 && n < 64  = "%f" ++ show (n-32)
    | otherwise          = "%unknown_sparc_real_reg_" ++ show n
 
-g0, g1, g2, fp, sp, o0, f0, f1, f6, f8, f22, f26, f27 :: Reg
+g0, g1, g2, fp, sp, o0, o1, f0, f1, f6, f8, f22, f26, f27 :: Reg
 
 f6  = RealReg (fReg 6)
 f8  = RealReg (fReg 8)
@@ -486,6 +496,7 @@ g2  = RealReg (gReg 2)
 fp  = RealReg (iReg 6)
 sp  = RealReg (oReg 6)
 o0  = RealReg (oReg 0)
+o1  = RealReg (oReg 1)
 f0  = RealReg (fReg 0)
 f1  = RealReg (fReg 1)
 

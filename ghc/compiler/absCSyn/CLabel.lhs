@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.49 2001/12/05 17:35:12 sewardj Exp $
+% $Id: CLabel.lhs,v 1.50 2001/12/12 18:12:45 sewardj Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -44,7 +44,7 @@ module CLabel (
 	mkIndInfoLabel,
 	mkIndStaticInfoLabel,
 	mkRtsGCEntryLabel,
-        mkMainRegTableLabel,
+        mkMainCapabilityLabel,
 	mkCharlikeClosureLabel,
 	mkIntlikeClosureLabel,
 	mkMAP_FROZEN_infoLabel,
@@ -178,7 +178,7 @@ data RtsLabelInfo
   | RtsUpdInfo            	-- upd_frame_info
   | RtsSeqInfo			-- seq_frame_info
   | RtsGCEntryLabel String 	-- a heap check fail handler, eg  stg_chk_2
-  | RtsMainRegTable             -- MainRegTable (??? Capabilities wurble ???)
+  | RtsMainCapability           -- MainCapability
   | Rts_Closure String		-- misc rts closures, eg CHARLIKE_closure
   | Rts_Info String		-- misc rts itbls, eg MUT_ARR_PTRS_FROZEN_info
   | Rts_Code String		-- misc rts code
@@ -247,7 +247,7 @@ mkSeqInfoLabel			= RtsLabel RtsSeqInfo
 mkIndInfoLabel			= RtsLabel (Rts_Info "stg_IND_info")
 mkIndStaticInfoLabel		= RtsLabel (Rts_Info "stg_IND_STATIC_info")
 mkRtsGCEntryLabel str		= RtsLabel (RtsGCEntryLabel str)
-mkMainRegTableLabel		= RtsLabel RtsMainRegTable
+mkMainCapabilityLabel		= RtsLabel RtsMainCapability
 mkCharlikeClosureLabel		= RtsLabel (Rts_Closure "stg_CHARLIKE_closure")
 mkIntlikeClosureLabel		= RtsLabel (Rts_Closure "stg_INTLIKE_closure")
 mkMAP_FROZEN_infoLabel		= RtsLabel (Rts_Info "stg_MUT_ARR_PTRS_FROZEN_info")
@@ -464,7 +464,7 @@ pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("NULL")
 
 pprCLbl (RtsLabel RtsUpdInfo)            = ptext SLIT("stg_upd_frame_info")
 pprCLbl (RtsLabel RtsSeqInfo)            = ptext SLIT("stg_seq_frame_info")
-pprCLbl (RtsLabel RtsMainRegTable)       = ptext SLIT("MainRegTable")
+pprCLbl (RtsLabel RtsMainCapability)     = ptext SLIT("MainCapability")
 pprCLbl (RtsLabel (RtsGCEntryLabel str)) = text str
 pprCLbl (RtsLabel (Rts_Closure str))     = text str
 pprCLbl (RtsLabel (Rts_Info str))        = text str

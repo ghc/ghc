@@ -1,5 +1,5 @@
 /* --------------------------------------------------------------------------
- * $Id: mkNativeHdr.c,v 1.6 2001/11/08 12:46:31 simonmar Exp $
+ * $Id: mkNativeHdr.c,v 1.7 2001/12/12 18:12:46 sewardj Exp $
  *
  * (c) The GHC Team, 1992-1998
  *
@@ -43,6 +43,8 @@
 #define OFFSET_stgChk1       FUN_OFFSET(stgChk1)
 #define OFFSET_stgGCEnter1   FUN_OFFSET(stgGCEnter1)
 #define OFFSET_stgUpdatePAP  FUN_OFFSET(stgUpdatePAP)
+
+#define OFFW_Capability_r  OFFSET(cap, cap.r)
 
 #define TSO_SP       OFFSET(tso, tso.sp)
 #define TSO_SU       OFFSET(tso, tso.su)
@@ -97,6 +99,10 @@ main()
     printf("#define OFFSET_stgChk1 (%d)\n", OFFSET_stgChk1);
     printf("#define OFFSET_stgGCEnter1 (%d)\n", OFFSET_stgGCEnter1);
     printf("#define OFFSET_stgUpdatePAP (%d)\n", OFFSET_stgUpdatePAP);
+
+    printf("\n-- Offset of the .r (StgRegTable) field in a Capability\n");
+
+    printf("#define OFFW_Capability_r (%d)\n", OFFW_Capability_r);
 
     printf("\n-- Storage Manager offsets for the Native Code Generator\n");
 

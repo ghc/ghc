@@ -127,7 +127,8 @@ absCtoNat absC
      _scc_ "x86fp_kludge"     x86fp_kludge almost_final    `bind`   \ final_mach_code ->
      _scc_ "vcat"     Pretty.vcat (map pprInstr final_mach_code)  `bind`   \ final_sdoc ->
      _scc_ "pprStixTrees"     pprStixStmts stixOpt         `bind`   \ stix_sdoc ->
-     returnUs (stix_sdoc, final_sdoc)
+     returnUs ({-\_ -> Pretty.vcat (map pprInstr almost_final),-}
+               stix_sdoc, final_sdoc)
      where
         bind f x = x f
 
