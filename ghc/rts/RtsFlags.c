@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.70 2003/09/17 21:20:16 sof Exp $
+ * $Id: RtsFlags.c,v 1.71 2003/10/31 16:48:45 sof Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -457,7 +457,7 @@ usage_text[] = {
 0
 };
 
-static __inline__ rtsBool
+static inline rtsBool
 strequal(const char *a, const char * b)
 {
     return(strcmp(a, b) == 0);
@@ -498,7 +498,13 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     char *last_slash;
 
     /* Remove directory from argv[0] -- default files in current directory */
-    if ((last_slash = (char *) strrchr(argv[0], '/')) != NULL) {
+    if ((last_slash = (char *) strrchr(argv[0], 
+#if !defined(mingw32_TARGET_OS)
+				       '/')
+#else
+				       '\\')
+#endif
+				       ) != NULL) {
 	prog_name = last_slash+1;
     } else {
 	prog_name = argv[0];
