@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.24 2001/02/12 12:46:23 sewardj Exp $
+ * $Id: Linker.c,v 1.25 2001/02/12 13:30:15 sewardj Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -1353,6 +1353,8 @@ ocGetNames_ELF ( ObjectCode* oc )
               )
               /* and not an undefined symbol */
               && stab[j].st_shndx != SHN_UNDEF
+	      /* and not in a "special section" */
+              && stab[j].st_shndx < SHN_LORESERVE
               &&
 	      /* and it's a not a section or string table or anything silly */
               ( ELF32_ST_TYPE(stab[j].st_info)==STT_FUNC ||
