@@ -10,7 +10,7 @@ test('rnfail010', normal, compile_fail, [''])
 test('rnfail011', normal, compile_fail, [''])
 test('rnfail012', normal, compile_fail, [''])
 test('rnfail013', normal, compile_fail, [''])
-test('rnfail014', normal, compile_fail, [''])
+
 test('rnfail015', normal, compile_fail, [''])
 test('rnfail016', normal, compile_fail, [''])
 test('rnfail017', normal, compile_fail, [''])

@@ -1,5 +1,5 @@
 
-mod40.hs:2:
+mod40.hs:3:
     Cycle in class declarations:
 	`C1' at mod40.hs:3
 	`C2' at mod40.hs:4
