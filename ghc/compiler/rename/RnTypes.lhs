@@ -288,6 +288,7 @@ rnPred doc (HsIParam n ty)
 
 \begin{code}
 rnPatsAndThen :: HsMatchContext Name
+	      -> Bool
 	      -> [RdrNamePat] 
 	      -> ([RenamedPat] -> RnM (a, FreeVars))
 	      -> RnM (a, FreeVars)
@@ -299,7 +300,7 @@ rnPatsAndThen :: HsMatchContext Name
 -- matches together, so that we spot the repeated variable in
 --	f x x = 1
 
-rnPatsAndThen ctxt pats thing_inside
+rnPatsAndThen ctxt repUnused pats thing_inside
   = bindPatSigTyVarsFV pat_sig_tys 	$
     bindLocalsFV doc_pat bndrs		$ \ new_bndrs ->
     rnPats pats				`thenM` \ (pats', pat_fvs) ->
@@ -308,8 +309,9 @@ rnPatsAndThen ctxt pats thing_inside
     let
 	unused_binders = filter (not . (`elemNameSet` res_fvs)) new_bndrs
     in
-    warnUnusedMatches unused_binders	`thenM_`
-
+    (if repUnused
+     then warnUnusedMatches unused_binders
+     else returnM ())                  `thenM_`
     returnM (res, res_fvs `plusFV` pat_fvs)
   where
     pat_sig_tys = collectSigTysFromPats pats

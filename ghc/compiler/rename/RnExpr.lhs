@@ -81,8 +81,8 @@ rnMatch ctxt match@(Match pats maybe_rhs_sig grhss)
     )					`thenM` \ (maybe_rhs_sig', ty_fvs) ->
 
 	-- Now the main event
-    rnPatsAndThen ctxt pats	$ \ pats' ->
-    rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
+    rnPatsAndThen ctxt True pats $ \ pats' ->
+    rnGRHSs ctxt grhss		 `thenM` \ (grhss', grhss_fvs) ->
 
     returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
 	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
@@ -387,8 +387,8 @@ rnExpr e@(ELazyPat _) = addErr (patSynErr e)	`thenM_`
 \begin{code}
 rnExpr (HsProc pat body src_loc)
   = addSrcLoc src_loc $
-    rnPatsAndThen ProcExpr [pat] $ \ [pat'] ->
-    rnCmdTop body	`thenM` \ (body',fvBody) ->
+    rnPatsAndThen ProcExpr True [pat] $ \ [pat'] ->
+    rnCmdTop body	              `thenM` \ (body',fvBody) ->
     returnM (HsProc pat' body' src_loc, fvBody)
 
 rnExpr (HsArrApp arrow arg _ ho rtl srcloc)
@@ -687,8 +687,8 @@ rnNormalStmts ctxt [] = returnM ([], emptyFVs)
 	-- Happens at the end of the sub-lists of a ParStmts
 
 rnNormalStmts ctxt (ExprStmt expr _ src_loc : stmts)
-  = addSrcLoc src_loc 		$
-    rnExpr expr			`thenM` \ (expr', fv_expr) ->
+  = addSrcLoc src_loc 	        $
+    rnExpr expr		        `thenM` \ (expr', fv_expr) ->
     rnNormalStmts ctxt stmts	`thenM` \ (stmts', fvs) ->
     returnM (ExprStmt expr' placeHolderType src_loc : stmts',
 	     fv_expr `plusFV` fvs)
@@ -703,8 +703,14 @@ rnNormalStmts ctxt (BindStmt pat expr src_loc : stmts)
     rnExpr expr				`thenM` \ (expr', fv_expr) ->
 	-- The binders do not scope over the expression
 
-    rnPatsAndThen (StmtCtxt ctxt) [pat]	$ \ [pat'] ->
-    rnNormalStmts ctxt stmts		`thenM` \ (stmts', fvs) ->
+    let
+     reportUnused = 
+       case ctxt of
+         ParStmtCtxt{} -> False
+	 _ -> True
+    in
+    rnPatsAndThen (StmtCtxt ctxt) reportUnused [pat] $ \ [pat'] ->
+    rnNormalStmts ctxt stmts		             `thenM` \ (stmts', fvs) ->
     returnM (BindStmt pat' expr' src_loc : stmts',
 	     fv_expr `plusFV` fvs)	-- fv_expr shouldn't really be filtered by
 					-- the rnPatsAndThen, but it does not matter
@@ -735,13 +741,16 @@ rnNormalStmts ctxt (ParStmt stmtss : stmts)
 	--       shadow the next; e.g. x <- xs; x <- ys
     rnNormalStmts ctxt stmts			`thenM` \ (stmts', fvs) ->
 
-	-- Cut down the exported binders to just the ones neede in the body
+	-- Cut down the exported binders to just the ones needed in the body
     let
 	used_bndrs_s = map (filter (`elemNameSet` fvs)) bndrss
+	unused_bndrs = filter (not . (`elemNameSet` fvs)) bndrs
     in
+     -- With processing of the branches and the tail of comprehension done,
+     -- we can finally compute&report any unused ParStmt binders.
+    warnUnusedMatches unused_bndrs  `thenM_`
     returnM (ParStmt (stmtss' `zip` used_bndrs_s) : stmts', 
 	     fv_stmtss `plusFV` fvs)
-	     
   where
     rn_branch (stmts, _) = rnNormalStmts (ParStmtCtxt ctxt) stmts
 
