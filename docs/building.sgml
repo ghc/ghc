@@ -1277,23 +1277,56 @@ install them?  That is specified by
 reverses the effect of <Literal>install</Literal>.
 </Para>
 </ListItem></VarListEntry>
+
 <VarListEntry>
 <Term><Literal>clean</Literal>:</Term>
 <ListItem>
 <Para>
-remove all easily-rebuilt files.
-</Para>
+Delete all files from the current directory that are normally
+created by building the program.  Don't delete the files that
+record the configuration. Also preserve files that could be made
+by building, but normally aren't because the distribution comes
+with them.</para>
 </ListItem></VarListEntry>
+
+<varlistentry>
+<term><literal>distclean</literal>:</term>
+<listitem>
+<para>Delete all files from the current directory that are created by
+configuring or building the program. If you have unpacked the source
+and built the program without creating any other files, <literal>make
+distclean</literal> should leave only the files that were in the
+distribution.</para>
+</listitem>
+</varlistentry>
+
+<varlistentry>
+<term><literal>mostlyclean</literal>:</term>
+<listitem>
+<para>Like <literal>clean</literal>, but may refrain from deleting a
+few files that people normally don't want to recompile.</para>
+</listitem>
+</varlistentry>
+
 <VarListEntry>
-<Term><Literal>veryclean</Literal>:</Term>
+<Term><Literal>maintainer-clean</Literal>:</Term>
 <ListItem>
 <Para>
-remove all files that can be rebuilt at all.
-There's a danger here that you may remove a file that needs a more
-obscure utility to rebuild it (especially if you started from a source
-distribution).
-</Para>
-</ListItem></VarListEntry>
+Delete everything from the current directory that can be reconstructed
+with this Makefile.  This typically includes everything deleted by
+<literal>distclean</literal>, plus more: C source files produced by
+Bison, tags tables, Info files, and so on.</para>
+
+<para>One exception, however: <literal>make maintainer-clean</literal>
+should not delete <filename>configure</filename> even if
+<filename>configure</filename> can be remade using a rule in the
+<filename>Makefile</filename>. More generally, <literal>make
+maintainer-clean</literal> should not delete anything that needs to
+exist in order to run <filename>configure</filename> and then begin to
+build the program.</para>
+</listitem>
+</varlistentry>
+
 <VarListEntry>
 <Term><Literal>check</Literal>:</Term>
 <ListItem>
