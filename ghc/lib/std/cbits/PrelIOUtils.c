@@ -210,7 +210,7 @@ int prel_sizeof_termios()
 int prel_sizeof_sigset_t()
 {
 #ifndef mingw32_TARGET_OS
-  return sizeof(struct sigset_t);
+  return sizeof(sigset_t);
 #else
   return 0;
 #endif
@@ -225,7 +225,7 @@ int prel_echo()
 #endif
 
 }
-extern int prel_tcsanow()
+int prel_tcsanow()
 {
 #ifdef TCSANOW
   return TCSANOW;
