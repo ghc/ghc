@@ -88,7 +88,6 @@ import IdInfo
 import Demand		( Demand )
 import Name	 	( Name, OccName,
 			  mkSysLocalName, mkLocalName,
-			  nameIsLocallyDefined,
 			  getOccName, isIPOcc
 			) 
 import OccName		( UserFS )

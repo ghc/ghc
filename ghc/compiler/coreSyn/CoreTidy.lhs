@@ -363,16 +363,15 @@ tidyTopBinder mod ext_ids tidy_env rhs caf_info
 tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
   | opt_OmitInterfacePragmas || not is_external
 	-- No IdInfo if the Id isn't external, or if we don't have -O
-  = mkIdInfo new_flavour 
+  = mkIdInfo new_flavour caf_info
 	`setStrictnessInfo` strictnessInfo core_idinfo
 	`setArityInfo`	    ArityExactly arity_info
-	`setCafInfo`        caf_info
 	-- Keep strictness, arity and CAF info; it's used by the code generator
 
   | otherwise
   =  let (rules', _) = initUs us (tidyRules tidy_env (specInfo core_idinfo))
      in
-     mkIdInfo new_flavour
+     mkIdInfo new_flavour caf_info
 	`setCprInfo`	    cprInfo core_idinfo
 	`setStrictnessInfo` strictnessInfo core_idinfo
 	`setInlinePragInfo` inlinePragInfo core_idinfo
@@ -380,7 +379,6 @@ tidyIdInfo us tidy_env is_external unfold_info arity_info caf_info id
 	`setWorkerInfo`	    tidyWorker tidy_env arity_info (workerInfo core_idinfo)
 	`setSpecInfo`	    rules'
 	`setArityInfo`	    ArityExactly arity_info
-	`setCafInfo`        caf_info
 		-- this is the final IdInfo, it must agree with the
 		-- code finally generated (i.e. NO more transformations
 		-- after this!).

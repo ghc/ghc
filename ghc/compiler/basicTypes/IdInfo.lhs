@@ -219,10 +219,11 @@ constantIdInfo :: IdInfo
 	-- we'd better assume it does
 constantIdInfo = mkIdInfo ConstantId MayHaveCafRefs
 
-mkIdInfo :: IdFlavour -> IdInfo
+mkIdInfo :: IdFlavour -> CafInfo -> IdInfo
 mkIdInfo flv caf 
   = IdInfo {
 	    flavourInfo		= flv,
+	    cafInfo		= caf,
 	    arityInfo		= UnknownArity,
 	    demandInfo		= wwLazy,
 	    specInfo		= emptyCoreRules,
@@ -230,7 +231,6 @@ mkIdInfo flv caf
 	    workerInfo		= NoWorker,
 	    strictnessInfo	= NoStrictnessInfo,
 	    unfoldingInfo	= noUnfolding,
-	    cafInfo		= caf
 	    cprInfo		= NoCPRInfo,
 	    lbvarInfo		= NoLBVarInfo,
 	    inlinePragInfo 	= NoInlinePragInfo,

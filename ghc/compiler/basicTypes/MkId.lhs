@@ -138,7 +138,7 @@ wiredInIds
 
 \begin{code}
 mkSpecPragmaId occ uniq ty loc
-  = mkId (mkLocalName uniq occ loc) ty (mkIdInfo SpecPragmaId)
+  = mkId (mkLocalName uniq occ loc) ty (mkIdInfo SpecPragmaId NoCafRefs)
 	-- Maybe a SysLocal?  But then we'd lose the location
 
 mkDefaultMethodId dm_name rec_c ty
@@ -169,7 +169,7 @@ mkDataConId :: Name -> DataCon -> Id
 mkDataConId work_name data_con
   = mkId work_name (dataConRepType data_con) info
   where
-    info = mkIdInfo (DataConId data_con)
+    info = mkIdInfo (DataConId data_con) NoCafRefs
 	   `setArityInfo`	exactArity arity
 	   `setStrictnessInfo`	strict_info
 	   `setCprInfo`		cpr_info
@@ -231,7 +231,7 @@ mkDataConWrapId data_con
     wrap_id = mkId (dataConName data_con) wrap_ty info
     work_id = dataConId data_con
 
-    info = mkIdInfo (DataConWrapId data_con)
+    info = mkIdInfo (DataConWrapId data_con) NoCafRefs
 	   `setUnfoldingInfo`	mkTopUnfolding (mkInlineMe wrap_rhs)
 	   `setCprInfo`		cpr_info
 		-- The Cpr info can be important inside INLINE rhss, where the
@@ -239,10 +239,6 @@ mkDataConWrapId data_con
 	   `setArityInfo`	exactArity arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
-	   `setCafInfo`	      NoCafRefs
-		-- The wrapper Id ends up in STG code as an argument,
-		-- sometimes before its definition, so we want to
-		-- signal that it has no CAFs
            `setTyGenInfo`     TyGenNever
                 -- No point generalising its type, since it gets eagerly inlined
                 -- away anyway
@@ -412,10 +408,9 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     selector_ty  = mkForAllTys tyvars $ mkForAllTys field_tyvars $
 		   mkFunTys dict_tys $  mkFunTy data_ty field_tau
       
-    info = mkIdInfo (RecordSelId field_label)
+    info = mkIdInfo (RecordSelId field_label) NoCafRefs
 	   `setArityInfo`	exactArity (1 + length dict_tys)
 	   `setUnfoldingInfo`	unfolding	
-	   `setCafInfo`		NoCafRefs
            `setTyGenInfo`	TyGenNever
 	-- ToDo: consider adding further IdInfo
 
@@ -523,10 +518,9 @@ mkDictSelId name clas
     field_lbl = mkFieldLabel name tycon ty tag
     tag       = assoc "MkId.mkDictSelId" (classSelIds clas `zip` allFieldLabelTags) sel_id
 
-    info      = mkIdInfo (RecordSelId field_lbl)
+    info      = mkIdInfo (RecordSelId field_lbl) NoCafRefs
 		`setArityInfo`	    exactArity 1
 		`setUnfoldingInfo`  unfolding
-		`setCafInfo`	    NoCafRefs
                 `setTyGenInfo`      TyGenNever
 		
 	-- We no longer use 'must-inline' on record selectors.  They'll
@@ -569,7 +563,7 @@ mkPrimOpId prim_op
     name = mkPrimOpIdName prim_op
     id   = mkId name ty info
 		
-    info = mkIdInfo (PrimOpId prim_op)
+    info = mkIdInfo (PrimOpId prim_op) NoCafRefs
 	   `setSpecInfo`	rules
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
@@ -600,7 +594,7 @@ mkCCallOpId uniq ccall ty
     name    = mkCCallName uniq occ_str
     prim_op = CCallOp ccall
 
-    info = mkIdInfo (PrimOpId prim_op)
+    info = mkIdInfo (PrimOpId prim_op) NoCafRefs
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
 
@@ -629,9 +623,11 @@ mkDictFunId dfun_name clas inst_tyvars inst_tys dfun_theta
   = mkId dfun_name dfun_ty info
   where
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
-    info = mkIdInfo DictFunId `setTyGenInfo` TyGenNever
+    info = mkIdInfo DictFunId MayHaveCafRefs
+	   `setTyGenInfo` TyGenNever
              -- type is wired-in (see comment at TcClassDcl.tcClassSig), so
              -- do not generalise it
+	-- An imported dfun may refer to CAFs, so we assume the worst
 
 {-  1 dec 99: disable the Mark Jones optimisation for the sake
     of compatibility with Hugs.

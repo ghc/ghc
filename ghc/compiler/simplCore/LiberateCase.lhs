@@ -14,7 +14,9 @@ import CoreSyn
 import CoreUnfold	( couldBeSmallEnoughToInline )
 import Var		( Id )
 import VarEnv
+import UniqFM		( ufmToList )
 import Maybes
+import Outputable
 \end{code}
 
 This module walks over @Core@, and looks for @case@ on free variables.
@@ -40,13 +42,15 @@ f = \ t -> case v of
 \end{verbatim}
 (note the NEED for shadowing)
 
-=> Run Andr\'e's wonder pass ...
+=> Simplify
+
 \begin{verbatim}
 f = \ t -> case v of
 	       V a b -> a : (letrec
 				f = \ t -> a : f t
 			     in f t)
 \begin{verbatim}
+
 Better code, because 'a' is  free inside the inner letrec, rather
 than needing projection from v.
 
@@ -141,6 +145,12 @@ data LibCaseEnv
 initEnv :: Int -> LibCaseEnv
 initEnv bomb_size = LibCaseEnv bomb_size 0 emptyVarEnv emptyVarEnv []
 
+pprEnv :: LibCaseEnv -> SDoc
+pprEnv (LibCaseEnv _ lvl lvl_env _ scruts)
+  = vcat [text "LibCaseEnv" <+> int lvl,
+	  fsep (map ppr (ufmToList lvl_env)),
+	  fsep (map ppr scruts)]
+
 bombOutSize (LibCaseEnv bomb_size _ _ _ _) = bomb_size
 \end{code}
 
@@ -233,16 +243,19 @@ Ids
 \begin{code}
 libCaseId :: LibCaseEnv -> Id -> CoreExpr
 libCaseId env v
-  | Just the_bind <- lookupRecId env v,	-- It's a use of a recursive thing
-    there_are_free_scruts		-- with free vars scrutinised in RHS
-  = Let the_bind (Var v)
+  | Just the_bind <- lookupRecId env v	-- It's a use of a recursive thing
+  -- = not (null free_scruts)		-- with free vars scrutinised in RHS
+  = if null free_scruts then
+	pprTrace "No:" (ppr v $$ pprEnv env) (Var v)
+    else
+	pprTrace "Yes:" (ppr v) $ Let the_bind (Var v)
 
   | otherwise
   = Var v
 
   where
-    rec_id_level	  = lookupLevel env v
-    there_are_free_scruts = freeScruts env rec_id_level
+    rec_id_level = lookupLevel env v
+    free_scruts  = freeScruts env rec_id_level
 \end{code}
 
 
@@ -283,13 +296,7 @@ addScrutedVar env@(LibCaseEnv bomb lvl lvl_env rec_env scruts) scrut_var
 
 lookupRecId :: LibCaseEnv -> Id -> Maybe CoreBind
 lookupRecId (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
-#ifndef DEBUG
   = lookupVarEnv rec_env id
-#else
-  = case (lookupVarEnv rec_env id) of
-      xxx@(Just _) -> xxx
-      xxx	   -> xxx
-#endif
 
 lookupLevel :: LibCaseEnv -> Id -> LibCaseLevel
 lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
@@ -299,10 +306,8 @@ lookupLevel (LibCaseEnv bomb lvl lvl_env rec_env scruts) id
 
 freeScruts :: LibCaseEnv
 	   -> LibCaseLevel 	-- Level of the recursive Id
-	   -> Bool		-- True <=> there is an enclosing case of a variable
-				-- bound outside (ie level <=) the recursive Id.
+	   -> [Id]		-- Ids that are bound ouside the recursive Id, (level <=)
+				-- but which are scrutinised on the way to this call
 freeScruts (LibCaseEnv bomb lvl lvl_env rec_env scruts) rec_bind_lvl
-  = not (null free_scruts)
-  where
-    free_scruts = [v | (v,lvl) <- scruts, lvl <= rec_bind_lvl]
+  = [v | (v,lvl) <- scruts, lvl <= rec_bind_lvl]
 \end{code}
