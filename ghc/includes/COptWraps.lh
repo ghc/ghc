@@ -557,7 +557,7 @@ gets whatever it's after.
 %************************************************************************
 
 \begin{code}
-#if powerpc_TARGET_ARCH
+#if powerpc_TARGET_ARCH || rs6000_TARGET_ARCH
 
 /* shift 4 arg registers down one */
 
@@ -565,6 +565,7 @@ gets whatever it's after.
     register void (*f)() __asm__("$2");	\
     __asm__ volatile (			\
     "move $2,$4\n"			\
+    "not used!!!????\n"			\
     "\tmove $4,$5\n"			\
     "\tmove $5,$6\n"			\
     "\tmove $6,$7\n"			\
@@ -577,11 +578,13 @@ gets whatever it's after.
      __asm__ volatile (		\
     "subu $sp,$sp,4\n"		\
     "\ts.d $f0, -8($sp)\n"  	\
+    "not used!!!????\n"		\
     "\tsw  $2, -12($sp)");
 
 #define MAGIC_RETURN		\
     __asm__ volatile (		\
     "l.d $f0, -8($sp)\n"	\
+    "not used!!!????\n"		\
     "\tlw  $2, -12($sp)");
 
 #define WRAPPER_NAME(f)	  /* nothing */

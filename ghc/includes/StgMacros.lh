@@ -874,7 +874,8 @@ Some floating-point format info, made with the \tr{enquire} program
  || m68k_TARGET_ARCH	\
  || mipsel_TARGET_ARCH	\
  || mipseb_TARGET_ARCH	\
- || powerpc_TARGET_ARCH
+ || powerpc_TARGET_ARCH \
+ || rs6000_TARGET_ARCH
 
 /* yes, it is IEEE floating point */
 #include "ieee-flpt.h"

@@ -14,6 +14,12 @@
 #include <sys/types.h>
 #endif
 
+#ifdef _AIX 
+/* this is included from sys/types.h only if _BSD is defined. */
+/* Since it is not, I include it here. - andre */
+#include <sys/select.h>
+#endif
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif

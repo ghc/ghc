@@ -179,6 +179,7 @@ sub process_asm_block {
     return(&process_asm_block_alpha($str)) if $TargetPlatform =~ /^alpha-/;
     return(&process_asm_block_hppa($str))  if $TargetPlatform =~ /^hppa/;
     return(&process_asm_block_mips($str))   if $TargetPlatform =~ /^mips-/;
+    return(&process_asm_block_powerpc($str))   if $TargetPlatform =~ /^powerpc-|^rs6000-/;
 
     # otherwise...
     &tidy_up_and_die(1,"$Pgm: no process_asm_block for $TargetPlatform\n");
@@ -427,6 +428,42 @@ sub process_asm_block_mips {
     $str .= $UNDEFINED_FUNS; # pin on gratuitiously-large amount of info
 
     print STDERR "### STRIPPED BLOCK (mips):\n$str" if $Dump_asm_splitting_info;
+
+    $str;
+}
+\end{code}
+
+\begin{code}
+sub process_asm_block_powerpc {
+    local($str) = @_;
+
+    # strip the marker
+    $str =~ s/___stg_split_marker.*\n//;
+    $str =~ s/___stg_split_marker.*\n//; # yes, twice.
+
+    # remove/record any literal constants defined here
+    while ( $str =~ /^(.csect .data[RW]\n\s+\.align.*\n(LC\.\.\d+):\n(\s\.byte .*\n)+)/ ) {
+	local($label) = $2;
+	local($body)  = $1;
+
+	&tidy_up_and_die(1,"Local constant label $label already defined!\n")
+	    if $LocalConstant{$label};
+
+	$LocalConstant{$label} = $body;
+	
+	$str =~ s/^.csect .data[RW]\n\s+\.align.*\nLC\.\.\d+:\n(\s\.byte .*\n)+//;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+	if ( $str =~ /\b$k(\b|\[)/ ) {
+	    $str = $LocalConstant{$k} . $str;
+	}
+    }
+
+    print STDERR "### STRIPPED BLOCK (powerpc/rs6000):\n$str" if $Dump_asm_splitting_info;
+
+    $str = ".toc\n" . $str;
 
     $str;
 }

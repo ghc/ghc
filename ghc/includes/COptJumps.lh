@@ -464,7 +464,7 @@ extern void __DISCARD__(STG_NO_ARGS);
 %************************************************************************
 
 \begin{code}
-#if powerpc_TARGET_ARCH
+#if powerpc_TARGET_ARCH || rs6000_TARGET_ARCH
 
 /* do FUNBEGIN/END the easy way */
 #define FUNBEGIN    __asm__ volatile ("--- BEGIN ---");
@@ -488,6 +488,12 @@ extern void __DISCARD__(STG_NO_ARGS);
 #define MINI_INTERPRETER_SETUP	    	    	\
     StgChar space[RESERVED_C_STACK_BYTES+6*sizeof(double)+19*sizeof(long)]; \
     __asm__ volatile ("stm  13,-176(1)\n"    	\
+                      "\tstfd 14,-200(1)\n"     \
+                      "\tstfd 15,-208(1)\n"     \
+                      "\tstfd 16,-216(1)\n"     \
+                      "\tstfd 17,-224(1)\n"     \
+                      "\tstfd 18,-232(1)\n"     \
+                      "\tstfd 19,-240(1)\n"     \
                       : : "I" (RESERVED_C_STACK_BYTES+16) : "1" );
 
     /* the 16 bytes is for the argument-register save-area above $sp */
@@ -496,6 +502,12 @@ extern void __DISCARD__(STG_NO_ARGS);
     __asm__ volatile (".globl miniInterpretEnd\n" \
                       "miniInterpretEnd:\n"    	\
 		      "\tlm 13,-176(1)\n"    	\
+                      "\tlfd 14,-200(1)\n"      \
+                      "\tlfd 15,-208(1)\n"      \
+                      "\tlfd 16,-216(1)\n"      \
+                      "\tlfd 17,-224(1)\n"      \
+                      "\tlfd 18,-232(1)\n"      \
+                      "\tlfd 19,-240(1)\n"      \
                       : : "I" (RESERVED_C_STACK_BYTES+16) : "1" );
 
 #endif /* powerpc */

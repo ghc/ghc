@@ -1216,14 +1216,14 @@ sub setupMachOpts {
       unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
       unshift(@CcBoth_flags,  ('-static'));
 
-  } elsif ($TargetPlatform =~ /^powerpc-/) {
+  } elsif ($TargetPlatform =~ /^powerpc-|^rs6000/) {
       # we know how to *mangle* asm for PowerPC
 # :-(   unshift(@CcRegd_flags, ('-D__STG_REV_TBLS__'));
       unshift(@CcRegd_flags, ('-DSTACK_CHECK_BY_PAGE_FAULT=1')) if $StkChkByPageFaultOK;
       unshift(@CcBoth_flags,  ('-static')); # always easier to start with
       unshift(@CcRegd_flags, ('-finhibit-size-directive')); # avoids traceback tables
-#      unshift(@Ld_flags, ('-Xlinker -bbigtoc -Xlinker -bnoquiet')); # we have lots of toc entries..
-      unshift(@Ld_flags, ('-Xlinker -bbigtoc')); # we have lots of toc entries...
+#      unshift(@Ld_flags, ('-Xlinker -bbigtoc -Xlinker -bnoquiet')); # if we have lots of toc entries...
+      unshift(@Ld_flags, ('-Xlinker -bbigtoc')); # just in case we have lots of toc entries...
 
   } elsif ($TargetPlatform =~ /^sparc-/) {
       # we know how to *mangle* asm for SPARC
@@ -1711,6 +1711,11 @@ Now the Haskell compiler, C compiler, and assembler
     }
 
     if ($do_cc) {
+#       # if we're going to split up object files,              #delete! andre
+#       # we inject split markers into the .hc file now         #delete! andre
+#       if ( $HscOut eq '-C=' && $SplitObjFiles ) {             #delete! andre
+#           &inject_split_markers ( $hsc_out );                 #delete! andre
+#        }                                                      #delete! andre
 	&runGcc    ($is_hc_file, $hsc_out, $cc_as_o);
 	&runMangler($is_hc_file, $cc_as_o, $cc_as, $ifile_root);
     }
@@ -2040,7 +2045,7 @@ sub runGcc {
     local($cc_help_s) = "ghc$$.s";
 
     $cc       = $CcRegd;
-    $s_output = ($is_hc_file || $TargetPlatform =~ /^(powerpc|hppa|i386)/) ? $cc_as_o : $cc_as;
+    $s_output = ($is_hc_file || $TargetPlatform =~ /^(powerpc|rs6000|hppa|i386)/) ? $cc_as_o : $cc_as;
     $c_flags .= " @CcRegd_flags";
     $c_flags .= ($is_hc_file) ? " @CcRegd_flags_hc"  : " @CcRegd_flags_c";
 
@@ -2121,8 +2126,8 @@ sub runMangler {
 	|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm-hppa.prl!\n");
 	&mini_mangle_asm_hppa($cc_as_o, $cc_as);
 
-    } elsif ($TargetPlatform =~ /^powerpc/) {
-	# minor mangling of non-threaded files for hp-pa only
+    } elsif ($TargetPlatform =~ /^powerpc|^rs6000/) {
+	# minor mangling of non-threaded files for powerpcs and rs6000s 
 	require('ghc-asm.prl')
 	|| &tidy_up_and_die(1,"$Pgm: panic: can't load ghc-asm-powerpc.prl!\n");
 	&mini_mangle_asm_powerpc($cc_as_o, $cc_as);
@@ -2851,7 +2856,7 @@ arg: while($_ = $Args[0]) {
 				        next arg; };
 
     /^-split-objs/	&& do {
-			if ( $TargetPlatform !~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|sparc)-/ ) {
+			if ( $TargetPlatform !~ /^(alpha|hppa1\.1|i386|m68k|mips|powerpc|rs6000|sparc)-/ ) {
 			    $SplitObjFiles = 0;
 			    print STDERR "WARNING: don't know how to split objects on this platform: $TargetPlatform\n`-split-objs' option ignored\n";
 			} else {
