@@ -51,10 +51,9 @@ static int              issued_reqs;
 
 static void
 onIOComplete(unsigned int reqID,
-	     void* param STG_UNUSED,
 	     int   fd STG_UNUSED,
 	     int   len,
-	     char* buf STG_UNUSED,
+	     void* buf STG_UNUSED,
 	     int   errCode)
 {
   /* Deposit result of request in queue/table */
@@ -96,20 +95,33 @@ addIORequest(int   fd,
 #if 0
   fprintf(stderr, "addIOReq: %d %d %d\n", fd, forWriting, len); fflush(stderr);
 #endif
-  return AddIORequest(fd,forWriting,isSock,len,buf,0,onIOComplete);
+  return AddIORequest(fd,forWriting,isSock,len,buf,onIOComplete);
 }
 
 unsigned int
-addDelayRequest(int   msecs)
+addDelayRequest(int msecs)
 {
   EnterCriticalSection(&queue_lock);
   issued_reqs++;
   LeaveCriticalSection(&queue_lock);
 #if 0
-  fprintf(stderr, "addDelayReq: %d %d %d\n", msecs); fflush(stderr);
+  fprintf(stderr, "addDelayReq: %d\n", msecs); fflush(stderr);
 #endif
-  return AddDelayRequest(msecs,0,onIOComplete);
+  return AddDelayRequest(msecs,onIOComplete);
 }
+
+unsigned int
+addDoProcRequest(void* proc, void* param)
+{
+  EnterCriticalSection(&queue_lock);
+  issued_reqs++;
+  LeaveCriticalSection(&queue_lock);
+#if 0
+  fprintf(stderr, "addProcReq: %p %p\n", proc, param); fflush(stderr);
+#endif
+  return AddProcRequest(proc,param,onIOComplete);
+}
+
 
 int
 startupAsyncIO()
@@ -186,6 +198,7 @@ start:
 	case BlockedOnDelay:
 	case BlockedOnRead:
 	case BlockedOnWrite:
+	case BlockedOnDoProc:
 	  if (tso->block_info.async_result->reqID == rID) {
 	    /* Found the thread blocked waiting on request; stodgily fill 
 	     * in its result block. 

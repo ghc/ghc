@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.102 2003/06/19 10:42:24 simonmar Exp $
+ * $Id: PrimOps.h,v 1.103 2003/07/03 15:14:57 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -244,6 +244,7 @@ EXTFUN_RTS(delayzh_fast);
 #ifdef mingw32_TARGET_OS
 EXTFUN_RTS(asyncReadzh_fast);
 EXTFUN_RTS(asyncWritezh_fast);
+EXTFUN_RTS(asyncDoProczh_fast);
 #endif
 
 

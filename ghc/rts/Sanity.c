@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.33 2003/04/22 16:25:12 simonmar Exp $
+ * $Id: Sanity.c,v 1.34 2003/07/03 15:14:58 sof Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -610,6 +610,9 @@ checkTSO(StgTSO *tso)
     case BlockedOnRead:
     case BlockedOnWrite:
     case BlockedOnDelay:
+#if defined(mingw32_TARGET_OS)
+    case BlockedOnDoProc:
+#endif
       /* isOnBQ(blocked_queue) */
       break;
     case BlockedOnException:

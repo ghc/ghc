@@ -13,6 +13,7 @@ addIORequest(int   fd,
 	     int   len,
 	     char* buf);
 extern unsigned int addDelayRequest(int   msecs);
+extern unsigned int addDoProcRequest(void* proc, void* param);
 extern int  startupAsyncIO(void);
 extern void shutdownAsyncIO(void);
 

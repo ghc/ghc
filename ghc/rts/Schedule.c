@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.170 2003/06/19 10:35:37 simonmar Exp $
+ * $Id: Schedule.c,v 1.171 2003/07/03 15:14:58 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -3103,6 +3103,9 @@ unblockThread(StgTSO *tso)
 
   case BlockedOnRead:
   case BlockedOnWrite:
+#if defined(mingw32_TARGET_OS)
+  case BlockedOnDoProc:
+#endif
     {
       /* take TSO off blocked_queue */
       StgBlockingQueueElement *prev = NULL;
@@ -3230,6 +3233,9 @@ unblockThread(StgTSO *tso)
 
   case BlockedOnRead:
   case BlockedOnWrite:
+#if defined(mingw32_TARGET_OS)
+  case BlockedOnDoProc:
+#endif
     {
       StgTSO *prev = NULL;
       for (t = blocked_queue_hd; t != END_TSO_QUEUE; 
@@ -3623,6 +3629,11 @@ printThreadBlockage(StgTSO *tso)
   case BlockedOnWrite:
     fprintf(stderr,"is blocked on write to fd %d", tso->block_info.fd);
     break;
+#if defined(mingw32_TARGET_OS)
+    case BlockedOnDoProc:
+    fprintf(stderr,"is blocked on proc (request: %d)", tso->block_info.async_result->reqID);
+    break;
+#endif
   case BlockedOnDelay:
     fprintf(stderr,"is blocked until %d", tso->block_info.target);
     break;

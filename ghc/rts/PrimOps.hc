@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.107 2003/04/15 14:37:12 simonmar Exp $
+ * $Id: PrimOps.hc,v 1.108 2003/07/03 15:14:58 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -1676,7 +1676,7 @@ FN_(asyncReadzh_fast)
     CurrentTSO->why_blocked = BlockedOnRead;
     ACQUIRE_LOCK(&sched_mutex);
     /* could probably allocate this on the heap instead */
-    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncWritezh_fast");
+    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncReadzh_fast");
     reqID = RET_STGCALL5(W_,addIORequest,R1.i,FALSE,R2.i,R3.i,(char*)R4.p);
     ares->reqID   = reqID;
     ares->len     = 0;
@@ -1700,6 +1700,28 @@ FN_(asyncWritezh_fast)
     ACQUIRE_LOCK(&sched_mutex);
     ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncWritezh_fast");
     reqID = RET_STGCALL5(W_,addIORequest,R1.i,TRUE,R2.i,R3.i,(char*)R4.p);
+    ares->reqID   = reqID;
+    ares->len     = 0;
+    ares->errCode = 0;
+    CurrentTSO->block_info.async_result = ares;
+    APPEND_TO_BLOCKED_QUEUE(CurrentTSO);
+    RELEASE_LOCK(&sched_mutex);
+    JMP_(stg_block_async);
+  FE_
+}
+
+FN_(asyncDoProczh_fast)
+{
+  StgAsyncIOResult* ares;
+  unsigned int reqID;
+  FB_
+    /* args: R1.i = proc, R2.i = param */
+    ASSERT(CurrentTSO->why_blocked == NotBlocked);
+    CurrentTSO->why_blocked = BlockedOnDoProc;
+    ACQUIRE_LOCK(&sched_mutex);
+    /* could probably allocate this on the heap instead */
+    ares = (StgAsyncIOResult*)RET_STGCALL2(P_,stgMallocBytes,sizeof(StgAsyncIOResult), "asyncDoProczh_fast");
+    reqID = RET_STGCALL2(W_,addDoProcRequest,R1.p,R2.p);
     ares->reqID   = reqID;
     ares->len     = 0;
     ares->errCode = 0;

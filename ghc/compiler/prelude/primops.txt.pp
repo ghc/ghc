@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt.pp,v 1.27 2003/06/19 10:42:26 simonmar Exp $
+-- $Id: primops.txt.pp,v 1.28 2003/07/03 15:14:56 sof Exp $
 --
 -- Primitive Operations
 --
@@ -1440,6 +1440,15 @@ primop  AsyncWriteOp "asyncWrite#" GenPrimOp
    needs_wrapper    = True
    has_side_effects = True
    out_of_line      = True
+
+primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
+   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
+   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
+   with
+   needs_wrapper    = True
+   has_side_effects = True
+   out_of_line      = True
+
 #endif
 
 ------------------------------------------------------------------------

@@ -32,18 +32,31 @@ extern void* GetFiberData ( void );
  *
  */
 typedef void (*CompletionProc)(unsigned int requestID,
-			       void* param,
 			       int   fd,
 			       int   len,
-			       char* buf,
+			       void* buf,
 			       int   errCode);
+
+typedef void (*DoProcProc)(void *param);
+
+typedef union workData {
+    struct {
+	int   fd;
+	int   len;
+	char *buf; 
+    } ioData;
+    struct { 
+	int   msecs;
+    } delayData;
+    struct { 
+	DoProcProc proc;
+	void* param;
+    } procData;
+} WorkData;
 
 typedef struct WorkItem {
   unsigned int   workKind;
-  int            fd;
-  int            len;
-  char*          buf;
-  void*          param;
+  WorkData       workData;
   unsigned int   requestID;
   CompletionProc onCompletion;
 } WorkItem;
@@ -54,10 +67,11 @@ extern CompletionProc onComplete;
  * that instead of passing a tag describing the work to be performed,
  * a function pointer is passed instead. Maybe later.
  */
-#define WORKER_READ       1
-#define WORKER_WRITE      2
-#define WORKER_DELAY      4
-#define WORKER_FOR_SOCKET 8
+#define WORKER_READ        1
+#define WORKER_WRITE       2
+#define WORKER_DELAY       4
+#define WORKER_FOR_SOCKET  8
+#define WORKER_DO_PROC    16
 
 /*
  * Starting up and shutting down. 
@@ -71,7 +85,6 @@ extern void ShutdownIOManager  ( void );
  * will invoke upon completion.
  */
 extern int AddDelayRequest ( unsigned int   msecs,
-			     void*          data,
 			     CompletionProc onCompletion);
 
 extern int AddIORequest ( int            fd,
@@ -79,7 +92,10 @@ extern int AddIORequest ( int            fd,
 			  BOOL           isSocket,
 			  int            len,
 			  char*          buffer,
-			  void*          data,
 			  CompletionProc onCompletion);
+
+extern int AddProcRequest ( void*          proc,
+			    void*          data,
+			    CompletionProc onCompletion);
 
 #endif /* __IOMANAGER_H__ */

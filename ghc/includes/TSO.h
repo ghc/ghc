@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.30 2003/02/21 05:34:15 sof Exp $
+ * $Id: TSO.h,v 1.31 2003/07/03 15:14:58 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -139,6 +139,9 @@ typedef enum {
   BlockedOnRead,
   BlockedOnWrite,
   BlockedOnDelay
+#if defined(mingw32_TARGET_OS)
+  , BlockedOnDoProc
+#endif
 #if defined(PAR)
   , BlockedOnGA  // blocked on a remote closure represented by a Global Address
   , BlockedOnGA_NoSend // same as above but without sending a Fetch message
@@ -150,7 +153,7 @@ typedef enum {
 #endif
 } StgTSOBlockReason;
 
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS)
 /* results from an async I/O request + it's ID. */
 typedef struct {
   unsigned int reqID;
@@ -163,7 +166,7 @@ typedef union {
   StgClosure *closure;
   struct StgTSO_ *tso;
   int fd;
-#ifdef mingw32_TARGET_OS
+#if defined(mingw32_TARGET_OS)
   StgAsyncIOResult* async_result;
 #endif
   unsigned int target;
