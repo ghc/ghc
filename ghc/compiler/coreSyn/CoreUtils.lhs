@@ -45,7 +45,7 @@ import Var		( Var, isId, isTyVar )
 import VarEnv
 import Name		( hashName, isDllName )
 import Literal		( hashLiteral, literalType, litIsDupable, 
-			  litIsTrivial, isZeroLit )
+			  litIsTrivial, isZeroLit, Literal( MachLabel ) )
 import DataCon		( DataCon, dataConRepArity, dataConArgTys,
 			  isExistentialDataCon, dataConTyCon )
 import PrimOp		( PrimOp(..), primOpOkForSpeculation, primOpIsCheap )
@@ -1239,7 +1239,19 @@ is_static False (Lam b e) = isRuntimeVar b || is_static False e
 
 is_static in_arg (Note (SCC _) e) = False
 is_static in_arg (Note _ e)       = is_static in_arg e
-is_static in_arg (Lit lit)        = True
+
+is_static in_arg (Lit lit)
+  = case lit of
+	MachLabel _ _ -> False
+	other 	      -> True
+	-- A MachLabel (foreign import "&foo") in an argument
+	-- prevents a constructor application from being static.  The
+	-- reason is that it might give rise to unresolvable symbols
+	-- in the object file: under Linux, references to "weak"
+	-- symbols from the data segment give rise to "unresolvable
+	-- relocation" errors at link time This might be due to a bug
+	-- in the linker, but we'll work around it here anyway. 
+	-- SDM 24/2/2004
 
 is_static in_arg other_expr = go other_expr 0
   where
