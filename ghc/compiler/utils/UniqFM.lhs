@@ -96,11 +96,11 @@ plusUFM		:: UniqFM elt -> UniqFM elt -> UniqFM elt
 plusUFM_C	:: (elt -> elt -> elt)
 		-> UniqFM elt -> UniqFM elt -> UniqFM elt
 
-minusUFM	:: UniqFM elt -> UniqFM elt -> UniqFM elt
+minusUFM	:: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 
 intersectUFM	:: UniqFM elt -> UniqFM elt -> UniqFM elt
-intersectUFM_C	:: (elt -> elt -> elt)
-		-> UniqFM elt -> UniqFM elt -> UniqFM elt
+intersectUFM_C	:: (elt1 -> elt2 -> elt3)
+		-> UniqFM elt1 -> UniqFM elt2 -> UniqFM elt3
 foldUFM		:: (elt -> a -> a) -> a -> UniqFM elt -> a
 mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
