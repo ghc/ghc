@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelCError.lhs,v 1.2 2001/01/12 17:45:30 qrczak Exp $
+% $Id: PrelCError.lhs,v 1.3 2001/01/15 20:55:14 qrczak Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -19,7 +19,7 @@ module PrelCError (
   -- Haskell representation for "errno" values
   --
   Errno(..),		-- instance: Eq
-  e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN, 
+  eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN, 
   eALREADY, eBADF, eBADMSG, eBADRPC, eBUSY, eCHILD, eCOMM, eCONNABORTED, 
   eCONNREFUSED, eCONNRESET, eDEADLK, eDESTADDRREQ, eDIRTY, eDOM, eDQUOT, 
   eEXIST, eFAULT, eFBIG, eFTYPE, eHOSTDOWN, eHOSTUNREACH, eIDRM, eILSEQ, 
@@ -146,7 +146,7 @@ instance Eq Errno where
 
 -- common "errno" symbols
 --
-e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN, 
+eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN, 
   eALREADY, eBADF, eBADMSG, eBADRPC, eBUSY, eCHILD, eCOMM, eCONNABORTED, 
   eCONNREFUSED, eCONNRESET, eDEADLK, eDESTADDRREQ, eDIRTY, eDOM, eDQUOT, 
   eEXIST, eFAULT, eFBIG, eFTYPE, eHOSTDOWN, eHOSTUNREACH, eIDRM, eILSEQ, 
@@ -164,6 +164,7 @@ e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN,
 -- the CCONST_XXX identifiers are cpp symbols whose value is computed by
 -- configure 
 --
+eOK             = Errno 0
 e2BIG           = Errno CCONST_E2BIG
 eACCES		= Errno CCONST_EACCES
 eADDRINUSE	= Errno CCONST_EADDRINUSE
@@ -268,9 +269,9 @@ eXDEV		= Errno CCONST_EXDEV
 --
 isValidErrno               :: Errno -> Bool
 --
--- the configure script sets all invalid "errno"s to 0
+-- the configure script sets all invalid "errno"s to -1
 --
-isValidErrno (Errno errno)  = errno /= 0
+isValidErrno (Errno errno)  = errno /= -1
 
 
 -- access to the current thread's "errno" value
@@ -386,7 +387,7 @@ errnoToIOError loc errno@(Errno no) maybeHdl maybeName =
 #endif
   where
     (errType, str)
-      | no == 0                   = (OtherError,
+      | errno == eOK              = (OtherError,
 				     "no error")
       | errno == e2BIG            = (ResourceExhausted,
 				     "argument list too long")

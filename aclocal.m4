@@ -1,4 +1,4 @@
-dnl $Id: aclocal.m4,v 1.61 2001/01/08 12:58:45 chak Exp $
+dnl $Id: aclocal.m4,v 1.62 2001/01/15 20:55:14 qrczak Exp $
 dnl 
 dnl Extra autoconf macros for the Glasgow fptools
 dnl
@@ -527,7 +527,7 @@ fi
 ])
 
 dnl ** Obtain the value of a C constant.
-dnl    The value will be `0' if the constant is undefined.
+dnl    The value will be `(-1)' if the constant is undefined.
 dnl
 dnl    This is set up so that the argument can be a shell variable.
 dnl
@@ -543,11 +543,11 @@ main()
 {
   FILE *f=fopen("conftestval", "w");
   if (!f) exit(1);
-  fprintf(f, "%d\n", $1);
+  fprintf(f, "(%d)\n", $1);
   exit(0);
 }], 
 eval "$cv_name=`cat conftestval`",
-eval "$cv_name=0",
+eval "$cv_name='(-1)'",
 ifelse([$2], , , eval "$cv_name=$2"))])dnl
 eval "fptools_check_cconst_result=`echo '$'{$cv_name}`"
 AC_MSG_RESULT($fptools_check_cconst_result)
@@ -860,7 +860,7 @@ dnl The variable LIBM (which is not an output variable by default) is
 dnl set to a value which is suitable for use in a Makefile (for example,
 dnl in make's LOADLIBES macro) provided you AC_SUBST it first.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.61 2001/01/08 12:58:45 chak Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.62 2001/01/15 20:55:14 qrczak Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 # FPTOOLS_CHECK_LIBM - check for math library
@@ -948,7 +948,7 @@ dnl Please note that as the ac_opengl macro and the toy example evolves,
 dnl the version number increases, so you may have to adjust the above
 dnl URL accordingly.
 dnl
-dnl @version 0.01 $Id: aclocal.m4,v 1.61 2001/01/08 12:58:45 chak Exp $
+dnl @version 0.01 $Id: aclocal.m4,v 1.62 2001/01/15 20:55:14 qrczak Exp $
 dnl @author Matthew D. Langston <langston@SLAC.Stanford.EDU>
 
 AC_DEFUN(FPTOOLS_HAVE_OPENGL,

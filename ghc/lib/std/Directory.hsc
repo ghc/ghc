@@ -1,5 +1,5 @@
 -- -----------------------------------------------------------------------------
--- $Id: Directory.hsc,v 1.3 2001/01/12 17:45:30 qrczak Exp $
+-- $Id: Directory.hsc,v 1.4 2001/01/15 20:55:14 qrczak Exp $
 --
 -- (c) The University of Glasgow, 1994-2000
 --
@@ -354,9 +354,9 @@ getDirectoryContents path = do
 	 else do errno <- getErrno
 		 if (errno == eINTR) then loop dir else do
 		 throwErrnoIfMinus1_ "getDirectoryContents" $ closedir dir
-		 if (isValidErrno errno) -- EOF
-		    then throwErrno "getDirectoryContents"
-		    else return []
+		 if (errno == eOK)
+		    then return []
+		    else throwErrno "getDirectoryContents"
 
 {-
 If the operating system has a notion of current directories,
