@@ -1,6 +1,6 @@
-#include "../../../includes/ghcconfig.h"
-
 #include "HsFFI.h"
+
+#include "../../../includes/ghcconfig.h"
 
 #if HAVE_LIMITS_H
 #include <limits.h>
@@ -49,6 +49,7 @@ INLINE int __hscore_CSIDL_APPDATA()  { return CSIDL_APPDATA;  }
 INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
 INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
 
+#if __GLASGOW_HASKELL__ < 604
 /*
  * Function: __hscore_getFolderPath()
  *
@@ -91,4 +92,5 @@ __hscore_getFolderPath(HWND hwndOwner,
     return (int)funcPtr(hwndOwner,nFolder,hToken,dwFlags,pszPath);
     /* ToDo: unload the DLL on shutdown? */
 }
+#endif /* __GLASGOW_HASKELL__ < 604 */
 #endif
