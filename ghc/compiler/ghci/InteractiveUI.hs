@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.79 2001/06/27 14:26:36 sewardj Exp $
+-- $Id: InteractiveUI.hs,v 1.80 2001/06/28 11:29:26 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -90,10 +90,11 @@ helpText = "\
 \ Commands available from the prompt:\n\ 
 \\  
 \   <stmt>		   evaluate/run <stmt>\n\ 
+\   :add <filename> ...    add module(s) to the current target set\n\ 
 \   :cd <dir>		   change directory to <dir>\n\ 
 \   :def <cmd> <expr>      define a command :<cmd>\n\ 
 \   :help, :?		   display this list of commands\n\ 
-\   :load <filename>       load a module (and its dependents)\n\ 
+\   :load <filename> ...   load module(s) and their dependents\n\ 
 \   :module <mod>	   set the context for expression evaluation to <mod>\n\ 
 \   :reload		   reload the current module set\n\ 
 \   :set <option> ...	   set options\n\ 
@@ -111,7 +112,6 @@ helpText = "\
 \    -<flags>		most GHC command line flags can also be set here\n\ 
 \                         (eg. -v2, -fglasgow-exts, etc.)\n\ 
 \"
- --ToDo   :add <filename>     add a module to the current set\n\ 
 
 interactiveUI :: CmState -> [FilePath] -> [LibrarySpec] -> IO ()
 interactiveUI cmstate paths cmdline_libs = do
@@ -360,11 +360,12 @@ help :: String -> GHCi ()
 help _ = io (putStr helpText)
 
 addModule :: String -> GHCi ()
-addModule path = do
+addModule str = do
+  let files = words str
   state <- getGHCiState
   dflags <- io (getDynFlags)
   io (revertCAFs)			-- always revert CAFs on load/add.
-  let new_targets = path : targets state 
+  let new_targets = files ++ targets state 
   (cmstate1, ok, mods) <- io (cmLoadModule (cmstate state) new_targets)
   setGHCiState state{ cmstate = cmstate1, targets = new_targets }
   modulesLoadedMsg ok mods
@@ -432,16 +433,17 @@ undefineMacro macro_name = do
   io (writeIORef commands (filter ((/= macro_name) . fst) cmds))
 
 loadModule :: String -> GHCi ()
-loadModule path = timeIt (loadModule' path)
+loadModule str = timeIt (loadModule' str)
 
-loadModule' path = do
+loadModule' str = do
+  let files = words str
   state <- getGHCiState
   dflags <- io getDynFlags
   cmstate1 <- io (cmUnload (cmstate state) dflags)
   setGHCiState state{ cmstate = cmstate1, targets = [] }
   io (revertCAFs)			-- always revert CAFs on load.
-  (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 [path])
-  setGHCiState state{ cmstate = cmstate2, targets = [path] }
+  (cmstate2, ok, mods) <- io (cmLoadModule cmstate1 files)
+  setGHCiState state{ cmstate = cmstate2, targets = files }
   modulesLoadedMsg ok mods
 
 reloadModule :: String -> GHCi ()
