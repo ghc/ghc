@@ -104,7 +104,7 @@ tryPrimOp TagToEnumOp [Type ty, Con (Literal (MachInt i _)) _]
   | otherwise = panic "tryPrimOp: tagToEnum# on non-enumeration type"
     where tag = fromInteger i
 	  constrs = tyConDataCons tycon
-	  (dc:_) = [ dc | dc <- constrs, tag == dataConTag dc ]
+	  (dc:_) = [ dc | dc <- constrs, tag == dataConTag dc - fIRST_TAG ]
 	  (Just (tycon,_)) = splitTyConApp_maybe ty
 \end{code}
 
