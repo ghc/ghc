@@ -28,7 +28,7 @@ import DriverState	( v_Build_tag, v_MainModIs )
 import StgSyn
 import CgMonad
 import AbsCSyn
-import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN_Name )
+import PrelNames	( gHC_PRIM, rOOT_MAIN, mAIN_Name, pREL_TOP_HANDLER )
 import CLabel		( mkSRTLabel, mkClosureLabel, 
 			  mkPlainModuleInitLabel, mkModuleInitLabel )
 import PprAbsC		( dumpRealC )
@@ -145,7 +145,12 @@ mkModuleInit way cost_centre_info this_mod mb_main_mod foreign_stubs imported_mo
 				   CLbl (mkModuleInitLabel mod way) AddrRep
 				]
 
-	register_mod_imports = map mk_import_register imported_mods
+	extra_imported_mods
+	  | Module.moduleName this_mod == main_mod_name = [ pREL_TOP_HANDLER ]
+	  | otherwise					= [ ]
+
+	register_mod_imports = 
+		map mk_import_register (imported_mods ++ extra_imported_mods)
 
 	-- When compiling the module in which the 'main' function lives,
 	-- we inject an extra stg_init procedure for stg_init_ZCMain, for the 
