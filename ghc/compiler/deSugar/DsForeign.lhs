@@ -43,6 +43,10 @@ import TysWiredIn	( unitTyCon, addrTy, stablePtrTyCon,
 			)
 import Unique
 import Outputable
+
+#if __GLASGOW_HASKELL__ >= 404
+import GlaExts		( fromInt )
+#endif
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into

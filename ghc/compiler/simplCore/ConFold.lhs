@@ -28,6 +28,10 @@ import Type		( splitTyConApp_maybe )
 import Maybes		( maybeToBool )
 import Char		( ord, chr )
 import Outputable
+
+#if __GLASGOW_HASKELL__ >= 404
+import GlaExts		( fromInt )
+#endif
 \end{code}
 
 \begin{code}

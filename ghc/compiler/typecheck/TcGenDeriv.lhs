@@ -65,6 +65,10 @@ import Maybes		( maybeToBool )
 import Constants
 import List		( partition, intersperse )
 import Char		( isAlpha )
+
+#if __GLASGOW_HASKELL__ >= 404
+import GlaExts		( fromInt )
+#endif
 \end{code}
 
 %************************************************************************
