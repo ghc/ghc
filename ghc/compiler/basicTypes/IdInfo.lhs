@@ -120,11 +120,11 @@ infixl 	1 `setTyGenInfo`,
 	  `setCafInfo`,
 	  `setNewStrictnessInfo`,
 	  `setAllStrictnessInfo`,
-	  `setNewDemandInfo`,
+	  `setNewDemandInfo`
 #ifdef DEBUG
-	  `setCprInfo`,
-	  `setDemandInfo`,
-	  `setStrictnessInfo`
+	  , `setCprInfo`
+	  , `setDemandInfo`
+	  , `setStrictnessInfo`
 #endif
 \end{code}
 
@@ -137,22 +137,23 @@ infixl 	1 `setTyGenInfo`,
 To be removed later
 
 \begin{code}
-setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
+-- setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
 -- Set old and new strictness info
 setAllStrictnessInfo info Nothing
-  = info { newStrictnessInfo = Nothing, 
+  = info { newStrictnessInfo = Nothing
 #ifdef DEBUG
-	   strictnessInfo = NoStrictnessInfo, 
-	   cprInfo = NoCPRInfo,
+         , strictnessInfo = NoStrictnessInfo
+         , cprInfo = NoCPRInfo
 #endif
-	   }
+         }
+
 setAllStrictnessInfo info (Just sig)
-  = info { newStrictnessInfo = Just sig, 
+  = info { newStrictnessInfo = Just sig
 #ifdef DEBUG
-	   strictnessInfo = oldStrictnessFromNew sig, 
-	   cprInfo = cprInfoFromNewStrictness sig,
+         , strictnessInfo = oldStrictnessFromNew sig
+         , cprInfo = cprInfoFromNewStrictness sig
 #endif
-	   }
+         }
 
 seqNewStrictnessInfo Nothing = ()
 seqNewStrictnessInfo (Just ty) = seqStrictSig ty
