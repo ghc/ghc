@@ -1116,6 +1116,14 @@ $ cvs checkout nofib/spectral
 	</varlistentry>
 
 	<varlistentry>
+	  <term>mips64-sgi-irix6</term>
+	  <indexterm><primary>mips-sgi-irix6</primary></indexterm>
+	  <listitem>
+	    <para>GHC currently works unregisterised.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
 	  <term>powerpc-ibm-aix</term>
 	  <indexterm><primary>powerpc-ibm-aix</primary></indexterm>
 	  <listitem>
