@@ -147,8 +147,8 @@ usageHeader prog = substProg prog $
   "    Hide the specified package.\n" ++
   "\n" ++
   "  $p list\n" ++
-  "    List all registered packages, both global and user (unless either\n" ++
-  "    --global or --user is specified), and both hidden and exposed.\n" ++
+  "    List registered packages in the global database, and also the" ++
+  "    user database if --user is given.\n" ++
   "\n" ++
   "  $p describe {pkg-id}\n" ++
   "    Give the registered description for the specified package. The\n" ++
