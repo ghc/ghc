@@ -1,6 +1,6 @@
 {-# OPTIONS -W #-}
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.47 2000/08/03 16:47:51 simonmar Exp $
+-- $Id: Main.hs,v 1.48 2000/08/04 09:02:56 simonmar Exp $
 --
 -- GHC Driver program
 --
@@ -1284,7 +1284,7 @@ genPipeline stop_after stop_after_flag filename
 	        | split	       	  -> not_valid
 	        | otherwise       -> [ Unlit, Cpp, Hsc, HCc, As ]
 
-	HscAsm  | split           -> not_valid
+	HscAsm  | split           -> [ Unlit, Cpp, Hsc, SplitMangle, SplitAs ]
 	        | otherwise       -> [ Unlit, Cpp, Hsc, As ]
 
 	HscJava	| split	          -> not_valid
