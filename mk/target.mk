@@ -437,7 +437,7 @@ all :: $(SCRIPT_LINK)
 # on perl.
 #
 $(SCRIPT_LINK) : $(SCRIPT_PROG)
-	@if ( perl -e '$$fn="$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	@if ( $(PERL) -e '$$fn="$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
 	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK)"; \
 	   $(RM) $(SCRIPT_LINK); \
 	   $(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK); \
@@ -667,7 +667,16 @@ endif
 #
 ifneq "$(SCRIPT_LINK)" ""
 install ::
-	$(LN_S) $(SCRIPT_PROG) $(bindir)/$(SCRIPT_LINK)
+	@if ( $(PERL) -e '$$fn="$(bindir)/$(SCRIPT_LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK) in $(bindir)"; \
+	   $(RM) $(bindir)/$(SCRIPT_LINK); \
+	   $(LN_S) $(SCRIPT_PROG) $(bindir)/$(SCRIPT_LINK); \
+	 else \
+	   echo "Creating a symbol link from $(SCRIPT_PROG) to $(SCRIPT_LINK) in $(bindir) failed: \`$(bindir)/$(SCRIPT_LINK)' already exists"; \
+	   echo "Perhaps remove \`$(bindir)/$(SCRIPT_LINK)' manually?"; \
+	   exit 1; \
+	 fi;
+
 endif
 
 ###########################################
@@ -747,7 +756,7 @@ dist-package-tar-gz ::
 	cd $(SRC_DIST_DIR); cd ..; $(TAR) chzf $(SRC_DIST_NAME).tar.gz $(SRC_DIST_NAME)
 
 dist-package-zip ::
-	cd $(SRC_DIST_DIR); cd ..; $(ZIP) -r $(SRC_DIST_NAME).zip $(SRC_DIST_NAME)
+	cd $(SRC_DIST_DIR); cd ..; $(ZIP) $(ZIP_OPTS) -r $(SRC_DIST_NAME).zip $(SRC_DIST_NAME)
 
 #
 # binary-dist creates a binary bundle, set BIN_DIST_NAME
