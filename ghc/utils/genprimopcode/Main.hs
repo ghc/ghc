@@ -352,7 +352,7 @@ mkPOI_RHS_text i
                       ++ listify (map ppType argTys) ++ " "
                       ++ "(" ++ ppType resTy ++ ")"
             
-sl_name i = "SLIT(\"" ++ name i ++ "\") "
+sl_name i = "FSLIT(\"" ++ name i ++ "\") "
 
 ppTyVar "a" = "alphaTyVar"
 ppTyVar "b" = "betaTyVar"
