@@ -819,8 +819,12 @@ pprInstr (FUNBEGIN clab)
     where
 	pp_lab = pprCLabel_asm clab
 
-	pp_ldgp  = ptext SLIT(":\n\tldgp $29,0($27)\n")
-	pp_frame = ptext SLIT("..ng:\n\t.frame $30,4240,$26,0\n\t.prologue 1")
+        -- NEVER use commas within those string literals, cpp will ruin your day
+	pp_ldgp  = hcat [ ptext SLIT(":\n\tldgp $29"), char ',', ptext SLIT("0($27)\n") ]
+	pp_frame = hcat [ ptext SLIT("..ng:\n\t.frame $30"), char ',',
+                          ptext SLIT("4240"), char ',',
+                          ptext SLIT("$26"), char ',',
+                          ptext SLIT("0\n\t.prologue 1") ]
 
 pprInstr (FUNEND clab)
   = (<>) (ptext SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
