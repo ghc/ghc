@@ -55,7 +55,6 @@ import qualified Text.ParserCombinators.ReadP as ReadP
   , look
   , (+++)
   , pfail
-  , choice
   )
 
 import Control.Monad( MonadPlus(..) )

@@ -50,7 +50,6 @@ import qualified Text.ParserCombinators.ReadP as P
 import Text.ParserCombinators.ReadP
   ( ReadP
   , readP_to_S
-  , readS_to_P
   )
 
 import qualified Text.Read.Lex as L

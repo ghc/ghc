@@ -33,23 +33,16 @@ import Text.ParserCombinators.ReadP
 
 import GHC.Base
 import GHC.Num( Num(..), Integer )
-import GHC.Show( Show(.. ), showChar, showString,
-		 isSpace, isAlpha, isAlphaNum,
-		 isOctDigit, isHexDigit, toUpper )
-import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, fromRational, 
+import GHC.Show( Show(.. ), isSpace, isAlpha, isAlphaNum )
+import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, 
 		 toInteger, (^), (^^), infinity, notANumber )
-import GHC.Float( Float, Double )
 import GHC.List
-import GHC.Show( ShowS, shows )
-import GHC.Enum( minBound, maxBound )
+import GHC.Enum( maxBound )
 import Data.Maybe
-import Data.Either
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
 -- Lexing types
-
-type LexP = ReadP Lexeme
 
 data Lexeme
   = Char   Char		-- Quotes removed, 
@@ -293,10 +286,6 @@ lexString =
 
 type Base   = Int
 type Digits = [Int]
-
-showDigit :: Int -> ShowS
-showDigit n | n <= 9    = shows n
-            | otherwise = showChar (chr (n + ord 'A' - 10))
 
 lexNumber :: ReadP Lexeme
 lexNumber 
