@@ -39,6 +39,7 @@ import TyVar		( TyVar, zipTyVarEnv )
 import Unique		( Unique )
 import Util		( equivClasses, panic, assertPanic )
 import Outputable
+import List		( nub )
 \end{code}
 
     instance c => k (t tvs) where b
@@ -98,13 +99,19 @@ mkInstanceRelatedIds dfun_name clas inst_tyvars inst_tys inst_decl_theta
     sc_theta' = instantiateThetaTy (zipTyVarEnv class_tyvars inst_tys) sc_theta
 
     dfun_theta = case inst_decl_theta of
-			[]    -> []	-- If inst_decl_theta is empty, then we don't
+		   []    -> []	-- If inst_decl_theta is empty, then we don't
 					-- want to have any dict arguments, so that we can
 					-- expose the constant methods.
 
-			other -> inst_decl_theta ++ sc_theta'
-					-- Otherwise we pass the superclass dictionaries to
-					-- the dictionary function; the Mark Jones optimisation.
+		   other -> nub (inst_decl_theta ++ sc_theta')
+				-- Otherwise we pass the superclass dictionaries to
+				-- the dictionary function; the Mark Jones optimisation.
+				--
+				-- NOTE the "nub".  I got caught by this one:
+				--   class Monad m => MonadT t m where ...
+				--   instance Monad m => MonadT (EnvT env) m where ...
+				-- Here, the inst_decl_theta has (Monad m); but so
+				-- does the sc_theta'!
 
     dfun_ty = mkSigmaTy inst_tyvars dfun_theta (mkDictTy clas inst_tys)
 

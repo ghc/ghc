@@ -4,7 +4,7 @@
 \section[TcPat]{Typechecking patterns}
 
 \begin{code}
-module TcPat ( tcPat ) where
+module TcPat ( tcPat, badFieldsCon ) where
 
 #include "HsVersions.h"
 
@@ -22,12 +22,13 @@ import TcEnv		( TcIdOcc(..), tcLookupGlobalValue, tcLookupGlobalValueByKey,
 			  tcLookupLocalValueOK, tcInstId
 			)
 import TcType 		( TcType, TcMaybe, newTyVarTy, newTyVarTys )
+import FieldLabel	( fieldLabelName )
 import Unify 		( unifyTauTy, unifyTauTyList, unifyTauTyLists )
 
 import Maybes		( maybeToBool )
 import Bag		( Bag )
 import CmdLineOpts	( opt_IrrefutableTuples )
-import Id		( GenId, idType, Id )
+import Id		( GenId, idType, Id, dataConFieldLabels )
 import Kind		( Kind, mkBoxedTypeKind, mkTypeKind )
 import Type		( splitFunTys, splitRhoTy,
 			  splitFunTy_maybe, splitAlgTyConApp_maybe,
@@ -194,7 +195,13 @@ tcPat pat_in@(RecPatIn name rpats)
 	     -- behave differently when called, not when used for
 	     -- matching.
 	(_, record_ty) = splitFunTys con_tau
+
+	field_names = map fieldLabelName (dataConFieldLabels con_id)
+	bad_fields  = [f | (f,_,_) <- rpats, not (f `elem` field_names)]
     in
+	-- Check that all the fields are from this constructor
+    checkTc (null bad_fields) (badFieldsCon name bad_fields)	`thenTc_`
+    
 	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (splitAlgTyConApp_maybe record_ty) )
 
@@ -365,7 +372,6 @@ matchConArgTys con arg_tys
     returnTc (con_id, con_result)
 \end{code}
 
-
 % =================================================
 
 Errors and contexts
@@ -381,4 +387,10 @@ recordLabel field_label
 recordRhs field_label pat
   = hang (ptext SLIT("In the record field pattern"))
 	 4 (sep [ppr field_label, char '=', ppr pat])
+
+badFieldsCon :: Name -> [Name] -> SDoc
+badFieldsCon con fields
+  = hsep [ptext SLIT("Constructor") <+> quotes (ppr con),
+	  ptext SLIT("does not have field(s):"), pprQuotedList fields]
 \end{code}
+

@@ -82,8 +82,11 @@ addListToUFM	:: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
 addToUFM_Directly
 		:: UniqFM elt -> Unique -> elt -> UniqFM elt
 
-addToUFM_C	:: Uniquable key => (elt -> elt -> elt)
-			   -> UniqFM elt -> key -> elt -> UniqFM elt
+addToUFM_C	:: Uniquable key => (elt -> elt -> elt)	-- old -> new -> result
+			   -> UniqFM elt 		-- old
+			   -> key -> elt 		-- new
+			   -> UniqFM elt		-- result
+
 addListToUFM_C	:: Uniquable key => (elt -> elt -> elt)
 			   -> UniqFM elt -> [(key,elt)]
 			   -> UniqFM elt

@@ -281,12 +281,23 @@ filterImports mod (Just (want_hiding, import_items)) avails
       = addErrRn (badImportItemErr mod item)	`thenRn_`
 	returnRn NotAvailable
 
-      | otherwise   = returnRn filtered_avail
+      | dodgy_import = addWarnRn (dodgyImportWarn mod item)	`thenRn_`
+		       returnRn filtered_avail
+
+      | otherwise    = returnRn filtered_avail
 		
       where
 	maybe_in_import_avails = lookupFM import_fm (ieOcc item)
 	Just avail	       = maybe_in_import_avails
 	filtered_avail	       = filterAvail item avail
+	dodgy_import 	       = case (item, avail) of
+				   (IEThingAll _, AvailTC _ [n]) -> True
+					-- This occurs when you import T(..), but
+					-- only export T abstractly.  The single [n]
+					-- in the AvailTC is the type or class itself
+					
+				   other -> False
+					
 \end{code}
 
 
@@ -603,6 +614,11 @@ mk_export_fn avails
 badImportItemErr mod ie
   = sep [ptext SLIT("Module"), quotes (pprModule mod), 
 	 ptext SLIT("does not export"), quotes (ppr ie)]
+
+dodgyImportWarn mod (IEThingAll tc)
+  = sep [ptext SLIT("Module") <+> quotes (pprModule mod) <+> ptext SLIT("exports") <+> quotes (ppr tc), 
+	 ptext SLIT("with no constructors/class operations;"),
+	 ptext SLIT("yet it is imported with a (..)")]
 
 modExportErr mod
   = hsep [ ptext SLIT("Unknown module in export list: module"), quotes (pprModule mod)]

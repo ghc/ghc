@@ -717,7 +717,7 @@ classTyVarNotInOpTyErr clas_tyvar sig
 	 4 (ppr sig)
 
 dupClassAssertWarn ctxt (assertion : dups)
-  = sep [hsep [ptext SLIT("Duplicated class assertion"), 
+  = sep [hsep [ptext SLIT("Duplicate class assertion"), 
 	       quotes (pprClassAssertion assertion),
 	       ptext SLIT("in the context:")],
 	 nest 4 (pprContext ctxt)]

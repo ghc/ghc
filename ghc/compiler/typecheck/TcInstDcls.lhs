@@ -39,7 +39,7 @@ import TcKind		( TcKind, unifyKind )
 import TcMonoType	( tcHsType )
 import TcSimplify	( tcSimplifyAndCheck )
 import TcType		( TcType, TcTyVar, TcTyVarSet, 
-			  zonkSigTyVar, tcInstSigTyVars, tcInstType, tcInstTheta
+			  zonkSigTyVar, tcInstSigType, tcInstTheta
 			)
 
 import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
@@ -47,8 +47,8 @@ import Bag		( emptyBag, unitBag, unionBags, unionManyBags,
 			)
 import CmdLineOpts	( opt_GlasgowExts )
 import Class		( classBigSig, Class )
-import Id		( isNullaryDataCon, dataConArgTys, replaceIdInfo, idName, Id )
-import Maybes 		( maybeToBool, seqMaybe, catMaybes )
+import Id		( isNullaryDataCon, dataConArgTys, replaceIdInfo, idName, idType, Id )
+import Maybes 		( maybeToBool, seqMaybe, catMaybes, expectJust )
 import Name		( nameOccName, mkLocalName,
 			  isLocallyDefined, Module,
 			  NamedThing(..)
@@ -61,7 +61,7 @@ import Type		( Type, ThetaType, isUnpointedType,
 			  splitSigmaTy, isTyVarTy, mkSigmaTy,
 			  splitTyConApp_maybe, splitDictTy_maybe,
 			  splitAlgTyConApp_maybe, splitRhoTy,
-			  tyVarsOfTypes
+			  tyVarsOfTypes, mkTyVarTys,
 			)
 import TyVar		( zipTyVarEnv, mkTyVarSet, tyVarSetToList, TyVar )
 import TysPrim		( byteArrayPrimTyCon, mutableByteArrayPrimTyCon )
@@ -187,8 +187,9 @@ tcInstDecl1 unf_env mod_name (InstDecl poly_ty binds uprags (Just dfun_name) src
 				     Just pair -> pair
     in
 
-	-- Check for respectable instance type
-    scrutiniseInstanceType clas inst_tys	`thenTc_`
+	-- Check for respectable instance type, and context
+    scrutiniseInstanceHead clas inst_tys	`thenNF_Tc_`
+    mapNF_Tc scrutiniseInstanceConstraint theta	`thenNF_Tc_`
 
 	-- Make the dfun id and constant-method ids
     let
@@ -315,22 +316,26 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
     recoverNF_Tc (returnNF_Tc (emptyLIE, EmptyMonoBinds))  $
     tcAddSrcLoc locn					   $
 
-	-- Get the class signature
-    let 
-	origin = InstanceDeclOrigin
+	-- Instantiate the instance decl with tc-style type variables
+    tcInstSigType (idType dfun_id)	`thenNF_Tc` \ dfun_ty' ->
+    let
+	(inst_tyvars', 
+	 dfun_theta', dict_ty') = splitSigmaTy dfun_ty'
+
+	(clas, inst_tys')	= expectJust "tcInstDecl2" (splitDictTy_maybe dict_ty')
+
         (class_tyvars,
 	 sc_theta, sc_sel_ids,
-	 op_sel_ids, defm_ids) = classBigSig clas
-    in
-      
-	-- Instantiate the instance decl with tc-style type variables
-    tcInstSigTyVars inst_tyvars		`thenNF_Tc` \ (inst_tyvars', _, tenv) ->
-    mapNF_Tc (tcInstType tenv) inst_tys	`thenNF_Tc` \ inst_tys' ->
-    tcInstTheta tenv dfun_theta		`thenNF_Tc` \ dfun_theta' ->
-    tcInstTheta tenv inst_decl_theta	`thenNF_Tc` \ inst_decl_theta' ->
+	 op_sel_ids, defm_ids)  = classBigSig clas
 
-         -- Instantiate the super-class context with inst_tys
-    tcInstTheta (zipTyVarEnv class_tyvars inst_tys') sc_theta		`thenNF_Tc` \ sc_theta' ->
+	origin			= InstanceDeclOrigin
+    in
+	-- Instantiate the theta found in the original instance decl
+    tcInstTheta (zipTyVarEnv inst_tyvars (mkTyVarTys inst_tyvars'))
+		inst_decl_theta					`thenNF_Tc` \ inst_decl_theta' ->
+
+         -- Instantiate the super-class context with the instance types
+    tcInstTheta (zipTyVarEnv class_tyvars inst_tys') sc_theta	`thenNF_Tc` \ sc_theta' ->
 
 	 -- Create dictionary Ids from the specified instance contexts.
     newDicts origin sc_theta'		`thenNF_Tc` \ (sc_dicts,        sc_dict_ids) ->
@@ -466,7 +471,7 @@ tcInstDecl2 (InstInfo clas inst_tyvars inst_tys
 %*									*
 %************************************************************************
 
-@scrutiniseInstanceType@ checks the type {\em and} its syntactic constraints:
+@scrutiniseInstanceHead@ checks the type {\em and} its syntactic constraints:
 it must normally look like: @instance Foo (Tycon a b c ...) ...@
 
 The exceptions to this syntactic checking: (1)~if the @GlasgowExts@
@@ -476,7 +481,11 @@ compiled elsewhere). In these cases, we let them go through anyway.
 We can also have instances for functions: @instance Foo (a -> b) ...@.
 
 \begin{code}
-scrutiniseInstanceType clas inst_taus
+scrutiniseInstanceConstraint (clas, tys)
+  | all isTyVarTy tys = returnNF_Tc ()
+  | otherwise	      = addErrTc (instConstraintErr clas tys)
+
+scrutiniseInstanceHead clas inst_taus
   |	-- CCALL CHECK (a).... urgh!
 	-- To verify that a user declaration of a CCallable/CReturnable 
 	-- instance is OK, we must be able to see the constructor(s)
@@ -486,20 +495,20 @@ scrutiniseInstanceType clas inst_taus
         --
      (uniqueOf clas == cCallableClassKey || uniqueOf clas == cReturnableClassKey)
   && is_alg_tycon_app && not constructors_visible
-  = failWithTc (invisibleDataConPrimCCallErr clas first_inst_tau)
+  = addErrTc (invisibleDataConPrimCCallErr clas first_inst_tau)
 
   |	-- CCALL CHECK (b) 
 	-- A user declaration of a CCallable/CReturnable instance
 	-- must be for a "boxed primitive" type.
     (uniqueOf clas == cCallableClassKey   && not (ccallable_type   first_inst_tau)) ||
     (uniqueOf clas == cReturnableClassKey && not (creturnable_type first_inst_tau))
-  = failWithTc (nonBoxedPrimCCallErr clas first_inst_tau)
+  = addErrTc (nonBoxedPrimCCallErr clas first_inst_tau)
 
   	-- DERIVING CHECK
 	-- It is obviously illegal to have an explicit instance
 	-- for something that we are also planning to `derive'
   | maybeToBool alg_tycon_app_maybe && clas `elem` (tyConDerivings alg_tycon)
-  = failWithTc (derivingWhenInstanceExistsErr clas first_inst_tau)
+  = addErrTc (derivingWhenInstanceExistsErr clas first_inst_tau)
 	   -- Kind check will have ensured inst_taus is of length 1
 
 	-- WITH HASKELL 1.4, MUST HAVE C (T a b c)
@@ -511,13 +520,13 @@ scrutiniseInstanceType clas inst_taus
 	  length (tyVarSetToList (tyVarsOfTypes arg_tys)) == length arg_tys
 		 -- This last condition checks that all the type variables are distinct
      )
-  = failWithTc (instTypeErr clas inst_taus
+  = addErrTc (instTypeErr clas inst_taus
 			(text "the instance type must be of form (T a b c)" $$
 			 text "where T is not a synonym, and a,b,c are distinct type variables")
     )
 
   | otherwise
-  = returnTc ()
+  = returnNF_Tc ()
 
   where
     (first_inst_tau : _)       = inst_taus
@@ -566,7 +575,12 @@ creturnable_type ty = maybeToBool (maybeBoxedPrimType ty) ||
 \end{code}
 
 \begin{code}
-
+instConstraintErr clas tys
+  = hang (ptext SLIT("Illegal constaint") <+> 
+	  quotes (pprConstraint clas tys) <+> 
+	  ptext SLIT("in instance context"))
+	 4 (ptext SLIT("(Instance contexts must constrain only type variables)"))
+	
 instTypeErr clas tys msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes (pprConstraint clas tys),
 	 nest 4 (parens msg)
