@@ -830,14 +830,14 @@ panic x = error ("panic! (the `impossible' happened):\n\t"
 	      ++ "Please report it as a compiler bug "
 	      ++ "to glasgow-haskell-bugs@dcs.gla.ac.uk.\n\n" )
 
-pprPanic heading pretty_msg = panic (heading++(show pretty_msg))
-pprError heading pretty_msg = error (heading++(show pretty_msg))
+pprPanic heading pretty_msg = panic (heading++ " " ++ (show pretty_msg))
+pprError heading pretty_msg = error (heading++ " " ++ (show pretty_msg))
 #if __GLASGOW_HASKELL__ == 201
-pprTrace heading pretty_msg = GHCbase.trace (heading++(show pretty_msg))
+pprTrace heading pretty_msg = GHCbase.trace (heading++" "++(show pretty_msg))
 #elif __GLASGOW_HASKELL__ >= 202
-pprTrace heading pretty_msg = GlaExts.trace (heading++(show pretty_msg))
+pprTrace heading pretty_msg = GlaExts.trace (heading++" "++(show pretty_msg))
 #else
-pprTrace heading pretty_msg = trace (heading++(show pretty_msg))
+pprTrace heading pretty_msg = trace (heading++" "++(show pretty_msg))
 #endif
 
 -- #-versions because panic can't return an unboxed int, and that's
