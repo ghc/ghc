@@ -3,9 +3,9 @@ module Main (main) where
 import IOExts ( unsafePerformIO )
 
 c :: Double -> Double
-c x = sin x
+c x = cos x
   where
-    sin :: Double -> Double
-    sin x = unsafePerformIO (_ccall_ sin x)
+    cos :: Double -> Double
+    cos x = unsafePerformIO (_ccall_ cos x)
 
 main = putStr (shows (c 0.0) "\n")
