@@ -5,7 +5,7 @@ Testing Enum Int8:
     pred (1::Int8) = 0
     pred (maxBound::Int8) = 126
     pred (minBound::Int8) = error "Enum.pred{Int8}: tried to take `pred' of minBound"
-    (map (toEnum::Int->Int8) [1, toInt (minBound::Int8), toInt (maxBound::Int8)]) = [1,-128,127]
+    (map (toEnum::Int->Int8) [1, fromIntegral (minBound::Int8), fromIntegral (maxBound::Int8)]) = [1,-128,127]
     (toEnum (maxBound::Int))::Int8 = error "Enum.toEnum{Int8}: tag (2147483647) is outside of bounds (-128,127)"
     (map fromEnum [(1::Int8),minBound,maxBound]) = [1,-128,127]
     (take 7 [(1::Int8)..]) = [1,2,3,4,5,6,7]
@@ -40,7 +40,7 @@ Testing Enum Int16:
     pred (1::Int16) = 0
     pred (maxBound::Int16) = 32766
     pred (minBound::Int16) = error "Enum.pred{Int16}: tried to take `pred' of minBound"
-    (map (toEnum::Int->Int16) [1, toInt (minBound::Int16), toInt (maxBound::Int16)]) = [1,-32768,32767]
+    (map (toEnum::Int->Int16) [1, fromIntegral (minBound::Int16), fromIntegral (maxBound::Int16)]) = [1,-32768,32767]
     (toEnum (maxBound::Int))::Int16 = error "Enum.toEnum{Int16}: tag (2147483647) is outside of bounds (-32768,32767)"
     (map fromEnum [(1::Int16),minBound,maxBound]) = [1,-32768,32767]
     (take 7 [(1::Int16)..]) = [1,2,3,4,5,6,7]
@@ -75,7 +75,7 @@ Testing Enum Int32:
     pred (1::Int32) = 0
     pred (maxBound::Int32) = 2147483646
     pred (minBound::Int32) = error "Enum.pred{Int32}: tried to take `pred' of minBound"
-    (map (toEnum::Int->Int32) [1, toInt (minBound::Int32), toInt (maxBound::Int32)]) = [1,-2147483648,2147483647]
+    (map (toEnum::Int->Int32) [1, fromIntegral (minBound::Int32), fromIntegral (maxBound::Int32)]) = [1,-2147483648,2147483647]
     (toEnum (maxBound::Int))::Int32 = 2147483647
     (map fromEnum [(1::Int32),minBound,maxBound]) = [1,-2147483648,2147483647]
     (take 7 [(1::Int32)..]) = [1,2,3,4,5,6,7]
@@ -110,9 +110,9 @@ Testing Enum Int64:
     pred (1::Int64) = 0
     pred (maxBound::Int64) = 9223372036854775806
     pred (minBound::Int64) = error "Enum.pred{Int64}: tried to take `pred' of minBound"
-    (map (toEnum::Int->Int64) [1, toInt (minBound::Int64), toInt (maxBound::Int64)]) = [1,0,-1]
+    (map (toEnum::Int->Int64) [1, fromIntegral (minBound::Int64), fromIntegral (maxBound::Int64)]) = [1,0,-1]
     (toEnum (maxBound::Int))::Int64 = 2147483647
-    (map fromEnum [(1::Int64),fromInt (minBound::Int) ,fromInt (maxBound::Int)]) = [1,-2147483648,2147483647]
+    (map fromEnum [(1::Int64),fromIntegral (minBound::Int) ,fromIntegral (maxBound::Int)]) = [1,-2147483648,2147483647]
     fromEnum (maxBound::Int64) = error "Enum.fromEnum{Int64}: value (9223372036854775807) is outside of Int's bounds (-2147483648,2147483647)"
     (take 7 [(1::Int64)..]) = [1,2,3,4,5,6,7]
     (take 7 [((maxBound::Int64)-5)..]) = [9223372036854775802,9223372036854775803,9223372036854775804,9223372036854775805,9223372036854775806,9223372036854775807]

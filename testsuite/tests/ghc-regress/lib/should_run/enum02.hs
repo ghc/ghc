@@ -29,7 +29,7 @@ testEnumInt8 = do
   mayBomb   (printTest (pred (minBound::Int8))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Int8) [1, toInt (minBound::Int8), toInt (maxBound::Int8)]))
+  printTest ((map (toEnum::Int->Int8) [1, fromIntegral (minBound::Int8), fromIntegral (maxBound::Int8)]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Int8))
 
      -- fromEnum
@@ -87,7 +87,7 @@ testEnumInt16 = do
   mayBomb   (printTest (pred (minBound::Int16))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Int16) [1, toInt (minBound::Int16), toInt (maxBound::Int16)]))
+  printTest ((map (toEnum::Int->Int16) [1, fromIntegral (minBound::Int16), fromIntegral (maxBound::Int16)]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Int16))
 
 
@@ -146,7 +146,7 @@ testEnumInt32 = do
   mayBomb   (printTest (pred (minBound::Int32))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Int32) [1, toInt (minBound::Int32), toInt (maxBound::Int32)]))
+  printTest ((map (toEnum::Int->Int32) [1, fromIntegral (minBound::Int32), fromIntegral (maxBound::Int32)]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Int32))
 
      -- fromEnum
@@ -204,11 +204,11 @@ testEnumInt64 = do
   mayBomb   (printTest (pred (minBound::Int64))) 
 
      -- toEnum
-  printTest ((map (toEnum::Int->Int64) [1, toInt (minBound::Int64), toInt (maxBound::Int64)]))
+  printTest ((map (toEnum::Int->Int64) [1, fromIntegral (minBound::Int64), fromIntegral (maxBound::Int64)]))
   mayBomb   (printTest ((toEnum (maxBound::Int))::Int64))
 
      -- fromEnum
-  printTest ((map fromEnum [(1::Int64),fromInt (minBound::Int) ,fromInt (maxBound::Int)]))
+  printTest ((map fromEnum [(1::Int64),fromIntegral (minBound::Int) ,fromIntegral (maxBound::Int)]))
   mayBomb   (printTest (fromEnum (maxBound::Int64)))
 
      -- [x..] aka enumFrom
