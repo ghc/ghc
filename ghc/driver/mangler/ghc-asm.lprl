@@ -184,8 +184,8 @@ sub init_TARGET_STUFF {
     $T_X86_PRE_LLBL	    = '.L';
     $T_X86_BADJMP   = '^\tjmp\s+[^\.\*]';
 
-    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*)\n)';
-    $T_COPY_DIRVS   = '^\s*\.(globl|type|size)';
+    $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s+\d+(,\s*0x90)?|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*|\.local.*)\n)';
+    $T_COPY_DIRVS   = '^\s*\.(globl|type|size|local)';
 
     if ( $TargetPlatform =~ /freebsd|netbsd/ ) {
         $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
@@ -457,12 +457,17 @@ sub mangle_asm {
 	if ( $TargetPlatform =~ /^mips-/ 
 	  && /^\t\.(globl\S+\.text|comm\t)/ ) {
 	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/;
-  
-	# As a temporary solution for compiling "foreign export" declarations,
-	# we use global variables to pass arguments from C to STG land.
-	# These declarations live in the .hc file and not in the generated C
-	# stub file, so we let them pass through here.
-	} elsif ( /^\t\.comm\t__fexp_.*$/ ) {
+	# Treat .comm variables as data.  These show up in two (known) places:
+	#
+	#    - the module_registered variable used in the __stginit fragment.
+	#      even though these are declared static and initialised, gcc 3.3
+	#      likes to make them .comm, presumably to save space in the
+	#      object file.
+	#
+	#    - global variables used to pass arguments from C to STG in
+	#      a foreign export.  (is this still true? --SDM)
+	# 
+	} elsif ( /^\t\.comm.*$/ ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
@@ -561,15 +566,6 @@ sub mangle_asm {
 	    $chksymb[$i] = $1;
 
 	    $vectorchk{$1} = $i;
-
-	# As a temporary solution for compiling "foreign export" declarations,
-	# we use global variables to pass arguments from C to STG land.
-	# These declarations live in the .hc file and not in the generated C
-	# stub file, so we let them pass through here.
-	} elsif ( /^[\t ]+\.comm[\t ]+__fexp_.*$/ ) {
-	    $chk[++$i]   = $_;
-	    $chkcat[$i]  = 'data';
-	    $chksymb[$i] = '';
 
 	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
 	     &&   /^[A-Za-z0-9][A-Za-z0-9_]*:/ ) {
