@@ -253,7 +253,9 @@ show-install-setup:
 
 install-docs : install-dirs-docs
 	if test -d share/html ; then $(CP) -r share/html/* $(htmldir) ; fi
-	if test -f share/*.ps ; then $(CP) share/*.ps $(psdir) ; fi
+	for i in share/*.ps; do \
+		$(CP) $$i $(psdir) ; \
+	done
 
 install-dirs-docs:
 	$(INSTALL_DIR) $(htmldir) 
