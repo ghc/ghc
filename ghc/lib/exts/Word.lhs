@@ -66,6 +66,9 @@ module Word
 	, sizeofWord32
 	, sizeofWord64
 
+	-- non-standard, GHC specific
+	, wordToInt
+
 	) where
 
 import GlaExts
@@ -96,6 +99,9 @@ intToWord16 = word32ToWord16 . intToWord32
 intToWord32 (I# x)   = W32# ((int2Word# x) `and#` (case (maxBound::Word32) of W32# x# -> x#))
 --intToWord32 (I# x)   = W32# (int2Word# x)
 word32ToInt (W32# x) = I#   (word2Int# x)
+
+wordToInt :: Word -> Int
+wordToInt (W# w#) = I# (word2Int# w#)
 
 \end{code}
 

@@ -31,7 +31,8 @@ module Int
 	-- plus Eq, Ord, Num, Bounded, Real, Integral, Ix, Enum, Read,
 	--  Show and Bits instances for each of Int8, Int16, Int32 and Int64
 
-	-- The "official" place to get these from is Addr.
+	-- The "official" place to get these from is Addr, importing
+	-- them from Int is a non-standard thing to do.
 	, indexInt8OffAddr
 	, indexInt16OffAddr
 	, indexInt32OffAddr
@@ -51,6 +52,9 @@ module Int
 	, sizeofInt16
 	, sizeofInt32
 	, sizeofInt64
+	
+	-- non-standard, GHC specific
+	, intToWord
 
 	) where
 
@@ -88,6 +92,10 @@ int16ToInt8  (I16# x) = I8#  x
 int16ToInt32 (I16# x) = I32# x
 int32ToInt8  (I32# x) = I8#  x
 int32ToInt16 (I32# x) = I16# x
+
+--GHC specific
+intToWord :: Int -> Word
+intToWord (I# i#) = W# (int2Word# i#)
 \end{code}
 
 \subsection[Int8]{The @Int8@ interface}
