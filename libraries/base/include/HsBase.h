@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsBase.h,v 1.27 2003/09/21 22:20:57 wolfgang Exp $
+ * $Id: HsBase.h,v 1.28 2003/09/24 10:32:12 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -616,6 +616,11 @@ __hscore_f_setfl( void )
   return 0;
 #endif
 }
+
+#if HAVE_TERMIOS_H
+// defined in rts/RtsStartup.c.
+extern struct termios saved_termios[];
+#endif
 
 INLINE int __hscore_hs_fileno (FILE *f) { return fileno (f); }
 

@@ -173,29 +173,22 @@ fdIsTTY fd = c_isatty (fromIntegral fd) >>= return.toBool
 
 setEcho :: Int -> Bool -> IO ()
 setEcho fd on = do
-  allocaBytes sizeof_termios  $ \p_tios -> do
-    throwErrnoIfMinus1Retry "setEcho"
-	(c_tcgetattr (fromIntegral fd) p_tios)
+  tcSetAttr fd $ \ p_tios -> do
     c_lflag <- c_lflag p_tios :: IO CTcflag
     let new_c_lflag
 	 | on        = c_lflag .|. fromIntegral const_echo
 	 | otherwise = c_lflag .&. complement (fromIntegral const_echo)
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
-    tcSetAttr fd const_tcsanow p_tios
 
 getEcho :: Int -> IO Bool
 getEcho fd = do
-  allocaBytes sizeof_termios  $ \p_tios -> do
-    throwErrnoIfMinus1Retry "setEcho"
-	(c_tcgetattr (fromIntegral fd) p_tios)
+  tcSetAttr fd $ \ p_tios -> do
     c_lflag <- c_lflag p_tios :: IO CTcflag
     return ((c_lflag .&. fromIntegral const_echo) /= 0)
 
 setCooked :: Int -> Bool -> IO ()
 setCooked fd cooked = 
-  allocaBytes sizeof_termios  $ \p_tios -> do
-    throwErrnoIfMinus1Retry "setCooked"
-	(c_tcgetattr (fromIntegral fd) p_tios)
+  tcSetAttr fd $ \ p_tios -> do
 
     -- turn on/off ICANON
     c_lflag <- c_lflag p_tios :: IO CTcflag
@@ -211,25 +204,38 @@ setCooked fd cooked =
 	    poke vmin  1
 	    poke vtime 0
 
-    tcSetAttr fd const_tcsanow p_tios
+tcSetAttr :: FD -> (Ptr CTermios -> IO a) -> IO a
+tcSetAttr fd fun = do
+     allocaBytes sizeof_termios  $ \p_tios -> do
+	throwErrnoIfMinus1Retry "tcSetAttr"
+	   (c_tcgetattr (fromIntegral fd) p_tios)
 
--- tcsetattr() when invoked by a background process causes the process
--- to be sent SIGTTOU regardless of whether the process has TOSTOP set
--- in its terminal flags (try it...).  This function provides a
--- wrapper which temporarily blocks SIGTTOU around the call, making it
--- transparent.
+	-- Save a copy of termios, if this is a standard file descriptor.
+	-- These terminal settings are restored in hs_exit().
+	when (fd <= 2) $ do
+	  p <- peekElemOff saved_termios fd
+	  when (p == nullPtr) $ do
+	     saved_tios <- mallocBytes sizeof_termios
+	     copyBytes saved_tios p_tios sizeof_termios
+	     pokeElemOff saved_termios fd saved_tios
 
-tcSetAttr :: FD -> CInt -> Ptr CTermios -> IO ()
-tcSetAttr fd options p_tios = do
-  allocaBytes sizeof_sigset_t $ \ p_sigset -> do
-  allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
-     c_sigemptyset p_sigset
-     c_sigaddset   p_sigset const_sigttou
-     c_sigprocmask const_sig_block p_sigset p_old_sigset
-     throwErrnoIfMinus1Retry_ "tcSetAttr" $
-	 c_tcsetattr (fromIntegral fd) options p_tios
-     c_sigprocmask const_sig_setmask p_old_sigset nullPtr
-     return ()
+	-- tcsetattr() when invoked by a background process causes the process
+	-- to be sent SIGTTOU regardless of whether the process has TOSTOP set
+	-- in its terminal flags (try it...).  This function provides a
+	-- wrapper which temporarily blocks SIGTTOU around the call, making it
+	-- transparent.
+	allocaBytes sizeof_sigset_t $ \ p_sigset -> do
+	allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
+	     c_sigemptyset p_sigset
+	     c_sigaddset   p_sigset const_sigttou
+	     c_sigprocmask const_sig_block p_sigset p_old_sigset
+	     r <- fun p_tios  -- do the business
+	     throwErrnoIfMinus1Retry_ "tcSetAttr" $
+		 c_tcsetattr (fromIntegral fd) const_tcsanow p_tios
+	     c_sigprocmask const_sig_setmask p_old_sigset nullPtr
+	     return r
+
+foreign import ccall "&saved_termios" saved_termios :: Ptr (Ptr CTermios)
 
 #else
 
