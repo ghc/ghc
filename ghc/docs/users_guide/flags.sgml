@@ -325,6 +325,37 @@
     </sect2>
 
     <sect2>
+      <title>Interactive-mode options (<xref linkend="ghci-dot-files">)</title>
+      
+      <informaltable>
+	<tgroup cols=3 align=left colsep=1 rowsep=1>
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-ignore-dot-ghci</option></entry>
+	      <entry>Disable reading of <filename>.ghci</filename> files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-read-dot-ghci</option></entry>
+	      <entry>Enable reading of <filename>.ghci</filename> files</entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
       <title>Packages (<xref linkend="packages">)</title>
       <informaltable>
 	<tgroup cols=3 align=left colsep=1 rowsep=1>
@@ -338,26 +369,14 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>--add-package</option></entry>
-	      <entry>Install a new package</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>--delete-package</option> <replaceable>name</replaceable></entry>
-	      <entry>Delete package entry <replaceable>name</replaceable></entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>--list-packages</option></entry>
-	      <entry>List installed packages</entry>
-	      <entry>static</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-package</option> <replaceable>name</replaceable></entry>
 	      <entry>Use package <replaceable>name</replaceable></entry>
+	      <entry>static</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-package-conf</option> <replaceable>file</replaceable></entry>
+	      <entry>Load more packages from <replaceable>file</replaceable></entry>
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
