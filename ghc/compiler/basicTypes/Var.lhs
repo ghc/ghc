@@ -66,7 +66,7 @@ in its @VarDetails@.
 \begin{code}
 data Var
   = Var {
-	varName    :: Name,
+	varName    :: !Name,
 	realUnique :: FastInt,		-- Key for fast comparison
 					-- Identical to the Unique in the name,
 					-- cached here for speed
