@@ -1529,7 +1529,8 @@ addIrred AddSCs avails irred = ASSERT2( not (irred `elemFM` avails), ppr irred $
 addAvailAndSCs :: Avails -> Inst -> Avail -> TcM Avails
 addAvailAndSCs avails inst avail
   | not (isClassDict inst) = returnM avails1
-  | otherwise		   = addSCs is_loop avails1 inst 
+  | otherwise		   = traceTc (text "addAvailAndSCs" <+> vcat [ppr inst, ppr deps]) `thenM_`
+			     addSCs is_loop avails1 inst 
   where
     avails1 = addToFM avails inst avail
     is_loop inst = inst `elem` deps	-- Note: this compares by *type*, not by Unique
@@ -1562,13 +1563,13 @@ addSCs is_loop avails dict
     sc_theta' = substTheta (mkTopTyVarSubst tyvars tys) sc_theta
 
     add_sc avails (sc_dict, sc_sel)	-- Add it, and its superclasses
+      | is_loop sc_dict
+      = returnM avails	-- See Note [SUPERCLASS-LOOP]
+      | otherwise
       = case lookupFM avails sc_dict of
-	  Just (Given _ _) -> returnM avails	-- Given is cheaper than
-							--   a superclass selection
-	  Just other | is_loop sc_dict -> returnM avails	-- See Note [SUPERCLASS-LOOP]
-		     | otherwise       -> returnM avails'	-- SCs already added
-
-	  Nothing -> addSCs is_loop avails' sc_dict
+	  Just (Given _ _) -> returnM avails	-- Given is cheaper than superclass selection
+	  Just other 	   -> returnM avails'	-- SCs already added
+	  Nothing 	   -> addSCs is_loop avails' sc_dict
       where
 	sc_sel_rhs = DictApp (TyApp (HsVar sc_sel) tys) [instToId dict]
 	avail      = Rhs sc_sel_rhs [dict]
@@ -1587,6 +1588,14 @@ Then we'll use the instance decl to deduce C [a] and then add the
 superclasses of C [a] to avails.  But we must not overwrite the binding
 for d1:Ord a (which is given) with a superclass selection or we'll just
 build a loop! 
+
+Here's another variant, immortalised in tcrun020
+	class Monad m => C1 m
+	class C1 m => C2 m x
+	instance C2 Maybe Bool
+For the instance decl we need to build (C1 Maybe), and it's no good if
+we run around and add (C2 Maybe Bool) and its superclasses to the avails 
+before we search for C1 Maybe.
 
 Here's another example 
  	class Eq b => Foo a b
