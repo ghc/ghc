@@ -392,7 +392,7 @@ cmLoadModule cmstate1 rootname
 				mg2_with_srcimps
 	-- when (verb >= 2) $
         --    putStrLn (showSDoc (text "Valid linkables:" 
-        --                       <+> ppr valid_linkables))
+        -- 			 <+> ppr valid_linkables))
 
         -- Figure out a stable set of modules which can be retained
         -- the top level envs, to avoid upsweeping them.  Goes to a
@@ -575,7 +575,10 @@ getValidLinkablesSCC old_linkables all_home_mods new_linkables scc0
 	  scc             = flattenSCC scc0
           scc_names       = map name_of_summary scc
 	  home_module m   = m `elem` all_home_mods && m `notElem` scc_names
-          scc_allhomeimps = nub (filter home_module (concatMap ms_allimps scc))
+          scc_allhomeimps = nub (filter home_module (concatMap ms_imps scc))
+		-- NOTE: ms_imps, not ms_allimps above.  We don't want to
+		-- force a module's SOURCE imports to be already compiled for
+		-- its object linkable to be valid.
 
 	  has_object m = case findModuleLinkable_maybe new_linkables m of
 			    Nothing -> False
@@ -639,7 +642,6 @@ getValidLinkable old_linkables objects_allowed new_linkables summary
 	      =  filter (\l -> linkableTime l > src_date) linkable
 
        return (valid_linkable ++ new_linkables)
-
 
 
 maybe_getFileLinkable :: ModuleName -> FilePath -> IO (Maybe Linkable)
