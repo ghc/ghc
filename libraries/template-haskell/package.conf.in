@@ -1,23 +1,30 @@
-Package {
-	name		= "template-haskell",
-	auto		= True,
-#ifdef INSTALLING
-	import_dirs	= [ "$libdir/imports" ],
-#else
-	import_dirs	= [ "$libdir/libraries/template-haskell" ],
-#endif
-	source_dirs	= [],
-#ifdef INSTALLING
-	library_dirs	= [ "$libdir" ],
-#else
-	library_dirs	= [ "$libdir/libraries/template-haskell" ],
-#endif
-	hs_libraries	= [ "HStemplate-haskell" ],
-	extra_libraries	= [],
-	include_dirs	= [],
-	c_includes	= [],
-	package_deps	= [ "base", "haskell98" ],
-	extra_ghc_opts	= [],
-	extra_cc_opts	= [],
-	extra_ld_opts	= []
-}
+name:		PACKAGE
+version:	VERSION
+license:	BSD3
+maintainer:	libraries@haskell.org
+exposed:	True
+
+exposed-modules:
+	Language.Haskell.TH.PprLib,
+	Language.Haskell.TH.Lib,
+	Language.Haskell.TH.Ppr,
+	Language.Haskell.TH.Syntax,
+	Language.Haskell.TH
+
+hidden-modules:
+
+import-dirs:	IMPORT_DIR
+library-dirs:	LIB_DIR
+hs-libraries:   "HStemplate-haskell"
+extra-libs:
+include-dirs:
+includes:		
+depends:	base, haskell98	
+extra-hugs-opts:
+extra-cc-opts:
+extra-ld-opts:
+framework-dirs:
+extra-frameworks:
+haddock-interfaces:
+haddock-html:
+

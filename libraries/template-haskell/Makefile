@@ -1,11 +1,12 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.1 2004/01/15 14:43:22 igloo Exp $
+# $Id: Makefile,v 1.2 2004/11/26 16:22:12 simonmar Exp $
 
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
 ALL_DIRS     = Language/Haskell Language/Haskell/TH
 PACKAGE      = template-haskell
+VERSION	     = 1.0
 PACKAGE_DEPS = base
 
 Language/Haskell/TH/Syntax_HC_OPTS += -fglasgow-exts
