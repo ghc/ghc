@@ -145,7 +145,7 @@ tcRnModule hsc_env pcs
    do { 	-- Deal with imports; sets tcg_rdr_env, tcg_imports
 	(rdr_env, imports) <- rnImports import_decls ;
 	updGblEnv ( \ gbl -> gbl { tcg_rdr_env = rdr_env,
-				   tcg_imports = imports }) 
+				   tcg_imports = tcg_imports gbl `plusImportAvails` imports }) 
 		     $ do {
 	traceRn (text "rn1") ;
 		-- Fail if there are any errors so far
@@ -172,7 +172,7 @@ tcRnModule hsc_env pcs
 	updGblEnv (\gbl -> gbl { tcg_deprecs = tcg_deprecs gbl `plusDeprecs` mod_deprecs })
 		  $ do {
 
-	traceRn (text "rn4") ;
+	traceRn (text "Rn4:" <+> ppr (imp_unqual (tcg_imports tcg_env))) ;
 		-- Process the export list
 	export_avails <- exportsFromAvail exports ;
 	updGblEnv (\gbl -> gbl { tcg_exports = export_avails })

@@ -14,7 +14,7 @@ import HscTypes		( HscEnv(..), PersistentCompilerState(..),
 			  GlobalRdrEnv, LocalRdrEnv, NameCache, FixityEnv,
 			  GhciMode, lookupType, unQualInScope )
 import TcRnTypes
-import Module		( Module, foldModuleEnv )
+import Module		( Module, moduleName, foldModuleEnv )
 import Name		( Name, isInternalName )
 import Type		( Type )
 import NameEnv		( extendNameEnvList )
@@ -140,7 +140,7 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
 		tcg_ist      = mkImpTypeEnv eps hpt,
 		tcg_inst_env = mkImpInstEnv dflags eps hpt,
 		tcg_exports  = [],
-		tcg_imports  = emptyImportAvails,
+		tcg_imports  = init_imports,
 		tcg_binds    = EmptyMonoBinds,
 		tcg_deprecs  = NoDeprecs,
 		tcg_insts    = [],
@@ -176,6 +176,13 @@ initTc  (HscEnv { hsc_mode   = ghci_mode,
     }
   where
     eps = pcs_EPS pcs
+
+    init_imports = mkImportAvails (moduleName mod) True []
+	-- Initialise tcg_imports with an empty set of bindings for
+	-- this module, so that if we see 'module M' in the export
+	-- list, and there are no bindings in M, we don't bleat 
+	-- "unknown module M".
+
 
 defaultDefaultTys :: [Type]
 defaultDefaultTys = [integerTy, doubleTy]
