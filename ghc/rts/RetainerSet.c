@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerSet.c,v 1.2 2001/11/26 16:54:21 simonmar Exp $
+ * $Id: RetainerSet.c,v 1.3 2002/07/18 09:12:36 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -9,6 +9,8 @@
  * ---------------------------------------------------------------------------*/
 
 #ifdef PROFILING
+
+#include <stdlib.h>
 
 #include "Rts.h"
 #include "RtsFlags.h"

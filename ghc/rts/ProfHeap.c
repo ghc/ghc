@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.36 2002/05/07 04:58:15 sof Exp $
+ * $Id: ProfHeap.c,v 1.37 2002/07/18 09:12:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -29,6 +29,8 @@
 #include "LdvProfile.h"
 #include "Arena.h"
 #include "Printer.h"
+
+#include <string.h>
 
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the

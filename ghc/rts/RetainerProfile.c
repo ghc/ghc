@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerProfile.c,v 1.4 2001/12/19 15:20:27 simonmar Exp $
+ * $Id: RetainerProfile.c,v 1.5 2002/07/18 09:12:35 simonmar Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -9,6 +9,8 @@
  * ---------------------------------------------------------------------------*/
 
 #ifdef PROFILING
+
+#include <stdio.h>
 
 #include "Rts.h"
 #include "RtsUtils.h"

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Proftimer.c,v 1.9 2001/12/12 14:31:43 simonmar Exp $
+ * $Id: Proftimer.c,v 1.10 2002/07/18 09:12:34 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,6 +10,8 @@
 #if defined (PROFILING)
 
 #include "PosixSource.h"
+
+#include <stdio.h>
 
 #include "Rts.h"
 #include "Profiling.h"
