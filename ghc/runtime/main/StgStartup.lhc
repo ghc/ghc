@@ -193,12 +193,18 @@ SET_STATIC_HDR(EmptySPTable_closure,EmptyStablePointerTable_info,CC_SUBSUMED,,ED
 /* End of SP stuff */
 #endif /* !PAR */
 
+/* Not a natural home for these, but
+   the following symbols may be referenced in
+   an object file, but never entered
+*/
+P_ GHC_void_closure = (P_) 0xbadbadbaL;
+P_ GHC_ZcCCallable_static_info = (P_) 0xbadbadbaL;
+P_ GHC_ZcCReturnable_static_info = (P_) 0xbadbadbaL;
 
 /* the IoWorld token to start the whole thing off */
 /* Question: this is just an amusing hex code isn't it
    -- or does it mean something? ADR */
 P_ realWorldZh_closure = (P_) 0xbadbadbaL;
-P_ GHC_void_closure = (P_) 0xbadbadbaL;
 
 #ifndef CONCURRENT
 
