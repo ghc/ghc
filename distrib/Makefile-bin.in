@@ -237,7 +237,9 @@ install-libs:
 	(cd lib/$(platform); find . -type f -exec sh -c '$(CP) $$0 $(libdir)/$$0' {} \; )
 
 install-datas:
-	(cd share; find . -type f -exec sh -c '$(INSTALL_DATA) $$0 $(datadir)/$$0' {} \; )
+	for i in `(cd share; find . -type f )`; do \
+	   $(INSTALL_DATA) share/$$i $(datadir)/$$i; \
+	done
 
 show-install-setup:
 	@echo "Install setup..."
