@@ -1598,7 +1598,7 @@ declarations
 </programlisting>
 
 "overlap" if <literal>type1</literal> and <literal>type2</literal> unify.
-
+</para>
 <para>
 However, if you give the command line option
 <option>-fallow-overlapping-instances</option><indexterm><primary>-fallow-overlapping-instances
@@ -3184,6 +3184,12 @@ the background to
 the main technical innovations is discussed in "<ulink
 url="http://research.microsoft.com/~simonpj/papers/meta-haskell">
 Template Meta-programming for Haskell</ulink>" (Proc Haskell Workshop 2002).
+The details of the Template Haskell design are still in flux.  Make sure you
+consult the <ulink url="http://www.haskell.org/ghc/docs/latest/html/libraries/index.html">online library reference material</ulink> 
+(search for the type ExpQ).
+[Temporary: many changes to the original design are described in 
+      <ulink url="http://research.microsoft.com/~simonpj/tmp/notes2.ps">"http://research.microsoft.com/~simonpj/tmp/notes2.ps"</ulink>.
+Not all of these changes are in GHC 6.2.]
 </para>
 
 <para> The first example from that paper is set out below as a worked example to help get you started. 
@@ -3289,6 +3295,7 @@ Tim Sheard is going to expand it.)
   First cut and paste the two modules below into "Main.hs" and "Printf.hs":</para>
 
 <programlisting>
+
 {- Main.hs -}
 module Main where
 
@@ -3299,9 +3306,8 @@ import Printf ( pr )
 -- generated at compile time by "pr" and splices it into
 -- the argument of "putStrLn".
 main = putStrLn ( $(pr "Hello") )
-</programlisting>
 
-<programlisting>
+
 {- Printf.hs -}
 module Printf where
 
@@ -3324,14 +3330,14 @@ parse s   = [ L s ]
 -- Generate Haskell source code from a parsed representation
 -- of the format string.  This code will be spliced into
 -- the module which calls "pr", at compile time.
-gen :: [Format] -> Expr
+gen :: [Format] -> ExpQ
 gen [D]   = [| \n -> show n |]
 gen [S]   = [| \s -> s |]
-gen [L s] = string s
+gen [L s] = stringE s
 
 -- Here we generate the Haskell code for the splice
 -- from an input format string.
-pr :: String -> Expr
+pr :: String -> ExpQ
 pr s      = gen (parse s)
 </programlisting>
 
