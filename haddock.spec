@@ -79,7 +79,11 @@ rm -rf ${RPM_BUILD_ROOT}
 
 %changelog
 
-* Wed May 01 2002 Tom Moertel <tom-rpms@moertel.com>
-- Created spec file
+* Tue Jul 23 2002 Simon Marlow <simonmar@microsoft.com>
+- Updated to version 0.4
+
 * Sun Jun 23 2002 Sven Panne <sven_panne@yahoo.com>
 - Cleaned up build root handling and added more docs
+
+* Wed May 01 2002 Tom Moertel <tom-rpms@moertel.com>
+- Created spec file
