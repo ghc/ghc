@@ -47,6 +47,9 @@ module Util (
 	IF_NOT_GHC(applyToSnd COMMA foldPair COMMA)
 	unzipWith,
 
+	-- tracing (abstract away from lib home)
+	trace,
+
 	-- error handling
 	panic, panic#, assertPanic
 
@@ -56,6 +59,7 @@ module Util (
 
 import FastString	( FastString )
 import List		( zipWith4 )
+import GlaExts		( trace )
 
 infixr 9 `thenCmp`
 \end{code}
