@@ -27,7 +27,7 @@ module Lex (
 	StringBuffer,
 
 	P, thenP, thenP_, returnP, mapP, failP, failMsgP,
-	getSrcLocP, getSrcFile,
+	getSrcLocP, setSrcLocP, getSrcFile,
 	layoutOn, layoutOff, pushContext, popContext
     ) where
 
@@ -1179,6 +1179,9 @@ lexError str buf s@PState{ loc = loc }
 
 getSrcLocP :: P SrcLoc
 getSrcLocP buf s@(PState{ loc = loc }) = POk s loc
+
+setSrcLocP :: SrcLoc -> P a -> P a
+setSrcLocP new_loc p buf s = p buf s{ loc=new_loc }
 
 getSrcFile :: P FAST_STRING
 getSrcFile buf s@(PState{ loc = loc }) = POk s (srcLocFile loc)
