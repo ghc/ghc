@@ -16,6 +16,9 @@
 #include "Schedule.h"
 #include <windows.h>
 #include "win32/AsyncIO.h"
+#if defined(RTS_SUPPORTS_THREADS)
+#include "Capability.h"
+#endif
 
 void
 awaitEvent(rtsBool wait)
