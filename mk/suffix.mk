@@ -245,6 +245,9 @@ endif
 
 %.html : %.xml
 	$(XSLTPROC) --output $@ \
+	            --stringparam toc.section.depth 3 \
+	            --stringparam section.autolabel 1 \
+	            --stringparam section.label.includes.component.label 1 \
 	            --stringparam html.stylesheet fptools.css \
 	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/docbook.xsl $<
 	cp $(FPTOOLS_CSS) .
@@ -253,6 +256,9 @@ endif
 	$(RM) -rf $(dir $@)
 	$(XSLTPROC) --stringparam base.dir $(dir $@) \
 	            --stringparam use.id.as.filename 1 \
+	            --stringparam toc.section.depth 3 \
+	            --stringparam section.autolabel 1 \
+	            --stringparam section.label.includes.component.label 1 \
 	            --stringparam html.stylesheet fptools.css \
 	            $(XSLTPROC_OPTS) $(DIR_DOCBOOK_XSL)/html/chunk.xsl $<
 	cp $(FPTOOLS_CSS) $(dir $@)
