@@ -210,7 +210,8 @@ AddIORequest ( int   fd,
 	       char* buffer,
 	       CompletionProc onCompletion)
 {
-  WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
+  WorkItem* wItem    = (WorkItem*)malloc(sizeof(WorkItem));
+  unsigned int reqID = ioMan->requestID++;
   if (!ioMan || !wItem) return 0;
   
   /* Fill in the blanks */
@@ -221,7 +222,7 @@ AddIORequest ( int   fd,
   wItem->workData.ioData.buf = buffer;
 
   wItem->onCompletion        = onCompletion;
-  wItem->requestID           = ioMan->requestID++;
+  wItem->requestID           = reqID;
   
   EnterCriticalSection(&ioMan->manLock);
   /* If there are no worker threads available, create one.
@@ -240,9 +241,12 @@ AddIORequest ( int   fd,
   }
   
   if (SubmitWork(ioMan->workQueue,wItem)) {
-    return wItem->requestID;
+      /* Note: the work item has potentially been consumed by a worker thread
+       *       (and freed) at this point, so we cannot use wItem's requestID.
+       */
+      return reqID;
   } else {
-    return 0;
+      return 0;
   }
 }	       
 
@@ -255,13 +259,14 @@ AddDelayRequest ( unsigned int   msecs,
 		  CompletionProc onCompletion)
 {
   WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
+  unsigned int reqID = ioMan->requestID++;
   if (!ioMan || !wItem) return FALSE;
   
   /* Fill in the blanks */
   wItem->workKind     = WORKER_DELAY;
   wItem->workData.delayData.msecs = msecs;
   wItem->onCompletion = onCompletion;
-  wItem->requestID    = ioMan->requestID++;
+  wItem->requestID    = reqID;
 
   EnterCriticalSection(&ioMan->manLock);
 #if 0
@@ -276,9 +281,10 @@ AddDelayRequest ( unsigned int   msecs,
   }
   
   if (SubmitWork(ioMan->workQueue,wItem)) {
-    return wItem->requestID;
+      /* See AddIORequest() comment */
+      return reqID;
   } else {
-    return 0;
+      return 0;
   }
 }
 
@@ -292,6 +298,7 @@ AddProcRequest ( void* proc,
 		 CompletionProc onCompletion)
 {
   WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
+  unsigned int reqID = ioMan->requestID++;
   if (!ioMan || !wItem) return FALSE;
   
   /* Fill in the blanks */
@@ -299,7 +306,7 @@ AddProcRequest ( void* proc,
   wItem->workData.procData.proc  = proc;
   wItem->workData.procData.param = param;
   wItem->onCompletion = onCompletion;
-  wItem->requestID    = ioMan->requestID++;
+  wItem->requestID    = reqID;
 
   EnterCriticalSection(&ioMan->manLock);
 #if 0
@@ -314,9 +321,10 @@ AddProcRequest ( void* proc,
   }
   
   if (SubmitWork(ioMan->workQueue,wItem)) {
-    return wItem->requestID;
+      /* See AddIORequest() comment */
+      return reqID;
   } else {
-    return 0;
+      return 0;
   }
 }
 
