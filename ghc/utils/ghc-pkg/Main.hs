@@ -41,6 +41,7 @@ import CString
 #endif
 #endif
 
+main :: IO ()
 main = do
   args <- getArgs
 
@@ -69,6 +70,7 @@ data Flag
   | DumpVersion
   deriving (Eq)
 
+isAction :: Flag -> Bool
 isAction (Config _)     = False
 isAction (Field _)      = False
 isAction (Input _)      = False
@@ -88,6 +90,7 @@ version = tail "\
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...]\n"
 
+flags :: [OptDescr Flag]
 flags = [
   Option ['f'] ["config-file"] (ReqArg Config "FILE")
 	"use the specified package config file",
@@ -124,6 +127,7 @@ flags = [
       (nm,[]) -> DefinedName nm []
       (nm,_:val) -> DefinedName nm val
 
+runit :: [Flag] -> IO ()
 runit clis = do
   let err_msg = "missing -f option, location of package.conf unknown\n"
   conf_filenames <- 
@@ -199,7 +203,7 @@ showPackage :: [[PackageConfig]]
 	    -> String
 	    -> [PackageConfig -> [String]]
 	    -> IO ()
-showPackage pkg_confs filename pkg_name fields =
+showPackage pkg_confs _ pkg_name fields =
   case [ p | pkgs <- pkg_confs, p <- pkgs, name p == pkg_name ] of
     []    -> die ("can't find package `" ++ pkg_name ++ "'\n")
     [pkg] | null fields -> hPutStrLn stdout (render (dumpPkgGuts pkg))
@@ -314,6 +318,7 @@ validatePackageConfig pkg pkg_confs@(pkgs:_) auto_ghci_libs updatePkg force = do
        | otherwise = pkgs
   return (existing_pkgs ++ [pkg])
 
+checkDir :: Bool -> String -> IO ()
 checkDir force d
  | "$libdir" `isPrefixOf` d = return ()
 	-- can't check this, because we don't know what $libdir is
@@ -338,6 +343,7 @@ checkHSLib dirs auto_ghci_libs force lib = do
 				 "' on library path") 
 	(dir:_) -> checkGHCiLib dirs dir batch_lib_file lib auto_ghci_libs
 
+doesLibExistIn :: String -> String -> IO Bool
 doesLibExistIn lib d
  | "$libdir" `isPrefixOf` d = return True
  | otherwise                = doesFileExist (d ++ '/':lib)
@@ -345,7 +351,6 @@ doesLibExistIn lib d
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
 checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build = do
   let ghci_lib_file = lib ++ ".o"
-      ghci_lib_path = batch_lib_dir ++ '/':ghci_lib_file
   bs <- mapM (\d -> doesFileExist (d ++ '/':ghci_lib_file)) dirs
   case [ dir | (exists,dir) <- zip bs dirs, exists ] of
         [] | auto_build -> 
@@ -353,11 +358,12 @@ checkGHCiLib dirs batch_lib_dir batch_lib_file lib auto_build = do
 	   | otherwise  -> 
 		hPutStrLn stderr ("warning: can't find GHCi lib `"
 					 ++ ghci_lib_file ++ "'")
-   	(dir:_) -> return ()
+   	(_:_) -> return ()
 
 -- automatically build the GHCi version of a batch lib, 
 -- using ld --whole-archive.
 
+autoBuildGHCiLib :: String -> String -> String -> IO ()
 autoBuildGHCiLib dir batch_file ghci_file = do
   let ghci_lib_file  = dir ++ '/':ghci_file
       batch_lib_file = dir ++ '/':batch_file
@@ -406,27 +412,27 @@ expandEnvVars pkg defines force = do
 	      , extra_frameworks= e_frames
 	      })
   where
-   expandStrings vs = do
-     xs <- mapM expandString vs
-       -- Flatten the elements of the expanded list; this is
-       -- to permit substitutions for list-valued variables. e.g.,
-       --     package_deps["${deps}"] where env var (say) 'deps'
-       -- is "base,haskell98,network"
-     return (concat (map (wordsBy (==',')) xs))
-   
-    -- Just for fun, keep this in the IO monad.
-   expandString :: String -> IO String
-   expandString str =
-     case break (=='$') str of
-       (xs, _:'{':rs) ->
-         case span (/='}') rs of
-	   (nm,_:remainder) -> do
-	      nm'  <- lookupEnvVar nm
-	      str' <- expandString remainder
-	      return (xs ++ nm' ++ str')
-	   _ -> return str -- no closing '}'
-       _ -> return str	   
+   expandStrings :: [String] -> IO [String]
+   expandStrings = liftM concat . mapM expandSpecial
 
+   -- Permit substitutions for list-valued variables (but only when
+   -- they occur alone), e.g., package_deps["${deps}"] where env var
+   -- (say) 'deps' is "base,haskell98,network"
+   expandSpecial :: String -> IO [String]
+   expandSpecial str =
+      let expand f = liftM f $ expandString str
+      in case splitString str of
+         [Var _] -> expand (wordsBy (== ','))
+         _ -> expand (\x -> [x])
+
+   expandString :: String -> IO String
+   expandString = liftM concat . mapM expandElem . splitString
+
+   expandElem :: Elem -> IO String
+   expandElem (String s) = return s
+   expandElem (Var v)    = lookupEnvVar v
+
+   lookupEnvVar :: String -> IO String
    lookupEnvVar nm = 
      case lookup nm defines of
        Just x | not (null x) -> return x
@@ -436,6 +442,20 @@ expandEnvVars pkg defines force = do
 					show nm)
 		      return "")
 
+data Elem = String String | Var String
+
+splitString :: String -> [Elem]
+splitString "" = []
+splitString str =
+   case break (== '$') str of
+      (pre, _:'{':xs) ->
+         case span (/= '}') xs of
+            (var, _:suf) ->
+               (if null pre then id else (String pre :)) (Var var : splitString suf)
+            _ -> [String str]   -- no closing brace
+      _ -> [String str]   -- no dollar/opening brace combo
+
+-- wordsBy isSpace == words
 wordsBy :: (Char -> Bool) -> String -> [String]
 wordsBy p s = case dropWhile p s of
   "" -> []
@@ -508,5 +528,5 @@ foreign import stdcall "GetModuleFileNameA" unsafe
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32
 #else
 getExecDir :: String -> IO (Maybe String) 
-getExecDir s = do return Nothing
+getExecDir _ = return Nothing
 #endif
