@@ -56,7 +56,6 @@ import IOExts		( IORef, readIORef, writeIORef )
 import Monad		( when, unless )
 import System		( system, ExitCode(..), exitWith )
 import CString
-import Addr
 import Int
 
 #if __GLASGOW_HASKELL__ < 500
@@ -70,9 +69,11 @@ import MarshalArray
 #if !defined(mingw32_TARGET_OS)
 import qualified Posix
 #else
-import Addr             ( nullAddr )
+import Addr
 import List		( isPrefixOf )
 #endif
+
+import List		( isSuffixOf )
 
 #include "HsVersions.h"
 
@@ -330,10 +331,7 @@ getTopDir minusbs
 	-- by looking for the package configuration file.
        ; am_installed <- doesFileExist (top_dir2 `slash` "package.conf")
 
-       ; if am_installed then
-	    return (True, top_dir2)
-	 else
-	    return (False, remove_suffix top_dir2)
+       ; return (am_installed, top_dir2)
        }
   where
     get_proto | not (null minusbs) 
@@ -343,19 +341,23 @@ getTopDir minusbs
 		   ; case maybe_exec_dir of	  -- (only works on Windows; 
 						  --  returns Nothing on Unix)
 			Nothing  -> throwDyn (InstallationError "missing -B<dir> option")
-			Just dir -> return dir
+			Just dir -> return (remove_suffix dir)
 		   }
 
-    remove_suffix dir	-- "/...stuff.../ghc/compiler" --> "/...stuff..."
-	= ASSERT2( not (null p1) && 
-		   not (null p2) && 
-		   dir == top_dir ++ "/ghc/compiler",
-		   text dir )
-	  top_dir
+    -- In an installed tree, the ghc binary lives in $libexecdir, which
+    -- is normally $libdir/bin.  So we strip off a /bin suffix here.
+    -- In a build tree, the ghc binary lives in $fptools/ghc/compiler,
+    -- so we strip off the /ghc/compiler suffix here too, leaving a
+    -- standard TOPDIR.
+    remove_suffix ghc_bin_dir	-- ghc_bin_dir is in standard Unix format
+	| "/ghc/compiler" `isSuffixOf` ghc_bin_dir	= back_two
+	| "/bin" `isSuffixOf` ghc_bin_dir  		= back_one
+	| otherwise				 	= ghc_bin_dir
 	where
-	 p1      = dropWhile (not . isSlash) (reverse dir)
+	 p1      = dropWhile (not . isSlash) (reverse ghc_bin_dir)
 	 p2      = dropWhile (not . isSlash) (tail p1)	-- head is '/'
-	 top_dir = reverse (tail p2)			-- head is '/'
+	 back_two = reverse (tail p2)			-- head is '/'
+	 back_one = reverse (tail p1)
 \end{code}
 
 
