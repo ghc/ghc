@@ -1,0 +1,9 @@
+ 
+cc002.hs:11: No instance for:
+		 `Foreign.CReturnable Foreign.ForeignObj'
+    cc002.hs:11:
+	in the result of the _ccall_ to a
+    When checking signature(s) for: `a'
+
+
+Compilation had errors
