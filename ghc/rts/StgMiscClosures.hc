@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.4 1999/01/15 12:47:20 sewardj Exp $
+ * $Id: StgMiscClosures.hc,v 1.5 1999/01/15 17:57:11 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -132,8 +132,23 @@ STGFUN(CAF_ENTERED_entry)
  * should be big enough for an old-generation indirection.  
  */
 
-INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,1,1,BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,const,EF_,0,0);
 STGFUN(BLACKHOLE_entry)
+{
+  FB_
+    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
+    ((StgBlackHole *)R1.p)->header.info = &BLACKHOLE_BQ_info;
+    /* Put ourselves on the blocking queue for this black hole */
+    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
+    ((StgBlackHole *)R1.p)->blocking_queue = CurrentTSO;
+
+    /* stg_gen_block is too heavyweight, use a specialised one */
+    BLOCK_NP(1);
+  FE_
+}
+
+INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,const,EF_,0,0);
+STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
     /* Put ourselves on the blocking queue for this black hole */
@@ -146,12 +161,14 @@ STGFUN(BLACKHOLE_entry)
 }
 
 /* identical to BLACKHOLEs except for the infotag */
-INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,1,1,CAF_BLACKHOLE,const,EF_,0,0);
+INFO_TABLE(CAF_BLACKHOLE_info, CAF_BLACKHOLE_entry,0,2,CAF_BLACKHOLE,const,EF_,0,0);
 STGFUN(CAF_BLACKHOLE_entry)
 {
   FB_
+    /* Change the BLACKHOLE into a BLACKHOLE_BQ */
+    ((StgBlackHole *)R1.p)->header.info = &BLACKHOLE_BQ_info;
     /* Put ourselves on the blocking queue for this black hole */
-    CurrentTSO->link = ((StgBlackHole *)R1.p)->blocking_queue;
+    CurrentTSO->link = (StgTSO *)&END_TSO_QUEUE_closure;
     ((StgBlackHole *)R1.p)->blocking_queue = CurrentTSO;
 
     /* stg_gen_block is too heavyweight, use a specialised one */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: DebugProf.c,v 1.3 1999/01/13 17:25:38 simonm Exp $
+ * $Id: DebugProf.c,v 1.4 1999/01/15 17:57:05 simonm Exp $
  *
  * (c) The GHC Team 1998
  *
@@ -157,6 +157,7 @@ static char *type_names[] = {
     , "SEQ_FRAME"
 
     , "BLACKHOLE"
+    , "BLACKHOLE_BQ"
     , "MVAR"
 
     , "ARR_WORDS"
@@ -282,6 +283,7 @@ heapCensus(bdescr *bd)
 	    case IND_PERM:
 	    case IND_OLDGEN_PERM:
 	    case BLACKHOLE:
+	    case BLACKHOLE_BQ:
 	    case WEAK:
 	    case FOREIGN:
 	    case MVAR:

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.hc,v 1.5 1999/01/14 14:43:46 simonm Exp $
+ * $Id: Updates.hc,v 1.6 1999/01/15 17:57:11 simonm Exp $
  *
  * Code to perform updates.
  *
@@ -305,10 +305,10 @@ EXTFUN(stg_update_PAP)
 
     case SEQ_FRAME:
       /* Set Sp to just above the SEQ frame (should be an activation rec.)*/
-      Sp = stgCast(StgPtr,Su) + sizeofW(StgSeqFrame);
+      Sp = (P_)Su + sizeofW(StgSeqFrame);
 
       /* restore Su */
-      Su = stgCast(StgSeqFrame*,Su)->link;
+      Su = ((StgSeqFrame *)Su)->link;
 	
       /* return to the activation record, with the address of the PAP in R1 */
       R1.p = (P_)PapClosure;
@@ -316,10 +316,10 @@ EXTFUN(stg_update_PAP)
       
     case CATCH_FRAME:
       /* Set Sp to just above the CATCH frame (should be an activation rec.)*/
-      Sp = stgCast(StgPtr,Su) + sizeofW(StgCatchFrame);
+      Sp = (P_)Su + sizeofW(StgCatchFrame);
 
       /* restore Su */
-      Su = stgCast(StgCatchFrame*,Su)->link;
+      Su = ((StgCatchFrame *)Su)->link;
 	
       /* restart by entering the PAP */
       R1.p = (P_)PapClosure;
@@ -455,7 +455,7 @@ STGFUN(AP_UPD_entry)
    IFN_(label)					\
    {						\
       FB_					\
-      Su = stgCast(StgSeqFrame*,Sp)->link;	\
+      Su = ((StgSeqFrame *)Sp)->link;	\
       Sp += sizeofW(StgSeqFrame);		\
       JMP_(ret);				\
       FE_					\
@@ -566,11 +566,11 @@ FN_(catchZh_fast)
     /* args: R1 = m, R2 = k */
     STK_CHK_GEN(sizeofW(StgCatchFrame), R1_PTR | R2_PTR, catchZh_fast, );
     Sp -= sizeofW(StgCatchFrame);
-    fp = stgCast(StgCatchFrame*,Sp);
+    fp = (StgCatchFrame *)Sp;
     SET_HDR(fp,(StgInfoTable *)&catch_frame_info,CCCS);
     fp -> handler = R2.cl;
     fp -> link = Su;
-    Su = stgCast(StgUpdateFrame*,fp);
+    Su = (StgUpdateFrame *)fp;
     TICK_ENT_VIA_NODE();
     JMP_(ENTRY_CODE(*R1.p));         
     
@@ -591,7 +591,7 @@ INFO_TABLE(raise_info,raise_entry,1,0,FUN,const,EF_,0,0);
 STGFUN(raise_entry)
 {
   FB_
-  R1.cl = payloadCPtr(R1.cl,0);
+  R1.cl = R1.cl->payload[0];
   JMP_(raiseZh_fast);
   FE_
 }
@@ -600,22 +600,32 @@ FN_(raiseZh_fast)
 {
   StgClosure *handler;
   StgUpdateFrame *p;
+  StgClosure *raise_closure;
   FB_
     /* args : R1 = error */
 
     p = Su;
+
+    /* This closure represents the expression 'raise# E' where E
+     * is the exception raise.  It is used to overwrite all the
+     * thunks which are currently under evaluataion.
+     */
+    raise_closure = (StgClosure *)RET_STGCALL1(P_,allocate,
+					       sizeofW(StgClosure)+1);
+    raise_closure->header.info = &raise_info;
+    raise_closure->payload[0] = R1.cl;
 
     while (1) {
 
       switch (get_itbl(p)->type) {
 
       case UPDATE_FRAME:
-	UPD_INPLACE1(p->updatee,&raise_info,R1.cl);
+	UPD_IND(p->updatee,raise_closure);
 	p = p->link;
 	continue;
 
       case SEQ_FRAME:
-	p = stgCast(StgSeqFrame*,p)->link;
+	p = ((StgSeqFrame *)p)->link;
 	continue;
 
       case CATCH_FRAME:
@@ -639,7 +649,7 @@ FN_(raiseZh_fast)
     Su = ((StgCatchFrame *)p)->link; 
     handler = ((StgCatchFrame *)p)->handler;
     
-    Sp = stgCast(StgPtr,p) + sizeofW(StgCatchFrame) - 1;
+    Sp = (P_)p + sizeofW(StgCatchFrame) - 1;
     *Sp = R1.w;
 
     TICK_ENT_VIA_NODE();

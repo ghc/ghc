@@ -1,6 +1,6 @@
 /* -*- mode: hugs-c; -*- */
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.2 1998/12/02 13:28:33 simonm Exp $
+ * $Id: Printer.c,v 1.3 1999/01/15 17:57:09 simonm Exp $
  *
  * Copyright (c) 1994-1998.
  *
@@ -145,7 +145,10 @@ void printClosure( StgClosure *obj )
             fprintf(stderr,")\n"); 
             break;
     case BLACKHOLE:
-            fprintf(stderr,"BH("); 
+            fprintf(stderr,"BH\n"); 
+            break;
+    case BLACKHOLE_BQ:
+            fprintf(stderr,"BQ("); 
             printPtr((StgPtr)stgCast(StgBlackHole*,obj)->blocking_queue);
             fprintf(stderr,")\n"); 
             break;

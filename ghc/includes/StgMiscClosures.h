@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.4 1999/01/15 12:47:19 sewardj Exp $
+ * $Id: StgMiscClosures.h,v 1.5 1999/01/15 17:57:04 simonm Exp $
  *
  * Entry code for various built-in closure types.
  *
@@ -21,6 +21,7 @@ STGFUN(CAF_UNENTERED_entry);
 STGFUN(CAF_ENTERED_entry);
 STGFUN(CAF_BLACKHOLE_entry);
 STGFUN(BLACKHOLE_entry);
+STGFUN(BLACKHOLE_BQ_entry);
 STGFUN(BCO_entry);
 STGFUN(EVACUATED_entry);
 STGFUN(FOREIGN_entry);
@@ -50,6 +51,7 @@ extern const StgInfoTable CAF_UNENTERED_info;
 extern const StgInfoTable CAF_ENTERED_info;
 extern const StgInfoTable CAF_BLACKHOLE_info;
 extern const StgInfoTable BLACKHOLE_info;
+extern const StgInfoTable BLACKHOLE_BQ_info;
 extern const StgInfoTable BCO_info;
 extern const StgInfoTable EVACUATED_info;
 extern const StgInfoTable FOREIGN_info;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.8 1999/01/14 11:11:29 simonm Exp $
+ * $Id: GC.c,v 1.9 1999/01/15 17:57:08 simonm Exp $
  *
  * Two-space garbage collector
  *
@@ -926,7 +926,11 @@ loop:
 
   case CAF_BLACKHOLE:
   case BLACKHOLE:
-    to = copy(q,BLACKHOLE_sizeW(),bd);
+  case BLACKHOLE_BQ:
+    /* ToDo: don't need to copy all the blackhole, some of it is
+     * just padding.
+     */
+    to = copy(q,BLACKHOLE_sizeW(),bd); 
     upd_evacuee(q,to);
     return to;
 
@@ -994,6 +998,7 @@ loop:
       case CAF_UNENTERED:
       case CAF_BLACKHOLE:
       case BLACKHOLE:
+      case BLACKHOLE_BQ:
 	/* not evaluated yet */
 	break;
 
@@ -1347,6 +1352,10 @@ scavenge(step *step)
 
     case CAF_BLACKHOLE:
     case BLACKHOLE:
+	p += BLACKHOLE_sizeW();
+	break;
+
+    case BLACKHOLE_BQ:
       { 
 	StgBlackHole *bh = (StgBlackHole *)p;
 	(StgClosure *)bh->blocking_queue = 
@@ -1520,6 +1529,9 @@ scavenge_one(StgPtr p)
 
   case CAF_BLACKHOLE:
   case BLACKHOLE:
+      break;
+
+  case BLACKHOLE_BQ:
     { 
       StgBlackHole *bh = (StgBlackHole *)p;
       (StgClosure *)bh->blocking_queue = 
@@ -1858,8 +1870,8 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
       goto follow_srt;
 
       /* Specialised code for update frames, since they're so common.
-       * We *know* the updatee points to a BLACKHOLE or CAF_BLACKHOLE,
-       * so just inline the code to evacuate it here.  
+       * We *know* the updatee points to a BLACKHOLE, CAF_BLACKHOLE,
+       * or BLACKHOLE_BQ, so just inline the code to evacuate it here.  
        */
     case UPDATE_FRAME:
       {
@@ -1873,8 +1885,15 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	  continue;
 	} else {
 	  bdescr *bd = Bdescr((P_)frame->updatee);
-	  ASSERT(type == BLACKHOLE || type == CAF_BLACKHOLE);
-	  if (bd->gen->no >= evac_gen && bd->gen->no > N) { continue; }
+	  ASSERT(type == BLACKHOLE || 
+		 type == CAF_BLACKHOLE ||
+		 type == BLACKHOLE_BQ);
+	  if (bd->gen->no > N) { 
+	    if (bd->gen->no < evac_gen) {
+	      failed_to_evac = rtsTrue;
+	    }
+	    continue;
+	  }
 	  to = copy(frame->updatee, BLACKHOLE_sizeW(), bd);
 	  upd_evacuee(frame->updatee,to);
 	  frame->updatee = to;
@@ -2212,9 +2231,9 @@ threadLazyBlackHole(StgTSO *tso)
        * above optimisation doesn't apply.
        */
       if (bh->header.info != &BLACKHOLE_info
+	  && bh->header.info != &BLACKHOLE_BQ_info
 	  && bh->header.info != &CAF_BLACKHOLE_info) {
 	SET_INFO(bh,&BLACKHOLE_info);
-	bh->blocking_queue = END_TSO_QUEUE;
       }
 
       update_frame = update_frame->link;
@@ -2332,13 +2351,9 @@ threadSqueezeStack(StgTSO *tso)
        * slower --SDM
        */
 #if 0 /* do it properly... */
-      if (GET_INFO(updatee_bypass) == BLACKHOLE_info
-	  || GET_INFO(updatee_bypass) == CAF_BLACKHOLE_info
-	  ) {
+      if (GET_INFO(updatee_bypass) == BLACKHOLE_BQ_info) {
 	/* Sigh.  It has one.  Don't lose those threads! */
-	if (GET_INFO(updatee_keep) == BLACKHOLE_info
-	    || GET_INFO(updatee_keep) == CAF_BLACKHOLE_info
-	    ) {
+	  if (GET_INFO(updatee_keep) == BLACKHOLE_BQ_info) {
 	  /* Urgh.  Two queues.  Merge them. */
 	  P_ keep_tso = ((StgBlackHole *)updatee_keep)->blocking_queue;
 	  
@@ -2375,10 +2390,10 @@ threadSqueezeStack(StgTSO *tso)
       if (is_update_frame) {
 	StgBlackHole *bh = (StgBlackHole *)frame->updatee;
 	if (bh->header.info != &BLACKHOLE_info
+	    && bh->header.info != &BLACKHOLE_BQ_info
 	    && bh->header.info != &CAF_BLACKHOLE_info
 	    ) {
 	  SET_INFO(bh,&BLACKHOLE_info);
-	  bh->blocking_queue = END_TSO_QUEUE;
 	}
       }
 

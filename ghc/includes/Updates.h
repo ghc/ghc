@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.3 1999/01/13 17:25:55 simonm Exp $
+ * $Id: Updates.h,v 1.4 1999/01/15 17:57:04 simonm Exp $
  *
  * Definitions related to updates.
  *
@@ -31,25 +31,13 @@
 			      (StgClosure *)heapptr);
 
 /* -----------------------------------------------------------------------------
-   Update a closure inplace with an infotable that expects 1 (closure)
-   argument.
-   Also may wake up BQs.
-   -------------------------------------------------------------------------- */
-
-#define UPD_INPLACE1(updclosure,info,c0)                        \
-        TICK_UPDATED_SET_UPDATED(updclosure);		        \
-        AWAKEN_BQ(updclosure);                                  \
-        SET_INFO(updclosure,info);                              \
-        payloadCPtr(updclosure,0) = (c0)
-
-/* -----------------------------------------------------------------------------
    Awaken any threads waiting on this computation
    -------------------------------------------------------------------------- */
 
 extern void awaken_blocked_queue(StgTSO *q);
 
 #define AWAKEN_BQ(closure)						\
-     	if (closure->header.info == &BLACKHOLE_info) {			\
+     	if (closure->header.info == &BLACKHOLE_BQ_info) {		\
 		StgTSO *bq = ((StgBlackHole *)closure)->blocking_queue;	\
 		if (bq != (StgTSO *)&END_TSO_QUEUE_closure) {		\
 			STGCALL1(awaken_blocked_queue, bq);		\
@@ -111,8 +99,6 @@ extern void newCAF(StgClosure*);
   {								\
     SET_INFO((StgInd *)cafptr,&IND_STATIC_info);	        \
     ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);	\
-    ((StgBlackHole *)(bhptr))->blocking_queue = 		\
-          (StgTSO *)&END_TSO_QUEUE_closure; 			\
     STGCALL1(newCAF,(StgClosure *)cafptr);			\
   }
 

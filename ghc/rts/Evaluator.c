@@ -5,8 +5,8 @@
  * Copyright (c) 1994-1998.
  *
  * $RCSfile: Evaluator.c,v $
- * $Revision: 1.2 $
- * $Date: 1998/12/02 13:28:17 $
+ * $Revision: 1.3 $
+ * $Date: 1999/01/15 17:57:06 $
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
@@ -402,10 +402,20 @@ static inline void PopSeqFrame( void )
 
 static inline StgClosure* raiseAnError( StgClosure* errObj )
 {
+    StgClosure *raise_closure;
+
+    /* This closure represents the expression 'raise# E' where E
+     * is the exception raise.  It is used to overwrite all the
+     * thunks which are currently under evaluataion.
+     */
+    raise_closure = (StgClosure *)allocate(sizeofW(StgClosure)+1);
+    raise_closure->header.info = &raise_info;
+    raise_closure->payload[0] = R1.cl;
+
     while (1) {
         switch (get_itbl(Su)->type) {
         case UPDATE_FRAME:
-                UPD_INPLACE1(Su->updatee,&raise_info,errObj);
+                UPD_IND(Su->updatee,raise_closure);
                 Sp = stgCast(StgStackPtr,Su) + sizeofW(StgUpdateFrame);
                 Su = Su->link;
                 break;
