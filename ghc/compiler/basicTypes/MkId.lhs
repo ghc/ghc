@@ -139,14 +139,15 @@ mkDataConId :: Name -> DataCon -> Id
 	-- Makes the *worker* for the data constructor; that is, the function
 	-- that takes the reprsentation arguments and builds the constructor.
 mkDataConId work_name data_con
-  = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
+  = id 
   where
+    id = mkGlobalId (DataConId data_con) work_name (dataConRepType data_con) info
     info = noCafNoTyGenIdInfo
 	   `setCgArity`		arity
 	   `setArityInfo`	exactArity arity
 	   `setCprInfo`		cpr_info
 	   `setStrictnessInfo`	strict_info
-	   `setNewStrictnessInfo`	mkNewStrictnessInfo arity strict_info cpr_info
+	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info cpr_info
 
     arity = dataConRepArity data_con
     strict_info = mkStrictnessInfo (dataConRepStrictness data_con, False)
@@ -226,7 +227,7 @@ mkDataConWrapId data_con
 	   `setArityInfo`	exactArity arity
 		-- It's important to specify the arity, so that partial
 		-- applications are treated as values
-	   `setNewStrictnessInfo` 	mkNewStrictnessInfo arity noStrictnessInfo cpr_info
+	   `setNewStrictnessInfo` 	mkNewStrictnessInfo wrap_id arity noStrictnessInfo cpr_info
 
     wrap_ty = mkForAllTys all_tyvars $
 	      mkFunTys all_arg_tys
@@ -606,7 +607,7 @@ mkPrimOpId prim_op
 	   `setCgArity` 	arity
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
-	   `setNewStrictnessInfo`	mkNewStrictnessInfo arity strict_info NoCPRInfo
+	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info NoCPRInfo
 
     rules = maybe emptyCoreRules (addRule emptyCoreRules id)
 		(primOpRule prim_op)
@@ -626,8 +627,9 @@ mkFCallId uniq fcall ty
   = ASSERT( isEmptyVarSet (tyVarsOfType ty) )
 	-- A CCallOpId should have no free type variables; 
 	-- when doing substitutions won't substitute over it
-    mkGlobalId (FCallId fcall) name ty info
+    id
   where
+    id = mkGlobalId (FCallId fcall) name ty info
     occ_str = showSDocIface (braces (ppr fcall <+> ppr ty))
 	-- The "occurrence name" of a ccall is the full info about the
 	-- ccall; it is encoded, but may have embedded spaces etc!
@@ -638,7 +640,7 @@ mkFCallId uniq fcall ty
 	   `setCgArity` 	arity
 	   `setArityInfo` 	exactArity arity
 	   `setStrictnessInfo`	strict_info
-	   `setNewStrictnessInfo`	mkNewStrictnessInfo arity strict_info NoCPRInfo
+	   `setNewStrictnessInfo`	mkNewStrictnessInfo id arity strict_info NoCPRInfo
 
     (_, tau) 	 = tcSplitForAllTys ty
     (arg_tys, _) = tcSplitFunTys tau
@@ -833,12 +835,13 @@ pcMiscPrelId key mod str ty info
     -- will be in "the right place" to be in scope.
 
 pc_bottoming_Id key mod name ty
- = pcMiscPrelId key mod name ty bottoming_info
+ = id
  where
+    id = pcMiscPrelId key mod name ty bottoming_info
     strict_info = mkStrictnessInfo ([wwStrict], True)
     bottoming_info = noCafNoTyGenIdInfo 
 		     `setStrictnessInfo`  strict_info
-	  	     `setNewStrictnessInfo`	mkNewStrictnessInfo 1 strict_info NoCPRInfo
+	  	     `setNewStrictnessInfo`	mkNewStrictnessInfo id 1 strict_info NoCPRInfo
 
 
 	-- these "bottom" out, no matter what their arguments

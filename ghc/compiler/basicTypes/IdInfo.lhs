@@ -129,18 +129,20 @@ infixl 	1 `setDemandInfo`,
 To be removed later
 
 \begin{code}
-mkNewStrictnessInfo :: Arity -> StrictnessInfo -> CprInfo -> NewDemand.StrictSig
-mkNewStrictnessInfo arity NoStrictnessInfo cpr
-  = NewDemand.mkStrictSig 
+mkNewStrictnessInfo :: Id -> Arity -> StrictnessInfo -> CprInfo -> NewDemand.StrictSig
+mkNewStrictnessInfo id arity NoStrictnessInfo cpr
+  = NewDemand.mkStrictSig id
 	arity
-	(NewDemand.mkDmdFun (replicate arity NewDemand.Lazy) (newRes False cpr))
+	(NewDemand.mkTopDmdType (replicate arity NewDemand.Lazy) (newRes False cpr))
 
-mkNewStrictnessInfo arity (StrictnessInfo ds res) cpr
-  = NewDemand.mkStrictSig 
+mkNewStrictnessInfo id arity (StrictnessInfo ds res) cpr
+  = NewDemand.mkStrictSig id
 	arity
-	(NewDemand.mkDmdFun (map newDemand ds) (newRes res cpr))
+	(NewDemand.mkTopDmdType (take arity (map newDemand ds)) (newRes res cpr))
+	-- Sometimes the old strictness analyser has more
+	-- demands than the arity justifies
 
-newRes True  _ 	         = NewDemand.BotRes
+newRes True  _ 	        = NewDemand.BotRes
 newRes False ReturnsCPR = NewDemand.RetCPR
 newRes False NoCPRInfo  = NewDemand.TopRes
 
@@ -148,7 +150,7 @@ newDemand :: Demand -> NewDemand.Demand
 newDemand (WwLazy True)      = NewDemand.Abs
 newDemand (WwLazy False)     = NewDemand.Lazy
 newDemand WwStrict	     = NewDemand.Eval
-newDemand (WwUnpack unpk ds) = NewDemand.Seq NewDemand.Drop (map newDemand ds)
+newDemand (WwUnpack unpk ds) = NewDemand.Seq NewDemand.Drop NewDemand.Now (map newDemand ds)
 newDemand WwPrim	     = NewDemand.Lazy
 newDemand WwEnum	     = NewDemand.Eval
 \end{code}
