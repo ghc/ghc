@@ -505,50 +505,6 @@ simplRhsExpr
 	-> SmplM (OutExpr, ArityInfo)
 \end{code}
 
-First a special case for variable right-hand sides
-	v = w
-It's OK to simplify the RHS, but it's often a waste of time.  Often
-these v = w things persist because v is exported, and w is used 
-elsewhere.  So if we're not careful we'll eta expand the rhs, only
-to eta reduce it in competeNonRec.
-
-If we leave the binding unchanged, we will certainly replace v by w at 
-every occurrence of v, which is good enough.  
-
-In fact, it's *better* to replace v by w than to inline w in v's rhs,
-even if this is the only occurrence of w.  Why? Because w might have
-IdInfo (like strictness) that v doesn't.
-Furthermore, there might be other uses of w; if so, inlining w in 
-v's rhs will duplicate w's rhs, whereas replacing v by w doesn't.
-
-HOWEVER, we have to be careful if w is something that *must* be
-inlined.  In particular, its binding may have been dropped.  Here's
-an example that actually happened:
-	let x = let y = e in y
-     in f x
-The "let y" was floated out, and then (since y occurs once in a
-definitely inlinable position) the binding was dropped, leaving
-	{y=e} let x = y in f x
-But now using the reasoning of this little section, 
-y wasn't inlined, because it was a let x=y form.
-
-\begin{code}
-simplRhsExpr env binder@(id,occ_info) (Var v) new_id
- | maybeToBool maybe_stop_at_var
- = returnSmpl (Var the_var, getIdArity the_var)
- where
-   maybe_stop_at_var 
-     = case (runEager $ lookupId env v) of
-	 VarArg v' | not (must_unfold v') -> Just v'
-	 other				  -> Nothing
-
-   Just the_var = maybe_stop_at_var
-
-   must_unfold v' =  idMustBeINLINEd v'
-		  || case lookupOutIdEnv env v' of
-			Just (_, _, InUnfolding _ _) -> True
-			other			     -> False
-\end{code}
 
 \begin{code}
 simplRhsExpr env binder@(id,occ_info) rhs new_id
@@ -597,6 +553,74 @@ simplRhsExpr env binder@(id,occ_info) rhs new_id
 
     (uvars, tyvars, body) = collectUsageAndTyBinders rhs
 \end{code}
+
+
+----------------------------------------------------------------
+	An old special case that is now nuked.
+
+First a special case for variable right-hand sides
+	v = w
+It's OK to simplify the RHS, but it's often a waste of time.  Often
+these v = w things persist because v is exported, and w is used 
+elsewhere.  So if we're not careful we'll eta expand the rhs, only
+to eta reduce it in competeNonRec.
+
+If we leave the binding unchanged, we will certainly replace v by w at 
+every occurrence of v, which is good enough.  
+
+In fact, it's *better* to replace v by w than to inline w in v's rhs,
+even if this is the only occurrence of w.  Why? Because w might have
+IdInfo (such as strictness) that v doesn't.
+
+Furthermore, there might be other uses of w; if so, inlining w in 
+v's rhs will duplicate w's rhs, whereas replacing v by w doesn't.
+
+HOWEVER, we have to be careful if w is something that *must* be
+inlined.  In particular, its binding may have been dropped.  Here's
+an example that actually happened:
+	let x = let y = e in y
+     in f x
+The "let y" was floated out, and then (since y occurs once in a
+definitely inlinable position) the binding was dropped, leaving
+	{y=e} let x = y in f x
+But now using the reasoning of this little section, 
+y wasn't inlined, because it was a let x=y form.
+
+
+		HOWEVER
+
+This "optimisation" turned out to be a bad idea.  If there's are
+top-level exported bindings like
+
+	y = I# 3#
+	x = y
+
+then y wasn't getting inlined in x's rhs, and we were getting
+bad code.  So I've removed the special case from here, and
+instead we only try eta reduction and constructor reuse 
+in completeNonRec if the thing is *not* exported.
+
+
+\begin{pseudocode}
+simplRhsExpr env binder@(id,occ_info) (Var v) new_id
+ | maybeToBool maybe_stop_at_var
+ = returnSmpl (Var the_var, getIdArity the_var)
+ where
+   maybe_stop_at_var 
+     = case (runEager $ lookupId env v) of
+	 VarArg v' | not (must_unfold v') -> Just v'
+	 other				  -> Nothing
+
+   Just the_var = maybe_stop_at_var
+
+   must_unfold v' =  idMustBeINLINEd v'
+		  || case lookupOutIdEnv env v' of
+			Just (_, _, InUnfolding _ _) -> True
+			other			     -> False
+\end{pseudocode}
+	
+		End of old, nuked, special case.
+------------------------------------------------------------------
 
 
 %************************************************************************
@@ -993,8 +1017,73 @@ simplNonRec env binder@(id,occ_info) rhs body_c body_ty
 
 
 @completeNonRec@ looks at the simplified post-floating RHS of the
-let-expression, and decides what to do.  There's one interesting
-aspect to this, namely constructor reuse.  Consider
+let-expression, with a view to turning
+	x = e
+into
+	x = y
+where y is just a variable.  Now we can eliminate the binding
+altogether, and replace x by y throughout.
+
+There are two cases when we can do this:
+
+	* When e is a constructor application, and we have
+	  another variable in scope bound to the same
+	  constructor application.  [This is just a special
+	  case of common-subexpression elimination.]
+
+	* When e can be eta-reduced to a variable.  E.g.
+		x = \a b -> y a b
+
+
+HOWEVER, if x is exported, we don't attempt this at all.  Why not?
+Because then we can't remove the x=y binding, in which case we 
+have just made things worse, perhaps a lot worse.
+
+\begin{code}
+	-- Right hand sides that are constructors
+	--	let v = C args
+	--	in
+	--- ...(let w = C same-args in ...)...
+	-- Then use v instead of w.	 This may save
+	-- re-constructing an existing constructor.
+completeNonRec env binder new_id new_rhs
+  |  not (isExported new_id)		-- Don't bother for exported things
+					-- because we won't be able to drop
+					-- its binding.
+  && maybeToBool maybe_atomic_rhs
+  = tick tick_type	`thenSmpl_`
+    returnSmpl (extendIdEnvWithAtom env binder rhs_arg, [])
+  where
+    Just (rhs_arg, tick_type) = maybe_atomic_rhs
+    maybe_atomic_rhs 
+      = 		-- Try first for an existing constructor application
+	case maybe_con new_rhs of {
+	Just con -> Just (VarArg con, ConReused);
+
+ 	Nothing  ->	-- No good; try eta-reduction
+	case etaCoreExpr new_rhs of {
+	Var v -> Just (VarArg v, AtomicRhs);
+	Lit l -> Just (LitArg l, AtomicRhs);
+
+	other -> Nothing -- Neither worked, so return Nothing
+	}}
+	
+
+    maybe_con (Con con con_args) | switchIsSet env SimplReuseCon
+				 = lookForConstructor env con con_args 
+    maybe_con other_rhs		 = Nothing
+
+completeNonRec env binder@(id,occ_info) new_id new_rhs
+  = returnSmpl (new_env , [NonRec new_id new_rhs])
+  where
+    new_env = extendEnvGivenBinding (extendIdEnvWithClone env binder new_id)
+				    occ_info new_id new_rhs
+\end{code}
+
+----------------------------------------------------------------------------
+	A digression on constructor CSE
+
+Consider
 @
 	f = \x -> case x of
 		    (y:ys) -> y:ys
@@ -1029,12 +1118,14 @@ variable) when we find a let-expression:
 	... (let y = C a1 .. an in ...) ...
 @
 where it is always good to ditch the binding for y, and replace y by
-x.  That's just what completeLetBinding does.
+x.
+		End of digression
+----------------------------------------------------------------------------
 
+----------------------------------------------------------------------------
+		A digression on "optimising" coercions
 
-\begin{code}
-{- FAILED CODE
-   The trouble is that we keep transforming
+   The trouble is that we kept transforming
 		let x = coerce e
 		    y = coerce x
 		in ...
@@ -1043,7 +1134,7 @@ x.  That's just what completeLetBinding does.
 		    y' = coerce x'
 		in ...
    and counting a couple of ticks for this non-transformation
-
+\begin{pseudocode}
 	-- We want to ensure that all let-bound Coerces have 
 	-- atomic bodies, so they can freely be inlined.
 completeNonRec env binder new_id (Coerce coercion ty rhs)
@@ -1062,50 +1153,10 @@ completeNonRec env binder new_id (Coerce coercion ty rhs)
 		   (Coerce coercion ty atomic_rhs)	`thenSmpl` \ (env2, binds2) ->
 
     returnSmpl (env2, binds1 ++ binds2)
--}
+\end{pseudocode}
+----------------------------------------------------------------------------
 
 
-	-- Right hand sides that are constructors
-	--	let v = C args
-	--	in
-	--- ...(let w = C same-args in ...)...
-	-- Then use v instead of w.	 This may save
-	-- re-constructing an existing constructor.
-completeNonRec env binder new_id rhs@(Con con con_args)
-  | switchIsSet env SimplReuseCon && 
-    maybeToBool maybe_existing_con &&
-    not (isExported new_id)		-- Don't bother for exported things
-					-- because we won't be able to drop
-					-- its binding.
-  = tick ConReused		`thenSmpl_`
-    returnSmpl (extendIdEnvWithAtom env binder (VarArg it), [NonRec new_id rhs])
-  where
-    maybe_existing_con = lookForConstructor env con con_args
-    Just it 	       = maybe_existing_con
-
-
-	-- Default case
-	-- Check for atomic right-hand sides.
-	-- We used to have a "tick AtomicRhs" in here, but it causes more trouble
-	-- than it's worth.  For a top-level binding a = b, where a is exported,
-	-- we can't drop the binding, so we get repeated AtomicRhs ticks
-completeNonRec env binder@(id,occ_info) new_id new_rhs
- | is_atomic eta'd_rhs 		-- If rhs (after eta reduction) is atomic
- = returnSmpl (atomic_env , [NonRec new_id eta'd_rhs])
-
- | otherwise			-- Non atomic rhs (don't eta after all)
- = returnSmpl (non_atomic_env , [NonRec new_id new_rhs])
- where
-   atomic_env = extendIdEnvWithAtom env binder the_arg
-
-   non_atomic_env = extendEnvGivenBinding (extendIdEnvWithClone env binder new_id)
-					  occ_info new_id new_rhs
-
-   eta'd_rhs = etaCoreExpr new_rhs
-   the_arg   = case eta'd_rhs of
-		  Var v -> VarArg v
-		  Lit l -> LitArg l
-\end{code}
 
 %************************************************************************
 %*									*
