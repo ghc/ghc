@@ -39,6 +39,13 @@ Executive summary of our extensions:
 
 	<variablelist>
 	  <varlistentry>
+	    <term>Class method types:</term>
+	    <listitem>
+	      <para><xref LinkEnd="classs-method-types"></para>
+	    </listitem>
+	  </varlistentry>
+
+	  <varlistentry>
 	    <term>Multi-parameter type classes:</term>
 	    <listitem>
 	      <para><xref LinkEnd="multi-param-type-classes"></para>
@@ -627,6 +634,27 @@ qualifier list has just one element, a boolean expression.
     branches.</para>
 
   </sect1>
+
+<sect1 id="class-method-types">
+<title>Class method types
+</title>
+<para>
+Haskell 98 prohibits class method types to mention constraints on the
+class type variable, thus:
+<programlisting>
+  class Seq s a where
+    fromList :: [a] -> s a
+    elem     :: Eq a => a -> s a -> Bool
+</programlisting>
+The type of <literal>elem</literal> is illegal in Haskell 98, because it
+contains the constraint <literal>Eq a</literal>, constrains only the 
+class type variable (in this case <literal>a</literal>).
+</para>
+<para>
+With the <option>-fglasgow-exts</option> GHC lifts this restriction.
+</para>
+
+</sect1>
 
 <sect1 id="multi-param-type-classes">
 <title>Multi-parameter type classes
