@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.93 2002/06/10 02:13:03 matthewc Exp $
+ * $Id: Linker.c,v 1.94 2002/06/11 08:06:33 matthewc Exp $
  *
  * (c) The GHC Team, 2000, 2001
  *
@@ -2115,7 +2115,9 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    switch (ehdr->e_machine) {
       case EM_386:   IF_DEBUG(linker,belch( "x86" )); break;
       case EM_SPARC: IF_DEBUG(linker,belch( "sparc" )); break;
+#ifdef EM_IA_64
       case EM_IA_64: IF_DEBUG(linker,belch( "ia64" )); break;
+#endif
       default:       IF_DEBUG(linker,belch( "unknown" ));
                      belch("%s: unknown architecture", oc->fileName);
                      return 0;
