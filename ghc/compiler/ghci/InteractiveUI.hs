@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: InteractiveUI.hs,v 1.56 2001/03/23 12:12:18 simonmar Exp $
+-- $Id: InteractiveUI.hs,v 1.57 2001/03/25 13:29:54 simonmar Exp $
 --
 -- GHC Interactive User Interface
 --
@@ -83,12 +83,13 @@ helpText = "\
 \\  
 \   <stmt>		evaluate/run <stmt>\n\ 
 \   :cd <dir>		change directory to <dir>\n\ 
-\   :def <cmd> <expr>   define a macro :<cmd>\n\ 
+\   :def <cmd> <expr>   define a command :<cmd>\n\ 
 \   :help, :?		display this list of commands\n\ 
 \   :load <filename>    load a module (and it dependents)\n\ 
 \   :module <mod>	set the context for expression evaluation to <mod>\n\ 
 \   :reload		reload the current module set\n\ 
 \   :set <option> ...	set options\n\ 
+\   :undef <name> 	undefine user-defined command :<name>\n\ 
 \   :type <expr>	show the type of <expr>\n\ 
 \   :unset <option> ...	unset options\n\ 
 \   :quit		exit GHCi\n\ 
@@ -156,10 +157,12 @@ runGHCi = do
   case home of
    Left e  -> return ()
    Right dir -> do
-  	dot_ghci <- io (IO.try (openFile (dir ++ "/.ghci") ReadMode))
-	case dot_ghci of
-	   Left e -> return ()
-	   Right hdl -> fileLoop hdl False
+	cwd <- io (getCurrentDirectory)
+	when (dir /= cwd) $ do
+  	  dot_ghci <- io (IO.try (openFile (dir ++ "/.ghci") ReadMode))
+  	  case dot_ghci of
+  	     Left e -> return ()
+  	     Right hdl -> fileLoop hdl False
 
   -- read commands from stdin
 #ifndef NO_READLINE
@@ -296,7 +299,7 @@ specialCommand str = do
 	         	     	       foldr1 (\a b -> a ++ ',':b) (map fst cs)
 					 ++ ")") >> return False)
 
-noArgs c = io (hPutStrLn stdout ("command `:" ++ c ++ "' takes no arguments"))
+noArgs c = throwDyn (OtherError ("command `" ++ c ++ "' takes no arguments"))
 
 -----------------------------------------------------------------------------
 -- Commands
