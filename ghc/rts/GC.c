@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.138 2002/08/16 13:29:06 simonmar Exp $
+ * $Id: GC.c,v 1.139 2002/09/05 16:26:33 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1727,6 +1727,15 @@ loop:
       const StgInfoTable* selectee_info;
       StgClosure* selectee = ((StgSelector*)q)->selectee;
 
+      // We only recurse a certain depth through selector thunks.
+      // NOTE: the depth is maintained manually, and we must be very
+      // careful to always decrement it before returning.
+      //
+      thunk_selector_depth++;
+      if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
+	  goto selector_abandon;
+      }
+
     selector_loop:
       selectee_info = get_itbl(selectee);
       switch (selectee_info->type) {
@@ -1746,29 +1755,30 @@ loop:
 		 (StgWord32)(selectee_info->layout.payload.ptrs + 
 		            selectee_info->layout.payload.nptrs));
 
+	  // The thunk is now under evaluation, so we overwrite it
+	  // with a BLACKHOLE.  This has a beneficial effect if the
+	  // selector thunk eventually refers to itself: we won't
+	  // recurse indefinitely, and the object which eventually
+	  // gets evacuated will be a BLACKHOLE (as it should be: a
+	  // selector thunk which refers to itself can only have value
+	  // _|_).
+	  SET_INFO(q,&stg_BLACKHOLE_info);
+
 	  // perform the selection! 
-	  q = selectee->payload[offset];
+	  selectee = selectee->payload[offset];
           if (major_gc==rtsTrue) {TICK_GC_SEL_MAJOR();} else {TICK_GC_SEL_MINOR();}
-
-	  /* if we're already in to-space, there's no need to continue
-	   * with the evacuation, just update the source address with
-	   * a pointer to the (evacuated) constructor field.
-	   */
-	  if (HEAP_ALLOCED(q)) {
-	    bdescr *bd = Bdescr((P_)q);
-	    if (bd->flags & BF_EVACUATED) {
-	      if (bd->gen_no < evac_gen) {
-		failed_to_evac = rtsTrue;
-		TICK_GC_FAILED_PROMOTION();
-	      }
-	      return q;
-	    }
-	  }
-
-	  /* otherwise, carry on and evacuate this constructor field,
-	   * (but not the constructor itself)
-	   */
-	  goto loop;
+	  // Carry on and evacuate this constructor field,
+	  // (but not the constructor itself)
+	  //
+	  // It is tempting to just 'goto loop;' at this point, but
+	  // that doesn't give us a way to decrement
+	  // thunk_selector_depth later.  So we recurse (boundedly)
+	  // into evacuate().
+	  // 
+	  selectee = evacuate(selectee);
+	  upd_evacuee(q,selectee);
+	  thunk_selector_depth--;
+	  return selectee;
 	}
 
       case IND:
@@ -1780,34 +1790,28 @@ loop:
 	goto selector_loop;
 
       case EVACUATED:
-	selectee = ((StgEvacuated *)selectee)->evacuee;
-	goto selector_loop;
+	  // We could follow forwarding pointers here too, but we don't
+	  // for two reasons:
+	  //    * If the constructor has already been evacuated, then
+	  //      we're only doing the evaluation early, not fixing a
+	  //      space leak.
+	  //    * When we finally reach the destination, we have to
+	  //      figure out whether we are in to-space or not, and this
+	  //      is somewhat awkward.
+	  //
+	  //   selectee = ((StgEvacuated *)selectee)->evacuee;
+	  //   goto selector_loop;
+	  break;
 
       case THUNK_SELECTOR:
-#         if 0
-          /* Disabled 03 April 2001 by JRS; it seems to cause the GC (or
-             something) to go into an infinite loop when the nightly
-             stage2 compiles PrelTup.lhs. */
-
 	  /* we can't recurse indefinitely in evacuate(), so set a
 	   * limit on the number of times we can go around this
 	   * loop.
 	   */
-	  if (thunk_selector_depth < MAX_THUNK_SELECTOR_DEPTH) {
-	      bdescr *bd;
-	      bd = Bdescr((P_)selectee);
-	      if (!bd->flags & BF_EVACUATED) {
-		  thunk_selector_depth++;
-		  selectee = evacuate(selectee);
-		  thunk_selector_depth--;
-		  goto selector_loop;
-	      }
-	  } else {
-              TICK_GC_SEL_ABANDONED();
-              // and fall through...
-          }
-#         endif
-
+	  q = evacuate(selectee);
+	  thunk_selector_depth--;
+	  return q;
+	  
       case AP_UPD:
       case THUNK:
       case THUNK_1_0:
@@ -1821,8 +1825,8 @@ loop:
       case SE_BLACKHOLE:
       case BLACKHOLE:
       case BLACKHOLE_BQ:
-	// not evaluated yet 
-	break;
+	  // not evaluated yet 
+	  break;
 
 #if defined(PAR)
 	// a copy of the top-level cases below 
@@ -1833,12 +1837,14 @@ loop:
   	  //ToDo: derive size etc from reverted IP
   	  //to = copy(q,size,stp);
   	  // recordMutable((StgMutClosure *)to);
+	  thunk_selector_depth--;
   	  return to;
   	}
     
       case BLOCKED_FETCH:
   	ASSERT(sizeofW(StgBlockedFetch) >= MIN_NONUPD_SIZE);
   	to = copy(q,sizeofW(StgBlockedFetch),stp);
+	thunk_selector_depth--;
   	return to;
 
 # ifdef DIST    
@@ -1847,11 +1853,13 @@ loop:
       case FETCH_ME:
   	ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
   	to = copy(q,sizeofW(StgFetchMe),stp);
+	thunk_selector_depth--;
   	return to;
     
       case FETCH_ME_BQ:
   	ASSERT(sizeofW(StgBlockedFetch) >= MIN_UPD_SIZE);
   	to = copy(q,sizeofW(StgFetchMeBlockingQueue),stp);
+	thunk_selector_depth--;
   	return to;
 #endif
 
@@ -1860,6 +1868,8 @@ loop:
 	     (int)(selectee_info->type));
       }
     }
+  selector_abandon:
+    thunk_selector_depth--;
     return copy(q,THUNK_SELECTOR_sizeW(),stp);
 
   case IND:
@@ -1942,7 +1952,7 @@ loop:
      */
     if (evac_gen > 0) {		// optimisation 
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
-      if (Bdescr((P_)p)->gen_no < evac_gen) {
+      if (HEAP_ALLOCED(p) && Bdescr((P_)p)->gen_no < evac_gen) {
 	failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
       }
@@ -2199,6 +2209,8 @@ scavenge(step *stp)
     info = get_itbl((StgClosure *)p);
     ASSERT(p && (LOOKS_LIKE_GHC_INFO(info) || IS_HUGS_CONSTR_INFO(info)));
     
+    ASSERT(thunk_selector_depth == 0);
+
     q = p;
     switch (info->type) {
 	
