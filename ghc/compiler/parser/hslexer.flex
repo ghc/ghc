@@ -315,28 +315,34 @@ NL  	    	    	[\n\r]
 
 <Code,GlaExt>"{-#"{WS}*"INTERFACE" {
 			      PUSH_STATE(UserPragma);
+			      forgetindent = TRUE;
 			      RETURN(INTERFACE_UPRAGMA);
 			    }
 <Code,GlaExt>"{-#"{WS}*"SPECIALI"[SZ]E {
 			      PUSH_STATE(UserPragma);
+			      forgetindent = TRUE;
 			      RETURN(SPECIALISE_UPRAGMA);
 			    }
 <Code,GlaExt>"{-#"{WS}*"INLINE" {
 			      PUSH_STATE(UserPragma);
+			      forgetindent = TRUE;
 			      RETURN(INLINE_UPRAGMA);
 			    }
 <Code,GlaExt>"{-#"{WS}*"MAGIC_UNFOLDING" {
 			      PUSH_STATE(UserPragma);
+			      forgetindent = TRUE;
 			      RETURN(MAGIC_UNFOLDING_UPRAGMA);
 			    }
 <Code,GlaExt>"{-#"{WS}*"GENERATE_SPECS" {
 			      /* these are handled by hscpp */
 			      nested_comments =1;
+			      forgetindent = TRUE;
                               PUSH_STATE(Comment);
 			    }
 <Code,GlaExt>"{-#"{WS}*"OPTIONS" {
 			      /* these are for the driver! */
 			      nested_comments =1;
+			      forgetindent = TRUE;
                               PUSH_STATE(Comment);
 			    }
 <Code,GlaExt>"{-#"{WS}*"SOURCE"{WS}*"#"?"-}" {
@@ -355,7 +361,15 @@ NL  	    	    	[\n\r]
 			      nested_comments = 1;
 			      PUSH_STATE(Comment);
 			    }
-<UserPragma>"#-}"	    { POP_STATE; RETURN(END_UPRAGMA); }
+<UserPragma>"#-}"	    { POP_STATE; 
+		              forgetindent=FALSE; 
+			      /* don't want any layout processing here,
+			       * so just use 'return' instead of 'RETURN',
+			       * remembering to set hssttok.
+			       */
+			      hssttok = -1;
+			      return(END_UPRAGMA); 
+			    }
 
 %{
     /*
