@@ -9,9 +9,9 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Show.hs,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+-- $Id: Show.hs,v 1.2 2001/07/04 12:06:33 simonmar Exp $
 --
--- Exiting the program.
+-- The Show class and associated functions.
 --
 -----------------------------------------------------------------------------
 
@@ -26,9 +26,21 @@ module Text.Show (
    showChar,		-- :: Char -> ShowS
    showString,		-- :: String -> ShowS
    showParen,		-- :: Bool -> ShowS -> ShowS
+   showListWith,	-- :: (a -> ShowS) -> [a] -> ShowS 
  ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Show
 #endif   
 
+#ifdef __GLASGOW_HASKELL__
+showListWith :: (a -> ShowS) -> [a] -> ShowS 
+showListWith = showList__
+#else
+showList__ :: (a -> ShowS) ->  [a] -> ShowS
+showList__ _     []     s = "[]" ++ s
+showList__ showx (x:xs) s = '[' : showx x (showl xs)
+  where
+    showl []     = ']' : s
+    showl (y:ys) = ',' : showx y (showl ys)
+#endif
