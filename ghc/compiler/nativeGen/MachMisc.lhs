@@ -36,7 +36,7 @@ module MachMisc (
     ) where
 
 #include "HsVersions.h"
--- #include "config.h"
+#include "../includes/config.h"
 
 import AbsCSyn		( MagicId(..) ) 
 import AbsCUtils	( magicIdPrimRep )
