@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.3 2001/07/24 15:13:01 simonmar Exp $
+ * $Id: GCCompact.c,v 1.4 2001/07/25 11:55:57 simonmar Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -148,18 +148,23 @@ thread_static( StgClosure* p )
       
     case IND_STATIC:
 	thread((StgPtr)&((StgInd *)p)->indirectee);
-	break;
+	p = IND_STATIC_LINK(p);
+	continue;
       
     case THUNK_STATIC:
+	p = THUNK_STATIC_LINK(p);
+	continue;
     case FUN_STATIC:
+	p = FUN_STATIC_LINK(p);
+	continue;
     case CONSTR_STATIC:
-	break;
+	p = STATIC_LINK(info,p);
+	continue;
       
     default:
 	barf("thread_static: strange closure %d", (int)(info->type));
     }
 
-    p = STATIC_LINK(info,p);
   }
 }
 
