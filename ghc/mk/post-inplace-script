@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# $1 is $(platform)
+# $2 is root of the unpacked tarfile tree
+# $3 is $(package)-$(version) ie ghc-4.11 
+
+echo POST_INPLACE_SCRIPT $1 $2 $3
+
+bin/$1/pkgconf install "$1" "" "YES" "" "$2/lib/$1" "$2/lib/$1" "$2/lib/$1" "" "$2/lib/$1/include" "" > $2/lib/$1/package.conf
