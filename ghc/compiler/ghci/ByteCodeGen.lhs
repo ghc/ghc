@@ -29,13 +29,16 @@ import VarSet		( VarSet, varSetElems )
 import PrimRep		( getPrimRepSize, isFollowableRep )
 import Constants	( wORD_SIZE )
 
+import Monad		( foldM )
 import Foreign		( Addr, Word16, Word32, nullAddr )
 import ST		( runST )
-import MutableArray	( readWord32Array,
-			  newFloatArray, writeFloatArray,
-			  newDoubleArray, writeDoubleArray,
-			  newIntArray, writeIntArray,
-			  newAddrArray, writeAddrArray )
+--import MutableArray	( readWord32Array,
+--			  newFloatArray, writeFloatArray,
+--			  newDoubleArray, writeDoubleArray,
+--			  newIntArray, writeIntArray,
+--			  newAddrArray, writeAddrArray )
+
+import MArray
 \end{code}
 
 Entry point.
@@ -64,28 +67,32 @@ byteCodeGen binds
 
 type LocalLabel = Int
 
+data UnboxedLit = UnboxedI Int | UnboxedF Float | UnboxedD Double
+
 data BCInstr
    -- Messing with the stack
    = ARGCHECK  Int
+   -- Push locals (existing bits of the stack)
    | PUSH_L    Int{-offset-}
    | PUSH_LL   Int Int{-2 offsets-}
    | PUSH_LLL  Int Int Int{-3 offsets-}
+   -- Push a ptr
    | PUSH_G    Name
-   | PUSH_AS   Name --Int	-- push alts and BCO_ptr_ret_info
-			-- Int is lit pool offset for itbl
-   | PUSH_LIT  Int	-- push literal word from offset pool
+   -- Push an alt continuation
+   | PUSH_AS   Name PrimRep	-- push alts and BCO_ptr_ret_info
+				-- PrimRep so we know which itbl
+   -- Pushing literals
+   | PUSH_UBX  Literal	-- push this int/float/double, NO TAG, on the stack
    | PUSH_TAG  Int      -- push this tag on the stack
-   | PUSHU_I   Int	-- push this int, NO TAG, on the stack
-   | PUSHU_F   Float	-- ... float ...
-   | PUSHU_D   Double	-- ... double ...
+
    | SLIDE     Int{-this many-} Int{-down by this much-}
    -- To do with the heap
    | ALLOC     Int	-- make an AP_UPD with this many payload words, zeroed
    | MKAP      Int{-ptr to AP_UPD is this far down stack-} Int{-# words-}
    | UNPACK    Int	-- unpack N ptr words from t.o.s Constr
-   | UNPACK_I  Int	-- unpack and tag an Int, from t.o.s Constr @ offset
-   | UNPACK_F  Int	-- unpack and tag a Float, from t.o.s Constr @ offset
-   | UNPACK_D  Int	-- unpack and tag a Double, from t.o.s Constr @ offset
+   | UPK_TAG   Int Int Int
+			-- unpack N non-ptr words from offset M in constructor
+			-- K words down the stack
    | PACK      DataCon Int
    -- For doing case trees
    | LABEL     LocalLabel
@@ -110,15 +117,11 @@ instance Outputable BCInstr where
    ppr (PUSH_LL o1 o2)       = text "PUSH_LL " <+> int o1 <+> int o2
    ppr (PUSH_LLL o1 o2 o3)   = text "PUSH_LLL" <+> int o1 <+> int o2 <+> int o3
    ppr (PUSH_G nm)           = text "PUSH_G  " <+> ppr nm
-   ppr (PUSH_AS nm)          = text "PUSH_AS " <+> ppr nm
-   ppr (PUSHU_I i)           = text "PUSHU_I " <+> int i
+   ppr (PUSH_AS nm pk)       = text "PUSH_AS " <+> ppr nm <+> ppr pk
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC sz)            = text "ALLOC   " <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int offset <+> int sz
    ppr (UNPACK sz)           = text "UNPACK  " <+> int sz
-   ppr (UNPACK_I sz)         = text "UNPACK_I" <+> int sz
-   ppr (UNPACK_F sz)         = text "UNPACK_F" <+> int sz
-   ppr (UNPACK_D sz)         = text "UNPACK_D" <+> int sz
    ppr (PACK dcon sz)        = text "PACK    " <+> ppr dcon <+> ppr sz
    ppr (LABEL     lab)       = text "__"       <> int lab <> colon
    ppr (TESTLT_I  i lab)     = text "TESTLT_I" <+> int i <+> text "__" <> int lab
@@ -288,8 +291,9 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
         d' = d + ret_frame_sizeW + taggedIdSizeW bndr
         p' = addToFM p bndr (d' - 1)
 
+        scrut_primrep = typePrimRep (idType bndr)
         isAlgCase
-           = case typePrimRep (idType bndr) of
+           = case scrut_primrep of
                 IntRep -> False ; FloatRep -> False ; DoubleRep -> False
                 PtrRep -> True
                 other  -> pprPanic "ByteCodeGen.schemeE" (ppr other)
@@ -303,7 +307,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
                  p''          = addListToFM 
                                    p' (zip binds_r (mkStackOffsets d' binds_r_szsw))
                  d''          = d' + binds_szw
-                 unpack_code  = mkUnpackCode 0 (map (typePrimRep.idType) binds_f)
+                 unpack_code  = mkUnpackCode 0 0 (map (typePrimRep.idType) binds_f)
              in schemeE d'' s p'' rhs	`thenBc` \ rhs_code -> 
                 returnBc (my_discr alt, unpack_code `appOL` rhs_code)
            | otherwise 
@@ -336,7 +340,7 @@ schemeE d s p (fvs, AnnCase scrut bndr alts)
              (d + ret_frame_sizeW) p scrut		`thenBc` \ scrut_code ->
 
      emitBc alt_bco 					`thenBc_`
-     returnBc (PUSH_AS alt_bco_name `consOL` scrut_code)
+     returnBc (PUSH_AS alt_bco_name scrut_primrep `consOL` scrut_code)
 
 
 schemeE d s p (fvs, AnnNote note body)
@@ -388,22 +392,29 @@ should_args_be_tagged (_, other)
 
 -- Make code to unpack a constructor onto the stack, adding
 -- tags for the unboxed bits.  Takes the PrimReps of the constructor's
--- arguments, and a travelling offset along the *constructor*.
-mkUnpackCode :: Int -> [PrimRep] -> BCInstrList
-mkUnpackCode off [] = nilOL
-mkUnpackCode off (r:rs)
+-- arguments, and a travelling offset along both the constructor
+-- (off_h) and the stack (off_s).
+mkUnpackCode :: Int -> Int -> [PrimRep] -> BCInstrList
+mkUnpackCode off_h off_s [] = nilOL
+mkUnpackCode off_h off_s (r:rs)
    | isFollowableRep r
    = let (rs_ptr, rs_nptr) = span isFollowableRep (r:rs)
          ptrs_szw = sum (map untaggedSizeW rs_ptr) 
      in  ASSERT(ptrs_szw == length rs_ptr)
-         UNPACK ptrs_szw `consOL` mkUnpackCode (off+ptrs_szw) rs_nptr
+         ASSERT(off_h == 0)
+         ASSERT(off_s == 0)
+         UNPACK ptrs_szw 
+         `consOL` mkUnpackCode (off_h + ptrs_szw) (off_s + ptrs_szw) rs_nptr
    | otherwise
    = case r of
-        IntRep    -> UNPACK_I off `consOL` theRest
-        FloatRep  -> UNPACK_F off `consOL` theRest
-        DoubleRep -> UNPACK_D off `consOL` theRest
+        IntRep    -> approved
+        FloatRep  -> approved
+        DoubleRep -> approved
      where
-        theRest = mkUnpackCode (off+untaggedSizeW r) rs
+        approved = UPK_TAG usizeW off_h off_s   `consOL` theRest
+        theRest  = mkUnpackCode (off_h + usizeW) (off_s + tsizeW) rs
+        usizeW   = untaggedSizeW r
+        tsizeW   = taggedSizeW r
 
 -- Push an atom onto the stack, returning suitable code & number of
 -- stack words used.  Pushes it either tagged or untagged, since 
@@ -458,9 +469,11 @@ pushAtom True d p (AnnLit lit)
 
 pushAtom False d p (AnnLit lit)
    = case lit of
-        MachInt i    -> (unitOL (PUSHU_I (fromInteger i)),  untaggedSizeW IntRep)
-        MachFloat r  -> (unitOL (PUSHU_F (fromRational r)), untaggedSizeW FloatRep)
-        MachDouble r -> (unitOL (PUSHU_D (fromRational r)), untaggedSizeW DoubleRep)
+        MachInt i    -> (code, untaggedSizeW IntRep)
+        MachFloat r  -> (code, untaggedSizeW FloatRep)
+        MachDouble r -> (code, untaggedSizeW DoubleRep)
+     where
+        code = unitOL (PUSH_UBX lit)
 
 pushAtom tagged d p (AnnApp f (_, AnnType _))
    = pushAtom tagged d p (snd f)
@@ -702,7 +715,7 @@ data BCO a = BCO [Word16] 	-- instructions
                  [a] 		-- Names or HValues
 
 -- Top level assembler fn.
-assembleBCO :: ProtoBCO Name -> BCO Name
+assembleBCO :: ProtoBCO Name -> IO AsmState
 assembleBCO (ProtoBCO nm instrs origin)
    = let
          -- pass 1: collect up the offsets of the local labels
@@ -719,111 +732,126 @@ assembleBCO (ProtoBCO nm instrs origin)
                  Just bco_offset -> bco_offset
                  Nothing -> pprPanic "assembleBCO.findLabel" (int lab)
 
-         -- pass 2: generate the instruction, ptr and nonptr bits
-         (insnW16s, litW32s, ptrs) = mkBits findLabel [] 0 [] 0 [] 0 instrs
+         init_n_insns = 10
+         init_n_lits = 4
+         init_n_ptrs = 4
      in
-         BCO insnW16s litW32s ptrs
+     do  insns <- newXIOUArray init_n_insns :: IO (XIOUArray Word16)
+         lits  <- newXIOUArray init_n_lits  :: IO (XIOUArray Word32)
+         ptrs  <- newXIOArray  init_n_ptrs  -- :: IO (XIOArray Name)
+
+         -- pass 2: generate the instruction, ptr and nonptr bits
+         let init_asm_state = (insns,lits,ptrs)
+         final_asm_state <- mkBits findLabel init_asm_state instrs         
+     
+         return final_asm_state
+
+
+-- instrs nonptrs ptrs
+type AsmState = (XIOUArray Word16, XIOUArray Word32, XIOArray Name)
 
 
 -- This is where all the action is (pass 2 of the assembler)
-mkBits :: (Int -> Int) 		-- label finder
-       -> [Word16] -> Int 	-- reverse acc instr bits
-       -> [Word32] -> Int 	-- reverse acc literal bits
-       -> [Name] -> Int		-- reverse acc ptrs
-       -> [BCInstr]		-- insns!
-       -> ([Word16], [Word32], [Name])
+mkBits :: (Int -> Int) 			-- label finder
+       -> AsmState
+       -> [BCInstr]			-- instructions (in)
+       -> IO AsmState
 
-mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs []
-   = (reverse r_is, reverse r_lits, reverse r_ptrs)
-mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs (instr:instrs)
-   = case instr of
-        ARGCHECK  n        -> boring2 i_ARGCHECK n
-        PUSH_L    off      -> boring2 i_PUSH_L off
-        PUSH_LL   o1 o2    -> boring3 i_PUSH_LL o1 o2
-        PUSH_LLL  o1 o2 o3 -> boring4 i_PUSH_LLL o1 o2 o3
-        PUSH_G    nm       -> exciting2_P i_PUSH_G n_ptrs nm
-        PUSHU_I   i        -> exciting2_I i_PUSHU_I n_lits i
-        PUSHU_F   f        -> exciting2_F i_PUSHU_F n_lits f
-        PUSHU_D   d        -> exciting2_D i_PUSHU_D n_lits d
-        SLIDE     n by     -> boring3 i_SLIDE n by
-        ALLOC     n        -> boring2 i_ALLOC n
-        MKAP      off sz   -> boring3 i_MKAP off sz
-        UNPACK    n        -> boring2 i_UNPACK n
-        PACK      dcon sz  -> exciting3_A i_PACK sz n_lits nullAddr {-findItbl dcon-}
-        LABEL     lab      -> nop
-        TESTLT_I  i l      -> exciting3_I i_TESTLT_I n_lits (findLabel l) i
-        TESTEQ_I  i l      -> exciting3_I i_TESTEQ_I n_lits (findLabel l) i
-        TESTLT_F  f l      -> exciting3_F i_TESTLT_F n_lits (findLabel l) f
-        TESTEQ_F  f l      -> exciting3_F i_TESTEQ_F n_lits (findLabel l) f
-        TESTLT_D  d l      -> exciting3_D i_TESTLT_D n_lits (findLabel l) d
-        TESTEQ_D  d l      -> exciting3_D i_TESTEQ_D n_lits (findLabel l) d
-        TESTLT_P  i l      -> exciting3_I i_TESTLT_P n_lits (findLabel l) i
-        TESTEQ_P  i l      -> exciting3_I i_TESTEQ_P n_lits (findLabel l) i
-        CASEFAIL           -> boring1 i_CASEFAIL
-        ENTER              -> boring1 i_ENTER
-        RETURN             -> boring1 i_RETURN
+mkBits findLabel st proto_insns
+  = foldM doInstr st proto_insns
+  where
+   doInstr :: AsmState -> BCInstr -> IO AsmState
+   doInstr st i
+     = case i of
+        ARGCHECK  n        -> instr2 st i_ARGCHECK n
+{-
+        PUSH_L    o1       -> do { instr2 i_PUSH_L o1 }
+        PUSH_LL   o1 o2    -> do { instr3 i_PUSH_LL o1 o2 }
+        PUSH_LLL  o1 o2 o3 -> do { instr4 i_PUSH_LLL o1 o2 o3 }
+        PUSH_G    nm       -> do { p <- ptr nm; instr2 i_PUSH_G p }
+        PUSH_AS   nm pk    -> do { p <- ptr nm ; np <- ret_itbl pk; 
+                                   instr3 i_PUSH_AS p np }
+        PUSH_UBX  lit      -> do { np <- literal lit; instr2 i_PUSH_UBX np }
+        PUSH_TAG  tag      -> do { instr2 i_PUSH_TAG tag }
+        SLIDE     n by     -> do { instr3 i_SLIDE n by }
+        ALLOC     n        -> do { instr2 i_ALLOC n }
+        MKAP      off sz   -> do { instr3 i_MKAP off sz }
+        UNPACK    n        -> do { instr2 i_UNPACK n }
+        UPK_TAG   n m k    -> do { instr4 i_UPK_TAG n m k }
+        PACK      dcon sz  -> do { np <- itbl dcon; instr3 i_PACK np sz }
+        LABEL     lab      -> do { instr0 }
+        TESTLT_I  i l      -> do { np <- int i; instr3 i_TESTLT_I np (findLabel l) }
+        TESTRQ_I  i l      -> do { np <- int i; instr3 i_TESTEQ_I np (findLabel l) }
+        TESTLT_F  f l      -> do { np <- float f; instr3 i_TESTLT_F np (findLabel l) }
+        TESTEQ_F  f l      -> do { np <- float f; instr3 i_TESTEQ_F np (findLabel l) }
+        TESTLT_D  d l      -> do { np <- double d; instr3 i_TESTLT_D np (findLabel l) }
+        TESTEQ_D  d l      -> do { np <- double d; instr3 i_TESTEQ_D np (findLabel l) }
+        TESTLT_P  i l      -> do { np <- int i; instr3 i_TESTLT_P np (findLabel l) }
+        TESTEQ_P  i l      -> do { np <- int i; instr3 i_TESTEQ_P np (findLabel l) }
+        CASEFAIL           -> do { instr1 i_CASEFAIL }
+        ENTER              -> do { instr1 i_ENTER }
+-}
      where
-        r_mkILit = reverse . mkILit
-        r_mkFLit = reverse . mkFLit
-        r_mkDLit = reverse . mkDLit
-        r_mkALit = reverse . mkALit
+        instr2 (st_i0,st_l0,st_p0) i1 i2
+           = do st_i1 <- addToXIOUArray st_i0 (i2s i1)
+                st_i2 <- addToXIOUArray st_i1 (i2s i2)
+                return (st_i2,st_l0,st_p0)
 
-        mkw :: Int -> Word16
-        mkw = fromIntegral
+        i2s :: Int -> Word16
+        i2s = fromIntegral
 
-        nop
-           = mkBits findLabel r_is n_is r_lits n_lits r_ptrs n_ptrs instrs
-        boring1 i1
-           = mkBits findLabel (mkw i1 : r_is) (n_is+1) 
-                    r_lits n_lits r_ptrs n_ptrs instrs
-        boring2 i1 i2 
-           = mkBits findLabel (mkw i2 : mkw i1 : r_is) (n_is+2) 
-                    r_lits n_lits r_ptrs n_ptrs instrs
-        boring3 i1 i2 i3
-           = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) 
-                    r_lits n_lits r_ptrs n_ptrs instrs
-        boring4 i1 i2 i3 i4
-           = mkBits findLabel (mkw i4 : mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+4) 
-                    r_lits n_lits r_ptrs n_ptrs instrs
+{-
+        instr2 i1 i2       = instr i1 >> instr i2
+        instr3 i1 i2 i3    = instr2 i1 i2 >> instr i3
+        instr4 i1 i2 i3 i4 = instr2 i1 i2 >> instr2 i3 i4
 
-        exciting2_P i1 i2 p
-           = mkBits findLabel (mkw i2 : mkw i1 : r_is) (n_is+2) r_lits n_lits
-                    (p:r_ptrs) (n_ptrs+1) instrs
-        exciting3_P i1 i2 i3 p
-           = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) r_lits n_lits
-                    (p:r_ptrs) (n_ptrs+1) instrs
+        instr :: Word16 -> IO Ctrs
+        instr i 
+           = do n_is <- readIORef v_n_is
+                writeInstr n_is i
+                writeIORef v_n_is (n_is+1)
 
-        exciting2_I i1 i2 i
-           = mkBits findLabel (mkw i2 : mkw i1 : r_is) (n_is+2) 
-                    (r_mkILit i ++ r_lits) (n_lits + intLitSz32s)
-                    r_ptrs n_ptrs instrs
-        exciting3_I i1 i2 i3 i
-           = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) 
-                    (r_mkILit i ++ r_lits) (n_lits + intLitSz32s)
-                    r_ptrs n_ptrs instrs
 
-        exciting2_F i1 i2 f
-           = mkBits findLabel (mkw i2 : mkw i1 : r_is) (n_is+2) 
-                    (r_mkFLit f ++ r_lits) (n_lits + floatLitSz32s)
-                    r_ptrs n_ptrs instrs
-        exciting3_F i1 i2 i3 f
-           = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) 
-                    (r_mkFLit f ++ r_lits) (n_lits + floatLitSz32s)
-                    r_ptrs n_ptrs instrs
+        nop = go n_is n_lits n_ptrs instrs
 
-        exciting2_D i1 i2 d
-           = mkBits findLabel (mkw i2 : mkw i1 : r_is) (n_is+2) 
-                    (r_mkDLit d ++ r_lits) (n_lits + doubleLitSz32s)
-                    r_ptrs n_ptrs instrs
-        exciting3_D i1 i2 i3 d
-           = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) 
-                    (r_mkDLit d ++ r_lits) (n_lits + doubleLitSz32s)
-                    r_ptrs n_ptrs instrs
+        instr1 i1 next
+           = do writeInstr r_is i1 n_is
+	        next (n_is+1) n_lits n_ptrs instrs
+        instr2 i1 i2 next
+           = do writeInstr r_is i1 n_is
+		writeInstr r_is i1 (n_is+1)
+		next (n_is+2) n_lits n_ptrs instrs
+        instr3 i1 i2 i3 next
+           = do writeInstr r_is i1 n_is
+		writeInstr r_is i2 (n_is+1)
+		writeInstr r_is i3 (n_is+2)
+		next (n_is+3) n_lits n_ptrs instrs
 
-        exciting3_A i1 i2 i3 d
-           = mkBits findLabel (mkw i3 : mkw i2 : mkw i1 : r_is) (n_is+3) 
-                    (r_mkALit d ++ r_lits) (n_lits + addrLitSz32s)
-                    r_ptrs n_ptrs instrs
+	ptr p n_is n_lits n_ptrs instrs
+	   = do writeArray r_ptrs p n_ptrs
+		mkBits n_is n_lits (n_ptrs+1) instrs
+
+	int i n_is n_lits n_ptrs instrs
+	   = do n_lits <- doILit r_lits i n_lits
+		mkBits n_is n_lits n_ptrs instrs
+
+	float f n_is n_lits n_ptrs instrs
+	   = do n_lits <- doFLit r_lits f n_lits
+		mkBits n_is n_lits n_ptrs instrs
+
+	double d n_is n_lits n_ptrs instrs
+	   = do n_lits <- doDLit r_lits d n_lits
+		mkBits n_is n_lits n_ptrs instrs
+
+	addr a n_is n_lits n_ptrs instrs
+	   = do n_lits <- doALit r_lits a n_lits
+		mkBits n_is n_lits n_ptrs instrs
+-}
+
+--writeInstr :: MutableByteArray# -> Int -> Int -> IO ()
+--writeInstr arr# ix e = IO $ \s ->
+--  case writeWord16Array# arr# ix e of
+
 
 
 -- The size in bytes of an instruction.
@@ -835,9 +863,6 @@ instrSizeB instr
         PUSH_LL  _ _   -> 6
         PUSH_LLL _ _ _ -> 8
         PUSH_G   _     -> 4
-        PUSHU_I  _     -> 4
-        PUSHU_F  _     -> 4
-        PUSHU_D  _     -> 4
         SLIDE    _ _   -> 6
         ALLOC    _     -> 4
         MKAP     _ _   -> 6
@@ -876,7 +901,8 @@ mkFLit f
    = runST (do
         arr <- newFloatArray ((0::Int),0)
         writeFloatArray arr 0 f
-        w0 <- readWord32Array arr 0
+        f_arr <- castSTUArray arr
+        w0 <- readWord32Array f_arr 0
         return [w0]
      )
 
@@ -884,8 +910,9 @@ mkDLit d
    = runST (do
         arr <- newDoubleArray ((0::Int),0)
         writeDoubleArray arr 0 d
-        w0 <- readWord32Array arr 0
-        w1 <- readWord32Array arr 1
+        d_arr <- castSTUArray arr
+        w0 <- readWord32Array d_arr 0
+        w1 <- readWord32Array d_arr 1
         return [w0,w1]
      )
 
@@ -894,15 +921,17 @@ mkILit i
    = runST (do
         arr <- newIntArray ((0::Int),0)
         writeIntArray arr 0 i
-        w0 <- readWord32Array arr 0
+        i_arr <- castSTUArray arr
+        w0 <- readWord32Array i_arr 0
         return [w0]
      )
    | wORD_SIZE == 8
    = runST (do
         arr <- newIntArray ((0::Int),0)
         writeIntArray arr 0 i
-        w0 <- readWord32Array arr 0
-        w1 <- readWord32Array arr 1
+        i_arr <- castSTUArray arr
+        w0 <- readWord32Array i_arr 0
+        w1 <- readWord32Array i_arr 1
         return [w0,w1]
      )
    
@@ -911,18 +940,73 @@ mkALit a
    = runST (do
         arr <- newAddrArray ((0::Int),0)
         writeAddrArray arr 0 a
-        w0 <- readWord32Array arr 0
+        a_arr <- castSTUArray arr
+        w0 <- readWord32Array a_arr 0
         return [w0]
      )
    | wORD_SIZE == 8
    = runST (do
         arr <- newAddrArray ((0::Int),0)
         writeAddrArray arr 0 a
-        w0 <- readWord32Array arr 0
-        w1 <- readWord32Array arr 1
+        a_arr <- castSTUArray arr
+        w0 <- readWord32Array a_arr 0
+        w1 <- readWord32Array a_arr 1
         return [w0,w1]
      )
    
+
+
+-- Zero-based expandable arrays
+data XIOUArray ele = XIOUArray Int (IOUArray Int ele)
+data XIOArray  ele = XIOArray  Int (IOArray Int ele)
+
+newXIOUArray size
+   = do arr <- newArray (0, size-1)
+        return (XIOUArray 0 arr)
+
+addToXIOUArray :: MArray IOUArray a IO
+                  => XIOUArray a -> a -> IO (XIOUArray a)
+addToXIOUArray (XIOUArray n_arr arr) x
+   = case bounds arr of
+        (lo, hi) -> ASSERT(lo == 0)
+                    if   n_arr > hi
+                    then do new_arr <- newArray (0, 2*hi-1)
+                            copy hi arr new_arr
+                            addToXIOUArray (XIOUArray n_arr new_arr) x
+                    else do writeArray arr n_arr x
+                            return (XIOUArray (n_arr+1) arr)
+     where
+        copy :: MArray IOUArray a IO
+                => Int -> IOUArray Int a -> IOUArray Int a -> IO ()
+        copy n src dst
+           | n < 0     = return ()
+           | otherwise = do nx <- readArray src n
+                            writeArray dst n nx
+                            copy (n-1) src dst
+
+
+
+newXIOArray size
+   = do arr <- newArray (0, size-1)
+        return (XIOArray 0 arr)
+
+addToXIOArray :: XIOArray a -> a -> IO (XIOArray a)
+addToXIOArray (XIOArray n_arr arr) x
+   = case bounds arr of
+        (lo, hi) -> ASSERT(lo == 0)
+                    if   n_arr > hi
+                    then do new_arr <- newArray (0, 2*hi-1)
+                            copy hi arr new_arr
+                            addToXIOArray (XIOArray n_arr new_arr) x
+                    else do writeArray arr n_arr x
+                            return (XIOArray (n_arr+1) arr)
+     where
+        copy :: Int -> IOArray Int a -> IOArray Int a -> IO ()
+        copy n src dst
+           | n < 0     = return ()
+           | otherwise = do nx <- readArray src n
+                            writeArray dst n nx
+                            copy (n-1) src dst
 
 
 #include "Bytecodes.h"
