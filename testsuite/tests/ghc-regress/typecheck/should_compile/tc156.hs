@@ -1,4 +1,4 @@
-{-# -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts #-}
 
 -- Test infix type constructors
 
