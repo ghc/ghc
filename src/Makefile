@@ -37,8 +37,6 @@ endif
 HADDOCKBIN=$(FPTOOLS_TOP_ABS)/haddock/src/$(HS_PROG)
 endif # INSTALLING
 
-HADDOCKLIB=$(shell cygpath -w $(libdir) | sed -e 's%\\%/%g')
-
 HAPPY_OPTS += $(GHC_HAPPY_OPTS)
 
 INSTALLED_SCRIPT_PROG  = haddock-$(ProjectVersion)
