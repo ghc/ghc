@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.23 2000/08/07 23:37:23 qrczak Exp $
+ * $Id: ClosureMacros.h,v 1.24 2000/08/16 15:29:34 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -182,7 +182,7 @@ extern void* DATA_SECTION_END_MARKER_DECL;
 #  define IS_HUGS_CONSTR_INFO(info) 0 /* ToDo: more than mildly bogus */
 #endif
 
-#ifdef HAVE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
+#ifdef ENABLE_WIN32_DLL_SUPPORT /* needed for mingw DietHEP */
 #  define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) \
                                      && !LOOKS_LIKE_STATIC_CLOSURE(info))
 #else
