@@ -216,7 +216,7 @@ lookupTopBndrRn rdr_name
   | otherwise
   = getModeRn	`thenRn` \ mode ->
     if isInterfaceMode mode
-	then lookupIfaceName rdr_name	
+	then lookupSysBinder rdr_name	
     else 
     getModuleRn		`thenRn` \ mod ->
     getGlobalNameEnv	`thenRn` \ global_env ->
