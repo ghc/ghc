@@ -264,7 +264,9 @@ getStdGen :: IO StdGen
 getStdGen  = readIORef theStdGen
 
 theStdGen :: IORef StdGen
-theStdGen  = unsafePerformIO (newIORef (createStdGen 0))
+theStdGen  = unsafePerformIO $ do
+   rng <- mkStdRNG 0
+   newIORef rng
 
 newStdGen :: IO StdGen
 newStdGen = do
