@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.63 2004/08/13 13:09:30 simonmar Exp $
+ * $Id: Stg.h,v 1.64 2004/09/02 12:45:25 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2004
  *
@@ -124,6 +124,26 @@ typedef StgWord StgWordArray[];
    -------------------------------------------------------------------------- */
 
 #include "TailCalls.h"
+
+/* -----------------------------------------------------------------------------
+   Other Stg stuff...
+   -------------------------------------------------------------------------- */
+
+#include "StgDLL.h"
+#include "MachRegs.h"
+#include "Regs.h"
+#include "StgProf.h"  /* ToDo: separate out RTS-only stuff from here */
+
+#if IN_STG_CODE
+/*
+ * This is included later for RTS sources, after definitions of
+ * StgInfoTable, StgClosure and so on. 
+ */
+#include "StgMiscClosures.h"
+#endif
+
+/* RTS external interface */
+#include "RtsExternal.h"
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles
@@ -317,26 +337,6 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 }
 
 #endif
-
-/* -----------------------------------------------------------------------------
-   Other Stg stuff...
-   -------------------------------------------------------------------------- */
-
-#include "StgDLL.h"
-#include "MachRegs.h"
-#include "Regs.h"
-#include "StgProf.h"  /* ToDo: separate out RTS-only stuff from here */
-
-#if IN_STG_CODE
-/*
- * This is included later for RTS sources, after definitions of
- * StgInfoTable, StgClosure and so on. 
- */
-#include "StgMiscClosures.h"
-#endif
-
-/* RTS external interface */
-#include "RtsExternal.h"
 
 /* -----------------------------------------------------------------------------
    Split markers
