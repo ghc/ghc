@@ -37,7 +37,6 @@ import Name		( OccName(..), Provenance,
 		 	  minusNameSet, unionManyNameSets, elemNameSet, unitNameSet, nameSetToList
 			)
 import Maybes		( catMaybes )
---import PprStyle--ToDo:rm
 import Pretty
 import Util		( Ord3(..), thenCmp, isIn, removeDups, panic, panic#, assertPanic, assocDefault )
 import UniqSet		( SYN_IE(UniqSet) )
@@ -45,10 +44,7 @@ import ListSetOps	( minusList )
 import Bag		( bagToList )
 import UniqFM		( UniqFM )
 import ErrUtils		( SYN_IE(Error) )
-#if __GLASGOW_HASKELL__ >= 202
-import Outputable
-#endif
-
+import Outputable	( Outputable(..) )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
