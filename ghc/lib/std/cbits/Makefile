@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.19 2000/05/12 11:48:30 rrt Exp $
+# $Id: Makefile,v 1.20 2000/05/31 12:04:49 panne Exp $
 
 TOP = ../../..
 include $(TOP)/mk/boilerplate.mk
@@ -40,6 +40,17 @@ SRC_BLD_DLL_OPTS += -lwinmm -lwsock32 -lHSrts_imp -lgmp -L. -L../../../rts/gmp -
 # 
 CC=$(GHC_INPLACE)
 
+# ghc-inplace needs access to HsStd.h and its includes, so copy them into the
+# standard place.
+# NOTE 1: Installation of the header files into their final place is done via
+# GHC_INCLUDE_DIR. This is not nice, but there is no easy way out.
+# NOTE 2: Filtering out timezone.h is a little bit hacky, but we don't need it
+# after compilation.
+boot ::
+	cp $(filter-out timezone.h,$(wildcard *.h)) $(GHC_INCLUDE_DIR)
+
+CLEAN_FILES += $(foreach header_file, $(filter-out timezone.h,$(wildcard *.h)), $(GHC_INCLUDE_DIR)/$(header_file))
+
 SRC_MKDEPENDC_OPTS += -I$(GHC_INCLUDE_DIR)
 
 # -----------------------------------------------------------------------------
@@ -53,10 +64,5 @@ ifneq "$(way)" "dll"
 INSTALL_LIBS += $(patsubst %.a, %_imp.a, $(LIBRARY))
 endif
 endif
-
-# install header files for the I/O library.  Other code might want to
-# plug 
-override datadir:=$(libdir)/includes
-INSTALL_DATAS += $(wildcard *.h)
 
 include $(TOP)/mk/target.mk
