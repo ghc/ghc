@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: HsSyn.lhs,v 1.21 2004/08/02 20:31:13 panne Exp $
+% $Id: HsSyn.lhs,v 1.22 2004/08/09 11:55:07 simonmar Exp $
 %
 % (c) The GHC Team, 1997-2002
 %
@@ -29,6 +29,8 @@ module HsSyn (
     unit_tycon_name, fun_tycon_name, list_tycon_name, tuple_tycon_name,
     unit_tycon_qname, fun_tycon_qname, list_tycon_qname, tuple_tycon_qname,
     unit_tycon, fun_tycon, list_tycon, tuple_tycon,
+
+    emptyModuleInfo,
 
     hsIdentifierStr, hsAnchorNameStr, hsNameStr, 
 	
@@ -81,15 +83,25 @@ instance Show HsIdentifier where
 data HsModule = HsModule Module (Maybe [HsExportSpec])
                         [HsImportDecl] [HsDecl] 
 			(Maybe String)		-- the doc options
-			(Maybe ModuleInfo)	-- the info (portability etc.)
-			(Maybe Doc)		-- the module doc
+			ModuleInfo      	-- the info (portability etc.)
+                        (Maybe Doc)             -- the module doc.
   deriving Show
 
 data ModuleInfo = ModuleInfo
-	{ portability :: String,
-	  stability   :: String,
-	  maintainer  :: String }
+	{ description :: Maybe Doc,
+          portability :: Maybe String,
+	  stability   :: Maybe String,
+	  maintainer  :: Maybe String
+          }
   deriving Show
+
+emptyModuleInfo :: ModuleInfo
+emptyModuleInfo = ModuleInfo {
+   description = Nothing,
+   portability = Nothing,
+   stability = Nothing,
+   maintainer = Nothing
+   }
 
 -- Export/Import Specifications
 

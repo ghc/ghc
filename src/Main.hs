@@ -270,48 +270,13 @@ run flags files = do
   -- dump an interface if requested
   case dump_iface of
      Nothing -> return ()
-     Just fn -> do
-	bh <- openBinMem 100000
-	put_ bh prepared_ifaces
-	writeBinMem bh fn
-      where
-	prepared_ifaces = 
-	  [ (mdl, iface_package iface,
-		  OptHide `elem` iface_options iface,
-		  fmToList (iface_env iface), 
-		  fmToList (iface_reexported iface),
-		  fmToList (iface_sub iface))
-	  | (mdl, iface) <- these_mod_ifaces ]
+     Just fn -> dumpInterfaces these_mod_ifaces fn
 
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
   case break (==',') s of
 	(fpath,',':file) -> (fpath,file)
 	(file, _)        -> ("", file)
-
-readIface :: FilePath -> IO [(Module,Interface)]
-readIface filename = do
-  bh <- readBinMem filename
-  stuff <- get bh
-  return (map to_interface stuff)
- where 
-   to_interface (mdl, package, hide, env, reexported, sub) = 
-	  (mdl, Interface { 
-		   iface_filename     = "",
-		   iface_package      = package,
-		   iface_env          = listToFM env,
-		   iface_import_env   = emptyFM,
-		   iface_sub	      = listToFM sub,
-		   iface_reexported   = listToFM reexported,
-		   iface_exports      = [],
-		   iface_orig_exports = [],
-		   iface_insts	      = [],
-		   iface_decls        = emptyFM,
-		   iface_info	      = Nothing,
-		   iface_doc          = Nothing,
-		   iface_options      = if hide then [OptHide] else []
-		}
-      	  )
 		
 
 updateHTMLXRefs :: [FilePath] -> [[(Module,Interface)]] -> IO ()
@@ -1127,6 +1092,112 @@ collectInstances mod_ifaces
 		    | HsInstDecl _ ctxt (cls,args) _ <- all_instances,
 		      nm <- nub (concat (map freeTyCons args))
 		    ]
+
+-- -----------------------------------------------------------------------------
+-- The interface file format.
+-- This has to read interfaces up to Haddock 0.6 (without the short
+-- document annotations), and interfaces afterwards, so we use the
+-- FormatVersion hack to work out which one the interface file contains.
+
+thisFormatVersion :: FormatVersion
+thisFormatVersion = mkFormatVersion 1
+
+-- | How we store interfaces.  Not everything is stored.
+type StoredInterface =
+   (Module,Maybe Doc,Maybe String,Bool,[(HsName,HsQName)],[(HsName,HsQName)],
+      [(HsName,[HsName])])
+
+-- | How we used to store interfaces.
+type NullVersionStoredInterface = 
+   (Module,Maybe String,Bool,[(HsName,HsQName)],[(HsName,HsQName)],
+      [(HsName,[HsName])])
+
+dumpInterfaces :: [(Module,Interface)] -> FilePath -> IO ()
+dumpInterfaces interfaces fileName =
+   do
+      let
+         preparedInterfaces :: [StoredInterface]
+         preparedInterfaces = map from_interface interfaces
+
+      bh <- openBinMem 100000
+      put_ bh thisFormatVersion
+      put_ bh preparedInterfaces
+      writeBinMem bh fileName
+
+
+readIface :: FilePath -> IO [(Module,Interface)]
+readIface fileName = do
+   bh <- readBinMem fileName
+   formatVersion <- get bh
+   if formatVersion == thisFormatVersion
+      then
+         do
+            (stuff :: [StoredInterface]) <- get bh
+            return (map to_interface stuff)
+      else
+         if formatVersion == nullFormatVersion
+            then
+               do
+                  (stuff :: [NullVersionStoredInterface]) <- get bh
+                  return (map nullVersion_to_interface stuff)
+               else
+                  do
+                     noDieMsg (
+                        "Warning: The interface file " ++ show fileName 
+                           ++ " could not be read.\n"
+                           ++ "Maybe it's from a later version of Haddock?\n")
+                     return [] 
+
+from_interface :: (Module,Interface) -> StoredInterface
+from_interface (mdl,iface) =
+   (mdl, toDescription iface,iface_package iface,
+      OptHide `elem` iface_options iface,
+      fmToList (iface_env iface), 
+      fmToList (iface_reexported iface),
+      fmToList (iface_sub iface)
+      )
+
+to_interface :: StoredInterface -> (Module,Interface)
+to_interface (mdl,descriptionOpt,package, hide, env, reexported, sub) = 
+   (mdl, Interface { 
+      iface_filename     = "",
+      iface_package      = package,
+      iface_env          = listToFM env,
+      iface_import_env   = emptyFM,
+      iface_sub          = listToFM sub,
+      iface_reexported   = listToFM reexported,
+      iface_exports      = [],
+      iface_orig_exports = [],
+      iface_insts        = [],
+      iface_decls        = emptyFM,
+      iface_info         = toModuleInfo descriptionOpt,
+      iface_doc          = Nothing,
+      iface_options      = if hide then [OptHide] else []
+      })
+
+nullVersion_to_interface :: NullVersionStoredInterface -> (Module,Interface)
+nullVersion_to_interface (mdl, package, hide, env, reexported, sub) = 
+   (mdl, Interface { 
+      iface_filename     = "",
+      iface_package      = package,
+      iface_env          = listToFM env,
+      iface_import_env   = emptyFM,
+      iface_sub          = listToFM sub,
+      iface_reexported   = listToFM reexported,
+      iface_exports      = [],
+      iface_orig_exports = [],
+      iface_insts        = [],
+      iface_decls        = emptyFM,
+      iface_info         = emptyModuleInfo,
+      iface_doc          = Nothing,
+      iface_options      = if hide then [OptHide] else []
+      })
+
+toModuleInfo :: Maybe Doc -> ModuleInfo
+toModuleInfo descriptionOpt = 
+   emptyModuleInfo {description = descriptionOpt}
+
+
  
 -- -----------------------------------------------------------------------------
 -- A monad which collects error messages

@@ -20,7 +20,7 @@ import HaddockHH2
 import HaddockDevHelp
 import HsSyn
 
-import Maybe	( fromJust, isJust )
+import Maybe	( fromJust, isJust, mapMaybe )
 import List 	( sortBy )
 import Char	( isUpper, toUpper )
 import Monad	( when, unless )
@@ -194,17 +194,26 @@ pageHeader mdl iface doctitle source_url maybe_contents_url maybe_index_url =
 
 moduleInfo :: Interface -> HtmlTable
 moduleInfo iface = 
-  case iface_info iface of
-    Nothing   -> Html.emptyTable
-    Just info ->
-          tda [align "right"] << narrowTable << (
-        	  (tda [theclass "infohead"] << toHtml "Portability") <->
-        	  (tda [theclass "infoval"] << toHtml (portability info)) </>
-        	  (tda [theclass "infohead"] << toHtml "Stability") <->
-        	  (tda [theclass "infoval"] << toHtml (stability info)) </>
-        	  (tda [theclass "infohead"] << toHtml "Maintainer") <->
-        	  (tda [theclass "infoval"] << toHtml (maintainer info))
-              )
+   let
+      info = iface_info iface
+
+      doOneEntry :: (String,ModuleInfo -> Maybe String) -> Maybe HtmlTable
+      doOneEntry (fieldName,field) = case field info of
+         Nothing -> Nothing
+         Just fieldValue -> 
+            Just ((tda [theclass "infohead"] << toHtml fieldName)
+               <-> (tda [theclass "infoval"]) << toHtml fieldValue)
+     
+      entries :: [HtmlTable]
+      entries = mapMaybe doOneEntry [
+         ("Portability",portability),
+         ("Stability",stability),
+         ("Maintainer",maintainer)
+         ]
+   in
+      case entries of
+         [] -> Html.emptyTable
+         _ -> tda [align "right"] << narrowTable << (foldl1 (</>) entries)
 
 -- ---------------------------------------------------------------------------
 -- Generate the module contents
@@ -219,7 +228,8 @@ ppHtmlContents
    -> IO ()
 ppHtmlContents odir doctitle maybe_package maybe_html_help_format maybe_index_url
   mdls prologue = do
-  let tree = mkModuleTree [(mod,iface_package iface) | (mod,iface) <- mdls]
+  let tree = mkModuleTree 
+         [(mod,iface_package iface,toDescription iface) | (mod,iface) <- mdls]
       html = 
 	header 
 		(documentCharacterEncoding +++
@@ -262,12 +272,17 @@ ppModuleTree _ ts =
     (htmlTable,_) = genTable emptyTable 0 ts
 
 mkNode :: [String] -> ModuleTree -> Int -> (HtmlTable,Int)
-mkNode ss (Node s leaf pkg ts) id = htmlNode
+mkNode ss (Node s leaf pkg short ts) id = htmlNode
   where
     htmlNode = case ts of
-      [] -> ( pad_td (Just 1.25) << htmlModule                           <-> htmlPkg,id)
-      _  -> ((pad_td Nothing<< (collapsebutton id_s +++ htmlModule) <-> htmlPkg) </> 
+      [] -> ( pad_td (Just 1.25) << htmlModule  <-> shortDescr <-> htmlPkg,id)
+      _  -> ((pad_td Nothing<< (collapsebutton id_s +++ htmlModule) <-> shortDescr <-> htmlPkg) </> 
                 (pad_td (Just 2) << sub_tree), id')
+
+    shortDescr :: HtmlTable
+    shortDescr = case short of
+	Nothing -> td empty
+	Just doc -> tda [theclass "rdoc"] (docToHtml doc)
 
     htmlModule 
       | leaf      = ppHsModule mdl

@@ -10,7 +10,7 @@ module HaddockUtil (
   -- * Misc utilities
   nameOfQName, collectNames, declBinders, declMainBinder, declSubBinders, 
   splitTyConApp, restrictTo, declDoc, parseModuleHeader, freeTyCons, unbang,
-  addFieldDoc, addFieldDocs, addConDoc, addConDocs,
+  addFieldDoc, addFieldDocs, addConDoc, addConDocs,toDescription,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -19,11 +19,15 @@ module HaddockUtil (
   cssFile, iconFile, jsFile, plusFile, minusFile,
 
   -- * Miscellaneous utilities
-  getProgramName, bye, die, dieMsg, mapSnd, mapMaybeM, escapeStr,
+  getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
 
   -- * HTML cross reference mapping
   html_xrefs_ref,
  ) where
+
+import HaddockLex
+import HaddockParse
+import HaddockTypes
 
 import HsSyn
 
@@ -33,15 +37,13 @@ import IO	( hPutStr, stderr )
 import System
 import Binary
 import Monad
-import Char	( isAlpha, ord )
+import Char	( isAlpha, isSpace, toUpper, ord )
 
 #if __GLASGOW_HASKELL__ < 503
-import RegexString
 import FiniteMap
 import IOExts
 import URI	( escapeString, unreserved )
 #else
-import Text.Regex
 import Data.FiniteMap
 import Data.IORef
 import System.IO.Unsafe	 ( unsafePerformIO )
@@ -113,6 +115,10 @@ freeTyCons ty = go ty []
 	go (HsTyTuple _ ts) r = foldr go r ts
 	go (HsTyVar _) r = r
 	go (HsTyDoc t _) r = go t r
+
+-- | extract a module's short description.
+toDescription :: Interface -> Maybe Doc
+toDescription = description. iface_info
 
 -- -----------------------------------------------------------------------------
 -- Adding documentation to record fields (used in parsing).
@@ -189,42 +195,148 @@ declDoc _ = Nothing
 -- -----------------------------------------------------------------------------
 -- Parsing module headers
 
-parseModuleHeader :: String -> (String, Maybe ModuleInfo)
-parseModuleHeader str =
-  case matchRegexAll moduleHeaderRE str of
-#if __GLASGOW_HASKELL__ < 503
-	Just (_, _, after, _, (_:_:_:s1:s2:s3:_)) -> 
-#else
-	Just (_, _, after, (_:_:_:s1:s2:s3:_)) -> 
-#endif
-	   (after, Just (ModuleInfo { 
-				 portability = s3,
-				 stability   = s2,
-				 maintainer  = s1 }))
-	_other -> (str, Nothing)
+-- NB.  The headers must be given in the order Module, Description,
+-- Copyright, License, Maintainer, Stability, Portability, except that
+-- any or all may be omitted.
+parseModuleHeader :: String -> Either String (String,ModuleInfo)
+parseModuleHeader str0 = 
+   let
+      getKey :: String -> String -> (Maybe String,String)
+      getKey key str = case parseKey key str of
+         Nothing -> (Nothing,str)
+         Just (value,rest) -> (Just value,rest)
+     
+      (moduleOpt,str1) = getKey "Module" str0
+      (descriptionOpt,str2) = getKey "Description" str1
+      (copyrightOpt,str3) = getKey "Copyright" str2
+      (licenseOpt,str4) = getKey "License" str3
+      (maintainerOpt,str5) = getKey "Maintainer" str4
+      (stabilityOpt,str6) = getKey "Stability" str5
+      (portabilityOpt,str7) = getKey "Portability" str6
 
-moduleHeaderRE :: Regex
-moduleHeaderRE = mkRegexWithOpts
-			 "^([ \t\n]*Module[ \t]*:.*\n)?\ 
-			  \([ \t\n]*Copyright[ \t]*:.*\n)?\ 
-			  \([ \t\n]*License[ \t]*:.*\n)?\ 
-			  \[ \t\n]*Maintainer[ \t]*:(.*)\n\ 
-			  \[ \t\n]*Stability[ \t]*:(.*)\n\ 
-			  \[ \t\n]*Portability[ \t]*:([^\n]*)\n"
-		True -- match "\n" with "."
-		False -- not case sensitive
-	-- All fields except the last (Portability) may be multi-line.
-	-- This is so that the portability field doesn't swallow up the
-	-- rest of the module documentation - we might want to revist
-	-- this at some point (perhaps have a separator between the 
-	-- portability field and the module documentation?).
+      description1 :: Either String (Maybe Doc)
+      description1 = case descriptionOpt of
+         Nothing -> Right Nothing
+         Just description -> case parseString . tokenise $ description of
+            Left mess -> Left ("Cannot parse Description: " ++ mess)
+            Right doc -> Right (Just doc)
+   in
+      case description1 of
+         Left mess -> Left mess
+         Right docOpt -> Right (str7,ModuleInfo {
+            description = docOpt,
+            portability = portabilityOpt,
+            stability = stabilityOpt,
+            maintainer = maintainerOpt
+            })
+   
 
-#if __GLASGOW_HASKELL__ < 500
-mkRegexWithOpts :: String -> Bool -> Bool -> Regex
-mkRegexWithOpts s single_line case_sensitive
-      = unsafePerformIO (re_compile_pattern (packString s) 
-                              single_line case_sensitive)
-#endif
+-- | This function is how we read keys.
+--
+-- all fields in the header are optional and have the form
+--
+-- [spaces1][field name][spaces] ":" 
+--    [text]"\n" ([spaces2][space][text]"\n" | [spaces]"\n")*
+-- where each [spaces2] should have [spaces1] as a prefix.
+--
+-- Thus for the key "Description",
+--
+-- > Description : this is a
+-- >    rather long
+-- >
+-- >    description
+-- >
+-- > The module comment starts here
+-- 
+-- the value will be "this is a .. description" and the rest will begin
+-- at "The module comment".
+parseKey :: String -> String -> Maybe (String,String)
+parseKey key toParse0 =
+   do
+      let
+         (spaces0,toParse1) = extractLeadingSpaces toParse0
+
+         indentation = spaces0
+      afterKey0 <- extractPrefix key toParse1
+      let
+         afterKey1 = extractLeadingSpaces afterKey0
+      afterColon0 <- case snd afterKey1 of
+         ':':afterColon -> return afterColon
+         _ -> Nothing
+      let
+         (_,afterColon1) = extractLeadingSpaces afterColon0
+
+      return (scanKey True indentation afterColon1)
+   where
+      scanKey :: Bool -> String -> String -> (String,String)
+      scanKey isFirst indentation [] = ([],[])
+      scanKey isFirst indentation str =
+         let
+            (nextLine,rest1) = extractNextLine str
+
+            accept = isFirst || sufficientIndentation || allSpaces
+
+            sufficientIndentation = case extractPrefix indentation nextLine of
+               Just (c:_) | isSpace c -> True
+               _ -> False
+
+            allSpaces = case extractLeadingSpaces nextLine of
+               (_,[]) -> True
+               _ -> False
+         in
+            if accept 
+               then
+                  let
+                     (scanned1,rest2) = scanKey False indentation rest1
+
+                     scanned2 = case scanned1 of 
+                        "" -> if allSpaces then "" else nextLine
+                        _ -> nextLine ++ "\n" ++ scanned1
+                  in
+                     (scanned2,rest2)
+               else
+                  ([],str)
+
+      extractLeadingSpaces :: String -> (String,String)
+      extractLeadingSpaces [] = ([],[])
+      extractLeadingSpaces (s@(c:cs)) 
+         | isSpace c = 
+            let
+               (spaces1,cs1) = extractLeadingSpaces cs
+            in
+               (c:spaces1,cs1)
+         | True = ([],s)
+
+      extractNextLine :: String -> (String,String)
+      extractNextLine [] = ([],[])
+      extractNextLine (c:cs) 
+         | c == '\n' =
+            ([],cs)
+         | True =
+            let
+               (line,rest) = extractNextLine cs
+            in
+               (c:line,rest)
+         
+
+      -- indentation returns characters after last newline.
+      indentation :: String -> String
+      indentation s = fromMaybe s (indentation0 s)
+         where
+            indentation0 :: String -> Maybe String
+            indentation0 [] = Nothing
+            indentation0 (c:cs) =
+               case indentation0 cs of
+                  Nothing -> if c == '\n' then Just cs else Nothing
+                  in0 -> in0
+               
+      -- comparison is case-insensitive.
+      extractPrefix :: String -> String -> Maybe String
+      extractPrefix [] s = Just s
+      extractPrefix s [] = Nothing
+      extractPrefix (c1:cs1) (c2:cs2)
+         | toUpper c1 == toUpper c2 = extractPrefix cs1 cs2
+         | True = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Filename mangling functions stolen from GHC's main/DriverUtil.lhs.
@@ -323,6 +435,9 @@ die s = hPutStr stderr s >> exitWith (ExitFailure 1)
 dieMsg :: String -> IO a
 dieMsg s = getProgramName >>= \prog -> die (prog ++ ": " ++ s)
 
+noDieMsg :: String -> IO ()
+noDieMsg s = getProgramName >>= \prog -> hPutStr stderr (prog ++ ": " ++ s)
+
 mapSnd :: (b -> c) -> [(a,b)] -> [(a,c)]
 mapSnd _ [] = []
 mapSnd f ((x,y):xs) = (x,f y) : mapSnd f xs
@@ -384,4 +499,39 @@ instance Binary HsIdentifier where
 		0 -> do s <- getString bh; return (HsIdent s)
 		1 -> do s <- getString bh; return (HsSymbol s)
 		_ -> do s <- getString bh; return (HsSpecial s)
+
+instance Binary id => Binary (GenDoc id) where
+   put_ bh DocEmpty = putByte bh 0
+   put_ bh (DocAppend gd1 gd2) = do putByte bh 1;put_ bh gd1;put_ bh gd2
+   put_ bh (DocString s) = do putByte bh 2;putString bh s
+   put_ bh (DocParagraph gd) = do putByte bh 3;put_ bh gd
+   put_ bh (DocIdentifier id) = do putByte bh 4;put_ bh id
+   put_ bh (DocModule s) = do putByte bh 5;putString bh s
+   put_ bh (DocEmphasis gd) = do putByte bh 6;put_ bh gd
+   put_ bh (DocMonospaced gd) = do putByte bh 7;put_ bh gd
+   put_ bh (DocUnorderedList gd) = do putByte bh 8;put_ bh gd
+   put_ bh (DocOrderedList gd) = do putByte bh 9;put_ bh gd
+   put_ bh (DocDefList gd) = do putByte bh 10;put_ bh gd
+   put_ bh (DocCodeBlock gd) = do putByte bh 11;put_ bh gd
+   put_ bh (DocURL s) = do putByte bh 12;putString bh s
+   put_ bh (DocAName s) = do putByte bh 13;putString bh s
+   get bh = do b <- getByte bh
+               case b of
+                  0 -> return DocEmpty
+                  1 -> do gd1 <- get bh;gd2 <- get bh;return (DocAppend gd1 gd2)
+                  2 -> do s <- getString bh;return (DocString s)
+                  3 -> do gd <- get bh;return (DocParagraph gd)
+                  4 -> do id <- get bh;return (DocIdentifier id)
+                  5 -> do s <- getString bh;return (DocModule s)
+                  6 -> do gd <- get bh;return (DocEmphasis gd)
+                  7 -> do gd <- get bh;return (DocMonospaced gd)
+                  8 -> do gd <- get bh;return (DocUnorderedList gd)
+                  9 -> do gd <- get bh;return (DocOrderedList gd)
+                  10 -> do gd <- get bh;return (DocDefList gd)
+                  11 -> do gd <- get bh;return (DocCodeBlock gd)
+                  12 -> do s <- getString bh;return (DocURL s)
+                  13 -> do s <- getString bh;return (DocAName s) 
+                  _ -> error ("Mysterious byte in document in interface" 
+                     ++ show b)
+
 

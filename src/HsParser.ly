@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
-$Id: HsParser.ly,v 1.20 2004/04/20 13:08:04 simonmar Exp $
+$Id: HsParser.ly,v 1.21 2004/08/09 11:55:07 simonmar Exp $
 
 (c) Simon Marlow, Sven Panne 1997-2002
 
@@ -155,14 +155,14 @@ Module Header
 >		opts info doc } }
 >	| body
 >	    { HsModule main_mod Nothing (reverse (fst $1)) (snd $1)
->		Nothing Nothing Nothing }
+>		Nothing emptyModuleInfo Nothing }
 
-> optdoc :: { (Maybe String, Maybe ModuleInfo, Maybe Doc) }
+> optdoc :: { (Maybe String,ModuleInfo,Maybe Doc) }
 >	: moduleheader			{ (Nothing, fst $1, snd $1) }
->	| DOCOPTIONS			{ (Just $1, Nothing, Nothing) }
+>	| DOCOPTIONS			{ (Just $1, emptyModuleInfo,Nothing) }
 >	| DOCOPTIONS moduleheader	{ (Just $1, fst $2, snd $2) }
 >	| moduleheader DOCOPTIONS	{ (Just $2, fst $1, snd $1) }
->	| {- empty -}			{ (Nothing, Nothing, Nothing) }
+>	| {- empty -}			{ (Nothing, emptyModuleInfo,Nothing) } 
 
 > body :: { ([HsImportDecl],[HsDecl]) }
 >	:  '{' bodyaux '}'				{ $2 }
@@ -1007,11 +1007,15 @@ Documentation comments
 > 	: docnext			{ Just $1 }
 >	| {- empty -}			{ Nothing }
 
-> moduleheader :: { (Maybe ModuleInfo, Maybe Doc) }
->	: DOCNEXT 	{% let (str, info) = parseModuleHeader $1 in
->			   case parseParas (tokenise str) of {
->				Left  err -> parseError err;
->				Right doc -> returnP (info, Just doc); } }
+> moduleheader :: { (ModuleInfo,Maybe Doc) }
+>       : DOCNEXT       {% case parseModuleHeader $1 of {
+>                          Right (str,info) -> 
+>                             case parseParas (tokenise str) of {
+>                                Left err -> parseError err;
+>                                Right doc -> returnP (info,Just doc);
+>                                };
+>                          Left err -> parseError err
+>                          } }
 
 -----------------------------------------------------------------------------
 

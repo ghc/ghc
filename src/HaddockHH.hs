@@ -57,9 +57,9 @@ ppHHContents odir doctitle maybe_package tree = do
         fn _  []     = error "HaddockHH.ppHHContents.fn: no module trees given"
 
 	ppNode :: [String] -> ModuleTree -> Doc
-	ppNode ss (Node s leaf _pkg []) =
+	ppNode ss (Node s leaf _pkg _ []) =
 	  ppLeaf s ss leaf
-	ppNode ss (Node s leaf _pkg ts) =
+	ppNode ss (Node s leaf _pkg _ ts) =
 	  ppLeaf s ss leaf $$
 	  text "<UL>" $+$
 	  nest 4 (fn (s:ss) ts) $+$

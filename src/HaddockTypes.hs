@@ -64,7 +64,7 @@ data Interface
 	iface_insts :: [HsDecl],
 		-- ^ instances from this module
 
-	iface_info :: Maybe ModuleInfo,
+	iface_info :: ModuleInfo,
 		-- ^ information from the module header
 
 	iface_doc :: Maybe Doc,

@@ -51,11 +51,11 @@ module Binary
 --   putBinFileWithDict,	-- :: Binary a => FilePath -> Module -> a -> IO ()
 
     -- re-export for the benefit of other modules.
-   openBinaryFile 
+   openBinaryFile, 
 
-  FormatVersion,
-  nullFormatVersion,
-  mkFormatVersion,
+   FormatVersion,
+   nullFormatVersion,
+   mkFormatVersion,
   ) where
 
 #include "MachDeps.h"
