@@ -71,9 +71,8 @@ data PrimOp
     | OrdOp | ChrOp
 
     -- Int#-related ops:
-   -- IntAbsOp unused?? ADR
     | IntAddOp | IntSubOp | IntMulOp | IntQuotOp
-    | IntRemOp | IntNegOp | IntAbsOp
+    | IntRemOp | IntNegOp
     | ISllOp | ISraOp | ISrlOp -- shift {left,right} {arithmetic,logical}
     | IntAddCOp
     | IntSubCOp
@@ -357,7 +356,6 @@ tagOf_PrimOp IntQuotOp			      = ILIT( 42)
 tagOf_PrimOp IntGcdOp			      = ILIT( 43)
 tagOf_PrimOp IntRemOp			      = ILIT( 44)
 tagOf_PrimOp IntNegOp			      = ILIT( 45)
-tagOf_PrimOp IntAbsOp			      = ILIT( 46)
 tagOf_PrimOp WordQuotOp			      = ILIT( 47)
 tagOf_PrimOp WordRemOp			      = ILIT( 48)
 tagOf_PrimOp AndOp			      = ILIT( 49)
@@ -1032,7 +1030,6 @@ primOpInfo IntRemOp  = mkDyadic SLIT("remInt#")	    intPrimTy
 primOpInfo IntGcdOp  = mkDyadic SLIT("gcdInt#")	    intPrimTy
 
 primOpInfo IntNegOp  = mkMonadic SLIT("negateInt#") intPrimTy
-primOpInfo IntAbsOp  = mkMonadic SLIT("absInt#")    intPrimTy
 
 primOpInfo IntAddCOp = 
 	mkGenPrimOp SLIT("addIntC#")  [] [intPrimTy, intPrimTy] 
