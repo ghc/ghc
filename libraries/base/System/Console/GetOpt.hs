@@ -39,7 +39,7 @@ over 1100 lines, we need only 195 here, including a 46 line example!
 
 module System.Console.GetOpt (
    -- * GetOpt
-   getOpt,
+   getOpt, getOpt',
    usageInfo,
    ArgOrder(..),
    OptDescr(..),
@@ -138,27 +138,39 @@ Process the command-line, and return the list of values that matched
 * The actual command line arguments (presumably got from 
   'System.Environment.getArgs').
 
-'getOpt' returns a triple, consisting of the argument values, a list
-of options that didn\'t match, and a list of error messages.
+'getOpt' returns a triple consisting of the option arguments, a list
+of non-options, and a list of error messages.
 -}
 getOpt :: ArgOrder a                   -- non-option handling
        -> [OptDescr a]                 -- option descriptors
-       -> [String]                     -- the commandline arguments
+       -> [String]                     -- the command-line arguments
        -> ([a],[String],[String])      -- (options,non-options,error messages)
-getOpt _        _        []         =  ([],[],[])
-getOpt ordering optDescr (arg:args) = procNextOpt opt ordering
-   where procNextOpt (Opt o)    _                 = (o:os,xs,es)
-         procNextOpt (NonOpt x) RequireOrder      = ([],x:rest,[])
-         procNextOpt (NonOpt x) Permute           = (os,x:xs,es)
-         procNextOpt (NonOpt x) (ReturnInOrder f) = (f x :os, xs,es)
-         procNextOpt EndOfOpts  RequireOrder      = ([],rest,[])
-         procNextOpt EndOfOpts  Permute           = ([],rest,[])
-         procNextOpt EndOfOpts  (ReturnInOrder f) = (map f rest,[],[])
-         procNextOpt (OptErr e) _                 = (os,xs,e:es)
-         procNextOpt (UnreqOpt _) _               = error "should not happen"
+getOpt ordering optDescr args = (os,xs,es ++ map errUnrec us)
+   where (os,xs,us,es) = getOpt' ordering optDescr args
+
+{-|
+This is almost the same as 'getOpt', but returns a quadruple
+consisting of the option arguments, a list of non-options, a list of
+unrecognized options, and a list of error messages.
+-}
+getOpt' :: ArgOrder a                         -- non-option handling
+        -> [OptDescr a]                       -- option descriptors
+        -> [String]                           -- the command-line arguments
+        -> ([a],[String], [String] ,[String]) -- (options,non-options,unrecognized,error messages)
+getOpt' _        _        []         =  ([],[],[],[])
+getOpt' ordering optDescr (arg:args) = procNextOpt opt ordering
+   where procNextOpt (Opt o)      _                 = (o:os,xs,us,es)
+         procNextOpt (UnreqOpt u) _                 = (os,xs,u:us,es)
+         procNextOpt (NonOpt x)   RequireOrder      = ([],x:rest,us,[])
+         procNextOpt (NonOpt x)   Permute           = (os,x:xs,us,es)
+         procNextOpt (NonOpt x)   (ReturnInOrder f) = (f x :os, xs,us,es)
+         procNextOpt EndOfOpts    RequireOrder      = ([],rest,us,[])
+         procNextOpt EndOfOpts    Permute           = ([],rest,us,[])
+         procNextOpt EndOfOpts    (ReturnInOrder f) = (map f rest,[],us,[])
+         procNextOpt (OptErr e)   _                 = (os,xs,us,e:es)
 
          (opt,rest) = getNext arg args optDescr
-         (os,xs,es) = getOpt ordering optDescr rest
+         (os,xs,us,es) = getOpt' ordering optDescr rest
 
 -- take a look at the next cmd line arg and decide what to do with it
 getNext :: String -> [String] -> [OptDescr a] -> (OptKind a,[String])
@@ -185,7 +197,7 @@ longOpt ls rs optDescr = long ads arg rs
          long [ReqArg f _] ('=':xs) rest     = (Opt (f xs),rest)
          long [OptArg f _] []       rest     = (Opt (f Nothing),rest)
          long [OptArg f _] ('=':xs) rest     = (Opt (f (Just xs)),rest)
-         long _            _        rest     = (errUnrec optStr,rest)
+         long _            _        rest     = (UnreqOpt optStr,rest)
 
 -- handle short option
 shortOpt :: Char -> String -> [String] -> [OptDescr a] -> (OptKind a,[String])
@@ -202,8 +214,8 @@ shortOpt y ys rs optDescr = short ads ys rs
         short (ReqArg f _:_) xs rest     = (Opt (f xs),rest)
         short (OptArg f _:_) [] rest     = (Opt (f Nothing),rest)
         short (OptArg f _:_) xs rest     = (Opt (f (Just xs)),rest)
-        short []             [] rest     = (errUnrec optStr,rest)
-        short []             xs rest     = (errUnrec optStr,('-':xs):rest)
+        short []             [] rest     = (UnreqOpt optStr,rest)
+        short []             xs rest     = (UnreqOpt optStr,('-':xs):rest)
 
 -- miscellaneous error formatting
 
@@ -214,8 +226,8 @@ errAmbig ods optStr = OptErr (usageInfo header ods)
 errReq :: String -> String -> OptKind a
 errReq d optStr = OptErr ("option `" ++ optStr ++ "' requires an argument " ++ d ++ "\n")
 
-errUnrec :: String -> OptKind a
-errUnrec optStr = OptErr ("unrecognized option `" ++ optStr ++ "'\n")
+errUnrec :: String -> String
+errUnrec optStr = "unrecognized option `" ++ optStr ++ "'\n"
 
 errNoArg :: String -> OptKind a
 errNoArg optStr = OptErr ("option `" ++ optStr ++ "' doesn't allow an argument\n")
