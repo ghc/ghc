@@ -698,6 +698,7 @@ sub setupOptimiseFlags {
 	  '-ffloat-lets-exposing-whnf',
 	  '-ffloat-primops-ok',
 	  '-fcase-of-case',
+	  '-fdo-case-elim',
 #	  '-fdo-lambda-eta-expansion',	# too complicated
 	  '-freuse-con',
 #	  '-flet-to-case',		# no strictness analysis, so...
