@@ -69,6 +69,7 @@ import PrelNum
 import PrelTup
 import PrelMaybe
 import PrelEither
+import PrelBounded
 import Monad
 import Maybe
 import Error	( error )

@@ -345,10 +345,6 @@ instance Enum () where
     enumFromTo () () 	= [()]
     enumFromThenTo () () () = [()]
 
-instance Bounded () where
-    minBound = ()
-    maxBound = ()
-
 instance  Show ()  where
     showsPrec p () = showString "()"
     showList ls    = showList__ (showsPrec 0) ls
@@ -398,10 +394,6 @@ efttCh now step done
   where
     go now | done now  = []
 	   | otherwise = C# (chr# now) : go (now +# step)
-
-instance  Bounded Char  where
-    minBound            =  '\0'
-    maxBound            =  '\255'
 
 instance  Show Char  where
     showsPrec p '\'' = showString "'\\''"
@@ -531,10 +523,6 @@ eftInt now step
   where
     go now = I# now : go (now +# step)
 
-
-instance  Bounded Int where
-    minBound =  -2147483647            -- **********************
-    maxBound =  2147483647	       -- **********************
 
 instance  Num Int  where
     (+)	   x y =  plusInt x y
