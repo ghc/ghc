@@ -4,7 +4,7 @@
 
 <ArtHeader>
 
-<Title>Building and Installing the Glasgow Functional Programming Tools Suite</Title>
+<Title>Building the Glasgow Functional Programming Tools Suite</Title>
 <Author><OtherName>The GHC Team</OtherName></Author>
 <Address><Email>glasgow-haskell-&lcub;users,bugs&rcub;@haskell.org</Email></Address>
 <PubDate>January 2000</PubDate>
@@ -651,9 +651,7 @@ All our documentation is written in SGML, using the DocBook DTD and
 processed using the <ULink
 URL="http://sourceware.cygnus.com/docbook-tools/">Cygnus DocBook
 tools</ULink>, which is the most shrink-wrapped SGML suite that we
-could find.  Unfortunately, it's only packaged as RPMs. You can use it
-to generate HTML, DVI (and hence PDF and Postscript) and RTF from any
-DocBook source file (including this manual). N.B. The <Emphasis>Cygnus</Emphasis> version of the tools is assumed. Others, such as the SuSE version, may not work.
+could find. You need all the RPMs except for psgml (i.e. docbook, jade, jadetex, sgmlcommon and stylesheets). Unfortunately, it's only packaged as RPMs. You can use it to generate HTML, DVI (and hence PDF and Postscript) and RTF from any DocBook source file (including this manual). N.B. The <Emphasis>Cygnus</Emphasis> version of the tools is assumed. Others, such as the SuSE version, may not work.
 </Para>
 </ListItem></VarListEntry>
 <VarListEntry>
