@@ -184,9 +184,17 @@ install-dirs ::
 	(cd lib/$(platform); find . -type d -exec sh -c '../../$(INSTALL_DIR) $$0 $(libdir)/$$0' {} \; )
 	(cd share; find . -type d -exec sh -c '../$(INSTALL_DIR) $(datadir)/$$0' {} \; )
 
-install :: config-pkgs install-dirs install-bin install-libs install-datas
+install :: config-pkgs install-dirs install-bin install-libs install-datas postinstall
 
-.PHONY: install-bin install-libs install-datas
+.PHONY: install-bin install-libs install-datas postinstall
+
+postinstall:
+	if test -x "bin/$(platform)/post-install-script" ; then \
+		echo "Running project-specific post-install script ..." ; \
+		bin/$(platform)/post-install-script $(platform) $(prefix) \
+			$(package)-$(version); \
+		echo "Done" ; \
+	fi
 
 install-bin:
 	for i in $(PACKAGE_BIN_INSTALL) ""; do \
@@ -199,11 +207,11 @@ install-bin:
 	   if [ "x$$i" != "x" ]; then 		\
 	   	( cd $(bindir); 		\
 		  if ( $(PERL) -e '$$fn="'$$i'"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   	     echo "Creating a symbol link from $$i-$(version) to $$i"; \
+	   	     echo "Creating a symbolic link from $$i-$(version) to $$i"; \
 	   	     $(RM) $$i; \
 	             $(LN_S) $$i-$(version) $$i; \
 	          else \
-	             echo "Creating a symbol link from $$i-$(version) to $$i failed: \`$$i' already exists"; \
+	             echo "Creating a symbolic link from $$i-$(version) to $$i failed: \`$$i' already exists"; \
 	             echo "Perhaps remove \`$$i' manually?"; \
 	             exit 1; \
 	          fi;\
