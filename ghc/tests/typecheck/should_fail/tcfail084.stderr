@@ -1,0 +1,7 @@
+
+tcfail084.hs:10:
+    Constructor `F' does not have field `y'
+    In the right-hand side of a pattern binding: F {y = 2}
+
+Compilation had errors
+
