@@ -187,7 +187,7 @@ initSysTools minusB_args
 		-- NB: top_dir is assumed to be in standard Unix format '/' separated
 
 	; let installed, installed_bin :: FilePath -> FilePath
-              installed_bin pgm   =  pgmPath (top_dir `slash` "extra-bin") pgm
+              installed_bin pgm   =  pgmPath (top_dir `slash` "bin") pgm
 	      installed     file  =  pgmPath top_dir file
 	      inplace dir   pgm   =  pgmPath (top_dir `slash` dir) pgm
 
