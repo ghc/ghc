@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Printf.lhs,v 1.2 2001/02/21 16:24:34 simonmar Exp $
+-- $Id: Printf.lhs,v 1.3 2001/08/07 11:13:46 simonmar Exp $
 
 -- (c) Simon Marlow 1997-2001
 -----------------------------------------------------------------------------
@@ -12,7 +12,6 @@
 > import CString
 > import IOExts
 > import ByteArray
-> import PrelPack (unpackCString)
 
 > showFloat 
 >	:: Bool				-- Always print decimal point
@@ -28,7 +27,10 @@
 > bUFSIZE = 512 :: Int
 
 > showFloat alt left sign blank zero width prec num =
->	unsafePerformIO ( do
+>	unsafePerformIO $ do
+
+#if __GLASGOW_HASKELL__ < 500
+
 >		buf <- malloc bUFSIZE
 >		snprintf buf (fromIntegral bUFSIZE) (packString format) num
 >		let s = unpackCString buf
@@ -38,8 +40,15 @@
 >			       -- but that's just too heavyweight.
 >		   free buf
 >		return s
->	)
->	
+
+#else
+
+>		allocaBytes bUFSIZE $ \buf -> do
+>		snprintf buf (fromIntegral bUFSIZE) (packString format) num
+>		peekCString buf
+
+#endif
+
 >  where
 >	format = '%' :
 >		if_bool alt   "#" ++
@@ -61,4 +70,13 @@
 > if_maybe (Just s) f = f s
 
 > type PackedString = ByteArray Int
+
+#if __GLASGOW_HASKELL__ < 500
+
 > foreign import unsafe snprintf :: Addr -> CSize -> PackedString -> Float -> IO ()
+
+#else
+
+> foreign import unsafe snprintf :: CString -> CSize -> PackedString -> Float -> IO ()
+
+#endif
