@@ -80,7 +80,7 @@ content2data = result
   -- Determine type of data to be constructed
   myType = myTypeOf result
     where
-      myTypeOf :: ReadX a -> a
+      myTypeOf :: forall a. ReadX a -> a
       myTypeOf =  undefined
 
   -- Handle an element
@@ -94,7 +94,7 @@ content2data = result
 
 
   -- A special case for lists
-  list :: Data a => ReadX [a]
+  list :: forall a. Data a => ReadX [a]
   list =          ( do h <- content2data
                        t <- list
                        return (h:t) )

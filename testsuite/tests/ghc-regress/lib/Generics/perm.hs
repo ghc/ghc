@@ -82,7 +82,7 @@ buildT = result
   -- Determine type of data to be constructed
   myType = myTypeOf result
     where
-      myTypeOf :: ReadT a -> a
+      myTypeOf :: forall a. ReadT a -> a
       myTypeOf =  undefined
 
   -- Turn string into constructor
@@ -91,11 +91,11 @@ buildT = result
                             (readConstr (dataTypeOf myType) str)
 
   -- Specialise buildT per kid type
-  buildT' :: Data a => a -> GenM
+  buildT' :: forall a. Data a => a -> GenM
   buildT' (_::a) = GenM (const mzero `extM` const (buildT::ReadT a))
 
   -- The permutation exploration function
-  perm :: Data a => [GenM] -> [GenM] -> a -> ReadT a
+  perm :: forall a. Data a => [GenM] -> [GenM] -> a -> ReadT a
   perm [] [] a = return a
   perm fs [] a = perm [] fs a
   perm fs (f:fs') a = (
