@@ -574,10 +574,9 @@ maybe_underscore doc
 -- (The C compiler does this itself).
 pprAsmCLbl (ForeignLabel fs (Just sz) _)
    = ftext fs <> char '@' <> int sz
-#else
+#endif
 pprAsmCLbl lbl
    = pprCLbl lbl
-#endif
 
 pprCLbl (StringLitLabel u)
   = pprUnique u <> ptext SLIT("_str")
