@@ -959,38 +959,19 @@ classes: exploring the design space</ULink > (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
 </para>
 
-<para>
-I'd like to thank people who reported shorcomings in the GHC 3.02
-implementation.  Our default decisions were all conservative ones, and
-the experience of these heroic pioneers has given useful concrete
-examples to support several generalisations.  (These appear below as
-design choices not implemented in 3.02.)
-</para>
 
-<para>
-I've discussed these notes with Mark Jones, and I believe that Hugs
-will migrate towards the same design choices as I outline here.
-Thanks to him, and to many others who have offered very useful
-feedback.
-</para>
-
-<sect3>
+<sect3 id="type-restrictions">
 <title>Types</title>
 
 <para>
-There are the following restrictions on the form of a qualified
-type:
-</para>
-
-<para>
+GHC imposes the following restrictions on the form of a qualified
+type, whether declared in a type signature
+or inferred. Consider the type:
 
 <programlisting>
   forall tv1..tvn (c1, ...,cn) => type
 </programlisting>
 
-</para>
-
-<para>
 (Here, I write the "foralls" explicitly, although the Haskell source
 language omits them; in Haskell 1.4, all the free type variables of an
 explicit source-language type signature are universally quantified,
@@ -1005,11 +986,15 @@ in GHC, you can give the foralls if you want.  See <xref LinkEnd="universal-quan
 
 <para>
  <emphasis>Each universally quantified type variable
-<literal>tvi</literal> must be mentioned (i.e. appear free) in <literal>type</literal></emphasis>.
+<literal>tvi</literal> must be reachable from <literal>type</literal></emphasis>.
 
+A type variable is "reachable" if it it is functionally dependent
+(see <xref linkend="functional-dependencies">)
+on the type variables free in <literal>type</literal>.
 The reason for this is that a value with a type that does not obey
 this restriction could not be used without introducing
-ambiguity. Here, for example, is an illegal type:
+ambiguity. 
+Here, for example, is an illegal type:
 
 
 <programlisting>
@@ -1064,10 +1049,6 @@ territory free in case we need it later.
 
 </para>
 
-<para>
-These restrictions apply to all types, whether declared in a type signature
-or inferred.
-</para>
 
 <para>
 Unlike Haskell 1.4, constraints in types do <emphasis>not</emphasis> have to be of
@@ -1154,56 +1135,14 @@ be acyclic</emphasis>.  So these class declarations are OK:
 
 </para>
 </listitem>
+
 <listitem>
 
 <para>
- <emphasis>In the signature of a class operation, every constraint
-must mention at least one type variable that is not a class type
-variable</emphasis>.
-
-Thus:
-
-
-<programlisting>
-  class Collection c a where
-    mapC :: Collection c b => (a->b) -> c a -> c b
-</programlisting>
-
-
-is OK because the constraint <literal>(Collection a b)</literal> mentions
-<literal>b</literal>, even though it also mentions the class variable
-<literal>a</literal>.  On the other hand:
-
-
-<programlisting>
-  class C a where
-    op :: Eq a => (a,b) -> (a,b)
-</programlisting>
-
-
-is not OK because the constraint <literal>(Eq a)</literal> mentions on the class
-type variable <literal>a</literal>, but not <literal>b</literal>.  However, any such
-example is easily fixed by moving the offending context up to the
-superclass context:
-
-
-<programlisting>
-  class Eq a => C a where
-    op ::(a,b) -> (a,b)
-</programlisting>
-
-
-A yet more relaxed rule would allow the context of a class-op signature
-to mention only class type variables.  However, that conflicts with
-Rule 1(b) for types above.
-
-</para>
-</listitem>
-<listitem>
-
-<para>
- <emphasis>The type of each class operation must mention <emphasis>all</emphasis> of
-the class type variables</emphasis>.  For example:
+ <emphasis>All of the class type variables must be reachable (in the sense 
+mentioned in <xref linkend="type-restrictions">)
+from the free varibles of each method type
+</emphasis>.  For example:
 
 
 <programlisting>
