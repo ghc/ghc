@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.47 2000/02/29 14:38:19 simonmar Exp $
+ * $Id: Schedule.c,v 1.48 2000/03/07 11:58:49 simonmar Exp $
  *
- * (c) The GHC Team, 1998-1999
+ * (c) The GHC Team, 1998-2000
  *
  * Scheduler
  *
@@ -714,8 +714,6 @@ schedule( void )
 	  }
 	}
 	threadPaused(new_t);
-	ready_to_gc = rtsTrue;
-	context_switch = 1;
 	PUSH_ON_RUN_QUEUE(new_t);
       }
       break;
