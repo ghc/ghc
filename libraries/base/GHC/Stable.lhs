@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: Stable.lhs,v 1.2 2002/03/14 12:09:52 simonmar Exp $
+% $Id: Stable.lhs,v 1.3 2002/04/24 15:47:34 simonmar Exp $
 %
 % (c) The GHC Team, 1992-2000
 %
@@ -37,7 +37,7 @@ newStablePtr a = IO $ \ s ->
 deRefStablePtr :: StablePtr a -> IO a
 deRefStablePtr (StablePtr sp) = IO $ \s -> deRefStablePtr# sp s
 
-foreign import unsafe freeStablePtr :: StablePtr a -> IO ()
+foreign import ccall unsafe freeStablePtr :: StablePtr a -> IO ()
 
 castStablePtrToPtr :: StablePtr a -> Ptr ()
 castStablePtrToPtr (StablePtr s) = Ptr (unsafeCoerce# s)
