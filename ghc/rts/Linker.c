@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.17 2001/02/06 12:27:57 simonmar Exp $
+ * $Id: Linker.c,v 1.18 2001/02/06 14:44:53 simonmar Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -383,7 +383,10 @@ loadObj( char *path )
    r = stat(path, &st);
    if (r == -1) { return 0; }
 
-   oc->fileName          = path;
+   /* sigh, stdup() isn't a POSIX function, so do it the long way */
+   oc->fileName = stgMallocBytes( strlen(path)+1, "loadObj" );
+   strcpy(oc->fileName, path);
+
    oc->fileSize          = st.st_size;
    oc->image             = stgMallocBytes( st.st_size, "loadObj(image)" );
    oc->symbols           = NULL;
@@ -490,6 +493,7 @@ unloadObj( char *path )
 	    /* We're going to leave this in place, in case there are
 	       any pointers from the heap into it: */
 	    /* free(oc->image); */
+	    free(oc->fileName);
 	    free(oc->symbols);
 	    free(oc->sections);
 	    free(oc);
