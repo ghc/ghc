@@ -25,6 +25,10 @@ module Foreign
 	, module Foreign.Marshal.Array
 	, module Foreign.Marshal.Error
 	, module Foreign.Marshal.Utils
+
+	-- For compatibility with the FFI addendum only.  The recommended
+	-- place to get this from is System.IO.Unsafe.
+	, unsafePerformIO
         ) where
 
 import Data.Int
@@ -37,3 +41,5 @@ import Foreign.Marshal.Alloc
 import Foreign.Marshal.Array
 import Foreign.Marshal.Error
 import Foreign.Marshal.Utils
+
+import System.IO.Unsafe (unsafePerformIO)
