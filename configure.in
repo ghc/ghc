@@ -488,8 +488,14 @@ AC_PATH_PROGS(TarCmd,gtar tar,tar)
 dnl ** check for gzip/compress
 AC_PATH_PROGS(CompressCmd,gzip compress,gzip)
 
-dnl ** check for jade/openjade
+dnl ** check for jade/openjade & determine a working catalog
 AC_PATH_PROGS(JadeCmd,openjade jade,jade)
+FPTOOLS_DOCBOOK_CATALOG(Catalog, $JadeCmd, docs/fptools-both.dsl, 
+                        glafp-utils/docbook/CATALOG*)
+if test -z "$Catalog"; then
+  AC_MSG_RESULT([Warning: You will not be able to build the documentation.])
+fi
+AC_SUBST(Catalog)
 
 compress_nm=`basename $CompressCmd`
 if test x"$compress_nm" = xgzip; then

@@ -1,4 +1,4 @@
-#
+#								 -*-makefile-*-
 # @configure_input@
 #
 ################################################################################
@@ -654,6 +654,8 @@ SRC_SGML2DVI_OPTS       = -d $(SGMLSTYLESHEET)
 SRC_SGML2HTML_OPTS      = -d $(SGMLSTYLESHEET)
 SRC_SGML2PS_OPTS      	= -d $(SGMLSTYLESHEET)
 SRC_SGML2RTF_OPTS       = -d $(SGMLSTYLESHEET)
+
+DOCBOOK_CATALOG		= $(FPTOOLS_TOP_ABS)/@Catalog@
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
