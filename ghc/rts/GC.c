@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.39 1999/02/24 16:25:40 simonm Exp $
+ * $Id: GC.c,v 1.40 1999/02/24 16:30:45 simonm Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -2247,7 +2247,15 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	    }
 	    continue;
 	  }
-	  step = bd->step->to;
+
+	  /* Don't promote blackholes */
+	  step = bd->step;
+	  if (!(step->gen->no == 0 && 
+		step->no != 0 &&
+		step->no == step->gen->n_steps-1)) {
+	    step = step->to;
+	  }
+
 	  switch (type) {
 	  case BLACKHOLE:
 	  case CAF_BLACKHOLE:
