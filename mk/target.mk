@@ -69,7 +69,7 @@ ifneq "$(MKDEPENDC_SRCS)" ""
 	$(MKDEPENDC) -f .depend $(MKDEPENDC_OPTS) -- $(CC_OPTS) -- $(MKDEPENDC_SRCS)
 endif
 ifneq "$(MKDEPENDHS_SRCS)" ""
-	@if echo $(notdir $(MKDEPENDHS)) | grep -s ghc ; then \
+	@if ( echo $(notdir $(MKDEPENDHS)) | grep ghc >/dev/null 2>&1 ); then \
 	   echo $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
 	   $(MKDEPENDHS) -M -optdep-f -optdep.depend $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(MKDEPENDHS_OPTS) $(HC_OPTS) $(MKDEPENDHS_SRCS) ; \
 	else \
