@@ -456,6 +456,10 @@ setsockopt IPTOS_THROUGHPUT: Invalid argument
           <literal>hslibs</literal> and <literal>libraries</literal>
           modules (for a full list of the projects available, see
           <xref linkend="projects">).</para>
+
+	  <para>Remeber that if you do not have
+          <literal>happy</literal> installed, you need to check it out
+          as well.</para>
 	</listitem>
       </itemizedlist>
     </sect2>
@@ -1212,6 +1216,12 @@ $ cvs checkout nofib/spectral
           work, and versions in between 2.7.2 and 2.95.2 (including
           <command>egcs</command>) have varying degrees of stability
           depending on the platform.</para>
+
+	  <para>GCC 3.2 is currently known to have problems building
+	  GHC on Sparc, but is stable on x86.</para>
+	  
+	  <para>GCC 3.3 currnetly cannot be used to build GHC, due to
+	  some problems with the new C preprocessor.</para>
 
 	  <para>If your GCC dies with &ldquo;internal error&rdquo; on
           some GHC source file, please let us know, so we can report
