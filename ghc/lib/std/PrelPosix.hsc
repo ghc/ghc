@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.5 2001/05/30 16:39:22 sewardj Exp $
+-- $Id: PrelPosix.hsc,v 1.6 2001/06/05 16:21:25 sewardj Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -256,6 +256,9 @@ foreign import "lseek" unsafe
 foreign import "write" unsafe 
    c_write :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
+foreign import "read" unsafe 
+   c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
+
 #ifndef mingw32_TARGET_OS
 foreign import "fcntl" unsafe
    fcntl_read  :: CInt -> CInt -> IO CInt
@@ -265,9 +268,6 @@ foreign import "fcntl" unsafe
 
 foreign import "fork" unsafe
    fork :: IO CPid 
-
-foreign import "read" unsafe 
-   c_read :: CInt -> Ptr CChar -> CSize -> IO CSsize
 
 foreign import "sigemptyset" unsafe
    c_sigemptyset :: Ptr CSigset -> IO ()
