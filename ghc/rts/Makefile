@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.69 2002/02/18 17:26:48 sof Exp $
+# $Id: Makefile,v 1.70 2002/04/13 05:18:07 sof Exp $
 #
 #  This is the Makefile for the runtime-system stuff.
 #  This stuff is written in C (and cannot be written in Haskell).
@@ -123,8 +123,8 @@ endif
 endif
 
 # If -DDEBUG is in effect, adjust package conf accordingly..
-ifneq "$(strip $(filter -DDEBUG,$(CC_OPTS)))" ""
-PACKAGE_CPP_OPTS += -DDEBUG
+ifneq "$(strip $(filter -DDEBUG,$(GhcHcOpts)))" ""
+PACKAGE_CPP_OPTS += -DDEBUG -DUSING_LIBBFD
 endif
 
 #-----------------------------------------------------------------------------
