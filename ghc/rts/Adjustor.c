@@ -233,7 +233,7 @@ createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr)
   <04>: 46100412	mov	a0, a2
   <08>: a61b0020	ldq     a0, 0x20(pv)	# load up hptr
   <0c>: 46730415	mov	a3, a5
-  <10>: a77b0028	ldq     t12, 0x28(pv)	# load up wptr
+  <10>: a77b0028	ldq     pv, 0x28(pv)	# load up wptr
   <14>: 46310413	mov	a1, a3
   <18>: 6bfb----	jmp     (pv), <hint>	# jump to wptr (with hint)
   <1c>: 00000000				# padding for alignment
