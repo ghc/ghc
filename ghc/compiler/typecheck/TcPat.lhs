@@ -17,16 +17,15 @@ import TcHsSyn		( TcPat, TcId, simpleHsLitTy )
 import TcMonad
 import Inst		( InstOrigin(..),
 			  emptyLIE, plusLIE, LIE, mkLIE, unitLIE, instToId, isEmptyLIE,
-			  newMethod, newOverloadedLit, newDicts
+			  newMethod, newOverloadedLit, newDicts, tcInstDataCon
 			)
 import Id		( mkLocalId, mkSysLocal )
 import Name		( Name )
 import FieldLabel	( fieldLabelName )
 import TcEnv		( tcLookupClass, tcLookupDataCon, tcLookupGlobalId, tcLookupId )
-import TcMType 		( tcInstTyVars, newTyVarTy, getTcTyVar, putTcTyVar, zapToType )
-import TcType		( TcType, TcTyVar, TcSigmaType, TyVarDetails(VanillaTv),
-			  mkTyConApp, mkClassPred, liftedTypeKind, tcGetTyVar_maybe,
-			  isHoleTyVar, openTypeKind )
+import TcMType 		( newTyVarTy, zapToType )
+import TcType		( TcType, TcTyVar, TcSigmaType, 
+			  mkClassPred, liftedTypeKind )
 import TcUnify		( tcSubOff, TcHoleType, 
 			  unifyTauTy, unifyListTy, unifyPArrTy, unifyTupleTy,  
 			  mkCoercion, idCoercion, isIdCoercion,
@@ -35,10 +34,7 @@ import TcMonoType	( tcHsSigType, UserTypeCtxt(..) )
 
 import TysWiredIn	( stringTy )
 import CmdLineOpts	( opt_IrrefutableTuples )
-import DataCon		( dataConSig, dataConFieldLabels, 
-			  dataConSourceArity
-			)
-import Subst		( substTy, substTheta )
+import DataCon		( dataConFieldLabels, dataConSourceArity )
 import PrelNames	( eqStringName, eqName, geName, cCallableClassName )
 import BasicTypes	( isBoxed )
 import Bag
@@ -227,10 +223,10 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
   = tcAddErrCtxt (patCtxt pat)	$
 
  	-- Check the constructor itself
-    tcConstructor pat name 		`thenTc` \ (data_con, ex_tvs, dicts, lie_avail1, arg_tys, con_res_ty) ->
+    tcConstructor pat name 		`thenTc` \ (data_con, lie_req1, ex_tvs, ex_dicts, lie_avail1, arg_tys, con_res_ty) ->
 
 	-- Check overall type matches (c.f. tcConPat)
-    tcSubPat con_res_ty pat_ty 		`thenTc` \ (co_fn, lie_req1) ->
+    tcSubPat con_res_ty pat_ty 		`thenTc` \ (co_fn, lie_req2) ->
     let
 	-- Don't use zipEqual! If the constructor isn't really a record, then
 	-- dataConFieldLabels will be empty (and each field in the pattern
@@ -240,10 +236,10 @@ tcPat tc_bndr pat@(RecPatIn name rpats) pat_ty
     in
 
 	-- Check the fields
-    tc_fields field_tys rpats		`thenTc` \ (rpats', lie_req2, tvs, ids, lie_avail2) ->
+    tc_fields field_tys rpats		`thenTc` \ (rpats', lie_req3, tvs, ids, lie_avail2) ->
 
-    returnTc (RecPat data_con pat_ty ex_tvs dicts rpats',
-	      lie_req1 `plusLIE` lie_req2,
+    returnTc (RecPat data_con pat_ty ex_tvs ex_dicts rpats',
+	      lie_req1 `plusLIE` lie_req2 `plusLIE` lie_req3,
 	      listToBag ex_tvs `unionBags` tvs,
 	      ids,
 	      lie_avail1 `plusLIE` lie_avail2)
@@ -384,24 +380,9 @@ tcConstructor pat con_name
     tcLookupDataCon con_name		`thenNF_Tc` \ data_con ->
 
 	-- Instantiate it
-    let 
-	(tvs, _, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
-	     -- Ignore the theta; overloaded constructors only
-	     -- behave differently when called, not when used for
-	     -- matching.
-    in
-    tcInstTyVars VanillaTv (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
-    let
-	ex_theta' = substTheta tenv ex_theta
-	arg_tys'  = map (substTy tenv) arg_tys
+    tcInstDataCon (PatOrigin pat) data_con	`thenNF_Tc` \ (_, ex_dicts, arg_tys, result_ty, lie_req, ex_lie, ex_tvs) ->
 
-	n_ex_tvs  = length ex_tvs
-	ex_tvs'   = take n_ex_tvs all_tvs'
-	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
-    in
-    newDicts (PatOrigin pat) ex_theta'	`thenNF_Tc` \ dicts ->
-
-    returnTc (data_con, ex_tvs', map instToId dicts, mkLIE dicts, arg_tys', result_ty)
+    returnTc (data_con, lie_req, ex_tvs, ex_dicts, ex_lie, arg_tys, result_ty)
 \end{code}	      
 
 ------------------------------------------------------
@@ -410,12 +391,12 @@ tcConPat tc_bndr pat con_name arg_pats pat_ty
   = tcAddErrCtxt (patCtxt pat)	$
 
 	-- Check the constructor itself
-    tcConstructor pat con_name 	`thenTc` \ (data_con, ex_tvs, dicts, lie_avail1, arg_tys, con_res_ty) ->
+    tcConstructor pat con_name 	`thenTc` \ (data_con, lie_req1, ex_tvs, ex_dicts, lie_avail1, arg_tys, con_res_ty) ->
 
 	-- Check overall type matches.
 	-- The pat_ty might be a for-all type, in which
 	-- case we must instantiate to match
-    tcSubPat con_res_ty pat_ty 	`thenTc` \ (co_fn, lie_req1) ->
+    tcSubPat con_res_ty pat_ty 	`thenTc` \ (co_fn, lie_req2) ->
 
 	-- Check correct arity
     let
@@ -426,10 +407,10 @@ tcConPat tc_bndr pat con_name arg_pats pat_ty
 	    (arityErr "Constructor" data_con con_arity no_of_args)	`thenTc_`
 
 	-- Check arguments
-    tcPats tc_bndr arg_pats arg_tys	`thenTc` \ (arg_pats', lie_req2, tvs, ids, lie_avail2) ->
+    tcPats tc_bndr arg_pats arg_tys	`thenTc` \ (arg_pats', lie_req3, tvs, ids, lie_avail2) ->
 
-    returnTc (co_fn <$> ConPat data_con pat_ty ex_tvs dicts arg_pats',
-	      lie_req1 `plusLIE` lie_req2,
+    returnTc (co_fn <$> ConPat data_con pat_ty ex_tvs ex_dicts arg_pats',
+	      lie_req1 `plusLIE` lie_req2 `plusLIE` lie_req3,
 	      listToBag ex_tvs `unionBags` tvs,
 	      ids,
 	      lie_avail1 `plusLIE` lie_avail2)

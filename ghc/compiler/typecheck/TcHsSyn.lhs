@@ -514,13 +514,12 @@ zonkExpr (RecordConOut data_con con_expr rbinds)
 
 zonkExpr (RecordUpd _ _) = panic "zonkExpr:RecordUpd"
 
-zonkExpr (RecordUpdOut expr in_ty out_ty dicts rbinds)
+zonkExpr (RecordUpdOut expr in_ty out_ty rbinds)
   = zonkExpr expr		`thenNF_Tc` \ new_expr ->
     zonkTcTypeToType in_ty	`thenNF_Tc` \ new_in_ty ->
     zonkTcTypeToType out_ty	`thenNF_Tc` \ new_out_ty ->
-    mapNF_Tc zonkIdOcc dicts	`thenNF_Tc` \ new_dicts ->
     zonkRbinds rbinds	`thenNF_Tc` \ new_rbinds ->
-    returnNF_Tc (RecordUpdOut new_expr new_in_ty new_out_ty new_dicts new_rbinds)
+    returnNF_Tc (RecordUpdOut new_expr new_in_ty new_out_ty new_rbinds)
 
 zonkExpr (ExprWithTySig _ _) = panic "zonkExpr:ExprWithTySig"
 zonkExpr (ArithSeqIn _)      = panic "zonkExpr:ArithSeqIn"

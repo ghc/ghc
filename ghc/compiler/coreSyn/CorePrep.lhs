@@ -27,7 +27,6 @@ import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
 		  isDataConId_maybe, idUnfolding
 		)
 import HscTypes ( ModDetails(..), implicitTyThingIds, typeEnvElts )
-import Unique	( mkBuiltinUnique )
 import BasicTypes ( TopLevelFlag(..), isTopLevel, isNotTopLevel,
 		    RecFlag(..), isNonRec
 		  )
@@ -160,8 +159,6 @@ mkImplicitBinds type_env
 	-- The etaExpand is so that the manifest arity of the
 	-- binding matches its claimed arity, which is an 
 	-- invariant of top level bindings going into the code gen
-  where
-    tmpl_uniqs = map mkBuiltinUnique [1..]
 
 get_unfolding id 	-- See notes above
   | Just data_con <- isDataConId_maybe id = Var id	-- The ice is thin here, but it works

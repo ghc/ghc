@@ -92,7 +92,7 @@ import Name		( Name, nameRdrName, nameUnique, nameOccName,
 			  nameModule, mkWiredInName )
 import OccName		( mkOccFS, tcName, dataName, mkWorkerOcc, mkGenOcc1, mkGenOcc2 )
 import RdrName		( rdrNameOcc )
-import DataCon		( DataCon, mkDataCon, dataConId, dataConSourceArity )
+import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
 import Var		( TyVar, tyVarKind )
 import TyCon		( TyCon, AlgTyConFlavour(..), DataConDetails(..), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName
@@ -258,7 +258,7 @@ mk_tuple boxity arity = (tycon, tuple_con)
 	gen_info  = mk_tc_gen_info mod tc_uniq tc_name tycon
 
 unitTyCon     = tupleTyCon Boxed 0
-unitDataConId = dataConId (head (tyConDataCons unitTyCon))
+unitDataConId = dataConWorkId (head (tyConDataCons unitTyCon))
 
 pairTyCon = tupleTyCon Boxed 2
 
@@ -457,8 +457,8 @@ boolTyCon = pcTyCon EnumTyCon NonRecursive boolTyConName
 falseDataCon = pcDataCon falseDataConName [] [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConName  [] [] [] boolTyCon
 
-falseDataConId = dataConId falseDataCon
-trueDataConId  = dataConId trueDataCon
+falseDataConId = dataConWorkId falseDataCon
+trueDataConId  = dataConWorkId trueDataCon
 \end{code}
 
 %************************************************************************

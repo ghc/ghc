@@ -52,7 +52,7 @@ import Id	( Id, isDataConId_maybe, isId, idName, isDeadBinder, idPrimRep
 import Name	( NamedThing(..), getOccString, isExternalName, isInternalName
 		, nameModule )
 import PrimRep  ( PrimRep(..) )
-import DataCon	( DataCon, dataConRepArity, dataConRepArgTys, dataConId )
+import DataCon	( DataCon, dataConRepArity, dataConRepArgTys, dataConWorkId )
 import qualified Type
 import qualified CoreSyn
 import CoreSyn	( CoreBind, CoreExpr, CoreAlt, CoreBndr,
@@ -755,7 +755,7 @@ shortName = reverse . takeWhile (/= '.') . reverse
 -- would return the name "Test.Foo".
 
 javaConstrWkrName :: DataCon -> TypeName
-javaConstrWkrName = javaIdTypeName . dataConId
+javaConstrWkrName = javaIdTypeName . dataConWorkId
 
 -- Makes x_inst for Rec decls
 -- They are *never* is primitive

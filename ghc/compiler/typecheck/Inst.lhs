@@ -13,7 +13,7 @@ module Inst (
 
 	newDictsFromOld, newDicts, cloneDict,
 	newMethod, newMethodWithGivenTy, newMethodAtLoc,
-	newOverloadedLit, newIPDict, tcInstCall,
+	newOverloadedLit, newIPDict, tcInstCall, tcInstDataCon,
 
 	tyVarsOfInst, tyVarsOfInsts, tyVarsOfLIE, 
 	ipNamesOfInst, ipNamesOfInsts, predsOfInst, predsOfInsts,
@@ -42,11 +42,11 @@ import TcMonad
 import TcEnv	( TcIdSet, tcGetInstEnv, tcLookupId )
 import InstEnv	( InstLookupResult(..), lookupInstEnv )
 import TcMType	( zonkTcType, zonkTcTypes, zonkTcPredType, zapToType,
-		  zonkTcThetaType, tcInstTyVar, tcInstType,
+		  zonkTcThetaType, tcInstTyVar, tcInstType, tcInstTyVars
 		)
 import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		  SourceType(..), PredType, ThetaType, TyVarDetails(VanillaTv),
-		  tcSplitForAllTys, tcSplitForAllTys, 
+		  tcSplitForAllTys, tcSplitForAllTys, mkTyConApp,
 		  tcSplitMethodTy, tcSplitPhiTy, tcFunArgTy,
 		  isIntTy,isFloatTy, isIntegerTy, isDoubleTy,
 		  tcIsTyVarTy, mkPredTy, mkTyVarTy, mkTyVarTys,
@@ -58,6 +58,7 @@ import TcType	( Type, TcType, TcThetaType, TcPredType, TcTauType, TcTyVarSet,
 		)
 import CoreFVs	( idFreeTyVars )
 import Class	( Class )
+import DataCon	( dataConSig )
 import Id	( Id, idName, idType, mkUserLocal, mkSysLocal, mkLocalId, setIdUnique )
 import PrelInfo	( isStandardClass, isCcallishClass, isNoDictClass )
 import Name	( Name, mkMethodOcc, getOccName )
@@ -364,6 +365,31 @@ tcInstCall orig fun_ty	-- fun_ty is usually a sigma-type
 	inst_fn e = mkHsDictApp (mkHsTyApp e (mkTyVarTys tyvars)) (map instToId dicts)
     in
     returnNF_Tc (inst_fn, mkLIE dicts, tau)
+
+tcInstDataCon orig data_con
+  = let 
+	(tvs, stupid_theta, ex_tvs, ex_theta, arg_tys, tycon) = dataConSig data_con
+	     -- We generate constraints for the stupid theta even when 
+	     -- pattern matching (as the Report requires)
+    in
+    tcInstTyVars VanillaTv (ex_tvs ++ tvs)	`thenNF_Tc` \ (all_tvs', ty_args', tenv) ->
+    let
+	stupid_theta' = substTheta tenv stupid_theta
+	ex_theta'     = substTheta tenv ex_theta
+	arg_tys'      = map (substTy tenv) arg_tys
+
+	n_ex_tvs  = length ex_tvs
+	ex_tvs'   = take n_ex_tvs all_tvs'
+	result_ty = mkTyConApp tycon (drop n_ex_tvs ty_args')
+    in
+    newDicts orig stupid_theta'	`thenNF_Tc` \ stupid_dicts ->
+    newDicts orig ex_theta'	`thenNF_Tc` \ ex_dicts ->
+
+	-- Note that we return the stupid theta *only* in the LIE;
+	-- we don't otherwise use it at all
+    returnNF_Tc (ty_args', map instToId ex_dicts, arg_tys', result_ty,
+		 mkLIE stupid_dicts, mkLIE ex_dicts, ex_tvs')
+
 
 newMethod :: InstOrigin
 	  -> TcId

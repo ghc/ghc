@@ -14,11 +14,13 @@ have a standard form, namely:
 \begin{code}
 module MkId (
 	mkDictFunId, mkDefaultMethodId,
-	mkDictSelId,
+	mkDictSelId, 
 
 	mkDataConId, mkDataConWrapId,
-	mkRecordSelId, rebuildConArgs,
+	mkRecordSelId, 
 	mkPrimOpId, mkFCallId,
+
+	mkReboxingAlt, mkNewTypeBody,
 
 	-- And some particular Ids; see below for why they are wired in
 	wiredInIds, ghcPrimIds,
@@ -52,7 +54,7 @@ import Literal		( Literal(..), nullAddrLit )
 import TyCon		( TyCon, isNewTyCon, tyConTyVars, tyConDataCons,
                           tyConTheta, isProductTyCon, isDataTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon, classTyVars, classSelIds )
-import Var		( Id, TyVar )
+import Var		( Id, TyVar, Var )
 import VarSet		( isEmptyVarSet )
 import Name		( mkWiredInName, mkFCallName, Name )
 import OccName		( mkVarOcc )
@@ -61,9 +63,9 @@ import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, 
 			  dataConFieldLabels, dataConRepArity, dataConTyCon,
 			  dataConArgTys, dataConRepType, 
-			  dataConInstOrigArgTys,
+			  dataConOrigArgTys,
                           dataConName, dataConTheta,
-			  dataConSig, dataConStrictMarks, dataConId,
+			  dataConSig, dataConStrictMarks, dataConWorkId,
 			  splitProductType
 			)
 import Id		( idType, mkGlobalId, mkVanillaGlobal, mkSysLocal,
@@ -92,6 +94,7 @@ import Util             ( dropList, isSingleton )
 import Outputable
 import ListSetOps	( assoc, assocMaybe )
 import UnicodeUtil      ( stringToUtf8 )
+import List		( nubBy )
 import Char             ( ord )
 \end{code}		
 
@@ -234,7 +237,7 @@ Notice that
 mkDataConWrapId data_con
   = mkGlobalId (DataConWrapId data_con) (dataConName data_con) wrap_ty info
   where
-    work_id = dataConId data_con
+    work_id = dataConWorkId data_con
 
     info = noCafNoTyGenIdInfo
 	   `setUnfoldingInfo`	wrap_unf
@@ -244,11 +247,9 @@ mkDataConWrapId data_con
 		-- applications are treated as values
 	   `setAllStrictnessInfo` 	Just wrap_sig
 
-    wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
-
     wrap_sig = mkStrictSig (mkTopDmdType arg_dmds res_info)
     res_info = strictSigResInfo (idNewStrictness work_id)
-    arg_dmds = [Abs | d <- dict_args] ++ map mk_dmd strict_marks
+    arg_dmds = map mk_dmd strict_marks
     mk_dmd str | isMarkedStrict str = evalDmd
 	       | otherwise	    = lazyDmd
 	-- The Cpr info can be important inside INLINE rhss, where the
@@ -265,10 +266,10 @@ mkDataConWrapId data_con
 		-- No existentials on a newtype, but it can have a context
 		-- e.g. 	newtype Eq a => T a = MkT (...)
 		mkTopUnfolding $ Note InlineMe $
-		mkLams tyvars $ mkLams dict_args $ Lam id_arg1 $ 
+		mkLams tyvars $ Lam id_arg1 $ 
 		mkNewTypeBody tycon result_ty (Var id_arg1)
 
-	     | null dict_args && not (any isMarkedStrict strict_marks)
+	     | not (any isMarkedStrict strict_marks)
 	     = mkCompulsoryUnfolding (Var work_id)
 			-- The common case.  Not only is this efficient,
 			-- but it also ensures that the wrapper is replaced
@@ -289,7 +290,7 @@ mkDataConWrapId data_con
 
 	     | otherwise
 	     = mkTopUnfolding $ Note InlineMe $
-	       mkLams all_tyvars $ mkLams dict_args $ 
+	       mkLams all_tyvars $ 
 	       mkLams ex_dict_args $ mkLams id_args $
 	       foldr mk_case con_app 
 		     (zip (ex_dict_args++id_args) strict_marks) i3 []
@@ -297,20 +298,23 @@ mkDataConWrapId data_con
     con_app i rep_ids = mkApps (Var work_id)
 			       (map varToCoreExpr (all_tyvars ++ reverse rep_ids))
 
-    (tyvars, theta, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
-    all_tyvars   = tyvars ++ ex_tyvars
+    (tyvars, _, ex_tyvars, ex_theta, orig_arg_tys, tycon) = dataConSig data_con
+    all_tyvars   = ex_tyvars ++ tyvars
 
-    dict_tys     = mkPredTys theta
     ex_dict_tys  = mkPredTys ex_theta
-    all_arg_tys  = dict_tys ++ ex_dict_tys ++ orig_arg_tys
+    all_arg_tys  = ex_dict_tys ++ orig_arg_tys
     result_ty    = mkTyConApp tycon (mkTyVarTys tyvars)
+
+    wrap_ty = mkForAllTys all_tyvars (mkFunTys all_arg_tys result_ty)
+	-- We used to include the stupid theta in the wrapper's args
+	-- but now we don't.  Instead the type checker just injects these
+	-- extra constraints where necessary.
 
     mkLocals i tys = (zipWith mkTemplateLocal [i..i+n-1] tys, i+n)
 		   where
 		     n = length tys
 
-    (dict_args, i1)    = mkLocals 1  dict_tys
-    (ex_dict_args,i2)  = mkLocals i1 ex_dict_tys
+    (ex_dict_args,i2)  = mkLocals 1  ex_dict_tys
     (id_args,i3)       = mkLocals i2 orig_arg_tys
     arity	       = i3-1
     (id_arg1:_)   = id_args		-- Used for newtype only
@@ -401,13 +405,22 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     data_ty   = mkTyConApp tycon tyvar_tys
     tyvar_tys = mkTyVarTys tyvars
 
-    tycon_theta	= tyConTheta tycon	-- The context on the data decl
+	-- Very tiresomely, the selectors are (unnecessarily!) overloaded over
+	-- just the dictionaries in the types of the constructors that contain
+	-- the relevant field.  [The Report says that pattern matching on a
+	-- constructor gives the same constraints as applying it.]  Urgh.  
+	--
+	-- However, not all data cons have all constraints (because of
+	-- TcTyDecls.thinContext).  So we need to find all the data cons 
+	-- involved in the pattern match and take the union of their constraints.
+	--
+	-- NB: this code relies on the fact that DataCons are quantified over
+	-- the identical type variables as their parent TyCon
+    tycon_theta	 = tyConTheta tycon	-- The context on the data decl
 					--   eg data (Eq a, Ord b) => T a b = ...
-    dict_tys  = [mkPredTy pred | pred <- tycon_theta, 
-				 needed_dict pred]
-    needed_dict pred = or [ tcEqPred pred p
-			  | (DataAlt dc, _, _) <- the_alts, p <- dataConTheta dc]
-    n_dict_tys = length dict_tys
+    needed_preds = [pred | (DataAlt dc, _, _) <- the_alts, pred <- dataConTheta dc]
+    dict_tys     = map mkPredTy (nubBy tcEqPred needed_preds)
+    n_dict_tys   = length dict_tys
 
     (field_tyvars,field_theta,field_tau) = tcSplitSigmaTy field_ty
     field_dict_tys			 = map mkPredTy field_theta
@@ -426,12 +439,6 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	--		R op -> op a dfoo
 	-- Note that this is exactly the type we'd infer from a user defn
 	--	op (R op) = op
-
-	-- Very tiresomely, the selectors are (unnecessarily!) overloaded over
-	-- just the dictionaries in the types of the constructors that contain
-	-- the relevant field.  Urgh.  
-	-- NB: this code relies on the fact that DataCons are quantified over
-	-- the identical type variables as their parent TyCon
 
     selector_ty :: Type
     selector_ty  = mkForAllTys tyvars $ mkForAllTys field_tyvars $
@@ -489,18 +496,17 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 	--	foo = /\a. \t:T. case t of { MkT f -> f a }
 
     mk_maybe_alt data_con 
-	  = case maybe_the_arg_id of
+	= case maybe_the_arg_id of
 		Nothing		-> Nothing
-		Just the_arg_id -> Just (DataAlt data_con, real_args, mkLets binds body)
-		  where
-	    	    body 	       = mk_result the_arg_id
-	    	    strict_marks       = dataConStrictMarks data_con
-	    	    (binds, real_args) = rebuildConArgs arg_ids strict_marks
-						        (map mkBuiltinUnique [unpack_base..])
+		Just the_arg_id -> Just (mkReboxingAlt uniqs data_con arg_ids body)
+				where
+			    	   body = mk_result the_arg_id
 	where
-            arg_ids = mkTemplateLocalsNum field_base (dataConInstOrigArgTys data_con tyvar_tys)
+            arg_ids = mkTemplateLocalsNum field_base (dataConOrigArgTys data_con)
+			-- No need to instantiate; same tyvars in datacon as tycon
 
 	    unpack_base = field_base + length arg_ids
+	    uniqs = map mkBuiltinUnique [unpack_base..]
 
 				-- arity+1 avoids all shadowing
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
@@ -520,46 +526,63 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     full_msg   = showSDoc (sep [text "No match in record selector", ppr sel_id]) 
 
 
--- This rather ugly function converts the unpacked data con 
--- arguments back into their packed form.
-
-rebuildConArgs
-  :: [Id]			-- Source-level args
-  -> [StrictnessMark]		-- Strictness annotations (per-arg)
-  -> [Unique]			-- Uniques for the new Ids
-  -> ([CoreBind], [Id])		-- A binding for each source-level arg, plus
-				-- a list of the representation-level arguments 
--- e.g.   data T = MkT Int !Int
+-- (mkReboxingAlt us con xs rhs) basically constructs the case
+-- alternative	(con, xs, rhs)
+-- but it does the reboxing necessary to construct the *source* 
+-- arguments, xs, from the representation arguments ys.
+-- For example:
+--	data T = MkT !(Int,Int) Bool
 --
--- rebuild [x::Int, y::Int] [Not, Unbox]
---  = ([ y = I# t ], [x,t])
+-- mkReboxingAlt MkT [x,b] r 
+--	= (DataAlt MkT, [y::Int,z::Int,b], let x = (y,z) in r)
+--
+-- mkDataAlt should really be in DataCon, but it can't because
+-- it manipulates CoreSyn.
 
-rebuildConArgs []	  stricts us = ([], [])
+mkReboxingAlt
+  :: [Unique]			-- Uniques for the new Ids
+  -> DataCon
+  -> [Var]			-- Source-level args
+  -> CoreExpr			-- RHS
+  -> CoreAlt
 
--- Type variable case
-rebuildConArgs (arg:args) stricts us 
-  | isTyVar arg
-  = let (binds, args') = rebuildConArgs args stricts us
-    in  (binds, arg:args')
-
--- Term variable case
-rebuildConArgs (arg:args) (str:stricts) us
-  | isMarkedUnboxed str
-  = let
-	arg_ty  = idType arg
-
-	(_, tycon_args, pack_con, con_arg_tys)
-	 	 = splitProductType "rebuildConArgs" arg_ty
-
-	unpacked_args  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
-	(binds, args') = rebuildConArgs args stricts (dropList con_arg_tys us)
-	con_app	       = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
-    in
-    (NonRec arg con_app : binds, unpacked_args ++ args')
+mkReboxingAlt us con args rhs
+  | not (any isMarkedUnboxed stricts)
+  = (DataAlt con, args, rhs)
 
   | otherwise
-  = let (binds, args') = rebuildConArgs args stricts us
-    in  (binds, arg:args')
+  = let
+	(binds, args') = go args stricts us
+    in
+    (DataAlt con, args', mkLets binds rhs)
+
+  where
+    stricts = dataConStrictMarks con
+
+    go [] stricts us = ([], [])
+
+	-- Type variable case
+    go (arg:args) stricts us 
+      | isTyVar arg
+      = let (binds, args') = go args stricts us
+	in  (binds, arg:args')
+
+	-- Term variable case
+    go (arg:args) (str:stricts) us
+      | isMarkedUnboxed str
+      = let
+	  (_, tycon_args, pack_con, con_arg_tys)
+	 	 = splitProductType "mkReboxingAlt" (idType arg)
+
+	  unpacked_args  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
+	  (binds, args') = go args stricts (dropList con_arg_tys us)
+	  con_app	 = mkConApp pack_con (map Type tycon_args ++ map Var unpacked_args)
+	in
+	(NonRec arg con_app : binds, unpacked_args ++ args')
+
+      | otherwise
+      = let (binds, args') = go args stricts us
+        in  (binds, arg:args')
 \end{code}
 
 

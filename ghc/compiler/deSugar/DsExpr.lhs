@@ -451,10 +451,10 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
-dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty dicts [])
+dsExpr (RecordUpdOut record_expr record_in_ty record_out_ty [])
   = dsExpr record_expr
 
-dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty dicts rbinds)
+dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty rbinds)
   = getSrcLocDs			`thenDs` \ src_loc ->
     dsExpr record_expr	 	`thenDs` \ record_expr' ->
 
@@ -477,9 +477,7 @@ dsExpr expr@(RecordUpdOut record_expr record_in_ty record_out_ty dicts rbinds)
 	    let 
 		val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
 					(dataConFieldLabels con) arg_ids
-		rhs = foldl HsApp (DictApp (TyApp (HsVar (dataConWrapId con)) 
-						  out_inst_tys)
-					   dicts)
+		rhs = foldl HsApp (TyApp (HsVar (dataConWrapId con)) out_inst_tys)
 				  val_args
 	    in
 	    returnDs (mkSimpleMatch [ConPat con record_in_ty [] [] (map VarPat arg_ids)]

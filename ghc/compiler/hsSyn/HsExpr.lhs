@@ -130,7 +130,6 @@ data HsExpr id pat
 		 Type			-- Type of *input* record
 		 Type			-- Type of *result* record (may differ from
 					-- 	type of input record)
-		 [id]			-- Dicts needed for construction
 		 (HsRecordBinds id pat)
 
   | ExprWithTySig			-- signature binding
@@ -327,7 +326,7 @@ ppr_expr (RecordConOut data_con con rbinds)
 
 ppr_expr (RecordUpd aexp rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
-ppr_expr (RecordUpdOut aexp _ _ _ rbinds)
+ppr_expr (RecordUpdOut aexp _ _ rbinds)
   = pp_rbinds (pprParendExpr aexp) rbinds
 
 ppr_expr (ExprWithTySig expr sig)

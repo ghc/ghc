@@ -33,7 +33,7 @@ import Literal		( Literal(..), isLitLitLit, mkMachInt, mkMachWord
 import PrimOp		( PrimOp(..), primOpOcc )
 import TysWiredIn	( trueDataConId, falseDataConId )
 import TyCon		( tyConDataCons_maybe, isEnumerationTyCon, isNewTyCon )
-import DataCon		( dataConTag, dataConTyCon, dataConId, fIRST_TAG )
+import DataCon		( dataConTag, dataConTyCon, dataConWorkId, fIRST_TAG )
 import CoreUtils	( exprIsValue, cheapEqExpr, exprIsConApp_maybe )
 import Type		( tyConAppTyCon, eqType )
 import OccName		( occNameUserString)
@@ -424,7 +424,7 @@ tagToEnumRule [Type ty, Lit (MachInt i)]
 
 	[]	  -> Nothing	-- Abstract type
 	(dc:rest) -> ASSERT( null rest )
-		     Just (Var (dataConId dc))
+		     Just (Var (dataConWorkId dc))
   where 
     correct_tag dc = (dataConTag dc - fIRST_TAG) == tag
     tag   = fromInteger i

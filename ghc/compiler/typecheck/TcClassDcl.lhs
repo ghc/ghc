@@ -33,16 +33,17 @@ import TcBinds		( tcMonoBinds )
 import TcMonoType	( TcSigInfo(..), tcHsType, tcHsTheta, mkTcSig )
 import TcSimplify	( tcSimplifyCheck )
 import TcUnify		( checkSigTyVars, sigCtxt )
-import TcMType		( tcInstTyVars, checkValidTheta, checkValidType, SourceTyCtxt(..), UserTypeCtxt(..) )
+import TcMType		( tcInstTyVars )
 import TcType		( Type, TyVarDetails(..), TcType, TcThetaType, TcTyVar, 
 			  mkTyVarTys, mkPredTys, mkClassPred, 
-			  tcIsTyVarTy, tcSplitTyConApp_maybe, tcSplitSigmaTy
+			  tcIsTyVarTy, tcSplitTyConApp_maybe
 			)
 import TcMonad
 import Generics		( mkGenericRhs )
 import PrelInfo		( nO_METHOD_BINDING_ERROR_ID )
-import Class		( classTyVars, classBigSig, classTyCon, className,
+import Class		( classTyVars, classBigSig, classTyCon, 
 			  Class, ClassOpItem, DefMeth (..) )
+import TyCon		( tyConGenInfo )
 import MkId		( mkDictSelId, mkDataConId, mkDataConWrapId, mkDefaultMethodId )
 import DataCon		( mkDataCon )
 import Id		( Id, idType, idName, setIdLocalExported )
@@ -54,8 +55,9 @@ import Outputable
 import Var		( TyVar )
 import CmdLineOpts
 import ErrUtils		( dumpIfSet )
-import Util		( count, isSingleton, lengthIs, equalLength )
-import Maybes		( seqMaybe, maybeToBool )
+import Util		( count, lengthIs, equalLength )
+import Maybes		( seqMaybe )
+import Maybe		( isJust )
 \end{code}
 
 
@@ -191,7 +193,7 @@ checkDefaultBinds clas ops (Just mbs)
 
 	returnTc (unitNameEnv op all_generic)
       where
-	n_generic    = count (maybeToBool . maybeGenericMatch) matches
+	n_generic    = count (isJust . maybeGenericMatch) matches
 	none_generic = n_generic == 0
 	all_generic  = matches `lengthIs` n_generic
 \end{code}
@@ -535,8 +537,12 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 	-- instance declaration is for a single-parameter type class with
 	-- a type constructor applied to type arguments in the instance decl
 	-- 	(checkTc, so False provokes the error)
-     checkTc (not (isInstDecl origin) || simple_inst)
-	     (badGenericInstance sel_id)			`thenTc_`
+     ASSERT( isInstDecl origin )	-- We never get here from a class decl
+
+     checkTc (isJust maybe_tycon)
+	     (badGenericInstance sel_id (notSimple inst_tys))	`thenTc_`
+     checkTc (isJust (tyConGenInfo tycon))
+	     (badGenericInstance sel_id (notGeneric tycon))			`thenTc_`
 
      ioToTc (dumpIfSet opt_PprStyle_Debug "Generic RHS" stuff)	`thenNF_Tc_`
      returnTc rhs
@@ -550,7 +556,6 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 	  -- case we require that the instance decl is for a single-parameter
 	  -- type class with type variable arguments:
 	  --	instance (...) => C (T a b)
-    simple_inst   = maybeToBool maybe_tycon
     clas_tyvar    = head (classTyVars clas)
     Just tycon	  = maybe_tycon
     maybe_tycon   = case inst_tys of 
@@ -600,10 +605,18 @@ badMethodErr clas op
 omittedMethodWarn sel_id
   = ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id)
 
-badGenericInstance sel_id
+badGenericInstance sel_id because
   = sep [ptext SLIT("Can't derive generic code for") <+> quotes (ppr sel_id),
-	 ptext SLIT("because the instance declaration is not for a simple type (T a b c)"),
-	 ptext SLIT("(where T is a derivable type constructor)")]
+	 because]
+
+notSimple inst_tys
+  = vcat [ptext SLIT("because the instance type(s)"), 
+	  nest 2 (ppr inst_tys),
+	  ptext SLIT("is not a simple type of form (T a b c)")]
+
+notGeneric tycon
+  = vcat [ptext SLIT("because the instance type constructor") <+> quotes (ppr tycon) <+> 
+	  ptext SLIT("was not compiled with -fgenerics")]
 
 mixedGenericErr op
   = ptext SLIT("Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)

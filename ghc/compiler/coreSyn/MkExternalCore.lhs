@@ -72,10 +72,10 @@ collect_tdefs _ tdefs = tdefs
 make_cdef :: DataCon -> C.Cdef
 make_cdef dcon =  C.Constr dcon_name existentials tys
   where 
-    dcon_name = make_con_qid (idName (dataConId dcon))
+    dcon_name    = make_con_qid (idName (dataConWorkId dcon))
     existentials = map make_tbind ex_tyvars
-          where (_,_,ex_tyvars,_,_,_) = dataConSig dcon
-    tys = map make_ty (dataConRepArgTys dcon)
+    ex_tyvars    = dataConExistentialTyVars dcon
+    tys 	 = map make_ty (dataConRepArgTys dcon)
 
 make_tbind :: TyVar -> C.Tbind
 make_tbind tv = (make_var_id (tyVarName tv), make_kind (tyVarKind tv))
@@ -113,7 +113,7 @@ make_exp _ = error "MkExternalCore died: make_exp"
 
 make_alt :: CoreAlt -> C.Alt
 make_alt (DataAlt dcon, vs, e) = 
-    C.Acon (make_con_qid (idName (dataConId dcon))) (map make_tbind tbs) (map make_vbind vbs) (make_exp e)
+    C.Acon (make_con_qid (idName (dataConWorkId dcon))) (map make_tbind tbs) (map make_vbind vbs) (make_exp e)
 	where (tbs,vbs) = span isTyVar vs
 make_alt (LitAlt l,_,e) = C.Alit (make_lit l) (make_exp e)
 make_alt (DEFAULT,[],e) = C.Adefault (make_exp e)

@@ -21,7 +21,7 @@ import TcEnv		( tcExtendTyVarEnv,
 			  tcLookupTyCon, tcLookupRecId, 
 			  TyThingDetails(..), RecTcEnv
 			)
-import TcType		( tcEqType, tyVarsOfTypes, tyVarsOfPred, ThetaType )
+import TcType		( tyVarsOfTypes, tyVarsOfPred, ThetaType )
 import TcMonad
 
 import DataCon		( DataCon, mkDataCon, dataConFieldLabels )
@@ -31,8 +31,7 @@ import Var		( TyVar )
 import Name		( Name, NamedThing(..) )
 import Outputable
 import TyCon		( TyCon, DataConDetails(..), visibleDataCons,
-			  tyConName, tyConTheta, 
-			  tyConTyVars, isSynTyCon )
+			  tyConTyVars )
 import VarSet		( intersectVarSet, isEmptyVarSet )
 import PrelNames	( unpackCStringName, unpackCStringUtf8Name )
 import List		( nubBy )

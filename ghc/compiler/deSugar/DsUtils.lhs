@@ -40,12 +40,11 @@ import DsMonad
 
 import CoreUtils	( exprType, mkIfThenElse )
 import PrelInfo		( iRREFUT_PAT_ERROR_ID )
-import MkId		( rebuildConArgs )
+import MkId		( mkReboxingAlt, mkNewTypeBody )
 import Id		( idType, Id, mkWildId )
 import Literal		( Literal(..), inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons, isRecursiveTyCon )
-import DataCon		( DataCon, dataConStrictMarks, dataConId,
-			  dataConSourceArity )
+import DataCon		( DataCon, dataConSourceArity )
 import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp )
 import TcType		( tcTyConAppTyCon, isIntTy, isFloatTy, isDoubleTy )
 import TysPrim		( intPrimTy, charPrimTy, floatPrimTy, doublePrimTy )
@@ -279,16 +278,11 @@ mkCoAlgCaseMatchResult var match_alts
 	-- Stuff for newtype
     (_, arg_ids, match_result) = head match_alts
     arg_id 	       	       = head arg_ids
-
-    newtype_rhs | isRecursiveTyCon tycon 	-- Recursive case; need a case
-	 	= Note (Coerce (idType arg_id) scrut_ty) (Var var)
-		| otherwise			-- Normal case (newtype is transparent)
-		= Var var
+    newtype_rhs 	       = mkNewTypeBody tycon (idType arg_id) (Var var)
 		
 	-- Stuff for data types
-    data_cons = tyConDataCons tycon
-
-    match_results             = [match_result | (_,_,match_result) <- match_alts]
+    data_cons      = tyConDataCons tycon
+    match_results  = [match_result | (_,_,match_result) <- match_alts]
 
     fail_flag | exhaustive_case
 	      = foldr1 orFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
@@ -300,12 +294,9 @@ mkCoAlgCaseMatchResult var match_alts
 		   returnDs (Case (Var var) wild_var (mk_default fail ++ alts))
 
     mk_alt fail (con, args, MatchResult _ body_fn)
-	= body_fn fail						`thenDs` \ body ->
-	  getUniquesDs						`thenDs` \ us ->
-	  let
-	     (binds, real_args) = rebuildConArgs args (dataConStrictMarks con) us
-	  in
-	  returnDs (DataAlt con, real_args, mkDsLets binds body)
+	= body_fn fail				`thenDs` \ body ->
+	  getUniquesDs				`thenDs` \ us ->
+	  returnDs (mkReboxingAlt us con args body)
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -606,10 +597,10 @@ interact well with rules.
 
 \begin{code}
 mkNilExpr :: Type -> CoreExpr
-mkNilExpr ty = App (Var (dataConId nilDataCon)) (Type ty)
+mkNilExpr ty = mkConApp nilDataCon [Type ty]
 
 mkConsExpr :: Type -> CoreExpr -> CoreExpr -> CoreExpr
-mkConsExpr ty hd tl = mkApps (Var (dataConId consDataCon)) [Type ty, hd, tl]
+mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
 \end{code}
 
 

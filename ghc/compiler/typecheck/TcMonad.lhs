@@ -51,7 +51,7 @@ import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import Class		( Class )
 import Name		( Name )
-import Var		( Id, TyVar, newMutTyVar, readMutTyVar, writeMutTyVar )
+import Var		( TyVar, newMutTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TidyEnv, emptyTidyEnv )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply,
 			  splitUniqSupply, mkSplitUniqSupply,
@@ -643,7 +643,7 @@ functions that deal with it.
 type InstLoc = (InstOrigin, SrcLoc, ErrCtxt)
 
 data InstOrigin
-  = OccurrenceOf Id		-- Occurrence of an overloaded identifier
+  = OccurrenceOf Name		-- Occurrence of an overloaded identifier
 
   | IPOcc (IPName Name)		-- Occurrence of an implicit parameter
   | IPBind (IPName Name)	-- Binding site of an implicit parameter
@@ -698,8 +698,8 @@ pprInstLoc :: InstLoc -> SDoc
 pprInstLoc (orig, locn, ctxt)
   = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
   where
-    pp_orig (OccurrenceOf id)
-      	= hsep [ptext SLIT("use of"), quotes (ppr id)]
+    pp_orig (OccurrenceOf name)
+      	= hsep [ptext SLIT("use of"), quotes (ppr name)]
     pp_orig (IPOcc name)
       	= hsep [ptext SLIT("use of implicit parameter"), quotes (ppr name)]
     pp_orig (IPBind name)

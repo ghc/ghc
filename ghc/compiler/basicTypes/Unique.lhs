@@ -42,7 +42,7 @@ module Unique (
 	mkPreludeTyConUnique, mkPreludeClassUnique,
 	mkPArrDataConUnique,
 
-	mkBuiltinUnique,
+	mkBuiltinUnique, builtinUniques,
 	mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3
     ) where
 
@@ -338,6 +338,9 @@ initTidyUniques = (mkUnique 'g' 0, mkUnique 'x' 0)
 
 mkPseudoUnique1, mkPseudoUnique2, mkPseudoUnique3, 
    mkBuiltinUnique :: Int -> Unique
+
+builtinUniques :: [Unique]
+builtinUniques = map mkBuiltinUnique [1..]
 
 mkBuiltinUnique i = mkUnique 'B' i
 mkPseudoUnique1 i = mkUnique 'C' i -- used for getUnique on Regs

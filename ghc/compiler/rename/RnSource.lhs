@@ -33,7 +33,7 @@ import RnMonad
 
 import Class		( FunDep, DefMeth (..) )
 import TyCon		( DataConDetails(..), visibleDataCons )
-import DataCon		( dataConId )
+import DataCon		( dataConWorkId )
 import Name		( Name, NamedThing(..) )
 import NameSet
 import PrelNames	( deRefStablePtrName, newStablePtrName,
@@ -597,7 +597,7 @@ rnCoreExpr (UfTuple (HsTupCon _ boxity arity) args)
   = mapRn rnCoreExpr args		`thenRn` \ args' ->
     returnRn (UfTuple (HsTupCon tup_name boxity arity) args')
   where
-    tup_name = getName (dataConId (tupleCon boxity arity))
+    tup_name = getName (dataConWorkId (tupleCon boxity arity))
 	-- Get the *worker* name and use that
 
 rnCoreExpr (UfApp fun arg)

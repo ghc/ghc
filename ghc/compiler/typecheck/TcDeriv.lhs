@@ -178,6 +178,12 @@ context to the instance decl.  The "offending classes" are
 
 	Read, Enum?
 
+FURTHER NOTE ADDED March 2002.  In fact, Haskell98 now requires that
+pattern matching against a constructor from a data type with a context
+gives rise to the constraints for that context -- or at least the thinned
+version.  So now all classes are "offending".
+
+
 
 %************************************************************************
 %*									*
@@ -348,12 +354,12 @@ makeDerivEqns tycl_decls
 			not (isUnLiftedType arg_ty)	-- No constraints for unlifted types?
 		      ]
 
-	
 	 -- "extra_constraints": see notes above about contexts on data decls
-	extra_constraints | offensive_class = tyConTheta tycon
-			  | otherwise	    = []
-	
-	offensive_class = classKey clas `elem` needsDataDeclCtxtClassKeys
+	extra_constraints = tyConTheta tycon
+
+	--    | offensive_class = tyConTheta tycon
+	--    | otherwise	    = []
+	-- offensive_class = classKey clas `elem` needsDataDeclCtxtClassKeys
 
 
     mk_eqn_help NewType tycon clas tys

@@ -67,7 +67,7 @@ import CoreSyn		( CoreBind )
 import Id		( Id )
 import Class		( Class, classSelIds )
 import TyCon		( TyCon, isNewTyCon, tyConGenIds, tyConSelIds, tyConDataCons_maybe )
-import DataCon		( dataConId, dataConWrapId )
+import DataCon		( dataConWorkId, dataConWrapId )
 
 import BasicTypes	( Version, initialVersion, Fixity, defaultFixity, IPName )
 
@@ -380,7 +380,7 @@ implicitTyThingIds things
     implicitConIds tc dc	-- Newtypes have a constructor wrapper,
 				-- but no worker
 	| isNewTyCon tc = [dataConWrapId dc]
-	| otherwise     = [dataConId dc, dataConWrapId dc]
+	| otherwise     = [dataConWorkId dc, dataConWrapId dc]
 \end{code}
 
 

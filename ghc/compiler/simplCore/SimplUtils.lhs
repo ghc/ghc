@@ -42,7 +42,7 @@ import Type		( Type, seqType, splitFunTys, dropForAlls, isStrictType,
 import TcType		( isDictTy )
 import OccName		( EncodedFS )
 import TyCon		( tyConDataCons_maybe, isAlgTyCon, isNewTyCon )
-import DataCon		( dataConRepArity, dataConSig, dataConArgTys )
+import DataCon		( dataConRepArity, dataConExistentialTyVars, dataConArgTys )
 import Var		( mkSysTyVar, tyVarKind )
 import Util		( lengthExceeds, mapAccumL )
 import Outputable
@@ -885,7 +885,7 @@ mk_args missing_con inst_tys
   = getUniquesSmpl 		`thenSmpl` \ tv_uniqs ->
     getUniquesSmpl 		`thenSmpl` \ id_uniqs ->
     let
-	(_,_,ex_tyvars,_,_,_) = dataConSig missing_con
+	ex_tyvars   = dataConExistentialTyVars missing_con
 	ex_tyvars'  = zipWith mk tv_uniqs ex_tyvars
 	mk uniq tv  = mkSysTyVar uniq (tyVarKind tv)
 	arg_tys     = dataConArgTys missing_con (inst_tys ++ mkTyVarTys ex_tyvars')

@@ -38,7 +38,7 @@ import CmdLineOpts
 import Id		( idType, idInfo, isImplicitId, idCgInfo,
 			  isLocalId, idName,
 			)
-import DataCon		( dataConId, dataConSig, dataConFieldLabels, dataConStrictMarks )
+import DataCon		( dataConWorkId, dataConSig, dataConFieldLabels, dataConStrictMarks )
 import IdInfo		-- Lots
 import Var              ( Var )
 import CoreSyn		( CoreRule(..), IdCoreRule )
@@ -219,7 +219,7 @@ ifaceTyThing (AClass clas) = cls_decl
     tycon     = classTyCon clas
     data_con  = head (tyConDataCons tycon)
     sys_names = mkClassDeclSysNames (getName tycon, getName data_con, 
-				     getName (dataConId data_con), map getName sc_sels)
+				     getName (dataConWorkId data_con), map getName sc_sels)
 
     toClassOpSig (sel_id, def_meth)
 	= ASSERT(sel_tyvars == clas_tyvars)
@@ -278,7 +278,7 @@ ifaceTyThing (ATyCon tycon) = ty_decl
     ifaceConDecls (DataCons cs) = DataCons (map ifaceConDecl cs)
 
     ifaceConDecl data_con 
-	= ConDecl (getName data_con) (getName (dataConId data_con))
+	= ConDecl (getName data_con) (getName (dataConWorkId data_con))
 		  (toHsTyVars ex_tyvars)
 		  (toHsContext ex_theta)
 		  details noSrcLoc

@@ -54,7 +54,7 @@ import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
 import Literal	        ( Literal, mkMachInt )
-import DataCon		( DataCon, dataConId )
+import DataCon		( DataCon, dataConWorkId )
 import BasicTypes	( Activation )
 import VarSet
 import Outputable
@@ -376,7 +376,7 @@ mkLets	      :: [Bind b] -> Expr b -> Expr b
 mkLams	      :: [b] -> Expr b -> Expr b
 
 mkLit lit	  = Lit lit
-mkConApp con args = mkApps (Var (dataConId con)) args
+mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
 mkLams binders body = foldr Lam body binders
 mkLets binds body   = foldr Let body binds

@@ -13,7 +13,7 @@ import Type             ( Type, isUnLiftedType, tyVarsOfType, tyVarsOfTypes,
 			  funTyCon
 			)
 import TcType		( tcSplitTyConApp_maybe, tcSplitSigmaTy, tcSplitSigmaTy )
-import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, dataConId, isExistentialDataCon )
+import DataCon          ( DataCon, dataConOrigArgTys, dataConWrapId, isExistentialDataCon )
 
 import TyCon            ( TyCon, tyConTyVars, tyConDataCons_maybe, 
 			  tyConGenInfo, isNewTyCon, newTyConRep, isBoxedTupleTyCon
@@ -25,9 +25,8 @@ import CoreUtils	( exprArity )
 import BasicTypes       ( EP(..), Boxity(..) )
 import Var              ( TyVar )
 import VarSet		( varSetElems )
-import Id               ( Id, mkVanillaGlobal, idType, idName, 
-			  mkTemplateLocal, mkTemplateLocalsNum
-			) 
+import Id               ( Id, mkVanillaGlobal, idType, idName, mkSysLocal )
+import MkId		( mkReboxingAlt, mkNewTypeBody )
 import TysWiredIn       ( genericTyCons,
 			  genUnitTyCon, genUnitDataCon, plusTyCon, inrDataCon,
 			  inlDataCon, crossTyCon, crossDataCon
@@ -37,8 +36,8 @@ import CoreUnfold       ( mkTopUnfolding )
 
 import Maybe		( isNothing )
 import SrcLoc		( builtinSrcLoc )
-import Unique		( mkBuiltinUnique )
-import Util             ( takeList )
+import Unique		( Unique, builtinUniques, mkBuiltinUnique )
+import Util             ( takeList, dropList )
 import Outputable 
 
 #include "HsVersions.h"
@@ -238,6 +237,10 @@ mkTyConGenInfo :: TyCon -> [Name] -> Maybe (EP Id)
 -- The two names are the names constructed by the renamer
 -- for the fromT and toT conversion functions.
 
+mkTyConGenInfo tycon []
+  = Nothing	-- This happens when we deal with the interface-file type
+		-- decl for a module compiled without -fgenerics
+
 mkTyConGenInfo tycon [from_name, to_name]
   | isNothing maybe_datacons	-- Abstractly imported types don't have
   = Nothing			-- to/from operations, (and should not need them)
@@ -275,7 +278,7 @@ mkTyConGenInfo tycon [from_name, to_name]
 
     (from_fn, to_fn, rep_ty) 
 	| isNewTyCon tycon
-	= ( mkLams tyvars $ Lam x  $ Var x,
+	= ( mkLams tyvars $ Lam x  $ mkNewTypeBody tycon newrep_ty (Var x),
 	    Var (dataConWrapId the_datacon),
 	    newrep_ty )
 
@@ -285,7 +288,8 @@ mkTyConGenInfo tycon [from_name, to_name]
 	    idType rep_var )
 
     -- x :: T a b c
-    x  = mkTemplateLocal 1 tycon_ty
+    x = mkGenericLocal u1 tycon_ty
+    (u1 : uniqs) = builtinUniques
 
 	    ----------------------
 	    -- 	Newtypes only
@@ -296,14 +300,15 @@ mkTyConGenInfo tycon [from_name, to_name]
 	    -- 	Non-newtypes only
     -- Recurse over the sum first
     -- The "2" is the first free unique
-    (from_alts, to_inner, rep_var) = mk_sum_stuff 2 tyvars datacons
+    (from_alts, to_inner, rep_var) = mk_sum_stuff uniqs tyvars datacons
     
+mkTyConGenInfo tycon names = pprPanic "mkTyConGenInfo" (ppr tycon <+> ppr names)
     
 
 ----------------------------------------------------
 --	Dealing with sums
 ----------------------------------------------------
-mk_sum_stuff :: Int	 	-- Base for generating unique names
+mk_sum_stuff :: [Unique] 	-- Base for generating unique names
 	     -> [TyVar]		-- Type variables over which the tycon is abstracted
 	     -> [DataCon] 	-- The data constructors
 	     -> ([Alt Id], CoreExpr, Id)
@@ -318,29 +323,36 @@ mk_sum_stuff :: Int	 	-- Base for generating unique names
 --						   D a b c }} },
 --			   cd)
 
-mk_sum_stuff i tyvars [datacon]
+mk_sum_stuff us tyvars [datacon]
    = ([from_alt], to_body_fn app_exp, rep_var)
    where
-     types        = dataConOrigArgTys datacon 
-     datacon_vars = mkTemplateLocalsNum i types
-     new_i        = i + length types 
-     app_exp      = mkVarApps (Var (dataConId datacon)) (tyvars ++ datacon_vars)
-     from_alt     = (DataAlt datacon, datacon_vars, from_alt_rhs)
-     
-     (_, from_alt_rhs, to_body_fn, rep_var) = mk_prod_stuff new_i datacon_vars
+     types        = dataConOrigArgTys datacon 	-- Existentials already excluded
+     datacon_vars = zipWith mkGenericLocal us types
+     us'          = dropList types us
 
-mk_sum_stuff i tyvars datacons
+     app_exp      = mkVarApps (Var (dataConWrapId datacon)) (tyvars ++ datacon_vars)
+     from_alt     = mkReboxingAlt us' datacon datacon_vars from_alt_rhs
+			-- We are talking about *user* datacons here; hence
+			--	dataConWrapId
+			-- 	mkReboxingAlt
+
+     (_,args',_)  = from_alt
+     us''	  = dropList args' us'	-- Conservative, but safe
+     
+     (_, from_alt_rhs, to_body_fn, rep_var) = mk_prod_stuff us'' datacon_vars
+
+mk_sum_stuff (u:us) tyvars datacons
   = (wrap inlDataCon l_from_alts ++ wrap inrDataCon r_from_alts,
      Case (Var rep_var) rep_var [(DataAlt inlDataCon, [l_rep_var], l_to_body),
 			 	 (DataAlt inrDataCon, [r_rep_var], r_to_body)],
      rep_var)
   where
     (l_datacons, r_datacons)	        = splitInHalf datacons
-    (l_from_alts, l_to_body, l_rep_var) = mk_sum_stuff (i+2) tyvars l_datacons
-    (r_from_alts, r_to_body, r_rep_var) = mk_sum_stuff (i+2) tyvars r_datacons
+    (l_from_alts, l_to_body, l_rep_var) = mk_sum_stuff us tyvars l_datacons
+    (r_from_alts, r_to_body, r_rep_var) = mk_sum_stuff us tyvars r_datacons
     rep_tys				= [idType l_rep_var, idType r_rep_var]
     rep_ty				= mkTyConApp plusTyCon rep_tys
-    rep_var 				= mkTemplateLocal i rep_ty
+    rep_var 				= mkGenericLocal u rep_ty
 
     wrap :: DataCon -> [Alt Id] -> [Alt Id] 
 	-- Wrap an application of the Inl or Inr constructor round each alternative
@@ -352,11 +364,11 @@ mk_sum_stuff i tyvars datacons
 ----------------------------------------------------
 --	Dealing with products
 ----------------------------------------------------
-mk_prod_stuff :: Int			-- Base for unique names
+mk_prod_stuff :: [Unique]		-- Base for unique names
 	      -> [Id] 			-- arg-ids; args of the original user-defined constructor
 					-- 	They are bound enclosing from_rhs
 					-- 	Please bind these in the to_body_fn 
-	      -> (Int,			-- Depleted unique-name supply
+	      -> ([Unique],		-- Depleted unique-name supply
 		  CoreExpr, 		-- from-rhs: puts together the representation from the arg_ids
 		  CoreExpr -> CoreExpr,	-- to_body_fn: takes apart the representation
 		  Id)			-- The rep-id; please bind this to the representation
@@ -372,26 +384,26 @@ mk_prod_stuff :: Int			-- Base for unique names
 -- because the returned to_body_fns are nested.  
 -- Hence the returned unqique-name supply
 
-mk_prod_stuff i []		-- Unit case
-  = (i,
+mk_prod_stuff (u:us) []		-- Unit case
+  = (us,
      Var (dataConWrapId genUnitDataCon),
      \x -> x, 
-     mkTemplateLocal i (mkTyConApp genUnitTyCon []))
+     mkGenericLocal u (mkTyConApp genUnitTyCon []))
 
-mk_prod_stuff i [arg_var]	-- Singleton case
-  = (i, Var arg_var, \x -> x, arg_var)
+mk_prod_stuff us [arg_var]	-- Singleton case
+  = (us, Var arg_var, \x -> x, arg_var)
 
-mk_prod_stuff i arg_vars	-- Two or more
-  = (r_i, 
+mk_prod_stuff (u:us) arg_vars	-- Two or more
+  = (us'', 
      mkConApp crossDataCon (map Type rep_tys ++ [l_alt_rhs, r_alt_rhs]),
      \x -> Case (Var rep_var) rep_var 
 		[(DataAlt crossDataCon, [l_rep_var, r_rep_var], l_to_body_fn (r_to_body_fn x))],
      rep_var)
   where
     (l_arg_vars, r_arg_vars) 		 = splitInHalf arg_vars
-    (l_i, l_alt_rhs, l_to_body_fn, l_rep_var) = mk_prod_stuff (i+1) l_arg_vars
-    (r_i, r_alt_rhs, r_to_body_fn, r_rep_var) = mk_prod_stuff l_i   r_arg_vars
-    rep_var = mkTemplateLocal i (mkTyConApp crossTyCon rep_tys)
+    (us', l_alt_rhs, l_to_body_fn, l_rep_var) = mk_prod_stuff us  l_arg_vars
+    (us'', r_alt_rhs, r_to_body_fn, r_rep_var) = mk_prod_stuff us' r_arg_vars
+    rep_var = mkGenericLocal u (mkTyConApp crossTyCon rep_tys)
     rep_tys = [idType l_rep_var, idType r_rep_var]
 \end{code}
 
@@ -404,6 +416,9 @@ splitInHalf list = (left, right)
 		   half  = length list `div` 2
 		   left  = take half list
 		   right = drop half list
+
+mkGenericLocal :: Unique -> Type -> Id
+mkGenericLocal uniq ty = mkSysLocal FSLIT("g") uniq ty
 \end{code}
 
 %************************************************************************

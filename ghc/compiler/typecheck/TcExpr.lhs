@@ -9,10 +9,11 @@ module TcExpr ( tcExpr, tcMonoExpr, tcId ) where
 #include "HsVersions.h"
 
 import HsSyn		( HsExpr(..), HsLit(..), ArithSeqInfo(..), 
-			  HsMatchContext(..), HsDoContext(..), mkMonoBind
+			  HsMatchContext(..), HsDoContext(..), 
+			  mkMonoBind 
 			)
 import RnHsSyn		( RenamedHsExpr, RenamedRecordBinds )
-import TcHsSyn		( TcExpr, TcRecordBinds, simpleHsLitTy  )
+import TcHsSyn		( TcExpr, TcRecordBinds, simpleHsLitTy, mkHsDictApp, mkHsTyApp )
 
 import TcMonad
 import TcUnify		( tcSubExp, tcGen, (<$>),
@@ -23,7 +24,7 @@ import Inst		( InstOrigin(..),
 			  LIE, mkLIE, emptyLIE, unitLIE, plusLIE, plusLIEs,
 			  newOverloadedLit, newMethod, newIPDict,
 			  newDicts, newMethodWithGivenTy,
-			  instToId, tcInstCall
+			  instToId, tcInstCall, tcInstDataCon
 			)
 import TcBinds		( tcBindsAndThen )
 import TcEnv		( tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
@@ -37,7 +38,7 @@ import TcMType		( tcInstTyVars, tcInstType, newHoleTyVarTy, zapToType,
 			  newTyVarTy, newTyVarTys, zonkTcType, readHoleResult )
 import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tcSplitFunTys, tcSplitTyConApp, mkTyVarTys,
-			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy,
+			  isSigmaTy, mkFunTy, mkAppTy, mkTyConTy, mkFunTys,
 			  mkTyConApp, mkClassPred, tcFunArgTy,
 			  tyVarsOfTypes, isLinearPred,
 			  liftedTypeKind, openTypeKind, mkArrowKind,
@@ -45,12 +46,12 @@ import TcType		( TcType, TcSigmaType, TcRhoType, TyVarDetails(VanillaTv),
 			  tidyOpenType
 			)
 import FieldLabel	( FieldLabel, fieldLabelName, fieldLabelType, fieldLabelTyCon )
-import Id		( idType, recordSelectorFieldLabel, isRecordSelector )
+import Id		( idType, recordSelectorFieldLabel, isRecordSelector, isDataConWrapId_maybe )
 import DataCon		( dataConFieldLabels, dataConSig, 
 			  dataConStrictMarks
 			)
 import Name		( Name )
-import TyCon		( TyCon, tyConTyVars, isAlgTyCon, tyConDataCons )
+import TyCon		( TyCon, tyConTyVars, tyConTheta, isAlgTyCon, tyConDataCons )
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import VarSet		( emptyVarSet, elemVarSet )
 import TysWiredIn	( boolTy, mkListTy, mkPArrTy, listTyCon, parrTyCon )
@@ -443,15 +444,16 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 		-- It's OK to use the non-tc splitters here (for a selector)
-	(Just (AnId sel_id) : _)    = maybe_sel_ids
-	(_, _, tau)	      	    = tcSplitSigmaTy (idType sel_id)	-- Selectors can be overloaded
-									-- when the data type has a context
-	data_ty		     	    = tcFunArgTy tau			-- Must succeed since sel_id is a selector
-	tycon		 	    = tcTyConAppTyCon data_ty
-	data_cons		    = tyConDataCons tycon
-	(con_tyvars, _, _, _, _, _) = dataConSig (head data_cons)
+	(Just (AnId sel_id) : _) = maybe_sel_ids
+
+	(_, _, tau)  = tcSplitSigmaTy (idType sel_id)	-- Selectors can be overloaded
+		     					-- when the data type has a context
+	data_ty	     = tcFunArgTy tau			-- Must succeed since sel_id is a selector
+	tycon	     = tcTyConAppTyCon data_ty
+	data_cons    = tyConDataCons tycon
+	tycon_tyvars = tyConTyVars tycon		-- The data cons use the same type vars
     in
-    tcInstTyVars VanillaTv con_tyvars		`thenNF_Tc` \ (_, result_inst_tys, _) ->
+    tcInstTyVars VanillaTv tycon_tyvars		`thenNF_Tc` \ (_, result_inst_tys, inst_env) ->
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
@@ -491,33 +493,29 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	  | tyvar `elemVarSet` common_tyvars = returnNF_Tc result_inst_ty	-- Same as result type
 	  | otherwise			     = newTyVarTy liftedTypeKind	-- Fresh type
     in
-    mapNF_Tc mk_inst_ty (zip con_tyvars result_inst_tys)	`thenNF_Tc` \ inst_tys ->
+    mapNF_Tc mk_inst_ty (zip tycon_tyvars result_inst_tys)	`thenNF_Tc` \ inst_tys ->
 
 	-- STEP 5
 	-- Typecheck the expression to be updated
     let
 	record_ty = mkTyConApp tycon inst_tys
     in
-    tcMonoExpr record_expr record_ty			`thenTc`    \ (record_expr', record_lie) ->
+    tcMonoExpr record_expr record_ty		`thenTc`    \ (record_expr', record_lie) ->
 
 	-- STEP 6
 	-- Figure out the LIE we need.  We have to generate some 
 	-- dictionaries for the data type context, since we are going to
-	-- do some construction.
+	-- do pattern matching over the data cons.
 	--
-	-- What dictionaries do we need?  For the moment we assume that all
-	-- data constructors have the same context, and grab it from the first
-	-- constructor.  If they have varying contexts then we'd have to 
-	-- union the ones that could participate in the update.
+	-- What dictionaries do we need?  
+	-- We just take the context of the type constructor
     let
-	(tyvars, theta, _, _, _, _) = dataConSig (head data_cons)
-	inst_env = mkTopTyVarSubst tyvars result_inst_tys
-	theta'   = substTheta inst_env theta
+	theta' = substTheta inst_env (tyConTheta tycon)
     in
     newDicts RecordUpdOrigin theta'	`thenNF_Tc` \ dicts ->
 
 	-- Phew!
-    returnTc (RecordUpdOut record_expr' record_ty result_record_ty (map instToId dicts) rbinds', 
+    returnTc (RecordUpdOut record_expr' record_ty result_record_ty rbinds', 
 	      mkLIE dicts `plusLIE` record_lie `plusLIE` rbinds_lie)
 
 tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
@@ -746,20 +744,24 @@ This gets a bit less sharing, but
 tcId :: Name -> NF_TcM (TcExpr, LIE, TcType)
 tcId name	-- Look up the Id and instantiate its type
   = tcLookupId name			`thenNF_Tc` \ id ->
-    loop (OccurrenceOf id) (HsVar id) emptyLIE (idType id)
+    case isDataConWrapId_maybe id of
+	Nothing       -> loop (HsVar id) emptyLIE (idType id)
+	Just data_con -> inst_data_con id data_con
   where
-    loop orig (HsVar fun_id) lie fun_ty
+    orig = OccurrenceOf name
+
+    loop (HsVar fun_id) lie fun_ty
 	| want_method_inst fun_ty
 	= tcInstType VanillaTv fun_ty		`thenNF_Tc` \ (tyvars, theta, tau) ->
 	  newMethodWithGivenTy orig fun_id 
 		(mkTyVarTys tyvars) theta tau	`thenNF_Tc` \ meth ->
-	  loop orig (HsVar (instToId meth)) 
+	  loop (HsVar (instToId meth)) 
 	       (unitLIE meth `plusLIE` lie) tau
 
-    loop orig fun lie fun_ty 
+    loop fun lie fun_ty 
 	| isSigmaTy fun_ty
 	= tcInstCall orig fun_ty	`thenNF_Tc` \ (inst_fn, inst_lie, tau) ->
-	  loop orig (inst_fn fun) (inst_lie `plusLIE` lie) tau
+	  loop (inst_fn fun) (inst_lie `plusLIE` lie) tau
 
 	| otherwise
 	= returnNF_Tc (fun, lie, fun_ty)
@@ -777,6 +779,15 @@ tcId name	-- Look up the Id and instantiate its type
 	-- because that loses the linearity of the constraint.
 	-- The simplest thing to do is never to construct a method constraint
 	-- in the first place that has a linear implicit parameter in it.
+
+	-- We treat data constructors differently, because we have to generate
+	-- constraints for their silly theta, which no longer appears in
+	-- the type of dataConWrapId.  It's dual to TcPat.tcConstructor
+    inst_data_con id data_con
+      = tcInstDataCon orig data_con	`thenNF_Tc` \ (ty_args, ex_dicts, arg_tys, result_ty, stupid_lie, ex_lie, _) ->
+	returnNF_Tc (mkHsDictApp (mkHsTyApp (HsVar id) ty_args) ex_dicts, 
+		     stupid_lie `plusLIE` ex_lie, 
+		     mkFunTys arg_tys result_ty)
 \end{code}
 
 Typecheck expression which in most cases will be an Id.

@@ -10,12 +10,12 @@ module DataCon (
 	mkDataCon,
 	dataConRepType, dataConSig, dataConName, dataConTag, dataConTyCon,
 	dataConArgTys, dataConOrigArgTys, dataConInstOrigArgTys,
-	dataConRepArgTys, dataConTheta,
+	dataConRepArgTys, dataConTheta, 
 	dataConFieldLabels, dataConStrictMarks,
 	dataConSourceArity, dataConRepArity,
-	dataConNumInstArgs, dataConId, dataConWrapId, dataConRepStrictness,
+	dataConNumInstArgs, dataConWorkId, dataConWrapId, dataConRepStrictness,
 	isNullaryDataCon, isTupleCon, isUnboxedTupleCon,
-	isExistentialDataCon, classDataCon,
+	isExistentialDataCon, classDataCon, dataConExistentialTyVars,
 
 	splitProductType_maybe, splitProductType,
     ) where
@@ -63,6 +63,41 @@ Every constructor, C, comes with a
   The worker is very like a primop, in that it has no binding,
 
 
+A note about the stupid context
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Data types can have a context:
+	
+	data (Eq a, Ord b) => T a b = T1 a b | T2 a
+
+and that makes the constructors have a context too
+(notice that T2's context is "thinned"):
+
+	T1 :: (Eq a, Ord b) => a -> b -> T a b
+	T2 :: (Eq a) => a -> T a b
+
+Furthermore, this context pops up when pattern matching
+(though GHC hasn't implemented this, but it is in H98, and
+I've fixed GHC so that it now does):
+
+	f (T2 x) = x
+gets inferred type
+	f :: Eq a => T a b -> a
+
+I say the context is "stupid" because the dictionaries passed
+are immediately discarded -- they do nothing and have no benefit.
+It's a flaw in the language.
+
+Up to now [March 2002] I have put this stupid context into the type of
+the "wrapper" constructors functions, T1 and T2, but that turned out
+to be jolly inconvenient for generics, and record update, and other
+functions that build values of type T (because they don't have
+suitable dictionaries available).
+
+So now I've taken the stupid context out.  I simply deal with it
+separately in the type checker on occurrences of a constructor, either
+in an expression or in a pattern.
+
+
 
 %************************************************************************
 %*									*
@@ -83,9 +118,13 @@ data DataCon
 	--	data Eq a => T a = forall b. Ord b => MkT a [b]
 
 	dcRepType   :: Type,	-- Type of the constructor
-				-- 	forall ab . Ord b => a -> [b] -> MkT a
-				-- (this is *not* of the constructor Id:
+				-- 	forall b a . Ord b => a -> [b] -> MkT a
+				-- (this is *not* of the constructor wrapper Id:
 				--  see notes after this data type declaration)
+				--
+				-- Notice that the existential type parameters come
+				-- *first*.  It doesn't really matter provided we are
+				-- consistent.
 
 	-- The next six fields express the type of the constructor, in pieces
 	-- e.g.
@@ -97,11 +136,23 @@ data DataCon
 	--	dcOrigArgTys   = [a,List b]
 	--	dcTyCon    = T
 
-	dcTyVars :: [TyVar], 		-- Type vars and context for the data type decl
+	dcTyVars :: [TyVar], 		-- Type vars for the data type decl
 					-- These are ALWAYS THE SAME AS THE TYVARS
 					-- FOR THE PARENT TyCon.  We occasionally rely on
 					-- this just to avoid redundant instantiation
-	dcTheta  ::  ThetaType,
+
+	dcStupidTheta  ::  ThetaType,	-- This is a "thinned" version of the context of 
+					-- the data decl.  
+		-- "Thinned", because the Report says
+		-- to eliminate any constraints that don't mention
+		-- tyvars free in the arg types for this constructor
+		--
+		-- "Stupid", because the dictionaries aren't used for anything.  
+		-- 
+		-- Indeed, [as of March 02] they are no 
+		-- longer in the type of the dataConWrapId, because
+		-- that makes it harder to use the wrap-id to rebuild
+		-- values after record selection or in generics.
 
 	dcExTyVars :: [TyVar], 		-- Ditto for the context of the constructor,
 	dcExTheta  :: ThetaType,	-- the existentially quantified stuff
@@ -136,7 +187,7 @@ data DataCon
 	--
 	-- An entirely separate wrapper function is built in TcTyDecls
 
-	dcId :: Id,		-- The corresponding worker Id
+	dcWorkId :: Id,		-- The corresponding worker Id
 				-- Takes dcRepArgTys as its arguments
 
 	dcWrapId :: Id		-- The wrapper Id
@@ -199,7 +250,7 @@ instance Show DataCon where
 
 %************************************************************************
 %*									*
-\subsection{Consruction}
+\subsection{Construction}
 %*									*
 %************************************************************************
 
@@ -223,13 +274,13 @@ mkDataCon name arg_stricts fields
     con
   where
     con = MkData {dcName = name, dcUnique = nameUnique name,
-	  	  dcTyVars = tyvars, dcTheta = theta,
+	  	  dcTyVars = tyvars, dcStupidTheta = theta,
 		  dcOrigArgTys = orig_arg_tys,
 		  dcRepArgTys = rep_arg_tys,
 	     	  dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
 		  dcStrictMarks = real_stricts, dcRepStrictness = rep_arg_stricts,
 		  dcFields = fields, dcTag = tag, dcTyCon = tycon, dcRepType = ty,
-		  dcId = work_id, dcWrapId = wrap_id}
+		  dcWorkId = work_id, dcWrapId = wrap_id}
 
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
@@ -244,7 +295,7 @@ mkDataCon name arg_stricts fields
     (rep_arg_stricts, rep_arg_tys) = computeRep real_stricts real_arg_tys
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
-    ty  = mkForAllTys (tyvars ++ ex_tyvars)
+    ty  = mkForAllTys (ex_tyvars ++ tyvars)
 	              (mkFunTys rep_arg_tys result_ty)
 		-- NB: the existential dict args are already in rep_arg_tys
 
@@ -267,8 +318,8 @@ dataConTyCon = dcTyCon
 dataConRepType :: DataCon -> Type
 dataConRepType = dcRepType
 
-dataConId :: DataCon -> Id
-dataConId = dcId
+dataConWorkId :: DataCon -> Id
+dataConWorkId = dcWorkId
 
 dataConWrapId :: DataCon -> Id
 dataConWrapId = dcWrapId
@@ -305,7 +356,7 @@ dataConSig :: DataCon -> ([TyVar], ThetaType,
 			  [TyVar], ThetaType,
 			  [Type], TyCon)
 
-dataConSig (MkData {dcTyVars = tyvars, dcTheta = theta,
+dataConSig (MkData {dcTyVars = tyvars, dcStupidTheta = theta,
 		     dcExTyVars = ex_tyvars, dcExTheta = ex_theta,
 		     dcOrigArgTys = arg_tys, dcTyCon = tycon})
   = (tyvars, theta, ex_tyvars, ex_theta, arg_tys, tycon)
@@ -320,17 +371,20 @@ dataConArgTys :: DataCon
 
 dataConArgTys (MkData {dcRepArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
- = map (substTyWith (tyvars ++ ex_tyvars) inst_tys) arg_tys
+ = map (substTyWith (ex_tyvars ++ tyvars) inst_tys) arg_tys
 
 dataConTheta :: DataCon -> ThetaType
-dataConTheta dc = dcTheta dc
+dataConTheta dc = dcStupidTheta dc
+
+dataConExistentialTyVars :: DataCon -> [TyVar]
+dataConExistentialTyVars dc = dcExTyVars dc
 
 -- And the same deal for the original arg tys:
 
 dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
 dataConInstOrigArgTys (MkData {dcOrigArgTys = arg_tys, dcTyVars = tyvars,
 		       dcExTyVars = ex_tyvars}) inst_tys
- = map (substTyWith (tyvars ++ ex_tyvars) inst_tys) arg_tys
+ = map (substTyWith (ex_tyvars ++ tyvars) inst_tys) arg_tys
 \end{code}
 
 These two functions get the real argument types of the constructor,

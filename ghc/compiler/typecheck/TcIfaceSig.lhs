@@ -223,7 +223,7 @@ tcCoreExpr (UfTuple (HsTupCon _ boxity arity) args)
     in
     returnTc (mkApps (Var con_id) con_args)
   where
-    con_id = dataConId (tupleCon boxity arity)
+    con_id = dataConWorkId (tupleCon boxity arity)
     
 
 tcCoreExpr (UfLam bndr body)
@@ -335,14 +335,14 @@ tcCoreAlt scrut_ty (UfLitLitAlt str ty, names, rhs)
 tcCoreAlt scrut_ty alt@(con, names, rhs)
   = tcConAlt con	`thenTc` \ con ->
     let
-	(main_tyvars, _, ex_tyvars, _, _, _) = dataConSig con
-
-	(tycon, inst_tys)   = splitTyConApp scrut_ty	-- NB: not tcSplitTyConApp
+	ex_tyvars  	  = dataConExistentialTyVars con
+	(tycon, inst_tys) = splitTyConApp scrut_ty	-- NB: not tcSplitTyConApp
 							-- We are looking at Core here
-	ex_tyvars'	    = [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
-	ex_tys'		    = mkTyVarTys ex_tyvars'
-	arg_tys		    = dataConArgTys con (inst_tys ++ ex_tys')
-	id_names	    = dropList ex_tyvars names
+	main_tyvars	  = tyConTyVars tycon
+	ex_tyvars'	  = [mkTyVar name (tyVarKind tv) | (name,tv) <- names `zip` ex_tyvars] 
+	ex_tys'		  = mkTyVarTys ex_tyvars'
+	arg_tys		  = dataConArgTys con (inst_tys ++ ex_tys')
+	id_names	  = dropList ex_tyvars names
 	arg_ids
 #ifdef DEBUG
 		| not (equalLength id_names arg_tys)

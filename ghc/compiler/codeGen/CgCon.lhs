@@ -45,7 +45,7 @@ import ClosureInfo	( mkConLFInfo, mkLFArgument, closureLFInfo,
 import CostCentre	( currentOrSubsumedCCS, dontCareCCS, CostCentreStack,
 			  currentCCS )
 import DataCon		( DataCon, dataConName, dataConTag, 
-			  isUnboxedTupleCon, isNullaryDataCon, dataConId, 
+			  isUnboxedTupleCon, isNullaryDataCon, dataConWorkId, 
 			  dataConWrapId, dataConRepArity
 			)
 import Id		( Id, idName, idPrimRep )
@@ -379,7 +379,7 @@ cgReturnDataCon con amodes
 		-- temporary variable, if the closure is a CHARLIKE.
 		-- funnily enough, this makes the unique always come
 		-- out as '54' :-)
-	  buildDynCon (dataConId con) currentCCS con amodes	`thenFC` \ idinfo ->
+	  buildDynCon (dataConWorkId con) currentCCS con amodes	`thenFC` \ idinfo ->
 	  idInfoToAmode PtrRep idinfo				`thenFC` \ amode ->
 
 
