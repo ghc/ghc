@@ -1,3 +1,4 @@
+
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
 %
@@ -6,7 +7,7 @@
 \begin{code}
 #include "HsVersions.h"
 
-module Match ( match, matchWrapper, matchSimply ) where
+module Match ( matchExport, match, matchWrapper, matchSimply ) where
 
 IMP_Ubiq()
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 201
@@ -17,30 +18,33 @@ import {-# SOURCE #-} DsExpr  ( dsExpr  )
 import {-# SOURCE #-} DsBinds ( dsBinds )
 #endif
 
-import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappedPatterns )
+import CmdLineOpts	( opt_WarnIncompletePatterns, opt_WarnOverlappedPatterns,
+			  opt_PprUserLength,opt_WarnSimplePatterns
+     			)
 import HsSyn		
 import TcHsSyn		( SYN_IE(TypecheckedPat), SYN_IE(TypecheckedMatch),
 			  SYN_IE(TypecheckedHsBinds), SYN_IE(TypecheckedHsExpr)	)
 import DsHsSyn		( outPatType, collectTypedPatBinders )
+import Check            ( check, SYN_IE(ExhaustivePat), SYN_IE(WarningPat), BoxedString )
 import CoreSyn
-
 import CoreUtils	( coreExprType )
 import DsMonad
 import DsGRHSs		( dsGRHSs )
 import DsUtils
-import MatchCon		( matchConFamily )
-import MatchLit		( matchLiterals )
-
+import ErrUtils 	( SYN_IE(Warning) )
 import FieldLabel	( FieldLabel {- Eq instance -} )
 import Id		( idType, dataConFieldLabels,
 			  dataConArgTys, recordSelectorFieldLabel,
 			  GenId{-instance-}, SYN_IE(Id)
 			)
+import MatchCon		( matchConFamily )
+import MatchLit		( matchLiterals )
 import Name		( Name {--O only-} )
-import Outputable	( PprStyle(..), Outputable(..) )
+import Outputable	( PprStyle(..), Outputable(..), pprQuote )
 import PprType		( GenType{-instance-}, GenTyVar{-ditto-} )        
-import Pretty		( Doc )
+import Pretty		
 import PrelVals		( pAT_ERROR_ID )
+import SrcLoc		( noSrcLoc, SrcLoc )
 import Type		( isPrimType, eqTy, getAppDataTyConExpandingDicts,
 			  instantiateTauTy, SYN_IE(Type)
 			)
@@ -55,8 +59,139 @@ import TysWiredIn	( nilDataCon, consDataCon, mkTupleTy, mkListTy,
 			  addrDataCon, wordTy, wordDataCon
 			)
 import Unique		( Unique{-instance Eq-} )
+import UniqSet
 import Util		( panic, pprPanic, assertPanic )
 \end{code}
+
+This function is a wrapper of @match@, it must be called from all the parts where 
+it was called match, but only substitutes the firs call, ....
+if the associated flags are declared, warnings will be issued.
+It can not be called matchWrapper because this name already exists :-(
+
+JJCQ 30-Nov-1997
+
+\begin{code}
+matchExport :: [Id]	        -- Vars rep'ing the exprs we're matching with
+            -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
+            -> DsM MatchResult  -- Desugared result!
+
+matchExport vars qs@((EqnInfo _ ctx _ (MatchResult _ _ _)) : _)
+  | incomplete && shadow = 
+      dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
+      dsIncompleteWarn ctx pats			`thenDs`   \ () ->
+      match vars qs
+  | incomplete            = 
+      dsIncompleteWarn ctx pats			`thenDs`   \ () ->
+      match vars qs
+  | shadow                = 
+      dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
+      match vars qs
+  | otherwise             =
+      match vars qs
+  where (pats,indexs) = check qs
+        incomplete    = opt_WarnIncompletePatterns && (length pats /= 0)
+        shadow        = opt_WarnOverlappedPatterns && sizeUniqSet indexs < no_eqns
+        no_eqns       = length qs
+	unused_eqns   = uniqSetToList (mkUniqSet [1..no_eqns] `minusUniqSet` indexs)
+	eqns_shadow   = map (\n -> qs!!(n - 1)) unused_eqns
+\end{code}
+
+This variable shows the maximun number of lines of output generated for warnings.
+It will limit the number of patterns/equations displayed to maximum_output.
+
+\begin{code}
+maximum_output = 4
+\end{code}
+
+The next two functions creates the warning message.
+
+\begin{code}
+dsShadowWarn :: DsMatchContext -> [EquationInfo] -> DsM ()
+dsShadowWarn ctx@(DsMatchContext kind _ _) qs = dsWarn warn 
+	where
+	  warn sty | length qs > maximum_output = 
+               hang (pp_context sty ctx (ptext SLIT("are overlapped")))
+                    12 ((vcat $ map (ppr_eqn kind sty) (take maximum_output qs))
+                        $$ ptext SLIT("..."))
+          warn sty =  
+               hang (pp_context sty ctx (ptext SLIT("are overlapped")))
+                    12 (vcat $ map (ppr_eqn kind sty) qs)
+
+dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
+dsIncompleteWarn ctx@(DsMatchContext kind _ _) pats = dsWarn warn 
+	where
+	  warn sty | length pats > maximum_output = 
+               hang (pp_context sty ctx (ptext SLIT("are non-exhaustive")))
+                    12 (hang (ptext SLIT("Patterns not recognized:"))
+                       4 ((vcat $ map (ppr_incomplete_pats kind sty) (take maximum_output pats))
+                          $$ ptext SLIT("...")))
+          warn sty =
+               hang (pp_context sty ctx (ptext SLIT("are non-exhaustive")))
+                    12 (hang (ptext SLIT("Patterns not recognized:"))
+                       4 (vcat $ map (ppr_incomplete_pats kind sty) pats))
+
+pp_context sty NoMatchContext msg = ptext SLIT("Warning: Some match(es)") <+> msg
+
+pp_context sty (DsMatchContext kind pats loc) msg
+  = hang (hcat [ppr (PprForUser opt_PprUserLength) loc, ptext SLIT(": ")])
+	     4 (hang message
+		     4 (pp_match kind pats))
+ where
+    message = ptext SLIT("Warning: Pattern match(es)") <+> msg     
+
+    pp_match (FunMatch fun) pats
+      = hsep [ptext SLIT("in the definition of function"), ppr sty fun]
+
+    pp_match CaseMatch pats
+      = hang (ptext SLIT("in a group of case alternatives beginning:"))
+	4 (ppr_pats sty pats)
+
+    pp_match PatBindMatch pats
+      = hang (ptext SLIT("in a pattern binding:"))
+	4 (ppr_pats sty pats)
+
+    pp_match LambdaMatch pats
+      = hang (ptext SLIT("in a lambda abstraction:"))
+	4 (ppr_pats sty pats)
+
+    pp_match DoBindMatch pats
+      = hang (ptext SLIT("in a `do' pattern binding:"))
+	4 (ppr_pats sty pats)
+
+    pp_match ListCompMatch pats
+      = hang (ptext SLIT("in a `list comprension' pattern binding:"))
+	4 (ppr_pats sty pats)
+
+    pp_match LetMatch pats
+      = hang (ptext SLIT("in a `let' pattern binding:"))
+	4 (ppr_pats sty pats)
+
+ppr_pats sty pats = pprQuote sty $ \ sty -> sep (map (ppr sty) pats)
+
+separator (FunMatch _)    = SLIT("=")
+separator (CaseMatch)     = SLIT("->") 
+separator (LambdaMatch)   = SLIT("->") 
+separator (PatBindMatch)  = panic "When is this used?"
+separator (DoBindMatch)   = SLIT("<-")  
+separator (ListCompMatch) = SLIT("<-")  
+separator (LetMatch)      = SLIT("=")
+                 
+ppr_shadow_pats kind sty pats = pprQuote sty $ \ sty ->
+	                 sep [sep (map (ppr sty) pats), ptext (separator kind), ptext SLIT("...")]
+    
+ppr_incomplete_pats kind sty (pats,[]) = pprQuote sty $ \ sty ->
+	                 sep [sep (map (ppr sty) pats)]
+ppr_incomplete_pats kind sty (pats,constraints) = pprQuote sty $ \ sty ->
+	                 sep [sep (map (ppr sty) pats), ptext SLIT("with"), 
+                         sep (map (ppr_constraint sty) constraints)]
+    
+
+ppr_constraint sty (var,pats) = sep [ppr sty var, ptext SLIT("`not_elem`"),ppr sty pats]
+
+ppr_eqn kind sty (EqnInfo _ _ pats _) = ppr_shadow_pats kind sty pats
+
+\end{code}
+
 
 The function @match@ is basically the same as in the Wadler chapter,
 except it is monadised, to carry around the name supply, info about
@@ -112,7 +247,6 @@ So, the full type signature:
 \begin{code}
 match :: [Id]		  -- Variables rep'ing the exprs we're matching with
       -> [EquationInfo]	  -- Info about patterns, etc. (type synonym below)
-      -> [EquationInfo]	  -- Potentially shadowing equations above this one
       -> DsM MatchResult  -- Desugared result!
 \end{code}
 
@@ -159,29 +293,19 @@ than the Wadler-chapter code for @match@ (p.~93, first @match@ clause).
 And gluing the ``success expressions'' together isn't quite so pretty.
 
 \begin{code}
-match [] eqns_info shadows
-  = complete_matches eqns_info (any eqn_cant_fail shadows)
+match [] eqns_info
+  = complete_matches eqns_info
   where
-    complete_matches [eqn] is_shadowed 
-	= complete_match eqn is_shadowed
+    complete_matches [eqn] 
+	= complete_match eqn
  
-    complete_matches (eqn:eqns) is_shadowed
-	= complete_match eqn is_shadowed 				`thenDs` \ match_result1 ->
-	  complete_matches eqns (is_shadowed || eqn_cant_fail eqn)	`thenDs` \ match_result2 ->
+    complete_matches (eqn:eqns)
+	= complete_match eqn		`thenDs` \ match_result1 ->
+	  complete_matches eqns 	`thenDs` \ match_result2 ->
 	  combineMatchResults match_result1 match_result2
 
-	-- If at this stage we find that at least one of the shadowing
-	-- equations is guaranteed not to fail, then warn of an overlapping pattern
-    complete_match (EqnInfo [] match_result@(MatchResult _ _ _ cxt)) is_shadowed
-	| opt_WarnOverlappedPatterns && is_shadowed = 
-	    dsShadowWarn cxt 	`thenDs` \ _ ->
-	    returnDs match_result
-
-	| otherwise   = returnDs match_result
-
-    eqn_cant_fail :: EquationInfo -> Bool
-    eqn_cant_fail (EqnInfo [] (MatchResult CanFail  _ _ _)) = False
-    eqn_cant_fail (EqnInfo [] (MatchResult CantFail _ _ _)) = True
+    complete_match (EqnInfo _ _ [] match_result@(MatchResult _ _ _))
+	= returnDs match_result
 \end{code}
 
 %************************************************************************
@@ -203,17 +327,16 @@ Wadler-chapter @match@ (p.~93, last clause), and @match_unmixed_blk@
 corresponds roughly to @matchVarCon@.
 
 \begin{code}
-match vars@(v:vs) eqns_info shadows
+match vars@(v:vs) eqns_info
   = mapDs (tidyEqnInfo v) eqns_info	`thenDs` \ tidy_eqns_info ->
-    mapDs (tidyEqnInfo v) shadows	`thenDs` \ tidy_shadows ->
     let
 	tidy_eqns_blks = unmix_eqns tidy_eqns_info
     in
-    match_unmixed_eqn_blks vars tidy_eqns_blks tidy_shadows
+    match_unmixed_eqn_blks vars tidy_eqns_blks
   where
     unmix_eqns []    = []
     unmix_eqns [eqn] = [ [eqn] ]
-    unmix_eqns (eq1@(EqnInfo (p1:p1s) _) : eq2@(EqnInfo (p2:p2s) _) : eqs)
+    unmix_eqns (eq1@(EqnInfo _ _ (p1:p1s) _) : eq2@(EqnInfo _ _ (p2:p2s) _) : eqs)
       = if (  (irrefutablePat p1 && irrefutablePat p2)
 	   || (isConPat       p1 && isConPat 	   p2)
 	   || (isLitPat       p1 && isLitPat 	   p2) ) then
@@ -230,19 +353,16 @@ match vars@(v:vs) eqns_info shadows
     -- subsequent blocks create a "fail expr" for the first one...
     match_unmixed_eqn_blks :: [Id]
 			   -> [ [EquationInfo] ]	-- List of eqn BLOCKS
-			   -> [EquationInfo]	 	-- Shadows
 			   -> DsM MatchResult
 
-    match_unmixed_eqn_blks vars [] shadows = panic "match_unmixed_eqn_blks"
+    match_unmixed_eqn_blks vars [] = panic "match_unmixed_eqn_blks"
 
-    match_unmixed_eqn_blks vars [eqn_blk] shadows = matchUnmixedEqns vars eqn_blk shadows
+    match_unmixed_eqn_blks vars [eqn_blk] = matchUnmixedEqns vars eqn_blk 
 
-    match_unmixed_eqn_blks vars (eqn_blk:eqn_blks) shadows
-      = matchUnmixedEqns vars eqn_blk shadows    	`thenDs` \ match_result1 ->  -- try to match with first blk
-	match_unmixed_eqn_blks vars eqn_blks shadows'	`thenDs` \ match_result2 ->
+    match_unmixed_eqn_blks vars (eqn_blk:eqn_blks) 
+      = matchUnmixedEqns vars eqn_blk    	`thenDs` \ match_result1 ->  -- try to match with first blk
+	match_unmixed_eqn_blks vars eqn_blks 	`thenDs` \ match_result2 ->
 	combineMatchResults match_result1 match_result2
-      where
-	shadows' = eqn_blk ++ shadows
 \end{code}
 
 Tidy up the leftmost pattern in an @EquationInfo@, given the variable @v@
@@ -284,9 +404,9 @@ tidyEqnInfo :: Id -> EquationInfo -> DsM EquationInfo
 	-- DsM'd because of internal call to "match".
 	-- "tidy1" does the interesting stuff, looking at
 	-- one pattern and fiddling the list of bindings.
-tidyEqnInfo v (EqnInfo (pat : pats) match_result)
+tidyEqnInfo v (EqnInfo n ctx (pat : pats) match_result)
   = tidy1 v pat match_result	`thenDs` \ (pat', match_result') ->
-    returnDs (EqnInfo (pat' : pats) match_result')
+    returnDs (EqnInfo n ctx (pat' : pats) match_result')
 
 tidy1 :: Id 					-- The Id being scrutinised
       -> TypecheckedPat 			-- The pattern against which it is to be matched
@@ -520,36 +640,31 @@ Its arguments and results are the same as for the ``top-level'' @match@.
 \begin{code}
 matchUnmixedEqns :: [Id]
 		  -> [EquationInfo]
-		  -> [EquationInfo]		-- Shadows
 		  -> DsM MatchResult
 
-matchUnmixedEqns [] _ _ = panic "matchUnmixedEqns: no names"
+matchUnmixedEqns [] _ = panic "matchUnmixedEqns: no names"
 
-matchUnmixedEqns all_vars@(var:vars) eqns_info shadows
+matchUnmixedEqns all_vars@(var:vars) eqns_info 
   | irrefutablePat first_pat
   = ASSERT( irrefutablePats column_1_pats )	-- Sanity check
   	-- Real true variables, just like in matchVar, SLPJ p 94
-    match vars remaining_eqns_info remaining_shadows
+    match vars remaining_eqns_info
 
   | isConPat first_pat
   = ASSERT( patsAreAllCons column_1_pats )
-    matchConFamily all_vars eqns_info shadows
+    matchConFamily all_vars eqns_info 
 
   | isLitPat first_pat
   = ASSERT( patsAreAllLits column_1_pats )
   	-- see notes in MatchLiteral
 	-- not worried about the same literal more than once in a column
 	-- (ToDo: sort this out later)
-    matchLiterals all_vars eqns_info shadows
+    matchLiterals all_vars eqns_info
 
   where
     first_pat		= head column_1_pats
-    column_1_pats 	= [pat                       | EqnInfo (pat:_)  _            <- eqns_info]
-    remaining_eqns_info = [EqnInfo pats match_result | EqnInfo (_:pats) match_result <- eqns_info]
-    remaining_shadows   = [EqnInfo pats match_result | EqnInfo (pat:pats) match_result <- shadows,
-						       irrefutablePat pat ]
-	-- Discard shadows which can be refuted, since they don't shadow
-	-- a variable
+    column_1_pats 	= [pat                       | EqnInfo _ _ (pat:_)  _            <- eqns_info]
+    remaining_eqns_info = [EqnInfo n ctx pats match_result | EqnInfo n ctx (_:pats) match_result <- eqns_info]
 \end{code}
 
 %************************************************************************
@@ -601,13 +716,19 @@ matchWrapper :: DsMatchKind			-- For shadowing warning messages
 	     -> [TypecheckedMatch]		-- Matches being desugared
 	     -> String 				-- Error message if the match fails
 	     -> DsM ([Id], CoreExpr) 	-- Results
+\end{code}
 
--- a special case for the common ...:
---	just one Match
---	lots of (all?) unfailable pats
---  e.g.,
---	f x y z = ....
+ a special case for the common ...:
+	just one Match
+	lots of (all?) unfailable pats
+  e.g.,
+	f x y z = ....
+ 
+ This special case have been ``undone'' due to problems with the new warnings 
+ messages (Check.lhs.check). We need there the name of the variables to be able to 
+ print later the equation. JJQC 30-11-97
 
+\begin{old_code}
 matchWrapper kind [(PatMatch (VarPat var) match)] error_string
   = matchWrapper kind [match] error_string `thenDs` \ (vars, core_expr) ->
     returnDs (var:vars, core_expr)
@@ -622,28 +743,43 @@ matchWrapper kind [(GRHSMatch
   = dsBinds False{-don't auto-scc-} binds            `thenDs` \ core_binds ->
     dsExpr  expr	                             `thenDs` \ core_expr ->
     returnDs ([], mkCoLetsAny core_binds core_expr)
+\end{old_code}
 
-----------------------------------------------------------------------------
--- and all the rest... (general case)
+ And all the rest... (general case)
+
+
+ There is one small problem with the Lambda Patterns, when somebody
+ writes something similar to:
+    (\ (x:xs) -> ...)
+ he/she don't want a warning about incomplete patterns, that is done with 
+ the flag opt_WarnSimplePatterns.
+ This problem also appears in the :
+   do patterns, but if the do can fail it creates another equation if the match can 
+                fail (see DsExpr.doDo function)
+   let patterns, are treated by matchSimply
+   List Comprension Patterns, are treated by matchSimply also
+
+We can't call matchSimply with Lambda patterns, due to lambda patterns can have more than
+one pattern, and match simply only accepts one pattern.
+
+JJQC 30-Nov-1997
+ 
+\begin{code}
 
 matchWrapper kind matches error_string
-  = flattenMatches kind matches	`thenDs` \ eqns_info@(EqnInfo arg_pats (MatchResult _ result_ty _ _) : _) ->
+  = flattenMatches kind 1 matches	`thenDs` \ eqns_info@(EqnInfo _ _ arg_pats (MatchResult _ result_ty _) : _) ->
 
     selectMatchVars arg_pats				`thenDs` \ new_vars ->
-    match new_vars eqns_info []				`thenDs` \ match_result ->
+    match_fun new_vars eqns_info 		 	`thenDs` \ match_result ->
 
     mkErrorAppDs pAT_ERROR_ID result_ty error_string	`thenDs` \ fail_expr ->
 
-	-- Check for incomplete pattern match
-    (case match_result of
-	MatchResult CanFail result_ty match_fn cxt 
-		| opt_WarnIncompletePatterns
-		-> dsIncompleteWarn cxt
-	other	-> returnDs ()
-    )							`thenDs` \ _ ->
-
     extractMatchResult match_result fail_expr		`thenDs` \ result_expr ->
     returnDs (new_vars, result_expr)
+  where match_fun = case kind of 
+                      LambdaMatch | opt_WarnSimplePatterns -> matchExport 
+                                  | otherwise              -> match
+                      _                                    -> matchExport
 \end{code}
 
 %************************************************************************
@@ -658,32 +794,37 @@ pattern. It returns an expression.
 
 \begin{code}
 matchSimply :: CoreExpr			-- Scrutinee
-	    -> TypecheckedPat			-- Pattern it should match
-	    -> Type				-- Type of result
+	    -> DsMatchKind              -- Match kind
+	    -> TypecheckedPat		-- Pattern it should match
+	    -> Type			-- Type of result
 	    -> CoreExpr			-- Return this if it matches
 	    -> CoreExpr			-- Return this if it does
 	    -> DsM CoreExpr
 
-matchSimply (Var var) pat result_ty result_expr fail_expr
-  = match [var] [eqn_info] []	`thenDs` \ match_result ->
-    extractMatchResult match_result fail_expr
+matchSimply (Var var) kind pat result_ty result_expr fail_expr
+  = getSrcLocDs				        `thenDs` \ locn ->
+    let
+      ctx = DsMatchContext kind [pat] locn
+      eqn_info = EqnInfo 1 ctx [pat] initial_match_result
+    in 
+      match_fun [var] [eqn_info]	        `thenDs` \ match_result ->
+      extractMatchResult match_result fail_expr
   where
-    eqn_info = EqnInfo [pat] initial_match_result
-    initial_match_result = MatchResult CantFail
-				       result_ty
-				       (\ ignore -> result_expr)
-				       NoMatchContext
+    initial_match_result = MatchResult CantFail result_ty (\ ignore -> result_expr)
+    match_fun = if opt_WarnSimplePatterns 
+                  then matchExport
+                  else match
 
-matchSimply scrut_expr pat result_ty result_expr msg
-  = newSysLocalDs (outPatType pat) 				`thenDs` \ scrut_var ->
-    matchSimply (Var scrut_var) pat result_ty result_expr msg	`thenDs` \ expr ->
+matchSimply scrut_expr kind pat result_ty result_expr msg
+  = newSysLocalDs (outPatType pat) 	        			`thenDs` \ scrut_var ->
+    matchSimply (Var scrut_var) kind pat result_ty result_expr msg	`thenDs` \ expr ->
     returnDs (Let (NonRec scrut_var scrut_expr) expr)
 
 
-extractMatchResult (MatchResult CantFail _ match_fn _) fail_expr
+extractMatchResult (MatchResult CantFail _ match_fn) fail_expr
   = returnDs (match_fn (error "It can't fail!"))
 
-extractMatchResult (MatchResult CanFail result_ty match_fn cxt) fail_expr
+extractMatchResult (MatchResult CanFail result_ty match_fn) fail_expr
   = mkFailurePair result_ty	 	`thenDs` \ (fail_bind_fn, if_it_fails) ->
     returnDs (Let (fail_bind_fn fail_expr) (match_fn if_it_fails))
 \end{code}
@@ -700,37 +841,40 @@ This is actually local to @matchWrapper@.
 \begin{code}
 flattenMatches
 	:: DsMatchKind
+        -> EqnNo
 	-> [TypecheckedMatch]
 	-> DsM [EquationInfo]
 
-flattenMatches kind [] = returnDs []
+flattenMatches kind n [] = returnDs []
 
-flattenMatches kind (match : matches)
-  = flatten_match [] match	`thenDs` \ eqn_info ->
-    flattenMatches kind matches	`thenDs` \ eqn_infos ->
+flattenMatches kind n (match : matches)
+  = flatten_match [] n match	`thenDs` \ eqn_info ->
+    flattenMatches kind (n+1) matches	`thenDs` \ eqn_infos ->
     returnDs (eqn_info : eqn_infos)
   where
     flatten_match :: [TypecheckedPat] 		-- Reversed list of patterns encountered so far
+                  -> EqnNo
 		  -> TypecheckedMatch
 		  -> DsM EquationInfo
 
-    flatten_match pats_so_far (PatMatch pat match)
-      = flatten_match (pat:pats_so_far) match
+    flatten_match pats_so_far n (PatMatch pat match)
+      = flatten_match (pat:pats_so_far) n match
 
-    flatten_match pats_so_far (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
+    flatten_match pats_so_far n (GRHSMatch (GRHSsAndBindsOut grhss binds ty))
       = dsBinds False{-don't auto-scc-} binds	`thenDs` \ core_binds ->
 	dsGRHSs ty kind pats grhss 		`thenDs` \ match_result ->
-	returnDs (EqnInfo pats (mkCoLetsMatchResult core_binds match_result))
+        getSrcLocDs				`thenDs` \ locn ->
+	returnDs (EqnInfo n (DsMatchContext kind pats locn) pats 
+                  (mkCoLetsMatchResult core_binds match_result))
       where
 	pats = reverse pats_so_far	-- They've accumulated in reverse order
 
-    flatten_match pats_so_far (SimpleMatch expr) 
+    flatten_match pats_so_far n (SimpleMatch expr) 
       = dsExpr expr		`thenDs` \ core_expr ->
 	getSrcLocDs		`thenDs` \ locn ->
-	returnDs (EqnInfo pats
+	returnDs (EqnInfo n (DsMatchContext kind pats locn) pats
 		    (MatchResult CantFail (coreExprType core_expr) 
-			      (\ ignore -> core_expr)
-			      (DsMatchContext kind pats locn)))
+			      (\ ignore -> core_expr)))
 
 	 -- the matching can't fail, so we won't generate an error message.
         where
