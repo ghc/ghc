@@ -44,9 +44,9 @@ import CoreUnfold	( unfoldingTemplate, hasUnfolding )
 import Type		( funResultTy, splitForAllTys, openTypeKind )
 import Bag		( isEmptyBag )
 import ErrUtils		( printErrorsAndWarnings, errorsFound, dumpIfSet_dyn, showPass )
-import Id		( idType, idUnfolding )
+import Id		( idType, idName, isLocalId, idUnfolding )
 import Module           ( Module )
-import Name		( Name, toRdrName )
+import Name		( Name, toRdrName, isGlobalName )
 import Name		( nameEnvElts, lookupNameEnv )
 import TyCon		( tyConGenInfo )
 import Util
@@ -358,7 +358,11 @@ dump_sigs results	-- Print type signatures
     ppr_sig (n,t)        = ppr n <+> dcolon <+> ppr t
 
     want_sig id | opt_PprStyle_Debug = True
-	        | otherwise	     = True	-- For now
+	        | otherwise	     = isLocalId id && isGlobalName (idName id)
+	-- isLocalId ignores data constructors, records selectors etc
+	-- The isGlobalName ignores local dictionary and method bindings
+	-- that the type checker has invented.  User-defined things have
+	-- Global names.
 
 ppr_gen_tycons tcs = vcat [ptext SLIT("{-# Generic type constructor details"),
 			   vcat (map ppr_gen_tycon tcs),
