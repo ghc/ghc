@@ -674,6 +674,14 @@ STGFUN(PAP_entry)
 
     FB_
 
+      /* Concurrent World:
+	 If we come from StackUnderflowEnterNode the old StkO has been
+	 nuked and the PAP carries over data from the old StkO.
+	 The underflow code must restore RetReg to the right value 
+	 because it is not grabbed from the update frame if there is data
+	 on one of the two stacks.
+          -- HWL
+      */
     while (AREL(SuA - SpA) == 0 && BREL(SuB - SpB) == 0) {
 #ifdef CONCURRENT
         if (SuB < STKO_BSTK_BOT(StkOReg)) {
