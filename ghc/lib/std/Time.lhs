@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Time.lhs,v 1.22 2000/06/30 13:39:36 simonmar Exp $
+% $Id: Time.lhs,v 1.23 2000/08/29 16:38:04 simonpj Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -703,9 +703,6 @@ foreign import "libHS_cbits" "get_tm_wday"  unsafe get_tm_wday  :: MBytes -> IO 
 foreign import "libHS_cbits" "get_tm_yday"  unsafe get_tm_yday  :: MBytes -> IO Int
 foreign import "libHS_cbits" "get_tm_isdst" unsafe get_tm_isdst :: MBytes -> IO Int
 	       		   
-foreign import "libHS_cbits" "prim_ZONE"    unsafe prim_ZONE    :: Bytes -> IO Addr
-foreign import "libHS_cbits" "prim_GMTOFF"  unsafe prim_GMTOFF  :: Bytes -> IO Int
-	       		   
 foreign import "libHS_cbits" "sizeof_struct_tm" unsafe sizeof_struct_tm :: Int
 
 #ifdef __HUGS__
@@ -722,6 +719,8 @@ foreign import "libHS_cbits" "prim_SETZONE" unsafe prim_SETZONE :: MBytes -> MBy
 #ifdef __HUGS__
 foreign import "libHS_cbits" "prim_toLocalTime"  unsafe prim_toLocalTime :: Int64 -> MBytes -> IO Int
 foreign import "libHS_cbits" "prim_toUTCTime"    unsafe prim_toUTCTime   :: Int64 -> MBytes -> IO Int
+foreign import "libHS_cbits" "prim_ZONE"    unsafe prim_ZONE    :: Bytes -> IO Addr
+foreign import "libHS_cbits" "prim_GMTOFF"  unsafe prim_GMTOFF  :: Bytes -> IO Int
 #else
 foreign import "libHS_cbits" "toLocalTime"  unsafe prim_toLocalTime :: Int -> Bytes -> MBytes -> IO Int
 foreign import "libHS_cbits" "toUTCTime"    unsafe prim_toUTCTime   :: Int -> Bytes -> MBytes -> IO Int
