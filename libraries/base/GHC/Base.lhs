@@ -1,7 +1,7 @@
 % -----------------------------------------------------------------------------
-% $Id: Base.lhs,v 1.5 2002/02/05 17:32:26 simonmar Exp $
+% $Id: Base.lhs,v 1.6 2002/02/12 09:39:19 simonmar Exp $
 %
-% (c) The University of Glasgow, 1992-2000
+% (c) The University of Glasgow, 1992-2002
 %
 \section[GHC.Base]{Module @GHC.Base@}
 
@@ -599,8 +599,8 @@ instance CReturnable () -- Why, exactly?
 
 \begin{code}
 data Unit = Unit
-data a :+: b = Inl a | Inr b
-data a :*: b = a :*: b
+data (:+:) a b = Inl a | Inr b
+data (:*:) a b = a :*: b
 \end{code}
 
 
