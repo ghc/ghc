@@ -1,4 +1,4 @@
-{-# OPTIONS -cpp #-}
+{-# OPTIONS -cpp -fffi #-}
 #include "config.h"
 -----------------------------------------------------------------------------
 --
@@ -20,11 +20,17 @@ module Main where
 
 import System.Environment
 import System.IO
-import System.Cmd
 import Data.List
 import System.Directory
 import System.Exit
 import Data.Char
+
+#if __GLASGOW_HASKELL__ < 603
+import Foreign		( withMany, withArray0, nullPtr, Ptr )
+import Foreign.C	( CString, withCString, throwErrnoIfMinus1 )
+#else
+import System.Cmd	( rawSystem )
+#endif
 
 main = do 
   args <- getArgs
@@ -77,3 +83,6 @@ die msg = do hPutStr stderr msg; exitWith (ExitFailure 1)
 dieProg :: String -> IO a
 dieProg msg = do p <- getProgName; die (p ++ ": " ++ msg)
 
+#if __GLASGOW_HASKELL__ < 603
+#include "../../../libraries/base/System/RawSystem.hs-inc"
+#endif
