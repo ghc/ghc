@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.16 $
- * $Date: 1999/12/10 15:59:42 $
+ * $Revision: 1.17 $
+ * $Date: 2000/01/13 10:47:05 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -94,6 +94,9 @@ static List local addStgVar             Args((List,Pair));
 
 static Cell local translate(e)         /* Translate expression:            */
 Cell e; {
+#if 0
+    printf ( "translate: " );print(e,100);printf("\n");
+#endif
     switch (whatIs(e)) {
         case LETREC     : snd(snd(e)) = translate(snd(snd(e)));
                           return expandLetrec(e);
@@ -1508,7 +1511,6 @@ Void evalExp() {                    /* compile and run input expression    */
         fflush (stdout);
         switch (status) {
         case Deadlock:
-        case AllBlocked: /* I don't understand the distinction - ADR */
                 printf("{Deadlock or Blackhole}");
                 if (doRevertCAFs) RevertCAFs();
                 break;
