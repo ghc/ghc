@@ -333,7 +333,11 @@ install ::
 	      fi; \
 	done
 
-NO_ALL_TARGETS=YES
+# Turn off target.mk's rules for 'all', 'boot' and 'install'.
+NO_BOOT_TARGET=YES
+NO_ALL_TARGET=YES
+NO_INSTALL_TARGET=YES
+
 include $(TOP)/mk/target.mk
 
 # -----------------------------------------------------------------------------

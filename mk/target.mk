@@ -79,10 +79,24 @@
 
 ifneq "$(SUBDIRS)" ""
 
-# we override the boot & all targets in the top level Makefile
-ifneq "$(NO_ALL_TARGETS)" "YES"
+# we override the 'boot', 'all' and 'install' targets in the top
+# level Makefile. Some of the sub-projects also set 'boot' to empty.
+
+ifeq "$(NO_ALL_TARGET)" "YES"
+ALL_TARGET     =
+else
 ALL_TARGET     = all
+endif
+
+ifeq "$(NO_BOOT_TARGET)" "YES"
+BOOT_TARGET    =
+else
 BOOT_TARGET    = boot
+endif
+
+ifneq "$(NO_INSTALL_TARGET)" "YES"
+INSTALL_TARGET =
+else
 INSTALL_TARGET = install
 endif
 
@@ -165,8 +179,12 @@ endif
 #  The boot target, at a minimum generates dependency information
 
 .PHONY: boot
-boot :: depend
 
+ifeq "$(NO_BOOT_TARGET)" "YES"
+boot ::
+else
+boot :: depend
+endif
 
 ##################################################################
 # 		GNU Standard targets
@@ -297,7 +315,7 @@ ifneq "$(BootingFromHc)" "YES"
 $(HS_PROG) :: $(HS_OBJS)
 	$(HC) -o $@ $(HC_OPTS) $(LD_OPTS) $(HS_OBJS)
 else
-# see bootstrp.mk
+# see bootstrap.mk
 $(HS_PROG) :: $(HS_OBJS)
 	$(CC) -o $@ $(HC_BOOT_CC_OPTS) $(HC_BOOT_LD_OPTS) $(HS_OBJS) $(HC_BOOT_LIBS)
 endif
