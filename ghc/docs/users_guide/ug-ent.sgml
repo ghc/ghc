@@ -14,6 +14,7 @@
 <!ENTITY packages       SYSTEM "packages.sgml" >
 <!ENTITY parallel       SYSTEM "parallel.sgml" >
 <!ENTITY phases         SYSTEM "phases.sgml" >
+<!ENTITY primitives     SYSTEM "primitives.sgml" >
 <!ENTITY separate       SYSTEM "separate_compilation.sgml" >
 <!ENTITY vs-hs          SYSTEM "vs_haskell.sgml" >
 <!ENTITY wrong          SYSTEM "gone_wrong.sgml" >
