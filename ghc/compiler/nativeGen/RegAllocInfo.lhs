@@ -917,23 +917,23 @@ spillReg vreg_to_slot_map delta dyn vreg
 
 	{-I386: spill above stack pointer leaving 3 words/spill-}
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
-                        in case regClass vreg of
-                              RcInteger -> MOV L (OpReg dyn) (OpAddr (spRel off_w))
-                              _         -> GST F80 dyn (spRel off_w) -- RcFloat/RcDouble
+                        in case regClass vreg of {
+                              RcInteger -> MOV L (OpReg dyn) (OpAddr (spRel off_w));
+                              _         -> GST F80 dyn (spRel off_w)} {- RcFloat/RcDouble -}
 
 	{-SPARC: spill below frame pointer leaving 2 words/spill-}
 	,IF_ARCH_sparc( 
-                        let off_w = 1 + (off `div` 4)
-                            sz = case regClass vreg of
-                                    RcInteger -> W
-                                    RcFloat   -> F
-                                    RcDouble  -> DF
+                        let{off_w = 1 + (off `div` 4);
+                            sz = case regClass vreg of {
+                                    RcInteger -> W;
+                                    RcFloat   -> F;
+                                    RcDouble  -> DF}}
                         in ST sz dyn (fpRel (- off_w))
         ,IF_ARCH_powerpc(
-			let sz = case regClass vreg of
-                                    RcInteger -> W
-                                    RcFloat   -> F
-                                    RcDouble  -> DF
+			let{sz = case regClass vreg of {
+                                    RcInteger -> W;
+                                    RcFloat   -> F;
+                                    RcDouble  -> DF}}
 			in ST sz dyn (AddrRegImm sp (ImmInt (off-delta)))
 	,))))
 
@@ -946,22 +946,22 @@ loadReg vreg_to_slot_map delta vreg dyn
 	 IF_ARCH_alpha( LD  sz dyn (spRel (- (off `div` 8)))
 
 	,IF_ARCH_i386 ( let off_w = (off-delta) `div` 4
-                        in case regClass vreg of
-                              RcInteger -> MOV L (OpAddr (spRel off_w)) (OpReg dyn)
-                              _         -> GLD F80 (spRel off_w) dyn -- RcFloat/RcDouble
+                        in case regClass vreg of {
+                              RcInteger -> MOV L (OpAddr (spRel off_w)) (OpReg dyn);
+                              _         -> GLD F80 (spRel off_w) dyn} {- RcFloat/RcDouble -}
 
 	,IF_ARCH_sparc( 
-                        let off_w = 1 + (off `div` 4)
-                            sz = case regClass vreg of
-                                   RcInteger -> W
-                                   RcFloat   -> F
-                                   RcDouble  -> DF
+                        let{off_w = 1 + (off `div` 4);
+                            sz = case regClass vreg of {
+                                   RcInteger -> W;
+                                   RcFloat   -> F;
+                                   RcDouble  -> DF}}
                         in LD sz (fpRel (- off_w)) dyn
         ,IF_ARCH_powerpc(
-			let sz = case regClass vreg of
-                                    RcInteger -> W
-                                    RcFloat   -> F
-                                    RcDouble  -> DF
+			let{sz = case regClass vreg of {
+                                    RcInteger -> W;
+                                    RcFloat   -> F;
+                                    RcDouble  -> DF}}
 			in LD sz dyn (AddrRegImm sp (ImmInt (off-delta)))
 	,))))
 \end{code}

@@ -76,11 +76,11 @@ underscorePrefix = (cLeadingUnderscore == "YES")
 fmtAsmLbl :: String -> String  -- for formatting labels
 
 fmtAsmLbl s
-  =  IF_ARCH_alpha(
      {- The alpha assembler likes temporary labels to look like $L123
 	instead of L123.  (Don't toss the L, because then Lf28
 	turns into $f28.)
      -}
+  =  IF_ARCH_alpha(
      '$' : s
      ,{-otherwise-}
      '.':'L':s
