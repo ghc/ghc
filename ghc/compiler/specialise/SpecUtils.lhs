@@ -25,31 +25,36 @@ IMP_Ubiq(){-uitous-}
 import CmdLineOpts	( opt_SpecialiseOverloaded, opt_SpecialiseUnboxed,
 			  opt_SpecialiseAll
 			)
-import Bag		( isEmptyBag, bagToList )
-import Class		( GenClass{-instance NamedThing-}, GenClassOp {- instance NamedThing -} )
+import Bag		( isEmptyBag, bagToList, Bag )
+import Class		( GenClass{-instance NamedThing-}, SYN_IE(Class),
+			  GenClassOp {- instance NamedThing -} )
 import FiniteMap	( emptyFM, addListToFM_C, plusFM_C, keysFM,
 			  lookupWithDefaultFM
 			)
 import Id		( idType, isDictFunId, isConstMethodId_maybe,
 			  isDefaultMethodId_maybe,
-			  GenId {-instance NamedThing -}
+			  GenId {-instance NamedThing -}, SYN_IE(Id)
 			)
 import Maybes		( maybeToBool, catMaybes, firstJust )
-import Name		( OccName, pprNonSym, pprOccName, modAndOcc )
+import Name		( OccName, pprOccName, modAndOcc, NamedThing(..) )
 import PprStyle		( PprStyle(..) )
 import PprType		( pprGenType, pprParendGenType, pprMaybeTy,
-			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar
+			  TyCon{-ditto-}, GenType{-ditto-}, GenTyVar, GenClassOp
 			)
 import Pretty		-- plenty of it
 import TyCon		( tyConTyVars, TyCon{-instance NamedThing-} )
 import Type		( splitSigmaTy, mkTyVarTy, mkForAllTys,
-			  getTyVar_maybe, isUnboxedType
+			  getTyVar_maybe, isUnboxedType, SYN_IE(Type)
 			)
-import TyVar		( GenTyVar{-instance Eq-} )
+import TyVar		( GenTyVar{-instance Eq-}, SYN_IE(TyVar) )
 import Unique		( Unique{-instance Eq-} )
 import Util		( equivClasses, zipWithEqual, cmpPString,
 			  assertPanic, panic{-ToDo:rm-}
 			)
+
+#if __GLASGOW_HASKELL__ >= 202
+import Outputable       ( Outputable(..) )
+#endif
 
 cmpType = panic "SpecUtils.cmpType (ToDo: get rid of)"
 mkSameSpecCon = panic "SpecUtils.mkSameSpecCon (ToDo)"
@@ -63,8 +68,8 @@ based on flags, the overloading constraint vector, and the types.
 
 \begin{code}
 specialiseCallTys :: ConstraintVector	-- Tells which type args are overloaded
-		  -> [Type]		-- Type args
-		  -> [Maybe Type]	-- Nothings replace non-specialised type args
+  		  -> [Type]		-- Type args
+  		  -> [Maybe Type]	-- Nothings replace non-specialised type args
 
 specialiseCallTys cvec tys
   | opt_SpecialiseAll = map Just tys
@@ -73,8 +78,8 @@ specialiseCallTys cvec tys
     spec_ty_other c ty | (opt_SpecialiseUnboxed && isUnboxedType ty) ||
 			 (opt_SpecialiseOverloaded && c)
 		       = Just ty
+ 		       | otherwise = Nothing
 
-		       | otherwise = Nothing
 \end{code}
 
 @getIdOverloading@ grabs the type of an Id, and returns a
@@ -159,13 +164,13 @@ with a list of specialising types. An error message is returned if not.
 \begin{code}
 argTysMatchSpecTys_error :: [Maybe Type]
 			 -> [Type]
-			 -> Maybe Pretty
+			 -> Maybe Doc
 argTysMatchSpecTys_error spec_tys arg_tys
   = if match spec_tys arg_tys
     then Nothing
-    else Just (ppSep [ppPStr SLIT("Spec and Arg Types Inconsistent:"),
-		      ppPStr SLIT("spectys="), ppSep [pprMaybeTy PprDebug ty | ty <- spec_tys],
-		      ppPStr SLIT("argtys="), ppSep [pprParendGenType PprDebug ty | ty <- arg_tys]])
+    else Just (sep [ptext SLIT("Spec and Arg Types Inconsistent:"),
+		      ptext SLIT("spectys="), sep [pprMaybeTy PprDebug ty | ty <- spec_tys],
+		      ptext SLIT("argtys="), sep [pprParendGenType PprDebug ty | ty <- arg_tys]])
   where
     match (Nothing:spec_tys) (arg:arg_tys)
       = not (isUnboxedType arg) &&
@@ -186,16 +191,16 @@ pprSpecErrs :: FAST_STRING			-- module name
 	    -> (Bag (Id,[Maybe Type]))	-- errors
 	    -> (Bag (Id,[Maybe Type]))	-- warnings
 	    -> (Bag (TyCon,[Maybe Type]))	-- errors
-	    -> Pretty
+	    -> Doc
 
 pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
   | not any_errs && not any_warn
-  = ppNil
+  = empty
 
   | otherwise
-  = ppAboves [
-	ppPStr SLIT("SPECIALISATION MESSAGES:"),
-	ppAboves (map pp_module_specs use_modules)
+  = vcat [
+	ptext SLIT("SPECIALISATION MESSAGES:"),
+	vcat (map pp_module_specs use_modules)
 	]
   where
     any_errs = not (isEmptyBag spec_errs && isEmptyBag spec_tyerrs)
@@ -249,20 +254,20 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 
     use_modules     = unks ++ known
 
-    pp_module_specs :: FAST_STRING -> Pretty
+    pp_module_specs :: FAST_STRING -> Doc
     pp_module_specs mod
       | mod == _NIL_
       = ASSERT (null mod_tyspecs)
-	ppAboves (map (pp_idspec ty_sty (ppPStr SLIT("UNKNOWN:"))) mod_idspecs)
+	vcat (map (pp_idspec ty_sty (ptext SLIT("UNKNOWN:"))) mod_idspecs)
 
       | have_specs
-      = ppAboves [
-	    ppAboves (map (pp_tyspec ty_sty (pp_module mod)) mod_tyspecs),
-	    ppAboves (map (pp_idspec ty_sty (pp_module mod)) mod_idspecs)
+      = vcat [
+	    vcat (map (pp_tyspec ty_sty (pp_module mod)) mod_tyspecs),
+	    vcat (map (pp_idspec ty_sty (pp_module mod)) mod_idspecs)
 	    ]
 
       | otherwise
-      = ppNil
+      = empty
 
       where
 	mod_tyspecs = lookupWithDefaultFM tyspecs_fm [] mod
@@ -271,15 +276,15 @@ pprSpecErrs this_mod spec_errs spec_warn spec_tyerrs
 	ty_sty = PprInterface
 
 pp_module mod
-  = ppBesides [ppPStr mod, ppChar ':']
+  = hcat [ptext mod, char ':']
 
-pp_tyspec :: PprStyle -> Pretty -> (OccName, TyCon, [Maybe Type]) -> Pretty
+pp_tyspec :: PprStyle -> Doc -> (OccName, TyCon, [Maybe Type]) -> Doc
 
 pp_tyspec sty pp_mod (_, tycon, tys)
-  = ppCat [pp_mod,
-	   ppStr "{-# SPECIALIZE data",
-	   pprNonSym PprForUser tycon, ppCat (map (pprParendGenType sty) spec_tys),
-	   ppStr "-} {- Essential -}"
+  = hsep [pp_mod,
+	   text "{-# SPECIALIZE data",
+	   ppr PprForUser tycon, hsep (map (pprParendGenType sty) spec_tys),
+	   text "-} {- Essential -}"
 	   ]
   where
     tvs = tyConTyVars tycon
@@ -289,48 +294,48 @@ pp_tyspec sty pp_mod (_, tycon, tys)
     choose_ty (tv, Nothing) = (mkTyVarTy tv, Just tv)
     choose_ty (tv, Just ty) = (ty, Nothing)
 
-pp_idspec :: PprStyle -> Pretty -> (OccName, Id, [Maybe Type], Bool) -> Pretty
+pp_idspec :: PprStyle -> Doc -> (OccName, Id, [Maybe Type], Bool) -> Doc
 
 pp_idspec sty pp_mod (_, id, tys, is_err)
   | isDictFunId id
-  = ppCat [pp_mod,
-	   ppStr "{-# SPECIALIZE instance",
+  = hsep [pp_mod,
+	   text "{-# SPECIALIZE instance",
 	   pprGenType sty spec_ty,
-	   ppStr "#-}", pp_essential ]
+	   text "#-}", pp_essential ]
 
   | is_const_method_id
   = let
 	Just (cls, clsty, clsop) = const_method_maybe
     in
-    ppCat [pp_mod,
-	   ppStr "{-# SPECIALIZE",
-	   pprNonSym sty clsop, ppStr "::",
+    hsep [pp_mod,
+	   text "{-# SPECIALIZE",
+	   ppr sty clsop, text "::",
 	   pprGenType sty spec_ty,
-	   ppStr "#-} {- IN instance",
+	   text "#-} {- IN instance",
 	   pprOccName sty (getOccName cls), pprParendGenType sty clsty,
-	   ppStr "-}", pp_essential ]
+	   text "-}", pp_essential ]
 
   | is_default_method_id
   = let
 	Just (cls, clsop, _) = default_method_maybe
     in
-    ppCat [pp_mod,
-	   ppStr "{- instance",
+    hsep [pp_mod,
+	   text "{- instance",
 	   pprOccName sty (getOccName cls),
-	   ppPStr SLIT("EXPLICIT METHOD REQUIRED"),
-	   pprNonSym sty clsop, ppStr "::",
+	   ptext SLIT("EXPLICIT METHOD REQUIRED"),
+	   ppr sty clsop, text "::",
 	   pprGenType sty spec_ty,
-	   ppStr "-}", pp_essential ]
+	   text "-}", pp_essential ]
 
   | otherwise
-  = ppCat [pp_mod,
-	   ppStr "{-# SPECIALIZE",
-	   pprNonSym PprForUser id, ppPStr SLIT("::"),
+  = hsep [pp_mod,
+	   text "{-# SPECIALIZE",
+	   ppr PprForUser id, ptext SLIT("::"),
 	   pprGenType sty spec_ty,
-	   ppStr "#-}", pp_essential ]
+	   text "#-}", pp_essential ]
   where
     spec_ty = specialiseTy (idType id) tys 100   -- HACK to drop all dicts!!!
-    pp_essential = if is_err then ppStr "{- Essential -}" else ppNil
+    pp_essential = if is_err then text "{- Essential -}" else empty
 
     const_method_maybe = isConstMethodId_maybe id
     is_const_method_id = maybeToBool const_method_maybe
