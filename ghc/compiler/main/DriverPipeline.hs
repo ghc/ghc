@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPipeline.hs,v 1.76 2001/06/08 20:09:43 sof Exp $
+-- $Id: DriverPipeline.hs,v 1.77 2001/06/14 11:46:55 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -194,8 +194,13 @@ genPipeline todo stop_flag persistent_output lang filename
       | otherwise = [ ]  -- just pass this file through to the linker
 
 	-- ToDo: this is somewhat cryptic
-
     not_valid = throwDyn (UsageError ("invalid option combination"))
+
+    stop_phase = case todo of 
+			StopBefore As | split -> SplitAs
+			StopBefore phase      -> phase
+			DoMkDependHS	      -> Ln
+			DoLink                -> Ln
    ----------- -----  ----   ---   --   --  -  -  -
 
 	-- this shouldn't happen.
@@ -203,6 +208,17 @@ genPipeline todo stop_flag persistent_output lang filename
 	then throwDyn (CmdLineError ("can't find starting phase for "
 				     ++ filename))
 	else do
+
+	-- if we can't find the phase we're supposed to stop before,
+	-- something has gone wrong.  This test carefully avoids the
+	-- case where we aren't supposed to do any compilation, because the file
+	-- is already in linkable form (for example).
+   if start_phase `elem` pipeline && 
+ 	(stop_phase /= Ln && stop_phase `notElem` pipeline)
+      then throwDyn (UsageError 
+		("flag " ++ stop_flag
+		 ++ " is incompatible with source file `" ++ filename ++ "'"))
+      else do
 
    let
 	-- .o and .hc suffixes can be overriden by command-line options:
@@ -235,27 +251,11 @@ genPipeline todo stop_flag persistent_output lang filename
 	-- the suffix on an output file is determined by the next phase
 	-- in the pipeline, so we add linking to the end of the pipeline
 	-- to force the output from the final phase to be a .o file.
-      stop_phase = case todo of 
-			StopBefore As | split -> SplitAs
-			StopBefore phase      -> phase
-			DoMkDependHS	      -> Ln
-			DoLink                -> Ln
 
       annotated_pipeline = annotatePipeline (pipeline ++ [Ln]) stop_phase
 
       phase_ne p (p1,_,_) = (p1 /= p)
    ----------- -----  ----   ---   --   --  -  -  -
-
-	-- if we can't find the phase we're supposed to stop before,
-	-- something has gone wrong.  This test carefully avoids the
-	-- case where we aren't supposed to do any compilation, because the file
-	-- is already in linkable form (for example).
-   if start_phase `elem` pipeline && 
- 	(stop_phase /= Ln && stop_phase `notElem` pipeline)
-      then throwDyn (UsageError 
-		("flag " ++ stop_flag
-		 ++ " is incompatible with source file `" ++ filename ++ "'"))
-      else do
 
    return (
      takeWhile (phase_ne stop_phase ) $
