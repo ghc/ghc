@@ -1,3 +1,66 @@
+Running the test suite against a GHC build
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To use the test suite to test a GHC build, just say 'make' in
+fptools/testsuite.  The build system will build the test driver and
+run all the tests against the GHC build in the same source tree.
+You'll get a summary indicating how many tests succeeded and failed
+(including how many of the failures were 'expected'), and a list of
+which tests failed.  To investigate the failures in more detail, see
+"Running individual tests" below.
+
+
+Running the testsuite with a compiler other than GHC
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(to be written.  The plan is something like: 
+
+	cvs checkout fpconfig
+	cd fptools
+	cvs checkout testsuite
+	autoconf
+	./configure
+	cd testsuite
+	make TestCompiler=nhc98
+)
+
+
+Running individual tests or subdirectories of the testsuite
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Most of the subdirectories in the testsuite have a Makefile.  In these
+subdirectories you can use 'make' to run the test driver in several
+ways:
+
+	make		-- run all the tests in the current directory
+	make verbose	-- as make test, but up the verbosity
+	make accept	-- run the tests, accepting the current output
+
+The following variables may be set on the make command line, to adjust
+various
+
+	TESTS			-- specific tests to run
+	EXTRA_HC_OPTS		-- extra flags to send to the Haskell compiler
+	EXTRA_RUNTEST_OPTS 	-- extra flags to give the test driver
+	CONFIG			-- use a different configuration file
+
+
+Updating tests when the output changes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If the output of a test has changed, but the new output is still
+correct, you can automatically update the sample output to match the
+new output like so:
+
+	make accept TESTS=<test-name>
+
+where <test-name> is the name of the test.  In a directory which
+contains a single test, or if you want to update *all* the tests in
+the current directory, just omit the 'TESTS=' part.
+
+
+Adding a new test
+~~~~~~~~~~~~~~~~~
 
 Almost all tests have a single source file and fall into one of the
 categories should_fail (to compile), should_compile, or should_run.
