@@ -34,7 +34,7 @@ module GHC.Handle (
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
-  IOMode(..), IOModeEx(..), openFile, openFileEx, openFd, fdToHandle,
+  IOMode(..), openFile, openBinaryFile, openFd, fdToHandle,
   hFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
@@ -639,38 +639,25 @@ Two files are the same if they have the same absolute name.  An
 implementation is free to impose stricter conditions.
 -}
 
-data IOModeEx 
- = BinaryMode IOMode
- | TextMode   IOMode
-   deriving (Eq, Read, Show)
-
 addFilePathToIOError fun fp (IOError h iot _ str _)
   = IOError h iot fun str (Just fp)
 
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
   catch 
-    (openFile' fp (if   dEFAULT_OPEN_IN_BINARY_MODE 
-                   then BinaryMode im
-                   else TextMode im))
+    (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE)
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
-openFileEx :: FilePath -> IOModeEx -> IO Handle
-openFileEx fp m =
+openBinaryFile :: FilePath -> IOMode -> IO Handle
+openBinaryFile fp m =
   catch
-    (openFile' fp m)
+    (openFile' fp m True)
     (\e -> ioError (addFilePathToIOError "openFileEx" fp e))
 
-
-openFile' filepath ex_mode =
+openFile' filepath mode binary =
   withCString filepath $ \ f ->
 
     let 
-      (mode, binary) =
-      	case ex_mode of
-           BinaryMode bmo -> (bmo, True)
-	   TextMode   tmo -> (tmo, False)
-
       oflags1 = case mode of
 	    	  ReadMode      -> read_flags  
 	    	  WriteMode     -> write_flags 

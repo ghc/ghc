@@ -24,6 +24,7 @@ module System.IO (
     stdin, stdout, stderr,   -- :: Handle
 
     openFile,		       -- :: FilePath -> IOMode -> IO Handle
+    openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
     hClose,		       -- :: Handle -> IO ()
     hFileSize,		       -- :: Handle -> IO Integer
     hIsEOF,		       -- :: Handle -> IO Bool
@@ -31,6 +32,7 @@ module System.IO (
 
     hSetBuffering,	       -- :: Handle -> BufferMode -> IO ()
     hGetBuffering,	       -- :: Handle -> IO BufferMode
+    hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
     hFlush,		       -- :: Handle -> IO ()
     hGetPosn,		       -- :: Handle -> IO HandlePosn
     hSetPosn,		       -- :: HandlePosn -> IO ()
