@@ -211,9 +211,9 @@ gmapType (o::[(Constr,r')] -> r) f (t::TypeVal a)
 
   -- All constructors of the given type
   cons :: [Constr]
-  cons  = if isPrimType $ dataTypeOf $ type2val t
-           then []
-           else dataCons $ dataTypeOf $ type2val t
+  cons  = if isAlgType $ dataTypeOf $ type2val t
+           then algTypeCons $ dataTypeOf $ type2val t
+	   else []
 
   -- Query constructors
   query :: [r']
@@ -258,9 +258,9 @@ gmapSubtermTypes o (r::r) f (t::TypeVal a)
 
   -- All constructors of the given type
   cons :: [Constr]
-  cons  = if isPrimType $ dataTypeOf $ type2val t
-           then []
-           else dataCons $ dataTypeOf $ type2val t
+  cons  = if isAlgType $ dataTypeOf $ type2val t
+           then algTypeCons $ dataTypeOf $ type2val t
+           else []
 
   -- Terms for all constructors
   terms :: [a]

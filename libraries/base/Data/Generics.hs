@@ -18,12 +18,13 @@
 module Data.Generics ( 
 
   -- * All Data.Generics modules
-  module Data.Generics.Basics,	-- primitives
-  module Data.Generics.Aliases,	-- aliases for type case, generic types
-  module Data.Generics.Schemes,	-- traversal schemes (everywhere etc.)
-  module Data.Generics.Text,	-- generic read and show
-  module Data.Generics.Twins,	-- twin traversal, e.g., generic eq
-  module Data.Generics.Reify,	-- experimental reification theme
+  module Data.Generics.Basics,	  -- primitives
+  module Data.Generics.Instances, -- instances of Data class
+  module Data.Generics.Aliases,	  -- aliases for type case, generic types
+  module Data.Generics.Schemes,	  -- traversal schemes (everywhere etc.)
+  module Data.Generics.Text,	  -- generic read and show
+  module Data.Generics.Twins,  	  -- twin traversal, e.g., generic eq
+  module Data.Generics.Reify,	  -- experimental reification theme
 
 #ifndef __HADDOCK__
 	,
@@ -47,6 +48,7 @@ import GHC.Base ( (:*:)(..), (:+:)(..), Unit(..) )
 #endif
 
 import Data.Generics.Basics
+import Data.Generics.Instances
 import Data.Generics.Aliases
 import Data.Generics.Schemes
 import Data.Generics.Text
