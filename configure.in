@@ -407,15 +407,27 @@ dnl --------------------------------------------------------------
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 
-dnl ** look for `perl', but watch out for version 4.035
-AC_PATH_PROG(PerlCmd,perl)
-if test -z "$PerlCmd"; then
-   echo "You must install perl before you can continue"
-   echo "Perhaps it is already installed, but not in your PATH?"
-   exit 1
-else
-FPTOOLS_CHECK_PERL_VERSION
-fi
+dnl ** look for `perl', but only in /bin on Windows
+case $HostOS_CPP in
+cygwin32|mingw32)
+   AC_CHECK_PROG(PerlCmd,perl,/bin/perl,,/bin)
+   if test -z "$PerlCmd"; then
+      echo "You must install the version of Perl shipped with GHC"
+      echo "(or a compatible one) in /bin."
+      exit 1
+   fi
+   ;;
+*)
+   AC_PATH_PROG(PerlCmd,perl)
+   if test -z "$PerlCmd"; then
+      echo "You must install perl before you can continue"
+      echo "Perhaps it is already installed, but not in your PATH?"
+      exit 1
+   else
+   FPTOOLS_CHECK_PERL_VERSION
+   fi
+   ;;
+esac
 
 dnl ** does #! path/to/perl work? (sometimes it's too long...)
 FPTOOLS_SHEBANG_PERL
