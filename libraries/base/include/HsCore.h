@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: HsCore.h,v 1.7 2002/02/05 17:32:27 simonmar Exp $
+ * $Id: HsCore.h,v 1.8 2002/02/06 11:49:32 simonmar Exp $
  *
  * (c) The University of Glasgow 2001-2002
  *
@@ -14,6 +14,7 @@
 #include "HsFFI.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
