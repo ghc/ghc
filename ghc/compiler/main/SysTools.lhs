@@ -651,8 +651,10 @@ setTmpDir dir = writeIORef v_TmpDir (canonicalise dir)
 #endif
 
 cleanTempFiles :: Int -> IO ()
-cleanTempFiles verb = do fs <- readIORef v_FilesToClean
-			 removeTmpFiles verb fs
+cleanTempFiles verb
+   = do fs <- readIORef v_FilesToClean
+	removeTmpFiles verb fs
+	writeIORef v_FilesToClean []
 
 cleanTempFilesExcept :: Int -> [FilePath] -> IO ()
 cleanTempFilesExcept verb dont_delete
