@@ -1,40 +1,44 @@
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "Main.h"
 #include "Defines.h"
 
 /* own stuff */
 #include "Error.h"
 
-void exit PROTO((int));
-
 /*VARARGS0*/
 void
-Error(a1,a2,a3,a4)
-  char* a1; char* a2; char* a3; char* a4;
+Error(const char *fmt, ...)
 {
+    va_list ap;
     fflush(stdout);
     fprintf(stderr, "%s: ", programname);
-    fprintf(stderr, a1, a2, a3, a4);
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
     fprintf(stderr, "\n");
     exit(1);
 }
 
 /*VARARGS0*/
 void
-Disaster(a1,a2,a3,a4)
-  char* a1; char* a2; char* a3; char* a4;
+Disaster(const char *fmt, ...)
 {
+    va_list ap;
     fflush(stdout);
     fprintf(stderr, "%s: ", programname);
-    fprintf(stderr, " Disaster! ("); 
-    fprintf(stderr, a1, a2, a3, a4);
+    fprintf(stderr, " Disaster! (");
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
     fprintf(stderr, ")\n");
     exit(1);
 }
 
 void
 Usage(str)
-  char *str;
+  const char *str;
 {
    if (str) printf("error: %s\n", str);
    printf("usage: %s -b -d -ef -g -i -p -mn -p -s -tf -y [file[.hp]]\n", programname);

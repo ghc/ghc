@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "Main.h"
 #include "Defines.h"
 #include "Error.h"
@@ -7,8 +8,6 @@
 
 /* own stuff */
 #include "AreaBelow.h"
-
-extern void free();
 
 /*
  *      Return the area enclosed by all of the curves. The algorithm

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "Main.h"
 #include "Defines.h"
 #include "Error.h"
@@ -16,8 +17,6 @@
  *	than 20 bands, the excess are gathered together as an "OTHER" ]
  *	band which appears as band 20.
  */
-
-extern void free();
 
 void
 TopTwenty()

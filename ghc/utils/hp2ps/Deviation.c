@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "Main.h"
@@ -6,8 +7,6 @@
 #include "Error.h"
 #include "HpFile.h"
 #include "Utilities.h"
-
-extern void free();
 
 /* own stuff */
 #include "Deviation.h"

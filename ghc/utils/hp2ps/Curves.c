@@ -16,7 +16,8 @@ static floatish *y;
 static floatish *py;		/* previous y values */
 
 static void Curve PROTO((struct entry *));	/* forward */
-static void ShadeCurve();			/* forward */
+static void ShadeCurve
+    PROTO((floatish *x, floatish *y, floatish *py, floatish shade));
 
 void
 Curves()

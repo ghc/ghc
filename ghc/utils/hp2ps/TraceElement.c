@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "Main.h"
 #include "Defines.h"
 #include "HpFile.h"
@@ -15,8 +16,6 @@
  *      (default 1%) of the grand total are considered to be ``trace
  *	elements'' and they are thrown away.	
  */
-
-extern void free();
 
 extern floatish thresholdpercent;
 
