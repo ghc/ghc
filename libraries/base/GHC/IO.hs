@@ -20,12 +20,15 @@ module GHC.IO (
    hWaitForInput, hGetChar, hGetLine, hGetContents, hPutChar, hPutStr,
    commitBuffer',	-- hack, see below
    hGetcBuffered,	-- needed by ghc/compiler/utils/StringBuffer.lhs
-   hGetBuf, hPutBuf, slurpFile,
+   hGetBuf, hGetBufNonBlocking, hPutBuf, hPutBufNonBlocking, slurpFile,
+   createPipe, createPipeEx,
    memcpy_ba_baoff,
    memcpy_ptr_baoff,
    memcpy_baoff_ba,
    memcpy_baoff_ptr,
  ) where
+
+#include "config.h"
 
 import Foreign
 import Foreign.C
@@ -646,29 +649,51 @@ hPutBuf :: Handle			-- handle to write to
 	-> Ptr a			-- address of buffer
 	-> Int				-- number of bytes of data in buffer
 	-> IO ()
-hPutBuf handle ptr count
-  | count == 0 = return ()
+hPutBuf h ptr count = do hPutBuf' h ptr count True; return ()
+
+hPutBufNonBlocking
+	:: Handle			-- handle to write to
+	-> Ptr a			-- address of buffer
+	-> Int				-- number of bytes of data in buffer
+	-> IO Int			-- returns: number of bytes written
+hPutBufNonBlocking h ptr count = hPutBuf' h ptr count False
+
+hPutBuf':: Handle			-- handle to write to
+	-> Ptr a			-- address of buffer
+	-> Int				-- number of bytes of data in buffer
+	-> Bool				-- allow blocking?
+	-> IO Int
+hPutBuf' handle ptr count can_block
+  | count == 0 = return 0
   | count <  0 = illegalBufferSize handle "hPutBuf" count
   | otherwise = 
     wantWritableHandle "hPutBuf" handle $ 
-      \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
+      \ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> 
+	  bufWrite fd ref is_stream ptr count can_block
 
-        old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
-	  <- readIORef ref
+bufWrite fd ref is_stream ptr count can_block =
+  seq count $ seq fd $ do  -- strictness hack
+  old_buf@Buffer{ bufBuf=old_raw, bufRPtr=r, bufWPtr=w, bufSize=size }
+     <- readIORef ref
 
-        -- enough room in handle buffer?
-        if (size - w > count)
-		-- There's enough room in the buffer:
-		-- just copy the data in and update bufWPtr.
-	    then do memcpy_baoff_ptr old_raw w ptr (fromIntegral count)
-		    writeIORef ref old_buf{ bufWPtr = w + count }
-		    return ()
+  -- enough room in handle buffer?
+  if (size - w > count)
+	-- There's enough room in the buffer:
+	-- just copy the data in and update bufWPtr.
+	then do memcpy_baoff_ptr old_raw w ptr (fromIntegral count)
+	        writeIORef ref old_buf{ bufWPtr = w + count }
+		return count
 
-		-- else, we have to flush
-	    else do flushed_buf <- flushWriteBuffer fd is_stream old_buf
-		    writeIORef ref flushed_buf
-		    -- ToDo: should just memcpy instead of writing if possible
-		    writeChunk fd is_stream (castPtr ptr) count
+	-- else, we have to flush
+	else do flushed_buf <- flushWriteBuffer fd is_stream old_buf
+		writeIORef ref flushed_buf
+		-- if we can fit in the buffer, then just loop	
+		if count < size
+		   then bufWrite fd ref is_stream ptr count can_block
+		   else if can_block
+		   	   then do writeChunk fd is_stream (castPtr ptr) count
+			           return count
+		   	   else writeChunkNonBlocking fd ptr count
 
 writeChunk :: FD -> Bool -> Ptr CChar -> Int -> IO ()
 writeChunk fd is_stream ptr bytes = loop 0 bytes 
@@ -681,6 +706,21 @@ writeChunk fd is_stream ptr bytes = loop 0 bytes
 	   		     off (fromIntegral bytes)
     -- write can't return 0
     loop (off + r) (bytes - r)
+
+writeChunkNonBlocking :: FD -> Ptr a -> Int -> IO Int
+writeChunkNonBlocking fd ptr bytes = loop 0 bytes 
+ where
+  loop :: Int -> Int -> IO Int
+  loop off bytes | bytes <= 0 = return off
+  loop off bytes = do
+    ssize <- c_write (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
+    let r = fromIntegral ssize :: Int
+    if (r == -1)
+      then do errno <- getErrno
+	      if (errno == eAGAIN || errno == eWOULDBLOCK)
+		 then return off
+		 else throwErrno "writeChunk"
+      else loop (off + r) (bytes - r)
 
 -- ---------------------------------------------------------------------------
 -- hGetBuf
@@ -698,33 +738,66 @@ writeChunk fd is_stream ptr bytes = loop 0 bytes
 -- is closed, 'hGetBuf' will behave as if EOF was reached.
 
 hGetBuf :: Handle -> Ptr a -> Int -> IO Int
-hGetBuf handle ptr count
+hGetBuf h ptr count = hGetBuf' h ptr count True
+
+hGetBufNonBlocking :: Handle -> Ptr a -> Int -> IO Int
+hGetBufNonBlocking h ptr count = hGetBuf' h ptr count False
+
+hGetBuf' :: Handle -> Ptr a -> Int -> Bool -> IO Int
+hGetBuf' handle ptr count can_block
   | count == 0 = return 0
   | count <  0 = illegalBufferSize handle "hGetBuf" count
   | otherwise = 
       wantReadableHandle "hGetBuf" handle $ 
 	\ handle_@Handle__{ haFD=fd, haBuffer=ref, haIsStream=is_stream } -> do
-	buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r } <- readIORef ref
-	if bufferEmpty buf
-	   then readChunk fd is_stream ptr count
-	   else do 
-		let avail = w - r
-		copied <- if (count >= avail)
-		       	    then do 
-				memcpy_ptr_baoff ptr raw r (fromIntegral avail)
-				writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
-				return avail
-		     	    else do
-				memcpy_ptr_baoff ptr raw r (fromIntegral count)
-				writeIORef ref buf{ bufRPtr = r + count }
-				return count
+	    bufRead fd ref is_stream ptr 0 count can_block
 
-		let remaining = count - copied
-		if remaining > 0 
-		   then do rest <- readChunk fd is_stream (ptr `plusPtr` copied) remaining
-			   return (rest + copied)
-		   else return count
-		
+bufRead fd ref is_stream ptr so_far count can_block =
+  seq fd $ seq so_far $ seq count $ do -- strictness hack
+  buf@Buffer{ bufBuf=raw, bufWPtr=w, bufRPtr=r, bufSize=sz } <- readIORef ref
+  if bufferEmpty buf
+     then if count < sz
+	 	then do 
+		   mb_buf <- maybeFillReadBuffer fd (not can_block) is_stream buf
+		   case mb_buf of
+		       Nothing -> return 0
+		       Just new_buf -> do 
+			  writeIORef ref new_buf
+		   	  bufRead fd ref is_stream ptr so_far count can_block
+		else if can_block 
+			then readChunk fd is_stream ptr count
+			else readChunkNonBlocking fd is_stream ptr count
+     else do 
+	let avail = w - r
+	if (count == avail)
+	   then do 
+		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
+		return (so_far + count)
+	   else do
+	if (count < avail)
+	   then do 
+		memcpy_ptr_baoff ptr raw r (fromIntegral count)
+		writeIORef ref buf{ bufRPtr = r + count }
+		return (so_far + count)
+	   else do
+
+	memcpy_ptr_baoff ptr raw r (fromIntegral avail)
+	writeIORef ref buf{ bufWPtr=0, bufRPtr=0 }
+
+	let remaining = count - avail
+	    so_far' = so_far + avail
+	    ptr' = ptr `plusPtr` avail
+
+	if remaining < sz
+	   then bufRead fd ref is_stream ptr' so_far' remaining can_block
+	   else do 
+
+	rest <- if can_block 
+			then readChunk fd is_stream ptr' remaining
+			else readChunkNonBlocking fd is_stream ptr' remaining
+	return (so_far' + rest)
+
 readChunk :: FD -> Bool -> Ptr a -> Int -> IO Int
 readChunk fd is_stream ptr bytes = loop 0 bytes 
  where
@@ -737,6 +810,23 @@ readChunk fd is_stream ptr bytes = loop 0 bytes
     if r == 0
 	then return off
 	else loop (off + r) (bytes - r)
+
+readChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
+readChunkNonBlocking fd is_stream ptr bytes = loop 0 bytes 
+ where
+  loop :: Int -> Int -> IO Int
+  loop off bytes | bytes <= 0 = return off
+  loop off bytes = do
+    ssize <- c_read (fromIntegral fd) (ptr `plusPtr` off) (fromIntegral bytes)
+    let r = fromIntegral ssize :: Int
+    if (r == -1)
+      then do errno <- getErrno
+	      if (errno == eAGAIN || errno == eWOULDBLOCK)
+		 then return off
+		 else throwErrno "readChunk"
+      else if (r == 0)
+		then return off
+		else loop (off + r) (bytes - r)
 
 slurpFile :: FilePath -> IO (Ptr (), Int)
 slurpFile fname = do
