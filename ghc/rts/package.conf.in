@@ -29,7 +29,7 @@ library-dirs:		FPTOOLS_TOP_ABS"/ghc/rts"
 
 hs-libraries:   "HSrts"
 
-extra-libs:		"m"		/* for ldexp() */
+extra-libraries:		"m"		/* for ldexp() */
 #ifndef HAVE_FRAMEWORK_HASKELLSUPPORT
 			      , "gmp"
 #ifdef HAVE_LIBDL
@@ -65,7 +65,7 @@ depends:
 extra-hugs-opts:
 extra-cc-opts:
 
-extra-ld-opts:
+ld-options:
 #ifdef LEADING_UNDERSCORE
            "-u", "_GHCziBase_Izh_static_info"
          , "-u", "_GHCziBase_Czh_static_info"
