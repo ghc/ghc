@@ -24,7 +24,6 @@ import VarEnv
 import Id		( Id, idType, idInfo, idArity, isDataConWorkId, 
 			  setIdUnfolding, isDeadBinder,
 			  idNewDemandInfo, setIdInfo,
-			  idSpecialisation, setIdSpecialisation,
 			  setIdOccInfo, zapLamIdInfo, setOneShotLambda, 
 			)
 import OccName		( encodeFS )
@@ -50,7 +49,7 @@ import CostCentre	( currentCCS )
 import Type		( isUnLiftedType, seqType, tyConAppArgs, funArgTy,
 			  splitFunTy_maybe, splitFunTy, eqType
 			)
-import Subst		( mkSubst, substTy, substExpr, substRules,
+import Subst		( mkSubst, substTy, substExpr, 
 			  isInScope, lookupIdSubst, simplIdInfo
 			)
 import TysPrim		( realWorldStatePrimTy )
