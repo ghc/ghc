@@ -549,17 +549,44 @@ listPackages = do
 
 newPackage :: IO ()
 newPackage = do
+  checkConfigAccess
+  details <- readIORef package_details
   hPutStr stdout "Reading package info from stdin... "
   stuff <- getContents
   let new_pkg = read stuff :: (String,Package)
   catchAll new_pkg
   	(\e -> throwDyn (OtherError "parse error in package info"))
   hPutStrLn stdout "done."
+  if (fst new_pkg `elem` map fst details)
+	then throwDyn (OtherError ("package `" ++ fst new_pkg ++ 
+					"' already installed"))
+	else do
   conf_file <- readIORef package_config
   savePackageConfig conf_file
   maybeRestoreOldConfig conf_file $ do
   writeNewConfig conf_file ( ++ [new_pkg])
   exitWith ExitSuccess
+
+deletePackage :: String -> IO ()
+deletePackage pkg = do  
+  checkConfigAccess
+  details <- readIORef package_details
+  if (pkg `notElem` map fst details)
+	then throwDyn (OtherError ("package `" ++ pkg ++ "' not installed"))
+	else do
+  conf_file <- readIORef package_config
+  savePackageConfig conf_file
+  maybeRestoreOldConfig conf_file $ do
+  writeNewConfig conf_file (filter ((/= pkg) . fst))
+  exitWith ExitSuccess
+
+checkConfigAccess :: IO ()
+checkConfigAccess = do
+  conf_file <- readIORef package_config
+  access <- fileAccess conf_file True True False
+  if not access
+	then throwDyn (OtherError "you don't have permission to modify the package configuration file")
+	else return ()
 
 maybeRestoreOldConfig :: String -> IO () -> IO ()
 maybeRestoreOldConfig conf_file io
@@ -589,14 +616,6 @@ savePackageConfig conf_file = do
     -- unless we move the old one out of the way...
   system ("mv " ++ conf_file ++ " " ++ conf_file ++ ".old")
   hPutStrLn stdout "done."
-
-deletePackage :: String -> IO ()
-deletePackage pkg = do  
-  conf_file <- readIORef package_config
-  savePackageConfig conf_file
-  maybeRestoreOldConfig conf_file $ do
-  writeNewConfig conf_file (filter ((/= pkg) . fst))
-  exitWith ExitSuccess
 
 -- package list is maintained in dependency order
 packages = global ["std", "rts", "gmp"] :: IORef [String]
