@@ -126,7 +126,13 @@ dmdAnal sigs dmd (Var var)
 dmdAnal sigs dmd (Note n e)
   = (dmd_ty, Note n e')
   where
-    (dmd_ty, e') = dmdAnal sigs dmd e	
+    (dmd_ty, e') = dmdAnal sigs dmd' e	
+    dmd' = case n of
+	     Coerce _ _ -> Eval	  -- This coerce usually arises from a recursive
+	     other	-> dmd 	  -- newtype, and we don't want to look inside them
+				  -- for exactly the same reason that we don't look
+				  -- inside recursive products -- we might not reach
+				  -- a fixpoint.  So revert to a vanilla Eval demand
 
 dmdAnal sigs dmd (App fun (Type ty))
   = (fun_ty, App fun' (Type ty))
@@ -609,12 +615,16 @@ lub Eval d    	        = Eval
 
 lub (Call d1) (Call d2) = Call (lub d1 d2)
 
-lub (Seq k1 l1 ds1) (Seq k2 l2 ds2) = Seq (k1 `vee` k2) (l1 `or_defer` l2)
-				          (zipWithEqual "lub" lub ds1 ds2)
+lub (Seq k1 l1 ds1) (Seq k2 l2 ds2) = Seq (k1 `vee` k2) (l1 `or_defer` l2) (lubs ds1 ds2)
 
 -- The last clauses deal with the remaining cases for Call and Seq
 lub d1@(Call _) d2@(Seq _ _ _) = pprPanic "lub" (ppr d1 $$ ppr d2)
 lub d1 d2		       = lub d2 d1
+
+-- A Seq can have an empty list of demands, in the polymorphic case.
+lubs [] ds2 = ds2
+lubs ds1 [] = ds1
+lubs ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith lub ds1 ds2
 
 or_defer Now Now = Now
 or_defer _   _   = Defer
@@ -674,19 +684,23 @@ both Eval (Seq k l ds) = Seq Keep Now ds
 both Eval (Call d)     = Call d
 both Eval d   	       = Eval
 
-both (Seq k1 Defer ds1) (Seq k2 Defer ds2) = Seq (k1 `vee` k2) Defer
-					         (zipWithEqual "both" both ds1 ds2)
-both (Seq k1 l1 ds1) (Seq k2 l2 ds2) = Seq (k1 `vee` k2) Now
-					   (zipWithEqual "both" both ds1' ds2')
-				     where
-					ds1' = case l1 of { Now -> ds1; Defer -> map defer ds1 }
-					ds2' = case l2 of { Now -> ds2; Defer -> map defer ds2 }
+both (Seq k1 Defer ds1) (Seq k2 Defer ds2) = Seq (k1 `vee` k2) Defer (boths ds1  ds2)
+both (Seq k1 l1 ds1)    (Seq k2 l2 ds2)    = Seq (k1 `vee` k2) Now   (boths ds1' ds2')
+					   where
+					     ds1' = case l1 of { Now -> ds1; Defer -> map defer ds1 }
+					     ds2' = case l2 of { Now -> ds2; Defer -> map defer ds2 }
 
 both (Call d1) (Call d2) = Call (d1 `both` d2)
 
 -- The last clauses deal with the remaining cases for Call and Seq
 both d1@(Call _) d2@(Seq _ _ _) = pprPanic "both" (ppr d1 $$ ppr d2)
 both d1 d2		        = both d2 d1
+
+-----------------------------------
+-- A Seq can have an empty list of demands, in the polymorphic case.
+boths [] ds2  = ds2
+boths ds1 []  = ds1
+boths ds1 ds2 = ASSERT( length ds1 == length ds2 ) zipWith both ds1 ds2
 
 -----------------------------------
 bothRes :: DmdResult -> DmdResult -> DmdResult
