@@ -6,5 +6,6 @@ HC_OPTS += -noC
 
 tcfail045_HC_OPTS = -fglasgow-exts
 tcfail068_HC_OPTS = -fglasgow-exts
+tcfail080_HC_OPTS = -fglasgow-exts
 
 include $(TOP)/mk/target.mk

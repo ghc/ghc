@@ -1,0 +1,7 @@
+ 
+tcfail080.hs:7:
+    Too many parameters for class `Collection'
+    In the class declaration for `Collection'
+
+
+Compilation had errors
