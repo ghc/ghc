@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: hugs.c,v $
- * $Revision: 1.21 $
- * $Date: 1999/11/17 16:57:38 $
+ * $Revision: 1.22 $
+ * $Date: 1999/11/23 09:59:38 $
  * ------------------------------------------------------------------------*/
 
 #include <setjmp.h>
@@ -238,7 +238,7 @@ char *argv[]; {
     }
 
     Printf("__   __ __  __  ____   ___      _________________________________________\n");
-    Printf("||   || ||  || ||  || ||__      Hugs 98: Based on the Haskell 98 standard\n");
+    Printf("||   || ||  || ||  || ||__      STGHugs: Based on the Haskell 98 standard\n");
     Printf("||___|| ||__|| ||__||  __||     Copyright (c) 1994-1999\n");
     Printf("||---||         ___||           World Wide Web: http://haskell.org/hugs\n");
     Printf("||   ||                         Report bugs to: hugs-bugs@haskell.org\n");
