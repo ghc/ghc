@@ -69,15 +69,7 @@ module TysWiredIn (
 	voidTy,
 	wordDataCon,
 	wordTy,
-	wordTyCon,
-
-	isFFIArgumentTy,     -- :: DynFlags -> Safety -> Type -> Bool
-	isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
-	isFFIExportResultTy, -- :: Type -> Bool
-	isFFIExternalTy,     -- :: Type -> Bool
-        isFFIDynArgumentTy,  -- :: Type -> Bool
- 	isFFIDynResultTy,    -- :: Type -> Bool
- 	isFFILabelTy,        -- :: Type -> Bool
+	wordTyCon
     ) where
 
 #include "HsVersions.h"
@@ -90,7 +82,6 @@ import PrelNames
 import TysPrim
 
 -- others:
-import ForeignCall	( Safety, playSafe )
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( mkPrelModule )
 import Name		( Name, nameRdrName, nameUnique, nameOccName, 
@@ -403,117 +394,6 @@ smallIntegerDataCon = pcDataCon smallIntegerDataConName
 		[] [] [intPrimTy] integerTyCon
 largeIntegerDataCon = pcDataCon largeIntegerDataConName
 		[] [] [intPrimTy, byteArrayPrimTy] integerTyCon
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsection[TysWiredIn-ext-type]{External types}
-%*									*
-%************************************************************************
-
-The compiler's foreign function interface supports the passing of a
-restricted set of types as arguments and results (the restricting factor
-being the )
-
-\begin{code}
-isFFIArgumentTy :: DynFlags -> Safety -> Type -> Bool
--- Checks for valid argument type for a 'foreign import'
-isFFIArgumentTy dflags safety ty 
-   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty
-
-isFFIExternalTy :: Type -> Bool
--- Types that are allowed as arguments of a 'foreign export'
-isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty
-
-isFFIImportResultTy :: DynFlags -> Type -> Bool
-isFFIImportResultTy dflags ty 
-  = checkRepTyCon (legalFIResultTyCon dflags) ty
-
-isFFIExportResultTy :: Type -> Bool
-isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
-
-isFFIDynArgumentTy :: Type -> Bool
--- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFIDynArgumentTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
-
-isFFIDynResultTy :: Type -> Bool
--- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFIDynResultTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
-
-isFFILabelTy :: Type -> Bool
--- The type of a foreign label must be Ptr, FunPtr, Addr,
--- or a newtype of either.
-isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
-
-checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
-	-- Look through newtypes
-checkRepTyCon check_tc ty = case splitTyConApp_maybe ty of
-				Just (tycon, _) -> check_tc tycon
-				Nothing		-> False
-\end{code}
-
-----------------------------------------------
-These chaps do the work; they are not exported
-----------------------------------------------
-
-\begin{code}
-legalFEArgTyCon :: TyCon -> Bool
--- It's illegal to return foreign objects and (mutable)
--- bytearrays from a _ccall_ / foreign declaration
--- (or be passed them as arguments in foreign exported functions).
-legalFEArgTyCon tc
-  | getUnique tc `elem` [ foreignObjTyConKey, foreignPtrTyConKey,
-			  byteArrayTyConKey, mutableByteArrayTyConKey ] 
-  = False
-  -- It's also illegal to make foreign exports that take unboxed
-  -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
-  | otherwise
-  = boxedMarshalableTyCon tc
-
-legalFIResultTyCon :: DynFlags -> TyCon -> Bool
-legalFIResultTyCon dflags tc
-  | getUnique tc `elem`
-	[ foreignObjTyConKey, foreignPtrTyConKey,
-	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
-  | tc == unitTyCon = True
-  | otherwise	    = marshalableTyCon dflags tc
-
-legalFEResultTyCon :: TyCon -> Bool
-legalFEResultTyCon tc
-  | getUnique tc `elem` 
-	[ foreignObjTyConKey, foreignPtrTyConKey,
-	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
-  | tc == unitTyCon = True
-  | otherwise       = boxedMarshalableTyCon tc
-
-legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
--- Checks validity of types going from Haskell -> external world
-legalOutgoingTyCon dflags safety tc
-  | playSafe safety && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
-  = False
-  | otherwise
-  = marshalableTyCon dflags tc
-
-marshalableTyCon dflags tc
-  =  (dopt Opt_GlasgowExts dflags && isUnLiftedTyCon tc)
-  || boxedMarshalableTyCon tc
-
-boxedMarshalableTyCon tc
-   = getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
-			 , int32TyConKey, int64TyConKey
-			 , wordTyConKey, word8TyConKey, word16TyConKey
-			 , word32TyConKey, word64TyConKey
-			 , floatTyConKey, doubleTyConKey
-			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
-			 , charTyConKey, foreignObjTyConKey
-			 , foreignPtrTyConKey
-			 , stablePtrTyConKey
-			 , byteArrayTyConKey, mutableByteArrayTyConKey
-			 , boolTyConKey
-			 ]
 \end{code}
 
 

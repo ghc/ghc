@@ -61,7 +61,9 @@ import TcType		( tcEqType, tcCmpPred,
 			  liftedTypeKind, unliftedTypeKind, openTypeKind, defaultKind, superKind,
 			  superBoxity, liftedBoxity, hasMoreBoxityInfo, typeKind,
 			  tyVarsOfType, tyVarsOfTypes, tidyOpenType, tidyOpenTypes, tidyTyVar,
-			  eqKind, isTypeKind
+			  eqKind, isTypeKind,
+
+			  isFFIArgumentTy, isFFIImportResultTy
 			)
 import Subst		( Subst, mkTopTyVarSubst, substTy )
 import Class		( classArity, className )
@@ -73,8 +75,7 @@ import Var		( TyVar, varName, tyVarKind, tyVarName, isTyVar, mkTyVar,
 
 -- others:
 import TcMonad          -- TcType, amongst others
-import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy,
-			  isFFIArgumentTy, isFFIImportResultTy )
+import TysWiredIn	( voidTy, listTyCon, mkListTy, mkTupleTy )
 import PrelNames	( cCallableClassKey, cReturnableClassKey, hasKey )
 import ForeignCall	( Safety(..) )
 import FunDeps		( grow )

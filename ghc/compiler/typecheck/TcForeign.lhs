@@ -34,14 +34,13 @@ import Inst		( emptyLIE, LIE, plusLIE )
 import ErrUtils		( Message )
 import Id		( Id, mkLocalId )
 import Name		( nameOccName )
-import TysWiredIn	( isFFIArgumentTy, isFFIImportResultTy, 
-			  isFFIExportResultTy,
-			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy,
-			  isFFILabelTy
-			)
 import PrimRep		( getPrimRepSize )
 import Type		( typePrimRep )
-import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe, tcSplitForAllTys )
+import TcType		( Type, tcSplitFunTys, tcSplitTyConApp_maybe, tcSplitForAllTys,
+			  isFFIArgumentTy, isFFIImportResultTy, 
+			  isFFIExportResultTy, isFFILabelTy,
+			  isFFIExternalTy, isFFIDynArgumentTy, isFFIDynResultTy
+			)
 import ForeignCall	( CCallSpec(..), CExportSpec(..), CCallTarget(..), isDynamicTarget, isCasmTarget )
 import CStrings		( CLabelString, isCLabelString )
 import PrelNames	( hasKey, ioTyConKey )
@@ -317,3 +316,4 @@ foreignDeclCtxt fo
   = hang (ptext SLIT("When checking declaration:"))
          4 (ppr fo)
 \end{code}
+

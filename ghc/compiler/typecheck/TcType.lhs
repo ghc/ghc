@@ -36,9 +36,9 @@ module TcType (
   -- Predicates. 
   -- Again, newtypes are opaque
   tcEqType, tcEqPred, tcCmpType, tcCmpTypes, tcCmpPred,
-  isQualifiedTy, isOverloadedTy, isStrictType, isStrictPred,
+  isQualifiedTy, isOverloadedTy, 
   isDoubleTy, isFloatTy, isIntTy,
-  isIntegerTy, isAddrTy, isBoolTy, isUnitTy, isForeignPtrTy, isPrimitiveType,
+  isIntegerTy, isAddrTy, isBoolTy, isUnitTy, isForeignPtrTy, 
   isTauTy, tcIsTyVarTy, tcIsForAllTy,
 
   ---------------------------------
@@ -49,11 +49,21 @@ module TcType (
 
   ---------------------------------
   -- Predicate types  
-  PredType, mkPredTy, mkPredTys, getClassPredTys_maybe, getClassPredTys, 
+  PredType, getClassPredTys_maybe, getClassPredTys, 
   isPredTy, isClassPred, isTyVarClassPred, predHasFDs,
   mkDictTy, tcSplitPredTy_maybe, predTyUnique,
   isDictTy, tcSplitDFunTy, predTyUnique, 
   mkClassPred, predMentionsIPs, inheritablePred, isIPPred, mkPredName,
+
+  ---------------------------------
+  -- Foreign import and export
+  isFFIArgumentTy,     -- :: DynFlags -> Safety -> Type -> Bool
+  isFFIImportResultTy, -- :: DynFlags -> Type -> Bool
+  isFFIExportResultTy, -- :: Type -> Bool
+  isFFIExternalTy,     -- :: Type -> Bool
+  isFFIDynArgumentTy,  -- :: Type -> Bool
+  isFFIDynResultTy,    -- :: Type -> Bool
+  isFFILabelTy,        -- :: Type -> Bool
 
   ---------------------------------
   -- Unifier and matcher  
@@ -72,10 +82,11 @@ module TcType (
   mkForAllTy, mkForAllTys, 
   mkFunTy, mkFunTys, zipFunTys, 
   mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
-  mkTyVarTy, mkTyVarTys, mkTyConTy, 
+  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys, 
 
   isUnLiftedType,	-- Source types are always lifted
   isUnboxedTupleType,	-- Ditto
+  isPrimitiveType,
 
   tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
   tidyTyVar, tidyTyVars,
@@ -100,25 +111,27 @@ import Type		(	-- Re-exports
 			  mkForAllTy, mkForAllTys, defaultKind, isTypeKind,
 			  mkFunTy, mkFunTys, zipFunTys, 
 			  mkTyConApp, mkAppTy, mkAppTys, mkSynTy, applyTy, applyTys,
-			  mkTyVarTy, mkTyVarTys, mkTyConTy,
-			  isUnLiftedType, isUnboxedTupleType,
+			  mkTyVarTy, mkTyVarTys, mkTyConTy, mkPredTy, mkPredTys,
+			  isUnLiftedType, isUnboxedTupleType, isPrimitiveType,
+			  splitNewType_maybe, splitTyConApp_maybe,
 			  tidyTopType, tidyType, tidyPred, tidyTypes, tidyFreeTyVars, tidyOpenType, tidyOpenTypes,
 			  tidyTyVar, tidyTyVars, eqKind, eqUsage,
 			  hasMoreBoxityInfo, liftedBoxity, superBoxity, typeKind, superKind
 			)
-import TyCon		( TyCon, isPrimTyCon, tyConArity, isNewTyCon )
+import TyCon		( TyCon, isPrimTyCon, tyConArity, isNewTyCon, isUnLiftedTyCon )
 import Class		( classTyCon, classHasFDs, Class )
 import Var		( TyVar, tyVarKind )
+import ForeignCall	( Safety, playSafe )
 import VarEnv
 import VarSet
 
 -- others:
-import CmdLineOpts	( opt_DictsStrict )
+import CmdLineOpts	( DynFlags, DynFlag( Opt_GlasgowExts ), dopt )
 import Name		( Name, NamedThing(..), mkLocalName )
 import OccName		( OccName, mkDictOcc )
 import NameSet
-import PrelNames	( floatTyConKey, doubleTyConKey, foreignPtrTyConKey,
-			  integerTyConKey, intTyConKey, addrTyConKey, boolTyConKey )
+import PrelNames	-- Lots (e.g. in isFFIArgumentTy
+import TysWiredIn	( ptrTyCon, funPtrTyCon, addrTyCon, unitTyCon )
 import Unique		( Unique, Uniquable(..), mkTupleTyConUnique )
 import SrcLoc		( SrcLoc )
 import Util		( cmpList, thenCmp )
@@ -346,12 +359,6 @@ tcSplitPredTy_maybe (UsageTy _ ty)	    = tcSplitPredTy_maybe ty
 tcSplitPredTy_maybe (SourceTy p) | isPred p = Just p
 tcSplitPredTy_maybe other	      	    = Nothing
 	
-mkPredTy :: PredType -> Type
-mkPredTy pred = SourceTy pred
-
-mkPredTys :: ThetaType -> [Type]
-mkPredTys preds = map SourceTy preds
-
 predTyUnique :: PredType -> Unique
 predTyUnique (IParam n _)      = getUnique n
 predTyUnique (ClassP clas tys) = getUnique clas
@@ -561,36 +568,6 @@ is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 			Nothing	     -> False
 \end{code}
 
-\begin{code}
-isPrimitiveType :: Type -> Bool
--- Returns types that are opaque to Haskell.
--- Most of these are unlifted, but now that we interact with .NET, we
--- may have primtive (foreign-imported) types that are lifted
-isPrimitiveType ty = case tcSplitTyConApp_maybe ty of
-			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
-					      isPrimTyCon tc
-			other		   -> False
-\end{code}
-
-@isStrictType@ computes whether an argument (or let RHS) should
-be computed strictly or lazily, based only on its type
-
-\begin{code}
-isStrictType :: Type -> Bool
-isStrictType ty
-  | isUnLiftedType ty			= True
-  | Just pred <- tcSplitPredTy_maybe ty = isStrictPred pred
-  | otherwise				= False
-
-isStrictPred (ClassP clas _) =  opt_DictsStrict
-			     && not (isNewTyCon (classTyCon clas))
-isStrictPred pred	     =  False
-	-- We may be strict in dictionary types, but only if it 
-	-- has more than one component.
-	-- [Being strict in a single-component dictionary risks
-	--  poking the dictionary component, which is wrong.]
-\end{code}
-
 
 %************************************************************************
 %*									*
@@ -663,6 +640,120 @@ namesOfDFunHead :: Type -> NameSet
 namesOfDFunHead dfun_ty = case tcSplitSigmaTy dfun_ty of
 				(tvs,_,head_ty) -> delListFromNameSet (namesOfType head_ty)
 								      (map getName tvs)
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection[TysWiredIn-ext-type]{External types}
+%*									*
+%************************************************************************
+
+The compiler's foreign function interface supports the passing of a
+restricted set of types as arguments and results (the restricting factor
+being the )
+
+\begin{code}
+isFFIArgumentTy :: DynFlags -> Safety -> Type -> Bool
+-- Checks for valid argument type for a 'foreign import'
+isFFIArgumentTy dflags safety ty 
+   = checkRepTyCon (legalOutgoingTyCon dflags safety) ty
+
+isFFIExternalTy :: Type -> Bool
+-- Types that are allowed as arguments of a 'foreign export'
+isFFIExternalTy ty = checkRepTyCon legalFEArgTyCon ty
+
+isFFIImportResultTy :: DynFlags -> Type -> Bool
+isFFIImportResultTy dflags ty 
+  = checkRepTyCon (legalFIResultTyCon dflags) ty
+
+isFFIExportResultTy :: Type -> Bool
+isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
+
+isFFIDynArgumentTy :: Type -> Bool
+-- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
+-- or a newtype of either.
+isFFIDynArgumentTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
+
+isFFIDynResultTy :: Type -> Bool
+-- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
+-- or a newtype of either.
+isFFIDynResultTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
+
+isFFILabelTy :: Type -> Bool
+-- The type of a foreign label must be Ptr, FunPtr, Addr,
+-- or a newtype of either.
+isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
+
+checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
+	-- Look through newtypes
+	-- Non-recursive ones are transparent to splitTyConApp,
+	-- but recursive ones aren't; hence the splitNewType_maybe
+checkRepTyCon check_tc ty 
+  | Just ty'    <- splitNewType_maybe ty  = checkRepTyCon check_tc ty'
+  | Just (tc,_) <- splitTyConApp_maybe ty = check_tc tc
+  | otherwise				  = False
+\end{code}
+
+----------------------------------------------
+These chaps do the work; they are not exported
+----------------------------------------------
+
+\begin{code}
+legalFEArgTyCon :: TyCon -> Bool
+-- It's illegal to return foreign objects and (mutable)
+-- bytearrays from a _ccall_ / foreign declaration
+-- (or be passed them as arguments in foreign exported functions).
+legalFEArgTyCon tc
+  | getUnique tc `elem` [ foreignObjTyConKey, foreignPtrTyConKey,
+			  byteArrayTyConKey, mutableByteArrayTyConKey ] 
+  = False
+  -- It's also illegal to make foreign exports that take unboxed
+  -- arguments.  The RTS API currently can't invoke such things.  --SDM 7/2000
+  | otherwise
+  = boxedMarshalableTyCon tc
+
+legalFIResultTyCon :: DynFlags -> TyCon -> Bool
+legalFIResultTyCon dflags tc
+  | getUnique tc `elem`
+	[ foreignObjTyConKey, foreignPtrTyConKey,
+	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
+  | tc == unitTyCon = True
+  | otherwise	    = marshalableTyCon dflags tc
+
+legalFEResultTyCon :: TyCon -> Bool
+legalFEResultTyCon tc
+  | getUnique tc `elem` 
+	[ foreignObjTyConKey, foreignPtrTyConKey,
+	  byteArrayTyConKey, mutableByteArrayTyConKey ]  = False
+  | tc == unitTyCon = True
+  | otherwise       = boxedMarshalableTyCon tc
+
+legalOutgoingTyCon :: DynFlags -> Safety -> TyCon -> Bool
+-- Checks validity of types going from Haskell -> external world
+legalOutgoingTyCon dflags safety tc
+  | playSafe safety && getUnique tc `elem` [byteArrayTyConKey, mutableByteArrayTyConKey]
+  = False
+  | otherwise
+  = marshalableTyCon dflags tc
+
+marshalableTyCon dflags tc
+  =  (dopt Opt_GlasgowExts dflags && isUnLiftedTyCon tc)
+  || boxedMarshalableTyCon tc
+
+boxedMarshalableTyCon tc
+   = getUnique tc `elem` [ intTyConKey, int8TyConKey, int16TyConKey
+			 , int32TyConKey, int64TyConKey
+			 , wordTyConKey, word8TyConKey, word16TyConKey
+			 , word32TyConKey, word64TyConKey
+			 , floatTyConKey, doubleTyConKey
+			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
+			 , charTyConKey, foreignObjTyConKey
+			 , foreignPtrTyConKey
+			 , stablePtrTyConKey
+			 , byteArrayTyConKey, mutableByteArrayTyConKey
+			 , boolTyConKey
+			 ]
 \end{code}
 
 

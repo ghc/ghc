@@ -23,13 +23,14 @@ module DataCon (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Subst( substTyWith )
+import {-# SOURCE #-} PprType( pprType )
 
 import CmdLineOpts	( opt_DictsStrict )
 import Type		( Type, TauType, ThetaType, 
 			  mkForAllTys, mkFunTys, mkTyConApp,
-			  mkTyVarTys, splitTyConApp_maybe, repType
+			  mkTyVarTys, splitTyConApp_maybe, repType, 
+			  mkPredTys, isStrictType
 			)
-import TcType		( isStrictPred, mkPredTys )
 import TyCon		( TyCon, tyConDataCons, tyConDataConsIfAvailable, isProductTyCon,
 			  isTupleTyCon, isUnboxedTupleTyCon, isRecursiveTyCon )
 import Class		( Class, classTyCon )
@@ -41,7 +42,6 @@ import NewDemand 	( Demand, lazyDmd, seqDmd )
 import Outputable
 import Unique		( Unique, Uniquable(..) )
 import CmdLineOpts	( opt_UnboxStrictFields )
-import PprType		()	-- Instances
 import Maybe
 import ListSetOps	( assoc )
 import Util		( zipEqual, zipWithEqual )
@@ -236,7 +236,8 @@ mkDataCon name arg_stricts fields
 	-- Strictness marks for source-args
 	--	*after unboxing choices*, 
 	-- but  *including existential dictionaries*
-    real_stricts = (map mk_dict_strict_mark ex_theta) ++
+    ex_dict_tys  = mkPredTys ex_theta
+    real_stricts = (map mk_dict_strict_mark ex_dict_tys) ++
 		   zipWithEqual "mkDataCon1" (chooseBoxingStrategy tycon) 
 				orig_arg_tys arg_stricts 
 
@@ -245,7 +246,7 @@ mkDataCon name arg_stricts fields
 	= unzip $ concat $ 
 	  zipWithEqual "mkDataCon2" unbox_strict_arg_ty 
 		       real_stricts 
-		       (mkPredTys ex_theta ++ orig_arg_tys)
+		       (ex_dict_tys ++ orig_arg_tys)
 
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkForAllTys (tyvars ++ ex_tyvars)
@@ -254,8 +255,8 @@ mkDataCon name arg_stricts fields
 
     result_ty = mkTyConApp tycon (mkTyVarTys tyvars)
 
-mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
-			 | otherwise	     = NotMarkedStrict
+mk_dict_strict_mark ty | isStrictType ty = MarkedStrict
+		       | otherwise	 = NotMarkedStrict
 \end{code}
 
 \begin{code}
@@ -409,7 +410,7 @@ splitProductType_maybe ty
 splitProductType str ty
   = case splitProductType_maybe ty of
 	Just stuff -> stuff
-	Nothing    -> pprPanic (str ++ ": not a product") (ppr ty)
+	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
 
 -- We attempt to unbox/unpack a strict field when either:
 --   (i)  The tycon is imported, and the field is marked '! !', or

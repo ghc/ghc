@@ -183,7 +183,7 @@ unboxArg arg
   = getSrcLocDs `thenDs` \ l ->
     pprPanic "unboxArg: " (ppr l <+> ppr arg_ty)
   where
-    arg_ty  					= repType (exprType arg)
+    arg_ty = repType (exprType arg)
 	-- The repType looks through any newtype or 
 	-- implicit-parameter wrappings on the argument;
 	-- this is necessary, because isBoolTy (in particular) does not.

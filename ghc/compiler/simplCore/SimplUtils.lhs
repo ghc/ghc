@@ -40,10 +40,9 @@ import NewDemand	( isStrictDmd, isBotRes, splitStrictSig )
 import SimplMonad
 import Type		( Type, mkForAllTys, seqType, 
 			  splitTyConApp_maybe, tyConAppArgs, mkTyVarTys,
-			  isUnLiftedType,
+			  isUnLiftedType, isStrictType,
 			  splitRepFunTys
 			)
-import TcType		( isStrictType )
 import TyCon		( tyConDataConsIfAvailable )
 import DataCon		( dataConRepArity )
 import VarEnv		( SubstEnv )

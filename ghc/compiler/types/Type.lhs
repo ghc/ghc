@@ -49,13 +49,13 @@ module Type (
 	applyTy, applyTys, isForAllTy,
 
 	-- Source types
-	SourceType(..), sourceTypeRep,
+	SourceType(..), sourceTypeRep, mkPredTy, mkPredTys,
 
 	-- Newtypes
 	splitNewType_maybe,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedTupleType, isAlgType,
+	isUnLiftedType, isUnboxedTupleType, isAlgType, isStrictType, isPrimitiveType,
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -94,7 +94,7 @@ import VarSet
 
 import Name	( NamedThing(..), mkLocalName, tidyOccName )
 import Class	( classTyCon )
-import TyCon	( TyCon, isRecursiveTyCon,
+import TyCon	( TyCon, isRecursiveTyCon, isPrimTyCon,
 		  isUnboxedTupleTyCon, isUnLiftedTyCon,
 		  isFunTyCon, isNewTyCon, newTyConRep,
 		  isAlgTyCon, isSynTyCon, tyConArity, 
@@ -103,6 +103,7 @@ import TyCon	( TyCon, isRecursiveTyCon,
 		)
 
 -- others
+import CmdLineOpts	( opt_DictsStrict )
 import Maybes		( maybeToBool )
 import SrcLoc		( noSrcLoc )
 import PrimRep		( PrimRep(..) )
@@ -606,6 +607,12 @@ Source types are always lifted.
 The key function is sourceTypeRep which gives the representation of a source type:
 
 \begin{code}
+mkPredTy :: PredType -> Type
+mkPredTy pred = SourceTy pred
+
+mkPredTys :: ThetaType -> [Type]
+mkPredTys preds = map SourceTy preds
+
 sourceTypeRep :: SourceType -> Type
 -- Convert a predicate to its "representation type";
 -- the type of evidence for that predicate, which is actually passed at runtime
@@ -682,7 +689,6 @@ typeKind (UsageTy _ ty)         = typeKind ty  -- we don't have separate kinds f
 		Free variables of a type
 		~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-
 tyVarsOfType :: Type -> TyVarSet
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
@@ -864,6 +870,37 @@ isAlgType :: Type -> Bool
 isAlgType ty = case splitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
 					      isAlgTyCon tc
+			other		   -> False
+\end{code}
+
+@isStrictType@ computes whether an argument (or let RHS) should
+be computed strictly or lazily, based only on its type.
+Works just like isUnLiftedType, except that it has a special case 
+for dictionaries.  Since it takes account of ClassP, you might think
+this function should be in TcType, but isStrictType is used by DataCon,
+which is below TcType in the hierarchy, so it's convenient to put it here.
+
+\begin{code}
+isStrictType (ForAllTy tv ty)		= isStrictType ty
+isStrictType (NoteTy _ ty)   		= isStrictType ty
+isStrictType (TyConApp tc _)		= isUnLiftedTyCon tc
+isStrictType (UsageTy _ ty)		= isStrictType ty
+isStrictType (SourceTy (ClassP clas _)) = opt_DictsStrict && not (isNewTyCon (classTyCon clas))
+	-- We may be strict in dictionary types, but only if it 
+	-- has more than one component.
+	-- [Being strict in a single-component dictionary risks
+	--  poking the dictionary component, which is wrong.]
+isStrictType other			= False	
+\end{code}
+
+\begin{code}
+isPrimitiveType :: Type -> Bool
+-- Returns types that are opaque to Haskell.
+-- Most of these are unlifted, but now that we interact with .NET, we
+-- may have primtive (foreign-imported) types that are lifted
+isPrimitiveType ty = case splitTyConApp_maybe ty of
+			Just (tc, ty_args) -> ASSERT( length ty_args == tyConArity tc )
+					      isPrimTyCon tc
 			other		   -> False
 \end{code}
 
