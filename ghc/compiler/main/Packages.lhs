@@ -6,7 +6,7 @@
 \begin{code}
 module Packages (
 	PackageConfig,
-	InstalledPackageInfo(..),
+	InstalledPackageInfo(..), showPackageId,
 	Version(..),
 	PackageIdentifier(..),
 	defaultPackageConfig,

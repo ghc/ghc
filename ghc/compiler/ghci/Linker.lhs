@@ -757,19 +757,19 @@ linkPackages dflags new_pkgs
 linkPackage :: DynFlags -> PackageConfig -> IO ()
 linkPackage dflags pkg
    = do 
-        let dirs      =  Packages.library_dirs pkg
-        let libs      =  Packages.hs_libraries pkg ++ extra_libraries pkg
-				++ [ lib | '-':'l':lib <- extra_ld_opts pkg ]
+        let dirs      =  Packages.libraryDirs pkg
+        let libs      =  Packages.hsLibraries pkg ++ Packages.extraLibraries pkg
+				++ [ lib | '-':'l':lib <- Packages.extraLdOpts pkg ]
         classifieds   <- mapM (locateOneObj dirs) libs
 
         -- Complication: all the .so's must be loaded before any of the .o's.  
 	let dlls = [ dll | DLL dll    <- classifieds ]
 	    objs = [ obj | Object obj <- classifieds ]
 
-	maybePutStr dflags ("Loading package " ++ Packages.name pkg ++ " ... ")
+	maybePutStr dflags ("Loading package " ++ showPackageId (package pkg) ++ " ... ")
 
 	-- See comments with partOfGHCi
-	when (Packages.name pkg `notElem` partOfGHCi) $ do
+	when (pkgName (package pkg) `notElem` partOfGHCi) $ do
 	    loadFrameworks pkg
             -- When a library A needs symbols from a library B, the order in
             -- extra_libraries/extra_ld_opts is "-lA -lB", because that's the
@@ -790,7 +790,7 @@ linkPackage dflags pkg
         maybePutStr dflags "linking ... "
         ok <- resolveObjs
 	if succeeded ok then maybePutStrLn dflags "done."
-	      else throwDyn (InstallationError ("unable to load package `" ++ name pkg ++ "'"))
+	      else throwDyn (InstallationError ("unable to load package `" ++ showPackageId (package pkg) ++ "'"))
 
 load_dyn dirs dll = do r <- loadDynamic dirs dll
 		       case r of
