@@ -631,7 +631,9 @@ endif
 ifneq "$(SCRIPT_PREFIX_FILES)" ""
 	@cat $(SCRIPT_PREFIX_FILES) >> $@
 endif
+ifneq "$(SCRIPT_SUBST)" ""
 	@eval $(SCRIPT_SUBST) 
+endif
 	@cat $(SCRIPT_OBJS) >> $@
 	@chmod a+x $@
 	@echo Done.
