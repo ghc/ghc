@@ -8,10 +8,10 @@ data Ty t where
   Arr  :: Ty a -> Ty b -> Ty (a -> b)
 
 data Exp g t where
-  Var :: Var g t -> Exp g t
-  Lam :: Ty a -> Exp (g,a) b -> Exp g (a->b) 
-  App :: Exp g (s -> t) -> Exp g s -> Exp g t
-  If  :: Exp g Bool -> Exp g t -> Exp g t -> Exp g t
+  Var 	 :: Var g t -> Exp g t
+  Lam 	 :: Ty a -> Exp (g,a) b -> Exp g (a->b) 
+  App 	 :: Exp g (s -> t) -> Exp g s -> Exp g t
+  If  	 :: Exp g Bool -> Exp g t -> Exp g t -> Exp g t
   ETrue  :: Exp g Bool
   EFalse :: Exp g Bool
 
@@ -55,7 +55,7 @@ var :: Var g t -> g -> t
 var ZVar     (_,t) = t
 var (SVar x) (h,s) = var x h
 
-eval :: Exp g t -> g -> t
+-- eval :: Exp g t -> g -> t
 eval (Var x)    g = var x g
 eval (Lam _ e)  g = \a -> eval e (g,a)
 eval (App e e') g = eval e g (eval e' g)

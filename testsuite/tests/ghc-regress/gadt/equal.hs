@@ -18,25 +18,13 @@ test Rint  Rint  = return Eq
 test Rchar Rchar = return Eq
 test Runit Runit = return Eq
 test (Rpair x y) (Rpair a b)
-  = case test x a of {
-	Nothing -> Nothing ;
-	Just Eq -> 
-    case test y b of
-	Nothing -> Nothing
-	Just Eq -> Just Eq 
-    }
-	
---  = do { Eq <- test x a; Eq <- test y b; return Eq }
+  = do { Eq <- test x a; Eq <- test y b; return Eq }
 test (Rsum x y) (Rsum a b)
-  = case test x a of {
-	Nothing -> Nothing ;
-	Just Eq -> 
-    case test y b of
-	Nothing -> Nothing
-	Just Eq -> Just Eq 
-    }
---  = do { Eq f g <- test x a; Eq h i <- test y b; return Eq }
+  = do { Eq <- test x a; Eq <- test y b; return Eq }
 test (Rcon s1 x) (Rcon s2 y)
   = if s1==s2 then test x y else Nothing
 test _ _ = Nothing
+
+f :: Equal a b -> a -> b -> b
+f Eq x y = x
 
