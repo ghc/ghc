@@ -292,7 +292,7 @@ ifaceTyCls (ATyCon tycon) so_far
 	        | otherwise	   = DataType
 
     ifaceConDecl data_con 
-	= ConDecl (getName data_con) (error "ifaceConDecl")
+	= ConDecl (getName data_con) (getName (dataConId data_con))
 		  (toHsTyVars ex_tyvars)
 		  (toHsContext ex_theta)
 		  details noSrcLoc
