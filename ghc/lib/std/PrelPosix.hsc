@@ -1,7 +1,7 @@
 {-# OPTIONS -fno-implicit-prelude -optc-DNON_POSIX_SOURCE #-}
 
 -- ---------------------------------------------------------------------------
--- $Id: PrelPosix.hsc,v 1.9 2001/07/13 11:48:52 rrt Exp $
+-- $Id: PrelPosix.hsc,v 1.10 2001/08/10 11:02:00 simonmar Exp $
 --
 -- POSIX support layer for the standard libraries
 --
@@ -90,17 +90,17 @@ fdType fd =
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
 			"unknown file type" Nothing
 
-foreign import "s_isreg_wrap" s_isreg :: CMode -> Bool
+foreign import "s_isreg_wrap" unsafe s_isreg :: CMode -> Bool
 #def inline int s_isreg_wrap(m) { return S_ISREG(m); }
 
-foreign import "s_isdir_wrap" s_isdir :: CMode -> Bool
+foreign import "s_isdir_wrap" unsafe s_isdir :: CMode -> Bool
 #def inline int s_isdir_wrap(m) { return S_ISDIR(m); }
 
-foreign import "s_isfifo_wrap" s_isfifo :: CMode -> Bool
+foreign import "s_isfifo_wrap" unsafe s_isfifo :: CMode -> Bool
 #def inline int s_isfifo_wrap(m) { return S_ISFIFO(m); }
 
 #ifndef mingw32_TARGET_OS
-foreign import "s_issock_wrap" s_issock :: CMode -> Bool
+foreign import "s_issock_wrap" unsafe s_issock :: CMode -> Bool
 #def inline int s_issock_wrap(m) { return S_ISSOCK(m); }
 #else
 s_issock :: CMode -> Bool
