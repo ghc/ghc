@@ -31,6 +31,14 @@ random ()
 {
   return mrand48 ();
 }
+#elif defined(_WIN32) && !(defined(__CYGWIN__) || defined(__CYGWIN32__))
+/* MS CRT supplies just the poxy rand(), with an upper bound of 0x7fff */
+static inline unsigned long
+random ()
+{
+  return rand () ^ (rand () << 16) ^ (rand() << 32);
+}
+
 #else
 long random ();
 #endif

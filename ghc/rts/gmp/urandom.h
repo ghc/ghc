@@ -29,6 +29,16 @@ urandom ()
 #define __URANDOM
 #endif
 
+#if defined(_WIN32) && !(defined(__CYGWIN__) || defined(__CYGWIN32__))
+/* MS CRT supplies just the poxy rand(), with an upper bound of 0x7fff */
+static inline unsigned long
+urandom ()
+{
+  return rand () ^ (rand () << 16) ^ (rand() << 32);
+}
+#define __URANDOM
+#endif
+
 #if defined (__alpha) && !defined (__URANDOM)
 /* DEC OSF/1 1.2 random() returns a double.  */
 long mrand48 ();
