@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.14 2001/03/27 16:33:17 rrt Exp $
+# $Id: Makefile,v 1.15 2001/05/22 10:38:57 simonmar Exp $
 
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
@@ -72,7 +72,7 @@ CLEAN_FILES += $(CONFIG_HS)
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
-all clean veryclean maintainer-clean ::
+all clean distclean maintainer-clean ::
 	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
 endif
 
