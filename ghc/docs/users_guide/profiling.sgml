@@ -81,7 +81,7 @@ $
     will contain something like this:</para>
 
 <screen>
-       Tue Apr 18 12:52 2000 Time and Allocation Profiling Report  (Final)
+          Fri May 12 14:06 2000 Time and Allocation Profiling Report  (Final)
 
            Main +RTS -p -RTS
 
@@ -93,15 +93,16 @@ COST CENTRE          MODULE     %time %alloc
 nfib                 Main       100.0  100.0
 
 
-COST CENTRE              MODULE         scc %time %alloc    inner  cafs
+                                              individual     inherited
+COST CENTRE              MODULE         scc  %time %alloc   %time %alloc
 
-MAIN                     MAIN             0   0.0   0.0        0     1
- main                    Main             0   0.0   0.0        0     1
- CAF 			 PrelHandle       3   0.0   0.0        0     3
- CAF 			 PrelAddr         1   0.0   0.0        0     0
- CAF 			 Main             6   0.0   0.0        1     0
-  main                   Main             1   0.0   0.0        1     1
-   nfib                  Main        242785 100.0 100.0   242784     4
+MAIN                     MAIN             0    0.0   0.0    100.0 100.0
+ main                    Main             0    0.0   0.0      0.0   0.0
+ CAF                     PrelHandle       3    0.0   0.0      0.0   0.0
+ CAF                     PrelAddr         1    0.0   0.0      0.0   0.0
+ CAF                     Main             6    0.0   0.0    100.0 100.0
+  main                   Main             1    0.0   0.0    100.0 100.0
+   nfib                  Main        242785  100.0 100.0    100.0 100.0
 </screen>
 
 
@@ -125,6 +126,12 @@ MAIN                     MAIN             0   0.0   0.0        0     1
     the costly call to <function>nfib</function> came from
     <function>main</function>.</para>
 
+    <para>The time and allocation incurred by a given part of the
+    program is displayed in two ways: &ldquo;individual&rdquo;, which
+    are the costs incurred by the code covered by this cost centre
+    stack alone, and &ldquo;inherited&rdquo;, which includes the costs
+    incurred by all the children of this node.</para>
+
     <para>The usefulness of cost-centre stacks is better demonstrated
     by  modifying the example slightly:</para>
 
@@ -139,18 +146,18 @@ nfib n = if n < 2 then 1 else nfib (n-1) + nfib (n-2)
     the new profiling results:</para>
 
 <screen>
-COST CENTRE              MODULE         scc %time %alloc    inner  cafs
+COST CENTRE              MODULE         scc  %time %alloc   %time %alloc
 
-MAIN                     MAIN             0   0.0   0.0        0     1
- main                    Main             0   0.0   0.0        0     1
- CAF                     PrelHandle       3   0.0   0.0        0     3
- CAF                     PrelAddr         1   0.0   0.0        0     0
- CAF             	 Main             9   0.0   0.0        1     1
-  main                   Main             1   0.0   0.0        2     2
-   g                     Main             1   0.0   0.0        1     3
-    nfib                 Main           465   0.0   0.2      464     0
-   f                     Main             1   0.0   0.0        1     1
-    nfib                 Main        242785 100.0  99.8   242784     1
+MAIN                     MAIN             0    0.0   0.0    100.0 100.0
+ main                    Main             0    0.0   0.0      0.0   0.0
+ CAF                     PrelHandle       3    0.0   0.0      0.0   0.0
+ CAF                     PrelAddr         1    0.0   0.0      0.0   0.0
+ CAF                     Main             9    0.0   0.0    100.0 100.0
+  main                   Main             1    0.0   0.0    100.0 100.0
+   g                     Main             1    0.0   0.0      0.0   0.2
+    nfib                 Main           465    0.0   0.2      0.0   0.2
+   f                     Main             1    0.0   0.0    100.0  99.8
+    nfib                 Main        242785  100.0  99.8    100.0  99.8
 </screen>
 
     <para>Now although we had two calls to <function>nfib</function>
@@ -161,7 +168,7 @@ MAIN                     MAIN             0   0.0   0.0        0     1
 
     <variablelist>
       <varlistentry>
-	<term>scc</term>
+	<term>entries</term>
 	<listitem>
 	  <para>The number of times this particular point in the call
 	  graph was entered.</para>
@@ -169,7 +176,7 @@ MAIN                     MAIN             0   0.0   0.0        0     1
       </varlistentry>
 
       <varlistentry>
-	<term>&percnt;time</term>
+	<term>individual &percnt;time</term>
 	<listitem>
 	  <para>The percentage of the total run time of the program
 	  spent at this point in the call graph.</para>
@@ -177,7 +184,7 @@ MAIN                     MAIN             0   0.0   0.0        0     1
       </varlistentry>
 
       <varlistentry>
-	<term>&percnt;alloc</term>
+	<term>individual &percnt;alloc</term>
 	<listitem>
 	  <para>The percentage of the total memory allocations
 	  (excluding profiling overheads) of the program made by this
@@ -186,19 +193,19 @@ MAIN                     MAIN             0   0.0   0.0        0     1
       </varlistentry>
 
       <varlistentry>
-	<term>inner</term>
+	<term>inherited &percnt;time</term>
 	<listitem>
-	  <para>The number of times an inner call-graph context was
-	  entered from here (including recursive calls).</para>
+	  <para>The percentage of the total run time of the program
+	  spent below this point in the call graph.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term>cafs</term>
+	<term>inherited &percnt;alloc</term>
 	<listitem>
-	  <para>The number of times a CAF context was entered from
-	  here.  CAFs are described in <xref
-	  linkend="prof-rules">.</para>
+	  <para>The percentage of the total memory allocations
+	  (excluding profiling overheads) of the program made by this
+	  call and all of its sub-calls.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
