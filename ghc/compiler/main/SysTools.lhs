@@ -37,9 +37,8 @@ module SysTools (
 
 	-- Misc
 	showGhcUsage,		-- IO ()	Shows usage message and exits
-	getSysMan,		-- IO String	Parallel system only
+	getSysMan		-- IO String	Parallel system only
 
-	runSomething	-- ToDo: make private
  ) where
 
 import DriverUtil
@@ -68,8 +67,6 @@ import List		( isPrefixOf )
 import List		( isSuffixOf )
 
 #include "HsVersions.h"
-
-{-# DEPRECATED runSomething "runSomething should be private to SysTools" #-}
 
 \end{code}
 
