@@ -4024,6 +4024,19 @@ compiles require Cygwin.</para>
 <para>The instructions that follow describe how to build GHC-mingw. It is
 possible to build GHC-cygwin, but it's not a supported route, and the build system might
 be flaky.</para>
+
+<para>In your build tree, you build a compiler called <Command>ghc-inplace</Command>.  It
+uses the <Command>gcc</Command> that you specify using the
+<option>--with-gcc</option> flag when you run
+<Command>configure</Command> (see below).
+The makefiles are careful to use <Command>ghc-inplace</Command> (not <Command>gcc</Command>)
+to compile any C files, so that it will in turn invoke the right <Command>gcc</Command> rather that
+whatever one happens to be in your path.  However, the makefiles do use whatever <Command>ld</Command> 
+and <Command>ar</Command> happen to be in your path. This is a bit naughty, but (a) they are only
+used to glom together .o files into a bigger .o file, or a .a file, 
+so they don't ever get libraries (which would be bogus; they might be the wrong libraries), and (b)
+Cygwin and Mingw use the same .o file format.  So its ok.
+</para>
 </sect3>
 </sect2>
 
@@ -4096,7 +4109,8 @@ directory, there's no need to copy anything.
 <listitem>
 <para>
 By default, cygwin provides the command shell <filename>ash</filename>
-as <filename>sh.exe</filename>. It has a couple of 'issues', so
+as <filename>sh.exe</filename>. It has a couple of 'issues' (to do with quoting
+and length of command lines), so
 in your <filename>/bin</filename> directory, make sure that <filename>
 bash.exe</filename> is also provided as <filename>sh.exe</filename>
 (i.e. overwrite the old <filename>sh.exe</filename> with a copy of
@@ -4161,6 +4175,11 @@ generate code, so you have to install that. Just pick up a mingw bundle at
 <ulink url="http://www.mingw.org/">http://www.mingw.org/</ulink>.
 We install it in <filename>c:/mingw</filename>.
 </para>
+<para>Do <emphasis>not</emphasis> add any of the <emphasis>mingw</emphasis> binaries to your  path.
+They are only going to get used by explicit access (via the --with-gcc flag you
+give to <Command>configure</Command> later).  If you do add them to your path
+you are likely to get into a mess because their names overlap with Cygwin binaries.
+</para>
 </listitem>
 
 
@@ -4212,6 +4231,13 @@ You either need to add <filename>ghc</filename> to your
 <constant>PATH</constant> before you invoke
 <Command>configure</Command>, or use the <Command>configure</Command>
 option <option>--with-ghc=c:/ghc/ghc-some-version/bin/ghc</option>.
+</para>
+</listitem>
+
+<listitem><para>
+If you are paranoid, delete <filename>config.cache</filename> if it exists.
+This file occasionally remembers out-of-date configuration information, which 
+can be really confusing.
 </para>
 </listitem>
 
