@@ -33,12 +33,12 @@ import Literal		( isNoRepLit )
 import MagicUFs		( applyMagicUnfoldingFun, MagicUnfoldingFun )
 import PprStyle		( PprStyle(..) )
 import PprType		( GenType{-instance Outputable-} )
---import Pretty		( ppBesides, ppStr )
 import SimplEnv
 import SimplMonad
 import TyCon		( tyConFamilySize )
 import Util		( pprTrace, assertPanic, panic )
 import Maybes		( maybeToBool )
+import Pretty
 \end{code}
 
 %************************************************************************
@@ -50,7 +50,7 @@ import Maybes		( maybeToBool )
 This where all the heavy-duty unfolding stuff comes into its own.
 
 \begin{code}
-completeVar env var args
+completeVar env var args result_ty
 
   | maybeToBool maybe_magic_result
   = tick MagicUnfold	`thenSmpl_`
@@ -66,24 +66,30 @@ completeVar env var args
 	--
 	-- Need to be careful: the RHS of INLINE functions is protected against inlining
 	-- by essential_unfoldings_only being set true; we must not inline workers back into
-	-- wrappers, even thouth the former have an unfold-always guidance.
+	-- wrappers, even though the former have an unfold-always guidance.
     costCentreOk (getEnclosingCC env) (getEnclosingCC unfold_env)
-  = tick UnfoldingDone	`thenSmpl_`
-#ifdef DEBUG
---    simplCount		`thenSmpl` \ n ->
---    (if n > 3000 then
---	pprTrace "Ticks > 3000 and unfolding" (ppr PprDebug var)
---    else
---	id
---    )
-#endif
-    simplExpr unfold_env unf_template args
+  = 
+{-
+    simplCount		`thenSmpl` \ n ->
+    (if n > 1000 then
+	pprTrace "Ticks > 1000 and unfolding" (sep [space, int n, ppr PprDebug var])
+    else
+	id
+    )
+    (if n>4000 then
+       returnSmpl (mkGenApp (Var var) args)
+    else
+-}
+
+    tickUnfold var		`thenSmpl_`
+    simplExpr unfold_env unf_template args result_ty
 
   | maybeToBool maybe_specialisation
   = tick SpecialisationDone	`thenSmpl_`
     simplExpr (extendTyEnvList env spec_bindings) 
 	      spec_template
 	      (map TyArg leftover_ty_args ++ remaining_args)
+	      result_ty
 
   | otherwise
   = returnSmpl (mkGenApp (Var var) args)
@@ -106,14 +112,12 @@ completeVar env var args
 		-> Just (occ_info, setEnclosingCC env enc_cc, unf)	
 
 	     (Just (_, occ_info, InUnfolding env_unf unf), _)
-		-> Just (occ_info, env_unf, unf)	
--- 			This combineSimplEnv is WRONG.  InUnfoldings are used for
---			recursive decls, and we're relying on using the old unfold enf
---			to avoid getting outselves in a loop!
---		-> Just (occ_info, combineSimplEnv env env_unf, unf)	
+		-> -- pprTrace ("InUnfolding for ") (ppr PprDebug var) $
+		   Just (occ_info, env_unf, unf)	
 
 	     (_, CoreUnfolding unf)
-		-> Just (noBinderInfo, env, unf)
+		-> -- pprTrace ("CoreUnfolding for ") (ppr PprDebug var) $
+		   Just (noBinderInfo, env, unf)
 
 	     other -> Nothing
 
@@ -129,13 +133,13 @@ completeVar env var args
 	---------- Switches
     sw_chkr		      = getSwitchChecker env
     essential_unfoldings_only = switchIsOn sw_chkr EssentialUnfoldingsOnly
+    is_case_scrutinee	      = switchIsOn sw_chkr SimplCaseScrutinee
     always_inline	      = case guidance of {UnfoldAlways -> True; other -> False}
-    ok_to_inline	      = okToInline form 
-			      		   occ_info
-			      		   small_enough
-    small_enough = smallEnoughToInline arg_evals guidance
-    arg_evals = [is_evald arg | arg <- args, isValArg arg]
-  
+
+    ok_to_inline	      = okToInline form occ_info small_enough
+    small_enough	      = smallEnoughToInline arg_evals is_case_scrutinee guidance
+    arg_evals		      = [is_evald arg | arg <- args, isValArg arg]
+
     is_evald (VarArg v) = isEvaluated (lookupRhsInfo env v)
     is_evald (LitArg l) = True
 
