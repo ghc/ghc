@@ -76,6 +76,7 @@ RUNTEST_OPTS +=  \
 	-e config.platform=\"$(TARGETPLATFORM)\" \
 	-e config.wordsize=\"$(WORDSIZE)\" \
 	-e default_testopts.cleanup=\"$(CLEANUP)\" \
+	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
 	$(EXTRA_RUNTEST_OPTS)
 
 TESTS	     = 

@@ -66,6 +66,10 @@ class TestConfig:
         # Lists of flags for each way
         self.way_flags = {}
 
+        # the timeout program
+        self.timeout_prog = ''
+        self.timeout = 300
+
 global config
 config = TestConfig()
 
@@ -913,11 +917,11 @@ def guess_compiler_flags():
 
 def runCmd( cmd ):
     if_verbose( 1, cmd )
-    return os.system( cmd )
-
-def runCmdNoFail( cmd ):
-    if_verbose( 1, cmd )
-    return os.system( cmd )
+    if (config.timeout_prog == ''):
+        return os.system( cmd )
+    else:
+        return os.spawnv(os.P_WAIT, config.timeout_prog,
+                         [config.timeout_prog,`config.timeout`,cmd] )
 
 def rm_no_fail( file ):
    try:

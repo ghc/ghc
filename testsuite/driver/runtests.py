@@ -60,7 +60,6 @@ for opt,arg in opts:
             sys.exit(1)
         config.run_ways = filter(eq(arg), config.run_ways + config.other_ways)
         config.compile_ways = filter(eq(arg), config.compile_ways + config.other_ways)
-        
 # -----------------------------------------------------------------------------
 # The main dude
 
