@@ -105,6 +105,15 @@ alpha*-unknown-freebsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='freebsd'
         ;;
+alpha*-unknown-openbsd*)
+	HostPlatform=alpha-unknown-openbsd
+	TargetPlatform=alpha-unknown-openbsd
+	BuildPlatform=alpha-unknown-openbsd
+        HostPlatform_CPP='alpha_unknown_openbsd'
+        HostArch_CPP='alpha'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
 amd64*-*-openbsd*)
 	HostPlatform=x86_64-unknown-openbsd
 	TargetPlatform=x86_64-unknown-openbsd
@@ -123,6 +132,15 @@ arm*-linux*)
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
         ;;
+arm*-openbsd*)
+        HostPlatform=arm-unknown-openbsd
+        TargetPlatform=arm-unknown-openbsd
+        BuildPlatform=arm-unknown-openbsd
+        HostPlatform_CPP='arm_unknown_openbsd'                 
+        HostArch_CPP='arm'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
+        ;;
 hppa*-*-linux*)
         HostPlatform=hppa-unknown-linux # hack again
         TargetPlatform=hppa-unknown-linux
@@ -131,6 +149,15 @@ hppa*-*-linux*)
         HostArch_CPP='hppa'
         HostVendor_CPP='unknown'                             
         HostOS_CPP='linux'
+        ;;
+hppa*-*-openbsd*)
+        HostPlatform=hppa-unknown-openbsd # hack again
+        TargetPlatform=hppa-unknown-openbsd
+        BuildPlatform=hppa-unknown-openbsd
+        HostPlatform_CPP='hppa_unknown_openbsd'                
+        HostArch_CPP='hppa'
+        HostVendor_CPP='unknown'                             
+        HostOS_CPP='openbsd'
         ;;
 hppa1.1-hp-hpux*)
 	HostPlatform=hppa1.1-hp-hpux  # canonicalise for our purposes (hack)
@@ -358,6 +385,15 @@ powerpc-unknown-linux*)
         HostArch_CPP='powerpc'
         HostVendor_CPP='unknown'
         HostOS_CPP='linux'
+        ;;
+powerpc-unknown-openbsd*)
+        HostPlatform=powerpc-unknown-openbsd
+        TargetPlatform=powerpc-unknown-openbsd
+        BuildPlatform=powerpc-unknown-openbsd
+        HostPlatform_CPP='powerpc_unknown_openbsd'
+        HostArch_CPP='powerpc'
+        HostVendor_CPP='unknown'
+        HostOS_CPP='openbsd'
         ;;
 s390-ibm-linux*)
        HostPlatform=s390-ibm-linux
