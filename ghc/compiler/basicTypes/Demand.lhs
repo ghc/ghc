@@ -6,9 +6,16 @@
 \begin{code}
 #include "HsVersions.h"
 
-module Demand where
+module Demand(
+	Demand(..),
 
-import PprStyle		( PprStyle )
+	wwLazy, wwStrict, wwUnpackData, wwUnpackNew, wwPrim, wwEnum, 
+	isStrict,
+
+	showDemands
+     ) where
+
+import BasicTypes	( NewOrData(..) )
 import Outputable
 import Pretty		( Doc, text )
 import Util		( panic )
@@ -33,9 +40,10 @@ data Demand
 			-- (does not imply worker's existence or any
 			-- calling-convention magic)
 
-  | WwUnpack		-- Argument is strict & a single-constructor
+  | WwUnpack		-- Argument is strict & a single-constructor type
+	NewOrData
 	Bool		-- True <=> wrapper unpacks it; False <=> doesn't
-	[Demand]	-- type; its constituent parts (whose StrictInfos
+	[Demand]	-- Its constituent parts (whose StrictInfos
 			-- are in the list) should be passed
 			-- as arguments to the worker.
 
@@ -46,15 +54,15 @@ data Demand
   | WwEnum		-- Argument is strict & an enumeration type;
 			-- an Int# representing the tag (start counting
 			-- at zero) should be passed to the worker.
-  deriving (Eq, Ord)
-      -- we need Eq/Ord to cross-chk update infos in interfaces
+  deriving( Eq )
 
 type MaybeAbsent = Bool -- True <=> not even used
 
 -- versions that don't worry about Absence:
 wwLazy	    = WwLazy 	  False
 wwStrict    = WwStrict
-wwUnpack xs = WwUnpack False xs
+wwUnpackData xs = WwUnpack DataType False xs
+wwUnpackNew  x  = WwUnpack NewType  False [x]
 wwPrim	    = WwPrim
 wwEnum	    = WwEnum
 \end{code}
@@ -70,7 +78,8 @@ wwEnum	    = WwEnum
 isStrict :: Demand -> Bool
 
 isStrict WwStrict	= True
-isStrict (WwUnpack _ _)	= True
+isStrict (WwUnpack DataType _ _) = True
+isStrict (WwUnpack NewType _ ds) = isStrict (head ds)
 isStrict WwPrim		= True
 isStrict WwEnum		= True
 isStrict _		= False
@@ -84,44 +93,57 @@ isStrict _		= False
 %************************************************************************
 
 \begin{code}
+showDemands :: [Demand] -> String
+showDemands wrap_args = show_demands wrap_args ""
+
+
 #ifdef REALLY_HASKELL_1_3
+
 instance Read Demand where
-#else
-instance Text Demand where
-#endif
-    readList str = read_em [{-acc-}] str
-      where
-	read_em acc ('L' : xs)	= read_em (WwLazy   False : acc) xs
-	read_em acc ('A' : xs)	= read_em (WwLazy   True  : acc) xs
-	read_em acc ('S' : xs)	= read_em (WwStrict : acc) xs
-	read_em acc ('P' : xs)	= read_em (WwPrim : acc) xs
-	read_em acc ('E' : xs)	= read_em (WwEnum : acc) xs
-
-	read_em acc (')' : xs)	= [(reverse acc, xs)]
-	read_em acc ( 'U'  : '(' : xs) = do_unpack True  acc xs
-	read_em acc ( 'u'  : '(' : xs) = do_unpack False acc xs
-
-	read_em acc rest	= [(reverse acc, rest)]
-
-	do_unpack wrapper_unpacks acc xs
-	  = case (read_em [] xs) of
-	      [(stuff, rest)] -> read_em (WwUnpack wrapper_unpacks stuff : acc) rest
-	      _ -> panic ("Text.Demand:"++str++"::"++xs)
-
-
-#ifdef REALLY_HASKELL_1_3
+    readList str = read_em [] str
 instance Show Demand where
+    showList wrap_args rest = show_demands wrap_args rest
+
+#else
+
+instance Text Demand where
+    readList str = read_em [] str
+    showList wrap_args rest = show_demands wrap_args rest
+
 #endif
-    showList wrap_args rest = foldr show1 rest wrap_args
-      where
+
+read_em acc ('L' : xs)	= read_em (WwLazy   False : acc) xs
+read_em acc ('A' : xs)	= read_em (WwLazy   True  : acc) xs
+read_em acc ('S' : xs)	= read_em (WwStrict : acc) xs
+read_em acc ('P' : xs)	= read_em (WwPrim : acc) xs
+read_em acc ('E' : xs)	= read_em (WwEnum : acc) xs
+read_em acc (')' : xs)	= [(reverse acc, xs)]
+read_em acc ( 'U'  : '(' : xs) = do_unpack DataType True  acc xs
+read_em acc ( 'u'  : '(' : xs) = do_unpack DataType False acc xs
+read_em acc ( 'N'  : '(' : xs) = do_unpack NewType  True  acc xs
+read_em acc ( 'n'  : '(' : xs) = do_unpack NewType  False acc xs
+read_em acc rest	= [(reverse acc, rest)]
+
+do_unpack new_or_data wrapper_unpacks acc xs
+	  = case (read_em [] xs) of
+	      [(stuff, rest)] -> read_em (WwUnpack new_or_data wrapper_unpacks stuff : acc) rest
+	      _ -> panic ("Demand.do_unpack:"++show acc++"::"++xs)
+
+show_demands wrap_args rest
+  = foldr show1 rest wrap_args
+  where
 	show1 (WwLazy False)  	 rest = 'L' : rest
 	show1 (WwLazy True)   	 rest = 'A' : rest
 	show1 WwStrict	      	 rest = 'S' : rest
 	show1 WwPrim	      	 rest = 'P' : rest
 	show1 WwEnum	      	 rest = 'E' : rest
-	show1 (WwUnpack wu args) rest = ch ++ "(" ++ showList args (')' : rest)
+	show1 (WwUnpack nd wu args) rest = ch ++ "(" ++ showList args (')' : rest)
 				      where
-					ch = if wu then "U" else "u"
+					ch = case nd of
+						DataType | wu        -> "U"
+							 | otherwise -> "u"
+						NewType  | wu        -> "N"
+							 | otherwise -> "n"
 
 instance Outputable Demand where
     ppr sty si = text (showList [si] "")
