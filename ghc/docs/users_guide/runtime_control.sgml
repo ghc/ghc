@@ -304,6 +304,17 @@
       </varlistentry>
 
       <varlistentry>
+	<term><option>-D</option><replaceable>num</replaceable></term>
+	<indexterm><primary>-D</primary><secondary>RTS option</secondary></indexterm>
+	<listitem>
+	  <para>An RTS debugging flag; varying quantities of output
+          depending on which bits are set in
+          <replaceable>num</replaceable>.  Only works if the RTS was
+          compiled with the <option>DEBUG</option> option.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
 	<term><option>-r</option><replaceable>file</replaceable></term>
 	<indexterm><primary><option>-r</option></primary><secondary>RTS option</secondary></indexterm>
 	<indexterm><primary>ticky ticky profiling</primary></indexterm>
@@ -327,14 +338,23 @@
 	</listitem>
       </varlistentry>
 
-      <varlistentry>
-	<term><option>-D</option><replaceable>num</replaceable></term>
-	<indexterm><primary>-D</primary><secondary>RTS option</secondary></indexterm>
+      <varlistentry id="stack-trace-option">
+	<term><option>-xc</option></term>
+	<indexterm><primary><option>-xc</option></primary><secondary>RTS
+	option</secondary></indexterm>
 	<listitem>
-	  <para>An RTS debugging flag; varying quantities of output
-          depending on which bits are set in
-          <replaceable>num</replaceable>.  Only works if the RTS was
-          compiled with the <option>DEBUG</option> option.</para>
+	  <para>(Only available when the program is compiled for
+	  profiling.)  When an exception is raised in the program,
+	  this option causes the current cost-centre-stack to be
+	  dumped to <literal>stderr</literal>.</para>
+
+	  <para>This can be particularly useful for debugging: if your
+	  program is complaining about a <literal>head []</literal>
+	  error and you haven't got a clue which bit of code is
+	  causing it, compiling with <literal>-prof
+	  -auto-all</literal> and running with <literal>+RTS -xc
+	  -RTS</literal> will tell you exactly the call stack at the
+	  point the error was raised.</para>
 	</listitem>
       </varlistentry>
 
