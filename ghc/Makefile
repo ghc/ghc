@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.9 1999/12/07 11:19:35 simonmar Exp $
+# $Id: Makefile,v 1.10 2000/01/31 15:12:07 simonmar Exp $
 #
 
 TOP=.
@@ -34,5 +34,7 @@ endif
 ifeq ($(IncludeTestDirsInBuild),YES)
 SUBDIRS += tests
 endif
+
+SRC_DIST_FILES += configure
 
 include $(TOP)/mk/target.mk
