@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.8 1999/09/15 13:50:14 sof Exp $
+ * $Id: Stable.c,v 1.9 1999/10/26 17:15:39 sewardj Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -199,7 +199,6 @@ getStablePtr(StgPtr p)
 {
   StgWord sn = lookupStableName(p);
   StgWord weight, weight_2;
-
   weight = stable_ptr_table[sn].weight;
   if (weight == 0) {
     weight = (StgWord)1 << (BITS_IN(StgWord)-1);
@@ -290,8 +289,10 @@ markStablePtrTable(rtsBool full)
 	  (StgClosure *)p->addr = new;
 	} else if ((P_)new != q) {
 	  removeHashTable(addrToStableHash, (W_)q, NULL);
-	  insertHashTable(addrToStableHash, (W_)new, 
-			  (void *)(p - stable_ptr_table));
+	  if (!lookupHashTable(addrToStableHash, (W_)new)) {
+	    insertHashTable(addrToStableHash, (W_)new, 
+			    (void *)(p - stable_ptr_table));
+	  }
 	  (StgClosure *)p->addr = new;
 	}
 	IF_DEBUG(stable, fprintf(stderr,"Stable ptr %d still alive at %p, weight %d\n", p - stable_ptr_table, new, p->weight));
