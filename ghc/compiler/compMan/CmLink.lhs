@@ -124,17 +124,19 @@ link mode dflags batch_attempt_linking linkables pls1
 link' Batch dflags batch_attempt_linking linkables pls1
    | batch_attempt_linking
    = do let o_files = concatMap getOfiles linkables
+        when (verb >= 1) $
+             hPutStrLn stderr "ghc: linking ..."
 	-- don't showPass in Batch mode; doLink will do that for us.
         doLink o_files
 	-- doLink only returns if it succeeds
         return (LinkOK pls1)
    | otherwise
-   = do let verb = verbosity dflags
-        when (verb >= 3) $ do
-	    hPutStrLn stderr "CmLink.link(batch): upsweep (partially?) failed OR main not exported;"
-            hPutStrLn stderr "not linking."
+   = do when (verb >= 3) $ do
+	    hPutStrLn stderr "CmLink.link(batch): upsweep (partially) failed OR"
+            hPutStrLn stderr "   Main.main not exported; not linking."
         return (LinkOK pls1)
    where
+      verb = verbosity dflags
       getOfiles (LP _)    = panic "CmLink.link(getOfiles): shouldn't get package linkables"
       getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
 
