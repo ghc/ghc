@@ -51,7 +51,7 @@ import System
 -- ---------------------------------------------------------------------------
 -- getArgs, getProgName, getEnv
 
--- Computation `getArgs' returns a list of the program's command
+-- | Computation 'getArgs' returns a list of the program's command
 -- line arguments (not including the program name).
 
 #ifdef __GLASGOW_HASKELL__
@@ -107,11 +107,13 @@ unpackProgName argv = do
    isPathSeparator _    = False
 
 
--- Computation `getEnv var' returns the value
--- of the environment variable {\em var}.  
-
--- This computation may fail with
---    NoSuchThing: The environment variable does not exist.
+-- | Computation 'getEnv' @var@ returns the value
+-- of the environment variable @var@.  
+--
+-- This computation may fail with:
+--
+--  * 'System.IO.Error.isDoesNotExistError' if the environment variable
+--    does not exist.
 
 getEnv :: String -> IO String
 getEnv name =

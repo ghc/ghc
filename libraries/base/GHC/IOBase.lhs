@@ -701,18 +701,17 @@ instance Eq Exception where
 -- -----------------------------------------------------------------------------
 -- The ExitCode type
 
--- The `ExitCode' type defines the exit codes that a program
--- can return.  `ExitSuccess' indicates successful termination;
--- and `ExitFailure code' indicates program failure
--- with value `code'.  The exact interpretation of `code'
--- is operating-system dependent.  In particular, some values of 
--- `code' may be prohibited (e.g. 0 on a POSIX-compliant system).
-
 -- We need it here because it is used in ExitException in the
 -- Exception datatype (above).
 
-data ExitCode = ExitSuccess | ExitFailure Int 
-                deriving (Eq, Ord, Read, Show)
+data ExitCode
+  = ExitSuccess	-- ^ indicates successful termination;
+  | ExitFailure Int
+		-- ^ indicates program failure with an exit code.
+		-- The exact interpretation of the code is
+		-- operating-system dependent.	In particular, some values
+		-- may be prohibited (e.g. 0 on a POSIX-compliant system).
+  deriving (Eq, Ord, Read, Show)
 
 -- --------------------------------------------------------------------------
 -- Primitive throw

@@ -40,9 +40,22 @@ import System
 -- ---------------------------------------------------------------------------
 -- exitWith
 
--- `exitWith code' terminates the program, returning `code' to the
--- program's caller.  Before it terminates, any open or semi-closed
--- handles are first closed.
+-- | Computation 'exitWith' @code@ throws 'ExitException' @code@.
+-- Normally this terminates the program, returning @code@ to the
+-- program's caller.  Before the program terminates, any open or
+-- semi-closed handles are first closed.
+--
+-- A program that fails in any other way is treated as if it had
+-- called 'exitFailure'.
+-- A program that terminates successfully without calling 'exitWith'
+-- explicitly is treated as it it had called 'exitWith' 'ExitSuccess'.
+--
+-- As an 'ExitException' is not an 'IOError', 'exitWith' bypasses
+-- the error handling in the 'IO' monad and cannot be intercepted by
+-- 'catch' from the "Prelude".  However it is an 'Exception', and can
+-- be caught using the functions of "Control.Exception".  This means
+-- that cleanup computations added with 'Control.Exception.bracket'
+-- (from "Control.Exception") are also executed properly on 'exitWith'.
 
 #ifndef __NHC__
 exitWith :: ExitCode -> IO a
@@ -54,5 +67,8 @@ exitWith code@(ExitFailure n)
 #endif
 #endif  /* ! __NHC__ */
 
+-- | The computation 'exitFailure' is equivalent to
+-- 'exitWith' @(@'ExitFailure' /exitfail/@)@,
+-- where /exitfail/ is implementation-dependent.
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
