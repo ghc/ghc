@@ -58,10 +58,9 @@ import CmdLineOpts	( dynFlag, verbosity )
 
 import Exception	( throwDyn )
 #if __GLASGOW_HASKELL__ > 408
-import Exception        ( catch )
+import qualified Exception ( catch )
 #else
 import Exception        ( catchAllIO )
-#define catch catchAllIO
 #endif
 import IO
 import Directory	( doesFileExist, removeFile )
@@ -96,7 +95,15 @@ import CError     ( throwErrnoIfMinus1 ) -- as can this
 import System		( system )
 #endif
 
+
 #include "HsVersions.h"
+
+-- Make catch work on older GHCs
+#if __GLASGOW_HASKELL__ > 408
+myCatch = Exception.catch
+#else
+myCatch = catchAllIO
+#endif
 
 \end{code}
 
@@ -647,7 +654,7 @@ removeTmpFiles verb fs
 	     ("Deleting: " ++ unwords fs)
 	     (mapM_ rm fs)
   where
-    rm f = removeFile f `catch` 
+    rm f = removeFile f `myCatch` 
 		(\_ignored -> 
 		    when (verb >= 2) $
 		      hPutStrLn stderr ("Warning: deleting non-existent " ++ f)
@@ -714,7 +721,7 @@ traceCmd phase_name cmd_line action
 	; unless n $ do {
 
 	   -- And run it!
-	; action `catch` handle_exn verb
+	; action `myCatch` handle_exn verb
 	}}
   where
     handle_exn verb exn = do { when (verb >= 2) (hPutStr   stderr "\n")
