@@ -207,3 +207,9 @@ test061:
 	@$(RM) A.hi A.o A.hc
 	$(TEST_HC) --make -keep-hc-files -fvia-C A.hs
 	test -f A.hc
+
+# Test that -main-is works with --make
+test062:
+	@$(RM) Hello.hi Hello.o Hello.hc
+	$(TEST_HC) --make -main-is Hello.hello Hello -o hello
+	./hello
