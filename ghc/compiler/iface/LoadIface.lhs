@@ -29,7 +29,7 @@ import HscTypes		( HscEnv(..), ModIface(..), emptyModIface,
 			  lookupIfaceByModName, emptyPackageIfaceTable,
 			  IsBootInterface, mkIfaceFixCache, 
 			  Pool(..), DeclPool, InstPool, 
-			  RulePool, Gated, addRuleToPool
+			  RulePool, Gated, addRuleToPool, RulePoolContents
 			 )
 
 import BasicTypes	( Version, Fixity(..), FixityDirection(..) )
@@ -371,7 +371,7 @@ loadRules mod pool@(Pool rule_pool n_in n_out) rules
 	{ new_pool <- foldlM (loadRule (moduleName mod)) rule_pool rules
 	; returnM (Pool new_pool (n_in + length rules) n_out) } }
 
-loadRule :: ModuleName -> NameEnv [Gated IfaceRule] -> IfaceRule -> IfL (NameEnv [Gated IfaceRule])
+loadRule :: ModuleName -> RulePoolContents -> IfaceRule -> IfL RulePoolContents
 -- "Gate" the rule simply by a crude notion of the free vars of
 -- the LHS.  It can be crude, because having too few free vars is safe.
 loadRule mod_name pool decl@(IfaceRule {ifRuleHead = fn, ifRuleArgs = args})
@@ -590,9 +590,9 @@ initExternalPackageState
       eps_PTE        = emptyTypeEnv,
       eps_inst_env   = emptyInstEnv,
       eps_rule_base  = emptyRuleBase,
-      eps_decls      = emptyPool,
-      eps_insts      = emptyPool,
-      eps_rules = foldr add emptyPool builtinRules
+      eps_decls      = emptyPool emptyNameEnv,
+      eps_insts      = emptyPool emptyNameEnv,
+      eps_rules      = foldr add (emptyPool []) builtinRules
     }
   where
 	-- Initialise the EPS rule pool with the built-in rules
@@ -640,7 +640,7 @@ ifaceStats eps
 
     Pool _ n_decls_in n_decls_out = eps_decls eps
     Pool _ n_insts_in n_insts_out = eps_insts eps
-    Pool _ n_rules_in n_rules_out  = eps_rules eps
+    Pool _ n_rules_in n_rules_out = eps_rules eps
     
     stats = vcat 
     	[int n_mods <+> text "interfaces read",

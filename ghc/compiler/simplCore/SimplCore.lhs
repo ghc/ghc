@@ -14,6 +14,7 @@ import CmdLineOpts	( CoreToDo(..), SimplifierSwitch(..),
 			)
 import CoreSyn
 import CoreFVs		( ruleRhsFreeVars )
+import TcIface		( loadImportedRules )
 import HscTypes		( HscEnv(..), GhciMode(..),
 			  ModGuts(..), ModGuts, Avails, availsToNameSet, 
 			  ModDetails(..),
@@ -224,7 +225,7 @@ prepareRules :: HscEnv
 
 prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	     us binds local_rules
-  = do	{ eps <- hscEPS hsc_env
+  = do	{ pkg_rule_base <- loadImportedRules hsc_env
 
 	; let env	       = emptySimplEnv SimplGently [] local_ids 
 	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
@@ -242,7 +243,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	      local_rule_base = extendRuleBaseList emptyRuleBase local_rules
 	      local_rule_ids  = ruleBaseIds local_rule_base	-- Local Ids with rules attached
 
-	      imp_rule_base   = foldl add_rules (eps_rule_base eps) (moduleEnvElts hpt)
+	      imp_rule_base   = foldl add_rules pkg_rule_base (moduleEnvElts hpt)
 	      final_rule_base = extendRuleBaseList imp_rule_base orphan_rules
 
 	; dumpIfSet_dyn dflags Opt_D_dump_rules "Transformation rules"

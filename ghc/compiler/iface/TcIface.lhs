@@ -6,7 +6,7 @@
 \begin{code}
 module TcIface ( 
 	tcImportDecl, typecheckIface,
-	tcIfaceKind, loadImportedInsts, 
+	tcIfaceKind, loadImportedInsts, loadImportedRules,
 	tcExtCoreBindings
  ) where
 #include "HsVersions.h"
@@ -25,13 +25,14 @@ import Type		( Kind, openTypeKind, liftedTypeKind,
 			  mkTyVarTys, mkGenTyConApp, mkTyVarTys, ThetaType )
 import TypeRep		( Type(..), PredType(..) )
 import TyCon		( TyCon, tyConName )
-import HscTypes		( ExternalPackageState(..), PackageInstEnv,
-			  TyThing(..), implicitTyThings, typeEnvIds,
+import HscTypes		( ExternalPackageState(..), PackageInstEnv, PackageRuleBase,
+			  HscEnv, TyThing(..), implicitTyThings, typeEnvIds,
 			  ModIface(..), ModDetails(..), InstPool, 
 			  TypeEnv, mkTypeEnv, extendTypeEnvList, lookupTypeEnv,
 			  DeclPool, RulePool, Pool(..), Gated, addRuleToPool )
 import InstEnv		( extendInstEnv )
 import CoreSyn
+import PprCore		( pprIdRules )
 import Rules		( extendRuleBaseList )
 import CoreUtils	( exprType )
 import CoreUnfold
@@ -152,7 +153,7 @@ recordImportOf :: TyThing -> IfG ()
 --	     whose gates are all in the type envt, is in eps_rule_base
 
 recordImportOf thing
-  = do 	{ (new_things, iface_rules) <- updateEps (\ eps -> 
+  = do 	{ new_things <- updateEps (\ eps -> 
 	    let { new_things   = thing : implicitTyThings thing 
 	 	; new_type_env = extendTypeEnvList (eps_PTE eps) new_things
 		-- NB: opportunity for a very subtle loop here!
@@ -163,24 +164,12 @@ recordImportOf thing
 		--	* which pokes the suspended forks
 		--	* which, to execute, need to consult type-env (to check
 		--	  entirely unrelated types, perhaps)
-
-	        ; (new_rules, iface_rules) = selectRules (eps_rules eps) 
-						         (map getName new_things)
-						         new_type_env }
-	    in (eps { eps_PTE = new_type_env, eps_rules = new_rules }, 
-	        (new_things, iface_rules))
+	    }
+	    in (eps { eps_PTE = new_type_env }, new_things)
 	  )
-
-    -- Now type-check those rules (which may side-effect the EPS again)
 	; traceIf (text "tcImport: extend type env" <+> ppr new_things)
-	; traceIf (text "tcImport: rules" <+> vcat (map ppr iface_rules))
-	; core_rules <- mapM tc_rule iface_rules
-	; updateEps_ (\ eps -> 
-	    eps { eps_rule_base = extendRuleBaseList (eps_rule_base eps) core_rules }
-	  ) }
+	}
 	
-tc_rule (mod, rule) = initIfaceLcl mod (tcIfaceRule rule)
-
 getThing :: Name -> IfG TyThing
 -- Find and typecheck the thing; the Name might be a "subordinate name"
 -- of the "main thing" (e.g. the constructor of a data type declaration)
@@ -503,30 +492,42 @@ are in the type environment.  However, remember that typechecking a Rule may
 (as a side effect) augment the type envt, and so we may need to iterate the process.
 
 \begin{code}
-selectRules :: RulePool 
-	    -> [Name] 		-- Names of things being added
-	    -> TypeEnv 		-- New type env, including things being added
-	    -> (RulePool, [(ModuleName, IfaceRule)])
-selectRules (Pool rules n_in n_out) new_names type_env
-  = (Pool rules' n_in (n_out + length iface_rules), iface_rules)
+loadImportedRules :: HscEnv -> IO PackageRuleBase
+loadImportedRules hsc_env
+  = initIfaceIO hsc_env $ do 
+	{ -- Get new rules
+	  if_rules <- updateEps (\ eps ->
+		let { (new_pool, if_rules) = selectRules (eps_rules eps) (eps_PTE eps) }
+		in (eps { eps_rules = new_pool }, if_rules) )
+
+	; let tc_rule (mod, rule) = initIfaceLcl mod (tcIfaceRule rule)
+	; core_rules <- mapM tc_rule if_rules
+
+	-- Debug print
+	; traceIf (ptext SLIT("Importing rules:") <+> pprIdRules core_rules)
+	
+	-- Update the rule base and return it
+	; updateEps (\ eps -> 
+	    let { new_rule_base = extendRuleBaseList (eps_rule_base eps) core_rules }
+	    in (eps { eps_rule_base = new_rule_base }, new_rule_base)
+	  ) }
+
+
+selectRules :: RulePool -> TypeEnv -> (RulePool, [(ModuleName, IfaceRule)])
+-- Not terribly efficient.  Look at each rule in the pool to see if
+-- all its gates are in the type env.  If so, take it out of the pool.
+-- If not, trim its gates for next time.
+selectRules (Pool rules n_in n_out) type_env
+  = (Pool rules' n_in (n_out + length if_rules), if_rules)
   where
-    (rules', iface_rules) = foldl select_one (rules, []) new_names
+    (rules', if_rules) = foldl do_one ([], []) rules
 
-    select_one :: (NameEnv [Gated IfaceRule], [(ModuleName, IfaceRule)]) -> Name
-	       -> (NameEnv [Gated IfaceRule], [(ModuleName, IfaceRule)])
-    select_one (rules, decls) name
-	= case lookupNameEnv rules name of
-	    Nothing 	     -> (rules, decls)
-	    Just gated_rules -> foldl filter_rule (delFromNameEnv rules name, decls) gated_rules
+    do_one (pool, if_rules) (gates, rule)
+	| null gates' = (pool, rule:if_rules)
+	| otherwise   = ((gates',rule) : pool, if_rules)
+	where
+	  gates' = filter (`elemNameEnv` type_env) gates
 
-    filter_rule :: (NameEnv [Gated IfaceRule], [(ModuleName, IfaceRule)]) -> Gated IfaceRule 
-		-> (NameEnv [Gated IfaceRule], [(ModuleName, IfaceRule)])
-    filter_rule (rules, decls) (rule_fvs, rule)
-	= case [fv | fv <- rule_fvs, not (fv `elemNameEnv` type_env)] of
-	    [] ->	-- No remaining FVs, so slurp it
-		 	(rules, rule:decls)
-	    fvs -> 	-- There leftover fvs, so toss it back in the pool
-			(addRuleToPool rules rule fvs, decls)
 
 tcIfaceRule :: IfaceRule -> IfL IdCoreRule
 tcIfaceRule (IfaceRule {ifRuleName = rule_name, ifActivation = act, ifRuleBndrs = bndrs,

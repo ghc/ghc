@@ -39,7 +39,7 @@ module HscTypes (
 	Dependencies(..), noDependencies,
 	Pool(..), emptyPool, DeclPool, InstPool, 
 	Gated,
-	RulePool, addRuleToPool, 
+	RulePool, RulePoolContents, addRuleToPool, 
 	NameCache(..), OrigNameCache, OrigIParamCache,
 	Avails, availsToNameSet, availName, availNames,
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
@@ -739,14 +739,7 @@ data ExternalPackageState
 		-- available before this instance decl is needed.
 
 	eps_rules :: !RulePool
-		-- Rules move from here to eps_rule_base when 
-		-- all their LHS free vars are in the eps_PTE
-		-- To maintain this invariant, we need to check the pool
-		-- 	a) when adding to the rule pool by loading an interface
-		--	   (some of the new rules may alrady have all their
-		--	   gates in the eps_PTE)
-		--	b) when extending the eps_PTE when we load a decl
-		-- 	   from the eps_decls pool
+		-- The as-yet un-slurped rules
   }
 \end{code}
 
@@ -777,36 +770,35 @@ type OrigIParamCache = FiniteMap (IPName OccName) (IPName Name)
 \end{code}
 
 \begin{code}
-data Pool p = Pool (NameEnv p) 	-- The pool itself, indexed by some primary key
+data Pool p = Pool p	 	-- The pool itself
 		   Int		-- Number of decls slurped into the map
 		   Int		-- Number of decls slurped out of the map
 
-emptyPool = Pool emptyNameEnv 0 0
+emptyPool p = Pool p 0 0
 
 instance Outputable p => Outputable (Pool p) where
   ppr (Pool p n_in n_out) 	-- Debug printing only
 	= vcat [ptext SLIT("Pool") <+> int n_in <+> int n_out,
 		nest 2 (ppr p)]
   
-type DeclPool = Pool IfaceDecl
+type DeclPool = Pool (NameEnv IfaceDecl)	-- Keyed by the "main thing" of the decl
 
 -------------------------
 type Gated d = ([Name], (ModuleName, d))	-- The [Name] 'gate' the declaration
 						-- ModuleName records which iface file this
 						-- decl came from
 
-type RulePool = Pool [Gated IfaceRule]
+type RulePool = Pool RulePoolContents
+type RulePoolContents = [Gated IfaceRule]
 
-addRuleToPool :: NameEnv [Gated IfaceRule] 
+addRuleToPool :: RulePoolContents
 	      -> (ModuleName, IfaceRule)
 	      -> [Name] 	-- Free vars of rule; always non-empty
-	      -> NameEnv [Gated IfaceRule]
-addRuleToPool rules rule (fv:fvs) = extendNameEnv_C combine rules fv [(fvs,rule)]
-				  where
-				    combine old _ = (fvs,rule) : old
+	      -> RulePoolContents
+addRuleToPool rules rule fvs = (fvs,rule) : rules
 
 -------------------------
-type InstPool = Pool [Gated IfaceInst]
+type InstPool = Pool (NameEnv [Gated IfaceInst])
 	-- The key of the Pool is the Class
 	-- The Names are the TyCons in the instance head
 	-- For example, suppose this is in an interface file
