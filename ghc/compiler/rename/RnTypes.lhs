@@ -214,8 +214,7 @@ mkHsOpTyRn op1 fix1 ty1 ty2@(HsOpTy ty21 op2 ty22)
     returnRn (HsOpTy ty1 op1 ty2)
 
 mkHsOpTyRn op fix ty1 ty2 			-- Default case, no rearrangment
-  = ASSERT( not_op_ty ty1 )
-    returnRn (HsOpTy ty1 op ty2)
+  = returnRn (HsOpTy ty1 op ty2)
 
 mkHsFunTyRn ty1 ty2			-- Precedence of function arrow is 0
   = returnRn (HsFunTy ty1 ty2)		-- so no rearrangement reqd.  Change
