@@ -76,7 +76,7 @@ dsBracket brack splices
     do_brack (VarBr n)  = do { MkC e1  <- lookupOcc n ; return e1 }
     do_brack (ExpBr e)  = do { MkC e1  <- repLE e     ; return e1 }
     do_brack (PatBr p)  = do { MkC p1  <- repLP p     ; return p1 }
-    do_brack (TypBr t)  = do { MkC t1  <- repLTy t     ; return t1 }
+    do_brack (TypBr t)  = do { MkC t1  <- repLTy t    ; return t1 }
     do_brack (DecBr ds) = do { MkC ds1 <- repTopDs ds ; return ds1 }
 
 {- -------------- Examples --------------------
@@ -275,7 +275,14 @@ repC :: LConDecl Name -> DsM (Core TH.ConQ)
 repC (L loc (ConDecl con [] (L _ []) details))
   = do { con1 <- lookupLOcc con ;		-- See note [Binders and occurrences] 
 	 repConstr con1 details }
-
+repC (L loc (ConDecl con tvs (L cloc ctxt) details))
+  = do { addTyVarBinds tvs $ \bndrs -> do {
+             c' <- repC (L loc (ConDecl con [] (L cloc []) details));
+             ctxt' <- repContext ctxt;
+             bndrs' <- coreList nameTyConName bndrs;
+             rep2 forallCName [unC bndrs', unC ctxt', unC c']
+         }
+       }
 repC (L loc con_decl)
   = do	{ dsWarn (loc, hang ds_msg 4 (ppr con_decl))
 	; return (panic "DsMeta:repC") }
@@ -1338,7 +1345,7 @@ templateHaskellNames = [
     -- Strict
     isStrictName, notStrictName,
     -- Con
-    normalCName, recCName, infixCName,
+    normalCName, recCName, infixCName, forallCName,
     -- StrictType
     strictTypeName,
     -- VarStrictType
@@ -1500,6 +1507,7 @@ notStrictName     = libFun  FSLIT("notStrict")     notStrictKey
 normalCName = libFun FSLIT("normalC") normalCIdKey
 recCName    = libFun FSLIT("recC")    recCIdKey
 infixCName  = libFun FSLIT("infixC")  infixCIdKey
+forallCName  = libFun FSLIT("forallC")  forallCIdKey
 			 
 -- type StrictType = ...
 strictTypeName    = libFun  FSLIT("strictType")    strictTKey
@@ -1674,6 +1682,7 @@ notStrictKey        = mkPreludeMiscIdUnique 282
 normalCIdKey      = mkPreludeMiscIdUnique 283
 recCIdKey         = mkPreludeMiscIdUnique 284
 infixCIdKey       = mkPreludeMiscIdUnique 285
+forallCIdKey      = mkPreludeMiscIdUnique 288
 
 -- type StrictType = ...
 strictTKey        = mkPreludeMiscIdUnique 286

@@ -42,7 +42,9 @@ import Outputable
 convertToHsDecls :: [TH.Dec] -> [Either (LHsDecl RdrName) Message]
 convertToHsDecls ds = map cvt_ltop ds
 
-mk_con con = L loc0 $ case con of
+mk_con con = L loc0 $ mk_nlcon con
+  where
+    mk_nlcon con = case con of
 	NormalC c strtys
 	 -> ConDecl (noLoc (cName c)) noExistentials noContext
 		  (PrefixCon (map mk_arg strtys))
@@ -52,7 +54,12 @@ mk_con con = L loc0 $ case con of
 	InfixC st1 c st2
 	 -> ConDecl (noLoc (cName c)) noExistentials noContext
 		  (InfixCon (mk_arg st1) (mk_arg st2))
-  where
+	ForallC tvs ctxt (ForallC tvs' ctxt' con')
+	 -> mk_nlcon (ForallC (tvs ++ tvs') (ctxt ++ ctxt') con')
+	ForallC tvs ctxt con' -> case mk_nlcon con' of
+				ConDecl l [] (L _ []) x ->
+				    ConDecl l (cvt_tvs tvs) (cvt_context ctxt) x
+				c -> panic "ForallC: Can't happen"
     mk_arg (IsStrict, ty)  = noLoc $ HsBangTy HsStrict (cvtType ty)
     mk_arg (NotStrict, ty) = cvtType ty
 
