@@ -1,0 +1,4 @@
+ 
+tcfail078.hs:5: Type constructor used as a class: `Integer'
+
+Compilation had errors
