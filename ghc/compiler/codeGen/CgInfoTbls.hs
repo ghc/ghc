@@ -58,7 +58,7 @@ import Unique		( Uniquable(..) )
 import CmdLineOpts	( opt_SccProfilingOn )
 import ListSetOps	( assocDefault )
 import Maybes		( isJust )
-import Constants	( wORD_SIZE, sIZEOF_StgFunInfoExtra )
+import Constants	( wORD_SIZE, sIZEOF_StgFunInfoExtraRev )
 import Outputable
 
 
@@ -461,7 +461,7 @@ funInfoTable :: CmmExpr -> CmmExpr
 -- in the info table.
 funInfoTable info_ptr
   | tablesNextToCode
-  = cmmOffsetB info_ptr (- stdInfoTableSizeB - sIZEOF_StgFunInfoExtra)
+  = cmmOffsetB info_ptr (- stdInfoTableSizeB - sIZEOF_StgFunInfoExtraRev)
   | otherwise
   = cmmOffsetW info_ptr (1 + stdInfoTableSizeW)
 				-- Past the entry code pointer
