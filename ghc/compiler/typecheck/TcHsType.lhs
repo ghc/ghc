@@ -303,9 +303,16 @@ kcHsType (HsForAllTy exp tv_names context ty)
   = kcHsTyVars tv_names		$ \ tv_names' ->
     kcHsContext context		`thenM`	\ ctxt' ->
     kcLiftedType ty		`thenM` \ ty' ->
-	-- The body of a forall must be of kind *
-	-- In principle, I suppose, we could allow unlifted types,
-	-- but it seems simpler to stick to lifted types for now.
+	-- The body of a forall must be a type, but in principle
+	-- there's no reason to prohibit *unlifted* types.
+	-- In fact, GHC can itself construct a function with an
+	-- unboxed tuple inside a for-all (via CPR analyis; see 
+	-- typecheck/should_compile/tc170)
+	--
+	-- Still, that's only for internal interfaces, which aren't
+	-- kind-checked, and it's a bit inconvenient to use kcTypeType
+	-- here (because it doesn't return the result kind), so I'm 
+	-- leaving it as lifted types for now.
     returnM (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind)
 
 ---------------------------

@@ -84,13 +84,13 @@ deSugar hsc_env
         ; doIfSet (not (isEmptyBag warnings))
 		  (printErrs warn_doc)
 
-	    -- if warnings are considered errors, leave.
+	-- If warnings are considered errors, leave.
 	; if errorsFound dflags (warns, emptyBag)
 	   then return Nothing
-	   else do {
+	   else do
 
 	-- Lint result if necessary
-          endPass dflags "Desugar" Opt_D_dump_ds ds_binds
+	{ endPass dflags "Desugar" Opt_D_dump_ds ds_binds
 
 	-- Dump output
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
