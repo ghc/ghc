@@ -36,10 +36,13 @@ test('driver071', normal, run_command_ignore_output, ['$MAKE test071'])
 
 test('driver080', normal, run_command_ignore_output, ['$MAKE test080'])
 
+test('driver200', normal, run_command_ignore_output, ['$MAKE test200'])
+
 clean(['B/C.hi', 'B/C.o', 'B/C.ooo', 'B/C.xhi',
        'd1/P/Q.o', 'd2/R/S.o', 'd1/P/Q.hi', 'd2/R/S.hi',
-       'A.ooo', 'A.xhi', 'Hello.hi', 'Hello.o', 'hello'])
+       'A.ooo', 'A.xhi', 'Hello.hi', 'Hello.o', 'hello', 'depend'])
 
 if default_testopts.cleanup != '':
     os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('obj'))
     os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('hi'))
+

@@ -278,3 +278,19 @@ test080:
 	$(TEST_HC) -C A.hs
 	test -f A.hc
 
+
+# -----------------------------------------------------------------------------
+# dependency-generation tests
+
+DEPFILE= depend
+
+# Test that we can create a dependency file, and that we can
+# modify an existing dependency file.
+test200:
+	@$(RM) $(DEPFILE)
+	$(TEST_HC) -M -optdep-f -optdep depend D
+	test -f $(DEPFILE)
+	$(TEST_HC) -M -optdep-f -optdep depend D B.C A
+	test -f $(DEPFILE)
+	$(TEST_HC) -M -optdep-f -optdep depend D.hs B/C.hs A.hs
+	test -f $(DEPFILE)
