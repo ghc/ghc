@@ -804,7 +804,7 @@ loadFrameworks pkg = return ()
 loadFrameworks pkg = mapM_ load frameworks
   where
     fw_dirs    = Packages.frameworkDirs pkg
-    frameworks = Packages.extraFrameworks pkg
+    frameworks = Packages.frameworks pkg
 
     load fw = do  r <- loadFramework fw_dirs fw
 		  case r of
