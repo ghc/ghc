@@ -19,7 +19,7 @@ import CmdLineOpts	( DynFlag(..) )
 import Generics		( mkTyConGenericBinds )
 import TcRnMonad
 import TcEnv		( newDFunName, 
-			  InstInfo(..), pprInstInfo, InstBindings(..),
+			  InstInfo(..), InstBindings(..),
 			  pprInstInfoDetails, tcLookupTyCon, tcExtendTyVarEnv
 			)
 import TcGenDeriv	-- Deriv stuff
@@ -215,8 +215,10 @@ tcDeriving tycl_decls
 	; let inst_info  = newtype_inst_info ++ ordinary_inst_info
 
 	-- Rename these extra bindings, discarding warnings about unused bindings etc
+	-- Set -fglasgow exts so that we can have type signatures in patterns,
+	-- which is used in the generic binds
 	; (rn_binds, gen_bndrs) 
-		<- discardWarnings $ do
+		<- discardWarnings $ setOptM Opt_GlasgowExts $ do
 			{ (rn_deriv, _dus1) <- rnTopMonoBinds deriv_binds []
 			; (rn_gen, dus_gen) <- rnTopMonoBinds gen_binds   []
 			; return (rn_deriv `ThenBinds` rn_gen, duDefs dus_gen) }

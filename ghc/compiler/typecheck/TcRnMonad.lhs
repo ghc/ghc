@@ -38,7 +38,7 @@ import Bag		( emptyBag )
 import Outputable
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, uniqFromSupply, splitUniqSupply )
 import Unique		( Unique )
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_PprStyle_Debug )
+import CmdLineOpts	( DynFlags, DynFlag(..), dopt, opt_PprStyle_Debug, dopt_set )
 import Bag		( snocBag, unionBags )
 import Panic		( showException )
  
@@ -225,6 +225,10 @@ getDOpts = do { env <- getTopEnv; return (hsc_dflags env) }
 
 doptM :: DynFlag -> TcRnIf gbl lcl Bool
 doptM flag = do { dflags <- getDOpts; return (dopt flag dflags) }
+
+setOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+setOptM flag = updEnv (\ env@(Env { env_top = top }) ->
+			 env { env_top = top { hsc_dflags = dopt_set (hsc_dflags top) flag}} )
 
 ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()	-- Do it flag is true
 ifOptM flag thing_inside = do { b <- doptM flag; 
