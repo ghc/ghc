@@ -1,5 +1,5 @@
 % -----------------------------------------------------------------------------
-% $Id: PrelStorable.lhs,v 1.4 2001/03/13 21:21:27 qrczak Exp $
+% $Id: PrelStorable.lhs,v 1.5 2001/04/13 21:37:43 panne Exp $
 %
 % (c) The FFI task force, 2000
 %
@@ -93,12 +93,6 @@ instance Storable Bool where
    peekElemOff p i   = liftM (/= (0::CInt)) $ peekElemOff (castPtr p) i
    pokeElemOff p i x = pokeElemOff (castPtr p) i (if x then 1 else 0::CInt)
 
-instance Storable (FunPtr a) where
-   sizeOf          (FunPtr x) = sizeOf x
-   alignment       (FunPtr x) = alignment x
-   peekElemOff p i            = liftM FunPtr $ peekElemOff (castPtr p) i
-   pokeElemOff p i (FunPtr x) = pokeElemOff (castPtr p) i x
-
 #define STORABLE(T,size,align,read,write)	\
 instance Storable (T) where {			\
     sizeOf    _ = size;				\
@@ -117,6 +111,9 @@ STORABLE(Word,SIZEOF_LONG,ALIGNMENT_LONG,
 
 STORABLE((Ptr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
 	 readPtrOffPtr,writePtrOffPtr)
+
+STORABLE((FunPtr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
+	 readFunPtrOffPtr,writeFunPtrOffPtr)
 
 STORABLE((StablePtr a),SIZEOF_VOID_P,ALIGNMENT_VOID_P,
 	 readStablePtrOffPtr,writeStablePtrOffPtr)
@@ -189,6 +186,7 @@ readWideCharOffPtr  :: Ptr Char          -> Int -> IO Char
 readIntOffPtr       :: Ptr Int           -> Int -> IO Int
 readWordOffPtr      :: Ptr Word          -> Int -> IO Word
 readPtrOffPtr       :: Ptr (Ptr a)       -> Int -> IO (Ptr a)
+readFunPtrOffPtr    :: Ptr (FunPtr a)    -> Int -> IO (FunPtr a)
 readFloatOffPtr     :: Ptr Float         -> Int -> IO Float
 readDoubleOffPtr    :: Ptr Double        -> Int -> IO Double
 readStablePtrOffPtr :: Ptr (StablePtr a) -> Int -> IO (StablePtr a)
@@ -209,6 +207,8 @@ readWordOffPtr (Ptr a) (I# i)
   = IO $ \s -> case readWordOffAddr# a i s      of (# s2, x #) -> (# s2, W# x #)
 readPtrOffPtr (Ptr a) (I# i)
   = IO $ \s -> case readAddrOffAddr# a i s      of (# s2, x #) -> (# s2, Ptr x #)
+readFunPtrOffPtr (Ptr a) (I# i)
+  = IO $ \s -> case readAddrOffAddr# a i s      of (# s2, x #) -> (# s2, FunPtr x #)
 readFloatOffPtr (Ptr a) (I# i)
   = IO $ \s -> case readFloatOffAddr# a i s     of (# s2, x #) -> (# s2, F# x #)
 readDoubleOffPtr (Ptr a) (I# i)
@@ -236,6 +236,7 @@ writeWideCharOffPtr  :: Ptr Char          -> Int -> Char        -> IO ()
 writeIntOffPtr       :: Ptr Int           -> Int -> Int         -> IO ()
 writeWordOffPtr      :: Ptr Word          -> Int -> Word        -> IO ()
 writePtrOffPtr       :: Ptr (Ptr a)       -> Int -> Ptr a       -> IO ()
+writeFunPtrOffPtr    :: Ptr (FunPtr a)    -> Int -> FunPtr a    -> IO ()
 writeFloatOffPtr     :: Ptr Float         -> Int -> Float       -> IO ()
 writeDoubleOffPtr    :: Ptr Double        -> Int -> Double      -> IO ()
 writeStablePtrOffPtr :: Ptr (StablePtr a) -> Int -> StablePtr a -> IO ()
@@ -255,6 +256,8 @@ writeIntOffPtr (Ptr a) (I# i) (I# x)
 writeWordOffPtr (Ptr a) (I# i) (W# x)
   = IO $ \s -> case writeWordOffAddr# a i x s      of s2 -> (# s2, () #)
 writePtrOffPtr (Ptr a) (I# i) (Ptr x)
+  = IO $ \s -> case writeAddrOffAddr# a i x s      of s2 -> (# s2, () #)
+writeFunPtrOffPtr (Ptr a) (I# i) (FunPtr x)
   = IO $ \s -> case writeAddrOffAddr# a i x s      of s2 -> (# s2, () #)
 writeFloatOffPtr (Ptr a) (I# i) (F# x)
   = IO $ \s -> case writeFloatOffAddr# a i x s     of s2 -> (# s2, () #)

@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: PrelPtr.lhs,v 1.1 2001/01/11 17:25:57 simonmar Exp $
+-- $Id: PrelPtr.lhs,v 1.2 2001/04/13 21:37:43 panne Exp $
 -- 
 -- (c) 2000
 -- 
@@ -41,19 +41,19 @@ instance CReturnable (Ptr a)
 ------------------------------------------------------------------------
 -- Function pointers for the default calling convention.
 
-newtype FunPtr a = FunPtr (Ptr a) deriving (Eq, Ord)
+data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 
 nullFunPtr :: FunPtr a
-nullFunPtr = FunPtr nullPtr
+nullFunPtr = FunPtr (int2Addr# 0#)
 
 castFunPtr :: FunPtr a -> FunPtr b
-castFunPtr (FunPtr a) = FunPtr (castPtr a)
+castFunPtr (FunPtr addr) = FunPtr addr
 
 castFunPtrToPtr :: FunPtr a -> Ptr b
-castFunPtrToPtr (FunPtr a) = castPtr a
+castFunPtrToPtr (FunPtr addr) = Ptr addr
 
 castPtrToFunPtr :: Ptr a -> FunPtr b
-castPtrToFunPtr a = FunPtr (castPtr a)
+castPtrToFunPtr (Ptr addr) = FunPtr addr
 
 instance CCallable   (FunPtr a)
 instance CReturnable (FunPtr a)

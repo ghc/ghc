@@ -19,6 +19,9 @@ module TysWiredIn (
 	ptrDataCon,
 	ptrTy,
 	ptrTyCon,
+	funPtrDataCon,
+	funPtrTy,
+	funPtrTyCon,
 	boolTy,
 	boolTyCon,
 	charDataCon,
@@ -136,6 +139,7 @@ wiredInTyCons = data_tycons ++ tuple_tycons ++ unboxed_tuple_tycons
 data_tycons = genericTyCons ++
 	      [ addrTyCon
 	      , ptrTyCon
+	      , funPtrTyCon
     	      , boolTyCon
     	      , charTyCon
     	      , doubleTyCon
@@ -344,6 +348,13 @@ ptrDataCon = pcDataCon ptrDataConName alpha_tyvar [] [addrPrimTy] ptrTyCon
 \end{code}
 
 \begin{code}
+funPtrTy = mkTyConTy funPtrTyCon
+
+funPtrTyCon = pcNonRecDataTyCon funPtrTyConName alpha_tyvar [(True,False)] [funPtrDataCon]
+funPtrDataCon = pcDataCon funPtrDataConName alpha_tyvar [] [addrPrimTy] funPtrTyCon
+\end{code}
+
+\begin{code}
 floatTy	= mkTyConTy floatTyCon
 
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [] [floatDataCon]
@@ -452,19 +463,19 @@ isFFIExportResultTy :: Type -> Bool
 isFFIExportResultTy ty = checkRepTyCon legalFEResultTyCon ty
 
 isFFIDynArgumentTy :: Type -> Bool
--- The argument type of a foreign import dynamic must be Ptr, Addr,
+-- The argument type of a foreign import dynamic must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFIDynArgumentTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == addrTyCon)
+isFFIDynArgumentTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
 
 isFFIDynResultTy :: Type -> Bool
--- The result type of a foreign export dynamic must be Ptr, Addr,
+-- The result type of a foreign export dynamic must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFIDynResultTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == addrTyCon)
+isFFIDynResultTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
 
 isFFILabelTy :: Type -> Bool
--- The type of a foreign label must be Ptr, Addr,
+-- The type of a foreign label must be Ptr, FunPtr, Addr,
 -- or a newtype of either.
-isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == addrTyCon)
+isFFILabelTy = checkRepTyCon (\tc -> tc == ptrTyCon || tc == funPtrTyCon || tc == addrTyCon)
 
 checkRepTyCon :: (TyCon -> Bool) -> Type -> Bool
 	-- look through newtypes
@@ -533,7 +544,7 @@ boxedMarshalableTyCon tc
 			 , wordTyConKey, word8TyConKey, word16TyConKey
 			 , word32TyConKey, word64TyConKey
 			 , floatTyConKey, doubleTyConKey
-			 , addrTyConKey, ptrTyConKey
+			 , addrTyConKey, ptrTyConKey, funPtrTyConKey
 			 , charTyConKey, foreignObjTyConKey
 			 , foreignPtrTyConKey
 			 , stablePtrTyConKey

@@ -482,6 +482,9 @@ addrDataConName   = dataQual aDDR_Name SLIT("A#") addrDataConKey
 ptrTyConName	  = tcQual   pREL_PTR_Name SLIT("Ptr") ptrTyConKey
 ptrDataConName    = dataQual pREL_PTR_Name SLIT("Ptr") ptrDataConKey
 
+funPtrTyConName	  = tcQual   pREL_PTR_Name SLIT("FunPtr") funPtrTyConKey
+funPtrDataConName = dataQual pREL_PTR_Name SLIT("FunPtr") funPtrDataConKey
+
 -- Byte array types
 byteArrayTyConName	  = tcQual pREL_BYTEARR_Name  SLIT("ByteArray") byteArrayTyConKey
 mutableByteArrayTyConName = tcQual pREL_BYTEARR_Name  SLIT("MutableByteArray") mutableByteArrayTyConKey
@@ -736,16 +739,17 @@ typeConKey				= mkPreludeTyConUnique 69
 threadIdPrimTyConKey			= mkPreludeTyConUnique 70
 bcoPrimTyConKey				= mkPreludeTyConUnique 71
 ptrTyConKey				= mkPreludeTyConUnique 72
+funPtrTyConKey				= mkPreludeTyConUnique 73
 
 -- Usage type constructors
-usageConKey				= mkPreludeTyConUnique 73
-usOnceTyConKey				= mkPreludeTyConUnique 74
-usManyTyConKey				= mkPreludeTyConUnique 75
+usageConKey				= mkPreludeTyConUnique 74
+usOnceTyConKey				= mkPreludeTyConUnique 75
+usManyTyConKey				= mkPreludeTyConUnique 76
 
 -- Generic Type Constructors
-crossTyConKey		      		= mkPreludeTyConUnique 76
-plusTyConKey		      		= mkPreludeTyConUnique 77
-genUnitTyConKey				= mkPreludeTyConUnique 78
+crossTyConKey		      		= mkPreludeTyConUnique 77
+plusTyConKey		      		= mkPreludeTyConUnique 78
+genUnitTyConKey				= mkPreludeTyConUnique 79
 \end{code}
 
 %************************************************************************
@@ -774,12 +778,13 @@ trueDataConKey				= mkPreludeDataConUnique 15
 wordDataConKey				= mkPreludeDataConUnique 16
 ioDataConKey				= mkPreludeDataConUnique 17
 ptrDataConKey				= mkPreludeDataConUnique 18
+funPtrDataConKey			= mkPreludeDataConUnique 19
 
 -- Generic data constructors
-crossDataConKey		      		= mkPreludeDataConUnique 19
-inlDataConKey		      		= mkPreludeDataConUnique 20
-inrDataConKey		      		= mkPreludeDataConUnique 21
-genUnitDataConKey			= mkPreludeDataConUnique 22
+crossDataConKey		      		= mkPreludeDataConUnique 20
+inlDataConKey		      		= mkPreludeDataConUnique 21
+inrDataConKey		      		= mkPreludeDataConUnique 22
+genUnitDataConKey			= mkPreludeDataConUnique 23
 \end{code}
 
 %************************************************************************
