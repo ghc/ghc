@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.20 2000/01/14 14:56:40 simonmar Exp $
+ * $Id: Printer.c,v 1.21 2000/02/14 10:59:30 sewardj Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -410,7 +410,7 @@ void printStackChunk( StgPtr sp, StgPtr spBottom )
 	  sp++;
 	small_bitmap:
 	  while (bitmap != 0) {
-	    fprintf(stderr,"Stack[%d] (%p) = ", spBottom-sp, sp);
+	    fprintf(stderr,"   stk[%d] (%p) = ", spBottom-sp, sp);
 	    if ((bitmap & 1) == 0) {
 	      printPtr((P_)*sp);
 	      fprintf(stderr,"\n");
