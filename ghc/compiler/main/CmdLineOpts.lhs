@@ -51,6 +51,7 @@ module CmdLineOpts (
 	opt_NumbersStrict,
 	opt_Parallel,
 	opt_SMP,
+	opt_NoMonomorphismRestriction,
 
 	-- optimisation opts
 	opt_DoSemiTagging,
@@ -405,6 +406,7 @@ opt_DoTickyProfiling		= lookUp  SLIT("-fticky-ticky")
 
 -- language opts
 opt_AllStrict			= lookUp  SLIT("-fall-strict")
+opt_NoMonomorphismRestriction	= lookUp  SLIT("-fno-monomorphism-restriction")
 opt_DictsStrict			= lookUp  SLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  SLIT("-firrefutable-tuples")
 opt_MaxContextReductionDepth	= lookup_def_int "-fcontext-stack" mAX_CONTEXT_REDUCTION_DEPTH

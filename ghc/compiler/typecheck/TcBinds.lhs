@@ -12,6 +12,7 @@ module TcBinds ( tcBindsAndThen, tcTopBinds,
 import {-# SOURCE #-} TcMatches ( tcGRHSs, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcExpr )
 
+import CmdLineOpts	( opt_NoMonomorphismRestriction )
 import HsSyn		( HsExpr(..), HsBinds(..), MonoBinds(..), Sig(..), StmtCtxt(..),
 			  Match(..), collectMonoBinders, andMonoBinds
 			)
@@ -428,7 +429,8 @@ tcBindWithSigs top_lvl mbind tc_ty_sigs inline_sigs is_rec
     )
   where
     tysig_names     = [name | (TySigInfo name _ _ _ _ _ _ _) <- tc_ty_sigs]
-    is_unrestricted = isUnRestrictedGroup tysig_names mbind
+    is_unrestricted | opt_NoMonomorphismRestriction = True
+		    | otherwise			    = isUnRestrictedGroup tysig_names mbind
 
 justPatBindings bind@(PatMonoBind _ _ _) binds = bind `andMonoBinds` binds
 justPatBindings (AndMonoBinds b1 b2) binds = 
