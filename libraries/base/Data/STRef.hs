@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable (requires non-portable module ST)
 --
--- $Id: STRef.hs,v 1.2 2001/07/03 11:37:50 simonmar Exp $
+-- $Id: STRef.hs,v 1.3 2002/03/04 17:25:36 panne Exp $
 --
 -- Mutable references in the ST monad.
 --
@@ -18,7 +18,8 @@ module Data.STRef (
 	STRef,		-- abstract, instance Eq
 	newSTRef,	-- :: a -> ST s (STRef s a)
 	readSTRef,	-- :: STRef s a -> ST s a
-	writeSTRef	-- :: STRef s a -> a -> ST s ()
+	writeSTRef,	-- :: STRef s a -> a -> ST s ()
+	modifySTRef	-- :: STRef s a -> (a -> a) -> ST s ()
  ) where
 
 import Prelude
