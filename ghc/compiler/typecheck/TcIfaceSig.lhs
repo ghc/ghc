@@ -17,7 +17,7 @@ import TcMonoType	( tcHsType )
 
 import TcEnv		( TcEnv, tcExtendTyVarEnv, 
 			  tcExtendGlobalValEnv, tcSetEnv,
-			  tcLookupGlobal_maybe, explicitLookupId, valueEnvIds
+			  tcLookupGlobal_maybe, explicitLookupId, tcEnvIds
 			)
 
 import RnHsSyn		( RenamedHsDecl )
@@ -29,9 +29,7 @@ import CoreUnfold
 import CoreLint		( lintUnfolding )
 import WorkWrap		( mkWrapper )
 
-import Id		( Id, mkId, mkVanillaId,
-			  isDataConWrapId_maybe
-			)
+import Id		( Id, mkId, mkVanillaId, isDataConWrapId_maybe )
 import MkId		( mkCCallOpId )
 import IdInfo
 import DataCon		( dataConSig, dataConArgTys )
@@ -42,6 +40,7 @@ import Demand		( wwLazy )
 import ErrUtils		( pprBagOfErrors )
 import Outputable	
 import Util		( zipWithEqual )
+import HscTypes		( TyThing(..) )
 \end{code}
 
 Ultimately, type signatures in interfaces will have pragmatic
@@ -61,7 +60,7 @@ tcInterfaceSigs unf_env decls
   = listTc [ do_one name ty id_infos src_loc
 	   | SigD (IfaceSig name ty id_infos src_loc) <- decls]
   where
-    in_scope_vars = filter isLocallyDefined (valueEnvIds unf_env)
+    in_scope_vars = filter isLocallyDefined (tcEnvIds unf_env)
 
     do_one name ty id_infos src_loc
       = tcAddSrcLoc src_loc 		 		$	
@@ -137,7 +136,8 @@ tcPragExpr unf_env name in_scope_vars expr
 
 		-- Check for type consistency in the unfolding
 	tcGetSrcLoc		`thenNF_Tc` \ src_loc -> 
-	case lintUnfolding src_loc in_scope_vars core_expr' of
+	getDOptsTc		`thenTc` \ dflags ->
+	case lintUnfolding dflags src_loc in_scope_vars core_expr' of
 	  (Nothing,_)       -> returnTc core_expr'  -- ignore warnings
 	  (Just fail_msg,_) -> failWithTc ((doc <+> text "failed Lint") $$ fail_msg)
   where

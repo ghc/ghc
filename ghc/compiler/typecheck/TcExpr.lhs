@@ -25,7 +25,7 @@ import Inst		( InstOrigin(..),
 			  getIPsOfLIE, instToId, ipToId
 			)
 import TcBinds		( tcBindsAndThen )
-import TcEnv		( tcInstId,
+import TcEnv		( TcTyThing(..), tcInstId,
 			  tcLookupClass, tcLookupGlobalId, tcLookupGlobal_maybe,
 			  tcLookupTyCon, tcLookupDataCon, tcLookup,
 			  tcExtendGlobalTyVars
@@ -61,16 +61,18 @@ import UsageSPUtils     ( unannotTy )
 import VarSet		( elemVarSet, mkVarSet )
 import TysWiredIn	( boolTy )
 import TcUnify		( unifyTauTy, unifyFunTy, unifyListTy, unifyTupleTy )
-import PrelNames	( cCallableClassKey, cReturnableClassKey, 
-			  enumFromClassOpKey, enumFromThenClassOpKey,
-			  enumFromToClassOpKey, enumFromThenToClassOpKey,
-			  thenMClassOpKey, failMClassOpKey, returnMClassOpKey, ioTyConKey
+import PrelNames	( cCallableClassName, 
+			  cReturnableClassName, 
+			  enumFromName, enumFromThenName,
+			  enumFromToName, enumFromThenToName,
+			  thenMName, failMName, returnMName, ioTyConName
 			)
 import Outputable
 import Maybes		( maybeToBool, mapMaybe )
 import ListSetOps	( minusList )
 import Util
 import CmdLineOpts      ( opt_WarnMissingFields )
+import HscTypes		( TyThing(..) )
 
 \end{code}
 
@@ -396,7 +398,7 @@ tcMonoExpr expr@(RecordCon con_name rbinds) res_ty
 
 	-- Check that the record bindings match the constructor
 	-- con_name is syntactically constrained to be a data constructor
-    tcLookupDataCon con_name	`thenTc` \ (data_con, _, _) ->
+    tcLookupDataCon con_name	`thenTc` \ data_con ->
     let
 	bad_fields = badFields rbinds data_con
     in
@@ -472,7 +474,7 @@ tcMonoExpr expr@(RecordUpd record_expr rbinds) res_ty
 	-- STEP 1
 	-- Figure out the tycon and data cons from the first field name
     let
-	(Just sel_id : _)	  = maybe_sel_ids
+	(Just (AnId sel_id) : _)  = maybe_sel_ids
 	(_, _, tau)	      	  = ASSERT( isNotUsgTy (idType sel_id) )
                                     splitSigmaTy (idType sel_id)	-- Selectors can be overloaded
 									-- when the data type has a context
@@ -553,7 +555,7 @@ tcMonoExpr (ArithSeqIn seq@(From expr)) res_ty
   = unifyListTy res_ty 				`thenTc` \ elt_ty ->  
     tcMonoExpr expr elt_ty		 	`thenTc` \ (expr', lie1) ->
 
-    tcLookupGlobalId enumFromClassOpName	`thenNF_Tc` \ sel_id ->
+    tcLookupGlobalId enumFromName		`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
 	      sel_id [elt_ty]			`thenNF_Tc` \ (lie2, enum_from_id) ->
 
@@ -565,7 +567,7 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
     unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcLookupGlobalId enumFromThenClassOpName		`thenNF_Tc` \ sel_id ->
+    tcLookupGlobalId enumFromThenName			`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ (lie3, enum_from_then_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_then_id)
@@ -577,7 +579,7 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
     unifyListTy  res_ty         			`thenTc`    \ elt_ty ->  
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
-    tcLookupGlobalId enumFromToClassOpName		`thenNF_Tc` \ sel_id ->
+    tcLookupGlobalId enumFromToName			`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ (lie3, enum_from_to_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_to_id)
@@ -590,7 +592,7 @@ tcMonoExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
     tcMonoExpr expr1 elt_ty				`thenTc`    \ (expr1',lie1) ->
     tcMonoExpr expr2 elt_ty				`thenTc`    \ (expr2',lie2) ->
     tcMonoExpr expr3 elt_ty				`thenTc`    \ (expr3',lie3) ->
-    tcLookupGlobalId enumFromThenToClassOpName		`thenNF_Tc` \ sel_id ->
+    tcLookupGlobalId enumFromThenToName			`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq) sel_id [elt_ty]	`thenNF_Tc` \ (lie4, eft_id) ->
 
     returnTc (ArithSeqOut (HsVar eft_id)
@@ -866,9 +868,9 @@ tcDoStmts do_or_lc stmts src_loc res_ty
 	--	then = then
 	-- where the second "then" sees that it already exists in the "available" stuff.
 	--
-    tcLookupGlobalId returnMClassOpName		`thenNF_Tc` \ return_sel_id ->
-    tcLookupGlobalId thenMClassOpName		`thenNF_Tc` \ then_sel_id ->
-    tcLookupGlobalId failMClassOpName		`thenNF_Tc` \ fail_sel_id ->
+    tcLookupGlobalId returnMName		`thenNF_Tc` \ return_sel_id ->
+    tcLookupGlobalId thenMName			`thenNF_Tc` \ then_sel_id ->
+    tcLookupGlobalId failMName			`thenNF_Tc` \ fail_sel_id ->
     newMethod DoOrigin return_sel_id [m]	`thenNF_Tc` \ (return_lie, return_id) ->
     newMethod DoOrigin then_sel_id [m]		`thenNF_Tc` \ (then_lie, then_id) ->
     newMethod DoOrigin fail_sel_id [m]		`thenNF_Tc` \ (fail_lie, fail_id) ->

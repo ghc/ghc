@@ -12,9 +12,10 @@ module CoreLint (
 
 #include "HsVersions.h"
 
-import IO	( hPutStr, hPutStrLn, stdout )
+import IO		( hPutStr, hPutStrLn, stdout )
 
-import CmdLineOpts      ( opt_D_show_passes, opt_DoCoreLinting, opt_PprStyle_Debug )
+import CmdLineOpts      ( DynFlags, dopt_D_show_passes, dopt_DoCoreLinting, 
+			  opt_PprStyle_Debug )
 import CoreSyn
 import Rules            ( RuleBase, pprRuleBase )
 import CoreFVs		( idFreeVars, mustHaveLocalBinding )
@@ -28,10 +29,10 @@ import VarSet
 import Subst		( mkTyVarSubst, substTy )
 import Name		( getSrcLoc )
 import PprCore
-import ErrUtils		( doIfSet, dumpIfSet, ghcExit, Message, 
+import ErrUtils		( doIfSet_dyn, dumpIfSet, ghcExit, Message, 
 			  ErrMsg, addErrLocHdrLine, pprBagOfErrors,
                           WarnMsg, pprBagOfWarnings)
-import SrcLoc		( SrcLoc, noSrcLoc, isNoSrcLoc )
+import SrcLoc		( SrcLoc, noSrcLoc )
 import Type		( Type, tyVarsOfType,
 			  splitFunTy_maybe, mkTyVarTy,
 			  splitForAllTy_maybe, splitTyConApp_maybe,
@@ -58,29 +59,29 @@ place for them.  They print out stuff before and after core passes,
 and do Core Lint when necessary.
 
 \begin{code}
-beginPass :: String -> IO ()
-beginPass pass_name
-  | opt_D_show_passes
+beginPass :: DynFlags -> String -> IO ()
+beginPass dflags pass_name
+  | dopt_D_show_passes dflags
   = hPutStrLn stdout ("*** " ++ pass_name)
   | otherwise
   = return ()
 
 
-endPass :: String -> Bool -> [CoreBind] -> IO [CoreBind]
-endPass pass_name dump_flag binds
+endPass :: DynFlags -> String -> Bool -> [CoreBind] -> IO [CoreBind]
+endPass dflags pass_name dump_flag binds
   = do  
-        (binds, _) <- endPassWithRules pass_name dump_flag binds Nothing
+        (binds, _) <- endPassWithRules dflags pass_name dump_flag binds Nothing
         return binds
 
-endPassWithRules :: String -> Bool -> [CoreBind] -> Maybe RuleBase
+endPassWithRules :: DynFlags -> String -> Bool -> [CoreBind] -> Maybe RuleBase
                  -> IO ([CoreBind], Maybe RuleBase)
-endPassWithRules pass_name dump_flag binds rules
+endPassWithRules dflags pass_name dump_flag binds rules
   = do 
         -- ToDo: force the rules?
 
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
-	if opt_D_show_passes then
+	if dopt_D_show_passes dflags then
 	   hPutStrLn stdout ("    Result size = " ++ show (coreBindsSize binds))
 	 else
 	   return ()
@@ -92,7 +93,7 @@ endPassWithRules pass_name dump_flag binds rules
                                               Just rb -> pprRuleBase rb)
 
 	-- Type check
-	lintCoreBindings pass_name binds
+	lintCoreBindings dflags pass_name binds
         -- ToDo: lint the rules
 
 	return (binds, rules)
@@ -130,13 +131,13 @@ Outstanding issues:
     --   may well be happening...);
 
 \begin{code}
-lintCoreBindings :: String -> [CoreBind] -> IO ()
+lintCoreBindings :: DynFlags -> String -> [CoreBind] -> IO ()
 
-lintCoreBindings whoDunnit binds
-  | not opt_DoCoreLinting
+lintCoreBindings dflags whoDunnit binds
+  | not (dopt_DoCoreLinting dflags)
   = return ()
 
-lintCoreBindings whoDunnit binds
+lintCoreBindings dflags whoDunnit binds
   = case (initL (lint_binds binds)) of
       (Nothing, Nothing)       -> done_lint
 
@@ -156,7 +157,7 @@ lintCoreBindings whoDunnit binds
 				  returnL ()
     lint_bind (NonRec bndr rhs) = lintSingleBinding NonRecursive (bndr,rhs)
 
-    done_lint = doIfSet opt_D_show_passes
+    done_lint = doIfSet_dyn dflags dopt_D_show_passes
 		        (hPutStr stdout ("*** Core Linted result of " ++ whoDunnit ++ "\n"))
     warn warnings
       = vcat [
@@ -190,19 +191,20 @@ We use this to check all unfoldings that come in from interfaces
 (it is very painful to catch errors otherwise):
 
 \begin{code}
-lintUnfolding :: SrcLoc
+lintUnfolding :: DynFlags 
+	      -> SrcLoc
 	      -> [Var]		-- Treat these as in scope
 	      -> CoreExpr
 	      -> (Maybe Message, Maybe Message)		-- (Nothing,_) => OK
 
-lintUnfolding locn vars expr
-  | not opt_DoCoreLinting
+lintUnfolding dflags locn vars expr
+  | not (dopt_DoCoreLinting dflags)
   = (Nothing, Nothing)
 
   | otherwise
   = initL (addLoc (ImportedUnfolding locn) $
-	     addInScopeVars vars	     $
-	     lintCoreExpr expr)
+	   addInScopeVars vars	           $
+	   lintCoreExpr expr)
 \end{code}
 
 %************************************************************************

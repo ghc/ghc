@@ -18,8 +18,9 @@ import TcSimplify	( tcSimplifyCheckThetas )
 
 import TysWiredIn	( integerTy, doubleTy )
 import Type             ( Type )
-import PrelNames	( numClassKey )
+import PrelNames	( numClassName )
 import Outputable
+import HscTypes		( TyThing(..) )
 \end{code}
 
 \begin{code}
@@ -38,9 +39,9 @@ tc_defaults [DefaultDecl [] locn]
 
 tc_defaults [DefaultDecl mono_tys locn]
   = tcLookupGlobal_maybe numClassName	`thenNF_Tc` \ maybe_num ->
-    case maybe_num of {
+    case maybe_num of
 	Just (AClass num_class) -> common_case num_class
-	other	          	-> returnTc [] ;
+	other	          	-> returnTc []
 		-- In the Nothing case, Num has not been sucked in, so the 
 		-- defaults will never be used; so simply discard the default decl.
 		-- This slightly benefits modules that don't use any
@@ -59,7 +60,7 @@ tc_defaults [DefaultDecl mono_tys locn]
  		    [ (num_class, [ty]) | ty <- tau_tys ]	`thenTc_`
     
     	returnTc tau_tys
-    	}
+
 
 tc_defaults decls@(DefaultDecl _ loc : _) =
     tcAddSrcLoc loc $

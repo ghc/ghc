@@ -10,7 +10,8 @@ module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 import CoreSyn
 import CoreUnfold	( Unfolding, certainlyWillInline )
-import CmdLineOpts	( opt_D_verbose_core2core, opt_D_dump_worker_wrapper )
+import CmdLineOpts	( DynFlags,
+			  dopt_D_verbose_core2core, dopt_D_dump_worker_wrapper )
 import CoreLint		( beginPass, endPass )
 import CoreUtils	( exprType, exprEtaExpandArity )
 import MkId		( mkWorkerId )
@@ -56,20 +57,23 @@ info for exported values).
 
 \begin{code}
 
-wwTopBinds :: UniqSupply
-	     -> [CoreBind]
-	     -> IO [CoreBind]
+wwTopBinds :: DynFlags 
+	   -> UniqSupply
+	   -> [CoreBind]
+	   -> IO [CoreBind]
 
-wwTopBinds us binds
+wwTopBinds dflags us binds
   = do {
-	beginPass "Worker Wrapper binds";
+	beginPass dflags "Worker Wrapper binds";
 
 	-- Create worker/wrappers, and mark binders with their
 	-- "strictness info" [which encodes their worker/wrapper-ness]
 	let { binds' = workersAndWrappers us binds };
 
-	endPass "Worker Wrapper binds" (opt_D_dump_worker_wrapper || 
-                                        opt_D_verbose_core2core) binds'
+	endPass dflags "Worker Wrapper binds" 
+		(dopt_D_dump_worker_wrapper dflags || 
+                    dopt_D_verbose_core2core dflags) 
+                binds'
     }
 \end{code}
 

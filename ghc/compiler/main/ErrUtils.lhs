@@ -11,7 +11,7 @@ module ErrUtils (
 	dontAddErrLoc,
 	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 	ghcExit,
-	doIfSet, dumpIfSet, dumpIfSet_dyn
+	doIfSet, doIfSet_dyn, dumpIfSet, dumpIfSet_dyn
     ) where
 
 #include "HsVersions.h"
@@ -96,6 +96,10 @@ ghcExit val
 doIfSet :: Bool -> IO () -> IO ()
 doIfSet flag action | flag      = action
 		    | otherwise = return ()
+
+doIfSet_dyn :: DynFlags -> (DynFlags -> Bool) -> IO () -> IO()
+doIfSet_dyn dflags flag action | flag dflags = action
+		               | otherwise   = return ()
 \end{code}
 
 \begin{code}

@@ -28,7 +28,10 @@ module TcEnv(
 
 	-- New Ids
 	newLocalId, newSpecPragmaId,
-	newDefaultMethodName, newDFunName
+	newDefaultMethodName, newDFunName,
+
+	-- ???
+	tcSetEnv, explicitLookupId
   ) where
 
 #include "HsVersions.h"
