@@ -435,6 +435,10 @@ FPTOOLS_TYPE_TIMEZONE
 dnl ** do we have altzone?
 FPTOOLS_ALTZONE
 
+dnl ** does struct stat contain st_blksize?
+#
+AC_STRUCT_ST_BLKSIZE
+
 dnl ** what are the sizes of various types
 dnl    (these must come before GHC_CHECK_ALIGNMENT)
 AC_CHECK_SIZEOF(unsigned int,4)
