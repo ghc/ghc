@@ -476,7 +476,7 @@ MKDEPENDHS	= $(HC)
 #
 HaveGcc 	= @HaveGcc@
 UseGcc  	= YES
-WhatGccIsCalled = gcc
+WhatGccIsCalled = @WhatGccIsCalled@
 ifeq "$(strip $(HaveGcc))" "YES"
 ifneq "$(strip $(UseGcc))"  "YES"
   CC	= cc
@@ -495,7 +495,9 @@ LibGmp		= @LibGmp@
 # Flex
 
 FLEX			= @LEX@
-FLEX_LIB		= @LEXLIB@
+# Don't bother with -lfl, we define our own yywrap()s anyway.
+FLEX_LIB		= 
+#WAS:FLEX_LIB		= @LEXLIB@
 
 #-----------------------------------------------------------------------------
 # Other standard (ha!) Unix utilities
