@@ -389,13 +389,7 @@ $(SCRIPT_PROG) :: $(SCRIPT_OBJS)
 	@echo Creating $@...
 ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
-	@if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
-		echo "#! /bin/sh -- # to stop perl from looping "      > $@ ; \
-		echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"  >> $@ ; \
-		echo "      if $$""running_under_some_shell;"         >> $@ ; \
-	 else \
-		echo "#! "$(PERL) > $@ ; \
-	fi;
+	echo "#! "$(PERL) > $@
 else
 	@touch $@
 endif
@@ -465,7 +459,7 @@ ifneq "$(INSTALL_PROGS)" ""
 install:: $(INSTALL_PROGS)
 	@$(INSTALL_DIR) $(bindir)
 	for i in $(INSTALL_PROGS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(bindir); \
 	done
 endif
 
@@ -480,13 +474,7 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
-	        echo "#! /bin/sh -- # to stop perl from looping "        > $$i.tmp  ; \
-	        echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"    >> $$i.tmp ; \
-	        echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
-	    else \
-		echo "#! $(PERL)" > $$i.tmp ; \
-	   fi; \
+	   echo "#! $(PERL)" > $$i.tmp ; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
 	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
@@ -515,13 +503,7 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIB_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
-	        echo "#! /bin/sh -- # to stop perl from looping "        > $$i.tmp  ; \
-	        echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'"    >> $$i.tmp ; \
-	        echo "      if $$""running_under_some_shell;"           >> $$i.tmp ; \
-	   else \
-		echo "#! $(PERL)" > $$i.tmp ; \
-	   fi; \
+	   echo "#! $(PERL)" > $$i.tmp ; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
 	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
@@ -550,13 +532,7 @@ ifeq "$(INTERP)" "perl"
 ifneq "$(BIN_DIST)" "1"
 	@for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
 	   $(RM) $$i.tmp; \
-	   if test $(HOSTPLATFORM) = "i386-unknown-cygwin32" ; then \
-	        echo "#! /bin/sh -- # to stop perl from looping "     > $$i.tmp  ; \
-	        echo "eval 'exec perl -S $$$""0 $$""{1+\"$$$""@\"}'" >> $$i.tmp ; \
-	        echo "      if $$""running_under_some_shell;"        >> $$i.tmp ; \
-	   else \
-		echo "#! $(PERL)" > $$i.tmp ; \
-	   fi; \
+	   echo "#! $(PERL)" > $$i.tmp ; \
 	   echo $$"bindir='$(bindir)';"                            >> $$i.tmp ; \
 	   echo $$"libdir='$(libdir)';"                            >> $$i.tmp ; \
 	   echo $$"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
@@ -596,7 +572,7 @@ ifneq "$(INSTALL_LIBEXECS)" ""
 install:: $(INSTALL_LIBEXECS)
 	@$(INSTALL_DIR) $(libexecdir)
 	-for i in $(INSTALL_LIBEXECS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(libexecdir); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i$(exeext) $(libexecdir); \
 	done
 endif
 
