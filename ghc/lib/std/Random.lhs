@@ -1,5 +1,5 @@
 % ------------------------------------------------------------------------------
-% $Id: Random.lhs,v 1.24 2001/02/28 00:01:03 qrczak Exp $
+% $Id: Random.lhs,v 1.25 2001/08/29 10:49:28 simonmar Exp $
 %
 % (c) The University of Glasgow, 1995-2000
 %
@@ -19,7 +19,7 @@ world..
 \begin{code}
 module Random
 	(
-	  RandomGen(next, split)
+	  RandomGen(next, split, genRange)
 	, StdGen
 	, mkStdGen
 	, Random ( random,   randomR,
@@ -53,12 +53,14 @@ import Char		( isSpace, chr, ord )
 
 \begin{code}
 class RandomGen g where
-   next  :: g -> (Int, g)
-   split :: g -> (g, g)
+   next     :: g -> (Int, g)
+   split    :: g -> (g, g)
+   genRange :: g -> (Int,Int)
 
-\end{code}
+   -- default mathod
+   genRange g = (minBound,maxBound)
 
-\begin{code}
+
 data StdGen 
  = StdGen Int Int
 
