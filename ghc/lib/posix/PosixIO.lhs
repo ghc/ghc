@@ -111,7 +111,7 @@ fdToHandle fd@(FD# fd#) = do
 	   (or as a result of) program termination.
 	 -}
 #ifndef __PARALLEL_HASKELL__
-	 fo <- makeForeignObj fo
+	 fo <- mkForeignObj fo
 	 if fd == stdInput || fd == stdOutput || fd == stdError then
 	      addForeignFinalizer fo (freeStdFileObject fo)
 	  else

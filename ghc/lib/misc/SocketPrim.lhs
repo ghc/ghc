@@ -1205,7 +1205,7 @@ socketToHandle :: Socket -> IOMode -> IO Handle
 
 socketToHandle (MkSocket fd _ _ _ _) m = do
     fileobj <- _ccall_ openFd fd (file_mode::Int) (flush_on_close::Int)
-    fo <- makeForeignObj fileobj
+    fo <- mkForeignObj fileobj
     addForeignFinalizer fo (freeFileObject fo)
     mkBuffer__ fo 0  -- not buffered
     hndl <- newHandle (Handle__ fo htype NoBuffering socket_str)
