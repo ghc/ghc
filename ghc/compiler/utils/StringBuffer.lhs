@@ -114,7 +114,7 @@ hGetStringBuffer fname =
     return (StringBuffer a# read# 0# 0#)
 #else
     openFile fname ReadMode >>= \ hndl ->
-    hFileSize hndl          >>= \ len@(J# _ _ d#) ->
+    hFileSize hndl          >>= \ len ->
     let len_i = fromInteger len in
       -- Allocate an array for system call to store its bytes into.
       -- ToDo: make it robust
