@@ -1,0 +1,2 @@
+read005.hs:4:7: Illegal character escape: `\&'
+read005.hs:4:7:  on input: "&"
