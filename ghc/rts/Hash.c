@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
- * $Id: Hash.c,v 1.2 2000/10/06 15:34:29 simonmar Exp $
+ * $Id: Hash.c,v 1.3 2000/12/04 12:31:21 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1995-1998
  * (c) The GHC Team, 1999

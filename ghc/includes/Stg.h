@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.33 2000/11/07 17:05:47 simonmar Exp $
+ * $Id: Stg.h,v 1.34 2000/12/04 12:31:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -212,6 +212,8 @@ typedef StgWord64       LW_;
 
 /* Runtime-system hooks */
 #include "Hooks.h"
+
+#include "HsFFI.h"
 
 /* Misc stuff without a home */
 DLL_IMPORT_RTS extern char **prog_argv;	/* so we can get at these from Haskell */

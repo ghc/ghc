@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.67 2000/11/13 14:40:36 simonmar Exp $
+ * $Id: PrimOps.h,v 1.68 2000/12/04 12:31:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -29,17 +29,46 @@
         } while (again);                                                \
    } while (0)
 
-#define indexWordOffClosurezh(r,a,i)                                    \
-   do { StgClosure* tmp = (StgClosure*)(a);                             \
-        CHASE_INDIRECTIONS(tmp);                                        \
-        r = ((W_ *)tmp)[i];                                             \
+#define indexWordOffClosurezh(r,a,i)		\
+   do { StgClosure* tmp = (StgClosure*)(a);	\
+        CHASE_INDIRECTIONS(tmp);		\
+        r = ((P_)tmp)[i];			\
    } while (0)
 
-#define indexPtrOffClosurezh(r,a,i)                                     \
-   do { StgClosure* tmp = (StgClosure*)(a);                             \
-        CHASE_INDIRECTIONS(tmp);                                        \
-        r = ((P_ *)tmp)[i];                                             \
+#define indexDoubleOffClosurezh(r,a,i)		\
+   do { StgClosure* tmp = (StgClosure*)(a);	\
+        CHASE_INDIRECTIONS(tmp);		\
+        r = PK_DBL(((P_)tmp + i);		\
    } while (0)
+
+#define indexPtrOffClosurezh(r,a,i)		\
+   do { StgClosure* tmp = (StgClosure*)(a);	\
+        CHASE_INDIRECTIONS(tmp);		\
+        r = ((P_ *)tmp)[i];			\
+   } while (0)					\
+
+#define setWordOffClosurezh(r,a,i,b)		\
+   do { StgClosure* tmp = (StgClosure*)(a);	\
+        CHASE_INDIRECTIONS(tmp);		\
+        ((P_)tmp)[i] = b;			\
+        r = (P_)tmp;				\
+   } while (0)
+
+#define setDoubleOffClosurezh(r,a,i,b)		\
+   do { StgClosure* tmp = (StgClosure*)(a);	\
+        CHASE_INDIRECTIONS(tmp);		\
+        ASSIGN_DBL((P_)tmp + i, b);		\
+        r = (P_)tmp;				\
+   } while (0)
+
+#define setPtrOffClosurezh(r,a,i,b)		\
+   do { StgClosure* tmp = (StgClosure*)(a);	\
+        CHASE_INDIRECTIONS(tmp);		\
+        ((P_ *)tmp)[i] = b;			\
+        r = (P_)tmp;				\
+   } while (0)
+
+#else
 
 #endif
 

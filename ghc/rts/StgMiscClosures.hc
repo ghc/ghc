@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.51 2000/11/14 12:49:57 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.52 2000/12/04 12:31:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -78,12 +78,13 @@ FN_(stg_mci_constr8_entry) { FB_ JMP_(RET_VEC((P_)(*Sp),7)); FE_ }
 /* Since this stuff is ostensibly in some other module, we need
    to supply an __init_ function.
 */
-EF_(__init_MCIzumakezuconstr);
+EXTFUN(__init_MCIzumakezuconstr);
 START_MOD_INIT(__init_MCIzumakezuconstr)
 END_MOD_INIT()
 
 
 INFO_TABLE(mci_make_constr_info,   mci_make_constr_entry,   0,0,FUN_STATIC,static,EF_,0,0);
+INFO_TABLE(mci_make_constr0_info,  mci_make_constr0_entry,  0,0,FUN_STATIC,static,EF_,0,0);
 INFO_TABLE(mci_make_constrI_info,  mci_make_constrI_entry,  0,0,FUN_STATIC,static,EF_,0,0);
 INFO_TABLE(mci_make_constrP_info,  mci_make_constrP_entry,  0,0,FUN_STATIC,static,EF_,0,0);
 INFO_TABLE(mci_make_constrPP_info, mci_make_constrPP_entry, 0,0,FUN_STATIC,static,EF_,0,0);
@@ -91,6 +92,10 @@ INFO_TABLE(mci_make_constrPPP_info,mci_make_constrPPP_entry,0,0,FUN_STATIC,stati
 
 SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstr_closure,
                mci_make_constr_info,0,,EI_)
+   ,{ /* payload */ }
+};
+SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstr0_closure,
+               mci_make_constr0_info,0,,EI_)
    ,{ /* payload */ }
 };
 SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrI_closure,
@@ -112,7 +117,7 @@ SET_STATIC_HDR(MCIzumakezuconstr_mcizumakezuconstrPPP_closure,
 
 
 /* Make a constructor with no args. */
-STGFUN(mci_make_constr_entry)
+STGFUN(mci_make_constr0_entry)
 {
   nat size, np, nw;
   StgClosure* con;
@@ -221,7 +226,7 @@ STGFUN(mci_make_constrPP_entry)
     Sp = Sp +2; /* Zap the Addr# arg */
     R1.cl = con;
 
-    JMP_(ENTRY_CODE(GET_INFO(R1.cl)));
+    JMP_(GET_ENTRY(R1.cl));
   FE_
 }
 
@@ -235,35 +240,27 @@ STGFUN(mci_make_constrPPP_entry)
   FE_
 }
 
-#if 0
 /* It would be nice if this worked, but it doesn't.  Yet. */
 STGFUN(mci_make_constr_entry)
 {
-  nat size, np, nw_heap, nw_really, w;
+  nat size, np, nw_heap, nw_really, i;
   StgClosure* con;
   StgInfoTable* itbl;
-  W_* r;
   FB_
-    itbl      = ((StgInfoTable**)Sp)[0];
-STGCALL3(fprintf,stderr,"mmc: itbl = %d\n",itbl);
+    /* Sp[0] should be the tag for the itbl */
+    itbl      = ((StgInfoTable**)Sp)[1];
 
-STGCALL3(fprintf,stderr,"mmc: sp-4 = %d\n", ((W_*)Sp)[-4] );
-STGCALL3(fprintf,stderr,"mmc: sp-3 = %d\n", ((W_*)Sp)[-3] );
-STGCALL3(fprintf,stderr,"mmc: sp-2 = %d\n", ((W_*)Sp)[-2] );
-STGCALL3(fprintf,stderr,"mmc: sp-1 = %d\n", ((W_*)Sp)[-1] );
-STGCALL3(fprintf,stderr,"mmc: sp+0 = %d\n", ((W_*)Sp)[0] );
-STGCALL3(fprintf,stderr,"mmc: sp+1 = %d\n", ((W_*)Sp)[1] );
-STGCALL3(fprintf,stderr,"mmc: sp+2 = %d\n", ((W_*)Sp)[2] );
-STGCALL3(fprintf,stderr,"mmc: sp+3 = %d\n", ((W_*)Sp)[3] );
-STGCALL3(fprintf,stderr,"mmc: sp+4 = %d\n", ((W_*)Sp)[4] );
-    np        = itbl->layout.payload.ptrs;
-    nw_really = itbl->layout.payload.nptrs;
-    nw_heap   = stg_max(nw_really, MIN_NONUPD_SIZE-np);
+    np        = INFO_PTR_TO_STRUCT(itbl)->layout.payload.ptrs;
+    nw_really = INFO_PTR_TO_STRUCT(itbl)->layout.payload.nptrs;
+
+    nw_heap   = stg_max((int)nw_really, MIN_NONUPD_SIZE-np);
     size      = CONSTR_sizeW( np, nw_heap );
 
-    /* The total number of words to copy off the stack is np + nw.
-       That doesn't include tag words, tho.
-    */
+#if 0
+     fprintf(stderr, "np = %d, nw_really = %d, nw_heap = %d, size = %d\n",
+	    np, nw_really, nw_heap, size);
+#endif
+
     HP_CHK_GEN_TICKY(size, NO_PTRS, mci_make_constr_entry, );
     TICK_ALLOC_PRIM(sizeofW(StgHeader), size-sizeofW(StgHeader), 0);
     CCS_ALLOC(CCCS,size); /* ccs prof */
@@ -271,30 +268,17 @@ STGCALL3(fprintf,stderr,"mmc: sp+4 = %d\n", ((W_*)Sp)[4] );
     con = (StgClosure*)(Hp + 1 - size);
     SET_HDR(con, itbl,CCCS);
 
-    /* Copy into the closure. */
-    w = 0;
-    r = Sp+1;
-    while (1) {
-       if (w == np + nw) break;
-       ASSERT(w < np + nw);
-       if (IS_ARG_TAG(*r)) { 
-          nat n = *r++;
-          for (; n > 0; n--)
-             con->payload[w++] = (StgClosure*)(*r++);
-       } else {
-          con->payload[w++] = (StgClosure*)(*r++);
-       }
-       ASSERT((P_)r <= (P_)Su);
+    /* set the pointer fields */
+    for (i = 0; i < np; i++) {
+	con->payload[i] = &stg_dummy_ret_closure;
     }
 
-    /* Remove all the args we've used. */
-    Sp = r;
+    Sp += 2;
 
     R1.cl = con;
-    JMP_(ENTRY_CODE(R1.cl));
+    JMP_(GET_ENTRY(R1.cl));
   FE_
 }
-#endif
 
 #endif /* GHCI */
 

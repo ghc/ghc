@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.43 2000/11/20 17:42:00 sewardj Exp $
+% $Id: CLabel.lhs,v 1.44 2000/12/04 12:31:19 simonmar Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 

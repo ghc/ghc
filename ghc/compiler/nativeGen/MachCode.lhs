@@ -24,7 +24,7 @@ import CLabel		( isAsmTemp, CLabel, labelDynamic )
 import Maybes		( maybeToBool, expectJust )
 import PrimRep		( isFloatingRep, PrimRep(..) )
 import PrimOp		( PrimOp(..) )
-import CallConv		( cCallConv )
+import CallConv		( cCallConv, stdCallConv )
 import Stix		( getNatLabelNCG, StixTree(..),
 			  StixReg(..), CodeSegment(..), 
                           DestInfo, hasDestInfo,
@@ -2339,11 +2339,14 @@ genCCall fn cconv kind args
     let (sizes, codes) = unzip sizes_n_codes
         tot_arg_size   = sum sizes
 	code2          = concatOL codes
-	call = toOL [
-                  CALL fn__2,
-		  ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp),
-                  DELTA (delta + tot_arg_size)
-               ]
+	call = toOL (
+                  [CALL (fn__2 tot_arg_size)]
+                  ++
+                  (if cconv == stdCallConv then [] else 
+		   [ADD L (OpImm (ImmInt tot_arg_size)) (OpReg esp)])
+                  ++
+                  [DELTA (delta + tot_arg_size)]
+               )
     in
     setDeltaNat (delta + tot_arg_size) `thenNat` \ _ ->
     returnNat (code2 `appOL` call)
@@ -2353,9 +2356,16 @@ genCCall fn cconv kind args
     -- internally generated names like '.mul,' which don't get an
     -- underscore prefix
     -- ToDo:needed (WDP 96/03) ???
-    fn__2 = case (_HEAD_ fn) of
-	      '.' -> ImmLit (ptext fn)
-	      _   -> ImmLab False (ptext fn)
+    fn_u  = _UNPK_ fn
+    fn__2 tot_arg_size
+       | head fn_u == '.'
+       = ImmLit (text (fn_u ++ stdcallsize tot_arg_size))
+       | otherwise 
+       = ImmLab False (text (fn_u ++ stdcallsize tot_arg_size))
+
+    stdcallsize tot_arg_size
+       | cconv == stdCallConv = '@':show tot_arg_size
+       | otherwise            = ""
 
     arg_size DF = 8
     arg_size F  = 4

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Sanity.c,v 1.22 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: Sanity.c,v 1.23 2000/12/04 12:31:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -499,7 +499,7 @@ checkHeap(bdescr *bd, StgPtr start)
 
 	/* skip over slop */
 	while (p < bd->free &&
-	       (*p == 0 || !LOOKS_LIKE_GHC_INFO((void*)*p))) { p++; } 
+	       (*p < 0x1000 || !LOOKS_LIKE_GHC_INFO((void*)*p))) { p++; } 
       }
       bd = bd->link;
       if (bd != NULL) {

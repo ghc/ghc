@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.22 2000/11/13 14:53:27 simonmar Exp $
+ * $Id: StgCRun.c,v 1.23 2000/12/04 12:31:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -322,7 +322,11 @@ StgRun(StgFunPtr f, StgRegTable *basereg) {
 StgThreadReturnCode
 StgRun(StgFunPtr f, StgRegTable *basereg) {
 
-    StgChar space[RESERVED_C_STACK_BYTES];
+    unsigned char space[RESERVED_C_STACK_BYTES];
+#if 0
+    register void *i7 __asm__("%i7");
+    ((void **)(space))[100] = i7;
+#endif
     f();
     __asm__ volatile (
 	    ".align 4\n"		

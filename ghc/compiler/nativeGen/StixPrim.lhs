@@ -22,6 +22,7 @@ import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 			  rESERVED_STACK_WORDS )
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkForeignLabel )
+import CallConv		( cCallConv )
 import Outputable
 import FastTypes
 
@@ -254,6 +255,10 @@ primCode ls WriteByteArrayOp_Word64    rs = primCode_WriteByteArrayOp Word64Rep 
 
 ToDo: saving/restoring of volatile regs around ccalls.
 
+JRS, 001113: always do the call of suspendThread and resumeThread as a ccall
+rather than inheriting the calling convention of the thing which we're really
+calling.
+
 \begin{code}
 primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
   | is_asm = error "ERROR: Native code generator can't handle casm"
@@ -266,8 +271,10 @@ primCode lhs (CCallOp (CCall (StaticTarget fn) is_asm may_gc cconv)) rhs
 	   id  = StReg (StixTemp uniq IntRep)
 
     	   suspend = StAssign IntRep id 
-			(StCall SLIT("suspendThread") cconv IntRep [stgBaseReg])
-	   resume  = StCall SLIT("resumeThread") cconv VoidRep [id]
+			(StCall SLIT("suspendThread") {-no:cconv-} cCallConv
+                                IntRep [stgBaseReg])
+	   resume  = StCall SLIT("resumeThread") {-no:cconv-} cCallConv
+                            VoidRep [id]
 	in
 	returnUs (\xs -> save (suspend : ccall : resume : load xs))
 

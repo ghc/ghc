@@ -343,6 +343,8 @@ __export PrelGHC
 
   indexPtrOffClosurezh
   indexWordOffClosurezh
+  setPtrOffClosurezh
+  setWordOffClosurezh
 
   reallyUnsafePtrEqualityzh
 

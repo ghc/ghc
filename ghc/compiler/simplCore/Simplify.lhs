@@ -258,8 +258,8 @@ simplExprF (Note (SCC cc) e) cont
 simplExprF (Note InlineCall e) cont
   = simplExprF e (InlinePlease cont)
 
--- Comments about the InlineMe case 
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--	 Comments about the InlineMe case 
+--	 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Don't inline in the RHS of something that has an
 -- inline pragma.  But be careful that the InScopeEnv that
 -- we return does still have inlinings on!
@@ -275,17 +275,31 @@ simplExprF (Note InlineCall e) cont
 -- the specialised version of g when f is inlined at some call site
 -- (perhaps in some other module).
 
-simplExprF (Note InlineMe e) cont
-  = case cont of
-	Stop _ _ -> 	-- Totally boring continuation
-			-- Don't inline inside an INLINE expression
-		  setBlackList noInlineBlackList (simplExpr e)	`thenSmpl` \ e' ->
-		  rebuild (mkInlineMe e') cont
+-- It's also important not to inline a worker back into a wrapper.
+-- A wrapper looks like
+--	wraper = inline_me (\x -> ...worker... )
+-- Normally, the inline_me prevents the worker getting inlined into
+-- the wrapper (initially, the worker's only call site!).  But,
+-- if the wrapper is sure to be called, the strictness analyser will
+-- mark it 'demanded', so when the RHS is simplified, it'll get an ArgOf
+-- continuation.  That's why the keep_inline predicate returns True for
+-- ArgOf continuations.  It shouldn't do any harm not to dissolve the
+-- inline-me note under these circumstances
 
-	other  -> 	-- Dissolve the InlineMe note if there's
-			-- an interesting context of any kind to combine with
-			-- (even a type application -- anything except Stop)
-		  simplExprF e cont	
+simplExprF (Note InlineMe e) cont
+  | keep_inline cont		-- Totally boring continuation
+  =				-- Don't inline inside an INLINE expression
+    setBlackList noInlineBlackList (simplExpr e)	`thenSmpl` \ e' ->
+    rebuild (mkInlineMe e') cont
+
+  | otherwise  	-- Dissolve the InlineMe note if there's
+		-- an interesting context of any kind to combine with
+		-- (even a type application -- anything except Stop)
+  = simplExprF e cont
+  where
+    keep_inline (Stop _ _)    = True		-- See notes above
+    keep_inline (ArgOf _ _ _) = True		-- about this predicate
+    keep_inline other	      = False
 
 -- A non-recursive let is dealt with by simplBeta
 simplExprF (Let (NonRec bndr rhs) body) cont

@@ -60,7 +60,8 @@ import PprType	( pprPred )
 import Type	( Type, PredType(..), 
 		  isTyVarTy, mkDictTy, mkPredTy,
 		  splitForAllTys, splitSigmaTy, funArgTy,
-		  splitRhoTy, tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
+		  splitMethodTy, splitRhoTy,
+		  tyVarsOfType, tyVarsOfTypes, tyVarsOfPred,
 		  tidyOpenType, tidyOpenTypes
 		)
 import Subst	( emptyInScopeSet, mkSubst, mkInScopeSet,
@@ -355,9 +356,9 @@ newMethod orig id tys
     let
 	(tyvars, rho) = splitForAllTys (idType id)
 	rho_ty	      = substTy (mkTyVarSubst tyvars tys) rho
-	(theta, tau)  = splitRhoTy rho_ty
+	(pred, tau)  = splitMethodTy rho_ty
     in
-    newMethodWithGivenTy orig id tys theta tau	`thenNF_Tc` \ meth_inst ->
+    newMethodWithGivenTy orig id tys [pred] tau	`thenNF_Tc` \ meth_inst ->
     returnNF_Tc (unitLIE meth_inst, instToId meth_inst)
 
 instOverloadedFun orig v arg_tys theta tau
@@ -553,7 +554,8 @@ pprInst (Dict u pred loc) = pprPred pred <+> show_uniq u
 pprInst m@(Method u id tys theta tau loc)
   = hsep [ppr id, ptext SLIT("at"), 
 	  brackets (interppSP tys) {- ,
-	  ppr theta, ppr tau,
+	  ptext SLIT("theta"), ppr theta,
+	  ptext SLIT("tau"), ppr tau
 	  show_uniq u,
 	  ppr (instToId m) -}]
 

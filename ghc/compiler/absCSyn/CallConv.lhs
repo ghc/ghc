@@ -14,7 +14,6 @@ module CallConv
        , cCallConv
        , defaultCallConv
        , callConvAttribute
-       , decorateExtName
        ) where
 
 #include "HsVersions.h"
@@ -56,29 +55,5 @@ callConvAttribute cc
  | cc == stdCallConv   = "__stdcall"
  | cc == cCallConv     = ""
  | otherwise	       = panic ("callConvAttribute: cannot handle" ++ showSDoc (pprCallConv cc))
-
-\end{code}
-
-For stdcall and Win32, the linker expects to see names of the form 
- 
-   "f@n"
-
-where n is the size (in 8-bit bytes) of the parameter area
-that is pushed onto the stack before invocation. We take
-care of mangling the function name here. 
-
-This name mangler is only used by the x86 native code generator.
-
-\begin{code}
-decorateExtName :: CallConv -> FAST_STRING -> [PrimRep] -> FAST_STRING
-decorateExtName cc fs ps
- | cc /= stdCallConv = fs
- | otherwise	     = fs _APPEND_ (_PK_ ('@':show (size::Int)))
- where
-  size = sum (map (adjustParamSize.getPrimRepSizeInBytes) ps)
-
-  adjustParamSize sz =  paramBoundary * ((sz + paramBoundary - 1) `div` paramBoundary)
-
-  paramBoundary = 4
 
 \end{code}

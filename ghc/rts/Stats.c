@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stats.c,v 1.21 2000/07/17 15:15:40 rrt Exp $
+ * $Id: Stats.c,v 1.22 2000/12/04 12:31:21 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -643,3 +643,11 @@ stat_describe_gens(void)
   }
   fprintf(stderr,"\n");
 }
+
+/* -----------------------------------------------------------------------------
+   Stats available via a programmatic interface, so eg. GHCi can time
+   each compilation and expression evaluation.
+   -------------------------------------------------------------------------- */
+
+extern HsInt getAllocations( void ) 
+{ return (HsInt)(total_allocated * sizeof(W_)); }

@@ -19,7 +19,8 @@ import VarEnv
 import Var
 import IdInfo		( ArityInfo(..), OccInfo(..) )
 import PrimOp		( PrimOp(..), ccallMayGC )
-import TysWiredIn       ( isForeignObjTy )
+import TysPrim		( foreignObjPrimTyCon )
+import Type		( splitTyConApp_maybe )
 import Maybes		( maybeToBool, orElse )
 import Name		( getOccName )
 import OccName		( occNameUserString )
@@ -414,9 +415,14 @@ call. This only an issue
 \begin{code}
 findLiveArgs :: StgLiveVars -> StgArg -> StgLiveVars
 findLiveArgs lvs (StgVarArg x) 
-   | isForeignObjTy (idType x) = extendVarSet lvs x
-   | otherwise		       = lvs
-findLiveArgs lvs arg	       = lvs
+   | isForeignObjPrimTy (idType x) = extendVarSet lvs x
+   | otherwise		           = lvs
+findLiveArgs lvs arg	           = lvs
+
+isForeignObjPrimTy ty
+   = case splitTyConApp_maybe ty of
+	Just (tycon, _) -> tycon == foreignObjPrimTyCon
+	Nothing		-> False
 \end{code}
 
 

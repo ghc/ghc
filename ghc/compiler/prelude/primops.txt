@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------
--- $Id: primops.txt,v 1.6 2000/11/07 15:21:40 simonmar Exp $
+-- $Id: primops.txt,v 1.7 2000/12/04 12:31:19 simonmar Exp $
 --
 -- Primitive Operations
 --
@@ -51,6 +51,13 @@ primop   IndexOffClosureOp_Ptr  "indexPtrOffClosure#"  GenPrimOp
 primop   IndexOffClosureOp_Word "indexWordOffClosure#"  GenPrimOp
    a -> Int# -> Word#
 
+primop   SetOffClosureOp_Ptr  "setPtrOffClosure#"  GenPrimOp
+   a -> Int# -> b -> (# a #)
+   with strictness = { \ arity -> StrictnessInfo [wwStrict, wwPrim, wwLazy] False }
+
+primop   SetOffClosureOp_Word "setWordOffClosure#"  GenPrimOp
+   a -> Int# -> Word# -> (# a #)
+   with strictness = { \ arity -> StrictnessInfo [wwStrict, wwPrim, wwPrim] False }
 
 ------------------------------------------------------------------------
 --- Addr#                                                            ---

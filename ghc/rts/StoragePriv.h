@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.12 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.13 2000/12/04 12:31:22 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -70,5 +70,15 @@ dbl_link_onto(bdescr *bd, bdescr **list)
 extern void memInventory(void);
 extern void checkSanity(nat N);
 #endif
+
+/* 
+ * These three are used by the garbage collector when we have
+ * dynamically-linked object modules.  (see ClosureMacros.h,
+ * IS_CODE_PTR etc.). 
+ * Defined in Linker.c.
+ */
+int is_dynamically_loaded_code_or_rodata_ptr ( char* p );
+int is_dynamically_loaded_rwdata_ptr ( char* p );
+int is_not_dynamically_loaded_ptr ( char* p );
 
 #endif /* STORAGEPRIV_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.89 2000/11/20 11:19:21 simonmar Exp $
+ * $Id: GC.c,v 1.90 2000/12/04 12:31:20 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -37,6 +37,7 @@
 #include "Sanity.h"
 #include "GC.h"
 #include "BlockAlloc.h"
+#include "MBlock.h"
 #include "Main.h"
 #include "ProfHeap.h"
 #include "SchedAPI.h"
@@ -3458,6 +3459,18 @@ threadSqueezeStack(StgTSO *tso)
 	    bh->header.info != &stg_CAF_BLACKHOLE_info) {
 #if (!defined(LAZY_BLACKHOLING)) && defined(DEBUG)
           fprintf(stderr,"Unexpected lazy BHing required at 0x%04x\n",(int)bh);
+#endif
+#ifdef DEBUG
+	  /* zero out the slop so that the sanity checker can tell
+	   * where the next closure is.
+	   */
+	  { 
+	      StgInfoTable *info = get_itbl(bh);
+	      nat np = info->layout.payload.ptrs, nw = info->layout.payload.nptrs, i;
+	      for (i = np; i < np + nw; i++) {
+		  ((StgClosure *)bh)->payload[i] = 0;
+	      }
+	  }
 #endif
 	  SET_INFO(bh,&stg_BLACKHOLE_info);
 	}

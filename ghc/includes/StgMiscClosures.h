@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.22 2000/11/13 14:40:36 simonmar Exp $
+ * $Id: StgMiscClosures.h,v 1.23 2000/12/04 12:31:20 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
