@@ -1442,16 +1442,16 @@ nameReference env n
 -- end hack
   | otherwise = packageReference (modulePackage (nameModule n))
 
-packageReference p = brackets ((text "ilx") <+> singleQuotes (ppr p  <> hscOptionQual))
-moduleNameReference m = brackets ((text ".module") <+> (text "ilx") <+> singleQuotes (pprModuleName m <> hscOptionQual <> text ".dll"))
+packageReference p = brackets (singleQuotes (ppr p  <> hscOptionQual))
+moduleNameReference m = brackets ((text ".module") <+> (singleQuotes (pprModuleName m <> hscOptionQual <> text ".dll")))
 
 moduleReference env m
   | ilxEnvModule env   == m = text ""
   | isHomeModule m = moduleNameReference (moduleName m)
--- See hack above
+  -- See hack above
   | isVanillaModule m && not inPrelude =  preludePackageReference
   | isVanillaModule m && inPrelude =  moduleNameReference (moduleName m)
--- end hack
+  -- end hack
   | otherwise  =  packageReference (modulePackage m)
 
 preludePackageReference = packageReference preludePackage

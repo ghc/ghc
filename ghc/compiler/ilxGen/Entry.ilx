@@ -1,18 +1,20 @@
 .assembly test { }
+.assembly extern 'mscorlib' { }
+.assembly extern ilx 'std' { }
 // ENTRYPOINT
 .class MainMain { 
    .method public static void Main(class [mscorlib]System.String[]) {
        .entrypoint
            ldstr "LOG: *** loading main value"   call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String)
-      ldsfld thunk<(func ( /* unit skipped */ ) --> class [ilx std]PrelBase_Z0T)> class Main::'Main_main'
+      ldsfld thunk<(func ( /* unit skipped */ ) --> class [std]PrelBase_Z0T)> class Main::'Main_main'
 
            ldstr "LOG: *** evaluating main value"
            call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String) 
-      callfunc () --> (func ( /* unit skipped */ ) --> class [ilx std]PrelBase_Z0T)
+      callfunc () --> (func ( /* unit skipped */ ) --> class [std]PrelBase_Z0T)
            ldstr "LOG: *** calling main value"
            call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String) 
       // ldunit
-      callfunc ( /* unit skipped */ ) --> class [ilx std]PrelBase_Z0T
+      callfunc ( /* unit skipped */ ) --> class [std]PrelBase_Z0T
 
       pop
 
@@ -25,22 +27,22 @@
       ldstr "LOG: ***calling critical finalizers manually in main()"
            call void [mscorlib]System.Console::WriteLine(class [mscorlib]System.String)
 
-ldsfld thunk<(func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handlezuzu>>) --> (func (/* unit skipped */) --> class [ilx std]PrelBase_Z0T))>  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
-ldsfld thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>  [ilx std]'PrelHandle'::'PrelHandle_stdin'
-      callfunc () (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func ( /* unit skipped */ ) -->  class [ilx std]PrelBase_Z0T)
-      callfunc ( /* unit skipped */ ) --> class [ilx std]PrelBase_Z0T
+ldsfld thunk<(func (thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handlezuzu>>) --> (func (/* unit skipped */) --> class [std]PrelBase_Z0T))>  [std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
+ldsfld thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handle__>>  [std]'PrelHandle'::'PrelHandle_stdin'
+      callfunc () (thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handle__>>) --> (func ( /* unit skipped */ ) -->  class [std]PrelBase_Z0T)
+      callfunc ( /* unit skipped */ ) --> class [std]PrelBase_Z0T
       pop
 
-ldsfld thunk<(func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handlezuzu>>) --> (func (/* unit skipped */) --> class [ilx std]PrelBase_Z0T))>  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
-ldsfld thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>  [ilx std]'PrelHandle'::'PrelHandle_stdout'
-      callfunc () (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func ( /* unit skipped */ ) -->  class [ilx std]PrelBase_Z0T)
-      callfunc ( /* unit skipped */ ) --> class [ilx std]PrelBase_Z0T
+ldsfld thunk<(func (thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handlezuzu>>) --> (func (/* unit skipped */) --> class [std]PrelBase_Z0T))>  [std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
+ldsfld thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handle__>>  [std]'PrelHandle'::'PrelHandle_stdout'
+      callfunc () (thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handle__>>) --> (func ( /* unit skipped */ ) -->  class [std]PrelBase_Z0T)
+      callfunc ( /* unit skipped */ ) --> class [std]PrelBase_Z0T
       pop
 
-ldsfld thunk<(func (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handlezuzu>>) --> (func (/* unit skipped */) --> class [ilx std]PrelBase_Z0T))>  [ilx std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
-ldsfld thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>  [ilx std]'PrelHandle'::'PrelHandle_stderr'
-      callfunc () (thunk<class [ilx std]PrelIOBase_MVar<class [ilx std]PrelIOBase_Handle__>>) --> (func ( /* unit skipped */ ) -->  class [ilx std]PrelBase_Z0T)
-      callfunc ( /* unit skipped */ ) --> class [ilx std]PrelBase_Z0T
+ldsfld thunk<(func (thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handlezuzu>>) --> (func (/* unit skipped */) --> class [std]PrelBase_Z0T))>  [std]'PrelHandle'::'PrelHandle_stdHandleFinalizzer'
+ldsfld thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handle__>>  [std]'PrelHandle'::'PrelHandle_stderr'
+      callfunc () (thunk<class [std]PrelIOBase_MVar<class [std]PrelIOBase_Handle__>>) --> (func ( /* unit skipped */ ) -->  class [std]PrelBase_Z0T)
+      callfunc ( /* unit skipped */ ) --> class [std]PrelBase_Z0T
       pop
 
       ldstr "LOG: exit main()\n"

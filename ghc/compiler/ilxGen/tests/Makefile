@@ -17,14 +17,10 @@ CORENV_DEBUG=
 CORENV_RETAIL=
 LOCALRUN=./
 ifeq ($(HOSTNAME),MSRC-HILDA)
-CORENV_DEBUG="call devcorb2gen.bat fastchecked"
+CORENV_DEBUG="call devcorb2gen.bat checked"
 CORENV_RETAIL="call devcorb2gen.bat free"
 LOCALRUN=.\\
 endif    
-
-ILX2IL_HOME=C:/devel/fcom/src
-ILX2IL=$(ILX2IL_HOME)/bin/ilx2il.opt.exe 
-ILVALID=$(ILX2IL_HOME)/bin/ilvalid.opt.exe 
 
 ghc:
 	$(MAKE) -C ../.. 
