@@ -40,14 +40,13 @@ import HsSyn	-- oodles of it
 
 -- others:
 import Id	( idName, idType, idUnfolding, setIdType, omitIfaceSigForId, isIP, Id )
-import DataCon	( DataCon, dataConWrapId, splitProductType_maybe )	
+import DataCon	( dataConWrapId )	
 import TcEnv	( tcLookupValueMaybe, tcExtendGlobalValEnv, tcGetValueEnv,
 		  ValueEnv, TcId, tcInstId
 		)
 
 import TcMonad
-import TcType	( TcType, TcTyVar,
-		  zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars
+import TcType	( zonkTcTypeToType, zonkTcTyVarToTyVar, zonkTcType, zonkTcSigTyVars
 		)
 import Name	( isLocallyDefined )
 import CoreSyn  ( Expr )
@@ -333,11 +332,18 @@ zonkExpr (HsIPVar id)
   = zonkIdOcc id	`thenNF_Tc` \ id' ->
     returnNF_Tc (HsIPVar id')
 
-zonkExpr (HsLit _) = panic "zonkExpr:HsLit"
-
-zonkExpr (HsLitOut lit ty)
+zonkExpr (HsLit (HsRat f ty))
   = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
-    returnNF_Tc (HsLitOut lit new_ty)
+    returnNF_Tc (HsLit (HsRat f new_ty))
+
+zonkExpr (HsLit (HsLitLit lit ty))
+  = zonkTcTypeToType ty	    `thenNF_Tc` \ new_ty  ->
+    returnNF_Tc (HsLit (HsLitLit lit new_ty))
+
+zonkExpr (HsLit lit)
+  = returnNF_Tc (HsLit lit)
+
+-- HsOverLit doesn't appear in typechecker output
 
 zonkExpr (HsLam match)
   = zonkMatch match	`thenNF_Tc` \ new_match ->
@@ -385,14 +391,16 @@ zonkExpr (HsLet binds expr)
     returnNF_Tc (HsLet new_binds new_expr)
 
 zonkExpr (HsWith expr binds)
-  = zonkExpr expr		`thenNF_Tc` \ new_expr ->
-    zonkIPBinds binds		`thenNF_Tc` \ new_binds ->
+  = zonkIPBinds binds				`thenNF_Tc` \ new_binds ->
+    tcExtendGlobalValEnv (map fst new_binds)	$
+    zonkExpr expr				`thenNF_Tc` \ new_expr ->
     returnNF_Tc (HsWith new_expr new_binds)
     where
 	zonkIPBinds = mapNF_Tc zonkIPBind
 	zonkIPBind (n, e) =
+	    zonkIdBndr n	`thenNF_Tc` \ n' ->
 	    zonkExpr e		`thenNF_Tc` \ e' ->
-	    returnNF_Tc (n, e')
+	    returnNF_Tc (n', e')
 
 zonkExpr (HsDo _ _ _) = panic "zonkExpr:HsDo"
 
