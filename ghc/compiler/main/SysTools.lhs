@@ -100,6 +100,7 @@ import List		( isPrefixOf )
 import Util		( dropList )
 import MarshalArray
 import Foreign
+import Foreign.C.String
 #endif
 
 #ifdef mingw32_HOST_OS
