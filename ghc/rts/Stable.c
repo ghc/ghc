@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.4 1999/03/08 16:41:24 sof Exp $
+ * $Id: Stable.c,v 1.5 1999/07/16 09:53:44 panne Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -199,7 +199,7 @@ getStablePtr(StgPtr p)
 
   weight = stable_ptr_table[sn].weight;
   if (weight == 0) {
-    weight = 1 << (BITS_IN(StgWord)-1);
+    weight = (StgWord)1 << (BITS_IN(StgWord)-1);
     stable_ptr_table[sn].weight = weight;
     return (StgStablePtr)(sn + ((BITS_IN(StgWord)-1) << STABLEPTR_WEIGHT_SHIFT));
   } 
