@@ -1,186 +1,415 @@
-%
-% (c) The GRASP/AQUA Project, Glasgow University, 1992-1996
-%
-\section[Digraph]{An implementation of directed graphs}
-
 \begin{code}
-#include "HsVersions.h"
+#if defined(COMPILING_GHC)
+# include "HsVersions.h"
+#endif
 
-module Digraph (
-	 stronglyConnComp,
-	 topologicalSort,
-	 dfs,
-	 MaybeErr,
+module Digraph(
 
-	 -- alternative interface
-	 findSCCs, SCC(..), Bag
+	-- At present the only one with a "nice" external interface
+	stronglyConnComp, stronglyConnCompR, SCC(..),
+
+	SYN_IE(Graph), SYN_IE(Vertex), 
+	graphFromEdges, buildG, transposeG, reverseE, outdegree, indegree,
+
+	Tree(..), SYN_IE(Forest),
+	showTree, showForest,
+
+	dfs, dff,
+	topSort,
+	components,
+	scc,
+	back, cross, forward,
+	reachable, path,
+	bcc
+
     ) where
 
-CHK_Ubiq() -- debugging consistency check
-IMPORT_1_3(List(partition))
+------------------------------------------------------------------------------
+-- A version of the graph algorithms described in:
+-- 
+-- ``Lazy Depth-First Search and Linear Graph Algorithms in Haskell''
+--   by David King and John Launchbury
+-- 
+-- Also included is some additional code for printing tree structures ...
+------------------------------------------------------------------------------
 
-import Maybes		( MaybeErr(..), maybeToBool )
-import Bag		( Bag, filterBag, bagToList, listToBag )
-import FiniteMap	( FiniteMap, listToFM, lookupFM, lookupWithDefaultFM )
-import Unique		( Unique )
-import Util
+#ifdef REALLY_HASKELL_1_3
+
+#define ARR_ELT		(COMMA)
+
+import Array
+import List
+import ST
+import ArrBase
+import Maybe
+
+#else
+
+#define ARR_ELT 	(:=)
+#define runST		_runST
+#define MutableArray	_MutableArray
+#define Show		Text
+
+import PreludeGlaST
+import Maybes		( mapMaybe )
+
+#endif
+
+import Util	( Ord3(..), 
+		  sortLt
+	 	)
 \end{code}
 
-This module implements at least part of an abstract data type for
-directed graphs.  The part implemented is what we need for doing
-dependency analyses.
-
->type Edge  vertex = (vertex, vertex)
->type Cycle vertex = [vertex]
 
 %************************************************************************
 %*									*
-%*	Strongly connected components					*
+%*	External interface
 %*									*
 %************************************************************************
-
-John Launchbury provided the basic code for doing strongly-connected
-components.
-
-The result is a list of cycles (each of which is a list of vertices),
-and these cycles are topologically sorted, so that if there is an edge from
-cycle A to cycle B, then A occurs after B in the result list.
 
 \begin{code}
-stronglyConnComp :: (vertex->vertex->Bool) -> [Edge vertex] -> [vertex] -> [[vertex]]
+data SCC vertex = AcyclicSCC vertex
+	        | CyclicSCC  [vertex]
 
-stronglyConnComp eq edges vertices
-  = snd (span_tree (new_range reversed_edges)
-		    ([],[])
-		   ( snd (dfs (new_range edges) ([],[]) vertices) )
-	)
+stronglyConnComp
+	:: Ord3 key
+	=> [(node, key, [key])]		-- The graph; its ok for the
+					-- out-list to contain keys which arent
+					-- a vertex key, they are ignored
+	-> [SCC node]
+
+stronglyConnComp edges
+  = map get_node (stronglyConnCompR edges)
   where
-    reversed_edges = map swap edges
+    get_node (AcyclicSCC (n, _, _)) = AcyclicSCC n
+    get_node (CyclicSCC triples)     = CyclicSCC [n | (n,_,_) <- triples]
 
-    swap (x,y) = (y,x)
+-- The "R" interface is used when you expect to apply SCC to
+-- the (some of) the result of SCC, so you dont want to lose the dependency info
+stronglyConnCompR
+	:: Ord3 key
+	=> [(node, key, [key])]		-- The graph; its ok for the
+					-- out-list to contain keys which arent
+					-- a vertex key, they are ignored
+	-> [SCC (node, key, [key])]
 
-    -- new_range :: Eq v => [Edge v] -> v -> [v]
-
-    new_range    []       w = []
-    new_range ((x,y):xys) w
-	 = if x `eq` w
-	   then (y : (new_range xys w))
-	   else (new_range xys w)
-
-    elem x []	  = False
-    elem x (y:ys) = x `eq` y || x `elem` ys
-
-{-  span_tree :: Eq v => (v -> [v])
-		      -> ([v], [[v]])
-		      -> [v]
-		      -> ([v], [[v]])
--}
-    span_tree r (vs,ns) []   = (vs,ns)
-    span_tree r (vs,ns) (x:xs)
-	 | x `elem` vs = span_tree r (vs,ns) xs
-	 | True	       = case (dfs r (x:vs,[]) (r x)) of { (vs',ns') ->
-			 span_tree r (vs',(x:ns'):ns) xs }
-
-{-  dfs :: Eq v => (v -> [v])
-		-> ([v], [v])
-		-> [v]
-		-> ([v], [v])
--}
-    dfs r (vs,ns)   []   = (vs,ns)
-    dfs r (vs,ns) (x:xs) | x `elem` vs = dfs r (vs,ns) xs
-			 | True        = case (dfs r (x:vs,[]) (r x)) of { (vs',ns') ->
-					 dfs r (vs',(x:ns')++ns) xs }
-\end{code}
-
-\begin{code}
-dfs :: (v -> v -> Bool)
-    -> (v -> [v])
-    -> ([v], [v])
-    -> [v]
-    -> ([v], [v])
-
-dfs eq r (vs,ns)   []   = (vs,ns)
-dfs eq r (vs,ns) (x:xs)
-    	| any (eq x) vs = dfs eq r (vs,ns) xs
-	| True          = case (dfs eq r (x:vs,[]) (r x)) of
-				(vs',ns') -> dfs eq r (vs',(x:ns')++ns) xs
-\end{code}
-
-\begin{code}
-{-# SPECIALIZE findSCCs :: (a -> (Unique, Bag Unique)) -> Bag a -> [SCC a] #-}
-
-findSCCs :: Ord key
-	 => (vertex -> (key, Bag key))	-- Give key of vertex, and keys of thing's
-					-- immediate neighbours.  It's ok for the
-					-- list to contain keys which don't correspond
-					-- to any vertex; they are ignored.
-	 -> Bag vertex		-- Stuff to be SCC'd
-	 -> [SCC vertex]	-- The union of all these is the original bag
-
-data SCC thing = AcyclicSCC thing
-	       | CyclicSCC  (Bag thing)
-
-findSCCs v_info vs
-  = let
-        (keys, keys_of, edgess) = unzip3 (map do_vertex (bagToList vs))
-	key_map = listToFM keys_of
-	edges   = concat edgess
-
-	do_vertex v = (k, (k, (v, ok_ns)), ok_edges)
-	  where
-	    (k, ns)  = v_info v
-	    ok_ns    = filter key_in_graph (bagToList ns)
-	    ok_edges = map (\n->(k,n)) ok_ns
-
-	key_in_graph n = maybeToBool (lookupFM key_map n)
-
-	the_sccs = stronglyConnComp (==) edges keys 
-
-	cnv_sccs = map cnv_scc the_sccs 
-
-	cnv_scc []  = panic "findSCCs: empty component"
-	cnv_scc [k] | singlecycle k
-		    = AcyclicSCC (get_vertex k)
-        cnv_scc ks  = CyclicSCC (listToBag (map get_vertex ks))
-
-	singlecycle k = not (isIn "cycle" k (get_neighs k))
-
-	get_vertex k = fst (lookupWithDefaultFM key_map vpanic k)
-	get_neighs k = snd (lookupWithDefaultFM key_map vpanic k)
-
-	vpanic = panic "Digraph: vertix not found from key"
-    in
-    cnv_sccs
-\end{code}
-
-%************************************************************************
-%*									*
-%*	Topological sort						*
-%*									*
-%************************************************************************
-
-Topological sort fails if it finds any cycles, returning the offending cycles.
-
-If it succeeds, the result is a list of vertices, such that if there is
-an edge from vertex A to vertex B then A occurs after B in the result list.
-
-\begin{code}
-topologicalSort :: (vertex->vertex->Bool) -> [Edge vertex] -> [vertex]
-	-> MaybeErr [vertex] 	-- Success: the sorted list
-		    [[vertex]]	-- Failure: the cycles
-
-topologicalSort eq edges vertices
-  = case (stronglyConnComp eq edges vertices) of { sccs ->
-    case (partition (is_cyclic edges) sccs)   of { (cycles, singletons) ->
-    if null cycles
-    then Succeeded [ v | [v] <- singletons ]
-    else Failed cycles
-    }}
+stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEdges -- SOF
+stronglyConnCompR edges
+  = map decode forest
   where
-    is_cyclic es []  = panic "is_cyclic: empty component"
-    is_cyclic es [v] = (v,v) `elem` es
-    is_cyclic es vs  = True
-
-    elem (x,y)   []	    = False
-    elem z@(x,y) ((a,b):cs) = (x `eq` a && y `eq` b) || z `elem` cs
+    (graph, vertex_fn) = graphFromEdges edges
+    forest	       = scc graph
+    decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
+		       | otherwise	   = AcyclicSCC (vertex_fn v)
+    decode other = CyclicSCC (dec other [])
+		 where
+		   dec (Node v ts) vs = vertex_fn v : foldr dec vs ts
+    mentions_itself v = v `elem` (graph ! v)
 \end{code}
+
+%************************************************************************
+%*									*
+%*	Graphs
+%*									*
+%************************************************************************
+
+
+\begin{code}
+type Vertex  = Int
+type Table a = Array Vertex a
+type Graph   = Table [Vertex]
+type Bounds  = (Vertex, Vertex)
+type Edge    = (Vertex, Vertex)
+\end{code}
+
+\begin{code}
+vertices :: Graph -> [Vertex]
+vertices  = indices
+
+edges    :: Graph -> [Edge]
+edges g   = [ (v, w) | v <- vertices g, w <- g!v ]
+
+mapT    :: (Vertex -> a -> b) -> Table a -> Table b
+mapT f t = array (bounds t) [ ARR_ELT v (f v (t!v)) | v <- indices t ]
+
+buildG :: Bounds -> [Edge] -> Graph
+#ifdef REALLY_HASKELL_1_3
+buildG bounds edges = accumArray (flip (:)) [] bounds edges
+#else
+buildG bounds edges = accumArray (flip (:)) [] bounds [ARR_ELT k v | (k,v) <- edges]
+#endif
+
+transposeG  :: Graph -> Graph
+transposeG g = buildG (bounds g) (reverseE g)
+
+reverseE    :: Graph -> [Edge]
+reverseE g   = [ (w, v) | (v, w) <- edges g ]
+
+outdegree :: Graph -> Table Int
+outdegree  = mapT numEdges
+             where numEdges v ws = length ws
+
+indegree :: Graph -> Table Int
+indegree  = outdegree . transposeG
+\end{code}
+
+
+\begin{code}
+graphFromEdges
+	:: Ord3 key
+	=> [(node, key, [key])]
+	-> (Graph, Vertex -> (node, key, [key]))
+graphFromEdges edges
+  = (graph, \v -> vertex_map ! v)
+  where
+    max_v      	    = length edges - 1
+    bounds          = (0,max_v) :: (Vertex, Vertex)
+    sorted_edges    = sortLt lt edges
+    edges1	    = zipWith ARR_ELT [0..] sorted_edges
+
+    graph	    = array bounds [ARR_ELT v (mapMaybe key_vertex ks) | ARR_ELT v (_,    _, ks) <- edges1]
+    key_map	    = array bounds [ARR_ELT v k			       | ARR_ELT v (_,    k, _ ) <- edges1]
+    vertex_map	    = array bounds edges1
+
+    (_,k1,_) `lt` (_,k2,_) = case k1 `cmp` k2 of { LT_ -> True; other -> False }
+
+    -- key_vertex :: key -> Maybe Vertex
+    -- 	returns Nothing for non-interesting vertices
+    key_vertex k   = find 0 max_v 
+		   where
+		     find a b | a > b 
+			      = Nothing
+		     find a b = case cmp k (key_map ! mid) of
+				   LT_ -> find a (mid-1)
+				   EQ_ -> Just mid
+				   GT_ -> find (mid+1) b
+			      where
+			 	mid = (a + b) `div` 2
+\end{code}
+
+%************************************************************************
+%*									*
+%*	Trees and forests
+%*									*
+%************************************************************************
+
+\begin{code}
+data Tree a   = Node a (Forest a)
+type Forest a = [Tree a]
+
+mapTree              :: (a -> b) -> (Tree a -> Tree b)
+mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
+\end{code}
+
+\begin{code}
+instance Show a => Show (Tree a) where
+  showsPrec p t s = showTree t ++ s
+
+showTree :: Show a => Tree a -> String
+showTree  = drawTree . mapTree show
+
+showForest :: Show a => Forest a -> String
+showForest  = unlines . map showTree
+
+drawTree        :: Tree String -> String
+drawTree         = unlines . draw
+
+draw (Node x ts) = grp this (space (length this)) (stLoop ts)
+ where this          = s1 ++ x ++ " "
+
+       space n       = take n (repeat ' ')
+
+       stLoop []     = [""]
+       stLoop [t]    = grp s2 "  " (draw t)
+       stLoop (t:ts) = grp s3 s4 (draw t) ++ [s4] ++ rsLoop ts
+
+       rsLoop [t]    = grp s5 "  " (draw t)
+       rsLoop (t:ts) = grp s6 s4 (draw t) ++ [s4] ++ rsLoop ts
+
+       grp fst rst   = zipWith (++) (fst:repeat rst)
+
+       [s1,s2,s3,s4,s5,s6] = ["- ", "--", "-+", " |", " `", " +"]
+\end{code}
+
+
+%************************************************************************
+%*									*
+%*	Depth first search
+%*									*
+%************************************************************************
+
+\begin{code}
+type Set s    = MutableArray s Vertex Bool
+
+mkEmpty      :: Bounds -> ST s (Set s)
+mkEmpty bnds  = newArray bnds False
+
+contains     :: Set s -> Vertex -> ST s Bool
+contains m v  = readArray m v
+
+include      :: Set s -> Vertex -> ST s ()
+include m v   = writeArray m v True
+\end{code}
+
+\begin{code}
+dff          :: Graph -> Forest Vertex
+dff g         = dfs g (vertices g)
+
+dfs          :: Graph -> [Vertex] -> Forest Vertex
+dfs g vs      = prune (bounds g) (map (generate g) vs)
+
+generate     :: Graph -> Vertex -> Tree Vertex
+generate g v  = Node v (map (generate g) (g!v))
+
+prune        :: Bounds -> Forest Vertex -> Forest Vertex
+prune bnds ts = runST (mkEmpty bnds  `thenST` \m ->
+                       chop m ts)
+
+chop         :: Set s -> Forest Vertex -> ST s (Forest Vertex)
+chop m []     = returnST []
+chop m (Node v ts : us)
+              = contains m v `thenStrictlyST` \visited ->
+                if visited then
+                  chop m us
+                else
+                  include m v `thenStrictlyST` \_  ->
+                  chop m ts   `thenStrictlyST` \as ->
+                  chop m us   `thenStrictlyST` \bs ->
+                  returnST (Node v as : bs)
+\end{code}
+
+
+%************************************************************************
+%*									*
+%*	Algorithms
+%*									*
+%************************************************************************
+
+------------------------------------------------------------
+-- Algorithm 1: depth first search numbering
+------------------------------------------------------------
+
+\begin{code}
+--preorder            :: Tree a -> [a]
+preorder (Node a ts) = a : preorderF ts
+
+preorderF           :: Forest a -> [a]
+preorderF ts         = concat (map preorder ts)
+
+preOrd :: Graph -> [Vertex]
+preOrd  = preorderF . dff
+
+tabulate        :: Bounds -> [Vertex] -> Table Int
+tabulate bnds vs = array bnds (zipWith ARR_ELT vs [1..])
+
+preArr          :: Bounds -> Forest Vertex -> Table Int
+preArr bnds      = tabulate bnds . preorderF
+\end{code}
+
+
+------------------------------------------------------------
+-- Algorithm 2: topological sorting
+------------------------------------------------------------
+
+\begin{code}
+--postorder :: Tree a -> [a]
+postorder (Node a ts) = postorderF ts ++ [a]
+
+postorderF   :: Forest a -> [a]
+postorderF ts = concat (map postorder ts)
+
+postOrd      :: Graph -> [Vertex]
+postOrd       = postorderF . dff
+
+topSort      :: Graph -> [Vertex]
+topSort       = reverse . postOrd
+\end{code}
+
+
+------------------------------------------------------------
+-- Algorithm 3: connected components
+------------------------------------------------------------
+
+\begin{code}
+components   :: Graph -> Forest Vertex
+components    = dff . undirected
+
+undirected   :: Graph -> Graph
+undirected g  = buildG (bounds g) (edges g ++ reverseE g)
+\end{code}
+
+
+-- Algorithm 4: strongly connected components
+
+\begin{code}
+scc  :: Graph -> Forest Vertex
+scc g = dfs g (reverse (postOrd (transposeG g)))
+\end{code}
+
+
+------------------------------------------------------------
+-- Algorithm 5: Classifying edges
+------------------------------------------------------------
+
+\begin{code}
+tree              :: Bounds -> Forest Vertex -> Graph
+tree bnds ts       = buildG bnds (concat (map flat ts))
+		   where
+		     flat (Node v rs) = [ (v, w) | Node w us <- ts ] ++
+                    		        concat (map flat ts)
+
+back              :: Graph -> Table Int -> Graph
+back g post        = mapT select g
+ where select v ws = [ w | w <- ws, post!v < post!w ]
+
+cross             :: Graph -> Table Int -> Table Int -> Graph
+cross g pre post   = mapT select g
+ where select v ws = [ w | w <- ws, post!v > post!w, pre!v > pre!w ]
+
+forward           :: Graph -> Graph -> Table Int -> Graph
+forward g tree pre = mapT select g
+ where select v ws = [ w | w <- ws, pre!v < pre!w ] \\ tree!v
+\end{code}
+
+
+------------------------------------------------------------
+-- Algorithm 6: Finding reachable vertices
+------------------------------------------------------------
+
+\begin{code}
+reachable    :: Graph -> Vertex -> [Vertex]
+reachable g v = preorderF (dfs g [v])
+
+path         :: Graph -> Vertex -> Vertex -> Bool
+path g v w    = w `elem` (reachable g v)
+\end{code}
+
+
+------------------------------------------------------------
+-- Algorithm 7: Biconnected components
+------------------------------------------------------------
+
+\begin{code}
+bcc :: Graph -> Forest [Vertex]
+bcc g = (concat . map bicomps . map (label g dnum)) forest
+ where forest = dff g
+       dnum   = preArr (bounds g) forest
+
+label :: Graph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
+label g dnum (Node v ts) = Node (v,dnum!v,lv) us
+ where us = map (label g dnum) ts
+       lv = minimum ([dnum!v] ++ [dnum!w | w <- g!v]
+                     ++ [lu | Node (u,du,lu) xs <- us])
+
+bicomps :: Tree (Vertex,Int,Int) -> Forest [Vertex]
+bicomps (Node (v,dv,lv) ts)
+      = [ Node (v:vs) us | (l,Node vs us) <- map collect ts]
+
+collect :: Tree (Vertex,Int,Int) -> (Int, Tree [Vertex])
+collect (Node (v,dv,lv) ts) = (lv, Node (v:vs) cs)
+ where collected = map collect ts
+       vs = concat [ ws | (lw, Node ws us) <- collected, lw<dv]
+       cs = concat [ if lw<dv then us else [Node (v:ws) us]
+                        | (lw, Node ws us) <- collected ]
+\end{code}
+
