@@ -587,10 +587,10 @@ class C a where
 
 <programlisting>
 data T a b
-  = -- | This is the documentation for the 'C1' constructor
-    C1 a b 
-  | -- | This is the documentation for the 'C2' constructor
-    C2 a b 
+  -- | This is the documentation for the 'C1' constructor
+  = C1 a b 
+  -- | This is the documentation for the 'C2' constructor
+  | C2 a b 
 </programlisting>
 
 	<para>or like this:</para>
@@ -614,10 +614,14 @@ data R a b =
 
 data R a b = 
   C { a :: a  -- ^ This is the documentation for the 'a' field
-              -- (NOTE: *before* the following comma)
     , b :: b  -- ^ This is the documentation for the 'b' field
     }
 </programlisting>
+
+        <para>Alternative layout styles are generally accepted by
+        Haddock - for example doc comments can appear before or after
+        the comma in separated lists such as the list of record fields
+        above.</para>
       </section>
 
       <section>
@@ -702,6 +706,24 @@ module Foo (
       <para>If you use section headings, then Haddock will generate a
       table of contents at the top of the module documentation for
       you.</para>
+
+      <para>The alternative style of placing the commas at the
+      beginning of each line is also supported. eg.:</para>
+
+<programlisting>
+module Foo (
+  -- * Classes
+  , C(..)
+  -- * Types
+  -- ** A data type
+  , T
+  -- ** A record
+  , R
+  -- * Some functions
+  , f
+  , g
+  ) where
+</programlisting>
 
       <section>
 	<title>Re-exporting an entire module</title>
