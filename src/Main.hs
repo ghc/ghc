@@ -341,7 +341,8 @@ mkInterface no_implicit_prelude mod_map filename
      decl_map :: FiniteMap HsName HsDecl
      decl_map = listToFM [ (n,d) | d <- final_decls, n <- declBinders d ]
 
-     instances = [ d | d@HsInstDecl{} <- final_decls ]
+     instances = [ d | d@HsInstDecl{} <- final_decls ] ++
+		 [ d | decl <- orig_decls, d <- derivedInstances mdl decl]
 
   -- make the "export items", which will be converted into docs later
   orig_export_list <- mkExportItems mod_map mdl orig_env decl_map sub_map
@@ -393,6 +394,78 @@ mkInterface no_implicit_prelude mod_map filename
 		   iface_options      = opts
 		}
       	  )
+
+-- Try to generate instance declarations for derived instances.
+-- We can't do this properly without instance inference, but if a type
+-- variable occurs as a constructor argument, then we can just
+-- propagate the derived class to the variable.  But we know nothing of
+-- the constraints on any type variables that occur elsewhere.
+-- Note that a type variable may be in both categories: then we know a
+-- constraint, but there may be more, or a stronger constraint.
+derivedInstances :: Module -> HsDecl -> [HsDecl]
+derivedInstances mdl decl = case decl of
+   HsDataDecl srcloc ctxt n tvs cons drv@(_:_) _ ->
+      derived srcloc ctxt n tvs cons drv
+   HsNewTypeDecl srcloc ctxt n tvs con drv@(_:_) _ ->
+      derived srcloc ctxt n tvs [con] drv
+   _ -> []
+ where
+  derived srcloc ctxt n tvs cons drv =
+     [HsInstDecl srcloc
+		 (ctxt ++ [(cls,[v]) | v <- simple_tvars] ++ extra_constraint)
+		 (cls,[t]) [] |
+	cls <- drv]
+   where
+     tvar_map = fmToList $ unionMaps (map tvarsConstr cons)
+     simple_tvars = [HsTyVar v | (v,(in_constr,_)) <- tvar_map, in_constr]
+     complex_tvars = [HsTyVar v | (v,(_,in_tycons)) <- tvar_map, in_tycons]
+     extra_constraint
+	| null complex_tvars = []
+	| otherwise = [(unknownConstraint,complex_tvars)]
+     t  | n == tuple_tycon_name (length tvs - 1) =
+	   HsTyTuple True (map HsTyVar tvs)
+        | otherwise = foldl HsTyApp (HsTyCon (Qual mdl n)) (map HsTyVar tvs)
+
+  -- collect the type variables occurring free in a constr
+  tvarsConstr :: HsConDecl -> FiniteMap HsName (Bool,Bool)
+  -- first Bool: tvar occurs as a data constructor argument
+  -- second Bool: tvar occurs as a type constructor argument
+  tvarsConstr (HsConDecl _ _ vs _ bts _) =
+     unionMaps (map tvarsBangType bts) `delListFromFM` vs
+  tvarsConstr (HsRecDecl _ _ vs _ fs _) =
+     unionMaps (map tvarsField fs) `delListFromFM` vs
+
+  tvarsField (HsFieldDecl _ bt _) = tvarsBangType bt
+
+  tvarsBangType (HsBangedTy t) = tvarsType t
+  tvarsBangType (HsUnBangedTy t) = tvarsType t
+
+  tvarsType (HsTyTuple _ ts) = unionMaps (map tvarsType ts)
+  tvarsType (HsTyVar tv) = unitFM tv (True,False)
+  tvarsType (HsTyDoc t _) = tvarsType t
+  tvarsType t = tvarsType2 t
+
+  tvarsType2 (HsForAllType (Just tvs) _ t) = tvarsType2 t `delListFromFM` tvs
+  tvarsType2 (HsForAllType Nothing _ t) = tvarsType2 t
+  tvarsType2 (HsTyFun t1 t2) = tvarsType2 t1 `unionMap` tvarsType2 t2
+  tvarsType2 (HsTyTuple _ ts) = unionMaps (map tvarsType2 ts)
+  tvarsType2 (HsTyApp t1 t2) = tvarsType2 t1 `unionMap` tvarsType2 t2
+  tvarsType2 (HsTyVar tv) = unitFM tv (False,True)
+  tvarsType2 (HsTyCon _) = emptyFM
+  tvarsType2 (HsTyDoc t _) = tvarsType2 t
+
+  unionMaps :: [FiniteMap HsName (Bool,Bool)] -> FiniteMap HsName (Bool,Bool)
+  unionMaps = foldr unionMap emptyFM
+
+  unionMap :: FiniteMap HsName (Bool,Bool) -> FiniteMap HsName (Bool,Bool) ->
+	FiniteMap HsName (Bool,Bool)
+  unionMap = plusFM_C or2
+
+  or2 :: (Bool,Bool) -> (Bool,Bool) -> (Bool,Bool)
+  or2 (a1,b1) (a2,b2) = (a1 || a2, b1 || b2)
+
+unknownConstraint :: HsQName
+unknownConstraint = UnQual (HsTyClsName (HsIdent "???"))
 
 -- -----------------------------------------------------------------------------
 -- Build the list of items that will become the documentation, from the

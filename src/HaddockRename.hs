@@ -88,12 +88,16 @@ renameDecl decl
 	    ty <- renameType ty0
 	    doc <- renameMaybeDoc doc0
 	    return (HsTypeDecl loc t args ty doc)
-	HsDataDecl loc ctx t args cons0 drv doc0 -> do
+	HsDataDecl loc ctx0 t args cons0 drv0 doc0 -> do
+	    ctx <- mapM renamePred ctx0
 	    cons <- mapM renameConDecl cons0
+	    drv <- mapM (lookupRn id) drv0
 	    doc <- renameMaybeDoc doc0
 	    return (HsDataDecl loc ctx t args cons drv doc)
-        HsNewTypeDecl loc ctx t args con0 drv doc0 -> do
+        HsNewTypeDecl loc ctx0 t args con0 drv0 doc0 -> do
+	    ctx <- mapM renamePred ctx0
 	    con <- renameConDecl con0
+	    drv <- mapM (lookupRn id) drv0
 	    doc <- renameMaybeDoc doc0
 	    return (HsNewTypeDecl loc ctx t args con drv doc)
         HsClassDecl loc ctxt0 nm tvs fds decls0 doc0 -> do
