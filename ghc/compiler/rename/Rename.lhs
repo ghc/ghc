@@ -221,6 +221,13 @@ renameExtCore dflags hit hst pcs this_module
     rnSourceDecls emptyRdrEnv emptyAvailEnv
 		  emptyLocalFixityEnv 
 		  InterfaceMode local_decls `thenRn` \ (rn_local_decls, source_fvs) ->
+    let
+        tycl_decls     = [d | (TyClD d) <- rn_local_decls ]
+	local_names    = foldl add emptyNameSet tycl_decls
+	add names decl = addListToNameSet names (map fst (tyClDeclSysNames decl ++ tyClDeclNames decl))
+    in
+    recordLocalSlurps local_names	`thenRn_`
+
     closeDecls rn_local_decls source_fvs    `thenRn` \ final_decls ->		  
        -- print everything qualified.
     let	print_unqualified = const False in
