@@ -637,6 +637,32 @@ Wed Mar 14 12:23:13 GMT 2001
       of <literal>it</literal> is lost.</para>
 
     </sect2>
+
+    <sect2>
+      <title>Type defaulting in GHCi</title>
+    <indexterm><primary>Type default</primary></indexterm>
+    <indexterm><primary><literal>Show</literal> class</primary></indexterm>
+      <para>
+      Consider this GHCi session:
+<programlisting>
+  ghci> reverse []
+</programlisting>
+      What should GHCi do?  Strictly speaking, the program is ambiguous.  <literal>show (reverse [])</literal>
+      (which is what GHCi computes here) has type <literal>Show a => a</literal> and how that displays depends 
+      on the type <literal>a</literal>.  For example:
+<programlisting>
+  ghci> (reverse []) :: String
+  ""
+  ghci> (reverse []) :: [Int]
+  []
+</programlisting>
+    However, it is tiresome for the user to have to specify the type, so GHCi extends Haskell's type-defaulting
+    rules (Section 4.3.4 of the Haskell 98 Report (Revised)) as follows.  If the expression yields a set of
+    type constraints that are all from standard classes (<literal>Num</literal>, <literal>Eq</literal> etc.), 
+   and at least one is either a numeric class <emphasis>or the <literal>Show</literal> class</emphasis>,
+   GHCi will try to use one of the <literal>default</literal> types, just as described in the Report.
+   </para>
+    </sect2>
   </sect1>
 
   <sect1 id="ghci-invokation">

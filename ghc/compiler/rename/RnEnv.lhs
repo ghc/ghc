@@ -39,7 +39,7 @@ import Module		( Module, ModuleName, moduleName, mkHomeModule,
 import PrelNames	( mkUnboundName, intTyConName, 
 			  boolTyConName, funTyConName,
 			  unpackCStringName, unpackCStringFoldrName, unpackCStringUtf8Name,
-			  eqStringName, printName, 
+			  eqStringName, printName, integerTyConName,
 			  bindIOName, returnIOName, failIOName, thenIOName
 			)
 #ifdef GHCI	
@@ -564,9 +564,15 @@ mentioned explicitly, but which might be needed by the type checker.
 implicitStmtFVs source_fvs 	-- Compiling a statement
   = stmt_fvs `plusFV` implicitModuleFVs source_fvs
   where
-    stmt_fvs = mkFVs [printName, bindIOName, thenIOName, returnIOName, failIOName]
+    stmt_fvs = mkFVs [printName, bindIOName, thenIOName, returnIOName, failIOName, 
+		      integerTyConName]
 		-- These are all needed implicitly when compiling a statement
 		-- See TcModule.tc_stmts
+	-- Reason for integerTyConName: consider this in GHCi
+	--	ghci>  []
+	-- We get an ambigous constraint (Show a), which we now default just like
+	-- numeric types... but unless we have the instance decl for Integer we 
+	-- won't find a valid default!
 
 implicitModuleFVs source_fvs
   = mkTemplateHaskellFVs source_fvs 	`plusFV` 

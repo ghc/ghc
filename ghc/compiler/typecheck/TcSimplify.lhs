@@ -53,7 +53,8 @@ import NameSet		( NameSet, mkNameSet, elemNameSet )
 import Class		( classBigSig )
 import FunDeps		( oclose, grow, improve, pprEquationDoc )
 import PrelInfo		( isNumericClass, isCreturnableClass, isCcallishClass ) 
-import PrelNames	( splitName, fstName, sndName )
+import PrelNames	( splitName, fstName, sndName, showClassKey )
+import HscTypes		( GhciMode(Interactive) )
 
 import Subst		( mkTopTyVarSubst, substTheta, substTy )
 import TysWiredIn	( unitTy, pairTyCon )
@@ -63,6 +64,7 @@ import VarEnv		( TidyEnv )
 import FiniteMap
 import Outputable
 import ListSetOps	( equivClasses )
+import Unique		( hasKey )
 import Util		( zipEqual, isSingleton )
 import List		( partition )
 import CmdLineOpts
@@ -1646,8 +1648,12 @@ tcSimplifyTop wanteds
     	(tidy_env, tidy_dicts) = tidyInsts bad_guys
     	(bad_ips, non_ips)     = partition isIPDict tidy_dicts
     	(no_insts, ambigs)     = partition no_inst non_ips
-    	no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
-    	fixed_tvs = oclose (fdPredsOfInsts tidy_dicts) emptyVarSet
+    	no_inst d              = not (isTyVarDict d) 
+	-- Previously, there was a more elaborate no_inst definition:
+	--	no_inst d = not (isTyVarDict d) || tyVarsOfInst d `subVarSet` fixed_tvs
+	--	fixed_tvs = oclose (fdPredsOfInsts tidy_dicts) emptyVarSet
+	-- But that seems over-elaborate to me; it only bites for class decls with
+	-- fundeps like this:		class C a b | -> b where ...
     in
 
 	-- Report definite errors
@@ -1668,7 +1674,8 @@ tcSimplifyTop wanteds
 	addTopAmbigErrs (tidy_env, ambigs)	`thenM_`
 
 	-- Disambiguate the ones that look feasible
-        mappM disambigGroup std_oks
+	getGhciMode				`thenM` \ mode ->
+        mappM (disambigGroup mode) std_oks
     )					`thenM` \ binds_ambig ->
 
     returnM (binds `andMonoBinds` andMonoBindList binds_ambig)
@@ -1715,12 +1722,13 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambigGroup :: [Inst]	-- All standard classes of form (C a)
+disambigGroup :: GhciMode 
+	      -> [Inst]	-- All standard classes of form (C a)
 	      -> TcM TcDictBinds
 
-disambigGroup dicts
-  |   any isNumericClass classes 	-- Guaranteed all standard classes
-	  -- see comment at the end of function for reasons as to
+disambigGroup ghci_mode dicts
+  |   any std_default_class classes 	-- Guaranteed all standard classes
+	  -- See comment at the end of function for reasons as to
 	  -- why the defaulting mechanism doesn't apply to groups that
 	  -- include CCallable or CReturnable dicts.
    && not (any isCcallishClass classes)
@@ -1746,35 +1754,38 @@ disambigGroup dicts
     in
 	-- See if any default works
     tryM (try_default default_tys)	`thenM` \ mb_ty ->
-    case mb_ty of {
-	Left _ -> 	-- If not, add an AmbigErr
-		  addTopAmbigErrs (tidyInsts dicts)	`thenM_`
-		  returnM EmptyMonoBinds ;
+    case mb_ty of
+	Left  _ 		-> bomb_out
+	Right chosen_default_ty -> choose_default chosen_default_ty
 
-	Right chosen_default_ty ->
+  | all isCreturnableClass classes	-- Default CCall stuff to ()
+  = choose_default unitTy
 
-	-- If so, bind the type variable 
-	-- and reduce the context, for real this time
-    unifyTauTy chosen_default_ty (mkTyVarTy tyvar)	`thenM_`
-    simpleReduceLoop (text "disambig" <+> ppr dicts)
-		     reduceMe dicts			`thenM` \ (frees, binds, ambigs) ->
-    WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
-    warnDefault dicts chosen_default_ty			`thenM_`
-    returnM binds }
-
-  | all isCreturnableClass classes
-  = 	-- Default CCall stuff to (); we don't even both to check that () is an
-	-- instance of CReturnable, because we know it is.
-    unifyTauTy (mkTyVarTy tyvar) unitTy	`thenM_`
-    returnM EmptyMonoBinds
-
-  | otherwise -- No defaults
-  = addTopAmbigErrs (tidyInsts dicts)	`thenM_`
-    returnM EmptyMonoBinds
+  | otherwise 				-- No defaults
+  = bomb_out
 
   where
-    tyvar       = get_tv (head dicts)		-- Should be non-empty
-    classes     = map get_clas dicts
+    tyvar   = get_tv (head dicts)	-- Should be non-empty
+    classes = map get_clas dicts
+
+    std_default_class cls
+      =  isNumericClass cls
+      || (ghci_mode == Interactive && cls `hasKey` showClassKey)
+	 	-- In interactive mode, we default Show a to Show ()
+		-- to avoid graututious errors on "show []"
+
+    choose_default default_ty	-- Commit to tyvar = default_ty
+      =	-- Bind the type variable 
+	unifyTauTy default_ty (mkTyVarTy tyvar)	`thenM_`
+	-- and reduce the context, for real this time
+	simpleReduceLoop (text "disambig" <+> ppr dicts)
+		     reduceMe dicts			`thenM` \ (frees, binds, ambigs) ->
+	WARN( not (null frees && null ambigs), ppr frees $$ ppr ambigs )
+	warnDefault dicts default_ty			`thenM_`
+	returnM binds
+
+    bomb_out = addTopAmbigErrs (tidyInsts dicts)	`thenM_`
+	       returnM EmptyMonoBinds
 \end{code}
 
 [Aside - why the defaulting mechanism is turned off when
