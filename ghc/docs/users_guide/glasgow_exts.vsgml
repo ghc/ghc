@@ -1,5 +1,5 @@
 % 
-% $Id: glasgow_exts.vsgml,v 1.19 1999/11/12 12:51:50 simonpj Exp $
+% $Id: glasgow_exts.vsgml,v 1.20 1999/11/25 10:28:41 simonpj Exp $
 %
 % GHC Language Extensions.
 %
@@ -73,6 +73,10 @@ The programmer can specify rewrite rules as part of the source program
 Details in Section <ref name="Rewrite Rules"
 id="rewrite-rules">.
 
+<tag>Pattern guards</tag>
+
+add a more flexible syntax and semantics for guards in function definitions.
+This gives expressiveness somewhat comparable to that of ``views''.
 </descrip>
 
 Before you get too carried away working at the lowest level (e.g.,
@@ -2262,3 +2266,414 @@ in the RHS of the @INLINE@ thing.  I regret the delicacy of this.
 see how to write rules that will do fusion and yet give an efficient
 program even if fusion doesn't happen.  More rules in @PrelList.lhs@.
 </itemize>
+
+
+%-----------------------------------------------------------------------------
+<sect1>Pattern guards
+<label id="pattern-guards">
+<p>
+GHC supports the ``pattern-guards'' extension to 
+the guards that form part of Haskell function
+definitions.   The general aim is similar to that of views [1,2],
+but the expressive power of this proposal is a little different, in places
+more expressive than views, and in places less so.
+
+<sect2>What's the problem?
+<p>
+Consider the following Haskell function definition
+<tscreen><verb>
+  filter p []     	= []
+  filter p (y:ys) | p y = y : filter p ys
+  | otherwise = filter p ys
+</verb></tscreen>
+
+<p>The decision of which right-hand side to choose is made in
+two stages: first, pattern matching selects a guarded group,
+and second, the boolean-valued guards select among the right-hand
+sides of the group.  In these two stages, only the pattern-matching
+stage can bind variables.  A guard is simply a boolean valued expression.
+
+<p>So pattern-matching combines selection with binding, whereas guards simply
+perform selection.  Sometimes this is a tremendous nuisance.  For example,
+suppose we have an abstract data type of finite maps, with a lookup
+operation:
+<tscreen><verb>
+  lookup :: FinteMap -> Int -> Maybe Int
+</verb></tscreen>
+
+<p>The lookup returns Nothing if the supplied key is not in the
+domain of the mapping, and (Just v) otherwise, where v is
+the value that the key maps to.  Now consider the following
+definition:
+<tscreen><verb>
+   clunky env var1 var2 | ok1 && ok2 = val1 + val2
+  			| otherwise  = var1 + var2
+     where
+        m1   = lookup env var1
+        m2   = lookup env var2
+        ok1  = maybeToBool m1
+        ok2  = maybeToBool m2
+        val1 = expectJust m1
+        val2 = expectJust m2
+</verb></tscreen>
+The auxiliary functions are
+<tscreen><verb>
+  maybeToBool :: Maybe a -> Bool
+  maybeToBool (Just x) = True
+  maybeToBool Nothing  = False
+  
+  expectJust :: Maybe a -> a
+  expectJust (Just x) = x
+  expectJust Nothing  = error "Unexpected Nothing"
+</verb></tscreen>
+<p>What is <tt>clunky</tt> doing?  The guard <tt>ok1 && ok2</tt> checks that both
+lookups succeed, using <tt>maybeToBool</tt> to convert the maybe types to
+booleans.  The (lazily evaluated) <tt>expectJust</tt> calls extract the values
+from the results of the lookups, and binds the returned values to
+<tt>val1</tt> and <tt>val2</tt> respectively.  If either lookup fails, then <tt>clunky</tt>
+takes the <tt>otherwise</tt> case and returns the sum of its arguments.
+
+<p>This is certainly legal Haskell, but it is a tremendously verbose
+and un-obvious way to achieve the desired effect.  Arguably, a more
+direct way to write <tt>clunky</tt> would be to use case expressions:
+<tscreen><verb>
+  clunky env var1 var1  = case lookup env var1 of
+			    Nothing -> fail
+			    Just val1 -> case lookup env var2 of
+					   Nothing -> fail
+					   Just val2 -> val1 + val2
+			where
+			  fail = val1 + val2
+</verb></tscreen>
+<p>This is a bit shorter, but hardly better.  Of course, we can rewrite
+any set of pattern-matching, guarded equations as case expressions;
+that is precisely what the compiler does when compiling equations!
+The reason that Haskell provides guarded equations is because they
+allow us to write down the cases we want to consider, one at a time,
+independently of each other.  This structure is hidden in the case
+version.  Two of the right-hand sides are really the same (<tt>fail</tt>),
+and the whole expression tends to become more and more indented. 
+
+<p>Worse, if this was just one equation of <tt>clunky</tt>, with others that
+follow, then the thing wouldn't work at all.  That is, suppose we have
+<tscreen><verb>
+  clunky' env (var1:var2:vars) | ok1 && ok2 = val1 + val2
+	where
+	  m1 = lookup env var1
+	  ...as before...
+
+  clunky' env [var1] = ...some stuff...
+  clunky' env []     = ...more stuff...
+</verb></tscreen>
+Now, if either the lookups fail we want to fall through to the second
+and third equations for <tt>clunky'</tt>.  If we write the definition in the
+form of a case expression we are forced to make the latter two
+equations for <tt>clunky'</tt> into a separate definition and call it in
+the right hand side of <tt>fail</tt>.  Ugh.  Ugh.  Ugh.  This is precisely
+why Haskell provides guards at all, rather than relying on if-then-else
+expressions: if the guard fails we fall through to the next equation,
+whereas we can't do that with a conditional.
+
+
+<p>What is frustrating about this is that the solution is so tantalisingly
+near at hand!  What we want to do is to pattern-match on the result of
+the lookup.  We can do it like this:
+<tscreen><verb>
+  clunky' env vars@(var1:var2:vars)
+    = clunky_help (lookup env var1) (lookup env var2) vars
+    where
+      clunky_help (Just val1) (Just val2) vars   = val1 + val2
+      clunky_help _           _           [var1] = ...some stuff...
+      clunky_help _           _           []     = ...more stuff...
+</verb></tscreen>
+<p>Now we do get three equations, one for each right-hand side, but
+it is still clunky.  In a big set of equations it becomes hard to
+remember what each <tt>Just</tt> pattern corresponds to.  Worse, we can't
+use one lookup in the next.  For example, suppose our function was
+like this:
+<tscreen><verb>
+  clunky'' env var1 var2
+	 | ok1 && ok2 = val2
+         | otherwise  = var1 + var2
+         where
+	     m1 = lookup env var1
+	     m2 = lookup env (var2 + val1)
+	     ok1 = maybeToBool m1
+	     ok2 = maybeToBool m2
+	     val1 = expectJust m1
+	     val2 = expectJust m2
+</verb></tscreen>
+<p>Notice that the second lookup uses val1, the result of the first lookup.
+To express this with a <tt>clunky_help</tt> function requires a second helper
+function nested inside the first.  Dire stuff.
+
+<p>So the original definition, using <tt>maybeToBool</tt> and <tt>expectJust</tt> has the
+merit that it scales nicely, to accommodate both multiple equations
+and successive lookups.  Yet it stinks.
+
+
+<sect2>The pattern guards extension
+<p>
+The extension that GHC implements is simple: 
+<em>instead of being a boolean expression,
+a guard is a list of qualifiers,
+exactly as in a list comprehension</em>.
+
+<p>That is, the only syntax change is to replace
+<em>exp</em> by <em>quals</em> in the syntax of guarded equations.
+
+<p>Here is how you can now write <tt>clunky</tt>:
+<tscreen><verb>
+  clunky env var1 var1
+    | Just val1 <- lookup env var1
+    , Just val2 <- lookup env var2
+    = val1 + val2
+  ...other equations for clunky...
+</verb></tscreen>
+<p>The semantics should be clear enough.  The qualifers are matched in
+order.  For a <tt><-</tt> qualifier, which I call a <em>pattern guard</em>, the
+right hand side is evaluated and matched against the pattern on the
+left.  If the match fails then the whole guard fails and the next
+equation is tried.  If it succeeds, then the appropriate binding takes
+place, and the next qualifier is matched, in the augmented
+environment.  Unlike list comprehensions, however, the type of the
+expression to the right of the <tt><-</tt> is the same as the type of the
+pattern to its left.  The bindings introduced by pattern guards scope
+over all the remaining guard qualifiers, and over the right hand side
+of the equation.
+
+<p>Just as with list comprehensions, boolean expressions can be freely mixed
+with among the pattern guards.  For example:
+<tscreen><verb>
+  f x | [y] <- x
+      , y > 3
+      , Just z <- h y
+      = ...
+</verb></tscreen>
+<p>Haskell's current guards therefore emerge as a special case, in which the
+qualifier list has just one element, a boolean expression.
+
+<p>Just as with list comprehensions, a <tt>let</tt> qualifier can introduce a binding.
+It is also possible to do this with pattern guard with a simple
+variable pattern <tt>a <- e</tt>
+However a <tt>let</tt> qualifier is a little more powerful, because it can
+introduce a recursive or mutually-recursive binding.  It is not clear
+whether this power is particularly useful, but it seems more uniform to
+have exactly the same syntax as list comprehensions.
+
+<p>One could argue that the notation <tt><-</tt> is misleading, suggesting
+the idea of <em>drawn from</em> as in a list comprehension.  But it's very
+nice to reuse precisely the list-comprehension syntax.  Furthermore,
+the only viable alternative is <tt>=</tt>, and that would lead to parsing
+difficulties, because we rely on the <tt>=</tt> to herald the arrival of
+the right-hand side of the equation.  Consider <tt>f x | y = h x = 3</tt>.
+
+<sect2>Views
+
+<p>One very useful application of pattern guards is to abstract data types.
+Given an abstract data type it's quite common to have conditional
+selectors.  For example:
+<tscreen><verb>
+  addressMaybe :: Person -> Maybe String
+</verb></tscreen>
+<p>The function <tt>addressMaybe</tt> extracts a string from the abstract data type
+<tt>Person</tt>, but returns <tt>Nothing</tt> if the person has no address.  Inside
+GHC we have lots of functions like:
+<tscreen><verb>
+  getFunTyMaybe :: Type -> Maybe (Type,Type)
+</verb></tscreen>
+<p>This returns <tt>Nothing</tt> if the argument is not a function type, and
+<tt>(Just arg_ty res_ty)</tt> if the argument is a function type.  The data
+type <tt>Type</tt> is abstract.
+
+<p>Since <tt>Type</tt> and <tt>Person</tt> are abstract we can't pattern-match on them,
+but it's really nice to be able to say:
+<tscreen><verb>
+  f person | Just address <- addressMaybe person
+    = ...
+    | otherwise
+    = ...
+</verb></tscreen>
+<p>Thus, pattern guards can be seen as addressing a similar goal to
+that of views, namely reconciling pattern matching with data abstraction.
+Views were proposed by Wadler ages ago [1], and are the subject of a
+recent concrete proposal for a Haskell language extension [2].
+
+<p>It is natural to ask whether views subsume pattern guards or vice versa.
+The answer is "neither".
+
+<sect3>Do views subsume pattern guards?
+
+<p>The views proposal [2] points out that you can use views to simulate
+(some) guards and, as we saw above, views have similar purpose and
+functionality to at least some applications of pattern guards.
+
+<p>However, views give a view on a <em>single</em> value, whereas guards allow
+arbitrary function calls to combine in-scope values.  For example,
+<tt>clunky</tt> matches <tt>(Just val1)</tt> against <tt>(lookup env var1)</tt>. We do not want a
+view of <tt>env</tt> nor of <tt>var1</tt> but rather of their combination by
+<tt>lookup</tt>.  Views simply do not help with <tt>clunky</tt>.
+
+<p>Views are capable of dealing with the data abstraction issue of
+course.  However, each conditional selector (such as <tt>getFunTyMaybe</tt>)
+would require its own view, complete with its own viewtype:
+<tscreen><verb>
+  view FunType of Type  = FunType Type Type
+  			| NotFunType
+	  where
+	    funType (Fun arg res) = FunType arg res
+	    funType other_type    = NotFunType
+</verb></tscreen>
+This seems a bit heavyweight (three new names instead of one)
+compared with
+<tscreen><verb>
+  getFunTypeMaybe (Fun arg res) = Just (arg,res)
+  getFunTypeMaybe other_type    = Nothing
+</verb></tscreen>
+<p>Here we can re-use the existing <tt>Maybe</tt> type.  Not only does this
+save defining new types, but it allows the existing library of
+functions on <tt>Maybe</tt> types to be applied directly to the result
+of <tt>getFunTypeMaybe</tt>.
+
+<p>Just to put this point another way, suppose we had a function
+<tscreen><verb>
+  tyvarsOf :: Type -> [TyVar]
+</verb></tscreen>
+that returns the free type variables of a type. 
+Would anyone suggest that we make this into a view of <tt>Type</tt>?
+<tscreen><verb>
+  view TyVarsOf of Type = TyVarsOf [TyVar]
+  			where
+			  tyVarsOf ty = ...
+</verb></tscreen>
+Now we could write
+<tscreen><verb>
+  f :: Type -> Int
+  f (TyVarsOf tyvars) = length tyvars
+</verb></tscreen>
+instead of
+<tscreen><verb>
+  f :: Type -> Int
+  f ty = length (tyvarsOf ty)
+</verb></tscreen>
+Surely not!  So why do so just because the value returned is a <tt>Maybe</tt> type?
+
+<sect3>Do pattern guards subsume views?
+
+<p>There are two ways in which views might be desired even if you
+had pattern guards:<p>
+<itemize>
+<item>
+We might prefer to write (using views)
+<tscreen><verb>
+  addCpx (Rect r1 i1) (Rect r1 i2) = rect (r1+r2) (c1+c2)
+</verb></tscreen>
+rather than (using pattern guards)
+<tscreen><verb>
+  addCpx c1 c2
+    | Rect r1 i1 <- getRect c1
+    , Rect r1 i2 <- getRect c2
+    = mkRect (r1+r2) (c1+c2)
+</verb></tscreen>(One might argue, though, that the latter accurately indicates that there may be some work involved in matching against a view, compared to ordinary pattern matching.)
+</item>
+<item>
+The pattern-guard notation gets a bit more clunky if we want a view that has more than one information-carrying constructor. For example, consider the following view:
+<tscreen><verb>
+  view AbsInt of Int = Pos Int | Neg Int
+    where
+      absInt n = if n>=0 then Pos n else Neg (-n)
+</verb></tscreen>
+Here the view returns a Pos or Neg constructor, each of which contains the absolute value of the original Int.  Now we can say
+<tscreen><verb>
+  f (Pos n) = n+1
+  f (Neg n) = n-1
+</verb></tscreen>
+Then <tt>f 4 = 5</tt>, <tt>f (-3) = -4</tt>.
+
+Without views, but with pattern guards, we could write this:
+<tscreen><verb>
+  data AbsInt = Pos Int | Neg Int
+  absInt n = if n>=0 then Pos n else Neg n
+
+  f n | Pos n' <- abs_n = n'+1
+      | Neg n' <- abs_n = n'-1
+      where
+        abs_n = absInt n
+</verb></tscreen>
+<p>Here we've used a where clause to ensure that <tt>absInt</tt> is only called once (though we could instead duplicate the call to <tt>absInt</tt> and hope the compile spots the common subexpression). 
+
+<p>The view version is undoubtedly more compact. (Again, one might wonder, though, whether it perhaps conceals too much.)
+</item>
+<item>
+When nested pattern guards are used, though, the use of a where clause fails.  For example, consider the following silly function using the <tt>AbsInt</tt> view
+<tscreen><verb>
+  g (Pos (Pos n)) = n+1
+  g (Pos (Neg n)) = n-1 -- A bit silly
+</verb></tscreen>
+Without views we have to write
+<tscreen><verb>
+  g n | n1 <- abs_n
+      , Pos n2 <- absInt n1
+      = n2+1
+      | Pos n1 <- abs_n
+      , Neg n2 <- absInt n1
+      = n2-1
+      where
+        abs_n = absInt n
+</verb></tscreen>
+<p>We can share the first call to <tt>absInt</tt> but not the second.  This is a compilation issue.  Just as we might hope that the compiler would spot the common sub-expression if we replaced <tt>abs_n by (absInt n)</tt>, so we might hope that it would optimise the second.
+The views optimisation seems more simple to spot, somehow.
+</item>
+</itemize>
+
+<sect3>Views --- summary
+<p>
+My gut feel at the moment is that the pattern-guard proposal
+<itemize>
+<item>is much simpler to specify and implement than views
+<item> gets some expressiveness that is simply inaccessible to views.
+<item>successfully reconciles pattern matching with data abstraction,
+albeit with a slightly less compact notation than views --
+but the extra notation carries useful clues
+<item>is less heavyweight to use when defining many information
+extraction functions over an ADT
+</itemize>
+So I think the case for pattern guards is stronger than that for views,
+and (if implemented) reduces, without eliminating, the need for views.
+
+<sect2>Argument evaluation order
+
+<p>Haskell specifies that patterns are evaluated left to right.  Thus
+<tscreen><verb>
+  f (x:xs) (y:ys) = ...
+  f xs     ys     = ...
+</verb></tscreen>
+Here, the first argument is evaluated and matched against <tt>(x:xs)</tt> and
+then the second argument is evaluated and matched against <tt>(y:ys)</tt>.
+If you want to match the second argument first --- a significant change
+since it changes the semantics of the function --- you are out of luck.
+You must either change the order of the arguments, or use case expressions
+instead.
+
+<p>With pattern guards you can say what you want, without changing the
+argument order:
+<tscreen><verb>
+  f xs ys | (y:ys) <- ys
+	    (x:xs) <- xs
+	  = ...
+  f xs ys = ...
+</verb></tscreen>
+(Since a pattern guard is a non recursive binding I have shadowed
+xs and ys, just to remind us that it's OK to do so.)
+
+<p>I can't say that this is a very important feature in practice, but
+it's worth noting.
+
+<sect2>References
+
+<p>[1] P Wadler, "Views: a way for pattern matching to cohabit with
+data abstraction", POPL 14 (1987), 307-313
+
+<p>[2] W Burton, E Meijer, P Sansom, S Thompson, P Wadler, "A (sic) extension
+to Haskell 1.3 for views", sent to the Haskell mailing list
+23 Oct 1996
