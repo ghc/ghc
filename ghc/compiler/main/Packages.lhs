@@ -439,7 +439,7 @@ getPackageLinkOpts dflags pkgs = do
   let 
 	imp        = if static then "" else "_dyn"
       	libs p     = map ((++imp) . addSuffix) (hACK (hsLibraries p)) ++ extraLibraries p
-	all_opts p = map ("-l" ++) (libs p) ++ extraLdOpts p
+	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 
 	suffix     = if null tag then "" else  '_':tag
 	rts_suffix = if null rts_tag then "" else  '_':rts_tag
@@ -483,7 +483,7 @@ getPackageLinkOpts dflags pkgs = do
 getPackageExtraCcOpts :: DynFlags -> [PackageId] -> IO [String]
 getPackageExtraCcOpts dflags pkgs = do
   ps <- getExplicitPackagesAnd dflags pkgs
-  return (concatMap extraCcOpts ps)
+  return (concatMap ccOptions ps)
 
 getPackageFrameworkPath  :: DynFlags -> [PackageId] -> IO [String]
 getPackageFrameworkPath dflags pkgs = do
@@ -493,7 +493,7 @@ getPackageFrameworkPath dflags pkgs = do
 getPackageFrameworks  :: DynFlags -> [PackageId] -> IO [String]
 getPackageFrameworks dflags pkgs = do
   ps <- getExplicitPackagesAnd dflags pkgs
-  return (concatMap extraFrameworks ps)
+  return (concatMap frameworks ps)
 
 -- -----------------------------------------------------------------------------
 -- Package Utils

@@ -84,11 +84,11 @@ field	:: { PackageConfig -> PackageConfig }
 		        "extraLibraries"    -> p{extraLibraries    = $3}
 		        "includeDirs"       -> p{includeDirs       = $3}
 		        "includes"          -> p{includes          = $3}
-		        "extraHugsOpts"     -> p{extraHugsOpts     = $3}
-		        "extraCcOpts"       -> p{extraCcOpts       = $3}
-		        "extraLdOpts"       -> p{extraLdOpts       = $3}
+		        "hugsOptions"       -> p{hugsOptions       = $3}
+		        "ccOptions"         -> p{ccOptions         = $3}
+		        "ldOptions"         -> p{ldOptions         = $3}
 		        "frameworkDirs"     -> p{frameworkDirs     = $3}
-		        "extraFrameworks"   -> p{extraFrameworks   = $3}
+		        "frameworks"        -> p{frameworks        = $3}
 		        "haddockInterfaces" -> p{haddockInterfaces = $3}
 		        "haddockHTMLs"      -> p{haddockHTMLs      = $3}
 		        "depends"     	    -> p{depends = []}
