@@ -337,6 +337,7 @@ HC_SPLIT_POST = \
     echo "INPUT(" *.$(way_)o ")" >>ld.script; \
     $(LD) -r $(LD_X) -o ../$(notdir $@) ld.script; \
   )
+CLEAN_FILES += *_split/ld.script
 else
 HC_SPLIT_POST = \
   ( cd $(basename $@)_split; \
