@@ -7,7 +7,6 @@
 <title>Building the Glasgow Functional Programming Tools Suite</title>
 <author><othername>The GHC Team</othername></author>
 <address><email>glasgow-haskell-&lcub;users,bugs&rcub;@haskell.org</email></address>
-<pubdate>November 2001</pubdate>
 
     <abstract>
       <para>The Glasgow fptools suite is a collection of Functional
@@ -3994,8 +3993,10 @@ Hello World!</screen>
       <sect3 id="sec-mangler">
 	<title>The mangler</title>
 	
-	<para>The mangler is an evil Perl-script that rearranges the
-	assembly code output from gcc to do two main things:</para>
+	<para>The mangler is an evil Perl-script
+	(<filename>ghc/driver/mangler/ghc-asm.lprl</filename>) that
+	rearranges the assembly code output from gcc to do two main
+	things:</para>
 
 	<itemizedlist>
 	  <listitem>
@@ -4023,6 +4024,23 @@ Hello World!</screen>
 	directives used to herald symbols.  Take a look at the
 	definitions for other architectures and use these as a
 	starting point.</para>
+      </sect3>
+
+      <sect3>
+	<title>The splitter</title>
+
+	<para>The splitter is another evil Perl script
+	(<filename>ghc/driver/split/ghc-split.lprl</filename>).  It
+	cooperates with the mangler to support object splitting.
+	Object splitting is what happens when the
+	<option>-split-objs</option> option is passed to GHC: the
+	object file is split into many smaller objects.  This feature
+	is used when building libraries, so that a program statically
+	linked against the library will pull in less of the
+	library.</para>
+
+	<para>The splitter has some platform-specific stuff; take a
+	look and tweak it for your system.</para>
       </sect3>
 
       <sect3>
