@@ -258,6 +258,7 @@ data DynFlag
    | Opt_D_dump_stix
    | Opt_D_dump_simpl_stats
    | Opt_D_dump_tc_trace
+   | Opt_D_dump_splices
    | Opt_D_dump_BCOs
    | Opt_D_dump_vect
    | Opt_D_source_stats

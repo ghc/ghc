@@ -1,4 +1,4 @@
-%
+2%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section[TcSplice]{Template Haskell splices}
@@ -144,6 +144,9 @@ tcTopSplice expr res_ty
 	expr2 = convertToHsExpr simple_expr 
     in
     traceTc (text "Got result" <+> ppr expr2) 	`thenM_`
+
+    showSplice "expression" 
+	       zonked_q_expr (ppr expr2)	`thenM_`
     initRn SourceMode (rnExpr expr2)		`thenM` \ (exp3, fvs) ->
     importSupportingDecls fvs			`thenM` \ env ->
 
@@ -180,6 +183,8 @@ tcSpliceDecls expr
 	decls = convertToHsDecls simple_expr 
     in
     traceTc (text "Got result" <+> vcat (map ppr decls))	`thenM_`
+    showSplice "declarations"
+	       zonked_q_expr (vcat (map ppr decls))		`thenM_`
     returnM decls
 \end{code}
 
@@ -341,6 +346,14 @@ Two successive brackets aren't allowed
 %************************************************************************
 
 \begin{code}
+showSplice :: String -> TypecheckedHsExpr -> SDoc -> TcM ()
+showSplice what before after
+  = getSrcLocM		`thenM` \ loc ->
+    traceSplice (hang (ppr loc <> colon <+> text "Splicing" <+> text what) 4
+		      (sep [nest 2 (ppr before),
+			    text "======>",
+			    nest 2 after]))
+
 illegalSplice level
   = ptext SLIT("Illegal splice at level") <+> ppr level
 

@@ -85,12 +85,20 @@ dsReify :: HsReify Id -> DsM CoreExpr
 -- Returns a CoreExpr of type 	reifyType --> M.Typ
 --				reifyDecl --> M.Dec
 --				reifyFixty --> M.Fix
-dsReify (ReifyOut ReifyType (AnId id))
-  = do { MkC e <- repTy (toHsType (idType id)) ;
-	 return e }
+dsReify (ReifyOut ReifyType name)
+  = do { thing <- dsLookupGlobal name ;
+		-- By deferring the lookup until now (rather than doing it
+		-- in the type checker) we ensure that all zonking has
+		-- been done.
+	 case thing of
+	    AnId id -> do { MkC e <- repTy (toHsType (idType id)) ;
+			    return e }
+	    other   -> pprPanic "dsReify: reifyType" (ppr name)
+	}
 
-dsReify r@(ReifyOut ReifyDecl thing)
-  = do { mb_d <- repTyClD (ifaceTyThing thing) ;
+dsReify r@(ReifyOut ReifyDecl name)
+  = do { thing <- dsLookupGlobal name ;
+	 mb_d <- repTyClD (ifaceTyThing thing) ;
 	 case mb_d of
 	   Just (MkC d) -> return d 
 	   Nothing	-> pprPanic "dsReify" (ppr r)

@@ -528,6 +528,7 @@ setNameCache nc = do { TopEnv { top_nc = nc_var } <- getTopEnv;
 traceTc, traceRn :: SDoc -> TcRn a ()
 traceRn      = dumpOptTcRn Opt_D_dump_rn_trace
 traceTc      = dumpOptTcRn Opt_D_dump_tc_trace
+traceSplice  = dumpOptTcRn Opt_D_dump_splices
 traceHiDiffs = dumpOptTcRn Opt_D_dump_hi_diffs
 
 dumpOptTcRn :: DynFlag -> SDoc -> TcRn a ()

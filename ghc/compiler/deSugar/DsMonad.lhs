@@ -16,7 +16,7 @@ module DsMonad (
 	getModuleDs,
 	getUniqueDs, getUniquesDs,
 	getDOptsDs,
-	dsLookupGlobalId, dsLookupTyCon,
+	dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -231,13 +231,19 @@ dsWarn warn = DsM(\ env warns -> returnUs ((), warns `snocBag` warn))
 \end{code}
 
 \begin{code}
+dsLookupGlobal :: Name -> DsM TyThing
+dsLookupGlobal name 
+  = DsM(\ env warns -> returnUs (ds_globals env name, warns))
+
 dsLookupGlobalId :: Name -> DsM Id
-dsLookupGlobalId name = DsM(\ env warns -> 
-	returnUs (get_id name (ds_globals env name), warns))
+dsLookupGlobalId name 
+  = dsLookupGlobal name		`thenDs` \ thing ->
+    returnDs (get_id name thing)
 
 dsLookupTyCon :: Name -> DsM TyCon
-dsLookupTyCon name = DsM(\ env warns -> 
-	returnUs (get_tycon name (ds_globals env name), warns))
+dsLookupTyCon name
+  = dsLookupGlobal name		`thenDs` \ thing ->
+    returnDs (get_tycon name thing)
 
 get_id name (AnId id) = id
 get_id name other     = pprPanic "dsLookupGlobalId" (ppr name)

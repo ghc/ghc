@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverFlags.hs,v 1.102 2002/09/13 15:02:34 simonpj Exp $
+-- $Id: DriverFlags.hs,v 1.103 2002/10/11 16:45:17 simonpj Exp $
 --
 -- Driver flags
 --
@@ -400,6 +400,7 @@ dynamic_flags = [
   ,  ( "dshow-passes",           NoArg (setVerbosity "2") )
   ,  ( "ddump-rn-trace",         NoArg (setDynFlag Opt_D_dump_rn_trace) )
   ,  ( "ddump-tc-trace",         NoArg (setDynFlag Opt_D_dump_tc_trace) )
+  ,  ( "ddump-splices",          NoArg (setDynFlag Opt_D_dump_splices) )
   ,  ( "ddump-rn-stats",         NoArg (setDynFlag Opt_D_dump_rn_stats) )
   ,  ( "ddump-stix",             NoArg (setDynFlag Opt_D_dump_stix) )
   ,  ( "ddump-simpl-stats",      NoArg (setDynFlag Opt_D_dump_simpl_stats) )

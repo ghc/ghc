@@ -651,15 +651,9 @@ tcMonoExpr (HsBracket brack loc) res_ty
 
 tcMonoExpr (HsReify (Reify flavour name)) res_ty
   = addErrCtxt (ptext SLIT("At the reification of") <+> ppr name)	$
-    tcLookupGlobal name		`thenM` \ thing ->
-	-- For now, we can only reify top-level things
-	-- The complication for non-top-level things is just that 
-	-- they might be a TcId, and need zonking etc.
-
     tcMetaTy  tycon_name	`thenM` \ reify_ty ->
     unifyTauTy res_ty reify_ty	`thenM_`
-
-    returnM (HsReify (ReifyOut flavour thing))
+    returnM (HsReify (ReifyOut flavour name))
   where
     tycon_name = case flavour of
 		   ReifyDecl -> DsMeta.decTyConName

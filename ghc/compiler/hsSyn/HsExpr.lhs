@@ -695,7 +695,9 @@ thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+>
 			     pp_body <+> ptext SLIT("|]")
 
 data HsReify id = Reify    ReifyFlavour id	-- Pre typechecking
-		| ReifyOut ReifyFlavour TyThing	-- Post typechecking
+		| ReifyOut ReifyFlavour Name	-- Post typechecking
+						-- The Name could be the name of
+						-- an Id, TyCon, or Class
 
 data ReifyFlavour = ReifyDecl | ReifyType | ReifyFixity
 
