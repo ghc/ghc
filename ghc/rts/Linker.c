@@ -301,6 +301,7 @@ typedef struct _RtsSymbolVal {
       Sym(_imp___timezone)                      \
       Sym(_imp___tzname)                        \
       Sym(_imp___iob)                           \
+      Sym(_imp___osver)                         \
       Sym(localtime)                            \
       Sym(gmtime)                               \
       Sym(opendir)                              \
