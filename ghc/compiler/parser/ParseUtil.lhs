@@ -6,7 +6,6 @@
 \begin{code}
 module ParseUtil (
 	  parseError		-- String -> Pa
-	, srcParseErr		-- StringBuffer -> SrcLoc -> Message
 	, cbot			-- a
 	, splitForConApp        -- RdrNameHsType -> [RdrNameBangType]
 				--     -> P (RdrName, [RdrNameBangType])
@@ -70,17 +69,6 @@ parseError :: String -> P a
 parseError s = 
   getSrcLocP `thenP` \ loc ->
   failMsgP (hcat [ppr loc, text ": ", text s])
-
-srcParseErr :: StringBuffer -> SrcLoc -> Message
-srcParseErr s l
-  = hcat [ppr l, 
-	  if null token 
-	     then ptext SLIT(": parse error (possibly incorrect indentation)")
-	     else hcat [ptext SLIT(": parse error on input "),
-          	  	char '`', text token, char '\'']
-    ]
-  where 
-	token = lexemeToString s
 
 cbot = panic "CCall:result_ty"
 

@@ -20,7 +20,7 @@ An example that provokes the error is
 
 module Lex (
 
-	ifaceParseErr,
+	ifaceParseErr, srcParseErr,
 
 	-- Monad for parser
 	Token(..), lexer, ParseResult(..), PState(..),
@@ -1250,10 +1250,10 @@ layoutOff buf s@(PState{ context = ctx }) =
     POk s{ context = NoLayout:ctx } ()
 
 popContext :: P ()
-popContext = \ buf s@(PState{ context = ctx }) ->
+popContext = \ buf s@(PState{ context = ctx, loc = loc }) ->
   case ctx of
 	(_:tl) -> POk s{ context = tl } ()
-	[]    -> panic "Lex.popContext: empty context"
+	[]     -> PFailed (srcParseErr buf loc)
 
 {- 
  Note that if the name of the file we're processing ends
@@ -1294,5 +1294,18 @@ ifaceVersionErr hi_vers l toks
       case hi_vers of
         Nothing -> ptext SLIT("pre ghc-3.02 version")
 	Just v  -> ptext SLIT("version") <+> integer v
+
+-----------------------------------------------------------------------------
+
+srcParseErr :: StringBuffer -> SrcLoc -> Message
+srcParseErr s l
+  = hcat [ppr l, 
+	  if null token 
+	     then ptext SLIT(": parse error (possibly incorrect indentation)")
+	     else hcat [ptext SLIT(": parse error on input "),
+          	  	char '`', text token, char '\'']
+    ]
+  where 
+	token = lexemeToString s
 
 \end{code}
