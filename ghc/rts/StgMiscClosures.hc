@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.hc,v 1.40 2000/04/03 15:54:50 simonmar Exp $
+ * $Id: StgMiscClosures.hc,v 1.41 2000/04/05 15:20:13 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -74,7 +74,7 @@ STGFUN(IND_STATIC_entry)
     FE_
 }
 
-INFO_TABLE(IND_PERM_info,IND_PERM_entry,1,1,IND_PERM,,EF_,0,0);
+INFO_TABLE(IND_PERM_info,IND_PERM_entry,1,1,IND_PERM,,EF_,"IND_PERM","IND_PERM");
 STGFUN(IND_PERM_entry)
 {
     FB_
@@ -200,7 +200,7 @@ STGFUN(CAF_ENTERED_entry)
  * old-generation indirection. 
  */
 
-INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,0,0);
+INFO_TABLE(BLACKHOLE_info, BLACKHOLE_entry,0,2,BLACKHOLE,,EF_,"BLACKHOLE","BLACKHOLE");
 STGFUN(BLACKHOLE_entry)
 {
   FB_
@@ -249,7 +249,7 @@ STGFUN(BLACKHOLE_entry)
   FE_
 }
 
-INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,EF_,0,0);
+INFO_TABLE(BLACKHOLE_BQ_info, BLACKHOLE_BQ_entry,1,1,BLACKHOLE_BQ,,EF_,"BLACKHOLE","BLACKHOLE");
 STGFUN(BLACKHOLE_BQ_entry)
 {
   FB_
@@ -422,7 +422,7 @@ STGFUN(WHITEHOLE_entry)
 /* -----------------------------------------------------------------------------
    The code for a BCO returns to the scheduler
    -------------------------------------------------------------------------- */
-INFO_TABLE(BCO_info,BCO_entry,0,0,BCO,,EF_,0,0);
+INFO_TABLE(BCO_info,BCO_entry,0,0,BCO,,EF_,"BCO","BCO");
 EF_(BCO_entry) {				
   FB_	
     Sp -= 1;
@@ -437,7 +437,7 @@ EF_(BCO_entry) {
    NON_ENTERABLE_ENTRY_CODE now defined at the beginning of the file
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(TSO_info, TSO_entry, 0,0,TSO,,EF_,0,0);
+INFO_TABLE(TSO_info, TSO_entry, 0,0,TSO,,EF_,"TSO","TSO");
 NON_ENTERABLE_ENTRY_CODE(TSO);
 
 /* -----------------------------------------------------------------------------
@@ -456,10 +456,10 @@ NON_ENTERABLE_ENTRY_CODE(EVACUATED);
    live weak pointers with dead ones).
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(WEAK_info,WEAK_entry,0,4,WEAK,,EF_,0,0);
+INFO_TABLE(WEAK_info,WEAK_entry,0,4,WEAK,,EF_,"WEAK","WEAK");
 NON_ENTERABLE_ENTRY_CODE(WEAK);
 
-INFO_TABLE_CONSTR(DEAD_WEAK_info,DEAD_WEAK_entry,0,1,0,CONSTR,,EF_,0,0);
+INFO_TABLE_CONSTR(DEAD_WEAK_info,DEAD_WEAK_entry,0,1,0,CONSTR,,EF_,"DEAD_WEAK","DEAD_WEAK");
 NON_ENTERABLE_ENTRY_CODE(DEAD_WEAK);
 
 /* -----------------------------------------------------------------------------
@@ -479,14 +479,14 @@ SET_STATIC_HDR(NO_FINALIZER_closure,NO_FINALIZER_info,0/*CC*/,,EI_)
    Foreign Objects are unlifted and therefore never entered.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(FOREIGN_info,FOREIGN_entry,0,1,FOREIGN,,EF_,0,0);
+INFO_TABLE(FOREIGN_info,FOREIGN_entry,0,1,FOREIGN,,EF_,"FOREIGN","FOREIGN");
 NON_ENTERABLE_ENTRY_CODE(FOREIGN);
 
 /* -----------------------------------------------------------------------------
    Stable Names are unlifted too.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(STABLE_NAME_info,STABLE_NAME_entry,0,1,STABLE_NAME,,EF_,0,0);
+INFO_TABLE(STABLE_NAME_info,STABLE_NAME_entry,0,1,STABLE_NAME,,EF_,"STABLE_NAME","STABLE_NAME");
 NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
 
 /* -----------------------------------------------------------------------------
@@ -496,10 +496,10 @@ NON_ENTERABLE_ENTRY_CODE(STABLE_NAME);
    and entry code for each type.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE(FULL_MVAR_info,FULL_MVAR_entry,4,0,MVAR,,EF_,0,0);
+INFO_TABLE(FULL_MVAR_info,FULL_MVAR_entry,4,0,MVAR,,EF_,"MVAR","MVAR");
 NON_ENTERABLE_ENTRY_CODE(FULL_MVAR);
 
-INFO_TABLE(EMPTY_MVAR_info,EMPTY_MVAR_entry,4,0,MVAR,,EF_,0,0);
+INFO_TABLE(EMPTY_MVAR_info,EMPTY_MVAR_entry,4,0,MVAR,,EF_,"MVAR","MVAR");
 NON_ENTERABLE_ENTRY_CODE(EMPTY_MVAR);
 
 /* -----------------------------------------------------------------------------
@@ -561,7 +561,7 @@ NON_ENTERABLE_ENTRY_CODE(EXCEPTION_CONS);
    -------------------------------------------------------------------------- */
 
 #define ArrayInfo(type)					\
-INFO_TABLE(type##_info, type##_entry, 0, 0, type, , EF_,0,0);
+INFO_TABLE(type##_info, type##_entry, 0, 0, type, , EF_,"" # type "","" # type "");
 
 ArrayInfo(ARR_WORDS);
 NON_ENTERABLE_ENTRY_CODE(ARR_WORDS);
