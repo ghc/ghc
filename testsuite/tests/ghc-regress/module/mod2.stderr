@@ -1,5 +1,4 @@
 
 mod2.hs:3:0:
     Failed to load interface for `N':
-	Could not find interface file for `N'
-	(use -v to see a list of the files searched for)
+	Could not find module `N': use -v to see a list of the files searched for
