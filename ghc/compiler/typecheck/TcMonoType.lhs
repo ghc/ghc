@@ -321,7 +321,10 @@ kcHsType (HsForAllTy (Just tv_names) context ty)
   = kcHsTyVars tv_names		`thenNF_Tc` \ kind_env ->
     tcExtendKindEnv kind_env	$
     kcHsContext context		`thenTc_`
-    kcHsType ty			`thenTc_`
+    kcLiftedType ty		`thenTc_`
+	-- The body of a forall must be of kind *
+	-- In principle, I suppose, we could allow unlifted types,
+	-- but it seems simpler to stick to lifted types for now.
     returnTc liftedTypeKind
 
 ---------------------------
