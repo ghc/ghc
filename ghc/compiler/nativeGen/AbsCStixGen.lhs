@@ -31,6 +31,7 @@ import ClosureInfo	( infoTableLabelFromCI, entryLabelFromCI,
 			)
 import Literal		( Literal(..), word2IntLit )
 import Maybes	    	( maybeToBool )
+import StgSyn		( StgOp(..) )
 import PrimOp		( primOpNeedsWrapper, PrimOp(..) )
 import PrimRep	    	( isFloatingRep, PrimRep(..) )
 import StixInfo	    	( genCodeInfoTable, genBitmapInfoTable )
@@ -387,8 +388,6 @@ Now the PrimOps, some of which may need caller-saves register wrappers.
     	returnUs (\xs -> saves ++ code (restores ++ xs))
 
   | otherwise = p2stix (nonVoid results) op (nonVoid args)
-    where
-	nonVoid = filter ((/= VoidRep) . getAmodeRep)
 \end{code}
 
 Now the dreaded conditional jump.
@@ -463,6 +462,8 @@ Finally, all of the disgusting AbstractC macros.
 
  gencode other
   = pprPanic "AbsCStixGen.gencode" (dumpRealC other)
+
+ nonVoid = filter ((/= VoidRep) . getAmodeRep)
 \end{code}
 
 Here, we generate a jump table if there are more than four (integer)

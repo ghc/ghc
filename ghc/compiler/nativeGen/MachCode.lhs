@@ -2344,7 +2344,7 @@ register allocator.
 \begin{code}
 genCCall
     :: FAST_STRING	-- function to call
-    -> CallConv
+    -> CCallConv
     -> PrimRep		-- type of the result
     -> [StixTree]	-- arguments (of mixed type)
     -> NatM InstrBlock

@@ -3,7 +3,8 @@
 %
 
 \begin{code}
-module StixPrim ( primCode, amodeToStix, amodeToStix' ) where
+module StixPrim ( primCode, amodeToStix, amodeToStix', foreignCallCode )
+  where
 
 #include "HsVersions.h"
 
@@ -15,7 +16,7 @@ import AbsCSyn 		hiding ( spRel )
 import AbsCUtils	( getAmodeRep, mixedTypeLocn )
 import SMRep		( fixedHdrSize )
 import Literal		( Literal(..), word2IntLit )
-import PrimOp		( PrimOp(..), CCall(..), CCallTarget(..) )
+import PrimOp		( PrimOp(..) )
 import PrimRep		( PrimRep(..), getPrimRepSizeInBytes )
 import UniqSupply	( returnUs, thenUs, getUniqueUs, UniqSM )
 import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
@@ -23,7 +24,8 @@ import Constants	( mIN_INTLIKE, mIN_CHARLIKE, uF_UPDATEE, bLOCK_SIZE,
 import CLabel		( mkIntlikeClosureLabel, mkCharlikeClosureLabel,
 			  mkMAP_FROZEN_infoLabel, mkEMPTY_MVAR_infoLabel,
 			  mkForeignLabel )
-import ForeignCall	( CCallConv(..) )
+import ForeignCall	( ForeignCall(..), CCallSpec(..), CCallTarget(..),
+			  CCallConv(..), playSafe )
 import Outputable
 import FastTypes
 
