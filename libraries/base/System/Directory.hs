@@ -632,7 +632,8 @@ withFileOrSymlinkStatus loc name f = do
 modificationTime :: Ptr CStat -> IO ClockTime
 modificationTime stat = do
     mtime <- st_mtime stat
-    return (TOD (toInteger (mtime :: CTime)) 0)
+    let realToInteger = round . realToFrac :: Real a => a -> Integer
+    return (TOD (realToInteger (mtime :: CTime)) 0)
     
 isDirectory :: Ptr CStat -> IO Bool
 isDirectory stat = do

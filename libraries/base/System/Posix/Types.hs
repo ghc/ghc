@@ -105,7 +105,7 @@ import Control.Monad
 #include "CTypes.h"
 
 #if defined(HTYPE_DEV_T)
-NUMERIC_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)
+ARITHMETIC_TYPE(CDev,tyConCDev,"CDev",HTYPE_DEV_T)
 #endif
 #if defined(HTYPE_INO_T)
 INTEGRAL_TYPE(CIno,tyConCIno,"CIno",HTYPE_INO_T)
@@ -139,10 +139,10 @@ INTEGRAL_TYPE(CNlink,tyConCNlink,"CNlink",HTYPE_NLINK_T)
 INTEGRAL_TYPE(CUid,tyConCUid,"CUid",HTYPE_UID_T)
 #endif
 #if defined(HTYPE_CC_T)
-NUMERIC_TYPE(CCc,tyConCCc,"CCc",HTYPE_CC_T)
+ARITHMETIC_TYPE(CCc,tyConCCc,"CCc",HTYPE_CC_T)
 #endif
 #if defined(HTYPE_SPEED_T)
-NUMERIC_TYPE(CSpeed,tyConCSpeed,"CSpeed",HTYPE_SPEED_T)
+ARITHMETIC_TYPE(CSpeed,tyConCSpeed,"CSpeed",HTYPE_SPEED_T)
 #endif
 #if defined(HTYPE_TCFLAG_T)
 INTEGRAL_TYPE(CTcflag,tyConCTcflag,"CTcflag",HTYPE_TCFLAG_T)

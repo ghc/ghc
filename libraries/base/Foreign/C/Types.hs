@@ -154,8 +154,8 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 "fromIntegral/CSigAtomic->a" fromIntegral = \(CSigAtomic x) -> fromIntegral x
  #-}
 
-NUMERIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
-NUMERIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
+ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
+ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
 data CFile = CFile

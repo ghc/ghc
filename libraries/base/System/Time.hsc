@@ -219,19 +219,21 @@ getClockTime = do
 
 #elif HAVE_GETTIMEOFDAY
 getClockTime = do
+  let realToInteger = round . realToFrac :: Real a => a -> Integer
   allocaBytes (#const sizeof(struct timeval)) $ \ p_timeval -> do
     throwErrnoIfMinus1_ "getClockTime" $ gettimeofday p_timeval nullPtr
     sec  <- (#peek struct timeval,tv_sec)  p_timeval :: IO CTime
     usec <- (#peek struct timeval,tv_usec) p_timeval :: IO CTime
-    return (TOD (fromIntegral sec) ((fromIntegral usec) * 1000000))
+    return (TOD (realToInteger sec) ((realToInteger usec) * 1000000))
  
 #elif HAVE_FTIME
 getClockTime = do
+  let realToInteger = round . realToFrac :: Real a => a -> Integer
   allocaBytes (#const sizeof(struct timeb)) $ \ p_timeb -> do
   ftime p_timeb
   sec  <- (#peek struct timeb,time) p_timeb :: IO CTime
   msec <- (#peek struct timeb,millitm) p_timeb :: IO CUShort
-  return (TOD (fromIntegral sec) (fromIntegral msec * 1000000000))
+  return (TOD (realToInteger sec) (fromIntegral msec * 1000000000))
 
 #else /* use POSIX time() */
 getClockTime = do
@@ -528,8 +530,9 @@ toClockTime (CalendarTime year mon mday hour min sec psec
         -- result.
         -- 
         gmtoff <- gmtoff p_tm
-	let res = fromIntegral t - tz + fromIntegral gmtoff
-	return (TOD (fromIntegral res) psec)
+        let realToInteger = round . realToFrac :: Real a => a -> Integer
+	    res = realToInteger t - fromIntegral tz + fromIntegral gmtoff
+	return (TOD res psec)
 #endif /* ! __HUGS__ */
 
 -- -----------------------------------------------------------------------------

@@ -64,9 +64,9 @@ getCPUTime = do
     u_usec <- (#peek struct timeval,tv_usec) ru_utime :: IO CTime
     s_sec  <- (#peek struct timeval,tv_sec)  ru_stime :: IO CTime
     s_usec <- (#peek struct timeval,tv_usec) ru_stime :: IO CTime
-
-    return ((fromIntegral u_sec * 1000000 + fromIntegral u_usec + 
-             fromIntegral s_sec * 1000000 + fromIntegral s_usec) 
+    let realToInteger = round . realToFrac :: Real a => a -> Integer
+    return ((realToInteger u_sec * 1000000 + realToInteger u_usec + 
+             realToInteger s_sec * 1000000 + realToInteger s_usec) 
 		* 1000000)
 
 type CRUsage = ()
@@ -77,7 +77,8 @@ foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
     times p_tms
     u_ticks  <- (#peek struct tms,tms_utime) p_tms :: IO CClock
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
-    return (( (fromIntegral u_ticks + fromIntegral s_ticks) * 1000000000000) 
+    let realToInteger = round . realToFrac :: Real a => a -> Integer
+    return (( (realToInteger u_ticks + realToInteger s_ticks) * 1000000000000) 
 			`div` fromIntegral clockTicks)
 
 type CTms = ()

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: CTypes.h,v 1.7 2003/07/24 12:05:42 panne Exp $
+ * $Id: CTypes.h,v 1.8 2004/06/13 21:03:47 panne Exp $
  *
  * Dirty CPP hackery for CTypes/CTypesISO
  *
@@ -15,9 +15,10 @@
 /* A hacked version for GHC follows the Haskell 98 version... */
 #ifndef __GLASGOW_HASKELL__
 
-#define NUMERIC_TYPE(T,C,S,B) \
+#define ARITHMETIC_TYPE(T,C,S,B) \
 newtype T = T B deriving (Eq, Ord) ; \
 INSTANCE_NUM(T) ; \
+INSTANCE_REAL(T) ; \
 INSTANCE_READ(T,B) ; \
 INSTANCE_SHOW(T,B) ; \
 INSTANCE_ENUM(T) ; \
@@ -25,15 +26,13 @@ INSTANCE_STORABLE(T) ; \
 INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INTEGRAL_TYPE(T,C,S,B) \
-NUMERIC_TYPE(T,C,S,B) ; \
+ARITHMETIC_TYPE(T,C,S,B) ; \
 INSTANCE_BOUNDED(T) ; \
-INSTANCE_REAL(T) ; \
 INSTANCE_INTEGRAL(T) ; \
 INSTANCE_BITS(T)
 
 #define FLOATING_TYPE(T,C,S,B) \
-NUMERIC_TYPE(T,C,S,B) ; \
-INSTANCE_REAL(T) ; \
+ARITHMETIC_TYPE(T,C,S,B) ; \
 INSTANCE_FRACTIONAL(T) ; \
 INSTANCE_FLOATING(T) ; \
 INSTANCE_REALFRAC(T) ; \
@@ -172,24 +171,24 @@ instance Storable T where { \
  * here...
  */
 
-#define NUMERIC_CLASSES  Eq,Ord,Num,Enum,Storable
-#define INTEGRAL_CLASSES Bounded,Real,Integral,Bits
-#define FLOATING_CLASSES Real,Fractional,Floating,RealFrac,RealFloat
+#define ARITHMETIC_CLASSES  Eq,Ord,Num,Enum,Storable,Real
+#define INTEGRAL_CLASSES Bounded,Integral,Bits
+#define FLOATING_CLASSES Fractional,Floating,RealFrac,RealFloat
 
-#define NUMERIC_TYPE(T,C,S,B) \
-newtype T = T B deriving (NUMERIC_CLASSES); \
+#define ARITHMETIC_TYPE(T,C,S,B) \
+newtype T = T B deriving (ARITHMETIC_CLASSES); \
 INSTANCE_READ(T,B); \
 INSTANCE_SHOW(T,B); \
 INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INTEGRAL_TYPE(T,C,S,B) \
-newtype T = T B deriving (NUMERIC_CLASSES, INTEGRAL_CLASSES); \
+newtype T = T B deriving (ARITHMETIC_CLASSES, INTEGRAL_CLASSES); \
 INSTANCE_READ(T,B); \
 INSTANCE_SHOW(T,B); \
 INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define FLOATING_TYPE(T,C,S,B) \
-newtype T = T B deriving (NUMERIC_CLASSES, FLOATING_CLASSES); \
+newtype T = T B deriving (ARITHMETIC_CLASSES, FLOATING_CLASSES); \
 INSTANCE_READ(T,B); \
 INSTANCE_SHOW(T,B); \
 INSTANCE_TYPEABLE0(T,C,S) ;
