@@ -290,9 +290,11 @@ commonParent paths@(p:ps) =
 #endif
     mb_path   -> mb_path
   where
+#ifdef mingw32_TARGET_OS
     getDrive (d:':':_) ds 
       | not (d `elem` ds) = d:ds
     getDrive _         ds = ds
+#endif
 
     common i acc []     ps = checkSep   i acc         ps
     common i acc (c:cs) ps
