@@ -920,15 +920,14 @@ on or rebooting may be the quickest cure.
 
 <Question>
 <Para>
-I get errors when trying to build GHC 4.07 with GHC 4.05.
+I get errors when trying to build GHC 4.08 with GHC 4.05.
 </Para>
 </Question>
 
-<Answer>
-<Para>
-This seems to work better if you don't use <Option>-O</Option> in <Constant>GhcHcOpts</Constant>. It's a bug in 4.05, unfortunately. Anyway, better to install 4.07 binaries and use those.
-</Para>
-</Answer>
+<Answer> <Para> This seems to work better if you don't use
+<Option>-O</Option> in <Constant>GhcHcOpts</Constant>. It's a bug in 4.05,
+unfortunately. Anyway, better to install 4.08 binaries and use those.
+</Para> </Answer>
 
 </QandAEntry>
 
