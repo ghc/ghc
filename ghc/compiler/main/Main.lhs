@@ -9,7 +9,7 @@
 module Main ( main ) where
 
 IMP_Ubiq(){-uitous-}
-IMPORT_1_3(IO(hGetContents,stdin,stderr,hPutStr,hClose,openFile,IOMode(..)))
+IMPORT_1_3(IO(stderr,hPutStr,hClose,openFile,IOMode(..)))
 
 import HsSyn
 import RdrHsSyn		( RdrName )
@@ -65,17 +65,16 @@ import Outputable	( PprStyle(..), Outputable(..), pprDumpStyle, pprErrorsStyle )
 \begin{code}
 main =
  _scc_ "main" 
- hGetContents stdin	>>= \ input_pgm ->
  let
     cmd_line_info = classifyOpts
  in
- doIt cmd_line_info input_pgm
+ doIt cmd_line_info
 \end{code}
 
 \begin{code}
-doIt :: ([CoreToDo], [StgToDo]) -> String -> IO ()
+doIt :: ([CoreToDo], [StgToDo]) -> IO ()
 
-doIt (core_cmds, stg_cmds) input_pgm
+doIt (core_cmds, stg_cmds)
   = doIfSet opt_Verbose 
 	(hPutStr stderr ("Glasgow Haskell Compiler, version " ++ 
 			 show PROJECTVERSION ++ 
