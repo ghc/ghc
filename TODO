@@ -1,6 +1,16 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* I've been thinking of a solution along these lines: Haddock
+  processes the modules in two phases.  The first phase resolves all the
+  names and determines the "definitive" documentation for each entity.
+  The second phase makes all the links point to the definitive
+  documentation, with certain exceptions: if the entity is also
+  documented in the local module, then point there instead.  Perhaps
+  there are other exceptions.  We might need a way to indicate
+  "definitive", or maybe just the module(s) furthest up the dependency
+  tree would do.
+
 * The lexer should handle "...." in doc strings, only recognising it if the
   contents looks like a module name.
 
@@ -50,6 +60,9 @@
 
 * Command-line flag to give the effect of --#ignore-exports on all modules
   (request by Chris Ryder, for generating implementation docs.)
+
+* Command-line flags to hide modules (easier for Cabal to use than requiring
+  #hide directives in the source).
 
 * Parse and remember {-# SOURCE #-} imports, possibly do something sensible
   with them?
