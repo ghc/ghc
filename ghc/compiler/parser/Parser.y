@@ -1,6 +1,6 @@
 {-								-*-haskell-*-
 -----------------------------------------------------------------------------
-$Id: Parser.y,v 1.129 2003/11/06 17:09:53 simonpj Exp $
+$Id: Parser.y,v 1.130 2003/11/26 10:07:19 simonmar Exp $
 
 Haskell grammar.
 
@@ -951,7 +951,7 @@ aexp	:: { RdrNameHsExpr }
 	| aexp1				{ $1 }
 
 aexp1	:: { RdrNameHsExpr }
-        : aexp1 '{' fbinds '}' 		{% (mkRecConstrOrUpdate $1 (reverse $3)) }
+        : aexp1 '{' fbinds '}'	 	{% (mkRecConstrOrUpdate $1 (reverse $3)) }
   	| aexp2				{ $1 }
 
 -- Here was the syntax for type applications that I was planning
@@ -1148,11 +1148,13 @@ qual  :: { RdrNameStmt }
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
 
-fbinds 	:: { RdrNameHsRecordBinds }
-	: fbinds ',' fbind		{ $3 : $1 }
-	| fbinds ','			{ $1 }
-	| fbind				{ [$1] }
+fbinds :: { RdrNameHsRecordBinds }
+	: fbinds1			{ $1 }
 	| {- empty -}			{ [] }
+
+fbinds1	:: { RdrNameHsRecordBinds }
+	: fbinds1 ',' fbind		{ $3 : $1 }
+	| fbind				{ [$1] }
 
 fbind	:: { (RdrName, RdrNameHsExpr) }
 	: qvar '=' exp			{ ($1,$3) }
