@@ -135,9 +135,9 @@ IncludeTestDirsInBuild=NO
 # 
 GhcProjectName       =The Glorious Glasgow Haskell Compilation System
 GhcProjectNameShort  =ghc
-GhcProjectVersion    =2.06
+GhcProjectVersion    =2.07
 GhcProjectPatchLevel =0
-GhcBuildeeVersion    =206
+GhcBuildeeVersion    =207
 GhcBuilderVersion    =29
 
 #
