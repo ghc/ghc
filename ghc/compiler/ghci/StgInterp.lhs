@@ -597,8 +597,8 @@ evalP (VarP v) de
 -- always has pointer rep.
 evalP (AppIP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalI e2 de)
 evalP (AppPP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalP e2 de)
-evalP (AppFP e1 e2) de  = unsafeCoerce# (evalF e1 de) (evalI e2 de)
-evalP (AppDP e1 e2) de  = unsafeCoerce# (evalD e1 de) (evalP e2 de)
+evalP (AppFP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalF e2 de)
+evalP (AppDP e1 e2) de  = unsafeCoerce# (evalP e1 de) (evalD e2 de)
 
 -- Lambdas always return P-rep, but we need to do different things
 -- depending on both the argument and result representations.
@@ -924,7 +924,7 @@ repOf (LitD _)         = RepD
 
 repOf (Native _)       = RepP
 
-repOf (VarP _)         = RepI
+repOf (VarP _)         = RepP
 repOf (VarI _)         = RepI
 repOf (VarF _)         = RepF
 repOf (VarD _)         = RepD
