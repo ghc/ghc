@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.35 2004/08/13 13:09:40 simonmar Exp $
+ * $Id: TSO.h,v 1.36 2004/08/13 13:57:06 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -167,6 +167,7 @@ typedef struct StgTSO_ {
   struct StgTSO_*    blocked_exceptions;
   StgThreadID        id;
   int                saved_errno;
+  struct StgMainThread_* main;
   
 #ifdef TICKY_TICKY
   MAYBE_EMPTY_STRUCT(StgTSOTickyInfo,ticky)

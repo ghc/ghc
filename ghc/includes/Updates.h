@@ -90,7 +90,7 @@
 	DECLARE_IPTR(info);				\
 	info = GET_INFO(updclosure);			\
         AWAKEN_BQ_NOLOCK(info,updclosure);		\
-	updateWithIndirection(info,stg_IND_info,	\
+	updateWithIndirection(info, INFO_PTR(stg_IND_info), \
 			      updclosure,		\
 			      heapptr,); 
 # endif
@@ -303,23 +303,11 @@ DEBUG_FILL_SLOP(StgClosure *p)
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);				\
     bd = Bdescr((P_)p1);						\
     if (bd->gen_no == 0) {						\
-      ((StgInd *)p1)->indirectee = p2;					\
       SET_INFO(p1, ind_info);						\
       LDV_RECORD_CREATE(p1);						\
       TICK_UPD_NEW_IND();						\
       and_then;								\
-    } else {								\
-      if (_info != &stg_BLACKHOLE_BQ_info) {				\
-        DEBUG_FILL_SLOP(p1);						\
-        ((StgIndOldGen *)p1)->mut_link = generations[bd->gen_no].mut_once_list;	\
-        generations[bd->gen_no].mut_once_list = (StgMutClosure *)p1;    \
-      }									\
-      ((StgIndOldGen *)p1)->indirectee = p2;				\
-      SET_INFO(p1, &stg_IND_OLDGEN_info);				\
-      TICK_UPD_OLD_IND();						\
-      and_then;								\
-    }									\
-  }
+    }}
 #endif
 
 /* The permanent indirection version isn't performance critical.  We

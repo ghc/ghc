@@ -373,7 +373,7 @@ extern void         markCAFs     ( evac_fn evac );
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-extern lnat RTS_VAR(total_allocated);
+extern ullong RTS_VAR(total_allocated);
 
 extern lnat calcAllocated  ( void );
 extern lnat calcLive       ( void );

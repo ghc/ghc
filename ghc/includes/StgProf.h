@@ -1,9 +1,9 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgProf.h,v 1.18 2004/08/13 13:09:37 simonmar Exp $
  *
- * (c) The GHC Team, 1998
+ * (c) The GHC Team, 2004
  *
  * Macros for profiling operations in STG code
+ *
  * ---------------------------------------------------------------------------*/
 
 #ifndef STGPROF_H
@@ -214,9 +214,6 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         /* registered CCS list */
 	    root 		: 0,				\
        }};
 
-# define CC_EXTERN(cc_ident) \
-    extern CostCentre cc_ident[];
-
 /* -----------------------------------------------------------------------------
  * Time / Allocation Macros
  * ---------------------------------------------------------------------------*/
@@ -224,157 +221,11 @@ extern CostCentreStack * RTS_VAR(CCS_LIST);         /* registered CCS list */
 /* eliminate profiling overhead from allocation costs */
 #define CCS_ALLOC(ccs, size) (ccs)->mem_alloc += ((size)-sizeofW(StgProfHeader))
 
-/* For grabbing the cost centre from a closure */
-#define CCS_HDR(closure)   ((StgClosure *)(closure))->header.prof.ccs
-
-/* Restore the CCCS from a stack frame.
- * (addr should always be Sp->header.prof.ccs) 
- */
-#define RESTORE_CCCS(addr)   (*CCCS = (CostCentreStack *)(addr))
-
-/* -----------------------------------------------------------------------------
- * Pushing a new cost centre (i.e. for scc annotations)
- * -------------------------------------------------------------------------- */
-
-# define SET_CCC_X(cc,do_subcc_count,do_scc_count)		\
-	do {							\
-	CCCS = PushCostCentre(CCCS,cc);				\
-	if (do_scc_count)     { CCCS->scc_count++; }		\
-	} while(0)
-
-/* We sometimes don't increment the scc_count field, for example when
- * this scc has been placed by the compiler on an expression it
- * floated outside the main scc annotation.
- */
-
-# define SET_CCC(cc_ident,do_scc_count) \
-	 SET_CCC_X(cc_ident,do_scc_count,do_scc_count)
-
-# define SET_CCS_TOP(cc_ident) \
-	 SET_CCC_X(cc_ident,0,1)
-
-/* -----------------------------------------------------------------------------
- * Allocating new cost centres / cost centre stacks.
- * -------------------------------------------------------------------------- */
-
-#define ASSIGN_CC_ID(ccID)                \
-        do {                              \
-        ccID = CC_ID;                     \
-        CC_ID++;                          \
-        } while(0)
-
-#define ASSIGN_CCS_ID(ccsID)              \
-        do {                              \
-        ccsID = CCS_ID;                   \
-        CCS_ID++;                         \
-        } while(0)
-
-#define ASSIGN_HP_ID(hpID)                \
-        do {                              \
-        hpID = HP_ID;                     \
-        HP_ID++;                          \
-        } while(0)
-
-#define SET_STATS_TO_ZERO(stack)          \
-        do {                              \
-        (stack)->scc_count = 0;           \
-        (stack)->time_ticks = 0;          \
-        (stack)->mem_alloc = 0;           \
-        } while(0)
-
-/* -----------------------------------------------------------------------------
- * Setting the cost centre when we enter a closure
- * -------------------------------------------------------------------------- */
-
-#if defined(PROFILING_DETAIL_COUNTS)
-#define CCCS_DETAIL_COUNT(inc_this) ((inc_this)++)
-#else
-#define CCCS_DETAIL_COUNT(inc_this) /*nothing*/
-#endif
-
-/* On entry to top level CAFs we count the scc ...*/
-
-#define ENTER_CCS_CAF_X(ccs)                                \
-        do {                                                \
-        /* set CCCS to ident ccs */                         \
-        CCCS = (CostCentreStack *)(ccs);                    \
-        /* inc scc count of CAF ccs */                      \
-        CCCS->scc_count++;                                  \
-        } while(0)
- 
-#define ENTER_CCS_CAF(ccs_ident)   ENTER_CCS_CAF_X(ccs_ident)
-#define ENTER_CCS_CAF_CL(closure)  ENTER_CCS_CAF_X(CCS_HDR(closure))
-
-/* ----------------------------------------------------------------------------
- * Entering a Thunk
- *
- * On entering a closure we only count the enter to thunks ...
- * ------------------------------------------------------------------------- */
-
-#define ENTER_CCS_T(ccs)				\
-        do {						\
-        *CCCS = (CostCentreStack *)(ccs);		\
-        CCCS_DETAIL_COUNT(CCCS->thunk_count);		\
-        } while(0)      
- 
-#define ENTER_CCS_TCL(closure)  ENTER_CCS_T(CCS_HDR(closure))
- 
-/* -----------------------------------------------------------------------------
- * Entering a function
- *
- * Here is our special "hybrid" case when we do *not* set the CCCS.
- *  (a) The closure is a function, not a thunk;
- *  (b) The CCS is CAF-ish.
- * -------------------------------------------------------------------------- */
-
-#define ENTER_CCS_F(stack) EnterFunCCS(stack)
- 
-#define ENTER_CCS_FCL(closure)  ENTER_CCS_F(CCS_HDR(closure))
-
-/* Entering a top-level function: costs are subsumed by the caller 
- */
-#define ENTER_CCS_FSUB()				\
-        do {						\
-        CCCS_DETAIL_COUNT(CCCS->subsumed_fun_count);	\
-        CCCS_DETAIL_COUNT(CCCS->function_count);	\
-	entering_PAP = 0;				\
-        } while(0)
- 
-#define ENTER_CCS_FCAF(stack)					\
-        do {							\
-        CostCentreStack *ccs = (CostCentreStack *) (stack);	\
-        CCCS_DETAIL_COUNT(ccs->caffun_subsumed);		\
-        CCCS_DETAIL_COUNT(CCCS->subsumed_caf_count);		\
-        CCCS_DETAIL_COUNT(CCCS->function_count);		\
-	entering_PAP = 0;					\
-        } while(0)
- 
-#define ENTER_CCS_FLOAD(ccs)                                \
-        do {                                                \
-        CCCS = (CostCentreStack *)(ccs);                    \
-        CCCS_DETAIL_COUNT(CCCS->function_count);            \
-        } while(0)
- 
-/* These ENTER_CC_PAP things are only used in the RTS */
- 
-#define ENTER_CCS_PAP(stack) 			\
-        do {					\
-	ENTER_CCS_F(stack);			\
-	*entering_PAP = rtsTrue;		\
-	} while(0)
-
-#define ENTER_CCS_PAP_CL(closure)  \
-        ENTER_CCS_PAP((closure)->header.prof.ccs)
-
-/* -----------------------------------------------------------------------------
-   When not profiling, these macros do nothing...
-   -------------------------------------------------------------------------- */
 #else /* !PROFILING */
 
 #define CCS_ALLOC(ccs, amount) doNothing()
-#define ENTER_CC_PAP_CL(r)     doNothing()
-#define ENTER_CCS_PAP_CL(r)    doNothing()
  
 #endif /* PROFILING */
 
 #endif /* STGPROF_H */
+

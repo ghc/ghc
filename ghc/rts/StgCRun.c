@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgCRun.c,v 1.42 2004/08/13 13:10:46 simonmar Exp $
+ * $Id: StgCRun.c,v 1.43 2004/08/13 13:57:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -69,6 +69,7 @@ register double fake_f9 __asm__("$f9");
 #include "Rts.h"
 #include "StgRun.h"
 #include "RtsFlags.h"
+#include "OSThreads.h"
 #include "Capability.h"
 
 #ifdef DEBUG
