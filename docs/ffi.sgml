@@ -610,9 +610,7 @@ defines the mapping between Haskell and C types.
 <Table id="sec-mapping-table">
 <Title>Mapping of Haskell types to C types</Title>
 
-<TGroup Cols="6">
-<ColSpec Align="Left" Colsep="0">
-<ColSpec Align="Left" Colsep="0">
+<TGroup Cols="4">
 <ColSpec Align="Left" Colsep="0">
 <ColSpec Align="Left" Colsep="0">
 <ColSpec Align="Left" Colsep="0">
@@ -747,10 +745,6 @@ defines the mapping between Haskell and C types.
 <Entry> <Literal>HsStablePtr</Literal> </Entry>
 <Entry> void* (8) </Entry>
 <Entry> </Entry>
-</Row>
-<Row>
-<Entry>
-</Entry>
 </Row>
 </TBody>
 
@@ -932,7 +926,7 @@ foreign import "mumble" mumble :: ForeignObj -&#62; IO ()
 
 f :: Addr -&#62; IO ()
 f ptr = do
-  fo &#60;- makeForeignObj ptr myFinalizer
+  fo &#60;- newForeignObj ptr myFinalizer
   mumble fo
 </ProgramListing>
 
