@@ -12,7 +12,10 @@
 --
 -----------------------------------------------------------------------------
 
-module Text.Printf(printf, hPrintf) where
+module Text.Printf(
+   printf, hPrintf,
+   PrintfType, HPrintfType, PrintfArg, IsChar
+) where
 
 import Prelude
 import Data.Array
@@ -23,7 +26,7 @@ import System.IO
 -------------------
 
 -- | Format a variable number of arguments with the C-style formatting string.
--- The return value is either 'String' or @(IO a)@.
+-- The return value is either 'String' or @('IO' a)@.
 --
 -- The format string consists of ordinary characters and /conversion
 -- specifications/, which specify how to format one of the arguments
@@ -54,13 +57,6 @@ import System.IO
 -- >    e      exponent format float   Float, Double
 -- >    s      string                  String
 --
--- The @PrintfType@ class provides the variable argument magic for
--- 'printf'.  Its implementation is intentionally not visible from
--- this module.  The following argument types are supported: Char, String, 
--- Int, Integer, Float, Double.  If you attempt to pass an argument of a
--- different type to 'printf', then the compiler will report it as a
--- missing instance of @PrintfArg@.
---
 -- Mismatch between the argument types and the format string will cause
 -- an exception to be thrown at runtime.
 --
@@ -77,14 +73,19 @@ printf :: (PrintfType r) => String -> r
 printf fmt = spr fmt []
 
 -- | Similar to 'printf', except that output is via the specified
--- 'Handle'.  The return type is restricted to @(IO a)@.
+-- 'Handle'.  The return type is restricted to @('IO' a)@.
 hPrintf :: (HPrintfType r) => Handle -> String -> r
 hPrintf hdl fmt = hspr hdl fmt []
 
+-- |The 'PrintfType' class provides the variable argument magic for
+-- 'printf'.  Its implementation is intentionally not visible from
+-- this module. If you attempt to pass an argument of a type which
+-- is not an instance of this class to 'printf' or 'hPrintf', then
+-- the compiler will report it as a missing instance of 'PrintfArg'.
 class PrintfType t where
     spr :: String -> [UPrintf] -> t
 
--- | The @HPrintfType@ class provides the variable argument magic for
+-- | The 'HPrintfType' class provides the variable argument magic for
 -- 'hPrintf'.  Its implementation is intentionally not visible from
 -- this module.
 class HPrintfType t where

@@ -362,8 +362,8 @@ parListN 0 strat xs     = ()
 parListN n strat (x:xs) = strat x `par` (parListN (n-1) strat xs)
 
 -- | Evaluates N elements of the spine of the argument list and applies
--- `strat' to the Nth element (if there is one) in parallel with the
--- result. e.g. parListNth 2 [e1, e2, e3] evaluates e2
+-- the given strategy to the Nth element (if there is one) in parallel with
+-- the result. e.g. parListNth 2 [e1, e2, e3] evaluates e2
 parListNth :: Int -> Strategy a -> Strategy [a]
 parListNth n strat xs 
   | null rest = ()
@@ -379,13 +379,14 @@ parListChunk n strat xs = seqListN n strat xs `par`
 			    parListChunk n strat (drop n xs)
 
 -- | 'parMap' applies a function to each element of the argument list in
--- parallel.  The result of the function is evaluated using `strat'
+-- parallel.  The result of the function is evaluated using the given
+-- strategy.
 parMap :: Strategy b -> (a -> b) -> [a] -> [b]
 parMap strat f xs 	= map f xs `using` parList strat
 
 -- | 'parFlatMap' uses 'parMap' to apply a list-valued function to each
 -- element of the argument list in parallel.  The result of the function
--- is evaluated using `strat'
+-- is evaluated using the given strategy.
 parFlatMap :: Strategy [b] -> (a -> [b]) -> [a] -> [b]
 parFlatMap strat f xs = concat (parMap strat f xs)
 
@@ -420,7 +421,7 @@ seqListNth n strat xs
     rest = drop n xs
 
 -- | Parallel n-buffer function added for the revised version of the strategies
--- paper. 'parBuffer' supersedes the older 'fringeList'. It has the same
+-- paper. 'parBuffer' supersedes the older @fringeList@. It has the same
 -- semantics.
 parBuffer :: Int -> Strategy a -> [a] -> [a]
 parBuffer n s xs = 
