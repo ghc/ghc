@@ -3,7 +3,8 @@
 # this directory.  For more information, look at ../configure.
 AC_INIT(Makefile.in)
 
-configdirs="mpn mpz mpf mpq mpbsd"
+AC_CONFIG_SUBDIRS(mpn mpz)
+
 srctrigger=gmp-impl.h
 srcname="GNU Multi-Precision library"
 
