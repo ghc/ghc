@@ -287,6 +287,9 @@ instance Outputable Bool where
 instance Outputable Int where
    ppr n = int n
 
+instance Outputable () where
+   ppr _ = text "()"
+
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
 
@@ -294,8 +297,8 @@ instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
 instance Outputable a => Outputable (Maybe a) where
-  ppr Nothing = text "Nothing"
-  ppr (Just x) = text "Just" <+> ppr x
+  ppr Nothing = ptext SLIT("Nothing")
+  ppr (Just x) = ptext SLIT("Just") <+> ppr x
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where

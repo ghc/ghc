@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Interpreter.hs,v 1.1 2000/11/07 16:03:38 simonmar Exp $
+-- $Id: Interpreter.hs,v 1.2 2000/11/08 13:51:58 simonmar Exp $
 --
 -- Interpreter subsystem wrapper
 --
@@ -17,7 +17,7 @@ module Interpreter (
     linkIModules,
     stgToInterpSyn,
     HValue,
-    UnlinkedIBinds,
+    UnlinkedIBind,
     loadObjs, resolveObjs,
 #endif
   ) where
@@ -32,7 +32,7 @@ type ItblEnv = ()
 linkIModules = error "linkIModules"
 stgToInterpSyn = error "linkIModules"
 type HValue = ()
-type UnlinkedIBinds = ()
+type UnlinkedIBind = ()
 loadObjs = error "loadObjs"
 resolveObjs = error "loadObjs"
 #endif

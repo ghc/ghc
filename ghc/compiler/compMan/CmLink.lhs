@@ -27,6 +27,8 @@ import Panic		( panic )
 \begin{code}
 data PersistentLinkerState 
    = PersistentLinkerState {
+
+#ifdef GHCI
 	-- Current global mapping from RdrNames to closure addresses
         closure_env :: ClosureEnv,
 
@@ -39,6 +41,10 @@ data PersistentLinkerState
 
 	-- notionally here, but really lives in the C part of the linker:
 	--            object_symtab :: FiniteMap String Addr
+#else
+	dummy :: ()	--  sigh, can't have an empty record
+#endif
+
      }
 
 data LinkResult 
@@ -76,8 +82,12 @@ instance Outputable Linkable where
    ppr (LP package_nm)       = text "LinkableP" <+> ptext package_nm
 
 emptyPLS :: IO PersistentLinkerState
+#ifdef GHCI
 emptyPLS = return (PersistentLinkerState { closure_env = emptyFM, 
                                            itbl_env    = emptyFM })
+#else
+emptyPLS = return (PersistentLinkerState {})
+#endif
 \end{code}
 
 \begin{code}
