@@ -20,7 +20,7 @@ import RnHsSyn		( SYN_IE(RenamedHsExpr),
 			  SYN_IE(RenamedStmt), SYN_IE(RenamedRecordBinds)
 			)
 import TcHsSyn		( SYN_IE(TcExpr), SYN_IE(TcStmt),
-			  TcIdOcc(..), SYN_IE(TcRecordBinds),
+			  SYN_IE(TcRecordBinds),
 			  mkHsTyApp
 			)
 
@@ -34,11 +34,11 @@ import TcEnv		( tcLookupLocalValue, tcLookupGlobalValue, tcLookupClassByKey,
 			  tcExtendGlobalTyVars, tcLookupGlobalValueMaybe 
 			)
 import SpecEnv		( SpecEnv )
-import TcMatches	( tcMatchesCase, tcMatch )
+import TcMatches	( tcMatchesCase, tcMatchExpected )
 import TcMonoType	( tcHsType )
 import TcPat		( tcPat )
 import TcSimplify	( tcSimplifyAndCheck, tcSimplifyRank2 )
-import TcType		( SYN_IE(TcType), TcMaybe(..),
+import TcType		( TcIdOcc(..), SYN_IE(TcType), TcMaybe(..),
 			  tcInstId, tcInstType, tcInstSigTcType, tcInstTyVars,
 			  tcInstSigType, tcInstTcType, tcInstTheta, tcSplitRhoTy,
 			  newTyVarTy, newTyVarTys, zonkTcTyVars, zonkTcType )
@@ -81,7 +81,9 @@ import Util
 \end{code}
 
 \begin{code}
-tcExpr :: RenamedHsExpr -> TcM s (TcExpr s, LIE s, TcType s)
+tcExpr :: RenamedHsExpr			-- Expession to type check
+       -> TcType s 			-- Expected type (could be a type variable)
+       -> TcM s (TcExpr s, LIE s)
 \end{code}
 
 %************************************************************************
@@ -91,16 +93,17 @@ tcExpr :: RenamedHsExpr -> TcM s (TcExpr s, LIE s, TcType s)
 %************************************************************************
 
 \begin{code}
-tcExpr (HsVar name)
-  = tcId name		`thenNF_Tc` \ (expr', lie, res_ty) ->
+tcExpr (HsVar name) res_ty
+  = tcId name			`thenNF_Tc` \ (expr', lie, id_ty) ->
+    unifyTauTy id_ty res_ty	`thenTc_`
 
     -- Check that the result type doesn't have any nested for-alls.
     -- For example, a "build" on its own is no good; it must be
     -- applied to something.
-    checkTc (isTauTy res_ty)
-	    (lurkingRank2Err name res_ty) `thenTc_`
+    checkTc (isTauTy id_ty)
+	    (lurkingRank2Err name id_ty) `thenTc_`
 
-    returnTc (expr', lie, res_ty)
+    returnTc (expr', lie)
 \end{code}
 
 %************************************************************************
@@ -112,59 +115,60 @@ tcExpr (HsVar name)
 Overloaded literals.
 
 \begin{code}
-tcExpr (HsLit (HsInt i))
-  = newTyVarTy mkBoxedTypeKind	`thenNF_Tc` \ ty ->
-
-    newOverloadedLit (LiteralOrigin (HsInt i))
+tcExpr (HsLit (HsInt i)) res_ty
+  = newOverloadedLit (LiteralOrigin (HsInt i))
 		     (OverloadedIntegral i)
-		     ty					`thenNF_Tc` \ (lie, over_lit_id) ->
+		     res_ty  `thenNF_Tc` \ stuff ->
+    returnTc stuff
 
-    returnTc (HsVar over_lit_id, lie, ty)
-
-tcExpr (HsLit (HsFrac f))
-  = newTyVarTy mkBoxedTypeKind	`thenNF_Tc` \ ty ->
-
-    newOverloadedLit (LiteralOrigin (HsFrac f))
+tcExpr (HsLit (HsFrac f)) res_ty
+  = newOverloadedLit (LiteralOrigin (HsFrac f))
 		     (OverloadedFractional f)
-		     ty					`thenNF_Tc` \ (lie, over_lit_id) ->
+		     res_ty  `thenNF_Tc` \ stuff ->
+    returnTc stuff
 
-    returnTc (HsVar over_lit_id, lie, ty)
 
-tcExpr (HsLit lit@(HsLitLit s))
+tcExpr (HsLit lit@(HsLitLit s)) res_ty
   = tcLookupClassByKey cCallableClassKey		`thenNF_Tc` \ cCallableClass ->
-    newTyVarTy mkBoxedTypeKind				`thenNF_Tc` \ ty ->
     newDicts (LitLitOrigin (_UNPK_ s))
-	     [(cCallableClass, ty)]			`thenNF_Tc` \ (dicts, _) ->
-    returnTc (HsLitOut lit ty, dicts, ty)
+	     [(cCallableClass, res_ty)]			`thenNF_Tc` \ (dicts, _) ->
+    returnTc (HsLitOut lit res_ty, dicts)
 \end{code}
 
 Primitive literals:
 
 \begin{code}
-tcExpr (HsLit lit@(HsCharPrim c))
-  = returnTc (HsLitOut lit charPrimTy, emptyLIE, charPrimTy)
+tcExpr (HsLit lit@(HsCharPrim c)) res_ty
+  = unifyTauTy charPrimTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit charPrimTy, emptyLIE)
 
-tcExpr (HsLit lit@(HsStringPrim s))
-  = returnTc (HsLitOut lit addrPrimTy, emptyLIE, addrPrimTy)
+tcExpr (HsLit lit@(HsStringPrim s)) res_ty
+  = unifyTauTy addrPrimTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit addrPrimTy, emptyLIE)
 
-tcExpr (HsLit lit@(HsIntPrim i))
-  = returnTc (HsLitOut lit intPrimTy, emptyLIE, intPrimTy)
+tcExpr (HsLit lit@(HsIntPrim i)) res_ty
+  = unifyTauTy intPrimTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit intPrimTy, emptyLIE)
 
-tcExpr (HsLit lit@(HsFloatPrim f))
-  = returnTc (HsLitOut lit floatPrimTy, emptyLIE, floatPrimTy)
+tcExpr (HsLit lit@(HsFloatPrim f)) res_ty
+  = unifyTauTy floatPrimTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit floatPrimTy, emptyLIE)
 
-tcExpr (HsLit lit@(HsDoublePrim d))
-  = returnTc (HsLitOut lit doublePrimTy, emptyLIE, doublePrimTy)
+tcExpr (HsLit lit@(HsDoublePrim d)) res_ty
+  = unifyTauTy doublePrimTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit doublePrimTy, emptyLIE)
 \end{code}
 
 Unoverloaded literals:
 
 \begin{code}
-tcExpr (HsLit lit@(HsChar c))
-  = returnTc (HsLitOut lit charTy, emptyLIE, charTy)
+tcExpr (HsLit lit@(HsChar c)) res_ty
+  = unifyTauTy charTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit charTy, emptyLIE)
 
-tcExpr (HsLit lit@(HsString str))
-  = returnTc (HsLitOut lit stringTy, emptyLIE, stringTy)
+tcExpr (HsLit lit@(HsString str)) res_ty
+  = unifyTauTy stringTy res_ty		`thenTc_`
+    returnTc (HsLitOut lit stringTy, emptyLIE)
 \end{code}
 
 %************************************************************************
@@ -174,26 +178,26 @@ tcExpr (HsLit lit@(HsString str))
 %************************************************************************
 
 \begin{code}
-tcExpr (HsPar expr) -- preserve parens so printing needn't guess where they go
-  = tcExpr expr
+tcExpr (HsPar expr) res_ty -- preserve parens so printing needn't guess where they go
+  = tcExpr expr res_ty
 
-tcExpr (NegApp expr neg) = tcExpr (HsApp neg expr)
+tcExpr (NegApp expr neg) res_ty = tcExpr (HsApp neg expr) res_ty
 
-tcExpr (HsLam match)
-  = tcMatch match	`thenTc` \ (match',lie,ty) ->
-    returnTc (HsLam match', lie, ty)
+tcExpr (HsLam match) res_ty
+  = tcMatchExpected res_ty match	`thenTc` \ (match',lie) ->
+    returnTc (HsLam match', lie)
 
-tcExpr (HsApp e1 e2) = accum e1 [e2]
+tcExpr (HsApp e1 e2) res_ty = accum e1 [e2]
   where
     accum (HsApp e1 e2) args = accum e1 (e2:args)
     accum fun args
-      = tcApp fun args 	`thenTc` \ (fun', args', lie, res_ty) ->
-	returnTc (foldl HsApp fun' args', lie, res_ty)
+      = tcApp fun args res_ty 	`thenTc` \ (fun', args', lie) ->
+	returnTc (foldl HsApp fun' args', lie)
 
 -- equivalent to (op e1) e2:
-tcExpr (OpApp arg1 op fix arg2)
-  = tcApp op [arg1,arg2]	`thenTc` \ (op', [arg1', arg2'], lie, res_ty) ->
-    returnTc (OpApp arg1' op' fix arg2', lie, res_ty)
+tcExpr (OpApp arg1 op fix arg2) res_ty
+  = tcApp op [arg1,arg2] res_ty	`thenTc` \ (op', [arg1', arg2'], lie) ->
+    returnTc (OpApp arg1' op' fix arg2', lie)
 \end{code}
 
 Note that the operators in sections are expected to be binary, and
@@ -207,8 +211,8 @@ a type error will occur if they aren't.
 -- or just
 -- 	op e
 
-tcExpr in_expr@(SectionL arg op)
-  = tcApp op [arg] 		`thenTc` \ (op', [arg'], lie, res_ty) ->
+tcExpr in_expr@(SectionL arg op) res_ty
+  = tcApp op [arg] res_ty 		`thenTc` \ (op', [arg'], lie) ->
 
 	-- Check that res_ty is a function type
 	-- Without this check we barf in the desugarer on
@@ -216,26 +220,21 @@ tcExpr in_expr@(SectionL arg op)
 	-- because it tries to desugar to
 	--	f op = \r -> 3 op r
 	-- so (3 `op`) had better be a function!
-    newTyVarTy mkTypeKind		`thenNF_Tc` \ ty1 ->
-    newTyVarTy mkTypeKind		`thenNF_Tc` \ ty2 ->
     tcAddErrCtxt (sectionLAppCtxt in_expr) $
-    unifyTauTy (mkFunTy ty1 ty2) res_ty	`thenTc_`
+    unifyFunTy res_ty			`thenTc_`
 
-    returnTc (SectionL arg' op', lie, res_ty)
+    returnTc (SectionL arg' op', lie)
 
 -- Right sections, equivalent to \ x -> x op expr, or
 --	\ x -> op x expr
 
-tcExpr in_expr@(SectionR op expr)
-  = tcExpr op			`thenTc`    \ (op',  lie1, op_ty) ->
-    tcExpr expr			`thenTc`    \ (expr',lie2, expr_ty) ->
-
-    newTyVarTy mkTypeKind	`thenNF_Tc` \ ty1 ->
-    newTyVarTy mkTypeKind	`thenNF_Tc` \ ty2 ->
+tcExpr in_expr@(SectionR op expr) res_ty
+  = tcExpr_id op		`thenTc`    \ (op', lie1, op_ty) ->
     tcAddErrCtxt (sectionRAppCtxt in_expr) $
-    unifyTauTy (mkFunTys [ty1, expr_ty] ty2) op_ty      `thenTc_`
-
-    returnTc (SectionR op' expr', lie1 `plusLIE` lie2, mkFunTy ty1 ty2)
+    split_fun_ty op_ty 2 {- two args -}			`thenTc` \ ([arg1_ty, arg2_ty], op_res_ty) ->
+    tcExpr expr	arg2_ty					`thenTc` \ (expr',lie2) ->
+    unifyTauTy (mkFunTy arg1_ty op_res_ty) res_ty	`thenTc_`
+    returnTc (SectionR op' expr', lie1 `plusLIE` lie2)
 \end{code}
 
 The interesting thing about @ccall@ is that it is just a template
@@ -246,7 +245,7 @@ arg/result types); unify them with the args/result; and store them for
 later use.
 
 \begin{code}
-tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty)
+tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty) res_ty
   = 	-- Get the callable and returnable classes.
     tcLookupClassByKey cCallableClassKey	`thenNF_Tc` \ cCallableClass ->
     tcLookupClassByKey cReturnableClassKey	`thenNF_Tc` \ cReturnableClass ->
@@ -261,98 +260,98 @@ tcExpr (CCall lbl args may_gc is_asm ignored_fake_result_ty)
     in
 
 	-- Arguments
-    tcExprs args			`thenTc` \ (args', args_lie, arg_tys) ->
+    mapNF_Tc (\ _ -> newTyVarTy mkTypeKind) [1..(length args)] `thenNF_Tc` \ ty_vars ->
+    tcExprs args ty_vars		   		       `thenTc`    \ (args', args_lie) ->
 
 	-- The argument types can be unboxed or boxed; the result
 	-- type must, however, be boxed since it's an argument to the PrimIO
 	-- type constructor.
     newTyVarTy mkBoxedTypeKind  		`thenNF_Tc` \ result_ty ->
+    unifyTauTy (mkPrimIoTy result_ty) res_ty    `thenTc_`
 
 	-- Construct the extra insts, which encode the
 	-- constraints on the argument and result types.
-    mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args arg_tys)    `thenNF_Tc` \ ccarg_dicts_s ->
+    mapNF_Tc new_arg_dict (zipEqual "tcExpr:CCall" args ty_vars)    `thenNF_Tc` \ ccarg_dicts_s ->
     newDicts result_origin [(cReturnableClass, result_ty)]	    `thenNF_Tc` \ (ccres_dict, _) ->
 
     returnTc (HsApp (HsVar (RealId stDataCon) `TyApp` [realWorldTy, result_ty])
 		    (CCall lbl args' may_gc is_asm result_ty),
 		      -- do the wrapping in the newtype constructor here
-	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie,
-	      mkPrimIoTy result_ty)
+	      foldr plusLIE ccres_dict ccarg_dicts_s `plusLIE` args_lie)
 \end{code}
 
 \begin{code}
-tcExpr (HsSCC label expr)
-  = tcExpr expr		`thenTc` \ (expr', lie, expr_ty) ->
-	 -- No unification. Give SCC the type of expr
-    returnTc (HsSCC label expr', lie, expr_ty)
+tcExpr (HsSCC label expr) res_ty
+  = tcExpr expr res_ty		`thenTc` \ (expr', lie) ->
+    returnTc (HsSCC label expr', lie)
 
-tcExpr (HsLet binds expr)
+tcExpr (HsLet binds expr) res_ty
   = tcBindsAndThen
 	combiner
 	binds 			-- Bindings to check
-	(tc_expr expr)	`thenTc` \ ((expr', ty), lie) ->
-    returnTc (expr', lie, ty)
+	(tc_expr)	`thenTc` \ (expr', lie) ->
+    returnTc (expr', lie)
   where
-    tc_expr expr = tcExpr expr `thenTc` \ (expr', lie, ty) ->
-	   	   returnTc ((expr',ty), lie)
-    combiner is_rec bind (expr, ty) = (HsLet (MonoBind bind [] is_rec) expr, ty)
+    tc_expr = tcExpr expr res_ty `thenTc` \ (expr', lie) ->
+	      returnTc (expr', lie)
+    combiner is_rec bind expr = HsLet (MonoBind bind [] is_rec) expr
 
-tcExpr in_expr@(HsCase expr matches src_loc)
+tcExpr in_expr@(HsCase expr matches src_loc) res_ty
   = tcAddSrcLoc src_loc	$
-    tcExpr expr			`thenTc`    \ (expr',lie1,expr_ty) ->
-    newTyVarTy mkTypeKind	`thenNF_Tc` \ result_ty ->
+    newTyVarTy mkTypeKind 	`thenNF_Tc` \ expr_ty ->
+    tcExpr expr expr_ty		`thenTc`    \ (expr',lie1) ->
 
     tcAddErrCtxt (caseCtxt in_expr) $
-    tcMatchesCase (mkFunTy expr_ty result_ty) matches	
+    tcMatchesCase (mkFunTy expr_ty res_ty) matches	
 				`thenTc`    \ (matches',lie2) ->
 
-    returnTc (HsCase expr' matches' src_loc, plusLIE lie1 lie2, result_ty)
+    returnTc (HsCase expr' matches' src_loc, plusLIE lie1 lie2)
 
-tcExpr (HsIf pred b1 b2 src_loc)
+tcExpr (HsIf pred b1 b2 src_loc) res_ty
   = tcAddSrcLoc src_loc	$
-    tcExpr pred			`thenTc`    \ (pred',lie1,predTy) ->
-
     tcAddErrCtxt (predCtxt pred) (
-      unifyTauTy boolTy predTy
-    )				`thenTc_`
-
-    tcExpr b1			`thenTc`    \ (b1',lie2,result_ty) ->
-    tcExpr b2			`thenTc`    \ (b2',lie3,b2Ty) ->
+    tcExpr pred boolTy	)	`thenTc`    \ (pred',lie1) ->
 
     tcAddErrCtxt (branchCtxt b1 b2) $
-    unifyTauTy result_ty b2Ty				`thenTc_`
-
-    returnTc (HsIf pred' b1' b2' src_loc, plusLIE lie1 (plusLIE lie2 lie3), result_ty)
+    tcExpr b1 res_ty		`thenTc`    \ (b1',lie2) ->
+    tcExpr b2 res_ty		`thenTc`    \ (b2',lie3) ->
+    returnTc (HsIf pred' b1' b2' src_loc, plusLIE lie1 (plusLIE lie2 lie3))
 \end{code}
 
 \begin{code}
-tcExpr expr@(HsDo do_or_lc stmts src_loc)
-  = tcDoStmts do_or_lc stmts src_loc
+tcExpr expr@(HsDo do_or_lc stmts src_loc) res_ty
+  = tcDoStmts do_or_lc stmts src_loc res_ty
 \end{code}
 
 \begin{code}
-tcExpr in_expr@(ExplicitList exprs)	-- Non-empty list
-  = newTyVarTy mkBoxedTypeKind		`thenNF_Tc` \ elt_ty ->
-    mapAndUnzipTc (tc_elt elt_ty) exprs	`thenTc` \ (exprs', lies) ->
-    returnTc (ExplicitListOut elt_ty exprs', plusLIEs lies, mkListTy elt_ty)
+tcExpr in_expr@(ExplicitList exprs) res_ty	-- Non-empty list
+  = unifyListTy res_ty                        `thenTc` \ elt_ty ->  
+    mapAndUnzipTc (tc_elt elt_ty) exprs	      `thenTc` \ (exprs', lies) ->
+    returnTc (ExplicitListOut elt_ty exprs', plusLIEs lies)
   where
     tc_elt elt_ty expr
       = tcAddErrCtxt (listCtxt expr) $
-	tcExpr expr			`thenTc` \ (expr', lie, expr_ty) ->
-	unifyTauTy elt_ty expr_ty	`thenTc_`
-	returnTc (expr', lie)
+	tcExpr expr elt_ty
 
-tcExpr (ExplicitTuple exprs)
-  = tcExprs exprs			`thenTc` \ (exprs', lie, tys) ->
-    returnTc (ExplicitTuple exprs', lie, mkTupleTy (length tys) tys)
+tcExpr (ExplicitTuple exprs) res_ty
+    -- ToDo: more direct way of testing if res_ty is a tuple type (cf. unifyListTy)?
+  = mapNF_Tc (\ _ -> newTyVarTy mkBoxedTypeKind) [1..len]	 `thenNF_Tc` \ ty_vars ->
+    unifyTauTy (mkTupleTy len ty_vars) res_ty                    `thenTc_`
+    mapAndUnzipTc (\ (expr,ty_var) -> tcExpr expr ty_var)
+               (exprs `zip` ty_vars) -- we know they're of equal length.
+               							 `thenTc` \ (exprs', lies) ->
+    returnTc (ExplicitTuple exprs', plusLIEs lies)
+    where
+     len = length exprs
 
-tcExpr (RecordCon (HsVar con) rbinds)
+tcExpr (RecordCon (HsVar con) rbinds) res_ty
   = tcId con				`thenNF_Tc` \ (con_expr, con_lie, con_tau) ->
     let
 	(_, record_ty) = splitFunTy con_tau
     in
 	-- Con is syntactically constrained to be a data constructor
     ASSERT( maybeToBool (maybeAppDataTyCon record_ty ) )
+    unifyTauTy record_ty res_ty         `thenTc_`
 
 	-- Check that the record bindings match the constructor
     tcLookupGlobalValue con				`thenNF_Tc` \ con_id ->
@@ -366,7 +365,7 @@ tcExpr (RecordCon (HsVar con) rbinds)
 	--  doesn't match the constructor.)
     tcRecordBinds record_ty rbinds		`thenTc` \ (rbinds', rbinds_lie) ->
 
-    returnTc (RecordCon con_expr rbinds', con_lie `plusLIE` rbinds_lie, record_ty)
+    returnTc (RecordCon con_expr rbinds', con_lie `plusLIE` rbinds_lie)
 
 
 -- The main complication with RecordUpd is that we need to explicitly
@@ -395,7 +394,7 @@ tcExpr (RecordCon (HsVar con) rbinds)
 --
 -- All this is done in STEP 4 below.
 
-tcExpr (RecordUpd record_expr rbinds)
+tcExpr (RecordUpd record_expr rbinds) res_ty
   = tcAddErrCtxt recordUpdCtxt			$
 
 	-- STEP 1
@@ -428,6 +427,7 @@ tcExpr (RecordUpd record_expr rbinds)
     let
 	result_record_ty = applyTyCon tycon result_inst_tys
     in
+    unifyTauTy result_record_ty res_ty          `thenTc_`
     tcRecordBinds result_record_ty rbinds	`thenTc` \ (rbinds', rbinds_lie) ->
 
 	-- STEP 4
@@ -456,9 +456,10 @@ tcExpr (RecordUpd record_expr rbinds)
 
 	-- STEP 5
 	-- Typecheck the expression to be updated
-    tcExpr record_expr					`thenTc` \ (record_expr', record_lie, record_ty) ->
-    unifyTauTy (applyTyCon tycon inst_tys) record_ty	`thenTc_`
-    
+    let
+	record_ty = applyTyCon tycon inst_tys
+    in
+    tcExpr record_expr record_ty			`thenTc`    \ (record_expr', record_lie) ->
 
 	-- STEP 6
 	-- Figure out the LIE we need.  We have to generate some 
@@ -478,69 +479,58 @@ tcExpr (RecordUpd record_expr rbinds)
 
 	-- Phew!
     returnTc (RecordUpdOut record_expr' result_record_ty dicts rbinds', 
-	      con_lie `plusLIE` record_lie `plusLIE` rbinds_lie, 
-	      result_record_ty)
+	      con_lie `plusLIE` record_lie `plusLIE` rbinds_lie)
 
-
-tcExpr (ArithSeqIn seq@(From expr))
-  = tcExpr expr					`thenTc`    \ (expr', lie1, ty) ->
+tcExpr (ArithSeqIn seq@(From expr)) res_ty
+  = unifyListTy res_ty                        `thenTc` \ elt_ty ->  
+    tcExpr expr elt_ty			      `thenTc`    \ (expr', lie1) ->
 
     tcLookupGlobalValueByKey enumFromClassOpKey	`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
-	      (RealId sel_id) [ty]		`thenNF_Tc` \ (lie2, enum_from_id) ->
+	      (RealId sel_id) [elt_ty]		`thenNF_Tc` \ (lie2, enum_from_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_id) (From expr'),
-	      lie1 `plusLIE` lie2,
-	      mkListTy ty)
+	      lie1 `plusLIE` lie2)
 
-tcExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2))
-  = tcExpr expr1		`thenTc`    \ (expr1',lie1,ty1) ->
-    tcExpr expr2		`thenTc`    \ (expr2',lie2,ty2) ->
-
-    tcAddErrCtxt (arithSeqCtxt in_expr) $
-    unifyTauTyList [ty1, ty2] 				`thenTc_`
-
+tcExpr in_expr@(ArithSeqIn seq@(FromThen expr1 expr2)) res_ty
+  = tcAddErrCtxt (arithSeqCtxt in_expr) $ 
+    unifyListTy  res_ty         `thenTc`    \ elt_ty ->  
+    tcExpr expr1 elt_ty		`thenTc`    \ (expr1',lie1) ->
+    tcExpr expr2 elt_ty		`thenTc`    \ (expr2',lie2) ->
     tcLookupGlobalValueByKey enumFromThenClassOpKey	`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
-	      (RealId sel_id) [ty1]			`thenNF_Tc` \ (lie3, enum_from_then_id) ->
+	      (RealId sel_id) [elt_ty]			`thenNF_Tc` \ (lie3, enum_from_then_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_then_id)
 			   (FromThen expr1' expr2'),
-	      lie1 `plusLIE` lie2 `plusLIE` lie3,
-	      mkListTy ty1)
+	      lie1 `plusLIE` lie2 `plusLIE` lie3)
 
-tcExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2))
-  = tcExpr expr1		`thenTc`    \ (expr1',lie1,ty1) ->
-    tcExpr expr2		`thenTc`    \ (expr2',lie2,ty2) ->
-
-    tcAddErrCtxt (arithSeqCtxt in_expr) $
-    unifyTauTyList [ty1,ty2]	`thenTc_`
-
+tcExpr in_expr@(ArithSeqIn seq@(FromTo expr1 expr2)) res_ty
+  = tcAddErrCtxt (arithSeqCtxt in_expr) $
+    unifyListTy  res_ty         `thenTc`    \ elt_ty ->  
+    tcExpr expr1 elt_ty		`thenTc`    \ (expr1',lie1) ->
+    tcExpr expr2 elt_ty		`thenTc`    \ (expr2',lie2) ->
     tcLookupGlobalValueByKey enumFromToClassOpKey	`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
-	      (RealId sel_id) [ty1] 		`thenNF_Tc` \ (lie3, enum_from_to_id) ->
+	      (RealId sel_id) [elt_ty] 		`thenNF_Tc` \ (lie3, enum_from_to_id) ->
 
     returnTc (ArithSeqOut (HsVar enum_from_to_id)
 			  (FromTo expr1' expr2'),
-	      lie1 `plusLIE` lie2 `plusLIE` lie3,
-	       mkListTy ty1)
+	      lie1 `plusLIE` lie2 `plusLIE` lie3)
 
-tcExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3))
-  = tcExpr expr1		`thenTc`    \ (expr1',lie1,ty1) ->
-    tcExpr expr2		`thenTc`    \ (expr2',lie2,ty2) ->
-    tcExpr expr3		`thenTc`    \ (expr3',lie3,ty3) ->
-
-    tcAddErrCtxt  (arithSeqCtxt in_expr) $
-    unifyTauTyList [ty1,ty2,ty3]			`thenTc_`
-
+tcExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3)) res_ty
+  = tcAddErrCtxt  (arithSeqCtxt in_expr) $
+    unifyListTy  res_ty         `thenTc`    \ elt_ty ->  
+    tcExpr expr1 elt_ty		`thenTc`    \ (expr1',lie1) ->
+    tcExpr expr2 elt_ty		`thenTc`    \ (expr2',lie2) ->
+    tcExpr expr3 elt_ty		`thenTc`    \ (expr3',lie3) ->
     tcLookupGlobalValueByKey enumFromThenToClassOpKey	`thenNF_Tc` \ sel_id ->
     newMethod (ArithSeqOrigin seq)
-	      (RealId sel_id) [ty1]			`thenNF_Tc` \ (lie4, eft_id) ->
+	      (RealId sel_id) [elt_ty]			`thenNF_Tc` \ (lie4, eft_id) ->
 
     returnTc (ArithSeqOut (HsVar eft_id)
 			   (FromThenTo expr1' expr2' expr3'),
-	      lie1 `plusLIE` lie2 `plusLIE` lie3 `plusLIE` lie4,
-	      mkListTy ty1)
+	      lie1 `plusLIE` lie2 `plusLIE` lie3 `plusLIE` lie4)
 \end{code}
 
 %************************************************************************
@@ -550,19 +540,23 @@ tcExpr in_expr@(ArithSeqIn seq@(FromThenTo expr1 expr2 expr3))
 %************************************************************************
 
 \begin{code}
-tcExpr in_expr@(ExprWithTySig expr poly_ty)
- = tcExpr expr			`thenTc` \ (texpr, lie, tau_ty) ->
+tcExpr in_expr@(ExprWithTySig expr poly_ty) res_ty
+ = tcSetErrCtxt (exprSigCtxt in_expr)	$
    tcHsType  poly_ty		`thenTc` \ sigma_sig ->
 
 	-- Check the tau-type part
-   tcSetErrCtxt (exprSigCtxt in_expr)	$
    tcInstSigType sigma_sig		`thenNF_Tc` \ sigma_sig' ->
    let
 	(sig_tyvars', sig_theta', sig_tau') = splitSigmaTy sigma_sig'
    in
-   unifyTauTy sig_tau' tau_ty		`thenTc_`
+   unifyTauTy sig_tau' res_ty		`thenTc_`
 
-	-- Check the type variables of the signature
+	-- Type check the expression, *after* we've incorporated the signature
+	-- info into res_ty
+   tcExpr expr res_ty		`thenTc` \ (texpr, lie) ->
+
+	-- Check the type variables of the signature, 
+	-- *after* typechecking the expression
    checkSigTyVars sig_tyvars' sig_tau'	`thenTc_`
 
 	-- Check overloading constraints
@@ -576,7 +570,38 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty)
 	-- result of the tcSimplifyAndCheck, except for any default
 	-- resolution it may have done, which is recorded in the
 	-- substitution.
-   returnTc (texpr, lie, tau_ty)
+   returnTc (texpr, lie)
+
+\end{code}
+
+Typecheck expression which in most cases will be an Id.
+
+\begin{code}
+tcExpr_id :: RenamedHsExpr
+           -> TcM s (TcExpr s,
+ 	       	     LIE s,
+	             TcType s)
+tcExpr_id id_expr
+ = case id_expr of
+	HsVar name -> tcId name			  `thenNF_Tc` \ stuff -> 
+		      returnTc stuff
+	other	   -> newTyVarTy mkTypeKind       `thenNF_Tc` \ id_ty ->
+		      tcExpr id_expr id_ty	  `thenTc`    \ (id_expr', lie_id) ->
+		      returnTc (id_expr', lie_id, id_ty) 
+
+
+--ToDo: move to Unify?
+unifyListTy :: TcType s              -- expected list type
+	    -> TcM s (TcType s)      -- list element type
+unifyListTy res_ty
+    -- ToDo: more direct way of testing if res_ty is a list type (cf. unifyFunTy)?
+  = newTyVarTy mkBoxedTypeKind		 `thenNF_Tc` \ elt_ty ->
+    unifyTauTy (mkListTy elt_ty) res_ty  `thenTc_`
+
+	-- This zonking makes the returned type as informative
+	-- as possible.
+    zonkTcType elt_ty			 `thenNF_Tc` \ elt_ty' ->
+    returnTc elt_ty'
 \end{code}
 
 %************************************************************************
@@ -586,70 +611,57 @@ tcExpr in_expr@(ExprWithTySig expr poly_ty)
 %************************************************************************
 
 \begin{code}
+
 tcApp :: RenamedHsExpr -> [RenamedHsExpr]   -- Function and args
+      -> TcType s			    -- Expected result type of application
       -> TcM s (TcExpr s, [TcExpr s],	    -- Translated fun and args
-		LIE s,
-		TcType s)		    -- Type of the application
+		LIE s)
 
-tcApp fun args
+tcApp fun args res_ty
   = 	-- First type-check the function
-	-- In the HsVar case we go straight to tcId to avoid hitting the
-	-- rank-2 check, which we check later here anyway
-    (case fun of
-	HsVar name -> tcId name	`thenNF_Tc` \ stuff -> returnTc stuff
-	other	   -> tcExpr fun
-    )					`thenTc` \ (fun', lie_fun, fun_ty) ->
+    tcExpr_id fun  			`thenTc` \ (fun', lie_fun, fun_ty) ->
 
-    tcApp_help fun 1 fun_ty args	`thenTc` \ (args', lie_args, res_ty) ->
+    tcAddErrCtxt (tooManyArgsCtxt fun) (
+	split_fun_ty fun_ty (length args)
+    )							`thenTc` \ (expected_arg_tys, actual_result_ty) ->
+
+	-- Unify with expected result before type-checking the args
+    unifyTauTy res_ty actual_result_ty			`thenTc_`
+
+	-- Now typecheck the args
+    mapAndUnzipTc tcArg (zipEqual "tcApp" args expected_arg_tys)	`thenTc` \ (args', lie_args_s) ->
 
     -- Check that the result type doesn't have any nested for-alls.
     -- For example, a "build" on its own is no good; it must be applied to something.
-    checkTc (isTauTy res_ty)
+    checkTc (isTauTy actual_result_ty)
 	    (lurkingRank2Err fun fun_ty) `thenTc_`
 
-    returnTc (fun', args', lie_fun `plusLIE` lie_args, res_ty)
+    returnTc (fun', args', lie_fun `plusLIE` plusLIEs lie_args_s)
 
 
-tcApp_help :: RenamedHsExpr -> Int	-- Function and arg position, used in error message(s)
-	   -> TcType s			-- The type of the function
-	   -> [RenamedHsExpr]		-- Arguments
-	   -> TcM s ([TcExpr s],		-- Typechecked args
-		     LIE s,
-		     TcType s)		-- Result type of the application
+split_fun_ty :: TcType s		-- The type of the function
+	     -> Int			-- Number of arguments
+	     -> TcM s ([TcType s],	-- Function argument types
+		       TcType s)	-- Function result types
 
-tcApp_help orig_fun arg_no fun_ty []
-  = returnTc ([], emptyLIE, fun_ty)
+split_fun_ty fun_ty 0 
+  = returnTc ([], fun_ty)
 
-tcApp_help orig_fun arg_no fun_ty all_args@(arg:args)
+split_fun_ty fun_ty n
   = 	-- Expect the function to have type A->B
-    tcAddErrCtxt (tooManyArgsCtxt orig_fun) (
-	    unifyFunTy fun_ty
-    )							`thenTc` \ (expected_arg_ty, result_ty) ->
-
-	-- Type check the argument
-    tcAddErrCtxt (funAppCtxt orig_fun arg_no arg) (
-		tcArg expected_arg_ty arg
-    )					 		`thenTc` \ (arg', lie_arg) ->
-
-	-- Do the other args
-    tcApp_help orig_fun (arg_no+1) result_ty args	`thenTc` \ (args', lie_args, res_ty) ->
-
-	-- Done
-    returnTc (arg':args', lie_arg `plusLIE` lie_args, res_ty)
-
+    unifyFunTy fun_ty		`thenTc` \ (arg_ty, res_ty) ->
+    split_fun_ty res_ty (n-1)	`thenTc` \ (arg_tys, final_res_ty) ->
+    returnTc (arg_ty:arg_tys, final_res_ty)
 \end{code}
 
 \begin{code}
-tcArg :: TcType s			-- Expected arg type
-      -> RenamedHsExpr			-- Actual argument
+tcArg :: (RenamedHsExpr, TcType s)	-- Actual argument and expected arg type
       -> TcM s (TcExpr s, LIE s)	-- Resulting argument and LIE
 
-tcArg expected_arg_ty arg
+tcArg (arg,expected_arg_ty)
   | not (maybeToBool (getForAllTy_maybe expected_arg_ty))
   = 	-- The ordinary, non-rank-2 polymorphic case
-    tcExpr arg					`thenTc` \ (arg', lie_arg, actual_arg_ty) ->
-    unifyTauTy expected_arg_ty actual_arg_ty	`thenTc_`
-    returnTc (arg', lie_arg)
+    tcExpr arg expected_arg_ty
 
   | otherwise
   = 	-- Ha!  The argument type of the function is a for-all type,
@@ -670,8 +682,7 @@ tcArg expected_arg_ty arg
     ASSERT( null sig_theta )	-- And expected_tyvars are all DontBind things
 	
 	-- Type-check the arg and unify with expected type
-    tcExpr arg					`thenTc` \ (arg', lie_arg, actual_arg_ty) ->
-    unifyTauTy sig_tau actual_arg_ty		`thenTc_`
+    tcExpr arg sig_tau				`thenTc` \ (arg', lie_arg) ->
 
 	-- Check that the arg_tyvars havn't been constrained
 	-- The interesting bit here is that we must include the free variables
@@ -761,7 +772,7 @@ tcId name
 %************************************************************************
 
 \begin{code}
-tcDoStmts do_or_lc stmts src_loc
+tcDoStmts do_or_lc stmts src_loc res_ty
   =	-- get the Monad and MonadZero classes
 	-- create type consisting of a fresh monad tyvar
     ASSERT( not (null stmts) )
@@ -778,7 +789,8 @@ tcDoStmts do_or_lc stmts src_loc
       combine_stmts stmt 		_ 	  ([], _) = panic "Bad last stmt tcDoStmts"
       combine_stmts stmt		_     (stmts, ty) = (stmt:stmts, ty)
     in
-    tc_stmts stmts	`thenTc` \ ((stmts', result_ty), final_lie) ->
+    tc_stmts stmts			`thenTc`   \ ((stmts', result_ty), final_lie) ->
+    unifyTauTy result_ty res_ty		`thenTc_`
 
 	-- Build the then and zero methods in case we need them
 	-- It's important that "then" and "return" appear just once in the final LIE,
@@ -806,13 +818,13 @@ tcDoStmts do_or_lc stmts src_loc
       failure_free (GuardStmt _ _)    = False
       failure_free other_stmt	      = True
     in
-    returnTc (HsDoOut do_or_lc stmts' return_id then_id zero_id result_ty src_loc,
-	      final_lie `plusLIE` monad_lie,
-	      result_ty)
+    returnTc (HsDoOut do_or_lc stmts' return_id then_id zero_id res_ty src_loc,
+	      final_lie `plusLIE` monad_lie)
+
 \end{code}
 
 \begin{code}
-tcStmt :: (RenamedHsExpr -> TcM s (TcExpr s, LIE s, TcType s))	-- This is tcExpr
+tcStmt :: (RenamedHsExpr -> TcType s -> TcM s (TcExpr s, LIE s))	-- This is tcExpr
 				-- The sole, disgusting, reason for this parameter
 				-- is to get the effect of polymorphic recursion
 				-- ToDo: rm when booting with Haskell 1.3
@@ -826,7 +838,8 @@ tcStmt :: (RenamedHsExpr -> TcM s (TcExpr s, LIE s, TcType s))	-- This is tcExpr
 tcStmt tc_expr do_or_lc m combine stmt@(ReturnStmt exp) do_next
   = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
     tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
-	tc_expr exp			 `thenTc`    \ (exp', exp_lie, exp_ty) ->
+        newTyVarTy mkTypeKind                `thenNF_Tc` \ exp_ty ->
+	tc_expr exp exp_ty		     `thenTc`    \ (exp', exp_lie) ->
 	returnTc (ReturnStmt exp', exp_lie, m exp_ty)
     )					`thenTc` \ (stmt', stmt_lie, stmt_ty) ->
     do_next				`thenTc` \ (thing', thing_lie) ->
@@ -835,10 +848,10 @@ tcStmt tc_expr do_or_lc m combine stmt@(ReturnStmt exp) do_next
 
 tcStmt tc_expr do_or_lc m combine stmt@(GuardStmt exp src_loc) do_next
   = ASSERT( case do_or_lc of { DoStmt -> False; ListComp -> True } )
+    newTyVarTy mkTypeKind                    `thenNF_Tc` \ exp_ty ->
     tcAddSrcLoc src_loc 		(
     tcSetErrCtxt (stmtCtxt do_or_lc stmt) (
-  	tc_expr exp	 		`thenTc`    \ (exp', exp_lie, exp_ty) ->
-  	unifyTauTy boolTy exp_ty	`thenTc_`
+  	tc_expr exp boolTy 		`thenTc`    \ (exp', exp_lie) ->
   	returnTc (GuardStmt exp' src_loc, exp_lie)
     ))					`thenTc` \ (stmt', stmt_lie) ->
     do_next				`thenTc` \ (thing', thing_lie) ->
@@ -847,12 +860,15 @@ tcStmt tc_expr do_or_lc m combine stmt@(GuardStmt exp src_loc) do_next
 
 tcStmt tc_expr do_or_lc m combine stmt@(ExprStmt exp src_loc) do_next
   = ASSERT( case do_or_lc of { DoStmt -> True; ListComp -> False } )
+    newTyVarTy mkTypeKind                    `thenNF_Tc` \ exp_ty ->
     tcAddSrcLoc src_loc 		(
     tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
-  	tc_expr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
-  	-- Check that exp has type (m tau) for some tau (doesn't matter what)
   	newTyVarTy mkTypeKind		`thenNF_Tc` \ tau ->
-        unifyTauTy (m tau) exp_ty	`thenTc_`
+	let
+	    -- exp has type (m tau) for some tau (doesn't matter what)
+	    exp_ty = m tau
+	in
+  	tc_expr exp exp_ty		`thenTc`    \ (exp', exp_lie) ->
   	returnTc (ExprStmt exp' src_loc, exp_lie, exp_ty)
     ))					`thenTc` \ (stmt',  stmt_lie, stmt_ty) ->
     do_next				`thenTc` \ (thing', thing_lie) ->
@@ -864,8 +880,7 @@ tcStmt tc_expr do_or_lc m combine stmt@(BindStmt pat exp src_loc) do_next
     tcAddSrcLoc src_loc		(
     tcSetErrCtxt (stmtCtxt do_or_lc stmt)	(
   	tcPat pat			`thenTc`    \ (pat', pat_lie, pat_ty) ->  
-      	tc_expr exp			`thenTc`    \ (exp', exp_lie, exp_ty) ->
-  	unifyTauTy (m pat_ty) exp_ty	`thenTc_`
+      	tc_expr exp (m pat_ty)		`thenTc`    \ (exp', exp_lie) ->
 
   	-- NB: the environment has been extended with the new binders
   	-- which the rhs can't "see", but the renamer should have made
@@ -943,7 +958,7 @@ tcRecordBinds expected_record_ty rbinds
 	  Just (record_ty, field_ty) = getFunTy_maybe tau
 	in
 	unifyTauTy expected_record_ty record_ty		`thenTc_`
-	tcArg field_ty rhs				`thenTc` \ (rhs', lie) ->
+	tcArg (rhs, field_ty)				`thenTc` \ (rhs', lie) ->
 	returnTc ((RealId sel_id, rhs', pun_flag), lie)
 
 badFields rbinds data_con
@@ -961,13 +976,13 @@ badFields rbinds data_con
 %************************************************************************
 
 \begin{code}
-tcExprs :: [RenamedHsExpr] -> TcM s ([TcExpr s], LIE s, [TcType s])
+tcExprs :: [RenamedHsExpr] -> [TcType s] -> TcM s ([TcExpr s], LIE s)
 
-tcExprs [] = returnTc ([], emptyLIE, [])
-tcExprs (expr:exprs)
- = tcExpr  expr			`thenTc` \ (expr',  lie1, ty) ->
-   tcExprs exprs		`thenTc` \ (exprs', lie2, tys) ->
-   returnTc (expr':exprs', lie1 `plusLIE` lie2, ty:tys)
+tcExprs [] [] = returnTc ([], emptyLIE)
+tcExprs (expr:exprs) (ty:tys)
+ = tcExpr  expr	 ty		`thenTc` \ (expr',  lie1) ->
+   tcExprs exprs tys		`thenTc` \ (exprs', lie2) ->
+   returnTc (expr':exprs', lie1 `plusLIE` lie2)
 \end{code}
 
 
