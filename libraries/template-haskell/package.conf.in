@@ -1,0 +1,25 @@
+#include "config.h"
+
+Package {
+	name		= "template-haskell",
+	auto		= True,
+#ifdef INSTALLING
+	import_dirs	= [ "$libdir/imports" ],
+#else
+	import_dirs	= [ "$libdir/libraries/template-haskell" ],
+#endif
+	source_dirs	= [],
+#ifdef INSTALLING
+	library_dirs	= [ "$libdir" ],
+#else
+	library_dirs	= [ "$libdir/libraries/template-haskell" ],
+#endif
+	hs_libraries	= [ "HStemplate-haskell" ],
+	extra_libraries	= [],
+	include_dirs	= [],
+	c_includes	= [],
+	package_deps	= [ "base", "haskell98" ],
+	extra_ghc_opts	= [],
+	extra_cc_opts	= [],
+	extra_ld_opts	= []
+}
