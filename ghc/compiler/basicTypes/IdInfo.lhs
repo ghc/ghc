@@ -60,7 +60,7 @@ module IdInfo (
 	specInfo, setSpecInfo,
 
 	-- CAF info
-	CafInfo(..), cafInfo, setCafInfo, ppCafInfo,
+	CafInfo(..), cafInfo, setCafInfo, mayHaveCafRefs, ppCafInfo,
 
         -- Constructed Product Result Info
         CprInfo(..), cprInfo, setCprInfo, ppCprInfo, noCprInfo,
@@ -524,6 +524,9 @@ data CafInfo
 -- LATER: not sure how easy this is...
 --      | OneCafRef Id
 
+
+mayHaveCafRefs MayHaveCafRefs = True
+mayHaveCafRefs _	      = False
 
 seqCaf c = c `seq` ()
 
