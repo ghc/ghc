@@ -441,7 +441,11 @@ hc-file-bundle : project-check
 	        echo `echo "$$f" | sed 's/hsc$$/hs/g' ` >> hc-files-to-go ; \
 	     fi; \
 	done;
-	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/rts/AutoApply.hc >> hc-files-to-go
+	for f in `$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler $(ProjectNameShort)-$(ProjectVersion)/ghc/rts -name "*.cmm" -follow -print` ""; do \
+	     if test "x$$f" != "x"; then \
+	        echo `echo "$$f" | sed 's/cmm$$/hc/g' ` >> hc-files-to-go ; \
+	     fi; \
+	done;
 	echo $(ProjectNameShort)-$(ProjectVersion)/libraries/base/GHC/PrimopWrappers.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/Parser.hs >> hc-files-to-go
 	echo $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler/parser/ParserCore.hs >> hc-files-to-go
