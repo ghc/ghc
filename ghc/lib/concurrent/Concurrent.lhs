@@ -29,6 +29,8 @@ module Concurrent (
 	, par  		-- :: a -> b -> b
 	, seq  		-- :: a -> b -> b
 	, fork  	-- :: a -> b -> b
+	, yield         -- :: IO ()
+
 	{-threadDelay, threadWaitRead, threadWaitWrite,-}
 
 	-- MVars

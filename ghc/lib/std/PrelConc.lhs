@@ -18,6 +18,8 @@ module PrelConc
 	, raiseInThread -- :: ThreadId -> Exception -> IO ()
 	, par  		-- :: a -> b -> b
 	, seq  		-- :: a -> b -> b
+	, yield         -- :: IO ()
+
 	{-threadDelay, threadWaitRead, threadWaitWrite,-}
 
 	-- MVars
@@ -67,6 +69,10 @@ raiseInThread (ThreadId id) ex = IO $ \ s ->
 myThreadId :: IO ThreadId
 myThreadId = IO $ \s ->
    case (myThreadId# s) of (# s1, id #) -> (# s1, ThreadId id #)
+
+yield :: IO ()
+yield = IO $ \s -> 
+   case (yield# s) of s1 -> (# s1, () #)
 
 -- "seq" is defined a bit wierdly (see below)
 --
