@@ -11,14 +11,20 @@ Haskell related information is available from the Haskell home page at
 
 	http://haskell.org/
 
+GHC has a new Web page; point your browser at
+
+	http://research.microsoft.com/users/t-simonm/ghc/
+
 + What's new
 =============
 
-GHC 4.02 fixes several bugs in 4.01 and adds the following features:
+GHC 4.02 fixes several bugs in 4.01 and adds the following major features:
 
 	* Full Haskell 98 language support,
 
 	* Scoped type variables,
+
+	* Better warnings for unused variables,
 
 	* A new generational garbage collector.
 
@@ -29,7 +35,9 @@ The following things have not been fixed yet:
 
 	* The profiler is still flaky.
 
-As usual, see the release notes (on the web page) for full details.
+See the release notes for full details:
+
+	http://research.microsoft.com/users/t-simonm/ghc/Docs/latest/users_guide/users_guide-1.html#ss1.4
 
 A source distribution and binaries for common architectures are
 available from the web page.
@@ -51,9 +59,8 @@ users hang out on glasgow-haskell-users@dcs.gla.ac.uk
 
 Relevant URLs on the World-Wide Web:
 
-GHC home page    	  http://www.dcs.gla.ac.uk/fp/software/ghc/
+GHC home page    	  http://research.microsoft.com/users/t-simonm/ghc/
 Haskell home page	  http://haskell.org/
-Glasgow FP group page     http://www.dcs.gla.ac.uk/fp/
 comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 
 
@@ -63,7 +70,7 @@ comp.lang.functional FAQ  http://www.cs.nott.ac.uk/Department/Staff/mpj/faq.html
 The easy way is to go to the WWW page, which should be
 self-explanatory:
 
-	http://www.dcs.gla.ac.uk/fp/software/ghc/
+	http://research.microsoft.com/users/t-simonm/ghc/
 
 Once you have the distribution, please follow the pointers in the
 README file to find all of the documentation about this release.  NB:
@@ -93,4 +100,4 @@ haven't been tested due to lack of time/hardware:
 The installer's guide included in distribution gives a complete
 run-down of what-ports-work; an on-line version can be found at
 
-   http://www.dcs.gla.ac.uk/fp/software/ghc/4.02/installation_guide/installing_toc.html
+   http://research.microsoft.com/users/t-simonm/ghc/Docs/latest/installation_guide/installing.html
