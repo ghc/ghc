@@ -703,6 +703,7 @@ repVal (MkC p) (MkC b) (MkC ds) = rep2 valName [p, b, ds]
 repFun :: Core String -> Core [M.Clse] -> DsM (Core M.Decl)  
 repFun (MkC nm) (MkC b) = rep2 funName [nm, b]
 
+{-
 repData :: Core String -> Core [String] -> Core [M.Cons] -> Core [String] -> DsM (Core M.Decl)
 repData (MkC nm) (MkC tvs) (MkC cons) (MkC derivs) = rep2 dataDName [nm, tvs, cons, derivs]
 
@@ -740,6 +741,7 @@ repArrowTyCon = rep2 arrowTyConName []
 repListTyCon :: DsM (Core M.Tag)
 repListTyCon = rep2 listTyConName []
 
+-}
 
 --------------- Miscellaneous -------------------
 

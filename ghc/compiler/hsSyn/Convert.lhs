@@ -16,7 +16,7 @@ import HsSyn as Hs
 	(	HsExpr(..), HsLit(..), ArithSeqInfo(..), 
 		HsDoContext(..), 
 		Match(..), GRHSs(..), GRHS(..), HsPred(..),
-		HsDecl(..), TyClDecl(..), InstDecl(..),
+		HsDecl(..), TyClDecl(..), InstDecl(..), ConDecl(..),
 		Stmt(..), HsBinds(..), MonoBinds(..), Sig(..),
 		Pat(..), HsConDetails(..), HsOverLit, BangType(..),
 		placeHolderType, HsType(..), HsTupCon(..),
@@ -26,7 +26,7 @@ import HsSyn as Hs
 
 import RdrName	( RdrName, mkRdrUnqual, mkRdrQual, mkOrig )
 import Module   ( mkModuleName )
-import RdrHsSyn	( mkHsIntegral, mkClassDecl, mkTyData, mkConDecl )
+import RdrHsSyn	( mkHsIntegral, mkClassDecl, mkTyData )
 import OccName
 import SrcLoc	( SrcLoc, generatedSrcLoc )
 import TyCon	( DataConDetails(..) )
@@ -53,7 +53,7 @@ cvt_top (Data tc tvs constrs derivs)
 		    (mk_derivs derivs) loc0)
   where
     mk_con (Constr c tys)
-	= mkConDecl (cName c) noExistentials noContext
+	= ConDecl (cName c) noExistentials noContext
 		    (PrefixCon (map mk_arg tys)) loc0
 
     mk_arg ty = BangType NotMarkedStrict (cvtType ty)
