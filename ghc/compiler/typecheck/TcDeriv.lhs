@@ -29,7 +29,7 @@ import RnMonad		( RnNameSupply,
 
 import Bag		( Bag, emptyBag, unionBags, listToBag )
 import Class		( classKey, Class )
-import ErrUtils		( dumpIfSet, Message )
+import ErrUtils		( dumpIfSet, Message, pprBagOfErrors )
 import MkId		( mkDictFunId )
 import Id		( mkVanillaId )
 import DataCon		( dataConArgTys, isNullaryDataCon )

@@ -46,9 +46,7 @@ import TcType		( TcType, typeToTcType,
 
 import RnMonad		( RnNameSupply, getIfaceFixities, Fixities, InterfaceDetails )
 import Bag		( isEmptyBag )
-import ErrUtils		( Message,
-			  pprBagOfErrors, dumpIfSet
-			)
+import ErrUtils		( Message, printErrorsAndWarnings, dumpIfSet )
 import Id		( Id, idType )
 import Module           ( pprModuleName )
 import Name		( Name, nameUnique, isLocallyDefined, NamedThing(..) )
@@ -99,8 +97,7 @@ typecheckModule us rn_name_supply iface_det mod
   = initTc us initEnv (tcModule rn_name_supply (getIfaceFixities iface_det) mod)
 		    	>>= \ (maybe_result, warns, errs) ->
 		
-    print_errs warns	>>
-    print_errs errs	>>
+    printErrorsAndWarnings errs warns		>>
 
     -- write the thin-air Id map
     (case maybe_result of
@@ -124,10 +121,6 @@ pp_rules [] = empty
 pp_rules rs = vcat [ptext SLIT("{-# RULES"),
 		    nest 4 (vcat (map ppr rs)),
 		    ptext SLIT("#-}")]
-
-print_errs errs
-  | isEmptyBag errs = return ()
-  | otherwise       = printErrs (pprBagOfErrors errs)
 \end{code}
 
 The internal monster:

@@ -135,10 +135,10 @@ import Inst		( lookupInst, lookupSimpleInst, LookupInstResult(..),
 			  isDict, isStdClassTyVarDict, isMethodFor,
 			  instToId, instBindingRequired, instCanBeGeneralised,
 			  newDictFromOld,
-			  instLoc, getDictClassTys,
-			  pprInst, zonkInst, tidyInst, tidyInsts,
+			  getDictClassTys,
+			  instLoc, pprInst, zonkInst, tidyInst, tidyInsts,
 			  Inst, LIE, pprInsts, pprInstsInFull, mkLIE, emptyLIE, 
-			  plusLIE, pprOrigin
+			  plusLIE
 			)
 import TcEnv		( tcGetGlobalTyVars )
 import TcType		( TcType, TcTyVarSet, typeToTcType )
@@ -1138,12 +1138,11 @@ genCantGenErr insts	-- Can't generalise these Insts
 addAmbigErrs ambig_tv_fn dicts = mapNF_Tc (addAmbigErr ambig_tv_fn) dicts
 
 addAmbigErr ambig_tv_fn dict
-  = tcAddSrcLoc (instLoc dict) $
-    addErrTcM (tidy_env,
-	       sep [text "Ambiguous type variable(s)" <+>
+  = addInstErrTcM (instLoc dict)
+	(tidy_env,
+	 sep [text "Ambiguous type variable(s)" <+>
 			hsep (punctuate comma (map (quotes . ppr) ambig_tvs)),
-		   nest 4 (text "in the constraint" <+> quotes (pprInst tidy_dict)),
-	 	   nest 4 (pprOrigin dict)])
+	      nest 4 (text "in the constraint" <+> quotes (pprInst tidy_dict))])
   where
     ambig_tvs = varSetElems (ambig_tv_fn tidy_dict)
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
@@ -1153,8 +1152,7 @@ warnDefault dicts default_ty
   = returnNF_Tc ()
 
   | otherwise
-  = tcAddSrcLoc (instLoc (head dicts))		$
-    warnTc True msg
+  = warnTc True msg
   where
     msg | length dicts > 1 
 	= (ptext SLIT("Defaulting the following constraint(s) to type") <+> quotes (ppr default_ty))
@@ -1166,33 +1164,30 @@ warnDefault dicts default_ty
     (_, tidy_dicts) = mapAccumL tidyInst emptyTidyEnv dicts
 
 addRuleLhsErr dict
-  = tcAddSrcLoc (instLoc dict)			$
-    addErrTcM (tidy_env,
-	       vcat [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
-		     nest 4 (pprOrigin dict),
-		     ptext SLIT("LHS of a rule must have no overloading")])
+  = addInstErrTcM (instLoc dict)
+	(tidy_env,
+	 vcat [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
+	       nest 4 (ptext SLIT("LHS of a rule must have no overloading"))])
   where
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 -- Used for top-level irreducibles
 addTopInstanceErr dict
-  = tcAddSrcLoc (instLoc dict)		       $
-    addErrTcM (tidy_env, 
-	       sep [ptext SLIT("No instance for") <+> quotes (pprInst tidy_dict),
-		   nest 4 $ pprOrigin dict])
+  = addInstErrTcM (instLoc dict) 
+	(tidy_env, 
+	 ptext SLIT("No instance for") <+> quotes (pprInst tidy_dict))
   where
     (tidy_env, tidy_dict) = tidyInst emptyTidyEnv dict
 
 addNoInstanceErr str givens dict
-  = tcAddSrcLoc (instLoc dict) $
-    addErrTcM (tidy_env, 
-	       sep [sep [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
-		        nest 4 $ parens $ pprOrigin dict],
-		   nest 4 $ ptext SLIT("from the context:") <+> pprInsts tidy_givens]
-	      $$
-	      ptext SLIT("Probable cause:") <+> 
+  = addInstErrTcM (instLoc dict) 
+	(tidy_env, 
+	 sep [ptext SLIT("Could not deduce") <+> quotes (pprInst tidy_dict),
+	      nest 4 $ ptext SLIT("from the context:") <+> pprInsts tidy_givens]
+	$$
+	 ptext SLIT("Probable cause:") <+> 
 	      vcat [sep [ptext SLIT("missing") <+> quotes (pprInst tidy_dict),
-			 ptext SLIT("in") <+> str],
+		    ptext SLIT("in") <+> str],
 		    if all_tyvars then empty else
 		    ptext SLIT("or missing instance declaration for") <+> quotes (pprInst tidy_dict)]
     )

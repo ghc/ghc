@@ -22,18 +22,20 @@ module TcMonad(
 
 	checkTc, checkTcM, checkMaybeTc, checkMaybeTcM, 
 	failTc, failWithTc, addErrTc, warnTc, recoverTc, checkNoErrsTc, recoverNF_Tc, discardErrsTc,
-	addErrTcM, failWithTcM,
+	addErrTcM, addInstErrTcM, failWithTcM,
 
 	tcGetEnv, tcSetEnv,
 	tcGetDefaultTys, tcSetDefaultTys,
 	tcGetUnique, tcGetUniques,
 
-	tcAddSrcLoc, tcGetSrcLoc,
+	tcAddSrcLoc, tcGetSrcLoc, tcGetInstLoc,
 	tcAddErrCtxtM, tcSetErrCtxtM,
 	tcAddErrCtxt, tcSetErrCtxt,
 
 	tcNewMutVar, tcNewSigTyVar, tcReadMutVar, tcWriteMutVar, TcRef,
 	tcNewMutTyVar, tcReadMutTyVar, tcWriteMutTyVar,
+
+	InstOrigin(..), InstLoc, pprInstLoc, 
 
 	TcError, TcWarning, TidyEnv, emptyTidyEnv,
 	arityErr
@@ -43,16 +45,18 @@ module TcMonad(
 
 import {-# SOURCE #-} TcEnv  ( TcEnv )
 
+import HsSyn		( HsLit )
+import RnHsSyn		( RenamedPat, RenamedArithSeqInfo, RenamedHsExpr )
 import Type		( Type, Kind, ThetaType, RhoType, TauType,
 			)
-import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, ErrMsg, Message, WarnMsg )
+import ErrUtils		( addShortErrLocLine, addShortWarnLocLine, pprBagOfErrors, ErrMsg, Message, WarnMsg )
 import CmdLineOpts      ( opt_PprStyle_Debug )
 
 import Bag		( Bag, emptyBag, isEmptyBag,
 			  foldBag, unitBag, unionBags, snocBag )
 import Class		( Class )
 import Name		( Name )
-import Var		( TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
+import Var		( Id, TyVar, newMutTyVar, newSigTyVar, readMutTyVar, writeMutTyVar )
 import VarEnv		( TyVarEnv, emptyVarEnv, TidyEnv, emptyTidyEnv )
 import VarSet		( TyVarSet )
 import UniqSupply	( UniqSupply, uniqFromSupply, uniqsFromSupply, splitUniqSupply,
@@ -313,6 +317,18 @@ checkMaybeTcM Nothing    err = err
 
 addErrTcM :: (TidyEnv, Message) -> NF_TcM s ()	-- Add an error message but don't fail
 addErrTcM (tidy_env, err_msg) down env
+  = add_err_tcm tidy_env err_msg ctxt loc down env
+  where
+    ctxt     = getErrCtxt down
+    loc      = getLoc down
+
+addInstErrTcM :: InstLoc -> (TidyEnv, Message) -> NF_TcM s ()	-- Add an error message but don't fail
+addInstErrTcM inst_loc@(_, loc, ctxt) (tidy_env, err_msg) down env
+  = add_err_tcm tidy_env err_msg full_ctxt loc down env
+  where
+    full_ctxt = (\env -> returnNF_Tc (env, pprInstLoc inst_loc)) : ctxt
+
+add_err_tcm tidy_env err_msg ctxt loc down env
   = do
 	(warns, errs) <- readIORef errs_var
 	ctxt_msgs     <- do_ctxt tidy_env ctxt down env
@@ -321,8 +337,6 @@ addErrTcM (tidy_env, err_msg) down env
 	writeIORef errs_var (warns, errs `snocBag` err)
   where
     errs_var = getTcErrs down
-    ctxt     = getErrCtxt down
-    loc      = getLoc down
 
 do_ctxt tidy_env [] down env
   = return []
@@ -467,6 +481,9 @@ tcAddSrcLoc loc m down env = m (setLoc down loc) env
 tcGetSrcLoc :: NF_TcM s SrcLoc
 tcGetSrcLoc down env = return (getLoc down)
 
+tcGetInstLoc :: InstOrigin -> NF_TcM s InstLoc
+tcGetInstLoc origin down env = return (origin, getLoc down, getErrCtxt down)
+
 tcSetErrCtxtM, tcAddErrCtxtM :: (TidyEnv -> NF_TcM s (TidyEnv, Message))
 			     -> TcM s a -> TcM s a
 tcSetErrCtxtM msg m down env = m (setErrCtxt down msg) env
@@ -581,3 +598,105 @@ arityErr kind name n m
 \end{code}
 
 
+
+%************************************************************************
+%*									*
+\subsection[Inst-origin]{The @InstOrigin@ type}
+%*									*
+%************************************************************************
+
+The @InstOrigin@ type gives information about where a dictionary came from.
+This is important for decent error message reporting because dictionaries
+don't appear in the original source code.  Doubtless this type will evolve...
+
+It appears in TcMonad because there are a couple of error-message-generation
+functions that deal with it.
+
+\begin{code}
+type InstLoc = (InstOrigin, SrcLoc, ErrCtxt)
+
+data InstOrigin
+  = OccurrenceOf Id		-- Occurrence of an overloaded identifier
+
+  | RecordUpdOrigin
+
+  | DataDeclOrigin		-- Typechecking a data declaration
+
+  | InstanceDeclOrigin		-- Typechecking an instance decl
+
+  | LiteralOrigin HsLit		-- Occurrence of a literal
+
+  | PatOrigin RenamedPat
+
+  | ArithSeqOrigin RenamedArithSeqInfo -- [x..], [x..y] etc
+
+  | SignatureOrigin		-- A dict created from a type signature
+  | Rank2Origin			-- A dict created when typechecking the argument
+				-- of a rank-2 typed function
+
+  | DoOrigin			-- The monad for a do expression
+
+  | ClassDeclOrigin		-- Manufactured during a class decl
+
+  | InstanceSpecOrigin	Class	-- in a SPECIALIZE instance pragma
+			Type
+
+	-- When specialising instances the instance info attached to
+	-- each class is not yet ready, so we record it inside the
+	-- origin information.  This is a bit of a hack, but it works
+	-- fine.  (Patrick is to blame [WDP].)
+
+  | ValSpecOrigin	Name	-- in a SPECIALIZE pragma for a value
+
+	-- Argument or result of a ccall
+	-- Dictionaries with this origin aren't actually mentioned in the
+	-- translated term, and so need not be bound.  Nor should they
+	-- be abstracted over.
+
+  | CCallOrigin		String			-- CCall label
+			(Maybe RenamedHsExpr)	-- Nothing if it's the result
+						-- Just arg, for an argument
+
+  | LitLitOrigin	String	-- the litlit
+
+  | UnknownOrigin	-- Help! I give up...
+\end{code}
+
+\begin{code}
+pprInstLoc :: InstLoc -> SDoc
+pprInstLoc (orig, locn, ctxt)
+  = hsep [text "arising from", pp_orig orig, text "at", ppr locn]
+  where
+    pp_orig (OccurrenceOf id)
+      	= hsep [ptext SLIT("use of"), quotes (ppr id)]
+    pp_orig (LiteralOrigin lit)
+	= hsep [ptext SLIT("the literal"), quotes (ppr lit)]
+    pp_orig (PatOrigin pat)
+	= hsep [ptext SLIT("the pattern"), quotes (ppr pat)]
+    pp_orig (InstanceDeclOrigin)
+	=  ptext SLIT("an instance declaration")
+    pp_orig (ArithSeqOrigin seq)
+	= hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
+    pp_orig (SignatureOrigin)
+	=  ptext SLIT("a type signature")
+    pp_orig (Rank2Origin)
+	=  ptext SLIT("a function with an overloaded argument type")
+    pp_orig (DoOrigin)
+	=  ptext SLIT("a do statement")
+    pp_orig (ClassDeclOrigin)
+	=  ptext SLIT("a class declaration")
+    pp_orig (InstanceSpecOrigin clas ty)
+	= hsep [text "a SPECIALIZE instance pragma; class",
+	        quotes (ppr clas), text "type:", ppr ty]
+    pp_orig (ValSpecOrigin name)
+	= hsep [ptext SLIT("a SPECIALIZE user-pragma for"), quotes (ppr name)]
+    pp_orig (CCallOrigin clabel Nothing{-ccall result-})
+	= hsep [ptext SLIT("the result of the _ccall_ to"), quotes (text clabel)]
+    pp_orig (CCallOrigin clabel (Just arg_expr))
+	= hsep [ptext SLIT("an argument in the _ccall_ to"), quotes (text clabel) <> comma, 
+		text "namely", quotes (ppr arg_expr)]
+    pp_orig (LitLitOrigin s)
+	= hsep [ptext SLIT("the ``literal-literal''"), quotes (text s)]
+    pp_orig (UnknownOrigin)
+	= ptext SLIT("...oops -- I don't know where the overloading came from!")
+\end{code}

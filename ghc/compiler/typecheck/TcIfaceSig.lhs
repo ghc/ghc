@@ -31,7 +31,7 @@ import CoreSyn
 import CoreUtils	( coreExprType )
 import CoreUnfold
 import CoreLint		( lintUnfolding )
-import WwLib		( mkWrapper )
+import WorkWrap		( mkWrapper )
 import PrimOp		( PrimOp(..) )
 
 import Id		( Id, mkId, mkVanillaId,
@@ -136,7 +136,7 @@ tcWorkerInfo unf_env ty info worker_name
       cpr_info   = cprInfo info
       demands    = case strictnessInfo info of
 			StrictnessInfo d _ -> d
-			_                  -> repeat wwLazy	-- Noncommittal
+			_                  -> take arity (repeat wwLazy)	-- Noncommittal
 \end{code}
 
 For unfoldings we try to do the job lazily, so that we never type check

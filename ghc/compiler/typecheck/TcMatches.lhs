@@ -403,7 +403,7 @@ stmtCtxt do_or_lc stmt
   where
     what = case do_or_lc of
 		ListComp -> ptext SLIT("a list-comprehension qualifier")
-		DoStmt   -> ptext SLIT("a do statement:")
+		DoStmt   -> ptext SLIT("a do statement")
 		PatBindRhs -> thing <+> ptext SLIT("a pattern binding")
 		FunRhs f   -> thing <+> ptext SLIT("an equation for") <+> quotes (ppr f)
 		CaseAlt	   -> thing <+> ptext SLIT("a case alternative")
