@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgStorage.h,v 1.3 1999/02/05 16:02:29 simonm Exp $
+ * $Id: StgStorage.h,v 1.4 1999/03/02 19:44:21 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -12,7 +12,7 @@
 
 #include "Block.h"
 
-extern bdescr *current_nursery;
+extern DLL_IMPORT_RTS bdescr *current_nursery;
 
 /* -----------------------------------------------------------------------------
    Allocation area for compiled code

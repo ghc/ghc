@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoMacros.h,v 1.3 1999/02/05 16:02:22 simonm Exp $
+ * $Id: InfoMacros.h,v 1.4 1999/03/02 19:44:09 sof Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,7 @@ INFO_TABLE_SRT_BITMAP(info, entry, bitmap_, srt_, srt_off_, srt_len_, \
 		      prof_descr, prof_type)            \
         entry_class(entry);                             \
 	info_class StgInfoTable info = {		\
-		layout : { bitmap : (StgNat32)bitmap_ },\
+		layout : { bitmap : (StgWord32)bitmap_ },\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),	\
                 INIT_ENTRY(entry)                       \
 	}
@@ -139,7 +139,7 @@ typedef struct {
 
 #define VEC_INFO_TABLE(bitmap_,srt_,srt_off_,srt_len_,type)	\
 	i : {						    	\
-		layout : { bitmap : (StgNat32)bitmap_ },	\
+		layout : { bitmap : (StgWord32)bitmap_ },	\
 		SRT_INFO(type,srt_,srt_off_,srt_len_)		\
 	}
 
@@ -163,7 +163,7 @@ typedef StgInfoTable StgPolyInfoTable;
 #define VEC_POLY_INFO_TABLE(nm,bitmap_,srt_,srt_off_,srt_len_,type) \
   StgFunPtr nm##_vec[8] = POLY_VEC(nm);                         \
   const StgInfoTable nm##_info = {				    	\
-		layout : { bitmap : (StgNat32)bitmap_ },	\
+		layout : { bitmap : (StgWord32)bitmap_ },	\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),		\
 		vector : &nm##_vec,                              \
                 INIT_ENTRY(nm##_entry)                          \
@@ -185,7 +185,7 @@ typedef vec_info_8 StgPolyInfoTable;
   const vec_info_8 nm##_info = {                                \
 	vec : POLY_VEC(nm),                                     \
 	i : {						    	\
-		layout : { bitmap : (StgNat32)bitmap_ },	\
+		layout : { bitmap : (StgWord32)bitmap_ },	\
 		SRT_INFO(type,srt_,srt_off_,srt_len_),		\
                 INIT_ENTRY(nm##_entry)                          \
 	    }                                                   \
@@ -197,5 +197,17 @@ typedef vec_info_8 StgPolyInfoTable;
 
 #define BITMAP(lbl,size) \
   static const StgLargeBitmap lbl = { size, {
+
+/* DLL_SRT_ENTRY is used on the Win32 side when filling initialising
+   an entry in an SRT table with a reference to a closure that's
+   living in a DLL. See elsewhere for reasons as to why we need
+   to distinguish these kinds of references.
+   (ToDo: fill in a more precise href.)
+*/
+#ifdef HAVE_WIN32_DLL_SUPPORT
+#define DLL_SRT_ENTRY(x) ((StgClosure*)(((char*)&DLL_IMPORT_DATA_VAR(x)) + 1))
+#else
+#define DLL_SRT_ENTRY(x) no-can-do
+#endif
 
 #endif /* INFOMACROS_H */

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.21 1999/03/01 10:25:20 simonm Exp $
+ * $Id: PrimOps.h,v 1.22 1999/03/02 19:44:12 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -59,7 +59,7 @@
 #define zlzezhzh(r,a,b)	r=(I_)((a)<=(b))
 
 /*  used by returning comparison primops, defined in Prims.hc. */
-extern const StgClosure *PrelBase_Bool_closure_tbl[];
+extern DLL_IMPORT_RTS const StgClosure *PrelBase_Bool_closure_tbl[];
 
 /* -----------------------------------------------------------------------------
    Char# PrimOps.
@@ -380,7 +380,7 @@ EF_(decodeDoublezh_fast);
 #define integerToWord64zh(r, sa,da)				\
 { unsigned long int* d;						\
   I_ aa;							\
-  StgNat64 res;							\
+  StgWord64 res;						\
 								\
   d		= (unsigned long int *) (BYTE_ARR_CTS(da));	\
   aa = ((StgArrWords *)da)->words;				\
@@ -420,12 +420,12 @@ EF_(word64ToIntegerzh_fast);
 
 /* The rest are (way!) out of line, implemented via C entry points.
  */
-I_ stg_gtWord64 (StgNat64, StgNat64);
-I_ stg_geWord64 (StgNat64, StgNat64);
-I_ stg_eqWord64 (StgNat64, StgNat64);
-I_ stg_neWord64 (StgNat64, StgNat64);
-I_ stg_ltWord64 (StgNat64, StgNat64);
-I_ stg_leWord64 (StgNat64, StgNat64);
+I_ stg_gtWord64 (StgWord64, StgWord64);
+I_ stg_geWord64 (StgWord64, StgWord64);
+I_ stg_eqWord64 (StgWord64, StgWord64);
+I_ stg_neWord64 (StgWord64, StgWord64);
+I_ stg_ltWord64 (StgWord64, StgWord64);
+I_ stg_leWord64 (StgWord64, StgWord64);
 
 I_ stg_gtInt64 (StgInt64, StgInt64);
 I_ stg_geInt64 (StgInt64, StgInt64);
@@ -434,8 +434,8 @@ I_ stg_neInt64 (StgInt64, StgInt64);
 I_ stg_ltInt64 (StgInt64, StgInt64);
 I_ stg_leInt64 (StgInt64, StgInt64);
 
-LW_ stg_remWord64  (StgNat64, StgNat64);
-LW_ stg_quotWord64 (StgNat64, StgNat64);
+LW_ stg_remWord64  (StgWord64, StgWord64);
+LW_ stg_quotWord64 (StgWord64, StgWord64);
 
 LI_ stg_remInt64    (StgInt64, StgInt64);
 LI_ stg_quotInt64   (StgInt64, StgInt64);
@@ -444,13 +444,13 @@ LI_ stg_plusInt64   (StgInt64, StgInt64);
 LI_ stg_minusInt64  (StgInt64, StgInt64);
 LI_ stg_timesInt64  (StgInt64, StgInt64);
 
-LW_ stg_and64  (StgNat64, StgNat64);
-LW_ stg_or64   (StgNat64, StgNat64);
-LW_ stg_xor64  (StgNat64, StgNat64);
-LW_ stg_not64  (StgNat64);
+LW_ stg_and64  (StgWord64, StgWord64);
+LW_ stg_or64   (StgWord64, StgWord64);
+LW_ stg_xor64  (StgWord64, StgWord64);
+LW_ stg_not64  (StgWord64);
 
-LW_ stg_shiftL64   (StgNat64, StgInt);
-LW_ stg_shiftRL64  (StgNat64, StgInt);
+LW_ stg_shiftL64   (StgWord64, StgInt);
+LW_ stg_shiftRL64  (StgWord64, StgInt);
 LI_ stg_iShiftL64  (StgInt64, StgInt);
 LI_ stg_iShiftRL64 (StgInt64, StgInt);
 LI_ stg_iShiftRA64 (StgInt64, StgInt);
@@ -460,8 +460,8 @@ I_ stg_int64ToInt     (StgInt64);
 LW_ stg_int64ToWord64 (StgInt64);
 
 LW_ stg_wordToWord64  (StgWord);
-W_  stg_word64ToWord  (StgNat64);
-LI_ stg_word64ToInt64 (StgNat64);
+W_  stg_word64ToWord  (StgWord64);
+LI_ stg_word64ToInt64 (StgWord64);
 #endif
 
 /* -----------------------------------------------------------------------------

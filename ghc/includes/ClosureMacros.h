@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: ClosureMacros.h,v 1.4 1999/02/05 16:02:20 simonm Exp $
+ * $Id: ClosureMacros.h,v 1.5 1999/03/02 19:44:08 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -105,6 +105,28 @@ extern StgFun DATA_SECTION_END_MARKER_DECL;
 #define IS_DATA_PTR(p) ((P_)(p) >= (P_)&TEXT_SECTION_END_MARKER && (P_)(p) < (P_)&DATA_SECTION_END_MARKER)
 #define IS_USER_PTR(p) ((P_)(p) >= (P_)&DATA_SECTION_END_MARKER)
 
+#ifdef HAVE_WIN32_DLL_SUPPORT
+/* ToDo: clean up */
+extern char* base_non_committed;
+#define HEAP_ALLOCED(x)  (((char*)(x) >= base_non_committed) && ((char*)(x) <= (base_non_committed + 128 * 1024 * 1024)))
+#endif
+
+#ifndef HAVE_WIN32_DLL_SUPPORT
+#define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
+#else
+/* Static closures are 'identified' by being prefixed with a zero. This is
+   so that they can be distinguished from pointers to info tables. Relies
+   on the fact that info tables are reversed.
+   
+   LOOKS_LIKE_STATIC_CLOSURE() - discriminates between static closures and info tbls
+                                 (needed by LOOKS_LIKE_GHC_INFO() below - [Win32 DLLs only.])
+   LOOKS_LIKE_STATIC() - distinguishes between static and heap allocated data.
+ */
+#define LOOKS_LIKE_STATIC(r) (!(HEAP_ALLOCED(r)))
+#define LOOKS_LIKE_STATIC_CLOSURE(r) ((*(((unsigned long *)(r))-1)) == 0)
+#endif
+
+
 /* -----------------------------------------------------------------------------
    Macros for distinguishing infotables from closures.
    
@@ -129,10 +151,12 @@ extern StgFun DATA_SECTION_END_MARKER_DECL;
 #define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
 #else
 /* otherwise we have entry pointers on closures */
-#define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
+# ifdef HAVE_WIN32_DLL_SUPPORT
+#  define LOOKS_LIKE_GHC_INFO(info) (!HEAP_ALLOCED(info) && !LOOKS_LIKE_STATIC_CLOSURE(info))
+# else
+#  define LOOKS_LIKE_GHC_INFO(info) IS_CODE_PTR(info)
+# endif
 #endif
-
-#define LOOKS_LIKE_STATIC(r) IS_DATA_PTR(r)
 
 /* -----------------------------------------------------------------------------
    Macros for calculating how big a closure will be (used during allocation)
@@ -319,6 +343,6 @@ SET_STATIC_HDR(PrelBase_CZh_closure,PrelBase_CZh_info,costCentreStack,const);
 #define bcoConstChar( bco, i )   (*stgCast(StgChar*,      ((bco)->payload+(bco)->n_ptrs+i)))
 #define bcoConstFloat( bco, i )  (PK_FLT(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
 #define bcoConstDouble( bco, i ) (PK_DBL(stgCast(StgWord*,(bco)->payload+(bco)->n_ptrs+i)))
-#define bcoInstr( bco, i )       (stgCast(StgNat8*,       ((bco)->payload+(bco)->n_ptrs+(bco)->n_words))[i])
+#define bcoInstr( bco, i )       (stgCast(StgWord8*,      ((bco)->payload+(bco)->n_ptrs+(bco)->n_words))[i])
 
 #endif /* CLOSUREMACROS_H */

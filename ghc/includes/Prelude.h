@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Prelude.h,v 1.5 1999/02/05 16:02:24 simonm Exp $
+ * $Id: Prelude.h,v 1.6 1999/03/02 19:44:11 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -10,30 +10,32 @@
 #ifndef PRELUDE_H
 #define PRELUDE_H
 
-#ifdef COMPILER
-extern const StgClosure PrelBase_Z91Z93_static_closure;
-extern const StgClosure PrelBase_Z40Z41_static_closure;
-extern const StgClosure PrelBase_True_static_closure;
-extern const StgClosure PrelBase_False_static_closure;
-extern const StgClosure PrelMain_mainIO_closure;
-extern const StgClosure PrelPack_unpackCString_closure;
+#ifdef COMPILING_RTS
 
-extern const StgInfoTable PrelBase_Czh_static_info;
-extern const StgInfoTable PrelBase_Izh_static_info;
-extern const StgInfoTable PrelBase_Fzh_static_info;
-extern const StgInfoTable PrelBase_Dzh_static_info;
-extern const StgInfoTable PrelAddr_Azh_static_info;
-extern const StgInfoTable PrelAddr_Wzh_static_info;
-extern const StgInfoTable PrelBase_Czh_con_info;
-extern const StgInfoTable PrelBase_Izh_con_info;
-extern const StgInfoTable PrelBase_Fzh_con_info;
-extern const StgInfoTable PrelBase_Dzh_con_info;
-extern const StgInfoTable PrelAddr_Azh_con_info;
-extern const StgInfoTable PrelAddr_Wzh_con_info;
-extern const StgInfoTable PrelAddr_I64zh_con_info;
-extern const StgInfoTable PrelAddr_W64zh_con_info;
-extern const StgInfoTable PrelStable_StablePtr_static_info;
-extern const StgInfoTable PrelStable_StablePtr_con_info;
+#ifdef COMPILER
+extern DLL_IMPORT const StgClosure PrelBase_Z91Z93_static_closure;
+extern DLL_IMPORT const StgClosure PrelBase_Z40Z41_static_closure;
+extern DLL_IMPORT const StgClosure PrelBase_True_static_closure;
+extern DLL_IMPORT const StgClosure PrelBase_False_static_closure;
+extern DLL_IMPORT const StgClosure PrelPack_unpackCString_closure;
+extern const StgClosure PrelMain_mainIO_closure;
+
+extern DLL_IMPORT const StgInfoTable PrelBase_Czh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Izh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Fzh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Dzh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelAddr_Azh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelAddr_Wzh_static_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Czh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Izh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Fzh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelBase_Dzh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelAddr_Azh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelAddr_Wzh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelAddr_I64zh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelAddr_W64zh_con_info;
+extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_static_info;
+extern DLL_IMPORT const StgInfoTable PrelStable_StablePtr_con_info;
 
 /* Define canonical names so we can abstract away from the actual
  * module these names are defined in.
@@ -85,6 +87,8 @@ extern const StgInfoTable StablePtr_static_info;
 
 #define W64zh_con_info        I64zh_con_info
 #define W64zh_static_info     I64zh_con_info
+
+#endif
 
 #endif
 

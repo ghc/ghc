@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.h,v 1.3 1999/02/05 16:02:27 simonm Exp $
+ * $Id: RtsAPI.h,v 1.4 1999/03/02 19:44:15 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -48,7 +48,9 @@ HaskellObj   rts_apply        ( HaskellObj, HaskellObj );
    ------------------------------------------------------------------------- */
 char         rts_getChar      ( HaskellObj );
 int          rts_getInt       ( HaskellObj );
+int          rts_getInt32     ( HaskellObj );
 unsigned int rts_getWord      ( HaskellObj );
+unsigned int rts_getWord32    ( HaskellObj );
 float        rts_getFloat     ( HaskellObj );
 double       rts_getDouble    ( HaskellObj );
 StgStablePtr rts_getStablePtr ( HaskellObj );

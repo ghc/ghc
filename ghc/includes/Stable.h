@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.h,v 1.3 1999/02/26 12:46:45 simonm Exp $
+ * $Id: Stable.h,v 1.4 1999/03/02 19:44:16 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -27,10 +27,10 @@ typedef struct {
   StgClosure *sn_obj;		/* the StableName object (or NULL) */
 } snEntry;
 
-extern snEntry *stable_ptr_table;
-extern snEntry *stable_ptr_free;
+extern DLL_IMPORT_RTS snEntry *stable_ptr_table;
+extern DLL_IMPORT_RTS snEntry *stable_ptr_free;
 
-extern unsigned int SPT_size;
+extern DLL_IMPORT_RTS unsigned int SPT_size;
 
 extern inline StgPtr
 deRefStablePtr(StgStablePtr sp)

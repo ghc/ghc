@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Updates.h,v 1.7 1999/02/05 16:02:31 simonm Exp $
+ * $Id: Updates.h,v 1.8 1999/03/02 19:44:23 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -56,7 +56,7 @@ extern void awaken_blocked_queue(StgTSO *q);
 #define PUSH_STD_CCCS(frame)
 #endif
 
-extern const StgPolyInfoTable Upd_frame_info; 
+extern DLL_IMPORT_DATA const StgPolyInfoTable Upd_frame_info; 
 
 #define PUSH_UPD_FRAME(target, Sp_offset)			\
 	{							\
@@ -98,7 +98,7 @@ extern void newCAF(StgClosure*);
 
 #define UPD_CAF(cafptr, bhptr)					\
   {								\
-    SET_INFO((StgInd *)cafptr,&IND_STATIC_info);	        \
+    SET_INFO((StgInd *)cafptr,(const StgInfoTable*)&IND_STATIC_info);	        \
     ((StgInd *)cafptr)->indirectee   = (StgClosure *)(bhptr);	\
     STGCALL1(newCAF,(StgClosure *)cafptr);			\
   }
@@ -107,16 +107,16 @@ extern void newCAF(StgClosure*);
    Update-related prototypes
    -------------------------------------------------------------------------- */
 
-extern STGFUN(Upd_frame_entry);
+DLL_IMPORT_RTS extern STGFUN(Upd_frame_entry);
 
-extern const StgInfoTable PAP_info;
-STGFUN(PAP_entry);
+extern DLL_IMPORT_DATA const StgInfoTable PAP_info;
+DLL_IMPORT_RTS STGFUN(PAP_entry);
 
-EXTFUN(stg_update_PAP);
+EXTFUN_RTS(stg_update_PAP);
 
-extern const StgInfoTable AP_UPD_info;
-STGFUN(AP_UPD_entry);
+extern DLL_IMPORT_DATA const StgInfoTable AP_UPD_info;
+DLL_IMPORT_RTS STGFUN(AP_UPD_entry);
 
-extern const StgInfoTable raise_info;
+extern DLL_IMPORT_DATA const StgInfoTable raise_info;
 
 #endif /* UPDATES_H */

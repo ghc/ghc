@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgTypes.h,v 1.4 1999/02/05 16:02:30 simonm Exp $
+ * $Id: StgTypes.h,v 1.5 1999/03/02 19:44:21 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -7,8 +7,8 @@
 
  * Specifically:
 
-	StgInt8, 16, 32, 64
-	StgNat8, 16, 32, 64
+	StgInt8,  16, 32, 64
+	StgWord8, 16, 32, 64
 	StgChar, StgFloat, StgDouble
 
 	***** All the same size: *****
@@ -31,15 +31,15 @@
  */
 
 typedef signed   char            StgInt8;
-typedef unsigned char            StgNat8;
+typedef unsigned char            StgWord8;
 
 typedef signed   short           StgInt16;
-typedef unsigned short           StgNat16;
+typedef unsigned short           StgWord16;
 
 
 #if SIZEOF_UNSIGNED_INT == 4
 typedef signed   int             StgInt32;
-typedef unsigned int             StgNat32;
+typedef unsigned int             StgWord32;
 #else
 #error GHC untested on this architecture: sizeof(unisgned int) != 4
 #endif
@@ -55,11 +55,11 @@ typedef unsigned int             StgNat32;
 
 #ifdef SUPPORT_LONG_LONGS
 /* assume long long is 64 bits */
-typedef unsigned long long int StgNat64;
+typedef unsigned long long int StgWord64;
 typedef signed long long int   StgInt64;
 #elif SIZEOF_LONG == 8
 typedef signed   long          StgInt64;
-typedef unsigned long          StgNat64;
+typedef unsigned long          StgWord64;
 #else
 #error GHC untested on this architecture: sizeof(void *) < 8 and no long longs.
 #endif
@@ -72,11 +72,11 @@ typedef unsigned long          StgNat64;
 
 #if SIZEOF_VOID_P == 8
 typedef StgInt64           StgInt;
-typedef StgNat64           StgWord;
+typedef StgWord64          StgWord;
 #else
 #if SIZEOF_VOID_P == 4
 typedef StgInt32           StgInt; 
-typedef StgNat32           StgWord;
+typedef StgWord32          StgWord;
 #else
 #error GHC untested on this architecture: sizeof(void *) != 4 or 8
 #endif
@@ -88,7 +88,7 @@ typedef void*              StgAddr;
  * Other commonly-used STG datatypes.
  */
 
-typedef StgNat8            StgChar;
+typedef StgWord8           StgChar;
 
 /*
  * If a double fits in an StgWord, don't bother using floats.
@@ -117,14 +117,14 @@ typedef StgInt             StgStackOffset;   /* offset in words! */
 
 typedef StgWord*           StgStackPtr;
 
-typedef StgNat8 	   StgCode;  	    /* close enough */
+typedef StgWord8 	   StgCode;  	    /* close enough */
 typedef StgCode*	   StgCodePtr;	
 
 typedef StgPtr*            StgArray;        /* the goods of an Array# */
 typedef char*		   StgByteArray;    /* the goods of a ByteArray# */
 
 typedef StgInt64	       LI_;
-typedef StgNat64	       LW_;
+typedef StgWord64	       LW_;
 
 /* Stable Pointers:  A stable pointer is represented as an index into
  * the stable pointer table in the low 24 bits with a weight in the

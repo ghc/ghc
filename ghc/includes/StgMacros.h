@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.6 1999/02/26 09:28:43 simonm Exp $
+ * $Id: StgMacros.h,v 1.7 1999/03/02 19:44:18 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -39,20 +39,24 @@
   --------------------------------------------------------------------------- */
 
 #define STGFUN(f)       StgFunPtr f(void)
-#define STATICFUN(f)    static StgFunPtr f(void)
 #define EXTFUN(f)	extern StgFunPtr f(void)
+#define EXTFUN_RTS(f)	extern DLL_IMPORT_RTS StgFunPtr f(void)
 #define FN_(f)		F_ f(void)
 #define IFN_(f)		static F_ f(void)
 #define IF_(f)		static F_ f(void)
 #define EF_(f)		extern F_ f(void)
+#define EDF_(f)		extern DLLIMPORT F_ f(void)
 
 #define ED_		extern
+#define EDD_		extern DLLIMPORT 
 #define ED_RO_		extern const
 #define ID_		extern
 #define ID_RO_		extern const
 #define EI_             extern const StgInfoTable
+#define EDI_            extern DLLIMPORT const StgInfoTable
 #define II_             extern const StgInfoTable
 #define EC_		extern StgClosure
+#define EDC_		extern DLLIMPORT StgClosure
 #define IC_		extern StgClosure
 
 /* -----------------------------------------------------------------------------
@@ -121,7 +125,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 /* -----------------------------------------------------------------------------
    Argument checks.
    
-   If (Sp + <n_args>) > Su { JMP_(stg_updatePAP); }
+   If (Sp + <n_args>) > Su { JMP_(stg_update_PAP); }
    
    Sp points to the topmost used word on the stack, and Su points to
    the most recently pushed update frame.
@@ -160,7 +164,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define STK_CHK(headroom,ret,r,layout,tag_assts)		\
 	if (Sp - headroom < SpLim) {				\
-	    EXTFUN(stg_chk_##layout);			 	\
+	    EXTFUN_RTS(stg_chk_##layout);		 	\
 	    tag_assts						\
 	    (r) = (P_)ret;					\
 	    JMP_(stg_chk_##layout);				\
@@ -168,7 +172,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
        
 #define HP_CHK(headroom,ret,r,layout,tag_assts)			\
 	if ((Hp += headroom) > HpLim) {				\
-	    EXTFUN(stg_chk_##layout);			 	\
+	    EXTFUN_RTS(stg_chk_##layout);		 	\
 	    tag_assts						\
 	    (r) = (P_)ret;                                     	\
 	    JMP_(stg_chk_##layout);			   	\
@@ -177,7 +181,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_STK_CHK(stk_headroom,hp_headroom,ret,r,layout,tag_assts) \
 	if (Sp - stk_headroom < SpLim || (Hp += hp_headroom) > HpLim) {	\
-	    EXTFUN(stg_chk_##layout);			 	\
+	    EXTFUN_RTS(stg_chk_##layout);		 	\
 	    tag_assts						\
 	    (r) = (P_)ret;	                               	\
 	    JMP_(stg_chk_##layout);			   	\
@@ -201,14 +205,14 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define STK_CHK_NP(headroom,ptrs,tag_assts)			\
 	if ((Sp - (headroom)) < SpLim) {			\
-	    EXTFUN(stg_gc_enter_##ptrs);			\
+	    EXTFUN_RTS(stg_gc_enter_##ptrs);			\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);				\
 	}
 
 #define HP_CHK_NP(headroom,ptrs,tag_assts)			\
 	if ((Hp += (headroom)) > HpLim) {			\
-	    EXTFUN(stg_gc_enter_##ptrs);			\
+	    EXTFUN_RTS(stg_gc_enter_##ptrs);			\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);				\
 	}							\
@@ -216,7 +220,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_CHK_SEQ_NP(headroom,ptrs,tag_assts)			\
 	if ((Hp += (headroom)) > HpLim) {			\
-	    EXTFUN(stg_gc_seq_##ptrs);				\
+	    EXTFUN_RTS(stg_gc_seq_##ptrs);			\
             tag_assts						\
 	    JMP_(stg_gc_seq_##ptrs);				\
 	}							\
@@ -224,7 +228,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_STK_CHK_NP(stk_headroom, hp_headroom, ptrs, tag_assts) \
 	if ((Sp - (stk_headroom)) < SpLim || (Hp += (hp_headroom)) > HpLim) { \
-	    EXTFUN(stg_gc_enter_##ptrs);		 	\
+	    EXTFUN_RTS(stg_gc_enter_##ptrs);		 	\
             tag_assts						\
 	    JMP_(stg_gc_enter_##ptrs);			   	\
 	}							\
@@ -234,7 +238,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define GEN_HP_CHK_ALT(headroom,lbl,tag_assts)			\
 	if ((Hp += (headroom)) > HpLim) {			\
-	    EXTFUN(lbl);					\
+	    EXTFUN_RTS(lbl);					\
             tag_assts						\
 	    JMP_(lbl);						\
 	}							\
@@ -349,9 +353,11 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
    out to be slowing us down we can make specialised ones.
    -------------------------------------------------------------------------- */
 
+EF_(stg_gen_yield);
+EF_(stg_gen_block);
+
 #define YIELD(liveness,reentry)			\
   {						\
-   EF_(stg_gen_yield);				\
    R9.w  = (W_)LIVENESS_MASK(liveness);		\
    R10.w = (W_)reentry;				\
    JMP_(stg_gen_yield);				\
@@ -359,7 +365,6 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define BLOCK(liveness,reentry)			\
   {						\
-   EF_(stg_gen_block);				\
    R9.w  = (W_)LIVENESS_MASK(liveness);		\
    R10.w = (W_)reentry;				\
    JMP_(stg_gen_block);				\
@@ -367,7 +372,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define BLOCK_NP(ptrs)				\
   {						\
-    EF_(stg_bock_##ptrs);			\
+    EF_(stg_block_##ptrs);			\
     JMP_(stg_block_##ptrs);			\
   }
 
@@ -378,8 +383,11 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
    We use a RET_DYN frame the same as for a dynamic heap check.
    ------------------------------------------------------------------------- */
 
+#if COMPILING_RTS
 EI_(stg_gen_chk_info);
-
+#else
+EDI_(stg_gen_chk_info);
+#endif
 /* -----------------------------------------------------------------------------
    Vectored Returns
 
@@ -530,11 +538,11 @@ typedef union
   } int64_thing;
 
 typedef union
-  { StgNat64 w;
+  { StgWord64 w;
     unpacked_double_word wu;
   } word64_thing;
 
-static inline void ASSIGN_Word64(W_ p_dest[], StgNat64 src)
+static inline void ASSIGN_Word64(W_ p_dest[], StgWord64 src)
 {
     word64_thing y;
     y.w = src;
@@ -542,7 +550,7 @@ static inline void ASSIGN_Word64(W_ p_dest[], StgNat64 src)
     p_dest[1] = y.wu.dlo;
 }
 
-static inline StgNat64 PK_Word64(W_ p_src[])
+static inline StgWord64 PK_Word64(W_ p_src[])
 {
     word64_thing y;
     y.wu.dhi = p_src[0];
@@ -571,7 +579,7 @@ static inline StgInt64 PK_Int64(W_ p_src[])
    Catch frames
    -------------------------------------------------------------------------- */
 
-extern const StgPolyInfoTable catch_frame_info;
+extern DLL_IMPORT_DATA const StgPolyInfoTable catch_frame_info;
 
 /* -----------------------------------------------------------------------------
    Seq frames
@@ -580,7 +588,7 @@ extern const StgPolyInfoTable catch_frame_info;
    an update...
    -------------------------------------------------------------------------- */
 
-extern const StgPolyInfoTable seq_frame_info;
+extern DLL_IMPORT_DATA const StgPolyInfoTable seq_frame_info;
 
 #define PUSH_SEQ_FRAME(sp)					\
 	{							\
@@ -642,7 +650,7 @@ static __inline__ void
 LoadThreadState (void)
 {
 #ifdef REG_Base
-  BaseReg = &MainRegTable;
+  BaseReg = (StgRegTable*)&MainRegTable;
 #endif
 
   Sp    = CurrentTSO->sp;

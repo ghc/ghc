@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stg.h,v 1.6 1999/02/05 16:02:28 simonm Exp $
+ * $Id: Stg.h,v 1.7 1999/03/02 19:44:17 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -25,6 +25,34 @@
 /* ToDo: Set this flag properly: COMPILER and INTERPRETER should not be mutually exclusive. */
 #ifndef INTERPRETER
 #define COMPILER 1
+#endif
+
+/* This is a feature test - doesn't belong here. FixMe. */
+#ifdef __MINGW32__
+#define HAVE_WIN32_DLL_SUPPORT
+#endif
+
+#ifdef HAVE_WIN32_DLL_SUPPORT
+# if __GNUC__ && !defined(__declspec)
+#  define DLLIMPORT
+# else
+#  define DLLIMPORT __declspec(dllimport)
+#  define DLLIMPORT_DATA(x) _imp__##x
+# endif
+#else
+# define DLLIMPORT
+#endif
+
+#ifdef COMPILING_RTS
+#define DLL_IMPORT DLLIMPORT
+#define DLL_IMPORT_RTS
+#define DLL_IMPORT_DATA
+#define DLL_IMPORT_DATA_VAR(x) x
+#else
+#define DLL_IMPORT
+#define DLL_IMPORT_RTS DLLIMPORT
+#define DLL_IMPORT_DATA DLLIMPORT
+#define DLL_IMPORT_DATA_VAR(x) _imp__##x
 #endif
 
 /* bit macros
@@ -129,8 +157,13 @@ void _stgAssert (char *, unsigned int);
 #include "Hooks.h"
 
 /* Misc stuff without a home */
+#ifdef BUILDING_RTS_DLL
+extern DLLIMPORT char **prog_argv;	/* so we can get at these from Haskell */
+extern DLLIMPORT int    prog_argc;
+#else
 extern char **prog_argv;	/* so we can get at these from Haskell */
 extern int    prog_argc;
+#endif
 
 extern char **environ;
 

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: TSO.h,v 1.4 1999/02/05 16:02:30 simonm Exp $
+ * $Id: TSO.h,v 1.5 1999/03/02 19:44:22 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -53,8 +53,9 @@ typedef enum {
  * having to worry about overflow.  A little calculation shows that
  * even doing 10^6 forks per second would take 35 million years to
  * overflow a 64 bit thread ID :-)
+ *
  */
-typedef StgNat32 StgThreadID;
+typedef StgWord32 StgThreadID;
 
 /*
  * This type is returned to the scheduler by a thread that has
@@ -98,7 +99,7 @@ typedef struct StgTSO_ {
   StgWord            stack[0];
 } StgTSO;
 
-extern StgTSO      *CurrentTSO;
+extern DLL_IMPORT_RTS StgTSO      *CurrentTSO;
 
 
 /* Workaround for a bug/quirk in gcc on certain architectures.

@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: InfoTables.h,v 1.11 1999/02/15 12:12:55 simonm Exp $
+ * $Id: InfoTables.h,v 1.12 1999/03/02 19:44:10 sof Exp $
  * 
  * (c) The GHC Team, 1998-1999
  *
@@ -273,21 +273,21 @@ typedef struct {
  */
 
 typedef union {
+#if SIZEOF_VOID_P == 8
+  struct {
+    StgWord32 ptrs;		/* number of pointers     */
+    StgWord32 nptrs;		/* number of non-pointers */
+  } payload;
+#else
+  struct {
+    StgWord16 ptrs;		/* number of pointers     */
+    StgWord16 nptrs;		/* number of non-pointers */
+  } payload;
 
   StgWord bitmap;		/* bit pattern, 1 = pointer, 0 = non-pointer */
   StgWord selector_offset;	/* used in THUNK_SELECTORs */
   StgLargeBitmap* large_bitmap;	/* pointer to large bitmap structure */
 
-#if SIZEOF_VOID_P == 8
-  struct {
-    StgNat32 ptrs;		/* number of pointers     */
-    StgNat32 nptrs;		/* number of non-pointers */
-  } payload;
-#else
-  struct {
-    StgNat16 ptrs;		/* number of pointers     */
-    StgNat16 nptrs;		/* number of non-pointers */
-  } payload;
 #endif
   
 } StgClosureInfo;
@@ -314,13 +314,13 @@ typedef struct _StgInfoTable {
 #endif
     StgClosureInfo  layout;	/* closure layout info (pointer-sized) */
 #if SIZEOF_VOID_P == 8
-    StgNat16        flags;	/* }                                   */
+    StgWord16       flags;	/* }                                   */
     StgClosureType  type : 16;	/* } These 4 elements fit into 64 bits */
-    StgNat32        srt_len;    /* }                                   */
+    StgWord32       srt_len;    /* }                                   */
 #else
-    StgNat8         flags;	/* }                                   */
+    StgWord8        flags;	/* }                                   */
     StgClosureType  type : 8;	/* } These 4 elements fit into 32 bits */
-    StgNat16        srt_len;    /* }                                   */
+    StgWord16       srt_len;    /* }                                   */
 #endif
 #if USE_MINIINTERPRETER
     StgFunPtr       (*vector)[];

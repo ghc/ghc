@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Block.h,v 1.4 1999/02/05 16:02:19 simonm Exp $
+ * $Id: Block.h,v 1.5 1999/03/02 19:44:07 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -47,12 +47,12 @@ typedef struct _bdescr {
   struct _bdescr *back;		/* used (occasionally) for doubly-linked lists*/
   struct _generation *gen;	/* generation */
   struct _step *step;		/* step */
-  StgNat32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
-  StgNat32 evacuated;           /* block is in to-space */
+  StgWord32 blocks;		/* no. of blocks (if grp head, 0 otherwise) */
+  StgWord32 evacuated;           /* block is in to-space */
 #if SIZEOF_VOID_P == 8
-  StgNat32 _padding[2];
+  StgWord32 _padding[2];
 #else
-  StgNat32 _padding[0];
+  StgWord32 _padding[0];
 #endif
 } bdescr;
 

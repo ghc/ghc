@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMiscClosures.h,v 1.10 1999/02/11 17:40:23 simonm Exp $
+ * $Id: StgMiscClosures.h,v 1.11 1999/03/02 19:44:20 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -45,36 +45,36 @@ STGFUN(dummy_ret_entry);
 
 /* info tables */
 
-extern const StgInfoTable IND_info;
-extern const StgInfoTable IND_STATIC_info;
-extern const StgInfoTable IND_PERM_info;
-extern const StgInfoTable IND_OLDGEN_info;
-extern const StgInfoTable IND_OLDGEN_PERM_info;
-extern const StgInfoTable CAF_UNENTERED_info;
-extern const StgInfoTable CAF_ENTERED_info;
-extern const StgInfoTable CAF_BLACKHOLE_info;
-extern const StgInfoTable BLACKHOLE_info;
-extern const StgInfoTable BLACKHOLE_BQ_info;
-extern const StgInfoTable BCO_info;
-extern const StgInfoTable EVACUATED_info;
-extern const StgInfoTable FOREIGN_info;
-extern const StgInfoTable WEAK_info;
-extern const StgInfoTable DEAD_WEAK_info;
-extern const StgInfoTable NO_FINALIZER_info;
-extern const StgInfoTable STABLE_NAME_info;
-extern const StgInfoTable FULL_MVAR_info;
-extern const StgInfoTable EMPTY_MVAR_info;
-extern const StgInfoTable TSO_info;
-extern const StgInfoTable ARR_WORDS_info;
-extern const StgInfoTable MUT_ARR_PTRS_info;
-extern const StgInfoTable MUT_ARR_PTRS_FROZEN_info;
-extern const StgInfoTable MUT_VAR_info;
-extern const StgInfoTable END_TSO_QUEUE_info;
-extern const StgInfoTable MUT_CONS_info;
-extern const StgInfoTable END_MUT_LIST_info;
-extern const StgInfoTable catch_info;
-extern const StgInfoTable seq_info;
-extern const StgInfoTable dummy_ret_info;
+extern DLL_IMPORT_RTS const StgInfoTable IND_info;
+extern DLL_IMPORT_RTS const StgInfoTable IND_STATIC_info;
+extern DLL_IMPORT_RTS const StgInfoTable IND_PERM_info;
+extern DLL_IMPORT_RTS const StgInfoTable IND_OLDGEN_info;
+extern DLL_IMPORT_RTS const StgInfoTable IND_OLDGEN_PERM_info;
+extern DLL_IMPORT_RTS const StgInfoTable CAF_UNENTERED_info;
+extern DLL_IMPORT_RTS const StgInfoTable CAF_ENTERED_info;
+extern DLL_IMPORT_RTS const StgInfoTable CAF_BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable BLACKHOLE_info;
+extern DLL_IMPORT_RTS const StgInfoTable BLACKHOLE_BQ_info;
+extern DLL_IMPORT_RTS const StgInfoTable BCO_info;
+extern DLL_IMPORT_RTS const StgInfoTable EVACUATED_info;
+extern DLL_IMPORT_RTS const StgInfoTable FOREIGN_info;
+extern DLL_IMPORT_RTS const StgInfoTable WEAK_info;
+extern DLL_IMPORT_RTS const StgInfoTable DEAD_WEAK_info;
+extern DLL_IMPORT_RTS const StgInfoTable STABLE_NAME_info;
+extern DLL_IMPORT_RTS const StgInfoTable FULL_MVAR_info;
+extern DLL_IMPORT_RTS const StgInfoTable EMPTY_MVAR_info;
+extern DLL_IMPORT_RTS const StgInfoTable TSO_info;
+extern DLL_IMPORT_RTS const StgInfoTable ARR_WORDS_info;
+extern DLL_IMPORT_RTS const StgInfoTable MUT_ARR_WORDS_info;
+extern DLL_IMPORT_RTS const StgInfoTable MUT_ARR_PTRS_info;
+extern DLL_IMPORT_RTS const StgInfoTable MUT_ARR_PTRS_FROZEN_info;
+extern DLL_IMPORT_RTS const StgInfoTable MUT_VAR_info;
+extern DLL_IMPORT_RTS const StgInfoTable END_TSO_QUEUE_info;
+extern DLL_IMPORT_RTS const StgInfoTable MUT_CONS_info;
+extern DLL_IMPORT_RTS const StgInfoTable END_MUT_LIST_info;
+extern DLL_IMPORT_RTS const StgInfoTable catch_info;
+extern DLL_IMPORT_RTS const StgInfoTable seq_info;
+extern DLL_IMPORT_RTS const StgInfoTable dummy_ret_info;
 
 #ifdef INTERPRETER
 
@@ -85,13 +85,13 @@ extern const StgInfoTable ret_bco_info;
 
 /* closures */
 
-extern StgClosure END_TSO_QUEUE_closure;
-extern StgClosure END_MUT_LIST_closure;
-extern StgClosure NO_FINALIZER_closure;
-extern StgClosure dummy_ret_closure;
+extern DLL_IMPORT_DATA StgClosure END_TSO_QUEUE_closure;
+extern DLL_IMPORT_DATA StgClosure END_MUT_LIST_closure;
+extern DLL_IMPORT_DATA StgClosure NO_FINALIZER_closure;
+extern DLL_IMPORT_DATA StgClosure dummy_ret_closure;
 
-extern StgIntCharlikeClosure CHARLIKE_closure[];
-extern StgIntCharlikeClosure INTLIKE_closure[];
+extern DLL_IMPORT_DATA StgIntCharlikeClosure CHARLIKE_closure[];
+extern DLL_IMPORT_DATA StgIntCharlikeClosure INTLIKE_closure[];
 
 /* standard entry points */
 
@@ -99,49 +99,55 @@ extern StgFun stg_error_entry;
 
 /* standard selector thunks */
 
-EI_ __sel_0_upd_info;
-EI_ __sel_1_upd_info;
-EI_ __sel_2_upd_info;
-EI_ __sel_3_upd_info;
-EI_ __sel_4_upd_info;
-EI_ __sel_5_upd_info;
-EI_ __sel_6_upd_info;
-EI_ __sel_7_upd_info;
-EI_ __sel_8_upd_info;
-EI_ __sel_8_upd_info;
-EI_ __sel_9_upd_info;
-EI_ __sel_10_upd_info;
-EI_ __sel_11_upd_info;
-EI_ __sel_12_upd_info;
-EI_ __sel_13_upd_info;
-EI_ __sel_14_upd_info;
-EI_ __sel_15_upd_info;
+#ifdef COMPILING_RTS
+#define EI__ EI_
+#else
+#define EI__ EDI_
+#endif
 
-EI_ __sel_0_noupd_info;
-EI_ __sel_1_noupd_info;
-EI_ __sel_2_noupd_info;
-EI_ __sel_3_noupd_info;
-EI_ __sel_4_noupd_info;
-EI_ __sel_5_noupd_info;
-EI_ __sel_6_noupd_info;
-EI_ __sel_7_noupd_info;
-EI_ __sel_8_noupd_info;
-EI_ __sel_9_noupd_info;
-EI_ __sel_10_noupd_info;
-EI_ __sel_11_noupd_info;
-EI_ __sel_12_noupd_info;
-EI_ __sel_13_noupd_info;
-EI_ __sel_14_noupd_info;
-EI_ __sel_15_noupd_info;
+EI__ __sel_0_upd_info;
+EI__ __sel_1_upd_info;
+EI__ __sel_2_upd_info;
+EI__ __sel_3_upd_info;
+EI__ __sel_4_upd_info;
+EI__ __sel_5_upd_info;
+EI__ __sel_6_upd_info;
+EI__ __sel_7_upd_info;
+EI__ __sel_8_upd_info;
+EI__ __sel_8_upd_info;
+EI__ __sel_9_upd_info;
+EI__ __sel_10_upd_info;
+EI__ __sel_11_upd_info;
+EI__ __sel_12_upd_info;
+EI__ __sel_13_upd_info;
+EI__ __sel_14_upd_info;
+EI__ __sel_15_upd_info;
+
+EI__ __sel_0_noupd_info;
+EI__ __sel_1_noupd_info;
+EI__ __sel_2_noupd_info;
+EI__ __sel_3_noupd_info;
+EI__ __sel_4_noupd_info;
+EI__ __sel_5_noupd_info;
+EI__ __sel_6_noupd_info;
+EI__ __sel_7_noupd_info;
+EI__ __sel_8_noupd_info;
+EI__ __sel_9_noupd_info;
+EI__ __sel_10_noupd_info;
+EI__ __sel_11_noupd_info;
+EI__ __sel_12_noupd_info;
+EI__ __sel_13_noupd_info;
+EI__ __sel_14_noupd_info;
+EI__ __sel_15_noupd_info;
 
 /* standard ap thunks */
 
-EI_ __ap_1_upd_info;
-EI_ __ap_2_upd_info;
-EI_ __ap_3_upd_info;
-EI_ __ap_4_upd_info;
-EI_ __ap_5_upd_info;
-EI_ __ap_6_upd_info;
-EI_ __ap_7_upd_info;
-EI_ __ap_8_upd_info;
+EI__ __ap_1_upd_info;
+EI__ __ap_2_upd_info;
+EI__ __ap_3_upd_info;
+EI__ __ap_4_upd_info;
+EI__ __ap_5_upd_info;
+EI__ __ap_6_upd_info;
+EI__ __ap_7_upd_info;
+EI__ __ap_8_upd_info;
 

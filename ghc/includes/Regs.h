@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Regs.h,v 1.3 1999/02/05 16:02:26 simonm Exp $
+ * $Id: Regs.h,v 1.4 1999/03/02 19:44:14 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -42,7 +42,7 @@ typedef struct {
   StgFloat 	  rF4;
   StgDouble 	  rD1;
   StgDouble 	  rD2;
-  StgNat64        rL1;
+  StgWord64       rL1;
   StgPtr 	  rSp;
   StgUpdateFrame *rSu;
   StgPtr 	  rSpLim;
@@ -50,7 +50,7 @@ typedef struct {
   StgPtr 	  rHpLim;
 } StgRegTable;
 
-extern StgRegTable  MainRegTable;
+extern DLL_IMPORT_RTS StgRegTable  MainRegTable;
 
 /*
  * Registers Hp and HpLim are global across the entire system, and are
@@ -226,7 +226,7 @@ GLOBAL_REG_DECL(StgDouble,D2,REG_D2)
 #endif
 
 #ifdef REG_L1
-GLOBAL_REG_DECL(StgNat64,L1,REG_L1)
+GLOBAL_REG_DECL(StgWord64,L1,REG_L1)
 #else
 #define L1 (BaseReg->rL1)
 #endif
