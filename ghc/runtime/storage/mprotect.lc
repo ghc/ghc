@@ -70,7 +70,7 @@ char * /*caddr_t*/ addr;
 int size;
 {
     int pagesize = GETPAGESIZE();
-    char * middle = (caddr_t) (((W_) (addr + size / 2)) / pagesize * pagesize);
+    char * middle = (char *) (((W_) (addr + size / 2)) / pagesize * pagesize);
 #if defined(cygwin32_TARGET_OS)
     unsigned int old_prot;
 #endif
