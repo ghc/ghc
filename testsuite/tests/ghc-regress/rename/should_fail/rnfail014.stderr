@@ -1,7 +1,0 @@
-
-rnfail014.hs:12:
-    Ambiguous constraint `Eq a'
-	At least one of the forall'd type variables mentioned by the constraint
-	must be reachable from the type after the '=>'
-    In the type: forall a. (Eq a) => Int -> Int
-    While checking the type signature for `f'
