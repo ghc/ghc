@@ -504,7 +504,6 @@ isStaticHscFlag f =
 	"fignore-asserts",
 	"fignore-interface-pragmas",
 	"fno-hi-version-check",
-	"fno-implicit-prelude",
 	"dno-black-holing",
 	"fomit-interface-pragmas",
 	"fno-pre-inlining",
