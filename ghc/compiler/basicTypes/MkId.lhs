@@ -41,9 +41,9 @@ import PrelNames	( pREL_ERR, pREL_GHC )
 import PrelRules	( primOpRule )
 import Rules		( addRule )
 import Type		( Type, ThetaType, mkDictTy, mkDictTys, mkTyConApp, mkTyVarTys,
-			  mkFunTys, mkFunTy, mkSigmaTy,
+			  mkFunTys, mkFunTy, mkSigmaTy, splitSigmaTy, 
 			  isUnLiftedType, mkForAllTys, mkTyVarTy, tyVarsOfType,
-			  splitFunTys, splitForAllTys
+			  splitFunTys, splitForAllTys, mkPredTy
 			)
 import Module		( Module )
 import CoreUtils	( exprType, mkInlineMe )
@@ -73,7 +73,7 @@ import DataCon		( DataCon, StrictnessMark(..),
 			  maybeMarkedUnboxed, splitProductType_maybe
 			)
 import Id		( idType, mkId,
-			  mkVanillaId, mkTemplateLocals,
+			  mkVanillaId, mkTemplateLocals, mkTemplateLocalsNum,
 			  mkTemplateLocal, idCprInfo
 			)
 import IdInfo		( IdInfo, constantIdInfo, mkIdInfo,
@@ -388,44 +388,69 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
     data_cons  = tyConDataCons tycon
     tyvars     = tyConTyVars tycon	-- These scope over the types in 
 					-- the FieldLabels of constructors of this type
-    tycon_theta	= tyConTheta tycon	-- The context on the data decl
-					--   eg data (Eq a, Ord b) => T a b = ...
-    (field_tyvars,field_tau) = splitForAllTys field_ty
-
     data_ty   = mkTyConApp tycon tyvar_tys
     tyvar_tys = mkTyVarTys tyvars
+
+    tycon_theta	= tyConTheta tycon	-- The context on the data decl
+					--   eg data (Eq a, Ord b) => T a b = ...
+    dict_tys  = [mkDictTy cls tys | (cls, tys) <- tycon_theta, 
+				    needed_dict (cls, tys)]
+    needed_dict pred = or [ pred `elem` (dataConTheta dc) 
+			  | (DataAlt dc, _, _) <- the_alts]
+    n_dict_tys = length dict_tys
+
+    (field_tyvars,field_theta,field_tau) = splitSigmaTy field_ty
+    field_dict_tys			 = map mkPredTy field_theta
+    n_field_dict_tys			 = length field_dict_tys
+	-- If the field has a universally quantified type we have to 
+	-- be a bit careful.  Suppose we have
+	--	data R = R { op :: forall a => Foo a => a -> a }
+	-- Then we can't give op the type
+	--	op :: R -> forall a. Foo a => a -> a
+	-- because the typechecker doesn't understand foralls to the
+	-- right of an arrow.  The "right" type to give it is
+	--	op :: forall a. Foo a => a -> a
+	-- But then we must generat the right unfolding too:
+	--	op = /\a -> \dfoo -> \ r ->
+	--	     case r of
+	--		R op -> op a dfoo
+	-- Note that this is exactly the type we'd infer from a user defn
+	--	op (R op) = op
 
 	-- Very tiresomely, the selectors are (unnecessarily!) overloaded over
 	-- just the dictionaries in the types of the constructors that contain
 	-- the relevant field.  Urgh.  
 	-- NB: this code relies on the fact that DataCons are quantified over
 	-- the identical type variables as their parent TyCon
-    dict_tys  = [mkDictTy cls tys | (cls, tys) <- tycon_theta, needed_dict (cls, tys)]
-    needed_dict pred = or [ pred `elem` (dataConTheta dc) 
-			  | (DataAlt dc, _, _) <- the_alts]
 
     selector_ty :: Type
     selector_ty  = mkForAllTys tyvars $ mkForAllTys field_tyvars $
-		   mkFunTys dict_tys $  mkFunTy data_ty field_tau
+		   mkFunTys dict_tys  $  mkFunTys field_dict_tys $
+		   mkFunTy data_ty field_tau
       
+    arity = 1 + n_dict_tys + n_field_dict_tys
     info = mkIdInfo (RecordSelId field_label) NoCafRefs
-	   `setArityInfo`	exactArity (1 + length dict_tys)
+	   `setArityInfo`	exactArity arity
 	   `setUnfoldingInfo`	unfolding	
            `setTyGenInfo`	TyGenNever
 	-- ToDo: consider adding further IdInfo
 
     unfolding = mkTopUnfolding sel_rhs
 
-	
-    (data_id:dict_ids) = mkTemplateLocals (data_ty:dict_tys)
+	-- Allocate Ids.  We do it a funny way round because field_dict_tys is
+	-- almost always empty	
+    dict_ids	       = mkTemplateLocalsNum 1		    dict_tys
+    field_dict_ids     = mkTemplateLocalsNum (n_dict_tys+1) field_dict_tys
+    data_id	       = mkTemplateLocal     arity	    data_ty
+
     alts      = map mk_maybe_alt data_cons
     the_alts  = catMaybes alts
     default_alt | all isJust alts = []	-- No default needed
 		| otherwise	  = [(DEFAULT, [], error_expr)]
 
-    sel_rhs = mkLams tyvars $ mkLams field_tyvars $ 
-	      mkLams dict_ids $ Lam data_id $
-	      sel_body
+    sel_rhs = mkLams tyvars   $ mkLams field_tyvars $ 
+	      mkLams dict_ids $ mkLams field_dict_ids $
+	      Lam data_id     $ sel_body
 
     sel_body | isNewTyCon tycon = Note (Coerce field_tau data_ty) (Var data_id)
 	     | otherwise	= Case (Var data_id) data_id (the_alts ++ default_alt)
@@ -435,13 +460,13 @@ mkRecordSelId tycon field_label unpack_id unpackUtf8_id
 		Nothing		-> Nothing
 		Just the_arg_id -> Just (DataAlt data_con, real_args, expr)
 		  where
-	    	    body 	      = mkVarApps (Var the_arg_id) field_tyvars
+	    	    body 	      = mkVarApps (mkVarApps (Var the_arg_id) field_tyvars) field_dict_ids
 	    	    strict_marks      = dataConStrictMarks data_con
 	    	    (expr, real_args) = rebuildConArgs data_con arg_ids strict_marks body
-					  (length arg_ids + 1)
+						       (length arg_ids + 1)
 	where
-            arg_ids = mkTemplateLocals (dataConInstOrigArgTys data_con tyvar_tys)
-				    -- The first one will shadow data_id, but who cares
+            arg_ids = mkTemplateLocalsNum (arity+1) (dataConInstOrigArgTys data_con tyvar_tys)
+				-- arity+1 avoids all shadowing
     	    maybe_the_arg_id  = assocMaybe (field_lbls `zip` arg_ids) field_label
     	    field_lbls	      = dataConFieldLabels data_con
 
