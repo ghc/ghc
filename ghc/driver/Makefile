@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile,v 1.57 2001/03/26 16:53:35 simonmar Exp $
+# $Id: Makefile,v 1.58 2001/03/27 08:29:07 qrczak Exp $
 #
 
 TOP=..
@@ -53,6 +53,7 @@ package.conf : pkgconf
 
 Package.o : ../utils/ghc-pkg/Package.hs
 
+override datadir = $(libdir)
 INSTALL_DATAS += package.conf
 
 CLEAN_FILES += pkgconf package.conf.inplace package.conf
