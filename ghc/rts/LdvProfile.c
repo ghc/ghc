@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: LdvProfile.c,v 1.5 2003/02/22 04:51:51 sof Exp $
+ * $Id: LdvProfile.c,v 1.6 2003/11/12 17:49:08 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -94,7 +94,7 @@ LDV_recordDead_FILL_SLOP_DYNAMIC( StgClosure *p )
  * closure.  Returns the size of the closure, including the profiling
  * header portion, so that the caller can find the next closure.
  * ----------------------------------------------------------------------- */
-static inline nat
+STATIC_INLINE nat
 processHeapClosureForDead( StgClosure *c )
 {
     nat size;

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.71 2003/10/31 16:48:45 sof Exp $
+ * $Id: RtsFlags.c,v 1.72 2003/11/12 17:49:09 sof Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -457,7 +457,7 @@ usage_text[] = {
 0
 };
 
-static inline rtsBool
+STATIC_INLINE rtsBool
 strequal(const char *a, const char * b)
 {
     return(strcmp(a, b) == 0);

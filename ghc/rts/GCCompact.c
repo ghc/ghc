@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.c,v 1.17 2003/10/22 11:11:59 simonmar Exp $
+ * $Id: GCCompact.c,v 1.18 2003/11/12 17:49:07 sof Exp $
  *
  * (c) The GHC Team 2001
  *
@@ -21,9 +21,8 @@
 
 // Turn off inlining when debugging - it obfuscates things
 #ifdef DEBUG
-#define INLINE
-#else
-#define INLINE inline
+# undef  STATIC_INLINE
+# define STATIC_INLINE static
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -48,7 +47,7 @@
    except for the info pointer.
    -------------------------------------------------------------------------- */
 
-static INLINE void
+STATIC_INLINE void
 thread( StgPtr p )
 {
     StgPtr q = (StgPtr)*p;
@@ -71,7 +70,7 @@ thread( StgPtr p )
     }
 }
 
-static INLINE void
+STATIC_INLINE void
 unthread( StgPtr p, StgPtr free )
 {
     StgPtr q = (StgPtr)*p, r;
@@ -85,7 +84,7 @@ unthread( StgPtr p, StgPtr free )
     *p = (StgWord)q;
 }
 
-static INLINE StgInfoTable *
+STATIC_INLINE StgInfoTable *
 get_threaded_info( StgPtr p )
 {
     StgPtr q = (P_)GET_INFO((StgClosure *)p);
@@ -100,7 +99,7 @@ get_threaded_info( StgPtr p )
 
 // A word-aligned memmove will be faster for small objects than libc's or gcc's.
 // Remember, the two regions *might* overlap, but: to <= from.
-static INLINE void
+STATIC_INLINE void
 move(StgPtr to, StgPtr from, nat size)
 {
     for(; size > 0; --size) {
@@ -108,7 +107,7 @@ move(StgPtr to, StgPtr from, nat size)
     }
 }
 
-static INLINE nat
+STATIC_INLINE nat
 obj_sizeW( StgClosure *p, StgInfoTable *info )
 {
     switch (info->type) {
@@ -184,7 +183,7 @@ thread_static( StgClosure* p )
   }
 }
 
-static INLINE void
+STATIC_INLINE void
 thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
 {
     nat i, b;
@@ -207,7 +206,7 @@ thread_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     }
 }
 
-static INLINE StgPtr
+STATIC_INLINE StgPtr
 thread_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
@@ -355,7 +354,7 @@ thread_stack(StgPtr p, StgPtr stack_end)
     }
 }
 
-static INLINE StgPtr
+STATIC_INLINE StgPtr
 thread_PAP (StgPAP *pap)
 {
     StgPtr p;
@@ -399,7 +398,7 @@ thread_PAP (StgPAP *pap)
     return p;
 }
 
-static INLINE StgPtr
+STATIC_INLINE StgPtr
 thread_AP_STACK (StgAP_STACK *ap)
 {
     thread((StgPtr)&ap->fun);
@@ -480,7 +479,7 @@ update_fwd_large( bdescr *bd )
   }
 }
 
-static INLINE StgPtr
+STATIC_INLINE StgPtr
 thread_obj (StgInfoTable *info, StgPtr p)
 {
     switch (info->type) {
@@ -610,6 +609,7 @@ thread_obj (StgInfoTable *info, StgPtr p)
     
     default:
 	barf("update_fwd: unknown/strange object  %d", (int)(info->type));
+	return NULL;
     }
 }
 

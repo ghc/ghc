@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GCCompact.h,v 1.2 2001/07/30 13:06:18 simonmar Exp $
+ * $Id: GCCompact.h,v 1.3 2003/11/12 17:49:07 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -7,7 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-static inline void 
+INLINE_HEADER void 
 mark(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -17,7 +17,7 @@ mark(StgPtr p, bdescr *bd)
     *bitmap_word |= bit_mask;
 }
 
-static inline void 
+INLINE_HEADER void 
 unmark(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words
@@ -27,7 +27,7 @@ unmark(StgPtr p, bdescr *bd)
     *bitmap_word &= ~bit_mask;
 }
 
-static inline int
+INLINE_HEADER int
 is_marked(StgPtr p, bdescr *bd)
 {
     nat offset_within_block = p - bd->start; // in words

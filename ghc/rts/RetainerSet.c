@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RetainerSet.c,v 1.4 2003/03/25 17:58:49 sof Exp $
+ * $Id: RetainerSet.c,v 1.5 2003/11/12 17:49:08 sof Exp $
  *
  * (c) The GHC Team, 2001
  * Author: Sungwoo Park
@@ -52,7 +52,7 @@ RetainerSet rs_MANY = {
 /* -----------------------------------------------------------------------------
  * calculate the size of a RetainerSet structure
  * -------------------------------------------------------------------------- */
-static inline size_t
+STATIC_INLINE size_t
 sizeofRetainerSet( int elems )
 {
     return (sizeof(RetainerSet) + elems * sizeof(retainer));

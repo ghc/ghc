@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.179 2003/10/05 20:18:36 panne Exp $
+ * $Id: Schedule.c,v 1.180 2003/11/12 17:49:10 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -960,7 +960,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     /* in a GranSim setup the TSO stays on the run queue */
     t = CurrentTSO;
     /* Take a thread from the run queue. */
-    t = POP_RUN_QUEUE(); // take_off_run_queue(t);
+    POP_RUN_QUEUE(t); // take_off_run_queue(t);
 
     IF_DEBUG(gran, 
 	     fprintf(stderr, "GRAN: About to run current thread, which is\n");
@@ -1067,7 +1067,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
     ASSERT(run_queue_hd != END_TSO_QUEUE);
 
     /* Take a thread from the run queue, if we have work */
-    t = POP_RUN_QUEUE();  // take_off_run_queue(END_TSO_QUEUE);
+    POP_RUN_QUEUE(t);  // take_off_run_queue(END_TSO_QUEUE);
     IF_DEBUG(sanity,checkTSO(t));
 
     /* ToDo: write something to the log-file
@@ -1113,7 +1113,7 @@ schedule( StgMainThread *mainThread USED_WHEN_RTS_SUPPORTS_THREADS,
   
     /* grab a thread from the run queue */
     ASSERT(run_queue_hd != END_TSO_QUEUE);
-    t = POP_RUN_QUEUE();
+    POP_RUN_QUEUE(t);
     // Sanity check the thread we're about to run.  This can be
     // expensive if there is lots of thread switching going on...
     IF_DEBUG(sanity,checkTSO(t));
@@ -1764,7 +1764,7 @@ suspendThread( StgRegTable *reg,
   /* assume that *reg is a pointer to the StgRegTable part
    * of a Capability.
    */
-  cap = (Capability *)((void *)reg - sizeof(StgFunTable));
+  cap = (Capability *)((void *)((unsigned char*)reg - sizeof(StgFunTable)));
 
   ACQUIRE_LOCK(&sched_mutex);
 
@@ -2759,7 +2759,7 @@ threadStackOverflow(StgTSO *tso)
   if (tso->stack_size >= tso->max_stack_size) {
 
     IF_DEBUG(gc,
-	     belch("@@ threadStackOverflow of TSO %d (%p): stack too large (now %ld; max is %ld",
+	     belch("@@ threadStackOverflow of TSO %d (%p): stack too large (now %ld; max is %ld)",
 		   tso->id, tso, tso->stack_size, tso->max_stack_size);
 	     /* If we're debugging, just print out the top of the stack */
 	     printStackChunk(tso->sp, stg_min(tso->stack+tso->stack_size, 
@@ -2831,12 +2831,12 @@ threadStackOverflow(StgTSO *tso)
    ------------------------------------------------------------------------ */
 
 #if defined(GRAN)
-static inline void
+STATIC_INLINE void
 unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
 {
 }
 #elif defined(PAR)
-static inline void
+STATIC_INLINE void
 unblockCount ( StgBlockingQueueElement *bqe, StgClosure *node )
 {
   /* write RESUME events to log file and
@@ -2972,7 +2972,7 @@ unblockOneLocked(StgTSO *tso)
 #endif
 
 #if defined(GRAN) || defined(PAR)
-inline StgBlockingQueueElement *
+INLINE_ME StgBlockingQueueElement *
 unblockOne(StgBlockingQueueElement *bqe, StgClosure *node)
 {
   ACQUIRE_LOCK(&sched_mutex);
@@ -2981,7 +2981,7 @@ unblockOne(StgBlockingQueueElement *bqe, StgClosure *node)
   return bqe;
 }
 #else
-inline StgTSO *
+INLINE_ME StgTSO *
 unblockOne(StgTSO *tso)
 {
   ACQUIRE_LOCK(&sched_mutex);

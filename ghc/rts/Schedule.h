@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Schedule.h,v 1.41 2003/10/01 10:57:43 wolfgang Exp $
+ * $Id: Schedule.h,v 1.42 2003/11/12 17:49:11 sof Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -258,17 +258,17 @@ void labelThread(StgPtr tso, char *label);
 
 /* Pop the first thread off the runnable queue.
  */
-#define POP_RUN_QUEUE()				\
-  ({ StgTSO *t = run_queue_hd;			\
-    if (t != END_TSO_QUEUE) {			\
-      run_queue_hd = t->link;			\
-      t->link = END_TSO_QUEUE;			\
+#define POP_RUN_QUEUE(pt)			\
+  do { StgTSO *__tmp_t = run_queue_hd;	        \
+    if (__tmp_t != END_TSO_QUEUE) {		\
+      run_queue_hd = __tmp_t->link;		\
+      __tmp_t->link = END_TSO_QUEUE;	        \
       if (run_queue_hd == END_TSO_QUEUE) {	\
         run_queue_tl = END_TSO_QUEUE;		\
       }						\
     }						\
-    t;						\
-  })
+    pt = __tmp_t;				\
+  } while(0)
 
 /* Add a thread to the end of the blocked queue.
  */

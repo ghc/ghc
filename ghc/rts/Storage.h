@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.h,v 1.52 2003/04/22 16:25:12 simonmar Exp $
+ * $Id: Storage.h,v 1.53 2003/11/12 17:49:11 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -63,7 +63,7 @@ extern StgPtr  allocate        ( nat n );
 extern StgPtr  allocatePinned  ( nat n );
 extern lnat    allocated_bytes ( void );
 
-static inline rtsBool
+INLINE_HEADER rtsBool
 doYouWantToGC( void )
 {
   return (alloc_blocks >= alloc_blocks_lim);
@@ -129,7 +129,7 @@ extern Mutex sm_mutex;
 /* ToDo: shouldn't recordMutable and recordOldToNewPtrs acquire some
  * kind of lock in the SMP case?
  */
-static inline void
+INLINE_HEADER void
 recordMutable(StgMutClosure *p)
 {
   bdescr *bd;
@@ -147,7 +147,7 @@ recordMutable(StgMutClosure *p)
   }
 }
 
-static inline void
+INLINE_HEADER void
 recordOldToNewPtrs(StgMutClosure *p)
 {
   bdescr *bd;
@@ -287,7 +287,7 @@ recordOldToNewPtrs(StgMutClosure *p)
   }
 
 #if defined(TICKY_TICKY) || defined(PROFILING)
-static inline void
+INLINE_HEADER void
 updateWithPermIndirection(const StgInfoTable *info, StgClosure *p1, StgClosure *p2) 
 {
   bdescr *bd;
@@ -363,53 +363,53 @@ void revertCAFs( void );
    Macros for calculating how big a closure will be (used during allocation)
    -------------------------------------------------------------------------- */
 
-static __inline__ StgOffset PAP_sizeW   ( nat n_args )
+INLINE_HEADER StgOffset PAP_sizeW   ( nat n_args )
 { return sizeofW(StgPAP) + n_args; }
 
-static __inline__ StgOffset AP_STACK_sizeW ( nat size )
+INLINE_HEADER StgOffset AP_STACK_sizeW ( nat size )
 { return sizeofW(StgAP_STACK) + size; }
 
-static __inline__ StgOffset CONSTR_sizeW( nat p, nat np )
+INLINE_HEADER StgOffset CONSTR_sizeW( nat p, nat np )
 { return sizeofW(StgHeader) + p + np; }
 
-static __inline__ StgOffset THUNK_SELECTOR_sizeW ( void )
+INLINE_HEADER StgOffset THUNK_SELECTOR_sizeW ( void )
 { return sizeofW(StgHeader) + MIN_UPD_SIZE; }
 
-static __inline__ StgOffset BLACKHOLE_sizeW ( void )
+INLINE_HEADER StgOffset BLACKHOLE_sizeW ( void )
 { return sizeofW(StgHeader) + MIN_UPD_SIZE; }
 
 /* --------------------------------------------------------------------------
    Sizes of closures
    ------------------------------------------------------------------------*/
 
-static __inline__ StgOffset sizeW_fromITBL( const StgInfoTable* itbl ) 
+INLINE_HEADER StgOffset sizeW_fromITBL( const StgInfoTable* itbl ) 
 { return sizeofW(StgClosure) 
        + sizeofW(StgPtr)  * itbl->layout.payload.ptrs 
        + sizeofW(StgWord) * itbl->layout.payload.nptrs; }
 
-static __inline__ StgOffset ap_stack_sizeW( StgAP_STACK* x )
+INLINE_HEADER StgOffset ap_stack_sizeW( StgAP_STACK* x )
 { return AP_STACK_sizeW(x->size); }
 
-static __inline__ StgOffset pap_sizeW( StgPAP* x )
+INLINE_HEADER StgOffset pap_sizeW( StgPAP* x )
 { return PAP_sizeW(x->n_args); }
 
-static __inline__ StgOffset arr_words_sizeW( StgArrWords* x )
+INLINE_HEADER StgOffset arr_words_sizeW( StgArrWords* x )
 { return sizeofW(StgArrWords) + x->words; }
 
-static __inline__ StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
+INLINE_HEADER StgOffset mut_arr_ptrs_sizeW( StgMutArrPtrs* x )
 { return sizeofW(StgMutArrPtrs) + x->ptrs; }
 
-static __inline__ StgWord tso_sizeW ( StgTSO *tso )
+INLINE_HEADER StgWord tso_sizeW ( StgTSO *tso )
 { return TSO_STRUCT_SIZEW + tso->stack_size; }
 
-static __inline__ StgWord bco_sizeW ( StgBCO *bco )
+INLINE_HEADER StgWord bco_sizeW ( StgBCO *bco )
 { return bco->size; }
 
 /* -----------------------------------------------------------------------------
    Sizes of stack frames
    -------------------------------------------------------------------------- */
 
-static inline StgWord stack_frame_sizeW( StgClosure *frame )
+INLINE_HEADER StgWord stack_frame_sizeW( StgClosure *frame )
 {
     StgRetInfoTable *info;
 

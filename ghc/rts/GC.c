@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.162 2003/10/24 11:45:40 simonmar Exp $
+ * $Id: GC.c,v 1.163 2003/11/12 17:49:07 sof Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -190,31 +190,31 @@ static rtsBool mark_stack_overflowed;
 static bdescr *oldgen_scan_bd;
 static StgPtr  oldgen_scan;
 
-static inline rtsBool
+STATIC_INLINE rtsBool
 mark_stack_empty(void)
 {
     return mark_sp == mark_stack;
 }
 
-static inline rtsBool
+STATIC_INLINE rtsBool
 mark_stack_full(void)
 {
     return mark_sp >= mark_splim;
 }
 
-static inline void
+STATIC_INLINE void
 reset_mark_stack(void)
 {
     mark_sp = mark_stack;
 }
 
-static inline void
+STATIC_INLINE void
 push_mark_stack(StgPtr p)
 {
     *mark_sp++ = p;
 }
 
-static inline StgPtr
+STATIC_INLINE StgPtr
 pop_mark_stack(void)
 {
     return *--mark_sp;
@@ -1294,6 +1294,7 @@ traverse_weak_ptr_list(void)
 
   default:
       barf("traverse_weak_ptr_list");
+      return rtsTrue;
   }
 
 }
@@ -1413,7 +1414,7 @@ mark_root(StgClosure **root)
   *root = evacuate(*root);
 }
 
-static __inline__ void 
+STATIC_INLINE void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
 {
     // Source object must be in from-space:
@@ -1425,7 +1426,7 @@ upd_evacuee(StgClosure *p, StgClosure *dest)
 }
 
 
-static __inline__ StgClosure *
+STATIC_INLINE StgClosure *
 copy(StgClosure *src, nat size, step *stp)
 {
   P_ to, from, dest;
@@ -1531,7 +1532,7 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
    -------------------------------------------------------------------------- */
 
 
-static inline void
+STATIC_INLINE void
 evacuate_large(StgPtr p)
 {
   bdescr *bd = Bdescr(p);
@@ -2215,7 +2216,7 @@ scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
  * srt field in the info table.  That's ok, because we'll
  * never dereference it.
  */
-static inline void
+STATIC_INLINE void
 scavenge_srt (StgClosure **srt, nat srt_bitmap)
 {
   nat bitmap;
@@ -2255,7 +2256,7 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 }
 
 
-static inline void
+STATIC_INLINE void
 scavenge_thunk_srt(const StgInfoTable *info)
 {
     StgThunkInfoTable *thunk_info;
@@ -2264,7 +2265,7 @@ scavenge_thunk_srt(const StgInfoTable *info)
     scavenge_srt((StgClosure **)thunk_info->srt, thunk_info->i.srt_bitmap);
 }
 
-static inline void
+STATIC_INLINE void
 scavenge_fun_srt(const StgInfoTable *info)
 {
     StgFunInfoTable *fun_info;
@@ -2273,7 +2274,7 @@ scavenge_fun_srt(const StgInfoTable *info)
     scavenge_srt((StgClosure **)fun_info->srt, fun_info->i.srt_bitmap);
 }
 
-static inline void
+STATIC_INLINE void
 scavenge_ret_srt(const StgInfoTable *info)
 {
     StgRetInfoTable *ret_info;
@@ -2315,7 +2316,7 @@ scavengeTSO (StgTSO *tso)
    in PAPs.
    -------------------------------------------------------------------------- */
 
-static inline StgPtr
+STATIC_INLINE StgPtr
 scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
 {
     StgPtr p;
@@ -2350,7 +2351,7 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     return p;
 }
 
-static inline StgPtr
+STATIC_INLINE StgPtr
 scavenge_PAP (StgPAP *pap)
 {
     StgPtr p;
@@ -3673,7 +3674,7 @@ scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     }
 }
 
-static inline StgPtr
+STATIC_INLINE StgPtr
 scavenge_small_bitmap (StgPtr p, nat size, StgWord bitmap)
 {
     while (size > 0) {
@@ -4221,20 +4222,20 @@ done_traversing:
 	void *gap_start, *next_gap_start, *gap_end;
 	nat chunk_size;
 
-	next_gap_start = (void *)gap + sizeof(StgUpdateFrame);
+	next_gap_start = (void *)((unsigned char*)gap + sizeof(StgUpdateFrame));
 	sp = next_gap_start;
 
 	while ((StgPtr)gap > tso->sp) {
 
 	    // we're working in *bytes* now...
 	    gap_start = next_gap_start;
-	    gap_end = gap_start - gap->gap_size * sizeof(W_);
+	    gap_end = (void*) ((unsigned char*)gap_start - gap->gap_size * sizeof(W_));
 
 	    gap = gap->next_gap;
-	    next_gap_start = (void *)gap + sizeof(StgUpdateFrame);
+	    next_gap_start = (void *)((unsigned char*)gap + sizeof(StgUpdateFrame));
 
-	    chunk_size = gap_end - next_gap_start;
-	    sp -= chunk_size;
+	    chunk_size = (unsigned char*)gap_end - (unsigned char*)next_gap_start;
+	    (unsigned char*)sp -= chunk_size;
 	    memmove(sp, next_gap_start, chunk_size);
 	}
 
@@ -4295,7 +4296,7 @@ printMutableList(generation *gen)
   fputc('\n', stderr);
 }
 
-static inline rtsBool
+STATIC_INLINE rtsBool
 maybeLarge(StgClosure *closure)
 {
   StgInfoTable *info = get_itbl(closure);

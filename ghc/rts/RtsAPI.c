@@ -1,5 +1,5 @@
 /* ----------------------------------------------------------------------------
- * $Id: RtsAPI.c,v 1.49 2003/10/01 10:49:07 wolfgang Exp $
+ * $Id: RtsAPI.c,v 1.50 2003/11/12 17:49:08 sof Exp $
  *
  * (c) The GHC Team, 1998-2001
  *
@@ -76,10 +76,10 @@ rts_mkInt32 (HsInt32 i)
 HaskellObj
 rts_mkInt64 (HsInt64 i)
 {
-  long long *tmp;
+  llong *tmp;
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   SET_HDR(p, I64zh_con_info, CCS_SYSTEM);
-  tmp  = (long long*)&(p->payload[0]);
+  tmp  = (llong*)&(p->payload[0]);
   *tmp = (StgInt64)i;
   return p;
 }
@@ -126,12 +126,12 @@ rts_mkWord32 (HsWord32 w)
 HaskellObj
 rts_mkWord64 (HsWord64 w)
 {
-  unsigned long long *tmp;
+  ullong *tmp;
 
   StgClosure *p = (StgClosure *)allocate(CONSTR_sizeW(0,2));
   /* see mk_Int8 comment */
   SET_HDR(p, W64zh_con_info, CCS_SYSTEM);
-  tmp  = (unsigned long long*)&(p->payload[0]);
+  tmp  = (ullong*)&(p->payload[0]);
   *tmp = (StgWord64)w;
   return p;
 }

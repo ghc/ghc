@@ -208,7 +208,7 @@ void releaseCapability(Capability* cap
 	   fprintf(stderr,"worker thread (%p): released capability\n",
 		   osThreadId()));
 #endif
- return;
+  return;
 }
 
 #if defined(RTS_SUPPORTS_THREADS)

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.c,v 1.16 2003/02/18 05:47:53 sof Exp $
+ * $Id: BlockAlloc.c,v 1.17 2003/11/12 17:49:05 sof Exp $
  *
  * (c) The GHC Team 1998-2000
  * 
@@ -44,7 +44,7 @@ void initBlockAllocator(void)
    Allocation
    -------------------------------------------------------------------------- */
 
-static inline void
+STATIC_INLINE void
 initGroup(nat n, bdescr *head)
 {
   bdescr *bd;
@@ -194,7 +194,7 @@ allocMegaGroup(nat n)
  * pointer to the newly enlarged group p.
  */
 
-static inline bdescr *
+STATIC_INLINE bdescr *
 coalesce(bdescr *p)
 {
   bdescr *bd, *q;

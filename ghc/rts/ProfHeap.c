@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.49 2003/10/24 14:45:38 stolz Exp $
+ * $Id: ProfHeap.c,v 1.50 2003/11/12 17:49:08 sof Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -72,7 +72,7 @@ typedef struct _counter {
     struct _counter *next;
 } counter;
 
-static inline void
+STATIC_INLINE void
 initLDVCtr( counter *ctr )
 {
     ctr->c.ldv.prim = 0;
@@ -177,7 +177,7 @@ static char *type_names[] = {
  * the band to which this closure's heap space is attributed in the
  * heap profile.
  * ------------------------------------------------------------------------- */
-static inline void *
+STATIC_INLINE void *
 closureIdentity( StgClosure *p )
 {
     switch (RtsFlags.ProfFlags.doHeapProfile) {
@@ -215,14 +215,14 @@ closureIdentity( StgClosure *p )
  * Profiling type predicates
  * ----------------------------------------------------------------------- */
 #ifdef PROFILING
-static inline rtsBool
+STATIC_INLINE rtsBool
 doingLDVProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV 
 	    || RtsFlags.ProfFlags.bioSelector != NULL);
 }
 
-static inline rtsBool
+STATIC_INLINE rtsBool
 doingRetainerProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
@@ -304,7 +304,7 @@ LDV_recordDead( StgClosure *c, nat size )
 /* --------------------------------------------------------------------------
  * Initialize censuses[era];
  * ----------------------------------------------------------------------- */
-static inline void
+STATIC_INLINE void
 initEra(Census *census)
 {
     census->hash  = allocHashTable();

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: BlockAlloc.h,v 1.9 2001/05/03 16:32:55 simonmar Exp $
+ * $Id: BlockAlloc.h,v 1.10 2003/11/12 17:49:06 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -28,7 +28,7 @@ extern void freeChain(bdescr *p);
 
 #define WORDS_PER_MBLOCK  (BLOCKS_PER_MBLOCK * BLOCK_SIZE_W)
 
-static inline nat
+INLINE_HEADER nat
 round_to_mblocks(nat words)
 {
   if (words > WORDS_PER_MBLOCK) {

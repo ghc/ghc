@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Sparks.c,v 1.6 2003/03/25 17:58:50 sof Exp $
+ * $Id: Sparks.c,v 1.7 2003/11/12 17:49:11 sof Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -526,10 +526,10 @@ activateSpark (rtsEvent *event, rtsSparkQ spark)
    Granularity info transformers. 
    Applied to the GRAN_INFO field of a spark.
 */
-static inline nat  ID(nat x) { return(x); };
-static inline nat  INV(nat x) { return(-x); };
-static inline nat  IGNORE(nat x) { return (0); };
-static inline nat  RAND(nat x) { return ((random() % MAX_RAND_PRI) + 1); }
+STATIC_INLINE nat  ID(nat x) { return(x); };
+STATIC_INLINE nat  INV(nat x) { return(-x); };
+STATIC_INLINE nat  IGNORE(nat x) { return (0); };
+STATIC_INLINE nat  RAND(nat x) { return ((random() % MAX_RAND_PRI) + 1); }
 
 /* NB: size_info and par_info are currently unused (what a shame!) -- HWL */
 //@cindex newSpark

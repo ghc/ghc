@@ -63,13 +63,13 @@
    return (retcode);
 
 
-static inline StgPtr
+STATIC_INLINE StgPtr
 allocate_UPD (int n_words)
 {
    return allocate(stg_max(sizeofW(StgHeader)+MIN_UPD_SIZE, n_words));
 }
 
-static inline StgPtr
+STATIC_INLINE StgPtr
 allocate_NONUPD (int n_words)
 {
     return allocate(stg_max(sizeofW(StgHeader)+MIN_NONUPD_SIZE, n_words));
@@ -1212,7 +1212,7 @@ run_BCO:
 #endif
 
 	    // And restart the thread again, popping the RET_DYN frame.
-	    cap = (Capability *)((void *)resumeThread(tok,rtsFalse) - sizeof(StgFunTable));
+	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok,rtsFalse) - sizeof(StgFunTable)));
 	    LOAD_STACK_POINTERS;
 	    Sp += ret_dyn_size;
 	    

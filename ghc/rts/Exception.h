@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Exception.h,v 1.6 2003/07/12 00:11:20 sof Exp $
+ * $Id: Exception.h,v 1.7 2003/11/12 17:49:07 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -14,7 +14,7 @@ extern const StgRetInfoTable stg_unblockAsyncExceptionszh_ret_info;
  * indefinitely).  Interruptible threads can be sent an exception with
  * killThread# even if they have async exceptions blocked.
  */
-static __inline__ int
+INLINE_HEADER int
 interruptible(StgTSO *t)
 {
   switch (t->why_blocked) {

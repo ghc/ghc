@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Stable.c,v 1.26 2003/06/24 13:45:49 stolz Exp $
+ * $Id: Stable.c,v 1.27 2003/11/12 17:49:11 sof Exp $
  *
  * (c) The GHC Team, 1998-2002
  *
@@ -117,7 +117,7 @@ static HashTable *addrToStableHash = NULL;
 
 #define INIT_SPT_SIZE 64
 
-static inline void
+STATIC_INLINE void
 initFreeList(snEntry *table, nat n, snEntry *free)
 {
   snEntry *p;
@@ -197,7 +197,7 @@ lookupStableName(StgPtr p)
   }
 }
 
-static inline void
+STATIC_INLINE void
 freeStableName(snEntry *sn)
 {
   ASSERT(sn->sn_obj == NULL);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StoragePriv.h,v 1.24 2002/12/19 14:33:23 simonmar Exp $
+ * $Id: StoragePriv.h,v 1.25 2003/11/12 17:49:11 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -62,7 +62,7 @@ extern lnat calcAllocated  ( void );
 extern lnat calcLive       ( void );
 extern lnat calcNeeded     ( void );
 
-static inline void
+INLINE_HEADER void
 dbl_link_onto(bdescr *bd, bdescr **list)
 {
   bd->link = *list;

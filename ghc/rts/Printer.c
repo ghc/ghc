@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Printer.c,v 1.61 2003/10/16 20:54:12 sof Exp $
+ * $Id: Printer.c,v 1.62 2003/11/12 17:49:08 sof Exp $
  *
  * (c) The GHC Team, 1994-2000.
  *
@@ -72,7 +72,7 @@ void printObj( StgClosure *obj )
     printClosure(obj);
 }
 
-static inline void
+STATIC_INLINE void
 printStdObjHdr( StgClosure *obj, char* tag )
 {
     fprintf(stderr,"%s(",tag);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsUtils.h,v 1.18 2003/09/26 12:11:18 panne Exp $
+ * $Id: RtsUtils.h,v 1.19 2003/11/12 17:49:10 sof Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -13,7 +13,7 @@ extern void *stgReallocBytes(void *p, int n, char *msg);
 extern void *stgCallocBytes(int n, int m, char *msg);
 extern void stgFree(void* p);
 
-extern void barf(char *s, ...) __attribute__((__noreturn__)) ;
+extern void barf(char *s, ...) GNU_ATTRIBUTE(__noreturn__);
 extern void belch(char *s, ...);
 extern void prog_belch(char *s, ...);
 
@@ -25,9 +25,6 @@ extern void setNonBlockingFd(int fd);
 extern void resetNonBlockingFd(int fd);
 
 extern nat stg_strlen(char *str);
-
-/*Defined in Main.c, but made visible here*/
-extern void stg_exit(int n) __attribute__((noreturn));
 
 char *time_str(void);
 char *ullong_format_string(ullong, char *, rtsBool);
