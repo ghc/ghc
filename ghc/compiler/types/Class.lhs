@@ -17,14 +17,13 @@ module Class (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Id	( Id, idType, idName )
+import {-# SOURCE #-} Id	( Id )
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} Type	( Type )
 import {-# SOURCE #-} SpecEnv	( SpecEnv )
 
 import TyCon		( TyCon )
 import TyVar		( TyVar )
-import Maybes		( assocMaybe )
 import Name		( NamedThing(..), Name, getOccName )
 import Unique		( Unique, Uniquable(..) )
 import BasicTypes	( Unused )

@@ -214,8 +214,6 @@ pprOutPat (DictPat dicts methods)
 		  brackets (interpp'SP dicts),
 		  brackets (interpp'SP methods)])
 
-pprConPatTy ty
- = parens (ppr ty)
 \end{code}
 
 %************************************************************************

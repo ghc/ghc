@@ -35,7 +35,7 @@ import Id		( GenId, mkTemplateLocals, idType,
 			)
 import IdInfo		( ArityInfo, exactArity )
 import Class		( classBigSig, classTyCon )
-import TyCon		( isNewTyCon, isDataTyCon, isAlgTyCon, tyConDataCons )
+import TyCon		( isNewTyCon, tyConDataCons )
 import FieldLabel	( FieldLabel )
 import PrelVals		( pAT_ERROR_ID )
 import Maybes

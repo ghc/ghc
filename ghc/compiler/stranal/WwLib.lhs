@@ -15,11 +15,11 @@ module WwLib (
 
 import CoreSyn
 import Id		( GenId, idType, mkSysLocal, dataConArgTys, isDataCon, isNewCon, Id )
-import IdInfo		( mkStrictnessInfo, {-??nonAbsentArgs,-} Demand(..) )
+import IdInfo		( Demand(..) )
 import PrelVals		( aBSENT_ERROR_ID, voidId )
 import TysPrim		( voidTy )
 import SrcLoc		( noSrcLoc )
-import Type		( isUnpointedType, mkTyVarTys, mkForAllTys, mkFunTys,
+import Type		( isUnpointedType, mkTyVarTys, mkFunTys,
 			  splitForAllTys, splitFunTys,
 			  splitAlgTyConApp_maybe, 
 			  Type
@@ -28,12 +28,9 @@ import TyCon		( isNewTyCon, isDataTyCon )
 import BasicTypes	( NewOrData(..) )
 import TyVar            ( TyVar )
 import PprType		( GenType, GenTyVar )
-import UniqSupply	( returnUs, thenUs, thenMaybeUs,
-			  getUniques, getUnique, UniqSM
-			)
-import Util		( zipWithEqual, zipEqual )
+import UniqSupply	( returnUs, thenUs, getUniques, getUnique, UniqSM )
+import Util		( zipEqual )
 import Outputable
-import List		( nub )
 \end{code}
 
 %************************************************************************

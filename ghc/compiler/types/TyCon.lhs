@@ -40,7 +40,7 @@ module TyCon(
 
 import {-# SOURCE #-} Type  ( Type )
 import {-# SOURCE #-} Class ( Class )
-import {-# SOURCE #-} Id    ( Id, isNullaryDataCon, idType )
+import {-# SOURCE #-} Id    ( Id, isNullaryDataCon )
 import {-# SOURCE #-} TysWiredIn ( tupleCon )
 
 
@@ -53,11 +53,8 @@ import Maybes
 import Name		( Name, nameUnique, mkWiredInTyConName, NamedThing(getName) )
 import Unique		( Unique, funTyConKey, Uniquable(..) )
 import PrimRep		( PrimRep(..), isFollowableRep )
-import PrelMods		( pREL_GHC, pREL_TUP, pREL_BASE )
-import Lex		( mkTupNameStr )
-import SrcLoc		( SrcLoc, mkBuiltinSrcLoc )
-import Util		( nOfThem, isIn )
-import Outputable
+import PrelMods		( pREL_GHC )
+import Util		( panic )
 \end{code}
 
 \begin{code}

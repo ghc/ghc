@@ -638,7 +638,6 @@ errorIdKey		      = mkPreludeMiscIdUnique  7
 foldlIdKey		      = mkPreludeMiscIdUnique  8
 foldrIdKey		      = mkPreludeMiscIdUnique  9
 forkIdKey   	    	      = mkPreludeMiscIdUnique 10
-int2IntegerIdKey	      = mkPreludeMiscIdUnique 11
 integerMinusOneIdKey	      = mkPreludeMiscIdUnique 12
 integerPlusOneIdKey	      = mkPreludeMiscIdUnique 13
 integerPlusTwoIdKey	      = mkPreludeMiscIdUnique 14

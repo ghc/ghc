@@ -9,15 +9,14 @@ module IdUtils ( primOpName ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUnfold	( UnfoldingGuidance(..), Unfolding, mkUnfolding )
+import CoreUnfold	( Unfolding )
 import Id		( mkPrimitiveId )
 import IdInfo		-- quite a few things
 import StdIdInfo
 import Name		( mkWiredInIdName, Name )
-import PrimOp		( primOpInfo, tagOf_PrimOp, primOp_str,
-			  PrimOpInfo(..), PrimOpResultInfo(..), PrimOp )
+import PrimOp		( primOpInfo, tagOf_PrimOp, PrimOpInfo(..), PrimOp )
 import PrelMods		( pREL_GHC )
-import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyVarTy, mkTyConApp )
+import Type		( mkForAllTys, mkFunTy, mkFunTys, mkTyConApp )
 import TysWiredIn	( boolTy )
 import Unique		( mkPrimOpIdUnique )
 import Util		( panic )

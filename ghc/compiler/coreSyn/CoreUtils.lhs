@@ -29,7 +29,7 @@ import Id		( idType, mkSysLocal, isBottomingId,
 			  addOneToIdEnv, growIdEnvList, lookupIdEnv,
 			  isNullIdEnv, IdEnv, Id
 			)
-import Literal		( literalType, isNoRepLit, Literal(..) )
+import Literal		( literalType, Literal(..) )
 import Maybes		( catMaybes, maybeToBool )
 import PprCore
 import PrimOp		( primOpType, PrimOp(..) )
@@ -46,7 +46,7 @@ import Type		( mkFunTy, mkForAllTy, mkTyVarTy,
 import TysWiredIn	( trueDataCon, falseDataCon )
 import Unique		( Unique )
 import BasicTypes	( Unused )
-import UniqSupply	( initUs, returnUs, thenUs,
+import UniqSupply	( returnUs, thenUs,
 			  mapUs, mapAndUnzipUs, getUnique,
 			  UniqSM, UniqSupply
 			)

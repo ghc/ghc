@@ -25,8 +25,6 @@ import {-# SOURCE #-} Name
 import Maybes		( maybeToBool )
 import UniqFM
 import Unique		( Unique, Uniquable(..) )
-import SrcLoc		( SrcLoc )
-import Outputable	( Outputable(..) )
 
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a

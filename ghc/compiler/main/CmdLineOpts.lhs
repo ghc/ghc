@@ -105,12 +105,17 @@ module CmdLineOpts (
 
 import Array	( array, (//) )
 import GlaExts
-import ArrBase
 import Argv
 import Constants	-- Default values for some flags
 
 import Maybes		( assocMaybe, firstJust, maybeToBool )
-import Util		( startsWith, panic, panic#, assertPanic )
+import Util		( startsWith, panic, panic# )
+
+#if __GLASGOW_HASKELL__ < 301
+import ArrBase	( Array(..) )
+#else
+import PrelArr  ( Array(..) )
+#endif
 \end{code}
 
 A command-line {\em switch} is (generally) either on or off; e.g., the
@@ -587,15 +592,6 @@ switchIsOn lookup_fn switch
   = case (lookup_fn switch) of
       SwBool False -> False
       _	    	   -> True
-
-stringSwitchSet :: (switch -> SwitchResult)
-		-> (FAST_STRING -> switch)
-		-> Maybe FAST_STRING
-
-stringSwitchSet lookup_fn switch
-  = case (lookup_fn (switch (panic "stringSwitchSet"))) of
-      SwString str -> Just str
-      _	    	   -> Nothing
 
 intSwitchSet :: (switch -> SwitchResult)
 	     -> (Int -> switch)

@@ -42,7 +42,7 @@ module Outputable (
 #include "HsVersions.h"
 
 import IO		( Handle, hPutChar, hPutStr, stderr, stdout )
-import CmdLineOpts	( opt_PprStyle_All, opt_PprStyle_Debug, opt_PprStyle_User, opt_PprUserLength )
+import CmdLineOpts	( opt_PprStyle_All, opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import qualified Pretty
 import Pretty		( Doc, Mode(..), TextDetails(..), fullRender )

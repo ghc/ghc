@@ -25,23 +25,17 @@ import RnEnv		( bindTyVarsRn, lookupBndrRn, lookupOccRn, lookupImplicitOccRn, bi
 			  listType_RDR, tupleType_RDR )
 import RnMonad
 
-import Name		( Name, isLocallyDefined, 
-			  OccName(..), occNameString, prefixOccName,
-			  ExportFlag(..),
-			  Provenance(..), getNameProvenance,
-			  NameSet, unionNameSets, emptyNameSet, mkNameSet, unitNameSet,
-			  elemNameSet, nameSetToList
+import Name		( Name, OccName(..), occNameString, prefixOccName,
+			  ExportFlag(..), Provenance(..), NameSet,
+			  elemNameSet
 			)
-import FiniteMap	( emptyFM, lookupFM, addListToFM_C )
+import FiniteMap	( lookupFM )
 import Id		( GenId{-instance NamedThing-} )
-import IdInfo		( IdInfo, StrictnessInfo(..), FBTypeInfo, DemandInfo, ArgUsageInfo )
+import IdInfo		( FBTypeInfo, ArgUsageInfo )
 import Lex		( isLexCon )
-import CoreUnfold	( Unfolding(..), SimpleUnfolding )
-import MagicUFs		( MagicUnfoldingFun )
 import PrelInfo		( derivingOccurrences, evalClass_RDR, numClass_RDR, allClass_NAME )
-import ListSetOps	( unionLists, minusList )
-import Maybes		( maybeToBool, catMaybes )
-import Bag		( emptyBag, unitBag, consBag, unionManyBags, unionBags, listToBag, bagToList )
+import Maybes		( maybeToBool )
+import Bag		( bagToList )
 import Outputable
 import SrcLoc		( SrcLoc )
 import Unique		( Unique )

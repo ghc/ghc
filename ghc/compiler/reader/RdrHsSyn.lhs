@@ -56,13 +56,10 @@ module RdrHsSyn (
 
 import HsSyn
 import Lex
-import PrelMods		( pRELUDE )
-import BasicTypes	( Module(..), NewOrData, IfaceFlavour(..), Unused )
-import Name		( ExportFlag(..), pprModule,
-			  OccName(..), pprOccName, 
+import BasicTypes	( Module(..), IfaceFlavour(..), Unused )
+import Name		( pprModule, OccName(..), pprOccName, 
 			  prefixOccName, NamedThing )
 import Util		( thenCmp )
-import CoreSyn		( GenCoreExpr )
 import HsPragmas	( GenPragmas, ClassPragmas, DataPragmas, ClassOpPragmas, InstancePragmas )
 import List		( nub )
 import Outputable

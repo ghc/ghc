@@ -48,22 +48,31 @@ module FastString
 #define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
+#if __GLASGOW_HASKELL__ < 301
 import PackBase
+import STBase		( StateAndPtr#(..) )
+import IOHandle		( filePtr, readHandle, writeHandle )
+import IOBase		( Handle__(..), IOError(..), IOErrorType(..),
+		  	  IOResult(..), IO(..),
+		  	  constructError
+			)
+#else
+import PrelPack
+import PrelST		( StateAndPtr#(..) )
+import PrelHandle	( filePtr, readHandle, writeHandle )
+import PrelIOBase	( Handle__(..), IOError(..), IOErrorType(..),
+		  	  IOResult(..), IO(..),
+		  	  constructError
+			)
+#endif
+
 import PrimPacked
 import GlaExts
-import Addr	( Addr(..) )
-import STBase	( StateAndPtr#(..) )
-import ArrBase	( MutableArray(..) )
-import Foreign	( ForeignObj(..) )
-import IOExts	( IOArray(..), newIOArray,
-		  IORef, newIORef, readIORef, writeIORef
-		)
+import Addr		( Addr(..) )
+import MutableArray	( MutableArray(..) )
+import Foreign		( ForeignObj(..) )
+import IOExts		( IORef, newIORef, readIORef, writeIORef )
 import IO
-import IOHandle	( filePtr, readHandle, writeHandle )
-import IOBase	( Handle__(..), IOError(..), IOErrorType(..),
-		  IOResult(..), IO(..),
-		  constructError
-		)
 
 #define hASH_TBL_SIZE 993
 \end{code} 
@@ -458,19 +467,19 @@ hPutFS handle (FastString _ l# ba#) =
  if l# ==# 0# then
     return ()
  else
-    _readHandle handle				    >>= \ htype ->
+    readHandle handle				    >>= \ htype ->
     case htype of 
       ErrorHandle ioError ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
           fail ioError
       ClosedHandle ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
 	  fail MkIOError(handle,IllegalOperation,"handle is closed")
       SemiClosedHandle _ _ ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
 	  fail MkIOError(handle,IllegalOperation,"handle is closed")
       ReadHandle _ _ _ ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
 	  fail MkIOError(handle,IllegalOperation,"handle is not open for writing")
       other -> 
           let fp = filePtr htype in
@@ -485,19 +494,19 @@ hPutFS handle (CharStr a# l#) =
  if l# ==# 0# then
     return ()
  else
-    _readHandle handle				    >>= \ htype ->
+    readHandle handle				    >>= \ htype ->
     case htype of 
       ErrorHandle ioError ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
           fail ioError
       ClosedHandle ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
 	  fail MkIOError(handle,IllegalOperation,"handle is closed")
       SemiClosedHandle _ _ ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
 	  fail MkIOError(handle,IllegalOperation,"handle is closed")
       ReadHandle _ _ _ ->
-	  _writeHandle handle htype		    >>
+	  writeHandle handle htype		    >>
 	  fail MkIOError(handle,IllegalOperation,"handle is not open for writing")
       other -> 
           let fp = filePtr htype in

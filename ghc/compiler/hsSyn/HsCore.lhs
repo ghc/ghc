@@ -21,9 +21,7 @@ module HsCore (
 
 -- friends:
 import HsTypes		( HsType, pprParendHsType )
-import PrimOp		( PrimOp, tagOf_PrimOp )
 import Kind		( Kind {- instance Outputable -} )
-import Type		( GenType {- instance Outputable -} )
 
 -- others:
 import Literal		( Literal )

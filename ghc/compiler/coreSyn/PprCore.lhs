@@ -17,13 +17,11 @@ module PprCore (
 
 import CoreSyn
 import CostCentre	( showCostCentre )
-import Id		( idType, getIdInfo, getIdStrictness, isTupleCon,
-			  nullIdEnv, DataCon, GenId{-instances-},
-			  Id
+import Id		( idType, getIdInfo, isTupleCon,
+			  DataCon, GenId{-instances-}, Id
 			) 
 import IdInfo		( ppIdInfo, ppStrictnessInfo )
 import Literal		( Literal{-instances-} )
-import Name		( OccName )
 import Outputable	-- quite a few things
 import PprEnv
 import PprType		( pprParendGenType, pprTyVarBndr, GenType{-instances-}, GenTyVar{-instance-} )

@@ -32,12 +32,19 @@ module PrimPacked
 
 import GlaExts
 import Addr	( Addr(..) )
-import GHC
-import ArrBase
 import ST
+import Foreign
+
+#if __GLASGOW_HASKELL__ < 301
+import ArrBase  	( StateAndMutableByteArray#(..), 
+			  StateAndByteArray#(..) )
 import STBase
-import IOBase	( ForeignObj(..) )
-import PackBase ( unpackCStringBA, packString )
+#else
+import PrelArr  	( StateAndMutableByteArray#(..), 
+			  StateAndByteArray#(..) )
+import PrelST
+#endif
+
 \end{code} 
 
 Return the length of a @\\NUL@ terminated character string:
@@ -198,9 +205,6 @@ eqCharStrPrefix a1# a2# len# =
   unsafePerformIO (
    _ccall_ strncmp (A# a1#) (A# a2#) (I# len#) >>= \ (I# x#) ->
    return (x# ==# 0#))
-  where
-   bottom :: (Int,Int)
-   bottom = error "eqStrPrefix"
 
 eqStrPrefixBA :: ByteArray# -> ByteArray# -> Int# -> Int# -> Bool
 eqStrPrefixBA b1# b2# start# len# = 
@@ -240,15 +244,4 @@ eqStrPrefixFO fo# barr# start# len# =
   where
    bottom :: (Int,Int)
    bottom = error "eqStrPrefixFO"
-\end{code}
-
-\begin{code}
-byteArrayToString :: ByteArray Int -> String
-byteArrayToString = unpackCStringBA
-\end{code}
-
-
-\begin{code}
-stringToByteArray :: String -> (ByteArray Int)
-stringToByteArray = packString
 \end{code}

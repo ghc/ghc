@@ -43,9 +43,6 @@ you will screw up the layout where they are used in case expressions!
 # define seqStrictlyST seqST
 # define thenStrictlyST thenST
 # define returnStrictlyST return
-# define _readHandle IOHandle.readHandle
-# define _writeHandle IOHandle.writeHandle
-# define _newHandle   IOHandle.newdHandle
 # define MkST ST
 # if __GLASGOW_HASKELL__ >= 209
 #  define STATE_TOK(x)    x
@@ -61,7 +58,6 @@ you will screw up the layout where they are used in case expressions!
 # define failWith fail
 # define MkIOError(h,errt,msg) (IOError (Just h) errt msg)
 # define CCALL_THEN thenIO_Prim
-# define _filePtr IOHandle.filePtr
 # define Text Show
 # define IMP_FASTSTRING() import FastString
 # if __GLASGOW_HASKELL__ >= 209
@@ -93,9 +89,10 @@ you will screw up the layout where they are used in case expressions!
 #if defined(__GLASGOW_HASKELL__)
 
 -- Import the beggars
-import GlaExts	( Int(..), Int#, (+#), (-#), (*#), 
-		  quotInt#, negateInt#, (==#), (<#), (<=#), (>=#), (>#)
-		)
+import GlaExts
+	( Int(..), Int#, (+#), (-#), (*#), 
+	  quotInt#, negateInt#, (==#), (<#), (<=#), (>=#), (>#)
+	)
 
 #define FAST_INT Int#
 #define ILIT(x) (x#)
@@ -146,24 +143,22 @@ import GlaExts	( Int(..), Int#, (+#), (-#), (*#),
 -- when compiling FastString itself
 #ifndef COMPILING_FAST_STRING
 -- 
-import FastString	( FastString, mkFastString, mkFastCharString#, nullFastString, 
-			  consFS, headFS, tailFS, lengthFS, unpackFS, appendFS, concatFS
-			)
+import qualified FastString 
 #endif
 
 # define USE_FAST_STRINGS 1
-# define FAST_STRING	FastString
-# define SLIT(x)	(mkFastCharString# (x#))
-# define _NULL_		nullFastString
-# define _NIL_		(mkFastString "")
-# define _CONS_		consFS
-# define _HEAD_		headFS
-# define _TAIL_		tailFS
-# define _LENGTH_	lengthFS
-# define _PK_		mkFastString
-# define _UNPK_		unpackFS
-# define _APPEND_	`appendFS`
-# define _CONCAT_	concatFS
+# define FAST_STRING	FastString.FastString
+# define SLIT(x)	(FastString.mkFastCharString# (x#))
+# define _NULL_		FastString.nullFastString
+# define _NIL_		(FastString.mkFastString "")
+# define _CONS_		FastString.consFS
+# define _HEAD_		FastString.headFS
+# define _TAIL_		FastString.tailFS
+# define _LENGTH_	FastString.lengthFS
+# define _PK_		FastString.mkFastString
+# define _UNPK_		FastString.unpackFS
+# define _APPEND_	`FastString.appendFS`
+# define _CONCAT_	FastString.concatFS
 #else
 # define FAST_STRING String
 # define SLIT(x)      (x)

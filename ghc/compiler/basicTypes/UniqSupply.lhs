@@ -24,10 +24,12 @@ module UniqSupply (
 import Unique
 import Util
 
-
 import GlaExts
-import IOBase	( IO(..), IOResult(..) )
-import PrelBase ( Char(..) )
+
+#if __GLASGOW_HASKELL__ < 301
+import IOBase		( IO(..), IOResult(..) )
+#else
+#endif
 
 w2i x = word2Int# x
 i2w x = int2Word# x

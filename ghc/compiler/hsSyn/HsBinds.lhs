@@ -14,13 +14,12 @@ import {-# SOURCE #-} HsExpr    ( pprExpr, HsExpr )
 import {-# SOURCE #-} HsMatches ( pprMatches, Match, pprGRHSsAndBinds, GRHSsAndBinds )
 
 -- friends:
-import HsPragmas	( GenPragmas, ClassOpPragmas )
 import HsTypes		( HsType )
 import CoreSyn		( CoreExpr )
 import PprCore		()	   -- Instances for Outputable
 
 --others:
-import Id		( DictVar, Id, GenId )
+import Id		( Id, GenId )
 import Name		( OccName, NamedThing(..) )
 import BasicTypes	( RecFlag(..) )
 import Outputable	

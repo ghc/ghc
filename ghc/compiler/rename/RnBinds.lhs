@@ -20,7 +20,6 @@ module RnBinds (
 import {-# SOURCE #-} RnSource ( rnHsSigType )
 
 import HsSyn
-import HsPragmas	( isNoGenPragmas, noGenPragmas )
 import RdrHsSyn
 import RnHsSyn
 import RnMonad
@@ -36,8 +35,7 @@ import Name		( OccName(..), Provenance,
 		 	  minusNameSet, unionManyNameSets, elemNameSet, unitNameSet, nameSetToList
 			)
 import BasicTypes	( RecFlag(..), TopLevelFlag(..) )
-import Maybes		( catMaybes )
-import Util		( thenCmp, isIn, removeDups, panic, panic#, assertPanic, assocDefault )
+import Util		( thenCmp, removeDups, panic, panic#, assertPanic )
 import UniqSet		( UniqSet )
 import ListSetOps	( minusList )
 import Bag		( bagToList )

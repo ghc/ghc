@@ -49,8 +49,6 @@ import {-# SOURCE #-} Name	( Name )
 
 import Unique		( Uniquable(..), Unique, u2i, mkUniqueGrimily )
 import Util
-import Outputable	( Outputable(..) )
-import SrcLoc		( SrcLoc )
 import GlaExts		-- Lots of Int# operations
 
 #if ! OMIT_NATIVE_CODEGEN

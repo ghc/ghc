@@ -12,8 +12,6 @@ module OrdList (
 
     	flattenOrdList
     ) where
-
-import Util	( mapAccumB, mapAccumL, mapAccumR )
 \end{code}
 
 This section provides an ordering list that allows fine grain

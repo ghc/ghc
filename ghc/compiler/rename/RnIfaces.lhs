@@ -26,25 +26,24 @@ import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), InstDecl(..), IfaceSig(..
 			  HsType(..), ConDecl(..), IE(..), ConDetails(..), Sig(..),
 			  hsDeclName
 			)
-import HsPragmas	( noGenPragmas )
 import BasicTypes	( Version, NewOrData(..), IfaceFlavour(..) )
 import RdrHsSyn		( RdrNameHsDecl, RdrNameInstDecl, RdrNameTyDecl,
 			  RdrName(..), rdrNameOcc
 			)
-import RnEnv		( newImportedGlobalName, addImplicitOccsRn, ifaceFlavour,
-			  availName, availNames, addAvailToNameSet, pprAvail
+import RnEnv		( newImportedGlobalName, addImplicitOccsRn,
+			  ifaceFlavour, availName, availNames, addAvailToNameSet
 			)
 import RnSource		( rnHsSigType )
 import RnMonad
 import RnHsSyn          ( RenamedHsDecl )
 import ParseIface	( parseIface, IfaceStuff(..) )
 
-import FiniteMap	( FiniteMap, sizeFM, emptyFM, unitFM,  delFromFM,
+import FiniteMap	( FiniteMap, sizeFM, emptyFM, delFromFM,
 			  lookupFM, addToFM, addToFM_C, addListToFM, 
-			  fmToList, eltsFM 
+			  fmToList
 			)
 import Name		( Name {-instance NamedThing-}, Provenance, OccName(..),
-			  nameModule, occNameString, moduleString, pprModule, isLocallyDefined,
+			  nameModule, moduleString, pprModule, isLocallyDefined,
 			  NameSet(..), emptyNameSet, unionNameSets, nameSetToList,
 			  minusNameSet, mkNameSet, elemNameSet, nameUnique, addOneToNameSet,
 			  isWiredInName, maybeWiredInTyConName, maybeWiredInIdName,
@@ -58,11 +57,11 @@ import SrcLoc		( mkSrcLoc, SrcLoc )
 import PrelMods		( pREL_GHC )
 import PrelInfo		( cCallishTyKeys )
 import Bag
-import Maybes		( MaybeErr(..), expectJust, maybeToBool )
+import Maybes		( MaybeErr(..), maybeToBool )
 import ListSetOps	( unionLists )
 import Outputable
 import Unique		( Unique )
-import StringBuffer     ( StringBuffer, hGetStringBuffer, freeStringBuffer )
+import StringBuffer     ( StringBuffer, hGetStringBuffer )
 import FastString	( mkFastString )
 import Outputable
 

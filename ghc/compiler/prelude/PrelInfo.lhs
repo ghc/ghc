@@ -171,18 +171,6 @@ data_tycons
     , voidTyCon
     , wordTyCon
     ]
-
-min_nonprim_tycon_list 	-- used w/ HideMostBuiltinNames
-  = [ boolTyCon
-    , charTyCon
-    , intTyCon
-    , floatTyCon
-    , doubleTyCon
-    , integerTyCon
-    , liftTyCon
-    , return2GMPsTyCon	-- ADR asked for these last two (WDP 94/11)
-    , returnIntAndGMPTyCon
-    ]
 \end{code}
 
 %************************************************************************

@@ -69,15 +69,22 @@ module StringBuffer
 import GlaExts
 import Addr 		( Addr(..) )
 import Foreign
-import IOBase
-import IOHandle
 import ST
-import STBase
-import Char 		(isDigit)
-import PackBase 
+import IO		( openFile, hFileSize, hClose, IOMode(..) )
+
+#if __GLASGOW_HASKELL__ < 301
+import IOBase		( IOError(..), IOErrorType(..) )
+import IOHandle		( readHandle, writeHandle, filePtr )
+import PackBase 	( unpackCStringBA )
+#else
+import PrelIOBase	( IOError(..), IOErrorType(..) )
+import PrelHandle	( readHandle, writeHandle, filePtr )
+import PrelPack		( unpackCStringBA )
+#endif
+
 import PrimPacked
 import FastString
-
+import Char 		(isDigit)
 \end{code} 
 
 \begin{code}
@@ -114,7 +121,7 @@ hGetStringBuffer fname =
 --    makeForeignObj arr free_p		                     >>= \ fo@(_ForeignObj fo#) ->
      readHandle hndl        >>= \ hndl_ ->
      writeHandle hndl hndl_ >>
-     let ptr = _filePtr hndl_ in
+     let ptr = filePtr hndl_ in
      _ccall_ fread arr (1::Int) len_i ptr                     >>= \  (I# read#) ->
 --     trace ("DEBUG: opened " ++ fname ++ show (I# read#)) $
      hClose hndl		     >>

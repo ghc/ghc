@@ -11,7 +11,7 @@ module TysPrim where
 
 #include "HsVersions.h"
 
-import Kind		( mkUnboxedTypeKind, mkBoxedTypeKind, mkTypeKind, mkArrowKind )
+import Kind		( mkBoxedTypeKind )
 import Name		( mkWiredInTyConName )
 import PrimRep		( PrimRep(..) )	-- getPrimRepInfo uses PrimRep repn
 import TyCon		( mkPrimTyCon, mkDataTyCon, TyCon )

@@ -20,11 +20,11 @@ module OccurAnal (
 import BinderInfo
 import CmdLineOpts	( opt_D_dump_occur_anal, SimplifierSwitch(..) )
 import CoreSyn
-import Digraph		( stronglyConnComp, stronglyConnCompR, SCC(..) )
+import Digraph		( stronglyConnCompR, SCC(..) )
 import Id		( idWantsToBeINLINEd, addNoInlinePragma, nukeNoInlinePragma,
 			  idType, idUnique, Id,
 			  emptyIdSet, unionIdSets, mkIdSet,
-			  unitIdSet, elementOfIdSet,
+			  elementOfIdSet,
 			  addOneToIdSet, IdSet,
 			  nullIdEnv, unitIdEnv, combineIdEnvs,
 			  delOneFromIdEnv, delManyFromIdEnv, isNullIdEnv, 
@@ -39,9 +39,8 @@ import PprType		( GenType{-instance Outputable-}, GenTyVar{-ditto-} )
 import TyVar		( GenTyVar{-instance Eq-} )
 import Unique		( Unique{-instance Eq-}, u2i )
 import UniqFM		( keysUFM )  
-import Util		( assoc, zipEqual, zipWithEqual )
+import Util		( zipWithEqual )
 import Outputable
-import List		( partition )
 
 isSpecPragmaId_maybe x = Nothing -- ToDo:!trace "OccurAnal.isSpecPragmaId_maybe"
 \end{code}
@@ -101,10 +100,12 @@ keepUnusedBinding :: OccEnv -> Id -> Bool
 keepUnusedBinding (OccEnv keep_dead keep_spec keep_conjurable _ _ _) binder
   = keep_dead || (keep_spec && maybeToBool (isSpecPragmaId_maybe binder))
 
+{- UNUSED:
 keepBecauseConjurable :: OccEnv -> Id -> Bool
 keepBecauseConjurable (OccEnv _ _ keep_conjurable _ _ _) binder
   = False
     {- keep_conjurable && isConstMethodId binder -}
+-}
 
 type UsageDetails = IdEnv BinderInfo	-- A finite map from ids to their usage
 
@@ -330,8 +331,6 @@ It isn't easy to do a perfect job in one blow.  Consider
 occAnalBind env (Rec pairs) body_usage
   = foldr (_scc_ "occAnalBind.dofinal" do_final_bind) (body_usage, []) sccs
   where
-    pp_scc (CyclicSCC cycle) = hcat [text "Cyclic ", hcat (punctuate comma (map pp_item cycle))]
-    pp_scc (AcyclicSCC item) = hcat [text "Acyclic ", pp_item item]
     pp_item (_, bndr, _)     = ppr bndr
 
     binders = map fst pairs

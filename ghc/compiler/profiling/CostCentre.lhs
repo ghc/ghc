@@ -28,9 +28,9 @@ module CostCentre (
 
 #include "HsVersions.h"
 
-import Id		( externallyVisibleId, GenId, showId, Id )
+import Id		( externallyVisibleId, GenId, Id )
 import CStrings		( identToC, stringToC )
-import Name		( OccName, getOccString, moduleString, nameString )
+import Name		( OccName, getOccString, moduleString )
 import Outputable	
 import Util	        ( panic, panic#, assertPanic, thenCmp )
 
@@ -497,7 +497,6 @@ uppCostCentreDecl is_local cc
       where
 	cc_IS_CAF      = "CC_IS_CAF"
 	cc_IS_DICT     = "CC_IS_DICT"
-	cc_IS_SUBSUMED = "CC_IS_SUBSUMED"
 	cc_IS_BORING   = "CC_IS_BORING"
 
 	do_caf IsCafCC	     = cc_IS_CAF

@@ -12,8 +12,6 @@ module UgenUtil (
 
 import GlaExts
 import Name
-import RdrHsSyn		( RdrName(..) )
-import BasicTypes	( IfaceFlavour )
 import SrcLoc		( mkSrcLoc, noSrcLoc, SrcLoc )
 import FastString	( FastString, mkFastCharString, mkFastCharString2 )
 \end{code}

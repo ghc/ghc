@@ -37,11 +37,8 @@ import TysPrim		( charPrimTyCon, addrPrimTyCon, intPrimTyCon,
 			  floatPrimTyCon, doublePrimTyCon
 			)
 import Name
-import UniqFM		( lookupUFM, {- ToDo:rm-} isNullUFM )
-import UniqSet		( emptyUniqSet, unitUniqSet,
-			  unionUniqSets, unionManyUniqSets,
-			  UniqSet
-			)
+import UniqFM		( isNullUFM )
+import UniqSet		( emptyUniqSet, unionManyUniqSets, UniqSet )
 import Util		( removeDups )
 import Outputable
 \end{code}

@@ -23,8 +23,7 @@ module HsTypes (
 
 import Outputable
 import Kind		( Kind {- instance Outputable -} )
-import Name		( nameOccName )
-import Util		( thenCmp, cmpList, isIn, panic )
+import Util		( thenCmp, cmpList, panic )
 import GlaExts		( Int#, (<#) )
 \end{code}
 

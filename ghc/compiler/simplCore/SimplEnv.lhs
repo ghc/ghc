@@ -53,21 +53,17 @@ import CmdLineOpts	( switchIsOn, intSwitchSet, opt_UnfoldingCreationThreshold,
 			)
 import CoreSyn
 import CoreUnfold	( mkFormSummary, couldBeSmallEnoughToInline, whnfOrBottom,
-			  Unfolding(..), UfExpr, RdrName,
-			  SimpleUnfolding(..), FormSummary(..),
-			  calcUnfoldingGuidance, UnfoldingGuidance(..)
-			)
-import CoreUtils	( coreExprCc, unTagBinders )
+			  Unfolding(..), SimpleUnfolding(..), FormSummary(..),
+			  calcUnfoldingGuidance	)
+import CoreUtils	( coreExprCc )
 import CostCentre	( CostCentre, subsumedCosts, noCostCentreAttached )
 import FiniteMap	-- lots of things
-import Id		( idType, getIdUnfolding, getIdStrictness, idWantsToBeINLINEd,
-			  applyTypeEnvToId, getInlinePragma,
-			  nullIdEnv, growIdEnvList, rngIdEnv, lookupIdEnv,
-			  addOneToIdEnv, modifyIdEnv, mkIdSet, modifyIdEnv_Directly,
+import Id		( applyTypeEnvToId, getInlinePragma,
+			  nullIdEnv, growIdEnvList, lookupIdEnv,
+			  addOneToIdEnv, modifyIdEnv, modifyIdEnv_Directly,
 			  IdEnv, IdSet, GenId, Id )
-import Literal		( isNoRepLit, Literal{-instances-} )
-import Maybes		( maybeToBool, expectJust )
-import Name		( isLocallyDefined )
+import Literal		( Literal{-instances-} )
+import Maybes		( expectJust )
 import OccurAnal	( occurAnalyseExpr )
 import PprCore		-- various instances
 import PprType		( GenType, GenTyVar )
@@ -78,8 +74,7 @@ import TyVar		( emptyTyVarEnv, plusTyVarEnv, addToTyVarEnv, growTyVarEnvList,
 			)
 import Unique		( Unique{-instance Outputable-}, Uniquable(..) )
 import UniqFM		( addToUFM, addToUFM_C, ufmToList )
-import Util		( Eager, appEager, returnEager, runEager,
-			  zipEqual, thenCmp, cmpList )
+import Util		( Eager, returnEager, zipEqual, thenCmp, cmpList )
 import Outputable
 \end{code}
 

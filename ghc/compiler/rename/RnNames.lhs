@@ -23,7 +23,6 @@ import RdrHsSyn	( RdrNameHsDecl(..), RdrName(..), RdrNameIE(..), RdrNameImportDe
 		  RdrNameHsModule, RdrNameFixityDecl,
 		  rdrNameOcc, ieOcc
 		)
-import RnHsSyn	( RenamedHsModule(..), RenamedFixityDecl(..) )
 import RnIfaces	( getInterfaceExports, getDeclBinders, recordSlurp, checkUpToDate )
 import BasicTypes ( IfaceFlavour(..) )
 import RnEnv
@@ -31,9 +30,9 @@ import RnMonad
 
 import FiniteMap
 import PrelMods
-import UniqFM	( UniqFM, emptyUFM, addListToUFM_C, lookupUFM )
+import UniqFM	( UniqFM, addListToUFM_C, lookupUFM )
 import Bag	( Bag, bagToList )
-import Maybes	( maybeToBool, expectJust )
+import Maybes	( maybeToBool )
 import Name
 import Outputable
 import Util	( removeDups )

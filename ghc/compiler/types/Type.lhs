@@ -56,8 +56,7 @@ import BasicTypes ( Unused )
 import Maybes	( maybeToBool, assocMaybe )
 import PrimRep	( PrimRep(..) )
 import Unique	-- quite a few *Keys
-import Util	( thenCmp, zipEqual, zipWithEqual, assoc )
-import Outputable
+import Util	( thenCmp, panic )
 \end{code}
 
 

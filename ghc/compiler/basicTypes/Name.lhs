@@ -57,11 +57,11 @@ module Name (
 import {-# SOURCE #-} Id    ( Id )
 import {-# SOURCE #-} TyCon ( TyCon )
 
-import CStrings		( identToC, modnameToC, cSEP )
+import CStrings		( identToC )
 import CmdLineOpts	( opt_PprStyle_All, opt_OmitInterfacePragmas, opt_EnsureSplittableC )
 import BasicTypes	( Module, IfaceFlavour(..), moduleString, pprModule )
 
-import Lex		( isLexSym, isLexConId )
+import Lex		( isLexConId )
 import SrcLoc		( noSrcLoc, mkBuiltinSrcLoc, SrcLoc )
 import Unique		( pprUnique, showUnique, Unique, Uniquable(..) )
 import UniqSet		( UniqSet(..), emptyUniqSet, unitUniqSet, unionUniqSets, uniqSetToList, 
@@ -558,14 +558,12 @@ class NamedThing a where
 
 \begin{code}
 modAndOcc	    :: NamedThing a => a -> (Module, OccName)
-getModule	    :: NamedThing a => a -> Module
 getSrcLoc	    :: NamedThing a => a -> SrcLoc
 isLocallyDefined    :: NamedThing a => a -> Bool
 isExported	    :: NamedThing a => a -> Bool
 getOccString	    :: NamedThing a => a -> String
 
 modAndOcc	    = nameModAndOcc	   . getName
-getModule	    = nameModule	   . getName
 isExported	    = isExportedName 	   . getName
 getSrcLoc	    = nameSrcLoc	   . getName
 isLocallyDefined    = isLocallyDefinedName . getName

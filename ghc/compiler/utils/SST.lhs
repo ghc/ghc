@@ -18,10 +18,18 @@ module SST(
 #include "HsVersions.h"
 
 import GlaExts
-import STBase
-import IOBase	( IO(..), IOResult(..) )
-import ArrBase
 import ST
+
+#if __GLASGOW_HASKELL__ < 301
+import STBase		( ST(..), STret(..), StateAndPtr#(..) )
+import ArrBase		( StateAndMutableArray#(..) )
+import IOBase		( IO(..), IOResult(..) )
+#else
+import PrelST		( ST(..), STret(..), StateAndPtr#(..) )
+import PrelArr		( StateAndMutableArray#(..) )
+import PrelIOBase	( IO(..), IOResult(..) )
+#endif
+
 \end{code}
 
 @SST@ is very like the standard @ST@ monad, but it comes with its

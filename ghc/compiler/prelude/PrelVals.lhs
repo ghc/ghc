@@ -8,9 +8,9 @@ module PrelVals where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} CoreUnfold ( UnfoldingGuidance(..), mkUnfolding )
+import {-# SOURCE #-} CoreUnfold ( mkUnfolding )
 
-import Id		( Id, mkImported, mkTemplateLocals )
+import Id		( Id, mkImported )
 import SpecEnv		( SpecEnv, emptySpecEnv )
 
 -- friends:
@@ -19,15 +19,12 @@ import TysPrim
 import TysWiredIn
 
 -- others:
-import CmdLineOpts	( maybe_CompilingGhcInternals )
 import CoreSyn		-- quite a bit
 import IdInfo		-- quite a bit
-import Literal		( mkMachInt )
 import Name		( mkWiredInIdName, Module )
 import PragmaInfo
-import PrimOp		( PrimOp(..) )
 import Type		
-import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, gammaTyVar, TyVar )
+import TyVar		( openAlphaTyVar, alphaTyVar, betaTyVar, TyVar )
 import Unique		-- lots of *Keys
 import Util		( panic )
 \end{code}

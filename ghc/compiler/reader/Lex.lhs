@@ -32,7 +32,7 @@ module Lex (
 
 #include "HsVersions.h"
 
-import Char 		(isDigit, isAlpha, isAlphanum, isUpper,isLower, isSpace, ord )
+import Char 		(isDigit, isAlphanum, isUpper,isLower, isSpace, ord )
 
 import {-# SOURCE #-} CostCentre
 

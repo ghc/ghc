@@ -54,13 +54,9 @@ import SpecEnv	        ( SpecEnv, emptySpecEnv, isEmptySpecEnv )
 import BasicTypes	( NewOrData )
 
 import Demand
-import Maybes		( firstJust )
 import Outputable	
-import Unique		( pprUnique )
-import Util		( mapAccumL )
 
-ord = fromEnum :: Char -> Int
-showTypeCategory = panic "IdInfo.showTypeCategory"
+import Char 		( ord )
 \end{code}
 
 An @IdInfo@ gives {\em optional} information about an @Id@.  If
@@ -376,11 +372,7 @@ updateInfoMaybe (SomeUpdateInfo	 u) = Just u
 Text instance so that the update annotations can be read in.
 
 \begin{code}
-#ifdef REALLY_HASKELL_1_3
 instance Read UpdateInfo where
-#else
-instance Text UpdateInfo where
-#endif
     readsPrec p s | null s    = panic "IdInfo: empty update pragma?!"
 		  | otherwise = [(SomeUpdateInfo (map ok_digit s),"")]
       where
@@ -429,8 +421,10 @@ argUsageInfo (IdInfo _ _ _ _ _ _ au _) = au
 addArgUsageInfo id_info			   NoArgUsageInfo = id_info
 addArgUsageInfo (IdInfo a b d e f g _ h) au_info	  = IdInfo a b d e f g au_info h
 
+{- UNUSED:
 ppArgUsageInfo NoArgUsageInfo	  = empty
 ppArgUsageInfo (SomeArgUsageInfo aut) = (<>) (ptext SLIT("_L_ ")) (ppArgUsageType aut)
+-}
 
 ppArgUsage (ArgUsage n)      = int n
 ppArgUsage (UnknownArgUsage) = char '-'

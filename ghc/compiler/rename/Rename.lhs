@@ -9,10 +9,10 @@ module Rename ( renameModule ) where
 #include "HsVersions.h"
 
 import HsSyn
-import RdrHsSyn		( RdrName(..), RdrNameHsModule, RdrNameImportDecl )
+import RdrHsSyn		( RdrName(..), RdrNameHsModule )
 import RnHsSyn		( RenamedHsModule, RenamedHsDecl, extractHsTyNames )
 
-import CmdLineOpts	( opt_HiMap, opt_WarnNameShadowing, opt_D_show_rn_trace,
+import CmdLineOpts	( opt_HiMap, opt_D_show_rn_trace,
 			  opt_D_dump_rn, opt_D_show_rn_stats,
 			  opt_WarnUnusedBinds, opt_WarnUnusedImports
 		        )
@@ -23,11 +23,9 @@ import RnIfaces		( getImportedInstDecls, importDecl, getImportVersions, getSpeci
 			  getDeferredDataDecls,
 			  mkSearchPath, getSlurpedNames, getRnStats
 			)
-import RnEnv		( availsToNameSet, addAvailToNameSet,
-			  addImplicitOccsRn, lookupImplicitOccRn )
-import Name		( Name, PrintUnqualified, Provenance, ExportFlag(..), 
-			  isLocallyDefined,
-			  NameSet(..), elemNameSet, mkNameSet, unionNameSets, 
+import RnEnv		( addImplicitOccsRn )
+import Name		( Name, PrintUnqualified, Provenance, isLocallyDefined,
+			  NameSet(..),
 			  nameSetToList, minusNameSet, NamedThing(..),
 			  nameModule, pprModule, pprOccName, nameOccName
 			)
@@ -38,7 +36,6 @@ import PrelInfo		( ioTyCon_NAME )
 import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
 			  doIfSet, dumpIfSet, ghcExit
 			)
-import FiniteMap	( emptyFM, eltsFM, fmToList, addToFM, FiniteMap )
 import Bag		( isEmptyBag )
 import UniqSupply	( UniqSupply )
 import Util		( equivClasses )

@@ -12,25 +12,23 @@ import CmdLineOpts	( opt_WarnNameShadowing, opt_WarnUnusedMatches,
 			  opt_WarnUnusedBinds, opt_WarnUnusedImports )
 import HsSyn
 import RdrHsSyn		( RdrName(..), RdrNameIE,
-			  rdrNameOcc, ieOcc, isQual, qual
+			  rdrNameOcc, isQual, qual
 			)
 import HsTypes		( getTyVarName, replaceTyVarName )
-import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..), pprModule )
+import BasicTypes	( Fixity(..), FixityDirection(..), IfaceFlavour(..) )
 import RnMonad
 import Name		( Name, OccName(..), Provenance(..), ExportFlag(..), NamedThing(..),
-			  occNameString, occNameFlavour, getSrcLoc,
+			  occNameFlavour, getSrcLoc,
 			  NameSet, emptyNameSet, addListToNameSet, nameSetToList,
 			  mkLocalName, mkGlobalName, modAndOcc,
 			  nameOccName, setNameProvenance, isVarOcc, getNameProvenance,
-			  pprProvenance, pprOccName, pprModule, pprNameProvenance,
-			  isLocalName
+			  pprOccName, isLocalName
 			)
 import TyCon		( TyCon )
-import TysWiredIn	( tupleTyCon, listTyCon, charTyCon, intTyCon )
+import TysWiredIn	( tupleTyCon, listTyCon, charTyCon )
 import FiniteMap
 import Unique		( Unique, Uniquable(..), unboundKey )
 import UniqFM           ( listToUFM, plusUFM_C )
-import Maybes		( maybeToBool )
 import UniqSupply
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Outputable

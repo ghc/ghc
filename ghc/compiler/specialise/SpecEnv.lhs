@@ -13,7 +13,7 @@ module SpecEnv (
 #include "HsVersions.h"
 
 import Type		( Type, GenType, matchTys, tyVarsOfTypes )
-import TyVar		( TyVar, TyVarEnv, lookupTyVarEnv, tyVarSetToList )
+import TyVar		( TyVarEnv, lookupTyVarEnv, tyVarSetToList )
 import Unify		( Subst, unifyTyListsX )
 import Maybes
 import Util		( assertPanic )

@@ -148,23 +148,20 @@ import BasicTypes	( Arity )
 import IdInfo
 import Maybes		( maybeToBool )
 import Name	 	( nameUnique, mkLocalName, mkSysLocalName, isLocalName,
-			  mkCompoundName,
-			  isLocallyDefinedName, occNameString, modAndOcc,
-			  isLocallyDefined, changeUnique, isWiredInName,
-			  nameString, getOccString, setNameVisibility,
-			  isExported, ExportFlag(..), Provenance,
+			  mkCompoundName, occNameString, modAndOcc,
+			  changeUnique, isWiredInName, setNameVisibility,
+			  ExportFlag(..), Provenance,
 			  OccName(..), Name, Module,
 			  NamedThing(..)
 			) 
 import PrimOp		( PrimOp )
 import PrelMods		( pREL_TUP, pREL_BASE )
-import Lex		( mkTupNameStr )
 import FieldLabel	( fieldLabelName, FieldLabel(..){-instances-} )
 import PragmaInfo	( PragmaInfo(..) )
 import SrcLoc		( mkBuiltinSrcLoc )
 import TysWiredIn	( tupleTyCon )
 import TyCon		( TyCon, tyConDataCons, isDataTyCon, isNewTyCon, mkSpecTyCon )
-import Type		( mkSigmaTy, mkTyVarTys, mkFunTys, splitSigmaTy,
+import Type		( mkSigmaTy, mkTyVarTys, mkFunTys,
 			  mkTyConApp, instantiateTy, mkForAllTys,
 			  tyVarsOfType, instantiateTy, typePrimRep,
 			  instantiateTauTy,
@@ -175,10 +172,10 @@ import TyVar		( TyVar, alphaTyVars, isEmptyTyVarSet,
 			)
 import UniqFM
 import UniqSet		-- practically all of it
-import Unique		( getBuiltinUniques, pprUnique, Unique, Uniquable(..) )
+import Unique		( getBuiltinUniques, Unique, Uniquable(..) )
 import Outputable
 import SrcLoc		( SrcLoc )
-import Util		( mapAccumL, nOfThem, zipEqual, assoc )
+import Util		( nOfThem, assoc )
 import GlaExts		( Int# )
 \end{code}
 

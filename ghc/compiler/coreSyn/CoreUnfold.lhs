@@ -15,14 +15,14 @@ find, unsurprisingly, a Core expression.
 \begin{code}
 module CoreUnfold (
 	SimpleUnfolding(..), Unfolding(..), UnfoldingGuidance(..), -- types
-	UfExpr,	RdrName, -- For closure (delete in 1.3)
 
-	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup, exprIsTrivial,
+	FormSummary(..), mkFormSummary, whnfOrBottom, exprSmallEnoughToDup, 
+	exprIsTrivial,
 
 	noUnfolding, mkMagicUnfolding, mkUnfolding, getUnfoldingTemplate,
 
-	smallEnoughToInline, couldBeSmallEnoughToInline, certainlySmallEnoughToInline,
-	inlineUnconditionally,
+	smallEnoughToInline, couldBeSmallEnoughToInline, 
+	certainlySmallEnoughToInline, inlineUnconditionally,
 
 	calcUnfoldingGuidance,
 
@@ -32,8 +32,6 @@ module CoreUnfold (
 #include "HsVersions.h"
 
 import {-# SOURCE #-} MagicUFs	( MagicUnfoldingFun, mkMagicUnfoldingFun )
-
-import Bag		( emptyBag, unitBag, unionBags, Bag )
 
 import CmdLineOpts	( opt_UnfoldingCreationThreshold,
 			  opt_UnfoldingUseThreshold,
@@ -49,23 +47,17 @@ import BinderInfo	( BinderInfo, isOneFunOcc, isOneSafeFunOcc
 import PragmaInfo	( PragmaInfo(..) )
 import CoreSyn
 import CoreUtils	( unTagBinders )
-import HsCore		( UfExpr )
-import RdrHsSyn		( RdrName )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import CoreUtils	( coreExprType )
 import Id		( Id, idType, getIdArity,  isBottomingId, isDataCon,
 			  idWantsToBeINLINEd, idMustBeINLINEd, idMustNotBeINLINEd,
 			  IdSet, GenId{-instances-} )
-import PrimOp		( primOpCanTriggerGC, fragilePrimOp, PrimOp(..) )
-import IdInfo		( ArityInfo(..), bottomIsGuaranteed )
-import Literal		( isNoRepLit, isLitLitLit )
+import PrimOp		( fragilePrimOp, primOpCanTriggerGC )
+import IdInfo		( ArityInfo(..) )
+import Literal		( isNoRepLit )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe )
 import Unique           ( Unique )
-import UniqSet		( emptyUniqSet, unitUniqSet, mkUniqSet,
-			  addOneToUniqSet, unionUniqSets
-			)
-import Maybes		( maybeToBool )
 import Util		( isIn, panic, assertPanic )
 import Outputable
 \end{code}

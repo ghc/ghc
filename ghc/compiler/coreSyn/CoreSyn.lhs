@@ -53,11 +53,11 @@ module CoreSyn (
 
 #include "HsVersions.h"
 
-import CostCentre	( showCostCentre, CostCentre )
+import CostCentre	( CostCentre )
 import Id		( idType, GenId{-instance Eq-}, Id )
 import Type		( isUnboxedType,GenType, Type )
 import TyVar		( GenTyVar, TyVar )
-import Util		( panic, assertPanic {-pprTrace:ToDo:rm-} )
+import Util		( panic, assertPanic )
 import BinderInfo       ( BinderInfo )
 import BasicTypes	( Unused )
 import Literal          ( Literal )

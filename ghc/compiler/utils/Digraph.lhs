@@ -34,12 +34,16 @@ module Digraph(
 
 #define ARR_ELT		(COMMA)
 
+import Util	( sortLt )
+
+-- GHC extensions
+import ST
+import MutableArray
+
+-- std interfaces
+import Maybe
 import Array
 import List
-import ST
-import ArrBase
-import Maybe
-import Util	( sortLt )
 \end{code}
 
 

@@ -13,9 +13,7 @@ module HsDecls where
 
 -- friends:
 import HsBinds		( HsBinds, MonoBinds, Sig, nullMonoBinds )
-import HsPragmas	( DataPragmas, ClassPragmas,
-			  InstancePragmas, ClassOpPragmas
-			)
+import HsPragmas	( DataPragmas, ClassPragmas )
 import HsTypes
 import HsCore		( UfExpr )
 import BasicTypes	( Fixity, NewOrData(..) )

@@ -10,8 +10,8 @@ module Argv ( argv ) where
 
 import FastString
 
-import GlaExts	( Addr )
-import ArrBase	( indexAddrOffAddr )
+import GlaExts		( Addr )
+import ByteArray 	( indexAddrOffAddr )
 
 argv :: [FAST_STRING]
 argv = unpackArgv ``prog_argv'' (``prog_argc''::Int)
