@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.hc,v 1.5 1999/01/21 10:31:47 simonm Exp $
+ * $Id: PrimOps.hc,v 1.6 1999/01/23 17:53:28 sof Exp $
  *
  * Primitive functions / data
  *
@@ -449,16 +449,16 @@ FN_(int64ToIntegerZh_fast)
 {
    /* arguments: L1 = Int64# */
 
-   StgInt64 val; /* to avoid aliasing */
+   StgInt64  val; /* to avoid aliasing */
    W_ hi;
    I_  s,a, neg, words_needed;
    StgArrWords* p;	/* address of array result */
    FB_
 
-     /* ToDo: extend StgUnion?? */
    val = (LI_)L1;
    neg = 0;
-   if ((LW_)(val) >= 0x100000000ULL)  { 
+
+   if ( val >= 0x100000000LL || val <= -0x100000000LL )  { 
        words_needed = 2;
    } else { 
        /* minimum is one word */
@@ -468,28 +468,29 @@ FN_(int64ToIntegerZh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
-   p = stgCast(StgArrWords*,Hp)-1;
+   p = stgCast(StgArrWords*,(Hp-words_needed+1))-1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
+
+   a = words_needed;
 
    if ( val < 0LL ) {
      neg = 1;
      val = -val;
-   }
+   } 
+
    hi = (W_)((LW_)val / 0x100000000ULL);
-   if ((LW_)(val) >= 0x100000000ULL)  { 
+
+   if ( a == 2 )  { 
       s = 2; 
-      a = 2;
-      Hp[0] = (W_)val;
-      Hp[1] = hi;
+      Hp[-1] = (W_)val;
+      Hp[0] = hi;
    } else if ( val != 0 ) {
       s = 1;
-      a = 1;
-     Hp[0] =  (W_)val;
+      Hp[0] = (W_)val;
    }  else /* val==0 */   {
       s = 0;
-      a = 1;
    }
-  s = ( neg ? -s : s );
+   s = ( neg ? -s : s );
 
    /* returns (# alloc :: Int#, 
 		 size  :: Int#, 
@@ -521,22 +522,21 @@ FN_(word64ToIntegerZh_fast)
    TICK_ALLOC_PRIM(sizeofW(StgArrWords),words_needed,0);
    CCS_ALLOC(CCCS,sizeofW(StgArrWords)+words_needed); /* ccs prof */
 
-   p = stgCast(StgArrWords*,Hp)-1;
+   p = stgCast(StgArrWords*,(Hp-words_needed+1))-1;
    SET_ARR_HDR(p, &ARR_WORDS_info, CCCS, words_needed);
+
+   a = words_needed;
 
    hi = (W_)((LW_)val / 0x100000000ULL);
    if ( val >= 0x100000000ULL ) { 
      s = 2;
-     a = 2;
-     Hp[0] = ((W_)val);
-     Hp[1] = (hi);
+     Hp[-1] = ((W_)val);
+     Hp[0]  = (hi);
    } else if ( val != 0 )      {
       s = 1;
-      a = 1;
       Hp[0] = ((W_)val);
    } else /* val==0 */         {
       s = 0;
-      a = 1;
    }
 
    /* returns (# alloc :: Int#, 
