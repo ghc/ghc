@@ -83,6 +83,11 @@ import System.IO
 -- efficient operations.  A 'PackedString' contains full Unicode 'Char's.
 newtype PackedString = PS (UArray Int Char)
 
+-- ToDo: we could support "slices", i.e. include offset and length fields into
+-- the string, so that operations like take/drop could be O(1).  Perhaps making
+-- a slice should be conditional on the ratio of the slice/string size to
+-- limit memory leaks.
+
 instance Eq PackedString where
    (PS x) == (PS y)  =  x == y
 
