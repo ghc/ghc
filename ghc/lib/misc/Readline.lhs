@@ -29,10 +29,9 @@ module Readline (
     rlPrompt, rlTerminalName, rlSetReadlineName, rlGetReadlineName
 
     ) where
-
 import GlaExts
 
-import PackedString	( unpackCString )
+import PackedString	( unpackCStringIO )
 import Foreign
 
 import System
@@ -67,19 +66,18 @@ readline prompt =  do
     if (litstr == ``NULL'') 
      then fail (userError "Readline has read EOF")
      else do
-	let str = unpackCString litstr
-	_casm_ ``free(%0);'' litstr
+	str <- unpackCStringIO litstr
+	_ccall_ free litstr
 	return str
-
 
 addHistory :: String		-- String to enter in history
            -> IO ()
 addHistory str = _ccall_ add_history str
 
 
-rlBindKey :: KeyCode ->			-- Key to Bind to
-	     RlCallbackFunction ->	-- Function to exec on execution
-	     IO ()
+rlBindKey :: KeyCode		    -- Key to Bind to
+	  -> RlCallbackFunction	    -- Function to exec on execution
+	  -> IO ()
 rlBindKey key cback =
     if (0 > key) || (key > 255) then
 	fail (userError "Invalid ASCII Key Code, must be in range 0.255")
@@ -208,7 +206,7 @@ they be in the IO Monad, should they be Mutable Variables?
 rlGetLineBuffer :: IO String
 rlGetLineBuffer = do
     litstr <- _casm_ ``%r = rl_line_buffer;''
-    return (unpackCString litstr)
+    unpackCStringIO litstr
 				
 rlSetLineBuffer :: String -> IO ()
 rlSetLineBuffer str = _casm_ ``rl_line_buffer = %0;'' str
@@ -242,18 +240,18 @@ rlPendingInput key = primIOToIO (_casm_ ``rl_pending_input = %0;'' key)
 rlPrompt :: IO String
 rlPrompt = do
     litstr <- _casm_ ``%r = rl_readline_name;''
-    return (unpackCString litstr)
+    unpackCStringIO litstr
 
 rlTerminalName :: IO String
 rlTerminalName = do
     litstr <- _casm_ ``%r = rl_terminal_name;''
-    return (unpackCString litstr)
+    unpackCStringIO litstr
 
 
 rlGetReadlineName :: IO String
 rlGetReadlineName = do
     litstr <- _casm_ ``%r = rl_readline_name;''
-    return (unpackCString litstr)
+    unpackCStringIO litstr
 
 rlSetReadlineName :: String -> IO ()
 rlSetReadlineName str = _casm_ ``rl_readline_name = %0;'' str
