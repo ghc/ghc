@@ -335,6 +335,8 @@ instance  Integral Integer where
 		   -- Case-ified by WDP 94/10
 
 instance  Enum Integer  where
+    toEnum n		 =  toInteger n
+    fromEnum n		 =  toInt n
     enumFrom n           =  n : enumFrom (n + 1)
     enumFromThen m n     =  en' m (n - m)
 	                    where en' m n = m : en' (m + n) n
