@@ -1,5 +1,5 @@
 #-----------------------------------------------------------------------------
-# $Id: Makefile.libHS,v 1.8 1997/01/21 22:56:20 sof Exp $
+# $Id: Makefile.libHS,v 1.10 1997/01/22 08:01:26 sof Exp $
 
 TOP = ../..
 include $(TOP)/ghc/mk/ghc.mk
@@ -109,7 +109,7 @@ concurrent/Concurrent_flags = -iconcurrent
 # Depend and install stuff
 
 # temp soln until ghcconfig.mk leaves 1.2 behind.
-MKDEPENDHS = $(LIB_GHC) -M
+MKDEPENDHS = $(GHC) $(GHCFLAGS) -M
 
 MKDEPENDHS_OPTS += -I$(GHC_INCLUDES)
 MKDEPENDHS_OPTS += -irequired:ghc:hbc:glaExts:concurrent
