@@ -8,6 +8,7 @@ override WAYS=
 INSTALLING=0
 
 C_PROG=hstags-help
+SRC_CC_OPTS += -O
 
 SCRIPT_PROG=hstags
 SCRIPT_OBJS=hstags.prl

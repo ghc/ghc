@@ -8,7 +8,9 @@ C_PROG 	= hp2ps
 
 INSTALL_PROGS += $(C_PROG)
 
-LIBS	= -lm
+SRC_CC_OPTS += -O
+LIBS	     = -lm
 
 CLEAN_FILES += $(C_OBJS) $(C_PROG)
+
 include $(TOP)/mk/target.mk
