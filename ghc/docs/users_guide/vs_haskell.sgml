@@ -25,7 +25,7 @@ The limitations here are listed in Haskell-Report order (roughly).
     <itemizedlist>
       <listitem>
 	<para>The Haskell report specifies that programs may be
-	written using Unicode.  GHC only accepts the ISO-8879-1
+	written using Unicode.  GHC only accepts the ISO-8859-1
 	character set at the moment.</para>
       </listitem>
 
