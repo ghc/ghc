@@ -72,4 +72,14 @@ FP_CHECK_CONST([O_BINARY], [#include <fcntl.h>], [0])
 # Check for idiosyncracies in some mingw impls of directory handling.
 FP_READDIR_EOF_ERRNO
 
+case "$target" in
+*-mingw32)
+	EXTRA_LIBS="wsock32, msvcrt, kernel32, user32, shell32" ;;
+*)
+	EXTRA_LIBS= ;;
+esac
+AC_SUBST([EXTRA_LIBS])
+
+AC_CONFIG_FILES([base.buildinfo])
+
 AC_OUTPUT
