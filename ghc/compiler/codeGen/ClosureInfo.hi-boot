@@ -1,7 +1,8 @@
 _interface_ ClosureInfo 1
 _exports_
-ClosureInfo ClosureInfo closureKind closureLabelFromCI closureNonHdrSize closurePtrsSize closureSMRep closureSemiTag closureSizeWithoutFixedHdr closureTypeDescr closureUpdReqd entryLabelFromCI fastLabelFromCI infoTableLabelFromCI maybeSelectorInfo;
+ClosureInfo ClosureInfo LambdaFormInfo closureKind closureLabelFromCI closureNonHdrSize closurePtrsSize closureSMRep closureSemiTag closureSizeWithoutFixedHdr closureTypeDescr closureUpdReqd entryLabelFromCI fastLabelFromCI infoTableLabelFromCI maybeSelectorInfo;
 _declarations_
+1 data LambdaFormInfo;
 1 data ClosureInfo;
 1 closureKind _:_ ClosureInfo -> PrelBase.String ;;
 1 closureLabelFromCI _:_ ClosureInfo -> CLabel.CLabel ;;
