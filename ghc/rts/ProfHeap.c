@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: ProfHeap.c,v 1.48 2003/09/23 15:38:36 simonmar Exp $
+ * $Id: ProfHeap.c,v 1.49 2003/10/24 14:45:38 stolz Exp $
  *
  * (c) The GHC Team, 1998-2003
  *
@@ -351,6 +351,7 @@ nextEra( void )
 
 #ifdef DEBUG_HEAP_PROF
 FILE *hp_file;
+static char *hp_filename;
 
 void initProfiling1( void )
 {
@@ -358,6 +359,20 @@ void initProfiling1( void )
 
 void initProfiling2( void )
 {
+  if (RtsFlags.ProfFlags.doHeapProfile) {
+    /* Initialise the log file name */
+    hp_filename = stgMallocBytes(strlen(prog_name) + 6, "hpFileName");
+    sprintf(hp_filename, "%s.hp", prog_name);
+    
+    /* open the log file */
+    if ((hp_file = fopen(hp_filename, "w")) == NULL) {
+      fprintf(stderr, "Can't open profiling report file %s\n", 
+	      hp_filename);
+      RtsFlags.ProfFlags.doHeapProfile = 0;
+      return;
+    }
+  }
+  
   initHeapProfiling();
 }
 
@@ -407,6 +422,7 @@ initHeapProfiling(void)
 
     initEra( &censuses[era] );
 
+    /* initProfilingLogFile(); */
     fprintf(hp_file, "JOB \"%s", prog_name);
 
 #ifdef PROFILING
