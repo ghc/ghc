@@ -10,14 +10,20 @@ The installer that installs GHC on Win32 also sets up the file-suffix associatio
 for ".hs" and ".lhs" files so that double-clicking them starts <command>ghci</command>.
 </para>
 <para>
-One little hitch happens if you right-click on a file, select "Open With..." and 
-then pick <command>ghci</command>.  If the filename has spaces in, what will happen is
-that GHC will get invoked like this:
+Be aware of that <command>ghc</command> and <command>ghci</command> do
+require filenames containing spaces to be escaped using quotes:
 <programlisting>
-  c:\ghc\bin\ghci \Documents and Settings\MyFile.lhs
+  c:\ghc\bin\ghci "c:\\Program Files\\Haskell\\Project.hs"
 </programlisting>
-So it looks to GHC as if there are three arguments, "\Documents", "and", and "Settings\MyFile.lhs".
+
+<para>
+If the quotes are left off in the above command, <command>ghci</command> will
+interpret the filename as two, "c:\\Program" and "Files\\Haskell\\Project.hs".
 </para>
+
+<!-- not clear whether there are current editions of Win32 OSes that
+     doesn't do this by default.
+
 <para> Solution: don't use "Open With...", avoid spaces in file names, 
 or fiddle with the appropriate registry setting:
 <programlisting>
@@ -26,8 +32,8 @@ or fiddle with the appropriate registry setting:
 Notice how the "%1" argument is quoted (or not).
 </para>
 <para> This problem doesn't occur when double-clicking.
-
 </para>
+-->
 
 </sect1>
 
