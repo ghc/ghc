@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: bootstrap.mk,v 1.30 2004/02/04 10:00:43 simonmar Exp $
+# $Id: bootstrap.mk,v 1.31 2004/10/07 03:19:51 dons Exp $
 #
 # Makefile rules for booting from .hc files without a driver.
 #
@@ -16,6 +16,8 @@ include $(TOP)/mk/paths.mk
 
 # Reset TOP
 TOP:=$(TOP_SAVED)
+
+include $(TOP)/mk/suffix.mk
 
 # -----------------------------------------------------------------------------
 # Set the platform-specific options to send to the C compiler.  These should
