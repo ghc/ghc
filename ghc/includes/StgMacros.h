@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: StgMacros.h,v 1.28 2000/07/20 17:06:41 rrt Exp $
+ * $Id: StgMacros.h,v 1.29 2000/07/21 09:01:48 rrt Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -46,9 +46,6 @@
 #define IF_(f)		static F_ f(void)
 #define EF_(f)		extern F_ f(void)
 #define EDF_(f)		extern DLLIMPORT F_ f(void)
-
-/* Use this rather than EF_ or EDF_ throughout the RTS */
-#define ERTSF_(f)   extern DLL_IMPORT_RTS F_ f(void)
 
 #define ED_		extern
 #define EDD_		extern DLLIMPORT 
@@ -296,7 +293,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define HP_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
    if ((Hp += (headroom)) > HpLim ) {			\
-	ERTSF_(stg_gen_chk);				\
+	EXTFUN_RTS(stg_gen_chk);				\
         tag_assts					\
 	R9.w = (W_)LIVENESS_MASK(liveness);		\
         R10.w = (W_)reentry;				\
@@ -309,7 +306,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define STK_CHK_GEN(headroom,liveness,reentry,tag_assts)	\
    if ((Sp - (headroom)) < SpLim) {				\
-	ERTSF_(stg_gen_chk);					\
+	EXTFUN_RTS(stg_gen_chk);					\
         tag_assts						\
 	R9.w = (W_)LIVENESS_MASK(liveness);			\
         R10.w = (W_)reentry;					\
@@ -318,7 +315,7 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
 
 #define MAYBE_GC(liveness,reentry)		\
    if (doYouWantToGC()) {			\
-	ERTSF_(stg_gen_hp);			\
+	EXTFUN_RTS(stg_gen_hp);			\
 	R9.w = (W_)LIVENESS_MASK(liveness);	\
         R10.w = (W_)reentry;			\
         JMP_(stg_gen_hp);			\
@@ -331,8 +328,8 @@ static inline int IS_ARG_TAG( StgWord p ) { return p <= ARGTAG_MAX; }
    out to be slowing us down we can make specialised ones.
    -------------------------------------------------------------------------- */
 
-ERTSF_(stg_gen_yield);
-ERTSF_(stg_gen_block);
+EXTFUN_RTS(stg_gen_yield);
+EXTFUN_RTS(stg_gen_block);
 
 #define YIELD(liveness,reentry)			\
   {						\
@@ -350,7 +347,7 @@ ERTSF_(stg_gen_block);
 
 #define BLOCK_NP(ptrs)				\
   {						\
-    ERTSF_(stg_block_##ptrs);			\
+    EXTFUN_RTS(stg_block_##ptrs);			\
     JMP_(stg_block_##ptrs);			\
   }
 
@@ -751,7 +748,7 @@ LoadThreadState (void)
         STGCALL1(getStablePtr,reg_fe_binder)
 	
 #define REGISTER_IMPORT(reg_mod_name)		\
-	do { ERTSF_(reg_mod_name);			\
+	do { EXTFUN_RTS(reg_mod_name);			\
 	  PUSH_INIT_STACK(reg_mod_name) ;	\
 	} while (0)
 	
