@@ -355,9 +355,10 @@ schemeE d s p (AnnLit literal)
 
 schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
    | (AnnVar v, args_r_to_l) <- splitApp rhs,
-     Just data_con <- isDataConId_maybe v
+     Just data_con <- isDataConId_maybe v,
+     dataConRepArity data_con == length args_r_to_l
    = 	-- Special case for a non-recursive let whose RHS is a 
-	-- (guaranteed saturatred) constructor application
+	-- saturatred constructor application.
 	-- Just allocate the constructor and carry on
      mkConAppCode d s p data_con args_r_to_l	`thenBc` \ alloc_code ->
      schemeE (d+1) s (addToFM p x d) body	`thenBc` \ body_code ->
@@ -503,7 +504,7 @@ schemeT d s p app
    = generateCCall d s p ccall_spec fn args_r_to_l
 
    -- Case 2: Constructor application
-   | Just con <- maybe_dcon,
+   | Just con <- maybe_saturated_dcon,
      isUnboxedTupleCon con
    = case args_r_to_l of
 	[arg1,arg2] | isVoidRepAtom arg1 -> 
@@ -513,7 +514,7 @@ schemeT d s p app
 	_other -> unboxedTupleException
 
    -- Case 3: Ordinary data constructor
-   | Just con <- maybe_dcon
+   | Just con <- maybe_saturated_dcon
    = mkConAppCode d s p con args_r_to_l	`thenBc` \ alloc_con ->
      returnBc (alloc_con	 `appOL` 
                mkSLIDE 1 (d - s) `snocOL`
@@ -543,13 +544,14 @@ schemeT d s p app
 	-- The function will necessarily be a variable, 
 	-- because we are compiling a tail call
       (AnnVar fn, args_r_to_l) = splitApp app
-      n_args = length args_r_to_l
 
-      -- only consider this to be a constructor application iff it is
+      -- Only consider this to be a constructor application iff it is
       -- saturated.  Otherwise, we'll call the constructor wrapper.
-      maybe_dcon  = case isDataConId_maybe fn of
-			Just con | dataConRepArity con == n_args -> Just con
-			_ -> Nothing
+      n_args = length args_r_to_l
+      maybe_saturated_dcon  
+	= case isDataConId_maybe fn of
+		Just con | dataConRepArity con == n_args -> Just con
+		_ -> Nothing
 
 -- -----------------------------------------------------------------------------
 -- Generate code to build a constructor application, 
