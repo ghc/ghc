@@ -28,7 +28,7 @@ import TysWiredIn	( consDataCon, mkTupleTy, mkListTy,
 			  tupleCon, parrFakeCon, mkPArrTy )
 import BasicTypes	( Boxity(..) )
 import UniqSet
-import SrcLoc		( noSrcLoc )x
+import SrcLoc		( noSrcLoc )
 import Util             ( lengthExceeds, isSingleton, notNull )
 import Outputable
 \end{code}

@@ -11,7 +11,7 @@ module Desugar ( deSugar, deSugarExpr ) where
 import CmdLineOpts	( DynFlag(..), dopt, opt_SccProfilingOn )
 import HscTypes		( ModGuts(..), ModGuts, HscEnv(..), ExternalPackageState(..), 
 			  PersistentCompilerState(..), 
-	  		  lookupType )
+	  		  lookupType, unQualInScope )
 import HsSyn		( MonoBinds, RuleDecl(..), RuleBndr(..), 
 			  HsExpr(..), HsBinds(..), MonoBinds(..) )
 import TcHsSyn		( TypecheckedRuleDecl, TypecheckedHsExpr )
@@ -32,11 +32,13 @@ import Id		( Id )
 import NameEnv		( lookupNameEnv )
 import VarEnv
 import VarSet
-import Bag		( isEmptyBag )
+import Bag		( isEmptyBag, mapBag )
 import CoreLint		( showPass, endPass )
 import ErrUtils		( doIfSet, dumpIfSet_dyn, pprBagOfWarnings, addShortWarnLocLine )
 import Outputable
+import qualified Pretty
 import UniqSupply	( mkSplitUniqSupply )
+import SrcLoc		( SrcLoc )
 import FastString
 import DATA_IOREF	( readIORef )
 \end{code}
@@ -73,7 +75,7 @@ deSugar hsc_env pcs
 		= initDs dflags us lookup mod
 			 (dsProgram binds rules fords)
 	
-	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns))
+	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
@@ -110,7 +112,8 @@ deSugar hsc_env pcs
 
 	-- Desugarer warnings are SDocs; here we
 	-- add the info about whether or not to print unqualified
-    mk_warn (loc,sdoc) = (loc, addShortWarnLocLine loc print_unqual sdoc)
+    mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
+    mk_warn (loc, sdoc) = addShortWarnLocLine loc print_unqual sdoc
 
 	-- The lookup function passed to initDs is used for well-known Ids, 
 	-- such as fold, build, cons etc, so the chances are
@@ -138,10 +141,13 @@ deSugarExpr hsc_env pcs mod_name unqual tc_expr
 
 	-- Do desugaring
 	; let (core_expr, ds_warns) = initDs dflags us lookup mod_name (dsExpr tc_expr)    
+	      warn_doc = pprBagOfWarnings (mapBag mk_warn ds_warns)
+	      mk_warn :: (SrcLoc,SDoc) -> (SrcLoc, Pretty.Doc)
+	      mk_warn (loc,sdoc) = addShortWarnLocLine loc unqual sdoc
 
 	-- Display any warnings
         ; doIfSet (not (isEmptyBag ds_warns))
-		  (printErrs (pprBagOfWarnings ds_warns))
+		  (printErrs warn_doc)
 
 	-- Dump output
 	; dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared" (pprCoreExpr core_expr)

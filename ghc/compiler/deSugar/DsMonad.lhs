@@ -84,7 +84,7 @@ instance Monad DsM where
 
 type DsWarnings = Bag DsWarning         -- The desugarer reports matches which are
 					-- completely shadowed or incomplete patterns
-type DsWarning = (Loc, SDoc)
+type DsWarning = (SrcLoc, SDoc)
 
 {-# INLINE thenDs #-}
 {-# INLINE returnDs #-}
