@@ -597,6 +597,7 @@ typedef struct _RtsSymbolVal {
       Sym(__udivdi3)                            \
       Sym(__moddi3)                             \
       Sym(__umoddi3)				\
+      Sym(__muldi3)				\
       Sym(__ashldi3)				\
       Sym(__ashrdi3)				\
       Sym(__lshrdi3)				\
