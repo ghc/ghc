@@ -25,4 +25,4 @@ PrelException_PutFullMVar_closure
 PrelException_BlockedOnDeadMVar_closure
 PrelException_NonTermination_closure
 __init_Prelude
-__init_PrelMain
+
