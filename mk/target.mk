@@ -407,6 +407,16 @@ endif
 	@echo Done.
 endif
 
+# links to script programs: we sometimes install a script as
+# <name>-<version> with a link from <name> to the real script.
+
+ifneq "$(SCRIPT_LINK)" ""
+all :: $(SCRIPT_LINK)
+
+$(SCRIPT_LINK) : $(SCRIPT_PROG)
+	$(LN_S) $(SCRIPT_PROG) $(SCRIPT_LINK)
+endif
+
 
 ###########################################
 #
@@ -478,7 +488,7 @@ ifneq "$(BIN_DIST)" "1"
 	   echo '$$'"libexecdir='$(libexecdir)';"                    >> $$i.tmp ; \
 	   echo '$$'"datadir='$(datadir)';"                          >> $$i.tmp ; \
 	   cat  $$i                                                >> $$i.tmp ; \
-	   echo $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_OPTS)) $$i.tmp $(bindir)/$$i ;    \
+	   echo $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_BIN_OPTS)) $$i.tmp $(bindir)/$$i ;    \
 	   $(INSTALL_PROGRAM) $(filter-out -s,$(INSTALL_BIN_OPTS)) $$i.tmp $(bindir)/$$i ; \
 	   $(RM) $$i.tmp; \
 	done
@@ -617,6 +627,14 @@ endif
 ifneq "$(way)" ""
 install-strip::
 	@$(MAKE) EXTRA_INSTALL_OPTS='-s' install                                	
+endif
+
+#
+# install links to script drivers.
+#
+ifneq "$(SCRIPT_LINK)" ""
+install ::
+	$(LN_S) $(SCRIPT_PROG) $(bindir)/$(SCRIPT_LINK)
 endif
 
 ###########################################
