@@ -64,8 +64,7 @@ constrArity ta c = glength $ withType (fromConstr c) ta
 typeReachableFrom :: (Data a, Data b) => TypeVal a -> TypeVal b -> Bool
 typeReachableFrom (a::TypeVal a) (b::TypeVal b) =
   or ( sameType a b
-     : map (recurse . (\c -> withType (fromConstr c) b))
-           (dataTypeCons $ dataTypeOf b)
+     : map (recurse . fromConstr) (dataTypeCons $ dataTypeOf b)
      )
   where
 

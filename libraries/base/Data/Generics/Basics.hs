@@ -30,7 +30,7 @@ module Data.Generics.Basics (
 	-- * Constructor representations
 	Constr,		-- abstract, instance of: Eq, Show
 	ConIndex,	-- alias for Int, start at 1
-	Fixity,		-- instance of: Eq, Show
+	Fixity(..),	-- instance of: Eq, Show
 	DataType,	-- abstract, instance of: Show
 
 	-- * Constructing constructor representations
@@ -296,10 +296,9 @@ type ConIndex = Int
 
 
 -- | Fixity of constructors
-data Fixity = NoFixity
-            | PreFixity
-            | InFixity
-		deriving (Eq,Show)
+data Fixity = Prefix
+            | Infix	-- Later: add associativity and precedence
+	    deriving (Eq,Show)
 
 -- | A package of constructor representations;
 --   could be a list, an array, a balanced tree, or others.
@@ -332,6 +331,7 @@ data DataType =
 
 -- | Make a representation for a datatype constructor
 mkConstr   :: ConIndex -> String -> Fixity -> Constr
+--	ToDo: consider adding arity?
 mkConstr = DataConstr
 
 -- | Make a package of constructor representations
@@ -452,8 +452,8 @@ instance Data Rational where
 -- define top-level definitions for representations.
 --
 
-falseConstr  = mkConstr 1 "False" NoFixity
-trueConstr   = mkConstr 2 "True"  NoFixity
+falseConstr  = mkConstr 1 "False" Prefix
+trueConstr   = mkConstr 2 "True"  Prefix
 boolDataType = mkDataType [falseConstr,trueConstr]
 
 instance Data Bool where
@@ -470,8 +470,8 @@ instance Data Bool where
 -- Cons-lists are terms with two immediate subterms.
 --
 
-nilConstr    = mkConstr 1 "[]"  NoFixity
-consConstr   = mkConstr 2 "(:)" InFixity
+nilConstr    = mkConstr 1 "[]"  Prefix
+consConstr   = mkConstr 2 "(:)" Infix
 listDataType = mkDataType [nilConstr,consConstr]
 
 instance Data a => Data [a] where
@@ -501,8 +501,8 @@ instance Data a => Data [a] where
 -- No surprises.
 --
 
-nothingConstr = mkConstr 1 "Nothing" NoFixity
-justConstr    = mkConstr 2 "Just"    NoFixity
+nothingConstr = mkConstr 1 "Nothing" Prefix
+justConstr    = mkConstr 2 "Just"    Prefix
 maybeDataType = mkDataType [nothingConstr,justConstr]
 
 instance Data a => Data (Maybe a) where
@@ -520,7 +520,7 @@ instance Data a => Data (Maybe a) where
 -- No surprises.
 --
 
-pairConstr = mkConstr 1 "(,)" InFixity
+pairConstr = mkConstr 1 "(,)" Infix
 productDataType = mkDataType [pairConstr]
 
 instance (Data a, Data b) => Data (a,b) where
