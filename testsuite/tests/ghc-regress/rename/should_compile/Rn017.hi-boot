@@ -1,6 +1,6 @@
 module Rn017 where
 
-data Wibble = MkWibble Wobble
+data Wibble 
 data Wobble
 
 a :: GHC.Base.Int -> GHC.Base.Int

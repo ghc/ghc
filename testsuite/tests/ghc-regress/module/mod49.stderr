@@ -1,2 +1,2 @@
 
-mod49.hs:5: Variable not in scope: `y'
+mod49.hs:5: `y' is not a (visible) method of class `C'

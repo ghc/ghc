@@ -2,5 +2,5 @@
 tcfail105.hs:8:
     All of the type variables in the constraint `Monad m' are already in scope
 	(at least one must be universally quantified here)
-    When checking the existential context of constructor `M'
+    When checking the data constructor: (Monad m) => M {unM :: m (S m t a)}
     In the data type declaration for `M'

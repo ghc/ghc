@@ -1,6 +1,4 @@
 
 tcfail057.hs:5:
     Class `RealFrac' used as a type
-    When checking kinds in `RealFrac a'
-    In the type: forall a. (RealFrac a) -> a -> a
-    While checking the type signature for `f'
+    In the type signature: f :: (RealFrac a) -> a -> a

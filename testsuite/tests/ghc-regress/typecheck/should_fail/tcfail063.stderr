@@ -1,6 +1,4 @@
 
 tcfail063.hs:6:
     Kind error: `Num' is not applied to enough type arguments
-    When checking kinds in `Num'
-    In the type: forall a. (Num) => Int -> a -> Int
-    While checking the type signature for `moby'
+    In the type signature: moby :: (Num) => Int -> a -> Int

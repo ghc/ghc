@@ -1,2 +1,2 @@
 
-tcfail056.hs:10: Variable not in scope: `<='
+tcfail056.hs:10: `<=' is not a (visible) method of class `Eq'

@@ -1,9 +1,5 @@
 
 mod110.hs:11:
     Ambiguous occurrence `Eq'
-    It could refer to either `GHC.Base.Eq', imported from Prelude at mod110.hs:4
-		          or `M.Eq', defined at mod110.hs:7
-
-mod110.hs:12: Variable not in scope: `equal'
-
-mod110.hs:13: Variable not in scope: `negate'
+    It could refer to either `M.Eq', defined at mod110.hs:7
+		          or `GHC.Base.Eq', imported from Prelude at mod110.hs:4

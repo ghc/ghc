@@ -1,3 +1,2 @@
 
-tests/ghc-regress/typecheck/should_fail/tcfail077.hs:8:
-    Variable not in scope: `op2'
+tcfail077.hs:8: `op2' is not a (visible) method of class `Foo'
