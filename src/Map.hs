@@ -56,7 +56,7 @@ fromList :: Ord k => [(k,a)] -> Map k a
 fromList = listToFM
 
 fromListWith :: Ord k => (a -> a -> a) -> [(k,a)] -> Map k a 
-fromListWith = flip addListToFM_C emptyFM
+fromListWith c = addListToFM_C (flip c) emptyFM
 
 toAscList :: Map k a -> [(k,a)]
 toAscList = fmToList

@@ -63,7 +63,7 @@ ppDevHelpFile odir doctitle maybe_package ifaces = do
     index = Map.toAscList (foldr getIfaceIndex Map.empty ifaces)
 
     getIfaceIndex (mdl,iface) fm =
-		Map.unionWith (++) (Map.fromListWith (++) [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
+		Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mdl]) | (name, Qual mdl' _) <- Map.toAscList (iface_env iface), mdl == mdl']) fm
 	
     ppList [] = empty
     ppList ((name,refs):mdls)  =

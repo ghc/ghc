@@ -386,7 +386,7 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format maybe_contents_ur
   -- that export that entity.  Each of the modules exports the entity
   -- in a visible or invisible way (hence the Bool).
   full_index :: Map String (Map HsQName [(Module,Bool)])
-  full_index = Map.fromListWith (\l r -> Map.unionWith (++) r l)
+  full_index = Map.fromListWith (flip (Map.unionWith (++)))
 		(concat (map getIfaceIndex ifaces))
 
   getIfaceIndex (mdl,iface) = 

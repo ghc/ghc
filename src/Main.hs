@@ -1079,8 +1079,8 @@ collectInstances
    -> Map HsQName [InstHead]  -- maps class/type names to instances
 
 collectInstances mod_ifaces
-  = Map.fromListWith (++) ty_inst_pairs `Map.union`
-    Map.fromListWith (++) class_inst_pairs
+  = Map.fromListWith (flip (++)) ty_inst_pairs `Map.union`
+    Map.fromListWith (flip (++)) class_inst_pairs
   where
     all_instances = concat (map (iface_insts.snd) mod_ifaces)
 
