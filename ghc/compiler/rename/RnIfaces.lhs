@@ -25,13 +25,14 @@ import IO
 #endif
 
 
-import CmdLineOpts	( opt_TyConPruning )
+import CmdLineOpts	( opt_PruneTyDecls, opt_PruneInstDecls, opt_PprUserLength )
 import HsSyn		( HsDecl(..), TyDecl(..), ClassDecl(..), HsTyVar, HsExpr, Sig(..), HsType(..),
 			  HsBinds(..), MonoBinds, DefaultDecl, ConDecl(..), ConDetails(..), BangType, IfaceSig(..),
-			  FixityDecl(..), Fixity, Fake, InPat, InstDecl(..), SYN_IE(Version), HsIdInfo,
-			  IE(..), NewOrData(..), hsDeclName
+			  FixityDecl(..), Fixity, Fake, InPat, InstDecl(..), HsIdInfo,
+			  IE(..), hsDeclName
 			)
 import HsPragmas	( noGenPragmas )
+import BasicTypes	( SYN_IE(Version), NewOrData(..) )
 import RdrHsSyn		( SYN_IE(RdrNameHsDecl), SYN_IE(RdrNameInstDecl), SYN_IE(RdrNameTyDecl),
 			  RdrName, rdrNameOcc
 			)
@@ -49,13 +50,13 @@ import FiniteMap	( FiniteMap, sizeFM, emptyFM, unitFM,  delFromFM,
 			  fmToList, eltsFM 
 			)
 import Name		( Name {-instance NamedThing-}, Provenance, OccName(..),
-			  modAndOcc, occNameString, moduleString, pprModule, isLocallyDefined,
+			  nameModule, occNameString, moduleString, pprModule, isLocallyDefined,
 			  NameSet(..), emptyNameSet, unionNameSets, nameSetToList,
-			  minusNameSet, mkNameSet, elemNameSet, nameUnique,
+			  minusNameSet, mkNameSet, elemNameSet, nameUnique, addOneToNameSet,
 			  isWiredInName, maybeWiredInTyConName, maybeWiredInIdName,
 			  NamedThing(..)
 			 )
-import Id		( GenId, Id(..), idType, dataConTyCon, isDataCon )
+import Id		( GenId, Id(..), idType, dataConTyCon, isAlgCon )
 import TyCon		( TyCon, tyConDataCons, isSynTyCon, getSynTyConDefn )
 import Type		( namesOfType )
 import TyVar		( GenTyVar )
@@ -66,11 +67,14 @@ import Bag
 import Maybes		( MaybeErr(..), expectJust, maybeToBool )
 import ListSetOps	( unionLists )
 import Pretty
-import PprStyle		( PprStyle(..) )
+import Outputable	( PprStyle(..) )
 import Unique		( Unique )
 import Util		( pprPanic, pprTrace, Ord3(..) )
 import StringBuffer     ( StringBuffer, hGetStringBuffer, freeStringBuffer )
 import Outputable
+#if __GLASGOW_HASKELL__ >= 202
+import List (nub)
+#endif
 \end{code}
 
 
@@ -86,7 +90,7 @@ getRnStats :: [RenamedHsDecl] -> RnMG Doc
 getRnStats all_decls
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_vers_map export_envs decls_fm all_names imp_names unslurped_insts deferred_data_decls inst_mods = ifaces
+	Ifaces this_mod mod_vers_map export_envs decls_fm all_names imp_names (unslurped_insts,_) deferred_data_decls inst_mods = ifaces
 	n_mods	    = sizeFM mod_vers_map
 
 	decls_imported = filter is_imported_decl all_decls
@@ -163,7 +167,7 @@ loadInterface :: Doc -> Module -> RnMG Ifaces
 loadInterface doc_str load_mod 
   = getIfacesRn 		`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_vers_map export_envs decls all_names imp_names insts deferred_data_decls inst_mods = ifaces
+	Ifaces this_mod mod_vers_map export_envs decls all_names imp_names (insts, tycls_names) deferred_data_decls inst_mods = ifaces
     in
 	-- CHECK WHETHER WE HAVE IT ALREADY
     if maybeToBool (lookupFM export_envs load_mod) 
@@ -181,7 +185,7 @@ loadInterface doc_str load_mod
 			new_export_envs = addToFM export_envs load_mod ([],[])
 			new_ifaces = Ifaces this_mod mod_vers_map
 					    new_export_envs
-					    decls all_names imp_names insts deferred_data_decls inst_mods
+					    decls all_names imp_names (insts, tycls_names) deferred_data_decls inst_mods
 		   in
 		   setIfacesRn new_ifaces		`thenRn_`
 		   failWithRn new_ifaces (noIfaceErr load_mod) ;
@@ -204,7 +208,7 @@ loadInterface doc_str load_mod
 			     (addToFM export_envs load_mod export_env)
 			     new_decls
 			     all_names imp_names
-			     new_insts
+			     (new_insts, tycls_names)
 			     deferred_data_decls 
 			     new_inst_mods 
     in
@@ -265,7 +269,7 @@ loadInstDecl mod_name insts decl@(InstDecl inst_ty binds uprags dfun_name src_lo
     in
 	-- We find the gates by renaming the instance type with in a 
 	-- and returning the occurrence pool.
-    initRnMS emptyRnEnv mod_name InterfaceMode (
+    initRnMS emptyRnEnv mod_name (InterfaceMode Compulsory) (
         findOccurrencesRn (rnHsSigType (\sty -> text "an instance decl") munged_inst_ty)	
     )						`thenRn` \ gate_names ->
     returnRn (((mod_name, decl), gate_names) `consBag` insts)
@@ -364,16 +368,16 @@ importDecl :: Name -> Necessity -> RnMG (Maybe RdrNameHsDecl)
 importDecl name necessity
   = checkSlurped name			`thenRn` \ already_slurped ->
     if already_slurped then
-	-- traceRn (sep [text "Already slurped:", ppr PprDebug name])	`thenRn_`
+	traceRn (sep [text "Already slurped:", ppr PprDebug name])	`thenRn_`
 	returnRn Nothing	-- Already dealt with
     else
     if isWiredInName name then
-	getWiredInDecl name
+	getWiredInDecl name necessity
     else 
        getIfacesRn 		`thenRn` \ ifaces ->
        let
          Ifaces this_mod _ _ _ _ _ _ _ _ = ifaces
-         (mod,_) = modAndOcc name
+         mod = nameModule name
        in
        if mod == this_mod  then    -- Don't bring in decls from
 	  pprTrace "importDecl wierdness:" (ppr PprDebug name) $
@@ -393,11 +397,11 @@ getNonWiredInDecl needed_name necessity
 	-- Special case for data/newtype type declarations
       Just (version, avail, TyD ty_decl) | is_data_or_newtype ty_decl
 	      -> getNonWiredDataDecl needed_name version avail ty_decl	`thenRn` \ (avail', maybe_decl) ->
-		 recordSlurp (Just version) avail'	`thenRn_`
+		 recordSlurp (Just version) necessity avail'	`thenRn_`
 		 returnRn maybe_decl
 
       Just (version,avail,decl)
-	      -> recordSlurp (Just version) avail	`thenRn_`
+	      -> recordSlurp (Just version) necessity avail	`thenRn_`
 		 returnRn (Just decl)
 
       Nothing -> 	-- Can happen legitimately for "Optional" occurrences
@@ -408,7 +412,7 @@ getNonWiredInDecl needed_name necessity
 		   returnRn Nothing
   where
      doc_str = sep [ptext SLIT("Need decl for"), ppr PprDebug needed_name]
-     (mod,_) = modAndOcc needed_name
+     mod = nameModule needed_name
 
      is_data_or_newtype (TyData _ _ _ _ _ _ _ _) = True
      is_data_or_newtype other		         = False
@@ -434,9 +438,10 @@ All this is necessary so that we know all types that are "in play", so
 that we know just what instances to bring into scope.
 	
 \begin{code}
-getWiredInDecl name
-  = get_wired				`thenRn` \ avail ->
-    recordSlurp Nothing avail		`thenRn_`
+getWiredInDecl name necessity
+  = initRnMS emptyRnEnv mod_name (InterfaceMode necessity) 
+	     get_wired				`thenRn` \ avail ->
+    recordSlurp Nothing necessity avail		`thenRn_`
 
    	-- Force in the home module in case it has instance decls for
 	-- the thing we are interested in.
@@ -459,7 +464,7 @@ getWiredInDecl name
     let
 	main_name  = availName avail
 	main_is_tc = case avail of { AvailTC _ _ -> True; Avail _ -> False }
-	(mod,_)    = modAndOcc main_name
+	mod        = nameModule main_name
 	doc_str    = sep [ptext SLIT("Need home module for wired in thing"), ppr PprDebug name]
     in
     (if not main_is_tc || mod == gHC__ then
@@ -475,12 +480,13 @@ getWiredInDecl name
     get_wired | is_tycon			-- ... a type constructor
 	      = get_wired_tycon the_tycon
 
-	      | (isDataCon the_id) 		-- ... a wired-in data constructor
+	      | (isAlgCon the_id) 		-- ... a wired-in data constructor
 	      = get_wired_tycon (dataConTyCon the_id)
 
 	      | otherwise			-- ... a wired-in non data-constructor
 	      = get_wired_id the_id
 
+    mod_name		 = nameModule name
     maybe_wired_in_tycon = maybeWiredInTyConName name
     is_tycon		 = maybeToBool maybe_wired_in_tycon
     maybe_wired_in_id    = maybeWiredInIdName    name
@@ -565,7 +571,7 @@ getNonWiredDataDecl needed_name
 	 	    avail@(AvailTC tycon_name _) 
 		    ty_decl@(TyData new_or_data context tycon tyvars condecls derivings pragmas src_loc)
   |  needed_name == tycon_name
-  && opt_TyConPruning
+  && opt_PruneTyDecls
   && not (nameUnique needed_name `elem` cCallishTyKeys)		-- Hack!  Don't prune these tycons whose constructors
 								-- the desugarer must be able to see when desugaring
 								-- a CCall.  Ugh!
@@ -631,7 +637,7 @@ getImportedInstDecls
 	-- removing them from the bag kept in Ifaces
     getIfacesRn 	`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_vers export_envs decls slurped_names imp_names insts deferred_data_decls inst_mods = ifaces
+	Ifaces this_mod mod_vers export_envs decls slurped_names imp_names (insts, tycls_names) deferred_data_decls inst_mods = ifaces
 
 		-- An instance decl is ungated if all its gates have been slurped
         select_ungated :: IfaceInst					-- A gated inst decl
@@ -647,15 +653,17 @@ getImportedInstDecls
 	  | otherwise
 	  = (ungated_decls, (decl, remaining_gates) : gated_decls)
 	  where
-	    remaining_gates = filter (not . (`elemNameSet` slurped_names)) gates
+	    remaining_gates = filter (not . (`elemNameSet` tycls_names)) gates
 
 	(un_gated_insts, still_gated_insts) = foldrBag select_ungated ([], []) insts
 	
 	new_ifaces = Ifaces this_mod mod_vers export_envs decls slurped_names imp_names
-			    (listToBag still_gated_insts)
+			    ((listToBag still_gated_insts), tycls_names)
+				-- NB: don't throw away tycls_names; we may comre across more instance decls
 			    deferred_data_decls 
 			    inst_mods
     in
+    traceRn (sep [text "getInstDecls:", fsep (map (ppr PprDebug) (nameSetToList tycls_names))])	`thenRn_`
     setIfacesRn new_ifaces	`thenRn_`
     returnRn un_gated_insts
   where
@@ -749,7 +757,7 @@ getImportVersions this_mod exports
      add_mv mv_map v@(name, version) 
       = addToFM_C (\ ls _ -> (v:ls)) mv_map mod [v] 
 	where
-	 (mod,_) = modAndOcc name
+	 mod = nameModule name
 
      add_mod mv_map mod = addToFM mv_map mod []
 \end{code}
@@ -767,21 +775,33 @@ getSlurpedNames
     in
     returnRn slurped_names
 
-recordSlurp maybe_version avail
-  = -- traceRn (sep [text "Record slurp:", pprAvail PprDebug avail])	`thenRn_`
+recordSlurp maybe_version necessity avail
+  = traceRn (hsep [text "Record slurp:", pprAvail (PprForUser opt_PprUserLength) avail, 
+					-- NB PprForDebug prints export flag, which is too
+					-- strict; it's a knot-tied thing in RnNames
+		  case necessity of {Compulsory -> text "comp"; Optional -> text "opt"}])	`thenRn_`
     getIfacesRn 	`thenRn` \ ifaces ->
     let
-	Ifaces this_mod mod_vers export_envs decls slurped_names imp_names insts deferred_data_decls inst_mods = ifaces
+	Ifaces this_mod mod_vers export_envs decls slurped_names imp_names (insts, tycls_names) deferred_data_decls inst_mods = ifaces
 	new_slurped_names = addAvailToNameSet slurped_names avail
 
 	new_imp_names = case maybe_version of
-			   Just version -> (availName avail, version) : imp_names
+			   Just version	-> (availName avail, version) : imp_names
 			   Nothing      -> imp_names
+
+		-- Add to the names that will let in instance declarations;
+		-- but only (a) if it's a type/class
+		--	    (b) if it's compulsory (unless the test flag opt_PruneInstDecls is off)
+	new_tycls_names = case avail of
+				AvailTC tc _  | not opt_PruneInstDecls || 
+						case necessity of {Optional -> False; Compulsory -> True }
+					      -> tycls_names `addOneToNameSet` tc
+				otherwise     -> tycls_names
 
 	new_ifaces = Ifaces this_mod mod_vers export_envs decls 
 			    new_slurped_names 
 			    new_imp_names
-			    insts
+			    (insts, new_tycls_names)
 			    deferred_data_decls 
 			    inst_mods
     in
@@ -810,7 +830,9 @@ getDeclBinders :: (RdrName -> SrcLoc -> RnMG Name)		-- New-name function
 getDeclBinders new_name (TyD (TyData _ _ tycon _ condecls _ _ src_loc))
   = new_name tycon src_loc			`thenRn` \ tycon_name ->
     getConFieldNames new_name condecls		`thenRn` \ sub_names ->
-    returnRn (AvailTC tycon_name (tycon_name : sub_names))
+    returnRn (AvailTC tycon_name (tycon_name : nub sub_names))
+	-- The "nub" is because getConFieldNames can legitimately return duplicates,
+	-- when a record declaration has the same field in multiple constructors
 
 getDeclBinders new_name (TyD (TySynonym tycon _ _ src_loc))
   = new_name tycon src_loc		`thenRn` \ tycon_name ->
