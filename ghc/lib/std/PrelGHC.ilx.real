@@ -472,10 +472,6 @@ end:
        ldarg 0 ldarg 1 stfld !0 class PrelGHC_MutVarzh<!0>::contents
        ret 
     }
-    .method public rtspecialname specialname instance void .ctor(!0) {
-       ldarg 0 ldarg 1 stfld !0 class PrelGHC_MutVarzh<!0>::contents
-       ret 
-    }
 }
 
 .class public PrelGHC_ZCTCCallable<any> {
