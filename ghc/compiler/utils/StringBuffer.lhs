@@ -72,7 +72,7 @@ import ST
 import Char		( chr )
 
 -- urk!
-#include "../lib/std/cbits/error.h"
+#include "../lib/std/cbits/stgerror.h"
 
 #if __GLASGOW_HASKELL__ >= 303
 import IO		( openFile, slurpFile )
