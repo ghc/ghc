@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Storage.c,v 1.42 2001/07/24 16:36:43 simonmar Exp $
+ * $Id: Storage.c,v 1.43 2001/08/07 09:20:52 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -160,10 +160,7 @@ initStorage (void)
     generations[g].steps[s].to = &generations[g+1].steps[0];
   }
   
-  /* The oldest generation has one step and it is compacted. */
-  if (RtsFlags.GcFlags.compact) {
-      oldest_gen->steps[0].is_compacted = 1;
-  }
+  /* The oldest generation has one step. */
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
 
   /* generation 0 is special: that's the nursery */
@@ -625,25 +622,25 @@ calcLive(void)
 extern lnat 
 calcNeeded(void)
 {
-  lnat needed = 0;
-  nat g, s;
-  step *stp;
-
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-    for (s = 0; s < generations[g].n_steps; s++) {
-      if (g == 0 && s == 0) { continue; }
-      stp = &generations[g].steps[s];
-      if (generations[g].steps[0].n_blocks +
-	  generations[g].steps[0].n_large_blocks 
-	  > generations[g].max_blocks
-	  && stp->is_compacted == 0) {
-	needed += 2 * stp->n_blocks;
-      } else {
-	needed += stp->n_blocks;
-      }
+    lnat needed = 0;
+    nat g, s;
+    step *stp;
+    
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	for (s = 0; s < generations[g].n_steps; s++) {
+	    if (g == 0 && s == 0) { continue; }
+	    stp = &generations[g].steps[s];
+	    if (generations[g].steps[0].n_blocks +
+		generations[g].steps[0].n_large_blocks 
+		> generations[g].max_blocks
+		&& stp->is_compacted == 0) {
+		needed += 2 * stp->n_blocks;
+	    } else {
+		needed += stp->n_blocks;
+	    }
+	}
     }
-  }
-  return needed;
+    return needed;
 }
 
 /* -----------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.42 2001/07/23 23:37:35 andy Exp $
+ * $Id: RtsFlags.c,v 1.43 2001/08/07 09:20:52 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -223,7 +223,7 @@ void initRtsFlagsDefaults(void)
 
     RtsFlags.GcFlags.minAllocAreaSize   = (256 * 1024)        / BLOCK_SIZE;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
-    RtsFlags.GcFlags.maxHeapSize	= (64  * 1024 * 1024) / BLOCK_SIZE;
+    RtsFlags.GcFlags.maxHeapSize	= 0;    /* off by default */
     RtsFlags.GcFlags.heapSizeSuggestion	= 0;    /* none */
     RtsFlags.GcFlags.pcFreeHeap		= 3;	/* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
@@ -235,9 +235,10 @@ void initRtsFlagsDefaults(void)
 #else
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.steps              = 2;
-    RtsFlags.GcFlags.compact            = rtsFalse;
     RtsFlags.GcFlags.squeezeUpdFrames	= rtsTrue;
 #endif
+    RtsFlags.GcFlags.compact            = rtsTrue;
+    RtsFlags.GcFlags.compactThreshold   = 30.0;
 #ifdef RTS_GTK_FRONTPANEL
     RtsFlags.GcFlags.frontpanel         = rtsFalse;
 #endif
@@ -385,10 +386,12 @@ usage_text[] = {
 "  -A<size> Sets the minimum allocation area size (default 256k) Egs: -A1m -A10k",
 "  -M<size> Sets the maximum heap size (default 64M)  Egs: -M256k -M1G",
 "  -H<size> Sets the minimum heap size (default 0M)   Egs: -H24m  -H1G",
-"  -m<n>%   Minimum % of heap which must be available (default 3%)",
+"  -m<n>    Minimum % of heap which must be available (default 3%)",
 "  -G<n>    Number of generations (default: 2)",
 "  -T<n>    Number of steps in younger generations (default: 2)",
-"  -c       Enable compaction for the oldest generation",
+"  -c<n>    Auto-enable compaction of the oldest generation when live data is",
+"           at least <n>% of the maximum heap size set with -M (default: 30%)",
+"  -c       Disable compaction",
 "",
 "  -t<file> One-line GC statistics  (default file: <program>.stat)",
 "  -s<file> Summary  GC statistics  (with -Sstderr going to stderr)",
@@ -467,6 +470,8 @@ usage_text[] = {
 "  -b...     All GranSim options start with -b; see GranSim User's Guide for details",
 #endif
 "",
+"RTS options may also be specified using the GHCRTS environment variable.",
+"",
 "Other RTS options may be available for programs compiled a different way.",
 "The GHC User's Guide has full details.",
 "",
@@ -527,6 +532,33 @@ setupRtsFlags(int *argc, char *argv[], int *rts_argc, char *rts_argv[])
     argv[*argc] = (char *) 0;
     rts_argv[*rts_argc] = (char *) 0;
 
+    // process arguments from the GHCRTS environment variable.
+    {
+	char *ghc_rts = getenv("GHCRTS");
+	char *c1, *c2, *s;
+
+	if (ghc_rts != NULL) {
+	    c1 = ghc_rts;
+	    do {
+		while (isspace(*c1)) { c1++; };
+		c2 = c1;
+		while (!isspace(*c2) && *c2 != '\0') { c2++; };
+
+		if (c1 == c2) { break; }
+
+		if (*rts_argc < MAX_RTS_ARGS-1) {
+		    s = malloc(c2-c1+1);
+		    strncpy(s, c1, c2-c1);
+		    s[c2-c1] = '\0';
+		    rts_argv[(*rts_argc)++] = s;
+		} else {
+		    barf("too many RTS arguments (max %d)", MAX_RTS_ARGS-1);
+		}
+
+		c1 = c2;
+	    } while (*c1 != '\0');
+	}
+    }
     /* Process RTS (rts_argv) part: mainly to determine statsfile */
 
     for (arg = 0; arg < *rts_argc; arg++) {
@@ -620,8 +652,14 @@ error = rtsTrue;
 		break;
 
 	      case 'c':
-		RtsFlags.GcFlags.compact = rtsTrue;
-		break;
+		  if (rts_argv[arg][2] != '\0') {
+		      RtsFlags.GcFlags.compact = rtsTrue;
+		      RtsFlags.GcFlags.compactThreshold =
+			  atof(rts_argv[arg]+2);
+		  } else {
+		      RtsFlags.GcFlags.compact = rtsFalse;
+		  }
+		  break;
 
 	      case 'F':
 	        RtsFlags.GcFlags.oldGenFactor = atof(rts_argv[arg]+2);

@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.113 2001/08/04 06:07:22 ken Exp $
+ * $Id: GC.c,v 1.114 2001/08/07 09:20:52 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -601,53 +601,13 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 
   // NO MORE EVACUATION AFTER THIS POINT!
   // Finally: compaction of the oldest generation.
-  if (major_gc && RtsFlags.GcFlags.compact) {
+  if (major_gc && oldest_gen->steps[0].is_compacted) {
       // save number of blocks for stats
       oldgen_saved_blocks = oldest_gen->steps[0].n_blocks;
       compact(get_roots);
   }
 
   IF_DEBUG(sanity, checkGlobalTSOList(rtsFalse));
-
-  /* Set the maximum blocks for the oldest generation, based on twice
-   * the amount of live data now, adjusted to fit the maximum heap
-   * size if necessary.  
-   *
-   * This is an approximation, since in the worst case we'll need
-   * twice the amount of live data plus whatever space the other
-   * generations need.
-   */
-  if (major_gc && RtsFlags.GcFlags.generations > 1) {
-      nat blocks = oldest_gen->steps[0].n_blocks +
-	  oldest_gen->steps[0].n_large_blocks;
-
-      oldest_gen->max_blocks = 
-	  stg_max(blocks * RtsFlags.GcFlags.oldGenFactor,
-		  RtsFlags.GcFlags.minOldGenSize);
-      if (RtsFlags.GcFlags.compact) {
-	  if ( oldest_gen->max_blocks >
-	       RtsFlags.GcFlags.maxHeapSize *
-	       (100 - RtsFlags.GcFlags.pcFreeHeap) / 100 ) {
-	      oldest_gen->max_blocks = 
-		  RtsFlags.GcFlags.maxHeapSize *
-		  (100 - RtsFlags.GcFlags.pcFreeHeap) / 100;
-	      if (oldest_gen->max_blocks < blocks) {
-		  belch("max_blocks: %ld, blocks: %ld, maxHeapSize: %ld",
-			oldest_gen->max_blocks,  blocks, RtsFlags.GcFlags.maxHeapSize);
-		  heapOverflow();
-	      }
-	  }
-      } else {
-	  if (oldest_gen->max_blocks > RtsFlags.GcFlags.maxHeapSize / 2) {
-	      oldest_gen->max_blocks = RtsFlags.GcFlags.maxHeapSize / 2;
-	      if (((int)oldest_gen->max_blocks - (int)blocks) < 
-		  (RtsFlags.GcFlags.pcFreeHeap *
-		   RtsFlags.GcFlags.maxHeapSize / 200)) {
-		  heapOverflow();
-	      }
-	  }
-      }
-  }
 
   /* run through all the generations/steps and tidy up 
    */
@@ -734,24 +694,8 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
 	stp->large_objects  = stp->scavenged_large_objects;
 	stp->n_large_blocks = stp->n_scavenged_large_blocks;
 
-	/* Set the maximum blocks for this generation, interpolating
-	 * between the maximum size of the oldest and youngest
-	 * generations.
-	 *
-	 * max_blocks =    oldgen_max_blocks * G
-	 *                 ----------------------
-	 *                      oldest_gen
-	 */
-	if (g != 0) {
-#if 0
-	  generations[g].max_blocks = (oldest_gen->max_blocks * g)
-	       / (RtsFlags.GcFlags.generations-1);
-#endif
-	  generations[g].max_blocks = oldest_gen->max_blocks;
-	}
-
-      // for older generations... 
       } else {
+	// for older generations... 
 	
 	/* For older generations, we need to append the
 	 * scavenged_large_object list (i.e. large objects that have been
@@ -770,7 +714,72 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     }
   }
 
-  // Guess the amount of live data for stats. 
+  /* Reset the sizes of the older generations when we do a major
+   * collection.
+   *
+   * CURRENT STRATEGY: make all generations except zero the same size.
+   * We have to stay within the maximum heap size, and leave a certain
+   * percentage of the maximum heap size available to allocate into.
+   */
+  if (major_gc && RtsFlags.GcFlags.generations > 1) {
+      nat live, size, min_alloc;
+      nat max  = RtsFlags.GcFlags.maxHeapSize;
+      nat gens = RtsFlags.GcFlags.generations;
+
+      // live in the oldest generations
+      live = oldest_gen->steps[0].n_blocks +
+	     oldest_gen->steps[0].n_large_blocks;
+
+      // default max size for all generations except zero
+      size = stg_max(live * RtsFlags.GcFlags.oldGenFactor,
+		     RtsFlags.GcFlags.minOldGenSize);
+
+      // minimum size for generation zero
+      min_alloc = (RtsFlags.GcFlags.pcFreeHeap * max) / 200;
+
+      // if we're going to go over the maximum heap size, reduce the
+      // size of the generations accordingly.  The calculation is
+      // different if compaction is turned on, because we don't need
+      // to double the space required to collect the old generation.
+      if (max != 0) {
+	  if (RtsFlags.GcFlags.compact) {
+	      if ( (size + (size - 1) * (gens - 2) * 2) + min_alloc > max ) {
+		  size = (max - min_alloc) / ((gens - 1) * 2 - 1);
+	      }
+	  } else {
+	      if ( (size * (gens - 1) * 2) + min_alloc > max ) {
+		  size = (max - min_alloc) / ((gens - 1) * 2);
+	      }
+	  }
+
+	  if (size < live) {
+	      heapOverflow();
+	  }
+      }
+
+#if 0
+      fprintf(stderr,"live: %d, min_alloc: %d, size : %d, max = %d\n", live,
+	      min_alloc, size, max);
+#endif
+
+      for (g = 0; g < gens; g++) {
+	  generations[g].max_blocks = size;
+      }
+
+      // Auto-enable compaction when the residency reaches a
+      // certain percentage of the maximum heap size (default: 30%).
+      if (RtsFlags.GcFlags.compact &&
+	  oldest_gen->steps[0].n_blocks > 
+	    (RtsFlags.GcFlags.compactThreshold * max) / 100) {
+	  oldest_gen->steps[0].is_compacted = 1;
+//	  fprintf(stderr,"compaction: on\n", live);
+      } else {
+	  oldest_gen->steps[0].is_compacted = 0;
+//	  fprintf(stderr,"compaction: off\n", live);
+      }
+  }
+
+  // Guess the amount of live data for stats.
   live = calcLive();
 
   /* Free the small objects allocated via allocate(), since this will
@@ -818,9 +827,9 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     /* For a two-space collector, we need to resize the nursery. */
     
     /* set up a new nursery.  Allocate a nursery size based on a
-     * function of the amount of live data (currently a factor of 2,
-     * should be configurable (ToDo)).  Use the blocks from the old
-     * nursery if possible, freeing up any left over blocks.
+     * function of the amount of live data (by default a factor of 2)
+     * Use the blocks from the old nursery if possible, freeing up any
+     * left over blocks.
      *
      * If we get near the maximum heap size, then adjust our nursery
      * size accordingly.  If the nursery is the same size as the live
@@ -829,7 +838,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
      * 
      * A normal 2-space collector would need 4L bytes to give the same
      * performance we get from 3L bytes, reducing to the same
-     * performance at 2L bytes.  
+     * performance at 2L bytes.
      */
     blocks = g0s0->n_to_blocks;
 
@@ -906,8 +915,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
     zero_static_object_list(scavenged_static_objects);
   }
 
-  /* Reset the nursery
-   */
+  // Reset the nursery
   resetNurseries();
 
   // start any pending finalizers 
@@ -1002,7 +1010,8 @@ traverse_weak_ptr_list(void)
 
     /* Now, check whether the key is reachable.
      */
-    if ((new = isAlive(w->key))) {
+    new = isAlive(w->key);
+    if (new != NULL) {
       w->key = new;
       // evacuate the value and finalizer 
       w->value = evacuate(w->value);
@@ -1063,7 +1072,6 @@ traverse_weak_ptr_list(void)
 	  // not alive (yet): leave this thread on the old_all_threads list.
 	  prev = &(t->global_link);
 	  next = t->global_link;
-	  continue;
       } 
       else {
 	  // alive: move this thread onto the all_threads list.
@@ -1071,7 +1079,6 @@ traverse_weak_ptr_list(void)
 	  t->global_link = all_threads;
 	  all_threads  = t;
 	  *prev = next;
-	  break;
       }
     }
   }
