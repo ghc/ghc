@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: PrimOps.h,v 1.33 1999/07/29 10:00:22 simonmar Exp $
+ * $Id: PrimOps.h,v 1.34 1999/08/24 09:33:08 simonmar Exp $
  *
  * (c) The GHC Team, 1998-1999
  *
@@ -132,7 +132,7 @@ I_ stg_div (I_ a, I_ b);
 	   jno 1f\n\t					\
 	   movl $1,%1\n\t				\
 	   1:" 						\
-	: "=r" (r), "=r" (c) : "r" (a), "0" (b));	\
+	: "=r" (r), "=&r" (c) : "r" (a), "0" (b));	\
 }
 
 #elif SIZEOF_VOID_P == 4
@@ -663,7 +663,9 @@ EF_(putMVarzh_fast);
    Delay/Wait PrimOps
    -------------------------------------------------------------------------- */
 
-/* Hmm, I'll think about these later. */
+EF_(waitReadzh_fast);
+EF_(waitWritezh_fast);
+EF_(delayzh_fast);
 
 /* -----------------------------------------------------------------------------
    Primitive I/O, error-handling PrimOps
@@ -710,6 +712,8 @@ EF_(killThreadzh_fast);
 EF_(seqzh_fast);
 
 #define myThreadIdzh(t) (t = CurrentTSO)
+
+extern int cmp_thread(const StgTSO *tso1, const StgTSO *tso2);
 
 /* Hmm, I'll think about these later. */
 /* -----------------------------------------------------------------------------
