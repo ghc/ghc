@@ -218,13 +218,13 @@ binary-pack::
 
 ifneq "$(way)" ""
 package-way-dist::
-	( cd $(BIN_DIST_TMPDIR); find $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print | xargs tar cvf $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar )
+	( cd $(BIN_DIST_TMPDIR); $(FIND) $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print | xargs tar cvf $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar )
 	gzip $(BIN_DIST_TMPDIR)/ghc-$(ProjectVersion)-$(way)-$(TARGETPLATFORM).tar
 endif
 
 ifneq "$(way)" ""
 remove-way-dist::
-	( cd $(BIN_DIST_TMPDIR); find $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec rm -f {} \; )
+	( cd $(BIN_DIST_TMPDIR); $(FIND) $(BIN_DIST_NAME)/ \( -name "*$(_way).a" -o -name "*.$(way_)hi" \) -print -exec rm -f {} \; )
 endif
 
 binary-dist::
@@ -294,12 +294,12 @@ dist-package-zip ::
 hc-file-bundle : project-check
 	$(RM) -r $(ProjectNameShort)-$(ProjectVersion)
 	$(LN_S) . $(ProjectNameShort)-$(ProjectVersion)
-	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
+	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
 	  \( -name "*.hc" -o -name "*_hsc.[ch]" -o -name "*_stub.[ch]" \) -print > hc-files-to-go
-	find $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
+	$(FIND) $(ProjectNameShort)-$(ProjectVersion)/ghc/compiler \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/driver \
 	     $(ProjectNameShort)-$(ProjectVersion)/ghc/lib \
 	     $(ProjectNameShort)-$(ProjectVersion)/hslibs \
