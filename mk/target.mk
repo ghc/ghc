@@ -234,8 +234,8 @@ ifneq "$(HS_PROG)" ""
 all :: $(HS_PROG)
 
 ifneq "$(BootingFromHc)" "YES"
-$(HS_PROG) :: $(HS_OBJS) $(C_OBJS)
-	$(HC) -o $@ $(HC_OPTS) $(LD_OPTS) $(HS_OBJS) $(C_OBJS)
+$(HS_PROG) :: $(OBJS)
+	$(HC) -o $@ $(HC_OPTS) $(LD_OPTS) $(OBJS)
 else
 # see bootstrap.mk
 $(HS_PROG) :: $(OBJS)
