@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: Makefile,v 1.79 2000/05/28 16:06:52 panne Exp $
+# $Id: Makefile,v 1.80 2000/06/01 08:29:09 simonmar Exp $
 
 TOP = ..
 include $(TOP)/mk/boilerplate.mk
@@ -189,10 +189,12 @@ typecheck/TcBinds_HC_OPTS       = -H10m
 typecheck/TcEnv_HC_OPTS		= -H10m
 utils/Argv_HC_OPTS 		= -fvia-C
 utils/SST_HC_OPTS 		= 
-utils/FastString_HC_OPTS	= 
 utils/StringBuffer_HC_OPTS	= -fvia-C -fno-prune-tydecls
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
 utils/DirUtils_HC_OPTS 		= 
+
+# temporary, due to bug in NCG  (SDM, 1/6/2000)
+utils/FastString_HC_OPTS	= -fvia-C
 
 ifeq "$(alpha_HOST_ARCH)" "1"
 # "stbu" bug in alpha native code generator...
