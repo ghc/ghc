@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.122 2002/02/13 08:48:06 sof Exp $
+ * $Id: Schedule.c,v 1.123 2002/02/14 07:52:05 sof Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -267,21 +267,6 @@ Mutex     sched_mutex       = INIT_MUTEX_VAR;
 Mutex     term_mutex        = INIT_MUTEX_VAR;
 
 
-/*
- * When a native thread has completed executing an external
- * call, it needs to communicate the result back to the
- * (Haskell) thread that made the call. Do this as follows:
- *
- *  - in resumeThread(), the thread increments the counter
- *    rts_n_returning_workers, and then blocks waiting on the
- *    condition returning_worker_cond.
- *  - upon entry to the scheduler, a worker/task checks 
- *    rts_n_returning_workers. If it is > 0, worker threads
- *    are waiting to return, so it gives up its capability
- *    to let a worker deposit its result.
- *  - the worker thread that gave up its capability then tries
- *    to re-grab a capability and re-enter the Scheduler.
- */
 
 
 /* thread_ready_cond: when signalled, a thread has become runnable for a
@@ -305,28 +290,13 @@ Condition thread_ready_cond = INIT_COND_VAR;
  * to create a new task when making an external call, keep track of
  * the number of tasks currently blocked waiting on thread_ready_cond.
  * (if > 0 => no need for a new task, just unblock an existing one).
+ *
+ * waitForWork() takes care of keeping it up-to-date; Task.startTask()
+ * uses its current value.
  */
 nat rts_n_waiting_tasks = 0;
 
-/* returning_worker_cond: when a worker thread returns from executing an
- * external call, it needs to wait for an RTS Capability before passing
- * on the result of the call to the Haskell thread that made it.
- * 
- * returning_worker_cond is signalled in Capability.releaseCapability().
- *
- */
-Condition returning_worker_cond = INIT_COND_VAR;
-
-/*
- * To avoid starvation of threads blocked on worker_thread_cond,
- * the task(s) that enter the Scheduler will check to see whether
- * there are one or more worker threads blocked waiting on
- * returning_worker_cond.
- *
- * Locks needed: sched_mutex
- */
-nat rts_n_waiting_workers = 0;
-
+static void waitForWork(void);
 
 # if defined(SMP)
 static Condition gc_pending_cond = INIT_COND_VAR;
@@ -456,20 +426,15 @@ schedule_start:
      * deposit the result of an external call. So,
      * be nice and hand over our capability.
      */
-    IF_DEBUG(scheduler, sched_belch("worker thread (%d): giving up RTS token (waiting workers: %d)\n", osThreadId(), rts_n_waiting_workers));
-    releaseCapability(cap);
-    RELEASE_LOCK(&sched_mutex);
-
-    yieldThread();
+    yieldCapability(cap);
+    /* Lost our sched_mutex lock, try to re-enter the scheduler. */
     goto schedule_start;
   }
 #endif
 
 #if defined(RTS_SUPPORTS_THREADS)
   while ( noCapabilities() ) {
-    rts_n_waiting_tasks++;
-    waitCondition(&thread_ready_cond, &sched_mutex);
-    rts_n_waiting_tasks--;
+    waitForWork();
   }
 #endif
 
@@ -731,7 +696,6 @@ schedule_start:
 	    if ( EMPTY_RUN_QUEUE() ) {
 	      IF_DEBUG(scheduler, sched_belch("all done, i think...shutting down."));
 	      shutdownHaskellAndExit(0);
-	    
 	    }
 #endif
 	    ASSERT( !EMPTY_RUN_QUEUE() );
@@ -761,9 +725,7 @@ schedule_start:
       releaseCapability(cap);
       while ( noCapabilities() || EMPTY_RUN_QUEUE() ) {
 	IF_DEBUG(scheduler, sched_belch("thread %d: waiting for work", osThreadId()));
-	rts_n_waiting_tasks++;
-	waitCondition( &thread_ready_cond, &sched_mutex );
-	rts_n_waiting_tasks--;
+	waitForWork();
 	IF_DEBUG(scheduler, sched_belch("thread %d: work now available %d %d", osThreadId(), getFreeCapabilities(),EMPTY_RUN_QUEUE()));
       }
     }
@@ -1566,21 +1528,10 @@ resumeThread( StgInt tok )
   Capability *cap;
 
 #if defined(RTS_SUPPORTS_THREADS)
-  IF_DEBUG(scheduler, sched_belch("worker %d: returning, waiting for sched. lock.\n", tok));
-  ACQUIRE_LOCK(&sched_mutex);
-  rts_n_waiting_workers++;
-  IF_DEBUG(scheduler, sched_belch("worker %d: returning; workers waiting: %d.\n", tok, rts_n_waiting_workers));
-
-  /*
-   * Wait for the go ahead
-   */
-  IF_DEBUG(scheduler, sched_belch("worker %d: waiting for capability %d...\n", tok, rts_n_free_capabilities));
-  while ( noCapabilities() ) {
-    waitCondition(&returning_worker_cond, &sched_mutex);
-  }
-  rts_n_waiting_workers--;
-
-  IF_DEBUG(scheduler, sched_belch("worker %d: acquired capability...\n", tok));
+  /* Wait for permission to re-enter the RTS with the result.. */
+  grabReturnCapability(&cap);
+#else
+  grabCapability(&cap);
 #endif
 
   /* Remove the thread off of the suspended list */
@@ -1597,30 +1548,26 @@ resumeThread( StgInt tok )
     barf("resumeThread: thread not found");
   }
   tso->link = END_TSO_QUEUE;
-
-#if defined(RTS_SUPPORTS_THREADS)
-  /* Is it clever to block here with the TSO off the list,
-   * but not hooked up to a capability?
-   */
-  while ( noCapabilities() ) {
-    IF_DEBUG(scheduler, sched_belch("waiting to resume"));
-    rts_n_waiting_tasks++;
-    waitCondition(&thread_ready_cond, &sched_mutex);
-    rts_n_waiting_tasks--;
-    IF_DEBUG(scheduler, sched_belch("resuming thread %d", tso->id));
-  }
-#endif
-
-  grabCapability(&cap);
-  RELEASE_LOCK(&sched_mutex);
-
   /* Reset blocking status */
   tso->why_blocked  = NotBlocked;
 
-  cap->r.rCurrentTSO = tso;
+  RELEASE_LOCK(&sched_mutex);
 
+  cap->r.rCurrentTSO = tso;
   return &cap->r;
 }
+
+
+#if defined(RTS_SUPPORTS_THREADS)
+static void
+waitForWork()
+{
+  rts_n_waiting_tasks++;
+  waitCondition(&thread_ready_cond, &sched_mutex);
+  rts_n_waiting_tasks--;
+  return;
+}
+#endif
 
 
 /* ---------------------------------------------------------------------------
@@ -2024,7 +1971,6 @@ initScheduler(void)
   initMutex(&term_mutex);
 
   initCondition(&thread_ready_cond);
-  initCondition(&returning_worker_cond);
 #endif
   
 #if defined(SMP)

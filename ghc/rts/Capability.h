@@ -28,14 +28,17 @@
 extern Capability MainCapability;
 #endif
 
-
 extern void initCapabilities(void);
-extern void grabCapability(Capability** cap);
+extern void grabCapability(Capability** pCap);
 extern void releaseCapability(Capability* cap);
 
 #if defined(RTS_SUPPORTS_THREADS)
 /* total number of available capabilities */
 extern nat rts_n_free_capabilities;  
+extern nat rts_n_waiting_workers;
+
+extern void grabReturnCapability(Capability** pCap);
+extern void yieldCapability(Capability* cap);
 
 static inline nat getFreeCapabilities (void)
 {
