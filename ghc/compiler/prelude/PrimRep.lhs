@@ -78,10 +78,12 @@ data PrimRep
 %************************************************************************
 
 Whether or not the thing is a pointer that the garbage-collector
-should follow.
+should follow. Or, to put it another (less confusing) way, whether
+the object in question is a heap object. 
 
-Or, to put it another (less confusing) way, whether the object in
-question is a heap object.
+Depending on the outcome, this predicate determines what stack
+the pointer/object possibly will have to be saved onto, and the
+computation of GC liveness info.
 
 \begin{code}
 isFollowableRep :: PrimRep -> Bool
@@ -93,7 +95,7 @@ isFollowableRep ByteArrayRep  = True
 --
 -- A: they're followable because these objects
 -- should be lugged around by the storage manager
--- (==> we need to generate code that identify them as such) -- 3/97 SOF
+-- (==> registers containing them are live) -- 3/97 SOF
 isFollowableRep ForeignObjRep  = True
 
 isFollowableRep StablePtrRep  = False
