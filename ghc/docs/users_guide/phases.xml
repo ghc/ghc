@@ -775,7 +775,15 @@ $ cat foo.hspp</screen>
       	</itemizedlist>
             Strictly speaking, <option>-main-is</option> is not a link-phase flag at all; it has no effect on the link step.
             The flag must be specified when compiling the module containing the specified main function (e.g. module <literal>A</literal>
-            in the latter two items above.  It has no effect for other modules (and hence can safely be given to <literal>ghc --make</literal>).
+            in the latter two items above).  It has no effect for other modules,
+            and hence can safely be given to <literal>ghc --make</literal>.
+	    However, if all the modules are otherwise up to date, you may need to force
+	    recompilation both of the module where the new "main" is, and of the
+	    module where the "main" function used to be;
+	    <literal>ghc</literal> is not clever 
+	    enough to figure out that they both need recompiling.  You can
+	    force recompilation by removing the object file, or by using the
+	    <option>-no-recomp</option> flag.
             </para> 
         </listitem>
       </varlistentry>
