@@ -28,7 +28,7 @@ module Data.Typeable
 
 	-- * Type-safe cast
 	cast,			-- :: (Typeable a, Typeable b) => a -> Maybe b
-	cast0,			-- a flexible variation on cast
+	gcast,			-- a flexible variation on cast
 
 	-- * Type representations
 	TypeRep,	-- abstract, instance of: Eq, Show, Typeable
@@ -48,8 +48,8 @@ module Data.Typeable
 	-- * The Typeable1 class
 	Typeable1( typeOf1 ),	-- :: t a -> TyCon
 	Typeable2( typeOf2 ),	-- :: t a b -> TyCon
-	cast1,			-- :: ... => c (t a) -> Maybe (c (t' a))
-	cast2			-- :: ... => c (t a b) -> Maybe (c (t' a b))
+	gcast1,			-- :: ... => c (t a) -> Maybe (c (t' a))
+	gcast2			-- :: ... => c (t a b) -> Maybe (c (t' a b))
 
   ) where
 
@@ -270,8 +270,8 @@ cast x = r
 
 
 -- | A flexible variation parameterised in a type constructor
-cast0 :: (Typeable a, Typeable b) => c a -> Maybe (c b)
-cast0 x = r
+gcast :: (Typeable a, Typeable b) => c a -> Maybe (c b)
+gcast x = r
  where
   r = if typeOf (getArg x) == typeOf (getArg (fromJust r))
         then Just $ unsafeCoerce x
@@ -521,51 +521,51 @@ appKeys k ks = foldl appKey k ks
 
 -- | Variant for unary type constructors
 class Typeable1 t where
-  typeOf1 :: t a -> TyCon
+  typeOf1 :: t a -> TypeRep
 
 
 -- | Variant for binary type constructors
 class Typeable2 t where
-  typeOf2 :: t a b -> TyCon
+  typeOf2 :: t a b -> TypeRep
 
 
 #ifndef __NHC__
 
 -- | Instance for lists
 instance Typeable1 [] where
-  typeOf1 _ = typerepTyCon (typeOf (undefined::[()]))
+  typeOf1 _ = mkAppTy (typerepTyCon (typeOf (undefined::[()]))) []
 
 
 -- | Instance for maybes
 instance Typeable1 Maybe where
-  typeOf1 _ = typerepTyCon (typeOf (undefined::Maybe ()))
+  typeOf1 _ = mkAppTy (typerepTyCon (typeOf (undefined::Maybe ()))) []
 
 
 -- | Instance for ratios
 instance Typeable1 Ratio where
-  typeOf1 _ = typerepTyCon (typeOf (undefined::Ratio ()))
+  typeOf1 _ = mkAppTy (typerepTyCon (typeOf (undefined::Ratio ()))) []
 
 
 -- | Instance for products
 instance Typeable2 (,) where
-  typeOf2 _ = typerepTyCon (typeOf (undefined::((),())))
+  typeOf2 _ = mkAppTy (typerepTyCon (typeOf (undefined::((),())))) []
 
 
 -- | Instance for sums
 instance Typeable2 Either where
-  typeOf2 _ = typerepTyCon (typeOf (undefined::Either () ()))
+  typeOf2 _ = mkAppTy (typerepTyCon (typeOf (undefined::Either () ()))) []
 
 
 -- | Instance for functions
 instance Typeable2 (->) where
-  typeOf2 _ = typerepTyCon (typeOf (undefined::() -> ()))
+  typeOf2 _ = mkAppTy (typerepTyCon (typeOf (undefined::() -> ()))) []
 
 #endif
 
 
 -- | Cast for * -> *
-cast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
-cast1 x = r
+gcast1 :: (Typeable1 t, Typeable1 t') => c (t a) -> Maybe (c (t' a)) 
+gcast1 x = r
  where
   r = if typeOf1 (getArg x) == typeOf1 (getArg (fromJust r))
        then Just $ unsafeCoerce x
@@ -575,8 +575,8 @@ cast1 x = r
 
 
 -- | Cast for * -> * -> *
-cast2 :: (Typeable2 t, Typeable2 t') => c (t a b) -> Maybe (c (t' a b)) 
-cast2 x = r
+gcast2 :: (Typeable2 t, Typeable2 t') => c (t a b) -> Maybe (c (t' a b)) 
+gcast2 x = r
  where
   r = if typeOf2 (getArg x) == typeOf2 (getArg (fromJust r))
        then Just $ unsafeCoerce x

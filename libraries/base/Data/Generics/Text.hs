@@ -43,7 +43,7 @@ gshow :: Data a => a -> String
 -- 
 gshow = ( \t ->
                 "("
-             ++ conString (toConstr t)
+             ++ showConstr (toConstr t)
              ++ concat (gmapQ ((++) " " . gshow) t)
              ++ ")"
         ) `extQ` (show :: String -> String)
@@ -107,7 +107,7 @@ gread = readP_to_S gread'
     -- failing in the monad if it isn't a constructor of this data type
     str2con :: String -> ReadP Constr	
     str2con = maybe mzero return
-            . stringCon myDataType
+            . readConstr myDataType
 
     -- Get a Constr's string at the front of an input string
     parseConstr :: ReadP String

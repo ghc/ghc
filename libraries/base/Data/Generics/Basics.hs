@@ -16,7 +16,7 @@
 
 module Data.Generics.Basics ( 
 
-	-- Module Data.Typeable re-exported for convenience
+	-- * Module Data.Typeable re-exported for convenience
 	module Data.Typeable,
 
 	-- * The Data class for processing constructor applications
@@ -25,48 +25,49 @@ module Data.Generics.Basics (
 		toConstr, 	-- :: a -> Constr
 		fromConstr,	-- :: Constr -> a
 		dataTypeOf,	-- :: a -> DataType
-		cast0to1,	-- mediate types and unary type constructors
-		cast0to2	-- mediate types and binary type constructors
+		dataCast1,	-- mediate types and unary type constructors
+		dataCast2	-- mediate types and binary type constructors
             ),
 
 	-- * Datatype representations
 	DataType,	-- abstract, instance of: Show
 	Constr,		-- abstract, instance of: Eq, Show
 	DataRep(..),	-- instance of: Eq, Show
-	ConRep(..),	-- instance of: Eq, Show
+	ConstrRep(..),	-- instance of: Eq, Show
 	ConIndex,	-- alias for Int, start at 1
 	Fixity(..),	-- instance of: Eq, Show
 
 	-- * Observers for datatype representations
-	dataTypeCon,	-- :: DataType -> String
+	dataTypeName,	-- :: DataType -> String
 	dataTypeRep,	-- :: DataType -> DataRep
- 	conDataType,	-- :: Constr -> DataType
- 	conRep,		-- :: Constr -> ConRep
- 	repCon,		-- :: DataType -> ConRep -> Constr
+ 	constrType,	-- :: Constr   -> DataType
+ 	constrRep,	-- :: Constr   -> ConstrRep
+ 	repConstr,		-- :: DataType -> ConstrRep -> Constr
 
 	-- * Representations of algebraic data types
-	mkDataType,	-- :: String -> [Constr] -> DataType
- 	mkDataCon,	-- :: DataType -> String -> Fixity -> Constr
-	algTypeCons,	-- :: DataType -> [Constr]
- 	conFixity,	-- :: Constr -> Fixity
+	mkDataType,	-- :: String   -> [Constr] -> DataType
+ 	mkConstr,	-- :: DataType -> String -> Fixity -> Constr
+	dataTypeConstrs,-- :: DataType -> [Constr]
+ 	constrFields,	-- :: Constr   -> [String]
+ 	constrFixity,	-- :: Constr   -> Fixity
 
 	-- * From strings to constr's and vice versa: all data types
-	conString, 	-- :: Constr -> String
-	stringCon,	-- :: DataType -> String -> Maybe Constr
+	showConstr, 	-- :: Constr   -> String
+	readConstr,	-- :: DataType -> String -> Maybe Constr
 
 	-- * Convenience funtions: algebraic data types
 	isAlgType,	-- :: DataType -> Bool
-	indexCon,	-- :: DataType -> ConIndex -> Constr
-	conIndex,	-- :: Constr -> ConIndex
-	maxConIndex,	-- :: DataType -> ConIndex
+	indexConstr,	-- :: DataType -> ConIndex -> Constr
+	constrIndex,	-- :: Constr   -> ConIndex
+	maxConstrIndex,	-- :: DataType -> ConIndex
 
 	-- * Representation of primitive types
 	mkIntType,	-- :: String -> DataType
 	mkFloatType,	-- :: String -> DataType
 	mkStringType,	-- :: String -> DataType
-	mkIntCon,	-- :: DataType -> Integer -> Constr
-	mkFloatCon,	-- :: DataType -> Double  -> Constr
-	mkStringCon,	-- :: DataType -> String  -> Constr
+	mkIntConstr,	-- :: DataType -> Integer -> Constr
+	mkFloatConstr,	-- :: DataType -> Double  -> Constr
+	mkStringConstr,	-- :: DataType -> String  -> Constr
 
 	-- * Non-representations for non-presentable types
 	mkNorepType,	-- :: String -> DataType
@@ -179,16 +180,16 @@ fold.
 ------------------------------------------------------------------------------
 
   -- | Mediate types and unary type constructors
-  cast0to1 :: Typeable1 t
-           => (forall a. Data a => c (t a))
-           -> Maybe (c a)
-  cast0to1 _ = Nothing
+  dataCast1 :: Typeable1 t
+            => (forall a. Data a => c (t a))
+            -> Maybe (c a)
+  dataCast1 _ = Nothing
 
   -- | Mediate types and binary type constructors
-  cast0to2 :: Typeable2 t
-           => (forall a b. (Data a, Data b) => c (t a b))
-           -> Maybe (c a)
-  cast0to2 _ = Nothing
+  dataCast2 :: Typeable2 t
+            => (forall a b. (Data a, Data b) => c (t a b))
+            -> Maybe (c a)
+  dataCast2 _ = Nothing
 
 
 
@@ -379,8 +380,9 @@ data DataType = DataType
 
 -- | Representation of constructors
 data Constr = Constr
-			{ conrep    :: ConRep
+			{ conrep    :: ConstrRep
 			, constring :: String
+			, confields :: [String]	-- for AlgRep only
 			, confixity :: Fixity	-- for AlgRep only
 			, datatype  :: DataType
 			}
@@ -391,7 +393,7 @@ instance Show Constr where
 
 -- | Equality of constructors
 instance Eq Constr where
-  c == c' = conRep c == conRep c'
+  c == c' = constrRep c == constrRep c'
 
 
 -- | Public representation of datatypes
@@ -405,12 +407,12 @@ data DataRep = AlgRep [Constr]
 
 
 -- | Public representation of constructors
-data ConRep = AlgCon ConIndex
-            | IntCon Integer
-    	    | FloatCon Double
-    	    | StringCon String
+data ConstrRep = AlgConstr    ConIndex
+               | IntConstr    Integer
+    	       | FloatConstr  Double
+    	       | StringConstr String
 
-	    deriving (Eq,Show)
+	       deriving (Eq,Show)
 
 
 --
@@ -435,8 +437,8 @@ data Fixity = Prefix
 
 
 -- | Gets the type constructor including the module
-dataTypeCon :: DataType -> String
-dataTypeCon = tycon
+dataTypeName :: DataType -> String
+dataTypeName = tycon
 
 
 
@@ -446,24 +448,24 @@ dataTypeRep = datarep
 
 
 -- | Gets the datatype of a constructor
-conDataType :: Constr -> DataType
-conDataType = datatype
+constrType :: Constr -> DataType
+constrType = datatype
 
 
 -- | Gets the public presentation of constructors
-conRep :: Constr -> ConRep
-conRep = conrep
+constrRep :: Constr -> ConstrRep
+constrRep = conrep
 
 
 -- | Look up a constructor by its representation
-repCon :: DataType -> ConRep -> Constr
-repCon dt cr =
+repConstr :: DataType -> ConstrRep -> Constr
+repConstr dt cr =
       case (dataTypeRep dt, cr) of
-	(AlgRep cs, AlgCon i)      -> cs !! (i-1)
-	(IntRep,    IntCon i)      -> mkIntCon dt i
-	(FloatRep,  FloatCon f)    -> mkFloatCon dt f
-	(StringRep, StringCon str) -> mkStringCon dt str
-	_ -> error "repCon"
+	(AlgRep cs, AlgConstr i)      -> cs !! (i-1)
+	(IntRep,    IntConstr i)      -> mkIntConstr dt i
+	(FloatRep,  FloatConstr f)    -> mkFloatConstr dt f
+	(StringRep, StringConstr str) -> mkStringConstr dt str
+	_ -> error "repConstr"
 
 
 
@@ -483,29 +485,35 @@ mkDataType str cs = DataType
 
 
 -- | Constructs a constructor
-mkDataCon :: DataType -> String -> Fixity -> Constr
-mkDataCon dt str fix =
+mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
+mkConstr dt str fields fix =
 	Constr
-		{ conrep    = AlgCon idx
+		{ conrep    = AlgConstr idx
 		, constring = str
+		, confields = fields
 		, confixity = fix
 		, datatype  = dt 
 		}
   where
-    idx = head [ i | (c,i) <- algTypeCons dt `zip` [1..],
-                     conString c == str ]
+    idx = head [ i | (c,i) <- dataTypeConstrs dt `zip` [1..],
+                     showConstr c == str ]
 
 
 -- | Gets the constructors
-algTypeCons :: DataType -> [Constr]
-algTypeCons dt = case datarep dt of 
-		   (AlgRep cons) -> cons
-		   _ -> error "algTypeCons"
+dataTypeConstrs :: DataType -> [Constr]
+dataTypeConstrs dt = case datarep dt of 
+			(AlgRep cons) -> cons
+			_ -> error "dataTypeConstrs"
+
+
+-- | Gets the field labels of a constructor
+constrFields :: Constr -> [String]
+constrFields = confields
 
 
 -- | Gets the fixity of a constructor
-conFixity :: Constr -> Fixity
-conFixity = confixity
+constrFixity :: Constr -> Fixity
+constrFixity = confixity
 
 
 
@@ -517,18 +525,18 @@ conFixity = confixity
 
 
 -- | Gets the string for a constructor
-conString :: Constr -> String
-conString = constring
+showConstr :: Constr -> String
+showConstr = constring
 
 
 -- | Lookup a constructor via a string
-stringCon :: DataType -> String -> Maybe Constr
-stringCon dt str =
+readConstr :: DataType -> String -> Maybe Constr
+readConstr dt str =
       case dataTypeRep dt of
 	AlgRep cons -> idx cons
-	IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntCon i)))
-	FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatCon f)))
-	StringRep   -> Just (mkStringCon dt str)
+	IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
+	FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatConstr f)))
+	StringRep   -> Just (mkStringConstr dt str)
         NoRep       -> Nothing
   where
 
@@ -540,7 +548,7 @@ stringCon dt str =
 
     -- Traverse list of algebraic datatype constructors
     idx :: [Constr] -> Maybe Constr
-    idx cons = let fit = filter ((==) str . conString) cons 
+    idx cons = let fit = filter ((==) str . showConstr) cons 
                 in if fit == []
                      then Nothing
                      else Just (head fit)
@@ -561,24 +569,24 @@ isAlgType dt = case datarep dt of
 
 
 -- | Gets the constructor for an index
-indexCon :: DataType -> ConIndex -> Constr
-indexCon dt idx = case datarep dt of
-                    (AlgRep cs) -> cs !! (idx-1)
-                    _           -> error "indexCon"
+indexConstr :: DataType -> ConIndex -> Constr
+indexConstr dt idx = case datarep dt of
+			(AlgRep cs) -> cs !! (idx-1)
+			_           -> error "indexConstr"
 
 
 -- | Gets the index of a constructor
-conIndex :: Constr -> ConIndex
-conIndex con = case conRep con of
-                 (AlgCon idx) -> idx
-		 _ -> error "conIndex"
+constrIndex :: Constr -> ConIndex
+constrIndex con = case constrRep con of
+                    (AlgConstr idx) -> idx
+ 		    _ -> error "constrIndex"
 
 
 -- | Gets the maximum constructor index
-maxConIndex :: DataType -> ConIndex
-maxConIndex dt = case dataTypeRep dt of
-		   AlgRep cs -> length cs
-		   _ 	     -> error "maxConIndex"
+maxConstrIndex :: DataType -> ConIndex
+maxConstrIndex dt = case dataTypeRep dt of
+			AlgRep cs -> length cs
+			_ 	     -> error "maxConstrIndex"
 
 
 
@@ -613,31 +621,32 @@ mkPrimType dr str = DataType
 
 
 -- Makes a constructor for primitive types
-mkPrimCon :: DataType -> String -> ConRep -> Constr
+mkPrimCon :: DataType -> String -> ConstrRep -> Constr
 mkPrimCon dt str cr = Constr 
 			{ datatype  = dt
 			, conrep    = cr
 			, constring = str
-			, confixity = error "conFixity"
+			, confields = error "constrFields"
+			, confixity = error "constrFixity"
 			}
 
 
-mkIntCon :: DataType -> Integer -> Constr
-mkIntCon dt i = case datarep dt of
-		  IntRep -> mkPrimCon dt (show i) (IntCon i)
-		  _ -> error "mkIntCon"
+mkIntConstr :: DataType -> Integer -> Constr
+mkIntConstr dt i = case datarep dt of
+		  IntRep -> mkPrimCon dt (show i) (IntConstr i)
+		  _ -> error "mkIntConstr"
 
 
-mkFloatCon :: DataType -> Double -> Constr
-mkFloatCon dt f = case datarep dt of
-		    FloatRep -> mkPrimCon dt (show f) (FloatCon f)
-		    _ -> error "mkFloatCon"
+mkFloatConstr :: DataType -> Double -> Constr
+mkFloatConstr dt f = case datarep dt of
+		    FloatRep -> mkPrimCon dt (show f) (FloatConstr f)
+		    _ -> error "mkFloatConstr"
 
 
-mkStringCon :: DataType -> String -> Constr
-mkStringCon dt str = case datarep dt of
-		       StringRep -> mkPrimCon dt str (StringCon str)
-		       _ -> error "mkStringCon"
+mkStringConstr :: DataType -> String -> Constr
+mkStringConstr dt str = case datarep dt of
+		       StringRep -> mkPrimCon dt str (StringConstr str)
+		       _ -> error "mkStringConstr"
 
 
 ------------------------------------------------------------------------------

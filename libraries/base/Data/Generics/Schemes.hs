@@ -25,6 +25,13 @@ module Data.Generics.Schemes (
 	listify,
         something,
 	synthesize,
+	gsize,
+	glength,
+	gdepth,
+	gcount,
+	gnodecount,
+	gtypecount,
+	gfindtype
 
  ) where
 
@@ -117,3 +124,45 @@ something = everything orElse
 --
 synthesize :: s  -> (s -> s -> s) -> GenericQ (s -> s) -> GenericQ s
 synthesize z o f x = f x (foldr o z (gmapQ (synthesize z o f) x))
+
+
+-- | Compute size of an arbitrary data structure
+gsize :: Data a => a -> Int
+gsize t = 1 + sum (gmapQ gsize t)
+
+
+-- | Count the number of immediate subterms of the given term
+glength :: GenericQ Int
+glength = length . gmapQ (const ())
+
+
+-- | Determine depth of the given term
+gdepth :: GenericQ Int
+gdepth = (+) 1 . foldr max 0 . gmapQ gdepth
+
+
+-- | Determine the number of all suitable nodes in a given term
+gcount :: GenericQ Bool -> GenericQ Int
+gcount p =  everything (+) (\x -> if p x then 1 else 0)
+
+
+-- | Determine the number of all nodes in a given term
+gnodecount :: GenericQ Int
+gnodecount = gcount (const True)
+
+
+-- | Determine the number of nodes of a given type in a given term
+gtypecount :: Typeable a => a -> GenericQ Int
+gtypecount (_::a) = gcount (False `mkQ` (\(_::a) -> True))
+
+
+-- | Find (unambiguously) an immediate subterm of a given type
+gfindtype :: (Data x, Data y) => x -> Maybe y
+gfindtype = singleton
+          . foldl unJust []
+          . gmapQ (Nothing `mkQ` Just)
+ where
+  unJust l (Just x) = x:l
+  unJust l Nothing  = l
+  singleton [s] = Just s
+  singleton _   = Nothing

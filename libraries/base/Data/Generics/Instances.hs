@@ -46,14 +46,14 @@ import GHC.Stable	     -- So we can give Data instance for StablePtr
 ------------------------------------------------------------------------------
 
 
-falseConstr  = mkDataCon boolDataType "False" Prefix
-trueConstr   = mkDataCon boolDataType "True"  Prefix
+falseConstr  = mkConstr boolDataType "False" [] Prefix
+trueConstr   = mkConstr boolDataType "True"  [] Prefix
 boolDataType = mkDataType "Prelude.Bool" [falseConstr,trueConstr]
 
 instance Data Bool where
   toConstr False = falseConstr
   toConstr True  = trueConstr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> False
                    2 -> True
                    _ -> error "fromConstr"
@@ -66,9 +66,9 @@ instance Data Bool where
 charType = mkStringType "Prelude.Char"
 
 instance Data Char where
-  toConstr x = mkStringCon charType [x]
-  fromConstr con = case conRep con of
-                     (StringCon [x]) -> x
+  toConstr x = mkStringConstr charType [x]
+  fromConstr con = case constrRep con of
+                     (StringConstr [x]) -> x
                      _ -> error "fromConstr"
   dataTypeOf _ = charType
 
@@ -79,9 +79,9 @@ instance Data Char where
 floatType = mkFloatType "Prelude.Float"
 
 instance Data Float where
-  toConstr x = mkFloatCon floatType (realToFrac x)
-  fromConstr con = case conRep con of
-                     (FloatCon x) -> realToFrac x
+  toConstr x = mkFloatConstr floatType (realToFrac x)
+  fromConstr con = case constrRep con of
+                     (FloatConstr x) -> realToFrac x
                      _ -> error "fromConstr"
   dataTypeOf _ = floatType
 
@@ -92,9 +92,9 @@ instance Data Float where
 doubleType = mkFloatType "Prelude.Double"
 
 instance Data Double where
-  toConstr = mkFloatCon floatType
-  fromConstr con = case conRep con of
-                     (FloatCon x) -> x
+  toConstr = mkFloatConstr floatType
+  fromConstr con = case constrRep con of
+                     (FloatConstr x) -> x
                      _ -> error "fromConstr"
   dataTypeOf _ = doubleType
 
@@ -105,9 +105,9 @@ instance Data Double where
 intType = mkIntType "Prelude.Int"
 
 instance Data Int where
-  toConstr x = mkIntCon intType (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr intType (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = intType
 
@@ -118,9 +118,9 @@ instance Data Int where
 integerType = mkIntType "Prelude.Integer"
 
 instance Data Integer where
-  toConstr = mkIntCon integerType
-  fromConstr con = case conRep con of
-                     (IntCon x) -> x
+  toConstr = mkIntConstr integerType
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> x
                      _ -> error "fromConstr"
   dataTypeOf _ = integerType
 
@@ -131,9 +131,9 @@ instance Data Integer where
 int8Type = mkIntType "Data.Int.Int8"
 
 instance Data Int8 where
-  toConstr x = mkIntCon int8Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr int8Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = int8Type
 
@@ -144,9 +144,9 @@ instance Data Int8 where
 int16Type = mkIntType "Data.Int.Int16"
 
 instance Data Int16 where
-  toConstr x = mkIntCon int16Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr int16Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = int16Type
 
@@ -157,9 +157,9 @@ instance Data Int16 where
 int32Type = mkIntType "Data.Int.Int32"
 
 instance Data Int32 where
-  toConstr x = mkIntCon int32Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr int32Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = int32Type
 
@@ -170,9 +170,9 @@ instance Data Int32 where
 int64Type = mkIntType "Data.Int.Int64"
 
 instance Data Int64 where
-  toConstr x = mkIntCon int64Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr int64Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = int64Type
 
@@ -183,9 +183,9 @@ instance Data Int64 where
 wordType = mkIntType "Data.Word.Word"
 
 instance Data Word where
-  toConstr x = mkIntCon wordType (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr wordType (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = wordType
 
@@ -196,9 +196,9 @@ instance Data Word where
 word8Type = mkIntType "Data.Word.Word8"
 
 instance Data Word8 where
-  toConstr x = mkIntCon word8Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr word8Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = word8Type
 
@@ -209,9 +209,9 @@ instance Data Word8 where
 word16Type = mkIntType "Data.Word.Word16"
 
 instance Data Word16 where
-  toConstr x = mkIntCon word16Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr word16Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = word16Type
 
@@ -222,9 +222,9 @@ instance Data Word16 where
 word32Type = mkIntType "Data.Word.Word32"
 
 instance Data Word32 where
-  toConstr x = mkIntCon word32Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr word32Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = word32Type
 
@@ -235,9 +235,9 @@ instance Data Word32 where
 word64Type = mkIntType "Data.Word.Word64"
 
 instance Data Word64 where
-  toConstr x = mkIntCon word64Type (fromIntegral x)
-  fromConstr con = case conRep con of
-                     (IntCon x) -> fromIntegral x
+  toConstr x = mkIntConstr word64Type (fromIntegral x)
+  fromConstr con = case constrRep con of
+                     (IntConstr x) -> fromIntegral x
                      _ -> error "fromConstr"
   dataTypeOf _ = word64Type
 
@@ -245,12 +245,12 @@ instance Data Word64 where
 ------------------------------------------------------------------------------
 
 
-ratioConstr = mkDataCon ratioDataType ":%" Infix
+ratioConstr = mkConstr ratioDataType ":%" [] Infix
 ratioDataType = mkDataType "GHC.Real.Ratio" [ratioConstr]
 
 instance (Data a, Integral a) => Data (Ratio a) where
   toConstr _ = ratioConstr
-  fromConstr c | conIndex c == 1 = undefined :% undefined
+  fromConstr c | constrIndex c == 1 = undefined :% undefined
   fromConstr _ = error "fromConstr"
   dataTypeOf _ = ratioDataType
 
@@ -258,8 +258,8 @@ instance (Data a, Integral a) => Data (Ratio a) where
 ------------------------------------------------------------------------------
 
 
-nilConstr    = mkDataCon listDataType "[]"  Prefix
-consConstr   = mkDataCon listDataType "(:)" Infix
+nilConstr    = mkConstr listDataType "[]"  [] Prefix
+consConstr   = mkConstr listDataType "(:)" [] Infix
 listDataType = mkDataType "Prelude.[]" [nilConstr,consConstr]
 
 instance Data a => Data [a] where
@@ -267,12 +267,12 @@ instance Data a => Data [a] where
   gfoldl f z (x:xs) = z (:) `f` x `f` xs
   toConstr []    = nilConstr
   toConstr (_:_) = consConstr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> []
                    2 -> undefined:undefined
                    _ -> error "fromConstr"
   dataTypeOf _ = listDataType
-  cast0to1   = cast1
+  dataCast1    = gcast1
 
 --
 -- The gmaps are given as an illustration.
@@ -289,8 +289,8 @@ instance Data a => Data [a] where
 ------------------------------------------------------------------------------
 
 
-nothingConstr = mkDataCon maybeDataType "Nothing" Prefix
-justConstr    = mkDataCon maybeDataType "Just"    Prefix
+nothingConstr = mkConstr maybeDataType "Nothing" [] Prefix
+justConstr    = mkConstr maybeDataType "Just"    [] Prefix
 maybeDataType = mkDataType "Prelude.Maybe" [nothingConstr,justConstr]
 
 instance Data a => Data (Maybe a) where
@@ -298,20 +298,20 @@ instance Data a => Data (Maybe a) where
   gfoldl f z (Just x) = z Just `f` x
   toConstr Nothing  = nothingConstr
   toConstr (Just _) = justConstr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> Nothing
                    2 -> Just undefined
                    _ -> error "fromConstr"
   dataTypeOf _ = maybeDataType
-  cast0to1   = cast1
+  dataCast1    = gcast1
 
 
 ------------------------------------------------------------------------------
 
 
-ltConstr         = mkDataCon orderingDataType "LT" Prefix
-eqConstr         = mkDataCon orderingDataType "EQ" Prefix
-gtConstr         = mkDataCon orderingDataType "GT" Prefix
+ltConstr         = mkConstr orderingDataType "LT" [] Prefix
+eqConstr         = mkConstr orderingDataType "EQ" [] Prefix
+gtConstr         = mkConstr orderingDataType "GT" [] Prefix
 orderingDataType = mkDataType "Prelude.Ordering" [ltConstr,eqConstr,gtConstr]
 
 instance Data Ordering where
@@ -321,7 +321,7 @@ instance Data Ordering where
   toConstr LT  = ltConstr
   toConstr EQ  = eqConstr
   toConstr GT  = gtConstr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> LT
                    2 -> EQ
                    3 -> GT
@@ -332,8 +332,8 @@ instance Data Ordering where
 ------------------------------------------------------------------------------
 
 
-leftConstr     = mkDataCon eitherDataType "Left"  Prefix
-rightConstr    = mkDataCon eitherDataType "Right" Prefix
+leftConstr     = mkConstr eitherDataType "Left"  [] Prefix
+rightConstr    = mkConstr eitherDataType "Right" [] Prefix
 eitherDataType = mkDataType "Prelude.Either" [leftConstr,rightConstr]
 
 instance (Data a, Data b) => Data (Either a b) where
@@ -341,12 +341,12 @@ instance (Data a, Data b) => Data (Either a b) where
   gfoldl f z (Right a)  = z Right `f` a
   toConstr (Left _)  = leftConstr
   toConstr (Right _) = rightConstr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> Left undefined
                    2 -> Right undefined
                    _ -> error "fromConstr"
   dataTypeOf _ = eitherDataType
-  cast0to2   = cast2
+  dataCast2    = gcast2
 
 
 ------------------------------------------------------------------------------
@@ -360,18 +360,18 @@ instance (Data a, Data b) => Data (a -> b) where
   toConstr _   = error "toConstr"
   fromConstr _ = error "fromConstr"
   dataTypeOf _ = mkNorepType "Prelude.(->)"
-  cast0to2     = cast2
+  dataCast2    = gcast2
 
 
 ------------------------------------------------------------------------------
 
 
-tuple0Constr = mkDataCon tuple0DataType "()" Prefix
+tuple0Constr = mkConstr tuple0DataType "()" [] Prefix
 tuple0DataType = mkDataType "Prelude.()" [tuple0Constr]
 
 instance Data () where
   toConstr _ = tuple0Constr
-  fromConstr c | conIndex c == 1 = ()  
+  fromConstr c | constrIndex c == 1 = ()  
   fromConstr _ = error "fromConstr"
   dataTypeOf _ = tuple0DataType
 
@@ -379,28 +379,28 @@ instance Data () where
 ------------------------------------------------------------------------------
 
 
-tuple2Constr = mkDataCon tuple2DataType "(,)" Infix
+tuple2Constr = mkConstr tuple2DataType "(,)" [] Infix
 tuple2DataType = mkDataType "Prelude.(,)" [tuple2Constr]
 
 instance (Data a, Data b) => Data (a,b) where
   gfoldl f z (a,b) = z (,) `f` a `f` b
   toConstr _ = tuple2Constr
-  fromConstr c | conIndex c == 1 = (undefined,undefined)
+  fromConstr c | constrIndex c == 1 = (undefined,undefined)
   fromConstr _ = error "fromConstr"
   dataTypeOf _ = tuple2DataType
-  cast0to2   = cast2
+  dataCast2    = gcast2
 
 
 ------------------------------------------------------------------------------
 
 
-tuple3Constr = mkDataCon tuple3DataType "(,,)" Infix
+tuple3Constr = mkConstr tuple3DataType "(,,)" [] Infix
 tuple3DataType = mkDataType "Prelude.(,)" [tuple3Constr]
 
 instance (Data a, Data b, Data c) => Data (a,b,c) where
   gfoldl f z (a,b,c) = z (,,) `f` a `f` b `f` c
   toConstr _ = tuple3Constr
-  fromConstr c | conIndex c == 1 = (undefined,undefined,undefined)
+  fromConstr c | constrIndex c == 1 = (undefined,undefined,undefined)
   fromConstr _ = error "fromConstr"
   dataTypeOf _ = tuple3DataType
 
@@ -408,14 +408,14 @@ instance (Data a, Data b, Data c) => Data (a,b,c) where
 ------------------------------------------------------------------------------
 
 
-tuple4Constr = mkDataCon tuple4DataType "(,,,)" Infix
+tuple4Constr = mkConstr tuple4DataType "(,,,)" [] Infix
 tuple4DataType = mkDataType "Prelude.(,,,)" [tuple4Constr]
 
 instance (Data a, Data b, Data c, Data d)
          => Data (a,b,c,d) where
   gfoldl f z (a,b,c,d) = z (,,,) `f` a `f` b `f` c `f` d
   toConstr _ = tuple4Constr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> (undefined,undefined,undefined,undefined)
                    _ -> error "fromConstr"
   dataTypeOf _ = tuple4DataType
@@ -424,14 +424,14 @@ instance (Data a, Data b, Data c, Data d)
 ------------------------------------------------------------------------------
 
 
-tuple5Constr = mkDataCon tuple5DataType "(,,,,)" Infix
+tuple5Constr = mkConstr tuple5DataType "(,,,,)" [] Infix
 tuple5DataType = mkDataType "Prelude.(,,,,)" [tuple5Constr]
 
 instance (Data a, Data b, Data c, Data d, Data e)
          => Data (a,b,c,d,e) where
   gfoldl f z (a,b,c,d,e) = z (,,,,) `f` a `f` b `f` c `f` d `f` e
   toConstr _ = tuple5Constr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
                    1 -> (undefined,undefined,undefined,undefined,undefined)
                    _ -> error "fromConstr"
   dataTypeOf _ = tuple5DataType
@@ -440,7 +440,7 @@ instance (Data a, Data b, Data c, Data d, Data e)
 ------------------------------------------------------------------------------
 
 
-tuple6Constr = mkDataCon tuple6DataType "(,,,,,)" Infix
+tuple6Constr = mkConstr tuple6DataType "(,,,,,)" [] Infix
 tuple6DataType = mkDataType "Prelude.(,,,,,)" [tuple6Constr]
 
 instance (Data a, Data b, Data c, Data d, Data e, Data f)
@@ -448,7 +448,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f)
   gfoldl f z (a,b,c,d,e,f') = z (,,,,,) `f` a `f` b `f` c `f` d `f` e `f` f'
   toConstr _ = tuple6Constr
   fromConstr c =
-    case conIndex c of
+    case constrIndex c of
            1 -> (undefined,undefined,undefined,undefined,undefined,undefined)
            _ -> error "fromConstr"
   dataTypeOf _ = tuple6DataType
@@ -457,7 +457,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f)
 ------------------------------------------------------------------------------
 
 
-tuple7Constr = mkDataCon tuple7DataType "(,,,,,,)" Infix
+tuple7Constr = mkConstr tuple7DataType "(,,,,,,)" [] Infix
 tuple7DataType = mkDataType "Prelude.(,,,,,,)" [tuple7Constr]
 
 instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
@@ -465,7 +465,7 @@ instance (Data a, Data b, Data c, Data d, Data e, Data f, Data g)
   gfoldl f z (a,b,c,d,e,f',g) =
     z (,,,,,,) `f` a `f` b `f` c `f` d `f` e `f` f' `f` g
   toConstr _ = tuple7Constr
-  fromConstr c = case conIndex c of
+  fromConstr c = case constrIndex c of
    1 -> (undefined,undefined,undefined,undefined,undefined,undefined,undefined)
    _ -> error "fromConstr"
   dataTypeOf _ = tuple7DataType

@@ -19,7 +19,7 @@ module Data.Generics.Aliases (
 
 	-- * Combinators to \"make\" generic functions via cast
 	mkT, mkQ, mkM, mkMp, mkR,
-	extT, extQ, extM, extMp, extB, extR,
+	ext0, extT, extQ, extM, extMp, extB, extR,
 
 	-- * Type synonyms for generic function types
 	GenericT, 
@@ -77,9 +77,7 @@ mkT :: ( Typeable a
     => (b -> b)
     -> a 
     -> a
-mkT f = case cast f of
-               Just g -> g
-               Nothing -> id
+mkT = extT id
 
 
 -- | Make a generic query;
@@ -148,18 +146,18 @@ mkR f = mzero `extR` f
 
 -- | Flexible type extension
 ext0 :: (Typeable a, Typeable b) => c a -> c b -> c a
-ext0 def ext = maybe def id (cast0 ext)
+ext0 def ext = maybe def id (gcast ext)
 
 
 -- | Extend a generic transformation by a type-specific case
 extT :: ( Typeable a
-        , Typeable b 
+        , Typeable b
         )
      => (a -> a)
      -> (b -> b)
      -> a
      -> a
-extT f = maybe f id . cast
+extT def ext = unT ((T def) `ext0` (T ext))
 
 
 -- | Extend a generic query by a type-specific case
@@ -342,7 +340,7 @@ ext1 :: (Data a, Typeable1 t)
      => c a
      -> (forall a. Data a => c (t a))
      -> c a
-ext1 def ext = maybe def id (cast0to1 ext)
+ext1 def ext = maybe def id (dataCast1 ext)
 
 
 -- | Type extension of transformations for unary type constructors
