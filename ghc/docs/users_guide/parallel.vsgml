@@ -85,6 +85,26 @@ isn't lost: the computation is suspended until required by another
 thread.  The memory used by the thread will be garbage collected if it
 isn't referenced from anywhere else.
 
+More generally, an arbitrary exception may be raised in any thread for
+which we have a <tt/ThreadId/, with <tt/raiseInThread/:
+
+<tscreen><verb>
+raiseInThread :: ThreadId -> Exception -> IO ()
+</verb></tscreen>
+
+Actually <tt/killThread/ just raises the <tt/ThreadKilled/ exception
+in the target thread, the normal action of which is to just terminate
+the thread.  The target thread will stop whatever it was doing (even
+if it was blocked on an <tt/MVar/ or other computation) and handle the
+exception.
+
+The <tt/ThreadId/ for the current thread can be obtained with
+<tt/myThreadId/:
+
+<tscreen><verb>
+myThreadId :: IO ThreadId
+</verb></tscreen>
+
 NOTE: if you have a @ThreadId@, you essentially have a pointer to the
 thread itself.  This means the thread itself can't be garbage
 collected until you drop the @ThreadId@.  This misfeature will
