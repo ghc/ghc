@@ -617,15 +617,15 @@ $ cat foo.hspp</screen>
 
       <varlistentry>
         <term>
-          <option>-no-link</option>
-          <indexterm><primary><option>-no-link</option></primary></indexterm>
+          <option>-c</option>
+          <indexterm><primary><option>-c</option></primary></indexterm>
         </term>
         <listitem>
-          <para>Omit the link step.  This flag can be useful if you
-          want to avoid linking in <option>--make</option> mode,
-          where linking is normally done automatically if the program
-          contains a <literal>Main</literal> module.</para>
-        </listitem>
+          <para>Omits the link step.  This option can be used with
+	    <option>&ndash;&ndash;make</option> to avoid the automatic linking
+	    that takes place if the program contains a <literal>Main</literal>
+	    module.</para>
+	</listitem>
       </varlistentry>
 
       <varlistentry>
