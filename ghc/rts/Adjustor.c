@@ -61,7 +61,7 @@ typedef enum {
  * TODO: Can the code span more than one page? If yes, we need to make two
  * pages executable!
  */
-static rtsBool
+static void
 execPage (void* addr, pageMode mode)
 {
 #if defined(i386_TARGET_ARCH) && defined(_WIN32) && 0
@@ -75,16 +75,11 @@ execPage (void* addr, pageMode mode)
 			  sInfo.dwPageSize,
 			  ( mode == pageExecuteReadWrite ? PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ),
 			  &dwOldProtect) == 0 ) {
-# if 1
 	DWORD rc = GetLastError();
-	prog_belch("execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
-# endif
-	return rtsFalse;
+	barf("execPage: failed to protect 0x%p; error=%lu; old protection: %lu\n", addr, rc, dwOldProtect);
     }
-    return rtsTrue;
 #else
     (void)addr;   (void)mode;   /* keep gcc -Wall happy */
-    return rtsTrue;
 #endif
 }
 
@@ -563,7 +558,7 @@ freeHaskellFunctionPtr(void* ptr)
  *
  * Perform initialisation of adjustor thunk layer (if needed.)
  */
-rtsBool
+void
 initAdjustor(void)
 {
 #if defined(i386_TARGET_ARCH)
@@ -594,5 +589,4 @@ initAdjustor(void)
 
   execPage(obscure_ccall_ret_code, pageExecuteRead);
 #endif
-  return rtsTrue;
 }
