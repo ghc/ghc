@@ -39,6 +39,7 @@ module SimplMonad (
 	getEnclosingCC, setEnclosingCC,
 
 	-- Environments
+	getEnv, setAllExceptInScope,
 	getSubst, setSubst,
 	getSubstEnv, extendSubst, extendSubstList,
 	getInScope, setInScope, extendInScope, extendInScopes, modifyInScope,
@@ -146,7 +147,7 @@ data SimplCont		-- Strict contexts
 				--	f (error "foo") ==> coerce t (error "foo")
 				-- when f is strict
 				-- We need to know the type t, to which to coerce.
-	    (OutExpr -> SimplM OutExprStuff)	-- What to do with the result
+	     (OutExpr -> SimplM OutExprStuff)	-- What to do with the result
 
 instance Outputable SimplCont where
   ppr (Stop _)        		     = ptext SLIT("Stop")
@@ -776,6 +777,14 @@ emptySimplEnv sw_chkr in_scope black_list
 	       seBlackList = black_list,
 	       seSubst = mkSubst in_scope emptySubstEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
+
+getEnv :: SimplM SimplEnv
+getEnv env us sc = (env, us, sc)
+
+setAllExceptInScope :: SimplEnv -> SimplM a -> SimplM a
+setAllExceptInScope new_env@(SimplEnv {seSubst = new_subst}) m 
+		    	    (SimplEnv {seSubst = old_subst}) us sc 
+  = m (new_env {seSubst = Subst.setInScope new_subst (substInScope old_subst)}) us sc
 
 getSubst :: SimplM Subst
 getSubst env us sc = (seSubst env, us, sc)

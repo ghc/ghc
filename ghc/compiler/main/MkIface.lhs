@@ -27,8 +27,8 @@ import Id		( Id, idType, idInfo, omitIfaceSigForId, isUserExportedId,
 import Var		( isId )
 import VarSet
 import DataCon		( StrictnessMark(..), dataConSig, dataConFieldLabels, dataConStrictMarks )
-import IdInfo		( IdInfo, StrictnessInfo, ArityInfo, InlinePragInfo(..), inlinePragInfo,
-			  arityInfo, ppArityInfo, 
+import IdInfo		( IdInfo, StrictnessInfo(..), ArityInfo, InlinePragInfo(..), inlinePragInfo,
+			  arityInfo, ppArityInfo, arityLowerBound,
 			  strictnessInfo, ppStrictnessInfo, isBottomingStrictness,
 			  cafInfo, ppCafInfo, specInfo,
 			  cprInfo, ppCprInfo,
@@ -290,7 +290,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
   = Nothing 		-- Well, that was easy!
 
 ifaceId get_idinfo needed_ids is_rec id rhs
-  = Just (hsep [sig_pretty, prag_pretty, char ';'], new_needed_ids)
+  = ASSERT2( arity_matches_strictness, ppr id )
+    Just (hsep [sig_pretty, prag_pretty, char ';'], new_needed_ids)
   where
     core_idinfo = idInfo id
     stg_idinfo  = get_idinfo id
@@ -310,7 +311,8 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 					ptext SLIT("##-}")]
 
     ------------  Arity  --------------
-    arity_pretty  = ppArityInfo (arityInfo stg_idinfo)
+    arity_info    = arityInfo stg_idinfo
+    arity_pretty  = ppArityInfo arity_info
 
     ------------ Caf Info --------------
     caf_pretty = ppCafInfo (cafInfo stg_idinfo)
@@ -369,6 +371,15 @@ ifaceId get_idinfo needed_ids is_rec id rhs
 
     find_fvs expr = exprSomeFreeVars interestingId expr
 
+    ------------ Sanity checking --------------
+	-- The arity of a wrapper function should match its strictness,
+	-- or else an importing module will get very confused indeed.
+    arity_matches_strictness
+	= not has_worker ||
+	  case strict_info of
+	    StrictnessInfo ds _ -> length ds == arityLowerBound arity_info
+	    other		-> True
+    
 interestingId id = isId id && isLocallyDefined id &&
 		   not (omitIfaceSigForId id)
 \end{code}

@@ -4,7 +4,7 @@
 \section[WorkWrap]{Worker/wrapper-generating back-end of strictness analyser}
 
 \begin{code}
-module WorkWrap ( wwTopBinds ) where
+module WorkWrap ( wwTopBinds, mkWrapper ) where
 
 #include "HsVersions.h"
 
@@ -14,19 +14,19 @@ import CmdLineOpts	( opt_UF_CreationThreshold , opt_D_verbose_core2core,
                           opt_D_dump_worker_wrapper
 			)
 import CoreLint		( beginPass, endPass )
-import CoreUtils	( coreExprType )
+import CoreUtils	( coreExprType, exprArity )
 import Const		( Con(..) )
 import DataCon		( DataCon )
 import MkId		( mkWorkerId )
-import Id		( Id, getIdStrictness, setIdArity, 
-			  setIdStrictness, 
+import Id		( Id, idType, getIdStrictness, setIdArity, 
+			  setIdStrictness, getIdDemandInfo,
 			  setIdWorkerInfo, getIdCprInfo )
 import VarSet
-import Type		( isNewType )
+import Type		( Type, isNewType, splitForAllTys, splitFunTys )
 import IdInfo		( mkStrictnessInfo, noStrictnessInfo, StrictnessInfo(..),
 			  CprInfo(..), exactArity
 			)
-import Demand           ( wwLazy )
+import Demand           ( Demand, wwLazy )
 import SaLib
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import UniqSet
@@ -85,15 +85,8 @@ workersAndWrappers :: UniqSupply -> [CoreBind] -> [CoreBind]
 
 workersAndWrappers us top_binds
   = initUs_ us $
-    mapUs (wwBind True{-top-level-}) top_binds `thenUs` \ top_binds2 ->
-    let
-	top_binds3 = map make_top_binding top_binds2
-    in
-    returnUs (concat top_binds3)
-  where
-    make_top_binding :: WwBinding -> [CoreBind]
-
-    make_top_binding (WwLet binds) = binds
+    mapUs wwBind top_binds `thenUs` \ top_binds' ->
+    returnUs (concat top_binds')
 \end{code}
 
 %************************************************************************
@@ -106,24 +99,23 @@ workersAndWrappers us top_binds
 turn.  Non-recursive case first, then recursive...
 
 \begin{code}
-wwBind	:: Bool			-- True <=> top-level binding
-	-> CoreBind
-	-> UniqSM WwBinding	-- returns a WwBinding intermediate form;
+wwBind	:: CoreBind
+	-> UniqSM [CoreBind]	-- returns a WwBinding intermediate form;
 				-- the caller will convert to Expr/Binding,
 				-- as appropriate.
 
-wwBind top_level (NonRec binder rhs)
+wwBind (NonRec binder rhs)
   = wwExpr rhs						`thenUs` \ new_rhs ->
     tryWW True {- non-recursive -} binder new_rhs 	`thenUs` \ new_pairs ->
-    returnUs (WwLet [NonRec b e | (b,e) <- new_pairs])
+    returnUs [NonRec b e | (b,e) <- new_pairs]
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
 ------------------------------
 
-wwBind top_level (Rec pairs)
+wwBind (Rec pairs)
   = mapUs do_one pairs		`thenUs` \ new_pairs ->
-    returnUs (WwLet [Rec (concat new_pairs)])
+    returnUs [Rec (concat new_pairs)]
   where
     do_one (binder, rhs) = wwExpr rhs 	`thenUs` \ new_rhs ->
 			   tryWW False {- recursive -} binder new_rhs
@@ -159,12 +151,9 @@ wwExpr (Note note expr)
     returnUs (Note note new_expr)
 
 wwExpr (Let bind expr)
-  = wwBind False{-not top-level-} bind	`thenUs` \ intermediate_bind ->
-    wwExpr expr				`thenUs` \ new_expr ->
-    returnUs (mash_ww_bind intermediate_bind new_expr)
-  where
-    mash_ww_bind (WwLet  binds)   body = mkLets binds body
-    mash_ww_bind (WwCase case_fn) body = case_fn body
+  = wwBind bind			`thenUs` \ intermediate_bind ->
+    wwExpr expr			`thenUs` \ new_expr ->
+    returnUs (mkLets intermediate_bind new_expr)
 
 wwExpr (Case expr binder alts)
   = wwExpr expr				`thenUs` \ new_expr ->
@@ -206,83 +195,62 @@ tryWW	:: Bool				-- True <=> a non-recursive binding
 					-- wrapper.
 tryWW non_rec fn_id rhs
   | (non_rec &&		-- Don't split if its non-recursive and small
-     certainlySmallEnoughToInline (calcUnfoldingGuidance opt_UF_CreationThreshold rhs) &&
+     certainlySmallEnoughToInline (calcUnfoldingGuidance opt_UF_CreationThreshold rhs)
 	-- No point in worker/wrappering something that is going to be
 	-- INLINEd wholesale anyway.  If the strictness analyser is run
 	-- twice, this test also prevents wrappers (which are INLINEd)
 	-- from being re-done.
+    )
 
-     not (null wrap_args && do_coerce_ww)
-	-- However, if we have	f = coerce T E
-	-- then we want to w/w anyway, to get
-	-- 			fw = E
-	--			f  = coerce T fw
-	-- We want to do this even if the binding is small and non-rec.
-	-- Reason: I've seen this situation:
-	--	let f = coerce T (\s -> E)
-	--	in \x -> case x of
-	--	   	    p -> coerce T' f
-	--		    q -> \s -> E2
-	-- If only we w/w'd f, we'd inline the coerce (because it's trivial)
-	-- to get
-	--	let fw = \s -> E
-	--	in \x -> case x of
-	--	   	    p -> fw
-	--		    q -> \s -> E2
-	-- Now we'll see that fw has arity 1, and will arity expand
-	-- the \x to get what we want.
-     )
+  || arity == 0		-- Don't split if it's not a function
 
-  || not (do_strict_ww || do_cpr_ww || do_coerce_ww) 
+  || not (do_strict_ww || do_cpr_ww || do_coerce_ww)
   = returnUs [ (fn_id, rhs) ]
 
   | otherwise		-- Do w/w split
-  = mkWwBodies tyvars wrap_args 
-	       body_ty 
-	       wrap_demands
-	       cpr_info
-                                                `thenUs` \ (wrap_fn, work_fn, work_demands) ->
+  = mkWwBodies fun_ty arity wrap_dmds cpr_info	`thenUs` \ (work_args, wrap_fn, work_fn) ->
     getUniqueUs					`thenUs` \ work_uniq ->
     let
-	work_rhs  = work_fn body
-	work_id   = mkWorkerId work_uniq fn_id (coreExprType work_rhs) `setIdStrictness`
-		    (if has_strictness_info then mkStrictnessInfo (work_demands ++ remaining_arg_demands, result_bot)
-	                                    else noStrictnessInfo) 
+	work_rhs     = work_fn rhs
+	work_demands = [getIdDemandInfo v | v <- work_args, isId v]
+	proto_work_id   	 = mkWorkerId work_uniq fn_id (coreExprType work_rhs) 
+	work_id | has_strictness = proto_work_id `setIdStrictness` mkStrictnessInfo (work_demands, result_bot)
+		| otherwise	 = proto_work_id
 
 	wrap_rhs = wrap_fn work_id
-	wrap_id  = fn_id `setIdStrictness` 
-                         (if has_strictness_info then mkStrictnessInfo (wrap_demands ++ remaining_arg_demands, result_bot)
-	                                         else noStrictnessInfo) 
+	wrap_id  = fn_id `setIdStrictness`      wrapper_strictness
                          `setIdWorkerInfo`	Just work_id
-			 `setIdArity`		exactArity (length wrap_args)
+			 `setIdArity`		exactArity arity
 		-- Add info to the wrapper:
-		--	(a) we want to inline it everywhere
+		--	(a) we want to set its arity
 		-- 	(b) we want to pin on its revised strictness info
 		--	(c) we pin on its worker id 
     in
     returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
   where
-    (tyvars, wrap_args, body) = collectTyAndValBinders rhs
-    n_wrap_args		      = length wrap_args
-    body_ty		      = coreExprType body
-    strictness_info     = getIdStrictness fn_id
-    has_strictness_info = case strictness_info of
-				StrictnessInfo _ _ -> True
-				other		   -> False
+    fun_ty = idType fn_id
+    arity  = exprArity rhs
 
+    strictness_info     		  = getIdStrictness fn_id
     StrictnessInfo arg_demands result_bot = strictness_info
+    has_strictness			  = case strictness_info of
+						StrictnessInfo _ _ -> True
+						other		   -> False
 			
-	-- NB: There maybe be more items in arg_demands than wrap_args, because
-	-- the strictness info is semantic and looks through InlineMe and Scc
-	-- Notes, whereas wrap_args does not
-    demands_for_visible_args = take n_wrap_args arg_demands
-    remaining_arg_demands    = drop n_wrap_args arg_demands
+    do_strict_ww = has_strictness && worthSplitting wrap_dmds result_bot
 
-    wrap_demands | has_strictness_info = setUnpackStrategy demands_for_visible_args
-		 | otherwise	       = repeat wwLazy
+	-- NB: There maybe be more items in arg_demands than arity, because
+	-- the strictness info is semantic and looks through InlineMe and Scc Notes, 
+	-- whereas arity does not
+    demands_for_visible_args = take arity arg_demands
+    remaining_arg_demands    = drop arity arg_demands
 
-    do_strict_ww = has_strictness_info && worthSplitting wrap_demands result_bot
+    wrap_dmds | has_strictness = setUnpackStrategy demands_for_visible_args
+	      | otherwise      = take arity (repeat wwLazy)
+
+    wrapper_strictness | has_strictness = mkStrictnessInfo (wrap_dmds ++ remaining_arg_demands, result_bot)
+	               | otherwise      = noStrictnessInfo
 
 	-------------------------------------------------------------
     cpr_info     = getIdCprInfo fn_id
@@ -293,52 +261,46 @@ tryWW non_rec fn_id rhs
     do_cpr_ww = has_cpr_info
 
 	-------------------------------------------------------------
-	-- Do the coercion thing if the body is of a newtype
-    do_coerce_ww = isNewType body_ty
+    do_coerce_ww = check_for_coerce arity fun_ty
 
+-- See if there's a Coerce before we run out of arity;
+-- if so, it's worth trying a w/w split.  Reason: we find
+-- functions like	f = coerce (\s -> e)
+--	     and	g = \x -> coerce (\s -> e)
+-- and they may have no useful strictness or cpr info, but if we
+-- do the w/w thing we get rid of the coerces.  
 
-{-	July 99: removed again by Simon
-
--- This rather (nay! extremely!) crude function looks at a wrapper function, and
--- snaffles out the worker Id from the wrapper.
--- This is needed when we write an interface file.
--- [May 1999: we used to get the constructors too, but that's no longer
---  	      necessary, because the renamer hauls in all type decls in 
---	      their fullness.]
-
--- <Mar 1999 (keving)> - Well,  since the addition of the CPR transformation this function
--- got too crude!  
--- Now the worker id is stored directly in the id's Info field.  We still use this function to
--- snaffle the wrapper's constructors but I don't trust the code to find the worker id.
-getWorkerId :: Id -> CoreExpr -> Id
-getWorkerId wrap_id wrapper_fn
-  = work_id wrapper_fn
+check_for_coerce arity ty
+  = length arg_tys <= arity && isNewType res_ty
+	-- Don't look further than arity args, 
+	-- but if there are arity or fewer, see if there's
+	-- a newtype in the corner
   where
-
-    work_id wrapper_fn
-            = case get_work_id wrapper_fn of
-                []   -> case work_id_try2 wrapper_fn of
-                        [] -> pprPanic "getWorkerId: can't find worker id" (ppr wrap_id)
-                        [id] -> id
-			_    -> pprPanic "getWorkerId: found too many worker ids" (ppr wrap_id)
-                [id] -> id
-                _    -> pprPanic "getWorkerId: found too many worker ids" (ppr wrap_id)
-
-    get_work_id (Lam _ body)			 = get_work_id body
-    get_work_id (Case _ _ [(_,_,rhs@(Case _ _ _))])	= get_work_id rhs
-    get_work_id (Case scrut _ [(_,_,rhs)])		= (get_work_id scrut) ++ (get_work_id rhs)
-    get_work_id (Note _ body)			 = get_work_id body
-    get_work_id (Let _ body)			 = get_work_id body
-    get_work_id (App (Var work_id) _)   	 = [work_id]
-    get_work_id (App fn _)   			 = get_work_id fn
-    get_work_id (Var work_id)			 = []
-    get_work_id other	   			 = [] 
-
-    work_id_try2 (Lam _ body)			 = work_id_try2 body
-    work_id_try2 (Note _ body)			 = work_id_try2 body
-    work_id_try2 (Let _ body)			 = work_id_try2 body
-    work_id_try2 (App fn _)   			 = work_id_try2 fn
-    work_id_try2 (Var work_id)			 = [work_id]
-    work_id_try2 other	   			 = [] 
--}
+    (_, tau) 	      = splitForAllTys ty
+    (arg_tys, res_ty) = splitFunTys tau
 \end{code}
+
+
+
+%************************************************************************
+%*									*
+\subsection{The worker wrapper core}
+%*									*
+%************************************************************************
+
+@mkWrapper@ is called when importing a function.  We have the type of 
+the function and the name of its worker, and we want to make its body (the wrapper).
+
+\begin{code}
+mkWrapper :: Type		-- Wrapper type
+	  -> Int		-- Arity
+	  -> [Demand]		-- Wrapper strictness info
+	  -> CprInfo            -- Wrapper cpr info
+	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
+
+mkWrapper fun_ty arity demands cpr_info
+  = mkWwBodies fun_ty arity demands cpr_info	`thenUs` \ (_, wrap_fn, _) ->
+    returnUs wrap_fn
+\end{code}
+
+

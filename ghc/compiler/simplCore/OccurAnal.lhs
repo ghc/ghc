@@ -25,7 +25,7 @@ import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial )
 import Const		( Con(..), Literal(..) )
-import Id		( isSpecPragmaId, isOneShotLambda,
+import Id		( isSpecPragmaId, isOneShotLambda, setOneShotLambda, 
 			  getInlinePragma, setInlinePragma,
 			  isExportedId, modifyIdInfo, idInfo,
 			  getIdSpecialisation, 
@@ -626,6 +626,10 @@ occAnal env expr@(Lam _ _)
   = case occAnal (env_body `addNewCands` binders) body of { (body_usage, body') ->
     let
         (final_usage, tagged_binders) = tagBinders body_usage binders
+	--	URGH!  Sept 99: we don't seem to be able to use binders' here, because
+	--	we get linear-typed things in the resulting program that we can't handle yet.
+	--	(e.g. PrelShow)  TODO 
+
 	really_final_usage = if linear then
 				final_usage
 			     else
@@ -635,7 +639,7 @@ occAnal env expr@(Lam _ _)
      mkLams tagged_binders body') }
   where
     (binders, body)    = collectBinders expr
-    (linear, env_body) = oneShotGroup env (filter isId binders)
+    (linear, env_body, binders') = oneShotGroup env binders
 
 occAnal env (Case scrut bndr alts)
   = case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   -> 
@@ -764,15 +768,31 @@ addNewCand (OccEnv ifun cands ctxt) id
 setCtxt :: OccEnv -> CtxtTy -> OccEnv
 setCtxt (OccEnv ifun cands _) ctxt = OccEnv ifun cands ctxt
 
-oneShotGroup :: OccEnv -> [Id] -> (Bool, OccEnv)	-- True <=> this is a one-shot linear lambda group
-							-- The [Id] are the binders
+oneShotGroup :: OccEnv -> [CoreBndr] -> (Bool, OccEnv, [CoreBndr])
+	-- True <=> this is a one-shot linear lambda group
+	-- The [CoreBndr] are the binders.
+
+	-- The result binders have one-shot-ness set that they might not have had originally.
+	-- This happens in (build (\cn -> e)).  Here the occurrence analyser
+	-- linearity context knows that c,n are one-shot, and it records that fact in
+	-- the binder. This is useful to guide subsequent float-in/float-out tranformations
+
 oneShotGroup (OccEnv ifun cands ctxt) bndrs 
-  = (go bndrs ctxt, OccEnv ifun cands (drop (length bndrs) ctxt))
+  = case go ctxt bndrs [] of
+	(new_ctxt, new_bndrs) -> (all is_one_shot new_bndrs, OccEnv ifun cands new_ctxt, new_bndrs)
   where
-	-- Only return True if *all* the lambdas are linear
-    go (bndr:bndrs) (lin:ctxt) 	= (lin || isOneShotLambda bndr) && go bndrs ctxt
-    go []	    ctxt       	= True
-    go bndrs	    []         	= all isOneShotLambda bndrs
+    is_one_shot b = isId b && isOneShotLambda b
+
+    go ctxt [] rev_bndrs = (ctxt, reverse rev_bndrs)
+
+    go (lin_ctxt:ctxt) (bndr:bndrs) rev_bndrs
+	| isId bndr = go ctxt bndrs (bndr':rev_bndrs)
+	where
+	  bndr' | lin_ctxt  = setOneShotLambda bndr
+		| otherwise = bndr
+
+    go ctxt (bndr:bndrs) rev_bndrs = go ctxt bndrs (bndr:rev_bndrs)
+
 
 zapCtxt env@(OccEnv ifun cands []) = env
 zapCtxt     (OccEnv ifun cands _ ) = OccEnv ifun cands []

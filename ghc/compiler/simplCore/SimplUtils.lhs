@@ -18,7 +18,7 @@ import BinderInfo
 import CmdLineOpts	( opt_SimplDoLambdaEtaExpansion, opt_SimplCaseMerge )
 import CoreSyn
 import CoreFVs		( exprFreeVars )
-import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap, exprGenerousArity )
+import CoreUtils	( exprIsTrivial, cheapEqExpr, coreExprType, exprIsCheap, exprEtaExpandArity )
 import Subst		( substBndrs, substBndr, substIds )
 import Id		( Id, idType, getIdArity, isId, idName,
 			  getInlinePragma, setInlinePragma,
@@ -322,7 +322,7 @@ tryEtaExpansion rhs
     (x_bndrs, body) = collectValBinders rhs
     (fun, args)	    = collectArgs body
     trivial_args    = map exprIsTrivial args
-    fun_arity	    = exprGenerousArity fun
+    fun_arity	    = exprEtaExpandArity fun
 
     bind_z_arg (arg, trivial_arg) 
 	| trivial_arg = returnSmpl (Nothing, arg)
@@ -357,7 +357,7 @@ tryEtaExpansion rhs
 	-- See if the body could obviously do with more args
 	(fun_arity - valArgCount args)
 
--- This case is now deal with by exprGenerousArity
+-- This case is now deal with by exprEtaExpandArity
 	-- Finally, see if it's a state transformer, and xs is non-null
 	-- (so it's also a function not a thunk) in which
 	-- case we eta-expand on principle! This can waste work,

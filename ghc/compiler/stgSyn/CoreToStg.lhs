@@ -654,9 +654,15 @@ coreExprToStgFloat env
 	(Case scrut@(Con (PrimOp SeqOp) [Type ty, e]) bndr alts) dem
   = coreExprToStgFloat env (Case e new_bndr [(DEFAULT,[],default_rhs)]) dem
   where 
-    new_bndr 			= setIdType bndr ty
     (other_alts, maybe_default) = findDefault alts
     Just default_rhs	        = maybe_default
+    new_bndr 			= setIdType bndr ty
+	-- NB:  SeqOp :: forall a. a -> Int#
+	-- So bndr has type Int# 
+	-- But now we are going to scrutinise the SeqOp's argument directly,
+	-- so we must change the type of the case binder to match that
+	-- of the argument expression e.  We can get this type from the argument
+	-- type of the SeqOp.
 
 coreExprToStgFloat env 
 	(Case scrut@(Con (PrimOp ParOp) args) bndr alts) dem

@@ -14,7 +14,7 @@ import HsPragmas
 import HsTypes		( getTyVarName, pprClassAssertion, cmpHsTypes )
 import RdrName		( RdrName, isRdrDataCon, rdrNameOcc, isRdrTyVar )
 import RdrHsSyn		( RdrNameContext, RdrNameHsType, RdrNameConDecl,
-			  extractRuleBndrsTyVars, extractHsTyRdrTyVars
+			  extractRuleBndrsTyVars, extractHsTyRdrTyVars, extractHsTysRdrTyVars
 			)
 import RnHsSyn
 import HsCore
@@ -551,7 +551,7 @@ rnHsPolyType doc (HsForAllTy Nothing ctxt ty)
 	mentioned_in_tau = extractHsTyRdrTyVars ty
 	forall_tyvars    = filter (not . (`elemFM` name_env)) mentioned_in_tau
     in
-    checkConstraints False doc forall_tyvars ctxt ty	`thenRn` \ ctxt' ->
+    checkConstraints doc forall_tyvars mentioned_in_tau ctxt ty	`thenRn` \ ctxt' ->
     rnForAll doc (map UserTyVar forall_tyvars) ctxt' ty
 
 rnHsPolyType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
@@ -575,9 +575,9 @@ rnHsPolyType doc (HsForAllTy (Just forall_tyvars) ctxt tau)
  
 	forall_tyvar_names    = map getTyVarName forall_tyvars
     in
-    mapRn_ (forAllErr doc tau) bad_guys 			`thenRn_`
-    mapRn_ (forAllWarn doc tau) warn_guys			`thenRn_`
-    checkConstraints True doc forall_tyvar_names ctxt tau	`thenRn` \ ctxt' ->
+    mapRn_ (forAllErr doc tau) bad_guys 					`thenRn_`
+    mapRn_ (forAllWarn doc tau) warn_guys					`thenRn_`
+    checkConstraints doc forall_tyvar_names mentioned_in_tau ctxt tau	`thenRn` \ ctxt' ->
     rnForAll doc forall_tyvars ctxt' tau
 
 rnHsPolyType doc other_ty = rnHsType doc other_ty
@@ -587,19 +587,26 @@ rnHsPolyType doc other_ty = rnHsType doc other_ty
 -- Since the forall'd type variables are a subset of the free tyvars
 -- of the tau-type part, this guarantees that every constraint mentions
 -- at least one of the free tyvars in ty
-checkConstraints explicit_forall doc forall_tyvars ctxt ty
+checkConstraints doc forall_tyvars tau_vars ctxt ty
    = mapRn check ctxt			`thenRn` \ maybe_ctxt' ->
      returnRn (catMaybes maybe_ctxt')
 	    -- Remove problem ones, to avoid duplicate error message.
    where
      check ct@(_,tys)
-	| forall_mentioned = returnRn (Just ct)
-	| otherwise	   = addErrRn (ctxtErr explicit_forall doc forall_tyvars ct ty)
-			     `thenRn_` returnRn Nothing
+	| ambiguous = failWithRn Nothing (ambigErr doc ct ty)
+	| not_univ  = failWithRn Nothing (univErr  doc ct ty)
+	| otherwise = returnRn (Just ct)
         where
-	  forall_mentioned = foldr ((||) . any (`elem` forall_tyvars) . extractHsTyRdrTyVars)
-			     False
-			     tys
+	  ct_vars    = extractHsTysRdrTyVars tys
+
+	  ambiguous  =	-- All the universally-quantified tyvars in the constraint must appear in the tau ty
+			-- (will change when we get functional dependencies)
+			not (all (\ct_var -> not (ct_var `elem` forall_tyvars) || ct_var `elem` tau_vars) ct_vars)
+			
+	  not_univ   = 	-- At least one of the tyvars in each constraint must
+			-- be universally quantified. This restriction isn't in Hugs
+			not (any (`elem` forall_tyvars) ct_vars)
+	
 
 rnForAll doc forall_tyvars ctxt ty
   = bindTyVarsFVRn doc forall_tyvars	$ \ new_tyvars ->
@@ -918,14 +925,19 @@ forAllErr doc ty tyvar
       $$
       (ptext SLIT("In") <+> doc))
 
-ctxtErr explicit_forall doc tyvars constraint ty
-  = sep [ptext SLIT("None of the type variable(s) in the constraint")
-          <+> quotes (pprClassAssertion constraint),
-	 if explicit_forall then
- 	   nest 4 (ptext SLIT("is universally quantified (i.e. bound by the forall)"))
-	 else
-	   nest 4 (ptext SLIT("appears in the type") <+> quotes (ppr ty))
+univErr doc constraint ty
+  = sep [ptext SLIT("All of the type variable(s) in the constraint")
+          <+> quotes (pprClassAssertion constraint) 
+	  <+> ptext SLIT("are already in scope"),
+	 nest 4 (ptext SLIT("At least one must be universally quantified here"))
     ]
+    $$
+    (ptext SLIT("In") <+> doc)
+
+ambigErr doc constraint ty
+  = sep [ptext SLIT("Ambiguous constraint") <+> quotes (pprClassAssertion constraint),
+	 nest 4 (ptext SLIT("in the type:") <+> ppr ty),
+	 nest 4 (ptext SLIT("Each forall-d type variable mentioned by the constraint must appear after the =>."))]
     $$
     (ptext SLIT("In") <+> doc)
 

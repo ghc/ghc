@@ -14,7 +14,7 @@ import CmdLineOpts	( intSwitchSet,
 			  SimplifierSwitch(..)
 			)
 import SimplMonad
-import SimplUtils	( mkCase, transformRhs, findAlt,
+import SimplUtils	( mkCase, transformRhs, findAlt, etaCoreExpr,
 			  simplBinder, simplBinders, simplIds, findDefault, mkCoerce
 			)
 import Var		( TyVar, mkSysTyVar, tyVarKind, maybeModifyIdInfo )
@@ -24,7 +24,7 @@ import Id		( Id, idType, idInfo, idUnique,
 			  getIdUnfolding, setIdUnfolding, isExportedId, 
 			  getIdSpecialisation, setIdSpecialisation,
 			  getIdDemandInfo, setIdDemandInfo,
-			  getIdArity, setIdArity, setIdInfo,
+			  setIdInfo,
 			  getIdStrictness, 
 			  setInlinePragma, getInlinePragma, idMustBeINLINEd,
 			  setOneShotLambda, maybeModifyIdInfo
@@ -217,8 +217,8 @@ simplExprF expr@(Con (PrimOp op) args) cont
 	  Nothing -> rebuild (Con (PrimOp op) args2) cont2
 
 simplExprF (Con con@(DataCon _) args) cont
-  = simplConArgs args		( \ args' ->
-    rebuild (Con con args') cont)
+  = simplConArgs args		$ \ args' ->
+    rebuild (Con con args') cont
 
 simplExprF expr@(Con con@(Literal _) args) cont
   = ASSERT( null args )
@@ -334,11 +334,14 @@ simplLam fun cont
 	-- Exactly enough args
     go expr cont = simplExprF expr cont
 
-
 -- completeLam deals with the case where a lambda doesn't have an ApplyTo
--- continuation.  Try for eta reduction, but *only* if we get all
--- the way to an exprIsTrivial expression.  
--- 'acc' holds the simplified binders, in reverse order
+-- continuation.  
+-- We used to try for eta reduction here, but I found that this was
+-- eta reducing things like 
+--	f = \x -> (coerce (\x -> e))
+-- This made f's arity reduce, which is a bad thing, so I removed the
+-- eta reduction at this point, and now do it only when binding 
+-- (at the call to postInlineUnconditionally
 
 completeLam acc (Lam bndr body) cont
   = simplBinder bndr			$ \ bndr' ->
@@ -346,29 +349,8 @@ completeLam acc (Lam bndr body) cont
 
 completeLam acc body cont
   = simplExpr body 			`thenSmpl` \ body' ->
-
-    case (opt_SimplDoEtaReduction, check_eta acc body') of
-	(True, Just body'') 	-- Eta reduce!
-		-> tick (EtaReduction (head acc))	`thenSmpl_`
-		   rebuild body'' cont
-
-	other	-> 	-- No eta reduction
-		   rebuild (foldl (flip Lam) body' acc) cont
-			-- Remember, acc is the reversed binders
-  where
-	-- NB: the binders are reversed
-    check_eta (b : bs) (App fun arg)
-	|  (varToCoreExpr b `cheapEqExpr` arg)
-	= check_eta bs fun
-
-    check_eta [] body
-	| exprIsTrivial body && 		-- ONLY if the body is trivial
-	  not (any (`elemVarSet` body_fvs) acc)
-	= Just body		-- Success!
-	where
-	  body_fvs = exprFreeVars body
-
-    check_eta _ _ = Nothing	-- Bale out
+    rebuild (foldl (flip Lam) body' acc) cont
+		-- Remember, acc is the *reversed* binders
 
 mkLamBndrZapper :: CoreExpr 	-- Function
 		-> Int		-- Number of args
@@ -396,6 +378,10 @@ simplConArgs (arg:args) thing_inside
   = switchOffInlining (simplExpr arg)	`thenSmpl` \ arg' ->
 	-- Simplify the RHS with inlining switched off, so that
 	-- only absolutely essential things will happen.
+	-- If we don't do this, consider:
+	--	let x = e in C {x}
+	-- We end up inlining x back into C's argument,
+	-- and then let-binding it again!
 
     simplConArgs args				$ \ args' ->
 
@@ -404,8 +390,8 @@ simplConArgs (arg:args) thing_inside
 	thing_inside (arg' : args')
     else
 	newId (coreExprType arg')		$ \ arg_id ->
-	thing_inside (Var arg_id : args')	`thenSmpl` \ res ->
-	returnSmpl (addBind (NonRec arg_id arg') res)
+	completeBeta arg_id arg_id arg'		$
+	thing_inside (Var arg_id : args')
 \end{code}
 
 
@@ -486,14 +472,30 @@ simplArg arg_ty demand arg arg_se cont_ty thing_inside
 	-- Return true only for dictionary types where the dictionary
 	-- has more than one component (else we risk poking on the component
 	-- of a newtype dictionary)
-  = getSubstEnv					`thenSmpl` \ body_se ->
-    transformRhs arg				`thenSmpl` \ t_arg ->
-    setSubstEnv arg_se (simplExprF t_arg (ArgOf NoDup cont_ty $ \ arg' ->
-    setSubstEnv body_se (thing_inside arg')
-    ))	-- NB: we must restore body_se before carrying on with thing_inside!!
+  = transformRhs arg			`thenSmpl` \ t_arg ->
+    getEnv 				`thenSmpl` \ env ->
+    setSubstEnv arg_se 				$
+    simplExprF t_arg (ArgOf NoDup cont_ty 	$ \ rhs' ->
+    setAllExceptInScope env			$
+    etaFirst thing_inside rhs')
 
   | otherwise
-  = simplRhs NotTopLevel True arg_ty arg arg_se thing_inside
+  = simplRhs NotTopLevel True {- OK to float unboxed -}
+	     arg_ty arg arg_se 
+	     thing_inside
+   
+-- Do eta-reduction on the simplified RHS, if eta reduction is on
+-- NB: etaCoreExpr only eta-reduces if that results in something trivial
+etaFirst | opt_SimplDoEtaReduction = \ thing_inside rhs -> thing_inside (etaCoreExprToTrivial rhs)
+	 | otherwise		   = \ thing_inside rhs -> thing_inside rhs
+
+-- Try for eta reduction, but *only* if we get all
+-- the way to an exprIsTrivial expression.    We don't want to remove
+-- extra lambdas unless we are going to avoid allocating this thing altogether
+etaCoreExprToTrivial rhs | exprIsTrivial rhs' = rhs'
+			 | otherwise	      = rhs
+			 where
+			   rhs' = etaCoreExpr rhs
 \end{code}
 
 
@@ -647,13 +649,13 @@ simplRhs top_lvl float_ubx rhs_ty rhs rhs_se thing_inside
 		-- and so there can't be any 'will be demanded' bindings in the floats.
 		-- Hence the assert
 	WARN( any demanded_float floats_out, ppr floats_out )
-	setInScope in_scope' (thing_inside rhs'') 	`thenSmpl` \ stuff ->
+	setInScope in_scope' (etaFirst thing_inside rhs'') 	`thenSmpl` \ stuff ->
 		-- in_scope' may be excessive, but that's OK;
 		-- it's a superset of what's in scope
 	returnSmpl (addBinds floats_out stuff)
     else	
 		-- Don't do the float
-	thing_inside (mkLets floats rhs')
+	etaFirst thing_inside (mkLets floats rhs')
 
 -- In a let-from-let float, we just tick once, arbitrarily
 -- choosing the first floated binder to identify it
@@ -724,16 +726,6 @@ completeCall black_list_fn in_scope orig_var var cont
 -- Doing so results in a significant space leak.
 -- Instead we pass orig_var, which has no inlinings etc.
 
-	-- Look for rules or specialisations that match
-	-- Do this *before* trying inlining because some functions
-	-- have specialisations *and* are strict; we don't want to
-	-- inline the wrapper of the non-specialised thing... better
-	-- to call the specialised thing instead.
-  | maybeToBool maybe_rule_match
-  = tick (RuleFired rule_name)			`thenSmpl_`
-    zapSubstEnv (simplExprF rule_rhs (pushArgs emptySubstEnv rule_args result_cont))
-	-- See note below about zapping the substitution here
-
 	-- Look for an unfolding. There's a binding for the
 	-- thing, but perhaps we want to inline it anyway
   | maybeToBool maybe_inline
@@ -751,32 +743,46 @@ completeCall black_list_fn in_scope orig_var var cont
   | otherwise		-- Neither rule nor inlining
 			-- Use prepareArgs to use function strictness
   = prepareArgs (ppr var) (idType var) (get_str var) cont	$ \ args' cont' ->
-    rebuild (mkApps (Var orig_var) args') cont'
+
+	-- Look for rules or specialisations that match
+	--
+	-- It's important to simplify the args first, because the rule-matcher
+	-- doesn't do substitution as it goes.  We don't want to use subst_args
+	-- (defined in the 'where') because that throws away useful occurrence info,
+	-- and perhaps-very-important specialisations.
+	--
+	-- Some functions have specialisations *and* are strict; in this case,
+	-- we don't want to inline the wrapper of the non-specialised thing; better
+	-- to call the specialised thing instead.
+	-- But the black-listing mechanism means that inlining of the wrapper
+	-- won't occur for things that have specialisations till a later phase, so
+	-- it's ok to try for inlining first.
+    case lookupRule in_scope var args' of
+	Just (rule_name, rule_rhs, rule_args) -> 
+		tick (RuleFired rule_name)			`thenSmpl_`
+		zapSubstEnv (simplExprF rule_rhs (pushArgs emptySubstEnv rule_args cont'))
+			-- See note above about zapping the substitution here
+	
+	Nothing -> rebuild (mkApps (Var orig_var) args') cont'
 
   where
     get_str var = case getIdStrictness var of
 			NoStrictnessInfo		  -> (repeat wwLazy, False)
 			StrictnessInfo demands result_bot -> (demands, result_bot)
 
-  
-    (args', result_cont) = contArgs in_scope cont
-    val_args    	 = filter isValArg args'
-    arg_infos  		 = map (interestingArg in_scope) val_args
-    inline_call	         = contIsInline result_cont
-    interesting_cont     = contIsInteresting result_cont
-    discard_inline_cont  | inline_call = discardInline cont
-		         | otherwise   = cont
-
 	---------- Unfolding stuff
+    (subst_args, result_cont) = contArgs in_scope cont
+    val_args    	      = filter isValArg subst_args
+    arg_infos  		      = map (interestingArg in_scope) val_args
+    inline_call	              = contIsInline result_cont
+    interesting_cont          = contIsInteresting result_cont
+    discard_inline_cont       | inline_call = discardInline cont
+		              | otherwise   = cont
+
     maybe_inline  = callSiteInline black_listed inline_call 
 				   var arg_infos interesting_cont
     Just unf_template = maybe_inline
     black_listed      = black_list_fn var
-
-    	---------- Specialisation stuff
-    maybe_rule_match           = lookupRule in_scope var args'
-    Just (rule_name, rule_rhs, rule_args) = maybe_rule_match
-
 
 
 -- An argument is interesting if it has *some* structure
@@ -1403,8 +1409,11 @@ mkDupableCont join_arg_ty (ArgOf _ cont_ty cont_fn) thing_inside
 	new_cont = ArgOf OkToDup cont_ty
 			 (\arg' -> rebuild_done (App (Var join_id) arg'))
     in
-	
-	-- Do the thing inside
+
+    tick (CaseOfCase join_id)						`thenSmpl_`
+	-- Want to tick here so that we go round again,
+	-- and maybe copy or inline the code;
+	-- not strictly CaseOf Case
     thing_inside new_cont		`thenSmpl` \ res ->
     returnSmpl (addBind (NonRec join_id join_rhs) res)
 
@@ -1415,6 +1424,11 @@ mkDupableCont ty (ApplyTo _ arg se cont) thing_inside
 	thing_inside (ApplyTo OkToDup arg' emptySubstEnv cont')
     else
     newId (coreExprType arg')						$ \ bndr ->
+
+    tick (CaseOfCase bndr)						`thenSmpl_`
+	-- Want to tick here so that we go round again,
+	-- and maybe copy or inline the code;
+	-- not strictly CaseOf Case
     thing_inside (ApplyTo OkToDup (Var bndr) emptySubstEnv cont')	`thenSmpl` \ res ->
     returnSmpl (addBind (NonRec bndr arg') res)
 

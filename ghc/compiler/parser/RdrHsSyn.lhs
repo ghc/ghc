@@ -48,7 +48,7 @@ module RdrHsSyn (
 	RdrNameGenPragmas,
 	RdrNameInstancePragmas,
 	extractHsTyRdrNames, 
-	extractHsTyRdrTyVars,
+	extractHsTyRdrTyVars, extractHsTysRdrTyVars,
 	extractPatsTyVars, 
 	extractRuleBndrsTyVars,
  
@@ -138,6 +138,9 @@ extractHsTyRdrNames ty = nub (extract_ty ty [])
 extractHsTyRdrTyVars	 :: RdrNameHsType -> [RdrName]
 extractHsTyRdrTyVars ty =  filter isRdrTyVar (extractHsTyRdrNames ty)
 
+extractHsTysRdrTyVars	  :: [RdrNameHsType] -> [RdrName]
+extractHsTysRdrTyVars tys =  filter isRdrTyVar (nub (extract_tys tys []))
+
 extractRuleBndrsTyVars :: [RuleBndr RdrName] -> [RdrName]
 extractRuleBndrsTyVars bndrs = filter isRdrTyVar (nub (foldr go [] bndrs))
                            where
@@ -150,6 +153,8 @@ extractHsCtxtRdrNames ty = nub (extract_ctxt ty [])
 extract_ctxt ctxt acc = foldr extract_ass acc ctxt
                     where
                       extract_ass (cls, tys) acc = foldr extract_ty (cls : acc) tys
+
+extract_tys tys acc = foldr extract_ty acc tys
 
 extract_ty (MonoTyApp ty1 ty2)          acc = extract_ty ty1 (extract_ty ty2 acc)
 extract_ty (MonoListTy ty)              acc = extract_ty ty acc

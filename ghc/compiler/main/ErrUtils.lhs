@@ -9,14 +9,14 @@ module ErrUtils (
 	addShortErrLocLine, addShortWarnLocLine,
 	addErrLocHdrLine,
 	dontAddErrLoc,
-	pprBagOfErrors, pprBagOfWarnings,
+	printErrorsAndWarnings, pprBagOfErrors, pprBagOfWarnings,
 	ghcExit,
 	doIfSet, dumpIfSet
     ) where
 
 #include "HsVersions.h"
 
-import Bag		( Bag, bagToList )
+import Bag		( Bag, bagToList, isEmptyBag )
 import SrcLoc		( SrcLoc, noSrcLoc )
 import Util		( sortLt )
 import Outputable
@@ -56,6 +56,16 @@ dontAddErrLoc title rest_of_err_msg
  | null title = (noSrcLoc, rest_of_err_msg)
  | otherwise  =
     ( noSrcLoc, hang (text title <> colon) 4 rest_of_err_msg )
+
+printErrorsAndWarnings :: Bag ErrMsg -> Bag WarnMsg -> IO ()
+	-- Don't print any warnings if there are errors
+printErrorsAndWarnings errs warns
+  | no_errs && no_warns  = return ()
+  | no_errs		 = printErrs (pprBagOfWarnings warns)
+  | otherwise		 = printErrs (pprBagOfErrors   errs)
+  where
+    no_warns = isEmptyBag warns
+    no_errs  = isEmptyBag errs
 
 pprBagOfErrors :: Bag ErrMsg -> SDoc
 pprBagOfErrors bag_of_errors

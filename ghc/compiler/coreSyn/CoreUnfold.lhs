@@ -48,14 +48,14 @@ import PprCore		( pprCoreExpr )
 import OccurAnal	( occurAnalyseGlobalExpr )
 import BinderInfo	( )
 import CoreUtils	( coreExprType, exprIsTrivial, exprIsValue, exprIsCheap )
-import Id		( Id, idType, idUnique, isId, 
+import Id		( Id, idType, idUnique, isId, getIdWorkerInfo,
 			  getIdSpecialisation, getInlinePragma, getIdUnfolding
 			)
 import VarSet
 import Name		( isLocallyDefined )
 import Const		( Con(..), isLitLitLit, isWHNFCon )
 import PrimOp		( PrimOp(..), primOpIsDupable )
-import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..) )
+import IdInfo		( ArityInfo(..), InlinePragInfo(..), OccInfo(..), workerExists )
 import TyCon		( tyConFamilySize )
 import Type		( splitAlgTyConApp_maybe, splitFunTy_maybe, isUnLiftedType )
 import Const		( isNoRepLit )
@@ -170,10 +170,8 @@ instance Outputable UnfoldingGuidance where
     ppr UnfoldAlways    = ptext SLIT("ALWAYS")
     ppr UnfoldNever	= ptext SLIT("NEVER")
     ppr (UnfoldIfGoodArgs v cs size discount)
-      = hsep [ptext SLIT("IF_ARGS"), int v,
-	       if null cs	-- always print *something*
-	       	then char 'X'
-		else hcat (map (text . show) cs),
+      = hsep [ ptext SLIT("IF_ARGS"), int v,
+	       brackets (hsep (map int cs)),
 	       int size,
 	       int discount ]
 \end{code}
@@ -199,21 +197,33 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
   = UnfoldAlways
  
   | otherwise
-  = case collectBinders expr of { (binders, body) ->
-    let
-	val_binders = filter isId binders
-    in
+  = case collect_val_bndrs expr of { (inline, val_binders, body) ->
     case (sizeExpr bOMB_OUT_SIZE val_binders body) of
 
       TooBig -> UnfoldNever
 
       SizeIs size cased_args scrut_discount
 	-> UnfoldIfGoodArgs
-			(length val_binders)
+			n_val_binders
 			(map discount_for val_binders)
-			(I# size)
+			final_size
 			(I# scrut_discount)
 	where        
+	    boxed_size    = I# size
+
+	    n_val_binders = length val_binders
+
+	    final_size | inline     = boxed_size `min` (n_val_binders + 2)
+		       | otherwise  = boxed_size
+		-- The idea is that if there is an INLINE pragma (inline is True)
+		-- and there's a big body, we give a size of n_val_binders+2.  This
+		-- This is enough to defeat the no-size-increase test in callSiteInline;
+		--   we don't want to inline an INLINE thing into a totally boring context
+		--
+		-- Sometimes, though, an INLINE thing is smaller than n_val_binders+2.
+		-- A particular case in point is a constructor, which has size 1.
+		-- We want to inline this regardless, hence the `min`
+
 	    discount_for b 
 		| num_cases == 0 = 0
 		| is_fun_ty  	 = num_cases * opt_UF_FunAppDiscount
@@ -228,6 +238,19 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 					  Nothing       -> (False, panic "discount")
 					  Just (tc,_,_) -> (True,  tc)
 	}
+  where
+
+    collect_val_bndrs e = go False [] e
+	-- We need to be a bit careful about how we collect the
+	-- value binders.  In ptic, if we see 
+	--	__inline_me (\x y -> e)
+	-- We want to say "2 value binders".  Why?  So that 
+	-- we take account of information given for the arguments
+
+    go inline rev_vbs (Note InlineMe e)     = go True   rev_vbs     e
+    go inline rev_vbs (Lam b e) | isId b    = go inline (b:rev_vbs) e
+				| otherwise = go inline rev_vbs     e
+    go inline rev_vbs e			    = (inline, reverse rev_vbs, e)
 \end{code}
 
 \begin{code}
@@ -242,12 +265,6 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
   where
     size_up (Type t)	      = sizeZero	-- Types cost nothing
     size_up (Var v)           = sizeOne
-
-    size_up (Note InlineMe _) = sizeTwo		-- The idea is that this is one more
-						-- than the size of the "call" (i.e. 1)
-						-- We want to reply "no" to noSizeIncrease
-						-- for a bare reference (i.e. applied to no args) 
-						-- to an INLINE thing
 
     size_up (Note _ body)     = size_up body	-- Notes cost nothing
 
@@ -289,7 +306,7 @@ sizeExpr (I# bOMB_OUT_SIZE) args expr
 
     ------------ 
     size_up_app (App fun arg) args   = size_up_app fun (arg:args)
-    size_up_app fun 	      args   = foldr (addSize . size_up) (fun_discount fun) args
+    size_up_app fun 	      args   = foldr (addSize . nukeScrutDiscount . size_up) (fun_discount fun) args
 
 	-- A function application with at least one value argument
 	-- so if the function is an argument give it an arg-discount
@@ -597,7 +614,9 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
 	-- we also discount 1 for each argument passed, because these will
 	-- reduce with the lambdas in the function (we count 1 for a lambda
  	-- in size_up).
-  = length (take n_vals_wanted arg_infos) +
+  = 1 +			-- Discount of 1 because the result replaces the call
+			-- so we count 1 for the function itself
+    length (take n_vals_wanted arg_infos) +
 			-- Discount of 1 for each arg supplied, because the 
 			-- result replaces the call
     round (opt_UF_KeenessFactor * 
@@ -636,10 +655,21 @@ blackListed :: IdSet 		-- Used in transformation rules
 -- inlined because of the inline phase we are in.  This is the sole
 -- place that the inline phase number is looked at.
 
+-- 	ToDo: improve horrible coding style (too much duplication)
+
 -- Phase 0: used for 'no imported inlinings please'
 -- This prevents wrappers getting inlined which in turn is bad for full laziness
+-- NEW: try using 'not a wrapper' rather than 'not imported' in this phase.
+-- This allows a little more inlining, which seems to be important, sometimes.
+-- For example PrelArr.newIntArr gets better.
 blackListed rule_vars (Just 0)
-  = \v -> not (isLocallyDefined v)
+  = \v -> let v_uniq = idUnique v
+	  in 
+		-- not (isLocallyDefined v)
+	     workerExists (getIdWorkerInfo v)
+	  || v `elemVarSet` rule_vars
+	  || not (isEmptyCoreRules (getIdSpecialisation v))
+	  || v_uniq == runSTRepIdKey
 
 -- Phase 1: don't inline any rule-y things or things with specialisations
 blackListed rule_vars (Just 1)

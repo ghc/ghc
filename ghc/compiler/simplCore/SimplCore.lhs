@@ -259,6 +259,11 @@ simplifyPgm (imported_rule_ids, rule_lhs_fvs)
 	   let { (binds', counts') = initSmpl sw_chkr us1 imported_rule_ids 
 					      black_list_fn 
 					      (simplTopBinds tagged_binds);
+			-- The imported_rule_ids are used by initSmpl to initialise
+			-- the in-scope set.  That way, the simplifier will change any
+			-- occurrences of the imported id to the one in the imported_rule_ids
+			-- set, which are decorated with their rules.
+
 	         all_counts        = counts `plusSimplCount` counts'
 	       } ;
 
@@ -447,7 +452,14 @@ postSimplExpr (Let bind body)
     returnPM (Let bind' body')
 
 postSimplExpr (Note note body)
-  = postSimplExprEta body	`thenPM` \ body' ->
+  = postSimplExpr body		`thenPM` \ body' ->
+	-- Do *not* call postSimplExprEta here
+	-- We don't want to turn f = \x -> coerce t (\y -> f x y)
+	-- into 		 f = \x -> coerce t (f x)
+	-- because then f has a lower arity.
+	-- This is not only bad in general, it causes the arity to 
+	-- not match the [Demand] on an Id, 
+	-- which confuses the importer of this module.
     returnPM (Note note body')
 
 postSimplExpr (Case scrut case_bndr alts)

@@ -10,7 +10,7 @@ module CoreUtils (
 	exprIsBottom, exprIsDupable, exprIsTrivial, exprIsCheap, 
 	exprIsValue,
 	exprOkForSpeculation, exprIsBig, hashExpr,
-	exprArity, exprGenerousArity,
+	exprArity, exprEtaExpandArity,
 	cheapEqExpr, eqExpr, applyTypeToArgs
     ) where
 
@@ -149,7 +149,7 @@ exprIsDupable (Con con args) = conIsDupable con &&
 
 exprIsDupable (Note _ e)     = exprIsDupable e
 exprIsDupable expr	     = case collectArgs expr of  
-				  (Var f, args) ->  valArgCount args <= dupAppSize
+				  (Var f, args) ->  all exprIsDupable args && valArgCount args <= dupAppSize
 				  other		->  False
 
 dupAppSize :: Int
@@ -230,7 +230,8 @@ It returns True iff
 
 	the expression guarantees to terminate, 
 	soon, 
-	without raising an exceptoin
+	without raising an exception,
+	without causing a side effect (e.g. writing a mutable variable)
 
 E.G.
 	let x = case y# +# 1# of { r# -> I# r# }
@@ -303,13 +304,24 @@ exprIsValue e@(App _ _)   = case collectArgs e of
 exprArity :: CoreExpr -> Int	-- How many value lambdas are at the top
 exprArity (Lam b e)     | isTyVar b	= exprArity e
 		        | otherwise	= 1 + exprArity e
+
 exprArity (Note note e) | ok_note note	= exprArity e
-exprArity other				= 0
+			where
+			  ok_note (Coerce _ _) = True
+				-- We *do* look through coerces when getting arities.
+				-- Reason: arities are to do with *representation* and
+				-- work duplication. 
+			  ok_note InlineMe     = True
+			  ok_note InlineCall   = True
+			  ok_note other	       = False
+				-- SCC and TermUsg might be over-conservative?
+
+exprArity other	= 0
 \end{code}
 
 
 \begin{code}
-exprGenerousArity :: CoreExpr -> Int 	-- The number of args the thing can be applied to
+exprEtaExpandArity :: CoreExpr -> Int 	-- The number of args the thing can be applied to
 					-- without doing much work
 -- This is used when eta expanding
 --	e  ==>  \xy -> e x y
@@ -320,17 +332,36 @@ exprGenerousArity :: CoreExpr -> Int 	-- The number of args the thing can be app
 -- We are prepared to evaluate x each time round the loop in order to get that
 -- Hence "generous" arity
 
-exprGenerousArity (Var v)         	= arityLowerBound (getIdArity v)
-exprGenerousArity (Note note e)	
-  | ok_note note			= exprGenerousArity e
-exprGenerousArity (Lam x e) 
-  | isId x    				= 1 + exprGenerousArity e
-  | otherwise 				= exprGenerousArity e
-exprGenerousArity (Let bind body) 	
-  | all exprIsCheap (rhssOfBind bind)	= exprGenerousArity body
-exprGenerousArity (Case scrut _ alts)
-  | exprIsCheap scrut			= min_zero [exprGenerousArity rhs | (_,_,rhs) <- alts]
-exprGenerousArity other 		= 0	-- Could do better for applications
+exprEtaExpandArity (Var v)         	= arityLowerBound (getIdArity v)
+exprEtaExpandArity (Lam x e) 
+  | isId x    				= 1 + exprEtaExpandArity e
+  | otherwise 				= exprEtaExpandArity e
+exprEtaExpandArity (Let bind body) 	
+  | all exprIsCheap (rhssOfBind bind)	= exprEtaExpandArity body
+exprEtaExpandArity (Case scrut _ alts)
+  | exprIsCheap scrut			= min_zero [exprEtaExpandArity rhs | (_,_,rhs) <- alts]
+
+exprEtaExpandArity (Note note e)	
+  | ok_note note			= exprEtaExpandArity e
+  where
+    ok_note InlineCall = True
+    ok_note other      = False
+	-- Notice that we do not look through __inline_me__
+	-- This one is a bit more surprising, but consider
+	--	f = _inline_me (\x -> e)
+	-- We DO NOT want to eta expand this to
+	--	f = \x -> (_inline_me (\x -> e)) x
+	-- because the _inline_me gets dropped now it is applied, 
+	-- giving just
+	--	f = \x -> e
+	-- A Bad Idea
+	--
+	-- Notice also that we don't look through Coerce
+	-- This is simply because the etaExpand code in SimplUtils
+	-- isn't capable of making the alternating lambdas and coerces
+	-- that would be necessary to exploit it
+
+exprEtaExpandArity other 		= 0	-- Could do better for applications
 
 min_zero :: [Int] -> Int	-- Find the minimum, but zero is the smallest
 min_zero (x:xs) = go x xs
@@ -340,24 +371,6 @@ min_zero (x:xs) = go x xs
 		  go min (x:xs) | x < min   = go x xs
 				| otherwise = go min xs 
 
-ok_note (SCC _)	     = False	-- (Over?) conservative
-ok_note (TermUsg _)  = False	-- Doesn't matter much
-
-ok_note (Coerce _ _) = True
-	-- We *do* look through coerces when getting arities.
-	-- Reason: arities are to do with *representation* and
-	-- work duplication. 
-
-ok_note InlineCall   = True
-ok_note InlineMe     = False
-	-- This one is a bit more surprising, but consider
-	--	f = _inline_me (\x -> e)
-	-- We DO NOT want to eta expand this to
-	--	f = \x -> (_inline_me (\x -> e)) x
-	-- because the _inline_me gets dropped now it is applied, 
-	-- giving just
-	--	f = \x -> e
-	-- A Bad Idea
 \end{code}
 
 

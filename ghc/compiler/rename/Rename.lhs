@@ -44,9 +44,7 @@ import PrelMods		( mAIN_Name, pREL_MAIN_Name )
 import TysWiredIn	( unitTyCon, intTyCon, doubleTyCon, boolTyCon )
 import PrelInfo		( ioTyCon_NAME, numClass_RDR, thinAirIdNames, derivingOccurrences )
 import Type		( namesOfType, funTyCon )
-import ErrUtils		( pprBagOfErrors, pprBagOfWarnings,
-			  doIfSet, dumpIfSet, ghcExit
-			)
+import ErrUtils		( printErrorsAndWarnings, dumpIfSet, ghcExit )
 import BasicTypes	( NewOrData(..) )
 import Bag		( isEmptyBag, bagToList )
 import FiniteMap	( fmToList, delListFromFM, addToFM, sizeFM, eltsFM )
@@ -77,14 +75,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc
 	\ (maybe_rn_stuff, rn_errs_bag, rn_warns_bag) ->
 
 	-- Check for warnings
-    doIfSet (not (isEmptyBag rn_warns_bag))
-	    (printErrs (pprBagOfWarnings rn_warns_bag))	>>
-
-	-- Check for errors; exit if so
-    doIfSet (not (isEmptyBag rn_errs_bag))
-	    (printErrs (pprBagOfErrors rn_errs_bag)	 >>
-	     ghcExit 1
-	    )						 >>
+    printErrorsAndWarnings rn_errs_bag rn_warns_bag	>>
 
 	-- Dump output, if any
     (case maybe_rn_stuff of
@@ -95,7 +86,10 @@ renameModule us this_mod@(HsModule mod_name vers exports imports local_decls loc
     )							>>
 
 	-- Return results
-    return maybe_rn_stuff
+    if not (isEmptyBag rn_errs_bag) then
+	    ghcExit 1 >> return Nothing
+    else
+	    return maybe_rn_stuff
 \end{code}
 
 

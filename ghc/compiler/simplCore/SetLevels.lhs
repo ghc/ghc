@@ -266,9 +266,9 @@ lvlExpr ctxt_lvl env (_, AnnNote note expr)
 -- Why not?  Because partial applications are fairly rare, and splitting
 -- lambdas makes them more expensive.
 
-lvlExpr ctxt_lvl env (_, AnnLam bndr rhs)
+lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs)
   = lvlMFE incd_lvl new_env body	`thenLvl` \ body' ->
-    returnLvl (mkLams lvld_bndrs body')
+    returnLvl (mk_lams lvld_bndrs expr body')
   where
     bndr_is_id         = isId bndr
     bndr_is_tyvar      = isTyVar bndr
@@ -283,10 +283,20 @@ lvlExpr ctxt_lvl env (_, AnnLam bndr rhs)
     lvld_bndrs = [(b,incd_lvl) | b <- bndrs]
     new_env    = extendLvlEnv env lvld_bndrs
 
+	-- Ignore notes, because we don't want to split
+	-- a lambda like this (\x -> coerce t (\s -> ...))
+	-- This happens quite a bit in state-transformer programs
     go (_, AnnLam bndr rhs) |  bndr_is_id && isId bndr 
 			    || bndr_is_tyvar && isTyVar bndr
 			    =  case go rhs of { (bndrs, body) -> (bndr:bndrs, body) }
+    go (_, AnnNote _ rhs)   = go rhs
     go body		    = ([], body)
+
+	-- Have to reconstruct the right Notes, since we ignored
+	-- them when gathering the lambdas
+    mk_lams (lb : lbs) (_, AnnLam _ body)     body' = Lam  lb   (mk_lams lbs body body')
+    mk_lams lbs	       (_, AnnNote note body) body' = Note note (mk_lams lbs body body')
+    mk_lams []	       body		      body' = body'
 
 lvlExpr ctxt_lvl env (_, AnnLet bind body)
   = lvlBind NotTopLevel ctxt_lvl env bind	`thenLvl` \ (binds', new_env) ->

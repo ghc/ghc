@@ -331,6 +331,7 @@ addStrictnessInfoToId str_val abs_val binder body
 	--	foldr k z (case e of p -> build g) 
 	-- gets transformed to
 	--	case e of p -> foldr k z (build g)
+	-- [foldr is only inlined late in compilation, after strictness analysis]
 	(binders, rhs) -> binder `setIdStrictness` 
 			  mkStrictnessInfo strictness
 		where
