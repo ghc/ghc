@@ -119,7 +119,6 @@ sub init_TARGET_STUFF {
     $T_MOVE_DIRVS   = '^(\s*(\.align\s+\d+(,0x90)?|\.globl\s+\S+|\.text|\.data|\.stab[^n].*|\.type\s+.*|\.size\s+.*)\n)';
     $T_COPY_DIRVS   = '\.(globl|stab)';
     $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\\\11"\n\t\.ascii\s+"(.*)\\\\0"';
-    $T_hsc_cc_PAT   = '\.ascii.*\)(hsc|cc) (.*)\\11"\n\t\.ascii\s+"(.*)\\0"' if ($TargetPlatform =~ /^.*-cygwin32/ );
     $T_DOT_WORD	    = '\.long';
     $T_DOT_GLOBAL   = '\.globl';
     $T_HDR_literal  = "\.text\n\t\.align 2\n";
