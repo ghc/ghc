@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: ClosureInfo.lhs,v 1.36 1999/03/22 16:58:20 simonm Exp $
+% $Id: ClosureInfo.lhs,v 1.37 1999/05/11 16:44:02 keithw Exp $
 %
 \section[ClosureInfo]{Data structures which describe closures}
 
@@ -48,7 +48,7 @@ module ClosureInfo (
 
 	isStaticClosure,
 	allocProfilingMsg,
-	blackHoleClosureInfo,
+	cafBlackHoleClosureInfo, seCafBlackHoleClosureInfo,
 	maybeSelectorInfo,
 
 	infoTblNeedsSRT,
@@ -68,7 +68,8 @@ import CgRetConv	( assignRegs )
 import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			  mkInfoTableLabel,
 			  mkConInfoTableLabel, mkStaticClosureLabel, 
-			  mkBlackHoleInfoTableLabel, 
+			  mkCAFBlackHoleInfoTableLabel, 
+			  mkSECAFBlackHoleInfoTableLabel, 
 			  mkStaticInfoTableLabel, mkStaticConEntryLabel,
 			  mkConEntryLabel, mkClosureLabel,
 			  mkSelectorInfoLabel, mkSelectorEntryLabel,
@@ -76,7 +77,7 @@ import CLabel		( CLabel, mkStdEntryLabel, mkFastEntryLabel,
 			  mkReturnPtLabel
 			)
 import CmdLineOpts	( opt_SccProfilingOn, opt_OmitBlackHoling,
-			  opt_Parallel )
+			  opt_Parallel, opt_DoTickyProfiling )
 import Id		( Id, idType, getIdArity )
 import DataCon		( DataCon, dataConTag, fIRST_TAG,
 			  isNullaryDataCon, isTupleCon, dataConName
@@ -155,9 +156,9 @@ data LambdaFormInfo
 	Int		-- arity;
 
   | LFBlackHole		-- Used for the closures allocated to hold the result
-
 			-- of a CAF.  We want the target of the update frame to
 			-- be in the heap, so we make a black hole to hold it.
+        CLabel          -- Flavour (info label, eg CAF_BLACKHOLE_info).
 
 
 data StandardFormInfo	-- Tells whether this thunk has one of a small number
@@ -252,7 +253,6 @@ Miscellaneous LF-infos.
 
 \begin{code}
 mkLFArgument	= LFArgument
-mkLFBlackHole	= LFBlackHole
 mkLFLetNoEscape = LFLetNoEscape
 
 mkLFImported :: Id -> LambdaFormInfo
@@ -582,9 +582,9 @@ nodeMustPointToIt lf_info
 	  -> returnFC True
 	  -- Node must point to any standard-form thunk.
 
-	LFArgument  -> returnFC True
-	LFImported  -> returnFC True
-	LFBlackHole -> returnFC True
+	LFArgument    -> returnFC True
+	LFImported    -> returnFC True
+	LFBlackHole _ -> returnFC True
 		    -- BH entry may require Node to point
 
 	LFLetNoEscape _ -> returnFC False
@@ -678,15 +678,15 @@ getEntryConvention name lf_info arg_kinds
 			     StdEntry (mkConEntryLabel (dataConName tup))
 
 	LFThunk _ _ _ updatable std_form_info _ _
-	  -> if updatable
+	  -> if updatable || opt_DoTickyProfiling  -- to catch double entry
 	     then ViaNode
-	     else StdEntry (thunkEntryLabel name std_form_info updatable)
+             else StdEntry (thunkEntryLabel name std_form_info updatable)
 
-	LFArgument  -> ViaNode
-	LFImported  -> ViaNode
-	LFBlackHole -> ViaNode	-- Presumably the black hole has by now
-				-- been updated, but we don't know with
-				-- what, so we enter via Node
+	LFArgument    -> ViaNode
+	LFImported    -> ViaNode
+	LFBlackHole _ -> ViaNode -- Presumably the black hole has by now
+				 -- been updated, but we don't know with
+				 -- what, so we enter via Node
 
 	LFLetNoEscape 0
 	  -> StdEntry (mkReturnPtLabel (nameUnique name))
@@ -717,7 +717,10 @@ blackHoleOnEntry (MkClosureInfo _ lf_info _)
 	LFThunk _ _ no_fvs updatable _ _ _
 	  -> if updatable
 	     then not opt_OmitBlackHoling
-	     else not no_fvs
+	     else opt_DoTickyProfiling || not no_fvs
+                  -- the former to catch double entry,
+                  -- and the latter to plug space-leaks.  KSW/SDM 1999-04.
+
 	other -> panic "blackHoleOnEntry"	-- Should never happen
 
 isStandardFormThunk :: LambdaFormInfo -> Bool
@@ -892,7 +895,7 @@ closureLFInfo (MkClosureInfo _ lf_info _) = lf_info
 
 closureUpdReqd :: ClosureInfo -> Bool
 closureUpdReqd (MkClosureInfo _ (LFThunk _ _ _ upd _ _ _) _) = upd
-closureUpdReqd (MkClosureInfo _ LFBlackHole _)         = True
+closureUpdReqd (MkClosureInfo _ (LFBlackHole _) _)           = True
 	-- Black-hole closures are allocated to receive the results of an
 	-- alg case with a named default... so they need to be updated.
 closureUpdReqd other_closure			       = False
@@ -945,10 +948,10 @@ fastLabelFromCI (MkClosureInfo name _ _)
 infoTableLabelFromCI :: ClosureInfo -> CLabel
 infoTableLabelFromCI (MkClosureInfo id lf_info rep)
   = case lf_info of
-	LFCon con _ 	-> mkConInfoPtr con rep
-	LFTuple tup _	-> mkConInfoPtr tup rep
+	LFCon con _ 	 -> mkConInfoPtr con rep
+	LFTuple tup _	 -> mkConInfoPtr tup rep
 
-	LFBlackHole     -> mkBlackHoleInfoTableLabel
+	LFBlackHole info -> info
 
 	LFThunk _ _ _ upd_flag (SelectorThunk offset) _ _ -> 
 		mkSelectorInfoLabel upd_flag offset
@@ -1010,17 +1013,23 @@ allocProfilingMsg (MkClosureInfo _ lf_info _)
       LFReEntrant _ _ _ _ _ _	-> SLIT("TICK_ALLOC_FUN")
       LFCon _ _			-> SLIT("TICK_ALLOC_CON")
       LFTuple _ _		-> SLIT("TICK_ALLOC_CON")
-      LFThunk _ _ _ _ _ _ _     -> SLIT("TICK_ALLOC_THK")
-      LFBlackHole		-> SLIT("TICK_ALLOC_BH")
+      LFThunk _ _ _ True _ _ _  -> SLIT("TICK_ALLOC_UP_THK")  -- updatable
+      LFThunk _ _ _ False _ _ _ -> SLIT("TICK_ALLOC_SE_THK")  -- nonupdatable
+      LFBlackHole _		-> SLIT("TICK_ALLOC_BH")
       LFImported		-> panic "TICK_ALLOC_IMP"
 \end{code}
 
 We need a black-hole closure info to pass to @allocDynClosure@ when we
-want to allocate the black hole on entry to a CAF.
+want to allocate the black hole on entry to a CAF.  These are the only
+ways to build an LFBlackHole, maintaining the invariant that it really
+is a black hole and not something else.
 
 \begin{code}
-blackHoleClosureInfo (MkClosureInfo name _ _)
-  = MkClosureInfo name LFBlackHole BlackHoleRep
+cafBlackHoleClosureInfo (MkClosureInfo name _ _)
+  = MkClosureInfo name (LFBlackHole mkCAFBlackHoleInfoTableLabel) BlackHoleRep
+
+seCafBlackHoleClosureInfo (MkClosureInfo name _ _)
+  = MkClosureInfo name (LFBlackHole mkSECAFBlackHoleInfoTableLabel) BlackHoleRep
 \end{code}
 
 %************************************************************************

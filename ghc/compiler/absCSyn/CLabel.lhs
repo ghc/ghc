@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CLabel.lhs,v 1.25 1999/04/27 12:34:49 simonm Exp $
+% $Id: CLabel.lhs,v 1.26 1999/05/11 16:44:04 keithw Exp $
 %
 \section[CLabel]{@CLabel@: Information to make C Labels}
 
@@ -36,7 +36,8 @@ module CLabel (
 
 	mkErrorStdEntryLabel,
 	mkUpdEntryLabel,
-	mkBlackHoleInfoTableLabel,
+        mkCAFBlackHoleInfoTableLabel,
+        mkSECAFBlackHoleInfoTableLabel,
 	mkRtsPrimOpLabel,
 
 	mkSelectorInfoLabel,
@@ -61,7 +62,7 @@ module CLabel (
 import {-# SOURCE #-} MachMisc ( underscorePrefix, fmtAsmLbl )
 #endif
 
-import CmdLineOpts      ( opt_Static )
+import CmdLineOpts      ( opt_Static, opt_DoTickyProfiling )
 import CStrings		( pp_cSEP )
 import DataCon		( ConTag, DataCon )
 import Module		( isDynamicModule )
@@ -153,7 +154,7 @@ data CaseLabelInfo
 data RtsLabelInfo
   = RtsShouldNeverHappenCode
 
-  | RtsBlackHoleInfoTbl
+  | RtsBlackHoleInfoTbl FAST_STRING  -- black hole with info table name
 
   | RtsUpdEntry
 
@@ -210,7 +211,11 @@ mkAsmTempLabel 			= AsmTempLabel
 
 mkErrorStdEntryLabel		= RtsLabel RtsShouldNeverHappenCode
 mkUpdEntryLabel			= RtsLabel RtsUpdEntry
-mkBlackHoleInfoTableLabel	= RtsLabel RtsBlackHoleInfoTbl
+mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsBlackHoleInfoTbl SLIT("CAF_BLACKHOLE_info"))
+mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
+                                    RtsLabel (RtsBlackHoleInfoTbl SLIT("SE_CAF_BLACKHOLE_info"))
+                                  else  -- RTS won't have info table unless -ticky is on
+                                    panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
 
 mkSelectorInfoLabel  upd off	= RtsLabel (RtsSelectorInfoTbl upd off)
@@ -299,7 +304,7 @@ For generating correct types in label declarations...
 
 \begin{code}
 labelType :: CLabel -> CLabelType
-labelType (RtsLabel RtsBlackHoleInfoTbl)      = InfoTblType
+labelType (RtsLabel (RtsBlackHoleInfoTbl _))  = InfoTblType
 labelType (RtsLabel (RtsSelectorInfoTbl _ _)) = InfoTblType
 labelType (RtsLabel (RtsApInfoTbl _ _))       = InfoTblType
 labelType (CaseLabel _ CaseReturnInfo)        = InfoTblType
@@ -415,7 +420,7 @@ pprCLbl (RtsLabel RtsShouldNeverHappenCode) = ptext SLIT("stg_error_entry")
 
 pprCLbl (RtsLabel RtsUpdEntry) = ptext SLIT("Upd_frame_entry")
 
-pprCLbl (RtsLabel RtsBlackHoleInfoTbl) = ptext SLIT("CAF_BLACKHOLE_info")
+pprCLbl (RtsLabel (RtsBlackHoleInfoTbl info)) = ptext info
 
 pprCLbl (RtsLabel (RtsSelectorInfoTbl upd_reqd offset))
   = hcat [ptext SLIT("__sel_"), text (show offset),

@@ -349,7 +349,7 @@ type MassageM result
   -> CollectedCCs
   -> (CollectedCCs, result)
 
--- the initUs function also returns the final UniqueSupply and CollectedCCs
+-- the initMM function also returns the final CollectedCCs
 
 initMM :: Module	-- module name, which we may consult
        -> UniqSupply

@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgClosure.lhs,v 1.28 1999/04/23 09:51:24 simonm Exp $
+% $Id: CgClosure.lhs,v 1.29 1999/05/11 16:44:02 keithw Exp $
 %
 \section[CgClosure]{Code generation for closures}
 
@@ -44,7 +44,7 @@ import CLabel		( CLabel, mkClosureLabel, mkFastEntryLabel,
 			  mkRednCountsLabel, mkStdEntryLabel
 			)
 import ClosureInfo	-- lots and lots of stuff
-import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn )
+import CmdLineOpts	( opt_GranMacros, opt_SccProfilingOn, opt_DoTickyProfiling )
 import CostCentre	
 import Id		( Id, idName, idType, idPrimRep )
 import Name		( Name )
@@ -55,6 +55,9 @@ import PprType          ( showTypeCategory )
 import Util		( isIn )
 import CmdLineOpts	( opt_SccProfilingOn )
 import Outputable
+
+import Name             ( nameOccName )
+import OccName          ( occNameFS )
 
 getWrapperArgTypeCategories = panic "CgClosure.getWrapperArgTypeCategories (ToDo)"
 \end{code}
@@ -600,7 +603,8 @@ funWrapper closure_info arg_regs stk_tags slow_label fun_body
 
 
 \begin{code}
-blackHoleIt :: ClosureInfo -> Bool -> Code	-- Only called for thunks
+blackHoleIt :: ClosureInfo -> Bool -> Code	-- Only called for closures with no args
+
 blackHoleIt closure_info node_points
   = if blackHoleOnEntry closure_info && node_points
     then
@@ -613,42 +617,59 @@ blackHoleIt closure_info node_points
 \end{code}
 
 \begin{code}
-setupUpdate :: ClosureInfo -> Code -> Code	-- Only called for thunks
+setupUpdate :: ClosureInfo -> Code -> Code	-- Only called for closures with no args
 	-- Nota Bene: this function does not change Node (even if it's a CAF),
 	-- so that the cost centre in the original closure can still be
 	-- extracted by a subsequent ENTER_CC_TCL
 
+-- I've tidied up the code for this function, but it should still do the same as
+-- it did before (modulo ticky stuff).  KSW 1999-04.
 setupUpdate closure_info code
- = if (closureUpdReqd closure_info) then
-	link_caf_if_needed	`thenFC` \ update_closure ->
-    	pushUpdateFrame update_closure code
+ = if closureReEntrant closure_info
+   then
+     code
    else
-	profCtrC SLIT("TICK_UPDF_OMITTED") [] `thenC`
-	code
+     case (closureUpdReqd closure_info, isStaticClosure closure_info) of
+       (False,False) -> profCtrC SLIT("TICK_UPDF_OMITTED") [] `thenC`
+	                code
+       (False,True ) -> (if opt_DoTickyProfiling
+                         then
+                         -- blackhole the SE CAF
+                           link_caf seCafBlackHoleClosureInfo `thenFC` \ _ -> nopC
+                         else
+                           nopC)                                                       `thenC`
+                        profCtrC SLIT("TICK_UPD_CAF_BH_SINGLE_ENTRY") [CString cl_name] `thenC`
+                        profCtrC SLIT("TICK_UPDF_OMITTED") []                           `thenC`
+	                code
+       (True ,False) -> pushUpdateFrame (CReg node) code
+       (True ,True ) -> -- blackhole the (updatable) CAF:
+                        link_caf cafBlackHoleClosureInfo           `thenFC` \ update_closure ->
+                        profCtrC SLIT("TICK_UPD_CAF_BH_UPDATABLE") [CString cl_name]    `thenC`
+                        pushUpdateFrame update_closure code
  where
-   link_caf_if_needed :: FCode CAddrMode	-- Returns amode for closure to be updated
-   link_caf_if_needed
-     = if not (isStaticClosure closure_info) then
-	  returnFC (CReg node)
-       else
+   cl_name :: FAST_STRING
+   cl_name  = (occNameFS . nameOccName . closureName) closure_info
 
-	  -- First we must allocate a black hole, and link the
-	  -- CAF onto the CAF list
+   link_caf :: (ClosureInfo -> ClosureInfo)  -- function yielding BH closure_info
+            -> FCode CAddrMode	             -- Returns amode for closure to be updated
+   link_caf bhCI
+     = -- To update a CAF we must allocate a black hole, link the CAF onto the
+       -- CAF list, then update the CAF to point to the fresh black hole.
+       -- This function returns the address of the black hole, so it can be
+       -- updated with the new value when available.
 
-		-- Alloc black hole specifying CC_HDR(Node) as the cost centre
-		--   Hack Warning: Using a CLitLit to get CAddrMode !
-	  let
-	      use_cc   = CLitLit SLIT("CCS_HDR(R1.p)") PtrRep
-	      blame_cc = use_cc
-	  in
-	  allocDynClosure (blackHoleClosureInfo closure_info) use_cc blame_cc []
-							`thenFC` \ heap_offset ->
-	  getHpRelOffset heap_offset			`thenFC` \ hp_rel ->
-	  let  amode = CAddr hp_rel
-	  in
-	  absC (CMacroStmt UPD_CAF [CReg node, amode])
-						  	`thenC`
-	  returnFC amode
+             -- Alloc black hole specifying CC_HDR(Node) as the cost centre
+             --   Hack Warning: Using a CLitLit to get CAddrMode !
+       let
+           use_cc   = CLitLit SLIT("CCS_HDR(R1.p)") PtrRep
+           blame_cc = use_cc
+       in
+       allocDynClosure (bhCI closure_info) use_cc blame_cc []  `thenFC` \ heap_offset ->
+       getHpRelOffset heap_offset                              `thenFC` \ hp_rel ->
+       let  amode = CAddr hp_rel
+       in
+       absC (CMacroStmt UPD_CAF [CReg node, amode])            `thenC`
+       returnFC amode
 \end{code}
 
 %************************************************************************

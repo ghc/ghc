@@ -23,20 +23,24 @@ import CostCentre	( noCCS )
 import Id		( Id, mkSysLocal, idType,
 			  externallyVisibleId, setIdUnique, idName, getIdDemandInfo
 			)
-import Var		( modifyIdInfo )
+import Var		( Var, varType, modifyIdInfo )
 import IdInfo		( setDemandInfo )
+import UsageSPUtils     ( primOpUsgTys )
 import DataCon		( DataCon, dataConName, dataConId )
 import Name	        ( Name, nameModule, isLocallyDefinedName )
 import Module		( isDynamicModule )
 import Const	        ( Con(..), Literal, isLitLitLit )
 import VarEnv
 import Const		( Con(..), isWHNFCon, Literal(..) )
-import PrimOp		( PrimOp(..) )
-import Type		( isUnLiftedType, isUnboxedTupleType, Type )
+import PrimOp		( PrimOp(..), primOpUsg )
+import Type		( isUnLiftedType, isUnboxedTupleType, Type, splitFunTy_maybe,
+                          UsageAnn(..), tyUsg, applyTy )
 import TysPrim		( intPrimTy )
 import Demand
 import Unique		( Unique, Uniquable(..) )
 import UniqSupply	-- all of it, really
+import Util
+import Maybes
 import Outputable
 \end{code}
 
@@ -74,12 +78,36 @@ Names new unique ids, since the code generator assumes that binders
 are unique across a module. (Simplifier doesn't maintain this
 invariant any longer.)
 
+A binder to be floated out becomes an @StgFloatBind@.
+
 \begin{code}
 type StgEnv = IdEnv Id
 
-data StgFloatBind
-   = LetBind Id StgExpr
-   | CaseBind Id StgExpr
+data StgFloatBind = StgFloatBind Id StgExpr RhsDemand
+\end{code}
+
+A @RhsDemand@ gives the demand on an RHS: strict (@isStrictDem@) and
+thus case-bound, or if let-bound, at most once (@isOnceDem@) or
+otherwise.
+
+\begin{code}
+data RhsDemand  = RhsDemand { isStrictDem :: Bool,  -- True => used at least once
+                              isOnceDem   :: Bool   -- True => used at most once
+                            }
+
+tyDem :: Type -> RhsDemand
+-- derive RhsDemand (assuming let-binding)
+tyDem ty = case tyUsg ty of
+             UsOnce  -> RhsDemand False True
+             UsMany  -> RhsDemand False False
+             UsVar _ -> pprPanic "CoreToStg.tyDem: UsVar unexpected:" $ ppr ty
+
+bdrDem :: Var -> RhsDemand
+bdrDem = tyDem . varType
+
+safeDem, onceDem :: RhsDemand
+safeDem = RhsDemand False False  -- always safe to use this
+onceDem = RhsDemand False True   -- used at most once
 \end{code}
 
 No free/live variable information is pinned on in this pass; it's added
@@ -100,7 +128,7 @@ topCoreBindsToStg :: UniqSupply	-- name supply
 		  -> [StgBinding]	-- output
 
 topCoreBindsToStg us core_binds
-  = initUs us (coreBindsToStg emptyVarEnv core_binds)
+  = initUs_ us (coreBindsToStg emptyVarEnv core_binds)
   where
     coreBindsToStg :: StgEnv -> [CoreBind] -> UniqSM [StgBinding]
 
@@ -124,13 +152,14 @@ coreBindToStg :: StgEnv
 		    	 StgEnv)	-- Floats
 
 coreBindToStg env (NonRec binder rhs)
-  = coreRhsToStg env rhs	`thenUs` \ stg_rhs ->
-    newLocalId env binder	`thenUs` \ (new_env, new_binder) ->
+  = coreRhsToStg env rhs (bdrDem binder) `thenUs` \ stg_rhs ->
+    newLocalId env binder	         `thenUs` \ (new_env, new_binder) ->
     returnUs ([StgNonRec new_binder stg_rhs], new_env)
 
 coreBindToStg env (Rec pairs)
-  = newLocalIds env binders		`thenUs` \ (env', binders') ->
-    mapUs (coreRhsToStg env') rhss      `thenUs` \ stg_rhss ->
+  = newLocalIds env binders		 `thenUs` \ (env', binders') ->
+    mapUs (\ (bdr,rhs) -> coreRhsToStg env' rhs (bdrDem bdr) )
+          pairs                          `thenUs` \ stg_rhss ->
     returnUs ([StgRec (binders' `zip` stg_rhss)], env')
   where
     (binders, rhss) = unzip pairs
@@ -144,13 +173,13 @@ coreBindToStg env (Rec pairs)
 %************************************************************************
 
 \begin{code}
-coreRhsToStg :: StgEnv -> CoreExpr -> UniqSM StgRhs
+coreRhsToStg :: StgEnv -> CoreExpr -> RhsDemand -> UniqSM StgRhs
 
-coreRhsToStg env core_rhs
-  = coreExprToStg env core_rhs 	`thenUs` \ stg_expr ->
-    returnUs (exprToRhs stg_expr)
+coreRhsToStg env core_rhs dem
+  = coreExprToStg env core_rhs dem  `thenUs` \ stg_expr ->
+    returnUs (exprToRhs dem stg_expr)
 
-exprToRhs (StgLet (StgNonRec var1 rhs) (StgApp var2 []))
+exprToRhs dem (StgLet (StgNonRec var1 rhs) (StgApp var2 []))
   | var1 == var2 
   = rhs
 	-- This curious stuff is to unravel what a lambda turns into
@@ -188,7 +217,7 @@ exprToRhs (StgLet (StgNonRec var1 rhs) (StgApp var2 []))
   constructors (ala C++ static class constructors) which will
   then be run at load time to fix up static closures.
 -}
-exprToRhs (StgCon (DataCon con) args _)
+exprToRhs dem (StgCon (DataCon con) args _)
   | not is_dynamic  &&
     all  (not.is_lit_lit) args  = StgRhsCon noCCS con args
  where
@@ -200,13 +229,12 @@ exprToRhs (StgCon (DataCon con) args _)
        Literal l -> isLitLitLit l
        _         -> False
 
-exprToRhs expr 
+exprToRhs dem expr
 	= StgRhsClosure noCCS		-- No cost centre (ToDo?)
 		        stgArgOcc	-- safe
 			noSRT		-- figure out later
 			bOGUS_FVs
-
-			Updatable	-- Be pessimistic
+			(if isOnceDem dem then SingleEntry else Updatable)
 			[]
 			expr
 
@@ -237,25 +265,29 @@ isDynName nm =
 %************************************************************************
 
 \begin{code}
-coreArgsToStg :: StgEnv -> [CoreArg] -> UniqSM ([StgFloatBind], [StgArg])
+coreArgsToStg :: StgEnv -> [(CoreArg,RhsDemand)] -> UniqSM ([StgFloatBind], [StgArg])
+-- arguments are all value arguments (tyargs already removed), paired with their demand
 
 coreArgsToStg env []
   = returnUs ([], [])
 
-coreArgsToStg env (Type ty : as)	-- Discard type arguments
-  = coreArgsToStg env as
-
-coreArgsToStg env (a:as)
-  = coreArgToStg env a		`thenUs` \ (bs1, a') ->
-    coreArgsToStg env as	`thenUs` \ (bs2, as') ->
+coreArgsToStg env (ad:ads)
+  = coreArgToStg env ad	        `thenUs` \ (bs1, a') ->
+    coreArgsToStg env ads       `thenUs` \ (bs2, as') ->
     returnUs (bs1 ++ bs2, a' : as')
 
 -- This is where we arrange that a non-trivial argument is let-bound
 
-coreArgToStg :: StgEnv -> CoreArg -> UniqSM ([StgFloatBind], StgArg)
+coreArgToStg :: StgEnv -> (CoreArg,RhsDemand) -> UniqSM ([StgFloatBind], StgArg)
 
-coreArgToStg env arg
-  = coreExprToStgFloat env arg	`thenUs` \ (binds, arg') ->
+coreArgToStg env (arg,dem)
+  = let
+        ty   = coreExprType arg
+        dem' = if isUnLiftedType ty  -- if it's unlifted, it's definitely strict
+               then dem { isStrictDem = True }
+               else dem
+    in
+    coreExprToStgFloat env arg dem'  `thenUs` \ (binds, arg') ->
     case (binds, arg') of
 	([], StgCon con [] _) | isWHNFCon con -> returnUs ([], StgConArg con)
 	([], StgApp v [])		      -> returnUs ([], StgVarArg v)
@@ -268,12 +300,9 @@ coreArgToStg env arg
 	-- expressions by pulling out the floats.
 	(_, other) ->
 		 newStgVar ty	`thenUs` \ v ->
-		 if isUnLiftedType ty
-		   then returnUs (binds ++ [CaseBind v arg'], StgVarArg v)
-		   else returnUs ([LetBind v (mkStgBinds binds arg')], StgVarArg v)
-	  where 
-		ty = coreExprType arg
-
+		 if isStrictDem dem'
+		   then returnUs (binds ++ [StgFloatBind v arg' dem'], StgVarArg v)
+		   else returnUs ([StgFloatBind v (mkStgBinds binds arg') dem'], StgVarArg v)
 \end{code}
 
 
@@ -284,9 +313,9 @@ coreArgToStg env arg
 %************************************************************************
 
 \begin{code}
-coreExprToStg :: StgEnv -> CoreExpr -> UniqSM StgExpr
+coreExprToStg :: StgEnv -> CoreExpr -> RhsDemand -> UniqSM StgExpr
 
-coreExprToStg env (Var var)
+coreExprToStg env (Var var) dem
   = returnUs (StgApp (stgLookup env var) [])
 
 \end{code}
@@ -298,13 +327,15 @@ coreExprToStg env (Var var)
 %************************************************************************
 
 \begin{code}
-coreExprToStg env expr@(Lam _ _)
+coreExprToStg env expr@(Lam _ _) dem
   = let
 	(binders, body) = collectBinders expr
 	id_binders      = filter isId binders
+        body_dem        = trace "coreExprToStg: approximating body_dem in Lam"
+                          safeDem
     in
     newLocalIds env id_binders		`thenUs` \ (env', binders') ->
-    coreExprToStg env' body             `thenUs` \ stg_body ->
+    coreExprToStg env' body body_dem    `thenUs` \ stg_body ->
 
     if null id_binders then -- it was all type/usage binders; tossed
 	returnUs stg_body
@@ -347,9 +378,9 @@ coreExprToStg env expr@(Lam _ _)
 %************************************************************************
 
 \begin{code}
-coreExprToStg env (Let bind body)
-  = coreBindToStg env     bind   `thenUs` \ (stg_binds, new_env) ->
-    coreExprToStg new_env body   `thenUs` \ stg_body ->
+coreExprToStg env (Let bind body) dem
+  = coreBindToStg env     bind      `thenUs` \ (stg_binds, new_env) ->
+    coreExprToStg new_env body dem  `thenUs` \ stg_body ->
     returnUs (foldr StgLet stg_body stg_binds)
 \end{code}
 
@@ -362,20 +393,20 @@ coreExprToStg env (Let bind body)
 
 Covert core @scc@ expression directly to STG @scc@ expression.
 \begin{code}
-coreExprToStg env (Note (SCC cc) expr)
-  = coreExprToStg env expr   `thenUs` \ stg_expr ->
+coreExprToStg env (Note (SCC cc) expr) dem
+  = coreExprToStg env expr dem  `thenUs` \ stg_expr ->
     returnUs (StgSCC cc stg_expr)
 \end{code}
 
 \begin{code}
-coreExprToStg env (Note other_note expr) = coreExprToStg env expr
+coreExprToStg env (Note other_note expr) dem = coreExprToStg env expr dem
 \end{code}
 
 The rest are handled by coreExprStgFloat.
 
 \begin{code}
-coreExprToStg env expr
-  = coreExprToStgFloat env expr  `thenUs` \ (binds,stg_expr) ->
+coreExprToStg env expr dem
+  = coreExprToStgFloat env expr dem  `thenUs` \ (binds,stg_expr) ->
     returnUs (mkStgBinds binds stg_expr)
 \end{code}
 
@@ -386,11 +417,12 @@ coreExprToStg env expr
 %************************************************************************
 
 \begin{code}
-coreExprToStgFloat env expr@(App _ _)
+coreExprToStgFloat env expr@(App _ _) dem
   = let
-	(fun,args)    = collect_args expr []
+        (fun,rads,_) = collect_args expr
+        ads          = reverse rads
     in
-    coreArgsToStg env args		`thenUs` \ (binds, stg_args) ->
+    coreArgsToStg env ads		`thenUs` \ (binds, stg_args) ->
 
 	-- Now deal with the function
     case (fun, stg_args) of
@@ -401,30 +433,29 @@ coreExprToStgFloat env expr@(App _ _)
 
       (non_var_fun, []) -> 	-- No value args, so recurse into the function
 			    ASSERT( null binds )
-			    coreExprToStg env non_var_fun `thenUs` \e ->
+			    coreExprToStg env non_var_fun dem  `thenUs` \e ->
 			    returnUs ([], e)
 
       other ->	-- A non-variable applied to things; better let-bind it.
 		newStgVar (coreExprType fun)	`thenUs` \ fun_id ->
-		coreExprToStg env fun		`thenUs` \ (stg_fun) ->
-		let
-		   fun_rhs = StgRhsClosure noCCS    -- No cost centre (ToDo?)
-					   stgArgOcc
-					   noSRT
-					   bOGUS_FVs
-					   SingleEntry	-- Only entered once
-					   []
-					   stg_fun
-		in
+                coreRhsToStg env fun onceDem    `thenUs` \ fun_rhs ->
 		returnUs (binds,
 			  StgLet (StgNonRec fun_id fun_rhs) $
 			  StgApp fun_id stg_args)
   where
-	-- Collect arguments
-    collect_args (App fun arg)            args = collect_args fun (arg:args)
-    collect_args (Note (Coerce _ _) expr) args = collect_args expr args
-    collect_args (Note InlineCall   expr) args = collect_args expr args
-    collect_args fun                      args = (fun, args)
+	-- Collect arguments and demands (*in reverse order*)
+    collect_args :: CoreExpr -> (CoreExpr, [(CoreExpr,RhsDemand)], Type)
+    collect_args (App fun (Type tyarg)) = let (the_fun,ads,fun_ty) = collect_args fun
+                                          in  (the_fun,ads,applyTy fun_ty tyarg)
+    collect_args (App fun arg         ) = let (the_fun,ads,fun_ty) = collect_args fun
+                                              (arg_ty,res_ty)      = expectJust "coreExprToStgFloat:collect_args" $
+                                                                     splitFunTy_maybe fun_ty
+                                          in  (the_fun,(arg,tyDem arg_ty):ads,res_ty)
+    collect_args (Note (Coerce ty _) e) = let (the_fun,ads,_     ) = collect_args e
+                                          in  (the_fun,ads,ty)
+    collect_args (Note InlineCall    e) = collect_args e
+    collect_args (Note (TermUsg _)   e) = collect_args e
+    collect_args fun                    = (fun,[],coreExprType fun)
 \end{code}
 
 %************************************************************************
@@ -433,16 +464,36 @@ coreExprToStgFloat env expr@(App _ _)
 %*									*
 %************************************************************************
 
-\begin{code}
-coreExprToStgFloat env expr@(Con (PrimOp (CCallOp (Right _) a b c)) args)
-  = getUniqueUs			`thenUs` \ u ->
-    coreArgsToStg env args      `thenUs` \ (binds, stg_atoms) ->
-    let con' = PrimOp (CCallOp (Right u) a b c) in
-    returnUs (binds, StgCon con' stg_atoms (coreExprType expr))
+For data constructors, the demand on an argument is the demand on the
+constructor as a whole (see module UsageSPInf).  For primops, the
+demand is derived from the type of the primop.
 
-coreExprToStgFloat env expr@(Con con args)
-  = coreArgsToStg env args	`thenUs` \ (binds, stg_atoms) ->
-    returnUs (binds, StgCon con stg_atoms (coreExprType expr))
+If usage inference is off, we simply make all bindings updatable for
+speed.
+
+\begin{code}
+coreExprToStgFloat env expr@(Con con args) dem
+  = let 
+        args'       = filter isValArg args
+        dems'       = case con of
+                        Literal _ -> ASSERT( null args' {-'cpp-} )
+                                     []
+                        DEFAULT   -> panic "coreExprToStgFloat: DEFAULT"
+                        DataCon c -> repeat (if isOnceDem dem then onceDem else safeDem)
+                        PrimOp  p -> let tyargs      = map (\ (Type ty) -> ty) $
+                                                           takeWhile isTypeArg args
+                                         (arg_tys,_) = primOpUsgTys p tyargs
+                                     in  ASSERT( length arg_tys == length args' {-'cpp-} )
+                                         -- primops always fully applied, so == not >=
+                                         map tyDem arg_tys
+    in
+    coreArgsToStg env (zip args' dems')                  `thenUs` \ (binds, stg_atoms) ->
+    (case con of  -- must change unique if present
+       PrimOp (CCallOp (Right _) a b c) -> getUniqueUs   `thenUs` \ u ->
+                                           returnUs (PrimOp (CCallOp (Right u) a b c))
+       _                                -> returnUs con)
+                                                         `thenUs` \ con' ->
+    returnUs (binds, StgCon con' stg_atoms (coreExprType expr))
 \end{code}
 
 %************************************************************************
@@ -452,8 +503,8 @@ coreExprToStgFloat env expr@(Con con args)
 %************************************************************************
 
 \begin{code}
-coreExprToStgFloat env expr@(Case scrut bndr alts)
-  = coreExprToStgFloat env scrut		`thenUs` \ (binds, scrut') ->
+coreExprToStgFloat env expr@(Case scrut bndr alts) dem
+  = coreExprToStgFloat env scrut (bdrDem bndr)	`thenUs` \ (binds, scrut') ->
     newEvaldLocalId env bndr			`thenUs` \ (env', bndr') ->
     alts_to_stg env' (findDefault alts)		`thenUs` \ alts' ->
     returnUs (binds, mkStgCase scrut' bndr' alts')
@@ -473,29 +524,34 @@ coreExprToStgFloat env expr@(Case scrut bndr alts)
 	returnUs (StgAlgAlts scrut_ty alts' deflt')
 
     alg_alt_to_stg env (DataCon con, bs, rhs)
-	  = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
+	  = coreExprToStg env rhs dem   `thenUs` \ stg_rhs ->
 	    returnUs (con, filter isId bs, [ True | b <- bs ]{-bogus use mask-}, stg_rhs)
 		-- NB the filter isId.  Some of the binders may be
 		-- existential type variables, which STG doesn't care about
 
     prim_alt_to_stg env (Literal lit, args, rhs)
 	  = ASSERT( null args )
-	    coreExprToStg env rhs    `thenUs` \ stg_rhs ->
+	    coreExprToStg env rhs dem   `thenUs` \ stg_rhs ->
 	    returnUs (lit, stg_rhs)
 
     default_to_stg env Nothing
       = returnUs StgNoDefault
 
     default_to_stg env (Just rhs)
-      = coreExprToStg env rhs    `thenUs` \ stg_rhs ->
+      = coreExprToStg env rhs dem   `thenUs` \ stg_rhs ->
 	returnUs (StgBindDefault stg_rhs)
 		-- The binder is used for prim cases and not otherwise
 		-- (hack for old code gen)
 \end{code}
 
 \begin{code}
-coreExprToStgFloat env expr
-  = coreExprToStg env expr `thenUs` \stg_expr ->
+coreExprToStgFloat env expr@(Type _) dem
+  = pprPanic "coreExprToStgFloat: tyarg unexpected:" $ ppr expr
+\end{code}
+
+\begin{code}
+coreExprToStgFloat env expr dem
+  = coreExprToStg env expr dem  `thenUs` \stg_expr ->
     returnUs ([], stg_expr)
 \end{code}
 
@@ -563,22 +619,16 @@ newLocalIds env (b:bs)
 mkStgBinds :: [StgFloatBind] -> StgExpr -> StgExpr
 mkStgBinds binds body = foldr mkStgBind body binds
 
-mkStgBind (CaseBind bndr rhs) body
+mkStgBind (StgFloatBind bndr rhs dem) body
   | isUnLiftedType bndr_ty
-  = mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
-  | otherwise
+  = ASSERT( not ((isUnboxedTupleType bndr_ty) && (isStrictDem dem==False)) )
+    mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
+
+  | isStrictDem dem == True    -- case
   = mkStgCase rhs bndr (StgAlgAlts bndr_ty [] (StgBindDefault body))
-  where
-    bndr_ty = idType bndr
 
-mkStgBind (LetBind bndr rhs) body
-  | isUnboxedTupleType bndr_ty
-  = panic "mkStgBinds: unboxed tuple"
-  | isUnLiftedType bndr_ty
-  = mkStgCase rhs bndr (StgPrimAlts bndr_ty [] (StgBindDefault body))
-
-  | otherwise
-  = StgLet (StgNonRec bndr (exprToRhs rhs)) body
+  | isStrictDem dem == False   -- let
+  = StgLet (StgNonRec bndr (exprToRhs dem rhs)) body
   where
     bndr_ty = idType bndr
 

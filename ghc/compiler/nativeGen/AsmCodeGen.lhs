@@ -22,7 +22,7 @@ import PrimOp		( commutableOp, PrimOp(..) )
 import RegAllocInfo	( mkMRegsState, MRegsState )
 import Stix		( StixTree(..), StixReg(..) )
 import PrimRep		( isFloatingRep )
-import UniqSupply	( returnUs, thenUs, mapUs, initUs, UniqSM, UniqSupply )
+import UniqSupply	( returnUs, thenUs, mapUs, initUs_, UniqSM, UniqSupply )
 import UniqFM		( UniqFM, emptyUFM, addToUFM, lookupUFM )
 import Outputable	
 
@@ -80,10 +80,10 @@ So, here we go:
 writeRealAsm :: Handle -> AbstractC -> UniqSupply -> IO ()
 writeRealAsm handle absC us
   = -- _scc_ "writeRealAsm" 
-    printForAsm handle (initUs us (runNCG absC))
+    printForAsm handle (initUs_ us (runNCG absC))
 
 dumpRealAsm :: AbstractC -> UniqSupply -> SDoc
-dumpRealAsm absC us = initUs us (runNCG absC)
+dumpRealAsm absC us = initUs_ us (runNCG absC)
 
 runNCG absC
   = genCodeAbstractC absC	`thenUs` \ treelists ->
