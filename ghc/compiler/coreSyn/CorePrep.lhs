@@ -15,14 +15,13 @@ import CoreFVs	( exprFreeVars )
 import CoreLint	( endPass )
 import CoreSyn
 import Type	( Type, applyTy, splitFunTy_maybe, 
-		  isUnLiftedType, isUnboxedTupleType, repType, seqType )
+		  isUnLiftedType, isUnboxedTupleType, seqType )
 import NewDemand  ( Demand, isStrictDmd, lazyDmd, StrictSig(..), DmdType(..) )
-import PrimOp	( PrimOp(..) )
 import Var 	( Var, Id, setVarUnique )
 import VarSet
 import VarEnv
 import Id	( mkSysLocal, idType, idNewDemandInfo, idArity,
-		  setIdType, isPrimOpId_maybe, isFCallId, isGlobalId, 
+		  isFCallId, isGlobalId, 
 		  isLocalId, hasNoBinding, idNewStrictness, 
 		  isDataConId_maybe, idUnfolding
 		)
@@ -341,8 +340,8 @@ corePrepExprFloat env (Let bind body)
 
 corePrepExprFloat env (Note n@(SCC _) expr)
   = corePrepAnExpr env expr		`thenUs` \ expr1 ->
-    deLam expr1				`thenUs` \ expr2 ->
-    returnUs (nilOL, Note n expr2)
+    deLamFloat expr1			`thenUs` \ (floats, expr2) ->
+    returnUs (floats, Note n expr2)
 
 corePrepExprFloat env (Note other_note expr)
   = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
@@ -356,10 +355,11 @@ corePrepExprFloat env expr@(Lam _ _)
     (bndrs,body) = collectBinders expr
 
 corePrepExprFloat env (Case scrut bndr alts)
-  = corePrepExprFloat env scrut		`thenUs` \ (floats, scrut') ->
+  = corePrepExprFloat env scrut		`thenUs` \ (floats1, scrut1) ->
+    deLamFloat scrut1			`thenUs` \ (floats2, scrut2) ->
     cloneBndr env bndr			`thenUs` \ (env', bndr') ->
     mapUs (sat_alt env') alts		`thenUs` \ alts' ->
-    returnUs (floats, Case scrut' bndr' alts')
+    returnUs (floats1 `appOL` floats2 , Case scrut2 bndr' alts')
   where
     sat_alt env (con, bs, rhs)
 	  = cloneBndrs env bs		`thenUs` \ (env', bs') ->
@@ -524,7 +524,7 @@ mkLocalNonRec bndr dem floats rhs
 
   where
     bndr_ty	 = idType bndr
-    bndr_rep_ty  = repType bndr_ty
+
 
 mkBinds :: OrdList FloatingBind -> CoreExpr -> UniqSM CoreExpr
 mkBinds binds body 
@@ -579,22 +579,29 @@ etaExpandRhs bndr rhs
 -- We arrange that they only show up as the RHS of a let(rec)
 -- ---------------------------------------------------------------------------
 
-deLam :: CoreExpr -> UniqSM CoreExpr	
+deLam :: CoreExpr -> UniqSM CoreExpr
+deLam expr = 
+  deLamFloat expr   `thenUs` \ (floats, expr) ->
+  mkBinds floats expr
+
+
+deLamFloat :: CoreExpr -> UniqSM (OrdList FloatingBind, CoreExpr)
 -- Remove top level lambdas by let-bindinig
 
-deLam (Note n expr)
+deLamFloat (Note n expr)
   =	-- You can get things like
 	-- 	case e of { p -> coerce t (\s -> ...) }
-    deLam expr	`thenUs` \ expr' ->
-    returnUs (Note n expr')
+    deLamFloat expr	`thenUs` \ (floats, expr') ->
+    returnUs (floats, Note n expr')
 
-deLam expr 
-  | null bndrs = returnUs expr
+deLamFloat expr 
+  | null bndrs = returnUs (nilOL, expr)
   | otherwise 
   = case tryEta bndrs body of
-      Just no_lam_result -> returnUs no_lam_result
+      Just no_lam_result -> returnUs (nilOL, no_lam_result)
       Nothing	         -> newVar (exprType expr)	`thenUs` \ fn ->
-			    returnUs (Let (NonRec fn expr) (Var fn))
+			    returnUs (unitOL (FloatLet (NonRec fn expr)), 
+				      Var fn)
   where
     (bndrs,body) = collectBinders expr
 
@@ -656,8 +663,10 @@ bdrDem :: Id -> RhsDemand
 bdrDem id = mkDem (idNewDemandInfo id)
 		  False {- For now -}
 
-safeDem, onceDem :: RhsDemand
-safeDem = RhsDemand False False  -- always safe to use this
+-- safeDem :: RhsDemand
+-- safeDem = RhsDemand False False  -- always safe to use this
+
+onceDem :: RhsDemand
 onceDem = RhsDemand False True   -- used at most once
 \end{code}
 
