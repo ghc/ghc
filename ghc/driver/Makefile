@@ -85,7 +85,7 @@ depend :: all
 #
 # Clean up
 #
-CLEAN_FILES += $(SCRIPT_OBJS) $(DYN_LOADABLE_BITS)
+CLEAN_FILES += $(SCRIPT_OBJS) $(SCRIPT_LINK) $(DYN_LOADABLE_BITS) ghc-[0-9].*
 
 #
 # Source distribution
