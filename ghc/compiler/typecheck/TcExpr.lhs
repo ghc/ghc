@@ -64,7 +64,6 @@ import PrelNames	( cCallableClassName, cReturnableClassName,
 			  enumFromToPName, enumFromThenToPName,
 			  ioTyConName
 			)
-import DsMeta		
 import ListSetOps	( minusList )
 import CmdLineOpts
 import HscTypes		( TyThing(..) )

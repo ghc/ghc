@@ -88,9 +88,8 @@ import CmdLineOpts	( DynFlags )
 import BasicTypes	( Version, initialVersion, IPName,
 			  Fixity, FixitySig(..), defaultFixity )
 
-import HsSyn		( DeprecTxt, TyClDecl, tyClDeclName, ifaceRuleDeclName,
-			  tyClDeclNames )
-import RdrHsSyn		( RdrNameInstDecl, RdrNameRuleDecl, RdrNameTyClDecl )
+import HsSyn		( DeprecTxt, TyClDecl, InstDecl, RuleDecl, 
+			  tyClDeclName, ifaceRuleDeclName, tyClDeclNames )
 import RnHsSyn		( RenamedTyClDecl, RenamedRuleDecl, RenamedInstDecl )
 
 import CoreSyn		( IdCoreRule )
@@ -355,10 +354,10 @@ data ParsedIface
       pi_orphan    :: WhetherHasOrphans,		-- Whether this module has orphans
       pi_usages	   :: [ImportVersion OccName],		-- Usages
       pi_exports   :: (Version, [RdrExportItem]),	-- Exports
-      pi_decls	   :: [(Version, RdrNameTyClDecl)],	-- Local definitions
+      pi_decls	   :: [(Version, TyClDecl RdrName)],	-- Local definitions
       pi_fixity	   :: [FixitySig RdrName],		-- Local fixity declarations,
-      pi_insts	   :: [RdrNameInstDecl],		-- Local instance declarations
-      pi_rules	   :: (Version, [RdrNameRuleDecl]),	-- Rules, with their version
+      pi_insts	   :: [InstDecl RdrName],		-- Local instance declarations
+      pi_rules	   :: (Version, [RuleDecl RdrName]),	-- Rules, with their version
       pi_deprecs   :: IfaceDeprecs			-- Deprecations
     }
 \end{code}
@@ -771,11 +770,11 @@ including the constructors of a type decl etc.  The Bool is True just
 for the 'main' Name.
 
 \begin{code}
-type DeclsMap = (NameEnv (AvailInfo, Bool, (Module, RdrNameTyClDecl)), Int)
+type DeclsMap = (NameEnv (AvailInfo, Bool, (Module, TyClDecl RdrName)), Int)
 						-- The Int says how many have been sucked in
 
-type IfaceInsts = GatedDecls RdrNameInstDecl
-type IfaceRules = GatedDecls RdrNameRuleDecl
+type IfaceInsts = GatedDecls (InstDecl RdrName)
+type IfaceRules = GatedDecls (RuleDecl RdrName)
 
 type GatedDecls d = (Bag (GatedDecl d), Int)	-- The Int says how many have been sucked in
 type GatedDecl  d = (GateFn, (Module, d))
