@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsStartup.c,v 1.3 1999/01/21 10:31:49 simonm Exp $
+ * $Id: RtsStartup.c,v 1.4 1999/01/22 10:58:43 simonm Exp $
  *
  * Main function for a standalone Haskell program.
  *
@@ -17,7 +17,7 @@
 #include "Ticky.h"
 
 #if defined(PROFILING)
-# include "ProfRTS.h"
+# include "ProfRts.h"
 #elif defined(DEBUG)
 # include "DebugProf.h"
 #endif
