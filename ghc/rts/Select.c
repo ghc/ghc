@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Select.c,v 1.25 2003/02/22 04:51:57 sof Exp $
+ * $Id: Select.c,v 1.26 2003/02/22 06:13:41 sof Exp $
  *
  * (c) The GHC Team 1995-2002
  *
@@ -19,6 +19,7 @@
 #include "RtsUtils.h"
 #include "RtsFlags.h"
 #include "Timer.h"
+#include "Itimer.h"
 #include "Signals.h"
 #include "Capability.h"
 
