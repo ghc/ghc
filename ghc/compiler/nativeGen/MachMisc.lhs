@@ -176,14 +176,8 @@ exactLog2 x
 	  Just (toInteger (iBox (pow2 x#)))
        }
   where
-#if __GLASGOW_HASKELL__ >= 503
-    shiftr x y = uncheckedShiftRL# x y
-#else
-    shiftr x y = shiftRL# x y
-#endif
-
     pow2 x# | x# ==# 1# = 0#
-            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftr` 1#))
+            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftRL#` 1#))
 \end{code}
 
 % - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -268,6 +262,8 @@ data Size
 #if sparc_TARGET_ARCH
     = B     -- byte (signed)
     | Bu    -- byte (unsigned)
+    | H     -- halfword (signed, 2 bytes)
+    | Hu    -- halfword (unsigned, 2 bytes)
     | W	    -- word (4 bytes)
     | F	    -- IEEE single-precision floating pt
     | DF    -- IEEE single-precision floating pt
@@ -283,11 +279,11 @@ primRepToSize CostCentreRep = IF_ARCH_alpha(Q,  IF_ARCH_i386(L,  IF_ARCH_sparc(W
 primRepToSize CharRep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 
 primRepToSize Int8Rep	    = IF_ARCH_alpha(B,  IF_ARCH_i386(B,  IF_ARCH_sparc(B,  )))
-primRepToSize Int16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(W,  IF_ARCH_sparc(err,)))
+primRepToSize Int16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(W,  IF_ARCH_sparc(H,  )))
     where err = primRepToSize_fail "Int16Rep"
 primRepToSize Int32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(L,  IF_ARCH_sparc(W,  )))
 primRepToSize Word8Rep	    = IF_ARCH_alpha(Bu, IF_ARCH_i386(Bu, IF_ARCH_sparc(Bu, )))
-primRepToSize Word16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(Wu, IF_ARCH_sparc(err,)))
+primRepToSize Word16Rep	    = IF_ARCH_alpha(err,IF_ARCH_i386(Wu, IF_ARCH_sparc(Hu, )))
     where err = primRepToSize_fail "Word16Rep"
 primRepToSize Word32Rep	    = IF_ARCH_alpha(L,  IF_ARCH_i386(Lu, IF_ARCH_sparc(W,  )))
 

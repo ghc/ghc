@@ -207,6 +207,8 @@ pprSize x = ptext (case x of
 #if sparc_TARGET_ARCH
 	B   -> SLIT("sb")
 	Bu  -> SLIT("ub")
+        H   -> SLIT("sh")
+        Hu  -> SLIT("uh")
 	W   -> SLIT("")
 	F   -> SLIT("")
 	DF  -> SLIT("d")
@@ -215,6 +217,8 @@ pprStSize :: Size -> Doc
 pprStSize x = ptext (case x of
 	B   -> SLIT("b")
 	Bu  -> SLIT("b")
+	H   -> SLIT("h")
+	Hu  -> SLIT("h")
 	W   -> SLIT("")
 	F   -> SLIT("")
 	DF  -> SLIT("d")
