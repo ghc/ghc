@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.29 2003/05/29 14:47:05 reid Exp $
+# $Id: package.mk,v 1.30 2003/06/04 12:37:09 reid Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -24,11 +24,12 @@ ifeq "$(STANDALONE_PACKAGE)" "NO"
 package.conf.inplace   : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
-endif
 
 package.conf.installed : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
 		| sed 's/^#.*$$//g' >$@
+
+endif
 
 # we could be more accurate here and add a dependency on
 # ghc/driver/package.conf, but that doesn't work too well because of
@@ -59,12 +60,19 @@ CLEAN_FILES += package.conf.installed package.conf.inplace
 
 else # $(STANDALONE_PACKAGE) == "YES"
 
+PACKAGE_CPP_OPTS += -DPACKAGE=\"${PACKAGE}\"
+PACKAGE_CPP_OPTS += -DPACKAGE_DEPS='$(patsubst %,"%"$(comma),$(PACKAGE_DEPS))'
+PACKAGE_CPP_OPTS += -DLIBRARY=\"HS$(PACKAGE)\"
+PACKAGE_CPP_OPTS += -DLIBDIR=\"$(libdir)\"
+
 # Let the package configuration file refer to $(libdir) as
 # ${pkglibdir}.  Note we can't use ${libdir} because ghc-pkg already
 # redefines it to point to GHC's libdir (bug or feature?).
 #
-install :: package.conf.installed
-	pkglibdir=$(libdir) $(GHC_PKG) --force --update-package <package.conf.installed
+install :: package.conf.in
+	$(CPP) $(RAWCPP_FLAGS) $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< \
+	| sed -e 's/^#.*$$//g' -e 's/""//g' -e 's/, ]/ ]/g' \
+	| $(GHC_PKG) --force --update-package
 
 endif # $(STANDALONE_PACKAGE)
 
