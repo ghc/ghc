@@ -209,7 +209,7 @@ tryLoadInterface doc_str mod_name from
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
 			       mi_usages  = [],	-- Will be filled in later
 			       mi_decls   = panic "No mi_decls in PIT",
-			       mi_globals = panic "No mi_globals in PIT"
+			       mi_globals = mkIfaceGlobalRdrEnv avails
 		    }
 
 	new_ifaces = ifaces { iPIT	  = new_pit,

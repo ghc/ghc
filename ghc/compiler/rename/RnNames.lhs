@@ -33,7 +33,7 @@ import NameSet
 import Name		( Name, nameSrcLoc, nameOccName,  nameEnvElts )
 import HscTypes		( Provenance(..), ImportReason(..), GlobalRdrEnv,
 			  GenAvailInfo(..), AvailInfo, Avails, AvailEnv )
-import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc, mkRdrQual, mkRdrUnqual )
+import RdrName		( RdrName, rdrNameOcc, setRdrNameOcc )
 import OccName		( setOccNameSpace, dataName )
 import NameSet		( elemNameSet, emptyNameSet )
 import Outputable
@@ -158,14 +158,16 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
     filterImports imp_mod_name from import_spec avails	`thenRn` \ (filtered_avails, hides, explicits) ->
 
     let
-	mk_provenance name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-    in
+	unqual_imp = not qual_only		-- Maybe want unqualified names
+	qual_mod   = case as_mod of
+			Nothing  	  -> imp_mod_name
+			Just another_name -> another_name
 
-    qualifyImports imp_mod_name
-		   (not qual_only)	-- Maybe want unqualified names
-		   as_mod hides
-		   mk_provenance
-		   filtered_avails
+	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
+	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp hides mk_prov filtered_avails
+	exports      = mkExportAvails qual_mod unqual_imp gbl_env       filtered_avails
+    in
+    returnRn (gbl_env, exports)
 \end{code}
 
 
@@ -188,13 +190,15 @@ importsFromLocalDecls this_mod decls
 	-- Record that locally-defined things are available
     recordLocalSlurps (availsToNameSet avails)		`thenRn_`
 
-	-- Build the environment
-    qualifyImports (moduleName this_mod)
-		   True			-- Want unqualified names
-		   Nothing		-- no 'as M'
-		   []			-- Hide nothing
-		   (\n -> LocalDef)	-- Provenance is local
-		   avails
+    let
+	mod_name   = moduleName this_mod
+	unqual_imp = True	-- Want unqualified names
+	mk_prov n  = LocalDef	-- Provenance is local
+	hides	   = []		-- Hide nothing
+	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp [] mk_prov avails
+	exports    = mkExportAvails mod_name unqual_imp gbl_env    avails
+    in
+    returnRn (gbl_env, exports)
 
 ---------------------------
 getLocalDeclBinders :: Module 
@@ -337,66 +341,12 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
 %*									*
 %************************************************************************
 
-@qualifyImports@ takes the @ExportEnv@ after filtering through the import spec
-of an import decl, and deals with producing an @RnEnv@ with the 
-right qualified names.  It also turns the @Names@ in the @ExportEnv@ into
-fully fledged @Names@.
-
 \begin{code}
-qualifyImports :: ModuleName		-- Imported module
-	       -> Bool			-- True <=> want unqualified import
-	       -> Maybe ModuleName	-- Optional "as M" part 
-	       -> [AvailInfo]		-- What's to be hidden (but only the unqualified 
-					-- 	version is hidden)
-	       -> (Name -> Provenance)
-	       -> Avails		-- Whats imported and how
-	       -> RnMG (GlobalRdrEnv, ExportAvails)
-
-qualifyImports this_mod unqual_imp as_mod hides mk_provenance avails
-  = 
- 	-- Make the name environment.  We're talking about a 
-	-- single module here, so there must be no name clashes.
-	-- In practice there only ever will be if it's the module
-	-- being compiled.
-    let
-	-- Add the things that are available
-	name_env1 = foldl add_avail emptyRdrEnv avails
-
-	-- Delete things that are hidden
-	name_env2 = foldl del_avail name_env1 hides
-
-	-- Create the export-availability info
-	export_avails = mkExportAvails qual_mod unqual_imp name_env2 avails
-    in
-    returnRn (name_env2, export_avails)
-
-  where
-    qual_mod = case as_mod of
-		  Nothing  	    -> this_mod
-		  Just another_name -> another_name
-
-    add_avail :: GlobalRdrEnv -> AvailInfo -> GlobalRdrEnv
-    add_avail env avail = foldl add_name env (availNames avail)
-
-    add_name env name
-	| unqual_imp = env2
-	| otherwise  = env1
-	where
-	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual qual_mod occ) (name,prov)
-	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    (name,prov)
-	  occ  = nameOccName name
-	  prov = mk_provenance name
-
-    del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
-			where
-			  rdr_names = map (mkRdrUnqual . nameOccName) (availNames avail)
-
-
 mkEmptyExportAvails :: ModuleName -> ExportAvails
 mkEmptyExportAvails mod_name = (unitFM mod_name [], emptyUFM)
 
 mkExportAvails :: ModuleName -> Bool -> GlobalRdrEnv -> [AvailInfo] -> ExportAvails
-mkExportAvails mod_name unqual_imp name_env avails
+mkExportAvails mod_name unqual_imp gbl_env avails
   = (mod_avail_env, entity_avail_env)
   where
     mod_avail_env = unitFM mod_name unqual_avails 
@@ -417,7 +367,7 @@ mkExportAvails mod_name unqual_imp name_env avails
 			 where
 			   uqs = filter unqual_in_scope ns
 
-    unqual_in_scope n = unQualInScope name_env n
+    unqual_in_scope n = unQualInScope gbl_env n
 
     entity_avail_env = listToUFM [ (name,avail) | avail <- avails, 
 			  	   		  name  <- availNames avail]

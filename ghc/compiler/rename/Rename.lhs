@@ -28,7 +28,7 @@ import RnIfaces		( slurpImpDecls, mkImportInfo, recordLocalSlurps,
 			)
 import RnHiFiles	( readIface, removeContext, loadInterface,
 			  loadExports, loadFixDecls, loadDeprecs )
-import RnEnv		( availsToNameSet, availName, 
+import RnEnv		( availsToNameSet, availName, mkIfaceGlobalRdrEnv,
 			  emptyAvailEnv, unitAvailEnv, availEnvElts, plusAvailEnv, groupAvails,
 			  warnUnusedImports, warnUnusedLocalBinds, warnUnusedModules,
 			  lookupOrigNames, lookupSrcName, newGlobalName, unQualInScope
@@ -486,7 +486,7 @@ loadOldIface parsed_iface
 			       mi_boot = False, mi_orphan = pi_orphan iface, 
 			       mi_fixities = fix_env, mi_deprecs = deprec_env,
 			       mi_decls   = decls,
-			       mi_globals = panic "No mi_globals in old interface"
+			       mi_globals = mkIfaceGlobalRdrEnv avails
 		    }
     in
     returnRn mod_iface

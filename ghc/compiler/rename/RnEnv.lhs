@@ -11,7 +11,7 @@ module RnEnv where		-- Export everything
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
-			  mkRdrUnqual, mkRdrUnqual, qualifyRdrName, lookupRdrEnv, foldRdrEnv
+			  mkRdrUnqual, mkRdrQual, qualifyRdrName, lookupRdrEnv, foldRdrEnv
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
@@ -484,6 +484,56 @@ checkDupNames doc_str rdr_names_w_loc
 \subsection{GlobalRdrEnv}
 %*									*
 %************************************************************************
+
+\begin{code}
+mkGlobalRdrEnv :: ModuleName		-- Imported module (after doing the "as M" name change)
+	       -> Bool			-- True <=> want unqualified import
+	       -> [AvailInfo]		-- What's to be hidden (but only the unqualified 
+	 				-- 	version is hidden)
+	       -> (Name -> Provenance)
+	       -> Avails		-- Whats imported and how
+	       -> GlobalRdrEnv
+
+mkGlobalRdrEnv this_mod unqual_imp hides mk_provenance avails
+  = gbl_env2
+  where
+ 	-- Make the name environment.  We're talking about a 
+	-- single module here, so there must be no name clashes.
+	-- In practice there only ever will be if it's the module
+	-- being compiled.
+
+	-- Add the things that are available
+    gbl_env1 = foldl add_avail emptyRdrEnv avails
+
+	-- Delete things that are hidden
+    gbl_env2 = foldl del_avail gbl_env1 hides
+
+    add_avail :: GlobalRdrEnv -> AvailInfo -> GlobalRdrEnv
+    add_avail env avail = foldl add_name env (availNames avail)
+
+    add_name env name
+	| unqual_imp = env2
+	| otherwise  = env1
+	where
+	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) (name,prov)
+	  env2 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    (name,prov)
+	  occ  = nameOccName name
+	  prov = mk_provenance name
+
+    del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
+			where
+			  rdr_names = map (mkRdrUnqual . nameOccName) (availNames avail)
+
+mkIfaceGlobalRdrEnv :: [(ModuleName,Avails)] -> GlobalRdrEnv
+-- Used to construct a GlobalRdrEnv for an interface that we've
+-- read from a .hi file.  We can't construct the original top-level
+-- environment because we don't have enough info, but we compromise
+-- by making an environment from its exports
+mkIfaceGlobalRdrEnv m_avails
+  = foldl add emptyRdrEnv m_avails
+  where
+    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True [] (\n -> LocalDef) avails)
+\end{code}
 
 \begin{code}
 plusGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrEnv -> GlobalRdrEnv
