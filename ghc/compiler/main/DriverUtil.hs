@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverUtil.hs,v 1.15 2000/12/12 14:35:08 simonmar Exp $
+-- $Id: DriverUtil.hs,v 1.16 2000/12/20 15:44:01 rrt Exp $
 --
 -- Utils for the driver
 --
@@ -60,7 +60,8 @@ getOptionsFromSource file
 		   | prefixMatch "#" l -> look h
 		   | prefixMatch "{-# LINE" l -> look h   -- -}
 		   | Just (opts:_) <- matchRegex optionRegex l
-			-> return (words opts)
+			-> do rest <- look h
+                              return (words opts ++ rest)
 		   | otherwise -> return []
 
 optionRegex = mkRegex "\\{-#[ \t]+OPTIONS[ \t]+(.*)#-\\}"   -- -}
