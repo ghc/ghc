@@ -1,7 +1,7 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: freeFile.c,v 1.10 2000/04/11 20:44:18 panne Exp $
+ * $Id: freeFile.c,v 1.11 2000/04/14 16:21:32 rrt Exp $
  *
  * Giving up files
  */
@@ -50,7 +50,7 @@ freeFileObject(StgAddr ptr)
     /*
      * The finaliser for the file objects embedded in Handles. The RTS
      * assumes that the finaliser runs without problems, so all
-     * we can do here is flish buffers + close(), and hope nothing went wrong.
+     * we can do here is flush buffers + close(), and hope nothing went wrong.
      *
      */
 
