@@ -595,14 +595,10 @@ id x			=  x
 lazy :: a -> a
 lazy x = x
 
--- 	SLPJ: this was transferred from the TH branch
---	and I've forgotten what it was for... so I'll
---	comment it back out for now.  It conflicts with
---	'assert' in GHC.Prim
 -- Assertion function. This simply ignores its boolean argument.
 -- The compiler may rewrite it to (assertError line)
--- assert :: Bool -> a -> a
--- assert pred r = r
+assert :: Bool -> a -> a
+assert pred r = r
  
 -- constant function
 const			:: a -> b -> a
