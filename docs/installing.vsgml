@@ -2,7 +2,7 @@
 <article>
 
 <title>Building and Installing the Glasgow Functional Programming Tools Suite
-Version 3.01
+Version 3.02
 <author>The GHC Team,
 Department of Computing Science,
 University of Glasgow,
@@ -10,7 +10,7 @@ Glasgow, Scotland,
 G12 8QQ.
 
 Email: @glasgow-haskell-{users,bugs}@@dcs.gla.ac.uk@
-<date>November 1997</date>
+<date>April 1998</date>
 
 <abstract>
 
@@ -1821,21 +1821,27 @@ can't find them, please ask.
 Assuming you've got them, unpack them on top of a fresh source tree.
 Then follow the `normal' instructions in Section~<ref
 id="sec:building-from-source" name="Buiding From Source"> for setting
-up a build tree and configuring it. The only extra thing to remember
-when booting from @.hc@ files is to add the following line to the
-@build.mk@ file:
+up a build tree. When you invoke the configure script, you'll have
+to tell the script about your intentions:
 
 <tscreen><verb>
-GhcWithHscBuiltViaC=YES
+foo% ./configure --enable-hc-booting
 </verb></tscreen>
-<ncdx/GhcWithHscBuiltViaC/
+<ncdx/--enable-hc-booting/
+<ncdx/--disable-hc-booting/
 
-and proceed with doing a @make boot@ followed by a @make all@.
+Assuming it configures OK and you don't need to create @mk/build.mk@
+for any other purposes, the next step is to proceed with a @make boot@
+followed by @make all@.
 
 That's the mechanics of the boot process, but, of course, if you're
 trying to boot on a platform that is not supported and significantly
 `different' from any of the supported ones, this is only the start of
 the adventure...(ToDo: porting tips - stuff to look out for, etc.)
+
+The end product of this will (hopefully) be a binary of the
+compiler proper, @ghc/compiler/hsc@ plus an archive of the Haskell
+Prelude libraries.
 
 <sect>Known pitfalls in building Glasgow Haskell
 <label id="sec:build-pitfalls">
