@@ -18,11 +18,8 @@
 TOP = ..
 
 # Use GHC for compiling C bits (NB. must be before boilerplate include)
-# NB. this requires BootingFromHc to be set on the make command line!
 #
-ifneq "$(BootingFromHc)" "YES"
 UseGhcForCc = YES
-endif
 
 include $(TOP)/mk/boilerplate.mk
 
