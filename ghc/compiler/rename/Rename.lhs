@@ -121,7 +121,7 @@ renameModule us this_mod@(HsModule mod_name vers exports imports fixities local_
     
 	-- RETURN THE RENAMED MODULE
     let
-	import_mods = [mod | ImportDecl mod _ _ _ _ <- imports]
+	import_mods = [mod | ImportDecl mod _ _ _ _ _ <- imports]
 
 	renamed_module = HsModule mod_name vers 
 				  trashed_exports trashed_imports trashed_fixities
