@@ -31,7 +31,7 @@ module Readline (
     ) where
 import GlaExts
 
-import PackedString	( unpackCStringIO )
+import CString	( unpackCStringIO )
 import Foreign
 
 import System
