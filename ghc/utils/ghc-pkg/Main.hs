@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: Main.hs,v 1.10 2001/06/04 06:20:35 qrczak Exp $
+-- $Id: Main.hs,v 1.11 2001/07/11 11:01:59 rrt Exp $
 --
 -- Package management tool
 -----------------------------------------------------------------------------
@@ -17,6 +17,10 @@ import Monad
 import Directory
 import System
 import IO
+
+#ifdef mingw32_TARGET_OS
+import Win32DLL
+#endif
 
 main = do
   args <- getArgs
@@ -48,12 +52,23 @@ flags = [
  	"Remove an installed package"
   ]
 
+#ifdef mingw32_TARGET_OS
+unDosifyPath xs = subst '\\' '/' xs
+#endif
+
 runit clis = do
+#ifndef mingw32_TARGET_OS
   conf_file <- 
      case [ f | Config f <- clis ] of
         []  -> die "missing -f option, location of package.conf unknown"
         [f] -> return f
         _   -> die (usageInfo usageHeader flags)
+#else
+  h <- getModuleHandle Nothing
+  n <- getModuleFileName h
+  let conf_file = reverse (tail (dropWhile (not . isSlash) (reverse (unDosifyPath n))))
+		   ++ "/package.conf"
+#endif
 
   let toField "import_dirs"     = return import_dirs
       toField "source_dirs"     = return source_dirs
