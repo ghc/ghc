@@ -152,7 +152,7 @@ deListComp (BindStmt pat list1 locn : quals) core_list2 -- rule A' above
     -- the "fail" value ...
     mkAppDs (Var h) [VarArg (Var u3)]		`thenDs` \ core_fail ->
     deListComp quals core_fail			`thenDs` \ rest_expr ->
-    matchSimply (Var u2) pat res_ty 
+    matchSimply (Var u2) ListCompMatch pat res_ty 
 		rest_expr core_fail		`thenDs` \ core_match ->
     mkAppDs (Var h) [VarArg core_list1]		`thenDs` \ letrec_body ->
 
@@ -225,7 +225,7 @@ dfListComp c_ty c_id n_ty n_id (BindStmt pat list1 locn : quals)
     dfListComp c_ty c_id b_ty b quals			`thenDs` \ core_rest ->
     -- build the pattern match
 
-    matchSimply (Var p) pat b_ty core_rest (Var b)	`thenDs` \ core_expr ->
+    matchSimply (Var p) ListCompMatch pat b_ty core_rest (Var b)	`thenDs` \ core_expr ->
 
     -- now build the outermost foldr, and return
 
