@@ -535,27 +535,43 @@ FPTOOLS_ALTZONE
 dnl ** does struct stat contain st_blksize?
 AC_STRUCT_ST_BLKSIZE
 
+dnl ** do we have long longs?
+FPTOOLS_C_LONG_LONG
+
 dnl ** what are the sizes of various types
 dnl    (these must come before GHC_CHECK_ALIGNMENT)
-AC_CHECK_SIZEOF(char,        1)
-AC_CHECK_SIZEOF(int,         4)
-AC_CHECK_SIZEOF(unsigned int,4)
-AC_CHECK_SIZEOF(float,       4)
-AC_CHECK_SIZEOF(double,      8)
-AC_CHECK_SIZEOF(long,        4)
-AC_CHECK_SIZEOF(void *,      4)
+AC_CHECK_SIZEOF(char,               1)
+AC_CHECK_SIZEOF(unsigned char,      1)
+AC_CHECK_SIZEOF(short,              2)
+AC_CHECK_SIZEOF(unsigned short,     2)
+AC_CHECK_SIZEOF(int,                4)
+AC_CHECK_SIZEOF(unsigned int,       4)
+AC_CHECK_SIZEOF(long,               4)
+AC_CHECK_SIZEOF(unsigned long,      4)
+if test "$fptools_cv_have_long_long" = yes; then
+AC_CHECK_SIZEOF(long long,          8)
+AC_CHECK_SIZEOF(unsigned long long, 8)
+fi
+AC_CHECK_SIZEOF(float,              4)
+AC_CHECK_SIZEOF(double,             8)
+AC_CHECK_SIZEOF(void *,             4)
 
 dnl ** what are alignment constraints on various types
 FPTOOLS_CHECK_ALIGNMENT(char)
+FPTOOLS_CHECK_ALIGNMENT(unsigned char)
+FPTOOLS_CHECK_ALIGNMENT(short)
+FPTOOLS_CHECK_ALIGNMENT(unsigned short)
 FPTOOLS_CHECK_ALIGNMENT(int)
-FPTOOLS_CHECK_ALIGNMENT(void *)
-FPTOOLS_CHECK_ALIGNMENT(unsigned int) dnl redundant but harmless
+FPTOOLS_CHECK_ALIGNMENT(unsigned int)
 FPTOOLS_CHECK_ALIGNMENT(long)
+FPTOOLS_CHECK_ALIGNMENT(unsigned long)
+if test "$fptools_cv_have_long_long" = yes; then
+FPTOOLS_CHECK_ALIGNMENT(long long)
+FPTOOLS_CHECK_ALIGNMENT(unsigned long long)
+fi
 FPTOOLS_CHECK_ALIGNMENT(float)
 FPTOOLS_CHECK_ALIGNMENT(double)
-
-dnl ** do we have long longs?
-FPTOOLS_C_LONG_LONG
+FPTOOLS_CHECK_ALIGNMENT(void *)
 
 dnl ** can we open files in binary mode?
 FPTOOLS_O_BINARY
