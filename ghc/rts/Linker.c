@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: Linker.c,v 1.35 2001/03/29 13:00:43 simonmar Exp $
+ * $Id: Linker.c,v 1.36 2001/04/02 07:22:50 qrczak Exp $
  *
  * (c) The GHC Team, 2000
  *
@@ -138,7 +138,7 @@ typedef struct _RtsSymbolVal {
       SymX(stackOverflow)			\
       SymX(int2Integerzh_fast)			\
       SymX(word2Integerzh_fast)			\
-      Maybe_ForeignObj              			\
+      Maybe_ForeignObj				\
       SymX(__encodeDouble)			\
       SymX(decodeDoublezh_fast)			\
       SymX(decodeFloatzh_fast)			\
@@ -159,7 +159,7 @@ typedef struct _RtsSymbolVal {
       SymX(orIntegerzh_fast)			\
       SymX(xorIntegerzh_fast)			\
       SymX(complementIntegerzh_fast)		\
-      Maybe_Stable_Names                                  \
+      Maybe_Stable_Names			\
       SymX(blockAsyncExceptionszh_fast)		\
       SymX(unblockAsyncExceptionszh_fast)	\
       SymX(isDoubleNaN)				\
@@ -206,12 +206,41 @@ typedef struct _RtsSymbolVal {
       SymX(stg_sig_install)			\
       Sym(nocldstop)				\
       SymX(createAdjustor)			\
+      SymX(rts_mkChar)				\
       SymX(rts_mkInt)				\
+      SymX(rts_mkInt8)				\
+      SymX(rts_mkInt16)				\
+      SymX(rts_mkInt32)				\
+      SymX(rts_mkInt64)				\
+      SymX(rts_mkWord)				\
+      SymX(rts_mkWord8)				\
+      SymX(rts_mkWord16)			\
+      SymX(rts_mkWord32)			\
+      SymX(rts_mkWord64)			\
+      SymX(rts_mkPtr)				\
+      SymX(rts_mkFloat)				\
+      SymX(rts_mkDouble)			\
       SymX(rts_mkStablePtr)			\
+      SymX(rts_mkBool)				\
+      SymX(rts_mkString)			\
       SymX(rts_apply)				\
+      SymX(rts_mkAddr)				\
+      SymX(rts_getChar)				\
+      SymX(rts_getInt)				\
+      SymX(rts_getInt32)			\
+      SymX(rts_getWord)				\
+      SymX(rts_getWord32)			\
+      SymX(rts_getPtr)				\
+      SymX(rts_getFloat)			\
+      SymX(rts_getDouble)			\
+      SymX(rts_getStablePtr)			\
+      SymX(rts_getBool)				\
+      SymX(rts_getAddr)				\
+      SymX(rts_eval)				\
+      SymX(rts_eval_)				\
       SymX(rts_evalIO)				\
-      SymX(rts_checkSchedStatus)		\
-      SymX(rts_getInt)
+      SymX(rts_evalLazyIO)			\
+      SymX(rts_checkSchedStatus)
 
 #ifndef SUPPORT_LONG_LONGS
 #define RTS_LONG_LONG_SYMS /* nothing */
