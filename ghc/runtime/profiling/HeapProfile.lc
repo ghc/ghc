@@ -632,7 +632,7 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
       case HEAP_BY_CC:
 	for (ind = 0; ind < max; ind++) {
 	    if ((cc = index_cc_table[ind]) != 0 && ! cc_to_ignore(cc)) {
-		fprintf(heap_file, "  %0.11s:%0.16s %ld\n", cc->module, cc->label, resid[ind] * sizeof(W_));
+		fprintf(heap_file, "  %s:%s %ld\n", cc->module, cc->label, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
 	}
@@ -641,7 +641,7 @@ heap_profile_done(STG_NO_ARGS)	  /* called at end of heap profile */
       case HEAP_BY_MOD:
 	for (ind = 0; ind < max; ind++) {
 	    if ((cc = index_mod_table[ind]) != 0 && ! cc_to_ignore(cc)) {
-		fprintf(heap_file, "  %0.11s %ld\n", cc->module, resid[ind] * sizeof(W_));
+		fprintf(heap_file, "  %s %ld\n", cc->module, resid[ind] * sizeof(W_));
 	    }
 	    resid[ind] = 0;
 	}
