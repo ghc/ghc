@@ -183,7 +183,7 @@ GhcUseGccForOptAsm=YES
 GhcUseGccForDebuggingAsm=YES
 
 # Build a registerised version of hsc and runtime
-# (you'd be desperate or silly not to).
+# (unregisterised used for Hugs at the moment)
 GhcWithRegisterised=YES
 
 # Build a compiler with a native code generator backend

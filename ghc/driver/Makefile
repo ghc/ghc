@@ -45,8 +45,8 @@ SCRIPT_SUBST_VARS := \
   GHC_LIB_DIR GHC_RUNTIME_DIR GHC_UTILS_DIR GHC_INCLUDE_DIR \
   GHC_OPT_HILEV_ASM GhcWithNativeCodeGen LeadingUnderscore\
   GHC_UNLIT GHC_HSCPP GHC_HSC GHC_SYSMAN EnableWin32DLLs \
-  CP RM CONTEXT_DIFF LibGmp \
-  $(USER_WAY_NAMES) $(USER_WAY_OPTS)
+  CP RM CONTEXT_DIFF LibGmp GhcWithRegisterised \
+  USER_WAY_NAMES USER_WAY_OPTS
 
 #
 # When creating a binary distribution, we prefix the driver script

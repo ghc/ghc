@@ -120,6 +120,8 @@ WAY_*_NAME WAY_*_REAL_OPTS
 
 LeadingUnderscore
 
+GhcWithRegisterised
+
 \end{verbatim}
 
 Establish what executables to run for the various phases, what the
@@ -478,7 +480,7 @@ $UNPROFscc_auto = '';	# set to relevant hsc flag if forcing auto sccs without pr
 $TICKYing = '';    	# set to t if compiling for ticky-ticky profiling
 $PARing = '';		# set to p if compiling for PAR
 $GRANing = '';		# set to g if compiling for GRAN
-$UNREGing = '';		# set to u if compiling unregisterised
+$UNREGing = ($GhcWithRegisterised eq 'YES') ? '' : 'u';
 $Specific_hi_file = '';		# set by -ohi <file>; "-" for stdout
 $Specific_dump_file = '';	# set by -odump <file>; "-" for stdout
 $Using_dump_file = 0;
@@ -908,7 +910,6 @@ sub setupBuildFlags {
   } elsif ( $UNREGing eq 'u' ) {
       $BuildTag = '_u';
   }
-
 \end{code}
 
 After the sanity checks, add flags to the necessary parts of the driver pipeline:
