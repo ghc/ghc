@@ -136,6 +136,6 @@ INSTALL_PROGS += $(DLL_NAME)
 INSTALL_LIBS  += $(patsubst %.a, %_imp.a, $(LIBRARY)) PrelMain.dll_o
 INSTALL_DATAS += dLL_ifs.hi
 endif
-INSTALL_DATAS += $(HS_IFACES)
+INSTALL_DATAS += $(HS_IFACES) PrelGHC.$(way_)hi
 
 include $(TOP)/mk/target.mk
