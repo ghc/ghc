@@ -11,7 +11,7 @@ module RdrName (
 	-- Construction
 	mkRdrUnqual, mkRdrQual, mkRdrOrig, mkRdrUnqual,
 	mkUnqual, mkQual, mkIfaceOrig, mkOrig,
-	qualifyRdrName, mkRdrNameWkr,
+	qualifyRdrName, unqualifyRdrName, mkRdrNameWkr,
 	dummyRdrVarName, dummyRdrTcName,
 
 	-- Destruction
@@ -21,7 +21,7 @@ module RdrName (
 	-- Environment
 	RdrNameEnv, 
 	emptyRdrEnv, lookupRdrEnv, addListToRdrEnv, rdrEnvElts, 
-	extendRdrEnv, rdrEnvToList, elemRdrEnv, foldRdrEnv,
+	extendRdrEnv, rdrEnvToList, elemRdrEnv, foldRdrEnv, 
 
 	-- Printing;	instance Outputable RdrName
 	pprUnqualRdrName 
@@ -113,6 +113,9 @@ qualifyRdrName :: ModuleName -> RdrName -> RdrName
 	-- Sets the module name of a RdrName, even if it has one already
 qualifyRdrName mod (RdrName _ occ) = RdrName (Qual mod) occ
 
+unqualifyRdrName :: RdrName -> RdrName
+unqualifyRdrName (RdrName _ occ) = RdrName Unqual occ
+
 mkRdrNameWkr :: RdrName -> RdrName 	-- Worker-ify it
 mkRdrNameWkr (RdrName qual occ) = RdrName qual (mkWorkerOcc occ)
 \end{code}
@@ -201,8 +204,8 @@ rdrEnvElts	:: RdrNameEnv a -> [a]
 elemRdrEnv	:: RdrName -> RdrNameEnv a -> Bool
 foldRdrEnv	:: (RdrName -> a -> b -> b) -> b -> RdrNameEnv a -> b
 
-emptyRdrEnv  = emptyFM
-lookupRdrEnv = lookupFM
+emptyRdrEnv     = emptyFM
+lookupRdrEnv    = lookupFM
 addListToRdrEnv = addListToFM
 rdrEnvElts	= eltsFM
 extendRdrEnv    = addToFM

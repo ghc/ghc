@@ -177,8 +177,8 @@ importsFromImportDecl this_mod_name (ImportDecl imp_mod_name from qual_only as_m
 			Just another_name -> another_name
 
 	mk_prov name = NonLocalDef (UserImport imp_mod iloc (name `elemNameSet` explicits)) 
-	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp True hides mk_prov filtered_avails deprecs
-	exports      = mkExportAvails qual_mod unqual_imp gbl_env            filtered_avails
+	gbl_env      = mkGlobalRdrEnv qual_mod unqual_imp mk_prov filtered_avails hides deprecs
+	exports      = mkExportAvails qual_mod unqual_imp gbl_env filtered_avails
     in
     returnRn (gbl_env, exports)
 \end{code}
@@ -212,7 +212,7 @@ importsFromLocalDecls this_mod decls
 	mk_prov n  = LocalDef	-- Provenance is local
 	hides	   = []		-- Hide nothing
 
-	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp True hides mk_prov avails NoDeprecs
+	gbl_env    = mkGlobalRdrEnv mod_name unqual_imp mk_prov avails hides NoDeprecs
 	    -- NoDeprecs: don't complain about locally defined names
 	    -- For a start, we may be exporting a deprecated thing
 	    -- Also we may use a deprecated thing in the defn of another
@@ -274,10 +274,9 @@ filterImports :: ModuleName			-- The module being imported
 	      -> [AvailInfo]			-- What's available
 	      -> RnMG ([AvailInfo],		-- What's actually imported
 		       [AvailInfo],		-- What's to be hidden
-						-- (the unqualified version, that is)
-			-- (We need to return both the above sets, because
-			--  the qualified version is never hidden; so we can't
-			--  implement hiding by reducing what's imported.)
+			-- (It's convenient to return both the above sets, because
+			--  the substraction can be done more efficiently when
+			--  building the environment.)
 		       NameSet)			-- What was imported explicitly
 
 	-- Complains if import spec mentions things that the module doesn't export
@@ -310,6 +309,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
     bale_out item = addErrRn (badImportItemErr mod from item)	`thenRn_`
 		    returnRn []
 
+    get_item :: RdrNameIE -> RnMG [(AvailInfo, [Name])]
     get_item item@(IEModuleContents _) = bale_out item
 
     get_item item@(IEThingAll _)
@@ -325,7 +325,7 @@ filterImports mod from (Just (want_hiding, import_items)) total_avails
     get_item item@(IEThingAbs n)
       | want_hiding	-- hiding( C ) 
 			-- Here the 'C' can be a data constructor *or* a type/class
-      = case catMaybes [check_item item, check_item (IEThingAbs data_n)] of
+      = case catMaybes [check_item item, check_item (IEVar data_n)] of
 		[]     -> bale_out item
 		avails -> returnRn [(a, []) | a <- avails]
 				-- The 'explicits' list is irrelevant when hiding

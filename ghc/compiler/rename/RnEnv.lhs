@@ -13,7 +13,8 @@ import {-# SOURCE #-} RnHiFiles
 import HsSyn
 import RdrHsSyn		( RdrNameIE )
 import RdrName		( RdrName, rdrNameModule, rdrNameOcc, isQual, isUnqual, isOrig,
-			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv
+			  mkRdrUnqual, mkRdrQual, lookupRdrEnv, foldRdrEnv, rdrEnvToList,
+			  unqualifyRdrName
 			)
 import HsTypes		( hsTyVarName, replaceTyVarName )
 import HscTypes		( Provenance(..), pprNameProvenance, hasBetterProv,
@@ -640,47 +641,57 @@ checkDupNames doc_str rdr_names_w_loc
 \begin{code}
 mkGlobalRdrEnv :: ModuleName		-- Imported module (after doing the "as M" name change)
 	       -> Bool			-- True <=> want unqualified import
-	       -> Bool			-- True <=> want qualified import
-	       -> [AvailInfo]		-- What's to be hidden (but only the unqualified 
-	 				-- 	version is hidden)
 	       -> (Name -> Provenance)
-	       -> Avails		-- Whats imported and how
+	       -> Avails		-- Whats imported
+	       -> Avails		-- What's to be hidden
+					-- I.e. import (imports - hides)
 	       -> Deprecations
 	       -> GlobalRdrEnv
 
-mkGlobalRdrEnv this_mod unqual_imp qual_imp hides 
-	       mk_provenance avails deprecs
-  = gbl_env2
+mkGlobalRdrEnv this_mod unqual_imp mk_provenance avails hides deprecs
+  = gbl_env3
   where
  	-- Make the name environment.  We're talking about a 
 	-- single module here, so there must be no name clashes.
 	-- In practice there only ever will be if it's the module
 	-- being compiled.
 
-	-- Add the things that are available
+	-- Add qualified names for the things that are available
+	-- (Qualified names are always imported)
     gbl_env1 = foldl add_avail emptyRdrEnv avails
 
-	-- Delete things that are hidden
+	-- Delete (qualified names of) things that are hidden
     gbl_env2 = foldl del_avail gbl_env1 hides
+
+	-- Add unqualified names
+    gbl_env3 | unqual_imp = foldl add_unqual gbl_env2 (rdrEnvToList gbl_env2)
+	     | otherwise  = gbl_env2
+
+    add_unqual env (qual_name, elts)
+	= foldl add_one env elts
+	where
+	  add_one env elt = addOneToGlobalRdrEnv env unqual_name elt
+	  unqual_name     = unqualifyRdrName qual_name
+	-- The qualified import should only have added one 
+	-- binding for each qualified name!  But if there's an error in
+	-- the module (multiple bindings for the same name) we may get
+	-- duplicates.  So the simple thing is to do the fold.
+
+    del_avail env avail 
+	= foldl delOneFromGlobalRdrEnv env rdr_names
+	where
+	  rdr_names = map (mkRdrQual this_mod . nameOccName)
+			  (availNames avail)
+
 
     add_avail :: GlobalRdrEnv -> AvailInfo -> GlobalRdrEnv
     add_avail env avail = foldl add_name env (availNames avail)
 
-    add_name env name
-	| qual_imp && unqual_imp = env3
-	| unqual_imp             = env2
-	| qual_imp               = env1
-	| otherwise	         = env
+    add_name env name 	-- Add qualified name only
+	= addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) elt
 	where
-	  env1 = addOneToGlobalRdrEnv env  (mkRdrQual this_mod occ) elt
-	  env2 = addOneToGlobalRdrEnv env  (mkRdrUnqual occ) 	    elt
-	  env3 = addOneToGlobalRdrEnv env1 (mkRdrUnqual occ) 	    elt
 	  occ  = nameOccName name
 	  elt  = GRE name (mk_provenance name) (lookupDeprec deprecs name)
-
-    del_avail env avail = foldl delOneFromGlobalRdrEnv env rdr_names
-			where
-			  rdr_names = map (mkRdrUnqual . nameOccName) (availNames avail)
 
 mkIfaceGlobalRdrEnv :: [(ModuleName,Avails)] -> GlobalRdrEnv
 -- Used to construct a GlobalRdrEnv for an interface that we've
@@ -690,8 +701,8 @@ mkIfaceGlobalRdrEnv :: [(ModuleName,Avails)] -> GlobalRdrEnv
 mkIfaceGlobalRdrEnv m_avails
   = foldl add emptyRdrEnv m_avails
   where
-    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True False [] 
-								(\n -> LocalDef) avails NoDeprecs)
+    add env (mod,avails) = plusGlobalRdrEnv env (mkGlobalRdrEnv mod True 
+								(\n -> LocalDef) avails [] NoDeprecs)
 		-- The NoDeprecs is a bit of a hack I suppose
 \end{code}
 
