@@ -19,13 +19,15 @@ It's rather big!
 \begin{code}
 module PrelNum where
 
+import PrelBase
+import GHC
 import {-# SOURCE #-}	IOBase	( error )
 import PrelList
-import PrelBase
+
 import ArrBase	( Array, array, (!) )
 import STBase   ( unsafePerformPrimIO )
 import Ix	( Ix(..) )
-import GHC
+import Numeric
 
 infixr 8  ^, ^^, **
 infixl 7  /, %, `quot`, `rem`, `div`, `mod`
@@ -397,7 +399,7 @@ instance  Real Float  where
 
 instance  Fractional Float  where
     (/) x y		=  divideFloat x y
-    fromRational x	=  fromRational__ x
+    fromRational x	=  fromRat x
     recip x		=  1.0 / x
 
 instance  Floating Float  where
@@ -541,7 +543,7 @@ instance  Real Double  where
 
 instance  Fractional Double  where
     (/) x y		=  divideDouble x y
-    fromRational x	=  fromRational__ x
+    fromRational x	=  fromRat x
     recip x		=  1.0 / x
 
 instance  Floating Double  where
@@ -801,144 +803,7 @@ instance  (Integral a)  => Show (Ratio a)  where
     	    	    	       (shows x . showString " % " . shows y)
 \end{code}
 
-[In response to a request for documentation of how fromRational works,
-Joe Fasel writes:] A quite reasonable request!  This code was added to
-the Prelude just before the 1.2 release, when Lennart, working with an
-early version of hbi, noticed that (read . show) was not the identity
-for floating-point numbers.  (There was a one-bit error about half the
-time.)  The original version of the conversion function was in fact
-simply a floating-point divide, as you suggest above. The new version
-is, I grant you, somewhat denser.
-
-Unfortunately, Joe's code doesn't work!  Here's an example:
-
-main = putStr (shows (1.82173691287639817263897126389712638972163e-300::Double) "\n")
-
-This program prints
-	0.0000000000000000
-instead of
-	1.8217369128763981e-300
-
-Lennart's code follows, and it works...
-
-\begin{pseudocode}
-{-# GENERATE_SPECS fromRational__ a{Double#,Double} #-}
-fromRational__ :: (RealFloat a) => Rational -> a
-fromRational__ x = x'
-	where x' = f e
-
---		If the exponent of the nearest floating-point number to x 
---		is e, then the significand is the integer nearest xb^(-e),
---		where b is the floating-point radix.  We start with a good
---		guess for e, and if it is correct, the exponent of the
---		floating-point number we construct will again be e.  If
---		not, one more iteration is needed.
-
-	      f e   = if e' == e then y else f e'
-		      where y	   = encodeFloat (round (x * (1 % b)^^e)) e
-			    (_,e') = decodeFloat y
-	      b	    = floatRadix x'
-
---		We obtain a trial exponent by doing a floating-point
---		division of x's numerator by its denominator.  The
---		result of this division may not itself be the ultimate
---		result, because of an accumulation of three rounding
---		errors.
-
-	      (s,e) = decodeFloat (fromInteger (numerator x) `asTypeOf` x'
-					/ fromInteger (denominator x))
-\end{pseudocode}
-
-Now, here's Lennart's code.
-
 \begin{code}
-fromRational__ :: (RealFloat a) => Rational -> a
-fromRational__ x = 
-    if x == 0 then encodeFloat 0 0 		-- Handle exceptional cases
-    else if x < 0 then - fromRat' (-x)		-- first.
-    else fromRat' x
-
--- Conversion process:
--- Scale the rational number by the RealFloat base until
--- it lies in the range of the mantissa (as used by decodeFloat/encodeFloat).
--- Then round the rational to an Integer and encode it with the exponent
--- that we got from the scaling.
--- To speed up the scaling process we compute the log2 of the number to get
--- a first guess of the exponent.
-
-fromRat' :: (RealFloat a) => Rational -> a
-fromRat' x = r
-  where b = floatRadix r
-        p = floatDigits r
-	(minExp0, _) = floatRange r
-	minExp = minExp0 - p		-- the real minimum exponent
-	xMin = toRational (expt b (p-1))
-	xMax = toRational (expt b p)
-	p0 = (integerLogBase b (numerator x) - integerLogBase b (denominator x) - p) `max` minExp
-	f = if p0 < 0 then 1 % expt b (-p0) else expt b p0 % 1
-	(x', p') = scaleRat (toRational b) minExp xMin xMax p0 (x / f)
-	r = encodeFloat (round x') p'
-
--- Scale x until xMin <= x < xMax, or p (the exponent) <= minExp.
-scaleRat :: Rational -> Int -> Rational -> Rational -> Int -> Rational -> (Rational, Int)
-scaleRat b minExp xMin xMax p x =
-    if p <= minExp then
-        (x, p)
-    else if x >= xMax then
-        scaleRat b minExp xMin xMax (p+1) (x/b)
-    else if x < xMin  then
-        scaleRat b minExp xMin xMax (p-1) (x*b)
-    else
-        (x, p)
-
--- Exponentiation with a cache for the most common numbers.
-minExpt = 0::Int
-maxExpt = 1100::Int
-expt :: Integer -> Int -> Integer
-expt base n =
-    if base == 2 && n >= minExpt && n <= maxExpt then
-        expts!n
-    else
-        base^n
-expts :: Array Int Integer
-expts = array (minExpt,maxExpt) [(n,2^n) | n <- [minExpt .. maxExpt]]
-
--- Compute the (floor of the) log of i in base b.
--- Simplest way would be just divide i by b until it's smaller then b, but that would
--- be very slow!  We are just slightly more clever.
-integerLogBase :: Integer -> Integer -> Int
-integerLogBase b i =
-     if i < b then
-        0
-     else
-	-- Try squaring the base first to cut down the number of divisions.
-        let l = 2 * integerLogBase (b*b) i
-	    doDiv :: Integer -> Int -> Int
-	    doDiv i l = if i < b then l else doDiv (i `div` b) (l+1)
-	in  doDiv (i `div` (b^l)) l
-\end{code}
-
-%*********************************************************
-%*							*
-\subsection{Showing numbers}
-%*							*
-%*********************************************************
-
-\begin{code}
-showInteger n r
-  = case quotRem n 10 of		     { (n', d) ->
-    case (chr (ord_0 + fromIntegral d)) of { C# c# -> -- stricter than necessary
-    let
-	r' = C# c# : r
-    in
-    if n' == 0 then r' else showInteger n' r'
-    }}
-
-showSigned :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
-showSigned showPos p x = if x < 0 then showParen (p > 6)
-						 (showChar '-' . showPos (-x))
-				  else showPos x
-
 showSignedInteger :: Int -> Integer -> ShowS
 showSignedInteger p n r
   = -- from HBC version; support code follows
@@ -957,48 +822,6 @@ jtos' n cs
 	chr (fromInteger (n + ord_0)) : cs
     else 
 	jtos' (n `quot` 10) (chr (fromInteger (n `rem` 10 + ord_0)) : cs)
-\end{code}
-
-The functions showFloat below uses rational arithmetic
-to insure correct conversion between the floating-point radix and
-decimal.  It is often possible to use a higher-precision floating-
-point type to obtain the same results.
-
-\begin{code}
-{-# GENERATE_SPECS showFloat a{Double#,Double} #-}
-showFloat:: (RealFloat a) => a -> ShowS
-showFloat x =
-    if isNaN x then showString "NaN"
-    else if isInfinite x then
-      ( if x < 0 then showString "-" else id) . showString "Infinite"
-    else if x < 0 || isNegativeZero x then showChar '-' . showFloat' (-x) else showFloat' x
-
-showFloat' :: (RealFloat a) => a -> ShowS
-showFloat' x =
-    if x == 0 then showString ("0." ++ take (m-1) zeros)
-	      else if e >= m-1 || e < 0 then showSci else showFix
-    where
-    showFix	= showString whole . showChar '.' . showString frac
-		  where (whole,frac) = splitAt (e+1) (show sig)
-    showSci	= showChar d . showChar '.' . showString frac
-		      . showChar 'e' . shows e
-    		  where (d:frac) = show sig
-    (m, sig, e) = if b == 10 then (w,  	s,   n+w-1)
-		  	     else (m', sig', e'   )
-    m'		= ceiling
-		      ((fromInt w * log (fromInteger b)) / log 10 :: Double)
-		  + 1
-    (sig', e')	= if	  sig1 >= 10^m'     then (round (t/10), e1+1)
-		  else if sig1 <  10^(m'-1) then (round (t*10), e1-1)
-		  			    else (sig1,		 e1  )
-    sig1	= round t
-    t		= s%1 * (b%1)^^n * 10^^(m'-e1-1)
-    e1		= floor (logBase 10 x)
-    (s, n)	= decodeFloat x
-    b		= floatRadix x
-    w		= floatDigits x
- 
-zeros = repeat '0'
 \end{code}
 
 @showRational@ converts a Rational to a string that looks like a
