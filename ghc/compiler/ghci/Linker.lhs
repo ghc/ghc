@@ -13,7 +13,7 @@ necessary.
 
 \begin{code}
 
-{-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS -optc-DNON_POSIX_SOURCE -#include "Linker.h" #-}
 
 module Linker ( HValue, initLinker, showLinkerState,
 		linkLibraries, linkExpr,
@@ -31,8 +31,10 @@ import ByteCodeItbls	( ItblEnv )
 import ByteCodeAsm	( CompiledByteCode(..), bcoFreeNames, UnlinkedBCO(..))
 
 import Packages
-import DriverState	( v_Library_paths, v_Opt_l,
-			  v_Cmdline_frameworks, v_Framework_paths, getStaticOpts )
+import DriverState	( v_Library_paths, v_Opt_l, getStaticOpts )
+#ifdef darwin_TARGET_OS
+import DriverState	( v_Cmdline_frameworks, v_Framework_paths )
+#endif
 import Finder		( findModule, findLinkable )
 import HscTypes
 import Name		( Name,  nameModule, isExternalName )
