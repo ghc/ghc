@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.87 2000/11/13 14:40:37 simonmar Exp $
+ * $Id: GC.c,v 1.88 2000/11/13 14:41:13 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -1362,10 +1362,24 @@ loop:
     recordMutable((StgMutClosure *)to);
     return to;
 
+  case CONSTR_0_1:
+  { 
+      StgWord w = (StgWord)q->payload[0];
+      if (q->header.info == Czh_con_info &&
+	  /* unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE && */ 
+	  (StgChar)w <= MAX_CHARLIKE) {
+	  return (StgClosure *)CHARLIKE_CLOSURE((StgChar)w);
+      }
+      if (q->header.info == Izh_con_info &&
+	  (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
+	  return (StgClosure *)INTLIKE_CLOSURE((StgInt)w);
+      }
+      /* else, fall through ... */
+  }
+
   case FUN_1_0:
   case FUN_0_1:
   case CONSTR_1_0:
-  case CONSTR_0_1:
     return copy(q,sizeofW(StgHeader)+1,step);
 
   case THUNK_1_0:		/* here because of MIN_UPD_SIZE */
