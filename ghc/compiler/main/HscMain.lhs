@@ -16,7 +16,7 @@ module HscMain ( HscResult(..), hscMain,
 import RdrHsSyn		( RdrNameHsExpr )
 import Rename		( renameExpr )
 import Unique		( Uniquable(..) )
-import Type		( Type, splitTyConApp_maybe )
+import Type		( Type, splitTyConApp_maybe, tidyType )
 import PrelNames	( ioTyConKey )
 import ByteCodeGen	( byteCodeGen )
 #endif
@@ -64,6 +64,7 @@ import HscTypes		( ModDetails, ModIface(..), PersistentCompilerState(..),
 			  typeEnvClasses, typeEnvTyCons, emptyIfaceTable )
 import FiniteMap	( FiniteMap, plusFM, emptyFM, addToFM )
 import OccName		( OccName )
+import VarEnv		( emptyTidyEnv )
 import Name		( Name, nameModule, nameOccName, getName, isGlobalName,
 			  emptyNameEnv )
 import Module		( Module, lookupModuleEnvByName )
@@ -436,6 +437,8 @@ hscExpr dflags wrap_io hst hit pcs0 this_module expr
 		Nothing -> return ({-WAS:pcs1-} pcs0, Nothing);
 		Just (pcs2, tc_expr, ty) -> do
 
+	let tidy_ty = tidyType emptyTidyEnv ty;
+
 		-- Desugar it
 	ds_expr <- deSugarExpr dflags pcs2 hst this_module
 			print_unqual tc_expr;
@@ -451,7 +454,7 @@ hscExpr dflags wrap_io hst hit pcs0 this_module expr
 		-- Convert to BCOs
 	bcos <- coreExprToBCOs dflags sat_expr
 
-	return (pcs2, Just (bcos, print_unqual, ty));
+	return (pcs2, Just (bcos, print_unqual, tidy_ty));
      }}}}
 
 hscParseExpr :: DynFlags -> String -> IO (Maybe RdrNameHsExpr)
