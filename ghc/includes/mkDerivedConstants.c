@@ -360,7 +360,7 @@ main(int argc, char *argv[])
     struct_field(StgFunInfoExtraFwd, slow_apply);
     struct_field(StgFunInfoExtraFwd, fun_type);
     struct_field(StgFunInfoExtraFwd, arity);
-    struct_field(StgFunInfoExtraFwd, bitmap);
+    struct_field(StgFunInfoExtraFwd, b.bitmap);
 
     struct_size(StgFunInfoExtraRev);
     struct_field(StgFunInfoExtraRev, slow_apply_offset);
