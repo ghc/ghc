@@ -2,7 +2,7 @@ _interface_ RnSource 1
 _exports_
 RnSource rnHsSigType;
 _declarations_
-1 rnHsSigType _:_ _forall_ [a] => (PprStyle.PprStyle -> Pretty.Doc)
+1 rnHsSigType _:_ _forall_ [a] => (Outputable.PprStyle -> Pretty.Doc)
 			       -> RdrHsSyn.RdrNameHsType
 			       -> RnMonad.RnMS a RnHsSyn.RenamedHsType ;;
 
