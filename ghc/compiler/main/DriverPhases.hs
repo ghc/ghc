@@ -1,5 +1,5 @@
 -----------------------------------------------------------------------------
--- $Id: DriverPhases.hs,v 1.30 2004/09/30 10:37:11 simonpj Exp $
+-- $Id: DriverPhases.hs,v 1.31 2005/01/18 13:51:28 simonmar Exp $
 --
 -- GHC Driver
 --
@@ -97,8 +97,9 @@ startPhase "cmm"   = CmmCpp
 startPhase "cmmcpp" = Cmm
 startPhase _       = Ln	   -- all unknown file types
 
--- the output suffix for a given phase is uniquely determined by
--- the input requirements of the next phase.
+-- This is used to determine the extension for the output from the
+-- current phase (if it generates a new file).  The extension depends
+-- on the next phase in the pipeline.
 phaseInputExt Unlit       = "lhs"
 phaseInputExt Cpp         = "lpp"	-- intermediate only
 phaseInputExt HsPp        = "hscpp"
