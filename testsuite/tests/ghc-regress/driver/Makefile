@@ -83,6 +83,7 @@ test024:
 	@$(MKDIRHIER) obj
 	@$(RM) B/C.hi
 	@$(RM) obj/B/C$(OBJSUFFIX)
+	@-rmdir obj/B
 	$(TEST_HC) -c B/C.hs -odir obj
 	test -f obj/B/C$(OBJSUFFIX)
 
