@@ -1,7 +1,7 @@
 %
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
-% $Id: CgMonad.lhs,v 1.30 2001/09/26 15:11:50 simonpj Exp $
+% $Id: CgMonad.lhs,v 1.31 2001/10/15 16:03:04 simonpj Exp $
 %
 \section[CgMonad]{The code generation monad}
 
@@ -280,7 +280,7 @@ initC :: CompilationInfo -> Code -> AbstractC
 initC cg_info (FCode code)
   = case (code (MkCgInfoDown 
 			cg_info 
-			(error "initC: statics")
+			emptyVarEnv -- (error "initC: statics")
 			(error "initC: srt")
 			(mkTopTickyCtrLabel)
 			initEobInfo)

@@ -43,7 +43,7 @@ import Type		( typePrimRep )
 import VarEnv
 import VarSet		( varSetElems )
 import Literal		( Literal )
-import Maybes		( catMaybes, maybeToBool )
+import Maybes		( catMaybes, maybeToBool, seqMaybe )
 import Name		( isLocalName, NamedThing(..) )
 #ifdef DEBUG
 import PprAbsC		( pprAmode )
@@ -194,22 +194,26 @@ modifyBindC name mangle_fn = do
 	setBinds $ modifyVarEnv mangle_fn binds name
 
 lookupBindC :: Id -> FCode CgIdInfo
-lookupBindC name = do
-	static_binds <- getStaticBinds
-	local_binds <- getBinds
-	case (lookupVarEnv local_binds name) of
-		Nothing -> case (lookupVarEnv static_binds name) of
-			Nothing -> cgPanic (text "lookupBindC: no info for" <+> ppr name)
-			Just this -> return this
-		Just this -> return this
+lookupBindC id = do maybe_info <- lookupBindC_maybe id
+		    case maybe_info of
+		      Just info -> return info
+		      Nothing   -> cgLookupPanic id
+
+lookupBindC_maybe :: Id -> FCode (Maybe CgIdInfo)
+lookupBindC_maybe id
+  = do	static_binds <- getStaticBinds
+	local_binds  <- getBinds
+	return (lookupVarEnv local_binds id
+			`seqMaybe`
+		lookupVarEnv static_binds id)
 			
-cgPanic :: SDoc -> FCode a
-cgPanic doc = do
-	static_binds <- getStaticBinds
+cgLookupPanic :: Id -> FCode a
+cgLookupPanic id
+  = do	static_binds <- getStaticBinds
 	local_binds <- getBinds
 	srt <- getSRTLabel
 	pprPanic "cgPanic"
-		(vcat [doc,
+		(vcat [ppr id,
 		ptext SLIT("static binds for:"),
 		vcat [ ppr i | (MkCgIdInfo i _ _ _) <- rngVarEnv static_binds ],
 		ptext SLIT("local binds for:"),
@@ -250,16 +254,17 @@ I {\em think} all looking-up is done through @getCAddrMode(s)@.
 getCAddrModeAndInfo :: Id -> FCode (Id, CAddrMode, LambdaFormInfo)
 
 getCAddrModeAndInfo id
-  | not (isLocalName name)
-  = returnFC (id, global_amode, mkLFImported id)
-	-- deals with imported or locally defined but externally visible ids
-	-- (CoreTidy makes all these into global names).
+  = do
+	maybe_cg_id_info <- lookupBindC_maybe id
+	case maybe_cg_id_info of
 
-  | otherwise = do -- *might* be a nested defn: in any case, it's something whose
-		-- definition we will know about...
-	(MkCgIdInfo id' volatile_loc stable_loc lf_info) <- lookupBindC id
-	amode <- idInfoPiecesToAmode kind volatile_loc stable_loc
-	return (id', amode, lf_info)
+		-- Nothing => not in the environment, so should be imported
+	  Nothing | isLocalName name -> cgLookupPanic id
+		  | otherwise	     -> returnFC (id, global_amode, mkLFImported id)
+
+	  Just (MkCgIdInfo id' volatile_loc stable_loc lf_info)
+		  -> do amode <- idInfoPiecesToAmode kind volatile_loc stable_loc
+			return (id', amode, lf_info)
   where
     name = getName id
     global_amode = CLbl (mkClosureLabel name) kind
