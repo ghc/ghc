@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: MBlock.c,v 1.32 2002/10/23 12:26:11 mthomas Exp $
+ * $Id: MBlock.c,v 1.33 2002/10/25 12:56:34 simonmar Exp $
  *
  * (c) The GHC Team 1998-1999
  *
@@ -95,8 +95,7 @@ my_mmap (void *addr, int size)
 #ifdef solaris2_TARGET_OS
     { 
 	int fd = open("/dev/zero",O_RDONLY);
-	ret = mmap(addr, size, PROT_READ | PROT_WRITE, 
-		   MAP_FIXED | MAP_PRIVATE, fd, 0);
+	ret = mmap(addr, size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	close(fd);
     }
 #elif hpux_TARGET_OS
