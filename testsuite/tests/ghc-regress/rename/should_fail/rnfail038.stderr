@@ -1,1 +1,2 @@
-rnfail038.hs:3: Module `List' does not export `wibble'
+
+rnfail038.hs:4: Module `List' does not export `wibble'
