@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: output.c,v $
- * $Revision: 1.13 $
- * $Date: 1999/11/29 18:59:29 $
+ * $Revision: 1.14 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -392,14 +392,12 @@ Cell e; {
     }
 
     switch (whatIs(h)) {
-#if NPLUSK
         case ADDPAT     : if (args==1)
                               putInfix(d,textPlus,syntaxOf(namePlus),
                                          arg(e),mkInt(intValOf(fun(e))));
                           else
                               putStr("ADDPAT");
                           return;
-#endif
 
         case TUPLE      : OPEN(args>tupleOf(h) && d>=FUN_PREC);
                           putTuple(tupleOf(h),e);

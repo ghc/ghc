@@ -11,8 +11,8 @@
  * included in the distribution.
  *
  * $RCSfile: compiler.c,v $
- * $Revision: 1.19 $
- * $Date: 2000/02/09 14:50:19 $
+ * $Revision: 1.20 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -619,9 +619,7 @@ Cell pat; {                       /* test with pat.                        */
 
         case STRCELL   :
         case CHARCELL  :
-#if NPLUSK
         case ADDPAT    :
-#endif
         case TUPLE     :
         case NAME      : return pat;
 
@@ -637,10 +635,8 @@ Cell p; {
     Cell h = getHead(p);
     if (h==nameFromInt || h==nameFromInteger || h==nameFromDouble)
         return p;
-#if NPLUSK
     else if (whatIs(h)==ADDPAT)
         return ap(fun(p),refutePat(arg(p)));
-#endif
 #if TREX
     else if (isExt(h)) {
         Cell pf = refutePat(extField(p));
@@ -708,10 +704,8 @@ Cell pat; {                     /* replaces parts of pattern that do not   */
                              if (h==nameFromInt     ||
                                  h==nameFromInteger || h==nameFromDouble)
                                  return WILDCARD;
-#if NPLUSK
                              else if (whatIs(h)==ADDPAT)
                                  return pat;
-#endif
 #if TREX
                              else if (isExt(h)) {
                                  Cell pf = matchPat(extField(pat));
@@ -811,14 +805,12 @@ List lds; {
                              return remPat(snd(pat),nv,lds);
                          }
 
-#if NPLUSK
         case ADDPAT    : return remPat1(arg(pat),       /* n + k = expr */
                                         ap(ap(ap(namePmSub,
                                                  arg(fun(pat))),
                                                  mkInt(snd(fun(fun(pat))))),
                                                  expr),
                                         lds);
-#endif
 
         case FINLIST   : return remPat1(mkConsList(snd(pat)),expr,lds);
 
@@ -938,9 +930,7 @@ Cell e;  {                             /* e  = expr to transform           */
 
         case AP       : return pmcPair(co,sc,e);
 
-#if NPLUSK
         case ADDPAT   :
-#endif
 #if TREX
         case EXT      :
 #endif
@@ -1347,10 +1337,8 @@ Cell ma; {                      /* match, ma.                              */
     Cell h = getHead(p);
     switch (whatIs(h)) {
         case CONFLDS : return fst(snd(p));
-#if NPLUSK
         case ADDPAT  : arg(fun(p)) = translate(arg(fun(p)));
                        return fun(p);
-#endif
 #if TREX
         case EXT     : h      = fun(fun(p));
                        arg(h) = translate(arg(h));
@@ -1391,18 +1379,12 @@ Cell d; {
         case CHARCELL  : return 0;
 #if TREX
         case AP        : switch (whatIs(fun(d))) {
-#if NPLUSK
                              case ADDPAT : return 1;
-#endif
                              case EXT    : return 2;
                              default     : return 0;
                          }
 #else
-#if NPLUSK
         case AP        : return (whatIs(fun(d))==ADDPAT) ? 1 : 0;
-#else
-        case AP        : return 0;      /* must be an Int or Float lit     */
-#endif
 #endif
     }
     internal("discrArity");
@@ -1411,10 +1393,8 @@ Cell d; {
 
 static Bool local eqNumDiscr(d1,d2)     /* Determine whether two numeric   */
 Cell d1, d2; {                          /* descriptors have same value     */
-#if NPLUSK
     if (whatIs(fun(d1))==ADDPAT)
         return whatIs(fun(d2))==ADDPAT && snd(fun(d1))==snd(fun(d2));
-#endif
     if (isInt(arg(d1)))
         return isInt(arg(d2)) && intOf(arg(d1))==intOf(arg(d2));
     if (isFloat(arg(d1)))

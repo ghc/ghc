@@ -8,8 +8,8 @@
  * included in the distribution.
  *
  * $RCSfile: connect.h,v $
- * $Revision: 1.24 $
- * $Date: 2000/03/09 02:47:13 $
+ * $Revision: 1.25 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -42,9 +42,7 @@ extern Name  nameIf,      nameSel;
 extern Name  nameCompAux;
 extern Name  namePmInt,   namePmFlt;    /* primitives for pattern matching */
 extern Name  namePmInteger;
-#if NPLUSK
 extern Name  namePmNpk,   namePmSub;    /* primitives for (n+k) patterns   */
-#endif
 extern Name  nameError;                 /* For runtime error messages      */
 extern Name  nameUndefined;             /* A generic undefined value       */
 extern Name  nameBlackHole;             /* For GC-detected black hole      */
@@ -76,10 +74,8 @@ extern Text  textPrelude;
 extern Text  textNum;                   /* used to process default decls   */
 extern Text  textCcall;                 /* used to process foreign import  */
 extern Text  textStdcall;               /*         ... and foreign export  */
-
-#if    NPLUSK
 extern Text  textPlus;                  /* Used to recognise n+k patterns  */
-#endif
+
 #if TREX
 extern Name  nameNoRec;                 /* The empty record                */
 extern Type  typeNoRow;                 /* The empty row                   */
@@ -555,6 +551,8 @@ extern Void getFileSize       Args((String, Long *));
 
 extern ZPair readInterface      Args((String,Long));
 extern Bool  processInterfaces  Args((Void));
+extern void  ifLinkConstrItbl ( Name n );
+
 
 extern List /* of ZTriple(I_INTERFACE, 
                           Text--name of obj file, 
@@ -568,3 +566,8 @@ extern Cell parseInterface        Args((String,Long));
 extern String getExtraObjectInfo ( String primaryObjectName,
                                    String extraFileName,
                                    Int*   extraFileSize );
+
+extern Name         newDSel             Args((Class,Int));
+extern Int          visitClass          Args((Class));
+
+extern Kind  simpleKind         Args((Int));

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: stg.c,v $
- * $Revision: 1.11 $
- * $Date: 2000/02/15 13:16:20 $
+ * $Revision: 1.12 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -556,7 +556,6 @@ StgVar b;
     endStgPP(fp);
 }
 
-#if 1 /*DEBUG_PRINTER*/
 Void ppStg( StgVar v )
 {
    printStg(stdout,v);
@@ -598,6 +597,5 @@ extern Void ppStgVars( List vs )
    printf("\n");
    endStgPP(stdout);
 }
-#endif
 
 /*-------------------------------------------------------------------------*/

@@ -7,8 +7,8 @@
  * Hugs version 1.4, December 1997
  *
  * $RCSfile: interface.c,v $
- * $Revision: 1.35 $
- * $Date: 2000/03/08 11:20:53 $
+ * $Revision: 1.36 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -23,8 +23,6 @@
 
 /*#define DEBUG_IFACE*/
 #define VERBOSE FALSE
-
-extern void print ( Cell, Int );
 
 /* --------------------------------------------------------------------------
  * (This comment is now out of date.  JRS, 991216).

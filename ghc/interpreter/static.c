@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: static.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/03/09 10:19:33 $
+ * $Revision: 1.28 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -58,9 +58,7 @@ static Void   local checkMems           Args((Class,List,Cell));
 static Void   local checkMems2           Args((Class,Cell));
 static Void   local addMembers          Args((Class));
 static Name   local newMember           Args((Int,Int,Cell,Type,Class));
-       Name         newDSel             Args((Class,Int));
 static Text   local generateText        Args((String,Class));
-       Int          visitClass          Args((Class));
 
 static List   local classBindings       Args((String,Class,List));
 static Name   local memberName          Args((Class,Text));
@@ -3447,7 +3445,6 @@ Cell p; {
 static Cell local checkMaybeCnkPat(l,p)/* Check applicative pattern with   */
 Int  l;                                /* the possibility of n+k pattern   */
 Cell p; {
-#if NPLUSK
     Cell h = getHead(p);
 
     if (argCount==2 && isVar(h) && textOf(h)==textPlus) {       /* n+k     */
@@ -3465,7 +3462,6 @@ Cell p; {
         arg(p)           = checkPat(l,v);
         return p;
     }
-#endif
     return checkApPat(l,0,p);
 }
 

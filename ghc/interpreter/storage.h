@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.h,v $
- * $Revision: 1.31 $
- * $Date: 2000/03/07 16:18:25 $
+ * $Revision: 1.32 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -249,28 +249,19 @@ extern  Ptr             cptrOf          Args((Cell));
 #define FATBAR       42           /* FATBAR     snd :: (Exp,Exp)           */
 #define LAZYPAT      43           /* LAZYPAT    snd :: Exp                 */
 #define DERIVE       45           /* DERIVE     snd :: Cell                */
-#if BREAK_FLOATS
-#define FLOATCELL    46           /* FLOATCELL  snd :: (Int,Int)           */
-#endif
-
 #define BOOLQUAL     49           /* BOOLQUAL   snd :: Exp                 */
 #define QWHERE       50           /* QWHERE     snd :: [Decl]              */
 #define FROMQUAL     51           /* FROMQUAL   snd :: (Exp,Exp)           */
 #define DOQUAL       52           /* DOQUAL     snd :: Exp                 */
 #define MONADCOMP    53           /* MONADCOMP  snd :: ((m,m0),(Exp,[Qual])*/
-
 #define GUARDED      54           /* GUARDED    snd :: [guarded exprs]     */
-
 #define ARRAY        55           /* Array      snd :: (Bounds,[Values])   */
 #define MUTVAR       56           /* Mutvar     snd :: Cell                */
-#if INTERNAL_PRIMS
 #define HUGSOBJECT   57           /* HUGSOBJECT snd :: Cell                */
-#endif
 
 #if IPARAM
 #define WITHEXP      58 	  /* WITHEXP    snd :: [(Var,Exp)]	   */
 #endif
-
 
 #define POLYTYPE     60           /* POLYTYPE   snd :: (Kind,Type)         */
 #define QUAL         61           /* QUAL       snd :: ([Classes],Type)    */
@@ -1070,6 +1061,16 @@ extern  Void   setLastExpr       Args((Cell));
 extern  Cell   getLastExpr       Args((Void));
 extern  List   addTyconsMatching Args((String,List));
 extern  List   addNamesMatching  Args((String,List));
+
+extern Tycon findTyconInAnyModule ( Text t );
+extern Class findClassInAnyModule ( Text t );
+extern Name  findNameInAnyModule ( Text t );
+extern Void  print Args((Cell, Int));
+extern void dumpTycon ( Int t );
+extern void dumpName ( Int n );
+extern void dumpClass ( Int c );
+extern void dumpInst ( Int i );
+extern void locateSymbolByName ( Text t );
 
 #if LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE(sss)     _##sss

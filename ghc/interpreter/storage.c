@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.47 $
- * $Date: 2000/03/07 16:18:25 $
+ * $Revision: 1.48 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -2123,7 +2123,6 @@ register Cell c; {
     return c;*/
 }
 
-#if DEBUG_PRINTER
 /* A very, very simple printer.
  * Output is uglier than from printExp - but the printer is more
  * robust and can be used on any data structure irrespective of
@@ -2135,11 +2134,6 @@ Cell c;
 Int  depth; {
     if (0 == depth) {
         Printf("...");
-#if 0 /* Not in this version of Hugs */
-    } else if (isPair(c) && !isGenPair(c)) {
-        extern Void printEvalCell Args((Cell, Int));
-        printEvalCell(c,depth);
-#endif
     } else {
         Int tag = whatIs(c);
         switch (tag) {
@@ -2363,7 +2357,7 @@ Int  depth; {
     }
     FlushStdout();
 }
-#endif
+
 
 Bool isVar(c)                           /* is cell a VARIDCELL/VAROPCELL ? */
 Cell c; {                               /* also recognises DICTVAR cells   */

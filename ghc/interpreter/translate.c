@@ -10,8 +10,8 @@
  * included in the distribution.
  *
  * $RCSfile: translate.c,v $
- * $Revision: 1.25 $
- * $Date: 2000/03/02 10:10:33 $
+ * $Revision: 1.26 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -213,7 +213,6 @@ StgExpr failExpr;
             Int    da    = discrArity(discr);
             char   str[30];
 
-#if NPLUSK
             if (whatIs(h) == ADDPAT && argCount == 1) {
                 /*   ADDPAT num dictIntegral
                  * ==>
@@ -260,7 +259,6 @@ StgExpr failExpr;
                                           failExpr)),
                          failExpr));
             }
-#endif /* NPLUSK */
 
             assert(isName(h) && argCount == 2);
             {

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: backend.h,v $
- * $Revision: 1.6 $
- * $Date: 1999/11/12 17:32:37 $
+ * $Revision: 1.7 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 /* --------------------------------------------------------------------------
@@ -165,14 +165,12 @@ extern Void optimiseBind Args((StgVar));
 
 Void printStg( FILE *fp, StgVar b);
             
-#if DEBUG_PRINTER
 extern Void ppStg        ( StgVar v );
 extern Void ppStgExpr    ( StgExpr e );
 extern Void ppStgRhs     ( StgRhs rhs );
 extern Void ppStgAlts    ( List alts );
 extern Void ppStgPrimAlts( List alts );
 extern Void ppStgVars    ( List vs );
-#endif
 
 
 extern List liftBinds( List binds );

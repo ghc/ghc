@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: link.c,v $
- * $Revision: 1.47 $
- * $Date: 2000/03/09 02:47:13 $
+ * $Revision: 1.48 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -96,9 +96,7 @@ Name namePrint;
 
 Name nameOtherwise;
 Name nameUndefined;                     /* generic undefined value         */
-#if NPLUSK
 Name namePmSub; 
-#endif
 Name namePMFail;
 Name nameEqChar;
 Name namePmInt;
@@ -482,9 +480,7 @@ Void linkPrimitiveNames(void) {        /* Hook to names defined in Prelude */
         nameOtherwise      = linkName("otherwise");
         nameUndefined      = linkName("undefined");
         /* pmc                                      */
-#       if NPLUSK                      
         namePmSub          = linkName("hugsprimPmSub");
-#       endif                          
         /* translator                               */
         nameEqChar         = linkName("hugsprimEqChar");
         nameCreateAdjThunk = linkName("hugsprimCreateAdjThunk");

@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: type.c,v $
- * $Revision: 1.27 $
- * $Date: 2000/03/07 09:34:43 $
+ * $Revision: 1.28 $
+ * $Date: 2000/03/10 14:53:00 $
  * ------------------------------------------------------------------------*/
 
 #include "prelude.h"
@@ -725,12 +725,10 @@ Cell e; {
         case LAZYPAT    : snd(e) = typeExpr(l,snd(e));
                           break;
 
-#if NPLUSK
         case ADDPAT     : {   Int alpha = newTyvars(1);
                               inferType(typeVarToVar,alpha);
                               return ap(e,assumeEvid(predIntegral,alpha));
                           }
-#endif
 
         default         : internal("typeExpr");
    }
