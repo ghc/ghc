@@ -1,0 +1,4 @@
+module TcIface where
+
+tcImportDecl         :: Name.Name   -> TcRnTypes.IfG TypeRep.TyThing
+
