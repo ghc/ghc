@@ -162,7 +162,7 @@ Ok, modules loaded: Main.
     indirectly, by the topmost module, and load them all in dependency
     order.</para>
 
-    <sect2>
+    <sect2 id="ghci-modules-filenames">
       <title>Modules vs. filenames</title>
       <indexterm><primary>modules</primary><secondary>and filenames</secondary></indexterm>
       <indexterm><primary>filenames</primary><secondary>of modules</secondary></indexterm>
@@ -207,10 +207,6 @@ Ok, modules loaded: Main.
       which GHCi can't find a source file, even if there are object
       and interface files for the module, you'll get an error
       message.</para>
-
-      <para>One final note: if you load a module called Main, it must
-      contain a <literal>main</literal> function, just like in
-      GHC.</para>
     </sect2>
 
     <sect2>
@@ -672,26 +668,33 @@ $ ghci Main.hs
       <title>Packages</title>
       <indexterm><primary>packages</primary><secondary>with GHCi</secondary></indexterm>
 
-      <para>GHCi can make use of all the packages that come with GHC,
-      For example, to start up GHCi with the <literal>network</literal>
-      package loaded:</para>
+      <para>Most packages (see <xref linkend="using-packages">) are
+      available without needing to specify any extra flags at all:
+      they will be automatically loaded the first time they are
+      needed.</para>
+
+      <para>For non-auto packages, however, you need to request the
+      package be loaded by using the <literal>-package</literal> flag:</para>
 
 <screen>
-$ ghci -package network
+$ ghci -package data
    ___         ___ _
   / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 5.04, for Haskell 98.
+ / /_\// /_/ / /  | |      GHC Interactive, version 5.05, for Haskell 98.
 / /_\\/ __  / /___| |      http://www.haskell.org/ghc/
 \____/\/ /_/\____/|_|      Type :? for help.
 
 Loading package base ... linking ... done.
 Loading package haskell98 ... linking ... done.
-Loading package network ... linking ... done.
+Loading package lang ... linking ... done.
+Loading package concurrent ... linking ... done.
+Loading package readline ... linking ... done.
+Loading package unix ... linking ... done.
+Loading package posix ... linking ... done.
+Loading package util ... linking ... done.
+Loading package data ... linking ... done.
 Prelude> 
-</screen>      
-
-      <para>Note that GHCi will also automatically load any packages
-      on which the requested package depends.</para>
+</screen>
 
       <para>The following command works to load new packages into a
       running GHCi:</para>
@@ -702,7 +705,7 @@ Prelude> :set -package <replaceable>name</replaceable>
 
       <para>But note that doing this will cause all currently loaded
       modules to be unloaded, and you'll be dumped back into the
-      Prelude.</para>
+      <literal>Prelude</literal>.</para>
     </sect2>
 
     <sect2>
@@ -711,7 +714,10 @@ Prelude> :set -package <replaceable>name</replaceable>
       
       <para>Extra libraries may be specified on the command line using
       the normal <literal>-l<replaceable>lib</replaceable></literal>
-      option.  For example, to load the &ldquo;m&rdquo; library:</para>
+      option.  (The term <emphasis>library</emphasis> here refers to
+      libraries of foreign object code; for using libraries of Haskell
+      source code, see <xref linkend="ghci-modules-filenames">.) For
+      example, to load the &ldquo;m&rdquo; library:</para>
 
 <screen>
 $ ghci -lm
@@ -1221,22 +1227,6 @@ Prelude> :set -fno-glasgow-exts
     <title>FAQ and Things To Watch Out For</title>
     
     <variablelist>
-      <varlistentry>
-	<term>GHCi complains about <function>main</function> not being
-	in scope when I load a module.</term>
-	<indexterm><primary><function>main</function></primary><secondary>with GHCi</secondary>
-	</indexterm>
-	<listitem>
-	  <para>You probably omitted the <literal>module</literal>
-	  declaration at the top of the module, which causes the
-	  module name to default to <literal>Main</literal>.  In
-	  Haskell, the <literal>Main</literal> module must define a
-	  function called <function>main</function>.  Admittedly this
-	  doesn't make a great deal of sense for an interpreter, but
-	  the rule was kept for compatibility with GHC.</para>
-	</listitem>
-      </varlistentry>
-
       <varlistentry>
 	<term>The interpreter can't load modules with foreign export
 	declarations!</term>
