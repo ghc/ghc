@@ -9,8 +9,8 @@
  * included in the distribution.
  *
  * $RCSfile: storage.c,v $
- * $Revision: 1.66 $
- * $Date: 2000/04/06 15:05:30 $
+ * $Revision: 1.67 $
+ * $Date: 2000/04/07 09:58:34 $
  * ------------------------------------------------------------------------*/
 
 #include "hugsbasictypes.h"
@@ -2200,7 +2200,7 @@ Void print ( Cell c, Int depth )
     else if (isTagNonPtr(c)) {
         Printf("TagNP(%d)", c);
     }
-    else if (isSpec(c)) {
+    else if (isSpec(c) && c != STAR) {
         Printf("TagS(%d)", c);
     }
     else if (isText(c)) {
