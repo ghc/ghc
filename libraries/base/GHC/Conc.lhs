@@ -47,6 +47,7 @@ module GHC.Conc
 #ifdef mingw32_TARGET_OS
 	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 	, asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+	, asyncDoProc   -- :: FunPtr (Ptr a -> IO ()) -> Ptr a -> IO ()
 
 	, asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
 	, asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
@@ -62,7 +63,7 @@ import GHC.Real		( fromIntegral )
 import GHC.Base		( Int(..) )
 import GHC.Exception    ( Exception(..), AsyncException(..) )
 import GHC.Pack		( packCString# )
-import GHC.Ptr          ( Ptr(..), plusPtr )
+import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 
 infixr 0 `par`, `pseq`
 \end{code}
@@ -330,6 +331,13 @@ asyncWrite :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 asyncWrite  (I# fd) (I# isSock) (I# len) (Ptr buf) = 
   IO $ \s -> case asyncWrite# fd isSock len buf s  of 
   	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+
+asyncDoProc :: FunPtr (Ptr a -> IO ()) -> Ptr a -> IO ()
+asyncDoProc (FunPtr proc) (Ptr param) = 
+    -- the return values are ignored; simplifies implementation of
+    -- the async*# primops to have them all return the same result.
+  IO $ \s -> case asyncDoProc# proc param s  of 
+  	       (# s, len#, err# #) -> (# s, () #)
 
 -- to aid the use of these primops by the IO Handle implementation,
 -- provide the following convenience funs:
