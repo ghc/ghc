@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: GC.c,v 1.157 2003/06/26 20:47:47 panne Exp $
+ * $Id: GC.c,v 1.158 2003/08/14 15:36:13 simonmar Exp $
  *
  * (c) The GHC Team 1998-2003
  *
@@ -378,6 +378,7 @@ GarbageCollect ( void (*get_roots)(evac_fn), rtsBool force_major_gc )
   if (RtsFlags.GcFlags.generations == 1) {
     old_to_blocks = g0s0->to_blocks;
     g0s0->to_blocks = NULL;
+    g0s0->n_to_blocks = 0;
   }
 
   /* Keep a count of how many new blocks we allocated during this GC
