@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * $Id: Schedule.c,v 1.71 2000/05/15 11:38:55 simonmar Exp $
+ * $Id: Schedule.c,v 1.72 2000/06/20 15:15:44 simonmar Exp $
  *
  * (c) The GHC Team, 1998-2000
  *
@@ -850,12 +850,8 @@ schedule( void )
     
     cap->rCurrentTSO = t;
     
-    /* set the context_switch flag
-     */
-    if (run_queue_hd == END_TSO_QUEUE)
-      context_switch = 0;
-    else
-      context_switch = 1;
+    /* context switches are now initiated by the timer signal */
+    context_switch = 0;
 
     RELEASE_LOCK(&sched_mutex);
 
