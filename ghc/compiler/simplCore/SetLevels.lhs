@@ -325,7 +325,8 @@ collect_binders lam
   = go [] lam
   where
     go rev_bndrs (_, AnnLam b e)  = go (b:rev_bndrs) e
-    go rev_bndrs (_, AnnNote n e) = go rev_bndrs e
+-- TEMP FIX
+--    go rev_bndrs (_, AnnNote n e) = go rev_bndrs e
     go rev_bndrs rhs		  = (reverse rev_bndrs, rhs)
 	-- Ignore notes, because we don't want to split
 	-- a lambda like this (\x -> coerce t (\s -> ...))
@@ -351,12 +352,13 @@ lvlMFE strict_ctxt ctxt_lvl env (_, AnnType ty)
   = returnLvl (Type ty)
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
-  |  isUnLiftedType ty				-- Can't let-bind it
+  |  isUnLiftedType ty			-- Can't let-bind it
+  || isInlineCtxt ctxt_lvl		-- Don't float out of an __inline__ context
   || not good_destination
-  || exprIsTrivial expr				-- Is trivial
-  || (strict_ctxt && exprIsBottom expr)		-- Strict context and is bottom
-						--  e.g. \x -> error "foo"
-						-- No gain from floating this
+  || exprIsTrivial expr			-- Is trivial
+  || (strict_ctxt && exprIsBottom expr)	-- Strict context and is bottom
+					--  e.g. \x -> error "foo"
+					-- No gain from floating this
   = 	-- Don't float it out
     lvlExpr ctxt_lvl env ann_expr
 
@@ -373,16 +375,11 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
 
     good_destination =  dest_lvl `ltMajLvl` ctxt_lvl	-- Escapes a value lambda
 		     || (isTopLvl dest_lvl		-- Goes to the top
-			 && not (isInlineCtxt ctxt_lvl)	-- Don't float out of an __inline__ context
 			 && not strict_ctxt)		--   or from a strict context	
 	-- A decision to float entails let-binding this thing, and we only do 
 	-- that if we'll escape a value lambda, or will go to the top level.
-	-- But beware (a):
-	--	x = __inline__ (f (g y))
-	-- Here we don't want to float the (g y); otherwise it'll get outside the
-	--  	__inline__ envelope, and may never get inlined
 	--
-	-- Also beware (b):
+	-- Beware:
 	--	concat = /\ a -> foldr ..a.. (++) []
 	-- was getting turned into
 	--	concat = /\ a -> lvl a

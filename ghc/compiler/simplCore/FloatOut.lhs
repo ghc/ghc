@@ -256,7 +256,8 @@ floatExpr env lvl (Note note@(SCC cc) expr)
 
 floatExpr env lvl (Note InlineMe expr)	-- Other than SCCs
   = case floatExpr env InlineCtxt expr of { (fs, floating_defns, expr') ->
-    ASSERT( null floating_defns )	-- We do no floating out of Inlines
+    WARN( not (null floating_defns),
+	  ppr expr $$ ppr floating_defns )	-- We do no floating out of Inlines
     (fs, [], Note InlineMe expr') }	-- See notes in SetLevels
 
 floatExpr env lvl (Note note expr)	-- Other than SCCs
