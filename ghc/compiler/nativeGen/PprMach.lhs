@@ -1133,12 +1133,14 @@ pprInstr_quotRem signed isQuot sz src dst
    = vcat [
      (text "\t# BEGIN " <> fakeInsn),
      (text "\tpushl $0;  pushl %eax;  pushl %edx;  pushl " <> pprOperand sz src),
-     (text "\tmovl " <> pprOperand sz dst <> text ",%eax;  xorl %edx,%edx;  cltd"),
+     (text "\tmovl " <> pprOperand sz dst <> text ",%eax;  " <> widen_to_64),
      (x86op <> text " 0(%esp);  movl " <> text resReg <> text ",12(%esp)"),
      (text "\tpopl %edx;  popl %edx;  popl %eax;  popl " <> pprOperand sz dst),
      (text "\t# END   " <> fakeInsn)
      ]
      where
+        widen_to_64 | signed     = text "cltd"
+                    | not signed = text "xorl %edx,%edx"
         x86op = if signed then text "\tidivl" else text "\tdivl"
         resReg = if isQuot then "%eax" else "%edx"
         opStr  | signed     = if isQuot then "IQUOT" else "IREM"
