@@ -1,12 +1,12 @@
 /* 
  * (c) The University of Glasgow, 2000-2001
  *
- * $Id: errno.c,v 1.3 2001/12/21 15:07:26 simonmar Exp $
+ * $Id: errno.c,v 1.4 2002/02/07 11:13:30 simonmar Exp $
  *
  * GHC Error Number Conversion
  */
 
-#include "HsCore.h"
+#include "HsBase.h"
 
 /* Raw errno */
 /* Covers up the fact that on Windows this is a function */

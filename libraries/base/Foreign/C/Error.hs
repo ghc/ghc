@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-implicit-prelude -#include "HsCore.h" #-}
+{-# OPTIONS -fno-implicit-prelude -#include "HsBase.h" #-}
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Foreign.C.Error
@@ -9,7 +9,7 @@
 -- Stability   :  provisional
 -- Portability :  portable
 --
--- $Id: Error.hs,v 1.5 2002/02/05 17:32:25 simonmar Exp $
+-- $Id: Error.hs,v 1.6 2002/02/07 11:13:30 simonmar Exp $
 --
 -- C-specific Marshalling support: Handling of C "errno" error codes
 --

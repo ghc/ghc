@@ -1,10 +1,10 @@
-{-# OPTIONS -fno-implicit-prelude -#include "HsCore.h" #-}
+{-# OPTIONS -fno-implicit-prelude -#include "HsBase.h" #-}
 
 #undef DEBUG_DUMP
 #undef DEBUG
 
 -- -----------------------------------------------------------------------------
--- $Id: Handle.hs,v 1.3 2002/02/05 17:32:26 simonmar Exp $
+-- $Id: Handle.hs,v 1.4 2002/02/07 11:13:30 simonmar Exp $
 --
 -- (c) The University of Glasgow, 1994-2001
 --

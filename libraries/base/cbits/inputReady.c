@@ -1,14 +1,14 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: inputReady.c,v 1.4 2001/12/21 15:07:26 simonmar Exp $
+ * $Id: inputReady.c,v 1.5 2002/02/07 11:13:30 simonmar Exp $
  *
  * hReady Runtime Support
  */
 
 /* select and supporting types is not Posix */
 /* #include "PosixSource.h" */
-#include "HsCore.h"
+#include "HsBase.h"
 
 /*
  * inputReady(fd) checks to see whether input is available on the file

@@ -1,12 +1,12 @@
 /* 
  * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
  *
- * $Id: lockFile.c,v 1.1 2001/06/28 14:15:04 simonmar Exp $
+ * $Id: lockFile.c,v 1.2 2002/02/07 11:13:30 simonmar Exp $
  *
  * stdin/stout/stderr Runtime Support
  */
 
-#include "HsCore.h"
+#include "HsBase.h"
 
 #ifndef FD_SETSIZE
 #define FD_SETSIZE 256

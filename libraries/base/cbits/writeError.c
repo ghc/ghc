@@ -1,7 +1,7 @@
 /* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1998
+ * (c) The University of Glasgow 2002
  *
- * $Id: writeError.c,v 1.4 2002/01/02 14:40:11 simonmar Exp $
+ * $Id: writeError.c,v 1.5 2002/02/07 11:13:30 simonmar Exp $
  *
  * hPutStr Runtime Support
  */
@@ -18,7 +18,7 @@ implementation in one or two places.)
 
 #include "Rts.h"
 #include "RtsUtils.h"
-#include "HsCore.h"
+#include "HsBase.h"
 
 void
 writeErrString__(HsAddr msg_hdr, HsAddr msg, HsInt len)

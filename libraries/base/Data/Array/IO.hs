@@ -1,4 +1,4 @@
-{-# OPTIONS -#include "HsCore.h" #-}
+{-# OPTIONS -#include "HsBase.h" #-}
 -----------------------------------------------------------------------------
 -- 
 -- Module      :  Data.Array.IO
@@ -9,7 +9,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- $Id: IO.hs,v 1.4 2002/02/05 17:32:25 simonmar Exp $
+-- $Id: IO.hs,v 1.5 2002/02/07 11:13:29 simonmar Exp $
 --
 -- Mutable boxed/unboxed arrays in the IO monad.
 --

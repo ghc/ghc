@@ -1,7 +1,7 @@
 /* 
- * (c) The GRASP/AQUA Project, Glasgow University, 1994-1998
+ * (c) The University of Glasgow 2002
  *
- * $Id: system.c,v 1.4 2001/12/21 15:07:26 simonmar Exp $
+ * $Id: system.c,v 1.5 2002/02/07 11:13:30 simonmar Exp $
  *
  * system Runtime Support
  */
@@ -9,7 +9,7 @@
 /* The itimer stuff in this module is non-posix */
 // #include "PosixSource.h"
 
-#include "HsCore.h"
+#include "HsBase.h"
 
 #if defined(mingw32_TARGET_OS)
 #include <windows.h>

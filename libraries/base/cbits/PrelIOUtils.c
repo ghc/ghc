@@ -5,5 +5,5 @@
  */
 
 #define INLINE
-#include "HsCore.h"
+#include "HsBase.h"
 

@@ -3,7 +3,7 @@
  *
  * Directory Runtime Support
  */
-#include "HsCore.h"
+#include "HsBase.h"
 
 #if defined(mingw32_TARGET_OS)
 #include <windows.h>
