@@ -200,13 +200,24 @@ fromIntegral	=  fromInteger . toInteger
     Double	-> Rational, 
     Rational	-> Double,
     Float	-> Rational,
-    Rational	-> Float,
-    Rational	-> Rational,
-    Double	-> Double,
-    Double	-> Float,
-    Float	-> Float,
-    Float	-> Double #-}
+    Rational	-> Float
+ #-}
 realToFrac	:: (Real a, Fractional b) => a -> b
 realToFrac	=  fromRational . toRational
+
+{-# RULES
+"realToFrac/Double->Float"      realToFrac = doubleToFloat
+"realToFrac/Float->Double"      realToFrac = floatToDouble
+"realToFrac/Double->Double"     realToFrac = id :: Double -> Double
+"realToFrac/Float->Float"       realToFrac = id :: Float -> Float
+"realToFrac/Rational->Rational" realToFrac = id :: Rational -> Rational
+ #-}
+
+doubleToFloat :: Double -> Float
+doubleToFloat (D# d) = F# (double2Float# d)
+
+floatToDouble :: Float -> Double
+floatToDouble (F# f) = D# (float2Double# f)
+
 \end{code}
 
