@@ -474,6 +474,9 @@
 /* Define if you have the <ieee754.h> header file.  */
 #undef HAVE_IEEE754_H
 
+/* Define if you have the <inttypes.h> header file.  */
+#undef HAVE_INTTYPES_H
+
 /* Define if you have the <io.h> header file.  */
 #undef HAVE_IO_H
 
