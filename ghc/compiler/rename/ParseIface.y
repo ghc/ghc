@@ -36,13 +36,11 @@ import Outputable
 %token
 	INTERFACE	    { ITinterface }
 	USAGES_PART	    { ITusages }
-	VERSIONS_PART	    { ITversions }
 	EXPORTS_PART	    { ITexports }
 	INSTANCE_MODULES_PART { ITinstance_modules }
 	INSTANCES_PART	    { ITinstances }
 	FIXITIES_PART	    { ITfixities }
 	DECLARATIONS_PART   { ITdeclarations }
-	PRAGMAS_PART	    { ITpragmas }
 	DATA		    { ITdata }
 	TYPE		    { ITtype }
 	NEWTYPE		    { ITnewtype }
@@ -59,7 +57,6 @@ import Outputable
 	DCOLON		    { ITdcolon }
 	COMMA		    { ITcomma }
 	DARROW		    { ITdarrow }
-	DOTDOT		    { ITdotdot }
 	EQUAL		    { ITequal }
 	OCURLY		    { ITocurly }
 	OBRACK		    { ITobrack }
@@ -160,10 +157,6 @@ whats_imported      :: { WhatsImported OccName }
 whats_imported      :                                           { Everything }
                     | name_version_pair name_version_pairs      { Specifically ($1:$2) }
 
-versions_part	    :: { [LocalVersion OccName] }
-versions_part	    :  VERSIONS_PART name_version_pairs		{ $2 }
-		    |						{ [] }
-
 name_version_pairs  ::	{ [LocalVersion OccName] }
 name_version_pairs  :  						{ [] }
 		    |  name_version_pair name_version_pairs	{ $1 : $2 }
@@ -197,7 +190,7 @@ entity		:  entity_occ 				{ if isTCOcc $1
 		|  entity_occ VBAR stuff_inside		{ AvailTC $1 $3 }
 
 stuff_inside	:: { [OccName] }
-stuff_inside	:  OPAREN val_occs1 CPAREN		{ $2
+stuff_inside	:  OPAREN val_occs CPAREN		{ $2
 --------------------------------------------------------------------------
 							}
 
@@ -386,9 +379,9 @@ val_occ		:  var_occ 		{ $1 }
 		|  CONID		{ VarOcc $1 }
 		|  CONSYM		{ VarOcc $1 }
 
-val_occs1	:: { [OccName] }
+val_occs	:: { [OccName] }
 		:  val_occ    		{ [$1] }
-		|  val_occ val_occs1	{ $1 : $2 }
+		|  val_occ val_occs	{ $1 : $2 }
 
 
 var_name	:: { RdrName }
@@ -431,10 +424,6 @@ tc_names1	:: { [RdrName] }
 tv_name		:: { RdrName }
 tv_name		:  VARID 		{ Unqual (TvOcc $1) }
 		|  VARSYM		{ Unqual (TvOcc $1) {- Allow t2 as a tyvar -} }
-
-tv_names	:: { [RdrName] }
-		:  			{ [] }
-		| tv_name tv_names	{ $1 : $2 }
 
 tv_bndr		:: { HsTyVar RdrName }
 tv_bndr		:  tv_name DCOLON akind	{ IfaceTyVar $1 $3 }
@@ -502,39 +491,43 @@ strict_info	: STRICT_PART qvar_name OCURLY qdata_names CCURLY 	{ HsStrictnessInf
 		| STRICT_PART qvar_name 			 	{ HsStrictnessInfo $1 (Just ($2,[])) }
 		| STRICT_PART 						{ HsStrictnessInfo $1 Nothing }
 
-core_expr	:: { UfExpr RdrName }
-core_expr	: qvar_name					{ UfVar $1 }
-		| qdata_name					{ UfVar $1 }
-		| core_lit					{ UfLit $1 }
-		| OPAREN core_expr CPAREN			{ $2 }
-		| qdata_name OCURLY data_args CCURLY		{ UfCon $1 $3 }
+core_expr :: { UfExpr RdrName }
+          : LAM core_val_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
+	  | BIGLAM core_tv_bndrs RARROW core_expr	{ foldr UfLam $4 $2 }
+	  | CASE core_expr OF 
+	     OCURLY alg_alts core_default CCURLY	{ UfCase $2 (UfAlgAlts  $5 $6) }
+	  | PRIM_CASE core_expr OF 
+	     OCURLY prim_alts core_default CCURLY	{ UfCase $2 (UfPrimAlts $5 $6) }
 
-		| core_expr ATSIGN atype			{ UfApp $1 (UfTyArg $3) }
-		| core_expr core_arg				{ UfApp $1 $2 }
- 		| LAM core_val_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
-		| BIGLAM core_tv_bndrs RARROW core_expr		{ foldr UfLam $4 $2 }
+	  | LET OCURLY core_val_bndr EQUAL core_expr CCURLY
+	    IN core_expr				{ UfLet (UfNonRec $3 $5) $8 }
+	  | LETREC OCURLY rec_binds CCURLY		
+	    IN core_expr				{ UfLet (UfRec $3) $6 }
 
-		| CASE core_expr OF 
-		  OCURLY alg_alts core_default CCURLY		{ UfCase $2 (UfAlgAlts  $5 $6) }
-		| PRIM_CASE core_expr OF 
-		  OCURLY prim_alts core_default CCURLY		{ UfCase $2 (UfPrimAlts $5 $6) }
+	  | CCALL ccall_string 
+  	      OBRACK atype atypes CBRACK core_args	{ let
+								(is_casm, may_gc) = $1
+							  in
+							  UfPrim (UfCCallOp $2 is_casm may_gc $5 $4)
+								 $7
+							}
 
+          | INLINE_CALL core_expr                       {  UfNote UfInlineCall $2 }
+          | COERCE atype core_expr                      {  UfNote (UfCoerce $2) $3 }
+          | SCC core_expr 	                        {  UfNote (UfSCC $1) $2	}
+	  | fexpr					{ $1 }
 
-		| LET OCURLY core_val_bndr EQUAL core_expr CCURLY
-		  IN core_expr					{ UfLet (UfNonRec $3 $5) $8 }
-		| LETREC OCURLY rec_binds CCURLY		
-		  IN core_expr					{ UfLet (UfRec $3) $6 }
+fexpr   :: { UfExpr RdrName }
+fexpr   : fexpr core_arg				{ UfApp $1 $2 }
+        | aexpr						{ $1 }
 
-		| CCALL ccall_string 
-			OBRACK atype atypes CBRACK core_args	{ let
-									(is_casm, may_gc) = $1
-								  in
-								  UfPrim (UfCCallOp $2 is_casm may_gc $5 $4)
-									 $7
-								}
-                | INLINE_CALL core_expr                         {  UfNote UfInlineCall $2 }
-                | COERCE atype core_expr                        {  UfNote (UfCoerce $2) $3 }
-		| SCC core_expr 	                        {  UfNote (UfSCC $1) $2	}
+aexpr	:: { UfExpr RdrName }
+aexpr   : qvar_name					{ UfVar $1 }
+	| qdata_name					{ UfVar $1 }
+	| core_lit					{ UfLit $1 }
+	| OPAREN core_expr CPAREN			{ $2 }
+	| qdata_name OCURLY data_args CCURLY		{ UfCon $1 $3 }
+
 
 rec_binds	:: { [(UfBinder RdrName, UfExpr RdrName)] }
 		:						{ [] }
@@ -557,6 +550,7 @@ core_arg	:: { UfArg RdrName }
 		: qvar_name					{ UfVarArg $1 }
 		| qdata_name					{ UfVarArg $1 }
 		| core_lit					{ UfLitArg $1 }
+		| ATSIGN atype					{ UfTyArg  $2 }
 
 core_args	:: { [UfArg RdrName] }
 		:						{ [] }
@@ -564,8 +558,9 @@ core_args	:: { [UfArg RdrName] }
 
 data_args	:: { [UfArg RdrName] }
 		: 						{ [] }
-		| ATSIGN atype data_args			{ UfTyArg $2 : $3 }
 		| core_arg data_args				{ $1 : $2 }
+
+{-		| ATSIGN atype data_args			{ UfTyArg $2 : $3 } -}
 
 core_lit	:: { Literal }
 core_lit	: INTEGER			{ MachInt $1 True }
