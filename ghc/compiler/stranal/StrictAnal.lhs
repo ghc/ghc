@@ -11,7 +11,7 @@ module StrictAnal ( saBinds ) where
 
 #include "HsVersions.h"
 
-import CmdLineOpts	( DynFlags, DynFlag(..), dopt )
+import CmdLineOpts	( DynFlags, DynFlag(..) )
 import CoreSyn
 import Id		( setIdStrictness, setInlinePragma, 
 			  idDemandInfo, setIdDemandInfo, isBottomingId,

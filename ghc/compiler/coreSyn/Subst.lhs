@@ -544,10 +544,9 @@ substExpr subst expr
 simplBndr :: Subst -> Var -> (Subst, Var)
 -- Used for lambda and case-bound variables
 -- Clone Id if necessary, substitute type
--- Return with IdInfo already substituted, 
--- but occurrence info zapped
+-- Return with IdInfo already substituted, but (fragile) occurrence info zapped
 -- The substitution is extended only if the variable is cloned, because
--- we don't need to use it to track occurrence info.
+-- we *don't* need to use it to track occurrence info.
 simplBndr subst bndr
   | isTyVar bndr  = substTyVar subst bndr
   | otherwise     = subst_id isFragileOcc subst subst bndr
@@ -559,9 +558,11 @@ simplLetId :: Subst -> Id -> (Subst, Id)
 -- Clone Id if necessary
 -- Substitute its type
 -- Return an Id with completely zapped IdInfo
--- Augment the subtitution if the unique changed or if there's
--- 	interesting occurrence info
--- [A subsequent substIdInfo will restore its IdInfo]
+-- 	[A subsequent substIdInfo will restore its IdInfo]
+-- Augment the subtitution 
+--	if the unique changed, *or* 
+--	if there's interesting occurrence info
+
 simplLetId subst@(Subst in_scope env) old_id
   = (Subst (in_scope `extendInScopeSet` new_id) new_env, new_id)
   where
@@ -590,7 +591,7 @@ simplIdInfo subst old_info bndr
 
 \begin{code}
 -- substBndr and friends are used when doing expression substitution only
--- In this case we can preserve occurrence information, and indeed we want
+-- In this case we can *preserve* occurrence information, and indeed we *want*
 -- to do so else lose useful occ info in rules.  Hence the calls to 
 -- simpl_id with keepOccInfo
 

@@ -512,7 +512,7 @@ idAppIsBottom id n_val_args = appIsBottom (idStrictness id) n_val_args
 \end{code}
 
 @exprIsValue@ returns true for expressions that are certainly *already* 
-evaluated to WHNF.  This is used to decide wether it's ok to change
+evaluated to WHNF.  This is used to decide whether it's ok to change
 	case x of _ -> e   ===>   e
 
 and to decide whether it's safe to discard a `seq`
