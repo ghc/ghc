@@ -45,15 +45,15 @@ RTS_ENTRY(stg_upd_frame_ret);
 RTS_ENTRY(stg_seq_frame_ret);
 
 /* Entry code for constructors created by the bytecode interpreter */
-RTS_ENTRY(stg_interp_constr_entry);
-RTS_ENTRY(stg_interp_constr1_entry);
-RTS_ENTRY(stg_interp_constr2_entry);
-RTS_ENTRY(stg_interp_constr3_entry);
-RTS_ENTRY(stg_interp_constr4_entry);
-RTS_ENTRY(stg_interp_constr5_entry);
-RTS_ENTRY(stg_interp_constr6_entry);
-RTS_ENTRY(stg_interp_constr7_entry);
-RTS_ENTRY(stg_interp_constr8_entry);
+RTS_FUN(stg_interp_constr_entry);
+RTS_FUN(stg_interp_constr1_entry);
+RTS_FUN(stg_interp_constr2_entry);
+RTS_FUN(stg_interp_constr3_entry);
+RTS_FUN(stg_interp_constr4_entry);
+RTS_FUN(stg_interp_constr5_entry);
+RTS_FUN(stg_interp_constr6_entry);
+RTS_FUN(stg_interp_constr7_entry);
+RTS_FUN(stg_interp_constr8_entry);
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    or a VoidRep to the interpreter. */
