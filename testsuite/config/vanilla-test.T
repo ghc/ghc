@@ -98,16 +98,15 @@ def say_fail_because_noteq ( $filename1, $filename2 )
    fi
 }
 
-def say_fail_because_output_produced ( $filename1 )
-{
-   print "--- FAIL because the program produced non-empty output:"
-   print "---      " ++ $filename1
-}
-
 def say_fail_because_nonempty ( $filename1 )
 {
    print "--- FAIL because the following file is non-empty:"
    print "---      " ++ $filename1
+   if defined $verbose then
+	print "--- contents:"
+	print (contents $filename1)
+	print ("--- end of " ++ $filename1)
+   fi
 }
 
 def say_fail_because_compiler_barfd ( $res )
@@ -243,7 +242,7 @@ def check_stdout_ok()
    if   not ( exists($s_stdout) )
    then if ((contents $r_stdout) == "")
 	   then return True
-	   else say_fail_because_output_produced($r_stdout)
+	   else say_fail_because_nonempty($r_stdout)
 		return False
 	fi
    fi
