@@ -5,7 +5,7 @@
 #	This file defines Make variables for the
 #	option flags for each utility program
 #
-# 	$Id: opts.mk,v 1.15 2000/05/09 15:37:08 rrt Exp $
+# 	$Id: opts.mk,v 1.16 2000/11/21 12:32:55 rrt Exp $
 #
 #################################################################################
 
@@ -57,10 +57,11 @@ SRC_INSTALL_BIN_OPTS	+= -s
 SRC_LINT_OPTS		+= -axz -DLINT $(SRC_CPP_OPTS)
 WAY$(_way)_LINT_OPTS	+= WAY$(_way)_CPP_OPTS
 
-#
 # Default fptools options for dllwrap.
-#
 SRC_BLD_DLL_OPTS += -mno-cygwin --target=i386-mingw32
+
+# Flags for CPP when running GreenCard on .pgc files
+GC_CPP_OPTS += -D__GLASGOW_HASKELL__
 
 
 #################################################################################

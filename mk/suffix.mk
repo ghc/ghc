@@ -110,11 +110,16 @@ endif
 # Green-card Suffix Rules
 #
 
+.PRECIOUS: %.gc
+
 %.hs : %.gc
 	$(GREENCARD) $(GREENCARD_OPTS) $< -o $@
 
 %.lhs : %.gc
 	$(GREENCARD) $(GREENCARD_OPTS) $< -o $@
+
+%.gc : %.pgc
+	$(CPP) $(GC_CPP_OPTS) $< | perl -pe 's#\\n#\n#g' > $@
 
 #-----------------------------------------------------------------------------
 # C-related suffix rules
