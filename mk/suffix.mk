@@ -362,4 +362,5 @@ endif
 
 % : %.pp
 	@$(RM) $@
-	$(CPP) $(RAWCPP_FLAGS) -P $(CPP_OPTS) -x c $< > $@
+	$(CPP) $(RAWCPP_FLAGS) -P $(CPP_OPTS) -x c $< | \
+	grep -v '^#pragma GCC' > $@

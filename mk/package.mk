@@ -1,5 +1,5 @@
 # -----------------------------------------------------------------------------
-# $Id: package.mk,v 1.38 2004/03/27 09:57:58 panne Exp $
+# $Id: package.mk,v 1.39 2004/10/02 15:12:48 wolfgang Exp $
 
 ifneq "$(PACKAGE)" ""
 
@@ -24,10 +24,12 @@ endif
 
 package.conf.inplace   : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -x c $(PACKAGE_CPP_OPTS) $< | \
+	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/\[ *,/[ /g' >$@
 
 package.conf.installed : package.conf.in
 	$(CPP) $(RAWCPP_FLAGS) -P $(PKGCONF_CPP_EXTRA_OPTS) -DINSTALLING -x c $(PACKAGE_CPP_OPTS) $< | \
+	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/\[ *,/[ /g' >$@
 
 # we could be more accurate here and add a dependency on
