@@ -1,7 +1,7 @@
 {-# OPTIONS -fffi -cpp #-}
 
 ------------------------------------------------------------------------
--- $Id: Main.hs,v 1.69 2005/01/28 12:56:26 simonmar Exp $
+-- $Id: Main.hs,v 1.70 2005/01/28 16:28:56 ross Exp $
 --
 -- Program for converting .hsc files to .hs files, by converting the
 -- file into a C program which is run to generate the Haskell source.
@@ -699,14 +699,14 @@ outHeaderHs flags inH toks =
     "#endif\n"++
     case inH of
         Nothing -> concatMap outFlag flags++concatMap outSpecial toks
-        Just f  -> outOption ("-#include \""++f++"\"")
+        Just f  -> outInclude ("\""++f++"\"")
     where
-    outFlag (Include f)          = outOption ("-#include "++f)
+    outFlag (Include f)          = outInclude f
     outFlag (Define  n Nothing)  = outOption ("-optc-D"++n)
     outFlag (Define  n (Just v)) = outOption ("-optc-D"++n++"="++v)
     outFlag _                    = ""
     outSpecial (pos, key, arg) = case key of
-        "include"                  -> outOption ("-#include "++arg)
+        "include"                  -> outInclude arg
         "define" | goodForOptD arg -> outOption ("-optc-D"++toOptD arg)
                  | otherwise       -> ""
         _ | conditional key        -> outCLine pos++"#"++key++" "++arg++"\n"
@@ -719,8 +719,22 @@ outHeaderHs flags inH toks =
     toOptD arg = case break isSpace arg of
         (name, "")      -> name
         (name, _:value) -> name++'=':dropWhile isSpace value
-    outOption s = "    printf (\"{-# OPTIONS %s #-}\\n\", \""++
-                  showCString s++"\");\n"
+    outOption s =
+	"#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 603\n" ++
+	"    printf (\"{-# OPTIONS %s #-}\\n\", \""++
+                  showCString s++"\");\n"++
+	"#else\n"++
+	"    printf (\"{-# GHC_OPTIONS %s #-}\\n\", \""++
+                  showCString s++"\");\n"++
+	"#endif\n"
+    outInclude s =
+	"#if __GLASGOW_HASKELL__ && __GLASGOW_HASKELL__ < 603\n" ++
+	"    printf (\"{-# OPTIONS -#include %s #-}\\n\", \""++
+                  showCString s++"\");\n"++
+	"#else\n"++
+	"    printf (\"{-# INCLUDE %s #-}\\n\", \""++
+                  showCString s++"\");\n"++
+	"#endif\n"
 
 outTokenHs :: Token -> String
 outTokenHs (Text pos txt) =
