@@ -524,7 +524,7 @@ findExecutable binary = do
   path <- getEnv "PATH"
   search (parseSearchPath path)
   where
-    fileName = binary `joinFileExt` drop 1 exeExtension
+    fileName = binary `joinFileExt` exeExtension
 
     search :: [FilePath] -> IO (Maybe FilePath)
     search [] = return Nothing
