@@ -898,8 +898,8 @@ Plan B (cunning, used for a long time up to and including GHC 6.2)
   In the Step 1 this constraint might have been simplified, perhaps to
   (Foo Zero Zero b), AND THEN THAT MIGHT BE IMPROVED, to bind 'b' to 'T'.
   This won't happen in Step 2... but that in turn might prevent some other
-  constraint mentioning 'b' from being simplified... and that in turn
-  breaks the invariant that no constraints are quantified over.
+  constraint (Baz [a] b) being simplified (e.g. via instance Baz [a] T where {..}) 
+  and that in turn breaks the invariant that no constraints are quantified over.
 
   Test typecheck/should_compile/tc177 (which failed in GHC 6.2) demonstrates
   the problem.
@@ -927,7 +927,27 @@ You might think this should work becuase the call to foo gives rise to a constra
 (HasCodedValue t), which can be satisfied by the type sig for doDecodeIO.  But the
 restricted binding act = ... calls tcSimplifyRestricted, and PlanC simplifies the
 constraint using the (rather bogus) instance declaration, and now we are stuffed.
-I claim this is not really a bug.  
+
+I claim this is not really a bug -- but it bit Sergey as well as George.  So here's
+plan D
+
+
+Plan D (a variant of plan B)
+  Step 1: Simplify the constraints as much as possible (to deal 
+  with Plan A's problem), BUT DO NO IMPROVEMENT.  Then set
+	qtvs = tau_tvs \ ftvs( simplify( wanteds ) )
+
+  Step 2: Now simplify again, treating the constraint as 'free' if 
+  it does not mention qtvs, and trying to reduce it otherwise.
+
+  The point here is that it's generally OK to have too few qtvs; that is,
+  to make the thing more monomorphic than it could be.  We don't want to
+  do that in the common cases, but in wierd cases it's ok: the programmer
+  can always add a signature.  
+
+  Too few qtvs => too many wanteds, which is what happens if you do less
+  improvement.
+
 
 \begin{code}
 tcSimplifyRestricted 	-- Used for restricted binding groups
@@ -942,31 +962,51 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 	-- They are all thrown back in the LIE
 
 tcSimplifyRestricted doc tau_tvs wanteds
-	-- 'reduceMe': Reduce as far as we can.  Don't stop at
+	-- Zonk everything in sight
+  = mappM zonkInst wanteds			`thenM` \ wanteds' ->
+    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
+    tcGetGlobalTyVars				`thenM` \ gbl_tvs' ->
+
+   	-- 'reduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
 	-- variables as possible, and we don't want to stop
 	-- at (say) Monad (ST s), because that reduces
 	-- immediately, with no constraint on s.
-  = simpleReduceLoop doc reduceMe wanteds	`thenM` \ (frees, binds, irreds) ->
-    ASSERT( null frees )
+	--
+	-- BUT do no improvement!  See Plan D above
+    reduceContextWithoutImprovement 
+	doc reduceMe wanteds' 		`thenM` \ (_frees, _binds, constrained_dicts) ->
 
 	-- Next, figure out the tyvars we will quantify over
-    zonkTcTyVarsAndFV (varSetElems tau_tvs)	`thenM` \ tau_tvs' ->
-    tcGetGlobalTyVars				`thenM` \ gbl_tvs ->
     let
-	constrained_tvs = tyVarsOfInsts irreds
-	qtvs = (tau_tvs' `minusVarSet` constrained_tvs)
-			 `minusVarSet` oclose (fdPredsOfInsts irreds) gbl_tvs
-		-- The second minusVarSet arranges not to quantify over
-		-- any tyvars that are functionally determined by ones in
-		-- the environment
+	constrained_tvs = tyVarsOfInsts constrained_dicts
+	qtvs = (tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs')
+			 `minusVarSet` constrained_tvs
+        try_me inst | isFreeWrtTyVars qtvs inst = Free
+	            | otherwise                 = ReduceMe
     in
     traceTc (text "tcSimplifyRestricted" <+> vcat [
-		pprInsts wanteds, pprInsts frees, pprInsts irreds,
-		pprLHsBinds binds,
+		pprInsts wanteds, pprInsts _frees, pprInsts constrained_dicts,
+		ppr _binds,
 		ppr constrained_tvs, ppr tau_tvs', ppr qtvs ])	`thenM_`
 
-    extendLIEs irreds						`thenM_`
+	-- The first step may have squashed more methods than
+	-- necessary, so try again, this time more gently, knowing the exact
+	-- set of type variables to quantify over.
+	--
+	-- We quantify only over constraints that are captured by qtvs;
+	-- these will just be a subset of non-dicts.  This in contrast
+	-- to normal inference (using isFreeWhenInferring) in which we quantify over
+	-- all *non-inheritable* constraints too.  This implements choice
+	-- (B) under "implicit parameter and monomorphism" above.
+	--
+	-- Remember that we may need to do *some* simplification, to
+	-- (for example) squash {Monad (ST s)} into {}.  It's not enough
+	-- just to float all constraints
+    reduceContextWithoutImprovement 
+	doc try_me wanteds' 		`thenM` \ (frees, binds, irreds) ->
+    ASSERT( null irreds )
+    extendLIEs frees			`thenM_`
     returnM (varSetElems qtvs, binds)
 \end{code}
 
@@ -1192,6 +1232,7 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 
 \begin{code}
 type Avails = FiniteMap Inst Avail
+emptyAvails = emptyFM
 
 data Avail
   = IsFree		-- Used for free Insts
@@ -1432,7 +1473,7 @@ reduceContext doc try_me givens wanteds
 	     ]))					`thenM_`
 
         -- Build the Avail mapping from "givens"
-    foldlM addGiven emptyFM givens			`thenM` \ init_state ->
+    foldlM addGiven emptyAvails givens			`thenM` \ init_state ->
 
         -- Do the real work
     reduceList (0,[]) try_me wanteds init_state		`thenM` \ avails ->
@@ -1456,6 +1497,34 @@ reduceContext doc try_me givens wanteds
 	     ])) 					`thenM_`
 
     returnM (no_improvement, frees, binds, irreds)
+
+-- reduceContextWithoutImprovement differs from reduceContext
+--	(a) no improvement
+--	(b) 'givens' is assumed empty
+reduceContextWithoutImprovement doc try_me wanteds
+  =
+    traceTc (text "reduceContextWithoutImprovement" <+> (vcat [
+	     text "----------------------",
+	     doc,
+	     text "wanted" <+> ppr wanteds,
+	     text "----------------------"
+	     ]))					`thenM_`
+
+        -- Do the real work
+    reduceList (0,[]) try_me wanteds emptyAvails	`thenM` \ avails ->
+    extractResults avails wanteds			`thenM` \ (binds, irreds, frees) ->
+
+    traceTc (text "reduceContextWithoutImprovement end" <+> (vcat [
+	     text "----------------------",
+	     doc,
+	     text "wanted" <+> ppr wanteds,
+	     text "----",
+	     text "avails" <+> pprAvails avails,
+	     text "frees" <+> ppr frees,
+	     text "----------------------"
+	     ])) 					`thenM_`
+
+    returnM (frees, binds, irreds)
 
 tcImprove :: Avails -> TcM Bool		-- False <=> no change
 -- Perform improvement using all the predicates in Avails
