@@ -6,6 +6,7 @@ SRC_HC_OPTS += -dcore-lint
 
 ds035_HC_OPTS = -fglasgow-exts
 ds044_HC_OPTS = -O -funbox-strict-fields
+ds049_HC_OPTS = -fvia-C
 ds050_HC_OPTS = -fglasgow-exts
 
 # mkdependHS doesn't understand OPTIONS pragmas...
