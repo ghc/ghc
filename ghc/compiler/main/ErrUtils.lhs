@@ -120,9 +120,12 @@ printErrorsAndWarnings (warns, errs)
 
 pprBagOfErrors :: Bag ErrMsg -> Pretty.Doc
 pprBagOfErrors bag_of_errors
-  = Pretty.vcat [ let style = mkErrStyle unqual in
-		  Pretty.text "" Pretty.$$ d style Pretty.$$ e style
-		| ErrMsg { errMsgShortDoc = d,
+  = Pretty.vcat [ let style = mkErrStyle unqual
+		      doc = mkLocMessage s (d $$ e)
+		  in
+		  Pretty.text "" Pretty.$$ doc style
+		| ErrMsg { errMsgSpans = s:ss,
+			   errMsgShortDoc = d,
 			   errMsgExtraInfo = e,
 			   errMsgContext = unqual } <- sorted_errs ]
     where
