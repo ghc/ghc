@@ -254,20 +254,20 @@ ap                =  liftM2 id
 
 The functions in this library use the following naming conventions: 
 
-* A postfix `M' always stands for a function in the Kleisli category:
+* A postfix \`M\' always stands for a function in the Kleisli category:
   @m@ is added to function results (modulo currying) and nowhere else.
   So, for example, 
 
 >  filter  ::              (a ->   Bool) -> [a] ->   [a]
 >  filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
 
-* A postfix `_' changes the result type from @(m a)@ to @(m ())@.
+* A postfix \`_\' changes the result type from @(m a)@ to @(m ())@.
   Thus (in the "Prelude"): 
 
 >  sequence  :: Monad m => [m a] -> m [a] 
 >  sequence_ :: Monad m => [m a] -> m () 
 
-* A prefix `m' generalises an existing function to a monadic form.
+* A prefix \`m\' generalises an existing function to a monadic form.
   Thus, for example: 
 
 >  sum  :: Num a       => [a]   -> a

@@ -488,7 +488,7 @@ Similar arguments apply for other interruptible operations like
 
 #ifdef __HADDOCK__
 -- | If the first argument evaluates to 'True', then the result is the
--- second argument.  Otherwise an 'Assertion' exception is raised,
+-- second argument.  Otherwise an 'AssertionFailed' exception is raised,
 -- containing a 'String' with the source file and line number of the
 -- call to assert.
 --

@@ -159,12 +159,12 @@ delFromFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key   -> FiniteMap
 -- | List version of 'delFromFM'.
 delListFromFM	:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> [key] -> FiniteMap key elt
 
--- | Combine two 'FiniteMaps'.  Mappings in the second argument shadow
+-- | Combine two 'FiniteMap's.  Mappings in the second argument shadow
 -- those in the first.
 plusFM		:: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt
 			   -> FiniteMap key elt
 
--- | Combine two 'FiniteMaps'.  The specified combination function is
+-- | Combine two 'FiniteMap's.  The specified combination function is
 -- used to calculate the new value when there are two elements with
 -- the same key.
 plusFM_C	:: (Ord key OUTPUTABLE_key) => (elt -> elt -> elt)

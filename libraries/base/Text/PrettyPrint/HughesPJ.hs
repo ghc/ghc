@@ -251,7 +251,7 @@ rational :: Rational -> Doc
 parens       :: Doc -> Doc; 	-- ^ Wrap document in @(...)@
 brackets     :: Doc -> Doc;  	-- ^ Wrap document in @[...]@
 braces	     :: Doc -> Doc;   	-- ^ Wrap document in @{...}@
-quotes	     :: Doc -> Doc;	-- ^ Wrap document in @'...'@
+quotes	     :: Doc -> Doc;	-- ^ Wrap document in @\'...\'@
 doubleQuotes :: Doc -> Doc;	-- ^ Wrap document in @\"...\"@
 
 -- Combining @Doc@ values
@@ -263,6 +263,7 @@ hsep   :: [Doc] -> Doc;          -- ^List version of '<+>'
 
 ($$)   :: Doc -> Doc -> Doc;     -- ^Above; if there is no
                                 -- overlap it \"dovetails\" the two
+($+$)   :: Doc -> Doc -> Doc;	 -- ^Above, without dovetailing.
 vcat   :: [Doc] -> Doc;          -- ^List version of '$$'
 
 cat    :: [Doc] -> Doc;          -- ^ Either hcat or vcat

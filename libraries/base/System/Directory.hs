@@ -236,7 +236,7 @@ EIO
 The operand is not a valid directory name.
 [ENAMETOOLONG, ELOOP]
 
-* 'isDoesNotExist'  'NoSuchThing'
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 The directory does not exist. 
 @[ENOENT, ENOTDIR]@
 
@@ -264,7 +264,7 @@ removeDirectory path = do
     withCString path $ \s ->
        throwErrnoIfMinus1Retry_ "removeDirectory" (c_rmdir s)
 
-{- |@'removefile' file@ removes the directory entry for an existing file
+{- |'removeFile' /file/ removes the directory entry for an existing file
 /file/, where /file/ is not itself a directory. The
 implementation may specify additional constraints which must be
 satisfied before a file can be removed (e.g. the file may not be in
@@ -274,13 +274,13 @@ The operation may fail with:
 
 * 'HardwareFault'
 A physical I\/O error has occurred.
-'EIO'
+@[EIO]@
 
 * 'InvalidArgument'
 The operand is not a valid file name.
 @[ENAMETOOLONG, ELOOP]@
 
-* 'isDoesNotExist' \/ 'NoSuchThing'
+* 'isDoesNotExistError' \/ 'NoSuchThing'
 The file does not exist. 
 @[ENOENT, ENOTDIR]@
 

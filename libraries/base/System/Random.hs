@@ -388,7 +388,7 @@ newStdGen = do
 
 {- |'getStdRandom' uses the supplied function to get a value from the current
 global random generator, and updates the global generator with the new generator
-returned by the function. For example, 'rollDice' gets a random integer between 1 and 6: 
+returned by the function. For example, @rollDice@ gets a random integer between 1 and 6: 
 
 >  rollDice :: IO Int
 >  rollDice = getStdRandom (randomR (1,6))

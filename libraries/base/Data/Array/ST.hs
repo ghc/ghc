@@ -8,7 +8,7 @@
 -- Stability   :  experimental
 -- Portability :  non-portable
 --
--- Mutable boxed and unboxed arrays in the 'ST' monad.
+-- Mutable boxed and unboxed arrays in the 'Control.Monad.ST.ST' monad.
 --
 -----------------------------------------------------------------------------
 

@@ -341,7 +341,7 @@ readIO s        =  case (do { (x,t) <- reads s ;
 #endif  /* __HUGS__ */
 
 -- | Computation 'hReady' @hdl@ indicates whether at least one item is
--- available for input from handle "hdl".
+-- available for input from handle @hdl@.
 -- 
 -- This operation may fail with:
 --
