@@ -75,6 +75,7 @@ data HsType name
   -- Generics
   | HsOpTy		(HsType name) name (HsType name)
   | HsNumTy             Integer
+
   -- these next two are only used in interfaces
   | HsPredTy		(HsPred name)
   

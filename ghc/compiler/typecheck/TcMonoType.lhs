@@ -212,6 +212,9 @@ kcHsType (HsFunTy ty1 ty2)
     kcTypeType ty2	`thenTc_`
     returnTc liftedTypeKind
 
+kcHsType (HsNumTy _)		-- The unit type for generics
+  = returnTc liftedTypeKind
+
 kcHsType ty@(HsOpTy ty1 op ty2)
   = kcTyVar op				`thenTc` \ op_kind ->
     kcHsType ty1			`thenTc` \ ty1_kind ->
