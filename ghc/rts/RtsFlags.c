@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------------
- * $Id: RtsFlags.c,v 1.35 2000/12/19 12:50:37 simonmar Exp $
+ * $Id: RtsFlags.c,v 1.36 2001/01/24 15:41:30 simonmar Exp $
  *
  * (c) The AQUA Project, Glasgow University, 1994-1997
  * (c) The GHC Team, 1998-1999
@@ -670,28 +670,30 @@ error = rtsTrue;
 #endif
 
 	      case 'S':
-		RtsFlags.GcFlags.giveStats ++;
+		  RtsFlags.GcFlags.giveStats = VERBOSE_GC_STATS;
+		  goto stats;
 
 	      case 's':
-		RtsFlags.GcFlags.giveStats ++;
+		  RtsFlags.GcFlags.giveStats = SUMMARY_GC_STATS;
+		  goto stats;
 
 	      case 't':
-		RtsFlags.GcFlags.giveStats ++;
+		  RtsFlags.GcFlags.giveStats = ONELINE_GC_STATS;
+		  goto stats;
 
-		/* giveStats == 1 means "stats are being collected only" */
-		RtsFlags.GcFlags.giveStats ++;
+	    stats:
 #ifdef PAR
-		/* Opening all those files would almost certainly fail... */
-		RtsFlags.ParFlags.ParStats.Full = rtsTrue;
-		RtsFlags.GcFlags.statsFile = stderr; /* temporary; ToDo: rm */
+		  /* Opening all those files would almost certainly fail... */
+		  RtsFlags.ParFlags.ParStats.Full = rtsTrue;
+		  RtsFlags.GcFlags.statsFile = stderr; /* temporary; ToDo: rm */
 #else
-		RtsFlags.GcFlags.statsFile
-		  = open_stats_file(arg, *argc, argv,
-			*rts_argc, rts_argv, STAT_FILENAME_FMT);
-
-		if (RtsFlags.GcFlags.statsFile == NULL) error = rtsTrue;
+		  RtsFlags.GcFlags.statsFile
+		      = open_stats_file(arg, *argc, argv,
+					*rts_argc, rts_argv, STAT_FILENAME_FMT);
+		  
+		  if (RtsFlags.GcFlags.statsFile == NULL) error = rtsTrue;
 #endif
-		break;
+		  break;
 
 	      case 'Z':
 		RtsFlags.GcFlags.squeezeUpdFrames = rtsFalse;
