@@ -31,8 +31,8 @@ then
   fi
 fi
 
-# assumption: openjade and pdfjadetex is installed in the same dir.
-PDFJADETEX=`dirname $JADE`/pdfjadetex
+# assumption: pdfjadetex is on the PATH
+PDFJADETEX=pdfjadetex
 
 $JADE -t tex -d ${DB_STYLESHEET}\#print -o ${output}.tex -c $DOCBOOK_CATALOG $1
 
