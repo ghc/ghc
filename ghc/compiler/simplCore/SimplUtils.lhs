@@ -834,8 +834,8 @@ of the inner case y, which give us nowhere to go!
 \begin{code}
 prepareAlts :: OutExpr 		-- Scrutinee
 	    -> InId		-- Case binder
-	    -> [InAlt]
-	    -> SimplM ([InAlt], 	-- Better alternatives
+	    -> [InAlt]		-- Increasing order
+	    -> SimplM ([InAlt], 	-- Better alternatives, still incresaing order
 			[AltCon])	-- These cases are handled
 
 prepareAlts scrut case_bndr alts
@@ -861,7 +861,9 @@ prepareAlts scrut case_bndr alts
 	-- is only one constructor left
     prepareDefault case_bndr handled_cons maybe_deflt	`thenSmpl` \ deflt_alt ->
 
-    returnSmpl (deflt_alt ++ better_alts, handled_cons)
+    returnSmpl (mergeAlts better_alts deflt_alt, handled_cons)
+	-- We need the mergeAlts in case the new default_alt 
+	-- has turned into a constructor alternative.
 
 prepareDefault case_bndr handled_cons (Just rhs)
   | Just (tycon, inst_tys) <- splitTyConApp_maybe (idType case_bndr),
@@ -929,10 +931,13 @@ mk_tv_bndrs missing_con inst_tys
 mkCase puts a case expression back together, trying various transformations first.
 
 \begin{code}
-mkCase :: OutExpr -> OutId -> OutType -> [OutAlt] -> SimplM OutExpr
+mkCase :: OutExpr -> OutId -> OutType
+       -> [OutAlt]		-- Increasing order
+       -> SimplM OutExpr
 
 mkCase scrut case_bndr ty alts
-  = mkAlts scrut case_bndr alts	`thenSmpl` \ better_alts ->
+  = getDOptsSmpl  			`thenSmpl` \dflags ->
+    mkAlts dflags scrut case_bndr alts	`thenSmpl` \ better_alts ->
     mkCase1 scrut case_bndr ty better_alts
 \end{code}
 
@@ -998,7 +1003,7 @@ and similarly in cascade for all the join points!
 --------------------------------------------------
 --	1. Merge identical branches
 --------------------------------------------------
-mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
+mkAlts dflags scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
   | all isDeadBinder bndrs1,			-- Remember the default 
     length filtered_alts < length con_alts	-- alternative comes first
   = tick (AltMerge case_bndr)			`thenSmpl_`
@@ -1013,56 +1018,53 @@ mkAlts scrut case_bndr alts@((con1,bndrs1,rhs1) : con_alts)
 --	2.  Merge nested cases
 --------------------------------------------------
 
-mkAlts scrut outer_bndr outer_alts
-  = getDOptsSmpl   `thenSmpl` \dflags ->
-    mkAlts' dflags scrut outer_bndr outer_alts
-  where
-  mkAlts' dflags scrut outer_bndr outer_alts
-    | dopt Opt_CaseMerge dflags,
-      (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
--- gaw 2004
-      Just (Case (Var scrut_var) inner_bndr _ inner_alts) <- maybe_outer_deflt,
-      scruting_same_var scrut_var
-
-    = let    --  Eliminate any inner alts which are shadowed by the outer ones
-    	outer_cons = [con | (con,_,_) <- outer_alts_without_deflt]
-    
-    	munged_inner_alts = [ (con, args, munge_rhs rhs) 
- 			    | (con, args, rhs) <- inner_alts, 
- 			       not (con `elem` outer_cons)	-- Eliminate shadowed inner alts
- 			    ]
-    	munge_rhs rhs = bindCaseBndr inner_bndr (Var outer_bndr) rhs
-    
-    	(inner_con_alts, maybe_inner_default) = findDefault munged_inner_alts
-
-    	new_alts = add_default maybe_inner_default
- 			       (outer_alts_without_deflt ++ inner_con_alts)
+mkAlts dflags scrut outer_bndr outer_alts
+  | dopt Opt_CaseMerge dflags,
+    (outer_alts_without_deflt, maybe_outer_deflt)   <- findDefault outer_alts,
+    Just (Case (Var scrut_var) inner_bndr _ inner_alts) <- maybe_outer_deflt,
+    scruting_same_var scrut_var
+  = let
+  	munged_inner_alts = [(con, args, munge_rhs rhs) | (con, args, rhs) <- inner_alts]
+  	munge_rhs rhs = bindCaseBndr inner_bndr (Var outer_bndr) rhs
+  
+  	new_alts = mergeAlts outer_alts_without_deflt munged_inner_alts
+		-- The merge keeps the inner DEFAULT at the front, if there is one
+		-- and eliminates any inner_alts that are shadowed by the outer_alts
     in
     tick (CaseMerge outer_bndr)				`thenSmpl_`
     returnSmpl new_alts
-	-- Warning: don't call mkAlts recursively!
-	-- Firstly, there's no point, because inner alts have already had
-	-- mkCase applied to them, so they won't have a case in their default
-	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
-	-- in munge_rhs may put a case into the DEFAULT branch!
-    where
-	-- We are scrutinising the same variable if it's
-	-- the outer case-binder, or if the outer case scrutinises a variable
-	-- (and it's the same).  Testing both allows us not to replace the
-	-- outer scrut-var with the outer case-binder (Simplify.simplCaseBinder).
-      scruting_same_var = case scrut of
+    	-- Warning: don't call mkAlts recursively!
+    	-- Firstly, there's no point, because inner alts have already had
+    	-- mkCase applied to them, so they won't have a case in their default
+    	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
+    	-- in munge_rhs may put a case into the DEFAULT branch!
+  where
+    	-- We are scrutinising the same variable if it's
+    	-- the outer case-binder, or if the outer case scrutinises a variable
+    	-- (and it's the same).  Testing both allows us not to replace the
+    	-- outer scrut-var with the outer case-binder (Simplify.simplCaseBinder).
+    scruting_same_var = case scrut of
 			  Var outer_scrut -> \ v -> v == outer_bndr || v == outer_scrut
 			  other		  -> \ v -> v == outer_bndr
 
-      add_default (Just rhs) alts = (DEFAULT,[],rhs) : alts
-      add_default Nothing    alts = alts
-
-
---------------------------------------------------
+------------------------------------------------
 --	Catch-all
---------------------------------------------------
+------------------------------------------------
 
-  mkAlts' dflags scrut case_bndr other_alts = returnSmpl other_alts
+mkAlts dflags scrut case_bndr other_alts = returnSmpl other_alts
+
+
+---------------------------------
+mergeAlts :: [OutAlt] -> [OutAlt] -> [OutAlt]
+-- Merge preserving order; alternatives in the first arg
+-- shadow ones in the second
+mergeAlts [] as2 = as2
+mergeAlts as1 [] = as1
+mergeAlts (a1:as1) (a2:as2)
+  = case a1 `cmpAlt` a2 of
+	LT -> a1 : mergeAlts as1      (a2:as2)
+	EQ -> a1 : mergeAlts as1      as2	-- Discard a2
+	GT -> a2 : mergeAlts (a1:as1) as2
 \end{code}
 
 
@@ -1285,7 +1287,6 @@ mkCase1 scrut case_bndr ty alts	-- Identity case
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
--- gaw 2004
 mkCase1 scrut bndr ty alts = returnSmpl (Case scrut bndr ty alts)
 \end{code}
 

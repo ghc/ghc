@@ -648,10 +648,9 @@ occAnal env expr@(Lam _ _)
     env2	      = env1 `addNewCands` binders	-- Add in-scope binders
     env_body	      = vanillaCtxt env2		-- Body is (no longer) an RhsContext
 
--- gaw 2004
 occAnal env (Case scrut bndr ty alts)
   = case mapAndUnzip (occAnalAlt alt_env bndr) alts of { (alts_usage_s, alts')   -> 
-    case occAnal (vanillaCtxt env) scrut	    	    of { (scrut_usage, scrut') ->
+    case occAnal (vanillaCtxt env) scrut	    of { (scrut_usage, scrut') ->
 	-- No need for rhsCtxt
     let
 	alts_usage  = foldr1 combineAltsUsageDetails alts_usage_s
@@ -659,7 +658,6 @@ occAnal env (Case scrut bndr ty alts)
 	(alts_usage1, tagged_bndr) = tagBinder alts_usage' bndr
         total_usage = scrut_usage `combineUsageDetails` alts_usage1
     in
--- gaw 2004
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
   where
     alt_env = env `addNewCand` bndr

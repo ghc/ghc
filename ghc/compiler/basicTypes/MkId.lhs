@@ -64,8 +64,7 @@ import PrimOp		( PrimOp, primOpSig, primOpOcc, primOpTag )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, DataConIds(..), dataConTyVars,
 			  dataConFieldLabels, dataConRepArity, 
-			  dataConRepArgTys, dataConRepType, 
-			  dataConStupidTheta, dataConOrigArgTys,
+			  dataConRepArgTys, dataConRepType, dataConStupidTheta, 
 			  dataConSig, dataConStrictMarks, dataConExStricts, 
 			  splitProductType, isVanillaDataCon
 			)
@@ -305,15 +304,15 @@ mkDataConIds wrap_name wkr_name data_con
 		MarkedStrict 
 		   | isUnLiftedType (idType arg) -> body i (arg:rep_args)
 		   | otherwise ->
--- gaw 2004
 			Case (Var arg) arg result_ty [(DEFAULT,[], body i (arg:rep_args))]
 
 		MarkedUnboxed
 		   -> case splitProductType "do_unbox" (idType arg) of
 			   (tycon, tycon_args, con, tys) ->
--- gaw 2004
-				   Case (Var arg) arg result_ty  [(DataAlt con, con_args,
-					body i' (reverse con_args ++ rep_args))]
+				   Case (Var arg) arg result_ty  
+					[(DataAlt con, 
+					  con_args,
+					  body i' (reverse con_args ++ rep_args))]
 			      where 
 				(con_args, i') = mkLocals i tys
 
@@ -454,7 +453,7 @@ mkRecordSelId tycon field_label field_ty
     arg_base	    = dict_id_base + 1
 
     alts      = map mk_maybe_alt data_cons
-    the_alts  = catMaybes alts
+    the_alts  = catMaybes alts		-- Already sorted by data-con
 
     no_default = all isJust alts	-- No default needed
     default_alt | no_default = []

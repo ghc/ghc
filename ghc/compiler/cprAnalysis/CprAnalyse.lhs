@@ -252,11 +252,11 @@ cprAnalExpr rho (Type t)
 
 cprAnalCaseAlts :: CPREnv -> [CoreAlt] -> ([CoreAlt], AbsVal)
 cprAnalCaseAlts rho alts
-    = foldl anal_alt ([], Bot) alts
+    = foldr anal_alt ([], Bot) alts
       where 
-      anal_alt :: ([CoreAlt], AbsVal) -> CoreAlt -> ([CoreAlt], AbsVal)
-      anal_alt (done, aval) (con, binds, exp) 
-	  = (done ++ [(con,binds,exp_cpr)], aval `lub` exp_aval)
+      anal_alt :: CoreAlt -> ([CoreAlt], AbsVal) -> ([CoreAlt], AbsVal)
+      anal_alt (con, binds, exp)  (done, aval)
+	  = ((con,binds,exp_cpr) : done, exp_aval `lub` aval)
 	    where (exp_cpr, exp_aval) = cprAnalExpr rho' exp
 		  rho' = rho `extendVarEnvList` (zip binds (repeat Top))
 

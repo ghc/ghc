@@ -71,10 +71,8 @@ tidyExpr env (Let b e)
   = tidyBind env b 	=: \ (env', b') ->
     Let b' (tidyExpr env' e)
 
--- gaw 2004
 tidyExpr env (Case e b ty alts)
   = tidyBndr env b 	=: \ (env', b) ->
--- gaw 2004
     Case (tidyExpr env e) b (tidyType env ty) (map (tidyAlt env') alts)
 
 tidyExpr env (Lam b e)

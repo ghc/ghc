@@ -163,7 +163,6 @@ substIdEnv env (Let (Rec bnds) expr) =
      newExpr = substIdEnv newEnv expr 
      substBnd (b,e) = (b, substIdEnv newEnv e)      
    in Let (Rec (map substBnd bnds)) newExpr
--- gaw 2004
 substIdEnv env (Case expr b ty alts) =
    Case (substIdEnv newEnv expr) b ty (map substAlt alts)
    where

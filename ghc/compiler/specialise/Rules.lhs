@@ -32,7 +32,6 @@ import BasicTypes	( Activation, CompilerPhase, isActive )
 import Outputable
 import FastString
 import Maybe		( isJust, fromMaybe )
-import Util		( sortLe )
 import Bag
 import List		( isPrefixOf )
 \end{code}
@@ -263,7 +262,7 @@ match menv subst (Case e1 x1 ty1 alts1) (Case e2 x2 ty2 alts2)
   = do	{ subst1 <- match_ty menv subst ty1 ty2
 	; subst2 <- match menv subst1 e1 e2
 	; let menv' = menv { me_env = rnBndr2 (me_env menv) x2 x2 }
-	; match_alts menv' subst2 (sortLe le_alt alts1) (sortLe le_alt alts2)
+	; match_alts menv' subst2 alts1 alts2	-- Alts are both sorted
 	}
 
 match menv subst (Type ty1) (Type ty2)
@@ -311,8 +310,6 @@ match_alts menv subst ((c1,vs1,r1):alts1) ((c2,vs2,r2):alts2)
 
 match_alts menv subst alts1 alts2 
   = Nothing
-
-le_alt (con1, _, _) (con2, _, _) = con1 <= con2
 \end{code}
 
 Matching Core types: use the matcher in TcType.
@@ -450,7 +447,6 @@ ruleCheck env (App f a)     = ruleCheckApp env (App f a) []
 ruleCheck env (Note n e)    = ruleCheck env e
 ruleCheck env (Let bd e)    = ruleCheckBind env bd `unionBags` ruleCheck env e
 ruleCheck env (Lam b e)     = ruleCheck env e
--- gaw 2004
 ruleCheck env (Case e _ _ as) = ruleCheck env e `unionBags` 
 			        unionManyBags [ruleCheck env r | (_,_,r) <- as]
 

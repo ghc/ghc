@@ -49,8 +49,7 @@ import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
 import CostCentre	( currentCCS )
 import Type		( TvSubstEnv, isUnLiftedType, seqType, tyConAppArgs, funArgTy,
-			  splitFunTy_maybe, splitFunTy, coreEqType, substTy,
-			  mkTyVarTys, mkTyConApp
+			  splitFunTy_maybe, splitFunTy, coreEqType, substTy, mkTyVarTys
 			)
 import VarEnv		( elemVarEnv )
 import Subst		( SubstResult(..), emptySubst, substExpr, 
@@ -64,7 +63,7 @@ import OrdList
 import Maybe		( Maybe )
 import Maybes		( orElse )
 import Outputable
-import Util             ( notNull, equalLength )
+import Util             ( notNull )
 \end{code}
 
 
@@ -350,7 +349,6 @@ simplNonRecX env bndr new_rhs thing_inside
 	-- because quotInt# can fail.
   = simplBinder env bndr	`thenSmpl` \ (env, bndr') ->
     thing_inside env 		`thenSmpl` \ (floats, body) ->
--- gaw 2004
     let body' = wrapFloats floats body in 
     returnSmpl (emptyFloats env, Case new_rhs bndr' (exprType body') [(DEFAULT, [], body')])
 
@@ -733,7 +731,6 @@ simplExprF env (Type ty) cont
     simplType env ty			`thenSmpl` \ ty' ->
     rebuild env (Type ty') cont
 
--- gaw 2004
 simplExprF env (Case scrut bndr case_ty alts) cont
   | not (switchIsOn (getSwitchChecker env) NoCaseOfCase)
   = 	-- Simplify the scrutinee with a Select continuation
@@ -1290,7 +1287,7 @@ Blob of helper functions for the "case-of-something-else" situation.
 rebuildCase :: SimplEnv
 	    -> OutExpr		-- Scrutinee
 	    -> InId		-- Case binder
-	    -> [InAlt]		-- Alternatives
+	    -> [InAlt]		-- Alternatives (inceasing order)
 	    -> SimplCont
 	    -> SimplM FloatsWithExpr
 

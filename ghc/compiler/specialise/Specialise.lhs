@@ -659,9 +659,8 @@ specExpr subst e@(Lam _ _)
 	-- More efficient to collect a group of binders together all at once
 	-- and we don't want to split a lambda group with dumped bindings
 
--- gaw 2004
 specExpr subst (Case scrut case_bndr ty alts)
-  = specExpr subst scrut			`thenSM` \ (scrut', uds_scrut) ->
+  = specExpr subst scrut		`thenSM` \ (scrut', uds_scrut) ->
     mapAndCombineSM spec_alt alts	`thenSM` \ (alts', uds_alts) ->
     returnSM (Case scrut' case_bndr' (substTy subst ty) alts', uds_scrut `plusUDs` uds_alts)
   where

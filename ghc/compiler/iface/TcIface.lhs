@@ -642,7 +642,6 @@ tcIfaceExpr (IfaceApp fun arg)
     tcIfaceExpr arg		`thenM` \ arg' ->
     returnM (App fun' arg')
 
--- gaw 2004
 tcIfaceExpr (IfaceCase scrut case_bndr ty alts) 
   = tcIfaceExpr scrut		`thenM` \ scrut' ->
     newIfaceName case_bndr	`thenM` \ case_bndr_name ->

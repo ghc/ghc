@@ -169,12 +169,11 @@ unboxArg arg
     tc `hasKey` boolTyConKey
   = newSysLocalDs intPrimTy		`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
--- gaw 2004 
 	      \ body -> Case (Case arg (mkWildId arg_ty) intPrimTy
   		                       [(DataAlt falseDataCon,[],mkIntLit 0),
 	                                (DataAlt trueDataCon, [],mkIntLit 1)])
+					-- In increasing tag order!
                              prim_arg
--- gaw 2004
                              (exprType body) 
 			     [(DEFAULT,[],body)])
 
@@ -186,7 +185,6 @@ unboxArg arg
     newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalDs data_con_arg_ty1	`thenDs` \ prim_arg ->
     returnDs (Var prim_arg,
--- gaw 2004
 	      \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,[prim_arg],body)]
     )
 
@@ -203,7 +201,6 @@ unboxArg arg
   = newSysLocalDs arg_ty		`thenDs` \ case_bndr ->
     newSysLocalsDs data_con_arg_tys	`thenDs` \ vars@[l_var, r_var, arr_cts_var] ->
     returnDs (Var arr_cts_var,
--- gaw 2004
 	      \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
 
     )
@@ -309,7 +306,6 @@ boxResult arg_ids augment mbTopCon result_ty
 					     Lam state_id $
 					      Case (App the_call (Var state_id))
 						   (mkWildId ccall_res_ty)
--- gaw 2004
                                                    (coreAltType the_alt) 
 						   [the_alt]
 					   ]
@@ -327,7 +323,6 @@ boxResult arg_ids augment mbTopCon result_ty
 		 let
 		    wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
 					      (mkWildId ccall_res_ty)
--- gaw 2004
                                               (coreAltType the_alt)
 					      [the_alt]
 		 in
@@ -397,7 +392,6 @@ resultWrapper result_ty
   | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
   = returnDs
      (Just intPrimTy, \e -> Case e (mkWildId intPrimTy)
--- gaw 2004 
                                    boolTy
 	                           [(DEFAULT             ,[],Var trueDataConId ),
 				    (LitAlt (mkMachInt 0),[],Var falseDataConId)])

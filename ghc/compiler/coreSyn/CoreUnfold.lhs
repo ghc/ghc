@@ -218,7 +218,6 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       where
 	rhs_size = foldr (addSize . size_up . snd) sizeZero pairs
 
--- gaw 2004
     size_up (Case (Var v) _ _ alts) 
 	| v `elem` top_args		-- We are scrutinising an argument variable
 	= 

@@ -429,7 +429,6 @@ mkWWcpr body_ty RetCPR
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
 	con_app   = mkConApp data_con (map Type tycon_arg_tys ++ [Var arg])
       in
--- gaw 2004
       returnUs (\ wkr_call -> Case wkr_call arg (exprType con_app) [(DEFAULT, [], con_app)],
 		\ body     -> workerCase body work_wild con_arg_ty1 [(DataAlt data_con, [arg], Var arg)],
 		con_arg_ty1)
@@ -446,7 +445,6 @@ mkWWcpr body_ty RetCPR
 	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
         con_app			       = mkConApp data_con    (map Type tycon_arg_tys ++ arg_vars)
       in
--- gaw 2004
       returnUs (\ wkr_call -> Case wkr_call wrap_wild (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)],
 		\ body     -> workerCase body work_wild ubx_tup_ty [(DataAlt data_con,    args, ubx_tup_app)],
 		ubx_tup_ty)
@@ -469,9 +467,7 @@ mkWWcpr body_ty other		-- No CPR info
 -- This transform doesn't move work or allocation
 -- from one cost centre to another
 
--- gaw 2004 
 workerCase (Note (SCC cc) e) arg ty alts = Note (SCC cc) (Case e arg ty alts)
--- gaw 2004
 workerCase e		     arg ty alts = Case e arg ty alts
 \end{code}
 
@@ -498,11 +494,9 @@ mk_unpk_case arg unpk_args boxing_con boxing_tycon body
 	-- A data type
   = Case (Var arg) 
 	 (sanitiseCaseBndr arg)
--- gaw 2004
          (exprType body)
 	 [(DataAlt boxing_con, unpk_args, body)]
 
--- gaw 2004
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
 
 sanitiseCaseBndr :: Id -> Id

@@ -407,13 +407,11 @@ corePrepExprFloat env expr@(Lam _ _)
   where
     (bndrs,body) = collectBinders expr
 
--- gaw 2004
 corePrepExprFloat env (Case scrut bndr ty alts)
   = corePrepExprFloat env scrut		`thenUs` \ (floats1, scrut1) ->
     deLamFloat scrut1			`thenUs` \ (floats2, scrut2) ->
     cloneBndr env bndr			`thenUs` \ (env', bndr') ->
     mapUs (sat_alt env') alts		`thenUs` \ alts' ->
--- gaw 2004
     returnUs (floats1 `appendFloats` floats2 , Case scrut2 bndr' ty alts')
   where
     sat_alt env (con, bs, rhs)
@@ -587,7 +585,6 @@ mkBinds (Floats _ binds) body
   | otherwise	  = deLam body		`thenUs` \ body' ->
 		    returnUs (foldrOL mk_bind body' binds)
   where
--- gaw 2004
     mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
     mk_bind (FloatLet bind)        body = Let bind body
 

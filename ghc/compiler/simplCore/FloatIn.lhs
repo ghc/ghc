@@ -323,7 +323,6 @@ bindings are: (a)~inside the scrutinee, (b)~inside one of the
 alternatives/default [default FVs always {\em first}!].
 
 \begin{code}
--- gaw 2004
 fiExpr to_drop (_, AnnCase scrut case_bndr ty alts)
   = mkCoLets' drop_here1 $
     mkCoLets' drop_here2 $

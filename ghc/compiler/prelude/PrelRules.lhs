@@ -289,7 +289,6 @@ litEq is_eq [expr, Lit lit] = do_lit_eq is_eq lit expr
 litEq is_eq other	    = Nothing
 
 do_lit_eq is_eq lit expr
--- gaw 2004
   = Just (Case expr (mkWildId (literalType lit)) boolTy
 		[(DEFAULT,    [], val_if_neq),
 		 (LitAlt lit, [], val_if_eq)])

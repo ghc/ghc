@@ -285,7 +285,6 @@ vectorise (Let bind body) =
     (vbody, vbodyTy) <- vectorise body
     return ((Let vbind vbody), vbodyTy)
 
--- gaw 2004
 vectorise (Case expr b ty alts) =
   do 
     (vexpr, vexprTy) <- vectorise expr

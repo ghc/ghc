@@ -332,7 +332,6 @@ lvlExpr ctxt_lvl env (_, AnnLet bind body)
     lvlExpr ctxt_lvl new_env body		`thenLvl` \ body' ->
     returnLvl (Let bind' body')
 
--- gaw 2004
 lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr ty alts)
   = lvlMFE True ctxt_lvl env expr	`thenLvl` \ expr' ->
     let

@@ -212,10 +212,10 @@ deBindComp pat core_list1 quals core_list2
 		rest_expr core_fail		`thenDs` \ core_match ->
     let
 	rhs = Lam u1 $
--- gaw 2004
 	      Case (Var u1) u1 res_ty
 		   [(DataAlt nilDataCon,  [], 	    core_list2),
 		    (DataAlt consDataCon, [u2, u3], core_match)]
+			-- Increasing order of tag
     in
     returnDs (Let (Rec [(h, rhs)]) letrec_body)
 \end{code}
@@ -250,11 +250,10 @@ mkZipBind elt_tys
     zip_fn_ty   = mkFunTys list_tys list_ret_ty
 
     mk_case (as, a', as') rest
--- gaw 2004
 	  = Case (Var as) as list_ret_ty
 		  [(DataAlt nilDataCon,  [],        mkNilExpr ret_elt_ty),
 		   (DataAlt consDataCon, [a', as'], rest)]
-
+			-- Increasing order of tag
 -- Helper functions that makes an HsTuple only for non-1-sized tuples
 mk_hs_tuple_expr :: [Id] -> LHsExpr Id
 mk_hs_tuple_expr []   = nlHsVar unitDataConId

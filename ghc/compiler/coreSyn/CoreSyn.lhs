@@ -15,7 +15,7 @@ module CoreSyn (
 	mkConApp, 
 	varToCoreExpr,
 
-	isTyVar, isId, 
+	isTyVar, isId, cmpAltCon, cmpAlt, ltAlt,
 	bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts, 
 	collectBinders, collectTyBinders, collectValBinders, collectTyAndValBinders,
 	collectArgs, 
@@ -54,7 +54,7 @@ import CostCentre	( CostCentre, noCostCentre )
 import Var		( Var, Id, TyVar, isTyVar, isId )
 import Type		( Type, mkTyVarTy, seqType )
 import Literal	        ( Literal, mkMachInt )
-import DataCon		( DataCon, dataConWorkId )
+import DataCon		( DataCon, dataConWorkId, dataConTag )
 import BasicTypes	( Activation )
 import VarSet
 import FastString
@@ -78,13 +78,17 @@ data Expr b	-- "b" for the type of binders,
   | App   (Expr b) (Arg b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
-  -- gaw 2004, added Type field
   | Case  (Expr b) b Type [Alt b]  	-- Binder gets bound to value of scrutinee
 	-- Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
 	--	      meaning that it covers all cases that can occur
 	--	      See the example below
 	--
 	-- Invariant: The DEFAULT case must be *first*, if it occurs at all
+	-- Invariant: The remaining cases are in order of increasing 
+	--		tag	(for DataAlts)
+	--		lit	(for LitAlts)
+	--	      This makes finding the relevant constructor easy,
+	--	      and makes comparison easier too
   | Note  Note (Expr b)
   | Type  Type			-- This should only show up at the top
 				-- level of an Arg
@@ -109,6 +113,7 @@ data AltCon = DataAlt DataCon
 	    | LitAlt  Literal
 	    | DEFAULT
 	 deriving (Eq, Ord)
+
 
 data Bind b = NonRec b (Expr b)
 	      | Rec [(b, (Expr b))]
@@ -345,6 +350,26 @@ instance Outputable AltCon where
 
 instance Show AltCon where
   showsPrec p con = showsPrecSDoc p (ppr con)
+
+cmpAlt :: Alt b -> Alt b -> Ordering
+cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2
+
+ltAlt :: Alt b -> Alt b -> Bool
+ltAlt a1 a2 = case a1 `cmpAlt` a2 of { LT -> True; other -> False }
+
+cmpAltCon :: AltCon -> AltCon -> Ordering
+-- Compares AltCons within a single list of alternatives
+cmpAltCon DEFAULT      DEFAULT	   = EQ
+cmpAltCon DEFAULT      con	   = LT
+
+cmpAltCon (DataAlt d1) (DataAlt d2) = dataConTag d1 `compare` dataConTag d2
+cmpAltCon (DataAlt _)  DEFAULT      = GT
+cmpAltCon (LitAlt  l1) (LitAlt  l2) = l1 `compare` l2
+cmpAltCon (LitAlt _)   DEFAULT      = GT
+
+cmpAltCon con1 con2 = WARN( True, text "Comparing incomparable AltCons" <+> 
+			 	  ppr con1 <+> ppr con2 )
+		      LT
 \end{code}
 
 

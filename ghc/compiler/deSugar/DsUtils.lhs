@@ -52,9 +52,9 @@ import Var		( Var )
 import Name		( Name )
 import Literal		( Literal(..), mkStringLit, inIntRange, tARGET_MAX_INT )
 import TyCon		( isNewTyCon, tyConDataCons )
-import DataCon		( DataCon, dataConSourceArity, dataConTyCon )
+import DataCon		( DataCon, dataConSourceArity, dataConTyCon, dataConTag )
 import Type		( mkFunTy, isUnLiftedType, Type, splitTyConApp, mkTyVarTy )
-import TcType		( tcTyConAppTyCon, tcEqType )
+import TcType		( tcEqType )
 import TysPrim		( intPrimTy )
 import TysWiredIn	( nilDataCon, consDataCon, 
                           tupleCon, mkTupleTy,
@@ -70,8 +70,8 @@ import PrelNames	( unpackCStringName, unpackCStringUtf8Name,
 			  lengthPName, indexPName )
 import Outputable
 import UnicodeUtil      ( intsToUtf8 )
-import SrcLoc		( Located(..), unLoc, noLoc )
-import Util             ( isSingleton, notNull, zipEqual )
+import SrcLoc		( Located(..), unLoc )
+import Util             ( isSingleton, notNull, zipEqual, sortWith )
 import ListSetOps	( assocDefault )
 import FastString
 \end{code}
@@ -302,9 +302,10 @@ mkCoPrimCaseMatchResult var ty match_alts
   = MatchResult CanFail mk_case
   where
     mk_case fail
-      = mappM (mk_alt fail) match_alts		`thenDs` \ alts ->
+      = mappM (mk_alt fail) sorted_alts		`thenDs` \ alts ->
 	returnDs (Case (Var var) var ty ((DEFAULT, [], fail) : alts))
 
+    sorted_alts = sortWith fst match_alts	-- Right order for a Case
     mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
 					       returnDs (LitAlt lit, [], body)
 
@@ -343,7 +344,9 @@ mkCoAlgCaseMatchResult var ty match_alts
 	      = CanFail
 
     wild_var = mkWildId (idType var)
-    mk_case fail = mappM (mk_alt fail) match_alts	`thenDs` \ alts ->
+    sorted_alts  = sortWith get_tag match_alts
+    get_tag (con, _, _) = dataConTag con
+    mk_case fail = mappM (mk_alt fail) sorted_alts	`thenDs` \ alts ->
 		   returnDs (Case (Var var) wild_var ty (mk_default fail ++ alts))
 
     mk_alt fail (con, args, MatchResult _ body_fn)
@@ -401,8 +404,8 @@ mkCoAlgCaseMatchResult var ty match_alts
 	--
 	unboxAlt = 
 	  newSysLocalDs intPrimTy			`thenDs` \l	   ->
-	  dsLookupGlobalId indexPName		`thenDs` \indexP   ->
-	  mappM (mkAlt indexP) match_alts               `thenDs` \alts     ->
+	  dsLookupGlobalId indexPName			`thenDs` \indexP   ->
+	  mappM (mkAlt indexP) sorted_alts              `thenDs` \alts     ->
 	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild ty (dft : alts)))
           where
 	    wild = mkWildId intPrimTy
@@ -772,7 +775,6 @@ mkSmallTupleCase
 mkSmallTupleCase [var] body _scrut_var scrut
   = bindNonRec var scrut body
 mkSmallTupleCase vars body scrut_var scrut
--- gaw 2004
 -- One branch no refinement?
   = Case scrut scrut_var (exprType body) [(DataAlt (tupleCon Boxed (length vars)), vars, body)]
 \end{code}
@@ -824,7 +826,6 @@ mkCoreSel [var] should_be_the_same_var scrut_var scrut
 
 mkCoreSel vars the_var scrut_var scrut
   = ASSERT( notNull vars )
--- gaw 2004
     Case scrut scrut_var (idType the_var)
 	 [(DataAlt (tupleCon Boxed (length vars)), vars, Var the_var)]
 \end{code}

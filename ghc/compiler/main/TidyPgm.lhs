@@ -644,14 +644,13 @@ cafRefs p (Var id)
 	Just id' -> fastBool (mayHaveCafRefs (idCafInfo id'))
 	Nothing  -> fastBool False
 
-cafRefs p (Lit l) 	     = fastBool False
-cafRefs p (App f a) 	     = fastOr (cafRefs p f) (cafRefs p) a
-cafRefs p (Lam x e) 	     = cafRefs p e
-cafRefs p (Let b e) 	     = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
--- gaw 2004
+cafRefs p (Lit l) 	       = fastBool False
+cafRefs p (App f a) 	       = fastOr (cafRefs p f) (cafRefs p) a
+cafRefs p (Lam x e) 	       = cafRefs p e
+cafRefs p (Let b e) 	       = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
 cafRefs p (Case e bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
-cafRefs p (Note n e) 	     = cafRefs p e
-cafRefs p (Type t) 	     = fastBool False
+cafRefs p (Note n e) 	       = cafRefs p e
+cafRefs p (Type t) 	       = fastBool False
 
 cafRefss p [] 	  = fastBool False
 cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es

@@ -204,7 +204,6 @@ dmdAnal sigs dmd (Lam var body)
     in
     (deferType lam_ty, Lam var' body')
 
--- gaw 2004
 dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
   | let tycon = dataConTyCon dc,
     isProductTyCon tycon,
@@ -251,10 +250,8 @@ dmdAnal sigs dmd (Case scrut case_bndr ty [alt@(DataAlt dc,bndrs,rhs)])
 
 	(scrut_ty, scrut') = dmdAnal sigs scrut_dmd scrut
     in
--- gaw 2004 
     (alt_ty1 `bothType` scrut_ty, Case scrut' case_bndr' ty [alt'])
 
--- gaw 2004
 dmdAnal sigs dmd (Case scrut case_bndr ty alts)
   = let
 	(alt_tys, alts')        = mapAndUnzip (dmdAnalAlt sigs dmd) alts
@@ -262,7 +259,6 @@ dmdAnal sigs dmd (Case scrut case_bndr ty alts)
 	(alt_ty, case_bndr')	= annotateBndr (foldr1 lubType alt_tys) case_bndr
     in
 --    pprTrace "dmdAnal:Case" (ppr alts $$ ppr alt_tys)
--- gaw 2004
     (alt_ty `bothType` scrut_ty, Case scrut' case_bndr' ty alts')
 
 dmdAnal sigs dmd (Let (NonRec id rhs) body) 

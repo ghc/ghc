@@ -333,7 +333,6 @@ coreToStgExpr (Note other_note expr)
 
 -- Cases require a little more real work.
 
--- gaw 2004
 coreToStgExpr (Case scrut bndr _ alts)
   = extendVarEnvLne [(bndr, LambdaBound)]	(
 	 mapAndUnzip3Lne vars_alt alts	`thenLne` \ (alts2, fvs_s, escs_s) ->

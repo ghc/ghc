@@ -21,7 +21,7 @@ module Util (
 	nTimes,
 
 	-- sorting
-	sortLe,
+	sortLe, sortWith,
 
 	-- transitive closures
 	transitiveClosure,
@@ -426,6 +426,11 @@ mergeSortLe le = generalMergeSort le
 
 sortLe :: (a->a->Bool) -> [a] -> [a]
 sortLe le = generalNaturalMergeSort le
+
+sortWith :: Ord b => (a->b) -> [a] -> [a]
+sortWith get_key xs = sortLe le xs
+  where
+    x `le` y = get_key x < get_key y	
 \end{code}
 
 %************************************************************************

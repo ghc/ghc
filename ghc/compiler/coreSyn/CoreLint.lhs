@@ -382,7 +382,8 @@ checkKinds tyvar arg_ty
 \begin{code}
 checkCaseAlts :: CoreExpr -> Type -> [CoreAlt] -> LintM ()
 -- a) Check that the alts are non-empty
--- b) Check that the DEFAULT comes first, if it exists
+-- b1) Check that the DEFAULT comes first, if it exists
+-- b2) Check that the others are in increasing order
 -- c) Check that there's a default for infinite types
 -- NB: Algebraic cases are not necessarily exhaustive, because
 --     the simplifer correctly eliminates case that can't 
@@ -393,10 +394,15 @@ checkCaseAlts e ty []
 
 checkCaseAlts e ty alts = 
   do { checkL (all non_deflt con_alts) (mkNonDefltMsg e)
+     ; checkL (increasing_tag con_alts) (mkNonIncreasingAltsMsg e)
      ; checkL (isJust maybe_deflt || not is_infinite_ty)
 	   (nonExhaustiveAltsMsg e) }
   where
     (con_alts, maybe_deflt) = findDefault alts
+
+	-- Check that successive alternatives have increasing tags 
+    increasing_tag (alt1 : rest@( alt2 : _)) = alt1 `ltAlt` alt2 && increasing_tag rest
+    increasing_tag other 		     = True
 
     non_deflt (DEFAULT, _, _) = False
     non_deflt alt	      = True
@@ -683,6 +689,8 @@ mkScrutMsg var scrut_ty
 
 mkNonDefltMsg e
   = hang (text "Case expression with DEFAULT not at the beginnning") 4 (ppr e)
+mkNonIncreasingAltsMsg e
+  = hang (text "Case expression with badly-ordered alternatives") 4 (ppr e)
 
 nonExhaustiveAltsMsg :: CoreExpr -> Message
 nonExhaustiveAltsMsg e

@@ -177,6 +177,8 @@ data AlgTyConRhs
 				--	e.g. data T a where { ... }
 	[DataCon]	-- The constructors; can be empty if the user declares
 			--   the type to have no constructors
+			-- INVARIANT: Kept in order of increasing tag
+			--	      (see the tag assignment in DataCon.mkDataCon)
 	Bool		-- Cached: True <=> an enumeration type
 
   | NewTyCon 		-- Newtypes always have exactly one constructor

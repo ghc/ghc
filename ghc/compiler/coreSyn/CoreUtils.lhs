@@ -90,7 +90,6 @@ exprType :: CoreExpr -> Type
 exprType (Var var)		= idType var
 exprType (Lit lit)		= literalType lit
 exprType (Let _ body)	   	= exprType body
--- gaw 2004
 exprType (Case _ _ ty alts)     = ty
 exprType (Note (Coerce ty _) e) = ty  -- **! should take usage from e
 exprType (Note other_note e)    = exprType e
@@ -247,7 +246,6 @@ bindNonRec :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- deals with them perfectly well.
 
 bindNonRec bndr rhs body 
--- gaw 2004
   | needsCaseBinding (idType bndr) rhs = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
   | otherwise			       = Let (NonRec bndr rhs) body
 
@@ -268,11 +266,10 @@ mkAltExpr (LitAlt lit) [] []
 
 mkIfThenElse :: CoreExpr -> CoreExpr -> CoreExpr -> CoreExpr
 mkIfThenElse guard then_expr else_expr
--- gaw 2004
 -- Not going to be refining, so okay to take the type of the "then" clause
   = Case guard (mkWildId boolTy) (exprType then_expr) 
-	 [ (DataAlt trueDataCon,  [], then_expr),
-	   (DataAlt falseDataCon, [], else_expr) ]
+	 [ (DataAlt falseDataCon, [], else_expr),	-- Increasing order of tag!
+    	   (DataAlt trueDataCon,  [], then_expr) ]
 \end{code}
 
 
@@ -295,14 +292,15 @@ findAlt con alts
   = case alts of
 	(deflt@(DEFAULT,_,_):alts) -> go alts deflt
 	other			   -> go alts panic_deflt
-
   where
     panic_deflt = pprPanic "Missing alternative" (ppr con $$ vcat (map ppr alts))
 
-    go []	 	       deflt 		   = deflt
-    go (alt@(con1,_,_) : alts) deflt | con == con1 = alt
-				     | otherwise   = ASSERT( not (con1 == DEFAULT) )
-						     go alts deflt
+    go []	 	       deflt = deflt
+    go (alt@(con1,_,_) : alts) deflt
+      =	case con `cmpAltCon` con1 of
+	  LT -> deflt	-- Missed it already; the alts are in increasing order
+	  EQ -> alt
+	  GT -> ASSERT( not (con1 == DEFAULT) ) go alts deflt
 \end{code}
 
 
@@ -414,7 +412,6 @@ exprIsCheap (Var _)         	    = True
 exprIsCheap (Note InlineMe e)  	    = True
 exprIsCheap (Note _ e)      	    = exprIsCheap e
 exprIsCheap (Lam x e)               = isRuntimeVar x || exprIsCheap e
--- gaw 2004
 exprIsCheap (Case e _ _ alts)       = exprIsCheap e && 
 				    and [exprIsCheap rhs | (_,_,rhs) <- alts]
 	-- Experimentally, treat (case x of ...) as cheap
@@ -546,12 +543,12 @@ exprIsBottom e = go 0 e
 		-- n is the number of args
 		 go n (Note _ e)     = go n e
 		 go n (Let _ e)      = go n e
--- gaw 2004
 		 go n (Case e _ _ _) = go 0 e	-- Just check the scrut
 		 go n (App e _)      = go (n+1) e
 		 go n (Var v)        = idAppIsBottom v n
 		 go n (Lit _)        = False
 		 go n (Lam _ _)	     = False
+		 go n (Type _)	     = False
 
 idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
@@ -818,7 +815,6 @@ arityType (App f a)  	   = case arityType f of
 	--  ===>
 	--	f x y = case x of { (a,b) -> e }
 	-- The difference is observable using 'seq'
--- gaw 2004  
 arityType (Case scrut _ _ alts) = case foldr1 andArityType [arityType rhs | (_,_,rhs) <- alts] of
 				  xs@(AFun one_shot _) | one_shot -> xs
 				  xs | exprIsCheap scrut	  -> xs
@@ -1087,7 +1083,6 @@ exprSize (Lit lit)       = lit `seq` 1
 exprSize (App f a)       = exprSize f + exprSize a
 exprSize (Lam b e)       = varSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
--- gaw 2004
 exprSize (Case e b t as) = seqType t `seq` exprSize e + varSize b + 1 + foldr ((+) . altSize) 0 as
 exprSize (Note n e)      = noteSize n + exprSize e
 exprSize (Type t)        = seqType t `seq` 1
@@ -1131,7 +1126,6 @@ hashExpr e | hash < 0  = 77	-- Just in case we hit -maxInt
 hash_expr (Note _ e)   		  = hash_expr e
 hash_expr (Let (NonRec b r) e)    = hashId b
 hash_expr (Let (Rec ((b,r):_)) e) = hashId b
--- gaw 2004
 hash_expr (Case _ b _ _)	  = hashId b
 hash_expr (App f e)   		  = hash_expr f * fast_hash_expr e
 hash_expr (Var v)     		  = hashId v
