@@ -188,6 +188,7 @@ __export PrelGHC
   plusIntegerzh
   minusIntegerzh
   timesIntegerzh
+  gcdIntegerzh
   quotRemIntegerzh
   integer2Intzh
   integer2Wordzh
