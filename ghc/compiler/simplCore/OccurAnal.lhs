@@ -904,7 +904,8 @@ orOccInfo IAmDead info2 = info2
 orOccInfo info1 IAmDead = info1
 orOccInfo (OneOcc in_lam1 one_branch1)
 	  (OneOcc in_lam2 one_branch2)
-  = OneOcc (in_lam1 || in_lam2) (one_branch1 && one_branch2)
+  = OneOcc (in_lam1 || in_lam2)
+	   False	-- False, because it occurs in both branches
 
 orOccInfo info1 info2 = NoOccInfo
 \end{code}
