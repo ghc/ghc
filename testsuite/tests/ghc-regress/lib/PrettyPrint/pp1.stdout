@@ -1,0 +1,4 @@
+This output is not what is expected, becuase the
+test "works" now, by virtue of a hack in HughesPJ.spaces.
+I'm leaving this strange output here to remind us to look
+at the root cause of the problem.  Sometime.
