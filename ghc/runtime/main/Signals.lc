@@ -206,24 +206,28 @@ install_segv_handler(STG_NO_ARGS)
 # elif defined(cygwin32_TARGET_OS)
 
 /*
- The signal handlers in cygwin32 (beta14) are only passed the signal
+ The signal handlers in cygwin32  are only passed the signal
  number, no sigcontext/siginfo is passed as event data..sigh. For
  SIGSEGV, to get at the violating address, we need to use the Win32's
- WaitForDebugEvent() to get out any status information. 
+ GetThreadContext() to get at the faulting address.
 */
 static void
 segv_handler(sig)
  int sig;
 {
-    /* From gdb/win32-nat.c */
-    DEBUG_EVENT event;
-    BOOL t = WaitForDebugEvent (&event, INFINITE);
+    CONTEXT context;
+    HANDLE hThread;
+    BOOL t;
+
+    context.ContextFlags = CONTEXT_CONTROL;
+    hThread = GetCurrentThread(); /* cannot fail */
+    t = GetThreadContext(hThread,&context);
 
     fflush(stdout);
     if (t == FALSE) {
         fprintf(stderr, "Segmentation fault caught, address unknown\n");
     } else {
-        void *si_addr = event.u.Exception.ExceptionRecord.ExceptionAddress;
+        void *si_addr = context.Eip; /* magic */
         if (si_addr >= (void *) stks_space
           && si_addr < (void *) (stks_space + RTSflags.GcFlags.stksSize))
             StackOverflow();
@@ -238,7 +242,6 @@ install_segv_handler()
 {
     return (int) signal(SIGSEGV, segv_handler) == -1;
 }
-
 
 # else /* ! (cygwin32|irix6|sunos4|linux*|*bsd|aix) */
 
