@@ -346,7 +346,7 @@ pprAbsC stmt@(CCallTypedef is_tdef (CCall op_str is_asm may_gc cconv) results ar
       -- the first argument will be the "I/O world" token (a VoidRep)
       -- all others should be non-void
      non_void_args =
-	let nvas = tail args
+	let nvas = init args
 	in ASSERT (all non_void nvas) nvas
 
       -- there will usually be two results: a (void) state which we
@@ -798,9 +798,10 @@ pprCCall call@(CCall op_str is_asm may_gc cconv) args results vol_regs
 	| otherwise = (	pp_basic_saves $$ pp_saves,
 			pp_basic_restores $$ pp_restores)
 
-    non_void_args = let nvas = take (length args - 1) args
-	  	    in ASSERT2 ( all non_void nvas, pprCCallOp call <+> hsep (map pprAmode args) )
-		       nvas
+    non_void_args = 
+	let nvas = init args
+	in ASSERT2 ( all non_void nvas, pprCCallOp call <+> hsep (map pprAmode args) )
+	nvas
     -- the last argument will be the "I/O world" token (a VoidRep)
     -- all others should be non-void
 
